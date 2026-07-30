@@ -157,6 +157,17 @@ class ModuleController extends Controller
         $this->bustProgress($module, $m);
         \App\Support\FlowRunner::fire('created', $module, $m);
 
+        // عقدٌ غير موقّع → تحويله لمسار التوقيع الإلكتروني: يُضبط على «قيد التوقيع»
+        // ويُنقل المستخدم لإنشاء طلب التوقيع مربوطاً بهذا العقد، مُهيَّأ سلفاً.
+        if ($module === 'contracts' && $r->boolean('to_esign') && hub_can(auth()->user(), 'contracts', 'a')) {
+            $m->forceFill(['status' => 'قيد التوقيع'])->saveQuietly();
+
+            return redirect()->route('esign.index', [
+                'contract' => $m->id,
+                'title'    => 'توقيع: ' . \Illuminate\Support\Str::limit((string) $m->title, 80),
+            ])->with('ok', 'أُنشئ العقد بحالة «قيد التوقيع» — جهّز طلب التوقيع الآن وأرسله للطرف الآخر');
+        }
+
         // «حفظ وإضافة آخر» — يبقيك في نموذج الإضافة للإدخال المتتابع
         if ($r->input('_stay')) {
             return redirect()->route('m.create', $module)->with('ok', 'أُضيف «' . \Illuminate\Support\Str::limit((string) ($m->{hub_display_col($module)} ?? ''), 40) . '» — أدخل التالي');

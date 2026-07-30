@@ -66,6 +66,13 @@
                 <input class="inp" name="_reason" maxlength="380" placeholder="مثال: تصحيح رقم الهاتف بطلب من العميل">
             </div>
         @endif
+        {{-- عقدٌ جديد: خيار التحويل للتوقيع الإلكتروني إن لم يكن موقّعاً بعد --}}
+        @if ($module === 'contracts' && ! $updating)
+            <label class="chk fw" style="margin-top:8px;padding:11px 14px;border:1px dashed color-mix(in srgb,var(--p) 40%,var(--ln));border-radius:12px;background:color-mix(in srgb,var(--p) 4%,transparent)">
+                <input type="checkbox" name="to_esign" value="1">
+                ✍️ <b>هذا العقد غير موقّع بعد</b> — بعد الحفظ يُضبط على «قيد التوقيع» ويُحوَّل لمركز التوقيع الإلكتروني لإرساله للطرف الآخر، وتُحدَّث حالته تلقائياً عند توقيعه.
+            </label>
+        @endif
         <div class="formfoot">
             <button class="btn p" type="submit">{{ $updating ? 'حفظ التعديلات' : 'إضافة' }}</button>
             @unless ($updating || $hx)

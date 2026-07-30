@@ -60,6 +60,9 @@ class EsignController extends Controller
             'contracts' => hub_scope(\App\Models\Contract::query(), 'contracts')
                 ->orderByDesc('created_at')->limit(200)->pluck('title', 'id'),
             'links'     => $links,
+            // تهيئة مسبقة عند القدوم من «عقد غير موقّع»
+            'preContract' => request('contract'),
+            'preTitle'    => request('title'),
         ]);
     }
 
@@ -113,6 +116,12 @@ class EsignController extends Controller
             'body' => $body, 'pass' => Hash::make($d['pass']),
             'token' => Str::random(48), 'created_by' => auth()->id(),
         ]);
+
+        // عقدٌ مربوط → حالته «قيد التوقيع» تلقائياً (سير العملية يبدأ)
+        if ($req->contract_id) {
+            \App\Models\Contract::where('id', $req->contract_id)
+                ->whereIn('status', ['مسودة', 'قيد التوقيع', ''])->update(['status' => 'قيد التوقيع']);
+        }
 
         hub_audit('إنشاء طلب توقيع', $linkModule ?: 'contracts', $linkId ?: $req->contract_id, $d['title']);
 
@@ -185,6 +194,13 @@ class EsignController extends Controller
             'signed_agent' => substr((string) $r->userAgent(), 0, 250),
             'signed_locale' => substr((string) $r->header('Accept-Language'), 0, 60),
         ])->save();
+
+        // سير العملية يكتمل: العقد المربوط يصير «ساري» تلقائياً عند التوقيع
+        if ($req->contract_id) {
+            \App\Models\Contract::where('id', $req->contract_id)
+                ->whereIn('status', ['قيد التوقيع', 'مسودة'])->update(['status' => 'ساري']);
+            $this->notifyOwners('📑 العقد المرتبط بـ«' . $req->title . '» صار «ساري» بعد توقيعه');
+        }
 
         $this->notifyOwners('✍️ وُقّع «' . $req->title . '» بواسطة ' . $d['signer_name']
             . ' — IP ' . $r->ip() . ' في ' . now()->format('Y-m-d H:i'));

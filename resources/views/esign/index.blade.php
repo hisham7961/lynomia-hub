@@ -20,7 +20,7 @@
         <form method="POST" action="{{ route('esign.store') }}" class="row" id="esignform">
             @csrf
             <div class="fld fw"><label>عنوان الطلب <span class="req">*</span></label>
-                <input class="inp" name="title" required maxlength="200" placeholder="مثال: عقد خدمات — مطاعم الذواقة"></div>
+                <input class="inp" name="title" required maxlength="200" value="{{ $preTitle ?? '' }}" placeholder="مثال: عقد خدمات — مطاعم الذواقة"></div>
             <div class="fld fw"><label>القالب <span class="req">*</span></label>
                 <select class="inp" name="template_id" id="tplsel" required>
                     <option value="">— اختر قالباً —</option>
@@ -46,7 +46,7 @@
                 <input type="hidden" name="link_id" id="link_id"></div>
             <div class="fld"><label>ربط بعقد (اختياري)</label>
                 <select class="inp" name="contract_id"><option value="">— بلا ربط —</option>
-                    @foreach ($contracts as $cid => $ct)<option value="{{ $cid }}">{{ \Illuminate\Support\Str::limit($ct, 40) }}</option>@endforeach
+                    @foreach ($contracts as $cid => $ct)<option value="{{ $cid }}" @selected(($preContract ?? null) === $cid)>{{ \Illuminate\Support\Str::limit($ct, 40) }}</option>@endforeach
                 </select></div>
             <button class="btn p">إنشاء الرابط الخاص</button>
         </form>
