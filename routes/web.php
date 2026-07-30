@@ -4,6 +4,7 @@ use App\Http\Controllers\Web\AlertController;
 use App\Http\Controllers\Web\AppCenterController;
 use App\Http\Controllers\Web\ApprovalDecisionController;
 use App\Http\Controllers\Web\AttachmentController;
+use App\Http\Controllers\Web\DmController;
 use App\Http\Controllers\Web\PrefController;
 use App\Http\Controllers\Web\TraceController;
 use App\Http\Controllers\Web\AuditController;
@@ -112,6 +113,12 @@ Route::middleware('auth')->group(function () {
     Route::post('comments/{id}/pin', [CommentController::class, 'pin'])->name('comments.pin');
     Route::post('comments/{id}/task', [CommentController::class, 'toTask'])->name('comments.task');
     Route::delete('comments/{id}', [CommentController::class, 'destroy'])->name('comments.destroy');
+    Route::post('comments/{id}/react', [CommentController::class, 'react'])->name('comments.react');
+
+    // ── المراسلة الداخلية المباشرة ──
+    Route::get('dm', [DmController::class, 'inbox'])->name('dm.inbox');
+    Route::get('dm/{userId}', [DmController::class, 'thread'])->name('dm.thread');
+    Route::post('dm/{userId}', [DmController::class, 'send'])->name('dm.send');
 
     // ── التخصيص الشخصي ──
     Route::get('personalize', [PrefController::class, 'edit'])->name('prefs.edit');

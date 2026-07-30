@@ -114,6 +114,58 @@ class CommentController extends Controller
         return back()->with('ok', 'أُنشئت مهمة من التعليق');
     }
 
+    /** تفاعل على تعليق: إيموجي واحد لكل مستخدم لكل رمز — الضغط ثانيةً يزيله */
+    public function react(Request $r, string $id)
+    {
+        $c = Comment::findOrFail($id);
+        $this->guardTarget($c->module, $c->record_id);          // يرى السجل = يتفاعل
+
+        $emoji = (string) $r->input('emoji');
+        abort_unless(in_array($emoji, self::REACTIONS, true), 422, 'تفاعل غير معروف');
+
+        $q = \Illuminate\Support\Facades\DB::table('reactions')
+            ->where('comment_id', $c->id)->where('user_id', auth()->id())->where('emoji', $emoji);
+
+        if ($q->exists()) {
+            $q->delete();
+        } else {
+            try {
+                \Illuminate\Support\Facades\DB::table('reactions')->insert([
+                    'id' => (string) Str::uuid(), 'comment_id' => $c->id,
+                    'user_id' => auth()->id(), 'emoji' => $emoji, 'created_at' => now(),
+                ]);
+            } catch (\Illuminate\Database\QueryException $e) {
+                // ضغطتان متزامنتان — القيد الفريد حسمها
+            }
+            if ($c->user_id !== auth()->id()) {
+                $this->notify($c->user_id, 'react',
+                    $emoji . ' تفاعل ' . auth()->user()->name . ' مع ' . ($c->module === 'feed' ? 'منشورك' : 'تعليقك') . ': ' . Str::limit(trim($c->body), 50),
+                    $c->module, $c->record_id);
+            }
+        }
+
+        return back()->withFragment('c-' . $c->id);
+    }
+
+    /** التفاعلات المتاحة — قائمة مغلقة كي لا تُحقن رموز عشوائية */
+    public const REACTIONS = ['👍', '❤️', '🎉', '😂', '🤔', '🙏'];
+
+    /** تفاعلات مجموعة تعليقات: [comment_id => [emoji => [أسماء]]] */
+    public static function reactionsFor($comments): array
+    {
+        $ids = collect($comments)->flatMap(fn ($c) => [$c->id, ...($c->relationLoaded('replies') ? $c->replies->pluck('id') : [])]);
+        if ($ids->isEmpty()) return [];
+
+        $rows = \Illuminate\Support\Facades\DB::table('reactions')
+            ->join('users', 'users.id', '=', 'reactions.user_id')
+            ->whereIn('comment_id', $ids)->get(['comment_id', 'emoji', 'users.name', 'reactions.user_id']);
+
+        $out = [];
+        foreach ($rows as $r) $out[$r->comment_id][$r->emoji][] = ['name' => $r->name, 'id' => $r->user_id];
+
+        return $out;
+    }
+
     /* ────────── أدوات مشتركة (يستخدمها أيضاً عرض الوحدات) ────────── */
 
     /** تعليقات سجل مع الردود، ويسجَّل أن المستخدم الحالي قرأها */

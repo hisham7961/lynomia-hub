@@ -209,6 +209,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'morning',   'label' => '☀️ تشغيل اليوم',      'route' => 'morning',         'ok' => true],
             ['key' => 'me',        'label' => '👤 بوابتي',           'route' => 'portal.me',       'ok' => true],
             ['key' => 'feed',      'label' => '📣 قناة الفريق',      'route' => 'feed',            'ok' => true],
+            ['key' => 'dm',        'label' => '💬 الرسائل',          'route' => 'dm.inbox',        'ok' => true],
             ['key' => 'inboxdocs', 'label' => '📥 صندوق الوثائق',    'route' => 'inboxdocs.index', 'ok' => true],
             ['key' => 'alerts',    'label' => '🔔 ينتهي قريباً',     'route' => 'alerts',          'ok' => true],
             ['key' => 'finrep',    'label' => '📊 التقارير المالية', 'route' => 'reports.finance', 'ok' => hub_can($user, 'fin', 'v')],

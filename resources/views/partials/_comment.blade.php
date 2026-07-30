@@ -1,7 +1,9 @@
-{{-- تعليق واحد + ردوده — يتوقع: $c $users $depth --}}
+{{-- تعليق واحد + ردوده — يتوقع: $c $users $depth (و$reactions اختيارياً من الصفحة الأم) --}}
 @php
     $readers = collect((array) $c->read_by)->reject(fn ($id) => $id === $c->user_id);
     $rnames  = $readers->map(fn ($id) => $users[$id] ?? '؟')->implode('، ');
+    $reactions = $reactions ?? \App\Http\Controllers\Web\CommentController::reactionsFor([$c]);
+    $myReacts = collect($reactions[$c->id] ?? [])->filter(fn ($rs) => collect($rs)->contains('id', auth()->id()))->keys()->all();
 @endphp
 <div class="cmt {{ $c->pinned ? 'pin' : '' }}" id="c-{{ $c->id }}" style="margin-inline-start:{{ min($depth, 2) * 26 }}px">
     <div class="chead">
@@ -17,6 +19,28 @@
     @if ($c->att)
         <a class="sub" href="{{ route('file.show', $c->att) }}" target="_blank" rel="noopener">📎 مرفق</a>
     @endif
+    {{-- التفاعلات: الموجودة تظهر بعدّها، والضغط يضيف أو يزيل --}}
+    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
+        @foreach ($reactions[$c->id] ?? [] as $emoji => $who)
+            <form method="POST" action="{{ route('comments.react', $c->id) }}" class="inline">
+                @csrf<input type="hidden" name="emoji" value="{{ $emoji }}">
+                <button class="bdg {{ in_array($emoji, $myReacts, true) ? 'ok' : '' }}" style="cursor:pointer;border:0"
+                        title="{{ collect($who)->pluck('name')->implode('، ') }}">{{ $emoji }} {{ count($who) }}</button>
+            </form>
+        @endforeach
+        <details class="inline" style="position:relative">
+            <summary class="sub" style="cursor:pointer;list-style:none" aria-label="أضف تفاعلاً">➕🙂</summary>
+            <div style="position:absolute;z-index:20;background:var(--cd);border:1px solid var(--brd);border-radius:10px;padding:4px 6px;display:flex;gap:2px;top:calc(100% + 4px);inset-inline-start:0">
+                @foreach (\App\Http\Controllers\Web\CommentController::REACTIONS as $e)
+                    @continue(isset($reactions[$c->id][$e]) && in_array($e, $myReacts, true))
+                    <form method="POST" action="{{ route('comments.react', $c->id) }}" class="inline">
+                        @csrf<input type="hidden" name="emoji" value="{{ $e }}">
+                        <button class="lnk" style="font-size:16px" aria-label="تفاعل {{ $e }}">{{ $e }}</button>
+                    </form>
+                @endforeach
+            </div>
+        </details>
+    </div>
     <div class="cacts">
         @if ($depth === 0)
             <details class="creply">

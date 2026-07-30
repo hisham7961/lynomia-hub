@@ -11,7 +11,7 @@
         @php $hidTop = (array) hub_pref('nav.hidden_top', []); @endphp
         @foreach (hub_top_links(auth()->user()) as $l)
             @continue(in_array($l['key'], $hidTop, true))
-            <a class="ni top {{ request()->routeIs($l['key'] === 'inboxdocs' ? 'inboxdocs.*' : ($l['key'] === 'costs' ? 'costs.*' : $l['route'])) ? 'on' : '' }}" href="{{ route($l['route']) }}">{{ $l['label'] }}@if ($l['key'] === 'alerts' && ($xc = hub_expiry_count()))<span class="nbdg">{{ $xc }}</span>@endif</a>
+            <a class="ni top {{ request()->routeIs($l['key'] === 'inboxdocs' ? 'inboxdocs.*' : ($l['key'] === 'costs' ? 'costs.*' : ($l['key'] === 'dm' ? 'dm.*' : $l['route']))) ? 'on' : '' }}" href="{{ route($l['route']) }}">{{ $l['label'] }}@if ($l['key'] === 'alerts' && ($xc = hub_expiry_count()))<span class="nbdg">{{ $xc }}</span>@elseif ($l['key'] === 'dm' && ($dc = \App\Http\Controllers\Web\DmController::unreadCount()))<span class="nbdg">{{ $dc }}</span>@endif</a>
         @endforeach
         @foreach (hub_nav(auth()->user()) as $g)
             @php $active = collect($g['items'])->contains(fn ($it) => request()->is('m/' . $it['key'] . '*')); @endphp

@@ -27,9 +27,10 @@
     </form>
 </div>
 
+@php $reactions = \App\Http\Controllers\Web\CommentController::reactionsFor($posts->getCollection()); @endphp
 @forelse ($posts as $c)
     <div class="card" style="margin-top:12px">
-        @include('partials._comment', ['c' => $c, 'users' => $users, 'depth' => 0])
+        @include('partials._comment', ['c' => $c, 'users' => $users, 'depth' => 0, 'reactions' => $reactions])
     </div>
 @empty
     <div class="card"><div class="sub" style="padding:22px;text-align:center">لا منشورات بعد — افتتح القناة بإعلانك الأول 🎉</div></div>
