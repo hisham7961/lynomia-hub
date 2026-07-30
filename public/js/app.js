@@ -219,3 +219,65 @@
     ship('Promise: ' + (e.reason && e.reason.message ? e.reason.message : e.reason), location.pathname, 0);
   });
 })();
+
+/* ═ v2.33 — PWA: عامل الخدمة + مسودات النماذج المحلية ═ */
+(function () {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(function () {});
+  }
+
+  // مسودات: أي نموذج data-draft يُحفظ محلياً أثناء الكتابة ويُسترجع عند العودة
+  var form = document.querySelector('form[data-draft]');
+  if (!form) return;
+  var key = 'lyn_draft:' + form.getAttribute('data-draft');
+
+  function fields() {
+    return Array.prototype.filter.call(form.elements, function (el) {
+      return el.name && el.name.indexOf('_') !== 0 && ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(el.tagName) >= 0
+        && ['file', 'password', 'hidden', 'submit', 'button'].indexOf(el.type) < 0;
+    });
+  }
+
+  var t;
+  form.addEventListener('input', function () {
+    clearTimeout(t);
+    t = setTimeout(function () {
+      var d = {};
+      fields().forEach(function (el) {
+        if (el.type === 'checkbox' || el.type === 'radio') { if (el.checked) d[el.name] = el.value; }
+        else if (el.value !== '') d[el.name] = el.value;
+      });
+      try { localStorage.setItem(key, JSON.stringify({ at: Date.now(), d: d })); } catch (e) {}
+    }, 700);
+  });
+
+  form.addEventListener('submit', function () { try { localStorage.removeItem(key); } catch (e) {} });
+
+  var saved;
+  try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) {}
+  if (!saved || !saved.d || !Object.keys(saved.d).length) return;
+  if (Date.now() - saved.at > 7 * 86400000) { localStorage.removeItem(key); return; }
+
+  var bar = document.createElement('div');
+  bar.className = 'flash wn';
+  bar.style.display = 'flex'; bar.style.gap = '10px'; bar.style.alignItems = 'center';
+  var mins = Math.round((Date.now() - saved.at) / 60000);
+  bar.innerHTML = '<span>📝 وجدنا مسودة غير محفوظة لهذا النموذج (' +
+    (mins < 60 ? 'قبل ' + (mins || 1) + ' دقيقة' : 'قبل ' + Math.round(mins / 60) + ' ساعة') + ')</span>' +
+    '<button type="button" class="btn sm" data-restore>استرجاعها</button>' +
+    '<button type="button" class="btn ghost sm" data-discard>تجاهل</button>';
+  form.parentNode.insertBefore(bar, form);
+
+  bar.querySelector('[data-restore]').addEventListener('click', function () {
+    fields().forEach(function (el) {
+      if (!(el.name in saved.d)) return;
+      if (el.type === 'checkbox' || el.type === 'radio') el.checked = (el.value === saved.d[el.name]);
+      else el.value = saved.d[el.name];
+    });
+    bar.remove();
+  });
+  bar.querySelector('[data-discard]').addEventListener('click', function () {
+    try { localStorage.removeItem(key); } catch (e) {}
+    bar.remove();
+  });
+})();

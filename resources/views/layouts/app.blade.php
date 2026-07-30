@@ -9,6 +9,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+<link rel="manifest" href="{{ route('pwa.manifest') }}">
+<link rel="icon" href="{{ route('pwa.icon') }}" type="image/svg+xml">
+<meta name="theme-color" content="{{ setting('app.color', '#6d28d9') }}">
 @if ($brand = hub_brand_css())<style>{!! $brand !!}</style>@endif
 </head>
 <body>

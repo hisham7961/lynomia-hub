@@ -24,6 +24,7 @@ use App\Http\Controllers\Web\PortalController;
 use App\Http\Controllers\Web\LegalController;
 use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\PurchaseController;
+use App\Http\Controllers\Web\PwaController;
 use App\Http\Controllers\Web\QualityController;
 use App\Http\Controllers\Web\QuoteController;
 use App\Http\Controllers\Web\ReportController;
@@ -43,6 +44,11 @@ Route::get('s/{token}/file', [DataRoomController::class, 'file'])->name('share.f
 
 // ── فحص صحي عام لمراقبات Uptime (بلا تسجيل دخول) ──
 Route::get('healthz', [OpsController::class, 'health'])->name('healthz')->middleware('throttle:30,1');
+
+// ── PWA: بيان وأيقونة وصفحة بلا اتصال (عامة) ──
+Route::get('manifest.webmanifest', [PwaController::class, 'manifest'])->name('pwa.manifest');
+Route::get('pwa-icon.svg', [PwaController::class, 'icon'])->name('pwa.icon');
+Route::get('offline', [PwaController::class, 'offline'])->name('pwa.offline');
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'show'])->name('login');
