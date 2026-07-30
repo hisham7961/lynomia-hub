@@ -8,6 +8,7 @@
         {{ setting('app.name', 'Lynomia Hub') }}</a></div>
     <nav>
         <a class="ni top {{ request()->routeIs('dashboard') ? 'on' : '' }}" href="{{ route('dashboard') }}">لوحة التحكم</a>
+        <a class="ni top {{ request()->routeIs('morning') ? 'on' : '' }}" href="{{ route('morning') }}">☀️ تشغيل اليوم</a>
         <a class="ni top {{ request()->routeIs('portal.me') ? 'on' : '' }}" href="{{ route('portal.me') }}">👤 بوابتي</a>
         <a class="ni top {{ request()->routeIs('feed') ? 'on' : '' }}" href="{{ route('feed') }}">📣 قناة الفريق</a>
         <a class="ni top {{ request()->routeIs('inboxdocs.*') ? 'on' : '' }}" href="{{ route('inboxdocs.index') }}">📥 صندوق الوثائق</a>

@@ -329,6 +329,19 @@ if (! function_exists('hub_expiry')) {
                         ->whereNotNull($f['col'])
                         ->whereBetween(\Illuminate\Support\Facades\DB::raw("DATE(`{$f['col']}`)"), [now()->subDays(60)->toDateString(), $limit]);
                     if ($scoped) $q = hub_scope($q, $mk, $user);
+
+                    // لا تنبيه على ما أُغلق: مهمة منجزة أو فاتورة مدفوعة أو عقد منتهٍ
+                    // كانت تظل تنبّه إلى الأبد فتفقد الصفحة مصداقيتها.
+                    if (($sc = $md['status'] ?? null) && \Illuminate\Support\Facades\Schema::hasColumn($md['table'], $sc)) {
+                        $q->where(fn ($w) => $w->whereNull($sc)->orWhereNotIn($sc, hub_closed_states()));
+                    }
+
+                    // مستند مالي سُدّد بالكامل لا يستحق تنبيه استحقاق ولو لم تُحدَّث حالته:
+                    // السداد المسجَّل هو الحقيقة، لا التسمية.
+                    if ($mk === 'fin' && \Illuminate\Support\Facades\Schema::hasColumn($md['table'], 'paid')) {
+                        $q->whereRaw('COALESCE(paid,0) < COALESCE(total,0)');
+                    }
+
                     $rows = $q->limit(40)->get(['id', $disp . ' as _n', $f['col'] . ' as _d']);
                 } catch (\Throwable $e) { continue; }
                 foreach ($rows as $row) {
@@ -842,5 +855,86 @@ if (! function_exists('hub_project_pl')) {
                 'over'     => $p->budget ? round($totalCost - (float) $p->budget, 2) : null,
             ];
         });
+    }
+}
+
+if (! function_exists('hub_project_health')) {
+    /**
+     * صحة المشروع: ستة عوامل من بيانات حقيقية، كل عامل ٠–١٠٠ بوزن معلن.
+     * لا نخترع «رضا العميل» ولا «استقرار الفريق» لأن لا مصدر لهما في النظام —
+     * ذكر عامل بلا بيانات يعطي رقماً كاذباً، والصراحة أنفع من لوحة جميلة.
+     */
+    function hub_project_health(string $projectId, bool $fresh = false): array
+    {
+        $key = "health:$projectId";
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
+
+        return \Illuminate\Support\Facades\Cache::remember($key, 300, function () use ($projectId) {
+            $DB = \Illuminate\Support\Facades\DB::class;
+            $p = \Illuminate\Support\Facades\DB::table('projects')->where('id', $projectId)->first();
+            if (! $p) return [];
+
+            $pl = hub_project_pl($projectId);
+            $f = [];
+
+            // ١) الالتزام بالموعد
+            $delay = $pl['delay']['days'] ?? 0;
+            $f[] = ['k' => 'الالتزام بالموعد', 'w' => 25,
+                    's' => $delay <= 0 ? 100 : max(0, 100 - $delay * 2),
+                    'note' => $delay > 0 ? "متأخر {$delay} يوماً" : 'ضمن الموعد'];
+
+            // ٢) الالتزام بالميزانية
+            $bs = 100; $bn = 'لا ميزانية معتمدة';
+            if (! empty($pl['budget']) && $pl['budget'] > 0) {
+                $used = $pl['cost']['total'] / $pl['budget'] * 100;
+                $bs = $used <= 100 ? 100 : max(0, (int) (100 - ($used - 100) * 2));
+                $bn = round($used) . '٪ من الميزانية مستهلك';
+            }
+            $f[] = ['k' => 'الالتزام بالميزانية', 'w' => 20, 's' => $bs, 'note' => $bn];
+
+            // ٣) المهام المتأخرة
+            $tAll = \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')->where('project_id', $projectId)->count();
+            $tLate = \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')->where('project_id', $projectId)
+                ->whereNotNull('due')->whereDate('due', '<', today())
+                ->whereNotIn('status', ['منجزة', 'مكتملة', 'ملغاة'])->count();
+            $f[] = ['k' => 'انضباط المهام', 'w' => 20,
+                    's' => $tAll ? max(0, (int) (100 - $tLate / $tAll * 200)) : 100,
+                    'note' => $tAll ? "{$tLate} متأخرة من {$tAll}" : 'لا مهام مسجَّلة'];
+
+            // ٤) المخاطر المفتوحة
+            $iss = \Illuminate\Support\Facades\DB::table('issues')->whereNull('deleted_at')->where('project_id', $projectId)
+                ->whereNotIn('status', ['مغلقة', 'محلولة', 'ملغاة'])->count();
+            $f[] = ['k' => 'المخاطر المفتوحة', 'w' => 15,
+                    's' => max(0, 100 - $iss * 15), 'note' => $iss ? "{$iss} مخاطرة مفتوحة" : 'لا مخاطر مفتوحة'];
+
+            // ٥) الأعطال التقنية (٩٠ يوماً)
+            $inc = \Illuminate\Support\Facades\Schema::hasTable('incidents')
+                ? \Illuminate\Support\Facades\DB::table('incidents')->whereNull('deleted_at')->where('project_id', $projectId)
+                    ->where('created_at', '>=', now()->subDays(90))->count() : 0;
+            $f[] = ['k' => 'استقرار التشغيل', 'w' => 10,
+                    's' => max(0, 100 - $inc * 20), 'note' => $inc ? "{$inc} حادث خلال ٩٠ يوماً" : 'بلا أعطال مسجَّلة'];
+
+            // ٦) عبء الدعم المفتوح
+            $tk = \Illuminate\Support\Facades\DB::table('tickets')->whereNull('deleted_at')->where('project_id', $projectId)
+                ->whereNotIn('status', ['تم الحل', 'مغلقة'])->count();
+            $f[] = ['k' => 'عبء الدعم', 'w' => 10,
+                    's' => max(0, 100 - $tk * 10), 'note' => $tk ? "{$tk} تذكرة مفتوحة" : 'لا تذاكر مفتوحة'];
+
+            $score = (int) round(array_sum(array_map(fn ($x) => $x['s'] * $x['w'], $f)) / 100);
+
+            return ['score' => $score, 'factors' => $f,
+                    'tone' => $score >= 80 ? 'ok' : ($score >= 55 ? 'wn' : 'bad'),
+                    'label' => $score >= 80 ? 'سليم' : ($score >= 55 ? 'يحتاج انتباهاً' : 'متعثر')];
+        });
+    }
+}
+
+if (! function_exists('hub_closed_states')) {
+    /** حالات تعني «انتهى الأمر» — تُستثنى من تنبيهات الانتهاء وقوائم ما يحتاج تدخلاً */
+    function hub_closed_states(): array
+    {
+        return ['منجزة', 'منجز', 'مكتملة', 'مكتمل', 'مغلقة', 'مغلق', 'ملغاة', 'ملغى', 'ملغي',
+                'محلولة', 'تم الحل', 'مدفوعة', 'مسددة', 'منتهية', 'منتهي', 'مؤرشفة', 'مؤرشف',
+                'منفَّذ', 'منفذ', 'مرفوض', 'مرفوضة', 'مغلق بتقرير', 'مُستعاد', 'متراجع عنه'];
     }
 }

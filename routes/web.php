@@ -18,6 +18,7 @@ use App\Http\Controllers\Web\FlowController;
 use App\Http\Controllers\Web\ImportController;
 use App\Http\Controllers\Web\InboxDocController;
 use App\Http\Controllers\Web\ModuleController;
+use App\Http\Controllers\Web\MorningController;
 use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\OdooController;
 use App\Http\Controllers\Web\PerformanceController;
@@ -79,6 +80,7 @@ Route::middleware('auth')->group(function () {
         return back()->with('ok', $cid === '' ? 'عدت لعرض كل الشركات' : 'تُصفّى القوائم الآن على الشركة المختارة');
     })->name('company.switch');
 
+    Route::get('morning', [MorningController::class, 'index'])->name('morning');
     Route::get('costs', [CostController::class, 'index'])->name('costs.index');
 
     // ── صندوق الوثائق الوارد ──
