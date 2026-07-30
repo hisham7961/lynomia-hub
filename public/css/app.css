@@ -4,18 +4,22 @@
    نفس عقد الأصناف تماماً: لا تغيير في أي قالب أو منطق
    ═══════════════════════════════════════════════════════════════ */
 
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Tajawal:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
 :root{
-  /* الهوية — تُستبدل من الإعدادات (hub_brand_css) */
-  --p:#0E7C66;--pd:#0A5F4E;--pdd:#07463A;--ps:#E2F0EC;--pss:#F0F7F5;--ac:#5FD6BC;
-  /* الأسطح والنص */
-  --bg:#F6F8F7;--cd:#FFFFFF;--ln:#E4EAE8;--lnd:#CDD8D4;--tx:#131F1C;--sb:#5F7671;
+  /* الهوية — الأخضر لكنةٌ لا لونٌ غالب. تُستبدل من الإعدادات (hub_brand_css) */
+  --p:#0E7C66;--pd:#0A5F4E;--pdd:#07463A;--ps:#E2F0EC;--pss:#F0F7F5;--ac:#2FB79A;
+  /* الأسطح والنص — خلفيةٌ كريميّة دافئة، حبرٌ كحليّ، حدودٌ دافئة */
+  --bg:#F5F3ED;--bg2:#EDEAE0;--cd:#FFFFFF;--ln:#E3DFD3;--lnd:#D6CFC0;--tx:#17202E;--sb:#6B7280;
+  /* الشريط الجانبي — كحليّ داكن أنيق (لا أخضر) */
+  --sbbg:#111A28;--sbbg2:#0C1420;--sbi:#B9C2CF;--sbh:#1B2637;
   /* الدلالات */
-  --ok:#0E8A57;--okbg:#E4F5EC;--bad:#C63A3A;--badbg:#FCECEC;--wn:#9A6A0D;--wnbg:#FCF3DE;
-  /* العمق */
-  --sh:0 1px 2px rgba(13,32,27,.04),0 2px 8px rgba(13,32,27,.04);
-  --shh:0 2px 6px rgba(13,32,27,.06),0 14px 34px rgba(13,32,27,.10);
+  --ok:#177E4D;--okbg:#E3F3E9;--bad:#B3372B;--badbg:#FBE6E1;--wn:#96660A;--wnbg:#FBF0D7;
+  /* العمق — ظلالٌ كحليّة محايدة */
+  --sh:0 1px 2px rgba(17,26,40,.05),0 2px 8px rgba(17,26,40,.05);
+  --shh:0 2px 6px rgba(17,26,40,.07),0 14px 34px rgba(17,26,40,.11);
   /* الهندسة والحركة */
-  --r:14px;--rs:9px;--t:.16s cubic-bezier(.4,0,.2,1);
+  --r:14px;--rs:10px;--t:.16s cubic-bezier(.4,0,.2,1);
   /* حلقة التركيز */
   --ring:0 0 0 3px color-mix(in srgb,var(--p) 18%,transparent);
 }
@@ -23,7 +27,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 [hidden]{display:none!important}
 html{scrollbar-color:var(--lnd) transparent;scroll-behavior:smooth}
-body{font:14.5px/1.65 Tajawal,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--tx);
+body{font:14.5px/1.65 'IBM Plex Sans Arabic',Tajawal,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--tx);
      -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 ::selection{background:color-mix(in srgb,var(--p) 22%,transparent)}
 ::-webkit-scrollbar{width:10px;height:10px}
@@ -48,12 +52,12 @@ a:hover{color:var(--pd)}
 
 /* ═ الشريط الجانبي — سطح داكن هادئ بطراز Linear ═ */
 .sidebar{width:252px;flex-shrink:0;position:sticky;top:0;height:100vh;overflow-y:auto;padding:0 8px 22px;display:flex;flex-direction:column;
-  background:linear-gradient(175deg,color-mix(in srgb,var(--pdd) 88%,#04120E),#07120F 90%);
+  background:linear-gradient(180deg,var(--sbbg),var(--sbbg2));
   color:#fff;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.14) transparent}
 .sidebar::-webkit-scrollbar{width:6px}
 .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border:0}
 .brand{padding:18px 12px 15px;margin:0 -8px 8px;border-bottom:1px solid rgba(255,255,255,.08);
-  position:sticky;top:0;z-index:2;background:color-mix(in srgb,var(--pdd) 90%,#04120E);backdrop-filter:blur(6px)}
+  position:sticky;top:0;z-index:2;background:color-mix(in srgb,var(--sbbg) 92%,#000);backdrop-filter:blur(6px)}
 .brand a{color:#fff;font-weight:800;font-size:16px;display:flex;gap:9px;align-items:center;letter-spacing:-.01em}
 .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--ac);box-shadow:0 0 0 4px color-mix(in srgb,var(--ac) 22%,transparent),0 0 14px var(--ac)}
 .sidebar details{border:0;margin:2px 0}
@@ -67,9 +71,9 @@ a:hover{color:var(--pd)}
 .ni{display:flex;gap:9px;align-items:center;padding:7px 12px;margin:1px 0;color:rgba(255,255,255,.78);
   font-size:13.5px;border-radius:var(--rs);border-inline-start:0;position:relative;transition:background var(--t),color var(--t)}
 .ni::before{content:"";width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.22);flex-shrink:0;transition:background var(--t),box-shadow var(--t)}
-.ni:hover{background:rgba(255,255,255,.07);color:#fff}
-.ni.on{background:rgba(255,255,255,.12);color:#fff;font-weight:700;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
-.ni.on::before{background:var(--ac);box-shadow:0 0 8px var(--ac)}
+.ni:hover{background:var(--sbh);color:#fff}
+.ni.on{background:var(--p);color:#fff;font-weight:700;box-shadow:0 2px 10px color-mix(in srgb,var(--p) 45%,transparent)}
+.ni.on::before{background:#fff;box-shadow:0 0 8px rgba(255,255,255,.6)}
 .ni.top{margin:2px 0;font-weight:700}
 
 /* ═ الشريط العلوي — زجاجي رقيق ═ */
@@ -101,7 +105,7 @@ a:hover{color:var(--pd)}
   position:relative;overflow:hidden}
 .stat::after{content:"";position:absolute;inset-inline-start:0;top:14%;bottom:14%;width:3.5px;border-radius:99px;
   background:linear-gradient(180deg,var(--ac),var(--p));opacity:.9}
-.stat b{font-size:24px;color:var(--pd);font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.25}
+.stat b{font-size:24px;color:var(--tx);font-family:Tajawal;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.25}
 .stat span{color:var(--sb);font-size:12px;font-weight:600}
 .stat .ico{position:absolute;inset-inline-end:12px;top:11px;font-size:19px;opacity:.4;transition:opacity .2s,transform .2s}
 .stat:hover{box-shadow:var(--shh);transform:translateY(-2px);border-color:color-mix(in srgb,var(--p) 30%,var(--ln))}
@@ -110,7 +114,7 @@ a:hover{color:var(--pd)}
 /* ═ الجداول ═ */
 .tblwrap{overflow-x:auto;border-radius:0 0 var(--r) var(--r)}
 .tbl{width:100%;border-collapse:collapse;font-size:13.5px}
-.tbl th{background:color-mix(in srgb,var(--tx) 3%,var(--cd));color:var(--sb);text-align:right;padding:10px 14px;
+.tbl th{background:var(--bg2);color:var(--sb);text-align:right;padding:10px 14px;
   font-size:11.5px;font-weight:800;letter-spacing:.4px;white-space:nowrap;position:sticky;top:0;z-index:1;
   border-bottom:1px solid var(--ln)}
 .tbl th a{color:var(--sb)}
@@ -126,7 +130,7 @@ a:hover{color:var(--pd)}
 
 /* ═ الأزرار — تسلسل هرمي دقيق ═ */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--lnd);
-  background:var(--cd);color:var(--tx);border-radius:10px;padding:7.5px 15px;font:600 13.5px Tajawal;
+  background:var(--cd);color:var(--tx);border-radius:10px;padding:7.5px 15px;font:600 13.5px 'IBM Plex Sans Arabic',Tajawal,sans-serif;
   cursor:pointer;transition:all var(--t);text-align:center;white-space:nowrap;user-select:none}
 .btn:hover{border-color:color-mix(in srgb,var(--p) 55%,var(--lnd));color:var(--p);background:color-mix(in srgb,var(--p) 3%,var(--cd));box-shadow:var(--sh)}
 .btn:focus-visible{box-shadow:var(--ring)}
@@ -148,7 +152,7 @@ a:hover{color:var(--pd)}
 .fld{display:flex;flex-direction:column;gap:5px}
 .fld.fw{grid-column:1/-1}
 .fld label{font-size:12.5px;font-weight:700;color:var(--sb)}
-.inp{border:1.5px solid var(--ln);border-radius:10px;padding:8px 13px;font:14px Tajawal;background:var(--cd);
+.inp{border:1px solid var(--ln);border-radius:10px;padding:8.5px 13px;font:14px 'IBM Plex Sans Arabic',Tajawal,sans-serif;background:var(--cd);
   color:var(--tx);width:100%;transition:border-color var(--t),box-shadow var(--t),background var(--t)}
 .inp::placeholder{color:color-mix(in srgb,var(--sb) 65%,transparent)}
 .inp:hover{border-color:var(--lnd)}
@@ -377,16 +381,17 @@ input.inp.htmx-request{background-image:linear-gradient(90deg,transparent,color-
 /* ═ الوضع الليلي — سطح داكن متزن ═ */
 html[data-theme="dark"]{color-scheme:dark}
 html[data-theme="dark"] body{
-  --bg:#0D1413;--cd:#141C1A;--ln:#233330;--lnd:#2F433F;--tx:#E7F0ED;--sb:#8CA39D;
-  --ps:#12362D;--pss:#12211E;--okbg:#0D2C21;--badbg:#361B1B;--wnbg:#302607;
-  --sh:0 1px 2px rgba(0,0,0,.35),0 3px 10px rgba(0,0,0,.28);
-  --shh:0 4px 14px rgba(0,0,0,.45),0 16px 38px rgba(0,0,0,.4)}
+  --bg:#0C1220;--bg2:#0F1726;--cd:#121B2B;--ln:#233149;--lnd:#2E3E56;--tx:#E8ECF3;--sb:#8A94A6;
+  --ps:#123027;--pss:#0F1B26;--ok:#5BD79B;--okbg:#123527;--bad:#F08A7A;--badbg:#3A1815;--wn:#EFC04B;--wnbg:#3A2E10;
+  --sbbg:#0A101B;--sbbg2:#070C15;--sbi:#93A0B4;--sbh:#152238;
+  --sh:0 1px 2px rgba(0,0,0,.4),0 3px 10px rgba(0,0,0,.32);
+  --shh:0 4px 14px rgba(0,0,0,.5),0 16px 38px rgba(0,0,0,.45)}
 html[data-theme="dark"] .topbar{background:color-mix(in srgb,var(--cd) 80%,transparent)}
-html[data-theme="dark"] .inp{background:#0F1715}
+html[data-theme="dark"] .inp{background:#0F1726}
 html[data-theme="dark"] .gsr,html[data-theme="dark"] .modalbox,html[data-theme="dark"] .palbox,html[data-theme="dark"] .logincard{background:var(--cd)}
 html[data-theme="dark"] .logincard{box-shadow:0 30px 90px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05)}
-html[data-theme="dark"] .tbl th{background:#121B19}
-html[data-theme="dark"] .stat b{color:var(--ac)}
+html[data-theme="dark"] .tbl th{background:var(--bg2)}
+html[data-theme="dark"] .stat b{color:var(--tx)}
 html[data-theme="dark"] .stat::after{background:linear-gradient(180deg,var(--ac),var(--p))}
 html[data-theme="dark"] .llc h5,html[data-theme="dark"] .logincard h1{color:var(--ac)}
 html[data-theme="dark"] .btn.p{background:linear-gradient(180deg,color-mix(in srgb,var(--p) 85%,#fff),var(--p))}
@@ -547,9 +552,9 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 /* ── شاشة الدخول: خلفيةٌ ذات عمق وهويّة ── */
 .loginbg{position:relative;overflow:hidden;
   background:
-    radial-gradient(1100px 620px at 78% -8%, color-mix(in srgb,var(--ac) 30%,transparent), transparent 60%),
-    radial-gradient(900px 560px at 12% 108%, color-mix(in srgb,var(--p) 34%,transparent), transparent 62%),
-    linear-gradient(160deg,var(--pdd),#061512 78%)}
+    radial-gradient(1100px 620px at 78% -8%, color-mix(in srgb,var(--ac) 26%,transparent), transparent 60%),
+    radial-gradient(900px 560px at 12% 108%, color-mix(in srgb,var(--p) 30%,transparent), transparent 62%),
+    linear-gradient(160deg,var(--sbbg),var(--sbbg2) 82%)}
 .loginbg::before{content:"";position:absolute;inset:0;pointer-events:none;
   background-image:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1px);background-size:26px 26px;mask-image:linear-gradient(160deg,#000,transparent 70%)}
 .logincard{padding:40px 36px 34px;border-radius:24px;
