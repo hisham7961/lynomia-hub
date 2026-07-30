@@ -39,11 +39,28 @@ class ModuleController extends Controller
 
         $fields = collect($def['fields']);
         foreach ((array) $r->input('f', []) as $fk => $fv) {
+            if ($fv === '' || ! is_string($fv)) continue;
+
             $f = $fields->firstWhere('key', $fk);
-            if ($f && $f['type'] === 'ref' && $fv !== '' && empty($f['multi'])) {
-                $q->where($f['col'], $fv);
+            if ($f && ($f['type'] ?? '') === 'ref') {
+                // المتعدد احتواءٌ في مصفوفة، والمفرد مساواة
+                empty($f['multi'])
+                    ? $q->where($f['col'], $fv)
+                    : $q->whereJsonContains($f['col'], $fv);
                 $filters[] = ['key' => $fk, 'label' => $f['label'], 'val' => $fv,
                               'name' => hub_ref_labels($f['ref'], [$fv])[$fv] ?? $fv];
+                continue;
+            }
+
+            // أعمدة الربط الضمنية — قائمة بيضاء بعمودين لا غير. بلا هذا الحصر يصير
+            // «عرض الكل» ترشيحاً على أي عمود يُسمّيه الرابط، وهو كاشفٌ للقيم بالاستدلال.
+            $implicit = ['company_id' => 'companies', 'project_id' => 'projects'];
+            if (isset($implicit[$fk]) && ($tbl = $def['table'] ?? null)
+                && \Illuminate\Support\Facades\Schema::hasColumn($tbl, $fk)) {
+                $q->where($fk, $fv);
+                $filters[] = ['key' => $fk, 'label' => hub_mod($implicit[$fk])['label'] ?? $fk,
+                              'val' => $fv,
+                              'name' => hub_ref_labels($implicit[$fk], [$fv])[$fv] ?? $fv];
             }
         }
 

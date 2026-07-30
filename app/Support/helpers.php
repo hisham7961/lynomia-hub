@@ -475,17 +475,65 @@ if (! function_exists('hub_children')) {
     function hub_children(string $module): array
     {
         static $map = null;
+
         if ($map === null) {
-            $map = [];
-            foreach (hub_modules() as $ck => $cd) {
-                foreach ($cd['fields'] as $f) {
-                    if (($f['type'] ?? '') === 'ref' && ($f['ref'] ?? '') !== '' && empty($f['multi'])) {
-                        $map[$f['ref']][] = [$ck, $f];
-                    }
-                }
+            // بناء الخريطة يستجوب مخطط القاعدة عن عمودَي الربط في ٧١ جدولاً. لو تُرك
+            // بلا تخبئة لأضاف ~١٤٠ استعلام استجواب إلى أول صفحة سجل في كل طلب.
+            // الخريطة تتبع الإعداد والمخطط معاً، وكلاهما لا يتغيّر إلا بإصدار — فمفتاحها الإصدار.
+            $key = 'hub:children:' . config('hub.version', '0');
+            try {
+                $map = \Illuminate\Support\Facades\Cache::rememberForever($key, fn () => hub_build_children_map());
+            } catch (\Throwable $e) {
+                $map = hub_build_children_map();     // تخبئة معطّلة لا تُعطّل العلاقات
             }
         }
+
         return $map[$module] ?? [];
+    }
+}
+
+if (! function_exists('hub_build_children_map')) {
+    /** بناء خريطة العلاقات العكسية: المراجع المفردة والمتعددة وأعمدة الربط الضمنية */
+    function hub_build_children_map(): array
+    {
+        $map = [];
+
+        // أعمدة ربط موجودة في القاعدة ولا يُصرّح بها السجل كمراجع.
+        // قائمة بيضاء بعمودين لا غير: هما محورا النظام، وتوسيعها يفتح ترشيحاً
+        // على أعمدة عشوائية من الرابط.
+        $implicit = ['company_id' => 'companies', 'project_id' => 'projects'];
+
+        foreach (hub_modules() as $ck => $cd) {
+            $declared = [];
+            foreach ($cd['fields'] as $f) {
+                if (($f['type'] ?? '') !== 'ref' || ($f['ref'] ?? '') === '') continue;
+                $declared[] = $f['col'];
+                // المتعدد يُدرَج الآن: كان الشرط `empty($f['multi'])` يُسقط ١١ علاقة عكسية،
+                // فلا جواب لسؤال «أي موظف يحمل هذا الجهاز؟» ولا «أي عميل يشتري هذه الخدمة؟»
+                $map[$f['ref']][] = [$ck, $f];
+            }
+
+            // قراءة أعمدة الجدول مرة واحدة بدل استجواب لكل عمود
+            $table = $cd['table'] ?? null;
+            try {
+                $cols = $table ? \Illuminate\Support\Facades\Schema::getColumnListing($table) : [];
+            } catch (\Throwable $e) {
+                $cols = [];
+            }
+
+            foreach ($implicit as $col => $ref) {
+                if ($ck === $ref || in_array($col, $declared, true)) continue;
+                if (! in_array($col, $cols, true)) continue;
+
+                $map[$ref][] = [$ck, [
+                    'key' => $col, 'col' => $col, 'ref' => $ref, 'type' => 'ref',
+                    'label' => hub_mod($ref)['label'] ?? $ref,
+                    'implicit' => true,
+                ]];
+            }
+        }
+
+        return $map;
     }
 }
 
@@ -1454,7 +1502,13 @@ if (! function_exists('hub_related')) {
             $cc = '\\App\\Models\\' . ($cd['model'] ?? '');
             if (! class_exists($cc)) continue;
 
-            $base = hub_scope($cc::where($cf['col'], $recordId), $ck);
+            // المرجع المتعدد يُخزَّن مصفوفةَ معرِّفات — فعكسه احتواءٌ لا مساواة
+            $base = hub_scope(
+                empty($cf['multi'])
+                    ? $cc::where($cf['col'], $recordId)
+                    : $cc::whereJsonContains($cf['col'], $recordId),
+                $ck
+            );
             // الصفوف أولاً والعدّ عند الحاجة فقط — كان count(*) لكل وحدة بنت
             // (٤٠+ استعلاماً على صفحة مشروع فارغ) قبل أي جلب
             $rows = (clone $base)->orderByDesc('created_at')->limit($limit + 1)->get();
