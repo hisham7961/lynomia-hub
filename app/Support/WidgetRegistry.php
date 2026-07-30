@@ -200,8 +200,14 @@ class WidgetRegistry
 
                     // عزل الشركات: صار `company_id` على القيد فيُفلتر مباشرة.
                     // القيد المعدوم الشركة (سجلٌ محذوف لم يُرحَّل) يُحجب عن المحدود.
+                    // درعُ النشر-قبل-الترحيل: إن غاب العمود بعدُ لا نفلتر به فينفجر —
+                    // بل نتحفّظ فنقصرها على نشاط المستخدم نفسه (لا تسريبَ ولا انهيار).
                     if (($cids = hub_company_ids($u)) !== null) {
-                        $q->whereIn('audits.company_id', $cids);
+                        if (Schema::hasColumn('audits', 'company_id')) {
+                            $q->whereIn('audits.company_id', $cids);
+                        } else {
+                            $q->where('audits.user_id', $u->id);
+                        }
                     }
 
                     // النطاق المشاريعي: فعلُه هو، أو ما جرى في مشاريعه
