@@ -191,7 +191,19 @@ class WidgetRegistry
                     $q = DB::table('audits')
                         ->leftJoin('users', 'users.id', '=', 'audits.user_id')
                         ->select('audits.*', 'users.name as user_name');
-                    if (hub_scoped($u)) {
+
+                    // وحدة لا يراها المستخدم لا يظهر نشاطها: اسم السجل وحده تسريب
+                    $visible = array_values(array_filter(array_keys(hub_modules()),
+                        fn ($m) => hub_can($u, $m, 'v')));
+                    $q->where(fn ($w) => $w->whereNull('audits.module')
+                                            ->orWhereIn('audits.module', $visible));
+
+                    /*
+                     * جدول التدقيق بلا `company_id`، فلا سبيل لفرز الشركة عليه. لذا يُقيَّد
+                     * **المحدود بشركاته** كما يُقيَّد المحدود بمشاريعه: فعلُه هو، أو ما جرى
+                     * في مشاريعه. الحجب أسلم من التسريب حتى لو ضاقت قائمته.
+                     */
+                    if (hub_scoped($u) || hub_company_ids($u) !== null) {
                         $ids = $u->visibleProjectIds();
                         $q->where(fn ($w) => $w->where('audits.user_id', $u->id)
                                                 ->orWhereIn('audits.project_id', $ids));
