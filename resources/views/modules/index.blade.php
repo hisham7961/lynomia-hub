@@ -36,6 +36,50 @@
 <div id="tblzone" hx-boost="true" hx-target="#tblzone" hx-select="#tblzone" hx-swap="outerHTML"
      hx-push-url="true" hx-select-oob="#flash:innerHTML">
     <div class="toolbar">
+        {{-- العروض المحفوظة: فلترك وبحثك وفرزك باسم واحد --}}
+        <details style="position:relative">
+            <summary class="btn ghost sm" style="list-style:none;cursor:pointer">📑 {{ $activeView?->name ?? 'العروض' }} ▾</summary>
+            <div class="card" style="position:absolute;z-index:30;min-width:280px;top:calc(100% + 6px);inset-inline-start:0;padding:10px">
+                @forelse ($views as $v)
+                    <div style="display:flex;gap:6px;align-items:center;padding:4px 0">
+                        <a href="{{ $v->url() }}" style="flex:1">{{ $v->is_default ? '⭐ ' : '' }}{{ $v->name }}</a>
+                        <form method="POST" action="{{ route('views.default', $v->id) }}" class="inline">@csrf
+                            <button class="btn ghost xs" title="{{ $v->is_default ? 'إلغاء الافتراضي' : 'اجعله الافتراضي — يُفتح تلقائياً' }}">{{ $v->is_default ? '★' : '☆' }}</button></form>
+                        <form method="POST" action="{{ route('views.destroy', $v->id) }}" class="inline" onsubmit="return confirm('حذف العرض «{{ $v->name }}»؟')">
+                            @csrf @method('DELETE')<button class="btn ghost xs" aria-label="حذف العرض {{ $v->name }}">✕</button></form>
+                    </div>
+                @empty
+                    <div class="sub" style="padding:4px 0">لا عروض محفوظة — رشّح وابحث وافرز ثم احفظ النتيجة باسم</div>
+                @endforelse
+                <form method="POST" action="{{ route('views.store') }}" style="display:flex;gap:6px;align-items:center;margin-top:8px;border-top:1px solid var(--brd);padding-top:8px;flex-wrap:wrap">
+                    @csrf
+                    <input type="hidden" name="module" value="{{ $module }}">
+                    <input type="hidden" name="query" value="{{ request()->getQueryString() }}">
+                    <label class="vh" for="sv-name">اسم العرض</label>
+                    <input class="inp" id="sv-name" name="name" maxlength="60" required placeholder="اسم العرض الحالي…" style="flex:1;min-width:130px">
+                    <label class="chk sub"><input type="checkbox" name="default" value="1"> افتراضي</label>
+                    <button class="btn sm">💾 حفظ</button>
+                </form>
+            </div>
+        </details>
+        {{-- أعمدة الجدول: اختر ما يظهر لك أنت --}}
+        <details style="position:relative">
+            <summary class="btn ghost sm" style="list-style:none;cursor:pointer">⚙️ الأعمدة ▾</summary>
+            <div class="card" style="position:absolute;z-index:30;min-width:240px;top:calc(100% + 6px);inset-inline-start:0;padding:10px;max-height:320px;overflow:auto">
+                @php $curCols = collect($columns)->pluck('key')->all(); @endphp
+                <form method="POST" action="{{ route('prefs.cols') }}">
+                    @csrf
+                    <input type="hidden" name="module" value="{{ $module }}">
+                    @foreach ($allFields as $af)
+                        <label class="chk" style="display:flex;padding:2px 0"><input type="checkbox" name="cols[]" value="{{ $af['key'] }}" @checked(in_array($af['key'], $curCols, true))> {{ $af['label'] }}</label>
+                    @endforeach
+                    <div style="display:flex;gap:6px;margin-top:8px">
+                        <button class="btn sm">حفظ أعمدتي</button>
+                        <button class="btn ghost sm" name="reset" value="1">↺ الافتراضي</button>
+                    </div>
+                </form>
+            </div>
+        </details>
         @foreach ($filters as $fl)
             <span class="chip">{{ $fl['label'] }}: {{ $fl['name'] }}<a href="{{ request()->fullUrlWithQuery(['f' => null, 'page' => null]) }}" title="إزالة">✕</a></span>
         @endforeach

@@ -90,6 +90,85 @@ class PrefController extends Controller
         return back()->with('ok', 'أُعيد الضبط الافتراضي');
     }
 
+    /** حفظ أعمدة الجدول الظاهرة لوحدة — تُخزَّن بترتيب سجل الوحدة */
+    public function saveCols(Request $r)
+    {
+        $data = $r->validate([
+            'module' => ['required', 'string', 'max:60'],
+            'cols'   => ['nullable', 'array', 'max:12'],
+            'cols.*' => ['string', 'max:60'],
+        ]);
+        $def = hub_mod($data['module']);
+        abort_unless($def && hub_can(auth()->user(), $data['module'], 'v'), 404);
+
+        $valid = collect($def['fields'])->pluck('key')->all();
+        $cols = $r->boolean('reset') ? []
+            : array_values(array_intersect($data['cols'] ?? [], $valid));
+
+        $u = auth()->user();
+        $prefs = (array) $u->prefs;
+        if ($cols) $prefs['cols'][$data['module']] = $cols;
+        else unset($prefs['cols'][$data['module']]);
+        $u->prefs = array_filter($prefs) ?: null;
+        $u->save();
+
+        return back()->with('ok', $cols ? 'حُفظت أعمدتك لهذه الوحدة' : 'عادت الأعمدة الافتراضية');
+    }
+
+    /** حفظ العرض الحالي (فلاتر + بحث + فرز) باسم */
+    public function storeView(Request $r)
+    {
+        $data = $r->validate([
+            'module'  => ['required', 'string', 'max:60'],
+            'name'    => ['required', 'string', 'max:60'],
+            'query'   => ['nullable', 'string', 'max:2000'],
+            'default' => ['nullable', 'boolean'],
+        ]);
+        abort_unless(hub_mod($data['module']) && hub_can(auth()->user(), $data['module'], 'v'), 404);
+
+        // تُحفظ معايير العرض فقط — لا صفحة ولا معرف عرض سابق
+        parse_str((string) ($data['query'] ?? ''), $qs);
+        unset($qs['page'], $qs['view']);
+        $query = http_build_query($qs);
+
+        abort_if(\App\Models\SavedView::where('user_id', auth()->id())
+            ->where('module', $data['module'])->count() >= 30, 422, 'بلغت حد ٣٠ عرضاً لهذه الوحدة');
+
+        if ($r->boolean('default')) {
+            \App\Models\SavedView::where('user_id', auth()->id())
+                ->where('module', $data['module'])->update(['is_default' => false]);
+        }
+
+        $v = \App\Models\SavedView::create([
+            'user_id' => auth()->id(), 'module' => $data['module'],
+            'name' => $data['name'], 'query' => $query ?: null,
+            'is_default' => $r->boolean('default'),
+        ]);
+
+        return redirect($v->url())->with('ok', 'حُفظ العرض «' . $v->name . '»');
+    }
+
+    /** تبديل العرض الافتراضي / حذفه — لصاحبه فقط */
+    public function defaultView(string $id)
+    {
+        $v = \App\Models\SavedView::where('user_id', auth()->id())->findOrFail($id);
+        if (! $v->is_default) {
+            \App\Models\SavedView::where('user_id', auth()->id())
+                ->where('module', $v->module)->update(['is_default' => false]);
+        }
+        $v->update(['is_default' => ! $v->is_default]);
+
+        return back()->with('ok', $v->is_default ? 'صار «' . $v->name . '» عرضك الافتراضي' : 'أُلغي الافتراضي');
+    }
+
+    public function destroyView(string $id)
+    {
+        $v = \App\Models\SavedView::where('user_id', auth()->id())->findOrFail($id);
+        $v->delete();
+
+        return back()->with('ok', 'حُذف العرض «' . $v->name . '»');
+    }
+
     /** المجموعات الخام (قبل تخصيص المستخدم) لعرضها في صفحة التخصيص */
     protected function rawGroups($u): array
     {

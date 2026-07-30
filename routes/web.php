@@ -116,6 +116,10 @@ Route::middleware('auth')->group(function () {
     Route::get('personalize', [PrefController::class, 'edit'])->name('prefs.edit');
     Route::post('personalize', [PrefController::class, 'update'])->name('prefs.update');
     Route::post('personalize/reset', [PrefController::class, 'reset'])->name('prefs.reset');
+    Route::post('personalize/cols', [PrefController::class, 'saveCols'])->name('prefs.cols');
+    Route::post('views', [PrefController::class, 'storeView'])->name('views.store');
+    Route::post('views/{id}/default', [PrefController::class, 'defaultView'])->name('views.default');
+    Route::delete('views/{id}', [PrefController::class, 'destroyView'])->name('views.destroy');
 
     // ── خيط التتبع من الفكرة إلى النشر ──
     Route::get('trace/{module}/{id}', [TraceController::class, 'show'])->name('trace');

@@ -54,6 +54,14 @@ class ModuleController extends Controller
     {
         [$def, $class] = $this->resolve($module, 'v');
         $def['key'] = $module;
+
+        // زيارة عارية + عرض افتراضي محفوظ → يُطبق تلقائياً (view= يمنع الدوران)
+        if (! $r->query() &&
+            ($dv = \App\Models\SavedView::where('user_id', auth()->id())
+                ->where('module', $module)->where('is_default', true)->first())) {
+            return redirect($dv->url());
+        }
+
         $trash = false; $filters = [];
         $q = $this->buildQuery($r, $def, $class, $trash, $filters);
         $fields = collect($def['fields']);
@@ -69,11 +77,18 @@ class ModuleController extends Controller
         [$columns, $labels] = $this->columnsAndLabels($def, $rows->items());
         $statusOptions = $this->statusOptions($def);
 
+        // عروض المستخدم المحفوظة لهذه الوحدة + العرض المطبَّق الآن
+        $views = \App\Models\SavedView::where('user_id', auth()->id())
+            ->where('module', $module)->orderByDesc('is_default')->orderBy('name')->get();
+        $activeView = ($vid = $r->query('view')) ? $views->firstWhere('id', $vid) : null;
+
         return view('modules.index', [
             'module' => $module, 'def' => $def, 'rows' => $rows,
             'columns' => $columns, 'labels' => $labels,
             'statusOptions' => $statusOptions, 'trash' => $trash,
             'filters' => $filters, 'sortKey' => $sortKey, 'sortDir' => $dir,
+            'views' => $views, 'activeView' => $activeView,
+            'allFields' => hub_visible_fields(auth()->user(), $module, $def),
         ]);
     }
 
@@ -480,7 +495,11 @@ class ModuleController extends Controller
     {
         // صلاحيات مستوى الحقل: المخفي عن دور المستخدم لا يظهر في جدول ولا صفحة ولا تصدير
         $fields = collect(hub_visible_fields(auth()->user(), (string) ($def['key'] ?? ''), $def));
-        $keys   = $all ? $fields->pluck('key')->all() : ($def['columns'] ?? $fields->take(4)->pluck('key')->all());
+        // أعمدة المستخدم المخصصة تتقدم على أعمدة السجل — وتُقاطَع مع المرئي لدوره
+        $userCols = $all ? [] : array_values(array_intersect(
+            (array) hub_pref('cols.' . ($def['key'] ?? ''), []), $fields->pluck('key')->all()));
+        $keys   = $all ? $fields->pluck('key')->all()
+            : ($userCols ?: ($def['columns'] ?? $fields->take(4)->pluck('key')->all()));
         $cols   = $fields->whereIn('key', $keys)->values()->all();
 
         $labels = [];
