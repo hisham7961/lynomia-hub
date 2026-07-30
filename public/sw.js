@@ -3,9 +3,9 @@
    - التنقل بين الصفحات: الشبكة أولاً بمهلة، وإلا آخر نسخة محفوظة، وإلا صفحة «بلا اتصال»
    - لا يخبئ أبداً: API، الملفات الخاصة، الأسرار، مراكز الإدارة */
 // يُرفع مع كل تغيير في CSS/JS — وإلا بقي مستخدمو PWA على الأصول القديمة المخبأة
-var VER = 'hub-v2.91';
+var VER = 'hub-v2.92';
 var STATIC = ['/offline', '/css/app.css', '/js/app.js', '/js/htmx.min.js'];
-var NEVER = ['/api/', '/files/', '/m/vault', '/admin/', '/jslog', '/logout'];
+var NEVER = ['/api/', '/files/', '/m/vault', '/admin/', '/apps/quoteflow', '/jslog', '/logout'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(VER).then(function (c) { return c.addAll(STATIC); }).then(function () { return self.skipWaiting(); }));

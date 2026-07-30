@@ -112,6 +112,7 @@
                     <div class="seg" style="--seg:var(--p)">
                         <span class="seglbl">النظام</span>
                         <a class="{{ request()->routeIs('settings.*') ? 'on' : '' }}" href="{{ route('settings.edit') }}">الإعدادات</a>
+                        <a href="{{ route('quoteflow') }}" title="تطبيق جانبي معزول — يفتح في تبويبه" target="_blank" rel="noopener">QuoteFlow ↗</a>
                     </div>
                 @endif
             </nav>

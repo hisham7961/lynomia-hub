@@ -41,6 +41,7 @@ use App\Http\Controllers\Web\RoleController;
 use App\Http\Controllers\Web\SearchController;
 use App\Http\Controllers\Web\SecurityController;
 use App\Http\Controllers\Web\SupportController;
+use App\Http\Controllers\Web\QuoteFlowController;
 use App\Http\Controllers\Web\SettingController;
 use App\Http\Controllers\Web\UserController;
 use App\Http\Controllers\Web\WebhookController;
@@ -217,6 +218,10 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/ops/test-error', [OpsController::class, 'testError'])->name('ops.testerror');
     Route::post('admin/ops/migrate', [OpsController::class, 'migrate'])->name('ops.migrate');
     Route::post('admin/ops/clear-cache', [OpsController::class, 'clearCache'])->name('ops.clearcache');
+
+    // QuoteFlow — تطبيق جانبي معزول للمالك وحده، حالته على الخادم
+    Route::get('apps/quoteflow', [QuoteFlowController::class, 'page'])->name('quoteflow');
+    Route::post('apps/quoteflow/save', [QuoteFlowController::class, 'save'])->name('quoteflow.save');
     Route::post('admin/demo/reset', function () {
         abort_unless(auth()->user()?->role?->is_owner, 403);
         // شامل: كل وحدة من السجل تنال بيانات تجريبية، والإعدادات الفارغة تُملأ
