@@ -665,7 +665,9 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .main::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
   background:radial-gradient(900px 420px at 88% -6%,color-mix(in srgb,var(--ac) 5%,transparent),transparent 60%),
              radial-gradient(700px 380px at -8% 30%,color-mix(in srgb,var(--p) 4%,transparent),transparent 60%)}
-.main>*{position:relative;z-index:1}
+/* المحتوى وحده يُرفع فوق التوهّج — لا كل الأبناء، وإلا خفض تخصيصُه طبقةَ البار
+   العلوي (z-index:20) لواحدٍ فغطّى المحتوىُ اللاحقُ قوائمَ الإشعارات والبحث. */
+.main>.content{position:relative;z-index:1}
 
 /* البطاقات تتنفس: رفعة خفيفة عند الحوم */
 .card.kid{transition:box-shadow .22s,transform .22s,border-color .22s}
