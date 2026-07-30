@@ -216,6 +216,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'ok' => $mon],
             ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'ok' => $mon],
             ['key' => 'recs',      'label' => '💡 مركز التوصيات',    'route' => 'recs',            'ok' => $mon],
+            ['key' => 'kpis',      'label' => '📈 مؤشرات KPI',       'route' => 'kpis.index',      'ok' => $mon],
             ['key' => 'supscores', 'label' => '🏅 تقييم الموردين',   'route' => 'supplierscores',  'ok' => hub_can($user, 'suppliers', 'v')],
             ['key' => 'capacity',  'label' => '📊 القدرات والموارد', 'route' => 'capacity',        'ok' => $mon],
             ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'ok' => $mon],
@@ -1561,5 +1562,83 @@ if (! function_exists('hub_supplier_score_calc')) {
         $score = $ontime * 0.6 + (1 - $ret) * 100 * 0.4;
 
         return max(0, min(100, (int) round($score)));
+    }
+}
+
+if (! function_exists('hub_kpi_metric')) {
+    /**
+     * قيمة مقياس واحد بأمان: count/sum/avg فوق جدول وحدة مسجّلة مع فلتر حالة
+     * اختياري — كل المدخلات محقّقة ضد سجل الوحدة، لا نص حر يُقيَّم.
+     */
+    function hub_kpi_metric(array $m, $user = null): ?float
+    {
+        $mk = (string) ($m['module'] ?? '');
+        $def = hub_mod($mk);
+        if (! $def) return null;
+        if ($user && ! hub_can($user, $mk, 'v')) return null;   // احترام الصلاحية
+
+        $agg = in_array($m['agg'] ?? '', ['count', 'sum', 'avg'], true) ? $m['agg'] : 'count';
+        $q = \Illuminate\Support\Facades\DB::table($def['table'])->whereNull('deleted_at');
+        if ($user) $q = hub_scope($q, $mk, $user);
+
+        // فلتر الحالة على عمود حالة الوحدة فقط
+        if (($st = trim((string) ($m['st'] ?? ''))) !== '' && ($sc = $def['status'] ?? null)
+            && \Illuminate\Support\Facades\Schema::hasColumn($def['table'], $sc)) {
+            $q->where($sc, $st);
+        }
+
+        if ($agg === 'count') return (float) $q->count();
+
+        // sum/avg يتطلبان عموداً رقمياً من حقول الوحدة
+        $col = collect($def['fields'])->firstWhere('key', $m['col'] ?? '');
+        if (! $col || ! in_array($col['type'], ['num', 'big'], true)) return null;
+
+        return $agg === 'sum' ? (float) $q->sum($col['col']) : (float) ($q->avg($col['col']) ?? 0);
+    }
+}
+
+if (! function_exists('hub_kpi_value')) {
+    /** قيمة مؤشر مركّب من معادلته المُهيكَلة — يعيد null إن تعذّر الحساب */
+    function hub_kpi_value(array $formula, $user = null): ?float
+    {
+        $a = isset($formula['a']) && is_array($formula['a']) ? hub_kpi_metric($formula['a'], $user) : null;
+        if ($a === null) return null;
+
+        $combine = $formula['combine'] ?? 'none';
+        if ($combine === 'none') return round($a, 2);
+
+        $b = isset($formula['b']) && is_array($formula['b']) ? hub_kpi_metric($formula['b'], $user) : null;
+        if ($b === null) return round($a, 2);
+
+        return match ($combine) {
+            'ratio_pct' => $b != 0.0 ? round($a / $b * 100, 1) : null,
+            'ratio'     => $b != 0.0 ? round($a / $b, 2) : null,
+            'diff'      => round($a - $b, 2),
+            'sum'       => round($a + $b, 2),
+            default     => round($a, 2),
+        };
+    }
+}
+
+if (! function_exists('hub_kpis')) {
+    /** كل المؤشرات المخصصة محسوبةً — لصفحة العرض */
+    function hub_kpis($user = null): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('kpi_defs')) return [];
+        $user = $user ?? auth()->user();
+
+        return \App\Models\KpiDef::orderBy('sort')->orderBy('created_at')->get()->map(function ($k) use ($user) {
+            $val = hub_kpi_value((array) $k->formula, $user);
+            $tone = '';
+            if ($val !== null && $k->target !== null) {
+                $hit = ($k->good ?? 'up') === 'up' ? $val >= $k->target : $val <= $k->target;
+                $near = ($k->good ?? 'up') === 'up' ? $val >= $k->target * 0.8 : $val <= $k->target * 1.2;
+                $tone = $hit ? 'ok' : ($near ? 'wn' : 'bad');
+            }
+
+            return ['id' => $k->id, 'name' => $k->name, 'unit' => $k->unit,
+                    'value' => $val, 'target' => $k->target, 'tone' => $tone,
+                    'good' => $k->good, 'formula' => (array) $k->formula];
+        })->all();
     }
 }

@@ -93,6 +93,9 @@ Route::middleware('auth')->group(function () {
     Route::get('impact', [CapacityController::class, 'impact'])->name('impact');
     Route::get('app-quality', [CapacityController::class, 'quality'])->name('appquality');
     Route::get('recommendations', [CapacityController::class, 'recommendations'])->name('recs');
+    Route::get('kpis', [\App\Http\Controllers\Web\KpiController::class, 'index'])->name('kpis.index');
+    Route::post('kpis', [\App\Http\Controllers\Web\KpiController::class, 'store'])->name('kpis.store');
+    Route::delete('kpis/{id}', [\App\Http\Controllers\Web\KpiController::class, 'destroy'])->name('kpis.destroy');
 
     // ── صندوق الوثائق الوارد ──
     Route::get('inboxdocs', [InboxDocController::class, 'index'])->name('inboxdocs.index');
