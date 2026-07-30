@@ -129,7 +129,7 @@ class ModuleController extends Controller
                 'module' => $ck, 'label' => $cd['label'], 'field' => $cf,
                 'count'  => $count,
                 'rows'   => (clone $base)->orderByDesc('created_at')->limit(8)->get(),
-                'display' => $cd['display'] ?? 'name',
+                'display' => hub_display_col($ck),
             ];
         }
 
@@ -203,7 +203,7 @@ class ModuleController extends Controller
         $rows = $this->buildQuery($r->merge(['status' => null]), $def, $class, $trash, $filters)
             ->orderByDesc('created_at')->limit(400)->get();
 
-        $disp = $def['display'] ?? 'name';
+        $disp = hub_display_col($module);
         $cols = [];
         foreach ($options as $o) $cols[$o] = [];
         foreach ($rows as $row) {

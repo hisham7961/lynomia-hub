@@ -17,9 +17,10 @@ class SearchController extends Controller
         $flat = [];
         foreach ($this->searchableModules() as $key => $def) {
             $rows = $this->query($key, $def, $q)->limit(3)->get();
+            $disp = hub_display_col($key);
             foreach ($rows as $row) {
                 $flat[] = ['module' => $key, 'id' => $row->id,
-                           'name' => (string) $row->{$def['display'] ?? 'name'}, 'label' => $def['label']];
+                           'name' => (string) $row->{$disp}, 'label' => $def['label']];
             }
             if (count($flat) >= 9) break;
         }
@@ -40,7 +41,7 @@ class SearchController extends Controller
                 if (! $count) continue;
                 $groups[] = [
                     'module' => $key, 'label' => $def['label'], 'count' => $count,
-                    'display' => $def['display'] ?? 'name', 'status' => $def['status'] ?? null,
+                    'display' => hub_display_col($key), 'status' => $def['status'] ?? null,
                     'rows' => $base->orderByDesc('created_at')->limit(8)->get(),
                 ];
             }

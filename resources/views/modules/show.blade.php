@@ -11,7 +11,7 @@
         <a class="btn p sm" href="{{ route('m.edit', [$module, $row->id]) }}" onclick="return Hub.modal(this.href)">تعديل</a>
     @endif
 </div>
-<span data-recent data-title="{{ $def['label'] }}: {{ \Illuminate\Support\Str::limit($row->{$def['display'] ?? 'name'} ?? $row->id, 28) }}" hidden></span>
+<span data-recent data-title="{{ $def['label'] }}: {{ \Illuminate\Support\Str::limit($row->{hub_display_col($module)} ?? $row->id, 28) }}" hidden></span>
 <div class="card">
     <dl class="detail">
         @foreach ($def['fields'] as $f)

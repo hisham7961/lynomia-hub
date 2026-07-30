@@ -19,7 +19,7 @@ trait Searchable
         $cols = collect($def['fields'] ?? [])
             ->whereIn('type', ['text', 'ta', 'url', 'sel', 'tags'])
             ->pluck('col')
-            ->push($def['display'] ?? 'name')
+            ->push(hub_display_col(static::MODULE))
             ->unique()
             ->values();
 

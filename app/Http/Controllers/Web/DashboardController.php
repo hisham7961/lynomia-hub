@@ -31,7 +31,7 @@ class DashboardController extends Controller
         if ($tdef && hub_can($user, 'tasks', 'v')) {
             $dueF   = collect($tdef['fields'])->firstWhere('key', 'due');
             $stCol  = $tdef['status'] ?? null;
-            $disp   = $tdef['display'] ?? 'title';
+            $disp   = hub_display_col('tasks');
             if ($dueF) {
                 $dueCol = $dueF['col'];
                 $due = hub_scope(DB::table($tdef['table'])->whereNull('deleted_at'), 'tasks')

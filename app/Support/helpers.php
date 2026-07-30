@@ -161,12 +161,30 @@ if (! function_exists('hub_ref_table')) {
     }
 }
 
+if (! function_exists('hub_display_col')) {
+    /**
+     * عمود القاعدة الفعلي لعرض وحدة — السجل قد يذكر مفتاح الحقل لا العمود
+     * (companies: display=nameAr والعمود name_ar) — الاستعلام بالمفتاح يكسر MySQL.
+     */
+    function hub_display_col(string $module): string
+    {
+        static $map = [];
+        if (isset($map[$module])) return $map[$module];
+
+        $def  = hub_mod($module);
+        $disp = $def['display'] ?? 'name';
+        $f    = collect($def['fields'] ?? [])->firstWhere('key', $disp);
+
+        return $map[$module] = $f['col'] ?? $disp;
+    }
+}
+
 if (! function_exists('hub_ref_display')) {
     /** عمود العرض لجدول مرجعي */
     function hub_ref_display(string $ref): string
     {
         if ($ref === 'roles') return 'name';
-        return hub_mod($ref)['display'] ?? 'name';
+        return hub_display_col($ref);
     }
 }
 
@@ -277,7 +295,7 @@ if (! function_exists('hub_expiry')) {
             $items = [];
             foreach (hub_expiry_fields() as [$mk, $f]) {
                 $md = hub_mod($mk);
-                $disp = $md['display'] ?? 'name';
+                $disp = hub_display_col($mk);
                 try {
                     $q = \Illuminate\Support\Facades\DB::table($md['table'])
                         ->whereNull('deleted_at')

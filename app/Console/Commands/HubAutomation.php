@@ -126,7 +126,7 @@ class HubAutomation extends Command
                 default                 => $q->whereRaw('1=0'),
             };
 
-            $disp = $md['display'] ?? 'name';
+            $disp = hub_display_col($rule->mod);
             $rows = $q->limit(50)->get(['id', $disp . ' as _n']);
             if ($rows->isEmpty()) continue;
             $rulesRun++;
