@@ -51,10 +51,12 @@
         @include('partials.chart_donut', ['slices' => $taskSlices])
     </div>
     @endif
+    @unless (in_array('recent', $hid ?? [], true))
     <div class="card kid" id="recentbox" hidden>
         <h3>📌 آخر ما فتحت</h3>
         <div id="recentlist" class="rl"></div>
     </div>
+    @endunless
     @if ($due->count())
     <div class="card kid">
         <h3>⏰ مهام تقترب مواعيدها</h3>
@@ -69,6 +71,7 @@
         </table>
     </div>
     @endif
+    @unless (in_array('audits', $hid ?? [], true))
     <div class="card kid" style="grid-column:span 1">
         <h3>🕘 آخر النشاطات</h3>
         <table class="mini">
@@ -83,5 +86,6 @@
             @endforelse
         </table>
     </div>
+    @endunless
 </div>
 @endsection

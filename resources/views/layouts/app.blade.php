@@ -89,10 +89,10 @@
 </div>
 @php
     $navData = collect(hub_nav(auth()->user()))
-        ->flatMap(fn ($g) => collect($g['items'])->map(fn ($k) => [
-            't' => hub_mod($k)['label'],
-            'u' => route('m.index', $k),
-            'n' => hub_can(auth()->user(), $k, 'a') ? route('m.create', $k) : null,
+        ->flatMap(fn ($g) => collect($g['items'])->map(fn ($it) => [
+            't' => $it['label'],
+            'u' => route('m.index', $it['key']),
+            'n' => hub_can(auth()->user(), $it['key'], 'a') ? route('m.create', $it['key']) : null,
         ]))
         ->values();
 @endphp

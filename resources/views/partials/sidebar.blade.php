@@ -8,42 +8,21 @@
         {{ setting('app.name', 'Lynomia Hub') }}</a></div>
     <nav>
         <a class="ni top {{ request()->routeIs('dashboard') ? 'on' : '' }}" href="{{ route('dashboard') }}">لوحة التحكم</a>
-        <a class="ni top {{ request()->routeIs('morning') ? 'on' : '' }}" href="{{ route('morning') }}">☀️ تشغيل اليوم</a>
-        <a class="ni top {{ request()->routeIs('portal.me') ? 'on' : '' }}" href="{{ route('portal.me') }}">👤 بوابتي</a>
-        <a class="ni top {{ request()->routeIs('feed') ? 'on' : '' }}" href="{{ route('feed') }}">📣 قناة الفريق</a>
-        <a class="ni top {{ request()->routeIs('inboxdocs.*') ? 'on' : '' }}" href="{{ route('inboxdocs.index') }}">📥 صندوق الوثائق</a>
-        @php $xc = hub_expiry_count(); @endphp
-        <a class="ni top {{ request()->routeIs('alerts') ? 'on' : '' }}" href="{{ route('alerts') }}">🔔 ينتهي قريباً @if ($xc)<span class="nbdg">{{ $xc }}</span>@endif</a>
-        @if (hub_can(auth()->user(), 'fin', 'v'))
-            <a class="ni top {{ request()->routeIs('reports.finance') ? 'on' : '' }}" href="{{ route('reports.finance') }}">📊 التقارير المالية</a>
-        @endif
-        @if (auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'monitor'))
-            <a class="ni top {{ request()->routeIs('costs.*') ? 'on' : '' }}" href="{{ route('costs.index') }}">💰 التكاليف والربحية</a>
-            <a class="ni top {{ request()->routeIs('capacity') ? 'on' : '' }}" href="{{ route('capacity') }}">📊 القدرات والموارد</a>
-            <a class="ni top {{ request()->routeIs('impact') ? 'on' : '' }}" href="{{ route('impact') }}">🕸️ خريطة الأثر</a>
-            <a class="ni top {{ request()->routeIs('appquality') ? 'on' : '' }}" href="{{ route('appquality') }}">🧪 جودة البرمجيات</a>
-        @endif
-        @if (hub_can(auth()->user(), 'contracts', 'v'))
-            <a class="ni top {{ request()->routeIs('legal') ? 'on' : '' }}" href="{{ route('legal') }}">⚖️ القانوني</a>
-        @endif
-        @if (hub_can(auth()->user(), 'tickets', 'v'))
-            <a class="ni top {{ request()->routeIs('support') ? 'on' : '' }}" href="{{ route('support') }}">🎫 لوحة الدعم</a>
-        @endif
-        @if (auth()->user()->role?->is_owner)
-            <a class="ni top {{ request()->routeIs('ceo') ? 'on' : '' }}" href="{{ route('ceo') }}">👑 لوحة CEO</a>
-        @endif
-        @if (auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'monitor'))
-            <a class="ni top {{ request()->routeIs('performance') ? 'on' : '' }}" href="{{ route('performance') }}">📈 لوحة الأداء</a>
-        @endif
+        @php $hidTop = (array) hub_pref('nav.hidden_top', []); @endphp
+        @foreach (hub_top_links(auth()->user()) as $l)
+            @continue(in_array($l['key'], $hidTop, true))
+            <a class="ni top {{ request()->routeIs($l['key'] === 'inboxdocs' ? 'inboxdocs.*' : ($l['key'] === 'costs' ? 'costs.*' : $l['route'])) ? 'on' : '' }}" href="{{ route($l['route']) }}">{{ $l['label'] }}@if ($l['key'] === 'alerts' && ($xc = hub_expiry_count()))<span class="nbdg">{{ $xc }}</span>@endif</a>
+        @endforeach
         @foreach (hub_nav(auth()->user()) as $g)
-            @php $active = collect($g['items'])->contains(fn ($k) => request()->is("m/$k*")); @endphp
+            @php $active = collect($g['items'])->contains(fn ($it) => request()->is('m/' . $it['key'] . '*')); @endphp
             <details {{ $active ? 'open' : '' }}>
                 <summary>{{ $g['icon'] }} {{ $g['g'] }}</summary>
-                @foreach ($g['items'] as $k)
-                    <a class="ni {{ request()->is("m/$k*") ? 'on' : '' }}" href="{{ route('m.index', $k) }}">{{ hub_mod($k)['label'] }}</a>
+                @foreach ($g['items'] as $it)
+                    <a class="ni {{ request()->is('m/' . $it['key'] . '*') ? 'on' : '' }}" href="{{ route('m.index', $it['key']) }}">{{ $it['label'] }}</a>
                 @endforeach
             </details>
         @endforeach
+        <a class="ni top {{ request()->routeIs('prefs.*') ? 'on' : '' }}" href="{{ route('prefs.edit') }}">🎛️ التخصيص</a>
         @if (hub_flag(auth()->user(), 'users') || hub_flag(auth()->user(), 'audit') || auth()->user()->role?->is_owner)
             @php $adm = request()->routeIs('users.*') || request()->routeIs('roles.*') || request()->routeIs('audit.*') || request()->routeIs('settings.*'); @endphp
             <details {{ $adm ? 'open' : '' }}>

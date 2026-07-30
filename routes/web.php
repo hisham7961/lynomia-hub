@@ -4,6 +4,7 @@ use App\Http\Controllers\Web\AlertController;
 use App\Http\Controllers\Web\AppCenterController;
 use App\Http\Controllers\Web\ApprovalDecisionController;
 use App\Http\Controllers\Web\AttachmentController;
+use App\Http\Controllers\Web\PrefController;
 use App\Http\Controllers\Web\TraceController;
 use App\Http\Controllers\Web\AuditController;
 use App\Http\Controllers\Web\AuthController;
@@ -110,6 +111,11 @@ Route::middleware('auth')->group(function () {
     Route::post('comments/{id}/pin', [CommentController::class, 'pin'])->name('comments.pin');
     Route::post('comments/{id}/task', [CommentController::class, 'toTask'])->name('comments.task');
     Route::delete('comments/{id}', [CommentController::class, 'destroy'])->name('comments.destroy');
+
+    // ── التخصيص الشخصي ──
+    Route::get('personalize', [PrefController::class, 'edit'])->name('prefs.edit');
+    Route::post('personalize', [PrefController::class, 'update'])->name('prefs.update');
+    Route::post('personalize/reset', [PrefController::class, 'reset'])->name('prefs.reset');
 
     // ── خيط التتبع من الفكرة إلى النشر ──
     Route::get('trace/{module}/{id}', [TraceController::class, 'show'])->name('trace');

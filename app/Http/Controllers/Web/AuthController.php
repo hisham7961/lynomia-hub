@@ -125,7 +125,8 @@ class AuthController extends Controller
 
         $r->session()->regenerate();
 
-        return redirect()->intended(route('dashboard'));
+        // شاشة البداية من تفضيل المستخدم — والرابط المقصود قبل الدخول يفوز عليها
+        return redirect()->intended(hub_home_url(auth()->user()));
     }
 
     public function logout(Request $r)

@@ -151,14 +151,101 @@ if (! function_exists('hub_can')) {
 
 if (! function_exists('hub_nav')) {
     /** مجموعات التنقل الجانبي — تُخفى الوحدات التي لا يملك المستخدم عرضها */
+    /**
+     * مجموعات التنقل بعد الصلاحيات **وتخصيص المستخدم**: وحدة مخفية تسقط،
+     * وتسمية بديلة تُطبق، وترتيب المجموعات يتبع اختياره — كله عرضٌ فقط:
+     * الإخفاء لا يمس الصلاحية والرابط المباشر يعمل كما هو.
+     */
     function hub_nav($user): array
     {
+        $hidden = (array) hub_pref('nav.hidden', [], $user);
+        $names  = (array) hub_pref('nav.names', [], $user);
+        $order  = (array) hub_pref('nav.order', [], $user);
+
         $out = [];
         foreach (config('hub_nav', []) as $g) {
-            $items = array_values(array_filter($g['items'], fn ($k) => hub_mod($k) && hub_can($user, $k, 'v')));
+            $items = [];
+            foreach ($g['items'] as $k) {
+                if (! hub_mod($k) || ! hub_can($user, $k, 'v')) continue;
+                if (in_array($k, $hidden, true)) continue;
+                $alias = trim((string) ($names[$k] ?? ''));
+                $items[] = ['key' => $k, 'label' => $alias !== '' ? $alias : hub_mod($k)['label']];
+            }
             if ($items) $out[] = ['g' => $g['g'], 'icon' => $g['icon'], 'items' => $items];
         }
+
+        if ($order) {
+            usort($out, function ($a, $b) use ($order) {
+                $ia = array_search($a['g'], $order, true); $ib = array_search($b['g'], $order, true);
+                return ($ia === false ? 99 : $ia) <=> ($ib === false ? 99 : $ib);
+            });
+        }
+
         return $out;
+    }
+}
+
+if (! function_exists('hub_pref')) {
+    /** تفضيل شخصي للمستخدم — نقطي: hub_pref('nav.hidden', []) */
+    function hub_pref(string $key, $default = null, $user = null)
+    {
+        $u = $user ?? auth()->user();
+
+        return data_get($u?->prefs, $key, $default);
+    }
+}
+
+if (! function_exists('hub_top_links')) {
+    /**
+     * كتالوج روابط القائمة العلوية بصلاحيات المستخدم — مصدر واحد للشريط الجانبي
+     * ولصفحة التخصيص ولاختيارات شاشة البداية.
+     */
+    function hub_top_links($user): array
+    {
+        $owner = (bool) $user?->role?->is_owner;
+        $mon = $owner || hub_flag($user, 'monitor');
+
+        $all = [
+            ['key' => 'morning',   'label' => '☀️ تشغيل اليوم',      'route' => 'morning',         'ok' => true],
+            ['key' => 'me',        'label' => '👤 بوابتي',           'route' => 'portal.me',       'ok' => true],
+            ['key' => 'feed',      'label' => '📣 قناة الفريق',      'route' => 'feed',            'ok' => true],
+            ['key' => 'inboxdocs', 'label' => '📥 صندوق الوثائق',    'route' => 'inboxdocs.index', 'ok' => true],
+            ['key' => 'alerts',    'label' => '🔔 ينتهي قريباً',     'route' => 'alerts',          'ok' => true],
+            ['key' => 'finrep',    'label' => '📊 التقارير المالية', 'route' => 'reports.finance', 'ok' => hub_can($user, 'fin', 'v')],
+            ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'ok' => $mon],
+            ['key' => 'capacity',  'label' => '📊 القدرات والموارد', 'route' => 'capacity',        'ok' => $mon],
+            ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'ok' => $mon],
+            ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'ok' => $mon],
+            ['key' => 'legal',     'label' => '⚖️ القانوني',         'route' => 'legal',           'ok' => hub_can($user, 'contracts', 'v')],
+            ['key' => 'support',   'label' => '🎫 لوحة الدعم',       'route' => 'support',         'ok' => hub_can($user, 'tickets', 'v')],
+            ['key' => 'ceo',       'label' => '👑 لوحة CEO',         'route' => 'ceo',             'ok' => $owner],
+            ['key' => 'perf',      'label' => '📈 لوحة الأداء',      'route' => 'performance',     'ok' => $mon],
+        ];
+
+        return array_values(array_filter($all, fn ($l) => $l['ok']));
+    }
+}
+
+if (! function_exists('hub_home_url')) {
+    /**
+     * شاشة البداية بعد الدخول: من تفضيل المستخدم `home` —
+     * صفحة من الكتالوج أو وحدة بصيغة m:tasks. الاختيار غير الصالح يسقط للوحة التحكم.
+     */
+    function hub_home_url($user = null): string
+    {
+        $u = $user ?? auth()->user();
+        $home = (string) hub_pref('home', '', $u);
+
+        if (str_starts_with($home, 'm:')) {
+            $mk = substr($home, 2);
+            if (hub_mod($mk) && hub_can($u, $mk, 'v')) return route('m.index', $mk);
+        } elseif ($home !== '' && $home !== 'dashboard') {
+            foreach (hub_top_links($u) as $l) {
+                if ($l['key'] === $home) return route($l['route']);
+            }
+        }
+
+        return route('dashboard');
     }
 }
 

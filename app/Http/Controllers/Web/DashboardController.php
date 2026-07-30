@@ -10,9 +10,10 @@ class DashboardController extends Controller
     public function index()
     {
         $user  = auth()->user();
+        $hid   = (array) hub_pref('dash.hidden', [], $user);   // بطاقات أخفاها المستخدم: لا تُحسب أصلاً
         $cards = [];
 
-        foreach (['projects', 'clients', 'tasks', 'tickets', 'fin', 'contracts'] as $key) {
+        foreach ($hid && in_array('counts', $hid, true) ? [] : ['projects', 'clients', 'tasks', 'tickets', 'fin', 'contracts'] as $key) {
             $def = hub_mod($key);
             if (! $def || ! hub_can($user, $key, 'v')) continue;
             $cards[] = [
@@ -23,12 +24,13 @@ class DashboardController extends Controller
         }
 
         // رادار الانتهاءات — أهم ٥
-        $expiry = collect(hub_expiry())->filter(fn ($i) => hub_can($user, $i['module'], 'v'))->take(5)->values();
+        $expiry = in_array('expiry', $hid, true) ? collect()
+            : collect(hub_expiry())->filter(fn ($i) => hub_can($user, $i['module'], 'v'))->take(5)->values();
 
         // مهام تقترب مواعيدها
         $due = collect(); $dueCol = $stCol = $disp = null;
         $tdef = hub_mod('tasks');
-        if ($tdef && hub_can($user, 'tasks', 'v')) {
+        if ($tdef && hub_can($user, 'tasks', 'v') && ! in_array('due', $hid, true)) {
             $dueF   = collect($tdef['fields'])->firstWhere('key', 'due');
             $stCol  = $tdef['status'] ?? null;
             $disp   = hub_display_col('tasks');
@@ -43,7 +45,7 @@ class DashboardController extends Controller
 
         // تقدم التطبيقات — نسبة الإنجاز الحية من محرك النسبة
         $apps = collect();
-        if (hub_can($user, 'apps', 'v')) {
+        if (hub_can($user, 'apps', 'v') && ! in_array('apps', $hid, true)) {
             $apps = hub_scope(DB::table('applications')->whereNull('deleted_at'), 'apps')
                 ->whereNotNull('project_id')
                 ->where(fn ($w) => $w->whereNull('status')->orWhere('status', 'NOT LIKE', '%موقوف%'))
@@ -57,7 +59,7 @@ class DashboardController extends Controller
 
         // توزيع المهام بالحالة — للدونات
         $taskSlices = [];
-        if (hub_can($user, 'tasks', 'v')) {
+        if (hub_can($user, 'tasks', 'v') && ! in_array('donut', $hid, true)) {
             $taskSlices = hub_scope(DB::table('tasks')->whereNull('deleted_at'), 'tasks')
                 ->select('status', DB::raw('COUNT(*) c'))->groupBy('status')->orderByDesc('c')->limit(6)->get()
                 ->map(fn ($r) => ['label' => $r->status ?: 'بلا حالة', 'value' => (int) $r->c])->all();
@@ -71,8 +73,8 @@ class DashboardController extends Controller
             $aq->where(fn ($w) => $w->where('audits.user_id', $user->id)
                                     ->orWhereIn('audits.project_id', $ids));
         }
-        $audits = $aq->orderByDesc('audits.created_at')->limit(10)->get();
+        $audits = in_array('audits', $hid, true) ? collect() : $aq->orderByDesc('audits.created_at')->limit(10)->get();
 
-        return view('dashboard', compact('cards', 'audits', 'due', 'dueCol', 'stCol', 'disp', 'expiry', 'apps', 'taskSlices'));
+        return view('dashboard', compact('cards', 'audits', 'due', 'dueCol', 'stCol', 'disp', 'expiry', 'apps', 'taskSlices', 'hid'));
     }
 }
