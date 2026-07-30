@@ -25,7 +25,7 @@ class QuoteController extends Controller
 
         return view('quotes.doc', [
             'q' => $q, 'client' => $client,
-            'items' => $this->parseItems((string) $q->items),
+            'items' => \App\Support\Items::parse((string) $q->items),
             'logo' => setting('app.logo'),
         ]);
     }
@@ -118,20 +118,4 @@ class QuoteController extends Controller
             ->with('ok', '🧾 أُنشئت الفاتورة من العرض — استحقاقها بعد ١٤ يوماً');
     }
 
-    /** بنود العرض: سطر لكل بند، أعمدة تفصل بـ | (وصف | كمية | سعر) — وإلا نص حر */
-    protected function parseItems(string $raw): array
-    {
-        $rows = [];
-        foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
-            $line = trim($line);
-            if ($line === '') continue;
-            $cols = array_map('trim', explode('|', $line));
-            $qty  = isset($cols[1]) && is_numeric($cols[1]) ? (float) $cols[1] : null;
-            $prc  = isset($cols[2]) && is_numeric($cols[2]) ? (float) $cols[2] : null;
-            $rows[] = ['desc' => $cols[0], 'qty' => $qty, 'price' => $prc,
-                       'sum' => ($qty !== null && $prc !== null) ? $qty * $prc : null];
-        }
-
-        return $rows;
-    }
 }

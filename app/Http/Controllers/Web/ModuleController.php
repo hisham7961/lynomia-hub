@@ -548,7 +548,7 @@ class ModuleController extends Controller
             $k = $f['key']; $c = $f['col']; $t = $f['type'];
 
             if (in_array($t, ['file', 'img'], true)) {
-                if ($r->hasFile($k)) $m->{$c} = $r->file($k)->store('hub', 'public');
+                if ($r->hasFile($k)) $m->{$c} = $r->file($k)->store('hub', 'local');   // خاص — يُخدم عبر بوابة الملفات المصادَق عليها
                 continue;
             }
             if ($t === 'bool') { $m->{$c} = $r->boolean($k); continue; }

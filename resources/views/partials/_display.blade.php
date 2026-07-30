@@ -25,8 +25,8 @@
     @php $ids = is_array($v) ? $v : (json_decode($v, true) ?: []); @endphp
     @foreach ($ids as $tg)<span class="bdg g">{{ $tg }}</span> @endforeach
 @elseif ($t === 'file' || $t === 'img')
-    @if ($t === 'img')<img class="thumb" src="{{ asset('storage/' . $v) }}" alt="">
-    @else<a href="{{ asset('storage/' . $v) }}" target="_blank">ملف ↗</a>@endif
+    @if ($t === 'img')<img class="thumb" src="{{ route('file.show', $v) }}" alt="">
+    @else<a href="{{ route('file.show', $v) }}" target="_blank">ملف ↗</a>@endif
 @elseif ($t === 'url')
     <a class="mono ltr" href="{{ $v }}" target="_blank" rel="noopener">{{ \Illuminate\Support\Str::limit($v, 34) }}</a>
 @elseif ($t === 'date')

@@ -56,8 +56,8 @@
         <input class="inp" type="file" name="{{ $k }}">
         @if ($raw)
             <div class="sub">
-                @if ($t === 'img')<img class="thumb" src="{{ asset('storage/' . $raw) }}" alt="">
-                @else<a href="{{ asset('storage/' . $raw) }}" target="_blank">الملف الحالي ↗</a>@endif
+                @if ($t === 'img')<img class="thumb" src="{{ route('file.show', $raw) }}" alt="">
+                @else<a href="{{ route('file.show', $raw) }}" target="_blank">الملف الحالي ↗</a>@endif
             </div>
         @endif
 

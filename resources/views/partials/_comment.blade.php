@@ -15,7 +15,7 @@
     </div>
     <div class="cbody">{{ $c->body }}</div>
     @if ($c->att)
-        <a class="sub" href="{{ asset('storage/' . $c->att) }}" target="_blank" rel="noopener">📎 مرفق</a>
+        <a class="sub" href="{{ route('file.show', $c->att) }}" target="_blank" rel="noopener">📎 مرفق</a>
     @endif
     <div class="cacts">
         @if ($depth === 0)

@@ -23,7 +23,7 @@ class PurchaseController extends Controller
         return view('purchases.doc', [
             'p' => $p,
             'supplier' => $p->supplier_id ? Supplier::find($p->supplier_id) : null,
-            'items' => $this->parseItems((string) $p->items),
+            'items' => \App\Support\Items::parse((string) $p->items),
             'logo' => setting('app.logo'),
         ]);
     }
@@ -95,20 +95,4 @@ class PurchaseController extends Controller
             ->with('ok', '🧾 أُنشئت فاتورة المورد — تظهر الآن في المالية والتقارير');
     }
 
-    /** بنود المستند: سطر لكل بند «وصف | كمية | سعر» */
-    protected function parseItems(string $raw): array
-    {
-        $rows = [];
-        foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
-            $line = trim($line);
-            if ($line === '') continue;
-            $cols = array_map('trim', explode('|', $line));
-            $qty = isset($cols[1]) && is_numeric($cols[1]) ? (float) $cols[1] : null;
-            $prc = isset($cols[2]) && is_numeric($cols[2]) ? (float) $cols[2] : null;
-            $rows[] = ['desc' => $cols[0], 'qty' => $qty, 'price' => $prc,
-                       'sum' => ($qty !== null && $prc !== null) ? $qty * $prc : null];
-        }
-
-        return $rows;
-    }
 }

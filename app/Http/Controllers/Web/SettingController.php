@@ -29,7 +29,7 @@ class SettingController extends Controller
             'files.max_kb' => ['أقصى حجم للملف المرفوع (كيلوبايت — فارغ = 512000)', 'number'],
         ],
         '🔔 التنبيهات الخارجية' => [
-            'notify.tg_token' => ['توكن بوت تلجرام', 'text'],
+            'notify.tg_token' => ['توكن بوت تلجرام (يُخزن مشفراً)', 'pass'],
             'notify.tg_chat'  => ['معرّف قناة/مجموعة تلجرام الافتراضي', 'text'],
         ],
         '🔏 الموافقات المُلزِمة' => [
@@ -83,7 +83,10 @@ class SettingController extends Controller
                 }
 
                 $v = $type === 'onoff' ? ($r->boolean($input) ? '1' : '') : trim((string) $r->input($input, ''));
-                if ($type === 'pass' && $v === '') continue;   // فارغ = إبقاء المفتاح المخزن
+                if ($type === 'pass') {
+                    if ($v === '') continue;                    // فارغ = إبقاء المفتاح المخزن
+                    $v = 'enc:' . \Illuminate\Support\Facades\Crypt::encryptString($v);   // الأسرار مشفرة في القاعدة
+                }
                 Setting::updateOrCreate(['key' => $key], ['value' => $v]);
             }
         }

@@ -10,6 +10,7 @@ use App\Http\Controllers\Web\CommentController;
 use App\Http\Controllers\Web\CustomFieldController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DataRoomController;
+use App\Http\Controllers\Web\FileController;
 use App\Http\Controllers\Web\FlowController;
 use App\Http\Controllers\Web\ImportController;
 use App\Http\Controllers\Web\ModuleController;
@@ -49,6 +50,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('me', [PortalController::class, 'me'])->name('portal.me');
+    Route::get('files/{path}', [FileController::class, 'show'])->name('file.show')->where('path', 'hub/.*');
 
     // ── غرفة البيانات (الإدارة) ──
     Route::get('dataroom', [DataRoomController::class, 'index'])->name('dataroom.index');

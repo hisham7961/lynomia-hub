@@ -48,7 +48,7 @@ class CommentController extends Controller
             'parent_id'  => $data['parent_id'] ?? null,
             'user_id'    => auth()->id(),
             'body'       => $data['body'],
-            'att'        => $r->hasFile('att') ? $r->file('att')->store('hub', 'public') : null,
+            'att'        => $r->hasFile('att') ? $r->file('att')->store('hub', 'local') : null,
             'mentions'   => $mentions ?: null,
             'read_by'    => [auth()->id()],
             'created_at' => now(),

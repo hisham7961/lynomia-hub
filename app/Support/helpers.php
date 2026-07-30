@@ -4,14 +4,22 @@ use App\Models\Setting;
 use Illuminate\Support\Facades\Cache;
 
 if (! function_exists('setting')) {
-    /** إعداد مخزَّن في القاعدة مع كاش — المفتاح حرفي (النقطة جزء من الاسم لا تداخل) */
+    /**
+     * إعداد مخزَّن في القاعدة مع كاش — المفتاح حرفي (النقطة جزء من الاسم لا تداخل).
+     * القيم السرية تُخزن مشفرة ببادئة enc: وتُفك هنا بشفافية.
+     */
     function setting(string $key, mixed $default = null): mixed
     {
         $all = Cache::remember('settings:all', 600, fn () => Setting::pluck('value', 'key')->all());
+        $v = array_key_exists($key, $all) ? $all[$key] : null;
+        if ($v === null || $v === '') return $default;
 
-        return array_key_exists($key, $all) && $all[$key] !== null && $all[$key] !== ''
-            ? $all[$key]
-            : $default;
+        if (is_string($v) && str_starts_with($v, 'enc:')) {
+            try { return \Illuminate\Support\Facades\Crypt::decryptString(substr($v, 4)); }
+            catch (\Throwable $e) { return $default; }
+        }
+
+        return $v;
     }
 }
 
