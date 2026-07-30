@@ -7,12 +7,29 @@
         @endif
         {{ setting('app.name', 'Lynomia Hub') }}</a></div>
     <nav>
-        <a class="ni top {{ request()->routeIs('dashboard') ? 'on' : '' }}" href="{{ route('dashboard') }}">لوحة التحكم</a>
-        @php $hidTop = (array) hub_pref('nav.hidden_top', []); @endphp
-        @foreach (hub_top_links(auth()->user()) as $l)
-            @continue(in_array($l['key'], $hidTop, true))
-            <a class="ni top {{ request()->routeIs($l['key'] === 'inboxdocs' ? 'inboxdocs.*' : ($l['key'] === 'costs' ? 'costs.*' : ($l['key'] === 'dm' ? 'dm.*' : $l['route']))) ? 'on' : '' }}" href="{{ route($l['route']) }}">{{ $l['label'] }}@if ($l['key'] === 'alerts' && ($xc = hub_expiry_count()))<span class="nbdg">{{ $xc }}</span>@elseif ($l['key'] === 'dm' && ($dc = \App\Http\Controllers\Web\DmController::unreadCount()))<span class="nbdg">{{ $dc }}</span>@endif</a>
+        <a class="ni top {{ request()->routeIs('dashboard') ? 'on' : '' }}" href="{{ route('dashboard') }}">🏠 لوحة التحكم</a>
+
+        {{-- منطقة الأدوات واللوحات — روابط مجموعةً في أقسام بدل قائمة مسطّحة --}}
+        @php
+            $navBadges = ['alerts' => hub_expiry_count(), 'dm' => \App\Http\Controllers\Web\DmController::unreadCount()];
+        @endphp
+        <div class="navsection">الأدوات واللوحات</div>
+        @foreach (hub_top_groups(auth()->user()) as $g)
+            @php
+                $gActive = collect($g['items'])->contains(fn ($it) => request()->routeIs($it['route'])
+                    || request()->routeIs(\Illuminate\Support\Str::before($it['route'], '.') . '.*'));
+                $gCount  = collect($g['items'])->sum(fn ($it) => (int) ($navBadges[$it['key']] ?? 0));
+            @endphp
+            <details {{ $g['open'] || $gActive ? 'open' : '' }}>
+                <summary>{{ $g['icon'] }} {{ $g['label'] }}@if ($gCount)<span class="nbdg">{{ $gCount }}</span>@endif</summary>
+                @foreach ($g['items'] as $it)
+                    <a class="ni {{ request()->routeIs($it['route']) || request()->routeIs(\Illuminate\Support\Str::before($it['route'], '.') . '.*') ? 'on' : '' }}" href="{{ route($it['route']) }}">{{ $it['label'] }}@if (($b = (int) ($navBadges[$it['key']] ?? 0)))<span class="nbdg">{{ $b }}</span>@endif</a>
+                @endforeach
+            </details>
         @endforeach
+
+        {{-- منطقة الوحدات — بيانات النظام الـ٧١ --}}
+        <div class="navsection">الوحدات</div>
         @foreach (hub_nav(auth()->user()) as $g)
             @php $active = collect($g['items'])->contains(fn ($it) => request()->is('m/' . $it['key'] . '*')); @endphp
             <details {{ $active ? 'open' : '' }}>
@@ -22,7 +39,9 @@
                 @endforeach
             </details>
         @endforeach
-        <a class="ni top {{ request()->routeIs('prefs.*') ? 'on' : '' }}" href="{{ route('prefs.edit') }}">🎛️ التخصيص</a>
+
+        <div class="navsection">النظام</div>
+        <a class="ni {{ request()->routeIs('prefs.*') ? 'on' : '' }}" href="{{ route('prefs.edit') }}">🎛️ التخصيص</a>
         @if (hub_flag(auth()->user(), 'users') || hub_flag(auth()->user(), 'audit') || hub_is_owner())
             @php $adm = request()->routeIs('users.*') || request()->routeIs('roles.*') || request()->routeIs('audit.*') || request()->routeIs('settings.*'); @endphp
             <details {{ $adm ? 'open' : '' }}>

@@ -230,31 +230,63 @@ if (! function_exists('hub_top_links')) {
         $owner = (bool) $user?->role?->is_owner;
         $mon = $owner || hub_flag($user, 'monitor');
 
+        // كل رابط مُصنَّف في قسم (group): daily/analytics/centers — تستعمله hub_top_groups
         $all = [
-            ['key' => 'morning',   'label' => '☀️ تشغيل اليوم',      'route' => 'morning',         'ok' => true],
-            ['key' => 'me',        'label' => '👤 بوابتي',           'route' => 'portal.me',       'ok' => true],
-            ['key' => 'feed',      'label' => '📣 قناة الفريق',      'route' => 'feed',            'ok' => true],
-            ['key' => 'dm',        'label' => '💬 الرسائل',          'route' => 'dm.inbox',        'ok' => true],
-            ['key' => 'inboxdocs', 'label' => '📥 صندوق الوثائق',    'route' => 'inboxdocs.index', 'ok' => true],
-            ['key' => 'alerts',    'label' => '🔔 ينتهي قريباً',     'route' => 'alerts',          'ok' => true],
-            ['key' => 'calendar',  'label' => '📅 التقويم',          'route' => 'calendar',        'ok' => true],
-            ['key' => 'finrep',    'label' => '📊 التقارير المالية', 'route' => 'reports.finance', 'ok' => hub_can($user, 'fin', 'v')],
-            ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'ok' => $mon],
-            ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'ok' => $mon],
-            ['key' => 'recs',      'label' => '💡 مركز التوصيات',    'route' => 'recs',            'ok' => $mon],
-            ['key' => 'kpis',      'label' => '📈 مؤشرات KPI',       'route' => 'kpis.index',      'ok' => $mon],
-            ['key' => 'innov',     'label' => '💡 مركز الابتكار',    'route' => 'innovation',      'ok' => hub_can($user, 'ideas', 'v')],
-            ['key' => 'supscores', 'label' => '🏅 تقييم الموردين',   'route' => 'supplierscores',  'ok' => hub_can($user, 'suppliers', 'v')],
-            ['key' => 'capacity',  'label' => '📊 القدرات والموارد', 'route' => 'capacity',        'ok' => $mon],
-            ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'ok' => $mon],
-            ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'ok' => $mon],
-            ['key' => 'legal',     'label' => '⚖️ القانوني',         'route' => 'legal',           'ok' => hub_can($user, 'contracts', 'v')],
-            ['key' => 'support',   'label' => '🎫 لوحة الدعم',       'route' => 'support',         'ok' => hub_can($user, 'tickets', 'v')],
-            ['key' => 'ceo',       'label' => '👑 لوحة CEO',         'route' => 'ceo',             'ok' => $owner],
-            ['key' => 'perf',      'label' => '📈 لوحة الأداء',      'route' => 'performance',     'ok' => $mon],
+            ['key' => 'morning',   'label' => '☀️ تشغيل اليوم',      'route' => 'morning',         'group' => 'daily',     'ok' => true],
+            ['key' => 'me',        'label' => '👤 بوابتي',           'route' => 'portal.me',       'group' => 'daily',     'ok' => true],
+            ['key' => 'alerts',    'label' => '🔔 ينتهي قريباً',     'route' => 'alerts',          'group' => 'daily',     'ok' => true],
+            ['key' => 'calendar',  'label' => '📅 التقويم',          'route' => 'calendar',        'group' => 'daily',     'ok' => true],
+            ['key' => 'feed',      'label' => '📣 قناة الفريق',      'route' => 'feed',            'group' => 'daily',     'ok' => true],
+            ['key' => 'dm',        'label' => '💬 الرسائل',          'route' => 'dm.inbox',        'group' => 'daily',     'ok' => true],
+            ['key' => 'inboxdocs', 'label' => '📥 صندوق الوثائق',    'route' => 'inboxdocs.index', 'group' => 'daily',     'ok' => true],
+
+            ['key' => 'ceo',       'label' => '👑 لوحة CEO',         'route' => 'ceo',             'group' => 'analytics', 'ok' => $owner],
+            ['key' => 'perf',      'label' => '📈 لوحة الأداء',      'route' => 'performance',     'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'finrep',    'label' => '📊 التقارير المالية', 'route' => 'reports.finance', 'group' => 'analytics', 'ok' => hub_can($user, 'fin', 'v')],
+            ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'kpis',      'label' => '📈 مؤشرات KPI',       'route' => 'kpis.index',      'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'capacity',  'label' => '📊 القدرات والموارد', 'route' => 'capacity',        'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'recs',      'label' => '💡 مركز التوصيات',    'route' => 'recs',            'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $mon],
+
+            ['key' => 'legal',     'label' => '⚖️ القانوني',         'route' => 'legal',           'group' => 'centers',   'ok' => hub_can($user, 'contracts', 'v')],
+            ['key' => 'support',   'label' => '🎫 لوحة الدعم',       'route' => 'support',         'group' => 'centers',   'ok' => hub_can($user, 'tickets', 'v')],
+            ['key' => 'innov',     'label' => '💡 مركز الابتكار',    'route' => 'innovation',      'group' => 'centers',   'ok' => hub_can($user, 'ideas', 'v')],
+            ['key' => 'supscores', 'label' => '🏅 تقييم الموردين',   'route' => 'supplierscores',  'group' => 'centers',   'ok' => hub_can($user, 'suppliers', 'v')],
         ];
 
         return array_values(array_filter($all, fn ($l) => $l['ok']));
+    }
+}
+
+if (! function_exists('hub_top_groups')) {
+    /**
+     * أدوات ولوحات الشريط الجانبي **مجموعةً في أقسام** بدل ٢١ رابطاً مسطّحاً.
+     * يحترم صلاحية كل رابط (من hub_top_links) وإخفاء المستخدم (nav.hidden_top).
+     * «مساحتي اليومية» مفتوحة افتراضياً؛ الباقي مطويّ ليبقى الشريط نظيفاً.
+     */
+    function hub_top_groups($user): array
+    {
+        $hidden = (array) hub_pref('nav.hidden_top', [], $user);
+        $links  = collect(hub_top_links($user))
+            ->reject(fn ($l) => in_array($l['key'], $hidden, true))
+            ->groupBy('group');
+
+        $defs = [
+            ['key' => 'daily',     'label' => 'مساحتي اليومية',     'icon' => '🧭', 'open' => true],
+            ['key' => 'analytics', 'label' => 'التحليلات واللوحات',  'icon' => '📊', 'open' => false],
+            ['key' => 'centers',   'label' => 'مراكز متخصّصة',       'icon' => '🎯', 'open' => false],
+        ];
+
+        $out = [];
+        foreach ($defs as $d) {
+            $items = $links->get($d['key'], collect())->values()->all();
+            if ($items) $out[] = $d + ['items' => $items];
+        }
+
+        return $out;
     }
 }
 
