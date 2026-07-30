@@ -19,6 +19,13 @@
         <header class="topbar">
             <button class="menubtn" type="button" onclick="document.body.classList.toggle('nav')" aria-label="القائمة">☰</button>
             <div class="crumb">@yield('title', 'لوحة التحكم')</div>
+            <div class="gsearch">
+                <input class="inp" type="search" id="gq" name="q" placeholder="بحث شامل… /" autocomplete="off"
+                       data-url="{{ route('search') }}"
+                       hx-get="{{ route('search.mini') }}" hx-trigger="input changed delay:300ms"
+                       hx-target="#gsr" hx-swap="innerHTML">
+                <div id="gsr" class="gsr"></div>
+            </div>
             <div class="spacer"></div>
             <div class="bell">
                 <button class="btn ghost sm" type="button" title="التنبيهات"

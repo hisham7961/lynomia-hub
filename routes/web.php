@@ -9,19 +9,23 @@ use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\ReportController;
 use App\Http\Controllers\Web\RoleController;
+use App\Http\Controllers\Web\SearchController;
 use App\Http\Controllers\Web\SettingController;
 use App\Http\Controllers\Web\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'show'])->name('login');
-    Route::post('login', [AuthController::class, 'login'])->name('login.attempt');
+    Route::post('login', [AuthController::class, 'login'])->name('login.attempt')
+        ->middleware('throttle:10,1');   // حد ١٠ محاولات بالدقيقة من نفس العنوان — يكمل قفل الحساب الموجود
 });
 
 Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('search', [SearchController::class, 'index'])->name('search');
+    Route::get('search/mini', [SearchController::class, 'mini'])->name('search.mini');
     Route::get('alerts', [AlertController::class, 'index'])->name('alerts');
     Route::get('notifications', [NotificationController::class, 'mini'])->name('notifications.mini');
     Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.readall');

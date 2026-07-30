@@ -156,3 +156,23 @@
 
 /* ═ v2.4 ═ */
 (function(){document.addEventListener('click',function(e){if(!e.target.closest('.bell')){var b=document.getElementById('bellbox');if(b)b.innerHTML='';}});})();
+
+/* ═ v2.4 — البحث الشامل ═ */
+(function () {
+  'use strict';
+  var q = document.getElementById('gq');
+  if (!q) return;
+  document.addEventListener('keydown', function (e) {
+    if (e.target === q && e.key === 'Enter') {
+      var t = q.value.trim();
+      if (t.length >= 2) location.href = q.dataset.url + '?q=' + encodeURIComponent(t);
+      return;
+    }
+    if (e.target === q && e.key === 'Escape') { document.getElementById('gsr').innerHTML = ''; q.blur(); return; }
+    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    if (e.key === '/') { e.preventDefault(); q.focus(); }
+  });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.gsearch')) { var b = document.getElementById('gsr'); if (b) b.innerHTML = ''; }
+  });
+})();
