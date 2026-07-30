@@ -10,9 +10,11 @@ use Illuminate\Support\Facades\Cache;
 class SettingController extends Controller
 {
     protected array $keys = [
-        'app.name'     => 'اسم النظام',
-        'app.currency' => 'العملة الافتراضية',
-        'app.company'  => 'اسم الشركة الأم',
+        'app.name'        => 'اسم النظام',
+        'app.currency'    => 'العملة الافتراضية',
+        'app.company'     => 'اسم الشركة الأم',
+        'notify.tg_token' => 'توكن بوت تلجرام (للتنبيهات الخارجية)',
+        'notify.tg_chat'  => 'معرّف قناة/مجموعة تلجرام الافتراضي',
     ];
 
     protected function gate(): void

@@ -11,4 +11,5 @@
     <button class="palitem sub" type="button" style="width:100%;border:0;background:none;cursor:pointer;border-top:1px dashed var(--ln);justify-content:center"
             hx-post="{{ route('notifications.readall') }}" hx-target="#bellbox" hx-swap="innerHTML">✓ تحديد الكل كمقروء</button>
 @endif
+<a class="palitem sub" href="{{ route('notifications.index') }}" style="justify-content:center;border-top:1px solid var(--ln)">مركز الإشعارات ←</a>
 <span id="bellbadge" hx-swap-oob="true">@php $nc = \App\Models\HubNotification::where('user_id', auth()->id())->where('read', false)->count(); @endphp@if($nc)<span class="nbdg">{{ $nc }}</span>@endif</span>
