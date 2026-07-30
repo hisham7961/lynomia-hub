@@ -104,6 +104,18 @@
     </div>
 
     <div class="card kid">
+        <h3>🪄 عدّة الانطلاق</h3>
+        <div class="sub" style="margin-bottom:8px">
+            ٣٧ مسار عمل جاهزاً + ١٦ قاعدة تنبيه متوقفة (تفعّلها من شاشتها) —
+            تُنشأ مرةً واحدة بالاسم فلا تكرار مهما ضغطت.
+        </div>
+        <form method="POST" action="{{ route('ops.starters') }}"
+              data-confirm="توليد مسارات العمل وقواعد التنبيه الجاهزة الآن؟">
+            @csrf<button class="btn ghost xs">🪄 توليد العدّة الآن</button>
+        </form>
+    </div>
+
+    <div class="card kid">
         <h3>🎭 الوضع التجريبي (Sandbox)</h3>
         <div class="sub" style="margin-bottom:8px">
             بيانات وهمية واقعية (موسومة 🎭) للتدريب وتجربة الاستيراد والمسارات والـ API بلا خوف —

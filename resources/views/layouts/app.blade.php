@@ -118,6 +118,25 @@
         @endif
         {{-- منطقة حية: قارئ الشاشة يقرأ الرسالة حين تُحقن بعد htmx أو تتبدل --}}
         <div id="flash" role="status" aria-live="polite">@include('partials.flash')</div>
+        {{-- نافذة اشتباه الوصول: تظهر مرةً واحدة لمن دخل من مكانٍ غريب أو خارج الدوام --}}
+        @if (auth()->check() && ($secWarn = session()->pull('sec.warn')))
+            <div class="modal" id="secwarn">
+                <div class="secbox">
+                    <div class="secicn">🛡️</div>
+                    <h2>اشتباه وصول غير معتاد</h2>
+                    <p class="sub">سُجّل دخولك في <b class="mono">{{ $secWarn['at'] }}</b>:</p>
+                    <ul>
+                        @foreach ($secWarn['reasons'] as $rr)<li>{{ $rr }}</li>@endforeach
+                    </ul>
+                    <p class="sub">إن كان هذا أنت فتابع بأمان — وإن لم يكن، بدّل كلمة السر فوراً؛ فقد أُبلغ مالكو النظام بهذا الدخول.</p>
+                    <div style="display:flex;gap:8px;justify-content:center;margin-top:14px">
+                        <a class="btn" href="{{ route('profile.edit') }}">🔑 تغيير كلمة السر</a>
+                        <button class="btn ghost" type="button"
+                                onclick="document.getElementById('secwarn').remove()">هذا أنا — متابعة</button>
+                    </div>
+                </div>
+            </div>
+        @endif
         <div class="content">@yield('content')</div>
     </main>
 </div>

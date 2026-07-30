@@ -218,6 +218,7 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/ops/test-error', [OpsController::class, 'testError'])->name('ops.testerror');
     Route::post('admin/ops/migrate', [OpsController::class, 'migrate'])->name('ops.migrate');
     Route::post('admin/ops/clear-cache', [OpsController::class, 'clearCache'])->name('ops.clearcache');
+    Route::post('admin/ops/starters', [OpsController::class, 'starters'])->name('ops.starters');
 
     // QuoteFlow — تطبيق جانبي معزول للمالك وحده، حالته على الخادم
     Route::get('apps/quoteflow', [QuoteFlowController::class, 'page'])->name('quoteflow');

@@ -110,6 +110,9 @@ class AuthController extends Controller
             'last_login_ip'   => $r->ip(),
         ])->saveQuietly();
 
+        // حارس الدخول: يتعلم العناوين المعتادة ويرصد الغريب وخارج الدوام
+        \App\Support\LoginSentry::inspect($u, (string) $r->ip());
+
         \App\Models\SessionLog::create([
             'user_id'      => $u->id,
             'device'       => substr((string) $r->header('X-Device', $r->userAgent()), 0, 200),

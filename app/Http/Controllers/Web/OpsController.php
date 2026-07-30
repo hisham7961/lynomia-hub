@@ -152,6 +152,20 @@ class OpsController extends Controller
         }
     }
 
+    /** توليد عدّة الانطلاق بضغطة: مسارات العمل + قواعد التنبيه — بلا طرفية */
+    public function starters()
+    {
+        $this->gate();
+
+        \Illuminate\Support\Facades\Artisan::call('hub:flows-starter');
+        $out = trim(\Illuminate\Support\Facades\Artisan::output());
+        \Illuminate\Support\Facades\Artisan::call('hub:alerts-starter');
+        $out .= "\n" . trim(\Illuminate\Support\Facades\Artisan::output());
+        hub_audit('توليد عدة الانطلاق', null, null, 'من مركز التشغيل');
+
+        return redirect()->route('ops.index')->with('ok', $out);
+    }
+
     /** توليد خطأ تجريبي للتحقق من مركز الأخطاء (عبر مسار الإبلاغ نفسه، دون صفحة 500) */
     public function testError()
     {

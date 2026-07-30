@@ -19,8 +19,18 @@ abstract class TestCase extends BaseTestCase
     protected User $employee;
     protected User $viewer;
 
+    /** ضبط إعداد نظام مع إسقاط خبيئة الإعدادات — للاختبارات */
+    protected function hubSetting(string $key, string $value): void
+    {
+        \App\Models\Setting::updateOrCreate(['key' => $key], ['value' => $value]);
+        \Illuminate\Support\Facades\Cache::forget('settings:all');
+    }
+
     protected function seedCore(): void
     {
+        // نظام ساعات العمل يُطفأ افتراضياً في الاختبارات — الحزمة تعمل بأي توقيت
+        // فلا تتقلب النتائج بساعة الخادم. اختباراتُه تفعّله صراحةً بـhubSetting.
+        $this->hubSetting('sec.hours_on', '0');
         $modules = array_keys(config('hub.modules'));
         $full = collect($modules)->mapWithKeys(fn ($m) => [$m => ['v' => 1, 'a' => 1, 'e' => 1, 'd' => 1]])->all();
         $edit = collect($modules)->mapWithKeys(fn ($m) => [$m => ['v' => 1, 'a' => 1, 'e' => 1, 'd' => 0]])->all();

@@ -752,3 +752,17 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .fg>.fld:nth-child(2){animation-delay:.03s}.fg>.fld:nth-child(3){animation-delay:.06s}
 .fg>.fld:nth-child(4){animation-delay:.09s}.fg>.fld:nth-child(5){animation-delay:.12s}
 .fg>.fld:nth-child(6){animation-delay:.15s}.fg>.fld:nth-child(n+7){animation-delay:.18s}
+
+/* ═ نافذة اشتباه الوصول — تحذير أمني مهيب لا يُفوَّت ═ */
+.secbox{background:var(--cd);border-radius:20px;width:min(430px,94%);padding:30px 26px;text-align:center;
+  margin:auto;border:1px solid color-mix(in srgb,var(--bad) 30%,var(--ln));
+  box-shadow:0 0 0 6px color-mix(in srgb,var(--bad) 8%,transparent),0 24px 70px rgba(17,26,40,.35);
+  animation:pop .22s cubic-bezier(.2,.8,.3,1.2)}
+.secicn{font-size:44px;margin-bottom:8px;animation:pulse 1.6s ease-in-out infinite;
+  width:76px;height:76px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  margin:0 auto 12px;background:color-mix(in srgb,var(--bad) 10%,transparent)}
+.secbox h2{font-size:19px;font-weight:800;color:var(--bad);margin-bottom:8px}
+.secbox ul{list-style:none;margin:10px 0;padding:10px;border-radius:12px;font-size:13.5px;font-weight:700;
+  background:color-mix(in srgb,var(--bad) 6%,transparent)}
+.secbox ul li{padding:3px 0}
+#secwarn{display:flex;align-items:center;justify-content:center}
