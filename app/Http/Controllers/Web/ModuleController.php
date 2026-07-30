@@ -180,7 +180,7 @@ class ModuleController extends Controller
 
         return view('modules.form', [
             'module' => $module, 'def' => $def, 'row' => $row,
-            'refOptions' => $this->refOptions($def),
+            'refOptions' => $this->refOptions($def, $row),
         ]);
     }
 
@@ -499,12 +499,14 @@ class ModuleController extends Controller
         return $f['options'] ?? [];
     }
 
-    /** خيارات كل الحقول المرجعية للنموذج */
-    protected function refOptions(array $def): array
+    /** خيارات كل الحقول المرجعية للنموذج — مع ضمان ظهور قيم السجل الحالية */
+    protected function refOptions(array $def, $row = null): array
     {
         $out = [];
         foreach (collect($def['fields'])->where('type', 'ref') as $f) {
-            $opts = hub_ref_options($f['ref']);
+            $cur = $row?->{$f['col']} ?? null;
+            if (is_string($cur) && ! empty($f['multi'])) $cur = json_decode($cur, true) ?: [];
+            $opts = hub_ref_options($f['ref'], $cur);
             if ($f['ref'] === 'projects' && hub_scoped(auth()->user())) {
                 $opts = array_intersect_key($opts, array_flip(auth()->user()->visibleProjectIds()));
             }

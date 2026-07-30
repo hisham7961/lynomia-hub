@@ -29,7 +29,9 @@ class WebhookDispatcher
         try {
             // يشمل الموقوف مؤقتاً عمداً: الإيقاف تباعدٌ آلي لا إلغاء اشتراك، فأحداثه
             // تُصفّ بموعد ما بعد الإيقاف بدل أن تضيع. أما المعطَّل يدوياً فقرار صريح فتُهمل أحداثه.
-            $hooks = Webhook::where('active', true)->get();
+            // تُقرأ مع **كل** كتابة في النظام — فتُخبّأ دقيقة وتُنسف عند أي تعديل اشتراك
+            $hooks = \Illuminate\Support\Facades\Cache::remember('webhooks:active', 60,
+                fn () => Webhook::where('active', true)->get());
             if ($hooks->isEmpty()) return;
 
             $name = $module . '.' . $event;

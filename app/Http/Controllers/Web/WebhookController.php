@@ -7,6 +7,7 @@ use App\Models\Webhook;
 use App\Models\WebhookDelivery;
 use App\Support\WebhookDispatcher;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 /** مركز Webhooks — اشتراكات موقعة لأنظمة خارجية (n8n وأشباهه) */
@@ -37,6 +38,7 @@ class WebhookController extends Controller
         ], [], ['name' => 'الاسم', 'url' => 'الرابط', 'events' => 'الأحداث']);
 
         Webhook::create($d + ['secret' => 'whs_' . Str::random(40), 'active' => true]);
+        Cache::forget('webhooks:active');
 
         return back()->with('ok', 'أُنشئ الاشتراك — انسخ السر من الجدول لتتحقق من التوقيع عند المستقبل');
     }
@@ -46,6 +48,7 @@ class WebhookController extends Controller
         $this->gate();
         $h = Webhook::findOrFail($id);
         $h->forceFill(['active' => ! $h->active, 'paused_until' => null, 'fail_streak' => 0])->save();
+        Cache::forget('webhooks:active');
 
         return back()->with('ok', $h->active ? 'فُعّل الاشتراك' : 'عُطّل الاشتراك');
     }
@@ -56,6 +59,7 @@ class WebhookController extends Controller
         $h = Webhook::findOrFail($id);
         WebhookDelivery::where('webhook_id', $h->id)->delete();
         $h->delete();
+        Cache::forget('webhooks:active');
 
         return back()->with('ok', 'حُذف الاشتراك وسجل محاولاته');
     }

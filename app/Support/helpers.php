@@ -214,16 +214,33 @@ if (! function_exists('hub_ref_labels')) {
 
 if (! function_exists('hub_ref_options')) {
     /** خيارات قائمة مرجعية (حد 500) */
-    function hub_ref_options(string $ref): array
+    /**
+     * @param mixed $ensure معرّف (أو معرّفات) لا بد أن تظهر في القائمة ولو تجاوزت الحد.
+     *
+     * الحد ٥٠٠ يبقي القوائم خفيفة، لكن سجلاً يشير لمرجع خارج الحد كان يُفتح بنموذج
+     * لا يحوي خياره — فيُرسل الفراغ عند الحفظ **ويُمحى الرابط بصمت**. لذا تُضاف
+     * القيم المختارة حالياً دائماً.
+     */
+    function hub_ref_options(string $ref, $ensure = null): array
     {
         $table = hub_ref_table($ref);
         if (! $table) return [];
-        return \Illuminate\Support\Facades\DB::table($table)
+
+        $disp = hub_ref_display($ref);
+        $rows = \Illuminate\Support\Facades\DB::table($table)
             ->whereNull('deleted_at')
-            ->orderBy(hub_ref_display($ref))
+            ->orderBy($disp)
             ->limit(500)
-            ->pluck(hub_ref_display($ref), 'id')
+            ->pluck($disp, 'id')
             ->all();
+
+        $need = array_filter(array_diff(array_map('strval', array_filter((array) $ensure)), array_map('strval', array_keys($rows))));
+        if ($need) {
+            $rows += \Illuminate\Support\Facades\DB::table($table)
+                ->whereIn('id', $need)->pluck($disp, 'id')->all();
+        }
+
+        return $rows;
     }
 }
 

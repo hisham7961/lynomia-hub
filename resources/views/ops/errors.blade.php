@@ -11,11 +11,13 @@
 
 <div class="toolbar">
     <form class="filters" method="GET">
-        <select class="inp" name="st" onchange="this.form.submit()">
+        <label class="vh" for="fst">تصفية بالحالة</label>
+        <select class="inp" id="fst" name="st" onchange="this.form.submit()">
             <option value="">كل الحالات</option>
             @foreach (['جديد', 'قيد المعالجة', 'محلول'] as $s)<option @selected($st === $s)>{{ $s }}</option>@endforeach
         </select>
-        <select class="inp" name="k" onchange="this.form.submit()">
+        <label class="vh" for="fk">تصفية بالنوع</label>
+        <select class="inp" id="fk" name="k" onchange="this.form.submit()">
             <option value="">كل الأنواع</option>
             @foreach (['php' => 'PHP', 'api' => 'API', 'js' => 'متصفح', 'slow' => 'بطيء'] as $kk => $kl)<option value="{{ $kk }}" @selected($k === $kk)>{{ $kl }}</option>@endforeach
         </select>
@@ -24,6 +26,7 @@
 </div>
 
 <div class="card pad0">
+    <div class="tblwrap">
     <table class="tbl">
         <thead><tr><th>الخطأ</th><th>النوع</th><th>التكرار</th><th>آخر ظهور</th><th>الحالة</th><th class="acts">إجراء</th></tr></thead>
         <tbody>
@@ -61,6 +64,7 @@
         @endforelse
         </tbody>
     </table>
+    </div>
 </div>
 {{ $rows->links('partials.pagination') }}
 @endsection

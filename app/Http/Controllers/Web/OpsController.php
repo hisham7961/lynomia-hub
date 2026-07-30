@@ -59,7 +59,10 @@ class OpsController extends Controller
         }
 
         // آخر نسخة احتياطية
-        $bk = collect(glob(storage_path('app/backups/hub-*.json')))->sort()->last();
+        // بالأحدث زمنياً لا بترتيب الاسم: ملف بتسمية يدوية كان يتصدر الترتيب
+        // الأبجدي فيُعرض كآخر نسخة ويوهم أن النسخ تعمل وهي متوقفة.
+        $bk = collect(glob(storage_path('app/backups/hub-*.json')))
+            ->sortBy(fn ($f) => filemtime($f))->last();
         $backup = $bk ? ['name' => basename($bk), 'size' => filesize($bk),
                          'age' => now()->diffForHumans(\Illuminate\Support\Carbon::createFromTimestamp(filemtime($bk)), true)] : null;
 

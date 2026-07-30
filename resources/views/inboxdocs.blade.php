@@ -13,8 +13,8 @@
     <form method="POST" action="{{ route('inboxdocs.store') }}" enctype="multipart/form-data">
         @csrf
         <div class="crow">
-            <input class="inp" type="file" name="file" required style="max-width:280px">
-            <input class="inp" name="note" placeholder="ملاحظة (اختياري): من أين وصلت؟ ما هي؟" maxlength="390" style="max-width:320px">
+            <label class="vh" for="upf">الملف</label><input class="inp" id="upf" type="file" name="file" required style="max-width:280px">
+            <label class="vh" for="upn">ملاحظة عن الوثيقة</label><input class="inp" id="upn" name="note" placeholder="ملاحظة (اختياري): من أين وصلت؟ ما هي؟" maxlength="390" style="max-width:320px">
             <button class="btn p sm">رفع إلى الوارد</button>
         </div>
         @error('file')<span class="ferr">{{ $message }}</span>@enderror
@@ -61,19 +61,19 @@
                 <form method="POST" action="{{ route('inboxdocs.classify', $doc->id) }}" class="frm" style="margin-top:8px">
                     @csrf
                     <div class="crow">
-                        <select class="inp" name="module" style="max-width:180px">
+                        <select class="inp" aria-label="الوحدة" name="module" style="max-width:180px">
                             <option value="">— الوحدة (اختياري)</option>
                             @foreach ($modules as $mk => $ml)<option value="{{ $mk }}">{{ $ml }}</option>@endforeach
                         </select>
-                        <input class="inp" name="record" placeholder="اسم السجل داخل الوحدة (اختياري)" maxlength="160" style="max-width:230px">
-                        <select class="inp" name="company_id" style="max-width:170px">
+                        <input class="inp" aria-label="اسم السجل" name="record" placeholder="اسم السجل داخل الوحدة (اختياري)" maxlength="160" style="max-width:230px">
+                        <select class="inp" aria-label="الشركة" name="company_id" style="max-width:170px">
                             <option value="">— الشركة</option>
                             @foreach ($companies as $cid => $cn)<option value="{{ $cid }}">{{ $cn }}</option>@endforeach
                         </select>
                     </div>
                     <div class="crow" style="margin-top:6px">
-                        <input class="inp" name="party" placeholder="الجهة: مورد/عميل/وزارة…" maxlength="150" style="max-width:180px">
-                        <input class="inp" name="kind" placeholder="النوع: فاتورة/عقد/رخصة…" maxlength="50" style="max-width:170px">
+                        <input class="inp" aria-label="الجهة" name="party" placeholder="الجهة: مورد/عميل/وزارة…" maxlength="150" style="max-width:180px">
+                        <input class="inp" aria-label="نوع الوثيقة" name="kind" placeholder="النوع: فاتورة/عقد/رخصة…" maxlength="50" style="max-width:170px">
                         <label class="sub">تاريخها <input class="inp" type="date" name="doc_date"></label>
                         <label class="sub">تنتهي <input class="inp" type="date" name="expiry"></label>
                         <button class="btn sm">حفظ التصنيف</button>

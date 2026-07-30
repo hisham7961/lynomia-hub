@@ -38,6 +38,7 @@
 </div>
 
 <div class="card pad0">
+    <div class="tblwrap">
     <table class="tbl">
         <thead><tr><th>الاشتراك</th><th>الأحداث</th><th>السر</th><th>آخر إرسال</th><th>الحالة</th><th class="acts">إجراء</th></tr></thead>
         <tbody>
@@ -45,7 +46,12 @@
             <tr>
                 <td><b>{{ $h->name }}</b><div class="sub mono ltr" style="font-size:11px">{{ \Illuminate\Support\Str::limit($h->url, 55) }}</div></td>
                 <td><span class="mono ltr" style="font-size:11px">{{ \Illuminate\Support\Str::limit($h->events, 40) }}</span></td>
-                <td><code class="mono ltr" style="font-size:10.5px;user-select:all">{{ $h->secret }}</code></td>
+                <td>
+                    <details>
+                        <summary class="sub" style="cursor:pointer">••••••• كشف</summary>
+                        <code class="mono ltr" style="font-size:10.5px;user-select:all;word-break:break-all">{{ $h->secret }}</code>
+                    </details>
+                </td>
                 <td class="sub">
                     @if ($h->last_at)
                         <span class="bdg {{ $h->last_ok ? 'ok' : 'bad' }}">{{ $h->last_ok ? '✓' : '✗' }}</span>
@@ -72,5 +78,6 @@
         @endforelse
         </tbody>
     </table>
+    </div>
 </div>
 @endsection

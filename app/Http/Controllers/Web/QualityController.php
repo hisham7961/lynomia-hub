@@ -21,7 +21,9 @@ class QualityController extends Controller
 
         // ١) عملاء مكررون: نفس الاسم المطبع أو نفس البريد/الهاتف غير الفارغ
         $groups = [];
-        $clients = Client::whereNull('deleted_at')->get(['id', 'name', 'email', 'phone', 'created_at']);
+        // صفوف خام لا نماذج: تحميل النماذج كان ~٢.٦ كيلوبايت للصف (٥٠ ميجابايت لعشرين ألف عميل)
+        $clients = collect(DB::table('clients')->whereNull('deleted_at')
+            ->limit(50000)->get(['id', 'name', 'email', 'phone', 'created_at']));
         foreach (['norm' => fn ($c) => mb_strtolower(preg_replace('/\s+/u', ' ', trim((string) $c->name))),
                   'email' => fn ($c) => mb_strtolower(trim((string) $c->email)),
                   'phone' => fn ($c) => preg_replace('/\D+/', '', (string) $c->phone)] as $kind => $fn) {

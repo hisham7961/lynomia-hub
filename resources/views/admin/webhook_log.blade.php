@@ -10,6 +10,7 @@
 </div>
 
 <div class="card pad0">
+    <div class="tblwrap">
     <table class="tbl">
         <thead><tr><th>الحدث</th><th>الجسم</th><th>الرد</th><th>المحاولات</th><th>الحالة</th><th class="acts">إجراء</th></tr></thead>
         <tbody>
@@ -35,6 +36,7 @@
         @endforelse
         </tbody>
     </table>
+    </div>
 </div>
 {{ $rows->links('partials.pagination') }}
 @endsection

@@ -17,9 +17,15 @@
                 @php $fm = hub_field_mode(auth()->user(), $module, $f['key']); @endphp
                 @continue($fm === 'hide')
                 @if ($fm === 'ro')
-                    <div class="fld"><label>{{ $f['label'] }} <span class="sub">· قراءة فقط</span></label>
-                        <div class="inp" style="opacity:.7;pointer-events:none">
-                            @if ($row)@include('partials._display', ['f' => $f, 'row' => $row, 'ctx' => 'table', 'labels' => []])@else <span class="sub">—</span> @endif
+                    {{-- أسماء المراجع تُبنى من خيارات النموذج نفسها، وإلا عُرض معرّف خام بدل الاسم --}}
+                    <div class="fld"><span class="lbl">{{ $f['label'] }} <span class="sub">· قراءة فقط</span></span>
+                        <div class="ro" aria-readonly="true">
+                            @if ($row)
+                                @include('partials._display', ['f' => $f, 'row' => $row, 'ctx' => 'show',
+                                    'labels' => [$f['key'] => ($refOptions[$f['key']] ?? [])]])
+                            @else
+                                <span class="sub">—</span>
+                            @endif
                         </div>
                     </div>
                 @else

@@ -46,10 +46,12 @@
                 @if ($hubCos->count() > 1)
                     <form method="POST" action="{{ route('company.switch') }}" class="inline">
                         @csrf
-                        <select class="inp" name="company" onchange="this.form.submit()" title="الشركة النشطة — تصفّي القوائم عليها" style="max-width:150px;font-size:12.5px">
+                        <label class="vh" for="cosw">الشركة النشطة — تصفّي القوائم عليها</label>
+                        <select class="inp" id="cosw" name="company" onchange="this.form.submit()" style="max-width:150px;font-size:12.5px">
                             <option value="">🏢 كل الشركات</option>
                             @foreach ($hubCos as $cid => $cn)<option value="{{ $cid }}" @selected(session('hub.company') === $cid)>{{ \Illuminate\Support\Str::limit($cn, 22) }}</option>@endforeach
                         </select>
+                        <noscript><button class="btn ghost sm">تطبيق</button></noscript>
                     </form>
                 @endif
             @endif

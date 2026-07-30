@@ -29,9 +29,10 @@ class HubOutbox extends Command
         }
 
         // رسائل علقت في sending (انقطاع سابق) لأكثر من ١٠ دقائق تعود للصف
+        // من لحظة الحجز لا الإنشاء — وإلا خطف تشغيلٌ رسالةً يرسلها تشغيلٌ آخر الآن فتُرسل مرتين
         OutboxMessage::where('state', 'sending')
-            ->where('created_at', '<', now()->subMinutes(10))
-            ->update(['state' => 'queued']);
+            ->where(fn ($q) => $q->whereNull('claimed_at')->orWhere('claimed_at', '<', now()->subMinutes(10)))
+            ->update(['state' => 'queued', 'claimed_at' => null]);
 
         $batch = OutboxMessage::where('state', 'queued')
             ->whereIn('channel', ['tg', 'mail'])
@@ -50,7 +51,8 @@ class HubOutbox extends Command
         $sent = 0; $failed = 0;
         foreach ($batch as $msg) {
             // sending أولاً حتى لا تُرسَل مرتين لو تداخل تشغيلان
-            if (! OutboxMessage::where('id', $msg->id)->where('state', 'queued')->update(['state' => 'sending'])) continue;
+            if (! OutboxMessage::where('id', $msg->id)->where('state', 'queued')
+                    ->update(['state' => 'sending', 'claimed_at' => now()])) continue;
 
             try {
                 match ($msg->channel) {
@@ -84,26 +86,37 @@ class HubOutbox extends Command
             if ($n) $this->info("أُعيد صف {$n} تسليم webhook فاشل");
         }
 
-        // تسليمات علقت في sending (انقطاع سابق) تعود للصف
+        // تسليمات علقت في sending (انقطاع سابق) تعود للصف — بالقياس من لحظة الحجز
         \App\Models\WebhookDelivery::where('state', 'sending')
-            ->where('created_at', '<', now()->subMinutes(10))
-            ->update(['state' => 'queued']);
+            ->where(fn ($q) => $q->whereNull('claimed_at')->orWhere('claimed_at', '<', now()->subMinutes(10)))
+            ->update(['state' => 'queued', 'claimed_at' => null]);
 
+        // التصفية على مستوى الاستعلام لا بعده: كانت الدفعة تُقتطع أولاً ثم تُصفّى في PHP،
+        // فاشتراكٌ معطَّل بمتراكمات قديمة يملأ الدفعة كلها ويُصفّى بالكامل — فيشلّ كل
+        // الاشتراكات الحيّة إلى الأبد. الآن لا يدخل الدفعةَ إلا تسليمٌ اشتراكه جاهز فعلاً.
         $due = \App\Models\WebhookDelivery::with('webhook')
             ->where('state', 'queued')
             ->where(fn ($q) => $q->whereNull('next_at')->orWhere('next_at', '<=', now()))
+            ->whereExists(fn ($q) => $q->from('webhooks')
+                ->whereColumn('webhooks.id', 'webhook_deliveries.webhook_id')
+                ->where('webhooks.active', true)
+                ->where(fn ($w) => $w->whereNull('webhooks.paused_until')
+                                     ->orWhere('webhooks.paused_until', '<=', now())))
             ->orderBy('created_at')
             ->limit((int) $this->option('limit'))
-            ->get()
-            ->filter(fn ($d) => $d->webhook?->deliverable());
+            ->get();
+
+        // تقليم: التسليمات المسلَّمة أقدم من ٣٠ يوماً لا قيمة لها والجدول بلا سقف
+        \App\Models\WebhookDelivery::where('state', 'sent')
+            ->where('created_at', '<', now()->subDays(30))->limit(500)->delete();
 
         if ($due->isEmpty()) return;
 
         $ok = 0; $fail = 0;
         foreach ($due as $d) {
             // منع الإرسال المزدوج لو تداخل تشغيلان — نفس نمط outbox
-            if (! \App\Models\WebhookDelivery::where('id', $d->id)->where('state', 'queued')->update(['state' => 'sending'])) continue;
-            $d->state = 'queued';   // send() يقرر الحالة النهائية
+            if (! \App\Models\WebhookDelivery::where('id', $d->id)->where('state', 'queued')
+                    ->update(['state' => 'sending', 'claimed_at' => now()])) continue;
             \App\Support\WebhookDispatcher::send($d) ? $ok++ : $fail++;
         }
         $this->info("Webhooks — نجح: {$ok} · فشل/أُعيد جدولته: {$fail}");

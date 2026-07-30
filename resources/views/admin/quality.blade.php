@@ -23,11 +23,14 @@
                 <input type="hidden" name="ids" value="{{ $ids }}">
                 <div class="sub" style="margin-bottom:6px">تشابه: {{ ['norm' => 'الاسم', 'email' => 'البريد', 'phone' => 'الهاتف'][$g['by']] ?? $g['by'] }}</div>
                 @foreach ($g['rows'] as $i => $c)
-                    <label style="display:flex;gap:8px;align-items:center;padding:4px 0">
-                        <input type="radio" name="keep" value="{{ $c->id }}" @checked($i === 0)>
-                        <a href="{{ route('m.show', ['clients', $c->id]) }}"><b>{{ $c->name }}</b></a>
+                    <div style="display:flex;gap:8px;align-items:center;padding:4px 0;flex-wrap:wrap">
+                        <label style="display:flex;gap:8px;align-items:center">
+                            <input type="radio" name="keep" value="{{ $c->id }}" @checked($i === 0)>
+                            <b>{{ $c->name }}</b>
+                        </label>
                         <span class="sub">{{ $c->email ?: '—' }} · {{ $c->phone ?: '—' }} · أُنشئ {{ $c->created_at ? \Illuminate\Support\Carbon::parse($c->created_at)->format('Y-m-d') : '؟' }}</span>
-                    </label>
+                        <a class="btn ghost xs" href="{{ route('m.show', ['clients', $c->id]) }}" target="_blank" rel="noopener">فحص ↗</a>
+                    </div>
                 @endforeach
                 <button class="btn sm" style="margin-top:6px">🔀 دمج في المحدد</button>
             </form>
