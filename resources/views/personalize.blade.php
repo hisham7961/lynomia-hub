@@ -93,6 +93,17 @@
     </div>
 
     <div class="card" style="margin-top:12px">
+        <h3>🔕 كتم الإشعارات</h3>
+        <div class="sub" style="margin-bottom:8px">أوقف أنواع الإشعارات التي لا تريدها — لن تصلك أصلاً. (الموافقات والإسناد والرسائل تبقى دائماً.)</div>
+        @php $muted = (array) hub_pref('mute', []); @endphp
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px">
+            @foreach (\App\Models\HubNotification::MUTEABLE as $mk => $ml)
+                <label class="chk"><input type="checkbox" name="mute[]" value="{{ $mk }}" @checked(in_array($mk, $muted, true))> كتم: {{ $ml }}</label>
+            @endforeach
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
         <h3>🏠 بطاقات لوحة التحكم</h3>
         <div class="sub" style="margin-bottom:8px">أخفِ البطاقات التي لا تعنيك — تعود من هنا متى شئت.</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px">

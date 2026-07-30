@@ -49,6 +49,8 @@ class PrefController extends Controller
             'order.*'      => ['nullable', 'integer', 'min:0', 'max:99'],
             'dash_hidden'  => ['nullable', 'array'],
             'dash_hidden.*' => ['string', 'max:30'],
+            'mute'         => ['nullable', 'array'],
+            'mute.*'       => ['string', 'max:30'],
         ]);
 
         // شاشة البداية: من الكتالوج أو m:وحدة يراها — الاختيار غير الصالح يُهمل
@@ -78,6 +80,8 @@ class PrefController extends Controller
         $prefs['dash'] = array_filter([
             'hidden' => array_values(array_intersect($data['dash_hidden'] ?? [], array_keys(self::DASH_CARDS))),
         ]);
+        // كتم أنواع الإشعارات — ضمن القائمة القابلة للكتم فقط
+        $prefs['mute'] = array_values(array_intersect($data['mute'] ?? [], array_keys(\App\Models\HubNotification::MUTEABLE)));
         $u->prefs = array_filter($prefs, fn ($v) => $v !== null && $v !== [] && $v !== '') ?: null;
         $u->save();
 
