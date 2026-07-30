@@ -14,6 +14,7 @@ use App\Http\Controllers\Web\ImportController;
 use App\Http\Controllers\Web\ModuleController;
 use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\OdooController;
+use App\Http\Controllers\Web\PerformanceController;
 use App\Http\Controllers\Web\PortalController;
 use App\Http\Controllers\Web\LegalController;
 use App\Http\Controllers\Web\ProfileController;
@@ -71,6 +72,7 @@ Route::middleware('auth')->group(function () {
     Route::post('purchase/{id}/act', [PurchaseController::class, 'act'])->name('purchases.act');
     Route::get('legal', [LegalController::class, 'index'])->name('legal');
     Route::get('support', [SupportController::class, 'index'])->name('support');
+    Route::get('performance', [PerformanceController::class, 'index'])->name('performance');
 
     // ── الربط الذكي بأودو (عرض فقط) ──
     Route::post('odoo/{module}/{id}/link', [OdooController::class, 'link'])->name('odoo.link');

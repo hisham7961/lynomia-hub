@@ -24,6 +24,9 @@
         @if (auth()->user()->role?->is_owner)
             <a class="ni top {{ request()->routeIs('ceo') ? 'on' : '' }}" href="{{ route('ceo') }}">👑 لوحة CEO</a>
         @endif
+        @if (auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'monitor'))
+            <a class="ni top {{ request()->routeIs('performance') ? 'on' : '' }}" href="{{ route('performance') }}">📈 لوحة الأداء</a>
+        @endif
         @foreach (hub_nav(auth()->user()) as $g)
             @php $active = collect($g['items'])->contains(fn ($k) => request()->is("m/$k*")); @endphp
             <details {{ $active ? 'open' : '' }}>
