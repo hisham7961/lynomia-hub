@@ -43,6 +43,24 @@ class UnifiedSemanticsTest extends TestCase
         }
     }
 
+    /**
+     * الحالات النهائية الخاصة بوحدتها — والمعيار: هل بقي عملٌ على أحد؟
+     * القائمة تُغذّي «ما يحتاج تدخلاً»، فالفشل ليس انتهاءً.
+     */
+    public function test_module_specific_terminal_states_follow_the_needs_action_rule(): void
+    {
+        // انتهى العمل فعلاً — لا متابعة بعدها
+        foreach (['خسارة', 'تم التعيين', 'منتهية خدمته', 'مستبعد', 'خرج من السوق',
+                  'مُستبدَلة', 'مرتجع', 'متوقفة عن البيع', 'مُقرّة', 'منتهية بتحديث النسخة'] as $s) {
+            $this->assertTrue(hub_is_closed($s), "«{$s}» انتهت ولا تطلب تدخلاً");
+        }
+
+        // حدثها انتهى لكنها تطلب تدخلاً — فتبقى مفتوحة عمداً
+        foreach (['فشل', 'فشلت', 'فوز', 'نفد', 'تالف'] as $s) {
+            $this->assertFalse(hub_is_closed($s), "«{$s}» تطلب تدخلاً فلا تُخفى");
+        }
+    }
+
     /** كل حالة مُصرَّح بها في السجل ومعناها الانتهاء يجب أن يعرفها التعريف الموحَّد */
     public function test_declared_states_are_drawn_from_the_registry(): void
     {
