@@ -74,7 +74,49 @@ class OpsController extends Controller
             'api'  => ErrorEvent::where('kind', 'api')->where('last_seen', '>=', now()->subDays(7))->count(),
         ];
 
-        return view('ops.index', compact('db', 'sys', 'outbox', 'beats', 'backup', 'errs'));
+        $pending = $this->pendingMigrations();
+
+        return view('ops.index', compact('db', 'sys', 'outbox', 'beats', 'backup', 'errs', 'pending'));
+    }
+
+    /** الهجرات الموجودة في الكود ولم تُطبَّق على القاعدة بعد — الفجوة التي تكسر النشر */
+    protected function pendingMigrations(): array
+    {
+        try {
+            $ran = DB::table('migrations')->pluck('migration')->all();
+
+            return collect(glob(database_path('migrations/*.php')))
+                ->map(fn ($f) => basename($f, '.php'))
+                ->reject(fn ($m) => in_array($m, $ran, true))
+                ->values()->all();
+        } catch (\Throwable $e) {
+            return [];   // تعذّر الفحص (جدول الهجرات نفسه غائب؟) — زر التشغيل يعالجه
+        }
+    }
+
+    /**
+     * تشغيل الترحيلات المعلقة من المتصفح — للمالك فقط، بلا طرفية.
+     * وُلد من حادثة حقيقية: كودٌ نُشر قبل هجرته فانكسر كل قيد تدقيق حتى الخروج.
+     */
+    public function migrate()
+    {
+        $this->gate();
+        @set_time_limit(300);
+
+        try {
+            \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+            $out = trim(\Illuminate\Support\Facades\Artisan::output());
+            hub_audit('تشغيل الترحيلات', null, null, 'من مركز التشغيل');
+            // مخطط الجدول ربما تغيّر للتو — تُنسى خبيئة الأعمدة فيُلتقط الجديد فوراً
+            \App\Models\AuditEntry::forgetColumnCache();
+
+            return redirect()->route('ops.index')
+                ->with('ok', 'اكتمل الترحيل بنجاح')
+                ->with('migrate_out', mb_substr($out, 0, 4000));
+        } catch (\Throwable $e) {
+            return redirect()->route('ops.index')
+                ->with('err', 'فشل الترحيل: ' . mb_substr($e->getMessage(), 0, 300));
+        }
     }
 
     /** فحص صحي داخلي عميق — JSON لمراقبات خارجية */

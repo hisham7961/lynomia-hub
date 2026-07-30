@@ -215,6 +215,7 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/audit', [AuditController::class, 'index'])->name('audit.index');
     Route::get('admin/ops', [OpsController::class, 'index'])->name('ops.index');
     Route::post('admin/ops/test-error', [OpsController::class, 'testError'])->name('ops.testerror');
+    Route::post('admin/ops/migrate', [OpsController::class, 'migrate'])->name('ops.migrate');
     Route::post('admin/demo/reset', function () {
         abort_unless(auth()->user()?->role?->is_owner, 403);
         // شامل: كل وحدة من السجل تنال بيانات تجريبية، والإعدادات الفارغة تُملأ

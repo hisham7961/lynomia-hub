@@ -70,6 +70,28 @@
     </div>
 
     <div class="card kid">
+        <h3>🛢️ ترحيلات القاعدة</h3>
+        @if (count($pending))
+            <div class="sub" style="margin-bottom:8px">
+                <b class="txt-bad">{{ count($pending) }} ترحيلاً معلقاً</b> — الكود يسبق القاعدة،
+                وهذه الفجوة سبب أخطاء «عمود غير معروف». اضغط للتطبيق:
+            </div>
+            <ul class="sub mono ltr" style="margin:0 0 10px;padding-inline-start:18px;max-height:120px;overflow:auto">
+                @foreach ($pending as $m)<li>{{ $m }}</li>@endforeach
+            </ul>
+            <form method="POST" action="{{ route('ops.migrate') }}"
+                  onsubmit="return confirm('تشغيل الترحيلات المعلقة على قاعدة البيانات الآن؟ (الترحيلات إضافية غير مدمرة)')">
+                @csrf<button class="btn xs">🛢️ تشغيل الترحيلات الآن</button>
+            </form>
+        @else
+            <div class="sub">✅ القاعدة مطابقة للكود — لا ترحيلات معلقة.</div>
+        @endif
+        @if (session('migrate_out'))
+            <pre class="mono ltr" style="margin-top:10px;font-size:11px;max-height:180px;overflow:auto;white-space:pre-wrap">{{ session('migrate_out') }}</pre>
+        @endif
+    </div>
+
+    <div class="card kid">
         <h3>🎭 الوضع التجريبي (Sandbox)</h3>
         <div class="sub" style="margin-bottom:8px">
             بيانات وهمية واقعية (موسومة 🎭) للتدريب وتجربة الاستيراد والمسارات والـ API بلا خوف —
