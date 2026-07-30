@@ -85,6 +85,7 @@ class V1Controller extends ModuleController
         try {
             $r->validate($this->rules($def, true), [], $this->attrs($def));
             $this->guardProject($r, $module);
+            $this->guardCompany($r, $module);
 
             $m = new $class;
             $this->fill($def, $r, $m);
@@ -113,6 +114,7 @@ class V1Controller extends ModuleController
         }
         $r->validate($this->rules($def, false), [], $this->attrs($def));
         $this->guardProject($r, $module);
+        $this->guardCompany($r, $module);
 
         $m = $this->findScoped($class, $module, $id);
         $prev = ($af = $this->assigneeField($def)) ? $m->{$af['col']} : null;

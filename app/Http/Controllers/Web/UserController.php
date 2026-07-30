@@ -25,10 +25,17 @@ class UserController extends Controller
         return view('users.index', compact('users'));
     }
 
+    /** شركات النظام لخانات العزل في النموذج */
+    protected function companies()
+    {
+        return \App\Models\Company::whereNull('deleted_at')->orderBy('name_ar')->pluck('name_ar', 'id');
+    }
+
     public function create()
     {
         $this->gate();
-        return view('users.form', ['u' => null, 'roles' => Role::orderBy('name')->get()]);
+        return view('users.form', ['u' => null, 'roles' => Role::orderBy('name')->get(),
+            'companies' => $this->companies()]);
     }
 
     public function store(Request $r)
@@ -42,7 +49,10 @@ class UserController extends Controller
             'role_id' => 'required|exists:roles,id',
             'status' => 'required|in:نشط,موقوف',
             'password' => ['required', 'string', password_rules()],
+            'companies' => 'nullable|array',
+            'companies.*' => 'string|exists:companies,id',
         ]);
+        $data['companies'] = array_values($data['companies'] ?? []);
         User::create($data);
 
         return redirect()->route('users.index')->with('ok', 'أُضيف المستخدم');
@@ -51,7 +61,8 @@ class UserController extends Controller
     public function edit(User $user)
     {
         $this->gate();
-        return view('users.form', ['u' => $user, 'roles' => Role::orderBy('name')->get()]);
+        return view('users.form', ['u' => $user, 'roles' => Role::orderBy('name')->get(),
+            'companies' => $this->companies()]);
     }
 
     public function update(Request $r, User $user)
@@ -65,7 +76,10 @@ class UserController extends Controller
             'role_id' => 'required|exists:roles,id',
             'status' => 'required|in:نشط,موقوف',
             'password' => ['nullable', 'string', password_rules()],
+            'companies' => 'nullable|array',
+            'companies.*' => 'string|exists:companies,id',
         ]);
+        $data['companies'] = array_values($data['companies'] ?? []);
         if (empty($data['password'])) unset($data['password']);
         $user->update($data);
 

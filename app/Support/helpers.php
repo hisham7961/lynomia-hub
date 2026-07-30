@@ -103,19 +103,44 @@ if (! function_exists('hub_project_col')) {
     }
 }
 
+if (! function_exists('hub_company_ids')) {
+    /**
+     * الشركات المسموحة للمستخدم في العزل الصارم — null = غير مقيد
+     * (مالك دائماً، أو مستخدم بلا قائمة شركات محددة).
+     */
+    function hub_company_ids($user = null): ?array
+    {
+        $user = $user ?? auth()->user();
+        if (! $user || $user->role?->is_owner) return null;
+        $ids = is_array($user->companies) ? $user->companies : (json_decode($user->companies ?? '[]', true) ?: []);
+        $ids = array_values(array_filter(array_map('strval', $ids)));
+
+        return $ids ?: null;
+    }
+}
+
 if (! function_exists('hub_scope')) {
     /**
-     * فرض نطاق المشاريع على أي استعلام (Eloquent أو Query Builder):
-     * المستخدم المحدود يرى مشاريعه فقط، وسجلات الوحدات المرتبطة بمشاريعه فقط.
-     * الوحدات بلا عمود مشروع تبقى محكومة بمصفوفة الصلاحيات وحدها.
+     * فرض النطاق الكامل على أي استعلام (Eloquent أو Query Builder):
+     *  1) نطاق المشاريع — المستخدم المحدود يرى مشاريعه وسجلاتها فقط.
+     *  2) عزل الشركات الصارم — من له قائمة شركات مسموحة لا يرى إلا سجلاتها،
+     *     والوصول المباشر بالرابط لسجل خارجها = 404 (findOrFail بعد النطاق).
+     * الوحدات بلا عمود مشروع/شركة تبقى محكومة بمصفوفة الصلاحيات وحدها.
      */
     function hub_scope($q, string $module, $user = null)
     {
         $user = $user ?? auth()->user();
-        if (! hub_scoped($user)) return $q;
-        $ids = $user->visibleProjectIds();
-        if ($module === 'projects') return $q->whereIn('id', $ids);
-        if ($col = hub_project_col($module)) return $q->whereIn($col, $ids);
+
+        if (hub_scoped($user)) {
+            $ids = $user->visibleProjectIds();
+            if ($module === 'projects') $q->whereIn('id', $ids);
+            elseif ($col = hub_project_col($module)) $q->whereIn($col, $ids);
+        }
+
+        if (($cids = hub_company_ids($user)) !== null && ($ccol = hub_company_col($module))) {
+            $q->whereIn($ccol, $cids);
+        }
+
         return $q;
     }
 }
@@ -800,13 +825,15 @@ if (! function_exists('hub_company_col')) {
 
 if (! function_exists('hub_company_scope')) {
     /**
-     * محوّل الشركة النشطة: عند اختيار شركة من الشريط العلوي تُصفّى قوائم
-     * الوحدات عليها — تصفية عرض للتركيز، لا عزلاً صارماً (ذاك طور لاحق موثق).
+     * محوّل الشركة النشطة: تصفية عرضٍ للتركيز فوق العزل الصارم (الذي يفرضه
+     * hub_scope) — واختيارٌ خارج شركات المستخدم المسموحة يُتجاهل دفاعاً إضافياً.
      */
     function hub_company_scope($q, string $module)
     {
         $cid = (string) session('hub.company', '');
         if ($cid === '') return $q;
+        $allowed = hub_company_ids();
+        if ($allowed !== null && ! in_array($cid, $allowed, true)) return $q;
         $col = hub_company_col($module);
 
         return $col ? $q->where($col, $cid) : $q;

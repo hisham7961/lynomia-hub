@@ -79,6 +79,8 @@ Route::middleware('auth')->group(function () {
         $cid = (string) $r->input('company', '');
         if ($cid !== '') {
             abort_unless(hub_can(auth()->user(), 'companies', 'v'), 403);
+            $allowed = hub_company_ids();
+            abort_if($allowed !== null && ! in_array($cid, $allowed, true), 403, 'هذه الشركة خارج نطاقك');
             abort_unless(\App\Models\Company::whereNull('deleted_at')->whereKey($cid)->exists(), 404);
         }
         session(['hub.company' => $cid]);

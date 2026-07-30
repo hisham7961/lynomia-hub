@@ -106,7 +106,8 @@ class ModuleController extends Controller
     {
         [$def, $class] = $this->resolve($module, 'a');
         $r->validate($this->rules($def), [], $this->attrs($def));
-        if ($resp = $this->guardProject($r, $module)) return $resp;
+        $this->guardProject($r, $module);
+        $this->guardCompany($r, $module);
 
         $m = new $class;
         $this->fill($def, $r, $m);
@@ -208,7 +209,8 @@ class ModuleController extends Controller
     {
         [$def, $class] = $this->resolve($module, 'e');
         $r->validate($this->rules($def, creating: false), [], $this->attrs($def));
-        if ($resp = $this->guardProject($r, $module)) return $resp;
+        $this->guardProject($r, $module);
+        $this->guardCompany($r, $module);
 
         $m = $this->findScoped($class, $module, $id);
         if (hub_needs_approval(auth()->user(), $module, 'e')) {
@@ -471,23 +473,39 @@ class ModuleController extends Controller
         return hub_scope($q, $module)->findOrFail($id);
     }
 
-    /** للحسابات المحدودة: يجب ربط السجل بأحد مشاريع المستخدم عند الإضافة أو التعديل */
-    protected function guardProject(Request $r, string $module)
+    /**
+     * للحسابات المحدودة: يجب ربط السجل بأحد مشاريع المستخدم عند الإضافة أو التعديل.
+     * يرمي ValidationException — تتحول redirect في الويب و422 JSON في الـ API.
+     */
+    protected function guardProject(Request $r, string $module): void
     {
-        if (! hub_scoped(auth()->user())) return null;
-        if ($module === 'projects') return null;                 // تُضبط عضويته تلقائياً في store
+        if (! hub_scoped(auth()->user())) return;
+        if ($module === 'projects') return;                      // تُضبط عضويته تلقائياً في store
         $pf = hub_project_field($module);
-        if (! $pf) return null;
+        if (! $pf) return;
 
         $ids = auth()->user()->visibleProjectIds();
         $val = (string) $r->input($pf['key']);
         if ($val === '' || ! in_array($val, $ids, true)) {
-            return back()
-                ->withErrors([$pf['key'] => 'حسابك محدود النطاق — اختر مشروعاً من مشاريعك'])
-                ->withInput();
+            throw \Illuminate\Validation\ValidationException::withMessages(
+                [$pf['key'] => 'حسابك محدود النطاق — اختر مشروعاً من مشاريعك']);
         }
+    }
 
-        return null;
+    /** العزل الصارم: من له شركات مسموحة يربط السجل بإحداها فقط عند الإضافة أو التعديل */
+    protected function guardCompany(Request $r, string $module): void
+    {
+        $ids = hub_company_ids();
+        if ($ids === null || $module === 'companies') return;
+        $cf = collect(hub_mod($module)['fields'] ?? [])
+            ->first(fn ($f) => ($f['type'] ?? '') === 'ref' && ($f['ref'] ?? '') === 'companies' && empty($f['multi']));
+        if (! $cf) return;
+
+        $val = (string) $r->input($cf['key']);
+        if ($val === '' || ! in_array($val, $ids, true)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(
+                [$cf['key'] => 'حسابك معزول على شركات محددة — اختر شركة من شركاتك']);
+        }
     }
 
     /** أعمدة الجدول (من تعريف الوحدة) + أسماء العرض للمراجع الظاهرة في الصفحة */
@@ -542,6 +560,10 @@ class ModuleController extends Controller
             $opts = hub_ref_options($f['ref'], $cur);
             if ($f['ref'] === 'projects' && hub_scoped(auth()->user())) {
                 $opts = array_intersect_key($opts, array_flip(auth()->user()->visibleProjectIds()));
+            }
+            // العزل الصارم: خيارات الشركات تنحصر في شركات المستخدم المسموحة
+            if ($f['ref'] === 'companies' && ($cids = hub_company_ids()) !== null) {
+                $opts = array_intersect_key($opts, array_flip($cids));
             }
             $out[$f['key']] = $opts;
         }

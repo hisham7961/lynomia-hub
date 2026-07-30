@@ -23,6 +23,7 @@ class User extends Authenticatable
     protected $casts = [
         'notify_prefs' => 'array',
         'prefs' => 'array',
+        'companies' => 'array',
         'recovery_codes' => 'array',
         'totp_enabled' => 'boolean',
         'totp_secret_cipher' => \App\Casts\EncryptedOrPlain::class,

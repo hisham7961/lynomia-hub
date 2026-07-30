@@ -41,8 +41,14 @@
             </div>
             <div class="spacer"></div>
             @if (hub_can(auth()->user(), 'companies', 'v'))
-                @php $hubCos = \Illuminate\Support\Facades\Cache::remember('topbar:companies', 300,
-                    fn () => \App\Models\Company::whereNull('deleted_at')->orderBy('name_ar')->pluck('name_ar', 'id')); @endphp
+                @php
+                    $hubCos = \Illuminate\Support\Facades\Cache::remember('topbar:companies', 300,
+                        fn () => \App\Models\Company::whereNull('deleted_at')->orderBy('name_ar')->pluck('name_ar', 'id'));
+                    // العزل الصارم: المستخدم المقيد لا يرى في المحوّل إلا شركاته
+                    if (($hubAllowed = hub_company_ids()) !== null) {
+                        $hubCos = $hubCos->only($hubAllowed);
+                    }
+                @endphp
                 @if ($hubCos->count() > 1)
                     <form method="POST" action="{{ route('company.switch') }}" class="inline">
                         @csrf
