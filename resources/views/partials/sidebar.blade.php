@@ -20,7 +20,8 @@
                     || request()->routeIs(\Illuminate\Support\Str::before($it['route'], '.') . '.*'));
                 $gCount  = collect($g['items'])->sum(fn ($it) => (int) ($navBadges[$it['key']] ?? 0));
             @endphp
-            <details {{ $g['open'] || $gActive ? 'open' : '' }}>
+            {{-- data-nav: مفتاح تذكُّر الفتح/الإغلاق في المتصفح · act: المجموعة النشطة لا يغلقها المحفوظ --}}
+            <details data-nav="t:{{ $g['label'] }}" @class(['act' => $gActive]) {{ $g['open'] || $gActive ? 'open' : '' }}>
                 <summary>{{ $g['icon'] }} {{ $g['label'] }}@if ($gCount)<span class="nbdg">{{ $gCount }}</span>@endif</summary>
                 @foreach ($g['items'] as $it)
                     <a class="ni {{ request()->routeIs($it['route']) || request()->routeIs(\Illuminate\Support\Str::before($it['route'], '.') . '.*') ? 'on' : '' }}" href="{{ route($it['route']) }}">{{ $it['label'] }}@if (($b = (int) ($navBadges[$it['key']] ?? 0)))<span class="nbdg">{{ $b }}</span>@endif</a>
@@ -32,7 +33,7 @@
         <div class="navsection">الوحدات</div>
         @foreach (hub_nav(auth()->user()) as $g)
             @php $active = collect($g['items'])->contains(fn ($it) => request()->is('m/' . $it['key'] . '*')); @endphp
-            <details {{ $active ? 'open' : '' }}>
+            <details data-nav="m:{{ $g['g'] }}" @class(['act' => $active]) {{ $active ? 'open' : '' }}>
                 <summary>{{ $g['icon'] }} {{ $g['g'] }}</summary>
                 @foreach ($g['items'] as $it)
                     <a class="ni {{ request()->is('m/' . $it['key'] . '*') ? 'on' : '' }}" href="{{ route('m.index', $it['key']) }}">{{ $it['label'] }}</a>
@@ -40,26 +41,7 @@
             </details>
         @endforeach
 
-        <div class="navsection">النظام</div>
-        <a class="ni {{ request()->routeIs('prefs.*') ? 'on' : '' }}" href="{{ route('prefs.edit') }}">🎛️ التخصيص</a>
-        @if (hub_flag(auth()->user(), 'users') || hub_flag(auth()->user(), 'audit') || hub_is_owner())
-            @php $adm = request()->routeIs('users.*') || request()->routeIs('roles.*') || request()->routeIs('audit.*') || request()->routeIs('settings.*'); @endphp
-            <details {{ $adm ? 'open' : '' }}>
-                <summary>⚙️ الإدارة</summary>
-                @if (hub_flag(auth()->user(), 'users'))<a class="ni {{ request()->routeIs('users.*') ? 'on' : '' }}" href="{{ route('users.index') }}">المستخدمون</a>@endif
-                @if (hub_is_owner())<a class="ni {{ request()->routeIs('roles.*') ? 'on' : '' }}" href="{{ route('roles.index') }}">الأدوار والصلاحيات</a>@endif
-                @if (hub_flag(auth()->user(), 'audit'))<a class="ni {{ request()->routeIs('audit.*') ? 'on' : '' }}" href="{{ route('audit.index') }}">سجل التدقيق</a>@endif
-                @if (hub_is_owner())<a class="ni {{ request()->routeIs('security.*') ? 'on' : '' }}" href="{{ route('security.index') }}">🛡️ مركز الأمان</a>@endif
-                @if (hub_is_owner())<a class="ni {{ request()->routeIs('ops.*') ? 'on' : '' }}" href="{{ route('ops.index') }}">🖥️ مركز التشغيل</a>@endif
-                @if (hub_is_owner())<a class="ni {{ request()->routeIs('errors.*') ? 'on' : '' }}" href="{{ route('errors.index') }}">🐞 مركز الأخطاء</a>@endif
-                @if (hub_secrets())<a class="ni {{ request()->routeIs('dataroom.*') ? 'on' : '' }}" href="{{ route('dataroom.index') }}">🔐 غرفة البيانات</a>@endif
-                @if (hub_is_owner())<a class="ni {{ request()->routeIs('fields.*') ? 'on' : '' }}" href="{{ route('fields.index') }}">🧩 باني الحقول</a>@endif
-                @if (hub_is_owner())<a class="ni {{ request()->routeIs('flows.*') ? 'on' : '' }}" href="{{ route('flows.index') }}">🪄 مسارات العمل</a>@endif
-                @if (hub_is_owner())<a class="ni {{ request()->routeIs('webhooks.*') ? 'on' : '' }}" href="{{ route('webhooks.index') }}">🪝 Webhooks</a>@endif
-                @if (hub_is_owner())<a class="ni {{ request()->routeIs('quality.*') ? 'on' : '' }}" href="{{ route('quality.index') }}">🧹 جودة البيانات</a>@endif
-                @if (hub_is_owner())<a class="ni {{ request()->routeIs('settings.*') ? 'on' : '' }}" href="{{ route('settings.edit') }}">الإعدادات</a>@endif
-            </details>
-        @endif
+        {{-- قسم «النظام» انتقل إلى قائمة الترس ⚙️ في البار العلوي — الجانبي للعمل اليومي فقط --}}
     </nav>
 
     {{-- رقم الإصدار — مصدره ملف VERSION عبر config('hub.version')، فيتحدّث تلقائياً مع كل رفعة --}}

@@ -354,3 +354,47 @@
 
   list.addEventListener('change', markDirty);
 })();
+
+/* ═ القائمة الجانبية: تذكُّر ما فتحتَه وأين كنت — فلا «يختفي المكان» بعد التنقل ═ */
+(function () {
+  var nav = document.querySelector('.sidebar');
+  if (!nav) return;
+  var KEY = 'lyn_nav_open', SK = 'lyn_nav_scroll';
+  var saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
+
+  nav.querySelectorAll('details[data-nav]').forEach(function (d) {
+    var k = d.dataset.nav;
+    // المحفوظ يُطبَّق — إلا أن المجموعة النشطة (فيها صفحتك الحالية) لا تُغلق أبداً
+    if (saved[k] === 1) d.open = true;
+    if (saved[k] === 0 && !d.classList.contains('act')) d.open = false;
+    d.addEventListener('toggle', function () {
+      saved[k] = d.open ? 1 : 0;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    });
+  });
+
+  // موضع التمرير يعود كما تركته، ثم يُضمن ظهور العنصر النشط في مرمى العين
+  var sc = parseInt(sessionStorage.getItem(SK) || '-1', 10);
+  if (sc >= 0) nav.scrollTop = sc;
+  var on = nav.querySelector('.ni.on');
+  if (on) {
+    var r = on.getBoundingClientRect(), nr = nav.getBoundingClientRect();
+    if (r.top < nr.top + 40 || r.bottom > nr.bottom - 10) on.scrollIntoView({ block: 'center' });
+  }
+  nav.addEventListener('scroll', function () {
+    try { sessionStorage.setItem(SK, String(nav.scrollTop)); } catch (e) {}
+  }, { passive: true });
+})();
+
+/* ═ قائمة الترس ⚙️: تُغلق بالنقر خارجها وبـEsc ═ */
+(function () {
+  var g = document.getElementById('gearmenu');
+  if (!g) return;
+  document.addEventListener('click', function (e) {
+    if (g.open && !g.contains(e.target)) g.open = false;
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') g.open = false;
+  });
+})();

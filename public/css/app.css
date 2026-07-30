@@ -259,6 +259,20 @@ input.inp.htmx-request{background-image:linear-gradient(90deg,transparent,color-
 .bell{position:relative}
 .bell .gsr{inset-inline-start:auto;inset-inline-end:0;min-width:300px;max-width:350px;max-height:60vh;overflow:auto}
 
+/* ═ قائمة الترس ⚙️ — النظام والإدارة في البار العلوي ═ */
+.gearmenu{position:relative}
+.gearmenu summary{list-style:none;user-select:none}
+.gearmenu summary::-webkit-details-marker{display:none}
+.gearmenu summary.on{border-color:var(--p);color:var(--p);font-weight:700}
+.gearbox{position:absolute;top:calc(100% + 8px);inset-inline-end:0;min-width:220px;max-height:70vh;overflow:auto;
+  background:var(--cd);border:1px solid var(--ln);border-radius:14px;box-shadow:var(--shh);z-index:50;
+  padding:6px;animation:pop .16s ease}
+.gi{display:flex;gap:9px;align-items:center;padding:8px 12px;font-size:13px;color:var(--tx);border-radius:9px;
+  transition:background var(--t)}
+.gi:hover{background:color-mix(in srgb,var(--p) 8%,transparent)}
+.gi.on{background:var(--p);color:#fff;font-weight:700}
+html[data-theme="dark"] .gearbox{background:var(--cd)}
+
 /* ═ النوافذ المنبثقة ═ */
 .modal{position:fixed;inset:0;background:color-mix(in srgb,#03110D 55%,transparent);backdrop-filter:blur(4px);
   z-index:70;display:flex;align-items:flex-start;justify-content:center;padding:6vh 14px;overflow:auto;animation:fadein .18s}

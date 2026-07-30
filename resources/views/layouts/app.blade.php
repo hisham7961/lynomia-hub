@@ -68,6 +68,29 @@
             </div>
             <button class="btn ghost sm" type="button" onclick="Hub.palette()" title="لوحة الأوامر">⌘K</button>
             <button class="btn ghost sm" type="button" onclick="Hub.theme()" title="الوضع الليلي">🌓</button>
+            {{-- قائمة النظام والإدارة — انتقلت من الجانبي ليخفّ ويتفرغ للعمل اليومي --}}
+            @php
+                $admOn = request()->routeIs('users.*', 'roles.*', 'audit.*', 'settings.*', 'security.*',
+                    'ops.*', 'errors.*', 'dataroom.*', 'fields.*', 'flows.*', 'webhooks.*', 'quality.*', 'prefs.*');
+            @endphp
+            <details class="gearmenu" id="gearmenu">
+                <summary class="btn ghost sm {{ $admOn ? 'on' : '' }}" title="النظام والإدارة">⚙️</summary>
+                <div class="gearbox">
+                    <a class="gi {{ request()->routeIs('prefs.*') ? 'on' : '' }}" href="{{ route('prefs.edit') }}">🎛️ التخصيص</a>
+                    @if (hub_flag(auth()->user(), 'users'))<a class="gi {{ request()->routeIs('users.*') ? 'on' : '' }}" href="{{ route('users.index') }}">👥 المستخدمون</a>@endif
+                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('roles.*') ? 'on' : '' }}" href="{{ route('roles.index') }}">🧑‍⚖️ الأدوار والصلاحيات</a>@endif
+                    @if (hub_flag(auth()->user(), 'audit'))<a class="gi {{ request()->routeIs('audit.*') ? 'on' : '' }}" href="{{ route('audit.index') }}">🕘 سجل التدقيق</a>@endif
+                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('security.*') ? 'on' : '' }}" href="{{ route('security.index') }}">🛡️ مركز الأمان</a>@endif
+                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('ops.*') ? 'on' : '' }}" href="{{ route('ops.index') }}">🖥️ مركز التشغيل</a>@endif
+                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('errors.*') ? 'on' : '' }}" href="{{ route('errors.index') }}">🐞 مركز الأخطاء</a>@endif
+                    @if (hub_secrets())<a class="gi {{ request()->routeIs('dataroom.*') ? 'on' : '' }}" href="{{ route('dataroom.index') }}">🔐 غرفة البيانات</a>@endif
+                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('fields.*') ? 'on' : '' }}" href="{{ route('fields.index') }}">🧩 باني الحقول</a>@endif
+                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('flows.*') ? 'on' : '' }}" href="{{ route('flows.index') }}">🪄 مسارات العمل</a>@endif
+                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('webhooks.*') ? 'on' : '' }}" href="{{ route('webhooks.index') }}">🪝 Webhooks</a>@endif
+                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('quality.*') ? 'on' : '' }}" href="{{ route('quality.index') }}">🧹 جودة البيانات</a>@endif
+                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('settings.*') ? 'on' : '' }}" href="{{ route('settings.edit') }}">⚙️ الإعدادات</a>@endif
+                </div>
+            </details>
             <div class="userbox">
                 <a href="{{ route('profile.edit') }}" title="ملفي الشخصي" style="display:flex;gap:10px;align-items:center;color:inherit">
                     <span class="ava">{{ mb_substr(auth()->user()->name, 0, 1) }}</span>

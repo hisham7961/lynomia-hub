@@ -60,6 +60,8 @@ class HubDemo extends Command
         if ($this->option('full')) {
             $n += $this->seedRegistry();
             $this->seedSettings();
+            // عدّة الانطلاق: مسارات عمل حقيقية دائمة (بالاسم فلا تتكرر، ولا يمسحها التصفير)
+            $this->call('hub:flows-starter');
         }
         \App\Models\Setting::updateOrCreate(['key' => 'demo.on'], ['value' => '1']);
         \Illuminate\Support\Facades\Cache::forget('settings:all');
@@ -110,28 +112,35 @@ class HubDemo extends Command
 
     protected function seed(): int
     {
-        $co = $this->row('companies', ['name_ar' => '🎭 شركة الأفق التجريبية', 'name_en' => 'Demo Horizon',
-            'country' => 'الكويت', 'city' => 'مدينة الكويت', 'type' => 'تقنية', 'status' => 'نشطة']);
+        // ثلاث شركات لا واحدة — فيُختبر محوّل الشركات والعزل والتقارير المجمّعة فعلاً
+        $cos = [];
+        foreach ([['🎭 شركة الأفق التجريبية', 'Demo Horizon', 'تقنية'],
+                  ['🎭 النخيل للتجارة العامة', 'Demo Palms Trading', 'تجارة'],
+                  ['🎭 البشائر للخدمات', 'Demo Bashaer Services', 'خدمات']] as [$na, $ne, $ty]) {
+            $cos[] = $this->row('companies', ['name_ar' => $na, 'name_en' => $ne,
+                'country' => 'الكويت', 'city' => 'مدينة الكويت', 'type' => $ty, 'status' => 'نشطة']);
+        }
+        $co = $cos[0];
 
         $clients = [];
         foreach ([['🎭 مطاعم الذواقة', 'info@demo-taste.example', 'عميل'],
                   ['🎭 عيادات الشفاء', 'care@demo-clinic.example', 'عميل'],
                   ['🎭 مكتبة المعرفة', 'hi@demo-books.example', 'مهتم'],
-                  ['🎭 نادي اللياقة', 'fit@demo-gym.example', 'تفاوض']] as [$n2, $e, $st]) {
+                  ['🎭 نادي اللياقة', 'fit@demo-gym.example', 'تفاوض']] as $i => [$n2, $e, $st]) {
             $clients[] = $this->row('clients', ['name' => $n2, 'email' => $e, 'stage' => $st,
-                'company_id' => $co, 'country' => 'الكويت', 'phone' => '+965 5' . random_int(1000000, 9999999)]);
+                'company_id' => $cos[$i % 3], 'country' => 'الكويت', 'phone' => '+965 5' . random_int(1000000, 9999999)]);
         }
 
         $projects = [];
         foreach ([['🎭 تطبيق توصيل الطلبات', 'قيد التنفيذ', 'عالية'],
                   ['🎭 موقع حجوزات العيادة', 'قيد التنفيذ', 'متوسطة'],
-                  ['🎭 متجر الكتب الإلكتروني', 'تخطيط', 'منخفضة']] as [$n2, $st, $pr]) {
-            $projects[] = $this->row('projects', ['name' => $n2, 'company_id' => $co,
+                  ['🎭 متجر الكتب الإلكتروني', 'تخطيط', 'منخفضة']] as $i => [$n2, $st, $pr]) {
+            $projects[] = $this->row('projects', ['name' => $n2, 'company_id' => $cos[$i % 3],
                 'status' => $st, 'priority' => $pr, 'type' => 'تطبيق',
                 'start_date' => now()->subDays(random_int(20, 90))->toDateString()]);
         }
 
-        $n = 8;   // ما أُدرج أعلاه
+        $n = 10;   // ما أُدرج أعلاه
         foreach (['تصميم الواجهات', 'ربط الدفع الإلكتروني', 'شاشة تتبع الطلب', 'اختبار الإصدار الأول',
                   'رفع المتجر لآبل', 'صفحة الحجوزات', 'تقارير الإدارة', 'إصلاح ملاحظات العميل'] as $i => $t) {
             $this->row('tasks', ['title' => '🎭 ' . $t, 'project_id' => $projects[$i % 3],
@@ -154,19 +163,19 @@ class HubDemo extends Command
                   ['فاتورة', 'نادي اللياقة', 2400, 'مسودة']] as $i => [$k, $p, $amt, $st]) {
             $this->row('fin_documents', ['doc_no' => '🎭DEMO-' . (100 + $i), 'kind' => $k, 'partner' => $p,
                 'date' => now()->subDays($i * 9)->toDateString(), 'amount' => $amt, 'tax' => 0,
-                'total' => $amt, 'currency' => 'د.ك', 'state' => $st, 'company_id' => $co,
+                'total' => $amt, 'currency' => 'د.ك', 'state' => $st, 'company_id' => $cos[$i % 3],
                 'project_id' => $projects[$i % 3]]);
             $n++;
         }
 
-        foreach ([['demo-taste.example', 25], ['demo-clinic.example', 190], ['demo-books.example', 400]] as [$d, $days]) {
-            $this->row('domains', ['name' => $d, 'company_id' => $co, 'registrar' => 'Namecheap',
+        foreach ([['demo-taste.example', 25], ['demo-clinic.example', 190], ['demo-books.example', 400]] as $i => [$d, $days]) {
+            $this->row('domains', ['name' => $d, 'company_id' => $cos[$i % 3], 'registrar' => 'Namecheap',
                 'expiry' => now()->addDays($days)->toDateString(), 'currency' => 'د.ك', 'cost' => 4]);
             $n++;
         }
 
-        foreach ([['🎭 نورة المطيري', 'تصميم'], ['🎭 يوسف العنزي', 'تطوير'], ['🎭 دلال الصباح', 'دعم']] as [$e, $d]) {
-            $this->row('employees', ['name' => $e, 'dept' => $d, 'company_id' => $co,
+        foreach ([['🎭 نورة المطيري', 'تصميم'], ['🎭 يوسف العنزي', 'تطوير'], ['🎭 دلال الصباح', 'دعم']] as $i => [$e, $d]) {
+            $this->row('employees', ['name' => $e, 'dept' => $d, 'company_id' => $cos[$i % 3],
                 'hired' => now()->subMonths(random_int(3, 30))->toDateString(), 'status' => 'على رأس العمل']);
             $n++;
         }
