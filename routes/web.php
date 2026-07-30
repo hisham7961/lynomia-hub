@@ -66,6 +66,18 @@ Route::middleware('auth')->group(function () {
     Route::get('me', [PortalController::class, 'me'])->name('portal.me');
     Route::get('files/{path}', [FileController::class, 'show'])->name('file.show')->where('path', 'hub/.*');
 
+    // ── محوّل الشركة النشطة (تصفية القوائم) ──
+    Route::post('company-switch', function (\Illuminate\Http\Request $r) {
+        $cid = (string) $r->input('company', '');
+        if ($cid !== '') {
+            abort_unless(hub_can(auth()->user(), 'companies', 'v'), 403);
+            abort_unless(\App\Models\Company::whereNull('deleted_at')->whereKey($cid)->exists(), 404);
+        }
+        session(['hub.company' => $cid]);
+
+        return back()->with('ok', $cid === '' ? 'عدت لعرض كل الشركات' : 'تُصفّى القوائم الآن على الشركة المختارة');
+    })->name('company.switch');
+
     // ── صندوق الوثائق الوارد ──
     Route::get('inboxdocs', [InboxDocController::class, 'index'])->name('inboxdocs.index');
     Route::post('inboxdocs', [InboxDocController::class, 'store'])->name('inboxdocs.store');

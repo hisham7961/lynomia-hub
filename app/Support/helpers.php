@@ -654,3 +654,40 @@ if (! function_exists('hub_visible_fields')) {
             fn ($f) => hub_field_mode($user, $module, $f['key']) !== 'hide'));
     }
 }
+
+if (! function_exists('hub_company_col')) {
+    /** عمود الشركة في وحدة ما إن وُجد (companies نفسها تُطابق على id) */
+    function hub_company_col(string $module): ?string
+    {
+        if ($module === 'companies') return 'id';
+        static $map = null;
+        if ($map === null) {
+            $map = [];
+            foreach (hub_modules() as $mk => $md) {
+                foreach ($md['fields'] as $f) {
+                    if (($f['type'] ?? '') === 'ref' && ($f['ref'] ?? '') === 'companies' && empty($f['multi'])) {
+                        $map[$mk] = $f['col'];
+                        break;
+                    }
+                }
+            }
+        }
+
+        return $map[$module] ?? null;
+    }
+}
+
+if (! function_exists('hub_company_scope')) {
+    /**
+     * محوّل الشركة النشطة: عند اختيار شركة من الشريط العلوي تُصفّى قوائم
+     * الوحدات عليها — تصفية عرض للتركيز، لا عزلاً صارماً (ذاك طور لاحق موثق).
+     */
+    function hub_company_scope($q, string $module)
+    {
+        $cid = (string) session('hub.company', '');
+        if ($cid === '') return $q;
+        $col = hub_company_col($module);
+
+        return $col ? $q->where($col, $cid) : $q;
+    }
+}

@@ -40,6 +40,19 @@
                 <div id="gsr" class="gsr"></div>
             </div>
             <div class="spacer"></div>
+            @if (hub_can(auth()->user(), 'companies', 'v'))
+                @php $hubCos = \Illuminate\Support\Facades\Cache::remember('topbar:companies', 300,
+                    fn () => \App\Models\Company::whereNull('deleted_at')->orderBy('name_ar')->pluck('name_ar', 'id')); @endphp
+                @if ($hubCos->count() > 1)
+                    <form method="POST" action="{{ route('company.switch') }}" class="inline">
+                        @csrf
+                        <select class="inp" name="company" onchange="this.form.submit()" title="الشركة النشطة — تصفّي القوائم عليها" style="max-width:150px;font-size:12.5px">
+                            <option value="">🏢 كل الشركات</option>
+                            @foreach ($hubCos as $cid => $cn)<option value="{{ $cid }}" @selected(session('hub.company') === $cid)>{{ \Illuminate\Support\Str::limit($cn, 22) }}</option>@endforeach
+                        </select>
+                    </form>
+                @endif
+            @endif
             <div class="bell">
                 <button class="btn ghost sm" type="button" title="التنبيهات"
                         hx-get="{{ route('notifications.mini') }}" hx-target="#bellbox" hx-swap="innerHTML">🔔<span id="bellbadge">@php $nbc = \App\Models\HubNotification::where('user_id', auth()->id())->where('read', false)->count(); @endphp@if($nbc)<span class="nbdg">{{ $nbc }}</span>@endif</span></button>

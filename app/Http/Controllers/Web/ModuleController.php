@@ -30,6 +30,7 @@ class ModuleController extends Controller
         $trash = $r->boolean('trash') && hub_can(auth()->user(), $def['key'] ?? '', 'd');
         $q = $trash ? $class::onlyTrashed() : $class::query();
         $q = hub_scope($q, $def['key'] ?? '');          // نطاق المشاريع للحسابات المحدودة
+        $q = hub_company_scope($q, $def['key'] ?? '');  // الشركة النشطة من الشريط العلوي
 
         if ($term = $r->input('q')) $q->search($term);
 
