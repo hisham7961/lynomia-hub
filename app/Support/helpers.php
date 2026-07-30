@@ -216,6 +216,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'ok' => $mon],
             ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'ok' => $mon],
             ['key' => 'recs',      'label' => '💡 مركز التوصيات',    'route' => 'recs',            'ok' => $mon],
+            ['key' => 'supscores', 'label' => '🏅 تقييم الموردين',   'route' => 'supplierscores',  'ok' => hub_can($user, 'suppliers', 'v')],
             ['key' => 'capacity',  'label' => '📊 القدرات والموارد', 'route' => 'capacity',        'ok' => $mon],
             ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'ok' => $mon],
             ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'ok' => $mon],
@@ -1479,5 +1480,86 @@ if (! function_exists('hub_recommendations')) {
                 ],
             ];
         });
+    }
+}
+
+if (! function_exists('hub_supplier_scores')) {
+    /**
+     * بطاقة أداء الموردين من سجل المشتريات الفعلي: عدد الأوامر، الإنفاق،
+     * نسبة الالتزام بالمواعيد (الأوامر المستلمة التي بلغت حالتها في موعدها أو قبله)،
+     * المرتجعات والإلغاءات، الأوامر المفتوحة، وغير المسدَّد — مع التقييم اليدوي للجودة.
+     *
+     * ملاحظة صدق: «التسليم في الموعد» يقارن تاريخ آخر تحديث للأمر المستلم بموعد
+     * تسليمه المتوقع (لا يوجد عمود تاريخ استلام صريح) — فهو تقدير معقول لا قياس دقيق.
+     */
+    function hub_supplier_scores(bool $fresh = false): array
+    {
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget('sup:scores');
+
+        return \Illuminate\Support\Facades\Cache::remember('sup:scores', 300, function () {
+            $db = \Illuminate\Support\Facades\DB::class;
+            $suppliers = $db::table('suppliers')->whereNull('deleted_at')->get();
+            $rows = [];
+
+            foreach ($suppliers as $s) {
+                $po = $db::table('purchases')->whereNull('deleted_at')->where('supplier_id', $s->id)->get();
+
+                $orders = $po->count();
+                $spend = (float) $po->sum('amount');
+                $received = $po->where('status', 'مستلم');
+                $returned = $po->whereIn('status', ['مرتجع', 'ملغى'])->count();
+                $open = $po->whereIn('status', ['معتمد', 'أُرسل للمورد', 'بانتظار الاعتماد'])->count();
+                $unpaid = $po->filter(fn ($p) => ! in_array($p->pay_state, ['مدفوع', 'مسدد'], true)
+                    && in_array($p->status, ['مستلم', 'أُرسل للمورد', 'معتمد'], true))->count();
+
+                // الالتزام بالموعد: من الأوامر المستلمة التي لها موعد تسليم متوقع
+                $withDue = $received->filter(fn ($p) => filled($p->due));
+                $onTime = $withDue->filter(function ($p) {
+                    $recvAt = \Illuminate\Support\Carbon::parse($p->updated_at)->startOfDay();
+                    return $recvAt->lte(\Illuminate\Support\Carbon::parse($p->due)->startOfDay());
+                })->count();
+                $onTimeRate = $withDue->count() ? (int) round($onTime / $withDue->count() * 100) : null;
+
+                // نجمات التقييم اليدوي: عدّ ⭐ في نص التقييم
+                $stars = substr_count((string) $s->rating, '⭐') ?: null;
+
+                $rows[] = [
+                    'id' => $s->id, 'name' => $s->name, 'cat' => $s->cat, 'stars' => $stars,
+                    'ratingLabel' => (string) $s->rating,
+                    'orders' => $orders, 'spend' => $spend,
+                    'received' => $received->count(), 'returned' => $returned,
+                    'open' => $open, 'unpaid' => $unpaid,
+                    'onTimeRate' => $onTimeRate, 'onTimeBase' => $withDue->count(),
+                    // درجة مركّبة تقريبية لمن له تاريخ: التزام ٦٠٪ + انخفاض المرتجعات ٤٠٪
+                    'score' => hub_supplier_score_calc($onTimeRate, $orders, $returned),
+                ];
+            }
+
+            // الأكثر إنفاقاً أولاً (حيث القرار أهم)
+            usort($rows, fn ($a, $b) => $b['spend'] <=> $a['spend']);
+
+            return [
+                'rows' => $rows,
+                'totals' => [
+                    'suppliers' => count($rows),
+                    'spend' => round((float) array_sum(array_column($rows, 'spend')), 2),
+                    'atRisk' => count(array_filter($rows, fn ($r) => $r['score'] !== null && $r['score'] < 50)),
+                    'noHistory' => count(array_filter($rows, fn ($r) => $r['orders'] === 0)),
+                ],
+            ];
+        });
+    }
+}
+
+if (! function_exists('hub_supplier_score_calc')) {
+    /** درجة مورد ٠-١٠٠: التزام بالموعد وازناً الأكبر، مطروحاً منه أثر المرتجعات */
+    function hub_supplier_score_calc(?int $onTimeRate, int $orders, int $returned): ?int
+    {
+        if ($orders === 0) return null;                       // بلا تاريخ لا درجة — لا نخترع رقماً
+        $ret = $orders > 0 ? $returned / $orders : 0;         // نسبة المرتجعات/الملغاة
+        $ontime = $onTimeRate ?? 60;                          // بلا مواعيد: محايد ٦٠
+        $score = $ontime * 0.6 + (1 - $ret) * 100 * 0.4;
+
+        return max(0, min(100, (int) round($score)));
     }
 }

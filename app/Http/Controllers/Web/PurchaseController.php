@@ -14,6 +14,14 @@ use Illuminate\Http\Request;
  */
 class PurchaseController extends Controller
 {
+    /** بطاقات أداء الموردين من سجل المشتريات */
+    public function scores()
+    {
+        abort_unless(hub_can(auth()->user(), 'suppliers', 'v'), 403, 'تقييم الموردين يتطلب صلاحية رؤية الموردين');
+
+        return view('supplier_scores', ['d' => hub_supplier_scores((bool) request()->query('fresh'))]);
+    }
+
     /** أمر شراء قابل للطباعة (A4) */
     public function doc(string $id)
     {
