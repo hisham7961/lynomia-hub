@@ -634,13 +634,11 @@ if (! function_exists('hub_field_mode')) {
         $user = $user ?? auth()->user();
         if (! $user || $user->role?->is_owner) return '';
 
-        static $cache = [];
-        $rid = $user->role_id ?? 'x';
-        if (! isset($cache[$rid])) {
-            $fr = $user->role?->field_rules;
-            $cache[$rid] = is_array($fr) ? $fr : (json_decode((string) $fr, true) ?: []);
-        }
-        $mode = $cache[$rid][$module][$fieldKey] ?? '';
+        // بلا تخبئة ساكنة عمداً: الدور محمّل أصلاً والقيمة مُكاستة، والتخبئة كانت
+        // تُبقي قيوداً قديمة سارية داخل العملية الواحدة (عمّال الطوابير وOctane).
+        $fr = $user->role?->field_rules;
+        $rules = is_array($fr) ? $fr : (json_decode((string) $fr, true) ?: []);
+        $mode = $rules[$module][$fieldKey] ?? '';
 
         return in_array($mode, ['ro', 'hide'], true) ? $mode : '';
     }

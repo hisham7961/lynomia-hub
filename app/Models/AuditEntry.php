@@ -36,14 +36,25 @@ class AuditEntry extends Model
         });
     }
 
-    /** البصمة القانونية: الحقول الجوهرية بترتيب ثابت — تُعاد للتحقق لاحقاً كما هي */
-    public function canonical(): string
-    {
-        $raw = $this->getAttributes();   // القيم كما ستُخزن (JSON نصي للمصفوفات)
+    /** أعمدة البصمة: من هو، ماذا فعل، بأي سجل، ولماذا — **ومن أين** (الأعمدة الجنائية) */
+    public const SEALED = ['user_id', 'action', 'module', 'record_id', 'project_id',
+                           'name', 'reason', 'before', 'after', 'device', 'ip', 'created_at'];
 
-        return implode('|', array_map(
+    /** بصمة الجيل الأول (قبل ضم project_id وdevice وip) — للتحقق من السجلات القديمة فقط */
+    public const SEALED_V1 = ['user_id', 'action', 'module', 'record_id',
+                              'name', 'reason', 'before', 'after', 'created_at'];
+
+    /**
+     * البصمة القانونية: الحقول الجوهرية بترتيب ثابت — تُعاد للتحقق لاحقاً كما هي.
+     * القيم تؤخذ خاماً كما ستُخزن (JSON نصي للمصفوفات) فتتطابق بعد القراءة من القاعدة.
+     */
+    public function canonical(bool $legacy = false): string
+    {
+        $raw = $this->getAttributes();
+
+        return ($legacy ? '' : 'v2|') . implode('|', array_map(
             fn ($k) => $k . '=' . (string) ($raw[$k] ?? ''),
-            ['user_id', 'action', 'module', 'record_id', 'name', 'reason', 'before', 'after', 'created_at']
+            $legacy ? self::SEALED_V1 : self::SEALED
         ));
     }
 }

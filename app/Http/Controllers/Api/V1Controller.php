@@ -28,10 +28,11 @@ class V1Controller extends ModuleController
         $out = [];
         foreach (hub_modules() as $key => $def) {
             if (! hub_can(auth()->user(), $key, 'v')) continue;
+            if (! $this->tokenAllows($key, 'v')) continue;   // الفهرس يصدق عمّا يستطيعه هذا المفتاح
             $out[] = [
                 'key' => $key, 'label' => $def['label'], 'table' => $def['table'],
                 'can' => collect(['v', 'a', 'e', 'd'])->filter(fn ($op) => hub_can(auth()->user(), $key, $op))->values(),
-                'fields' => collect($def['fields'])->map(fn ($f) => [
+                'fields' => collect(hub_visible_fields(auth()->user(), $key, $def))->map(fn ($f) => [
                     'key' => $f['key'], 'label' => $f['label'], 'type' => $f['type'],
                     'required' => (bool) ($f['required'] ?? false), 'ref' => $f['ref'] ?? null,
                 ]),
@@ -56,7 +57,7 @@ class V1Controller extends ModuleController
         $fields = $r->query('fields');
 
         return response()->json([
-            'data' => collect($page->items())->map(fn ($row) => $this->pick($def, $row, $fields)),
+            'data' => collect($page->items())->map(fn ($row) => $this->shape($def, $row, $fields)),
             'total' => $page->total(),
             'page' => $page->currentPage(), 'last_page' => $page->lastPage(),
         ]);
@@ -68,7 +69,7 @@ class V1Controller extends ModuleController
         [$def, $class] = $this->resolveApi($module, 'v');
         $row = hub_scope($class::query(), $module)->findOrFail($id);
 
-        return response()->json(['data' => $this->pick($def, $row, $r->query('fields'))]);
+        return response()->json(['data' => $this->shape($def, $row, $r->query('fields'))]);
     }
 
     /** POST /api/v1/{module} — نفس تحقق النماذج، مع Idempotency-Key اختيارية */
@@ -89,7 +90,7 @@ class V1Controller extends ModuleController
         $this->bustProgress($module, $m);
         \App\Support\FlowRunner::fire('created', $module, $m);
 
-        $resp = response()->json(['data' => $m->fresh()], 201);
+        $resp = response()->json(['data' => $this->shape($def, $m->fresh())], 201);
         $this->idempotentStore($r, $resp);
 
         return $resp;
@@ -117,7 +118,7 @@ class V1Controller extends ModuleController
             \App\Support\FlowRunner::fire('status', $module, $m, (string) $m->{$sc});
         }
 
-        return response()->json(['data' => $m->fresh()]);
+        return response()->json(['data' => $this->shape($def, $m->fresh())]);
     }
 
     /** DELETE /api/v1/{module}/{id} */
@@ -136,6 +137,7 @@ class V1Controller extends ModuleController
     public function progress(string $projectId)
     {
         abort_unless(hub_can(auth()->user(), 'projects', 'v'), 403);
+        abort_unless($this->tokenAllows('projects', 'v'), 403, 'نطاق هذا المفتاح لا يشمل «projects:v»');
         hub_scope(\App\Models\Project::query(), 'projects')->findOrFail($projectId);
 
         return response()->json(hub_progress($projectId));
@@ -145,6 +147,7 @@ class V1Controller extends ModuleController
     public function health()
     {
         abort_unless(auth()->user()->role?->is_owner, 403);
+        abort_unless($this->tokenAllows('reports', 'v'), 403, 'نطاق هذا المفتاح لا يشمل «reports:v»');
 
         return response()->json(hub_health());
     }
@@ -212,26 +215,45 @@ class V1Controller extends ModuleController
         return [$token->id, $ikey];
     }
 
-    /** اختيار حقول ?fields=key1,key2 + إسقاط المخفي بصلاحيات مستوى الحقل — وid دائماً */
-    protected function pick(array $def, $row, ?string $fields)
+    /**
+     * تشكيل السجل قبل إخراجه — يمرّ به **كل** رد يحمل سجلاً (قراءةً وكتابةً):
+     *  ١) يُسقط الحقول المخفية بصلاحيات مستوى الحقل،
+     *  ٢) يُسقط حقول الأسرار عمّن لا يملك علم رؤيتها (كما تُقنّعها الواجهة تماماً)
+     *     — إسقاطاً لا تقنيعاً، فإعادة إرسال السجل بـ PUT لا تدهس السر بقيمة قناع،
+     *  ٣) ثم يطبّق اختيار الحقول ?fields=.
+     * لا مسار يعيد السجل خاماً بعد اليوم.
+     */
+    protected function shape(array $def, $row, ?string $fields = null)
     {
         $module = (string) ($def['key'] ?? '');
-        $visible = hub_visible_fields(auth()->user(), $module, $def);
-        $want = preg_split('/[،,\s]+/u', (string) $fields, -1, PREG_SPLIT_NO_EMPTY);
-
-        // لا اختيار ولا حقول مخفية على هذا الدور → السجل كما هو
-        if (! $want && count($visible) === count($def['fields'])) return $row;
-
+        $u = auth()->user();
+        $canSec = (bool) ($u?->role?->is_owner || hub_flag($u, 'secrets') || hub_flag($u, 'copySec'));
         $arr = is_array($row) ? $row : $row->toArray();
-        $out = ['id' => $arr['id'] ?? null];
-        foreach ($visible as $f) {
-            if ($want && ! in_array($f['key'], $want, true)) continue;
-            if (array_key_exists($f['col'], $arr)) $out[$f['key']] = $arr[$f['col']];
+
+        foreach ($def['fields'] as $f) {
+            $hidden = hub_field_mode($u, $module, $f['key']) === 'hide';
+            $secret = ($f['type'] ?? '') === 'sec' && ! $canSec;
+            if ($hidden || $secret) unset($arr[$f['col']]);
         }
-        if (! $want) {
-            foreach (['created_at', 'updated_at'] as $ts) if (isset($arr[$ts])) $out[$ts] = $arr[$ts];
+
+        $want = preg_split('/[،,\s]+/u', (string) $fields, -1, PREG_SPLIT_NO_EMPTY);
+        if (! $want) return $arr;
+
+        $out = ['id' => $arr['id'] ?? null];
+        foreach ($def['fields'] as $f) {
+            if (in_array($f['key'], $want, true) && array_key_exists($f['col'], $arr)) {
+                $out[$f['key']] = $arr[$f['col']];
+            }
         }
 
         return $out;
+    }
+
+    /** نطاق المفتاح لمسار لا يمرّ بـ resolveApi (التقارير والفهرس) — مفتاح بلا نطاق يمرّ */
+    protected function tokenAllows(string $module, string $op = 'v'): bool
+    {
+        $t = request()->attributes->get('api_token');
+
+        return ! $t || $t->allows($module, $op);
     }
 }
