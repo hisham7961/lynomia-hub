@@ -17,3 +17,6 @@
 !/storage/framework/views/.gitkeep
 /storage/app/*
 !/storage/app/.gitkeep
+
+# ملفات أقراص الاختبار الوهمية
+/storage/framework/testing/
