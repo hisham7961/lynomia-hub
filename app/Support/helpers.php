@@ -217,6 +217,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'ok' => $mon],
             ['key' => 'recs',      'label' => '💡 مركز التوصيات',    'route' => 'recs',            'ok' => $mon],
             ['key' => 'kpis',      'label' => '📈 مؤشرات KPI',       'route' => 'kpis.index',      'ok' => $mon],
+            ['key' => 'innov',     'label' => '💡 مركز الابتكار',    'route' => 'innovation',      'ok' => hub_can($user, 'ideas', 'v')],
             ['key' => 'supscores', 'label' => '🏅 تقييم الموردين',   'route' => 'supplierscores',  'ok' => hub_can($user, 'suppliers', 'v')],
             ['key' => 'capacity',  'label' => '📊 القدرات والموارد', 'route' => 'capacity',        'ok' => $mon],
             ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'ok' => $mon],

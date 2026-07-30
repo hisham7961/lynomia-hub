@@ -9,6 +9,6 @@ return [
     ['g' => 'المشتريات',         'icon' => '🛒', 'items' => ['suppliers', 'purchases']],
     ['g' => 'الموارد البشرية',   'icon' => '👥', 'items' => ['hr', 'attend', 'leaves', 'payroll', 'recruit', 'hrlog', 'skills']],
     ['g' => 'الأصول والعقود',    'icon' => '📦', 'items' => ['assets', 'assetlog', 'stock', 'stockmv', 'contracts', 'ip', 'compliance']],
-    ['g' => 'المعرفة والأتمتة',  'icon' => '📚', 'items' => ['kb', 'autos', 'rules', 'policies', 'policyacks', 'media', 'events', 'plans']],
+    ['g' => 'المعرفة والأتمتة',  'icon' => '📚', 'items' => ['kb', 'autos', 'rules', 'policies', 'policyacks', 'media', 'events', 'plans', 'ideas']],
     ['g' => 'الموارد',           'icon' => '🗃️', 'items' => ['files', 'subs', 'vault']],
 ];

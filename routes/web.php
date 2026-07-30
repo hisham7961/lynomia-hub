@@ -140,6 +140,10 @@ Route::middleware('auth')->group(function () {
     // ── رحلة العميل ──
     Route::get('journey/{id}', [JourneyController::class, 'show'])->name('journey');
 
+    // ── مركز الابتكار ──
+    Route::get('innovation', [\App\Http\Controllers\Web\InnovationController::class, 'index'])->name('innovation');
+    Route::post('ideas/{id}/promote', [\App\Http\Controllers\Web\InnovationController::class, 'promote'])->name('ideas.promote');
+
     // ── المرفقات الشاملة على أي سجل ──
     Route::post('attachments', [AttachmentController::class, 'store'])->name('att.store');
     Route::get('attachments/{id}/dl', [AttachmentController::class, 'download'])->name('att.dl');
