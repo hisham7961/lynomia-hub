@@ -30,6 +30,9 @@
 @if (in_array($module, ['projects', 'companies', 'clients'], true))
     @include('partials.odoo_card')
 @endif
+@if ($module === 'tickets')
+    @include('partials.ticket_sla')
+@endif
 <div class="card">
     <dl class="detail">
         @foreach ($def['fields'] as $f)

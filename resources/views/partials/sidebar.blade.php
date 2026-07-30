@@ -18,6 +18,9 @@
         @if (hub_can(auth()->user(), 'contracts', 'v'))
             <a class="ni top {{ request()->routeIs('legal') ? 'on' : '' }}" href="{{ route('legal') }}">⚖️ القانوني</a>
         @endif
+        @if (hub_can(auth()->user(), 'tickets', 'v'))
+            <a class="ni top {{ request()->routeIs('support') ? 'on' : '' }}" href="{{ route('support') }}">🎫 لوحة الدعم</a>
+        @endif
         @if (auth()->user()->role?->is_owner)
             <a class="ni top {{ request()->routeIs('ceo') ? 'on' : '' }}" href="{{ route('ceo') }}">👑 لوحة CEO</a>
         @endif

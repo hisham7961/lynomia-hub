@@ -23,6 +23,7 @@ use App\Http\Controllers\Web\ReportController;
 use App\Http\Controllers\Web\RoleController;
 use App\Http\Controllers\Web\SearchController;
 use App\Http\Controllers\Web\SecurityController;
+use App\Http\Controllers\Web\SupportController;
 use App\Http\Controllers\Web\SettingController;
 use App\Http\Controllers\Web\UserController;
 use Illuminate\Support\Facades\Route;
@@ -69,6 +70,7 @@ Route::middleware('auth')->group(function () {
     Route::get('purchase/{id}/doc', [PurchaseController::class, 'doc'])->name('purchases.doc');
     Route::post('purchase/{id}/act', [PurchaseController::class, 'act'])->name('purchases.act');
     Route::get('legal', [LegalController::class, 'index'])->name('legal');
+    Route::get('support', [SupportController::class, 'index'])->name('support');
 
     // ── الربط الذكي بأودو (عرض فقط) ──
     Route::post('odoo/{module}/{id}/link', [OdooController::class, 'link'])->name('odoo.link');

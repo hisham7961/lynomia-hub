@@ -319,6 +319,68 @@ if (! function_exists('hub_expiry')) {
     }
 }
 
+if (! function_exists('hub_sla_rules')) {
+    /**
+     * قواعد SLA من الإعداد sla.rules بصيغة «أولوية:ساعات_استجابة:ساعات_حل» مفصولة بمسافات —
+     * مثال: عاجلة:1:8 عالية:4:24 متوسطة:8:72 افتراضي:8:72
+     */
+    function hub_sla_rules(): array
+    {
+        $raw = (string) setting('sla.rules', 'عاجلة:1:8 عالية:4:24 متوسطة:8:72 منخفضة:24:120 افتراضي:8:72');
+        $out = [];
+        foreach (preg_split('/[\s,،]+/u', $raw, -1, PREG_SPLIT_NO_EMPTY) as $part) {
+            $bits = explode(':', $part);
+            if (count($bits) === 3 && is_numeric($bits[1]) && is_numeric($bits[2])) {
+                $out[trim($bits[0])] = [(float) $bits[1], (float) $bits[2]];
+            }
+        }
+
+        return $out ?: ['افتراضي' => [8, 72]];
+    }
+}
+
+if (! function_exists('hub_sla')) {
+    /**
+     * حالة SLA لتذكرة: مواعيد الاستجابة والحل مقابل أول رد (تعليق) ووقت الإغلاق.
+     * $firstReply يُمرر مسبقاً في القوائم لتفادي استعلام لكل تذكرة.
+     */
+    function hub_sla(object $t, $firstReply = 'auto'): array
+    {
+        $rules = hub_sla_rules();
+        $prio = trim((string) ($t->priority ?? ''));
+        $policy = 'افتراضي';
+        foreach ($rules as $name => $r) {
+            if ($name !== 'افتراضي' && $prio !== '' && mb_stripos($prio, $name) !== false) { $policy = $name; break; }
+        }
+        [$respH, $resH] = $rules[$policy] ?? $rules['افتراضي'] ?? [8, 72];
+
+        $created = \Illuminate\Support\Carbon::parse($t->created_at);
+        $respDue = $created->copy()->addHours($respH);
+        $resDue  = $created->copy()->addHours($resH);
+
+        if ($firstReply === 'auto') {
+            $firstReply = \App\Models\Comment::where('module', 'tickets')->where('record_id', $t->id)
+                ->orderBy('created_at')->value('created_at');
+        }
+        $respAt = $firstReply ? \Illuminate\Support\Carbon::parse($firstReply) : null;
+
+        $meta = is_array($t->meta ?? null) ? $t->meta : (json_decode((string) ($t->meta ?? ''), true) ?: []);
+        $closed = in_array((string) ($t->status ?? ''), ['تم الحل', 'مغلقة'], true);
+        $resAt = isset($meta['resolved_at']) ? \Illuminate\Support\Carbon::parse($meta['resolved_at'])
+               : ($closed ? \Illuminate\Support\Carbon::parse($t->updated_at) : null);
+
+        return [
+            'policy'  => $policy . ' (' . rtrim(rtrim(number_format($respH, 1), '0'), '.') . 'س / ' . rtrim(rtrim(number_format($resH, 1), '0'), '.') . 'س)',
+            'respDue' => $respDue, 'respAt' => $respAt,
+            'respLate' => $respAt ? $respAt->gt($respDue) : now()->gt($respDue),
+            'respPending' => ! $respAt,
+            'resDue' => $resDue, 'resAt' => $resAt,
+            'resLate' => $resAt ? $resAt->gt($resDue) : now()->gt($resDue),
+            'resPending' => ! $resAt,
+        ];
+    }
+}
+
 if (! function_exists('hub_custom_fields')) {
     /**
      * الحقول المخصصة لوحدة — يعرّفها المالك من «باني الحقول» وتُخزن في الإعداد custom.fields

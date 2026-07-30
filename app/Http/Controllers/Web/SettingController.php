@@ -39,6 +39,9 @@ class SettingController extends Controller
             'maintenance.on'  => ['تفعيل وضع الصيانة (الدخول للمالكين فقط)', 'onoff'],
             'maintenance.msg' => ['رسالة تظهر للمستخدمين أثناء الصيانة', 'text'],
         ],
+        '🎫 دعم العملاء (SLA)' => [
+            'sla.rules' => ['قواعد SLA — أولوية:ساعات_الاستجابة:ساعات_الحل (مثال: عاجلة:1:8 عالية:4:24 افتراضي:8:72)', 'text'],
+        ],
         '🔗 ربط أودو — عرض فقط' => [
             'odoo.url'  => ['رابط خادم أودو (مثال: https://mycompany.odoo.com)', 'text'],
             'odoo.db'   => ['اسم قاعدة البيانات', 'text'],

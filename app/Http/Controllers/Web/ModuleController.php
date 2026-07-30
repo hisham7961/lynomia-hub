@@ -346,11 +346,25 @@ class ModuleController extends Controller
             ->with('ok', 'هذه العملية محمية — أُرسل طلب الموافقة للمعتمدين وسيصلك إشعار بالقرار');
     }
 
-    /** نسف كاش نسبة الإنجاز عند تغيّر مهمة أو بند خطة */
+    /** نسف كاش نسبة الإنجاز عند تغيّر مهمة أو بند خطة + ختم وقت حل التذاكر (SLA) */
     protected function bustProgress(string $module, Model $m): void
     {
         if (in_array($module, ['tasks', 'feats'], true) && ($pid = $m->project_id ?? null)) {
             \Illuminate\Support\Facades\Cache::forget('hub:progress:' . $pid);
+        }
+
+        if ($module === 'tickets') {
+            $meta = (array) ($m->meta ?? []);
+            $closed = in_array((string) $m->status, ['تم الحل', 'مغلقة'], true);
+            if ($closed && empty($meta['resolved_at'])) {
+                $meta['resolved_at'] = now()->toIso8601String();
+                $m->meta = $meta;
+                $m->saveQuietly();
+            } elseif (! $closed && ! empty($meta['resolved_at'])) {
+                unset($meta['resolved_at']);          // أُعيد فتحها
+                $m->meta = $meta ?: null;
+                $m->saveQuietly();
+            }
         }
     }
 
