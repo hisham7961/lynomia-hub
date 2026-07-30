@@ -217,9 +217,10 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/ops/test-error', [OpsController::class, 'testError'])->name('ops.testerror');
     Route::post('admin/demo/reset', function () {
         abort_unless(auth()->user()?->role?->is_owner, 403);
-        \Illuminate\Support\Facades\Artisan::call('hub:demo');
+        // شامل: كل وحدة من السجل تنال بيانات تجريبية، والإعدادات الفارغة تُملأ
+        \Illuminate\Support\Facades\Artisan::call('hub:demo', ['--full' => true]);
 
-        return back()->with('ok', 'صُفّر الوضع التجريبي — بيانات وهمية جديدة نظيفة');
+        return back()->with('ok', 'صُفّر الوضع التجريبي — بيانات وهمية جديدة نظيفة في كل الوحدات');
     })->name('demo.reset');
     Route::post('admin/demo/off', function () {
         abort_unless(auth()->user()?->role?->is_owner, 403);
