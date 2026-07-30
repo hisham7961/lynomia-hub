@@ -1,5 +1,11 @@
 <aside class="sidebar">
-    <div class="brand"><a href="{{ route('dashboard') }}"><span class="dot"></span>{{ setting('app.name', 'Lynomia Hub') }}</a></div>
+    <div class="brand"><a href="{{ route('dashboard') }}">
+        @if ($logo = setting('app.logo'))
+            <img src="{{ asset('storage/' . $logo) }}" alt="" style="height:26px;border-radius:6px">
+        @else
+            <span class="dot"></span>
+        @endif
+        {{ setting('app.name', 'Lynomia Hub') }}</a></div>
     <nav>
         <a class="ni top {{ request()->routeIs('dashboard') ? 'on' : '' }}" href="{{ route('dashboard') }}">لوحة التحكم</a>
         <a class="ni top {{ request()->routeIs('portal.me') ? 'on' : '' }}" href="{{ route('portal.me') }}">👤 بوابتي</a>

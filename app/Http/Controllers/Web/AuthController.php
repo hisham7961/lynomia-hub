@@ -54,6 +54,45 @@ class AuthController extends Controller
         }
 
         $u = Auth::user();
+
+        // مصادقة ثنائية مفعّلة؟ أوقف الدخول حتى إدخال الرمز
+        if ($u->totp_enabled) {
+            Auth::logout();
+            $r->session()->put('2fa:uid', $u->id);
+            $r->session()->regenerate();
+
+            return redirect()->route('login.otp');
+        }
+
+        return $this->finishLogin($u, $r);
+    }
+
+    /** خطوة رمز المصادقة الثنائية */
+    public function otpShow(Request $r)
+    {
+        abort_unless($r->session()->has('2fa:uid'), 404);
+
+        return view('auth.otp');
+    }
+
+    public function otpVerify(Request $r)
+    {
+        $u = User::find($r->session()->get('2fa:uid'));
+        abort_unless($u, 404);
+
+        if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, (string) $r->input('code'))) {
+            return back()->withErrors(['code' => 'الرمز غير صحيح أو انتهى — جرّب الرمز الحالي في التطبيق']);
+        }
+
+        $r->session()->forget('2fa:uid');
+        Auth::login($u, remember: true);
+
+        return $this->finishLogin($u, $r);
+    }
+
+    /** إتمام الدخول الموحد: تصفير العدادات + سجل الجلسة + تدوير المعرف */
+    protected function finishLogin(User $u, Request $r)
+    {
         $u->forceFill([
             'failed_attempts' => 0,
             'locked_until'    => null,

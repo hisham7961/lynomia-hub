@@ -24,6 +24,7 @@ class User extends Authenticatable
         'notify_prefs' => 'array',
         'recovery_codes' => 'array',
         'totp_enabled' => 'boolean',
+        'totp_secret_cipher' => \App\Casts\EncryptedOrPlain::class,
         'locked_until' => 'datetime',
         'password_changed_at' => 'datetime',
         'last_login_at' => 'datetime',

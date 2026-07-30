@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+@if ($brand = hub_brand_css())<style>{!! $brand !!}</style>@endif
 </head>
 <body>
 <div id="topload"></div>

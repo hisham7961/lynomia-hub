@@ -23,6 +23,9 @@ Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'show'])->name('login');
     Route::post('login', [AuthController::class, 'login'])->name('login.attempt')
         ->middleware('throttle:10,1');   // حد ١٠ محاولات بالدقيقة من نفس العنوان — يكمل قفل الحساب الموجود
+    Route::get('login/otp', [AuthController::class, 'otpShow'])->name('login.otp');
+    Route::post('login/otp', [AuthController::class, 'otpVerify'])->name('login.otp.verify')
+        ->middleware('throttle:6,1');
 });
 
 Route::middleware('auth')->group(function () {
@@ -56,6 +59,9 @@ Route::middleware('auth')->group(function () {
     Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('profile/password', [ProfileController::class, 'password'])->name('profile.password');
+    Route::post('profile/2fa/start', [ProfileController::class, 'twofaStart'])->name('profile.2fa.start');
+    Route::post('profile/2fa/confirm', [ProfileController::class, 'twofaConfirm'])->name('profile.2fa.confirm');
+    Route::post('profile/2fa/disable', [ProfileController::class, 'twofaDisable'])->name('profile.2fa.disable');
 
     // ── الإدارة ──
     Route::get('admin/users', [UserController::class, 'index'])->name('users.index');

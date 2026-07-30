@@ -8,9 +8,58 @@ use Illuminate\Http\Request;
 /** الملف الشخصي: بيانات المستخدم نفسه + تغيير كلمة مروره بنفسه */
 class ProfileController extends Controller
 {
-    public function edit()
+    public function edit(Request $r)
     {
-        return view('profile', ['u' => auth()->user()]);
+        // سر مصادقة ثنائية معلّق (لم يؤكد بعد) — يبقى في الجلسة حتى التأكيد
+        $pending = $r->session()->get('2fa:pending');
+
+        return view('profile', [
+            'u' => auth()->user(),
+            'pending2fa' => $pending,
+            'otpUri' => $pending ? \App\Support\Totp::uri($pending, auth()->user()->email, (string) setting('app.name', 'Lynomia Hub')) : null,
+        ]);
+    }
+
+    /** بدء تفعيل المصادقة الثنائية: توليد سر وعرضه للمستخدم */
+    public function twofaStart(Request $r)
+    {
+        $r->session()->put('2fa:pending', \App\Support\Totp::secret());
+
+        return redirect()->route('profile.edit')->with('ok', 'أدخل السر في تطبيق المصادقة ثم أكّد بالرمز');
+    }
+
+    /** تأكيد التفعيل برمز صحيح من التطبيق */
+    public function twofaConfirm(Request $r)
+    {
+        $secret = (string) $r->session()->get('2fa:pending');
+        abort_unless($secret !== '', 422);
+        if (! \App\Support\Totp::verify($secret, (string) $r->input('code'))) {
+            return back()->withErrors(['code' => 'الرمز غير صحيح — تأكد من إدخال السر في التطبيق وأن ساعة الجوال مضبوطة']);
+        }
+
+        $u = auth()->user();
+        $u->totp_secret_cipher = $secret;
+        $u->totp_enabled = true;
+        $u->saveQuietly();
+        $r->session()->forget('2fa:pending');
+
+        return redirect()->route('profile.edit')->with('ok', '✅ فُعّلت المصادقة الثنائية — ستُطلب عند كل دخول');
+    }
+
+    /** تعطيل — يتطلب رمزاً صحيحاً */
+    public function twofaDisable(Request $r)
+    {
+        $u = auth()->user();
+        abort_unless($u->totp_enabled, 422);
+        if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, (string) $r->input('code'))) {
+            return back()->withErrors(['code' => 'الرمز غير صحيح']);
+        }
+
+        $u->totp_secret_cipher = null;
+        $u->totp_enabled = false;
+        $u->saveQuietly();
+
+        return redirect()->route('profile.edit')->with('ok', 'عُطّلت المصادقة الثنائية');
     }
 
     public function update(Request $r)

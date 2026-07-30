@@ -319,6 +319,39 @@ if (! function_exists('hub_expiry')) {
     }
 }
 
+if (! function_exists('hub_shade')) {
+    /** مزج لون hex مع الأبيض (نسبة موجبة) أو الأسود (سالبة) — لاشتقاق درجات الهوية */
+    function hub_shade(string $hex, float $pct): string
+    {
+        $hex = ltrim($hex, '#');
+        if (strlen($hex) !== 6) return '#' . $hex;
+        $to = $pct >= 0 ? 255 : 0;
+        $p = min(1, abs($pct));
+        $out = '#';
+        foreach (str_split($hex, 2) as $c) {
+            $v = (int) round(hexdec($c) + ($to - hexdec($c)) * $p);
+            $out .= str_pad(dechex(max(0, min(255, $v))), 2, '0', STR_PAD_LEFT);
+        }
+        return $out;
+    }
+}
+
+if (! function_exists('hub_brand_css')) {
+    /** متغيرات CSS من اللون الأساسي المُعد — فارغ إن لم يُخصص لون */
+    function hub_brand_css(): string
+    {
+        $c = (string) setting('app.color', '');
+        if (! preg_match('/^#[0-9a-fA-F]{6}$/', $c) || strtoupper($c) === '#0E7C66') return '';
+
+        return ':root{--p:' . $c
+            . ';--pd:' . hub_shade($c, -0.22)
+            . ';--pdd:' . hub_shade($c, -0.42)
+            . ';--ps:' . hub_shade($c, 0.86)
+            . ';--pss:' . hub_shade($c, 0.94)
+            . ';--ac:' . hub_shade($c, 0.35) . '}';
+    }
+}
+
 if (! function_exists('hub_health')) {
     /**
      * تقرير صحة الشركة: نتيجة 0-100 لكل قسم بمعادلة شفافة تُذكر في note.

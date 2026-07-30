@@ -474,7 +474,7 @@ class ModuleController extends Controller
                     ? [$r[0], "exists:$t,id"]
                     : [$r[0], 'array'];
             }
-            if (in_array($f['type'], ['file', 'img'], true)) $r = [$r[0], 'file', 'max:512000'];
+            if (in_array($f['type'], ['file', 'img'], true)) $r = [$r[0], 'file', 'max:' . (int) setting('files.max_kb', 512000)];
             $rules[$f['key']] = $r;
         }
         return $rules;
