@@ -89,6 +89,7 @@ Route::middleware('auth')->group(function () {
     })->name('company.switch');
 
     Route::get('morning', [MorningController::class, 'index'])->name('morning');
+    Route::get('calendar', [\App\Http\Controllers\Web\CalendarController::class, 'index'])->name('calendar');
     Route::get('costs', [CostController::class, 'index'])->name('costs.index');
     Route::get('service-costs', [CostController::class, 'services'])->name('servicecosts');
     Route::get('capacity', [CapacityController::class, 'index'])->name('capacity');

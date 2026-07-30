@@ -237,6 +237,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'dm',        'label' => '💬 الرسائل',          'route' => 'dm.inbox',        'ok' => true],
             ['key' => 'inboxdocs', 'label' => '📥 صندوق الوثائق',    'route' => 'inboxdocs.index', 'ok' => true],
             ['key' => 'alerts',    'label' => '🔔 ينتهي قريباً',     'route' => 'alerts',          'ok' => true],
+            ['key' => 'calendar',  'label' => '📅 التقويم',          'route' => 'calendar',        'ok' => true],
             ['key' => 'finrep',    'label' => '📊 التقارير المالية', 'route' => 'reports.finance', 'ok' => hub_can($user, 'fin', 'v')],
             ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'ok' => $mon],
             ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'ok' => $mon],
@@ -430,7 +431,8 @@ if (! function_exists('hub_expiry')) {
     function hub_expiry(bool $fresh = false, $user = null): array
     {
         $user   = $user ?? auth()->user();
-        $scoped = hub_scoped($user);
+        // مقيد = نطاق مشاريع أو عزل شركات — مخبأ خاص به كي لا تتسرب أسماء أجنبية عبر المخبأ المشترك
+        $scoped = hub_scoped($user) || hub_company_ids($user) !== null;
         $key    = $scoped ? 'hub:expiry:u:' . $user->id : 'hub:expiry';
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
