@@ -743,3 +743,18 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .content>.card:nth-of-type(2){animation-delay:.12s}
 .content>.card:nth-of-type(3){animation-delay:.19s}
 .content>.card:nth-of-type(n+4){animation-delay:.26s}
+
+/* ═ حيوية النماذج — الحقل النشط يُضيء عنوانه، وشريط الحفظ يبقى في متناول اليد ═ */
+.fld label{transition:color var(--t)}
+.fld:focus-within label{color:var(--p)}
+.fld:focus-within .lbl{color:var(--p)}
+.inp{transition:border-color var(--t),box-shadow var(--t),background var(--t)}
+/* شريط الحفظ يلتصق بأسفل الشاشة في النماذج الطويلة — الحفظ دائماً في المتناول */
+.formfoot{display:flex;gap:8px;align-items:center;margin-top:16px;position:sticky;bottom:0;z-index:5;
+  padding:12px 0 10px;background:linear-gradient(180deg,transparent,var(--cd) 30%);
+  border-top:1px solid color-mix(in srgb,var(--ln) 60%,transparent)}
+/* حقول النموذج تدخل بتتابع خاطف */
+.fg>.fld{animation:rise .35s cubic-bezier(.2,.75,.3,1) backwards}
+.fg>.fld:nth-child(2){animation-delay:.03s}.fg>.fld:nth-child(3){animation-delay:.06s}
+.fg>.fld:nth-child(4){animation-delay:.09s}.fg>.fld:nth-child(5){animation-delay:.12s}
+.fg>.fld:nth-child(6){animation-delay:.15s}.fg>.fld:nth-child(n+7){animation-delay:.18s}
