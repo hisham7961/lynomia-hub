@@ -427,3 +427,34 @@
     if (!arm(el, el.dataset.confirm)) { e.preventDefault(); e.stopPropagation(); }
   }, true);
 })();
+
+/* ═ الحيوية: الأرقام تعدّ صعوداً وأشرطة التقدم تمتلئ أمام العين ═ */
+(function () {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  // عدّ تصاعدي لأرقام بطاقات الإحصاء — الأرقام الصِرفة فقط، وبنفس تنسيق الفواصل
+  document.querySelectorAll('.stat b, .kpi b').forEach(function (el) {
+    var raw = (el.textContent || '').trim();
+    if (!/^[\d,]+$/.test(raw)) return;
+    var target = parseInt(raw.replace(/,/g, ''), 10);
+    if (!isFinite(target) || target <= 0 || target > 5000000) return;
+    var t0 = null, DUR = 650;
+    function step(ts) {
+      if (!t0) t0 = ts;
+      var k = Math.min(1, (ts - t0) / DUR);
+      k = 1 - Math.pow(1 - k, 3);                       // تباطؤ في النهاية
+      el.textContent = Math.round(target * k).toLocaleString('en-US');
+      if (k < 1) requestAnimationFrame(step);
+    }
+    el.textContent = '0';
+    requestAnimationFrame(step);
+  });
+
+  // أشرطة التقدم: تُصفَّر ثم تنساب لهدفها (الانتقال معرف في CSS)
+  document.querySelectorAll('.pbar span').forEach(function (s) {
+    var w = s.style.width;
+    if (!w) return;
+    s.style.width = '0';
+    requestAnimationFrame(function () { requestAnimationFrame(function () { s.style.width = w; }); });
+  });
+})();
