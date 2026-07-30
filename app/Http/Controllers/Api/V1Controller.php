@@ -71,7 +71,7 @@ class V1Controller extends ModuleController
     public function apiStore(Request $r, string $module)
     {
         [$def, $class] = $this->resolveApi($module, 'a');
-        $r->validate($this->rules($def, true));
+        $r->validate($this->rules($def, true), [], $this->attrs($def));
         $this->guardProject($r, $module);
 
         $m = new $class;
@@ -91,7 +91,7 @@ class V1Controller extends ModuleController
         if (hub_needs_approval(auth()->user(), $module, 'e')) {
             return response()->json(['error' => 'هذه العملية محمية بالموافقات — نفّذها من الواجهة ليُصفّ الطلب'], 409);
         }
-        $r->validate($this->rules($def, false));
+        $r->validate($this->rules($def, false), [], $this->attrs($def));
         $this->guardProject($r, $module);
 
         $m = $this->findScoped($class, $module, $id);

@@ -1,0 +1,50 @@
+<?php
+
+/** رسائل التحقق بالعربية — :attribute يُستبدل بتسمية الحقل من السجل */
+return [
+    'accepted'  => 'يجب قبول :attribute.',
+    'array'     => 'حقل :attribute يجب أن يكون قائمة.',
+    'boolean'   => 'حقل :attribute يجب أن يكون نعم أو لا.',
+    'confirmed' => 'تأكيد :attribute غير مطابق.',
+    'current_password' => 'كلمة المرور غير صحيحة.',
+    'date'      => ':attribute ليس تاريخاً صحيحاً.',
+    'email'     => ':attribute يجب أن يكون بريداً إلكترونياً صحيحاً.',
+    'exists'    => 'القيمة المختارة في :attribute غير موجودة.',
+    'file'      => ':attribute يجب أن يكون ملفاً.',
+    'image'     => ':attribute يجب أن يكون صورة.',
+    'in'        => 'القيمة المختارة في :attribute غير صالحة.',
+    'integer'   => ':attribute يجب أن يكون رقماً صحيحاً.',
+    'max' => [
+        'numeric' => ':attribute يجب ألا يتجاوز :max.',
+        'file'    => 'حجم :attribute يجب ألا يتجاوز :max كيلوبايت.',
+        'string'  => ':attribute يجب ألا يتجاوز :max حرفاً.',
+        'array'   => ':attribute يجب ألا يتجاوز :max عنصراً.',
+    ],
+    'min' => [
+        'numeric' => ':attribute يجب ألا يقل عن :min.',
+        'file'    => 'حجم :attribute يجب ألا يقل عن :min كيلوبايت.',
+        'string'  => ':attribute يجب ألا يقل عن :min أحرف.',
+        'array'   => ':attribute يجب ألا يقل عن :min عناصر.',
+    ],
+    'numeric'  => ':attribute يجب أن يكون رقماً.',
+    'required' => 'حقل :attribute إلزامي.',
+    'string'   => ':attribute يجب أن يكون نصاً.',
+    'unique'   => 'قيمة :attribute مستخدمة من قبل.',
+    'url'      => ':attribute يجب أن يكون رابطاً صحيحاً.',
+    'uploaded' => 'فشل رفع :attribute — قد يتجاوز الحجم المسموح.',
+
+    'attributes' => [
+        'email' => 'البريد الإلكتروني',
+        'password' => 'كلمة المرور',
+        'name' => 'الاسم',
+        'title' => 'العنوان',
+        'code' => 'الرمز',
+        'current' => 'كلمة المرور الحالية',
+        'body' => 'النص',
+        'file' => 'الملف',
+        'note' => 'الملاحظة',
+        'label' => 'اسم الحقل',
+        'tname' => 'اسم المفتاح',
+        'pid' => 'معرف أودو',
+    ],
+];

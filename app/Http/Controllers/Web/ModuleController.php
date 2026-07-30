@@ -89,7 +89,7 @@ class ModuleController extends Controller
     public function store(Request $r, string $module)
     {
         [$def, $class] = $this->resolve($module, 'a');
-        $r->validate($this->rules($def));
+        $r->validate($this->rules($def), [], $this->attrs($def));
         if ($resp = $this->guardProject($r, $module)) return $resp;
 
         $m = new $class;
@@ -164,7 +164,7 @@ class ModuleController extends Controller
     public function update(Request $r, string $module, string $id)
     {
         [$def, $class] = $this->resolve($module, 'e');
-        $r->validate($this->rules($def, creating: false));
+        $r->validate($this->rules($def, creating: false), [], $this->attrs($def));
         if ($resp = $this->guardProject($r, $module)) return $resp;
 
         $m = $this->findScoped($class, $module, $id);
@@ -524,6 +524,16 @@ class ModuleController extends Controller
         }
 
         return $rules;
+    }
+
+    /** تسميات الحقول العربية لرسائل التحقق (:attribute) — تشمل الحقول المخصصة */
+    protected function attrs(array $def): array
+    {
+        $out = [];
+        foreach ($def['fields'] as $f) $out[$f['key']] = $f['label'];
+        foreach (hub_custom_fields($def['key'] ?? null) as $cf) $out['custom.' . $cf['key']] = $cf['label'];
+
+        return $out;
     }
 
     /** تعبئة الموديل من الطلب حسب نوع كل حقل */

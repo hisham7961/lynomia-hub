@@ -393,3 +393,9 @@ html[data-theme="dark"] .btn.p{background:linear-gradient(180deg,color-mix(in sr
 html[data-theme="dark"] .kcol{background:#101917}
 html[data-theme="dark"] .hitem{background:var(--cd)}
 html[data-theme="dark"] .ava{box-shadow:inset 0 0 0 2px rgba(255,255,255,.12)}
+
+/* ═ v2.24 — زر قيد الإرسال ═ */
+.btn.busy{position:relative;color:transparent!important;pointer-events:none}
+.btn.busy::after{content:"";position:absolute;inset:0;margin:auto;width:15px;height:15px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+.btn.busy:not(.p)::after{border-color:color-mix(in srgb,var(--p) 30%,transparent);border-top-color:var(--p)}
+@keyframes spin{to{transform:rotate(360deg)}}

@@ -176,3 +176,23 @@
     if (!e.target.closest('.gsearch')) { var b = document.getElementById('gsr'); if (b) b.innerHTML = ''; }
   });
 })();
+
+/* ═ v2.24 — حماية الإرسال المزدوج + حالة تحميل ═ */
+(function () {
+  document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (!(f instanceof HTMLFormElement) || f.hasAttribute('data-resubmit')) return;
+    if (f.dataset.busy) { e.preventDefault(); return; }
+    f.dataset.busy = '1';
+    var btns = f.querySelectorAll('button[type="submit"],button:not([type])');
+    setTimeout(function () { btns.forEach(function (b) { b.disabled = true; b.classList.add('busy'); }); }, 0);
+    setTimeout(function () {           /* فك القفل احتياطاً عند فشل الشبكة */
+      delete f.dataset.busy;
+      btns.forEach(function (b) { b.disabled = false; b.classList.remove('busy'); });
+    }, 8000);
+  }, true);
+  window.addEventListener('pageshow', function () {   /* عودة بزر الرجوع (bfcache) */
+    document.querySelectorAll('form[data-busy]').forEach(function (f) { delete f.dataset.busy; });
+    document.querySelectorAll('button.busy').forEach(function (b) { b.disabled = false; b.classList.remove('busy'); });
+  });
+})();
