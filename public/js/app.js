@@ -41,33 +41,12 @@
   document.addEventListener('htmx:beforeRequest', function () { var b = $('#topload'); b.style.width = '68%'; b.style.opacity = 1; clearTimeout(tl); });
   document.addEventListener('htmx:afterSettle', function () { var b = $('#topload'); b.style.width = '100%'; tl = setTimeout(function () { b.style.opacity = 0; b.style.width = '0'; }, 350); });
 
-  /* ── لوحة الأوامر Ctrl+K ── */
-  var NAV = [];
-  try { NAV = JSON.parse($('#navdata').textContent); } catch (e) {}
-  /* أسماء الوحدات صارت قابلة للتخصيص (nav.names) فتصل إلى هنا كنص مستخدم —
-     تُهرَّب قبل بناء innerHTML كي لا يُحقن وسم عبر تسمية بديلة */
-  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function palRender(q) {
-    q = (q || '').trim();
-    var list = $('#pallist'), out = '';
-    NAV.filter(function (i) { return !q || i.t.indexOf(q) > -1; }).slice(0, 9).forEach(function (i) {
-      out += '<div class="palitem"><a href="' + esc(i.u) + '">' + esc(i.t) + '</a>' +
-             (i.n ? '<button type="button" class="btn ghost xs" onclick="Hub.closeP();Hub.modal(\'' + esc(i.n) + '\')">＋ جديد</button>' : '') + '</div>';
-    });
-    list.innerHTML = out || '<div class="palitem sub">لا نتائج</div>';
-  }
-  Hub.palette = function () { $('#palette').hidden = false; var i = $('#palq'); i.value = ''; palRender(''); i.focus(); };
-  Hub.closeP = function () { $('#palette').hidden = true; };
-  document.addEventListener('input', function (e) { if (e.target.id === 'palq') palRender(e.target.value); });
-  document.addEventListener('keydown', function (e) {
-    if (e.target.id === 'palq' && e.key === 'Enter') { var a = $('#pallist a'); if (a) location.href = a.href; }
-  });
-
   /* ── الاختصارات ── */
   document.addEventListener('keydown', function (e) {
     var typing = /INPUT|TEXTAREA|SELECT/.test(e.target.tagName);
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); Hub.palette(); return; }
-    if (e.key === 'Escape') { Hub.closeP(); Hub.closeModal(); return; }
+    // Ctrl+K صار يركز البحث الشامل — طريق واحد للوصول لكل شيء
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); var g = $('#gq'); if (g) g.focus(); return; }
+    if (e.key === 'Escape') { Hub.closeModal(); return; }
     if (typing) return;
     if (e.key === 'n') { var b = $('#newbtn'); if (b) { e.preventDefault(); b.click(); } }
   });

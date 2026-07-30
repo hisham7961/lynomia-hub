@@ -351,12 +351,6 @@ html[data-theme="dark"] .seg{background:color-mix(in srgb,var(--cd) 88%,transpar
   border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:13px;transition:all var(--t)}
 .mclose:hover{background:var(--badbg);color:var(--bad);transform:rotate(90deg)}
 .mhead{display:flex;gap:10px;align-items:center;margin-bottom:16px;font-size:15px}
-.palbox{background:var(--cd);border-radius:18px;width:min(560px,100%);padding:12px;
-  box-shadow:0 34px 90px rgba(0,0,0,.32);animation:pop .2s ease}
-.palitem{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 13px;
-  border-radius:10px;font-size:14px;color:var(--tx);transition:background var(--t)}
-.palitem a{color:var(--tx);flex:1}
-.palitem:hover{background:color-mix(in srgb,var(--p) 6%,transparent)}
 #pallist{margin-top:8px;max-height:46vh;overflow:auto}
 .cfilter{margin-bottom:5px;padding:6px 10px;font-size:12.5px}
 .rl a{display:block;padding:6px 2px;border-bottom:1px solid color-mix(in srgb,var(--ln) 55%,transparent);font-size:13px}
@@ -470,7 +464,7 @@ html[data-theme="dark"] body{
   --shh:0 4px 14px rgba(0,0,0,.5),0 16px 38px rgba(0,0,0,.45)}
 html[data-theme="dark"] .topbar{background:color-mix(in srgb,var(--cd) 80%,transparent)}
 html[data-theme="dark"] .inp{background:#0F1726}
-html[data-theme="dark"] .gsr,html[data-theme="dark"] .modalbox,html[data-theme="dark"] .palbox,html[data-theme="dark"] .logincard{background:var(--cd)}
+html[data-theme="dark"] .gsr,html[data-theme="dark"] .modalbox,html[data-theme="dark"] .logincard{background:var(--cd)}
 html[data-theme="dark"] .logincard{box-shadow:0 30px 90px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05)}
 html[data-theme="dark"] .tbl th{background:var(--bg2)}
 html[data-theme="dark"] .stat b{color:var(--tx)}

@@ -66,7 +66,6 @@
                         hx-get="{{ route('notifications.mini') }}" hx-target="#bellbox" hx-swap="innerHTML">🔔<span id="bellbadge">@php $nbc = \App\Models\HubNotification::where('user_id', auth()->id())->where('read', false)->count(); @endphp@if($nbc)<span class="nbdg">{{ $nbc }}</span>@endif</span></button>
                 <div id="bellbox" class="gsr"></div>
             </div>
-            <button class="btn ghost sm" type="button" onclick="Hub.palette()" title="لوحة الأوامر">⌘K</button>
             <button class="btn ghost sm" type="button" onclick="Hub.theme()" title="الوضع الليلي">🌓</button>
             <div class="userbox">
                 <a href="{{ route('profile.edit') }}" title="ملفي الشخصي" style="display:flex;gap:10px;align-items:center;color:inherit">
@@ -128,22 +127,7 @@
         <div id="modalbody"></div>
     </div>
 </div>
-<div class="modal" id="palette" hidden>
-    <div class="palbox">
-        <input class="inp" id="palq" placeholder="اكتب اسم وحدة أو أمراً… ⏎ للانتقال" autocomplete="off">
-        <div id="pallist"></div>
-    </div>
-</div>
-@php
-    $navData = collect(hub_nav(auth()->user()))
-        ->flatMap(fn ($g) => collect($g['items'])->map(fn ($it) => [
-            't' => $it['label'],
-            'u' => route('m.index', $it['key']),
-            'n' => hub_can(auth()->user(), $it['key'], 'a') ? route('m.create', $it['key']) : null,
-        ]))
-        ->values();
-@endphp
-<script type="application/json" id="navdata">@json($navData)</script>
+{{-- لوحة ⌘K أُزيلت: البحث الشامل في الشريط العلوي صار الطريق الواحد لكل شيء --}}
 <script src="{{ asset('js/htmx.min.js') }}?v={{ config('hub.version') }}"></script>
 <script src="{{ asset('js/app.js') }}?v={{ config('hub.version') }}"></script>
 </body>

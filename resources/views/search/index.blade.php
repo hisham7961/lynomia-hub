@@ -8,10 +8,22 @@
     </form>
 </div>
 
+@php $dests = $dests ?? []; @endphp
+@if (count($dests))
+    {{-- وجهات النظام المطابقة: البحث يوصلك لأي صفحة أو قسم بالاسم --}}
+    <div class="card">
+        <h3>🧭 صفحات وأقسام</h3>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+            @foreach ($dests as $d)<a class="btn ghost sm" href="{{ $d['u'] }}">{{ $d['t'] }}</a>@endforeach
+        </div>
+    </div>
+@endif
 @if (mb_strlen($q) < 2)
     <div class="card"><div class="sub" style="padding:20px;text-align:center">اكتب حرفين على الأقل للبحث في كل الوحدات</div></div>
 @elseif (! count($groups))
-    <div class="card"><div class="sub" style="padding:20px;text-align:center">لا نتائج لـ«{{ $q }}» في أي وحدة</div></div>
+    @unless (count($dests))
+        <div class="card"><div class="sub" style="padding:20px;text-align:center">لا نتائج لـ«{{ $q }}» في أي وحدة</div></div>
+    @endunless
 @else
     <div class="sub" style="margin-bottom:12px">{{ count($groups) }} وحدة فيها نتائج لـ«{{ $q }}»</div>
     <div class="kids">
