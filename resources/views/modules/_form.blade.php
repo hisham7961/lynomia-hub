@@ -16,6 +16,12 @@
                 @include('partials._field', ['f' => $f, 'row' => $row, 'refOptions' => $refOptions])
             @endforeach
         </div>
+        @if ($updating)
+            <div class="fld fw" style="margin-top:6px">
+                <label>سبب التعديل <span class="sub">(اختياري — يُحفظ في سجل التدقيق)</span></label>
+                <input class="inp" name="_reason" maxlength="380" placeholder="مثال: تصحيح رقم الهاتف بطلب من العميل">
+            </div>
+        @endif
         <div class="formfoot">
             <button class="btn p" type="submit">{{ $updating ? 'حفظ التعديلات' : 'إضافة' }}</button>
             @if ($hx)

@@ -41,7 +41,7 @@ trait Auditable
 ),
             'before'     => $before,
             'after'      => $after,
-            'reason'     => Request::header('X-Change-Reason'),
+            'reason'     => Request::input('_reason') ?: Request::header('X-Change-Reason'),
             'device'     => substr((string) Request::header('X-Device', Request::userAgent()), 0, 200),
             'ip'         => Request::ip(),
             'created_at' => now(),

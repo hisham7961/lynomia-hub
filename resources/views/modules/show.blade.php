@@ -18,6 +18,9 @@
     @endif
 </div>
 <span data-recent data-title="{{ $def['label'] }}: {{ \Illuminate\Support\Str::limit($row->{hub_display_col($module)} ?? $row->id, 28) }}" hidden></span>
+@if ($module === 'approvals')
+    @include('partials.approval_exec')
+@endif
 <div class="card">
     <dl class="detail">
         @foreach ($def['fields'] as $f)

@@ -4,12 +4,14 @@ use App\Models\Setting;
 use Illuminate\Support\Facades\Cache;
 
 if (! function_exists('setting')) {
-    /** إعداد مخزَّن في القاعدة مع كاش */
+    /** إعداد مخزَّن في القاعدة مع كاش — المفتاح حرفي (النقطة جزء من الاسم لا تداخل) */
     function setting(string $key, mixed $default = null): mixed
     {
         $all = Cache::remember('settings:all', 600, fn () => Setting::pluck('value', 'key')->all());
-        $val = data_get($all, $key, $default);
-        return $val;
+
+        return array_key_exists($key, $all) && $all[$key] !== null && $all[$key] !== ''
+            ? $all[$key]
+            : $default;
     }
 }
 
@@ -314,6 +316,35 @@ if (! function_exists('hub_expiry')) {
             usort($items, fn ($a, $b) => $a['days'] <=> $b['days']);
             return array_slice($items, 0, 200);
         });
+    }
+}
+
+if (! function_exists('hub_needs_approval')) {
+    /**
+     * هل تتطلب هذه العملية موافقة قبل التنفيذ؟ — من الإعداد approval.rules
+     * بصيغة «وحدة:أحرف» مفصولة بمسافات/فواصل، الأحرف: e=تعديل d=حذف (مثال: vault:ed fin:d)
+     * المالك وحاملو علم «approve» يمرّون مباشرة.
+     */
+    function hub_needs_approval($user, string $module, string $op): bool
+    {
+        if (! $user || $user->role?->is_owner || hub_flag($user, 'approve')) return false;
+
+        foreach (preg_split('/[\s,،]+/u', (string) setting('approval.rules', ''), -1, PREG_SPLIT_NO_EMPTY) as $rule) {
+            [$mk, $ops] = array_pad(explode(':', $rule, 2), 2, 'ed');
+            if ($mk === $module && str_contains($ops, $op)) return true;
+        }
+
+        return false;
+    }
+}
+
+if (! function_exists('hub_approvers')) {
+    /** المعتمدون: المالكون + حاملو علم approve */
+    function hub_approvers(): array
+    {
+        return \App\Models\User::whereNull('deleted_at')->with('role')->get()
+            ->filter(fn ($u) => $u->role?->is_owner || hub_flag($u, 'approve'))
+            ->pluck('id')->values()->all();
     }
 }
 

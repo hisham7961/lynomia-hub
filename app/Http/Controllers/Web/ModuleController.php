@@ -167,6 +167,9 @@ class ModuleController extends Controller
         if ($resp = $this->guardProject($r, $module)) return $resp;
 
         $m = $this->findScoped($class, $module, $id);
+        if (hub_needs_approval(auth()->user(), $module, 'e')) {
+            return $this->queueApproval($def, $module, 'e', $m, $r);
+        }
         if ($module === 'projects' && hub_scoped(auth()->user())) {
             \Illuminate\Support\Facades\Cache::forget('user:' . auth()->id() . ':projects');
         }
@@ -182,7 +185,11 @@ class ModuleController extends Controller
     public function destroy(string $module, string $id)
     {
         [$def, $class] = $this->resolve($module, 'd');
-        $this->findScoped($class, $module, $id)->delete();
+        $m = $this->findScoped($class, $module, $id);
+        if (hub_needs_approval(auth()->user(), $module, 'd')) {
+            return $this->queueApproval($def, $module, 'd', $m, request());
+        }
+        $m->delete();
 
         return redirect()->route('m.index', $module)->with('ok', 'نُقل السجل إلى السلة');
     }
@@ -283,6 +290,52 @@ class ModuleController extends Controller
     }
 
     /* ────────── أدوات داخلية ────────── */
+
+    /**
+     * العمليات المحمية: بدل التنفيذ يُصفّ طلب موافقة بحمولة التعديل،
+     * ويُشعَر المعتمدون — الملفات المرفوعة لا تُؤجل (تُستثنى من الحمولة).
+     */
+    protected function queueApproval(array $def, string $module, string $op, Model $m, Request $r)
+    {
+        $payload = null;
+        if ($op === 'e') {
+            $keys = collect($def['fields'])
+                ->reject(fn ($f) => in_array($f['type'], ['file', 'img'], true))
+                ->pluck('key')->all();
+            $payload = collect($r->only($keys))->filter(fn ($v) => $v !== null)->all();
+        }
+
+        $name = \Illuminate\Support\Str::limit((string) ($m->{hub_display_col($module)} ?? $m->id), 60);
+        $approvers = hub_approvers();
+
+        $ap = \App\Models\Approval::create([
+            'title'        => ($op === 'd' ? 'حذف ' : 'تعديل ') . $def['label'] . ': ' . $name,
+            'type'         => 'عملية محمية',
+            'reason'       => $r->input('_reason'),
+            'due'          => now()->addDays(3)->toDateString(),
+            'project_id'   => $m->project_id ?? null,
+            'approver_id'  => $approvers[0] ?? null,
+            'mod'          => $module,
+            'record_id'    => $m->id,
+            'op'           => $op,
+            'payload'      => $payload,
+            'requested_by' => auth()->id(),
+            'status'       => 'معلّق',
+        ]);
+
+        foreach ($approvers as $uid) {
+            if ($uid === auth()->id()) continue;
+            \App\Models\HubNotification::create([
+                'user_id' => $uid, 'kind' => 'approval',
+                'text'    => 'طلب موافقة من ' . auth()->user()->name . ': ' . $ap->title,
+                'module'  => 'approvals', 'record_id' => $ap->id,
+                'read'    => false, 'created_at' => now(),
+            ]);
+        }
+
+        return redirect()->route('m.index', $module)
+            ->with('ok', 'هذه العملية محمية — أُرسل طلب الموافقة للمعتمدين وسيصلك إشعار بالقرار');
+    }
 
     /** نسف كاش نسبة الإنجاز عند تغيّر مهمة أو بند خطة */
     protected function bustProgress(string $module, Model $m): void

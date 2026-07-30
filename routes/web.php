@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Web\AlertController;
 use App\Http\Controllers\Web\AppCenterController;
+use App\Http\Controllers\Web\ApprovalDecisionController;
 use App\Http\Controllers\Web\AuditController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\CommentController;
@@ -28,6 +29,10 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('me', [PortalController::class, 'me'])->name('portal.me');
+
+    // ── حسم الموافقات المُلزِمة ──
+    Route::post('approvals/{id}/approve', [ApprovalDecisionController::class, 'approve'])->name('approvals.approve');
+    Route::post('approvals/{id}/reject', [ApprovalDecisionController::class, 'reject'])->name('approvals.reject');
 
     // ── التعليقات وقناة الفريق ──
     Route::get('feed', [CommentController::class, 'feed'])->name('feed');

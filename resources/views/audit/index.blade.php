@@ -22,13 +22,14 @@
                 <td><span class="bdg {{ $a->action === 'حذف' ? 'bad' : ($a->action === 'إضافة' ? 'ok' : '') }}">{{ $a->action }}</span></td>
                 <td>{{ hub_mod($a->module)['label'] ?? $a->module }}</td>
                 <td>{{ \Illuminate\Support\Str::limit($a->name, 44) }}
+                    @if ($a->reason)<div class="sub">💬 السبب: {{ \Illuminate\Support\Str::limit($a->reason, 70) }}</div>@endif
                     @if ($a->before || $a->after)
                         <details><summary class="sub" style="cursor:pointer">التغيير ▾</summary>
                             <pre class="mono ltr" style="font-size:11px;background:var(--pss);border-radius:8px;padding:8px;margin-top:4px;max-width:420px;overflow:auto">{{ json_encode(['قبل' => json_decode($a->before ?? 'null'), 'بعد' => json_decode($a->after ?? 'null')], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) }}</pre>
                         </details>
                     @endif
                 </td>
-                <td class="mono ltr">{{ $a->ip }}</td>
+                <td class="mono ltr" @if ($a->device) title="{{ $a->device }}" @endif>{{ $a->ip }}</td>
             </tr>
         @empty
             <tr><td colspan="6" class="empty">لا سجلات</td></tr>

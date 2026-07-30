@@ -15,6 +15,7 @@ class SettingController extends Controller
         'app.company'     => 'اسم الشركة الأم',
         'notify.tg_token' => 'توكن بوت تلجرام (للتنبيهات الخارجية)',
         'notify.tg_chat'  => 'معرّف قناة/مجموعة تلجرام الافتراضي',
+        'approval.rules'  => 'عمليات تتطلب موافقة — وحدة:أحرف (e تعديل · d حذف) مثال: vault:ed fin:d contracts:e',
     ];
 
     protected function gate(): void

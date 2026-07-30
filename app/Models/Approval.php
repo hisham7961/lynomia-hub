@@ -29,6 +29,8 @@ class Approval extends Model
         'custom' => 'array',
         'meta' => 'array',
         'archived' => 'boolean',
+        'payload' => 'array',
+        'decided_at' => 'datetime',
     ];
 
     public function project(): BelongsTo
