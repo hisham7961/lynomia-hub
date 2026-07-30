@@ -1,0 +1,415 @@
+<?php
+
+namespace App\Http\Controllers\Web;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+
+/** متحكم عام واحد يخدم كل الوحدات — سجل الوحدات config/hub.php يقود كل شيء */
+class ModuleController extends Controller
+{
+    /** حل الوحدة: التعريف + صنف الموديل، مع فرض الصلاحية */
+    protected function resolve(string $module, string $op): array
+    {
+        $def = hub_mod($module);
+        abort_if(! $def || $module === 'users', 404);           // users لها صفحتها الإدارية الخاصة
+        abort_unless(hub_can(auth()->user(), $module, $op), 403, 'لا تملك صلاحية على هذه الوحدة');
+
+        $class = '\\App\\Models\\' . $def['model'];
+        abort_unless(class_exists($class), 404);
+
+        return [$def, $class];
+    }
+
+    /** استعلام القائمة الموحّد (بحث + حالة + فلاتر مراجع) — يخدم الفهرس والتصدير والكانبان */
+    protected function buildQuery(Request $r, array $def, string $class, bool &$trash = false, array &$filters = []): \Illuminate\Database\Eloquent\Builder
+    {
+        $trash = $r->boolean('trash') && hub_can(auth()->user(), $def['key'] ?? '', 'd');
+        $q = $trash ? $class::onlyTrashed() : $class::query();
+        $q = hub_scope($q, $def['key'] ?? '');          // نطاق المشاريع للحسابات المحدودة
+
+        if ($term = $r->input('q')) $q->search($term);
+
+        $statusCol = $def['status'] ?? null;
+        if ($statusCol && ($st = $r->input('status'))) $q->where($statusCol, $st);
+
+        $fields = collect($def['fields']);
+        foreach ((array) $r->input('f', []) as $fk => $fv) {
+            $f = $fields->firstWhere('key', $fk);
+            if ($f && $f['type'] === 'ref' && $fv !== '' && empty($f['multi'])) {
+                $q->where($f['col'], $fv);
+                $filters[] = ['key' => $fk, 'label' => $f['label'], 'val' => $fv,
+                              'name' => hub_ref_labels($f['ref'], [$fv])[$fv] ?? $fv];
+            }
+        }
+
+        return $q;
+    }
+
+    public function index(Request $r, string $module)
+    {
+        [$def, $class] = $this->resolve($module, 'v');
+        $def['key'] = $module;
+        $trash = false; $filters = [];
+        $q = $this->buildQuery($r, $def, $class, $trash, $filters);
+        $fields = collect($def['fields']);
+
+        // فرز بأي عمود من أعمدة الوحدة
+        $sortKey = $r->input('s');
+        $sf      = $sortKey ? $fields->firstWhere('key', $sortKey) : null;
+        $dir     = $r->input('d') === 'asc' ? 'asc' : 'desc';
+        $q->orderBy($sf['col'] ?? 'created_at', $sf ? $dir : 'desc');
+
+        $rows = $q->paginate(25)->withQueryString();
+
+        [$columns, $labels] = $this->columnsAndLabels($def, $rows->items());
+        $statusOptions = $this->statusOptions($def);
+
+        return view('modules.index', [
+            'module' => $module, 'def' => $def, 'rows' => $rows,
+            'columns' => $columns, 'labels' => $labels,
+            'statusOptions' => $statusOptions, 'trash' => $trash,
+            'filters' => $filters, 'sortKey' => $sortKey, 'sortDir' => $dir,
+        ]);
+    }
+
+    public function create(string $module)
+    {
+        [$def] = $this->resolve($module, 'a');
+
+        return view('modules.form', [
+            'module' => $module, 'def' => $def, 'row' => null,
+            'refOptions' => $this->refOptions($def),
+        ]);
+    }
+
+    public function store(Request $r, string $module)
+    {
+        [$def, $class] = $this->resolve($module, 'a');
+        $r->validate($this->rules($def));
+        if ($resp = $this->guardProject($r, $module)) return $resp;
+
+        $m = new $class;
+        $this->fill($def, $r, $m);
+
+        // مستخدم محدود ينشئ مشروعاً: نضمن بقاءه ضمن نطاقه (مديراً أو عضواً)
+        if ($module === 'projects' && hub_scoped(auth()->user())) {
+            $me  = auth()->id();
+            $mem = collect(is_array($m->members) ? $m->members : (json_decode($m->members ?? '[]', true) ?: []));
+            if ($m->manager_id !== $me && ! $mem->contains($me)) {
+                $m->members = $mem->push($me)->values()->all();
+            }
+            \Illuminate\Support\Facades\Cache::forget("user:{$me}:projects");
+        }
+
+        $m->save();
+
+        return redirect()->route('m.index', $module)->with('ok', 'أُضيف السجل بنجاح');
+    }
+
+    public function show(string $module, string $id)
+    {
+        [$def, $class] = $this->resolve($module, 'v');
+        $row = $this->findScoped($class, $module, $id, 'with');
+        [, $labels] = $this->columnsAndLabels($def, [$row], all: true);
+
+        // السجلات المرتبطة: كل وحدة تشير لهذا السجل بحقل مرجعي
+        $children = [];
+        foreach (hub_children($module) as [$ck, $cf]) {
+            if (! hub_can(auth()->user(), $ck, 'v')) continue;
+            $cd = hub_mod($ck);
+            $cc = '\\App\\Models\\' . $cd['model'];
+            if (! class_exists($cc)) continue;
+            $base  = hub_scope($cc::where($cf['col'], $row->id), $ck);
+            $count = (clone $base)->count();
+            if (! $count) continue;
+            $children[] = [
+                'module' => $ck, 'label' => $cd['label'], 'field' => $cf,
+                'count'  => $count,
+                'rows'   => (clone $base)->orderByDesc('created_at')->limit(8)->get(),
+                'display' => $cd['display'] ?? 'name',
+            ];
+        }
+
+        // آخر الإصدارات المحفوظة
+        $versions = \App\Models\RecordVersion::where('module', $module)->where('record_id', $row->id)
+            ->orderByDesc('version')->limit(10)->get();
+        $verUsers = \Illuminate\Support\Facades\DB::table('users')
+            ->whereIn('id', $versions->pluck('changed_by')->filter())->pluck('name', 'id');
+
+        return view('modules.show', compact('module', 'def', 'row', 'labels', 'children', 'versions', 'verUsers'));
+    }
+
+    public function edit(string $module, string $id)
+    {
+        [$def, $class] = $this->resolve($module, 'e');
+        $row = $this->findScoped($class, $module, $id);
+
+        return view('modules.form', [
+            'module' => $module, 'def' => $def, 'row' => $row,
+            'refOptions' => $this->refOptions($def),
+        ]);
+    }
+
+    public function update(Request $r, string $module, string $id)
+    {
+        [$def, $class] = $this->resolve($module, 'e');
+        $r->validate($this->rules($def, creating: false));
+        if ($resp = $this->guardProject($r, $module)) return $resp;
+
+        $m = $this->findScoped($class, $module, $id);
+        if ($module === 'projects' && hub_scoped(auth()->user())) {
+            \Illuminate\Support\Facades\Cache::forget('user:' . auth()->id() . ':projects');
+        }
+        $this->fill($def, $r, $m);
+        $m->save();
+
+        return redirect()->route('m.index', $module)->with('ok', 'حُفظت التعديلات');
+    }
+
+    public function destroy(string $module, string $id)
+    {
+        [$def, $class] = $this->resolve($module, 'd');
+        $this->findScoped($class, $module, $id)->delete();
+
+        return redirect()->route('m.index', $module)->with('ok', 'نُقل السجل إلى السلة');
+    }
+
+    public function restore(string $module, string $id)
+    {
+        [$def, $class] = $this->resolve($module, 'd');
+        $this->findScoped($class, $module, $id, 'only')->restore();
+
+        return redirect()->route('m.index', [$module, 'trash' => 1])->with('ok', 'استُعيد السجل');
+    }
+
+    /** كانبان عام: أعمدة من خيارات الحالة، أو من القيم الفعلية إن لم تُعرّف */
+    public function board(Request $r, string $module)
+    {
+        [$def, $class] = $this->resolve($module, 'v');
+        $def['key'] = $module;
+        $statusCol = $def['status'] ?? null;
+        abort_unless($statusCol, 404, 'هذه الوحدة بلا حقل حالة');
+
+        $options = $this->statusOptions($def);
+        if (! $options) {
+            $options = hub_scope($class::whereNotNull($statusCol), $module)->distinct()->limit(8)->pluck($statusCol)->all();
+        }
+        abort_unless($options, 404, 'لا حالات معرّفة بعد — أضف سجلات أولاً');
+
+        $trash = false; $filters = [];
+        $rows = $this->buildQuery($r->merge(['status' => null]), $def, $class, $trash, $filters)
+            ->orderByDesc('created_at')->limit(400)->get();
+
+        $disp = $def['display'] ?? 'name';
+        $cols = [];
+        foreach ($options as $o) $cols[$o] = [];
+        foreach ($rows as $row) {
+            $st = $row->{$statusCol} ?? '';
+            if (! isset($cols[$st])) continue;
+            $cols[$st][] = $row;
+        }
+
+        return view('modules.board', compact('module', 'def', 'cols', 'disp', 'statusCol'));
+    }
+
+    /** تغيير حالة سجل (سحب وإفلات الكانبان) */
+    public function setStatus(Request $r, string $module, string $id)
+    {
+        [$def, $class] = $this->resolve($module, 'e');
+        $statusCol = $def['status'] ?? null;
+        abort_unless($statusCol, 404);
+
+        $m = $this->findScoped($class, $module, $id);
+        $m->{$statusCol} = (string) $r->input('status');
+        $m->save();
+
+        return response()->json(['ok' => 1]);
+    }
+
+    /** تصدير CSV بنفس فلاتر القائمة الحالية (BOM ليقرأ Excel العربية) */
+    public function export(Request $r, string $module)
+    {
+        [$def, $class] = $this->resolve($module, 'v');
+        abort_unless(hub_flag(auth()->user(), 'exp') || auth()->user()->role?->is_owner, 403, 'التصدير يتطلب صلاحية');
+        $def['key'] = $module;
+
+        $trash = false; $filters = [];
+        $rows = $this->buildQuery($r, $def, $class, $trash, $filters)
+            ->orderByDesc('created_at')->limit(5000)->get();
+
+        [$columns, $labels] = $this->columnsAndLabels($def, $rows->all());
+
+        return response()->streamDownload(function () use ($rows, $columns, $labels) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, array_column($columns, 'label'));
+            foreach ($rows as $row) {
+                $line = [];
+                foreach ($columns as $f) {
+                    $v = $row->{$f['col']} ?? '';
+                    if ($f['type'] === 'ref' && empty($f['multi'])) $v = $labels[$f['key']][$v] ?? $v;
+                    elseif ($f['type'] === 'sec') $v = '••••';
+                    elseif (is_array($v)) $v = implode('، ', $v);
+                    elseif (is_string($v) && str_starts_with($v, '[')) { $d = json_decode($v, true); if (is_array($d)) $v = implode('، ', array_map(fn ($x) => is_scalar($x) ? $x : '', $d)); }
+                    $line[] = $v;
+                }
+                fputcsv($out, $line);
+            }
+            fclose($out);
+        }, $module . '-' . now()->format('Y-m-d') . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    public function restoreVersion(string $module, string $id, int $version)
+    {
+        [$def, $class] = $this->resolve($module, 'e');
+        $row = $this->findScoped($class, $module, $id);
+        abort_unless($row->restoreVersion($version), 422, 'النسخة غير موجودة');
+
+        return back()->with('ok', "استُعيدت النسخة $version وحُفظت كنسخة جديدة");
+    }
+
+    /* ────────── أدوات داخلية ────────── */
+
+    /** إيجاد سجل داخل نطاق المستخدم — الوصول المباشر بالرابط لسجل خارج النطاق = 404 */
+    protected function findScoped(string $class, string $module, string $id, string $trash = 'none'): Model
+    {
+        $q = match ($trash) {
+            'with'  => $class::withTrashed(),
+            'only'  => $class::onlyTrashed(),
+            default => $class::query(),
+        };
+
+        return hub_scope($q, $module)->findOrFail($id);
+    }
+
+    /** للحسابات المحدودة: يجب ربط السجل بأحد مشاريع المستخدم عند الإضافة أو التعديل */
+    protected function guardProject(Request $r, string $module)
+    {
+        if (! hub_scoped(auth()->user())) return null;
+        if ($module === 'projects') return null;                 // تُضبط عضويته تلقائياً في store
+        $pf = hub_project_field($module);
+        if (! $pf) return null;
+
+        $ids = auth()->user()->visibleProjectIds();
+        $val = (string) $r->input($pf['key']);
+        if ($val === '' || ! in_array($val, $ids, true)) {
+            return back()
+                ->withErrors([$pf['key'] => 'حسابك محدود النطاق — اختر مشروعاً من مشاريعك'])
+                ->withInput();
+        }
+
+        return null;
+    }
+
+    /** أعمدة الجدول (من تعريف الوحدة) + أسماء العرض للمراجع الظاهرة في الصفحة */
+    protected function columnsAndLabels(array $def, array $rows, bool $all = false): array
+    {
+        $fields = collect($def['fields']);
+        $keys   = $all ? $fields->pluck('key')->all() : ($def['columns'] ?? $fields->take(4)->pluck('key')->all());
+        $cols   = $fields->whereIn('key', $keys)->values()->all();
+
+        $labels = [];
+        foreach ($fields->where('type', 'ref') as $f) {
+            if (! $all && ! in_array($f['key'], $keys, true)) continue;
+            $ids = [];
+            foreach ($rows as $row) {
+                $v = $row->{$f['col']} ?? null;
+                if (! $v) continue;
+                if (! empty($f['multi'])) {
+                    $arr = is_array($v) ? $v : (json_decode($v, true) ?: []);
+                    $ids = array_merge($ids, $arr);
+                } else {
+                    $ids[] = $v;
+                }
+            }
+            $labels[$f['key']] = hub_ref_labels($f['ref'], $ids);
+        }
+
+        return [$cols, $labels];
+    }
+
+    /** خيارات حالة الوحدة (إن وُجد عمود حالة) */
+    protected function statusOptions(array $def): array
+    {
+        $col = $def['status'] ?? null;
+        if (! $col) return [];
+        $f = collect($def['fields'])->firstWhere('col', $col);
+
+        return $f['options'] ?? [];
+    }
+
+    /** خيارات كل الحقول المرجعية للنموذج */
+    protected function refOptions(array $def): array
+    {
+        $out = [];
+        foreach (collect($def['fields'])->where('type', 'ref') as $f) {
+            $opts = hub_ref_options($f['ref']);
+            if ($f['ref'] === 'projects' && hub_scoped(auth()->user())) {
+                $opts = array_intersect_key($opts, array_flip(auth()->user()->visibleProjectIds()));
+            }
+            $out[$f['key']] = $opts;
+        }
+        return $out;
+    }
+
+    /** قواعد التحقق من تعريف الوحدة — الحقول السرية مطلوبة عند الإنشاء فقط (التعديل الفارغ يُبقي القديم) */
+    protected function rules(array $def, bool $creating = true): array
+    {
+        $rules = [];
+        foreach ($def['fields'] as $f) {
+            $required = ! empty($f['required']) && ($creating || ($f['type'] ?? '') !== 'sec');
+            $r = [$required ? 'required' : 'nullable'];
+            $r[] = match ($f['type']) {
+                'num', 'big' => 'numeric',
+                'date', 'dt' => 'date',
+                'file', 'img' => 'file',
+                default => 'string',
+            };
+            if ($f['type'] === 'ref' && ($t = hub_ref_table($f['ref']))) {
+                $r = empty($f['multi'])
+                    ? [$r[0], "exists:$t,id"]
+                    : [$r[0], 'array'];
+            }
+            if (in_array($f['type'], ['file', 'img'], true)) $r = [$r[0], 'file', 'max:512000'];
+            $rules[$f['key']] = $r;
+        }
+        return $rules;
+    }
+
+    /** تعبئة الموديل من الطلب حسب نوع كل حقل */
+    protected function fill(array $def, Request $r, Model $m): void
+    {
+        foreach ($def['fields'] as $f) {
+            $k = $f['key']; $c = $f['col']; $t = $f['type'];
+
+            if (in_array($t, ['file', 'img'], true)) {
+                if ($r->hasFile($k)) $m->{$c} = $r->file($k)->store('hub', 'public');
+                continue;
+            }
+            if ($t === 'bool') { $m->{$c} = $r->boolean($k); continue; }
+            if ($t === 'tags') {
+                $v = trim((string) $r->input($k));
+                $arr = $v === '' ? null : array_values(array_filter(array_map('trim', preg_split('/[,،]/u', $v))));
+                $m->{$c} = $arr === null ? null : ($m->hasCast($c) ? $arr : json_encode($arr, JSON_UNESCAPED_UNICODE));
+                continue;
+            }
+            if ($t === 'ref' && ! empty($f['multi'])) {
+                $arr = array_values(array_filter((array) $r->input($k, [])));
+                $m->{$c} = ! $arr ? null : ($m->hasCast($c) ? $arr : json_encode($arr, JSON_UNESCAPED_UNICODE));
+                continue;
+            }
+            if (in_array($t, ['num', 'big'], true)) {
+                $v = $r->input($k);
+                $m->{$c} = ($v === null || $v === '') ? null : (float) $v;
+                continue;
+            }
+
+            $v = $r->input($k);
+            if ($t === 'sec' && ($v === null || $v === '')) continue;   // إبقاء السرّ القديم
+            $m->{$c} = ($v === '' ? null : $v);
+        }
+    }
+}

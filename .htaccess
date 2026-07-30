@@ -1,0 +1,13 @@
+# لاستضافة cPanel/Apache حين لا تستطيع تغيير مجلد الجذر:
+# يوجّه كل الطلبات إلى مجلد public دون كشف بقية الملفات.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# منع الوصول للملفات الحساسة
+<FilesMatch "^(\.env|composer\.(json|lock)|artisan|VERSION)$">
+    Require all denied
+</FilesMatch>
