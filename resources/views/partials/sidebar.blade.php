@@ -46,6 +46,7 @@
                 @if (auth()->user()->role?->is_owner)<a class="ni {{ request()->routeIs('security.*') ? 'on' : '' }}" href="{{ route('security.index') }}">🛡️ مركز الأمان</a>@endif
                 @if (auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'secrets'))<a class="ni {{ request()->routeIs('dataroom.*') ? 'on' : '' }}" href="{{ route('dataroom.index') }}">🔐 غرفة البيانات</a>@endif
                 @if (auth()->user()->role?->is_owner)<a class="ni {{ request()->routeIs('fields.*') ? 'on' : '' }}" href="{{ route('fields.index') }}">🧩 باني الحقول</a>@endif
+                @if (auth()->user()->role?->is_owner)<a class="ni {{ request()->routeIs('flows.*') ? 'on' : '' }}" href="{{ route('flows.index') }}">🪄 مسارات العمل</a>@endif
                 @if (auth()->user()->role?->is_owner)<a class="ni {{ request()->routeIs('settings.*') ? 'on' : '' }}" href="{{ route('settings.edit') }}">الإعدادات</a>@endif
             </details>
         @endif

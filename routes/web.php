@@ -10,6 +10,7 @@ use App\Http\Controllers\Web\CommentController;
 use App\Http\Controllers\Web\CustomFieldController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DataRoomController;
+use App\Http\Controllers\Web\FlowController;
 use App\Http\Controllers\Web\ImportController;
 use App\Http\Controllers\Web\ModuleController;
 use App\Http\Controllers\Web\NotificationController;
@@ -118,6 +119,10 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/settings', [SettingController::class, 'edit'])->name('settings.edit');
     Route::post('admin/settings', [SettingController::class, 'update'])->name('settings.update');
     Route::post('admin/settings/odoo-test', [SettingController::class, 'odooTest'])->name('settings.odoo.test');
+    Route::get('admin/flows', [FlowController::class, 'index'])->name('flows.index');
+    Route::post('admin/flows', [FlowController::class, 'store'])->name('flows.store');
+    Route::post('admin/flows/{id}/toggle', [FlowController::class, 'toggle'])->name('flows.toggle');
+    Route::delete('admin/flows/{id}', [FlowController::class, 'destroy'])->name('flows.destroy');
     Route::get('admin/fields', [CustomFieldController::class, 'index'])->name('fields.index');
     Route::post('admin/fields', [CustomFieldController::class, 'store'])->name('fields.store');
     Route::delete('admin/fields/{module}/{key}', [CustomFieldController::class, 'destroy'])->name('fields.destroy');

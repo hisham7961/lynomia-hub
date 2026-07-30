@@ -79,6 +79,7 @@ class V1Controller extends ModuleController
         $m->save();
         $this->notifyAssignee($def, $module, $m);
         $this->bustProgress($module, $m);
+        \App\Support\FlowRunner::fire('created', $module, $m);
 
         return response()->json(['data' => $m->fresh()], 201);
     }
@@ -95,10 +96,15 @@ class V1Controller extends ModuleController
 
         $m = $this->findScoped($class, $module, $id);
         $prev = ($af = $this->assigneeField($def)) ? $m->{$af['col']} : null;
+        $prevStatus = ($sc = $def['status'] ?? null) ? $m->{$sc} : null;
         $this->fill($def, $r, $m);
         $m->save();
         $this->notifyAssignee($def, $module, $m, $prev);
         $this->bustProgress($module, $m);
+        \App\Support\FlowRunner::fire('updated', $module, $m);
+        if ($sc && (string) $m->{$sc} !== (string) $prevStatus) {
+            \App\Support\FlowRunner::fire('status', $module, $m, (string) $m->{$sc});
+        }
 
         return response()->json(['data' => $m->fresh()]);
     }

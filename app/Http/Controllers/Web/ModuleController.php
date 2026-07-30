@@ -108,6 +108,7 @@ class ModuleController extends Controller
         $m->save();
         $this->notifyAssignee($def, $module, $m);
         $this->bustProgress($module, $m);
+        \App\Support\FlowRunner::fire('created', $module, $m);
 
         return redirect()->route('m.index', $module)->with('ok', 'أُضيف السجل بنجاح');
     }
@@ -174,10 +175,15 @@ class ModuleController extends Controller
             \Illuminate\Support\Facades\Cache::forget('user:' . auth()->id() . ':projects');
         }
         $prevAssignee = ($af = $this->assigneeField($def)) ? $m->{$af['col']} : null;
+        $prevStatus = ($sc = $def['status'] ?? null) ? $m->{$sc} : null;
         $this->fill($def, $r, $m);
         $m->save();
         $this->notifyAssignee($def, $module, $m, $prevAssignee);
         $this->bustProgress($module, $m);
+        \App\Support\FlowRunner::fire('updated', $module, $m);
+        if ($sc && (string) $m->{$sc} !== (string) $prevStatus) {
+            \App\Support\FlowRunner::fire('status', $module, $m, (string) $m->{$sc});
+        }
 
         return redirect()->route('m.index', $module)->with('ok', 'حُفظت التعديلات');
     }
@@ -240,9 +246,13 @@ class ModuleController extends Controller
         abort_unless($statusCol, 404);
 
         $m = $this->findScoped($class, $module, $id);
+        $prevStatus = $m->{$statusCol};
         $m->{$statusCol} = (string) $r->input('status');
         $m->save();
         $this->bustProgress($module, $m);
+        if ((string) $m->{$statusCol} !== (string) $prevStatus) {
+            \App\Support\FlowRunner::fire('status', $module, $m, (string) $m->{$statusCol});
+        }
 
         return response()->json(['ok' => 1]);
     }
