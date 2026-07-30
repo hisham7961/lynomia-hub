@@ -13,6 +13,14 @@ class DashboardController extends Controller
         $hid   = (array) hub_pref('dash.hidden', [], $user);   // بطاقات أخفاها المستخدم: لا تُحسب أصلاً
         $cards = [];
 
+        // ودجات مؤشرات KPI المخصصة — لمن يبنيها (مالك/متابعة)، وتُخفى بمفتاح kpis
+        $kpis = [];
+        if (! in_array('kpis', $hid, true)
+            && ($user->role?->is_owner || hub_flag($user, 'monitor'))
+            && \Illuminate\Support\Facades\Schema::hasTable('kpi_defs')) {
+            $kpis = hub_kpis($user);
+        }
+
         foreach ($hid && in_array('counts', $hid, true) ? [] : ['projects', 'clients', 'tasks', 'tickets', 'fin', 'contracts'] as $key) {
             $def = hub_mod($key);
             if (! $def || ! hub_can($user, $key, 'v')) continue;
@@ -75,6 +83,6 @@ class DashboardController extends Controller
         }
         $audits = in_array('audits', $hid, true) ? collect() : $aq->orderByDesc('audits.created_at')->limit(10)->get();
 
-        return view('dashboard', compact('cards', 'audits', 'due', 'dueCol', 'stCol', 'disp', 'expiry', 'apps', 'taskSlices', 'hid'));
+        return view('dashboard', compact('cards', 'audits', 'due', 'dueCol', 'stCol', 'disp', 'expiry', 'apps', 'taskSlices', 'hid', 'kpis'));
     }
 }

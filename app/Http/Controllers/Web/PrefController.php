@@ -15,6 +15,7 @@ class PrefController extends Controller
     /** بطاقات لوحة التحكم القابلة للإخفاء */
     public const DASH_CARDS = [
         'counts' => 'بطاقات العدّ العلوية',
+        'kpis'   => '📈 ودجات مؤشرات KPI',
         'expiry' => '🔔 ينتهي قريباً',
         'apps'   => '📱 تقدم التطبيقات',
         'donut'  => '✅ المهام بالحالة',

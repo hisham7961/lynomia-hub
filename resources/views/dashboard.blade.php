@@ -8,6 +8,19 @@
     </div>
 </div>
 @php $icons = ['projects' => '🚀', 'clients' => '🤝', 'tasks' => '✅', 'tickets' => '🎫', 'fin' => '💵', 'contracts' => '📜']; @endphp
+@if (! empty($kpis))
+    <div class="cards">
+        @foreach ($kpis as $k)
+            <a class="stat" href="{{ route('kpis.index') }}" title="مؤشر مخصص — من باني KPI">
+                <span class="ico">📈</span>
+                <b class="{{ $k['tone'] === 'bad' ? 'txt-bad' : '' }}">
+                    {{ $k['value'] === null ? '—' : rtrim(rtrim(number_format($k['value'], 1), '0'), '.') }}{{ $k['unit'] ? ' ' . $k['unit'] : '' }}
+                </b>
+                <span>{{ $k['name'] }}@if ($k['target'] !== null && $k['tone']) · <span class="bdg {{ $k['tone'] }}" style="font-size:9px">هدف {{ rtrim(rtrim(number_format($k['target'], 1), '0'), '.') }}</span>@endif</span>
+            </a>
+        @endforeach
+    </div>
+@endif
 <div class="cards">
     @foreach ($cards as $c)
         <a class="stat" href="{{ route('m.index', $c['key']) }}">
