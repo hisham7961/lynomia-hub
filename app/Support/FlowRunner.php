@@ -19,6 +19,9 @@ class FlowRunner
     /** @param string $event created|updated|status */
     public static function fire(string $event, string $module, Model $m, ?string $statusTo = null): void
     {
+        // نفس نقاط الأحداث تغذي مركز Webhooks (ويب + API + كانبان)
+        WebhookDispatcher::fire($event, $module, $m, $statusTo);
+
         try {
             $flows = Flow::where('enabled', true)->where('module', $module)->where('event', $event)->get();
             if ($flows->isEmpty()) return;

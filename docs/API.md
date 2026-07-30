@@ -61,3 +61,44 @@ curl -H "Authorization: Bearer $TOKEN" https://hub.lynomia.com/api/v1/reports/pr
 | 422 | فشل التحقق — التفاصيل في `errors` |
 | 429 | تجاوز حد المعدل |
 | 503 | قفل طوارئ (غير المالكين) |
+
+## Webhooks (الأحداث الصادرة)
+
+اشترك من **الإدارة ← 🪝 Webhooks**: رابط استقبال + قائمة أحداث
+(`*` أو `tickets.created` أو `projects.*` أو `*.status` — الأحداث: `created` و`updated` و`status`).
+
+كل حدث يصلك `POST` بجسم JSON:
+
+```json
+{
+  "event": "tickets.created",
+  "module": "tickets",
+  "label": "التذاكر",
+  "record_id": "uuid",
+  "display": "عنوان التذكرة",
+  "status_to": null,
+  "by": "اسم المنفذ",
+  "at": "2026-07-30T12:00:00+03:00",
+  "data": { "مفاتيح الحقول من سجل الوحدات": "بلا أسرار وبلا مسارات ملفات" }
+}
+```
+
+**الترويسات:**
+
+| ترويسة | المعنى |
+|---|---|
+| `X-Hub-Event` | اسم الحدث مثل `tickets.created` |
+| `X-Hub-Event-Id` | معرف فريد — خزّنه وتجاهل أي تكرار له |
+| `X-Hub-Signature` | `sha256=hex(hmac_sha256(body, secret))` — تحقق قبل التصديق |
+
+**التسليم:** رد بـ 2xx خلال ١٠ ثوانٍ. الفاشل يُعاد تلقائياً بتباعد
+(١ ← ٥ ← ١٥ ← ٦٠ ← ١٨٠ ← ٧٢٠ دقيقة)، وبعد ١٠ إخفاقات متتالية يُوقَف
+الاشتراك ساعة ثم يستأنف. سجل المحاولات وإعادة الإرسال اليدوي وزر الاختبار
+كلها في صفحة الاشتراك.
+
+**مثال تحقق في PHP عند المستقبل:**
+
+```php
+$sig = 'sha256=' . hash_hmac('sha256', file_get_contents('php://input'), $secret);
+if (! hash_equals($sig, $_SERVER['HTTP_X_HUB_SIGNATURE'] ?? '')) http_response_code(401);
+```

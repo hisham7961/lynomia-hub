@@ -31,6 +31,7 @@ use App\Http\Controllers\Web\SecurityController;
 use App\Http\Controllers\Web\SupportController;
 use App\Http\Controllers\Web\SettingController;
 use App\Http\Controllers\Web\UserController;
+use App\Http\Controllers\Web\WebhookController;
 use Illuminate\Support\Facades\Route;
 
 // ── الوجه العام لغرفة البيانات (بلا تسجيل دخول — الرمز هو المفتاح) ──
@@ -126,6 +127,13 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/errors', [ErrorCenterController::class, 'index'])->name('errors.index');
     Route::post('admin/errors/{id}/status', [ErrorCenterController::class, 'status'])->name('errors.status');
     Route::post('jslog', [ErrorCenterController::class, 'jslog'])->name('jslog')->middleware('throttle:20,1');
+    Route::get('admin/webhooks', [WebhookController::class, 'index'])->name('webhooks.index');
+    Route::post('admin/webhooks', [WebhookController::class, 'store'])->name('webhooks.store');
+    Route::post('admin/webhooks/{id}/toggle', [WebhookController::class, 'toggle'])->name('webhooks.toggle');
+    Route::post('admin/webhooks/{id}/test', [WebhookController::class, 'test'])->name('webhooks.test');
+    Route::delete('admin/webhooks/{id}', [WebhookController::class, 'destroy'])->name('webhooks.destroy');
+    Route::get('admin/webhooks/{id}/log', [WebhookController::class, 'log'])->name('webhooks.log');
+    Route::post('admin/webhooks/{id}/resend/{did}', [WebhookController::class, 'resend'])->name('webhooks.resend');
     Route::get('admin/security', [SecurityController::class, 'index'])->name('security.index');
     Route::post('admin/security/lockdown', [SecurityController::class, 'lockdown'])->name('security.lockdown');
     Route::get('admin/settings', [SettingController::class, 'edit'])->name('settings.edit');

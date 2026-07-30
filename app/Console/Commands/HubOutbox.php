@@ -39,7 +39,13 @@ class HubOutbox extends Command
             ->limit((int) $this->option('limit'))
             ->get();
 
-        if ($batch->isEmpty()) { $this->info('لا رسائل بانتظار الإرسال'); return self::SUCCESS; }
+        if ($batch->isEmpty()) {
+            $this->info('لا رسائل بانتظار الإرسال');
+            $this->webhooks();
+            \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.outbox'], ['value' => now()->toIso8601String()]);
+            \Illuminate\Support\Facades\Cache::forget('settings:all');
+            return self::SUCCESS;
+        }
 
         $sent = 0; $failed = 0;
         foreach ($batch as $msg) {
@@ -62,9 +68,45 @@ class HubOutbox extends Command
 
         $this->info("أُرسل: {$sent} · فشل: {$failed}" . ($failed ? ' — أعدها لاحقاً بـ --retry' : ''));
 
+        $this->webhooks();
+
         \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.outbox'], ['value' => now()->toIso8601String()]);
         \Illuminate\Support\Facades\Cache::forget('settings:all');
         return self::SUCCESS;
+    }
+
+    /** تسليم Webhooks المستحقة (المصفوفة الآن أو التي حان موعد إعادتها) */
+    protected function webhooks(): void
+    {
+        if ($this->option('retry')) {
+            $n = \App\Models\WebhookDelivery::where('state', 'failed')
+                ->update(['state' => 'queued', 'next_at' => null, 'tries' => 0, 'error' => null]);
+            if ($n) $this->info("أُعيد صف {$n} تسليم webhook فاشل");
+        }
+
+        // تسليمات علقت في sending (انقطاع سابق) تعود للصف
+        \App\Models\WebhookDelivery::where('state', 'sending')
+            ->where('created_at', '<', now()->subMinutes(10))
+            ->update(['state' => 'queued']);
+
+        $due = \App\Models\WebhookDelivery::with('webhook')
+            ->where('state', 'queued')
+            ->where(fn ($q) => $q->whereNull('next_at')->orWhere('next_at', '<=', now()))
+            ->orderBy('created_at')
+            ->limit((int) $this->option('limit'))
+            ->get()
+            ->filter(fn ($d) => $d->webhook?->deliverable());
+
+        if ($due->isEmpty()) return;
+
+        $ok = 0; $fail = 0;
+        foreach ($due as $d) {
+            // منع الإرسال المزدوج لو تداخل تشغيلان — نفس نمط outbox
+            if (! \App\Models\WebhookDelivery::where('id', $d->id)->where('state', 'queued')->update(['state' => 'sending'])) continue;
+            $d->state = 'queued';   // send() يقرر الحالة النهائية
+            \App\Support\WebhookDispatcher::send($d) ? $ok++ : $fail++;
+        }
+        $this->info("Webhooks — نجح: {$ok} · فشل/أُعيد جدولته: {$fail}");
     }
 
     protected function telegram(OutboxMessage $msg): void
