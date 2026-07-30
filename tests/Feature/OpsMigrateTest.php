@@ -50,5 +50,20 @@ class OpsMigrateTest extends TestCase
         $this->seedCore();
         $this->actingAs($this->employee)->get('/admin/ops')->assertForbidden();
         $this->actingAs($this->employee)->post('/admin/ops/migrate')->assertForbidden();
+        $this->actingAs($this->employee)->post('/admin/ops/clear-cache')->assertForbidden();
+    }
+
+    /** زر مسح الكاش: يمسح كاش البيانات فعلاً ويُدوَّن في التدقيق */
+    public function test_clear_cache_button_flushes_and_audits(): void
+    {
+        $this->seedCore();
+        \Illuminate\Support\Facades\Cache::put('probe', 'قديم', 600);
+        $this->assertSame('قديم', \Illuminate\Support\Facades\Cache::get('probe'));
+
+        $this->actingAs($this->owner)->post('/admin/ops/clear-cache')
+            ->assertRedirect(route('ops.index'));
+
+        $this->assertNull(\Illuminate\Support\Facades\Cache::get('probe'), 'الكاش لم يُمسح');
+        $this->assertDatabaseHas('audits', ['action' => 'مسح الكاش']);
     }
 }

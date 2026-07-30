@@ -132,6 +132,26 @@ class OpsController extends Controller
                                  'version' => trim((string) @file_get_contents(base_path('VERSION')))], $ok ? 200 : 503);
     }
 
+    /**
+     * مسح كاش النظام من المتصفح — شقيق زر الترحيلات في دورة «النشر بلا طرفية».
+     * optimize:clear يمسح المهيّأ كله: الإعدادات والمسارات والقوالب المجمّعة وكاش البيانات.
+     */
+    public function clearCache()
+    {
+        $this->gate();
+
+        try {
+            \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+            hub_audit('مسح الكاش', null, null, 'من مركز التشغيل');
+
+            return redirect()->route('ops.index')
+                ->with('ok', 'مُسح الكاش كله: الإعدادات والمسارات والقوالب وكاش البيانات');
+        } catch (\Throwable $e) {
+            return redirect()->route('ops.index')
+                ->with('err', 'فشل مسح الكاش: ' . mb_substr($e->getMessage(), 0, 300));
+        }
+    }
+
     /** توليد خطأ تجريبي للتحقق من مركز الأخطاء (عبر مسار الإبلاغ نفسه، دون صفحة 500) */
     public function testError()
     {
