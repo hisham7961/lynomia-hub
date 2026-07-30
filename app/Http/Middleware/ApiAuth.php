@@ -12,6 +12,9 @@ class ApiAuth
 {
     public function handle(Request $request, Closure $next)
     {
+        // ردود الـ API دائماً JSON — حتى بلا ترويسة Accept (أخطاء التحقق 422 لا تحويلات)
+        $request->headers->set('Accept', 'application/json');
+
         $plain = (string) $request->bearerToken();
         if ($plain === '') {
             return response()->json(['error' => 'أرسل المفتاح في ترويسة Authorization: Bearer <token>'], 401);

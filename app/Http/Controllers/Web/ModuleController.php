@@ -110,6 +110,11 @@ class ModuleController extends Controller
         $this->bustProgress($module, $m);
         \App\Support\FlowRunner::fire('created', $module, $m);
 
+        // «حفظ وإضافة آخر» — يبقيك في نموذج الإضافة للإدخال المتتابع
+        if ($r->input('_stay')) {
+            return redirect()->route('m.create', $module)->with('ok', 'أُضيف «' . \Illuminate\Support\Str::limit((string) ($m->{hub_display_col($module)} ?? ''), 40) . '» — أدخل التالي');
+        }
+
         return redirect()->route('m.index', $module)->with('ok', 'أُضيف السجل بنجاح');
     }
 

@@ -50,6 +50,9 @@
         @endif
         <div class="formfoot">
             <button class="btn p" type="submit">{{ $updating ? 'حفظ التعديلات' : 'إضافة' }}</button>
+            @unless ($updating || $hx)
+                <button class="btn" type="submit" name="_stay" value="1">حفظ وإضافة آخر</button>
+            @endunless
             @if ($hx)
                 <button class="btn ghost" type="button" onclick="Hub.closeModal()">إلغاء</button>
             @else
