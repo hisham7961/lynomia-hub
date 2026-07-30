@@ -41,6 +41,20 @@ class DashboardController extends Controller
             }
         }
 
+        // تقدم التطبيقات — نسبة الإنجاز الحية من محرك النسبة
+        $apps = collect();
+        if (hub_can($user, 'apps', 'v')) {
+            $apps = hub_scope(DB::table('applications')->whereNull('deleted_at'), 'apps')
+                ->whereNotNull('project_id')
+                ->where(fn ($w) => $w->whereNull('status')->orWhere('status', 'NOT LIKE', '%موقوف%'))
+                ->orderByDesc('created_at')->limit(6)
+                ->get(['id', 'name', 'ver', 'status', 'project_id'])
+                ->map(function ($a) {
+                    $a->progress = hub_progress($a->project_id)['pct'];
+                    return $a;
+                });
+        }
+
         $aq = DB::table('audits')
             ->leftJoin('users', 'users.id', '=', 'audits.user_id')
             ->select('audits.*', 'users.name as user_name');
@@ -51,6 +65,6 @@ class DashboardController extends Controller
         }
         $audits = $aq->orderByDesc('audits.created_at')->limit(10)->get();
 
-        return view('dashboard', compact('cards', 'audits', 'due', 'dueCol', 'stCol', 'disp', 'expiry'));
+        return view('dashboard', compact('cards', 'audits', 'due', 'dueCol', 'stCol', 'disp', 'expiry', 'apps'));
     }
 }

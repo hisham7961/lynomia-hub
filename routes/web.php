@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Web\AlertController;
+use App\Http\Controllers\Web\AppCenterController;
 use App\Http\Controllers\Web\AuditController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\CommentController;
@@ -35,6 +36,7 @@ Route::middleware('auth')->group(function () {
     Route::post('comments/{id}/task', [CommentController::class, 'toTask'])->name('comments.task');
     Route::delete('comments/{id}', [CommentController::class, 'destroy'])->name('comments.destroy');
     Route::get('employee/{id}', [PortalController::class, 'employee'])->name('portal.employee');
+    Route::get('app/{id}', [AppCenterController::class, 'show'])->name('apps.center');
     Route::get('search', [SearchController::class, 'index'])->name('search');
     Route::get('search/mini', [SearchController::class, 'mini'])->name('search.mini');
     Route::get('alerts', [AlertController::class, 'index'])->name('alerts');

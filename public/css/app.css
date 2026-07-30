@@ -222,3 +222,15 @@ html[data-theme="dark"] .llc h5,html[data-theme="dark"] .logincard h1{color:var(
 .crow select{max-width:190px}
 .crow input[type=file]{max-width:220px;font-size:12px}
 .err{color:var(--bad);font-size:12px;margin-top:4px}
+
+/* ═ v2.8 — مركز التطبيقات ونسبة الإنجاز ═ */
+.pbar{height:10px;background:var(--pss);border-radius:99px;overflow:hidden}
+.pbar span{display:block;height:100%;background:linear-gradient(90deg,var(--p),var(--pd));border-radius:99px;transition:width .4s ease}
+.pbar.big{height:16px}
+.pbar.sm{height:6px;margin:5px 0 3px}
+.kid.wide{grid-column:1/-1}
+.txt-bad{color:var(--bad)}
+.tl{display:flex;gap:12px;padding:10px 0;border-bottom:1px dashed var(--ln)}
+.tl:last-of-type{border-bottom:0}
+.tlv{min-width:64px;text-align:center;font-weight:800;font-size:13px;color:var(--pd);background:var(--ps);border-radius:10px;padding:6px 8px;height:fit-content}
+.tlb{flex:1;min-width:0}

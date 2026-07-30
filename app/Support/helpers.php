@@ -317,6 +317,68 @@ if (! function_exists('hub_expiry')) {
     }
 }
 
+if (! function_exists('hub_progress')) {
+    /**
+     * محرك نسبة الإنجاز لمشروع: خطة العمل (وزن×تقدم) 50٪ + المهام 30٪ + الاختبارات 20٪
+     * — يُعاد توزيع الأوزان عند غياب مكوّن. تُخبأ 10 دقائق وتُنسف عند حفظ مهمة/بند.
+     * يعيد: pct + تفصيل كل مكوّن (شفافية النسبة أمام الفريق).
+     */
+    function hub_progress(string $projectId, bool $fresh = false): array
+    {
+        $key = 'hub:progress:' . $projectId;
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
+
+        return \Illuminate\Support\Facades\Cache::remember($key, 600, function () use ($projectId) {
+            $db = \Illuminate\Support\Facades\DB::getFacadeRoot();
+
+            // ١) بنود الخطة: وزن × تقدم (الملغى لا يُحسب، المكتمل بلا نسبة = 100)
+            $feats = $db->table('plan_items')->whereNull('deleted_at')
+                ->where('project_id', $projectId)
+                ->where(fn ($w) => $w->whereNull('status')->orWhere('status', 'NOT LIKE', '%ملغ%'))
+                ->get(['weight', 'progress', 'status', 'test']);
+            $fw = 0.0; $fs = 0.0;
+            foreach ($feats as $f) {
+                $w = max(0.0, (float) ($f->weight ?: 1));
+                if ($w == 0.0) $w = 1.0;
+                $p = $f->progress !== null ? min(100, max(0, (float) $f->progress))
+                    : (\Illuminate\Support\Str::contains((string) $f->status, ['مكتمل', 'منجز']) ? 100.0 : 0.0);
+                $fw += $w; $fs += $w * $p;
+            }
+            $featsPct = $fw > 0 ? $fs / $fw : null;
+
+            // ٢) المهام: المغلقة = 100، المفتوحة بنسبتها (بحد 99) — الملغاة خارج الحساب
+            $tasks = $db->table('tasks')->whereNull('deleted_at')
+                ->where('project_id', $projectId)
+                ->where(fn ($w) => $w->whereNull('status')->orWhere('status', 'NOT LIKE', '%ملغ%'))
+                ->get(['status', 'progress']);
+            $tn = count($tasks); $ts = 0.0; $done = 0;
+            foreach ($tasks as $t) {
+                $closed = \Illuminate\Support\Str::contains((string) $t->status, ['مكتمل', 'منجز']);
+                if ($closed) { $done++; $ts += 100; }
+                else $ts += min(99, max(0, (float) ($t->progress ?? 0)));
+            }
+            $tasksPct = $tn > 0 ? $ts / $tn : null;
+
+            // ٣) الاختبارات: نسبة الناجح من البنود التي دخلت الاختبار أصلاً
+            $tested = collect($feats)->filter(fn ($f) => trim((string) $f->test) !== '' && $f->test !== '—');
+            $pass = $tested->filter(fn ($f) => \Illuminate\Support\Str::contains((string) $f->test, ['ناجح', 'مقبول', 'اجتاز']))->count();
+            $testsPct = $tested->count() ? $pass * 100.0 / $tested->count() : null;
+
+            // المزج بأوزان 50/30/20 مع إعادة التوزيع عند الغياب
+            $parts = [[$featsPct, .5], [$tasksPct, .3], [$testsPct, .2]];
+            $wsum = 0.0; $acc = 0.0;
+            foreach ($parts as [$p, $w]) if ($p !== null) { $wsum += $w; $acc += $p * $w; }
+
+            return [
+                'pct'   => $wsum > 0 ? (int) round($acc / $wsum) : null,
+                'feats' => ['pct' => $featsPct === null ? null : (int) round($featsPct), 'n' => count($feats)],
+                'tasks' => ['pct' => $tasksPct === null ? null : (int) round($tasksPct), 'done' => $done, 'total' => $tn],
+                'tests' => ['pct' => $testsPct === null ? null : (int) round($testsPct), 'pass' => $pass, 'n' => $tested->count()],
+            ];
+        });
+    }
+}
+
 if (! function_exists('hub_expiry_count')) {
     /** عدد التنبيهات (متأخر + خلال ٧ أيام) لجرس الشريط العلوي — بنطاق المستخدم */
     function hub_expiry_count($user = null): int

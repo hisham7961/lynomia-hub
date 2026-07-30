@@ -107,6 +107,7 @@ class ModuleController extends Controller
 
         $m->save();
         $this->notifyAssignee($def, $module, $m);
+        $this->bustProgress($module, $m);
 
         return redirect()->route('m.index', $module)->with('ok', 'أُضيف السجل بنجاح');
     }
@@ -173,6 +174,7 @@ class ModuleController extends Controller
         $this->fill($def, $r, $m);
         $m->save();
         $this->notifyAssignee($def, $module, $m, $prevAssignee);
+        $this->bustProgress($module, $m);
 
         return redirect()->route('m.index', $module)->with('ok', 'حُفظت التعديلات');
     }
@@ -233,6 +235,7 @@ class ModuleController extends Controller
         $m = $this->findScoped($class, $module, $id);
         $m->{$statusCol} = (string) $r->input('status');
         $m->save();
+        $this->bustProgress($module, $m);
 
         return response()->json(['ok' => 1]);
     }
@@ -280,6 +283,14 @@ class ModuleController extends Controller
     }
 
     /* ────────── أدوات داخلية ────────── */
+
+    /** نسف كاش نسبة الإنجاز عند تغيّر مهمة أو بند خطة */
+    protected function bustProgress(string $module, Model $m): void
+    {
+        if (in_array($module, ['tasks', 'feats'], true) && ($pid = $m->project_id ?? null)) {
+            \Illuminate\Support\Facades\Cache::forget('hub:progress:' . $pid);
+        }
+    }
 
     /** حقل المسؤول (assigneeId → users) إن وُجد في الوحدة */
     protected function assigneeField(array $def): ?array
