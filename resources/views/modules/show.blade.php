@@ -24,6 +24,23 @@
     @endif
 </div>
 <span data-recent data-title="{{ $def['label'] }}: {{ \Illuminate\Support\Str::limit($row->{hub_display_col($module)} ?? $row->id, 28) }}" hidden></span>
+
+{{-- ترويسة السجل: هوية الوحدة + الاسم كبيراً + شارة الحالة — تعرف ماذا تفتح من نظرة --}}
+@php
+    $look = hub_mod_look($module);
+    $rDisp = (string) ($row->{hub_display_col($module)} ?? $row->id);
+    $rStatus = ($def['status'] ?? null) ? ($row->{$def['status']} ?? null) : null;
+@endphp
+<div class="modhero" style="--mh:{{ $look['color'] }}">
+    <span class="mhico">{{ $look['icon'] }}</span>
+    <div style="min-width:0">
+        <div class="sub">{{ $def['label'] }}</div>
+        <h2 style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ \Illuminate\Support\Str::limit($rDisp, 70) }}</h2>
+    </div>
+    <div class="spacer"></div>
+    @if ($row->trashed())<span class="bdg bad">🗑 في السلة</span>
+    @elseif ($rStatus)<span class="bdg {{ hub_tone($rStatus) }}" style="font-size:12.5px;padding:5px 13px">{{ $rStatus }}</span>@endif
+</div>
 @if ($module === 'approvals')
     @include('partials.approval_exec')
 @endif

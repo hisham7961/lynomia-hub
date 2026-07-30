@@ -6,7 +6,7 @@
 @if (count($timeline))
     <div class="card">
         <h3>🧾 ما جرى على هذا السجل</h3>
-        <div class="tl">
+        <div class="tl tlv2">
             @foreach ($timeline as $e)
                 <div class="tlrow">
                     <span class="tlico">{{ $e['ico'] }}</span>
