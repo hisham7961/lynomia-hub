@@ -15,6 +15,7 @@ use App\Http\Controllers\Web\OpsController;
 use App\Http\Controllers\Web\FileController;
 use App\Http\Controllers\Web\FlowController;
 use App\Http\Controllers\Web\ImportController;
+use App\Http\Controllers\Web\InboxDocController;
 use App\Http\Controllers\Web\ModuleController;
 use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\OdooController;
@@ -58,6 +59,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('me', [PortalController::class, 'me'])->name('portal.me');
     Route::get('files/{path}', [FileController::class, 'show'])->name('file.show')->where('path', 'hub/.*');
+
+    // ── صندوق الوثائق الوارد ──
+    Route::get('inboxdocs', [InboxDocController::class, 'index'])->name('inboxdocs.index');
+    Route::post('inboxdocs', [InboxDocController::class, 'store'])->name('inboxdocs.store');
+    Route::post('inboxdocs/{id}/classify', [InboxDocController::class, 'classify'])->name('inboxdocs.classify');
+    Route::delete('inboxdocs/{id}', [InboxDocController::class, 'destroy'])->name('inboxdocs.destroy');
 
     // ── غرفة البيانات (الإدارة) ──
     Route::get('dataroom', [DataRoomController::class, 'index'])->name('dataroom.index');

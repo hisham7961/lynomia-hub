@@ -10,6 +10,7 @@
         <a class="ni top {{ request()->routeIs('dashboard') ? 'on' : '' }}" href="{{ route('dashboard') }}">لوحة التحكم</a>
         <a class="ni top {{ request()->routeIs('portal.me') ? 'on' : '' }}" href="{{ route('portal.me') }}">👤 بوابتي</a>
         <a class="ni top {{ request()->routeIs('feed') ? 'on' : '' }}" href="{{ route('feed') }}">📣 قناة الفريق</a>
+        <a class="ni top {{ request()->routeIs('inboxdocs.*') ? 'on' : '' }}" href="{{ route('inboxdocs.index') }}">📥 صندوق الوثائق</a>
         @php $xc = hub_expiry_count(); @endphp
         <a class="ni top {{ request()->routeIs('alerts') ? 'on' : '' }}" href="{{ route('alerts') }}">🔔 ينتهي قريباً @if ($xc)<span class="nbdg">{{ $xc }}</span>@endif</a>
         @if (hub_can(auth()->user(), 'fin', 'v'))
