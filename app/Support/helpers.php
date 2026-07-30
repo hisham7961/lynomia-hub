@@ -213,6 +213,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'alerts',    'label' => '🔔 ينتهي قريباً',     'route' => 'alerts',          'ok' => true],
             ['key' => 'finrep',    'label' => '📊 التقارير المالية', 'route' => 'reports.finance', 'ok' => hub_can($user, 'fin', 'v')],
             ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'ok' => $mon],
+            ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'ok' => $mon],
             ['key' => 'capacity',  'label' => '📊 القدرات والموارد', 'route' => 'capacity',        'ok' => $mon],
             ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'ok' => $mon],
             ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'ok' => $mon],
@@ -1230,5 +1231,128 @@ if (! function_exists('hub_bytes')) {
         }
 
         return number_format($b) . ' ب';
+    }
+}
+
+if (! function_exists('hub_cycle_monthly')) {
+    /** تطبيع مبلغ دورةٍ ما إلى شهري — «مرة واحدة» و«حسب الاستخدام» لا شهرية لهما فتعيد null */
+    function hub_cycle_monthly($amount, $cycle): ?float
+    {
+        if ($amount === null || $amount === '') return null;
+
+        return match ((string) $cycle) {
+            'سنوي' => (float) $amount / 12,
+            'نصف سنوي' => (float) $amount / 6,
+            'ربع سنوي' => (float) $amount / 3,
+            'مرة واحدة', 'حسب الاستخدام' => null,
+            default => (float) $amount,      // شهري أو غير محدد
+        };
+    }
+}
+
+if (! function_exists('hub_service_costs')) {
+    /**
+     * تحليل تكلفة الخدمات: لكل خدمة نشطة سعرها الشهري المكافئ مقابل كلفتها
+     * الشهرية الحقيقية = المعلنة + حصتها من سيرفرها (مقسومة على الخدمات
+     * المتشاركة فيه) + دومينها (سنوي ÷ ١٢) + اشتراكات الأدوات المطابقة بالاسم.
+     * ولكل باقة: هامشها من تكلفتها التقديرية وعمر آخر مراجعة سعر.
+     */
+    function hub_service_costs(bool $fresh = false): array
+    {
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget('svc:costs');
+
+        return \Illuminate\Support\Facades\Cache::remember('svc:costs', 300, function () {
+            $db = \Illuminate\Support\Facades\DB::class;
+            $norm = fn (?string $s) => mb_strtolower(trim(preg_replace('/\s+/u', ' ', (string) $s)));
+
+            $services = $db::table('services')->whereNull('deleted_at')
+                ->whereNotIn('status', hub_closed_states())->get();
+            $servers = $db::table('servers')->whereNull('deleted_at')->get(['id', 'cost', 'cycle'])->keyBy('id');
+            $domains = $db::table('domains')->whereNull('deleted_at')->get(['id', 'cost'])->keyBy('id');
+            $subs = $db::table('subscriptions')->whereNull('deleted_at')
+                ->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', ['ملغي', 'منتهي']))
+                ->get(['service', 'amount', 'cycle']);
+
+            // كم خدمة تتشارك السيرفر نفسه؟ حصة كلٍّ = كلفته ÷ عددها
+            $sharing = $services->whereNotNull('server_id')->countBy('server_id');
+
+            $rows = [];
+            foreach ($services as $s) {
+                $priceM = hub_cycle_monthly($s->price, $s->cycle);
+                $declared = $s->cost !== null ? (float) $s->cost : null;   // «تكلفة التشغيل الشهرية» شهرية أصلاً
+
+                $serverM = null; $serverShared = 0;
+                if ($s->server_id && ($sv = $servers[$s->server_id] ?? null) && $sv->cost !== null) {
+                    $serverShared = (int) ($sharing[$s->server_id] ?? 1);
+                    $whole = hub_cycle_monthly($sv->cost, $sv->cycle);
+                    $serverM = $whole !== null ? $whole / max(1, $serverShared) : null;
+                }
+
+                // الدومين: كلفة التسجيل سنوية بطبيعتها → ÷ ١٢
+                $domainM = ($s->domain_id && ($d = $domains[$s->domain_id] ?? null) && $d->cost !== null)
+                    ? (float) $d->cost / 12 : null;
+
+                // أدوات مطابقة بالاسم (يحوي أو يُحوى)
+                $tools = 0.0; $toolNames = [];
+                $sn = $norm($s->name);
+                if ($sn !== '') {
+                    foreach ($subs as $sub) {
+                        $bn = $norm($sub->service);
+                        if ($bn === '' || ($bn !== $sn && ! str_contains($bn, $sn) && ! str_contains($sn, $bn))) continue;
+                        $m = hub_cycle_monthly($sub->amount, $sub->cycle);
+                        if ($m !== null) { $tools += $m; $toolNames[] = trim((string) $sub->service); }
+                    }
+                }
+
+                $parts = array_filter([$declared, $serverM, $domainM, $tools ?: null], fn ($v) => $v !== null);
+                $costM = $parts ? round(array_sum($parts), 3) : null;
+                $margin = ($priceM !== null && $costM !== null) ? round($priceM - $costM, 3) : null;
+
+                $rows[] = [
+                    'id' => $s->id, 'name' => $s->name, 'kind' => $s->kind, 'status' => $s->status,
+                    'cycle' => $s->cycle, 'price' => $s->price !== null ? (float) $s->price : null,
+                    'priceM' => $priceM !== null ? round($priceM, 3) : null,
+                    'declared' => $declared,
+                    'serverM' => $serverM !== null ? round($serverM, 3) : null, 'serverShared' => $serverShared,
+                    'domainM' => $domainM !== null ? round($domainM, 3) : null,
+                    'toolsM' => $tools ? round($tools, 3) : null, 'toolNames' => array_values(array_unique($toolNames)),
+                    'costM' => $costM, 'margin' => $margin,
+                    'marginPct' => ($margin !== null && $priceM > 0) ? (int) round($margin / $priceM * 100) : null,
+                ];
+            }
+
+            // الباقات: الهامش من التكلفة التقديرية وعمر السعر
+            $plans = $db::table('pricing_plans')->whereNull('deleted_at')
+                ->whereNotIn('status', hub_closed_states())->get();
+            $svcNames = $services->pluck('name', 'id');
+            $planRows = [];
+            foreach ($plans as $p) {
+                $margin = ($p->price !== null && $p->unit_cost !== null) ? (float) $p->price - (float) $p->unit_cost : null;
+                $ageFrom = $p->price_changed_at ?: $p->effective_from;
+                $planRows[] = [
+                    'id' => $p->id, 'name' => $p->name, 'service' => $svcNames[$p->service_id] ?? null,
+                    'price' => $p->price !== null ? (float) $p->price : null, 'cycle' => $p->cycle,
+                    'currency' => $p->currency, 'unitCost' => $p->unit_cost !== null ? (float) $p->unit_cost : null,
+                    'free' => (bool) $p->free_tier, 'margin' => $margin,
+                    'marginPct' => ($margin !== null && (float) $p->price > 0) ? (int) round($margin / (float) $p->price * 100) : null,
+                    'priceAgeDays' => $ageFrom ? (int) \Illuminate\Support\Carbon::parse($ageFrom)->diffInDays(now()) : null,
+                ];
+            }
+
+            $withM = collect($rows)->filter(fn ($r) => $r['margin'] !== null);
+
+            return [
+                'rows' => collect($rows)->sortBy([['margin', 'asc']])->values()->all(),
+                'plans' => collect($planRows)->sortBy([['margin', 'asc']])->values()->all(),
+                'totals' => [
+                    'revenueM' => round((float) collect($rows)->sum(fn ($r) => $r['priceM'] ?? 0), 2),
+                    'costM' => round((float) collect($rows)->sum(fn ($r) => $r['costM'] ?? 0), 2),
+                    'underwater' => $withM->where('margin', '<', 0)->count(),
+                    'unpriced' => collect($rows)->whereNull('priceM')->count(),
+                    'uncosted' => collect($rows)->whereNull('costM')->count(),
+                    'plansUnder' => collect($planRows)->filter(fn ($p) => $p['margin'] !== null && $p['margin'] < 0 && ! $p['free'])->count(),
+                ],
+            ];
+        });
     }
 }

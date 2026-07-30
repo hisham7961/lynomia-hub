@@ -15,6 +15,14 @@ class CostController extends Controller
             403, 'لوحة التكاليف للمالكين ومن يحمل صلاحية المتابعة');
     }
 
+    /** تحليل تكلفة الخدمات والباقات */
+    public function services()
+    {
+        $this->gate();
+
+        return view('service_costs', ['d' => hub_service_costs((bool) request()->query('fresh'))]);
+    }
+
     public function index(Request $r)
     {
         $this->gate();

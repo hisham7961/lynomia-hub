@@ -86,6 +86,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('morning', [MorningController::class, 'index'])->name('morning');
     Route::get('costs', [CostController::class, 'index'])->name('costs.index');
+    Route::get('service-costs', [CostController::class, 'services'])->name('servicecosts');
     Route::get('capacity', [CapacityController::class, 'index'])->name('capacity');
     Route::get('impact', [CapacityController::class, 'impact'])->name('impact');
     Route::get('app-quality', [CapacityController::class, 'quality'])->name('appquality');
