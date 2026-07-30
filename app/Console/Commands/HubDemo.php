@@ -37,11 +37,16 @@ class HubDemo extends Command
         return self::SUCCESS;
     }
 
+    /**
+     * المسح بمسار JSON لا بـ LIKE على النص: عمود meta من نوع json، وMySQL يعيد
+     * صياغته عند التخزين («{"demo": 1}» بمسافة) فلا يطابق نمطاً نصياً كُتب بلا مسافة —
+     * فكان المسح يحذف صفراً على MySQL وتتضاعف البيانات التجريبية مع كل تصفير.
+     */
     protected function purge(): int
     {
         $n = 0;
         foreach (self::TABLES as $t) {
-            $n += DB::table($t)->where('meta', 'LIKE', '%"demo":1%')->delete();
+            $n += DB::table($t)->where('meta->demo', 1)->delete();
         }
 
         return $n;

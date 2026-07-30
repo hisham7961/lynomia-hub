@@ -97,8 +97,12 @@ class QualityController extends Controller
                         $moved += DB::table($md['table'])->where($f['col'], $dup->id)->update([$f['col'] => $keep->id]);
                     }
                 }
-                $moved += DB::table('comments')->where('module', 'clients')->where('record_id', $dup->id)
-                    ->update(['record_id' => $keep->id]);
+                // المرفقات الحيّة المشيرة للسجل بـ (وحدة + معرّف) خارج سجل الوحدات.
+                // نتعمّد استثناء التدقيق والإصدارات: تاريخٌ يبقى ملتصقاً بالسجل الأصلي.
+                foreach (['comments', 'inbox_documents'] as $t) {
+                    $moved += DB::table($t)->where('module', 'clients')->where('record_id', $dup->id)
+                        ->update(['record_id' => $keep->id]);
+                }
 
                 // ملء فراغات الأساسي من المدموج (لا استبدال لقيم موجودة)
                 foreach (['contact', 'email', 'phone', 'country', 'company_id', 'owner_id', 'source', 'notes'] as $col) {

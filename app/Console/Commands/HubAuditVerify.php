@@ -43,13 +43,17 @@ class HubAuditVerify extends Command
             }
 
             $row = $bucket->first();
-            $strong = hash('sha256', $prev . '|' . $row->canonical());
-            $old    = hash('sha256', $prev . '|' . $row->canonical(true));
 
-            if ($strong === $row->hash) {
-                // مختوم بالبصمة الكاملة
-            } elseif ($old === $row->hash) {
-                $weak++;                              // بصمة الجيل الأول: مقبولة لكنها لا تحمي IP/الجهاز
+            // ثلاث صياغات مقبولة، كلها تمثّل المحتوى نفسه:
+            //  v2    — الحالية (JSON موحّد الصياغة، يعمل على sqlite وMySQL معاً)
+            //  v2raw — سجلات كُتبت قبل توحيد صياغة JSON
+            //  v1    — سجلات قبل ضم الأعمدة الجنائية (تُحصى وتُحذَّر)
+            if (hash('sha256', $prev . '|' . $row->canonical()) === $row->hash) {
+                // مختوم بالبصمة الكاملة الحالية
+            } elseif (hash('sha256', $prev . '|' . $row->canonical('v2raw')) === $row->hash) {
+                // نفس التغطية، صياغة أقدم — يرقّيها reseal بلا ضجيج
+            } elseif (hash('sha256', $prev . '|' . $row->canonical('v1')) === $row->hash) {
+                $weak++;                              // بصمة الجيل الأول: لا تحمي IP/الجهاز
             } else {
                 $this->error("❌ سجل معدَّل بعد كتابته: {$row->id} ({$row->action} / {$row->module}) — التجزئة لا تطابق المحتوى");
                 return self::FAILURE;

@@ -46,15 +46,44 @@ class AuditEntry extends Model
 
     /**
      * البصمة القانونية: الحقول الجوهرية بترتيب ثابت — تُعاد للتحقق لاحقاً كما هي.
-     * القيم تؤخذ خاماً كما ستُخزن (JSON نصي للمصفوفات) فتتطابق بعد القراءة من القاعدة.
+     *
+     * `before` و`after` عمودا json، وMySQL يعيد صياغة المستند عند التخزين (مسافات
+     * وترميز يونيكود وترتيب مفاتيح)، فبصمة تُحسب على النص الخام تنجح على sqlite
+     * وتفشل على MySQL فيصرخ التحقق «معدَّل» على قاعدة سليمة تماماً. لذا يُعاد ترميز
+     * الوثيقة صياغةً موحّدة (مفاتيح مرتبة، بلا هروب) فتتطابق على المحركين.
+     *
+     * @param string $mode  v2 (الحالية) · v2raw (نص خام — لسجلات كُتبت قبل التوحيد) · v1 (بلا الأعمدة الجنائية)
      */
-    public function canonical(bool $legacy = false): string
+    public function canonical(string $mode = 'v2'): string
     {
         $raw = $this->getAttributes();
+        $keys = $mode === 'v1' ? self::SEALED_V1 : self::SEALED;
+        $norm = $mode === 'v2';
 
-        return ($legacy ? '' : 'v2|') . implode('|', array_map(
-            fn ($k) => $k . '=' . (string) ($raw[$k] ?? ''),
-            $legacy ? self::SEALED_V1 : self::SEALED
+        return ($mode === 'v1' ? '' : 'v2|') . implode('|', array_map(
+            fn ($k) => $k . '=' . ($norm ? self::sealValue($k, $raw[$k] ?? '') : (string) ($raw[$k] ?? '')),
+            $keys
         ));
+    }
+
+    /** صياغة موحّدة لأعمدة JSON — أي تمثيل للوثيقة نفسها يعطي النص نفسه */
+    protected static function sealValue(string $key, $value): string
+    {
+        if (! in_array($key, ['before', 'after'], true) || $value === null || $value === '') {
+            return (string) $value;
+        }
+
+        $data = is_string($value) ? json_decode($value, true) : $value;
+        if (! is_array($data)) return (string) $value;
+
+        self::ksortDeep($data);
+
+        return (string) json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    protected static function ksortDeep(array &$a): void
+    {
+        ksort($a);
+        foreach ($a as &$v) if (is_array($v)) self::ksortDeep($v);
     }
 }

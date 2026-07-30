@@ -120,7 +120,7 @@ class AuditFindingsTest extends TestCase
 
         // إعادة ختم صف بالبصمة القديمة كما كانت تكتبها النسخة السابقة
         $row = AuditEntry::whereNotNull('hash')->orderBy('created_at')->first();
-        $legacy = hash('sha256', $row->prev_hash . '|' . $row->canonical(true));
+        $legacy = hash('sha256', $row->prev_hash . '|' . $row->canonical('v1'));
         $prev = $legacy;
         DB::table('audits')->where('id', $row->id)->update(['hash' => $legacy]);
         foreach (AuditEntry::whereNotNull('hash')->orderBy('created_at')->get()->skip(1) as $next) {

@@ -27,7 +27,9 @@ class WebhookDispatcher
     public static function fire(string $event, string $module, Model $m, ?string $statusTo = null): void
     {
         try {
-            $hooks = Webhook::where('active', true)->get()->filter->deliverable();
+            // يشمل الموقوف مؤقتاً عمداً: الإيقاف تباعدٌ آلي لا إلغاء اشتراك، فأحداثه
+            // تُصفّ بموعد ما بعد الإيقاف بدل أن تضيع. أما المعطَّل يدوياً فقرار صريح فتُهمل أحداثه.
+            $hooks = Webhook::where('active', true)->get();
             if ($hooks->isEmpty()) return;
 
             $name = $module . '.' . $event;
@@ -39,9 +41,11 @@ class WebhookDispatcher
             $eventId = (string) Str::uuid();
 
             foreach ($hooks as $h) {
+                $paused = $h->paused_until && $h->paused_until->isFuture();
                 WebhookDelivery::create([
                     'webhook_id' => $h->id, 'event' => $name, 'event_id' => $eventId,
                     'payload' => $payload, 'state' => 'queued', 'created_at' => now(),
+                    'next_at' => $paused ? $h->paused_until : null,
                 ]);
             }
         } catch (\Throwable $e) {
@@ -71,6 +75,18 @@ class WebhookDispatcher
             'at'        => now()->toIso8601String(),
             'data'      => $data,
         ];
+    }
+
+    /**
+     * كتابة حالة التسليم مباشرةً بالاستعلام لا بالنموذج.
+     * السبب: عامل التسليم يحجز الصف بتحديث مباشر إلى «sending»، فتصير حالة النموذج
+     * في الذاكرة مخالفة لما في القاعدة، وأي قيمة تُعاد لأصلها (queued ← queued)
+     * تبدو «غير متسخة» فيتخطاها save() ويبقى الصف عالقاً في sending.
+     */
+    protected static function persist(WebhookDelivery $d, array $attrs): void
+    {
+        WebhookDelivery::whereKey($d->id)->update($attrs);
+        $d->forceFill($attrs)->syncOriginal();
     }
 
     /**
@@ -104,8 +120,8 @@ class WebhookDispatcher
         $ms = (int) round((microtime(true) - $t0) * 1000);
 
         if ($ok) {
-            $d->forceFill(['state' => 'sent', 'tries' => $d->tries + 1, 'next_at' => null,
-                           'code' => $code, 'ms' => $ms, 'error' => null, 'delivered_at' => now()])->save();
+            self::persist($d, ['state' => 'sent', 'tries' => $d->tries + 1, 'next_at' => null,
+                               'code' => $code, 'ms' => $ms, 'error' => null, 'delivered_at' => now()]);
             $h->forceFill(['fail_streak' => 0, 'paused_until' => null, 'runs' => $h->runs + 1,
                            'last_at' => now(), 'last_ok' => true])->save();
 
@@ -114,11 +130,11 @@ class WebhookDispatcher
 
         $tries = $d->tries + 1;
         $retry = $tries <= count(self::BACKOFF);
-        $d->forceFill([
+        self::persist($d, [
             'state' => $retry ? 'queued' : 'failed', 'tries' => $tries,
             'next_at' => $retry ? now()->addMinutes(self::BACKOFF[$tries - 1]) : null,
             'code' => $code, 'ms' => $ms, 'error' => $err,
-        ])->save();
+        ]);
 
         $streak = $h->fail_streak + 1;
         $h->forceFill([

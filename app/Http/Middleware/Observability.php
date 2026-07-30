@@ -21,8 +21,12 @@ class Observability
         if (method_exists($response, 'header')) $response->header('X-Request-Id', $rid);
 
         $ms = (int) ((microtime(true) - $start) * 1000);
-        if ($ms > 1000 && ! $request->is('files/*', 'storage/*')) {
-            ErrorLog::capture('slow', 'طلب بطيء (' . $ms . 'ms): ' . $request->method() . ' ' . $request->path());
+        $limit = max(50, (int) setting('ops.slow_ms', 1000));   // عتبة البطء قابلة للضبط من الإعدادات
+        if ($ms > $limit && ! $request->is('files/*', 'storage/*')) {
+            // المدة تُقرَّب لمرتبة: لو دخلت الرسالةَ بالمللي ثانية لصار كل طلب بطيء
+            // صفاً فريداً — فيغرق مركز الأخطاء بدل أن يعدّ تكرار البطء نفسه.
+            $tier = $ms >= 30000 ? '>30ث' : ($ms >= 10000 ? '>10ث' : ($ms >= 3000 ? '>3ث' : '>ثانية'));
+            ErrorLog::capture('slow', 'طلب بطيء (' . $tier . '): ' . $request->method() . ' ' . $request->path());
         }
 
         return $response;

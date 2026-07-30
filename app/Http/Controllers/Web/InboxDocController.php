@@ -75,10 +75,20 @@ class InboxDocController extends Controller
         if ($module && filled($d['record'] ?? null)) {
             $def = hub_mod($module);
             $disp = hub_display_col($module);
-            $hits = \Illuminate\Support\Facades\DB::table($def['table'])->whereNull('deleted_at')
-                ->where($disp, 'LIKE', '%' . trim($d['record']) . '%')->limit(2)->get(['id', $disp . ' as n']);
+            $term = trim($d['record']);
+            $base = fn () => \Illuminate\Support\Facades\DB::table($def['table'])->whereNull('deleted_at');
+
+            // تهريب محارف LIKE: بدونه يطابق «%» كل السجلات فتُربط الوثيقة بسجل عشوائي
+            $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $term) . '%';
+
+            // التطابق التام يفوز أولاً — وإلا تعذّر تصنيف «شركة النور» لمجرد وجود «شركة النور الثانية»
+            $hits = $base()->where($disp, $term)->limit(2)->get(['id', $disp . ' as n']);
+            if ($hits->isEmpty()) {
+                $hits = $base()->where($disp, 'LIKE', $like)->limit(3)->get(['id', $disp . ' as n']);
+            }
+
             if ($hits->isEmpty()) return back()->withErrors(['record' => 'لا سجل بهذا الاسم في الوحدة المختارة']);
-            if ($hits->count() > 1) return back()->withErrors(['record' => 'الاسم يطابق أكثر من سجل — كن أدق (وجدنا: ' . $hits->pluck('n')->implode('، ') . ')']);
+            if ($hits->count() > 1) return back()->withErrors(['record' => 'الاسم يطابق أكثر من سجل — اكتب الاسم كاملاً (وجدنا: ' . $hits->pluck('n')->implode('، ') . ')']);
             $recordId = $hits->first()->id;
         }
 
