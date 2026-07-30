@@ -132,6 +132,38 @@ class BoardController extends Controller
         return back()->with('ok', 'أُضيفت الودجة');
     }
 
+    /**
+     * حفظ التخطيط: الترتيب والعرض والارتفاع دفعةً واحدة.
+     *
+     * الترتيب يُؤخذ من ترتيب `order[]` كما وصل — فسحبُ العنصر في المتصفح يعيد ترتيب
+     * الحقول المخفية، ولا حاجة لحقل موضعٍ يُحرَّر بيد المستخدم. والمعرِّفات تُصفّى على
+     * ودجات هذه اللوحة وحدها، فمعرِّفٌ من لوحة أخرى يسقط بلا أثر.
+     */
+    public function saveLayout(Request $r, string $id)
+    {
+        $b = $this->owned($id);
+        $d = $r->validate([
+            'order'   => ['nullable', 'array'],
+            'order.*' => ['string'],
+            'w'       => ['nullable', 'array'],
+            'w.*'     => ['integer', 'min:3', 'max:12'],
+            'h'       => ['nullable', 'array'],
+            'h.*'     => ['integer', 'min:1', 'max:6'],
+        ]);
+
+        $mine = $b->widgets()->pluck('id')->all();
+        $order = array_values(array_intersect($d['order'] ?? [], $mine));
+
+        foreach ($order as $i => $wid) {
+            $w = ['y' => $i, 'x' => 0];
+            if (isset($d['w'][$wid])) $w['w'] = (int) $d['w'][$wid];
+            if (isset($d['h'][$wid])) $w['h'] = (int) $d['h'][$wid];
+            DashboardWidget::where('dashboard_id', $b->id)->where('id', $wid)->update($w);
+        }
+
+        return back()->with('ok', 'حُفظ التخطيط');
+    }
+
     public function removeWidget(string $id, string $widgetId)
     {
         $b = $this->owned($id);

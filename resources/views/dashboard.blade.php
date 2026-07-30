@@ -19,17 +19,14 @@
 </div>
 
 @if ($board)
-    {{-- لوحة مبنيّة: ودجاتها بترتيبها المحفوظ، وكل ودجة مرّت ببوابتها قبل الوصول هنا --}}
-    @foreach ($layout as $w)
-        @if (in_array($w['key'], ['counts', 'kpis'], true))
-            @include('partials.widgets.' . $w['key'], ['data' => $w['data']])
-        @endif
-    @endforeach
-    <div class="kids">
+    {{-- لوحة مبنيّة: ودجاتها بترتيبها وعرضها المحفوظين.
+         بطاقات العدّ ومؤشرات KPI صفوفٌ كاملة بطبعها فتُثبَّت على العرض الكامل. --}}
+    <div class="bgrid">
         @foreach ($layout as $w)
-            @unless (in_array($w['key'], ['counts', 'kpis'], true))
+            @php $span = in_array($w['key'], ['counts', 'kpis'], true) ? 12 : (int) $w['w']; @endphp
+            <div class="bcell" style="--w:{{ max(3, min(12, $span)) }}">
                 @include('partials.widgets.' . $w['key'], ['data' => $w['data']])
-            @endunless
+            </div>
         @endforeach
     </div>
     @if (! count($layout))

@@ -79,6 +79,7 @@ Route::middleware('auth')->group(function () {
     Route::get('boards/{id}', [BoardController::class, 'edit'])->name('boards.edit');
     Route::put('boards/{id}', [BoardController::class, 'update'])->name('boards.update');
     Route::delete('boards/{id}', [BoardController::class, 'destroy'])->name('boards.destroy');
+    Route::put('boards/{id}/layout', [BoardController::class, 'saveLayout'])->name('boards.layout');
     Route::post('boards/{id}/widgets', [BoardController::class, 'addWidget'])->name('boards.widget.add');
     Route::delete('boards/{id}/widgets/{widgetId}', [BoardController::class, 'removeWidget'])->name('boards.widget.remove');
     Route::get('me', [PortalController::class, 'me'])->name('portal.me');

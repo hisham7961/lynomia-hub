@@ -19,22 +19,49 @@
 
 <div class="kids" style="margin-top:12px">
     <div class="card kid">
-        <h3>ودجات اللوحة</h3>
-        <table class="mini">
-            @forelse ($board->widgets as $w)
-                <tr>
-                    <td>{{ \App\Support\WidgetRegistry::labels()[$w->widget_key] ?? $w->widget_key }}</td>
-                    <td style="width:1%">
-                        <form method="POST" action="{{ route('boards.widget.remove', [$board->id, $w->id]) }}">
-                            @csrf @method('DELETE')<button class="btn ghost xs">إزالة</button>
-                        </form>
-                    </td>
-                </tr>
-            @empty
-                <tr><td class="empty">لا ودجات بعد — أضف من القائمة المجاورة</td></tr>
-            @endforelse
-        </table>
+        <h3>ودجات اللوحة <span class="sub" style="font-weight:400">اسحب لإعادة الترتيب</span></h3>
+        <form method="POST" action="{{ route('boards.layout', $board->id) }}" id="layoutform">
+            @csrf @method('PUT')
+            <ul class="wlist" id="wlist">
+                @foreach ($board->widgets as $w)
+                    <li class="witem" draggable="true" data-id="{{ $w->id }}">
+                        <input type="hidden" name="order[]" value="{{ $w->id }}">
+                        <span class="grip" aria-hidden="true">⠿</span>
+                        <span class="wname">{{ \App\Support\WidgetRegistry::labels()[$w->widget_key] ?? $w->widget_key }}</span>
+                        <label class="sub">العرض
+                            <select class="inp xs" name="w[{{ $w->id }}]">
+                                @foreach ([3 => 'ربع', 4 => 'ثلث', 6 => 'نصف', 8 => 'ثلثان', 12 => 'كامل'] as $v => $t)
+                                    <option value="{{ $v }}" @selected((int) $w->w === $v)>{{ $t }}</option>
+                                @endforeach
+                            </select></label>
+                        <label class="sub">الطول
+                            <select class="inp xs" name="h[{{ $w->id }}]">
+                                @foreach ([1 => 'قصير', 2 => 'عادي', 3 => 'طويل', 4 => 'أطول'] as $v => $t)
+                                    <option value="{{ $v }}" @selected((int) $w->h === $v)>{{ $t }}</option>
+                                @endforeach
+                            </select></label>
+                        <span class="wmove">
+                            <button type="button" class="btn ghost xs" data-move="up" aria-label="أعلى">▲</button>
+                            <button type="button" class="btn ghost xs" data-move="down" aria-label="أسفل">▼</button>
+                        </span>
+                        {{-- النموذج خارج نموذج التخطيط، والزر يرتبط به بالسمة form --}}
+                        <button class="btn ghost xs" form="rm-{{ $w->id }}"
+                                onclick="return confirm('إزالة هذه الودجة من اللوحة؟')">إزالة</button>
+                    </li>
+                @endforeach
+            </ul>
+            @if ($board->widgets->count())
+                <button class="btn" style="margin-top:10px">حفظ التخطيط</button>
+            @else
+                <div class="empty">لا ودجات بعد — أضف من القائمة المجاورة</div>
+            @endif
+        </form>
     </div>
+
+    @foreach ($board->widgets as $w)
+        <form method="POST" action="{{ route('boards.widget.remove', [$board->id, $w->id]) }}"
+              id="rm-{{ $w->id }}" hidden>@csrf @method('DELETE')</form>
+    @endforeach
 
     <div class="card kid">
         <h3>ودجات متاحة</h3>

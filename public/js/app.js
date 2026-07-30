@@ -285,3 +285,72 @@
     bar.remove();
   });
 })();
+
+/* باني اللوحات: إعادة ترتيب الودجات سحباً، وبأزرار أعلى/أسفل لمن لا يسحب.
+   الترتيب يُقرأ من ترتيب حقول order[] في الصفحة، فلا حقل موضعٍ يُحرَّر بيد أحد. */
+(function () {
+  var list = document.getElementById('wlist');
+  if (!list) return;
+
+  var dragged = null;
+
+  function items() {
+    return Array.prototype.slice.call(list.querySelectorAll('.witem'));
+  }
+
+  function markDirty() {
+    var f = document.getElementById('layoutform');
+    if (f) f.classList.add('dirty');
+  }
+
+  list.addEventListener('dragstart', function (e) {
+    var li = e.target.closest ? e.target.closest('.witem') : null;
+    if (!li) return;
+    dragged = li;
+    li.classList.add('drag');
+    try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ''); } catch (x) {}
+  });
+
+  list.addEventListener('dragend', function () {
+    if (dragged) dragged.classList.remove('drag');
+    items().forEach(function (i) { i.classList.remove('over'); });
+    dragged = null;
+  });
+
+  list.addEventListener('dragover', function (e) {
+    if (!dragged) return;
+    e.preventDefault();
+    var li = e.target.closest ? e.target.closest('.witem') : null;
+    if (!li || li === dragged) return;
+    items().forEach(function (i) { if (i !== li) i.classList.remove('over'); });
+    li.classList.add('over');
+
+    // النصف الأعلى ⇒ قبله، والأسفل ⇒ بعده
+    var r = li.getBoundingClientRect();
+    var before = (e.clientY - r.top) < r.height / 2;
+    list.insertBefore(dragged, before ? li : li.nextSibling);
+  });
+
+  list.addEventListener('drop', function (e) {
+    e.preventDefault();
+    items().forEach(function (i) { i.classList.remove('over'); });
+    markDirty();
+  });
+
+  // بديلٌ يعمل باللمس ولوحة المفاتيح — السحب وحده يُقصي من لا يستطيعه
+  list.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-move]') : null;
+    if (!b) return;
+    var li = b.closest('.witem');
+    if (!li) return;
+    if (b.getAttribute('data-move') === 'up' && li.previousElementSibling) {
+      list.insertBefore(li, li.previousElementSibling);
+    } else if (b.getAttribute('data-move') === 'down' && li.nextElementSibling) {
+      list.insertBefore(li.nextElementSibling, li);
+    }
+    markDirty();
+    b.focus();
+  });
+
+  list.addEventListener('change', markDirty);
+})();

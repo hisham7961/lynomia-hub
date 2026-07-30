@@ -215,4 +215,101 @@ class DashboardBuilderTest extends TestCase
         $this->actingAs($this->owner->fresh())->get('/')
             ->assertOk()->assertDontSee('آخر النشاطات');
     }
+
+    /* ── ٦ب: حفظ التخطيط ── */
+
+    public function test_layout_save_reorders_and_resizes(): void
+    {
+        $this->seedCore();
+        $b = Dashboard::create(['name' => 'لوحة', 'owner_id' => $this->owner->id]);
+        $a1 = DashboardWidget::create(['dashboard_id' => $b->id, 'widget_key' => 'audits', 'y' => 0, 'w' => 6, 'h' => 2]);
+        $a2 = DashboardWidget::create(['dashboard_id' => $b->id, 'widget_key' => 'donut',  'y' => 1, 'w' => 4, 'h' => 2]);
+
+        // الترتيب معكوس، والعرض والطول جديدان
+        $this->actingAs($this->owner)->put("/boards/{$b->id}/layout", [
+            'order' => [$a2->id, $a1->id],
+            'w' => [$a2->id => 12, $a1->id => 3],
+            'h' => [$a2->id => 1,  $a1->id => 4],
+        ])->assertRedirect();
+
+        $this->assertSame(0, (int) $a2->fresh()->y);
+        $this->assertSame(1, (int) $a1->fresh()->y);
+        $this->assertSame(12, (int) $a2->fresh()->w);
+        $this->assertSame(3, (int) $a1->fresh()->w);
+        $this->assertSame(4, (int) $a1->fresh()->h);
+    }
+
+    /** الترتيب المحفوظ هو ما يُعرض */
+    public function test_saved_order_drives_the_rendered_layout(): void
+    {
+        $this->seedCore();
+        $b = Dashboard::create(['name' => 'لوحة', 'owner_id' => $this->owner->id]);
+        $a = DashboardWidget::create(['dashboard_id' => $b->id, 'widget_key' => 'audits', 'y' => 0]);
+        $d = DashboardWidget::create(['dashboard_id' => $b->id, 'widget_key' => 'donut', 'y' => 1]);
+
+        $keys = fn () => collect($this->actingAs($this->owner)->get('/?d=' . $b->id)
+            ->original->getData()['layout'])->pluck('key')->all();
+        $this->assertSame(['audits', 'donut'], $keys());
+
+        $this->actingAs($this->owner)->put("/boards/{$b->id}/layout", ['order' => [$d->id, $a->id]]);
+        $this->assertSame(['donut', 'audits'], $keys());
+    }
+
+    /** معرِّف ودجة من لوحة أخرى يسقط بلا أثر — لا يُحرَّك ولا يُحجَّم */
+    public function test_layout_save_ignores_widgets_from_another_board(): void
+    {
+        $this->seedCore();
+        $mine = Dashboard::create(['name' => 'لوحتي', 'owner_id' => $this->owner->id]);
+        $w1 = DashboardWidget::create(['dashboard_id' => $mine->id, 'widget_key' => 'audits', 'y' => 0, 'w' => 6]);
+
+        $other = Dashboard::create(['name' => 'لوحة أخرى', 'owner_id' => $this->employee->id]);
+        $foreign = DashboardWidget::create(['dashboard_id' => $other->id, 'widget_key' => 'donut', 'y' => 7, 'w' => 4]);
+
+        $this->actingAs($this->owner)->put("/boards/{$mine->id}/layout", [
+            'order' => [$foreign->id, $w1->id],
+            'w' => [$foreign->id => 12, $w1->id => 3],
+        ])->assertRedirect();
+
+        $this->assertSame(7, (int) $foreign->fresh()->y, 'ودجة لوحة أخرى تحرّكت');
+        $this->assertSame(4, (int) $foreign->fresh()->w, 'ودجة لوحة أخرى تحجّمت');
+        $this->assertSame(0, (int) $w1->fresh()->y);
+        $this->assertSame(3, (int) $w1->fresh()->w);
+    }
+
+    public function test_layout_save_rejects_out_of_range_sizes(): void
+    {
+        $this->seedCore();
+        $b = Dashboard::create(['name' => 'لوحة', 'owner_id' => $this->owner->id]);
+        $w = DashboardWidget::create(['dashboard_id' => $b->id, 'widget_key' => 'audits', 'w' => 6, 'h' => 2]);
+
+        $this->actingAs($this->owner)->put("/boards/{$b->id}/layout", [
+            'order' => [$w->id], 'w' => [$w->id => 99],
+        ])->assertSessionHasErrors('w.' . $w->id);
+
+        $this->assertSame(6, (int) $w->fresh()->w);
+    }
+
+    public function test_another_user_cannot_save_your_layout(): void
+    {
+        $this->seedCore();
+        $b = Dashboard::create(['name' => 'لوحتي', 'owner_id' => $this->owner->id]);
+        $w = DashboardWidget::create(['dashboard_id' => $b->id, 'widget_key' => 'audits', 'y' => 0, 'w' => 6]);
+
+        $this->actingAs($this->employee)->put("/boards/{$b->id}/layout", [
+            'order' => [$w->id], 'w' => [$w->id => 12],
+        ])->assertNotFound();
+
+        $this->assertSame(6, (int) $w->fresh()->w);
+    }
+
+    /** العرض المحفوظ يصل إلى الصفحة فعلاً */
+    public function test_saved_width_reaches_the_rendered_page(): void
+    {
+        $this->seedCore();
+        $b = Dashboard::create(['name' => 'لوحة', 'owner_id' => $this->owner->id]);
+        DashboardWidget::create(['dashboard_id' => $b->id, 'widget_key' => 'audits', 'y' => 0, 'w' => 4, 'h' => 2]);
+
+        $this->actingAs($this->owner)->get('/?d=' . $b->id)
+            ->assertOk()->assertSee('--w:4', false);
+    }
 }
