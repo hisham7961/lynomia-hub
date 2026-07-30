@@ -215,6 +215,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'finrep',    'label' => '📊 التقارير المالية', 'route' => 'reports.finance', 'ok' => hub_can($user, 'fin', 'v')],
             ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'ok' => $mon],
             ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'ok' => $mon],
+            ['key' => 'recs',      'label' => '💡 مركز التوصيات',    'route' => 'recs',            'ok' => $mon],
             ['key' => 'capacity',  'label' => '📊 القدرات والموارد', 'route' => 'capacity',        'ok' => $mon],
             ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'ok' => $mon],
             ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'ok' => $mon],
@@ -1352,6 +1353,129 @@ if (! function_exists('hub_service_costs')) {
                     'unpriced' => collect($rows)->whereNull('priceM')->count(),
                     'uncosted' => collect($rows)->whereNull('costM')->count(),
                     'plansUnder' => collect($planRows)->filter(fn ($p) => $p['margin'] !== null && $p['margin'] < 0 && ! $p['free'])->count(),
+                ],
+            ];
+        });
+    }
+}
+
+if (! function_exists('hub_recommendations')) {
+    /**
+     * مركز التوصيات: يجمع إشاراتٍ قابلة للتنفيذ من محرّكات النظام القائمة —
+     * خدمات تحت الماء، فريق فوق طاقته، مشاريع متعثرة، تطبيقات كثيرة الأعطال،
+     * انتهاءات وشيكة، مستحقات غير محصّلة. كلها من بياناتك المسجَّلة لا من تقدير،
+     * وكل توصية تحمل سببها بالأرقام ورابط إجرائها. مرتّبة بالأولوية.
+     */
+    function hub_recommendations(bool $fresh = false): array
+    {
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget('recs');
+
+        return \Illuminate\Support\Facades\Cache::remember('recs', 300, function () {
+            $rank = ['حرج' => 3, 'مهم' => 2, 'اطّلاع' => 1];
+            $out = [];
+            $add = function ($sev, $ico, $title, $why, $url, $action) use (&$out) {
+                $out[] = compact('sev', 'ico', 'title', 'why', 'url', 'action');
+            };
+
+            // ١) خدمات تبيع بأقل من كلفتها
+            try {
+                $svc = hub_service_costs();
+                foreach (array_slice(array_filter($svc['rows'], fn ($r) => $r['margin'] !== null && $r['margin'] < 0), 0, 5) as $s) {
+                    $add('حرج', '🌊', 'خدمة تبيع بخسارة: ' . $s['name'],
+                        'سعرها الشهري ' . number_format((float) $s['priceM'], 1) . ' وكلفتها ' . number_format((float) $s['costM'], 1)
+                        . ' — هامش ' . number_format((float) $s['margin'], 1) . ' شهرياً. راجع السعر أو الكلفة.',
+                        route('m.show', ['services', $s['id']]), 'راجع الخدمة');
+                }
+                if (($svc['totals']['unpriced'] ?? 0) > 0) {
+                    $add('اطّلاع', '🏷️', ($svc['totals']['unpriced']) . ' خدمة بلا سعر شهري',
+                        'لا يمكن قياس ربحيتها حتى تُسعّرها. سجّل أسعارها لتظهر في تحليل التكلفة.',
+                        route('servicecosts'), 'افتح تحليل التكلفة');
+                }
+            } catch (\Throwable $e) {}
+
+            // ٢) فريق فوق طاقته هذا الأسبوع
+            try {
+                $cap = hub_capacity();
+                $over = array_filter($cap['rows'], fn ($r) => ($r['load'] ?? 0) > 100);
+                usort($over, fn ($a, $b) => $b['load'] <=> $a['load']);
+                foreach (array_slice($over, 0, 4) as $r) {
+                    $add('مهم', '🔥', 'فوق طاقته: ' . $r['name'],
+                        'حمله ' . $r['load'] . '٪ — محجوز ' . $r['booked'] . ' ساعة على متاح ' . $r['available']
+                        . '. أجّل أو وزّع أو وظّف.',
+                        route('capacity'), 'افتح لوحة القدرات');
+                }
+            } catch (\Throwable $e) {}
+
+            // ٣) مشاريع متعثرة الصحة
+            try {
+                $projects = \Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at')
+                    ->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', hub_closed_states()))
+                    ->limit(40)->get(['id', 'name']);
+                $sick = [];
+                foreach ($projects as $p) {
+                    $h = hub_project_health($p->id);
+                    if (($h['score'] ?? 100) < 55) $sick[] = ['p' => $p, 'h' => $h];
+                }
+                usort($sick, fn ($a, $b) => $a['h']['score'] <=> $b['h']['score']);
+                foreach (array_slice($sick, 0, 5) as $s) {
+                    $add($s['h']['score'] < 40 ? 'حرج' : 'مهم', '🩺', 'مشروع متعثر: ' . $s['p']->name,
+                        'صحته ' . $s['h']['score'] . '/١٠٠ (' . ($s['h']['label'] ?? '') . '). راجع عوامل التعثر في صفحته.',
+                        route('m.show', ['projects', $s['p']->id]), 'افتح المشروع');
+                }
+            } catch (\Throwable $e) {}
+
+            // ٤) تطبيقات كثيرة الأخطاء الحرجة أو التراجع عن النشر
+            try {
+                foreach (hub_app_quality() as $a) {
+                    if (($a['critBugs'] ?? 0) >= 1) {
+                        $add('حرج', '🐞', 'أخطاء حرجة مفتوحة: ' . $a['name'],
+                            $a['critBugs'] . ' خطأ حرج مفتوح' . (($a['openBugs'] ?? 0) ? ' من ' . $a['openBugs'] . ' مفتوح' : '') . '. عالجها قبل النشر القادم.',
+                            route('appquality'), 'افتح جودة البرمجيات');
+                    } elseif (($a['rollback'] ?? null) !== null && $a['rollback'] > 20) {
+                        $add('مهم', '↩️', 'نشر غير مستقر: ' . $a['name'],
+                            'معدل التراجع ' . $a['rollback'] . '٪ من ' . ($a['deploys'] ?? 0) . ' نشرة. راجع جودة الإصدارات قبل الدفع.',
+                            route('appquality'), 'افتح جودة البرمجيات');
+                    }
+                }
+            } catch (\Throwable $e) {}
+
+            // ٥) مستحقات غير محصّلة قديمة
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('fin_documents')) {
+                    $overdue = \Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at')
+                        ->where('kind', 'فاتورة')
+                        ->whereRaw('COALESCE(paid,0) < COALESCE(total,0)')
+                        ->whereNotNull('due')->whereDate('due', '<', now()->toDateString())
+                        ->orderBy('due')->limit(6)->get(['id', 'doc_no', 'partner', 'total', 'paid', 'due']);
+                    foreach ($overdue as $d) {
+                        $rem = (float) ($d->total ?? 0) - (float) ($d->paid ?? 0);
+                        $days = (int) \Illuminate\Support\Carbon::parse($d->due)->diffInDays(now());
+                        $add($days > 60 ? 'حرج' : 'مهم', '💸', 'مستحق متأخر: ' . ($d->partner ?: ($d->doc_no ?: 'فاتورة')),
+                            'باقٍ ' . number_format($rem, 1) . ' متأخر ' . $days . ' يوماً. تابع التحصيل.',
+                            route('m.show', ['fin', $d->id]), 'افتح الفاتورة');
+                    }
+                }
+            } catch (\Throwable $e) {}
+
+            // ٦) انتهاءات وشيكة (٧ أيام)
+            try {
+                $soon = collect(hub_expiry())->filter(fn ($i) => ($i['days'] ?? 99) <= 7)->take(6);
+                foreach ($soon as $i) {
+                    $add($i['days'] < 0 ? 'حرج' : 'مهم', '⏳', 'ينتهي قريباً: ' . $i['name'],
+                        $i['mlabel'] . ' · ' . $i['flabel'] . ' — ' . ($i['days'] < 0 ? 'متأخر' : ($i['days'] === 0 ? 'اليوم' : 'خلال ' . $i['days'] . ' يوم')) . '.',
+                        route('m.show', [$i['module'], $i['id']]), 'افتح السجل');
+                }
+            } catch (\Throwable $e) {}
+
+            // الترتيب: الأشد أولاً، وضمن الدرجة يبقى ترتيب الاكتشاف
+            usort($out, fn ($a, $b) => ($rank[$b['sev']] ?? 0) <=> ($rank[$a['sev']] ?? 0));
+
+            return [
+                'items'  => $out,
+                'counts' => [
+                    'حرج'    => count(array_filter($out, fn ($r) => $r['sev'] === 'حرج')),
+                    'مهم'    => count(array_filter($out, fn ($r) => $r['sev'] === 'مهم')),
+                    'اطّلاع' => count(array_filter($out, fn ($r) => $r['sev'] === 'اطّلاع')),
                 ],
             ];
         });

@@ -33,6 +33,14 @@ class CapacityController extends Controller
         return view('quality_apps', ['apps' => hub_app_quality((bool) request()->query('fresh'))]);
     }
 
+    /** مركز التوصيات: إشارات قابلة للتنفيذ مجموعة من محرّكات النظام */
+    public function recommendations()
+    {
+        $this->gate();
+
+        return view('recommendations', ['r' => hub_recommendations((bool) request()->query('fresh'))]);
+    }
+
     /**
      * خريطة الأثر: تُقلب سجل الاعتماديات رأساً على عقب —
      * بدل «على ماذا يعتمد نظامي» تعرض «ماذا يسقط إن سقط هذا العنصر».

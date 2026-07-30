@@ -92,6 +92,7 @@ Route::middleware('auth')->group(function () {
     Route::get('capacity', [CapacityController::class, 'index'])->name('capacity');
     Route::get('impact', [CapacityController::class, 'impact'])->name('impact');
     Route::get('app-quality', [CapacityController::class, 'quality'])->name('appquality');
+    Route::get('recommendations', [CapacityController::class, 'recommendations'])->name('recs');
 
     // ── صندوق الوثائق الوارد ──
     Route::get('inboxdocs', [InboxDocController::class, 'index'])->name('inboxdocs.index');
