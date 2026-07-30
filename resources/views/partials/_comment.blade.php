@@ -65,7 +65,7 @@
             <form method="POST" action="{{ route('comments.task', $c->id) }}">@csrf<button class="lnk sub" type="submit">→ مهمة</button></form>
         @endif
         @if ($c->user_id === auth()->id() || hub_is_owner())
-            <form method="POST" action="{{ route('comments.destroy', $c->id) }}" onsubmit="return confirm('حذف التعليق؟')">@csrf @method('DELETE')<button class="lnk sub" type="submit">حذف</button></form>
+            <form method="POST" action="{{ route('comments.destroy', $c->id) }}" data-confirm="حذف التعليق؟">@csrf @method('DELETE')<button class="lnk sub" type="submit">حذف</button></form>
         @endif
     </div>
     @if ($depth === 0 && $c->relationLoaded('replies'))

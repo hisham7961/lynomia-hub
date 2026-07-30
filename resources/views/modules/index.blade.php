@@ -29,7 +29,7 @@
                     <a href="{{ $v->url() }}" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ $v->is_default ? '⭐ ' : '' }}{{ $v->name }}</a>
                     <form method="POST" action="{{ route('views.default', $v->id) }}" class="inline">@csrf
                         <button class="btn ghost xs" title="{{ $v->is_default ? 'إلغاء الافتراضي' : 'اجعله الافتراضي — يُفتح تلقائياً' }}">{{ $v->is_default ? '★' : '☆' }}</button></form>
-                    <form method="POST" action="{{ route('views.destroy', $v->id) }}" class="inline" onsubmit="return confirm('حذف هذا العرض؟')">
+                    <form method="POST" action="{{ route('views.destroy', $v->id) }}" class="inline" data-confirm="حذف هذا العرض؟">
                         @csrf @method('DELETE')<button class="btn ghost xs" aria-label="حذف العرض {{ $v->name }}">✕</button></form>
                 </div>
             @empty
@@ -76,7 +76,7 @@
         <a class="btn ghost sm" href="{{ route('m.import', $module) }}">📥 استيراد</a>
     @endif
     @if (! $trash && hub_can(auth()->user(), $module, 'a'))
-        <a class="btn p sm" id="newbtn" href="{{ route('m.create', $module) }}" onclick="return Hub.modal(this.href)">＋ جديد <span class="kbd">n</span></a>
+        <a class="btn p sm" id="newbtn" href="{{ route('m.create', $module) }}">＋ جديد <span class="kbd">n</span></a>
     @endif
 </div>
 <div id="tblzone" hx-boost="true" hx-target="#tblzone" hx-select="#tblzone" hx-swap="outerHTML"
@@ -112,9 +112,9 @@
                         @if ($trash)
                             <form method="POST" action="{{ route('m.restore', [$module, $row->id]) }}" class="inline">@csrf<button class="btn xs" type="submit">استعادة</button></form>
                         @else
-                            @if (hub_can(auth()->user(), $module, 'e'))<a class="btn ghost xs" href="{{ route('m.edit', [$module, $row->id]) }}" onclick="return Hub.modal(this.href)">تعديل</a>@endif
+                            @if (hub_can(auth()->user(), $module, 'e'))<a class="btn ghost xs" href="{{ route('m.edit', [$module, $row->id]) }}">تعديل</a>@endif
                             @if (hub_can(auth()->user(), $module, 'd'))
-                                <form method="POST" action="{{ route('m.destroy', [$module, $row->id]) }}" class="inline" onsubmit="return confirm('نقل السجل إلى السلة؟')">@csrf @method('DELETE')<button class="btn ghost xs dn" type="submit">حذف</button></form>
+                                <form method="POST" action="{{ route('m.destroy', [$module, $row->id]) }}" class="inline" data-confirm="نقل السجل إلى السلة؟">@csrf @method('DELETE')<button class="btn ghost xs dn" type="submit">حذف</button></form>
                             @endif
                         @endif
                     </td>
@@ -123,7 +123,7 @@
                 <tr><td colspan="{{ count($columns) + 1 }}" class="empty">
                     <span class="big">{{ $trash ? '🗑' : '📄' }}</span>
                     {{ $trash ? 'السلة فارغة' : (request('q') ? 'لا نتائج للبحث' : 'لا سجلات بعد') }}
-                    @if (! $trash && ! request('q') && hub_can(auth()->user(), $module, 'a'))<div style="margin-top:10px"><a class="btn p sm" href="{{ route('m.create', $module) }}" onclick="return Hub.modal(this.href)">أضف أول سجل</a></div>@endif
+                    @if (! $trash && ! request('q') && hub_can(auth()->user(), $module, 'a'))<div style="margin-top:10px"><a class="btn p sm" href="{{ route('m.create', $module) }}">أضف أول سجل</a></div>@endif
                 </td></tr>
             @endforelse
             </tbody>

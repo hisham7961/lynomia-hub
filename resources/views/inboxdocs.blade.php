@@ -51,7 +51,7 @@
                 @endif
             </div>
             @if (hub_is_owner())
-                <form method="POST" action="{{ route('inboxdocs.destroy', $doc->id) }}" onsubmit="return confirm('حذف الوثيقة؟')">
+                <form method="POST" action="{{ route('inboxdocs.destroy', $doc->id) }}" data-confirm="حذف الوثيقة؟">
                     @csrf @method('DELETE')<button class="btn ghost xs" style="color:var(--bad)">🗑</button>
                 </form>
             @endif

@@ -274,15 +274,15 @@ if (! function_exists('hub_top_groups')) {
             ->reject(fn ($l) => in_array($l['key'], $hidden, true))
             ->groupBy('group');
 
+        // مجموعتان لا ثلاث: «المراكز المتخصّصة» ضُمّت للتحليلات — تخفيفاً للعجقة
         $defs = [
-            ['key' => 'daily',     'label' => 'مساحتي اليومية',     'icon' => '🧭', 'open' => true],
-            ['key' => 'analytics', 'label' => 'التحليلات واللوحات',  'icon' => '📊', 'open' => false],
-            ['key' => 'centers',   'label' => 'مراكز متخصّصة',       'icon' => '🎯', 'open' => false],
+            ['key' => ['daily'],                'label' => 'مساحتي اليومية',    'icon' => '🧭', 'open' => true],
+            ['key' => ['analytics', 'centers'], 'label' => 'اللوحات والمراكز',  'icon' => '📊', 'open' => false],
         ];
 
         $out = [];
         foreach ($defs as $d) {
-            $items = $links->get($d['key'], collect())->values()->all();
+            $items = collect($d['key'])->flatMap(fn ($k) => $links->get($k, collect()))->values()->all();
             if ($items) $out[] = $d + ['items' => $items];
         }
 

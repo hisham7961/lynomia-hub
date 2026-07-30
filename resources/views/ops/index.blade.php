@@ -64,7 +64,7 @@
             <tr><td>طلبات بطيئة (> ثانية)</td><td style="width:1%"><b>{{ $errs['slow'] }}</b></td></tr>
             <tr><td>أخطاء API</td><td style="width:1%"><b>{{ $errs['api'] }}</b></td></tr>
         </table>
-        <form method="POST" action="{{ route('ops.testerror') }}" style="margin-top:10px" onsubmit="return confirm('توليد خطأ تجريبي للتحقق من الالتقاط؟')">
+        <form method="POST" action="{{ route('ops.testerror') }}" style="margin-top:10px" data-confirm="توليد خطأ تجريبي للتحقق من الالتقاط؟">
             @csrf<button class="btn ghost xs">🧪 توليد خطأ تجريبي</button>
         </form>
     </div>
@@ -80,7 +80,7 @@
                 @foreach ($pending as $m)<li>{{ $m }}</li>@endforeach
             </ul>
             <form method="POST" action="{{ route('ops.migrate') }}"
-                  onsubmit="return confirm('تشغيل الترحيلات المعلقة على قاعدة البيانات الآن؟ (الترحيلات إضافية غير مدمرة)')">
+                  data-confirm="تشغيل الترحيلات المعلقة على قاعدة البيانات الآن؟ (الترحيلات إضافية غير مدمرة)">
                 @csrf<button class="btn xs">🛢️ تشغيل الترحيلات الآن</button>
             </form>
         @else
@@ -98,7 +98,7 @@
             الإعدادات والمسارات والقوالب المجمّعة وكاش البيانات، دفعةً واحدة.
         </div>
         <form method="POST" action="{{ route('ops.clearcache') }}"
-              onsubmit="return confirm('مسح كاش النظام كله الآن؟ (آمن — يُعاد بناؤه تلقائياً)')">
+              data-confirm="مسح كاش النظام كله الآن؟ (آمن — يُعاد بناؤه تلقائياً)">
             @csrf<button class="btn ghost xs">🧹 مسح الكاش الآن</button>
         </form>
     </div>
@@ -110,7 +110,7 @@
             {{ setting('demo.on') ? 'مفعّل الآن، صفّره أو أنهه من الشريط العلوي.' : 'غير مفعّل.' }}
         </div>
         @if (! setting('demo.on'))
-            <form method="POST" action="{{ route('demo.reset') }}" onsubmit="return confirm('توليد بيانات تجريبية وهمية؟ تُمسح كلها بزر الإنهاء.')">
+            <form method="POST" action="{{ route('demo.reset') }}" data-confirm="توليد بيانات تجريبية وهمية؟ تُمسح كلها بزر الإنهاء.">
                 @csrf<button class="btn ghost xs">🎭 تفعيل الوضع التجريبي</button>
             </form>
         @endif

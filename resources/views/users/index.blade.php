@@ -20,7 +20,7 @@
                 <td class="acts">
                     <a class="btn ghost xs" href="{{ route('users.edit', $u) }}">تعديل</a>
                     @if ($u->id !== auth()->id())
-                        <form class="inline" method="POST" action="{{ route('users.destroy', $u) }}" onsubmit="return confirm('حذف المستخدم؟')">@csrf @method('DELETE')<button class="btn ghost xs dn">حذف</button></form>
+                        <form class="inline" method="POST" action="{{ route('users.destroy', $u) }}" data-confirm="حذف المستخدم؟">@csrf @method('DELETE')<button class="btn ghost xs dn">حذف</button></form>
                     @endif
                 </td>
             </tr>

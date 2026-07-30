@@ -21,7 +21,8 @@
             </div>
             @if ($a->uploaded_by === auth()->id() || hub_is_owner() || hub_can(auth()->user(), $aModule, 'e'))
                 <form method="POST" action="{{ route('att.destroy', $a->id) }}" class="inline"
-                      onsubmit="return confirm('حذف المرفق «' + {{ \Illuminate\Support\Js::from(\Illuminate\Support\Str::limit($a->original_name, 40)) }} + '»؟')">
+                      {{-- الاسم في سمة HTML مُهرَّبة — لا سياق JS فلا صنف الحقن القديم أصلاً --}}
+                      data-confirm="حذف المرفق «{{ \Illuminate\Support\Str::limit($a->original_name, 40) }}»؟">
                     @csrf @method('DELETE')
                     <button class="btn ghost xs" aria-label="حذف المرفق {{ $a->original_name }}">حذف</button>
                 </form>

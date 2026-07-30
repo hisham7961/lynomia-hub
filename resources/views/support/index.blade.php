@@ -7,7 +7,7 @@
         <div class="sub">طابور التذاكر بمؤقتات SLA — قواعد الاستجابة والحل تُضبط من الإعدادات (sla.rules)</div>
     </div>
     @if (hub_can(auth()->user(), 'tickets', 'a'))
-        <a class="btn p sm" href="{{ route('m.create', 'tickets') }}" onclick="return Hub.modal(this.href)">＋ تذكرة</a>
+        <a class="btn p sm" href="{{ route('m.create', 'tickets') }}">＋ تذكرة</a>
     @endif
 </div>
 

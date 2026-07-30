@@ -89,10 +89,10 @@
                         @if ($t->scopes)<div class="sub">🔬 نطاقات: <span class="mono ltr" style="font-size:10.5px">{{ \Illuminate\Support\Str::limit($t->scopes, 45) }}</span></div>@endif
                         @if ($t->allowed_ips)<div class="sub">📍 IP: <span class="mono ltr" style="font-size:10.5px">{{ \Illuminate\Support\Str::limit($t->allowed_ips, 45) }}</span></div>@endif</td>
                     <td style="width:1%;white-space:nowrap">
-                        <form class="inline" method="POST" action="{{ route('profile.token.rotate', $t->id) }}" onsubmit="return confirm('تدوير المفتاح؟ القيمة القديمة ستتوقف فوراً وتحصل على قيمة جديدة بنفس النطاقات.')">
+                        <form class="inline" method="POST" action="{{ route('profile.token.rotate', $t->id) }}" data-confirm="تدوير المفتاح؟ القيمة القديمة ستتوقف فوراً وتحصل على قيمة جديدة بنفس النطاقات.">
                             @csrf<button class="btn ghost xs">🔄 تدوير</button>
                         </form>
-                        <form class="inline" method="POST" action="{{ route('profile.token.revoke', $t->id) }}" onsubmit="return confirm('إبطال المفتاح؟ التطبيقات المستخدمة له ستتوقف.')">
+                        <form class="inline" method="POST" action="{{ route('profile.token.revoke', $t->id) }}" data-confirm="إبطال المفتاح؟ التطبيقات المستخدمة له ستتوقف.">
                             @csrf @method('DELETE')<button class="btn ghost xs" style="color:var(--bad)">إبطال</button>
                         </form></td>
                 </tr>
@@ -126,7 +126,7 @@
                 @csrf
                 <div class="crow">
                     <input class="inp ltr @error('code') err @enderror" name="code" placeholder="رمز التطبيق الحالي" maxlength="6" inputmode="numeric" style="max-width:170px" required>
-                    <button class="btn ghost sm" type="submit" onclick="return confirm('تعطيل المصادقة الثنائية؟')">تعطيل</button>
+                    <button class="btn ghost sm" type="submit" data-confirm="تعطيل المصادقة الثنائية؟">تعطيل</button>
                 </div>
                 @error('code')<span class="ferr">{{ $message }}</span>@enderror
             </form>

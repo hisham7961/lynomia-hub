@@ -6,7 +6,7 @@
     <div class="sub">اسحب أي بطاقة إلى عمود آخر لتغيير حالتها فوراً</div>
     <div class="spacer"></div>
     @if (hub_can(auth()->user(), $module, 'a'))
-        <a class="btn p sm" href="{{ route('m.create', $module) }}" onclick="return Hub.modal(this.href)">＋ جديد</a>
+        <a class="btn p sm" href="{{ route('m.create', $module) }}">＋ جديد</a>
     @endif
 </div>
 <div class="kanban" data-kanban data-url="{{ route('m.status', [$module, '__ID__']) }}" data-can="{{ hub_can(auth()->user(), $module, 'e') ? 1 : 0 }}">

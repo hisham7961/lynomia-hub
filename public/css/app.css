@@ -259,19 +259,20 @@ input.inp.htmx-request{background-image:linear-gradient(90deg,transparent,color-
 .bell{position:relative}
 .bell .gsr{inset-inline-start:auto;inset-inline-end:0;min-width:300px;max-width:350px;max-height:60vh;overflow:auto}
 
-/* ═ قائمة الترس ⚙️ — النظام والإدارة في البار العلوي ═ */
-.gearmenu{position:relative}
-.gearmenu summary{list-style:none;user-select:none}
-.gearmenu summary::-webkit-details-marker{display:none}
-.gearmenu summary.on{border-color:var(--p);color:var(--p);font-weight:700}
-.gearbox{position:absolute;top:calc(100% + 8px);inset-inline-end:0;min-width:220px;max-height:70vh;overflow:auto;
-  background:var(--cd);border:1px solid var(--ln);border-radius:14px;box-shadow:var(--shh);z-index:50;
-  padding:6px;animation:pop .16s ease}
-.gi{display:flex;gap:9px;align-items:center;padding:8px 12px;font-size:13px;color:var(--tx);border-radius:9px;
-  transition:background var(--t)}
-.gi:hover{background:color-mix(in srgb,var(--p) 8%,transparent)}
-.gi.on{background:var(--p);color:#fff;font-weight:700}
-html[data-theme="dark"] .gearbox{background:var(--cd)}
+/* ═ زر التأكيد داخل الصفحة — يتحول لسؤال تحذيري بدل منبثقة المتصفح ═ */
+.confirming{background:var(--bad)!important;border-color:var(--bad)!important;color:#fff!important;
+  font-weight:700;animation:pop .16s ease}
+.confirming b{text-decoration:underline}
+
+/* ═ شريط الإدارة — ظاهرٌ دائماً تحت البار العلوي، أقسامه بفواصل ═ */
+.adminbar{display:flex;flex-wrap:wrap;align-items:center;gap:3px 5px;padding:5px 18px;font-size:12px;
+  background:color-mix(in srgb,var(--cd) 55%,transparent);border-bottom:1px solid var(--ln)}
+.adminbar a{padding:3px 10px;border-radius:99px;color:var(--tx);border:1px solid transparent;
+  white-space:nowrap;transition:background var(--t),border-color var(--t)}
+.adminbar a:hover{background:color-mix(in srgb,var(--p) 8%,transparent);border-color:var(--ln)}
+.adminbar a.on{background:var(--p);color:#fff;font-weight:700}
+.adminbar .sep{width:1px;height:14px;background:var(--ln);margin:0 3px;flex-shrink:0}
+@media print{.adminbar{display:none!important}}
 
 /* ═ النوافذ المنبثقة ═ */
 .modal{position:fixed;inset:0;background:color-mix(in srgb,#03110D 55%,transparent);backdrop-filter:blur(4px);

@@ -33,7 +33,7 @@ class PersonalizeTest extends TestCase
     {
         $this->seedCore();
         $this->employee->update(['prefs' => [
-            'nav' => ['hidden' => ['competitors'], 'names' => ['clients' => 'الزبائن'], 'order' => ['المالية']],
+            'nav' => ['hidden' => ['competitors'], 'names' => ['clients' => 'الزبائن'], 'order' => ['المالية والمشتريات']],
         ]]);
 
         $nav = hub_nav($this->employee->fresh());
@@ -44,7 +44,7 @@ class PersonalizeTest extends TestCase
         $labels = collect($nav)->flatMap(fn ($g) => collect($g['items'])->pluck('label', 'key'));
         $this->assertSame('الزبائن', $labels['clients']);
 
-        $this->assertSame('المالية', $nav[0]['g'], 'المجموعة المختارة أولاً تتقدم');
+        $this->assertSame('المالية والمشتريات', $nav[0]['g'], 'المجموعة المختارة أولاً تتقدم');
     }
 
     public function test_hiding_is_display_only_not_permission(): void

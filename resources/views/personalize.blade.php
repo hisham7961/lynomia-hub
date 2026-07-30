@@ -9,7 +9,7 @@
             <b>الإخفاء تنظيمٌ للعرض لا صلاحية</b> — ما تخفيه يبقى متاحاً بالرابط المباشر والبحث.
         </div>
     </div>
-    <form method="POST" action="{{ route('prefs.reset') }}" onsubmit="return confirm('مسح كل تخصيصك والعودة للافتراضي؟')">
+    <form method="POST" action="{{ route('prefs.reset') }}" data-confirm="مسح كل تخصيصك والعودة للافتراضي؟">
         @csrf<button class="btn ghost sm">↺ الضبط الافتراضي</button>
     </form>
 </div>

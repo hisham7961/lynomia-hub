@@ -17,10 +17,10 @@
         <a class="btn ghost sm" href="{{ route('journey', $row->id) }}">🧭 رحلة العميل</a>
     @endif
     @if (hub_can(auth()->user(), $module, 'a'))
-        <a class="btn ghost sm" href="{{ route('m.create', [$module, 'from' => $row->id]) }}" onclick="return Hub.modal(this.href)">⎘ نسخ كسجل جديد</a>
+        <a class="btn ghost sm" href="{{ route('m.create', [$module, 'from' => $row->id]) }}">⎘ نسخ كسجل جديد</a>
     @endif
     @if (hub_can(auth()->user(), $module, 'e') && ! $row->trashed())
-        <a class="btn p sm" href="{{ route('m.edit', [$module, $row->id]) }}" onclick="return Hub.modal(this.href)">تعديل</a>
+        <a class="btn p sm" href="{{ route('m.edit', [$module, $row->id]) }}">تعديل</a>
     @endif
 </div>
 <span data-recent data-title="{{ $def['label'] }}: {{ \Illuminate\Support\Str::limit($row->{hub_display_col($module)} ?? $row->id, 28) }}" hidden></span>
@@ -77,7 +77,7 @@
                 <span class="sub">{{ $verUsers[$v->changed_by] ?? '—' }}</span>
                 <span class="spacer"></span>
                 @if (! $loop->first && hub_can(auth()->user(), $module, 'e') && ! $row->trashed())
-                    <form method="POST" action="{{ route('m.version.restore', [$module, $row->id, $v->version]) }}" class="inline" onsubmit="return confirm('استعادة النسخة {{ $v->version }}؟ الحالية تُحفظ قبلها.')">
+                    <form method="POST" action="{{ route('m.version.restore', [$module, $row->id, $v->version]) }}" class="inline" data-confirm="استعادة النسخة {{ $v->version }}؟ الحالية تُحفظ قبلها.">
                         @csrf<button class="btn ghost xs">استعادة</button>
                     </form>
                 @endif

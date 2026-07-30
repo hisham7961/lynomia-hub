@@ -37,7 +37,7 @@
                 <span class="spacer"></span>
                 @if ($canE)
                     <form method="POST" action="{{ route('odoo.refresh', [$module, $row->id]) }}">@csrf<button class="btn ghost xs">🔄 تحديث الآن</button></form>
-                    <form method="POST" action="{{ route('odoo.unlink', [$module, $row->id]) }}" onsubmit="return confirm('فك ربط هذا السجل بأودو؟')">@csrf<button class="btn ghost xs" style="color:var(--bad)">فك الربط</button></form>
+                    <form method="POST" action="{{ route('odoo.unlink', [$module, $row->id]) }}" data-confirm="فك ربط هذا السجل بأودو؟">@csrf<button class="btn ghost xs" style="color:var(--bad)">فك الربط</button></form>
                 @endif
             </div>
         @elseif (! $opid)

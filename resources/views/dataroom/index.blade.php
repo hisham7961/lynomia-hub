@@ -58,7 +58,7 @@
                     @else<span class="bdg ok">نشط</span>@endif</td>
                 <td class="acts">
                     @unless ($dead)
-                        <form method="POST" action="{{ route('dataroom.revoke', $l->id) }}" onsubmit="return confirm('إلغاء الرابط فوراً؟ لا يمكن التراجع.')">
+                        <form method="POST" action="{{ route('dataroom.revoke', $l->id) }}" data-confirm="إلغاء الرابط فوراً؟ لا يمكن التراجع.">
                             @csrf<button class="btn ghost xs" style="color:var(--bad)">إلغاء</button>
                         </form>
                     @endunless

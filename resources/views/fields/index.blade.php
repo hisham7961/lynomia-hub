@@ -29,7 +29,7 @@
                     <td><b>{{ $f['label'] }}</b> @if (! empty($f['required']))<span class="req">*</span>@endif
                         <div class="sub">{{ $types[$f['type']] ?? $f['type'] }}{{ ($f['type'] ?? '') === 'ref' ? ' ← ' . ($refs[$f['ref']] ?? $f['ref']) : '' }}{{ ! empty($f['options']) ? ': ' . implode('، ', $f['options']) : '' }} · <span class="mono ltr">{{ $f['key'] }}</span></div></td>
                     <td style="width:1%">
-                        <form method="POST" action="{{ route('fields.destroy', [$module, $f['key']]) }}" onsubmit="return confirm('حذف الحقل من النماذج؟ القيم المخزنة تبقى.')">
+                        <form method="POST" action="{{ route('fields.destroy', [$module, $f['key']]) }}" data-confirm="حذف الحقل من النماذج؟ القيم المخزنة تبقى.">
                             @csrf @method('DELETE')<button class="btn ghost xs" style="color:var(--bad)">حذف</button>
                         </form></td>
                 </tr>

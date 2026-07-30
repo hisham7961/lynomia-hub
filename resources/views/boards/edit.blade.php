@@ -46,7 +46,7 @@
                         </span>
                         {{-- النموذج خارج نموذج التخطيط، والزر يرتبط به بالسمة form --}}
                         <button class="btn ghost xs" form="rm-{{ $w->id }}"
-                                onclick="return confirm('إزالة هذه الودجة من اللوحة؟')">إزالة</button>
+                                data-confirm="إزالة هذه الودجة من اللوحة؟">إزالة</button>
                     </li>
                 @endforeach
             </ul>
@@ -85,9 +85,8 @@
 
 <div class="card" style="margin-top:12px">
     <form method="POST" action="{{ route('boards.destroy', $board->id) }}"
-          {{-- الاسم يُمرَّر مُرمَّزاً JSON: `{{ }}` وحدها تُحوّل ' إلى &#039; ثم يفكّها
-               المتصفح قبل محلّل JS، فيخرج الاسمُ من السلسلة. --}}
-          onsubmit="return confirm('حذف اللوحة «' + {{ \Illuminate\Support\Js::from(\Illuminate\Support\Str::limit($board->name, 40)) }} + '»؟')">
+          {{-- الاسم في سمة HTML مُهرَّبة — لا سياق JS فلا صنف الحقن القديم أصلاً --}}
+          data-confirm="حذف اللوحة «{{ \Illuminate\Support\Str::limit($board->name, 40) }}»؟">
         @csrf @method('DELETE')<button class="btn ghost xs">🗑️ حذف اللوحة</button>
     </form>
 </div>

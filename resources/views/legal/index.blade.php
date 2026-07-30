@@ -7,7 +7,7 @@
         <div class="sub">العقود والرخص والعلامات والتأمين والالتزامات — والتجديدات قبل فوات أوانها</div>
     </div>
     @if (hub_can(auth()->user(), 'contracts', 'a'))
-        <a class="btn p sm" href="{{ route('m.create', 'contracts') }}" onclick="return Hub.modal(this.href)">＋ مستند قانوني</a>
+        <a class="btn p sm" href="{{ route('m.create', 'contracts') }}">＋ مستند قانوني</a>
     @endif
 </div>
 
@@ -38,7 +38,7 @@
                     </td>
                     <td style="width:1%">
                         @if (hub_can(auth()->user(), 'contracts', 'e'))
-                            <a class="btn ghost xs" href="{{ route('m.edit', ['contracts', $c->id]) }}" onclick="return Hub.modal(this.href)">تجديد/تعديل</a>
+                            <a class="btn ghost xs" href="{{ route('m.edit', ['contracts', $c->id]) }}">تجديد/تعديل</a>
                         @endif
                     </td>
                 </tr>

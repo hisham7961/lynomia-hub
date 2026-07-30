@@ -14,14 +14,15 @@ use Tests\TestCase;
  */
 class NavAndFlowsStarterTest extends TestCase
 {
-    /** المالك يجد روابط الإدارة في قائمة الترس، والجانبي بلا قسم «النظام» */
-    public function test_admin_links_moved_to_topbar_gear(): void
+    /** روابط الإدارة ظاهرة دائماً في شريطٍ تحت البار العلوي — لا خلف زر */
+    public function test_admin_links_always_visible_in_adminbar(): void
     {
         $this->seedCore();
         $html = $this->actingAs($this->owner)->get('/')->assertOk()->getContent();
 
-        $this->assertStringContainsString('gearmenu', $html);
-        foreach (['الإعدادات', 'مسارات العمل', 'مركز الأمان', 'سجل التدقيق', 'التخصيص'] as $l) {
+        $this->assertStringContainsString('class="adminbar"', $html);
+        $this->assertStringNotContainsString('gearmenu', $html);
+        foreach (['⚙️ الإعدادات', '🪄 المسارات', '🛡️ الأمان', '🕘 التدقيق', '🎛️ التخصيص'] as $l) {
             $this->assertStringContainsString($l, $html);
         }
         // الجانبي تخفف: لا قسم «النظام» فيه بعد اليوم
@@ -30,14 +31,48 @@ class NavAndFlowsStarterTest extends TestCase
         $this->assertStringContainsString('data-nav=', $html);
     }
 
-    /** الموظف (غير المالك) لا يرى روابط لا تخصه في قائمة الترس */
-    public function test_gear_menu_respects_permissions(): void
+    /** الموظف (غير المالك) لا يرى في شريط الإدارة روابط لا تخصه */
+    public function test_adminbar_respects_permissions(): void
     {
         $this->seedCore();
         $html = $this->actingAs($this->employee)->get('/')->assertOk()->getContent();
 
-        $this->assertStringNotContainsString('مركز الأمان', $html);
+        $this->assertStringNotContainsString('🛡️ الأمان', $html);
         $this->assertStringNotContainsString('href="' . route('settings.edit') . '"', $html);
+    }
+
+    /** الدمج: مجموعات الجانبي ٧ للوحدات ومجموعتان للأدوات — والوحدات المنقولة في أهلها */
+    public function test_sidebar_groups_are_merged(): void
+    {
+        $this->seedCore();
+        $this->assertCount(7, config('hub_nav'));
+        $this->assertCount(2, hub_top_groups($this->owner));
+
+        $fin = collect(config('hub_nav'))->firstWhere('g', 'المالية والمشتريات');
+        foreach (['suppliers', 'purchases', 'subs'] as $k) $this->assertContains($k, $fin['items']);
+        $dig = collect(config('hub_nav'))->firstWhere('g', 'الأصول الرقمية');
+        $this->assertContains('vault', $dig['items']);
+        // لا وحدة ضاعت في الدمج
+        $all = collect(config('hub_nav'))->flatMap(fn ($g) => $g['items']);
+        $this->assertSame($all->count(), $all->unique()->count());
+        foreach (['files', 'kb', 'fin', 'tasks'] as $k) $this->assertContains($k, $all->all());
+    }
+
+    /** لا منبثقات: النماذج الحرجة تحمل data-confirm (تأكيد داخل الصفحة) لا confirm() */
+    public function test_no_browser_popups_remain(): void
+    {
+        $this->seedCore();
+        $p = \App\Models\Project::create(['name' => 'م']);
+        $t = \App\Models\Task::create(['title' => 'مهمة', 'project_id' => $p->id]);
+
+        $html = $this->actingAs($this->owner)->get('/m/tasks')->assertOk()->getContent();
+        $this->assertStringNotContainsString('Hub.modal(this.href)', $html);
+        $this->assertStringNotContainsString('return confirm(', $html);
+        $this->assertStringContainsString('data-confirm=', $html);
+
+        $show = $this->actingAs($this->owner)->get("/m/tasks/{$t->id}")->assertOk()->getContent();
+        $this->assertStringNotContainsString('Hub.modal(this.href)', $show);
+        $this->assertStringNotContainsString('return confirm(', $show);
     }
 
     /** عدّة الانطلاق تُنشئ المسارات مرة واحدة — النداء الثاني لا يكرّر */

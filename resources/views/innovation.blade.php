@@ -5,7 +5,7 @@
     <a class="btn ghost sm" href="{{ route('m.index', 'ideas') }}">📋 كل الأفكار</a>
     <div class="spacer"></div>
     @if (hub_can(auth()->user(), 'ideas', 'a'))
-        <a class="btn p sm" href="{{ route('m.create', 'ideas') }}" onclick="return Hub.modal(this.href)">＋ فكرة جديدة</a>
+        <a class="btn p sm" href="{{ route('m.create', 'ideas') }}">＋ فكرة جديدة</a>
     @endif
 </div>
 <div class="hero">
@@ -42,7 +42,7 @@
             </div>
             @if (! $i->project_id && in_array($i->status, ['معتمدة', 'قيد التقييم'], true) && hub_can(auth()->user(), 'projects', 'a') && hub_can(auth()->user(), 'ideas', 'e'))
                 <form method="POST" action="{{ route('ideas.promote', $i->id) }}"
-                      onsubmit="return confirm('ترقية «' + {{ \Illuminate\Support\Js::from(\Illuminate\Support\Str::limit($i->title, 40)) }} + '» إلى مشروع؟')">
+                      data-confirm="ترقية «{{ \Illuminate\Support\Str::limit($i->title, 40) }}» إلى مشروع؟">
                     @csrf<button class="btn sm">🚀 رقِّ لمشروع</button>
                 </form>
             @endif

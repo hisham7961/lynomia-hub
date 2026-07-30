@@ -54,7 +54,7 @@
     @if ($pending && $canJudge && $target)
         <div class="crow" style="margin-top:12px">
             <form method="POST" action="{{ route('approvals.approve', $row->id) }}"
-                  onsubmit="return confirm('اعتماد العملية وتنفيذها الآن؟')">
+                  data-confirm="اعتماد العملية وتنفيذها الآن؟">
                 @csrf<button class="btn p sm" type="submit">✓ اعتماد وتنفيذ</button>
             </form>
             <form method="POST" action="{{ route('approvals.reject', $row->id) }}" style="display:flex;gap:6px">

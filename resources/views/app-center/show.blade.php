@@ -13,7 +13,7 @@
         </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-        @if (hub_can(auth()->user(), 'apps', 'e'))<a class="btn ghost sm" href="{{ route('m.edit', ['apps', $app->id]) }}" onclick="return Hub.modal(this.href)">✏️ تعديل</a>@endif
+        @if (hub_can(auth()->user(), 'apps', 'e'))<a class="btn ghost sm" href="{{ route('m.edit', ['apps', $app->id]) }}">✏️ تعديل</a>@endif
         <a class="btn ghost sm" href="{{ route('m.show', ['apps', $app->id]) }}">📄 كل الحقول</a>
     </div>
 </div>
@@ -53,7 +53,7 @@
     <div class="card kid wide">
         <h3>🚀 الإصدارات والتحديثات <span class="bdg g">{{ $releases->count() }}</span>
             @if (hub_can(auth()->user(), 'code', 'a'))
-                <a class="btn ghost xs" style="margin-inline-start:auto" href="{{ route('m.create', 'code') }}" onclick="return Hub.modal(this.href)">＋ إصدار جديد</a>
+                <a class="btn ghost xs" style="margin-inline-start:auto" href="{{ route('m.create', 'code') }}">＋ إصدار جديد</a>
             @endif
         </h3>
         @forelse ($releases as $rel)

@@ -70,7 +70,7 @@
                     <a class="btn ghost xs" href="{{ route('webhooks.log', $h->id) }}">📜 السجل ({{ $h->deliveries_count }})</a>
                     <form class="inline" method="POST" action="{{ route('webhooks.test', $h->id) }}">@csrf<button class="btn ghost xs">🧪 اختبار</button></form>
                     <form class="inline" method="POST" action="{{ route('webhooks.toggle', $h->id) }}">@csrf<button class="btn ghost xs">{{ $h->active ? '⏸ تعطيل' : '▶️ تفعيل' }}</button></form>
-                    <form class="inline" method="POST" action="{{ route('webhooks.destroy', $h->id) }}" onsubmit="return confirm('حذف الاشتراك وكل سجل محاولاته؟')">@csrf @method('DELETE')<button class="btn ghost xs danger">🗑</button></form>
+                    <form class="inline" method="POST" action="{{ route('webhooks.destroy', $h->id) }}" data-confirm="حذف الاشتراك وكل سجل محاولاته؟">@csrf @method('DELETE')<button class="btn ghost xs danger">🗑</button></form>
                 </td>
             </tr>
         @empty

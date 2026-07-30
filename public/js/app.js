@@ -387,14 +387,43 @@
   }, { passive: true });
 })();
 
-/* ═ قائمة الترس ⚙️: تُغلق بالنقر خارجها وبـEsc ═ */
+/* ═ التأكيد داخل الصفحة: ضغطتان على الزر نفسه — لا منبثقة متصفح بعد اليوم ═
+   الضغطة الأولى تحوّل الزر لسؤال تحذيري ٦ ثوانٍ، والثانية خلالها تنفّذ. */
 (function () {
-  var g = document.getElementById('gearmenu');
-  if (!g) return;
+  var ARM_MS = 6000;
+
+  function disarm(btn) {
+    if (!btn.dataset.armed) return;
+    delete btn.dataset.armed;
+    btn.classList.remove('confirming');
+    if (btn.dataset.oldHtml !== undefined) { btn.innerHTML = btn.dataset.oldHtml; delete btn.dataset.oldHtml; }
+    clearTimeout(btn._disarmT);
+  }
+
+  // true = مسلَّح فمرِّر التنفيذ · false = سُلِّح الآن فأوقف
+  function arm(btn, msg) {
+    if (btn.dataset.armed) { disarm(btn); return true; }
+    btn.dataset.armed = '1';
+    btn.dataset.oldHtml = btn.innerHTML;
+    btn.classList.add('confirming');
+    btn.innerHTML = '⚠️ ' + msg + ' <b>اضغط للتأكيد</b>';
+    btn._disarmT = setTimeout(function () { disarm(btn); }, ARM_MS);
+    return false;
+  }
+
+  // نماذج تحمل data-confirm: التسليح على زر الإرسال الفعلي
+  document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (!f.dataset || !f.dataset.confirm) return;
+    var btn = e.submitter || f.querySelector('button[type=submit],button:not([type]),input[type=submit]');
+    if (!btn) return;                      // بلا زر ظاهر: التمرير خيرٌ من قفل النموذج
+    if (!arm(btn, f.dataset.confirm)) e.preventDefault();
+  }, true);
+
+  // عناصر تحمل data-confirm بنفسها (زر يشير لنموذج خارجي بسمة form، أو رابط)
   document.addEventListener('click', function (e) {
-    if (g.open && !g.contains(e.target)) g.open = false;
-  });
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') g.open = false;
-  });
+    var el = e.target.closest('button[data-confirm],a[data-confirm]');
+    if (!el) return;
+    if (!arm(el, el.dataset.confirm)) { e.preventDefault(); e.stopPropagation(); }
+  }, true);
 })();

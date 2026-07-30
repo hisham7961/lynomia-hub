@@ -18,7 +18,7 @@
         <div class="sub" style="margin-bottom:10px">اختر السجل الأساسي ثم ادمج — تُعاد كل الإشارات (عقود، عروض، اجتماعات، قرارات، تعليقات) إليه، وتُملأ فراغاته من المدموجين، والمدموجون إلى سلة المحذوفات (قابل للتراجع).</div>
         @foreach ($groups as $ids => $g)
             <form method="POST" action="{{ route('quality.merge') }}" style="border:1px solid var(--brd);border-radius:12px;padding:12px;margin-bottom:10px"
-                  onsubmit="return confirm('دمج المجموعة في السجل المحدد؟')">
+                  data-confirm="دمج المجموعة في السجل المحدد؟">
                 @csrf
                 <input type="hidden" name="ids" value="{{ $ids }}">
                 <div class="sub" style="margin-bottom:6px">تشابه: {{ ['norm' => 'الاسم', 'email' => 'البريد', 'phone' => 'الهاتف'][$g['by']] ?? $g['by'] }}</div>

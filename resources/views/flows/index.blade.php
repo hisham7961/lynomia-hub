@@ -25,7 +25,7 @@
                 <td class="acts">
                     <a class="btn ghost xs" href="{{ route('flows.sandbox', $f->id) }}" title="جرّب المسار على سجل حقيقي بلا تنفيذ">🧪 تجربة</a>
                     <form class="inline" method="POST" action="{{ route('flows.toggle', $f->id) }}">@csrf<button class="btn ghost xs">{{ $f->enabled ? 'تعطيل' : 'تفعيل' }}</button></form>
-                    <form class="inline" method="POST" action="{{ route('flows.destroy', $f->id) }}" onsubmit="return confirm('حذف المسار؟')">@csrf @method('DELETE')<button class="btn ghost xs" style="color:var(--bad)">حذف</button></form>
+                    <form class="inline" method="POST" action="{{ route('flows.destroy', $f->id) }}" data-confirm="حذف المسار؟">@csrf @method('DELETE')<button class="btn ghost xs" style="color:var(--bad)">حذف</button></form>
                 </td>
             </tr>
         @empty

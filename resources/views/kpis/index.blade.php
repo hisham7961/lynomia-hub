@@ -28,7 +28,7 @@
                 @endif
                 {{-- الاسم لا يُحقن في JS: تأكيد ثابت — الاسم في سياق نص JS داخل سمة قابل للحقن --}}
                 <form method="POST" action="{{ route('kpis.destroy', $k['id']) }}" style="position:absolute;top:6px;inset-inline-end:6px"
-                      onsubmit="return confirm('حذف هذا المؤشر؟')">
+                      data-confirm="حذف هذا المؤشر؟">
                     @csrf @method('DELETE')<button class="btn ghost xs" aria-label="حذف المؤشر {{ $k['name'] }}">✕</button>
                 </form>
             </div>

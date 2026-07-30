@@ -27,17 +27,17 @@ class AdversarialAuditTest extends TestCase
     public function test_board_name_cannot_break_out_of_the_confirm_string(): void
     {
         $this->seedCore();
-        $evil = "x'); alert(1); //";
+        // بعد v2.89 لا سياق JS أصلاً: التأكيد صار سمة data-confirm مُهرَّبة HTML —
+        // فنُثبت غياب onsubmit كلياً، وأن الاسم الخبيث لا يكسر السمة ولا يفتح وسماً
+        $evil = 'x" onmouseover="alert(1)';
         $b = Dashboard::create(['name' => $evil, 'owner_id' => $this->owner->id]);
 
         $html = $this->actingAs($this->owner)->get("/boards/{$b->id}")->assertOk()->getContent();
 
-        // نفحص سمة onsubmit وحدها: الاسم يظهر مُهرَّباً بأمان في العنوان والحقل أيضاً
-        preg_match('/onsubmit="([^"]*)"/', $html, $m);
-        $this->assertNotEmpty($m, 'لم يُعثر على نموذج الحذف');
-        $this->assertStringNotContainsString('&#039;', $m[1],
-            'اسم اللوحة يخرج من سلسلة confirm — حقن JS');
-        $this->assertStringContainsString('\\u0027', $m[1], 'الاسم غير مُرمَّز JSON');
+        $this->assertStringNotContainsString('onsubmit=', $html, 'عاد تأكيد onsubmit المنبثق');
+        $this->assertStringContainsString('data-confirm=', $html, 'لا تأكيد داخل الصفحة لنموذج الحذف');
+        $this->assertStringNotContainsString($evil, $html,
+            'اسم اللوحة وصل خاماً غير مُهرَّب — كسرُ سمة وحقن HTML');
     }
 
     /** ونفس الفحص على القالب المُصرَّف مباشرةً، بلا اعتماد على شكل الصفحة */

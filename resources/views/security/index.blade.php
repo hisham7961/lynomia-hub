@@ -7,7 +7,7 @@
         <div class="sub">كل ما يمس أمن النظام في شاشة واحدة</div>
     </div>
     <form method="POST" action="{{ route('security.lockdown') }}"
-          onsubmit="return confirm('{{ $lockdown ? 'رفع قفل الطوارئ وإعادة الوصول للجميع؟' : 'تفعيل قفل الطوارئ؟ كل الجلسات غير المالكة ستُعلّق فوراً!' }}')">
+          data-confirm="{{ $lockdown ? 'رفع قفل الطوارئ وإعادة الوصول للجميع؟' : 'تفعيل قفل الطوارئ؟ كل الجلسات غير المالكة ستُعلّق فوراً!' }}">
         @csrf
         <button class="btn {{ $lockdown ? '' : 'ghost' }} sm" type="submit"
                 style="{{ $lockdown ? 'background:var(--bad);border-color:var(--bad);color:#fff' : 'color:var(--bad);border-color:var(--bad)' }}">

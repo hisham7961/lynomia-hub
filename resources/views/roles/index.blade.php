@@ -14,7 +14,7 @@
                 <td class="acts">
                     @unless ($r->is_owner)
                         <a class="btn ghost xs" href="{{ route('roles.edit', $r) }}">تعديل</a>
-                        <form class="inline" method="POST" action="{{ route('roles.destroy', $r) }}" onsubmit="return confirm('حذف الدور؟')">@csrf @method('DELETE')<button class="btn ghost xs dn">حذف</button></form>
+                        <form class="inline" method="POST" action="{{ route('roles.destroy', $r) }}" data-confirm="حذف الدور؟">@csrf @method('DELETE')<button class="btn ghost xs dn">حذف</button></form>
                     @endunless
                 </td>
             </tr>

@@ -7,7 +7,7 @@
         <div class="sub">مؤشرات الشركة المحسوبة · الأهداف (OKR) · أداء الموظفين آخر ٣٠ يوماً</div>
     </div>
     @if (hub_can(auth()->user(), 'okrs', 'a'))
-        <a class="btn p sm" href="{{ route('m.create', 'okrs') }}" onclick="return Hub.modal(this.href)">＋ هدف جديد</a>
+        <a class="btn p sm" href="{{ route('m.create', 'okrs') }}">＋ هدف جديد</a>
     @endif
 </div>
 

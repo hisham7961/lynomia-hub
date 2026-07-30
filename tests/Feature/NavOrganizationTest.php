@@ -53,11 +53,10 @@ class NavOrganizationTest extends TestCase
     public function test_daily_group_is_open_and_others_collapsed_by_default(): void
     {
         $this->seedCore();
-        $groups = collect(hub_top_groups($this->owner))->keyBy('key');
+        $groups = collect(hub_top_groups($this->owner))->keyBy('label');
 
-        $this->assertTrue($groups['daily']['open']);
-        $this->assertFalse($groups['analytics']['open']);
-        $this->assertFalse($groups['centers']['open']);
+        $this->assertTrue($groups['مساحتي اليومية']['open']);
+        $this->assertFalse($groups['اللوحات والمراكز']['open']);
     }
 
     public function test_sidebar_renders_region_labels_and_group_headers(): void
@@ -65,10 +64,11 @@ class NavOrganizationTest extends TestCase
         $this->seedCore();
         $html = $this->actingAs($this->owner)->get('/')->assertOk()->getContent();
 
-        foreach (['الأدوات واللوحات', 'الوحدات', 'النظام'] as $region) {
+        // «النظام» غادر الجانبي إلى شريط الإدارة العلوي (v2.89)
+        foreach (['الأدوات واللوحات', 'الوحدات'] as $region) {
             $this->assertStringContainsString($region, $html, "منطقة «{$region}» غائبة");
         }
-        foreach (['مساحتي اليومية', 'التحليلات واللوحات', 'مراكز متخصّصة'] as $g) {
+        foreach (['مساحتي اليومية', 'اللوحات والمراكز'] as $g) {
             $this->assertStringContainsString($g, $html, "قسم «{$g}» غائب");
         }
         // لم تبقَ قائمة الأدوات المسطّحة: الرابط المسطّح الوحيد هو لوحة التحكم
@@ -90,26 +90,31 @@ class NavOrganizationTest extends TestCase
     public function test_a_fully_empty_group_is_suppressed(): void
     {
         $this->seedCore();
-        // مستخدم بلا monitor ولا رؤية للمالية: قسم التحليلات يفقد كل روابطه
+        // بلا monitor، ومحجوب عن كل ما يُبقي روابط «اللوحات والمراكز» بعد الدمج
+        $none = ['v' => 0, 'a' => 0, 'e' => 0, 'd' => 0];
         $u = $this->limited('noanalytics@test.local', [
-            'fin' => ['v' => 0, 'a' => 0, 'e' => 0, 'd' => 0],
+            'fin' => $none, 'contracts' => $none, 'tickets' => $none,
+            'ideas' => $none, 'suppliers' => $none,
         ]);
 
-        $keys = collect(hub_top_groups($u))->pluck('key');
-        $this->assertFalse($keys->contains('analytics'), 'قسم تحليلات فارغ عُرض رأسه');
-        $this->assertTrue($keys->contains('daily'), 'القسم اليومي يبقى دائماً');
+        $labels = collect(hub_top_groups($u))->pluck('label');
+        $this->assertFalse($labels->contains('اللوحات والمراكز'), 'قسمٌ فارغ عُرض رأسه');
+        $this->assertTrue($labels->contains('مساحتي اليومية'), 'القسم اليومي يبقى دائماً');
     }
 
     /** لكن قسمٌ فيه رابطٌ واحد مسموح يُعرض */
     public function test_a_group_with_one_permitted_link_is_shown(): void
     {
         $this->seedCore();
-        // يرى المالية فقط ⇒ finrep يبقى في التحليلات، فيُعرض القسم
-        $u = $this->limited('onlyfin@test.local');
+        // يرى المالية وحدها من روابط القسم المدموج ⇒ finrep يبقى، فيُعرض القسم به وحده
+        $none = ['v' => 0, 'a' => 0, 'e' => 0, 'd' => 0];
+        $u = $this->limited('onlyfin@test.local', [
+            'contracts' => $none, 'tickets' => $none, 'ideas' => $none, 'suppliers' => $none,
+        ]);
 
-        $analytics = collect(hub_top_groups($u))->firstWhere('key', 'analytics');
-        $this->assertNotNull($analytics, 'قسم فيه رابط مسموح لم يُعرض');
-        $this->assertSame(['finrep'], collect($analytics['items'])->pluck('key')->all());
+        $g = collect(hub_top_groups($u))->firstWhere('label', 'اللوحات والمراكز');
+        $this->assertNotNull($g, 'قسم فيه رابط مسموح لم يُعرض');
+        $this->assertSame(['finrep'], collect($g['items'])->pluck('key')->all());
     }
 
     public function test_personalization_still_lists_every_tool_for_hiding(): void

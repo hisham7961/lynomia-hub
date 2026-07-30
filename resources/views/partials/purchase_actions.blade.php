@@ -30,7 +30,7 @@
                 @else
                     <form method="POST" action="{{ route('purchases.act', $row->id) }}">@csrf<input type="hidden" name="do" value="bill"><button class="btn p sm">🧾 فاتورة المورد</button></form>
                 @endif
-                <form method="POST" action="{{ route('purchases.act', $row->id) }}" onsubmit="return confirm('تسجيل المستند كمرتجع؟')">@csrf<input type="hidden" name="do" value="return"><button class="btn ghost sm" style="color:var(--bad)">↩ مرتجع</button></form>
+                <form method="POST" action="{{ route('purchases.act', $row->id) }}" data-confirm="تسجيل المستند كمرتجع؟">@csrf<input type="hidden" name="do" value="return"><button class="btn ghost sm" style="color:var(--bad)">↩ مرتجع</button></form>
             @endif
         @endif
     </div>

@@ -20,8 +20,8 @@
     <div style="background:repeating-linear-gradient(45deg,#7c3aed,#7c3aed 14px,#6d28d9 14px,#6d28d9 28px);color:#fff;text-align:center;padding:6px 12px;font-size:13px;font-weight:700">
         🎭 وضع تجريبي — البيانات الموسومة 🎭 وهمية للتدريب والتجربة
         @if (auth()->check() && hub_is_owner())
-            <form class="inline" method="POST" action="{{ route('demo.reset') }}" onsubmit="return confirm('تصفير البيانات التجريبية وإعادة توليدها من جديد؟')">@csrf<button class="btn ghost xs" style="color:#fff;border-color:#ffffff88">↺ تصفير</button></form>
-            <form class="inline" method="POST" action="{{ route('demo.off') }}" onsubmit="return confirm('إنهاء الوضع التجريبي ومسح كل بياناته الوهمية؟')">@csrf<button class="btn ghost xs" style="color:#fff;border-color:#ffffff88">✕ إنهاء</button></form>
+            <form class="inline" method="POST" action="{{ route('demo.reset') }}" data-confirm="تصفير البيانات التجريبية وإعادة توليدها من جديد؟">@csrf<button class="btn ghost xs" style="color:#fff;border-color:#ffffff88">↺ تصفير</button></form>
+            <form class="inline" method="POST" action="{{ route('demo.off') }}" data-confirm="إنهاء الوضع التجريبي ومسح كل بياناته الوهمية؟">@csrf<button class="btn ghost xs" style="color:#fff;border-color:#ffffff88">✕ إنهاء</button></form>
         @endif
     </div>
 @endif
@@ -68,29 +68,6 @@
             </div>
             <button class="btn ghost sm" type="button" onclick="Hub.palette()" title="لوحة الأوامر">⌘K</button>
             <button class="btn ghost sm" type="button" onclick="Hub.theme()" title="الوضع الليلي">🌓</button>
-            {{-- قائمة النظام والإدارة — انتقلت من الجانبي ليخفّ ويتفرغ للعمل اليومي --}}
-            @php
-                $admOn = request()->routeIs('users.*', 'roles.*', 'audit.*', 'settings.*', 'security.*',
-                    'ops.*', 'errors.*', 'dataroom.*', 'fields.*', 'flows.*', 'webhooks.*', 'quality.*', 'prefs.*');
-            @endphp
-            <details class="gearmenu" id="gearmenu">
-                <summary class="btn ghost sm {{ $admOn ? 'on' : '' }}" title="النظام والإدارة">⚙️</summary>
-                <div class="gearbox">
-                    <a class="gi {{ request()->routeIs('prefs.*') ? 'on' : '' }}" href="{{ route('prefs.edit') }}">🎛️ التخصيص</a>
-                    @if (hub_flag(auth()->user(), 'users'))<a class="gi {{ request()->routeIs('users.*') ? 'on' : '' }}" href="{{ route('users.index') }}">👥 المستخدمون</a>@endif
-                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('roles.*') ? 'on' : '' }}" href="{{ route('roles.index') }}">🧑‍⚖️ الأدوار والصلاحيات</a>@endif
-                    @if (hub_flag(auth()->user(), 'audit'))<a class="gi {{ request()->routeIs('audit.*') ? 'on' : '' }}" href="{{ route('audit.index') }}">🕘 سجل التدقيق</a>@endif
-                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('security.*') ? 'on' : '' }}" href="{{ route('security.index') }}">🛡️ مركز الأمان</a>@endif
-                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('ops.*') ? 'on' : '' }}" href="{{ route('ops.index') }}">🖥️ مركز التشغيل</a>@endif
-                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('errors.*') ? 'on' : '' }}" href="{{ route('errors.index') }}">🐞 مركز الأخطاء</a>@endif
-                    @if (hub_secrets())<a class="gi {{ request()->routeIs('dataroom.*') ? 'on' : '' }}" href="{{ route('dataroom.index') }}">🔐 غرفة البيانات</a>@endif
-                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('fields.*') ? 'on' : '' }}" href="{{ route('fields.index') }}">🧩 باني الحقول</a>@endif
-                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('flows.*') ? 'on' : '' }}" href="{{ route('flows.index') }}">🪄 مسارات العمل</a>@endif
-                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('webhooks.*') ? 'on' : '' }}" href="{{ route('webhooks.index') }}">🪝 Webhooks</a>@endif
-                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('quality.*') ? 'on' : '' }}" href="{{ route('quality.index') }}">🧹 جودة البيانات</a>@endif
-                    @if (hub_is_owner())<a class="gi {{ request()->routeIs('settings.*') ? 'on' : '' }}" href="{{ route('settings.edit') }}">⚙️ الإعدادات</a>@endif
-                </div>
-            </details>
             <div class="userbox">
                 <a href="{{ route('profile.edit') }}" title="ملفي الشخصي" style="display:flex;gap:10px;align-items:center;color:inherit">
                     <span class="ava">{{ mb_substr(auth()->user()->name, 0, 1) }}</span>
@@ -99,6 +76,35 @@
                 <form method="POST" action="{{ route('logout') }}">@csrf<button class="btn ghost sm" type="submit">خروج</button></form>
             </div>
         </header>
+        {{-- شريط الإدارة — ظاهرٌ دائماً تحت البار العلوي، لا خلف زر. أقسامه بفواصل --}}
+        @php $isOwner = hub_is_owner(); @endphp
+        @if ($isOwner || hub_flag(auth()->user(), 'users') || hub_flag(auth()->user(), 'audit') || hub_secrets())
+            <nav class="adminbar" aria-label="الإدارة والنظام">
+                <a class="{{ request()->routeIs('prefs.*') ? 'on' : '' }}" href="{{ route('prefs.edit') }}">🎛️ التخصيص</a>
+                @if (hub_flag(auth()->user(), 'users') || $isOwner)
+                    <span class="sep" aria-hidden="true"></span>
+                    @if (hub_flag(auth()->user(), 'users'))<a class="{{ request()->routeIs('users.*') ? 'on' : '' }}" href="{{ route('users.index') }}">👥 المستخدمون</a>@endif
+                    @if ($isOwner)<a class="{{ request()->routeIs('roles.*') ? 'on' : '' }}" href="{{ route('roles.index') }}">🧑‍⚖️ الأدوار</a>@endif
+                @endif
+                @if (hub_flag(auth()->user(), 'audit') || $isOwner)
+                    <span class="sep" aria-hidden="true"></span>
+                    @if (hub_flag(auth()->user(), 'audit'))<a class="{{ request()->routeIs('audit.*') ? 'on' : '' }}" href="{{ route('audit.index') }}">🕘 التدقيق</a>@endif
+                    @if ($isOwner)<a class="{{ request()->routeIs('security.*') ? 'on' : '' }}" href="{{ route('security.index') }}">🛡️ الأمان</a>@endif
+                    @if ($isOwner)<a class="{{ request()->routeIs('ops.*') ? 'on' : '' }}" href="{{ route('ops.index') }}">🖥️ التشغيل</a>@endif
+                    @if ($isOwner)<a class="{{ request()->routeIs('errors.*') ? 'on' : '' }}" href="{{ route('errors.index') }}">🐞 الأخطاء</a>@endif
+                @endif
+                @if (hub_secrets())<a class="{{ request()->routeIs('dataroom.*') ? 'on' : '' }}" href="{{ route('dataroom.index') }}">🔐 غرفة البيانات</a>@endif
+                @if ($isOwner)
+                    <span class="sep" aria-hidden="true"></span>
+                    <a class="{{ request()->routeIs('fields.*') ? 'on' : '' }}" href="{{ route('fields.index') }}">🧩 الحقول</a>
+                    <a class="{{ request()->routeIs('flows.*') ? 'on' : '' }}" href="{{ route('flows.index') }}">🪄 المسارات</a>
+                    <a class="{{ request()->routeIs('webhooks.*') ? 'on' : '' }}" href="{{ route('webhooks.index') }}">🪝 Webhooks</a>
+                    <a class="{{ request()->routeIs('quality.*') ? 'on' : '' }}" href="{{ route('quality.index') }}">🧹 الجودة</a>
+                    <span class="sep" aria-hidden="true"></span>
+                    <a class="{{ request()->routeIs('settings.*') ? 'on' : '' }}" href="{{ route('settings.edit') }}">⚙️ الإعدادات</a>
+                @endif
+            </nav>
+        @endif
         {{-- منطقة حية: قارئ الشاشة يقرأ الرسالة حين تُحقن بعد htmx أو تتبدل --}}
         <div id="flash" role="status" aria-live="polite">@include('partials.flash')</div>
         <div class="content">@yield('content')</div>
