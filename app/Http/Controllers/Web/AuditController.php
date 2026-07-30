@@ -23,7 +23,8 @@ class AuditController extends Controller
             ->when($r->input('module'), fn ($q, $m) => $q->where('audits.module', $m))
             ->when($r->input('q'), fn ($q, $t) => $q->where('audits.name', 'LIKE', "%$t%"))
             ->orderByDesc('audits.created_at')
-            ->paginate(40)->withQueryString();
+            // بلا COUNT(*) إجمالي — أسرع الجداول نمواً والعدّ مع join يثقل كل صفحة
+            ->simplePaginate(40)->withQueryString();
 
         return view('audit.index', compact('rows'));
     }

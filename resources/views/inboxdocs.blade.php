@@ -45,7 +45,8 @@
                         @if ($doc->kind)<span class="bdg">{{ $doc->kind }}</span>@endif
                         @if ($doc->party)<span class="bdg">🏛 {{ $doc->party }}</span>@endif
                         @if ($doc->doc_date)<span class="bdg">📅 {{ $doc->doc_date->format('Y-m-d') }}</span>@endif
-                        @if ($doc->expiry)<span class="bdg {{ $doc->expiry->isPast() ? 'bad' : 'wn' }}">⏳ ينتهي {{ $doc->expiry->format('Y-m-d') }}</span>@endif
+                        {{-- النص نفسه يفرّق لا اللون وحده — قارئ الشاشة وعمى الألوان لا يريان الشارة --}}
+                        @if ($doc->expiry)<span class="bdg {{ $doc->expiry->isPast() ? 'bad' : 'wn' }}">{{ $doc->expiry->isPast() ? '⛔ منتهية منذ ' . $doc->expiry->format('Y-m-d') : '⏳ تنتهي ' . $doc->expiry->format('Y-m-d') }}</span>@endif
                     </div>
                 @endif
             </div>

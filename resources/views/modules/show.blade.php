@@ -52,7 +52,7 @@
                 <dd>
                     @if ($cv === null || $cv === '')—
                     @elseif (($cf['type'] ?? '') === 'bool'){{ $cv ? '✓ نعم' : 'لا' }}
-                    @elseif (($cf['type'] ?? '') === 'ref'){{ hub_ref_options($cf['ref'])[$cv] ?? $cv }}
+                    @elseif (($cf['type'] ?? '') === 'ref'){{ hub_ref_labels($cf['ref'], [$cv])[$cv] ?? $cv }}
                     @else{{ $cv }}
                     @endif
                 </dd>

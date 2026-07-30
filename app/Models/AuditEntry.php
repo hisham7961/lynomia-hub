@@ -19,19 +19,24 @@ class AuditEntry extends Model
     {
         static::creating(function (self $m) {
             try {
-                for ($i = 0; $i < 3; $i++) {
-                    $head = (string) \Illuminate\Support\Facades\DB::table('audit_chain')->where('id', 1)->value('head');
-                    if ($head === '') return;                     // الهجرة لم تطبق بعد — لا نkسر الكتابة
+                // قفل صف الرأس داخل معاملة قصيرة: القراءة والتقديم ذرّة واحدة —
+                // كان تحديثاً تفاؤلياً بثلاث محاولات، ومن يخسرها كلها يُدرَج بلا بصمة بصمت
+                \Illuminate\Support\Facades\DB::transaction(function () use ($m) {
+                    $head = (string) \Illuminate\Support\Facades\DB::table('audit_chain')
+                        ->where('id', 1)->lockForUpdate()->value('head');
+                    if ($head === '') return;                     // الهجرة لم تطبق بعد — لا نكسر الكتابة
                     $hash = hash('sha256', $head . '|' . $m->canonical());
-                    if (\Illuminate\Support\Facades\DB::table('audit_chain')
-                        ->where('id', 1)->where('head', $head)->update(['head' => $hash])) {
-                        $m->prev_hash = $head;
-                        $m->hash = $hash;
-                        return;
-                    }
-                }
+                    \Illuminate\Support\Facades\DB::table('audit_chain')->where('id', 1)->update(['head' => $hash]);
+                    $m->prev_hash = $head;
+                    $m->hash = $hash;
+                }, 3);
             } catch (\Throwable $e) {
-                // التدقيق نفسه لا يفشل بسبب السلسلة
+                // فشل استثنائي (قاعدة تحت ضغط مثلاً): الكتابة تمضي بلا بصمة كي لا يتعطل
+                // العمل — لكن لا صمت بعد اليوم: يُسجَّل هنا، وhub:audit-verify يفشل صراحةً
+                // على أي سجل بلا بصمة كُتب بعد بدء السلسلة (حقبة audit_chain.started_at)
+                \App\Support\ErrorLog::capture('php',
+                    'audit-chain: فشل ختم سجل تدقيق (' . $m->action . '/' . $m->module . ') — ' . $e->getMessage(),
+                    __FILE__, __LINE__);
             }
         });
     }

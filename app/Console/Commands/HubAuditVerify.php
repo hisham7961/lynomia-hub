@@ -5,73 +5,94 @@ namespace App\Console\Commands;
 use App\Models\AuditEntry;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * التحقق من سلسلة تجزئة التدقيق: يمشي السلسلة من البداية ويعيد حساب كل تجزئة.
  * أي تعديل أو حذف أو إدراج مزور في السجلات المسلسلة يكسر المشي أو المطابقة.
  *
- * البصمة الحالية (v2) تشمل الأعمدة الجنائية أيضاً: القسم والجهاز وعنوان IP.
- * السجلات المختومة ببصمة الجيل الأول تبقى مقبولة (فلا إنذار كاذب) لكنها تُحصى
- * وتُعرض بصراحة لأن تغطيتها أضعف — و`--reseal` يرقّيها بعد تحقق نظيف.
+ * الذاكرة محدودة مهما كبر الجدول: المشي على فهرس خفيف (id/prev/hash فقط)
+ * ثم يُتحقق المحتوى دفعةً دفعة — كان `get()` كاملاً وينفجر على الجداول الناضجة.
+ *
+ * وسجل بلا بصمة كُتب **بعد** بدء السلسلة (حقبة audit_chain.started_at) فشلُ ختمٍ
+ * لا «تاريخ قديم» — يُفشل التحقق صراحةً. قبل الحقبة يُحصى تاريخاً خارج التغطية.
  */
 class HubAuditVerify extends Command
 {
     protected $signature = 'hub:audit-verify {--reseal : ترقية السجلات المختومة ببصمة قديمة إلى البصمة الكاملة (بعد تحقق نظيف)}';
     protected $description = 'التحقق من سلامة سلسلة تجزئة سجل التدقيق';
 
+    protected const BATCH = 400;
+
     public function handle(): int
     {
-        $rows = AuditEntry::whereNotNull('hash')->get();
-        $legacyRows = AuditEntry::whereNull('hash')->count();
+        $epoch = Schema::hasColumn('audit_chain', 'started_at')
+            ? DB::table('audit_chain')->where('id', 1)->value('started_at') : null;
 
-        if ($rows->isEmpty()) {
+        $unsealed = AuditEntry::whereNull('hash')->count();
+        $suspect = $epoch ? AuditEntry::whereNull('hash')->where('created_at', '>=', $epoch)->count() : 0;
+        $legacyRows = $unsealed - $suspect;
+
+        // فهرس خفيف: ثلاث قيم قصيرة لكل سجل — المشي بلا تحميل المحتوى
+        $index = DB::table('audits')->whereNotNull('hash')->get(['id', 'prev_hash', 'hash']);
+
+        if ($index->isEmpty() && ! $suspect) {
             $this->info('لا سجلات مسلسلة بعد' . ($legacyRows ? " ({$legacyRows} سجل سابق للسلسلة)" : ''));
             return self::SUCCESS;
         }
 
-        $byPrev = $rows->groupBy('prev_hash');
+        // ١) مشي البنية على الفهرس: الترتيب والتفرع والانقطاع
+        $byPrev = $index->groupBy('prev_hash');
         $prev = str_repeat('0', 64);
-        $ok = 0; $weak = 0;
-        $chain = [];                                  // الترتيب الحقيقي للسلسلة — يلزم لإعادة الختم
-
+        $order = [];                                   // [id => prev_hash] بترتيب السلسلة الحقيقي
         while (true) {
             $bucket = $byPrev->get($prev);
             if (! $bucket) break;
             if ($bucket->count() > 1) {
-                $this->error("⚠️ تفرع في السلسلة بعد {$ok} سجل — تجزئتان تشيران لنفس السابق (عبث محتمل)");
+                $this->error('⚠️ تفرع في السلسلة بعد ' . count($order) . ' سجل — تجزئتان تشيران لنفس السابق (عبث محتمل)');
                 return self::FAILURE;
             }
-
             $row = $bucket->first();
-
-            // ثلاث صياغات مقبولة، كلها تمثّل المحتوى نفسه:
-            //  v2    — الحالية (JSON موحّد الصياغة، يعمل على sqlite وMySQL معاً)
-            //  v2raw — سجلات كُتبت قبل توحيد صياغة JSON
-            //  v1    — سجلات قبل ضم الأعمدة الجنائية (تُحصى وتُحذَّر)
-            if (hash('sha256', $prev . '|' . $row->canonical()) === $row->hash) {
-                // مختوم بالبصمة الكاملة الحالية
-            } elseif (hash('sha256', $prev . '|' . $row->canonical('v2raw')) === $row->hash) {
-                // نفس التغطية، صياغة أقدم — يرقّيها reseal بلا ضجيج
-            } elseif (hash('sha256', $prev . '|' . $row->canonical('v1')) === $row->hash) {
-                $weak++;                              // بصمة الجيل الأول: لا تحمي IP/الجهاز
-            } else {
-                $this->error("❌ سجل معدَّل بعد كتابته: {$row->id} ({$row->action} / {$row->module}) — التجزئة لا تطابق المحتوى");
-                return self::FAILURE;
-            }
-
-            $ok++;
-            $chain[] = $row;
+            $order[$row->id] = $prev;
             $prev = $row->hash;
         }
 
-        if ($ok < $rows->count()) {
-            $this->error('❌ انقطاع: ' . ($rows->count() - $ok) . ' سجل مسلسل غير موصول بالسلسلة (حذف أو تزوير محتمل) — سلِم منها: ' . $ok);
+        if (count($order) < $index->count()) {
+            $this->error('❌ انقطاع: ' . ($index->count() - count($order)) . ' سجل مسلسل غير موصول بالسلسلة (حذف أو تزوير محتمل) — سلِم منها: ' . count($order));
             return self::FAILURE;
         }
 
         $head = (string) DB::table('audit_chain')->where('id', 1)->value('head');
         if ($head !== $prev) {
             $this->error('❌ رأس السلسلة المخزن لا يطابق آخر سجل — حُذفت سجلات من الذيل على الأرجح');
+            return self::FAILURE;
+        }
+
+        // ٢) تحقق المحتوى دفعةً دفعة — ثلاث صياغات مقبولة كلها تمثل المحتوى نفسه:
+        //  v2 (الحالية) · v2raw (قبل توحيد صياغة JSON) · v1 (قبل الأعمدة الجنائية — تُحصى وتُحذَّر)
+        $ok = 0; $weak = 0;
+        foreach (array_chunk(array_keys($order), self::BATCH) as $ids) {
+            $rows = AuditEntry::whereIn('id', $ids)->get()->keyBy('id');
+            foreach ($ids as $id) {
+                $row = $rows[$id]; $p = $order[$id];
+                if (hash('sha256', $p . '|' . $row->canonical()) === $row->hash) {
+                    // مختوم بالبصمة الكاملة الحالية
+                } elseif (hash('sha256', $p . '|' . $row->canonical('v2raw')) === $row->hash) {
+                    // نفس التغطية، صياغة أقدم — يرقّيها reseal بلا ضجيج
+                } elseif (hash('sha256', $p . '|' . $row->canonical('v1')) === $row->hash) {
+                    $weak++;
+                } else {
+                    $this->error("❌ سجل معدَّل بعد كتابته: {$row->id} ({$row->action} / {$row->module}) — التجزئة لا تطابق المحتوى");
+                    return self::FAILURE;
+                }
+                $ok++;
+            }
+        }
+
+        // ٣) سجلات فشل ختمها بعد بدء السلسلة — البنية سليمة لكن التغطية مثقوبة
+        if ($suspect) {
+            $this->error("❌ {$suspect} سجل بلا بصمة كُتب بعد بدء السلسلة — فشل ختمٍ لا تاريخ قديم."
+                . ' راجع مركز الأخطاء (audit-chain) لمعرفة السبب؛ هذه السجلات خارج ضمان كشف العبث.');
             return self::FAILURE;
         }
 
@@ -84,25 +105,31 @@ class HubAuditVerify extends Command
         }
 
         if ($this->option('reseal') && $weak) {
-            $this->reseal($chain);
+            $this->reseal(array_keys($order));
         }
 
         return self::SUCCESS;
     }
 
-    /** إعادة ختم السلسلة كاملةً بالبصمة الحالية — لا تُنفَّذ إلا بعد تحقق نظيف أعلاه */
-    protected function reseal($chain): void
+    /**
+     * إعادة ختم السلسلة كاملةً بالبصمة الحالية — لا تُنفَّذ إلا بعد تحقق نظيف أعلاه.
+     * معاملة واحدة (انقطاعها في المنتصف يترك سلسلة مكسورة) لكن التحميل دفعةً دفعة.
+     */
+    protected function reseal(array $orderedIds): void
     {
         $prev = str_repeat('0', 64);
-        DB::transaction(function () use ($chain, &$prev) {
-            foreach ($chain as $row) {
-                $hash = hash('sha256', $prev . '|' . $row->canonical());
-                DB::table('audits')->where('id', $row->id)->update(['prev_hash' => $prev, 'hash' => $hash]);
-                $prev = $hash;
+        DB::transaction(function () use ($orderedIds, &$prev) {
+            foreach (array_chunk($orderedIds, self::BATCH) as $ids) {
+                $rows = AuditEntry::whereIn('id', $ids)->get()->keyBy('id');
+                foreach ($ids as $id) {
+                    $hash = hash('sha256', $prev . '|' . $rows[$id]->canonical());
+                    DB::table('audits')->where('id', $id)->update(['prev_hash' => $prev, 'hash' => $hash]);
+                    $prev = $hash;
+                }
             }
             DB::table('audit_chain')->where('id', 1)->update(['head' => $prev]);
         });
 
-        $this->info('🔄 أُعيد ختم ' . count($chain) . ' سجل بالبصمة الكاملة — التحقق التالي سيكون خالياً من التحذير');
+        $this->info('🔄 أُعيد ختم ' . count($orderedIds) . ' سجل بالبصمة الكاملة — التحقق التالي سيكون خالياً من التحذير');
     }
 }

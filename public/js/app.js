@@ -9,7 +9,8 @@
   function flashInit() {
     $$('#flash .flash.ok').forEach(function (f) {
       if (f._t) return; f._t = 1;
-      setTimeout(function () { f.classList.add('hide'); setTimeout(function () { f.remove(); }, 600); }, 3000);
+      /* ٧ ثوانٍ لا ٣ — القراءة البطيئة ومكبّر الشاشة يحتاجان وقتاً، ورسائل الخطأ لا تختفي أصلاً */
+      setTimeout(function () { f.classList.add('hide'); setTimeout(function () { f.remove(); }, 600); }, 7000);
     });
   }
   Hub.toast = function (msg, bad) {

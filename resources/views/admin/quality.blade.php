@@ -28,7 +28,8 @@
                             <input type="radio" name="keep" value="{{ $c->id }}" @checked($i === 0)>
                             <b>{{ $c->name }}</b>
                         </label>
-                        <span class="sub">{{ $c->email ?: '—' }} · {{ $c->phone ?: '—' }} · أُنشئ {{ $c->created_at ? \Illuminate\Support\Carbon::parse($c->created_at)->format('Y-m-d') : '؟' }}</span>
+                        {{-- bdi يعزل الأرقام والبريد عن إعادة الترتيب الثنائي — قرار الدمج لا رجعة فيه فلا يُقرأ رقم معكوساً --}}
+                        <span class="sub"><bdi>{{ $c->email ?: '—' }}</bdi> · <bdi>{{ $c->phone ?: '—' }}</bdi> · أُنشئ <bdi>{{ $c->created_at ? \Illuminate\Support\Carbon::parse($c->created_at)->format('Y-m-d') : '؟' }}</bdi></span>
                         <a class="btn ghost xs" href="{{ route('m.show', ['clients', $c->id]) }}" target="_blank" rel="noopener">فحص ↗</a>
                     </div>
                 @endforeach

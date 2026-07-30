@@ -6,9 +6,9 @@
     <form method="POST" action="{{ $role ? route('roles.update', $role) : route('roles.store') }}">
         @csrf @if($role)@method('PUT')@endif
         <div class="fg">
-            <div class="fld"><label>اسم الدور <b class="req">*</b></label><input class="inp" name="name" value="{{ old('name', $role?->name) }}" required></div>
-            <div class="fld"><label>النطاق</label>
-                <select class="inp" name="scope">
+            <div class="fld"><label for="rf-name">اسم الدور <b class="req">*</b></label><input class="inp" id="rf-name" name="name" value="{{ old('name', $role?->name) }}" required></div>
+            <div class="fld"><label for="rf-scope">النطاق</label>
+                <select class="inp" id="rf-scope" name="scope">
                     <option value="all" @selected(old('scope', $role?->scope) === 'all')>كل النظام</option>
                     <option value="proj" @selected(old('scope', $role?->scope ?? 'proj') === 'proj')>حسب المشروع</option>
                 </select>
@@ -21,9 +21,10 @@
             <tbody>
             @foreach (hub_modules() as $mk => $md)
                 <tr>
-                    <td>{{ $md['label'] }} <button type="button" class="btn ghost xs" data-row-toggle>الكل</button></td>
+                    <td>{{ $md['label'] }} <button type="button" class="btn ghost xs" data-row-toggle aria-label="تبديل كل صلاحيات {{ $md['label'] }}">الكل</button></td>
                     @foreach ($ops as $op => $l)
-                        <td class="c"><input type="checkbox" name="matrix[{{ $mk }}][{{ $op }}]" value="1" @checked(!empty($mx[$mk][$op]))></td>
+                        {{-- aria-label: ٢٧٦ مربعاً بلا اسم يقرؤها قارئ الشاشة «خانة اختيار» فقط --}}
+                        <td class="c"><input type="checkbox" name="matrix[{{ $mk }}][{{ $op }}]" value="1" aria-label="{{ $l }} — {{ $md['label'] }}" @checked(!empty($mx[$mk][$op]))></td>
                     @endforeach
                 </tr>
             @endforeach

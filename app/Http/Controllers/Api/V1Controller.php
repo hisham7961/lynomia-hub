@@ -77,23 +77,31 @@ class V1Controller extends ModuleController
     {
         [$def, $class] = $this->resolveApi($module, 'a');
 
-        // نفس المفتاح + نفس Idempotency-Key = نفس الرد المخزن، بلا إنشاء ثانٍ
-        if ($replay = $this->idempotent($r)) return $replay;
+        // الحجز **قبل** التنفيذ لا بعده: طلبان متزامنان بنفس المفتاح كانا ينفّذان
+        // معاً (سجلان وويبهوكان) ولا يُحسم إلا تخزين الرد — الآن يُنفَّذ واحد فقط
+        $gate = $this->idempotentBegin($r);
+        if ($gate instanceof \Symfony\Component\HttpFoundation\Response) return $gate;
 
-        $r->validate($this->rules($def, true), [], $this->attrs($def));
-        $this->guardProject($r, $module);
+        try {
+            $r->validate($this->rules($def, true), [], $this->attrs($def));
+            $this->guardProject($r, $module);
 
-        $m = new $class;
-        $this->fill($def, $r, $m);
-        $m->save();
-        $this->notifyAssignee($def, $module, $m);
-        $this->bustProgress($module, $m);
-        \App\Support\FlowRunner::fire('created', $module, $m);
+            $m = new $class;
+            $this->fill($def, $r, $m);
+            $m->save();
+            $this->notifyAssignee($def, $module, $m);
+            $this->bustProgress($module, $m);
+            \App\Support\FlowRunner::fire('created', $module, $m);
 
-        $resp = response()->json(['data' => $this->shape($def, $m->fresh())], 201);
-        $this->idempotentStore($r, $resp);
+            $resp = response()->json(['data' => $this->shape($def, $m->fresh())], 201);
+            $this->idempotentFinish($r, $resp);
 
-        return $resp;
+            return $resp;
+        } catch (\Throwable $e) {
+            // فشل قبل الإتمام (تحقق مثلاً): حرّر الحجز كي لا يُحجب المفتاح للأبد
+            if ($gate === true) $this->idempotentRelease($r);
+            throw $e;
+        }
     }
 
     /** PUT /api/v1/{module}/{id} */
@@ -171,38 +179,80 @@ class V1Controller extends ModuleController
         return [$def, $class];
     }
 
-    /** إن حمل الطلب Idempotency-Key سبق تنفيذه: أعد الرد المخزن نفسه */
-    protected function idempotent(Request $r)
+    /**
+     * حجز مفتاح Idempotency قبل التنفيذ. يعيد:
+     *  null  — لا مفتاح في الطلب، امضِ عادياً
+     *  true  — حُجز الآن، نفّذ ثم idempotentFinish (أو Release عند الفشل)
+     *  Response — إما إعادة الرد المخزن (تنفيذ سابق مكتمل) أو 409 (تنفيذ متزامن جارٍ)
+     */
+    protected function idempotentBegin(Request $r)
     {
         [$tokenId, $ikey] = $this->ikeyOf($r);
         if (! $ikey) return null;
 
-        $row = \Illuminate\Support\Facades\DB::table('idempotency_keys')
-            ->where('token_id', $tokenId)->where('ikey', $ikey)->first();
-        if (! $row) return null;
+        for ($try = 0; $try < 2; $try++) {
+            try {
+                \Illuminate\Support\Facades\DB::table('idempotency_keys')->insert([
+                    'id' => (string) \Illuminate\Support\Str::uuid(),
+                    'token_id' => $tokenId, 'ikey' => $ikey,
+                    'code' => null, 'response' => null,           // يُملآن عند الإتمام
+                    'created_at' => now(),
+                ]);
 
-        return response($row->response, $row->code)
-            ->header('Content-Type', 'application/json')
-            ->header('X-Idempotent-Replay', 'true');
+                return true;
+            } catch (\Illuminate\Database\QueryException $e) {
+                $row = \Illuminate\Support\Facades\DB::table('idempotency_keys')
+                    ->where('token_id', $tokenId)->where('ikey', $ikey)->first();
+                if (! $row) continue;                             // حُذف تحتنا (تنظيف) — أعد المحاولة
+
+                if ($row->response !== null) {
+                    return response($row->response, $row->code)
+                        ->header('Content-Type', 'application/json')
+                        ->header('X-Idempotent-Replay', 'true');
+                }
+
+                // حجز يتيم من محاولة ماتت قبل الإتمام: بعد دقيقة يجوز الاستيلاء عليه
+                if (\Illuminate\Support\Carbon::parse($row->created_at)->lt(now()->subMinute())) {
+                    \Illuminate\Support\Facades\DB::table('idempotency_keys')
+                        ->where('id', $row->id)->whereNull('response')->delete();
+                    continue;
+                }
+
+                return response()->json(['error' => 'الطلب نفسه قيد المعالجة الآن — أعد المحاولة بعد لحظات'], 409);
+            }
+        }
+
+        return true;    // التنظيف انزلق تحتنا مرتين — لا نعطّل العميل
     }
 
-    /** تخزين رد ناجح تحت مفتاح Idempotency (مع تنظيف ما جاوز يومين) */
-    protected function idempotentStore(Request $r, $resp): void
+    /** إتمام الحجز: يُملأ الرد المخزن تحت المفتاح (مع تنظيف ما جاوز يومين) */
+    protected function idempotentFinish(Request $r, $resp): void
     {
         [$tokenId, $ikey] = $this->ikeyOf($r);
         if (! $ikey) return;
 
         try {
-            \Illuminate\Support\Facades\DB::table('idempotency_keys')->insert([
-                'id' => (string) \Illuminate\Support\Str::uuid(),
-                'token_id' => $tokenId, 'ikey' => $ikey,
-                'code' => $resp->getStatusCode(), 'response' => $resp->getContent(),
-                'created_at' => now(),
-            ]);
+            \Illuminate\Support\Facades\DB::table('idempotency_keys')
+                ->where('token_id', $tokenId)->where('ikey', $ikey)
+                ->update(['code' => $resp->getStatusCode(), 'response' => $resp->getContent()]);
             \Illuminate\Support\Facades\DB::table('idempotency_keys')
                 ->where('created_at', '<', now()->subDays(2))->delete();
         } catch (\Throwable $e) {
-            // سباق إدراجين متزامنين — القيد الفريد يحسمه ولا نكسر الرد
+            // فشل التخزين لا يكسر الرد — أسوأ الأحوال إعادة تنفيذ مكشوفة لاحقاً
+        }
+    }
+
+    /** تحرير حجز لم يكتمل — كي لا يظل المفتاح محجوباً بعد طلب فاشل */
+    protected function idempotentRelease(Request $r): void
+    {
+        [$tokenId, $ikey] = $this->ikeyOf($r);
+        if (! $ikey) return;
+
+        try {
+            \Illuminate\Support\Facades\DB::table('idempotency_keys')
+                ->where('token_id', $tokenId)->where('ikey', $ikey)->whereNull('response')->delete();
+        } catch (\Throwable $e) {
+            // الحجز اليتيم يُستولى عليه بعد دقيقة على كل حال
         }
     }
 

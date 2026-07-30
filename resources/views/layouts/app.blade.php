@@ -70,7 +70,8 @@
                 <form method="POST" action="{{ route('logout') }}">@csrf<button class="btn ghost sm" type="submit">خروج</button></form>
             </div>
         </header>
-        <div id="flash">@include('partials.flash')</div>
+        {{-- منطقة حية: قارئ الشاشة يقرأ الرسالة حين تُحقن بعد htmx أو تتبدل --}}
+        <div id="flash" role="status" aria-live="polite">@include('partials.flash')</div>
         <div class="content">@yield('content')</div>
     </main>
 </div>

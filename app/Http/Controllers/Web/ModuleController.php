@@ -149,13 +149,15 @@ class ModuleController extends Controller
             $cd = hub_mod($ck);
             $cc = '\\App\\Models\\' . $cd['model'];
             if (! class_exists($cc)) continue;
-            $base  = hub_scope($cc::where($cf['col'], $row->id), $ck);
-            $count = (clone $base)->count();
-            if (! $count) continue;
+            $base = hub_scope($cc::where($cf['col'], $row->id), $ck);
+            // الصفوف أولاً والعدّ عند الحاجة فقط — كان count(*) لكل وحدة بنت
+            // (٤٠+ استعلاماً على صفحة مشروع فارغ) قبل أي جلب
+            $rows = (clone $base)->orderByDesc('created_at')->limit(9)->get();
+            if ($rows->isEmpty()) continue;
             $children[] = [
                 'module' => $ck, 'label' => $cd['label'], 'field' => $cf,
-                'count'  => $count,
-                'rows'   => (clone $base)->orderByDesc('created_at')->limit(8)->get(),
+                'count'  => $rows->count() <= 8 ? $rows->count() : (clone $base)->count(),
+                'rows'   => $rows->take(8),
                 'display' => hub_display_col($ck),
             ];
         }

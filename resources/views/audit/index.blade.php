@@ -38,5 +38,5 @@
         </tbody>
     </table>
 </div>
-{{ $rows->links('partials.pagination') }}
+{{ $rows->links('partials.pagination_simple') }}
 @endsection

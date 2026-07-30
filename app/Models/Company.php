@@ -30,5 +30,13 @@ class Company extends Model
         'archived' => 'boolean',
     ];
 
-
+    protected static function booted(): void
+    {
+        // قائمة الشركات في الشريط العلوي مخبأة ٥ دقائق — بلا هذا الإبطال تبقى
+        // شركة جديدة أو مُعادُ تسميتها غائبةً عن المبدّل حتى انتهاء الكاش
+        $bust = fn () => \Illuminate\Support\Facades\Cache::forget('topbar:companies');
+        static::saved($bust);
+        static::deleted($bust);
+        static::restored($bust);
+    }
 }
