@@ -12,17 +12,15 @@ use Illuminate\Http\Request;
  */
 class PrefController extends Controller
 {
-    /** بطاقات لوحة التحكم القابلة للإخفاء */
-    public const DASH_CARDS = [
-        'counts' => 'بطاقات العدّ العلوية',
-        'kpis'   => '📈 ودجات مؤشرات KPI',
-        'expiry' => '🔔 ينتهي قريباً',
-        'apps'   => '📱 تقدم التطبيقات',
-        'donut'  => '✅ المهام بالحالة',
-        'recent' => '📌 آخر ما فتحت',
-        'due'    => '⏰ مهام تقترب مواعيدها',
-        'audits' => '🕘 آخر النشاطات',
-    ];
+    /**
+     * بطاقات لوحة التحكم القابلة للإخفاء — مصدرها سجل الودجات.
+     * كانت قائمة ثابتة هنا لا يعرفها `DashboardController`، فإضافة ودجة تتطلب
+     * تعديل ملفين ونسيان أحدهما يعطي بطاقةً بلا اسم أو اسماً بلا بطاقة.
+     */
+    protected function dashCards(): array
+    {
+        return \App\Support\WidgetRegistry::labels();
+    }
 
     public function edit()
     {
@@ -31,7 +29,7 @@ class PrefController extends Controller
         return view('personalize', [
             'top'    => hub_top_links($u),
             'groups' => $this->rawGroups($u),
-            'cards'  => self::DASH_CARDS,
+            'cards'  => $this->dashCards(),
         ]);
     }
 
@@ -79,7 +77,7 @@ class PrefController extends Controller
             'order'      => $order,
         ]);
         $prefs['dash'] = array_filter([
-            'hidden' => array_values(array_intersect($data['dash_hidden'] ?? [], array_keys(self::DASH_CARDS))),
+            'hidden' => array_values(array_intersect($data['dash_hidden'] ?? [], array_keys($this->dashCards()))),
         ]);
         // كتم أنواع الإشعارات — ضمن القائمة القابلة للكتم فقط
         $prefs['mute'] = array_values(array_intersect($data['mute'] ?? [], array_keys(\App\Models\HubNotification::MUTEABLE)));
