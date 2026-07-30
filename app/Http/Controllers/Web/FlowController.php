@@ -91,4 +91,38 @@ class FlowController extends Controller
 
         return back()->with('ok', 'حُذف المسار');
     }
+
+    /**
+     * Sandbox: جرّب مساراً على سجل حقيقي وشاهد ما **سيحدث** — بلا تنفيذ.
+     * أحدث ٢٠ سجلاً من وحدة المسار للاختيار، والتقرير من محرك المسارات نفسه.
+     */
+    public function sandbox(Request $r, string $id)
+    {
+        $this->gate();
+        $flow = Flow::findOrFail($id);
+        $def = hub_mod($flow->module);
+        abort_unless($def, 404, 'وحدة هذا المسار غير مثبّتة');
+
+        $class = '\\App\\Models\\' . $def['model'];
+        $recent = class_exists($class)
+            ? $class::query()->orderByDesc('created_at')->limit(20)
+                ->get(['id', hub_display_col($flow->module), 'created_at'])
+            : collect();
+
+        $result = null; $record = null;
+        if ($rid = $r->query('rid')) {
+            $record = class_exists($class) ? $class::find($rid) : null;
+            if ($record) {
+                // للحدث «status» نحاكي التحول إلى الحالة المطلوبة في المسار
+                $statusTo = $flow->event === 'status' ? (string) $flow->status_to : null;
+                $result = \App\Support\FlowRunner::simulate($flow, $flow->module, $record, $statusTo);
+            }
+        }
+
+        return view('flows.sandbox', [
+            'flow' => $flow, 'def' => $def, 'recent' => $recent,
+            'record' => $record, 'result' => $result,
+            'display' => hub_display_col($flow->module),
+        ]);
+    }
 }

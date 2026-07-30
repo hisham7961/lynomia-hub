@@ -45,6 +45,74 @@ class FlowRunner
         }
     }
 
+    /**
+     * تجربة جافة: يقيّم المسار على سجل حقيقي ويصف ما **سيحدث** دون تنفيذ أي
+     * إجراء — لا إشعار يُرسل ولا مهمة تُنشأ ولا حقل يُكتب. أمان تكامل n8n:
+     * ترى أثر المسار قبل أن تفعّله على بياناتك.
+     */
+    public static function simulate(Flow $flow, string $module, Model $m, ?string $statusTo = null): array
+    {
+        $def = hub_mod($module);
+        if (! $def) return ['ok' => false, 'why' => 'وحدة غير معروفة', 'actions' => []];
+
+        // مطابقة الحالة (الحدث مضمون: المسار مُختار لحدثه في الواجهة)
+        $statusMatch = true; $statusWhy = '';
+        if ($flow->event === 'status' && trim((string) $flow->status_to) !== '') {
+            $statusMatch = trim((string) $flow->status_to) === trim((string) $statusTo);
+            $statusWhy = "الحالة المطلوبة «{$flow->status_to}»، والمُختبَرة «" . ($statusTo ?: '—') . '»';
+        }
+
+        // الشرط
+        $condPass = self::condPass($flow, $def, $m);
+        $condWhy = '';
+        if ($flow->cond_field) {
+            $field = collect($def['fields'])->firstWhere('key', $flow->cond_field);
+            $cur = $field ? $m->{$field['col']} : null;
+            $cur = is_array($cur) ? implode('،', $cur) : (string) $cur;
+            $ops = ['eq' => 'يساوي', 'has' => 'يحوي', 'gt' => 'أكبر من', 'lt' => 'أصغر من'];
+            $condWhy = ($field['label'] ?? $flow->cond_field) . " («{$cur}») "
+                . ($ops[$flow->cond_op] ?? '=') . " «{$flow->cond_value}»";
+        }
+
+        $wouldRun = $statusMatch && $condPass;
+
+        // وصف الإجراءات بقوالبها محلولةً — بلا تنفيذ
+        $actions = [];
+        foreach ((array) $flow->actions as $a) {
+            $actions[] = self::describe($a, $def, $module, $m);
+        }
+
+        return [
+            'ok' => $wouldRun,
+            'statusMatch' => $statusMatch, 'statusWhy' => $statusWhy,
+            'condPass' => $condPass, 'condWhy' => $condWhy,
+            'actions' => $actions,
+            'record' => self::display($def, $module, $m),
+        ];
+    }
+
+    /** وصف إجراء واحد بقالبه محلولاً — انعكاس act() بلا آثار جانبية */
+    protected static function describe(array $a, array $def, string $module, Model $m): array
+    {
+        $text = self::tpl((string) ($a['text'] ?? ''), $def, $module, $m);
+        $type = $a['type'] ?? '';
+
+        return match ($type) {
+            'notify' => ['icon' => '🔔', 'label' => 'إشعار داخلي',
+                'detail' => (($a['to'] ?? 'owners') === 'owners' ? 'إلى المالكين' : 'إلى مستخدم محدد')
+                    . ': ' . ($text ?: 'حدث في ' . $def['label'])],
+            'tg' => ['icon' => '📨', 'label' => 'رسالة تلجرام', 'detail' => $text ?: '—'],
+            'mail' => ['icon' => '✉️', 'label' => 'بريد إلكتروني',
+                'detail' => 'إلى ' . ($a['to_email'] ?? '—') . ': ' . ($text ?: '—')],
+            'task' => ['icon' => '✅', 'label' => 'إنشاء مهمة',
+                'detail' => $text ?: ('متابعة: ' . self::display($def, $module, $m))],
+            'set' => ['icon' => '✏️', 'label' => 'تعيين حقل',
+                'detail' => (collect($def['fields'])->firstWhere('key', $a['field'] ?? '')['label'] ?? ($a['field'] ?? '—'))
+                    . ' ← «' . ($a['value'] ?? '') . '»'],
+            default => ['icon' => '❓', 'label' => 'إجراء غير معروف', 'detail' => $type],
+        };
+    }
+
     /* ── الشرط ── */
     protected static function condPass(Flow $f, array $def, Model $m): bool
     {

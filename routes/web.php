@@ -223,6 +223,7 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/settings/odoo-test', [SettingController::class, 'odooTest'])->name('settings.odoo.test');
     Route::get('admin/flows', [FlowController::class, 'index'])->name('flows.index');
     Route::post('admin/flows', [FlowController::class, 'store'])->name('flows.store');
+    Route::get('admin/flows/{id}/sandbox', [FlowController::class, 'sandbox'])->name('flows.sandbox');
     Route::post('admin/flows/{id}/toggle', [FlowController::class, 'toggle'])->name('flows.toggle');
     Route::delete('admin/flows/{id}', [FlowController::class, 'destroy'])->name('flows.destroy');
     Route::get('admin/fields', [CustomFieldController::class, 'index'])->name('fields.index');

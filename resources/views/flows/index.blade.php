@@ -23,6 +23,7 @@
                 <td><b>{{ $f->runs }}</b>@if ($f->last_run_at)<div class="sub">{{ $f->last_run_at->diffForHumans() }}</div>@endif</td>
                 <td>@if ($f->enabled)<span class="bdg ok">مفعّل</span>@else<span class="bdg g">معطل</span>@endif</td>
                 <td class="acts">
+                    <a class="btn ghost xs" href="{{ route('flows.sandbox', $f->id) }}" title="جرّب المسار على سجل حقيقي بلا تنفيذ">🧪 تجربة</a>
                     <form class="inline" method="POST" action="{{ route('flows.toggle', $f->id) }}">@csrf<button class="btn ghost xs">{{ $f->enabled ? 'تعطيل' : 'تفعيل' }}</button></form>
                     <form class="inline" method="POST" action="{{ route('flows.destroy', $f->id) }}" onsubmit="return confirm('حذف المسار؟')">@csrf @method('DELETE')<button class="btn ghost xs" style="color:var(--bad)">حذف</button></form>
                 </td>
