@@ -29,7 +29,7 @@ Accept: application/json
 | `GET /api/v1/{module}?q=&status=&page=&per=` | قائمة مرقمة (per ≤ 100) مع بحث وفلتر حالة |
 | `GET /api/v1/{module}/{id}` | سجل واحد |
 | `POST /api/v1/{module}` | إنشاء — أرسل الحقول **بمفاتيح السجل** (مثل `nameAr`، `clientId`) بنفس تحقق النماذج |
-| `PUT /api/v1/{module}/{id}` | تعديل |
+| `PUT /api/v1/{module}/{id}` | تعديل — **استبدال كامل**: أرسل كل الحقول التي تريد إبقاءها؛ الحقل الغائب يُفرَّغ (اقرأ السجل بـ GET ثم أعد إرساله معدلاً) |
 | `DELETE /api/v1/{module}/{id}` | نقل للسلة |
 
 ## أمثلة
