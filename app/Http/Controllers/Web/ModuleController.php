@@ -538,6 +538,9 @@ class ModuleController extends Controller
                 'num', 'big' => 'numeric',
                 'date', 'dt' => 'date',
                 'file', 'img' => 'file',
+                // كانت تسقط للنص: صندوق المتصفح يمر بـ«1» صدفةً، لكن الـ API
+                // بقيمة منطقية true يُرفض برسالة «يجب أن يكون نصاً».
+                'bool' => 'boolean',
                 default => 'string',
             };
             if ($f['type'] === 'ref' && ($t = hub_ref_table($f['ref']))) {
