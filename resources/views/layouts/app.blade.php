@@ -76,32 +76,43 @@
                 <form method="POST" action="{{ route('logout') }}">@csrf<button class="btn ghost sm" type="submit">خروج</button></form>
             </div>
         </header>
-        {{-- شريط الإدارة — ظاهرٌ دائماً تحت البار العلوي، لا خلف زر. أقسامه بفواصل --}}
+        {{-- شريط الإدارة — كبسولات ظاهرة دائماً، لكل عائلةٍ عنوانٌ ولونُ هوية (--seg) --}}
         @php $isOwner = hub_is_owner(); @endphp
         @if ($isOwner || hub_flag(auth()->user(), 'users') || hub_flag(auth()->user(), 'audit') || hub_secrets())
             <nav class="adminbar" aria-label="الإدارة والنظام">
-                <a class="{{ request()->routeIs('prefs.*') ? 'on' : '' }}" href="{{ route('prefs.edit') }}">🎛️ التخصيص</a>
+                <div class="seg" style="--seg:var(--ac)">
+                    <span class="seglbl">شخصي</span>
+                    <a class="{{ request()->routeIs('prefs.*') ? 'on' : '' }}" href="{{ route('prefs.edit') }}">التخصيص</a>
+                </div>
                 @if (hub_flag(auth()->user(), 'users') || $isOwner)
-                    <span class="sep" aria-hidden="true"></span>
-                    @if (hub_flag(auth()->user(), 'users'))<a class="{{ request()->routeIs('users.*') ? 'on' : '' }}" href="{{ route('users.index') }}">👥 المستخدمون</a>@endif
-                    @if ($isOwner)<a class="{{ request()->routeIs('roles.*') ? 'on' : '' }}" href="{{ route('roles.index') }}">🧑‍⚖️ الأدوار</a>@endif
+                    <div class="seg" style="--seg:#4C6FA5">
+                        <span class="seglbl">الفريق</span>
+                        @if (hub_flag(auth()->user(), 'users'))<a class="{{ request()->routeIs('users.*') ? 'on' : '' }}" href="{{ route('users.index') }}">المستخدمون</a>@endif
+                        @if ($isOwner)<a class="{{ request()->routeIs('roles.*') ? 'on' : '' }}" href="{{ route('roles.index') }}">الأدوار</a>@endif
+                    </div>
                 @endif
-                @if (hub_flag(auth()->user(), 'audit') || $isOwner)
-                    <span class="sep" aria-hidden="true"></span>
-                    @if (hub_flag(auth()->user(), 'audit'))<a class="{{ request()->routeIs('audit.*') ? 'on' : '' }}" href="{{ route('audit.index') }}">🕘 التدقيق</a>@endif
-                    @if ($isOwner)<a class="{{ request()->routeIs('security.*') ? 'on' : '' }}" href="{{ route('security.index') }}">🛡️ الأمان</a>@endif
-                    @if ($isOwner)<a class="{{ request()->routeIs('ops.*') ? 'on' : '' }}" href="{{ route('ops.index') }}">🖥️ التشغيل</a>@endif
-                    @if ($isOwner)<a class="{{ request()->routeIs('errors.*') ? 'on' : '' }}" href="{{ route('errors.index') }}">🐞 الأخطاء</a>@endif
+                @if (hub_flag(auth()->user(), 'audit') || $isOwner || hub_secrets())
+                    <div class="seg" style="--seg:#C08A3E">
+                        <span class="seglbl">الرقابة</span>
+                        @if (hub_flag(auth()->user(), 'audit'))<a class="{{ request()->routeIs('audit.*') ? 'on' : '' }}" href="{{ route('audit.index') }}">التدقيق</a>@endif
+                        @if ($isOwner)<a class="{{ request()->routeIs('security.*') ? 'on' : '' }}" href="{{ route('security.index') }}">الأمان</a>@endif
+                        @if ($isOwner)<a class="{{ request()->routeIs('ops.*') ? 'on' : '' }}" href="{{ route('ops.index') }}">التشغيل</a>@endif
+                        @if ($isOwner)<a class="{{ request()->routeIs('errors.*') ? 'on' : '' }}" href="{{ route('errors.index') }}">الأخطاء</a>@endif
+                        @if (hub_secrets())<a class="{{ request()->routeIs('dataroom.*') ? 'on' : '' }}" href="{{ route('dataroom.index') }}">غرفة البيانات</a>@endif
+                    </div>
                 @endif
-                @if (hub_secrets())<a class="{{ request()->routeIs('dataroom.*') ? 'on' : '' }}" href="{{ route('dataroom.index') }}">🔐 غرفة البيانات</a>@endif
                 @if ($isOwner)
-                    <span class="sep" aria-hidden="true"></span>
-                    <a class="{{ request()->routeIs('fields.*') ? 'on' : '' }}" href="{{ route('fields.index') }}">🧩 الحقول</a>
-                    <a class="{{ request()->routeIs('flows.*') ? 'on' : '' }}" href="{{ route('flows.index') }}">🪄 المسارات</a>
-                    <a class="{{ request()->routeIs('webhooks.*') ? 'on' : '' }}" href="{{ route('webhooks.index') }}">🪝 Webhooks</a>
-                    <a class="{{ request()->routeIs('quality.*') ? 'on' : '' }}" href="{{ route('quality.index') }}">🧹 الجودة</a>
-                    <span class="sep" aria-hidden="true"></span>
-                    <a class="{{ request()->routeIs('settings.*') ? 'on' : '' }}" href="{{ route('settings.edit') }}">⚙️ الإعدادات</a>
+                    <div class="seg" style="--seg:#7C6FB0">
+                        <span class="seglbl">البناء</span>
+                        <a class="{{ request()->routeIs('fields.*') ? 'on' : '' }}" href="{{ route('fields.index') }}">الحقول</a>
+                        <a class="{{ request()->routeIs('flows.*') ? 'on' : '' }}" href="{{ route('flows.index') }}">المسارات</a>
+                        <a class="{{ request()->routeIs('webhooks.*') ? 'on' : '' }}" href="{{ route('webhooks.index') }}">Webhooks</a>
+                        <a class="{{ request()->routeIs('quality.*') ? 'on' : '' }}" href="{{ route('quality.index') }}">الجودة</a>
+                    </div>
+                    <div class="seg" style="--seg:var(--p)">
+                        <span class="seglbl">النظام</span>
+                        <a class="{{ request()->routeIs('settings.*') ? 'on' : '' }}" href="{{ route('settings.edit') }}">الإعدادات</a>
+                    </div>
                 @endif
             </nav>
         @endif

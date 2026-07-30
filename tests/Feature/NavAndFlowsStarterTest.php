@@ -21,8 +21,11 @@ class NavAndFlowsStarterTest extends TestCase
         $html = $this->actingAs($this->owner)->get('/')->assertOk()->getContent();
 
         $this->assertStringContainsString('class="adminbar"', $html);
+        $this->assertStringContainsString('class="seg"', $html);
         $this->assertStringNotContainsString('gearmenu', $html);
-        foreach (['⚙️ الإعدادات', '🪄 المسارات', '🛡️ الأمان', '🕘 التدقيق', '🎛️ التخصيص'] as $l) {
+        // عناوين الكبسولات الخمس + عينة من روابطها
+        foreach (['شخصي', 'الفريق', 'الرقابة', 'البناء', 'النظام',
+                  'الإعدادات', 'المسارات', 'الأمان', 'التدقيق', 'التخصيص'] as $l) {
             $this->assertStringContainsString($l, $html);
         }
         // الجانبي تخفف: لا قسم «النظام» فيه بعد اليوم
@@ -37,7 +40,7 @@ class NavAndFlowsStarterTest extends TestCase
         $this->seedCore();
         $html = $this->actingAs($this->employee)->get('/')->assertOk()->getContent();
 
-        $this->assertStringNotContainsString('🛡️ الأمان', $html);
+        $this->assertStringNotContainsString('href="' . route('security.index') . '"', $html);
         $this->assertStringNotContainsString('href="' . route('settings.edit') . '"', $html);
     }
 

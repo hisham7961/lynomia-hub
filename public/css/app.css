@@ -264,15 +264,27 @@ input.inp.htmx-request{background-image:linear-gradient(90deg,transparent,color-
   font-weight:700;animation:pop .16s ease}
 .confirming b{text-decoration:underline}
 
-/* ═ شريط الإدارة — ظاهرٌ دائماً تحت البار العلوي، أقسامه بفواصل ═ */
-.adminbar{display:flex;flex-wrap:wrap;align-items:center;gap:3px 5px;padding:5px 18px;font-size:12px;
-  background:color-mix(in srgb,var(--cd) 55%,transparent);border-bottom:1px solid var(--ln)}
-.adminbar a{padding:3px 10px;border-radius:99px;color:var(--tx);border:1px solid transparent;
-  white-space:nowrap;transition:background var(--t),border-color var(--t)}
-.adminbar a:hover{background:color-mix(in srgb,var(--p) 8%,transparent);border-color:var(--ln)}
-.adminbar a.on{background:var(--p);color:#fff;font-weight:700}
-.adminbar .sep{width:1px;height:14px;background:var(--ln);margin:0 3px;flex-shrink:0}
+/* ═ شريط الإدارة — كبسولات لكل عائلة عنوانٌ ولون هوية (--seg تُضبط في القالب) ═ */
+.adminbar{display:flex;align-items:center;gap:7px;padding:7px 18px;font-size:12px;
+  overflow-x:auto;scrollbar-width:none;border-bottom:1px solid var(--ln);
+  background:linear-gradient(180deg,color-mix(in srgb,var(--cd) 72%,transparent),transparent)}
+.adminbar::-webkit-scrollbar{display:none}
+.seg{--seg:var(--p);display:inline-flex;align-items:center;gap:1px;flex-shrink:0;padding:2px;
+  background:color-mix(in srgb,var(--cd) 78%,transparent);border:1px solid color-mix(in srgb,var(--seg) 22%,var(--ln));
+  border-radius:99px;box-shadow:0 1px 4px color-mix(in srgb,var(--seg) 8%,transparent)}
+.seglbl{font-size:10px;font-weight:800;letter-spacing:.4px;padding:3px 9px 3px 7px;border-radius:99px;
+  color:color-mix(in srgb,var(--seg) 62%,var(--tx));background:color-mix(in srgb,var(--seg) 13%,transparent);
+  display:inline-flex;align-items:center;gap:5px;user-select:none}
+.seglbl::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--seg);
+  box-shadow:0 0 5px color-mix(in srgb,var(--seg) 60%,transparent)}
+.seg a{padding:3px 10px;border-radius:99px;color:color-mix(in srgb,var(--tx) 80%,transparent);
+  white-space:nowrap;transition:background var(--t),color var(--t)}
+.seg a:hover{background:color-mix(in srgb,var(--seg) 12%,transparent);color:var(--tx)}
+.seg a.on{background:var(--seg);color:#fff;font-weight:700;
+  box-shadow:0 2px 9px color-mix(in srgb,var(--seg) 45%,transparent)}
+@media (max-width:760px){.adminbar{padding:6px 12px}}
 @media print{.adminbar{display:none!important}}
+html[data-theme="dark"] .seg{background:color-mix(in srgb,var(--cd) 88%,transparent)}
 
 /* ═ النوافذ المنبثقة ═ */
 .modal{position:fixed;inset:0;background:color-mix(in srgb,#03110D 55%,transparent);backdrop-filter:blur(4px);
