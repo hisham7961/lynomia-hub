@@ -14,6 +14,7 @@ use App\Http\Controllers\Web\ModuleController;
 use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\PortalController;
 use App\Http\Controllers\Web\ProfileController;
+use App\Http\Controllers\Web\QuoteController;
 use App\Http\Controllers\Web\ReportController;
 use App\Http\Controllers\Web\RoleController;
 use App\Http\Controllers\Web\SearchController;
@@ -59,6 +60,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('comments/{id}', [CommentController::class, 'destroy'])->name('comments.destroy');
     Route::get('employee/{id}', [PortalController::class, 'employee'])->name('portal.employee');
     Route::get('app/{id}', [AppCenterController::class, 'show'])->name('apps.center');
+    Route::get('quote/{id}/doc', [QuoteController::class, 'doc'])->name('quotes.doc');
+    Route::post('quote/{id}/act', [QuoteController::class, 'act'])->name('quotes.act');
     Route::get('search', [SearchController::class, 'index'])->name('search');
     Route::get('search/mini', [SearchController::class, 'mini'])->name('search.mini');
     Route::get('alerts', [AlertController::class, 'index'])->name('alerts');

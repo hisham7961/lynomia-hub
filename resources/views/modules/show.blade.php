@@ -21,6 +21,9 @@
 @if ($module === 'approvals')
     @include('partials.approval_exec')
 @endif
+@if ($module === 'quotes')
+    @include('partials.quote_actions')
+@endif
 <div class="card">
     <dl class="detail">
         @foreach ($def['fields'] as $f)
