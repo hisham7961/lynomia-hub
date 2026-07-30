@@ -42,4 +42,9 @@
             </details>
         @endif
     </nav>
+
+    {{-- رقم الإصدار — مصدره ملف VERSION عبر config('hub.version')، فيتحدّث تلقائياً مع كل رفعة --}}
+    <div class="sidefoot">
+        <span class="verbadge" title="إصدار النظام">v{{ config('hub.version') }}</span>
+    </div>
 </aside>
