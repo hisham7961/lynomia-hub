@@ -117,11 +117,11 @@
                         <td>@include('partials._display', ['f' => $f, 'row' => $row, 'labels' => $labels, 'ctx' => 'table'])</td>
                     @endforeach
                     <td class="acts">
-                        <a class="btn ghost xs" href="{{ route('m.show', [$module, $row->id]) }}">عرض</a>
+                        <a class="btn ghost xs" hx-boost="false" href="{{ route('m.show', [$module, $row->id]) }}">عرض</a>
                         @if ($trash)
                             <form method="POST" action="{{ route('m.restore', [$module, $row->id]) }}" class="inline">@csrf<button class="btn xs" type="submit">استعادة</button></form>
                         @else
-                            @if (hub_can(auth()->user(), $module, 'e'))<a class="btn ghost xs" href="{{ route('m.edit', [$module, $row->id]) }}">تعديل</a>@endif
+                            @if (hub_can(auth()->user(), $module, 'e'))<a class="btn ghost xs" hx-boost="false" href="{{ route('m.edit', [$module, $row->id]) }}">تعديل</a>@endif
                             @if (hub_can(auth()->user(), $module, 'd'))
                                 <form method="POST" action="{{ route('m.destroy', [$module, $row->id]) }}" class="inline" data-confirm="نقل السجل إلى السلة؟">@csrf @method('DELETE')<button class="btn ghost xs dn" type="submit">حذف</button></form>
                             @endif
@@ -132,7 +132,7 @@
                 <tr><td colspan="{{ count($columns) + 1 }}" class="empty">
                     <span class="big">{{ $trash ? '🗑' : '📄' }}</span>
                     {{ $trash ? 'السلة فارغة' : (request('q') ? 'لا نتائج للبحث' : 'لا سجلات بعد') }}
-                    @if (! $trash && ! request('q') && hub_can(auth()->user(), $module, 'a'))<div style="margin-top:10px"><a class="btn p sm" href="{{ route('m.create', $module) }}">أضف أول سجل</a></div>@endif
+                    @if (! $trash && ! request('q') && hub_can(auth()->user(), $module, 'a'))<div style="margin-top:10px"><a class="btn p sm" hx-boost="false" href="{{ route('m.create', $module) }}">أضف أول سجل</a></div>@endif
                 </td></tr>
             @endforelse
             </tbody>

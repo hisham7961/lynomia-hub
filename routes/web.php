@@ -69,7 +69,18 @@ Route::middleware('guest')->group(function () {
         ->middleware('throttle:6,1');
 });
 
+// التوقيع الإلكتروني — الجهة العامة: العميل بلا حساب، برابط خاص وكلمة سر
+Route::get('sign/{token}', [\App\Http\Controllers\Web\EsignController::class, 'show'])->name('sign.show');
+Route::post('sign/{token}/unlock', [\App\Http\Controllers\Web\EsignController::class, 'unlock'])->name('sign.unlock');
+Route::post('sign/{token}', [\App\Http\Controllers\Web\EsignController::class, 'sign'])->name('sign.sign');
+
 Route::middleware('auth')->group(function () {
+    // التوقيع الإلكتروني — الجهة الداخلية (بصلاحية العقود)
+    Route::get('esign', [\App\Http\Controllers\Web\EsignController::class, 'index'])->name('esign.index');
+    Route::post('esign', [\App\Http\Controllers\Web\EsignController::class, 'store'])->name('esign.store');
+    Route::post('esign/templates', [\App\Http\Controllers\Web\EsignController::class, 'storeTemplate'])->name('esign.tpl.store');
+    Route::delete('esign/templates/{id}', [\App\Http\Controllers\Web\EsignController::class, 'destroyTemplate'])->name('esign.tpl.destroy');
+    Route::get('esign/{id}/doc', [\App\Http\Controllers\Web\EsignController::class, 'doc'])->name('esign.doc');
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');

@@ -252,6 +252,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $mon],
 
             ['key' => 'legal',     'label' => '⚖️ القانوني',         'route' => 'legal',           'group' => 'centers',   'ok' => hub_can($user, 'contracts', 'v')],
+            ['key' => 'esign',     'label' => '✍️ توقيع العقود',     'route' => 'esign.index',     'group' => 'centers',   'ok' => hub_can($user, 'contracts', 'v')],
             ['key' => 'support',   'label' => '🎫 لوحة الدعم',       'route' => 'support',         'group' => 'centers',   'ok' => hub_can($user, 'tickets', 'v')],
             ['key' => 'innov',     'label' => '💡 مركز الابتكار',    'route' => 'innovation',      'group' => 'centers',   'ok' => hub_can($user, 'ideas', 'v')],
             ['key' => 'supscores', 'label' => '🏅 تقييم الموردين',   'route' => 'supplierscores',  'group' => 'centers',   'ok' => hub_can($user, 'suppliers', 'v')],

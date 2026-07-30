@@ -56,6 +56,9 @@
 @if ($module === 'tickets')
     @include('partials.ticket_sla')
 @endif
+@if ($module === 'contracts' && hub_can(auth()->user(), 'contracts', 'v'))
+    @include('partials.esign_card')
+@endif
 <div class="card">
     <dl class="detail">
         @foreach ($def['fields'] as $f)
