@@ -55,6 +55,14 @@ class DashboardController extends Controller
                 });
         }
 
+        // توزيع المهام بالحالة — للدونات
+        $taskSlices = [];
+        if (hub_can($user, 'tasks', 'v')) {
+            $taskSlices = hub_scope(DB::table('tasks')->whereNull('deleted_at'), 'tasks')
+                ->select('status', DB::raw('COUNT(*) c'))->groupBy('status')->orderByDesc('c')->limit(6)->get()
+                ->map(fn ($r) => ['label' => $r->status ?: 'بلا حالة', 'value' => (int) $r->c])->all();
+        }
+
         $aq = DB::table('audits')
             ->leftJoin('users', 'users.id', '=', 'audits.user_id')
             ->select('audits.*', 'users.name as user_name');
@@ -65,6 +73,6 @@ class DashboardController extends Controller
         }
         $audits = $aq->orderByDesc('audits.created_at')->limit(10)->get();
 
-        return view('dashboard', compact('cards', 'audits', 'due', 'dueCol', 'stCol', 'disp', 'expiry', 'apps'));
+        return view('dashboard', compact('cards', 'audits', 'due', 'dueCol', 'stCol', 'disp', 'expiry', 'apps', 'taskSlices'));
     }
 }

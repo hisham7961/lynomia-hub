@@ -45,6 +45,12 @@
         </table>
     </div>
     @endif
+    @if (count($taskSlices))
+    <div class="card kid">
+        <h3>✅ المهام بالحالة</h3>
+        @include('partials.chart_donut', ['slices' => $taskSlices])
+    </div>
+    @endif
     <div class="card kid" id="recentbox" hidden>
         <h3>📌 آخر ما فتحت</h3>
         <div id="recentlist" class="rl"></div>

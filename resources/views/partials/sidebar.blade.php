@@ -9,6 +9,9 @@
         @if (hub_can(auth()->user(), 'fin', 'v'))
             <a class="ni top {{ request()->routeIs('reports.finance') ? 'on' : '' }}" href="{{ route('reports.finance') }}">📊 التقارير المالية</a>
         @endif
+        @if (auth()->user()->role?->is_owner)
+            <a class="ni top {{ request()->routeIs('ceo') ? 'on' : '' }}" href="{{ route('ceo') }}">👑 لوحة CEO</a>
+        @endif
         @foreach (hub_nav(auth()->user()) as $g)
             @php $active = collect($g['items'])->contains(fn ($k) => request()->is("m/$k*")); @endphp
             <details {{ $active ? 'open' : '' }}>

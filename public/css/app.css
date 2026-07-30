@@ -234,3 +234,15 @@ html[data-theme="dark"] .llc h5,html[data-theme="dark"] .logincard h1{color:var(
 .tl:last-of-type{border-bottom:0}
 .tlv{min-width:64px;text-align:center;font-weight:800;font-size:13px;color:var(--pd);background:var(--ps);border-radius:10px;padding:6px 8px;height:fit-content}
 .tlb{flex:1;min-width:0}
+
+/* ═ v2.10 — لوحة CEO والصحة والدونات ═ */
+.hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.hitem{background:var(--bg);border:1px solid var(--ln);border-radius:12px;padding:12px}
+.donutwrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center}
+.donut{width:130px;height:130px;flex-shrink:0}
+.dtotal{font-size:20px;font-weight:800;fill:var(--tx)}
+.dlegend{display:flex;flex-direction:column;gap:5px;font-size:12.5px}
+.dlegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:6px}
+.dlegend b{color:var(--tx)}
+html[data-theme="dark"] .hitem{background:var(--cd)}
+@media print{.sidebar,.topbar,.btn{display:none!important}.main{margin:0!important}}

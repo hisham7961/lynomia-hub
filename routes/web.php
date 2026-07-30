@@ -5,6 +5,7 @@ use App\Http\Controllers\Web\AppCenterController;
 use App\Http\Controllers\Web\ApprovalDecisionController;
 use App\Http\Controllers\Web\AuditController;
 use App\Http\Controllers\Web\AuthController;
+use App\Http\Controllers\Web\CeoController;
 use App\Http\Controllers\Web\CommentController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\ModuleController;
@@ -49,6 +50,7 @@ Route::middleware('auth')->group(function () {
     Route::get('notifications/mini', [NotificationController::class, 'mini'])->name('notifications.mini');
     Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.readall');
     Route::get('reports/finance', [ReportController::class, 'finance'])->name('reports.finance');
+    Route::get('ceo', [CeoController::class, 'index'])->name('ceo');
 
     // ── الملف الشخصي ──
     Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
