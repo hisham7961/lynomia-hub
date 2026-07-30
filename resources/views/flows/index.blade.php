@@ -17,7 +17,7 @@
             @php $fdef = hub_mod($f->module); @endphp
             <tr style="{{ $f->enabled ? '' : 'opacity:.55' }}">
                 <td><b>{{ $f->name }}</b><div class="sub">{{ $fdef['label'] ?? $f->module }}</div></td>
-                <td class="sub">{{ ['created' => 'عند الإنشاء', 'updated' => 'عند التعديل', 'status' => 'عند تحول الحالة'][$f->event] }}{{ $f->status_to ? ' إلى «' . $f->status_to . '»' : '' }}
+                <td class="sub">{{ \App\Support\HubEvents::label($f->event) }}{{ $f->status_to ? ' إلى «' . $f->status_to . '»' : '' }}
                     @if ($f->cond_field)<div>+ شرط: {{ collect($fdef['fields'] ?? [])->firstWhere('key', $f->cond_field)['label'] ?? $f->cond_field }} {{ ['eq' => '=', 'has' => 'يحتوي', 'gt' => '>', 'lt' => '<'][$f->cond_op] ?? '=' }} {{ $f->cond_value }}</div>@endif</td>
                 <td>@foreach ((array) $f->actions as $a)<span class="bdg g">{{ ['notify' => '🔔 إشعار', 'tg' => '📨 تلجرام', 'mail' => '✉️ بريد', 'task' => '✅ مهمة', 'set' => '✏️ تعيين حقل'][$a['type']] ?? $a['type'] }}</span> @endforeach</td>
                 <td><b>{{ $f->runs }}</b>@if ($f->last_run_at)<div class="sub">{{ $f->last_run_at->diffForHumans() }}</div>@endif</td>
@@ -58,6 +58,15 @@
                     <option value="created">عند إنشاء سجل</option>
                     <option value="updated" @selected(old('event') === 'updated')>عند تعديل سجل</option>
                     <option value="status" @selected(old('event') === 'status')>عند تحول الحالة إلى…</option>
+                    @php $sem = \App\Support\HubEvents::namesFor($def['key'] ?? ''); @endphp
+                    @if (count($sem))
+                        {{-- أحداث الأعمال: تُغني عن مطابقة نص الحالة يدوياً --}}
+                        <optgroup label="أحداث الأعمال">
+                            @foreach ($sem as $ev => $lbl)
+                                <option value="{{ $ev }}" @selected(old('event') === $ev)>{{ $lbl }}</option>
+                            @endforeach
+                        </optgroup>
+                    @endif
                 </select></div>
             <div class="fld"><label>الحالة الهدف <span class="sub">(لحدث تحول الحالة)</span></label>
                 @php $stField = collect($def['fields'])->firstWhere('col', $def['status'] ?? ''); @endphp

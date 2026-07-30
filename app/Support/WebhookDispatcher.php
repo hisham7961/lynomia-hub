@@ -34,7 +34,9 @@ class WebhookDispatcher
                 fn () => Webhook::where('active', true)->get());
             if ($hooks->isEmpty()) return;
 
-            $name = $module . '.' . $event;
+            // الحدث الدلالي مُسمّى بنطاقه أصلاً (`invoice.paid`) فلا يُسبق باسم الوحدة،
+            // والخام يبقى `module.event` كما كان — فاشتراكات الويبهوكس القائمة لا تتأثر.
+            $name = str_contains($event, '.') ? $event : $module . '.' . $event;
             $hooks = $hooks->filter(fn ($h) => $h->wants($name));
             if ($hooks->isEmpty()) return;
 

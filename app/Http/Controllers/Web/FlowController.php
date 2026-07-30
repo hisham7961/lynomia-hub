@@ -34,7 +34,8 @@ class FlowController extends Controller
         $d = $r->validate([
             'name'       => ['required', 'string', 'max:190'],
             'm'          => ['required', 'string'],
-            'event'      => ['required', 'in:created,updated,status'],
+            'event'      => ['required', \Illuminate\Validation\Rule::in(
+                array_merge(['created', 'updated', 'status'], \App\Support\HubEvents::semanticNames()))],
             'status_to'  => ['nullable', 'string', 'max:120'],
             'cond_field' => ['nullable', 'string', 'max:80'],
             'cond_op'    => ['nullable', 'in:eq,has,gt,lt'],

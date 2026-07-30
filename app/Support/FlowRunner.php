@@ -17,11 +17,19 @@ use Illuminate\Database\Eloquent\Model;
 class FlowRunner
 {
     /** @param string $event created|updated|status */
+    /**
+     * نقطة النداء التاريخية من المتحكمات — صارت تُفوِّض للناقل.
+     * الناقل يُنادي الويبهوكس ثم المسارات بالترتيب نفسه، فالسلوك القائم لم يتغيّر،
+     * ويُضاف فوقه بثُّ الأحداث الدلالية.
+     */
     public static function fire(string $event, string $module, Model $m, ?string $statusTo = null): void
     {
-        // نفس نقاط الأحداث تغذي مركز Webhooks (ويب + API + كانبان)
-        WebhookDispatcher::fire($event, $module, $m, $statusTo);
+        HubEvents::dispatch($event, $module, $m, $statusTo);
+    }
 
+    /** تنفيذ المسارات المطابقة — مشتركٌ في الناقل، لا يُنادى مباشرة */
+    public static function run(string $event, string $module, Model $m, ?string $statusTo = null): void
+    {
         try {
             $flows = Flow::where('enabled', true)->where('module', $module)->where('event', $event)->get();
             if ($flows->isEmpty()) return;

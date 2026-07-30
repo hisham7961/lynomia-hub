@@ -7565,4 +7565,60 @@ return [
         'expense' => ['مصروف', 'فاتورة مشتريات', 'دفعة صادرة'],
         'dead'    => ['ملغاة', 'مسودة'],
     ],
+
+    /*
+     * خريطة الأحداث الدلالية.
+     *
+     * الحدث الخام (`created`/`updated`/`status`) يبقى يُبثّ كما هو دائماً؛ هذه الخريطة
+     * تُضيف فوقه اسماً يفهمه صاحب العمل: بدل أن يكتب كل مشترك مطابقةَ نصٍّ لـ«مدفوعة»
+     * بمفرداته، يشترك على `invoice.paid` مرة واحدة.
+     *
+     * `on`   الحدث الخام المشتقّ منه.
+     * `to`   قيمة الحالة المطلوبة (مقارنة مُطبَّعة تتجاهل التشكيل) — بلا `to` يُطابق أي تحوّل.
+     * `emit` الاسم الدلالي المبثوث.
+     *
+     * كل قيمة أدناه مأخوذة من `options` المُصرَّح بها في الوحدة نفسها — لا اسم مخترع
+     * لحدثٍ لا يقع.
+     */
+    'events' => [
+        'fin' => [
+            ['on' => 'status', 'to' => ['مدفوعة'], 'emit' => 'invoice.paid', 'label' => 'سُدّدت فاتورة'],
+            ['on' => 'status', 'to' => ['متأخرة'], 'emit' => 'invoice.overdue', 'label' => 'تأخّرت فاتورة'],
+        ],
+        'contracts' => [
+            ['on' => 'status', 'to' => ['ساري'], 'emit' => 'contract.signed', 'label' => 'سرى عقد'],
+            ['on' => 'status', 'to' => ['منتهي'], 'emit' => 'contract.expired', 'label' => 'انتهى عقد'],
+        ],
+        'tasks' => [
+            ['on' => 'status', 'to' => ['مكتملة', 'منجزة'], 'emit' => 'task.completed', 'label' => 'أُنجزت مهمة'],
+        ],
+        'projects' => [
+            ['on' => 'status', 'to' => ['مكتمل'], 'emit' => 'project.completed', 'label' => 'اكتمل مشروع'],
+            ['on' => 'status', 'emit' => 'project.status_changed', 'label' => 'تغيّرت حالة مشروع'],
+        ],
+        'quotes' => [
+            ['on' => 'status', 'to' => ['مقبول'], 'emit' => 'quote.accepted', 'label' => 'قُبل عرض سعر'],
+            ['on' => 'status', 'to' => ['مرفوض'], 'emit' => 'quote.rejected', 'label' => 'رُفض عرض سعر'],
+        ],
+        'purchases' => [
+            ['on' => 'status', 'to' => ['معتمد'], 'emit' => 'purchase.approved', 'label' => 'اعتُمد أمر شراء'],
+            ['on' => 'status', 'to' => ['مستلم'], 'emit' => 'purchase.received', 'label' => 'استُلم أمر شراء'],
+        ],
+        'leaves' => [
+            ['on' => 'status', 'to' => ['معتمد'], 'emit' => 'leave.approved', 'label' => 'اعتُمدت إجازة'],
+            ['on' => 'status', 'to' => ['مرفوض'], 'emit' => 'leave.rejected', 'label' => 'رُفضت إجازة'],
+        ],
+        'issues' => [
+            ['on' => 'status', 'to' => ['محلولة', 'مغلقة'], 'emit' => 'issue.resolved', 'label' => 'حُلّت مشكلة'],
+        ],
+        'deploys' => [
+            ['on' => 'status', 'to' => ['فشل'], 'emit' => 'deploy.failed', 'label' => 'فشل نشر'],
+        ],
+        'restores' => [
+            ['on' => 'status', 'to' => ['فشلت'], 'emit' => 'backup.restore_failed', 'label' => 'فشلت استعادة نسخة'],
+        ],
+        'ideas' => [
+            ['on' => 'status', 'to' => ['معتمدة'], 'emit' => 'idea.approved', 'label' => 'اعتُمدت فكرة'],
+        ],
+    ],
 ];
