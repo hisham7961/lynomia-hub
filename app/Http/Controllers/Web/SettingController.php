@@ -39,6 +39,12 @@ class SettingController extends Controller
             'maintenance.on'  => ['تفعيل وضع الصيانة (الدخول للمالكين فقط)', 'onoff'],
             'maintenance.msg' => ['رسالة تظهر للمستخدمين أثناء الصيانة', 'text'],
         ],
+        '🔗 ربط أودو — عرض فقط' => [
+            'odoo.url'  => ['رابط خادم أودو (مثال: https://mycompany.odoo.com)', 'text'],
+            'odoo.db'   => ['اسم قاعدة البيانات', 'text'],
+            'odoo.user' => ['بريد مستخدم القراءة', 'text'],
+            'odoo.key'  => ['مفتاح API (من إعدادات أمان الحساب في أودو)', 'pass'],
+        ],
     ];
 
     protected function gate(): void
@@ -74,12 +80,31 @@ class SettingController extends Controller
                 }
 
                 $v = $type === 'onoff' ? ($r->boolean($input) ? '1' : '') : trim((string) $r->input($input, ''));
+                if ($type === 'pass' && $v === '') continue;   // فارغ = إبقاء المفتاح المخزن
                 Setting::updateOrCreate(['key' => $key], ['value' => $v]);
             }
         }
 
         Cache::forget('settings:all');
+        Cache::forget('odoo:uid');
 
         return back()->with('ok', 'حُفظت الإعدادات وطُبّقت فوراً');
+    }
+
+    /** اختبار اتصال أودو — يعرض إصدار الخادم أو سبب الفشل */
+    public function odooTest()
+    {
+        $this->gate();
+        if (! \App\Support\Odoo::configured()) {
+            return back()->withErrors(['odoo' => 'أكمل حقول أودو الأربعة أولاً ثم احفظ']);
+        }
+        try {
+            $ver = \App\Support\Odoo::version();
+            $uid = \App\Support\Odoo::uid();
+
+            return back()->with('ok', "✅ الاتصال ناجح — أودو {$ver} · معرف المستخدم {$uid}");
+        } catch (\Throwable $e) {
+            return back()->withErrors(['odoo' => '❌ ' . $e->getMessage()]);
+        }
     }
 }

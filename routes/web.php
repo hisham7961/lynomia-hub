@@ -12,6 +12,7 @@ use App\Http\Controllers\Web\DataRoomController;
 use App\Http\Controllers\Web\ImportController;
 use App\Http\Controllers\Web\ModuleController;
 use App\Http\Controllers\Web\NotificationController;
+use App\Http\Controllers\Web\OdooController;
 use App\Http\Controllers\Web\PortalController;
 use App\Http\Controllers\Web\LegalController;
 use App\Http\Controllers\Web\ProfileController;
@@ -67,6 +68,11 @@ Route::middleware('auth')->group(function () {
     Route::get('purchase/{id}/doc', [PurchaseController::class, 'doc'])->name('purchases.doc');
     Route::post('purchase/{id}/act', [PurchaseController::class, 'act'])->name('purchases.act');
     Route::get('legal', [LegalController::class, 'index'])->name('legal');
+
+    // ── الربط الذكي بأودو (عرض فقط) ──
+    Route::post('odoo/{module}/{id}/link', [OdooController::class, 'link'])->name('odoo.link');
+    Route::post('odoo/{module}/{id}/unlink', [OdooController::class, 'unlink'])->name('odoo.unlink');
+    Route::post('odoo/{module}/{id}/refresh', [OdooController::class, 'refresh'])->name('odoo.refresh');
     Route::get('search', [SearchController::class, 'index'])->name('search');
     Route::get('search/mini', [SearchController::class, 'mini'])->name('search.mini');
     Route::get('alerts', [AlertController::class, 'index'])->name('alerts');
@@ -106,6 +112,7 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/security/lockdown', [SecurityController::class, 'lockdown'])->name('security.lockdown');
     Route::get('admin/settings', [SettingController::class, 'edit'])->name('settings.edit');
     Route::post('admin/settings', [SettingController::class, 'update'])->name('settings.update');
+    Route::post('admin/settings/odoo-test', [SettingController::class, 'odooTest'])->name('settings.odoo.test');
 
     // ── الوحدات (سجل الوحدات يقود كل شيء) ──
     Route::prefix('m/{module}')->name('m.')->group(function () {

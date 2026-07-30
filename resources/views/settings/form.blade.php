@@ -28,6 +28,9 @@
                             @error($input)<span class="ferr">{{ $message }}</span>@enderror
                         @elseif ($type === 'number')
                             <input class="inp ltr" type="number" name="{{ $input }}" value="{{ $val }}" style="max-width:180px">
+                        @elseif ($type === 'pass')
+                            <input class="inp ltr" type="password" name="{{ $input }}" autocomplete="new-password"
+                                   placeholder="{{ $val ? '•••••••• (محفوظ — اتركه فارغاً للإبقاء عليه)' : '' }}">
                         @else
                             <input class="inp" name="{{ $input }}" value="{{ $val }}">
                         @endif
@@ -39,4 +42,13 @@
     <div class="formfoot"><button class="btn p">حفظ كل الإعدادات</button></div>
     <div class="sub" style="margin-top:10px">لأي إعداد آخر من الطرفية: <span class="mono ltr">php artisan hub:set key value</span></div>
 </form>
+
+<div class="card" style="max-width:680px">
+    <h3>🔌 اختبار اتصال أودو</h3>
+    <p class="sub">بعد حفظ بيانات الربط الأربعة، جرّب الاتصال — وعند نجاحه تظهر بطاقة «أودو» في صفحات المشاريع والشركات والعملاء للربط الذكي.</p>
+    @error('odoo')<div class="ferr" style="margin:6px 0">{{ $message }}</div>@enderror
+    <form method="POST" action="{{ route('settings.odoo.test') }}" style="margin-top:8px">
+        @csrf<button class="btn sm">🔌 اختبار الاتصال الآن</button>
+    </form>
+</div>
 @endsection

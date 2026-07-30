@@ -27,6 +27,9 @@
 @if ($module === 'purchases')
     @include('partials.purchase_actions')
 @endif
+@if (in_array($module, ['projects', 'companies', 'clients'], true))
+    @include('partials.odoo_card')
+@endif
 <div class="card">
     <dl class="detail">
         @foreach ($def['fields'] as $f)
