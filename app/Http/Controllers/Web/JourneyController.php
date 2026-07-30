@@ -43,13 +43,20 @@ class JourneyController extends Controller
             }
         }
 
-        // المستندات المالية بمطابقة اسم الطرف — لا رابط صريح فنقولها صراحةً في الصفحة
-        $fin = ['count' => 0, 'total' => 0.0, 'paid' => 0.0];
-        if (hub_can(auth()->user(), 'fin', 'v') && trim((string) $client->name) !== '') {
+        // المستندات المالية: المرجع الصريح أولاً، ثم مطابقة الاسم لما لم يُرحَّل بعد
+        // (الأسماء المكرّرة لا تُرحَّل عمداً). الصفحة تقول أيّهما جاء من أين.
+        $fin = ['count' => 0, 'total' => 0.0, 'paid' => 0.0, 'linked' => 0, 'byName' => 0];
+        if (hub_can(auth()->user(), 'fin', 'v')) {
+            $name = trim((string) $client->name);
             $docs = hub_scope(DB::table('fin_documents')->whereNull('deleted_at'), 'fin')
-                ->where('partner', $client->name)->limit(100)->get();
+                ->where(fn ($w) => $w
+                    ->where('client_id', $client->id)
+                    ->when($name !== '', fn ($q) => $q->orWhere(fn ($x) => $x
+                        ->whereNull('client_id')->where('partner', $name))))
+                ->limit(100)->get();
             foreach ($docs as $d) {
                 $fin['count']++;
+                $d->client_id ? $fin['linked']++ : $fin['byName']++;
                 $fin['total'] += (float) ($d->total ?? 0);
                 $fin['paid'] += (float) ($d->paid ?? 0);
                 $add($d->date ?: $d->created_at, '💵', $d->kind ?: 'مستند مالي',
