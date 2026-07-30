@@ -231,6 +231,10 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/ops/clear-cache', [OpsController::class, 'clearCache'])->name('ops.clearcache');
     Route::post('admin/ops/starters', [OpsController::class, 'starters'])->name('ops.starters');
 
+    // مركز نشاط الموظفين — للمالك فقط
+    Route::get('admin/activity', [\App\Http\Controllers\Web\ActivityController::class, 'index'])->name('activity.index');
+    Route::get('admin/activity/{id}', [\App\Http\Controllers\Web\ActivityController::class, 'show'])->name('activity.show');
+
     // QuoteFlow — تطبيق جانبي معزول للمالك وحده، حالته على الخادم
     Route::get('apps/quoteflow', [QuoteFlowController::class, 'page'])->name('quoteflow');
     Route::post('apps/quoteflow/unlock', [QuoteFlowController::class, 'unlock'])->name('quoteflow.unlock');

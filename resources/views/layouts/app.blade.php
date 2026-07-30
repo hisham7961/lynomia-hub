@@ -97,6 +97,7 @@
                         @if ($isOwner)<a class="{{ request()->routeIs('security.*') ? 'on' : '' }}" href="{{ route('security.index') }}">الأمان</a>@endif
                         @if ($isOwner)<a class="{{ request()->routeIs('ops.*') ? 'on' : '' }}" href="{{ route('ops.index') }}">التشغيل</a>@endif
                         @if ($isOwner)<a class="{{ request()->routeIs('errors.*') ? 'on' : '' }}" href="{{ route('errors.index') }}">الأخطاء</a>@endif
+                        @if ($isOwner)<a class="{{ request()->routeIs('activity.*') ? 'on' : '' }}" href="{{ route('activity.index') }}">نشاط الموظفين</a>@endif
                         @if (hub_secrets())<a class="{{ request()->routeIs('dataroom.*') ? 'on' : '' }}" href="{{ route('dataroom.index') }}">غرفة البيانات</a>@endif
                     </div>
                 @endif

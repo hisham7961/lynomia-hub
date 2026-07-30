@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectUsersTo(fn () => route('dashboard'));
         $middleware->appendToGroup('web', \App\Http\Middleware\HubMaintenance::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\WorkHours::class);
+        $middleware->appendToGroup('web', \App\Http\Middleware\TrackVisits::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\SecurityHeaders::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\Observability::class);
         $middleware->appendToGroup('api', \App\Http\Middleware\SecurityHeaders::class);
