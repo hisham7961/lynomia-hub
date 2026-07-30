@@ -13,6 +13,9 @@
     @if (in_array($module, ['requests', 'feats', 'tasks', 'changes', 'code', 'deploys', 'incidents'], true))
         <a class="btn ghost sm" href="{{ route('trace', [$module, $row->id]) }}">🧵 خيط التتبع</a>
     @endif
+    @if ($module === 'clients')
+        <a class="btn ghost sm" href="{{ route('journey', $row->id) }}">🧭 رحلة العميل</a>
+    @endif
     @if (hub_can(auth()->user(), $module, 'a'))
         <a class="btn ghost sm" href="{{ route('m.create', [$module, 'from' => $row->id]) }}" onclick="return Hub.modal(this.href)">⎘ نسخ كسجل جديد</a>
     @endif

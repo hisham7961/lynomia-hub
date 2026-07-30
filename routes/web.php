@@ -5,6 +5,7 @@ use App\Http\Controllers\Web\AppCenterController;
 use App\Http\Controllers\Web\ApprovalDecisionController;
 use App\Http\Controllers\Web\AttachmentController;
 use App\Http\Controllers\Web\DmController;
+use App\Http\Controllers\Web\JourneyController;
 use App\Http\Controllers\Web\PrefController;
 use App\Http\Controllers\Web\TraceController;
 use App\Http\Controllers\Web\AuditController;
@@ -131,6 +132,9 @@ Route::middleware('auth')->group(function () {
 
     // ── خيط التتبع من الفكرة إلى النشر ──
     Route::get('trace/{module}/{id}', [TraceController::class, 'show'])->name('trace');
+
+    // ── رحلة العميل ──
+    Route::get('journey/{id}', [JourneyController::class, 'show'])->name('journey');
 
     // ── المرفقات الشاملة على أي سجل ──
     Route::post('attachments', [AttachmentController::class, 'store'])->name('att.store');
