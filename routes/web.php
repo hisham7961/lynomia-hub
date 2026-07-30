@@ -8,6 +8,8 @@ use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\CeoController;
 use App\Http\Controllers\Web\CommentController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\DataRoomController;
+use App\Http\Controllers\Web\ImportController;
 use App\Http\Controllers\Web\ModuleController;
 use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\PortalController;
@@ -19,6 +21,11 @@ use App\Http\Controllers\Web\SecurityController;
 use App\Http\Controllers\Web\SettingController;
 use App\Http\Controllers\Web\UserController;
 use Illuminate\Support\Facades\Route;
+
+// ── الوجه العام لغرفة البيانات (بلا تسجيل دخول — الرمز هو المفتاح) ──
+Route::get('s/{token}', [DataRoomController::class, 'show'])->name('share.show');
+Route::post('s/{token}', [DataRoomController::class, 'unlock'])->name('share.unlock')->middleware('throttle:10,1');
+Route::get('s/{token}/file', [DataRoomController::class, 'file'])->name('share.file');
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'show'])->name('login');
@@ -34,6 +41,11 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('me', [PortalController::class, 'me'])->name('portal.me');
+
+    // ── غرفة البيانات (الإدارة) ──
+    Route::get('dataroom', [DataRoomController::class, 'index'])->name('dataroom.index');
+    Route::post('dataroom', [DataRoomController::class, 'store'])->name('dataroom.store');
+    Route::post('dataroom/{id}/revoke', [DataRoomController::class, 'revoke'])->name('dataroom.revoke');
 
     // ── حسم الموافقات المُلزِمة ──
     Route::post('approvals/{id}/approve', [ApprovalDecisionController::class, 'approve'])->name('approvals.approve');
@@ -91,6 +103,9 @@ Route::middleware('auth')->group(function () {
         Route::get('board', [ModuleController::class, 'board'])->name('board');
         Route::get('export', [ModuleController::class, 'export'])->name('export');
         Route::get('create', [ModuleController::class, 'create'])->name('create');
+        Route::get('import', [ImportController::class, 'form'])->name('import');
+        Route::post('import', [ImportController::class, 'map'])->name('import.map');
+        Route::post('import/run', [ImportController::class, 'run'])->name('import.run');
         Route::post('{id}/status', [ModuleController::class, 'setStatus'])->name('status');
         Route::post('/', [ModuleController::class, 'store'])->name('store');
         Route::get('{id}', [ModuleController::class, 'show'])->name('show');

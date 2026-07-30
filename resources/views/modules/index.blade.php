@@ -26,6 +26,9 @@
     @if (! $trash && (hub_flag(auth()->user(), 'exp') || auth()->user()->role?->is_owner))
         <a class="btn ghost sm" href="{{ route('m.export', ['module' => $module] + request()->query()) }}">📤 CSV</a>
     @endif
+    @if (! $trash && hub_can(auth()->user(), $module, 'a') && ! hub_scoped(auth()->user()))
+        <a class="btn ghost sm" href="{{ route('m.import', $module) }}">📥 استيراد</a>
+    @endif
     @if (! $trash && hub_can(auth()->user(), $module, 'a'))
         <a class="btn p sm" id="newbtn" href="{{ route('m.create', $module) }}" onclick="return Hub.modal(this.href)">＋ جديد <span class="kbd">n</span></a>
     @endif
