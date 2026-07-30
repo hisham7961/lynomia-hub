@@ -4,6 +4,7 @@ use App\Http\Controllers\Web\AlertController;
 use App\Http\Controllers\Web\AppCenterController;
 use App\Http\Controllers\Web\ApprovalDecisionController;
 use App\Http\Controllers\Web\AttachmentController;
+use App\Http\Controllers\Web\TraceController;
 use App\Http\Controllers\Web\AuditController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\CapacityController;
@@ -109,6 +110,9 @@ Route::middleware('auth')->group(function () {
     Route::post('comments/{id}/pin', [CommentController::class, 'pin'])->name('comments.pin');
     Route::post('comments/{id}/task', [CommentController::class, 'toTask'])->name('comments.task');
     Route::delete('comments/{id}', [CommentController::class, 'destroy'])->name('comments.destroy');
+
+    // ── خيط التتبع من الفكرة إلى النشر ──
+    Route::get('trace/{module}/{id}', [TraceController::class, 'show'])->name('trace');
 
     // ── المرفقات الشاملة على أي سجل ──
     Route::post('attachments', [AttachmentController::class, 'store'])->name('att.store');

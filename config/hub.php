@@ -1774,6 +1774,13 @@ return [
                     'multi' => true,
                 ],
                 [
+                    'key' => 'featId',
+                    'col' => 'feat_id',
+                    'label' => 'المتطلب المنفَّذ (خيط التتبع)',
+                    'type' => 'ref',
+                    'ref' => 'feats',
+                ],
+                [
                     'key' => 'priority',
                     'col' => 'priority',
                     'label' => 'الأولوية',
@@ -6529,6 +6536,13 @@ return [
                     'ref' => 'users',
                 ],
                 [
+                    'key' => 'requestId',
+                    'col' => 'request_id',
+                    'label' => 'الطلب الأصلي (خيط التتبع)',
+                    'type' => 'ref',
+                    'ref' => 'requests',
+                ],
+                [
                     'key' => 'start',
                     'col' => 'date_start',
                     'label' => 'البداية',
@@ -6999,6 +7013,7 @@ return [
                 ['key' => 'appId', 'col' => 'app_id', 'label' => 'التطبيق المعني', 'type' => 'ref', 'ref' => 'apps'],
                 ['key' => 'domainId', 'col' => 'domain_id', 'label' => 'الدومين المعني', 'type' => 'ref', 'ref' => 'domains'],
                 ['key' => 'projectId', 'col' => 'project_id', 'label' => 'المشروع', 'type' => 'ref', 'ref' => 'projects'],
+                ['key' => 'taskId', 'col' => 'task_id', 'label' => 'المهمة المنفَّذة (خيط التتبع)', 'type' => 'ref', 'ref' => 'tasks'],
                 ['key' => 'risk', 'col' => 'risk', 'label' => 'درجة المخاطرة', 'type' => 'sel',
                  'options' => ['منخفضة', 'متوسطة', 'عالية', 'حرجة']],
                 ['key' => 'plan', 'col' => 'plan', 'label' => 'خطة التنفيذ (خطوات مرقمة)', 'type' => 'ta'],
@@ -7166,6 +7181,7 @@ return [
                 ['key' => 'rollbackable', 'col' => 'rollbackable', 'label' => 'يمكن التراجع عنه', 'type' => 'bool'],
                 ['key' => 'durationMin', 'col' => 'duration_min', 'label' => 'مدة النشر (دقيقة)', 'type' => 'num'],
                 ['key' => 'changeId', 'col' => 'change_id', 'label' => 'التغيير التقني المرتبط', 'type' => 'ref', 'ref' => 'changes'],
+                ['key' => 'releaseId', 'col' => 'release_id', 'label' => 'الإصدار المنشور (خيط التتبع)', 'type' => 'ref', 'ref' => 'code'],
                 ['key' => 'incidentId', 'col' => 'incident_id', 'label' => 'الحادث المرتبط', 'type' => 'ref', 'ref' => 'incidents'],
                 ['key' => 'att', 'col' => 'att_id', 'label' => 'مرفق (سجل النشر)', 'type' => 'file'],
                 ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات', 'type' => 'ta'],
