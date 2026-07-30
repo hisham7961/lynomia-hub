@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# حاجز رفع النسخة — تطبيقٌ لقاعدة CLAUDE.md: «مع أي تحديث يُدفَع يُرفع رقم النسخة».
+# يرفض دفعةً تحوي commits جديدة دون تغيير ملف VERSION. للتجاوز عمداً: git push --no-verify
+#
+set -u
+zero="0000000000000000000000000000000000000000"
+block=0
+
+ver_at() { git show "$1:VERSION" 2>/dev/null || echo ""; }
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [ "$local_sha" = "$zero" ] && continue                    # حذف مرجع — لا شأن لنا
+
+    if [ "$remote_sha" = "$zero" ]; then                      # مرجع جديد على البعيد
+        base="$(git merge-base "$local_sha" origin/main 2>/dev/null || echo "")"
+        [ -z "$base" ] && continue                            # لا أصل مشترك — دفعة أولى، اسمح
+        old_ver="$(ver_at "$base")"
+    else
+        [ "$local_sha" = "$remote_sha" ] && continue          # لا commits جديدة
+        old_ver="$(ver_at "$remote_sha")"
+    fi
+
+    new_ver="$(ver_at "$local_sha")"
+    if [ -n "$new_ver" ] && [ "$new_ver" = "$old_ver" ]; then
+        echo "✗ الدفعة تحوي تحديثاً جديداً لكن VERSION لم يتغيّر (لا يزال $new_ver)." >&2
+        echo "  ارفع الرقم في ملف VERSION، وأضف مدخلاً في «سجل الإصدارات» بـREADME، ثم أعد الدفع." >&2
+        echo "  للتجاوز عمداً (نادراً): git push --no-verify" >&2
+        block=1
+    fi
+done
+
+exit $block

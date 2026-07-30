@@ -31,7 +31,8 @@
     "scripts": {
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
-            "@php artisan package:discover --ansi"
+            "@php artisan package:discover --ansi",
+            "@php -r \"is_dir('.git') && @shell_exec('git config core.hooksPath .githooks');\""
         ],
         "setup": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",

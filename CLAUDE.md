@@ -15,11 +15,21 @@
 مثال مصغّر لدفعة:
 
 ```bash
-printf '2.82.0' > VERSION
+printf '2.83.0' > VERSION
 # حرّر README.md: السطر الأول + مدخل سجل الإصدارات
 git add -A && git commit -m "vX.Y.Z وصف التغيير"
 git push
 ```
+
+**الحاجز الآلي:** خطّاف `.githooks/pre-push` **يرفض** أي دفعةٍ فيها commits جديدة دون
+تغيير `VERSION` — فالقاعدة مفروضةٌ لا متروكةٌ للذاكرة. يُفعَّل ذاتيّاً عبر
+`composer install` (سكربت `post-autoload-dump`). ولتفعيله يدويّاً في نسخةٍ جديدة:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+للتجاوز عمداً في حالةٍ نادرة (دفعة وثائق بحتة مثلاً): `git push --no-verify`.
 
 ## ✅ اصطلاحات أخرى مُتَّبعة في هذا المستودع
 
