@@ -107,10 +107,17 @@ class WidgetRegistry
                     foreach (['projects', 'clients', 'tasks', 'tickets', 'fin', 'contracts'] as $key) {
                         $def = hub_mod($key);
                         if (! $def || ! hub_can($u, $key, 'v')) continue;
+                        $q = fn () => hub_scope(DB::table($def['table'])->whereNull('deleted_at'), $key);
+
+                        // اتجاه الأسبوع: الجديد في ٧ أيام مقابل الـ٧ التي قبلها
+                        $thisW = $q()->where('created_at', '>=', now()->subDays(7))->count();
+                        $prevW = $q()->whereBetween('created_at', [now()->subDays(14), now()->subDays(7)])->count();
+
                         $out[] = [
                             'key'   => $key,
                             'label' => $def['label'],
-                            'count' => hub_scope(DB::table($def['table'])->whereNull('deleted_at'), $key)->count(),
+                            'count' => $q()->count(),
+                            'trend' => $prevW > 0 ? round(($thisW - $prevW) * 100 / $prevW) : ($thisW > 0 ? 100 : null),
                         ];
                     }
 
@@ -219,6 +226,21 @@ class WidgetRegistry
 
                     return $q->orderByDesc('audits.created_at')->limit(10)->get();
                 },
+            ],
+
+            'links' => [
+                'label' => '⚡ روابط سريعة',
+                'size'  => ['w' => 4, 'h' => 2],
+                'gate'  => fn ($u) => true,
+                // بلاطات ملونة لأكثر الوجهات استعمالاً — تُفلتر بصلاحيات المستخدم
+                'resolver' => fn ($u) => collect([
+                    ['t' => 'التقويم',          'r' => 'calendar',        'i' => '📅', 'c' => '#0E7C66', 'ok' => true],
+                    ['t' => 'بوابتي',           'r' => 'portal.me',       'i' => '👤', 'c' => '#4C6FA5', 'ok' => true],
+                    ['t' => 'تشغيل اليوم',      'r' => 'morning',         'i' => '☀️', 'c' => '#C08A3E', 'ok' => true],
+                    ['t' => 'الرسائل',          'r' => 'dm.inbox',        'i' => '💬', 'c' => '#7C6FB0', 'ok' => true],
+                    ['t' => 'صندوق الوثائق',    'r' => 'inboxdocs.index', 'i' => '📥', 'c' => '#2FB79A', 'ok' => true],
+                    ['t' => 'التقارير المالية', 'r' => 'reports.finance', 'i' => '📊', 'c' => '#B0568E', 'ok' => hub_can($u, 'fin', 'v')],
+                ])->filter(fn ($l) => $l['ok'])->values()->all(),
             ],
 
             // تُعرض في المتصفح من تخزينه المحلي — بلا مُحضِّر، لكنها تبقى في السجل

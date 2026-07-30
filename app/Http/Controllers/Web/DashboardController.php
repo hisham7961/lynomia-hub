@@ -77,10 +77,41 @@ class DashboardController extends Controller
             'apps'       => WidgetRegistry::resolve('apps', $user) ?? collect(),
             'taskSlices' => WidgetRegistry::resolve('donut', $user) ?? [],
             'audits'     => WidgetRegistry::resolve('audits', $user) ?? collect(),
+            'links'      => WidgetRegistry::resolve('links', $user) ?? [],
+            'pending'    => $this->pendingLine($user),
             'due'        => $dueBox['rows'],
             'dueCol'     => $dueBox['dueCol'],
             'stCol'      => $dueBox['stCol'],
             'disp'       => $dueBox['disp'],
         ];
+    }
+
+    /** سطر الترويسة: ما ينتظر المستخدم فعلاً — يُذكر الموجود فقط، ويصمت الصفر */
+    protected function pendingLine($user): string
+    {
+        $bits = [];
+        try {
+            $t = \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')
+                ->where('assignee_id', $user->id)
+                ->tap(fn ($q) => hub_open_scope($q))->count();
+            if ($t) $bits[] = "{$t} مهام مفتوحة عليك";
+
+            if (hub_can($user, 'tickets', 'v')) {
+                $k = hub_scope(\Illuminate\Support\Facades\DB::table('tickets')->whereNull('deleted_at'), 'tickets')
+                    ->where('priority', 'LIKE', '%عاجلة%')
+                    ->tap(fn ($q) => hub_open_scope($q))->count();
+                if ($k) $bits[] = "{$k} تذاكر عاجلة";
+            }
+
+            if (hub_flag($user, 'approve') || hub_is_owner($user)) {
+                $a = \Illuminate\Support\Facades\DB::table('approvals')
+                    ->where('status', 'LIKE', '%بانتظار%')->count();
+                if ($a) $bits[] = "{$a} طلبات اعتماد بانتظارك";
+            }
+        } catch (\Throwable $e) {
+            return '';
+        }
+
+        return $bits ? 'لديك ' . implode(' و', $bits) . '.' : 'لا شيء عاجل بانتظارك — يوم هادئ 🌿';
     }
 }

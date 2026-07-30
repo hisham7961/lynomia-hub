@@ -100,16 +100,71 @@ a:hover{color:var(--pd)}
 .hero{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
 .hero h2{font-size:21px;font-weight:800;letter-spacing:-.02em}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:12px;margin-bottom:18px}
-.stat{background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);padding:15px 17px;display:flex;
-  flex-direction:column;gap:2px;box-shadow:var(--sh);transition:box-shadow .22s,transform .22s,border-color .22s;
-  position:relative;overflow:hidden}
-.stat::after{content:"";position:absolute;inset-inline-start:0;top:14%;bottom:14%;width:3.5px;border-radius:99px;
-  background:linear-gradient(180deg,var(--ac),var(--p));opacity:.9}
-.stat b{font-size:24px;color:var(--tx);font-family:Tajawal;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.25}
+.stat{--st:var(--p);background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);padding:16px 17px 13px;
+  display:flex;flex-direction:column;gap:2px;box-shadow:var(--sh);
+  transition:box-shadow .22s,transform .22s,border-color .22s;position:relative;overflow:hidden}
+/* شريط علوي متدرج بلون هوية البطاقة — كما في لوحات ERP الحديثة */
+.stat::before{content:"";position:absolute;inset-inline:0;top:0;height:3.5px;
+  background:linear-gradient(90deg,var(--st),color-mix(in srgb,var(--st) 30%,transparent))}
+.stat::after{content:"";position:absolute;inset-inline-end:-24px;top:-24px;width:86px;height:86px;border-radius:50%;
+  background:radial-gradient(circle,color-mix(in srgb,var(--st) 14%,transparent),transparent 70%)}
+.stat b{font-size:25px;color:var(--tx);font-family:Tajawal;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.25}
 .stat span{color:var(--sb);font-size:12px;font-weight:600}
-.stat .ico{position:absolute;inset-inline-end:12px;top:11px;font-size:19px;opacity:.4;transition:opacity .2s,transform .2s}
-.stat:hover{box-shadow:var(--shh);transform:translateY(-2px);border-color:color-mix(in srgb,var(--p) 30%,var(--ln))}
+.stat .stico{position:absolute;inset-inline-end:12px;top:14px;width:34px;height:34px;border-radius:11px;
+  display:flex;align-items:center;justify-content:center;font-size:17px;z-index:1;
+  background:color-mix(in srgb,var(--st) 14%,transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--st) 22%,transparent);
+  transition:transform .2s}
+/* توافق: بطاقات قديمة (مركز التشغيل وغيره) ما زالت تستخدم .ico البسيطة */
+.stat .ico{position:absolute;inset-inline-end:12px;top:11px;font-size:19px;opacity:.4;z-index:1;transition:opacity .2s,transform .2s}
 .stat:hover .ico{opacity:.85;transform:scale(1.12)}
+.stat .trend{font-size:11px;font-weight:700;margin-top:5px}
+.stat .trend.up{color:var(--ok)}
+.stat .trend.dn{color:var(--bad)}
+.stat:hover{box-shadow:var(--shh);transform:translateY(-2px);border-color:color-mix(in srgb,var(--st) 35%,var(--ln))}
+.stat:hover .stico{transform:scale(1.1) rotate(-4deg)}
+
+/* ═ ترويسة الترحيب — بطاقة كحلية بتوهجات ناعمة ═ */
+.welcome{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  margin-bottom:18px;padding:22px 24px;border-radius:18px;color:#fff;position:relative;overflow:hidden;
+  background:linear-gradient(135deg,var(--sbbg) 0%,color-mix(in srgb,var(--sbbg) 82%,var(--p)) 100%)}
+.welcome::before{content:"";position:absolute;inset-inline-end:-60px;top:-80px;width:260px;height:260px;border-radius:50%;
+  background:radial-gradient(circle,color-mix(in srgb,var(--ac) 30%,transparent),transparent 65%)}
+.welcome::after{content:"";position:absolute;inset-inline-start:18%;bottom:-90px;width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle,color-mix(in srgb,var(--p) 42%,transparent),transparent 65%)}
+.welcome h2{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.welcome .wsub{font-size:13.5px;color:rgba(255,255,255,.85);margin-top:4px;font-weight:600}
+.welcome .wdate{font-size:11.5px;color:rgba(255,255,255,.55);margin-top:3px}
+.welcome .boardbar{position:relative;z-index:1}
+.welcome .btn.ghost{color:rgba(255,255,255,.85);border-color:rgba(255,255,255,.25)}
+.welcome .btn.ghost:hover{border-color:rgba(255,255,255,.6);background:rgba(255,255,255,.08)}
+.welcome .btn.ghost.on{background:var(--p);border-color:var(--p);color:#fff}
+
+/* ═ روابط سريعة — بلاطات ملونة ═ */
+.qlinks{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:9px}
+.ql{--ql:var(--p);display:flex;flex-direction:column;align-items:center;gap:7px;padding:14px 8px 11px;
+  border-radius:14px;color:var(--tx);font-size:12px;font-weight:700;text-align:center;
+  background:color-mix(in srgb,var(--ql) 7%,transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ql) 16%,transparent);
+  transition:transform .18s,box-shadow .18s,background .18s}
+.ql .qlico{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;
+  background:color-mix(in srgb,var(--ql) 16%,transparent);
+  box-shadow:0 0 0 4px color-mix(in srgb,var(--ql) 7%,transparent)}
+.ql:hover{transform:translateY(-2px);background:color-mix(in srgb,var(--ql) 12%,transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ql) 35%,transparent),0 6px 16px color-mix(in srgb,var(--ql) 18%,transparent)}
+
+/* ═ سيل النشاطات — صف بصورة رمزية ═ */
+.actfeed{display:flex;flex-direction:column}
+.actrow{display:flex;align-items:center;gap:11px;padding:8px 2px;border-bottom:1px solid color-mix(in srgb,var(--ln) 45%,transparent)}
+.actrow:last-child{border-bottom:0}
+.avx{--av:var(--p);width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--av),color-mix(in srgb,var(--av) 60%,#000 12%));
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--av) 14%,transparent)}
+.actbody{flex:1;min-width:0}
+.actline{display:flex;align-items:center;gap:7px;font-size:12.5px}
+.actline b{font-weight:700}
+.actrow .sub{font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acttime{font-size:10.5px;color:var(--sb);flex-shrink:0;white-space:nowrap}
 
 /* ═ الجداول ═ */
 .tblwrap{overflow-x:auto;border-radius:0 0 var(--r) var(--r)}

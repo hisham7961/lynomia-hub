@@ -1,10 +1,12 @@
 @extends('layouts.app')
 @section('title', $board->name ?? 'لوحة التحكم')
 @section('content')
-<div class="hero">
-    <div>
-        <h2>أهلاً {{ auth()->user()->name }} 👋</h2>
-        <div class="sub">{{ now()->translatedFormat('l · j F Y') }}</div>
+@php $h = (int) now()->format('H'); $greet = $h < 12 ? 'صباح الخير' : ($h < 17 ? 'طاب يومك' : 'مساء الخير'); @endphp
+<div class="welcome">
+    <div class="wtext">
+        <h2>{{ $greet }}، {{ auth()->user()->name }} 👋</h2>
+        <div class="wsub">{{ $pending ?? '' }}</div>
+        <div class="wdate">{{ now()->translatedFormat('l · j F Y') }}</div>
     </div>
     @if (count($boards) || $board)
         <div class="boardbar">
@@ -38,6 +40,9 @@
     @include('partials.widgets.kpis',   ['data' => $kpis])
     @include('partials.widgets.counts', ['data' => $cards])
     <div class="kids">
+        @unless (in_array('links', $hid ?? [], true))
+            @include('partials.widgets.links', ['data' => $links])
+        @endunless
         @include('partials.widgets.expiry', ['data' => $expiry])
         @include('partials.widgets.apps',   ['data' => $apps])
         @include('partials.widgets.donut',  ['data' => $taskSlices])
