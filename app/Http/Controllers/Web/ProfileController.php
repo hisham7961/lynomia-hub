@@ -17,7 +17,36 @@ class ProfileController extends Controller
             'u' => auth()->user(),
             'pending2fa' => $pending,
             'otpUri' => $pending ? \App\Support\Totp::uri($pending, auth()->user()->email, (string) setting('app.name', 'Lynomia Hub')) : null,
+            'tokens' => \App\Models\ApiToken::where('user_id', auth()->id())->orderByDesc('created_at')->get(),
         ]);
+    }
+
+    /** إنشاء مفتاح API — يظهر النص الكامل مرة واحدة فقط */
+    public function tokenStore(Request $r)
+    {
+        $d = $r->validate([
+            'tname' => ['required', 'string', 'max:110'],
+            'tdays' => ['nullable', 'integer', 'min:1', 'max:730'],
+        ]);
+
+        $plain = 'lyn_' . \Illuminate\Support\Str::random(44);
+        \App\Models\ApiToken::create([
+            'user_id'    => auth()->id(),
+            'name'       => $d['tname'],
+            'token_hash' => hash('sha256', $plain),
+            'expires_at' => filled($d['tdays'] ?? null) ? now()->addDays((int) $d['tdays']) : null,
+            'created_at' => now(),
+        ]);
+
+        return back()->with('ok', 'أُنشئ المفتاح — انسخه الآن فلن يظهر مرة أخرى')->with('newtoken', $plain);
+    }
+
+    /** إبطال مفتاح API */
+    public function tokenRevoke(string $id)
+    {
+        \App\Models\ApiToken::where('user_id', auth()->id())->where('id', $id)->delete();
+
+        return back()->with('ok', 'أُبطل المفتاح فوراً');
     }
 
     /** بدء تفعيل المصادقة الثنائية: توليد سر وعرضه للمستخدم */

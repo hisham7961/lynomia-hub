@@ -74,6 +74,40 @@
     </div>
 
     <div class="card kid">
+        <h3>🔌 مفاتيح API</h3>
+        @if (session('newtoken'))
+            <div style="border:1px solid var(--ok);border-radius:10px;padding:10px;margin-bottom:10px">
+                <b>مفتاحك الجديد — انسخه الآن، لن يظهر مرة أخرى:</b>
+                <div class="mono ltr" style="background:var(--pss);border-radius:8px;padding:8px;margin-top:6px;word-break:break-all;user-select:all">{{ session('newtoken') }}</div>
+            </div>
+        @endif
+        <table class="mini">
+            @forelse ($tokens as $t)
+                <tr>
+                    <td>{{ $t->name }}
+                        <div class="sub">أُنشئ {{ $t->created_at->diffForHumans() }}{{ $t->expires_at ? ' · ينتهي ' . $t->expires_at->format('Y-m-d') : '' }}{{ $t->last_used_at ? ' · آخر استخدام ' . $t->last_used_at->diffForHumans() : ' · لم يُستخدم' }}</div></td>
+                    <td style="width:1%">
+                        <form method="POST" action="{{ route('profile.token.revoke', $t->id) }}" onsubmit="return confirm('إبطال المفتاح؟ التطبيقات المستخدمة له ستتوقف.')">
+                            @csrf @method('DELETE')<button class="btn ghost xs" style="color:var(--bad)">إبطال</button>
+                        </form></td>
+                </tr>
+            @empty
+                <tr><td class="sub" style="padding:10px">لا مفاتيح — أنشئ واحداً لربط أنظمة خارجية (n8n، تطبيقاتك…)</td></tr>
+            @endforelse
+        </table>
+        <form method="POST" action="{{ route('profile.token.store') }}" style="margin-top:10px">
+            @csrf
+            <div class="crow">
+                <input class="inp" name="tname" placeholder="اسم المفتاح (مثال: n8n)" required maxlength="110" style="max-width:200px">
+                <input class="inp ltr" type="number" name="tdays" placeholder="أيام الصلاحية (اختياري)" min="1" max="730" style="max-width:170px">
+                <button class="btn p sm" type="submit">＋ إنشاء مفتاح</button>
+            </div>
+            @error('tname')<span class="ferr">{{ $message }}</span>@enderror
+        </form>
+        <div class="sub" style="margin-top:8px">الاستخدام: ترويسة <span class="mono ltr">Authorization: Bearer &lt;المفتاح&gt;</span> — التوثيق في <span class="mono ltr">docs/API.md</span></div>
+    </div>
+
+    <div class="card kid">
         <h3>🛡️ المصادقة الثنائية (2FA)</h3>
         @if ($u->totp_enabled)
             <p class="sub">✅ مفعّلة — يُطلب رمز من تطبيق المصادقة عند كل دخول.</p>

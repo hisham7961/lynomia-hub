@@ -75,6 +75,8 @@ Route::middleware('auth')->group(function () {
     Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('profile/password', [ProfileController::class, 'password'])->name('profile.password');
+    Route::post('profile/token', [ProfileController::class, 'tokenStore'])->name('profile.token.store');
+    Route::delete('profile/token/{id}', [ProfileController::class, 'tokenRevoke'])->name('profile.token.revoke');
     Route::post('profile/2fa/start', [ProfileController::class, 'twofaStart'])->name('profile.2fa.start');
     Route::post('profile/2fa/confirm', [ProfileController::class, 'twofaConfirm'])->name('profile.2fa.confirm');
     Route::post('profile/2fa/disable', [ProfileController::class, 'twofaDisable'])->name('profile.2fa.disable');
