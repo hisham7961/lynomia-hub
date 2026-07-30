@@ -1129,3 +1129,19 @@ if (! function_exists('hub_app_quality')) {
         });
     }
 }
+
+if (! function_exists('hub_bytes')) {
+    /** حجم ملف مقروء: 1536 → «1.5 ك.ب» */
+    function hub_bytes($bytes): string
+    {
+        $b = (float) $bytes;
+        foreach (['ب', 'ك.ب', 'م.ب', 'ج.ب'] as $unit) {
+            if ($b < 1024 || $unit === 'ج.ب') {
+                return ($b >= 100 || $unit === 'ب' ? number_format($b) : number_format($b, 1)) . ' ' . $unit;
+            }
+            $b /= 1024;
+        }
+
+        return number_format($b) . ' ب';
+    }
+}

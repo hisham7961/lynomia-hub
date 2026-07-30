@@ -170,7 +170,10 @@ class ModuleController extends Controller
         $comments = CommentController::forRecord($module, $row->id);
         $cUsers   = CommentController::userNames();
 
-        return view('modules.show', compact('module', 'def', 'row', 'labels', 'children', 'versions', 'verUsers', 'comments', 'cUsers'));
+        // المرفقات الشاملة
+        [$attachments, $aUsers] = AttachmentController::forRecord($module, $row->id);
+
+        return view('modules.show', compact('module', 'def', 'row', 'labels', 'children', 'versions', 'verUsers', 'comments', 'cUsers', 'attachments', 'aUsers'));
     }
 
     public function edit(string $module, string $id)

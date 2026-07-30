@@ -94,5 +94,6 @@
         @endforeach
     </div>
 @endif
+@include('partials.attachments', ['aModule' => $module, 'aRecordId' => $row->id])
 @include('partials.comments', ['cModule' => $module, 'cRecordId' => $row->id, 'comments' => $comments, 'users' => $cUsers])
 @endsection
