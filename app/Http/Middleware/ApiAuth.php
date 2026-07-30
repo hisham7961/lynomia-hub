@@ -25,6 +25,10 @@ class ApiAuth
             return response()->json(['error' => 'مفتاح غير صالح أو منتهٍ'], 401);
         }
 
+        if (! $token->ipAllowed($request->ip())) {
+            return response()->json(['error' => 'هذا المفتاح مقيد بعناوين IP محددة وعنوانك ليس منها'], 403);
+        }
+
         $user = $token->user()->whereNull('deleted_at')->first();
         if (! $user || $user->status === 'موقوف' || ($user->locked_until && now()->lt($user->locked_until))) {
             return response()->json(['error' => 'الحساب موقوف أو مقفل'], 403);
@@ -36,6 +40,7 @@ class ApiAuth
         }
 
         Auth::setUser($user);
+        $request->attributes->set('api_token', $token);   // للنطاقات وIdempotency لاحقاً
 
         // آخر استخدام — كتابة واحدة بالدقيقة كحد أقصى
         if (! $token->last_used_at || $token->last_used_at->lt(now()->subMinute())) {

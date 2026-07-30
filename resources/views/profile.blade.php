@@ -85,9 +85,14 @@
             @forelse ($tokens as $t)
                 <tr>
                     <td>{{ $t->name }}
-                        <div class="sub">أُنشئ {{ $t->created_at->diffForHumans() }}{{ $t->expires_at ? ' · ينتهي ' . $t->expires_at->format('Y-m-d') : '' }}{{ $t->last_used_at ? ' · آخر استخدام ' . $t->last_used_at->diffForHumans() : ' · لم يُستخدم' }}</div></td>
-                    <td style="width:1%">
-                        <form method="POST" action="{{ route('profile.token.revoke', $t->id) }}" onsubmit="return confirm('إبطال المفتاح؟ التطبيقات المستخدمة له ستتوقف.')">
+                        <div class="sub">أُنشئ {{ $t->created_at->diffForHumans() }}{{ $t->expires_at ? ' · ينتهي ' . $t->expires_at->format('Y-m-d') : '' }}{{ $t->last_used_at ? ' · آخر استخدام ' . $t->last_used_at->diffForHumans() : ' · لم يُستخدم' }}</div>
+                        @if ($t->scopes)<div class="sub">🔬 نطاقات: <span class="mono ltr" style="font-size:10.5px">{{ \Illuminate\Support\Str::limit($t->scopes, 45) }}</span></div>@endif
+                        @if ($t->allowed_ips)<div class="sub">📍 IP: <span class="mono ltr" style="font-size:10.5px">{{ \Illuminate\Support\Str::limit($t->allowed_ips, 45) }}</span></div>@endif</td>
+                    <td style="width:1%;white-space:nowrap">
+                        <form class="inline" method="POST" action="{{ route('profile.token.rotate', $t->id) }}" onsubmit="return confirm('تدوير المفتاح؟ القيمة القديمة ستتوقف فوراً وتحصل على قيمة جديدة بنفس النطاقات.')">
+                            @csrf<button class="btn ghost xs">🔄 تدوير</button>
+                        </form>
+                        <form class="inline" method="POST" action="{{ route('profile.token.revoke', $t->id) }}" onsubmit="return confirm('إبطال المفتاح؟ التطبيقات المستخدمة له ستتوقف.')">
                             @csrf @method('DELETE')<button class="btn ghost xs" style="color:var(--bad)">إبطال</button>
                         </form></td>
                 </tr>
@@ -102,7 +107,13 @@
                 <input class="inp ltr" type="number" name="tdays" placeholder="أيام الصلاحية (اختياري)" min="1" max="730" style="max-width:170px">
                 <button class="btn p sm" type="submit">＋ إنشاء مفتاح</button>
             </div>
+            <div class="crow" style="margin-top:6px">
+                <input class="inp ltr" name="tscopes" placeholder="نطاقات (اختياري): tickets:va, projects:v — فارغ = كامل" maxlength="1900" dir="ltr" style="max-width:300px">
+                <input class="inp ltr" name="tips" placeholder="IP مسموحة (اختياري): 1.2.3.4, 10.0.0.0/8" maxlength="390" dir="ltr" style="max-width:280px">
+            </div>
+            <div class="sub" style="margin-top:4px">النطاق: <span class="mono ltr">وحدة:عمليات</span> — العمليات <span class="mono ltr">v</span> عرض، <span class="mono ltr">a</span> إضافة، <span class="mono ltr">e</span> تعديل، <span class="mono ltr">d</span> حذف. المفتاح لا يتجاوز صلاحيات حسابك أبداً.</div>
             @error('tname')<span class="ferr">{{ $message }}</span>@enderror
+            @error('tscopes')<span class="ferr">{{ $message }}</span>@enderror
         </form>
         <div class="sub" style="margin-top:8px">الاستخدام: ترويسة <span class="mono ltr">Authorization: Bearer &lt;المفتاح&gt;</span> — التوثيق في <span class="mono ltr">docs/API.md</span></div>
     </div>

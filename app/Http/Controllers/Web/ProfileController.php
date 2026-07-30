@@ -25,20 +25,35 @@ class ProfileController extends Controller
     public function tokenStore(Request $r)
     {
         $d = $r->validate([
-            'tname' => ['required', 'string', 'max:110'],
-            'tdays' => ['nullable', 'integer', 'min:1', 'max:730'],
-        ]);
+            'tname'   => ['required', 'string', 'max:110'],
+            'tdays'   => ['nullable', 'integer', 'min:1', 'max:730'],
+            'tscopes' => ['nullable', 'string', 'max:1900'],
+            'tips'    => ['nullable', 'string', 'max:390'],
+        ], [], ['tname' => 'اسم المفتاح', 'tdays' => 'أيام الصلاحية', 'tscopes' => 'النطاقات', 'tips' => 'قائمة IP']);
 
         $plain = 'lyn_' . \Illuminate\Support\Str::random(44);
         \App\Models\ApiToken::create([
-            'user_id'    => auth()->id(),
-            'name'       => $d['tname'],
-            'token_hash' => hash('sha256', $plain),
-            'expires_at' => filled($d['tdays'] ?? null) ? now()->addDays((int) $d['tdays']) : null,
-            'created_at' => now(),
+            'user_id'     => auth()->id(),
+            'name'        => $d['tname'],
+            'token_hash'  => hash('sha256', $plain),
+            'expires_at'  => filled($d['tdays'] ?? null) ? now()->addDays((int) $d['tdays']) : null,
+            'scopes'      => trim((string) ($d['tscopes'] ?? '')) ?: null,
+            'allowed_ips' => trim((string) ($d['tips'] ?? '')) ?: null,
+            'created_at'  => now(),
         ]);
 
         return back()->with('ok', 'أُنشئ المفتاح — انسخه الآن فلن يظهر مرة أخرى')->with('newtoken', $plain);
+    }
+
+    /** تدوير مفتاح: قيمة جديدة بنفس الاسم والنطاقات — القديمة تتوقف فوراً */
+    public function tokenRotate(string $id)
+    {
+        $t = \App\Models\ApiToken::where('user_id', auth()->id())->findOrFail($id);
+        $plain = 'lyn_' . \Illuminate\Support\Str::random(44);
+        $t->forceFill(['token_hash' => hash('sha256', $plain), 'created_at' => now(), 'last_used_at' => null])->save();
+
+        return back()->with('ok', 'دُوّر المفتاح «' . $t->name . '» — القيمة القديمة توقفت فوراً، انسخ الجديدة الآن')
+                     ->with('newtoken', $plain);
     }
 
     /** إبطال مفتاح API */
