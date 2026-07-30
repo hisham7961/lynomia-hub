@@ -35,9 +35,44 @@ class QuoteFlowController extends Controller
         abort_unless(hub_is_owner(), 403, 'QuoteFlow لمالك النظام فقط');
     }
 
+    /** كلمة سرّ ثانية فوق الملكية — تُبدَّل من الإعدادات بمفتاح quoteflow.pass */
+    protected function pass(): string
+    {
+        return (string) (setting('quoteflow.pass') ?: '1998');
+    }
+
+    /** شاشة كلمة السر — لا شيء من بيانات التطبيق يُرسل قبل اجتيازها */
+    public function unlock(Request $r)
+    {
+        $this->gate();
+
+        // ٥ محاولات بالدقيقة لكل مستخدم — ضد التخمين حتى من جلسة مالكٍ مسروقة
+        $key = 'quoteflow-unlock:' . auth()->id();
+        if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($key, 5)) {
+            return back()->with('err', 'محاولات كثيرة — انتظر دقيقة ثم أعد المحاولة');
+        }
+
+        if (! hash_equals($this->pass(), (string) $r->input('pass'))) {
+            \Illuminate\Support\Facades\RateLimiter::hit($key, 60);
+            hub_audit('محاولة دخول QuoteFlow فاشلة');
+
+            return back()->with('err', 'كلمة السر غير صحيحة');
+        }
+
+        \Illuminate\Support\Facades\RateLimiter::clear($key);
+        session(['quoteflow.ok' => true]);
+
+        return redirect()->route('quoteflow');
+    }
+
     public function page()
     {
         $this->gate();
+
+        // البوابة الثانية: كلمة السر أولاً — الصفحة المقفلة لا تحمل أي بيانات
+        if (! session('quoteflow.ok')) {
+            return view('sideapps.quoteflow-gate');
+        }
 
         $html = file_get_contents(resource_path('sideapps/quoteflow.html'));
         $map  = $this->stored() ?? $this->seedFromBundledBackup();
@@ -67,6 +102,7 @@ class QuoteFlowController extends Controller
     public function save(Request $r)
     {
         $this->gate();
+        abort_unless(session('quoteflow.ok'), 403, 'الجلسة غير مفتوحة على QuoteFlow');
 
         $data = $r->input('data');
         if (! is_array($data)) return response()->json(['ok' => false, 'err' => 'بنية غير صالحة'], 422);

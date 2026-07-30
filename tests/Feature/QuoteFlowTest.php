@@ -10,6 +10,53 @@ use Tests\TestCase;
  */
 class QuoteFlowTest extends TestCase
 {
+    /** يفتح جلسة المالك على التطبيق بكلمة السر — كما يفعل المستخدم فعلاً */
+    protected function unlock(): void
+    {
+        $this->actingAs($this->owner)
+            ->post('/apps/quoteflow/unlock', ['pass' => '1998'])
+            ->assertRedirect(route('quoteflow'));
+    }
+
+    /** حتى المالك يُسأل كلمة السر — والصفحة المقفلة لا تسرّب أي بيانات */
+    public function test_owner_faces_password_gate_with_no_data_leak(): void
+    {
+        $this->seedCore();
+        $html = $this->actingAs($this->owner)->get('/apps/quoteflow')->assertOk()->getContent();
+
+        $this->assertStringContainsString('كلمة السر', $html);
+        $this->assertStringNotContainsString('qfu_products_v3', $html, 'بيانات مبذورة قبل كلمة السر!');
+        $this->assertStringNotContainsString('Medee SERUM', $html, 'بيانات مسرّبة قبل كلمة السر!');
+
+        // الحفظ مقفول أيضاً قبل الفتح
+        $this->actingAs($this->owner)->post('/apps/quoteflow/save', ['data' => []])->assertForbidden();
+    }
+
+    /** كلمة سر خاطئة: يبقى مقفولاً وتُدوَّن المحاولة، والصحيحة تفتح */
+    public function test_wrong_password_stays_locked_and_correct_unlocks(): void
+    {
+        $this->seedCore();
+        $this->actingAs($this->owner)->post('/apps/quoteflow/unlock', ['pass' => '0000'])
+            ->assertSessionHas('err');
+        $this->assertDatabaseHas('audits', ['action' => 'محاولة دخول QuoteFlow فاشلة']);
+        $this->actingAs($this->owner)->get('/apps/quoteflow')->assertSee('كلمة السر');
+
+        $this->unlock();
+        $this->actingAs($this->owner)->get('/apps/quoteflow')->assertOk()->assertSee('qfu_products_v3', false);
+    }
+
+    /** التخمين محدود: بعد ٥ محاولات فاشلة تُرفض حتى الصحيحة لدقيقة */
+    public function test_unlock_attempts_are_rate_limited(): void
+    {
+        $this->seedCore();
+        for ($i = 0; $i < 5; $i++) {
+            $this->actingAs($this->owner)->post('/apps/quoteflow/unlock', ['pass' => 'خطأ ' . $i]);
+        }
+        $this->actingAs($this->owner)->post('/apps/quoteflow/unlock', ['pass' => '1998'])
+            ->assertSessionHas('err');
+        $this->actingAs($this->owner)->get('/apps/quoteflow')->assertSee('كلمة السر');
+    }
+
     /** البوابة: غير المالك ممنوع صفحةً وحفظاً */
     public function test_only_owner_can_access(): void
     {
@@ -23,6 +70,7 @@ class QuoteFlowTest extends TestCase
     public function test_first_open_seeds_bundled_backup_into_server_store(): void
     {
         $this->seedCore();
+        $this->unlock();
         $res = $this->actingAs($this->owner)->get('/apps/quoteflow')->assertOk();
 
         $html = $res->getContent();
@@ -43,6 +91,7 @@ class QuoteFlowTest extends TestCase
     public function test_save_filters_keys_and_next_open_seeds_saved_state(): void
     {
         $this->seedCore();
+        $this->unlock();
         $this->actingAs($this->owner)->post('/apps/quoteflow/save', ['data' => [
             'qfu_products_v3'  => '[{"id":"p_x","name":"منتج محفوظ من الخادم"}]',
             'qfu_customers_v3' => '[]',
@@ -65,6 +114,7 @@ class QuoteFlowTest extends TestCase
     public function test_empty_state_clears_server_and_stays_cleared(): void
     {
         $this->seedCore();
+        $this->unlock();
         $this->actingAs($this->owner)->get('/apps/quoteflow');   // بذر أولي
         $this->actingAs($this->owner)->post('/apps/quoteflow/save', ['data' => []])->assertOk();
 
@@ -76,6 +126,7 @@ class QuoteFlowTest extends TestCase
     public function test_oversize_state_is_rejected(): void
     {
         $this->seedCore();
+        $this->unlock();
         $this->actingAs($this->owner)->post('/apps/quoteflow/save', ['data' => [
             'qfu_products_v3' => str_repeat('x', 12_100_000),
         ]])->assertStatus(413);
@@ -89,6 +140,7 @@ class QuoteFlowTest extends TestCase
     public function test_sync_shim_is_injected_after_the_app_script_not_inside_it(): void
     {
         $this->seedCore();
+        $this->unlock();
         $html = $this->actingAs($this->owner)->get('/apps/quoteflow')->assertOk()->getContent();
 
         $shimAt = strpos($html, 'qfsync');

@@ -221,6 +221,7 @@ Route::middleware('auth')->group(function () {
 
     // QuoteFlow — تطبيق جانبي معزول للمالك وحده، حالته على الخادم
     Route::get('apps/quoteflow', [QuoteFlowController::class, 'page'])->name('quoteflow');
+    Route::post('apps/quoteflow/unlock', [QuoteFlowController::class, 'unlock'])->name('quoteflow.unlock');
     Route::post('apps/quoteflow/save', [QuoteFlowController::class, 'save'])->name('quoteflow.save');
     Route::post('admin/demo/reset', function () {
         abort_unless(auth()->user()?->role?->is_owner, 403);
