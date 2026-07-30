@@ -48,11 +48,15 @@ class QuoteFlowController extends Controller
         $pos  = strpos($html, '<script');
         $html = $pos === false ? $seed . $html : substr_replace($html, $seed, $pos, 0);
 
-        // غلاف المزامنة قبل إغلاق الوسم — يلتف على saveAll ويدفع للخادم مؤجَّلاً
+        // غلاف المزامنة قبل إغلاق الوسم — يلتف على saveAll ويدفع للخادم مؤجَّلاً.
+        // **عند آخر `</body>` حصراً**: التطبيق يحمل النص نفسه داخل سكربته (قالب
+        // الطباعة PDF)، واستبدال أول ظهورٍ حقن الغلاف وسط السكربت فقتله بالكامل —
+        // لأن `</script>` في الغلاف أنهى وسم سكربت التطبيق في منتصفه.
         $shim = view('sideapps.quoteflow-sync', [
             'keys' => self::KEYS, 'url' => route('quoteflow.save'), 'token' => csrf_token(),
         ])->render();
-        $html = str_replace('</body>', $shim . '</body>', $html);
+        $tail = strrpos($html, '</body>');
+        $html = $tail === false ? $html . $shim : substr_replace($html, $shim, $tail, 0);
 
         hub_audit('فتح QuoteFlow', null, null, 'تطبيق جانبي');
 

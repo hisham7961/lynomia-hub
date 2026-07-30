@@ -81,6 +81,26 @@ class QuoteFlowTest extends TestCase
         ]])->assertStatus(413);
     }
 
+    /**
+     * غلاف المزامنة يُحقن بعد آخر `</body>` لا أولها — التطبيق يحمل `</body>` نصاً
+     * داخل سكربته (قالب طباعة PDF)، وحقنٌ عند أول ظهورٍ يقطع السكربت فيموت التطبيق
+     * كلياً (لا زر يستجيب). أُثبت فشله أولاً ثم أُصلح.
+     */
+    public function test_sync_shim_is_injected_after_the_app_script_not_inside_it(): void
+    {
+        $this->seedCore();
+        $html = $this->actingAs($this->owner)->get('/apps/quoteflow')->assertOk()->getContent();
+
+        $shimAt = strpos($html, 'qfsync');
+        $this->assertNotFalse($shimAt, 'غلاف المزامنة غائب');
+        // آخر عنصر في التطبيق سكربت html2pdf — الغلاف يجب أن يأتي بعده لا قبله
+        $this->assertGreaterThan(strpos($html, 'html2pdf'), $shimAt,
+            'الغلاف حُقن وسط سكربت التطبيق فقتله');
+        // ودالة الطباعة سليمة لم يُقطع نصها
+        $this->assertStringContainsString('function printPdfFallback', $html);
+        $this->assertSame(1, substr_count($html, "b.id = 'qfsync'"), 'الغلاف حُقن أكثر من مرة أو صفراً');
+    }
+
     /** رابط الشريط: المالك يراه والموظف لا */
     public function test_adminbar_link_visibility(): void
     {
