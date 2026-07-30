@@ -36,6 +36,10 @@ trait Auditable
             'module'     => static::MODULE ?? $this->getTable(),
             'record_id'  => $this->getKey(),
             'project_id' => $this->project_id ?? null,
+            // شركة السجل تُحفظ مع القيد: العزل يُفرض على التدقيق كما على البيانات،
+            // وجدول الشركات نفسه شركتُه هي سجلّه
+            'company_id' => $this->company_id
+                ?? ($this->getTable() === 'companies' ? $this->getKey() : null),
 'name' => (string) (
     $this->{defined('static::DISPLAY') ? static::DISPLAY : 'name'} ?? ''
 ),

@@ -78,9 +78,49 @@ class AdversarialAuditTest extends TestCase
              'name' => 'سجل-الشركة-الأخرى', 'user_id' => $this->owner->id, 'created_at' => now()],
         ]);
 
+        // القيد الأول يخصّ شركته صراحةً؛ الثاني شركةً أخرى
+        DB::table('audits')->where('name', 'سجل-شركتي')->update(['company_id' => $mine->id]);
+        DB::table('audits')->where('name', 'سجل-الشركة-الأخرى')->update(['company_id' => $theirs->id]);
+
         $rows = collect(WidgetRegistry::resolve('audits', $u))->pluck('name');
+        $this->assertTrue($rows->contains('سجل-شركتي'), 'قيد شركته اختفى');
         $this->assertFalse($rows->contains('سجل-الشركة-الأخرى'),
             'ودجة النشاطات تسرّب أسماء سجلات من شركة أخرى');
+    }
+
+    /** الكتابة تلتقط الشركة النشطة تلقائياً عبر سمة Auditable */
+    public function test_audit_write_captures_the_record_company(): void
+    {
+        $this->seedCore();
+        $co = Company::create(['name_ar' => 'شركة القيد']);
+        $p = Project::create(['name' => 'مشروع', 'company_id' => $co->id]);
+
+        $this->actingAs($this->owner);
+        $t = Task::create(['title' => 'مهمة مؤسسية', 'project_id' => $p->id, 'company_id' => $co->id]);
+
+        $row = DB::table('audits')->where('module', 'tasks')->where('record_id', $t->id)->first();
+        $this->assertNotNull($row);
+        $this->assertSame($co->id, $row->company_id, 'القيد لم يلتقط شركة السجل');
+    }
+
+    /** القيد المعدوم الشركة (سجلٌ محذوف لم يُرحَّل) يُحجب عن المحدود لا يُكشف */
+    public function test_null_company_audit_is_hidden_from_company_limited_user(): void
+    {
+        $this->seedCore();
+        $mine = Company::create(['name_ar' => 'شركتي']);
+        $modules = array_keys(config('hub.modules'));
+        $matrix = collect($modules)->mapWithKeys(fn ($m) => [$m => ['v' => 1, 'a' => 1, 'e' => 1, 'd' => 0]])->all();
+        $role = Role::create(['name' => 'بشركة', 'scope' => 'all', 'flags' => [], 'matrix' => $matrix]);
+        $u = User::create(['name' => 'محدود', 'email' => 'nc@test.local', 'password' => 'Secret!2026x',
+            'role_id' => $role->id, 'status' => 'نشط', 'password_changed_at' => now(), 'companies' => [$mine->id]]);
+
+        DB::table('audits')->insert([
+            'module' => 'tasks', 'record_id' => (string) Str::uuid(), 'action' => 'إضافة',
+            'name' => 'قيد-يتيم', 'user_id' => $this->owner->id, 'company_id' => null, 'created_at' => now(),
+        ]);
+
+        $rows = collect(WidgetRegistry::resolve('audits', $u))->pluck('name');
+        $this->assertFalse($rows->contains('قيد-يتيم'), 'قيدٌ بلا شركة ظهر للمحدود');
     }
 
     /** ولا تعرض نشاط وحدة لا يملك المستخدم رؤيتها */

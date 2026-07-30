@@ -198,12 +198,14 @@ class WidgetRegistry
                     $q->where(fn ($w) => $w->whereNull('audits.module')
                                             ->orWhereIn('audits.module', $visible));
 
-                    /*
-                     * جدول التدقيق بلا `company_id`، فلا سبيل لفرز الشركة عليه. لذا يُقيَّد
-                     * **المحدود بشركاته** كما يُقيَّد المحدود بمشاريعه: فعلُه هو، أو ما جرى
-                     * في مشاريعه. الحجب أسلم من التسريب حتى لو ضاقت قائمته.
-                     */
-                    if (hub_scoped($u) || hub_company_ids($u) !== null) {
+                    // عزل الشركات: صار `company_id` على القيد فيُفلتر مباشرة.
+                    // القيد المعدوم الشركة (سجلٌ محذوف لم يُرحَّل) يُحجب عن المحدود.
+                    if (($cids = hub_company_ids($u)) !== null) {
+                        $q->whereIn('audits.company_id', $cids);
+                    }
+
+                    // النطاق المشاريعي: فعلُه هو، أو ما جرى في مشاريعه
+                    if (hub_scoped($u)) {
                         $ids = $u->visibleProjectIds();
                         $q->where(fn ($w) => $w->where('audits.user_id', $u->id)
                                                 ->orWhereIn('audits.project_id', $ids));

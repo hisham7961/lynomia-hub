@@ -1446,8 +1446,16 @@ if (! function_exists('hub_audit')) {
     function hub_audit(string $action, ?string $module = null, ?string $recordId = null,
                        ?string $name = null, array $extra = [])
     {
+        $companyId = (string) session('hub.company', '') ?: null;
+        $allowed = hub_company_ids();
+        if ($companyId !== null && $allowed !== null && ! in_array($companyId, $allowed, true)) {
+            $companyId = null;
+        }
+
         return \App\Models\AuditEntry::create($extra + [
             'user_id'   => auth()->id(),
+            // الشركة النشطة من الشريط العلوي، إن كانت ضمن المسموح لهذا المستخدم
+            'company_id' => $companyId,
             'action'    => $action,
             'module'    => $module,
             'record_id' => $recordId,
