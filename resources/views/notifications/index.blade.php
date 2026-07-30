@@ -15,7 +15,7 @@
 <div class="card pad0">
     @forelse ($items as $n)
         @php $url = ($n->module && $n->record_id && hub_mod($n->module)) ? route('m.show', [$n->module, $n->record_id]) : null; @endphp
-        <a class="gitem" @if($url) href="{{ $url }}" @else href="javascript:void 0" @endif
+        <a class="gitem" @if($url) href="{{ hub_safe_url($url) }}" @else href="javascript:void 0" @endif
            style="padding:12px 16px;{{ $n->read ? 'opacity:.62' : '' }}">
             @unless ($n->read)<span style="width:8px;height:8px;border-radius:50%;background:var(--p);flex-shrink:0"></span>@endunless
             <span style="flex:1;line-height:1.6">{{ $n->text }}

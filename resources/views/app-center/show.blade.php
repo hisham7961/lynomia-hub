@@ -43,7 +43,7 @@
         @if ($app->apple_rev && $app->apple_rev !== '—')<span class="chip">🍎 مراجعة آبل: <span class="bdg {{ hub_tone($app->apple_rev) }}">{{ $app->apple_rev }}</span></span>@endif
         @if ($app->google_rev && $app->google_rev !== '—')<span class="chip">🤖 مراجعة جوجل: <span class="bdg {{ hub_tone($app->google_rev) }}">{{ $app->google_rev }}</span></span>@endif
         @foreach (['play' => '▶ Google Play', 'appstore' => '🍏 App Store', 'huawei' => '📕 AppGallery', 'admin_url' => '🛠 لوحة الإدارة', 'test_url' => '🧪 نسخة الاختبار', 'git' => '🌿 المستودع', 'firebase' => '🔥 Firebase'] as $col => $label)
-            @if ($app->{$col})<a class="btn ghost xs" href="{{ $app->{$col} }}" target="_blank" rel="noopener">{{ $label }}</a>@endif
+            @if ($app->{$col})<a class="btn ghost xs" href="{{ hub_safe_url($app->{$col}) }}" target="_blank" rel="noopener">{{ $label }}</a>@endif
         @endforeach
     </div>
 </div>

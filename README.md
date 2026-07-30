@@ -1,4 +1,4 @@
-# Lynomia Business Hub — v2.65.0
+# Lynomia Business Hub — v2.66.0
 
 **نظام إدارة أعمال عربي موحّد** — مشروع Laravel واحد قياسي: **MySQL + Blade + Eloquent** — بلا Docker، بلا أدوات بناء، جاهز للرفع على أي استضافة PHP عادية.
 

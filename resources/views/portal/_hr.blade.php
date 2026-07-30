@@ -64,7 +64,7 @@
                 <tr>
                     <td>@if (hub_can(auth()->user(), 'meetings', 'v'))<a href="{{ route('m.show', ['meetings', $mt->id]) }}">{{ \Illuminate\Support\Str::limit($mt->title, 32) }}</a>@else {{ \Illuminate\Support\Str::limit($mt->title, 32) }} @endif
                         <div class="sub">{{ \Illuminate\Support\Carbon::parse($mt->dt)->translatedFormat('l j F · H:i') }}</div></td>
-                    <td style="width:1%">@if ($mt->link)<a class="btn ghost xs" href="{{ $mt->link }}" target="_blank" rel="noopener">انضم</a>@endif</td>
+                    <td style="width:1%">@if ($mt->link)<a class="btn ghost xs" href="{{ hub_safe_url($mt->link) }}" target="_blank" rel="noopener">انضم</a>@endif</td>
                 </tr>
             @endforeach
         </table>

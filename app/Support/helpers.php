@@ -375,6 +375,27 @@ if (! function_exists('hub_flag')) {
     }
 }
 
+if (! function_exists('hub_safe_url')) {
+    /**
+     * رابط آمن للعرض: يسمح فقط بمخططات غير قابلة للتنفيذ (http/https/mailto/tel)
+     * أو الروابط النسبية — ويحيّد javascript: وdata: وغيرها إلى # كي لا تنفَّذ
+     * عند النقر. يُغلّف كل قيم حقول url القادمة من المستخدم قبل وضعها في href.
+     */
+    function hub_safe_url(?string $v): string
+    {
+        $v = trim((string) $v);
+        if ($v === '') return '#';
+        // المتصفحات تُزيل التبويب والأسطر من الروابط قبل تفسيرها، فـ«java[tab]script:»
+        // ينفَّذ — نُحاكي ذلك: نجرّد كل محارف التحكم قبل فحص المخطط لا بعده.
+        $probe = preg_replace('/[\x00-\x1F\x7F]+/', '', $v);
+        if (preg_match('/^([a-z][a-z0-9+.\-]*)\s*:/i', $probe, $m)) {
+            return in_array(strtolower($m[1]), ['http', 'https', 'mailto', 'tel'], true) ? $v : '#';
+        }
+        // بلا مخطط: رابط نسبي أو //host — نمنع // المفتوح لتفادي الغموض، ونقبل الباقي
+        return str_starts_with($probe, '//') ? '#' : $v;
+    }
+}
+
 if (! function_exists('hub_tone')) {
     /** لون شارة الحالة من دلالة الكلمة العربية */
     function hub_tone(?string $v): string

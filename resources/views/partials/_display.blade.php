@@ -28,7 +28,7 @@
     @if ($t === 'img')<img class="thumb" src="{{ route('file.show', $v) }}" alt="">
     @else<a href="{{ route('file.show', $v) }}" target="_blank">ملف ↗</a>@endif
 @elseif ($t === 'url')
-    <a class="mono ltr" href="{{ $v }}" target="_blank" rel="noopener">{{ \Illuminate\Support\Str::limit($v, 34) }}</a>
+    <a class="mono ltr" href="{{ hub_safe_url($v) }}" target="_blank" rel="noopener">{{ \Illuminate\Support\Str::limit($v, 34) }}</a>
 @elseif ($t === 'date')
     <span class="mono">{{ substr($v, 0, 10) }}</span>
 @elseif ($t === 'dt')
