@@ -169,7 +169,10 @@ class ModuleController extends Controller
         // المرفقات الشاملة
         [$attachments, $aUsers] = AttachmentController::forRecord($module, $row->id);
 
-        return view('modules.show', compact('module', 'def', 'row', 'labels', 'children', 'versions', 'verUsers', 'comments', 'cUsers', 'attachments', 'aUsers'));
+        // الخط الزمني الموحَّد — يدمج التدقيق والتعليقات والمرفقات والإصدارات
+        $timeline = hub_timeline($module, $row->id);
+
+        return view('modules.show', compact('module', 'def', 'row', 'labels', 'children', 'versions', 'verUsers', 'comments', 'cUsers', 'attachments', 'aUsers', 'timeline'));
     }
 
     public function edit(string $module, string $id)

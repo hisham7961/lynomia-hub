@@ -1264,6 +1264,86 @@ if (! function_exists('hub_open_scope')) {
     }
 }
 
+if (! function_exists('hub_timeline')) {
+    /**
+     * الخط الزمني الموحَّد لسجل — بلا جدول جديد.
+     *
+     * التاريخ كان موجوداً كاملاً موزّعاً على أربعة جداول تتشارك `(module, record_id)`
+     * ولا أحد يدمجها، فكان على المستخدم أن يفتح أربع بطاقات ليعرف ما جرى. هذا قارئٌ
+     * يوحّدها ويُطبّعها لشكل رحلة العميل — فتحصل الوحدات الـ٧١ على خط زمني دفعةً واحدة.
+     *
+     * لا يُخرج `before/after` من التدقيق: الخط الزمني يقول **من فعل ماذا ومتى**،
+     * أما القيم القديمة فلها سجل الإصدارات بصلاحيته.
+     */
+    function hub_timeline(string $module, string $recordId, int $limit = 60): array
+    {
+        $db = \Illuminate\Support\Facades\DB::class;
+        $ev = [];
+        $add = function ($at, string $ico, string $label, string $title,
+                         ?string $url = null, ?string $who = null) use (&$ev) {
+            if (! $at) return;
+            $ev[] = ['at' => (string) $at, 'ico' => $ico, 'label' => $label,
+                     'title' => $title, 'url' => $url, 'status' => null, 'who' => $who];
+        };
+
+        $users = [];
+        $name  = function ($id) use (&$users) {
+            if ($id === null) return null;
+            if (! array_key_exists($id, $users)) {
+                $users[$id] = \Illuminate\Support\Facades\DB::table('users')
+                    ->where('id', $id)->value('name');
+            }
+
+            return $users[$id];
+        };
+
+        $icons = ['إضافة' => '🌱', 'تعديل' => '✏️', 'حذف' => '🗑️', 'استعادة' => '♻️',
+                  'تصدير' => '📤', 'استيراد' => '📥', 'عرض حساس' => '👁️'];
+
+        // ١) التدقيق — من فعل ماذا
+        foreach (\Illuminate\Support\Facades\DB::table('audits')
+                    ->where('module', $module)->where('record_id', $recordId)
+                    ->orderByDesc('created_at')->limit($limit)
+                    ->get(['action', 'reason', 'user_id', 'created_at']) as $a) {
+            $add($a->created_at, $icons[$a->action] ?? '📌', (string) $a->action,
+                (string) ($a->reason ?: ''), null, $name($a->user_id));
+        }
+
+        // ٢) التعليقات
+        foreach (\Illuminate\Support\Facades\DB::table('comments')->whereNull('deleted_at')
+                    ->where('module', $module)->where('record_id', $recordId)
+                    ->orderByDesc('created_at')->limit($limit)
+                    ->get(['id', 'body', 'user_id', 'created_at']) as $c) {
+            $add($c->created_at, '💬', 'تعليق',
+                \Illuminate\Support\Str::limit((string) $c->body, 90),
+                '#c-' . $c->id, $name($c->user_id));
+        }
+
+        // ٣) المرفقات
+        foreach (\Illuminate\Support\Facades\DB::table('attachments')->whereNull('deleted_at')
+                    ->where('module', $module)->where('record_id', $recordId)
+                    ->orderByDesc('created_at')->limit($limit)
+                    ->get(['original_name', 'uploaded_by', 'created_at']) as $t) {
+            $add($t->created_at, '📎', 'مرفق',
+                \Illuminate\Support\Str::limit((string) $t->original_name, 60),
+                null, $name($t->uploaded_by));
+        }
+
+        // ٤) الإصدارات المحفوظة
+        foreach (\Illuminate\Support\Facades\DB::table('record_versions')
+                    ->where('module', $module)->where('record_id', $recordId)
+                    ->orderByDesc('created_at')->limit($limit)
+                    ->get(['version', 'changed_by', 'created_at']) as $v) {
+            $add($v->created_at, '🕐', 'نسخة', 'الإصدار ' . $v->version, null, $name($v->changed_by));
+        }
+
+        // الأحدث أولاً — تاريخُ سجلٍ يُقرأ من آخره، بخلاف رحلة العميل
+        usort($ev, fn ($a, $b) => strcmp($b['at'], $a['at']));
+
+        return array_slice($ev, 0, $limit);
+    }
+}
+
 if (! function_exists('hub_notify')) {
     /**
      * إنشاء إشعار — نفس المصفوفة كانت منسوخة في ستة مواضع، وسقط `Str::limit`

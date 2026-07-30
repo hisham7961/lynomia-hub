@@ -66,6 +66,7 @@
     </dl>
 </div>
 @include('partials.record_list', ['children' => $children, 'ownerId' => $row->id])
+@include('partials.timeline', ['timeline' => $timeline])
 @if ($versions->count() > 1)
     <div class="card">
         <h3>🕐 سجل الإصدارات</h3>
