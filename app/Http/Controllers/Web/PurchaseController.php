@@ -66,7 +66,7 @@ class PurchaseController extends Controller
     /** الاعتماد للمالكين وحاملي علم approve فقط */
     protected function approve(Purchase $p)
     {
-        abort_unless(auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'approve'), 403,
+        abort_unless(hub_approver(), 403,
             'اعتماد المشتريات للمالكين وحاملي صلاحية الاعتماد');
 
         return $this->setStatus($p, 'معتمد', '✅ اعتُمد أمر الشراء');

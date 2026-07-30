@@ -14,7 +14,7 @@ class KpiController extends Controller
 {
     protected function gate(): void
     {
-        abort_unless(auth()->user()?->role?->is_owner || hub_flag(auth()->user(), 'monitor'),
+        abort_unless(hub_monitor(),
             403, 'باني المؤشرات للمالكين ومن يحمل صلاحية المتابعة');
     }
 

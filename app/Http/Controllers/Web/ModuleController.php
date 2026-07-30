@@ -143,7 +143,7 @@ class ModuleController extends Controller
 
         // عرض حساس: صفحة تعرض سراً غير فارغ لمستخدم مخوّل — تُسجّل في التدقيق
         $u = auth()->user();
-        if ($u->role?->is_owner || hub_flag($u, 'secrets') || hub_flag($u, 'copySec')) {
+        if (hub_copy_secrets($u)) {
             foreach ($def['fields'] as $f) {
                 if (($f['type'] ?? '') === 'sec' && filled($row->{$f['col']} ?? null)) {
                     \App\Models\AuditEntry::create([
@@ -306,7 +306,7 @@ class ModuleController extends Controller
     public function export(Request $r, string $module)
     {
         [$def, $class] = $this->resolve($module, 'v');
-        abort_unless(hub_flag(auth()->user(), 'exp') || auth()->user()->role?->is_owner, 403, 'التصدير يتطلب صلاحية');
+        abort_unless(hub_exporter(), 403, 'التصدير يتطلب صلاحية');
         $def['key'] = $module;
 
         $trash = false; $filters = [];

@@ -375,6 +375,68 @@ if (! function_exists('hub_flag')) {
     }
 }
 
+/*
+ * السياسات المسمّاة — الطبقة الرقيقة التي تُسمّي «من يرى هذه الشاشة».
+ *
+ * كانت هذه السياسات السبع منسوخة في ~٤٠ تعبيراً مضمّناً، فتفرّقت صياغتها:
+ * بعضها يكتب `auth()->user()->role?->is_owner` وبعضها `auth()->user()?->role?->is_owner`،
+ * وكلها تُضيف `is_owner ||` قبل `hub_flag(...)` رغم أن `hub_flag` تُرجع true للمالك أصلاً.
+ * تسميتها هنا تجعل السياسة قابلة للقراءة والتغيير في موضع واحد، وتُؤمّن المستخدم المعدوم
+ * (أوامر الطرفية والمهام المجدولة) بلا اعتماد على وسيط auth.
+ */
+
+if (! function_exists('hub_is_owner')) {
+    /** مالك النظام — أعلى سلطة، يتجاوز المصفوفة والأعلام. تُفوِّض لـUser::isOwner فتبقى التعريفة واحدة */
+    function hub_is_owner($user = null): bool
+    {
+        $user = $user ?? auth()->user();
+        return $user instanceof \App\Models\User
+            ? $user->isOwner()
+            : (bool) ($user?->role?->is_owner);
+    }
+}
+
+if (! function_exists('hub_monitor')) {
+    /** المراقبة: لوحات الأداء والتكلفة والطاقة — بيانات أداء الأفراد حساسة */
+    function hub_monitor($user = null): bool
+    {
+        return hub_flag($user ?? auth()->user(), 'monitor');
+    }
+}
+
+if (! function_exists('hub_approver')) {
+    /** اعتماد الطلبات وأوامر الشراء */
+    function hub_approver($user = null): bool
+    {
+        return hub_flag($user ?? auth()->user(), 'approve');
+    }
+}
+
+if (! function_exists('hub_secrets')) {
+    /** الاطلاع على الأسرار المخزّنة (الخزنة، غرفة البيانات) */
+    function hub_secrets($user = null): bool
+    {
+        return hub_flag($user ?? auth()->user(), 'secrets');
+    }
+}
+
+if (! function_exists('hub_copy_secrets')) {
+    /** نسخ سرّ إلى الحافظة — علم منفصل عن مجرد الاطلاع */
+    function hub_copy_secrets($user = null): bool
+    {
+        $user = $user ?? auth()->user();
+        return hub_flag($user, 'secrets') || hub_flag($user, 'copySec');
+    }
+}
+
+if (! function_exists('hub_exporter')) {
+    /** التصدير إلى CSV — مسرّب بيانات محتمل فله علمه */
+    function hub_exporter($user = null): bool
+    {
+        return hub_flag($user ?? auth()->user(), 'exp');
+    }
+}
+
 if (! function_exists('hub_safe_url')) {
     /**
      * رابط آمن للعرض: يسمح فقط بمخططات غير قابلة للتنفيذ (http/https/mailto/tel)

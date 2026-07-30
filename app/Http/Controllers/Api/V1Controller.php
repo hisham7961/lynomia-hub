@@ -18,7 +18,7 @@ class V1Controller extends ModuleController
 
         return response()->json([
             'id' => $u->id, 'name' => $u->name, 'email' => $u->email,
-            'role' => $u->role?->name, 'is_owner' => (bool) $u->role?->is_owner,
+            'role' => $u->role?->name, 'is_owner' => hub_is_owner($u),
         ]);
     }
 
@@ -156,7 +156,7 @@ class V1Controller extends ModuleController
     /** GET /api/v1/reports/health — للمالكين */
     public function health()
     {
-        abort_unless(auth()->user()->role?->is_owner, 403);
+        abort_unless(hub_is_owner(), 403);
         abort_unless($this->tokenAllows('reports', 'v'), 403, 'نطاق هذا المفتاح لا يشمل «reports:v»');
 
         return response()->json(hub_health());
@@ -279,7 +279,7 @@ class V1Controller extends ModuleController
     {
         $module = (string) ($def['key'] ?? '');
         $u = auth()->user();
-        $canSec = (bool) ($u?->role?->is_owner || hub_flag($u, 'secrets') || hub_flag($u, 'copySec'));
+        $canSec = hub_copy_secrets($u);
         $arr = is_array($row) ? $row : $row->toArray();
 
         foreach ($def['fields'] as $f) {

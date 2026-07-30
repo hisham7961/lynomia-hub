@@ -76,7 +76,7 @@ class AttachmentController extends Controller
         $a = Attachment::findOrFail($id);
         $u = auth()->user();
         abort_unless(
-            $a->uploaded_by === $u->id || $u->role?->is_owner || hub_can($u, $a->module, 'e'),
+            $a->uploaded_by === $u->id || hub_is_owner($u) || hub_can($u, $a->module, 'e'),
             403, 'حذف المرفق لمن رفعه أو من يملك تعديل الوحدة'
         );
         $this->guardRecord($a->module, $a->record_id, 'v');

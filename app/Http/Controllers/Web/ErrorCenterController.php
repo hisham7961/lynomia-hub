@@ -12,7 +12,7 @@ class ErrorCenterController extends Controller
 {
     protected function gate(): void
     {
-        abort_unless(auth()->user()?->role?->is_owner, 403, 'مركز الأخطاء للمالكين فقط');
+        abort_unless(hub_is_owner(), 403, 'مركز الأخطاء للمالكين فقط');
     }
 
     public function index(Request $r)

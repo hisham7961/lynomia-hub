@@ -109,7 +109,7 @@ class InboxDocController extends Controller
     /** حذف — للمالك فقط */
     public function destroy(string $id)
     {
-        abort_unless(auth()->user()?->role?->is_owner, 403, 'حذف الوثائق للمالك فقط');
+        abort_unless(hub_is_owner(), 403, 'حذف الوثائق للمالك فقط');
         InboxDocument::findOrFail($id)->delete();
 
         return back()->with('ok', 'حُذفت الوثيقة (حذف ناعم)');

@@ -19,7 +19,7 @@
                     @if ($a->field) · <span title="ملاحظة">{{ \Illuminate\Support\Str::limit($a->field, 60) }}</span>@endif
                 </div>
             </div>
-            @if ($a->uploaded_by === auth()->id() || auth()->user()->role?->is_owner || hub_can(auth()->user(), $aModule, 'e'))
+            @if ($a->uploaded_by === auth()->id() || hub_is_owner() || hub_can(auth()->user(), $aModule, 'e'))
                 <form method="POST" action="{{ route('att.destroy', $a->id) }}" class="inline"
                       onsubmit="return confirm('حذف المرفق «' + {{ \Illuminate\Support\Js::from(\Illuminate\Support\Str::limit($a->original_name, 40)) }} + '»؟')">
                     @csrf @method('DELETE')

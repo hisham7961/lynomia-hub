@@ -19,7 +19,7 @@
         }
     }
     $pending  = in_array($row->status, [null, '', 'معلّق'], true);
-    $canJudge = auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'approve');
+    $canJudge = hub_approver();
     $reqName  = $row->requested_by ? (\App\Models\User::find($row->requested_by)?->name ?? '—') : null;
 @endphp
 @if ($row->mod)

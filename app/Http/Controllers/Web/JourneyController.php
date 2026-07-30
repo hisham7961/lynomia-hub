@@ -33,7 +33,8 @@ class JourneyController extends Controller
             if (! $md || ! hub_can(auth()->user(), $mk, 'v')) continue;
             $disp = hub_display_col($mk);
             $sc = $md['status'] ?? null;
-            $rows = DB::table($md['table'])->whereNull('deleted_at')
+            // النطاق يُفرض على الابن نفسه: رؤية العميل لا تمنح رؤية عروضه وعقوده
+            $rows = hub_scope(DB::table($md['table'])->whereNull('deleted_at'), $mk)
                 ->where('client_id', $client->id)->limit(100)
                 ->get(array_values(array_unique(array_filter(['id', $disp, $sc, 'created_at']))));
             foreach ($rows as $r) {
@@ -45,7 +46,7 @@ class JourneyController extends Controller
         // المستندات المالية بمطابقة اسم الطرف — لا رابط صريح فنقولها صراحةً في الصفحة
         $fin = ['count' => 0, 'total' => 0.0, 'paid' => 0.0];
         if (hub_can(auth()->user(), 'fin', 'v') && trim((string) $client->name) !== '') {
-            $docs = DB::table('fin_documents')->whereNull('deleted_at')
+            $docs = hub_scope(DB::table('fin_documents')->whereNull('deleted_at'), 'fin')
                 ->where('partner', $client->name)->limit(100)->get();
             foreach ($docs as $d) {
                 $fin['count']++;

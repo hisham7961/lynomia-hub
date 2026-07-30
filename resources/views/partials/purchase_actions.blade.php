@@ -3,7 +3,7 @@
     $st = $row->status ?? 'مسودة';
     $meta = (array) $row->meta;
     $canE = hub_can(auth()->user(), 'purchases', 'e');
-    $canApprove = auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'approve');
+    $canApprove = hub_approver();
 @endphp
 <div class="card">
     <h3 style="margin-bottom:8px">🛒 مسار الشراء <span class="bdg {{ hub_tone($st) }}">{{ $st }}</span>

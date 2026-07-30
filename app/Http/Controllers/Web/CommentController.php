@@ -64,7 +64,7 @@ class CommentController extends Controller
     {
         $c = Comment::findOrFail($id);
         $can = $c->module === 'feed'
-            ? (auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'monitor'))
+            ? hub_monitor()
             : hub_can(auth()->user(), $c->module, 'e');
         abort_unless($can, 403);
 
@@ -77,7 +77,7 @@ class CommentController extends Controller
     public function destroy(string $id)
     {
         $c = Comment::findOrFail($id);
-        abort_unless($c->user_id === auth()->id() || auth()->user()->role?->is_owner, 403);
+        abort_unless($c->user_id === auth()->id() || hub_is_owner(), 403);
         $c->delete();
 
         return back()->with('ok', 'حُذف التعليق');

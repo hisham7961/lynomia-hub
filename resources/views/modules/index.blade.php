@@ -69,7 +69,7 @@
     @if (! $trash && ($def['status'] ?? null))
         <a class="btn ghost sm" href="{{ route('m.board', $module) }}">🗂 كانبان</a>
     @endif
-    @if (! $trash && (hub_flag(auth()->user(), 'exp') || auth()->user()->role?->is_owner))
+    @if (! $trash && (hub_exporter()))
         <a class="btn ghost sm" href="{{ route('m.export', ['module' => $module] + request()->query()) }}">📤 CSV</a>
     @endif
     @if (! $trash && hub_can(auth()->user(), $module, 'a') && ! hub_scoped(auth()->user()))

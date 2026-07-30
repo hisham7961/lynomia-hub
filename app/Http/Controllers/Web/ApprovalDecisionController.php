@@ -56,7 +56,7 @@ class ApprovalDecisionController extends ModuleController
     /** الطلب المعلّق + بوابة الصلاحية (مالك أو حامل علم approve) */
     protected function pending(string $id): Approval
     {
-        abort_unless(auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'approve'), 403, 'الحسم للمعتمدين فقط');
+        abort_unless(hub_approver(), 403, 'الحسم للمعتمدين فقط');
         $ap = Approval::findOrFail($id);
         abort_unless($ap->mod && in_array($ap->status, [null, '', 'معلّق'], true), 422, 'حُسم هذا الطلب من قبل');
 

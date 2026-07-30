@@ -19,8 +19,8 @@
     </h3>
 
     @unless ($odooOk)
-        <p class="sub">لم يُهيأ الربط بعد — {{ auth()->user()->role?->is_owner ? 'أدخل بيانات خادم أودو من' : 'اطلب من المالك تهيئته في' }}
-            @if (auth()->user()->role?->is_owner)<a href="{{ route('settings.edit') }}">الإعدادات ← ربط أودو</a>@else الإعدادات @endif
+        <p class="sub">لم يُهيأ الربط بعد — {{ hub_is_owner() ? 'أدخل بيانات خادم أودو من' : 'اطلب من المالك تهيئته في' }}
+            @if (hub_is_owner())<a href="{{ route('settings.edit') }}">الإعدادات ← ربط أودو</a>@else الإعدادات @endif
             — وستمتلئ هذه البطاقة بمبيعات وفواتير هذا السجل تلقائياً.</p>
     @else
         @if ($err)<div class="ferr" style="margin-bottom:8px">⚠️ {{ $err }}</div>@endif

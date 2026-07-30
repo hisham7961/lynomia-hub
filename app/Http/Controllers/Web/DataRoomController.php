@@ -18,7 +18,7 @@ class DataRoomController extends Controller
 {
     protected function gate(): void
     {
-        abort_unless(auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'secrets'), 403,
+        abort_unless(hub_secrets(), 403,
             'غرفة البيانات تتطلب صلاحية الأسرار أو المالك');
     }
 

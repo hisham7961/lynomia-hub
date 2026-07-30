@@ -50,7 +50,7 @@
                     </div>
                 @endif
             </div>
-            @if (auth()->user()->role?->is_owner)
+            @if (hub_is_owner())
                 <form method="POST" action="{{ route('inboxdocs.destroy', $doc->id) }}" onsubmit="return confirm('حذف الوثيقة؟')">
                     @csrf @method('DELETE')<button class="btn ghost xs" style="color:var(--bad)">🗑</button>
                 </form>

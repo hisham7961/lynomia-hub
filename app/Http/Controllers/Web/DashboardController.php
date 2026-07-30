@@ -16,7 +16,7 @@ class DashboardController extends Controller
         // ودجات مؤشرات KPI المخصصة — لمن يبنيها (مالك/متابعة)، وتُخفى بمفتاح kpis
         $kpis = [];
         if (! in_array('kpis', $hid, true)
-            && ($user->role?->is_owner || hub_flag($user, 'monitor'))
+            && hub_monitor($user)
             && \Illuminate\Support\Facades\Schema::hasTable('kpi_defs')) {
             $kpis = hub_kpis($user);
         }

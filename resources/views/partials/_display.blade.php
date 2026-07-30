@@ -4,7 +4,7 @@
 @if ($v === null || $v === '' || $v === [])
     <span class="sub">—</span>
 @elseif ($t === 'sec')
-    @php $canSec = auth()->user()?->role?->is_owner || hub_flag(auth()->user(), 'secrets') || hub_flag(auth()->user(), 'copySec'); @endphp
+    @php $canSec = hub_copy_secrets(); @endphp
     @if ($canSec && ($ctx ?? 'table') === 'show')
         <span class="mono" data-sec hidden>{{ $v }}</span><span class="mono" data-secmask>••••••</span>
         <button class="btn ghost xs" type="button"

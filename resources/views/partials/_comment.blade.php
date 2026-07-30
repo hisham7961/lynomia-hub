@@ -57,14 +57,14 @@
                 </form>
             </details>
         @endif
-        @php $canPin = $c->module === 'feed' ? (auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'monitor')) : hub_can(auth()->user(), $c->module, 'e'); @endphp
+        @php $canPin = $c->module === 'feed' ? (hub_monitor()) : hub_can(auth()->user(), $c->module, 'e'); @endphp
         @if ($canPin)
             <form method="POST" action="{{ route('comments.pin', $c->id) }}">@csrf<button class="lnk sub" type="submit">{{ $c->pinned ? 'فك التثبيت' : '📌 تثبيت' }}</button></form>
         @endif
         @if (! $c->task_id && hub_can(auth()->user(), 'tasks', 'a'))
             <form method="POST" action="{{ route('comments.task', $c->id) }}">@csrf<button class="lnk sub" type="submit">→ مهمة</button></form>
         @endif
-        @if ($c->user_id === auth()->id() || auth()->user()->role?->is_owner)
+        @if ($c->user_id === auth()->id() || hub_is_owner())
             <form method="POST" action="{{ route('comments.destroy', $c->id) }}" onsubmit="return confirm('حذف التعليق؟')">@csrf @method('DELETE')<button class="lnk sub" type="submit">حذف</button></form>
         @endif
     </div>

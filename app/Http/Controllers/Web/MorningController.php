@@ -121,7 +121,7 @@ class MorningController extends Controller
         }
 
         // ── تشغيلي وأمني (للمالك) ──
-        if ($u->role?->is_owner) {
+        if (hub_is_owner($u)) {
             $ops = collect();
             $bk = setting('heartbeat.backup');
             if (! $bk || \Illuminate\Support\Carbon::parse($bk)->lt(now()->subHours(26))) {

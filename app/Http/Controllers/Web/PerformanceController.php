@@ -18,7 +18,7 @@ class PerformanceController extends Controller
 
     public function index()
     {
-        abort_unless(auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'monitor'), 403,
+        abort_unless(hub_monitor(), 403,
             'لوحة الأداء للمالكين وحاملي صلاحية المراقبة');
 
         return view('performance.index', [

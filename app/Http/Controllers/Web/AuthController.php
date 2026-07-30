@@ -42,7 +42,7 @@ class AuthController extends Controller
         }
 
         // قفل الطوارئ: يدخل المالكون فقط
-        if (setting('security.lockdown') && $user && ! $user->role?->is_owner) {
+        if (setting('security.lockdown') && $user && ! hub_is_owner($user)) {
             return $fail('النظام في قفل طوارئ مؤقت — الدخول للمالكين فقط');
         }
 
