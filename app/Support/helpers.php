@@ -1509,7 +1509,9 @@ if (! function_exists('hub_supplier_scores')) {
                 $orders = $po->count();
                 $spend = (float) $po->sum('amount');
                 $received = $po->where('status', 'مستلم');
-                $returned = $po->whereIn('status', ['مرتجع', 'ملغى'])->count();
+                // المرتجعات مسؤولية المورد؛ الإلغاء غالباً قرارنا فلا يُحتسب ضده
+                $returned = $po->where('status', 'مرتجع')->count();
+                $cancelled = $po->where('status', 'ملغى')->count();
                 $open = $po->whereIn('status', ['معتمد', 'أُرسل للمورد', 'بانتظار الاعتماد'])->count();
                 $unpaid = $po->filter(fn ($p) => ! in_array($p->pay_state, ['مدفوع', 'مسدد'], true)
                     && in_array($p->status, ['مستلم', 'أُرسل للمورد', 'معتمد'], true))->count();
@@ -1525,15 +1527,17 @@ if (! function_exists('hub_supplier_scores')) {
                 // نجمات التقييم اليدوي: عدّ ⭐ في نص التقييم
                 $stars = substr_count((string) $s->rating, '⭐') ?: null;
 
+                // قاعدة نسبة المرتجعات: الأوامر **المسلَّمة فعلاً** (مستلمة + مرتجعة) لا كل
+                // الأوامر بما فيها المسودّات — ولا درجة لمن لم يُسلَّم منه شيء بعد
+                $delivered = $received->count() + $returned;
                 $rows[] = [
                     'id' => $s->id, 'name' => $s->name, 'cat' => $s->cat, 'stars' => $stars,
                     'ratingLabel' => (string) $s->rating,
                     'orders' => $orders, 'spend' => $spend,
-                    'received' => $received->count(), 'returned' => $returned,
-                    'open' => $open, 'unpaid' => $unpaid,
+                    'received' => $received->count(), 'returned' => $returned, 'cancelled' => $cancelled,
+                    'open' => $open, 'unpaid' => $unpaid, 'delivered' => $delivered,
                     'onTimeRate' => $onTimeRate, 'onTimeBase' => $withDue->count(),
-                    // درجة مركّبة تقريبية لمن له تاريخ: التزام ٦٠٪ + انخفاض المرتجعات ٤٠٪
-                    'score' => hub_supplier_score_calc($onTimeRate, $orders, $returned),
+                    'score' => hub_supplier_score_calc($onTimeRate, $delivered, $returned),
                 ];
             }
 
@@ -1546,7 +1550,8 @@ if (! function_exists('hub_supplier_scores')) {
                     'suppliers' => count($rows),
                     'spend' => round((float) array_sum(array_column($rows, 'spend')), 2),
                     'atRisk' => count(array_filter($rows, fn ($r) => $r['score'] !== null && $r['score'] < 50)),
-                    'noHistory' => count(array_filter($rows, fn ($r) => $r['orders'] === 0)),
+                    // بلا درجة = لا تسليم بعد (سواء بلا أوامر أو أوامر مفتوحة/مسودّات فقط)
+                    'noHistory' => count(array_filter($rows, fn ($r) => $r['score'] === null)),
                 ],
             ];
         });
@@ -1555,11 +1560,11 @@ if (! function_exists('hub_supplier_scores')) {
 
 if (! function_exists('hub_supplier_score_calc')) {
     /** درجة مورد ٠-١٠٠: التزام بالموعد وازناً الأكبر، مطروحاً منه أثر المرتجعات */
-    function hub_supplier_score_calc(?int $onTimeRate, int $orders, int $returned): ?int
+    function hub_supplier_score_calc(?int $onTimeRate, int $delivered, int $returned): ?int
     {
-        if ($orders === 0) return null;                       // بلا تاريخ لا درجة — لا نخترع رقماً
-        $ret = $orders > 0 ? $returned / $orders : 0;         // نسبة المرتجعات/الملغاة
-        $ontime = $onTimeRate ?? 60;                          // بلا مواعيد: محايد ٦٠
+        if ($delivered === 0) return null;                    // لم يُسلَّم منه شيء بعد — لا درجة نخترعها
+        $ret = $returned / $delivered;                        // نسبة المرتجع من المُسلَّم فعلاً
+        $ontime = $onTimeRate ?? 60;                          // بلا مواعيد مسجّلة: محايد ٦٠
         $score = $ontime * 0.6 + (1 - $ret) * 100 * 0.4;
 
         return max(0, min(100, (int) round($score)));
@@ -1582,10 +1587,12 @@ if (! function_exists('hub_kpi_metric')) {
         $q = \Illuminate\Support\Facades\DB::table($def['table'])->whereNull('deleted_at');
         if ($user) $q = hub_scope($q, $mk, $user);
 
-        // فلتر الحالة على عمود حالة الوحدة فقط
-        if (($st = trim((string) ($m['st'] ?? ''))) !== '' && ($sc = $def['status'] ?? null)
-            && \Illuminate\Support\Facades\Schema::hasColumn($def['table'], $sc)) {
-            $q->where($sc, $st);
+        // فلتر الحالة: عمود الحالة **الفيزيائي** لا مفتاحه — في وحدة الوثائق
+        // المفتاح docStatus والعمود doc_status، فالفحص بالمفتاح كان يُسقط الفلتر بصمت
+        if (($st = trim((string) ($m['st'] ?? ''))) !== '' && ($skey = $def['status'] ?? null)) {
+            $sfield = collect($def['fields'])->firstWhere('key', $skey);
+            $scol = $sfield['col'] ?? $skey;
+            if (\Illuminate\Support\Facades\Schema::hasColumn($def['table'], $scol)) $q->where($scol, $st);
         }
 
         if ($agg === 'count') return (float) $q->count();
@@ -1594,7 +1601,13 @@ if (! function_exists('hub_kpi_metric')) {
         $col = collect($def['fields'])->firstWhere('key', $m['col'] ?? '');
         if (! $col || ! in_array($col['type'], ['num', 'big'], true)) return null;
 
-        return $agg === 'sum' ? (float) $q->sum($col['col']) : (float) ($q->avg($col['col']) ?? 0);
+        // متوسط بلا صفوف = لا بيانات (null)، لا صفر مضلِّل
+        if ($agg === 'avg') {
+            $avg = $q->avg($col['col']);
+            return $avg === null ? null : round((float) $avg, 4);
+        }
+
+        return (float) $q->sum($col['col']);
     }
 }
 
@@ -1608,8 +1621,10 @@ if (! function_exists('hub_kpi_value')) {
         $combine = $formula['combine'] ?? 'none';
         if ($combine === 'none') return round($a, 2);
 
+        // المقياس الثاني تعذّر (عمود غير رقمي مثلاً): لا نُظهر المقياس الأول
+        // خام تحت وحدة العملية — «—» أصدق من رقمٍ ليس ما وعدت به المعادلة
         $b = isset($formula['b']) && is_array($formula['b']) ? hub_kpi_metric($formula['b'], $user) : null;
-        if ($b === null) return round($a, 2);
+        if ($b === null) return null;
 
         return match ($combine) {
             'ratio_pct' => $b != 0.0 ? round($a / $b * 100, 1) : null,

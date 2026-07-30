@@ -48,6 +48,36 @@ class SupplierScoresTest extends TestCase
         $this->assertSame(1, hub_supplier_scores(true)['totals']['noHistory']);
     }
 
+    public function test_cancellations_do_not_count_against_the_supplier(): void
+    {
+        $this->seedCore();
+        $s = Supplier::create(['name' => 'مورد ممتاز']);
+        // تسليم واحد في الموعد + أربعة أوامر ألغيناها نحن → يجب ألا تسحب الدرجة
+        Purchase::create(['doc_no' => 'D1', 'supplier_id' => $s->id, 'amount' => 100,
+            'due' => now()->addDay(), 'status' => 'مستلم', 'pay_state' => 'مدفوع']);
+        foreach (['C1', 'C2', 'C3', 'C4'] as $n) {
+            Purchase::create(['doc_no' => $n, 'supplier_id' => $s->id, 'amount' => 50, 'status' => 'ملغى']);
+        }
+
+        $row = collect(hub_supplier_scores(true)['rows'])->firstWhere('id', $s->id);
+        // delivered = 1، returned = 0 → 100×0.6 + 1×100×0.4 = 100
+        $this->assertSame(100, $row['score'], 'الإلغاء قرارنا لا يُحتسب ضد المورد');
+        $this->assertSame(4, $row['cancelled']);
+    }
+
+    public function test_supplier_with_only_open_orders_has_null_score(): void
+    {
+        $this->seedCore();
+        $s = Supplier::create(['name' => 'مورد جديد']);
+        Purchase::create(['doc_no' => 'O1', 'supplier_id' => $s->id, 'amount' => 100, 'status' => 'أُرسل للمورد']);
+
+        $row = collect(hub_supplier_scores(true)['rows'])->firstWhere('id', $s->id);
+        $this->assertSame(1, $row['orders']);
+        $this->assertSame(0, $row['delivered']);
+        $this->assertNull($row['score'], 'أوامر مفتوحة بلا تسليم لا تعطي درجة خضراء وهمية');
+        $this->assertSame(1, hub_supplier_scores(true)['totals']['noHistory']);
+    }
+
     public function test_page_gated_by_suppliers_visibility(): void
     {
         $this->seedCore();

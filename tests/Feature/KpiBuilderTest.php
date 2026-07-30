@@ -67,6 +67,46 @@ class KpiBuilderTest extends TestCase
         $this->assertNull($v);
     }
 
+    /** الفلتر يعمل حتى حين يختلف مفتاح الحالة عن عمودها (files: docStatus/doc_status) */
+    public function test_status_filter_uses_physical_column_for_documents(): void
+    {
+        $this->seedCore();
+        \Illuminate\Support\Facades\DB::table('documents')->insert([
+            ['id' => (string) \Illuminate\Support\Str::uuid(), 'name' => 'عقد فعال', 'doc_status' => 'فعال',
+             'created_at' => now(), 'updated_at' => now()],
+            ['id' => (string) \Illuminate\Support\Str::uuid(), 'name' => 'عقد منتهٍ', 'doc_status' => 'منتهي',
+             'created_at' => now(), 'updated_at' => now()],
+            ['id' => (string) \Illuminate\Support\Str::uuid(), 'name' => 'آخر منتهٍ', 'doc_status' => 'منتهي',
+             'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        // «عدد الوثائق المنتهية» يجب أن يساوي ٢ لا ٣ — الفلتر كان يُسقَط بصمت
+        $v = hub_kpi_value(['a' => ['agg' => 'count', 'module' => 'files', 'st' => 'منتهي'],
+            'combine' => 'none'], $this->owner);
+        $this->assertSame(2.0, $v);
+    }
+
+    public function test_null_second_metric_yields_null_not_raw_first(): void
+    {
+        $this->seedCore();
+        FinDocument::create(['doc_no' => 'Z', 'kind' => 'فاتورة', 'total' => 100, 'paid' => 50, 'state' => 'جزئي']);
+
+        // المقياس الثاني فوق عمود غير رقمي → القيمة كلها null لا مجموع المدفوع خاماً
+        $v = hub_kpi_value([
+            'a' => ['agg' => 'sum', 'module' => 'fin', 'col' => 'paid'],
+            'b' => ['agg' => 'sum', 'module' => 'fin', 'col' => 'partner'],
+            'combine' => 'ratio_pct',
+        ], $this->owner);
+        $this->assertNull($v);
+    }
+
+    public function test_average_over_zero_rows_is_null(): void
+    {
+        $this->seedCore();
+        $v = hub_kpi_metric(['agg' => 'avg', 'module' => 'fin', 'col' => 'total', 'st' => 'حالة لا وجود لها'], $this->owner);
+        $this->assertNull($v, 'متوسط بلا صفوف لا بيانات — لا صفر');
+    }
+
     public function test_build_store_and_gate(): void
     {
         $this->seedCore();
