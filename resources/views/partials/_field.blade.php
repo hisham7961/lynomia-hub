@@ -53,7 +53,12 @@
         <input class="inp mono" type="password" name="{{ $k }}" value="" placeholder="{{ $raw ? '•••••• (اتركه فارغاً للإبقاء)' : '' }}" autocomplete="new-password">
 
     @elseif ($t === 'file' || $t === 'img')
-        <input class="inp" type="file" name="{{ $k }}">
+        <label class="filefield">
+            <input type="file" name="{{ $k }}" data-empty="لم يُحدَّد ملف"
+                onchange="var n=this.parentNode.querySelector('.filename');n.textContent=this.files&&this.files.length?this.files[0].name:this.dataset.empty">
+            <span class="filebtn">📎 اختر ملفاً</span>
+            <span class="filename">لم يُحدَّد ملف</span>
+        </label>
         @if ($raw)
             <div class="sub">
                 @if ($t === 'img')<img class="thumb" src="{{ route('file.show', $raw) }}" alt="">

@@ -10,7 +10,8 @@
 </head>
 <body class="loginbg">
 <div class="logincard">
-    @if ($logo = setting('app.logo'))<img src="{{ asset('storage/' . $logo) }}" alt="" style="height:52px;border-radius:10px;margin-bottom:8px">@endif
+    @if ($logo = setting('app.logo'))<img src="{{ asset('storage/' . $logo) }}" alt="" style="height:52px;border-radius:10px;margin-bottom:8px">
+    @else<div class="loginmark">🏢</div>@endif
     <h1>{{ setting('app.name', 'Lynomia Business Hub') }}</h1>
     <p class="sub">نظام إدارة الأعمال الموحّد</p>
     @if ($errors->any())<div class="flash bad">{{ $errors->first() }}</div>@endif
