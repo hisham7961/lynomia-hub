@@ -202,3 +202,23 @@ html[data-theme="dark"] .llc h5,html[data-theme="dark"] .logincard h1{color:var(
 /* ═ v2.4 — جرس التنبيهات ═ */
 .bell{position:relative}
 .bell .gsr{inset-inline-start:auto;inset-inline-end:0;min-width:290px;max-width:340px;max-height:60vh;overflow:auto}
+
+/* ═ v2.7 — التعليقات وقناة الفريق ═ */
+.cmt{padding:10px 0;border-bottom:1px dashed var(--ln)}
+.cmt:last-of-type{border-bottom:0}
+.cmt.pin{background:var(--pss);border-radius:10px;padding:10px 12px;border-bottom:0;margin-bottom:6px}
+.chead{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ava.sm{width:26px;height:26px;font-size:11px}
+.cbody{margin:6px 0 4px;line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.cacts{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.cacts form{display:inline}
+.lnk{border:0;background:none;cursor:pointer;padding:0;font:inherit;color:var(--p)}
+.lnk:hover{text-decoration:underline}
+.creply summary{cursor:pointer;list-style:none}
+.creply summary::-webkit-details-marker{display:none}
+.cform{margin-top:12px}
+.cform textarea{width:100%;resize:vertical}
+.crow{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap}
+.crow select{max-width:190px}
+.crow input[type=file]{max-width:220px;font-size:12px}
+.err{color:var(--bad);font-size:12px;margin-top:4px}

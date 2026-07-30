@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Web\CommentController;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -140,7 +141,11 @@ class ModuleController extends Controller
         $verUsers = \Illuminate\Support\Facades\DB::table('users')
             ->whereIn('id', $versions->pluck('changed_by')->filter())->pluck('name', 'id');
 
-        return view('modules.show', compact('module', 'def', 'row', 'labels', 'children', 'versions', 'verUsers'));
+        // التعليقات على السجل + أسماء المستخدمين للمنشن
+        $comments = CommentController::forRecord($module, $row->id);
+        $cUsers   = CommentController::userNames();
+
+        return view('modules.show', compact('module', 'def', 'row', 'labels', 'children', 'versions', 'verUsers', 'comments', 'cUsers'));
     }
 
     public function edit(string $module, string $id)

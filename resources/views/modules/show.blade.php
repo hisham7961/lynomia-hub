@@ -62,4 +62,5 @@
         @endforeach
     </div>
 @endif
+@include('partials.comments', ['cModule' => $module, 'cRecordId' => $row->id, 'comments' => $comments, 'users' => $cUsers])
 @endsection

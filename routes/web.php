@@ -3,6 +3,7 @@
 use App\Http\Controllers\Web\AlertController;
 use App\Http\Controllers\Web\AuditController;
 use App\Http\Controllers\Web\AuthController;
+use App\Http\Controllers\Web\CommentController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\ModuleController;
 use App\Http\Controllers\Web\NotificationController;
@@ -26,6 +27,13 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('me', [PortalController::class, 'me'])->name('portal.me');
+
+    // ── التعليقات وقناة الفريق ──
+    Route::get('feed', [CommentController::class, 'feed'])->name('feed');
+    Route::post('comments', [CommentController::class, 'store'])->name('comments.store');
+    Route::post('comments/{id}/pin', [CommentController::class, 'pin'])->name('comments.pin');
+    Route::post('comments/{id}/task', [CommentController::class, 'toTask'])->name('comments.task');
+    Route::delete('comments/{id}', [CommentController::class, 'destroy'])->name('comments.destroy');
     Route::get('employee/{id}', [PortalController::class, 'employee'])->name('portal.employee');
     Route::get('search', [SearchController::class, 'index'])->name('search');
     Route::get('search/mini', [SearchController::class, 'mini'])->name('search.mini');
