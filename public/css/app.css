@@ -448,3 +448,4 @@ html[data-theme="dark"] .ava{box-shadow:inset 0 0 0 2px rgba(255,255,255,.12)}
 .tlmain{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
 .tlat{flex:0 0 auto;white-space:nowrap}
 @media (max-width:640px){.tlrow{flex-wrap:wrap}.tlat{width:100%;padding-inline-start:calc(1.4em + 8px)}}
+.boardbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-inline-start:auto}

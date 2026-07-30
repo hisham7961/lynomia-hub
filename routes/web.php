@@ -15,6 +15,7 @@ use App\Http\Controllers\Web\CeoController;
 use App\Http\Controllers\Web\CommentController;
 use App\Http\Controllers\Web\CostController;
 use App\Http\Controllers\Web\CustomFieldController;
+use App\Http\Controllers\Web\BoardController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DataRoomController;
 use App\Http\Controllers\Web\ErrorCenterController;
@@ -71,6 +72,15 @@ Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+    // باني اللوحات — لوحات متعددة مبنيّة من سجل الودجات
+    Route::get('boards', [BoardController::class, 'index'])->name('boards.index');
+    Route::post('boards', [BoardController::class, 'store'])->name('boards.store');
+    Route::get('boards/{id}', [BoardController::class, 'edit'])->name('boards.edit');
+    Route::put('boards/{id}', [BoardController::class, 'update'])->name('boards.update');
+    Route::delete('boards/{id}', [BoardController::class, 'destroy'])->name('boards.destroy');
+    Route::post('boards/{id}/widgets', [BoardController::class, 'addWidget'])->name('boards.widget.add');
+    Route::delete('boards/{id}/widgets/{widgetId}', [BoardController::class, 'removeWidget'])->name('boards.widget.remove');
     Route::get('me', [PortalController::class, 'me'])->name('portal.me');
     Route::get('files/{path}', [FileController::class, 'show'])->name('file.show')->where('path', 'hub/.*');
 

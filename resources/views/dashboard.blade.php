@@ -1,104 +1,57 @@
 @extends('layouts.app')
-@section('title', 'لوحة التحكم')
+@section('title', $board->name ?? 'لوحة التحكم')
 @section('content')
 <div class="hero">
     <div>
         <h2>أهلاً {{ auth()->user()->name }} 👋</h2>
         <div class="sub">{{ now()->translatedFormat('l · j F Y') }}</div>
     </div>
+    @if (count($boards) || $board)
+        <div class="boardbar">
+            <a class="btn ghost xs {{ $board ? '' : 'on' }}" href="{{ route('dashboard') }}">الافتراضية</a>
+            @foreach ($boards as $b)
+                <a class="btn ghost xs {{ $board && $board->id === $b->id ? 'on' : '' }}"
+                   href="{{ route('dashboard', ['d' => $b->id]) }}">{{ $b->name }}</a>
+            @endforeach
+            <a class="btn ghost xs" href="{{ route('boards.index') }}">🧩 لوحاتي</a>
+        </div>
+    @endif
 </div>
-@php $icons = ['projects' => '🚀', 'clients' => '🤝', 'tasks' => '✅', 'tickets' => '🎫', 'fin' => '💵', 'contracts' => '📜']; @endphp
-@if (! empty($kpis))
-    <div class="cards">
-        @foreach ($kpis as $k)
-            <a class="stat" href="{{ route('kpis.index') }}" title="مؤشر مخصص — من باني KPI">
-                <span class="ico">📈</span>
-                <b class="{{ $k['tone'] === 'bad' ? 'txt-bad' : '' }}">
-                    {{ $k['value'] === null ? '—' : rtrim(rtrim(number_format($k['value'], 1), '0'), '.') }}{{ $k['unit'] ? ' ' . $k['unit'] : '' }}
-                </b>
-                <span>{{ $k['name'] }}@if ($k['target'] !== null && $k['tone']) · <span class="bdg {{ $k['tone'] }}" style="font-size:9px">هدف {{ rtrim(rtrim(number_format($k['target'], 1), '0'), '.') }}</span>@endif</span>
-            </a>
+
+@if ($board)
+    {{-- لوحة مبنيّة: ودجاتها بترتيبها المحفوظ، وكل ودجة مرّت ببوابتها قبل الوصول هنا --}}
+    @foreach ($layout as $w)
+        @if (in_array($w['key'], ['counts', 'kpis'], true))
+            @include('partials.widgets.' . $w['key'], ['data' => $w['data']])
+        @endif
+    @endforeach
+    <div class="kids">
+        @foreach ($layout as $w)
+            @unless (in_array($w['key'], ['counts', 'kpis'], true))
+                @include('partials.widgets.' . $w['key'], ['data' => $w['data']])
+            @endunless
         @endforeach
     </div>
+    @if (! count($layout))
+        <div class="card"><div class="sub">هذه اللوحة بلا ودجات بعد —
+            <a href="{{ route('boards.edit', $board->id) }}">أضف ودجاتها</a>.</div></div>
+    @endif
+@else
+    {{-- اللوحة الافتراضية: نفس البطاقات وبنفس الترتيب كما كانت --}}
+    @include('partials.widgets.kpis',   ['data' => $kpis])
+    @include('partials.widgets.counts', ['data' => $cards])
+    <div class="kids">
+        @include('partials.widgets.expiry', ['data' => $expiry])
+        @include('partials.widgets.apps',   ['data' => $apps])
+        @include('partials.widgets.donut',  ['data' => $taskSlices])
+        @unless (in_array('recent', $hid ?? [], true))
+            @include('partials.widgets.recent')
+        @endunless
+        @include('partials.widgets.due', ['data' => ['rows' => $due, 'dueCol' => $dueCol,
+                                                     'stCol' => $stCol, 'disp' => $disp]])
+        @unless (in_array('audits', $hid ?? [], true))
+            @include('partials.widgets.audits', ['data' => $audits])
+        @endunless
+    </div>
 @endif
-<div class="cards">
-    @foreach ($cards as $c)
-        <a class="stat" href="{{ route('m.index', $c['key']) }}">
-            <span class="ico">{{ $icons[$c['key']] ?? '📁' }}</span>
-            <b>{{ number_format($c['count']) }}</b><span>{{ $c['label'] }}</span>
-        </a>
-    @endforeach
-</div>
-<div class="kids">
-    @if ($expiry->count())
-    <div class="card kid">
-        <h3>🔔 ينتهي قريباً <a class="btn ghost xs" style="margin-inline-start:auto" href="{{ route('alerts') }}">الكل ←</a></h3>
-        <table class="mini">
-            @foreach ($expiry as $i)
-                <tr>
-                    <td><a href="{{ route('m.show', [$i['module'], $i['id']]) }}">{{ \Illuminate\Support\Str::limit($i['name'], 26) }}</a><div class="sub">{{ $i['mlabel'] }} · {{ $i['flabel'] }}</div></td>
-                    <td style="width:1%"><span class="bdg {{ $i['days'] < 0 ? 'bad' : ($i['days'] <= 7 ? 'wn' : 'g') }}">{{ $i['days'] < 0 ? 'متأخر' : ($i['days'] === 0 ? 'اليوم' : $i['days'] . ' يوم') }}</span></td>
-                </tr>
-            @endforeach
-        </table>
-    </div>
-    @endif
-    @if ($apps->count())
-    <div class="card kid">
-        <h3>📱 تقدم التطبيقات</h3>
-        <table class="mini">
-            @foreach ($apps as $a)
-                <tr>
-                    <td><a href="{{ route('apps.center', $a->id) }}">{{ \Illuminate\Support\Str::limit($a->name, 24) }}</a>
-                        <div class="pbar sm"><span style="width:{{ (int) ($a->progress ?? 0) }}%"></span></div>
-                        <div class="sub">{{ $a->ver ? 'v' . $a->ver . ' · ' : '' }}{{ $a->status }}</div></td>
-                    <td style="width:1%"><b>{{ $a->progress !== null ? $a->progress . '٪' : '—' }}</b></td>
-                </tr>
-            @endforeach
-        </table>
-    </div>
-    @endif
-    @if (count($taskSlices))
-    <div class="card kid">
-        <h3>✅ المهام بالحالة</h3>
-        @include('partials.chart_donut', ['slices' => $taskSlices])
-    </div>
-    @endif
-    @unless (in_array('recent', $hid ?? [], true))
-    <div class="card kid" id="recentbox" hidden>
-        <h3>📌 آخر ما فتحت</h3>
-        <div id="recentlist" class="rl"></div>
-    </div>
-    @endunless
-    @if ($due->count())
-    <div class="card kid">
-        <h3>⏰ مهام تقترب مواعيدها</h3>
-        <table class="mini">
-            @foreach ($due as $t)
-                <tr>
-                    <td><a href="{{ route('m.show', ['tasks', $t->id]) }}">{{ \Illuminate\Support\Str::limit($t->{$disp}, 38) }}</a></td>
-                    <td class="mono" style="width:1%;white-space:nowrap">{{ substr($t->{$dueCol}, 0, 10) }}</td>
-                    @if ($stCol)<td style="width:1%"><span class="bdg {{ hub_tone($t->{$stCol}) }}">{{ $t->{$stCol} }}</span></td>@endif
-                </tr>
-            @endforeach
-        </table>
-    </div>
-    @endif
-    @unless (in_array('audits', $hid ?? [], true))
-    <div class="card kid" style="grid-column:span 1">
-        <h3>🕘 آخر النشاطات</h3>
-        <table class="mini">
-            @forelse ($audits as $a)
-                <tr>
-                    <td style="width:1%;white-space:nowrap"><span class="bdg {{ $a->action === 'حذف' ? 'bad' : ($a->action === 'إضافة' ? 'ok' : 'g') }}">{{ $a->action }}</span></td>
-                    <td>{{ hub_mod($a->module)['label'] ?? $a->module }}: {{ \Illuminate\Support\Str::limit($a->name, 30) }}</td>
-                    <td class="mono sub" style="width:1%;white-space:nowrap">{{ \Illuminate\Support\Carbon::parse($a->created_at)->format('m-d H:i') }}</td>
-                </tr>
-            @empty
-                <tr><td class="empty">لا نشاط بعد — ابدأ بإضافة أول سجل</td></tr>
-            @endforelse
-        </table>
-    </div>
-    @endunless
-</div>
 @endsection
