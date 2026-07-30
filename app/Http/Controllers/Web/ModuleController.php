@@ -260,6 +260,15 @@ class ModuleController extends Controller
 
         [$columns, $labels] = $this->columnsAndLabels($def, $rows->all());
 
+        // بصمة التصدير في التدقيق — تُعرض في مركز الأمان
+        \App\Models\AuditEntry::create([
+            'user_id' => auth()->id(), 'action' => 'تصدير', 'module' => $module,
+            'name'    => $rows->count() . ' سجل (CSV)',
+            'ip'      => request()->ip(),
+            'device'  => substr((string) request()->userAgent(), 0, 200),
+            'created_at' => now(),
+        ]);
+
         return response()->streamDownload(function () use ($rows, $columns, $labels) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");

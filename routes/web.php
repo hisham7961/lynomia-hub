@@ -15,6 +15,7 @@ use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\ReportController;
 use App\Http\Controllers\Web\RoleController;
 use App\Http\Controllers\Web\SearchController;
+use App\Http\Controllers\Web\SecurityController;
 use App\Http\Controllers\Web\SettingController;
 use App\Http\Controllers\Web\UserController;
 use Illuminate\Support\Facades\Route;
@@ -79,6 +80,8 @@ Route::middleware('auth')->group(function () {
     Route::delete('admin/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
 
     Route::get('admin/audit', [AuditController::class, 'index'])->name('audit.index');
+    Route::get('admin/security', [SecurityController::class, 'index'])->name('security.index');
+    Route::post('admin/security/lockdown', [SecurityController::class, 'lockdown'])->name('security.lockdown');
     Route::get('admin/settings', [SettingController::class, 'edit'])->name('settings.edit');
     Route::post('admin/settings', [SettingController::class, 'update'])->name('settings.update');
 

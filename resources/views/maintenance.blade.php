@@ -8,8 +8,8 @@
 </head>
 <body class="loginbg">
 <div class="logincard" style="text-align:center">
-    <div style="font-size:52px">🚧</div>
-    <h1>النظام تحت الصيانة</h1>
+    <div style="font-size:52px">{{ $icon ?? '🚧' }}</div>
+    <h1>{{ $title ?? 'النظام تحت الصيانة' }}</h1>
     <p class="sub">{{ $msg ?: 'نعود إليكم قريباً — شكراً لصبركم' }}</p>
 </div>
 </body>

@@ -41,6 +41,11 @@ class AuthController extends Controller
             }
         }
 
+        // قفل الطوارئ: يدخل المالكون فقط
+        if (setting('security.lockdown') && $user && ! $user->role?->is_owner) {
+            return $fail('النظام في قفل طوارئ مؤقت — الدخول للمالكين فقط');
+        }
+
         if (! Auth::attempt($data, remember: true)) {
             if ($user) {
                 $user->failed_attempts = ((int) $user->failed_attempts) + 1;
@@ -50,6 +55,15 @@ class AuthController extends Controller
                 }
                 $user->saveQuietly();   // عدّاد أمني — بلا تدقيق ولا إصدارات
             }
+            // بصمة المحاولة الفاشلة في التدقيق — تُعرض في مركز الأمان
+            \App\Models\AuditEntry::create([
+                'user_id' => $user?->id, 'action' => 'دخول فاشل',
+                'name'    => substr($data['email'], 0, 290),
+                'ip'      => $r->ip(),
+                'device'  => substr((string) $r->userAgent(), 0, 200),
+                'created_at' => now(),
+            ]);
+
             return $fail();
         }
 

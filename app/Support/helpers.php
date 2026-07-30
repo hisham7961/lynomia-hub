@@ -121,10 +121,10 @@ if (! function_exists('hub_modules')) {
 }
 
 if (! function_exists('hub_mod')) {
-    /** تعريف وحدة واحدة أو null */
-    function hub_mod(string $key): ?array
+    /** تعريف وحدة واحدة أو null — يقبل null بأمان (سجلات تدقيق نظامية بلا وحدة) */
+    function hub_mod(?string $key): ?array
     {
-        return config("hub.modules.$key");
+        return $key === null || $key === '' ? null : config("hub.modules.$key");
     }
 }
 
