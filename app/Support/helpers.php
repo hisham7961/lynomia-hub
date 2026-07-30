@@ -319,6 +319,21 @@ if (! function_exists('hub_expiry')) {
     }
 }
 
+if (! function_exists('hub_custom_fields')) {
+    /**
+     * الحقول المخصصة لوحدة — يعرّفها المالك من «باني الحقول» وتُخزن في الإعداد custom.fields
+     * وقيمها في عمود custom الموجود بكل جدول. كل حقل: key(cf_*) label type [options] [ref] [required]
+     */
+    function hub_custom_fields(?string $module): array
+    {
+        if (! $module) return [];
+        $all = setting('custom.fields');
+        $all = is_array($all) ? $all : (json_decode((string) $all, true) ?: []);
+
+        return array_values(array_filter((array) ($all[$module] ?? []), fn ($f) => ! empty($f['key'])));
+    }
+}
+
 if (! function_exists('hub_shade')) {
     /** مزج لون hex مع الأبيض (نسبة موجبة) أو الأسود (سالبة) — لاشتقاق درجات الهوية */
     function hub_shade(string $hex, float $pct): string

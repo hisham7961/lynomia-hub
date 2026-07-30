@@ -38,6 +38,19 @@
                 <dd>@include('partials._display', ['f' => $f, 'row' => $row, 'labels' => $labels, 'ctx' => 'show'])</dd>
             </div>
         @endforeach
+        @foreach (hub_custom_fields($module) as $cf)
+            @php $cv = data_get($row->custom, $cf['key']); @endphp
+            <div class="drow">
+                <dt>{{ $cf['label'] }} <span class="sub">· مخصص</span></dt>
+                <dd>
+                    @if ($cv === null || $cv === '')—
+                    @elseif (($cf['type'] ?? '') === 'bool'){{ $cv ? '✓ نعم' : 'لا' }}
+                    @elseif (($cf['type'] ?? '') === 'ref'){{ hub_ref_options($cf['ref'])[$cv] ?? $cv }}
+                    @else{{ $cv }}
+                    @endif
+                </dd>
+            </div>
+        @endforeach
         <div class="drow"><dt>أُنشئ</dt><dd class="mono">{{ optional($row->created_at)->format('Y-m-d H:i') }}</dd></div>
         <div class="drow"><dt>آخر تعديل</dt><dd class="mono">{{ optional($row->updated_at)->format('Y-m-d H:i') }} · نسخة {{ $row->version ?? 1 }}</dd></div>
     </dl>

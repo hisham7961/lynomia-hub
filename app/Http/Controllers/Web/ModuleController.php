@@ -310,7 +310,7 @@ class ModuleController extends Controller
         if ($op === 'e') {
             $keys = collect($def['fields'])
                 ->reject(fn ($f) => in_array($f['type'], ['file', 'img'], true))
-                ->pluck('key')->all();
+                ->pluck('key')->push('custom')->all();
             $payload = collect($r->only($keys))->filter(fn ($v) => $v !== null)->all();
         }
 
@@ -486,6 +486,19 @@ class ModuleController extends Controller
             if (in_array($f['type'], ['file', 'img'], true)) $r = [$r[0], 'file', 'max:' . (int) setting('files.max_kb', 512000)];
             $rules[$f['key']] = $r;
         }
+
+        // الحقول المخصصة (باني الحقول)
+        foreach (hub_custom_fields($def['key'] ?? null) as $cf) {
+            $r = [! empty($cf['required']) ? 'required' : 'nullable'];
+            $r[] = match ($cf['type'] ?? 'text') {
+                'num'  => 'numeric',
+                'date' => 'date',
+                default => 'string',
+            };
+            if (($cf['type'] ?? '') === 'ref' && ($t = hub_ref_table($cf['ref'] ?? ''))) $r[] = "exists:$t,id";
+            $rules['custom.' . $cf['key']] = $r;
+        }
+
         return $rules;
     }
 
@@ -520,6 +533,23 @@ class ModuleController extends Controller
             $v = $r->input($k);
             if ($t === 'sec' && ($v === null || $v === '')) continue;   // إبقاء السرّ القديم
             $m->{$c} = ($v === '' ? null : $v);
+        }
+
+        // الحقول المخصصة → عمود custom (مع إبقاء المفاتيح غير المعرفة كما هي)
+        $cfs = hub_custom_fields($def['key'] ?? null);
+        if ($cfs) {
+            $custom = (array) ($m->custom ?? []);
+            foreach ($cfs as $cf) {
+                $key = $cf['key'];
+                $v = match ($cf['type'] ?? 'text') {
+                    'bool'  => $r->boolean('custom.' . $key),
+                    'num'   => ($x = $r->input('custom.' . $key)) === null || $x === '' ? null : (float) $x,
+                    default => ($x = $r->input('custom.' . $key)) === '' ? null : $x,
+                };
+                if ($v === null) unset($custom[$key]);
+                else $custom[$key] = $v;
+            }
+            $m->custom = $custom ?: null;
         }
     }
 }

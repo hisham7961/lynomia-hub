@@ -7,6 +7,7 @@ use App\Http\Controllers\Web\AuditController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\CeoController;
 use App\Http\Controllers\Web\CommentController;
+use App\Http\Controllers\Web\CustomFieldController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DataRoomController;
 use App\Http\Controllers\Web\ImportController;
@@ -113,6 +114,9 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/settings', [SettingController::class, 'edit'])->name('settings.edit');
     Route::post('admin/settings', [SettingController::class, 'update'])->name('settings.update');
     Route::post('admin/settings/odoo-test', [SettingController::class, 'odooTest'])->name('settings.odoo.test');
+    Route::get('admin/fields', [CustomFieldController::class, 'index'])->name('fields.index');
+    Route::post('admin/fields', [CustomFieldController::class, 'store'])->name('fields.store');
+    Route::delete('admin/fields/{module}/{key}', [CustomFieldController::class, 'destroy'])->name('fields.destroy');
 
     // ── الوحدات (سجل الوحدات يقود كل شيء) ──
     Route::prefix('m/{module}')->name('m.')->group(function () {
