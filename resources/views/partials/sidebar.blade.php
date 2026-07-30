@@ -50,6 +50,7 @@
                 @if (auth()->user()->role?->is_owner)<a class="ni {{ request()->routeIs('fields.*') ? 'on' : '' }}" href="{{ route('fields.index') }}">🧩 باني الحقول</a>@endif
                 @if (auth()->user()->role?->is_owner)<a class="ni {{ request()->routeIs('flows.*') ? 'on' : '' }}" href="{{ route('flows.index') }}">🪄 مسارات العمل</a>@endif
                 @if (auth()->user()->role?->is_owner)<a class="ni {{ request()->routeIs('webhooks.*') ? 'on' : '' }}" href="{{ route('webhooks.index') }}">🪝 Webhooks</a>@endif
+                @if (auth()->user()->role?->is_owner)<a class="ni {{ request()->routeIs('quality.*') ? 'on' : '' }}" href="{{ route('quality.index') }}">🧹 جودة البيانات</a>@endif
                 @if (auth()->user()->role?->is_owner)<a class="ni {{ request()->routeIs('settings.*') ? 'on' : '' }}" href="{{ route('settings.edit') }}">الإعدادات</a>@endif
             </details>
         @endif

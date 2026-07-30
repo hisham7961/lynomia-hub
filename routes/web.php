@@ -23,6 +23,7 @@ use App\Http\Controllers\Web\PortalController;
 use App\Http\Controllers\Web\LegalController;
 use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\PurchaseController;
+use App\Http\Controllers\Web\QualityController;
 use App\Http\Controllers\Web\QuoteController;
 use App\Http\Controllers\Web\ReportController;
 use App\Http\Controllers\Web\RoleController;
@@ -125,6 +126,8 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/audit', [AuditController::class, 'index'])->name('audit.index');
     Route::get('admin/ops', [OpsController::class, 'index'])->name('ops.index');
     Route::post('admin/ops/test-error', [OpsController::class, 'testError'])->name('ops.testerror');
+    Route::get('admin/quality', [QualityController::class, 'index'])->name('quality.index');
+    Route::post('admin/quality/merge', [QualityController::class, 'merge'])->name('quality.merge');
     Route::get('admin/errors', [ErrorCenterController::class, 'index'])->name('errors.index');
     Route::post('admin/errors/{id}/status', [ErrorCenterController::class, 'status'])->name('errors.status');
     Route::post('jslog', [ErrorCenterController::class, 'jslog'])->name('jslog')->middleware('throttle:20,1');
