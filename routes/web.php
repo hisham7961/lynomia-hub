@@ -139,6 +139,18 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/audit', [AuditController::class, 'index'])->name('audit.index');
     Route::get('admin/ops', [OpsController::class, 'index'])->name('ops.index');
     Route::post('admin/ops/test-error', [OpsController::class, 'testError'])->name('ops.testerror');
+    Route::post('admin/demo/reset', function () {
+        abort_unless(auth()->user()?->role?->is_owner, 403);
+        \Illuminate\Support\Facades\Artisan::call('hub:demo');
+
+        return back()->with('ok', 'صُفّر الوضع التجريبي — بيانات وهمية جديدة نظيفة');
+    })->name('demo.reset');
+    Route::post('admin/demo/off', function () {
+        abort_unless(auth()->user()?->role?->is_owner, 403);
+        \Illuminate\Support\Facades\Artisan::call('hub:demo', ['--purge' => true]);
+
+        return back()->with('ok', 'انتهى الوضع التجريبي ومُسحت بياناته الوهمية كلها');
+    })->name('demo.off');
     Route::get('admin/quality', [QualityController::class, 'index'])->name('quality.index');
     Route::post('admin/quality/merge', [QualityController::class, 'merge'])->name('quality.merge');
     Route::get('admin/errors', [ErrorCenterController::class, 'index'])->name('errors.index');

@@ -16,6 +16,15 @@
 </head>
 <body>
 <div id="topload"></div>
+@if (setting('demo.on'))
+    <div style="background:repeating-linear-gradient(45deg,#7c3aed,#7c3aed 14px,#6d28d9 14px,#6d28d9 28px);color:#fff;text-align:center;padding:6px 12px;font-size:13px;font-weight:700">
+        🎭 وضع تجريبي — البيانات الموسومة 🎭 وهمية للتدريب والتجربة
+        @if (auth()->check() && auth()->user()->role?->is_owner)
+            <form class="inline" method="POST" action="{{ route('demo.reset') }}" onsubmit="return confirm('تصفير البيانات التجريبية وإعادة توليدها من جديد؟')">@csrf<button class="btn ghost xs" style="color:#fff;border-color:#ffffff88">↺ تصفير</button></form>
+            <form class="inline" method="POST" action="{{ route('demo.off') }}" onsubmit="return confirm('إنهاء الوضع التجريبي ومسح كل بياناته الوهمية؟')">@csrf<button class="btn ghost xs" style="color:#fff;border-color:#ffffff88">✕ إنهاء</button></form>
+        @endif
+    </div>
+@endif
 <div class="shell">
     @include('partials.sidebar')
     <div class="overlay" onclick="document.body.classList.remove('nav')"></div>
