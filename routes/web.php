@@ -6,6 +6,7 @@ use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\ModuleController;
 use App\Http\Controllers\Web\NotificationController;
+use App\Http\Controllers\Web\PortalController;
 use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\ReportController;
 use App\Http\Controllers\Web\RoleController;
@@ -24,6 +25,8 @@ Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('me', [PortalController::class, 'me'])->name('portal.me');
+    Route::get('employee/{id}', [PortalController::class, 'employee'])->name('portal.employee');
     Route::get('search', [SearchController::class, 'index'])->name('search');
     Route::get('search/mini', [SearchController::class, 'mini'])->name('search.mini');
     Route::get('alerts', [AlertController::class, 'index'])->name('alerts');

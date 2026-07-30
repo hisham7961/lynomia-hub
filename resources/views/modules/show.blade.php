@@ -4,6 +4,9 @@
 <div class="toolbar">
     <a class="btn ghost sm" href="{{ route('m.index', $module) }}">→ رجوع</a>
     <div class="spacer"></div>
+    @if ($module === 'hr')
+        <a class="btn ghost sm" href="{{ route('portal.employee', $row->id) }}">🗂️ الملف الشامل</a>
+    @endif
     @if (hub_can(auth()->user(), $module, 'a'))
         <a class="btn ghost sm" href="{{ route('m.create', [$module, 'from' => $row->id]) }}" onclick="return Hub.modal(this.href)">⎘ نسخ كسجل جديد</a>
     @endif

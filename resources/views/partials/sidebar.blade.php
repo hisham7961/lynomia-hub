@@ -2,6 +2,7 @@
     <div class="brand"><a href="{{ route('dashboard') }}"><span class="dot"></span>{{ setting('app.name', 'Lynomia Hub') }}</a></div>
     <nav>
         <a class="ni top {{ request()->routeIs('dashboard') ? 'on' : '' }}" href="{{ route('dashboard') }}">لوحة التحكم</a>
+        <a class="ni top {{ request()->routeIs('portal.me') ? 'on' : '' }}" href="{{ route('portal.me') }}">👤 بوابتي</a>
         @php $xc = hub_expiry_count(); @endphp
         <a class="ni top {{ request()->routeIs('alerts') ? 'on' : '' }}" href="{{ route('alerts') }}">🔔 ينتهي قريباً @if ($xc)<span class="nbdg">{{ $xc }}</span>@endif</a>
         @if (hub_can(auth()->user(), 'fin', 'v'))

@@ -105,6 +105,7 @@ class ModuleController extends Controller
         }
 
         $m->save();
+        $this->notifyAssignee($def, $module, $m);
 
         return redirect()->route('m.index', $module)->with('ok', 'أُضيف السجل بنجاح');
     }
@@ -163,8 +164,10 @@ class ModuleController extends Controller
         if ($module === 'projects' && hub_scoped(auth()->user())) {
             \Illuminate\Support\Facades\Cache::forget('user:' . auth()->id() . ':projects');
         }
+        $prevAssignee = ($af = $this->assigneeField($def)) ? $m->{$af['col']} : null;
         $this->fill($def, $r, $m);
         $m->save();
+        $this->notifyAssignee($def, $module, $m, $prevAssignee);
 
         return redirect()->route('m.index', $module)->with('ok', 'حُفظت التعديلات');
     }
@@ -272,6 +275,35 @@ class ModuleController extends Controller
     }
 
     /* ────────── أدوات داخلية ────────── */
+
+    /** حقل المسؤول (assigneeId → users) إن وُجد في الوحدة */
+    protected function assigneeField(array $def): ?array
+    {
+        $f = collect($def['fields'])->firstWhere('key', 'assigneeId');
+
+        return ($f && ($f['ref'] ?? '') === 'users' && empty($f['multi'])) ? $f : null;
+    }
+
+    /** إشعار داخلي للمسؤول عند إسناده سجلاً (مهمة/تذكرة/ميزة…) — لا إشعار لمن أسند لنفسه */
+    protected function notifyAssignee(array $def, string $module, Model $m, ?string $prev = null): void
+    {
+        $f = $this->assigneeField($def);
+        if (! $f) return;
+        $to = $m->{$f['col']} ?? null;
+        if (! $to || $to === $prev || $to === auth()->id()) return;
+
+        \App\Models\HubNotification::create([
+            'user_id'    => $to,
+            'kind'       => 'assign',
+            'text'       => 'أُسند إليك في ' . $def['label'] . ': '
+                            . \Illuminate\Support\Str::limit((string) ($m->{hub_display_col($module)} ?? ''), 60)
+                            . ' — بواسطة ' . auth()->user()->name,
+            'module'     => $module,
+            'record_id'  => $m->id,
+            'read'       => false,
+            'created_at' => now(),
+        ]);
+    }
 
     /** إيجاد سجل داخل نطاق المستخدم — الوصول المباشر بالرابط لسجل خارج النطاق = 404 */
     protected function findScoped(string $class, string $module, string $id, string $trash = 'none'): Model
