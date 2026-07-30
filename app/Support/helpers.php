@@ -1056,3 +1056,76 @@ if (! function_exists('hub_capacity')) {
         ];
     }
 }
+
+if (! function_exists('hub_app_quality')) {
+    /**
+     * جودة البرمجيات لكل تطبيق — تجميع فوق ما يُسجَّل أصلاً:
+     * الأخطاء المفتوحة والحرجة وزمن حلها، نجاح الاختبارات من خطة العمل،
+     * الأعطال بعد النشر من سجل الحوادث، ومعدل التراجع من سجل النشر.
+     */
+    function hub_app_quality(bool $fresh = false): array
+    {
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget('quality:apps');
+
+        return \Illuminate\Support\Facades\Cache::remember('quality:apps', 300, function () {
+            $DB = \Illuminate\Support\Facades\DB::class;
+            $closed = hub_closed_states();
+            $apps = hub_scope(\Illuminate\Support\Facades\DB::table('applications')->whereNull('deleted_at'), 'apps')
+                ->orderBy('name')->limit(80)->get(['id', 'name', 'ver', 'status', 'project_id']);
+            if ($apps->isEmpty()) return [];
+
+            $ids = $apps->pluck('id')->all();
+            $pids = $apps->pluck('project_id')->filter()->all();
+
+            $iss = \Illuminate\Support\Facades\DB::table('issues')->whereNull('deleted_at')
+                ->whereIn('app_id', $ids)->get(['app_id', 'severity', 'status', 'found', 'closed']);
+
+            $inc = \Illuminate\Support\Facades\Schema::hasTable('incidents')
+                ? \Illuminate\Support\Facades\DB::table('incidents')->whereNull('deleted_at')
+                    ->whereIn('app_id', $ids)->where('created_at', '>=', now()->subDays(90))
+                    ->selectRaw('app_id, COUNT(*) n')->groupBy('app_id')->get()->keyBy('app_id')
+                : collect();
+
+            $dep = \Illuminate\Support\Facades\Schema::hasTable('deployments')
+                ? \Illuminate\Support\Facades\DB::table('deployments')->whereNull('deleted_at')
+                    ->whereIn('app_id', $ids)->get(['app_id', 'status', 'deployed_at'])
+                : collect();
+
+            $feats = $pids ? \Illuminate\Support\Facades\DB::table('plan_items')->whereNull('deleted_at')
+                ->whereIn('project_id', $pids)->whereNotNull('test')->where('test', '!=', '')
+                ->get(['project_id', 'test']) : collect();
+
+            $out = [];
+            foreach ($apps as $a) {
+                $mine = $iss->where('app_id', $a->id);
+                $open = $mine->filter(fn ($i) => ! in_array((string) $i->status, $closed, true));
+
+                // متوسط زمن الحل بالأيام للأخطاء المغلقة بتاريخين
+                $days = $mine->filter(fn ($i) => $i->found && $i->closed)
+                    ->map(fn ($i) => \Illuminate\Support\Carbon::parse($i->found)
+                        ->diffInDays(\Illuminate\Support\Carbon::parse($i->closed)));
+
+                $ft = $a->project_id ? $feats->where('project_id', $a->project_id) : collect();
+                $pass = $ft->filter(fn ($f) => in_array((string) $f->test, ['نجح', 'ناجح', 'مرّ'], true))->count();
+
+                $dp = $dep->where('app_id', $a->id);
+                $rolled = $dp->filter(fn ($d) => in_array((string) $d->status, ['متراجع عنه', 'فشل'], true))->count();
+
+                $out[] = [
+                    'id' => $a->id, 'name' => $a->name, 'ver' => $a->ver, 'status' => $a->status,
+                    'openBugs' => $open->count(),
+                    'critBugs' => $open->filter(fn ($i) => in_array((string) $i->severity, ['حرجة', 'حرج', 'عالية'], true))->count(),
+                    'fixDays'  => $days->count() ? round($days->avg(), 1) : null,
+                    'tested'   => $ft->count(),
+                    'passRate' => $ft->count() ? (int) round($pass / $ft->count() * 100) : null,
+                    'incidents' => (int) ($inc[$a->id]->n ?? 0),
+                    'deploys'  => $dp->count(),
+                    'rollback' => $dp->count() ? (int) round($rolled / $dp->count() * 100) : null,
+                    'lastDeploy' => $dp->max('deployed_at'),
+                ];
+            }
+
+            return $out;
+        });
+    }
+}

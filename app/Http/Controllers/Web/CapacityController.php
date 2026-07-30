@@ -25,6 +25,14 @@ class CapacityController extends Controller
         ]);
     }
 
+    /** جودة البرمجيات لكل تطبيق */
+    public function quality()
+    {
+        $this->gate();
+
+        return view('quality_apps', ['apps' => hub_app_quality((bool) request()->query('fresh'))]);
+    }
+
     /**
      * خريطة الأثر: تُقلب سجل الاعتماديات رأساً على عقب —
      * بدل «على ماذا يعتمد نظامي» تعرض «ماذا يسقط إن سقط هذا العنصر».
