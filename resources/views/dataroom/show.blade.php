@@ -5,7 +5,7 @@
 <meta name="robots" content="noindex">
 <title>{{ $link->title }} — {{ setting('app.name', config('app.name')) }}</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/app.css') }}">
+<link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ config('hub.version') }}">
 <style>
 .dr{max-width:960px;margin:20px auto;padding:0 16px}
 .drhead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}

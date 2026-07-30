@@ -25,6 +25,10 @@ class DashboardFaceliftTest extends TestCase
         $this->assertStringContainsString('class="actfeed"', $html);          // سيل النشاط
         $this->assertStringContainsString('class="avx"', $html);              // صورة رمزية
         $this->assertStringContainsString('عن الأسبوع الماضي', $html);        // اتجاه أسبوعي (مهمة أنشئت الآن)
+
+        // بصمة النسخة على الأصول: كل إصدار رابطٌ جديد — فلا شكل قديم بعد التحديث
+        $this->assertStringContainsString('css/app.css?v=' . config('hub.version'), $html);
+        $this->assertStringContainsString('js/app.js?v=' . config('hub.version'), $html);
     }
 
     /** سطر «ما ينتظرك»: يذكر المهام المفتوحة على المستخدم */

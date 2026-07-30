@@ -1,9 +1,10 @@
 /* Lynomia Hub — عامل الخدمة: عمل بلا اتصال واتصال ضعيف
-   - الأصول الثابتة: من الكاش أولاً (سرعة)
+   - الأصول الثابتة: من الكاش فوراً + تحديثٌ بالخلفية (stale-while-revalidate) —
+     مع بصمة ?v=النسخة في روابط الأصول، فكل إصدارٍ رابطٌ جديد يفوّت الكاش القديم.
+     كان «كاش أولاً» جامداً: المستخدم يرى الشكل القديم حتى يضغط Ctrl+Shift+R.
    - التنقل بين الصفحات: الشبكة أولاً بمهلة، وإلا آخر نسخة محفوظة، وإلا صفحة «بلا اتصال»
    - لا يخبئ أبداً: API، الملفات الخاصة، الأسرار، مراكز الإدارة */
-// يُرفع مع كل تغيير في CSS/JS — وإلا بقي مستخدمو PWA على الأصول القديمة المخبأة
-var VER = 'hub-v2.92';
+var VER = 'hub-v2.93';
 var STATIC = ['/offline', '/css/app.css', '/js/app.js', '/js/htmx.min.js'];
 var NEVER = ['/api/', '/files/', '/m/vault', '/admin/', '/apps/quoteflow', '/jslog', '/logout'];
 
@@ -27,14 +28,17 @@ self.addEventListener('fetch', function (e) {
   var url = new URL(req.url);
   if (url.origin !== location.origin || never(url)) return;
 
-  // أصول ثابتة: كاش أولاً
+  // أصول ثابتة: من الكاش فوراً + إعادة جلبٍ بالخلفية تُحدّث الكاش للزيارة التالية
   if (url.pathname.indexOf('/css/') === 0 || url.pathname.indexOf('/js/') === 0) {
     e.respondWith(caches.match(req).then(function (hit) {
-      return hit || fetch(req).then(function (res) {
-        var copy = res.clone();
-        caches.open(VER).then(function (c) { c.put(req, copy); });
+      var refresh = fetch(req).then(function (res) {
+        if (res && res.ok) {
+          var copy = res.clone();
+          caches.open(VER).then(function (c) { c.put(req, copy); });
+        }
         return res;
-      });
+      }).catch(function () { return hit; });
+      return hit || refresh;
     }));
     return;
   }
