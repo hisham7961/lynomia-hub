@@ -50,7 +50,7 @@ class UserController extends Controller
             'status' => 'required|in:نشط,موقوف',
             'password' => ['required', 'string', password_rules()],
             'companies' => 'nullable|array',
-            'companies.*' => 'string|exists:companies,id',
+            'companies.*' => ['string', Rule::exists('companies', 'id')->whereNull('deleted_at')],
         ]);
         $data['companies'] = array_values($data['companies'] ?? []);
         User::create($data);
@@ -77,7 +77,7 @@ class UserController extends Controller
             'status' => 'required|in:نشط,موقوف',
             'password' => ['nullable', 'string', password_rules()],
             'companies' => 'nullable|array',
-            'companies.*' => 'string|exists:companies,id',
+            'companies.*' => ['string', Rule::exists('companies', 'id')->whereNull('deleted_at')],
         ]);
         $data['companies'] = array_values($data['companies'] ?? []);
         if (empty($data['password'])) unset($data['password']);

@@ -14,6 +14,8 @@ class CapacityController extends Controller
     {
         abort_unless(auth()->user()?->role?->is_owner || hub_flag(auth()->user(), 'monitor'),
             403, 'هذه اللوحة للمالكين ومن يحمل صلاحية المتابعة');
+        // كل لوحات هذا المتحكم تجمع عبر المنشأة كلها بمخبّأ عام — تُمنع عن المعزول
+        hub_org_analytics_guard();
     }
 
     public function index(Request $r)

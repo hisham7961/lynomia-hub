@@ -462,7 +462,10 @@ if (! function_exists('hub_expiry')) {
                         $q->whereRaw('COALESCE(paid,0) < COALESCE(total,0)');
                     }
 
-                    $rows = $q->limit(40)->get(['id', $disp . ' as _n', $f['col'] . ' as _d']);
+                    // الترتيب تصاعدياً بالتاريخ قبل الحد: نُبقي الأربعين الأقرب/الأكثر تأخراً
+                    // لا أربعين عشوائية بترتيب القاعدة (كان يُسقط أعجل السجلات صمتاً).
+                    $rows = $q->orderBy(\Illuminate\Support\Facades\DB::raw("DATE(`{$f['col']}`)"))
+                        ->limit(40)->get(['id', $disp . ' as _n', $f['col'] . ' as _d']);
                 } catch (\Throwable $e) { continue; }
                 foreach ($rows as $row) {
                     $d = substr((string) $row->_d, 0, 10);
@@ -804,7 +807,12 @@ if (! function_exists('hub_visible_fields')) {
 }
 
 if (! function_exists('hub_company_col')) {
-    /** عمود الشركة في وحدة ما إن وُجد (companies نفسها تُطابق على id) */
+    /**
+     * عمود الشركة للعزل: من تعريف الوحدة، أو العمود الفعلي company_id في الجدول
+     * إن وُجد ولو لم يُعرَّف مرجعاً — كي لا يتسرب ما تربطه القاعدة بالشركة (مثل
+     * المهام والتذاكر والقيود التي تحمل company_id دون تعريف مرجع). يماثل
+     * hub_project_col تماماً — وإلا انطفأ العزل صامتاً على عشرات الوحدات.
+     */
     function hub_company_col(string $module): ?string
     {
         if ($module === 'companies') return 'id';
@@ -820,8 +828,28 @@ if (! function_exists('hub_company_col')) {
                 }
             }
         }
+        if (array_key_exists($module, $map)) return $map[$module];
 
-        return $map[$module] ?? null;
+        $table = hub_mod($module)['table'] ?? null;
+        try {
+            $has = $table && \Illuminate\Support\Facades\Schema::hasColumn($table, 'company_id');
+        } catch (\Throwable $e) {
+            $has = false;
+        }
+
+        return $map[$module] = $has ? 'company_id' : null;
+    }
+}
+
+if (! function_exists('hub_org_analytics_guard')) {
+    /**
+     * لوحات التحليلات على مستوى المنشأة (تقييم الموردين، تكلفة الخدمات،
+     * التوصيات، القدرات…) تجمع عبر كل الشركات ومحرّكاتها مخبّأة بمفاتيح عامة —
+     * فالمستخدم المعزول شركاتياً يُمنع منها (403) كي لا تتسرب أرقام شركات أجنبية.
+     */
+    function hub_org_analytics_guard(): void
+    {
+        abort_if(hub_company_ids() !== null, 403, 'هذه اللوحة على مستوى المنشأة كلها — غير متاحة لحسابٍ معزول على شركات محددة');
     }
 }
 

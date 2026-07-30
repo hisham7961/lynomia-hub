@@ -19,6 +19,7 @@ class CostController extends Controller
     public function services()
     {
         $this->gate();
+        hub_org_analytics_guard();
 
         return view('service_costs', ['d' => hub_service_costs((bool) request()->query('fresh'))]);
     }

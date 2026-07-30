@@ -500,6 +500,9 @@ class ModuleController extends Controller
         $cf = collect(hub_mod($module)['fields'] ?? [])
             ->first(fn ($f) => ($f['type'] ?? '') === 'ref' && ($f['ref'] ?? '') === 'companies' && empty($f['multi']));
         if (! $cf) return;
+        // حقل الشركة مخفيّ أو للقراءة لدور المستخدم: النموذج لا يرسله وfill لا يكتبه،
+        // فالقيمة القائمة تبقى وhub_scope يفرض العزل قراءةً — لا تحبس الحفظ عبثاً.
+        if (hub_field_mode(auth()->user(), $module, $cf['key']) !== '') return;
 
         $val = (string) $r->input($cf['key']);
         if ($val === '' || ! in_array($val, $ids, true)) {
@@ -561,9 +564,13 @@ class ModuleController extends Controller
             if ($f['ref'] === 'projects' && hub_scoped(auth()->user())) {
                 $opts = array_intersect_key($opts, array_flip(auth()->user()->visibleProjectIds()));
             }
-            // العزل الصارم: خيارات الشركات تنحصر في شركات المستخدم المسموحة
-            if ($f['ref'] === 'companies' && ($cids = hub_company_ids()) !== null) {
-                $opts = array_intersect_key($opts, array_flip($cids));
+            // العزل الصارم: أي مرجعٍ لوحدةٍ معزولة على الشركات (الشركات نفسها،
+            // العملاء، الموردون…) تنحصر خياراته في شركات المستخدم المسموحة —
+            // وإلا سرّبت القائمة أسماء سجلات شركات أجنبية وسمحت بالربط بها.
+            if (($cids = hub_company_ids()) !== null && ($ccol = hub_company_col($f['ref']))) {
+                $allowed = \Illuminate\Support\Facades\DB::table(hub_ref_table($f['ref']))
+                    ->whereIn($ccol, $cids)->pluck('id')->map(fn ($v) => (string) $v)->all();
+                $opts = array_intersect_key($opts, array_flip($allowed));
             }
             $out[$f['key']] = $opts;
         }

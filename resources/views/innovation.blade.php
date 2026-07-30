@@ -42,7 +42,7 @@
             </div>
             @if (! $i->project_id && in_array($i->status, ['معتمدة', 'قيد التقييم'], true) && hub_can(auth()->user(), 'projects', 'a') && hub_can(auth()->user(), 'ideas', 'e'))
                 <form method="POST" action="{{ route('ideas.promote', $i->id) }}"
-                      onsubmit="return confirm('ترقية «{{ \Illuminate\Support\Str::limit($i->title, 40) }}» إلى مشروع؟')">
+                      onsubmit="return confirm('ترقية «' + {{ \Illuminate\Support\Js::from(\Illuminate\Support\Str::limit($i->title, 40)) }} + '» إلى مشروع؟')">
                     @csrf<button class="btn sm">🚀 رقِّ لمشروع</button>
                 </form>
             @endif

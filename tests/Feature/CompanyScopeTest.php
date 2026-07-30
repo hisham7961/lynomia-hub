@@ -39,13 +39,37 @@ class CompanyScopeTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_scope_ignores_modules_without_company_column(): void
+    public function test_switcher_filters_modules_by_physical_company_column(): void
     {
+        // المهام لا تُعرّف مرجع شركة لكن جدولها يحمل company_id فعلياً —
+        // فالمحوّل (والعزل) يفرضان عليها التصفية عبر عمودها المادي.
         $this->seedCore();
         $a = Company::create(['name_ar' => 'شركة ألف']);
-        \App\Models\Task::create(['title' => 'مهمة عامة', 'status' => 'جديدة']);
+        $b = Company::create(['name_ar' => 'شركة باء']);
+        \App\Models\Task::create(['title' => 'مهمة ألف', 'status' => 'جديدة', 'company_id' => $a->id]);
+        \App\Models\Task::create(['title' => 'مهمة باء', 'status' => 'جديدة', 'company_id' => $b->id]);
 
         $this->actingAs($this->owner)->post('/company-switch', ['company' => $a->id]);
-        $this->actingAs($this->owner)->get('/m/tasks')->assertOk()->assertSee('مهمة عامة');
+        $this->actingAs($this->owner)->get('/m/tasks')->assertOk()
+            ->assertSee('مهمة ألف')->assertDontSee('مهمة باء');
+
+        // العودة لكل الشركات تُظهرهما معاً
+        $this->actingAs($this->owner)->post('/company-switch', ['company' => '']);
+        $this->actingAs($this->owner)->get('/m/tasks')->assertOk()
+            ->assertSee('مهمة ألف')->assertSee('مهمة باء');
+    }
+
+    public function test_isolation_covers_column_less_modules_via_physical_company_id(): void
+    {
+        // مستخدم معزول (scope='all') لا يرى مهام شركة أجنبية رغم غياب مرجع الشركة
+        $this->seedCore();
+        $a = Company::create(['name_ar' => 'شركة ألف']);
+        $b = Company::create(['name_ar' => 'شركة باء']);
+        \App\Models\Task::create(['title' => 'مهمة ألف', 'status' => 'جديدة', 'company_id' => $a->id]);
+        \App\Models\Task::create(['title' => 'مهمة باء', 'status' => 'جديدة', 'company_id' => $b->id]);
+        $this->employee->update(['companies' => [$a->id]]);
+
+        $this->actingAs($this->employee)->get('/m/tasks')->assertOk()
+            ->assertSee('مهمة ألف')->assertDontSee('مهمة باء');
     }
 }

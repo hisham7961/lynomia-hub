@@ -18,6 +18,7 @@ class PurchaseController extends Controller
     public function scores()
     {
         abort_unless(hub_can(auth()->user(), 'suppliers', 'v'), 403, 'تقييم الموردين يتطلب صلاحية رؤية الموردين');
+        hub_org_analytics_guard();
 
         return view('supplier_scores', ['d' => hub_supplier_scores((bool) request()->query('fresh'))]);
     }

@@ -88,4 +88,36 @@ class CompanyIsolationTest extends TestCase
         // مستخدم بلا قائمة = غير مقيد
         $this->actingAs($this->viewer)->get('/m/clients')->assertSee('عميل ألف')->assertSee('عميل باء');
     }
+
+    public function test_org_analytics_pages_blocked_for_isolated_user(): void
+    {
+        $this->seedCompanies();
+        // تقييم الموردين وتكلفة الخدمات والتوصيات لوحات منشأة كاملة — 403 للمعزول
+        $this->actingAs($this->employee)->get('/supplier-scores')->assertForbidden();
+        $this->actingAs($this->employee)->get('/service-costs')->assertForbidden();
+        $this->actingAs($this->employee)->get('/recommendations')->assertForbidden();
+        // وغير المعزول (المالك) يصلها
+        $this->actingAs($this->owner)->get('/supplier-scores')->assertOk();
+    }
+
+    public function test_refoptions_hide_foreign_company_reference_targets(): void
+    {
+        $this->seedCompanies();
+        // نموذج الاجتماعات يرجع للعملاء — المعزول لا يرى عميل الشركة الأجنبية في القائمة
+        $resp = $this->actingAs($this->employee)->get('/m/meetings/create');
+        $resp->assertOk()->assertSee('عميل ألف')->assertDontSee('عميل باء');
+    }
+
+    public function test_soft_deleted_company_rejected_in_user_form(): void
+    {
+        $this->seedCompanies();
+        $this->coB->delete();   // حذف ناعم
+        $resp = $this->actingAs($this->owner)->from('/admin/users/' . $this->employee->id . '/edit')
+            ->put('/admin/users/' . $this->employee->id, [
+                'name' => 'موظفة', 'email' => 'emp@test.local',
+                'role_id' => $this->employee->role_id, 'status' => 'نشط',
+                'companies' => [$this->coB->id],
+            ]);
+        $resp->assertSessionHasErrors('companies.0');
+    }
 }

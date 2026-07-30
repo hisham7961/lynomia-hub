@@ -37,35 +37,48 @@ class CalendarController extends Controller
             : now()->startOfMonth();
         $end = $start->copy()->endOfMonth();
 
-        // نجمع أحداث الشهر يوماً بيوم: [Y-m-d => [ [module, icon, label, name, id], ... ]]
-        $days = [];
-        $overflow = 0;
-        foreach ($this->fields() as [$mk, $f]) {
-            if (! hub_can(auth()->user(), $mk, 'v')) continue;
-            $md = hub_mod($mk);
-            $disp = hub_display_col($mk);
-            try {
-                $rows = hub_scope(
-                    DB::table($md['table'])->whereNull('deleted_at')->whereNotNull($f['col'])
-                        ->whereBetween(DB::raw("DATE(`{$f['col']}`)"), [$start->toDateString(), $end->toDateString()]),
-                    $mk
-                )->limit(80)->get(['id', $disp . ' as _n', DB::raw("DATE(`{$f['col']}`) as _d")]);
-            } catch (\Throwable $e) {
-                continue;
+        // مخبّأ لكل (شهر × نطاق المستخدم): يمنع إعادة عشرات الاستعلامات عند كل تنقّل
+        // شهري — على غرار رادار الانتهاءات. المقيَّد (مشاريع/شركات) بمفتاح خاص به.
+        $scoped = hub_scoped(auth()->user()) || hub_company_ids() !== null;
+        $ckey = 'hub:calendar:' . $start->format('Y-m') . ':' . ($scoped ? 'u:' . auth()->id() : 'all');
+        [$days, $overflow] = \Illuminate\Support\Facades\Cache::remember($ckey, $scoped ? 300 : 600, function () use ($start, $end) {
+            $days = [];
+            $overflow = 0;
+            foreach ($this->fields() as [$mk, $f]) {
+                if (! hub_can(auth()->user(), $mk, 'v')) continue;
+                $md = hub_mod($mk);
+                $disp = hub_display_col($mk);
+                try {
+                    $base = hub_scope(
+                        DB::table($md['table'])->whereNull('deleted_at')->whereNotNull($f['col'])
+                            ->whereBetween(DB::raw("DATE(`{$f['col']}`)"), [$start->toDateString(), $end->toDateString()]),
+                        $mk
+                    );
+                    // نعدّ الكل ثم نجلب الأقرب زمنياً بترتيب صريح — الحدّ لم يعد يُسقط
+                    // سجلات عشوائية صمتاً، والمحجوب يُصرَّح به في العدّاد.
+                    $total = (clone $base)->count();
+                    $rows = (clone $base)->orderBy(DB::raw("DATE(`{$f['col']}`)"))
+                        ->limit(80)->get(['id', $disp . ' as _n', DB::raw("DATE(`{$f['col']}`) as _d")]);
+                    $overflow += max(0, $total - $rows->count());
+                } catch (\Throwable $e) {
+                    continue;
+                }
+
+                foreach ($rows as $row) {
+                    $d = (string) $row->_d;
+                    if (count($days[$d] ?? []) >= 8) { $overflow++; continue; }   // اليوم المزدحم يُقتصر ويُصرَّح بالباقي
+                    $days[$d][] = [
+                        'module' => $mk,
+                        'mlabel' => $md['label'] ?? $mk,
+                        'label'  => $f['label'],
+                        'name'   => (string) ($row->_n ?? ''),
+                        'id'     => (string) $row->id,
+                    ];
+                }
             }
 
-            foreach ($rows as $row) {
-                $d = (string) $row->_d;
-                if (count($days[$d] ?? []) >= 8) { $overflow++; continue; }   // اليوم المزدحم يُقتصر ويُصرَّح بالباقي
-                $days[$d][] = [
-                    'module' => $mk,
-                    'mlabel' => $md['label'] ?? $mk,
-                    'label'  => $f['label'],
-                    'name'   => (string) ($row->_n ?? ''),
-                    'id'     => (string) $row->id,
-                ];
-            }
-        }
+            return [$days, $overflow];
+        });
 
         return view('calendar', [
             'start' => $start, 'days' => $days, 'overflow' => $overflow,
