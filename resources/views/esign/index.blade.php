@@ -31,6 +31,19 @@
             <div class="fld fw" id="varszone"><span class="sub">اختر قالباً لتظهر متغيراته هنا</span></div>
             <div class="fld"><label>كلمة سر الرابط <span class="req">*</span></label>
                 <input class="inp" name="pass" required minlength="4" maxlength="80" placeholder="يدخلها العميل قبل العرض"></div>
+            <div class="fld"><label>ربط بجهة (عميل، موظف، شركة…)</label>
+                <select class="inp" name="link" id="linksel">
+                    <option value="">— بلا ربط —</option>
+                    @foreach ($links as $glabel => $g)
+                        <optgroup label="{{ $glabel }}">
+                            @foreach ($g['rows'] as $rid => $rname)
+                                <option value="{{ $g['module'] }}:{{ $rid }}">{{ \Illuminate\Support\Str::limit($rname, 44) }}</option>
+                            @endforeach
+                        </optgroup>
+                    @endforeach
+                </select>
+                <input type="hidden" name="link_module" id="link_module">
+                <input type="hidden" name="link_id" id="link_id"></div>
             <div class="fld"><label>ربط بعقد (اختياري)</label>
                 <select class="inp" name="contract_id"><option value="">— بلا ربط —</option>
                     @foreach ($contracts as $cid => $ct)<option value="{{ $cid }}">{{ \Illuminate\Support\Str::limit($ct, 40) }}</option>@endforeach
@@ -42,9 +55,11 @@
     <div class="card kid">
         <h3>📋 القوالب</h3>
         @foreach ($templates as $t)
-            <div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid color-mix(in srgb,var(--ln) 45%,transparent)">
-                <b style="flex:1">{{ $t->name }}</b>
-                <span class="sub">{{ implode('، ', array_slice($t->vars(), 0, 4)) }}{{ count($t->vars()) > 4 ? '…' : '' }}</span>
+            <div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid color-mix(in srgb,var(--ln) 45%,transparent)">
+                <div style="flex:1;min-width:0">
+                    <b>{{ $t->name }}</b>@if ($t->kind) <span class="bdg g">{{ $t->kind }}</span>@endif
+                    <div class="sub" style="font-size:11.5px">{{ $t->descr }} · {{ count($t->vars()) }} متغيّر</div>
+                </div>
                 <form method="POST" action="{{ route('esign.tpl.destroy', $t->id) }}" class="inline" data-confirm="حذف القالب «{{ \Illuminate\Support\Str::limit($t->name, 30) }}»؟">
                     @csrf @method('DELETE')<button class="btn ghost xs">✕</button></form>
             </div>
@@ -65,11 +80,12 @@
 <div class="card">
     <h3>🗂 طلبات التوقيع</h3>
     <div class="tblwrap"><table class="tbl">
-        <thead><tr><th>العنوان</th><th>الحالة</th><th>الموقّع</th><th>فُتح</th><th>وُقّع في</th><th>IP</th><th class="acts">إجراءات</th></tr></thead>
+        <thead><tr><th>العنوان</th><th>الجهة</th><th>الحالة</th><th>الموقّع</th><th>فُتح</th><th>وُقّع في</th><th>IP</th><th class="acts">إجراءات</th></tr></thead>
         <tbody>
         @forelse ($requests as $q)
             <tr>
                 <td>{{ $q->title }}</td>
+                <td>@if ($l = $q->linkLabel())<a href="{{ $q->linkUrl() }}" class="sub">{{ $l }}</a>@else<span class="sub">—</span>@endif</td>
                 <td><span class="bdg {{ $q->status === 'وُقّع' ? 'ok' : 'wn' }}">{{ $q->status }}</span></td>
                 <td>{{ $q->signer_name ?: '—' }}</td>
                 <td class="mono sub">{{ $q->opens }}×{{ $q->opened_at ? ' · ' . $q->opened_at->format('m-d H:i') : '' }}</td>
@@ -82,13 +98,20 @@
                 </td>
             </tr>
         @empty
-            <tr><td colspan="7" class="empty">لا طلبات بعد — أنشئ أول طلب توقيع من النموذج أعلاه</td></tr>
+            <tr><td colspan="8" class="empty">لا طلبات بعد — أنشئ أول طلب توقيع من النموذج أعلاه</td></tr>
         @endforelse
         </tbody>
     </table></div>
 </div>
 
 <script>
+// تفكيك اختيار الجهة «module:id» إلى حقلين مخفيين
+var linksel = document.getElementById('linksel');
+if (linksel) linksel.addEventListener('change', function () {
+    var p = (this.value || '').split(':');
+    document.getElementById('link_module').value = p[0] || '';
+    document.getElementById('link_id').value = p[1] || '';
+});
 document.getElementById('tplsel').addEventListener('change', function () {
     var zone = document.getElementById('varszone'), opt = this.selectedOptions[0];
     var vars = opt && opt.dataset.vars ? JSON.parse(opt.dataset.vars) : [];

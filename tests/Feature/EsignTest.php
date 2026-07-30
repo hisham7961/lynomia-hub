@@ -32,10 +32,12 @@ class EsignTest extends TestCase
         $this->actingAs($this->owner)->get('/esign')->assertOk()->assertSee('عقد تقديم خدمات');
         $tpl = SignTemplate::where('name', 'عقد تقديم خدمات')->first();
 
+        $client = \App\Models\Client::create(['name' => 'مطاعم الذواقة', 'stage' => 'عميل']);
         $this->actingAs($this->owner)->post('/esign', [
             'title' => 'عقد خدمات الذواقة', 'template_id' => $tpl->id, 'pass' => 'sign1234',
             'contract_id' => $contract->id,
-            'vars' => ['اسم_العميل' => 'مطاعم الذواقة', 'اسم_شركتنا' => 'لينوميا',
+            'link_module' => 'clients', 'link_id' => $client->id,
+            'vars' => ['اسم_الطرف_الثاني' => 'مطاعم الذواقة', 'اسم_شركتنا' => 'لينوميا',
                        'المبلغ' => '1500', 'العملة' => 'د.ك'],
         ])->assertSessionHas('sign_link');
 
@@ -93,6 +95,55 @@ class EsignTest extends TestCase
         $req = SignRequest::first();
         $this->post("/sign/{$req->token}", ['signer_name' => 'متسلل', 'signature' => $this->sig])
             ->assertForbidden();
+    }
+
+    /** الربط بجهة: يظهر الطلب على صفحة العميل نفسه، وربطٌ خارج النطاق يُتجاهل */
+    public function test_request_links_to_entity_and_shows_on_its_page(): void
+    {
+        $this->seedCore();
+        $this->actingAs($this->owner)->get('/esign');
+        $tpl = SignTemplate::first();
+        $client = \App\Models\Client::create(['name' => 'شركة النور', 'stage' => 'عميل محتمل']);
+
+        $this->actingAs($this->owner)->post('/esign', [
+            'title' => 'عقد النور', 'template_id' => $tpl->id, 'pass' => 'p1234',
+            'link_module' => 'clients', 'link_id' => $client->id,
+        ])->assertSessionHas('sign_link');
+
+        $req = SignRequest::first();
+        $this->assertSame('clients', $req->link_module);
+        $this->assertSame($client->id, $req->link_id);
+        $this->assertStringContainsString('شركة النور', (string) $req->linkLabel());
+
+        // البطاقة العكسية على صفحة العميل
+        $this->actingAs($this->owner)->get("/m/clients/{$client->id}")
+            ->assertOk()->assertSee('التواقيع المرتبطة')->assertSee('عقد النور');
+    }
+
+    /** ربطٌ بجهة لا يملكها/غير مسموحة يُتجاهل بأمان دون كسر الإنشاء */
+    public function test_invalid_link_is_ignored(): void
+    {
+        $this->seedCore();
+        $this->actingAs($this->owner)->get('/esign');
+        $tpl = SignTemplate::first();
+
+        $this->actingAs($this->owner)->post('/esign', [
+            'title' => 'ع', 'template_id' => $tpl->id, 'pass' => 'p1234',
+            'link_module' => 'tasks', 'link_id' => 'x',   // tasks ليست ضمن الجهات المسموحة
+        ])->assertSessionHas('sign_link');
+
+        $this->assertNull(SignRequest::first()->link_module);
+    }
+
+    /** المكتبة غنية: عشرة قوالب متنوّعة بأنواعها */
+    public function test_rich_template_library_is_seeded(): void
+    {
+        $this->seedCore();
+        $this->actingAs($this->owner)->get('/esign')->assertOk();
+        $this->assertGreaterThanOrEqual(10, SignTemplate::count());
+        foreach (['عقد عمل (توظيف)', 'عقد شراكة', 'اتفاقية مستوى خدمة (SLA)', 'خطاب عرض وظيفي'] as $n) {
+            $this->assertTrue(SignTemplate::where('name', $n)->exists(), "قالب «{$n}» غائب");
+        }
     }
 
     /** صلاحية العقود تحكم المركز: من لا يضيف عقوداً لا ينشئ طلبات */

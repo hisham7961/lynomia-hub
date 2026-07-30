@@ -28,16 +28,38 @@ class EsignController extends Controller
 
     /* ────────── الجهة الداخلية ────────── */
 
+    /** الجهات القابلة للربط: أي وحدة كيانٍ يملك المستخدم رؤيتها */
+    protected const LINKABLE = [
+        'clients'  => '👤 عميل / محتمل',
+        'companies' => '🏢 شركة',
+        'hr'       => '🧑‍💼 موظف',
+        'suppliers' => '🚚 مورد',
+        'recruit'  => '🎯 مرشح توظيف',
+        'projects' => '🚀 مشروع',
+    ];
+
     public function index()
     {
         $this->gate();
         $this->seedDefaultTemplates();
 
+        // خيارات الربط: مجموعةٌ لكل جهة يملك المستخدم رؤيتها، بنطاقه
+        $links = [];
+        foreach (self::LINKABLE as $mk => $label) {
+            if (! hub_can(auth()->user(), $mk, 'v')) continue;
+            $def = hub_mod($mk);
+            $rows = hub_scope(('\\App\\Models\\' . $def['model'])::query(), $mk)
+                ->orderByDesc('created_at')->limit(300)
+                ->pluck(hub_display_col($mk), 'id');
+            if ($rows->isNotEmpty()) $links[$label] = ['module' => $mk, 'rows' => $rows];
+        }
+
         return view('esign.index', [
-            'templates' => SignTemplate::orderBy('name')->get(),
+            'templates' => SignTemplate::orderBy('sort')->orderBy('name')->get(),
             'requests'  => SignRequest::orderByDesc('created_at')->limit(60)->get(),
             'contracts' => hub_scope(\App\Models\Contract::query(), 'contracts')
                 ->orderByDesc('created_at')->limit(200)->pluck('title', 'id'),
+            'links'     => $links,
         ]);
     }
 
@@ -65,8 +87,17 @@ class EsignController extends Controller
         $d = $r->validate([
             'title' => 'required|string|max:200', 'template_id' => 'required|exists:sign_templates,id',
             'pass' => 'required|string|min:4|max:80', 'contract_id' => 'nullable|string',
+            'link_module' => 'nullable|string|max:40', 'link_id' => 'nullable|string|max:64',
             'vars' => 'array',
         ]);
+
+        // الربط: يُقبل فقط إن كانت الجهة ضمن المسموح ويملك المستخدم رؤيتها
+        $linkModule = $linkId = null;
+        if (($lm = $d['link_module'] ?? null) && ($li = $d['link_id'] ?? null)
+            && array_key_exists($lm, self::LINKABLE) && hub_can(auth()->user(), $lm, 'v')) {
+            $exists = hub_scope(('\\App\\Models\\' . hub_mod($lm)['model'])::query(), $lm)->whereKey($li)->exists();
+            if ($exists) { $linkModule = $lm; $linkId = $li; }
+        }
 
         // ملء متغيرات القالب — غير المذكور يبقى كما هو ظاهراً فيُرى النقص قبل الإرسال
         $tpl = SignTemplate::findOrFail($d['template_id']);
@@ -78,11 +109,12 @@ class EsignController extends Controller
         $req = SignRequest::create([
             'title' => $d['title'], 'template_id' => $tpl->id,
             'contract_id' => ($d['contract_id'] ?? null) ?: null,
+            'link_module' => $linkModule, 'link_id' => $linkId,
             'body' => $body, 'pass' => Hash::make($d['pass']),
             'token' => Str::random(48), 'created_by' => auth()->id(),
         ]);
 
-        hub_audit('إنشاء طلب توقيع', 'contracts', $req->contract_id, $d['title']);
+        hub_audit('إنشاء طلب توقيع', $linkModule ?: 'contracts', $linkId ?: $req->contract_id, $d['title']);
 
         return back()->with('ok', 'أُنشئ طلب التوقيع — انسخ الرابط الخاص وأرسله للعميل مع كلمة السر (بقناة أخرى)')
                      ->with('sign_link', route('sign.show', $req->token));
@@ -173,21 +205,16 @@ class EsignController extends Controller
         }
     }
 
-    /** قوالب افتراضية عند أول زيارة — تُعدَّل وتُحذف بحرية */
+    /**
+     * مكتبة قوالب احترافية عند أول زيارة — عقودٌ متنوعة صيغةً ونوعاً، تُعدَّل
+     * وتُحذف وتُضاف بحرية. كل قالب: ديباجةٌ، بنودٌ مرقّمة، ومتغيرات {بين_أقواس}.
+     */
     protected function seedDefaultTemplates(): void
     {
         if (SignTemplate::exists()) return;
 
-        $foot = "\n\nحُرّر هذا العقد في {التاريخ}.\n\nالطرف الأول: {اسم_شركتنا}\nالطرف الثاني: {اسم_العميل}";
-        foreach ([
-            ['عقد تقديم خدمات', 'خدمات',
-             "عقد تقديم خدمات\n\nاتُّفق بين {اسم_شركتنا} (الطرف الأول) و{اسم_العميل} (الطرف الثاني) على قيام الطرف الأول بتقديم خدمات {وصف_الخدمة} مقابل مبلغ {المبلغ} {العملة}، خلال مدة {المدة}.\n\nشروط الدفع: {شروط_الدفع}.\nيلتزم الطرفان بما ورد أعلاه، وأي تعديل يكون كتابةً وباتفاق الطرفين." . $foot],
-            ['اتفاقية عدم إفشاء (NDA)', 'سرية',
-             "اتفاقية عدم إفشاء\n\nيلتزم {اسم_العميل} بالحفاظ على سرية كل المعلومات والمستندات والبيانات التي يطّلع عليها بحكم تعامله مع {اسم_شركتنا}، وعدم إفشائها لأي طرف ثالث دون إذن كتابي مسبق، وذلك طوال مدة التعامل و{مدة_السرية} بعد انتهائه." . $foot],
-            ['عقد توريد', 'توريد',
-             "عقد توريد\n\nيلتزم {اسم_شركتنا} بتوريد {وصف_البضاعة} إلى {اسم_العميل} بكمية {الكمية} وسعر إجمالي {المبلغ} {العملة}، والتسليم في {مكان_التسليم} بتاريخ أقصاه {تاريخ_التسليم}.\n\nشروط الدفع: {شروط_الدفع}." . $foot],
-        ] as [$name, $kind, $body]) {
-            SignTemplate::create(['name' => $name, 'kind' => $kind, 'body' => $body]);
+        foreach (\App\Support\ContractTemplates::library() as $i => $tpl) {
+            SignTemplate::create($tpl + ['sort' => $i]);
         }
     }
 }

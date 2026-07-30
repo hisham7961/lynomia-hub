@@ -59,6 +59,9 @@
 @if ($module === 'contracts' && hub_can(auth()->user(), 'contracts', 'v'))
     @include('partials.esign_card')
 @endif
+@if (in_array($module, ['clients', 'companies', 'hr', 'suppliers', 'recruit', 'projects'], true) && hub_can(auth()->user(), 'contracts', 'v'))
+    @include('partials.esign_linked')
+@endif
 <div class="card">
     <dl class="detail">
         @foreach ($def['fields'] as $f)
