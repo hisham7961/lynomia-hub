@@ -124,6 +124,23 @@ class ModuleController extends Controller
         $row = $this->findScoped($class, $module, $id, 'with');
         [, $labels] = $this->columnsAndLabels($def, [$row], all: true);
 
+        // عرض حساس: صفحة تعرض سراً غير فارغ لمستخدم مخوّل — تُسجّل في التدقيق
+        $u = auth()->user();
+        if ($u->role?->is_owner || hub_flag($u, 'secrets') || hub_flag($u, 'copySec')) {
+            foreach ($def['fields'] as $f) {
+                if (($f['type'] ?? '') === 'sec' && filled($row->{$f['col']} ?? null)) {
+                    \App\Models\AuditEntry::create([
+                        'user_id' => $u->id, 'action' => 'عرض حساس', 'module' => $module,
+                        'record_id' => $row->id,
+                        'name' => \Illuminate\Support\Str::limit((string) ($row->{hub_display_col($module)} ?? $row->id), 60),
+                        'device' => substr((string) request()->userAgent(), 0, 200),
+                        'ip' => request()->ip(), 'created_at' => now(),
+                    ]);
+                    break;
+                }
+            }
+        }
+
         // السجلات المرتبطة: كل وحدة تشير لهذا السجل بحقل مرجعي
         $children = [];
         foreach (hub_children($module) as [$ck, $cf]) {
