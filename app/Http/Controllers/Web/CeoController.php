@@ -8,9 +8,17 @@ use Illuminate\Support\Facades\DB;
 /** لوحة CEO — صورة الشركة كاملة في شاشة واحدة (للمالكين) */
 class CeoController extends Controller
 {
-    protected array $income  = ['فاتورة مبيعات', 'دفعة واردة'];
-    protected array $expense = ['مصروف', 'فاتورة مشتريات', 'دفعة صادرة'];
-    protected array $dead    = ['ملغاة', 'مسودة'];
+    /** تصنيف المستندات المالية — تعريف واحد في config('hub.fin') لكل التقارير */
+    protected array $income;
+    protected array $expense;
+    protected array $dead;
+
+    public function __construct()
+    {
+        $this->income  = config('hub.fin.income');
+        $this->expense = config('hub.fin.expense');
+        $this->dead    = config('hub.fin.dead');
+    }
 
     public function index()
     {
@@ -26,11 +34,11 @@ class CeoController extends Controller
             'netM'    => $sum($this->income, $m0) - $sum($this->expense, $m0),
             'netY'    => $sum($this->income, $y0) - $sum($this->expense, $y0),
             'unpaid'  => (float) $fin()->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة'])->sum(DB::raw('total - paid')),
-            'projects'=> DB::table('projects')->whereNull('deleted_at')->where(fn ($w) => $w->whereNull('status')->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مكتمل%')->where('status', 'NOT LIKE', '%ملغ%')))->count(),
+            'projects'=> hub_open_scope(DB::table('projects')->whereNull('deleted_at'))->count(),
             'clients' => DB::table('clients')->whereNull('deleted_at')->count(),
             'emps'    => DB::table('employees')->whereNull('deleted_at')->count(),
-            'openTasks' => DB::table('tasks')->whereNull('deleted_at')->where(fn ($w) => $w->whereNull('status')->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مكتمل%')->where('status', 'NOT LIKE', '%منجز%')->where('status', 'NOT LIKE', '%ملغ%')))->count(),
-            'lateTasks' => DB::table('tasks')->whereNull('deleted_at')->whereNotNull('due')->where('due', '<', now()->toDateString())->where(fn ($w) => $w->whereNull('status')->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مكتمل%')->where('status', 'NOT LIKE', '%منجز%')->where('status', 'NOT LIKE', '%ملغ%')))->count(),
+            'openTasks' => hub_open_scope(DB::table('tasks')->whereNull('deleted_at'))->count(),
+            'lateTasks' => hub_open_scope(DB::table('tasks')->whereNull('deleted_at')->whereNotNull('due')->where('due', '<', now()->toDateString()))->count(),
         ];
 
         // صحة الشركة
@@ -47,8 +55,7 @@ class CeoController extends Controller
         $max = max(1, ...array_merge(array_column($months, 'i'), array_column($months, 'e')));
 
         // تقدم المشاريع الجارية
-        $projects = DB::table('projects')->whereNull('deleted_at')
-            ->where(fn ($w) => $w->whereNull('status')->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مكتمل%')->where('status', 'NOT LIKE', '%ملغ%')))
+        $projects = hub_open_scope(DB::table('projects')->whereNull('deleted_at'))
             ->orderByDesc('created_at')->limit(6)->get(['id', 'name', 'status'])
             ->map(function ($p) { $p->progress = hub_progress($p->id)['pct']; return $p; });
 

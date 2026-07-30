@@ -29,13 +29,9 @@ class AppCenterController extends Controller
             ->orderByDesc('date')->orderByDesc('created_at')
             ->limit(30)->get();
 
-        // الأعطال والتذاكر المفتوحة على هذا التطبيق
-        $openish = fn ($q) => $q->where(fn ($w) => $w->whereNull('status')
-            ->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مغلق%')
-                                   ->where('status', 'NOT LIKE', '%محلول%')
-                                   ->where('status', 'NOT LIKE', '%ملغ%')));
+        // الأعطال والتذاكر المفتوحة على هذا التطبيق — «مفتوح» من التعريف الموحَّد
         // كل استعلام يُبنى من جديد ومُنطَّقاً — والعدّاد يُنطَّق كذلك وإلا فضح الرقمُ المخفيَّ
-        $scoped = fn (string $table, string $mk) => $openish(
+        $scoped = fn (string $table, string $mk) => hub_open_scope(
             hub_scope(DB::table($table)->whereNull('deleted_at'), $mk)->where('app_id', $app->id)
         );
         $issues = $scoped('issues', 'issues')
@@ -49,7 +45,7 @@ class AppCenterController extends Controller
         $feats = $app->project_id
             ? hub_scope(DB::table('plan_items')->whereNull('deleted_at'), 'feats')
                 ->where('project_id', $app->project_id)
-                ->where(fn ($w) => $w->whereNull('status')->orWhere('status', 'NOT LIKE', '%ملغ%'))
+                ->tap(fn ($q) => hub_open_scope($q))
                 ->orderByDesc('weight')->limit(10)
                 ->get(['id', 'title', 'type', 'weight', 'progress', 'status', 'test'])
             : collect();

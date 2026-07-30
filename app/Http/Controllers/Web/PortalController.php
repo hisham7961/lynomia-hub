@@ -45,13 +45,8 @@ class PortalController extends Controller
         ];
 
         if ($userId) {
-            // «مفتوحة» = حالتها لا توحي بالإغلاق (مفردات الحالة حرة في السجل)
-            $open = fn ($q) => $q->where(function ($w) {
-                $w->whereNull('status')
-                  ->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مكتمل%')
-                                         ->where('status', 'NOT LIKE', '%منجز%')
-                                         ->where('status', 'NOT LIKE', '%ملغ%'));
-            });
+            // «مفتوحة» من التعريف الموحَّد — مصدرها hub_closed_states لا مفردات محلية
+            $open = fn ($q) => hub_open_scope($q);
 
             $out['tasks'] = $open(DB::table('tasks')->whereNull('deleted_at')->where('assignee_id', $userId))
                 ->orderByRaw('due IS NULL, due')
@@ -67,21 +62,14 @@ class PortalController extends Controller
             // موافقات بانتظاري: أنا المعتمد أو ضمن سلسلة الاعتماد، ولم تُحسم
             $out['approvals'] = DB::table('approvals')->whereNull('deleted_at')
                 ->where(fn ($w) => $w->where('approver_id', $userId)->orWhere('chain', 'LIKE', '%"' . $userId . '"%'))
-                ->where(fn ($w) => $w->whereNull('status')
-                    ->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%موافق%')
-                                           ->where('status', 'NOT LIKE', '%معتمد%')
-                                           ->where('status', 'NOT LIKE', '%مرفوض%')
-                                           ->where('status', 'NOT LIKE', '%ملغ%')))
+                ->tap(fn ($q) => hub_open_scope($q, 'status', ['موافق', 'موافقة', 'معتمد', 'معتمدة']))
                 ->orderByRaw('due IS NULL, due')->limit(8)
                 ->get(['id', 'title', 'type', 'amount', 'currency', 'due', 'status']);
 
             // تذاكري المفتوحة
             $out['tickets'] = DB::table('tickets')->whereNull('deleted_at')
                 ->where('assignee_id', $userId)
-                ->where(fn ($w) => $w->whereNull('status')
-                    ->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مغلق%')
-                                           ->where('status', 'NOT LIKE', '%محلول%')
-                                           ->where('status', 'NOT LIKE', '%ملغ%')))
+                ->tap(fn ($q) => hub_open_scope($q))
                 ->orderByDesc('created_at')->limit(8)
                 ->get(['id', 'subject', 'customer', 'priority', 'status']);
 

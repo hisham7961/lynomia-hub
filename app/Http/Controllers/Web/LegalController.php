@@ -15,8 +15,7 @@ class LegalController extends Controller
         $base = fn () => hub_scope(DB::table('contracts')->whereNull('deleted_at'), 'contracts');
         $today = now()->toDateString();
         $soon = now()->addDays(60)->toDateString();
-        $activeish = fn ($q) => $q->where(fn ($w) => $w->whereNull('status')
-            ->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%منته%')->where('status', 'NOT LIKE', '%ملغ%')));
+        $activeish = fn ($q) => hub_open_scope($q);
 
         $kpi = [
             'active'  => $activeish($base())->count(),

@@ -159,24 +159,7 @@ class ModuleController extends Controller
         }
 
         // السجلات المرتبطة: كل وحدة تشير لهذا السجل بحقل مرجعي
-        $children = [];
-        foreach (hub_children($module) as [$ck, $cf]) {
-            if (! hub_can(auth()->user(), $ck, 'v')) continue;
-            $cd = hub_mod($ck);
-            $cc = '\\App\\Models\\' . $cd['model'];
-            if (! class_exists($cc)) continue;
-            $base = hub_scope($cc::where($cf['col'], $row->id), $ck);
-            // الصفوف أولاً والعدّ عند الحاجة فقط — كان count(*) لكل وحدة بنت
-            // (٤٠+ استعلاماً على صفحة مشروع فارغ) قبل أي جلب
-            $rows = (clone $base)->orderByDesc('created_at')->limit(9)->get();
-            if ($rows->isEmpty()) continue;
-            $children[] = [
-                'module' => $ck, 'label' => $cd['label'], 'field' => $cf,
-                'count'  => $rows->count() <= 8 ? $rows->count() : (clone $base)->count(),
-                'rows'   => $rows->take(8),
-                'display' => hub_display_col($ck),
-            ];
-        }
+        $children = hub_related($module, $row->id);
 
         // آخر الإصدارات المحفوظة
         $versions = \App\Models\RecordVersion::where('module', $module)->where('record_id', $row->id)

@@ -11,9 +11,18 @@ use Illuminate\Support\Facades\DB;
  */
 class PerformanceController extends Controller
 {
-    protected array $income  = ['فاتورة مبيعات', 'دفعة واردة'];
-    protected array $expense = ['مصروف', 'فاتورة مشتريات', 'دفعة صادرة'];
-    protected array $dead    = ['ملغاة', 'مسودة'];
+    /** تصنيف المستندات المالية — تعريف واحد في config('hub.fin') لكل التقارير */
+    protected array $income;
+    protected array $expense;
+    protected array $dead;
+
+    public function __construct()
+    {
+        $this->income  = config('hub.fin.income');
+        $this->expense = config('hub.fin.expense');
+        $this->dead    = config('hub.fin.dead');
+    }
+
     protected array $doneWords = ['مكتمل', 'منجز'];
 
     public function index()
@@ -61,17 +70,15 @@ class PerformanceController extends Controller
             'activeP'  => $activePartners,
             'projPct'  => $projTotal ? (int) round($projDone * 100 / $projTotal) : null,
             'projDone' => $projDone, 'projTotal' => $projTotal,
-            'crit'     => DB::table('issues')->whereNull('deleted_at')->where('severity', 'LIKE', '%حرج%')
-                            ->where(fn ($w) => $w->whereNull('status')
-                                ->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مغلق%')->where('status', 'NOT LIKE', '%محلول%')))->count(),
+            'crit'     => hub_open_scope(DB::table('issues')->whereNull('deleted_at')
+                            ->where('severity', 'LIKE', '%حرج%'))->count(),
         ];
     }
 
     /* ── الأهداف بمستوياتها ── */
     protected function okrs()
     {
-        return DB::table('objectives')->whereNull('deleted_at')
-            ->where(fn ($w) => $w->whereNull('status')->orWhere('status', 'NOT LIKE', '%ملغ%'))
+        return hub_open_scope(DB::table('objectives')->whereNull('deleted_at'))
             ->orderByRaw("CASE level WHEN 'الشركة' THEN 0 WHEN 'قسم' THEN 1 WHEN 'مشروع' THEN 2 ELSE 3 END")
             ->orderByDesc('created_at')->limit(20)
             ->get(['id', 'title', 'level', 'owner_id', 'period', 'due', 'progress', 'status'])
@@ -87,9 +94,8 @@ class PerformanceController extends Controller
         $perf = DB::table('employees')->whereNull('deleted_at')->whereNotNull('user_id')->pluck('perf', 'user_id');
         $empIds = DB::table('employees')->whereNull('deleted_at')->whereNotNull('user_id')->pluck('id', 'user_id');
 
-        $doneLike = fn ($q) => $q->where(fn ($w) => $w->where('status', 'LIKE', '%مكتمل%')->orWhere('status', 'LIKE', '%منجز%'));
-        $openLike = fn ($q) => $q->where(fn ($w) => $w->whereNull('status')
-            ->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مكتمل%')->where('status', 'NOT LIKE', '%منجز%')->where('status', 'NOT LIKE', '%ملغ%')));
+        $doneLike = fn ($q) => hub_closed_scope($q);
+        $openLike = fn ($q) => hub_open_scope($q);
 
         return $users->map(function ($u) use ($since, $perf, $empIds, $doneLike, $openLike) {
             // المهام المنجزة (وقت الإغلاق التقريبي = آخر تعديل)

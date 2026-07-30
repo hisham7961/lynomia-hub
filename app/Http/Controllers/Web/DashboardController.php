@@ -56,7 +56,7 @@ class DashboardController extends Controller
         if (hub_can($user, 'apps', 'v') && ! in_array('apps', $hid, true)) {
             $apps = hub_scope(DB::table('applications')->whereNull('deleted_at'), 'apps')
                 ->whereNotNull('project_id')
-                ->where(fn ($w) => $w->whereNull('status')->orWhere('status', 'NOT LIKE', '%موقوف%'))
+                ->tap(fn ($q) => hub_open_scope($q, 'status', ['موقوف']))   // «موقوف» دلالة التطبيقات وحدها
                 ->orderByDesc('created_at')->limit(6)
                 ->get(['id', 'name', 'ver', 'status', 'project_id'])
                 ->map(function ($a) {

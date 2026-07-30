@@ -8,9 +8,17 @@ use Illuminate\Support\Facades\DB;
 /** التقارير المالية v1 — مبنية على وحدة المالية (fin) مباشرة */
 class ReportController extends Controller
 {
-    protected array $income  = ['فاتورة مبيعات', 'دفعة واردة'];
-    protected array $expense = ['مصروف', 'فاتورة مشتريات', 'دفعة صادرة'];
-    protected array $dead    = ['ملغاة', 'مسودة'];
+    /** تصنيف المستندات المالية — تعريف واحد في config('hub.fin') لكل التقارير */
+    protected array $income;
+    protected array $expense;
+    protected array $dead;
+
+    public function __construct()
+    {
+        $this->income  = config('hub.fin.income');
+        $this->expense = config('hub.fin.expense');
+        $this->dead    = config('hub.fin.dead');
+    }
 
     public function finance()
     {

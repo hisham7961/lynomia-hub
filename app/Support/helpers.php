@@ -695,10 +695,9 @@ if (! function_exists('hub_health')) {
                     ->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة']);
                 $openN = (clone $open)->count();
                 $late  = $openN ? (clone $open)->whereNotNull('due')->where('due', '<', $today)->count() : 0;
-                $inc = (float) $db->table('fin_documents')->whereNull('deleted_at')->whereNotIn('state', ['ملغاة', 'مسودة'])
-                    ->whereIn('kind', ['فاتورة مبيعات', 'دفعة واردة'])->where('date', '>=', now()->startOfMonth()->toDateString())->sum('total');
-                $exp = (float) $db->table('fin_documents')->whereNull('deleted_at')->whereNotIn('state', ['ملغاة', 'مسودة'])
-                    ->whereIn('kind', ['مصروف', 'فاتورة مشتريات', 'دفعة صادرة'])->where('date', '>=', now()->startOfMonth()->toDateString())->sum('total');
+                $m0  = now()->startOfMonth()->toDateString();
+                $inc = hub_fin_sum(config('hub.fin.income'), $m0);
+                $exp = hub_fin_sum(config('hub.fin.expense'), $m0);
                 $score = 100 - ($openN ? ($late / $openN) * 60 : 0) - ($inc - $exp < 0 ? 20 : 0);
                 $out['المالية'] = ['score' => $clamp($score), 'note' => "{$late}/{$openN} مستحق متأخر · صافي الشهر " . ($inc - $exp >= 0 ? 'موجب' : 'سالب')];
             } catch (\Throwable $e) {}
@@ -1162,13 +1161,179 @@ if (! function_exists('hub_project_health')) {
     }
 }
 
+if (! function_exists('hub_ar_norm')) {
+    /**
+     * تطبيع عربي للمقارنة: يجرّد التشكيل والتطويل ويوحّد صور الألف والياء والتاء المربوطة.
+     *
+     * لا يُستخدم للعرض — للمقارنة فقط. سببه أن السجل يُصرّح بالكلمة نفسها بصور مختلفة
+     * (`مُنجزة` مقابل `منجزة`، `منفّذ` مقابل `منفذ`)، فكانت المقارنة الحرفية تعتبر
+     * السجل المنتهي مفتوحاً لمجرد شدّة أو ضمّة.
+     */
+    function hub_ar_norm(?string $s): string
+    {
+        $s = trim((string) $s);
+        if ($s === '') return '';
+        // التشكيل والتطويل: َ ً ُ ٌ ِ ٍ ّ ْ ٰ ـ
+        $s = preg_replace('/[\x{0610}-\x{061A}\x{064B}-\x{065F}\x{0670}\x{0640}]/u', '', $s);
+        $s = strtr($s, ['أ' => 'ا', 'إ' => 'ا', 'آ' => 'ا', 'ٱ' => 'ا', 'ى' => 'ي', 'ة' => 'ه']);
+
+        return preg_replace('/\s+/u', ' ', $s);
+    }
+}
+
 if (! function_exists('hub_closed_states')) {
-    /** حالات تعني «انتهى الأمر» — تُستثنى من تنبيهات الانتهاء وقوائم ما يحتاج تدخلاً */
+    /**
+     * حالات تعني «انتهى الأمر» — تُستثنى من التنبيهات وقوائم ما يحتاج تدخلاً.
+     *
+     * القائمة الحرفية أدناه هي المرجع، لكنها تُوسَّع تلقائياً بكل حالة **مُصرَّح بها في
+     * السجل** تطابق إحداها بعد التطبيع. فـ`مُنجزة` (الأفكار) و`منفّذ` (التغييرات) و`مدفوع`
+     * (الرواتب) كانت تُحسب مفتوحة لأنها تكتب الكلمة نفسها بصورة أخرى — لا لأن معناها مختلف.
+     */
     function hub_closed_states(): array
     {
-        return ['منجزة', 'منجز', 'مكتملة', 'مكتمل', 'مغلقة', 'مغلق', 'ملغاة', 'ملغى', 'ملغي',
-                'محلولة', 'تم الحل', 'مدفوعة', 'مسددة', 'منتهية', 'منتهي', 'مؤرشفة', 'مؤرشف',
-                'منفَّذ', 'منفذ', 'مرفوض', 'مرفوضة', 'مغلق بتقرير', 'مُستعاد', 'متراجع عنه'];
+        static $out = null;
+        if ($out !== null) return $out;
+
+        $base = ['منجزة', 'منجز', 'مكتملة', 'مكتمل', 'مغلقة', 'مغلق', 'ملغاة', 'ملغى', 'ملغي',
+                 'محلولة', 'تم الحل', 'مدفوعة', 'مسددة', 'منتهية', 'منتهي', 'مؤرشفة', 'مؤرشف',
+                 'منفَّذ', 'منفذ', 'مرفوض', 'مرفوضة', 'مغلق بتقرير', 'مُستعاد', 'متراجع عنه',
+                 // صور مذكّرة لكلمات موجودة أصلاً، لا يلتقطها التطبيع لأن الفرق في آخر
+                 // الكلمة لا في تشكيلها: «مدفوع» (مسيّرات الرواتب) و«منتهٍ» (الأحداث).
+                 'مدفوع', 'منتهٍ'];
+
+        $norm = array_map('hub_ar_norm', $base);
+        $out  = $base;
+        foreach (hub_declared_states() as $s) {
+            if (! in_array($s, $out, true) && in_array(hub_ar_norm($s), $norm, true)) $out[] = $s;
+        }
+
+        return $out = array_values(array_unique($out));
+    }
+}
+
+if (! function_exists('hub_declared_states')) {
+    /** كل قيم الحالة المُصرَّح بها في سجل الوحدات — مصدر مفردات النظام الفعلية */
+    function hub_declared_states(): array
+    {
+        static $all = null;
+        if ($all !== null) return $all;
+
+        $all = [];
+        foreach (hub_modules() as $md) {
+            $sc = $md['status'] ?? null;
+            if (! $sc) continue;
+            foreach ($md['fields'] as $f) {
+                if (($f['col'] ?? '') === $sc && ! empty($f['options'])) {
+                    foreach ($f['options'] as $o) $all[] = $o;
+                }
+            }
+        }
+
+        return $all = array_values(array_unique($all));
+    }
+}
+
+if (! function_exists('hub_is_closed')) {
+    /** هل هذه الحالة تعني «انتهى الأمر»؟ — مقارنة مُطبَّعة */
+    function hub_is_closed(?string $status, array $alsoClosed = []): bool
+    {
+        $s = hub_ar_norm($status);
+        if ($s === '') return false;
+        $closed = array_map('hub_ar_norm', array_merge(hub_closed_states(), $alsoClosed));
+
+        return in_array($s, $closed, true);
+    }
+}
+
+if (! function_exists('hub_open_scope')) {
+    /**
+     * تقييد الاستعلام على السجلات **المفتوحة**: حالة معدومة، أو حالة ليست من المنتهية.
+     *
+     * كان هذا التعريف مكتوباً يدوياً في تسعة متحكمات بمفردات متضاربة (`%مغلق%` هنا،
+     * `%مكتمل%` هناك، `%منته%` ثالثاً) فكان السجل الواحد «مفتوحاً» في صفحة و«مغلقاً»
+     * في أخرى. صار مصدره واحداً هنا.
+     *
+     * `$alsoClosed` لما تنفرد به الوحدة: «موقوف» للمشاريع، و«موافق/معتمد» للموافقات —
+     * دلالاتٌ محلية صحيحة لا تعمّم على بقية النظام.
+     */
+    function hub_open_scope($q, string $col = 'status', array $alsoClosed = [])
+    {
+        $closed = array_values(array_unique(array_merge(hub_closed_states(), $alsoClosed)));
+
+        return $q->where(fn ($w) => $w->whereNull($col)->orWhereNotIn($col, $closed));
+    }
+}
+
+if (! function_exists('hub_fin_sum')) {
+    /** مجموع مستندات مالية من أنواع بعينها منذ تاريخ — يستثني الملغاة والمسودات دائماً */
+    function hub_fin_sum(array $kinds, ?string $from = null, string $col = 'total'): float
+    {
+        $q = \Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at')
+            ->whereNotIn('state', config('hub.fin.dead'))
+            ->whereIn('kind', $kinds);
+        if ($from) $q->where('date', '>=', $from);
+
+        return (float) $q->sum($col);
+    }
+}
+
+if (! function_exists('hub_cached')) {
+    /**
+     * غلاف التخبئة: `if ($fresh) forget; return remember(...)` كان منسوخاً ١٢ مرة،
+     * وكل نسخة فرصةٌ لنسيان `forget` فيبقى المحرّك يقرأ رقماً قديماً بعد التحديث.
+     */
+    function hub_cached(string $key, int $ttl, bool $fresh, \Closure $fn)
+    {
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
+
+        return \Illuminate\Support\Facades\Cache::remember($key, $ttl, $fn);
+    }
+}
+
+if (! function_exists('hub_related')) {
+    /**
+     * السجلات المرتبطة بسجل: كل وحدة تشير إليه بحقل مرجعي، مع صفوفها وعدّها.
+     *
+     * مستخرَجة من `ModuleController::show` لأن أربعة متحكمات (الرحلة، مركز التطبيق،
+     * السلسلة، البوابة) أعادت اختراعها بـ`DB::table` خام — وهناك تسرّب النطاق.
+     * هنا النطاق والصلاحية مفروضان **بالبناء**: `hub_can` قبل الوحدة و`hub_scope` على استعلامها.
+     */
+    function hub_related(string $module, string $recordId, int $limit = 8): array
+    {
+        $out = [];
+        foreach (hub_children($module) as [$ck, $cf]) {
+            if (! hub_can(auth()->user(), $ck, 'v')) continue;
+            $cd = hub_mod($ck);
+            $cc = '\\App\\Models\\' . ($cd['model'] ?? '');
+            if (! class_exists($cc)) continue;
+
+            $base = hub_scope($cc::where($cf['col'], $recordId), $ck);
+            // الصفوف أولاً والعدّ عند الحاجة فقط — كان count(*) لكل وحدة بنت
+            // (٤٠+ استعلاماً على صفحة مشروع فارغ) قبل أي جلب
+            $rows = (clone $base)->orderByDesc('created_at')->limit($limit + 1)->get();
+            if ($rows->isEmpty()) continue;
+
+            $out[] = [
+                'module'  => $ck,
+                'label'   => $cd['label'],
+                'field'   => $cf,
+                'count'   => $rows->count() <= $limit ? $rows->count() : (clone $base)->count(),
+                'rows'    => $rows->take($limit),
+                'display' => hub_display_col($ck),
+            ];
+        }
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_closed_scope')) {
+    /** نقيض `hub_open_scope` — المنتهية وحدها. مصدرهما واحد فلا ينزلق تعريفٌ عن نقيضه */
+    function hub_closed_scope($q, string $col = 'status', array $alsoClosed = [])
+    {
+        $closed = array_values(array_unique(array_merge(hub_closed_states(), $alsoClosed)));
+
+        return $q->whereIn($col, $closed);
     }
 }
 
