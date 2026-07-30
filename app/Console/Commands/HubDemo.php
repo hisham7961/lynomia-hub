@@ -62,6 +62,7 @@ class HubDemo extends Command
             $this->seedSettings();
             // عدّة الانطلاق: مسارات عمل حقيقية دائمة (بالاسم فلا تتكرر، ولا يمسحها التصفير)
             $this->call('hub:flows-starter');
+            $this->call('hub:alerts-starter');
         }
         \App\Models\Setting::updateOrCreate(['key' => 'demo.on'], ['value' => '1']);
         \Illuminate\Support\Facades\Cache::forget('settings:all');

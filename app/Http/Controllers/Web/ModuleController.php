@@ -129,6 +129,19 @@ class ModuleController extends Controller
         $m = new $class;
         $this->fill($def, $r, $m);
 
+        // وراثة الشركة النشطة: وحدةٌ لها عمود شركة بلا حقلٍ في نموذجها (الخدمات،
+        // قواعد التنبيه، المهام...) كانت تولد سجلاً بلا شركة — فيختفي فوراً من
+        // القائمة المفلترة بالشركة النشطة في الشريط العلوي. صار السجل الجديد
+        // يرثها تلقائياً (إن كانت ضمن المسموح للمستخدم)، والفارغ المقصود يبقى
+        // ممكناً بالرجوع لوضع «كل الشركات» قبل الإضافة.
+        if ($module !== 'companies' && ($ccol = hub_company_col($module)) && empty($m->{$ccol})) {
+            $cid = (string) session('hub.company', '');
+            $allowed = hub_company_ids();
+            if ($cid !== '' && ($allowed === null || in_array($cid, $allowed, true))) {
+                $m->{$ccol} = $cid;
+            }
+        }
+
         // مستخدم محدود ينشئ مشروعاً: نضمن بقاءه ضمن نطاقه (مديراً أو عضواً)
         if ($module === 'projects' && hub_scoped(auth()->user())) {
             $me  = auth()->id();
