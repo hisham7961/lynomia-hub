@@ -196,3 +196,26 @@
     document.querySelectorAll('button.busy').forEach(function (b) { b.disabled = false; b.classList.remove('busy'); });
   });
 })();
+
+/* ═ v2.26 — التقاط أخطاء المتصفح لمركز الأخطاء ═ */
+(function () {
+  var sent = {};
+  function ship(msg, src, line) {
+    var key = msg + '|' + src + '|' + line;
+    if (sent[key]) return; sent[key] = 1;                 /* مرة لكل جلسة صفحة */
+    try {
+      var meta = document.querySelector('meta[name="csrf-token"]');
+      if (!meta || !navigator.sendBeacon) return;
+      var fd = new FormData();
+      fd.append('_token', meta.content);
+      fd.append('message', String(msg).slice(0, 400));
+      fd.append('source', String(src || '').slice(0, 250));
+      fd.append('line', line || 0);
+      navigator.sendBeacon('/jslog', fd);
+    } catch (e) {}
+  }
+  window.addEventListener('error', function (e) { ship(e.message, e.filename, e.lineno); });
+  window.addEventListener('unhandledrejection', function (e) {
+    ship('Promise: ' + (e.reason && e.reason.message ? e.reason.message : e.reason), location.pathname, 0);
+  });
+})();

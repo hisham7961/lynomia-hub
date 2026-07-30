@@ -44,6 +44,8 @@
                 @if (auth()->user()->role?->is_owner)<a class="ni {{ request()->routeIs('roles.*') ? 'on' : '' }}" href="{{ route('roles.index') }}">الأدوار والصلاحيات</a>@endif
                 @if (hub_flag(auth()->user(), 'audit'))<a class="ni {{ request()->routeIs('audit.*') ? 'on' : '' }}" href="{{ route('audit.index') }}">سجل التدقيق</a>@endif
                 @if (auth()->user()->role?->is_owner)<a class="ni {{ request()->routeIs('security.*') ? 'on' : '' }}" href="{{ route('security.index') }}">🛡️ مركز الأمان</a>@endif
+                @if (auth()->user()->role?->is_owner)<a class="ni {{ request()->routeIs('ops.*') ? 'on' : '' }}" href="{{ route('ops.index') }}">🖥️ مركز التشغيل</a>@endif
+                @if (auth()->user()->role?->is_owner)<a class="ni {{ request()->routeIs('errors.*') ? 'on' : '' }}" href="{{ route('errors.index') }}">🐞 مركز الأخطاء</a>@endif
                 @if (auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'secrets'))<a class="ni {{ request()->routeIs('dataroom.*') ? 'on' : '' }}" href="{{ route('dataroom.index') }}">🔐 غرفة البيانات</a>@endif
                 @if (auth()->user()->role?->is_owner)<a class="ni {{ request()->routeIs('fields.*') ? 'on' : '' }}" href="{{ route('fields.index') }}">🧩 باني الحقول</a>@endif
                 @if (auth()->user()->role?->is_owner)<a class="ni {{ request()->routeIs('flows.*') ? 'on' : '' }}" href="{{ route('flows.index') }}">🪄 مسارات العمل</a>@endif

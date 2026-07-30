@@ -10,6 +10,8 @@ use App\Http\Controllers\Web\CommentController;
 use App\Http\Controllers\Web\CustomFieldController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DataRoomController;
+use App\Http\Controllers\Web\ErrorCenterController;
+use App\Http\Controllers\Web\OpsController;
 use App\Http\Controllers\Web\FileController;
 use App\Http\Controllers\Web\FlowController;
 use App\Http\Controllers\Web\ImportController;
@@ -35,6 +37,9 @@ use Illuminate\Support\Facades\Route;
 Route::get('s/{token}', [DataRoomController::class, 'show'])->name('share.show');
 Route::post('s/{token}', [DataRoomController::class, 'unlock'])->name('share.unlock')->middleware('throttle:10,1');
 Route::get('s/{token}/file', [DataRoomController::class, 'file'])->name('share.file');
+
+// ── فحص صحي عام لمراقبات Uptime (بلا تسجيل دخول) ──
+Route::get('healthz', [OpsController::class, 'health'])->name('healthz')->middleware('throttle:30,1');
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'show'])->name('login');
@@ -116,6 +121,11 @@ Route::middleware('auth')->group(function () {
     Route::delete('admin/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
 
     Route::get('admin/audit', [AuditController::class, 'index'])->name('audit.index');
+    Route::get('admin/ops', [OpsController::class, 'index'])->name('ops.index');
+    Route::post('admin/ops/test-error', [OpsController::class, 'testError'])->name('ops.testerror');
+    Route::get('admin/errors', [ErrorCenterController::class, 'index'])->name('errors.index');
+    Route::post('admin/errors/{id}/status', [ErrorCenterController::class, 'status'])->name('errors.status');
+    Route::post('jslog', [ErrorCenterController::class, 'jslog'])->name('jslog')->middleware('throttle:20,1');
     Route::get('admin/security', [SecurityController::class, 'index'])->name('security.index');
     Route::post('admin/security/lockdown', [SecurityController::class, 'lockdown'])->name('security.lockdown');
     Route::get('admin/settings', [SettingController::class, 'edit'])->name('settings.edit');

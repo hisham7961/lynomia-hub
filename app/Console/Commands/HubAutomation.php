@@ -36,6 +36,8 @@ class HubAutomation extends Command
 
         $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['outbox']} رسالة صادرة");
 
+        \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.automation'], ['value' => now()->toIso8601String()]);
+        \Illuminate\Support\Facades\Cache::forget('settings:all');
         return self::SUCCESS;
     }
 

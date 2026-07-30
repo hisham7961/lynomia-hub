@@ -62,6 +62,8 @@ class HubOutbox extends Command
 
         $this->info("أُرسل: {$sent} · فشل: {$failed}" . ($failed ? ' — أعدها لاحقاً بـ --retry' : ''));
 
+        \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.outbox'], ['value' => now()->toIso8601String()]);
+        \Illuminate\Support\Facades\Cache::forget('settings:all');
         return self::SUCCESS;
     }
 

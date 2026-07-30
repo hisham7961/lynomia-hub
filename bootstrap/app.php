@@ -16,8 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectUsersTo(fn () => route('dashboard'));
         $middleware->appendToGroup('web', \App\Http\Middleware\HubMaintenance::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\SecurityHeaders::class);
+        $middleware->appendToGroup('web', \App\Http\Middleware\Observability::class);
         $middleware->appendToGroup('api', \App\Http\Middleware\SecurityHeaders::class);
+        $middleware->appendToGroup('api', \App\Http\Middleware\Observability::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // كل استثناء يُجمَّع في مركز الأخطاء (بلا كسر المعالجة الأصلية)
+        $exceptions->report(fn (\Throwable $e) => \App\Support\ErrorLog::exception($e));
     })->create();

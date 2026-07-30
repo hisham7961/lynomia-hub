@@ -86,6 +86,8 @@ class HubBackup extends Command
         $this->info('✓ ' . basename($file) . ' — ' . number_format($total) . ' سجل، ' .
                     number_format(filesize($file) / 1024, 1) . ' KB (محفوظ آخر ' . $keep . ' نسخة)');
 
+        \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.backup'], ['value' => now()->toIso8601String()]);
+        \Illuminate\Support\Facades\Cache::forget('settings:all');
         return self::SUCCESS;
     }
 }
