@@ -5,6 +5,7 @@ use App\Http\Controllers\Web\AppCenterController;
 use App\Http\Controllers\Web\ApprovalDecisionController;
 use App\Http\Controllers\Web\AuditController;
 use App\Http\Controllers\Web\AuthController;
+use App\Http\Controllers\Web\CapacityController;
 use App\Http\Controllers\Web\CeoController;
 use App\Http\Controllers\Web\CommentController;
 use App\Http\Controllers\Web\CostController;
@@ -82,6 +83,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('morning', [MorningController::class, 'index'])->name('morning');
     Route::get('costs', [CostController::class, 'index'])->name('costs.index');
+    Route::get('capacity', [CapacityController::class, 'index'])->name('capacity');
+    Route::get('impact', [CapacityController::class, 'impact'])->name('impact');
 
     // ── صندوق الوثائق الوارد ──
     Route::get('inboxdocs', [InboxDocController::class, 'index'])->name('inboxdocs.index');

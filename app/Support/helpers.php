@@ -938,3 +938,121 @@ if (! function_exists('hub_closed_states')) {
                 'منفَّذ', 'منفذ', 'مرفوض', 'مرفوضة', 'مغلق بتقرير', 'مُستعاد', 'متراجع عنه'];
     }
 }
+
+if (! function_exists('hub_workdays')) {
+    /** أيام العمل بين تاريخين — الجمعة والسبت عطلة (قابلة للضبط بـ cost.weekend) */
+    function hub_workdays(\Illuminate\Support\Carbon $from, \Illuminate\Support\Carbon $to): int
+    {
+        $off = array_filter(array_map('intval', preg_split('/[،,\s]+/u',
+            (string) setting('cost.weekend', '5,6'), -1, PREG_SPLIT_NO_EMPTY)));
+        $off = $off ?: [5, 6];                       // ٥=الجمعة ٦=السبت بترقيم ISO
+        $n = 0;
+        for ($d = $from->copy()->startOfDay(); $d->lte($to); $d->addDay()) {
+            if (! in_array($d->dayOfWeekIso, $off, true)) $n++;
+        }
+
+        return $n;
+    }
+}
+
+if (! function_exists('hub_capacity')) {
+    /**
+     * القدرات والاستغلال لكل موظف خلال فترة:
+     *   المتاح = (أيام العمل − أيام الإجازة المعتمدة) × ساعات اليوم
+     *   المحجوز = مجموع الساعات المقدَّرة لمهامه المفتوحة المستحقة في الفترة
+     *   المسجَّل = ساعاته الفعلية (من المهام والحضور)
+     * الحمل = المحجوز ÷ المتاح · الاستغلال = المسجَّل ÷ المتاح · والاختناق حمل > ١٠٠٪.
+     */
+    function hub_capacity(?string $from = null, ?string $to = null): array
+    {
+        $f = \Illuminate\Support\Carbon::parse($from ?: now()->startOfMonth()->toDateString())->startOfDay();
+        $t = \Illuminate\Support\Carbon::parse($to ?: now()->endOfMonth()->toDateString())->endOfDay();
+
+        $hoursDay = max(1, (int) setting('cost.work_hours', 8));
+        $workDays = hub_workdays($f, $t);
+        $DB = \Illuminate\Support\Facades\DB::class;
+
+        $emps = \Illuminate\Support\Facades\DB::table('employees')->whereNull('deleted_at')
+            ->whereNotIn('status', ['منتهية خدمته', 'مستقيل', 'موقوف'])
+            ->orderBy('name')->limit(300)->get(['id', 'name', 'dept', 'user_id']);
+        if ($emps->isEmpty()) return ['rows' => [], 'from' => $f->toDateString(), 'to' => $t->toDateString(),
+                                      'workDays' => $workDays, 'hoursDay' => $hoursDay, 'totals' => []];
+
+        $userIds = $emps->pluck('user_id')->filter()->all();
+        $empIds  = $emps->pluck('id')->all();
+
+        // إجازات معتمدة متقاطعة مع الفترة
+        $leaves = \Illuminate\Support\Facades\DB::table('leave_requests')->whereNull('deleted_at')
+            ->where('status', 'معتمدة')->whereIn('emp_id', $empIds)
+            ->whereDate('date_from', '<=', $t->toDateString())
+            ->whereDate('date_to', '>=', $f->toDateString())
+            ->get(['emp_id', 'date_from', 'date_to']);
+        $leaveDays = [];
+        foreach ($leaves as $l) {
+            $a = \Illuminate\Support\Carbon::parse($l->date_from)->max($f);
+            $b = \Illuminate\Support\Carbon::parse($l->date_to)->min($t);
+            $leaveDays[$l->emp_id] = ($leaveDays[$l->emp_id] ?? 0) + hub_workdays($a, $b);
+        }
+
+        $open = ['منجزة', 'مكتملة', 'ملغاة'];
+
+        // المحجوز: مهام مفتوحة مستحقة في الفترة (أو بلا موعد — تُحتسب على الفترة الحالية)
+        $booked = $userIds ? \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')
+            ->whereIn('assignee_id', $userIds)->whereNotIn('status', $open)
+            ->where(fn ($q) => $q->whereNull('due')->orWhereBetween('due', [$f->toDateString(), $t->toDateString()]))
+            ->selectRaw('assignee_id, COALESCE(SUM(est_h),0) h, COUNT(*) n')
+            ->groupBy('assignee_id')->get()->keyBy('assignee_id') : collect();
+
+        // المسجَّل: ساعات فعلية على مهام حُدِّثت داخل الفترة
+        $logged = $userIds ? \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')
+            ->whereIn('assignee_id', $userIds)->whereNotNull('act_h')
+            ->whereBetween('updated_at', [$f, $t])
+            ->selectRaw('assignee_id, COALESCE(SUM(act_h),0) h')
+            ->groupBy('assignee_id')->get()->keyBy('assignee_id') : collect();
+
+        // حضور مسجَّل داخل الفترة (مصدر أدق حين يُستخدم)
+        $att = \Illuminate\Support\Facades\DB::table('attendance')->whereNull('deleted_at')
+            ->whereIn('emp_id', $empIds)->whereBetween('date', [$f->toDateString(), $t->toDateString()])
+            ->selectRaw('emp_id, COALESCE(SUM(hours),0) h')->groupBy('emp_id')->get()->keyBy('emp_id');
+
+        // مشاريع مُسندة
+        $projects = $userIds ? \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')
+            ->whereIn('assignee_id', $userIds)->whereNotIn('status', $open)->whereNotNull('project_id')
+            ->selectRaw('assignee_id, COUNT(DISTINCT project_id) n')
+            ->groupBy('assignee_id')->get()->keyBy('assignee_id') : collect();
+
+        $rows = [];
+        foreach ($emps as $e) {
+            $lv  = (int) ($leaveDays[$e->id] ?? 0);
+            $avail = max(0, ($workDays - $lv) * $hoursDay);
+            $bk  = (float) ($booked[$e->user_id]->h ?? 0);
+            $lg  = max((float) ($logged[$e->user_id]->h ?? 0), (float) ($att[$e->id]->h ?? 0));
+
+            $rows[] = [
+                'id' => $e->id, 'name' => $e->name, 'dept' => $e->dept,
+                'leaveDays' => $lv, 'available' => $avail,
+                'booked' => round($bk, 1), 'logged' => round($lg, 1),
+                'tasks' => (int) ($booked[$e->user_id]->n ?? 0),
+                'projects' => (int) ($projects[$e->user_id]->n ?? 0),
+                'load' => $avail > 0 ? (int) round($bk / $avail * 100) : null,
+                'util' => $avail > 0 ? (int) round($lg / $avail * 100) : null,
+                'linked' => (bool) $e->user_id,
+            ];
+        }
+
+        usort($rows, fn ($a, $b) => ($b['load'] ?? -1) <=> ($a['load'] ?? -1));
+
+        return [
+            'rows' => $rows, 'from' => $f->toDateString(), 'to' => $t->toDateString(),
+            'workDays' => $workDays, 'hoursDay' => $hoursDay,
+            'totals' => [
+                'available' => array_sum(array_column($rows, 'available')),
+                'booked'    => round(array_sum(array_column($rows, 'booked')), 1),
+                'logged'    => round(array_sum(array_column($rows, 'logged')), 1),
+                'over'      => count(array_filter($rows, fn ($r) => ($r['load'] ?? 0) > 100)),
+                'idle'      => count(array_filter($rows, fn ($r) => $r['available'] > 0 && ($r['load'] ?? 0) < 50)),
+                'unlinked'  => count(array_filter($rows, fn ($r) => ! $r['linked'])),
+            ],
+        ];
+    }
+}

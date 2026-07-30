@@ -112,7 +112,7 @@ class MorningController extends Controller
         // ── غياب اليوم ──
         if (hub_can($u, 'leaves', 'v')) {
             $lv = DB::table('leave_requests')->whereNull('deleted_at')->where('status', 'معتمدة')
-                ->whereDate('from_date', '<=', today())->whereDate('to_date', '>=', today())
+                ->whereDate('date_from', '<=', today())->whereDate('date_to', '>=', today())
                 ->limit(8)->get(['id', 'emp_id', 'type']);
             $names = hub_ref_labels('hr', $lv->pluck('emp_id')->all());
             $add('🏝️', 'غائبون اليوم', 'من لن تجده على رأس العمل',

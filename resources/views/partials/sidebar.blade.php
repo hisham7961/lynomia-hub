@@ -19,6 +19,8 @@
         @endif
         @if (auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'monitor'))
             <a class="ni top {{ request()->routeIs('costs.*') ? 'on' : '' }}" href="{{ route('costs.index') }}">💰 التكاليف والربحية</a>
+            <a class="ni top {{ request()->routeIs('capacity') ? 'on' : '' }}" href="{{ route('capacity') }}">📊 القدرات والموارد</a>
+            <a class="ni top {{ request()->routeIs('impact') ? 'on' : '' }}" href="{{ route('impact') }}">🕸️ خريطة الأثر</a>
         @endif
         @if (hub_can(auth()->user(), 'contracts', 'v'))
             <a class="ni top {{ request()->routeIs('legal') ? 'on' : '' }}" href="{{ route('legal') }}">⚖️ القانوني</a>
