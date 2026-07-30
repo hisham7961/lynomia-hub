@@ -44,12 +44,15 @@
   /* ── لوحة الأوامر Ctrl+K ── */
   var NAV = [];
   try { NAV = JSON.parse($('#navdata').textContent); } catch (e) {}
+  /* أسماء الوحدات صارت قابلة للتخصيص (nav.names) فتصل إلى هنا كنص مستخدم —
+     تُهرَّب قبل بناء innerHTML كي لا يُحقن وسم عبر تسمية بديلة */
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function palRender(q) {
     q = (q || '').trim();
     var list = $('#pallist'), out = '';
     NAV.filter(function (i) { return !q || i.t.indexOf(q) > -1; }).slice(0, 9).forEach(function (i) {
-      out += '<div class="palitem"><a href="' + i.u + '">' + i.t + '</a>' +
-             (i.n ? '<button type="button" class="btn ghost xs" onclick="Hub.closeP();Hub.modal(\'' + i.n + '\')">＋ جديد</button>' : '') + '</div>';
+      out += '<div class="palitem"><a href="' + esc(i.u) + '">' + esc(i.t) + '</a>' +
+             (i.n ? '<button type="button" class="btn ghost xs" onclick="Hub.closeP();Hub.modal(\'' + esc(i.n) + '\')">＋ جديد</button>' : '') + '</div>';
     });
     list.innerHTML = out || '<div class="palitem sub">لا نتائج</div>';
   }

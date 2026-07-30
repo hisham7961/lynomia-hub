@@ -84,6 +84,52 @@ class SavedViewsTest extends TestCase
         $this->assertStringNotContainsString('>الحالة', $m[0]);
     }
 
+    /** حفظ شاشة التخصيص لا يمحو أعمدة الجداول المحفوظة بمسار آخر */
+    public function test_personalize_save_preserves_column_prefs(): void
+    {
+        $this->seedCore();
+        $this->employee->update(['prefs' => ['cols' => ['tasks' => ['title', 'status']]]]);
+
+        $this->actingAs($this->employee->fresh())->post('/personalize', ['home' => 'dashboard'])
+            ->assertRedirect();
+
+        $this->assertSame(['title', 'status'], $this->employee->fresh()->prefs['cols']['tasks'] ?? null,
+            'أعمدة الجداول يجب أن تنجو من حفظ شاشة التخصيص');
+    }
+
+    /** بلوغ حد ٣٠ عرضاً يعيد رسالة فلاش لا رد ٤٢٢ صامت */
+    public function test_view_cap_flashes_instead_of_aborting(): void
+    {
+        $this->seedCore();
+        for ($i = 0; $i < 30; $i++) {
+            \App\Models\SavedView::create(['user_id' => $this->employee->id, 'module' => 'tasks',
+                'name' => 'ع' . $i, 'query' => null]);
+        }
+
+        $this->actingAs($this->employee)->post('/views', ['module' => 'tasks', 'name' => 'الحادي والثلاثون'])
+            ->assertRedirect()->assertSessionHas('err');
+        $this->assertSame(30, \App\Models\SavedView::where('module', 'tasks')->count());
+    }
+
+    /** إزالة الفلتر تُسقط علامة العرض view= فلا تبقى «مطبَّقة» على بيانات لا تطابقها */
+    public function test_removing_filter_chip_drops_view_marker(): void
+    {
+        $this->seedCore();
+        $p = \App\Models\Project::create(['name' => 'مشروع', 'status' => 'قيد التنفيذ']);
+        \App\Models\Task::create(['title' => 'مهمة', 'project_id' => $p->id, 'status' => 'جديدة']);
+        $v = \App\Models\SavedView::create(['user_id' => $this->employee->id, 'module' => 'tasks',
+            'name' => 'عرض', 'query' => 'f[projectId]=' . $p->id, 'is_default' => false]);
+
+        $html = $this->actingAs($this->employee)
+            ->get('/m/tasks?f[projectId]=' . $p->id . '&view=' . $v->id)->assertOk()->getContent();
+        // رابط إزالة الرقاقة (داخل <span class="chip">…<a href=…>✕) يُسقط view تماماً
+        $this->assertMatchesRegularExpression('/class="chip"[^<]*<a href="([^"]*)"/u', $html);
+        preg_match('/class="chip"[^<]*<a href="([^"]*)"/u', $html, $m);
+        $chipHref = html_entity_decode($m[1]);
+        $this->assertStringNotContainsString('view=', $chipHref,
+            'إزالة الفلتر يجب ألا تُبقي علامة العرض view=');
+    }
+
     public function test_reset_returns_default_columns(): void
     {
         $this->seedCore();

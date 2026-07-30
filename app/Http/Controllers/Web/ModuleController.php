@@ -55,10 +55,12 @@ class ModuleController extends Controller
         [$def, $class] = $this->resolve($module, 'v');
         $def['key'] = $module;
 
+        // عروض المستخدم المحفوظة لهذه الوحدة — استعلام واحد يخدم التحويل والقائمة معاً
+        $views = \App\Models\SavedView::where('user_id', auth()->id())
+            ->where('module', $module)->orderByDesc('is_default')->orderBy('name')->get();
+
         // زيارة عارية + عرض افتراضي محفوظ → يُطبق تلقائياً (view= يمنع الدوران)
-        if (! $r->query() &&
-            ($dv = \App\Models\SavedView::where('user_id', auth()->id())
-                ->where('module', $module)->where('is_default', true)->first())) {
+        if (! $r->query() && ($dv = $views->firstWhere('is_default', true))) {
             return redirect($dv->url());
         }
 
@@ -77,9 +79,7 @@ class ModuleController extends Controller
         [$columns, $labels] = $this->columnsAndLabels($def, $rows->items());
         $statusOptions = $this->statusOptions($def);
 
-        // عروض المستخدم المحفوظة لهذه الوحدة + العرض المطبَّق الآن
-        $views = \App\Models\SavedView::where('user_id', auth()->id())
-            ->where('module', $module)->orderByDesc('is_default')->orderBy('name')->get();
+        // العرض المطبَّق الآن (القائمة جُلبت أعلاه بلا استعلام ثانٍ)
         $activeView = ($vid = $r->query('view')) ? $views->firstWhere('id', $vid) : null;
 
         return view('modules.index', [

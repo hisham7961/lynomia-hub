@@ -65,18 +65,20 @@ class PrefController extends Controller
         $names = collect($data['names'] ?? [])->map(fn ($v) => trim((string) $v))
             ->filter(fn ($v) => $v !== '')->all();
 
-        $u->prefs = array_filter([
-            'home'        => $validHome ? $home : null,
-            'nav'         => array_filter([
-                'hidden'     => array_values($data['hidden'] ?? []),
-                'hidden_top' => array_values($data['hidden_top'] ?? []),
-                'names'      => $names,
-                'order'      => $order,
-            ]),
-            'dash'        => array_filter([
-                'hidden' => array_values(array_intersect($data['dash_hidden'] ?? [], array_keys(self::DASH_CARDS))),
-            ]),
-        ]) ?: null;
+        // دمج فوق الموجود لا استبداله — كي لا يمحو حفظُ هذه الشاشة قسم `cols`
+        // (أعمدة الجداول) الذي يديره مسار آخر
+        $prefs = (array) $u->prefs;
+        $prefs['home'] = $validHome && $home !== '' && $home !== 'dashboard' ? $home : null;
+        $prefs['nav'] = array_filter([
+            'hidden'     => array_values($data['hidden'] ?? []),
+            'hidden_top' => array_values($data['hidden_top'] ?? []),
+            'names'      => $names,
+            'order'      => $order,
+        ]);
+        $prefs['dash'] = array_filter([
+            'hidden' => array_values(array_intersect($data['dash_hidden'] ?? [], array_keys(self::DASH_CARDS))),
+        ]);
+        $u->prefs = array_filter($prefs, fn ($v) => $v !== null && $v !== [] && $v !== '') ?: null;
         $u->save();
 
         return back()->with('ok', 'حُفظ تخصيصك — القائمة والبداية ولوحة التحكم صارت على ذوقك');
@@ -131,8 +133,11 @@ class PrefController extends Controller
         unset($qs['page'], $qs['view']);
         $query = http_build_query($qs);
 
-        abort_if(\App\Models\SavedView::where('user_id', auth()->id())
-            ->where('module', $data['module'])->count() >= 30, 422, 'بلغت حد ٣٠ عرضاً لهذه الوحدة');
+        // رد عادي لا abort: النموذج غير مُعزَّز بـhtmx فالتحويل يُظهر الرسالة في منطقة الفلاش
+        if (\App\Models\SavedView::where('user_id', auth()->id())
+            ->where('module', $data['module'])->count() >= 30) {
+            return back()->with('err', 'بلغت حد ٣٠ عرضاً لهذه الوحدة — احذف عرضاً قديماً أولاً');
+        }
 
         if ($r->boolean('default')) {
             \App\Models\SavedView::where('user_id', auth()->id())
