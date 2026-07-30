@@ -450,11 +450,17 @@
     requestAnimationFrame(step);
   });
 
-  // أشرطة التقدم: تُصفَّر ثم تنساب لهدفها (الانتقال معرف في CSS)
+  // أشرطة التقدم وأعمدة المخططات: تُصفَّر ثم تنساب لهدفها (الانتقال معرف في CSS)
   document.querySelectorAll('.pbar span').forEach(function (s) {
     var w = s.style.width;
     if (!w) return;
     s.style.width = '0';
     requestAnimationFrame(function () { requestAnimationFrame(function () { s.style.width = w; }); });
+  });
+  document.querySelectorAll('.cbar').forEach(function (s) {
+    var h = s.style.height;
+    if (!h) return;
+    s.style.height = '0';
+    requestAnimationFrame(function () { requestAnimationFrame(function () { s.style.height = h; }); });
   });
 })();

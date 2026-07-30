@@ -495,10 +495,44 @@ if (! function_exists('hub_tone')) {
     function hub_tone(?string $v): string
     {
         if (! $v) return 'g';
-        foreach (['مكتمل', 'منجز', 'نشط', 'مدفوع', 'مقبول', 'موافق', 'ناجح', 'مغلق', 'تم'] as $w) if (str_contains($v, $w)) return 'ok';
-        foreach (['متأخر', 'ملغ', 'مرفوض', 'موقوف', 'فشل', 'حرج', 'منته'] as $w) if (str_contains($v, $w)) return 'bad';
+        foreach (['مكتمل', 'منجز', 'نشط', 'مدفوع', 'مقبول', 'موافق', 'ناجح', 'مغلق', 'تم', 'ساري', 'معتمد', 'فوز'] as $w) if (str_contains($v, $w)) return 'ok';
+        foreach (['متأخر', 'ملغ', 'مرفوض', 'موقوف', 'فشل', 'حرج', 'منته', 'خسار'] as $w) if (str_contains($v, $w)) return 'bad';
         foreach (['قيد', 'انتظار', 'جديد', 'مسود', 'معلق', 'مراجعة', 'تجريب'] as $w) if (str_contains($v, $w)) return 'wn';
         return 'g';
+    }
+}
+
+if (! function_exists('hub_mod_look')) {
+    /**
+     * هوية بصرية للوحدة: أيقونة ولون — من مجموعتها في التنقل، مع تخصيصٍ للأشهر.
+     * تُغذي ترويسات صفحات الوحدات فيعرف المستخدم أين هو من نظرة.
+     */
+    function hub_mod_look(string $module): array
+    {
+        static $groupColor = [
+            'الكيانات' => '#4C6FA5', 'الأصول الرقمية' => '#2FB79A', 'العمل' => '#0E7C66',
+            'المالية والمشتريات' => '#B0568E', 'الموارد البشرية' => '#C08A3E',
+            'الأصول والعقود' => '#7C6FB0', 'المعرفة والملفات' => '#6B9080',
+        ];
+        static $icons = [
+            'projects' => '🚀', 'clients' => '🤝', 'tasks' => '✅', 'tickets' => '🎫',
+            'fin' => '💵', 'contracts' => '📜', 'companies' => '🏢', 'hr' => '👥',
+            'quotes' => '📝', 'suppliers' => '🚚', 'purchases' => '🛒', 'ideas' => '💡',
+            'leaves' => '🗓️', 'apps' => '📱', 'domains' => '🌐', 'servers' => '🖥️',
+            'vault' => '🔐', 'kb' => '📚', 'meetings' => '🪑', 'assets' => '📦',
+        ];
+
+        $icon = $icons[$module] ?? '📁';
+        $color = 'var(--p)';
+        foreach (config('hub_nav', []) as $g) {
+            if (in_array($module, $g['items'], true)) {
+                $color = $groupColor[$g['g']] ?? $color;
+                if (! isset($icons[$module])) $icon = $g['icon'];
+                break;
+            }
+        }
+
+        return ['icon' => $icon, 'color' => $color];
     }
 }
 
@@ -1149,7 +1183,8 @@ if (! function_exists('hub_project_pl')) {
 
             return [
                 'project'  => $p->name,
-                'currency' => $p->currency ?: (string) setting('fin.currency', 'د.ك'),
+                // «العملة الافتراضية» من الإعدادات — المفتاح الموحد app.currency
+                'currency' => $p->currency ?: (string) setting('app.currency', 'د.ك'),
                 'months'   => $months, 'days' => $days,
                 'revenue'  => ['invoiced' => round($revenue, 2), 'collected' => round($collected, 2),
                                'docs' => (int) ($inv->n ?? 0),

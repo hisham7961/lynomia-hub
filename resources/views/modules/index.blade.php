@@ -1,6 +1,15 @@
 @extends('layouts.app')
 @section('title', $def['label'])
 @section('content')
+{{-- ترويسة هوية الوحدة: أيقونة ولون مجموعتها + العدد الحي --}}
+@php $look = hub_mod_look($module); @endphp
+<div class="modhero" style="--mh:{{ $look['color'] }}">
+    <span class="mhico">{{ $look['icon'] }}</span>
+    <div>
+        <h2>{{ $def['label'] }}@if ($trash) <span class="sub">— 🗑 السلة</span>@endif</h2>
+        <div class="sub">{{ number_format(method_exists($rows, 'total') ? $rows->total() : count($rows)) }} سجل</div>
+    </div>
+</div>
 <div class="toolbar">
     <form class="filters" method="GET"
           hx-boost="true" hx-target="#tblzone" hx-select="#tblzone" hx-swap="outerHTML" hx-push-url="true">

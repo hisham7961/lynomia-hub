@@ -54,7 +54,7 @@ class CostController extends Controller
         return view('costs.index', [
             'rows' => $rows->sortByDesc(fn ($x) => $x['pl']['revenue']['invoiced'])->values(),
             'tot' => $tot,
-            'currency' => (string) setting('fin.currency', 'د.ك'),
+            'currency' => (string) setting('app.currency', 'د.ك'),
             'rates' => hub_hourly_rates(),
         ]);
     }
