@@ -6,6 +6,7 @@ return [
     ['g' => 'الأصول الرقمية',    'icon' => '💠', 'items' => ['apps', 'code', 'websites', 'domains', 'servers', 'accounts', 'dbs', 'apis', 'social', 'posts', 'emails', 'phones']],
     ['g' => 'العمل',             'icon' => '🗂️', 'items' => ['tasks', 'designs', 'updates', 'issues', 'tickets', 'meetings', 'decisions', 'approvals', 'okrs', 'feats']],
     ['g' => 'المالية',           'icon' => '💰', 'items' => ['fin', 'banks', 'quotes', 'budgets', 'recur', 'costc', 'entries', 'accounts2']],
+    ['g' => 'المشتريات',         'icon' => '🛒', 'items' => ['suppliers', 'purchases']],
     ['g' => 'الموارد البشرية',   'icon' => '👥', 'items' => ['hr', 'attend', 'leaves', 'payroll', 'recruit', 'hrlog']],
     ['g' => 'الأصول والعقود',    'icon' => '📦', 'items' => ['assets', 'assetlog', 'stock', 'stockmv', 'contracts']],
     ['g' => 'المعرفة والأتمتة',  'icon' => '📚', 'items' => ['kb', 'autos', 'rules']],
