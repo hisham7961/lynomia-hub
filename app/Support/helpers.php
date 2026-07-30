@@ -706,3 +706,141 @@ if (! function_exists('hub_company_scope')) {
         return $col ? $q->where($col, $cid) : $q;
     }
 }
+
+if (! function_exists('hub_hourly_rates')) {
+    /**
+     * أجر الساعة لكل مستخدم — مشتقاً من راتب ملفه الوظيفي وبدلاته.
+     * الافتراض معلن وقابل للضبط: أيام العمل بالشهر وساعات اليوم من الإعدادات.
+     * من لا ملف له (أو بلا راتب) يُحسب بمتوسط الفريق حتى لا تُبخس التكلفة صفراً.
+     */
+    function hub_hourly_rates(): array
+    {
+        return \Illuminate\Support\Facades\Cache::remember('cost:rates', 600, function () {
+            $days  = max(1, (int) setting('cost.work_days', 22));
+            $hours = max(1, (int) setting('cost.work_hours', 8));
+
+            $rows = \Illuminate\Support\Facades\DB::table('employees')
+                ->whereNull('deleted_at')->whereNotNull('user_id')
+                ->get(['user_id', 'salary', 'allow']);
+
+            $rates = [];
+            foreach ($rows as $r) {
+                $monthly = (float) ($r->salary ?? 0) + (float) ($r->allow ?? 0);
+                if ($monthly > 0) $rates[$r->user_id] = round($monthly / ($days * $hours), 3);
+            }
+            $avg = $rates ? round(array_sum($rates) / count($rates), 3) : 0.0;
+
+            return ['rates' => $rates, 'avg' => $avg, 'days' => $days, 'hours' => $hours];
+        });
+    }
+}
+
+if (! function_exists('hub_project_pl')) {
+    /**
+     * التكلفة الفعلية وربحية مشروع واحد — بأربع دلاء تكلفة صريحة:
+     *   ساعات الفريق · السيرفرات · الأدوات والاشتراكات · الخدمات الخارجية
+     * مقابل الإيراد المفوتر والمحصّل، ثم الربح والهامش وتكلفة التأخير.
+     *
+     * كل رقم قابل للتفسير: الدوال تعيد مصادرها (ساعات، عدد مستندات، أشهر التشغيل)
+     * حتى لا يواجه المالك رقماً لا يعرف من أين جاء.
+     */
+    function hub_project_pl(string $projectId, bool $fresh = false): array
+    {
+        $key = "pl:$projectId";
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
+
+        return \Illuminate\Support\Facades\Cache::remember($key, 300, function () use ($projectId) {
+            $DB = \Illuminate\Support\Facades\DB::class;
+            $p = \Illuminate\Support\Facades\DB::table('projects')->where('id', $projectId)->first();
+            if (! $p) return [];
+
+            // ── مدة التشغيل بالأشهر (لتطبيع التكاليف الدورية) ──
+            $start = $p->start_date ? \Illuminate\Support\Carbon::parse($p->start_date) : null;
+            $end   = $p->launch_act ? \Illuminate\Support\Carbon::parse($p->launch_act) : now();
+            $days  = $start ? max(1, $start->diffInDays($end)) : 30;
+            $months = max(1, round($days / 30, 2));
+
+            // ── ١) ساعات الفريق ──
+            $rt = hub_hourly_rates();
+            $byUser = \Illuminate\Support\Facades\DB::table('tasks')
+                ->whereNull('deleted_at')->where('project_id', $projectId)
+                ->whereNotNull('act_h')->where('act_h', '>', 0)
+                ->selectRaw('assignee_id, SUM(act_h) h')->groupBy('assignee_id')->get();
+
+            $hoursCost = 0.0; $hoursTotal = 0.0;
+            foreach ($byUser as $r) {
+                $h = (float) $r->h;
+                $hoursTotal += $h;
+                $hoursCost += $h * ($rt['rates'][$r->assignee_id] ?? $rt['avg']);
+            }
+
+            // ── ٢) السيرفرات (تكلفة الدورة مطبّعة شهرياً × أشهر التشغيل) ──
+            $norm = fn ($amount, $cycle) => match ((string) $cycle) {
+                'سنوي' => (float) $amount / 12,
+                'ربع سنوي' => (float) $amount / 3,
+                'نصف سنوي' => (float) $amount / 6,
+                'مرة واحدة' => 0.0,          // تُحتسب كاملةً خارج الدورية أدناه
+                default => (float) $amount,   // شهري
+            };
+            $oneOff = fn ($amount, $cycle) => (string) $cycle === 'مرة واحدة' ? (float) $amount : 0.0;
+
+            $servers = \Illuminate\Support\Facades\DB::table('servers')
+                ->whereNull('deleted_at')->where('project_id', $projectId)->get(['cost', 'cycle']);
+            $serverCost = 0.0;
+            foreach ($servers as $s) $serverCost += $norm($s->cost, $s->cycle) * $months + $oneOff($s->cost, $s->cycle);
+
+            // ── ٣) الأدوات والاشتراكات ──
+            $subs = \Illuminate\Support\Facades\DB::table('subscriptions')
+                ->whereNull('deleted_at')->where('project_id', $projectId)->get(['amount', 'cycle']);
+            $toolCost = 0.0;
+            foreach ($subs as $s) $toolCost += $norm($s->amount, $s->cycle) * $months + $oneOff($s->amount, $s->cycle);
+
+            // ── ٤) الخدمات الخارجية: مشتريات + مصروفات مالية مرتبطة بالمشروع ──
+            $purch = (float) \Illuminate\Support\Facades\DB::table('purchases')
+                ->whereNull('deleted_at')->where('project_id', $projectId)->sum('amount');
+            $expense = (float) \Illuminate\Support\Facades\DB::table('fin_documents')
+                ->whereNull('deleted_at')->where('project_id', $projectId)
+                ->where('kind', 'مصروف')->sum('total');
+            $externalCost = $purch + $expense;
+
+            // ── الإيراد: مفوتر ومحصّل ──
+            $inv = \Illuminate\Support\Facades\DB::table('fin_documents')
+                ->whereNull('deleted_at')->where('project_id', $projectId)->where('kind', 'فاتورة')
+                ->selectRaw('COALESCE(SUM(total),0) t, COALESCE(SUM(paid),0) p, COUNT(*) n')->first();
+
+            $revenue   = (float) ($inv->t ?? 0);
+            $collected = (float) ($inv->p ?? 0);
+            $totalCost = $hoursCost + $serverCost + $toolCost + $externalCost;
+            $profit    = $revenue - $totalCost;
+
+            // ── تكلفة التأخير: أيام التأخر × متوسط الحرق اليومي ──
+            $delayDays = 0;
+            if ($p->launch_exp) {
+                $exp = \Illuminate\Support\Carbon::parse($p->launch_exp);
+                $act = $p->launch_act ? \Illuminate\Support\Carbon::parse($p->launch_act) : now();
+                if ($act->gt($exp)) $delayDays = (int) $exp->diffInDays($act);
+            }
+            $burn = $totalCost / max(1, $days);
+
+            return [
+                'project'  => $p->name,
+                'currency' => $p->currency ?: (string) setting('fin.currency', 'د.ك'),
+                'months'   => $months, 'days' => $days,
+                'revenue'  => ['invoiced' => round($revenue, 2), 'collected' => round($collected, 2),
+                               'docs' => (int) ($inv->n ?? 0),
+                               'uncollected' => round($revenue - $collected, 2)],
+                'cost'     => ['hours' => round($hoursCost, 2), 'servers' => round($serverCost, 2),
+                               'tools' => round($toolCost, 2), 'external' => round($externalCost, 2),
+                               'total' => round($totalCost, 2)],
+                'hours'    => ['logged' => round($hoursTotal, 1), 'people' => $byUser->count(),
+                               'avg_rate' => $rt['avg']],
+                'profit'   => round($profit, 2),
+                'margin'   => $revenue > 0 ? round($profit / $revenue * 100, 1) : null,
+                'burn_day' => round($burn, 2),
+                'delay'    => ['days' => $delayDays, 'cost' => round($delayDays * $burn, 2)],
+                'budget'   => $p->budget !== null ? (float) $p->budget : null,
+                'over'     => $p->budget ? round($totalCost - (float) $p->budget, 2) : null,
+            ];
+        });
+    }
+}

@@ -16,6 +16,9 @@
         @if (hub_can(auth()->user(), 'fin', 'v'))
             <a class="ni top {{ request()->routeIs('reports.finance') ? 'on' : '' }}" href="{{ route('reports.finance') }}">📊 التقارير المالية</a>
         @endif
+        @if (auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'monitor'))
+            <a class="ni top {{ request()->routeIs('costs.*') ? 'on' : '' }}" href="{{ route('costs.index') }}">💰 التكاليف والربحية</a>
+        @endif
         @if (hub_can(auth()->user(), 'contracts', 'v'))
             <a class="ni top {{ request()->routeIs('legal') ? 'on' : '' }}" href="{{ route('legal') }}">⚖️ القانوني</a>
         @endif

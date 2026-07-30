@@ -7,6 +7,7 @@ use App\Http\Controllers\Web\AuditController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\CeoController;
 use App\Http\Controllers\Web\CommentController;
+use App\Http\Controllers\Web\CostController;
 use App\Http\Controllers\Web\CustomFieldController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DataRoomController;
@@ -77,6 +78,8 @@ Route::middleware('auth')->group(function () {
 
         return back()->with('ok', $cid === '' ? 'عدت لعرض كل الشركات' : 'تُصفّى القوائم الآن على الشركة المختارة');
     })->name('company.switch');
+
+    Route::get('costs', [CostController::class, 'index'])->name('costs.index');
 
     // ── صندوق الوثائق الوارد ──
     Route::get('inboxdocs', [InboxDocController::class, 'index'])->name('inboxdocs.index');

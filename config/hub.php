@@ -1184,6 +1184,26 @@ return [
                     'expiry' => true,
                 ],
                 [
+                    'key' => 'cost',
+                    'col' => 'cost',
+                    'label' => 'تكلفة الدورة',
+                    'type' => 'num',
+                ],
+                [
+                    'key' => 'cycle',
+                    'col' => 'cycle',
+                    'label' => 'دورة التكلفة',
+                    'type' => 'sel',
+                    'options' => ['شهري', 'ربع سنوي', 'نصف سنوي', 'سنوي', 'مرة واحدة'],
+                ],
+                [
+                    'key' => 'currency',
+                    'col' => 'currency',
+                    'label' => 'العملة',
+                    'type' => 'sel',
+                    'options' => ['د.ك', 'دولار', 'ريال', 'درهم', 'يورو'],
+                ],
+                [
                     'key' => 'ownerId',
                     'col' => 'owner_id',
                     'label' => 'المسؤول',

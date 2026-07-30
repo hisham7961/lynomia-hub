@@ -386,6 +386,15 @@ class ModuleController extends Controller
             \Illuminate\Support\Facades\Cache::forget('hub:progress:' . $pid);
         }
 
+        // ربحية المشروع: أي مدخل من مدخلاتها يُبطل حسابها المخبأ فوراً
+        if (in_array($module, ['tasks', 'fin', 'servers', 'subs', 'purchases', 'projects'], true)) {
+            $pid = $module === 'projects' ? $m->id : ($m->project_id ?? null);
+            if ($pid) \Illuminate\Support\Facades\Cache::forget('pl:' . $pid);
+        }
+
+        // أجور الساعة مشتقة من رواتب الملفات الوظيفية — تعديلها يُبطل الجدول كله
+        if ($module === 'hr') \Illuminate\Support\Facades\Cache::forget('cost:rates');
+
         if ($module === 'tickets') {
             $meta = (array) ($m->meta ?? []);
             $closed = in_array((string) $m->status, ['تم الحل', 'مغلقة'], true);
