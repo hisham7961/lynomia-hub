@@ -14,7 +14,17 @@
         @if ($updating)@method('PUT')@endif
         <div class="fg">
             @foreach ($def['fields'] as $f)
-                @include('partials._field', ['f' => $f, 'row' => $row, 'refOptions' => $refOptions])
+                @php $fm = hub_field_mode(auth()->user(), $module, $f['key']); @endphp
+                @continue($fm === 'hide')
+                @if ($fm === 'ro')
+                    <div class="fld"><label>{{ $f['label'] }} <span class="sub">· قراءة فقط</span></label>
+                        <div class="inp" style="opacity:.7;pointer-events:none">
+                            @if ($row)@include('partials._display', ['f' => $f, 'row' => $row, 'ctx' => 'table', 'labels' => []])@else <span class="sub">—</span> @endif
+                        </div>
+                    </div>
+                @else
+                    @include('partials._field', ['f' => $f, 'row' => $row, 'refOptions' => $refOptions])
+                @endif
             @endforeach
             @foreach (hub_custom_fields($module) as $cf)
                 @php $ck = $cf['key']; $cv = old("custom.$ck", data_get($row?->custom, $ck)); @endphp

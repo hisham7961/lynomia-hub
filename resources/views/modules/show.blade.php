@@ -36,6 +36,7 @@
 <div class="card">
     <dl class="detail">
         @foreach ($def['fields'] as $f)
+            @continue(hub_field_mode(auth()->user(), $module, $f['key']) === 'hide')
             <div class="drow">
                 <dt>{{ $f['label'] }}</dt>
                 <dd>@include('partials._display', ['f' => $f, 'row' => $row, 'labels' => $labels, 'ctx' => 'show'])</dd>

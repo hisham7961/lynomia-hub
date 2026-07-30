@@ -212,18 +212,24 @@ class V1Controller extends ModuleController
         return [$token->id, $ikey];
     }
 
-    /** اختيار حقول ?fields=key1,key2 — بمفاتيح السجل لا أعمدة القاعدة، وid دائماً */
+    /** اختيار حقول ?fields=key1,key2 + إسقاط المخفي بصلاحيات مستوى الحقل — وid دائماً */
     protected function pick(array $def, $row, ?string $fields)
     {
+        $module = (string) ($def['key'] ?? '');
+        $visible = hub_visible_fields(auth()->user(), $module, $def);
         $want = preg_split('/[،,\s]+/u', (string) $fields, -1, PREG_SPLIT_NO_EMPTY);
-        if (! $want) return $row;
+
+        // لا اختيار ولا حقول مخفية على هذا الدور → السجل كما هو
+        if (! $want && count($visible) === count($def['fields'])) return $row;
 
         $arr = is_array($row) ? $row : $row->toArray();
         $out = ['id' => $arr['id'] ?? null];
-        foreach ($def['fields'] as $f) {
-            if (in_array($f['key'], $want, true) && array_key_exists($f['col'], $arr)) {
-                $out[$f['key']] = $arr[$f['col']];
-            }
+        foreach ($visible as $f) {
+            if ($want && ! in_array($f['key'], $want, true)) continue;
+            if (array_key_exists($f['col'], $arr)) $out[$f['key']] = $arr[$f['col']];
+        }
+        if (! $want) {
+            foreach (['created_at', 'updated_at'] as $ts) if (isset($arr[$ts])) $out[$ts] = $arr[$ts];
         }
 
         return $out;

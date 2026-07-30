@@ -463,7 +463,8 @@ class ModuleController extends Controller
     /** أعمدة الجدول (من تعريف الوحدة) + أسماء العرض للمراجع الظاهرة في الصفحة */
     protected function columnsAndLabels(array $def, array $rows, bool $all = false): array
     {
-        $fields = collect($def['fields']);
+        // صلاحيات مستوى الحقل: المخفي عن دور المستخدم لا يظهر في جدول ولا صفحة ولا تصدير
+        $fields = collect(hub_visible_fields(auth()->user(), (string) ($def['key'] ?? ''), $def));
         $keys   = $all ? $fields->pluck('key')->all() : ($def['columns'] ?? $fields->take(4)->pluck('key')->all());
         $cols   = $fields->whereIn('key', $keys)->values()->all();
 
@@ -516,6 +517,9 @@ class ModuleController extends Controller
     {
         $rules = [];
         foreach ($def['fields'] as $f) {
+            // حقل ممنوع على الدور لا يُتحقق منه (وإلا استحال الحفظ بحقل إلزامي مخفي)
+            if (hub_field_mode(auth()->user(), (string) ($def['key'] ?? ''), $f['key']) !== '') continue;
+
             $required = ! empty($f['required']) && ($creating || ($f['type'] ?? '') !== 'sec');
             $r = [$required ? 'required' : 'nullable'];
             $r[] = match ($f['type']) {
@@ -563,6 +567,9 @@ class ModuleController extends Controller
     {
         foreach ($def['fields'] as $f) {
             $k = $f['key']; $c = $f['col']; $t = $f['type'];
+
+            // حقل مخفي أو قراءة فقط لدور المستخدم: لا يُكتب أبداً (حتى لو حُقن في الطلب)
+            if (hub_field_mode(auth()->user(), (string) ($def['key'] ?? ''), $k) !== '') continue;
 
             if (in_array($t, ['file', 'img'], true)) {
                 if ($r->hasFile($k)) $m->{$c} = $r->file($k)->store('hub', 'local');   // خاص — يُخدم عبر بوابة الملفات المصادَق عليها

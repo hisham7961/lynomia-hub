@@ -13,7 +13,7 @@ class Role extends Model
     use HasUuid;
 
     protected $guarded = ['id'];
-    protected $casts = ['flags' => 'array', 'matrix' => 'array', 'is_owner' => 'boolean'];
+    protected $casts = ['flags' => 'array', 'matrix' => 'array', 'is_owner' => 'boolean', 'field_rules' => 'array'];
 
     public function users()
     {

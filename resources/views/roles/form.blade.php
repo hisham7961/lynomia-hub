@@ -30,6 +30,27 @@
             </tbody>
         </table>
         </div>
+        @php $fr = $role ? (is_array($role->field_rules) ? $role->field_rules : (json_decode($role->field_rules ?? '[]', true) ?: [])) : []; @endphp
+        <h3 style="margin-top:14px">🔬 صلاحيات مستوى الحقل <span class="sub">(اختياري — عادي: يرى ويعدل · قراءة فقط · مخفي تماماً)</span></h3>
+        <div class="sub" style="margin-bottom:8px">مثال: أخفِ «الراتب» في ملفات الموظفين عن هذا الدور — يختفي من الجداول والصفحات والتصدير والـ API، ولا يُكتب حتى لو حُقن في الطلب. المالك يرى كل شيء دائماً.</div>
+        @foreach (hub_modules() as $mk => $md)
+            @php $set = collect($fr[$mk] ?? [])->filter()->count(); @endphp
+            <details style="margin-bottom:6px" {{ $set ? 'open' : '' }}>
+                <summary>{{ $md['label'] }} @if ($set)<span class="bdg wn">{{ $set }} قيد</span>@endif</summary>
+                <div class="fg" style="padding:8px 4px">
+                    @foreach ($md['fields'] as $f)
+                        <div class="fld">
+                            <label class="sub">{{ $f['label'] }}</label>
+                            <select class="inp" name="fr[{{ $mk }}][{{ $f['key'] }}]">
+                                <option value="">عادي</option>
+                                <option value="ro" @selected(($fr[$mk][$f['key']] ?? '') === 'ro')>قراءة فقط</option>
+                                <option value="hide" @selected(($fr[$mk][$f['key']] ?? '') === 'hide')>مخفي</option>
+                            </select>
+                        </div>
+                    @endforeach
+                </div>
+            </details>
+        @endforeach
         <div class="formfoot"><button class="btn p">حفظ الدور</button><a class="btn ghost" href="{{ route('roles.index') }}">إلغاء</a></div>
     </form>
 </div>

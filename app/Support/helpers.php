@@ -623,3 +623,34 @@ if (! function_exists('hub_expiry_count')) {
         return count(array_filter(hub_expiry(false, $user), fn ($i) => $i['days'] <= 7));
     }
 }
+
+if (! function_exists('hub_field_mode')) {
+    /**
+     * صلاحيات مستوى الحقل: '' كامل · 'ro' قراءة فقط · 'hide' مخفي.
+     * تُضبط لكل دور من شاشة الأدوار (field_rules) — المالك يرى كل شيء دائماً.
+     */
+    function hub_field_mode($user, string $module, string $fieldKey): string
+    {
+        $user = $user ?? auth()->user();
+        if (! $user || $user->role?->is_owner) return '';
+
+        static $cache = [];
+        $rid = $user->role_id ?? 'x';
+        if (! isset($cache[$rid])) {
+            $fr = $user->role?->field_rules;
+            $cache[$rid] = is_array($fr) ? $fr : (json_decode((string) $fr, true) ?: []);
+        }
+        $mode = $cache[$rid][$module][$fieldKey] ?? '';
+
+        return in_array($mode, ['ro', 'hide'], true) ? $mode : '';
+    }
+}
+
+if (! function_exists('hub_visible_fields')) {
+    /** حقول الوحدة بعد إخفاء الممنوع عن دور المستخدم */
+    function hub_visible_fields($user, string $module, array $def): array
+    {
+        return array_values(array_filter($def['fields'],
+            fn ($f) => hub_field_mode($user, $module, $f['key']) !== 'hide'));
+    }
+}

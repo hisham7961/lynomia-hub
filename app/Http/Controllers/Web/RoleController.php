@@ -76,6 +76,16 @@ class RoleController extends Controller
             if ($r->boolean("flags.$f")) $flags[$f] = 1;
         }
 
-        return $d + ['matrix' => $matrix, 'flags' => $flags, 'is_owner' => false];
+        // صلاحيات مستوى الحقل: نحفظ القيود فقط (ro/hide) ونطرح الوحدات الفارغة
+        $fieldRules = [];
+        foreach ((array) $r->input('fr', []) as $mod => $fields) {
+            if (! hub_mod((string) $mod)) continue;
+            foreach ((array) $fields as $fk => $mode) {
+                if (in_array($mode, ['ro', 'hide'], true)) $fieldRules[$mod][$fk] = $mode;
+            }
+        }
+
+        return $d + ['matrix' => $matrix, 'flags' => $flags, 'is_owner' => false,
+                     'field_rules' => $fieldRules ?: null];
     }
 }
