@@ -56,13 +56,9 @@ class AuthController extends Controller
                 $user->saveQuietly();   // عدّاد أمني — بلا تدقيق ولا إصدارات
             }
             // بصمة المحاولة الفاشلة في التدقيق — تُعرض في مركز الأمان
-            \App\Models\AuditEntry::create([
-                'user_id' => $user?->id, 'action' => 'دخول فاشل',
-                'name'    => substr($data['email'], 0, 290),
-                'ip'      => $r->ip(),
-                'device'  => substr((string) $r->userAgent(), 0, 200),
-                'created_at' => now(),
-            ]);
+            // البريد يُحفظ كاملاً (٢٩٠) لا مبتوراً عند ٦٠ — أثرٌ أمني يُقرأ لاحقاً
+            hub_audit('دخول فاشل', null, null, null,
+                ['user_id' => $user?->id, 'name' => substr($data['email'], 0, 290)]);
 
             return $fail();
         }

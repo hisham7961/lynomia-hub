@@ -1264,6 +1264,50 @@ if (! function_exists('hub_open_scope')) {
     }
 }
 
+if (! function_exists('hub_notify')) {
+    /**
+     * إنشاء إشعار — نفس المصفوفة كانت منسوخة في ستة مواضع، وسقط `Str::limit`
+     * من إحداها (حسم الموافقات) فكان النص الطويل يُبتر في القاعدة لا في التطبيق.
+     * الكتم مفروض في طبقة الموديل فلا يُعاد هنا.
+     */
+    function hub_notify($userId, string $kind, string $text,
+                        ?string $module = null, ?string $recordId = null)
+    {
+        if (! $userId) return null;
+
+        return \App\Models\HubNotification::create([
+            'user_id'   => $userId,
+            'kind'      => $kind,
+            'text'      => \Illuminate\Support\Str::limit($text, 590),
+            'module'    => $module,
+            'record_id' => $recordId,
+            'read'      => false,
+            'created_at' => now(),
+        ]);
+    }
+}
+
+if (! function_exists('hub_audit')) {
+    /**
+     * قيد تدقيق يدوي — ثلاثي `device/ip/created_at` كان منسوخاً حرفياً في ستة مواضع.
+     * (سمة `Auditable` تتكفّل بقيود CRUD تلقائياً؛ هذه لما لا يمر بالموديل.)
+     */
+    function hub_audit(string $action, ?string $module = null, ?string $recordId = null,
+                       ?string $name = null, array $extra = [])
+    {
+        return \App\Models\AuditEntry::create($extra + [
+            'user_id'   => auth()->id(),
+            'action'    => $action,
+            'module'    => $module,
+            'record_id' => $recordId,
+            'name'      => $name === null ? null : \Illuminate\Support\Str::limit($name, 60),
+            'device'    => substr((string) request()->userAgent(), 0, 200),
+            'ip'        => request()->ip(),
+            'created_at' => now(),
+        ]);
+    }
+}
+
 if (! function_exists('hub_fin_sum')) {
     /** مجموع مستندات مالية من أنواع بعينها منذ تاريخ — يستثني الملغاة والمسودات دائماً */
     function hub_fin_sum(array $kinds, ?string $from = null, string $col = 'total'): float

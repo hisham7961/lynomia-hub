@@ -112,12 +112,8 @@ class ImportController extends Controller
         @unlink(storage_path('app/' . $sess['path']));
         $r->session()->forget('import');
 
-        \App\Models\AuditEntry::create([
-            'user_id' => auth()->id(), 'action' => 'استيراد', 'module' => $module,
-            'name' => "{$ok} سجل" . ($skipped ? ' (' . count($skipped) . ' متخطى)' : ''),
-            'ip' => $r->ip(), 'device' => substr((string) $r->userAgent(), 0, 200),
-            'created_at' => now(),
-        ]);
+        hub_audit('استيراد', $module, null,
+            "{$ok} سجل" . ($skipped ? ' (' . count($skipped) . ' متخطى)' : ''));
 
         return view('import.result', compact('module', 'def', 'ok', 'skipped'));
     }

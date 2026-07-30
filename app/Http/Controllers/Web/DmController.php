@@ -72,11 +72,8 @@ class DmController extends Controller
             'created_at' => now(),
         ]);
 
-        HubNotification::create([
-            'user_id' => $other->id, 'kind' => 'dm',
-            'text' => Str::limit('💬 رسالة من ' . auth()->user()->name . ': ' . trim($data['body']), 590),
-            'read' => false, 'created_at' => now(),
-        ]);
+        hub_notify($other->id, 'dm',
+            '💬 رسالة من ' . auth()->user()->name . ': ' . trim($data['body']));
 
         return redirect()->route('dm.thread', $other->id)->withFragment('bottom');
     }

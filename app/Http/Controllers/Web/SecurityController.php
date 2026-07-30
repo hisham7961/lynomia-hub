@@ -88,14 +88,7 @@ class SecurityController extends Controller
         else Setting::where('key', 'security.lockdown')->delete();
         Cache::forget('settings:all');
 
-        \App\Models\AuditEntry::create([
-            'user_id' => auth()->id(),
-            'action'  => $on ? 'تفعيل قفل الطوارئ' : 'رفع قفل الطوارئ',
-            'name'    => auth()->user()->name,
-            'ip'      => request()->ip(),
-            'device'  => substr((string) request()->userAgent(), 0, 200),
-            'created_at' => now(),
-        ]);
+        hub_audit($on ? 'تفعيل قفل الطوارئ' : 'رفع قفل الطوارئ', null, null, auth()->user()->name);
 
         return back()->with('ok', $on ? '🔒 فُعّل قفل الطوارئ — الجلسات غير المالكة عُلّقت فوراً' : '🔓 رُفع قفل الطوارئ');
     }

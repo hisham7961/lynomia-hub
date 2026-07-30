@@ -66,11 +66,7 @@ class ApprovalDecisionController extends ModuleController
     protected function tellRequester(Approval $ap, string $text): void
     {
         if (! $ap->requested_by || $ap->requested_by === auth()->id()) return;
-        HubNotification::create([
-            'user_id' => $ap->requested_by, 'kind' => 'approval',
-            'text'    => $text . ' — بقرار من ' . auth()->user()->name,
-            'module'  => 'approvals', 'record_id' => $ap->id,
-            'read'    => false, 'created_at' => now(),
-        ]);
+        hub_notify($ap->requested_by, 'approval',
+            $text . ' — بقرار من ' . auth()->user()->name, 'approvals', $ap->id);
     }
 }

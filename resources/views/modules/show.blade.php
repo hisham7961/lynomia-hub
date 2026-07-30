@@ -65,23 +65,7 @@
         <div class="drow"><dt>آخر تعديل</dt><dd class="mono">{{ optional($row->updated_at)->format('Y-m-d H:i') }} · نسخة {{ $row->version ?? 1 }}</dd></div>
     </dl>
 </div>
-@if (count($children))
-    <h3 style="margin:4px 0 10px">🔗 السجلات المرتبطة</h3>
-    <div class="kids">
-        @foreach ($children as $ch)
-            <div class="card kid">
-                <h3>{{ $ch['label'] }} <span class="bdg">{{ number_format($ch['count']) }}</span></h3>
-                <table class="mini">
-                    @foreach ($ch['rows'] as $cr)
-                        <tr><td><a href="{{ route('m.show', [$ch['module'], $cr->id]) }}">{{ \Illuminate\Support\Str::limit($cr->{$ch['display']} ?? $cr->id, 44) }}</a></td>
-                        <td class="mono sub" style="width:1%;white-space:nowrap">{{ optional($cr->created_at)->format('m-d') }}</td></tr>
-                    @endforeach
-                </table>
-                <div style="margin-top:8px"><a class="btn ghost xs" href="{{ route('m.index', [$ch['module'], 'f' => [$ch['field']['key'] => $row->id]]) }}">عرض الكل ←</a></div>
-            </div>
-        @endforeach
-    </div>
-@endif
+@include('partials.record_list', ['children' => $children, 'ownerId' => $row->id])
 @if ($versions->count() > 1)
     <div class="card">
         <h3>🕐 سجل الإصدارات</h3>

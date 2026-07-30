@@ -83,12 +83,7 @@ class AttachmentController extends Controller
 
         $a->delete();   // حذف ناعم — الملف يبقى على القرص للاستعادة
 
-        \App\Models\AuditEntry::create([
-            'user_id' => $u->id, 'action' => 'حذف مرفق', 'module' => $a->module,
-            'record_id' => $a->record_id, 'name' => Str::limit((string) $a->original_name, 60),
-            'device' => substr((string) request()->userAgent(), 0, 200),
-            'ip' => request()->ip(), 'created_at' => now(),
-        ]);
+        hub_audit('حذف مرفق', $a->module, $a->record_id, (string) $a->original_name);
 
         return back()->with('ok', 'حُذف المرفق');
     }

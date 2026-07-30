@@ -146,13 +146,8 @@ class ModuleController extends Controller
         if (hub_copy_secrets($u)) {
             foreach ($def['fields'] as $f) {
                 if (($f['type'] ?? '') === 'sec' && filled($row->{$f['col']} ?? null)) {
-                    \App\Models\AuditEntry::create([
-                        'user_id' => $u->id, 'action' => 'عرض حساس', 'module' => $module,
-                        'record_id' => $row->id,
-                        'name' => \Illuminate\Support\Str::limit((string) ($row->{hub_display_col($module)} ?? $row->id), 60),
-                        'device' => substr((string) request()->userAgent(), 0, 200),
-                        'ip' => request()->ip(), 'created_at' => now(),
-                    ]);
+                    hub_audit('عرض حساس', $module, $row->id,
+                        (string) ($row->{hub_display_col($module)} ?? $row->id));
                     break;
                 }
             }
@@ -299,13 +294,7 @@ class ModuleController extends Controller
         [$columns, $labels] = $this->columnsAndLabels($def, $rows->all());
 
         // بصمة التصدير في التدقيق — تُعرض في مركز الأمان
-        \App\Models\AuditEntry::create([
-            'user_id' => auth()->id(), 'action' => 'تصدير', 'module' => $module,
-            'name'    => $rows->count() . ' سجل (CSV)',
-            'ip'      => request()->ip(),
-            'device'  => substr((string) request()->userAgent(), 0, 200),
-            'created_at' => now(),
-        ]);
+        hub_audit('تصدير', $module, null, $rows->count() . ' سجل (CSV)');
 
         return response()->streamDownload(function () use ($rows, $columns, $labels) {
             $out = fopen('php://output', 'w');
@@ -372,12 +361,8 @@ class ModuleController extends Controller
 
         foreach ($approvers as $uid) {
             if ($uid === auth()->id()) continue;
-            \App\Models\HubNotification::create([
-                'user_id' => $uid, 'kind' => 'approval',
-                'text'    => 'طلب موافقة من ' . auth()->user()->name . ': ' . $ap->title,
-                'module'  => 'approvals', 'record_id' => $ap->id,
-                'read'    => false, 'created_at' => now(),
-            ]);
+            hub_notify($uid, 'approval',
+                'طلب موافقة من ' . auth()->user()->name . ': ' . $ap->title, 'approvals', $ap->id);
         }
 
         return redirect()->route('m.index', $module)
@@ -431,17 +416,11 @@ class ModuleController extends Controller
         $to = $m->{$f['col']} ?? null;
         if (! $to || $to === $prev || $to === auth()->id()) return;
 
-        \App\Models\HubNotification::create([
-            'user_id'    => $to,
-            'kind'       => 'assign',
-            'text'       => 'أُسند إليك في ' . $def['label'] . ': '
-                            . \Illuminate\Support\Str::limit((string) ($m->{hub_display_col($module)} ?? ''), 60)
-                            . ' — بواسطة ' . auth()->user()->name,
-            'module'     => $module,
-            'record_id'  => $m->id,
-            'read'       => false,
-            'created_at' => now(),
-        ]);
+        hub_notify($to, 'assign',
+            'أُسند إليك في ' . $def['label'] . ': '
+            . \Illuminate\Support\Str::limit((string) ($m->{hub_display_col($module)} ?? ''), 60)
+            . ' — بواسطة ' . auth()->user()->name,
+            $module, $m->id);
     }
 
     /** إيجاد سجل داخل نطاق المستخدم — الوصول المباشر بالرابط لسجل خارج النطاق = 404 */

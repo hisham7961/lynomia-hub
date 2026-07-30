@@ -239,11 +239,9 @@ class CommentController extends Controller
 
     protected function notify(string $uid, string $kind, string $text, ?string $module, ?string $recordId): void
     {
-        HubNotification::create([
-            'user_id' => $uid, 'kind' => $kind, 'text' => Str::limit($text, 590),
-            'module' => $module === 'feed' ? null : $module, 'record_id' => $module === 'feed' ? null : $recordId,
-            'read' => false, 'created_at' => now(),
-        ]);
+        hub_notify($uid, $kind, $text,
+            $module === 'feed' ? null : $module,
+            $module === 'feed' ? null : $recordId);
     }
 
     /** سجل القراءة: يُضاف المستخدم الحالي لمن قرأ (التعليقات والردود المعروضة) */
