@@ -28,9 +28,9 @@ class FlowController extends Controller
         ]);
     }
 
-    public function store(Request $r)
+    /** تحقّق المسار — مشترك بين الإنشاء والتعديل فلا يتفرّق العقد بينهما */
+    protected function validated(Request $r): array
     {
-        $this->gate();
         $d = $r->validate([
             'name'       => ['required', 'string', 'max:190'],
             'm'          => ['required', 'string'],
@@ -43,7 +43,12 @@ class FlowController extends Controller
         ]);
         abort_unless(hub_mod($d['m']), 404);
 
-        // تجميع الإجراءات المفعلة من النموذج
+        return $d;
+    }
+
+    /** تجميع الإجراءات المفعّلة من النموذج — مشترك بين الإنشاء والتعديل */
+    protected function collectActions(Request $r): array
+    {
         $actions = [];
         if ($r->boolean('a_notify')) {
             $actions[] = ['type' => 'notify', 'to' => (string) $r->input('a_notify_to', 'owners'),
@@ -62,6 +67,15 @@ class FlowController extends Controller
             $actions[] = ['type' => 'set', 'field' => (string) $r->input('a_set_field', ''),
                           'value' => (string) $r->input('a_set_value', '')];
         }
+
+        return $actions;
+    }
+
+    public function store(Request $r)
+    {
+        $this->gate();
+        $d = $this->validated($r);
+        $actions = $this->collectActions($r);
         if (! $actions) return back()->withErrors(['actions' => 'فعّل إجراءً واحداً على الأقل'])->withInput();
 
         Flow::create([
@@ -74,6 +88,65 @@ class FlowController extends Controller
         ]);
 
         return redirect()->route('flows.index', ['m' => $d['m']])->with('ok', '🪄 أُنشئ المسار وهو مفعّل الآن');
+    }
+
+    /**
+     * شاشة تعديل مسارٍ قائم — كان المسار يُنشأ ويُحذف ولا يُعدَّل، فتصحيح
+     * كلمةٍ في نصّ إشعار يعني حذفه وإعادة بنائه من الصفر (وتضيع عدّادات
+     * تشغيله وتاريخه). النموذج نفسه يخدم الحالتين مُعبّأً بقيم المسار.
+     */
+    public function edit(string $id)
+    {
+        $this->gate();
+        $flow = Flow::findOrFail($id);
+        $def = hub_mod($flow->module);
+        abort_unless($def, 404, 'وحدة هذا المسار غير مثبّتة');
+
+        return view('flows.edit', [
+            'flow'   => $flow,
+            'module' => $flow->module,
+            'def'    => $def,
+            'users'  => \App\Models\User::whereNull('deleted_at')->orderBy('name')->pluck('name', 'id'),
+        ]);
+    }
+
+    public function update(Request $r, string $id)
+    {
+        $this->gate();
+        $flow = Flow::findOrFail($id);
+        $d = $this->validated($r);
+        $actions = $this->collectActions($r);
+        if (! $actions) return back()->withErrors(['actions' => 'فعّل إجراءً واحداً على الأقل'])->withInput();
+
+        $flow->update([
+            'name' => $d['name'], 'module' => $d['m'], 'event' => $d['event'],
+            'status_to' => $d['status_to'] ?? null,
+            'cond_field' => $d['cond_field'] ?? null,
+            'cond_op' => $d['cond_op'] ?? 'eq',
+            'cond_value' => $d['cond_value'] ?? null,
+            'actions' => $actions,
+        ]);
+        hub_audit('تعديل مسار', 'autos', $flow->id, $flow->name);
+
+        return redirect()->route('flows.index', ['m' => $flow->module])
+            ->with('ok', '✏️ حُفظ تعديل المسار — عدّاد تشغيلاته وتاريخه كما هما');
+    }
+
+    /** استنساخ مسار: أسرع طريق لبناء متغيّرٍ منه — يولد معطّلاً حتى تراجعه */
+    public function duplicate(string $id)
+    {
+        $this->gate();
+        $src = Flow::findOrFail($id);
+        $copy = $src->replicate(['runs', 'last_run_at', 'created_by']);
+        $copy->name = \Illuminate\Support\Str::limit($src->name . ' (نسخة)', 190, '');
+        $copy->enabled = false;
+        $copy->runs = 0;
+        $copy->last_run_at = null;
+        $copy->created_by = auth()->id();
+        $copy->save();
+
+        return redirect()->route('flows.edit', $copy->id)
+            ->with('ok', '📑 نُسخ المسار معطّلاً — عدّله ثم فعّله');
     }
 
     public function toggle(string $id)
