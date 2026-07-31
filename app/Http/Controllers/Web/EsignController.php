@@ -43,6 +43,7 @@ class EsignController extends Controller
         'decisions' => '⚖️ قرار',
         'policies' => '📜 سياسة',
         'policyacks' => '🖊️ إقرار سياسة',
+        'assets'   => '🧰 أصل / عهدة',
     ];
 
     public function index()

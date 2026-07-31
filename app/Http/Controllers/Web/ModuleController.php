@@ -627,6 +627,40 @@ class ModuleController extends Controller
         // حالة الصنف تُشتق من كميته وحدّه فور أي حفظ — نفد/منخفض/متاح
         if ($module === 'stock' && $m instanceof \App\Models\StockItem) hub_stock_sync($m);
 
+        // مزامنة الأصل مع صيانته: قيد التنفيذ تضعه «صيانة»، والمكتملة تختم
+        // «آخر صيانة» وتعيده «قيد الاستخدام» — كان الحقلان يدويين متناقضين
+        if ($module === 'assetlog' && $m->asset_id && ($asset = \App\Models\Asset::find($m->asset_id))) {
+            if ((string) $m->status === 'قيد التنفيذ' && $asset->status !== 'صيانة') {
+                $asset->status = 'صيانة';
+                $asset->saveQuietly();
+            } elseif ((string) $m->status === 'مكتملة') {
+                $asset->maint = $m->date;
+                if ($asset->status === 'صيانة') $asset->status = 'قيد الاستخدام';
+                $asset->saveQuietly();
+            }
+        }
+
+        // إخلاء العهدة عند المغادرة: منتهية خدمته وبعهدته أصول ⟵ مهمة استرداد
+        // واحدة (لا تتكرر) تسمّي الأصول — كانت العهدة تُنسى مع المغادر
+        if ($module === 'hr' && (string) $m->status === 'منتهية خدمته' && $m->user_id) {
+            $held = \App\Models\Asset::whereNull('deleted_at')
+                ->where('holder_id', $m->user_id)->get(['id', 'name']);
+            if ($held->isNotEmpty()) {
+                $title = 'استرداد عهدة: ' . $m->name;
+                $exists = \App\Models\Task::whereNull('deleted_at')->where('title', $title)
+                    ->whereNotIn('status', ['منجزة', 'مكتملة', 'ملغاة'])->exists();
+                if (! $exists) {
+                    \App\Models\Task::create([
+                        'title' => $title, 'status' => 'جديدة', 'priority' => 'عالية',
+                        'company_id' => $m->company_id,
+                        'description' => "الموظف منتهية خدمته وبعهدته:\n- "
+                            . $held->pluck('name')->implode("\n- ")
+                            . "\n\nاسترد الأصول ووثّق التسليم بإقرارٍ موقّع ثم حوّل حالتها إلى «متاح».",
+                    ]);
+                }
+            }
+        }
+
         if ($module === 'tickets') {
             $meta = (array) ($m->meta ?? []);
             $closed = in_array((string) $m->status, ['تم الحل', 'مغلقة'], true);
