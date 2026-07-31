@@ -195,6 +195,10 @@ Route::middleware('auth')->group(function () {
     Route::get('innovation', [\App\Http\Controllers\Web\InnovationController::class, 'index'])->name('innovation');
     Route::post('ideas/{id}/promote', [\App\Http\Controllers\Web\InnovationController::class, 'promote'])->name('ideas.promote');
 
+    // ── مركز السوشال ميديا: مراقبة وتحليل ──
+    Route::get('social', [\App\Http\Controllers\Web\SocialController::class, 'index'])->name('social.index');
+    Route::post('social/snapshot', [\App\Http\Controllers\Web\SocialController::class, 'snapshot'])->name('social.snapshot');
+
     // ── المرفقات الشاملة على أي سجل ──
     Route::post('attachments', [AttachmentController::class, 'store'])->name('att.store');
     Route::get('attachments/{id}/dl', [AttachmentController::class, 'download'])->name('att.dl');

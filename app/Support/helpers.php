@@ -250,6 +250,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'recs',      'label' => '💡 مركز التوصيات',    'route' => 'recs',            'group' => 'analytics', 'ok' => $mon],
             ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'group' => 'analytics', 'ok' => $mon],
             ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'social',    'label' => '📣 مركز السوشال',     'route' => 'social.index',    'group' => 'analytics', 'ok' => hub_can($user, 'social', 'v')],
 
             ['key' => 'legal',     'label' => '⚖️ القانوني',         'route' => 'legal',           'group' => 'centers',   'ok' => hub_can($user, 'contracts', 'v')],
             ['key' => 'esign',     'label' => '✍️ توقيع العقود',     'route' => 'esign.index',     'group' => 'centers',   'ok' => hub_can($user, 'contracts', 'v')],
@@ -2696,5 +2697,156 @@ if (! function_exists('hub_metric_bulk_latest')) {
         foreach ($rows as $r) $out[$r->record_id] = (float) $r->value;   // الأخير يغلب
 
         return $out;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// السوشال ميديا: مراقبةٌ وتحليل — لا دفتر جرد
+// كانت الوحدة تخزّن أرقاماً خاماً بلا معدّل تفاعل ولا اتجاه ولا مقارنة.
+// ─────────────────────────────────────────────────────────────────────────
+
+if (! function_exists('hub_social_engagement')) {
+    /**
+     * معدّل التفاعل **محسوباً لا مُدخَلاً**: (إعجاب+تعليق+مشاركة+حفظ) ÷ قاعدة.
+     * القاعدة أوّل متاحٍ من الوصول ثم الظهور ثم المشاهدات ثم متابعي الحساب —
+     * فمنشورٌ بلا وصولٍ مسجَّل لا يُحرَم من نسبةٍ تقريبية، ويُصرَّح بأي قاعدةٍ حُسب.
+     */
+    function hub_social_engagement($post): array
+    {
+        $n = fn ($v) => (float) ($v ?? 0);
+        $inter = $n($post->likes) + $n($post->comments2) + $n($post->shares) + $n($post->saves);
+
+        $base = null;
+        $label = '';
+        foreach ([['reach', 'الوصول'], ['impr', 'الظهور'], ['views', 'المشاهدات']] as [$c, $l]) {
+            if ($n($post->{$c}) > 0) { $base = $n($post->{$c}); $label = $l; break; }
+        }
+        if ($base === null && ($post->social_id ?? null)) {
+            $f = \Illuminate\Support\Facades\DB::table('social_accounts')
+                ->where('id', $post->social_id)->value('followers');
+            if ((float) $f > 0) { $base = (float) $f; $label = 'المتابعون'; }
+        }
+
+        return [
+            'interactions' => $inter,
+            'base' => $base,
+            'baseLabel' => $label,
+            'rate' => $base ? round($inter * 100 / $base, 2) : null,
+            'clicks' => $n($post->clicks),
+            'spend' => $n($post->spend),
+            'cpe' => ($n($post->spend) > 0 && $inter > 0) ? round($n($post->spend) / $inter, 3) : null,
+        ];
+    }
+}
+
+if (! function_exists('hub_social_feed_state')) {
+    /**
+     * حال التغذية لحسابٍ أو منشور: أهي آلية (n8n/API) أم لقطةٌ داخلية أم لا شيء.
+     * «كله أوتو» يحتاج أولاً معرفة **ما ليس أوتو** — وإلا ظنّ المستخدم الرقم حيّاً وهو ميت.
+     */
+    function hub_social_feed_state(string $module, string $recordId, string $metric = 'followers'): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('metric_points')) {
+            return ['mode' => 'none', 'label' => 'غير مربوط', 'tone' => 'wn', 'at' => null, 'source' => null];
+        }
+
+        $p = \App\Models\MetricPoint::where('module', $module)->where('record_id', $recordId)
+            ->where('metric', $metric)->orderByDesc('at')->first(['at', 'source']);
+
+        if (! $p) return ['mode' => 'none', 'label' => 'غير مربوط', 'tone' => 'wn', 'at' => null, 'source' => null];
+
+        $auto = in_array($p->source, ['n8n', 'api', 'webhook'], true);
+        $stale = $p->at->lt(now()->subDays(3));
+
+        return [
+            'mode' => $auto ? ($stale ? 'stale' : 'auto') : 'internal',
+            'label' => $auto ? ($stale ? 'آلي لكنه متوقف' : 'آلي') : 'لقطة داخلية',
+            'tone' => $auto ? ($stale ? 'bad' : 'ok') : 'wn',
+            'at' => $p->at, 'source' => $p->source,
+        ];
+    }
+}
+
+if (! function_exists('hub_social_stats')) {
+    /**
+     * تحليل السوشال كاملاً — منطّقٌ بصلاحية المستخدم ونطاقه.
+     * كل رقمٍ هنا مشتقٌّ من السلسلة الزمنية أو محسوب، لا حقلٌ يُملأ يدوياً.
+     */
+    function hub_social_stats(int $days = 30): array
+    {
+        $accounts = hub_scope(\App\Models\SocialAccount::query(), 'social')
+            ->whereNull('deleted_at')->get();
+
+        $posts = hub_can(auth()->user(), 'posts', 'v')
+            ? hub_scope(\App\Models\SocialPost::query(), 'posts')->whereNull('deleted_at')->get()
+            : collect();
+
+        // ── الحسابات: المتابعون الآن ونموّهم من السلسلة ──
+        $rows = $accounts->map(function ($a) use ($days, $posts) {
+            $g = hub_metric_growth('social', $a->id, 'followers', $days);
+            $series = hub_metric_series('social', $a->id, 'followers', $days);
+            $mine = $posts->where('social_id', $a->id);
+            $rates = $mine->map(fn ($p) => hub_social_engagement($p)['rate'])->filter(fn ($r) => $r !== null);
+
+            return [
+                'id' => $a->id, 'platform' => $a->platform, 'handle' => $a->handle,
+                'url' => $a->url, 'status' => $a->status,
+                'followers' => hub_metric_latest('social', $a->id, 'followers') ?? (float) ($a->followers ?? 0),
+                'goal' => (float) ($a->goal ?? 0),
+                'growth' => $g, 'spark' => hub_metric_spark($series),
+                'posts' => $mine->count(),
+                'published' => $mine->where('status', 'منشور')->count(),
+                'rate' => $rates->count() ? round($rates->avg(), 2) : null,
+                'feed' => hub_social_feed_state('social', $a->id),
+            ];
+        })->sortByDesc('followers')->values()->all();
+
+        // ── المنشورات: التفاعل محسوباً ──
+        $pub = $posts->where('status', 'منشور');
+        $scored = $pub->map(function ($p) use ($accounts) {
+            $e = hub_social_engagement($p);
+
+            return ['id' => $p->id, 'title' => $p->title, 'type' => $p->type, 'pub_at' => $p->pub_at,
+                    'account' => $accounts->firstWhere('id', $p->social_id)?->handle,
+                    'reach' => (float) ($p->reach ?? 0)] + $e;
+        })->sortByDesc('interactions')->values();
+
+        // ── أداء أنواع المحتوى: أين يستحق الجهد ──
+        $byType = $scored->filter(fn ($p) => $p['type'])->groupBy('type')
+            ->map(fn ($g, $t) => [
+                'type' => $t, 'n' => $g->count(),
+                'rate' => $g->pluck('rate')->filter(fn ($r) => $r !== null)->avg(),
+                'inter' => $g->sum('interactions'),
+            ])->sortByDesc('rate')->values()->all();
+
+        // ── أفضل وقت للنشر: متوسط التفاعل بحسب ساعة النشر ──
+        $byHour = $scored->filter(fn ($p) => $p['pub_at'])->groupBy(fn ($p) => (int) $p['pub_at']->format('G'))
+            ->map(fn ($g, $h) => ['hour' => (int) $h, 'n' => $g->count(), 'inter' => round($g->avg('interactions'))])
+            ->sortByDesc('inter')->values()->all();
+
+        $recent = $pub->filter(fn ($p) => $p->pub_at && $p->pub_at->gte(now()->subDays($days)));
+        $rates = $scored->pluck('rate')->filter(fn ($r) => $r !== null);
+        $totalNow = collect($rows)->sum('followers');
+        $delta = collect($rows)->sum(fn ($r) => $r['growth']['delta'] ?? 0);
+
+        return [
+            'days' => $days,
+            'accounts' => $rows,
+            'top' => $scored->take(8)->all(),
+            'byType' => $byType,
+            'byHour' => array_slice($byHour, 0, 6),
+            'kpi' => [
+                'accounts' => count($rows),
+                'followers' => $totalNow,
+                'delta' => $delta,
+                'pct' => ($totalNow - $delta) > 0 ? round($delta * 100 / ($totalNow - $delta), 1) : null,
+                'posts' => $recent->count(),
+                'reach' => (float) $recent->sum('reach'),
+                'rate' => $rates->count() ? round($rates->avg(), 2) : null,
+                'spend' => (float) $pub->sum('spend'),
+                'unlinked' => collect($rows)->where('feed.mode', 'none')->count(),
+                'stalled' => collect($rows)->where('feed.mode', 'stale')->count(),
+            ],
+        ];
     }
 }
