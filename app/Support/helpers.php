@@ -1093,6 +1093,29 @@ if (! function_exists('hub_company_scope')) {
     }
 }
 
+if (! function_exists('hub_risk_score')) {
+    /**
+     * درجة المخاطرة = احتمال × أثر (١-٤ لكلٍّ، فالمدى ١-١٦) — كان سجل المخاطر
+     * بلا احتمال إطلاقاً، و`severity` وحدها لا تصنع درجةً ولا خريطة حرارية،
+     * وكل الأخطار متساوية في حساب صحة المشروع (عدٌّ لا وزن).
+     */
+    function hub_risk_score(?string $likelihood, ?string $severity): ?array
+    {
+        $L = ['نادر' => 1, 'محتمل' => 2, 'مرجّح' => 3, 'شبه مؤكد' => 4];
+        $S = ['منخفضة' => 1, 'متوسطة' => 2, 'عالية' => 3, 'حرجة' => 4, 'حرج' => 4];
+
+        $l = $L[trim((string) $likelihood)] ?? null;
+        $s = $S[trim((string) $severity)] ?? null;
+        if ($l === null || $s === null) return null;
+
+        $score = $l * $s;
+        $band = $score >= 12 ? 'حرجة' : ($score >= 6 ? 'عالية' : ($score >= 3 ? 'متوسطة' : 'منخفضة'));
+
+        return ['l' => $l, 's' => $s, 'score' => $score, 'band' => $band,
+                'tone' => $score >= 12 ? 'bad' : ($score >= 6 ? 'wn' : 'ok')];
+    }
+}
+
 if (! function_exists('hub_okr_progress')) {
     /**
      * تقدّم الهدف محسوباً من نتائجه الرئيسية (متوسط موزون) — كان `progress`
@@ -1509,11 +1532,19 @@ if (! function_exists('hub_project_health')) {
                     's' => $tAll ? max(0, (int) (100 - $tLate / $tAll * 200)) : 100,
                     'note' => $tAll ? "{$tLate} متأخرة من {$tAll}" : 'لا مهام مسجَّلة'];
 
-            // ٤) المخاطر المفتوحة
-            $iss = \Illuminate\Support\Facades\DB::table('issues')->whereNull('deleted_at')->where('project_id', $projectId)
-                ->whereNotIn('status', ['مغلقة', 'محلولة', 'ملغاة'])->count();
+            // ٤) المخاطر المفتوحة — موزونةً بالخطورة: كان العدّ يساوي بين خطرٍ
+            // حرج وآخر منخفض، فمشروعٌ بخمسة أخطار تافهة يبدو أسوأ من واحدٍ قاتل
+            $risks = \Illuminate\Support\Facades\DB::table('issues')->whereNull('deleted_at')
+                ->where('project_id', $projectId)
+                ->whereNotIn('status', ['مغلقة', 'محلولة', 'ملغاة'])->pluck('severity');
+            $weights = ['حرجة' => 30, 'حرج' => 30, 'عالية' => 15, 'متوسطة' => 8, 'منخفضة' => 3];
+            $penalty = 0;
+            foreach ($risks as $sev) $penalty += $weights[trim((string) $sev)] ?? 10;
+            $iss = $risks->count();
+            $crit = $risks->filter(fn ($s) => in_array(trim((string) $s), ['حرجة', 'حرج'], true))->count();
             $f[] = ['k' => 'المخاطر المفتوحة', 'w' => 15,
-                    's' => max(0, 100 - $iss * 15), 'note' => $iss ? "{$iss} مخاطرة مفتوحة" : 'لا مخاطر مفتوحة'];
+                    's' => max(0, 100 - $penalty),
+                    'note' => $iss ? "{$iss} مخاطرة مفتوحة" . ($crit ? " (منها {$crit} حرجة)" : '') : 'لا مخاطر مفتوحة'];
 
             // ٥) الأعطال التقنية (٩٠ يوماً)
             $inc = \Illuminate\Support\Facades\Schema::hasTable('incidents')

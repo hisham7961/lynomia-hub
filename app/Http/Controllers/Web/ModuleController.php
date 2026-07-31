@@ -420,7 +420,12 @@ class ModuleController extends Controller
         $dueF = $fields->first(fn ($f) => ($f['type'] ?? '') === 'date' && preg_match('/due|end|deadline/i', $f['col']))
             ?? $fields->first(fn ($f) => ($f['type'] ?? '') === 'date');
         $prioF = $fields->first(fn ($f) => ($f['key'] ?? '') === 'priority' && ($f['type'] ?? '') === 'sel');
-        $refF = $fields->first(fn ($f) => ($f['type'] ?? '') === 'ref' && ($f['ref'] ?? '') !== 'users' && empty($f['multi']));
+        // مرجع البطاقة الأب: أول مرجعٍ غير بشري **له قيم فعلاً** — مرجعٌ ثانوي
+        // فارغ (كقرار المهمة) كان يحجب المرجع الحقيقي فتفقد البطاقة سياقها
+        $refCands = $fields->filter(fn ($f) => ($f['type'] ?? '') === 'ref'
+            && ($f['ref'] ?? '') !== 'users' && empty($f['multi']))->values();
+        $refF = $refCands->first(fn ($f) => $rows->contains(fn ($r) => filled($r->{$f['col']} ?? null)))
+             ?? $refCands->first();
 
         $assigneeNames = $assigneeF ? hub_ref_labels('users', $rows->pluck($assigneeF['col'])->all()) : [];
         $refNames = $refF ? hub_ref_labels($refF['ref'], $rows->pluck($refF['col'])->all()) : [];

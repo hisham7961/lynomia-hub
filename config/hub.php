@@ -1890,6 +1890,7 @@ return [
                     'label' => 'وسوم',
                     'type' => 'tags',
                 ],
+                ['key' => 'decisionId', 'col' => 'decision_id', 'label' => 'القرار المنبثقة عنه', 'type' => 'ref', 'ref' => 'decisions'],
             ],
             'search' => [
                 'title',
@@ -1998,6 +1999,8 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'likelihood', 'col' => 'likelihood', 'label' => 'احتمال الوقوع (للمخاطر)', 'type' => 'sel',
+                 'options' => ['شبه مؤكد', 'مرجّح', 'محتمل', 'نادر']],
                 [
                     'key' => 'title',
                     'col' => 'title',
@@ -2505,13 +2508,15 @@ return [
             'model' => 'Meeting',
             'label' => 'الاجتماعات',
             'display' => 'title',
-            'status' => null,
+            'status' => 'status',
             'columns' => [
                 'title',
                 'dt',
                 'projectId',
             ],
             'fields' => [
+                ['key' => 'status', 'col' => 'status', 'label' => 'حالة الاجتماع', 'type' => 'sel',
+                 'options' => ['مجدول', 'انعقد', 'بانتظار المحضر', 'مُلغى']],
                 [
                     'key' => 'title',
                     'col' => 'title',
