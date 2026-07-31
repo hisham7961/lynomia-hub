@@ -3523,6 +3523,9 @@ return [
                 'nextDate',
             ],
             'fields' => [
+                ['key' => 'lostReason', 'col' => 'lost_reason', 'label' => 'سبب الخسارة', 'type' => 'sel',
+                 'options' => ['السعر', 'المزايا', 'التوقيت', 'منافس', 'لا ميزانية', 'بلا رد', 'أخرى']],
+                ['key' => 'competitorId', 'col' => 'competitor_id', 'label' => 'خسرناه لصالح', 'type' => 'ref', 'ref' => 'competitors'],
                 [
                     'key' => 'name',
                     'col' => 'name',

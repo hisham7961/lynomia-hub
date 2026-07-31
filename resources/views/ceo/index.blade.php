@@ -21,6 +21,44 @@
     <div class="stat"><span class="ico">⏰</span><b class="{{ $kpi['lateTasks'] ? 'txt-bad' : '' }}">{{ $kpi['lateTasks'] }}</b><span>مهام متأخرة</span></div>
 </div>
 
+{{-- مسار المبيعات والإيراد المتكرر — أرقام القرار التجاري --}}
+<div class="cards">
+    <div class="stat"><span class="ico">📈</span><b>{{ number_format($mrr['mrr'], 0) }}</b><span>MRR — إيراد شهري متكرر</span></div>
+    <div class="stat"><span class="ico">🎯</span><b>{{ number_format($pipe['pipeline'], 0) }}</b><span>مسار المبيعات المفتوح</span></div>
+    <div class="stat"><span class="ico">⚖️</span><b>{{ number_format($pipe['weighted'], 0) }}</b><span>المرجّح باحتمال الإغلاق</span></div>
+    @if ($pipe['winRate'] !== null)
+        <div class="stat"><span class="ico">🏆</span><b class="{{ $pipe['winRate'] < 40 ? 'txt-bad' : '' }}">{{ $pipe['winRate'] }}٪</b><span>نسبة الفوز من المحسوم</span></div>
+    @endif
+</div>
+
+@if ($pipe['lostReasons'] || $pipe['lostToCompetitors'])
+    <div class="grid2">
+        @if ($pipe['lostReasons'])
+            <div class="card kid">
+                <h3>📉 لماذا نخسر</h3>
+                <table class="mini">
+                    @foreach (array_slice($pipe['lostReasons'], 0, 6) as $l)
+                        <tr><td>{{ $l['reason'] }}</td><td class="sub acts">{{ $l['count'] }}</td>
+                            <td class="mono acts">{{ number_format($l['value'], 0) }}</td></tr>
+                    @endforeach
+                </table>
+            </div>
+        @endif
+        @if ($pipe['lostToCompetitors'])
+            <div class="card kid">
+                <h3>🥊 خسرنا لصالح</h3>
+                <table class="mini">
+                    @foreach (array_slice($pipe['lostToCompetitors'], 0, 6) as $c)
+                        <tr><td><a href="{{ route('m.show', ['competitors', $c['id']]) }}">{{ $c['name'] }}</a></td>
+                            <td class="sub acts">{{ $c['count'] }}</td>
+                            <td class="mono acts">{{ number_format($c['value'], 0) }}</td></tr>
+                    @endforeach
+                </table>
+            </div>
+        @endif
+    </div>
+@endif
+
 {{-- صحة الشركة --}}
 <div class="card">
     <h3 style="margin-bottom:12px">🩺 تقرير صحة الشركة</h3>

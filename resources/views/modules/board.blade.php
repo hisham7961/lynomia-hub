@@ -18,10 +18,22 @@
 @endcomponent
 <div class="kanban" data-kanban data-url="{{ route('m.status', [$module, '__ID__']) }}" data-can="{{ hub_can(auth()->user(), $module, 'e') ? 1 : 0 }}">
     @foreach ($cols as $status => $items)
+        @php
+            // مسار المبيعات رقماً لا عدّاد بطاقات: مجموع القيم والقيمة المرجّحة
+            // باحتمال الإغلاق — حقلان مخزَّنان كانا يُملآن ولا يُجمعان في أي مكان
+            $kValue = collect($items)->sum(fn ($r) => (float) ($r->value ?? 0));
+            $kWeighted = collect($items)->sum(fn ($r) => (float) ($r->value ?? 0) * ((float) ($r->prob ?? 0) / 100));
+        @endphp
         <div class="kcol" data-status="{{ $status }}">
             <div class="khead">
                 <span class="bdg {{ hub_tone($status) }}">{{ $status }}</span>
                 <span class="kcount sub">{{ count($items) }}</span>
+                @if ($kValue > 0)
+                    <span class="sub mono" style="flex-basis:100%;margin-top:2px"
+                          title="مجموع القيم{{ $kWeighted > 0 ? ' · المرجّح باحتمال الإغلاق' : '' }}">
+                        {{ number_format($kValue, 0) }}@if ($kWeighted > 0 && round($kWeighted) != round($kValue)) · مرجّح {{ number_format($kWeighted, 0) }}@endif
+                    </span>
+                @endif
                 @if ($canAdd)
                     <a class="kadd" href="{{ route('m.create', $module) }}?{{ http_build_query([$statusKey => $status]) }}"
                        title="إضافة في «{{ $status }}»" aria-label="إضافة سجل في حالة {{ $status }}">＋</a>

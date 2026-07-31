@@ -1091,6 +1091,73 @@ if (! function_exists('hub_company_scope')) {
     }
 }
 
+if (! function_exists('hub_pipeline')) {
+    /**
+     * مسار المبيعات رقماً: قيمة كل مرحلة ومرجّحها باحتمال الإغلاق، وتشريح
+     * الخسائر بالسبب وبالمنافس — كانت `value` و`prob` تُملآن ولا تُجمعان،
+     * ووحدة المنافسين لا تُقرأ من أي شاشة إطلاقاً.
+     */
+    function hub_pipeline($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        $q = hub_scope(\Illuminate\Support\Facades\DB::table('clients')->whereNull('deleted_at'), 'clients', $user);
+        $rows = hub_company_scope($q, 'clients')
+            ->get(['id', 'name', 'stage', 'value', 'prob', 'lost_reason', 'competitor_id']);
+
+        $open = ['عميل محتمل', 'تم التواصل', 'عرض سعر', 'تفاوض'];
+        $stages = []; $lost = []; $byCompetitor = [];
+        $pipeline = 0.0; $weighted = 0.0; $won = 0.0; $lostValue = 0.0;
+
+        foreach ($rows as $r) {
+            $v = (float) ($r->value ?? 0);
+            $w = $v * ((float) ($r->prob ?? 0) / 100);
+            $st = (string) $r->stage;
+
+            $stages[$st] ??= ['stage' => $st, 'count' => 0, 'value' => 0.0, 'weighted' => 0.0];
+            $stages[$st]['count']++;
+            $stages[$st]['value'] += $v;
+            $stages[$st]['weighted'] += $w;
+
+            if (in_array($st, $open, true)) { $pipeline += $v; $weighted += $w; }
+            if ($st === 'فوز') $won += $v;
+            if ($st === 'خسارة') {
+                $lostValue += $v;
+                $reason = (string) ($r->lost_reason ?: 'غير مسجَّل');
+                $lost[$reason] ??= ['reason' => $reason, 'count' => 0, 'value' => 0.0];
+                $lost[$reason]['count']++;
+                $lost[$reason]['value'] += $v;
+                if ($r->competitor_id) {
+                    $byCompetitor[$r->competitor_id] ??= ['id' => $r->competitor_id, 'count' => 0, 'value' => 0.0];
+                    $byCompetitor[$r->competitor_id]['count']++;
+                    $byCompetitor[$r->competitor_id]['value'] += $v;
+                }
+            }
+        }
+
+        if ($byCompetitor) {
+            $names = \Illuminate\Support\Facades\DB::table('competitors')
+                ->whereIn('id', array_keys($byCompetitor))->pluck('name', 'id');
+            foreach ($byCompetitor as $cid => &$c) $c['name'] = $names[$cid] ?? '؟';
+            unset($c);
+        }
+
+        usort($lost, fn ($a, $b) => $b['value'] <=> $a['value']);
+        usort($byCompetitor, fn ($a, $b) => $b['value'] <=> $a['value']);
+        $decided = $won + $lostValue;
+
+        return [
+            'stages' => array_values($stages),
+            'pipeline' => round($pipeline, 2),
+            'weighted' => round($weighted, 2),
+            'won' => round($won, 2),
+            'lostValue' => round($lostValue, 2),
+            'winRate' => $decided > 0 ? (int) round($won / $decided * 100) : null,
+            'lostReasons' => $lost,
+            'lostToCompetitors' => $byCompetitor,
+        ];
+    }
+}
+
 if (! function_exists('hub_mrr')) {
     /**
      * الإيراد الشهري المتكرر (MRR) من العقود السارية — أثمن رقمٍ تجاري لم يكن
