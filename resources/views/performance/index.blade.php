@@ -35,8 +35,8 @@
                     <td style="width:40%"><a href="{{ route('m.show', ['okrs', $o->id]) }}">{{ \Illuminate\Support\Str::limit($o->title, 46) }}</a>
                         <div class="sub">{{ $o->period }}{{ $o->due ? ' · حتى ' . substr($o->due, 0, 10) : '' }}</div></td>
                     <td><div class="pbar sm"><span style="width:{{ min(100, max(0, (int) ($o->progress ?? 0))) }}%"></span></div></td>
-                    <td style="width:1%"><b>{{ (int) ($o->progress ?? 0) }}٪</b></td>
-                    <td style="width:1%">@if ($o->status)<span class="bdg {{ hub_tone($o->status) }}">{{ $o->status }}</span>@endif</td>
+                    <td class="acts"><b>{{ (int) ($o->progress ?? 0) }}٪</b></td>
+                    <td class="acts">@if ($o->status)<span class="bdg {{ hub_tone($o->status) }}">{{ $o->status }}</span>@endif</td>
                 </tr>
             @endforeach
         </table>
@@ -48,7 +48,7 @@
 {{-- أداء الموظفين --}}
 <div class="card pad0">
     <div style="padding:16px 16px 0"><h3>👥 أداء الموظفين — آخر ٣٠ يوماً</h3></div>
-    <table class="tbl">
+    <div class="tblwrap"><table class="tbl">
         <thead><tr><th>الموظف</th><th>مهام أُنجزت</th><th>الالتزام بالمواعيد</th><th>متأخرة الآن</th><th>تذاكر حُلّت</th><th>متوسط الحل</th><th>تقييم المدير</th></tr></thead>
         <tbody>
         @forelse ($people as $p)
@@ -67,7 +67,7 @@
             <tr><td colspan="7" class="empty">لا نشاط مسجل بعد — الأرقام تتجمع تلقائياً مع عمل الفريق</td></tr>
         @endforelse
         </tbody>
-    </table>
+    </table></div>
 </div>
 <div class="sub" style="margin-top:8px">الالتزام = المنجزة قبل موعدها من ذات المواعيد · زمن الإنجاز تقريبي بآخر تعديل · تقييم المدير من حقل «التقييم» في ملف الموظف</div>
 @endsection

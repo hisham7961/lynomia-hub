@@ -7,7 +7,7 @@
     <a class="btn p sm" href="{{ route('users.create') }}">＋ مستخدم جديد</a>
 </div>
 <div class="card pad0">
-    <table class="tbl">
+    <div class="tblwrap"><table class="tbl">
         <thead><tr><th>الاسم</th><th>البريد</th><th>الدور</th><th>الحالة</th><th>آخر دخول</th><th class="acts">إجراءات</th></tr></thead>
         <tbody>
         @foreach ($users as $u)
@@ -26,7 +26,7 @@
             </tr>
         @endforeach
         </tbody>
-    </table>
+    </table></div>
 </div>
 {{ $users->links('partials.pagination') }}
 @endsection

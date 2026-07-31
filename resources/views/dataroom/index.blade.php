@@ -37,7 +37,7 @@
 </div>
 
 <div class="card pad0">
-    <table class="tbl">
+    <div class="tblwrap"><table class="tbl">
         <thead><tr><th>المستند</th><th>الحماية</th><th>المشاهدات</th><th>الحالة</th><th class="acts">إجراء</th></tr></thead>
         <tbody>
         @forelse ($links as $l)
@@ -68,6 +68,6 @@
             <tr><td colspan="5" class="empty">لا روابط بعد — شارك أول مستند من الأعلى</td></tr>
         @endforelse
         </tbody>
-    </table>
+    </table></div>
 </div>
 @endsection

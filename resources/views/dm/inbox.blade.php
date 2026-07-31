@@ -33,7 +33,7 @@
             </div>
         </a>
     @empty
-        <div class="empty" style="padding:40px"><span class="big">💬</span>
+        <div class="empty"><span class="big">💬</span>
             لا محادثات بعد — اختر زميلاً من «محادثة جديدة» وابدأ
         </div>
     @endforelse

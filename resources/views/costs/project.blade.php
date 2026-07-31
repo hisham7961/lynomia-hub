@@ -49,7 +49,7 @@
                             <div style="background:var(--p);height:100%;width:{{ round($val / $max * 100) }}%"></div>
                         </div>
                     </td>
-                    <td style="width:1%;white-space:nowrap"><b>{{ $m($val) }}</b>
+                    <td class="acts"><b>{{ $m($val) }}</b>
                         <span class="sub">{{ round($val / $max * 100) }}٪</span></td>
                 </tr>
             @endforeach
@@ -69,7 +69,7 @@
                 {{ $m($pl['burn_day']) }} {{ $c }} من الحرق الجاري — هذا ما دفعتَه ثمناً للتأخير وحده.
             </div>
         @else
-            <div class="empty" style="padding:18px"><span class="big">🎉</span>لا تأخير عن الموعد المتوقع</div>
+            @include('partials.empty', ['icon' => '🎉', 'text' => 'لا تأخير عن الموعد المتوقع'])
         @endif
     </div>
 </div>

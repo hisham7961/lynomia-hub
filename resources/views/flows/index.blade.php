@@ -10,7 +10,7 @@
 
 {{-- المسارات الموجودة --}}
 <div class="card pad0">
-    <table class="tbl">
+    <div class="tblwrap"><table class="tbl">
         <thead><tr><th>المسار</th><th>متى</th><th>الإجراءات</th><th>التشغيلات</th><th>الحالة</th><th class="acts">إجراء</th></tr></thead>
         <tbody>
         @forelse ($flows as $f)
@@ -32,7 +32,7 @@
             <tr><td colspan="6" class="empty"><span class="big">🪄</span>لا مسارات بعد — اختر وحدة بالأسفل وابنِ أول مسار</td></tr>
         @endforelse
         </tbody>
-    </table>
+    </table></div>
 </div>
 
 {{-- الباني --}}

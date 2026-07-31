@@ -53,7 +53,7 @@
                             <tr>
                                 <td>{{ $p['name'] }} <span class="sub ltr">{{ is_string($p['email'] ?? null) ? $p['email'] : '' }}</span>
                                     <span class="sub">· معرف #{{ $p['id'] }}</span></td>
-                                <td style="width:1%">
+                                <td class="acts">
                                     <form method="POST" action="{{ route('odoo.link', [$module, $row->id]) }}">
                                         @csrf
                                         <input type="hidden" name="pid" value="{{ $p['id'] }}">

@@ -19,7 +19,7 @@
                     @foreach ($ch['rows'] as $cr)
                         <tr>
                             <td><a href="{{ route('m.show', [$ch['module'], $cr->id]) }}">{{ \Illuminate\Support\Str::limit($cr->{$ch['display']} ?? $cr->id, 44) }}</a></td>
-                            <td class="mono sub" style="width:1%;white-space:nowrap">{{ optional($cr->created_at)->format('m-d') }}</td>
+                            <td class="mono sub acts">{{ optional($cr->created_at)->format('m-d') }}</td>
                         </tr>
                     @endforeach
                 </table>

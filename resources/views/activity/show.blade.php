@@ -30,7 +30,7 @@
         <summary class="sub" style="cursor:pointer">مِمَّ تتكوّن نسبة الشك؟</summary>
         <table class="mini" style="margin-top:6px">
             @foreach ($risk['parts'] as $plabel => $pv)
-                <tr><td>{{ $plabel }}</td><td style="width:1%"><b>{{ $pv }}</b></td></tr>
+                <tr><td>{{ $plabel }}</td><td class="acts"><b>{{ $pv }}</b></td></tr>
             @endforeach
         </table>
     </details>
@@ -61,7 +61,7 @@
         <h3>📄 الصفحات الأكثر زيارة</h3>
         <table class="mini">
             @foreach ($topPages as $p)
-                <tr><td class="mono ltr" style="font-size:11.5px">{{ $p->path }}</td><td style="width:1%"><b>{{ $p->c }}</b></td></tr>
+                <tr><td class="mono ltr" style="font-size:11.5px">{{ $p->path }}</td><td class="acts"><b>{{ $p->c }}</b></td></tr>
             @endforeach
         </table>
     </div>
@@ -72,8 +72,8 @@
         <table class="mini">
             @foreach ($devices as $d)
                 <tr><td class="mono ltr" style="font-size:10.5px">{{ \Illuminate\Support\Str::limit($d->device, 60) }}</td>
-                    <td class="mono ltr" style="width:1%">{{ $d->ip }}</td>
-                    <td class="mono sub" style="width:1%">{{ substr($d->created_at, 5, 11) }}</td></tr>
+                    <td class="mono ltr acts">{{ $d->ip }}</td>
+                    <td class="mono sub acts">{{ substr($d->created_at, 5, 11) }}</td></tr>
             @endforeach
         </table>
         <b class="sub" style="display:block;margin-top:8px">العناوين المعروفة:</b>
@@ -91,7 +91,7 @@
         <div style="max-height:340px;overflow:auto">
             <table class="mini">
                 @foreach ($trail as $v)
-                    <tr><td class="mono sub" style="width:1%;white-space:nowrap">{{ substr($v->at, 5, 11) }}</td>
+                    <tr><td class="mono sub acts">{{ substr($v->at, 5, 11) }}</td>
                         <td class="mono ltr" style="font-size:11.5px">{{ $v->path }}</td></tr>
                 @endforeach
             </table>

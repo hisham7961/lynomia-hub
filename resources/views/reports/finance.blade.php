@@ -30,9 +30,9 @@
             @forelse ($unpaid as $u)
                 <tr>
                     <td><a href="{{ route('m.show', ['fin', $u->id]) }}">{{ $u->no ?: \Illuminate\Support\Str::limit($u->partner, 18) }}</a><div class="sub">{{ \Illuminate\Support\Str::limit($u->partner, 22) }}</div></td>
-                    <td class="mono" style="width:1%;white-space:nowrap">{{ number_format($u->total - $u->paid, 2) }}</td>
-                    <td style="width:1%"><span class="bdg {{ hub_tone($u->state) }}">{{ $u->state }}</span></td>
-                    <td class="mono sub" style="width:1%;white-space:nowrap">{{ $u->due ? substr($u->due, 0, 10) : '—' }}</td>
+                    <td class="mono acts">{{ number_format($u->total - $u->paid, 2) }}</td>
+                    <td class="acts"><span class="bdg {{ hub_tone($u->state) }}">{{ $u->state }}</span></td>
+                    <td class="mono sub acts">{{ $u->due ? substr($u->due, 0, 10) : '—' }}</td>
                 </tr>
             @empty
                 <tr><td class="empty">لا مستحقات معلقة 🎉</td></tr>
@@ -43,7 +43,7 @@
         <h3>🏆 أعلى مصادر الدخل</h3>
         <table class="mini">
             @forelse ($topPartners as $p)
-                <tr><td>{{ \Illuminate\Support\Str::limit($p->partner, 26) }}</td><td class="mono" style="width:1%;white-space:nowrap">{{ number_format($p->s, 2) }}</td></tr>
+                <tr><td>{{ \Illuminate\Support\Str::limit($p->partner, 26) }}</td><td class="mono acts">{{ number_format($p->s, 2) }}</td></tr>
             @empty
                 <tr><td class="empty">لا بيانات بعد</td></tr>
             @endforelse
@@ -51,7 +51,7 @@
         <h3 style="margin-top:14px">📋 حسب الحالة</h3>
         <table class="mini">
             @foreach ($byState as $st)
-                <tr><td><span class="bdg {{ hub_tone($st->state) }}">{{ $st->state }}</span></td><td class="sub" style="width:1%">{{ $st->c }}</td><td class="mono" style="width:1%;white-space:nowrap">{{ number_format($st->s, 2) }}</td></tr>
+                <tr><td><span class="bdg {{ hub_tone($st->state) }}">{{ $st->state }}</span></td><td class="sub acts">{{ $st->c }}</td><td class="mono acts">{{ number_format($st->s, 2) }}</td></tr>
             @endforeach
         </table>
     </div>

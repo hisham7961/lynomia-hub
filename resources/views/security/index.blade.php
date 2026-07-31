@@ -33,7 +33,7 @@
         <table class="mini">
             @forelse ($sessions as $s)
                 <tr><td>{{ $s->uname ?? '—' }}<div class="sub" title="{{ $s->device }}">{{ \Illuminate\Support\Carbon::parse($s->started_at)->diffForHumans() }}</div></td>
-                    <td class="mono ltr" style="width:1%">{{ $s->ip }}</td></tr>
+                    <td class="mono ltr acts">{{ $s->ip }}</td></tr>
             @empty
                 <tr><td class="sub" style="padding:12px;text-align:center">لا جلسات مسجلة</td></tr>
             @endforelse
@@ -45,7 +45,7 @@
         <table class="mini">
             @forelse ($failed as $f)
                 <tr><td class="mono ltr" style="font-size:12px">{{ \Illuminate\Support\Str::limit($f->name, 28) }}<div class="sub" title="{{ $f->device }}">{{ \Illuminate\Support\Carbon::parse($f->created_at)->diffForHumans() }}</div></td>
-                    <td class="mono ltr" style="width:1%">{{ $f->ip }}</td></tr>
+                    <td class="mono ltr acts">{{ $f->ip }}</td></tr>
             @empty
                 <tr><td class="sub" style="padding:12px;text-align:center">لا محاولات فاشلة 🎉</td></tr>
             @endforelse
@@ -57,7 +57,7 @@
         <table class="mini">
             @forelse ($idleUsers as $u)
                 <tr><td>{{ $u->name }}<div class="sub">{{ $u->email }} · {{ $u->last_login_at ? 'آخر دخول ' . \Illuminate\Support\Carbon::parse($u->last_login_at)->diffForHumans() : 'لم يدخل قط' }}</div></td>
-                    <td style="width:1%">@unless ($u->totp_enabled)<span class="bdg wn" title="بلا مصادقة ثنائية">بلا 2FA</span>@endunless</td></tr>
+                    <td class="acts">@unless ($u->totp_enabled)<span class="bdg wn" title="بلا مصادقة ثنائية">بلا 2FA</span>@endunless</td></tr>
             @empty
                 <tr><td class="sub" style="padding:12px;text-align:center">الجميع نشطون 💪</td></tr>
             @endforelse
@@ -95,7 +95,7 @@
         <table class="mini">
             @forelse ($exports as $e)
                 <tr><td>{{ $e->uname ?? '—' }} — {{ hub_mod($e->module)['label'] ?? $e->module }}<div class="sub">{{ $e->name }} · {{ \Illuminate\Support\Carbon::parse($e->created_at)->diffForHumans() }}</div></td>
-                    <td class="mono ltr" style="width:1%">{{ $e->ip }}</td></tr>
+                    <td class="mono ltr acts">{{ $e->ip }}</td></tr>
             @empty
                 <tr><td class="sub" style="padding:12px;text-align:center">لا عمليات تصدير بعد</td></tr>
             @endforelse

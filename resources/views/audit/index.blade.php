@@ -13,7 +13,7 @@
     </form>
 </div>
 <div class="card pad0">
-    <table class="tbl">
+    <div class="tblwrap"><table class="tbl">
         <thead><tr><th>الوقت</th><th>المستخدم</th><th>الإجراء</th><th>الوحدة</th><th>السجل</th><th>IP</th></tr></thead>
         <tbody>
         @forelse ($rows as $a)
@@ -36,7 +36,7 @@
             <tr><td colspan="6" class="empty">لا سجلات</td></tr>
         @endforelse
         </tbody>
-    </table>
+    </table></div>
 </div>
 {{ $rows->links('partials.pagination_simple') }}
 @endsection

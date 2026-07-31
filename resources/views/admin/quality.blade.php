@@ -48,7 +48,7 @@
                 <table class="mini">
                     @foreach ($c['sample'] as $s)
                         <tr><td><a href="{{ route('m.show', [$c['module'], $s['id']]) }}">{{ \Illuminate\Support\Str::limit($s['name'], 45) }}</a></td>
-                            <td style="width:1%"><a class="btn ghost xs" href="{{ route('m.edit', [$c['module'], $s['id']]) }}">تصحيح ←</a></td></tr>
+                            <td class="acts"><a class="btn ghost xs" href="{{ route('m.edit', [$c['module'], $s['id']]) }}">تصحيح ←</a></td></tr>
                     @endforeach
                 </table>
                 @if ($c['count'] > count($c['sample']))

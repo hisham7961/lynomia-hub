@@ -7,8 +7,8 @@
         @foreach ($rows as $t)
             <tr>
                 <td><a href="{{ route('m.show', ['tasks', $t->id]) }}">{{ \Illuminate\Support\Str::limit($t->{$disp}, 38) }}</a></td>
-                <td class="mono" style="width:1%;white-space:nowrap">{{ substr($t->{$dueCol}, 0, 10) }}</td>
-                @if ($stCol)<td style="width:1%"><span class="bdg {{ hub_tone($t->{$stCol}) }}">{{ $t->{$stCol} }}</span></td>@endif
+                <td class="mono acts">{{ substr($t->{$dueCol}, 0, 10) }}</td>
+                @if ($stCol)<td class="acts"><span class="bdg {{ hub_tone($t->{$stCol}) }}">{{ $t->{$stCol} }}</span></td>@endif
             </tr>
         @endforeach
     </table>

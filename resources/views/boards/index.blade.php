@@ -15,7 +15,7 @@
 </div>
 
 <div class="card" style="margin-top:12px">
-    <table class="tbl">
+    <div class="tblwrap"><table class="tbl">
         <thead><tr><th>اللوحة</th><th>الودجات</th><th>الحالة</th><th></th></tr></thead>
         <tbody>
         @forelse ($boards as $b)
@@ -37,6 +37,6 @@
             <tr><td colspan="4" class="empty">لا لوحات بعد — أنشئ أولاها من الأعلى</td></tr>
         @endforelse
         </tbody>
-    </table>
+    </table></div>
 </div>
 @endsection

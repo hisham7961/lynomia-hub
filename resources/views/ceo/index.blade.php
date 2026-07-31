@@ -72,7 +72,7 @@
                 <tr>
                     <td><a href="{{ route('m.show', ['projects', $p->id]) }}">{{ \Illuminate\Support\Str::limit($p->name, 26) }}</a>
                         <div class="pbar sm"><span style="width:{{ (int) ($p->progress ?? 0) }}%"></span></div></td>
-                    <td style="width:1%"><b>{{ $p->progress !== null ? $p->progress . '٪' : '—' }}</b></td>
+                    <td class="acts"><b>{{ $p->progress !== null ? $p->progress . '٪' : '—' }}</b></td>
                 </tr>
             @empty
                 <tr><td class="sub" style="padding:12px;text-align:center">لا مشاريع جارية</td></tr>
@@ -86,7 +86,7 @@
         <table class="mini">
             @forelse ($onLeave as $l)
                 <tr><td>{{ $l->name }}<div class="sub">{{ $l->type }} · يعود {{ substr($l->to, 0, 10) }}</div></td>
-                    <td style="width:1%"><span class="bdg wn">إجازة</span></td></tr>
+                    <td class="acts"><span class="bdg wn">إجازة</span></td></tr>
             @empty
                 <tr><td class="sub" style="padding:12px;text-align:center">لا أحد في إجازة اليوم — الفريق مكتمل 💪</td></tr>
             @endforelse
@@ -101,8 +101,8 @@
                 <tr>
                     <td><a href="{{ route('m.show', ['fin', $u->id]) }}">{{ $u->no ?: \Illuminate\Support\Str::limit($u->partner, 20) }}</a>
                         <div class="sub">{{ \Illuminate\Support\Str::limit($u->partner, 24) }}{{ $u->due ? ' · استحق ' . substr($u->due, 0, 10) : '' }}</div></td>
-                    <td class="mono" style="width:1%;white-space:nowrap"><b>{{ number_format($u->total - $u->paid, 0) }}</b></td>
-                    <td style="width:1%"><span class="bdg {{ hub_tone($u->state) }}">{{ $u->state }}</span></td>
+                    <td class="mono acts"><b>{{ number_format($u->total - $u->paid, 0) }}</b></td>
+                    <td class="acts"><span class="bdg {{ hub_tone($u->state) }}">{{ $u->state }}</span></td>
                 </tr>
             @empty
                 <tr><td class="sub" style="padding:12px;text-align:center">كل المستحقات محصلة 🎉</td></tr>

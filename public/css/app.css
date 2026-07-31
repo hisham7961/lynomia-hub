@@ -740,6 +740,8 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .empty{border:1.5px dashed color-mix(in srgb,var(--ln) 80%,transparent);border-radius:14px;
   margin:8px 2px;background:color-mix(in srgb,var(--cd) 40%,transparent)}
 .empty::before{content:"🍃";display:block;font-size:26px;margin-bottom:8px;opacity:.7}
+/* v2.126: أيقونة واحدة لا اثنتان — من جلب أيقونته الدالة (.big) لا يأخذ الورقة فوقها */
+.empty:has(.big)::before{content:none}
 
 /* شريط التحميل العلوي: تدرج بلون الهوية مع لمعان */
 #topload{background:linear-gradient(90deg,var(--p),var(--ac),var(--p));background-size:200% 100%;

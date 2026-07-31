@@ -31,12 +31,12 @@
                 <tr>
                     <td><a href="{{ route('m.show', ['contracts', $c->id]) }}">{{ \Illuminate\Support\Str::limit($c->title, 40) }}</a>
                         <div class="sub">{{ $c->type }}{{ $c->party ? ' · ' . $c->party : '' }}{{ $c->value ? ' · ' . number_format((float) $c->value, 0) . ' ' . $c->currency : '' }}{{ $c->renewal ? ' · التجديد: ' . $c->renewal : '' }}</div></td>
-                    <td style="width:1%;white-space:nowrap">
+                    <td class="acts">
                         @if ($c->days < 0)<span class="bdg bad">متجاوز بـ{{ abs($c->days) }} يوم</span>
                         @elseif ($c->days <= 14)<span class="bdg bad">{{ $c->days }} يوم</span>
                         @else<span class="bdg wn">{{ $c->days }} يوم</span>@endif
                     </td>
-                    <td style="width:1%">
+                    <td class="acts">
                         @if (hub_can(auth()->user(), 'contracts', 'e'))
                             <a class="btn ghost xs" href="{{ route('m.edit', ['contracts', $c->id]) }}">تجديد/تعديل</a>
                         @endif
@@ -79,7 +79,7 @@
                 <tr>
                     <td><b>{{ \Illuminate\Support\Str::limit($q->title, 44) }}</b>
                         <div class="sub">أُرسل {{ $q->sent_at->diffForHumans() }} · فُتح {{ $q->opens }}×</div></td>
-                    <td style="width:1%;white-space:nowrap">
+                    <td class="acts">
                         @if (hub_can(auth()->user(), 'contracts', 'e'))
                             <form method="POST" action="{{ route('esign.resend', $q->id) }}" class="inline">@csrf
                                 <button class="btn ghost xs">⏰ تذكير</button></form>
@@ -100,7 +100,7 @@
             @forelse ($pendingSteps as $st)
                 <tr><td>{{ \Illuminate\Support\Str::limit($st->req->title, 34) }}
                     <div class="sub">مرحلة {{ $st->stage }}: {{ $st->label ?: $st->kind }}</div></td>
-                    <td style="width:1%"><a class="btn ghost xs" href="{{ route('esign.index') }}">قرار</a></td></tr>
+                    <td class="acts"><a class="btn ghost xs" href="{{ route('esign.index') }}">قرار</a></td></tr>
             @empty
                 <tr><td class="sub" style="padding:12px;text-align:center">لا موافقات معلقة</td></tr>
             @endforelse
@@ -112,7 +112,7 @@
             @forelse ($renewals as $r)
                 <tr><td><a href="{{ route('m.show', ['contracts', $r->id]) }}">{{ \Illuminate\Support\Str::limit($r->title, 34) }}</a>
                     <div class="sub mono ltr">{{ $r->doc_no }}</div></td>
-                    <td style="width:1%"><span class="bdg {{ $r->status === 'مسودة' ? 'wn' : 'ok' }}">{{ $r->status === 'مسودة' ? 'مسودة تجديد' : $r->status }}</span></td></tr>
+                    <td class="acts"><span class="bdg {{ $r->status === 'مسودة' ? 'wn' : 'ok' }}">{{ $r->status === 'مسودة' ? 'مسودة تجديد' : $r->status }}</span></td></tr>
             @empty
                 <tr><td class="sub" style="padding:12px;text-align:center">لا تجديدات جارية</td></tr>
             @endforelse
@@ -128,8 +128,8 @@
                 <tr>
                     <td><a href="{{ route('m.show', ['obligations', $o->id]) }}">{{ \Illuminate\Support\Str::limit($o->title, 44) }}</a>
                         <div class="sub">{{ $obUsers[$o->owner_id] ?? '' }}{{ $o->amount ? ' · ' . number_format($o->amount, 0) . ' ' . ($o->currency ?: '') : '' }}</div></td>
-                    <td class="mono sub" style="width:1%;white-space:nowrap">{{ $o->due?->format('Y-m-d') }}</td>
-                    <td style="width:1%"><span class="bdg {{ $o->due && $o->due->isPast() ? 'bad' : 'wn' }}">{{ $o->status ?: 'قائم' }}</span></td>
+                    <td class="mono sub acts">{{ $o->due?->format('Y-m-d') }}</td>
+                    <td class="acts"><span class="bdg {{ $o->due && $o->due->isPast() ? 'bad' : 'wn' }}">{{ $o->status ?: 'قائم' }}</span></td>
                 </tr>
             @empty
                 <tr><td class="sub" style="padding:16px;text-align:center">لا التزامات تستحق قريباً — أضفها من وحدة «التزامات العقود» أو تبويب العقد</td></tr>

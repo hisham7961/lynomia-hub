@@ -87,7 +87,7 @@
                     <td>{{ \Illuminate\Support\Str::limit($f->title, 30) }}
                         <div class="pbar sm"><span style="width:{{ min(100, max(0, (int) ($f->progress ?? 0))) }}%"></span></div>
                         <div class="sub">{{ $f->type }} · وزن {{ $f->weight ?: 1 }}{{ $f->test && $f->test !== '—' ? ' · اختبار: ' . $f->test : '' }}</div></td>
-                    <td style="width:1%"><b>{{ (int) ($f->progress ?? 0) }}٪</b></td>
+                    <td class="acts"><b>{{ (int) ($f->progress ?? 0) }}٪</b></td>
                 </tr>
             @endforeach
         </table>
@@ -102,7 +102,7 @@
                 <tr>
                     <td>@if (hub_can(auth()->user(), 'issues', 'v'))<a href="{{ route('m.show', ['issues', $i->id]) }}">{{ \Illuminate\Support\Str::limit($i->title, 34) }}</a>@else {{ \Illuminate\Support\Str::limit($i->title, 34) }} @endif
                         @if ($i->severity)<div class="sub">{{ $i->severity }}</div>@endif</td>
-                    <td style="width:1%">@if ($i->status)<span class="bdg {{ hub_tone($i->status) }}">{{ $i->status }}</span>@endif</td>
+                    <td class="acts">@if ($i->status)<span class="bdg {{ hub_tone($i->status) }}">{{ $i->status }}</span>@endif</td>
                 </tr>
             @empty
                 <tr><td class="sub" style="padding:12px;text-align:center">لا أعطال مفتوحة 🎉</td></tr>
@@ -116,7 +116,7 @@
             @forelse ($tickets as $t)
                 <tr>
                     <td>@if (hub_can(auth()->user(), 'tickets', 'v'))<a href="{{ route('m.show', ['tickets', $t->id]) }}">{{ \Illuminate\Support\Str::limit($t->subject, 34) }}</a>@else {{ \Illuminate\Support\Str::limit($t->subject, 34) }} @endif</td>
-                    <td style="width:1%">@if ($t->status)<span class="bdg {{ hub_tone($t->status) }}">{{ $t->status }}</span>@endif</td>
+                    <td class="acts">@if ($t->status)<span class="bdg {{ hub_tone($t->status) }}">{{ $t->status }}</span>@endif</td>
                 </tr>
             @empty
                 <tr><td class="sub" style="padding:12px;text-align:center">لا تذاكر مفتوحة 🎉</td></tr>

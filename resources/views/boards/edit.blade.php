@@ -69,7 +69,7 @@
             @forelse ($available as $key => $def)
                 <tr>
                     <td>{{ $def['label'] }}</td>
-                    <td style="width:1%">
+                    <td class="acts">
                         <form method="POST" action="{{ route('boards.widget.add', $board->id) }}">
                             @csrf<input type="hidden" name="widget_key" value="{{ $key }}">
                             <button class="btn ghost xs">إضافة</button>

@@ -74,7 +74,7 @@
                     <input class="inp ltr" id="ord-{{ $gi }}" type="number" name="order[{{ $g['g'] }}]" min="0" max="99" style="max-width:90px"
                            value="{{ ($oi = array_search($g['g'], $order, true)) === false ? '' : $oi }}" placeholder="—">
                 </div>
-                <table class="tbl">
+                <div class="tblwrap"><table class="tbl">
                     <thead><tr><th>الوحدة</th><th style="width:110px">إخفاء</th><th style="width:220px">تسمية بديلة</th></tr></thead>
                     <tbody>
                     @foreach ($g['items'] as $it)
@@ -87,7 +87,7 @@
                         </tr>
                     @endforeach
                     </tbody>
-                </table>
+                </table></div>
             </details>
         @endforeach
     </div>

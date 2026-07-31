@@ -36,7 +36,7 @@
                         <tr>
                             <td><a href="{{ route('m.show', [$g['module'], $row->id]) }}">{{ \Illuminate\Support\Str::limit((string) $row->{$g['display']}, 40) }}</a></td>
                             @if ($g['status'] && $row->{$g['status']})
-                                <td style="width:1%"><span class="bdg {{ hub_tone($row->{$g['status']}) }}">{{ $row->{$g['status']} }}</span></td>
+                                <td class="acts"><span class="bdg {{ hub_tone($row->{$g['status']}) }}">{{ $row->{$g['status']} }}</span></td>
                             @endif
                         </tr>
                     @endforeach

@@ -3,7 +3,7 @@
 @section('content')
 <div class="toolbar"><div class="spacer"></div><a class="btn p sm" href="{{ route('roles.create') }}">＋ دور جديد</a></div>
 <div class="card pad0">
-    <table class="tbl">
+    <div class="tblwrap"><table class="tbl">
         <thead><tr><th>الدور</th><th>النطاق</th><th>المستخدمون</th><th class="acts">إجراءات</th></tr></thead>
         <tbody>
         @foreach ($roles as $r)
@@ -20,6 +20,6 @@
             </tr>
         @endforeach
         </tbody>
-    </table>
+    </table></div>
 </div>
 @endsection

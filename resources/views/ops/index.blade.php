@@ -30,7 +30,7 @@
         <table class="mini">
             @forelse ($outbox as $state => $c)
                 <tr><td>{{ ['queued' => 'بالانتظار', 'sending' => 'قيد الإرسال', 'sent' => 'أُرسلت', 'failed' => 'فاشلة'][$state] ?? $state }}</td>
-                    <td style="width:1%"><span class="bdg {{ $state === 'failed' ? 'bad' : ($state === 'queued' ? 'wn' : 'ok') }}">{{ $c }}</span></td></tr>
+                    <td class="acts"><span class="bdg {{ $state === 'failed' ? 'bad' : ($state === 'queued' ? 'wn' : 'ok') }}">{{ $c }}</span></td></tr>
             @empty
                 <tr><td class="sub" style="padding:10px">الصف فارغ</td></tr>
             @endforelse
@@ -43,7 +43,7 @@
         <table class="mini">
             @foreach ($beats as $b)
                 <tr><td>{{ $b['label'] }}<div class="sub">{{ $b['at'] ? \Illuminate\Support\Carbon::parse($b['at'])->diffForHumans() : 'لم تعمل بعد' }}</div></td>
-                    <td style="width:1%"><span class="bdg {{ $b['late'] ? 'bad' : 'ok' }}">{{ $b['late'] ? '⚠️ متأخرة' : '✓ تعمل' }}</span></td></tr>
+                    <td class="acts"><span class="bdg {{ $b['late'] ? 'bad' : 'ok' }}">{{ $b['late'] ? '⚠️ متأخرة' : '✓ تعمل' }}</span></td></tr>
             @endforeach
         </table>
         <div class="sub" style="margin-top:6px">إن كانت كلها متأخرة فسطر cron غير مفعّل على الخادم (انظر README)</div>
@@ -65,9 +65,9 @@
     <div class="card kid">
         <h3>📉 مؤشرات ٧ أيام</h3>
         <table class="mini">
-            <tr><td>تكرارات الأخطاء</td><td style="width:1%"><b>{{ $errs['week'] }}</b></td></tr>
-            <tr><td>طلبات بطيئة (> ثانية)</td><td style="width:1%"><b>{{ $errs['slow'] }}</b></td></tr>
-            <tr><td>أخطاء API</td><td style="width:1%"><b>{{ $errs['api'] }}</b></td></tr>
+            <tr><td>تكرارات الأخطاء</td><td class="acts"><b>{{ $errs['week'] }}</b></td></tr>
+            <tr><td>طلبات بطيئة (> ثانية)</td><td class="acts"><b>{{ $errs['slow'] }}</b></td></tr>
+            <tr><td>أخطاء API</td><td class="acts"><b>{{ $errs['api'] }}</b></td></tr>
         </table>
         <form method="POST" action="{{ route('ops.testerror') }}" style="margin-top:10px" data-confirm="توليد خطأ تجريبي للتحقق من الالتقاط؟">
             @csrf<button class="btn ghost xs">🧪 توليد خطأ تجريبي</button>
@@ -123,7 +123,7 @@
     <div class="card kid">
         <h3>🛠️ بيئة التشغيل</h3>
         <table class="mini">
-            <tr><td>البيئة</td><td style="width:1%"><span class="bdg {{ $env['env'] === 'production' ? 'ok' : 'wn' }}">{{ $env['env'] }}</span></td></tr>
+            <tr><td>البيئة</td><td class="acts"><span class="bdg {{ $env['env'] === 'production' ? 'ok' : 'wn' }}">{{ $env['env'] }}</span></td></tr>
             <tr><td>وضع التصحيح Debug</td><td><span class="bdg {{ $env['debug'] ? 'bad' : 'ok' }}">{{ $env['debug'] ? '⚠️ مفعّل — أطفئه في الإنتاج' : 'متوقف ✓' }}</span></td></tr>
             <tr><td>الكاش · الجلسات · الطوابير</td><td class="mono ltr">{{ $env['cache'] }} · {{ $env['session'] }} · {{ $env['queue'] }}</td></tr>
             <tr><td>مسرّع OPcache</td><td><span class="bdg {{ $env['opcache'] === 'مفعّل' ? 'ok' : 'wn' }}">{{ $env['opcache'] }}</span></td></tr>
@@ -141,8 +141,8 @@
             <table class="mini">
                 @foreach ($tables as $t)
                     <tr><td class="mono ltr">{{ $t->t }}</td>
-                        <td class="mono sub" style="width:1%">{{ number_format($t->r) }} صف</td>
-                        <td class="mono sub" style="width:1%">{{ $fmt($t->s) }}</td></tr>
+                        <td class="mono sub acts">{{ number_format($t->r) }} صف</td>
+                        <td class="mono sub acts">{{ $fmt($t->s) }}</td></tr>
                 @endforeach
             </table>
         </div>

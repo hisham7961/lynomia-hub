@@ -26,7 +26,7 @@
             </span>
         </a>
     @empty
-        <div class="sub" style="padding:28px;text-align:center">{{ $unread ? 'لا إشعارات غير مقروءة 🎉' : 'لا إشعارات بعد' }}</div>
+        @include('partials.empty', ['icon' => '🔔', 'text' => $unread ? 'لا إشعارات غير مقروءة 🎉' : 'لا إشعارات بعد'])
     @endforelse
 </div>
 

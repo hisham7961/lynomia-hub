@@ -34,7 +34,7 @@
                 <tr>
                     <td>@if (hub_can(auth()->user(), 'approvals', 'v'))<a href="{{ route('m.show', ['approvals', $a->id]) }}">{{ \Illuminate\Support\Str::limit($a->title, 32) }}</a>@else {{ \Illuminate\Support\Str::limit($a->title, 32) }} @endif
                         <div class="sub">{{ $a->type }}{{ $a->amount ? ' · ' . number_format((float) $a->amount, 0) . ' ' . $a->currency : '' }}{{ $a->due ? ' · قبل ' . substr($a->due, 0, 10) : '' }}</div></td>
-                    <td style="width:1%">@if ($a->status)<span class="bdg {{ hub_tone($a->status) }}">{{ $a->status }}</span>@endif</td>
+                    <td class="acts">@if ($a->status)<span class="bdg {{ hub_tone($a->status) }}">{{ $a->status }}</span>@endif</td>
                 </tr>
             @endforeach
         </table>
@@ -49,7 +49,7 @@
                 <tr>
                     <td>@if (hub_can(auth()->user(), 'tickets', 'v'))<a href="{{ route('m.show', ['tickets', $t->id]) }}">{{ \Illuminate\Support\Str::limit($t->subject, 32) }}</a>@else {{ \Illuminate\Support\Str::limit($t->subject, 32) }} @endif
                         <div class="sub">{{ $t->customer }}{{ $t->priority ? ' · ' . $t->priority : '' }}</div></td>
-                    <td style="width:1%">@if ($t->status)<span class="bdg {{ hub_tone($t->status) }}">{{ $t->status }}</span>@endif</td>
+                    <td class="acts">@if ($t->status)<span class="bdg {{ hub_tone($t->status) }}">{{ $t->status }}</span>@endif</td>
                 </tr>
             @endforeach
         </table>
@@ -64,7 +64,7 @@
                 <tr>
                     <td>@if (hub_can(auth()->user(), 'meetings', 'v'))<a href="{{ route('m.show', ['meetings', $mt->id]) }}">{{ \Illuminate\Support\Str::limit($mt->title, 32) }}</a>@else {{ \Illuminate\Support\Str::limit($mt->title, 32) }} @endif
                         <div class="sub">{{ \Illuminate\Support\Carbon::parse($mt->dt)->translatedFormat('l j F · H:i') }}</div></td>
-                    <td style="width:1%">@if ($mt->link)<a class="btn ghost xs" href="{{ hub_safe_url($mt->link) }}" target="_blank" rel="noopener">انضم</a>@endif</td>
+                    <td class="acts">@if ($mt->link)<a class="btn ghost xs" href="{{ hub_safe_url($mt->link) }}" target="_blank" rel="noopener">انضم</a>@endif</td>
                 </tr>
             @endforeach
         </table>
@@ -79,7 +79,7 @@
                 <tr>
                     <td>@if (hub_can(auth()->user(), 'decisions', 'v'))<a href="{{ route('m.show', ['decisions', $d->id]) }}">{{ \Illuminate\Support\Str::limit($d->title, 32) }}</a>@else {{ \Illuminate\Support\Str::limit($d->title, 32) }} @endif
                         @if ($d->due)<div class="sub">قبل {{ substr($d->due, 0, 10) }}</div>@endif</td>
-                    <td style="width:1%"><span class="bdg {{ hub_tone($d->status) }}">{{ $d->status }}</span></td>
+                    <td class="acts"><span class="bdg {{ hub_tone($d->status) }}">{{ $d->status }}</span></td>
                 </tr>
             @endforeach
         </table>
@@ -102,7 +102,7 @@
                         @else {{ \Illuminate\Support\Str::limit($t->title, 34) }} @endif
                         <div class="sub">{{ $t->due ? 'الاستحقاق: ' . substr($t->due, 0, 10) : 'بلا موعد' }}{{ $t->priority ? ' · ' . $t->priority : '' }}</div>
                     </td>
-                    <td style="width:1%">
+                    <td class="acts">
                         @if ($t->status)<span class="bdg {{ hub_tone($t->status) }}">{{ $t->status }}</span>@endif
                         @if ($t->progress !== null)<div class="sub" style="text-align:center">{{ (int) $t->progress }}٪</div>@endif
                     </td>
@@ -120,7 +120,7 @@
             @forelse ($leaves as $l)
                 <tr>
                     <td>{{ $l->type }}<div class="sub">{{ substr($l->date_from, 0, 10) }} ← {{ substr((string) $l->date_to, 0, 10) }} ({{ $l->days }} يوم)</div></td>
-                    <td style="width:1%"><span class="bdg {{ hub_tone($l->status) }}">{{ $l->status }}</span></td>
+                    <td class="acts"><span class="bdg {{ hub_tone($l->status) }}">{{ $l->status }}</span></td>
                 </tr>
             @empty
                 <tr><td class="sub" style="padding:14px;text-align:center">لا طلبات بعد</td></tr>
@@ -134,7 +134,7 @@
             @forelse ($attend as $a)
                 <tr>
                     <td>{{ substr($a->date, 0, 10) }}<div class="sub">{{ $a->time_in ?? '—' }} ← {{ $a->time_out ?? '—' }}</div></td>
-                    <td style="width:1%">{{ $a->hours !== null ? number_format((float) $a->hours, 1) . ' س' : '' }}
+                    <td class="acts">{{ $a->hours !== null ? number_format((float) $a->hours, 1) . ' س' : '' }}
                         @if ($a->status)<span class="bdg {{ hub_tone($a->status) }}">{{ $a->status }}</span>@endif</td>
                 </tr>
             @empty
@@ -149,7 +149,7 @@
             @forelse ($log as $r)
                 <tr>
                     <td>{{ \Illuminate\Support\Str::limit($r->title, 32) }}<div class="sub">{{ $r->kind }}{{ $r->date ? ' · ' . substr($r->date, 0, 10) : '' }}{{ $r->expiry ? ' · ينتهي ' . substr($r->expiry, 0, 10) : '' }}</div></td>
-                    <td style="width:1%">@if ($r->status)<span class="bdg {{ hub_tone($r->status) }}">{{ $r->status }}</span>@endif</td>
+                    <td class="acts">@if ($r->status)<span class="bdg {{ hub_tone($r->status) }}">{{ $r->status }}</span>@endif</td>
                 </tr>
             @empty
                 <tr><td class="sub" style="padding:14px;text-align:center">السجل فارغ</td></tr>
@@ -164,7 +164,7 @@
             @forelse ($assets as $a)
                 <tr>
                     <td>{{ $a->name }}<div class="sub">{{ $a->type }}{{ $a->tag ? ' · ' . $a->tag : '' }}</div></td>
-                    <td style="width:1%">@if ($a->status)<span class="bdg {{ hub_tone($a->status) }}">{{ $a->status }}</span>@endif</td>
+                    <td class="acts">@if ($a->status)<span class="bdg {{ hub_tone($a->status) }}">{{ $a->status }}</span>@endif</td>
                 </tr>
             @empty
                 <tr><td class="sub" style="padding:14px;text-align:center">لا عهدة مسجلة</td></tr>

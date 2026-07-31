@@ -88,7 +88,7 @@
                         <div class="sub">أُنشئ {{ $t->created_at->diffForHumans() }}{{ $t->expires_at ? ' · ينتهي ' . $t->expires_at->format('Y-m-d') : '' }}{{ $t->last_used_at ? ' · آخر استخدام ' . $t->last_used_at->diffForHumans() : ' · لم يُستخدم' }}</div>
                         @if ($t->scopes)<div class="sub">🔬 نطاقات: <span class="mono ltr" style="font-size:10.5px">{{ \Illuminate\Support\Str::limit($t->scopes, 45) }}</span></div>@endif
                         @if ($t->allowed_ips)<div class="sub">📍 IP: <span class="mono ltr" style="font-size:10.5px">{{ \Illuminate\Support\Str::limit($t->allowed_ips, 45) }}</span></div>@endif</td>
-                    <td style="width:1%;white-space:nowrap">
+                    <td class="acts">
                         <form class="inline" method="POST" action="{{ route('profile.token.rotate', $t->id) }}" data-confirm="تدوير المفتاح؟ القيمة القديمة ستتوقف فوراً وتحصل على قيمة جديدة بنفس النطاقات.">
                             @csrf<button class="btn ghost xs">🔄 تدوير</button>
                         </form>

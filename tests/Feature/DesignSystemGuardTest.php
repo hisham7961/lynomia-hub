@@ -55,6 +55,24 @@ class DesignSystemGuardTest extends TestCase
             '.tl يجب أن يكون له تعريف واحد لا تعريفان متناقضان');
     }
 
+    /** د2 (v2.126): لا width:1% مضمّنة (الصنف .acts هو الطريق) وكل جداول .tbl ملفوفة بحاويتها */
+    public function test_tables_use_acts_class_and_tblwrap(): void
+    {
+        $bad = [];
+        foreach (glob(resource_path('views/{,*/,*/*/}*.blade.php'), GLOB_BRACE) as $f) {
+            $s = file_get_contents($f);
+            if (str_contains($s, 'style="width:1%')) $bad[] = basename(dirname($f)) . '/' . basename($f) . ': width:1% مضمّنة';
+        }
+        foreach (['users/index', 'audit/index', 'support/index', 'roles/index', 'dataroom/index',
+                  'boards/index', 'flows/index', 'flows/sandbox', 'performance/index', 'personalize'] as $v) {
+            $s = file_get_contents(resource_path("views/$v.blade.php"));
+            if (str_contains($s, '<table class="tbl"') && ! str_contains($s, 'tblwrap')) {
+                $bad[] = "$v: جدول .tbl بلا .tblwrap — رؤوس لاصقة مكسورة وفيضان جوال";
+            }
+        }
+        $this->assertSame([], $bad, implode("\n", $bad));
+    }
+
     /** أوزان الخط المطلوبة كلها محملة فعلاً — لا faux-bold مركّب من المتصفح */
     public function test_no_font_weight_beyond_loaded_families(): void
     {
