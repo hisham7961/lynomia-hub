@@ -199,6 +199,18 @@ class EsignController extends Controller
             'created_by' => auth()->id(),
         ]);
 
+        // v2.118: نطاق الطلب من عقده أو جهته المربوطة — به يعمل العزل الشركاتي مباشرة
+        $this->stampScope($req);
+
+        // موقّعٌ أول برمز الطلب نفسه (نمط الكتابة المزدوجة الانتقالي — م4 يوسعه لموقّعين
+        // متعددين برموز مستقلة) + أول حدث في سجل الأدلة
+        \App\Models\ContractSigner::create([
+            'request_id' => $req->id, 'order' => 1, 'role' => 'موقّع',
+            'name' => 'الطرف الثاني', 'token' => $req->token,
+            'status' => 'بانتظار التوقيع',
+        ]);
+        \App\Models\ContractEvent::log('created', $req);
+
         // عقدٌ مربوط → «قيد التوقيع» — بحفظ Eloquent حقيقي (v2.117) فيمر بالتدقيق
         // والإصدارات ومسارات العمل، لا بتحديث query-builder صامت
         $this->flipContract($req->contract_id, ['مسودة', 'قيد التوقيع', ''], 'قيد التوقيع');
@@ -223,6 +235,26 @@ class EsignController extends Controller
         $c->status = $to;
         $c->save();
         \App\Support\FlowRunner::fire('status', 'contracts', $c, $to);
+    }
+
+    /** نطاق الطلب (شركة/مشروع) يُشتق من عقده أولاً ثم من جهته المربوطة */
+    protected function stampScope(SignRequest $req): void
+    {
+        try {
+            $co = $pr = null;
+            if ($req->contract_id && ($c = \App\Models\Contract::find($req->contract_id))) {
+                [$co, $pr] = [$c->company_id, $c->project_id];
+            } elseif ($req->link_module && $req->link_id && ($def = hub_mod($req->link_module))) {
+                $cls = '\\App\\Models\\' . $def['model'];
+                if (class_exists($cls) && ($row = $cls::find($req->link_id))) {
+                    $co = $row->company_id ?? null;
+                    $pr = $row->project_id ?? null;
+                }
+            }
+            if ($co || $pr) $req->forceFill(['company_id' => $co, 'project_id' => $pr])->saveQuietly();
+        } catch (\Throwable $e) {
+            report($e);   // النطاق إثراء — فشله لا يمنع الإنشاء
+        }
     }
 
     /** رمز تحقق قصير فريد للمستند — يُطابَق به معنا */
@@ -258,6 +290,7 @@ class EsignController extends Controller
         // على النص الجديد بلا علمه. الآن يدور الرمز: الرابط القديم يموت، وجلسته معه
         // (مفتاحها الرمز)، ويُدقَّق التدوير، وعلى المرسل مشاركة الرابط الجديد
         $rotated = false;
+        $oldToken = $req->token;
         if ($d['body'] !== $req->body && $req->opened_at) {
             $req->token = Str::random(48);
             $rotated = true;
@@ -269,6 +302,11 @@ class EsignController extends Controller
         ])->save();
         hub_audit('تحرير طلب توقيع', 'contracts', $req->contract_id, $req->title);
         if ($rotated) {
+            // v2.118: رمز الموقّع المرحّل يتبع رمز الطلب (الكتابة المزدوجة) — يدور معه
+            \App\Models\ContractSigner::where('request_id', $req->id)
+                ->where('token', $oldToken)->update(['token' => $req->token]);
+            \App\Models\ContractEvent::log('voided', $req,
+                ['meta' => json_encode(['reason' => 'تدوير الرابط بعد تعديل النص'], JSON_UNESCAPED_UNICODE)]);
             hub_audit('تحرير بعد الاطلاع — تدوير رابط التوقيع', 'contracts', $req->contract_id, $req->title);
             $this->notifyOwners('🔄 عُدّل نص «' . $req->title . '» بعد اطلاع الموقّع — الرابط القديم أُبطل وصدر رابط جديد');
         }
@@ -308,6 +346,7 @@ class EsignController extends Controller
         // أول فتح بعد كلمة السر: يُسجَّل ويُنبَّه أصحاب النظام برمز التحقق
         if (! $req->opened_at) {
             $req->forceFill(['opened_at' => now()])->saveQuietly();
+            \App\Models\ContractEvent::log('opened', $req);
             $this->notifyOwners('👀 فُتح «' . $req->title . '» [' . $req->verify_code . '] — من ' . $r->ip());
         }
         $req->increment('opens');
@@ -326,6 +365,12 @@ class EsignController extends Controller
 
         $d = $r->validate(['reason' => 'required|string|max:400']);
         $req->forceFill(['status' => 'رُفض', 'declined_reason' => $d['reason']])->save();
+
+        // v2.118: مرآة الموقّع + حدث الرفض في سجل الأدلة
+        $signer = \App\Models\ContractSigner::where('request_id', $req->id)->orderBy('order')->first();
+        $signer?->forceFill(['status' => 'رُفض', 'decline_reason' => $d['reason']])->save();
+        \App\Models\ContractEvent::log('declined', $req, ['signer_id' => $signer?->id,
+            'meta' => json_encode(['reason' => $d['reason']], JSON_UNESCAPED_UNICODE)]);
 
         // v2.117: الرفض كان يترك العقد المربوط معلقاً «قيد التوقيع» للأبد — يعود مسودةً
         // ليُراجَع ويُعاد إرساله، والانقلاب مدقق ويطلق مسارات العمل كأي تغيير حالة
@@ -425,6 +470,18 @@ class EsignController extends Controller
             'signed_agent' => substr((string) $r->userAgent(), 0, 250),
             'signed_locale' => substr((string) $r->header('Accept-Language'), 0, 60),
         ])->save();
+
+        // v2.118: مرآة الموقّع وسجل الأدلة — الكتابة المزدوجة الانتقالية حتى م4
+        $signer = \App\Models\ContractSigner::where('request_id', $req->id)->orderBy('order')->first();
+        $signer?->forceFill([
+            'status' => 'وُقّع', 'name' => $d['signer_name'], 'signature' => $d['signature'],
+            'id_no' => $d['signer_id_no'] ?? null, 'selfie' => $d['selfie'] ?? null,
+            'signed_at' => now(), 'ip' => $r->ip(),
+            'agent' => substr((string) $r->userAgent(), 0, 250),
+            'locale' => substr((string) $r->header('Accept-Language'), 0, 60),
+        ])->save();
+        \App\Models\ContractEvent::log('signed', $req, ['signer_id' => $signer?->id,
+            'meta' => json_encode(['name' => $d['signer_name']], JSON_UNESCAPED_UNICODE)]);
 
         // سير العملية يكتمل: العقد المربوط «ساري» — بحفظ Eloquent (v2.117) فيُدقَّق
         // ويُصدَر ويُطلق contract.signed فعلاً (كان التحديث المباشر يخرسه)

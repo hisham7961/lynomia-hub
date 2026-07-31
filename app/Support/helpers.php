@@ -1476,6 +1476,31 @@ if (! function_exists('hub_timeline')) {
             $add($v->created_at, '🕐', 'نسخة', 'الإصدار ' . $v->version, null, $name($v->changed_by));
         }
 
+        // ٥) سجل أدلة التوقيع (v2.118) — دورة التوقيع كاملة على صفحة العقد نفسها
+        if ($module === 'contracts') {
+            try {
+                $signIcons = ['created' => '📨', 'sent' => '📤', 'opened' => '👀',
+                    'otp_sent' => '🔑', 'otp_ok' => '🔓', 'signed' => '✍️', 'declined' => '🚫',
+                    'voided' => '❌', 'reminded' => '⏰', 'downloaded' => '⬇️'];
+                $signLabels = ['created' => 'أُنشئ طلب توقيع', 'sent' => 'أُرسل للتوقيع',
+                    'opened' => 'فُتحت الوثيقة', 'otp_sent' => 'أُرسل رمز تحقق', 'otp_ok' => 'تحقق ناجح',
+                    'signed' => 'وُقّعت الوثيقة', 'declined' => 'رُفض التوقيع', 'voided' => 'أُبطل الرابط',
+                    'reminded' => 'تذكير بالتوقيع', 'downloaded' => 'نُزّلت الوثيقة'];
+                foreach (\Illuminate\Support\Facades\DB::table('contract_events')
+                            ->where('contract_id', $recordId)
+                            ->orderByDesc('created_at')->limit($limit)
+                            ->get(['event', 'ip', 'actor_id', 'meta', 'created_at']) as $s) {
+                    $meta = json_decode((string) $s->meta, true) ?: [];
+                    $add($s->created_at, $signIcons[$s->event] ?? '🖊️',
+                        $signLabels[$s->event] ?? (string) $s->event,
+                        trim(($meta['name'] ?? $meta['reason'] ?? '') . ($s->ip ? ' — ' . $s->ip : '')),
+                        null, $name($s->actor_id));
+                }
+            } catch (\Throwable $e) {
+                // كودٌ وصل قبل هجرته — الخط الزمني لا ينفجر
+            }
+        }
+
         // الأحدث أولاً — تاريخُ سجلٍ يُقرأ من آخره، بخلاف رحلة العميل
         usort($ev, fn ($a, $b) => strcmp($b['at'], $a['at']));
 

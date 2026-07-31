@@ -3769,6 +3769,7 @@ return [
             'display' => 'title',
             'status' => 'status',
             'columns' => [
+                'doc_no',
                 'title',
                 'type',
                 'party',
@@ -3783,6 +3784,12 @@ return [
                     'label' => 'اسم العقد',
                     'type' => 'text',
                     'required' => true,
+                ],
+                [
+                    'key' => 'doc_no',
+                    'col' => 'doc_no',
+                    'label' => 'رقم العقد (يُولَّد تلقائياً إن تُرك فارغاً)',
+                    'type' => 'text',
                 ],
                 [
                     'key' => 'type',
@@ -3921,6 +3928,7 @@ return [
             ],
             'search' => [
                 'title',
+                'doc_no',
                 'party',
                 'alerts',
                 'obligations',

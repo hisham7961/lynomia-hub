@@ -43,6 +43,10 @@ class SettingController extends Controller
         '🔏 الموافقات المُلزِمة' => [
             'approval.rules' => ['وحدات محمية — وحدة:أحرف (e تعديل · d حذف) مثال: vault:ed fin:d', 'text'],
         ],
+        '📜 العقود والتوقيع' => [
+            'contracts.doc_no_format' => ['صيغة ترقيم العقود — {YEAR} السنة و{SEQ} تسلسل سنوي (الافتراضي CTR-{YEAR}-{SEQ})', 'text'],
+            'esign.link_days_default' => ['صلاحية رابط التوقيع الافتراضية بالأيام (فارغ = بلا انتهاء)', 'text'],
+        ],
         '🚧 وضع الصيانة' => [
             'maintenance.on'  => ['تفعيل وضع الصيانة (الدخول للمالكين فقط)', 'onoff'],
             'maintenance.msg' => ['رسالة تظهر للمستخدمين أثناء الصيانة', 'text'],

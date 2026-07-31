@@ -10,7 +10,12 @@ trait HasVersions
 {
     protected static function bootHasVersions(): void
     {
-        static::creating(fn ($m) => $m->version = $m->version ?? 1);
+        // v2.118: كانت arrow fn تُرجع قيمة التعيين (1) — وأحداث creating «موقِفة»:
+        // أول ردٍّ غير null يقطع السلسلة، فكل مستمع creating يُسجَّل بعد هذا الـtrait
+        // كان يُخرَس بصمت. مغلقة ببدنٍ صريح تُرجع null فلا توقف أحداً بعدها.
+        static::creating(function ($m) {
+            $m->version = $m->version ?? 1;
+        });
 
         // نزيد الرقم فقط عند تغيّر فعلي — الحفظ بلا تغيير لا ينشئ نسخة جديدة
         static::updating(function ($m) {
