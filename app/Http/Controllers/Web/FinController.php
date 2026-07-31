@@ -63,8 +63,55 @@ class FinController extends Controller
         hub_audit('دفعة', 'fin', $doc->id,
             ($doc->doc_no ?: $doc->id) . ' — ' . number_format($amount, 2) . ' ' . ($doc->currency ?: ''));
 
+        $this->autoJournal($doc, $amount);
+
         return back()->with('ok', $doc->state === 'مدفوعة'
             ? '💰 سُدّد المستند بالكامل'
             : '💰 سُجّلت الدفعة — المتبقي ' . number_format($total - (float) $doc->paid, 2));
+    }
+
+    /**
+     * قيد يومية آلي للدفعة — أول قارئ لخريطة finance.accounts المبذورة منذ
+     * البداية بلا مستهلك. خلف إعداد finance.auto_journal (معطل افتراضياً —
+     * قرار الترحيل الآلي للمنشأة لا لنا): قبضُ دخلٍ يدين البنك/الصندوق ويُدين
+     * المبيعات، وصرفُ مصروفٍ يعكس. القيد يولد مُرحَّلاً مقفلاً بسطرين موزونين.
+     */
+    protected function autoJournal(FinDocument $doc, float $amount): void
+    {
+        if (setting('finance.auto_journal') !== '1') return;
+
+        try {
+            $map = setting('finance.accounts');
+            $map = is_array($map) ? $map : (json_decode((string) $map, true) ?: []);
+            $income = in_array((string) $doc->kind, config('hub.fin.income'), true);
+            $moneyCode = (string) ($doc->bank_id ? ($map['bank'] ?? '') : ($map['cash'] ?? ''));
+            $otherCode = (string) ($income ? ($map['sales'] ?? '') : ($map['exp'] ?? ''));
+
+            $accId = fn (string $code) => $code === '' ? null
+                : \App\Models\LedgerAccount::whereNull('deleted_at')->where('code', $code)->value('id');
+            $money = $accId($moneyCode);
+            $other = $accId($otherCode);
+            if (! $money || ! $other) return;   // خريطة غير مكتملة — لا قيد أعرج
+
+            $entry = \App\Models\JournalEntry::create([
+                'doc_no' => 'JE-' . ($doc->doc_no ?: substr($doc->id, 0, 8)) . '-' . now()->format('His'),
+                'date' => now()->toDateString(),
+                'description' => ($income ? 'قبض' : 'صرف') . ' دفعة على ' . ($doc->doc_no ?: $doc->id),
+                'reference' => (string) $doc->doc_no,
+                'state' => 'مرحّل',
+                'fin_id' => $doc->id,
+                'project_id' => $doc->project_id,
+                'company_id' => $doc->company_id,
+                'meta' => ['posted_at' => now()->toIso8601String(), 'auto' => 'payment'],
+            ]);
+            \App\Models\JournalLine::create(['entry_id' => $entry->id, 'cc_id' => $doc->cc_id,
+                'acc_id' => $income ? $money : $other, 'debit' => $amount, 'credit' => 0,
+                'memo' => $income ? 'قبض الدفعة' : 'المصروف']);
+            \App\Models\JournalLine::create(['entry_id' => $entry->id, 'cc_id' => $doc->cc_id,
+                'acc_id' => $income ? $other : $money, 'debit' => 0, 'credit' => $amount,
+                'memo' => $income ? 'الإيراد' : 'سداد الدفعة']);
+        } catch (\Throwable $e) {
+            report($e);   // القيد الآلي لا يُفشل تسجيل الدفعة نفسها
+        }
     }
 }
