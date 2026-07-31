@@ -23,6 +23,9 @@ class Brand extends Model
 
     protected $casts = [
         'services' => 'array',
+        'domain_ids' => 'array',
+        'social_ids' => 'array',
+        'app_ids' => 'array',
         'tags' => 'array',
         'custom' => 'array',
         'meta' => 'array',

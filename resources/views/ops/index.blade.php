@@ -221,7 +221,7 @@
             تُنشأ مرةً واحدة بالاسم فلا تكرار مهما ضغطت.
         </div>
         <form method="POST" action="{{ route('ops.starters') }}"
-              data-confirm="توليد مسارات العمل وقواعد التنبيه الجاهزة الآن؟">
+              data-confirm="توليد مسارات العمل وقواعد التنبيه ومكتبة مؤشرات KPI الجاهزة الآن؟">
             @csrf<button class="btn ghost xs">🪄 توليد العدّة الآن</button>
         </form>
     </div>

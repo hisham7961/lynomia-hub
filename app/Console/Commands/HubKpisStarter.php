@@ -37,8 +37,8 @@ class HubKpisStarter extends Command
         ['💵 المحصّل فعلياً', 'fin', 'sum', 'paid', null, 'none', null, null, null, null, null, null, 'up'],
         ['📊 نسبة التحصيل', 'fin', 'sum', 'paid', null, 'ratio_pct', 'fin', 'sum', 'total', '', '٪', 90, 'up'],
         ['🧾 عدد الفواتير غير المسددة', 'fin', 'count', null, 'غير مدفوعة', 'none', null, null, null, null, 'فاتورة', 0, 'down'],
-        ['💳 مصروفات المشتريات', 'purchases', 'sum', 'total', null, 'none', null, null, null, null, null, null, 'down'],
-        ['🔁 كلفة الاشتراكات الشهرية', 'subs', 'sum', 'cost', 'نشط', 'none', null, null, null, null, null, null, 'down'],
+        ['💳 مصروفات المشتريات', 'purchases', 'sum', 'amount', null, 'none', null, null, null, null, null, null, 'down'],
+        ['🔁 كلفة الاشتراكات الشهرية', 'subs', 'sum', 'amount', 'نشط', 'none', null, null, null, null, null, null, 'down'],
 
         // ── المبيعات ──
         ['🤝 العملاء النشطون', 'clients', 'count', null, 'نشط', 'none', null, null, null, null, 'عميل', null, 'up'],
@@ -92,7 +92,7 @@ class HubKpisStarter extends Command
         ['🧩 الخدمات النشطة', 'services', 'count', null, 'نشطة', 'none', null, null, null, null, 'خدمة', null, 'up'],
         ['🔐 أسرار الخزنة', 'vault', 'count', null, null, 'none', null, null, null, null, 'سرّ', null, 'up'],
         ['📑 السياسات السارية', 'policies', 'count', null, 'سارية', 'none', null, null, null, null, 'سياسة', null, 'up'],
-        ['🖊️ الإقرارات المكتملة', 'policyacks', 'count', null, 'مُقَر', 'ratio_pct', 'policyacks', 'count', null, '', '٪', 100, 'up'],
+        ['🖊️ الإقرارات المكتملة', 'policyacks', 'count', null, 'مُقرّة', 'ratio_pct', 'policyacks', 'count', null, '', '٪', 100, 'up'],
         ['🎯 الأهداف على المسار', 'okrs', 'count', null, 'على المسار', 'ratio_pct', 'okrs', 'count', null, '', '٪', 70, 'up'],
     ];
 

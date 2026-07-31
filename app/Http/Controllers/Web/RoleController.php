@@ -9,6 +9,17 @@ use Illuminate\Http\Request;
 
 class RoleController extends Controller
 {
+    /** أعلام الدور كما يقرؤها hub_flag — المصدر الوحيد للنموذج والحفظ معاً */
+    public const FLAGS = [
+        'users'   => 'إدارة المستخدمين',
+        'audit'   => 'سجل التدقيق',
+        'approve' => 'اعتماد الطلبات والموافقات',
+        'monitor' => 'اللوحات التحليلية والمراقبة',
+        'secrets' => 'كشف أسرار الخزنة',
+        'copySec' => 'نسخ السرّ دون كشفه',
+        'exp'     => 'تصدير البيانات',
+    ];
+
     protected array $ops = ['v' => 'عرض', 'a' => 'إضافة', 'e' => 'تعديل', 'd' => 'حذف'];
 
     protected function gate(): void
@@ -47,7 +58,7 @@ class RoleController extends Controller
     public function update(Request $r, Role $role)
     {
         $this->gate();
-        $role->update($this->data($r));
+        $role->update($this->data($r, $role));
 
         return redirect()->route('roles.index')->with('ok', 'حُفظ الدور');
     }
@@ -62,7 +73,7 @@ class RoleController extends Controller
         return redirect()->route('roles.index')->with('ok', 'حُذف الدور');
     }
 
-    protected function data(Request $r): array
+    protected function data(Request $r, ?Role $role = null): array
     {
         $d = $r->validate(['name' => 'required|string|max:80', 'scope' => 'required|in:all,proj']);
         $matrix = [];
@@ -71,9 +82,19 @@ class RoleController extends Controller
                 if ($r->boolean("matrix.$mod.$op")) $matrix[$mod][$op] = 1;
             }
         }
-        $flags = [];
-        foreach (['users', 'audit', 'approve', 'secrets', 'exp'] as $f) {
-            if ($r->boolean("flags.$f")) $flags[$f] = 1;
+        // الأعلام السبعة التي يقرؤها النظام فعلاً (hub_flag). كانت القائمة
+        // خمسةً فقط، والنموذج لا يعرض أياً منها إطلاقاً — فكان كل تعديلِ دورٍ
+        // روتيني يكتب [] فوق أعلامه ويُسقط الاعتماد والتدقيق والمراقبة صامتاً.
+        //
+        // ومربّع الاختيار غير المؤشَّر لا يُرسَل أصلاً، فلا يُفرَّق بين «أُلغيت
+        // كلها» و«لم يُرسَل القسم» إلا بعلامةٍ صريحة: `flags_submitted` من
+        // النموذج. بلا هذه العلامة تبقى الأعلام القديمة كما هي.
+        $flags = (array) ($role?->flags ?? []);
+        if ($r->has('flags') || $r->boolean('flags_submitted')) {
+            $flags = [];
+            foreach (array_keys(self::FLAGS) as $f) {
+                if ($r->boolean("flags.$f")) $flags[$f] = 1;
+            }
         }
 
         // صلاحيات مستوى الحقل: نحفظ القيود فقط (ro/hide) ونطرح الوحدات الفارغة
