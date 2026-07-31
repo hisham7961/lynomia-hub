@@ -819,6 +819,8 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'domainId', 'col' => 'domain_id', 'label' => 'الدومين', 'type' => 'ref', 'ref' => 'domains'],
+                ['key' => 'serverId', 'col' => 'server_id', 'label' => 'السيرفر المستضيف', 'type' => 'ref', 'ref' => 'servers'],
                 [
                     'key' => 'name',
                     'col' => 'name',
@@ -1120,6 +1122,7 @@ return [
                 'expiry',
             ],
             'fields' => [
+                ['key' => 'vaultId', 'col' => 'vault_id', 'label' => 'اعتماد الدخول (من الخزنة)', 'type' => 'ref', 'ref' => 'vault'],
                 [
                     'key' => 'name',
                     'col' => 'name',
@@ -1258,6 +1261,8 @@ return [
                 'subExp',
             ],
             'fields' => [
+                ['key' => 'vaultId', 'col' => 'vault_id', 'label' => 'سرّ الدخول (من الخزنة)', 'type' => 'ref', 'ref' => 'vault'],
+                ['key' => 'twoFA', 'col' => 'two_fa', 'label' => 'التحقق الثنائي مفعّل', 'type' => 'bool'],
                 [
                     'key' => 'platform',
                     'col' => 'platform',
@@ -1403,6 +1408,8 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'domainId', 'col' => 'domain_id', 'label' => 'الدومين التابع له', 'type' => 'ref', 'ref' => 'domains'],
+                ['key' => 'vaultId', 'col' => 'vault_id', 'label' => 'سرّ الدخول (من الخزنة)', 'type' => 'ref', 'ref' => 'vault'],
                 [
                     'key' => 'address',
                     'col' => 'address',
@@ -6788,6 +6795,7 @@ return [
                 
             ],
             'fields' => [
+                ['key' => 'clientId', 'col' => 'client_id', 'label' => 'العميل', 'type' => 'ref', 'ref' => 'clients'],
                 [
                     'key' => 'subject',
                     'col' => 'subject',
@@ -7345,6 +7353,8 @@ return [
             'status' => 'status',
             'columns' => ['title', 'testDate', 'backupName', 'durationMin', 'status', 'offsite'],
             'fields' => [
+                ['key' => 'dbId', 'col' => 'db_id', 'label' => 'قاعدة البيانات المختبَرة', 'type' => 'ref', 'ref' => 'dbs'],
+                ['key' => 'nextTest', 'col' => 'next_test', 'label' => 'الاختبار الدوري القادم', 'type' => 'date', 'expiry' => true],
                 ['key' => 'title', 'col' => 'title', 'label' => 'عنوان الاختبار', 'type' => 'text', 'required' => true],
                 ['key' => 'testDate', 'col' => 'test_date', 'label' => 'تاريخ الاختبار', 'type' => 'date'],
                 ['key' => 'byId', 'col' => 'by_id', 'label' => 'من نفّذ الاختبار', 'type' => 'ref', 'ref' => 'users'],
