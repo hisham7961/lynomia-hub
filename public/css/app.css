@@ -97,8 +97,13 @@ a:hover{color:var(--pd)}
   box-shadow:var(--sh);transition:box-shadow .25s}
 .card.pad0{padding:0;overflow:hidden}
 .card h3{font-size:14px;margin-bottom:12px;display:flex;gap:8px;align-items:center;font-weight:800;letter-spacing:-.01em}
-.hero{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+/* رأس صفحات المراكز: سطر هويةٍ واحد بمسطرة قاعدية وشارة جانبية — يوحّد ~٢٠ مركزاً دفعةً */
+.hero{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap;
+  padding-bottom:13px;border-bottom:1px solid color-mix(in srgb,var(--ln) 75%,transparent);position:relative}
+.hero::after{content:"";position:absolute;bottom:-1px;inset-inline-start:0;width:64px;height:2.5px;
+  border-radius:99px;background:linear-gradient(90deg,var(--p),transparent)}
 .hero h2{font-size:21px;font-weight:800;letter-spacing:-.02em}
+.hero .sub{margin-top:3px}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:12px;margin-bottom:18px}
 .stat{--st:var(--p);background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);padding:16px 17px 13px;
   display:flex;flex-direction:column;gap:2px;box-shadow:var(--sh);
