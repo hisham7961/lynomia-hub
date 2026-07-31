@@ -7,13 +7,13 @@
 <div class="card">
     <form method="POST" action="{{ route('boards.update', $board->id) }}" class="row">
         @csrf @method('PUT')
-        <div class="fld fw"><label>الاسم <span class="req">*</span></label>
+        <div class="fld fw"><label>الاسم <b class="req">*</b></label>
             <input class="inp" name="name" required maxlength="80" value="{{ old('name', $board->name) }}"></div>
         <label class="chk"><input type="checkbox" name="is_default" value="1" @checked($board->is_default)> افتراضية</label>
         @if (hub_is_owner(auth()->user()))
             <label class="chk"><input type="checkbox" name="shared" value="1" @checked($board->shared)> منشورة للجميع</label>
         @endif
-        <button class="btn">حفظ</button>
+        <button class="btn p">حفظ</button>
     </form>
 </div>
 
@@ -51,7 +51,7 @@
                 @endforeach
             </ul>
             @if ($board->widgets->count())
-                <button class="btn" style="margin-top:10px">حفظ التخطيط</button>
+                <button class="btn p" style="margin-top:10px">حفظ التخطيط</button>
             @else
                 <div class="empty">لا ودجات بعد — أضف من القائمة المجاورة</div>
             @endif

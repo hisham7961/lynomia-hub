@@ -35,7 +35,7 @@
             @foreach (hub_custom_fields($module) as $cf)
                 @php $ck = $cf['key']; $cv = old("custom.$ck", data_get($row?->custom, $ck)); @endphp
                 <div class="fld {{ $errors->has("custom.$ck") ? 'haserr' : '' }}">
-                    <label>{{ $cf['label'] }} @if (! empty($cf['required']))<span class="req">*</span>@endif <span class="sub">· مخصص</span></label>
+                    <label>{{ $cf['label'] }} @if (! empty($cf['required']))<b class="req">*</b>@endif <span class="sub">· مخصص</span></label>
                     @if (($cf['type'] ?? 'text') === 'sel')
                         <select class="inp" name="custom[{{ $ck }}]">
                             <option value=""></option>

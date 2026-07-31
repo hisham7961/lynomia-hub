@@ -51,9 +51,9 @@
         @csrf
         <input type="hidden" name="m" value="{{ $module }}">
         <div class="fg">
-            <div class="fld fw"><label>اسم المسار <span class="req">*</span></label>
+            <div class="fld fw"><label>اسم المسار <b class="req">*</b></label>
                 <input class="inp" name="name" required maxlength="190" value="{{ old('name') }}" placeholder="مثال: تنبيه المالكين عند تذكرة عاجلة"></div>
-            <div class="fld"><label>متى يعمل؟ <span class="req">*</span></label>
+            <div class="fld"><label>متى يعمل؟ <b class="req">*</b></label>
                 <select class="inp" name="event">
                     <option value="created">عند إنشاء سجل</option>
                     <option value="updated" @selected(old('event') === 'updated')>عند تعديل سجل</option>

@@ -20,9 +20,9 @@
     <form method="POST" action="{{ route('dataroom.store') }}" enctype="multipart/form-data">
         @csrf
         <div class="fg">
-            <div class="fld"><label>عنوان المستند <span class="req">*</span></label>
+            <div class="fld"><label>عنوان المستند <b class="req">*</b></label>
                 <input class="inp" name="title" required maxlength="190" placeholder="مثال: القوائم المالية 2026 للمحاسب"></div>
-            <div class="fld"><label>الملف <span class="req">*</span></label>
+            <div class="fld"><label>الملف <b class="req">*</b></label>
                 <input class="inp" type="file" name="file" required>
                 @error('file')<span class="ferr">{{ $message }}</span>@enderror</div>
             <div class="fld"><label>كلمة مرور <span class="sub">(اختياري)</span></label>

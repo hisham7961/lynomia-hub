@@ -3,15 +3,19 @@
     // التعبئة المسبقة تعمل في الإضافة فقط — التعديل يعرض قيم السجل حصراً
     $raw = $row ? $row->{$c} : (($prefill ?? [])[$k] ?? null);
     $wide = in_array($t, ['ta', 'tags']) || ! empty($f['multi']);
+    // v2.128: ربطٌ برمجي — id للحقل وfor على العنوان، فالقارئ الشاشي يسمي كل حقل،
+    // ونقر العنوان يركّز حقله. required الفعلية تعكس إلزامية السجل لا النجمة وحدها.
+    $fid = 'f-' . $k;
+    $req = ! empty($f['required']) ? ' required aria-required=true' : '';
 @endphp
 <div class="fld {{ $wide ? 'fw' : '' }} @error($k) haserr @enderror">
-    <label>{{ $f['label'] }} @if(!empty($f['required']))<b class="req">*</b>@endif</label>
+    <label @if(! in_array($t, ['bool', 'file', 'img']) && empty($f['multi'])) for="{{ $fid }}" @endif>{{ $f['label'] }} @if(!empty($f['required']))<b class="req" aria-hidden="true">*</b>@endif</label>
 
     @if ($t === 'ta')
-        <textarea class="inp" name="{{ $k }}" rows="3">{{ old($k, $raw) }}</textarea>
+        <textarea class="inp @error($k) err @enderror" id="{{ $fid }}" name="{{ $k }}" rows="3"{!! $req !!}>{{ old($k, $raw) }}</textarea>
 
     @elseif ($t === 'sel')
-        <select class="inp" name="{{ $k }}">
+        <select class="inp @error($k) err @enderror" id="{{ $fid }}" name="{{ $k }}"{!! $req !!}>
             <option value=""></option>
             @foreach ($f['options'] ?? [] as $o)
                 <option value="{{ $o }}" @selected(old($k, $raw) === $o)>{{ $o }}</option>
@@ -39,7 +43,7 @@
         </div>
 
     @elseif ($t === 'ref')
-        <select class="inp" name="{{ $k }}">
+        <select class="inp @error($k) err @enderror" id="{{ $fid }}" name="{{ $k }}"{!! $req !!}>
             <option value=""></option>
             @foreach ($refOptions[$k] ?? [] as $id => $label)
                 <option value="{{ $id }}" @selected(old($k, $raw) === $id)>{{ $label }}</option>
@@ -47,23 +51,23 @@
         </select>
 
     @elseif ($t === 'date')
-        <input class="inp" type="date" name="{{ $k }}" value="{{ old($k, $raw ? substr($raw, 0, 10) : '') }}">
+        <input class="inp @error($k) err @enderror" id="{{ $fid }}" type="date" name="{{ $k }}" value="{{ old($k, $raw ? substr($raw, 0, 10) : '') }}"{!! $req !!}>
 
     @elseif ($t === 'dt')
-        <input class="inp" type="datetime-local" name="{{ $k }}" value="{{ old($k, $raw ? str_replace(' ', 'T', substr($raw, 0, 16)) : '') }}">
+        <input class="inp @error($k) err @enderror" id="{{ $fid }}" type="datetime-local" name="{{ $k }}" value="{{ old($k, $raw ? str_replace(' ', 'T', substr($raw, 0, 16)) : '') }}"{!! $req !!}>
 
     @elseif ($t === 'num' || $t === 'big')
-        <input class="inp" type="number" step="any" name="{{ $k }}" value="{{ old($k, $raw) }}">
+        <input class="inp @error($k) err @enderror" id="{{ $fid }}" type="number" step="any" name="{{ $k }}" value="{{ old($k, $raw) }}"{!! $req !!}>
 
     @elseif ($t === 'bool')
         <label class="chk"><input type="checkbox" name="{{ $k }}" value="1" @checked(old($k, (bool) $raw))> نعم</label>
 
     @elseif ($t === 'tags')
         @php $tv = old($k, is_string($raw) ? implode('، ', json_decode($raw, true) ?: []) : ''); @endphp
-        <input class="inp" name="{{ $k }}" value="{{ $tv }}" placeholder="افصل بينها بفواصل">
+        <input class="inp" id="{{ $fid }}" name="{{ $k }}" value="{{ $tv }}" placeholder="افصل بينها بفواصل">
 
     @elseif ($t === 'sec')
-        <input class="inp mono" type="password" name="{{ $k }}" value="" placeholder="{{ $raw ? '•••••• (اتركه فارغاً للإبقاء)' : '' }}" autocomplete="new-password">
+        <input class="inp mono" id="{{ $fid }}" type="password" name="{{ $k }}" value="" placeholder="{{ $raw ? '•••••• (اتركه فارغاً للإبقاء)' : '' }}" autocomplete="new-password">
 
     @elseif ($t === 'file' || $t === 'img')
         <label class="filefield">
@@ -80,10 +84,10 @@
         @endif
 
     @elseif ($t === 'url')
-        <input class="inp mono ltr" name="{{ $k }}" value="{{ old($k, $raw) }}" placeholder="https://…">
+        <input class="inp mono ltr @error($k) err @enderror" id="{{ $fid }}" name="{{ $k }}" value="{{ old($k, $raw) }}" placeholder="https://…">
 
     @else
-        <input class="inp" name="{{ $k }}" value="{{ old($k, $raw) }}">
+        <input class="inp @error($k) err @enderror" id="{{ $fid }}" name="{{ $k }}" value="{{ old($k, $raw) }}"{!! $req !!}>
     @endif
-    @error($k)<span class="ferr">{{ $message }}</span>@enderror
+    @error($k)<span class="ferr" id="{{ $fid }}-err">{{ $message }}</span>@enderror
 </div>

@@ -459,7 +459,8 @@ document.addEventListener('input', function (e) {
   var dirty = false, submitting = false;
   document.addEventListener('input', function (e) {
     var f = e.target && e.target.form;
-    if (f && (f.method || '').toLowerCase() === 'post') dirty = true;
+    // v2.128: نماذج الفلترة والبحث (data-noguard) لا تحبس المغادرة — لا بيانات تضيع فيها
+    if (f && (f.method || '').toLowerCase() === 'post' && !f.hasAttribute('data-noguard')) dirty = true;
   });
   // غير رأسمالي (bubble): يعمل بعد محرك التأكيد — الضغطة المسلِّحة الممنوعة لا تُحسب إرسالاً
   document.addEventListener('submit', function (e) {

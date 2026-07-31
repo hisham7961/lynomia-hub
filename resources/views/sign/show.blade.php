@@ -28,16 +28,16 @@
             <div class="sub" style="margin-bottom:8px">بتوقيعك أدناه تقرّ بأنك قرأت الوثيقة ووافقت على بنودها. يُسجَّل عنوان الشبكة والجهاز والوقت{{ ($opts['selfie'] ?? false) ? ' وصورة التحقق' : '' }} مع التوقيع.</div>
             <form method="POST" action="{{ route('sign.sign', $token ?? $req->token) }}" id="sform">
                 @csrf
-                <div class="fld" style="margin-bottom:10px"><label>الاسم الكامل <span class="req">*</span></label>
+                <div class="fld" style="margin-bottom:10px"><label>الاسم الكامل <b class="req">*</b></label>
                     <input class="inp" name="signer_name" required maxlength="160" placeholder="اكتب اسمك كما في الهوية"></div>
                 @if ($opts['idno'] ?? false)
-                    <div class="fld" style="margin-bottom:10px"><label>رقم الهوية / السجل <span class="req">*</span></label>
+                    <div class="fld" style="margin-bottom:10px"><label>رقم الهوية / السجل <b class="req">*</b></label>
                         <input class="inp ltr" name="signer_id_no" required maxlength="60" placeholder="123456789012"></div>
                 @endif
 
                 @if ($opts['selfie'] ?? false)
                     <div class="fld" style="margin-bottom:12px">
-                        <label>📸 صورة تحقق (سيلفي) <span class="req">*</span> <span class="sub">— تُلتقط بموافقتك وتُرفق بالتوقيع</span></label>
+                        <label>📸 صورة تحقق (سيلفي) <b class="req">*</b> <span class="sub">— تُلتقط بموافقتك وتُرفق بالتوقيع</span></label>
                         <video id="cam" autoplay playsinline muted
                                style="width:100%;max-width:340px;border-radius:12px;background:#000;display:none"></video>
                         <img id="shot" alt="" style="max-width:340px;border-radius:12px;display:none;border:2px solid var(--ok)">
@@ -50,7 +50,7 @@
                     </div>
                 @endif
 
-                <label>ارسم توقيعك <span class="req">*</span></label>
+                <label>ارسم توقيعك <b class="req">*</b></label>
                 <canvas id="pad" width="700" height="180"
                         style="width:100%;max-width:700px;height:180px;border:2px dashed var(--lnd);border-radius:12px;background:#fff;touch-action:none;cursor:crosshair"></canvas>
                 <input type="hidden" name="signature" id="sig">

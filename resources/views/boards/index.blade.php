@@ -8,7 +8,7 @@
     <h3>لوحة جديدة</h3>
     <form method="POST" action="{{ route('boards.store') }}" class="row">
         @csrf
-        <div class="fld fw"><label>اسم اللوحة <span class="req">*</span></label>
+        <div class="fld fw"><label>اسم اللوحة <b class="req">*</b></label>
             <input class="inp" name="name" required maxlength="80" placeholder="مثال: متابعة التشغيل اليومية"></div>
         <button class="btn">إنشاء</button>
     </form>

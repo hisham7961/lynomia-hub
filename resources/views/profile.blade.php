@@ -20,7 +20,7 @@
             @csrf @method('PUT')
             <div class="fg">
                 <div class="fld fw">
-                    <label>الاسم <span class="req">*</span></label>
+                    <label>الاسم <b class="req">*</b></label>
                     <input class="inp @error('name') err @enderror" name="name" value="{{ old('name', $u->name) }}" required>
                     @error('name')<span class="ferr">{{ $message }}</span>@enderror
                 </div>
@@ -52,18 +52,18 @@
             @csrf @method('PUT')
             <div class="fg">
                 <div class="fld fw">
-                    <label>كلمة المرور الحالية <span class="req">*</span></label>
+                    <label>كلمة المرور الحالية <b class="req">*</b></label>
                     <input class="inp ltr @error('current') err @enderror" type="password" name="current" autocomplete="current-password" required>
                     @error('current')<span class="ferr">{{ $message }}</span>@enderror
                 </div>
                 <div class="fld fw">
-                    <label>كلمة المرور الجديدة <span class="req">*</span></label>
+                    <label>كلمة المرور الجديدة <b class="req">*</b></label>
                     <input class="inp ltr @error('password') err @enderror" type="password" name="password" autocomplete="new-password" required>
                     @error('password')<span class="ferr">{{ $message }}</span>@enderror
                     <span class="sub">{{ (int) setting('auth.pw_min', 10) }} خانات على الأقل، بأحرف كبيرة وصغيرة وأرقام</span>
                 </div>
                 <div class="fld fw">
-                    <label>تأكيد كلمة المرور الجديدة <span class="req">*</span></label>
+                    <label>تأكيد كلمة المرور الجديدة <b class="req">*</b></label>
                     <input class="inp ltr" type="password" name="password_confirmation" autocomplete="new-password" required>
                 </div>
             </div>

@@ -73,6 +73,18 @@ class DesignSystemGuardTest extends TestCase
         $this->assertSame([], $bad, implode("\n", $bad));
     }
 
+    /** د4 (v2.128): ربط label بالحقل برمجياً — كل نماذج الوحدات الـ71 كانت بلا أسماء للقارئ الشاشي */
+    public function test_module_form_fields_are_programmatically_labelled(): void
+    {
+        $this->seedCore();
+        $html = $this->actingAs($this->owner)->get('/m/contracts/create')->assertOk()->getContent();
+
+        $this->assertStringContainsString('for="f-title"', $html, 'العنوان مربوط بحقله');
+        $this->assertStringContainsString('id="f-title"', $html);
+        $this->assertStringContainsString('aria-required', $html, 'الإلزامية معلنة للتقنيات المساعدة');
+        $this->assertStringContainsString('id="f-type"', $html);
+    }
+
     /** أوزان الخط المطلوبة كلها محملة فعلاً — لا faux-bold مركّب من المتصفح */
     public function test_no_font_weight_beyond_loaded_families(): void
     {

@@ -27,7 +27,7 @@
         <form method="POST" action="{{ route('esign.store') }}" class="row" id="esignform">
             @csrf
             <div data-wstep class="fw">
-                <div class="fld fw"><label>عنوان الطلب <span class="req">*</span></label>
+                <div class="fld fw"><label>عنوان الطلب <b class="req">*</b></label>
                     <input class="inp" name="title" required maxlength="200" value="{{ $preTitle ?? '' }}" placeholder="مثال: عقد خدمات — مطاعم الذواقة"></div>
                 <div class="fld fw"><label>القالب <span class="sub">— أو اتركه واكتب النص حراً في خطوة المتغيرات</span></label>
                     <select class="inp" name="template_id" id="tplsel">

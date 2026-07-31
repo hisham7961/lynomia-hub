@@ -26,7 +26,7 @@
         <table class="mini">
             @forelse ($fields as $f)
                 <tr>
-                    <td><b>{{ $f['label'] }}</b> @if (! empty($f['required']))<span class="req">*</span>@endif
+                    <td><b>{{ $f['label'] }}</b> @if (! empty($f['required']))<b class="req">*</b>@endif
                         <div class="sub">{{ $types[$f['type']] ?? $f['type'] }}{{ ($f['type'] ?? '') === 'ref' ? ' ← ' . ($refs[$f['ref']] ?? $f['ref']) : '' }}{{ ! empty($f['options']) ? ': ' . implode('، ', $f['options']) : '' }} · <span class="mono ltr">{{ $f['key'] }}</span></div></td>
                     <td class="acts">
                         <form method="POST" action="{{ route('fields.destroy', [$module, $f['key']]) }}" data-confirm="حذف الحقل من النماذج؟ القيم المخزنة تبقى.">
@@ -45,10 +45,10 @@
             @csrf
             <input type="hidden" name="m" value="{{ $module }}">
             <div class="fg">
-                <div class="fld"><label>اسم الحقل <span class="req">*</span></label>
+                <div class="fld"><label>اسم الحقل <b class="req">*</b></label>
                     <input class="inp" name="label" value="{{ old('label') }}" required maxlength="120" placeholder="مثال: رقم السجل التجاري">
                     @error('label')<span class="ferr">{{ $message }}</span>@enderror</div>
-                <div class="fld"><label>النوع <span class="req">*</span></label>
+                <div class="fld"><label>النوع <b class="req">*</b></label>
                     <select class="inp" name="type">
                         @foreach ($types as $tk => $tl)<option value="{{ $tk }}" @selected(old('type') === $tk)>{{ $tl }}</option>@endforeach
                     </select></div>
