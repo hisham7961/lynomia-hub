@@ -20,14 +20,16 @@ class ModuleHeroTest extends TestCase
         $this->assertStringContainsString('2 سجل', $html);
     }
 
-    /** صفحة السجل: ترويسة هوية باسم السجل وشارة حالته الملونة */
+    /** صفحة السجل v2.108: ترويسة موحدة (مسار ← هوية ← حالة ← إجراءات) وجسم بعمودين وسكة جانبية */
     public function test_record_show_page_has_identity_hero_with_status(): void
     {
         $this->seedCore();
         $t = \App\Models\Task::create(['title' => 'مهمة الترويسة', 'status' => 'قيد التنفيذ']);
 
         $html = $this->actingAs($this->owner)->get("/m/tasks/{$t->id}")->assertOk()->getContent();
-        $this->assertStringContainsString('class="modhero"', $html);
+        $this->assertStringContainsString('class="rechead"', $html);      // ترويسة السجل الموحدة
+        $this->assertStringContainsString('class="crumbs"', $html);       // مسار التنقل
+        $this->assertStringContainsString('class="rec-rail"', $html);     // السكة الجانبية
         $this->assertStringContainsString('مهمة الترويسة', $html);
         $this->assertStringContainsString('bdg wn', $html);               // «قيد التنفيذ» برتقالية
         $this->assertStringContainsString('tlv2', $html);                 // الخط الزمني الجديد

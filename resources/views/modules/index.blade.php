@@ -9,6 +9,22 @@
         <h2>{{ $def['label'] }}@if ($trash) <span class="sub">— 🗑 السلة</span>@endif</h2>
         <div class="sub">{{ number_format(method_exists($rows, 'total') ? $rows->total() : count($rows)) }} سجل</div>
     </div>
+    <div class="spacer"></div>
+    {{-- الإجراءات في الترويسة نفسها — نمط «رأس صفحةٍ» واحد: الهوية بدايةً والفعل نهايةً --}}
+    <div class="rh-acts">
+        @if (! $trash && ($def['status'] ?? null))
+            <a class="btn ghost sm" href="{{ route('m.board', $module) }}">🗂 كانبان</a>
+        @endif
+        @if (! $trash && (hub_exporter()))
+            <a class="btn ghost sm" href="{{ route('m.export', ['module' => $module] + request()->query()) }}">📤 CSV</a>
+        @endif
+        @if (! $trash && hub_can(auth()->user(), $module, 'a') && ! hub_scoped(auth()->user()))
+            <a class="btn ghost sm" href="{{ route('m.import', $module) }}">📥 استيراد</a>
+        @endif
+        @if (! $trash && hub_can(auth()->user(), $module, 'a'))
+            <a class="btn p sm" id="newbtn" href="{{ route('m.create', $module) }}">＋ جديد <span class="kbd">n</span></a>
+        @endif
+    </div>
 </div>
 <div class="toolbar">
     <form class="filters" method="GET"
@@ -75,18 +91,6 @@
         </div>
     </details>
     <div class="spacer"></div>
-    @if (! $trash && ($def['status'] ?? null))
-        <a class="btn ghost sm" href="{{ route('m.board', $module) }}">🗂 كانبان</a>
-    @endif
-    @if (! $trash && (hub_exporter()))
-        <a class="btn ghost sm" href="{{ route('m.export', ['module' => $module] + request()->query()) }}">📤 CSV</a>
-    @endif
-    @if (! $trash && hub_can(auth()->user(), $module, 'a') && ! hub_scoped(auth()->user()))
-        <a class="btn ghost sm" href="{{ route('m.import', $module) }}">📥 استيراد</a>
-    @endif
-    @if (! $trash && hub_can(auth()->user(), $module, 'a'))
-        <a class="btn p sm" id="newbtn" href="{{ route('m.create', $module) }}">＋ جديد <span class="kbd">n</span></a>
-    @endif
 </div>
 <div id="tblzone" hx-boost="true" hx-target="#tblzone" hx-select="#tblzone" hx-swap="outerHTML"
      hx-push-url="true" hx-select-oob="#flash:innerHTML">
