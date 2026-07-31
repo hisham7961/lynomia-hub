@@ -73,6 +73,9 @@ Route::middleware('guest')->group(function () {
 Route::get('sign/{token}', [\App\Http\Controllers\Web\EsignController::class, 'show'])->name('sign.show');
 Route::post('sign/{token}/unlock', [\App\Http\Controllers\Web\EsignController::class, 'unlock'])->name('sign.unlock');
 Route::post('sign/{token}', [\App\Http\Controllers\Web\EsignController::class, 'sign'])->name('sign.sign');
+Route::post('sign/{token}/decline', [\App\Http\Controllers\Web\EsignController::class, 'decline'])->name('sign.decline');
+Route::get('sign/{token}/doc', [\App\Http\Controllers\Web\EsignController::class, 'clientDoc'])->name('sign.doc');
+Route::match(['get', 'post'], 'verify', [\App\Http\Controllers\Web\EsignController::class, 'verify'])->name('sign.verify');
 
 Route::middleware('auth')->group(function () {
     // التوقيع الإلكتروني — الجهة الداخلية (بصلاحية العقود)
@@ -81,6 +84,8 @@ Route::middleware('auth')->group(function () {
     Route::post('esign/templates', [\App\Http\Controllers\Web\EsignController::class, 'storeTemplate'])->name('esign.tpl.store');
     Route::delete('esign/templates/{id}', [\App\Http\Controllers\Web\EsignController::class, 'destroyTemplate'])->name('esign.tpl.destroy');
     Route::get('esign/{id}/doc', [\App\Http\Controllers\Web\EsignController::class, 'doc'])->name('esign.doc');
+    Route::get('esign/{id}/edit', [\App\Http\Controllers\Web\EsignController::class, 'edit'])->name('esign.edit');
+    Route::put('esign/{id}', [\App\Http\Controllers\Web\EsignController::class, 'update'])->name('esign.update');
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');

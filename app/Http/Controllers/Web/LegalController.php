@@ -19,8 +19,8 @@ class LegalController extends Controller
 
         $kpi = [
             'active'  => $activeish($base())->count(),
-            'soon'    => $activeish($base())->whereNotNull('end')->whereBetween('end', [$today, $soon])->count(),
-            'overdue' => $activeish($base())->whereNotNull('end')->where('end', '<', $today)->count(),
+            'soon'    => $activeish($base())->whereNotNull('date_end')->whereBetween('date_end', [$today, $soon])->count(),
+            'overdue' => $activeish($base())->whereNotNull('date_end')->where('date_end', '<', $today)->count(),
             'value'   => (float) $activeish($base())->sum('value'),
         ];
 
@@ -29,9 +29,9 @@ class LegalController extends Controller
             ->map(fn ($r) => ['label' => $r->type ?: 'غير مصنف', 'value' => (int) $r->c])->all();
 
         // تنتهي قريباً (أو تجاوزت) — بأيام متبقية
-        $expiring = $activeish($base())->whereNotNull('end')->where('end', '<=', $soon)
-            ->orderBy('end')->limit(12)
-            ->get(['id', 'title', 'type', 'party', 'end', 'renewal', 'value', 'currency'])
+        $expiring = $activeish($base())->whereNotNull('date_end')->where('date_end', '<=', $soon)
+            ->orderBy('date_end')->limit(12)
+            ->get(['id', 'title', 'type', 'party', 'date_end as end', 'renewal', 'value', 'currency'])
             ->map(function ($c) {
                 $c->days = (int) now()->startOfDay()->diffInDays(\Illuminate\Support\Carbon::parse($c->end)->startOfDay(), false);
                 return $c;

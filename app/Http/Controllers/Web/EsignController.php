@@ -88,10 +88,15 @@ class EsignController extends Controller
     {
         $this->gate('a');
         $d = $r->validate([
-            'title' => 'required|string|max:200', 'template_id' => 'required|exists:sign_templates,id',
+            'title' => 'required|string|max:200',
+            'template_id' => 'nullable|exists:sign_templates,id',
+            'free_body' => 'nullable|string|max:200000',
             'pass' => 'required|string|min:4|max:80', 'contract_id' => 'nullable|string',
             'link_module' => 'nullable|string|max:40', 'link_id' => 'nullable|string|max:64',
             'vars' => 'array',
+            // خيارات لكل طلب — أنت تختار لكل عقدٍ ما يلزمه
+            'opt_selfie' => 'nullable|boolean', 'opt_idno' => 'nullable|boolean',
+            'opt_decline' => 'nullable|boolean', 'expire_days' => 'nullable|integer|min:1|max:365',
         ]);
 
         // الربط: يُقبل فقط إن كانت الجهة ضمن المسموح ويملك المستخدم رؤيتها
@@ -102,19 +107,35 @@ class EsignController extends Controller
             if ($exists) { $linkModule = $lm; $linkId = $li; }
         }
 
-        // ملء متغيرات القالب — غير المذكور يبقى كما هو ظاهراً فيُرى النقص قبل الإرسال
-        $tpl = SignTemplate::findOrFail($d['template_id']);
-        $body = $tpl->body;
-        foreach ((array) ($d['vars'] ?? []) as $k => $v) {
-            $body = str_replace('{' . $k . '}', (string) $v, $body);
+        // النص: من قالبٍ بمتغيراته، أو نصٌّ حرٌّ يكتبه المستخدم كاملاً
+        if (! empty($d['template_id'])) {
+            $tpl = SignTemplate::findOrFail($d['template_id']);
+            $body = $tpl->body;
+            foreach ((array) ($d['vars'] ?? []) as $k => $v) {
+                $body = str_replace('{' . $k . '}', (string) $v, $body);
+            }
+        } else {
+            $body = trim((string) ($d['free_body'] ?? ''));
+            if ($body === '') {
+                return back()->with('err', 'اختر قالباً أو اكتب نص العقد كاملاً')->withInput();
+            }
         }
 
         $req = SignRequest::create([
-            'title' => $d['title'], 'template_id' => $tpl->id,
+            'title' => $d['title'], 'template_id' => $d['template_id'] ?? null,
             'contract_id' => ($d['contract_id'] ?? null) ?: null,
             'link_module' => $linkModule, 'link_id' => $linkId,
             'body' => $body, 'pass' => Hash::make($d['pass']),
-            'token' => Str::random(48), 'created_by' => auth()->id(),
+            'token' => Str::random(48),
+            'verify_code' => self::makeVerifyCode(),
+            'doc_hash' => hash('sha256', $body),
+            'opts' => json_encode([
+                'selfie'  => (bool) ($d['opt_selfie'] ?? false),
+                'idno'    => (bool) ($d['opt_idno'] ?? false),
+                'decline' => (bool) ($d['opt_decline'] ?? true),
+            ]),
+            'expires_at' => ! empty($d['expire_days']) ? now()->addDays((int) $d['expire_days']) : null,
+            'created_by' => auth()->id(),
         ]);
 
         // عقدٌ مربوط → حالته «قيد التوقيع» تلقائياً (سير العملية يبدأ)
@@ -125,8 +146,45 @@ class EsignController extends Controller
 
         hub_audit('إنشاء طلب توقيع', $linkModule ?: 'contracts', $linkId ?: $req->contract_id, $d['title']);
 
-        return back()->with('ok', 'أُنشئ طلب التوقيع — انسخ الرابط الخاص وأرسله للعميل مع كلمة السر (بقناة أخرى)')
-                     ->with('sign_link', route('sign.show', $req->token));
+        return redirect()->route('esign.edit', $req->id)
+            ->with('ok', 'أُنشئ الطلب — راجع نص العقد وحرّره كما تشاء، ثم انسخ الرابط وأرسله')
+            ->with('sign_link', route('sign.show', $req->token));
+    }
+
+    /** رمز تحقق قصير فريد للمستند — يُطابَق به معنا */
+    protected static function makeVerifyCode(): string
+    {
+        do {
+            $code = 'LYN-' . strtoupper(Str::random(4)) . '-' . strtoupper(Str::random(4));
+        } while (SignRequest::where('verify_code', $code)->exists());
+
+        return $code;
+    }
+
+    /** صفحة تحرير نص العقد — قبل التوقيع فقط، وكل تعديلٍ يجدّد بصمة الوثيقة */
+    public function edit(string $id)
+    {
+        $this->gate('e');
+        $req = SignRequest::findOrFail($id);
+
+        return view('esign.edit', ['req' => $req]);
+    }
+
+    public function update(Request $r, string $id)
+    {
+        $this->gate('e');
+        $req = SignRequest::findOrFail($id);
+        abort_if($req->status === 'وُقّع', 410, 'وثيقة موقعة لا تُحرَّر — أنشئ طلباً جديداً');
+
+        $d = $r->validate(['title' => 'required|string|max:200', 'body' => 'required|string|max:200000']);
+        $req->forceFill([
+            'title' => $d['title'], 'body' => $d['body'],
+            'doc_hash' => hash('sha256', $d['body']),   // بصمة جديدة للنص الجديد
+        ])->save();
+        hub_audit('تحرير طلب توقيع', 'contracts', $req->contract_id, $req->title);
+
+        return redirect()->route('esign.edit', $req->id)->with('ok', 'حُفظ النص وتجدّدت بصمة الوثيقة')
+            ->with('sign_link', route('sign.show', $req->token));
     }
 
     /** وثيقة موقعة/للطباعة — الجهة الداخلية */
@@ -143,18 +201,67 @@ class EsignController extends Controller
     {
         $req = SignRequest::where('token', $token)->firstOrFail();
 
+        // صلاحية الرابط الزمنية — المنتهي يُغلق بأدب (والموقَّع يبقى مفتوحاً كنسخة)
+        if ($req->expires_at && now()->gt($req->expires_at) && $req->status !== 'وُقّع') {
+            return response()->view('sign.expired', ['req' => $req], 410);
+        }
+
         if (! session("sign.ok.{$token}")) {
             return view('sign.gate', ['token' => $token, 'title' => $req->title]);
         }
 
-        // أول فتح بعد كلمة السر: يُسجَّل ويُنبَّه أصحاب النظام
+        // أول فتح بعد كلمة السر: يُسجَّل ويُنبَّه أصحاب النظام برمز التحقق
         if (! $req->opened_at) {
             $req->forceFill(['opened_at' => now()])->saveQuietly();
-            $this->notifyOwners('👀 فُتح طلب التوقيع «' . $req->title . '» — من ' . $r->ip());
+            $this->notifyOwners('👀 فُتح «' . $req->title . '» [' . $req->verify_code . '] — من ' . $r->ip());
         }
         $req->increment('opens');
 
-        return view('sign.show', ['req' => $req]);
+        return view('sign.show', ['req' => $req, 'opts' => json_decode((string) $req->opts, true) ?: []]);
+    }
+
+    /** رفض التوقيع — إن كان الخيار مفعّلاً لهذا الطلب */
+    public function decline(Request $r, string $token)
+    {
+        $req = SignRequest::where('token', $token)->firstOrFail();
+        abort_unless(session("sign.ok.{$token}"), 403);
+        abort_if($req->status !== 'بانتظار التوقيع', 410);
+        $opts = json_decode((string) $req->opts, true) ?: [];
+        abort_unless($opts['decline'] ?? true, 403, 'الرفض غير متاح لهذه الوثيقة');
+
+        $d = $r->validate(['reason' => 'required|string|max:400']);
+        $req->forceFill(['status' => 'رُفض', 'declined_reason' => $d['reason']])->save();
+
+        $this->notifyOwners('🚫 رُفض توقيع «' . $req->title . '» [' . $req->verify_code . '] — السبب: ' . $d['reason']);
+        hub_audit('رفض توقيع', 'contracts', $req->contract_id, $req->title);
+
+        return view('sign.declined', ['req' => $req]);
+    }
+
+    /** نسخة العميل النهائية — عبر رابطه المفتوح بكلمة السر (طباعة/حفظ PDF) */
+    public function clientDoc(string $token)
+    {
+        $req = SignRequest::where('token', $token)->firstOrFail();
+        abort_unless(session("sign.ok.{$token}"), 403);
+
+        return view('esign.doc', ['req' => $req, 'client' => true]);
+    }
+
+    /** التحقق العلني برمز المستند — يطابق أي نسخة معنا دون كشف النص */
+    public function verify(Request $r)
+    {
+        $found = null;
+        $code = strtoupper(trim((string) $r->input('code')));
+        if ($code !== '') {
+            $key = 'verify:' . $r->ip();
+            if (RateLimiter::tooManyAttempts($key, 10)) {
+                return view('sign.verify', ['code' => $code, 'found' => null, 'throttled' => true]);
+            }
+            RateLimiter::hit($key, 60);
+            $found = SignRequest::where('verify_code', $code)->first();
+        }
+
+        return view('sign.verify', ['code' => $code, 'found' => $found, 'throttled' => false]);
     }
 
     public function unlock(Request $r, string $token)
@@ -181,15 +288,22 @@ class EsignController extends Controller
     {
         $req = SignRequest::where('token', $token)->firstOrFail();
         abort_unless(session("sign.ok.{$token}"), 403);
-        abort_if($req->status === 'وُقّع', 410, 'هذه الوثيقة موقعة مسبقاً');
+        abort_if($req->status !== 'بانتظار التوقيع', 410, 'هذه الوثيقة أُغلقت — وُقّعت أو رُفضت مسبقاً');
 
+        $opts = json_decode((string) $req->opts, true) ?: [];
         $d = $r->validate([
             'signer_name' => 'required|string|max:160',
             'signature'   => 'required|string|min:100|max:400000|starts_with:data:image/png',
+            // شروط هذا الطلب تحديداً — أنت اخترتها عند الإنشاء
+            'signer_id_no' => ($opts['idno'] ?? false) ? 'required|string|max:60' : 'nullable|string|max:60',
+            'selfie' => ($opts['selfie'] ?? false)
+                ? 'required|string|min:100|max:2000000|starts_with:data:image/'
+                : 'nullable|string|max:2000000|starts_with:data:image/',
         ]);
 
         $req->forceFill([
             'status' => 'وُقّع', 'signer_name' => $d['signer_name'], 'signature' => $d['signature'],
+            'signer_id_no' => $d['signer_id_no'] ?? null, 'selfie' => $d['selfie'] ?? null,
             'signed_at' => now(), 'signed_ip' => $r->ip(),
             'signed_agent' => substr((string) $r->userAgent(), 0, 250),
             'signed_locale' => substr((string) $r->header('Accept-Language'), 0, 60),
@@ -202,8 +316,9 @@ class EsignController extends Controller
             $this->notifyOwners('📑 العقد المرتبط بـ«' . $req->title . '» صار «ساري» بعد توقيعه');
         }
 
-        $this->notifyOwners('✍️ وُقّع «' . $req->title . '» بواسطة ' . $d['signer_name']
-            . ' — IP ' . $r->ip() . ' في ' . now()->format('Y-m-d H:i'));
+        // الإشعار يحمل رمز التحقق — تطابقه مع الوثيقة في صفحة /verify أو قائمة المركز
+        $this->notifyOwners('✍️ وُقّع «' . $req->title . '» [' . $req->verify_code . '] بواسطة '
+            . $d['signer_name'] . ' — IP ' . $r->ip() . ' في ' . now()->format('Y-m-d H:i'));
         hub_audit('توقيع عقد إلكترونياً', 'contracts', $req->contract_id,
             $req->title . ' — ' . $d['signer_name']);
 

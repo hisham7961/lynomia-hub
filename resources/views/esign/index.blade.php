@@ -21,14 +21,26 @@
             @csrf
             <div class="fld fw"><label>عنوان الطلب <span class="req">*</span></label>
                 <input class="inp" name="title" required maxlength="200" value="{{ $preTitle ?? '' }}" placeholder="مثال: عقد خدمات — مطاعم الذواقة"></div>
-            <div class="fld fw"><label>القالب <span class="req">*</span></label>
-                <select class="inp" name="template_id" id="tplsel" required>
-                    <option value="">— اختر قالباً —</option>
+            <div class="fld fw"><label>القالب <span class="sub">— أو اتركه واكتب النص حراً بالأسفل</span></label>
+                <select class="inp" name="template_id" id="tplsel">
+                    <option value="">✏️ بلا قالب — سأكتب العقد كاملاً</option>
                     @foreach ($templates as $t)
                         <option value="{{ $t->id }}" data-vars='@json($t->vars())'>{{ $t->name }}{{ $t->kind ? ' · ' . $t->kind : '' }}</option>
                     @endforeach
                 </select></div>
-            <div class="fld fw" id="varszone"><span class="sub">اختر قالباً لتظهر متغيراته هنا</span></div>
+            <div class="fld fw" id="varszone">
+                <label>نص العقد الحر</label>
+                <textarea class="inp" name="free_body" rows="8" placeholder="اكتب نص العقد كاملاً هنا… (وستحرّره لاحقاً بحرية أيضاً)">{{ old('free_body') }}</textarea>
+            </div>
+            {{-- خيارات هذا الطلب — أنت تختار لكل عقدٍ ما يلزمه --}}
+            <div class="fld fw" style="border:1px dashed var(--lnd);border-radius:12px;padding:11px 14px">
+                <label style="margin-bottom:6px">🎚️ متطلبات التوقيع لهذا العقد</label>
+                <label class="chk"><input type="checkbox" name="opt_selfie" value="1"> 📸 طلب صورة تحقق بالكاميرا (سيلفي) لحظة التوقيع</label>
+                <label class="chk"><input type="checkbox" name="opt_idno" value="1"> 🪪 رقم الهوية/السجل إلزامي</label>
+                <label class="chk"><input type="checkbox" name="opt_decline" value="1" checked> 🚫 السماح للطرف الآخر برفض التوقيع (مع ذكر السبب)</label>
+                <label class="chk" style="gap:8px">⌛ صلاحية الرابط
+                    <input class="inp" type="number" name="expire_days" min="1" max="365" placeholder="∞" style="width:80px"> يوماً (فارغ = بلا انتهاء)</label>
+            </div>
             <div class="fld"><label>كلمة سر الرابط <span class="req">*</span></label>
                 <input class="inp" name="pass" required minlength="4" maxlength="80" placeholder="يدخلها العميل قبل العرض"></div>
             <div class="fld"><label>ربط بجهة (عميل، موظف، شركة…)</label>
@@ -112,10 +124,13 @@ if (linksel) linksel.addEventListener('change', function () {
     document.getElementById('link_module').value = p[0] || '';
     document.getElementById('link_id').value = p[1] || '';
 });
+// المنطقة تتبدل: قالبٌ → حقول متغيراته؛ بلا قالب → نص العقد الحر
+var freeBodyHtml = document.getElementById('varszone').innerHTML;
 document.getElementById('tplsel').addEventListener('change', function () {
     var zone = document.getElementById('varszone'), opt = this.selectedOptions[0];
+    if (! this.value) { zone.innerHTML = freeBodyHtml; return; }
     var vars = opt && opt.dataset.vars ? JSON.parse(opt.dataset.vars) : [];
-    zone.innerHTML = vars.length ? '<label>متغيرات القالب</label>' : '<span class="sub">هذا القالب بلا متغيرات</span>';
+    zone.innerHTML = vars.length ? '<label>متغيرات القالب — املأها ليتولد العقد</label>' : '<span class="sub">هذا القالب بلا متغيرات</span>';
     vars.forEach(function (v) {
         var w = document.createElement('div'); w.style.marginBottom = '6px';
         var esc = v.replace(/"/g, '&quot;');
