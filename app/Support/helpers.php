@@ -742,7 +742,9 @@ if (! function_exists('hub_sla')) {
         $resDue  = $created->copy()->addHours($resH);
 
         if ($firstReply === 'auto') {
+            // أول رد **غير داخلي**: الملاحظة بين موظفَين لا تصل العميل فلا توقف عدّاده
             $firstReply = \App\Models\Comment::where('module', 'tickets')->where('record_id', $t->id)
+                ->where(fn ($q) => $q->where('internal', false)->orWhereNull('internal'))
                 ->orderBy('created_at')->value('created_at');
         }
         $respAt = $firstReply ? \Illuminate\Support\Carbon::parse($firstReply) : null;

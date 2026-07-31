@@ -36,6 +36,7 @@ class CommentController extends Controller
             'body'      => ['required', 'string', 'max:4000'],
             'att'       => ['nullable', 'file', 'max:512000'],
             'mention'   => ['nullable', 'array'],
+            'internal'  => ['nullable', 'boolean'],
         ]);
 
         [$module, $recordId] = $this->guardTarget($data['module'], $data['record_id'] ?? null);
@@ -49,6 +50,8 @@ class CommentController extends Controller
             'user_id'    => auth()->id(),
             'body'       => $data['body'],
             'att'        => $r->hasFile('att') ? $r->file('att')->store('hub', 'local') : null,
+            // ملاحظة داخلية: لا تُحتسب رداً على العميل في مؤشرات SLA
+            'internal'   => $module === 'tickets' && $r->boolean('internal'),
             'mentions'   => $mentions ?: null,
             'read_by'    => [auth()->id()],
             'created_at' => now(),
