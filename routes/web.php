@@ -76,6 +76,8 @@ Route::post('sign/{token}/unlock', [\App\Http\Controllers\Web\EsignController::c
 Route::post('sign/{token}', [\App\Http\Controllers\Web\EsignController::class, 'sign'])->name('sign.sign');
 Route::post('sign/{token}/decline', [\App\Http\Controllers\Web\EsignController::class, 'decline'])->name('sign.decline');
 Route::get('sign/{token}/doc', [\App\Http\Controllers\Web\EsignController::class, 'clientDoc'])->name('sign.doc');
+Route::get('sign/{token}/certificate', [\App\Http\Controllers\Web\EsignController::class, 'clientCertificate'])->name('sign.cert');
+Route::get('sign/{token}/pdf', [\App\Http\Controllers\Web\EsignController::class, 'clientPdf'])->name('sign.pdf');
 Route::match(['get', 'post'], 'verify', [\App\Http\Controllers\Web\EsignController::class, 'verify'])->name('sign.verify');
 
 Route::middleware('auth')->group(function () {
@@ -89,6 +91,8 @@ Route::middleware('auth')->group(function () {
     Route::post('esign/templates/{id}/archive', [\App\Http\Controllers\Web\EsignController::class, 'archiveTemplate'])->name('esign.tpl.archive');
     Route::post('esign/preview', [\App\Http\Controllers\Web\EsignController::class, 'preview'])->name('esign.preview');
     Route::get('esign/{id}/doc', [\App\Http\Controllers\Web\EsignController::class, 'doc'])->name('esign.doc');
+    Route::get('esign/{id}/certificate', [\App\Http\Controllers\Web\EsignController::class, 'certificate'])->name('esign.cert');
+    Route::get('esign/{id}/pdf', [\App\Http\Controllers\Web\EsignController::class, 'pdf'])->name('esign.pdf');
     Route::post('esign/{id}/cancel', [\App\Http\Controllers\Web\EsignController::class, 'cancel'])->name('esign.cancel');
     Route::post('esign/{id}/resend', [\App\Http\Controllers\Web\EsignController::class, 'resend'])->name('esign.resend');
     Route::post('esign/{id}/extend', [\App\Http\Controllers\Web\EsignController::class, 'extend'])->name('esign.extend');

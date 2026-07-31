@@ -504,7 +504,127 @@ class EsignController extends Controller
         $req = SignRequest::findOrFail($id);
         $this->guardRequest($req);
 
-        return view('esign.doc', ['req' => $req]);
+        return view('esign.doc', ['req' => $req, 'sgs' => $this->signedIndependents($req)]);
+    }
+
+    /** الموقّعون المستقلون الذين وقّعوا — الموقّع المرحّل برمز الطلب يبقى على كتلته القديمة */
+    protected function signedIndependents(SignRequest $req)
+    {
+        return \App\Models\ContractSigner::where('request_id', $req->id)
+            ->where('status', 'وُقّع')->where('token', '!=', (string) $req->token)
+            ->orderBy('order')->get();
+    }
+
+    /* ────────── حزمة الأدلة (v2.122) ────────── */
+
+    /** شهادة إتمام التوقيع — الجهة الداخلية، للموقعة فقط */
+    public function certificate(string $id)
+    {
+        $this->gate();
+        $req = SignRequest::findOrFail($id);
+        $this->guardRequest($req);
+        abort_if($req->status !== 'وُقّع', 410, 'الشهادة تصدر للوثائق الموقعة فقط');
+
+        [$chain, $head] = \App\Support\Evidence::chain($req);
+
+        return view('esign.certificate', [
+            'req' => $req, 'chain' => $chain, 'head' => $head,
+            'signers' => \App\Models\ContractSigner::where('request_id', $req->id)->orderBy('order')->get(),
+            'qr' => \App\Support\Qr::svg(route('sign.verify') . '?code=' . $req->verify_code, 132),
+        ]);
+    }
+
+    /** شهادة الإتمام عبر رابط الموقّع المفتوح — نفس الشهادة حرفياً */
+    public function clientCertificate(string $token)
+    {
+        [$req, $signer] = $this->resolveToken($token);
+        abort_unless(session("sign.ok.{$token}"), 403);
+        abort_if($req->status !== 'وُقّع', 410, 'الشهادة تصدر للوثائق الموقعة فقط');
+
+        [$chain, $head] = \App\Support\Evidence::chain($req);
+
+        return view('esign.certificate', [
+            'req' => $req, 'chain' => $chain, 'head' => $head, 'client' => true,
+            'signers' => \App\Models\ContractSigner::where('request_id', $req->id)->orderBy('order')->get(),
+            'qr' => \App\Support\Qr::svg(route('sign.verify') . '?code=' . $req->verify_code, 132),
+        ]);
+    }
+
+    /** تنزيل الوثيقة PDF — يتساقط لصفحة HTML القابلة للطباعة عند غياب المحرك */
+    public function pdf(string $id)
+    {
+        $this->gate();
+        $req = SignRequest::findOrFail($id);
+        $this->guardRequest($req);
+
+        $bin = \App\Support\DocRenderer::pdf(\App\Support\DocRenderer::docHtml($req), $req->title);
+        if (! $bin) {
+            return redirect()->route('esign.doc', $req->id)
+                ->with('err', 'محرك PDF غير متاح — اطبع من هذه الصفحة (Ctrl+P)');
+        }
+
+        return response($bin, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $req->verify_code . '.pdf"',
+        ]);
+    }
+
+    /** تنزيل PDF عبر رابط الموقّع المفتوح — ويُسجَّل في سجل الأدلة */
+    public function clientPdf(string $token)
+    {
+        [$req, $signer] = $this->resolveToken($token);
+        abort_unless(session("sign.ok.{$token}"), 403);
+
+        $bin = \App\Support\DocRenderer::pdf(\App\Support\DocRenderer::docHtml($req), $req->title);
+        if (! $bin) return redirect()->route('sign.doc', $token);
+        \App\Models\ContractEvent::log('downloaded', $req, ['signer_id' => $signer?->id]);
+
+        return response($bin, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $req->verify_code . '.pdf"',
+        ]);
+    }
+
+    /**
+     * لحظة الاكتمال (v2.122): تجميد رأس سلسلة الأدلة في evidence_hash، أرشفة
+     * نسخة PDF موقعة كمرفق على العقد المربوط، وبريد النسخة النهائية والشهادة
+     * لكل موقّعٍ بريدي ومستلمي النسخ. كله إثراء — فشله لا يمس التوقيع المحفوظ.
+     */
+    protected function archiveSignedCopy(SignRequest $req): void
+    {
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('sign_requests', 'evidence_hash')) {
+                [, $head] = \App\Support\Evidence::chain($req);
+                $req->forceFill(['evidence_hash' => $head])->saveQuietly();
+            }
+
+            if ($req->contract_id
+                && ($pdf = \App\Support\DocRenderer::pdf(\App\Support\DocRenderer::docHtml($req), $req->title))) {
+                $path = 'hub/att/signed-' . $req->verify_code . '.pdf';
+                \Illuminate\Support\Facades\Storage::disk('local')->put($path, $pdf);
+                \App\Models\Attachment::create([
+                    'module' => 'contracts', 'record_id' => $req->contract_id,
+                    'field' => 'نسخة موقعة — ' . $req->verify_code,
+                    'disk' => 'local', 'path' => $path,
+                    'original_name' => 'signed-' . $req->verify_code . '.pdf',
+                    'mime' => 'application/pdf', 'size' => strlen($pdf),
+                    'checksum' => hash('sha256', $pdf),
+                    'uploaded_by' => $req->created_by,
+                ]);
+            }
+
+            foreach (\App\Models\ContractSigner::where('request_id', $req->id)
+                         ->whereNotNull('email')->orderBy('order')->get() as $s) {
+                \App\Models\OutboxMessage::create([
+                    'kind' => 'sign_copy', 'channel' => 'mail', 'target' => $s->email,
+                    'text' => 'اكتمل توقيع «' . Str::limit($req->title, 60) . '» — نسختك النهائية: '
+                        . route('sign.doc', $s->token) . ' وشهادة الإتمام: ' . route('sign.cert', $s->token),
+                    'state' => 'queued', 'created_at' => now(),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /* ────────── الجهة العامة (العميل) ────────── */
@@ -575,7 +695,9 @@ class EsignController extends Controller
         }
         $req->increment('opens');
 
-        return view('sign.show', ['req' => $req, 'opts' => $req->opts ?: [], 'signer' => $signer]);
+        // v2.122: تمرير الرمز الحالي للنموذج — رمز الموقّع المستقل لا رمز الطلب،
+        // فجلسة الفتح مفتاحها رمزه هو (كان النموذج يرسل برمز الطلب → 403 صامت)
+        return view('sign.show', ['req' => $req, 'opts' => $req->opts ?: [], 'signer' => $signer, 'token' => $token]);
     }
 
     /** إرسال رمز تحقق بريدي للموقّع المستقل — عبر صندوق الصادر */
@@ -657,7 +779,8 @@ class EsignController extends Controller
         abort_unless(session("sign.ok.{$token}"), 403);
         \App\Models\ContractEvent::log('downloaded', $req, ['signer_id' => $signer?->id]);
 
-        return view('esign.doc', ['req' => $req, 'client' => true]);
+        return view('esign.doc', ['req' => $req, 'client' => true, 'token' => $token,
+            'sgs' => $this->signedIndependents($req)]);
     }
 
     /* ────────── إدارة دورة الطلب (v2.120) ────────── */
@@ -831,7 +954,15 @@ class EsignController extends Controller
             $found = SignRequest::where('verify_code', $code)->where('status', 'وُقّع')->first();
         }
 
-        return view('sign.verify', ['code' => $code, 'found' => $found, 'throttled' => false]);
+        return view('sign.verify', [
+            'code' => $code, 'found' => $found, 'throttled' => false,
+            // v2.122: الموقّعون وأزمانهم (أسماء فقط — لا بريد ولا IP علناً) + QR للنسخ الورقية
+            'signers' => $found
+                ? \App\Models\ContractSigner::where('request_id', $found->id)
+                    ->where('role', 'موقّع')->where('status', 'وُقّع')->orderBy('order')->get()
+                : collect(),
+            'qr' => $found ? \App\Support\Qr::svg(route('sign.verify') . '?code=' . $found->verify_code, 120) : null,
+        ]);
     }
 
     public function unlock(Request $r, string $token)
@@ -923,6 +1054,8 @@ class EsignController extends Controller
                 $this->notifyOwners('📑 العقد المرتبط بـ«' . $req->title . '» صار «ساري» بعد توقيعه');
             }
             $this->completeLinked($req, $d['signer_name'], $r);
+            // v2.122: حزمة الأدلة — تجميد رأس السلسلة + أرشفة نسخة PDF + بريد النسخ
+            $this->archiveSignedCopy($req);
         } else {
             // متسلسل: بريد الدور التالي يخرج تلقائياً لحظة اكتمال من قبله
             if ($req->mode === 'متسلسل') $this->deliverNext($req);
@@ -936,7 +1069,7 @@ class EsignController extends Controller
         hub_audit('توقيع عقد إلكترونياً', 'contracts', $req->contract_id,
             $req->title . ' — ' . $d['signer_name']);
 
-        return view('sign.done', ['req' => $req, 'partial' => $pending > 0]);
+        return view('sign.done', ['req' => $req, 'partial' => $pending > 0, 'token' => $token]);
     }
 
     /** بريد الموقّع التالي في المتسلسل — أول موقّعٍ معلق دوره بريديٌّ ولم يُرسَل له بعد */

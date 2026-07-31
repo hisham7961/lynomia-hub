@@ -10,9 +10,16 @@
 </head>
 <body style="background:var(--bg);padding:24px 12px">
 <div style="max-width:800px;margin:0 auto">
-    <div class="noprint" style="display:flex;gap:8px;margin-bottom:12px">
+    <div class="noprint" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         @unless ($client ?? false)<a class="btn ghost sm" href="{{ route('esign.index') }}">→ رجوع</a>@endunless
         <button class="btn sm" onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+        @if (($client ?? false) && ($token ?? null))
+            <a class="btn ghost sm" href="{{ route('sign.pdf', $token) }}">⬇️ تنزيل PDF</a>
+            @if ($req->status === 'وُقّع')<a class="btn ghost sm" href="{{ route('sign.cert', $token) }}">📜 شهادة الإتمام</a>@endif
+        @elseif (! ($client ?? false))
+            <a class="btn ghost sm" href="{{ route('esign.pdf', $req->id) }}">⬇️ تنزيل PDF</a>
+            @if ($req->status === 'وُقّع')<a class="btn ghost sm" href="{{ route('esign.cert', $req->id) }}">📜 شهادة الإتمام</a>@endif
+        @endif
     </div>
     <div class="card">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;border-bottom:2px solid var(--ln);padding-bottom:10px;margin-bottom:14px">
@@ -24,7 +31,34 @@
         </div>
         <div style="white-space:pre-wrap;line-height:2;font-size:14.5px">{{ $req->body }}</div>
 
-        @if ($req->status === 'وُقّع')
+        @if (($sgs ?? collect())->isNotEmpty())
+            {{-- v2.122: موقّعون مستقلون (م4) — توقيع كل واحد بأثره، والقديم على كتلته أدناه --}}
+            @foreach ($sgs as $s)
+                <div style="margin-top:26px;border-top:2px solid var(--ln);padding-top:16px">
+                    <b>توقيع: {{ $s->name }} ({{ $s->role }})</b><br>
+                    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;margin:8px 0">
+                        @if (str_starts_with((string) $s->signature, 'data:image/png'))
+                            <img src="{{ $s->signature }}" alt="التوقيع" style="max-width:300px;border:1px solid var(--ln);border-radius:10px;background:#fff">
+                        @endif
+                        @if ($s->selfie)
+                            <img src="{{ $s->selfie }}" alt="صورة التحقق" style="max-width:140px;border:1px solid var(--ln);border-radius:10px">
+                        @endif
+                    </div>
+                    <table class="mini">
+                        @if ($s->id_no)<tr><td>رقم الهوية/السجل</td><td class="mono ltr">{{ $s->id_no }}</td></tr>@endif
+                        <tr><td>وقت التوقيع</td><td class="mono">{{ $s->signed_at?->format('Y-m-d H:i:s') }}</td></tr>
+                        <tr><td>عنوان الشبكة IP</td><td class="mono ltr">{{ $s->ip }}</td></tr>
+                        <tr><td>الجهاز</td><td class="mono ltr" style="font-size:10.5px">{{ $s->agent }}</td></tr>
+                    </table>
+                </div>
+            @endforeach
+            <div style="margin-top:14px">
+                <table class="mini">
+                    <tr><td>بصمة الوثيقة SHA-256</td><td class="mono ltr" style="font-size:9.5px;word-break:break-all">{{ $req->doc_hash }}</td></tr>
+                </table>
+                <div class="sub" style="margin-top:8px">للتحقق من أصالة هذه الوثيقة: {{ route('sign.verify') }} — أدخل الرمز {{ $req->verify_code }}</div>
+            </div>
+        @elseif ($req->status === 'وُقّع')
             <div style="margin-top:26px;border-top:2px solid var(--ln);padding-top:16px">
                 <b>توقيع الطرف الثاني:</b><br>
                 <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;margin:8px 0">

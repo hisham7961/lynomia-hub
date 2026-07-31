@@ -153,6 +153,9 @@
                 <td class="mono ltr sub">{{ $q->signed_ip ?: '—' }}</td>
                 <td class="acts">
                     <a class="btn ghost xs" href="{{ route('esign.doc', $q->id) }}">📄 الوثيقة</a>
+                    @if ($q->status === 'وُقّع')
+                        <a class="btn ghost xs" href="{{ route('esign.cert', $q->id) }}" title="شهادة الإتمام بسجل الأدلة">📜</a>
+                    @endif
                     <button class="btn ghost xs" type="button"
                             onclick="navigator.clipboard.writeText(@js(route('sign.show', $q->token)));this.textContent='✓ نُسخ'">نسخ الرابط</button>
                     @if ($q->status === 'بانتظار التوقيع' && ! $q->cancelled_at)

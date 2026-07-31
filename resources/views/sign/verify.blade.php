@@ -30,7 +30,23 @@
                         <tr><td>وقت التوقيع</td><td class="mono">{{ $found->signed_at->format('Y-m-d H:i') }}</td></tr>
                     @endif
                     <tr><td>بصمة الوثيقة</td><td class="mono ltr" style="font-size:10px;word-break:break-all">{{ $found->doc_hash }}</td></tr>
+                    @if ($found->evidence_hash)
+                        <tr><td>رأس سلسلة الأدلة</td><td class="mono ltr" style="font-size:10px;word-break:break-all">{{ $found->evidence_hash }}</td></tr>
+                    @endif
                 </table>
+                @if (($signers ?? collect())->count() > 1 || (($signers ?? collect())->count() === 1 && ! $found->signer_name))
+                    <table class="mini" style="margin-top:8px">
+                        @foreach ($signers as $s)
+                            <tr><td>وقّع</td><td><b>{{ $s->name }}</b> <span class="mono sub">{{ $s->signed_at?->format('Y-m-d H:i') }}</span></td></tr>
+                        @endforeach
+                    </table>
+                @endif
+                @if ($qr ?? null)
+                    <div style="text-align:center;margin-top:10px">
+                        <div style="background:#fff;padding:6px;border-radius:10px;border:1px solid var(--ln);display:inline-block">{!! $qr !!}</div>
+                        <div class="sub" style="font-size:10px;margin-top:2px">رمز تحققٍ سريع — اطبعه مع نسختك</div>
+                    </div>
+                @endif
                 <div class="sub" style="margin-top:6px">قارن البصمة مع المطبوعة على نسختك — تطابقها يثبت أن النص لم يُمسّ.</div>
             </div>
         @else

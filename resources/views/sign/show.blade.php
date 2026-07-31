@@ -19,14 +19,14 @@
         <div class="card" style="text-align:center"><div style="font-size:34px">✅</div>
             <b>هذه الوثيقة موقعة</b>
             <div class="sub">بواسطة {{ $req->signer_name }} في {{ $req->signed_at?->format('Y-m-d H:i') }}</div>
-            <a class="btn" style="margin-top:10px" href="{{ route('sign.doc', $req->token) }}">📄 نسختك النهائية (طباعة / PDF)</a></div>
+            <a class="btn" style="margin-top:10px" href="{{ route('sign.doc', $token ?? $req->token) }}">📄 نسختك النهائية (طباعة / PDF)</a></div>
     @elseif ($req->status === 'رُفض')
         <div class="card" style="text-align:center"><div style="font-size:34px">🚫</div><b>رُفض توقيع هذه الوثيقة</b></div>
     @else
         <div class="card">
             <h3>✍️ التوقيع</h3>
             <div class="sub" style="margin-bottom:8px">بتوقيعك أدناه تقرّ بأنك قرأت الوثيقة ووافقت على بنودها. يُسجَّل عنوان الشبكة والجهاز والوقت{{ ($opts['selfie'] ?? false) ? ' وصورة التحقق' : '' }} مع التوقيع.</div>
-            <form method="POST" action="{{ route('sign.sign', $req->token) }}" id="sform">
+            <form method="POST" action="{{ route('sign.sign', $token ?? $req->token) }}" id="sform">
                 @csrf
                 <div class="fld" style="margin-bottom:10px"><label>الاسم الكامل <span class="req">*</span></label>
                     <input class="inp" name="signer_name" required maxlength="160" placeholder="اكتب اسمك كما في الهوية"></div>
@@ -63,7 +63,7 @@
             @if ($opts['decline'] ?? true)
                 <details style="margin-top:14px">
                     <summary class="sub" style="cursor:pointer">🚫 لا أوافق — أريد رفض التوقيع</summary>
-                    <form method="POST" action="{{ route('sign.decline', $req->token) }}" style="margin-top:8px;display:flex;gap:8px">
+                    <form method="POST" action="{{ route('sign.decline', $token ?? $req->token) }}" style="margin-top:8px;display:flex;gap:8px">
                         @csrf
                         <input class="inp" name="reason" required maxlength="400" placeholder="سبب الرفض (يصل للجهة المُرسلة)" style="flex:1">
                         <button class="btn" style="border-color:var(--bad);color:var(--bad)">تأكيد الرفض</button>

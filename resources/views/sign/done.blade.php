@@ -17,7 +17,7 @@
         <div class="sub" style="font-size:11px">احتفظ به — تتحقق به من أصالة نسختك في أي وقت عبر {{ route('sign.verify') }}</div>
     </div>
     <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-        <a class="btn p" href="{{ route('sign.doc', $req->token) }}">📄 نسختك النهائية (حفظ PDF)</a>
+        <a class="btn p" href="{{ route('sign.doc', $token ?? $req->token) }}">📄 نسختك النهائية (حفظ PDF)</a>
     </div>
 </div>
 </body>
