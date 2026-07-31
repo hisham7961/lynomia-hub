@@ -26,7 +26,8 @@
   Hub.modal = function (url) {
     var m = $('#modal'); m.hidden = false; document.body.classList.add('lock');
     modalOpener = document.activeElement;
-    $('#modalbody').innerHTML = '<div class="sub" style="padding:30px;text-align:center">… جارٍ التحميل</div>';
+    /* v2.132: هيكل عظمي بدل نص التحميل — الصفحة تَعِد بالشكل قبل الوصول */
+    $('#modalbody').innerHTML = '<div class="skelrow" aria-hidden="true"><div class="skel" style="width:40%;height:18px"></div><div class="skel"></div><div class="skel" style="width:85%"></div><div class="skel" style="height:38px;margin-top:6px"></div></div>';
     htmx.ajax('GET', url, { target: '#modalbody', swap: 'innerHTML' });
     var c = m.querySelector('.mclose'); if (c) c.focus();
     return false;
@@ -871,5 +872,19 @@ document.addEventListener('input', function (e) {
     t.value = t.value.slice(0, s) + ins + t.value.slice(s);
     t.focus(); t.selectionStart = t.selectionEnd = s + ins.length;
     t.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+})();
+
+/* ═ v2.132 — حيوية مدركة: خفوت منطقة الجدول أثناء جلب htmx (بحثاً وفلترةً وترقيماً) ═ */
+(function () {
+  'use strict';
+  document.addEventListener('htmx:beforeRequest', function (e) {
+    var z = document.getElementById('tblzone');
+    var t = e.detail && e.detail.target;
+    if (z && t && (t.id === 'tblzone' || z.contains(t))) z.classList.add('loading');
+  });
+  document.addEventListener('htmx:afterSettle', function () {
+    var z = document.getElementById('tblzone');
+    if (z) z.classList.remove('loading');
   });
 })();

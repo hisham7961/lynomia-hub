@@ -927,6 +927,15 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .pagecenter{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);padding:16px}
 .pagedoc{background:var(--bg);padding:20px 12px}
 
+/* ═ الحيوية المدركة (v2.132): هياكل عظمية وخفوت الجلب ═ */
+.skel{position:relative;overflow:hidden;background:color-mix(in srgb,var(--sb) 12%,transparent);border-radius:8px;min-height:12px}
+.skel::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--cd) 55%,transparent),transparent);
+  background-size:200% 100%;animation:shimmer 1.2s infinite}
+.skelrow{display:flex;flex-direction:column;gap:10px;padding:14px}
+@media (prefers-reduced-motion:reduce){.skel::after{animation:none}}
+/* منطقة الجدول أثناء جلب htmx: خفوتٌ يقول «جارٍ» بدل صمتٍ يوحي بالتجمد */
+#tblzone.loading{opacity:.45;pointer-events:none;transition:opacity .15s}
+
 /* ═ كثافة الجوال (v2.115): الترويسات كانت تلتهم ٦٣٢ من ٨٤٤ بكسل قبل أول صف بيانات ═ */
 @media (max-width:760px){
   .demoband{font-size:11px;padding:3px 8px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}
