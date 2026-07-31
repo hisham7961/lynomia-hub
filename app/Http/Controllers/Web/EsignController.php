@@ -1123,9 +1123,15 @@ class EsignController extends Controller
             } elseif ($req->link_module === 'policies') {
                 $pol = \App\Models\Policy::find($req->link_id);
                 if ($pol) {
+                    // الموظف المُقِر يُحل من بريد الموقّع — سجل امتثال بلا صاحب لا يُدقَّق
+                    $signerEmail = \App\Models\ContractSigner::where('request_id', $req->id)
+                        ->where('role', 'موقّع')->whereNotNull('email')->value('email');
                     \App\Models\PolicyAck::create([
                         'title' => $pol->title . ' — ' . $signer,
                         'policy_id' => $pol->id, 'ver' => $pol->ver,
+                        'user_id' => $signerEmail
+                            ? \App\Models\User::whereNull('deleted_at')->where('email', $signerEmail)->value('id')
+                            : null,
                         'ack_at' => now(), 'ip' => $r->ip(),
                         'device' => substr((string) $r->userAgent(), 0, 190),
                         'status' => 'مُقرّة',

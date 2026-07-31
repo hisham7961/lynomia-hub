@@ -106,6 +106,7 @@ class QuoteController extends Controller
         $inv = FinDocument::create([
             'doc_no'      => 'INV-' . $q->doc_no,
             'kind'        => 'فاتورة مبيعات',
+            'client_id'   => $q->client_id,   // المرجع الصريح — الاسم النصي يضيع بالتكرار وتغيير الاسم
             'partner'     => $q->client_id ? (Client::find($q->client_id)?->name ?? '') : '',
             'date'        => now()->toDateString(),
             'due'         => now()->addDays(14)->toDateString(),

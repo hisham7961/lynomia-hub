@@ -42,9 +42,18 @@ class InnovationController extends Controller
         $idea = hub_scope(Idea::query(), 'ideas')->findOrFail($id);
         abort_if($idea->project_id, 422, 'رُقّيت هذه الفكرة لمشروع من قبل');
 
+        // «تخطيط» من خيارات المشاريع المعلنة (كانت «قيد التخطيط» فلا يظهر المشروع
+        // في أي عمود كانبان)، والشركة تُورَّث كوراثة الإنشاء العادي — الشركة النشطة
+        // وإلا أولى شركات المعزول — فلا يولد المشروع يتيماً يختفي عن صاحبه
+        $cid = (string) session('hub.company', '');
+        $allowed = hub_company_ids();
+        if ($cid === '' || ($allowed !== null && ! in_array($cid, $allowed, true))) {
+            $cid = $allowed[0] ?? null;
+        }
         $project = Project::create([
             'name' => \Illuminate\Support\Str::limit((string) $idea->title, 120, ''),
-            'status' => 'قيد التخطيط',
+            'status' => 'تخطيط',
+            'company_id' => $cid ?: null,
             'description' => trim("من مركز الابتكار.\n\nالمشكلة: " . (string) $idea->problem . "\n\nالفكرة: " . (string) $idea->idea),
         ]);
 

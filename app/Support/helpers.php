@@ -1681,9 +1681,10 @@ if (! function_exists('hub_capacity')) {
         $userIds = $emps->pluck('user_id')->filter()->all();
         $empIds  = $emps->pluck('id')->all();
 
-        // إجازات معتمدة متقاطعة مع الفترة
+        // إجازات معتمدة متقاطعة مع الفترة — «معتمد» هي قيمة السجل المعلنة
+        // (كانت «معتمدة» فلا تُخصم إجازة واحدة من الطاقة أبداً)
         $leaves = \Illuminate\Support\Facades\DB::table('leave_requests')->whereNull('deleted_at')
-            ->where('status', 'معتمدة')->whereIn('emp_id', $empIds)
+            ->where('status', 'معتمد')->whereIn('emp_id', $empIds)
             ->whereDate('date_from', '<=', $t->toDateString())
             ->whereDate('date_to', '>=', $f->toDateString())
             ->get(['emp_id', 'date_from', 'date_to']);

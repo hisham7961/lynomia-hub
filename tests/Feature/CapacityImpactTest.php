@@ -15,7 +15,7 @@ class CapacityImpactTest extends TestCase
     {
         $this->seedCore();
         $e = Employee::create(['name' => 'موظف قدرة', 'user_id' => $this->employee->id,
-            'status' => 'على رأس العمل']);
+            'status' => 'نشط']);
 
         // أسبوعان كاملان: ١٠ أيام عمل (الجمعة والسبت عطلة)
         $from = '2026-06-01';   // اثنين
@@ -27,7 +27,7 @@ class CapacityImpactTest extends TestCase
 
         // إجازة معتمدة يومي عمل تنقص المتاح
         DB::table('leave_requests')->insert(['id' => (string) Str::uuid(), 'emp_id' => $e->id,
-            'type' => 'سنوية', 'status' => 'معتمدة', 'date_from' => '2026-06-01', 'date_to' => '2026-06-02',
+            'type' => 'إجازة سنوية', 'status' => 'معتمد', 'date_from' => '2026-06-01', 'date_to' => '2026-06-02',
             'created_at' => now(), 'updated_at' => now()]);
 
         $c2 = hub_capacity($from, $to);
@@ -39,7 +39,7 @@ class CapacityImpactTest extends TestCase
     public function test_load_and_bottleneck_detection(): void
     {
         $this->seedCore();
-        $e = Employee::create(['name' => 'مثقل', 'user_id' => $this->employee->id, 'status' => 'على رأس العمل']);
+        $e = Employee::create(['name' => 'مثقل', 'user_id' => $this->employee->id, 'status' => 'نشط']);
         $p = Project::create(['name' => 'مشروع', 'status' => 'قيد التنفيذ']);
 
         // ١٠٠ ساعة مقدَّرة على فترة متاحها ٨٠ → حمل ١٢٥٪
@@ -58,7 +58,7 @@ class CapacityImpactTest extends TestCase
     public function test_completed_tasks_do_not_consume_future_capacity(): void
     {
         $this->seedCore();
-        Employee::create(['name' => 'منجز', 'user_id' => $this->employee->id, 'status' => 'على رأس العمل']);
+        Employee::create(['name' => 'منجز', 'user_id' => $this->employee->id, 'status' => 'نشط']);
         Task::create(['title' => 'مهمة منجزة', 'assignee_id' => $this->employee->id,
             'est_h' => 100, 'due' => '2026-06-10', 'status' => 'منجزة']);
 
@@ -70,7 +70,7 @@ class CapacityImpactTest extends TestCase
     public function test_employee_without_a_linked_account_is_flagged(): void
     {
         $this->seedCore();
-        Employee::create(['name' => 'بلا حساب', 'status' => 'على رأس العمل']);
+        Employee::create(['name' => 'بلا حساب', 'status' => 'نشط']);
         $row = collect(hub_capacity()['rows'])->firstWhere('name', 'بلا حساب');
         $this->assertFalse($row['linked']);
         $this->assertSame(1, hub_capacity()['totals']['unlinked']);
