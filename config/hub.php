@@ -3412,6 +3412,7 @@ return [
                 'state',
             ],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 [
                     'key' => 'no',
                     'col' => 'doc_no',
@@ -4101,6 +4102,7 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 [
                     'key' => 'assetId',
                     'col' => 'asset_id',
@@ -4536,6 +4538,7 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 [
                     'key' => 'empId',
                     'col' => 'emp_id',
@@ -5870,6 +5873,7 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 [
                     'key' => 'no',
                     'col' => 'doc_no',
@@ -5997,6 +6001,7 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 [
                     'key' => 'empId',
                     'col' => 'emp_id',
@@ -6149,6 +6154,7 @@ return [
                 'nextDate',
             ],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 [
                     'key' => 'name',
                     'col' => 'name',
@@ -6286,6 +6292,7 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 [
                     'key' => 'empId',
                     'col' => 'emp_id',
@@ -7076,6 +7083,7 @@ return [
             'status' => 'status',
             'columns' => ['name', 'empId', 'level', 'gap', 'certExp', 'status'],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 ['key' => 'name', 'col' => 'name', 'label' => 'المهارة', 'type' => 'text', 'required' => true],
                 ['key' => 'empId', 'col' => 'emp_id', 'label' => 'الموظف', 'type' => 'ref', 'required' => true, 'ref' => 'hr'],
                 ['key' => 'cat', 'col' => 'cat', 'label' => 'تصنيف المهارة', 'type' => 'sel',
@@ -7110,6 +7118,7 @@ return [
             'status' => 'status',
             'columns' => ['title', 'cat', 'ver', 'effDate', 'reviewDate', 'status'],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 ['key' => 'title', 'col' => 'title', 'label' => 'عنوان السياسة', 'type' => 'text', 'required' => true],
                 ['key' => 'cat', 'col' => 'cat', 'label' => 'تصنيف السياسة', 'type' => 'sel',
                  'options' => ['أمن معلومات', 'استخدام الأجهزة', 'إجازات', 'مصروفات', 'كلمات المرور', 'بيانات العملاء', 'سلوك مهني', 'أخرى']],
@@ -7222,6 +7231,7 @@ return [
             'status' => 'status',
             'columns' => ['title', 'policyId', 'userId', 'ver', 'ackAt', 'status'],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 ['key' => 'title', 'col' => 'title', 'label' => 'وصف مختصر (السياسة — الموظف)', 'type' => 'text'],
                 ['key' => 'policyId', 'col' => 'policy_id', 'label' => 'السياسة', 'type' => 'ref', 'required' => true, 'ref' => 'policies'],
                 ['key' => 'userId', 'col' => 'user_id', 'label' => 'الموظف المُقِر', 'type' => 'ref', 'required' => true, 'ref' => 'users'],

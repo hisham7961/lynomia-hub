@@ -222,6 +222,10 @@ class ModuleController extends Controller
             $allowed = hub_company_ids();
             if ($cid !== '' && ($allowed === null || in_array($cid, $allowed, true))) {
                 $m->{$ccol} = $cid;
+            } elseif ($allowed !== null) {
+                // معزولٌ بلا شركة نشطة: سجلٌ بلا شركة يختفي من قوائمه فوراً
+                // (whereIn يُقصي NULL) — يُنسب لأولى شركاته المسموحة بدل أن يضيع
+                $m->{$ccol} = $allowed[0];
             }
         }
 
