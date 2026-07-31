@@ -27,6 +27,11 @@ class Metrics
         'apps' => [
             'downloads' => 'downloads', 'rating' => 'rating', 'reviews' => 'reviews',
         ],
+        // المنافس أيضاً رقمٌ متحرّك: متابعوه وتحميلات تطبيقه وتقييمه —
+        // الرقم وحده لا يقول أينمو أم ينكمش
+        'competitors' => [
+            'followers' => 'followers', 'downloads' => 'app_downloads', 'rating' => 'app_rating',
+        ],
     ];
 
     /** المقاييس المعلنة لوحدة (أسماؤها فقط) */
