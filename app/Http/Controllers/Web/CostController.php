@@ -15,13 +15,17 @@ class CostController extends Controller
             403, 'لوحة التكاليف للمالكين ومن يحمل صلاحية المتابعة');
     }
 
-    /** تحليل تكلفة الخدمات والباقات */
+    /** تحليل تكلفة الخدمات والباقات — ومعه الإيراد الشهري المتكرر الحقيقي */
     public function services()
     {
         $this->gate();
         hub_org_analytics_guard();
+        $fresh = (bool) request()->query('fresh');
 
-        return view('service_costs', ['d' => hub_service_costs((bool) request()->query('fresh'))]);
+        return view('service_costs', [
+            'd' => hub_service_costs($fresh),
+            'mrr' => hub_mrr($fresh),
+        ]);
     }
 
     public function index(Request $r)

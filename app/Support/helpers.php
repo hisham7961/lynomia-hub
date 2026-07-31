@@ -1091,6 +1091,70 @@ if (! function_exists('hub_company_scope')) {
     }
 }
 
+if (! function_exists('hub_mrr')) {
+    /**
+     * الإيراد الشهري المتكرر (MRR) من العقود السارية — أثمن رقمٍ تجاري لم يكن
+     * قابلاً للقياس أصلاً: `hub_service_costs` كان يقيس هامشاً نظرياً من السعر
+     * المُعلن لا من عقدٍ مُوقَّع. قيمة كل عقد تُطبَّع شهرياً حسب دورة باقته أو
+     * خدمته (سنوي ÷ ١٢، ربع سنوي ÷ ٣)، و«مرة واحدة» لا تدخل التكرار.
+     * التوزيع بالخدمة يجعل «أي خدمة تحمل إيرادنا؟» سؤالاً له جواب.
+     */
+    function hub_mrr(bool $fresh = false): array
+    {
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget('rev:mrr');
+
+        return \Illuminate\Support\Facades\Cache::remember('rev:mrr', 300, function () {
+            $DB = \Illuminate\Support\Facades\DB::class;
+            $divisor = ['شهري' => 1, 'ربع سنوي' => 3, 'نصف سنوي' => 6, 'سنوي' => 12];
+
+            $contracts = \Illuminate\Support\Facades\DB::table('contracts')->whereNull('deleted_at')
+                ->where('status', 'ساري')->where('type', 'عقد عميل')
+                ->get(['id', 'title', 'value', 'currency', 'service_id', 'plan_id', 'client_id', 'date_end']);
+            if ($contracts->isEmpty()) return ['mrr' => 0.0, 'arr' => 0.0, 'contracts' => 0,
+                                               'byService' => [], 'unmapped' => 0, 'oneTime' => 0.0];
+
+            $plans = \Illuminate\Support\Facades\DB::table('pricing_plans')->whereNull('deleted_at')
+                ->get(['id', 'cycle', 'service_id'])->keyBy('id');
+            $services = \Illuminate\Support\Facades\DB::table('services')->whereNull('deleted_at')
+                ->get(['id', 'name', 'cycle'])->keyBy('id');
+
+            $mrr = 0.0; $oneTime = 0.0; $unmapped = 0; $byService = [];
+            foreach ($contracts as $c) {
+                $value = (float) ($c->value ?? 0);
+                if ($value <= 0) continue;
+
+                $plan = $c->plan_id ? ($plans[$c->plan_id] ?? null) : null;
+                $sid = $c->service_id ?: ($plan->service_id ?? null);
+                $svc = $sid ? ($services[$sid] ?? null) : null;
+                $cycle = (string) ($plan->cycle ?? $svc->cycle ?? 'سنوي');   // بلا ربطٍ: سنويٌّ افتراضاً
+
+                if (! $sid) $unmapped++;
+                if ($cycle === 'مرة واحدة') { $oneTime += $value; continue; }
+
+                $monthly = $value / ($divisor[$cycle] ?? 12);
+                $mrr += $monthly;
+
+                $key = $sid ?: '_none';
+                $byService[$key] ??= ['id' => $sid, 'name' => $svc->name ?? 'بلا خدمة مربوطة',
+                                      'mrr' => 0.0, 'contracts' => 0];
+                $byService[$key]['mrr'] += $monthly;
+                $byService[$key]['contracts']++;
+            }
+
+            usort($byService, fn ($a, $b) => $b['mrr'] <=> $a['mrr']);
+
+            return [
+                'mrr' => round($mrr, 2),
+                'arr' => round($mrr * 12, 2),
+                'contracts' => $contracts->count(),
+                'byService' => $byService,
+                'unmapped' => $unmapped,
+                'oneTime' => round($oneTime, 2),
+            ];
+        });
+    }
+}
+
 if (! function_exists('hub_stock_sync')) {
     /**
      * اشتقاق حالة الصنف من كميته وحدّه: نفد ⟵ صفر، منخفض ⟵ بلغ حد إعادة

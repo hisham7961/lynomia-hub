@@ -3135,6 +3135,7 @@ return [
                 'state',
             ],
             'fields' => [
+                ['key' => 'serviceId', 'col' => 'service_id', 'label' => 'الخدمة', 'type' => 'ref', 'ref' => 'services'],
                 [
                     'key' => 'no',
                     'col' => 'doc_no',
@@ -3806,6 +3807,8 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'serviceId', 'col' => 'service_id', 'label' => 'الخدمة المباعة', 'type' => 'ref', 'ref' => 'services'],
+                ['key' => 'planId', 'col' => 'plan_id', 'label' => 'الباقة', 'type' => 'ref', 'ref' => 'plans'],
                 [
                     'key' => 'title',
                     'col' => 'title',
@@ -5397,6 +5400,7 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'serviceId', 'col' => 'service_id', 'label' => 'الخدمة المعروضة', 'type' => 'ref', 'ref' => 'services'],
                 [
                     'key' => 'no',
                     'col' => 'doc_no',
