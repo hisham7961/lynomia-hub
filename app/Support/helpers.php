@@ -3034,3 +3034,79 @@ if (! function_exists('hub_expiry_bust')) {
         Cache::forever('hub:expiry:gen', (int) Cache::get('hub:expiry:gen', 0) + 1);
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// المراقبة الحيّة: هدفٌ خارجيّ يُفحَص، وتوافرٌ يُشتق من سلسلةٍ لا من انطباع
+// ─────────────────────────────────────────────────────────────────────────
+
+if (! function_exists('hub_outbound_ok')) {
+    /**
+     * حارس الطلبات الصادرة (SSRF): لا يصير النظام مِجَسّاً على شبكته الداخلية.
+     * يُرفض غير http/https، والمضيف الذي يُحَلّ إلى عنوانٍ خاص أو محلي أو
+     * link-local (169.254.169.254 بوابة بيانات السحابة) أو محجوز.
+     * الإعداد `monitor.allow_private` يفتحها عمداً لتنصيبٍ داخلي مغلق.
+     */
+    function hub_outbound_ok(string $url): array
+    {
+        $no = fn (string $why) => ['ok' => false, 'why' => $why, 'ip' => null];
+
+        $url = trim($url);
+        $p = @parse_url($url);
+        if (! $p || empty($p['scheme']) || empty($p['host'])) return $no('رابط غير صالح');
+        if (! in_array(strtolower($p['scheme']), ['http', 'https'], true)) {
+            return $no('يُسمح بـ http/https فقط — لا ' . $p['scheme']);
+        }
+
+        $host = $p['host'];
+        if (setting('monitor.allow_private')) return ['ok' => true, 'why' => '', 'ip' => null];
+
+        // أسماءٌ محلية تُرفض قبل أي استعلام DNS
+        if (preg_match('/^(localhost|.*\.localhost|.*\.internal|.*\.local)$/i', $host)) {
+            return $no('مضيف داخلي: ' . $host);
+        }
+
+        // المُحلِّل قابلٌ للاستبدال (app('hub.dns')) كي تكون الاختبارات قاطعةً
+        // بلا اعتمادٍ على DNS حيّ — والسلوك في الإنتاج كما هو.
+        $resolve = app()->bound('hub.dns') ? app('hub.dns') : fn ($h) => @gethostbynamel($h);
+        $ips = filter_var($host, FILTER_VALIDATE_IP) ? [$host] : ($resolve($host) ?: []);
+        if (! $ips) return $no('تعذّر تحليل اسم المضيف: ' . $host);
+
+        foreach ($ips as $ip) {
+            $public = filter_var($ip, FILTER_VALIDATE_IP,
+                FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+            if ($public === false) return $no('عنوان داخلي أو محجوز: ' . $ip);
+            // 169.254.0.0/16 بوابة بيانات السحابة — يمر أحياناً من فلتر PHP
+            if (str_starts_with($ip, '169.254.')) return $no('عنوان link-local: ' . $ip);
+        }
+
+        return ['ok' => true, 'why' => '', 'ip' => $ips[0]];
+    }
+}
+
+if (! function_exists('hub_uptime')) {
+    /**
+     * التوافر الحقيقي لهدفٍ من سلسلته: نسبة الفحوص الناجحة، ومتوسط زمن
+     * الاستجابة، وآخر فحص. عتبات ٩٩٪ / ٩٥٪ — لا «يعمل/لا يعمل» عارية.
+     */
+    function hub_uptime(string $module, string $recordId, int $days = 30): array
+    {
+        $ups = hub_metric_series($module, $recordId, 'up', $days);
+        $lat = hub_metric_series($module, $recordId, 'latency', $days);
+
+        $n = count($ups);
+        $good = count(array_filter($ups, fn ($p) => (float) $p['value'] > 0));
+        $pct = $n ? round($good * 100 / $n, 2) : null;
+
+        return [
+            'checks' => $n, 'up' => $good, 'down' => $n - $good, 'pct' => $pct,
+            'last' => $n ? end($ups) : null,
+            'live' => $n ? ((float) end($ups)['value'] > 0) : null,
+            'ms' => $lat ? (int) round(array_sum(array_column($lat, 'value')) / count($lat)) : null,
+            'lastMs' => $lat ? (int) end($lat)['value'] : null,
+            'spark' => hub_metric_spark($lat, 40),
+            'days' => $days,
+            'tone' => $pct === null ? '' : ($pct >= 99 ? 'ok' : ($pct >= 95 ? 'wn' : 'bad')),
+            'label' => $pct === null ? 'غير مراقب' : ($pct >= 99 ? 'مستقر' : ($pct >= 95 ? 'متذبذب' : 'غير مستقر')),
+        ];
+    }
+}

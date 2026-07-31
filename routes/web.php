@@ -195,6 +195,10 @@ Route::middleware('auth')->group(function () {
     Route::get('innovation', [\App\Http\Controllers\Web\InnovationController::class, 'index'])->name('innovation');
     Route::post('ideas/{id}/promote', [\App\Http\Controllers\Web\InnovationController::class, 'promote'])->name('ideas.promote');
 
+    // ── المراقبة الحيّة: فحصٌ عند الطلب لسيرفر أو موقع ──
+    Route::post('monitor/{module}/{id}/check', [\App\Http\Controllers\Web\MonitorController::class, 'check'])
+        ->name('monitor.check');
+
     // ── مركز السوشال ميديا: مراقبة وتحليل ──
     Route::get('social', [\App\Http\Controllers\Web\SocialController::class, 'index'])->name('social.index');
     Route::post('social/snapshot', [\App\Http\Controllers\Web\SocialController::class, 'snapshot'])->name('social.snapshot');

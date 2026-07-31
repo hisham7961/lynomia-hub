@@ -29,6 +29,10 @@ class Metrics
         ],
         // المنافس أيضاً رقمٌ متحرّك: متابعوه وتحميلات تطبيقه وتقييمه —
         // الرقم وحده لا يقول أينمو أم ينكمش
+        // المواقع: زوّار وجلسات وتحويلات تصل من GA عبر n8n إلى /api/v1/metrics
+        'websites' => [
+            'lighthouse' => 'lighthouse',
+        ],
         'competitors' => [
             'followers' => 'followers', 'downloads' => 'app_downloads', 'rating' => 'app_rating',
         ],

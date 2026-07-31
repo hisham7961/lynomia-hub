@@ -966,6 +966,19 @@ return [
                     'label' => 'Pixels (Meta / TikTok)',
                     'type' => 'text',
                 ],
+
+                // ── التحليلات: كانت خانة GA تُملأ فلا يصل زائرٌ واحد ──
+                ['key' => 'ga4Id', 'col' => 'ga4_id', 'label' => 'معرّف GA4 (G-XXXXXXX)', 'type' => 'text'],
+                ['key' => 'gtmId', 'col' => 'gtm_id', 'label' => 'معرّف GTM (GTM-XXXXX)', 'type' => 'text'],
+                ['key' => 'sitemap', 'col' => 'sitemap', 'label' => 'رابط خريطة الموقع', 'type' => 'url'],
+
+                // ── المراقبة الحيّة والصحة التقنية ──
+                ['key' => 'monitorOn', 'col' => 'monitor_on', 'label' => 'فعّل المراقبة الحيّة', 'type' => 'bool'],
+                ['key' => 'monitorUrl', 'col' => 'monitor_url', 'label' => 'رابط الفحص (يُترك فارغاً = رابط الموقع)', 'type' => 'url'],
+                ['key' => 'cfZone', 'col' => 'cf_zone', 'label' => 'منطقة Cloudflare', 'type' => 'text'],
+                ['key' => 'sslExpiry', 'col' => 'ssl_expiry', 'label' => 'انتهاء شهادة SSL', 'type' => 'date', 'expiry' => true],
+                ['key' => 'lighthouse', 'col' => 'lighthouse', 'label' => 'درجة الأداء (Lighthouse)', 'type' => 'num'],
+                ['key' => 'lastAudit', 'col' => 'last_audit', 'label' => 'آخر تدقيق تقني/SEO', 'type' => 'date'],
                 [
                     'key' => 'supEmail',
                     'col' => 'sup_email',
@@ -1199,6 +1212,22 @@ return [
                     'label' => 'المواصفات',
                     'type' => 'text',
                 ],
+
+                // ── المراقبة الحيّة: كان الجدول يخبرك بالمزوّد ولا يخبرك أَحيٌّ هو الآن ──
+                ['key' => 'monitorOn', 'col' => 'monitor_on', 'label' => 'فعّل المراقبة الحيّة', 'type' => 'bool'],
+                ['key' => 'monitorUrl', 'col' => 'monitor_url', 'label' => 'رابط الفحص (health endpoint)', 'type' => 'url'],
+                ['key' => 'statusUrl', 'col' => 'status_url', 'label' => 'صفحة حالة المزوّد', 'type' => 'url'],
+                ['key' => 'cfZone', 'col' => 'cf_zone', 'label' => 'منطقة Cloudflare', 'type' => 'text'],
+
+                // ── المواصفات المفصّلة وكلفتها ──
+                ['key' => 'region', 'col' => 'region', 'label' => 'الموقع الجغرافي', 'type' => 'text'],
+                ['key' => 'cores', 'col' => 'cores', 'label' => 'أنوية المعالج', 'type' => 'num'],
+                ['key' => 'ramGb', 'col' => 'ram_gb', 'label' => 'الذاكرة (GB)', 'type' => 'num'],
+                ['key' => 'diskGb', 'col' => 'disk_gb', 'label' => 'القرص (GB)', 'type' => 'num'],
+                ['key' => 'costMonth', 'col' => 'cost_month', 'label' => 'الكلفة الشهرية', 'type' => 'num'],
+                ['key' => 'backupPolicy', 'col' => 'backup_policy', 'label' => 'سياسة النسخ الاحتياطي', 'type' => 'text'],
+                ['key' => 'lastPatch', 'col' => 'last_patch', 'label' => 'آخر ترقيع أمني', 'type' => 'date'],
+
                 [
                     'key' => 'panel',
                     'col' => 'panel',

@@ -65,6 +65,7 @@ class OpsController extends Controller
         // نبضات المجدولات (متأخرة إن تجاوزت ضعف دورتها)
         $beats = [];
         foreach ([['outbox', 'عامل التسليم (كل ٥ دقائق)', 15],
+                  ['uptime', 'الفحص الحيّ (كل ٥ دقائق)', 15],
                   ['automation', 'الأتمتة اليومية', 26 * 60],
                   ['backup', 'النسخ الاحتياطي اليومي', 26 * 60]] as [$k, $label, $maxMin]) {
             $at = setting('heartbeat.' . $k);
