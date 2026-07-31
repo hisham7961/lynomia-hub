@@ -42,7 +42,7 @@
             {{-- معاينة كاملة داخل الصفحة نفسها — بلا منبثقات: الصورة تتمدد وPDF بعارضه --}}
             @if ($isImg || $isPdf)
                 <details style="margin-top:4px">
-                    <summary class="sub" style="cursor:pointer">👁 معاينة كاملة داخل الصفحة</summary>
+                    <summary class="sub pointer">👁 معاينة كاملة داخل الصفحة</summary>
                     @if ($isImg)
                         <img src="{{ route('att.view', $a->id) }}" alt="{{ $a->original_name }}" loading="lazy"
                              style="max-width:100%;max-height:70vh;border-radius:12px;border:1px solid var(--ln);margin-top:6px;background:#fff">

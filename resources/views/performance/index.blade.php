@@ -26,7 +26,7 @@
 {{-- الأهداف --}}
 <div class="card">
     <h3>🎯 الأهداف والنتائج (OKR)
-        @if (hub_can(auth()->user(), 'okrs', 'v'))<a class="btn ghost xs" style="margin-inline-start:auto" href="{{ route('m.index', 'okrs') }}">إدارة الأهداف ←</a>@endif
+        @if (hub_can(auth()->user(), 'okrs', 'v'))<a class="btn ghost xs msauto" href="{{ route('m.index', 'okrs') }}">إدارة الأهداف ←</a>@endif
     </h3>
     @forelse ($okrs as $level => $items)
         <h3 class="sub" style="margin:10px 0 6px">{{ $level === 'الشركة' ? '🏢' : ($level === 'قسم' ? '🗂️' : ($level === 'مشروع' ? '🚀' : '👤')) }} مستوى {{ $level }}</h3>

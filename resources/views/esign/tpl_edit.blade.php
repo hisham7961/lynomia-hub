@@ -79,7 +79,7 @@
                     <div class="sub" style="margin-top:6px">لا بنود محفوظة — احفظ صيغك المعتمدة هنا لتدرجها بنقرة في أي قالب.</div>
                 @endforelse
             </div>
-            <details style="margin-top:8px"><summary class="sub" style="cursor:pointer">＋ بند جديد</summary>
+            <details style="margin-top:8px"><summary class="sub pointer">＋ بند جديد</summary>
                 <form method="POST" action="{{ route('esign.clause.store') }}" style="margin-top:6px">
                     @csrf
                     <input class="inp" name="name" required maxlength="120" placeholder="اسم البند (سرية، إنهاء…)" style="margin-bottom:6px;width:100%">

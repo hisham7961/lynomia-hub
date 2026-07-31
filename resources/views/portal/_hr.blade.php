@@ -92,7 +92,7 @@
 <div class="kids">
     <div class="card kid">
         <h3>✅ {{ $self ? 'مهامي' : 'مهامه' }} المفتوحة
-            @if (hub_can(auth()->user(), 'tasks', 'v'))<a class="btn ghost xs" style="margin-inline-start:auto" href="{{ route('m.index', 'tasks') }}">الكل ←</a>@endif
+            @if (hub_can(auth()->user(), 'tasks', 'v'))<a class="btn ghost xs msauto" href="{{ route('m.index', 'tasks') }}">الكل ←</a>@endif
         </h3>
         <table class="mini">
             @forelse ($tasks as $t)

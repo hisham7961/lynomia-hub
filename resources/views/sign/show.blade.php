@@ -62,7 +62,7 @@
 
             @if ($opts['decline'] ?? true)
                 <details style="margin-top:14px">
-                    <summary class="sub" style="cursor:pointer">🚫 لا أوافق — أريد رفض التوقيع</summary>
+                    <summary class="sub pointer">🚫 لا أوافق — أريد رفض التوقيع</summary>
                     <form method="POST" action="{{ route('sign.decline', $token ?? $req->token) }}" style="margin-top:8px;display:flex;gap:8px">
                         @csrf
                         <input class="inp" name="reason" required maxlength="400" placeholder="سبب الرفض (يصل للجهة المُرسلة)" style="flex:1">

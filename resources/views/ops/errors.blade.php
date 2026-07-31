@@ -42,7 +42,7 @@
                         @if ($e->request_id) · <span class="mono ltr" style="font-size:10px">{{ substr($e->request_id, 0, 8) }}</span>@endif
                     </div>
                     @if ($e->trace)
-                        <details><summary class="sub" style="cursor:pointer">Stack trace ▾</summary>
+                        <details><summary class="sub pointer">Stack trace ▾</summary>
                             <pre class="mono ltr" style="font-size:10.5px;background:var(--pss);border-radius:8px;padding:8px;margin-top:4px;max-height:220px;overflow:auto">{{ \Illuminate\Support\Str::limit($e->trace, 4000) }}</pre>
                         </details>
                     @endif

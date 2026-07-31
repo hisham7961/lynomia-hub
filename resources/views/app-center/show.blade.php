@@ -53,7 +53,7 @@
     <div class="card kid wide">
         <h3>🚀 الإصدارات والتحديثات <span class="bdg g">{{ $releases->count() }}</span>
             @if (hub_can(auth()->user(), 'code', 'a'))
-                <a class="btn ghost xs" style="margin-inline-start:auto" href="{{ route('m.create', 'code') }}">＋ إصدار جديد</a>
+                <a class="btn ghost xs msauto" href="{{ route('m.create', 'code') }}">＋ إصدار جديد</a>
             @endif
         </h3>
         @forelse ($releases as $rel)

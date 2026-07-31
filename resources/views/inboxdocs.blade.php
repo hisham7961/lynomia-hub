@@ -58,7 +58,7 @@
         </div>
 
         @if ($doc->status === 'وارد')
-            <details style="margin-top:8px"><summary class="sub" style="cursor:pointer">🏷️ تصنيف الوثيقة ▾</summary>
+            <details style="margin-top:8px"><summary class="sub pointer">🏷️ تصنيف الوثيقة ▾</summary>
                 <form method="POST" action="{{ route('inboxdocs.classify', $doc->id) }}" class="frm" style="margin-top:8px">
                     @csrf
                     <div class="crow">

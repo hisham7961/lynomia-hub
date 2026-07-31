@@ -31,7 +31,7 @@
         @foreach ($groups as $g)
             <div class="card kid">
                 <h3>{{ $g['label'] }} <span class="bdg g">{{ number_format($g['count']) }}</span>
-                    <a class="btn ghost xs" style="margin-inline-start:auto" href="{{ route('m.index', [$g['module'], 'q' => $q]) }}">داخل الوحدة ←</a></h3>
+                    <a class="btn ghost xs msauto" href="{{ route('m.index', [$g['module'], 'q' => $q]) }}">داخل الوحدة ←</a></h3>
                 <table class="mini">
                     @foreach ($g['rows'] as $row)
                         <tr>

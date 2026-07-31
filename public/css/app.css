@@ -859,14 +859,21 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .chips{border:1px solid var(--ln);border-radius:12px;padding:10px;background:var(--cd)}
 .chipq{margin-bottom:8px;max-width:260px}
 .chipgrid{display:flex;flex-wrap:wrap;gap:7px;max-height:190px;overflow-y:auto;padding:1px}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 13px;border:1.5px solid var(--ln);
+/* v2.133: مبدئياً كانت هذه القواعد على .chip العارية فتطغى على رقاقة الإزالة (244)
+   ورقائق المتغيرات والبنود — التشريح الصندوقي محصور الآن بسياق الاختيار .chipgrid */
+.chipgrid .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 13px;border:1.5px solid var(--ln);
   border-radius:999px;font-size:12.5px;cursor:pointer;user-select:none;background:var(--bg2);
   transition:border-color var(--t),background var(--t),color var(--t)}
-.chip input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
-.chip:hover{border-color:color-mix(in srgb,var(--p) 55%,var(--ln))}
-.chip:has(input:checked){background:var(--pss);border-color:var(--p);color:var(--pd);font-weight:700}
-.chip:has(input:checked) span::before{content:"✓ "}
-.chip:has(input:focus-visible){box-shadow:var(--ring)}
+.chipgrid .chip input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.chipgrid .chip:hover{border-color:color-mix(in srgb,var(--p) 55%,var(--ln))}
+.chipgrid .chip:has(input:checked){background:var(--pss);border-color:var(--p);color:var(--pd);font-weight:700}
+.chipgrid .chip:has(input:checked) span::before{content:"✓ "}
+.chipgrid .chip:has(input:focus-visible){box-shadow:var(--ring)}
+/* رقائق الأزرار (متغيرات/بنود): تشريحها الصريح — كانت تعيش عرضاً على طغيان القاعدة العارية */
+.varchip,.clausechip{display:inline-flex;align-items:center;gap:6px;padding:6px 13px;border:1.5px solid var(--ln);
+  border-radius:999px;font-size:12.5px;cursor:pointer;user-select:none;background:var(--bg2);
+  transition:border-color var(--t),background var(--t),color var(--t)}
+.varchip:hover,.clausechip:hover{border-color:color-mix(in srgb,var(--p) 55%,var(--ln))}
 
 /* ═ باني الفلاتر المتقدم (v2.116) ═ */
 .advbox{min-width:440px;max-width:min(560px,92vw)}
@@ -935,6 +942,10 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 @media (prefers-reduced-motion:reduce){.skel::after{animation:none}}
 /* منطقة الجدول أثناء جلب htmx: خفوتٌ يقول «جارٍ» بدل صمتٍ يوحي بالتجمد */
 #tblzone.loading{opacity:.45;pointer-events:none;transition:opacity .15s}
+
+/* ═ أدوات صغيرة (v2.133): بدائل لأكثر الأنماط المضمنة تكراراً ═ */
+.msauto{margin-inline-start:auto}
+.pointer{cursor:pointer}
 
 /* ═ كثافة الجوال (v2.115): الترويسات كانت تلتهم ٦٣٢ من ٨٤٤ بكسل قبل أول صف بيانات ═ */
 @media (max-width:760px){

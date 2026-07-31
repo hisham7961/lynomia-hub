@@ -27,7 +27,7 @@
             <div class="sub">الساعات المريبة (٠٠–٠٦)</div><b style="font-size:26px">{{ $risk['night_h'] }}</b><div class="sub">ساعة بعد منتصف الليل</div></div>
     </div>
     <details style="margin-top:8px">
-        <summary class="sub" style="cursor:pointer">مِمَّ تتكوّن نسبة الشك؟</summary>
+        <summary class="sub pointer">مِمَّ تتكوّن نسبة الشك؟</summary>
         <table class="mini" style="margin-top:6px">
             @foreach ($risk['parts'] as $plabel => $pv)
                 <tr><td>{{ $plabel }}</td><td class="acts"><b>{{ $pv }}</b></td></tr>

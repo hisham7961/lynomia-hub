@@ -1,7 +1,7 @@
 {{-- ودجة: رادار الانتهاءات --}}
 @if ($data && $data->count())
 <div class="card kid">
-    <h3>🔔 ينتهي قريباً <a class="btn ghost xs" style="margin-inline-start:auto" href="{{ route('alerts') }}">الكل ←</a></h3>
+    <h3>🔔 ينتهي قريباً <a class="btn ghost xs msauto" href="{{ route('alerts') }}">الكل ←</a></h3>
     <table class="mini">
         @foreach ($data as $i)
             <tr>

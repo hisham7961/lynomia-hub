@@ -30,7 +30,7 @@
     <label class="vh" for="dm-body">نص الرسالة</label>
     <textarea class="inp" id="dm-body" name="body" rows="2" required maxlength="4000"
               placeholder="اكتب رسالة…" style="flex:1"></textarea>
-    <label class="btn ghost sm" style="cursor:pointer">📎<input type="file" name="att" class="vh"></label>
+    <label class="btn ghost sm pointer">📎<input type="file" name="att" class="vh"></label>
     <button class="btn p sm" type="submit">إرسال ↵</button>
 </form>
 @error('body')<div class="err">{{ $message }}</div>@enderror

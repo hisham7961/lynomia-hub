@@ -23,7 +23,7 @@
                             @if ($val)
                                 <div class="crow" style="margin-bottom:6px">
                                     <img src="{{ asset('storage/' . $val) }}" alt="" style="height:44px;border-radius:9px;border:1px solid var(--ln)">
-                                    <label class="sub" style="cursor:pointer"><input type="checkbox" name="{{ $input }}_clear" value="1"> إزالة الشعار</label>
+                                    <label class="sub pointer"><input type="checkbox" name="{{ $input }}_clear" value="1"> إزالة الشعار</label>
                                 </div>
                             @endif
                             <input class="inp" type="file" name="{{ $input }}" accept="image/*">

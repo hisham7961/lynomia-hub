@@ -48,7 +48,7 @@
                 <td><span class="mono ltr" style="font-size:11px">{{ \Illuminate\Support\Str::limit($h->events, 40) }}</span></td>
                 <td>
                     <details>
-                        <summary class="sub" style="cursor:pointer">••••••• كشف</summary>
+                        <summary class="sub pointer">••••••• كشف</summary>
                         <code class="mono ltr" style="font-size:10.5px;user-select:all;word-break:break-all">{{ $h->secret }}</code>
                     </details>
                 </td>
