@@ -487,6 +487,7 @@ return [
                     'col' => 'next_up',
                     'label' => 'التحديث القادم',
                     'type' => 'date',
+                    'expiry' => true,
                 ],
                 [
                     'key' => 'devId',
@@ -5164,7 +5165,9 @@ return [
                     'col' => 'last_bk',
                     'label' => 'آخر نسخة احتياطية',
                     'type' => 'date',
-                    'expiry' => true,
+                    // تاريخ ماضٍ بدلالة معكوسة (القديم هو الخطر لا القريب) — مكانه قاعدة
+                    // تنبيه «بلا نسخة منذ N يوم» لا رادار المواعيد
+                    'expiry' => false,
                 ],
                 [
                     'key' => 'env',
@@ -5787,7 +5790,8 @@ return [
                     'label' => 'التوليد القادم',
                     'type' => 'date',
                     'required' => true,
-                    'expiry' => true,
+                    // موعد آلة لا موعد إنسان: المحرك اليومي يولّده بنفسه — وجوده في الرادار ضجيج
+                    'expiry' => false,
                 ],
                 [
                     'key' => 'projectId',
@@ -7287,7 +7291,7 @@ return [
                 ['key' => 'lessons', 'col' => 'lessons', 'label' => 'الدروس المستفادة', 'type' => 'ta'],
                 ['key' => 'prevention', 'col' => 'prevention', 'label' => 'الإجراءات الوقائية لمنع التكرار', 'type' => 'ta'],
                 ['key' => 'postmortem', 'col' => 'postmortem', 'label' => 'كُتب تقرير Postmortem', 'type' => 'bool'],
-                ['key' => 'reviewDate', 'col' => 'review_date', 'label' => 'تاريخ مراجعة تنفيذ الوقاية', 'type' => 'date'],
+                ['key' => 'reviewDate', 'col' => 'review_date', 'label' => 'تاريخ مراجعة تنفيذ الوقاية', 'type' => 'date', 'expiry' => true],
                 ['key' => 'att', 'col' => 'att_id', 'label' => 'مرفق (لقطات/سجلات/تقرير)', 'type' => 'file'],
                 ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات', 'type' => 'ta'],
                 ['key' => 'tags', 'col' => 'tags', 'label' => 'وسوم', 'type' => 'tags'],
@@ -7578,7 +7582,7 @@ return [
                  'options' => ['معرض', 'مؤتمر', 'ندوة', 'رعاية', 'ورشة', 'إطلاق منتج']],
                 ['key' => 'venue', 'col' => 'venue', 'label' => 'المكان', 'type' => 'text'],
                 ['key' => 'dateStart', 'col' => 'date_start', 'label' => 'تاريخ البداية', 'type' => 'date'],
-                ['key' => 'dateEnd', 'col' => 'date_end', 'label' => 'تاريخ النهاية', 'type' => 'date'],
+                ['key' => 'dateEnd', 'col' => 'date_end', 'label' => 'تاريخ النهاية', 'type' => 'date', 'expiry' => false],
                 ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 ['key' => 'brandId', 'col' => 'brand_id', 'label' => 'العلامة التجارية', 'type' => 'ref', 'ref' => 'brands'],
                 ['key' => 'ownerId', 'col' => 'owner_id', 'label' => 'المسؤول عن الحدث', 'type' => 'ref', 'ref' => 'users'],

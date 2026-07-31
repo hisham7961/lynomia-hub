@@ -605,7 +605,13 @@ if (! function_exists('hub_build_children_map')) {
 }
 
 if (! function_exists('hub_expiry_fields')) {
-    /** حقول التواريخ المصيرية عبر كل الوحدات (انتهاء/تجديد/استحقاق) */
+    /**
+     * حقول التواريخ المصيرية عبر كل الوحدات (انتهاء/تجديد/استحقاق).
+     * راية 'expiry' المعلنة في السجل تُحترم أولاً وتحسم الاتجاهين: true تُدخل
+     * الحقل ولو لم يطابق الأنماط (الصيانة القادمة، متابعة العميل، صلاحية العرض)،
+     * وfalse تُخرجه ولو طابقها («تاريخ النهاية» لمعرضٍ ليس انتهاء رخصة).
+     * كانت الراية تُكتب في التعريفات ولا يقرؤها أي سطر.
+     */
     function hub_expiry_fields(): array
     {
         static $out = null;
@@ -613,11 +619,15 @@ if (! function_exists('hub_expiry_fields')) {
         $out = [];
         foreach (hub_modules() as $mk => $md) {
             foreach ($md['fields'] as $f) {
-                $isDate = in_array($f['type'], ['date', 'dt'], true);
+                if (! in_array($f['type'], ['date', 'dt'], true)) continue;
+                if (array_key_exists('expiry', $f)) {
+                    if ($f['expiry']) $out[] = [$mk, $f];
+                    continue;
+                }
                 $byKey  = in_array($f['key'], ['end', 'due', 'expiry', 'expires', 'renew', 'renewal', 'warranty'], true)
                           || preg_match('/exp$|Exp$/', $f['key']);
                 $byLbl  = preg_match('/انتها|تجديد|استحقاق|نهاية|ضمان/u', $f['label']);
-                if ($isDate && ($byKey || $byLbl)) $out[] = [$mk, $f];
+                if ($byKey || $byLbl) $out[] = [$mk, $f];
             }
         }
         return $out;
@@ -637,15 +647,21 @@ if (! function_exists('hub_expiry')) {
         return \Illuminate\Support\Facades\Cache::remember($key, $scoped ? 300 : 600, function () use ($scoped, $user) {
             $today = now()->toDateString();
             $limit = now()->addDays(30)->toDateString();
+            // عتبة التنبيه لكل سجل: حقول «تنبيه قبل (يوم)» كانت تُعرض ولا تُقرأ —
+            // وحدةٌ لها عمود عتبة تُجلب بنافذة موسّعة ثم يُرشَّح كل سجل بعتبته هو
+            $alertCols = ['domains' => 'alert', 'files' => 'alert', 'subs' => 'alerts'];
+            $wide = now()->addDays(120)->toDateString();
             $items = [];
             foreach (hub_expiry_fields() as [$mk, $f]) {
                 $md = hub_mod($mk);
                 $disp = hub_display_col($mk);
+                $acol = $alertCols[$mk] ?? null;
                 try {
+                    if ($acol && ! \Illuminate\Support\Facades\Schema::hasColumn($md['table'], $acol)) $acol = null;
                     $q = \Illuminate\Support\Facades\DB::table($md['table'])
                         ->whereNull('deleted_at')
                         ->whereNotNull($f['col'])
-                        ->whereBetween(\Illuminate\Support\Facades\DB::raw("DATE(`{$f['col']}`)"), [now()->subDays(60)->toDateString(), $limit]);
+                        ->whereBetween(\Illuminate\Support\Facades\DB::raw("DATE(`{$f['col']}`)"), [now()->subDays(60)->toDateString(), $acol ? $wide : $limit]);
                     if ($scoped) $q = hub_scope($q, $mk, $user);
 
                     // لا تنبيه على ما أُغلق: مهمة منجزة أو فاتورة مدفوعة أو عقد منتهٍ
@@ -662,12 +678,20 @@ if (! function_exists('hub_expiry')) {
 
                     // الترتيب تصاعدياً بالتاريخ قبل الحد: نُبقي الأربعين الأقرب/الأكثر تأخراً
                     // لا أربعين عشوائية بترتيب القاعدة (كان يُسقط أعجل السجلات صمتاً).
+                    $cols = ['id', $disp . ' as _n', $f['col'] . ' as _d'];
+                    if ($acol) $cols[] = $acol . ' as _a';
                     $rows = $q->orderBy(\Illuminate\Support\Facades\DB::raw("DATE(`{$f['col']}`)"))
-                        ->limit(40)->get(['id', $disp . ' as _n', $f['col'] . ' as _d']);
+                        ->limit(40)->get($cols);
                 } catch (\Throwable $e) { continue; }
                 foreach ($rows as $row) {
                     $d = substr((string) $row->_d, 0, 10);
                     $days = (int) now()->startOfDay()->diffInDays(\Illuminate\Support\Carbon::parse($d)->startOfDay(), false);
+                    if ($acol) {
+                        // عتبة السجل نفسه: رقم مفرد أو قائمة «90,60,30» تؤخذ أقصاها — والفارغ = 30
+                        $nums = array_filter(array_map('intval',
+                            preg_split('/[\s,،]+/u', (string) ($row->_a ?? ''), -1, PREG_SPLIT_NO_EMPTY)));
+                        if ($days > ($nums ? max($nums) : 30)) continue;
+                    }
                     $items[] = ['module' => $mk, 'mlabel' => $md['label'], 'flabel' => $f['label'],
                                 'id' => $row->id, 'name' => (string) $row->_n, 'date' => $d, 'days' => $days];
                 }
