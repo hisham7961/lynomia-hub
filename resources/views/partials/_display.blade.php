@@ -13,7 +13,8 @@
         <span class="mono">••••••</span>
     @endif
 @elseif ($t === 'bool')
-    <span class="bdg {{ $v ? 'ok' : '' }}">{{ $v ? 'نعم' : 'لا' }}</span>
+    {{-- «نعم» شارة تلفت النظر؛ «لا» نصٌّ هادئ — شارات النفي كانت ضجيجاً بصرياً في كل صف --}}
+    @if ($v)<span class="bdg ok">✓ نعم</span>@else<span class="sub">لا</span>@endif
 @elseif ($t === 'sel')
     <span class="bdg {{ hub_tone($v) }}">{{ $v }}</span>
 @elseif ($t === 'ref' && ! empty($f['multi']))
@@ -34,7 +35,9 @@
 @elseif ($t === 'dt')
     <span class="mono">{{ str_replace('T', ' ', substr($v, 0, 16)) }}</span>
 @elseif ($t === 'num' || $t === 'big')
-    <span class="mono">{{ is_numeric($v) ? number_format((float) $v, 2) : $v }}</span>
+    {{-- الحقول المالية (بدلالة تسميتها العربية) تُعرض بعملتها: عملة السجل إن وُجدت وإلا عملة المنصة --}}
+    @php $money = (bool) preg_match('/قيمة|مبلغ|راتب|تكلفة|سعر|ميزانية|أجر|رسوم|دفعة|إيراد|مصروف/u', $f['label']); @endphp
+    <span class="mono">{{ is_numeric($v) ? number_format((float) $v, 2) : $v }}</span>@if ($money && is_numeric($v)) <span class="sub">{{ $row->currency ?? setting('app.currency', 'د.ك') }}</span>@endif
 @elseif ($t === 'ta')
     @if (($ctx ?? 'table') === 'show'){!! nl2br(e($v)) !!}@else{{ \Illuminate\Support\Str::limit($v, 60) }}@endif
 @else

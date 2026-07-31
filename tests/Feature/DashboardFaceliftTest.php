@@ -24,7 +24,10 @@ class DashboardFaceliftTest extends TestCase
         $this->assertStringContainsString('التقويم', $html);
         $this->assertStringContainsString('class="actfeed"', $html);          // سيل النشاط
         $this->assertStringContainsString('class="avx"', $html);              // صورة رمزية
-        $this->assertStringContainsString('عن الأسبوع الماضي', $html);        // اتجاه أسبوعي (مهمة أنشئت الآن)
+        // مهمة أنشئت الآن بلا أسبوعٍ سابقٍ يقارَن به: عدٌّ صادق «+ هذا الأسبوع»،
+        // لا نسبة «١٠٠٪» مختلقة كانت تظهر على كل بطاقة وتُفقد الرقم معناه
+        $this->assertStringContainsString('هذا الأسبوع', $html);
+        $this->assertStringNotContainsString('100٪ عن الأسبوع الماضي', $html);
 
         // بصمة النسخة على الأصول: كل إصدار رابطٌ جديد — فلا شكل قديم بعد التحديث
         $this->assertStringContainsString('css/app.css?v=' . config('hub.version'), $html);

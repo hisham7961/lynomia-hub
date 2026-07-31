@@ -117,7 +117,10 @@ class WidgetRegistry
                             'key'   => $key,
                             'label' => $def['label'],
                             'count' => $q()->count(),
-                            'trend' => $prevW > 0 ? round(($thisW - $prevW) * 100 / $prevW) : ($thisW > 0 ? 100 : null),
+                            // نسبة فقط حين يوجد أساس مقارنة حقيقي — «١٠٠٪» المُختلَقة حين
+                            // الأسبوع السابق صفر كانت تكذب على كل بطاقة وتُفقد الرقم معناه
+                            'trend' => $prevW > 0 ? (int) round(($thisW - $prevW) * 100 / $prevW) : null,
+                            'fresh' => $prevW === 0 ? $thisW : null,   // جديد بلا أساس مقارنة
                         ];
                     }
 

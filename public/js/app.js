@@ -417,6 +417,23 @@
   }, true);
 })();
 
+/* ═ حارس المغادرة: نموذج POST كُتب فيه ولم يُرسل — المتصفح يسأل قبل ضياعه ═
+   (المسودات المحلية تبقى شبكة أمانٍ ثانية إن غادر رغم التحذير) */
+(function () {
+  var dirty = false, submitting = false;
+  document.addEventListener('input', function (e) {
+    var f = e.target && e.target.form;
+    if (f && (f.method || '').toLowerCase() === 'post') dirty = true;
+  });
+  // غير رأسمالي (bubble): يعمل بعد محرك التأكيد — الضغطة المسلِّحة الممنوعة لا تُحسب إرسالاً
+  document.addEventListener('submit', function (e) {
+    if (!e.defaultPrevented) submitting = true;
+  });
+  window.addEventListener('beforeunload', function (e) {
+    if (dirty && !submitting) { e.preventDefault(); e.returnValue = ''; }
+  });
+})();
+
 /* ═ الحيوية: الأرقام تعدّ صعوداً وأشرطة التقدم تمتلئ أمام العين ═ */
 (function () {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;

@@ -14,9 +14,11 @@
                 <span class="stico">{{ $ico }}</span>
                 <b>{{ number_format($c['count']) }}</b><span>{{ $c['label'] }}</span>
                 @if (($c['trend'] ?? null) !== null)
-                    <span class="trend {{ $c['trend'] >= 0 ? 'up' : 'dn' }}">
-                        {{ $c['trend'] >= 0 ? '↑' : '↓' }} {{ abs($c['trend']) }}٪ عن الأسبوع الماضي
+                    <span class="trend {{ $c['trend'] > 0 ? 'up' : ($c['trend'] < 0 ? 'dn' : '') }}">
+                        {{ $c['trend'] > 0 ? '↑' : ($c['trend'] < 0 ? '↓' : '=') }} {{ abs($c['trend']) }}٪ عن الأسبوع الماضي
                     </span>
+                @elseif (($c['fresh'] ?? 0) > 0)
+                    <span class="trend up">+{{ number_format($c['fresh']) }} هذا الأسبوع</span>
                 @endif
             </a>
         @endforeach
