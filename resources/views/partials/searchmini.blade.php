@@ -1,7 +1,10 @@
-@php $dests = $dests ?? []; $acts = $acts ?? []; $flat = $flat ?? []; @endphp
-@if ($q === '' && (count($dests) || count($acts)))
+@php $dests = $dests ?? []; $acts = $acts ?? []; $flat = $flat ?? []; $recents = $recents ?? []; @endphp
+@if ($q === '' && (count($dests) || count($acts) || count($recents)))
     <div class="gitem sub ghint">اكتب للبحث في كل شيء — ↑↓ للتنقل وEnter للفتح</div>
 @endif
+@foreach ($recents as $r)
+    <a class="gitem" href="{{ $r['u'] }}"><span class="bdg g">🕘 {{ $r['l'] }}</span> {{ \Illuminate\Support\Str::limit($r['t'], 40) }}</a>
+@endforeach
 @foreach ($dests as $d)
     <a class="gitem" href="{{ $d['u'] }}"><span class="bdg wn">صفحة</span> {{ $d['t'] }}</a>
 @endforeach

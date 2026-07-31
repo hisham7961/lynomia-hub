@@ -49,6 +49,36 @@ class SearchPaletteTest extends TestCase
         $this->assertStringContainsString('مهمة للبحث الحي', $html2);       // السجل نفسه
     }
 
+    public function test_recent_records_appear_in_focus_mode(): void
+    {
+        $this->seedCore();
+        $t = Task::create(['title' => 'مهمة زرتها للتو', 'status' => 'جديدة']);
+
+        // زيارة صفحة السجل تُسجَّل عبر TrackVisits ثم تظهر في «الأخيرة»
+        $this->actingAs($this->owner)->get("/m/tasks/{$t->id}")->assertOk();
+        $html = $this->actingAs($this->owner)->get('/search/mini?q=')->assertOk()->getContent();
+        $this->assertStringContainsString('🕘', $html);
+        $this->assertStringContainsString('مهمة زرتها للتو', $html);
+    }
+
+    public function test_recent_records_revalidate_deleted_and_foreign_paths(): void
+    {
+        $this->seedCore();
+        $t = Task::create(['title' => 'ستُحذف بعد الزيارة', 'status' => 'جديدة']);
+        $this->actingAs($this->owner)->get("/m/tasks/{$t->id}")->assertOk();
+        $t->delete();
+
+        // زيارة مزروعة لمسار لا وحدة له — تُتجاهل بصمت
+        \Illuminate\Support\Facades\DB::table('page_visits')->insert([
+            'id' => (string) \Illuminate\Support\Str::uuid(), 'user_id' => $this->owner->id,
+            'path' => '/m/ghost-module/123', 'route' => 'm.show', 'at' => now(),
+        ]);
+
+        $html = $this->actingAs($this->owner)->get('/search/mini?q=')->assertOk()->getContent();
+        $this->assertStringNotContainsString('ستُحذف بعد الزيارة', $html);   // المحذوف لا يعود عبر «الأخيرة»
+        $this->assertStringNotContainsString('ghost-module', $html);
+    }
+
     public function test_topbar_is_accessible_combobox_with_palette_wiring(): void
     {
         $this->seedCore();

@@ -17,9 +17,10 @@ class SearchController extends Controller
     {
         $q = trim((string) $r->input('q'));
         if ($q === '') {
+            $recents = $this->recents(5);
             return view('partials.searchmini', [
-                'flat' => [], 'q' => '',
-                'dests' => array_slice($this->destinations(''), 0, 6),
+                'flat' => [], 'q' => '', 'recents' => $recents,
+                'dests' => array_slice($this->destinations(''), 0, $recents ? 4 : 6),
                 'acts' => $this->quickActions('', 3),
             ]);
         }
@@ -41,6 +42,42 @@ class SearchController extends Controller
             'dests' => array_slice($this->destinations($q), 0, 4),
             'acts' => $this->quickActions($q, 3),
         ]);
+    }
+
+    /**
+     * «الأخيرة»: آخر السجلات التي فتحها المستخدم — من سجل التنقل القائم (page_visits)
+     * بلا جدول جديد. كل سجل يُعاد التحقق منه لحظة العرض: الوحدة موجودة، والصلاحية
+     * قائمة، والسجل داخل نطاق المستخدم وغير محذوف — فلا يتسرب عبر «الأخيرة» ما لم
+     * يعد له رؤيته.
+     */
+    protected function recents(int $limit): array
+    {
+        $u = auth()->user();
+        $visits = \Illuminate\Support\Facades\DB::table('page_visits')
+            ->where('user_id', $u->id)->where('route', 'm.show')
+            ->orderByDesc('at')->limit(40)->pluck('path');
+
+        $out = [];
+        $seen = [];
+        foreach ($visits as $path) {
+            if (! preg_match('#^/m/([\w-]+)/([\w-]+)$#u', $path, $m)) continue;
+            [, $module, $id] = $m;
+            if (isset($seen[$path])) continue;
+            $seen[$path] = 1;
+
+            $def = hub_mod($module);
+            if (! $def || ! hub_can($u, $module, 'v')) continue;
+            $class = '\\App\\Models\\' . ($def['model'] ?? '');
+            if (! class_exists($class)) continue;
+            $row = hub_scope($class::query(), $module)->whereKey($id)->first();
+            if (! $row) continue;
+
+            $out[] = ['t' => (string) $row->{hub_display_col($module)}, 'l' => $def['label'],
+                      'u' => route('m.show', [$module, $id])];
+            if (count($out) >= $limit) break;
+        }
+
+        return $out;
     }
 
     /** إجراءات سريعة: «＋ جديد» في الوحدات التي يملك المستخدم الإضافة فيها ويطابق اسمُها النص */
