@@ -5017,7 +5017,7 @@ return [
             'key' => 'autos',
             'table' => 'automations',
             'model' => 'Automation',
-            'label' => 'الأتمتة (Workflows)',
+            'label' => 'الأتمتة (مؤرشفة — انظر مسارات العمل)',
             'display' => 'name',
             'status' => 'status',
             'columns' => [
@@ -7762,6 +7762,20 @@ return [
         ],
         'deploys' => [
             ['on' => 'status', 'to' => ['فشل'], 'emit' => 'deploy.failed', 'label' => 'فشل نشر'],
+            ['on' => 'status', 'to' => ['متراجع عنه'], 'emit' => 'deploy.rolled_back', 'label' => 'تراجعٌ عن نشر'],
+        ],
+        // الحوادث كانت بلا حدثٍ دلاليّ واحد بينما لنظيراتها أحداثها — فيضطر
+        // المشترك الخارجي (n8n) لمطابقة نصّ الحالة بنفسه
+        'incidents' => [
+            ['on' => 'created', 'emit' => 'incident.opened', 'label' => 'فُتحت حادثة'],
+            ['on' => 'status', 'to' => ['مُحتوى'], 'emit' => 'incident.contained', 'label' => 'احتُويت حادثة'],
+            ['on' => 'status', 'to' => ['مُستعاد'], 'emit' => 'incident.resolved', 'label' => 'استُعيدت الخدمة'],
+            ['on' => 'status', 'to' => ['مغلق بتقرير'], 'emit' => 'incident.closed', 'label' => 'أُغلقت حادثة بتقرير'],
+        ],
+        'changes' => [
+            ['on' => 'status', 'to' => ['معتمد'], 'emit' => 'change.approved', 'label' => 'اعتُمد تغيير تقني'],
+            ['on' => 'status', 'to' => ['منفّذ'], 'emit' => 'change.executed', 'label' => 'نُفّذ تغيير تقني'],
+            ['on' => 'status', 'to' => ['متراجع عنه'], 'emit' => 'change.rolled_back', 'label' => 'تراجعٌ عن تغيير'],
         ],
         'restores' => [
             ['on' => 'status', 'to' => ['فشلت'], 'emit' => 'backup.restore_failed', 'label' => 'فشلت استعادة نسخة'],

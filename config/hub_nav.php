@@ -12,5 +12,5 @@ return [
     ['g' => 'المالية والمشتريات',  'icon' => '💰', 'items' => ['fin', 'banks', 'quotes', 'budgets', 'subs', 'recur', 'costc', 'entries', 'accounts2', 'suppliers', 'purchases']],
     ['g' => 'الموارد البشرية',     'icon' => '👥', 'items' => ['hr', 'attend', 'leaves', 'payroll', 'recruit', 'hrlog', 'skills']],
     ['g' => 'الأصول والعقود',      'icon' => '📦', 'items' => ['assets', 'assetlog', 'stock', 'stockmv', 'contracts', 'obligations', 'ip', 'compliance']],
-    ['g' => 'المعرفة والملفات',    'icon' => '📚', 'items' => ['kb', 'files', 'autos', 'rules', 'policies', 'policyacks', 'media', 'events', 'plans', 'ideas']],
+    ['g' => 'المعرفة والملفات',    'icon' => '📚', 'items' => ['kb', 'files', 'rules', 'policies', 'policyacks', 'media', 'events', 'plans', 'ideas']],
 ];

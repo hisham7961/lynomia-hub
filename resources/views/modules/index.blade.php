@@ -1,6 +1,8 @@
 @extends('layouts.app')
 @section('title', $def['label'])
 @section('content')
+{{-- خطاف لافتة الوحدة (تنبيهات الأرشفة والتحويل) — لا أثر لوحدةٍ بلا ملف --}}
+@includeIf('modules.notice.' . $module)
 {{-- ترويسة هوية الوحدة: أيقونة ولون مجموعتها + العدد الحي --}}
 @php $look = hub_mod_look($module); @endphp
 <div class="modhero" style="--mh:{{ $look['color'] }}">

@@ -892,8 +892,15 @@ if (! function_exists('hub_health')) {
                 $ssl = $db->table('domains')->whereNull('deleted_at')->whereNotNull('ssl_exp')->where('ssl_exp', '<', $today)->count();
                 $crit = $db->table('issues')->whereNull('deleted_at')->where('severity', 'LIKE', '%حرج%')
                     ->where(fn ($w) => $w->whereNull('status')->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مغلق%')->where('status', 'NOT LIKE', '%محلول%')))->count();
-                $score = 100 - ($sn2 ? ($sLate / $sn2) * 30 : 0) - min(30, $ssl * 10) - min(40, $crit * 10);
-                $out['البنية التحتية'] = ['score' => $clamp($score), 'note' => "{$sLate} سيرفر منتهٍ · {$ssl} شهادة SSL منتهية · {$crit} عطل حرج مفتوح"];
+                // الحوادث المفتوحة تدخل الدرجة أخيراً — كانت وحدة إدارة الحوادث
+                // كاملةً خارج تقييم البنية التحتية، والدرجة تعدّ issues بدلاً منها
+                $inc = \Illuminate\Support\Facades\Schema::hasTable('incidents')
+                    ? $db->table('incidents')->whereNull('deleted_at')
+                        ->whereNotIn('status', ['مغلق بتقرير', 'مُستعاد'])->count() : 0;
+                $score = 100 - ($sn2 ? ($sLate / $sn2) * 30 : 0) - min(30, $ssl * 10)
+                       - min(40, $crit * 10) - min(30, $inc * 12);
+                $out['البنية التحتية'] = ['score' => $clamp($score),
+                    'note' => "{$sLate} سيرفر منتهٍ · {$ssl} شهادة SSL منتهية · {$crit} عطل حرج مفتوح · {$inc} حادثة مفتوحة"];
             } catch (\Throwable $e) {}
 
             return $out;
@@ -2072,10 +2079,13 @@ if (! function_exists('hub_app_quality')) {
             $iss = \Illuminate\Support\Facades\DB::table('issues')->whereNull('deleted_at')
                 ->whereIn('app_id', $ids)->get(['app_id', 'severity', 'status', 'found', 'closed']);
 
+            // الحوادث ٩٠ يوماً: عدّها ومتوسط زمن تعافيها (MTTR) — كان زمن التعطل
+            // المسجَّل لا يُحوَّل إلى مؤشرٍ واحد رغم توفره في كل حادثة
             $inc = \Illuminate\Support\Facades\Schema::hasTable('incidents')
                 ? \Illuminate\Support\Facades\DB::table('incidents')->whereNull('deleted_at')
                     ->whereIn('app_id', $ids)->where('created_at', '>=', now()->subDays(90))
-                    ->selectRaw('app_id, COUNT(*) n')->groupBy('app_id')->get()->keyBy('app_id')
+                    ->selectRaw('app_id, COUNT(*) n, AVG(downtime_min) mttr')
+                    ->groupBy('app_id')->get()->keyBy('app_id')
                 : collect();
 
             $dep = \Illuminate\Support\Facades\Schema::hasTable('deployments')
@@ -2111,6 +2121,8 @@ if (! function_exists('hub_app_quality')) {
                     'tested'   => $ft->count(),
                     'passRate' => $ft->count() ? (int) round($pass / $ft->count() * 100) : null,
                     'incidents' => (int) ($inc[$a->id]->n ?? 0),
+                    'mttr' => isset($inc[$a->id]->mttr) && $inc[$a->id]->mttr !== null
+                        ? (int) round((float) $inc[$a->id]->mttr) : null,
                     'deploys'  => $dp->count(),
                     'rollback' => $dp->count() ? (int) round($rolled / $dp->count() * 100) : null,
                     'lastDeploy' => $dp->max('deployed_at'),
