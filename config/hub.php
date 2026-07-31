@@ -4938,9 +4938,11 @@ return [
                     'expiry' => true,
                 ],
                 [
+                    // تُحسب من النتائج الرئيسية وتُكتب تلقائياً — الكتابة اليدوية
+                    // تنقض OKR من أصله. تبقى مفيدةً لهدفٍ لا نتائج له بعد.
                     'key' => 'progress',
                     'col' => 'progress',
-                    'label' => 'نسبة الإنجاز %',
+                    'label' => 'نسبة الإنجاز % (تُحسب من النتائج الرئيسية)',
                     'type' => 'num',
                 ],
                 [
@@ -4976,14 +4978,22 @@ return [
             'label' => 'النتائج الرئيسية (KR)',
             'display' => 'title',
             'status' => 'status',
-            'columns' => ['title', 'objectiveId', 'currentValue', 'targetValue', 'status'],
+            'columns' => ['title', 'objectiveId', 'currentValue', 'targetValue', 'source', 'status'],
             'fields' => [
                 ['key' => 'title', 'col' => 'title', 'label' => 'النتيجة الرئيسية', 'type' => 'text', 'required' => true],
                 ['key' => 'objectiveId', 'col' => 'objective_id', 'label' => 'الهدف', 'type' => 'ref', 'required' => true, 'ref' => 'okrs'],
-                ['key' => 'kpiId', 'col' => 'kpi_id', 'label' => 'المؤشر (يحسب القيمة آلياً)', 'type' => 'text'],
+                // ── من أين تأتي القيمة: مصدرٌ يُختار لا معرّفٌ يُلصق ──
+                ['key' => 'source', 'col' => 'source', 'label' => 'مصدر القياس', 'type' => 'sel',
+                 'options' => ['manual', 'count', 'sum', 'avg', 'kpi', 'metric']],
+                ['key' => 'srcModule', 'col' => 'src_module', 'label' => 'الوحدة المقيسة (مفتاحها)', 'type' => 'text'],
+                ['key' => 'srcCol', 'col' => 'src_col', 'label' => 'العمود (للمجموع/المتوسط)', 'type' => 'text'],
+                ['key' => 'srcStatus', 'col' => 'src_status', 'label' => 'تضييق بحالة السجل', 'type' => 'text'],
+                ['key' => 'srcRecord', 'col' => 'src_record', 'label' => 'السجل (للمقياس الزمني)', 'type' => 'text'],
+                ['key' => 'srcMetric', 'col' => 'src_metric', 'label' => 'اسم المقياس الزمني', 'type' => 'text'],
+                ['key' => 'kpiId', 'col' => 'kpi_id', 'label' => 'مؤشر KPI المرتبط', 'type' => 'text'],
                 ['key' => 'startValue', 'col' => 'start_value', 'label' => 'قيمة البداية', 'type' => 'num'],
                 ['key' => 'targetValue', 'col' => 'target_value', 'label' => 'القيمة المستهدفة', 'type' => 'num'],
-                ['key' => 'currentValue', 'col' => 'current_value', 'label' => 'القيمة الحالية', 'type' => 'num'],
+                ['key' => 'currentValue', 'col' => 'current_value', 'label' => 'القيمة الحالية (تُقرأ آلياً إن اختير مصدر)', 'type' => 'num'],
                 ['key' => 'unit', 'col' => 'unit', 'label' => 'الوحدة', 'type' => 'text'],
                 ['key' => 'weight', 'col' => 'weight', 'label' => 'الوزن داخل الهدف', 'type' => 'num'],
                 ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],

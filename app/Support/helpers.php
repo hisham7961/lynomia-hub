@@ -250,6 +250,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'recs',      'label' => '💡 مركز التوصيات',    'route' => 'recs',            'group' => 'analytics', 'ok' => $mon],
             ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'group' => 'analytics', 'ok' => $mon],
             ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'okrb',      'label' => '🎯 لوحة الأهداف',     'route' => 'okrs.board',      'group' => 'analytics', 'ok' => hub_can($user, 'okrs', 'v')],
             ['key' => 'social',    'label' => '📣 مركز السوشال',     'route' => 'social.index',    'group' => 'analytics', 'ok' => hub_can($user, 'social', 'v')],
 
             ['key' => 'legal',     'label' => '⚖️ القانوني',         'route' => 'legal',           'group' => 'centers',   'ok' => hub_can($user, 'contracts', 'v')],
@@ -1139,7 +1140,7 @@ if (! function_exists('hub_okr_progress')) {
      * الحالية من `hub_kpi_value` (المحرك مكتوبٌ وجاهز منذ إصدارات بلا مستهلك
      * في الأهداف)، وهدفٌ بلا نتائج يبقى على رقمه اليدوي — لا نكذب بصفر.
      */
-    function hub_okr_progress(string $objectiveId, bool $refresh = false): ?array
+    function hub_okr_progress(string $objectiveId, bool $refresh = false, bool $withPace = false): ?array
     {
         // الملغاة تُستثنى — وبلا حالة تبقى (whereNotIn وحده يُقصي NULL صامتاً)
         $krs = \App\Models\KeyResult::whereNull('deleted_at')
@@ -1148,19 +1149,20 @@ if (! function_exists('hub_okr_progress')) {
             ->get();
         if ($krs->isEmpty()) return null;
 
-        $kpis = null;
         $sum = 0.0; $weights = 0.0; $rows = [];
         foreach ($krs as $kr) {
-            // القيمة الحالية من المؤشر المرتبط — إن وُجد وطُلب التحديث
-            if ($refresh && $kr->kpi_id && \Illuminate\Support\Facades\Schema::hasTable('kpi_defs')) {
-                $kpis ??= \Illuminate\Support\Facades\DB::table('kpi_defs')->get()->keyBy('id');
-                if ($def = ($kpis[$kr->kpi_id] ?? null)) {
-                    $formula = is_array($def->formula) ? $def->formula : (json_decode((string) $def->formula, true) ?: []);
-                    $val = hub_kpi_value($formula);
-                    if ($val !== null) {
-                        $kr->current_value = $val;
-                        $kr->saveQuietly();
-                    }
+            // القيمة الحالية من مصدرها — والمصدر الآلي **يغلب** أي كتابة يدوية،
+            // وإلا فما فائدة الأتمتة إن نقضتها آخر لمسةِ يد.
+            $auto = hub_kr_source($kr) !== 'manual';
+            if ($auto && $refresh) {
+                $val = hub_kr_read($kr);
+                if ($val !== null && (float) ($kr->current_value ?? PHP_FLOAT_MIN) !== $val) {
+                    $kr->current_value = $val;
+                    $kr->read_at = now();
+                    $kr->saveQuietly();
+                } elseif ($val !== null) {
+                    $kr->read_at = now();
+                    $kr->saveQuietly();
                 }
             }
 
@@ -1169,15 +1171,33 @@ if (! function_exists('hub_okr_progress')) {
             if ($pct !== null) { $sum += $pct * $w; $weights += $w; }
             $rows[] = ['id' => $kr->id, 'title' => $kr->title, 'pct' => $pct,
                        'current' => $kr->current_value, 'target' => $kr->target_value,
-                       'unit' => $kr->unit, 'status' => $kr->status, 'auto' => (bool) $kr->kpi_id];
+                       'start' => $kr->start_value, 'weight' => $w,
+                       'unit' => $kr->unit, 'status' => $kr->status, 'auto' => $auto,
+                       'source' => hub_kr_source($kr), 'readAt' => $kr->read_at];
         }
 
-        return [
-            'pct' => $weights > 0 ? (int) round($sum / $weights) : null,
+        $pct = $weights > 0 ? (int) round($sum / $weights) : null;
+
+        $out = [
+            'pct' => $pct,
             'krs' => $rows,
             'count' => $krs->count(),
             'measured' => count(array_filter($rows, fn ($r) => $r['pct'] !== null)),
+            'autoCount' => count(array_filter($rows, fn ($r) => $r['auto'])),
         ];
+
+        $o = \App\Models\Objective::find($objectiveId);
+        if ($o) {
+            $out += hub_okr_pace($o, $pct);
+            // النسبة تُكتب على الهدف **دائماً** لا عند التحديث فقط: القوائم
+            // والتصدير والودجات تقرأ العمود، فيبقى صادقاً بلا أن يلمسه أحد.
+            if ($pct !== null && (int) ($o->progress ?? -1) !== $pct) {
+                $o->forceFill(['progress' => $pct, 'computed_at' => now(),
+                               'progress_at_risk' => $out['gap'] ?? null])->saveQuietly();
+            }
+        }
+
+        return $out;
     }
 }
 
@@ -3107,6 +3127,144 @@ if (! function_exists('hub_uptime')) {
             'days' => $days,
             'tone' => $pct === null ? '' : ($pct >= 99 ? 'ok' : ($pct >= 95 ? 'wn' : 'bad')),
             'label' => $pct === null ? 'غير مراقب' : ($pct >= 99 ? 'مستقر' : ($pct >= 95 ? 'متذبذب' : 'غير مستقر')),
+        ];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// OKR: نسبةٌ تُحسب لا تُكتب
+// كانت «نسبة الإنجاز» حقلاً يُملأ باليد على الهدف — وهذا ينقض OKR من أصله.
+// ─────────────────────────────────────────────────────────────────────────
+
+if (! function_exists('hub_kr_sources')) {
+    /** مصادر قياس النتيجة الرئيسية — معلَنةً في مكانٍ واحد تقرؤه الواجهة والحساب */
+    function hub_kr_sources(): array
+    {
+        return [
+            'manual' => 'يدوي — أسجّل القيمة بنفسي',
+            'count'  => 'عدّ سجلات وحدة',
+            'sum'    => 'مجموع عمود في وحدة',
+            'avg'    => 'متوسط عمود في وحدة',
+            'kpi'    => 'مؤشر KPI محفوظ',
+            'metric' => 'مقياس زمني على سجل',
+        ];
+    }
+}
+
+if (! function_exists('hub_kr_source')) {
+    /**
+     * مصدر النتيجة فعلياً. نتيجةٌ قديمة عليها `kpi_id` وحده (قبل وجود عمود
+     * المصدر) تبقى آليةً كما كانت — الإضافة لا الكسر.
+     */
+    function hub_kr_source($kr): string
+    {
+        $src = trim((string) ($kr->source ?? ''));
+        if ($src !== '') return $src;
+
+        return $kr->kpi_id ? 'kpi' : 'manual';
+    }
+}
+
+if (! function_exists('hub_kr_read')) {
+    /**
+     * قراءة القيمة الحالية لنتيجةٍ رئيسية من مصدرها.
+     * تُعيد `null` للمصدر اليدوي أو لتعذّر القراءة — و«لا قراءة» ليست صفراً.
+     * القراءة تمر بنطاق المستخدم وصلاحيته عبر hub_kpi_metric.
+     */
+    function hub_kr_read($kr, $user = null): ?float
+    {
+        $src = hub_kr_source($kr);
+        if ($src === 'manual') return null;
+
+        try {
+            if ($src === 'kpi') {
+                if (! $kr->kpi_id || ! \Illuminate\Support\Facades\Schema::hasTable('kpi_defs')) return null;
+                $def = \App\Models\KpiDef::find($kr->kpi_id);
+                if (! $def) return null;
+                $f = is_array($def->formula) ? $def->formula : (json_decode((string) $def->formula, true) ?: []);
+
+                return hub_kpi_value($f, $user);
+            }
+
+            if ($src === 'metric') {
+                if (! $kr->src_module || ! $kr->src_record || ! $kr->src_metric) return null;
+
+                return hub_metric_latest($kr->src_module, $kr->src_record, $kr->src_metric);
+            }
+
+            if (in_array($src, ['count', 'sum', 'avg'], true)) {
+                if (! $kr->src_module) return null;
+
+                return hub_kpi_metric([
+                    'agg' => $src, 'module' => $kr->src_module,
+                    'col' => $kr->src_col, 'st' => $kr->src_status,
+                ], $user);
+            }
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        return null;
+    }
+}
+
+if (! function_exists('hub_okr_pace')) {
+    /**
+     * الإيقاع: أين **يُفترض** أن نكون الآن من الفترة، مقابل أين نحن فعلاً.
+     * روح OKR كلها هنا — «٣٠٪» وحدها لا تقول أمتقدّمون نحن أم متأخرون.
+     */
+    function hub_okr_pace($objective, ?int $pct): array
+    {
+        $out = ['expected' => null, 'gap' => null, 'pace' => '', 'tone' => '', 'daysLeft' => null];
+
+        $start = $objective->date_start ? \Illuminate\Support\Carbon::parse($objective->date_start)->startOfDay() : null;
+        $due = $objective->due ? \Illuminate\Support\Carbon::parse($objective->due)->startOfDay() : null;
+        if (! $start || ! $due || $due->lte($start)) return $out;
+
+        $total = max(1, $start->diffInDays($due));
+        $gone = max(0, min($total, $start->diffInDays(now()->startOfDay())));
+        $expected = (int) round($gone * 100 / $total);
+        $out['expected'] = $expected;
+        $out['daysLeft'] = (int) now()->startOfDay()->diffInDays($due, false);
+        if ($pct === null) return $out;
+
+        $gap = $pct - $expected;
+        $out['gap'] = $gap;
+        // هامش ٥٪ حول الخط: التقلّب اليومي ليس تعثّراً
+        $out['pace'] = $gap >= 10 ? 'متقدّم' : ($gap >= -5 ? 'على المسار' : 'متأخر');
+        $out['tone'] = $gap >= 10 ? 'ok' : ($gap >= -5 ? 'ok' : ($gap >= -20 ? 'wn' : 'bad'));
+        if ($out['pace'] === 'متأخر' && $out['tone'] === 'ok') $out['tone'] = 'wn';
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_okr_board')) {
+    /** لوحة OKR كاملةً — منطّقةً بصلاحية المستخدم ونطاقه */
+    function hub_okr_board($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        $objs = hub_scope(\App\Models\Objective::query(), 'okrs')->whereNull('deleted_at')
+            ->orderByRaw("CASE WHEN status IN ('مكتمل','ملغى') THEN 1 ELSE 0 END")
+            ->orderBy('due')->limit(120)->get();
+
+        $rows = [];
+        foreach ($objs as $o) {
+            $p = hub_okr_progress($o->id, true, true);
+            $rows[] = ['o' => $o, 'p' => $p];
+        }
+
+        $measured = array_filter($rows, fn ($r) => ($r['p']['pct'] ?? null) !== null);
+
+        return [
+            'rows' => $rows,
+            'n' => count($rows),
+            'measured' => count($measured),
+            'unmeasured' => count($rows) - count($measured),
+            'avg' => $measured ? (int) round(array_sum(array_map(fn ($r) => $r['p']['pct'], $measured)) / count($measured)) : null,
+            'behind' => count(array_filter($measured, fn ($r) => ($r['p']['pace'] ?? '') === 'متأخر')),
+            'ahead' => count(array_filter($measured, fn ($r) => ($r['p']['pace'] ?? '') === 'متقدّم')),
+            'auto' => count(array_filter($rows, fn ($r) => collect($r['p']['krs'] ?? [])->contains('auto', true))),
         ];
     }
 }

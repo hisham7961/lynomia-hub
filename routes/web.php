@@ -195,6 +195,10 @@ Route::middleware('auth')->group(function () {
     Route::get('innovation', [\App\Http\Controllers\Web\InnovationController::class, 'index'])->name('innovation');
     Route::post('ideas/{id}/promote', [\App\Http\Controllers\Web\InnovationController::class, 'promote'])->name('ideas.promote');
 
+    // ── لوحة الأهداف والنتائج ──
+    Route::get('okrs', [\App\Http\Controllers\Web\OkrController::class, 'index'])->name('okrs.board');
+    Route::post('okrs/refresh', [\App\Http\Controllers\Web\OkrController::class, 'refresh'])->name('okrs.refresh');
+
     // ── المراقبة الحيّة: فحصٌ عند الطلب لسيرفر أو موقع ──
     Route::post('monitor/{module}/{id}/check', [\App\Http\Controllers\Web\MonitorController::class, 'check'])
         ->name('monitor.check');
