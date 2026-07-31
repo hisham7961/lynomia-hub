@@ -507,3 +507,52 @@ document.addEventListener('input', function (e) {
     requestAnimationFrame(function () { requestAnimationFrame(function () { s.style.height = h; }); });
   });
 })();
+
+/* ═ v2.114 — الإجراءات الجماعية: تحديد صفوف ← شريط طافٍ (حالة/تصدير/حذف) ═ */
+(function () {
+  'use strict';
+  function bar() { return document.getElementById('bulkbar'); }
+  function rows() { return [].slice.call(document.querySelectorAll('input.brow')); }
+  function checked() { return rows().filter(function (c) { return c.checked; }); }
+
+  function sync() {
+    var b = bar();
+    if (!b) return;
+    var n = checked().length;
+    b.hidden = n === 0;
+    var cnt = document.getElementById('bulkn');
+    if (cnt) cnt.textContent = n;
+    var all = document.getElementById('ballsel');
+    if (all) {
+      all.checked = n > 0 && n === rows().length;
+      all.indeterminate = n > 0 && n < rows().length;
+    }
+  }
+
+  document.addEventListener('change', function (e) {
+    if (e.target.id === 'ballsel') {
+      rows().forEach(function (c) { c.checked = e.target.checked; });
+      sync(); return;
+    }
+    if (e.target.classList && e.target.classList.contains('brow')) sync();
+  });
+
+  document.addEventListener('click', function (e) {
+    if (e.target.id === 'bulkclear') {
+      rows().forEach(function (c) { c.checked = false; });
+      sync();
+    }
+  });
+
+  /* المعرفات تُحقن لحظة الإرسال فقط — فلا حالة خفية تتقادم مع تبديل htmx للجدول */
+  document.addEventListener('submit', function (e) {
+    var b = bar();
+    if (!b || e.target !== b) return;
+    b.querySelectorAll('input[name="ids[]"]').forEach(function (i) { i.remove(); });
+    checked().forEach(function (c) {
+      var i = document.createElement('input');
+      i.type = 'hidden'; i.name = 'ids[]'; i.value = c.value;
+      b.appendChild(i);
+    });
+  }, true);
+})();

@@ -397,6 +397,17 @@ html[data-theme="dark"] .seg{background:color-mix(in srgb,var(--cd) 88%,transpar
   background:color-mix(in srgb,var(--p) 14%,transparent);color:var(--p);font-size:10px;font-weight:800}
 .kempty{border:1.5px dashed var(--ln);border-radius:10px;padding:14px 10px;text-align:center;font-size:12px}
 
+/* ═ الإجراءات الجماعية (v2.114) ═ */
+th.bsel,td.bsel{width:34px;text-align:center;padding-inline:8px}
+.bsel input{width:15px;height:15px;accent-color:var(--p);cursor:pointer}
+#bulkbar{position:fixed;bottom:18px;inset-inline:0;margin-inline:auto;width:max-content;max-width:calc(100vw - 24px);
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;
+  background:var(--cd);border:1px solid var(--ln);border-radius:14px;padding:10px 16px;
+  box-shadow:0 12px 34px rgba(0,0,0,.18);z-index:60;animation:slidein .25s cubic-bezier(.2,.75,.3,1)}
+#bulkbar[hidden]{display:none}
+#bulkbar .bulkgrp{display:flex;align-items:center;gap:6px}
+#bulkbar select.inp{padding:5px 10px;font-size:12.5px}
+
 /* ═ الرسوم البيانية وأشرطة التقدم ═ */
 .chart{display:flex;gap:10px;align-items:flex-end;height:172px;padding:8px 4px 4px}
 .cg{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%}

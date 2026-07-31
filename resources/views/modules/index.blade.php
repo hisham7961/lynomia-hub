@@ -104,10 +104,20 @@
             <a class="btn ghost sm" href="{{ route('m.index', [$module, 'trash' => $trash ? null : 1]) }}">{{ $trash ? '↩ عودة للسجلات' : '🗑 السلة' }}</a>
         @endif
     </div>
+    @php
+        // الإجراءات الجماعية: تظهر أعمدة التحديد لمن يملك فعلاً جماعياً واحداً على الأقل
+        $bulkStatus = ! $trash && ! empty($def['status']) && hub_can(auth()->user(), $module, 'e');
+        $bulkDelete = ! $trash && hub_can(auth()->user(), $module, 'd');
+        $bulkExport = ! $trash && hub_exporter();
+        $canBulk = $bulkStatus || $bulkDelete || $bulkExport;
+        $statusOpts = $bulkStatus ? (collect($def['fields'])->firstWhere('col', $def['status'])['options'] ?? []) : [];
+        $bulkStatus = $bulkStatus && count($statusOpts) > 0;
+    @endphp
     <div class="card pad0">
         <div class="tblwrap">
         <table class="tbl">
             <thead><tr>
+                @if ($canBulk)<th class="bsel"><input type="checkbox" id="ballsel" aria-label="تحديد الكل"></th>@endif
                 @foreach ($columns as $f)
                     @php $ns = ($sortKey === $f['key'] && $sortDir === 'desc') ? 'asc' : 'desc'; @endphp
                     <th><a href="{{ request()->fullUrlWithQuery(['s' => $f['key'], 'd' => $ns, 'page' => null]) }}">{{ $f['label'] }}@if ($sortKey === $f['key']) {{ $sortDir === 'asc' ? '▲' : '▼' }}@endif</a></th>
@@ -117,6 +127,7 @@
             <tbody>
             @forelse ($rows as $row)
                 <tr>
+                    @if ($canBulk)<td class="bsel"><input type="checkbox" class="brow" value="{{ $row->id }}" aria-label="تحديد السجل"></td>@endif
                     @foreach ($columns as $f)
                         <td>@include('partials._display', ['f' => $f, 'row' => $row, 'labels' => $labels, 'ctx' => 'table'])</td>
                     @endforeach
@@ -133,7 +144,7 @@
                     </td>
                 </tr>
             @empty
-                <tr><td colspan="{{ count($columns) + 1 }}" class="empty">
+                <tr><td colspan="{{ count($columns) + 1 + ($canBulk ? 1 : 0) }}" class="empty">
                     <span class="big">{{ $trash ? '🗑' : '📄' }}</span>
                     {{ $trash ? 'السلة فارغة' : (request('q') ? 'لا نتائج للبحث' : 'لا سجلات بعد') }}
                     @if (! $trash && ! request('q') && hub_can(auth()->user(), $module, 'a'))<div style="margin-top:10px"><a class="btn p sm" hx-boost="false" href="{{ route('m.create', $module) }}">أضف أول سجل</a></div>@endif
@@ -144,5 +155,28 @@
         </div>
     </div>
     {{ $rows->links('partials.pagination') }}
+    @if ($canBulk)
+        {{-- شريط الإجراءات الجماعية: يطفو حين يُحدد سجل — الحذف بضغطتي تأكيد --}}
+        <form id="bulkbar" method="POST" action="{{ route('m.bulk', $module) }}" hidden aria-live="polite">
+            @csrf
+            <b><span id="bulkn">0</span> محدد</b>
+            @if ($bulkStatus)
+                <label class="bulkgrp">
+                    <select name="status" class="inp" aria-label="الحالة الجديدة">
+                        @foreach ($statusOpts as $o)<option value="{{ $o }}">{{ $o }}</option>@endforeach
+                    </select>
+                    <button class="btn sm" type="submit" name="do" value="status">تغيير الحالة</button>
+                </label>
+            @endif
+            @if ($bulkExport)
+                <button class="btn ghost sm" type="submit" name="do" value="export">⬇ تصدير المحدد</button>
+            @endif
+            @if ($bulkDelete)
+                <button class="btn ghost sm dn" type="submit" name="do" value="delete"
+                        data-confirm="نقل السجلات المحددة إلى السلة؟">🗑 حذف</button>
+            @endif
+            <button class="btn ghost sm" type="button" id="bulkclear">إلغاء</button>
+        </form>
+    @endif
 </div>
 @endsection

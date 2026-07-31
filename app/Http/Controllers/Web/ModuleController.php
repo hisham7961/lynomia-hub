@@ -359,10 +359,16 @@ class ModuleController extends Controller
         $rows = $this->buildQuery($r, $def, $class, $trash, $filters)
             ->orderByDesc('created_at')->limit(5000)->get();
 
-        [$columns, $labels] = $this->columnsAndLabels($def, $rows->all());
-
         // بصمة التصدير في التدقيق — تُعرض في مركز الأمان
         hub_audit('تصدير', $module, null, $rows->count() . ' سجل (CSV)');
+
+        return $this->streamCsv($module, $def, $rows);
+    }
+
+    /** بث CSV بترويسة BOM (يقرأ Excel العربية) — تستعمله «تصدير القائمة» و«تصدير المحدد» */
+    protected function streamCsv(string $module, array $def, $rows)
+    {
+        [$columns, $labels] = $this->columnsAndLabels($def, $rows->all());
 
         return response()->streamDownload(function () use ($rows, $columns, $labels) {
             $out = fopen('php://output', 'w');
@@ -382,6 +388,69 @@ class ModuleController extends Controller
             }
             fclose($out);
         }, $module . '-' . now()->format('Y-m-d') . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * إجراءات جماعية على تحديد من القائمة — كل سجل يمر بنفس بوابات مساره الفردي:
+     * النطاق يُطبَّق فيُتخطى ما خرج عنه بصمت (تحديدٌ مختلط لا يفشل كله)، والحالة
+     * تُطلق مسارات العمل لكل سجل كما لو غُيّرت يدوياً، والحذف يُرفض كلياً لمن
+     * حذفُه مشروط بالموافقات (فالتوثيق الفردي أصل لا يُلتف عليه بالجملة).
+     */
+    public function bulk(Request $r, string $module)
+    {
+        $do = (string) $r->input('do');
+        $ids = array_slice(array_values(array_filter((array) $r->input('ids', []), 'is_string')), 0, 200);
+        abort_unless(count($ids) > 0, 400, 'لم تُحدد سجلات');
+
+        if ($do === 'export') {
+            [$def, $class] = $this->resolve($module, 'v');
+            abort_unless(hub_exporter(), 403, 'التصدير يتطلب صلاحية');
+            $def['key'] = $module;
+            $rows = hub_scope($class::query(), $module)->whereIn('id', $ids)->orderByDesc('created_at')->get();
+            hub_audit('تصدير', $module, null, $rows->count() . ' سجل محدد (CSV جماعي)');
+
+            return $this->streamCsv($module, $def, $rows);
+        }
+
+        if ($do === 'status') {
+            [$def, $class] = $this->resolve($module, 'e');
+            $statusCol = $def['status'] ?? null;
+            abort_unless($statusCol, 404, 'هذه الوحدة بلا حقل حالة');
+            $to = (string) $r->input('status');
+            $opts = $this->statusOptions($def);
+            abort_unless($to !== '' && (! $opts || in_array($to, $opts, true)), 422, 'حالة غير معروفة');
+
+            $n = 0;
+            foreach ($ids as $id) {
+                $m = hub_scope($class::query(), $module)->whereKey($id)->first();
+                if (! $m || (string) $m->{$statusCol} === $to) continue;
+                $m->{$statusCol} = $to;
+                $m->save();
+                $this->bustProgress($module, $m);
+                \App\Support\FlowRunner::fire('status', $module, $m, $to);
+                $n++;
+            }
+
+            return back()->with('ok', "غُيّرت حالة {$n} من السجلات إلى «{$to}»");
+        }
+
+        if ($do === 'delete') {
+            [$def, $class] = $this->resolve($module, 'd');
+            if (hub_needs_approval(auth()->user(), $module, 'd')) {
+                return back()->with('err', 'حذفُك يمر بالموافقات — احذف السجلات فردياً ليُوثَّق كل طلب على حدة');
+            }
+            $n = 0;
+            foreach ($ids as $id) {
+                $m = hub_scope($class::query(), $module)->whereKey($id)->first();
+                if (! $m) continue;
+                $m->delete();
+                $n++;
+            }
+
+            return back()->with('ok', "نُقل {$n} من السجلات إلى السلة");
+        }
+
+        abort(400, 'إجراء غير معروف');
     }
 
     public function restoreVersion(string $module, string $id, int $version)
