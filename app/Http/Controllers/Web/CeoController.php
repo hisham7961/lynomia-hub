@@ -77,9 +77,13 @@ class CeoController extends Controller
             ->select('status', DB::raw('COUNT(*) c'))->groupBy('status')->orderByDesc('c')->limit(6)->get()
             ->map(fn ($r) => ['label' => $r->status ?: 'بلا حالة', 'value' => (int) $r->c])->all();
 
+        // مسار المبيعات والإيراد المتكرر — أرقام القرار التجاري في لوحة القيادة
+        $pipe = hub_pipeline();
+        $mrr = hub_mrr();
+
         $currency = setting('app.currency', 'د.ك');
 
         return view('ceo.index', compact('kpi', 'health', 'months', 'max', 'projects',
-            'onLeave', 'attToday', 'unpaidTop', 'taskSlices', 'currency'));
+            'onLeave', 'attToday', 'unpaidTop', 'taskSlices', 'pipe', 'mrr', 'currency'));
     }
 }

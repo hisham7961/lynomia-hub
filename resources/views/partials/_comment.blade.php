@@ -11,6 +11,7 @@
         <b>{{ $users[$c->user_id] ?? 'مستخدم محذوف' }}</b>
         <span class="sub">{{ $c->created_at?->diffForHumans() }}</span>
         @if ($c->pinned)<span class="bdg wn">📌 مثبّت</span>@endif
+        @if ($c->internal ?? false)<span class="bdg" title="ملاحظة بين الفريق — لا تُحتسب رداً على العميل">🔒 داخلية</span>@endif
         @if ($c->resolved_at)<span class="bdg ok" title="حلّه {{ $users[$c->resolved_by] ?? '؟' }}">✔ محلول</span>@endif
         @if ($c->task_id)<a class="bdg ok" href="{{ route('m.show', ['tasks', $c->task_id]) }}">✓ مهمة</a>@endif
         <span class="spacer"></span>

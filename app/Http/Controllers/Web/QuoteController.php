@@ -75,6 +75,7 @@ class QuoteController extends Controller
             'title'      => 'عقد بموجب عرض السعر ' . $q->doc_no,
             'type'       => 'عقد عميل',
             'client_id'  => $q->client_id,
+            'service_id' => $q->service_id,   // الخدمة تتبع البيع فيُقاس MRR من مصدره
             'company_id' => $q->company_id,
             'project_id' => $q->project_id,
             'party'      => $q->client_id ? Client::find($q->client_id)?->name : null,
@@ -106,6 +107,8 @@ class QuoteController extends Controller
         $inv = FinDocument::create([
             'doc_no'      => 'INV-' . $q->doc_no,
             'kind'        => 'فاتورة مبيعات',
+            'client_id'   => $q->client_id,   // المرجع الصريح — الاسم النصي يضيع بالتكرار وتغيير الاسم
+            'service_id'  => $q->service_id,
             'partner'     => $q->client_id ? (Client::find($q->client_id)?->name ?? '') : '',
             'date'        => now()->toDateString(),
             'due'         => now()->addDays(14)->toDateString(),

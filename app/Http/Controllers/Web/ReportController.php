@@ -24,7 +24,10 @@ class ReportController extends Controller
     {
         abort_unless(hub_can(auth()->user(), 'fin', 'v'), 403);
         $t = hub_mod('fin')['table'];
-        $base = fn () => DB::table($t)->whereNull('deleted_at')->whereNotIn('state', $this->dead);
+        // النطاق والعزل يسريان على التقرير كما يسريان على القوائم — المعزول يرى شركاته فقط،
+        // والشركة النشطة من المحوّل تركّز الأرقام عليها
+        $base = fn () => hub_company_scope(
+            hub_scope(DB::table($t)->whereNull('deleted_at')->whereNotIn('state', $this->dead), 'fin'), 'fin');
 
         $mStart = now()->startOfMonth()->toDateString();
         $sum = fn ($kinds, $from = null) => (float) $base()->whereIn('kind', $kinds)
@@ -56,8 +59,15 @@ class ReportController extends Controller
         $topPartners = $base()->whereIn('kind', $this->income)->whereNotNull('partner')->where('partner', '!=', '')
             ->select('partner', DB::raw('SUM(total) s'))->groupBy('partner')->orderByDesc('s')->limit(7)->get();
 
+        // المصروف حسب مركز التكلفة (سنة جارية): cc_id كان يُملأ ولا يُقرأ في أي تقرير
+        $byCC = $base()->whereIn('kind', $this->expense)
+            ->where('date', '>=', now()->startOfYear()->toDateString())
+            ->select('cc_id', DB::raw('COUNT(*) c'), DB::raw('SUM(total) s'))
+            ->groupBy('cc_id')->orderByDesc('s')->limit(12)->get();
+        $ccNames = DB::table('cost_centers')->whereIn('id', $byCC->pluck('cc_id')->filter())->pluck('name', 'id');
+
         $currency = setting('app.currency', 'د.ك');
 
-        return view('reports.finance', compact('cards', 'months', 'max', 'unpaid', 'byState', 'topPartners', 'currency'));
+        return view('reports.finance', compact('cards', 'months', 'max', 'unpaid', 'byState', 'topPartners', 'byCC', 'ccNames', 'currency'));
     }
 }

@@ -204,6 +204,14 @@ Route::middleware('auth')->group(function () {
     Route::get('app/{id}', [AppCenterController::class, 'show'])->name('apps.center');
     Route::get('quote/{id}/doc', [QuoteController::class, 'doc'])->name('quotes.doc');
     Route::post('quote/{id}/act', [QuoteController::class, 'act'])->name('quotes.act');
+    Route::post('fin/{id}/act', [\App\Http\Controllers\Web\FinController::class, 'act'])->name('fin.act');
+    Route::post('entry/{id}/line', [\App\Http\Controllers\Web\EntryController::class, 'line'])->name('entries.line');
+    Route::delete('entry/{id}/line/{lineId}', [\App\Http\Controllers\Web\EntryController::class, 'dropLine'])->name('entries.line.drop');
+    Route::post('entry/{id}/post', [\App\Http\Controllers\Web\EntryController::class, 'post'])->name('entries.post');
+    Route::post('stockmv/{id}/act', [\App\Http\Controllers\Web\StockController::class, 'act'])->name('stockmv.act');
+    Route::post('payroll/{id}/act', [\App\Http\Controllers\Web\PayrollController::class, 'act'])->name('payroll.act');
+    Route::post('candidates/{id}/hire', [\App\Http\Controllers\Web\HireController::class, 'hire'])->name('recruit.hire');
+    Route::post('meetings/{id}/extract', [\App\Http\Controllers\Web\MinutesController::class, 'extract'])->name('meetings.extract');
     Route::get('supplier-scores', [PurchaseController::class, 'scores'])->name('supplierscores');
     Route::get('purchase/{id}/doc', [PurchaseController::class, 'doc'])->name('purchases.doc');
     Route::post('purchase/{id}/act', [PurchaseController::class, 'act'])->name('purchases.act');
@@ -319,6 +327,7 @@ Route::middleware('auth')->group(function () {
         Route::post('import', [ImportController::class, 'map'])->name('import.map');
         Route::post('import/run', [ImportController::class, 'run'])->name('import.run');
         Route::post('{id}/status', [ModuleController::class, 'setStatus'])->name('status');
+        Route::post('{id}/secret/{field}', [ModuleController::class, 'revealSecret'])->name('secret');
         Route::post('bulk', [ModuleController::class, 'bulk'])->name('bulk');
         Route::post('/', [ModuleController::class, 'store'])->name('store');
         Route::get('{id}', [ModuleController::class, 'show'])->name('show');

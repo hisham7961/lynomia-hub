@@ -62,6 +62,12 @@
         @if ($module === 'purchases')
             @include('partials.purchase_actions')
         @endif
+        @if ($module === 'fin')
+            @include('partials.fin_actions')
+        @endif
+        @if ($module === 'stockmv')
+            @include('partials.stockmv_actions')
+        @endif
         @if ($module === 'tickets')
             @include('partials.ticket_sla')
         @endif
@@ -107,7 +113,7 @@
             @include('partials.odoo_card')
         @endif
         @if (in_array($module, ['clients', 'companies', 'hr', 'suppliers', 'recruit', 'projects',
-                                'approvals', 'decisions', 'policies', 'policyacks'], true) && hub_can(auth()->user(), 'contracts', 'v'))
+                                'approvals', 'decisions', 'policies', 'policyacks', 'assets'], true) && hub_can(auth()->user(), 'contracts', 'v'))
             @include('partials.esign_linked')
         @endif
         @include('partials.attachments', ['aModule' => $module, 'aRecordId' => $row->id])

@@ -17,7 +17,7 @@
         <thead><tr>
             <th>التطبيق</th><th>النسخة</th>
             <th>أخطاء مفتوحة</th><th>حرجة</th><th>متوسط زمن الحل</th>
-            <th>نجاح الاختبارات</th><th>أعطال ٩٠ يوماً</th><th>عمليات نشر</th><th>معدل التراجع</th><th>آخر نشر</th>
+            <th>نجاح الاختبارات</th><th>أعطال ٩٠ يوماً</th><th>متوسط التعافي</th><th>عمليات نشر</th><th>معدل التراجع</th><th>آخر نشر</th>
         </tr></thead>
         <tbody>
         @forelse ($apps as $a)
@@ -36,6 +36,7 @@
                     @endif
                 </td>
                 <td>@if ($a['incidents'])<span class="bdg bad">{{ $a['incidents'] }}</span>@else <span class="sub">—</span> @endif</td>
+                <td class="mono">@if ($a['mttr'] !== null){{ $a['mttr'] }} د@else<span class="sub">—</span>@endif</td>
                 <td class="sub">{{ $a['deploys'] ?: '—' }}</td>
                 <td>
                     @if ($a['rollback'] === null)<span class="sub">—</span>

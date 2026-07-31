@@ -487,6 +487,7 @@ return [
                     'col' => 'next_up',
                     'label' => 'التحديث القادم',
                     'type' => 'date',
+                    'expiry' => true,
                 ],
                 [
                     'key' => 'devId',
@@ -818,6 +819,8 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'domainId', 'col' => 'domain_id', 'label' => 'الدومين', 'type' => 'ref', 'ref' => 'domains'],
+                ['key' => 'serverId', 'col' => 'server_id', 'label' => 'السيرفر المستضيف', 'type' => 'ref', 'ref' => 'servers'],
                 [
                     'key' => 'name',
                     'col' => 'name',
@@ -1119,6 +1122,7 @@ return [
                 'expiry',
             ],
             'fields' => [
+                ['key' => 'vaultId', 'col' => 'vault_id', 'label' => 'اعتماد الدخول (من الخزنة)', 'type' => 'ref', 'ref' => 'vault'],
                 [
                     'key' => 'name',
                     'col' => 'name',
@@ -1257,6 +1261,8 @@ return [
                 'subExp',
             ],
             'fields' => [
+                ['key' => 'vaultId', 'col' => 'vault_id', 'label' => 'سرّ الدخول (من الخزنة)', 'type' => 'ref', 'ref' => 'vault'],
+                ['key' => 'twoFA', 'col' => 'two_fa', 'label' => 'التحقق الثنائي مفعّل', 'type' => 'bool'],
                 [
                     'key' => 'platform',
                     'col' => 'platform',
@@ -1402,6 +1408,8 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'domainId', 'col' => 'domain_id', 'label' => 'الدومين التابع له', 'type' => 'ref', 'ref' => 'domains'],
+                ['key' => 'vaultId', 'col' => 'vault_id', 'label' => 'سرّ الدخول (من الخزنة)', 'type' => 'ref', 'ref' => 'vault'],
                 [
                     'key' => 'address',
                     'col' => 'address',
@@ -1882,6 +1890,7 @@ return [
                     'label' => 'وسوم',
                     'type' => 'tags',
                 ],
+                ['key' => 'decisionId', 'col' => 'decision_id', 'label' => 'القرار المنبثقة عنه', 'type' => 'ref', 'ref' => 'decisions'],
             ],
             'search' => [
                 'title',
@@ -1897,6 +1906,10 @@ return [
             'display' => 'done',
             'status' => null,
             'columns' => [
+                'projectId',
+                'done',
+                'progress',
+                'hours',
             ],
             'fields' => [
                 [
@@ -1986,6 +1999,8 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'likelihood', 'col' => 'likelihood', 'label' => 'احتمال الوقوع (للمخاطر)', 'type' => 'sel',
+                 'options' => ['شبه مؤكد', 'مرجّح', 'محتمل', 'نادر']],
                 [
                     'key' => 'title',
                     'col' => 'title',
@@ -2493,13 +2508,15 @@ return [
             'model' => 'Meeting',
             'label' => 'الاجتماعات',
             'display' => 'title',
-            'status' => null,
+            'status' => 'status',
             'columns' => [
                 'title',
                 'dt',
                 'projectId',
             ],
             'fields' => [
+                ['key' => 'status', 'col' => 'status', 'label' => 'حالة الاجتماع', 'type' => 'sel',
+                 'options' => ['مجدول', 'انعقد', 'بانتظار المحضر', 'مُلغى']],
                 [
                     'key' => 'title',
                     'col' => 'title',
@@ -2716,8 +2733,8 @@ return [
                 'title',
                 'type',
                 'amount',
-                'requesterId',
-                'stage',
+                'approverId',
+                'due',
                 'status',
             ],
             'fields' => [
@@ -2727,6 +2744,14 @@ return [
                     'label' => 'عنوان الطلب',
                     'type' => 'text',
                     'required' => true,
+                ],
+                [
+                    'key' => 'status',
+                    'col' => 'status',
+                    'label' => 'حالة الموافقة',
+                    'type' => 'sel',
+                    'required' => true,
+                    'options' => ['معلّق', 'معتمد', 'مرفوض', 'ملغى'],
                 ],
                 [
                     'key' => 'type',
@@ -2948,7 +2973,7 @@ return [
                 'status',
                 'pubAt',
                 'views',
-                'eng',
+                
             ],
             'fields' => [
                 [
@@ -3115,6 +3140,7 @@ return [
                 'state',
             ],
             'fields' => [
+                ['key' => 'serviceId', 'col' => 'service_id', 'label' => 'الخدمة', 'type' => 'ref', 'ref' => 'services'],
                 [
                     'key' => 'no',
                     'col' => 'doc_no',
@@ -3258,6 +3284,13 @@ return [
                         'شيك',
                         'أخرى',
                     ],
+                ],
+                [
+                    'key' => 'bankId',
+                    'col' => 'bank_id',
+                    'label' => 'الحساب البنكي / الصندوق',
+                    'type' => 'ref',
+                    'ref' => 'banks',
                 ],
                 [
                     'key' => 'ccId',
@@ -3408,10 +3441,11 @@ return [
                 'date',
                 'projectId',
                 'desc',
-                'dr',
+                
                 'state',
             ],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 [
                     'key' => 'no',
                     'col' => 'doc_no',
@@ -3494,6 +3528,9 @@ return [
                 'nextDate',
             ],
             'fields' => [
+                ['key' => 'lostReason', 'col' => 'lost_reason', 'label' => 'سبب الخسارة', 'type' => 'sel',
+                 'options' => ['السعر', 'المزايا', 'التوقيت', 'منافس', 'لا ميزانية', 'بلا رد', 'أخرى']],
+                ['key' => 'competitorId', 'col' => 'competitor_id', 'label' => 'خسرناه لصالح', 'type' => 'ref', 'ref' => 'competitors'],
                 [
                     'key' => 'name',
                     'col' => 'name',
@@ -3778,6 +3815,8 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'serviceId', 'col' => 'service_id', 'label' => 'الخدمة المباعة', 'type' => 'ref', 'ref' => 'services'],
+                ['key' => 'planId', 'col' => 'plan_id', 'label' => 'الباقة', 'type' => 'ref', 'ref' => 'plans'],
                 [
                     'key' => 'title',
                     'col' => 'title',
@@ -4101,6 +4140,7 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 [
                     'key' => 'assetId',
                     'col' => 'asset_id',
@@ -4349,6 +4389,12 @@ return [
                 'iqamaExp',
             ],
             'fields' => [
+                ['key' => 'email', 'col' => 'email', 'label' => 'البريد الإلكتروني', 'type' => 'text'],
+                ['key' => 'phone', 'col' => 'phone', 'label' => 'رقم الهاتف', 'type' => 'text'],
+                ['key' => 'nationality', 'col' => 'nationality', 'label' => 'الجنسية', 'type' => 'text'],
+                ['key' => 'civilId', 'col' => 'civil_id', 'label' => 'الرقم المدني', 'type' => 'text'],
+                ['key' => 'iban', 'col' => 'iban', 'label' => 'IBAN للتحويل', 'type' => 'text'],
+                ['key' => 'emergency', 'col' => 'emergency', 'label' => 'جهة اتصال للطوارئ (اسم وهاتف)', 'type' => 'text'],
                 [
                     'key' => 'name',
                     'col' => 'name',
@@ -4536,6 +4582,7 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 [
                     'key' => 'empId',
                     'col' => 'emp_id',
@@ -4838,6 +4885,31 @@ return [
                 'description',
             ],
         ],
+        'krs' => [
+            'key' => 'krs',
+            'table' => 'key_results',
+            'model' => 'KeyResult',
+            'label' => 'النتائج الرئيسية (KR)',
+            'display' => 'title',
+            'status' => 'status',
+            'columns' => ['title', 'objectiveId', 'currentValue', 'targetValue', 'status'],
+            'fields' => [
+                ['key' => 'title', 'col' => 'title', 'label' => 'النتيجة الرئيسية', 'type' => 'text', 'required' => true],
+                ['key' => 'objectiveId', 'col' => 'objective_id', 'label' => 'الهدف', 'type' => 'ref', 'required' => true, 'ref' => 'okrs'],
+                ['key' => 'kpiId', 'col' => 'kpi_id', 'label' => 'المؤشر (يحسب القيمة آلياً)', 'type' => 'text'],
+                ['key' => 'startValue', 'col' => 'start_value', 'label' => 'قيمة البداية', 'type' => 'num'],
+                ['key' => 'targetValue', 'col' => 'target_value', 'label' => 'القيمة المستهدفة', 'type' => 'num'],
+                ['key' => 'currentValue', 'col' => 'current_value', 'label' => 'القيمة الحالية', 'type' => 'num'],
+                ['key' => 'unit', 'col' => 'unit', 'label' => 'الوحدة', 'type' => 'text'],
+                ['key' => 'weight', 'col' => 'weight', 'label' => 'الوزن داخل الهدف', 'type' => 'num'],
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
+                ['key' => 'projectId', 'col' => 'project_id', 'label' => 'المشروع', 'type' => 'ref', 'ref' => 'projects'],
+                ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
+                 'options' => ['على المسار', 'متعثرة', 'مكتملة', 'ملغاة']],
+                ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات', 'type' => 'ta'],
+            ],
+            'search' => ['title', 'notes'],
+        ],
         'kb' => [
             'key' => 'kb',
             'table' => 'kb_articles',
@@ -4945,7 +5017,7 @@ return [
             'key' => 'autos',
             'table' => 'automations',
             'model' => 'Automation',
-            'label' => 'الأتمتة (Workflows)',
+            'label' => 'الأتمتة (مؤرشفة — انظر مسارات العمل)',
             'display' => 'name',
             'status' => 'status',
             'columns' => [
@@ -4953,7 +5025,7 @@ return [
                 'trigger',
                 'act1',
                 'status',
-                'runs',
+                
             ],
             'fields' => [
                 [
@@ -5149,7 +5221,9 @@ return [
                     'col' => 'last_bk',
                     'label' => 'آخر نسخة احتياطية',
                     'type' => 'date',
-                    'expiry' => true,
+                    // تاريخ ماضٍ بدلالة معكوسة (القديم هو الخطر لا القريب) — مكانه قاعدة
+                    // تنبيه «بلا نسخة منذ N يوم» لا رادار المواعيد
+                    'expiry' => false,
                 ],
                 [
                     'key' => 'env',
@@ -5359,6 +5433,7 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'serviceId', 'col' => 'service_id', 'label' => 'الخدمة المعروضة', 'type' => 'ref', 'ref' => 'services'],
                 [
                     'key' => 'no',
                     'col' => 'doc_no',
@@ -5712,7 +5787,7 @@ return [
                 'cycle',
                 'next',
                 'status',
-                'runs',
+                
             ],
             'fields' => [
                 [
@@ -5772,7 +5847,8 @@ return [
                     'label' => 'التوليد القادم',
                     'type' => 'date',
                     'required' => true,
-                    'expiry' => true,
+                    // موعد آلة لا موعد إنسان: المحرك اليومي يولّده بنفسه — وجوده في الرادار ضجيج
+                    'expiry' => false,
                 ],
                 [
                     'key' => 'projectId',
@@ -5870,6 +5946,7 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 [
                     'key' => 'no',
                     'col' => 'doc_no',
@@ -5997,6 +6074,7 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 [
                     'key' => 'empId',
                     'col' => 'emp_id',
@@ -6149,6 +6227,7 @@ return [
                 'nextDate',
             ],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 [
                     'key' => 'name',
                     'col' => 'name',
@@ -6286,6 +6365,7 @@ return [
                 'status',
             ],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 [
                     'key' => 'empId',
                     'col' => 'emp_id',
@@ -6401,7 +6481,7 @@ return [
                 'op',
                 'val',
                 'status',
-                'runs',
+                
             ],
             'fields' => [
                 [
@@ -6417,20 +6497,19 @@ return [
                     'label' => 'القسم',
                     'type' => 'sel',
                     'required' => true,
+                    // كل الوحدات: كانت القائمة مبتورة على ١٣ فلا قاعدة على المشاكل
+                    // ولا القرارات ولا الامتثال ولا الموافقات — والمحرك عام يقبلها كلها
                     'options' => [
-                        'servers',
-                        'projects',
-                        'fin',
-                        'stock',
-                        'clients',
-                        'contracts',
-                        'subs',
-                        'domains',
-                        'tasks',
-                        'tickets',
-                        'banks',
-                        'assets',
-                        'hr',
+                        'companies', 'projects', 'apps', 'code', 'websites', 'domains', 'servers',
+                        'accounts', 'emails', 'phones', 'vault', 'tasks', 'updates', 'issues',
+                        'files', 'subs', 'meetings', 'decisions', 'approvals', 'social', 'posts',
+                        'fin', 'accounts2', 'entries', 'clients', 'services', 'contracts', 'assets',
+                        'assetlog', 'stock', 'hr', 'leaves', 'banks', 'okrs', 'kb', 'autos', 'dbs',
+                        'apis', 'quotes', 'budgets', 'costc', 'recur', 'stockmv', 'attend', 'payroll',
+                        'recruit', 'hrlog', 'rules', 'feats', 'designs', 'tickets', 'suppliers',
+                        'purchases', 'changes', 'skills', 'policies', 'obligations', 'compliance',
+                        'ideas', 'policyacks', 'incidents', 'deploys', 'restores', 'requests', 'deps',
+                        'competitors', 'brands', 'media', 'ip', 'events', 'plans',
                     ],
                 ],
                 [
@@ -6449,6 +6528,8 @@ return [
                     'options' => [
                         'أكبر من',
                         'أصغر من',
+                        'أكبر من عمود',
+                        'أصغر من عمود',
                         'يساوي',
                         'يحتوي',
                         'أيام متبقية أقل من',
@@ -6599,7 +6680,7 @@ return [
                     'col' => 'status',
                     'label' => 'الحالة',
                     'type' => 'sel',
-                    'options' => ['مقترحة', 'مخططة', 'قيد التطوير', 'قيد الاختبار', 'منشورة', 'ملغاة', 'قيد العمل', 'مكتمل'],
+                    'options' => ['مقترحة', 'مخططة', 'قيد التطوير', 'قيد الاختبار', 'منشورة', 'ملغاة'],
                 ],
                 [
                     'key' => 'progress',
@@ -6612,7 +6693,7 @@ return [
                     'col' => 'test',
                     'label' => 'حالة الاختبار',
                     'type' => 'sel',
-                    'options' => ['لم يُختبر', 'قيد الاختبار', 'نجح', 'فشل', 'ناجح'],
+                    'options' => ['لم يُختبر', 'قيد الاختبار', 'ناجح', 'فشل'],
                 ],
                 [
                     'key' => 'testNote',
@@ -6761,9 +6842,10 @@ return [
                 'cat',
                 'priority',
                 'status',
-                'dueAt',
+                
             ],
             'fields' => [
+                ['key' => 'clientId', 'col' => 'client_id', 'label' => 'العميل', 'type' => 'ref', 'ref' => 'clients'],
                 [
                     'key' => 'subject',
                     'col' => 'subject',
@@ -7009,6 +7091,7 @@ return [
             'status' => 'status',
             'columns' => ['no', 'supplierId', 'status', 'amount', 'due', 'payState'],
             'fields' => [
+                ['key' => 'receivedAt', 'col' => 'received_at', 'label' => 'تاريخ الاستلام الفعلي', 'type' => 'date'],
                 ['key' => 'no', 'col' => 'doc_no', 'label' => 'رقم المستند', 'type' => 'text', 'required' => true],
                 ['key' => 'supplierId', 'col' => 'supplier_id', 'label' => 'المورد', 'type' => 'ref', 'ref' => 'suppliers', 'required' => true],
                 ['key' => 'projectId', 'col' => 'project_id', 'label' => 'المشروع', 'type' => 'ref', 'ref' => 'projects'],
@@ -7076,6 +7159,7 @@ return [
             'status' => 'status',
             'columns' => ['name', 'empId', 'level', 'gap', 'certExp', 'status'],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 ['key' => 'name', 'col' => 'name', 'label' => 'المهارة', 'type' => 'text', 'required' => true],
                 ['key' => 'empId', 'col' => 'emp_id', 'label' => 'الموظف', 'type' => 'ref', 'required' => true, 'ref' => 'hr'],
                 ['key' => 'cat', 'col' => 'cat', 'label' => 'تصنيف المهارة', 'type' => 'sel',
@@ -7110,6 +7194,7 @@ return [
             'status' => 'status',
             'columns' => ['title', 'cat', 'ver', 'effDate', 'reviewDate', 'status'],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 ['key' => 'title', 'col' => 'title', 'label' => 'عنوان السياسة', 'type' => 'text', 'required' => true],
                 ['key' => 'cat', 'col' => 'cat', 'label' => 'تصنيف السياسة', 'type' => 'sel',
                  'options' => ['أمن معلومات', 'استخدام الأجهزة', 'إجازات', 'مصروفات', 'كلمات المرور', 'بيانات العملاء', 'سلوك مهني', 'أخرى']],
@@ -7222,6 +7307,7 @@ return [
             'status' => 'status',
             'columns' => ['title', 'policyId', 'userId', 'ver', 'ackAt', 'status'],
             'fields' => [
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 ['key' => 'title', 'col' => 'title', 'label' => 'وصف مختصر (السياسة — الموظف)', 'type' => 'text'],
                 ['key' => 'policyId', 'col' => 'policy_id', 'label' => 'السياسة', 'type' => 'ref', 'required' => true, 'ref' => 'policies'],
                 ['key' => 'userId', 'col' => 'user_id', 'label' => 'الموظف المُقِر', 'type' => 'ref', 'required' => true, 'ref' => 'users'],
@@ -7265,7 +7351,7 @@ return [
                 ['key' => 'lessons', 'col' => 'lessons', 'label' => 'الدروس المستفادة', 'type' => 'ta'],
                 ['key' => 'prevention', 'col' => 'prevention', 'label' => 'الإجراءات الوقائية لمنع التكرار', 'type' => 'ta'],
                 ['key' => 'postmortem', 'col' => 'postmortem', 'label' => 'كُتب تقرير Postmortem', 'type' => 'bool'],
-                ['key' => 'reviewDate', 'col' => 'review_date', 'label' => 'تاريخ مراجعة تنفيذ الوقاية', 'type' => 'date'],
+                ['key' => 'reviewDate', 'col' => 'review_date', 'label' => 'تاريخ مراجعة تنفيذ الوقاية', 'type' => 'date', 'expiry' => true],
                 ['key' => 'att', 'col' => 'att_id', 'label' => 'مرفق (لقطات/سجلات/تقرير)', 'type' => 'file'],
                 ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات', 'type' => 'ta'],
                 ['key' => 'tags', 'col' => 'tags', 'label' => 'وسوم', 'type' => 'tags'],
@@ -7318,6 +7404,8 @@ return [
             'status' => 'status',
             'columns' => ['title', 'testDate', 'backupName', 'durationMin', 'status', 'offsite'],
             'fields' => [
+                ['key' => 'dbId', 'col' => 'db_id', 'label' => 'قاعدة البيانات المختبَرة', 'type' => 'ref', 'ref' => 'dbs'],
+                ['key' => 'nextTest', 'col' => 'next_test', 'label' => 'الاختبار الدوري القادم', 'type' => 'date', 'expiry' => true],
                 ['key' => 'title', 'col' => 'title', 'label' => 'عنوان الاختبار', 'type' => 'text', 'required' => true],
                 ['key' => 'testDate', 'col' => 'test_date', 'label' => 'تاريخ الاختبار', 'type' => 'date'],
                 ['key' => 'byId', 'col' => 'by_id', 'label' => 'من نفّذ الاختبار', 'type' => 'ref', 'ref' => 'users'],
@@ -7556,7 +7644,7 @@ return [
                  'options' => ['معرض', 'مؤتمر', 'ندوة', 'رعاية', 'ورشة', 'إطلاق منتج']],
                 ['key' => 'venue', 'col' => 'venue', 'label' => 'المكان', 'type' => 'text'],
                 ['key' => 'dateStart', 'col' => 'date_start', 'label' => 'تاريخ البداية', 'type' => 'date'],
-                ['key' => 'dateEnd', 'col' => 'date_end', 'label' => 'تاريخ النهاية', 'type' => 'date'],
+                ['key' => 'dateEnd', 'col' => 'date_end', 'label' => 'تاريخ النهاية', 'type' => 'date', 'expiry' => false],
                 ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
                 ['key' => 'brandId', 'col' => 'brand_id', 'label' => 'العلامة التجارية', 'type' => 'ref', 'ref' => 'brands'],
                 ['key' => 'ownerId', 'col' => 'owner_id', 'label' => 'المسؤول عن الحدث', 'type' => 'ref', 'ref' => 'users'],
@@ -7674,6 +7762,20 @@ return [
         ],
         'deploys' => [
             ['on' => 'status', 'to' => ['فشل'], 'emit' => 'deploy.failed', 'label' => 'فشل نشر'],
+            ['on' => 'status', 'to' => ['متراجع عنه'], 'emit' => 'deploy.rolled_back', 'label' => 'تراجعٌ عن نشر'],
+        ],
+        // الحوادث كانت بلا حدثٍ دلاليّ واحد بينما لنظيراتها أحداثها — فيضطر
+        // المشترك الخارجي (n8n) لمطابقة نصّ الحالة بنفسه
+        'incidents' => [
+            ['on' => 'created', 'emit' => 'incident.opened', 'label' => 'فُتحت حادثة'],
+            ['on' => 'status', 'to' => ['مُحتوى'], 'emit' => 'incident.contained', 'label' => 'احتُويت حادثة'],
+            ['on' => 'status', 'to' => ['مُستعاد'], 'emit' => 'incident.resolved', 'label' => 'استُعيدت الخدمة'],
+            ['on' => 'status', 'to' => ['مغلق بتقرير'], 'emit' => 'incident.closed', 'label' => 'أُغلقت حادثة بتقرير'],
+        ],
+        'changes' => [
+            ['on' => 'status', 'to' => ['معتمد'], 'emit' => 'change.approved', 'label' => 'اعتُمد تغيير تقني'],
+            ['on' => 'status', 'to' => ['منفّذ'], 'emit' => 'change.executed', 'label' => 'نُفّذ تغيير تقني'],
+            ['on' => 'status', 'to' => ['متراجع عنه'], 'emit' => 'change.rolled_back', 'label' => 'تراجعٌ عن تغيير'],
         ],
         'restores' => [
             ['on' => 'status', 'to' => ['فشلت'], 'emit' => 'backup.restore_failed', 'label' => 'فشلت استعادة نسخة'],

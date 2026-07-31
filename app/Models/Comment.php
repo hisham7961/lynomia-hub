@@ -17,6 +17,7 @@ class Comment extends Model
 
     protected $casts = [
         'pinned'     => 'boolean',
+        'internal'   => 'boolean',
         'mentions'   => 'array',
         'read_by'    => 'array',
         'created_at' => 'datetime',

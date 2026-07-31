@@ -605,7 +605,13 @@ if (! function_exists('hub_build_children_map')) {
 }
 
 if (! function_exists('hub_expiry_fields')) {
-    /** حقول التواريخ المصيرية عبر كل الوحدات (انتهاء/تجديد/استحقاق) */
+    /**
+     * حقول التواريخ المصيرية عبر كل الوحدات (انتهاء/تجديد/استحقاق).
+     * راية 'expiry' المعلنة في السجل تُحترم أولاً وتحسم الاتجاهين: true تُدخل
+     * الحقل ولو لم يطابق الأنماط (الصيانة القادمة، متابعة العميل، صلاحية العرض)،
+     * وfalse تُخرجه ولو طابقها («تاريخ النهاية» لمعرضٍ ليس انتهاء رخصة).
+     * كانت الراية تُكتب في التعريفات ولا يقرؤها أي سطر.
+     */
     function hub_expiry_fields(): array
     {
         static $out = null;
@@ -613,11 +619,15 @@ if (! function_exists('hub_expiry_fields')) {
         $out = [];
         foreach (hub_modules() as $mk => $md) {
             foreach ($md['fields'] as $f) {
-                $isDate = in_array($f['type'], ['date', 'dt'], true);
+                if (! in_array($f['type'], ['date', 'dt'], true)) continue;
+                if (array_key_exists('expiry', $f)) {
+                    if ($f['expiry']) $out[] = [$mk, $f];
+                    continue;
+                }
                 $byKey  = in_array($f['key'], ['end', 'due', 'expiry', 'expires', 'renew', 'renewal', 'warranty'], true)
                           || preg_match('/exp$|Exp$/', $f['key']);
                 $byLbl  = preg_match('/انتها|تجديد|استحقاق|نهاية|ضمان/u', $f['label']);
-                if ($isDate && ($byKey || $byLbl)) $out[] = [$mk, $f];
+                if ($byKey || $byLbl) $out[] = [$mk, $f];
             }
         }
         return $out;
@@ -637,15 +647,21 @@ if (! function_exists('hub_expiry')) {
         return \Illuminate\Support\Facades\Cache::remember($key, $scoped ? 300 : 600, function () use ($scoped, $user) {
             $today = now()->toDateString();
             $limit = now()->addDays(30)->toDateString();
+            // عتبة التنبيه لكل سجل: حقول «تنبيه قبل (يوم)» كانت تُعرض ولا تُقرأ —
+            // وحدةٌ لها عمود عتبة تُجلب بنافذة موسّعة ثم يُرشَّح كل سجل بعتبته هو
+            $alertCols = ['domains' => 'alert', 'files' => 'alert', 'subs' => 'alerts'];
+            $wide = now()->addDays(120)->toDateString();
             $items = [];
             foreach (hub_expiry_fields() as [$mk, $f]) {
                 $md = hub_mod($mk);
                 $disp = hub_display_col($mk);
+                $acol = $alertCols[$mk] ?? null;
                 try {
+                    if ($acol && ! \Illuminate\Support\Facades\Schema::hasColumn($md['table'], $acol)) $acol = null;
                     $q = \Illuminate\Support\Facades\DB::table($md['table'])
                         ->whereNull('deleted_at')
                         ->whereNotNull($f['col'])
-                        ->whereBetween(\Illuminate\Support\Facades\DB::raw("DATE(`{$f['col']}`)"), [now()->subDays(60)->toDateString(), $limit]);
+                        ->whereBetween(\Illuminate\Support\Facades\DB::raw("DATE(`{$f['col']}`)"), [now()->subDays(60)->toDateString(), $acol ? $wide : $limit]);
                     if ($scoped) $q = hub_scope($q, $mk, $user);
 
                     // لا تنبيه على ما أُغلق: مهمة منجزة أو فاتورة مدفوعة أو عقد منتهٍ
@@ -662,12 +678,20 @@ if (! function_exists('hub_expiry')) {
 
                     // الترتيب تصاعدياً بالتاريخ قبل الحد: نُبقي الأربعين الأقرب/الأكثر تأخراً
                     // لا أربعين عشوائية بترتيب القاعدة (كان يُسقط أعجل السجلات صمتاً).
+                    $cols = ['id', $disp . ' as _n', $f['col'] . ' as _d'];
+                    if ($acol) $cols[] = $acol . ' as _a';
                     $rows = $q->orderBy(\Illuminate\Support\Facades\DB::raw("DATE(`{$f['col']}`)"))
-                        ->limit(40)->get(['id', $disp . ' as _n', $f['col'] . ' as _d']);
+                        ->limit(40)->get($cols);
                 } catch (\Throwable $e) { continue; }
                 foreach ($rows as $row) {
                     $d = substr((string) $row->_d, 0, 10);
                     $days = (int) now()->startOfDay()->diffInDays(\Illuminate\Support\Carbon::parse($d)->startOfDay(), false);
+                    if ($acol) {
+                        // عتبة السجل نفسه: رقم مفرد أو قائمة «90,60,30» تؤخذ أقصاها — والفارغ = 30
+                        $nums = array_filter(array_map('intval',
+                            preg_split('/[\s,،]+/u', (string) ($row->_a ?? ''), -1, PREG_SPLIT_NO_EMPTY)));
+                        if ($days > ($nums ? max($nums) : 30)) continue;
+                    }
                     $items[] = ['module' => $mk, 'mlabel' => $md['label'], 'flabel' => $f['label'],
                                 'id' => $row->id, 'name' => (string) $row->_n, 'date' => $d, 'days' => $days];
                 }
@@ -718,7 +742,9 @@ if (! function_exists('hub_sla')) {
         $resDue  = $created->copy()->addHours($resH);
 
         if ($firstReply === 'auto') {
+            // أول رد **غير داخلي**: الملاحظة بين موظفَين لا تصل العميل فلا توقف عدّاده
             $firstReply = \App\Models\Comment::where('module', 'tickets')->where('record_id', $t->id)
+                ->where(fn ($q) => $q->where('internal', false)->orWhereNull('internal'))
                 ->orderBy('created_at')->value('created_at');
         }
         $respAt = $firstReply ? \Illuminate\Support\Carbon::parse($firstReply) : null;
@@ -866,8 +892,15 @@ if (! function_exists('hub_health')) {
                 $ssl = $db->table('domains')->whereNull('deleted_at')->whereNotNull('ssl_exp')->where('ssl_exp', '<', $today)->count();
                 $crit = $db->table('issues')->whereNull('deleted_at')->where('severity', 'LIKE', '%حرج%')
                     ->where(fn ($w) => $w->whereNull('status')->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مغلق%')->where('status', 'NOT LIKE', '%محلول%')))->count();
-                $score = 100 - ($sn2 ? ($sLate / $sn2) * 30 : 0) - min(30, $ssl * 10) - min(40, $crit * 10);
-                $out['البنية التحتية'] = ['score' => $clamp($score), 'note' => "{$sLate} سيرفر منتهٍ · {$ssl} شهادة SSL منتهية · {$crit} عطل حرج مفتوح"];
+                // الحوادث المفتوحة تدخل الدرجة أخيراً — كانت وحدة إدارة الحوادث
+                // كاملةً خارج تقييم البنية التحتية، والدرجة تعدّ issues بدلاً منها
+                $inc = \Illuminate\Support\Facades\Schema::hasTable('incidents')
+                    ? $db->table('incidents')->whereNull('deleted_at')
+                        ->whereNotIn('status', ['مغلق بتقرير', 'مُستعاد'])->count() : 0;
+                $score = 100 - ($sn2 ? ($sLate / $sn2) * 30 : 0) - min(30, $ssl * 10)
+                       - min(40, $crit * 10) - min(30, $inc * 12);
+                $out['البنية التحتية'] = ['score' => $clamp($score),
+                    'note' => "{$sLate} سيرفر منتهٍ · {$ssl} شهادة SSL منتهية · {$crit} عطل حرج مفتوح · {$inc} حادثة مفتوحة"];
             } catch (\Throwable $e) {}
 
             return $out;
@@ -1067,6 +1100,263 @@ if (! function_exists('hub_company_scope')) {
     }
 }
 
+if (! function_exists('hub_risk_score')) {
+    /**
+     * درجة المخاطرة = احتمال × أثر (١-٤ لكلٍّ، فالمدى ١-١٦) — كان سجل المخاطر
+     * بلا احتمال إطلاقاً، و`severity` وحدها لا تصنع درجةً ولا خريطة حرارية،
+     * وكل الأخطار متساوية في حساب صحة المشروع (عدٌّ لا وزن).
+     */
+    function hub_risk_score(?string $likelihood, ?string $severity): ?array
+    {
+        $L = ['نادر' => 1, 'محتمل' => 2, 'مرجّح' => 3, 'شبه مؤكد' => 4];
+        $S = ['منخفضة' => 1, 'متوسطة' => 2, 'عالية' => 3, 'حرجة' => 4, 'حرج' => 4];
+
+        $l = $L[trim((string) $likelihood)] ?? null;
+        $s = $S[trim((string) $severity)] ?? null;
+        if ($l === null || $s === null) return null;
+
+        $score = $l * $s;
+        $band = $score >= 12 ? 'حرجة' : ($score >= 6 ? 'عالية' : ($score >= 3 ? 'متوسطة' : 'منخفضة'));
+
+        return ['l' => $l, 's' => $s, 'score' => $score, 'band' => $band,
+                'tone' => $score >= 12 ? 'bad' : ($score >= 6 ? 'wn' : 'ok')];
+    }
+}
+
+if (! function_exists('hub_okr_progress')) {
+    /**
+     * تقدّم الهدف محسوباً من نتائجه الرئيسية (متوسط موزون) — كان `progress`
+     * رقماً يدوياً منفصلاً عن الواقع. النتيجة المربوطة بمؤشر تُحدَّث قيمتها
+     * الحالية من `hub_kpi_value` (المحرك مكتوبٌ وجاهز منذ إصدارات بلا مستهلك
+     * في الأهداف)، وهدفٌ بلا نتائج يبقى على رقمه اليدوي — لا نكذب بصفر.
+     */
+    function hub_okr_progress(string $objectiveId, bool $refresh = false): ?array
+    {
+        // الملغاة تُستثنى — وبلا حالة تبقى (whereNotIn وحده يُقصي NULL صامتاً)
+        $krs = \App\Models\KeyResult::whereNull('deleted_at')
+            ->where('objective_id', $objectiveId)
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'ملغاة'))
+            ->get();
+        if ($krs->isEmpty()) return null;
+
+        $kpis = null;
+        $sum = 0.0; $weights = 0.0; $rows = [];
+        foreach ($krs as $kr) {
+            // القيمة الحالية من المؤشر المرتبط — إن وُجد وطُلب التحديث
+            if ($refresh && $kr->kpi_id && \Illuminate\Support\Facades\Schema::hasTable('kpi_defs')) {
+                $kpis ??= \Illuminate\Support\Facades\DB::table('kpi_defs')->get()->keyBy('id');
+                if ($def = ($kpis[$kr->kpi_id] ?? null)) {
+                    $formula = is_array($def->formula) ? $def->formula : (json_decode((string) $def->formula, true) ?: []);
+                    $val = hub_kpi_value($formula);
+                    if ($val !== null) {
+                        $kr->current_value = $val;
+                        $kr->saveQuietly();
+                    }
+                }
+            }
+
+            $pct = $kr->pct();
+            $w = (float) ($kr->weight ?? 0) ?: 1.0;
+            if ($pct !== null) { $sum += $pct * $w; $weights += $w; }
+            $rows[] = ['id' => $kr->id, 'title' => $kr->title, 'pct' => $pct,
+                       'current' => $kr->current_value, 'target' => $kr->target_value,
+                       'unit' => $kr->unit, 'status' => $kr->status, 'auto' => (bool) $kr->kpi_id];
+        }
+
+        return [
+            'pct' => $weights > 0 ? (int) round($sum / $weights) : null,
+            'krs' => $rows,
+            'count' => $krs->count(),
+            'measured' => count(array_filter($rows, fn ($r) => $r['pct'] !== null)),
+        ];
+    }
+}
+
+if (! function_exists('hub_pipeline')) {
+    /**
+     * مسار المبيعات رقماً: قيمة كل مرحلة ومرجّحها باحتمال الإغلاق، وتشريح
+     * الخسائر بالسبب وبالمنافس — كانت `value` و`prob` تُملآن ولا تُجمعان،
+     * ووحدة المنافسين لا تُقرأ من أي شاشة إطلاقاً.
+     */
+    function hub_pipeline($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        $q = hub_scope(\Illuminate\Support\Facades\DB::table('clients')->whereNull('deleted_at'), 'clients', $user);
+        $rows = hub_company_scope($q, 'clients')
+            ->get(['id', 'name', 'stage', 'value', 'prob', 'lost_reason', 'competitor_id']);
+
+        $open = ['عميل محتمل', 'تم التواصل', 'عرض سعر', 'تفاوض'];
+        $stages = []; $lost = []; $byCompetitor = [];
+        $pipeline = 0.0; $weighted = 0.0; $won = 0.0; $lostValue = 0.0;
+
+        foreach ($rows as $r) {
+            $v = (float) ($r->value ?? 0);
+            $w = $v * ((float) ($r->prob ?? 0) / 100);
+            $st = (string) $r->stage;
+
+            $stages[$st] ??= ['stage' => $st, 'count' => 0, 'value' => 0.0, 'weighted' => 0.0];
+            $stages[$st]['count']++;
+            $stages[$st]['value'] += $v;
+            $stages[$st]['weighted'] += $w;
+
+            if (in_array($st, $open, true)) { $pipeline += $v; $weighted += $w; }
+            if ($st === 'فوز') $won += $v;
+            if ($st === 'خسارة') {
+                $lostValue += $v;
+                $reason = (string) ($r->lost_reason ?: 'غير مسجَّل');
+                $lost[$reason] ??= ['reason' => $reason, 'count' => 0, 'value' => 0.0];
+                $lost[$reason]['count']++;
+                $lost[$reason]['value'] += $v;
+                if ($r->competitor_id) {
+                    $byCompetitor[$r->competitor_id] ??= ['id' => $r->competitor_id, 'count' => 0, 'value' => 0.0];
+                    $byCompetitor[$r->competitor_id]['count']++;
+                    $byCompetitor[$r->competitor_id]['value'] += $v;
+                }
+            }
+        }
+
+        if ($byCompetitor) {
+            $names = \Illuminate\Support\Facades\DB::table('competitors')
+                ->whereIn('id', array_keys($byCompetitor))->pluck('name', 'id');
+            foreach ($byCompetitor as $cid => &$c) $c['name'] = $names[$cid] ?? '؟';
+            unset($c);
+        }
+
+        usort($lost, fn ($a, $b) => $b['value'] <=> $a['value']);
+        usort($byCompetitor, fn ($a, $b) => $b['value'] <=> $a['value']);
+        $decided = $won + $lostValue;
+
+        return [
+            'stages' => array_values($stages),
+            'pipeline' => round($pipeline, 2),
+            'weighted' => round($weighted, 2),
+            'won' => round($won, 2),
+            'lostValue' => round($lostValue, 2),
+            'winRate' => $decided > 0 ? (int) round($won / $decided * 100) : null,
+            'lostReasons' => $lost,
+            'lostToCompetitors' => $byCompetitor,
+        ];
+    }
+}
+
+if (! function_exists('hub_mrr')) {
+    /**
+     * الإيراد الشهري المتكرر (MRR) من العقود السارية — أثمن رقمٍ تجاري لم يكن
+     * قابلاً للقياس أصلاً: `hub_service_costs` كان يقيس هامشاً نظرياً من السعر
+     * المُعلن لا من عقدٍ مُوقَّع. قيمة كل عقد تُطبَّع شهرياً حسب دورة باقته أو
+     * خدمته (سنوي ÷ ١٢، ربع سنوي ÷ ٣)، و«مرة واحدة» لا تدخل التكرار.
+     * التوزيع بالخدمة يجعل «أي خدمة تحمل إيرادنا؟» سؤالاً له جواب.
+     */
+    function hub_mrr(bool $fresh = false): array
+    {
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget('rev:mrr');
+
+        return \Illuminate\Support\Facades\Cache::remember('rev:mrr', 300, function () {
+            $DB = \Illuminate\Support\Facades\DB::class;
+            $divisor = ['شهري' => 1, 'ربع سنوي' => 3, 'نصف سنوي' => 6, 'سنوي' => 12];
+
+            $contracts = \Illuminate\Support\Facades\DB::table('contracts')->whereNull('deleted_at')
+                ->where('status', 'ساري')->where('type', 'عقد عميل')
+                ->get(['id', 'title', 'value', 'currency', 'service_id', 'plan_id', 'client_id', 'date_end']);
+            if ($contracts->isEmpty()) return ['mrr' => 0.0, 'arr' => 0.0, 'contracts' => 0,
+                                               'byService' => [], 'unmapped' => 0, 'oneTime' => 0.0];
+
+            $plans = \Illuminate\Support\Facades\DB::table('pricing_plans')->whereNull('deleted_at')
+                ->get(['id', 'cycle', 'service_id'])->keyBy('id');
+            $services = \Illuminate\Support\Facades\DB::table('services')->whereNull('deleted_at')
+                ->get(['id', 'name', 'cycle'])->keyBy('id');
+
+            $mrr = 0.0; $oneTime = 0.0; $unmapped = 0; $byService = [];
+            foreach ($contracts as $c) {
+                $value = (float) ($c->value ?? 0);
+                if ($value <= 0) continue;
+
+                $plan = $c->plan_id ? ($plans[$c->plan_id] ?? null) : null;
+                $sid = $c->service_id ?: ($plan->service_id ?? null);
+                $svc = $sid ? ($services[$sid] ?? null) : null;
+                $cycle = (string) ($plan->cycle ?? $svc->cycle ?? 'سنوي');   // بلا ربطٍ: سنويٌّ افتراضاً
+
+                if (! $sid) $unmapped++;
+                if ($cycle === 'مرة واحدة') { $oneTime += $value; continue; }
+
+                $monthly = $value / ($divisor[$cycle] ?? 12);
+                $mrr += $monthly;
+
+                $key = $sid ?: '_none';
+                $byService[$key] ??= ['id' => $sid, 'name' => $svc->name ?? 'بلا خدمة مربوطة',
+                                      'mrr' => 0.0, 'contracts' => 0];
+                $byService[$key]['mrr'] += $monthly;
+                $byService[$key]['contracts']++;
+            }
+
+            usort($byService, fn ($a, $b) => $b['mrr'] <=> $a['mrr']);
+
+            return [
+                'mrr' => round($mrr, 2),
+                'arr' => round($mrr * 12, 2),
+                'contracts' => $contracts->count(),
+                'byService' => $byService,
+                'unmapped' => $unmapped,
+                'oneTime' => round($oneTime, 2),
+            ];
+        });
+    }
+}
+
+if (! function_exists('hub_stock_sync')) {
+    /**
+     * اشتقاق حالة الصنف من كميته وحدّه: نفد ⟵ صفر، منخفض ⟵ بلغ حد إعادة
+     * الطلب، متاح فيما سوى ذلك. الحالات اليدوية (تالف/محجوز) لا تُدهس.
+     * كانت مسارات «مخزون نفد/منخفض» الجاهزة معطلةً لأن لا شيء يضبط الحالة.
+     */
+    function hub_stock_sync(\App\Models\StockItem $item): void
+    {
+        $auto = ['متاح', 'منخفض', 'نفد'];
+        $cur = (string) $item->status;
+        if ($cur !== '' && ! in_array($cur, $auto, true)) return;
+
+        $qty = (float) ($item->qty ?? 0);
+        $reorder = (float) ($item->reorder ?? 0);
+        $new = $qty <= 0 ? 'نفد' : (($reorder > 0 && $qty <= $reorder) ? 'منخفض' : 'متاح');
+        if ($new === $cur) return;
+
+        $item->status = $new;
+        $item->saveQuietly();
+        \App\Support\FlowRunner::fire('status', 'stock', $item, $new);
+    }
+}
+
+if (! function_exists('hub_budget_actual')) {
+    /**
+     * المصروف الفعلي مقابل ميزانية: يجمع مستندات المصروف غير الملغاة المطابقة
+     * لأبعاد الميزانية (شركة، مشروع، مركز تكلفة، بند، فترة) — الأبعاد الفارغة
+     * لا تُقيّد، وبند «الكل» يشمل كل البنود. كانت الوحدة سجلَّ نوايا: كل
+     * الأبعاد جاهزة ومطابقة لبنود المالية حرفياً ولا استعلامَ واحد يقارنها.
+     */
+    function hub_budget_actual($b): array
+    {
+        $q = \Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at')
+            ->whereIn('kind', config('hub.fin.expense'))
+            ->whereNotIn('state', config('hub.fin.dead'));
+        foreach (['company_id', 'project_id', 'cc_id'] as $col) {
+            if (! empty($b->{$col})) $q->where($col, $b->{$col});
+        }
+        if (! empty($b->cat) && $b->cat !== 'الكل') $q->where('cat', $b->cat);
+        if (! empty($b->date_from)) $q->whereDate('date', '>=', substr((string) $b->date_from, 0, 10));
+        if (! empty($b->date_to)) $q->whereDate('date', '<=', substr((string) $b->date_to, 0, 10));
+
+        $spent  = (float) $q->sum('total');
+        $amount = (float) ($b->amount ?? 0);
+
+        return [
+            'spent'  => $spent,
+            'amount' => $amount,
+            'remain' => $amount - $spent,
+            'pct'    => $amount > 0 ? (int) round($spent / $amount * 100) : null,
+        ];
+    }
+}
+
 if (! function_exists('hub_hourly_rates')) {
     /**
      * أجر الساعة لكل مستخدم — مشتقاً من راتب ملفه الوظيفي وبدلاته.
@@ -1249,11 +1539,19 @@ if (! function_exists('hub_project_health')) {
                     's' => $tAll ? max(0, (int) (100 - $tLate / $tAll * 200)) : 100,
                     'note' => $tAll ? "{$tLate} متأخرة من {$tAll}" : 'لا مهام مسجَّلة'];
 
-            // ٤) المخاطر المفتوحة
-            $iss = \Illuminate\Support\Facades\DB::table('issues')->whereNull('deleted_at')->where('project_id', $projectId)
-                ->whereNotIn('status', ['مغلقة', 'محلولة', 'ملغاة'])->count();
+            // ٤) المخاطر المفتوحة — موزونةً بالخطورة: كان العدّ يساوي بين خطرٍ
+            // حرج وآخر منخفض، فمشروعٌ بخمسة أخطار تافهة يبدو أسوأ من واحدٍ قاتل
+            $risks = \Illuminate\Support\Facades\DB::table('issues')->whereNull('deleted_at')
+                ->where('project_id', $projectId)
+                ->whereNotIn('status', ['مغلقة', 'محلولة', 'ملغاة'])->pluck('severity');
+            $weights = ['حرجة' => 30, 'حرج' => 30, 'عالية' => 15, 'متوسطة' => 8, 'منخفضة' => 3];
+            $penalty = 0;
+            foreach ($risks as $sev) $penalty += $weights[trim((string) $sev)] ?? 10;
+            $iss = $risks->count();
+            $crit = $risks->filter(fn ($s) => in_array(trim((string) $s), ['حرجة', 'حرج'], true))->count();
             $f[] = ['k' => 'المخاطر المفتوحة', 'w' => 15,
-                    's' => max(0, 100 - $iss * 15), 'note' => $iss ? "{$iss} مخاطرة مفتوحة" : 'لا مخاطر مفتوحة'];
+                    's' => max(0, 100 - $penalty),
+                    'note' => $iss ? "{$iss} مخاطرة مفتوحة" . ($crit ? " (منها {$crit} حرجة)" : '') : 'لا مخاطر مفتوحة'];
 
             // ٥) الأعطال التقنية (٩٠ يوماً)
             $inc = \Illuminate\Support\Facades\Schema::hasTable('incidents')
@@ -1681,9 +1979,10 @@ if (! function_exists('hub_capacity')) {
         $userIds = $emps->pluck('user_id')->filter()->all();
         $empIds  = $emps->pluck('id')->all();
 
-        // إجازات معتمدة متقاطعة مع الفترة
+        // إجازات معتمدة متقاطعة مع الفترة — «معتمد» هي قيمة السجل المعلنة
+        // (كانت «معتمدة» فلا تُخصم إجازة واحدة من الطاقة أبداً)
         $leaves = \Illuminate\Support\Facades\DB::table('leave_requests')->whereNull('deleted_at')
-            ->where('status', 'معتمدة')->whereIn('emp_id', $empIds)
+            ->where('status', 'معتمد')->whereIn('emp_id', $empIds)
             ->whereDate('date_from', '<=', $t->toDateString())
             ->whereDate('date_to', '>=', $f->toDateString())
             ->get(['emp_id', 'date_from', 'date_to']);
@@ -1780,10 +2079,13 @@ if (! function_exists('hub_app_quality')) {
             $iss = \Illuminate\Support\Facades\DB::table('issues')->whereNull('deleted_at')
                 ->whereIn('app_id', $ids)->get(['app_id', 'severity', 'status', 'found', 'closed']);
 
+            // الحوادث ٩٠ يوماً: عدّها ومتوسط زمن تعافيها (MTTR) — كان زمن التعطل
+            // المسجَّل لا يُحوَّل إلى مؤشرٍ واحد رغم توفره في كل حادثة
             $inc = \Illuminate\Support\Facades\Schema::hasTable('incidents')
                 ? \Illuminate\Support\Facades\DB::table('incidents')->whereNull('deleted_at')
                     ->whereIn('app_id', $ids)->where('created_at', '>=', now()->subDays(90))
-                    ->selectRaw('app_id, COUNT(*) n')->groupBy('app_id')->get()->keyBy('app_id')
+                    ->selectRaw('app_id, COUNT(*) n, AVG(downtime_min) mttr')
+                    ->groupBy('app_id')->get()->keyBy('app_id')
                 : collect();
 
             $dep = \Illuminate\Support\Facades\Schema::hasTable('deployments')
@@ -1819,6 +2121,8 @@ if (! function_exists('hub_app_quality')) {
                     'tested'   => $ft->count(),
                     'passRate' => $ft->count() ? (int) round($pass / $ft->count() * 100) : null,
                     'incidents' => (int) ($inc[$a->id]->n ?? 0),
+                    'mttr' => isset($inc[$a->id]->mttr) && $inc[$a->id]->mttr !== null
+                        ? (int) round((float) $inc[$a->id]->mttr) : null,
                     'deploys'  => $dp->count(),
                     'rollback' => $dp->count() ? (int) round($rolled / $dp->count() * 100) : null,
                     'lastDeploy' => $dp->max('deployed_at'),
@@ -2123,10 +2427,11 @@ if (! function_exists('hub_supplier_scores')) {
                 $unpaid = $po->filter(fn ($p) => ! in_array($p->pay_state, ['مدفوع', 'مسدد'], true)
                     && in_array($p->status, ['مستلم', 'أُرسل للمورد', 'معتمد'], true))->count();
 
-                // الالتزام بالموعد: من الأوامر المستلمة التي لها موعد تسليم متوقع
+                // الالتزام بالموعد: تاريخ الاستلام الصريح (يُختم عند إجراء الاستلام) هو
+                // القياس — وآخر التحديث بديلٌ تقديري للأوامر السابقة لوجود العمود
                 $withDue = $received->filter(fn ($p) => filled($p->due));
                 $onTime = $withDue->filter(function ($p) {
-                    $recvAt = \Illuminate\Support\Carbon::parse($p->updated_at)->startOfDay();
+                    $recvAt = \Illuminate\Support\Carbon::parse($p->received_at ?? $p->updated_at)->startOfDay();
                     return $recvAt->lte(\Illuminate\Support\Carbon::parse($p->due)->startOfDay());
                 })->count();
                 $onTimeRate = $withDue->count() ? (int) round($onTime / $withDue->count() * 100) : null;

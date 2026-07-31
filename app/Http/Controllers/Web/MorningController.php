@@ -26,7 +26,7 @@ class MorningController extends Controller
 
         // ── قرارات تنتظرك ──
         if (hub_can($u, 'approvals', 'v')) {
-            $ap = DB::table('approvals')->whereNull('deleted_at')->where('status', 'معلّق')
+            $ap = hub_scope(DB::table('approvals')->whereNull('deleted_at'), 'approvals')->where('status', 'معلّق')
                 ->orderBy('due')->limit(8)->get(['id', 'title', 'due']);
             $add('✋', 'قرارات تنتظر حسمك', 'عمليات موقوفة لن تُنفَّذ قبل اعتمادك',
                 $ap->map(fn ($r) => ['t' => $r->title, 's' => $r->due ? 'الموعد ' . substr((string) $r->due, 0, 10) : '',
@@ -36,7 +36,7 @@ class MorningController extends Controller
 
         // ── طلبات داخلية بانتظار تقييم ──
         if (Schema::hasTable('internal_requests') && hub_can($u, 'requests', 'v')) {
-            $rq = DB::table('internal_requests')->whereNull('deleted_at')
+            $rq = hub_scope(DB::table('internal_requests')->whereNull('deleted_at'), 'requests')
                 ->whereIn('status', ['جديد', 'قيد التقييم', 'بانتظار الاعتماد'])
                 ->orderByDesc('created_at')->limit(6)->get(['id', 'title', 'prio_req', 'status']);
             $add('📨', 'طلبات داخلية بلا قرار', 'طلبات فريقك واقفة عند التقييم',
@@ -47,7 +47,7 @@ class MorningController extends Controller
 
         // ── حوادث تقنية مفتوحة ──
         if (Schema::hasTable('incidents') && hub_can($u, 'incidents', 'v')) {
-            $inc = DB::table('incidents')->whereNull('deleted_at')
+            $inc = hub_scope(DB::table('incidents')->whereNull('deleted_at'), 'incidents')
                 ->whereNotIn('status', ['مغلق بتقرير', 'مُستعاد'])
                 ->orderByDesc('started_at')->limit(6)->get(['id', 'title', 'severity', 'status']);
             $add('🚨', 'حوادث تقنية مفتوحة', 'خدمات متأثرة الآن',
@@ -86,7 +86,7 @@ class MorningController extends Controller
 
         // ── مستحقات مالية ──
         if (hub_can($u, 'fin', 'v')) {
-            $due = DB::table('fin_documents')->whereNull('deleted_at')
+            $due = hub_scope(DB::table('fin_documents')->whereNull('deleted_at'), 'fin')
                 ->whereNotNull('due')->whereDate('due', '<=', today()->addDays(7))
                 ->whereRaw('COALESCE(paid,0) < COALESCE(total,0)')
                 ->orderBy('due')->limit(8)->get(['id', 'doc_no', 'partner', 'total', 'paid', 'due']);
@@ -111,7 +111,7 @@ class MorningController extends Controller
 
         // ── غياب اليوم ──
         if (hub_can($u, 'leaves', 'v')) {
-            $lv = DB::table('leave_requests')->whereNull('deleted_at')->where('status', 'معتمدة')
+            $lv = hub_scope(DB::table('leave_requests')->whereNull('deleted_at'), 'leaves')->where('status', 'معتمد')
                 ->whereDate('date_from', '<=', today())->whereDate('date_to', '>=', today())
                 ->limit(8)->get(['id', 'emp_id', 'type']);
             $names = hub_ref_labels('hr', $lv->pluck('emp_id')->all());

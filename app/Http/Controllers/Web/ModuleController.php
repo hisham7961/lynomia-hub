@@ -222,6 +222,10 @@ class ModuleController extends Controller
             $allowed = hub_company_ids();
             if ($cid !== '' && ($allowed === null || in_array($cid, $allowed, true))) {
                 $m->{$ccol} = $cid;
+            } elseif ($allowed !== null) {
+                // معزولٌ بلا شركة نشطة: سجلٌ بلا شركة يختفي من قوائمه فوراً
+                // (whereIn يُقصي NULL) — يُنسب لأولى شركاته المسموحة بدل أن يضيع
+                $m->{$ccol} = $allowed[0];
             }
         }
 
@@ -268,17 +272,8 @@ class ModuleController extends Controller
         $row = $this->findScoped($class, $module, $id, 'with');
         [, $labels] = $this->columnsAndLabels($def, [$row], all: true);
 
-        // عرض حساس: صفحة تعرض سراً غير فارغ لمستخدم مخوّل — تُسجّل في التدقيق
-        $u = auth()->user();
-        if (hub_copy_secrets($u)) {
-            foreach ($def['fields'] as $f) {
-                if (($f['type'] ?? '') === 'sec' && filled($row->{$f['col']} ?? null)) {
-                    hub_audit('عرض حساس', $module, $row->id,
-                        (string) ($row->{hub_display_col($module)} ?? $row->id));
-                    break;
-                }
-            }
-        }
+        // الأسرار لا تُزرع في HTML — تُكشف عبر revealSecret ويُسجَّل «عرض حساس»
+        // عند كل كشفٍ فعلي لا عند مجرد فتح الصفحة (كان يسم الفاتح كأنه كاشف)
 
         // السجلات المرتبطة: كل وحدة تشير لهذا السجل بحقل مرجعي
         $children = hub_related($module, $row->id);
@@ -300,6 +295,35 @@ class ModuleController extends Controller
         $timeline = hub_timeline($module, $row->id);
 
         return view('modules.show', compact('module', 'def', 'row', 'labels', 'children', 'versions', 'verUsers', 'comments', 'cUsers', 'attachments', 'aUsers', 'timeline'));
+    }
+
+    /**
+     * كشف سرّ عبر الخادم: القيمة لا تُطبع في مصدر الصفحة إطلاقاً — تُطلب هنا عند
+     * الضغط على «إظهار»، فيُفرض علم الأسرار وقائمة «المستخدمين المخولين» (الخزنة)
+     * ويُسجَّل «عرض حساس» عند كل كشفٍ فعلي باسم السر وحقله.
+     */
+    public function revealSecret(string $module, string $id, string $field)
+    {
+        [$def, $class] = $this->resolve($module, 'v');
+        $row = $this->findScoped($class, $module, $id);
+        $u = auth()->user();
+
+        abort_unless(hub_copy_secrets($u), 403, 'ليست لديك صلاحية رؤية الأسرار');
+
+        $f = collect($def['fields'])->firstWhere('key', $field);
+        abort_unless($f && ($f['type'] ?? '') === 'sec', 404);
+        abort_if(hub_field_mode($u, $module, $field) === 'hide', 403);
+
+        // «المستخدمون المخولون»: قائمة غير فارغة تحصر الكشف بأهلها — والمالك محصّن
+        $allowed = array_values(array_filter(array_map('strval', (array) ($row->allowed_ids ?? []))));
+        if ($allowed && ! hub_is_owner($u) && ! in_array((string) $u->id, $allowed, true)) {
+            abort(403, 'هذا السر محصور بقائمة مخولين لست منهم');
+        }
+
+        hub_audit('عرض حساس', $module, $row->id,
+            (string) ($row->{hub_display_col($module)} ?? $row->id) . ' — ' . ($f['label'] ?? $field));
+
+        return response()->json(['v' => (string) ($row->{$f['col']} ?? '')]);
     }
 
     public function edit(string $module, string $id)
@@ -396,7 +420,12 @@ class ModuleController extends Controller
         $dueF = $fields->first(fn ($f) => ($f['type'] ?? '') === 'date' && preg_match('/due|end|deadline/i', $f['col']))
             ?? $fields->first(fn ($f) => ($f['type'] ?? '') === 'date');
         $prioF = $fields->first(fn ($f) => ($f['key'] ?? '') === 'priority' && ($f['type'] ?? '') === 'sel');
-        $refF = $fields->first(fn ($f) => ($f['type'] ?? '') === 'ref' && ($f['ref'] ?? '') !== 'users' && empty($f['multi']));
+        // مرجع البطاقة الأب: أول مرجعٍ غير بشري **له قيم فعلاً** — مرجعٌ ثانوي
+        // فارغ (كقرار المهمة) كان يحجب المرجع الحقيقي فتفقد البطاقة سياقها
+        $refCands = $fields->filter(fn ($f) => ($f['type'] ?? '') === 'ref'
+            && ($f['ref'] ?? '') !== 'users' && empty($f['multi']))->values();
+        $refF = $refCands->first(fn ($f) => $rows->contains(fn ($r) => filled($r->{$f['col']} ?? null)))
+             ?? $refCands->first();
 
         $assigneeNames = $assigneeF ? hub_ref_labels('users', $rows->pluck($assigneeF['col'])->all()) : [];
         $refNames = $refF ? hub_ref_labels($refF['ref'], $rows->pluck($refF['col'])->all()) : [];
@@ -600,6 +629,43 @@ class ModuleController extends Controller
         // أجور الساعة مشتقة من رواتب الملفات الوظيفية — تعديلها يُبطل الجدول كله
         if ($module === 'hr') \Illuminate\Support\Facades\Cache::forget('cost:rates');
 
+        // حالة الصنف تُشتق من كميته وحدّه فور أي حفظ — نفد/منخفض/متاح
+        if ($module === 'stock' && $m instanceof \App\Models\StockItem) hub_stock_sync($m);
+
+        // مزامنة الأصل مع صيانته: قيد التنفيذ تضعه «صيانة»، والمكتملة تختم
+        // «آخر صيانة» وتعيده «قيد الاستخدام» — كان الحقلان يدويين متناقضين
+        if ($module === 'assetlog' && $m->asset_id && ($asset = \App\Models\Asset::find($m->asset_id))) {
+            if ((string) $m->status === 'قيد التنفيذ' && $asset->status !== 'صيانة') {
+                $asset->status = 'صيانة';
+                $asset->saveQuietly();
+            } elseif ((string) $m->status === 'مكتملة') {
+                $asset->maint = $m->date;
+                if ($asset->status === 'صيانة') $asset->status = 'قيد الاستخدام';
+                $asset->saveQuietly();
+            }
+        }
+
+        // إخلاء العهدة عند المغادرة: منتهية خدمته وبعهدته أصول ⟵ مهمة استرداد
+        // واحدة (لا تتكرر) تسمّي الأصول — كانت العهدة تُنسى مع المغادر
+        if ($module === 'hr' && (string) $m->status === 'منتهية خدمته' && $m->user_id) {
+            $held = \App\Models\Asset::whereNull('deleted_at')
+                ->where('holder_id', $m->user_id)->get(['id', 'name']);
+            if ($held->isNotEmpty()) {
+                $title = 'استرداد عهدة: ' . $m->name;
+                $exists = \App\Models\Task::whereNull('deleted_at')->where('title', $title)
+                    ->whereNotIn('status', ['منجزة', 'مكتملة', 'ملغاة'])->exists();
+                if (! $exists) {
+                    \App\Models\Task::create([
+                        'title' => $title, 'status' => 'جديدة', 'priority' => 'عالية',
+                        'company_id' => $m->company_id,
+                        'description' => "الموظف منتهية خدمته وبعهدته:\n- "
+                            . $held->pluck('name')->implode("\n- ")
+                            . "\n\nاسترد الأصول ووثّق التسليم بإقرارٍ موقّع ثم حوّل حالتها إلى «متاح».",
+                    ]);
+                }
+            }
+        }
+
         if ($module === 'tickets') {
             $meta = (array) ($m->meta ?? []);
             $closed = in_array((string) $m->status, ['تم الحل', 'مغلقة'], true);
@@ -616,11 +682,19 @@ class ModuleController extends Controller
     }
 
     /** حقل المسؤول (assigneeId → users) إن وُجد في الوحدة */
+    /**
+     * حقل المسؤول الذي يستحق إشعار الإسناد — كان يشترط المفتاح assigneeId حرفياً
+     * فلا يُبلَّغ منفّذ القرار (execId) ولا مدير الإجازة (mgrId) ولا مقابِل
+     * المرشح (interviewer) أبداً. أول مرجعِ مستخدمين مفرد من القائمة يفوز.
+     */
     protected function assigneeField(array $def): ?array
     {
-        $f = collect($def['fields'])->firstWhere('key', 'assigneeId');
+        foreach (['assigneeId', 'execId', 'mgrId', 'interviewer'] as $key) {
+            $f = collect($def['fields'])->firstWhere('key', $key);
+            if ($f && ($f['ref'] ?? '') === 'users' && empty($f['multi'])) return $f;
+        }
 
-        return ($f && ($f['ref'] ?? '') === 'users' && empty($f['multi'])) ? $f : null;
+        return null;
     }
 
     /** إشعار داخلي للمسؤول عند إسناده سجلاً (مهمة/تذكرة/ميزة…) — لا إشعار لمن أسند لنفسه */

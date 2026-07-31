@@ -12,6 +12,37 @@
     </div>
 </div>
 
+{{-- الإيراد الحقيقي من العقود السارية — لا من الأسعار المعلنة --}}
+<div class="cards">
+    <div class="stat"><span class="ico">📈</span><b>{{ number_format($mrr['mrr'], 1) }}</b><span>MRR — إيراد شهري متكرر (عقود سارية)</span></div>
+    <div class="stat"><span class="ico">🗓️</span><b>{{ number_format($mrr['arr'], 1) }}</b><span>ARR — سنوي متكرر</span></div>
+    <div class="stat"><span class="ico">📜</span><b>{{ $mrr['contracts'] }}</b><span>عقد عميل سارٍ</span></div>
+    @if ($mrr['unmapped'])
+        <div class="stat"><span class="ico">🔗</span><b class="txt-bad">{{ $mrr['unmapped'] }}</b><span>عقد بلا خدمة مربوطة</span></div>
+    @endif
+    @if ($mrr['oneTime'])
+        <div class="stat"><span class="ico">1️⃣</span><b>{{ number_format($mrr['oneTime'], 1) }}</b><span>عقود مرة واحدة (خارج التكرار)</span></div>
+    @endif
+</div>
+
+@if ($mrr['byService'])
+    <div class="card pad0">
+        <div class="tblwrap"><table class="tbl">
+            <thead><tr><th>الخدمة</th><th>عقود سارية</th><th>MRR</th><th>حصة الإيراد</th></tr></thead>
+            <tbody>
+            @foreach ($mrr['byService'] as $s)
+                <tr>
+                    <td>@if ($s['id'])<a href="{{ route('m.show', ['services', $s['id']]) }}">{{ $s['name'] }}</a>@else<span class="sub">{{ $s['name'] }}</span>@endif</td>
+                    <td class="mono">{{ $s['contracts'] }}</td>
+                    <td class="mono">{{ number_format($s['mrr'], 2) }}</td>
+                    <td class="mono sub">{{ $mrr['mrr'] > 0 ? round($s['mrr'] / $mrr['mrr'] * 100) : 0 }}٪</td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table></div>
+    </div>
+@endif
+
 <div class="cards">
     <div class="stat"><span class="ico">💵</span><b>{{ number_format($t['revenueM'], 1) }}</b><span>إيراد شهري مكافئ (المسعَّر فقط)</span></div>
     <div class="stat"><span class="ico">💸</span><b>{{ number_format($t['costM'], 1) }}</b><span>كلفة شهرية مرصودة</span></div>

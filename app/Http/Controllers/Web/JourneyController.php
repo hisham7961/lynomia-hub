@@ -26,9 +26,11 @@ class JourneyController extends Controller
 
         $add($client->created_at, '🌱', 'البداية', 'سُجّل العميل في النظام', null);
 
-        // الوحدات التي تشير للعميل بحقل مرجعي صريح
+        // الوحدات التي تشير للعميل بحقل مرجعي صريح — التذاكر كانت الحلقة المفقودة
+        // الوحيدة في الرؤية الشاملة (معلّقة على نص حر) حتى v2.144
         foreach ([['quotes', '🧾', 'عرض سعر'], ['contracts', '📜', 'عقد'],
-                  ['meetings', '🤝', 'اجتماع'], ['decisions', '⚖️', 'قرار']] as [$mk, $ico, $lbl]) {
+                  ['meetings', '🤝', 'اجتماع'], ['decisions', '⚖️', 'قرار'],
+                  ['tickets', '🎫', 'تذكرة']] as [$mk, $ico, $lbl]) {
             $md = hub_mod($mk);
             if (! $md || ! hub_can(auth()->user(), $mk, 'v')) continue;
             $disp = hub_display_col($mk);

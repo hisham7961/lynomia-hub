@@ -35,8 +35,9 @@ class HubAutomation extends Command
         $a = $this->alertRules();
         $e = $this->esignReminders();
         $c = $this->contractsAuto();
+        $b = $this->budgetsAuto();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه");
 
         \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.automation'], ['value' => now()->toIso8601String()]);
         \Illuminate\Support\Facades\Cache::forget('settings:all');
@@ -141,6 +142,43 @@ class HubAutomation extends Command
         return ['expired' => $expired, 'drafts' => $drafts];
     }
 
+    /**
+     * تنبيه «حد الميزانية»: alert_pct كان حقلاً ميتاً — ميزانية نشطة بلغ
+     * استهلاكها الفعلي حدَّها تُنبّه المراقبين (مرة كل ٧ أيام لكل ميزانية).
+     */
+    protected function budgetsAuto(): int
+    {
+        $hits = 0;
+        try {
+            $budgets = DB::table('budgets')->whereNull('deleted_at')
+                ->where('status', 'نشطة')->whereNotNull('alert_pct')->where('alert_pct', '>', 0)
+                ->where('amount', '>', 0)->limit(300)->get();
+            foreach ($budgets as $b) {
+                $ba = hub_budget_actual($b);
+                if ($ba['pct'] === null || $ba['pct'] < (int) $b->alert_pct) continue;
+                $dup = HubNotification::where('kind', 'budget:' . $b->id)
+                    ->where('created_at', '>=', now()->subDays(7))->exists();
+                if ($dup) continue;
+                $hits++;
+                if (! $this->dry) {
+                    foreach ($this->recipients(null) as $uid) {
+                        HubNotification::create([
+                            'user_id' => $uid, 'kind' => 'budget:' . $b->id,
+                            'text' => Str::limit("📊 الميزانية «{$b->name}» بلغت {$ba['pct']}٪ من مخصصها"
+                                . ' (' . number_format($ba['spent'], 2) . ' من ' . number_format($ba['amount'], 2) . ')', 590),
+                            'module' => 'budgets', 'record_id' => $b->id,
+                            'read' => false, 'created_at' => now(),
+                        ]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e);   // تنبيهات الميزانية لا تُسقط بقية المحرك
+        }
+
+        return $hits;
+    }
+
     /* ───── 1) المصروفات المتكررة ───── */
     protected function recurring(): array
     {
@@ -176,7 +214,12 @@ class HubAutomation extends Command
                             'currency'   => $rec->currency,
                             'project_id' => $rec->project_id,
                             'company_id' => $rec->company_id,
-                            'description'=> 'وُلّد تلقائياً من المتكرر: ' . $rec->name . ($rec->cat ? ' — ' . $rec->cat : ''),
+                            // الأبعاد كاملة: كانت تضيع عند التوليد (البند يُحشر نصاً في الوصف)
+                            // فتعمى تقارير البنود ومراكز التكلفة عن كل المولَّد آلياً
+                            'cc_id'      => $rec->cc_id,
+                            'cat'        => $rec->cat,
+                            'method'     => $rec->method,
+                            'description'=> 'وُلّد تلقائياً من المتكرر: ' . $rec->name,
                         ]);
                     }
                     $docs++;
@@ -217,9 +260,15 @@ class HubAutomation extends Command
 
             $q = DB::table($md['table'])->whereNull('deleted_at');
             $v = (string) $rule->val;
+            // مقارنة عمود بعمود: القيمة اسم حقلٍ من الوحدة نفسها (قائمة بيضاء من سجلها)
+            // — بها يحيا «حد إعادة الطلب» لكل صنف و«حد التنبيه» لكل صندوق
+            $vcol = fn () => collect($md['fields'])->firstWhere('key', $v)['col']
+                ?? (Schema::hasColumn($md['table'], $v) ? $v : null);
             match ($rule->op) {
                 'أكبر من'               => $q->where($col, '>', (float) $v),
                 'أصغر من'               => $q->where($col, '<', (float) $v),
+                'أكبر من عمود'          => ($c2 = $vcol()) ? $q->whereNotNull($c2)->whereColumn($col, '>', $c2) : $q->whereRaw('1=0'),
+                'أصغر من عمود'          => ($c2 = $vcol()) ? $q->whereNotNull($c2)->whereColumn($col, '<', $c2) : $q->whereRaw('1=0'),
                 'يساوي'                 => $q->where($col, $v),
                 'يحتوي'                 => $q->where($col, 'LIKE', "%{$v}%"),
                 'فارغ'                  => $q->where(fn ($w) => $w->whereNull($col)->orWhere($col, '')),
@@ -234,9 +283,21 @@ class HubAutomation extends Command
             $rulesRun++;
 
             $every = max(1, (int) ($rule->every ?: 7));
-            $to    = $this->recipients($rule->to_id);
+            $to    = $this->recipientUsers($rule->to_id);
+
+            // النطاق يُفرض لكل مستلم على حدة — القاعدة لا تُسرّب عنوان سجل خارج نطاقه
+            $rowIds = $rows->pluck('id')->all();
+            $visible = [];
+            foreach ($to as $ru) {
+                $visible[$ru->id] = hub_scope(
+                    DB::table($md['table'])->whereNull('deleted_at')->whereIn('id', $rowIds),
+                    $rule->mod, $ru)->pluck('id')->map(fn ($i) => (string) $i)->flip()->all();
+            }
 
             foreach ($rows as $row) {
+                $canSee = $to->filter(fn ($ru) => isset($visible[$ru->id][(string) $row->id]));
+                if ($canSee->isEmpty()) continue;
+
                 // منع التكرار: نفس القاعدة ونفس السجل خلال «كل N يوم»
                 $dup = HubNotification::where('kind', 'rule:' . $rule->id)
                     ->where('record_id', $row->id)
@@ -247,10 +308,10 @@ class HubAutomation extends Command
                 $text = trim(($rule->msg ?: $rule->name) . ' — ' . Str::limit((string) $row->_n, 60));
                 $hits++;
 
-                foreach ($to as $uid) {
+                foreach ($canSee as $ru) {
                     if ($this->dry) continue;
                     HubNotification::create([
-                        'user_id'   => $uid,
+                        'user_id'   => $ru->id,
                         'kind'      => 'rule:' . $rule->id,
                         'text'      => Str::limit($text, 590),
                         'module'    => $rule->mod,
@@ -265,7 +326,7 @@ class HubAutomation extends Command
                     if (str_contains($chan, $word) || str_contains($chan, 'الكل')) {
                         $outbox++;
                         if (! $this->dry) OutboxMessage::create([
-                            'user_id'    => $to[0] ?? null,
+                            'user_id'    => $canSee->first()?->id,
                             'kind'       => 'rule:' . $rule->id,
                             'channel'    => $ch,
                             'target'     => null,               // يملؤها عامل التسليم (n8n)
@@ -284,11 +345,17 @@ class HubAutomation extends Command
     /** المستلمون: المحدد في القاعدة، وإلا المالكون + حاملو علم monitor */
     protected function recipients($toId): array
     {
-        if ($toId) return [$toId];
+        return $this->recipientUsers($toId)->pluck('id')->values()->all();
+    }
+
+    /** المستلمون كنماذج مستخدمين — يلزمنا المستخدم نفسه لفرض نطاقه على القاعدة */
+    protected function recipientUsers($toId): \Illuminate\Support\Collection
+    {
+        if ($toId) return User::whereNull('deleted_at')->where('id', $toId)->get()->values();
 
         return User::whereNull('deleted_at')->get()
             ->filter(fn ($u) => $u->role?->is_owner || hub_flag($u, 'monitor'))
-            ->pluck('id')->values()->all();
+            ->values();
     }
 
     /** إشعار للمالكين وحاملي monitor */
