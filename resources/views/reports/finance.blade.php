@@ -57,6 +57,18 @@
                 <tr><td><span class="bdg {{ hub_tone($st->state) }}">{{ $st->state }}</span></td><td class="sub acts">{{ $st->c }}</td><td class="mono acts">{{ number_format($st->s, 2) }}</td></tr>
             @endforeach
         </table>
+        <h3 style="margin-top:14px">🎯 مصروف السنة حسب مركز التكلفة</h3>
+        <table class="mini">
+            @forelse ($byCC as $cc)
+                <tr>
+                    <td>{{ $cc->cc_id ? ($ccNames[$cc->cc_id] ?? '؟') : 'بلا مركز' }}</td>
+                    <td class="sub acts">{{ $cc->c }}</td>
+                    <td class="mono acts">{{ number_format($cc->s, 2) }}</td>
+                </tr>
+            @empty
+                <tr><td class="empty">لا مصروفات هذه السنة</td></tr>
+            @endforelse
+        </table>
     </div>
 </div>
 @endsection

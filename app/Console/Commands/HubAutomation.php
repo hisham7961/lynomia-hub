@@ -214,7 +214,12 @@ class HubAutomation extends Command
                             'currency'   => $rec->currency,
                             'project_id' => $rec->project_id,
                             'company_id' => $rec->company_id,
-                            'description'=> 'وُلّد تلقائياً من المتكرر: ' . $rec->name . ($rec->cat ? ' — ' . $rec->cat : ''),
+                            // الأبعاد كاملة: كانت تضيع عند التوليد (البند يُحشر نصاً في الوصف)
+                            // فتعمى تقارير البنود ومراكز التكلفة عن كل المولَّد آلياً
+                            'cc_id'      => $rec->cc_id,
+                            'cat'        => $rec->cat,
+                            'method'     => $rec->method,
+                            'description'=> 'وُلّد تلقائياً من المتكرر: ' . $rec->name,
                         ]);
                     }
                     $docs++;
