@@ -4,7 +4,7 @@
      كان «كاش أولاً» جامداً: المستخدم يرى الشكل القديم حتى يضغط Ctrl+Shift+R.
    - التنقل بين الصفحات: الشبكة أولاً بمهلة، وإلا آخر نسخة محفوظة، وإلا صفحة «بلا اتصال»
    - لا يخبئ أبداً: API، الملفات الخاصة، الأسرار، مراكز الإدارة */
-var VER = 'hub-v2.108';
+var VER = 'hub-v2.109';
 var STATIC = ['/offline', '/css/app.css', '/js/app.js', '/js/htmx.min.js'];
 // /attachments/ ضمن الممنوع: معاينة PDF داخل iframe تُعد تنقلاً فكانت ستُخبأ — ملفات خاصة لا تُخبأ أبداً
 var NEVER = ['/api/', '/files/', '/attachments/', '/m/vault', '/admin/', '/apps/quoteflow', '/jslog', '/logout'];

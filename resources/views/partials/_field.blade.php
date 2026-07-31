@@ -18,12 +18,24 @@
         </select>
 
     @elseif ($t === 'ref' && ! empty($f['multi']))
+        {{-- رقائق اختيارٍ متعدد بدل مربع النظام الخام (Ctrl+نقر لم يعرفه أحد):
+             كل خيارٍ حبةٌ تُنقر، والمختار يتوشح ✓ — والنموذج يرسل k[] نفسها بلا تغيير عقد --}}
         @php $sel = collect(old($k, is_array($raw) ? $raw : (json_decode($raw ?? '[]', true) ?: []))); @endphp
-        <select class="inp" name="{{ $k }}[]" multiple size="5">
-            @foreach ($refOptions[$k] ?? [] as $id => $label)
-                <option value="{{ $id }}" @selected($sel->contains($id))>{{ $label }}</option>
-            @endforeach
-        </select>
+        <div class="chips" data-chips>
+            @if (count($refOptions[$k] ?? []) > 8)
+                <input class="inp chipq" type="search" placeholder="تصفية الخيارات…" data-chipfilter aria-label="تصفية {{ $f['label'] }}">
+            @endif
+            <div class="chipgrid">
+                @forelse ($refOptions[$k] ?? [] as $id => $label)
+                    <label class="chip">
+                        <input type="checkbox" name="{{ $k }}[]" value="{{ $id }}" @checked($sel->contains($id))>
+                        <span>{{ $label }}</span>
+                    </label>
+                @empty
+                    <span class="sub">لا خيارات بعد</span>
+                @endforelse
+            </div>
+        </div>
 
     @elseif ($t === 'ref')
         <select class="inp" name="{{ $k }}">

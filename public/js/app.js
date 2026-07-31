@@ -417,6 +417,15 @@
   }, true);
 })();
 
+/* ═ تصفية رقائق الاختيار المتعدد — بحثٌ فوري داخل صندوق الرقائق ═ */
+document.addEventListener('input', function (e) {
+  if (!e.target.matches || !e.target.matches('[data-chipfilter]')) return;
+  var q = e.target.value.trim();
+  e.target.closest('[data-chips]').querySelectorAll('.chip').forEach(function (c) {
+    c.style.display = !q || c.textContent.indexOf(q) >= 0 ? '' : 'none';
+  });
+});
+
 /* ═ حارس المغادرة: نموذج POST كُتب فيه ولم يُرسل — المتصفح يسأل قبل ضياعه ═
    (المسودات المحلية تبقى شبكة أمانٍ ثانية إن غادر رغم التحذير) */
 (function () {

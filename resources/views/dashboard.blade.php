@@ -36,21 +36,22 @@
             <a href="{{ route('boards.edit', $board->id) }}">أضف ودجاتها</a>.</div></div>
     @endif
 @else
-    {{-- اللوحة الافتراضية: نفس البطاقات وبنفس الترتيب كما كانت --}}
+    {{-- اللوحة الافتراضية بترتيب «قرارات أولاً»: ما يستحق تدخلك الآن (ينتهي قريباً،
+         مواعيد تقترب) يتصدر — والمرجعيات (تقدم، حالات، سجل) بعده --}}
     @include('partials.widgets.kpis',   ['data' => $kpis])
     @include('partials.widgets.counts', ['data' => $cards])
     <div class="kids">
+        @include('partials.widgets.expiry', ['data' => $expiry])
+        @include('partials.widgets.due', ['data' => ['rows' => $due, 'dueCol' => $dueCol,
+                                                     'stCol' => $stCol, 'disp' => $disp]])
         @unless (in_array('links', $hid ?? [], true))
             @include('partials.widgets.links', ['data' => $links])
         @endunless
-        @include('partials.widgets.expiry', ['data' => $expiry])
         @include('partials.widgets.apps',   ['data' => $apps])
         @include('partials.widgets.donut',  ['data' => $taskSlices])
         @unless (in_array('recent', $hid ?? [], true))
             @include('partials.widgets.recent')
         @endunless
-        @include('partials.widgets.due', ['data' => ['rows' => $due, 'dueCol' => $dueCol,
-                                                     'stCol' => $stCol, 'disp' => $disp]])
         @unless (in_array('audits', $hid ?? [], true))
             @include('partials.widgets.audits', ['data' => $audits])
         @endunless

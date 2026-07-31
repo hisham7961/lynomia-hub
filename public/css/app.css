@@ -468,7 +468,8 @@ html[data-theme="dark"] body{
   --sh:0 1px 2px rgba(0,0,0,.4),0 3px 10px rgba(0,0,0,.32);
   --shh:0 4px 14px rgba(0,0,0,.5),0 16px 38px rgba(0,0,0,.45)}
 html[data-theme="dark"] .topbar{background:color-mix(in srgb,var(--cd) 80%,transparent)}
-html[data-theme="dark"] .inp{background:#0F1726}
+/* background-color لا الاختزال background: الاختزال كان يصفّر repeat/position لسهم select فيتكرر نمطاً */
+html[data-theme="dark"] .inp{background-color:#0F1726}
 html[data-theme="dark"] .gsr,html[data-theme="dark"] .modalbox,html[data-theme="dark"] .logincard{background:var(--cd)}
 html[data-theme="dark"] .logincard{box-shadow:0 30px 90px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05)}
 html[data-theme="dark"] .tbl th{background:var(--bg2)}
@@ -800,3 +801,16 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .mrow{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:12.5px;color:var(--sb)}
 .mrow b{font-weight:600;font-size:12px}
 @media (max-width:1100px){.rec{grid-template-columns:1fr}.rec-rail{position:static;max-height:none;overflow:visible}}
+
+/* ═ v2.109 رقائق الاختيار المتعدد — تنقر فتُختار، لا Ctrl+نقر خفياً بعد اليوم ═ */
+.chips{border:1px solid var(--ln);border-radius:12px;padding:10px;background:var(--cd)}
+.chipq{margin-bottom:8px;max-width:260px}
+.chipgrid{display:flex;flex-wrap:wrap;gap:7px;max-height:190px;overflow-y:auto;padding:1px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 13px;border:1.5px solid var(--ln);
+  border-radius:999px;font-size:12.5px;cursor:pointer;user-select:none;background:var(--bg2);
+  transition:border-color var(--t),background var(--t),color var(--t)}
+.chip input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.chip:hover{border-color:color-mix(in srgb,var(--p) 55%,var(--ln))}
+.chip:has(input:checked){background:var(--pss);border-color:var(--p);color:var(--pd);font-weight:700}
+.chip:has(input:checked) span::before{content:"✓ "}
+.chip:has(input:focus-visible){box-shadow:var(--ring)}
