@@ -8,10 +8,21 @@ use Illuminate\Http\Request;
 /** البحث الشامل عبر كل الوحدات — يحترم مصفوفة الصلاحيات ونطاق المشاريع */
 class SearchController extends Controller
 {
-    /** النتائج الحية للشريط العلوي (htmx) — خفيفة: بلا عدّ، تتوقف عند الاكتفاء */
+    /**
+     * النتائج الحية للشريط العلوي (htmx) — البحث هو لوحة أوامر النظام:
+     * - تركيزٌ بلا كتابة: أهم الوجهات + إجراءات «＋ جديد» فوراً (توجّهٌ لحظي بلا حرف)
+     * - حرف واحد: لا شيء بعد (ضجيج)، وحرفان فأكثر: وجهات + إجراءات + سجلات بنطاق المستخدم
+     */
     public function mini(Request $r)
     {
         $q = trim((string) $r->input('q'));
+        if ($q === '') {
+            return view('partials.searchmini', [
+                'flat' => [], 'q' => '',
+                'dests' => array_slice($this->destinations(''), 0, 6),
+                'acts' => $this->quickActions('', 3),
+            ]);
+        }
         if (mb_strlen($q) < 2) return response('');
 
         $flat = [];
@@ -28,7 +39,24 @@ class SearchController extends Controller
         return view('partials.searchmini', [
             'flat' => array_slice($flat, 0, 9), 'q' => $q,
             'dests' => array_slice($this->destinations($q), 0, 4),
+            'acts' => $this->quickActions($q, 3),
         ]);
+    }
+
+    /** إجراءات سريعة: «＋ جديد» في الوحدات التي يملك المستخدم الإضافة فيها ويطابق اسمُها النص */
+    protected function quickActions(string $q, int $limit): array
+    {
+        $u = auth()->user();
+        $acts = [];
+        foreach (hub_nav($u) as $g) {
+            foreach ($g['items'] as $it) {
+                if ($q !== '' && mb_stripos($it['label'], $q) === false) continue;
+                if (! hub_can($u, $it['key'], 'a')) continue;
+                $acts[] = ['t' => $it['label'], 'u' => route('m.create', $it['key'])];
+                if (count($acts) >= $limit) return $acts;
+            }
+        }
+        return $acts;
     }
 
     /** صفحة النتائج الكاملة مجمّعة بالوحدات */

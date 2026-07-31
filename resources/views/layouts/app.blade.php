@@ -31,12 +31,15 @@
         <header class="topbar">
             <button class="menubtn" type="button" onclick="document.body.classList.toggle('nav')" aria-label="القائمة">☰</button>
             <div class="crumb">@yield('title', 'لوحة التحكم')</div>
+            {{-- البحث هو لوحة أوامر النظام: تركيزٌ يعرض الوجهات فوراً، وكتابةٌ تبحث في كل شيء --}}
             <div class="gsearch">
-                <input class="inp" type="search" id="gq" name="q" placeholder="بحث شامل… /" autocomplete="off"
+                <input class="inp" type="search" id="gq" name="q" placeholder="بحث وأوامر…" autocomplete="off"
+                       role="combobox" aria-expanded="false" aria-controls="gsr" aria-autocomplete="list"
                        data-url="{{ route('search') }}"
-                       hx-get="{{ route('search.mini') }}" hx-trigger="input changed delay:300ms"
+                       hx-get="{{ route('search.mini') }}" hx-trigger="input changed delay:300ms, focus"
                        hx-target="#gsr" hx-swap="innerHTML">
-                <div id="gsr" class="gsr"></div>
+                <kbd class="kbdhint" aria-hidden="true">Ctrl K</kbd>
+                <div id="gsr" class="gsr" role="listbox" aria-label="نتائج البحث والأوامر"></div>
             </div>
             <div class="spacer"></div>
             @if (hub_can(auth()->user(), 'companies', 'v'))
