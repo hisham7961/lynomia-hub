@@ -1093,6 +1093,55 @@ if (! function_exists('hub_company_scope')) {
     }
 }
 
+if (! function_exists('hub_okr_progress')) {
+    /**
+     * تقدّم الهدف محسوباً من نتائجه الرئيسية (متوسط موزون) — كان `progress`
+     * رقماً يدوياً منفصلاً عن الواقع. النتيجة المربوطة بمؤشر تُحدَّث قيمتها
+     * الحالية من `hub_kpi_value` (المحرك مكتوبٌ وجاهز منذ إصدارات بلا مستهلك
+     * في الأهداف)، وهدفٌ بلا نتائج يبقى على رقمه اليدوي — لا نكذب بصفر.
+     */
+    function hub_okr_progress(string $objectiveId, bool $refresh = false): ?array
+    {
+        // الملغاة تُستثنى — وبلا حالة تبقى (whereNotIn وحده يُقصي NULL صامتاً)
+        $krs = \App\Models\KeyResult::whereNull('deleted_at')
+            ->where('objective_id', $objectiveId)
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'ملغاة'))
+            ->get();
+        if ($krs->isEmpty()) return null;
+
+        $kpis = null;
+        $sum = 0.0; $weights = 0.0; $rows = [];
+        foreach ($krs as $kr) {
+            // القيمة الحالية من المؤشر المرتبط — إن وُجد وطُلب التحديث
+            if ($refresh && $kr->kpi_id && \Illuminate\Support\Facades\Schema::hasTable('kpi_defs')) {
+                $kpis ??= \Illuminate\Support\Facades\DB::table('kpi_defs')->get()->keyBy('id');
+                if ($def = ($kpis[$kr->kpi_id] ?? null)) {
+                    $formula = is_array($def->formula) ? $def->formula : (json_decode((string) $def->formula, true) ?: []);
+                    $val = hub_kpi_value($formula);
+                    if ($val !== null) {
+                        $kr->current_value = $val;
+                        $kr->saveQuietly();
+                    }
+                }
+            }
+
+            $pct = $kr->pct();
+            $w = (float) ($kr->weight ?? 0) ?: 1.0;
+            if ($pct !== null) { $sum += $pct * $w; $weights += $w; }
+            $rows[] = ['id' => $kr->id, 'title' => $kr->title, 'pct' => $pct,
+                       'current' => $kr->current_value, 'target' => $kr->target_value,
+                       'unit' => $kr->unit, 'status' => $kr->status, 'auto' => (bool) $kr->kpi_id];
+        }
+
+        return [
+            'pct' => $weights > 0 ? (int) round($sum / $weights) : null,
+            'krs' => $rows,
+            'count' => $krs->count(),
+            'measured' => count(array_filter($rows, fn ($r) => $r['pct'] !== null)),
+        ];
+    }
+}
+
 if (! function_exists('hub_pipeline')) {
     /**
      * مسار المبيعات رقماً: قيمة كل مرحلة ومرجّحها باحتمال الإغلاق، وتشريح
