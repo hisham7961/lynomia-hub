@@ -62,6 +62,7 @@ class ContractEsignFlowTest extends TestCase
         $this->actingAs($this->owner)->post('/esign', [
             'title' => 'توقيع عقد التوريد', 'template_id' => $tpl->id, 'pass' => 'pass12',
             'contract_id' => $c->id,
+            'vars' => ['اسم_الطرف_الثاني' => 'مورد التوريد'],   // v2.119: الإلزامي لا بد منه
         ])->assertSessionHas('sign_link');
 
         // إنشاء الطلب ضبط العقد على «قيد التوقيع»

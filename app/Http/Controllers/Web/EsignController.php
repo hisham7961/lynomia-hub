@@ -75,6 +75,7 @@ class EsignController extends Controller
             'preContract' => request('contract'),
             'preTitle'    => request('title'),
             'preLink'     => request('link'),
+            'registry'    => \App\Support\ContractVars::flat(),
         ]);
     }
 
@@ -124,6 +125,96 @@ class EsignController extends Controller
         return back()->with('ok', 'أُضيف القالب — متغيراته بين أقواس {هكذا} تُملأ عند الإنشاء');
     }
 
+    /** v2.119: تحرير قالب — كان معدوماً (حذفٌ وإعادة كتابة!) — بمحرر بنود ولقطة إصدار */
+    public function editTemplate(string $id)
+    {
+        $this->gate('e');
+        $tpl = SignTemplate::findOrFail($id);
+
+        return view('esign.tpl_edit', [
+            'tpl' => $tpl,
+            'versions' => \App\Models\SignTemplateVersion::where('template_id', $id)
+                ->orderByDesc('version')->limit(20)->get(),
+            'registry' => \App\Support\ContractVars::registry(),
+        ]);
+    }
+
+    public function updateTemplate(Request $r, string $id)
+    {
+        $this->gate('e');
+        $tpl = SignTemplate::findOrFail($id);
+        $d = $r->validate([
+            'name' => 'required|string|max:160', 'kind' => 'nullable|string|max:80',
+            'descr' => 'nullable|string|max:300', 'note' => 'nullable|string|max:300',
+            'blocks' => 'required|string|max:400000',
+        ]);
+
+        $blocks = json_decode($d['blocks'], true);
+        abort_unless(is_array($blocks) && count($blocks), 422, 'بنود غير صالحة');
+        $blocks = array_values(array_map(fn ($b) => [
+            'h' => mb_substr(trim((string) ($b['h'] ?? '')), 0, 200),
+            'body' => mb_substr((string) ($b['body'] ?? ''), 0, 100000),
+            'break' => (bool) ($b['break'] ?? false),
+        ], $blocks));
+        $body = SignTemplate::flatten($blocks);
+        abort_if(trim($body) === '', 422, 'القالب فارغ');
+
+        // تعديلٌ جوهري للنص → لقطة الإصدار الحالي أولاً ثم رقم جديد
+        if ($body !== (string) $tpl->body) {
+            $tpl->snapshotVersion($d['note'] ?? null);
+            $tpl->version = (int) ($tpl->version ?: 1) + 1;
+        }
+        $tpl->forceFill([
+            'name' => $d['name'], 'kind' => $d['kind'] ?? $tpl->kind,
+            'descr' => $d['descr'] ?? $tpl->descr,
+            'blocks' => $blocks, 'body' => $body,
+        ])->save();
+        hub_audit('تعديل قالب توقيع', 'contracts', null, $tpl->name . ' (إصدار ' . $tpl->version . ')');
+
+        return redirect()->route('esign.tpl.edit', $tpl->id)
+            ->with('ok', 'حُفظ القالب — الإصدار ' . $tpl->version . ' والطلبات القديمة على نصوصها المحفوظة');
+    }
+
+    /** أرشفة بدل الحذف — يختفي من نموذج الإرسال وتبقى وثائقه القديمة سليمة */
+    public function archiveTemplate(string $id)
+    {
+        $this->gate('e');
+        $tpl = SignTemplate::findOrFail($id);
+        $tpl->forceFill(['archived_at' => $tpl->archived_at ? null : now()])->save();
+        hub_audit($tpl->archived_at ? 'أرشفة قالب توقيع' : 'استعادة قالب توقيع', 'contracts', null, $tpl->name);
+
+        return back()->with('ok', $tpl->archived_at ? 'أُرشف القالب — يختفي من الإرسال وتبقى وثائقه' : 'استُعيد القالب');
+    }
+
+    /** معاينة حية قبل الإنشاء — النص بعد حل المتغيرات كما سيراه الموقّع تماماً */
+    public function preview(Request $r)
+    {
+        $this->gate();
+        $d = $r->validate([
+            'template_id' => 'nullable|exists:sign_templates,id',
+            'free_body' => 'nullable|string|max:200000',
+            'vars' => 'array', 'contract_id' => 'nullable|string',
+            'link_module' => 'nullable|string|max:40', 'link_id' => 'nullable|string|max:64',
+        ]);
+
+        $contractId = ($d['contract_id'] ?? null) ?: null;
+        if ($contractId && ! hub_scope(\App\Models\Contract::query(), 'contracts')->whereKey($contractId)->exists()) {
+            $contractId = null;
+        }
+        $body = ! empty($d['template_id'])
+            ? SignTemplate::findOrFail($d['template_id'])->body
+            : (string) ($d['free_body'] ?? '');
+        $vals = array_merge(
+            \App\Support\ContractVars::resolve($contractId, $d['link_module'] ?? null, $d['link_id'] ?? null),
+            array_filter((array) ($d['vars'] ?? []), fn ($v) => is_string($v) && trim($v) !== '')
+        );
+
+        return view('esign._preview', [
+            'body' => \App\Support\ContractVars::apply($body, $vals),
+            'missing' => \App\Support\ContractVars::missing($body, $vals),
+        ]);
+    }
+
     public function destroyTemplate(string $id)
     {
         $this->gate('d');
@@ -170,10 +261,16 @@ class EsignController extends Controller
         // النص: من قالبٍ بمتغيراته، أو نصٌّ حرٌّ يكتبه المستخدم كاملاً
         if (! empty($d['template_id'])) {
             $tpl = SignTemplate::findOrFail($d['template_id']);
-            $body = $tpl->body;
-            foreach ((array) ($d['vars'] ?? []) as $k => $v) {
-                $body = str_replace('{' . $k . '}', (string) $v, $body);
+            // v2.119: الحل التلقائي من السجلات المربوطة أولاً وقيم المستخدم تعلوه،
+            // الإلزامي الفارغ يمنع الإنشاء، والاختياري الفارغ يُعلَّم ⟦ظاهراً⟧
+            $vals = array_merge(
+                \App\Support\ContractVars::resolve($contractId, $linkModule, $linkId),
+                array_filter((array) ($d['vars'] ?? []), fn ($v) => is_string($v) && trim($v) !== '')
+            );
+            if ($missing = \App\Support\ContractVars::missing($tpl->body, $vals)) {
+                return back()->with('err', 'متغيرات إلزامية لم تُملأ: ' . implode('، ', $missing))->withInput();
             }
+            $body = \App\Support\ContractVars::apply($tpl->body, $vals);
         } else {
             $body = trim((string) ($d['free_body'] ?? ''));
             if ($body === '') {

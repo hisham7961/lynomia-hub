@@ -625,3 +625,161 @@ document.addEventListener('input', function (e) {
   scan();
   document.addEventListener('htmx:afterSettle', scan);
 })();
+
+/* ═ v2.119 — CLM م3: محرر البنود، رقائق المتغيرات، المعاينة الحية، ومعالج الإرسال ═ */
+(function () {
+  'use strict';
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  var lastField = null;
+  document.addEventListener('focusin', function (e) {
+    if (e.target.matches && e.target.matches('#blocks textarea, #blocks input[data-h], #varszone textarea')) lastField = e.target;
+  });
+
+  /* — محرر البنود (صفحة تحرير القالب) — */
+  var wrap = document.getElementById('blocks');
+  if (wrap) {
+    var rows = [];
+    function row(b) {
+      var d = document.createElement('div');
+      d.className = 'blockrow';
+      d.innerHTML =
+        '<div class="bhead">' +
+          '<input class="inp" data-h placeholder="عنوان البند (اختياري)" value="' + esc(b.h || '') + '">' +
+          '<label class="chk sub" title="ابدأ صفحة جديدة عند الطباعة قبل هذا البند"><input type="checkbox" data-br' + (b.break ? ' checked' : '') + '> فاصل صفحة</label>' +
+          '<span class="spacer"></span>' +
+          '<button class="btn ghost xs" type="button" data-up title="أعلى">↑</button>' +
+          '<button class="btn ghost xs" type="button" data-dn title="أسفل">↓</button>' +
+          '<button class="btn ghost xs dn" type="button" data-rm aria-label="حذف البند">✕</button>' +
+        '</div>' +
+        '<textarea class="inp" rows="5" placeholder="نص البند — أدرج المتغيرات من القائمة الجانبية">' + esc(b.body || '') + '</textarea>';
+      return d;
+    }
+    (JSON.parse(wrap.dataset.init || '[]')).forEach(function (b) { wrap.appendChild(row(b)); });
+    if (!wrap.children.length) wrap.appendChild(row({}));
+
+    document.getElementById('addblock') && document.getElementById('addblock').addEventListener('click', function () {
+      var d = row({}); wrap.appendChild(d); d.querySelector('textarea').focus();
+    });
+    wrap.addEventListener('click', function (e) {
+      var r = e.target.closest('.blockrow'); if (!r) return;
+      if (e.target.closest('[data-rm]')) { r.remove(); if (!wrap.children.length) wrap.appendChild(row({})); }
+      if (e.target.closest('[data-up]') && r.previousElementSibling) wrap.insertBefore(r, r.previousElementSibling);
+      if (e.target.closest('[data-dn]') && r.nextElementSibling) wrap.insertBefore(r.nextElementSibling, r);
+    });
+
+    function collect() {
+      return [].map.call(wrap.querySelectorAll('.blockrow'), function (r) {
+        return { h: r.querySelector('[data-h]').value.trim(),
+                 body: r.querySelector('textarea').value,
+                 break: r.querySelector('[data-br]').checked };
+      }).filter(function (b) { return b.h || b.body.trim(); });
+    }
+    var form = document.getElementById('tplform');
+    form && form.addEventListener('submit', function () {
+      document.getElementById('blocksjson').value = JSON.stringify(collect());
+    });
+
+    /* معاينة القالب: تسطيح محلي ثم عرضٌ خادمي (نفس مسار الإنشاء تماماً) */
+    var pv = document.getElementById('tplpreview');
+    pv && pv.addEventListener('click', function () {
+      var flat = collect().map(function (b) { return (b.h ? b.h + '\n' : '') + b.body.trim(); }).join('\n\n');
+      var fd = new FormData();
+      fd.append('_token', document.querySelector('meta[name=csrf-token]').content);
+      fd.append('free_body', flat);
+      fetch('/esign/preview', { method: 'POST', body: fd })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          document.getElementById('pvbody').innerHTML = html;
+          document.getElementById('pvmodal').hidden = false;
+        });
+    });
+  }
+
+  /* — رقائق المتغيرات: نقرة تُدرج {الاسم} عند المؤشر — */
+  document.addEventListener('click', function (e) {
+    var chip = e.target.closest('.varchip');
+    if (!chip) return;
+    var t = lastField || document.querySelector('#blocks textarea, #varszone textarea');
+    if (!t) return;
+    var ins = '{' + chip.dataset.k + '}';
+    var s = t.selectionStart || 0, epos = t.selectionEnd || 0;
+    t.value = t.value.slice(0, s) + ins + t.value.slice(epos);
+    t.focus(); t.selectionStart = t.selectionEnd = s + ins.length;
+  });
+  var vs = document.getElementById('varsearch');
+  vs && vs.addEventListener('input', function () {
+    var q = vs.value.trim();
+    document.querySelectorAll('#varlist .varchip').forEach(function (c) {
+      c.style.display = !q || c.textContent.indexOf(q) >= 0 || c.dataset.k.indexOf(q) >= 0 ? '' : 'none';
+    });
+  });
+
+  /* — نموذج الإرسال: متغيرات موسومة تنجو من تبديل القالب + معاينة + معالج خطوات — */
+  var ez = document.getElementById('varszone');
+  if (ez) {
+    var reg = JSON.parse(ez.dataset.reg || '{}');
+    var saved = {};   // قيم المستخدم — تبقى عند تبديل القالب
+    document.addEventListener('input', function (e) {
+      if (e.target.name && e.target.name.indexOf('vars[') === 0) {
+        saved[e.target.name.slice(5, -1)] = e.target.value;
+      }
+    });
+    var sel = document.getElementById('tplsel');
+    var freeHtml = ez.innerHTML;   // النص الحر الأصلي (بقيمة old إن وجدت) يعود عند إلغاء القالب
+    function rebuild() {
+      var opt = sel && sel.selectedOptions[0];
+      var vars = sel && sel.value && opt && opt.dataset.vars ? JSON.parse(opt.dataset.vars) : null;
+      if (!vars) {
+        ez.innerHTML = freeHtml;
+        return;
+      }
+      ez.innerHTML = vars.map(function (v) {
+        var d = reg[v] || {};
+        var lbl = d.label || v.replace(/_/g, ' ');
+        return '<div class="fld">' +
+          '<label>' + esc(lbl) + (d.req ? ' <b class="req">*</b>' : '') +
+            (d.desc ? ' <span class="sub">· ' + esc(d.desc) + '</span>' : '') + '</label>' +
+          '<input class="inp" name="vars[' + esc(v) + ']" value="' + esc(saved[v] || '') + '"' +
+          ' placeholder="' + esc(d.src ? 'تلقائي من السجل المربوط إن وُجد' : (d.ex ? 'مثال: ' + d.ex : '')) + '">' +
+        '</div>';
+      }).join('');
+    }
+    if (sel) { sel.addEventListener('change', rebuild); if (sel.value) rebuild(); }
+
+    /* معاينة قبل الإنشاء — بنفس محرك الحل الخادمي */
+    var pvb = document.getElementById('esignpreview');
+    pvb && pvb.addEventListener('click', function () {
+      var form = document.getElementById('esignform');
+      var fd = new FormData(form);
+      fd.append('_token', document.querySelector('meta[name=csrf-token]').content);
+      fetch('/esign/preview', { method: 'POST', body: fd })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          document.getElementById('pvbody').innerHTML = html;
+          document.getElementById('pvmodal').hidden = false;
+        });
+    });
+
+    /* معالج الخطوات: تنقّل خفيف بنفس الصفحة — بلا JS تظهر كل الأقسام تباعاً */
+    var steps = [].slice.call(document.querySelectorAll('[data-wstep]'));
+    if (steps.length) {
+      var cur = 0;
+      function show(i) {
+        cur = Math.max(0, Math.min(i, steps.length - 1));
+        steps.forEach(function (s, j) { s.hidden = j !== cur; });
+        document.querySelectorAll('.wchip').forEach(function (c, j) {
+          c.classList.toggle('on', j === cur); c.classList.toggle('done', j < cur);
+        });
+        var prev = document.getElementById('wprev'), next = document.getElementById('wnext'),
+            send = document.getElementById('wsend');
+        if (prev) prev.hidden = cur === 0;
+        if (next) next.hidden = cur === steps.length - 1;
+        if (send) send.hidden = cur !== steps.length - 1;
+      }
+      document.getElementById('wnext') && document.getElementById('wnext').addEventListener('click', function () { show(cur + 1); });
+      document.getElementById('wprev') && document.getElementById('wprev').addEventListener('click', function () { show(cur - 1); });
+      document.querySelectorAll('.wchip').forEach(function (c, j) { c.addEventListener('click', function () { show(j); }); });
+      show(0);
+    }
+  }
+})();

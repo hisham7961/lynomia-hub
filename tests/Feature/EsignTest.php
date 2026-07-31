@@ -86,8 +86,10 @@ class EsignTest extends TestCase
         $this->seedCore();
         $this->actingAs($this->owner)->get('/esign');
         $tpl = SignTemplate::first();
+        // v2.119: المتغيرات الإلزامية (اسم الطرف الثاني) تمنع الإنشاء إن غابت
         $r = $this->actingAs($this->owner)->post('/esign', [
             'title' => 'ع', 'template_id' => $tpl->id, 'pass' => 'x1234',
+            'vars' => ['اسم_الطرف_الثاني' => 'طرفٌ ما'],
         ]);
         $r->assertSessionHasNoErrors();
         auth()->logout();
@@ -130,6 +132,7 @@ class EsignTest extends TestCase
         $this->actingAs($this->owner)->post('/esign', [
             'title' => 'ع', 'template_id' => $tpl->id, 'pass' => 'p1234',
             'link_module' => 'tasks', 'link_id' => 'x',   // tasks ليست ضمن الجهات المسموحة
+            'vars' => ['اسم_الطرف_الثاني' => 'طرفٌ ما'],   // v2.119: الإلزامي لا بد منه
         ])->assertSessionHas('sign_link');
 
         $this->assertNull(SignRequest::first()->link_module);

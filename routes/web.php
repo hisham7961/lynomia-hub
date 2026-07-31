@@ -83,6 +83,10 @@ Route::middleware('auth')->group(function () {
     Route::post('esign', [\App\Http\Controllers\Web\EsignController::class, 'store'])->name('esign.store');
     Route::post('esign/templates', [\App\Http\Controllers\Web\EsignController::class, 'storeTemplate'])->name('esign.tpl.store');
     Route::delete('esign/templates/{id}', [\App\Http\Controllers\Web\EsignController::class, 'destroyTemplate'])->name('esign.tpl.destroy');
+    Route::get('esign/templates/{id}/edit', [\App\Http\Controllers\Web\EsignController::class, 'editTemplate'])->name('esign.tpl.edit');
+    Route::put('esign/templates/{id}', [\App\Http\Controllers\Web\EsignController::class, 'updateTemplate'])->name('esign.tpl.update');
+    Route::post('esign/templates/{id}/archive', [\App\Http\Controllers\Web\EsignController::class, 'archiveTemplate'])->name('esign.tpl.archive');
+    Route::post('esign/preview', [\App\Http\Controllers\Web\EsignController::class, 'preview'])->name('esign.preview');
     Route::get('esign/{id}/doc', [\App\Http\Controllers\Web\EsignController::class, 'doc'])->name('esign.doc');
     Route::get('esign/{id}/edit', [\App\Http\Controllers\Web\EsignController::class, 'edit'])->name('esign.edit');
     Route::put('esign/{id}', [\App\Http\Controllers\Web\EsignController::class, 'update'])->name('esign.update');

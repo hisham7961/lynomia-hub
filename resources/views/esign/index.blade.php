@@ -17,50 +17,72 @@
 <div class="kids">
     <div class="card kid">
         <h3>➕ طلب توقيع جديد</h3>
+        {{-- معالج بخطوات: قالب ← ربط ← متغيرات ← خيارات وإرسال — بلا JS تظهر الأقسام تباعاً --}}
+        <div class="wchips" aria-hidden="true">
+            <button type="button" class="wchip on">١ · القالب</button>
+            <button type="button" class="wchip">٢ · الربط</button>
+            <button type="button" class="wchip">٣ · المتغيرات</button>
+            <button type="button" class="wchip">٤ · الإرسال</button>
+        </div>
         <form method="POST" action="{{ route('esign.store') }}" class="row" id="esignform">
             @csrf
-            <div class="fld fw"><label>عنوان الطلب <span class="req">*</span></label>
-                <input class="inp" name="title" required maxlength="200" value="{{ $preTitle ?? '' }}" placeholder="مثال: عقد خدمات — مطاعم الذواقة"></div>
-            <div class="fld fw"><label>القالب <span class="sub">— أو اتركه واكتب النص حراً بالأسفل</span></label>
-                <select class="inp" name="template_id" id="tplsel">
-                    <option value="">✏️ بلا قالب — سأكتب العقد كاملاً</option>
-                    @foreach ($templates as $t)
-                        <option value="{{ $t->id }}" data-vars='@json($t->vars())'>{{ $t->name }}{{ $t->kind ? ' · ' . $t->kind : '' }}</option>
-                    @endforeach
-                </select></div>
-            <div class="fld fw" id="varszone">
-                <label>نص العقد الحر</label>
-                <textarea class="inp" name="free_body" rows="8" placeholder="اكتب نص العقد كاملاً هنا… (وستحرّره لاحقاً بحرية أيضاً)">{{ old('free_body') }}</textarea>
+            <div data-wstep class="fw">
+                <div class="fld fw"><label>عنوان الطلب <span class="req">*</span></label>
+                    <input class="inp" name="title" required maxlength="200" value="{{ $preTitle ?? '' }}" placeholder="مثال: عقد خدمات — مطاعم الذواقة"></div>
+                <div class="fld fw"><label>القالب <span class="sub">— أو اتركه واكتب النص حراً في خطوة المتغيرات</span></label>
+                    <select class="inp" name="template_id" id="tplsel">
+                        <option value="">✏️ بلا قالب — سأكتب العقد كاملاً</option>
+                        @foreach ($templates->whereNull('archived_at') as $t)
+                            <option value="{{ $t->id }}" data-vars='@json($t->vars())'>{{ $t->name }}{{ $t->kind ? ' · ' . $t->kind : '' }}</option>
+                        @endforeach
+                    </select></div>
             </div>
-            {{-- خيارات هذا الطلب — أنت تختار لكل عقدٍ ما يلزمه --}}
-            <div class="fld fw" style="border:1px dashed var(--lnd);border-radius:12px;padding:11px 14px">
-                <label style="margin-bottom:6px">🎚️ متطلبات التوقيع لهذا العقد</label>
-                <label class="chk"><input type="checkbox" name="opt_selfie" value="1"> 📸 طلب صورة تحقق بالكاميرا (سيلفي) لحظة التوقيع</label>
-                <label class="chk"><input type="checkbox" name="opt_idno" value="1"> 🪪 رقم الهوية/السجل إلزامي</label>
-                <label class="chk"><input type="checkbox" name="opt_decline" value="1" checked> 🚫 السماح للطرف الآخر برفض التوقيع (مع ذكر السبب)</label>
-                <label class="chk" style="gap:8px">⌛ صلاحية الرابط
-                    <input class="inp" type="number" name="expire_days" min="1" max="365" placeholder="∞" style="width:80px"> يوماً (فارغ = بلا انتهاء)</label>
+            <div data-wstep class="fw">
+                <div class="fld fw"><label>ربط بجهة (عميل، موظف، شركة…) <span class="sub">· يملأ متغيرات الطرف الثاني تلقائياً</span></label>
+                    <select class="inp" name="link" id="linksel">
+                        <option value="">— بلا ربط —</option>
+                        @foreach ($links as $glabel => $g)
+                            <optgroup label="{{ $glabel }}">
+                                @foreach ($g['rows'] as $rid => $rname)
+                                    <option value="{{ $g['module'] }}:{{ $rid }}" @selected(($preLink ?? '') === $g['module'] . ':' . $rid)>{{ \Illuminate\Support\Str::limit($rname, 44) }}</option>
+                                @endforeach
+                            </optgroup>
+                        @endforeach
+                    </select>
+                    <input type="hidden" name="link_module" id="link_module">
+                    <input type="hidden" name="link_id" id="link_id"></div>
+                <div class="fld fw"><label>ربط بعقد (اختياري) <span class="sub">· يملأ رقم العقد وقيمته وتواريخه تلقائياً</span></label>
+                    <select class="inp" name="contract_id"><option value="">— بلا ربط —</option>
+                        @foreach ($contracts as $cid => $ct)<option value="{{ $cid }}" @selected(($preContract ?? null) === $cid)>{{ \Illuminate\Support\Str::limit($ct, 40) }}</option>@endforeach
+                    </select></div>
             </div>
-            <div class="fld"><label>كلمة سر الرابط <span class="req">*</span></label>
-                <input class="inp" name="pass" required minlength="4" maxlength="80" placeholder="يدخلها العميل قبل العرض"></div>
-            <div class="fld"><label>ربط بجهة (عميل، موظف، شركة…)</label>
-                <select class="inp" name="link" id="linksel">
-                    <option value="">— بلا ربط —</option>
-                    @foreach ($links as $glabel => $g)
-                        <optgroup label="{{ $glabel }}">
-                            @foreach ($g['rows'] as $rid => $rname)
-                                <option value="{{ $g['module'] }}:{{ $rid }}" @selected(($preLink ?? '') === $g['module'] . ':' . $rid)>{{ \Illuminate\Support\Str::limit($rname, 44) }}</option>
-                            @endforeach
-                        </optgroup>
-                    @endforeach
-                </select>
-                <input type="hidden" name="link_module" id="link_module">
-                <input type="hidden" name="link_id" id="link_id"></div>
-            <div class="fld"><label>ربط بعقد (اختياري)</label>
-                <select class="inp" name="contract_id"><option value="">— بلا ربط —</option>
-                    @foreach ($contracts as $cid => $ct)<option value="{{ $cid }}" @selected(($preContract ?? null) === $cid)>{{ \Illuminate\Support\Str::limit($ct, 40) }}</option>@endforeach
-                </select></div>
-            <button class="btn p">إنشاء الرابط الخاص</button>
+            <div data-wstep class="fw">
+                <div class="fld fw" id="varszone" data-reg='@json($registry)'>
+                    <label>نص العقد الحر</label>
+                    <textarea class="inp" name="free_body" rows="8" placeholder="اكتب نص العقد كاملاً هنا… (وستحرّره لاحقاً بحرية أيضاً)">{{ old('free_body') }}</textarea>
+                </div>
+                <div class="sub fw" style="margin-top:4px">💡 الحقول الفارغة ذات المصدر تُملأ تلقائياً من السجل المربوط، والإلزامية <b class="req">*</b> لا يُنشأ الطلب بدونها.</div>
+            </div>
+            <div data-wstep class="fw">
+                {{-- خيارات هذا الطلب — أنت تختار لكل عقدٍ ما يلزمه --}}
+                <div class="fld fw" style="border:1px dashed var(--lnd);border-radius:12px;padding:11px 14px">
+                    <label style="margin-bottom:6px">🎚️ متطلبات التوقيع لهذا العقد</label>
+                    <label class="chk"><input type="checkbox" name="opt_selfie" value="1"> 📸 طلب صورة تحقق بالكاميرا (سيلفي) لحظة التوقيع</label>
+                    <label class="chk"><input type="checkbox" name="opt_idno" value="1"> 🪪 رقم الهوية/السجل إلزامي</label>
+                    <label class="chk"><input type="checkbox" name="opt_decline" value="1" checked> 🚫 السماح للطرف الآخر برفض التوقيع (مع ذكر السبب)</label>
+                    <label class="chk" style="gap:8px">⌛ صلاحية الرابط
+                        <input class="inp" type="number" name="expire_days" min="1" max="365" value="{{ setting('esign.link_days_default') }}" placeholder="∞" style="width:80px"> يوماً (فارغ = بلا انتهاء)</label>
+                </div>
+                <div class="fld"><label>كلمة سر الرابط <span class="req">*</span></label>
+                    <input class="inp" name="pass" required minlength="4" maxlength="80" placeholder="يدخلها العميل قبل العرض"></div>
+            </div>
+            <div class="fw" style="display:flex;gap:8px;align-items:center;margin-top:6px">
+                <button class="btn ghost sm" type="button" id="wprev" hidden>→ السابق</button>
+                <span class="spacer"></span>
+                <button class="btn ghost sm" type="button" id="esignpreview">👁 معاينة الوثيقة</button>
+                <button class="btn sm" type="button" id="wnext">التالي ←</button>
+                <button class="btn p" id="wsend" hidden>إنشاء الرابط الخاص</button>
+            </div>
         </form>
     </div>
 
@@ -69,10 +91,16 @@
         @foreach ($templates as $t)
             <div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid color-mix(in srgb,var(--ln) 45%,transparent)">
                 <div style="flex:1;min-width:0">
-                    <b>{{ $t->name }}</b>@if ($t->kind) <span class="bdg g">{{ $t->kind }}</span>@endif
+                    <b>{{ $t->name }}</b>
+                    <span class="bdg g">ن{{ $t->version ?: 1 }}</span>
+                    @if ($t->kind) <span class="bdg g">{{ $t->kind }}</span>@endif
+                    @if ($t->archived_at)<span class="bdg wn">مؤرشف</span>@endif
                     <div class="sub" style="font-size:11.5px">{{ $t->descr }} · {{ count($t->vars()) }} متغيّر</div>
                 </div>
-                <form method="POST" action="{{ route('esign.tpl.destroy', $t->id) }}" class="inline" data-confirm="حذف القالب «{{ \Illuminate\Support\Str::limit($t->name, 30) }}»؟">
+                <a class="btn ghost xs" href="{{ route('esign.tpl.edit', $t->id) }}">✏️ تحرير</a>
+                <form method="POST" action="{{ route('esign.tpl.archive', $t->id) }}" class="inline">@csrf
+                    <button class="btn ghost xs" title="{{ $t->archived_at ? 'استعادة' : 'أرشفة — تختفي من الإرسال وتبقى وثائقها' }}">{{ $t->archived_at ? '♻️' : '🗄️' }}</button></form>
+                <form method="POST" action="{{ route('esign.tpl.destroy', $t->id) }}" class="inline" data-confirm="حذف القالب «{{ \Illuminate\Support\Str::limit($t->name, 30) }}»؟ الأرشفة أسلم.">
                     @csrf @method('DELETE')<button class="btn ghost xs">✕</button></form>
             </div>
         @endforeach
@@ -83,7 +111,8 @@
                 <input class="inp" name="name" required maxlength="160" placeholder="اسم القالب" style="margin-bottom:6px">
                 <input class="inp" name="kind" maxlength="80" placeholder="النوع (خدمات، NDA…)" style="margin-bottom:6px">
                 <textarea class="inp" name="body" required rows="7" placeholder="نص العقد — المتغيرات بين أقواس {اسم_العميل} {المبلغ}"></textarea>
-                <button class="btn sm" style="margin-top:6px">حفظ القالب</button>
+                <div class="sub" style="margin:4px 0">بعد الحفظ افتح «تحرير» لبناء البنود المهيكلة وإدراج المتغيرات من المكتبة.</div>
+                <button class="btn sm" style="margin-top:2px">حفظ القالب</button>
             </form>
         </details>
     </div>
@@ -116,6 +145,13 @@
     </table></div>
 </div>
 
+<div class="modal" id="pvmodal" hidden>
+    <div class="modalbox" style="max-width:760px">
+        <button class="mclose" type="button" onclick="document.getElementById('pvmodal').hidden=true" aria-label="إغلاق">✕</button>
+        <div id="pvbody"></div>
+    </div>
+</div>
+
 <script>
 // تفكيك اختيار الجهة «module:id» إلى حقلين مخفيين
 var linksel = document.getElementById('linksel');
@@ -125,19 +161,5 @@ function splitLink() {
     document.getElementById('link_id').value = p[1] || '';
 }
 if (linksel) { linksel.addEventListener('change', splitLink); splitLink(); /* تهيئة مسبقة من رابط الجهة */ }
-// المنطقة تتبدل: قالبٌ → حقول متغيراته؛ بلا قالب → نص العقد الحر
-var freeBodyHtml = document.getElementById('varszone').innerHTML;
-document.getElementById('tplsel').addEventListener('change', function () {
-    var zone = document.getElementById('varszone'), opt = this.selectedOptions[0];
-    if (! this.value) { zone.innerHTML = freeBodyHtml; return; }
-    var vars = opt && opt.dataset.vars ? JSON.parse(opt.dataset.vars) : [];
-    zone.innerHTML = vars.length ? '<label>متغيرات القالب — املأها ليتولد العقد</label>' : '<span class="sub">هذا القالب بلا متغيرات</span>';
-    vars.forEach(function (v) {
-        var w = document.createElement('div'); w.style.marginBottom = '6px';
-        var esc = v.replace(/"/g, '&quot;');
-        w.innerHTML = '<input class="inp" name="vars[' + esc + ']" placeholder="' + esc.replace(/_/g, ' ') + '">';
-        zone.appendChild(w);
-    });
-});
 </script>
 @endsection

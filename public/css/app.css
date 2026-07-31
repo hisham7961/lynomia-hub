@@ -867,6 +867,21 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .advacts{display:flex;gap:8px;align-items:center;margin-top:4px}
 @media (max-width:760px){.advbox{min-width:0}.advrow{flex-wrap:wrap}.advval{flex-basis:100%}}
 
+/* ═ CLM م3 (v2.119): معالج الإرسال ومحرر البنود ═ */
+.wchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.wchip{border:1px solid var(--ln);background:var(--cd);border-radius:99px;padding:5px 13px;font-size:12px;
+  cursor:pointer;color:var(--sb);transition:all var(--t)}
+.wchip.on{background:var(--ps);color:var(--pd);border-color:color-mix(in srgb,var(--p) 30%,var(--ln));font-weight:700}
+.wchip.done{color:var(--ok)}
+[data-wstep][hidden]{display:none}
+.blockrow{border:1px solid var(--ln);border-radius:12px;padding:10px 12px;margin-bottom:10px;background:var(--cd)}
+.blockrow .bhead{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.blockrow .bhead input[data-h]{flex:1;min-width:180px;font-weight:700}
+.blockrow textarea{width:100%;line-height:1.9}
+.varchip{border:1px solid var(--ln)!important}
+.varchip:hover{border-color:var(--p)!important;color:var(--p)}
+.modalbox .flash{margin:0 0 10px;position:static}
+
 /* ═ كثافة الجوال (v2.115): الترويسات كانت تلتهم ٦٣٢ من ٨٤٤ بكسل قبل أول صف بيانات ═ */
 @media (max-width:760px){
   .demoband{font-size:11px;padding:3px 8px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}
