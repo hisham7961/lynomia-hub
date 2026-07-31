@@ -296,6 +296,8 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/errors', [ErrorCenterController::class, 'index'])->name('errors.index');
     Route::post('admin/errors/{id}/status', [ErrorCenterController::class, 'status'])->name('errors.status');
     Route::post('jslog', [ErrorCenterController::class, 'jslog'])->name('jslog')->middleware('throttle:20,1');
+    Route::get('admin/integrations', [\App\Http\Controllers\Web\IntegrationController::class, 'index'])->name('integrations.index');
+    Route::get('admin/integrations/guide', [\App\Http\Controllers\Web\IntegrationController::class, 'guide'])->name('integrations.guide');
     Route::get('admin/webhooks', [WebhookController::class, 'index'])->name('webhooks.index');
     Route::post('admin/webhooks', [WebhookController::class, 'store'])->name('webhooks.store');
     Route::post('admin/webhooks/{id}/toggle', [WebhookController::class, 'toggle'])->name('webhooks.toggle');
