@@ -207,6 +207,8 @@ Route::middleware('auth')->group(function () {
     Route::get('supplier-scores', [PurchaseController::class, 'scores'])->name('supplierscores');
     Route::get('purchase/{id}/doc', [PurchaseController::class, 'doc'])->name('purchases.doc');
     Route::post('purchase/{id}/act', [PurchaseController::class, 'act'])->name('purchases.act');
+    // CTO م2 (v2.134): صفحات مساحات العمل المركزية
+    Route::get('w/{key}', [\App\Http\Controllers\Web\WorkspaceController::class, 'show'])->name('workspace');
     Route::get('legal', [LegalController::class, 'index'])->name('legal');
     Route::post('legal/rules/{id}/enable', [LegalController::class, 'enableRule'])->name('legal.rule.enable');
     Route::get('support', [SupportController::class, 'index'])->name('support');

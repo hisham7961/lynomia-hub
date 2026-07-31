@@ -137,6 +137,11 @@ class SearchController extends Controller
             $cat[] = ['t' => $l['label'], 'u' => route($l['route'])];
         }
 
+        // مساحات العمل — الصفحات المركزية للمجالات (مرشّحة بصلاحية المستخدم)
+        foreach (\App\Support\Workspaces::for($u) as $key => $ws) {
+            $cat[] = ['t' => $ws['icon'] . ' مساحة ' . $ws['label'], 'u' => route('workspace', $key)];
+        }
+
         // صفحات الوحدات الـ٧١ بأسمائها (المخصصة إن سمّاها المستخدم)
         foreach (hub_nav($u) as $g) {
             foreach ($g['items'] as $it) {

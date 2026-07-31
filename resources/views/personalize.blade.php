@@ -47,6 +47,21 @@
         </select>
     </div>
 
+    {{-- نمط القائمة الجانبية: مساحات عمل مختصرة أو القائمة الكاملة (CTO م2) --}}
+    @php $navStyle = hub_pref('nav.style', 'spaces'); @endphp
+    <div class="card" style="margin-top:12px">
+        <h3>🧭 نمط القائمة الجانبية</h3>
+        <div class="sub" style="margin-bottom:8px">كيف تتنقل بين أقسام النظام؟ الاختيار لك وحدك — لا يمسّ صلاحياتك، وكل رابط وحدة يبقى يعمل.</div>
+        <label class="chk" style="display:block;margin-bottom:6px">
+            <input type="radio" name="nav_style" value="spaces" @checked($navStyle !== 'classic')>
+            <b>مساحات العمل</b> (مختصر) — قائمة نظيفة بمساحات المجالات، وكل مساحة تُبلّغ عن وحداتها في صفحتها المركزية.
+        </label>
+        <label class="chk" style="display:block">
+            <input type="radio" name="nav_style" value="classic" @checked($navStyle === 'classic')>
+            <b>القائمة الكاملة</b> (كلاسيكي) — كل الوحدات مجموعةً في القائمة الجانبية كما اعتدت.
+        </label>
+    </div>
+
     <div class="card" style="margin-top:12px">
         <h3>📌 روابط القائمة العلوية</h3>
         <div class="sub" style="margin-bottom:8px">أزل ما لا تستخدمه — يختفي من قائمتك أنت فقط.</div>

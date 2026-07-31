@@ -38,6 +38,7 @@ class PrefController extends Controller
         $u = auth()->user();
         $data = $r->validate([
             'home'         => ['nullable', 'string', 'max:60'],
+            'nav_style'    => ['nullable', 'in:spaces,classic'],
             'hidden'       => ['nullable', 'array'],
             'hidden.*'     => ['string', 'max:60'],
             'hidden_top'   => ['nullable', 'array'],
@@ -70,7 +71,11 @@ class PrefController extends Controller
         // (أعمدة الجداول) الذي يديره مسار آخر
         $prefs = (array) $u->prefs;
         $prefs['home'] = $validHome && $home !== '' && $home !== 'dashboard' ? $home : null;
+        // نمط التنقل: 'spaces' افتراضي (مساحات العمل) لا يُخزَّن، و'classic'
+        // (القائمة الكاملة) يُخزَّن صراحةً — فالافتراضي يبقى بلا أثر في prefs
+        $navStyle = ($data['nav_style'] ?? 'spaces') === 'classic' ? 'classic' : null;
         $prefs['nav'] = array_filter([
+            'style'      => $navStyle,
             'hidden'     => array_values($data['hidden'] ?? []),
             'hidden_top' => array_values($data['hidden_top'] ?? []),
             'names'      => $names,

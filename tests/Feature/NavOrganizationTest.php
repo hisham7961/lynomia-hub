@@ -64,15 +64,39 @@ class NavOrganizationTest extends TestCase
         $this->seedCore();
         $html = $this->actingAs($this->owner)->get('/')->assertOk()->getContent();
 
-        // «النظام» غادر الجانبي إلى شريط الإدارة العلوي (v2.89)
-        foreach (['الأدوات واللوحات', 'الوحدات'] as $region) {
-            $this->assertStringContainsString($region, $html, "منطقة «{$region}» غائبة");
+        // النمط الافتراضي «مساحات العمل» (CTO م2): المساحات والأدوات ظاهرة
+        foreach (['مساحات العمل', 'الأدوات واللوحات'] as $region) {
+            $this->assertStringContainsString('<div class="navsection">' . $region . '</div>', $html, "منطقة «{$region}» غائبة");
         }
+        // القائمة الكاملة للوحدات مطويّة على لوحة التحكم في النمط الافتراضي — لا ازدحام
+        $this->assertStringNotContainsString('<div class="navsection">الوحدات</div>', $html);
         foreach (['مساحتي اليومية', 'اللوحات والمراكز'] as $g) {
             $this->assertStringContainsString($g, $html, "قسم «{$g}» غائب");
         }
+        // «النظام» غادر الجانبي إلى شريط الإدارة العلوي (v2.89)
         // لم تبقَ قائمة الأدوات المسطّحة: الرابط المسطّح الوحيد هو لوحة التحكم
         $this->assertSame(1, substr_count($html, 'class="ni top'));
+    }
+
+    /** النمط الكلاسيكي (تفضيل مستخدم) يُعيد القائمة الكاملة للوحدات — لا حذف قدرة */
+    public function test_classic_nav_style_shows_full_module_list(): void
+    {
+        $this->seedCore();
+        $this->owner->prefs = ['nav' => ['style' => 'classic']];
+        $this->owner->save();
+
+        $html = $this->actingAs($this->owner->fresh())->get('/')->assertOk()->getContent();
+        $this->assertStringContainsString('<div class="navsection">الوحدات</div>', $html);
+        // ومساحات العمل تبقى ظاهرة أيضاً في النمط الكلاسيكي — إضافة لا استبدال
+        $this->assertStringContainsString('<div class="navsection">مساحات العمل</div>', $html);
+    }
+
+    /** حتى في نمط المساحات، تصفّح وحدة يُظهر قائمتها كي لا يفقد المستخدم سياقه */
+    public function test_spaces_nav_style_still_shows_modules_on_module_page(): void
+    {
+        $this->seedCore();
+        $html = $this->actingAs($this->owner)->get('/m/tasks')->assertOk()->getContent();
+        $this->assertStringContainsString('<div class="navsection">الوحدات</div>', $html);
     }
 
     public function test_a_hidden_top_link_is_removed_from_its_group(): void
