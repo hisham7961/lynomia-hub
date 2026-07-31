@@ -12,6 +12,10 @@ Route::prefix('v1')->middleware(ApiAuth::class)->group(function () {
     Route::get('reports/progress/{projectId}', [V1Controller::class, 'progress']);
     Route::get('reports/health', [V1Controller::class, 'health']);
 
+    // المقاييس الزمنية: استقبالٌ آلي (n8n) وقراءةُ السلسلة — قبل {module} كي لا تبتلعها
+    Route::post('metrics', [V1Controller::class, 'metricsIngest']);
+    Route::get('metrics/{module}/{id}', [V1Controller::class, 'metricsShow']);
+
     Route::get('{module}', [V1Controller::class, 'apiIndex']);
     Route::post('{module}', [V1Controller::class, 'apiStore']);
     Route::get('{module}/{id}', [V1Controller::class, 'apiShow']);

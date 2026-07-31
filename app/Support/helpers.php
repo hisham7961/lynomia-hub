@@ -2592,3 +2592,109 @@ if (! function_exists('hub_pending_migrations')) {
         });
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// نواة المقاييس الزمنية — سلسلةٌ عامة لأي وحدةٍ وأي مقياس
+// كل رقمٍ متحرّك كان لقطةً تُدهس بالتي بعدها: «المتابعون ١٢٠٠٠» بلا ذاكرةٍ
+// لما كانوا أمس، فلا نمو ولا اتجاه ولا رسم. هذه المساعِدات هي السكة الوحيدة
+// للكتابة والقراءة كي لا يتفرّق الحساب في الشاشات.
+// ─────────────────────────────────────────────────────────────────────────
+
+if (! function_exists('hub_metric_put')) {
+    /**
+     * تسجيل نقطة قياس. النقطة تُعرَّف بـ(وحدة، سجل، مقياس، لحظة) — فإعادة
+     * الدفع بالقيمة نفسها أو بقيمةٍ مصحّحة **تُحدِّث** ولا تكرّر.
+     */
+    function hub_metric_put(string $module, string $recordId, string $metric, float $value,
+                            $at = null, string $source = 'manual', array $meta = []): \App\Models\MetricPoint
+    {
+        $at = $at ? \Illuminate\Support\Carbon::parse($at) : now();
+
+        return \App\Models\MetricPoint::updateOrCreate(
+            ['module' => $module, 'record_id' => $recordId, 'metric' => $metric, 'at' => $at],
+            ['value' => $value, 'source' => $source, 'meta' => $meta ?: null],
+        );
+    }
+}
+
+if (! function_exists('hub_metric_series')) {
+    /** السلسلة الزمنية لمقياسٍ على سجل — الأقدم أولاً، جاهزةً للرسم */
+    function hub_metric_series(string $module, string $recordId, string $metric, int $days = 90): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('metric_points')) return [];
+
+        return \App\Models\MetricPoint::where('module', $module)->where('record_id', $recordId)
+            ->where('metric', $metric)->where('at', '>=', now()->subDays($days))
+            ->orderBy('at')->get(['at', 'value', 'source'])
+            ->map(fn ($p) => ['at' => $p->at, 'value' => (float) $p->value, 'source' => $p->source])->all();
+    }
+}
+
+if (! function_exists('hub_metric_latest')) {
+    /** آخر قيمة مسجّلة — والافتراضي `null` لا صفر: «لا قياس» ليس «صفراً» */
+    function hub_metric_latest(string $module, string $recordId, string $metric): ?float
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('metric_points')) return null;
+
+        $p = \App\Models\MetricPoint::where('module', $module)->where('record_id', $recordId)
+            ->where('metric', $metric)->orderByDesc('at')->first(['value']);
+
+        return $p ? (float) $p->value : null;
+    }
+}
+
+if (! function_exists('hub_metric_growth')) {
+    /**
+     * النمو خلال مدة: من أول نقطةٍ داخل المدة إلى آخرها.
+     * `pct` تكون `null` إن كانت البداية صفراً — القسمة على صفر ليست «∞٪».
+     */
+    function hub_metric_growth(string $module, string $recordId, string $metric, int $days = 30): array
+    {
+        $s = hub_metric_series($module, $recordId, $metric, $days);
+        $out = ['from' => null, 'to' => null, 'delta' => null, 'pct' => null,
+                'points' => count($s), 'days' => $days, 'tone' => ''];
+        if (! $s) return $out;
+
+        $from = (float) $s[0]['value'];
+        $to = (float) end($s)['value'];
+        $delta = round($to - $from, 4);
+        $out = array_merge($out, [
+            'from' => $from, 'to' => $to, 'delta' => $delta,
+            'pct' => $from != 0.0 ? round($delta * 100 / abs($from), 2) : null,
+            'tone' => $delta > 0 ? 'ok' : ($delta < 0 ? 'bad' : ''),
+        ]);
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_metric_spark')) {
+    /** نِسبٌ مئوية جاهزة لرسم شريطٍ صغير — أعلى قيمةٍ = ١٠٠٪ */
+    function hub_metric_spark(array $series, int $max = 30): array
+    {
+        $series = array_slice($series, -$max);
+        $peak = max(1.0, max(array_map(fn ($p) => (float) $p['value'], $series ?: [['value' => 1]])));
+
+        return array_map(fn ($p) => [
+            'at' => $p['at'], 'value' => (float) $p['value'],
+            'pct' => (int) round((float) $p['value'] * 100 / $peak),
+        ], $series);
+    }
+}
+
+if (! function_exists('hub_metric_bulk_latest')) {
+    /** آخر قيمة لمقياسٍ لعدة سجلات دفعةً — يمنع استعلاماً لكل صف في القوائم */
+    function hub_metric_bulk_latest(string $module, array $ids, string $metric): array
+    {
+        if (! $ids || ! \Illuminate\Support\Facades\Schema::hasTable('metric_points')) return [];
+
+        $rows = \Illuminate\Support\Facades\DB::table('metric_points')
+            ->where('module', $module)->where('metric', $metric)->whereIn('record_id', $ids)
+            ->orderBy('record_id')->orderBy('at')->get(['record_id', 'value']);
+
+        $out = [];
+        foreach ($rows as $r) $out[$r->record_id] = (float) $r->value;   // الأخير يغلب
+
+        return $out;
+    }
+}

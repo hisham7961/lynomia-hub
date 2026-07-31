@@ -632,6 +632,10 @@ class ModuleController extends Controller
         // حالة الصنف تُشتق من كميته وحدّه فور أي حفظ — نفد/منخفض/متاح
         if ($module === 'stock' && $m instanceof \App\Models\StockItem) hub_stock_sync($m);
 
+        // الحقول المقيسة (متابعون، إعجابات، تحميلات، تقييم) تُسجَّل نقطةً في
+        // السلسلة الزمنية مع كل حفظ — الحقل وحده يدهس ما قبله فلا يبقى نمو
+        \App\Support\Metrics::capture($module, $m);
+
         // مزامنة الأصل مع صيانته: قيد التنفيذ تضعه «صيانة»، والمكتملة تختم
         // «آخر صيانة» وتعيده «قيد الاستخدام» — كان الحقلان يدويين متناقضين
         if ($module === 'assetlog' && $m->asset_id && ($asset = \App\Models\Asset::find($m->asset_id))) {

@@ -80,6 +80,54 @@ Content-Type: application/json
     </table></div>
 </div>
 
+{{-- ═══ المقاييس الزمنية ═══ --}}
+<div class="card">
+    <h3 class="cardtitle">📈 الاتجاه الثالث: الأرقام المتحرّكة (مقاييس زمنية)</h3>
+    <div class="sub" style="line-height:2;margin-bottom:10px">
+        بعض الأرقام لا تُنشئ سجلاً بل <b>تتغيّر عليه</b>: المتابعون، الإعجابات، التحميلات،
+        التقييم، المشاهدات. لو كُتبت في حقلٍ عادي لدهس كلُّ تحديثٍ ما قبله فلا تبقى ذاكرةٌ
+        للنمو. لذلك لها نقطة استقبالٍ خاصة تحفظ <b>سلسلةً زمنية</b>:
+    </div>
+    <pre class="mono ltr" style="background:var(--cd);border:1px solid var(--brd);border-radius:10px;padding:12px;overflow:auto;direction:ltr;text-align:left">POST https://hub.example.com/api/v1/metrics
+Authorization: Bearer lyn_xxxxxxxx
+Content-Type: application/json
+
+{ "points": [
+  { "module": "social", "record_id": "9d8b...", "metric": "followers", "value": 12480,
+    "at": "2026-07-31T08:00:00Z", "source": "n8n" },
+  { "module": "posts",  "record_id": "7a1c...", "metric": "likes",     "value": 342 },
+  { "module": "apps",   "record_id": "3f60...", "metric": "downloads", "value": 51200 }
+] }</pre>
+    <div class="sub" style="margin-bottom:10px">
+        حتى ٥٠٠ نقطة في الدفعة. النقطة تُعرَّف بـ<span class="mono ltr">(module, record_id, metric, at)</span>
+        — فإعادة الدفع <b>تُحدِّث ولا تكرّر</b>، ولا حاجة لـ<span class="mono ltr">Idempotency-Key</span> هنا.
+        وكل نقطةٍ تمرّ بصلاحية تعديل وحدتها وبنطاق رؤيتك: لا تُسجَّل قياساتٌ على سجلٍ لا تراه.
+    </div>
+
+    <h3 style="margin:14px 0 6px" class="sub">المقاييس المعروفة (وأين تُعرَض)</h3>
+    <div class="tblwrap"><table class="tbl">
+        <thead><tr><th>القسم</th><th>المقاييس</th><th>تُقرأ في</th></tr></thead>
+        <tbody>
+            <tr><td><b>السوشال ميديا</b> <span class="mono ltr sub">social</span></td>
+                <td class="mono ltr">followers, reach, impressions, engagement</td>
+                <td class="sub">تحليلات السوشال · صفحة الحساب</td></tr>
+            <tr><td><b>منشورات ومشاهدات</b> <span class="mono ltr sub">posts</span></td>
+                <td class="mono ltr">likes, comments, shares, saves, views, reach, impr, clicks</td>
+                <td class="sub">تحليلات السوشال · صفحة المنشور</td></tr>
+            <tr><td><b>التطبيقات</b> <span class="mono ltr sub">apps</span></td>
+                <td class="mono ltr">downloads, rating, reviews, installs, crashes, dau</td>
+                <td class="sub">مركز التطبيق · جودة التطبيقات</td></tr>
+            <tr><td class="sub" colspan="3">وأي مقياسٍ آخر تختاره على أي وحدة — الاسم حرٌّ والقراءة عامة عبر
+                <span class="mono ltr">GET /api/v1/metrics/{module}/{id}?metric=&days=</span></td></tr>
+        </tbody>
+    </table></div>
+    <div class="sub" style="margin-top:10px">
+        <b>وبلا n8n أيضاً:</b> أمر <span class="mono ltr">php artisan hub:metrics-snapshot</span> يلتقط
+        القيم الحالية من حقول السجلات يومياً فتُبنى السلسلة من نفسها — والتعديل اليدوي لأي
+        حقلٍ مقيس يُسجَّل نقطةً فوراً. فلا تبدأ من فراغ.
+    </div>
+</div>
+
 {{-- ═══ كتالوج الأحداث ═══ --}}
 <div class="card">
     <h3 class="cardtitle">📡 كتالوج الأحداث الصادرة</h3>
