@@ -29,10 +29,17 @@ class PurchaseController extends Controller
         abort_unless(hub_can(auth()->user(), 'purchases', 'v'), 403);
         $p = hub_scope(Purchase::query(), 'purchases')->findOrFail($id);
 
+        // إثراء البنود بحساب الكراتين (تعبئة المنتجات) بعزل شركة المستند —
+        // فيعرف المُستلِم كم كرتونة يتوقّع من كل صنف
+        $items = \App\Support\Items::cartons(
+            \App\Support\Items::parse((string) $p->items), $p->company_id);
+
         return view('purchases.doc', [
             'p' => $p,
             'supplier' => $p->supplier_id ? Supplier::find($p->supplier_id) : null,
-            'items' => \App\Support\Items::parse((string) $p->items),
+            'items' => $items,
+            'showCartons' => \App\Support\Items::anyCartons($items),
+            'totalCartons' => \App\Support\Items::totalCartons($items),
             'logo' => setting('app.logo'),
         ]);
     }

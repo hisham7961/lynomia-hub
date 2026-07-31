@@ -70,12 +70,15 @@ td{padding:9px 12px;border-bottom:1px solid #e3ecea}
 
     @if (count($items))
     <table>
-        <thead><tr><th>البيان</th><th style="width:70px">الكمية</th><th style="width:110px">سعر الوحدة</th><th style="width:110px">الإجمالي</th></tr></thead>
+        <thead><tr><th>البيان</th><th style="width:70px">الكمية</th>@if (! empty($showCartons))<th style="width:130px">الكراتين</th>@endif<th style="width:110px">سعر الوحدة</th><th style="width:110px">الإجمالي</th></tr></thead>
         <tbody>
             @foreach ($items as $it)
                 <tr>
                     <td>{{ $it['desc'] }}</td>
                     <td style="text-align:center">{{ $it['qty'] !== null ? rtrim(rtrim(number_format($it['qty'], 2), '0'), '.') : '—' }}</td>
+                    @if (! empty($showCartons))
+                        <td style="text-align:center">{{ $it['cartonText'] !== '' ? $it['cartonText'] : '—' }}@if (($it['per'] ?? null))<div style="font-size:10px;color:#888">الكرتونة {{ $it['per'] }} وحدة</div>@endif</td>
+                    @endif
                     <td>{{ $it['price'] !== null ? number_format($it['price'], 3) : '—' }}</td>
                     <td>{{ $it['sum'] !== null ? number_format($it['sum'], 3) : '—' }}</td>
                 </tr>
@@ -85,6 +88,7 @@ td{padding:9px 12px;border-bottom:1px solid #e3ecea}
     @endif
 
     <div class="tot"><table>
+        @if (! empty($showCartons) && ($totalCartons ?? 0) > 0)<tr><td>إجمالي الكراتين الكاملة</td><td>{{ $totalCartons }} كرتونة</td></tr>@endif
         @if ($q->amount !== null)<tr><td>الإجمالي قبل الضريبة</td><td>{{ number_format((float) $q->amount, 3) }}</td></tr>@endif
         @if ($q->tax)<tr><td>الضريبة</td><td>{{ number_format((float) $q->tax, 3) }}</td></tr>@endif
         <tr class="g"><td>الإجمالي المستحق</td><td>{{ number_format((float) $q->total, 3) }} {{ $q->currency ?? '' }}</td></tr>

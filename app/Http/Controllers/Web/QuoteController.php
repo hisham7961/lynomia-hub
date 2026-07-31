@@ -23,9 +23,15 @@ class QuoteController extends Controller
         $q = hub_scope(Quote::query(), 'quotes')->findOrFail($id);
         $client = $q->client_id ? Client::find($q->client_id) : null;
 
+        // إثراء البنود بحساب الكراتين (تعبئة المنتجات) بعزل شركة المستند
+        $items = \App\Support\Items::cartons(
+            \App\Support\Items::parse((string) $q->items), $q->company_id);
+
         return view('quotes.doc', [
             'q' => $q, 'client' => $client,
-            'items' => \App\Support\Items::parse((string) $q->items),
+            'items' => $items,
+            'showCartons' => \App\Support\Items::anyCartons($items),
+            'totalCartons' => \App\Support\Items::totalCartons($items),
             'logo' => setting('app.logo'),
         ]);
     }

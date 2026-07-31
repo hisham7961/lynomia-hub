@@ -89,5 +89,6 @@
     @else
         <input class="inp @error($k) err @enderror" id="{{ $fid }}" name="{{ $k }}" value="{{ old($k, $raw) }}"{!! $req !!}>
     @endif
+    @if (! empty($f['hint']))<span class="sub fhint">{{ $f['hint'] }}</span>@endif
     @error($k)<span class="ferr" id="{{ $fid }}-err">{{ $message }}</span>@enderror
 </div>
