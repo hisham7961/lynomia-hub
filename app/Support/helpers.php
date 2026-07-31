@@ -1091,6 +1091,29 @@ if (! function_exists('hub_company_scope')) {
     }
 }
 
+if (! function_exists('hub_stock_sync')) {
+    /**
+     * اشتقاق حالة الصنف من كميته وحدّه: نفد ⟵ صفر، منخفض ⟵ بلغ حد إعادة
+     * الطلب، متاح فيما سوى ذلك. الحالات اليدوية (تالف/محجوز) لا تُدهس.
+     * كانت مسارات «مخزون نفد/منخفض» الجاهزة معطلةً لأن لا شيء يضبط الحالة.
+     */
+    function hub_stock_sync(\App\Models\StockItem $item): void
+    {
+        $auto = ['متاح', 'منخفض', 'نفد'];
+        $cur = (string) $item->status;
+        if ($cur !== '' && ! in_array($cur, $auto, true)) return;
+
+        $qty = (float) ($item->qty ?? 0);
+        $reorder = (float) ($item->reorder ?? 0);
+        $new = $qty <= 0 ? 'نفد' : (($reorder > 0 && $qty <= $reorder) ? 'منخفض' : 'متاح');
+        if ($new === $cur) return;
+
+        $item->status = $new;
+        $item->saveQuietly();
+        \App\Support\FlowRunner::fire('status', 'stock', $item, $new);
+    }
+}
+
 if (! function_exists('hub_budget_actual')) {
     /**
      * المصروف الفعلي مقابل ميزانية: يجمع مستندات المصروف غير الملغاة المطابقة

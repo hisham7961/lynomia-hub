@@ -65,6 +65,9 @@
         @if ($module === 'fin')
             @include('partials.fin_actions')
         @endif
+        @if ($module === 'stockmv')
+            @include('partials.stockmv_actions')
+        @endif
         @if ($module === 'tickets')
             @include('partials.ticket_sla')
         @endif

@@ -624,6 +624,9 @@ class ModuleController extends Controller
         // أجور الساعة مشتقة من رواتب الملفات الوظيفية — تعديلها يُبطل الجدول كله
         if ($module === 'hr') \Illuminate\Support\Facades\Cache::forget('cost:rates');
 
+        // حالة الصنف تُشتق من كميته وحدّه فور أي حفظ — نفد/منخفض/متاح
+        if ($module === 'stock' && $m instanceof \App\Models\StockItem) hub_stock_sync($m);
+
         if ($module === 'tickets') {
             $meta = (array) ($m->meta ?? []);
             $closed = in_array((string) $m->status, ['تم الحل', 'مغلقة'], true);
