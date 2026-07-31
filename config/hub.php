@@ -7605,6 +7605,9 @@ return [
         'contracts' => [
             ['on' => 'status', 'to' => ['ساري'], 'emit' => 'contract.signed', 'label' => 'سرى عقد'],
             ['on' => 'status', 'to' => ['منتهي'], 'emit' => 'contract.expired', 'label' => 'انتهى عقد'],
+            // v2.121: يطلقهما متحكم الموافقات المرحلية — اكتمال سلسلة الاعتماد أو رفض مرحلة
+            ['on' => 'approved', 'emit' => 'contract.approved', 'label' => 'اكتملت موافقات عقد'],
+            ['on' => 'approval_rejected', 'emit' => 'contract.approval_rejected', 'label' => 'رُفضت موافقة عقد'],
         ],
         'tasks' => [
             ['on' => 'status', 'to' => ['مكتملة', 'منجزة'], 'emit' => 'task.completed', 'label' => 'أُنجزت مهمة'],

@@ -61,13 +61,24 @@ class EsignController extends Controller
             if ($rows->isNotEmpty()) $links[$label] = ['module' => $mk, 'rows' => $rows];
         }
 
+        $requests = $this->filterVisible(
+            SignRequest::orderByDesc('created_at')->limit(200)->get()
+        )->take(60)->values();
+
+        // v2.121: المرحلة المعلقة الحالية لكل طلب محجوز — لشريط القرار في القائمة
+        $apSteps = \Illuminate\Support\Facades\Schema::hasTable('contract_approval_steps')
+            ? \App\Models\ContractApprovalStep::whereIn('request_id',
+                    $requests->where('status', 'بانتظار الموافقة')->pluck('id'))
+                ->where('status', 'بانتظار')->orderBy('stage')->get()
+                ->groupBy('request_id')->map->first()
+            : collect();
+
         return view('esign.index', [
             'templates' => SignTemplate::orderBy('sort')->orderBy('name')->get(),
             // v2.117: القائمة كانت تعرض طلبات كل الشركات بلا تنطيق — تُرشَّح الآن
             // عبر نطاق العقد/الجهة المربوطة والمنشئ (وcompany_id مباشرةً يأتي في م2)
-            'requests'  => $this->filterVisible(
-                SignRequest::orderByDesc('created_at')->limit(200)->get()
-            )->take(60)->values(),
+            'requests'  => $requests,
+            'apSteps'   => $apSteps,
             'contracts' => hub_scope(\App\Models\Contract::query(), 'contracts')
                 ->orderByDesc('created_at')->limit(200)->pluck('title', 'id'),
             'links'     => $links,
@@ -104,7 +115,14 @@ class EsignController extends Controller
             foreach ($ids as $i) $okLinks["$mk:$i"] = true;
         }
 
+        // v2.121: الموافِق المسمى على مرحلة معلقة يرى الطلب — قراره يخصه
+        $okSteps = \Illuminate\Support\Facades\Schema::hasTable('contract_approval_steps')
+            ? \App\Models\ContractApprovalStep::where('approver_id', $u->id)->where('status', 'بانتظار')
+                ->whereIn('request_id', $reqs->pluck('id'))->pluck('request_id')->flip()->all()
+            : [];
+
         return $reqs->filter(fn ($q) => $q->created_by === $u->id
+            || isset($okSteps[$q->id])
             || ($q->contract_id && isset($okContracts[$q->contract_id]))
             || ($q->link_module && $q->link_id && isset($okLinks["{$q->link_module}:{$q->link_id}"])));
     }
@@ -324,6 +342,15 @@ class EsignController extends Controller
         // v2.118: نطاق الطلب من عقده أو جهته المربوطة — به يعمل العزل الشركاتي مباشرة
         $this->stampScope($req);
 
+        // v2.121: عقدٌ قيمته تبلغ عتبة موافقةٍ ما → الطلب يُحجز «بانتظار الموافقة»
+        // ولا يُسلَّم ولا ينقلب العقد حتى تكتمل المراحل بالترتيب. بلا قواعد = صفر أثر
+        $hold = null;
+        if ($contractId && ($hc = \App\Models\Contract::find($contractId))
+            && \App\Support\ContractApprovals::spawn($req, $hc)) {
+            $req->forceFill(['status' => 'بانتظار الموافقة'])->saveQuietly();
+            $hold = \App\Support\ContractApprovals::pending($req);
+        }
+
         if ($signersIn) {
             // v2.120: موقّعون مستقلون — رمزٌ خاص لكل واحد، والبريديون يتسلمون روابطهم
             // آلياً عبر صندوق الصادر (المتسلسل: الأول فقط، والبقية عند دورهم)
@@ -336,11 +363,13 @@ class EsignController extends Controller
                 ]);
             }
             \App\Models\ContractEvent::log('created', $req);
-            $req->forceFill(['sent_at' => now()])->saveQuietly();
-            foreach ($created as $s) {
-                if (! $s->email || $s->role !== 'موقّع') continue;
-                if ($req->mode === 'متسلسل' && $this->waitingFor($req, $s)) continue;
-                $this->mailSigner($req, $s);
+            if (! $hold) {
+                $req->forceFill(['sent_at' => now()])->saveQuietly();
+                foreach ($created as $s) {
+                    if (! $s->email || $s->role !== 'موقّع') continue;
+                    if ($req->mode === 'متسلسل' && $this->waitingFor($req, $s)) continue;
+                    $this->mailSigner($req, $s);
+                }
             }
             // مستلمو النسخ يتسلمون الرابط للاطلاع فقط بعد الاكتمال (م6 يرسل النسخة النهائية)
         } else {
@@ -351,6 +380,14 @@ class EsignController extends Controller
                 'status' => 'بانتظار التوقيع',
             ]);
             \App\Models\ContractEvent::log('created', $req);
+        }
+
+        if ($hold) {
+            $this->notifyStage($hold, $req);
+            hub_audit('إنشاء طلب توقيع بانتظار الموافقة', $linkModule ?: 'contracts', $linkId ?: $req->contract_id, $d['title']);
+
+            return redirect()->route('esign.edit', $req->id)
+                ->with('ok', 'أُنشئ الطلب وحُجز «بانتظار الموافقة» — يُسلَّم للموقّعين تلقائياً فور اكتمال مراحل الاعتماد');
         }
 
         // عقدٌ مربوط → «قيد التوقيع» — بحفظ Eloquent حقيقي (v2.117) فيمر بالتدقيق
@@ -505,6 +542,10 @@ class EsignController extends Controller
         if ($req->cancelled_at) {
             return response()->view('sign.expired', ['req' => $req, 'cancelled' => true], 410);
         }
+        // v2.121: طلبٌ محجوز للموافقات الداخلية — لا يُعرض نصه قبل اعتماده
+        if ($req->status === 'بانتظار الموافقة') {
+            return response()->view('sign.expired', ['req' => $req, 'approval' => true], 403);
+        }
         // صلاحية الرابط الزمنية — المنتهي يُغلق بأدب (والموقَّع يبقى مفتوحاً كنسخة)
         if ($req->expires_at && now()->gt($req->expires_at) && $req->status !== 'وُقّع') {
             return response()->view('sign.expired', ['req' => $req], 410);
@@ -543,6 +584,7 @@ class EsignController extends Controller
         [$req, $signer] = $this->resolveToken($token);
         abort_unless($signer && $signer->email, 404);
         abort_if($req->cancelled_at || ($req->expires_at && now()->gt($req->expires_at)), 410);
+        abort_if($req->status === 'بانتظار الموافقة', 403);   // محجوزٌ للموافقات — لا رموز قبل التسليم
 
         $key = 'sign-otp:' . $token;
         if (RateLimiter::tooManyAttempts($key, 3)) {
@@ -671,6 +713,106 @@ class EsignController extends Controller
             $req->title . ' — ' . $d['days'] . ' يوماً');
 
         return back()->with('ok', 'مُدّدت الصلاحية حتى ' . $req->expires_at->format('Y-m-d'));
+    }
+
+    /* ────────── موافقات العقود المرحلية (v2.121) ────────── */
+
+    /** اعتماد المرحلة المعلقة الحالية — القرار للموافِق المسمى أو المالك، وبالترتيب حصراً */
+    public function approve(Request $r, string $id)
+    {
+        $this->gate();
+        $req = SignRequest::findOrFail($id);
+        $this->guardRequest($req);
+        abort_if($req->status !== 'بانتظار الموافقة' || $req->cancelled_at, 410, 'لا مرحلة معلقة لهذا الطلب');
+        $step = \App\Support\ContractApprovals::pending($req);
+        abort_unless($step, 410, 'لا مرحلة معلقة لهذا الطلب');
+        abort_unless(\App\Support\ContractApprovals::canDecide(auth()->user(), $step), 403,
+            'قرار هذه المرحلة ليس لك');
+
+        $d = $r->validate(['note' => 'nullable|string|max:400']);
+        $step->forceFill(['status' => 'موافق', 'decided_by' => auth()->id(),
+            'decided_at' => now(), 'note' => $d['note'] ?? null])->save();
+        hub_audit('اعتماد مرحلة موافقة عقد', 'contracts', $req->contract_id,
+            $req->title . ' — مرحلة ' . $step->stage . ' (' . ($step->label ?: $step->kind) . ')');
+
+        // مرحلة تالية؟ يُخطَر صاحب قرارها ويبقى الطلب محجوزاً
+        if ($next = \App\Support\ContractApprovals::pending($req)) {
+            $this->notifyStage($next, $req);
+
+            return back()->with('ok', 'اعتُمدت المرحلة — التالي: ' . ($next->label ?: $next->kind));
+        }
+
+        // اكتملت السلسلة: الطلب يتحرر ويُسلَّم الآن، والحدث الدلالي ينطلق
+        $this->deliver($req);
+        if ($req->contract_id && ($c = \App\Models\Contract::find($req->contract_id))) {
+            \App\Support\FlowRunner::fire('approved', 'contracts', $c);
+        }
+        $this->notifyOwners('✅ اكتملت موافقات «' . $req->title . '» وأُرسل للموقّعين');
+
+        return back()->with('ok', 'اكتملت الموافقات — أُرسل الطلب للموقّعين');
+    }
+
+    /** رفض المرحلة المعلقة — يوقف الطلب كله ويميت روابطه، والعقد يبقى مسودة */
+    public function reject(Request $r, string $id)
+    {
+        $this->gate();
+        $req = SignRequest::findOrFail($id);
+        $this->guardRequest($req);
+        abort_if($req->status !== 'بانتظار الموافقة' || $req->cancelled_at, 410, 'لا مرحلة معلقة لهذا الطلب');
+        $step = \App\Support\ContractApprovals::pending($req);
+        abort_unless($step, 410, 'لا مرحلة معلقة لهذا الطلب');
+        abort_unless(\App\Support\ContractApprovals::canDecide(auth()->user(), $step), 403,
+            'قرار هذه المرحلة ليس لك');
+
+        $note = mb_substr(trim((string) $r->input('note')), 0, 400);
+        if ($note === '') return back()->with('err', 'اكتب سبب الرفض — يُبلَّغ به منشئ الطلب');
+
+        $step->forceFill(['status' => 'مرفوض', 'decided_by' => auth()->id(),
+            'decided_at' => now(), 'note' => $note])->save();
+        $req->forceFill(['status' => 'أُلغي', 'cancelled_at' => now()])->save();
+        \App\Models\ContractEvent::log('voided', $req, ['meta' => json_encode(
+            ['reason' => 'رُفضت الموافقة الداخلية — ' . $note], JSON_UNESCAPED_UNICODE)]);
+        if ($req->contract_id && ($c = \App\Models\Contract::find($req->contract_id))) {
+            \App\Support\FlowRunner::fire('approval_rejected', 'contracts', $c);
+        }
+        hub_audit('رفض مرحلة موافقة عقد', 'contracts', $req->contract_id,
+            $req->title . ' — مرحلة ' . $step->stage . ': ' . $note);
+        if ($req->created_by) {
+            HubNotification::create(['user_id' => $req->created_by, 'kind' => 'sign',
+                'text' => '⛔ رُفضت موافقة «' . Str::limit($req->title, 60) . '» في مرحلة '
+                    . ($step->label ?: $step->kind) . ' — السبب: ' . $note,
+                'read' => false, 'created_at' => now()]);
+        }
+        $this->notifyOwners('⛔ رُفضت موافقة «' . $req->title . '» — ' . $note);
+
+        return back()->with('ok', 'رُفضت الموافقة وأُغلق الطلب — أنشئ طلباً جديداً بعد المعالجة');
+    }
+
+    /** تسليم طلبٍ اكتملت موافقاته: يتحرر ويُراسَل موقّعوه وينقلب عقده «قيد التوقيع» */
+    protected function deliver(SignRequest $req): void
+    {
+        $req->forceFill(['status' => 'بانتظار التوقيع', 'sent_at' => now()])->save();
+        foreach (\App\Models\ContractSigner::where('request_id', $req->id)
+                     ->where('role', 'موقّع')->where('status', 'بانتظار التوقيع')
+                     ->whereNotNull('email')->orderBy('order')->get() as $s) {
+            if ($req->mode === 'متسلسل' && $this->waitingFor($req, $s)) continue;
+            if (\App\Models\ContractEvent::where('request_id', $req->id)
+                    ->where('signer_id', $s->id)->where('event', 'sent')->exists()) continue;
+            $this->mailSigner($req, $s);
+        }
+        $this->flipContract($req->contract_id, ['مسودة', 'قيد التوقيع', ''], 'قيد التوقيع');
+    }
+
+    /** إخطار صاحب قرار المرحلة — الموافِق المسمى أو المالكين عند غيابه */
+    protected function notifyStage(\App\Models\ContractApprovalStep $step, SignRequest $req): void
+    {
+        $text = '🔏 طلب توقيع «' . Str::limit($req->title, 60) . '» بانتظار اعتمادك — مرحلة '
+            . $step->stage . ': ' . ($step->label ?: $step->kind);
+        foreach ($step->approver_id ? [$step->approver_id] : array_unique(hub_approvers()) as $uid) {
+            if (! $uid) continue;
+            HubNotification::create(['user_id' => $uid, 'kind' => 'sign',
+                'text' => $text, 'read' => false, 'created_at' => now()]);
+        }
     }
 
     /** التحقق العلني برمز المستند — يطابق أي نسخة معنا دون كشف النص */

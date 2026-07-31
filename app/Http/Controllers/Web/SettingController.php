@@ -46,6 +46,7 @@ class SettingController extends Controller
         '📜 العقود والتوقيع' => [
             'contracts.doc_no_format' => ['صيغة ترقيم العقود — {YEAR} السنة و{SEQ} تسلسل سنوي (الافتراضي CTR-{YEAR}-{SEQ})', 'text'],
             'esign.link_days_default' => ['صلاحية رابط التوقيع الافتراضية بالأيام (فارغ = بلا انتهاء)', 'text'],
+            'contracts.approval_steps' => ['مراحل اعتماد العقود قبل الإرسال — JSON مرتب: [{"kind":"مالية","min_value":10000,"approver_id":"معرف مستخدم أو فارغ للمالكين","label":"وصف"}] (فارغ = بلا موافقات)', 'text'],
         ],
         '🚧 وضع الصيانة' => [
             'maintenance.on'  => ['تفعيل وضع الصيانة (الدخول للمالكين فقط)', 'onoff'],

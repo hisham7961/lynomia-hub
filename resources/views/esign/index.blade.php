@@ -143,7 +143,10 @@
             <tr>
                 <td>{{ $q->title }}</td>
                 <td>@if ($l = $q->linkLabel())<a href="{{ $q->linkUrl() }}" class="sub">{{ $l }}</a>@else<span class="sub">—</span>@endif</td>
-                <td><span class="bdg {{ $q->status === 'وُقّع' ? 'ok' : ($q->status === 'رُفض' ? 'bad' : 'wn') }}">{{ $q->status }}</span></td>
+                <td><span class="bdg {{ $q->status === 'وُقّع' ? 'ok' : ($q->status === 'رُفض' ? 'bad' : 'wn') }}">{{ $q->status }}</span>
+                    @if ($q->status === 'بانتظار الموافقة' && ($ap = ($apSteps[$q->id] ?? null)))
+                        <div class="sub" style="margin-top:2px">مرحلة {{ $ap->stage }}: {{ $ap->label ?: $ap->kind }}</div>
+                    @endif</td>
                 <td>{{ $q->signer_name ?: '—' }}</td>
                 <td class="mono sub">{{ $q->opens }}×{{ $q->opened_at ? ' · ' . $q->opened_at->format('m-d H:i') : '' }}</td>
                 <td class="mono sub">{{ $q->signed_at?->format('Y-m-d H:i') ?: '—' }}</td>
@@ -157,6 +160,17 @@
                             <button class="btn ghost xs" title="تذكير بريدي للموقّعين المعلقين">⏰</button></form>
                         <form method="POST" action="{{ route('esign.cancel', $q->id) }}" class="inline">@csrf
                             <button class="btn ghost xs dn" data-confirm="إلغاء الطلب وإبطال كل روابطه؟" title="إلغاء الطلب">🚫</button></form>
+                    @endif
+                    @if ($q->status === 'بانتظار الموافقة' && ($ap = ($apSteps[$q->id] ?? null))
+                         && \App\Support\ContractApprovals::canDecide(auth()->user(), $ap))
+                        <details class="inline"><summary class="btn ghost xs">🔏 قرار المرحلة</summary>
+                            <form method="POST" action="{{ route('esign.approve', $q->id) }}"
+                                  style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">@csrf
+                                <input class="inp" name="note" maxlength="400" placeholder="ملاحظة / سبب الرفض" style="max-width:170px">
+                                <button class="btn xs p">✅ اعتماد</button>
+                                <button class="btn xs dn" formaction="{{ route('esign.reject', $q->id) }}">⛔ رفض</button>
+                            </form>
+                        </details>
                     @endif
                 </td>
             </tr>

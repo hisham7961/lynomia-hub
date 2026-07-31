@@ -92,6 +92,8 @@ Route::middleware('auth')->group(function () {
     Route::post('esign/{id}/cancel', [\App\Http\Controllers\Web\EsignController::class, 'cancel'])->name('esign.cancel');
     Route::post('esign/{id}/resend', [\App\Http\Controllers\Web\EsignController::class, 'resend'])->name('esign.resend');
     Route::post('esign/{id}/extend', [\App\Http\Controllers\Web\EsignController::class, 'extend'])->name('esign.extend');
+    Route::post('esign/{id}/approve', [\App\Http\Controllers\Web\EsignController::class, 'approve'])->name('esign.approve');
+    Route::post('esign/{id}/reject', [\App\Http\Controllers\Web\EsignController::class, 'reject'])->name('esign.reject');
     Route::get('esign/{id}/edit', [\App\Http\Controllers\Web\EsignController::class, 'edit'])->name('esign.edit');
     Route::put('esign/{id}', [\App\Http\Controllers\Web\EsignController::class, 'update'])->name('esign.update');
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
