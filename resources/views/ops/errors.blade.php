@@ -10,8 +10,22 @@
     <a class="btn ghost sm" href="{{ route('ops.index') }}">🖥️ مركز التشغيل ←</a>
 </div>
 
+{{-- المؤشرات: «ما الوضع؟» قبل الغوص في القائمة --}}
+<div class="cards">
+    <div class="stat"><span class="ico">🆕</span><b class="{{ $kpi['new'] ? 'txt-bad' : '' }}">{{ $kpi['new'] }}</b><span>خطأ جديد لم يُراجَع</span></div>
+    <div class="stat"><span class="ico">🔧</span><b>{{ $kpi['working'] }}</b><span>قيد المعالجة</span></div>
+    <div class="stat"><span class="ico">📅</span><b>{{ $kpi['today'] }}</b><span>ظهر خلال ٢٤ ساعة</span></div>
+    <div class="stat"><span class="ico">🔁</span><b>{{ number_format($kpi['hits24']) }}</b><span>مرة تكرار (٢٤ ساعة)</span></div>
+    @foreach ($byKind as $bk)
+        <div class="stat"><span class="ico">{{ ['php' => '🐘', 'api' => '🔌', 'js' => '🌐', 'slow' => '🐌'][$bk->kind] ?? '❓' }}</span>
+            <b>{{ $bk->n }}</b><span>{{ ['php' => 'استثناء PHP', 'api' => 'خطأ API', 'js' => 'خطأ متصفح', 'slow' => 'طلب بطيء'][$bk->kind] ?? $bk->kind }} · {{ number_format($bk->hits) }} تكرار</span></div>
+    @endforeach
+</div>
+
 <div class="toolbar">
     <form class="filters" method="GET">
+        <label class="vh" for="fq">بحث</label>
+        <input class="inp" id="fq" name="q" value="{{ $q }}" placeholder="🔎 ابحث في الرسالة أو الملف أو الرابط" style="max-width:260px">
         <label class="vh" for="fst">تصفية بالحالة</label>
         <select class="inp" id="fst" name="st" onchange="this.form.submit()">
             <option value="">كل الحالات</option>
@@ -22,7 +36,13 @@
             <option value="">كل الأنواع</option>
             @foreach (['php' => 'PHP', 'api' => 'API', 'js' => 'متصفح', 'slow' => 'بطيء'] as $kk => $kl)<option value="{{ $kk }}" @selected($k === $kk)>{{ $kl }}</option>@endforeach
         </select>
-        <noscript><button class="btn sm">تصفية</button></noscript>
+        <label class="vh" for="fsort">الترتيب</label>
+        <select class="inp" id="fsort" name="sort" onchange="this.form.submit()">
+            <option value="last_seen" @selected($sort === 'last_seen')>الأحدث ظهوراً</option>
+            <option value="count" @selected($sort === 'count')>الأكثر تكراراً</option>
+        </select>
+        <button class="btn sm">تصفية</button>
+        @if ($q !== '' || $st !== '' || $k !== '')<a class="btn ghost sm" href="{{ route('errors.index') }}">مسح</a>@endif
     </form>
 </div>
 
@@ -33,26 +53,25 @@
         <tbody>
         @forelse ($rows as $e)
             <tr>
-                <td style="max-width:480px">
-                    <b>{{ \Illuminate\Support\Str::limit($e->message, 90) }}</b>
-                    <div class="sub">
-                        {{ $e->file ? \Illuminate\Support\Str::limit(str_replace(base_path() . '/', '', $e->file), 50) . ($e->line ? ':' . $e->line : '') : '' }}
-                        {{ $e->url ? ' · ' . \Illuminate\Support\Str::limit($e->url, 45) : '' }}
-                        {{ $e->user_id ? ' · ' . ($users[$e->user_id] ?? '؟') : '' }}
-                        @if ($e->request_id) · <span class="mono ltr" style="font-size:10px">{{ substr($e->request_id, 0, 8) }}</span>@endif
+                <td style="max-width:560px">
+                    {{-- الرسالة كاملةً (كانت تُبتر عند ٩٠ حرفاً فيضيع معناها) والموضع صريح --}}
+                    <a href="{{ route('errors.show', $e->id) }}"><b>{{ \Illuminate\Support\Str::limit($e->message, 200) }}</b></a>
+                    <div class="sub mono ltr" style="font-size:11px;direction:ltr;text-align:left">
+                        📍 {{ $e->file ? str_replace(base_path() . '/', '', $e->file) . ($e->line ? ':' . $e->line : '') : '— بلا موضع —' }}
                     </div>
-                    @if ($e->trace)
-                        <details><summary class="sub pointer">Stack trace ▾</summary>
-                            <pre class="mono ltr" style="font-size:10.5px;background:var(--pss);border-radius:8px;padding:8px;margin-top:4px;max-height:220px;overflow:auto">{{ \Illuminate\Support\Str::limit($e->trace, 4000) }}</pre>
-                        </details>
-                    @endif
+                    <div class="sub">
+                        {{ $e->url ? '🔗 ' . \Illuminate\Support\Str::limit($e->url, 70) : '' }}
+                        {{ $e->user_id ? ' · 👤 ' . ($users[$e->user_id] ?? '؟') : '' }}
+                        · أول ظهور {{ $e->first_seen?->diffForHumans() }}
+                    </div>
                 </td>
                 <td><span class="bdg {{ $e->kind === 'slow' ? 'wn' : ($e->kind === 'js' ? 'g' : 'bad') }}">{{ ['php' => 'PHP', 'api' => 'API', 'js' => 'متصفح', 'slow' => 'بطيء'][$e->kind] ?? $e->kind }}</span></td>
                 <td><b>{{ $e->count }}</b></td>
                 <td class="sub">{{ $e->last_seen->diffForHumans() }}</td>
                 <td><span class="bdg {{ $e->status === 'محلول' ? 'ok' : ($e->status === 'جديد' ? 'bad' : 'wn') }}">{{ $e->status }}</span></td>
                 <td class="acts">
-                    @foreach (['قيد المعالجة', 'محلول', 'جديد'] as $to)
+                    <a class="btn ghost xs" href="{{ route('errors.show', $e->id) }}">🔍 تفاصيل</a>
+                    @foreach (['قيد المعالجة', 'محلول'] as $to)
                         @continue($to === $e->status)
                         <form class="inline" method="POST" action="{{ route('errors.status', $e->id) }}">
                             @csrf<input type="hidden" name="to" value="{{ $to }}"><button class="btn ghost xs">{{ $to }}</button>

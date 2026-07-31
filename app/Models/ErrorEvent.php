@@ -14,5 +14,5 @@ class ErrorEvent extends Model
     protected $guarded = ['id'];
     public $timestamps = false;
 
-    protected $casts = ['first_seen' => 'datetime', 'last_seen' => 'datetime'];
+    protected $casts = ['first_seen' => 'datetime', 'last_seen' => 'datetime', 'meta' => 'array'];
 }

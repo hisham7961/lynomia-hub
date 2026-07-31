@@ -294,7 +294,9 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/quality', [QualityController::class, 'index'])->name('quality.index');
     Route::post('admin/quality/merge', [QualityController::class, 'merge'])->name('quality.merge');
     Route::get('admin/errors', [ErrorCenterController::class, 'index'])->name('errors.index');
+    Route::get('admin/errors/{id}', [ErrorCenterController::class, 'show'])->name('errors.show');
     Route::post('admin/errors/{id}/status', [ErrorCenterController::class, 'status'])->name('errors.status');
+    Route::post('admin/errors/{id}/task', [ErrorCenterController::class, 'toTask'])->name('errors.task');
     Route::post('jslog', [ErrorCenterController::class, 'jslog'])->name('jslog')->middleware('throttle:20,1');
     Route::get('admin/integrations', [\App\Http\Controllers\Web\IntegrationController::class, 'index'])->name('integrations.index');
     Route::get('admin/integrations/guide', [\App\Http\Controllers\Web\IntegrationController::class, 'guide'])->name('integrations.guide');
