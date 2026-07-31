@@ -115,7 +115,12 @@
 
     @if ($emp)
     <div class="card kid">
-        <h3>🏖️ الإجازات والطلبات</h3>
+        <h3>🏖️ الإجازات والطلبات
+            @if ($self && hub_can(auth()->user(), 'leaves', 'a'))
+                <a class="btn ghost xs" style="float:left"
+                   href="{{ route('m.create', ['leaves', 'empId' => $emp->id]) }}">＋ طلب إجازة</a>
+            @endif
+        </h3>
         <table class="mini">
             @forelse ($leaves as $l)
                 <tr>
