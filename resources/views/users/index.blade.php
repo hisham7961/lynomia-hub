@@ -1,10 +1,11 @@
 @extends('layouts.app')
 @section('title', 'المستخدمون')
 @section('content')
+@component('partials.pagehead', ['icon' => '👥', 'title' => 'المستخدمون', 'crumb' => 'النظام'])
+    <a class="btn p sm" href="{{ route('users.create') }}">＋ مستخدم جديد</a>
+@endcomponent
 <div class="toolbar">
     <form class="filters" method="GET"><input class="inp" type="search" name="q" value="{{ request('q') }}" placeholder="بحث بالاسم أو البريد…"><button class="btn sm">بحث</button></form>
-    <div class="spacer"></div>
-    <a class="btn p sm" href="{{ route('users.create') }}">＋ مستخدم جديد</a>
 </div>
 <div class="card pad0">
     <div class="tblwrap"><table class="tbl">

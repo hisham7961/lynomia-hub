@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'توقيع العقود')
 @section('content')
-<div class="modhero" style="--mh:#7C6FB0">
+<div class="modhero" style="--mh:{{ hub_mod_look('contracts')['color'] }}">
     <span class="mhico">✍️</span>
     <div><div class="sub">مركز</div><h2>توقيع العقود الإلكتروني</h2></div>
 </div>

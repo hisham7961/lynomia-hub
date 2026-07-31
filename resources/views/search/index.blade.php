@@ -1,6 +1,7 @@
 @extends('layouts.app')
 @section('title', 'نتائج البحث')
 @section('content')
+@include('partials.pagehead', ['icon' => '🔎', 'title' => 'البحث الشامل', 'crumb' => 'الأدوات'])
 <div class="toolbar">
     <form class="filters" method="GET" action="{{ route('search') }}">
         <input class="inp" type="search" name="q" value="{{ $q }}" placeholder="بحث شامل في كل الوحدات…" autofocus>

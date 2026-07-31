@@ -3,6 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>الأدوات</span><span aria-hidden="true">‹</span><b>لوحة الدعم</b></nav>
         <h2>🎫 لوحة الدعم</h2>
         <div class="sub">طابور التذاكر بمؤقتات SLA — قواعد الاستجابة والحل تُضبط من الإعدادات (sla.rules)</div>
     </div>

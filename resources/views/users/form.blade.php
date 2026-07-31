@@ -1,6 +1,8 @@
 @extends('layouts.app')
 @section('title', $u ? 'تعديل مستخدم' : 'مستخدم جديد')
 @section('content')
+@include('partials.pagehead', ['icon' => '👤', 'title' => $u ? 'تعديل مستخدم' : 'مستخدم جديد',
+    'crumb' => 'المستخدمون', 'crumbUrl' => route('users.index'), 'back' => route('users.index'), 'backLabel' => 'المستخدمون'])
 <div class="card" style="max-width:640px">
     <form method="POST" action="{{ $u ? route('users.update', $u) : route('users.store') }}">
         @csrf @if($u)@method('PUT')@endif

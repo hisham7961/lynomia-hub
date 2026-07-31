@@ -3,6 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>الأدوات</span><span aria-hidden="true">‹</span><b>التقويم الموحّد</b></nav>
         <h2>📅 التقويم الموحّد</h2>
         <div class="sub">كل مواعيدك من كل الوحدات في شبكة واحدة — مهام واجتماعات وانتهاءات وإطلاقات، بصلاحياتك ونطاقك.</div>
     </div>

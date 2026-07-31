@@ -1,7 +1,10 @@
 @extends('layouts.app')
 @section('title', 'التقارير المالية')
 @section('content')
-<div class="toolbar"><div class="sub">مبنية مباشرة على وحدة المالية — الملغاة والمسودات مستثناة</div><div class="spacer"></div><button class="btn ghost sm" onclick="window.print()">🖨 طباعة</button></div>
+@component('partials.pagehead', ['icon' => '💰', 'title' => 'التقارير المالية', 'crumb' => 'الأدوات',
+    'sub' => 'مبنية مباشرة على وحدة المالية — الملغاة والمسودات مستثناة'])
+    <button class="btn ghost sm" onclick="window.print()">🖨 طباعة</button>
+@endcomponent
 <div class="cards">
     <div class="stat"><span class="ico">📈</span><b>{{ number_format($cards['inc'], 2) }}</b><span>دخل هذا الشهر ({{ $currency }})</span></div>
     <div class="stat"><span class="ico">📉</span><b>{{ number_format($cards['exp'], 2) }}</b><span>مصروف هذا الشهر</span></div>

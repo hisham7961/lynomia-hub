@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'تحرير قالب — ' . $tpl->name)
 @section('content')
-<div class="modhero" style="--mh:#7C6FB0">
+<div class="modhero" style="--mh:{{ hub_mod_look('contracts')['color'] }}">
     <span class="mhico">📑</span>
     <div>
         <div class="sub">قوالب التوقيع الإلكتروني</div>

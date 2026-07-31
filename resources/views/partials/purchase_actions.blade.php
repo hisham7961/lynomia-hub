@@ -6,7 +6,7 @@
     $canApprove = hub_approver();
 @endphp
 <div class="card">
-    <h3 style="margin-bottom:8px">🛒 مسار الشراء <span class="bdg {{ hub_tone($st) }}">{{ $st }}</span>
+    <h3>🛒 مسار الشراء <span class="bdg {{ hub_tone($st) }}">{{ $st }}</span>
         @if ($row->pay_state)<span class="bdg {{ $row->pay_state === 'مدفوع' ? 'ok' : 'wn' }}">{{ $row->pay_state }}</span>@endif
     </h3>
     <div class="crow">

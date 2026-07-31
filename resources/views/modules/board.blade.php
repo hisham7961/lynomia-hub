@@ -7,14 +7,15 @@
     // مفتاح حقل الحالة (قد يخالف اسم العمود) — به تُبنى رابط التعبئة المسبقة لزر ＋
     $statusKey = collect($def['fields'] ?? [])->firstWhere('col', $statusCol)['key'] ?? $statusCol;
 @endphp
-<div class="toolbar">
-    <a class="btn ghost sm" href="{{ route('m.index', $module) }}">☰ عرض القائمة</a>
-    <div class="sub">اسحب أي بطاقة إلى عمود آخر لتغيير حالتها فوراً</div>
-    <div class="spacer"></div>
+@php $look = hub_mod_look($module); @endphp
+@component('partials.pagehead', ['icon' => $look['icon'] ?? '🗂', 'title' => 'كانبان — ' . $def['label'],
+    'crumb' => $def['label'], 'crumbUrl' => route('m.index', $module),
+    'sub' => 'اسحب أي بطاقة إلى عمود آخر لتغيير حالتها فوراً',
+    'back' => route('m.index', $module), 'backLabel' => 'عرض القائمة'])
     @if ($canAdd)
         <a class="btn p sm" href="{{ route('m.create', $module) }}">＋ جديد</a>
     @endif
-</div>
+@endcomponent
 <div class="kanban" data-kanban data-url="{{ route('m.status', [$module, '__ID__']) }}" data-can="{{ hub_can(auth()->user(), $module, 'e') ? 1 : 0 }}">
     @foreach ($cols as $status => $items)
         <div class="kcol" data-status="{{ $status }}">

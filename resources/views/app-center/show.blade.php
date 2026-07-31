@@ -20,7 +20,7 @@
 
 {{-- نسبة الإنجاز الحية --}}
 <div class="card">
-    <h3 style="margin-bottom:10px">🎯 نسبة الإنجاز
+    <h3>🎯 نسبة الإنجاز
         @if ($progress && $progress['pct'] !== null)<b style="font-size:22px;margin-inline-start:6px">{{ $progress['pct'] }}٪</b>@endif
     </h3>
     @if ($progress && $progress['pct'] !== null)
@@ -38,7 +38,7 @@
 
 {{-- المتاجر والمراجعات والروابط --}}
 <div class="card">
-    <h3 style="margin-bottom:8px">🏪 المتاجر والروابط</h3>
+    <h3>🏪 المتاجر والروابط</h3>
     <div class="crow">
         @if ($app->apple_rev && $app->apple_rev !== '—')<span class="chip">🍎 مراجعة آبل: <span class="bdg {{ hub_tone($app->apple_rev) }}">{{ $app->apple_rev }}</span></span>@endif
         @if ($app->google_rev && $app->google_rev !== '—')<span class="chip">🤖 مراجعة جوجل: <span class="bdg {{ hub_tone($app->google_rev) }}">{{ $app->google_rev }}</span></span>@endif

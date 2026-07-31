@@ -1,6 +1,7 @@
 @extends('layouts.app')
 @section('title', 'سجل التدقيق')
 @section('content')
+@include('partials.pagehead', ['icon' => '🧾', 'title' => 'سجل التدقيق', 'crumb' => 'النظام'])
 <div class="sub" style="margin-bottom:10px">🔗 السجل مسلسل بتجزئة تشابكية — لا يُعدَّل ولا يُحذف من الواجهة، وأي عبث مباشر بالقاعدة يكشفه أمر <span class="mono ltr">php artisan hub:audit-verify</span>. تشمل السلسلة أيضاً عمليات التصدير و<b>عرض الأسرار</b>.</div>
 <div class="toolbar">
     <form class="filters" method="GET">

@@ -1,11 +1,13 @@
 @extends('layouts.app')
 @section('title', 'إعدادات النظام')
 @section('content')
+@include('partials.pagehead', ['icon' => '⚙️', 'title' => 'إعدادات النظام', 'crumb' => 'النظام',
+    'sub' => 'كل مفاتيح التشغيل بلا كود — تسري فور الحفظ'])
 <form method="POST" action="{{ route('settings.update') }}" enctype="multipart/form-data" style="max-width:680px">
     @csrf
     @foreach ($groups as $gLabel => $items)
         <div class="card" style="margin-bottom:14px">
-            <h3 style="margin-bottom:10px">{{ $gLabel }}</h3>
+            <h3>{{ $gLabel }}</h3>
             <div class="fg">
                 @foreach ($items as $key => [$label, $type])
                     @php $input = str_replace('.', '_', $key); $val = old($input, $values[$key]); @endphp

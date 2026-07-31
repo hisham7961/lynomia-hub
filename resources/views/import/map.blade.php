@@ -1,10 +1,12 @@
 @extends('layouts.app')
 @section('title', 'مطابقة الأعمدة — ' . $def['label'])
 @section('content')
+@include('partials.pagehead', ['icon' => '🔗', 'title' => 'مطابقة أعمدة الملف بحقول ' . $def['label'],
+    'crumb' => $def['label'], 'crumbUrl' => route('m.index', $module),
+    'sub' => number_format($total) . ' صف في الملف'])
 <form method="POST" action="{{ route('m.import.run', $module) }}">
     @csrf
     <div class="card">
-        <h3 style="margin-bottom:6px">🔗 مطابقة أعمدة الملف بحقول {{ $def['label'] }} <span class="bdg g">{{ number_format($total) }} صف</span></h3>
         <p class="sub">طوبقت الأعمدة المتشابهة تلقائياً — راجعها وعدّل ما يلزم. عمود بلا حقل = يُتجاهل.</p>
         <div class="tblwrap"><table class="tbl">
             <thead><tr><th>عمود الملف</th><th>عينة من بياناته</th><th>يُستورد إلى حقل</th></tr></thead>

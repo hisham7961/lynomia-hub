@@ -40,7 +40,7 @@
             <tr><td>رأس سلسلة الأدلة المجمّد</td><td class="mono ltr" style="font-size:9.5px;word-break:break-all">{{ $req->evidence_hash ?: $head }}</td></tr>
         </table>
 
-        <h3 style="margin-bottom:6px">الأطراف</h3>
+        <h3>الأطراف</h3>
         <div class="tblwrap"><table class="tbl">
             <thead><tr><th>الاسم</th><th>الدور</th><th>الحالة</th><th>وقّع في</th><th>IP</th></tr></thead>
             <tbody>

@@ -3,6 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>الأدوات</span><span aria-hidden="true">‹</span><b>المركز القانوني</b></nav>
         <h2>⚖️ المركز القانوني</h2>
         <div class="sub">العقود والرخص والعلامات والتأمين والالتزامات — والتجديدات قبل فوات أوانها</div>
     </div>

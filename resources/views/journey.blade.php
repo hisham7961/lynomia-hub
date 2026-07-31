@@ -1,11 +1,12 @@
 @extends('layouts.app')
 @section('title', 'رحلة العميل — ' . $client->name)
 @section('content')
-<div class="toolbar">
-    <a class="btn ghost sm" href="{{ route('m.show', ['clients', $client->id]) }}">→ ملف العميل</a>
-</div>
 <div class="hero">
     <div>
+        <nav class="crumbs" aria-label="مسار التنقل">
+            <a href="{{ route('m.show', ['clients', $client->id]) }}">ملف العميل</a>
+            <span aria-hidden="true">‹</span><b>الرحلة</b>
+        </nav>
         <h2>🧭 رحلة {{ $client->name }} {{ $client->vip ? '👑' : '' }}</h2>
         <div class="sub">
             @if ($client->vip)<span class="bdg wn">عميل VIP</span>@endif

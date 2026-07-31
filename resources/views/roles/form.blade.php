@@ -1,6 +1,8 @@
 @extends('layouts.app')
 @section('title', $role ? 'تعديل دور' : 'دور جديد')
 @section('content')
+@include('partials.pagehead', ['icon' => '🎭', 'title' => $role ? 'تعديل دور' : 'دور جديد',
+    'crumb' => 'الأدوار والصلاحيات', 'crumbUrl' => route('roles.index'), 'back' => route('roles.index'), 'backLabel' => 'الأدوار'])
 @php $mx = $role ? (is_array($role->matrix) ? $role->matrix : (json_decode($role->matrix ?? '[]', true) ?: [])) : []; @endphp
 <div class="card">
     <form method="POST" action="{{ $role ? route('roles.update', $role) : route('roles.store') }}">

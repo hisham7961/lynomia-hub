@@ -3,6 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>الأدوات</span><span aria-hidden="true">‹</span><b>لوحة الأداء</b></nav>
         <h2>📈 لوحة الأداء</h2>
         <div class="sub">مؤشرات الشركة المحسوبة · الأهداف (OKR) · أداء الموظفين آخر ٣٠ يوماً</div>
     </div>

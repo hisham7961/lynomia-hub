@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'تحرير العقد')
 @section('content')
-<div class="modhero" style="--mh:#7C6FB0">
+<div class="modhero" style="--mh:{{ hub_mod_look('contracts')['color'] }}">
     <span class="mhico">📝</span>
     <div><div class="sub">تحرير نص العقد · رمز التحقق <b class="mono ltr">{{ $req->verify_code }}</b></div>
         <h2>{{ $req->title }}</h2></div>

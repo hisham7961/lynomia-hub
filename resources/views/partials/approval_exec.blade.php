@@ -24,7 +24,7 @@
 @endphp
 @if ($row->mod)
 <div class="card">
-    <h3 style="margin-bottom:8px">⚡ عملية محمية بانتظار الحسم</h3>
+    <h3>⚡ عملية محمية بانتظار الحسم</h3>
     <div class="crow" style="margin-bottom:10px">
         <span class="chip">{{ $row->op === 'd' ? '🗑 حذف' : '✏️ تعديل' }} في {{ $tdef['label'] ?? $row->mod }}</span>
         @if ($target)<a class="chip" href="{{ route('m.show', [$row->mod, $row->record_id]) }}">فتح السجل الهدف ←</a>@endif

@@ -3,6 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><b>مركز جودة البيانات</b></nav>
         <h2>🧹 مركز جودة البيانات</h2>
         <div class="sub">مكررات ونواقص وركود — نظّفها هنا قبل أن تُفسد تقاريرك</div>
     </div>

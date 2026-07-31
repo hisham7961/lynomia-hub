@@ -1,6 +1,6 @@
 {{-- المرفقات الشاملة — يتوقع: $aModule $aRecordId $attachments $aUsers (id=>name) --}}
 <div class="card" id="attachments">
-    <h3 style="margin-bottom:10px">📎 المرفقات <span class="bdg g">{{ $attachments->count() }}</span></h3>
+    <h3>📎 المرفقات <span class="bdg g">{{ $attachments->count() }}</span></h3>
 
     @forelse ($attachments as $a)
         @php

@@ -1,6 +1,7 @@
 @extends('layouts.app')
 @section('title', 'مركز الإشعارات')
 @section('content')
+@include('partials.pagehead', ['icon' => '🔔', 'title' => 'مركز الإشعارات', 'crumb' => 'الأدوات'])
 <div class="toolbar">
     <a class="btn {{ $unread ? 'ghost' : '' }} sm" href="{{ route('notifications.index') }}">الكل</a>
     <a class="btn {{ $unread ? '' : 'ghost' }} sm" href="{{ route('notifications.index', ['unread' => 1]) }}">غير المقروء</a>

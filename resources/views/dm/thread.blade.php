@@ -1,13 +1,9 @@
 @extends('layouts.app')
 @section('title', 'محادثة — ' . $other->name)
 @section('content')
-<div class="toolbar">
-    <a class="btn ghost sm" href="{{ route('dm.inbox') }}">→ الرسائل</a>
-    <span class="ava sm">{{ mb_substr($other->name, 0, 1) }}</span>
-    <b>{{ $other->name }}</b>
-    <span class="sub">{{ $other->job_title ?: '' }}</span>
-</div>
-
+@include('partials.pagehead', ['icon' => '💬', 'title' => $other->name,
+    'crumb' => 'الرسائل', 'crumbUrl' => route('dm.inbox'),
+    'sub' => $other->job_title ?: null, 'back' => route('dm.inbox'), 'backLabel' => 'الرسائل'])
 <div class="card" style="display:flex;flex-direction:column;gap:8px;min-height:300px">
     @forelse ($msgs as $m)
         @php $mine = $m->from_id === auth()->id(); @endphp

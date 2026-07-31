@@ -4,6 +4,7 @@
 @php $fmt = fn ($b) => $b === null ? '—' : ($b > 1073741824 ? number_format($b / 1073741824, 1) . ' GB' : number_format($b / 1048576, 1) . ' MB'); @endphp
 <div class="hero">
     <div>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><b>مركز مراقبة وتشغيل النظام</b></nav>
         <h2>🖥️ مركز مراقبة وتشغيل النظام</h2>
         <div class="sub">الفحص الخارجي: <span class="mono ltr">GET /healthz</span> — يصلح لمراقبات Uptime</div>
     </div>

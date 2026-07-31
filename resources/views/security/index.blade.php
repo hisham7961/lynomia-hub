@@ -3,6 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><b>مركز الأمان</b></nav>
         <h2>🛡️ مركز الأمان</h2>
         <div class="sub">كل ما يمس أمن النظام في شاشة واحدة</div>
     </div>

@@ -3,6 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><b>مركز الأخطاء والسجلات</b></nav>
         <h2>🐞 مركز الأخطاء والسجلات</h2>
         <div class="sub">استثناءات PHP وأخطاء API والمتصفح والطلبات البطيئة — مجمعة بالتكرار وبمعرف الطلب</div>
     </div>

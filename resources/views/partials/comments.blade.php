@@ -1,7 +1,7 @@
 {{-- قسم التعليقات — يتوقع: $cModule $cRecordId $comments $users (id=>name) --}}
 @php $reactions = \App\Http\Controllers\Web\CommentController::reactionsFor($comments); @endphp
 <div class="card" id="comments">
-    <h3 style="margin-bottom:10px">💬 التعليقات <span class="bdg g">{{ $comments->count() }}</span></h3>
+    <h3>💬 التعليقات <span class="bdg g">{{ $comments->count() }}</span></h3>
 
     @forelse ($comments as $c)
         @include('partials._comment', ['c' => $c, 'users' => $users, 'depth' => 0])

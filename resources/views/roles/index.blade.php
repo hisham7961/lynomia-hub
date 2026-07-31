@@ -1,7 +1,9 @@
 @extends('layouts.app')
 @section('title', 'الأدوار والصلاحيات')
 @section('content')
-<div class="toolbar"><div class="spacer"></div><a class="btn p sm" href="{{ route('roles.create') }}">＋ دور جديد</a></div>
+@component('partials.pagehead', ['icon' => '🎭', 'title' => 'الأدوار والصلاحيات', 'crumb' => 'النظام'])
+    <a class="btn p sm" href="{{ route('roles.create') }}">＋ دور جديد</a>
+@endcomponent
 <div class="card pad0">
     <div class="tblwrap"><table class="tbl">
         <thead><tr><th>الدور</th><th>النطاق</th><th>المستخدمون</th><th class="acts">إجراءات</th></tr></thead>

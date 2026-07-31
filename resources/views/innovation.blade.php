@@ -1,13 +1,7 @@
 @extends('layouts.app')
 @section('title', 'مركز الابتكار')
 @section('content')
-<div class="toolbar">
-    <a class="btn ghost sm" href="{{ route('m.index', 'ideas') }}">📋 كل الأفكار</a>
-    <div class="spacer"></div>
-    @if (hub_can(auth()->user(), 'ideas', 'a'))
-        <a class="btn p sm" href="{{ route('m.create', 'ideas') }}">＋ فكرة جديدة</a>
-    @endif
-</div>
+{{-- v2.127: الترويسة أولاً ثم المحتوى — كان الترتيب معكوساً وحيداً بين الصفحات --}}
 <div class="hero">
     <div>
         <h2>💡 مركز الابتكار</h2>
@@ -15,6 +9,12 @@
             أفكار الفريق مرتّبة بدرجة <b>ICE = الأثر × الثقة × سهولة التنفيذ</b> (كلٌّ من ١ إلى ١٠) —
             الأعلى درجةً أولاً، فتبدأ بما يعطي أكبر عائد بأقل جهد.
         </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn ghost sm" href="{{ route('m.index', 'ideas') }}">📋 كل الأفكار</a>
+        @if (hub_can(auth()->user(), 'ideas', 'a'))
+            <a class="btn p sm" href="{{ route('m.create', 'ideas') }}">＋ فكرة جديدة</a>
+        @endif
     </div>
 </div>
 

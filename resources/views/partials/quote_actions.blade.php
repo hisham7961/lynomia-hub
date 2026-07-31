@@ -5,7 +5,7 @@
     $canE = hub_can(auth()->user(), 'quotes', 'e');
 @endphp
 <div class="card">
-    <h3 style="margin-bottom:8px">🧭 مسار العرض <span class="bdg {{ hub_tone($st) }}">{{ $st }}</span></h3>
+    <h3>🧭 مسار العرض <span class="bdg {{ hub_tone($st) }}">{{ $st }}</span></h3>
     <div class="crow">
         <a class="btn ghost sm" href="{{ route('quotes.doc', $row->id) }}">🖨 المستند (طباعة / PDF)</a>
 

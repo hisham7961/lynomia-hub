@@ -16,7 +16,7 @@
 @endif
 
 <div class="card">
-    <h3 style="margin-bottom:8px">＋ مشاركة مستند جديد</h3>
+    <h3>＋ مشاركة مستند جديد</h3>
     <form method="POST" action="{{ route('dataroom.store') }}" enctype="multipart/form-data">
         @csrf
         <div class="fg">
