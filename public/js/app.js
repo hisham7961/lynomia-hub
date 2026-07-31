@@ -556,3 +556,72 @@ document.addEventListener('input', function (e) {
     });
   }, true);
 })();
+
+/* ═ v2.116 — باني الفلاتر المتقدم: صفوف (حقل/عامل/قيمة) تُبنى محلياً وتُرسل fl[i][…] ═ */
+(function () {
+  'use strict';
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+  function boot(box) {
+    if (box.dataset.ready) return;
+    box.dataset.ready = '1';
+    var FIELDS = JSON.parse(box.dataset.fields);
+    var OPS = JSON.parse(box.dataset.ops);
+    var LBL = JSON.parse(box.dataset.lbl);
+    var rows = box.querySelector('.advrows');
+    var n = 0;
+
+    function fieldOf(k) { for (var i = 0; i < FIELDS.length; i++) if (FIELDS[i].k === k) return FIELDS[i]; return FIELDS[0]; }
+
+    function addRow(init) {
+      init = init || {};
+      var i = n++;
+      var d = document.createElement('div');
+      d.className = 'advrow';
+      d.innerHTML = '<select class="inp" name="fl[' + i + '][f]" aria-label="الحقل"></select>' +
+        '<select class="inp" name="fl[' + i + '][o]" aria-label="العامل"></select>' +
+        '<span class="advval"></span>' +
+        '<button class="btn ghost xs" type="button" data-advrm aria-label="حذف الشرط">✕</button>';
+      var fs = d.children[0], os = d.children[1], vs = d.children[2];
+      FIELDS.forEach(function (x) { fs.add(new Option(x.l, x.k, false, x.k === init.f)); });
+
+      function fillOps(sel) {
+        os.innerHTML = '';
+        (OPS[fieldOf(fs.value).t] || []).forEach(function (op) { os.add(new Option(LBL[op] || op, op, false, op === sel)); });
+      }
+      function fillVal(val) {
+        var x = fieldOf(fs.value), op = os.value;
+        if (op === 'empty' || op === 'nempty') { vs.innerHTML = ''; return; }
+        if (x.t === 'sel') {
+          vs.innerHTML = '<select class="inp" name="fl[' + i + '][v]">' +
+            x.o.map(function (o) { return '<option' + (o === val ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select>';
+        } else if (x.t === 'bool') {
+          vs.innerHTML = '<select class="inp" name="fl[' + i + '][v]">' +
+            '<option value="1"' + (val === '1' ? ' selected' : '') + '>نعم</option>' +
+            '<option value="0"' + (val === '0' ? ' selected' : '') + '>لا</option></select>';
+        } else {
+          var t = (x.t === 'date' || x.t === 'dt') ? 'date' : ((x.t === 'num' || x.t === 'big') ? 'number' : 'text');
+          vs.innerHTML = '<input class="inp" type="' + t + '" name="fl[' + i + '][v]" value="' + esc(val || '') + '"' +
+            (t === 'number' ? ' step="any"' : '') + (t === 'text' ? ' placeholder="القيمة…"' : '') + '>';
+        }
+      }
+      fs.addEventListener('change', function () { fillOps(); fillVal(''); });
+      os.addEventListener('change', function () { fillVal(vs.querySelector('[name]') ? vs.querySelector('[name]').value : ''); });
+      fillOps(init.o); fillVal(init.v || '');
+      rows.appendChild(d);
+    }
+
+    (JSON.parse(box.dataset.init || '[]') || []).forEach(function (c) { if (c && c.f) addRow(c); });
+    if (!rows.children.length) addRow();
+
+    box.addEventListener('click', function (e) {
+      if (e.target.closest('[data-advadd]')) { addRow(); return; }
+      var rm = e.target.closest('[data-advrm]');
+      if (rm) { rm.closest('.advrow').remove(); if (!rows.children.length) addRow(); }
+    });
+  }
+
+  function scan() { var b = document.querySelector('[data-advfl]'); if (b) boot(b); }
+  scan();
+  document.addEventListener('htmx:afterSettle', scan);
+})();

@@ -42,6 +42,32 @@
         @endif
         @if ($trash)<input type="hidden" name="trash" value="1">@endif
         @foreach ((array) request('f', []) as $fk => $fv)<input type="hidden" name="f[{{ $fk }}]" value="{{ $fv }}">@endforeach
+        @php
+            // باني الفلاتر المتقدم: الحقول القابلة للترشيح فقط (لا أسرار/ملفات/مراجع) وغير المخفية عن المستخدم
+            $advFields = collect($def['fields'])
+                ->filter(fn ($f) => isset(\App\Http\Controllers\Web\ModuleController::FL_OPS[$f['type'] ?? 'text'])
+                    && hub_field_mode(auth()->user(), $module, $f['key']) !== 'hide')
+                ->map(fn ($f) => ['k' => $f['key'], 'l' => $f['label'], 't' => $f['type'], 'o' => array_values($f['options'] ?? [])])
+                ->values();
+            $nfl = count((array) request('fl', []));
+        @endphp
+        @if ($advFields->isNotEmpty() && ! $trash)
+            <details class="ddwrap advfl" @if ($nfl) open @endif>
+                <summary class="btn ghost sm ddsum">⚙ فلاتر@if ($nfl) <span class="bdg">{{ $nfl }}</span>@endif ▾</summary>
+                <div class="card ddpanel advbox" data-advfl
+                     data-fields='@json($advFields)'
+                     data-ops='@json(\App\Http\Controllers\Web\ModuleController::FL_OPS)'
+                     data-lbl='@json(\App\Http\Controllers\Web\ModuleController::FL_LABELS)'
+                     data-init='@json(array_values((array) request('fl', [])))'>
+                    <div class="advrows"></div>
+                    <div class="advacts">
+                        <button class="btn ghost xs" type="button" data-advadd>＋ شرط</button>
+                        <span class="spacer"></span>
+                        <button class="btn xs" type="submit">تطبيق</button>
+                    </div>
+                </div>
+            </details>
+        @endif
         <noscript><button class="btn sm" type="submit">بحث</button></noscript>
     </form>
     {{-- العروض والأعمدة خارج منطقة التبديل الحي (#tblzone): نماذج عادية غير مُعزَّزة
@@ -97,7 +123,7 @@
     <div class="toolbar">
         @foreach ($filters as $fl)
             {{-- إزالة الفلتر تُسقط معه علامة العرض: العرض المطبَّق لم يعد قائماً --}}
-            <span class="chip">{{ $fl['label'] }}: {{ $fl['name'] }}<a href="{{ request()->fullUrlWithQuery(['f' => null, 'page' => null, 'view' => null]) }}" title="إزالة">✕</a></span>
+            <span class="chip">{{ $fl['label'] }} {{ $fl['op'] ?? ':' }} {{ $fl['name'] }}<a href="{{ $fl['rmurl'] ?? request()->fullUrlWithQuery(['f' => null, 'page' => null, 'view' => null]) }}" title="إزالة">✕</a></span>
         @endforeach
         <span class="spacer"></span>
         @if (hub_can(auth()->user(), $module, 'd'))

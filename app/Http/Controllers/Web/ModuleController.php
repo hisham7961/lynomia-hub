@@ -64,7 +64,82 @@ class ModuleController extends Controller
             }
         }
 
+        $this->applyAdvancedFilters($r, $def, $fields, $q, $filters);
+
         return $q;
+    }
+
+    /** عوامل الفلاتر المتقدمة المسموحة لكل نوع حقل — ما خرج عنها يُتجاهل بصمت */
+    public const FL_OPS = [
+        'text' => ['has', 'eq', 'neq', 'empty', 'nempty'],
+        'ta' => ['has', 'eq', 'neq', 'empty', 'nempty'],
+        'url' => ['has', 'empty', 'nempty'],
+        'sel' => ['eq', 'neq', 'empty', 'nempty'],
+        'num' => ['eq', 'neq', 'gt', 'lt', 'empty', 'nempty'],
+        'big' => ['eq', 'neq', 'gt', 'lt', 'empty', 'nempty'],
+        'date' => ['eq', 'before', 'after', 'empty', 'nempty'],
+        'dt' => ['eq', 'before', 'after', 'empty', 'nempty'],
+        'bool' => ['eq'],
+    ];
+
+    /** تسميات العوامل للرقائق والواجهة */
+    public const FL_LABELS = [
+        'has' => 'يحوي', 'eq' => '=', 'neq' => '≠', 'gt' => '>', 'lt' => '<',
+        'before' => 'قبل', 'after' => 'بعد', 'empty' => 'فارغ', 'nempty' => 'غير فارغ',
+    ];
+
+    /**
+     * باني الفلاتر المتقدم (v2.116): شروط مركبة fl[i][f|o|v] بمنطق «و».
+     * كل شرط يُصادَق ضد تعريف الوحدة: الحقل موجود، ونوعه قابل للترشيح (لا أسرار
+     * ولا ملفات — الترشيح على عمود سرّي كاشفٌ للقيم بالاستدلال)، وحقول الصلاحية
+     * المخفية عن المستخدم لا تُرشَّح، والعامل من القائمة البيضاء لنوعه. ما فشل
+     * بصادقةٍ يُتجاهل بصمت فلا يكسر رابطاً محفوظاً قديماً.
+     */
+    protected function applyAdvancedFilters(Request $r, array $def, $fields, $q, array &$filters): void
+    {
+        foreach (array_slice((array) $r->input('fl', []), 0, 10, true) as $i => $cond) {
+            if (! is_array($cond)) continue;
+            $fk = (string) ($cond['f'] ?? '');
+            $op = (string) ($cond['o'] ?? '');
+            $fv = $cond['v'] ?? '';
+            if (! is_string($fv)) continue;
+
+            $f = $fields->firstWhere('key', $fk);
+            if (! $f) continue;
+            $t = $f['type'] ?? 'text';
+            if (! isset(self::FL_OPS[$t]) || ! in_array($op, self::FL_OPS[$t], true)) continue;
+            if (hub_field_mode(auth()->user(), $def['key'] ?? '', $fk) === 'hide') continue;
+
+            $needsVal = ! in_array($op, ['empty', 'nempty'], true);
+            if ($needsVal && $fv === '') continue;
+            if (in_array($t, ['sel'], true) && $needsVal && ! in_array($fv, $f['options'] ?? [], true)) continue;
+            if (in_array($t, ['num', 'big'], true) && $needsVal && ! is_numeric($fv)) continue;
+
+            $col = $f['col'];
+            match ($op) {
+                'has' => $q->where($col, 'like', '%' . str_replace(['%', '_'], ['\\%', '\\_'], $fv) . '%'),
+                'eq' => $t === 'bool'
+                    ? $q->where($col, (bool) ((int) $fv))
+                    : $q->where($col, in_array($t, ['num', 'big'], true) ? $fv + 0 : $fv),
+                'neq' => $q->where($col, '!=', in_array($t, ['num', 'big'], true) ? $fv + 0 : $fv),
+                'gt' => $q->where($col, '>', $fv + 0),
+                'lt' => $q->where($col, '<', $fv + 0),
+                'before' => $q->whereDate($col, '<', $fv),
+                'after' => $q->whereDate($col, '>', $fv),
+                'empty' => $q->where(fn ($w) => $w->whereNull($col)->orWhere($col, '')),
+                'nempty' => $q->whereNotNull($col)->where($col, '!=', ''),
+            };
+
+            // رقاقة الشرط مع رابط إزالته وحده — بقية الشروط والمعايير تبقى
+            $qs = $r->query();
+            unset($qs['fl'][$i], $qs['page']);
+            $filters[] = [
+                'key' => "fl:$i", 'label' => $f['label'],
+                'val' => $fv, 'op' => self::FL_LABELS[$op],
+                'name' => $needsVal ? ($t === 'bool' ? ((int) $fv ? 'نعم' : 'لا') : $fv) : '',
+                'rmurl' => $r->url() . ($qs ? '?' . http_build_query($qs) : ''),
+            ];
+        }
     }
 
     public function index(Request $r, string $module)

@@ -856,6 +856,17 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .chip:has(input:checked) span::before{content:"✓ "}
 .chip:has(input:focus-visible){box-shadow:var(--ring)}
 
+/* ═ باني الفلاتر المتقدم (v2.116) ═ */
+.advbox{min-width:440px;max-width:min(560px,92vw)}
+.advrow{display:flex;gap:6px;align-items:center;margin-bottom:7px}
+.advrow select.inp,.advrow .advval .inp{padding:6px 9px;font-size:12.5px}
+.advrow>select:first-child{max-width:150px}
+.advrow>select:nth-child(2){max-width:105px}
+.advval{flex:1;min-width:0;display:flex}
+.advval .inp{width:100%}
+.advacts{display:flex;gap:8px;align-items:center;margin-top:4px}
+@media (max-width:760px){.advbox{min-width:0}.advrow{flex-wrap:wrap}.advval{flex-basis:100%}}
+
 /* ═ كثافة الجوال (v2.115): الترويسات كانت تلتهم ٦٣٢ من ٨٤٤ بكسل قبل أول صف بيانات ═ */
 @media (max-width:760px){
   .demoband{font-size:11px;padding:3px 8px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}
