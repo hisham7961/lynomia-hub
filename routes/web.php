@@ -164,6 +164,12 @@ Route::middleware('auth')->group(function () {
     Route::post('comments/{id}/task', [CommentController::class, 'toTask'])->name('comments.task');
     Route::delete('comments/{id}', [CommentController::class, 'destroy'])->name('comments.destroy');
     Route::post('comments/{id}/react', [CommentController::class, 'react'])->name('comments.react');
+    Route::post('comments/{id}/resolve', [CommentController::class, 'resolve'])->name('comments.resolve');
+    // v2.123: سلسلة العقد (ملحق/تجديد) + مكتبة البنود
+    Route::post('contract/{id}/amend', [\App\Http\Controllers\Web\ContractActionsController::class, 'amend'])->name('contract.amend');
+    Route::post('contract/{id}/renew', [\App\Http\Controllers\Web\ContractActionsController::class, 'renew'])->name('contract.renew');
+    Route::post('esign/clauses', [\App\Http\Controllers\Web\ContractActionsController::class, 'storeClause'])->name('esign.clause.store');
+    Route::delete('esign/clauses', [\App\Http\Controllers\Web\ContractActionsController::class, 'destroyClause'])->name('esign.clause.destroy');
 
     // ── المراسلة الداخلية المباشرة ──
     Route::get('dm', [DmController::class, 'inbox'])->name('dm.inbox');

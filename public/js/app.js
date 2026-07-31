@@ -825,3 +825,28 @@ document.addEventListener('input', function (e) {
     document.getElementById('signersjson').value = list.length ? JSON.stringify(list) : '';
   });
 })();
+
+/* ═ v2.123 — CLM م7: إدراج بنود المكتبة عند المؤشر (نسخٌ بالقيمة كالرقائق) ═ */
+(function () {
+  'use strict';
+  var data = document.getElementById('clausedata');
+  if (!data) return;
+  var clauses = [];
+  try { clauses = JSON.parse(data.textContent || '[]'); } catch (e) { /* مكتبة فارغة */ }
+  document.addEventListener('click', function (e) {
+    var chip = e.target.closest('.clausechip');
+    if (!chip) return;
+    var cl = clauses[parseInt(chip.dataset.i, 10)];
+    if (!cl) return;
+    // نُدرج في آخر حقل نصي لمسه المستخدم في المحرر — وإلا آخر بند في القائمة
+    var fields = document.querySelectorAll('#blocks textarea');
+    var t = (document.activeElement && document.activeElement.matches && document.activeElement.matches('#blocks textarea'))
+      ? document.activeElement : (fields.length ? fields[fields.length - 1] : null);
+    if (!t) return;
+    var ins = (t.value.trim() ? '\n\n' : '') + cl.name + '\n' + cl.body;
+    var s = t.selectionEnd || t.value.length;
+    t.value = t.value.slice(0, s) + ins + t.value.slice(s);
+    t.focus(); t.selectionStart = t.selectionEnd = s + ins.length;
+    t.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+})();

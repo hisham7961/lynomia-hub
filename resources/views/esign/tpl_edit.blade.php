@@ -58,6 +58,36 @@
                 @endforeach
             </div>
         </div>
+        {{-- مكتبة البنود (v2.123): إدراجٌ نسخٌ بالقيمة — تعديل المكتبة لا يمس وثيقة قديمة --}}
+        @php $clauses = \App\Http\Controllers\Web\ContractActionsController::clauses(); @endphp
+        <div class="card" style="padding:14px">
+            <b>📚 مكتبة البنود</b>
+            <script type="application/json" id="clausedata">@json($clauses)</script>
+            <div style="max-height:30vh;overflow:auto;margin-top:6px">
+                @forelse ($clauses as $i => $cl)
+                    <div style="display:flex;gap:4px;align-items:center;margin:2px 0">
+                        <button type="button" class="chip clausechip" data-i="{{ $i }}"
+                                title="{{ \Illuminate\Support\Str::limit($cl['body'], 140) }}"
+                                style="cursor:pointer;flex:1;text-align:start">{{ $cl['name'] }}</button>
+                        <form method="POST" action="{{ route('esign.clause.destroy') }}" class="inline"
+                              data-confirm="حذف «{{ $cl['name'] }}» من المكتبة؟ الوثائق التي أُدرج فيها لا تتأثر.">
+                            @csrf @method('DELETE')<input type="hidden" name="i" value="{{ $i }}">
+                            <button class="lnk sub" aria-label="حذف البند">✕</button>
+                        </form>
+                    </div>
+                @empty
+                    <div class="sub" style="margin-top:6px">لا بنود محفوظة — احفظ صيغك المعتمدة هنا لتدرجها بنقرة في أي قالب.</div>
+                @endforelse
+            </div>
+            <details style="margin-top:8px"><summary class="sub" style="cursor:pointer">＋ بند جديد</summary>
+                <form method="POST" action="{{ route('esign.clause.store') }}" style="margin-top:6px">
+                    @csrf
+                    <input class="inp" name="name" required maxlength="120" placeholder="اسم البند (سرية، إنهاء…)" style="margin-bottom:6px;width:100%">
+                    <textarea class="inp" name="body" required rows="4" maxlength="20000" placeholder="نص البند — المتغيرات {بين_أقواس} تعمل هنا أيضاً" style="width:100%"></textarea>
+                    <button class="btn sm" style="margin-top:6px">حفظ في المكتبة</button>
+                </form>
+            </details>
+        </div>
         {{-- تاريخ الإصدارات --}}
         <div class="card" style="padding:14px">
             <b>🕐 الإصدارات</b>

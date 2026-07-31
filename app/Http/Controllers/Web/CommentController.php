@@ -73,6 +73,24 @@ class CommentController extends Controller
         return back()->with('ok', $c->pinned ? 'ثُبّت' : 'أُلغي التثبيت');
     }
 
+    /**
+     * حلّ التعليق وعكسه (v2.123): نقاشٌ عولج يُعلَّم «محلولاً» فيهدأ بصرياً دون
+     * حذف أثره — لصاحب التعليق أو من يملك تعديل وحدة السجل.
+     */
+    public function resolve(string $id)
+    {
+        $c = Comment::findOrFail($id);
+        $can = $c->user_id === auth()->id()
+            || ($c->module === 'feed' ? hub_monitor() : hub_can(auth()->user(), $c->module, 'e'));
+        abort_unless($can, 403);
+
+        $done = $c->resolved_at === null;
+        $c->update(['resolved_at' => $done ? now() : null,
+            'resolved_by' => $done ? auth()->id() : null, 'updated_at' => now()]);
+
+        return back()->with('ok', $done ? 'عُلّم التعليق محلولاً' : 'أُعيد التعليق مفتوحاً');
+    }
+
     /** حذف — صاحب التعليق أو المالك */
     public function destroy(string $id)
     {

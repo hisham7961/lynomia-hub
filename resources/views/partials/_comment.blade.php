@@ -11,6 +11,7 @@
         <b>{{ $users[$c->user_id] ?? 'مستخدم محذوف' }}</b>
         <span class="sub">{{ $c->created_at?->diffForHumans() }}</span>
         @if ($c->pinned)<span class="bdg wn">📌 مثبّت</span>@endif
+        @if ($c->resolved_at)<span class="bdg ok" title="حلّه {{ $users[$c->resolved_by] ?? '؟' }}">✔ محلول</span>@endif
         @if ($c->task_id)<a class="bdg ok" href="{{ route('m.show', ['tasks', $c->task_id]) }}">✓ مهمة</a>@endif
         <span class="spacer"></span>
         @if ($readers->count())<span class="sub" title="{{ $rnames }}">👁 {{ $readers->count() }}</span>@endif
@@ -60,6 +61,9 @@
         @php $canPin = $c->module === 'feed' ? (hub_monitor()) : hub_can(auth()->user(), $c->module, 'e'); @endphp
         @if ($canPin)
             <form method="POST" action="{{ route('comments.pin', $c->id) }}">@csrf<button class="lnk sub" type="submit">{{ $c->pinned ? 'فك التثبيت' : '📌 تثبيت' }}</button></form>
+        @endif
+        @if ($c->user_id === auth()->id() || $canPin)
+            <form method="POST" action="{{ route('comments.resolve', $c->id) }}">@csrf<button class="lnk sub" type="submit">{{ $c->resolved_at ? 'إعادة فتح' : '✔ حل' }}</button></form>
         @endif
         @if (! $c->task_id && hub_can(auth()->user(), 'tasks', 'a'))
             <form method="POST" action="{{ route('comments.task', $c->id) }}">@csrf<button class="lnk sub" type="submit">→ مهمة</button></form>
