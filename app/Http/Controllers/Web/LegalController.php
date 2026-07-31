@@ -37,12 +37,64 @@ class LegalController extends Controller
                 return $c;
             });
 
-        // التزامات مسجلة
-        $obligations = $base()->whereNotNull('obligations')->where('obligations', '!=', '')
-            ->orderByDesc('created_at')->limit(8)->get(['id', 'title', 'type', 'obligations']);
+        // v2.124: التزامات متتبعة تستحق (وحدة م7) بدل قصاصات النص القديمة
+        $obligations = \Illuminate\Support\Facades\Schema::hasTable('contract_obligations')
+            ? hub_scope(\App\Models\ContractObligation::query(), 'obligations')
+                ->whereNotIn('status', ['مكتمل', 'ملغي'])->whereNotNull('due')
+                ->whereDate('due', '<=', now()->addDays(31))->orderBy('due')->limit(10)->get()
+            : collect();
 
+        // v2.124: قيمة الساري بكل عملة على حدة — لا جمع عملات مختلفة في رقمٍ واحد
+        $values = $activeish($base())->whereNotNull('value')->where('value', '>', 0)
+            ->select('currency', DB::raw('SUM(value) s'), DB::raw('COUNT(*) c'))
+            ->groupBy('currency')->orderByDesc('s')->limit(5)->get();
+
+        // v2.124: عالقة بلا توقيع >٧ أيام من الإرسال — بزر تذكيرٍ مباشر
+        $stuck = app(EsignController::class)->filterVisible(
+            \App\Models\SignRequest::where('status', 'بانتظار التوقيع')->whereNull('cancelled_at')
+                ->whereNotNull('sent_at')->where('sent_at', '<=', now()->subDays(7))
+                ->orderBy('sent_at')->limit(50)->get()
+        )->take(8);
+
+        // v2.124: موافقات معلقة + خط التجديد (قيد التجديد ومسودات التجديد)
+        $pendingSteps = \Illuminate\Support\Facades\Schema::hasTable('contract_approval_steps')
+            ? \App\Models\ContractApprovalStep::where('status', 'بانتظار')
+                ->orderBy('created_at')->orderBy('stage')->limit(20)->get()->unique('request_id')->take(8)
+                ->map(function ($s) {
+                    $s->req = \App\Models\SignRequest::find($s->request_id);
+                    return $s;
+                })->filter(fn ($s) => $s->req)
+            : collect();
+        $renewals = $base()
+            ->where(fn ($q) => $q->where('status', 'قيد التجديد')
+                ->orWhere(fn ($w) => $w->where('kind', 'تجديد')->where('status', 'مسودة')))
+            ->orderByDesc('created_at')->limit(8)->get(['id', 'title', 'doc_no', 'status', 'kind', 'date_end']);
+
+        // v2.124: التوزيع بالمسؤول (الساري فقط) — أسماء حقيقية لا معرفات
+        $byOwnerRaw = $activeish($base())->whereNotNull('owner_id')
+            ->select('owner_id', DB::raw('COUNT(*) c'))->groupBy('owner_id')->orderByDesc('c')->limit(6)->get();
+        $ownerNames = \App\Models\User::whereIn('id', $byOwnerRaw->pluck('owner_id'))->pluck('name', 'id');
+        $byOwner = $byOwnerRaw->map(fn ($r) => ['label' => $ownerNames[$r->owner_id] ?? 'غير معروف', 'value' => (int) $r->c])->all();
+
+        // v2.124: قاعدتا تنبيه العقود المبذورتان معطلتين — زر تفعيلٍ بنقرة (لا نفعّل عن المستخدم)
+        $dormantRules = \App\Models\AlertRule::whereNull('deleted_at')->where('mod', 'contracts')
+            ->where('status', '!=', 'مفعّلة')->orderBy('name')->limit(4)->get(['id', 'name']);
+
+        $obUsers = \App\Models\User::whereIn('id', $obligations->pluck('owner_id')->filter())->pluck('name', 'id');
         $currency = setting('app.currency', 'د.ك');
 
-        return view('legal.index', compact('kpi', 'types', 'expiring', 'obligations', 'currency'));
+        return view('legal.index', compact('kpi', 'types', 'expiring', 'obligations', 'currency',
+            'values', 'stuck', 'pendingSteps', 'renewals', 'byOwner', 'dormantRules', 'obUsers'));
+    }
+
+    /** تفعيل قاعدة تنبيه عقود مبذورة معطلة — بنقرة صريحة من المستخدم لا آلياً */
+    public function enableRule(string $id)
+    {
+        abort_unless(hub_can(auth()->user(), 'contracts', 'e'), 403);
+        $rule = \App\Models\AlertRule::whereNull('deleted_at')->where('mod', 'contracts')->findOrFail($id);
+        $rule->forceFill(['status' => 'مفعّلة'])->save();
+        hub_audit('تفعيل قاعدة تنبيه عقود', 'contracts', null, $rule->name);
+
+        return back()->with('ok', 'فُعّلت «' . $rule->name . '» — تعمل مع أتمتة الصباح اليومية');
     }
 }

@@ -44,6 +44,24 @@ class HubDigest extends Command
             $lines[] = 'لا توصيات حرجة الآن — أو أن البيانات غير مكتملة بعد.';
         }
 
+        // v2.124: نبض العقود — أرقام حقيقية فقط، والسطر يُحذف كله عند الصفر
+        try {
+            $active = \App\Models\Contract::where('status', 'ساري')->count();
+            $exp30 = \App\Models\Contract::where('status', 'ساري')->whereNotNull('date_end')
+                ->whereBetween('date_end', [now()->toDateString(), now()->addDays(30)->toDateString()])->count();
+            $unsigned = \App\Models\SignRequest::where('status', 'بانتظار التوقيع')
+                ->whereNull('cancelled_at')->count();
+            $obDue = Schema::hasTable('contract_obligations')
+                ? \App\Models\ContractObligation::whereNotIn('status', ['مكتمل', 'ملغي'])
+                    ->whereNotNull('due')->whereDate('due', '<=', now()->addDays(30))->count()
+                : 0;
+            if ($active + $exp30 + $unsigned + $obDue > 0) {
+                $lines[] = "📜 العقود: {$active} سارٍ · {$exp30} ينتهي خلال ٣٠ يوماً · {$unsigned} بانتظار توقيع · {$obDue} التزام يستحق خلال شهر.";
+            }
+        } catch (\Throwable $e) {
+            // قسم العقود إثراء — لا يُسقط التقرير
+        }
+
         // أبرز مؤشرات KPI المخصصة
         if (Schema::hasTable('kpi_defs') && function_exists('hub_kpis')) {
             $kpis = collect(hub_kpis($owner))->filter(fn ($k) => $k['value'] !== null)->take(5);

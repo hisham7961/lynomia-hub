@@ -208,6 +208,7 @@ Route::middleware('auth')->group(function () {
     Route::get('purchase/{id}/doc', [PurchaseController::class, 'doc'])->name('purchases.doc');
     Route::post('purchase/{id}/act', [PurchaseController::class, 'act'])->name('purchases.act');
     Route::get('legal', [LegalController::class, 'index'])->name('legal');
+    Route::post('legal/rules/{id}/enable', [LegalController::class, 'enableRule'])->name('legal.rule.enable');
     Route::get('support', [SupportController::class, 'index'])->name('support');
     Route::get('performance', [PerformanceController::class, 'index'])->name('performance');
 

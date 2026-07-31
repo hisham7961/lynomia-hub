@@ -58,16 +58,38 @@ class ContractActionsController extends Controller
                 ->with('ok', 'مسودة التجديد قائمة بالفعل: ' . $ex->doc_no);
         }
 
-        $new = $this->copyFrom($c, 'تجديد', 'تجديد');
+        $new = self::spawnRenewal($c);
+        hub_audit('بدء تجديد عقد', 'contracts', $c->id, $c->title . ' → ' . $new->doc_no);
+
+        return redirect()->route('m.show', ['contracts', $new->id])
+            ->with('ok', 'أُنشئت مسودة التجديد ' . $new->doc_no . ' والأصل صار «قيد التجديد»');
+    }
+
+    /**
+     * إنشاء مسودة التجديد وقلب الأصل «قيد التجديد» — يشترك فيها زر التجديد
+     * وأتمتة hub:automation (مسودة قبل النهاية بمدة الإشعار). null = مسودة قائمة.
+     */
+    public static function spawnRenewal(Contract $c): ?Contract
+    {
+        if (Contract::where('parent_id', $c->id)->where('kind', 'تجديد')
+                ->where('status', 'مسودة')->exists()) {
+            return null;
+        }
+
+        $data = collect(self::COPY)->mapWithKeys(fn ($col) => [$col => $c->{$col}])->all();
+        $data['title'] = 'تجديد — ' . mb_substr((string) $c->title, 0, 240);
+        $data['status'] = 'مسودة';
+        $data['parent_id'] = $c->id;
+        $data['kind'] = 'تجديد';
+        $new = Contract::create($data);
+
         if ($c->status === 'ساري' || $c->status === 'منتهي') {
             $c->status = 'قيد التجديد';
             $c->save();
             \App\Support\FlowRunner::fire('renewed', 'contracts', $c);
         }
-        hub_audit('بدء تجديد عقد', 'contracts', $c->id, $c->title . ' → ' . $new->doc_no);
 
-        return redirect()->route('m.show', ['contracts', $new->id])
-            ->with('ok', 'أُنشئت مسودة التجديد ' . $new->doc_no . ' والأصل صار «قيد التجديد»');
+        return $new;
     }
 
     /* ────────── مكتبة البنود (settings — الإدراج نسخٌ بالقيمة) ────────── */

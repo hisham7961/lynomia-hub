@@ -16,7 +16,8 @@ class SignRequest extends Model
     protected $hidden = ['pass'];
     // v2.117: كانت opts تُقرأ بـ json_decode يدوي وexpires_at تُقارن نصاً خاماً
     protected $casts = ['opened_at' => 'datetime', 'signed_at' => 'datetime',
-                        'expires_at' => 'datetime', 'opts' => 'array'];
+                        'expires_at' => 'datetime', 'opts' => 'array',
+                        'sent_at' => 'datetime', 'cancelled_at' => 'datetime'];
 
     public function signers()
     {

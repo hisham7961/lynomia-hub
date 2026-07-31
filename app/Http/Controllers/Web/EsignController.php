@@ -95,7 +95,7 @@ class EsignController extends Controller
      * والمنشئ طلباته، وسوى ذلك عبر نطاق العقد أو الجهة المربوطة — استعلامٌ
      * مجمّع لكل مجموعة لا استعلامان لكل صف.
      */
-    protected function filterVisible($reqs)
+    public function filterVisible($reqs)
     {
         $u = auth()->user();
         if (hub_is_owner($u)) return collect($reqs);

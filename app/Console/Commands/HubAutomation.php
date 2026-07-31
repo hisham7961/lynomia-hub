@@ -34,8 +34,9 @@ class HubAutomation extends Command
         $g = $this->recurring();
         $a = $this->alertRules();
         $e = $this->esignReminders();
+        $c = $this->contractsAuto();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد");
 
         \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.automation'], ['value' => now()->toIso8601String()]);
         \Illuminate\Support\Facades\Cache::forget('settings:all');
@@ -89,6 +90,55 @@ class HubAutomation extends Command
         }
 
         return $sent;
+    }
+
+    /**
+     * CLM م8: أتمتة دورة العقد.
+     *  - الانتهاء التلقائي: ساري تجاوز نهايته → «منتهي» بحفظ Eloquent فيطلق
+     *    contract.expired فعلاً لأول مرة — خلف setting('contracts.auto_expire')
+     *    المعطل افتراضياً لإصدارٍ كامل (قرار الانقلاب الآلي للمنشأة لا لنا).
+     *  - مسودة التجديد المبكرة: عقدٌ تجديده «تلقائي» وحقل الإشعار notice مضبوط
+     *    تُبنى مسودة تجديده قبل النهاية بمدة الإشعار (idempotent عبر spawnRenewal).
+     */
+    protected function contractsAuto(): array
+    {
+        $expired = 0; $drafts = 0;
+        try {
+            if (setting('contracts.auto_expire') === '1') {
+                $due = \App\Models\Contract::where('status', 'ساري')
+                    ->whereNotNull('date_end')->whereDate('date_end', '<', today())->limit(200)->get();
+                foreach ($due as $c) {
+                    if (! $this->dry) {
+                        $c->status = 'منتهي';
+                        $c->save();
+                        \App\Support\FlowRunner::fire('status', 'contracts', $c, 'منتهي');
+                        $this->notifyMonitors('contract-exp',
+                            'انتهى العقد «' . \Illuminate\Support\Str::limit($c->title, 60) . '» تلقائياً بتجاوز نهايته',
+                            'contracts', $c->id);
+                    }
+                    $expired++;
+                }
+            }
+
+            $renewable = \App\Models\Contract::where('status', 'ساري')->where('renewal', 'تلقائي')
+                ->whereNotNull('notice')->where('notice', '>', 0)->whereNotNull('date_end')->limit(200)->get()
+                ->filter(fn ($c) => \Illuminate\Support\Carbon::parse($c->date_end)
+                    ->lte(today()->addDays((int) $c->notice)));
+            foreach ($renewable as $c) {
+                if ($this->dry) { $drafts++; continue; }
+                if ($new = \App\Http\Controllers\Web\ContractActionsController::spawnRenewal($c)) {
+                    $drafts++;
+                    $this->notifyMonitors('contract-renew',
+                        'أُنشئت مسودة تجديد «' . \Illuminate\Support\Str::limit($c->title, 60)
+                            . '» (' . $new->doc_no . ') قبل نهايته بمدة الإشعار — راجعها وأرسلها',
+                        'contracts', $new->id);
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e);   // أتمتة العقود لا تُسقط بقية المحرك
+        }
+
+        return ['expired' => $expired, 'drafts' => $drafts];
     }
 
     /* ───── 1) المصروفات المتكررة ───── */
