@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\ErrorEvent;
+use App\Support\SysMonitor;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -45,6 +46,19 @@ class OpsController extends Controller
             'uptime'    => is_readable('/proc/uptime') ? (int) floatval(file_get_contents('/proc/uptime')) : null,
         ];
 
+        // الاستهلاك الحقيقي و**من يستهلك** — الرقم بلا فاعلٍ لا يُعالَج:
+        // «الحمل ٢٫٤» بلا عدد أنوية لا يقول أهو ٦٠٪ أم ٢٤٠٪، و«القرص ٩١٪»
+        // بلا تفصيلٍ لا يُخلي بايتاً واحداً.
+        $cpu = SysMonitor::cpu();
+        $mem = SysMonitor::memory();
+        $consumers = [
+            'disk'   => SysMonitor::diskConsumers(),
+            'tables' => SysMonitor::tableConsumers(),
+            'slow'   => SysMonitor::slowRoutes(),
+            'busy'   => SysMonitor::busyRoutes(),
+        ];
+        $pulse = SysMonitor::pulse();
+
         // طوابير الرسائل
         $outbox = DB::table('outbox')->select('state', DB::raw('COUNT(*) c'))->groupBy('state')->pluck('c', 'state');
 
@@ -85,17 +99,6 @@ class OpsController extends Controller
         } catch (\Throwable $e) {
         }
 
-        // أثقل الجداول — أين تنمو القاعدة فعلاً (MySQL؛ وفي SQLite حجم الملف يكفي أعلاه)
-        $tables = [];
-        try {
-            if ($db['driver'] === 'mysql') {
-                $tables = DB::select('SELECT table_name t, table_rows r, (data_length + index_length) s
-                    FROM information_schema.tables WHERE table_schema = DATABASE()
-                    ORDER BY s DESC LIMIT 8');
-            }
-        } catch (\Throwable $e) {
-        }
-
         // آخر أسطر الأخطاء من ملف اللوغ — بلا SSH: آخر ٦٤ك.ب فقط ثم سطور ERROR الأخيرة
         $logLines = [];
         try {
@@ -122,8 +125,8 @@ class OpsController extends Controller
             'maint'  => (bool) setting('maintenance.on', false),
         ];
 
-        return view('ops.index', compact('db', 'sys', 'outbox', 'beats', 'backup', 'errs', 'pending',
-            'live', 'tables', 'logLines', 'env'));
+        return view('ops.index', compact('db', 'sys', 'cpu', 'mem', 'consumers', 'pulse', 'outbox',
+            'beats', 'backup', 'errs', 'pending', 'live', 'logLines', 'env'));
     }
 
     /** نسخة احتياطية فورية بضغطة — دورة «النشر بلا طرفية» تكتمل بها */
