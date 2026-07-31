@@ -3280,6 +3280,13 @@ return [
                     ],
                 ],
                 [
+                    'key' => 'bankId',
+                    'col' => 'bank_id',
+                    'label' => 'الحساب البنكي / الصندوق',
+                    'type' => 'ref',
+                    'ref' => 'banks',
+                ],
+                [
                     'key' => 'ccId',
                     'col' => 'cc_id',
                     'label' => 'مركز التكلفة',

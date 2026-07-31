@@ -62,6 +62,9 @@
         @if ($module === 'purchases')
             @include('partials.purchase_actions')
         @endif
+        @if ($module === 'fin')
+            @include('partials.fin_actions')
+        @endif
         @if ($module === 'tickets')
             @include('partials.ticket_sla')
         @endif

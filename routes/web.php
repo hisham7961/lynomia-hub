@@ -204,6 +204,7 @@ Route::middleware('auth')->group(function () {
     Route::get('app/{id}', [AppCenterController::class, 'show'])->name('apps.center');
     Route::get('quote/{id}/doc', [QuoteController::class, 'doc'])->name('quotes.doc');
     Route::post('quote/{id}/act', [QuoteController::class, 'act'])->name('quotes.act');
+    Route::post('fin/{id}/act', [\App\Http\Controllers\Web\FinController::class, 'act'])->name('fin.act');
     Route::get('supplier-scores', [PurchaseController::class, 'scores'])->name('supplierscores');
     Route::get('purchase/{id}/doc', [PurchaseController::class, 'doc'])->name('purchases.doc');
     Route::post('purchase/{id}/act', [PurchaseController::class, 'act'])->name('purchases.act');
