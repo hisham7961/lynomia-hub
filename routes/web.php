@@ -210,6 +210,7 @@ Route::middleware('auth')->group(function () {
     Route::post('entry/{id}/post', [\App\Http\Controllers\Web\EntryController::class, 'post'])->name('entries.post');
     Route::post('stockmv/{id}/act', [\App\Http\Controllers\Web\StockController::class, 'act'])->name('stockmv.act');
     Route::post('payroll/{id}/act', [\App\Http\Controllers\Web\PayrollController::class, 'act'])->name('payroll.act');
+    Route::post('candidates/{id}/hire', [\App\Http\Controllers\Web\HireController::class, 'hire'])->name('recruit.hire');
     Route::get('supplier-scores', [PurchaseController::class, 'scores'])->name('supplierscores');
     Route::get('purchase/{id}/doc', [PurchaseController::class, 'doc'])->name('purchases.doc');
     Route::post('purchase/{id}/act', [PurchaseController::class, 'act'])->name('purchases.act');

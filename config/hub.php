@@ -4378,6 +4378,12 @@ return [
                 'iqamaExp',
             ],
             'fields' => [
+                ['key' => 'email', 'col' => 'email', 'label' => 'البريد الإلكتروني', 'type' => 'text'],
+                ['key' => 'phone', 'col' => 'phone', 'label' => 'رقم الهاتف', 'type' => 'text'],
+                ['key' => 'nationality', 'col' => 'nationality', 'label' => 'الجنسية', 'type' => 'text'],
+                ['key' => 'civilId', 'col' => 'civil_id', 'label' => 'الرقم المدني', 'type' => 'text'],
+                ['key' => 'iban', 'col' => 'iban', 'label' => 'IBAN للتحويل', 'type' => 'text'],
+                ['key' => 'emergency', 'col' => 'emergency', 'label' => 'جهة اتصال للطوارئ (اسم وهاتف)', 'type' => 'text'],
                 [
                     'key' => 'name',
                     'col' => 'name',
