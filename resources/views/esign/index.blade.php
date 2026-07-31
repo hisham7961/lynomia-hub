@@ -98,7 +98,7 @@
             <tr>
                 <td>{{ $q->title }}</td>
                 <td>@if ($l = $q->linkLabel())<a href="{{ $q->linkUrl() }}" class="sub">{{ $l }}</a>@else<span class="sub">—</span>@endif</td>
-                <td><span class="bdg {{ $q->status === 'وُقّع' ? 'ok' : 'wn' }}">{{ $q->status }}</span></td>
+                <td><span class="bdg {{ $q->status === 'وُقّع' ? 'ok' : ($q->status === 'رُفض' ? 'bad' : 'wn') }}">{{ $q->status }}</span></td>
                 <td>{{ $q->signer_name ?: '—' }}</td>
                 <td class="mono sub">{{ $q->opens }}×{{ $q->opened_at ? ' · ' . $q->opened_at->format('m-d H:i') : '' }}</td>
                 <td class="mono sub">{{ $q->signed_at?->format('Y-m-d H:i') ?: '—' }}</td>

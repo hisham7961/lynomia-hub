@@ -243,7 +243,10 @@ class ModuleController extends Controller
         // عقدٌ غير موقّع → تحويله لمسار التوقيع الإلكتروني: يُضبط على «قيد التوقيع»
         // ويُنقل المستخدم لإنشاء طلب التوقيع مربوطاً بهذا العقد، مُهيَّأ سلفاً.
         if ($module === 'contracts' && $r->boolean('to_esign') && hub_can(auth()->user(), 'contracts', 'a')) {
-            $m->forceFill(['status' => 'قيد التوقيع'])->saveQuietly();
+            // v2.117: حفظٌ حقيقي لا saveQuietly — الانقلاب يُدقَّق ويُصدَر وتلتقطه المسارات
+            $m->status = 'قيد التوقيع';
+            $m->save();
+            \App\Support\FlowRunner::fire('status', $module, $m, 'قيد التوقيع');
 
             return redirect()->route('esign.index', [
                 'contract' => $m->id,

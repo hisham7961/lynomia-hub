@@ -131,15 +131,22 @@ class EsignProTest extends TestCase
             ->assertSee($req->verify_code)->assertSee('بصمة الوثيقة');
     }
 
-    /** صفحة التحقق العلنية: الرمز الصحيح يطابق، والخاطئ يرفض، بلا كشف النص */
+    /** صفحة التحقق العلنية: الرمز الصحيح يطابق الموقَّع، والخاطئ يرفض، بلا كشف النص */
     public function test_public_verify_page(): void
     {
         $this->seedCore();
         $req = $this->makeReq();
+        // v2.117: التحقق للموقَّع فقط — المسودة لا نسخة معتمدة لها فلا يُكشف وجودها
+        $this->post("/sign/{$req->token}/unlock", ['pass' => 'p1234']);
+        $this->get("/sign/{$req->token}");
+        $this->post("/sign/{$req->token}", [
+            'signer_name' => 'موقّع التحقق',
+            'signature' => 'data:image/png;base64,' . base64_encode(str_repeat('x', 120)),
+        ])->assertOk();
         auth()->logout();
 
         $this->post('/verify', ['code' => $req->verify_code])
-            ->assertOk()->assertSee('مستند أصلي')->assertSee($req->doc_hash)
+            ->assertOk()->assertSee('مستند أصلي')->assertSee($req->fresh()->doc_hash)
             ->assertDontSee('نص عقدٍ حرٍّ');   // لا يكشف المحتوى
 
         $this->post('/verify', ['code' => 'LYN-0000-0000'])->assertOk()->assertSee('لا مستند بهذا الرمز');

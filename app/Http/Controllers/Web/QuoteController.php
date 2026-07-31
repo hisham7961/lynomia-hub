@@ -74,9 +74,11 @@ class QuoteController extends Controller
             'party'      => $q->client_id ? Client::find($q->client_id)?->name : null,
             'value'      => $q->total,
             'currency'   => $q->currency,
-            'start'      => now()->toDateString(),
+            // v2.117: كان يكتب عمود start الوهمي (الصحيح date_start → انفجار 500 على
+            // MySQL) وحالة «نشط» الخارجة عن خيارات الوحدة فلا كانبان ولا حدث يلتقطها
+            'date_start' => now()->toDateString(),
             'owner_id'   => $q->owner_id ?: auth()->id(),
-            'status'     => 'نشط',
+            'status'     => 'ساري',
             'notes'      => 'أُنشئ تلقائياً من عرض السعر ' . $q->doc_no
                           . ($q->terms ? "\n\nالشروط المتفق عليها:\n" . Str::limit($q->terms, 1500) : ''),
         ]);

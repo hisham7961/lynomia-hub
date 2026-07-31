@@ -13,7 +13,9 @@ class SignRequest extends Model
     protected $table = 'sign_requests';
     protected $guarded = ['id'];
     protected $hidden = ['pass'];
-    protected $casts = ['opened_at' => 'datetime', 'signed_at' => 'datetime'];
+    // v2.117: كانت opts تُقرأ بـ json_decode يدوي وexpires_at تُقارن نصاً خاماً
+    protected $casts = ['opened_at' => 'datetime', 'signed_at' => 'datetime',
+                        'expires_at' => 'datetime', 'opts' => 'array'];
 
     /** اسم الجهة المرتبطة معروضاً — «👤 مطاعم الذواقة» أو null */
     public function linkLabel(): ?string

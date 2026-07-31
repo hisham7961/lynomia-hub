@@ -63,7 +63,11 @@ class EsignController extends Controller
 
         return view('esign.index', [
             'templates' => SignTemplate::orderBy('sort')->orderBy('name')->get(),
-            'requests'  => SignRequest::orderByDesc('created_at')->limit(60)->get(),
+            // v2.117: القائمة كانت تعرض طلبات كل الشركات بلا تنطيق — تُرشَّح الآن
+            // عبر نطاق العقد/الجهة المربوطة والمنشئ (وcompany_id مباشرةً يأتي في م2)
+            'requests'  => $this->filterVisible(
+                SignRequest::orderByDesc('created_at')->limit(200)->get()
+            )->take(60)->values(),
             'contracts' => hub_scope(\App\Models\Contract::query(), 'contracts')
                 ->orderByDesc('created_at')->limit(200)->pluck('title', 'id'),
             'links'     => $links,
@@ -72,6 +76,42 @@ class EsignController extends Controller
             'preTitle'    => request('title'),
             'preLink'     => request('link'),
         ]);
+    }
+
+    /**
+     * الرؤية المرحلية لطلب التوقيع (حتى تصل company_id في م2): المالك يرى الكل،
+     * والمنشئ طلباته، وسوى ذلك عبر نطاق العقد أو الجهة المربوطة — استعلامٌ
+     * مجمّع لكل مجموعة لا استعلامان لكل صف.
+     */
+    protected function filterVisible($reqs)
+    {
+        $u = auth()->user();
+        if (hub_is_owner($u)) return collect($reqs);
+        $reqs = collect($reqs);
+
+        $okContracts = hub_scope(\App\Models\Contract::query(), 'contracts')
+            ->whereIn('id', $reqs->pluck('contract_id')->filter()->unique())
+            ->pluck('id')->flip();
+
+        $okLinks = [];
+        foreach ($reqs->whereNotNull('link_module')->groupBy('link_module') as $mk => $group) {
+            $def = hub_mod($mk);
+            if (! $def || ! hub_can($u, $mk, 'v')) continue;
+            $cls = '\\App\\Models\\' . $def['model'];
+            if (! class_exists($cls)) continue;
+            $ids = hub_scope($cls::query(), $mk)->whereIn('id', $group->pluck('link_id')->filter())->pluck('id');
+            foreach ($ids as $i) $okLinks["$mk:$i"] = true;
+        }
+
+        return $reqs->filter(fn ($q) => $q->created_by === $u->id
+            || ($q->contract_id && isset($okContracts[$q->contract_id]))
+            || ($q->link_module && $q->link_id && isset($okLinks["{$q->link_module}:{$q->link_id}"])));
+    }
+
+    /** حارس السجل الواحد — 404 لا 403 كي لا يُكشف وجود ما خارج النطاق */
+    protected function guardRequest(SignRequest $req): void
+    {
+        abort_if($this->filterVisible([$req])->isEmpty(), 404);
     }
 
     public function storeTemplate(Request $r)
@@ -87,6 +127,10 @@ class EsignController extends Controller
     public function destroyTemplate(string $id)
     {
         $this->gate('d');
+        // v2.117: قالبٌ أنتج طلبات توقيع لا يُحذف — سجل المصدر جزء من أثر الوثيقة
+        if (SignRequest::where('template_id', $id)->exists()) {
+            return back()->with('err', 'هذا القالب مستعمل في طلبات توقيع قائمة — لا يُحذف حفاظاً على أثرها');
+        }
         SignTemplate::findOrFail($id)->delete();
 
         return back()->with('ok', 'حُذف القالب');
@@ -115,6 +159,14 @@ class EsignController extends Controller
             if ($exists) { $linkModule = $lm; $linkId = $li; }
         }
 
+        // v2.117: العقد المربوط كان يُقبل نصاً حراً بلا وجودٍ ولا نطاق — فيُلوَّث عقدٌ
+        // خارج نطاق المستخدم. الآن: موجودٌ وداخل النطاق أو يُرفض الطلب كله بوضوح
+        $contractId = ($d['contract_id'] ?? null) ?: null;
+        if ($contractId !== null
+            && ! hub_scope(\App\Models\Contract::query(), 'contracts')->whereKey($contractId)->exists()) {
+            return back()->with('err', 'العقد المحدد غير موجود أو خارج نطاقك')->withInput();
+        }
+
         // النص: من قالبٍ بمتغيراته، أو نصٌّ حرٌّ يكتبه المستخدم كاملاً
         if (! empty($d['template_id'])) {
             $tpl = SignTemplate::findOrFail($d['template_id']);
@@ -131,32 +183,46 @@ class EsignController extends Controller
 
         $req = SignRequest::create([
             'title' => $d['title'], 'template_id' => $d['template_id'] ?? null,
-            'contract_id' => ($d['contract_id'] ?? null) ?: null,
+            'contract_id' => $contractId,
             'link_module' => $linkModule, 'link_id' => $linkId,
             'body' => $body, 'pass' => Hash::make($d['pass']),
             'token' => Str::random(48),
             'verify_code' => self::makeVerifyCode(),
             'doc_hash' => hash('sha256', $body),
-            'opts' => json_encode([
+            // cast مصفوفة (v2.117) — لا json_encode يدوي وإلا ترمّز مرتين
+            'opts' => [
                 'selfie'  => (bool) ($d['opt_selfie'] ?? false),
                 'idno'    => (bool) ($d['opt_idno'] ?? false),
                 'decline' => (bool) ($d['opt_decline'] ?? true),
-            ]),
+            ],
             'expires_at' => ! empty($d['expire_days']) ? now()->addDays((int) $d['expire_days']) : null,
             'created_by' => auth()->id(),
         ]);
 
-        // عقدٌ مربوط → حالته «قيد التوقيع» تلقائياً (سير العملية يبدأ)
-        if ($req->contract_id) {
-            \App\Models\Contract::where('id', $req->contract_id)
-                ->whereIn('status', ['مسودة', 'قيد التوقيع', ''])->update(['status' => 'قيد التوقيع']);
-        }
+        // عقدٌ مربوط → «قيد التوقيع» — بحفظ Eloquent حقيقي (v2.117) فيمر بالتدقيق
+        // والإصدارات ومسارات العمل، لا بتحديث query-builder صامت
+        $this->flipContract($req->contract_id, ['مسودة', 'قيد التوقيع', ''], 'قيد التوقيع');
 
         hub_audit('إنشاء طلب توقيع', $linkModule ?: 'contracts', $linkId ?: $req->contract_id, $d['title']);
 
         return redirect()->route('esign.edit', $req->id)
             ->with('ok', 'أُنشئ الطلب — راجع نص العقد وحرّره كما تشاء، ثم انسخ الرابط وأرسله')
             ->with('sign_link', route('sign.show', $req->token));
+    }
+
+    /**
+     * انقلاب حالة العقد المربوط بحفظ Eloquent (v2.117): كان saveQuietly/التحديث المباشر
+     * يتجاوز Auditable وHasVersions وFlowRunner — فلا يُطلق contract.signed أبداً في
+     * مسار التوقيع الفعلي. الآن يمر بكل البوابات ويُطلق الحدث الدلالي.
+     */
+    protected function flipContract(?string $contractId, array $from, string $to): void
+    {
+        if (! $contractId) return;
+        $c = \App\Models\Contract::whereKey($contractId)->whereIn('status', $from)->first();
+        if (! $c || (string) $c->status === $to) return;
+        $c->status = $to;
+        $c->save();
+        \App\Support\FlowRunner::fire('status', 'contracts', $c, $to);
     }
 
     /** رمز تحقق قصير فريد للمستند — يُطابَق به معنا */
@@ -174,6 +240,7 @@ class EsignController extends Controller
     {
         $this->gate('e');
         $req = SignRequest::findOrFail($id);
+        $this->guardRequest($req);
 
         return view('esign.edit', ['req' => $req]);
     }
@@ -182,16 +249,34 @@ class EsignController extends Controller
     {
         $this->gate('e');
         $req = SignRequest::findOrFail($id);
+        $this->guardRequest($req);
         abort_if($req->status === 'وُقّع', 410, 'وثيقة موقعة لا تُحرَّر — أنشئ طلباً جديداً');
 
         $d = $r->validate(['title' => 'required|string|max:200', 'body' => 'required|string|max:200000']);
+
+        // v2.117: تعديل نصٍّ اطّلع عليه الموقّع كان صامتاً — الرابط والجلسة يبقيان
+        // على النص الجديد بلا علمه. الآن يدور الرمز: الرابط القديم يموت، وجلسته معه
+        // (مفتاحها الرمز)، ويُدقَّق التدوير، وعلى المرسل مشاركة الرابط الجديد
+        $rotated = false;
+        if ($d['body'] !== $req->body && $req->opened_at) {
+            $req->token = Str::random(48);
+            $rotated = true;
+        }
+
         $req->forceFill([
             'title' => $d['title'], 'body' => $d['body'],
             'doc_hash' => hash('sha256', $d['body']),   // بصمة جديدة للنص الجديد
         ])->save();
         hub_audit('تحرير طلب توقيع', 'contracts', $req->contract_id, $req->title);
+        if ($rotated) {
+            hub_audit('تحرير بعد الاطلاع — تدوير رابط التوقيع', 'contracts', $req->contract_id, $req->title);
+            $this->notifyOwners('🔄 عُدّل نص «' . $req->title . '» بعد اطلاع الموقّع — الرابط القديم أُبطل وصدر رابط جديد');
+        }
 
-        return redirect()->route('esign.edit', $req->id)->with('ok', 'حُفظ النص وتجدّدت بصمة الوثيقة')
+        return redirect()->route('esign.edit', $req->id)
+            ->with('ok', $rotated
+                ? 'حُفظ النص وتجدّدت بصمة الوثيقة — وثيقةٌ مُطَّلعٌ عليها: أُبطل الرابط القديم فشارك الجديد'
+                : 'حُفظ النص وتجدّدت بصمة الوثيقة')
             ->with('sign_link', route('sign.show', $req->token));
     }
 
@@ -199,8 +284,10 @@ class EsignController extends Controller
     public function doc(string $id)
     {
         $this->gate();
+        $req = SignRequest::findOrFail($id);
+        $this->guardRequest($req);
 
-        return view('esign.doc', ['req' => SignRequest::findOrFail($id)]);
+        return view('esign.doc', ['req' => $req]);
     }
 
     /* ────────── الجهة العامة (العميل) ────────── */
@@ -225,7 +312,7 @@ class EsignController extends Controller
         }
         $req->increment('opens');
 
-        return view('sign.show', ['req' => $req, 'opts' => json_decode((string) $req->opts, true) ?: []]);
+        return view('sign.show', ['req' => $req, 'opts' => $req->opts ?: []]);
     }
 
     /** رفض التوقيع — إن كان الخيار مفعّلاً لهذا الطلب */
@@ -234,11 +321,18 @@ class EsignController extends Controller
         $req = SignRequest::where('token', $token)->firstOrFail();
         abort_unless(session("sign.ok.{$token}"), 403);
         abort_if($req->status !== 'بانتظار التوقيع', 410);
-        $opts = json_decode((string) $req->opts, true) ?: [];
+        $opts = $req->opts ?: [];
         abort_unless($opts['decline'] ?? true, 403, 'الرفض غير متاح لهذه الوثيقة');
 
         $d = $r->validate(['reason' => 'required|string|max:400']);
         $req->forceFill(['status' => 'رُفض', 'declined_reason' => $d['reason']])->save();
+
+        // v2.117: الرفض كان يترك العقد المربوط معلقاً «قيد التوقيع» للأبد — يعود مسودةً
+        // ليُراجَع ويُعاد إرساله، والانقلاب مدقق ويطلق مسارات العمل كأي تغيير حالة
+        if ($req->contract_id) {
+            $this->flipContract($req->contract_id, ['قيد التوقيع'], 'مسودة');
+            hub_audit('إعادة عقد لمسودة بعد رفض التوقيع', 'contracts', $req->contract_id, $req->title);
+        }
 
         // موافقة موجهة رفض صاحبها التوقيع → «مرفوض» بسبب موثق (الملزِمة تُحسم من شاشتها)
         if ($req->link_module === 'approvals' && $req->link_id) {
@@ -279,7 +373,9 @@ class EsignController extends Controller
                 return view('sign.verify', ['code' => $code, 'found' => null, 'throttled' => true]);
             }
             RateLimiter::hit($key, 60);
-            $found = SignRequest::where('verify_code', $code)->first();
+            // v2.117: الموقعة فقط — الرد على رموز المسودات كان يكشف وجودها وعناوينها
+            // لمن يجرب الرموز (الغرض أصالة نسخةٍ بيدك، والمسودة لا نسخة معتمدة لها)
+            $found = SignRequest::where('verify_code', $code)->where('status', 'وُقّع')->first();
         }
 
         return view('sign.verify', ['code' => $code, 'found' => $found, 'throttled' => false]);
@@ -311,7 +407,7 @@ class EsignController extends Controller
         abort_unless(session("sign.ok.{$token}"), 403);
         abort_if($req->status !== 'بانتظار التوقيع', 410, 'هذه الوثيقة أُغلقت — وُقّعت أو رُفضت مسبقاً');
 
-        $opts = json_decode((string) $req->opts, true) ?: [];
+        $opts = $req->opts ?: [];
         $d = $r->validate([
             'signer_name' => 'required|string|max:160',
             'signature'   => 'required|string|min:100|max:400000|starts_with:data:image/png',
@@ -330,10 +426,10 @@ class EsignController extends Controller
             'signed_locale' => substr((string) $r->header('Accept-Language'), 0, 60),
         ])->save();
 
-        // سير العملية يكتمل: العقد المربوط يصير «ساري» تلقائياً عند التوقيع
+        // سير العملية يكتمل: العقد المربوط «ساري» — بحفظ Eloquent (v2.117) فيُدقَّق
+        // ويُصدَر ويُطلق contract.signed فعلاً (كان التحديث المباشر يخرسه)
         if ($req->contract_id) {
-            \App\Models\Contract::where('id', $req->contract_id)
-                ->whereIn('status', ['قيد التوقيع', 'مسودة'])->update(['status' => 'ساري']);
+            $this->flipContract($req->contract_id, ['قيد التوقيع', 'مسودة'], 'ساري');
             $this->notifyOwners('📑 العقد المرتبط بـ«' . $req->title . '» صار «ساري» بعد توقيعه');
         }
         $this->completeLinked($req, $d['signer_name'], $r);
