@@ -16,7 +16,7 @@
 <body>
 <div id="topload"></div>
 @if (setting('demo.on'))
-    <div style="background:repeating-linear-gradient(45deg,#7c3aed,#7c3aed 14px,#6d28d9 14px,#6d28d9 28px);color:#fff;text-align:center;padding:6px 12px;font-size:13px;font-weight:700">
+    <div class="demoband">
         🎭 وضع تجريبي — البيانات الموسومة 🎭 وهمية للتدريب والتجربة
         @if (auth()->check() && hub_is_owner())
             <form class="inline" method="POST" action="{{ route('demo.reset') }}" data-confirm="تصفير البيانات التجريبية وإعادة توليدها من جديد؟">@csrf<button class="btn ghost xs" style="color:#fff;border-color:#ffffff88">↺ تصفير</button></form>

@@ -397,6 +397,10 @@ html[data-theme="dark"] .seg{background:color-mix(in srgb,var(--cd) 88%,transpar
   background:color-mix(in srgb,var(--p) 14%,transparent);color:var(--p);font-size:10px;font-weight:800}
 .kempty{border:1.5px dashed var(--ln);border-radius:10px;padding:14px 10px;text-align:center;font-size:12px}
 
+/* ═ بانر الوضع التجريبي ═ */
+.demoband{background:repeating-linear-gradient(45deg,#7c3aed,#7c3aed 14px,#6d28d9 14px,#6d28d9 28px);
+  color:#fff;text-align:center;padding:6px 12px;font-size:13px;font-weight:700}
+
 /* ═ الإجراءات الجماعية (v2.114) ═ */
 th.bsel,td.bsel{width:34px;text-align:center;padding-inline:8px}
 .bsel input{width:15px;height:15px;accent-color:var(--p);cursor:pointer}
@@ -851,3 +855,34 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .chip:has(input:checked){background:var(--pss);border-color:var(--p);color:var(--pd);font-weight:700}
 .chip:has(input:checked) span::before{content:"✓ "}
 .chip:has(input:focus-visible){box-shadow:var(--ring)}
+
+/* ═ كثافة الجوال (v2.115): الترويسات كانت تلتهم ٦٣٢ من ٨٤٤ بكسل قبل أول صف بيانات ═ */
+@media (max-width:760px){
+  .demoband{font-size:11px;padding:3px 8px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}
+  /* أزرار البانر الرفيع تُستثنى من حد اللمس ٤٠ بكسل — سطرٌ إعلامي لا منطقة عمل */
+  .demoband .btn.xs{min-height:0;padding-block:2px}
+  .topbar{padding:7px 10px;gap:6px 8px}
+  .topbar .crumb{font-size:14.5px}
+  .topbar select.inp{max-width:130px;padding:6px 8px;font-size:12px}
+  /* الحرف الأول في الدائرة يكفي هويةً على الجوال — الاسم الكامل في صفحة الملف */
+  .topbar .uname{display:none}
+  .gsearch .inp{padding:6px 12px}
+  .content{padding:10px 10px 30px}
+  .modhero{gap:10px;margin-bottom:8px}
+  .mhico{width:34px;height:34px;font-size:17px;border-radius:10px}
+  .modhero h2{font-size:16.5px}
+  .modhero .sub{font-size:11px}
+  /* أفعال الترويسة والفلاتر: سطرٌ واحد ينزلق أفقياً بدل التراص عمودياً */
+  .rh-acts{flex-basis:100%;display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .rh-acts::-webkit-scrollbar{display:none}
+  .rh-acts .btn{flex-shrink:0;white-space:nowrap}
+  /* الفعل الأول («＋ جديد») يتصدر صف الانزلاق — لا يُدفن آخر السطر خارج العرض */
+  .rh-acts .btn.p{order:-1}
+  /* شريط الأدوات كله سطرٌ واحد ينزلق أفقياً — لا تراص عمودي يدفن الجدول */
+  .toolbar{margin-bottom:8px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .toolbar::-webkit-scrollbar{display:none}
+  .toolbar>*,.toolbar .btn{flex-shrink:0;white-space:nowrap}
+  .toolbar .filters{flex-wrap:nowrap}
+  .filters .inp{min-width:140px;flex-shrink:0}
+  .filters select.inp{min-width:120px}
+}
