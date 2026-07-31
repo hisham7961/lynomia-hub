@@ -109,13 +109,21 @@ class ModuleController extends Controller
         ]);
     }
 
-    public function create(string $module)
+    public function create(Request $r, string $module)
     {
         [$def] = $this->resolve($module, 'a');
 
+        // تعبئة مسبقة من الرابط (زر ＋ داخل عمود الكانبان مثلاً يمرر الحالة):
+        // تُقبل مفاتيح حقول الوحدة فقط وبقيم نصية — والتحقق الكامل يبقى عند الحفظ
+        $prefill = [];
+        foreach ($def['fields'] ?? [] as $f) {
+            $v = $r->query($f['key']);
+            if (is_string($v) && $v !== '') $prefill[$f['key']] = $v;
+        }
+
         return view('modules.form', [
             'module' => $module, 'def' => $def, 'row' => null,
-            'refOptions' => $this->refOptions($def),
+            'refOptions' => $this->refOptions($def), 'prefill' => $prefill,
         ]);
     }
 
@@ -302,7 +310,23 @@ class ModuleController extends Controller
             $cols[$st][] = $row;
         }
 
-        return view('modules.board', compact('module', 'def', 'cols', 'disp', 'statusCol'));
+        // إثراء البطاقات من تعريف الوحدة نفسه — يعمل لأي وحدة لها حالة دون تخصيص:
+        // المسؤول (أول مرجع مفرد لمستخدم)، الاستحقاق (أول حقل تاريخ استحقاقي)،
+        // الأولوية (حقل sel باسم priority)، والمرجع الأب (أول مرجع مفرد غير المستخدمين)
+        $fields = collect($def['fields'] ?? []);
+        $assigneeF = $fields->first(fn ($f) => ($f['type'] ?? '') === 'ref' && ($f['ref'] ?? '') === 'users' && empty($f['multi']));
+        $dueF = $fields->first(fn ($f) => ($f['type'] ?? '') === 'date' && preg_match('/due|end|deadline/i', $f['col']))
+            ?? $fields->first(fn ($f) => ($f['type'] ?? '') === 'date');
+        $prioF = $fields->first(fn ($f) => ($f['key'] ?? '') === 'priority' && ($f['type'] ?? '') === 'sel');
+        $refF = $fields->first(fn ($f) => ($f['type'] ?? '') === 'ref' && ($f['ref'] ?? '') !== 'users' && empty($f['multi']));
+
+        $assigneeNames = $assigneeF ? hub_ref_labels('users', $rows->pluck($assigneeF['col'])->all()) : [];
+        $refNames = $refF ? hub_ref_labels($refF['ref'], $rows->pluck($refF['col'])->all()) : [];
+
+        return view('modules.board', compact(
+            'module', 'def', 'cols', 'disp', 'statusCol',
+            'assigneeF', 'dueF', 'prioF', 'refF', 'assigneeNames', 'refNames'
+        ));
     }
 
     /** تغيير حالة سجل (سحب وإفلات الكانبان) */

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>صيانة — {{ setting('app.name', config('app.name')) }}</title>
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap" rel="stylesheet">
+<link href="{{ asset('css/fonts.css') }}?v={{ config('hub.version') }}" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ config('hub.version') }}">
 </head>
 <body class="loginbg">

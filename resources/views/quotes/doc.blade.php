@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>عرض سعر {{ $q->doc_no }} — {{ setting('app.name', config('app.name')) }}</title>
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link href="{{ asset('css/fonts.css') }}?v={{ config('hub.version') }}" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Tajawal,sans-serif;color:#1c2b28;background:#f2f5f4;padding:20px;font-size:14px;line-height:1.7}

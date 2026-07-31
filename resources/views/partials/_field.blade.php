@@ -1,6 +1,7 @@
 @php
     $k = $f['key']; $c = $f['col']; $t = $f['type'];
-    $raw = $row?->{$c};
+    // التعبئة المسبقة تعمل في الإضافة فقط — التعديل يعرض قيم السجل حصراً
+    $raw = $row ? $row->{$c} : (($prefill ?? [])[$k] ?? null);
     $wide = in_array($t, ['ta', 'tags']) || ! empty($f['multi']);
 @endphp
 <div class="fld {{ $wide ? 'fw' : '' }} @error($k) haserr @enderror">

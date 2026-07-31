@@ -4,7 +4,9 @@
    نفس عقد الأصناف تماماً: لا تغيير في أي قالب أو منطق
    ═══════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Tajawal:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
+/* الخطوط مستضافة ذاتياً (fonts.css بجوار هذا الملف) — كانت تُستورد من Google Fonts
+   فتبطئ أول تحميل وتكسر الواجهة دون إنترنت رغم وعد الـPWA بالعمل بلا اتصال */
+@import url('fonts.css');
 
 :root{
   /* الهوية — الأخضر لكنةٌ لا لونٌ غالب. تُستبدل من الإعدادات (hub_brand_css) */
@@ -375,6 +377,18 @@ html[data-theme="dark"] .seg{background:color-mix(in srgb,var(--cd) 88%,transpar
 .kcard:hover{box-shadow:var(--shh);border-color:color-mix(in srgb,var(--p) 30%,var(--ln));transform:translateY(-1px)}
 .kcard a{color:var(--tx);font-weight:600}
 .kcard.drag{opacity:.45;transform:rotate(2deg) scale(1.02);cursor:grabbing}
+.kadd{margin-inline-start:auto;width:22px;height:22px;display:grid;place-items:center;border-radius:7px;
+  color:var(--sb);font-weight:700;line-height:1;transition:background var(--t),color var(--t)}
+.kadd:hover{background:color-mix(in srgb,var(--p) 12%,transparent);color:var(--p)}
+.khead .kcount{margin-inline-start:6px}
+.kref{margin-top:3px;font-size:11.5px}
+.kmeta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px;font-size:11px;color:var(--sb)}
+.kdue{white-space:nowrap}
+.kdue.late{color:var(--bad);font-weight:700}
+.kwho{display:inline-flex;align-items:center;gap:4px;max-width:100%}
+.kav{width:17px;height:17px;border-radius:50%;display:inline-grid;place-items:center;flex-shrink:0;
+  background:color-mix(in srgb,var(--p) 14%,transparent);color:var(--p);font-size:10px;font-weight:800}
+.kempty{border:1.5px dashed var(--ln);border-radius:10px;padding:14px 10px;text-align:center;font-size:12px}
 
 /* ═ الرسوم البيانية وأشرطة التقدم ═ */
 .chart{display:flex;gap:10px;align-items:flex-end;height:172px;padding:8px 4px 4px}

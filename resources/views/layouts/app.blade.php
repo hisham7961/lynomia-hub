@@ -6,8 +6,7 @@
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <script>(function(){var t=localStorage.getItem('lyn_theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.dataset.theme='dark'})()</script>
 <title>@yield('title', 'لوحة التحكم') — {{ setting('app.name', config('app.name')) }}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link href="{{ asset('css/fonts.css') }}?v={{ config('hub.version') }}" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ config('hub.version') }}">
 <link rel="manifest" href="{{ route('pwa.manifest') }}">
 <link rel="icon" href="{{ route('pwa.icon') }}" type="image/svg+xml">
