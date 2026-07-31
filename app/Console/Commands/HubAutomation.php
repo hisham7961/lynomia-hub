@@ -35,8 +35,9 @@ class HubAutomation extends Command
         $a = $this->alertRules();
         $e = $this->esignReminders();
         $c = $this->contractsAuto();
+        $b = $this->budgetsAuto();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه");
 
         \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.automation'], ['value' => now()->toIso8601String()]);
         \Illuminate\Support\Facades\Cache::forget('settings:all');
@@ -139,6 +140,43 @@ class HubAutomation extends Command
         }
 
         return ['expired' => $expired, 'drafts' => $drafts];
+    }
+
+    /**
+     * تنبيه «حد الميزانية»: alert_pct كان حقلاً ميتاً — ميزانية نشطة بلغ
+     * استهلاكها الفعلي حدَّها تُنبّه المراقبين (مرة كل ٧ أيام لكل ميزانية).
+     */
+    protected function budgetsAuto(): int
+    {
+        $hits = 0;
+        try {
+            $budgets = DB::table('budgets')->whereNull('deleted_at')
+                ->where('status', 'نشطة')->whereNotNull('alert_pct')->where('alert_pct', '>', 0)
+                ->where('amount', '>', 0)->limit(300)->get();
+            foreach ($budgets as $b) {
+                $ba = hub_budget_actual($b);
+                if ($ba['pct'] === null || $ba['pct'] < (int) $b->alert_pct) continue;
+                $dup = HubNotification::where('kind', 'budget:' . $b->id)
+                    ->where('created_at', '>=', now()->subDays(7))->exists();
+                if ($dup) continue;
+                $hits++;
+                if (! $this->dry) {
+                    foreach ($this->recipients(null) as $uid) {
+                        HubNotification::create([
+                            'user_id' => $uid, 'kind' => 'budget:' . $b->id,
+                            'text' => Str::limit("📊 الميزانية «{$b->name}» بلغت {$ba['pct']}٪ من مخصصها"
+                                . ' (' . number_format($ba['spent'], 2) . ' من ' . number_format($ba['amount'], 2) . ')', 590),
+                            'module' => 'budgets', 'record_id' => $b->id,
+                            'read' => false, 'created_at' => now(),
+                        ]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            report($e);   // تنبيهات الميزانية لا تُسقط بقية المحرك
+        }
+
+        return $hits;
     }
 
     /* ───── 1) المصروفات المتكررة ───── */

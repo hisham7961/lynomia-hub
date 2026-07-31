@@ -1091,6 +1091,37 @@ if (! function_exists('hub_company_scope')) {
     }
 }
 
+if (! function_exists('hub_budget_actual')) {
+    /**
+     * المصروف الفعلي مقابل ميزانية: يجمع مستندات المصروف غير الملغاة المطابقة
+     * لأبعاد الميزانية (شركة، مشروع، مركز تكلفة، بند، فترة) — الأبعاد الفارغة
+     * لا تُقيّد، وبند «الكل» يشمل كل البنود. كانت الوحدة سجلَّ نوايا: كل
+     * الأبعاد جاهزة ومطابقة لبنود المالية حرفياً ولا استعلامَ واحد يقارنها.
+     */
+    function hub_budget_actual($b): array
+    {
+        $q = \Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at')
+            ->whereIn('kind', config('hub.fin.expense'))
+            ->whereNotIn('state', config('hub.fin.dead'));
+        foreach (['company_id', 'project_id', 'cc_id'] as $col) {
+            if (! empty($b->{$col})) $q->where($col, $b->{$col});
+        }
+        if (! empty($b->cat) && $b->cat !== 'الكل') $q->where('cat', $b->cat);
+        if (! empty($b->date_from)) $q->whereDate('date', '>=', substr((string) $b->date_from, 0, 10));
+        if (! empty($b->date_to)) $q->whereDate('date', '<=', substr((string) $b->date_to, 0, 10));
+
+        $spent  = (float) $q->sum('total');
+        $amount = (float) ($b->amount ?? 0);
+
+        return [
+            'spent'  => $spent,
+            'amount' => $amount,
+            'remain' => $amount - $spent,
+            'pct'    => $amount > 0 ? (int) round($spent / $amount * 100) : null,
+        ];
+    }
+}
+
 if (! function_exists('hub_hourly_rates')) {
     /**
      * أجر الساعة لكل مستخدم — مشتقاً من راتب ملفه الوظيفي وبدلاته.
