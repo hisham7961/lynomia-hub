@@ -1897,6 +1897,10 @@ return [
             'display' => 'done',
             'status' => null,
             'columns' => [
+                'projectId',
+                'done',
+                'progress',
+                'hours',
             ],
             'fields' => [
                 [
@@ -2716,8 +2720,8 @@ return [
                 'title',
                 'type',
                 'amount',
-                'requesterId',
-                'stage',
+                'approverId',
+                'due',
                 'status',
             ],
             'fields' => [
@@ -2727,6 +2731,14 @@ return [
                     'label' => 'عنوان الطلب',
                     'type' => 'text',
                     'required' => true,
+                ],
+                [
+                    'key' => 'status',
+                    'col' => 'status',
+                    'label' => 'حالة الموافقة',
+                    'type' => 'sel',
+                    'required' => true,
+                    'options' => ['معلّق', 'معتمد', 'مرفوض', 'ملغى'],
                 ],
                 [
                     'key' => 'type',
@@ -2948,7 +2960,7 @@ return [
                 'status',
                 'pubAt',
                 'views',
-                'eng',
+                
             ],
             'fields' => [
                 [
@@ -3408,7 +3420,7 @@ return [
                 'date',
                 'projectId',
                 'desc',
-                'dr',
+                
                 'state',
             ],
             'fields' => [
@@ -4956,7 +4968,7 @@ return [
                 'trigger',
                 'act1',
                 'status',
-                'runs',
+                
             ],
             'fields' => [
                 [
@@ -5715,7 +5727,7 @@ return [
                 'cycle',
                 'next',
                 'status',
-                'runs',
+                
             ],
             'fields' => [
                 [
@@ -6408,7 +6420,7 @@ return [
                 'op',
                 'val',
                 'status',
-                'runs',
+                
             ],
             'fields' => [
                 [
@@ -6768,7 +6780,7 @@ return [
                 'cat',
                 'priority',
                 'status',
-                'dueAt',
+                
             ],
             'fields' => [
                 [
