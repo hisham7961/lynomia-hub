@@ -17,6 +17,12 @@ class MobileDensityTest extends TestCase
         $this->assertGreaterThan(strpos($css, '.rh-acts{display:flex;gap:8px'), $block,
             'كتلة v2.115 يجب أن تبقى آخر الملف وإلا جاوزتها قواعد المكونات الأساسية');
 
+        // v2.125: تشديد الحارس — «بعد قاعدةٍ ما» لا يكفي؛ الكتلة آخرُ الملف فعلياً
+        // (لا شيء بعد قوسها الأخير سوى بياض). أي CSS جديد يُدرج قبلها لا بعدها.
+        $this->assertSame('}', substr(rtrim($css), -1));
+        $this->assertLessThan(3000, strlen($css) - $block,
+            'ظهر محتوى بعد كتلة v2.115 — أدرج الجديد قبلها فآخر الملف يملك الغلبة في الشلال');
+
         // الجواهر: صف أفعال منزلق لا يلتف، والزر الأساسي يتصدره، وبانر التجربة صنفٌ لا نمطاً مضمّناً
         $this->assertStringContainsString('.rh-acts{flex-basis:100%;display:flex;flex-wrap:nowrap', $css);
         $this->assertStringContainsString('.rh-acts .btn.p{order:-1}', $css);

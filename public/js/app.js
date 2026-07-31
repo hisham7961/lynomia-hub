@@ -44,8 +44,7 @@
   /* ── الاختصارات ── */
   document.addEventListener('keydown', function (e) {
     var typing = /INPUT|TEXTAREA|SELECT/.test(e.target.tagName);
-    // Ctrl+K صار يركز البحث الشامل — طريق واحد للوصول لكل شيء
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); var g = $('#gq'); if (g) g.focus(); return; }
+    // v2.125: معالج Ctrl+K هنا حُذف — لوحة الأوامر (v2.112) تعالجه بمعالجها الأغنى وحدها
     if (e.key === 'Escape') { Hub.closeModal(); return; }
     if (typing) return;
     if (e.key === 'n') { var b = $('#newbtn'); if (b) { e.preventDefault(); b.click(); } }
@@ -476,7 +475,7 @@ document.addEventListener('input', function (e) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   // عدّ تصاعدي لأرقام بطاقات الإحصاء — الأرقام الصِرفة فقط، وبنفس تنسيق الفواصل
-  document.querySelectorAll('.stat b, .kpi b').forEach(function (el) {
+  document.querySelectorAll('.stat b').forEach(function (el) {   /* v2.125: ‎.kpi كان هدفاً ميتاً */
     var raw = (el.textContent || '').trim();
     if (!/^[\d,]+$/.test(raw)) return;
     var target = parseInt(raw.replace(/,/g, ''), 10);

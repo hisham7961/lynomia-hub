@@ -57,7 +57,7 @@
             @endif
         </h3>
         @forelse ($releases as $rel)
-            <div class="tl">
+            <div class="reltl">
                 <div class="tlv">{{ $rel->ver ?: '—' }}</div>
                 <div class="tlb">
                     <div class="chead">
