@@ -881,6 +881,7 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .varchip{border:1px solid var(--ln)!important}
 .varchip:hover{border-color:var(--p)!important;color:var(--p)}
 .modalbox .flash{margin:0 0 10px;position:static}
+.signerrow{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
 
 /* ═ كثافة الجوال (v2.115): الترويسات كانت تلتهم ٦٣٢ من ٨٤٤ بكسل قبل أول صف بيانات ═ */
 @media (max-width:760px){

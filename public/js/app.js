@@ -783,3 +783,45 @@ document.addEventListener('input', function (e) {
     }
   }
 })();
+
+/* ═ v2.120 — صفوف الموقّعين المتعددين في نموذج الإرسال ═ */
+(function () {
+  'use strict';
+  var rows = document.getElementById('signerrows');
+  if (!rows) return;
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function addRow() {
+    var d = document.createElement('div');
+    d.className = 'signerrow';
+    d.innerHTML =
+      '<input class="inp" data-sname placeholder="اسم الموقّع" style="flex:1;min-width:140px">' +
+      '<input class="inp ltr" data-semail type="email" placeholder="email@example.com" style="flex:1;min-width:160px">' +
+      '<select class="inp" data-srole style="width:auto"><option>موقّع</option><option>شاهد</option><option>مستلم نسخة</option></select>' +
+      '<button class="btn ghost xs" type="button" data-srm aria-label="حذف الموقّع">✕</button>';
+    rows.appendChild(d);
+  }
+  document.getElementById('addsigner').addEventListener('click', function () { addRow(); });
+  rows.addEventListener('click', function (e) {
+    if (e.target.closest('[data-srm]')) e.target.closest('.signerrow').remove();
+  });
+  var form = document.getElementById('esignform');
+  function collectSigners() {
+    return [].map.call(rows.querySelectorAll('.signerrow'), function (r) {
+      return { name: r.querySelector('[data-sname]').value.trim(),
+               email: r.querySelector('[data-semail]').value.trim(),
+               role: r.querySelector('[data-srole]').value };
+    }).filter(function (s) { return s.name; });
+  }
+  /* كلمة السر إلزامية متصفحياً فقط حين لا موقّعين مستقلين */
+  function syncPass() {
+    var pi = document.getElementById('passinput');
+    if (pi) pi.required = collectSigners().length === 0;
+  }
+  document.addEventListener('input', function (e) { if (e.target.closest && e.target.closest('.signerrow')) syncPass(); });
+  rows.addEventListener('click', syncPass);
+  syncPass();
+  form && form.addEventListener('submit', function () {
+    var list = collectSigners();
+    document.getElementById('signersjson').value = list.length ? JSON.stringify(list) : '';
+  });
+})();

@@ -234,9 +234,12 @@ class EsignController extends Controller
             'title' => 'required|string|max:200',
             'template_id' => 'nullable|exists:sign_templates,id',
             'free_body' => 'nullable|string|max:200000',
-            'pass' => 'required|string|min:4|max:80', 'contract_id' => 'nullable|string',
+            'pass' => 'nullable|string|min:4|max:80', 'contract_id' => 'nullable|string',
             'link_module' => 'nullable|string|max:40', 'link_id' => 'nullable|string|max:64',
             'vars' => 'array',
+            // v2.120: موقّعون متعددون — صفوف JSON من الواجهة، ووضع التوقيع
+            'signers' => 'nullable|string|max:20000',
+            'mode' => 'nullable|in:مفرد,متوازٍ,متسلسل',
             // خيارات لكل طلب — أنت تختار لكل عقدٍ ما يلزمه
             'opt_selfie' => 'nullable|boolean', 'opt_idno' => 'nullable|boolean',
             'opt_decline' => 'nullable|boolean', 'expire_days' => 'nullable|integer|min:1|max:365',
@@ -256,6 +259,25 @@ class EsignController extends Controller
         if ($contractId !== null
             && ! hub_scope(\App\Models\Contract::query(), 'contracts')->whereKey($contractId)->exists()) {
             return back()->with('err', 'العقد المحدد غير موجود أو خارج نطاقك')->withInput();
+        }
+
+        // v2.120: صفوف الموقّعين — أسماء وأدوار وترتيب وبريد؛ بلا صفوف = المسار
+        // القديم بحذافيره (موقّع واحد بكلمة سر مشتركة تُنقل يدوياً)
+        $signersIn = [];
+        foreach (array_slice((array) (json_decode((string) ($d['signers'] ?? ''), true) ?: []), 0, 10) as $i => $s) {
+            $name = trim((string) ($s['name'] ?? ''));
+            if ($name === '') continue;
+            $email = trim((string) ($s['email'] ?? ''));
+            $signersIn[] = [
+                'name' => mb_substr($name, 0, 160),
+                'email' => $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null,
+                'phone' => mb_substr(trim((string) ($s['phone'] ?? '')), 0, 40) ?: null,
+                'role' => in_array($s['role'] ?? '', ['موقّع', 'شاهد', 'مستلم نسخة'], true) ? $s['role'] : 'موقّع',
+                'order' => $i + 1,
+            ];
+        }
+        if (! $signersIn && trim((string) ($d['pass'] ?? '')) === '') {
+            return back()->with('err', 'أدخل كلمة سر الرابط، أو أضف موقّعين ببريدهم ليتسلموا روابطهم ورموزهم آلياً')->withInput();
         }
 
         // النص: من قالبٍ بمتغيراته، أو نصٌّ حرٌّ يكتبه المستخدم كاملاً
@@ -282,7 +304,10 @@ class EsignController extends Controller
             'title' => $d['title'], 'template_id' => $d['template_id'] ?? null,
             'contract_id' => $contractId,
             'link_module' => $linkModule, 'link_id' => $linkId,
-            'body' => $body, 'pass' => Hash::make($d['pass']),
+            'mode' => $signersIn ? ($d['mode'] ?? (count($signersIn) > 1 ? 'متوازٍ' : 'مفرد')) : 'مفرد',
+            'body' => $body,
+            // مسار الموقّعين المستقلين لا يستعمل كلمة السر — تُولد عشوائية للعمود
+            'pass' => Hash::make(trim((string) ($d['pass'] ?? '')) !== '' ? $d['pass'] : Str::random(20)),
             'token' => Str::random(48),
             'verify_code' => self::makeVerifyCode(),
             'doc_hash' => hash('sha256', $body),
@@ -299,14 +324,34 @@ class EsignController extends Controller
         // v2.118: نطاق الطلب من عقده أو جهته المربوطة — به يعمل العزل الشركاتي مباشرة
         $this->stampScope($req);
 
-        // موقّعٌ أول برمز الطلب نفسه (نمط الكتابة المزدوجة الانتقالي — م4 يوسعه لموقّعين
-        // متعددين برموز مستقلة) + أول حدث في سجل الأدلة
-        \App\Models\ContractSigner::create([
-            'request_id' => $req->id, 'order' => 1, 'role' => 'موقّع',
-            'name' => 'الطرف الثاني', 'token' => $req->token,
-            'status' => 'بانتظار التوقيع',
-        ]);
-        \App\Models\ContractEvent::log('created', $req);
+        if ($signersIn) {
+            // v2.120: موقّعون مستقلون — رمزٌ خاص لكل واحد، والبريديون يتسلمون روابطهم
+            // آلياً عبر صندوق الصادر (المتسلسل: الأول فقط، والبقية عند دورهم)
+            $created = [];
+            foreach ($signersIn as $s) {
+                $created[] = \App\Models\ContractSigner::create($s + [
+                    'request_id' => $req->id, 'token' => Str::random(48),
+                    'channel' => $s['email'] ? 'بريد' : 'يدوي',
+                    'status' => 'بانتظار التوقيع',
+                ]);
+            }
+            \App\Models\ContractEvent::log('created', $req);
+            $req->forceFill(['sent_at' => now()])->saveQuietly();
+            foreach ($created as $s) {
+                if (! $s->email || $s->role !== 'موقّع') continue;
+                if ($req->mode === 'متسلسل' && $this->waitingFor($req, $s)) continue;
+                $this->mailSigner($req, $s);
+            }
+            // مستلمو النسخ يتسلمون الرابط للاطلاع فقط بعد الاكتمال (م6 يرسل النسخة النهائية)
+        } else {
+            // المسار القديم: موقّعٌ واحد برمز الطلب نفسه وكلمة سرٍّ تُنقل يدوياً
+            \App\Models\ContractSigner::create([
+                'request_id' => $req->id, 'order' => 1, 'role' => 'موقّع',
+                'name' => 'الطرف الثاني', 'token' => $req->token,
+                'status' => 'بانتظار التوقيع',
+            ]);
+            \App\Models\ContractEvent::log('created', $req);
+        }
 
         // عقدٌ مربوط → «قيد التوقيع» — بحفظ Eloquent حقيقي (v2.117) فيمر بالتدقيق
         // والإصدارات ومسارات العمل، لا بتحديث query-builder صامت
@@ -427,35 +472,102 @@ class EsignController extends Controller
 
     /* ────────── الجهة العامة (العميل) ────────── */
 
+    /**
+     * حل الرمز (v2.120): رمز موقّعٍ مستقل أولاً ثم رمز الطلب (المسار القديم) —
+     * صفوف الموقّع المرحّلة تحمل رمز طلبها نفسه فتُعامل مساراً قديماً بحذافيره.
+     */
+    protected function resolveToken(string $token): array
+    {
+        $signer = \App\Models\ContractSigner::where('token', $token)->first();
+        $req = $signer
+            ? SignRequest::find($signer->request_id)
+            : SignRequest::where('token', $token)->first();
+        abort_unless($req, 404);
+
+        return [$req, ($signer && $signer->token !== $req->token) ? $signer : null];
+    }
+
+    /** حارس المتسلسل: الموقّع N لا يفتح قبل توقيع من قبله */
+    protected function waitingFor(SignRequest $req, \App\Models\ContractSigner $signer): ?\App\Models\ContractSigner
+    {
+        if ($req->mode !== 'متسلسل') return null;
+
+        return \App\Models\ContractSigner::where('request_id', $req->id)
+            ->where('role', 'موقّع')->where('order', '<', $signer->order)
+            ->where('status', '!=', 'وُقّع')->orderBy('order')->first();
+    }
+
     public function show(Request $r, string $token)
     {
-        $req = SignRequest::where('token', $token)->firstOrFail();
+        [$req, $signer] = $this->resolveToken($token);
 
+        // الطلب الملغى — الروابط كلها تموت بأدب
+        if ($req->cancelled_at) {
+            return response()->view('sign.expired', ['req' => $req, 'cancelled' => true], 410);
+        }
         // صلاحية الرابط الزمنية — المنتهي يُغلق بأدب (والموقَّع يبقى مفتوحاً كنسخة)
         if ($req->expires_at && now()->gt($req->expires_at) && $req->status !== 'وُقّع') {
             return response()->view('sign.expired', ['req' => $req], 410);
         }
-
-        if (! session("sign.ok.{$token}")) {
-            return view('sign.gate', ['token' => $token, 'title' => $req->title]);
+        // طلبٌ رفضه طرفٌ آخر — بقية الموقّعين يرون الخبر لا نموذج توقيع ميتاً
+        if ($req->status === 'رُفض' && $signer && $signer->status !== 'رُفض') {
+            return view('sign.declined', ['req' => $req, 'other' => true]);
         }
 
-        // أول فتح بعد كلمة السر: يُسجَّل ويُنبَّه أصحاب النظام برمز التحقق
+        if (! session("sign.ok.{$token}")) {
+            return view('sign.gate', ['token' => $token, 'title' => $req->title, 'signer' => $signer]);
+        }
+
+        // المتسلسل: دورُك لم يحن بعد
+        if ($signer && $signer->status === 'بانتظار التوقيع' && ($w = $this->waitingFor($req, $signer))) {
+            return view('sign.waiting', ['req' => $req, 'signer' => $signer, 'before' => $w]);
+        }
+
+        // أول فتح بعد البوابة: يُسجَّل ويُنبَّه أصحاب النظام برمز التحقق
         if (! $req->opened_at) {
             $req->forceFill(['opened_at' => now()])->saveQuietly();
-            \App\Models\ContractEvent::log('opened', $req);
+            \App\Models\ContractEvent::log('opened', $req, ['signer_id' => $signer?->id]);
             $this->notifyOwners('👀 فُتح «' . $req->title . '» [' . $req->verify_code . '] — من ' . $r->ip());
+        } elseif ($signer && ! \App\Models\ContractEvent::where('request_id', $req->id)
+                ->where('signer_id', $signer->id)->where('event', 'opened')->exists()) {
+            \App\Models\ContractEvent::log('opened', $req, ['signer_id' => $signer->id]);
         }
         $req->increment('opens');
 
-        return view('sign.show', ['req' => $req, 'opts' => $req->opts ?: []]);
+        return view('sign.show', ['req' => $req, 'opts' => $req->opts ?: [], 'signer' => $signer]);
     }
 
-    /** رفض التوقيع — إن كان الخيار مفعّلاً لهذا الطلب */
+    /** إرسال رمز تحقق بريدي للموقّع المستقل — عبر صندوق الصادر */
+    public function sendOtp(Request $r, string $token)
+    {
+        [$req, $signer] = $this->resolveToken($token);
+        abort_unless($signer && $signer->email, 404);
+        abort_if($req->cancelled_at || ($req->expires_at && now()->gt($req->expires_at)), 410);
+
+        $key = 'sign-otp:' . $token;
+        if (RateLimiter::tooManyAttempts($key, 3)) {
+            return back()->with('err', 'أُرسلت رموز كثيرة — انتظر عشر دقائق');
+        }
+        RateLimiter::hit($key, 600);
+
+        $code = (string) random_int(100000, 999999);
+        $signer->forceFill(['otp_code' => Hash::make($code), 'otp_expires_at' => now()->addMinutes(10)])->save();
+        \App\Models\OutboxMessage::create([
+            'kind' => 'sign_otp', 'channel' => 'mail', 'target' => $signer->email,
+            'text' => 'رمز توقيع «' . Str::limit($req->title, 60) . '»: ' . $code . ' — صالح ١٠ دقائق.',
+            'state' => 'queued', 'created_at' => now(),
+        ]);
+        \App\Models\ContractEvent::log('otp_sent', $req, ['signer_id' => $signer->id]);
+
+        return back()->with('ok', 'أُرسل رمز التحقق إلى بريدك — صالح عشر دقائق');
+    }
+
+    /** رفض التوقيع — إن كان الخيار مفعّلاً لهذا الطلب. رفضُ أي موقّعٍ إلزامي يوقف الطلب كله */
     public function decline(Request $r, string $token)
     {
-        $req = SignRequest::where('token', $token)->firstOrFail();
+        [$req, $viaSigner] = $this->resolveToken($token);
         abort_unless(session("sign.ok.{$token}"), 403);
+        abort_if((bool) $req->cancelled_at, 410);
         abort_if($req->status !== 'بانتظار التوقيع', 410);
         $opts = $req->opts ?: [];
         abort_unless($opts['decline'] ?? true, 403, 'الرفض غير متاح لهذه الوثيقة');
@@ -463,8 +575,9 @@ class EsignController extends Controller
         $d = $r->validate(['reason' => 'required|string|max:400']);
         $req->forceFill(['status' => 'رُفض', 'declined_reason' => $d['reason']])->save();
 
-        // v2.118: مرآة الموقّع + حدث الرفض في سجل الأدلة
-        $signer = \App\Models\ContractSigner::where('request_id', $req->id)->orderBy('order')->first();
+        // مرآة الموقّع (الرافض نفسه إن كان مستقلاً) + حدث الرفض في سجل الأدلة
+        $signer = $viaSigner
+            ?: \App\Models\ContractSigner::where('request_id', $req->id)->orderBy('order')->first();
         $signer?->forceFill(['status' => 'رُفض', 'decline_reason' => $d['reason']])->save();
         \App\Models\ContractEvent::log('declined', $req, ['signer_id' => $signer?->id,
             'meta' => json_encode(['reason' => $d['reason']], JSON_UNESCAPED_UNICODE)]);
@@ -495,13 +608,69 @@ class EsignController extends Controller
         return view('sign.declined', ['req' => $req]);
     }
 
-    /** نسخة العميل النهائية — عبر رابطه المفتوح بكلمة السر (طباعة/حفظ PDF) */
+    /** نسخة العميل النهائية — عبر رابطه المفتوح (طباعة/حفظ PDF) */
     public function clientDoc(string $token)
     {
-        $req = SignRequest::where('token', $token)->firstOrFail();
+        [$req, $signer] = $this->resolveToken($token);
         abort_unless(session("sign.ok.{$token}"), 403);
+        \App\Models\ContractEvent::log('downloaded', $req, ['signer_id' => $signer?->id]);
 
         return view('esign.doc', ['req' => $req, 'client' => true]);
+    }
+
+    /* ────────── إدارة دورة الطلب (v2.120) ────────── */
+
+    /** إلغاء الطلب — كل الروابط تموت فوراً، والوثيقة الموقعة لا تُلغى */
+    public function cancel(string $id)
+    {
+        $this->gate('e');
+        $req = SignRequest::findOrFail($id);
+        $this->guardRequest($req);
+        abort_if($req->status === 'وُقّع', 410, 'وثيقة موقعة لا تُلغى — أنشئ ملحق إنهاء');
+
+        $req->forceFill(['status' => 'أُلغي', 'cancelled_at' => now()])->save();
+        \App\Models\ContractEvent::log('voided', $req,
+            ['meta' => json_encode(['reason' => 'إلغاء من المرسل'], JSON_UNESCAPED_UNICODE)]);
+        // عقد علّقه هذا الطلب يعود مسودة
+        if ($req->contract_id) $this->flipContract($req->contract_id, ['قيد التوقيع'], 'مسودة');
+        hub_audit('إلغاء طلب توقيع', 'contracts', $req->contract_id, $req->title);
+        $this->notifyOwners('🚫 أُلغي طلب التوقيع «' . $req->title . '» — روابطه أُبطلت');
+
+        return back()->with('ok', 'أُلغي الطلب وأُبطلت روابطه');
+    }
+
+    /** إعادة إرسال/تذكير بريدي لكل موقّع معلق له بريد */
+    public function resend(string $id)
+    {
+        $this->gate('e');
+        $req = SignRequest::findOrFail($id);
+        $this->guardRequest($req);
+        abort_if($req->status !== 'بانتظار التوقيع' || $req->cancelled_at, 410);
+
+        $n = 0;
+        foreach (\App\Models\ContractSigner::where('request_id', $req->id)
+                     ->where('status', 'بانتظار التوقيع')->whereNotNull('email')->orderBy('order')->get() as $s) {
+            if ($req->mode === 'متسلسل' && $this->waitingFor($req, $s)) continue;
+            $this->mailSigner($req, $s, 'sign_reminder');
+            $n++;
+        }
+
+        return back()->with($n ? 'ok' : 'err',
+            $n ? "أُرسل تذكير إلى {$n} من الموقّعين" : 'لا موقّع معلقاً له بريد — انسخ الرابط وأرسله يدوياً');
+    }
+
+    /** تمديد صلاحية الرابط */
+    public function extend(Request $r, string $id)
+    {
+        $this->gate('e');
+        $req = SignRequest::findOrFail($id);
+        $this->guardRequest($req);
+        $d = $r->validate(['days' => 'required|integer|min:1|max:365']);
+        $req->forceFill(['expires_at' => now()->addDays((int) $d['days'])])->save();
+        hub_audit('تمديد صلاحية طلب توقيع', 'contracts', $req->contract_id,
+            $req->title . ' — ' . $d['days'] . ' يوماً');
+
+        return back()->with('ok', 'مُدّدت الصلاحية حتى ' . $req->expires_at->format('Y-m-d'));
     }
 
     /** التحقق العلني برمز المستند — يطابق أي نسخة معنا دون كشف النص */
@@ -525,13 +694,27 @@ class EsignController extends Controller
 
     public function unlock(Request $r, string $token)
     {
-        $req = SignRequest::where('token', $token)->firstOrFail();
+        [$req, $signer] = $this->resolveToken($token);
 
         $key = 'sign-unlock:' . $token . ':' . $r->ip();
         if (RateLimiter::tooManyAttempts($key, 5)) {
             return back()->with('err', 'محاولات كثيرة — انتظر دقيقة');
         }
-        if (! Hash::check((string) $r->input('pass'), $req->pass)) {
+
+        // موقّع مستقل: بوابته رمز OTP بريدي لا كلمة السر المشتركة
+        if ($signer) {
+            $otp = (string) $r->input('otp');
+            $ok = $otp !== '' && $signer->otp_code
+                && (! $signer->otp_expires_at || now()->lt($signer->otp_expires_at))
+                && Hash::check($otp, $signer->otp_code);
+            if (! $ok) {
+                RateLimiter::hit($key, 60);
+
+                return back()->with('err', 'رمز التحقق غير صحيح أو منتهي — اطلب رمزاً جديداً');
+            }
+            $signer->forceFill(['otp_code' => null, 'otp_expires_at' => null])->save();   // يُستهلك مرة واحدة
+            \App\Models\ContractEvent::log('otp_ok', $req, ['signer_id' => $signer->id]);
+        } elseif (! Hash::check((string) $r->input('pass'), $req->pass)) {
             RateLimiter::hit($key, 60);
 
             return back()->with('err', 'كلمة السر غير صحيحة');
@@ -545,9 +728,14 @@ class EsignController extends Controller
 
     public function sign(Request $r, string $token)
     {
-        $req = SignRequest::where('token', $token)->firstOrFail();
+        [$req, $viaSigner] = $this->resolveToken($token);
         abort_unless(session("sign.ok.{$token}"), 403);
+        abort_if((bool) $req->cancelled_at, 410, 'أُلغي هذا الطلب');
         abort_if($req->status !== 'بانتظار التوقيع', 410, 'هذه الوثيقة أُغلقت — وُقّعت أو رُفضت مسبقاً');
+        if ($viaSigner) {
+            abort_if($viaSigner->status === 'وُقّع', 410, 'وقّعت هذه الوثيقة مسبقاً');
+            abort_if((bool) $this->waitingFor($req, $viaSigner), 403, 'دورك في التوقيع لم يحن بعد');
+        }
 
         $opts = $req->opts ?: [];
         $d = $r->validate([
@@ -560,16 +748,9 @@ class EsignController extends Controller
                 : 'nullable|string|max:2000000|starts_with:data:image/',
         ]);
 
-        $req->forceFill([
-            'status' => 'وُقّع', 'signer_name' => $d['signer_name'], 'signature' => $d['signature'],
-            'signer_id_no' => $d['signer_id_no'] ?? null, 'selfie' => $d['selfie'] ?? null,
-            'signed_at' => now(), 'signed_ip' => $r->ip(),
-            'signed_agent' => substr((string) $r->userAgent(), 0, 250),
-            'signed_locale' => substr((string) $r->header('Accept-Language'), 0, 60),
-        ])->save();
-
-        // v2.118: مرآة الموقّع وسجل الأدلة — الكتابة المزدوجة الانتقالية حتى م4
-        $signer = \App\Models\ContractSigner::where('request_id', $req->id)->orderBy('order')->first();
+        // كتابة أثر التوقيع على صف الموقّع (المستقل أو المرحّل الأول)
+        $signer = $viaSigner
+            ?: \App\Models\ContractSigner::where('request_id', $req->id)->orderBy('order')->first();
         $signer?->forceFill([
             'status' => 'وُقّع', 'name' => $d['signer_name'], 'signature' => $d['signature'],
             'id_no' => $d['signer_id_no'] ?? null, 'selfie' => $d['selfie'] ?? null,
@@ -580,13 +761,32 @@ class EsignController extends Controller
         \App\Models\ContractEvent::log('signed', $req, ['signer_id' => $signer?->id,
             'meta' => json_encode(['name' => $d['signer_name']], JSON_UNESCAPED_UNICODE)]);
 
-        // سير العملية يكتمل: العقد المربوط «ساري» — بحفظ Eloquent (v2.117) فيُدقَّق
-        // ويُصدَر ويُطلق contract.signed فعلاً (كان التحديث المباشر يخرسه)
-        if ($req->contract_id) {
-            $this->flipContract($req->contract_id, ['قيد التوقيع', 'مسودة'], 'ساري');
-            $this->notifyOwners('📑 العقد المرتبط بـ«' . $req->title . '» صار «ساري» بعد توقيعه');
+        // اكتمال الطلب: كل من دوره «موقّع» وقّع — طلب الموقّع الواحد يكتمل فوراً كما كان
+        $pending = \App\Models\ContractSigner::where('request_id', $req->id)
+            ->where('role', 'موقّع')->where('status', '!=', 'وُقّع')->count();
+
+        if ($pending === 0) {
+            $req->forceFill([
+                'status' => 'وُقّع', 'signer_name' => $d['signer_name'], 'signature' => $d['signature'],
+                'signer_id_no' => $d['signer_id_no'] ?? null, 'selfie' => $d['selfie'] ?? null,
+                'signed_at' => now(), 'signed_ip' => $r->ip(),
+                'signed_agent' => substr((string) $r->userAgent(), 0, 250),
+                'signed_locale' => substr((string) $r->header('Accept-Language'), 0, 60),
+            ])->save();
+
+            // سير العملية يكتمل: العقد المربوط «ساري» — بحفظ Eloquent (v2.117) فيُدقَّق
+            // ويُصدَر ويُطلق contract.signed فعلاً (كان التحديث المباشر يخرسه)
+            if ($req->contract_id) {
+                $this->flipContract($req->contract_id, ['قيد التوقيع', 'مسودة'], 'ساري');
+                $this->notifyOwners('📑 العقد المرتبط بـ«' . $req->title . '» صار «ساري» بعد توقيعه');
+            }
+            $this->completeLinked($req, $d['signer_name'], $r);
+        } else {
+            // متسلسل: بريد الدور التالي يخرج تلقائياً لحظة اكتمال من قبله
+            if ($req->mode === 'متسلسل') $this->deliverNext($req);
+            $this->notifyOwners('✍️ وقّع ' . $d['signer_name'] . ' على «' . $req->title
+                . '» — بقي ' . $pending . ' من الموقّعين');
         }
-        $this->completeLinked($req, $d['signer_name'], $r);
 
         // الإشعار يحمل رمز التحقق — تطابقه مع الوثيقة في صفحة /verify أو قائمة المركز
         $this->notifyOwners('✍️ وُقّع «' . $req->title . '» [' . $req->verify_code . '] بواسطة '
@@ -594,7 +794,33 @@ class EsignController extends Controller
         hub_audit('توقيع عقد إلكترونياً', 'contracts', $req->contract_id,
             $req->title . ' — ' . $d['signer_name']);
 
-        return view('sign.done', ['req' => $req]);
+        return view('sign.done', ['req' => $req, 'partial' => $pending > 0]);
+    }
+
+    /** بريد الموقّع التالي في المتسلسل — أول موقّعٍ معلق دوره بريديٌّ ولم يُرسَل له بعد */
+    protected function deliverNext(SignRequest $req): void
+    {
+        $next = \App\Models\ContractSigner::where('request_id', $req->id)
+            ->where('role', 'موقّع')->where('status', 'بانتظار التوقيع')
+            ->whereNotNull('email')->orderBy('order')->first();
+        if (! $next || $this->waitingFor($req, $next)) return;
+        if (\App\Models\ContractEvent::where('request_id', $req->id)
+                ->where('signer_id', $next->id)->where('event', 'sent')->exists()) return;
+        $this->mailSigner($req, $next);
+    }
+
+    /** رسالة رابط التوقيع لموقّع — نصية موجزة عبر صندوق الصادر (يسلّمها hub:outbox) */
+    protected function mailSigner(SignRequest $req, \App\Models\ContractSigner $signer, string $kind = 'sign_link'): void
+    {
+        \App\Models\OutboxMessage::create([
+            'kind' => $kind, 'channel' => 'mail', 'target' => $signer->email,
+            'text' => ($kind === 'sign_reminder' ? 'تذكير: ' : '')
+                . 'وثيقة «' . Str::limit($req->title, 60) . '» بانتظار توقيعك: '
+                . route('sign.show', $signer->token)
+                . ' — افتح الرابط واطلب رمز التحقق البريدي ثم وقّع.',
+            'state' => 'queued', 'created_at' => now(),
+        ]);
+        \App\Models\ContractEvent::log($kind === 'sign_reminder' ? 'reminded' : 'sent', $req, ['signer_id' => $signer->id]);
     }
 
     /* ────────── أدوات ────────── */

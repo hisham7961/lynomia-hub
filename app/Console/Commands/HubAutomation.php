@@ -33,12 +33,62 @@ class HubAutomation extends Command
 
         $g = $this->recurring();
         $a = $this->alertRules();
+        $e = $this->esignReminders();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['outbox']} رسالة صادرة");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير");
 
         \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.automation'], ['value' => now()->toIso8601String()]);
         \Illuminate\Support\Facades\Cache::forget('settings:all');
         return self::SUCCESS;
+    }
+
+    /**
+     * CLM م4: تذكيرات الموقّعين المتلكئين — لكل عتبة من setting('esign.remind_days')
+     * («3,7» افتراضاً) تذكيرٌ واحد بالضبط: عدد أحداث reminded يلحق عدد العتبات
+     * المقطوعة فلا تكرار مهما أُعيد التشغيل.
+     */
+    protected function esignReminders(): int
+    {
+        $sent = 0;
+        try {
+            $thresholds = array_values(array_filter(array_map('intval',
+                preg_split('/[\s,،]+/u', (string) (setting('esign.remind_days') ?: '3,7')))));
+            if (! $thresholds) return 0;
+
+            $pending = \App\Models\ContractSigner::where('status', 'بانتظار التوقيع')
+                ->whereNotNull('email')->where('role', 'موقّع')->limit(500)->get();
+            foreach ($pending as $s) {
+                $req = \App\Models\SignRequest::find($s->request_id);
+                if (! $req || $req->status !== 'بانتظار التوقيع' || $req->cancelled_at) continue;
+                if ($req->expires_at && now()->gt($req->expires_at)) continue;
+                if ($req->mode === 'متسلسل' && \App\Models\ContractSigner::where('request_id', $req->id)
+                        ->where('role', 'موقّع')->where('order', '<', $s->order)
+                        ->where('status', '!=', 'وُقّع')->exists()) continue;
+
+                $since = $req->sent_at ?: $req->created_at;
+                if (! $since) continue;
+                $days = (int) now()->diffInDays($since, true);
+                $crossed = count(array_filter($thresholds, fn ($t) => $days >= $t));
+                $already = \App\Models\ContractEvent::where('request_id', $req->id)
+                    ->where('signer_id', $s->id)->where('event', 'reminded')->count();
+                if ($crossed <= $already) continue;
+
+                if (! $this->dry) {
+                    \App\Models\OutboxMessage::create([
+                        'kind' => 'sign_reminder', 'channel' => 'mail', 'target' => $s->email,
+                        'text' => 'تذكير: وثيقة «' . \Illuminate\Support\Str::limit($req->title, 60)
+                            . '» بانتظار توقيعك منذ ' . $days . ' يوماً: ' . route('sign.show', $s->token),
+                        'state' => 'queued', 'created_at' => now(),
+                    ]);
+                    \App\Models\ContractEvent::log('reminded', $req, ['signer_id' => $s->id]);
+                }
+                $sent++;
+            }
+        } catch (\Throwable $e) {
+            report($e);   // التذكيرات لا تُسقط بقية الأتمتة
+        }
+
+        return $sent;
     }
 
     /* ───── 1) المصروفات المتكررة ───── */

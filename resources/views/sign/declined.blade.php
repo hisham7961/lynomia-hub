@@ -6,8 +6,13 @@
 <body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)">
 <div class="card" style="max-width:400px;width:92%;text-align:center;padding:30px 24px">
     <div style="font-size:40px;margin-bottom:8px">🚫</div>
-    <h2>تم تسجيل رفضك</h2>
-    <p class="sub" style="margin-top:8px">سُجّل رفض توقيع «{{ $req->title }}» وأُبلغت الجهة المُرسلة بالسبب.<br>يمكنك إغلاق الصفحة.</p>
+    @if ($other ?? false)
+        <h2>أُغلقت هذه الوثيقة</h2>
+        <p class="sub" style="margin-top:8px">رفض أحد الأطراف توقيع «{{ $req->title }}» فتوقفت دورتها.<br>ستتواصل معك الجهة المُرسلة إن صدرت نسخة جديدة.</p>
+    @else
+        <h2>تم تسجيل رفضك</h2>
+        <p class="sub" style="margin-top:8px">سُجّل رفض توقيع «{{ $req->title }}» وأُبلغت الجهة المُرسلة بالسبب.<br>يمكنك إغلاق الصفحة.</p>
+    @endif
 </div>
 </body>
 </html>

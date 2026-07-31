@@ -71,6 +71,7 @@ Route::middleware('guest')->group(function () {
 
 // التوقيع الإلكتروني — الجهة العامة: العميل بلا حساب، برابط خاص وكلمة سر
 Route::get('sign/{token}', [\App\Http\Controllers\Web\EsignController::class, 'show'])->name('sign.show');
+Route::post('sign/{token}/otp', [\App\Http\Controllers\Web\EsignController::class, 'sendOtp'])->name('sign.otp')->middleware('throttle:6,10');
 Route::post('sign/{token}/unlock', [\App\Http\Controllers\Web\EsignController::class, 'unlock'])->name('sign.unlock');
 Route::post('sign/{token}', [\App\Http\Controllers\Web\EsignController::class, 'sign'])->name('sign.sign');
 Route::post('sign/{token}/decline', [\App\Http\Controllers\Web\EsignController::class, 'decline'])->name('sign.decline');
@@ -88,6 +89,9 @@ Route::middleware('auth')->group(function () {
     Route::post('esign/templates/{id}/archive', [\App\Http\Controllers\Web\EsignController::class, 'archiveTemplate'])->name('esign.tpl.archive');
     Route::post('esign/preview', [\App\Http\Controllers\Web\EsignController::class, 'preview'])->name('esign.preview');
     Route::get('esign/{id}/doc', [\App\Http\Controllers\Web\EsignController::class, 'doc'])->name('esign.doc');
+    Route::post('esign/{id}/cancel', [\App\Http\Controllers\Web\EsignController::class, 'cancel'])->name('esign.cancel');
+    Route::post('esign/{id}/resend', [\App\Http\Controllers\Web\EsignController::class, 'resend'])->name('esign.resend');
+    Route::post('esign/{id}/extend', [\App\Http\Controllers\Web\EsignController::class, 'extend'])->name('esign.extend');
     Route::get('esign/{id}/edit', [\App\Http\Controllers\Web\EsignController::class, 'edit'])->name('esign.edit');
     Route::put('esign/{id}', [\App\Http\Controllers\Web\EsignController::class, 'update'])->name('esign.update');
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');

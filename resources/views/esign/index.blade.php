@@ -64,6 +64,22 @@
                 <div class="sub fw" style="margin-top:4px">💡 الحقول الفارغة ذات المصدر تُملأ تلقائياً من السجل المربوط، والإلزامية <b class="req">*</b> لا يُنشأ الطلب بدونها.</div>
             </div>
             <div data-wstep class="fw">
+                {{-- v2.120: موقّعون متعددون — كلٌّ برابطه ورمزه البريدي؛ بلا صفوف = المسار
+                     القديم (موقّع واحد بكلمة سر تُنقل يدوياً) --}}
+                <div class="fld fw" style="border:1px dashed var(--lnd);border-radius:12px;padding:11px 14px">
+                    <label style="margin-bottom:6px">✍️ الموقّعون <span class="sub">— أضف موقّعين ببريدهم فيتسلم كلٌّ رابطه ورمز تحقق خاصاً؛ اتركها فارغة للمسار اليدوي بكلمة سر</span></label>
+                    <div id="signerrows"></div>
+                    <input type="hidden" name="signers" id="signersjson">
+                    <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+                        <button class="btn ghost xs" type="button" id="addsigner">＋ موقّع</button>
+                        <span class="spacer"></span>
+                        <label class="chk sub" style="gap:6px">وضع التوقيع
+                            <select class="inp" name="mode" style="width:auto;padding:4px 8px">
+                                <option value="متوازٍ">متوازٍ — الكل معاً</option>
+                                <option value="متسلسل">متسلسل — بالترتيب</option>
+                            </select></label>
+                    </div>
+                </div>
                 {{-- خيارات هذا الطلب — أنت تختار لكل عقدٍ ما يلزمه --}}
                 <div class="fld fw" style="border:1px dashed var(--lnd);border-radius:12px;padding:11px 14px">
                     <label style="margin-bottom:6px">🎚️ متطلبات التوقيع لهذا العقد</label>
@@ -73,8 +89,8 @@
                     <label class="chk" style="gap:8px">⌛ صلاحية الرابط
                         <input class="inp" type="number" name="expire_days" min="1" max="365" value="{{ setting('esign.link_days_default') }}" placeholder="∞" style="width:80px"> يوماً (فارغ = بلا انتهاء)</label>
                 </div>
-                <div class="fld"><label>كلمة سر الرابط <span class="req">*</span></label>
-                    <input class="inp" name="pass" required minlength="4" maxlength="80" placeholder="يدخلها العميل قبل العرض"></div>
+                <div class="fld"><label>كلمة سر الرابط <span class="sub">— إلزامية للمسار اليدوي؛ الموقّعون البريديون يتسلمون رموزهم آلياً</span></label>
+                    <input class="inp" name="pass" id="passinput" minlength="4" maxlength="80" placeholder="يدخلها العميل قبل العرض"></div>
             </div>
             <div class="fw" style="display:flex;gap:8px;align-items:center;margin-top:6px">
                 <button class="btn ghost sm" type="button" id="wprev" hidden>→ السابق</button>
@@ -136,6 +152,12 @@
                     <a class="btn ghost xs" href="{{ route('esign.doc', $q->id) }}">📄 الوثيقة</a>
                     <button class="btn ghost xs" type="button"
                             onclick="navigator.clipboard.writeText(@js(route('sign.show', $q->token)));this.textContent='✓ نُسخ'">نسخ الرابط</button>
+                    @if ($q->status === 'بانتظار التوقيع' && ! $q->cancelled_at)
+                        <form method="POST" action="{{ route('esign.resend', $q->id) }}" class="inline">@csrf
+                            <button class="btn ghost xs" title="تذكير بريدي للموقّعين المعلقين">⏰</button></form>
+                        <form method="POST" action="{{ route('esign.cancel', $q->id) }}" class="inline">@csrf
+                            <button class="btn ghost xs dn" data-confirm="إلغاء الطلب وإبطال كل روابطه؟" title="إلغاء الطلب">🚫</button></form>
+                    @endif
                 </td>
             </tr>
         @empty
