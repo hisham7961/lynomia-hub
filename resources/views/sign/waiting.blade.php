@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ $req->title }} — بانتظار الدور</title>
-<link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ config('hub.version') }}">
+@include('partials.standalone_head')
 </head>
-<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)">
+<body class="pagecenter">
 <div class="card" style="max-width:420px;width:92%;text-align:center;padding:28px 24px">
     <div style="font-size:38px;margin-bottom:8px">⏳</div>
     <h2 style="margin-bottom:6px">{{ $req->title }}</h2>

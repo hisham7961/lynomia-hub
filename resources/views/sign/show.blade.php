@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ $req->title }} — للتوقيع</title>
-<link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ config('hub.version') }}">
+@include('partials.standalone_head')
 </head>
-<body style="background:var(--bg);padding:20px 12px">
+<body class="pagedoc">
 @php $opts = $opts ?? []; @endphp
 <div style="max-width:800px;margin:0 auto">
     <div class="card">

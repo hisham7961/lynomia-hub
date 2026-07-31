@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>تم التوقيع</title>
-<link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ config('hub.version') }}">
+@include('partials.standalone_head')
 </head>
-<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)">
+<body class="pagecenter">
 <div class="card" style="max-width:440px;width:92%;text-align:center;padding:32px 24px">
     <div style="font-size:46px;margin-bottom:10px">✅</div>
     <h2>تم التوقيع بنجاح</h2>

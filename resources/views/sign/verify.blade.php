@@ -2,8 +2,8 @@
 <html lang="ar" dir="rtl">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>التحقق من مستند</title>
-<link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ config('hub.version') }}"></head>
-<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);padding:16px">
+@include('partials.standalone_head')</head>
+<body class="pagecenter">
 <div class="card" style="max-width:460px;width:94%;padding:28px 24px">
     <div style="text-align:center;margin-bottom:14px">
         <div style="font-size:38px">🔎</div>

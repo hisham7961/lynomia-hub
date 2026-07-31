@@ -923,6 +923,10 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 /* مصفوفة الصلاحيات: العمود الأول (اسم الوحدة) يلتصق أثناء الانزلاق الأفقي */
 .matrix th:first-child,.matrix td:first-child{position:sticky;inset-inline-start:0;background:var(--cd);z-index:1}
 
+/* ═ الصفحات المستقلة (v2.131): تمركز وأرضية موحدان بدل ست نسخ مضمنة حرفية ═ */
+.pagecenter{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);padding:16px}
+.pagedoc{background:var(--bg);padding:20px 12px}
+
 /* ═ كثافة الجوال (v2.115): الترويسات كانت تلتهم ٦٣٢ من ٨٤٤ بكسل قبل أول صف بيانات ═ */
 @media (max-width:760px){
   .demoband{font-size:11px;padding:3px 8px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}

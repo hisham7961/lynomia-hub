@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QuoteFlow — كلمة السر</title>
-<link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ config('hub.version') }}">
+@include('partials.standalone_head')
 </head>
-<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)">
+<body class="pagecenter">
 <div class="card" style="max-width:360px;width:92%;text-align:center;padding:28px 24px">
     <div style="font-size:38px;margin-bottom:8px">🧾</div>
     <h2 style="margin-bottom:4px">QuoteFlow</h2>
@@ -16,7 +16,7 @@
         @csrf
         <input class="inp" type="password" name="pass" placeholder="كلمة السر" autofocus autocomplete="current-password"
                style="text-align:center;margin-bottom:12px">
-        <button class="btn" style="width:100%">دخول</button>
+        <button class="btn p full">دخول</button>
     </form>
     <a class="sub" href="{{ route('dashboard') }}" style="display:inline-block;margin-top:14px">← عودة للوحة التحكم</a>
 </div>

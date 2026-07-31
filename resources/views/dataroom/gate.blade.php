@@ -4,8 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>مستند محمي — {{ setting('app.name', config('app.name')) }}</title>
-<link href="{{ asset('css/fonts.css') }}?v={{ config('hub.version') }}" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ config('hub.version') }}">
+@include('partials.standalone_head')
 </head>
 <body class="loginbg">
 <div class="logincard">

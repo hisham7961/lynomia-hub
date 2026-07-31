@@ -5,10 +5,10 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>شهادة إتمام — {{ $req->title }}</title>
-<link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ config('hub.version') }}">
+@include('partials.standalone_head')
 <style>@media print{.noprint{display:none!important}body{background:#fff!important}.card{box-shadow:none!important;border:0!important}}</style>
 </head>
-<body style="background:var(--bg);padding:24px 12px">
+<body class="pagedoc">
 <div style="max-width:820px;margin:0 auto">
     <div class="noprint" style="display:flex;gap:8px;margin-bottom:12px">
         @unless ($client ?? false)<a class="btn ghost sm" href="{{ route('esign.index') }}">→ رجوع</a>@endunless
