@@ -195,6 +195,13 @@ Route::middleware('auth')->group(function () {
     Route::get('innovation', [\App\Http\Controllers\Web\InnovationController::class, 'index'])->name('innovation');
     Route::post('ideas/{id}/promote', [\App\Http\Controllers\Web\InnovationController::class, 'promote'])->name('ideas.promote');
 
+    // ── مركز السياسات والإقرارات (والمعرفة الإلزامية) ──
+    Route::get('policies', [\App\Http\Controllers\Web\PolicyController::class, 'index'])->name('policies.board');
+    Route::post('{module}/{id}/announce', [\App\Http\Controllers\Web\PolicyController::class, 'announce'])
+        ->whereIn('module', ['policies', 'kb'])->name('acks.announce');
+    Route::post('{module}/{id}/ack', [\App\Http\Controllers\Web\PolicyController::class, 'ack'])
+        ->whereIn('module', ['policies', 'kb'])->name('acks.ack');
+
     // ── لوحة الأهداف والنتائج ──
     Route::get('okrs', [\App\Http\Controllers\Web\OkrController::class, 'index'])->name('okrs.board');
     Route::post('okrs/refresh', [\App\Http\Controllers\Web\OkrController::class, 'refresh'])->name('okrs.refresh');

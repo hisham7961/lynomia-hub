@@ -251,6 +251,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'group' => 'analytics', 'ok' => $mon],
             ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $mon],
             ['key' => 'okrb',      'label' => '🎯 لوحة الأهداف',     'route' => 'okrs.board',      'group' => 'analytics', 'ok' => hub_can($user, 'okrs', 'v')],
+            ['key' => 'polb',      'label' => '📜 السياسات والإقرارات', 'route' => 'policies.board', 'group' => 'centers',   'ok' => hub_can($user, 'policies', 'v')],
             ['key' => 'social',    'label' => '📣 مركز السوشال',     'route' => 'social.index',    'group' => 'analytics', 'ok' => hub_can($user, 'social', 'v')],
 
             ['key' => 'legal',     'label' => '⚖️ القانوني',         'route' => 'legal',           'group' => 'centers',   'ok' => hub_can($user, 'contracts', 'v')],
@@ -3266,5 +3267,212 @@ if (! function_exists('hub_okr_board')) {
             'ahead' => count(array_filter($measured, fn ($r) => ($r['p']['pace'] ?? '') === 'متقدّم')),
             'auto' => count(array_filter($rows, fn ($r) => collect($r['p']['krs'] ?? [])->contains('auto', true))),
         ];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// السياسات وقاعدة المعرفة: نصٌّ يُبلَّغ ويُقَرّ ويسقط إقراره بتحديث نسخته
+// كانت تُحفظ ثم تُنسى: لا إبلاغ، ولا معرفةَ من قرأ، ولا أثرَ لتحديث النسخة.
+// ─────────────────────────────────────────────────────────────────────────
+
+if (! function_exists('hub_ack_modules')) {
+    /** الوحدات التي تُقَرّ: مفتاحها ⟵ [عمود الإلزام، عمود النسخة، المسار] */
+    function hub_ack_modules(): array
+    {
+        return [
+            'policies' => ['col' => 'ack_required', 'ver' => 'ver', 'label' => 'سياسة'],
+            'kb'       => ['col' => 'must_read',    'ver' => 'ver', 'label' => 'مقال معرفة'],
+        ];
+    }
+}
+
+if (! function_exists('hub_ack_targets')) {
+    /**
+     * من يلزمه الإقرار بهذا السجل: الجميع، أو أعضاء مشروعه، أو منسوبو شركته.
+     * المستخدمون النشطون وحدهم — إقرارٌ من حسابٍ موقوف ليس إقراراً.
+     */
+    function hub_ack_targets(string $module, $row): array
+    {
+        $q = \App\Models\User::where('status', 'نشط');
+
+        $pid = $row->project_id ?? null;
+        $cid = $row->company_id ?? null;
+
+        if ($pid && ($p = \App\Models\Project::find($pid))) {
+            $members = array_values(array_filter(array_merge(
+                (array) ($p->members ?? []), [$p->manager_id ?? null])));
+            if ($members) $q->whereIn('id', $members);
+        } elseif ($cid && \Illuminate\Support\Facades\Schema::hasColumn('users', 'company_id')) {
+            $q->where('company_id', $cid);
+        }
+
+        return $q->pluck('id')->all();
+    }
+}
+
+if (! function_exists('hub_ack_announce')) {
+    /**
+     * إعلان السجل: يُفتح لكل مُخاطَبٍ **إقرارٌ معلّق** ويصله إشعار.
+     * فتح الإقرار سلفاً هو الفرق بين «من لم يُقِر؟» المُجاب عنها وبين التخمين.
+     */
+    function hub_ack_announce(string $module, string $recordId): int
+    {
+        $spec = hub_ack_modules()[$module] ?? null;
+        if (! $spec) return 0;
+
+        $def = hub_mod($module);
+        $class = '\\App\\Models\\' . $def['model'];
+        $row = $class::find($recordId);
+        if (! $row) return 0;
+
+        $ver = (string) ($row->{$spec['ver']} ?? '') ?: '1.0';
+        $title = (string) ($row->title ?? '');
+        $n = 0;
+
+        foreach (hub_ack_targets($module, $row) as $uid) {
+            $ack = \App\Models\PolicyAck::firstOrNew([
+                'src_module' => $module, 'record_id' => $recordId, 'user_id' => $uid, 'ver' => $ver,
+            ]);
+            if (! $ack->exists) {
+                $ack->fill([
+                    'title' => \Illuminate\Support\Str::limit($title, 200),
+                    'policy_id' => $module === 'policies' ? $recordId : null,
+                    'status' => 'معلّق',
+                ])->save();
+            }
+            hub_notify($uid, 'policy',
+                ($module === 'kb' ? 'قراءة إلزامية: ' : 'سياسة تحتاج إقرارك: ') . $title . ' (نسخة ' . $ver . ')',
+                $module, $recordId);
+            $n++;
+        }
+
+        try {
+            $row->forceFill(['announced_at' => now()])->saveQuietly();
+        } catch (\Throwable $e) {
+        }
+
+        return $n;
+    }
+}
+
+if (! function_exists('hub_ack_state')) {
+    /** حال الإقرار على سجل: من أقرّ ومن لم يُقِر — بالأسماء لا بالعدد وحده */
+    function hub_ack_state(string $module, string $recordId): array
+    {
+        $spec = hub_ack_modules()[$module] ?? null;
+        $def = hub_mod($module);
+        $out = ['ver' => null, 'done' => 0, 'pending' => 0, 'total' => 0, 'pct' => 0,
+                'doneRows' => [], 'pendingRows' => [], 'required' => false];
+        if (! $spec || ! $def) return $out;
+
+        $class = '\\App\\Models\\' . $def['model'];
+        $row = $class::find($recordId);
+        if (! $row) return $out;
+
+        $ver = (string) ($row->{$spec['ver']} ?? '') ?: '1.0';
+        $out['ver'] = $ver;
+        $out['required'] = (bool) ($row->{$spec['col']} ?? false);
+
+        $acks = \App\Models\PolicyAck::whereNull('deleted_at')
+            ->where(fn ($q) => $q->where('record_id', $recordId)
+                ->orWhere(fn ($w) => $w->whereNull('record_id')->where('policy_id', $recordId)))
+            ->where('ver', $ver)->get();
+
+        $names = \App\Models\User::whereIn('id', $acks->pluck('user_id')->filter()->all())
+            ->pluck('name', 'id');
+
+        foreach ($acks as $a) {
+            $entry = ['id' => $a->id, 'user' => $names[$a->user_id] ?? '—',
+                      'at' => $a->ack_at, 'signed' => (bool) $a->sign_request_id];
+            if ((string) $a->status === 'مُقَر') $out['doneRows'][] = $entry;
+            elseif ((string) $a->status !== 'منتهية بتحديث النسخة') $out['pendingRows'][] = $entry;
+        }
+
+        $out['done'] = count($out['doneRows']);
+        $out['pending'] = count($out['pendingRows']);
+        $out['total'] = $out['done'] + $out['pending'];
+        $out['pct'] = $out['total'] ? (int) round($out['done'] * 100 / $out['total']) : 0;
+        $out['tone'] = $out['pct'] >= 100 ? 'ok' : ($out['pct'] >= 60 ? 'wn' : 'bad');
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_ack_do')) {
+    /** تسجيل إقرار المستخدم الحالي بنسخة السجل — مع دليله: وقتٌ وعنوانٌ وجهاز */
+    function hub_ack_do(string $module, string $recordId, ?string $signRequestId = null): ?\App\Models\PolicyAck
+    {
+        $spec = hub_ack_modules()[$module] ?? null;
+        $def = hub_mod($module);
+        if (! $spec || ! $def) return null;
+
+        $class = '\\App\\Models\\' . $def['model'];
+        $row = $class::find($recordId);
+        if (! $row) return null;
+
+        $ver = (string) ($row->{$spec['ver']} ?? '') ?: '1.0';
+        $ack = \App\Models\PolicyAck::firstOrNew([
+            'src_module' => $module, 'record_id' => $recordId,
+            'user_id' => auth()->id(), 'ver' => $ver,
+        ]);
+        $ack->fill([
+            'title' => \Illuminate\Support\Str::limit((string) ($row->title ?? ''), 200),
+            'policy_id' => $module === 'policies' ? $recordId : ($ack->policy_id ?? null),
+            'status' => 'مُقَر', 'ack_at' => now(),
+            'ip' => substr((string) request()->ip(), 0, 60),
+            'device' => substr((string) request()->userAgent(), 0, 200),
+            'sign_request_id' => $signRequestId ?: $ack->sign_request_id,
+        ])->save();
+
+        hub_audit('إقرار ' . $spec['label'], $module, $recordId, 'نسخة ' . $ver);
+
+        return $ack;
+    }
+}
+
+if (! function_exists('hub_ack_reset')) {
+    /**
+     * تحديث النسخة يُسقط الإقرارات السابقة ويُعيد الإعلان.
+     * بلا هذا يبقى الجميع «مُقِرّين» بنسخةٍ ماتت — وهو أسوأ من ألّا يُقِرّ أحد،
+     * لأنه امتثالٌ ورقيٌّ كاذب.
+     */
+    function hub_ack_reset(string $module, string $recordId, string $currentVer): int
+    {
+        // نُسقط **كل ما ليس النسخة الحالية** لا نسخةً بعينها: بذلك يعمل الإسقاط
+        // أياً كان مصدر التغيير (واجهة، API، استيراد، أمر طرفية) ولا يعتمد على
+        // التقاط القيمة القديمة قبل الحفظ — وهو ما كان يفلت صامتاً.
+        $n = \App\Models\PolicyAck::whereNull('deleted_at')
+            ->where(fn ($q) => $q->where('record_id', $recordId)
+                ->orWhere(fn ($w) => $w->whereNull('record_id')->where('policy_id', $recordId)))
+            ->where(fn ($q) => $q->where('ver', '!=', $currentVer)->orWhereNull('ver'))
+            ->whereIn('status', ['معلّق', 'مُقَر'])
+            ->update(['status' => 'منتهية بتحديث النسخة']);
+
+        hub_ack_announce($module, $recordId);
+
+        return (int) $n;
+    }
+}
+
+if (! function_exists('hub_ack_board')) {
+    /** لوحة الإقرارات: كل سجلٍ يلزمه إقرار بحاله — منطّقاً بصلاحية الرؤية */
+    function hub_ack_board($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        $out = [];
+        foreach (hub_ack_modules() as $mk => $spec) {
+            if (! hub_can($user, $mk, 'v')) continue;
+            $def = hub_mod($mk);
+            $class = '\\App\\Models\\' . $def['model'];
+            $rows = hub_scope($class::query(), $mk, $user)->whereNull('deleted_at')
+                ->where($spec['col'], true)->orderByDesc('created_at')->limit(60)->get();
+            foreach ($rows as $r) {
+                $out[] = ['module' => $mk, 'label' => $spec['label'], 'row' => $r,
+                          'state' => hub_ack_state($mk, $r->id)];
+            }
+        }
+        usort($out, fn ($a, $b) => $a['state']['pct'] <=> $b['state']['pct']);
+
+        return $out;
     }
 }
