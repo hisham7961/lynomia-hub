@@ -14,6 +14,8 @@
 @if ($brand = hub_brand_css())<style>{!! $brand !!}</style>@endif
 </head>
 <body>
+{{-- v2.129: رابط تجاوز — مستخدم لوحة المفاتيح لا يجتاز الشريط الجانبي كاملاً كل صفحة --}}
+<a class="skiplink" href="#content">تجاوز إلى المحتوى</a>
 <div id="topload"></div>
 @if (setting('demo.on'))
     <div class="demoband">
@@ -68,7 +70,7 @@
                         hx-get="{{ route('notifications.mini') }}" hx-target="#bellbox" hx-swap="innerHTML">🔔<span id="bellbadge">@php $nbc = \App\Models\HubNotification::where('user_id', auth()->id())->where('read', false)->count(); @endphp@if($nbc)<span class="nbdg">{{ $nbc }}</span>@endif</span></button>
                 <div id="bellbox" class="gsr"></div>
             </div>
-            <button class="btn ghost sm" type="button" onclick="Hub.theme()" title="الوضع الليلي">🌓</button>
+            <button class="btn ghost sm" type="button" onclick="Hub.theme()" title="الوضع الليلي" aria-label="تبديل الوضع الليلي">🌓</button>
             <div class="userbox">
                 <a href="{{ route('profile.edit') }}" title="ملفي الشخصي" style="display:flex;gap:10px;align-items:center;color:inherit">
                     <span class="ava">{{ mb_substr(auth()->user()->name, 0, 1) }}</span>
@@ -148,10 +150,10 @@
                 </div>
             </div>
         @endif
-        <div class="content">@yield('content')</div>
+        <div class="content" id="content" tabindex="-1">@yield('content')</div>
     </main>
 </div>
-<div class="modal" id="modal" hidden>
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-label="نافذة حوارية">
     <div class="modalbox">
         <button class="mclose" type="button" onclick="Hub.closeModal()" aria-label="إغلاق">✕</button>
         <div id="modalbody"></div>

@@ -19,14 +19,35 @@
     $('#flash').appendChild(d); flashInit();
   };
 
-  /* ── النافذة المنبثقة ── */
+  /* ── النافذة المنبثقة ──
+     v2.129: إدارة تركيز كاملة — يدخل الحوار عند الفتح، يُحبس فيه بـTab،
+     ويعود لمُطلقه عند الإغلاق (كان يبقى خلف الحوار فيتوه مستخدم الكيبورد) */
+  var modalOpener = null;
   Hub.modal = function (url) {
     var m = $('#modal'); m.hidden = false; document.body.classList.add('lock');
+    modalOpener = document.activeElement;
     $('#modalbody').innerHTML = '<div class="sub" style="padding:30px;text-align:center">… جارٍ التحميل</div>';
     htmx.ajax('GET', url, { target: '#modalbody', swap: 'innerHTML' });
+    var c = m.querySelector('.mclose'); if (c) c.focus();
     return false;
   };
-  Hub.closeModal = function () { $('#modal').hidden = true; $('#modalbody').innerHTML = ''; document.body.classList.remove('lock'); };
+  Hub.closeModal = function () {
+    $('#modal').hidden = true; $('#modalbody').innerHTML = ''; document.body.classList.remove('lock');
+    if (modalOpener && modalOpener.focus) { try { modalOpener.focus(); } catch (e) {} modalOpener = null; }
+  };
+  // فخ Tab: الدوران داخل الحوار المفتوح لا خلفه
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Tab') return;
+    var m = $('#modal');
+    if (!m || m.hidden) return;
+    var f = [].slice.call(m.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])'))
+      .filter(function (el) { return el.offsetParent !== null; });
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    else if (!m.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+  });
 
   /* بعد أي تبديل: نجاح الحفظ يُفرغ النموذج ⇒ أغلق النافذة */
   document.addEventListener('htmx:afterSwap', function () {
@@ -154,7 +175,9 @@
     var cur = selected(), i = cur ? list.indexOf(cur) : -1;
     if (cur) cur.classList.remove('sel');
     var next = list[(i + dir + list.length) % list.length];
+    if (cur) cur.setAttribute('aria-selected', 'false');
     next.classList.add('sel');
+    next.setAttribute('aria-selected', 'true');
     next.scrollIntoView({ block: 'nearest' });
     q.setAttribute('aria-activedescendant', next.id || (next.id = 'gi' + list.indexOf(next)));
   }

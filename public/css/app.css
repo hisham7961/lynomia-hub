@@ -894,6 +894,17 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .modalbox .flash{margin:0 0 10px;position:static}
 .signerrow{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
 
+/* ═ الوصولية (v2.129) ═ */
+/* رابط التجاوز: مخفي حتى يُركَّز بالكيبورد فيطفو أول الصفحة */
+.skiplink{position:fixed;top:-48px;inset-inline-start:12px;z-index:99;background:var(--p);color:#fff;
+  padding:9px 16px;border-radius:0 0 10px 10px;font-weight:700;font-size:13px;transition:top var(--t)}
+.skiplink:focus-visible{top:0;color:#fff}
+#content:focus{outline:0}
+/* تركيز مرئي في وضع التباين القسري: outline الشفاف يُرسم صلباً هناك وbox-shadow تُلغى */
+:focus-visible{outline:2px solid transparent;outline-offset:2px}
+/* تبويبات مساحة العمل: حالة الاختيار للتقنيات المساعدة تطابق البصرية */
+.cwtabs button[aria-selected="true"]{background:var(--p);color:#fff;border-color:var(--p)}
+
 /* ═ كثافة الجوال (v2.115): الترويسات كانت تلتهم ٦٣٢ من ٨٤٤ بكسل قبل أول صف بيانات ═ */
 @media (max-width:760px){
   .demoband{font-size:11px;padding:3px 8px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}

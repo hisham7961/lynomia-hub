@@ -7,7 +7,7 @@
         @endif
         {{ setting('app.name', 'Lynomia Hub') }}</a></div>
     <nav>
-        <a class="ni top {{ request()->routeIs('dashboard') ? 'on' : '' }}" href="{{ route('dashboard') }}">🏠 لوحة التحكم</a>
+        <a class="ni top {{ request()->routeIs('dashboard') ? 'on' : '' }}" @if (request()->routeIs('dashboard')) aria-current="page" @endif href="{{ route('dashboard') }}">🏠 لوحة التحكم</a>
 
         {{-- منطقة الأدوات واللوحات — روابط مجموعةً في أقسام بدل قائمة مسطّحة --}}
         @php
@@ -24,7 +24,8 @@
             <details data-nav="t:{{ $g['label'] }}" @class(['act' => $gActive]) {{ $g['open'] || $gActive ? 'open' : '' }}>
                 <summary>{{ $g['icon'] }} {{ $g['label'] }}@if ($gCount)<span class="nbdg">{{ $gCount }}</span>@endif</summary>
                 @foreach ($g['items'] as $it)
-                    <a class="ni {{ request()->routeIs($it['route']) || request()->routeIs(\Illuminate\Support\Str::before($it['route'], '.') . '.*') ? 'on' : '' }}" href="{{ route($it['route']) }}">{{ $it['label'] }}@if (($b = (int) ($navBadges[$it['key']] ?? 0)))<span class="nbdg">{{ $b }}</span>@endif</a>
+                    @php $niOn = request()->routeIs($it['route']) || request()->routeIs(\Illuminate\Support\Str::before($it['route'], '.') . '.*'); @endphp
+                    <a class="ni {{ $niOn ? 'on' : '' }}" @if ($niOn) aria-current="page" @endif href="{{ route($it['route']) }}">{{ $it['label'] }}@if (($b = (int) ($navBadges[$it['key']] ?? 0)))<span class="nbdg">{{ $b }}</span>@endif</a>
                 @endforeach
             </details>
         @endforeach
@@ -36,7 +37,8 @@
             <details data-nav="m:{{ $g['g'] }}" @class(['act' => $active]) {{ $active ? 'open' : '' }}>
                 <summary>{{ $g['icon'] }} {{ $g['g'] }}</summary>
                 @foreach ($g['items'] as $it)
-                    <a class="ni {{ request()->is('m/' . $it['key'] . '*') ? 'on' : '' }}" href="{{ route('m.index', $it['key']) }}">{{ $it['label'] }}</a>
+                    @php $miOn = request()->is('m/' . $it['key'] . '*'); @endphp
+                    <a class="ni {{ $miOn ? 'on' : '' }}" @if ($miOn) aria-current="page" @endif href="{{ route('m.index', $it['key']) }}">{{ $it['label'] }}</a>
                 @endforeach
             </details>
         @endforeach

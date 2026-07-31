@@ -85,6 +85,20 @@ class DesignSystemGuardTest extends TestCase
         $this->assertStringContainsString('id="f-type"', $html);
     }
 
+    /** د5 (v2.129): معالم الوصولية الأساسية حاضرة في القشرة والقوائم */
+    public function test_accessibility_landmarks_present(): void
+    {
+        $this->seedCore();
+        $html = $this->actingAs($this->owner)->get('/')->assertOk()->getContent();
+
+        $this->assertStringContainsString('class="skiplink"', $html, 'رابط التجاوز أول الصفحة');
+        $this->assertStringContainsString('id="content" tabindex="-1"', $html);
+        $this->assertStringContainsString('role="dialog"', $html, 'المودال حوار معلن');
+        $this->assertStringContainsString('aria-current="page"', $html, 'الموضع الحالي معلن في التنقل');
+        $this->assertStringContainsString('aria-label="تبديل الوضع الليلي"', $html);
+        $this->assertStringNotContainsString('javascript:void', $html);
+    }
+
     /** أوزان الخط المطلوبة كلها محملة فعلاً — لا faux-bold مركّب من المتصفح */
     public function test_no_font_weight_beyond_loaded_families(): void
     {

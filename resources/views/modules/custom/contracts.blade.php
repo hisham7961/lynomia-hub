@@ -30,12 +30,12 @@
 </style>
 <div class="card" id="cworkspace">
     <h3 class="cardtitle">🗂 مساحة عمل العقد</h3>
-    <div class="cwtabs" role="tablist">
-        <button type="button" class="on" data-cw="parties">✍️ الأطراف والتواقيع</button>
-        <button type="button" data-cw="approvals">🔏 الموافقات</button>
-        <button type="button" data-cw="obligations">📌 الالتزامات <span class="sub">({{ $wsObs->count() }})</span></button>
-        <button type="button" data-cw="fin">💰 المالية</button>
-        <button type="button" data-cw="chain">🔗 سلسلة العقد</button>
+    <div class="cwtabs" role="tablist" aria-label="أقسام مساحة عمل العقد">
+        <button type="button" class="on" role="tab" aria-selected="true" data-cw="parties">✍️ الأطراف والتواقيع</button>
+        <button type="button" role="tab" aria-selected="false" tabindex="-1" data-cw="approvals">🔏 الموافقات</button>
+        <button type="button" role="tab" aria-selected="false" tabindex="-1" data-cw="obligations">📌 الالتزامات <span class="sub">({{ $wsObs->count() }})</span></button>
+        <button type="button" role="tab" aria-selected="false" tabindex="-1" data-cw="fin">💰 المالية</button>
+        <button type="button" role="tab" aria-selected="false" tabindex="-1" data-cw="chain">🔗 سلسلة العقد</button>
     </div>
 
     <div class="cwpane" data-cwp="parties">
@@ -156,13 +156,30 @@
     </div>
 </div>
 <script>
-document.querySelectorAll('#cworkspace .cwtabs button').forEach(function (b) {
-    b.addEventListener('click', function () {
-        document.querySelectorAll('#cworkspace .cwtabs button').forEach(function (x) { x.classList.remove('on'); });
-        b.classList.add('on');
+(function () {
+    var tabs = [].slice.call(document.querySelectorAll('#cworkspace .cwtabs button'));
+    function activate(b) {
+        tabs.forEach(function (x) {
+            var on = x === b;
+            x.classList.toggle('on', on);
+            x.setAttribute('aria-selected', on ? 'true' : 'false');
+            x.tabIndex = on ? 0 : -1;
+        });
         document.querySelectorAll('#cworkspace .cwpane').forEach(function (p) {
             p.hidden = p.dataset.cwp !== b.dataset.cw;
+            if (!p.hidden) { p.setAttribute('role', 'tabpanel'); }
+        });
+    }
+    tabs.forEach(function (b, i) {
+        b.addEventListener('click', function () { activate(b); });
+        // أسهم الكيبورد بين التبويبات — نمط tablist المعياري
+        b.addEventListener('keydown', function (e) {
+            var d = e.key === 'ArrowLeft' ? 1 : e.key === 'ArrowRight' ? -1 : 0;   // RTL
+            if (!d) return;
+            e.preventDefault();
+            var n = tabs[(i + d + tabs.length) % tabs.length];
+            activate(n); n.focus();
         });
     });
-});
+})();
 </script>
