@@ -396,7 +396,8 @@ return [
                 'platform',
                 'ver',
                 'status',
-                'nextUp',
+                'downloads',
+                'rating',
             ],
             'fields' => [
                 [
@@ -463,6 +464,24 @@ return [
                     'col' => 'auto_store',
                     'label' => 'مزامنة بيانات المتجر تلقائياً',
                     'type' => 'bool',
+                ],
+                [
+                    'key' => 'downloads',
+                    'col' => 'downloads',
+                    'label' => 'التحميلات',
+                    'type' => 'num',
+                ],
+                [
+                    'key' => 'rating',
+                    'col' => 'rating',
+                    'label' => 'تقييم المتجر (٠–٥)',
+                    'type' => 'num',
+                ],
+                [
+                    'key' => 'reviews',
+                    'col' => 'reviews',
+                    'label' => 'عدد المراجعات',
+                    'type' => 'num',
                 ],
                 [
                     'key' => 'pkg',

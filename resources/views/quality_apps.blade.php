@@ -11,6 +11,51 @@
     </div>
 </div>
 
+{{-- أرقام المتاجر: جودةٌ داخلية بلا تحميلٍ ولا تقييم نصفُ صورة --}}
+<div class="card pad0">
+    <h3 class="cardtitle" style="padding:12px 14px 0">🏪 أرقام المتاجر</h3>
+    <div class="sub" style="padding:0 14px 8px">
+        التحميلات والتقييم ونموّهما من السلسلة الزمنية — تصل آلياً عبر
+        <span class="mono ltr">POST /api/v1/metrics</span>، ويسجّلها كل حفظٍ للحقول أيضاً.
+    </div>
+    <div class="tblwrap"><table class="tbl">
+        <thead><tr><th>التطبيق</th><th>التحميلات</th><th>نموّها</th><th>التقييم</th>
+            <th>المراجعات</th><th>المنحنى</th><th>التغذية</th></tr></thead>
+        <tbody>
+        @forelse ($apps as $a)
+            @php $s = $a['store']; @endphp
+            <tr>
+                <td><a href="{{ route('apps.center', $a['id']) }}"><b>{{ $a['name'] }}</b></a>
+                    <div class="sub">{{ $a['status'] ?: '—' }}</div></td>
+                <td class="mono"><b>{{ $s['downloads'] === null ? '—' : number_format($s['downloads']) }}</b></td>
+                <td>
+                    @if ($s['growth']['delta'] === null)<span class="sub">لا سلسلة</span>
+                    @else<span class="bdg {{ $s['growth']['tone'] ?: 'g' }}">{{ $s['growth']['delta'] >= 0 ? '+' : '' }}{{ number_format($s['growth']['delta']) }}</span>@endif
+                </td>
+                <td>
+                    @if ($s['rating'] === null)<span class="sub">—</span>
+                    @else<span class="bdg {{ $s['ratingTone'] }}">⭐ {{ number_format($s['rating'], 1) }}</span>@endif
+                </td>
+                <td class="mono sub">{{ $s['reviews'] === null ? '—' : number_format($s['reviews']) }}</td>
+                <td>
+                    @if (count($s['spark']) > 1)
+                        <span style="display:inline-flex;align-items:flex-end;gap:2px;height:24px">
+                            @foreach ($s['spark'] as $sp)
+                                <span title="{{ $sp['at']->format('Y-m-d') }} — {{ number_format($sp['value']) }}"
+                                      style="display:block;width:4px;border-radius:2px;background:var(--p);height:{{ max(8, $sp['pct']) }}%"></span>
+                            @endforeach
+                        </span>
+                    @else<span class="sub">—</span>@endif
+                </td>
+                <td><span class="bdg {{ $s['feed']['tone'] }}">{{ $s['feed']['label'] }}</span></td>
+            </tr>
+        @empty
+            <tr><td colspan="7" class="empty"><span class="big">🏪</span>لا تطبيقات مسجَّلة</td></tr>
+        @endforelse
+        </tbody>
+    </table></div>
+</div>
+
 <div class="card pad0">
     <div class="tblwrap">
     <table class="tbl">

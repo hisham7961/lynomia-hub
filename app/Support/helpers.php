@@ -2071,7 +2071,8 @@ if (! function_exists('hub_app_quality')) {
             $DB = \Illuminate\Support\Facades\DB::class;
             $closed = hub_closed_states();
             $apps = hub_scope(\Illuminate\Support\Facades\DB::table('applications')->whereNull('deleted_at'), 'apps')
-                ->orderBy('name')->limit(80)->get(['id', 'name', 'ver', 'status', 'project_id']);
+                ->orderBy('name')->limit(80)->get(['id', 'name', 'ver', 'status', 'project_id',
+                    'downloads', 'rating', 'reviews', 'auto_store']);
             if ($apps->isEmpty()) return [];
 
             $ids = $apps->pluck('id')->all();
@@ -2127,6 +2128,8 @@ if (! function_exists('hub_app_quality')) {
                     'deploys'  => $dp->count(),
                     'rollback' => $dp->count() ? (int) round($rolled / $dp->count() * 100) : null,
                     'lastDeploy' => $dp->max('deployed_at'),
+                    // واقع المتاجر: جودةٌ داخلية بلا تحميلٍ ولا تقييمٍ نصفُ صورة
+                    'store' => hub_app_store($a),
                 ];
             }
 
@@ -2847,6 +2850,39 @@ if (! function_exists('hub_social_stats')) {
                 'unlinked' => collect($rows)->where('feed.mode', 'none')->count(),
                 'stalled' => collect($rows)->where('feed.mode', 'stale')->count(),
             ],
+        ];
+    }
+}
+
+if (! function_exists('hub_app_store')) {
+    /**
+     * أداء التطبيق في المتاجر: الأرقام الحالية ونموّها من السلسلة الزمنية،
+     * وحالُ تغذيتها. كانت الوحدة تخبرك برقم Build ولا تخبرك أَحيٌّ هو أم ميت.
+     */
+    function hub_app_store($app, int $days = 30): array
+    {
+        $now = fn (string $m, $col) => hub_metric_latest('apps', $app->id, $m) ?? (($app->{$col} ?? null) !== null ? (float) $app->{$col} : null);
+
+        $dl = $now('downloads', 'downloads');
+        $rt = $now('rating', 'rating');
+        $rv = $now('reviews', 'reviews');
+
+        $gDl = hub_metric_growth('apps', $app->id, 'downloads', $days);
+        $gRt = hub_metric_growth('apps', $app->id, 'rating', $days);
+        $feed = hub_social_feed_state('apps', $app->id, 'downloads');
+        if ($feed['mode'] === 'none') $feed = hub_social_feed_state('apps', $app->id, 'rating');
+
+        return [
+            'downloads' => $dl, 'rating' => $rt, 'reviews' => $rv,
+            'growth' => $gDl, 'ratingGrowth' => $gRt,
+            'spark' => hub_metric_spark(hub_metric_series('apps', $app->id, 'downloads', $days), 40),
+            'ratingSpark' => hub_metric_spark(hub_metric_series('apps', $app->id, 'rating', $days), 40),
+            'feed' => $feed,
+            'auto' => (bool) ($app->auto_store ?? false),
+            'days' => $days,
+            // تقييمٌ دون ٣٫٥ في المتاجر يخنق التحميل — يُلوَّن لا يُدفَن في خانة
+            'ratingTone' => $rt === null ? '' : ($rt >= 4.3 ? 'ok' : ($rt >= 3.5 ? 'wn' : 'bad')),
+            'has' => $dl !== null || $rt !== null || $rv !== null,
         ];
     }
 }
