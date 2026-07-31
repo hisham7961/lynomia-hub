@@ -20,12 +20,82 @@ class FlowController extends Controller
         $module = (string) $r->query('m', '');
         if ($module !== '') abort_unless(hub_mod($module), 404);
 
+        $all = Flow::orderBy('module')->orderByDesc('enabled')->orderBy('name')->get();
+
+        // بحثٌ وفلترة: بـ٨٩ مساراً صارت القائمة المسطّحة غير صالحة للاستعمال
+        $q = trim((string) $r->query('q', ''));
+        $only = (string) $r->query('only', '');          // on|off
+        $group = (string) $r->query('g', '');
+        $flows = $all->filter(function ($f) use ($q, $only, $group) {
+            if ($only === 'on' && ! $f->enabled) return false;
+            if ($only === 'off' && $f->enabled) return false;
+            if ($group !== '' && $this->groupOf($f->module) !== $group) return false;
+            if ($q !== '') {
+                $hay = $f->name . ' ' . (hub_mod($f->module)['label'] ?? $f->module) . ' ' . $f->status_to;
+                if (mb_stripos($hay, $q) === false) return false;
+            }
+
+            return true;
+        });
+
+        // التجميع بمجموعات التنقل نفسها — تصنيفٌ واحد يعرفه المستخدم أصلاً
+        $grouped = $flows->groupBy(fn ($f) => $this->groupOf($f->module))
+            ->sortKeys();
+
+        // التغطية: أي وحدةٍ لها مسار وأيها بلا — «ماذا ينقصني؟» سؤالٌ له جواب
+        $withFlows = $all->pluck('module')->unique()->all();
+        $coverage = [];
+        foreach (config('hub_nav', []) as $g) {
+            $has = []; $missing = [];
+            foreach ($g['items'] as $mk) {
+                if (! hub_mod($mk)) continue;
+                in_array($mk, $withFlows, true) ? $has[] = $mk : $missing[] = $mk;
+            }
+            if ($has || $missing) $coverage[$g['g']] = ['icon' => $g['icon'], 'has' => $has, 'missing' => $missing];
+        }
+
         return view('flows.index', [
-            'module' => $module,
-            'def'    => $module ? hub_mod($module) : null,
-            'flows'  => Flow::orderByDesc('created_at')->get(),
-            'users'  => \App\Models\User::whereNull('deleted_at')->orderBy('name')->pluck('name', 'id'),
+            'module'   => $module,
+            'def'      => $module ? hub_mod($module) : null,
+            'flows'    => $flows,
+            'grouped'  => $grouped,
+            'coverage' => $coverage,
+            'total'    => $all->count(),
+            'onCount'  => $all->where('enabled', true)->count(),
+            'q'        => $q, 'only' => $only, 'group' => $group,
+            'users'    => \App\Models\User::whereNull('deleted_at')->orderBy('name')->pluck('name', 'id'),
         ]);
+    }
+
+    /** مجموعة التنقل التي تنتمي إليها وحدة المسار — للتجميع في الشاشة */
+    protected function groupOf(string $module): string
+    {
+        static $map = null;
+        if ($map === null) {
+            $map = [];
+            foreach (config('hub_nav', []) as $g) {
+                foreach ($g['items'] as $mk) $map[$mk] = $g['g'];
+            }
+        }
+
+        return $map[$module] ?? 'أخرى';
+    }
+
+    /** تفعيل/تعطيل مجموعةٍ كاملة — مراجعة ٨٩ مساراً واحداً واحداً غير عملية */
+    public function bulk(Request $r)
+    {
+        $this->gate();
+        $d = $r->validate([
+            'g'  => ['required', 'string', 'max:60'],
+            'do' => ['required', 'in:on,off'],
+        ]);
+
+        $ids = Flow::all()->filter(fn ($f) => $this->groupOf($f->module) === $d['g'])->pluck('id');
+        abort_if($ids->isEmpty(), 422, 'لا مسارات في هذه المجموعة');
+        Flow::whereIn('id', $ids)->update(['enabled' => $d['do'] === 'on']);
+
+        return back()->with('ok', ($d['do'] === 'on' ? '✅ فُعّلت ' : '⏸ عُطّلت ')
+            . $ids->count() . ' مسار في «' . $d['g'] . '»');
     }
 
     /** تحقّق المسار — مشترك بين الإنشاء والتعديل فلا يتفرّق العقد بينهما */

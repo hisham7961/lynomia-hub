@@ -310,6 +310,7 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/settings/odoo-test', [SettingController::class, 'odooTest'])->name('settings.odoo.test');
     Route::get('admin/flows', [FlowController::class, 'index'])->name('flows.index');
     Route::post('admin/flows', [FlowController::class, 'store'])->name('flows.store');
+    Route::post('admin/flows/bulk', [FlowController::class, 'bulk'])->name('flows.bulk');
     Route::get('admin/flows/{id}/edit', [FlowController::class, 'edit'])->name('flows.edit');
     Route::put('admin/flows/{id}', [FlowController::class, 'update'])->name('flows.update');
     Route::post('admin/flows/{id}/duplicate', [FlowController::class, 'duplicate'])->name('flows.duplicate');
