@@ -243,6 +243,8 @@ class OpsController extends Controller
         $out = trim(\Illuminate\Support\Facades\Artisan::output());
         \Illuminate\Support\Facades\Artisan::call('hub:alerts-starter');
         $out .= "\n" . trim(\Illuminate\Support\Facades\Artisan::output());
+        \Illuminate\Support\Facades\Artisan::call('hub:kpis-starter');
+        $out .= "\n" . trim(\Illuminate\Support\Facades\Artisan::output());
         hub_audit('توليد عدة الانطلاق', null, null, 'من مركز التشغيل');
 
         return redirect()->route('ops.index')->with('ok', $out);
