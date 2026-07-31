@@ -1,7 +1,10 @@
 {{-- نموذج المسار — يخدم الإنشاء والتعديل معاً.
      يتوقع: $def $module $users، و$flow اختيارياً (تعديل) وإلا فإنشاء. --}}
 @php
-    $isEdit = isset($flow) && $flow;
+    // سياق الإنشاء لا يمرّر $flow — تعريفه أولاً شرطٌ لأن الإغلاقات أدناه
+    // تلتقطه بـ use، وPHP يرفع «متغير غير معرّف» عند تعريف الإغلاق نفسه
+    $flow = $flow ?? null;
+    $isEdit = (bool) $flow;
     // قيم العرض: المُدخل السابق عند خطأ التحقق، ثم قيم المسار عند التعديل، ثم الفراغ
     $v = function (string $key, $fallback = '') use ($isEdit, $flow) {
         return old($key, $isEdit ? ($flow->{$key} ?? $fallback) : $fallback);

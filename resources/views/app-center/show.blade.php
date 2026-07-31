@@ -36,6 +36,58 @@
     @endif
 </div>
 
+{{-- أداء المتجر: التحميلات والتقييم — أَحيٌّ التطبيق أم ميت؟ --}}
+@php
+    $store = hub_app_store($app);
+    $sNum = fn ($v) => $v === null ? '—' : number_format((float) $v, ((float) $v == (int) $v) ? 0 : 1);
+@endphp
+<div class="card">
+    <h3>📊 أداء المتجر <span class="sub">· آخر {{ $store['days'] }} يوماً</span></h3>
+    <div class="cards" style="margin-bottom:10px">
+        <div class="stat"><span class="ico">⬇️</span><b>{{ $sNum($store['downloads']) }}</b><span>التحميلات</span></div>
+        <div class="stat"><span class="ico">{{ ($store['growth']['delta'] ?? 0) >= 0 ? '📈' : '📉' }}</span>
+            <b class="{{ ($store['growth']['delta'] ?? 0) < 0 ? 'txt-bad' : '' }}">
+                {{ $store['growth']['delta'] === null ? '—' : (($store['growth']['delta'] >= 0 ? '+' : '') . number_format($store['growth']['delta'])) }}</b>
+            <span>نمو التحميلات{{ $store['growth']['pct'] !== null ? ' · ' . $store['growth']['pct'] . '٪' : '' }}</span></div>
+        <div class="stat"><span class="ico">⭐</span>
+            <b class="{{ $store['ratingTone'] === 'bad' ? 'txt-bad' : '' }}">{{ $store['rating'] === null ? '—' : number_format($store['rating'], 1) }}</b>
+            <span>تقييم المتجر{{ $store['reviews'] !== null ? ' · ' . $sNum($store['reviews']) . ' مراجعة' : '' }}</span></div>
+        <div class="stat"><span class="ico">🔌</span>
+            <b class="{{ $store['feed']['tone'] === 'bad' ? 'txt-bad' : '' }}">{{ $store['feed']['label'] }}</b>
+            <span>{{ $store['feed']['at'] ? 'آخر قياس ' . $store['feed']['at']->diffForHumans() : 'لا قياس مسجّل' }}</span></div>
+    </div>
+
+    @if (count($store['spark']) > 1)
+        <div class="sub" style="margin-bottom:4px">منحنى التحميلات:</div>
+        <div style="display:flex;align-items:flex-end;gap:3px;height:70px">
+            @foreach ($store['spark'] as $s)
+                <div title="{{ $s['at']->format('Y-m-d') }} — {{ number_format($s['value']) }}"
+                     style="flex:1;min-width:4px;height:100%;display:flex;align-items:flex-end">
+                    <span style="display:block;width:100%;border-radius:3px 3px 0 0;background:var(--p);height:{{ max(6, $s['pct']) }}%"></span>
+                </div>
+            @endforeach
+        </div>
+    @endif
+
+    @if ($store['rating'] !== null && $store['ratingTone'] === 'bad')
+        <div class="sub" style="margin-top:10px;color:var(--bad)">
+            ⚠️ تقييمٌ دون ٣٫٥ يخنق التحميل في المتاجر قبل أي تسويق — عالج المراجعات أولاً.
+        </div>
+    @endif
+
+    @if (! $store['has'] || $store['feed']['mode'] === 'none')
+        <div class="sub" style="margin-top:10px;line-height:2">
+            <b>{{ $store['feed']['label'] }}</b> — أرقام هذا التطبيق لا تصل من نفسها.
+            @if ($store['auto']) («مزامنة المتجر تلقائياً» مؤشَّرة لكن لا نقاط تصل بعد.) @endif
+            دع n8n (أو أي مصدر يقرأ Play Console / App Store Connect) يدفعها إلى
+            <span class="mono ltr">POST /api/v1/metrics</span> بمقاييس
+            <span class="mono ltr">downloads, rating, reviews</span> —
+            التفصيل في <a href="{{ route('integrations.guide') }}">دليل الربط</a>.
+            وحتى ذلك، كل حفظٍ للحقول يسجّل نقطةً في السلسلة من نفسه.
+        </div>
+    @endif
+</div>
+
 {{-- المتاجر والمراجعات والروابط --}}
 <div class="card">
     <h3>🏪 المتاجر والروابط</h3>

@@ -195,6 +195,25 @@ Route::middleware('auth')->group(function () {
     Route::get('innovation', [\App\Http\Controllers\Web\InnovationController::class, 'index'])->name('innovation');
     Route::post('ideas/{id}/promote', [\App\Http\Controllers\Web\InnovationController::class, 'promote'])->name('ideas.promote');
 
+    // ── مركز السياسات والإقرارات (والمعرفة الإلزامية) ──
+    Route::get('policies', [\App\Http\Controllers\Web\PolicyController::class, 'index'])->name('policies.board');
+    Route::post('{module}/{id}/announce', [\App\Http\Controllers\Web\PolicyController::class, 'announce'])
+        ->whereIn('module', ['policies', 'kb'])->name('acks.announce');
+    Route::post('{module}/{id}/ack', [\App\Http\Controllers\Web\PolicyController::class, 'ack'])
+        ->whereIn('module', ['policies', 'kb'])->name('acks.ack');
+
+    // ── لوحة الأهداف والنتائج ──
+    Route::get('okrs', [\App\Http\Controllers\Web\OkrController::class, 'index'])->name('okrs.board');
+    Route::post('okrs/refresh', [\App\Http\Controllers\Web\OkrController::class, 'refresh'])->name('okrs.refresh');
+
+    // ── المراقبة الحيّة: فحصٌ عند الطلب لسيرفر أو موقع ──
+    Route::post('monitor/{module}/{id}/check', [\App\Http\Controllers\Web\MonitorController::class, 'check'])
+        ->name('monitor.check');
+
+    // ── مركز السوشال ميديا: مراقبة وتحليل ──
+    Route::get('social', [\App\Http\Controllers\Web\SocialController::class, 'index'])->name('social.index');
+    Route::post('social/snapshot', [\App\Http\Controllers\Web\SocialController::class, 'snapshot'])->name('social.snapshot');
+
     // ── المرفقات الشاملة على أي سجل ──
     Route::post('attachments', [AttachmentController::class, 'store'])->name('att.store');
     Route::get('attachments/{id}/dl', [AttachmentController::class, 'download'])->name('att.dl');
@@ -294,8 +313,12 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/quality', [QualityController::class, 'index'])->name('quality.index');
     Route::post('admin/quality/merge', [QualityController::class, 'merge'])->name('quality.merge');
     Route::get('admin/errors', [ErrorCenterController::class, 'index'])->name('errors.index');
+    Route::get('admin/errors/{id}', [ErrorCenterController::class, 'show'])->name('errors.show');
     Route::post('admin/errors/{id}/status', [ErrorCenterController::class, 'status'])->name('errors.status');
+    Route::post('admin/errors/{id}/task', [ErrorCenterController::class, 'toTask'])->name('errors.task');
     Route::post('jslog', [ErrorCenterController::class, 'jslog'])->name('jslog')->middleware('throttle:20,1');
+    Route::get('admin/integrations', [\App\Http\Controllers\Web\IntegrationController::class, 'index'])->name('integrations.index');
+    Route::get('admin/integrations/guide', [\App\Http\Controllers\Web\IntegrationController::class, 'guide'])->name('integrations.guide');
     Route::get('admin/webhooks', [WebhookController::class, 'index'])->name('webhooks.index');
     Route::post('admin/webhooks', [WebhookController::class, 'store'])->name('webhooks.store');
     Route::post('admin/webhooks/{id}/toggle', [WebhookController::class, 'toggle'])->name('webhooks.toggle');

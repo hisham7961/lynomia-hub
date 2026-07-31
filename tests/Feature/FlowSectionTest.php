@@ -68,6 +68,44 @@ class FlowSectionTest extends TestCase
         $this->assertFalse((bool) $work->fresh()->enabled);
     }
 
+    /**
+     * النموذج يُعرض ويحفظ لكل وحدة — الجزء المشترك كان يلتقط $flow بـ use وهو
+     * غير معرَّف في سياق الإنشاء، فينفجر «خطأ غير متوقع» عند اختيار أي وحدة.
+     * الاختبارات السابقة فاتته لأنها حمّلت الصفحة بلا اختيار وحدة فلا يُعرض النموذج.
+     */
+    public function test_create_form_renders_for_every_module(): void
+    {
+        $this->seedCore();
+        foreach (array_keys(hub_modules()) as $mk) {
+            $this->actingAs($this->owner)->get('/admin/flows?m=' . $mk)
+                ->assertOk()->assertSee('اسم المسار');
+        }
+    }
+
+    /** ومسار الإنشاء كاملاً: من فتح النموذج إلى حفظ مسارٍ يعمل */
+    public function test_creating_a_flow_end_to_end(): void
+    {
+        $this->seedCore();
+        $this->actingAs($this->owner)->get('/admin/flows?m=tickets')->assertOk();
+
+        $this->actingAs($this->owner)->post('/admin/flows', [
+            'name' => 'مسار أنشأه المستخدم', 'm' => 'tickets', 'event' => 'status',
+            'status_to' => 'تم الحل',
+            'a_notify' => 1, 'a_notify_to' => 'owners', 'a_notify_text' => 'حُلّت: {_display}',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $f = Flow::where('name', 'مسار أنشأه المستخدم')->firstOrFail();
+        $this->assertSame('tickets', $f->module);
+        $this->assertTrue((bool) $f->enabled);
+
+        // ويعمل فعلاً: تحول الحالة يُطلقه
+        $t = \App\Models\Ticket::create(['subject' => 'تذكرة المسار', 'status' => 'جديدة']);
+        $this->actingAs($this->owner)->post('/m/tickets/' . $t->id . '/status', ['status' => 'تم الحل']);
+        $this->assertTrue(\Illuminate\Support\Facades\DB::table('notifications_hub')
+            ->where('text', 'LIKE', '%حُلّت: تذكرة المسار%')->exists(),
+            'المسار المُنشأ من الواجهة يجب أن يعمل فعلاً');
+    }
+
     public function test_bulk_is_owner_only_and_validates_group(): void
     {
         $this->seedCore();

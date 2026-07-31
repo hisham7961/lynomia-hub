@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'مركز التشغيل')
 @section('content')
-@php $fmt = fn ($b) => $b === null ? '—' : ($b > 1073741824 ? number_format($b / 1073741824, 1) . ' GB' : number_format($b / 1048576, 1) . ' MB'); @endphp
+@php $fmt = fn ($b) => \App\Support\SysMonitor::bytes($b === null ? null : (int) $b); @endphp
 <div class="hero">
     <div>
         <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><b>مركز مراقبة وتشغيل النظام</b></nav>
@@ -11,19 +11,123 @@
     <a class="btn ghost sm" href="{{ route('errors.index') }}">🐞 مركز الأخطاء ←</a>
 </div>
 
+{{-- المؤشرات الحيّة: نِسبٌ لها معنى — «الحمل ٢٫٤» بلا عدد أنوية لا يقول شيئاً --}}
 <div class="cards">
-    <div class="stat"><span class="ico">🗄️</span>
-        <b class="{{ $db['ok'] ? '' : 'txt-bad' }}">{{ $db['ok'] ? 'متصلة' : 'متعطلة!' }}</b>
-        <span>القاعدة ({{ $db['driver'] }}) · {{ $db['ms'] }}ms · {{ $fmt($db['size']) }}</span></div>
+    <div class="stat"><span class="ico">⚙️</span>
+        <b class="{{ ($cpu['tone'] ?? '') === 'bad' ? 'txt-bad' : '' }}">{{ $cpu['ok'] ? $cpu['pct'] . '٪' : '—' }}</b>
+        <span>من طاقة المعالج · {{ $cpu['cores'] }} نواة{{ $cpu['ok'] ? ' · حمل ' . $cpu['load1'] . ' / ' . $cpu['load5'] . ' / ' . $cpu['load15'] : '' }}</span>
+        @if ($cpu['ok'])<div class="pbar sm"><span style="width:{{ min(100, $cpu['pct']) }}%"></span></div>
+            <span class="sub">{{ $cpu['band'] }} — الحمل لدقيقة و٥ و١٥</span>@endif</div>
+
+    <div class="stat"><span class="ico">🧠</span>
+        <b class="{{ ($mem['tone'] ?? '') === 'bad' ? 'txt-bad' : '' }}">{{ $mem['ok'] ? $mem['pct'] . '٪' : $fmt($mem['php_peak']) }}</b>
+        <span>ذاكرة النظام{{ $mem['ok'] ? ' · ' . $fmt($mem['used']) . ' من ' . $fmt($mem['total']) : ' (غير متاحة — تُعرض ذروة الطلب)' }}</span>
+        @if ($mem['ok'])<div class="pbar sm"><span style="width:{{ min(100, $mem['pct']) }}%"></span></div>
+            <span class="sub">متاح {{ $fmt($mem['avail']) }} · ذروة هذا الطلب {{ $fmt($mem['php_peak']) }}</span>@endif</div>
+
     <div class="stat"><span class="ico">💽</span>
         <b class="{{ ($sys['disk_pct'] ?? 0) > 85 ? 'txt-bad' : '' }}">{{ $sys['disk_pct'] !== null ? $sys['disk_pct'] . '٪' : '—' }}</b>
-        <span>التخزين المستخدم · متاح {{ $fmt($sys['disk_free']) }}</span></div>
-    <div class="stat"><span class="ico">🧠</span><b>{{ $fmt($sys['mem']) }}</b><span>ذاكرة الطلب · PHP {{ $sys['php'] }}</span></div>
-    <div class="stat"><span class="ico">⚙️</span><b>{{ $sys['load'] !== null ? number_format($sys['load'], 2) : '—' }}</b><span>حمل المعالج (دقيقة)</span></div>
-    <div class="stat"><span class="ico">⏱</span><b>{{ $sys['uptime'] ? floor($sys['uptime'] / 86400) . ' يوم' : '—' }}</b><span>تشغيل الخادم</span></div>
-    <div class="stat"><span class="ico">🐞</span><b class="{{ $errs['new'] ? 'txt-bad' : '' }}">{{ $errs['new'] }}</b><span>أخطاء جديدة بانتظار المعالجة</span></div>
-    <div class="stat"><span class="ico">🟢</span><b>{{ $live['now'] }}</b><span>على النظام الآن (آخر ٥ دقائق) · {{ $live['today'] }} دخول اليوم</span></div>
+        <span>القرص المستخدم · متاح {{ $fmt($sys['disk_free']) }} من {{ $fmt($sys['disk_total']) }}</span>
+        @if ($sys['disk_pct'] !== null)<div class="pbar sm"><span style="width:{{ min(100, $sys['disk_pct']) }}%"></span></div>@endif</div>
+
+    <div class="stat"><span class="ico">🗄️</span>
+        <b class="{{ $db['ok'] ? '' : 'txt-bad' }}">{{ $db['ok'] ? $db['ms'] . 'ms' : 'متعطلة!' }}</b>
+        <span>زمن استجابة القاعدة ({{ $db['driver'] }}) · حجمها {{ $fmt($db['size']) }}</span></div>
+
+    <div class="stat"><span class="ico">🟢</span><b>{{ $live['now'] }}</b>
+        <span>على النظام الآن (٥ دقائق) · {{ $live['today'] }} دخول اليوم</span></div>
+    <div class="stat"><span class="ico">🐞</span>
+        <b class="{{ $errs['new'] ? 'txt-bad' : '' }}">{{ $errs['new'] }}</b>
+        <span><a href="{{ route('errors.index') }}">خطأ جديد بانتظار المراجعة ←</a></span></div>
+    <div class="stat"><span class="ico">⏱</span>
+        <b>{{ $sys['uptime'] ? floor($sys['uptime'] / 86400) . ' يوم' : '—' }}</b>
+        <span>تشغيل الخادم · PHP {{ $sys['php'] }}</span></div>
 </div>
+
+{{-- نبض ٢٤ ساعة: الشكل الزمني يفرّق بين حملٍ معتاد وقفزةٍ مفاجئة --}}
+<div class="card">
+    <h3 class="cardtitle">📈 نبض ٢٤ ساعة <span class="sub">· طلبات النظام لكل ساعة، والساعات ذات الأخطاء بالأحمر</span></h3>
+    <div style="display:flex;align-items:flex-end;gap:3px;height:78px;padding-top:6px">
+        @foreach ($pulse as $p)
+            <div title="الساعة {{ $p['hour'] }}:00 — {{ $p['hits'] }} طلباً{{ $p['errs'] ? '، ' . $p['errs'] . ' خطأ' : '' }}"
+                 style="flex:1;min-width:4px;height:100%;display:flex;align-items:flex-end">
+                <span style="display:block;width:100%;border-radius:3px 3px 0 0;min-height:2px;
+                             height:{{ max(2, $p['pct']) }}%;
+                             background:{{ $p['errs'] ? 'var(--bad)' : 'var(--p)' }};
+                             opacity:{{ $p['hits'] ? 1 : .18 }}"></span>
+            </div>
+        @endforeach
+    </div>
+    <div class="sub" style="display:flex;justify-content:space-between;margin-top:4px">
+        <span>{{ $pulse[0]['hour'] }}:00 (قبل ٢٤ ساعة)</span>
+        <span>الآن {{ end($pulse)['hour'] }}:00</span>
+    </div>
+</div>
+
+{{-- من يستهلك: الرقم بلا فاعلٍ لا يُعالَج --}}
+<h3 class="secttl">🔎 من يستهلك؟</h3>
+<div class="kids">
+    <div class="card kid">
+        <h3>💽 من يستهلك القرص</h3>
+        @if (count($consumers['disk']))
+            <table class="mini">
+                @foreach ($consumers['disk'] as $d)
+                    <tr><td>{{ $d['label'] }}<div class="sub mono ltr">{{ $d['path'] }} · {{ number_format($d['files']) }} ملفاً</div></td>
+                        <td class="acts mono"><b>{{ $fmt($d['size']) }}</b></td></tr>
+                @endforeach
+            </table>
+            <div class="sub" style="margin-top:6px">النسخ القديمة وسجلات النظام أكثر ما يملأ القرص صامتاً.</div>
+        @else
+            <div class="sub">لا مجلدات تخزين بعد.</div>
+        @endif
+    </div>
+
+    <div class="card kid">
+        <h3>📚 من يستهلك القاعدة <span class="sub">· أثقل الجداول</span></h3>
+        <table class="mini">
+            @foreach ($consumers['tables'] as $t)
+                <tr><td>{{ $t['label'] }}@if (! empty($t['platform']))<span class="bdg g">منصة</span>@endif
+                        <div class="sub mono ltr">{{ $t['table'] }}</div></td>
+                    <td class="acts mono"><b>{{ number_format($t['n']) }}</b> صف</td>
+                    @if (! empty($t['size']))<td class="acts mono sub">{{ $fmt($t['size']) }}</td>@endif</tr>
+            @endforeach
+        </table>
+    </div>
+
+    <div class="card kid">
+        <h3>🐌 من يستهلك الوقت <span class="sub">· أبطأ المسارات (٧ أيام)</span></h3>
+        @if (count($consumers['slow']))
+            <table class="mini">
+                @foreach ($consumers['slow'] as $s)
+                    <tr><td class="mono ltr" style="word-break:break-all;font-size:11px">{{ \Illuminate\Support\Str::limit($s['url'] ?: '—', 64) }}
+                            <div class="sub">{{ \Illuminate\Support\Str::limit((string) $s['sample'], 60) }}</div></td>
+                        <td class="acts"><span class="bdg wn">{{ $s['hits'] }}×</span></td></tr>
+                @endforeach
+            </table>
+            <div class="sub" style="margin-top:6px"><a href="{{ route('errors.index', ['k' => 'slow']) }}">كل الطلبات البطيئة ←</a></div>
+        @else
+            <div class="sub">✅ لا طلبات تجاوزت الثانية خلال ٧ أيام.</div>
+        @endif
+    </div>
+
+    <div class="card kid">
+        <h3>🔥 أكثر الصفحات استدعاءً <span class="sub">· ٧ أيام</span></h3>
+        @if (count($consumers['busy']))
+            <table class="mini">
+                @foreach ($consumers['busy'] as $b)
+                    <tr><td class="mono ltr" style="word-break:break-all;font-size:11px">{{ \Illuminate\Support\Str::limit($b['path'], 56) }}</td>
+                        <td class="acts mono sub">{{ $b['users'] }} مستخدم</td>
+                        <td class="acts"><b>{{ number_format($b['hits']) }}</b></td></tr>
+                @endforeach
+            </table>
+            <div class="sub" style="margin-top:6px">هنا يذهب الحمل فعلاً — أي تحسينٍ لهذه الصفحات يُحسّ.</div>
+        @else
+            <div class="sub">لا زيارات مسجلة خلال ٧ أيام.</div>
+        @endif
+    </div>
+</div>
+
+<h3 class="secttl">🛠️ التشغيل والصيانة</h3>
 
 <div class="kids">
     <div class="card kid">
@@ -135,19 +239,6 @@
                 {{ $env['maint'] ? '🔓 إنهاء وضع الصيانة (مفعّل الآن!)' : '🔧 تفعيل وضع الصيانة' }}</button>
         </form>
     </div>
-
-    @if (count($tables))
-        <div class="card kid">
-            <h3>📚 أثقل جداول القاعدة</h3>
-            <table class="mini">
-                @foreach ($tables as $t)
-                    <tr><td class="mono ltr">{{ $t->t }}</td>
-                        <td class="mono sub acts">{{ number_format($t->r) }} صف</td>
-                        <td class="mono sub acts">{{ $fmt($t->s) }}</td></tr>
-                @endforeach
-            </table>
-        </div>
-    @endif
 
     <div class="card kid">
         <h3>📜 آخر أخطاء ملف السجل <span class="sub">· laravel.log بلا SSH</span></h3>

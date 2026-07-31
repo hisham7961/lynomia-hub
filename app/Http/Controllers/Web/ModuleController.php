@@ -632,6 +632,23 @@ class ModuleController extends Controller
         // حالة الصنف تُشتق من كميته وحدّه فور أي حفظ — نفد/منخفض/متاح
         if ($module === 'stock' && $m instanceof \App\Models\StockItem) hub_stock_sync($m);
 
+        // الحقول المقيسة (متابعون، إعجابات، تحميلات، تقييم) تُسجَّل نقطةً في
+        // السلسلة الزمنية مع كل حفظ — الحقل وحده يدهس ما قبله فلا يبقى نمو
+        \App\Support\Metrics::capture($module, $m);
+
+        // سياسةٌ أو مقالٌ إلزامي تغيّرت نسخته: الإقرارات القديمة تسقط ويُعاد
+        // الإعلان. بلا هذا يبقى الجميع «مُقِرّين» بنسخةٍ ماتت — امتثالٌ كاذب.
+        if (isset(hub_ack_modules()[$module]) && (bool) ($m->{hub_ack_modules()[$module]['col']} ?? false)) {
+            $spec = hub_ack_modules()[$module];
+            $ver = (string) ($m->{$spec['ver']} ?? '') ?: '1.0';
+            $stale = \App\Models\PolicyAck::whereNull('deleted_at')
+                ->where(fn ($q) => $q->where('record_id', $m->id)
+                    ->orWhere(fn ($w) => $w->whereNull('record_id')->where('policy_id', $m->id)))
+                ->where(fn ($q) => $q->where('ver', '!=', $ver)->orWhereNull('ver'))
+                ->whereIn('status', ['معلّق', 'مُقَر'])->exists();
+            if ($stale) hub_ack_reset($module, $m->id, $ver);
+        }
+
         // مزامنة الأصل مع صيانته: قيد التنفيذ تضعه «صيانة»، والمكتملة تختم
         // «آخر صيانة» وتعيده «قيد الاستخدام» — كان الحقلان يدويين متناقضين
         if ($module === 'assetlog' && $m->asset_id && ($asset = \App\Models\Asset::find($m->asset_id))) {

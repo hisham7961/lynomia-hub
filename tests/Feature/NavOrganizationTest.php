@@ -118,7 +118,7 @@ class NavOrganizationTest extends TestCase
         $none = ['v' => 0, 'a' => 0, 'e' => 0, 'd' => 0];
         $u = $this->limited('noanalytics@test.local', [
             'fin' => $none, 'contracts' => $none, 'tickets' => $none,
-            'ideas' => $none, 'suppliers' => $none,
+            'ideas' => $none, 'suppliers' => $none, 'social' => $none, 'okrs' => $none, 'policies' => $none,
         ]);
 
         $labels = collect(hub_top_groups($u))->pluck('label');
@@ -134,6 +134,7 @@ class NavOrganizationTest extends TestCase
         $none = ['v' => 0, 'a' => 0, 'e' => 0, 'd' => 0];
         $u = $this->limited('onlyfin@test.local', [
             'contracts' => $none, 'tickets' => $none, 'ideas' => $none, 'suppliers' => $none,
+            'social' => $none, 'okrs' => $none, 'policies' => $none,
         ]);
 
         $g = collect(hub_top_groups($u))->firstWhere('label', 'اللوحات والمراكز');

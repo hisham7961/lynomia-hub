@@ -110,7 +110,7 @@
                         <span class="seglbl">البناء</span>
                         <a class="{{ request()->routeIs('fields.*') ? 'on' : '' }}" href="{{ route('fields.index') }}">الحقول</a>
                         <a class="{{ request()->routeIs('flows.*') ? 'on' : '' }}" href="{{ route('flows.index') }}">المسارات</a>
-                        <a class="{{ request()->routeIs('webhooks.*') ? 'on' : '' }}" href="{{ route('webhooks.index') }}">Webhooks</a>
+                        <a class="{{ request()->routeIs('integrations.*') || request()->routeIs('webhooks.*') ? 'on' : '' }}" href="{{ route('integrations.index') }}">التكاملات</a>
                         <a class="{{ request()->routeIs('quality.*') ? 'on' : '' }}" href="{{ route('quality.index') }}">الجودة</a>
                     </div>
                     <div class="seg" style="--seg:var(--p)">

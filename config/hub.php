@@ -396,7 +396,8 @@ return [
                 'platform',
                 'ver',
                 'status',
-                'nextUp',
+                'downloads',
+                'rating',
             ],
             'fields' => [
                 [
@@ -463,6 +464,24 @@ return [
                     'col' => 'auto_store',
                     'label' => 'مزامنة بيانات المتجر تلقائياً',
                     'type' => 'bool',
+                ],
+                [
+                    'key' => 'downloads',
+                    'col' => 'downloads',
+                    'label' => 'التحميلات',
+                    'type' => 'num',
+                ],
+                [
+                    'key' => 'rating',
+                    'col' => 'rating',
+                    'label' => 'تقييم المتجر (٠–٥)',
+                    'type' => 'num',
+                ],
+                [
+                    'key' => 'reviews',
+                    'col' => 'reviews',
+                    'label' => 'عدد المراجعات',
+                    'type' => 'num',
                 ],
                 [
                     'key' => 'pkg',
@@ -947,6 +966,19 @@ return [
                     'label' => 'Pixels (Meta / TikTok)',
                     'type' => 'text',
                 ],
+
+                // ── التحليلات: كانت خانة GA تُملأ فلا يصل زائرٌ واحد ──
+                ['key' => 'ga4Id', 'col' => 'ga4_id', 'label' => 'معرّف GA4 (G-XXXXXXX)', 'type' => 'text'],
+                ['key' => 'gtmId', 'col' => 'gtm_id', 'label' => 'معرّف GTM (GTM-XXXXX)', 'type' => 'text'],
+                ['key' => 'sitemap', 'col' => 'sitemap', 'label' => 'رابط خريطة الموقع', 'type' => 'url'],
+
+                // ── المراقبة الحيّة والصحة التقنية ──
+                ['key' => 'monitorOn', 'col' => 'monitor_on', 'label' => 'فعّل المراقبة الحيّة', 'type' => 'bool'],
+                ['key' => 'monitorUrl', 'col' => 'monitor_url', 'label' => 'رابط الفحص (يُترك فارغاً = رابط الموقع)', 'type' => 'url'],
+                ['key' => 'cfZone', 'col' => 'cf_zone', 'label' => 'منطقة Cloudflare', 'type' => 'text'],
+                ['key' => 'sslExpiry', 'col' => 'ssl_expiry', 'label' => 'انتهاء شهادة SSL', 'type' => 'date', 'expiry' => true],
+                ['key' => 'lighthouse', 'col' => 'lighthouse', 'label' => 'درجة الأداء (Lighthouse)', 'type' => 'num'],
+                ['key' => 'lastAudit', 'col' => 'last_audit', 'label' => 'آخر تدقيق تقني/SEO', 'type' => 'date'],
                 [
                     'key' => 'supEmail',
                     'col' => 'sup_email',
@@ -1180,6 +1212,22 @@ return [
                     'label' => 'المواصفات',
                     'type' => 'text',
                 ],
+
+                // ── المراقبة الحيّة: كان الجدول يخبرك بالمزوّد ولا يخبرك أَحيٌّ هو الآن ──
+                ['key' => 'monitorOn', 'col' => 'monitor_on', 'label' => 'فعّل المراقبة الحيّة', 'type' => 'bool'],
+                ['key' => 'monitorUrl', 'col' => 'monitor_url', 'label' => 'رابط الفحص (health endpoint)', 'type' => 'url'],
+                ['key' => 'statusUrl', 'col' => 'status_url', 'label' => 'صفحة حالة المزوّد', 'type' => 'url'],
+                ['key' => 'cfZone', 'col' => 'cf_zone', 'label' => 'منطقة Cloudflare', 'type' => 'text'],
+
+                // ── المواصفات المفصّلة وكلفتها ──
+                ['key' => 'region', 'col' => 'region', 'label' => 'الموقع الجغرافي', 'type' => 'text'],
+                ['key' => 'cores', 'col' => 'cores', 'label' => 'أنوية المعالج', 'type' => 'num'],
+                ['key' => 'ramGb', 'col' => 'ram_gb', 'label' => 'الذاكرة (GB)', 'type' => 'num'],
+                ['key' => 'diskGb', 'col' => 'disk_gb', 'label' => 'القرص (GB)', 'type' => 'num'],
+                ['key' => 'costMonth', 'col' => 'cost_month', 'label' => 'الكلفة الشهرية', 'type' => 'num'],
+                ['key' => 'backupPolicy', 'col' => 'backup_policy', 'label' => 'سياسة النسخ الاحتياطي', 'type' => 'text'],
+                ['key' => 'lastPatch', 'col' => 'last_patch', 'label' => 'آخر ترقيع أمني', 'type' => 'date'],
+
                 [
                     'key' => 'panel',
                     'col' => 'panel',
@@ -3685,8 +3733,9 @@ return [
                 'kind',
                 'price',
                 'cycle',
+                'stage',
+                'ownerId',
                 'status',
-                'ver',
             ],
             'fields' => [
                 [
@@ -3773,6 +3822,39 @@ return [
                     'label' => 'الإصدار الحالي',
                     'type' => 'text',
                 ],
+
+                // ── مالكها وعلامتها ──
+                ['key' => 'ownerId', 'col' => 'owner_id', 'label' => 'مالك الخدمة (المسؤول عنها)', 'type' => 'ref', 'ref' => 'users'],
+                ['key' => 'brandId', 'col' => 'brand_id', 'label' => 'العلامة التجارية', 'type' => 'ref', 'ref' => 'brands'],
+
+                // ── من ينافسها وما يطوّرها: كان الابتكار في وادٍ والخدمة في وادٍ ──
+                ['key' => 'competitorIds', 'col' => 'competitor_ids', 'label' => 'من ينافسها', 'type' => 'ref', 'ref' => 'competitors', 'multi' => true],
+                ['key' => 'ideaIds', 'col' => 'idea_ids', 'label' => 'أفكار تطوّرها', 'type' => 'ref', 'ref' => 'ideas', 'multi' => true],
+
+                // ── تسعيرٌ يُدافَع عنه لا رقمٌ وحيد ──
+                ['key' => 'unit', 'col' => 'unit', 'label' => 'وحدة التسعير', 'type' => 'sel',
+                 'options' => ['ثابت', 'لكل مستخدم', 'لكل جهاز', 'لكل ساعة', 'لكل مشروع', 'لكل وحدة', 'حسب الاستخدام']],
+                ['key' => 'currency', 'col' => 'currency', 'label' => 'العملة', 'type' => 'text'],
+                ['key' => 'minPrice', 'col' => 'min_price', 'label' => 'أدنى سعر يُقبل', 'type' => 'num'],
+                ['key' => 'setupFee', 'col' => 'setup_fee', 'label' => 'رسوم التهيئة (مرة واحدة)', 'type' => 'num'],
+                ['key' => 'priceReview', 'col' => 'price_review', 'label' => 'موعد مراجعة السعر', 'type' => 'date', 'expiry' => true],
+
+                // ── ما الذي يُباع فعلاً ──
+                ['key' => 'valueProp', 'col' => 'value_prop', 'label' => 'عرض القيمة — لماذا يشتريها العميل', 'type' => 'ta'],
+                ['key' => 'audience', 'col' => 'audience', 'label' => 'الفئة المستهدفة', 'type' => 'ta'],
+                ['key' => 'features', 'col' => 'features', 'label' => 'ما تشمله الخدمة', 'type' => 'ta'],
+                ['key' => 'deliverables', 'col' => 'deliverables', 'label' => 'المخرجات التي يستلمها العميل', 'type' => 'ta'],
+                ['key' => 'requirements', 'col' => 'requirements', 'label' => 'ما نحتاجه من العميل قبل البدء', 'type' => 'ta'],
+                ['key' => 'leadTime', 'col' => 'lead_time', 'label' => 'مدة التسليم', 'type' => 'text'],
+                ['key' => 'warranty', 'col' => 'warranty', 'label' => 'الضمان وما بعد البيع', 'type' => 'text'],
+                ['key' => 'docsUrl', 'col' => 'docs_url', 'label' => 'رابط التوثيق', 'type' => 'url'],
+
+                // ── دورة حياة الخدمة ──
+                ['key' => 'stage', 'col' => 'stage', 'label' => 'مرحلة الخدمة', 'type' => 'sel',
+                 'options' => ['فكرة', 'قيد التطوير', 'تجريبية محدودة', 'مُطلقة', 'ناضجة', 'قيد الإيقاف', 'موقوفة']],
+                ['key' => 'launchAt', 'col' => 'launch_at', 'label' => 'تاريخ الإطلاق', 'type' => 'date'],
+                ['key' => 'retireAt', 'col' => 'retire_at', 'label' => 'تاريخ الإيقاف المخطَّط', 'type' => 'date', 'expiry' => true],
+
                 [
                     'key' => 'status',
                     'col' => 'status',
@@ -3796,6 +3878,8 @@ return [
                 'name',
                 'ver',
                 'description',
+                'value_prop',
+                'deliverables',
             ],
         ],
         'contracts' => [
@@ -4854,9 +4938,11 @@ return [
                     'expiry' => true,
                 ],
                 [
+                    // تُحسب من النتائج الرئيسية وتُكتب تلقائياً — الكتابة اليدوية
+                    // تنقض OKR من أصله. تبقى مفيدةً لهدفٍ لا نتائج له بعد.
                     'key' => 'progress',
                     'col' => 'progress',
-                    'label' => 'نسبة الإنجاز %',
+                    'label' => 'نسبة الإنجاز % (تُحسب من النتائج الرئيسية)',
                     'type' => 'num',
                 ],
                 [
@@ -4892,14 +4978,22 @@ return [
             'label' => 'النتائج الرئيسية (KR)',
             'display' => 'title',
             'status' => 'status',
-            'columns' => ['title', 'objectiveId', 'currentValue', 'targetValue', 'status'],
+            'columns' => ['title', 'objectiveId', 'currentValue', 'targetValue', 'source', 'status'],
             'fields' => [
                 ['key' => 'title', 'col' => 'title', 'label' => 'النتيجة الرئيسية', 'type' => 'text', 'required' => true],
                 ['key' => 'objectiveId', 'col' => 'objective_id', 'label' => 'الهدف', 'type' => 'ref', 'required' => true, 'ref' => 'okrs'],
-                ['key' => 'kpiId', 'col' => 'kpi_id', 'label' => 'المؤشر (يحسب القيمة آلياً)', 'type' => 'text'],
+                // ── من أين تأتي القيمة: مصدرٌ يُختار لا معرّفٌ يُلصق ──
+                ['key' => 'source', 'col' => 'source', 'label' => 'مصدر القياس', 'type' => 'sel',
+                 'options' => ['manual', 'count', 'sum', 'avg', 'kpi', 'metric']],
+                ['key' => 'srcModule', 'col' => 'src_module', 'label' => 'الوحدة المقيسة (مفتاحها)', 'type' => 'text'],
+                ['key' => 'srcCol', 'col' => 'src_col', 'label' => 'العمود (للمجموع/المتوسط)', 'type' => 'text'],
+                ['key' => 'srcStatus', 'col' => 'src_status', 'label' => 'تضييق بحالة السجل', 'type' => 'text'],
+                ['key' => 'srcRecord', 'col' => 'src_record', 'label' => 'السجل (للمقياس الزمني)', 'type' => 'text'],
+                ['key' => 'srcMetric', 'col' => 'src_metric', 'label' => 'اسم المقياس الزمني', 'type' => 'text'],
+                ['key' => 'kpiId', 'col' => 'kpi_id', 'label' => 'مؤشر KPI المرتبط', 'type' => 'text'],
                 ['key' => 'startValue', 'col' => 'start_value', 'label' => 'قيمة البداية', 'type' => 'num'],
                 ['key' => 'targetValue', 'col' => 'target_value', 'label' => 'القيمة المستهدفة', 'type' => 'num'],
-                ['key' => 'currentValue', 'col' => 'current_value', 'label' => 'القيمة الحالية', 'type' => 'num'],
+                ['key' => 'currentValue', 'col' => 'current_value', 'label' => 'القيمة الحالية (تُقرأ آلياً إن اختير مصدر)', 'type' => 'num'],
                 ['key' => 'unit', 'col' => 'unit', 'label' => 'الوحدة', 'type' => 'text'],
                 ['key' => 'weight', 'col' => 'weight', 'label' => 'الوزن داخل الهدف', 'type' => 'num'],
                 ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
@@ -7290,6 +7384,8 @@ return [
                 ['key' => 'ease', 'col' => 'ease', 'label' => 'سهولة التنفيذ (١-١٠)', 'type' => 'num'],
                 ['key' => 'byId', 'col' => 'by_id', 'label' => 'صاحب الفكرة', 'type' => 'ref', 'ref' => 'users'],
                 ['key' => 'projectId', 'col' => 'project_id', 'label' => 'المشروع الناتج', 'type' => 'ref', 'ref' => 'projects'],
+                // الفكرة تخدم خدمةً بعينها غالباً — بلا هذا الربط يبقى الابتكار معزولاً
+                ['key' => 'serviceId', 'col' => 'service_id', 'label' => 'الخدمة التي تطوّرها', 'type' => 'ref', 'ref' => 'services'],
                 ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
                  'options' => ['جديدة', 'قيد التقييم', 'معتمدة', 'قيد التنفيذ', 'مؤجلة', 'مرفوضة', 'مُنجزة']],
                 ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات التقييم', 'type' => 'ta'],
@@ -7509,7 +7605,7 @@ return [
             'label' => 'المنافسون',
             'display' => 'name',
             'status' => 'status',
-            'columns' => ['name', 'market', 'serviceId', 'threat', 'lastSeen', 'status'],
+            'columns' => ['name', 'market', 'serviceId', 'threat', 'positioning', 'nextReview', 'status'],
             'fields' => [
                 ['key' => 'name', 'col' => 'name', 'label' => 'اسم المنافس', 'type' => 'text', 'required' => true],
                 ['key' => 'website', 'col' => 'website', 'label' => 'الموقع الإلكتروني', 'type' => 'url'],
@@ -7525,7 +7621,49 @@ return [
                  'options' => ['مرتفع', 'متوسط', 'منخفض']],
                 ['key' => 'lastSeen', 'col' => 'last_seen', 'label' => 'آخر رصد لنشاطه', 'type' => 'date'],
                 ['key' => 'sources', 'col' => 'sources', 'label' => 'مصادر المتابعة والرصد', 'type' => 'ta'],
-                ['key' => 'social', 'col' => 'social', 'label' => 'حساباتهم على منصات التواصل', 'type' => 'text'],
+                ['key' => 'social', 'col' => 'social', 'label' => 'حسابات أخرى (نص حر)', 'type' => 'text'],
+
+                // قناةٌ لكل منصة: خانةٌ واحدة كانت تُحشر فيها الروابط كلها فلا تُفتح ولا تُقارن
+                ['key' => 'instagram', 'col' => 'instagram', 'label' => 'إنستغرام', 'type' => 'url'],
+                ['key' => 'tiktok', 'col' => 'tiktok', 'label' => 'تيك توك', 'type' => 'url'],
+                ['key' => 'x', 'col' => 'x_url', 'label' => 'إكس (تويتر)', 'type' => 'url'],
+                ['key' => 'linkedin', 'col' => 'linkedin', 'label' => 'لينكدإن', 'type' => 'url'],
+                ['key' => 'youtube', 'col' => 'youtube', 'label' => 'يوتيوب', 'type' => 'url'],
+                ['key' => 'facebook', 'col' => 'facebook', 'label' => 'فيسبوك', 'type' => 'url'],
+                ['key' => 'snapchat', 'col' => 'snapchat', 'label' => 'سناب شات', 'type' => 'url'],
+                ['key' => 'followers', 'col' => 'followers', 'label' => 'إجمالي متابعيهم', 'type' => 'num'],
+
+                // التسعير المُقارَن: «نموذج التسعير» نصاً لا يُقارَن برقمنا
+                ['key' => 'priceFrom', 'col' => 'price_from', 'label' => 'أرخص باقة معلنة', 'type' => 'num'],
+                ['key' => 'priceTo', 'col' => 'price_to', 'label' => 'أغلى باقة معلنة', 'type' => 'num'],
+                ['key' => 'currency', 'col' => 'currency', 'label' => 'العملة', 'type' => 'text'],
+                ['key' => 'billing', 'col' => 'billing', 'label' => 'دورة فوترتهم', 'type' => 'sel',
+                 'options' => ['شهري', 'سنوي', 'مرة واحدة', 'حسب الاستخدام', 'مختلط']],
+                ['key' => 'freeTier', 'col' => 'free_tier', 'label' => 'لديهم باقة مجانية؟', 'type' => 'bool'],
+                ['key' => 'trialDays', 'col' => 'trial_days', 'label' => 'أيام التجربة المجانية', 'type' => 'num'],
+
+                // تطبيقاتهم: رقمٌ عام يُقارَن بأرقامنا في مركز التطبيق
+                ['key' => 'play', 'col' => 'play', 'label' => 'تطبيقهم — Google Play', 'type' => 'url'],
+                ['key' => 'appstore', 'col' => 'appstore', 'label' => 'تطبيقهم — App Store', 'type' => 'url'],
+                ['key' => 'appDownloads', 'col' => 'app_downloads', 'label' => 'تحميلات تطبيقهم', 'type' => 'num'],
+                ['key' => 'appRating', 'col' => 'app_rating', 'label' => 'تقييم تطبيقهم', 'type' => 'num'],
+
+                // الشركة خلف المنتج
+                ['key' => 'hq', 'col' => 'hq', 'label' => 'المقر الرئيسي', 'type' => 'text'],
+                ['key' => 'founded', 'col' => 'founded', 'label' => 'سنة التأسيس', 'type' => 'text'],
+                ['key' => 'size', 'col' => 'size', 'label' => 'حجم الفريق التقريبي', 'type' => 'sel',
+                 'options' => ['1–10', '11–50', '51–200', '201–1000', 'أكثر من 1000', 'غير معروف']],
+                ['key' => 'funding', 'col' => 'funding', 'label' => 'التمويل المعلن', 'type' => 'text'],
+                ['key' => 'positioning', 'col' => 'positioning', 'label' => 'موقعهم في السوق', 'type' => 'sel',
+                 'options' => ['الأرخص', 'الأفضل قيمةً', 'الأفخم', 'الأسرع', 'الأشمل', 'الأكثر تخصصاً']],
+                ['key' => 'ourEdge', 'col' => 'our_edge', 'label' => 'ما نتفوّق به عليهم', 'type' => 'ta'],
+                ['key' => 'theirEdge', 'col' => 'their_edge', 'label' => 'ما يتفوّقون به علينا', 'type' => 'ta'],
+
+                // المراجعة الدورية: بلا موعدٍ يُنسى المنافس سنةً كاملة
+                ['key' => 'nextReview', 'col' => 'next_review', 'label' => 'موعد المراجعة القادمة', 'type' => 'date', 'expiry' => true],
+                ['key' => 'reviewCycle', 'col' => 'review_cycle', 'label' => 'دورية المراجعة', 'type' => 'sel',
+                 'options' => ['شهرية', 'ربع سنوية', 'نصف سنوية', 'سنوية']],
+
                 ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
                  'options' => ['نشط', 'يُراقب', 'خرج من السوق']],
                 ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات وتحليل', 'type' => 'ta'],
@@ -7541,10 +7679,13 @@ return [
             'label' => 'العلامات التجارية',
             'display' => 'name',
             'status' => 'status',
-            'columns' => ['name', 'companyId', 'ownerId', 'website', 'status'],
+            'columns' => ['name', 'companyId', 'projectId', 'tmStatus', 'tmExpiry', 'status'],
             'fields' => [
                 ['key' => 'name', 'col' => 'name', 'label' => 'اسم العلامة التجارية', 'type' => 'text', 'required' => true],
+                ['key' => 'nameEn', 'col' => 'name_en', 'label' => 'الاسم بالإنجليزية', 'type' => 'text'],
+                ['key' => 'slogan', 'col' => 'slogan', 'label' => 'الشعار اللفظي (Slogan)', 'type' => 'text'],
                 ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة المالكة', 'type' => 'ref', 'ref' => 'companies'],
+                ['key' => 'projectId', 'col' => 'project_id', 'label' => 'المشروع المرتبط', 'type' => 'ref', 'ref' => 'projects'],
                 ['key' => 'desc', 'col' => 'description', 'label' => 'وصف العلامة وما تمثله', 'type' => 'ta'],
                 ['key' => 'logo', 'col' => 'logo_id', 'label' => 'الشعار', 'type' => 'img'],
                 ['key' => 'colors', 'col' => 'colors', 'label' => 'ألوان الهوية (أكواد HEX)', 'type' => 'text'],
@@ -7556,6 +7697,25 @@ return [
                 ['key' => 'services', 'col' => 'services', 'label' => 'المنتجات والخدمات تحت العلامة', 'type' => 'ref', 'ref' => 'services', 'multi' => true],
                 ['key' => 'kit', 'col' => 'kit_id', 'label' => 'ملفات الهوية (Brand Kit)', 'type' => 'file'],
                 ['key' => 'guidelines', 'col' => 'guidelines', 'label' => 'إرشادات الاستخدام والممنوعات', 'type' => 'ta'],
+
+                // الملكية الفكرية: علامةٌ بلا تسجيلٍ ملكٌ لمن يسجّلها أولاً،
+                // ومسجَّلةٌ بلا تجديدٍ تسقط بانقضاء مدتها صمتاً
+                ['key' => 'tmStatus', 'col' => 'tm_status', 'label' => 'حالة التسجيل بالملكية الفكرية', 'type' => 'sel',
+                 'options' => ['غير مسجّلة', 'قيد الإعداد', 'مُودعة (قيد الفحص)', 'منشورة للاعتراض', 'مسجّلة', 'مرفوضة', 'منتهية']],
+                ['key' => 'tmNo', 'col' => 'tm_no', 'label' => 'رقم التسجيل/الإيداع', 'type' => 'text'],
+                ['key' => 'tmClasses', 'col' => 'tm_classes', 'label' => 'الفئات المسجَّلة (نيس)', 'type' => 'text'],
+                ['key' => 'tmCountries', 'col' => 'tm_countries', 'label' => 'البلدان المحمية فيها', 'type' => 'text'],
+                ['key' => 'tmOffice', 'col' => 'tm_office', 'label' => 'جهة التسجيل', 'type' => 'text'],
+                ['key' => 'tmAgent', 'col' => 'tm_agent', 'label' => 'وكيل الملكية الفكرية', 'type' => 'text'],
+                ['key' => 'tmFiledAt', 'col' => 'tm_filed_at', 'label' => 'تاريخ الإيداع', 'type' => 'date'],
+                ['key' => 'tmRegAt', 'col' => 'tm_reg_at', 'label' => 'تاريخ التسجيل', 'type' => 'date'],
+                ['key' => 'tmExpiry', 'col' => 'tm_expiry', 'label' => 'تاريخ التجديد', 'type' => 'date', 'expiry' => true],
+
+                // أصولها الرقمية: العلامة تعيش في نطاقاتٍ وحساباتٍ وتطبيقات
+                ['key' => 'domains', 'col' => 'domain_ids', 'label' => 'النطاقات المطابقة', 'type' => 'ref', 'ref' => 'domains', 'multi' => true],
+                ['key' => 'socialIds', 'col' => 'social_ids', 'label' => 'حسابات التواصل التابعة', 'type' => 'ref', 'ref' => 'social', 'multi' => true],
+                ['key' => 'appIds', 'col' => 'app_ids', 'label' => 'التطبيقات التي تحملها', 'type' => 'ref', 'ref' => 'apps', 'multi' => true],
+
                 ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
                  'options' => ['نشطة', 'قيد الإطلاق', 'متوقفة']],
                 ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات', 'type' => 'ta'],

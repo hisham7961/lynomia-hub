@@ -129,16 +129,22 @@ class MorningController extends Controller
                             's' => $bk ? 'آخر تشغيل ' . \Illuminate\Support\Carbon::parse($bk)->diffForHumans() : 'لم يعمل قط',
                             'u' => route('ops.index'), 'tone' => 'bad']);
             }
-            if (Schema::hasTable('restore_tests')) {
-                $lastTest = DB::table('restore_tests')->whereNull('deleted_at')->max('test_date');
-                if (! $lastTest || $lastTest < today()->subDays(90)->toDateString()) {
-                    $ops->push(['t' => 'لم تُختبر استعادة النسخ منذ أكثر من ٩٠ يوماً',
-                                's' => 'نسخة لم تُختبر ليست نسخة', 'u' => route('m.index', 'restores'), 'tone' => 'bad']);
-                }
-            }
-            if ($n = DB::table('error_events')->where('status', 'جديد')->count()) {
-                $ops->push(['t' => "{$n} خطأ جديد بانتظار المعالجة", 's' => 'من مركز الأخطاء',
-                            'u' => route('errors.index'), 'tone' => 'wn']);
+            // «اختبار استعادة النسخ» أُخرج من الواجهة بطلب المالك — لا تنبيه له.
+            // (المسار والبيانات باقيان: لا حذف ولا هجرة مدمّرة.)
+            // الأخطاء الجديدة بأسمائها لا بعددها: «٣ أخطاء بانتظار المعالجة» لا تقول
+            // شيئاً — الرسالة والموضع والتكرار هي ما يُبنى عليه قرار
+            $newErrs = DB::table('error_events')->where('status', 'جديد')
+                ->orderByDesc('count')->limit(4)->get(['id', 'message', 'file', 'line', 'kind', 'count']);
+            foreach ($newErrs as $er) {
+                $where = $er->file ? str_replace(base_path() . '/', '', $er->file) . ($er->line ? ':' . $er->line : '') : '';
+                $ops->push([
+                    't' => \Illuminate\Support\Str::limit($er->message, 80),
+                    's' => trim(($er->count > 1 ? "تكرّر {$er->count} مرة · " : '')
+                        . ['php' => 'استثناء PHP', 'api' => 'خطأ API', 'js' => 'خطأ متصفح', 'slow' => 'طلب بطيء'][$er->kind] ?? $er->kind)
+                        . ($where ? ' · ' . $where : ''),
+                    'u' => route('errors.show', $er->id),
+                    'tone' => $er->kind === 'slow' ? 'wn' : 'bad',
+                ]);
             }
             $fails = DB::table('audits')->where('action', 'دخول فاشل')
                 ->where('created_at', '>=', now()->subDay())->count();

@@ -107,6 +107,9 @@ a:hover{color:var(--pd)}
   box-shadow:var(--sh);transition:box-shadow .25s}
 .card.pad0{padding:0;overflow:hidden}
 .card h3{font-size:14px;margin-bottom:12px;display:flex;gap:8px;align-items:center;font-weight:700;letter-spacing:-.01em}
+/* عنوان قسمٍ خارج البطاقات — يفصل مجموعات البطاقات في الصفحات الطويلة (مركز التشغيل) */
+.secttl{font-size:14px;font-weight:700;letter-spacing:-.01em;margin:22px 0 10px;display:flex;gap:8px;align-items:center;
+  color:var(--sb);border-top:1px solid var(--ln);padding-top:14px}
 /* رأس صفحات المراكز: سطر هويةٍ واحد بمسطرة قاعدية وشارة جانبية — يوحّد ~٢٠ مركزاً دفعةً */
 .hero{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap;
   padding-bottom:13px;border-bottom:1px solid color-mix(in srgb,var(--ln) 75%,transparent);position:relative}
