@@ -7048,6 +7048,7 @@ return [
             'status' => 'status',
             'columns' => ['no', 'supplierId', 'status', 'amount', 'due', 'payState'],
             'fields' => [
+                ['key' => 'receivedAt', 'col' => 'received_at', 'label' => 'تاريخ الاستلام الفعلي', 'type' => 'date'],
                 ['key' => 'no', 'col' => 'doc_no', 'label' => 'رقم المستند', 'type' => 'text', 'required' => true],
                 ['key' => 'supplierId', 'col' => 'supplier_id', 'label' => 'المورد', 'type' => 'ref', 'ref' => 'suppliers', 'required' => true],
                 ['key' => 'projectId', 'col' => 'project_id', 'label' => 'المشروع', 'type' => 'ref', 'ref' => 'projects'],

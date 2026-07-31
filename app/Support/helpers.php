@@ -2202,10 +2202,11 @@ if (! function_exists('hub_supplier_scores')) {
                 $unpaid = $po->filter(fn ($p) => ! in_array($p->pay_state, ['مدفوع', 'مسدد'], true)
                     && in_array($p->status, ['مستلم', 'أُرسل للمورد', 'معتمد'], true))->count();
 
-                // الالتزام بالموعد: من الأوامر المستلمة التي لها موعد تسليم متوقع
+                // الالتزام بالموعد: تاريخ الاستلام الصريح (يُختم عند إجراء الاستلام) هو
+                // القياس — وآخر التحديث بديلٌ تقديري للأوامر السابقة لوجود العمود
                 $withDue = $received->filter(fn ($p) => filled($p->due));
                 $onTime = $withDue->filter(function ($p) {
-                    $recvAt = \Illuminate\Support\Carbon::parse($p->updated_at)->startOfDay();
+                    $recvAt = \Illuminate\Support\Carbon::parse($p->received_at ?? $p->updated_at)->startOfDay();
                     return $recvAt->lte(\Illuminate\Support\Carbon::parse($p->due)->startOfDay());
                 })->count();
                 $onTimeRate = $withDue->count() ? (int) round($onTime / $withDue->count() * 100) : null;
