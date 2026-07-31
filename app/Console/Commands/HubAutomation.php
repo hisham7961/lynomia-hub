@@ -217,9 +217,15 @@ class HubAutomation extends Command
 
             $q = DB::table($md['table'])->whereNull('deleted_at');
             $v = (string) $rule->val;
+            // مقارنة عمود بعمود: القيمة اسم حقلٍ من الوحدة نفسها (قائمة بيضاء من سجلها)
+            // — بها يحيا «حد إعادة الطلب» لكل صنف و«حد التنبيه» لكل صندوق
+            $vcol = fn () => collect($md['fields'])->firstWhere('key', $v)['col']
+                ?? (Schema::hasColumn($md['table'], $v) ? $v : null);
             match ($rule->op) {
                 'أكبر من'               => $q->where($col, '>', (float) $v),
                 'أصغر من'               => $q->where($col, '<', (float) $v),
+                'أكبر من عمود'          => ($c2 = $vcol()) ? $q->whereNotNull($c2)->whereColumn($col, '>', $c2) : $q->whereRaw('1=0'),
+                'أصغر من عمود'          => ($c2 = $vcol()) ? $q->whereNotNull($c2)->whereColumn($col, '<', $c2) : $q->whereRaw('1=0'),
                 'يساوي'                 => $q->where($col, $v),
                 'يحتوي'                 => $q->where($col, 'LIKE', "%{$v}%"),
                 'فارغ'                  => $q->where(fn ($w) => $w->whereNull($col)->orWhere($col, '')),

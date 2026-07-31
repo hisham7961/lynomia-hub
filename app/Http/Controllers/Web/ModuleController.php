@@ -640,11 +640,19 @@ class ModuleController extends Controller
     }
 
     /** حقل المسؤول (assigneeId → users) إن وُجد في الوحدة */
+    /**
+     * حقل المسؤول الذي يستحق إشعار الإسناد — كان يشترط المفتاح assigneeId حرفياً
+     * فلا يُبلَّغ منفّذ القرار (execId) ولا مدير الإجازة (mgrId) ولا مقابِل
+     * المرشح (interviewer) أبداً. أول مرجعِ مستخدمين مفرد من القائمة يفوز.
+     */
     protected function assigneeField(array $def): ?array
     {
-        $f = collect($def['fields'])->firstWhere('key', 'assigneeId');
+        foreach (['assigneeId', 'execId', 'mgrId', 'interviewer'] as $key) {
+            $f = collect($def['fields'])->firstWhere('key', $key);
+            if ($f && ($f['ref'] ?? '') === 'users' && empty($f['multi'])) return $f;
+        }
 
-        return ($f && ($f['ref'] ?? '') === 'users' && empty($f['multi'])) ? $f : null;
+        return null;
     }
 
     /** إشعار داخلي للمسؤول عند إسناده سجلاً (مهمة/تذكرة/ميزة…) — لا إشعار لمن أسند لنفسه */
