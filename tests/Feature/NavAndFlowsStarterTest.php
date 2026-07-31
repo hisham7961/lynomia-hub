@@ -127,6 +127,47 @@ class NavAndFlowsStarterTest extends TestCase
                 $this->assertContains($f->status_to, array_values($statusField['options'] ?? []),
                     "مسار «{$f->name}» يستهدف حالة معدومة: {$f->status_to}");
             }
+
+            // الحدث: بدائي أو دلاليٌّ **تبثّه وحدته هي** — حدثٌ من وحدةٍ أخرى لا يصل أبداً
+            if (! in_array($f->event, ['created', 'updated', 'status'], true)) {
+                $emits = array_column((array) config("hub.events.{$f->module}", []), 'emit');
+                $this->assertContains($f->event, $emits,
+                    "مسار «{$f->name}» يستمع لحدث «{$f->event}» لا تبثّه وحدته {$f->module}");
+            }
+        }
+    }
+
+    /** التوسعة تولد معطّلة: دفعةٌ مفعّلة بهذا الحجم تُغرق المالك فيُطفئها كلها */
+    public function test_expanded_starter_flows_are_created_disabled(): void
+    {
+        $this->seedCore();
+        Artisan::call('hub:flows-starter');
+
+        $this->assertGreaterThanOrEqual(80, Flow::count(), 'العدّة الموسّعة أقل من المتوقع');
+        $this->assertTrue(Flow::where('name', '🚨 مهمة عاجلة جديدة')->value('enabled'),
+            'المسارات الأساسية تبقى مفعّلة كما كانت');
+        $this->assertFalse((bool) Flow::where('name', '🖥️ سيرفر متوقف — طوارئ')->value('enabled'),
+            'المسارات الموسّعة تولد معطّلة بانتظار المراجعة');
+    }
+
+    /** التغطية: كل مجموعة تنقّلٍ رئيسية لها مسارٌ واحد على الأقل */
+    public function test_starter_covers_every_major_aspect(): void
+    {
+        $this->seedCore();
+        Artisan::call('hub:flows-starter');
+        $modules = Flow::pluck('module')->unique()->all();
+
+        foreach ([
+            'العمل' => ['tasks', 'meetings', 'approvals', 'decisions', 'okrs', 'krs'],
+            'المالية' => ['fin', 'entries', 'payroll', 'banks', 'budgets'],
+            'المبيعات' => ['clients', 'quotes', 'contracts', 'obligations'],
+            'المخزون والأصول' => ['stock', 'stockmv', 'assets', 'assetlog'],
+            'الموارد البشرية' => ['hr', 'leaves', 'attend', 'skills', 'policies'],
+            'البنية التحتية' => ['servers', 'websites', 'dbs', 'apis', 'restores', 'incidents'],
+            'التسويق' => ['posts', 'media', 'events', 'ip', 'competitors'],
+        ] as $aspect => $wanted) {
+            $hit = array_intersect($wanted, $modules);
+            $this->assertNotEmpty($hit, "جانب «{$aspect}» بلا أي مسار انطلاقي");
         }
     }
 
