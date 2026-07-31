@@ -29,7 +29,9 @@ class AttachmentsTest extends TestCase
 
         $a = Attachment::first();
         $this->assertSame('عقد التطوير.pdf', $a->original_name);
-        $this->assertSame('نسخة موقعة', $a->field);
+        // v2.170: الملاحظة لها عمودها `note` (٣٠٠ حرف) — كانت تُحشر في `field`
+        // بطول ٦٠ فتنكسر على MySQL الصارم. والقديم يُنقل بالهجرة ولا يُفقد.
+        $this->assertSame('نسخة موقعة', $a->note);
         $this->assertSame(64, strlen((string) $a->checksum));
 
         $this->actingAs($this->owner)->get('/m/projects/' . $p->id)

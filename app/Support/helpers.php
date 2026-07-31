@@ -642,7 +642,11 @@ if (! function_exists('hub_expiry')) {
         $user   = $user ?? auth()->user();
         // مقيد = نطاق مشاريع أو عزل شركات — مخبأ خاص به كي لا تتسرب أسماء أجنبية عبر المخبأ المشترك
         $scoped = hub_scoped($user) || hub_company_ids($user) !== null;
-        $key    = $scoped ? 'hub:expiry:u:' . $user->id : 'hub:expiry';
+        // المخبأ يفصل بالدور أيضاً: وثائق الملفات تُرشَّح بصلاحية رؤية وحدتها،
+        // فمخبأٌ مشترك بين دورين مختلفين كان سيسرّب ما لا يُرى لأحدهما.
+        // و«الجيل» يُبطل المخبأ فور رفع وثيقةٍ مؤرَّخة — لا انتظارَ عشر دقائق.
+        $gen    = (int) Cache::get('hub:expiry:gen', 0);
+        $key    = ($scoped ? 'hub:expiry:u:' . $user->id : 'hub:expiry:r:' . ($user->role_id ?? '0')) . ':g' . $gen;
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
         return \Illuminate\Support\Facades\Cache::remember($key, $scoped ? 300 : 600, function () use ($scoped, $user) {
@@ -697,6 +701,10 @@ if (! function_exists('hub_expiry')) {
                                 'id' => $row->id, 'name' => (string) $row->_n, 'date' => $d, 'days' => $days];
                 }
             }
+            // وثائق ملفات الكيانات: شهادةٌ منتهية أخطر من حقلٍ منتهٍ — بها
+            // يتوقف تعاملٌ أو يسقط ترخيص. تُضَمّ للرادار نفسه بنطاقها.
+            foreach (hub_doc_expiry($user) as $doc) $items[] = $doc;
+
             usort($items, fn ($a, $b) => $a['days'] <=> $b['days']);
             return array_slice($items, 0, 200);
         });
@@ -2884,5 +2892,145 @@ if (! function_exists('hub_app_store')) {
             'ratingTone' => $rt === null ? '' : ($rt >= 4.3 ? 'ok' : ($rt >= 3.5 ? 'wn' : 'bad')),
             'has' => $dl !== null || $rt !== null || $rv !== null,
         ];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ملف الكيان: الوثائق المتعارف عليها لكل وحدة
+// كانت المرفقات كومةً بلا نوع: تُرفع فلا يُعرف ما نقص، ولا ينبّه انتهاءُ
+// سجلٍ تجاري أحداً. الآن للملف اكتمالٌ يُقاس ونواقصُ تُسمّى وانتهاءٌ يُرصد.
+// ─────────────────────────────────────────────────────────────────────────
+
+if (! function_exists('hub_doc_spec')) {
+    /** قائمة الوثائق المتوقّعة لوحدة — فارغةٌ لمن لا ملفَّ لها */
+    function hub_doc_spec(string $module): array
+    {
+        return (array) (config('hub_docs.' . $module) ?? []);
+    }
+}
+
+if (! function_exists('hub_doc_label')) {
+    /** اسم وثيقةٍ بمفتاحها — للعرض في الرادار والسجلات */
+    function hub_doc_label(string $module, ?string $kind): ?string
+    {
+        if (! $kind) return null;
+
+        return collect(hub_doc_spec($module))->firstWhere('key', $kind)['label'] ?? $kind;
+    }
+}
+
+if (! function_exists('hub_dossier')) {
+    /**
+     * حال ملف سجلٍ واحد: لكل وثيقةٍ متوقّعة حالتها ونسخها وتاريخ انتهائها.
+     * الحالات: مفقودة | سارية | تنتهي قريباً | منتهية | مرفوعة (بلا تاريخ).
+     * الاكتمال يُحسب على **الإلزامية** وحدها — وإلا بدا الملف ناقصاً أبداً.
+     */
+    function hub_dossier(string $module, string $recordId): array
+    {
+        $spec = hub_doc_spec($module);
+        $out = ['rows' => [], 'have' => 0, 'need' => 0, 'requiredMissing' => 0, 'pct' => 0,
+                'expiring' => 0, 'expired' => 0, 'extra' => 0];
+        if (! $spec) return $out;
+
+        $files = collect();
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('attachments')) {
+                $files = \App\Models\Attachment::whereNull('deleted_at')
+                    ->where('module', $module)->where('record_id', $recordId)
+                    ->orderByDesc('created_at')->get();
+            }
+        } catch (\Throwable $e) {
+        }
+
+        $today = now()->startOfDay();
+        foreach ($spec as $d) {
+            $mine = $files->where('kind', $d['key']);
+            $latest = $mine->sortByDesc(fn ($a) => $a->expires_at ?: $a->created_at)->first();
+            $exp = $latest?->expires_at;
+            $days = $exp ? (int) $today->diffInDays($exp->copy()->startOfDay(), false) : null;
+
+            $state = 'مفقودة';
+            $tone = ! empty($d['req']) ? 'bad' : 'wn';
+            if ($mine->count()) {
+                $out['have']++;
+                if ($days === null)        { $state = 'مرفوعة'; $tone = 'ok'; }
+                elseif ($days < 0)         { $state = 'منتهية'; $tone = 'bad'; $out['expired']++; }
+                elseif ($days <= 30)       { $state = 'تنتهي قريباً'; $tone = 'wn'; $out['expiring']++; }
+                else                       { $state = 'سارية'; $tone = 'ok'; }
+            } elseif (! empty($d['req'])) {
+                $out['requiredMissing']++;
+            }
+            if (! empty($d['req'])) $out['need']++;
+
+            $out['rows'][] = [
+                'key' => $d['key'], 'label' => $d['label'],
+                'req' => (bool) ($d['req'] ?? false), 'multi' => (bool) ($d['multi'] ?? false),
+                'expiry' => (bool) ($d['expiry'] ?? false), 'hint' => $d['hint'] ?? null,
+                'n' => $mine->count(), 'files' => $mine->values()->all(),
+                'latest' => $latest, 'expires' => $exp, 'days' => $days,
+                'state' => $state, 'tone' => $tone,
+            ];
+        }
+
+        // ملفاتٌ مرفوعة بلا نوعٍ معلن — تُحصى كي لا تُنسى في الكومة القديمة
+        $out['extra'] = $files->filter(fn ($f) => ! $f->kind
+            || ! collect($spec)->contains(fn ($d) => $d['key'] === $f->kind))->count();
+
+        $haveReq = collect($out['rows'])->where('req', true)->filter(fn ($r) => $r['n'] > 0)->count();
+        $out['pct'] = $out['need'] ? (int) round($haveReq * 100 / $out['need']) : ($out['have'] ? 100 : 0);
+        $out['tone'] = $out['pct'] >= 100 ? 'ok' : ($out['pct'] >= 60 ? 'wn' : 'bad');
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_doc_expiry')) {
+    /**
+     * وثائق على وشك الانتهاء عبر كل الوحدات — تُضَمّ لرادار «ينتهي قريباً».
+     * شهادةٌ منتهية أخطر من حقلٍ منتهٍ: بها يتوقف تعاملٌ أو يسقط ترخيص.
+     */
+    function hub_doc_expiry($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        if (! \Illuminate\Support\Facades\Schema::hasTable('attachments')) return [];
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('attachments', 'expires_at')) return [];
+
+        $rows = \App\Models\Attachment::whereNull('deleted_at')->whereNotNull('expires_at')
+            ->whereBetween('expires_at', [now()->subDays(60)->toDateString(), now()->addDays(60)->toDateString()])
+            ->orderBy('expires_at')->limit(300)->get(['module', 'record_id', 'kind', 'expires_at', 'doc_no']);
+
+        $out = [];
+        foreach ($rows->groupBy('module') as $mk => $group) {
+            $md = hub_mod($mk);
+            if (! $md || ! hub_can($user, $mk, 'v')) continue;   // لا يُسرّب الرادار ما لا يُرى
+            try {
+                $ids = hub_scope(\Illuminate\Support\Facades\DB::table($md['table'])->whereNull('deleted_at'), $mk, $user)
+                    ->whereIn('id', $group->pluck('record_id')->unique()->all())
+                    ->pluck(hub_display_col($mk), 'id');
+            } catch (\Throwable $e) { continue; }
+
+            foreach ($group as $a) {
+                if (! isset($ids[$a->record_id])) continue;      // خارج نطاقه
+                $d = $a->expires_at->toDateString();
+                $out[] = [
+                    'module' => $mk, 'mlabel' => $md['label'],
+                    'flabel' => hub_doc_label($mk, $a->kind) ?? 'وثيقة',
+                    'id' => $a->record_id, 'name' => (string) $ids[$a->record_id],
+                    'date' => $d, 'doc' => true,
+                    'days' => (int) now()->startOfDay()->diffInDays($a->expires_at->copy()->startOfDay(), false),
+                ];
+            }
+        }
+        usort($out, fn ($x, $y) => $x['days'] <=> $y['days']);
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_expiry_bust')) {
+    /** إبطال رادار «ينتهي قريباً» فوراً — يُستدعى عند تغيّر وثيقةٍ مؤرَّخة */
+    function hub_expiry_bust(): void
+    {
+        Cache::forever('hub:expiry:gen', (int) Cache::get('hub:expiry:gen', 0) + 1);
     }
 }

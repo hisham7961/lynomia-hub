@@ -24,7 +24,11 @@
                         {{ hub_bytes($a->size) }} · {{ $aUsers[$a->uploaded_by] ?? '—' }}
                         · {{ optional($a->created_at)->format('Y-m-d H:i') }}
                         @if ($a->downloads) · ⬇ {{ $a->downloads }}@endif
-                        @if ($a->field) · <span title="ملاحظة">{{ \Illuminate\Support\Str::limit($a->field, 60) }}</span>@endif
+                        @php $aNote = $a->note ?: $a->field; @endphp
+                        @if ($a->kind) · <span class="bdg g">{{ hub_doc_label($aModule, $a->kind) }}</span>@endif
+                        @if ($a->doc_no) · رقم {{ $a->doc_no }}@endif
+                        @if ($a->expires_at) · ينتهي {{ $a->expires_at->toDateString() }}@endif
+                        @if ($aNote) · <span title="ملاحظة">{{ \Illuminate\Support\Str::limit($aNote, 60) }}</span>@endif
                     </div>
                 </div>
                 @if ($isImg || $isPdf)
@@ -64,8 +68,23 @@
         <label class="vh" for="att-file">اختر ملفاً</label>
         <input class="inp" id="att-file" type="file" name="file" required>
         <label class="vh" for="att-note">ملاحظة عن الملف</label>
-        <input class="inp" id="att-note" type="text" name="note" maxlength="200" placeholder="ملاحظة (اختياري)">
+        <input class="inp" id="att-note" type="text" name="note" maxlength="300" placeholder="ملاحظة (اختياري)">
+        @php $aSpec = hub_doc_spec($aModule); @endphp
+        @if ($aSpec)
+            <label class="vh" for="att-kind">نوع الوثيقة</label>
+            <select class="inp" id="att-kind" name="kind">
+                <option value="">— نوع الوثيقة (اختياري) —</option>
+                @foreach ($aSpec as $d)
+                    <option value="{{ $d['key'] }}" @selected(request()->query('kind') === $d['key'])>{{ $d['label'] }}</option>
+                @endforeach
+            </select>
+            <label class="vh" for="att-docno">رقم الوثيقة</label>
+            <input class="inp" id="att-docno" type="text" name="doc_no" maxlength="80" placeholder="رقمها (اختياري)" style="max-width:140px">
+            <label class="vh" for="att-exp">تاريخ الانتهاء</label>
+            <input class="inp" id="att-exp" type="date" name="expires_at" title="تاريخ الانتهاء — يدخل رادار «ينتهي قريباً»" style="max-width:160px">
+        @endif
         <button class="btn p sm" type="submit">إرفاق</button>
     </form>
+    @error('kind')<div class="err">{{ $message }}</div>@enderror
     @error('file')<div class="err">{{ $message }}</div>@enderror
 </div>

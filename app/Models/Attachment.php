@@ -11,7 +11,8 @@ class Attachment extends Model
     use HasUuid, SoftDeletes;
 
     protected $guarded = ['id'];
-    protected $casts = ['scanned_at' => 'datetime', 'size' => 'integer', 'version' => 'integer'];
+    protected $casts = ['scanned_at' => 'datetime', 'size' => 'integer', 'version' => 'integer',
+                        'issued_at' => 'date', 'expires_at' => 'date'];
 
     /** لا تُسمِّها isClean — تتصادم مع Model::isClean($attributes) وتُفجّر التحميل */
     public function avClean(): bool
