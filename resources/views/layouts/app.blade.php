@@ -119,6 +119,14 @@
         @endif
         {{-- منطقة حية: قارئ الشاشة يقرأ الرسالة حين تُحقن بعد htmx أو تتبدل --}}
         <div id="flash" role="status" aria-live="polite">@include('partials.flash')</div>
+        {{-- حارس النشر: كودٌ وصل وهجرته لم تُشغَّل بعد = أعمدة ناقصة وأخطاء 500 متفرقة.
+             يُصارح المالك فوراً بدل انتظار أول انهيار، وزر الحل بجانبه --}}
+        @if (hub_is_owner() && ($pmc = hub_pending_migrations()) > 0)
+            <div class="flash bad" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <span>⚠️ <b>{{ $pmc }}</b> ترحيل قاعدة بيانات معلّق — الكود الجديد وصل وقاعدة البيانات لم تُحدَّث بعد، وقد تظهر أخطاء «عمود مفقود» حتى تشغيلها.</span>
+                <a class="btn xs" href="{{ route('ops.index') }}">⚙️ افتح مركز التشغيل وشغّلها</a>
+            </div>
+        @endif
         {{-- نافذة اشتباه الوصول: تظهر مرةً واحدة لمن دخل من مكانٍ غريب أو خارج الدوام --}}
         @if (auth()->check() && ($secWarn = session()->pull('sec.warn')))
             <div class="modal" id="secwarn">

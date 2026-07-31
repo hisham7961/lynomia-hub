@@ -26,7 +26,8 @@ class SignRequest extends Model
         $row = $class::find($this->link_id);
         if (! $row) return null;
         $icons = ['clients' => '👤', 'companies' => '🏢', 'hr' => '🧑‍💼',
-                  'suppliers' => '🚚', 'recruit' => '🎯', 'projects' => '🚀'];
+                  'suppliers' => '🚚', 'recruit' => '🎯', 'projects' => '🚀',
+                  'approvals' => '✅', 'decisions' => '⚖️', 'policies' => '📜', 'policyacks' => '🖊️'];
 
         return ($icons[$this->link_module] ?? '🔗') . ' ' . ($row->{hub_display_col($this->link_module)} ?? $this->link_id);
     }

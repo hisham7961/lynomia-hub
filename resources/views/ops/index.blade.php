@@ -21,6 +21,7 @@
     <div class="stat"><span class="ico">⚙️</span><b>{{ $sys['load'] !== null ? number_format($sys['load'], 2) : '—' }}</b><span>حمل المعالج (دقيقة)</span></div>
     <div class="stat"><span class="ico">⏱</span><b>{{ $sys['uptime'] ? floor($sys['uptime'] / 86400) . ' يوم' : '—' }}</b><span>تشغيل الخادم</span></div>
     <div class="stat"><span class="ico">🐞</span><b class="{{ $errs['new'] ? 'txt-bad' : '' }}">{{ $errs['new'] }}</b><span>أخطاء جديدة بانتظار المعالجة</span></div>
+    <div class="stat"><span class="ico">🟢</span><b>{{ $live['now'] }}</b><span>على النظام الآن (آخر ٥ دقائق) · {{ $live['today'] }} دخول اليوم</span></div>
 </div>
 
 <div class="kids">
@@ -49,12 +50,16 @@
     </div>
 
     <div class="card kid">
-        <h3>💾 آخر نسخة احتياطية</h3>
+        <h3>💾 النسخ الاحتياطي</h3>
         @if ($backup)
             <div><b>{{ $backup['name'] }}</b><div class="sub">{{ $fmt($backup['size']) }} · منذ {{ $backup['age'] }}</div></div>
         @else
-            <div class="sub">لا نسخ بعد — شغّل <span class="mono ltr">php artisan hub:backup</span></div>
+            <div class="sub">لا نسخ بعد — خذ أول نسخة الآن بالزر:</div>
         @endif
+        <form method="POST" action="{{ route('ops.backup') }}" style="margin-top:10px"
+              data-confirm="أخذ نسخة احتياطية كاملة الآن؟ (قد تستغرق لحظات)">
+            @csrf<button class="btn ghost xs">💾 نسخة احتياطية الآن</button>
+        </form>
     </div>
 
     <div class="card kid">
@@ -113,6 +118,44 @@
               data-confirm="توليد مسارات العمل وقواعد التنبيه الجاهزة الآن؟">
             @csrf<button class="btn ghost xs">🪄 توليد العدّة الآن</button>
         </form>
+    </div>
+
+    <div class="card kid">
+        <h3>🛠️ بيئة التشغيل</h3>
+        <table class="mini">
+            <tr><td>البيئة</td><td style="width:1%"><span class="bdg {{ $env['env'] === 'production' ? 'ok' : 'wn' }}">{{ $env['env'] }}</span></td></tr>
+            <tr><td>وضع التصحيح Debug</td><td><span class="bdg {{ $env['debug'] ? 'bad' : 'ok' }}">{{ $env['debug'] ? '⚠️ مفعّل — أطفئه في الإنتاج' : 'متوقف ✓' }}</span></td></tr>
+            <tr><td>الكاش · الجلسات · الطوابير</td><td class="mono ltr">{{ $env['cache'] }} · {{ $env['session'] }} · {{ $env['queue'] }}</td></tr>
+            <tr><td>مسرّع OPcache</td><td><span class="bdg {{ $env['opcache'] === 'مفعّل' ? 'ok' : 'wn' }}">{{ $env['opcache'] }}</span></td></tr>
+        </table>
+        <form method="POST" action="{{ route('ops.maintenance') }}" style="margin-top:10px"
+              data-confirm="{{ $env['maint'] ? 'إنهاء وضع الصيانة وإعادة النظام للجميع؟' : 'تفعيل وضع الصيانة؟ يقفل النظام على غير المالكين برسالة مهذبة.' }}">
+            @csrf<button class="btn ghost xs" @if(!$env['maint'])style="color:var(--bad)"@endif>
+                {{ $env['maint'] ? '🔓 إنهاء وضع الصيانة (مفعّل الآن!)' : '🔧 تفعيل وضع الصيانة' }}</button>
+        </form>
+    </div>
+
+    @if (count($tables))
+        <div class="card kid">
+            <h3>📚 أثقل جداول القاعدة</h3>
+            <table class="mini">
+                @foreach ($tables as $t)
+                    <tr><td class="mono ltr">{{ $t->t }}</td>
+                        <td class="mono sub" style="width:1%">{{ number_format($t->r) }} صف</td>
+                        <td class="mono sub" style="width:1%">{{ $fmt($t->s) }}</td></tr>
+                @endforeach
+            </table>
+        </div>
+    @endif
+
+    <div class="card kid">
+        <h3>📜 آخر أخطاء ملف السجل <span class="sub">· laravel.log بلا SSH</span></h3>
+        @if (count($logLines))
+            <div class="mono ltr" style="font-size:10.5px;max-height:220px;overflow:auto;background:var(--bg2);border-radius:10px;padding:8px;white-space:pre-wrap;word-break:break-all">@foreach ($logLines as $l){{ $l }}
+@endforeach</div>
+        @else
+            <div class="sub">✅ لا أسطر أخطاء في نهاية ملف السجل.</div>
+        @endif
     </div>
 
     <div class="card kid">

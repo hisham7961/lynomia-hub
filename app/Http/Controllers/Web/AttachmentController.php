@@ -70,6 +70,36 @@ class AttachmentController extends Controller
         return response()->download($abs, $a->original_name ?: basename($a->path));
     }
 
+    /** أنواع تُعاين حيّاً داخل المتصفح — صور نقطية وPDF فقط؛ SVG/HTML تبقى تنزيلاً (قد تحمل سكربتات) */
+    protected const INLINE_MIMES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp', 'image/avif', 'application/pdf'];
+
+    /**
+     * معاينة حية: الصورة/الشهادة/اللوجو تُعرض مصغّرةً وكاملةً دون تنزيل،
+     * وPDF يفتح في عارض المتصفح. بهوية المستخدم وصلاحيته نفسها، ويُسجَّل الاطلاع.
+     */
+    public function preview(string $id)
+    {
+        $a = Attachment::findOrFail($id);
+        $this->guardRecord($a->module, $a->record_id, 'v');
+        abort_unless(in_array($a->mime, self::INLINE_MIMES, true), 415, 'هذا النوع يُنزَّل ولا يُعاين');
+
+        $abs = Storage::disk($a->disk ?: 'local')->path($a->path);
+        abort_unless(is_file($abs), 404, 'الملف غير موجود على القرص');
+
+        DB::table('download_log')->insert([
+            'attachment_id' => $a->id, 'user_id' => auth()->id(),
+            'ip' => request()->ip(), 'device' => substr('معاينة · ' . request()->userAgent(), 0, 200),
+            'created_at' => now(),
+        ]);
+
+        return response()->file($abs, [
+            'Content-Type'           => $a->mime,
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'",
+            'Cache-Control'          => 'private, max-age=300',
+        ]);
+    }
+
     /** الحذف: من رفعه، أو من يملك تعديل الوحدة، أو المالك — ويُدوَّن في التدقيق */
     public function destroy(string $id)
     {

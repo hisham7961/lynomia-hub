@@ -59,7 +59,8 @@
 @if ($module === 'contracts' && hub_can(auth()->user(), 'contracts', 'v'))
     @include('partials.esign_card')
 @endif
-@if (in_array($module, ['clients', 'companies', 'hr', 'suppliers', 'recruit', 'projects'], true) && hub_can(auth()->user(), 'contracts', 'v'))
+@if (in_array($module, ['clients', 'companies', 'hr', 'suppliers', 'recruit', 'projects',
+                        'approvals', 'decisions', 'policies', 'policyacks'], true) && hub_can(auth()->user(), 'contracts', 'v'))
     @include('partials.esign_linked')
 @endif
 <div class="card">

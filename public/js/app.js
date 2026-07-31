@@ -396,7 +396,17 @@
     if (!f.dataset || !f.dataset.confirm) return;
     var btn = e.submitter || f.querySelector('button[type=submit],button:not([type]),input[type=submit]');
     if (!btn) return;                      // بلا زر ظاهر: التمرير خيرٌ من قفل النموذج
-    if (!arm(btn, f.dataset.confirm)) e.preventDefault();
+    if (!arm(btn, f.dataset.confirm)) {
+      e.preventDefault();
+      // حارس الإرسال المزدوج سبقنا فقفل النموذج وعطّل أزراره — الضغطة الأولى
+      // لم تُرسل شيئاً، ففكّ قفله وأعد تفعيل الأزرار كي تعمل ضغطة التأكيد
+      delete f.dataset.busy;
+      setTimeout(function () {
+        f.querySelectorAll('button,input[type=submit]').forEach(function (b) {
+          b.disabled = false; b.classList.remove('busy');
+        });
+      }, 0);
+    }
   }, true);
 
   // عناصر تحمل data-confirm بنفسها (زر يشير لنموذج خارجي بسمة form، أو رابط)

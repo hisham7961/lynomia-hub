@@ -178,6 +178,7 @@ Route::middleware('auth')->group(function () {
     // ── المرفقات الشاملة على أي سجل ──
     Route::post('attachments', [AttachmentController::class, 'store'])->name('att.store');
     Route::get('attachments/{id}/dl', [AttachmentController::class, 'download'])->name('att.dl');
+    Route::get('attachments/{id}/view', [AttachmentController::class, 'preview'])->name('att.view');
     Route::delete('attachments/{id}', [AttachmentController::class, 'destroy'])->name('att.destroy');
     Route::get('employee/{id}', [PortalController::class, 'employee'])->name('portal.employee');
     Route::get('app/{id}', [AppCenterController::class, 'show'])->name('apps.center');
@@ -235,6 +236,8 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/ops/migrate', [OpsController::class, 'migrate'])->name('ops.migrate');
     Route::post('admin/ops/clear-cache', [OpsController::class, 'clearCache'])->name('ops.clearcache');
     Route::post('admin/ops/starters', [OpsController::class, 'starters'])->name('ops.starters');
+    Route::post('admin/ops/backup', [OpsController::class, 'backupNow'])->name('ops.backup');
+    Route::post('admin/ops/maintenance', [OpsController::class, 'toggleMaintenance'])->name('ops.maintenance');
 
     // مركز نشاط الموظفين — للمالك فقط
     Route::get('admin/activity', [\App\Http\Controllers\Web\ActivityController::class, 'index'])->name('activity.index');

@@ -2240,3 +2240,25 @@ if (! function_exists('hub_kpis')) {
         })->all();
     }
 }
+
+if (! function_exists('hub_pending_migrations')) {
+    /**
+     * عدد ترحيلات القاعدة المعلقة (ملفات في الكود لم تُطبَّق بعد) — مخبّأ دقيقتين
+     * كي لا يفحص كل طلب، ويُنسى فور تشغيل الترحيلات من مركز التشغيل.
+     */
+    function hub_pending_migrations(): int
+    {
+        return (int) Cache::remember('hub.pending_migrations', 120, function () {
+            try {
+                $ran = \Illuminate\Support\Facades\DB::table('migrations')->pluck('migration')->all();
+
+                return collect(glob(database_path('migrations/*.php')))
+                    ->map(fn ($f) => basename($f, '.php'))
+                    ->reject(fn ($m) => in_array($m, $ran, true))
+                    ->count();
+            } catch (\Throwable $e) {
+                return 0;   // تعذّر الفحص — لا نُقلق الواجهة، مركز التشغيل يكشف التفصيل
+            }
+        });
+    }
+}

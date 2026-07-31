@@ -24,6 +24,9 @@ class EsignController extends Controller
     protected function gate(string $op = 'v'): void
     {
         abort_unless(hub_can(auth()->user(), 'contracts', $op), 403, 'التوقيع الإلكتروني يتبع صلاحية العقود');
+        // كودٌ نُشر قبل هجرته: رسالة صريحة بدل QueryException «عمود مفقود» غامضة
+        abort_unless(\Illuminate\Support\Facades\Schema::hasColumn('sign_requests', 'verify_code'),
+            503, 'قاعدة البيانات بحاجة لتحديث — شغّل الترحيلات من مركز التشغيل ⚙️ ثم عد');
     }
 
     /* ────────── الجهة الداخلية ────────── */
@@ -36,6 +39,10 @@ class EsignController extends Controller
         'suppliers' => '🚚 مورد',
         'recruit'  => '🎯 مرشح توظيف',
         'projects' => '🚀 مشروع',
+        'approvals' => '✅ موافقة',
+        'decisions' => '⚖️ قرار',
+        'policies' => '📜 سياسة',
+        'policyacks' => '🖊️ إقرار سياسة',
     ];
 
     public function index()
@@ -60,9 +67,10 @@ class EsignController extends Controller
             'contracts' => hub_scope(\App\Models\Contract::query(), 'contracts')
                 ->orderByDesc('created_at')->limit(200)->pluck('title', 'id'),
             'links'     => $links,
-            // تهيئة مسبقة عند القدوم من «عقد غير موقّع»
+            // تهيئة مسبقة عند القدوم من «عقد غير موقّع» أو من زر جهةٍ ما «＋ طلب توقيع»
             'preContract' => request('contract'),
             'preTitle'    => request('title'),
+            'preLink'     => request('link'),
         ]);
     }
 
@@ -232,6 +240,19 @@ class EsignController extends Controller
         $d = $r->validate(['reason' => 'required|string|max:400']);
         $req->forceFill(['status' => 'رُفض', 'declined_reason' => $d['reason']])->save();
 
+        // موافقة موجهة رفض صاحبها التوقيع → «مرفوض» بسبب موثق (الملزِمة تُحسم من شاشتها)
+        if ($req->link_module === 'approvals' && $req->link_id) {
+            try {
+                $ap = \App\Models\Approval::find($req->link_id);
+                if ($ap && ! $ap->mod && in_array($ap->status, [null, '', 'معلّق'], true)) {
+                    $ap->forceFill(['status' => 'مرفوض', 'decided_at' => now()])->save();
+                    hub_audit('رفض موافقة عبر التوقيع الإلكتروني', 'approvals', $ap->id, $ap->title . ' — ' . $d['reason']);
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
         $this->notifyOwners('🚫 رُفض توقيع «' . $req->title . '» [' . $req->verify_code . '] — السبب: ' . $d['reason']);
         hub_audit('رفض توقيع', 'contracts', $req->contract_id, $req->title);
 
@@ -315,6 +336,7 @@ class EsignController extends Controller
                 ->whereIn('status', ['قيد التوقيع', 'مسودة'])->update(['status' => 'ساري']);
             $this->notifyOwners('📑 العقد المرتبط بـ«' . $req->title . '» صار «ساري» بعد توقيعه');
         }
+        $this->completeLinked($req, $d['signer_name'], $r);
 
         // الإشعار يحمل رمز التحقق — تطابقه مع الوثيقة في صفحة /verify أو قائمة المركز
         $this->notifyOwners('✍️ وُقّع «' . $req->title . '» [' . $req->verify_code . '] بواسطة '
@@ -326,6 +348,58 @@ class EsignController extends Controller
     }
 
     /* ────────── أدوات ────────── */
+
+    /**
+     * التوقيع يُكمل سير الجهة المربوطة تلقائياً:
+     *  - موافقة موجهة لشخص → «معتمد» بتوقيعه (إلا الموافقات المُلزِمة ذات العملية
+     *    المؤجلة: تلك تُنفَّذ حصراً من شاشة الموافقات كي لا تُعتمد دون تنفيذ حمولتها).
+     *  - سياسة → يتولد سجل إقرارٍ موثّق (النسخة، الوقت، IP، الجهاز، رمز التحقق).
+     *  - سجل إقرار سياسة معلّق → يصير «مُقرّة» ببيانات التوقيع نفسها.
+     */
+    protected function completeLinked(SignRequest $req, string $signer, Request $r): void
+    {
+        if (! $req->link_module || ! $req->link_id) return;
+
+        try {
+            if ($req->link_module === 'approvals') {
+                $ap = \App\Models\Approval::find($req->link_id);
+                if ($ap && ! $ap->mod && in_array($ap->status, [null, '', 'معلّق'], true)) {
+                    $ap->forceFill(['status' => 'معتمد', 'decided_at' => now()])->save();
+                    $this->notifyOwners('✅ الموافقة «' . $ap->title . '» اعتُمدت بتوقيع ' . $signer
+                        . ' [' . $req->verify_code . ']');
+                    hub_audit('اعتماد موافقة بالتوقيع الإلكتروني', 'approvals', $ap->id, $ap->title);
+                }
+            } elseif ($req->link_module === 'policies') {
+                $pol = \App\Models\Policy::find($req->link_id);
+                if ($pol) {
+                    \App\Models\PolicyAck::create([
+                        'title' => $pol->title . ' — ' . $signer,
+                        'policy_id' => $pol->id, 'ver' => $pol->ver,
+                        'ack_at' => now(), 'ip' => $r->ip(),
+                        'device' => substr((string) $r->userAgent(), 0, 190),
+                        'status' => 'مُقرّة',
+                        'notes' => 'إقرار موقّع إلكترونياً — رمز التحقق ' . $req->verify_code,
+                    ]);
+                    $this->notifyOwners('📜 وُثّق إقرار «' . $pol->title . '» بتوقيع ' . $signer);
+                    hub_audit('إقرار سياسة بالتوقيع الإلكتروني', 'policies', $pol->id, $pol->title . ' — ' . $signer);
+                }
+            } elseif ($req->link_module === 'policyacks') {
+                $ack = \App\Models\PolicyAck::find($req->link_id);
+                if ($ack && $ack->status !== 'مُقرّة') {
+                    $ack->forceFill(['status' => 'مُقرّة', 'ack_at' => now(), 'ip' => $r->ip(),
+                        'device' => substr((string) $r->userAgent(), 0, 190),
+                        'notes' => trim(($ack->notes ? $ack->notes . "\n" : '')
+                            . 'وُقّع إلكترونياً بواسطة ' . $signer . ' — رمز التحقق ' . $req->verify_code),
+                    ])->save();
+                    hub_audit('إتمام إقرار سياسة بالتوقيع الإلكتروني', 'policyacks', $ack->id, (string) $ack->title);
+                }
+            } elseif ($req->link_module === 'decisions') {
+                hub_audit('توثيق قرار بتوقيع إلكتروني', 'decisions', $req->link_id, $req->title . ' — ' . $signer);
+            }
+        } catch (\Throwable $e) {
+            report($e);   // إكمال السير إضافة — فشله لا يُفشل التوقيع نفسه المحفوظ فعلاً
+        }
+    }
 
     protected function notifyOwners(string $text): void
     {
@@ -342,10 +416,21 @@ class EsignController extends Controller
      */
     protected function seedDefaultTemplates(): void
     {
-        if (SignTemplate::exists()) return;
-
+        // قوالب مكتبةٍ جديدة تظهر للمنشآت القائمة تلقائياً — لكن ما بذرناه سابقاً
+        // وحذفه المستخدم عمداً لا يُبعث من جديد (سجل الأسماء المبذورة في الإعدادات)
+        $seeded = (array) (setting('esign.tpl_seeded') ?: []);
+        $have = SignTemplate::pluck('name')->all();
+        $changed = false;
         foreach (\App\Support\ContractTemplates::library() as $i => $tpl) {
-            SignTemplate::create($tpl + ['sort' => $i]);
+            if (! in_array($tpl['name'], $seeded, true)) {
+                if (! in_array($tpl['name'], $have, true)) SignTemplate::create($tpl + ['sort' => $i]);
+                $seeded[] = $tpl['name'];
+                $changed = true;
+            }
+        }
+        if ($changed) {
+            \App\Models\Setting::updateOrCreate(['key' => 'esign.tpl_seeded'], ['value' => array_values($seeded)]);
+            \Illuminate\Support\Facades\Cache::forget('settings:all');
         }
     }
 }

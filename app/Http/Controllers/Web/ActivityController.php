@@ -78,6 +78,67 @@ class ActivityController extends Controller
         $suspects = DB::table('audits')->where('user_id', $u->id)
             ->where('action', 'دخول مريب')->orderByDesc('created_at')->limit(10)->get();
 
-        return view('activity.show', compact('u', 'days', 'topPages', 'devices', 'ips', 'trail', 'suspects'));
+        return view('activity.show', compact('u', 'days', 'topPages', 'devices', 'ips', 'trail', 'suspects')
+            + ['risk' => $this->riskProfile($u->id, $visits)]);
+    }
+
+    /**
+     * ملف الشك — أرقامٌ مشتقة من نشاط النظام نفسه (١٤ يوماً) بلا أي مراقبة خارجية:
+     *  - ساعات النشاط مصنفةً: دوام (٠٨–١٦)، خارج الدوام، مريبة (منتصف الليل–٠٦).
+     *  - معدل التلاعب: الدخول المريب + المحاولات الفاشلة نسبةً إلى الدخول الكلي.
+     *  - تعدد الأجهزة وعناوين الشبكة، ونسبة شكٍّ مركّبة معلنة المكوّنات.
+     */
+    protected function riskProfile(string $uid, $visits): array
+    {
+        $since = now()->subDays(14);
+
+        // تصنيف سلال النشاط (كل سلة ٥ دقائق) حسب ساعتها المحلية
+        $seen = []; $inMin = $outMin = $nightMin = 0;
+        foreach ($visits as $v) {
+            $ts = strtotime((string) $v->at);
+            $bucket = intdiv($ts, 300);
+            if (isset($seen[$bucket])) continue;
+            $seen[$bucket] = true;
+            $h = (int) date('G', $ts);
+            if ($h < 6)                 $nightMin += 5;
+            elseif ($h >= 8 && $h < 16) $inMin += 5;
+            else                        $outMin += 5;
+        }
+        $totalMin = $inMin + $outMin + $nightMin;
+
+        $logins   = DB::table('sessions_log')->where('user_id', $uid)->where('started_at', '>=', $since)->count();
+        $strange  = DB::table('audits')->where('user_id', $uid)->where('action', 'دخول مريب')
+                        ->where('created_at', '>=', $since)->count();
+        $failed   = DB::table('audits')->where('user_id', $uid)->where('action', 'دخول فاشل')
+                        ->where('created_at', '>=', $since)->count();
+        $devCount = (int) DB::table('sessions_log')->where('user_id', $uid)->where('started_at', '>=', $since)
+                        ->distinct()->count('device');
+        $ipCount  = (int) DB::table('user_ips')->where('user_id', $uid)->count();
+
+        // معدل التلاعب: إشارات الدخول الشاذة منسوبةً لكل الدخول
+        $tamper = $logins + $failed > 0
+            ? (int) round(($strange + $failed) * 100 / ($logins + $failed)) : 0;
+        // معدل تعدد الأجهزة: دخولٌ من كم جهازاً مختلفاً وسطياً
+        $devRate = $logins > 0 ? round($devCount * 100 / $logins) : 0;
+
+        // نسبة الشك المركبة (٠–١٠٠) — مكوناتها معلنة في الواجهة كي تُفهم لا تُخشى
+        $parts = [
+            'دخول شاذ (مكان غريب/خارج الدوام)' => $logins > 0 ? min(40, (int) round($strange * 40 / $logins)) : 0,
+            'محاولات دخول فاشلة'               => min(15, $failed * 3),
+            'نشاط في ساعات مريبة (٠٠–٠٦)'      => $totalMin > 0 ? min(25, (int) round($nightMin * 25 / $totalMin)) : 0,
+            'نشاط خارج الدوام'                  => $totalMin > 0 ? min(10, (int) round($outMin * 10 / $totalMin)) : 0,
+            'تعدد الأجهزة'                      => min(10, max(0, $devCount - 1) * 3),
+        ];
+        $score = min(100, array_sum($parts));
+
+        return [
+            'in_h'    => round($inMin / 60, 1),  'out_h' => round($outMin / 60, 1),
+            'night_h' => round($nightMin / 60, 1),
+            'logins'  => $logins, 'strange' => $strange, 'failed' => $failed,
+            'devices' => $devCount, 'ips' => $ipCount,
+            'tamper'  => $tamper, 'dev_rate' => $devRate,
+            'score'   => $score, 'parts' => $parts,
+            'tone'    => $score >= 55 ? 'bad' : ($score >= 25 ? 'wn' : 'ok'),
+        ];
     }
 }

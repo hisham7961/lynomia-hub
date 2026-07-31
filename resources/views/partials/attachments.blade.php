@@ -4,28 +4,53 @@
 
     @forelse ($attachments as $a)
         @php
-            $ico = str_starts_with((string) $a->mime, 'image/') ? '🖼️'
-                : (str_contains((string) $a->mime, 'pdf') ? '📕'
+            $isImg = in_array($a->mime, ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp', 'image/avif'], true);
+            $isPdf = $a->mime === 'application/pdf';
+            $ico = $isImg ? '🖼️' : ($isPdf ? '📕'
                 : (str_contains((string) $a->mime, 'sheet') || str_contains((string) $a->mime, 'csv') ? '📊' : '📄'));
         @endphp
-        <div class="arow" id="att-{{ $a->id }}" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 0;border-bottom:1px solid var(--brd)">
-            <span aria-hidden="true">{{ $ico }}</span>
-            <div style="min-width:0;flex:1">
-                <a href="{{ route('att.dl', $a->id) }}"><b>{{ \Illuminate\Support\Str::limit($a->original_name, 60) }}</b></a>
-                <div class="sub">
-                    {{ hub_bytes($a->size) }} · {{ $aUsers[$a->uploaded_by] ?? '—' }}
-                    · {{ optional($a->created_at)->format('Y-m-d H:i') }}
-                    @if ($a->downloads) · ⬇ {{ $a->downloads }}@endif
-                    @if ($a->field) · <span title="ملاحظة">{{ \Illuminate\Support\Str::limit($a->field, 60) }}</span>@endif
+        <div class="arow" id="att-{{ $a->id }}" style="padding:7px 0;border-bottom:1px solid var(--brd)">
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                {{-- الصور والشهادات واللوجوهات تُرى قبل أي ضغطة: مصغّرة حية لا أيقونة صمّاء --}}
+                @if ($isImg)
+                    <img src="{{ route('att.view', $a->id) }}" alt="" loading="lazy"
+                         style="width:52px;height:52px;object-fit:cover;border-radius:10px;border:1px solid var(--ln);background:#fff">
+                @else
+                    <span aria-hidden="true" style="font-size:22px">{{ $ico }}</span>
+                @endif
+                <div style="min-width:0;flex:1">
+                    <a href="{{ route('att.dl', $a->id) }}"><b>{{ \Illuminate\Support\Str::limit($a->original_name, 60) }}</b></a>
+                    <div class="sub">
+                        {{ hub_bytes($a->size) }} · {{ $aUsers[$a->uploaded_by] ?? '—' }}
+                        · {{ optional($a->created_at)->format('Y-m-d H:i') }}
+                        @if ($a->downloads) · ⬇ {{ $a->downloads }}@endif
+                        @if ($a->field) · <span title="ملاحظة">{{ \Illuminate\Support\Str::limit($a->field, 60) }}</span>@endif
+                    </div>
                 </div>
+                @if ($isImg || $isPdf)
+                    <a class="btn ghost xs" href="{{ route('att.view', $a->id) }}" target="_blank" rel="noopener" title="فتح المعاينة في تبويب">↗</a>
+                @endif
+                @if ($a->uploaded_by === auth()->id() || hub_is_owner() || hub_can(auth()->user(), $aModule, 'e'))
+                    <form method="POST" action="{{ route('att.destroy', $a->id) }}" class="inline"
+                          {{-- الاسم في سمة HTML مُهرَّبة — لا سياق JS فلا صنف الحقن القديم أصلاً --}}
+                          data-confirm="حذف المرفق «{{ \Illuminate\Support\Str::limit($a->original_name, 40) }}»؟">
+                        @csrf @method('DELETE')
+                        <button class="btn ghost xs" aria-label="حذف المرفق {{ $a->original_name }}">حذف</button>
+                    </form>
+                @endif
             </div>
-            @if ($a->uploaded_by === auth()->id() || hub_is_owner() || hub_can(auth()->user(), $aModule, 'e'))
-                <form method="POST" action="{{ route('att.destroy', $a->id) }}" class="inline"
-                      {{-- الاسم في سمة HTML مُهرَّبة — لا سياق JS فلا صنف الحقن القديم أصلاً --}}
-                      data-confirm="حذف المرفق «{{ \Illuminate\Support\Str::limit($a->original_name, 40) }}»؟">
-                    @csrf @method('DELETE')
-                    <button class="btn ghost xs" aria-label="حذف المرفق {{ $a->original_name }}">حذف</button>
-                </form>
+            {{-- معاينة كاملة داخل الصفحة نفسها — بلا منبثقات: الصورة تتمدد وPDF بعارضه --}}
+            @if ($isImg || $isPdf)
+                <details style="margin-top:4px">
+                    <summary class="sub" style="cursor:pointer">👁 معاينة كاملة داخل الصفحة</summary>
+                    @if ($isImg)
+                        <img src="{{ route('att.view', $a->id) }}" alt="{{ $a->original_name }}" loading="lazy"
+                             style="max-width:100%;max-height:70vh;border-radius:12px;border:1px solid var(--ln);margin-top:6px;background:#fff">
+                    @else
+                        <iframe src="{{ route('att.view', $a->id) }}" title="{{ $a->original_name }}" loading="lazy"
+                                style="width:100%;height:480px;border:1px solid var(--ln);border-radius:12px;margin-top:6px;background:#fff"></iframe>
+                    @endif
+                </details>
             @endif
         </div>
     @empty

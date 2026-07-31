@@ -49,7 +49,7 @@
                     @foreach ($links as $glabel => $g)
                         <optgroup label="{{ $glabel }}">
                             @foreach ($g['rows'] as $rid => $rname)
-                                <option value="{{ $g['module'] }}:{{ $rid }}">{{ \Illuminate\Support\Str::limit($rname, 44) }}</option>
+                                <option value="{{ $g['module'] }}:{{ $rid }}" @selected(($preLink ?? '') === $g['module'] . ':' . $rid)>{{ \Illuminate\Support\Str::limit($rname, 44) }}</option>
                             @endforeach
                         </optgroup>
                     @endforeach
@@ -119,11 +119,12 @@
 <script>
 // تفكيك اختيار الجهة «module:id» إلى حقلين مخفيين
 var linksel = document.getElementById('linksel');
-if (linksel) linksel.addEventListener('change', function () {
-    var p = (this.value || '').split(':');
+function splitLink() {
+    var p = (linksel.value || '').split(':');
     document.getElementById('link_module').value = p[0] || '';
     document.getElementById('link_id').value = p[1] || '';
-});
+}
+if (linksel) { linksel.addEventListener('change', splitLink); splitLink(); /* تهيئة مسبقة من رابط الجهة */ }
 // المنطقة تتبدل: قالبٌ → حقول متغيراته؛ بلا قالب → نص العقد الحر
 var freeBodyHtml = document.getElementById('varszone').innerHTML;
 document.getElementById('tplsel').addEventListener('change', function () {

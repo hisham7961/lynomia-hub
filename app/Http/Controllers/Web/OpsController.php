@@ -76,7 +76,84 @@ class OpsController extends Controller
 
         $pending = $this->pendingMigrations();
 
-        return view('ops.index', compact('db', 'sys', 'outbox', 'beats', 'backup', 'errs', 'pending'));
+        // من على النظام الآن — نشاط فعلي خلال آخر ٥ دقائق، ودخول اليوم
+        $live = ['now' => 0, 'today' => 0];
+        try {
+            $live['now'] = DB::table('page_visits')->where('at', '>=', now()->subMinutes(5))
+                ->distinct()->count('user_id');
+            $live['today'] = DB::table('sessions_log')->where('started_at', '>=', now()->startOfDay())->count();
+        } catch (\Throwable $e) {
+        }
+
+        // أثقل الجداول — أين تنمو القاعدة فعلاً (MySQL؛ وفي SQLite حجم الملف يكفي أعلاه)
+        $tables = [];
+        try {
+            if ($db['driver'] === 'mysql') {
+                $tables = DB::select('SELECT table_name t, table_rows r, (data_length + index_length) s
+                    FROM information_schema.tables WHERE table_schema = DATABASE()
+                    ORDER BY s DESC LIMIT 8');
+            }
+        } catch (\Throwable $e) {
+        }
+
+        // آخر أسطر الأخطاء من ملف اللوغ — بلا SSH: آخر ٦٤ك.ب فقط ثم سطور ERROR الأخيرة
+        $logLines = [];
+        try {
+            $lf = storage_path('logs/laravel.log');
+            if (is_file($lf)) {
+                $fh = fopen($lf, 'r');
+                fseek($fh, max(0, filesize($lf) - 65536));
+                $chunk = (string) stream_get_contents($fh);
+                fclose($fh);
+                $logLines = array_slice(array_values(array_filter(explode("\n", $chunk),
+                    fn ($l) => str_contains($l, '.ERROR') || str_contains($l, '.CRITICAL'))), -25);
+            }
+        } catch (\Throwable $e) {
+        }
+
+        // بيئة التشغيل — ما يحدد سلوك النظام فعلياً على هذا الخادم
+        $env = [
+            'env'    => (string) config('app.env'),
+            'debug'  => (bool) config('app.debug'),
+            'cache'  => (string) config('cache.default'),
+            'queue'  => (string) config('queue.default'),
+            'session' => (string) config('session.driver'),
+            'opcache' => function_exists('opcache_get_status') && @opcache_get_status(false) ? 'مفعّل' : 'متوقف',
+            'maint'  => (bool) setting('maintenance.on', false),
+        ];
+
+        return view('ops.index', compact('db', 'sys', 'outbox', 'beats', 'backup', 'errs', 'pending',
+            'live', 'tables', 'logLines', 'env'));
+    }
+
+    /** نسخة احتياطية فورية بضغطة — دورة «النشر بلا طرفية» تكتمل بها */
+    public function backupNow()
+    {
+        $this->gate();
+        @set_time_limit(300);
+
+        try {
+            \Illuminate\Support\Facades\Artisan::call('hub:backup');
+            hub_audit('نسخة احتياطية يدوية', null, null, 'من مركز التشغيل');
+
+            return redirect()->route('ops.index')
+                ->with('ok', 'أُخذت نسخة احتياطية الآن: ' . mb_substr(trim(\Illuminate\Support\Facades\Artisan::output()), 0, 300));
+        } catch (\Throwable $e) {
+            return redirect()->route('ops.index')->with('err', 'فشل النسخ: ' . mb_substr($e->getMessage(), 0, 300));
+        }
+    }
+
+    /** تبديل وضع الصيانة بضغطة — يقفل النظام على غير المالكين برسالة مهذبة */
+    public function toggleMaintenance()
+    {
+        $this->gate();
+        $on = ! (bool) setting('maintenance.on', false);
+        \App\Models\Setting::updateOrCreate(['key' => 'maintenance.on'], ['value' => $on ? '1' : '']);
+        Cache::forget('settings:all');
+        hub_audit($on ? 'تفعيل وضع الصيانة' : 'إنهاء وضع الصيانة', null, null, 'من مركز التشغيل');
+
+        return redirect()->route('ops.index')
+            ->with('ok', $on ? 'فُعّل وضع الصيانة — الموظفون يرون رسالة الصيانة الآن' : 'أُنهي وضع الصيانة — عاد النظام للجميع');
     }
 
     /** الهجرات الموجودة في الكود ولم تُطبَّق على القاعدة بعد — الفجوة التي تكسر النشر */
@@ -109,6 +186,7 @@ class OpsController extends Controller
             hub_audit('تشغيل الترحيلات', null, null, 'من مركز التشغيل');
             // مخطط الجدول ربما تغيّر للتو — تُنسى خبيئة الأعمدة فيُلتقط الجديد فوراً
             \App\Models\AuditEntry::forgetColumnCache();
+            Cache::forget('hub.pending_migrations');   // شارة التحذير تختفي فوراً
 
             return redirect()->route('ops.index')
                 ->with('ok', 'اكتمل الترحيل بنجاح')

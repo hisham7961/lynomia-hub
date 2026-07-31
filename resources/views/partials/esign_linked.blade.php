@@ -7,7 +7,7 @@
 <div class="card">
     <h3>✍️ التواقيع المرتبطة
         <span class="spacer"></span>
-        @if (hub_can(auth()->user(), 'contracts', 'a'))<a class="btn ghost xs" href="{{ route('esign.index') }}">＋ طلب توقيع</a>@endif</h3>
+        @if (hub_can(auth()->user(), 'contracts', 'a'))<a class="btn ghost xs" href="{{ route('esign.index', ['link' => $module . ':' . $row->id, 'title' => hub_mod($module)['label'] . ' — ' . ($row->{hub_display_col($module)} ?? '')]) }}">＋ طلب توقيع</a>@endif</h3>
     @forelse ($lreqs as $q)
         <div style="display:flex;gap:9px;align-items:center;padding:6px 0;border-bottom:1px solid color-mix(in srgb,var(--ln) 45%,transparent)">
             <span class="bdg {{ $q->status === 'وُقّع' ? 'ok' : 'wn' }}">{{ $q->status }}</span>

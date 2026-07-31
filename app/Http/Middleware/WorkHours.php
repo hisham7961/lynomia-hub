@@ -15,7 +15,7 @@ use Illuminate\Http\Request;
 class WorkHours
 {
     /** مسارات نقل الملفات الممنوعة خارج الدوام */
-    protected const FILE_ROUTES = ['file.show', 'att.dl', 'att.store', 'm.export'];
+    protected const FILE_ROUTES = ['file.show', 'att.dl', 'att.view', 'att.store', 'm.export'];
 
     public function handle(Request $r, Closure $next)
     {
