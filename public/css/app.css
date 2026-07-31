@@ -290,7 +290,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--p)}
   border-bottom:1px solid color-mix(in srgb,var(--ln) 55%,transparent)}
 .detail .drow:hover{background:color-mix(in srgb,var(--p) 2.5%,transparent)}
 .detail dt{color:var(--sb);font-size:12.5px;font-weight:700}
-.kids{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+/* v2.130: min(330px,100%) — أرضية 330px الصلبة كانت أضيق نقطة في التطبيق على شاشة 360px */
+.kids{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr));gap:14px}
 /* v2.125: .mini صنفٌ مستقل — كان مقيداً بـ.kid فتظهر جداول التوقيع والتحقق بأنماط المتصفح الخام */
 .mini{width:100%;border-collapse:collapse;font-size:12.5px}
 .mini td{padding:6px 4px;border-top:1px solid color-mix(in srgb,var(--ln) 55%,transparent)}
@@ -904,6 +905,23 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 :focus-visible{outline:2px solid transparent;outline-offset:2px}
 /* تبويبات مساحة العمل: حالة الاختيار للتقنيات المساعدة تطابق البصرية */
 .cwtabs button[aria-selected="true"]{background:var(--p);color:#fff;border-color:var(--p)}
+
+/* ═ الجوال والاستجابة (v2.130) ═ */
+/* التقويم: 7 أعمدة مرنة بلا أرضية صلبة — وعلى الجوال قائمة أيامٍ ذات أحداث فقط */
+.cgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.cwd{text-align:center;font-size:12.5px;padding:4px 0}
+.cday{border:1px solid var(--line);border-radius:10px;min-height:86px;padding:6px;min-width:0}
+.cday.lead{border:0;min-height:0}
+.ctoday{outline:2px solid var(--p);outline-offset:-2px}
+.cwdname{display:none;font-size:11px}
+@media (max-width:760px){
+  .cgrid{display:flex;flex-direction:column;gap:8px}
+  .cwd,.cday.lead,.cday.no-ev{display:none}
+  .cday{min-height:0}
+  .cwdname{display:inline}
+}
+/* مصفوفة الصلاحيات: العمود الأول (اسم الوحدة) يلتصق أثناء الانزلاق الأفقي */
+.matrix th:first-child,.matrix td:first-child{position:sticky;inset-inline-start:0;background:var(--cd);z-index:1}
 
 /* ═ كثافة الجوال (v2.115): الترويسات كانت تلتهم ٦٣٢ من ٨٤٤ بكسل قبل أول صف بيانات ═ */
 @media (max-width:760px){

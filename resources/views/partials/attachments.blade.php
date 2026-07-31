@@ -48,7 +48,7 @@
                              style="max-width:100%;max-height:70vh;border-radius:12px;border:1px solid var(--ln);margin-top:6px;background:#fff">
                     @else
                         <iframe src="{{ route('att.view', $a->id) }}" title="{{ $a->original_name }}" loading="lazy"
-                                style="width:100%;height:480px;border:1px solid var(--ln);border-radius:12px;margin-top:6px;background:#fff"></iframe>
+                                style="width:100%;height:60vh;border:1px solid var(--ln);border-radius:12px;margin-top:6px;background:#fff"></iframe>
                     @endif
                 </details>
             @endif
