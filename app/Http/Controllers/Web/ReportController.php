@@ -24,7 +24,10 @@ class ReportController extends Controller
     {
         abort_unless(hub_can(auth()->user(), 'fin', 'v'), 403);
         $t = hub_mod('fin')['table'];
-        $base = fn () => DB::table($t)->whereNull('deleted_at')->whereNotIn('state', $this->dead);
+        // النطاق والعزل يسريان على التقرير كما يسريان على القوائم — المعزول يرى شركاته فقط،
+        // والشركة النشطة من المحوّل تركّز الأرقام عليها
+        $base = fn () => hub_company_scope(
+            hub_scope(DB::table($t)->whereNull('deleted_at')->whereNotIn('state', $this->dead), 'fin'), 'fin');
 
         $mStart = now()->startOfMonth()->toDateString();
         $sum = fn ($kinds, $from = null) => (float) $base()->whereIn('kind', $kinds)

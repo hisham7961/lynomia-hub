@@ -234,9 +234,21 @@ class HubAutomation extends Command
             $rulesRun++;
 
             $every = max(1, (int) ($rule->every ?: 7));
-            $to    = $this->recipients($rule->to_id);
+            $to    = $this->recipientUsers($rule->to_id);
+
+            // النطاق يُفرض لكل مستلم على حدة — القاعدة لا تُسرّب عنوان سجل خارج نطاقه
+            $rowIds = $rows->pluck('id')->all();
+            $visible = [];
+            foreach ($to as $ru) {
+                $visible[$ru->id] = hub_scope(
+                    DB::table($md['table'])->whereNull('deleted_at')->whereIn('id', $rowIds),
+                    $rule->mod, $ru)->pluck('id')->map(fn ($i) => (string) $i)->flip()->all();
+            }
 
             foreach ($rows as $row) {
+                $canSee = $to->filter(fn ($ru) => isset($visible[$ru->id][(string) $row->id]));
+                if ($canSee->isEmpty()) continue;
+
                 // منع التكرار: نفس القاعدة ونفس السجل خلال «كل N يوم»
                 $dup = HubNotification::where('kind', 'rule:' . $rule->id)
                     ->where('record_id', $row->id)
@@ -247,10 +259,10 @@ class HubAutomation extends Command
                 $text = trim(($rule->msg ?: $rule->name) . ' — ' . Str::limit((string) $row->_n, 60));
                 $hits++;
 
-                foreach ($to as $uid) {
+                foreach ($canSee as $ru) {
                     if ($this->dry) continue;
                     HubNotification::create([
-                        'user_id'   => $uid,
+                        'user_id'   => $ru->id,
                         'kind'      => 'rule:' . $rule->id,
                         'text'      => Str::limit($text, 590),
                         'module'    => $rule->mod,
@@ -265,7 +277,7 @@ class HubAutomation extends Command
                     if (str_contains($chan, $word) || str_contains($chan, 'الكل')) {
                         $outbox++;
                         if (! $this->dry) OutboxMessage::create([
-                            'user_id'    => $to[0] ?? null,
+                            'user_id'    => $canSee->first()?->id,
                             'kind'       => 'rule:' . $rule->id,
                             'channel'    => $ch,
                             'target'     => null,               // يملؤها عامل التسليم (n8n)
@@ -284,11 +296,17 @@ class HubAutomation extends Command
     /** المستلمون: المحدد في القاعدة، وإلا المالكون + حاملو علم monitor */
     protected function recipients($toId): array
     {
-        if ($toId) return [$toId];
+        return $this->recipientUsers($toId)->pluck('id')->values()->all();
+    }
+
+    /** المستلمون كنماذج مستخدمين — يلزمنا المستخدم نفسه لفرض نطاقه على القاعدة */
+    protected function recipientUsers($toId): \Illuminate\Support\Collection
+    {
+        if ($toId) return User::whereNull('deleted_at')->where('id', $toId)->get()->values();
 
         return User::whereNull('deleted_at')->get()
             ->filter(fn ($u) => $u->role?->is_owner || hub_flag($u, 'monitor'))
-            ->pluck('id')->values()->all();
+            ->values();
     }
 
     /** إشعار للمالكين وحاملي monitor */

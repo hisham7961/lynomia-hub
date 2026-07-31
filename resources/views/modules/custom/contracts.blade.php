@@ -13,8 +13,9 @@
         : collect();
     $wsChain = \App\Models\Contract::where('parent_id', $row->id)->orderByDesc('created_at')->limit(20)->get();
     $wsParent = $row->parent_id ? \App\Models\Contract::find($row->parent_id) : null;
-    $wsFin = ($row->project_id || $row->company_id)
-        ? \Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at')
+    // تبويب المالية خلف صلاحية fin.v ونطاق المستخدم — رؤية العقد لا تمنح رؤية أرقامه المالية
+    $wsFin = (hub_can($u, 'fin', 'v') && ($row->project_id || $row->company_id))
+        ? hub_scope(\Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at'), 'fin')
             ->when($row->project_id,
                 fn ($q) => $q->where('project_id', $row->project_id),
                 fn ($q) => $q->where('company_id', $row->company_id))
@@ -34,7 +35,9 @@
         <button type="button" class="on" role="tab" aria-selected="true" data-cw="parties">✍️ الأطراف والتواقيع</button>
         <button type="button" role="tab" aria-selected="false" tabindex="-1" data-cw="approvals">🔏 الموافقات</button>
         <button type="button" role="tab" aria-selected="false" tabindex="-1" data-cw="obligations">📌 الالتزامات <span class="sub">({{ $wsObs->count() }})</span></button>
-        <button type="button" role="tab" aria-selected="false" tabindex="-1" data-cw="fin">💰 المالية</button>
+        @if (hub_can($u, 'fin', 'v'))
+            <button type="button" role="tab" aria-selected="false" tabindex="-1" data-cw="fin">💰 المالية</button>
+        @endif
         <button type="button" role="tab" aria-selected="false" tabindex="-1" data-cw="chain">🔗 سلسلة العقد</button>
     </div>
 
