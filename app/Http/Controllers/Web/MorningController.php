@@ -129,13 +129,8 @@ class MorningController extends Controller
                             's' => $bk ? 'آخر تشغيل ' . \Illuminate\Support\Carbon::parse($bk)->diffForHumans() : 'لم يعمل قط',
                             'u' => route('ops.index'), 'tone' => 'bad']);
             }
-            if (Schema::hasTable('restore_tests')) {
-                $lastTest = DB::table('restore_tests')->whereNull('deleted_at')->max('test_date');
-                if (! $lastTest || $lastTest < today()->subDays(90)->toDateString()) {
-                    $ops->push(['t' => 'لم تُختبر استعادة النسخ منذ أكثر من ٩٠ يوماً',
-                                's' => 'نسخة لم تُختبر ليست نسخة', 'u' => route('m.index', 'restores'), 'tone' => 'bad']);
-                }
-            }
+            // «اختبار استعادة النسخ» أُخرج من الواجهة بطلب المالك — لا تنبيه له.
+            // (المسار والبيانات باقيان: لا حذف ولا هجرة مدمّرة.)
             // الأخطاء الجديدة بأسمائها لا بعددها: «٣ أخطاء بانتظار المعالجة» لا تقول
             // شيئاً — الرسالة والموضع والتكرار هي ما يُبنى عليه قرار
             $newErrs = DB::table('error_events')->where('status', 'جديد')
