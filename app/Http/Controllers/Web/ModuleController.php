@@ -268,17 +268,8 @@ class ModuleController extends Controller
         $row = $this->findScoped($class, $module, $id, 'with');
         [, $labels] = $this->columnsAndLabels($def, [$row], all: true);
 
-        // عرض حساس: صفحة تعرض سراً غير فارغ لمستخدم مخوّل — تُسجّل في التدقيق
-        $u = auth()->user();
-        if (hub_copy_secrets($u)) {
-            foreach ($def['fields'] as $f) {
-                if (($f['type'] ?? '') === 'sec' && filled($row->{$f['col']} ?? null)) {
-                    hub_audit('عرض حساس', $module, $row->id,
-                        (string) ($row->{hub_display_col($module)} ?? $row->id));
-                    break;
-                }
-            }
-        }
+        // الأسرار لا تُزرع في HTML — تُكشف عبر revealSecret ويُسجَّل «عرض حساس»
+        // عند كل كشفٍ فعلي لا عند مجرد فتح الصفحة (كان يسم الفاتح كأنه كاشف)
 
         // السجلات المرتبطة: كل وحدة تشير لهذا السجل بحقل مرجعي
         $children = hub_related($module, $row->id);
@@ -300,6 +291,35 @@ class ModuleController extends Controller
         $timeline = hub_timeline($module, $row->id);
 
         return view('modules.show', compact('module', 'def', 'row', 'labels', 'children', 'versions', 'verUsers', 'comments', 'cUsers', 'attachments', 'aUsers', 'timeline'));
+    }
+
+    /**
+     * كشف سرّ عبر الخادم: القيمة لا تُطبع في مصدر الصفحة إطلاقاً — تُطلب هنا عند
+     * الضغط على «إظهار»، فيُفرض علم الأسرار وقائمة «المستخدمين المخولين» (الخزنة)
+     * ويُسجَّل «عرض حساس» عند كل كشفٍ فعلي باسم السر وحقله.
+     */
+    public function revealSecret(string $module, string $id, string $field)
+    {
+        [$def, $class] = $this->resolve($module, 'v');
+        $row = $this->findScoped($class, $module, $id);
+        $u = auth()->user();
+
+        abort_unless(hub_copy_secrets($u), 403, 'ليست لديك صلاحية رؤية الأسرار');
+
+        $f = collect($def['fields'])->firstWhere('key', $field);
+        abort_unless($f && ($f['type'] ?? '') === 'sec', 404);
+        abort_if(hub_field_mode($u, $module, $field) === 'hide', 403);
+
+        // «المستخدمون المخولون»: قائمة غير فارغة تحصر الكشف بأهلها — والمالك محصّن
+        $allowed = array_values(array_filter(array_map('strval', (array) ($row->allowed_ids ?? []))));
+        if ($allowed && ! hub_is_owner($u) && ! in_array((string) $u->id, $allowed, true)) {
+            abort(403, 'هذا السر محصور بقائمة مخولين لست منهم');
+        }
+
+        hub_audit('عرض حساس', $module, $row->id,
+            (string) ($row->{hub_display_col($module)} ?? $row->id) . ' — ' . ($f['label'] ?? $field));
+
+        return response()->json(['v' => (string) ($row->{$f['col']} ?? '')]);
     }
 
     public function edit(string $module, string $id)

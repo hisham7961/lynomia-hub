@@ -6,9 +6,18 @@
 @elseif ($t === 'sec')
     @php $canSec = hub_copy_secrets(); @endphp
     @if ($canSec && ($ctx ?? 'table') === 'show')
-        <span class="mono" data-sec hidden>{{ $v }}</span><span class="mono" data-secmask>••••••</span>
+        {{-- السر لا يُزرع في مصدر الصفحة: يُجلب من الخادم عند الكشف، فيُفرض تخويل
+             الخزنة ويُسجَّل «عرض حساس» عند كل كشفٍ فعلي لا عند فتح الصفحة --}}
+        <span class="mono" data-secmask>••••••</span>
         <button class="btn ghost xs" type="button"
-                onclick="var w=this.parentNode,s=w.querySelector('[data-sec]'),m=w.querySelector('[data-secmask]');s.hidden=!s.hidden;m.hidden=!m.hidden;this.textContent=s.hidden?'إظهار':'إخفاء'">إظهار</button>
+                data-reveal="{{ route('m.secret', [$module ?? request()->route('module'), $row->id, $key]) }}"
+                onclick="(function(b){var m=b.parentNode.querySelector('[data-secmask]');
+                    if(b.dataset.open){m.textContent='••••••';delete b.dataset.open;b.textContent='إظهار';return}
+                    b.disabled=true;
+                    fetch(b.dataset.reveal,{method:'POST',headers:{'X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]').content,'Accept':'application/json'}})
+                    .then(function(r){if(!r.ok)throw r.status;return r.json()})
+                    .then(function(j){m.textContent=j.v||'—';b.dataset.open='1';b.textContent='إخفاء';b.disabled=false})
+                    .catch(function(s){b.textContent=s===403?'غير مخوّل':'تعذّر الكشف';b.disabled=false})})(this)">إظهار</button>
     @else
         <span class="mono">••••••</span>
     @endif

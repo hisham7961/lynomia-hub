@@ -55,12 +55,17 @@ class AuditChainTest extends TestCase
         $this->seedCore();
         $v = \App\Models\VaultSecret::create(['title' => 'سر الخادم', 'type' => 'خادم', 'secret_cipher' => 'TopSecret']);
 
+        // v2.138: فتح الصفحة وحده لا يسم صاحبه كاشفاً — «عرض حساس» يُسجَّل عند الكشف الفعلي
         $this->actingAs($this->owner)->get('/m/vault/' . $v->id)->assertOk();
+        $this->assertDatabaseMissing('audits', ['action' => 'عرض حساس', 'module' => 'vault', 'record_id' => $v->id]);
+
+        $this->actingAs($this->owner)->post('/m/vault/' . $v->id . '/secret/secret')
+            ->assertOk()->assertJson(['v' => 'TopSecret']);
         $this->assertDatabaseHas('audits', ['action' => 'عرض حساس', 'module' => 'vault', 'record_id' => $v->id]);
 
-        // المشاهد لا يرى السر فلا يُسجل عليه عرض حساس
+        // المشاهد لا يملك علم الأسرار — الكشف مرفوض ولا يُسجل عليه عرض حساس
         AuditEntry::where('action', 'عرض حساس')->delete();
-        $this->actingAs($this->viewer)->get('/m/vault/' . $v->id);
+        $this->actingAs($this->viewer)->post('/m/vault/' . $v->id . '/secret/secret')->assertForbidden();
         $this->assertDatabaseMissing('audits', ['action' => 'عرض حساس', 'record_id' => $v->id]);
     }
 }

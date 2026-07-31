@@ -319,6 +319,7 @@ Route::middleware('auth')->group(function () {
         Route::post('import', [ImportController::class, 'map'])->name('import.map');
         Route::post('import/run', [ImportController::class, 'run'])->name('import.run');
         Route::post('{id}/status', [ModuleController::class, 'setStatus'])->name('status');
+        Route::post('{id}/secret/{field}', [ModuleController::class, 'revealSecret'])->name('secret');
         Route::post('bulk', [ModuleController::class, 'bulk'])->name('bulk');
         Route::post('/', [ModuleController::class, 'store'])->name('store');
         Route::get('{id}', [ModuleController::class, 'show'])->name('show');

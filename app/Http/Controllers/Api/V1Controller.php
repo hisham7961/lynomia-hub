@@ -282,9 +282,14 @@ class V1Controller extends ModuleController
         $canSec = hub_copy_secrets($u);
         $arr = is_array($row) ? $row : $row->toArray();
 
+        // «المستخدمون المخولون» في الخزنة تسري على الـ API كما تسري على الواجهة:
+        // قائمة غير فارغة تحجب السر عمّن ليس فيها (والمالك محصّن)
+        $allowed = array_values(array_filter(array_map('strval', (array) ($arr['allowed_ids'] ?? []))));
+        $inAllowed = ! $allowed || hub_is_owner($u) || in_array((string) $u?->id, $allowed, true);
+
         foreach ($def['fields'] as $f) {
             $hidden = hub_field_mode($u, $module, $f['key']) === 'hide';
-            $secret = ($f['type'] ?? '') === 'sec' && ! $canSec;
+            $secret = ($f['type'] ?? '') === 'sec' && (! $canSec || ! $inAllowed);
             if ($hidden || $secret) unset($arr[$f['col']]);
         }
 
