@@ -121,6 +121,7 @@ class NavOrganizationTest extends TestCase
             'media' => $none, 'events' => $none, 'hr' => $none,
             'ideas' => $none, 'suppliers' => $none, 'social' => $none, 'okrs' => $none, 'policies' => $none,
             'feats' => $none, 'deploys' => $none, 'requests' => $none, 'designs' => $none,
+            'assets' => $none,
         ]);
 
         $labels = collect(hub_top_groups($u))->pluck('label');
@@ -139,6 +140,7 @@ class NavOrganizationTest extends TestCase
             'social' => $none, 'okrs' => $none, 'policies' => $none, 'plans' => $none,
             'media' => $none, 'events' => $none, 'hr' => $none,
             'feats' => $none, 'deploys' => $none, 'requests' => $none, 'designs' => $none,
+            'assets' => $none,
         ]);
 
         $g = collect(hub_top_groups($u))->firstWhere('label', 'اللوحات والمراكز');
