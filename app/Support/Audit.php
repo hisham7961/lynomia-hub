@@ -34,9 +34,17 @@ class Audit
         $a = self::decode($after);
         if (! $b && ! $a) return [];
 
+        // **قيود مستوى الحقل تسري على السجل كما تسري على السجلات**: القيد يحمل
+        // «قبل ← بعد» بقيمهما، فطباعتُه كانت نافذةً خلفية على كل حقلٍ مخفيّ —
+        // يكفي أن يحمل الدور راية «سجل التدقيق» ليقرأ رواتب من لا يراها.
+        $u = auth()->user();
         $labels = [];
+        $locked = [];
         foreach ((array) (hub_mod((string) $module)['fields'] ?? []) as $f) {
-            if (! empty($f['col'])) $labels[$f['col']] = (string) ($f['label'] ?? $f['col']);
+            $col = (string) ($f['col'] ?? '');
+            if ($col === '') continue;
+            $labels[$col] = (string) ($f['label'] ?? $col);
+            if (hub_field_mode($u, (string) $module, (string) ($f['key'] ?? $col)) !== '') $locked[$col] = 1;
         }
 
         $out = [];
@@ -51,8 +59,10 @@ class Audit
             $out[] = [
                 'col'   => $col,
                 'label' => $labels[$col] ?? self::humanCol($col),
-                'from'  => self::show($col, $from),
-                'to'    => self::show($col, $to),
+                // الحقل المحجوب: يُقال إنه **تغيّر** ولا تُكشف قيمتاه — فلا
+                // يضيع أثرُ التعديل ولا تُسرَّب القيمة
+                'from'  => isset($locked[$col]) ? '••• محجوب' : self::show($col, $from),
+                'to'    => isset($locked[$col]) ? '••• محجوب' : self::show($col, $to),
             ];
         }
 

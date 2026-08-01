@@ -86,6 +86,9 @@ class ImportController extends Controller
             foreach ($mapping as $i => $fk) {
                 $f = $fields[$fk] ?? null;
                 if (! $f) continue;
+                // صلاحية الحقل تسري على الاستيراد كما تسري على النموذج: ملفٌّ
+                // بعمودٍ اسمه «الراتب» كان يكتبه لمن لا يملك حتى رؤيته
+                if (hub_field_mode(auth()->user(), $module, (string) $fk) !== '') continue;
                 $v = trim((string) ($line[(int) $i] ?? ''));
                 if ($v === '') continue;
 
@@ -102,6 +105,19 @@ class ImportController extends Controller
                         break;
                     }
                 }
+            }
+
+            // **عزل الشركات يسري على الإنشاء كما على القراءة**: المستوردُ المعزول
+            // كان يكتب سجلاً داخل شركةٍ لا يراها لمجرّد أن الملف يسمّيها، فيدسّ
+            // بياناتٍ في كيانٍ ليس له — والنتيجة لا تظهر له بعدها فلا يُكتشف.
+            $allowed = hub_company_ids();
+            if ($allowed !== null && \Illuminate\Support\Facades\Schema::hasColumn($def['table'], 'company_id')) {
+                $cid = (string) ($m->company_id ?? '');
+                if ($cid !== '' && ! in_array($cid, $allowed, true)) {
+                    $skipped[] = 'صف ' . ($n + 2) . ': شركة خارج نطاقك';
+                    continue;
+                }
+                if ($cid === '') $m->company_id = $allowed[0];      // شركته الافتراضية لا الفراغ
             }
 
             if ($rowErr) { $skipped[] = 'صف ' . ($n + 2) . ': ' . $rowErr; continue; }

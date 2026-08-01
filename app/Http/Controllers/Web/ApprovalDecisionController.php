@@ -28,8 +28,12 @@ class ApprovalDecisionController extends ModuleController
         if ($ap->op === 'd') {
             if (! $m->trashed()) $m->delete();
         } else {
-            $req = Request::create('/', 'POST', (array) $ap->payload);
-            $this->fill($def, $req, $m);
+            // حصرُ الكتابة بمفاتيح الحمولة: المعتمِد وافق على **هذه** التغييرات،
+            // ولو مُرِّرت كاملةً لكُتب null فوق كل حقلٍ غاب عنها (ومنها ما نُقّي
+            // عند الالتقاط لأن الطالب لا يملك كتابته).
+            $payload = (array) $ap->payload;
+            $req = Request::create('/', 'POST', $payload);
+            $this->fill($def, $req, $m, array_keys($payload));
             $m->save();
             $this->bustProgress($ap->mod, $m);
         }
