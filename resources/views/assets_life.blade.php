@@ -8,9 +8,12 @@
             من يحمل ماذا · ما انتهى ضمانه · ما فات موعد صيانته · وما صار إصلاحه أغلى من إحلاله.
         </div>
     </div>
-    @if (hub_can(auth()->user(), 'assetlog', 'a'))
-        <a class="btn ghost sm" href="{{ route('m.create', 'assetlog') }}">＋ قيد صيانة</a>
-    @endif
+    <div style="display:flex;gap:8px">
+        <a class="btn ghost sm" href="{{ route('assets.life', ['fresh' => 1]) }}">↻ تحديث</a>
+        @if (hub_can(auth()->user(), 'assetlog', 'a'))
+            <a class="btn ghost sm" href="{{ route('m.create', 'assetlog') }}">＋ قيد صيانة</a>
+        @endif
+    </div>
 </div>
 
 @if ($sum)

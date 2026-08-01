@@ -24,6 +24,8 @@ use Illuminate\Support\Facades\Schema;
  */
 class AppsProjects
 {
+    public const TTL = 300;
+
     /**
      * وقت الحفظ: سجلٌّ له تطبيقٌ وليس له مشروع يرث مشروع تطبيقه.
      * لا يُكتب فوق اختيارٍ صريح — من كتب مشروعاً يُحترم، ويُعرض تناقضُه لاحقاً.
@@ -74,6 +76,12 @@ class AppsProjects
      * `$fixable` وحدها تُصلَح تلقائياً — التناقض قرارُ إنسان.
      */
     public static function scan($user = null): array
+    {
+        return hub_screen('ap:scan', self::TTL, fn () => self::scanCalc($user),
+            array_merge(['applications', 'projects'], array_column(self::dualModules(), 'table')));
+    }
+
+    protected static function scanCalc($user = null): array
     {
         $user = $user ?? auth()->user();
         if (! Schema::hasTable('applications')) return ['orphanApps' => [], 'noProject' => [],
@@ -170,7 +178,11 @@ class AppsProjects
             $n++;
         }
 
-        if ($n) hub_audit('ربط سجلات بمشاريع تطبيقاتها', null, null, $n . ' سجلاً');
+        if ($n) {
+            hub_audit('ربط سجلات بمشاريع تطبيقاتها', null, null, $n . ' سجلاً');
+            // التحديث بمنشئ الاستعلام لا يُطلق أحداث Eloquent
+            foreach (self::dualModules() as $d) hub_data_bump($d['table']);
+        }
 
         return $n;
     }

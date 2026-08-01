@@ -121,17 +121,26 @@ class Acks
              'device' => substr((string) request()->userAgent(), 0, 200),
              'note' => $note ?: null, 'created_at' => now()],
         );
+
+        // كتابةٌ بمنشئ الاستعلام لا تُطلق أحداث Eloquent — فالختم يُرفع يدوياً
+        hub_data_bump('record_acks');
     }
 
     /**
      * كل ما ينتظر إقرار مستخدم — للصندوق الموحّد.
      * يقرأ الوحدات المسجَّلة وحدها، وكلٌّ خلف صلاحيتها ونطاقها.
+     *
+     * الاستعلامات **مجمَّعة**: صفّان لكل وحدة (السجلات ثم إقراراتي عليها) لا
+     * استعلامان لكل سجل. هذا القارئ يُستدعى من شارة الشريط الجانبي في كل صفحة،
+     * فحسابُه لكل صفٍّ على حدة كان يعني مئتَي استعلامٍ لفتح أي شاشة.
      */
     public static function pending($user): array
     {
         if (! Schema::hasTable('record_acks') || ! $user) return [];
 
+        $uid = (string) $user->id;
         $out = [];
+
         foreach (self::registry() as $module => $def) {
             $md = hub_mod($module);
             if (! $md || ! Schema::hasTable($md['table']) || ! hub_can($user, $module, 'v')) continue;
@@ -141,12 +150,26 @@ class Acks
 
             $q = hub_scope(DB::table($md['table'])->whereNull('deleted_at'), $module, $user);
             $q = $def['who']['type'] === 'one'
-                ? $q->where($col, $user->id)
-                : $q->where($col, 'LIKE', '%"' . $user->id . '"%');
+                ? $q->where($col, $uid)
+                : $q->where($col, 'LIKE', '%"' . $uid . '"%');
 
             $display = $md['display'] ?? 'title';
-            foreach ($q->orderByDesc('created_at')->limit(30)->get() as $row) {
-                if (! self::pendingFor($module, $row, (string) $user->id)) continue;
+            $rows = $q->orderByDesc('created_at')->limit(30)->get(['id', $display, 'version']);
+            if ($rows->isEmpty()) continue;
+
+            // إقراراتي على هذه السجلات دفعةً واحدة — أحدثُ نسخةٍ أقررتُ بها لكلٍّ
+            $mine = DB::table('record_acks')->where('module', $module)->where('user_id', $uid)
+                ->whereIn('record_id', $rows->pluck('id'))
+                ->orderByDesc('ack_at')->get(['record_id', 'ver']);
+            $acked = [];
+            foreach ($mine as $a) $acked[$a->record_id] ??= (int) $a->ver;
+
+            foreach ($rows as $row) {
+                $ver = (int) ($row->version ?: 1);
+                $at = $acked[$row->id] ?? null;
+                // لم يُقرّ أصلاً، أو أقرّ بنسخةٍ سابقة في وحدةٍ يُبطلها التعديل
+                if ($at !== null && ! ($def['reack'] && $at !== $ver)) continue;
+
                 $out[] = [
                     'module' => $module, 'id' => $row->id,
                     'title' => (string) ($row->{$display} ?? $md['label']),

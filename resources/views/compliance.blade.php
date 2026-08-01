@@ -8,9 +8,12 @@
             «متأخر» كلمةٌ لا ثمن لها — وهنا يُقال ماذا يقع فعلاً، ومتى يبدأ العمل لا متى يحلّ الموعد.
         </div>
     </div>
-    @if (hub_can(auth()->user(), 'compliance', 'a'))
-        <a class="btn ghost sm" href="{{ route('m.create', 'compliance') }}">＋ بند التزام</a>
-    @endif
+    <div style="display:flex;gap:8px">
+        <a class="btn ghost sm" href="{{ route('compliance.board', ['fresh' => 1]) }}">↻ تحديث</a>
+        @if (hub_can(auth()->user(), 'compliance', 'a'))
+            <a class="btn ghost sm" href="{{ route('m.create', 'compliance') }}">＋ بند التزام</a>
+        @endif
+    </div>
 </div>
 
 @if ($pulse)

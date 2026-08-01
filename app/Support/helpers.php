@@ -1938,6 +1938,71 @@ if (! function_exists('hub_cached')) {
     }
 }
 
+if (! function_exists('hub_scope_key')) {
+    /**
+     * بصمة نطاق القارئ لمفاتيح التخبئة.
+     *
+     * كل قارئٍ جديد يمرّ بـ`hub_scope` و`hub_can` و`hub_field_mode` — فنتيجته
+     * **تختلف باختلاف القارئ**. مفتاحٌ عامّ واحد يعني أن أول من يفتح الشاشة
+     * يخبّئ نسخته، ويقرؤها بعده من لا يملك رؤيتها. البصمة تحمل الدور والمستخدم
+     * والشركة النشطة وعدسة المشروع — وهي أربعة ما يغيّر النتيجة.
+     */
+    function hub_scope_key(string $prefix): string
+    {
+        $u = auth()->user();
+
+        return $prefix . ':' . ($u?->role_id ?? '0') . ':' . ($u?->id ?? '0')
+            . ':' . (string) session('hub.company', '-') . hub_lens_key(hub_lens()['id'] ?? null);
+    }
+}
+
+if (! function_exists('hub_data_bump')) {
+    /**
+     * ختمُ تغيّر جدول — عدّادٌ يزيد مع كل كتابةٍ على الجدول.
+     *
+     * التخبئة بمهلةٍ وحدها تكذب: تُعدِّل سجلاً فتبقى الشاشة تعرض الرقم القديم
+     * خمس دقائق، فيظنّ المستخدم أن تعديله لم يُحفظ فيعيده. الختم يجعل المفتاح
+     * نفسه يتغيّر ساعةَ تتغيّر البيانات — فلا نصّ يُبطَل يدوياً ولا رقمٌ يتأخّر.
+     */
+    function hub_data_bump(?string $table = null): void
+    {
+        $k = 'hub:stamp:' . ($table ?: '*');
+        try {
+            \Illuminate\Support\Facades\Cache::put($k,
+                ((int) \Illuminate\Support\Facades\Cache::get($k, 0)) + 1, 86400);
+        } catch (\Throwable $e) {
+            // خبيئةٌ معطّلة لا تُسقط عملية حفظ — أسوأ ما يقع أن تتأخر شاشةٌ محسوبة
+        }
+    }
+}
+
+if (! function_exists('hub_data_stamp')) {
+    /** ختم الجداول المطلوبة مجموعاً — جزءٌ من مفتاح الشاشة */
+    function hub_data_stamp(array $tables): string
+    {
+        if (! $tables) return '';
+
+        $c = \Illuminate\Support\Facades\Cache::class;
+
+        return ':' . implode('.', array_map(
+            fn ($t) => (string) (int) \Illuminate\Support\Facades\Cache::get('hub:stamp:' . $t, 0), $tables));
+    }
+}
+
+if (! function_exists('hub_screen')) {
+    /**
+     * غلاف شاشةٍ محسوبة: بصمة النطاق + ختم الجداول + مهلة + `?fresh=1`.
+     *
+     * الشاشات المحسوبة تقرأ عشرات الاستعلامات وقيمتُها لا تتغير كل ثانية —
+     * لكنها **تتغيّر ساعةَ تتغيّر بياناتها**، فالختم يسبق المهلة.
+     */
+    function hub_screen(string $prefix, int $ttl, \Closure $fn, array $tables = [])
+    {
+        return hub_cached(hub_scope_key($prefix) . hub_data_stamp($tables), $ttl,
+            (bool) request()->query('fresh'), $fn);
+    }
+}
+
 if (! function_exists('hub_related')) {
     /**
      * السجلات المرتبطة بسجل: كل وحدة تشير إليه بحقل مرجعي، مع صفوفها وعدّها.

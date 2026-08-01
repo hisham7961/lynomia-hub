@@ -68,7 +68,10 @@ class QualityController extends Controller
                 foreach (config('hub.modules') as $md) {
                     foreach ($md['fields'] as $f) {
                         if (($f['ref'] ?? null) !== 'clients' || ($f['type'] ?? '') !== 'ref') continue;
-                        $moved += DB::table($md['table'])->where($f['col'], $dup->id)->update([$f['col'] => $keep->id]);
+                        $n = DB::table($md['table'])->where($f['col'], $dup->id)->update([$f['col'] => $keep->id]);
+                        // كتابةٌ خام لا تُطلق أحداث Eloquent — يُرفع ختم الجدول يدوياً
+                        if ($n) hub_data_bump($md['table']);
+                        $moved += $n;
                     }
                 }
                 // المرفقات الحيّة المشيرة للسجل بـ (وحدة + معرّف) خارج سجل الوحدات.

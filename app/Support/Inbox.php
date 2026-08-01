@@ -25,6 +25,11 @@ class Inbox
 {
     public const TTL = 60;
 
+    /** الجداول التي يقرؤها الصندوق — ختمُها جزءٌ من مفتاحه فلا يعرض ما بطل */
+    public const TABLES = ['approvals', 'record_acks', 'sign_requests', 'policies', 'policy_acks',
+        'kb_articles', 'kb_reads', 'internal_requests', 'leave_requests', 'tasks', 'decisions',
+        'tickets', 'meetings', 'contract_obligations', 'compliance_items'];
+
     /** الحاويات مرتّبةً — الرقم هو الترتيب */
     public const BUCKETS = [
         0 => ['label' => 'متأخر',        'icon' => '🔴', 'tone' => 'bad'],
@@ -34,12 +39,25 @@ class Inbox
         4 => ['label' => 'بلا موعد',     'icon' => '⚫', 'tone' => ''],
     ];
 
-    /** كل ما ينتظر تصرّف المستخدم، مرتّباً */
+    /**
+     * كل ما ينتظر تصرّف المستخدم، مرتّباً.
+     *
+     * مخبّأ ببصمة النطاق: هذا القارئ يقرأ ثلاثة عشر مصدراً، وشارةُ الشريط
+     * الجانبي تستدعيه في **كل صفحة** — فحسابُه في كل طلبٍ يجعل ثمنَ فتح أي
+     * شاشةٍ ثمنَ فتح البوابة كاملةً.
+     */
     public static function items($user = null): array
     {
         $user = $user ?? auth()->user();
         if (! $user) return [];
 
+        return hub_cached('inbox:items:' . ($user->role_id ?? '0') . ':' . $user->id
+            . hub_data_stamp(self::TABLES),
+            self::TTL, (bool) request()->query('fresh'), fn () => self::build($user));
+    }
+
+    protected static function build($user): array
+    {
         $out = [];
         foreach (['approvals', 'acks', 'signatures', 'policies', 'mustRead', 'requests',
                   'leaves', 'tasks', 'decisions', 'tickets', 'meetings', 'obligations', 'compliance'] as $src) {
@@ -63,8 +81,8 @@ class Inbox
         $user = $user ?? auth()->user();
         if (! $user) return 0;
 
-        return (int) Cache::remember('inbox:n:' . $user->id, self::TTL,
-            fn () => collect(self::items($user))->where('bucket', '<=', 1)->count());
+        // من خبيئة الصفّ نفسه: عدٌّ منفصلٌ كان يعيد بناء الصندوق كاملاً مرةً أخرى
+        return collect(self::items($user))->where('bucket', '<=', 1)->count();
     }
 
     /** ملخّصٌ بالحاويات — للترويسة */

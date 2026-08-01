@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
@@ -31,6 +32,18 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api', fn ($request) => Limit::perMinute(120)->by(
             $request->bearerToken() ? hash('sha256', $request->bearerToken()) : $request->ip()
         ));
+
+        /**
+         * ختمُ تغيّر الجداول: كل كتابةٍ ترفع عدّاد جدولها، ومفاتيح الشاشات
+         * المحسوبة تحمل الختم — فتُبطَل خبيئتُها لحظةَ تتغيّر بياناتها لا بعد
+         * مهلتها. بلا هذا تعرض الشاشة رقماً قديماً فيُعاد التعديل ظنّاً أنه ضاع.
+         */
+        foreach (['eloquent.saved: *', 'eloquent.deleted: *', 'eloquent.restored: *'] as $ev) {
+            Event::listen($ev, function ($event, $payload) {
+                $m = is_array($payload) ? ($payload[0] ?? null) : $payload;
+                if ($m instanceof \Illuminate\Database\Eloquent\Model) hub_data_bump($m->getTable());
+            });
+        }
 
         /** صلاحية وحدة: Gate::allows('mod', [$moduleKey, 'v|a|e|d']) — المالك مسموح له كل شيء */
         Gate::define('mod', function (User $user, string $module, string $op = 'v') {

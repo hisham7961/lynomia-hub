@@ -22,6 +22,8 @@ use Illuminate\Support\Facades\Schema;
  */
 class Delivery
 {
+    public const TTL = 300;
+
     /** كل مصدرٍ خلف صلاحيته — الشاشة تجمع ولا تفتح باباً مغلقاً */
     protected static function may(string $module): bool
     {
@@ -35,6 +37,12 @@ class Delivery
      * منذ رُفع طلبها. المتوسط وحده يخدع — فيُحسب **الوسيط** معه.
      */
     public static function leadTime(): array
+    {
+        return hub_screen('dlv:lead', self::TTL, fn () => self::leadTimeCalc(),
+            ['plan_items', 'internal_requests']);
+    }
+
+    protected static function leadTimeCalc(): array
     {
         if (! self::may('feats') || ! Schema::hasTable('plan_items')) return [];
 
@@ -74,6 +82,12 @@ class Delivery
     /* ────────── أين ينكسر الخيط ────────── */
 
     public static function breaks(): array
+    {
+        return hub_screen('dlv:breaks', self::TTL, fn () => self::breaksCalc(),
+            ['internal_requests', 'plan_items', 'deployments', 'dependencies', 'work_updates', 'projects']);
+    }
+
+    protected static function breaksCalc(): array
     {
         $out = [];
 
@@ -190,6 +204,11 @@ class Delivery
     /** كم نشرةً إنتاجية في الشهر، وكم فشلت، وكم متوسط مدّتها */
     public static function cadence(): array
     {
+        return hub_screen('dlv:cad', self::TTL, fn () => self::cadenceCalc(), ['deployments']);
+    }
+
+    protected static function cadenceCalc(): array
+    {
         if (! self::may('deploys') || ! Schema::hasTable('deployments')) return [];
 
         $rows = DB::table('deployments')->whereNull('deleted_at')
@@ -259,6 +278,11 @@ class Delivery
 
     /** التصاميم: ما علق منها وما تأخر */
     public static function designs(): array
+    {
+        return hub_screen('dlv:dsg', self::TTL, fn () => self::designsCalc(), ['design_tasks']);
+    }
+
+    protected static function designsCalc(): array
     {
         if (! self::may('designs') || ! Schema::hasTable('design_tasks')) return [];
 

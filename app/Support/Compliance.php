@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\Schema;
  */
 class Compliance
 {
+    public const TTL = 300;
+
     public static function may(): bool
     {
         return hub_can(auth()->user(), 'compliance', 'v');
@@ -37,6 +39,12 @@ class Compliance
 
     /** الرادار: كل بندٍ مستحقٍّ أو متأخر، بأثره ومهلته */
     public static function radar(): array
+    {
+        return hub_screen('cmp:radar', self::TTL, fn () => self::radarCalc(),
+            ['compliance_items', 'companies', 'users']);
+    }
+
+    protected static function radarCalc(): array
     {
         if (! self::may() || ! Schema::hasTable('compliance_items')) return [];
 
@@ -81,6 +89,11 @@ class Compliance
      */
     public static function missing(): array
     {
+        return hub_screen('cmp:miss', self::TTL, fn () => self::missingCalc(), ['compliance_items', 'companies']);
+    }
+
+    protected static function missingCalc(): array
+    {
         if (! self::may() || ! Schema::hasTable('compliance_items') || ! Schema::hasTable('companies')) return [];
 
         $expected = collect(self::kinds())->filter(fn ($k) => $k['baseline'] ?? false)->keys();
@@ -111,6 +124,11 @@ class Compliance
 
     /** ثغراتٌ في السجل نفسه: بلا مالك، بلا دليل، بلا تاريخ، وحالةٌ تكذب */
     public static function gaps(): array
+    {
+        return hub_screen('cmp:gaps', self::TTL, fn () => self::gapsCalc(), ['compliance_items']);
+    }
+
+    protected static function gapsCalc(): array
     {
         if (! self::may() || ! Schema::hasTable('compliance_items')) return [];
 
@@ -151,6 +169,11 @@ class Compliance
 
     /** كلفة الامتثال ونبضه — الرسوم المستحقة خلال ٩٠ يوماً تدفّقٌ نقديّ لا أحد يخطّط له */
     public static function pulse(): array
+    {
+        return hub_screen('cmp:pulse', self::TTL, fn () => self::pulseCalc(), ['compliance_items']);
+    }
+
+    protected static function pulseCalc(): array
     {
         if (! self::may() || ! Schema::hasTable('compliance_items')) return [];
 

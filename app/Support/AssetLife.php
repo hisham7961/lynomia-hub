@@ -24,6 +24,7 @@ class AssetLife
 {
     /** عتبة الإحلال: صيانةٌ بلغت نصف ثمن الأصل تُساوي شراءه من جديد تقريباً */
     public const REPLACE_AT = 0.5;
+    public const TTL = 300;
 
     public static function may(): bool
     {
@@ -32,6 +33,11 @@ class AssetLife
 
     /** من يحمل ماذا، وبكم — والعهدة التي بيد من لم يعد معنا */
     public static function custody(): array
+    {
+        return hub_screen('al:cust', self::TTL, fn () => self::custodyCalc(), ['assets', 'users']);
+    }
+
+    protected static function custodyCalc(): array
     {
         if (! self::may() || ! Schema::hasTable('assets')) return [];
 
@@ -64,6 +70,11 @@ class AssetLife
      * الأشياء التي لها ثمنٌ إن أُهملت — كلٌّ بسببه وأثره.
      */
     public static function flags(): array
+    {
+        return hub_screen('al:flags', self::TTL, fn () => self::flagsCalc(), ['assets', 'asset_maintenance']);
+    }
+
+    protected static function flagsCalc(): array
     {
         if (! self::may() || ! Schema::hasTable('assets')) return [];
 
@@ -139,6 +150,11 @@ class AssetLife
      */
     public static function replace(): array
     {
+        return hub_screen('al:repl', self::TTL, fn () => self::replaceCalc(), ['assets', 'asset_maintenance']);
+    }
+
+    protected static function replaceCalc(): array
+    {
         if (! self::may() || ! Schema::hasTable('assets') || ! Schema::hasTable('asset_maintenance')) return [];
 
         $assets = hub_scope(DB::table('assets')->whereNull('deleted_at'), 'assets')
@@ -172,6 +188,11 @@ class AssetLife
 
     /** ملخّصٌ يُقرأ في سطر */
     public static function summary(): array
+    {
+        return hub_screen('al:sum', self::TTL, fn () => self::summaryCalc(), ['assets', 'asset_maintenance']);
+    }
+
+    protected static function summaryCalc(): array
     {
         if (! self::may() || ! Schema::hasTable('assets')) return [];
 

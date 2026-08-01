@@ -20,8 +20,16 @@ use Illuminate\Support\Facades\Schema;
  */
 class CeoBoard
 {
+    public const TTL = 300;
+
     /** ما لا يمضي دون قرار المالك */
     public static function awaiting($user): array
+    {
+        return hub_screen('ceo:await', self::TTL, fn () => self::awaitingCalc($user),
+            ['approvals', 'decisions', 'internal_requests']);
+    }
+
+    protected static function awaitingCalc($user): array
     {
         $out = [];
 
@@ -63,6 +71,12 @@ class CeoBoard
      * كلٌّ منها رقمٌ بالعملة — لا «عدد سجلات» يُقرأ ولا يُحرّك.
      */
     public static function leaks(): array
+    {
+        return hub_screen('ceo:leaks', self::TTL, fn () => self::leaksCalc(),
+            ['fin_documents', 'projects', 'subscriptions']);
+    }
+
+    protected static function leaksCalc(): array
     {
         $out = [];
         $cur = setting('app.currency', 'د.ك');
@@ -114,6 +128,11 @@ class CeoBoard
      */
     public static function concentration(): array
     {
+        return hub_screen('ceo:conc', self::TTL, fn () => self::concentrationCalc(), ['fin_documents', 'clients']);
+    }
+
+    protected static function concentrationCalc(): array
+    {
         if (! Schema::hasTable('fin_documents')) return [];
 
         $income = (array) config('hub.fin.income', []);
@@ -153,6 +172,11 @@ class CeoBoard
 
     /** مخاطر مفتوحة: مشاكل وحوادث لم تُغلق، بترتيب الشدّة */
     public static function risks(): array
+    {
+        return hub_screen('ceo:risks', self::TTL, fn () => self::risksCalc(), ['issues', 'incidents']);
+    }
+
+    protected static function risksCalc(): array
     {
         $out = [];
 
@@ -209,6 +233,12 @@ class CeoBoard
 
     /** الحوكمة: ما يقع على المالك ولو لم يكن مالكه — عقودٌ وامتثال */
     public static function governance(): array
+    {
+        return hub_screen('ceo:gov', self::TTL, fn () => self::governanceCalc(),
+            ['contracts', 'compliance_items', 'contract_obligations']);
+    }
+
+    protected static function governanceCalc(): array
     {
         $out = [];
 
