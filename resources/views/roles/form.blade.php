@@ -6,9 +6,17 @@
     'sub' => 'ابدأ من قالبٍ أو من دورٍ قائم، ثم اضبط ما تحتاجه وحده — لا حاجة للمرور على كل وحدة'])
 
 @php
+    // **ما بنيتَه يبقى بعد خطأ التحقّق**: الصفحة كانت تُعاد من قاعدة البيانات
+    // لا من `old()`، فاسمٌ فارغ يمحو مئة نقرةٍ على المصفوفة والرايات والقيود.
     $mx = $role ? (is_array($role->matrix) ? $role->matrix : (json_decode($role->matrix ?? '[]', true) ?: [])) : [];
     $rfFlags = $role ? (is_array($role->flags) ? $role->flags : (json_decode($role->flags ?? '[]', true) ?: [])) : [];
     $fr = $role ? (is_array($role->field_rules) ? $role->field_rules : (json_decode($role->field_rules ?? '[]', true) ?: [])) : [];
+    if (old('matrix_submitted')) $mx = (array) old('matrix', []);
+    if (old('flags_submitted')) $rfFlags = (array) old('flags', []);
+    if (old('fr_submitted')) {
+        $fr = collect((array) old('fr', []))->map(fn ($f) => array_filter((array) $f,
+            fn ($m) => in_array($m, ['ro', 'hide'], true)))->filter()->all();
+    }
     $risky = \App\Http\Controllers\Web\RoleController::RISKY_FLAGS;
     $modCount = collect($groups)->sum(fn ($g) => count($g['items']));
 @endphp
@@ -63,7 +71,9 @@
         <h3>🚩 الصلاحيات العامة <span class="sub">(خارج مصفوفة الوحدات)</span></h3>
         <div class="sub" style="margin-bottom:8px">
             لا تُشتق من الوحدات: من يعتمد الطلبات، ومن يرى سجل التدقيق واللوحات،
-            ومن يكشف أسرار الخزنة أو ينسخها دون كشف، ومن يُصدّر البيانات.
+            ومن يكشف أسرار الخزنة أو ينسخها، ومن يُصدّر البيانات.
+            <br><b>ملاحظة:</b> «نسخ السرّ للحافظة» ليس حاجزاً دون الكشف — منفذ الجلب واحد
+            والنصّ يصل جهاز المستخدم في الحالين، والفرق أن الشاشة لا تعرضه. امنحه بحذر الكشف نفسه.
         </div>
         {{-- علامةٌ صريحة: بها يُفرَّق «أُلغيت كلها» عن «لم يُرسَل القسم» --}}
         <input type="hidden" name="flags_submitted" value="1">

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -24,7 +25,24 @@ class HubImportJson extends Command
         $modules = config('hub.modules');
         $total = 0;
 
-        DB::transaction(function () use ($db, $modules, &$total) {
+        // **‎--truncate كان معلَناً ولا يُقرأ**: من يستعيد نسخةً ظنّاً أنها
+        // تستبدل القاعدة كان يحصل على دمجٍ صامت — سجلاتٌ قديمة تبقى مختلطةً
+        // بالمستعادة، فتتضاعف الفواتير ويعود عميلٌ حُذف عمداً.
+        $truncate = (bool) $this->option('truncate');
+
+        DB::transaction(function () use ($db, $modules, &$total, $truncate) {
+            if ($truncate) {
+                foreach ($modules as $key => $def) {
+                    if ($key === 'users') continue;
+                    $t = (string) ($def['table'] ?? '');
+                    // تُفرَّغ الجداول التي يحملها الملف وحدها — لا يُمسّ ما لا يُستعاد
+                    if ($t !== '' && Schema::hasTable($t) && array_key_exists($key, (array) $db)) {
+                        DB::table($t)->delete();
+                    }
+                }
+                $this->warn('‎--truncate: أُفرغت جداول الوحدات الموجودة في الملف قبل الاستعادة');
+            }
+
             // الأدوار والمستخدمون أولاً (مراجع)
             foreach ((array) ($db['roles'] ?? []) as $r) {
                 DB::table('roles')->updateOrInsert(['id' => $r['id']], [

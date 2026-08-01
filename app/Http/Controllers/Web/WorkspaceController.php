@@ -39,8 +39,16 @@ class WorkspaceController extends Controller
             return $out;
         });
 
-        // آخر النشاط في وحدات المساحة — من سجل التدقيق (بعزل الشركة النشطة إن وُجدت)
+        // آخر النشاط في وحدات المساحة — من سجل التدقيق.
+        // **العزل الصارم أولاً**: كان الترشيح بالشركة **النشطة** وحدها، فمن لم
+        // يختر شركةً (وهو الوضع الافتراضي) يقرأ أسماء سجلات الشركات كلها.
         $activity = \App\Models\AuditEntry::whereIn('module', $ws['modules'])
+            ->when(hub_company_ids() !== null, function ($q) {
+                $ids = hub_company_ids();
+                $uid = auth()->id();
+                $q->where(fn ($w) => $w->whereIn('company_id', $ids)
+                    ->orWhere(fn ($y) => $y->whereNull('company_id')->where('user_id', $uid)));
+            })
             ->when((string) session('hub.company', ''), fn ($q, $c) => $q->where(
                 fn ($w) => $w->where('company_id', $c)->orWhereNull('company_id')))
             ->orderByDesc('created_at')->limit(8)->get();

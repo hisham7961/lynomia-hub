@@ -146,7 +146,22 @@ class UserController extends Controller
         if ($isSelf && ! hub_is_owner()) {
             unset($data['companies']);
         } else {
-            $data['companies'] = array_values($data['companies'] ?? []);
+            $sent = array_values($data['companies'] ?? []);
+            /*
+             * **شركةٌ حُذفت ناعماً لا تُعرض في النموذج فلا تُرسَل** — وغيابُها
+             * كان يُقرأ «بلا قيد»، فينقلب الحسابُ المعزول مطلقَ الوصول بحفظِ
+             * تعديلٍ في هاتفه. القاعدة: العزل لا يُرفع إلا بقرارٍ صريح — أي
+             * بقائمةٍ فيها شركةٌ قائمة، لا بقائمةٍ فرغت لأن هدفها اختفى.
+             */
+            $prev = (array) ($user->companies ?? []);
+            if (! $sent && $prev) {
+                // قائمةٌ فرغت: إن كان الفراغ لأن كل شركاته محذوفة فهو حادثٌ لا
+                // قرار — تُستبقى كما هي. أما إن بقيت له شركةٌ قائمة فالإفراغ
+                // اختيارٌ صريح من المالك ويُحترم.
+                $ghosts = \App\Models\Company::onlyTrashed()->whereIn('id', $prev)->pluck('id')->all();
+                if (count($ghosts) === count($prev)) $sent = $prev;
+            }
+            $data['companies'] = $sent;
         }
         if (empty($data['password'])) unset($data['password']);
         else $data['password_changed_at'] = now();
