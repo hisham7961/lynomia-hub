@@ -142,6 +142,8 @@ Route::middleware('auth')->group(function () {
     Route::get('pricing', [\App\Http\Controllers\Web\PricingController::class, 'index'])->name('pricing');
     Route::get('digital-assets', [\App\Http\Controllers\Web\DigitalAssetsController::class, 'index'])->name('digital.assets');
     Route::get('recommendations', [CapacityController::class, 'recommendations'])->name('recs');
+    Route::get('delivery', [\App\Http\Controllers\Web\DeliveryController::class, 'index'])->name('delivery');
+    Route::get('assets-life', [\App\Http\Controllers\Web\AssetLifeController::class, 'index'])->name('assets.life');
     Route::get('kpis', [\App\Http\Controllers\Web\KpiController::class, 'index'])->name('kpis.index');
     Route::post('kpis', [\App\Http\Controllers\Web\KpiController::class, 'store'])->name('kpis.store');
     Route::put('kpis/{id}', [\App\Http\Controllers\Web\KpiController::class, 'update'])->name('kpis.update');
@@ -163,6 +165,10 @@ Route::middleware('auth')->group(function () {
     // ── حسم الموافقات المُلزِمة ──
     Route::post('approvals/{id}/approve', [ApprovalDecisionController::class, 'approve'])->name('approvals.approve');
     Route::post('approvals/{id}/reject', [ApprovalDecisionController::class, 'reject'])->name('approvals.reject');
+
+    // ── الإقرار الموثَّق على السجلات (محضر · عهدة · قرار) ──
+    Route::post('acks/{module}/{id}', [\App\Http\Controllers\Web\AckController::class, 'store'])->name('acks.store');
+    Route::post('acks/{module}/{id}/remind', [\App\Http\Controllers\Web\AckController::class, 'remind'])->name('acks.remind');
 
     // ── التعليقات وقناة الفريق ──
     Route::get('feed', [CommentController::class, 'feed'])->name('feed');

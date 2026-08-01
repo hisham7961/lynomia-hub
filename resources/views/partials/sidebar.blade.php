@@ -22,7 +22,9 @@
 
         {{-- منطقة الأدوات واللوحات — روابط مجموعةً في أقسام بدل قائمة مسطّحة --}}
         @php
-            $navBadges = ['alerts' => hub_expiry_count(), 'dm' => \App\Http\Controllers\Web\DmController::unreadCount()];
+            // «بوابتي» تحمل عدّاد المتأخر والمستحق اليوم — صندوقٌ لا يُعلن نفسه لا يُفتح
+            $navBadges = ['alerts' => hub_expiry_count(), 'dm' => \App\Http\Controllers\Web\DmController::unreadCount(),
+                          'me' => \App\Support\Inbox::count()];
         @endphp
         <div class="navsection">الأدوات واللوحات</div>
         @foreach (hub_top_groups(auth()->user()) as $g)
