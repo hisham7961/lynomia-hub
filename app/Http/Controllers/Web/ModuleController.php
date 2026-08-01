@@ -580,8 +580,29 @@ class ModuleController extends Controller
 
         if ($do === 'status') {
             [$def, $class] = $this->resolve($module, 'e');
-            $statusCol = $def['status'] ?? null;
+            /*
+             * ثلاثةُ حرّاسٍ كانت في المسار الفردي وغابت هنا — والحارسُ الذي
+             * يُطبَّق في بابٍ ويُنسى في آخر ليس حارساً بل قناعةٌ كاذبة:
+             *
+             *   · **العمود لا المفتاح**: `$def['status']` مفتاحُ الحقل، وقد
+             *     يخالف عمودَه (`docStatus` ↔ `doc_status`) — على MySQL:
+             *     Unknown column وخطأ ٥٠٠، وعلى SQLite كتابةٌ صامتة في لا شيء.
+             *   · **وضعُ الحقل**: من حالتُه «قراءة فقط» يُمنع فرداً ويكتب جملةً.
+             *   · **الموافقات**: تعديلُه يمرّ بالطابور فرداً، ويمرّ هنا بلا
+             *     طلبٍ ولا توثيق — والالتفافُ بالجملة أوسعُ أثراً من الفرد.
+             */
+            $statusCol = hub_status_col($module);
             abort_unless($statusCol, 404, 'هذه الوحدة بلا حقل حالة');
+
+            $sf = hub_status_field($module);
+            $fm = hub_field_mode(auth()->user(), $module, (string) ($sf['key'] ?? 'status'));
+            abort_if($fm !== '', 403, 'حقل الحالة ليس لك تعديله في هذه الوحدة');
+
+            if (hub_needs_approval(auth()->user(), $module, 'e')) {
+                return back()->with('err',
+                    'تعديلُك يمر بالموافقات — غيّر الحالة فردياً ليُوثَّق كل طلب على حدة');
+            }
+
             $to = hub_str($r->input('status'));
             $opts = $this->statusOptions($def);
             abort_unless($to !== '' && (! $opts || in_array($to, $opts, true)), 422, 'حالة غير معروفة');
@@ -623,6 +644,14 @@ class ModuleController extends Controller
     {
         [$def, $class] = $this->resolve($module, 'e');
         $row = $this->findScoped($class, $module, $id);
+
+        // الاستعادةُ تعديلٌ كامل — فتمرّ بطابور الموافقات كما يمرّ نموذج التعديل،
+        // وإلا صارت البابَ الذي يُكتب منه ما يُمنع كتابتُه من الباب المجاور
+        if (hub_needs_approval(auth()->user(), $module, 'e')) {
+            return back()->with('err',
+                'تعديلُك يمر بالموافقات — لا تُستعاد النسخ مباشرةً؛ افتح السجل وقدّم التعديل ليُوثَّق');
+        }
+
         abort_unless($row->restoreVersion($version), 422, 'النسخة غير موجودة');
 
         return back()->with('ok', "استُعيدت النسخة $version وحُفظت كنسخة جديدة");

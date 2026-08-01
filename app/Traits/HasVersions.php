@@ -54,12 +54,35 @@ trait HasVersions
             ->orderByDesc('version');
     }
 
-    public function restoreVersion(int $version): bool
+    /**
+     * استعادةُ لقطةٍ قديمة.
+     *
+     * **وضعُ الحقول يسري هنا كما في نموذج التعديل**: اللقطةُ تحمل كل عمود، وكان
+     * `fill()` يكتبها جميعاً — فمن حقلُ الراتب عنده «مخفيّ» أو «قراءة فقط»
+     * يستعيد نسخةً فيُعيد كتابة راتبٍ لا يراه أصلاً، بضغطةٍ واحدةٍ لا يُقرأ فيها
+     * ما يُكتب. ما لا يملك المستخدم كتابته لا يُستعاد، ويبقى على قيمته الحالية.
+     */
+    public function restoreVersion(int $version, $user = null): bool
     {
         $v = $this->versions()->where('version', $version)->first();
         if (! $v) return false;
-        $data = collect($v->snapshot)->except(['id', 'version', 'created_at', 'updated_at', 'deleted_at'])->all();
-        $this->fill($data);
+
+        $data = collect($v->snapshot)->except(['id', 'version', 'created_at', 'updated_at', 'deleted_at']);
+
+        $module = static::MODULE;
+        $user = $user ?? Auth::user();
+        if ($user && ! $user->role?->is_owner && ($def = hub_mod($module))) {
+            // خريطةُ عمود ← مفتاح الحقل: اللقطة بأعمدة القاعدة وقواعد الحقول بمفاتيحها
+            $locked = [];
+            foreach ($def['fields'] ?? [] as $f) {
+                if (hub_field_mode($user, $module, (string) ($f['key'] ?? '')) !== '') {
+                    $locked[] = (string) ($f['col'] ?? $f['key'] ?? '');
+                }
+            }
+            $data = $data->except(array_filter($locked));
+        }
+
+        $this->fill($data->all());
 
         return $this->save();
     }

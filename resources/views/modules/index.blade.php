@@ -137,8 +137,12 @@
     </div>
     @php
         // الإجراءات الجماعية: تظهر أعمدة التحديد لمن يملك فعلاً جماعياً واحداً على الأقل
-        $bulkStatus = ! $trash && ! empty($def['status']) && hub_can(auth()->user(), $module, 'e');
-        $bulkDelete = ! $trash && hub_can(auth()->user(), $module, 'd');
+        // الحرّاس هنا نسخةٌ من حرّاس الخادم: زرٌّ يُعرض ثم يُردّ بـ٤٠٣ عيبُ واجهةٍ لا أمان
+        $bulkStatus = ! $trash && ! empty($def['status']) && hub_can(auth()->user(), $module, 'e')
+            && hub_field_mode(auth()->user(), $module, (string) (hub_status_field($module)['key'] ?? 'status')) === ''
+            && ! hub_needs_approval(auth()->user(), $module, 'e');
+        $bulkDelete = ! $trash && hub_can(auth()->user(), $module, 'd')
+            && ! hub_needs_approval(auth()->user(), $module, 'd');
         $bulkExport = ! $trash && hub_exporter();
         $canBulk = $bulkStatus || $bulkDelete || $bulkExport;
         $statusOpts = $bulkStatus ? (hub_status_field($module)['options'] ?? []) : [];
