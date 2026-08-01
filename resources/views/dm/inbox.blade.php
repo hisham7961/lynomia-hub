@@ -14,13 +14,16 @@
         <h2>💬 الرسائل</h2>
         <div class="sub">مراسلة داخلية مباشرة — لا يقرأ المحادثة غير طرفيها، والحضور من نبضة الجلسة الحيّة.</div>
     </div>
-    <form method="GET" action="" onsubmit="if(this.to.value){location.href='{{ url('dm') }}/'+this.to.value};return false" class="filters">
+    {{-- النموذج يصل الخادم فعلاً: كان `onsubmit` وحده، و<select> لا يُرسِل
+         نموذجَه باختيار عنصر، ولا زرَّ إرسالٍ مرئيّ — فيختار المستخدم زميلاً
+         ولا يحدث شيء. الجافاسكربت الآن تسريعٌ لا شرطُ عمل. --}}
+    <form method="GET" action="{{ route('dm.inbox') }}" class="filters">
         <label class="vh" for="dm-to">ابدأ محادثة مع</label>
-        <select class="inp" id="dm-to" name="to">
+        <select class="inp" id="dm-to" name="to" onchange="if(this.value)this.form.submit()">
             <option value="">✉️ محادثة جديدة مع…</option>
             @foreach ($all as $uid => $name)<option value="{{ $uid }}">{{ $name }}</option>@endforeach
         </select>
-        <noscript><button class="btn sm">فتح</button></noscript>
+        <button class="btn sm" type="submit">فتح المحادثة</button>
     </form>
 </div>
 
@@ -65,8 +68,42 @@
 
     <div class="dmthread">
         @if (! $other)
-            <div class="card"><div class="empty" style="padding:48px 12px"><span class="big">✉️</span>
-                اختر محادثةً من القائمة — أو ابدأ واحدةً جديدة</div></div>
+            {{-- **صندوقُ كتابةٍ حاضرٌ دائماً**: كان اللوحُ فارغاً بعبارة «اختر
+                 محادثة» — ومن دخل أولَ مرة لا يجد أين يكتب ولا زراً يُرسل.
+                 الآن الرسالةُ الأولى: تختار الزميل وتكتب وترسل في خطوةٍ واحدة. --}}
+            <div class="card">
+                <h3>✉️ رسالة جديدة</h3>
+                <div class="sub" style="margin-bottom:10px">
+                    اختر زميلاً واكتب رسالتك — تصل فوراً مع إشعار، ولا يقرؤها غيرُكما.
+                </div>
+                @if ($errors->any())<div class="err" role="alert">{{ $errors->first() }}</div>@endif
+                <form method="POST" action="{{ route('dm.start') }}" enctype="multipart/form-data">
+                    @csrf
+                    <div class="fld" style="max-width:380px">
+                        <label for="new-to">إلى <b class="req">*</b></label>
+                        <select class="inp" id="new-to" name="to" required>
+                            <option value="">— اختر زميلاً —</option>
+                            @foreach ($all as $uid => $name)
+                                <option value="{{ $uid }}" @selected(old('to') === $uid)>{{ $name }}</option>
+                            @endforeach
+                        </select>
+                        @if (! count($all))<span class="sub">لا زملاء نشطون بعد — أضِف مستخدماً أولاً</span>@endif
+                    </div>
+                    <div class="fld fw" style="margin-top:8px">
+                        <label for="new-body">الرسالة <b class="req">*</b></label>
+                        <textarea class="inp" id="new-body" name="body" rows="4" required maxlength="4000"
+                                  placeholder="اكتب رسالتك هنا…">{{ old('body') }}</textarea>
+                    </div>
+                    <div class="toolbar" style="margin-top:10px">
+                        <button class="btn p" type="submit">📨 إرسال</button>
+                        <label class="btn ghost pointer">📎 أرفق ملفاً<input type="file" name="att" class="vh"></label>
+                    </div>
+                </form>
+            </div>
+            @if (count($threads))
+                <div class="card" style="margin-top:10px"><div class="sub" style="padding:6px 0;text-align:center">
+                    …أو اختر محادثةً قائمة من القائمة</div></div>
+            @endif
         @else
             @php $p = $presence[$other->id] ?? null; @endphp
             <div class="card" style="padding:10px 14px;display:flex;gap:10px;align-items:center">
@@ -77,8 +114,17 @@
                         {{ $fmtSeen($p) ?? ($other->job_title ?: 'لم يدخل بعد') }}
                     </div>
                 </div>
+                @if (($other->status ?? '') !== 'نشط')
+                    <span class="bdg bad" title="لن تصل رسالتُك إلى صندوقٍ يفتحه أحد">⏸ موقوف</span>
+                @endif
                 <a class="btn ghost xs" href="{{ route('dm.inbox') }}">كل المحادثات</a>
             </div>
+            @if (($other->status ?? '') !== 'نشط')
+                <div class="card" style="margin-top:10px;border:1px solid var(--wn)">
+                    <div class="sub">⏸ <b>هذا الحساب موقوف</b> — تقرأ ما مضى ولا تُرسل جديداً؛
+                    رسالةٌ إلى صندوقٍ لا يفتحه أحد ليست رسالة.</div>
+                </div>
+            @endif
 
             <div class="card" id="dmbox" style="display:flex;flex-direction:column;gap:5px;min-height:320px;max-height:56vh;overflow:auto;margin-top:10px">
                 @php $lastDay = null; $lastFrom = null; @endphp
@@ -115,7 +161,8 @@
             </div>
 
             <form method="POST" action="{{ route('dm.send', $other->id) }}" enctype="multipart/form-data"
-                  class="card" style="display:flex;gap:8px;align-items:flex-end;margin-top:10px" id="dmform">
+                  class="card" style="display:flex;gap:8px;align-items:flex-end;margin-top:10px" id="dmform"
+                  @if (($other->status ?? '') !== 'نشط') hidden @endif>
                 @csrf
                 <label class="vh" for="dm-body">نص الرسالة</label>
                 <textarea class="inp" id="dm-body" name="body" rows="1" required maxlength="4000"

@@ -198,6 +198,7 @@ Route::middleware('auth')->group(function () {
 
     // ── المراسلة الداخلية المباشرة ──
     Route::get('dm', [DmController::class, 'inbox'])->name('dm.inbox');
+    Route::post('dm', [DmController::class, 'start'])->name('dm.start');
     Route::get('dm/{userId}', [DmController::class, 'thread'])->name('dm.thread');
     Route::post('dm/{userId}', [DmController::class, 'send'])->name('dm.send');
 

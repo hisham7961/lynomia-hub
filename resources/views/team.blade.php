@@ -61,7 +61,13 @@
                         @if ($c['docPct'] < 100)<span class="bdg {{ $c['docMissing'] ? 'bad' : 'wn' }}" title="اكتمال الملف">📂 {{ $c['docPct'] }}٪</span>@endif
                         @if ($c['skillsN'])<span class="bdg" title="مهارات">🧠 {{ $c['skillsN'] }}</span>@endif
                         @if ($c['certsN'])<span class="bdg" title="شهادات">🎓 {{ $c['certsN'] }}</span>@endif
-                        @if (! $c['userId'])<span class="bdg wn" title="لا حساب في النظام">بلا حساب</span>@endif
+                        @if (! $c['userId'])
+                            <span class="bdg wn" title="لا حساب في النظام">بلا حساب</span>
+                        @elseif ($c['userId'] !== auth()->id())
+                            {{-- بابٌ ثانٍ للمراسلة: الدليلُ يعرف من هو، فلا يُبحث عنه في قائمةٍ ثانية --}}
+                            <a class="bdg lnk" href="{{ route('dm.thread', $c['userId']) }}"
+                               title="راسِل {{ $c['name'] }}">💬 راسِله</a>
+                        @endif
                     </div>
 
                     @if (count($c['skills']))
