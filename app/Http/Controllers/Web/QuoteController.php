@@ -40,6 +40,7 @@ class QuoteController extends Controller
     public function act(Request $r, string $id)
     {
         abort_unless(hub_can(auth()->user(), 'quotes', 'e'), 403, 'إجراءات العرض تتطلب صلاحية تعديل');
+        if ($why = hub_block_if_queued('quotes')) return back()->with('err', $why);
         $q = hub_scope(Quote::query(), 'quotes')->findOrFail($id);
         $action = hub_str($r->input('do'));
 

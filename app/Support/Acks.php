@@ -114,13 +114,23 @@ class Acks
     /** تسجيل الإقرار بدليله — الوقت والعنوان والجهاز */
     public static function record(string $module, $row, string $userId, ?string $note = null): void
     {
-        DB::table('record_acks')->updateOrInsert(
-            ['module' => $module, 'record_id' => $row->id, 'user_id' => $userId, 'ver' => self::version($row)],
-            ['id' => (string) Str::uuid(), 'ack_at' => now(),
-             'ip' => substr((string) request()->ip(), 0, 60),
-             'device' => substr((string) request()->userAgent(), 0, 200),
-             'note' => $note ?: null, 'created_at' => now()],
-        );
+        /*
+         * **الإقرارُ الأول لا يُمحى.** كان `updateOrInsert` يكتب فوق الصفّ: فمن
+         * أقرّ في يناير من مكتبه ثم ضغط الزرّ ثانيةً في مارس من هاتفه، صار
+         * الدليلُ يقول «مارس، من هذا الجهاز» — و**وقتُ العلم الأول ضاع**، وهو
+         * بالضبط ما يُحتجّ به: متى عَلِم، لا متى أعاد الضغط.
+         *
+         * الإقرارُ شهادةٌ مؤرَّخة: تُكتب مرةً لكل نسخةٍ من السجل وتبقى. ونسخةٌ
+         * جديدة تُطلب إقراراً جديداً بصفٍّ مستقل، فيبقى التاريخان معاً.
+         */
+        DB::table('record_acks')->insertOrIgnore([
+            'id' => (string) Str::uuid(),
+            'module' => $module, 'record_id' => $row->id, 'user_id' => $userId,
+            'ver' => self::version($row), 'ack_at' => now(),
+            'ip' => substr((string) request()->ip(), 0, 60),
+            'device' => substr((string) request()->userAgent(), 0, 200),
+            'note' => $note ?: null, 'created_at' => now(),
+        ]);
 
         // كتابةٌ بمنشئ الاستعلام لا تُطلق أحداث Eloquent — فالختم يُرفع يدوياً
         hub_data_bump('record_acks');

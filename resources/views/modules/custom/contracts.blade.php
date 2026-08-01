@@ -26,7 +26,7 @@
 <style>
 .cwtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .cwtabs button{border:1px solid var(--brd);background:transparent;color:inherit;border-radius:20px;padding:5px 12px;cursor:pointer;font-size:12.5px}
-.cwtabs button.on{background:var(--pr);color:#fff;border-color:var(--pr)}
+.cwtabs button.on{background:var(--p);color:#fff;border-color:var(--p)}
 .cwpane[hidden]{display:none}
 </style>
 <div class="card" id="cworkspace">

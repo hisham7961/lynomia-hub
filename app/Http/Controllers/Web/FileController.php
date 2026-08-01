@@ -72,12 +72,32 @@ class FileController extends Controller
                     if (hub_scope($q, $mk, $u)->exists()) return true;
                 }
 
-                // المرفقات العامة وصندوق الوارد — لهما بوابتاهما المحروستان
-                foreach ([['attachments', 'path'], ['inbox_documents', 'path']] as [$t, $c]) {
-                    if (Schema::hasTable($t) && Schema::hasColumn($t, $c)
-                        && DB::table($t)->where($c, $path)->exists()) {
-                        return true;
+                /*
+                 * **البابُ الخلفيّ**: كان هذا الجزء يعود `true` لأي مسارٍ موجودٍ
+                 * في `attachments` أو `inbox_documents` **بلا صلاحيةٍ ولا نطاق**،
+                 * بحجّة أن «لهما بوابتاهما المحروستان» — وهذه هي البوابة. فكلُّ
+                 * الفحص أعلاه يُلتف عليه بمسارٍ واحدٍ من مرفقات سجلٍّ لا يملكه
+                 * القارئ: عقدُ موظفٍ، أو صورةُ هويةٍ، أو كشفُ راتب.
+                 *
+                 * المرفقُ يُقاس بسجله: من يرى السجل يرى مرفقه، ولا أحد سواه.
+                 */
+                if (Schema::hasTable('attachments')) {
+                    $rows = DB::table('attachments')->where('path', $path)
+                        ->orWhere('thumb_path', $path)->get(['module', 'record_id']);
+                    foreach ($rows as $a) {
+                        $mk = (string) $a->module;
+                        if (! hub_mod($mk) || ! hub_can($u, $mk, 'v')) continue;
+                        if (! $a->record_id) continue;
+                        if (hub_read($mk, $u)?->where('id', $a->record_id)->exists()) return true;
                     }
+                }
+
+                // صندوق الوارد: خلف صلاحية الوثائق نفسها التي تحرس شاشته
+                if (Schema::hasTable('inbox_documents')
+                    && (hub_can($u, 'inboxdocs', 'v') || hub_can($u, 'files', 'v'))
+                    && DB::table('inbox_documents')->whereNull('deleted_at')
+                        ->where('path', $path)->exists()) {
+                    return true;
                 }
 
                 return false;

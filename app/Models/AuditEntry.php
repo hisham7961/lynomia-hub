@@ -37,6 +37,24 @@ class AuditEntry extends Model
         return self::$liveColumns;
     }
 
+    /**
+     * **تقديمُ الرأس وكتابةُ القيد ذرّةٌ واحدة.**
+     *
+     * البصمةُ تُحسب ويُقدَّم رأسُ السلسلة في `creating`، ثم يقع الإدراج. فإن فشل
+     * الإدراج — عمودٌ يرفض قيمة، قاعدةٌ تحت ضغط، مستمعٌ يرمي — بقي الرأس على
+     * بصمةٍ **لا يحملها أي سجل**، فيقول الفحص بعدها إلى الأبد «⚠️ عبث — حُذفت
+     * قيودٌ من الذيل». وإنذارُ تلاعبٍ كاذبٌ دائم أسوأ من لا إنذار: يُدرّب الجميع
+     * على تجاهل الإشارة الوحيدة التي تهمّ.
+     *
+     * بلفّ الإدراج بمعاملة، يرتدّ تقديمُ الرأس مع ارتداد الصفّ فيبقيان متّسقين.
+     */
+    public function save(array $options = [])
+    {
+        if ($this->exists) return parent::save($options);
+
+        return \Illuminate\Support\Facades\DB::transaction(fn () => parent::save($options));
+    }
+
     protected static function booted(): void
     {
         static::creating(function (self $m) {

@@ -436,7 +436,15 @@
     btn.dataset.armed = '1';
     btn.dataset.oldHtml = btn.innerHTML;
     btn.classList.add('confirming');
-    btn.innerHTML = '⚠️ ' + msg + ' <b>اضغط للتأكيد</b>';
+    /* v2.210: كان `innerHTML = '⚠️ ' + msg` — وسمةُ data-confirm تحمل في أربعةَ
+       عشرَ موضعاً اسمَ سجلٍّ **يكتبه المستخدم** (اسم مرفق، عنوان سياسة، اسم قالب).
+       الهروبُ في Blade يحمي السمة، ثم يعيدها المتصفح نصّاً خاماً في dataset،
+       فتُحقن HTML هنا: سجلٌّ اسمُه <img src=x onerror=…> ينفّذ عند أول ضغطةِ حذف.
+       بناءُ العقد نصّاً لا مصدراً — التسمية وحدها لا تصير شيفرة. */
+    btn.textContent = '⚠️ ' + msg + ' ';
+    var b = document.createElement('b');
+    b.textContent = 'اضغط للتأكيد';
+    btn.appendChild(b);
     btn._disarmT = setTimeout(function () { disarm(btn); }, ARM_MS);
     return false;
   }

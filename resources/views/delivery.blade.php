@@ -127,6 +127,6 @@
 .rel { padding:10px 4px; border-bottom:1px solid var(--ln) }
 .rel:last-child { border-bottom:0 }
 .relhead { display:flex; gap:8px; align-items:center; flex-wrap:wrap }
-.rellist { margin:5px 0 0; padding-inline-start:20px; font-size:12.5px; line-height:1.9; color:var(--mut) }
+.rellist { margin:5px 0 0; padding-inline-start:20px; font-size:12.5px; line-height:1.9; color:var(--sb) }
 </style>
 @endsection

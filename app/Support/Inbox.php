@@ -28,8 +28,10 @@ class Inbox
 
     /** الجداول التي يقرؤها الصندوق — ختمُها جزءٌ من مفتاحه فلا يعرض ما بطل */
     public const TABLES = ['roles', 'users', 'approvals', 'record_acks', 'sign_requests', 'policies', 'policy_acks',
-        'kb_articles', 'kb_reads', 'internal_requests', 'leave_requests', 'tasks', 'decisions',
-        'tickets', 'meetings', 'contract_obligations', 'compliance_items'];
+        'kb_articles', 'internal_requests', 'leave_requests', 'tasks', 'decisions',
+        // employees: يُقرأ للوثائق الشخصية (إقامةٌ تنتهي) وكان غائباً عن الختم —
+        // فتعديلُ الملف لا يُبطل الخبيئة ويبقى المُنجَز معروضاً حتى تنتهي المهلة
+        'employees', 'tickets', 'meetings', 'contract_obligations', 'compliance_items'];
 
     /** الحاويات مرتّبةً — الرقم هو الترتيب */
     public const BUCKETS = [
