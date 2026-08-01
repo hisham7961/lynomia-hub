@@ -1991,7 +1991,7 @@ if (! function_exists('hub_capacity')) {
      *   المسجَّل = ساعاته الفعلية (من المهام والحضور)
      * الحمل = المحجوز ÷ المتاح · الاستغلال = المسجَّل ÷ المتاح · والاختناق حمل > ١٠٠٪.
      */
-    function hub_capacity(?string $from = null, ?string $to = null): array
+    function hub_capacity(?string $from = null, ?string $to = null, ?string $projectId = null): array
     {
         $f = \Illuminate\Support\Carbon::parse($from ?: now()->startOfMonth()->toDateString())->startOfDay();
         $t = \Illuminate\Support\Carbon::parse($to ?: now()->endOfMonth()->toDateString())->endOfDay();
@@ -2003,8 +2003,19 @@ if (! function_exists('hub_capacity')) {
         $emps = \Illuminate\Support\Facades\DB::table('employees')->whereNull('deleted_at')
             ->whereNotIn('status', ['منتهية خدمته', 'مستقيل', 'موقوف'])
             ->orderBy('name')->limit(300)->get(['id', 'name', 'dept', 'user_id']);
+        // تحت العدسة: الموظف ينتمي للمشروع **بعمله فيه** لا بعمود project_id على
+        // ملفه (وهو شبه فارغ دائماً — الموظف ليس ملكاً لمشروع). ترشيحه بالعمود
+        // كان سيُفرغ اللوحة كلها ويعرض أصفاراً تبدو حقيقةً لا فراغَ بيانات.
+        if ($projectId) {
+            $onProject = \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')
+                ->where('project_id', $projectId)->whereNotNull('assignee_id')
+                ->distinct()->pluck('assignee_id')->all();
+            $emps = $emps->filter(fn ($e) => in_array($e->user_id, $onProject, true))->values();
+        }
+
         if ($emps->isEmpty()) return ['rows' => [], 'from' => $f->toDateString(), 'to' => $t->toDateString(),
-                                      'workDays' => $workDays, 'hoursDay' => $hoursDay, 'totals' => []];
+                                      'workDays' => $workDays, 'hoursDay' => $hoursDay,
+                                      'lensed' => (bool) $projectId, 'totals' => []];
 
         $userIds = $emps->pluck('user_id')->filter()->all();
         $empIds  = $emps->pluck('id')->all();
@@ -2027,6 +2038,7 @@ if (! function_exists('hub_capacity')) {
 
         // المحجوز: مهام مفتوحة مستحقة في الفترة (أو بلا موعد — تُحتسب على الفترة الحالية)
         $booked = $userIds ? \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')
+            ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
             ->whereIn('assignee_id', $userIds)->whereNotIn('status', $open)
             ->where(fn ($q) => $q->whereNull('due')->orWhereBetween('due', [$f->toDateString(), $t->toDateString()]))
             ->selectRaw('assignee_id, COALESCE(SUM(est_h),0) h, COUNT(*) n')
@@ -2034,6 +2046,7 @@ if (! function_exists('hub_capacity')) {
 
         // المسجَّل: ساعات فعلية على مهام حُدِّثت داخل الفترة
         $logged = $userIds ? \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')
+            ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
             ->whereIn('assignee_id', $userIds)->whereNotNull('act_h')
             ->whereBetween('updated_at', [$f, $t])
             ->selectRaw('assignee_id, COALESCE(SUM(act_h),0) h')
@@ -2046,6 +2059,7 @@ if (! function_exists('hub_capacity')) {
 
         // مشاريع مُسندة
         $projects = $userIds ? \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')
+            ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
             ->whereIn('assignee_id', $userIds)->whereNotIn('status', $open)->whereNotNull('project_id')
             ->selectRaw('assignee_id, COUNT(DISTINCT project_id) n')
             ->groupBy('assignee_id')->get()->keyBy('assignee_id') : collect();
@@ -2055,7 +2069,10 @@ if (! function_exists('hub_capacity')) {
             $lv  = (int) ($leaveDays[$e->id] ?? 0);
             $avail = max(0, ($workDays - $lv) * $hoursDay);
             $bk  = (float) ($booked[$e->user_id]->h ?? 0);
-            $lg  = max((float) ($logged[$e->user_id]->h ?? 0), (float) ($att[$e->id]->h ?? 0));
+            // بلا عدسة: أدقّ المصدرين. وتحتها: ساعات المهام وحدها — بصمة الحضور
+            // لا تُنسب لمشروع، ونسبتها إليه تعطي رقماً خاطئاً يبدو معقولاً.
+            $lg  = $projectId ? (float) ($logged[$e->user_id]->h ?? 0)
+                              : max((float) ($logged[$e->user_id]->h ?? 0), (float) ($att[$e->id]->h ?? 0));
 
             $rows[] = [
                 'id' => $e->id, 'name' => $e->name, 'dept' => $e->dept,
@@ -2074,12 +2091,17 @@ if (! function_exists('hub_capacity')) {
         return [
             'rows' => $rows, 'from' => $f->toDateString(), 'to' => $t->toDateString(),
             'workDays' => $workDays, 'hoursDay' => $hoursDay,
+            'lensed' => (bool) $projectId,
             'totals' => [
                 'available' => array_sum(array_column($rows, 'available')),
                 'booked'    => round(array_sum(array_column($rows, 'booked')), 1),
                 'logged'    => round(array_sum(array_column($rows, 'logged')), 1),
                 'over'      => count(array_filter($rows, fn ($r) => ($r['load'] ?? 0) > 100)),
-                'idle'      => count(array_filter($rows, fn ($r) => $r['available'] > 0 && ($r['load'] ?? 0) < 50)),
+                // «بلا شغل» يُقاس بطاقة الموظف الكاملة، وتحت العدسة ينكمش المحجوز
+                // وحده — فيُقال «الفريق عاطل» وهو محترقٌ على مشاريع أخرى. إنذارٌ
+                // كاذب يقود لقرار توظيفٍ خاطئ، فيُسكَت تحت العدسة عمداً.
+                'idle'      => $projectId ? 0
+                    : count(array_filter($rows, fn ($r) => $r['available'] > 0 && ($r['load'] ?? 0) < 50)),
                 'unlinked'  => count(array_filter($rows, fn ($r) => ! $r['linked'])),
             ],
         ];
@@ -2092,7 +2114,7 @@ if (! function_exists('hub_app_quality')) {
      * الأخطاء المفتوحة والحرجة وزمن حلها، نجاح الاختبارات من خطة العمل،
      * الأعطال بعد النشر من سجل الحوادث، ومعدل التراجع من سجل النشر.
      */
-    function hub_app_quality(bool $fresh = false): array
+    function hub_app_quality(bool $fresh = false, ?string $projectId = null): array
     {
         // صلاحية الوحدة أولاً: hub_scope يُنطّق بالمشاريع ولا يقرأ مصفوفة
         // الصلاحيات، فمن يحمل عَلَم «المتابعة» بلا صلاحية رؤية التطبيقات كان
@@ -2103,13 +2125,16 @@ if (! function_exists('hub_app_quality')) {
         // ومفتاحٌ عامّ فوق استعلامٍ مُنطَّق بـhub_scope كان يُقدّم أرقام مستخدمٍ
         // لآخر. المفتاح يفصل بالدور، وبالمستخدم نفسه حين يكون نطاقه مقيّداً.
         $key = 'quality:apps:' . (hub_scoped($u) || hub_company_ids($u) !== null
-            ? 'u:' . ($u?->id ?? '0') : 'r:' . ($u?->role_id ?? '0'));
+            ? 'u:' . ($u?->id ?? '0') : 'r:' . ($u?->role_id ?? '0')) . hub_lens_key($projectId);
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
-        return \Illuminate\Support\Facades\Cache::remember($key, 300, function () {
+        return \Illuminate\Support\Facades\Cache::remember($key, 300, function () use ($projectId) {
             $DB = \Illuminate\Support\Facades\DB::class;
             $closed = hub_closed_states();
+            // الترشيح **داخل** الاستعلام قبل القصّ: ترشيحٌ بعده يُخفي تطبيقات
+            // المشروع الواقعة خارج أول ٨٠ اسماً أبجدياً بلا أثر
             $apps = hub_scope(\Illuminate\Support\Facades\DB::table('applications')->whereNull('deleted_at'), 'apps')
+                ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
                 ->orderBy('name')->limit(80)->get(['id', 'name', 'ver', 'status', 'project_id',
                     'downloads', 'rating', 'reviews', 'auto_store']);
             if ($apps->isEmpty()) return [];
@@ -2327,11 +2352,17 @@ if (! function_exists('hub_recommendations')) {
      * انتهاءات وشيكة، مستحقات غير محصّلة. كلها من بياناتك المسجَّلة لا من تقدير،
      * وكل توصية تحمل سببها بالأرقام ورابط إجرائها. مرتّبة بالأولوية.
      */
-    function hub_recommendations(bool $fresh = false): array
+    function hub_recommendations(bool $fresh = false, ?string $projectId = null): array
     {
-        if ($fresh) \Illuminate\Support\Facades\Cache::forget('recs');
+        // المفتاح كان سلسلةً مسطّحة «recs»: بلا مستخدمٍ ولا دورٍ ولا مشروع —
+        // فوق استعلاماتٍ مُنطَّقة بـhub_scope. أي أن أول من يفتح اللوحة يُخبّئ
+        // نتائجه لكل من بعده خمس دقائق. يحمل المفتاح الثلاثة الآن.
+        $u = auth()->user();
+        $key = 'recs:' . (hub_scoped($u) || hub_company_ids($u) !== null
+            ? 'u:' . ($u?->id ?? '0') : 'r:' . ($u?->role_id ?? '0')) . hub_lens_key($projectId);
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
-        return \Illuminate\Support\Facades\Cache::remember('recs', 300, function () {
+        return \Illuminate\Support\Facades\Cache::remember($key, 300, function () use ($projectId) {
             $rank = ['حرج' => 3, 'مهم' => 2, 'اطّلاع' => 1];
             $out = [];
             $add = function ($sev, $ico, $title, $why, $url, $action) use (&$out) {
@@ -2356,7 +2387,7 @@ if (! function_exists('hub_recommendations')) {
 
             // ٢) فريق فوق طاقته هذا الأسبوع
             try {
-                $cap = hub_capacity();
+                $cap = hub_capacity(null, null, $projectId);
                 $over = array_filter($cap['rows'], fn ($r) => ($r['load'] ?? 0) > 100);
                 usort($over, fn ($a, $b) => $b['load'] <=> $a['load']);
                 foreach (array_slice($over, 0, 4) as $r) {
@@ -2371,6 +2402,7 @@ if (! function_exists('hub_recommendations')) {
             try {
                 $projects = \Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at')
                     ->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', hub_closed_states()))
+                    ->when($projectId, fn ($q) => $q->where('id', $projectId))
                     ->limit(40)->get(['id', 'name']);
                 $sick = [];
                 foreach ($projects as $p) {
@@ -2406,6 +2438,7 @@ if (! function_exists('hub_recommendations')) {
                     $overdue = \Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at')
                         ->where('kind', 'فاتورة')
                         ->whereRaw('COALESCE(paid,0) < COALESCE(total,0)')
+                        ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
                         ->whereNotNull('due')->whereDate('due', '<', now()->toDateString())
                         ->orderBy('due')->limit(6)->get(['id', 'doc_no', 'partner', 'total', 'paid', 'due']);
                     foreach ($overdue as $d) {
@@ -3575,5 +3608,110 @@ if (! function_exists('hub_feed_state_of')) {
             'tone' => $auto ? ($stale ? 'bad' : 'ok') : 'wn',
             'at' => $last['at'], 'source' => $last['source'] ?? null,
         ];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// عدسة المشروع: مُرشِّحٌ واحد يمرّ بكل اللوحات التحليلية
+// كان كل مركزٍ يعرض المنشأة كلها مجموعةً — فلا يُعرف نصيب مشروعٍ بعينه من
+// القدرات ولا من التوصيات ولا من الأثر. عدسةٌ واحدة تخدمها كلها، وأي مركزٍ
+// جديد يرثها مجاناً.
+// ─────────────────────────────────────────────────────────────────────────
+
+if (! function_exists('hub_lens_path')) {
+    /**
+     * كيف يُوصَل من وحدةٍ إلى مشروعها: مباشرةً بعمود، أو بقفزةٍ واحدة، أو لا طريق.
+     * ٦٤ وحدة من ٧٣ مباشرة، واثنتان بقفزة، وسبعٌ لا علاقة لها بمشروع أصلاً —
+     * وهذه الأخيرة **تُقال صراحةً** بدل أن تعرض كل شيء وكأن المُرشِّح طُبّق.
+     */
+    function hub_lens_path(string $module): array
+    {
+        static $memo = [];
+        if (isset($memo[$module])) return $memo[$module];
+
+        $def = hub_mod($module);
+        $t = $def['table'] ?? null;
+        if (! $t || ! \Illuminate\Support\Facades\Schema::hasTable($t)) {
+            return $memo[$module] = ['mode' => 'none'];
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn($t, 'project_id')) {
+            return $memo[$module] = ['mode' => 'direct', 'col' => 'project_id'];
+        }
+
+        // قفزةٌ واحدة عبر مرجعٍ يحمل المشروع
+        foreach (['app_id' => 'applications', 'emp_id' => 'employees', 'client_id' => 'clients',
+                  'contract_id' => 'contracts', 'asset_id' => 'assets', 'objective_id' => 'objectives',
+                  'social_id' => 'social_accounts', 'policy_id' => 'policies'] as $c => $tt) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn($t, $c)
+                && \Illuminate\Support\Facades\Schema::hasTable($tt)
+                && \Illuminate\Support\Facades\Schema::hasColumn($tt, 'project_id')) {
+                return $memo[$module] = ['mode' => 'via', 'col' => $c, 'table' => $tt];
+            }
+        }
+
+        return $memo[$module] = ['mode' => 'none'];
+    }
+}
+
+if (! function_exists('hub_lens')) {
+    /**
+     * العدسة النشطة من الرابط (`?p=`) — **مُتحقَّقاً من نطاقها**: لا يفتح
+     * المستخدم عدسةً على مشروعٍ لا يراه، فالمُرشِّح ليس باباً خلفياً.
+     */
+    function hub_lens($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        $out = ['id' => null, 'name' => null, 'on' => false];
+
+        $pid = trim((string) request()->query('p', ''));
+        if ($pid === '' || ! $user) return $out;
+
+        $p = hub_scope(\App\Models\Project::query(), 'projects', $user)
+            ->whereNull('deleted_at')->whereKey($pid)->first(['id', 'name']);
+        if (! $p) return $out;      // خارج نطاقه — العدسة لا تُفتح ولا يُنبَّه على وجوده
+
+        return ['id' => $p->id, 'name' => $p->name, 'on' => true];
+    }
+}
+
+if (! function_exists('hub_lens_apply')) {
+    /** تطبيق العدسة على استعلام وحدةٍ ما — بلا عدسةٍ يعود الاستعلام كما هو */
+    function hub_lens_apply($q, string $module, ?string $projectId)
+    {
+        if (! $projectId) return $q;
+        $path = hub_lens_path($module);
+
+        if ($path['mode'] === 'direct') return $q->where($path['col'], $projectId);
+        if ($path['mode'] === 'via') {
+            return $q->whereIn($path['col'], function ($sub) use ($path, $projectId) {
+                $sub->select('id')->from($path['table'])->where('project_id', $projectId);
+            });
+        }
+
+        return $q;   // لا طريق — المسؤولية على الشاشة أن تقول ذلك لا أن تُخفي
+    }
+}
+
+if (! function_exists('hub_lens_projects')) {
+    /** مشاريع المستخدم لقائمة اختيار العدسة — المفتوحة أولاً */
+    function hub_lens_projects($user = null): array
+    {
+        $user = $user ?? auth()->user();
+
+        return hub_scope(\App\Models\Project::query(), 'projects', $user)
+            ->whereNull('deleted_at')
+            ->orderByRaw("CASE WHEN status IN ('مكتمل','ملغى') THEN 1 ELSE 0 END")
+            ->orderBy('name')->limit(300)->pluck('name', 'id')->all();
+    }
+}
+
+if (! function_exists('hub_lens_key')) {
+    /**
+     * لاحقة مفتاح التخبئة للعدسة. مفتاحٌ لا يحمل المشروع يُقدّم نتيجة مشروعٍ
+     * لآخر — وهو عيبٌ وقع في هذا المستودع من قبل، فلا يتكرر.
+     */
+    function hub_lens_key(?string $projectId): string
+    {
+        return $projectId ? ':p:' . $projectId : '';
     }
 }

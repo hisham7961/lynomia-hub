@@ -12,6 +12,8 @@
     @endif
 </div>
 
+@include('partials.lens', ['lensModules' => ['contracts', 'obligations', 'rules']])
+
 <div class="cards">
     <div class="stat"><span class="ico">📜</span><b>{{ $kpi['active'] }}</b><span>مستندات سارية</span></div>
     <div class="stat"><span class="ico">⏳</span><b class="{{ $kpi['soon'] ? 'txt-bad' : '' }}">{{ $kpi['soon'] }}</b><span>تنتهي خلال ٦٠ يوماً</span></div>
