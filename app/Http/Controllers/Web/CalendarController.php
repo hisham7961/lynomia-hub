@@ -39,8 +39,14 @@ class CalendarController extends Controller
 
         // مخبّأ لكل (شهر × نطاق المستخدم): يمنع إعادة عشرات الاستعلامات عند كل تنقّل
         // شهري — على غرار رادار الانتهاءات. المقيَّد (مشاريع/شركات) بمفتاح خاص به.
+        // **والمحتوى مُرشَّحٌ بالصلاحيات أيضاً**: مفتاحٌ باسم «all» لكل غير
+        // المُنطَّقين كان يُقدّم نتيجة أوسعِهم صلاحيةً لأضيقهم — فحسابٌ يرى وحدةً
+        // واحدة يرث ما رآه من فتح الشهر قبله. المفتاح يحمل الدور (ومنه تُشتقّ
+        // المصفوفة)، والمُنطَّق يحمل هويته.
         $scoped = hub_scoped(auth()->user()) || hub_company_ids() !== null;
-        $ckey = 'hub:calendar:' . $start->format('Y-m') . ':' . ($scoped ? 'u:' . auth()->id() : 'all');
+        $ckey = 'hub:calendar:' . $start->format('Y-m') . ':'
+              . ($scoped ? 'u:' . auth()->id() : 'r:' . (auth()->user()?->role_id ?? '0'))
+              . ':c:' . (string) session('hub.company', '');
         [$days, $overflow] = \Illuminate\Support\Facades\Cache::remember($ckey, $scoped ? 300 : 600, function () use ($start, $end) {
             $days = [];
             $overflow = 0;

@@ -660,6 +660,12 @@ if (! function_exists('hub_expiry')) {
             $wide = now()->addDays(120)->toDateString();
             $items = [];
             foreach (hub_expiry_fields() as [$mk, $f]) {
+                // **صلاحية الوحدة قبل نطاقها**: الرادار كان يُرشَّح بالنطاق وحده،
+                // فيسرد أسماء سجلاتٍ من وحداتٍ لا يملك المستخدم رؤيتها أصلاً —
+                // اسمُ العقد وتاريخُه إفشاءٌ ولو لم تُفتح الوحدة.
+                // وبلا مستخدم (طرفيةٌ أو مهمةٌ مجدولة) لا ترشيح: السياق نظاميّ،
+                // والمستقبِلون يُرشَّحون في موضعهم لا هنا.
+                if ($user && ! hub_can($user, $mk, 'v')) continue;
                 $md = hub_mod($mk);
                 $disp = hub_display_col($mk);
                 $acol = $alertCols[$mk] ?? null;

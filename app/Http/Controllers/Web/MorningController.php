@@ -75,10 +75,14 @@ class MorningController extends Controller
         }
 
         // ── مهام متأخرة ──
-        $tk = hub_scope(DB::table('tasks')->whereNull('deleted_at'), 'tasks')
+        // كل بندٍ في هذه الصفحة يفحص صلاحية وحدته، وهذا وحده كان يكتفي بالنطاق:
+        // فمن لا يرى المهام أصلاً كان يقرأ عناوينها في ملخّص صباحه
+        $tk = hub_can($u, 'tasks', 'v')
+            ? hub_scope(DB::table('tasks')->whereNull('deleted_at'), 'tasks')
             ->whereNotNull('due')->whereDate('due', '<', today())
             ->whereNotIn('status', ['منجزة', 'مكتملة', 'ملغاة'])
-            ->orderBy('due')->limit(8)->get(['id', 'title', 'due']);
+            ->orderBy('due')->limit(8)->get(['id', 'title', 'due'])
+            : collect();
         $add('🔥', 'مهام تجاوزت موعدها', 'التزامات مضى وقتها ولم تُغلق',
             $tk->map(fn ($r) => ['t' => $r->title, 's' => 'كان ' . substr((string) $r->due, 0, 10),
                                  'u' => route('m.show', ['tasks', $r->id]), 'tone' => 'bad']),
