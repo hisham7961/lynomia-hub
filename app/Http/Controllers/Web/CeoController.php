@@ -83,7 +83,16 @@ class CeoController extends Controller
 
         $currency = setting('app.currency', 'د.ك');
 
+        // طبقة القرار فوق طبقة الأرقام: ما ينتظرني · أين ينزف المال · أين الخطر
+        $awaiting = \App\Support\CeoBoard::awaiting(auth()->user());
+        $leaks = \App\Support\CeoBoard::leaks();
+        $conc = \App\Support\CeoBoard::concentration();
+        $risks = \App\Support\CeoBoard::risks();
+        $trend = \App\Support\CeoBoard::trend($months);
+        $gov = \App\Support\CeoBoard::governance();
+
         return view('ceo.index', compact('kpi', 'health', 'months', 'max', 'projects',
-            'onLeave', 'attToday', 'unpaidTop', 'taskSlices', 'pipe', 'mrr', 'currency'));
+            'onLeave', 'attToday', 'unpaidTop', 'taskSlices', 'pipe', 'mrr', 'currency',
+            'awaiting', 'leaks', 'conc', 'risks', 'trend', 'gov'));
     }
 }

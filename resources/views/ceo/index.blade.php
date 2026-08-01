@@ -9,6 +9,106 @@
     <button class="btn ghost sm" onclick="window.print()">🖨 طباعة</button>
 </div>
 
+{{-- ═ طبقة القرار: قبل أي رقم — ما ينتظرني، وأين ينزف المال، وأين الخطر ═ --}}
+@if (count($awaiting) || count($gov))
+<div class="card" style="margin-bottom:12px">
+    <h3 class="cardtitle">🛎️ ينتظر قرارك</h3>
+    <div class="kids">
+        @foreach (array_merge($awaiting, $gov) as $a)
+            <a class="card kid ceoact" href="{{ $a['url'] }}">
+                <div style="display:flex;gap:10px;align-items:baseline">
+                    <span style="font-size:20px">{{ $a['icon'] }}</span>
+                    <b class="{{ $a['tone'] === 'bad' ? 'txt-bad' : '' }}" style="font-size:22px">{{ $a['n'] }}</b>
+                    <b>{{ $a['label'] }}</b>
+                </div>
+                <div class="sub" style="font-size:12px;margin-top:3px">{{ $a['why'] }}</div>
+            </a>
+        @endforeach
+    </div>
+</div>
+@endif
+
+@if (count($leaks))
+<div class="card" style="margin-bottom:12px">
+    <h3 class="cardtitle">🩸 أين ينزف المال</h3>
+    <div class="sub" style="margin-bottom:8px">أرقامٌ بالعملة لا أعداد سجلات — لأن ما يُقاس بالمال يُقرَّر فيه.</div>
+    <table class="mini">
+        @foreach ($leaks as $l)
+            <tr>
+                <td style="width:26px">{{ $l['icon'] }}</td>
+                <td><a href="{{ $l['url'] }}"><b>{{ $l['label'] }}</b></a>
+                    <div class="sub" style="font-size:12px">{{ $l['why'] }}</div></td>
+                <td class="acts mono"><b class="{{ $l['tone'] === 'bad' ? 'txt-bad' : '' }}">
+                    {{ number_format($l['amount'], 0) }}</b> <span class="sub">{{ $l['cur'] }}</span></td>
+            </tr>
+        @endforeach
+    </table>
+</div>
+@endif
+
+<div class="grid2">
+    @if ($conc)
+    <div class="card kid">
+        <h3>🎯 تركّز الإيراد <span class="bdg {{ $conc['tone'] }}">{{ $conc['firstPct'] }}٪</span></h3>
+        <div class="sub" style="margin-bottom:8px">{{ $conc['verdict'] }}</div>
+        <table class="mini">
+            @foreach ($conc['top'] as $c)
+                <tr>
+                    <td>{{ $c['name'] }}
+                        {{-- شريطٌ يُري النسبة بالعين: الرقم وحده يُقرأ ولا يُشعَر به --}}
+                        <div style="height:5px;border-radius:99px;background:var(--pss);margin-top:4px">
+                            <div style="height:5px;border-radius:99px;background:var(--p);width:{{ min(100, $c['pct']) }}%"></div>
+                        </div>
+                    </td>
+                    <td class="acts mono">{{ $c['pct'] }}٪</td>
+                    <td class="acts mono sub">{{ number_format($c['amount'], 0) }}</td>
+                </tr>
+            @endforeach
+        </table>
+        <div class="sub" style="margin-top:6px;font-size:12px">
+            أكبر ثلاثة عملاء يشكّلون <b>{{ $conc['top3Pct'] }}٪</b> من إيراد اثني عشر شهراً — من أصل {{ $conc['n'] }} عميلاً دافعاً.
+        </div>
+    </div>
+    @endif
+
+    @if ($trend)
+    <div class="card kid">
+        <h3>{{ $trend['dir'] === 'up' ? '📈' : ($trend['dir'] === 'down' ? '📉' : '➖') }} الاتجاه</h3>
+        <div style="font-size:26px;font-weight:700;color:{{ $trend['delta'] >= 0 ? 'var(--ok)' : 'var(--bad)' }}">
+            {{ $trend['delta'] >= 0 ? '+' : '−' }}{{ number_format(abs($trend['delta']), 0) }} {{ $currency }}
+        </div>
+        <div class="sub">{{ $trend['verdict'] }}</div>
+        @if ($trend['vsBase'] !== null)
+            <div class="sub" style="margin-top:6px;font-size:12px">
+                ومقارنةً بمتوسط الأشهر السابقة:
+                <b class="{{ $trend['vsBase'] >= 0 ? '' : 'txt-bad' }}">
+                    {{ $trend['vsBase'] >= 0 ? '+' : '−' }}{{ number_format(abs($trend['vsBase']), 0) }}
+                </b> — شهرٌ واحد قد يكون صدفة، والخطّ الأساس يكشف ذلك.
+            </div>
+        @endif
+    </div>
+    @endif
+</div>
+
+@if (count($risks))
+<div class="card" style="margin-top:12px">
+    <h3 class="cardtitle">⚠️ مخاطر مفتوحة</h3>
+    <table class="mini">
+        @foreach ($risks as $r)
+            <tr>
+                <td style="width:26px">{{ $r['icon'] }}</td>
+                <td><a href="{{ route('m.show', [$r['module'], $r['id']]) }}">{{ \Illuminate\Support\Str::limit($r['title'], 60) }}</a>
+                    @if ($r['age'] !== null)<div class="sub" style="font-size:12px">مفتوحة منذ {{ $r['age'] }} يوماً</div>@endif</td>
+                <td class="acts"><span class="bdg {{ $r['tone'] }}">{{ $r['sev'] }}</span></td>
+                <td class="acts sub">{{ $r['status'] }}</td>
+            </tr>
+        @endforeach
+    </table>
+</div>
+@endif
+
+<h3 style="margin:16px 0 8px">📊 الأرقام</h3>
+
 {{-- المؤشرات العليا --}}
 <div class="cards">
     <div class="stat"><span class="ico">⚖️</span><b style="color:{{ $kpi['netM'] >= 0 ? 'var(--ok)' : 'var(--bad)' }}">{{ number_format($kpi['netM'], 0) }}</b><span>صافي الشهر ({{ $currency }})</span></div>
@@ -148,4 +248,8 @@
         </table>
     </div>
 </div>
+<style>
+.ceoact { color:inherit; display:block }
+.ceoact:hover { border-color:var(--p) }
+</style>
 @endsection
