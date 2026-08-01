@@ -250,6 +250,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'recs',      'label' => '💡 مركز التوصيات',    'route' => 'recs',            'group' => 'analytics', 'ok' => $mon],
             ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'group' => 'analytics', 'ok' => $mon],
             ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'delivery',  'label' => '🛤️ مسار التسليم',     'route' => 'delivery',        'group' => 'analytics', 'ok' => hub_can($user, 'feats', 'v') || hub_can($user, 'deploys', 'v') || hub_can($user, 'requests', 'v') || hub_can($user, 'designs', 'v')],
             ['key' => 'dassets',   'label' => '🔐 الأصول الرقمية',   'route' => 'digital.assets',  'group' => 'analytics', 'ok' => $mon],
             ['key' => 'pricing',   'label' => '💳 الباقات والتسعير', 'route' => 'pricing',         'group' => 'centers',   'ok' => hub_can($user, 'plans', 'v')],
             ['key' => 'mediac',    'label' => '📣 مركز الإعلام',      'route' => 'media.center',    'group' => 'centers',   'ok' => hub_can($user, 'media', 'v') || hub_can($user, 'events', 'v')],

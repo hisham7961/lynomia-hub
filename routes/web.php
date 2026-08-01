@@ -142,6 +142,7 @@ Route::middleware('auth')->group(function () {
     Route::get('pricing', [\App\Http\Controllers\Web\PricingController::class, 'index'])->name('pricing');
     Route::get('digital-assets', [\App\Http\Controllers\Web\DigitalAssetsController::class, 'index'])->name('digital.assets');
     Route::get('recommendations', [CapacityController::class, 'recommendations'])->name('recs');
+    Route::get('delivery', [\App\Http\Controllers\Web\DeliveryController::class, 'index'])->name('delivery');
     Route::get('kpis', [\App\Http\Controllers\Web\KpiController::class, 'index'])->name('kpis.index');
     Route::post('kpis', [\App\Http\Controllers\Web\KpiController::class, 'store'])->name('kpis.store');
     Route::put('kpis/{id}', [\App\Http\Controllers\Web\KpiController::class, 'update'])->name('kpis.update');
