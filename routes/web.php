@@ -40,6 +40,7 @@ use App\Http\Controllers\Web\ReportController;
 use App\Http\Controllers\Web\RoleController;
 use App\Http\Controllers\Web\SearchController;
 use App\Http\Controllers\Web\SecurityController;
+use App\Http\Controllers\Web\StaffController;
 use App\Http\Controllers\Web\SupportController;
 use App\Http\Controllers\Web\QuoteFlowController;
 use App\Http\Controllers\Web\SettingController;
@@ -159,6 +160,14 @@ Route::middleware('auth')->group(function () {
     Route::post('inboxdocs', [InboxDocController::class, 'store'])->name('inboxdocs.store');
     Route::post('inboxdocs/{id}/classify', [InboxDocController::class, 'classify'])->name('inboxdocs.classify');
     Route::delete('inboxdocs/{id}', [InboxDocController::class, 'destroy'])->name('inboxdocs.destroy');
+
+    // ── الموظفون وحساباتهم: طرفان لشخصٍ واحد ──
+    Route::get('staff', [StaffController::class, 'index'])->name('staff.index');
+    Route::post('staff/{id}/link', [StaffController::class, 'link'])->name('staff.link');
+    Route::post('staff/{id}/unlink', [StaffController::class, 'unlink'])->name('staff.unlink');
+    Route::post('staff/{id}/account', [StaffController::class, 'account'])->name('staff.account');
+    Route::post('staff/{id}/align', [StaffController::class, 'align'])->name('staff.align');
+    Route::post('staff/user/{id}/file', [StaffController::class, 'file'])->name('staff.file');
 
     // ── غرفة البيانات (الإدارة) ──
     Route::get('dataroom', [DataRoomController::class, 'index'])->name('dataroom.index');

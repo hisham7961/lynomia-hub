@@ -33,7 +33,7 @@
 <div class="toolbar">
     <form class="filters" method="GET"
           hx-boost="true" hx-target="#tblzone" hx-select="#tblzone" hx-swap="outerHTML" hx-push-url="true">
-        <input class="inp" type="search" name="q" value="{{ request('q') }}" placeholder="بحث حي في {{ $def['label'] }}…"
+        <input class="inp" type="search" name="q" value="{{ hub_str(request('q')) }}" placeholder="بحث حي في {{ $def['label'] }}…"
                hx-get="{{ route('m.index', $module) }}" hx-include="closest form"
                hx-trigger="input changed delay:400ms" hx-target="#tblzone" hx-select="#tblzone" hx-swap="outerHTML" hx-push-url="true">
         @if ($statusOptions)
@@ -41,11 +41,12 @@
                     hx-get="{{ route('m.index', $module) }}" hx-include="closest form"
                     hx-trigger="change" hx-target="#tblzone" hx-select="#tblzone" hx-swap="outerHTML" hx-push-url="true">
                 <option value="">كل الحالات</option>
-                @foreach ($statusOptions as $o)<option value="{{ $o }}" @selected(request('status') === $o)>{{ $o }}</option>@endforeach
+                @foreach ($statusOptions as $o)<option value="{{ $o }}" @selected(hub_str(request('status')) === $o)>{{ $o }}</option>@endforeach
             </select>
         @endif
         @if ($trash)<input type="hidden" name="trash" value="1">@endif
-        @foreach ((array) request('f', []) as $fk => $fv)<input type="hidden" name="f[{{ $fk }}]" value="{{ $fv }}">@endforeach
+        {{-- المفتاح والقيمة نصّان أو لا يُبثّان: `?f[x][]=y` كان يُلقى في htmlspecialchars فتسقط الشاشة --}}
+        @foreach ((array) request('f', []) as $fk => $fv)@if (is_string($fk) && is_string($fv))<input type="hidden" name="f[{{ $fk }}]" value="{{ $fv }}">@endif @endforeach
         @php
             // باني الفلاتر المتقدم: الحقول القابلة للترشيح فقط (لا أسرار/ملفات/مراجع) وغير المخفية عن المستخدم
             $advFields = collect($def['fields'])
@@ -140,7 +141,7 @@
         $bulkDelete = ! $trash && hub_can(auth()->user(), $module, 'd');
         $bulkExport = ! $trash && hub_exporter();
         $canBulk = $bulkStatus || $bulkDelete || $bulkExport;
-        $statusOpts = $bulkStatus ? (collect($def['fields'])->firstWhere('col', $def['status'])['options'] ?? []) : [];
+        $statusOpts = $bulkStatus ? (hub_status_field($module)['options'] ?? []) : [];
         $bulkStatus = $bulkStatus && count($statusOpts) > 0;
     @endphp
     <div class="card pad0">
@@ -176,8 +177,8 @@
             @empty
                 <tr><td colspan="{{ count($columns) + 1 + ($canBulk ? 1 : 0) }}" class="empty">
                     <span class="big">{{ $trash ? '🗑' : '📄' }}</span>
-                    {{ $trash ? 'السلة فارغة' : (request('q') ? 'لا نتائج للبحث' : 'لا سجلات بعد') }}
-                    @if (! $trash && ! request('q') && hub_can(auth()->user(), $module, 'a'))<div style="margin-top:10px"><a class="btn p sm" hx-boost="false" href="{{ route('m.create', $module) }}">أضف أول سجل</a></div>@endif
+                    {{ $trash ? 'السلة فارغة' : (hub_str(request('q')) !== '' ? 'لا نتائج للبحث' : 'لا سجلات بعد') }}
+                    @if (! $trash && hub_str(request('q')) === '' && hub_can(auth()->user(), $module, 'a'))<div style="margin-top:10px"><a class="btn p sm" hx-boost="false" href="{{ route('m.create', $module) }}">أضف أول سجل</a></div>@endif
                 </td></tr>
             @endforelse
             </tbody>

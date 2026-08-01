@@ -45,7 +45,8 @@ class KpiController extends Controller
         $this->gate();
 
         // `?edit=` يحمّل المؤشر في الباني نفسه — لا شاشة ثانية ولا نموذج مكرّر
-        $editing = ($id = $r->query('edit')) ? KpiDef::find($id) : null;
+        // `?edit[]=` كان يُمرَّر مصفوفةً إلى find() فتعود Collection ثم تسقط الشاشة
+        $editing = ($id = hub_str($r->query('edit'))) ? KpiDef::find($id) : null;
 
         return view('kpis.index', [
             'kpis'    => hub_kpis(null, true),
@@ -142,7 +143,8 @@ class KpiController extends Controller
         return $r->validate([
             'name'     => ['required', 'string', 'max:190'],
             'unit'     => ['nullable', 'string', 'max:30'],
-            'target'   => ['nullable', 'numeric'],
+            // `1e400` عددٌ صالح نحوياً ولانهائيٌّ فعلاً — يُرفض قبل الكتابة لا بعدها
+            'target'   => ['nullable', 'numeric', 'max:999999999999'],
             'good'     => ['required', 'in:up,down'],
             'a_agg'    => ['required', 'in:count,sum,avg'],
             'a_module' => ['required', 'string', 'max:60'],
@@ -176,6 +178,6 @@ class KpiController extends Controller
         }
 
         return ['name' => $d['name'], 'unit' => $d['unit'] ?? null,
-                'target' => $d['target'] ?? null, 'good' => $d['good'], 'formula' => $formula];
+                'target' => hub_num($d['target'] ?? null), 'good' => $d['good'], 'formula' => $formula];
     }
 }

@@ -12,8 +12,20 @@ use Illuminate\Http\Request;
  */
 class InboxDocController extends Controller
 {
+    /**
+     * بوابة الصندوق: كان مفتوحاً لكل من سجّل دخوله — يقرأ أسماء الملفات
+     * ويرفع ويصنّف بلا صلاحيةٍ واحدة. الآن يمرّ بصلاحية الوثائق أو الصندوق.
+     */
+    protected function gate(string $op = 'v'): void
+    {
+        $u = auth()->user();
+        abort_unless(hub_can($u, 'inboxdocs', $op) || hub_can($u, 'files', $op),
+            403, 'صندوق الوثائق يحتاج صلاحية الوثائق');
+    }
+
     public function index(Request $r)
     {
+        $this->gate('v');
         $st = $r->query('st', 'وارد');
         $q = InboxDocument::orderByDesc('created_at');
         if (in_array($st, ['وارد', 'مصنف'], true)) $q->where('status', $st);
@@ -31,6 +43,7 @@ class InboxDocController extends Controller
     /** رفع سريع — الملف وحده يكفي، الملاحظة اختيارية */
     public function store(Request $r)
     {
+        $this->gate('a');
         $d = $r->validate([
             'file' => ['required', 'file', 'max:' . (int) setting('files.max_kb', 512000)],
             'note' => ['nullable', 'string', 'max:390'],
@@ -53,6 +66,7 @@ class InboxDocController extends Controller
     /** تصنيف: وحدة/سجل بالاسم/شركة/جهة/نوع/تاريخ/انتهاء — كله اختياري عدا شيء واحد على الأقل */
     public function classify(Request $r, string $id)
     {
+        $this->gate('e');
         $doc = InboxDocument::findOrFail($id);
         $d = $r->validate([
             'module'   => ['nullable', 'string', 'max:40'],
@@ -73,10 +87,15 @@ class InboxDocController extends Controller
 
         // حل السجل بالاسم داخل الوحدة المختارة (تطابق أو احتواء)
         if ($module && filled($d['record'] ?? null)) {
-            $def = hub_mod($module);
             $disp = hub_display_col($module);
             $term = trim($d['record']);
-            $base = fn () => \Illuminate\Support\Facades\DB::table($def['table'])->whereNull('deleted_at');
+            // **البحث بصلاحية القارئ ونطاقه**: كان يقرأ الجدول خاماً، فرسالةُ
+            // «الاسم يطابق أكثر من سجل» تُعدّد أسماء عملاءَ لا يملك رؤيتهم —
+            // تصنيفُ ورقةٍ لا يُشترى بتسريب دفتر الأسماء.
+            $base = fn () => hub_read($module);
+            if ($base() === null) {
+                return back()->withErrors(['module' => 'لا تملك صلاحية العرض على الوحدة المختارة']);
+            }
 
             // تهريب محارف LIKE: بدونه يطابق «%» كل السجلات فتُربط الوثيقة بسجل عشوائي
             $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $term) . '%';

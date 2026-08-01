@@ -11,7 +11,13 @@
           @if ($hx) hx-boost="true" hx-target="#recform" hx-select="#recform" hx-swap="outerHTML"
               hx-select-oob="#tblzone:outerHTML,#flash:innerHTML" hx-push-url="false" @endif>
         @csrf
-        @if ($updating)@method('PUT')@endif
+        @if ($updating)
+            @method('PUT')
+            {{-- النسخة التي فُتح عليها النموذج: لو تغيّرت قبل الحفظ رُدَّ التعديل
+                 بدل أن يدهس كاتبٌ كاتباً بصمت ويرى كلاهما «حُفظ» --}}
+            <input type="hidden" name="_version" value="{{ $row->version }}">
+            @error('_version')<div class="err" role="alert">⚠️ {{ $message }}</div>@enderror
+        @endif
         <div class="fg">
             @foreach ($def['fields'] as $f)
                 @php $fm = hub_field_mode(auth()->user(), $module, $f['key']); @endphp
@@ -66,6 +72,30 @@
                 <input class="inp" name="_reason" maxlength="380" placeholder="مثال: تصحيح رقم الهاتف بطلب من العميل">
             </div>
         @endif
+        {{-- موظفٌ جديد: حسابُ النظام معه لا بعده بأسبوع. الربط بحسابٍ قائم على
+             البريد يقع تلقائياً؛ وهذا الخيار لفتح حسابٍ جديد لمن لا حساب له --}}
+        @if ($module === 'hr' && ! $updating && hub_flag(auth()->user(), 'users'))
+            <div class="fw" style="margin-top:8px;padding:11px 14px;border:1px dashed color-mix(in srgb,var(--p) 40%,var(--ln));border-radius:12px;background:color-mix(in srgb,var(--p) 4%,transparent)">
+                <label class="chk">
+                    <input type="checkbox" name="_make_account" value="1"
+                           onchange="document.getElementById('acctrole').style.display=this.checked?'':'none'">
+                    🔑 <b>افتح له حساب نظام كذلك</b> — بكلمة مرورٍ مؤقتة تُعرض مرةً واحدة، يُلزَم بتبديلها عند أول دخول.
+                </label>
+                <div class="sub" style="margin-top:4px">
+                    إن كان لبريده حسابٌ قائم فسيُربط به تلقائياً بلا حاجة لهذا الخيار — البريد هو الهوية.
+                </div>
+                <div id="acctrole" style="display:none;margin-top:8px;max-width:320px">
+                    <label for="acct-role">دور الحساب</label>
+                    <select class="inp" id="acct-role" name="_account_role">
+                        <option value="">— اختر الدور —</option>
+                        @foreach (hub_assignable_roles() as $r)
+                            <option value="{{ $r->id }}">{{ $r->name }}{{ $r->is_owner ? ' — مالك النظام' : '' }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+        @endif
+
         {{-- عقدٌ جديد: خيار التحويل للتوقيع الإلكتروني إن لم يكن موقّعاً بعد --}}
         @if ($module === 'contracts' && ! $updating)
             <label class="chk fw" style="margin-top:8px;padding:11px 14px;border:1px dashed color-mix(in srgb,var(--p) 40%,var(--ln));border-radius:12px;background:color-mix(in srgb,var(--p) 4%,transparent)">

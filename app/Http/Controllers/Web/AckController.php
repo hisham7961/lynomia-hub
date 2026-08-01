@@ -20,7 +20,7 @@ class AckController extends Controller
         abort_unless(in_array((string) auth()->id(), Acks::targets($module, $row), true), 403,
             'الإقرار لمن طُلب منه وحده — ولا يُقرّ أحدٌ نيابةً عن غيره');
 
-        $note = trim((string) $r->input('note'));
+        $note = trim(hub_str($r->input('note')));
         abort_if(mb_strlen($note) > 1000, 422, 'التحفّظ أطول من المسموح');
 
         Acks::record($module, $row, (string) auth()->id(), $note ?: null);

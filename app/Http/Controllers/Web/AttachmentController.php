@@ -28,7 +28,7 @@ class AttachmentController extends Controller
             'note'      => ['nullable', 'string', 'max:300'],
             // نوع الوثيقة من ملف الكيان — مفتاحٌ معلن لا نصٌّ حر
             'kind'       => ['nullable', 'string', 'max:40',
-                             \Illuminate\Validation\Rule::in(collect(hub_doc_spec((string) $r->input('module')))->pluck('key')->all())],
+                             \Illuminate\Validation\Rule::in(collect(hub_doc_spec(hub_str($r->input('module'))))->pluck('key')->all())],
             'doc_no'     => ['nullable', 'string', 'max:80'],
             'issued_at'  => ['nullable', 'date'],
             'expires_at' => ['nullable', 'date'],

@@ -24,7 +24,7 @@ class CustomFieldController extends Controller
     public function index(Request $r)
     {
         $this->gate();
-        $module = (string) $r->query('m', '');
+        $module = hub_str($r->query('m', ''));
         if ($module !== '') abort_unless(hub_mod($module), 404);
 
         return view('fields.index', [

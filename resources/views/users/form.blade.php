@@ -51,6 +51,15 @@
                 <input class="inp mono" type="password" name="password" autocomplete="new-password" @if(!$u) required @endif>
                 @error('password')<span class="ferr">{{ $message }}</span>@enderror
             </div>
+            {{-- الحساب والملفُّ شخصٌ واحد: بريدٌ ينتظره ملفٌّ يُربط تلقائياً،
+                 ومن لا ملفَّ له يُفتح له واحدٌ هنا بقرارٍ صريح --}}
+            @if (! $u && hub_can(auth()->user(), 'hr', 'a'))
+                <label class="chk fw" style="margin-top:8px;padding:11px 14px;border:1px dashed color-mix(in srgb,var(--p) 40%,var(--ln));border-radius:12px;background:color-mix(in srgb,var(--p) 4%,transparent)">
+                    <input type="checkbox" name="_make_employee" value="1">
+                    📄 <b>أنشئ له ملفاً وظيفياً كذلك</b> — حسابٌ بلا ملفّ يعني موظفاً بلا راتبٍ ولا عهدةٍ ولا رصيد إجازات،
+                    ولا يظهر في دليل الفريق. وإن كان له ملفٌّ بالبريد نفسه فسيُربط به تلقائياً بلا حاجة لهذا الخيار.
+                </label>
+            @endif
         </div>
         <div class="formfoot"><button class="btn p">حفظ</button><a class="btn ghost" href="{{ route('users.index') }}">إلغاء</a></div>
     </form>

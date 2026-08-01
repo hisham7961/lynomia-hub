@@ -32,12 +32,12 @@ class ModuleController extends Controller
         $q = hub_scope($q, $def['key'] ?? '');          // نطاق المشاريع للحسابات المحدودة
         $q = hub_company_scope($q, $def['key'] ?? '');  // الشركة النشطة من الشريط العلوي
 
-        if ($term = $r->input('q')) $q->search($term);
+        if ($term = hub_str($r->input('q'))) $q->search($term);
 
         // فحص جودة (`?qc=`): يفتح **نفس** السجلات التي عدّها مركز الجودة —
         // فالنقص يُفتح لا يُقرأ. والمفتاح يُطابَق على قائمة الفحوص المشتقّة من
         // السجل، فمفتاحٌ مُلفَّق لا يبني قيداً ولا يوسّع القائمة.
-        if ($qc = $r->input('qc')) {
+        if ($qc = hub_str($r->input('qc'))) {
             $rule = \App\Support\DataQuality::rules($def['key'] ?? '')[$qc] ?? null;
             if ($rule) {
                 $q = \App\Support\DataQuality::apply($q, (string) ($def['key'] ?? ''), (string) $qc);
@@ -45,12 +45,13 @@ class ModuleController extends Controller
             }
         }
 
-        $statusCol = $def['status'] ?? null;
-        if ($statusCol && ($st = $r->input('status'))) $q->where($statusCol, $st);
+        // العمود الفيزيائي لا المفتاح — في الوثائق المفتاح docStatus والعمود doc_status
+        $statusCol = hub_status_col($def['key'] ?? '');
+        if ($statusCol && ($st = hub_str($r->input('status'))) !== '') $q->where($statusCol, $st);
 
         $fields = collect($def['fields']);
         foreach ((array) $r->input('f', []) as $fk => $fv) {
-            if ($fv === '' || ! is_string($fv)) continue;
+            if ($fv === '' || ! is_string($fv) || ! is_string($fk)) continue;
 
             $f = $fields->firstWhere('key', $fk);
             if ($f && ($f['type'] ?? '') === 'ref') {
@@ -261,6 +262,21 @@ class ModuleController extends Controller
         $this->bustProgress($module, $m);
         \App\Support\FlowRunner::fire('created', $module, $m);
 
+        /*
+         * **موظفٌ جديد بحسابٍ جديد**: الربط بحسابٍ قائم يقع تلقائياً في نموذج
+         * Employee (البريد هو الهوية)، وفتحُ حسابٍ جديد قرارٌ صريح يُطلب من
+         * النموذج — بدورٍ مختار وكلمةِ مرورٍ مؤقتة تُعرض مرةً واحدة.
+         */
+        if ($module === 'hr' && $r->boolean('_make_account') && ! $m->user_id) {
+            $temp = \App\Support\Staff::makeAccount($m, hub_str($r->input('_account_role')));
+            if ($temp !== null) {
+                return redirect()->route('m.show', [$module, $m->id])
+                    ->with('ok', 'أُضيف الموظف وأُنشئ حسابه')
+                    ->with('temp_password', $temp)
+                    ->with('temp_password_for', (string) $m->email);
+            }
+        }
+
         // عقدٌ غير موقّع → تحويله لمسار التوقيع الإلكتروني: يُضبط على «قيد التوقيع»
         // ويُنقل المستخدم لإنشاء طلب التوقيع مربوطاً بهذا العقد، مُهيَّأ سلفاً.
         if ($module === 'contracts' && $r->boolean('to_esign') && hub_can(auth()->user(), 'contracts', 'a')) {
@@ -362,6 +378,19 @@ class ModuleController extends Controller
         $this->guardCompany($r, $module);
 
         $m = $this->findScoped($class, $module, $id);
+
+        /*
+         * القفل التفاؤلي: عمود `version` كان يزيد ولا يُقارَن، والنموذج لا يبعث
+         * نسخةً — فكاتبان على السجل نفسه، والثاني يدهس الأول **بلا إشارة**
+         * وكلاهما يرى «حُفظت التعديلات». من يبعث نسخةً قديمة يُردّ برسالةٍ
+         * تقول ماذا حدث؛ ومن لا يبعث نسخةً (API قديم أو سكربت) لا يُمنع.
+         */
+        $seen = $r->input('_version');
+        if ($seen !== null && $seen !== '' && (int) $seen !== (int) $m->version) {
+            return back()->withInput()->withErrors(['_version' =>
+                'عدّل شخصٌ آخر هذا السجل بينما كنت تحرّره — افتحه من جديد وراجع تغييرك قبل الحفظ.']);
+        }
+
         if (hub_needs_approval(auth()->user(), $module, 'e')) {
             return $this->queueApproval($def, $module, 'e', $m, $r);
         }
@@ -369,7 +398,7 @@ class ModuleController extends Controller
             \Illuminate\Support\Facades\Cache::forget('user:' . auth()->id() . ':projects');
         }
         $prevAssignee = ($af = $this->assigneeField($def)) ? $m->{$af['col']} : null;
-        $prevStatus = ($sc = $def['status'] ?? null) ? $m->{$sc} : null;
+        $prevStatus = ($sc = hub_status_col($module)) ? $m->{$sc} : null;
         $this->fill($def, $r, $m);
         $m->save();
         $this->notifyAssignee($def, $module, $m, $prevAssignee);
@@ -407,7 +436,7 @@ class ModuleController extends Controller
     {
         [$def, $class] = $this->resolve($module, 'v');
         $def['key'] = $module;
-        $statusCol = $def['status'] ?? null;
+        $statusCol = hub_status_col($module);
         abort_unless($statusCol, 404, 'هذه الوحدة بلا حقل حالة');
 
         $options = $this->statusOptions($def);
@@ -465,12 +494,12 @@ class ModuleController extends Controller
         // السحب والإفلات كان يكتب عمود الحالة مباشرةً: لا فحصَ لصلاحية الحقل
         // (فيُكتب عمودٌ «قراءة فقط» بجرّة إصبع) ولا تحقّقَ من الخيارات المعرَّفة
         // (فتُزرع حالةٌ لا يعرفها السجل فلا تُعدّ في إحصاء ولا تُطلق أتمتة).
-        $statusField = collect($def['fields'])->firstWhere('col', $statusCol);
+        $statusField = hub_status_field($module);
         $statusKey = (string) ($statusField['key'] ?? $statusCol);
         abort_if(hub_field_mode(auth()->user(), $module, $statusKey) !== '', 403,
             'حقل الحالة غير قابل للكتابة بصلاحيتك');
 
-        $new = (string) $r->input('status');
+        $new = hub_str($r->input('status'));
         $options = (array) ($statusField['options'] ?? []);
         abort_if($options && ! in_array($new, $options, true), 422, 'حالة غير معرَّفة في هذه الوحدة');
 
@@ -535,7 +564,7 @@ class ModuleController extends Controller
      */
     public function bulk(Request $r, string $module)
     {
-        $do = (string) $r->input('do');
+        $do = hub_str($r->input('do'));
         $ids = array_slice(array_values(array_filter((array) $r->input('ids', []), 'is_string')), 0, 200);
         abort_unless(count($ids) > 0, 400, 'لم تُحدد سجلات');
 
@@ -553,7 +582,7 @@ class ModuleController extends Controller
             [$def, $class] = $this->resolve($module, 'e');
             $statusCol = $def['status'] ?? null;
             abort_unless($statusCol, 404, 'هذه الوحدة بلا حقل حالة');
-            $to = (string) $r->input('status');
+            $to = hub_str($r->input('status'));
             $opts = $this->statusOptions($def);
             abort_unless($to !== '' && (! $opts || in_array($to, $opts, true)), 422, 'حالة غير معروفة');
 
@@ -637,6 +666,8 @@ class ModuleController extends Controller
             'payload'      => $payload,
             'requested_by' => auth()->id(),
             'status'       => 'معلّق',
+            // نسخة السجل وقت الطلب — بها يُكشف عند الحسم أنّ أحداً عدّله في الطابور
+            'meta'         => ['ver' => (int) ($m->version ?? 0)],
         ]);
 
         foreach ($approvers as $uid) {
@@ -782,7 +813,7 @@ class ModuleController extends Controller
         if (! $pf) return;
 
         $ids = auth()->user()->visibleProjectIds();
-        $val = (string) $r->input($pf['key']);
+        $val = hub_str($r->input($pf['key']));
         if ($val === '' || ! in_array($val, $ids, true)) {
             throw \Illuminate\Validation\ValidationException::withMessages(
                 [$pf['key'] => 'حسابك محدود النطاق — اختر مشروعاً من مشاريعك']);
@@ -801,7 +832,7 @@ class ModuleController extends Controller
         // فالقيمة القائمة تبقى وhub_scope يفرض العزل قراءةً — لا تحبس الحفظ عبثاً.
         if (hub_field_mode(auth()->user(), $module, $cf['key']) !== '') return;
 
-        $val = (string) $r->input($cf['key']);
+        $val = hub_str($r->input($cf['key']));
         if ($val === '' || ! in_array($val, $ids, true)) {
             throw \Illuminate\Validation\ValidationException::withMessages(
                 [$cf['key'] => 'حسابك معزول على شركات محددة — اختر شركة من شركاتك']);
@@ -843,11 +874,10 @@ class ModuleController extends Controller
     /** خيارات حالة الوحدة (إن وُجد عمود حالة) */
     protected function statusOptions(array $def): array
     {
-        $col = $def['status'] ?? null;
-        if (! $col) return [];
-        $f = collect($def['fields'])->firstWhere('col', $col);
-
-        return $f['options'] ?? [];
+        // البحث كان بـ`col` والقيمة **مفتاح**: في الوثائق `docStatus` مقابل
+        // `doc_status` فلا يُطابَق شيء وتعود القائمة فارغة — فلا فلتر حالةٍ
+        // في الشاشة ولا تغييرَ جماعي، بلا رسالةٍ تقول لماذا
+        return hub_status_field($def['key'] ?? '')['options'] ?? [];
     }
 
     /** خيارات كل الحقول المرجعية للنموذج — مع ضمان ظهور قيم السجل الحالية */
@@ -963,19 +993,23 @@ class ModuleController extends Controller
             }
             if ($t === 'bool') { $m->{$c} = $r->boolean($k); continue; }
             if ($t === 'tags') {
-                $v = trim((string) $r->input($k));
+                $v = trim(hub_str($r->input($k)));
                 $arr = $v === '' ? null : array_values(array_filter(array_map('trim', preg_split('/[,،]/u', $v))));
                 $m->{$c} = $arr === null ? null : ($m->hasCast($c) ? $arr : json_encode($arr, JSON_UNESCAPED_UNICODE));
                 continue;
             }
             if ($t === 'ref' && ! empty($f['multi'])) {
-                $arr = array_values(array_filter((array) $r->input($k, [])));
+                // نصوصٌ فقط: مصفوفةٌ متداخلة كانت تُخزَّن ثم تقتل **عرض السجل
+                // وتعديله معاً** (`strval` على مصفوفة) — فيستحيل إصلاحه من الواجهة
+                $arr = array_values(array_filter((array) $r->input($k, []),
+                    fn ($x) => is_string($x) && $x !== ''));
                 $m->{$c} = ! $arr ? null : ($m->hasCast($c) ? $arr : json_encode($arr, JSON_UNESCAPED_UNICODE));
                 continue;
             }
             if (in_array($t, ['num', 'big'], true)) {
-                $v = $r->input($k);
-                $m->{$c} = ($v === null || $v === '') ? null : (float) $v;
+                // `1e400` يمرّ من `numeric` ويصير INF، فيُكتب ثم يفشل ترميز قيد
+                // التدقيق — فيقع خطأٌ **بعد** أن يكون التغيير قد وقع
+                $m->{$c} = hub_num($r->input($k));
                 continue;
             }
 

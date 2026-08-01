@@ -15,7 +15,7 @@ class SearchController extends Controller
      */
     public function mini(Request $r)
     {
-        $q = trim((string) $r->input('q'));
+        $q = trim(hub_str($r->input('q')));
         if ($q === '') {
             $recents = $this->recents(5);
             return view('partials.searchmini', [
@@ -99,7 +99,7 @@ class SearchController extends Controller
     /** صفحة النتائج الكاملة مجمّعة بالوحدات */
     public function index(Request $r)
     {
-        $q = trim((string) $r->input('q'));
+        $q = trim(hub_str($r->input('q')));
         $groups = [];
         $dests = mb_strlen($q) >= 2 ? $this->destinations($q) : [];
 

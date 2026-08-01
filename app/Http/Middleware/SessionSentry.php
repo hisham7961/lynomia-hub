@@ -25,19 +25,25 @@ class SessionSentry
     {
         $id = (string) session('hub.sl', '');
 
+        // الحسابُ نفسه يُعاد فحصه مع كل طلب: المنعُ كان عند تسجيل الدخول وحده،
+        // فموظفٌ أُنهيت خدمتُه وجهازُه مفتوح يظلّ يقرأ ويكتب — ويُوقّع إقرار
+        // عهدةٍ يُحتجّ به. الإيقافُ والحذف يجب أن يسريا **الآن** لا عند خروجه.
+        if (auth()->check() && ! $r->routeIs(...self::SKIP)) {
+            $u = auth()->user();
+            if ($u->deleted_at !== null || ($u->status ?? 'نشط') !== 'نشط') {
+                return $this->kick($r, $u->deleted_at !== null
+                    ? 'حُذف هذا الحساب — راجع من يدير المستخدمين'
+                    : 'أُوقف هذا الحساب — راجع من يدير المستخدمين');
+            }
+        }
+
         if ($id !== '' && auth()->check() && ! $r->routeIs(...self::SKIP)) {
             try {
                 $row = DB::table('sessions_log')->where('id', $id)->first(['revoked', 'user_id']);
 
                 // صفٌّ غائب ليس إنهاءً (قد يكون تشذيباً) — الإنهاء وسمٌ صريح
                 if ($row && $row->revoked) {
-                    // Auth::logout يدوّر رمز «تذكّرني» أيضاً، فلا تُبعث الجلسة من الكعكة
-                    Auth::logout();
-                    $r->session()->invalidate();
-                    $r->session()->regenerateToken();
-
-                    return redirect()->route('login')
-                        ->withErrors(['email' => 'أُنهيت هذه الجلسة من مركز الأمان — سجّل الدخول من جديد']);
+                    return $this->kick($r, 'أُنهيت هذه الجلسة من مركز الأمان — سجّل الدخول من جديد');
                 }
 
                 if ($row && now()->timestamp - (int) session('hub.slp', 0) > 60) {
@@ -50,5 +56,15 @@ class SessionSentry
         }
 
         return $next($r);
+    }
+
+    /** إخراجٌ نظيف: `Auth::logout` يدوّر رمز «تذكّرني» فلا تُبعث الجلسة من الكعكة */
+    protected function kick(Request $r, string $why)
+    {
+        Auth::logout();
+        $r->session()->invalidate();
+        $r->session()->regenerateToken();
+
+        return redirect()->route('login')->withErrors(['email' => $why]);
     }
 }

@@ -126,14 +126,14 @@ class SettingController extends Controller
                 }
 
                 if ($type === 'pass') {
-                    $v = trim((string) $r->input($input, ''));
+                    $v = trim(hub_str($r->input($input, '')));
                     if ($v === '' || $v === '••••') continue;     // فارغ = إبقاء المخزَّن
                     $this->put($key, 'enc:' . Crypt::encryptString($v), $changed);
                     continue;
                 }
 
                 if (! $r->has($input)) continue;                  // حفظٌ جزئي لا يمحو الباقي
-                $v = trim((string) $r->input($input, ''));
+                $v = trim(hub_str($r->input($input, '')));
 
                 if ($v !== '' && isset(self::CHECKS[$key]) && ! preg_match(self::CHECKS[$key]['re'], $v)) {
                     $errors[$input] = ($meta['label'] ?? $key) . ' — ' . self::CHECKS[$key]['msg'];

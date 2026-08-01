@@ -48,8 +48,8 @@ class V1Controller extends ModuleController
         [$def, $class] = $this->resolveApi($module, 'v');
 
         $q = hub_scope($class::query(), $module);
-        if ($term = trim((string) $r->query('q'))) $q->search($term);
-        if (($st = $r->query('status')) && ($def['status'] ?? null)) $q->where($def['status'], $st);
+        if ($term = trim(hub_str($r->query('q')))) $q->search($term);
+        if (($st = hub_str($r->query('status'))) !== '' && ($sc = hub_status_col($module))) $q->where($sc, $st);
 
         $page = $q->orderByDesc('created_at')
             ->paginate(min(100, max(1, (int) $r->query('per', 25))));
@@ -118,7 +118,7 @@ class V1Controller extends ModuleController
 
         $m = $this->findScoped($class, $module, $id);
         $prev = ($af = $this->assigneeField($def)) ? $m->{$af['col']} : null;
-        $prevStatus = ($sc = $def['status'] ?? null) ? $m->{$sc} : null;
+        $prevStatus = ($sc = hub_status_col($module)) ? $m->{$sc} : null;
         $this->fill($def, $r, $m);
         $m->save();
         $this->notifyAssignee($def, $module, $m, $prev);
@@ -227,7 +227,7 @@ class V1Controller extends ModuleController
         [$def, $class] = $this->resolveApi($module, 'v');
         hub_scope($class::query(), $module)->findOrFail($id);
 
-        $metric = trim((string) $r->query('metric'));
+        $metric = trim(hub_str($r->query('metric')));
         $days = min(730, max(1, (int) $r->query('days', 90)));
 
         if ($metric === '') {

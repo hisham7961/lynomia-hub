@@ -20,7 +20,7 @@ class FinController extends Controller
         abort_unless(hub_can(auth()->user(), 'fin', 'e'), 403, 'تسجيل الدفعات يتطلب صلاحية تعديل المالية');
         $doc = hub_scope(FinDocument::query(), 'fin')->findOrFail($id);
 
-        return match ((string) $r->input('do')) {
+        return match (hub_str($r->input('do'))) {
             'pay'   => $this->pay($r, $doc),
             default => abort(422),
         };

@@ -28,7 +28,7 @@ class StockController extends Controller
         abort_unless(hub_can(auth()->user(), 'stockmv', 'e'), 403, 'ترحيل الحركات يتطلب صلاحية تعديلها');
         $mv = hub_scope(StockMove::query(), 'stockmv')->findOrFail($id);
 
-        return match ((string) $r->input('do')) {
+        return match (hub_str($r->input('do'))) {
             'confirm' => $this->confirm($mv),
             'cancel'  => $this->cancel($mv),
             default   => abort(422),

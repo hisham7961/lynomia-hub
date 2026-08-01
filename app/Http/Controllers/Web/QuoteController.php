@@ -41,7 +41,7 @@ class QuoteController extends Controller
     {
         abort_unless(hub_can(auth()->user(), 'quotes', 'e'), 403, 'إجراءات العرض تتطلب صلاحية تعديل');
         $q = hub_scope(Quote::query(), 'quotes')->findOrFail($id);
-        $action = (string) $r->input('do');
+        $action = hub_str($r->input('do'));
 
         return match ($action) {
             'send'     => $this->setStatus($q, 'مُرسل', '📨 حُدّد العرض كمُرسل للعميل'),

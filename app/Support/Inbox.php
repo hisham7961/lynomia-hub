@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Support\ErrorLog;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -65,7 +66,10 @@ class Inbox
                 foreach (self::{$src}($user) as $one) $out[] = self::stamp($one);
             } catch (\Throwable $e) {
                 // مصدرٌ سقط لا يُسقط الصندوق كله — البوابة أهمّ من أيّ صفٍّ فيها
-                \App\Models\ErrorLog::capture('php', "inbox: سقط مصدر {$src} — " . $e->getMessage());
+                // الصنف `App\Models\ErrorLog` لا وجود له — فكانت المِصْيدة نفسها
+                // ترمي `Class not found` وتُسقط الصندوق: حارسٌ يقتل من يحرسه
+                ErrorLog::capture('php', "inbox: سقط مصدر {$src} — " . $e->getMessage(),
+                    __FILE__, __LINE__);
             }
         }
 
@@ -150,8 +154,11 @@ class Inbox
             ->whereNotNull('ack_at')->get(['policy_id', 'ver']);
         $acked = $mine->map(fn ($a) => $a->policy_id . '|' . (string) $a->ver)->all();
 
+        // مسودّةٌ أو مؤرشفة لا تُطالِب أحداً: الإقرار على نصٍّ **سارٍ**
         return hub_scope(DB::table('policies')->whereNull('deleted_at'), 'policies', $u)
             ->where('ack_required', 1)
+            ->where(fn ($w) => $w->whereNull('status')
+                ->orWhereNotIn('status', ['مسودة', 'قيد الاعتماد', 'مؤرشفة', 'مؤرشف', 'ملغاة']))
             ->orderByRaw('eff_date IS NULL, eff_date')->limit(40)
             ->get(['id', 'title', 'ver', 'cat', 'eff_date'])
             // النسخة جزءٌ من المفتاح: سياسةٌ حُدّثت تعود تنتظر إقراراً جديداً
@@ -165,24 +172,38 @@ class Inbox
             ])->values()->all();
     }
 
-    /** مقالات معرفة موسومة «يجب قراءتها» ولم أقرأها */
+    /**
+     * مقالات معرفة موسومة «يجب قراءتها» ولم أُقرّ بنسختها الحالية.
+     *
+     * كان يقرأ `kb_reads` — جدولٌ **لا يكتب فيه أحد**: `hub_ack_do('kb')` يكتب
+     * في `policy_acks`. فالنتيجة: تقول لوحةُ السياسات «١٠٠٪ مُقَرّ» ويبقى البند
+     * في صندوق المستخدم **إلى الأبد بلا فعلٍ يُزيله**. القراءة الآن من السكّة
+     * التي يُكتب فيها فعلاً، وبالنسخة كما في السياسات.
+     */
     protected static function mustRead($u): array
     {
-        if (! Schema::hasTable('kb_articles') || ! Schema::hasTable('kb_reads')) return [];
+        if (! Schema::hasTable('kb_articles') || ! Schema::hasTable('policy_acks')) return [];
         if (! hub_can($u, 'kb', 'v')) return [];
 
-        $read = DB::table('kb_reads')->where('user_id', $u->id)->pluck('article_id')->all();
+        $acked = DB::table('policy_acks')->whereNull('deleted_at')
+            ->where('src_module', 'kb')->where('user_id', $u->id)->whereNotNull('ack_at')
+            ->get(['record_id', 'ver'])
+            ->map(fn ($a) => $a->record_id . '|' . (string) $a->ver)->all();
 
         return hub_scope(DB::table('kb_articles')->whereNull('deleted_at'), 'kb', $u)
             ->where('must_read', 1)
-            ->whereNotIn('id', $read ?: ['-'])
-            ->orderByDesc('created_at')->limit(20)
-            ->get(['id', 'title', 'cat'])
+            ->where(fn ($w) => $w->whereNull('status')
+                ->orWhereNotIn('status', ['مسودة', 'قيد المراجعة', 'مؤرشف', 'مؤرشفة']))
+            ->orderByDesc('created_at')->limit(40)
+            ->get(['id', 'title', 'cat', 'ver'])
+            // النسخة جزءٌ من المفتاح كما في السياسات — ونصٌّ حُدّث يُقرأ من جديد
+            ->reject(fn ($k) => in_array($k->id . '|' . ((string) $k->ver ?: '1.0'), $acked, true))
+            ->take(20)
             ->map(fn ($k) => [
                 'kind' => 'kb', 'icon' => '📕', 'label' => 'قراءة إلزامية',
                 'title' => $k->title, 'due' => null, 'why' => $k->cat ?: 'من قاعدة المعرفة',
                 'url' => route('m.show', ['kb', $k->id]),
-            ])->all();
+            ])->values()->all();
     }
 
     /** طلبات داخلية أنا مقيّمها ولم تُحسم */

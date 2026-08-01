@@ -90,7 +90,7 @@ class AuthController extends Controller
         $u = User::find($r->session()->get('2fa:uid'));
         abort_unless($u, 404);
 
-        if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, (string) $r->input('code'))) {
+        if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, hub_str($r->input('code')))) {
             return back()->withErrors(['code' => 'الرمز غير صحيح أو انتهى — جرّب الرمز الحالي في التطبيق']);
         }
 

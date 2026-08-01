@@ -2,7 +2,7 @@
 @section('title', 'بوابتي — الصندوق الموحد')
 @section('content')
 @php
-    $filter = (string) request()->query('k', '');
+    $filter = hub_str(request()->query('k', ''));
     $kinds = collect($inbox)->groupBy('kind')->map->count();
     $shown = $filter !== '' ? collect($inbox)->where('kind', $filter)->values()->all() : $inbox;
     $kindLabels = collect($inbox)->pluck('label', 'kind')->all();

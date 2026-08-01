@@ -238,7 +238,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'calendar',  'label' => '📅 التقويم',          'route' => 'calendar',        'group' => 'daily',     'ok' => true],
             ['key' => 'feed',      'label' => '📣 قناة الفريق',      'route' => 'feed',            'group' => 'daily',     'ok' => true],
             ['key' => 'dm',        'label' => '💬 الرسائل',          'route' => 'dm.inbox',        'group' => 'daily',     'ok' => true],
-            ['key' => 'inboxdocs', 'label' => '📥 صندوق الوثائق',    'route' => 'inboxdocs.index', 'group' => 'daily',     'ok' => true],
+            ['key' => 'inboxdocs', 'label' => '📥 صندوق الوثائق',    'route' => 'inboxdocs.index', 'group' => 'daily',     'ok' => hub_can($user, 'inboxdocs', 'v') || hub_can($user, 'files', 'v')],
 
             ['key' => 'ceo',       'label' => '👑 لوحة CEO',         'route' => 'ceo',             'group' => 'analytics', 'ok' => $owner],
             ['key' => 'perf',      'label' => '📈 لوحة الأداء',      'route' => 'performance',     'group' => 'analytics', 'ok' => $mon],
@@ -258,6 +258,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'pricing',   'label' => '💳 الباقات والتسعير', 'route' => 'pricing',         'group' => 'centers',   'ok' => hub_can($user, 'plans', 'v')],
             ['key' => 'mediac',    'label' => '📣 مركز الإعلام',      'route' => 'media.center',    'group' => 'centers',   'ok' => hub_can($user, 'media', 'v') || hub_can($user, 'events', 'v')],
             ['key' => 'teamdir',   'label' => '👥 دليل الفريق',       'route' => 'team',            'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
+            ['key' => 'staff',     'label' => '🪪 الموظفون وحساباتهم', 'route' => 'staff.index',    'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
             ['key' => 'okrb',      'label' => '🎯 لوحة الأهداف',     'route' => 'okrs.board',      'group' => 'analytics', 'ok' => hub_can($user, 'okrs', 'v')],
             ['key' => 'polb',      'label' => '📜 السياسات والإقرارات', 'route' => 'policies.board', 'group' => 'centers',   'ok' => hub_can($user, 'policies', 'v')],
             ['key' => 'social',    'label' => '📣 مركز السوشال',     'route' => 'social.index',    'group' => 'analytics', 'ok' => hub_can($user, 'social', 'v')],
@@ -471,6 +472,21 @@ if (! function_exists('hub_user_admins')) {
         return \App\Models\User::with('role')->whereNull('deleted_at')->where('status', 'نشط')->get()
             ->filter(fn ($u) => $u->role?->is_owner || hub_flag($u, 'users'))
             ->pluck('id')->all();
+    }
+}
+
+if (! function_exists('hub_assignable_roles')) {
+    /**
+     * الأدوار القابلة للمنح من هذا المستخدم — **غير المالك لا يمنح ملكيةً فلا
+     * تُعرض له**. الحارس مفروضٌ في الخادم كذلك (Staff::makeAccount)، وهذا
+     * إخفاءُ ما لا يُمنح حتى لا يُعرض خيارٌ يُرفض عند الحفظ.
+     */
+    function hub_assignable_roles($user = null)
+    {
+        $user = $user ?? auth()->user();
+
+        return \App\Models\Role::when(! hub_is_owner($user), fn ($q) => $q->where('is_owner', false))
+            ->orderByDesc('is_owner')->orderBy('name')->get(['id', 'name', 'is_owner']);
     }
 }
 
@@ -697,7 +713,7 @@ if (! function_exists('hub_expiry')) {
 
                     // لا تنبيه على ما أُغلق: مهمة منجزة أو فاتورة مدفوعة أو عقد منتهٍ
                     // كانت تظل تنبّه إلى الأبد فتفقد الصفحة مصداقيتها.
-                    if (($sc = $md['status'] ?? null) && \Illuminate\Support\Facades\Schema::hasColumn($md['table'], $sc)) {
+                    if (($sc = hub_status_col($mk)) && \Illuminate\Support\Facades\Schema::hasColumn($md['table'], $sc)) {
                         $q->where(fn ($w) => $w->whereNull($sc)->orWhereNotIn($sc, hub_closed_states()));
                     }
 
@@ -1710,13 +1726,12 @@ if (! function_exists('hub_declared_states')) {
         if ($all !== null) return $all;
 
         $all = [];
-        foreach (hub_modules() as $md) {
-            $sc = $md['status'] ?? null;
-            if (! $sc) continue;
-            foreach ($md['fields'] as $f) {
-                if (($f['col'] ?? '') === $sc && ! empty($f['options'])) {
-                    foreach ($f['options'] as $o) $all[] = $o;
-                }
+        foreach (hub_modules() as $mk => $md) {
+            // بالمفتاح لا بالعمود: المطابقة كانت `col === $md['status']` و
+            // `status` مفتاحٌ — فخيارات وحدة الوثائق كانت تسقط من مفردات النظام
+            $f = hub_status_field($mk);
+            if ($f && ! empty($f['options'])) {
+                foreach ($f['options'] as $o) $all[] = $o;
             }
         }
 
@@ -1958,6 +1973,83 @@ if (! function_exists('hub_scope_key')) {
         return $prefix . ':' . ($u?->role_id ?? '0') . ':' . ($u?->id ?? '0')
             . ':' . (string) session('hub.company', '-') . hub_lens_key(hub_lens()['id'] ?? null)
             . hub_data_stamp(['roles', 'users']);
+    }
+}
+
+if (! function_exists('hub_status_col')) {
+    /**
+     * **عمود** الحالة الفيزيائي لوحدة — لا مفتاحه.
+     *
+     * `$def['status']` مفتاحُ حقلٍ لا اسمُ عمود، وهما متطابقان في اثنتين
+     * وسبعين وحدة و**مختلفان في واحدة**: وحدة الوثائق مفتاحُها `docStatus`
+     * وعمودها `doc_status`. فكل قارئٍ يستعمل المفتاح مباشرةً يبني
+     * `where "docStatus" = ?` — يُعيده SQLite صفراً صامتاً، ويرفضه **MySQL**
+     * بـ`Unknown column` وخطأ ٥٠٠.
+     *
+     * وأثرُه أوسع من الترشيح: قائمةُ الحالات تُبنى بـ`firstWhere('col', ...)`
+     * فتعود فارغة، والحدث لا يُطلَق عند تغيّر الحالة، ووثيقةٌ ملغاة تبقى
+     * تُنبّه «تنتهي قريباً» لأن مرشّح المفتوح يُتخطّى.
+     *
+     * نظيرتُه `hub_display_col()` موجودةٌ منذ زمن — وهذه كانت ناقصة.
+     */
+    function hub_status_col(string $module): ?string
+    {
+        static $map = [];
+        if (array_key_exists($module, $map)) return $map[$module];
+
+        $def = hub_mod($module);
+        $key = $def['status'] ?? null;
+        if (! $key) return $map[$module] = null;
+
+        $f = collect($def['fields'] ?? [])->firstWhere('key', $key);
+
+        return $map[$module] = $f['col'] ?? $key;
+    }
+}
+
+if (! function_exists('hub_status_field')) {
+    /** تعريفُ حقل الحالة (بخياراته) — للقوائم المنسدلة */
+    function hub_status_field(string $module): ?array
+    {
+        $def = hub_mod($module);
+        $key = $def['status'] ?? null;
+
+        return $key ? (collect($def['fields'] ?? [])->firstWhere('key', $key) ?: null) : null;
+    }
+}
+
+if (! function_exists('hub_str')) {
+    /**
+     * نصٌّ من مدخلٍ لا يُوثَق به.
+     *
+     * `(string) $request->query('k')` يبدو بريئاً حتى يصل `?k[]=x`: تحويل
+     * المصفوفة إلى نصّ يرمي `Array to string conversion`، فتسقط الشاشة بخمسمئة
+     * برابطٍ يُلصق — بلا صلاحيةٍ ولا مهارة. وكلُّ موضعٍ يقرأ معامِلاً نصّياً
+     * يمرّ من هنا.
+     */
+    function hub_str($v, string $default = ''): string
+    {
+        if (is_string($v)) return $v;
+        if (is_int($v) || is_float($v) || is_bool($v)) return (string) $v;
+
+        return $default;      // مصفوفةٌ أو كائنٌ أو null — لا نصّ فيه
+    }
+}
+
+if (! function_exists('hub_num')) {
+    /**
+     * عددٌ منتهٍ من مدخلٍ لا يُوثَق به.
+     * `1e400` يمرّ من قاعدة `numeric` ويصير `INF`، فيُكتب في السجل ثم يفشل
+     * ترميز قيد التدقيق — فيقع خطأٌ **بعد** أن يكون التغيير قد وقع: تغييرٌ
+     * بلا أثر، وهو نقضُ «إثبات لا ادّعاء».
+     */
+    function hub_num($v): ?float
+    {
+        if ($v === null || $v === '' || is_array($v) || ! is_numeric($v)) return null;
+
+        $f = (float) $v;
+
+        return is_finite($f) ? $f : null;
     }
 }
 
@@ -2772,18 +2864,19 @@ if (! function_exists('hub_kpi_metric')) {
      */
     function hub_kpi_metric(array $m, $user = null): ?float
     {
-        $mk = (string) ($m['module'] ?? '');
+        $mk = hub_str($m['module'] ?? '');
         $def = hub_mod($mk);
         if (! $def) return null;
         if ($user && ! hub_can($user, $mk, 'v')) return null;   // احترام الصلاحية
 
-        $agg = in_array($m['agg'] ?? '', ['count', 'sum', 'avg'], true) ? $m['agg'] : 'count';
+        $aggIn = hub_str($m['agg'] ?? '');
+        $agg = in_array($aggIn, ['count', 'sum', 'avg'], true) ? $aggIn : 'count';
         $q = \Illuminate\Support\Facades\DB::table($def['table'])->whereNull('deleted_at');
         if ($user) $q = hub_scope($q, $mk, $user);
 
         // فلتر الحالة: عمود الحالة **الفيزيائي** لا مفتاحه — في وحدة الوثائق
         // المفتاح docStatus والعمود doc_status، فالفحص بالمفتاح كان يُسقط الفلتر بصمت
-        if (($st = trim((string) ($m['st'] ?? ''))) !== '' && ($skey = $def['status'] ?? null)) {
+        if (($st = trim(hub_str($m['st'] ?? ''))) !== '' && ($skey = $def['status'] ?? null)) {
             $sfield = collect($def['fields'])->firstWhere('key', $skey);
             $scol = $sfield['col'] ?? $skey;
             if (\Illuminate\Support\Facades\Schema::hasColumn($def['table'], $scol)) $q->where($scol, $st);
@@ -2792,7 +2885,7 @@ if (! function_exists('hub_kpi_metric')) {
         if ($agg === 'count') return (float) $q->count();
 
         // sum/avg يتطلبان عموداً رقمياً من حقول الوحدة
-        $col = collect($def['fields'])->firstWhere('key', $m['col'] ?? '');
+        $col = collect($def['fields'])->firstWhere('key', hub_str($m['col'] ?? ''));
         if (! $col || ! in_array($col['type'], ['num', 'big'], true)) return null;
 
         // متوسط بلا صفوف = لا بيانات (null)، لا صفر مضلِّل
@@ -2837,17 +2930,21 @@ if (! function_exists('hub_kpi_explain')) {
      */
     function hub_kpi_explain(array $formula): string
     {
+        // كل عضوٍ في المعادلة قد يصل **مصفوفةً** من استيرادٍ أو صفٍّ قديم:
+        // `$arr['x']` على مصفوفة، و`(string) $arr` — كلاهما يرمي، وصفٌّ واحد
+        // مشوّه كان يُعطّل `/kpis` واللوحة الرئيسية **لكل المستخدمين**.
         $one = function ($m) {
             if (! is_array($m)) return '—';
-            $def = hub_mod((string) ($m['module'] ?? ''));
+            $def = hub_mod(hub_str($m['module'] ?? ''));
             if (! $def) return 'وحدة غير معروفة';
-            $agg = ['count' => 'عدد سجلات', 'sum' => 'مجموع', 'avg' => 'متوسط'][$m['agg'] ?? 'count'] ?? 'عدد سجلات';
+            $aggKey = hub_str($m['agg'] ?? 'count');
+            $agg = ['count' => 'عدد سجلات', 'sum' => 'مجموع', 'avg' => 'متوسط'][$aggKey] ?? 'عدد سجلات';
             $txt = $agg . ' ' . $def['label'];
-            if (($m['agg'] ?? '') !== 'count' && ($ck = $m['col'] ?? null)) {
+            if ($aggKey !== 'count' && ($ck = hub_str($m['col'] ?? '')) !== '') {
                 $col = collect($def['fields'])->firstWhere('key', $ck);
                 $txt = $agg . ' «' . ($col['label'] ?? $ck) . '» في ' . $def['label'];
             }
-            if (trim((string) ($m['st'] ?? '')) !== '') $txt .= ' بحالة «' . $m['st'] . '»';
+            if (($st = trim(hub_str($m['st'] ?? ''))) !== '') $txt .= ' بحالة «' . $st . '»';
 
             return $txt;
         };
@@ -3910,7 +4007,7 @@ if (! function_exists('hub_lens')) {
         $user = $user ?? auth()->user();
         $out = ['id' => null, 'name' => null, 'on' => false];
 
-        $pid = trim((string) request()->query('p', ''));
+        $pid = trim(hub_str(request()->query('p', '')));
         if ($pid === '' || ! $user) return $out;
 
         $p = hub_scope(\App\Models\Project::query(), 'projects', $user)
