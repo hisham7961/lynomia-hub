@@ -37,6 +37,9 @@ class InnovationController extends Controller
         return view('innovation', [
             'ideas' => $ideas,
             'byUsers' => $byUsers,
+            'contributors' => \App\Support\Innovation::contributors(),
+            'pulse' => \App\Support\Innovation::pulse(),
+            'atts' => \App\Support\Innovation::attachmentCounts($ideas->pluck('id')->all()),
             'scored' => $ideas->filter(fn ($i) => $i->ice !== null)->count(),
             'lens' => $lens,
         ]);

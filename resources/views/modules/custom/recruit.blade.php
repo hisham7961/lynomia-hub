@@ -8,8 +8,23 @@
             ينشئ الملف الوظيفي من بيانات المرشح (الاسم، الوظيفة، القسم، البريد، الهاتف، الراتب المتوقع)
             وينقل المرحلة إلى «تم التعيين» — بلا إعادة إدخال.
         </div>
-        <form method="POST" action="{{ route('recruit.hire', $row->id) }}" class="inline">
-            @csrf<button class="btn">🎉 عيّن المرشح</button>
+        <form method="POST" action="{{ route('recruit.hire', $row->id) }}">
+            @csrf
+            @if (hub_flag(auth()->user(), 'users'))
+                {{-- حسابُ النظام مع التعيين لا بعده بأسبوع: يُختار الدور الآن،
+                     وتُعرض كلمةٌ مؤقتة مرةً واحدة، ويُشعَر من يدير المستخدمين لمراجعة الصلاحيات --}}
+                <div class="fld" style="max-width:340px;margin-bottom:8px">
+                    <label>أنشئ له حساباً بالنظام بدور</label>
+                    <select class="inp" name="role_id">
+                        <option value="">بلا حساب الآن</option>
+                        @foreach (\App\Models\Role::when(! hub_is_owner(), fn ($q) => $q->where('is_owner', false))->orderBy('name')->get() as $rrole)
+                            <option value="{{ $rrole->id }}">{{ $rrole->name }}{{ $rrole->is_owner ? ' — مالك النظام' : '' }}</option>
+                        @endforeach
+                    </select>
+                    <small class="mut">تُنشأ كلمةُ مرورٍ مؤقتة تُعرض مرةً واحدة، ويصل من يدير المستخدمين إشعارٌ لمراجعة صلاحياته.</small>
+                </div>
+            @endif
+            <button class="btn">🎉 عيّن المرشح</button>
         </form>
     </div>
 @elseif (! empty($rcMeta['employee_id']))
