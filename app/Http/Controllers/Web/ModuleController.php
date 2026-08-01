@@ -34,6 +34,17 @@ class ModuleController extends Controller
 
         if ($term = $r->input('q')) $q->search($term);
 
+        // فحص جودة (`?qc=`): يفتح **نفس** السجلات التي عدّها مركز الجودة —
+        // فالنقص يُفتح لا يُقرأ. والمفتاح يُطابَق على قائمة الفحوص المشتقّة من
+        // السجل، فمفتاحٌ مُلفَّق لا يبني قيداً ولا يوسّع القائمة.
+        if ($qc = $r->input('qc')) {
+            $rule = \App\Support\DataQuality::rules($def['key'] ?? '')[$qc] ?? null;
+            if ($rule) {
+                $q = \App\Support\DataQuality::apply($q, (string) ($def['key'] ?? ''), (string) $qc);
+                $filters[] = ['key' => 'qc', 'label' => 'فحص جودة', 'val' => $qc, 'name' => $rule['label']];
+            }
+        }
+
         $statusCol = $def['status'] ?? null;
         if ($statusCol && ($st = $r->input('status'))) $q->where($statusCol, $st);
 
