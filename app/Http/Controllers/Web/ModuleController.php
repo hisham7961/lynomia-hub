@@ -363,6 +363,19 @@ class ModuleController extends Controller
         $this->guardCompany($r, $module);
 
         $m = $this->findScoped($class, $module, $id);
+
+        /*
+         * القفل التفاؤلي: عمود `version` كان يزيد ولا يُقارَن، والنموذج لا يبعث
+         * نسخةً — فكاتبان على السجل نفسه، والثاني يدهس الأول **بلا إشارة**
+         * وكلاهما يرى «حُفظت التعديلات». من يبعث نسخةً قديمة يُردّ برسالةٍ
+         * تقول ماذا حدث؛ ومن لا يبعث نسخةً (API قديم أو سكربت) لا يُمنع.
+         */
+        $seen = $r->input('_version');
+        if ($seen !== null && $seen !== '' && (int) $seen !== (int) $m->version) {
+            return back()->withInput()->withErrors(['_version' =>
+                'عدّل شخصٌ آخر هذا السجل بينما كنت تحرّره — افتحه من جديد وراجع تغييرك قبل الحفظ.']);
+        }
+
         if (hub_needs_approval(auth()->user(), $module, 'e')) {
             return $this->queueApproval($def, $module, 'e', $m, $r);
         }
@@ -638,6 +651,8 @@ class ModuleController extends Controller
             'payload'      => $payload,
             'requested_by' => auth()->id(),
             'status'       => 'معلّق',
+            // نسخة السجل وقت الطلب — بها يُكشف عند الحسم أنّ أحداً عدّله في الطابور
+            'meta'         => ['ver' => (int) ($m->version ?? 0)],
         ]);
 
         foreach ($approvers as $uid) {

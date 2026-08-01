@@ -238,7 +238,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'calendar',  'label' => '📅 التقويم',          'route' => 'calendar',        'group' => 'daily',     'ok' => true],
             ['key' => 'feed',      'label' => '📣 قناة الفريق',      'route' => 'feed',            'group' => 'daily',     'ok' => true],
             ['key' => 'dm',        'label' => '💬 الرسائل',          'route' => 'dm.inbox',        'group' => 'daily',     'ok' => true],
-            ['key' => 'inboxdocs', 'label' => '📥 صندوق الوثائق',    'route' => 'inboxdocs.index', 'group' => 'daily',     'ok' => true],
+            ['key' => 'inboxdocs', 'label' => '📥 صندوق الوثائق',    'route' => 'inboxdocs.index', 'group' => 'daily',     'ok' => hub_can($user, 'inboxdocs', 'v') || hub_can($user, 'files', 'v')],
 
             ['key' => 'ceo',       'label' => '👑 لوحة CEO',         'route' => 'ceo',             'group' => 'analytics', 'ok' => $owner],
             ['key' => 'perf',      'label' => '📈 لوحة الأداء',      'route' => 'performance',     'group' => 'analytics', 'ok' => $mon],

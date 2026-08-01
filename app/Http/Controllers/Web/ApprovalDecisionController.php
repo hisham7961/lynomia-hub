@@ -22,11 +22,22 @@ class ApprovalDecisionController extends ModuleController
         $class = '\\App\\Models\\' . $def['model'];
         $m = $class::withTrashed()->findOrFail($ap->record_id);
 
+        // **حمولةٌ قديمة لا تُعاد فوق تعديلٍ أحدث**: الطلب يمكث في الطابور أياماً،
+        // ويُعدَّل السجل فيها. الاعتماد كان يُعيد لعب الحمولة المخزنة فيدهس ما لا
+        // يراه المعتمِد ولا يعلم به. النسخة المُلتقطة وقت الطلب هي الفيصل.
+        $ver = data_get($ap->meta, 'ver');
+        if ($ap->op === 'e' && $ver !== null && (int) $ver !== (int) ($m->version ?? 0)) {
+            return back()->withErrors(['approval' =>
+                'تغيّر السجل بعد تقديم هذا الطلب — راجعه مع الطالب وليُعِد تقديمه على النسخة الحالية. '
+                . 'لم يُنفَّذ شيء ولم يُحسم الطلب.']);
+        }
+
         // سبب التغيير في التدقيق = مرجع الموافقة + سبب الطالب
         request()->merge(['_reason' => trim('تنفيذ موافقة معتمدة' . ($ap->reason ? ' — ' . $ap->reason : ''))]);
 
         if ($ap->op === 'd') {
-            if (! $m->trashed()) $m->delete();
+            $did = ! $m->trashed();
+            if ($did) $m->delete();
         } else {
             // حصرُ الكتابة بمفاتيح الحمولة: المعتمِد وافق على **هذه** التغييرات،
             // ولو مُرِّرت كاملةً لكُتب null فوق كل حقلٍ غاب عنها (ومنها ما نُقّي
@@ -34,14 +45,23 @@ class ApprovalDecisionController extends ModuleController
             $payload = (array) $ap->payload;
             $req = Request::create('/', 'POST', $payload);
             $this->fill($def, $req, $m, array_keys($payload));
-            $m->save();
-            $this->bustProgress($ap->mod, $m);
+            // **لا يُقال «نُفّذ» وشيءٌ لم يُنفَّذ**: حمولةٌ تطابق الحاضر تُحفظ بلا أثر،
+            // وكان الطالب يُبلَّغ «نُفّذ» فيبني على تنفيذٍ لم يقع.
+            $did = $m->isDirty();
+            if ($did) {
+                $m->save();
+                $this->bustProgress($ap->mod, $m);
+            }
         }
 
         $ap->forceFill(['status' => 'معتمد', 'decided_by' => auth()->id(), 'decided_at' => now()])->save();
-        $this->tellRequester($ap, 'اعتُمد ونُفّذ طلبك: ' . $ap->title);
+        $this->tellRequester($ap, $did
+            ? 'اعتُمد ونُفّذ طلبك: ' . $ap->title
+            : 'اعتُمد طلبك ولم يتغيّر شيء — السجل يطابق المطلوب أصلاً: ' . $ap->title);
 
-        return back()->with('ok', 'اعتُمدت العملية ونُفّذت');
+        return back()->with('ok', $did
+            ? 'اعتُمدت العملية ونُفّذت'
+            : 'اعتُمدت العملية — ولم يتغيّر شيء في السجل لأنه يطابق المطلوب أصلاً');
     }
 
     public function reject(Request $r, string $id)

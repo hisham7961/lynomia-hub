@@ -11,7 +11,13 @@
           @if ($hx) hx-boost="true" hx-target="#recform" hx-select="#recform" hx-swap="outerHTML"
               hx-select-oob="#tblzone:outerHTML,#flash:innerHTML" hx-push-url="false" @endif>
         @csrf
-        @if ($updating)@method('PUT')@endif
+        @if ($updating)
+            @method('PUT')
+            {{-- النسخة التي فُتح عليها النموذج: لو تغيّرت قبل الحفظ رُدَّ التعديل
+                 بدل أن يدهس كاتبٌ كاتباً بصمت ويرى كلاهما «حُفظ» --}}
+            <input type="hidden" name="_version" value="{{ $row->version }}">
+            @error('_version')<div class="err" role="alert">⚠️ {{ $message }}</div>@enderror
+        @endif
         <div class="fg">
             @foreach ($def['fields'] as $f)
                 @php $fm = hub_field_mode(auth()->user(), $module, $f['key']); @endphp
