@@ -53,6 +53,23 @@ class SettingController extends Controller
         return (array) config('hub_settings.internal', []);
     }
 
+    /**
+     * قيمةٌ صالحةٌ للعرض في مدخل.
+     *
+     * عمود `settings.value` مصبوبٌ `array`، والمنصِّب يبذر خرائط JSON حقيقية
+     * (`finance.accounts` و`notify.quiet`) — فتعود القيمة **مصفوفةً** وتُطبع في
+     * مدخلٍ نصّي فتسقط الشاشة بـ`htmlspecialchars(): array given` على **كل
+     * تنصيبٍ جديد**. تُعاد هنا نصّاً JSON مقروءاً وقابلاً للتحرير،
+     * وقارئا الخريطة (المالية والرواتب) يقبلان النصّ والمصفوفة معاً.
+     */
+    public static function displayValue($v): string
+    {
+        if ($v === null || is_bool($v)) return $v ? '1' : '';
+        if (is_scalar($v)) return (string) $v;
+
+        return (string) json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+    }
+
     protected function gate(): void
     {
         abort_unless(hub_is_owner(), 403);
@@ -65,7 +82,7 @@ class SettingController extends Controller
         $values = collect(self::exposedKeys())
             ->mapWithKeys(fn ($k) => [$k => in_array($k, self::SECRETS, true)
                 ? (setting($k, '') !== '' ? '••••' : '')      // السرّ لا يعود للشاشة أبداً
-                : setting($k, '')]);
+                : self::displayValue(setting($k, ''))]);
 
         return view('settings.form', [
             'groups'   => self::catalog(),
