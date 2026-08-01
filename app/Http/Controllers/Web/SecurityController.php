@@ -55,12 +55,20 @@ class SecurityController extends Controller
         $failed = DB::table('audits')->where('action', 'دخول فاشل')
             ->orderByDesc('created_at')->limit(10)->get(['name', 'ip', 'device', 'created_at']);
 
-        // عناوين تطرق أكثر من حساب: تخمينٌ لا نسيان
-        $knocking = DB::table('audits')->where('action', 'دخول فاشل')
-            ->where('created_at', '>=', now()->subDays(7))->whereNotNull('ip')
-            ->groupBy('ip')->havingRaw('COUNT(DISTINCT name) > 1')
-            ->orderByRaw('COUNT(*) DESC')->limit(6)
-            ->get([DB::raw('ip'), DB::raw('COUNT(*) as hits'), DB::raw('COUNT(DISTINCT name) as targets')]);
+        // عناوين تطرق أكثر من حساب: تخمينٌ لا نسيان.
+        // مجمَّعٌ في try: تجميعٌ بـHAVING على محرّكاتٍ مضبوطةٍ بصرامة قد يُرفض،
+        // وبطاقةٌ ناقصة أهون من لوحة أمانٍ لا تُفتح.
+        try {
+            $knocking = DB::table('audits')->where('action', 'دخول فاشل')
+                ->where('created_at', '>=', now()->subDays(7))->whereNotNull('ip')
+                ->groupBy('ip')->havingRaw('COUNT(DISTINCT name) > 1')
+                ->orderByRaw('COUNT(*) DESC')->limit(6)
+                ->get([DB::raw('ip'), DB::raw('COUNT(*) as hits'), DB::raw('COUNT(DISTINCT name) as targets')]);
+        } catch (\Throwable $e) {
+            \App\Support\ErrorLog::capture('php', 'security: تعذّر تجميع العناوين الطارقة — ' . $e->getMessage(),
+                $e->getFile(), $e->getLine());
+            $knocking = collect();
+        }
 
         $idleUsers = (clone $users)->where('status', '!=', 'موقوف')
             ->where(fn ($w) => $w->whereNull('last_login_at')->orWhere('last_login_at', '<', now()->subDays(60)))
@@ -87,11 +95,15 @@ class SecurityController extends Controller
             ->orderByDesc('audits.created_at')->limit(8)
             ->get(['users.name as uname', 'audits.module', 'audits.name', 'audits.ip', 'audits.created_at']);
 
+        // الفحوص تُحسب مرةً واحدة: كانت تُنفَّذ مرتين (اللوحة ثم الملخّص) —
+        // اثنان وثلاثون استعلاماً حيث يكفي ستة عشر
+        $posture = SecurityPosture::checks();
+
         return view('security.index', [
             'kpi' => $kpi, 'sessions' => $sessions, 'failed' => $failed, 'knocking' => $knocking,
             'idleUsers' => $idleUsers, 'staleSecrets' => $staleSecrets,
             'roles' => $roles, 'exports' => $exports,
-            'posture' => SecurityPosture::checks(), 'summary' => SecurityPosture::summary(),
+            'posture' => $posture, 'summary' => SecurityPosture::summary($posture),
             'lockdown' => (bool) setting('security.lockdown', false),
         ]);
     }

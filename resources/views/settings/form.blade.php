@@ -39,7 +39,8 @@
                 @php
                     $input = str_replace('.', '_', $key);
                     $type  = $meta['type'] ?? 'text';
-                    $val   = old($input, $values[$key] ?? '');
+                    // القيمة قد تعود مركّبة (عمود value مصبوبٌ array والمنصِّب يبذر خرائط)
+                    $val   = \App\Http\Controllers\Web\SettingController::displayValue(old($input, $values[$key] ?? ''));
                     $on    = in_array($val, ['1', 1, true], true);
                     $risky = trim((string) ($meta['risk'] ?? '')) !== '';
                     $hay   = $key . ' ' . ($meta['label'] ?? '') . ' ' . ($meta['effect'] ?? '') . ' ' . ($meta['risk'] ?? '');

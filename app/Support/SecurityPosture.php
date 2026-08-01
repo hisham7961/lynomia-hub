@@ -17,33 +17,42 @@ use Illuminate\Support\Facades\Schema;
  */
 class SecurityPosture
 {
-    /** كل فحص: key · label · tone (ok|wn|bad) · why · n · fix · url */
+    /** ترتيب الفحوص — الأسماء وحدها كي تُنفَّذ كلٌّ منها معزولةً عن أخواتها */
+    protected const ORDER = ['lockdown', 'maintenance', 'ssrf', 'quoteflowPass', 'twofaPrivileged',
+                             'twofaCoverage', 'passwordPolicy', 'stalePasswords', 'idleUsers', 'lockedNow',
+                             'vaultRotation', 'apiStale', 'shareOpen', 'auditChain', 'demoMode', 'ownerCount'];
+
+    /**
+     * كل فحص: key · label · tone (ok|wn|bad) · why · n · fix · url
+     *
+     * **كلٌّ معزول**: ستة عشر فحصاً تقرأ سبعة جداول وثمانية إعدادات، وسقوط
+     * واحدٍ منها كان يُسقط اللوحة كلها — ولوحةُ أمانٍ لا تُفتح وقت العطل هي
+     * أسوأ ما يمكن أن تكون. الساقط يظهر بطاقةَ تحذيرٍ تحيل إلى مركز الأخطاء،
+     * والخمسة عشر الباقية تعمل.
+     */
     public static function checks(): array
     {
-        return array_values(array_filter([
-            self::lockdown(),
-            self::maintenance(),
-            self::ssrf(),
-            self::quoteflowPass(),
-            self::twofaPrivileged(),
-            self::twofaCoverage(),
-            self::passwordPolicy(),
-            self::stalePasswords(),
-            self::idleUsers(),
-            self::lockedNow(),
-            self::vaultRotation(),
-            self::apiStale(),
-            self::shareOpen(),
-            self::auditChain(),
-            self::demoMode(),
-            self::ownerCount(),
-        ]));
+        $out = [];
+        foreach (self::ORDER as $check) {
+            try {
+                $row = self::$check();
+                if ($row) $out[] = $row;
+            } catch (\Throwable $e) {
+                \App\Support\ErrorLog::capture('php',
+                    "security-posture: سقط فحص {$check} — " . $e->getMessage(), $e->getFile(), $e->getLine());
+                $out[] = self::row($check, 'فحصٌ تعذّر تنفيذه: ' . $check, 'wn',
+                    'لم يُنفَّذ هذا الفحص على هذا التنصيب، فحالتُه مجهولة لا سليمة.', 0,
+                    'التفصيل مسجَّلٌ في مركز الأخطاء باسم security-posture.', route('errors.index'));
+            }
+        }
+
+        return $out;
     }
 
     /** ملخّصٌ للشريط العلوي: كم مكسور وكم تحذير */
-    public static function summary(): array
+    public static function summary(?array $checks = null): array
     {
-        $c = collect(self::checks());
+        $c = collect($checks ?? self::checks());
 
         return [
             'bad'   => $c->where('tone', 'bad')->count(),
@@ -88,9 +97,17 @@ class SecurityPosture
             route('settings.edit'));
     }
 
+    /** قيمة إعدادٍ نصّاً دائماً — عمود القيم مصبوبٌ array فقد تعود مركّبة */
+    protected static function str(string $key, string $def = ''): string
+    {
+        $v = setting($key, $def);
+
+        return is_scalar($v) ? (string) $v : (string) json_encode($v, JSON_UNESCAPED_UNICODE);
+    }
+
     protected static function quoteflowPass(): array
     {
-        $v = (string) setting('quoteflow.pass', '');
+        $v = self::str('quoteflow.pass');
         $weak = $v === '' || $v === '1998';
 
         return self::row('qf_pass', 'كلمة سرّ QuoteFlow', $weak ? 'bad' : 'ok',
@@ -134,7 +151,7 @@ class SecurityPosture
 
     protected static function passwordPolicy(): array
     {
-        $min = (int) setting('auth.pw_min', 10);
+        $min = (int) self::str('auth.pw_min', '10');
         $tone = $min >= 12 ? 'ok' : ($min >= 10 ? 'wn' : 'bad');
 
         return self::row('pw_min', 'سياسة كلمة المرور', $tone,
