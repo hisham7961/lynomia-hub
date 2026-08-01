@@ -12,7 +12,16 @@ class LegalController extends Controller
     {
         abort_unless(hub_can(auth()->user(), 'contracts', 'v'), 403, 'المركز القانوني يتطلب صلاحية عرض العقود');
 
-        $base = fn () => hub_scope(DB::table('contracts')->whereNull('deleted_at'), 'contracts');
+        // عدسة المشروع: لفّة واحدة على المُغلَّف تُرشِّح ست كتلٍ من تسع
+        $lens = hub_lens();
+        $pid  = $lens['id'];
+        $base = fn () => hub_lens_apply(
+            hub_scope(DB::table('contracts')->whereNull('deleted_at'), 'contracts'), 'contracts', $pid);
+
+        // الالتزامات وطلبات التوقيع: عمود المشروع فيها شبه فارغ (يُملأ وقت
+        // الترحيل فقط) — فالطريق الأمتن: العمود **أو** عقدُها في المشروع.
+        $viaContract = fn ($q) => $pid ? $q->where(fn ($w) => $w->where('project_id', $pid)
+            ->orWhereIn('contract_id', DB::table('contracts')->select('id')->where('project_id', $pid))) : $q;
         $today = now()->toDateString();
         $soon = now()->addDays(60)->toDateString();
         $activeish = fn ($q) => hub_open_scope($q);
@@ -39,7 +48,7 @@ class LegalController extends Controller
 
         // v2.124: التزامات متتبعة تستحق (وحدة م7) بدل قصاصات النص القديمة
         $obligations = \Illuminate\Support\Facades\Schema::hasTable('contract_obligations')
-            ? hub_scope(\App\Models\ContractObligation::query(), 'obligations')
+            ? $viaContract(hub_scope(\App\Models\ContractObligation::query(), 'obligations'))
                 ->whereNotIn('status', ['مكتمل', 'ملغي'])->whereNotNull('due')
                 ->whereDate('due', '<=', now()->addDays(31))->orderBy('due')->limit(10)->get()
             : collect();
@@ -51,7 +60,7 @@ class LegalController extends Controller
 
         // v2.124: عالقة بلا توقيع >٧ أيام من الإرسال — بزر تذكيرٍ مباشر
         $stuck = app(EsignController::class)->filterVisible(
-            \App\Models\SignRequest::where('status', 'بانتظار التوقيع')->whereNull('cancelled_at')
+            $viaContract(\App\Models\SignRequest::where('status', 'بانتظار التوقيع'))->whereNull('cancelled_at')
                 ->whereNotNull('sent_at')->where('sent_at', '<=', now()->subDays(7))
                 ->orderBy('sent_at')->limit(50)->get()
         )->take(8);
@@ -59,6 +68,10 @@ class LegalController extends Controller
         // v2.124: موافقات معلقة + خط التجديد (قيد التجديد ومسودات التجديد)
         $pendingSteps = \Illuminate\Support\Facades\Schema::hasTable('contract_approval_steps')
             ? \App\Models\ContractApprovalStep::where('status', 'بانتظار')
+                // لا عمود مشروع على المرحلة — الطريق عبر طلب التوقيع أو عقده
+                ->when($pid, fn ($q) => $q->whereIn('request_id',
+                    DB::table('sign_requests')->select('id')->where('project_id', $pid)
+                        ->orWhereIn('contract_id', DB::table('contracts')->select('id')->where('project_id', $pid))))
                 ->orderBy('created_at')->orderBy('stage')->limit(20)->get()->unique('request_id')->take(8)
                 ->map(function ($s) {
                     $s->req = \App\Models\SignRequest::find($s->request_id);
@@ -84,7 +97,7 @@ class LegalController extends Controller
         $currency = setting('app.currency', 'د.ك');
 
         return view('legal.index', compact('kpi', 'types', 'expiring', 'obligations', 'currency',
-            'values', 'stuck', 'pendingSteps', 'renewals', 'byOwner', 'dormantRules', 'obUsers'));
+            'values', 'stuck', 'pendingSteps', 'renewals', 'byOwner', 'dormantRules', 'obUsers', 'lens'));
     }
 
     /** تفعيل قاعدة تنبيه عقود مبذورة معطلة — بنقرة صريحة من المستخدم لا آلياً */

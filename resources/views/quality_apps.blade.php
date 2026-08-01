@@ -11,6 +11,8 @@
     </div>
 </div>
 
+@include('partials.lens', ['lensModules' => ['apps', 'issues', 'incidents', 'deploys']])
+
 {{-- أرقام المتاجر: جودةٌ داخلية بلا تحميلٍ ولا تقييم نصفُ صورة --}}
 <div class="card pad0">
     <h3 class="cardtitle" style="padding:12px 14px 0">🏪 أرقام المتاجر</h3>

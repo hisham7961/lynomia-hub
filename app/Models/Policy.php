@@ -17,6 +17,7 @@ class Policy extends Model
 
     protected $table = 'policies';
     public const MODULE = 'policies';
+    public const ACK_FLAG = 'ack_required';
     public const DISPLAY = 'title';
 
     protected $guarded = ['id', 'version', 'created_by'];
@@ -37,36 +38,19 @@ class Policy extends Model
      * ولا شيء يكتبها أبداً. تغيّر `ver` الآن يُنهي إقرارات النسخة السابقة
      * ويولّد إقرارات معلّقة جديدة لمن أقرّوها (فيُعاد سؤالهم عن الجديد).
      */
+    /**
+     * محرّكٌ **واحد** لدورة الإقرار، ومكانه النموذج لا المتحكّم: تغيّر النسخة
+     * يُسقط إقرارات ما قبلها ويُعيد الإعلان — أياً كان مصدر التغيير (واجهة،
+     * API، استيراد، أمر طرفية، بذرة). كان المنطق مكرَّراً في موضعين بمفردتَي
+     * حالةٍ مختلفتين، فيرسل إشعارين ويرى كلٌّ نصف السجلات.
+     */
     protected static function booted(): void
     {
-        static::updated(function (self $p) {
-            if (! $p->wasChanged('ver')) return;
-            $old = (string) $p->getOriginal('ver');
-            if ($old === '') return;
+        static::updated(function (self $m) {
+            if (! $m->wasChanged('ver')) return;
+            if (! (bool) ($m->{static::ACK_FLAG} ?? false)) return;
 
-            $stale = \App\Models\PolicyAck::where('policy_id', $p->id)
-                ->where('ver', $old)->where('status', 'مُقرّة')->get();
-            if ($stale->isEmpty()) return;
-
-            foreach ($stale as $ack) {
-                $ack->forceFill(['status' => 'منتهية بتحديث النسخة'])->saveQuietly();
-
-                // إقرارٌ معلّق بالنسخة الجديدة لمن أقرّ القديمة — الامتثال يُعاد طلبه لا يُفترض
-                if (! $p->ack_required || ! $ack->user_id) continue;
-                $exists = \App\Models\PolicyAck::where('policy_id', $p->id)
-                    ->where('user_id', $ack->user_id)->where('ver', (string) $p->ver)->exists();
-                if ($exists) continue;
-
-                \App\Models\PolicyAck::create([
-                    'title' => $p->title . ' — نسخة ' . $p->ver,
-                    'policy_id' => $p->id, 'user_id' => $ack->user_id, 'ver' => (string) $p->ver,
-                    'status' => 'بانتظار الإقرار', 'company_id' => $p->company_id,
-                    'notes' => 'أُعيد طلب الإقرار بعد تحديث النسخة من ' . $old . ' إلى ' . $p->ver,
-                ]);
-                hub_notify($ack->user_id, 'policy',
-                    '📜 حُدّثت سياسة «' . \Illuminate\Support\Str::limit($p->title, 60) . '» — إقرارك مطلوب على النسخة ' . $p->ver,
-                    'policies', $p->id);
-            }
+            hub_ack_reset(static::MODULE, $m->id, (string) ($m->ver ?: '1.0'));
         });
     }
 }

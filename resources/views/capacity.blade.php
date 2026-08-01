@@ -11,6 +11,7 @@
         </div>
     </div>
     <form class="filters" method="GET">
+        <input type="hidden" name="p" value="{{ request()->query('p') }}">
         <label class="vh" for="cf">من تاريخ</label>
         <input class="inp" id="cf" type="date" name="from" value="{{ $c['from'] }}">
         <label class="vh" for="ct">إلى تاريخ</label>
@@ -18,6 +19,8 @@
         <button class="btn sm">عرض</button>
     </form>
 </div>
+
+@include('partials.lens', ['lensModules' => ['tasks', 'hr', 'leaves', 'attend']])
 
 <div class="cards">
     <div class="stat"><span class="ico">🗓️</span><b>{{ $c['workDays'] }}</b><span>يوم عمل × {{ $c['hoursDay'] }} ساعات</span></div>

@@ -18,6 +18,8 @@
     </div>
 </div>
 
+@include('partials.lens', ['lensModules' => ['ideas']])
+
 <div class="cards" style="grid-template-columns:1fr">
 @forelse ($ideas as $i)
     @php $tone = $i->ice === null ? '' : ($i->ice >= 500 ? 'ok' : ($i->ice >= 200 ? 'wn' : '')); @endphp

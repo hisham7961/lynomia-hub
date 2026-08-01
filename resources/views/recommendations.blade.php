@@ -13,6 +13,8 @@
     <a class="btn ghost sm" href="{{ route('recs', ['fresh' => 1]) }}">↻ تحديث</a>
 </div>
 
+@include('partials.lens', ['lensModules' => ['services', 'fin']])
+
 <div class="cards">
     <div class="stat"><span class="ico">🔴</span><b class="{{ $c['حرج'] ? 'txt-bad' : '' }}">{{ $c['حرج'] }}</b><span>حرجة</span></div>
     <div class="stat"><span class="ico">🟠</span><b>{{ $c['مهم'] }}</b><span>مهمة</span></div>

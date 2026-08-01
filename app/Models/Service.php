@@ -26,6 +26,10 @@ class Service extends Model
         'price' => 'decimal:3',
         'cost' => 'decimal:3',
         'sla' => 'decimal:3',
+        // المراجع المتعددة: بلا cast يُخزَّن JSON نصّاً ثم يُقرأ (array) فيصير
+        // ['["uuid"]'] — عنصرٌ واحد نصُّه السلسلة كلها، فتُعرض البطاقة فارغة
+        'competitor_ids' => 'array',
+        'idea_ids' => 'array',
         'custom' => 'array',
         'meta' => 'array',
         'archived' => 'boolean',

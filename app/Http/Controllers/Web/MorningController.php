@@ -140,7 +140,7 @@ class MorningController extends Controller
                 $ops->push([
                     't' => \Illuminate\Support\Str::limit($er->message, 80),
                     's' => trim(($er->count > 1 ? "تكرّر {$er->count} مرة · " : '')
-                        . ['php' => 'استثناء PHP', 'api' => 'خطأ API', 'js' => 'خطأ متصفح', 'slow' => 'طلب بطيء'][$er->kind] ?? $er->kind)
+                        . (['php' => 'استثناء PHP', 'api' => 'خطأ API', 'js' => 'خطأ متصفح', 'slow' => 'طلب بطيء'][$er->kind] ?? $er->kind))
                         . ($where ? ' · ' . $where : ''),
                     'u' => route('errors.show', $er->id),
                     'tone' => $er->kind === 'slow' ? 'wn' : 'bad',

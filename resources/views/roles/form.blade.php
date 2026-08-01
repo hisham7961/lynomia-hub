@@ -16,6 +16,27 @@
                 </select>
             </div>
         </div>
+        {{-- الأعلام العامة: صلاحياتٌ لا تخصّ وحدةً بعينها بل النظام كله.
+             لم تكن معروضةً إطلاقاً بينما المتحكّم يكتبها من الطلب — فكان كل
+             حفظٍ يمسحها صامتاً. --}}
+        @php $rfFlags = $role ? (is_array($role->flags) ? $role->flags : (json_decode($role->flags ?? '[]', true) ?: [])) : []; @endphp
+        <h3 style="margin-top:14px">🚩 الصلاحيات العامة <span class="sub">(خارج مصفوفة الوحدات)</span></h3>
+        <div class="sub" style="margin-bottom:8px">
+            هذه لا تُشتق من الوحدات: من يعتمد الطلبات، ومن يرى سجل التدقيق واللوحات،
+            ومن يكشف أسرار الخزنة أو ينسخها دون كشف، ومن يُصدّر البيانات.
+        </div>
+        {{-- علامةٌ صريحة: بها يُفرَّق «أُلغيت كلها» عن «لم يُرسَل القسم» --}}
+        <input type="hidden" name="flags_submitted" value="1">
+        <div class="crow" style="margin-bottom:6px">
+            @foreach (\App\Http\Controllers\Web\RoleController::FLAGS as $fk => $flabel)
+                <label class="chip" style="cursor:pointer" for="rf-flag-{{ $fk }}">
+                    <input type="checkbox" id="rf-flag-{{ $fk }}" name="flags[{{ $fk }}]" value="1"
+                           aria-label="{{ $flabel }}" @checked(! empty($rfFlags[$fk]))>
+                    {{ $flabel }}
+                </label>
+            @endforeach
+        </div>
+
         <h3 style="margin-top:14px">مصفوفة الصلاحيات</h3>
         <div class="matrixwrap">
         <table class="tbl matrix">

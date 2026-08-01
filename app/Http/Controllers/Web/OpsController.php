@@ -40,7 +40,6 @@ class OpsController extends Controller
         $sys = [
             'disk_free' => $free, 'disk_total' => $total,
             'disk_pct'  => ($free && $total) ? (int) round(($total - $free) * 100 / $total) : null,
-            'mem'       => memory_get_peak_usage(true),
             'load'      => function_exists('sys_getloadavg') ? (sys_getloadavg()[0] ?? null) : null,
             'php'       => PHP_VERSION,
             'uptime'    => is_readable('/proc/uptime') ? (int) floatval(file_get_contents('/proc/uptime')) : null,
@@ -242,6 +241,8 @@ class OpsController extends Controller
         \Illuminate\Support\Facades\Artisan::call('hub:flows-starter');
         $out = trim(\Illuminate\Support\Facades\Artisan::output());
         \Illuminate\Support\Facades\Artisan::call('hub:alerts-starter');
+        $out .= "\n" . trim(\Illuminate\Support\Facades\Artisan::output());
+        \Illuminate\Support\Facades\Artisan::call('hub:kpis-starter', ['--all' => true]);
         $out .= "\n" . trim(\Illuminate\Support\Facades\Artisan::output());
         hub_audit('توليد عدة الانطلاق', null, null, 'من مركز التشغيل');
 

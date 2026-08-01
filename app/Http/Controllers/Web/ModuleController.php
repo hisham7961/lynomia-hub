@@ -638,16 +638,9 @@ class ModuleController extends Controller
 
         // سياسةٌ أو مقالٌ إلزامي تغيّرت نسخته: الإقرارات القديمة تسقط ويُعاد
         // الإعلان. بلا هذا يبقى الجميع «مُقِرّين» بنسخةٍ ماتت — امتثالٌ كاذب.
-        if (isset(hub_ack_modules()[$module]) && (bool) ($m->{hub_ack_modules()[$module]['col']} ?? false)) {
-            $spec = hub_ack_modules()[$module];
-            $ver = (string) ($m->{$spec['ver']} ?? '') ?: '1.0';
-            $stale = \App\Models\PolicyAck::whereNull('deleted_at')
-                ->where(fn ($q) => $q->where('record_id', $m->id)
-                    ->orWhere(fn ($w) => $w->whereNull('record_id')->where('policy_id', $m->id)))
-                ->where(fn ($q) => $q->where('ver', '!=', $ver)->orWhereNull('ver'))
-                ->whereIn('status', ['معلّق', 'مُقَر'])->exists();
-            if ($stale) hub_ack_reset($module, $m->id, $ver);
-        }
+        // دورة الإقرار (إسقاط عند تحديث النسخة + إعادة الإعلان) انتقلت إلى
+        // النموذج نفسه — Policy::booted و KbArticle::booted — فتعمل أياً كان
+        // مصدر التغيير لا من هذا المسار وحده.
 
         // مزامنة الأصل مع صيانته: قيد التنفيذ تضعه «صيانة»، والمكتملة تختم
         // «آخر صيانة» وتعيده «قيد الاستخدام» — كان الحقلان يدويين متناقضين

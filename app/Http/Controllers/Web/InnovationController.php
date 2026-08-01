@@ -16,7 +16,15 @@ class InnovationController extends Controller
     {
         abort_unless(hub_can(auth()->user(), 'ideas', 'v'), 403);
 
-        $ideas = hub_scope(Idea::query(), 'ideas')->orderByDesc('created_at')->limit(300)->get()
+        // العدسة قبل القصّ لا بعده. والطريق مزدوج: عمود المشروع يعني «المشروع
+        // الناتج إن رُقّيت» — فوحده يُخفي كل فكرةٍ لم تُرقَّ بعد، وهي جوهر
+        // الصفحة. فيُضاف الطريق عبر الخدمة: فكرةٌ تطوّر خدمةً في المشروع.
+        $lens = hub_lens();
+        $ideas = hub_scope(Idea::query(), 'ideas')
+            ->when($lens['id'], fn ($q) => $q->where(fn ($w) => $w->where('project_id', $lens['id'])
+                ->orWhereIn('service_id', \Illuminate\Support\Facades\DB::table('services')
+                    ->select('id')->where('project_id', $lens['id']))))
+            ->orderByDesc('created_at')->limit(300)->get()
             ->map(function ($i) {
                 $i->ice = $i->iceScore();
                 return $i;
@@ -30,6 +38,7 @@ class InnovationController extends Controller
             'ideas' => $ideas,
             'byUsers' => $byUsers,
             'scored' => $ideas->filter(fn ($i) => $i->ice !== null)->count(),
+            'lens' => $lens,
         ]);
     }
 

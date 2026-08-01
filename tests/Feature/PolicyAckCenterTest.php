@@ -46,7 +46,7 @@ class PolicyAckCenterTest extends TestCase
         hub_ack_announce('policies', $p->id);
 
         PolicyAck::where('record_id', $p->id)->where('user_id', $this->employee->id)
-            ->update(['status' => 'مُقَر', 'ack_at' => now(), 'ver' => '1.0']);
+            ->update(['status' => 'مُقرّة', 'ack_at' => now(), 'ver' => '1.0']);
 
         $html = $this->actingAs($this->owner)->get('/policies')->assertOk()->getContent();
         $this->assertStringContainsString('سياسة أمن المعلومات', $html);
@@ -64,7 +64,7 @@ class PolicyAckCenterTest extends TestCase
         $this->seedCore();
         $p = $this->pol();
         hub_ack_announce('policies', $p->id);
-        PolicyAck::where('record_id', $p->id)->update(['status' => 'مُقَر', 'ack_at' => now(), 'ver' => '1.0']);
+        PolicyAck::where('record_id', $p->id)->update(['status' => 'مُقرّة', 'ack_at' => now(), 'ver' => '1.0']);
         $this->assertSame(100, hub_ack_state('policies', $p->id)['pct']);
 
         // تحديث النسخة من الواجهة
@@ -94,7 +94,7 @@ class PolicyAckCenterTest extends TestCase
         $this->actingAs($this->employee)->post('/policies/' . $p->id . '/ack')->assertRedirect();
 
         $ack = PolicyAck::where('record_id', $p->id)->where('user_id', $this->employee->id)->firstOrFail();
-        $this->assertSame('مُقَر', $ack->status);
+        $this->assertSame('مُقرّة', $ack->status);
         $this->assertSame('1.0', $ack->ver, 'الإقرار مقرونٌ بالنسخة لا مطلقاً');
         $this->assertNotNull($ack->ack_at);
         $this->assertNotEmpty($ack->ip, 'الدليل يُحفظ: عنوان وجهاز ووقت');
