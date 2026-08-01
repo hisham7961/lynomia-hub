@@ -1961,6 +1961,76 @@ if (! function_exists('hub_scope_key')) {
     }
 }
 
+if (! function_exists('hub_col_max')) {
+    /**
+     * أقصى طولٍ يقبله العمود فعلاً — من القاعدة لا من التخمين.
+     *
+     * هنا جذرُ عائلةٍ كاملة من الأعطال: `ModuleController::rules()` كان يُخرج
+     * `string` بلا `max` لكل حقل نصّي، و**SQLite لا يفرض طول varchar** فتمرّ
+     * الحزمة خضراء، ثم يرفضها MySQL في الإنتاج بـSQLSTATE 22001. هكذا وقع عطل
+     * `flows.event`، ونفس الشكل كامنٌ في عشرات الأعمدة.
+     *
+     * القياس بالمحارف لا بالبايتات: MySQL يعدّ `VARCHAR(N)` محارفَ، والعربية
+     * متعددةُ البايتات — فلو قِيس بالبايت لضاق الحدّ إلى ثلثه بلا سبب.
+     */
+    function hub_col_max(string $table, string $col): ?int
+    {
+        return hub_col_widths()[$table][$col] ?? null;
+    }
+}
+
+if (! function_exists('hub_col_widths')) {
+    /**
+     * خريطةُ أطوال الأعمدة النصّية، مقروءةً من **مصدر الهجرات**.
+     *
+     * ولمَ لا تُقرأ من القاعدة؟ لأن SQLite — محرّك الاختبارات — لا يصرّح بطول
+     * `varchar` أصلاً: هو يقبل أي طول ولا يذكره. فلو قِيس من القاعدة لعادت
+     * الحزمةُ عمياءَ عن العطل نفسه الذي جاءت تحرسه. والمصدر واحدٌ للمحرّكين.
+     *
+     * الأخيرُ يفوز: هجرةُ توسعةٍ لاحقة (`change()`) تنسخ الطول القديم.
+     */
+    function hub_col_widths(): array
+    {
+        static $map = null;
+        if ($map !== null) return $map;
+
+        $map = \Illuminate\Support\Facades\Cache::remember('hub:colwidths:' . config('hub.version'), 86400, function () {
+            $out = [];
+            foreach (glob(database_path('migrations/*.php')) ?: [] as $file) {
+                $src = (string) @file_get_contents($file);
+                // كل كتلة Schema::create/table ثم كل string/char فيها بطولها
+                preg_match_all("/Schema::(?:create|table)\\(\\s*'([a-z0-9_]+)'(.*?)(?=Schema::(?:create|table)\\(|\\z)/s",
+                    $src, $blocks, PREG_SET_ORDER);
+                foreach ($blocks as $b) {
+                    preg_match_all("/->(?:string|char)\\(\\s*'([a-z0-9_]+)'\\s*,\\s*(\\d+)/", $b[2], $cols, PREG_SET_ORDER);
+                    foreach ($cols as $c) $out[$b[1]][$c[1]] = (int) $c[2];
+                    // uuid() و char(36) الضمنيان — معرّفاتٌ بطول ٣٦
+                    preg_match_all("/->uuid\\(\\s*'([a-z0-9_]+)'/", $b[2], $uu, PREG_SET_ORDER);
+                    foreach ($uu as $c) $out[$b[1]][$c[1]] ??= 36;
+                }
+            }
+
+            return $out;
+        });
+
+        return $map;
+    }
+}
+
+if (! function_exists('hub_fit')) {
+    /**
+     * قصُّ نصٍّ ليسع عموداً — **بالمحارف** لا بالبايتات.
+     * `substr` تقطع الحرف العربي نصفين فتُنتج UTF-8 فاسدةً يرفضها MySQL
+     * بـ«Incorrect string value» ويبتلعها SQLite صامتاً.
+     */
+    function hub_fit(?string $v, int $max): ?string
+    {
+        if ($v === null) return null;
+
+        return mb_strlen($v) > $max ? mb_substr($v, 0, $max) : $v;
+    }
+}
+
 if (! function_exists('hub_read')) {
     /**
      * قارئُ وحدةٍ محروس — سكّةٌ واحدة لكل شاشةٍ تجمع من عدّة وحدات.

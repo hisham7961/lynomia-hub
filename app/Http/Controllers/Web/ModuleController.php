@@ -899,6 +899,20 @@ class ModuleController extends Controller
                     : [$r[0], 'array'];
             }
             if (in_array($f['type'], ['file', 'img'], true)) $r = [$r[0], 'file', 'max:' . (int) setting('files.max_kb', 512000)];
+
+            // سقفُ الطول من **عرض العمود نفسه**: كان الحقل النصّي يُتحقّق منه
+            // كـ`string` بلا حدّ، وSQLite لا يفرض طول varchar فتمرّ الحزمة،
+            // ثم يرفض MySQL القيمة في الإنتاج بـ22001. الرفضُ برسالةٍ للمستخدم
+            // خيرٌ من خمسمئةٍ بعد أن يكون السجل قد كُتب.
+            if (in_array($f['type'], ['text', 'sel', 'url', 'sec'], true)
+                && ($w = hub_col_max($def['table'] ?? '', $f['col'] ?? $f['key']))) {
+                $r[] = 'max:' . $w;
+            }
+            // وقائمةُ الخيارات تُلزِم: شاشةُ الحالة تفرضها منذ v2.x والنموذج لا
+            if (($f['type'] ?? '') === 'sel' && ! empty($f['options'])) {
+                $r[] = \Illuminate\Validation\Rule::in($f['options']);
+            }
+
             $rules[$f['key']] = $r;
         }
 
