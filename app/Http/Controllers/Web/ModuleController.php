@@ -34,6 +34,17 @@ class ModuleController extends Controller
 
         if ($term = $r->input('q')) $q->search($term);
 
+        // فحص جودة (`?qc=`): يفتح **نفس** السجلات التي عدّها مركز الجودة —
+        // فالنقص يُفتح لا يُقرأ. والمفتاح يُطابَق على قائمة الفحوص المشتقّة من
+        // السجل، فمفتاحٌ مُلفَّق لا يبني قيداً ولا يوسّع القائمة.
+        if ($qc = $r->input('qc')) {
+            $rule = \App\Support\DataQuality::rules($def['key'] ?? '')[$qc] ?? null;
+            if ($rule) {
+                $q = \App\Support\DataQuality::apply($q, (string) ($def['key'] ?? ''), (string) $qc);
+                $filters[] = ['key' => 'qc', 'label' => 'فحص جودة', 'val' => $qc, 'name' => $rule['label']];
+            }
+        }
+
         $statusCol = $def['status'] ?? null;
         if ($statusCol && ($st = $r->input('status'))) $q->where($statusCol, $st);
 
@@ -163,6 +174,12 @@ class ModuleController extends Controller
         // فرز بأي عمود من أعمدة الوحدة
         $sortKey = $r->input('s');
         $sf      = $sortKey ? $fields->firstWhere('key', $sortKey) : null;
+        // الترتيب بعمودٍ مخفيّ إفشاءٌ بلا عرض: «من أعلى راتباً» يُقرأ من الترتيب
+        // وحده. الحارس هنا لأن الفرز كان الطريق الوحيد حول hub_visible_fields.
+        if ($sf && hub_field_mode(auth()->user(), $module, (string) $sf['key']) !== '') {
+            $sf = null;
+            $sortKey = null;
+        }
         $dir     = $r->input('d') === 'asc' ? 'asc' : 'desc';
         $q->orderBy($sf['col'] ?? 'created_at', $sf ? $dir : 'desc');
 
@@ -444,8 +461,21 @@ class ModuleController extends Controller
         abort_unless($statusCol, 404);
 
         $m = $this->findScoped($class, $module, $id);
+
+        // السحب والإفلات كان يكتب عمود الحالة مباشرةً: لا فحصَ لصلاحية الحقل
+        // (فيُكتب عمودٌ «قراءة فقط» بجرّة إصبع) ولا تحقّقَ من الخيارات المعرَّفة
+        // (فتُزرع حالةٌ لا يعرفها السجل فلا تُعدّ في إحصاء ولا تُطلق أتمتة).
+        $statusField = collect($def['fields'])->firstWhere('col', $statusCol);
+        $statusKey = (string) ($statusField['key'] ?? $statusCol);
+        abort_if(hub_field_mode(auth()->user(), $module, $statusKey) !== '', 403,
+            'حقل الحالة غير قابل للكتابة بصلاحيتك');
+
+        $new = (string) $r->input('status');
+        $options = (array) ($statusField['options'] ?? []);
+        abort_if($options && ! in_array($new, $options, true), 422, 'حالة غير معرَّفة في هذه الوحدة');
+
         $prevStatus = $m->{$statusCol};
-        $m->{$statusCol} = (string) $r->input('status');
+        $m->{$statusCol} = $new;
         $m->save();
         $this->bustProgress($module, $m);
         if ((string) $m->{$statusCol} !== (string) $prevStatus) {
@@ -579,8 +609,14 @@ class ModuleController extends Controller
     {
         $payload = null;
         if ($op === 'e') {
+            // **التنقية عند الالتقاط لا عند التنفيذ**: الحمولة كانت تُلتقط خاماً
+            // ثم يعيد المعتمِد تشغيلها بصلاحياته هو — فمن لا يملك رؤية الراتب
+            // يضبطه بوكيلٍ يوقّع بحسن نية. ما لا يملك الطالب كتابته لا يدخل
+            // الطابور أصلاً، فلا يُوقَّع على ما لا يُرى.
+            $u = auth()->user();
             $keys = collect($def['fields'])
                 ->reject(fn ($f) => in_array($f['type'], ['file', 'img'], true))
+                ->reject(fn ($f) => hub_field_mode($u, $module, (string) ($f['key'] ?? '')) !== '')
                 ->pluck('key')->push('custom')->all();
             $payload = collect($r->only($keys))->filter(fn ($v) => $v !== null)->all();
         }
@@ -892,10 +928,17 @@ class ModuleController extends Controller
     }
 
     /** تعبئة الموديل من الطلب حسب نوع كل حقل */
-    protected function fill(array $def, Request $r, Model $m): void
+    /**
+     * @param ?array $only حصرُ الكتابة بمفاتيحَ بعينها — لإعادة تشغيل حمولة
+     *   موافقةٍ معتمَدة: المعتمِد وافق على **تلك** التغييرات لا على تفريغ ما
+     *   عداها. وبغير الحصر يُكتب null فوق كل حقلٍ غاب عن الحمولة.
+     */
+    protected function fill(array $def, Request $r, Model $m, ?array $only = null): void
     {
         foreach ($def['fields'] as $f) {
             $k = $f['key']; $c = $f['col']; $t = $f['type'];
+
+            if ($only !== null && ! in_array($k, $only, true)) continue;
 
             // حقل مخفي أو قراءة فقط لدور المستخدم: لا يُكتب أبداً (حتى لو حُقن في الطلب)
             if (hub_field_mode(auth()->user(), (string) ($def['key'] ?? ''), $k) !== '') continue;

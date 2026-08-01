@@ -6,9 +6,17 @@
     'sub' => 'ابدأ من قالبٍ أو من دورٍ قائم، ثم اضبط ما تحتاجه وحده — لا حاجة للمرور على كل وحدة'])
 
 @php
+    // **ما بنيتَه يبقى بعد خطأ التحقّق**: الصفحة كانت تُعاد من قاعدة البيانات
+    // لا من `old()`، فاسمٌ فارغ يمحو مئة نقرةٍ على المصفوفة والرايات والقيود.
     $mx = $role ? (is_array($role->matrix) ? $role->matrix : (json_decode($role->matrix ?? '[]', true) ?: [])) : [];
     $rfFlags = $role ? (is_array($role->flags) ? $role->flags : (json_decode($role->flags ?? '[]', true) ?: [])) : [];
     $fr = $role ? (is_array($role->field_rules) ? $role->field_rules : (json_decode($role->field_rules ?? '[]', true) ?: [])) : [];
+    if (old('matrix_submitted')) $mx = (array) old('matrix', []);
+    if (old('flags_submitted')) $rfFlags = (array) old('flags', []);
+    if (old('fr_submitted')) {
+        $fr = collect((array) old('fr', []))->map(fn ($f) => array_filter((array) $f,
+            fn ($m) => in_array($m, ['ro', 'hide'], true)))->filter()->all();
+    }
     $risky = \App\Http\Controllers\Web\RoleController::RISKY_FLAGS;
     $modCount = collect($groups)->sum(fn ($g) => count($g['items']));
 @endphp
@@ -63,7 +71,9 @@
         <h3>🚩 الصلاحيات العامة <span class="sub">(خارج مصفوفة الوحدات)</span></h3>
         <div class="sub" style="margin-bottom:8px">
             لا تُشتق من الوحدات: من يعتمد الطلبات، ومن يرى سجل التدقيق واللوحات،
-            ومن يكشف أسرار الخزنة أو ينسخها دون كشف، ومن يُصدّر البيانات.
+            ومن يكشف أسرار الخزنة أو ينسخها، ومن يُصدّر البيانات.
+            <br><b>ملاحظة:</b> «نسخ السرّ للحافظة» ليس حاجزاً دون الكشف — منفذ الجلب واحد
+            والنصّ يصل جهاز المستخدم في الحالين، والفرق أن الشاشة لا تعرضه. امنحه بحذر الكشف نفسه.
         </div>
         {{-- علامةٌ صريحة: بها يُفرَّق «أُلغيت كلها» عن «لم يُرسَل القسم» --}}
         <input type="hidden" name="flags_submitted" value="1">
@@ -142,30 +152,64 @@
             @php $frCount = collect($fr)->sum(fn ($f) => count(array_filter((array) $f))); @endphp
             @if ($frCount)<b>القيود المضبوطة الآن: {{ $frCount }}.</b>@endif
         </div>
-        <input class="inp" id="frq" placeholder="🔎 ابحث عن وحدة لضبط حقولها" autocomplete="off" style="max-width:340px;margin-bottom:8px">
-        @foreach ($groups as $gLabel => $g)
-            <div class="sub" style="margin:10px 0 4px;font-weight:700">{{ $g['icon'] }} {{ $gLabel }}</div>
-            @foreach ($g['items'] as $mk => $md)
-                @php $set = collect($fr[$mk] ?? [])->filter()->count(); @endphp
-                <details class="frmod" data-q="{{ mb_strtolower($md['label'] . ' ' . $mk) }}" style="margin-bottom:5px" {{ $set ? 'open' : '' }}>
-                    <summary>{{ $md['label'] }} @if ($set)<span class="bdg wn">{{ $set }} قيد</span>@endif</summary>
-                    <div class="fg" style="padding:8px 4px">
-                        @foreach ($md['fields'] as $f)
-                            <div class="fld">
-                                <label class="sub">{{ $f['label'] }}</label>
-                                <select class="inp" name="fr[{{ $mk }}][{{ $f['key'] }}]">
-                                    <option value="">عادي</option>
-                                    <option value="ro" @selected(($fr[$mk][$f['key']] ?? '') === 'ro')>قراءة فقط</option>
-                                    <option value="hide" @selected(($fr[$mk][$f['key']] ?? '') === 'hide')>مخفي</option>
+        {{-- **لا قائمةَ لكل حقلٍ في النظام**: القائمة المنسدلة تُرسَل دائماً ولو
+             كانت «عادي»، و١٢٢٠ منها تتجاوز سقف PHP الافتراضي (max_input_vars=1000)
+             فيُقصّ الطلب صمتاً وتُمحى القيود الواقعة في الذيل. تُعرض القيود
+             القائمة وحدها، وتُضاف الجديدة من مُنتقٍ لا يزيد الطلب إلا بما يُضبط. --}}
+        <input type="hidden" name="fr_submitted" value="1">
+
+        <div id="frlist">
+            @foreach ($fr as $mk => $fields)
+                @php $md = hub_mod((string) $mk); @endphp
+                @if ($md)
+                    @foreach ((array) $fields as $fk => $mode)
+                        @php $fld = collect($md['fields'] ?? [])->firstWhere('key', $fk); @endphp
+                        @if ($fld && in_array($mode, ['ro', 'hide'], true))
+                            <div class="crow frrow" style="gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--ln)">
+                                <b style="font-size:13px">{{ $md['label'] }}</b>
+                                <span class="sub">›</span>
+                                <span>{{ $fld['label'] }}</span>
+                                <select class="inp" name="fr[{{ $mk }}][{{ $fk }}]" style="max-width:150px">
+                                    <option value="ro" @selected($mode === 'ro')>قراءة فقط</option>
+                                    <option value="hide" @selected($mode === 'hide')>مخفي</option>
+                                    <option value="">أزِل القيد</option>
                                 </select>
                             </div>
-                        @endforeach
-                    </div>
-                </details>
+                        @endif
+                    @endforeach
+                @endif
             @endforeach
-        @endforeach
+        </div>
+        @if (! $frCount)<div class="sub" id="frempty">لا قيود مضبوطة — كل الحقول عادية لهذا الدور.</div>@endif
+
+        <div class="crow" style="gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--ln)">
+            <select class="inp" id="fr-mod" style="max-width:200px"><option value="">＋ اختر وحدة…</option>
+                @foreach ($groups as $gLabel => $g)
+                    <optgroup label="{{ $gLabel }}">
+                        @foreach ($g['items'] as $mk => $md)<option value="{{ $mk }}">{{ $md['label'] }}</option>@endforeach
+                    </optgroup>
+                @endforeach
+            </select>
+            <select class="inp" id="fr-field" style="max-width:220px" disabled><option value="">الحقل…</option></select>
+            <select class="inp" id="fr-mode" style="max-width:150px">
+                <option value="ro">قراءة فقط</option><option value="hide">مخفي</option>
+            </select>
+            <button type="button" class="btn ghost sm" id="fr-add">أضِف القيد</button>
+        </div>
+        @php
+            // كتالوج المُنتقي: بيانٌ لا مدخلات — لا يزيد حجم الطلب بحرف
+            $frCatalog = [];
+            foreach ($groups as $g) {
+                foreach ($g['items'] as $ck => $cm) {
+                    $frCatalog[$ck] = ['label' => $cm['label'], 'fields' => array_map(
+                        fn ($f) => ['k' => $f['key'], 'l' => $f['label']], (array) ($cm['fields'] ?? []))];
+                }
+            }
+        @endphp
+        <script type="application/json" id="fr-catalog">@json($frCatalog)</script>
     </div>
 
+    <input type="hidden" name="matrix_submitted" value="1">
     <div class="formfoot"><button class="btn p">حفظ الدور</button><a class="btn ghost" href="{{ route('roles.index') }}">إلغاء</a></div>
 </form>
 
@@ -174,7 +218,7 @@
     var form = document.getElementById('roleform');
     if (! form) return;
     var q = document.getElementById('mxq'), none = document.getElementById('mxnone'),
-        count = document.getElementById('mxcount'), frq = document.getElementById('frq');
+        count = document.getElementById('mxcount');
 
     function recount() {
         var mods = {}, n = 0;
@@ -257,8 +301,45 @@
         }
     }
     q.addEventListener('input', function () { filter(q, '.mxrow', true); });
-    if (frq) frq.addEventListener('input', function () { filter(frq, '.frmod', false); });
     recount();
+
+    // مُنتقي قيود الحقول: يبني صفّاً واحداً لكل قيدٍ يُضبط — فلا يحمل الطلب
+    // إلا ما ضُبط فعلاً بدل قائمةٍ لكل حقلٍ في النظام
+    var cat = {}, catEl = document.getElementById('fr-catalog');
+    try { cat = JSON.parse(catEl.textContent); } catch (e) {}
+    var mSel = document.getElementById('fr-mod'), fSel = document.getElementById('fr-field'),
+        modeSel = document.getElementById('fr-mode'), addBtn = document.getElementById('fr-add'),
+        list = document.getElementById('frlist'), empty = document.getElementById('frempty');
+
+    if (mSel) mSel.addEventListener('change', function () {
+        var m = cat[mSel.value];
+        fSel.innerHTML = '<option value="">الحقل…</option>';
+        fSel.disabled = ! m;
+        if (! m) return;
+        m.fields.forEach(function (f) {
+            var o = document.createElement('option'); o.value = f.k; o.textContent = f.l; fSel.appendChild(o);
+        });
+    });
+
+    if (addBtn) addBtn.addEventListener('click', function () {
+        var mk = mSel.value, fk = fSel.value, mode = modeSel.value;
+        if (! mk || ! fk) return;
+        if (list.querySelector('[name="fr[' + mk + '][' + fk + ']"]')) return;
+        var m = cat[mk], f = m.fields.find(function (x) { return x.k === fk; });
+        var row = document.createElement('div');
+        row.className = 'crow frrow';
+        row.style.cssText = 'gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--ln)';
+        row.innerHTML = '<b style="font-size:13px"></b><span class="sub">›</span><span></span>'
+            + '<select class="inp" name="fr[' + mk + '][' + fk + ']" style="max-width:150px">'
+            + '<option value="ro">قراءة فقط</option><option value="hide">مخفي</option>'
+            + '<option value="">أزِل القيد</option></select>';
+        row.querySelector('b').textContent = m.label;
+        row.querySelectorAll('span')[1].textContent = f.l;
+        row.querySelector('select').value = mode;
+        list.appendChild(row);
+        if (empty) empty.style.display = 'none';
+        fSel.value = '';
+    });
 })();
 </script>
 @endsection

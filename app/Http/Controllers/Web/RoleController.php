@@ -16,12 +16,14 @@ class RoleController extends Controller
         'approve' => 'اعتماد الطلبات والموافقات',
         'monitor' => 'اللوحات التحليلية والمراقبة',
         'secrets' => 'كشف أسرار الخزنة',
-        'copySec' => 'نسخ السرّ دون كشفه',
+        // الاسم القديم «نسخ السرّ دون كشفه» كان يَعِد بحاجزٍ لا وجود له: منفذ
+        // الكشف واحد، والنصّ يصل جهاز المستخدم في الحالين — والفرق عرضٌ لا منع.
+        'copySec' => 'نسخ السرّ للحافظة — نصّه يصل الجهاز',
         'exp'     => 'تصدير البيانات',
     ];
 
     /** رايات يترتّب على منحها وصولٌ واسع — تُوسَم في الشاشة لا تُدسّ بين البقية */
-    public const RISKY_FLAGS = ['users', 'secrets', 'exp', 'audit'];
+    public const RISKY_FLAGS = ['users', 'secrets', 'copySec', 'exp', 'audit'];
 
     protected array $ops = ['v' => 'عرض', 'a' => 'إضافة', 'e' => 'تعديل', 'd' => 'حذف'];
 
@@ -96,9 +98,28 @@ class RoleController extends Controller
     public function store(Request $r)
     {
         $this->gate();
-        Role::create($this->data($r));
+        $role = Role::create($this->data($r));
+        $this->trail('إضافة دور', $role);
 
         return redirect()->route('roles.index')->with('ok', 'أُضيف الدور');
+    }
+
+    /**
+     * أثرُ تدقيقٍ لكل مسٍّ بالأدوار.
+     *
+     * `Role` لا يستعمل سمة Auditable، فالشاشة **التي تمنح الصلاحيات كلها**
+     * كانت الوحيدة غير المرئية للتدقيق: تُوسَّع صلاحيات دورٍ فلا يبقى أثرٌ
+     * لمن وسّعها ولا متى — وهو أوّل ما يُسأل عنه بعد أي حادث.
+     */
+    protected function trail(string $action, Role $role): void
+    {
+        $x = self::reach($role);
+        hub_audit($action, 'roles', $role->id, $role->name, ['after' => [
+            'scope' => $role->scope,
+            'modules_view' => $x['v'], 'modules_edit' => $x['e'], 'modules_delete' => $x['d'],
+            'field_rules' => $x['fields'],
+            'flags' => array_keys(array_filter((array) ($role->flags ?? []))),
+        ]]);
     }
 
     public function edit(Role $role)
@@ -122,6 +143,7 @@ class RoleController extends Controller
         abort_if((bool) $role->is_owner, 422, 'لا يُعدَّل دور المالك — ولا تُنزع ملكيته');
 
         $role->update($this->data($r, $role));
+        $this->trail('تعديل دور', $role);
 
         return redirect()->route('roles.index')->with('ok', 'حُفظ الدور');
     }
@@ -138,6 +160,8 @@ class RoleController extends Controller
             'matrix' => $role->matrix, 'flags' => $role->flags, 'field_rules' => $role->field_rules,
         ]);
 
+        $this->trail('استنساخ دور', $copy);
+
         return redirect()->route('roles.edit', $copy)->with('ok', 'استُنسخ الدور — عدّله ثم احفظ');
     }
 
@@ -146,6 +170,7 @@ class RoleController extends Controller
         $this->gate();
         abort_if((bool) $role->is_owner, 422, 'لا يُحذف دور المالك');
         abort_if(User::where('role_id', $role->id)->exists(), 422, 'انقل مستخدمي هذا الدور أولاً');
+        $this->trail('حذف دور', $role);
         $role->delete();
 
         return redirect()->route('roles.index')->with('ok', 'حُذف الدور');
@@ -188,39 +213,59 @@ class RoleController extends Controller
         // قالبٌ مُختار يبني الأساس، وما أرسله النموذج يعلو عليه
         $tpl = $r->input('template') ? self::fromTemplate((string) $r->input('template')) : [];
 
-        $matrix = [];
-        foreach (array_keys(hub_modules()) as $mod) {
-            $row = [];
-            foreach (array_keys($this->ops) as $op) {
-                if ($r->boolean("matrix.$mod.$op")) $row[$op] = 1;
+        // **«لم يُرسَل» غير «أُفرِغ عمداً»**: مربّع الاختيار غير المؤشَّر لا يصل
+        // في الطلب، فبلا علامةٍ صريحة لا يُفرَّق بين مصفوفةٍ مُفرَّغةٍ عمداً وقسمٍ
+        // لم يُرسَل أصلاً — وكان القالب يُعيد ما أزاله المالك بيده.
+        $matrixSent = $r->has('matrix') || $r->boolean('matrix_submitted');
+        $matrix = $matrixSent ? [] : (array) ($role?->matrix ?? []);
+        if ($matrixSent) {
+            foreach (array_keys(hub_modules()) as $mod) {
+                $row = [];
+                foreach (array_keys($this->ops) as $op) {
+                    if ($r->boolean("matrix.$mod.$op")) $row[$op] = 1;
+                }
+                // **الكتابة تستلزم العرض**: دورٌ يعدّل ولا يرى حالةٌ لا تُستعمل —
+                // كل قارئ يمرّ بـhub_can(...,'v') أولاً، فالإضافة بلا عرض صمتٌ محض.
+                if ($row) { $row['v'] = 1; $matrix[$mod] = $row; }
             }
-            // **الكتابة تستلزم العرض**: دورٌ يعدّل ولا يرى حالةٌ لا تُستعمل —
-            // كل قارئ يمرّ بـhub_can(...,'v') أولاً، فالإضافة بلا عرض صمتٌ محض.
-            if ($row) { $row['v'] = 1; $matrix[$mod] = $row; }
         }
-        if (! $matrix && ! empty($tpl['matrix'])) $matrix = $tpl['matrix'];
+        if (! $matrixSent && ! $matrix && ! empty($tpl['matrix'])) $matrix = $tpl['matrix'];
 
         // الأعلام السبعة التي يقرؤها النظام فعلاً (hub_flag). ومربّع الاختيار
         // غير المؤشَّر لا يُرسَل أصلاً، فلا يُفرَّق بين «أُلغيت كلها» و«لم يُرسَل
         // القسم» إلا بعلامةٍ صريحة: `flags_submitted`.
+        $flagsSent = $r->has('flags') || $r->boolean('flags_submitted');
         $flags = (array) ($role?->flags ?? []);
-        if ($r->has('flags') || $r->boolean('flags_submitted')) {
+        if ($flagsSent) {
             $flags = [];
             foreach (array_keys(self::FLAGS) as $f) {
                 if ($r->boolean("flags.$f")) $flags[$f] = 1;
             }
         }
-        if (! $flags && ! $r->has('flags') && ! empty($tpl['flags'])) $flags = $tpl['flags'];
+        if (! $flagsSent && ! $flags && ! empty($tpl['flags'])) $flags = $tpl['flags'];
 
-        // صلاحيات مستوى الحقل: نحفظ القيود فقط (ro/hide) ونطرح الوحدات الفارغة
-        $fieldRules = [];
-        foreach ((array) $r->input('fr', []) as $mod => $fields) {
-            if (! hub_mod((string) $mod)) continue;
-            foreach ((array) $fields as $fk => $mode) {
-                if (in_array($mode, ['ro', 'hide'], true)) $fieldRules[$mod][$fk] = $mode;
+        /*
+         * صلاحيات مستوى الحقل — **لا تُبنى من الصفر إلا إن أُرسل قسمُها**.
+         *
+         * كان القسم يرسل قائمةً منسدلة لكل حقلٍ في النظام (١٢٢٠ قائمة) فيتجاوز
+         * الطلبُ `max_input_vars` الافتراضي (١٠٠٠)، وPHP **يقصّ** الزائد بلا
+         * خطأ — ثم يُعاد البناء من المقصوص فتُمحى كل قيود الذيل: يحفظ المالك
+         * تعديلاً في اسم الدور فيُكشف الراتب لعشرات الأدوار صمتاً.
+         * الآن: النموذج لا يرسل إلا القيود القائمة، والعلامة `fr_submitted`
+         * تفرّق بين «أُفرِغت عمداً» و«لم يصل القسم».
+         */
+        $frSent = $r->has('fr') || $r->boolean('fr_submitted');
+        $fieldRules = (array) ($role?->field_rules ?? []);
+        if ($frSent) {
+            $fieldRules = [];
+            foreach ((array) $r->input('fr', []) as $mod => $fields) {
+                if (! hub_mod((string) $mod)) continue;
+                foreach ((array) $fields as $fk => $mode) {
+                    if (in_array($mode, ['ro', 'hide'], true)) $fieldRules[$mod][$fk] = $mode;
+                }
             }
         }
-        if (! $fieldRules && ! empty($tpl['field_rules'])) $fieldRules = $tpl['field_rules'];
+        if (! $frSent && ! $fieldRules && ! empty($tpl['field_rules'])) $fieldRules = $tpl['field_rules'];
 
         return $d + ['matrix' => $matrix, 'flags' => $flags, 'is_owner' => false,
                      'field_rules' => $fieldRules ?: null];

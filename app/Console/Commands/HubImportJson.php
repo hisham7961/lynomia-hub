@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -24,7 +25,24 @@ class HubImportJson extends Command
         $modules = config('hub.modules');
         $total = 0;
 
-        DB::transaction(function () use ($db, $modules, &$total) {
+        // **‎--truncate كان معلَناً ولا يُقرأ**: من يستعيد نسخةً ظنّاً أنها
+        // تستبدل القاعدة كان يحصل على دمجٍ صامت — سجلاتٌ قديمة تبقى مختلطةً
+        // بالمستعادة، فتتضاعف الفواتير ويعود عميلٌ حُذف عمداً.
+        $truncate = (bool) $this->option('truncate');
+
+        DB::transaction(function () use ($db, $modules, &$total, $truncate) {
+            if ($truncate) {
+                foreach ($modules as $key => $def) {
+                    if ($key === 'users') continue;
+                    $t = (string) ($def['table'] ?? '');
+                    // تُفرَّغ الجداول التي يحملها الملف وحدها — لا يُمسّ ما لا يُستعاد
+                    if ($t !== '' && Schema::hasTable($t) && array_key_exists($key, (array) $db)) {
+                        DB::table($t)->delete();
+                    }
+                }
+                $this->warn('‎--truncate: أُفرغت جداول الوحدات الموجودة في الملف قبل الاستعادة');
+            }
+
             // الأدوار والمستخدمون أولاً (مراجع)
             foreach ((array) ($db['roles'] ?? []) as $r) {
                 DB::table('roles')->updateOrInsert(['id' => $r['id']], [
@@ -32,6 +50,7 @@ class HubImportJson extends Command
                     'scope' => $r['scope'] ?? 'proj',
                     'flags' => json_encode(collect($r)->only(['secrets','approve','users','audit','exp','monitor','copySec'])),
                     'matrix' => json_encode($r['m'] ?? []),
+                    'field_rules' => json_encode($r['fieldRules'] ?? []),
                     'created_at' => now(), 'updated_at' => now(),
                 ]);
             }
@@ -42,6 +61,9 @@ class HubImportJson extends Command
                     'phone' => $u['phone'] ?? null, 'job_title' => $u['title'] ?? null,
                     'role_id' => $u['roleId'] ?? null, 'status' => $u['status'] ?? 'نشط',
                     'notify_prefs' => json_encode($u['nprefs'] ?? []),
+                    'companies' => json_encode($u['companies'] ?? []),
+                    'allowed_ips' => $u['allowedIps'] ?? null,
+                    'expires_at' => $u['expiresAt'] ?? null,
                     'created_at' => now(), 'updated_at' => now(),
                 ]);
             }

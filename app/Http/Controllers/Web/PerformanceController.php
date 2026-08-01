@@ -29,6 +29,10 @@ class PerformanceController extends Controller
     {
         abort_unless(hub_monitor(), 403,
             'لوحة الأداء للمالكين وحاملي صلاحية المراقبة');
+        // تجمع المنشأة كلها من الجداول الخام — كأخواتها الثلاث (القدرات
+        // والتوصيات والأثر) — وكانت وحدها بلا حارس العزل، فالمحصورُ بشركةٍ
+        // يقرأ إيراد المنشأة كلها ورواتبها
+        hub_org_analytics_guard();
 
         return view('performance.index', [
             'company' => $this->companyKpis(),
