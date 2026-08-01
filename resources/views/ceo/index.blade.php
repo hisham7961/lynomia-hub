@@ -6,7 +6,10 @@
         <h2>👑 لوحة CEO</h2>
         <div class="sub">صورة الشركة كاملة — {{ now()->translatedFormat('l · j F Y') }}</div>
     </div>
-    <button class="btn ghost sm" onclick="window.print()">🖨 طباعة</button>
+    <div style="display:flex;gap:8px">
+        <a class="btn ghost sm" href="{{ route('ceo', ['fresh' => 1]) }}">↻ تحديث</a>
+        <button class="btn ghost sm" onclick="window.print()">🖨 طباعة</button>
+    </div>
 </div>
 
 {{-- ═ طبقة القرار: قبل أي رقم — ما ينتظرني، وأين ينزف المال، وأين الخطر ═ --}}

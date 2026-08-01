@@ -20,9 +20,17 @@ use Illuminate\Support\Facades\Schema;
  */
 class Compliance
 {
+    public const TTL = 300;
+
     public static function may(): bool
     {
         return hub_can(auth()->user(), 'compliance', 'v');
+    }
+
+    /** الرسوم حقلٌ قد يُحجب بقيود الدور — والمجموع يكشفه كما يكشفه الصفّ */
+    public static function seesFee(): bool
+    {
+        return ! hub_masked('compliance', 'fee');
     }
 
     public static function kinds(): array
@@ -37,6 +45,12 @@ class Compliance
 
     /** الرادار: كل بندٍ مستحقٍّ أو متأخر، بأثره ومهلته */
     public static function radar(): array
+    {
+        return hub_screen('cmp:radar', self::TTL, fn () => self::radarCalc(),
+            ['compliance_items', 'companies', 'users']);
+    }
+
+    protected static function radarCalc(): array
     {
         if (! self::may() || ! Schema::hasTable('compliance_items')) return [];
 
@@ -60,7 +74,7 @@ class Compliance
             $out[] = [
                 'id' => $r->id, 'title' => $r->title, 'kind' => $r->kind ?: 'غير مصنّف',
                 'authority' => $r->authority, 'due' => $r->due, 'days' => $days,
-                'fee' => $r->fee !== null ? (float) $r->fee : null,
+                'fee' => $r->fee !== null && self::seesFee() ? (float) $r->fee : null,
                 'owner' => $names[$r->owner_id] ?? null,
                 'company' => $cos[$r->company_id] ?? null,
                 'status' => $r->status, 'lead' => $lead,
@@ -80,6 +94,11 @@ class Compliance
      * لا يحمرّ صفٌّ لأنه لا صفَّ أصلاً — وهذا أخطر من التأخر.
      */
     public static function missing(): array
+    {
+        return hub_screen('cmp:miss', self::TTL, fn () => self::missingCalc(), ['compliance_items', 'companies']);
+    }
+
+    protected static function missingCalc(): array
     {
         if (! self::may() || ! Schema::hasTable('compliance_items') || ! Schema::hasTable('companies')) return [];
 
@@ -111,6 +130,11 @@ class Compliance
 
     /** ثغراتٌ في السجل نفسه: بلا مالك، بلا دليل، بلا تاريخ، وحالةٌ تكذب */
     public static function gaps(): array
+    {
+        return hub_screen('cmp:gaps', self::TTL, fn () => self::gapsCalc(), ['compliance_items']);
+    }
+
+    protected static function gapsCalc(): array
     {
         if (! self::may() || ! Schema::hasTable('compliance_items')) return [];
 
@@ -152,6 +176,11 @@ class Compliance
     /** كلفة الامتثال ونبضه — الرسوم المستحقة خلال ٩٠ يوماً تدفّقٌ نقديّ لا أحد يخطّط له */
     public static function pulse(): array
     {
+        return hub_screen('cmp:pulse', self::TTL, fn () => self::pulseCalc(), ['compliance_items']);
+    }
+
+    protected static function pulseCalc(): array
+    {
         if (! self::may() || ! Schema::hasTable('compliance_items')) return [];
 
         $open = hub_open_scope(self::q(), 'status', ['معفى']);
@@ -161,9 +190,8 @@ class Compliance
             'late' => (clone $open)->whereNotNull('due')->where('due', '<', now()->toDateString())->count(),
             'soon' => (clone $open)->whereNotNull('due')
                 ->whereBetween('due', [now()->toDateString(), now()->addDays(90)->toDateString()])->count(),
-            'fees90' => (float) (clone $open)->whereNotNull('due')
-                ->whereBetween('due', [now()->toDateString(), now()->addDays(90)->toDateString()])->sum('fee'),
-            'feesYear' => (float) self::q()->sum('fee'),
+            'fees90' => self::seesFee() ? (float) (clone $open)->whereNotNull('due')
+                ->whereBetween('due', [now()->toDateString(), now()->addDays(90)->toDateString()])->sum('fee') : null,
             'cur' => setting('app.currency', 'د.ك'),
         ];
     }

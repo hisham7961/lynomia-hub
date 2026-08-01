@@ -115,14 +115,13 @@ class UnifiedInboxTest extends TestCase
         $this->actingAs($this->owner);
         $this->assertContains('سياسة أمن المعلومات', collect(Inbox::items($this->owner))->pluck('title')->all());
 
-        DB::table('policy_acks')->insert(['id' => (string) Str::uuid(), 'title' => 'إقرار',
-            'policy_id' => $pid, 'user_id' => $this->owner->id, 'ver' => '1.0',
-            'ack_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+        \App\Models\PolicyAck::create(['title' => 'إقرار', 'policy_id' => $pid,
+            'user_id' => $this->owner->id, 'ver' => '1.0', 'ack_at' => now()]);
 
         $this->assertNotContains('سياسة أمن المعلومات', collect(Inbox::items($this->owner))->pluck('title')->all());
 
         // نسخةٌ جديدة = إقرارٌ جديد: الإقرار القديم لا يُغطّي نصّاً تغيّر
-        DB::table('policies')->where('id', $pid)->update(['ver' => '2.0']);
+        \App\Models\Policy::where('id', $pid)->first()->update(['ver' => '2.0']);
         $this->assertContains('سياسة أمن المعلومات', collect(Inbox::items($this->owner))->pluck('title')->all(),
             'سياسةٌ حُدّثت ولم تُطلب من أحدٍ إقراراً جديداً — الإقرار القديم يُغطّي نصّاً لم يقرأه');
     }

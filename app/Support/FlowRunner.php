@@ -154,7 +154,10 @@ class FlowRunner
                     if (! $uid) continue;
                     HubNotification::create([
                         'user_id' => $uid, 'kind' => 'flow',
-                        'text' => $text ?: ('حدث في ' . $def['label']),
+                        // نصُّ إجراء المسار يصل بلا حدٍّ من شاشة المسارات، والعمود
+                        // ٦٠٠ — والفشل هنا **صامت** لأن act() ملفوفةٌ بـcatch
+                        'text' => hub_fit($text ?: ('حدث في ' . $def['label']),
+                            hub_col_max('notifications_hub', 'text') ?? 590),
                         'module' => $module, 'record_id' => $m->id,
                         'read' => false, 'created_at' => now(),
                     ]);
@@ -163,7 +166,7 @@ class FlowRunner
 
             case 'tg':
                 OutboxMessage::create([
-                    'kind' => 'flow', 'channel' => 'tg', 'text' => mb_substr($text, 0, 790),
+                    'kind' => 'flow', 'channel' => 'tg', 'text' => hub_fit($text, hub_col_max('outbox', 'text') ?? 790),
                     'state' => 'queued', 'created_at' => now(),
                 ]);
                 break;
@@ -171,7 +174,8 @@ class FlowRunner
             case 'mail':
                 OutboxMessage::create([
                     'kind' => 'flow', 'channel' => 'mail',
-                    'target' => (string) ($a['to_email'] ?? ''), 'text' => mb_substr($text, 0, 790),
+                    'target' => hub_fit((string) ($a['to_email'] ?? ''), hub_col_max('outbox', 'target') ?? 290),
+                    'text' => hub_fit($text, hub_col_max('outbox', 'text') ?? 790),
                     'state' => 'queued', 'created_at' => now(),
                 ]);
                 break;

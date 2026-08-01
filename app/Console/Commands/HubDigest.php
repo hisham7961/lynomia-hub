@@ -85,7 +85,7 @@ class HubDigest extends Command
             HubNotification::create(['user_id' => $u->id, 'kind' => 'digest',
                 'text' => \Illuminate\Support\Str::limit($text, 590), 'read' => false, 'created_at' => now()]);
             OutboxMessage::create(['user_id' => $u->id, 'kind' => 'digest', 'channel' => 'tg',
-                'text' => mb_substr($text, 0, 3500), 'state' => 'queued', 'created_at' => now()]);
+                'text' => hub_fit($text, hub_col_max('outbox', 'text') ?? 790), 'state' => 'queued', 'created_at' => now()]);
         }
 
         \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.digest'], ['value' => now()->toIso8601String()]);

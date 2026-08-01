@@ -1938,6 +1938,184 @@ if (! function_exists('hub_cached')) {
     }
 }
 
+if (! function_exists('hub_scope_key')) {
+    /**
+     * بصمة نطاق القارئ لمفاتيح التخبئة.
+     *
+     * كل قارئٍ جديد يمرّ بـ`hub_scope` و`hub_can` و`hub_field_mode` — فنتيجته
+     * **تختلف باختلاف القارئ**. مفتاحٌ عامّ واحد يعني أن أول من يفتح الشاشة
+     * يخبّئ نسخته، ويقرؤها بعده من لا يملك رؤيتها. البصمة تحمل الدور والمستخدم
+     * والشركة النشطة وعدسة المشروع — وهي أربعة ما يغيّر النتيجة.
+     */
+    function hub_scope_key(string $prefix): string
+    {
+        $u = auth()->user();
+
+        // ختمُ `roles` و`users` جزءٌ من المفتاح: المفتاح كان يحمل **معرّف** الدور
+        // لا **صلاحياته**، فسحبُ صلاحيةٍ من دورٍ لا يغيّر المفتاح — ويبقى الموظف
+        // المسحوبة صلاحيتُه يقرأ الشاشة المخبّأة حتى تنتهي مهلتها. والعزل بالشركة
+        // مخزَّنٌ على المستخدم، فتغييره يجب أن يُبطل كذلك.
+        return $prefix . ':' . ($u?->role_id ?? '0') . ':' . ($u?->id ?? '0')
+            . ':' . (string) session('hub.company', '-') . hub_lens_key(hub_lens()['id'] ?? null)
+            . hub_data_stamp(['roles', 'users']);
+    }
+}
+
+if (! function_exists('hub_col_max')) {
+    /**
+     * أقصى طولٍ يقبله العمود فعلاً — من القاعدة لا من التخمين.
+     *
+     * هنا جذرُ عائلةٍ كاملة من الأعطال: `ModuleController::rules()` كان يُخرج
+     * `string` بلا `max` لكل حقل نصّي، و**SQLite لا يفرض طول varchar** فتمرّ
+     * الحزمة خضراء، ثم يرفضها MySQL في الإنتاج بـSQLSTATE 22001. هكذا وقع عطل
+     * `flows.event`، ونفس الشكل كامنٌ في عشرات الأعمدة.
+     *
+     * القياس بالمحارف لا بالبايتات: MySQL يعدّ `VARCHAR(N)` محارفَ، والعربية
+     * متعددةُ البايتات — فلو قِيس بالبايت لضاق الحدّ إلى ثلثه بلا سبب.
+     */
+    function hub_col_max(string $table, string $col): ?int
+    {
+        return hub_col_widths()[$table][$col] ?? null;
+    }
+}
+
+if (! function_exists('hub_col_widths')) {
+    /**
+     * خريطةُ أطوال الأعمدة النصّية، مقروءةً من **مصدر الهجرات**.
+     *
+     * ولمَ لا تُقرأ من القاعدة؟ لأن SQLite — محرّك الاختبارات — لا يصرّح بطول
+     * `varchar` أصلاً: هو يقبل أي طول ولا يذكره. فلو قِيس من القاعدة لعادت
+     * الحزمةُ عمياءَ عن العطل نفسه الذي جاءت تحرسه. والمصدر واحدٌ للمحرّكين.
+     *
+     * الأخيرُ يفوز: هجرةُ توسعةٍ لاحقة (`change()`) تنسخ الطول القديم.
+     */
+    function hub_col_widths(): array
+    {
+        static $map = null;
+        if ($map !== null) return $map;
+
+        $map = \Illuminate\Support\Facades\Cache::remember('hub:colwidths:' . config('hub.version'), 86400, function () {
+            $out = [];
+            foreach (glob(database_path('migrations/*.php')) ?: [] as $file) {
+                $src = (string) @file_get_contents($file);
+                // كل كتلة Schema::create/table ثم كل string/char فيها بطولها
+                preg_match_all("/Schema::(?:create|table)\\(\\s*'([a-z0-9_]+)'(.*?)(?=Schema::(?:create|table)\\(|\\z)/s",
+                    $src, $blocks, PREG_SET_ORDER);
+                foreach ($blocks as $b) {
+                    preg_match_all("/->(?:string|char)\\(\\s*'([a-z0-9_]+)'\\s*,\\s*(\\d+)/", $b[2], $cols, PREG_SET_ORDER);
+                    foreach ($cols as $c) $out[$b[1]][$c[1]] = (int) $c[2];
+                    // uuid() و char(36) الضمنيان — معرّفاتٌ بطول ٣٦
+                    preg_match_all("/->uuid\\(\\s*'([a-z0-9_]+)'/", $b[2], $uu, PREG_SET_ORDER);
+                    foreach ($uu as $c) $out[$b[1]][$c[1]] ??= 36;
+                }
+            }
+
+            return $out;
+        });
+
+        return $map;
+    }
+}
+
+if (! function_exists('hub_fit')) {
+    /**
+     * قصُّ نصٍّ ليسع عموداً — **بالمحارف** لا بالبايتات.
+     * `substr` تقطع الحرف العربي نصفين فتُنتج UTF-8 فاسدةً يرفضها MySQL
+     * بـ«Incorrect string value» ويبتلعها SQLite صامتاً.
+     */
+    function hub_fit(?string $v, int $max): ?string
+    {
+        if ($v === null) return null;
+
+        return mb_strlen($v) > $max ? mb_substr($v, 0, $max) : $v;
+    }
+}
+
+if (! function_exists('hub_read')) {
+    /**
+     * قارئُ وحدةٍ محروس — سكّةٌ واحدة لكل شاشةٍ تجمع من عدّة وحدات.
+     *
+     * جولةُ تدقيقٍ كشفت نمطاً يتكرّر: شاشةٌ تُقاس بصلاحية وحدةٍ **واحدة** ثم
+     * تقرأ خمس وحداتٍ أخرى بـ`DB::table(...)` خاماً — فتعرض لمن يملك «الأحداث»
+     * كتالوجَ الإعلام، ولمن يملك «الباقات» تكلفةَ الخدمات، ولمقاولٍ على مشروعٍ
+     * واحد أسماءَ المشاريع كلها.
+     *
+     * هذا القارئ يجمع الحرّاس الثلاثة في مكانٍ واحد: وجودُ الجدول، و`hub_can`
+     * للوحدة، و`hub_scope` لنطاق القارئ، وتصفيةُ المحذوف. ويعيد `null` عند
+     * المنع — فالمستدعي يعرف أن لا شيء له هنا ولا يقرأ خاماً «للاحتياط».
+     */
+    function hub_read(string $module, $user = null)
+    {
+        $user = $user ?? auth()->user();
+        $def = hub_mod($module);
+        if (! $def) return null;
+
+        $table = $def['table'] ?? null;
+        if (! $table || ! \Illuminate\Support\Facades\Schema::hasTable($table)) return null;
+        if (! hub_can($user, $module, 'v')) return null;
+
+        $q = \Illuminate\Support\Facades\DB::table($table);
+        if (\Illuminate\Support\Facades\Schema::hasColumn($table, 'deleted_at')) $q->whereNull('deleted_at');
+
+        return hub_scope($q, $module, $user);
+    }
+}
+
+if (! function_exists('hub_masked')) {
+    /** هل هذا الحقل محجوبٌ أو للقراءة فقط عن هذا القارئ؟ */
+    function hub_masked(string $module, string $field, $user = null): bool
+    {
+        return hub_field_mode($user ?? auth()->user(), $module, $field) !== '';
+    }
+}
+
+if (! function_exists('hub_data_bump')) {
+    /**
+     * ختمُ تغيّر جدول — عدّادٌ يزيد مع كل كتابةٍ على الجدول.
+     *
+     * التخبئة بمهلةٍ وحدها تكذب: تُعدِّل سجلاً فتبقى الشاشة تعرض الرقم القديم
+     * خمس دقائق، فيظنّ المستخدم أن تعديله لم يُحفظ فيعيده. الختم يجعل المفتاح
+     * نفسه يتغيّر ساعةَ تتغيّر البيانات — فلا نصّ يُبطَل يدوياً ولا رقمٌ يتأخّر.
+     */
+    function hub_data_bump(?string $table = null): void
+    {
+        $k = 'hub:stamp:' . ($table ?: '*');
+        try {
+            \Illuminate\Support\Facades\Cache::put($k,
+                ((int) \Illuminate\Support\Facades\Cache::get($k, 0)) + 1, 86400);
+        } catch (\Throwable $e) {
+            // خبيئةٌ معطّلة لا تُسقط عملية حفظ — أسوأ ما يقع أن تتأخر شاشةٌ محسوبة
+        }
+    }
+}
+
+if (! function_exists('hub_data_stamp')) {
+    /** ختم الجداول المطلوبة مجموعاً — جزءٌ من مفتاح الشاشة */
+    function hub_data_stamp(array $tables): string
+    {
+        if (! $tables) return '';
+
+        $c = \Illuminate\Support\Facades\Cache::class;
+
+        return ':' . implode('.', array_map(
+            fn ($t) => (string) (int) \Illuminate\Support\Facades\Cache::get('hub:stamp:' . $t, 0), $tables));
+    }
+}
+
+if (! function_exists('hub_screen')) {
+    /**
+     * غلاف شاشةٍ محسوبة: بصمة النطاق + ختم الجداول + مهلة + `?fresh=1`.
+     *
+     * الشاشات المحسوبة تقرأ عشرات الاستعلامات وقيمتُها لا تتغير كل ثانية —
+     * لكنها **تتغيّر ساعةَ تتغيّر بياناتها**، فالختم يسبق المهلة.
+     */
+    function hub_screen(string $prefix, int $ttl, \Closure $fn, array $tables = [])
+    {
+        return hub_cached(hub_scope_key($prefix) . hub_data_stamp($tables), $ttl,
+            (bool) request()->query('fresh'), $fn);
+    }
+}
+
 if (! function_exists('hub_related')) {
     /**
      * السجلات المرتبطة بسجل: كل وحدة تشير إليه بحقل مرجعي، مع صفوفها وعدّها.

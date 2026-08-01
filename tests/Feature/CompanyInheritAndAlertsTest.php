@@ -21,7 +21,7 @@ class CompanyInheritAndAlertsTest extends TestCase
         session(['hub.company' => $co->id]);
 
         $this->actingAs($this->owner)
-            ->post('/m/services', ['name' => 'خدمة تصميم هوية', 'kind' => 'خدمة'])
+            ->post('/m/services', ['name' => 'خدمة تصميم هوية', 'kind' => 'خدمة مرة واحدة'])
             ->assertRedirect();
 
         // ورثت الشركة النشطة
@@ -54,7 +54,7 @@ class CompanyInheritAndAlertsTest extends TestCase
     {
         $this->seedCore();
         session()->forget('hub.company');
-        $this->actingAs($this->owner)->post('/m/services', ['name' => 'خدمة عامة', 'kind' => 'خدمة']);
+        $this->actingAs($this->owner)->post('/m/services', ['name' => 'خدمة عامة', 'kind' => 'خدمة مرة واحدة']);
 
         $this->assertNull(DB::table('services')->where('name', 'خدمة عامة')->value('company_id'));
     }

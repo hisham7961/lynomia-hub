@@ -18,7 +18,7 @@ class AuditFindingsTest extends TestCase
     protected function vault(): VaultSecret
     {
         return VaultSecret::create([
-            'title' => 'سر الخادم', 'type' => 'خادم',
+            'title' => 'سر الخادم', 'type' => 'مفتاح SSH',
             'username' => 'root', 'secret_cipher' => 'P@ssw0rd-TOP-SECRET',
         ]);
     }
@@ -63,7 +63,7 @@ class AuditFindingsTest extends TestCase
 
         // ردّ التعديل كان يعيد السجل خاماً — بسره الصريح
         $put = $this->withHeader('Authorization', 'Bearer ' . $tok)
-            ->putJson('/api/v1/vault/' . $v->id, ['title' => 'سر الخادم', 'type' => 'خادم', 'user' => 'root'])
+            ->putJson('/api/v1/vault/' . $v->id, ['title' => 'سر الخادم', 'type' => 'مفتاح SSH', 'user' => 'root'])
             ->assertOk();
         $put->assertDontSee('TOP-SECRET');
         $this->assertSame('P@ssw0rd-TOP-SECRET', $v->fresh()->secret_cipher);   // ولم يُدهس السر

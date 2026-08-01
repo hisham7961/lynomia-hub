@@ -8,9 +8,12 @@
             «متأخر» كلمةٌ لا ثمن لها — وهنا يُقال ماذا يقع فعلاً، ومتى يبدأ العمل لا متى يحلّ الموعد.
         </div>
     </div>
-    @if (hub_can(auth()->user(), 'compliance', 'a'))
-        <a class="btn ghost sm" href="{{ route('m.create', 'compliance') }}">＋ بند التزام</a>
-    @endif
+    <div style="display:flex;gap:8px">
+        <a class="btn ghost sm" href="{{ route('compliance.board', ['fresh' => 1]) }}">↻ تحديث</a>
+        @if (hub_can(auth()->user(), 'compliance', 'a'))
+            <a class="btn ghost sm" href="{{ route('m.create', 'compliance') }}">＋ بند التزام</a>
+        @endif
+    </div>
 </div>
 
 @if ($pulse)
@@ -18,8 +21,10 @@
     <div class="stat"><span class="ico">📋</span><b>{{ number_format($pulse['n']) }}</b><span>بند التزام</span></div>
     <div class="stat"><span class="ico">🔴</span><b class="{{ $pulse['late'] ? 'txt-bad' : '' }}">{{ $pulse['late'] }}</b><span>متأخر</span></div>
     <div class="stat"><span class="ico">🟡</span><b>{{ $pulse['soon'] }}</b><span>يستحق خلال ٩٠ يوماً</span></div>
-    <div class="stat"><span class="ico">💵</span><b>{{ number_format($pulse['fees90'], 0) }}</b>
-        <span>رسوم التسعين يوماً ({{ $pulse['cur'] }})</span></div>
+    @if ($pulse['fees90'] !== null)
+        <div class="stat"><span class="ico">💵</span><b>{{ number_format($pulse['fees90'], 0) }}</b>
+            <span>رسوم التسعين يوماً ({{ $pulse['cur'] }})</span></div>
+    @endif
 </div>
 <div class="card" style="margin-bottom:12px">
     <div class="sub">

@@ -22,15 +22,22 @@ class MediaCenter
 {
     public const TTL = 600;
 
+    /**
+     * قارئٌ محروس: الشاشة تُفتح بصلاحية «الإعلام» **أو** «الأحداث»، فكان من
+     * يملك إحداهما يقرأ الأخرى كاملةً. وكلٌّ الآن خلف وحدته ونطاقها.
+     */
     protected static function live(string $t)
     {
+        $module = ['media_items' => 'media', 'events' => 'events'][$t] ?? null;
+        if ($module) return hub_read($module);
+
         return DB::table($t)->when(Schema::hasColumn($t, 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'));
     }
 
     /** خطّ الزمن: وصولٌ وعددُ ظهوراتٍ لكل شهر — النموّ يُرى لا يُخمَّن */
     public static function timeline(int $months = 12): array
     {
-        if (! Schema::hasTable('media_items')) return [];
+        if (! self::live('media_items')) return [];
 
         $from = now()->startOfMonth()->subMonths($months - 1);
         $rows = self::live('media_items')->whereNotNull('date')
@@ -65,7 +72,7 @@ class MediaCenter
     /** كتالوج الظهورات — بطاقاتٌ بصورتها ووصولها وأثرها */
     public static function catalogue(int $limit = 60): array
     {
-        if (! Schema::hasTable('media_items')) return [];
+        if (! self::live('media_items')) return [];
 
         $rows = self::live('media_items')->orderByDesc('date')->limit($limit)
             ->get(['id', 'title', 'type', 'outlet', 'date', 'url', 'brand_id', 'speaker_id',
@@ -88,7 +95,7 @@ class MediaCenter
     /** المنابر التي تنشر عنّا، وأصواتُنا التي تتحدث */
     public static function outletsAndVoices(): array
     {
-        if (! Schema::hasTable('media_items')) return ['outlets' => [], 'voices' => []];
+        if (! self::live('media_items')) return ['outlets' => [], 'voices' => []];
 
         $rows = self::live('media_items')->get(['outlet', 'speaker_id', 'reach', 'impact']);
         $people = DB::table('users')->whereNull('deleted_at')->pluck('name', 'id');
@@ -112,7 +119,7 @@ class MediaCenter
     /** الفعاليات: ما أنفقناه وما عاد — وكم كلّف العميل المحتمل الواحد */
     public static function events(): array
     {
-        if (! Schema::hasTable('events')) return [];
+        if (! self::live('events')) return [];
 
         $rows = self::live('events')->orderByDesc('date_start')->limit(40)
             ->get(['id', 'title', 'type', 'venue', 'date_start', 'date_end', 'brand_id', 'owner_id',
@@ -216,9 +223,8 @@ class MediaCenter
 
     public static function all(bool $fresh = false): array
     {
-        if ($fresh) Cache::forget('media:all');
-
-        return Cache::remember('media:all', self::TTL, function () {
+        // المفتاح ببصمة القارئ: المحتوى صار يختلف بصلاحيته ونطاقه
+        return hub_cached(hub_scope_key('media:all'), self::TTL, $fresh, function () {
             $tl = self::timeline();
             $cat = self::catalogue();
             $ev = self::events();

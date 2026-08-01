@@ -21,26 +21,41 @@ class Pricing
 {
     public const TTL = 600;
 
+    /**
+     * قارئٌ محروس: الشاشة تُفتح بصلاحية «الباقات» وكانت تقرأ الخدمات والمنافسين
+     * والتطبيقات خاماً — فيرى صاحبُ الباقات تكلفةَ الخدمات وميزةَ المنافسين
+     * وإن حُجبت عنه في وحداتها.
+     */
     protected static function live(string $t)
     {
+        $module = ['pricing_plans' => 'plans', 'services' => 'services',
+                   'competitors' => 'competitors', 'applications' => 'apps'][$t] ?? null;
+        if ($module) return hub_read($module);
+
         return DB::table($t)->when(Schema::hasColumn($t, 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'));
+    }
+
+    /** التكلفة والهامش حقولٌ قد تُحجب — والباقة تُعرض بلاهما لا بهما مكشوفَين */
+    public static function seesCost(): bool
+    {
+        return ! hub_masked('services', 'cost') && ! hub_masked('plans', 'unitCost');
     }
 
     /** الكتالوج: خدمةٌ ← باقاتها ← منافسوها، مع الشعار والهامش */
     public static function catalog(): array
     {
-        if (! Schema::hasTable('pricing_plans')) return [];
+        if (! self::live('pricing_plans')) return [];
 
         $plans = self::live('pricing_plans')->get();
         if ($plans->isEmpty()) return [];
 
-        $services = Schema::hasTable('services')
+        $services = self::live('services')
             ? self::live('services')->get(['id', 'name', 'kind', 'price', 'cost', 'cycle', 'project_id', 'status'])->keyBy('id')
             : collect();
 
         // شعار المنتج: تطبيقُ المشروع نفسه — فالباقة تُعرض بوجهٍ يعرفه العميل
         $logos = [];
-        if (Schema::hasTable('applications')) {
+        if (self::live('applications')) {
             foreach (self::live('applications')->whereNotNull('logo_id')
                 ->get(['project_id', 'logo_id', 'name']) as $a) {
                 if ($a->project_id && ! isset($logos[$a->project_id])) {
@@ -49,7 +64,7 @@ class Pricing
             }
         }
 
-        $rivals = Schema::hasTable('competitors')
+        $rivals = self::live('competitors')
             ? self::live('competitors')->whereNotNull('service_id')
                 ->get(['id', 'name', 'service_id', 'price_from', 'price_to', 'currency', 'billing',
                        'free_tier', 'trial_days', 'our_edge', 'their_edge', 'positioning'])
@@ -80,7 +95,7 @@ class Pricing
                 'service'   => $svc->name ?? 'باقاتٌ بلا خدمة',
                 'kind'      => $svc->kind ?? null,
                 'status'    => $svc->status ?? null,
-                'opex'      => $svc->cost !== null ? (float) $svc->cost : null,
+                'opex'      => $svc->cost !== null && self::seesCost() ? (float) $svc->cost : null,
                 'projectId' => $pid,
                 'logo'      => $logos[$pid]['logo'] ?? null,
                 'appName'   => $logos[$pid]['app'] ?? null,
@@ -101,7 +116,7 @@ class Pricing
     protected static function plan($p): array
     {
         $price = $p->price !== null ? (float) $p->price : null;
-        $cost  = $p->unit_cost !== null ? (float) $p->unit_cost : null;
+        $cost  = $p->unit_cost !== null && self::seesCost() ? (float) $p->unit_cost : null;
         $free  = (bool) ($p->free_tier ?? false);
 
         $margin = ($price !== null && $cost !== null && $price > 0)
@@ -247,9 +262,8 @@ class Pricing
 
     public static function all(bool $fresh = false): array
     {
-        if ($fresh) Cache::forget('pricing:all');
-
-        return Cache::remember('pricing:all', self::TTL, function () {
+        // المفتاح ببصمة القارئ: المحتوى صار يختلف بصلاحيته ونطاقه وقيود حقوله
+        return hub_cached(hub_scope_key('pricing:all'), self::TTL, $fresh, function () {
             $cat = self::catalog();
 
             return ['catalog' => $cat, 'insights' => self::insights($cat), 'at' => now()->toDateTimeString()];

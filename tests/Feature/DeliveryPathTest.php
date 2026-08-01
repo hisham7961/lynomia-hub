@@ -38,13 +38,10 @@ class DeliveryPathTest extends TestCase
 
     protected function deploy(array $a): string
     {
-        $id = (string) Str::uuid();
-        DB::table('deployments')->insert(array_merge([
-            'id' => $id, 'ver' => '1.0.0', 'env' => 'إنتاج', 'status' => 'ناجح',
-            'deployed_at' => now(), 'created_at' => now(), 'updated_at' => now(),
-        ], $a));
-
-        return $id;
+        // عبر النموذج كما يكتب النظام — فتُرفع أختام الجداول كما في الإنتاج
+        return \App\Models\Deployment::create(array_merge([
+            'ver' => '1.0.0', 'env' => 'إنتاج', 'status' => 'ناجح', 'deployed_at' => now(),
+        ], $a))->id;
     }
 
     /** زمن التسليم يُحسب من تاريخ الطلب، والوسيط يُحسب مع المتوسط */

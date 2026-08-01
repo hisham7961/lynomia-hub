@@ -24,6 +24,8 @@ use Illuminate\Support\Facades\Schema;
  */
 class AppsProjects
 {
+    public const TTL = 300;
+
     /**
      * وقت الحفظ: سجلٌّ له تطبيقٌ وليس له مشروع يرث مشروع تطبيقه.
      * لا يُكتب فوق اختيارٍ صريح — من كتب مشروعاً يُحترم، ويُعرض تناقضُه لاحقاً.
@@ -75,16 +77,26 @@ class AppsProjects
      */
     public static function scan($user = null): array
     {
+        return hub_screen('ap:scan', self::TTL, fn () => self::scanCalc($user),
+            array_merge(['applications', 'projects'], array_column(self::dualModules(), 'table')));
+    }
+
+    protected static function scanCalc($user = null): array
+    {
         $user = $user ?? auth()->user();
         if (! Schema::hasTable('applications')) return ['orphanApps' => [], 'noProject' => [],
             'conflict' => [], 'appless' => [], 'byProject' => []];
 
+        // الخريطةُ الكاملة تلزم للمقارنة، لكن **الأسماء** لا تُعرض إلا لمن يملك
+        // وحدتها ونطاقها: اسم المشروع بيانٌ كاسم أي حقل
         $appProj = DB::table('applications')->whereNull('deleted_at')
             ->get(['id', 'name', 'project_id', 'platform', 'status']);
         $map = $appProj->pluck('project_id', 'id');
 
-        $projNames = Schema::hasTable('projects')
-            ? DB::table('projects')->whereNull('deleted_at')->pluck('name', 'id') : collect();
+        $appQ = hub_read('apps', $user);
+        $appSeen = $appQ ? $appQ->pluck('name', 'id') : collect();
+        $projQ = hub_read('projects', $user);
+        $projNames = $projQ ? $projQ->pluck('name', 'id') : collect();
 
         $noProject = [];
         $conflict = [];
@@ -101,7 +113,7 @@ class AppsProjects
                 $have = $r->{$d['proj']} ?? null;
                 $item = ['module' => $mk, 'label' => $d['label'], 'id' => $r->id,
                          'title' => (string) ($r->{$d['display']} ?? '—'),
-                         'app' => $appProj->firstWhere('id', $r->{$d['app']})?->name,
+                         'app' => $appSeen[$r->{$d['app']}] ?? '—',
                          'want' => $projNames[$want] ?? '—', 'wantId' => $want];
                 if (! $have) $noProject[] = $item;
                 elseif ($have !== $want) $conflict[] = $item + ['have' => $projNames[$have] ?? '—'];
@@ -109,9 +121,10 @@ class AppsProjects
         }
 
         // تطبيقاتٌ يتيمة: لا تصعد إلى أي مجموعٍ ولا تظهر في عدسة مشروع
-        $orphan = hub_can($user, 'apps', 'v')
-            ? $appProj->whereNull('project_id')->map(fn ($a) => ['id' => $a->id, 'name' => $a->name,
-                'platform' => $a->platform, 'status' => $a->status])->values()->all()
+        $orphan = $appQ
+            ? $appProj->whereNull('project_id')->filter(fn ($a) => isset($appSeen[$a->id]))
+                ->map(fn ($a) => ['id' => $a->id, 'name' => $a->name,
+                    'platform' => $a->platform, 'status' => $a->status])->values()->all()
             : [];
 
         return [
@@ -119,18 +132,18 @@ class AppsProjects
             'noProject'  => $noProject,
             'conflict'   => $conflict,
             'appless'    => self::appless($user, $appProj),
-            'byProject'  => self::byProject($user, $appProj, $projNames),
+            'byProject'  => self::byProject($user, $appProj, $projNames, $appSeen),
         ];
     }
 
     /** مشروعٌ منتَجُه تطبيقٌ ولا ملفَّ تطبيقٍ له — فلا نسخةَ ولا تقييمَ يُتابَع */
     protected static function appless($user, $appProj): array
     {
-        if (! hub_can($user, 'projects', 'v') || ! Schema::hasTable('projects')) return [];
+        if (! ($pq = hub_read('projects', $user))) return [];
 
         $withApp = $appProj->pluck('project_id')->filter()->unique()->all();
 
-        return hub_open_scope(hub_scope(DB::table('projects')->whereNull('deleted_at'), 'projects', $user))
+        return hub_open_scope($pq)
             ->whereNotIn('id', $withApp ?: ['-'])
             ->where(fn ($w) => $w->whereNotNull('prod')->where('prod', '!=', '')
                 ->orWhere(fn ($x) => $x->whereNotNull('url')->where('url', '!=', '')))
@@ -139,11 +152,14 @@ class AppsProjects
     }
 
     /** خريطةٌ بسيطة: كل مشروعٍ وتطبيقاته */
-    protected static function byProject($user, $appProj, $projNames): array
+    protected static function byProject($user, $appProj, $projNames, $appSeen): array
     {
         if (! hub_can($user, 'apps', 'v')) return [];
 
-        return $appProj->whereNotNull('project_id')->groupBy('project_id')
+        return $appProj->whereNotNull('project_id')
+            // لا يُسمّى تطبيقٌ ولا مشروعٌ خارج ما يراه القارئ
+            ->filter(fn ($a) => isset($appSeen[$a->id]) && isset($projNames[$a->project_id]))
+            ->groupBy('project_id')
             ->map(fn ($g, $pid) => [
                 'id' => $pid, 'project' => $projNames[$pid] ?? 'مشروعٌ محذوف',
                 'apps' => $g->map(fn ($a) => ['id' => $a->id, 'name' => $a->name,
@@ -170,7 +186,11 @@ class AppsProjects
             $n++;
         }
 
-        if ($n) hub_audit('ربط سجلات بمشاريع تطبيقاتها', null, null, $n . ' سجلاً');
+        if ($n) {
+            hub_audit('ربط سجلات بمشاريع تطبيقاتها', null, null, $n . ' سجلاً');
+            // التحديث بمنشئ الاستعلام لا يُطلق أحداث Eloquent
+            foreach (self::dualModules() as $d) hub_data_bump($d['table']);
+        }
 
         return $n;
     }

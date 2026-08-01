@@ -22,11 +22,7 @@ use Illuminate\Support\Facades\Schema;
  */
 class Delivery
 {
-    /** كل مصدرٍ خلف صلاحيته — الشاشة تجمع ولا تفتح باباً مغلقاً */
-    protected static function may(string $module): bool
-    {
-        return hub_can(auth()->user(), $module, 'v');
-    }
+    public const TTL = 300;
 
     /* ────────── زمن التسليم ────────── */
 
@@ -36,17 +32,21 @@ class Delivery
      */
     public static function leadTime(): array
     {
-        if (! self::may('feats') || ! Schema::hasTable('plan_items')) return [];
+        return hub_screen('dlv:lead', self::TTL, fn () => self::leadTimeCalc(),
+            ['plan_items', 'internal_requests']);
+    }
 
-        $feats = DB::table('plan_items')->whereNull('deleted_at')
+    protected static function leadTimeCalc(): array
+    {
+        if (! hub_read('feats')) return [];
+
+        $feats = hub_read('feats')
             ->where('status', 'منشورة')->whereNotNull('request_id')
             ->limit(300)->get(['id', 'title', 'request_id', 'due', 'updated_at']);
         if ($feats->isEmpty()) return [];
 
-        $reqs = Schema::hasTable('internal_requests')
-            ? DB::table('internal_requests')->whereIn('id', $feats->pluck('request_id'))
-                ->pluck('req_date', 'id')
-            : collect();
+        $rq = hub_read('requests');
+        $reqs = $rq ? $rq->whereIn('id', $feats->pluck('request_id'))->pluck('req_date', 'id') : collect();
 
         $days = [];
         $slow = [];
@@ -75,13 +75,20 @@ class Delivery
 
     public static function breaks(): array
     {
+        return hub_screen('dlv:breaks', self::TTL, fn () => self::breaksCalc(),
+            ['internal_requests', 'plan_items', 'deployments', 'dependencies', 'work_updates', 'projects']);
+    }
+
+    protected static function breaksCalc(): array
+    {
         $out = [];
 
         // طلبٌ اعتُمد ثم لم يُترجَم إلى شيء — أسوأ من الرفض: وعدٌ بلا أثر
-        if (self::may('requests') && Schema::hasTable('internal_requests')) {
-            $rows = DB::table('internal_requests')->whereNull('deleted_at')
-                ->where('decision', 'مقبول')
+        if ($q = hub_read('requests')) {
+            $rows = $q->where('decision', 'مقبول')
                 ->whereNull('project_id')->whereNull('task_id')
+                // الاستثناء يقرأ المزايا **بلا نطاق** عمداً: طلبٌ صار ميزةً في
+                // مشروعٍ لا أراه ليس «منسيّاً» — والقائمة معرّفاتٌ لا تُعرض
                 ->when(Schema::hasTable('plan_items'), fn ($q) => $q->whereNotIn('id',
                     DB::table('plan_items')->whereNull('deleted_at')->whereNotNull('request_id')->pluck('request_id')))
                 ->orderBy('req_date')->limit(10)->get(['id', 'title', 'req_date']);
@@ -94,14 +101,13 @@ class Delivery
             }
         }
 
-        if (self::may('feats') && Schema::hasTable('plan_items')) {
-            $deployed = Schema::hasTable('deployments')
-                ? DB::table('deployments')->whereNull('deleted_at')->where('env', 'إنتاج')
-                    ->whereNotNull('project_id')->pluck('project_id')->unique()
-                : collect();
+        if (hub_read('feats')) {
+            $dq = hub_read('deploys');
+            $deployed = $dq ? $dq->where('env', 'إنتاج')->whereNotNull('project_id')->pluck('project_id')->unique()
+                            : collect();
 
             // ميزةٌ «منشورة» ولا نشرَ إنتاجيّ في مشروعها يوثّقها
-            foreach (DB::table('plan_items')->whereNull('deleted_at')->where('status', 'منشورة')
+            foreach (hub_read('feats')->where('status', 'منشورة')
                         ->whereNotNull('project_id')->whereNotIn('project_id', $deployed->all() ?: ['-'])
                         ->limit(10)->get(['id', 'title']) as $f) {
                 $out[] = ['icon' => '🚀', 'tone' => 'wn', 'kind' => 'منشورةٌ بلا نشرٍ موثَّق',
@@ -110,8 +116,7 @@ class Delivery
             }
 
             // تناقضٌ خطر: اختبارُها فشل وهي في الإنتاج
-            foreach (DB::table('plan_items')->whereNull('deleted_at')
-                        ->where('status', 'منشورة')->where('test', 'فشل')
+            foreach (hub_read('feats')->where('status', 'منشورة')->where('test', 'فشل')
                         ->limit(10)->get(['id', 'title', 'test_note']) as $f) {
                 $out[] = ['icon' => '🧪', 'tone' => 'bad', 'kind' => 'منشورةٌ واختبارها فاشل',
                     'title' => $f->title, 'module' => 'feats', 'id' => $f->id,
@@ -120,8 +125,7 @@ class Delivery
             }
 
             // متأخرةٌ عن موعدها وما زالت قيد التطوير
-            foreach (DB::table('plan_items')->whereNull('deleted_at')
-                        ->whereIn('status', ['قيد التطوير', 'قيد الاختبار'])
+            foreach (hub_read('feats')->whereIn('status', ['قيد التطوير', 'قيد الاختبار'])
                         ->whereNotNull('due')->where('due', '<', now()->toDateString())
                         ->orderBy('due')->limit(10)->get(['id', 'title', 'due']) as $f) {
                 $late = (int) Carbon::parse($f->due)->diffInDays(now());
@@ -131,9 +135,9 @@ class Delivery
             }
         }
 
-        if (self::may('deploys') && Schema::hasTable('deployments')) {
+        if (hub_read('deploys')) {
             // إصدارٌ إنتاجيّ بلا سجل تغييرات — لا يُعرف ما فيه إن وجب التراجع
-            foreach (DB::table('deployments')->whereNull('deleted_at')->where('env', 'إنتاج')
+            foreach (hub_read('deploys')->where('env', 'إنتاج')
                         ->where(fn ($w) => $w->whereNull('changes_log')->orWhere('changes_log', ''))
                         ->orderByDesc('deployed_at')->limit(8)->get(['id', 'ver', 'deployed_at']) as $d) {
                 $out[] = ['icon' => '📋', 'tone' => 'wn', 'kind' => 'إصدارٌ بلا سجل تغييرات',
@@ -142,7 +146,7 @@ class Delivery
             }
 
             // هجرةٌ فشلت: قاعدةٌ في حالةٍ وسط
-            foreach (DB::table('deployments')->whereNull('deleted_at')->where('migrations', 'فشلت')
+            foreach (hub_read('deploys')->where('migrations', 'فشلت')
                         ->orderByDesc('deployed_at')->limit(5)->get(['id', 'ver', 'env']) as $d) {
                 $out[] = ['icon' => '🗄️', 'tone' => 'bad', 'kind' => 'هجرة قاعدة فشلت',
                     'title' => 'الإصدار ' . ($d->ver ?: '—') . ' · ' . ($d->env ?: ''),
@@ -152,9 +156,8 @@ class Delivery
         }
 
         // اعتماديةٌ حرجة بلا بديل: نقطة انهيارٍ واحدة تُسقط الخدمة
-        if (self::may('deps') && Schema::hasTable('dependencies')) {
-            foreach (DB::table('dependencies')->whereNull('deleted_at')
-                        ->where('criticality', 'حرجة')->where('status', 'نشطة')
+        if ($dep = hub_read('deps')) {
+            foreach ($dep->where('criticality', 'حرجة')->where('status', 'نشطة')
                         ->where(fn ($w) => $w->whereNull('fallback')->orWhere('fallback', ''))
                         ->limit(8)->get(['id', 'title', 'dep_name', 'dep_type']) as $d) {
                 $out[] = ['icon' => '🔗', 'tone' => 'bad', 'kind' => 'اعتمادية حرجة بلا بديل',
@@ -165,12 +168,11 @@ class Delivery
         }
 
         // مشروعٌ جارٍ صامت: لا تحديث عمل منذ أسبوعين
-        if (self::may('updates') && Schema::hasTable('work_updates') && Schema::hasTable('projects')) {
-            $last = DB::table('work_updates')->whereNull('deleted_at')
-                ->select('project_id', DB::raw('MAX(created_at) as last'))
+        // المشاريع الصامتة: تتطلب رؤية التحديثات **والمشاريع** معاً — الاسم بيانٌ أيضاً
+        if (($wu = hub_read('updates')) && ($pj = hub_read('projects'))) {
+            $last = $wu->select('project_id', DB::raw('MAX(created_at) as last'))
                 ->groupBy('project_id')->pluck('last', 'project_id');
-            foreach (hub_open_scope(DB::table('projects')->whereNull('deleted_at'))
-                        ->limit(30)->get(['id', 'name']) as $p) {
+            foreach (hub_open_scope($pj)->limit(30)->get(['id', 'name']) as $p) {
                 $l = $last[$p->id] ?? null;
                 if ($l && Carbon::parse($l)->gt(now()->subDays(14))) continue;
                 $out[] = ['icon' => '🤫', 'tone' => 'wn', 'kind' => 'مشروعٌ جارٍ صامت',
@@ -190,10 +192,14 @@ class Delivery
     /** كم نشرةً إنتاجية في الشهر، وكم فشلت، وكم متوسط مدّتها */
     public static function cadence(): array
     {
-        if (! self::may('deploys') || ! Schema::hasTable('deployments')) return [];
+        return hub_screen('dlv:cad', self::TTL, fn () => self::cadenceCalc(), ['deployments']);
+    }
 
-        $rows = DB::table('deployments')->whereNull('deleted_at')
-            ->where('deployed_at', '>=', now()->subDays(90))
+    protected static function cadenceCalc(): array
+    {
+        if (! ($q = hub_read('deploys'))) return [];
+
+        $rows = $q->where('deployed_at', '>=', now()->subDays(90))
             ->get(['env', 'status', 'deployed_at', 'duration_min']);
         if ($rows->isEmpty()) return [];
 
@@ -224,16 +230,15 @@ class Delivery
      */
     public static function releases(int $limit = 12): array
     {
-        if (! self::may('deploys') || ! Schema::hasTable('deployments')) return [];
+        if (! ($q = hub_read('deploys'))) return [];
 
-        $rows = DB::table('deployments')->whereNull('deleted_at')->where('env', 'إنتاج')
+        $rows = $q->where('env', 'إنتاج')
             ->orderByDesc('deployed_at')->limit($limit + 1)
             ->get(['id', 'ver', 'app_id', 'project_id', 'deployed_at', 'changes_log', 'status', 'by_id']);
         if ($rows->isEmpty()) return [];
 
-        $apps = Schema::hasTable('applications')
-            ? DB::table('applications')->whereIn('id', $rows->pluck('app_id')->filter())->pluck('name', 'id')
-            : collect();
+        $aq = hub_read('apps');
+        $apps = $aq ? $aq->whereIn('id', $rows->pluck('app_id')->filter())->pluck('name', 'id') : collect();
         $users = DB::table('users')->whereIn('id', $rows->pluck('by_id')->filter())->pluck('name', 'id');
 
         $list = $rows->values();
@@ -260,9 +265,14 @@ class Delivery
     /** التصاميم: ما علق منها وما تأخر */
     public static function designs(): array
     {
-        if (! self::may('designs') || ! Schema::hasTable('design_tasks')) return [];
+        return hub_screen('dlv:dsg', self::TTL, fn () => self::designsCalc(), ['design_tasks']);
+    }
 
-        $q = fn () => DB::table('design_tasks')->whereNull('deleted_at');
+    protected static function designsCalc(): array
+    {
+        if (! hub_read('designs')) return [];
+
+        $q = fn () => hub_read('designs');
         $open = hub_open_scope($q(), 'status', ['جاهز', 'ملغي']);
 
         return [
