@@ -15,6 +15,31 @@ use Illuminate\Support\Str;
  */
 class DmController extends Controller
 {
+    /**
+     * حضورُ الزملاء — من هو متصلٌ الآن ومتى ظهر آخر مرة.
+     *
+     * `sessions_log.last_seen_at` صار نبضةً حيّة منذ v2.181، فالحضور يُقرأ منه
+     * بلا أي بنيةٍ جديدة: خمس دقائق من آخر ظهورٍ تعني «متصل الآن».
+     */
+    public static function presence(array $userIds): array
+    {
+        if (! $userIds || ! \Illuminate\Support\Facades\Schema::hasTable('sessions_log')) return [];
+
+        $rows = \Illuminate\Support\Facades\DB::table('sessions_log')
+            ->whereIn('user_id', $userIds)->where('revoked', false)
+            ->groupBy('user_id')
+            ->pluck(\Illuminate\Support\Facades\DB::raw('MAX(last_seen_at)'), 'user_id');
+
+        $out = [];
+        foreach ($rows as $uid => $at) {
+            if (! $at) continue;
+            $c = \Illuminate\Support\Carbon::parse($at);
+            $out[$uid] = ['online' => $c->gt(now()->subMinutes(5)), 'at' => $c];
+        }
+
+        return $out;
+    }
+
     /** قائمة المحادثات: آخر رسالة وغير المقروء لكل طرف */
     public function inbox()
     {
@@ -35,7 +60,9 @@ class DmController extends Controller
         $all = User::whereNull('deleted_at')->where('id', '!=', $me)
             ->where('status', 'نشط')->orderBy('name')->pluck('name', 'id');
 
-        return view('dm.inbox', ['threads' => $threads, 'users' => $users, 'all' => $all]);
+        return view('dm.inbox', ['threads' => $threads, 'users' => $users, 'all' => $all,
+            'open' => null, 'msgs' => collect(), 'other' => null,
+            'presence' => self::presence($threads->pluck('other')->all())]);
     }
 
     /** خيط محادثة مع مستخدم — الفتح يختم القراءة */
@@ -50,7 +77,27 @@ class DmController extends Controller
 
         $msgs = DmMessage::where('thread_key', $key)->orderBy('created_at')->limit(300)->get();
 
-        return view('dm.thread', ['other' => $other, 'msgs' => $msgs]);
+        // نفس الشاشة: قائمةُ المحادثات إلى جانب الخيط المفتوح — لا صفحتان منفصلتان
+        $me = auth()->id();
+        $all = DmMessage::where('from_id', $me)->orWhere('to_id', $me)
+            ->orderByDesc('created_at')->limit(500)->get();
+        $threads = $all->groupBy('thread_key')->map(function ($g) use ($me) {
+            $last = $g->first();
+
+            return ['other' => $last->from_id === $me ? $last->to_id : $last->from_id,
+                    'last' => $last, 'unread' => $g->where('to_id', $me)->whereNull('read_at')->count()];
+        })->values();
+
+        $ids = $threads->pluck('other')->push($other->id)->unique()->all();
+
+        return view('dm.inbox', [
+            'other' => $other, 'msgs' => $msgs, 'open' => $other->id,
+            'threads' => $threads,
+            'users' => User::whereIn('id', $ids)->pluck('name', 'id'),
+            'all' => User::whereNull('deleted_at')->where('id', '!=', $me)
+                ->where('status', 'نشط')->orderBy('name')->pluck('name', 'id'),
+            'presence' => self::presence($ids),
+        ]);
     }
 
     public function send(Request $r, string $userId)
