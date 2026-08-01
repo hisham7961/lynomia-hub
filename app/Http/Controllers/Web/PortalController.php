@@ -16,8 +16,11 @@ class PortalController extends Controller
     public function me()
     {
         $emp = Employee::where('user_id', auth()->id())->whereNull('deleted_at')->first();
+        $inbox = \App\Support\Inbox::items(auth()->user());
 
-        return view('portal.me', ['emp' => $emp, 'self' => true] + $this->bundle($emp, auth()->id()));
+        return view('portal.me', ['emp' => $emp, 'self' => true,
+            'inbox' => $inbox, 'buckets' => \App\Support\Inbox::summary($inbox),
+        ] + $this->bundle($emp, auth()->id()));
     }
 
     /** الملف الشامل لموظف — لمن يملك عرض وحدة HR */

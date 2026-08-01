@@ -22,9 +22,9 @@
 </div>
 @endif
 
-{{-- ── الصندوق الموحد: ما ينتظر التصرف ── --}}
-@if ($approvals->count() || $decisions->count() || $tickets->count() || $meetings->count())
-<h3 style="margin:14px 0 10px">📥 {{ $self ? 'صندوقي الموحد — ينتظر تصرفي' : 'ينتظر تصرفه' }}</h3>
+{{-- ما ينتظر التصرف — للملف الشامل وحده: «بوابتي» لها صندوقها الموحّد أعلاه --}}
+@if (! $self && ($approvals->count() || $decisions->count() || $tickets->count() || $meetings->count()))
+<h3 style="margin:14px 0 10px">📥 ينتظر تصرفه</h3>
 <div class="kids">
     @if ($approvals->count())
     <div class="card kid">
@@ -90,8 +90,10 @@
 
 <h3 style="margin:14px 0 10px">🗂️ {{ $self ? 'ملفي وعملي' : 'ملفه وعمله' }}</h3>
 <div class="kids">
+    {{-- مهام صاحب البوابة تأتيه مرتّبةً في الصندوق الموحّد — فلا تُكرَّر هنا --}}
+    @unless ($self)
     <div class="card kid">
-        <h3>✅ {{ $self ? 'مهامي' : 'مهامه' }} المفتوحة
+        <h3>✅ مهامه المفتوحة
             @if (hub_can(auth()->user(), 'tasks', 'v'))<a class="btn ghost xs msauto" href="{{ route('m.index', 'tasks') }}">الكل ←</a>@endif
         </h3>
         <table class="mini">
@@ -112,6 +114,7 @@
             @endforelse
         </table>
     </div>
+    @endunless
 
     @if ($emp)
     <div class="card kid">
