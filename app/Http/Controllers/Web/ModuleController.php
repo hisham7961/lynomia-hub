@@ -986,5 +986,7 @@ class ModuleController extends Controller
             }
             $m->custom = $custom ?: null;
         }
+
+        \App\Support\AppsProjects::inherit($def, $m);
     }
 }

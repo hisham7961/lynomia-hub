@@ -252,6 +252,8 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $mon],
             ['key' => 'delivery',  'label' => '🛤️ مسار التسليم',     'route' => 'delivery',        'group' => 'analytics', 'ok' => hub_can($user, 'feats', 'v') || hub_can($user, 'deploys', 'v') || hub_can($user, 'requests', 'v') || hub_can($user, 'designs', 'v')],
             ['key' => 'assetlife', 'label' => '💼 العهدة ودورة الحياة', 'route' => 'assets.life',  'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
+            ['key' => 'compb',     'label' => '⚖️ الامتثال وأثره',   'route' => 'compliance.board', 'group' => 'centers', 'ok' => hub_can($user, 'compliance', 'v')],
+            ['key' => 'appsproj',  'label' => '🔗 التطبيقات والمشاريع', 'route' => 'appsprojects', 'group' => 'centers', 'ok' => hub_can($user, 'apps', 'v') || hub_can($user, 'projects', 'v')],
             ['key' => 'dassets',   'label' => '🔐 الأصول الرقمية',   'route' => 'digital.assets',  'group' => 'analytics', 'ok' => $mon],
             ['key' => 'pricing',   'label' => '💳 الباقات والتسعير', 'route' => 'pricing',         'group' => 'centers',   'ok' => hub_can($user, 'plans', 'v')],
             ['key' => 'mediac',    'label' => '📣 مركز الإعلام',      'route' => 'media.center',    'group' => 'centers',   'ok' => hub_can($user, 'media', 'v') || hub_can($user, 'events', 'v')],
