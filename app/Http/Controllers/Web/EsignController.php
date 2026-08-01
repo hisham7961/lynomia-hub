@@ -888,7 +888,7 @@ class EsignController extends Controller
         abort_unless(\App\Support\ContractApprovals::canDecide(auth()->user(), $step), 403,
             'قرار هذه المرحلة ليس لك');
 
-        $note = mb_substr(trim((string) $r->input('note')), 0, 400);
+        $note = mb_substr(trim(hub_str($r->input('note'))), 0, 400);
         if ($note === '') return back()->with('err', 'اكتب سبب الرفض — يُبلَّغ به منشئ الطلب');
 
         $step->forceFill(['status' => 'مرفوض', 'decided_by' => auth()->id(),
@@ -943,7 +943,7 @@ class EsignController extends Controller
     public function verify(Request $r)
     {
         $found = null;
-        $code = strtoupper(trim((string) $r->input('code')));
+        $code = strtoupper(trim(hub_str($r->input('code'))));
         if ($code !== '') {
             $key = 'verify:' . $r->ip();
             if (RateLimiter::tooManyAttempts($key, 10)) {
@@ -977,7 +977,7 @@ class EsignController extends Controller
 
         // موقّع مستقل: بوابته رمز OTP بريدي لا كلمة السر المشتركة
         if ($signer) {
-            $otp = (string) $r->input('otp');
+            $otp = hub_str($r->input('otp'));
             $ok = $otp !== '' && $signer->otp_code
                 && (! $signer->otp_expires_at || now()->lt($signer->otp_expires_at))
                 && Hash::check($otp, $signer->otp_code);
@@ -988,7 +988,7 @@ class EsignController extends Controller
             }
             $signer->forceFill(['otp_code' => null, 'otp_expires_at' => null])->save();   // يُستهلك مرة واحدة
             \App\Models\ContractEvent::log('otp_ok', $req, ['signer_id' => $signer->id]);
-        } elseif (! Hash::check((string) $r->input('pass'), $req->pass)) {
+        } elseif (! Hash::check(hub_str($r->input('pass')), $req->pass)) {
             RateLimiter::hit($key, 60);
 
             return back()->with('err', 'كلمة السر غير صحيحة');

@@ -20,7 +20,7 @@ class CommentController extends Controller
     public function feed(Request $r)
     {
         $me = (string) auth()->id();
-        $tab = in_array($t = (string) $r->query('t', 'all'), ['all', 'me', 'pin'], true) ? $t : 'all';
+        $tab = in_array($t = hub_str($r->query('t', 'all')), ['all', 'me', 'pin'], true) ? $t : 'all';
 
         $posts = Comment::where('module', 'feed')->whereNull('parent_id')->with('user', 'replies.user')
             // «ما ذكرني»: قناةٌ تنمو تُغرق ما يعنيك — والذكرُ هو ما يعنيك
@@ -169,7 +169,7 @@ class CommentController extends Controller
         $c = Comment::findOrFail($id);
         $this->guardTarget($c->module, $c->record_id);          // يرى السجل = يتفاعل
 
-        $emoji = (string) $r->input('emoji');
+        $emoji = hub_str($r->input('emoji'));
         abort_unless(in_array($emoji, self::REACTIONS, true), 422, 'تفاعل غير معروف');
 
         $q = \Illuminate\Support\Facades\DB::table('reactions')

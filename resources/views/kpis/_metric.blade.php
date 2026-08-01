@@ -1,7 +1,11 @@
 {{-- مقياس واحد — يتوقع: $p (بادئة a|b) $catalog، و$sel اختيارياً للتعديل --}}
 @php
     $sel = $sel ?? [];
-    $selMod = (string) ($sel['module'] ?? '');
+    // أعضاء المعادلة قد تصل مصفوفاتٍ من صفٍّ مشوّه — والنموذج لا يسقط بسببها
+    $selMod = hub_str($sel['module'] ?? '');
+    $selAgg = hub_str($sel['agg'] ?? '');
+    $selCol = hub_str($sel['col'] ?? '');
+    $selSt  = hub_str($sel['st'] ?? '');
     // خيارات العمود والحالة تُطبع من الخادم عند التعديل: لولا ذلك لبقيت القوائم
     // فارغةً حتى يلمس المستخدم قائمة الوحدة، فيُحفظ المؤشر بمقياسٍ منزوع العمود
     $selCat = $catalog[$selMod] ?? ['nums' => [], 'states' => []];
@@ -11,7 +15,7 @@
         <label for="{{ $p }}-agg">الحساب</label>
         <select class="inp" id="{{ $p }}-agg" name="{{ $p }}_agg">
             @foreach (['count' => 'عدد السجلات', 'sum' => 'مجموع عمود', 'avg' => 'متوسط عمود'] as $v => $lbl)
-                <option value="{{ $v }}" @selected(($sel['agg'] ?? '') === $v)>{{ $lbl }}</option>
+                <option value="{{ $v }}" @selected($selAgg === $v)>{{ $lbl }}</option>
             @endforeach
         </select>
     </div>
@@ -29,7 +33,7 @@
         <select class="inp" id="{{ $p }}-col" name="{{ $p }}_col">
             <option value="">—</option>
             @foreach ($selCat['nums'] ?? [] as $n)
-                <option value="{{ $n['key'] }}" @selected(($sel['col'] ?? '') === $n['key'])>{{ $n['label'] }}</option>
+                <option value="{{ $n['key'] }}" @selected($selCol === $n['key'])>{{ $n['label'] }}</option>
             @endforeach
         </select>
     </div>
@@ -38,7 +42,7 @@
         <select class="inp" id="{{ $p }}-st" name="{{ $p }}_st">
             <option value="">كل الحالات</option>
             @foreach ($selCat['states'] ?? [] as $s)
-                <option value="{{ $s }}" @selected(($sel['st'] ?? '') === $s)>{{ $s }}</option>
+                <option value="{{ $s }}" @selected($selSt === $s)>{{ $s }}</option>
             @endforeach
         </select>
     </div>

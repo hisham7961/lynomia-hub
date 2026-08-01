@@ -77,7 +77,7 @@ class ProfileController extends Controller
     {
         $secret = (string) $r->session()->get('2fa:pending');
         abort_unless($secret !== '', 422);
-        if (! \App\Support\Totp::verify($secret, (string) $r->input('code'))) {
+        if (! \App\Support\Totp::verify($secret, hub_str($r->input('code')))) {
             return back()->withErrors(['code' => 'الرمز غير صحيح — تأكد من إدخال السر في التطبيق وأن ساعة الجوال مضبوطة']);
         }
 
@@ -95,7 +95,7 @@ class ProfileController extends Controller
     {
         $u = auth()->user();
         abort_unless($u->totp_enabled, 422);
-        if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, (string) $r->input('code'))) {
+        if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, hub_str($r->input('code')))) {
             return back()->withErrors(['code' => 'الرمز غير صحيح']);
         }
 

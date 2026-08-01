@@ -21,7 +21,7 @@ class PayrollController extends Controller
         abort_unless(hub_can(auth()->user(), 'payroll', 'e'), 403, 'إجراءات المسيّر تتطلب صلاحية تعديل الرواتب');
         $run = hub_scope(PayrollRun::query(), 'payroll')->findOrFail($id);
 
-        return match ((string) $r->input('do')) {
+        return match (hub_str($r->input('do'))) {
             'generate' => $this->generate($run),
             'approve'  => $this->approve($run),
             'pay'      => $this->pay($run),

@@ -21,7 +21,7 @@ class ErrorCenterController extends Controller
         $q = ErrorEvent::query();
         if ($st = $r->query('st')) $q->where('status', $st);
         if ($k = $r->query('k')) $q->where('kind', $k);
-        if ($term = trim((string) $r->query('q', ''))) {
+        if ($term = trim(hub_str($r->query('q', '')))) {
             $q->where(fn ($w) => $w->where('message', 'LIKE', "%{$term}%")
                 ->orWhere('file', 'LIKE', "%{$term}%")->orWhere('url', 'LIKE', "%{$term}%"));
         }

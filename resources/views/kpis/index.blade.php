@@ -5,7 +5,7 @@
     $f = (array) ($editing?->formula ?? []);
     $selA = (array) ($f['a'] ?? []);
     $selB = (array) ($f['b'] ?? []);
-    $combine = (string) ($f['combine'] ?? 'none');
+    $combine = hub_str($f['combine'] ?? 'none', 'none');
     $num = fn ($v) => rtrim(rtrim(number_format((float) $v, 1), '0'), '.');
 @endphp
 

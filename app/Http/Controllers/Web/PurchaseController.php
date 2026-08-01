@@ -61,7 +61,7 @@ class PurchaseController extends Controller
     {
         abort_unless(hub_can(auth()->user(), 'purchases', 'e'), 403, 'إجراءات الشراء تتطلب صلاحية تعديل');
         $p = hub_scope(Purchase::query(), 'purchases')->findOrFail($id);
-        $do = (string) $r->input('do');
+        $do = hub_str($r->input('do'));
 
         // الملغى والمرتجع نهايتان — لا إجراء يبعثهما
         abort_if(in_array((string) $p->status, ['ملغى', 'مرتجع'], true) && $do !== 'bill', 422,

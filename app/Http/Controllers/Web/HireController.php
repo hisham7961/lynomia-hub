@@ -46,7 +46,7 @@ class HireController extends Controller
          * لمراجعة الصلاحيات**. وحارس التصعيد نفسه يسري: الملكية لا يمنحها إلا مالك.
          */
         $temp = null;
-        $roleId = (string) $r->input('role_id', '');
+        $roleId = hub_str($r->input('role_id', ''));
         if ($roleId !== '' && hub_can(auth()->user(), 'users', 'v') || ($roleId !== '' && hub_flag(auth()->user(), 'users'))) {
             $role = \App\Models\Role::find($roleId);
             abort_if($role && $role->is_owner && ! hub_is_owner(), 403, 'منح دور المالك لا يكون إلا من مالك');

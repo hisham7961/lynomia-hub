@@ -52,7 +52,7 @@ class QuoteFlowController extends Controller
             return back()->with('err', 'محاولات كثيرة — انتظر دقيقة ثم أعد المحاولة');
         }
 
-        if (! hash_equals($this->pass(), (string) $r->input('pass'))) {
+        if (! hash_equals($this->pass(), hub_str($r->input('pass')))) {
             \Illuminate\Support\Facades\RateLimiter::hit($key, 60);
             hub_audit('محاولة دخول QuoteFlow فاشلة');
 

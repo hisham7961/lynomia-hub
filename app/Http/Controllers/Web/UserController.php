@@ -86,7 +86,7 @@ class UserController extends Controller
     public function store(Request $r)
     {
         $this->gate();
-        $this->guardEscalation((string) $r->input('role_id'));
+        $this->guardEscalation(hub_str($r->input('role_id')));
 
         $data = $r->validate([
             'name' => 'required|string|max:120',
@@ -122,7 +122,7 @@ class UserController extends Controller
     public function update(Request $r, User $user)
     {
         $this->gate();
-        $this->guardEscalation((string) $r->input('role_id'), $user);
+        $this->guardEscalation(hub_str($r->input('role_id')), $user);
 
         $data = $r->validate([
             'name' => 'required|string|max:120',

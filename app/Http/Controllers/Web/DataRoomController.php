@@ -89,7 +89,7 @@ class DataRoomController extends Controller
     public function unlock(Request $r, string $token)
     {
         $link = $this->alive($token);
-        if (! $link->password_hash || ! Hash::check((string) $r->input('password'), $link->password_hash)) {
+        if (! $link->password_hash || ! Hash::check(hub_str($r->input('password')), $link->password_hash)) {
             return back()->withErrors(['password' => 'كلمة المرور غير صحيحة']);
         }
         $r->session()->put('share:' . $link->id, true);

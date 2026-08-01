@@ -17,15 +17,15 @@ class FlowController extends Controller
     public function index(Request $r)
     {
         $this->gate();
-        $module = (string) $r->query('m', '');
+        $module = hub_str($r->query('m', ''));
         if ($module !== '') abort_unless(hub_mod($module), 404);
 
         $all = Flow::orderBy('module')->orderByDesc('enabled')->orderBy('name')->get();
 
         // بحثٌ وفلترة: بـ٨٩ مساراً صارت القائمة المسطّحة غير صالحة للاستعمال
-        $q = trim((string) $r->query('q', ''));
-        $only = (string) $r->query('only', '');          // on|off
-        $group = (string) $r->query('g', '');
+        $q = trim(hub_str($r->query('q', '')));
+        $only = hub_str($r->query('only', ''));          // on|off
+        $group = hub_str($r->query('g', ''));
         $flows = $all->filter(function ($f) use ($q, $only, $group) {
             if ($only === 'on' && ! $f->enabled) return false;
             if ($only === 'off' && $f->enabled) return false;
@@ -121,21 +121,21 @@ class FlowController extends Controller
     {
         $actions = [];
         if ($r->boolean('a_notify')) {
-            $actions[] = ['type' => 'notify', 'to' => (string) $r->input('a_notify_to', 'owners'),
-                          'text' => (string) $r->input('a_notify_text', '')];
+            $actions[] = ['type' => 'notify', 'to' => hub_str($r->input('a_notify_to', 'owners')),
+                          'text' => hub_str($r->input('a_notify_text', ''))];
         }
-        if ($r->boolean('a_tg')) $actions[] = ['type' => 'tg', 'text' => (string) $r->input('a_tg_text', '')];
+        if ($r->boolean('a_tg')) $actions[] = ['type' => 'tg', 'text' => hub_str($r->input('a_tg_text', ''))];
         if ($r->boolean('a_mail')) {
-            $actions[] = ['type' => 'mail', 'to_email' => (string) $r->input('a_mail_to', ''),
-                          'text' => (string) $r->input('a_mail_text', '')];
+            $actions[] = ['type' => 'mail', 'to_email' => hub_str($r->input('a_mail_to', '')),
+                          'text' => hub_str($r->input('a_mail_text', ''))];
         }
         if ($r->boolean('a_task')) {
-            $actions[] = ['type' => 'task', 'text' => (string) $r->input('a_task_title', ''),
+            $actions[] = ['type' => 'task', 'text' => hub_str($r->input('a_task_title', '')),
                           'assignee' => $r->input('a_task_assignee') ?: null];
         }
         if ($r->boolean('a_set')) {
-            $actions[] = ['type' => 'set', 'field' => (string) $r->input('a_set_field', ''),
-                          'value' => (string) $r->input('a_set_value', '')];
+            $actions[] = ['type' => 'set', 'field' => hub_str($r->input('a_set_field', '')),
+                          'value' => hub_str($r->input('a_set_value', ''))];
         }
 
         return $actions;

@@ -211,7 +211,7 @@ class RoleController extends Controller
         $d = $r->validate(['name' => 'required|string|max:80', 'scope' => 'required|in:all,proj']);
 
         // قالبٌ مُختار يبني الأساس، وما أرسله النموذج يعلو عليه
-        $tpl = $r->input('template') ? self::fromTemplate((string) $r->input('template')) : [];
+        $tpl = $r->input('template') ? self::fromTemplate(hub_str($r->input('template'))) : [];
 
         // **«لم يُرسَل» غير «أُفرِغ عمداً»**: مربّع الاختيار غير المؤشَّر لا يصل
         // في الطلب، فبلا علامةٍ صريحة لا يُفرَّق بين مصفوفةٍ مُفرَّغةٍ عمداً وقسمٍ

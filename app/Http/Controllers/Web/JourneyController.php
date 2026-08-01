@@ -34,7 +34,7 @@ class JourneyController extends Controller
             $md = hub_mod($mk);
             if (! $md || ! hub_can(auth()->user(), $mk, 'v')) continue;
             $disp = hub_display_col($mk);
-            $sc = $md['status'] ?? null;
+            $sc = hub_status_col($mk);
             // النطاق يُفرض على الابن نفسه: رؤية العميل لا تمنح رؤية عروضه وعقوده
             $rows = hub_scope(DB::table($md['table'])->whereNull('deleted_at'), $mk)
                 ->where('client_id', $client->id)->limit(100)

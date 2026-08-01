@@ -47,7 +47,7 @@ class ApprovalDecisionController extends ModuleController
     public function reject(Request $r, string $id)
     {
         $ap = $this->pending($id);
-        $note = trim((string) $r->input('note'));
+        $note = trim(hub_str($r->input('note')));
 
         $ap->forceFill(['status' => 'مرفوض', 'decided_by' => auth()->id(), 'decided_at' => now()])->save();
         $this->tellRequester($ap, 'رُفض طلبك: ' . $ap->title . ($note !== '' ? " — السبب: {$note}" : ''));
