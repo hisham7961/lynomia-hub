@@ -144,6 +144,9 @@ Route::middleware('auth')->group(function () {
     Route::get('recommendations', [CapacityController::class, 'recommendations'])->name('recs');
     Route::get('kpis', [\App\Http\Controllers\Web\KpiController::class, 'index'])->name('kpis.index');
     Route::post('kpis', [\App\Http\Controllers\Web\KpiController::class, 'store'])->name('kpis.store');
+    Route::put('kpis/{id}', [\App\Http\Controllers\Web\KpiController::class, 'update'])->name('kpis.update');
+    Route::post('kpis/{id}/toggle', [\App\Http\Controllers\Web\KpiController::class, 'toggle'])->name('kpis.toggle');
+    Route::post('kpis/{id}/move', [\App\Http\Controllers\Web\KpiController::class, 'move'])->name('kpis.move');
     Route::delete('kpis/{id}', [\App\Http\Controllers\Web\KpiController::class, 'destroy'])->name('kpis.destroy');
 
     // ── صندوق الوثائق الوارد ──

@@ -2648,26 +2648,71 @@ if (! function_exists('hub_kpi_value')) {
     }
 }
 
+if (! function_exists('hub_kpi_explain')) {
+    /**
+     * المعادلة بالعربية. بطاقةٌ تقول «٤٥٪» ولا تقول **مِمَّ** حُسبت لا تُراجَع
+     * ولا تُصحَّح: من يحذفها لا يدري ما يحذف، ومن يشكّ فيها لا يدري أين يشكّ.
+     */
+    function hub_kpi_explain(array $formula): string
+    {
+        $one = function ($m) {
+            if (! is_array($m)) return '—';
+            $def = hub_mod((string) ($m['module'] ?? ''));
+            if (! $def) return 'وحدة غير معروفة';
+            $agg = ['count' => 'عدد سجلات', 'sum' => 'مجموع', 'avg' => 'متوسط'][$m['agg'] ?? 'count'] ?? 'عدد سجلات';
+            $txt = $agg . ' ' . $def['label'];
+            if (($m['agg'] ?? '') !== 'count' && ($ck = $m['col'] ?? null)) {
+                $col = collect($def['fields'])->firstWhere('key', $ck);
+                $txt = $agg . ' «' . ($col['label'] ?? $ck) . '» في ' . $def['label'];
+            }
+            if (trim((string) ($m['st'] ?? '')) !== '') $txt .= ' بحالة «' . $m['st'] . '»';
+
+            return $txt;
+        };
+
+        $a = $one($formula['a'] ?? null);
+        $combine = $formula['combine'] ?? 'none';
+        if ($combine === 'none') return $a;
+
+        $b = $one($formula['b'] ?? null);
+
+        return match ($combine) {
+            'ratio_pct' => "({$a}) ÷ ({$b}) × ١٠٠",
+            'ratio'     => "({$a}) ÷ ({$b})",
+            'diff'      => "({$a}) − ({$b})",
+            'sum'       => "({$a}) + ({$b})",
+            default     => $a,
+        };
+    }
+}
+
 if (! function_exists('hub_kpis')) {
-    /** كل المؤشرات المخصصة محسوبةً — لصفحة العرض */
-    function hub_kpis($user = null): array
+    /**
+     * كل المؤشرات المخصصة محسوبةً — لصفحة العرض.
+     * `$withHidden` للباني وحده: اللوحات والملخّص لا ترى الموقوف.
+     */
+    function hub_kpis($user = null, bool $withHidden = false): array
     {
         if (! \Illuminate\Support\Facades\Schema::hasTable('kpi_defs')) return [];
         $user = $user ?? auth()->user();
+        $hasActive = \Illuminate\Support\Facades\Schema::hasColumn('kpi_defs', 'active');
 
-        return \App\Models\KpiDef::orderBy('sort')->orderBy('created_at')->get()->map(function ($k) use ($user) {
-            $val = hub_kpi_value((array) $k->formula, $user);
-            $tone = '';
-            if ($val !== null && $k->target !== null) {
-                $hit = ($k->good ?? 'up') === 'up' ? $val >= $k->target : $val <= $k->target;
-                $near = ($k->good ?? 'up') === 'up' ? $val >= $k->target * 0.8 : $val <= $k->target * 1.2;
-                $tone = $hit ? 'ok' : ($near ? 'wn' : 'bad');
-            }
+        return \App\Models\KpiDef::when($hasActive && ! $withHidden, fn ($q) => $q->where('active', true))
+            ->orderBy('sort')->orderBy('created_at')->get()->map(function ($k) use ($user, $hasActive) {
+                $val = hub_kpi_value((array) $k->formula, $user);
+                $tone = '';
+                if ($val !== null && $k->target !== null) {
+                    $hit = ($k->good ?? 'up') === 'up' ? $val >= $k->target : $val <= $k->target;
+                    $near = ($k->good ?? 'up') === 'up' ? $val >= $k->target * 0.8 : $val <= $k->target * 1.2;
+                    $tone = $hit ? 'ok' : ($near ? 'wn' : 'bad');
+                }
 
-            return ['id' => $k->id, 'name' => $k->name, 'unit' => $k->unit,
-                    'value' => $val, 'target' => $k->target, 'tone' => $tone,
-                    'good' => $k->good, 'formula' => (array) $k->formula];
-        })->all();
+                return ['id' => $k->id, 'name' => $k->name, 'unit' => $k->unit,
+                        'value' => $val, 'target' => $k->target, 'tone' => $tone,
+                        'good' => $k->good, 'formula' => (array) $k->formula,
+                        'active' => $hasActive ? (bool) $k->active : true,
+                        'explain' => hub_kpi_explain((array) $k->formula)];
+            })->all();
     }
 }
 
