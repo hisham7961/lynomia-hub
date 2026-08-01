@@ -328,6 +328,8 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/webhooks/{id}/resend/{did}', [WebhookController::class, 'resend'])->name('webhooks.resend');
     Route::get('admin/security', [SecurityController::class, 'index'])->name('security.index');
     Route::post('admin/security/lockdown', [SecurityController::class, 'lockdown'])->name('security.lockdown');
+    Route::post('admin/security/sessions/{id}/revoke', [SecurityController::class, 'revokeSession'])->name('security.session.revoke');
+    Route::post('admin/security/users/{id}/revoke', [SecurityController::class, 'revokeUser'])->name('security.user.revoke');
     Route::get('admin/settings', [SettingController::class, 'edit'])->name('settings.edit');
     Route::post('admin/settings', [SettingController::class, 'update'])->name('settings.update');
     Route::post('admin/settings/odoo-test', [SettingController::class, 'odooTest'])->name('settings.odoo.test');

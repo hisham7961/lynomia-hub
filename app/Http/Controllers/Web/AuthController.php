@@ -113,7 +113,9 @@ class AuthController extends Controller
         // حارس الدخول: يتعلم العناوين المعتادة ويرصد الغريب وخارج الدوام
         \App\Support\LoginSentry::inspect($u, (string) $r->ip());
 
-        \App\Models\SessionLog::create([
+        // معرّف صفّ الجلسة يُحفَظ في الجلسة نفسها: بغيره لا نبضةَ حضورٍ ولا
+        // إنهاءَ عن بُعد — وهو ما جعل عمود revoked ميتاً منذ الهجرة الأولى
+        $log = \App\Models\SessionLog::create([
             'user_id'      => $u->id,
             'device'       => substr((string) $r->header('X-Device', $r->userAgent()), 0, 200),
             'ip'           => $r->ip(),
@@ -123,6 +125,7 @@ class AuthController extends Controller
         ]);
 
         $r->session()->regenerate();
+        $r->session()->put('hub.sl', $log->id);
 
         // شاشة البداية من تفضيل المستخدم — والرابط المقصود قبل الدخول يفوز عليها
         return redirect()->intended(hub_home_url(auth()->user()));
