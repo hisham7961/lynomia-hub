@@ -17,14 +17,42 @@ use Illuminate\Support\Str;
 class CommentController extends Controller
 {
     /** قناة الفريق — منشورات عامة يراها كل مستخدم */
-    public function feed()
+    public function feed(Request $r)
     {
-        $q = Comment::where('module', 'feed')->whereNull('parent_id')->with('user', 'replies.user');
-        $posts = (clone $q)->orderByDesc('pinned')->orderByDesc('created_at')->paginate(15);
+        $me = (string) auth()->id();
+        $tab = in_array($t = (string) $r->query('t', 'all'), ['all', 'me', 'pin'], true) ? $t : 'all';
+
+        $posts = Comment::where('module', 'feed')->whereNull('parent_id')->with('user', 'replies.user')
+            // «ما ذكرني»: قناةٌ تنمو تُغرق ما يعنيك — والذكرُ هو ما يعنيك
+            ->when($tab === 'me', fn ($w) => self::mentioning($w, $me))
+            ->when($tab === 'pin', fn ($w) => $w->where('pinned', true))
+            ->orderByDesc('pinned')->orderByDesc('created_at')
+            ->paginate(15)->withQueryString();
 
         $this->markRead($posts->getCollection());
 
-        return view('feed.index', ['posts' => $posts, 'users' => $this->userNames()]);
+        // نبضُ القناة: قناةٌ صامتة تُقال لا تُخفى — والذكرُ يُعدّ كي لا يمرّ دون انتباه
+        $week = Comment::where('module', 'feed')->whereNull('parent_id')
+            ->where('created_at', '>=', now()->subDays(7))->get(['user_id']);
+
+        return view('feed.index', [
+            'posts' => $posts, 'users' => $this->userNames(), 'tab' => $tab,
+            'pulse' => [
+                'week'   => $week->count(),
+                'people' => $week->pluck('user_id')->filter()->unique()->count(),
+                'pinned' => Comment::where('module', 'feed')->where('pinned', true)->count(),
+                'mine'   => self::mentioning(
+                    Comment::where('module', 'feed')->whereNull('parent_id'), $me)->count(),
+            ],
+            'presence' => DmController::presence(
+                $posts->getCollection()->pluck('user_id')->filter()->unique()->values()->all()),
+        ]);
+    }
+
+    /** منشوراتٌ ذُكر فيها فلان — `mentions` عمودُ JSON يحمل قائمة المعرّفات */
+    protected static function mentioning($q, string $uid)
+    {
+        return $q->whereJsonContains('mentions', $uid);
     }
 
     public function store(Request $r)

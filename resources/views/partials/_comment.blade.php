@@ -4,10 +4,18 @@
     $rnames  = $readers->map(fn ($id) => $users[$id] ?? '؟')->implode('، ');
     $reactions = $reactions ?? \App\Http\Controllers\Web\CommentController::reactionsFor([$c]);
     $myReacts = collect($reactions[$c->id] ?? [])->filter(fn ($rs) => collect($rs)->contains('id', auth()->id()))->keys()->all();
+    // الحضور اختياري: تمرّره قناة الفريق، ولا تعرفه شاشات السجلات
+    $online = ($presence ?? [])[$c->user_id]['online'] ?? false;
 @endphp
 <div class="cmt {{ $c->pinned ? 'pin' : '' }}" id="c-{{ $c->id }}" style="margin-inline-start:{{ min($depth, 2) * 26 }}px">
     <div class="chead">
-        <span class="ava sm">{{ mb_substr($users[$c->user_id] ?? '؟', 0, 1) }}</span>
+        <span style="position:relative;flex:none;display:inline-block">
+            <span class="ava sm">{{ mb_substr($users[$c->user_id] ?? '؟', 0, 1) }}</span>
+            @if ($online)
+                <span class="onlinedot" title="متصل الآن" style="position:absolute;inset-inline-end:-1px;bottom:0;width:9px;height:9px;
+                            border-radius:50%;background:var(--ok);border:2px solid var(--bg)"></span>
+            @endif
+        </span>
         <b>{{ $users[$c->user_id] ?? 'مستخدم محذوف' }}</b>
         <span class="sub">{{ $c->created_at?->diffForHumans() }}</span>
         @if ($c->pinned)<span class="bdg wn">📌 مثبّت</span>@endif
