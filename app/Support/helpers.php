@@ -258,6 +258,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'pricing',   'label' => '💳 الباقات والتسعير', 'route' => 'pricing',         'group' => 'centers',   'ok' => hub_can($user, 'plans', 'v')],
             ['key' => 'mediac',    'label' => '📣 مركز الإعلام',      'route' => 'media.center',    'group' => 'centers',   'ok' => hub_can($user, 'media', 'v') || hub_can($user, 'events', 'v')],
             ['key' => 'teamdir',   'label' => '👥 دليل الفريق',       'route' => 'team',            'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
+            ['key' => 'staff',     'label' => '🪪 الموظفون وحساباتهم', 'route' => 'staff.index',    'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
             ['key' => 'okrb',      'label' => '🎯 لوحة الأهداف',     'route' => 'okrs.board',      'group' => 'analytics', 'ok' => hub_can($user, 'okrs', 'v')],
             ['key' => 'polb',      'label' => '📜 السياسات والإقرارات', 'route' => 'policies.board', 'group' => 'centers',   'ok' => hub_can($user, 'policies', 'v')],
             ['key' => 'social',    'label' => '📣 مركز السوشال',     'route' => 'social.index',    'group' => 'analytics', 'ok' => hub_can($user, 'social', 'v')],
@@ -471,6 +472,21 @@ if (! function_exists('hub_user_admins')) {
         return \App\Models\User::with('role')->whereNull('deleted_at')->where('status', 'نشط')->get()
             ->filter(fn ($u) => $u->role?->is_owner || hub_flag($u, 'users'))
             ->pluck('id')->all();
+    }
+}
+
+if (! function_exists('hub_assignable_roles')) {
+    /**
+     * الأدوار القابلة للمنح من هذا المستخدم — **غير المالك لا يمنح ملكيةً فلا
+     * تُعرض له**. الحارس مفروضٌ في الخادم كذلك (Staff::makeAccount)، وهذا
+     * إخفاءُ ما لا يُمنح حتى لا يُعرض خيارٌ يُرفض عند الحفظ.
+     */
+    function hub_assignable_roles($user = null)
+    {
+        $user = $user ?? auth()->user();
+
+        return \App\Models\Role::when(! hub_is_owner($user), fn ($q) => $q->where('is_owner', false))
+            ->orderByDesc('is_owner')->orderBy('name')->get(['id', 'name', 'is_owner']);
     }
 }
 

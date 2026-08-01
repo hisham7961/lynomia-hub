@@ -45,31 +45,16 @@ class HireController extends Controller
          * وكلمةُ مرورٍ مؤقتة تُعرض مرةً واحدة، و**إشعارٌ لكل من يدير المستخدمين
          * لمراجعة الصلاحيات**. وحارس التصعيد نفسه يسري: الملكية لا يمنحها إلا مالك.
          */
+        /*
+         * سكّةٌ واحدة للطرفين: App\Support\Staff. كان الشرط هنا نسخةً ثانية —
+         * و`$roleId && hub_can(users,'v') || $roleId && hub_flag(users)` تُقرأ
+         * **بالأسبقية** فتُجيز فتحَ حسابٍ لمن يملك **عرض** المستخدمين وحده.
+         * العرضُ ليس المنح. الرايةُ وحدها تفتح الحسابات، ويفرضها الرافد نفسه.
+         */
         $temp = null;
         $roleId = hub_str($r->input('role_id', ''));
-        if ($roleId !== '' && hub_can(auth()->user(), 'users', 'v') || ($roleId !== '' && hub_flag(auth()->user(), 'users'))) {
-            $role = \App\Models\Role::find($roleId);
-            abort_if($role && $role->is_owner && ! hub_is_owner(), 403, 'منح دور المالك لا يكون إلا من مالك');
-
-            $email = trim((string) $c->email);
-            if ($role && $email !== '' && ! \App\Models\User::where('email', $email)->exists()) {
-                $temp = \Illuminate\Support\Str::password(14);
-                $user = \App\Models\User::create([
-                    'name' => $c->name, 'email' => $email, 'phone' => $c->phone,
-                    'job_title' => $c->job, 'role_id' => $role->id, 'status' => 'نشط',
-                    'password' => $temp,
-                    // بلا ختمِ تجديد: الحساب يبدأ بكلمةٍ مؤقتة يجب تبديلها
-                    'password_changed_at' => null,
-                ]);
-                $emp->update(['user_id' => $user->id]);
-                hub_audit('إنشاء حساب لموظف جديد', 'users', $user->id, $user->name . ' — دور ' . $role->name);
-
-                foreach (hub_user_admins() as $adminId) {
-                    hub_notify($adminId, 'مستخدمون',
-                        '👤 أُنشئ حساب لـ«' . $c->name . '» بدور «' . $role->name . '» عند التعيين — راجع صلاحياته',
-                        'users', $user->id);
-                }
-            }
+        if ($roleId !== '' && hub_flag(auth()->user(), 'users')) {
+            $temp = \App\Support\Staff::makeAccount($emp, $roleId);
         }
 
         $c->stage = 'تم التعيين';

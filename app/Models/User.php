@@ -33,9 +33,21 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
+    /** حسابٌ جديد يجد ملفَّه الوظيفي الذي ينتظره — البريد هو الهوية */
+    protected static function booted(): void
+    {
+        static::created(fn (self $u) => \App\Support\Staff::linkWaitingFile($u));
+    }
+
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
+    }
+
+    /** الملفّ الوظيفي المرتبط بهذا الحساب */
+    public function employee(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Employee::class, 'user_id');
     }
 
     public function isOwner(): bool

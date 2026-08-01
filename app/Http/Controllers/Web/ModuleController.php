@@ -262,6 +262,21 @@ class ModuleController extends Controller
         $this->bustProgress($module, $m);
         \App\Support\FlowRunner::fire('created', $module, $m);
 
+        /*
+         * **موظفٌ جديد بحسابٍ جديد**: الربط بحسابٍ قائم يقع تلقائياً في نموذج
+         * Employee (البريد هو الهوية)، وفتحُ حسابٍ جديد قرارٌ صريح يُطلب من
+         * النموذج — بدورٍ مختار وكلمةِ مرورٍ مؤقتة تُعرض مرةً واحدة.
+         */
+        if ($module === 'hr' && $r->boolean('_make_account') && ! $m->user_id) {
+            $temp = \App\Support\Staff::makeAccount($m, hub_str($r->input('_account_role')));
+            if ($temp !== null) {
+                return redirect()->route('m.show', [$module, $m->id])
+                    ->with('ok', 'أُضيف الموظف وأُنشئ حسابه')
+                    ->with('temp_password', $temp)
+                    ->with('temp_password_for', (string) $m->email);
+            }
+        }
+
         // عقدٌ غير موقّع → تحويله لمسار التوقيع الإلكتروني: يُضبط على «قيد التوقيع»
         // ويُنقل المستخدم لإنشاء طلب التوقيع مربوطاً بهذا العقد، مُهيَّأ سلفاً.
         if ($module === 'contracts' && $r->boolean('to_esign') && hub_can(auth()->user(), 'contracts', 'a')) {

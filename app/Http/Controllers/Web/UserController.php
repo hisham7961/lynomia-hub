@@ -104,9 +104,22 @@ class UserController extends Controller
         $data['companies'] = array_values($data['companies'] ?? []);
         // بصمة تجديد كلمة المرور: بغيرها يكذب فحص «لم تُجدَّد منذ سنة» على كل حسابٍ جديد
         $data['password_changed_at'] = now();
-        User::create($data);
+        $u = User::create($data);
 
-        return redirect()->route('users.index')->with('ok', 'أُضيف المستخدم');
+        /*
+         * **الحساب والملفُّ شخصٌ واحد**: الربط بملفٍّ ينتظر بريدَه يقع تلقائياً
+         * في نموذج User. وإنشاءُ ملفٍّ وظيفيّ لمن لا ملفَّ له قرارٌ صريح من
+         * النموذج — فحسابٌ بلا ملفّ يعني موظفاً بلا راتبٍ ولا عهدةٍ ولا إجازات.
+         */
+        $msg = 'أُضيف المستخدم';
+        if ($r->boolean('_make_employee') && hub_can(auth()->user(), 'hr', 'a')
+            && \App\Support\Staff::makeFile($u)) {
+            $msg = 'أُضيف المستخدم وأُنشئ ملفُّه الوظيفي';
+        } elseif ($u->employee()->exists()) {
+            $msg = 'أُضيف المستخدم ورُبط بملفّه الوظيفي';
+        }
+
+        return redirect()->route('users.index')->with('ok', $msg);
     }
 
     public function edit(User $user)
