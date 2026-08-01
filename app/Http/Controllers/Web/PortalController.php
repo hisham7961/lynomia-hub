@@ -27,7 +27,8 @@ class PortalController extends Controller
     public function employee(string $id)
     {
         abort_unless(hub_can(auth()->user(), 'hr', 'v'), 403, 'عرض ملفات الموظفين يتطلب صلاحية الموارد البشرية');
-        $emp = Employee::whereNull('deleted_at')->findOrFail($id);
+        // النطاق يسري كما في كل قارئ: ملفٌّ خارج شركتي أو مشاريعي = ٤٠٤ لا ٢٠٠
+        $emp = hub_scope(Employee::query(), 'hr')->findOrFail($id);
 
         return view('portal.employee', ['emp' => $emp, 'self' => false] + $this->bundle($emp, $emp->user_id));
     }
@@ -47,55 +48,74 @@ class PortalController extends Controller
             'meetings' => collect(), 'decisions' => collect(),
         ];
 
+        // كل قسمٍ خلف وحدته: شاشةٌ مقاسةٌ بصلاحية HR كانت تعرض الإجازات والحضور
+        // والسجل التأديبي والعهدة لمن لا يملك أيّاً من وحداتها
+        $u = auth()->user();
+        $out['may'] = [
+            'leaves' => hub_can($u, 'leaves', 'v'), 'attend' => hub_can($u, 'attend', 'v'),
+            'hrlog' => hub_can($u, 'hrlog', 'v'), 'assets' => hub_can($u, 'assets', 'v'),
+            'tasks' => hub_can($u, 'tasks', 'v'), 'kb' => hub_can($u, 'kb', 'v'),
+        ];
+
         if ($userId) {
             // «مفتوحة» من التعريف الموحَّد — مصدرها hub_closed_states لا مفردات محلية
             $open = fn ($q) => hub_open_scope($q);
 
-            $out['tasks'] = $open(DB::table('tasks')->whereNull('deleted_at')->where('assignee_id', $userId))
-                ->orderByRaw('due IS NULL, due')
-                ->limit(10)->get(['id', 'title', 'status', 'due', 'progress', 'priority', 'project_id']);
-            $out['openTasks'] = $open(DB::table('tasks')->whereNull('deleted_at')->where('assignee_id', $userId))->count();
+            if ($out['may']['tasks']) {
+                $mine = fn () => $open(hub_scope(DB::table('tasks')->whereNull('deleted_at'), 'tasks')
+                    ->where('assignee_id', $userId));
+                $out['tasks'] = $mine()->orderByRaw('due IS NULL, due')
+                    ->limit(10)->get(['id', 'title', 'status', 'due', 'progress', 'priority', 'project_id']);
+                $out['openTasks'] = $mine()->count();
+            }
 
-            $out['assets'] = DB::table('assets')->whereNull('deleted_at')
+            if ($out['may']['assets']) $out['assets'] = hub_scope(DB::table('assets')->whereNull('deleted_at'), 'assets')
                 ->where('holder_id', $userId)->orderBy('name')
                 ->limit(12)->get(['id', 'name', 'type', 'tag', 'status']);
 
             /* ── الصندوق الموحد: كل ما ينتظر تصرفي ── */
 
             // موافقات بانتظاري: أنا المعتمد أو ضمن سلسلة الاعتماد، ولم تُحسم
-            $out['approvals'] = DB::table('approvals')->whereNull('deleted_at')
+            $out['approvals'] = ! hub_can($u, 'approvals', 'v') ? collect()
+                : hub_scope(DB::table('approvals')->whereNull('deleted_at'), 'approvals')
                 ->where(fn ($w) => $w->where('approver_id', $userId)->orWhere('chain', 'LIKE', '%"' . $userId . '"%'))
                 ->tap(fn ($q) => hub_open_scope($q, 'status', ['موافق', 'موافقة', 'معتمد', 'معتمدة']))
                 ->orderByRaw('due IS NULL, due')->limit(8)
                 ->get(['id', 'title', 'type', 'amount', 'currency', 'due', 'status']);
 
             // تذاكري المفتوحة
-            $out['tickets'] = DB::table('tickets')->whereNull('deleted_at')
+            $out['tickets'] = ! hub_can($u, 'tickets', 'v') ? collect()
+                : hub_scope(DB::table('tickets')->whereNull('deleted_at'), 'tickets')
                 ->where('assignee_id', $userId)
                 ->tap(fn ($q) => hub_open_scope($q))
                 ->orderByDesc('created_at')->limit(8)
                 ->get(['id', 'subject', 'customer', 'priority', 'status']);
 
             // اجتماعاتي القادمة: أنا من المشاركين
-            $out['meetings'] = DB::table('meetings')->whereNull('deleted_at')
+            $out['meetings'] = ! hub_can($u, 'meetings', 'v') ? collect()
+                : hub_scope(DB::table('meetings')->whereNull('deleted_at'), 'meetings')
                 ->where('parts', 'LIKE', '%"' . $userId . '"%')
                 ->where('dt', '>=', now()->startOfDay())
                 ->orderBy('dt')->limit(6)
                 ->get(['id', 'title', 'dt', 'link']);
 
             // قرارات أنفّذها ولم تُنجز
-            $out['decisions'] = DB::table('decisions')->whereNull('deleted_at')
+            $out['decisions'] = ! hub_can($u, 'decisions', 'v') ? collect()
+                : hub_scope(DB::table('decisions')->whereNull('deleted_at'), 'decisions')
                 ->where('exec_id', $userId)
                 ->whereIn('status', ['لم يبدأ', 'قيد التنفيذ', 'متعثر'])
                 ->orderByRaw('due IS NULL, due')->limit(8)
                 ->get(['id', 'title', 'due', 'status']);
         }
 
-        if ($emp) {
+        if ($emp && $out['may']['leaves']) {
             $out['leaves'] = DB::table('leave_requests')->whereNull('deleted_at')
                 ->where('emp_id', $emp->id)->orderByDesc('date_from')
                 ->limit(6)->get(['id', 'type', 'date_from', 'date_to', 'days', 'status']);
 
+        }
+
+        if ($emp && $out['may']['attend']) {
             $out['attend'] = DB::table('attendance')->whereNull('deleted_at')
                 ->where('emp_id', $emp->id)->orderByDesc('date')
                 ->limit(7)->get(['id', 'date', 'time_in', 'time_out', 'hours', 'status']);
@@ -106,16 +126,21 @@ class PortalController extends Controller
                 ->selectRaw('COUNT(*) as d, COALESCE(SUM(hours),0) as h')->first();
             $out['attMonth'] = ['days' => (int) ($m->d ?? 0), 'hours' => (float) ($m->h ?? 0)];
 
+        }
+
+        if ($emp && $out['may']['hrlog']) {
             $out['log'] = DB::table('employee_records')->whereNull('deleted_at')
                 ->where('emp_id', $emp->id)->orderByDesc('date')
                 ->limit(8)->get(['id', 'kind', 'title', 'date', 'expiry', 'status']);
         }
 
-        // سياسات «يجب قراءتها» من قاعدة المعرفة — للبوابة الشخصية
+        // مقالاتٌ «يجب قراءتها» — خلف وحدة المعرفة ونطاقها
         try {
-            $out['mustRead'] = DB::table('kb_articles')->whereNull('deleted_at')
-                ->where('must_read', 1)->orderByDesc('created_at')
-                ->limit(5)->get(['id', 'title', 'cat']);
+            if ($out['may']['kb']) {
+                $out['mustRead'] = hub_scope(DB::table('kb_articles')->whereNull('deleted_at'), 'kb')
+                    ->where('must_read', 1)->orderByDesc('created_at')
+                    ->limit(5)->get(['id', 'title', 'cat']);
+            }
         } catch (\Throwable $e) {
         }
 
