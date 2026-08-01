@@ -35,6 +35,61 @@ class DirectMessageReachTest extends TestCase
             ->assertSee('name="to"', false);
     }
 
+    /**
+     * **ومكانُ الكتابة يتقدّم قائمةَ اللاشيء.**
+     *
+     * المكوّناتُ كانت موجودةً منذ v2.209 لكن ترتيبَها يدفنها: لوحُ المحادثات
+     * أولاً بارتفاعٍ محجوز ٦٢٪ من الشاشة، والكتابةُ بعده. وعلى الجوال — وهو
+     * كيف يُفتح النظام فعلاً — ينهار العمودان إلى عمود، فيملأ لوحٌ **فارغ**
+     * الشاشةَ كلَّها ويبقى صندوق الكتابة **تحت الطيّة**. فمن دخل ولم يُمرِّر
+     * يرى شاشةً مكتوباً فيها «لا محادثات بعد» ولا مكانَ يكتب فيه.
+     *
+     * القاعدة: **من لا شيء عنده ليقرأه يجب أن يرى أين يكتب أولاً.**
+     */
+    public function test_the_place_to_write_comes_before_the_list_of_nothing(): void
+    {
+        $this->seedCore();
+        $html = $this->actingAs($this->owner)->get('/dm')->assertOk()->getContent();
+
+        $write = strpos($html, 'name="body"');
+        $list  = strpos($html, 'id="dmq"');
+
+        $this->assertNotFalse($write, 'لا صندوق كتابةٍ في الصفحة أصلاً');
+        $this->assertLessThan($list, $write,
+            'قائمةُ المحادثات الفارغة تتصدّر الشاشة وصندوق الكتابة تحتها — وعلى الجوال يقع تحت الطيّة');
+    }
+
+    /** ولوحٌ فارغ لا يحجز ارتفاعاً يدفع ما بعده خارج الشاشة */
+    public function test_an_empty_conversation_list_does_not_reserve_a_screenful(): void
+    {
+        $this->seedCore();
+        $html = $this->actingAs($this->owner)->get('/dm')->getContent();
+
+        $this->assertStringNotContainsString('max-height:62vh', $html,
+            'لوحٌ فارغ يحجز ٦٢٪ من الشاشة فيدفع صندوق الكتابة تحت الطيّة');
+    }
+
+    /** وزرٌّ صريح في الترويسة يقود للكتابة — لا يُبحث عن الباب */
+    public function test_the_header_offers_an_explicit_new_message_button(): void
+    {
+        $this->seedCore();
+
+        $this->actingAs($this->owner)->get('/dm')->assertOk()->assertSee('رسالة جديدة');
+    }
+
+    /** ومع محادثةٍ مفتوحة تبقى القائمة في مكانها — الترتيب لا ينقلب على من يقرأ */
+    public function test_with_an_open_thread_the_list_still_leads(): void
+    {
+        $this->seedCore();
+        \App\Models\DmMessage::create(['thread_key' => 'x', 'from_id' => $this->employee->id,
+            'to_id' => $this->owner->id, 'body' => 'مرحباً', 'created_at' => now()]);
+
+        $html = $this->actingAs($this->owner)->get('/dm/' . $this->employee->id)->assertOk()->getContent();
+
+        $this->assertLessThan(strpos($html, 'id="dm-body"'), strpos($html, 'id="dmq"'),
+            'انقلب الترتيب على من عنده محادثاتٌ يقرؤها');
+    }
+
     /** واختيارُ زميلٍ يفتح الخيط بلا جافاسكربت — القائمة ليست زينة */
     public function test_picking_a_colleague_opens_the_thread_without_javascript(): void
     {
