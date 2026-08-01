@@ -32,6 +32,7 @@ class HubImportJson extends Command
                     'scope' => $r['scope'] ?? 'proj',
                     'flags' => json_encode(collect($r)->only(['secrets','approve','users','audit','exp','monitor','copySec'])),
                     'matrix' => json_encode($r['m'] ?? []),
+                    'field_rules' => json_encode($r['fieldRules'] ?? []),
                     'created_at' => now(), 'updated_at' => now(),
                 ]);
             }
@@ -42,6 +43,9 @@ class HubImportJson extends Command
                     'phone' => $u['phone'] ?? null, 'job_title' => $u['title'] ?? null,
                     'role_id' => $u['roleId'] ?? null, 'status' => $u['status'] ?? 'نشط',
                     'notify_prefs' => json_encode($u['nprefs'] ?? []),
+                    'companies' => json_encode($u['companies'] ?? []),
+                    'allowed_ips' => $u['allowedIps'] ?? null,
+                    'expires_at' => $u['expiresAt'] ?? null,
                     'created_at' => now(), 'updated_at' => now(),
                 ]);
             }

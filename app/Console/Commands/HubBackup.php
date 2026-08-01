@@ -26,6 +26,10 @@ class HubBackup extends Command
             return array_merge([
                 'id' => $r->id, 'name' => $r->name, 'all' => (bool) $r->is_owner,
                 'scope' => $r->scope ?? 'proj', 'm' => json_decode($r->matrix ?? '[]', true) ?: [],
+                // **قيود مستوى الحقل تُنسَخ**: كانت تسقط من النسخة، فالاستعادة
+                // تُعيد النظام **بلا قيدٍ واحد** — وهي أخطر من غياب النسخة
+                // أصلاً لأنها تُظنّ استعادةً كاملة فلا يراجعها أحد.
+                'fieldRules' => json_decode($r->field_rules ?? '[]', true) ?: [],
             ], $flags);
         })->all();
 
@@ -34,6 +38,11 @@ class HubBackup extends Command
             'id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'phone' => $u->phone,
             'title' => $u->job_title, 'roleId' => $u->role_id, 'status' => $u->status,
             'nprefs' => json_decode($u->notify_prefs ?? '[]', true) ?: [],
+            // عزل الشركات وحارسا الحساب — كلها تسقط عند الاستعادة إن لم تُنسخ،
+            // فيعود الحساب المعزول يرى المنشأة كلها والمنتهي يعمل بلا انتهاء
+            'companies'  => json_decode($u->companies ?? '[]', true) ?: [],
+            'allowedIps' => $u->allowed_ips,
+            'expiresAt'  => $u->expires_at,
         ])->all();
 
         // كل وحدات السجل — الأعمدة تعود مفاتيحَ (عكس خريطة الاستيراد)

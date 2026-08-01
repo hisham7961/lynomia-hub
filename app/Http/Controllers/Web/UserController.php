@@ -137,13 +137,35 @@ class UserController extends Controller
             'expires_at' => 'nullable|date',
             'allowed_ips' => 'nullable|string|max:400',
         ]);
-        $data['companies'] = array_values($data['companies'] ?? []);
+        /*
+         * **عزل الشركات لا يُفكّ عن النفس**: من يحمل راية «إدارة المستخدمين»
+         * كان يفتح ملفه ويفرّغ قائمة شركاته فيرى المنشأة كلها بضغطة. توسيعُ
+         * نطاقِ المرء نفسه قرارُ مالكٍ لا قرارُ إداريّ.
+         */
+        $isSelf = $user->id === auth()->id();
+        if ($isSelf && ! hub_is_owner()) {
+            unset($data['companies']);
+        } else {
+            $data['companies'] = array_values($data['companies'] ?? []);
+        }
         if (empty($data['password'])) unset($data['password']);
         else $data['password_changed_at'] = now();
 
         // آخر مالكٍ نشط لا يُوقَف: إيقافه يقفل الأدوار والإعدادات والأمان على الجميع
         if ($data['status'] === 'موقوف' && $user->role?->is_owner && self::activeOwners() <= 1) {
             return back()->withInput()->withErrors(['status' => 'هذا آخر مالكٍ نشط — عيّن مالكاً آخر قبل إيقافه']);
+        }
+
+        /*
+         * **ولا يجرّد آخر مالكٍ نفسه بتبديل دوره**: الإيقاف والحذف محروسان،
+         * وتبديل الدور كان الباب الثالث المفتوح — وبعده لا أحد يفتح الأدوار
+         * ولا الإعدادات ولا مركز الأمان، وإعادة الملكية نفسها تحتاج مالكاً.
+         * قفلٌ دائمٌ لا رجعة فيه إلا بتحرير القاعدة يدوياً.
+         */
+        if ($user->role?->is_owner && self::activeOwners() <= 1
+            && ! \App\Models\Role::whereKey($data['role_id'])->value('is_owner')) {
+            return back()->withInput()->withErrors(['role_id' =>
+                'هذا آخر مالكٍ نشط — عيّن مالكاً آخر قبل تغيير دوره، وإلا أُقفلت إدارة النظام نهائياً']);
         }
 
         $user->update($data);
