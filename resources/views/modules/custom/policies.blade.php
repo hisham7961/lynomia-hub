@@ -29,7 +29,7 @@
             @endif
         </div>
         <div style="background:var(--brd);border-radius:8px;height:10px;overflow:hidden;margin-bottom:10px">
-            <div style="height:100%;width:{{ $pcPct }}%;border-radius:8px;background:{{ $pcPct === 100 ? 'var(--ok, #27ae60)' : 'var(--pr)' }}"></div>
+            <div style="height:100%;width:{{ $pcPct }}%;border-radius:8px;background:{{ $pcPct === 100 ? 'var(--ok, #27ae60)' : 'var(--p)' }}"></div>
         </div>
         @if ($pcPending->isNotEmpty())
             <div class="sub" style="margin-bottom:4px">بانتظار إقرارهم:</div>

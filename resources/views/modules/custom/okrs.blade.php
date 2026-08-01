@@ -22,7 +22,7 @@
         </div>
         @if ($okr['pct'] !== null)
             <div style="background:var(--brd);border-radius:8px;height:10px;overflow:hidden;margin-bottom:10px">
-                <div style="height:100%;width:{{ $okr['pct'] }}%;border-radius:8px;background:{{ $okr['pct'] >= 70 ? 'var(--ok, #27ae60)' : ($okr['pct'] >= 40 ? 'var(--pr)' : 'var(--bad, #c0392b)') }}"></div>
+                <div style="height:100%;width:{{ $okr['pct'] }}%;border-radius:8px;background:{{ $okr['pct'] >= 70 ? 'var(--ok, #27ae60)' : ($okr['pct'] >= 40 ? 'var(--p)' : 'var(--bad, #c0392b)') }}"></div>
             </div>
         @endif
         <div class="tblwrap"><table class="tbl">

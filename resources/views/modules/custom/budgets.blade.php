@@ -19,7 +19,7 @@
     </div>
     @if ($pct !== null)
         <div style="background:var(--brd);border-radius:8px;height:10px;overflow:hidden">
-            <div style="height:100%;width:{{ min(100, max(0, $pct)) }}%;border-radius:8px;background:{{ $pct >= 100 ? 'var(--bad, #c0392b)' : (($alert && $pct >= $alert) ? 'var(--wn, #e67e22)' : 'var(--pr)') }}"></div>
+            <div style="height:100%;width:{{ min(100, max(0, $pct)) }}%;border-radius:8px;background:{{ $pct >= 100 ? 'var(--bad, #c0392b)' : (($alert && $pct >= $alert) ? 'var(--wn, #e67e22)' : 'var(--p)') }}"></div>
         </div>
         @if ($alert)
             <div class="sub" style="margin-top:6px">حد التنبيه: {{ $alert }}٪ — {{ $pct >= $alert ? 'بلغته الميزانية ⚠️' : 'لم يُبلغ بعد' }}</div>

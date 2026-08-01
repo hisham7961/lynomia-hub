@@ -12,18 +12,18 @@
 <div class="card">
     <h3>🧿 مؤشرات الشك والسلوك <span class="sub">· آخر ١٤ يوماً</span></h3>
     <div class="statv2" style="margin-top:8px">
-        <div class="st" style="--st:{{ $risk['tone'] === 'bad' ? 'var(--bad)' : ($risk['tone'] === 'wn' ? '#C08A3E' : 'var(--p)') }}">
+        <div class="stat" style="--st:{{ $risk['tone'] === 'bad' ? 'var(--bad)' : ($risk['tone'] === 'wn' ? '#C08A3E' : 'var(--p)') }}">
             <div class="sub">نسبة الشك بالمستخدم</div>
             <b style="font-size:26px">{{ $risk['score'] }}<span class="sub">/100</span></b>
             <div class="sub">{{ $risk['tone'] === 'bad' ? 'مرتفعة — راجع التفاصيل' : ($risk['tone'] === 'wn' ? 'متوسطة — راقب' : 'طبيعية') }}</div>
         </div>
-        <div class="st"><div class="sub">معدل التلاعب</div><b style="font-size:26px">{{ $risk['tamper'] }}%</b>
+        <div class="stat"><div class="sub">معدل التلاعب</div><b style="font-size:26px">{{ $risk['tamper'] }}%</b>
             <div class="sub">{{ $risk['strange'] }} دخول شاذ + {{ $risk['failed'] }} محاولة فاشلة من {{ $risk['logins'] + $risk['failed'] }}</div></div>
-        <div class="st"><div class="sub">التسجيل من أجهزة مختلفة</div><b style="font-size:26px">{{ $risk['devices'] }}</b>
+        <div class="stat"><div class="sub">التسجيل من أجهزة مختلفة</div><b style="font-size:26px">{{ $risk['devices'] }}</b>
             <div class="sub">جهازاً عبر {{ $risk['logins'] }} دخول · {{ $risk['ips'] }} عنوان شبكة</div></div>
-        <div class="st"><div class="sub">ساعات داخل الدوام (٠٨–١٦)</div><b style="font-size:26px">{{ $risk['in_h'] }}</b><div class="sub">ساعة نشاط فعلي</div></div>
-        <div class="st"><div class="sub">ساعات خارج الدوام</div><b style="font-size:26px">{{ $risk['out_h'] }}</b><div class="sub">ساعة (٠٦–٠٨ و١٦–٢٤)</div></div>
-        <div class="st" style="--st:{{ $risk['night_h'] > 0 ? 'var(--bad)' : 'var(--p)' }}">
+        <div class="stat"><div class="sub">ساعات داخل الدوام (٠٨–١٦)</div><b style="font-size:26px">{{ $risk['in_h'] }}</b><div class="sub">ساعة نشاط فعلي</div></div>
+        <div class="stat"><div class="sub">ساعات خارج الدوام</div><b style="font-size:26px">{{ $risk['out_h'] }}</b><div class="sub">ساعة (٠٦–٠٨ و١٦–٢٤)</div></div>
+        <div class="stat" style="--st:{{ $risk['night_h'] > 0 ? 'var(--bad)' : 'var(--p)' }}">
             <div class="sub">الساعات المريبة (٠٠–٠٦)</div><b style="font-size:26px">{{ $risk['night_h'] }}</b><div class="sub">ساعة بعد منتصف الليل</div></div>
     </div>
     <details style="margin-top:8px">
