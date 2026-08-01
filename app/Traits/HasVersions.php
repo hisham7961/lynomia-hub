@@ -36,11 +36,18 @@ trait HasVersions
                 return;
             }
 
-            RecordVersion::create([
+            /*
+             * **بين الفحص والإدراج نافذة**: كاتبٌ آخر يسبقنا فيها فيقع خرقُ قيد
+             * التفرّد `(module, record_id, version)` — و`create()` يرمي، فيسقط
+             * **الحفظُ كلُّه** بخطأ ٥٠٠ على مستخدمٍ لم يفعل شيئاً خاطئاً. اللقطةُ
+             * سجلٌّ تاريخيّ لا يُكرَّر: من سبق كتبها، ويكفي. `insertOrIgnore`
+             * يجعل الإدراج مُحتمِلاً للتزاحم بدل أن يعاقب الخاسر.
+             */
+            \Illuminate\Support\Facades\DB::table('record_versions')->insertOrIgnore([
                 'module'     => static::MODULE,
                 'record_id'  => $m->getKey(),
                 'version'    => $version,
-                'snapshot'   => $m->auditable(),
+                'snapshot'   => json_encode($m->auditable(), JSON_UNESCAPED_UNICODE),
                 'changed_by' => Auth::id(),
                 'created_at' => now(),
             ]);
