@@ -41,7 +41,7 @@ class Inbox
         if (! $user) return [];
 
         $out = [];
-        foreach (['approvals', 'signatures', 'policies', 'mustRead', 'requests',
+        foreach (['approvals', 'acks', 'signatures', 'policies', 'mustRead', 'requests',
                   'leaves', 'tasks', 'decisions', 'tickets', 'meetings', 'obligations', 'compliance'] as $src) {
             try {
                 foreach (self::{$src}($user) as $one) $out[] = self::stamp($one);
@@ -260,6 +260,18 @@ class Inbox
                     . ' · فُتحت ' . Carbon::parse($t->created_at)->diffForHumans()),
                 'url' => route('m.show', ['tickets', $t->id]),
             ])->all();
+    }
+
+    /** إقرارات تنتظرني: محضرٌ لم أعتمده، عهدةٌ لم أستلمها، قرارٌ لم أُقرّ به */
+    protected static function acks($u): array
+    {
+        return collect(\App\Support\Acks::pending($u))->map(fn ($a) => [
+            'kind' => 'ack', 'icon' => '🖊️', 'label' => $a['label'],
+            'title' => $a['title'], 'due' => null, 'why' => $a['why'],
+            'url' => route('m.show', [$a['module'], $a['id']]),
+            // إقرارٌ معلّق ليس «لاحقاً»: قيمته في وقته، وبعده يصير جدلاً
+            'bucket' => 1,
+        ])->all();
     }
 
     /** اجتماعاتي القادمة — التزامُ وقتٍ لا يقلّ عن التزام عمل */

@@ -164,6 +164,10 @@ Route::middleware('auth')->group(function () {
     Route::post('approvals/{id}/approve', [ApprovalDecisionController::class, 'approve'])->name('approvals.approve');
     Route::post('approvals/{id}/reject', [ApprovalDecisionController::class, 'reject'])->name('approvals.reject');
 
+    // ── الإقرار الموثَّق على السجلات (محضر · عهدة · قرار) ──
+    Route::post('acks/{module}/{id}', [\App\Http\Controllers\Web\AckController::class, 'store'])->name('acks.store');
+    Route::post('acks/{module}/{id}/remind', [\App\Http\Controllers\Web\AckController::class, 'remind'])->name('acks.remind');
+
     // ── التعليقات وقناة الفريق ──
     Route::get('feed', [CommentController::class, 'feed'])->name('feed');
     Route::post('comments', [CommentController::class, 'store'])->name('comments.store');

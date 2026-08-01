@@ -74,6 +74,8 @@
         @if ($module === 'contracts' && hub_can(auth()->user(), 'contracts', 'v'))
             @include('partials.esign_card')
         @endif
+        {{-- الإقرار الموثَّق — يظهر للوحدات المسجَّلة في config/hub_acks.php وحدها --}}
+        @include('partials.acks')
         {{-- v2.123: خطاف مساحة عمل مخصصة للوحدة — لا أثر على وحدة بلا ملف مخصص --}}
         @includeIf('modules.custom.' . $module)
 
