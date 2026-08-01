@@ -137,6 +137,7 @@ Route::middleware('auth')->group(function () {
     Route::get('capacity', [CapacityController::class, 'index'])->name('capacity');
     Route::get('impact', [CapacityController::class, 'impact'])->name('impact');
     Route::get('app-quality', [CapacityController::class, 'quality'])->name('appquality');
+    Route::get('pricing', [\App\Http\Controllers\Web\PricingController::class, 'index'])->name('pricing');
     Route::get('digital-assets', [\App\Http\Controllers\Web\DigitalAssetsController::class, 'index'])->name('digital.assets');
     Route::get('recommendations', [CapacityController::class, 'recommendations'])->name('recs');
     Route::get('kpis', [\App\Http\Controllers\Web\KpiController::class, 'index'])->name('kpis.index');
