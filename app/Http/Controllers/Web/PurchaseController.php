@@ -60,6 +60,7 @@ class PurchaseController extends Controller
     public function act(Request $r, string $id)
     {
         abort_unless(hub_can(auth()->user(), 'purchases', 'e'), 403, 'إجراءات الشراء تتطلب صلاحية تعديل');
+        if ($why = hub_block_if_queued('purchases')) return back()->with('err', $why);
         $p = hub_scope(Purchase::query(), 'purchases')->findOrFail($id);
         $do = hub_str($r->input('do'));
 

@@ -978,6 +978,25 @@ if (! function_exists('hub_needs_approval')) {
     }
 }
 
+if (! function_exists('hub_block_if_queued')) {
+    /**
+     * **أزرارُ المسار لا تلتفّ على طابور الموافقات.**
+     *
+     * تعديلُ أمر الشراء من نموذج السجل يُصفّ طلب موافقة، وزرُّ «أرسل للمورد» في
+     * الشاشة نفسها كان يكتب الحالة مباشرة. والقاعدةُ التي يُلتَفُّ عليها بزرٍّ
+     * مجاورٍ ليست قاعدة.
+     *
+     * تعيد رسالةَ ردٍّ تُوجّه للمسار الموثَّق، أو `null` إن لم تكن الوحدة تحت قاعدة.
+     */
+    function hub_block_if_queued(string $module, string $op = 'e'): ?string
+    {
+        return hub_needs_approval(auth()->user(), $module, $op)
+            ? 'تعديلاتُك على هذه الوحدة تمر بالموافقات — عدّل السجل من نموذجه ليُصفّ الطلب ويُوثَّق، '
+              . 'فأزرارُ المسار لا تلتفّ على الطابور'
+            : null;
+    }
+}
+
 if (! function_exists('hub_approvers')) {
     /** المعتمدون: المالكون + حاملو علم approve */
     function hub_approvers(): array

@@ -50,6 +50,8 @@ class ContractActionsController extends Controller
     /** تجديد: مسودة تجديد + الأصل «قيد التجديد» (بحفظ Eloquent → contract.renewed) */
     public function renew(string $id)
     {
+        // التجديد يكتب «قيد التجديد» على العقد الأصل — فهو تعديلٌ يمرّ بالطابور
+        if ($why = hub_block_if_queued('contracts')) return back()->with('err', $why);
         $c = $this->find($id);
         // idempotent: مسودة تجديدٍ قائمة لهذا الأصل لا تُكرر بنقرة متعجلة
         if ($ex = Contract::where('parent_id', $c->id)->where('kind', 'تجديد')
