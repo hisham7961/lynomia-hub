@@ -27,13 +27,24 @@
     </form>
 </div>
 
-{{-- لوحان: المحادثات إلى جانب الخيط — لا صفحتان تُفتحان بالتناوب --}}
-<div class="dmwrap">
+{{-- لوحان: المحادثات إلى جانب الخيط — لا صفحتان تُفتحان بالتناوب.
+     **الترتيب في المصدر يضع الكتابة أولاً** حين لا محادثة مفتوحة: على الجوال
+     ينهار العمودان إلى عمود، وكان لوحُ المحادثات الفارغ يملأ الشاشة فيبقى
+     صندوق الكتابة تحت الطيّة — فمن دخل ولم يُمرِّر لا يجد أين يكتب.
+     وعلى الشاشة الواسعة يُعيد `order` العمودين إلى مكانيهما بلا تغيير. --}}
+<div class="dmwrap {{ $other ? 'thread' : 'fresh' }}">
+    {{-- بلا محادثةٍ مفتوحة: الكتابةُ أولاً في المصدر — فمن لا شيء عنده ليقرأه
+         يجب أن يرى أين يكتب قبل أن يرى قائمةَ اللاشيء --}}
+    @unless ($other)
+        <div class="dmthread">@include('dm._compose')</div>
+    @endunless
+
     <div class="card pad0 dmlist">
         <div style="padding:10px 12px;border-bottom:1px solid var(--ln)">
             <input class="inp" id="dmq" placeholder="🔎 ابحث في المحادثات" autocomplete="off">
         </div>
-        <div style="max-height:62vh;overflow:auto">
+        {{-- الارتفاع المحجوز لِما فيه محادثاتٌ تُمرَّر؛ ولوحٌ فارغ لا يحجز شاشةً --}}
+        <div @style(['max-height:62vh;overflow:auto' => count($threads) > 0])>
             @forelse ($threads as $t)
                 @php $p = $presence[$t['other']] ?? null; @endphp
                 <a class="dmrow" data-q="{{ mb_strtolower(($users[$t['other']] ?? '') . ' ' . $t['last']->body) }}"
@@ -66,46 +77,9 @@
         </div>
     </div>
 
+    @if ($other)
     <div class="dmthread">
-        @if (! $other)
-            {{-- **صندوقُ كتابةٍ حاضرٌ دائماً**: كان اللوحُ فارغاً بعبارة «اختر
-                 محادثة» — ومن دخل أولَ مرة لا يجد أين يكتب ولا زراً يُرسل.
-                 الآن الرسالةُ الأولى: تختار الزميل وتكتب وترسل في خطوةٍ واحدة. --}}
-            <div class="card">
-                <h3>✉️ رسالة جديدة</h3>
-                <div class="sub" style="margin-bottom:10px">
-                    اختر زميلاً واكتب رسالتك — تصل فوراً مع إشعار، ولا يقرؤها غيرُكما.
-                </div>
-                @if ($errors->any())<div class="err" role="alert">{{ $errors->first() }}</div>@endif
-                <form method="POST" action="{{ route('dm.start') }}" enctype="multipart/form-data">
-                    @csrf
-                    <div class="fld" style="max-width:380px">
-                        <label for="new-to">إلى <b class="req">*</b></label>
-                        <select class="inp" id="new-to" name="to" required>
-                            <option value="">— اختر زميلاً —</option>
-                            @foreach ($all as $uid => $name)
-                                <option value="{{ $uid }}" @selected(old('to') === $uid)>{{ $name }}</option>
-                            @endforeach
-                        </select>
-                        @if (! count($all))<span class="sub">لا زملاء نشطون بعد — أضِف مستخدماً أولاً</span>@endif
-                    </div>
-                    <div class="fld fw" style="margin-top:8px">
-                        <label for="new-body">الرسالة <b class="req">*</b></label>
-                        <textarea class="inp" id="new-body" name="body" rows="4" required maxlength="4000"
-                                  placeholder="اكتب رسالتك هنا…">{{ old('body') }}</textarea>
-                    </div>
-                    <div class="toolbar" style="margin-top:10px">
-                        <button class="btn p" type="submit">📨 إرسال</button>
-                        <label class="btn ghost pointer">📎 أرفق ملفاً<input type="file" name="att" class="vh"></label>
-                    </div>
-                </form>
-            </div>
-            @if (count($threads))
-                <div class="card" style="margin-top:10px"><div class="sub" style="padding:6px 0;text-align:center">
-                    …أو اختر محادثةً قائمة من القائمة</div></div>
-            @endif
-        @else
-            @php $p = $presence[$other->id] ?? null; @endphp
+        @php $p = $presence[$other->id] ?? null; @endphp
             <div class="card" style="padding:10px 14px;display:flex;gap:10px;align-items:center">
                 <span class="ava">{{ mb_substr($other->name, 0, 1) }}</span>
                 <div style="min-width:0;flex:1">
@@ -172,21 +146,24 @@
                 <button class="btn p sm" type="submit">إرسال</button>
             </form>
             @error('body')<div class="err">{{ $message }}</div>@enderror
-        @endif
     </div>
+    @endif
 </div>
 
 <style>
 .dmwrap { display:grid; grid-template-columns:320px 1fr; gap:12px; align-items:start }
+/* الترتيب في المصدر يضع الكتابة أولاً، و`order` يُعيد العمودين إلى مكانيهما
+   على الشاشة الواسعة: القائمة يميناً والخيط يساراً كما كانا تماماً */
+.dmlist { order:1 } .dmthread { order:2 }
 @media (max-width:900px) {
     .dmwrap { grid-template-columns:1fr }
-    .dmwrap.open .dmlist { display:none }      /* على الجوال: خيطٌ واحد يملأ الشاشة */
+    .dmwrap.thread .dmlist { display:none }    /* على الجوال: خيطٌ واحد يملأ الشاشة */
+    /* وبلا محادثةٍ مفتوحة: صندوقُ الكتابة يتصدّر بدل أن يُدفن تحت قائمةٍ فارغة */
+    .dmwrap.fresh .dmthread { order:0 }
 }
 </style>
 <script>
 (function () {
-    if (document.querySelector('.dmthread .card #dmbox')) document.querySelector('.dmwrap').classList.add('open');
-
     var box = document.getElementById('dmbox');
     if (box) box.scrollTop = box.scrollHeight;
 
