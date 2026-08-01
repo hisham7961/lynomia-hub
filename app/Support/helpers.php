@@ -1956,6 +1956,44 @@ if (! function_exists('hub_scope_key')) {
     }
 }
 
+if (! function_exists('hub_read')) {
+    /**
+     * قارئُ وحدةٍ محروس — سكّةٌ واحدة لكل شاشةٍ تجمع من عدّة وحدات.
+     *
+     * جولةُ تدقيقٍ كشفت نمطاً يتكرّر: شاشةٌ تُقاس بصلاحية وحدةٍ **واحدة** ثم
+     * تقرأ خمس وحداتٍ أخرى بـ`DB::table(...)` خاماً — فتعرض لمن يملك «الأحداث»
+     * كتالوجَ الإعلام، ولمن يملك «الباقات» تكلفةَ الخدمات، ولمقاولٍ على مشروعٍ
+     * واحد أسماءَ المشاريع كلها.
+     *
+     * هذا القارئ يجمع الحرّاس الثلاثة في مكانٍ واحد: وجودُ الجدول، و`hub_can`
+     * للوحدة، و`hub_scope` لنطاق القارئ، وتصفيةُ المحذوف. ويعيد `null` عند
+     * المنع — فالمستدعي يعرف أن لا شيء له هنا ولا يقرأ خاماً «للاحتياط».
+     */
+    function hub_read(string $module, $user = null)
+    {
+        $user = $user ?? auth()->user();
+        $def = hub_mod($module);
+        if (! $def) return null;
+
+        $table = $def['table'] ?? null;
+        if (! $table || ! \Illuminate\Support\Facades\Schema::hasTable($table)) return null;
+        if (! hub_can($user, $module, 'v')) return null;
+
+        $q = \Illuminate\Support\Facades\DB::table($table);
+        if (\Illuminate\Support\Facades\Schema::hasColumn($table, 'deleted_at')) $q->whereNull('deleted_at');
+
+        return hub_scope($q, $module, $user);
+    }
+}
+
+if (! function_exists('hub_masked')) {
+    /** هل هذا الحقل محجوبٌ أو للقراءة فقط عن هذا القارئ؟ */
+    function hub_masked(string $module, string $field, $user = null): bool
+    {
+        return hub_field_mode($user ?? auth()->user(), $module, $field) !== '';
+    }
+}
+
 if (! function_exists('hub_data_bump')) {
     /**
      * ختمُ تغيّر جدول — عدّادٌ يزيد مع كل كتابةٍ على الجدول.

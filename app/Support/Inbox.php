@@ -150,7 +150,8 @@ class Inbox
             ->whereNotNull('ack_at')->get(['policy_id', 'ver']);
         $acked = $mine->map(fn ($a) => $a->policy_id . '|' . (string) $a->ver)->all();
 
-        return DB::table('policies')->whereNull('deleted_at')->where('ack_required', 1)
+        return hub_scope(DB::table('policies')->whereNull('deleted_at'), 'policies', $u)
+            ->where('ack_required', 1)
             ->orderByRaw('eff_date IS NULL, eff_date')->limit(40)
             ->get(['id', 'title', 'ver', 'cat', 'eff_date'])
             // النسخة جزءٌ من المفتاح: سياسةٌ حُدّثت تعود تنتظر إقراراً جديداً
@@ -172,7 +173,8 @@ class Inbox
 
         $read = DB::table('kb_reads')->where('user_id', $u->id)->pluck('article_id')->all();
 
-        return DB::table('kb_articles')->whereNull('deleted_at')->where('must_read', 1)
+        return hub_scope(DB::table('kb_articles')->whereNull('deleted_at'), 'kb', $u)
+            ->where('must_read', 1)
             ->whereNotIn('id', $read ?: ['-'])
             ->orderByDesc('created_at')->limit(20)
             ->get(['id', 'title', 'cat'])
