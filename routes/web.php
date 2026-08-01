@@ -278,6 +278,7 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/roles', [RoleController::class, 'store'])->name('roles.store');
     Route::get('admin/roles/{role}/edit', [RoleController::class, 'edit'])->name('roles.edit');
     Route::put('admin/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
+    Route::post('admin/roles/{role}/clone', [RoleController::class, 'clone'])->name('roles.clone');
     Route::delete('admin/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
 
     Route::get('admin/audit', [AuditController::class, 'index'])->name('audit.index');
