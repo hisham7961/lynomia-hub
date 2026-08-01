@@ -137,6 +137,7 @@ Route::middleware('auth')->group(function () {
     Route::get('capacity', [CapacityController::class, 'index'])->name('capacity');
     Route::get('impact', [CapacityController::class, 'impact'])->name('impact');
     Route::get('app-quality', [CapacityController::class, 'quality'])->name('appquality');
+    Route::get('team', [\App\Http\Controllers\Web\TeamController::class, 'index'])->name('team');
     Route::get('media-center', [\App\Http\Controllers\Web\MediaCenterController::class, 'index'])->name('media.center');
     Route::get('pricing', [\App\Http\Controllers\Web\PricingController::class, 'index'])->name('pricing');
     Route::get('digital-assets', [\App\Http\Controllers\Web\DigitalAssetsController::class, 'index'])->name('digital.assets');

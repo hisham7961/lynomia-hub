@@ -130,6 +130,8 @@ return [
 
     // ── الموظفون ──
     'hr' => [
+        // الصورة الشخصية: وجهُ الموظف في الدليل — كانت الوحدة بلا حقلٍ لها إطلاقاً
+        ['key' => 'photo', 'label' => 'الصورة الشخصية'],
         ['key' => 'id', 'label' => 'الهوية / الإقامة', 'req' => true, 'expiry' => true],
         ['key' => 'passport', 'label' => 'جواز السفر', 'expiry' => true],
         ['key' => 'contract', 'label' => 'عقد العمل', 'req' => true, 'expiry' => true],
