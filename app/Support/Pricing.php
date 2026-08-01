@@ -95,7 +95,11 @@ class Pricing
                 'service'   => $svc->name ?? 'باقاتٌ بلا خدمة',
                 'kind'      => $svc->kind ?? null,
                 'status'    => $svc->status ?? null,
-                'opex'      => $svc->cost !== null && self::seesCost() ? (float) $svc->cost : null,
+                // **باقةٌ بلا خدمةٍ مرئية**: حُذفت، أو خارج نطاق القارئ، أو
+                // `service_id` يشير إلى ما لم يعد موجوداً. بقيّةُ الحقول تُقرأ
+                // بـ`??` وهذا كان يُقرأ خاماً — و«قراءةُ خاصيةٍ على null» تحذيرٌ
+                // يحوّله Laravel إلى استثناء، **فيسقط الكتالوج كلُّه بصفٍّ واحد**.
+                'opex'      => ($svc?->cost ?? null) !== null && self::seesCost() ? (float) $svc->cost : null,
                 'projectId' => $pid,
                 'logo'      => $logos[$pid]['logo'] ?? null,
                 'appName'   => $logos[$pid]['app'] ?? null,
@@ -236,8 +240,16 @@ class Pricing
             }
         }
 
-        // خدماتٌ نشطة لا باقة لها إطلاقاً — لا تظهر في الكتالوج أصلاً
-        if (Schema::hasTable('services') && Schema::hasTable('pricing_plans')) {
+        /*
+         * خدماتٌ نشطة لا باقة لها إطلاقاً — لا تظهر في الكتالوج أصلاً.
+         *
+         * **وجودُ الجدول ليس صلاحيةَ قراءته**: `live()` تعيد `null` لمن لا يملك
+         * الوحدة، و`null->whereNotNull()` خطأٌ قاتل. الكتالوج يحرس هذا وهذه
+         * الفقرة لم تكن تحرسه — فالشاشة تنفتح لمن يملك كل شيء **وتنهار على من
+         * يملك بعضه**، وهو الأغلب في منشأةٍ لها أدوار.
+         */
+        if (Schema::hasTable('services') && Schema::hasTable('pricing_plans')
+            && self::live('services') && self::live('pricing_plans')) {
             $withPlans = self::live('pricing_plans')->whereNotNull('service_id')->pluck('service_id')->unique()->all();
             $naked = self::live('services')->whereNotIn('id', $withPlans ?: ['-'])
                 ->where(fn ($q) => $q->whereNull('status')->orWhereNotIn('status', ['موقوفة', 'ملغاة', 'مؤرشفة']))
