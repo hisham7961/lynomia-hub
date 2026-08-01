@@ -39,19 +39,29 @@ class CeoDecisionLayerTest extends TestCase
     public function test_leaks_are_measured_in_money(): void
     {
         $this->seedCore();
-        FinDocument::create(['doc_no' => 'A', 'kind' => 'فاتورة', 'total' => 1000, 'paid' => 200,
+        FinDocument::create(['doc_no' => 'A', 'kind' => 'فاتورة مبيعات', 'total' => 1000, 'paid' => 200,
+            'state' => 'متأخرة', 'due' => now()->subDays(90)->toDateString()]);
+        // فاتورةٌ لم يُدفع منها شيء: `total - NULL = NULL` كان يُسقطها من المجموع
+        // — وهي أسوأ ما فيه. وفاتورةُ **مشتريات** مالٌ علينا لا لنا.
+        FinDocument::create(['doc_no' => 'B', 'kind' => 'فاتورة مبيعات', 'total' => 5000, 'paid' => null,
+            'state' => 'مرسلة', 'due' => now()->subDays(90)->toDateString()]);
+        FinDocument::create(['doc_no' => 'C', 'kind' => 'فاتورة مشتريات', 'total' => 9000, 'paid' => 0,
             'state' => 'متأخرة', 'due' => now()->subDays(90)->toDateString()]);
         Project::create(['name' => 'مشروع متجاوز', 'status' => 'قيد التنفيذ',
             'budget' => 1000, 'cost' => 1750]);
 
+        $this->actingAs($this->owner);
         $leaks = collect(CeoBoard::leaks());
 
         $aged = $leaks->firstWhere('label', 'مستحقات متأخرة فوق ٦٠ يوماً');
         $this->assertNotNull($aged, 'مستحقٌّ متقادم ٩٠ يوماً لم يُحسب نزيفاً');
-        $this->assertSame(800.0, (float) $aged['amount'], 'النزيف هو غير المحصَّل لا إجمالي الفاتورة');
+        $this->assertSame(5800.0, (float) $aged['amount'],
+            'النزيف هو غير المحصَّل من فواتير **المبيعات** — والفاتورة التي لم يُدفع منها شيء أولى بالعدّ');
 
-        $over = $leaks->firstWhere('tone', 'bad');
-        $this->assertSame(750.0, (float) $leaks->firstWhere('label', '1 مشروع تجاوز ميزانيته')['amount'],
+        $over = $leaks->firstWhere('label', '1 مشروع تجاوز ميزانيته');
+        $this->assertNotNull($over, 'مشروعٌ تجاوز ميزانيته لم يُحسب نزيفاً');
+        $this->assertSame('bad', $over['tone']);
+        $this->assertSame(750.0, (float) $over['amount'],
             'تجاوز الميزانية يُقاس بالفرق لا بالتكلفة كلها');
     }
 
@@ -68,6 +78,7 @@ class CeoDecisionLayerTest extends TestCase
                 'date' => now()->subMonth()->toDateString()]);
         }
 
+        $this->actingAs($this->owner);
         $conc = CeoBoard::concentration();
 
         $this->assertSame(80, $conc['firstPct']);
@@ -85,6 +96,7 @@ class CeoDecisionLayerTest extends TestCase
         FinDocument::create(['doc_no' => 'X', 'kind' => 'فاتورة مبيعات', 'total' => 500, 'paid' => 500,
             'state' => 'مدفوعة', 'client_id' => $c->id, 'date' => now()->toDateString()]);
 
+        $this->actingAs($this->owner);
         $this->assertSame([], CeoBoard::concentration());
     }
 
@@ -120,6 +132,7 @@ class CeoDecisionLayerTest extends TestCase
             'due' => now()->subDays(5)->toDateString(), 'status' => 'قائم',
             'created_at' => now(), 'updated_at' => now()]);
 
+        $this->actingAs($this->owner);
         $g = collect(CeoBoard::governance());
         $this->assertNotNull($g->firstWhere('label', 'التزامات نظامية متأخرة'));
         $this->assertSame('bad', $g->firstWhere('label', 'التزامات نظامية متأخرة')['tone']);

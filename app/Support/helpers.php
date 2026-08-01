@@ -1951,8 +1951,13 @@ if (! function_exists('hub_scope_key')) {
     {
         $u = auth()->user();
 
+        // ختمُ `roles` و`users` جزءٌ من المفتاح: المفتاح كان يحمل **معرّف** الدور
+        // لا **صلاحياته**، فسحبُ صلاحيةٍ من دورٍ لا يغيّر المفتاح — ويبقى الموظف
+        // المسحوبة صلاحيتُه يقرأ الشاشة المخبّأة حتى تنتهي مهلتها. والعزل بالشركة
+        // مخزَّنٌ على المستخدم، فتغييره يجب أن يُبطل كذلك.
         return $prefix . ':' . ($u?->role_id ?? '0') . ':' . ($u?->id ?? '0')
-            . ':' . (string) session('hub.company', '-') . hub_lens_key(hub_lens()['id'] ?? null);
+            . ':' . (string) session('hub.company', '-') . hub_lens_key(hub_lens()['id'] ?? null)
+            . hub_data_stamp(['roles', 'users']);
     }
 }
 

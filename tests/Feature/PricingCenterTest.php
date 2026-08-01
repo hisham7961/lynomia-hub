@@ -21,6 +21,8 @@ class PricingCenterTest extends TestCase
     protected function scene(): array
     {
         $this->seedCore();
+        // القارئات صارت محروسةً بذاتها — تُقرأ بهويّة صاحب صلاحية
+        $this->actingAs($this->owner);
 
         $p = \App\Models\Project::create(['name' => 'مشروع المنصة', 'status' => 'قيد التنفيذ']);
         DB::table('applications')->insert(['id' => (string) Str::uuid(), 'name' => 'تطبيق ليونوميا',

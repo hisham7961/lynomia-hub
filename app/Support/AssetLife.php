@@ -31,6 +31,12 @@ class AssetLife
         return hub_can(auth()->user(), 'assets', 'v');
     }
 
+    /** هل يرى القارئ ثمن الأصل؟ المجموع يكشف الحقل المحجوب كما يكشفه الصفّ */
+    public static function seesPrice(): bool
+    {
+        return ! hub_masked('assets', 'price');
+    }
+
     /** من يحمل ماذا، وبكم — والعهدة التي بيد من لم يعد معنا */
     public static function custody(): array
     {
@@ -57,7 +63,8 @@ class AssetLife
             $by[$k] ??= ['id' => $k, 'name' => $u->name ?? 'حسابٌ محذوف',
                          'gone' => $gone, 'n' => 0, 'value' => 0.0, 'items' => []];
             $by[$k]['n']++;
-            $by[$k]['value'] += (float) ($a->price ?? 0);
+            // الثمن حقلٌ قد يُحجب بقيود الدور — والمجموع يكشفه لو جُمع
+            $by[$k]['value'] += self::seesPrice() ? (float) ($a->price ?? 0) : 0.0;
             if (count($by[$k]['items']) < 6) $by[$k]['items'][] = $a->name;
         }
 
@@ -85,10 +92,11 @@ class AssetLife
         // ضمانٌ ينتهي أو انتهى: إصلاحٌ كان مجانياً يصير على الحساب
         foreach ($q()->whereNotNull('warranty')
                     ->where('warranty', '<=', now()->addDays(60)->toDateString())
-                    ->whereNotIn('status', ['مستبعد', 'تالف'])
+                    // NOT IN تُسقط NULL صامتةً — وأصلٌ بلا حالة أصلٌ قائم
+                    ->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', ['مستبعد', 'تالف']))
                     ->orderBy('warranty')->limit(12)->get(['id', 'name', 'warranty']) as $a) {
             $d = (int) now()->startOfDay()->diffInDays(Carbon::parse($a->warranty)->startOfDay(), false);
-            $out[] = ['icon' => '🛡️', 'tone' => $d < 0 ? 'wn' : 'wn', 'id' => $a->id,
+            $out[] = ['icon' => '🛡️', 'tone' => $d < 0 ? 'bad' : 'wn', 'id' => $a->id,
                 'kind' => $d < 0 ? 'ضمانٌ منتهٍ' : 'ضمانٌ ينتهي قريباً', 'title' => $a->name,
                 'why' => $d < 0
                     ? 'انتهى منذ ' . abs($d) . ' يوماً — أيُّ إصلاحٍ من الآن على حساب الشركة.'
@@ -112,8 +120,8 @@ class AssetLife
 
         // أصلٌ تجاوز عمره الافتراضي
         foreach ($q()->whereNotNull('life')->where('life', '>', 0)->whereNotNull('buy_date')
-                    ->whereNotIn('status', ['مستبعد', 'تالف'])
-                    ->limit(50)->get(['id', 'name', 'life', 'buy_date']) as $a) {
+                    ->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', ['مستبعد', 'تالف']))
+                    ->orderBy('buy_date')->limit(80)->get(['id', 'name', 'life', 'buy_date']) as $a) {
             $years = Carbon::parse($a->buy_date)->diffInYears(now());
             if ($years < (float) $a->life) continue;
             $out[] = ['icon' => '⏳', 'tone' => 'wn', 'id' => $a->id,
@@ -128,7 +136,7 @@ class AssetLife
             $out[] = ['icon' => '🪦', 'tone' => 'bad', 'id' => $a->id,
                 'kind' => 'خارج الخدمة بلا استبعاد', 'title' => $a->name,
                 'why' => 'حالته «' . $a->status . '» وبلا تاريخ استبعاد — يبقى في الجرد أصلاً قائماً'
-                    . ($a->price ? ' بقيمة ' . number_format((float) $a->price, 0) : '') . '.'];
+                    . ($a->price && self::seesPrice() ? ' بقيمة ' . number_format((float) $a->price, 0) : '') . '.'];
         }
 
         // أصلٌ قيد الاستخدام بلا حائز: مسؤوليةٌ بلا صاحب
@@ -155,15 +163,18 @@ class AssetLife
 
     protected static function replaceCalc(): array
     {
-        if (! self::may() || ! Schema::hasTable('assets') || ! Schema::hasTable('asset_maintenance')) return [];
+        // اللوحة كلها ثمنٌ ونسبةٌ منه: تُطوى كاملةً لمن حُجب عنه الثمن
+        if (! self::may() || ! self::seesPrice()) return [];
+        if (! Schema::hasTable('assets') || ! Schema::hasTable('asset_maintenance')) return [];
 
         $assets = hub_scope(DB::table('assets')->whereNull('deleted_at'), 'assets')
             ->whereNotNull('price')->where('price', '>', 0)
             ->get(['id', 'name', 'price', 'status', 'buy_date'])->keyBy('id');
         if ($assets->isEmpty()) return [];
 
+        // «صُرف» تعني المكتملة: قيدٌ مجدولٌ لم يُدفع بعد فلا يُحتسب في قرار الإحلال
         $spend = DB::table('asset_maintenance')->whereNull('deleted_at')
-            ->whereIn('asset_id', $assets->keys())
+            ->whereIn('asset_id', $assets->keys())->where('status', 'مكتملة')
             ->select('asset_id', DB::raw('SUM(cost) as c'), DB::raw('COUNT(*) as n'))
             ->groupBy('asset_id')->get();
 
@@ -197,14 +208,16 @@ class AssetLife
         if (! self::may() || ! Schema::hasTable('assets')) return [];
 
         $q = fn () => hub_scope(DB::table('assets')->whereNull('deleted_at'), 'assets');
+        // بنطاق القارئ وبالمكتملة وحدها — كان يجمع صيانة المنظمة كلها بجانب أصوله هو
         $spend = Schema::hasTable('asset_maintenance')
-            ? (float) DB::table('asset_maintenance')->whereNull('deleted_at')
+            ? (float) hub_scope(DB::table('asset_maintenance')->whereNull('deleted_at'), 'assetlog')
+                ->where('status', 'مكتملة')
                 ->where('date', '>=', now()->subMonths(12)->toDateString())->sum('cost')
             : 0.0;
 
         return [
             'n' => $q()->count(),
-            'value' => (float) $q()->sum('price'),
+            'value' => self::seesPrice() ? (float) $q()->sum('price') : null,
             'held' => $q()->whereNotNull('holder_id')->count(),
             'inMaint' => $q()->where('status', 'صيانة')->count(),
             'spend12' => $spend,

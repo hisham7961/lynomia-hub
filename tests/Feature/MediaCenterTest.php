@@ -21,6 +21,8 @@ class MediaCenterTest extends TestCase
     protected function scene(): void
     {
         $this->seedCore();
+        // القارئات صارت محروسةً بذاتها: تُقرأ بهويّة صاحب صلاحية لا بلا هويّة
+        $this->actingAs($this->owner);
 
         $item = fn (array $a) => DB::table('media_items')->insert($a + [
             'id' => (string) Str::uuid(), 'type' => 'خبر', 'lang' => 'عربي',

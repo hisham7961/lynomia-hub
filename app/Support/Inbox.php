@@ -26,7 +26,7 @@ class Inbox
     public const TTL = 60;
 
     /** الجداول التي يقرؤها الصندوق — ختمُها جزءٌ من مفتاحه فلا يعرض ما بطل */
-    public const TABLES = ['approvals', 'record_acks', 'sign_requests', 'policies', 'policy_acks',
+    public const TABLES = ['roles', 'users', 'approvals', 'record_acks', 'sign_requests', 'policies', 'policy_acks',
         'kb_articles', 'kb_reads', 'internal_requests', 'leave_requests', 'tasks', 'decisions',
         'tickets', 'meetings', 'contract_obligations', 'compliance_items'];
 

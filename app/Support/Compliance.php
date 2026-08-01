@@ -27,6 +27,12 @@ class Compliance
         return hub_can(auth()->user(), 'compliance', 'v');
     }
 
+    /** الرسوم حقلٌ قد يُحجب بقيود الدور — والمجموع يكشفه كما يكشفه الصفّ */
+    public static function seesFee(): bool
+    {
+        return ! hub_masked('compliance', 'fee');
+    }
+
     public static function kinds(): array
     {
         return (array) config('hub_compliance', []);
@@ -68,7 +74,7 @@ class Compliance
             $out[] = [
                 'id' => $r->id, 'title' => $r->title, 'kind' => $r->kind ?: 'غير مصنّف',
                 'authority' => $r->authority, 'due' => $r->due, 'days' => $days,
-                'fee' => $r->fee !== null ? (float) $r->fee : null,
+                'fee' => $r->fee !== null && self::seesFee() ? (float) $r->fee : null,
                 'owner' => $names[$r->owner_id] ?? null,
                 'company' => $cos[$r->company_id] ?? null,
                 'status' => $r->status, 'lead' => $lead,
@@ -184,9 +190,8 @@ class Compliance
             'late' => (clone $open)->whereNotNull('due')->where('due', '<', now()->toDateString())->count(),
             'soon' => (clone $open)->whereNotNull('due')
                 ->whereBetween('due', [now()->toDateString(), now()->addDays(90)->toDateString()])->count(),
-            'fees90' => (float) (clone $open)->whereNotNull('due')
-                ->whereBetween('due', [now()->toDateString(), now()->addDays(90)->toDateString()])->sum('fee'),
-            'feesYear' => (float) self::q()->sum('fee'),
+            'fees90' => self::seesFee() ? (float) (clone $open)->whereNotNull('due')
+                ->whereBetween('due', [now()->toDateString(), now()->addDays(90)->toDateString()])->sum('fee') : null,
             'cur' => setting('app.currency', 'د.ك'),
         ];
     }

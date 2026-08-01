@@ -33,31 +33,35 @@ class CeoBoard
     {
         $out = [];
 
-        if (Schema::hasTable('approvals')) {
-            $n = hub_open_scope(DB::table('approvals')->whereNull('deleted_at'),
-                    'status', ['موافق', 'موافقة', 'معتمد', 'معتمدة'])->count();
-            $old = hub_open_scope(DB::table('approvals')->whereNull('deleted_at'),
-                    'status', ['موافق', 'موافقة', 'معتمد', 'معتمدة'])
-                ->where('created_at', '<', now()->subDays(3))->count();
+        // الحرّاس هنا لا في المتحكم وحده: أيُّ ودجةٍ أو موجزٍ يستدعي هذه القارئات
+        // مستقبلاً يجب أن يجد البابَ مغلقاً، لا أن يعتمد على سطرٍ في شاشةٍ واحدة
+        if (hub_read('approvals', $user)) {
+            $pending = fn () => hub_open_scope(hub_read('approvals', $user),
+                'status', ['موافق', 'موافقة', 'معتمد', 'معتمدة']);
+            $n = $pending()->count();
+            $old = $pending()->where('created_at', '<', now()->subDays(3))->count();
             if ($n) $out[] = ['icon' => '🔏', 'n' => $n, 'label' => 'موافقات معلّقة',
                 'why' => $old ? "منها {$old} معلّقة أكثر من ٣ أيام — التأخير قرارٌ أيضاً وله ثمن." : 'بانتظار حسم.',
                 'url' => route('m.index', 'approvals'), 'tone' => $old ? 'bad' : 'wn'];
         }
 
-        if (Schema::hasTable('decisions')) {
-            $late = DB::table('decisions')->whereNull('deleted_at')
-                ->whereIn('status', ['لم يبدأ', 'قيد التنفيذ', 'متعثر'])
+        if (hub_read('decisions', $user)) {
+            $open = fn () => hub_read('decisions', $user)
+                ->whereIn('status', ['لم يبدأ', 'قيد التنفيذ', 'متعثر']);
+            $late = $open()->whereNotNull('due')->where('due', '<', now()->toDateString())->count();
+            $stuck = $open()->where('status', 'متعثر')->count();
+            // القرار المتعثر الذي فات موعده واحدٌ لا اثنان — الجمع كان يضاعفه
+            $both = $open()->where('status', 'متعثر')
                 ->whereNotNull('due')->where('due', '<', now()->toDateString())->count();
-            $stuck = DB::table('decisions')->whereNull('deleted_at')->where('status', 'متعثر')->count();
-            if ($late || $stuck) $out[] = ['icon' => '🧭', 'n' => $late + $stuck, 'label' => 'قرارات لم تُنفَّذ',
+            $n = $late + $stuck - $both;
+            if ($n) $out[] = ['icon' => '🧭', 'n' => $n, 'label' => 'قرارات لم تُنفَّذ',
                 'why' => ($late ? "{$late} تجاوزت موعدها" : '') . ($late && $stuck ? ' و' : '')
                     . ($stuck ? "{$stuck} متعثّرة" : '') . ' — قرارٌ لا يُنفَّذ يُعلّم الفريق أن القرارات اختيارية.',
                 'url' => route('m.index', 'decisions'), 'tone' => 'bad'];
         }
 
-        if (Schema::hasTable('internal_requests')) {
-            $n = hub_open_scope(DB::table('internal_requests')->whereNull('deleted_at')
-                    ->where(fn ($w) => $w->whereNull('decision')->orWhere('decision', '')))->count();
+        if ($rq = hub_read('requests', $user)) {
+            $n = hub_open_scope($rq->where(fn ($w) => $w->whereNull('decision')->orWhere('decision', '')))->count();
             if ($n) $out[] = ['icon' => '📨', 'n' => $n, 'label' => 'طلبات داخلية بلا بتّ',
                 'why' => 'الطلب المعلّق يُستهلك مرتين: مرة انتظاراً ومرة تذكيراً.',
                 'url' => route('m.index', 'requests'), 'tone' => 'wn'];
@@ -82,11 +86,14 @@ class CeoBoard
         $cur = setting('app.currency', 'د.ك');
 
         // مستحقات متقادمة: المتأخر عن استحقاقه فوق ٦٠ يوماً يقترب من كونه خسارة
-        if (Schema::hasTable('fin_documents')) {
-            $aged = (float) DB::table('fin_documents')->whereNull('deleted_at')
+        if ($fin = hub_read('fin')) {
+            // ثلاثةُ تصحيحات: (١) النوع — كانت فواتير **المشتريات** تُحسب مستحقاتٍ
+            // لنا؛ (٢) `total - NULL = NULL` فالفاتورة التي لم يُدفع منها شيء —
+            // وهي أسوأها — كانت تسقط من المجموع؛ (٣) النطاق.
+            $aged = (float) $fin->whereIn('kind', (array) config('hub.fin.income', []) ?: ['فاتورة مبيعات'])
                 ->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة'])
                 ->whereNotNull('due')->where('due', '<', now()->subDays(60)->toDateString())
-                ->sum(DB::raw('total - paid'));
+                ->sum(DB::raw('total - COALESCE(paid, 0)'));
             if ($aged > 0) $out[] = ['icon' => '⏳', 'amount' => $aged, 'cur' => $cur,
                 'label' => 'مستحقات متأخرة فوق ٦٠ يوماً',
                 'why' => 'كلما طال التقادم قلّت فرصة التحصيل — هذا أقرب ما يكون إلى خسارة مؤجّلة.',
@@ -94,8 +101,8 @@ class CeoBoard
         }
 
         // مشاريع تجاوزت ميزانيتها: الفرق هو النزف نفسه
-        if (Schema::hasTable('projects')) {
-            $over = hub_open_scope(DB::table('projects')->whereNull('deleted_at'))
+        if ($pj = hub_read('projects')) {
+            $over = hub_open_scope($pj)
                 ->whereNotNull('budget')->where('budget', '>', 0)
                 ->whereColumn('cost', '>', 'budget')
                 ->get(['name', 'budget', 'cost']);
@@ -107,8 +114,8 @@ class CeoBoard
         }
 
         // اشتراكات تتجدد تلقائياً خلال شهر: تُدفع بصمت ما لم تُراجَع قبل موعدها
-        if (Schema::hasTable('subscriptions')) {
-            $subs = hub_open_scope(DB::table('subscriptions')->whereNull('deleted_at'))
+        if ($sb = hub_read('subs')) {
+            $subs = hub_open_scope($sb)
                 ->whereNotNull('renew')
                 ->whereBetween('renew', [now()->toDateString(), now()->addDays(30)->toDateString()])
                 ->get(['service', 'amount', 'auto_renew']);
@@ -133,12 +140,13 @@ class CeoBoard
 
     protected static function concentrationCalc(): array
     {
-        if (! Schema::hasTable('fin_documents')) return [];
+        if (! ($fin = hub_read('fin'))) return [];
 
         $income = (array) config('hub.fin.income', []);
         $dead = (array) config('hub.fin.dead', []);
-        $rows = DB::table('fin_documents')->whereNull('deleted_at')
-            ->whereIn('kind', $income ?: ['فاتورة'])->whereNotIn('state', $dead ?: ['ملغاة'])
+        $rows = $fin->whereIn('kind', $income ?: ['فاتورة مبيعات'])
+            // NOT IN تُسقط NULL صامتةً — ومستندٌ بلا حالة مستندٌ قائم
+            ->where(fn ($w) => $w->whereNull('state')->orWhereNotIn('state', $dead ?: ['ملغاة']))
             ->where('date', '>=', now()->subMonths(12)->toDateString())
             ->whereNotNull('client_id')
             ->select('client_id', DB::raw('SUM(total) as t'))
@@ -147,9 +155,8 @@ class CeoBoard
         $total = (float) $rows->sum('t');
         if ($total <= 0 || $rows->count() < 2) return [];
 
-        $names = Schema::hasTable('clients')
-            ? DB::table('clients')->whereIn('id', $rows->pluck('client_id'))->pluck('name', 'id')
-            : collect();
+        $cq = hub_read('clients');
+        $names = $cq ? $cq->whereIn('id', $rows->pluck('client_id'))->pluck('name', 'id') : collect();
 
         $top = $rows->take(5)->map(fn ($r) => [
             'name' => $names[$r->client_id] ?? 'عميل محذوف',
@@ -180,8 +187,8 @@ class CeoBoard
     {
         $out = [];
 
-        if (Schema::hasTable('issues')) {
-            $rows = hub_open_scope(DB::table('issues')->whereNull('deleted_at'))
+        if ($iq = hub_read('issues')) {
+            $rows = hub_open_scope($iq)
                 ->orderByRaw("CASE severity WHEN 'حرجة' THEN 0 WHEN 'عالية' THEN 1 WHEN 'متوسطة' THEN 2 ELSE 3 END")
                 ->limit(6)->get(['id', 'title', 'severity', 'status', 'found']);
             foreach ($rows as $r) {
@@ -192,8 +199,8 @@ class CeoBoard
             }
         }
 
-        if (Schema::hasTable('incidents')) {
-            $rows = hub_open_scope(DB::table('incidents')->whereNull('deleted_at'))
+        if ($nq = hub_read('incidents')) {
+            $rows = hub_open_scope($nq)
                 ->limit(4)->get(['id', 'title', 'severity', 'status', 'started_at']);
             foreach ($rows as $r) {
                 $age = $r->started_at ? (int) \Illuminate\Support\Carbon::parse($r->started_at)->diffInDays(now()) : null;
@@ -242,8 +249,8 @@ class CeoBoard
     {
         $out = [];
 
-        if (Schema::hasTable('contracts')) {
-            $soon = hub_open_scope(DB::table('contracts')->whereNull('deleted_at'))
+        if ($cq = hub_read('contracts')) {
+            $soon = hub_open_scope($cq)
                 ->whereNotNull('date_end')
                 ->whereBetween('date_end', [now()->toDateString(), now()->addDays(60)->toDateString()])
                 ->count();
@@ -252,16 +259,17 @@ class CeoBoard
                 'url' => route('legal'), 'tone' => 'wn'];
         }
 
-        if (Schema::hasTable('compliance_items')) {
-            $late = hub_open_scope(DB::table('compliance_items')->whereNull('deleted_at'))
+        if ($mq = hub_read('compliance')) {
+            // «معفى» ليس متأخراً — شاشةُ الامتثال تستثنيه واللوحة كانت تعدّه
+            $late = hub_open_scope($mq, 'status', ['معفى'])
                 ->whereNotNull('due')->where('due', '<', now()->toDateString())->count();
             if ($late) $out[] = ['icon' => '⚖️', 'n' => $late, 'label' => 'التزامات نظامية متأخرة',
                 'why' => 'المخالفة النظامية تُغرَّم ولا تُناقَش — وهي أرخص ما يُعالَج قبل موعدها.',
                 'url' => route('m.index', 'compliance'), 'tone' => 'bad'];
         }
 
-        if (Schema::hasTable('contract_obligations')) {
-            $late = hub_open_scope(DB::table('contract_obligations')->whereNull('deleted_at'))
+        if ($oq = hub_read('obligations')) {
+            $late = hub_open_scope($oq)
                 ->whereNotNull('due')->where('due', '<', now()->toDateString())->count();
             if ($late) $out[] = ['icon' => '📑', 'n' => $late, 'label' => 'التزامات تعاقدية متأخرة',
                 'why' => 'إخلالٌ بعقدٍ وقّعته الشركة — يُقاس بالغرامة أو بالسمعة.',
