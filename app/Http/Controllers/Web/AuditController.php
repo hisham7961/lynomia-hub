@@ -47,7 +47,9 @@ class AuditController extends Controller
             ->when($r->input('to'), fn ($w, $d) => $w->whereDate('audits.created_at', '<=', $d))
             ->when($r->input('q'), fn ($w, $t) => $w->where(fn ($x) => $x
                 ->where('audits.name', 'LIKE', "%$t%")->orWhere('audits.reason', 'LIKE', "%$t%")))
-            ->orderByDesc('audits.created_at')
+            // فاصلُ id بعد الطابع: created_at بدقّة الثانية تتساوى قيمُه،
+            // والترتيبُ على المتساوي قرعةٌ تكرّر صفوفاً وتُسقط أخرى عبر الصفحات
+            ->orderByDesc('audits.created_at')->orderByDesc('audits.id')
             // بلا COUNT(*) إجمالي — أسرع الجداول نمواً والعدّ مع join يثقل كل صفحة
             ->simplePaginate(40)->withQueryString();
 

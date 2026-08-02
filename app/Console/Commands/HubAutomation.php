@@ -28,6 +28,7 @@ class HubAutomation extends Command
 
     public function handle(): int
     {
+        $this->monitorUsers = null;   // ذاكرة المستلمين تصلح لتشغيلةٍ واحدة
         $this->dry = (bool) $this->option('dry');
         if ($this->dry) $this->warn('وضع المعاينة — لن يُكتب شيء');
 
@@ -353,12 +354,17 @@ class HubAutomation extends Command
     /** المستلمون كنماذج مستخدمين — يلزمنا المستخدم نفسه لفرض نطاقه على القاعدة */
     protected function recipientUsers($toId): \Illuminate\Support\Collection
     {
-        if ($toId) return User::whereNull('deleted_at')->where('id', $toId)->get()->values();
+        if ($toId) return User::whereNull('deleted_at')->where('id', $toId)->with('role')->get()->values();
 
-        return User::whereNull('deleted_at')->get()
+        // with('role') وذاكرةُ التشغيلة الواحدة: كان كلُّ نداءٍ يحمّل كلَّ
+        // المستخدمين ثم دورَ كلٍّ باستعلامٍ مستقل (N+1) — مع كل إشعارٍ مولَّد.
+        // تُصفَّر في مطلع handle() فلا تتلوث تشغيلاتُ العملية الواحدة.
+        return $this->monitorUsers ??= User::whereNull('deleted_at')->with('role')->get()
             ->filter(fn ($u) => $u->role?->is_owner || hub_flag($u, 'monitor'))
             ->values();
     }
+
+    protected ?\Illuminate\Support\Collection $monitorUsers = null;
 
     /** إشعار للمالكين وحاملي monitor */
     protected function notifyMonitors(string $kind, string $text, ?string $module, ?string $recordId): void

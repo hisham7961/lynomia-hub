@@ -138,8 +138,15 @@ class ModuleController extends Controller
                 'lt' => $q->where($col, '<', $fv + 0),
                 'before' => $q->whereDate($col, '<', $fv),
                 'after' => $q->whereDate($col, '>', $fv),
-                'empty' => $q->where(fn ($w) => $w->whereNull($col)->orWhere($col, '')),
-                'nempty' => $q->whereNotNull($col)->where($col, '!=', ''),
+                // «فارغ» على رقمٍ أو تاريخ = NULL وحده: مقارنةُ '' تُصنّف الصفرَ
+                // فارغاً على MySQL (يحوّل '' إلى 0) وتُعيد غيرَه على SQLite —
+                // انقسامٌ صامت بين المحرّكين ونتيجةٌ خاطئة في الإنتاج
+                'empty' => in_array($t, ['num', 'big', 'date', 'dt'], true)
+                    ? $q->whereNull($col)
+                    : $q->where(fn ($w) => $w->whereNull($col)->orWhere($col, '')),
+                'nempty' => in_array($t, ['num', 'big', 'date', 'dt'], true)
+                    ? $q->whereNotNull($col)
+                    : $q->whereNotNull($col)->where($col, '!=', ''),
             };
 
             // رقاقة الشرط مع رابط إزالته وحده — بقية الشروط والمعايير تبقى
@@ -175,9 +182,10 @@ class ModuleController extends Controller
         // فرز بأي عمود من أعمدة الوحدة
         $sortKey = $r->input('s');
         $sf      = $sortKey ? $fields->firstWhere('key', $sortKey) : null;
-        // الترتيب بعمودٍ مخفيّ إفشاءٌ بلا عرض: «من أعلى راتباً» يُقرأ من الترتيب
-        // وحده. الحارس هنا لأن الفرز كان الطريق الوحيد حول hub_visible_fields.
-        if ($sf && hub_field_mode(auth()->user(), $module, (string) $sf['key']) !== '') {
+        // الترتيب بعمودٍ **مخفيّ** إفشاءٌ بلا عرض: «من أعلى راتباً» يُقرأ من
+        // الترتيب وحده. أمّا «قراءة فقط» فقيمتُه ظاهرةٌ في الجدول أصلاً ولا
+        // شيءَ يُستدَلّ — كان `!== ''` يشمله فيُلغى فرزُ عمودٍ مرئيٍّ بصمت.
+        if ($sf && hub_field_mode(auth()->user(), $module, (string) $sf['key']) === 'hide') {
             $sf = null;
             $sortKey = null;
         }

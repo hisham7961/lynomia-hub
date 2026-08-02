@@ -106,8 +106,10 @@ class MessagingController extends Controller
                 'username' => 'المستخدم', 'password' => 'كلمة المرور',
                 'from_address' => 'عنوان المُرسِل', 'from_name' => 'اسم المُرسِل']);
 
+        // «none» حرفيةً لا فراغاً: setting() يعامل '' كغيابٍ فيعيد الافتراضي tls —
+        // فمن اختار «بلا تشفير» (خادم داخلي على 25) كان يُفرض عليه TLS فيفشل
         foreach (['host' => $d['host'], 'port' => (string) $d['port'],
-                  'encryption' => $d['encryption'] === 'none' ? '' : $d['encryption'],
+                  'encryption' => $d['encryption'],
                   'username' => $d['username'], 'from_address' => $d['from_address'],
                   'from_name' => (string) ($d['from_name'] ?? '')] as $k => $v) {
             \App\Models\Setting::updateOrCreate(['key' => 'mail.' . $k], ['value' => $v]);
