@@ -535,6 +535,25 @@ class StaffAccountLinkTest extends TestCase
             'قيل له ما ينقص ولم يُدلّ على مكان إضافته');
     }
 
+    /**
+     * **والبابُ في كِلا مدخلَي الموظف لا في أحدهما.**
+     *
+     * لملفّ الموظف مدخلان: «📄 كل الحقول» (`/m/hr/{id}`) و**«🗂️ الملف الشامل»**
+     * (`/employee/{id}`) — وهو المدخلُ الذي يُفتح عادةً لأنه ملخّصُ الموظف كلِّه.
+     * فبطاقةٌ في أحدهما وحده تعني أنّ من يدخل من الآخر لا يرى البابَ أصلاً،
+     * ويعود يسأل: «لا أرى تحويل الموظف لحساب».
+     */
+    public function test_the_full_employee_file_offers_it_too(): void
+    {
+        $this->seedCore();
+        $emp = Employee::create(['name' => 'في الشامل', 'email' => 'full@test.local', 'status' => 'نشط']);
+
+        $html = $this->actingAs($this->owner)->get("/employee/{$emp->id}")->assertOk()->getContent();
+
+        $this->assertStringContainsString(route('staff.account', $emp->id), $html,
+            'الملفُّ الشامل بلا بابٍ لفتح الحساب — وهو المدخلُ الأشيع');
+    }
+
     /** ومن له حسابٌ لا يُعرض له الزرّ — الطلبُ منتهٍ */
     public function test_the_button_is_gone_once_an_account_exists(): void
     {

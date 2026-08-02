@@ -9,9 +9,15 @@
     يرى حسابَه لا زرّاً انتهت حاجتُه.
 --}}
 @php
-    $stAcct = $row->user_id ? \App\Models\User::find($row->user_id) : null;
-    $stMay = hub_flag(auth()->user(), 'users') && hub_can(auth()->user(), 'hr', 'e') && ! $row->trashed();
+    // مدخلان لملفّ الموظف: «كل الحقول» يمرّر $row، و«الملف الشامل» يمرّر $emp —
+    // والبطاقةُ واحدةٌ لهما، فبابٌ في أحدهما وحده بابٌ لا يراه نصفُ الداخلين
+    $stEmp = $acctRow ?? ($row ?? ($emp ?? null));
+    $stAcct = ($stEmp && $stEmp->user_id) ? \App\Models\User::find($stEmp->user_id) : null;
+    $stMay = $stEmp && hub_flag(auth()->user(), 'users')
+        && hub_can(auth()->user(), 'hr', 'e') && ! $stEmp->trashed();
 @endphp
+
+@if ($stEmp)
 
 @if ($stAcct)
     <div class="card">
@@ -29,20 +35,20 @@
 @elseif ($stMay)
     <div class="card">
         <div class="cardtitle">🔑 لا حساب نظام لهذا الموظف</div>
-        @if (blank($row->email))
+        @if (blank($stEmp->email))
             <div class="fhint">
                 البريدُ الإلكتروني ناقصٌ في الملف — <b>وهو هويةُ الدخول</b> فلا حساب بدونه.
                 أضِفه أولاً ثم عُد لتفتح له حساباً.
             </div>
             <div style="margin-top:8px">
-                <a class="btn p sm" href="{{ route('m.edit', ['hr', $row->id]) }}">✏️ أضِف بريده</a>
+                <a class="btn p sm" href="{{ route('m.edit', ['hr', $stEmp->id]) }}">✏️ أضِف بريده</a>
             </div>
         @else
             <div class="fhint">
                 يُفتح له حسابٌ بكلمة مرورٍ مؤقتة تُعرض <b>مرةً واحدة</b>، يُلزَم بتبديلها عند أول دخول.
                 وإن كان لبريده حسابٌ قائم فسيُربط به بدل إنشاء ثانٍ.
             </div>
-            <form method="POST" action="{{ route('staff.account', $row->id) }}"
+            <form method="POST" action="{{ route('staff.account', $stEmp->id) }}"
                   class="row" style="gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
                 @csrf
                 <select class="inp xs" name="role_id" required aria-label="دور الحساب" style="max-width:260px">
@@ -55,4 +61,5 @@
             </form>
         @endif
     </div>
+@endif
 @endif
