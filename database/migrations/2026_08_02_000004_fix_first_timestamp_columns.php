@@ -27,6 +27,12 @@ return new class extends Migration
             DB::statement('ALTER TABLE metric_points MODIFY at DATETIME NOT NULL');
             DB::statement('ALTER TABLE sessions_log MODIFY started_at DATETIME NOT NULL');
         }
+
+        // ومع تصحيح نوع حقل «ملف الكود» إلى file: عمودُه كان uuid(36) والمتحكم
+        // يخزّن مسارَ الملف (~45 حرفاً) — التوسعة على عرف 2026_07_31_000021
+        \Illuminate\Support\Facades\Schema::table('code_releases', function (\Illuminate\Database\Schema\Blueprint $t) {
+            $t->string('file_id', 500)->nullable()->change();
+        });
     }
 
     public function down(): void

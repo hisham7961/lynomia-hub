@@ -112,9 +112,17 @@ class Odoo
             && $this->url !== '' && $this->db !== '' && $this->user !== '' && $this->key !== '';
     }
 
-    protected function cacheKey(string $suffix): string
+    /**
+     * مفتاح كاش يحمل معرّفَ الاتصال **وبصمةَ اعتماده**: تعديلُ بيانات اتصالٍ
+     * (توجيهُه لخادمٍ آخر أو تدويرُ مفتاحه) يُدوّر كلَّ مفاتيحه تلقائياً —
+     * كان نسفُ `uid` وحده يترك opts/stats/chan تخدم بياناتِ الخادم القديم
+     * حتى عشر دقائق. عامٌّ لأن الاختبارات تُثبت العزل به.
+     */
+    public function cacheKey(string $suffix): string
     {
-        return 'odoo:' . $this->connId . ':' . $suffix;
+        $fp = substr(sha1($this->url . '|' . $this->db . '|' . $this->user . '|' . $this->key), 0, 8);
+
+        return 'odoo:' . $this->connId . ':' . $fp . ':' . $suffix;
     }
 
     /* ───────────── النداء ───────────── */
@@ -333,18 +341,6 @@ class Odoo
         return self::for(null)->serverVersion();
     }
 
-    public static function exec(string $model, string $method, array $args = [], array $kw = [])
-    {
-        return self::for(null)->call($model, $method, $args, $kw);
-    }
-
-    public static function searchPartners(string $q): array
-    {
-        return self::for(null)->partners($q);
-    }
-
-    public static function partnerStats(int $pid, bool $fresh = false): array
-    {
-        return self::for(null)->stats($pid, $fresh);
-    }
+    // exec/searchPartners/partnerStats الساكنة أُزيلت: بلا مستدعٍ منذ صارت
+    // البطاقات تحلّ بـforRow — شيفرةُ «توافقٍ» بلا من يتوافق معها شيفرةٌ ميتة
 }

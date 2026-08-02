@@ -76,7 +76,10 @@ class AuditController extends Controller
         $hoursEnd   = (string) setting('sec.hours_end', '16:00');
 
         $today = $base()->get(['action', 'ip', 'created_at', 'user_id']);
+        // بحدّ تسعين يوماً: كان DISTINCT على كامل أسرع الجداول نمواً مع كل
+        // فتحة شاشة — وعنوانٌ غاب تسعين يوماً عودتُه «جديدة» عملياً بحق
         $seen = DB::table('audits')->where('created_at', '<', $day)
+            ->where('created_at', '>=', $day->copy()->subDays(90))
             ->whereNotNull('ip')->distinct()->pluck('ip')->all();
 
         return [

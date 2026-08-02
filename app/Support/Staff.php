@@ -56,7 +56,7 @@ class Staff
         $email = trim($email);
         if ($email === '') return null;
 
-        $u = User::whereNull('deleted_at')->where('email', $email)->first();
+        $u = User::whereNull('deleted_at')->where('email', $email)->orderBy('id')->first();   // بترتيبٍ حتمي: البريد غير فريد
         if (! $u) return null;
 
         return self::accountTaken($u->id, $exceptEmp) ? null : $u;
@@ -88,7 +88,7 @@ class Staff
         if (blank($u->email)) return null;
 
         $emp = Employee::whereNull('deleted_at')->where('email', $u->email)
-            ->whereNull('user_id')->first();
+            ->whereNull('user_id')->orderBy('id')->first();
         if (! $emp || self::accountTaken($u->id)) return null;
 
         $emp->forceFill(['user_id' => $u->id])->saveQuietly();
@@ -132,7 +132,7 @@ class Staff
         $email = trim((string) $emp->email);
         if ($email === '') return ['temp' => null, 'outcome' => 'no_email', 'user' => null];
 
-        if ($existing = User::whereNull('deleted_at')->where('email', $email)->first()) {
+        if ($existing = User::whereNull('deleted_at')->where('email', $email)->orderBy('id')->first()) {
             // حسابٌ بهذا البريد موجود: يُربط إن كان حرّاً، وإلا فهو لملفٍّ آخر
             $linked = self::linkByEmail($emp);
 
@@ -170,7 +170,7 @@ class Staff
 
         if (Employee::whereNull('deleted_at')->where('user_id', $u->id)->exists()) return null;
         if (filled($u->email) && ($emp = Employee::whereNull('deleted_at')
-            ->where('email', $u->email)->whereNull('user_id')->first())) {
+            ->where('email', $u->email)->whereNull('user_id')->orderBy('id')->first())) {
             $emp->forceFill(['user_id' => $u->id])->saveQuietly();
 
             return $emp;

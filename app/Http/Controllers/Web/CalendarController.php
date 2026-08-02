@@ -56,8 +56,11 @@ class CalendarController extends Controller
                 $disp = hub_display_col($mk);
                 try {
                     $base = hub_scope(
+                        // نطاقٌ على العمود الخام لا DATE(col): الدالة على العمود
+                        // تُعمي الفهرس فيمسح المحرّك الجدول كله لكل وحدة شهرياً
                         DB::table($md['table'])->whereNull('deleted_at')->whereNotNull($f['col'])
-                            ->whereBetween(DB::raw("DATE(`{$f['col']}`)"), [$start->toDateString(), $end->toDateString()]),
+                            ->where($f['col'], '>=', $start->toDateString())
+                            ->where($f['col'], '<', $end->copy()->addDay()->toDateString()),
                         $mk
                     );
                     // نعدّ الكل ثم نجلب الأقرب زمنياً بترتيب صريح — الحدّ لم يعد يُسقط

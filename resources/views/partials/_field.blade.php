@@ -46,7 +46,9 @@
         <select class="inp @error($k) err @enderror" id="{{ $fid }}" name="{{ $k }}"{!! $req !!}>
             <option value=""></option>
             @foreach ($refOptions[$k] ?? [] as $id => $label)
-                <option value="{{ $id }}" @selected(old($k, $raw) === $id)>{{ $label }}</option>
+                {{-- بلا === النوعية: old() نصٌّ ومعرفُ الخيار قد يكون رقماً — كانت
+                     المقارنةُ الصارمة تُفقد الاختيارَ بعد أي خطأ تحقق --}}
+                <option value="{{ $id }}" @selected((string) old($k, $raw) === (string) $id)>{{ $label }}</option>
             @endforeach
         </select>
 

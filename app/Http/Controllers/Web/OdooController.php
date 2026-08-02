@@ -18,7 +18,6 @@ class OdooController extends Controller
             'pname' => ['nullable', 'string', 'max:200'],
         ]);
 
-        $m->meta = ((array) $m->meta) + [];
         $meta = (array) $m->meta;
         $meta['odoo_partner_id'] = (int) $d['pid'];
         $meta['odoo_partner_name'] = (string) ($d['pname'] ?? '');

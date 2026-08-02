@@ -135,8 +135,14 @@ class OdooConnectionsTest extends TestCase
 
         $this->assertSame(7, Odoo::for($a->id)->login());
         $this->assertSame(9, Odoo::for($b->id)->login(), 'هوية الخادم الأول تسرّبت للثاني عبر الكاش');
-        $this->assertNotNull(Cache::get('odoo:' . $a->id . ':uid'));
-        $this->assertNotNull(Cache::get('odoo:' . $b->id . ':uid'));
+        $this->assertNotNull(Cache::get(Odoo::for($a->id)->cacheKey('uid')));
+        $this->assertNotNull(Cache::get(Odoo::for($b->id)->cacheKey('uid')));
+
+        // وتعديلُ الاعتماد يُدوّر المفاتيح كلَّها — لا كاشَ يخدم خادماً قديماً
+        $oldKey = Odoo::for($a->id)->cacheKey('uid');
+        $a->update(['url' => 'https://a2.example.com']);
+        $this->assertNotSame($oldKey, Odoo::for($a->id)->cacheKey('uid'),
+            'تغيّر الخادم ولم تتبدل مفاتيح الكاش — أرقامُ القديم ستُخدَم للجديد');
     }
 
     public function test_connection_test_button_records_last_ok_and_version(): void
