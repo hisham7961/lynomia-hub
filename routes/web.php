@@ -291,6 +291,7 @@ Route::middleware('auth')->group(function () {
     Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('profile/password', [ProfileController::class, 'password'])->name('profile.password');
+    Route::put('profile/notify', [ProfileController::class, 'notifyPrefs'])->name('profile.notify');
     Route::post('profile/token', [ProfileController::class, 'tokenStore'])->name('profile.token.store');
     Route::delete('profile/token/{id}', [ProfileController::class, 'tokenRevoke'])->name('profile.token.revoke');
     Route::post('profile/token/{id}/rotate', [ProfileController::class, 'tokenRotate'])->name('profile.token.rotate');
@@ -353,6 +354,10 @@ Route::middleware('auth')->group(function () {
     Route::post('jslog', [ErrorCenterController::class, 'jslog'])->name('jslog')->middleware('throttle:20,1');
     Route::get('admin/integrations', [\App\Http\Controllers\Web\IntegrationController::class, 'index'])->name('integrations.index');
     Route::get('admin/integrations/guide', [\App\Http\Controllers\Web\IntegrationController::class, 'guide'])->name('integrations.guide');
+    // مركز المراسلة — كل طرق التواصل الخارجة في شاشة واحدة
+    Route::get('admin/integrations/messaging', [\App\Http\Controllers\Web\MessagingController::class, 'index'])->name('integrations.messaging');
+    Route::post('admin/integrations/messaging/test', [\App\Http\Controllers\Web\MessagingController::class, 'test'])->name('integrations.messaging.test');
+    Route::post('admin/integrations/messaging/retry', [\App\Http\Controllers\Web\MessagingController::class, 'retry'])->name('integrations.messaging.retry');
     // خوادم أودو المتعددة — الاتصال الافتراضي يبقى في الإعدادات، وهنا الإضافيون
     Route::get('admin/integrations/odoo', [\App\Http\Controllers\Web\OdooConnectionController::class, 'index'])->name('integrations.odoo');
     Route::post('admin/integrations/odoo', [\App\Http\Controllers\Web\OdooConnectionController::class, 'store'])->name('integrations.odoo.store');

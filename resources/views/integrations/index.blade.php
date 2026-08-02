@@ -44,7 +44,9 @@
                 <td class="acts"><a class="btn ghost xs" href="{{ route('webhooks.index') }}">فتح ↗</a></td></tr>
             <tr><td><b>🔑 مفاتيح REST API</b></td><td class="sub">توليد المفاتيح وتدويرها وإبطالها — في ملفك الشخصي</td>
                 <td class="acts"><a class="btn ghost xs" href="{{ route('profile.edit') }}">فتح ↗</a></td></tr>
-            <tr><td><b>📤 الصندوق الصادر</b></td><td class="sub">طوابير تلجرام والبريد وحالات التسليم — في مركز التشغيل</td>
+            <tr><td><b>📨 مركز المراسلة</b></td><td class="sub">تلجرام والبريد وداخل التطبيق: الحالة والاختبار والإعادة ودليل الإعداد التفصيلي</td>
+                <td class="acts"><a class="btn ghost xs" href="{{ route('integrations.messaging') }}">فتح ↗</a></td></tr>
+            <tr><td><b>📤 طوابير التشغيل</b></td><td class="sub">نبضات الوظائف المجدولة وطوابير الرسائل — في مركز التشغيل</td>
                 <td class="acts"><a class="btn ghost xs" href="{{ route('ops.index') }}">فتح ↗</a></td></tr>
         </tbody>
     </table></div>

@@ -119,6 +119,30 @@ class ProfileController extends Controller
         return redirect()->route('profile.edit')->with('ok', 'حُفظت بياناتك');
     }
 
+    /**
+     * **وجهات التنبيه الشخصية** — الحلقةُ التي كانت ميتة: عاملُ التسليم يقرأ
+     * `notify_prefs` (تلجرام المستخدم وبريده البديل) منذ بنائه، ولا واجهةَ
+     * كانت تكتبها — فمحطةُ «تفضيل المستخدم» في سلسلة الوجهات لم تعمل يوماً.
+     */
+    public function notifyPrefs(Request $r)
+    {
+        $d = $r->validate([
+            'tg'    => ['nullable', 'string', 'max:60', 'regex:/^-?\d+$/'],
+            'email' => ['nullable', 'email', 'max:200'],
+        ], ['tg.regex' => 'معرف تلجرام رقمٌ (موجب للمحادثات، سالب للقنوات والمجموعات) — يستخرجه دليل مركز المراسلة'],
+           ['tg' => 'معرف تلجرام', 'email' => 'البريد البديل']);
+
+        $u = auth()->user();
+        $prefs = is_array($u->notify_prefs) ? $u->notify_prefs : [];
+        foreach (['tg', 'email'] as $k) {
+            $v = trim((string) ($d[$k] ?? ''));
+            if ($v === '') unset($prefs[$k]); else $prefs[$k] = $v;
+        }
+        $u->forceFill(['notify_prefs' => $prefs])->save();
+
+        return redirect()->route('profile.edit')->with('ok', 'حُفظت وجهات تنبيهك — تنبيهاتك القادمة ستسلك الوجهة الجديدة');
+    }
+
     public function password(Request $r)
     {
         $r->validate([

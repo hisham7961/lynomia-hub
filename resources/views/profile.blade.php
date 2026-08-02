@@ -47,6 +47,34 @@
     </div>
 
     <div class="card kid">
+        <h3>🎯 وجهات التنبيه</h3>
+        @php $nprefs = is_array($u->notify_prefs) ? $u->notify_prefs : []; @endphp
+        <div class="sub" style="margin-bottom:8px">
+            تنبيهاتُك الشخصية (تلجرام وبريد) تُرسل لهذه الوجهات بدل القناة العامة —
+            اتركها فارغةً للبقاء على الافتراضي.
+        </div>
+        <form method="POST" action="{{ route('profile.notify') }}">
+            @csrf @method('PUT')
+            <div class="fg">
+                <div class="fld fw">
+                    <label>معرف محادثتك في تلجرام</label>
+                    <input class="inp ltr @error('tg') err @enderror" name="tg" value="{{ old('tg', $nprefs['tg'] ?? '') }}"
+                           placeholder="123456789" dir="ltr">
+                    @error('tg')<span class="ferr">{{ $message }}</span>@enderror
+                    <span class="sub">طريقة استخراجه خطوةً خطوة في مركز المراسلة (للمالك) أو من مديرك</span>
+                </div>
+                <div class="fld fw">
+                    <label>بريدٌ بديل للتنبيهات</label>
+                    <input class="inp ltr @error('email') err @enderror" name="email" value="{{ old('email', $nprefs['email'] ?? '') }}"
+                           placeholder="me@example.com" dir="ltr">
+                    @error('email')<span class="ferr">{{ $message }}</span>@enderror
+                </div>
+            </div>
+            <div class="formfoot"><button class="btn p" type="submit">حفظ الوجهات</button></div>
+        </form>
+    </div>
+
+    <div class="card kid">
         <h3>🔒 تغيير كلمة المرور</h3>
         <form method="POST" action="{{ route('profile.password') }}">
             @csrf @method('PUT')
