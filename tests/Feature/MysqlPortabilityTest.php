@@ -6,6 +6,7 @@ use App\Models\AuditEntry;
 use App\Models\Client;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
@@ -76,13 +77,18 @@ class MysqlPortabilityTest extends TestCase
         $this->assertNotNull(Client::find($real->id));       // والحقيقي سليم
     }
 
+    /**
+     * **واختبارُ قابلية النقل كان هو نفسه غير قابلٍ للنقل**: `PRAGMA index_list`
+     * لهجةُ SQLite وحدها، فيسقط الاختبارُ على MySQL بخطأ صياغة — وهو المحرّك
+     * الذي يعمل عليه النظام فعلاً. المخطّطُ يُقرأ الآن بواجهة Laravel المحايدة.
+     */
     public function test_hot_query_indexes_exist(): void
     {
         $this->seedCore();
         foreach ([['idempotency_keys', 'idem_gc_idx'],
                   ['webhook_deliveries', 'wd_due_idx'],
                   ['inbox_documents', 'inbox_list_idx']] as [$table, $index]) {
-            $found = collect(DB::select("PRAGMA index_list('{$table}')"))->pluck('name');
+            $found = collect(Schema::getIndexes($table))->pluck('name');
             $this->assertTrue($found->contains($index), "الفهرس {$index} مفقود على {$table}");
         }
     }

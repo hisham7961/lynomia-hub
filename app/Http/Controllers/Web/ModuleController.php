@@ -486,7 +486,14 @@ class ModuleController extends Controller
     public function setStatus(Request $r, string $module, string $id)
     {
         [$def, $class] = $this->resolve($module, 'e');
-        $statusCol = $def['status'] ?? null;
+        /*
+         * **العمود لا المفتاح.** `$def['status']` مفتاحُ الحقل، وقد يخالف عمودَه
+         * (`files`: `docStatus` ↔ `doc_status`). فسحبُ بطاقةٍ في لوحة كانبان على
+         * وحدةٍ كهذه يكتب في عمودٍ لا وجود له: على MySQL `Unknown column` وخطأ
+         * ٥٠٠، وعلى SQLite كتابةٌ صامتةٌ في لا شيء — البطاقةُ تعود مكانها والمستخدم
+         * لا يفهم لماذا. أُصلح توأمُه في الإجراء الجماعي بـv2.208 وبقي هذا.
+         */
+        $statusCol = hub_status_col($module);
         abort_unless($statusCol, 404);
 
         $m = $this->findScoped($class, $module, $id);

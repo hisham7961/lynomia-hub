@@ -55,9 +55,12 @@ class DeployWithoutMigrateTest extends TestCase
             if (str_contains(mb_strtolower($q->sql), 'pragma') || str_contains($q->sql, 'information_schema')) $n++;
         });
 
-        for ($i = 0; $i < 5; $i++) hub_has_col('dm_messages', 'deleted_at');
+        hub_has_col('dm_messages', 'deleted_at');
+        $first = $n;                         // ثمنُ النداء الأول (يختلف بالمحرّك)
+        for ($i = 0; $i < 9; $i++) hub_has_col('dm_messages', 'deleted_at');
 
-        $this->assertLessThanOrEqual(1, $n,
+        // المقياسُ الصحيح: التسعةُ التالية بلا ثمن — لا عددُ استعلامات الأول
+        $this->assertSame($first, $n,
             'فحصُ العمود يستعلم المخطّط في كل نداء — ثمنٌ يُدفع في كل صفحة');
     }
 
