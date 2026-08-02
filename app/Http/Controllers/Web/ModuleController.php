@@ -226,6 +226,7 @@ class ModuleController extends Controller
         $r->validate($this->rules($def), [], $this->attrs($def));
         $this->guardProject($r, $module);
         $this->guardCompany($r, $module);
+        $this->guardAccountRequest($r, $module);
 
         $m = new $class;
         $this->fill($def, $r, $m);
@@ -267,14 +268,31 @@ class ModuleController extends Controller
          * Employee (البريد هو الهوية)، وفتحُ حسابٍ جديد قرارٌ صريح يُطلب من
          * النموذج — بدورٍ مختار وكلمةِ مرورٍ مؤقتة تُعرض مرةً واحدة.
          */
-        if ($module === 'hr' && $r->boolean('_make_account') && ! $m->user_id) {
-            $temp = \App\Support\Staff::makeAccount($m, hub_str($r->input('_account_role')));
-            if ($temp !== null) {
-                return redirect()->route('m.show', [$module, $m->id])
-                    ->with('ok', 'أُضيف الموظف وأُنشئ حسابه')
-                    ->with('temp_password', $temp)
+        if ($module === 'hr' && $r->boolean('_make_account')) {
+            $to = fn (string $key, string $msg) => redirect()
+                ->route('m.show', [$module, $m->id])->with($key, $msg);
+
+            // البريدُ وجد حسابَه فرُبط تلقائياً عند الإنشاء — لا حسابَ جديد، ويُقال ذلك
+            if ($m->user_id) {
+                return $to('ok', 'أُضيف الموظف ورُبط بحسابه القائم على هذا البريد'
+                    . ' — لم يُنشأ حسابٌ جديد ولا كلمةُ مرورٍ مؤقتة.');
+            }
+
+            $res = \App\Support\Staff::makeAccountResult($m, hub_str($r->input('_account_role')));
+            if ($res['temp'] !== null) {
+                return $to('ok', 'أُضيف الموظف وأُنشئ حسابه')
+                    ->with('temp_password', $res['temp'])
                     ->with('temp_password_for', (string) $m->email);
             }
+
+            // **ولا مآلَ صامت**: كلُّ ما لم يُنشأ يُقال سببُه
+            return $to('err', match ($res['outcome']) {
+                'linked'  => 'أُضيف الموظف ورُبط بحسابه القائم على هذا البريد — لم يُنشأ حسابٌ جديد.',
+                'taken'   => 'أُضيف الموظف ولم يُفتح له حساب: لهذا البريد حسابٌ مرتبطٌ بملفٍّ وظيفيٍّ آخر،'
+                           . ' ولا يُقتسَم حساب. راجع شاشة المستخدمين أو استعمل بريداً آخر.',
+                'no_email' => 'أُضيف الموظف ولم يُفتح له حساب: لا بريد إلكتروني — والبريد هو هوية الدخول.',
+                default   => 'أُضيف الموظف ولم يُفتح له حساب — راجع شاشة المستخدمين.',
+            });
         }
 
         // عقدٌ غير موقّع → تحويله لمسار التوقيع الإلكتروني: يُضبط على «قيد التوقيع»
@@ -873,6 +891,40 @@ class ModuleController extends Controller
             throw \Illuminate\Validation\ValidationException::withMessages(
                 [$cf['key'] => 'حسابك معزول على شركات محددة — اختر شركة من شركاتك']);
         }
+    }
+
+    /**
+     * **طلبُ حسابٍ مع موظفٍ جديد: شروطُه تُفحص قبل الحفظ لا بعده.**
+     *
+     * البريد اختياريّ في نموذج الموظف، وفتحُ الحساب يحتاجه (البريدُ هوية
+     * الدخول). فمن يضع علامة «🔑 افتح له حساب» بلا بريد كان يُحفظ موظفُه
+     * ويُبتلع طلبُ حسابه **صامتاً** ويُقال له «أُضيف السجل بنجاح» — فيظنّ أنّ
+     * للرجل حساباً ولا يكتشف خلافَ ذلك إلا حين لا يستطيع الدخول.
+     *
+     * والفحصُ قبل الحفظ لا بعده: **إمّا الطرفان معاً وإمّا لا شيء وسببٌ مكتوب**
+     * — لا موظفٌ محفوظٌ ونصفُ طلبٍ ساقط.
+     *
+     * ويُتخطّى الفحصُ لمن لا يملك إدارة المستخدمين: الخيارُ لا يُعرض له أصلاً،
+     * وإرسالُه مفتعلاً يُردّ في `Staff::makeAccount` بـ403 — ولا يُحرم من حفظ
+     * ملفٍّ وظيفيّ هو مسموحٌ له أصلاً.
+     */
+    protected function guardAccountRequest(Request $r, string $module): void
+    {
+        if ($module !== 'hr' || ! $r->boolean('_make_account')) return;
+        if (! hub_flag(auth()->user(), 'users')) return;
+
+        $err = [];
+        if (blank($r->input('email'))) {
+            $err['email'] = 'فتحُ حسابٍ يحتاج بريداً إلكترونياً — البريد هو هوية الدخول.'
+                . ' أضِف البريد، أو أزِل خيار «افتح له حساب نظام» وافتحه لاحقاً من شاشة المستخدمين.';
+        }
+
+        $roleId = hub_str($r->input('_account_role'));
+        if ($roleId === '' || ! \App\Models\Role::find($roleId)) {
+            $err['_account_role'] = 'اختر دورَ الحساب — الدور يحدّد ما يراه صاحبه وما يفعله.';
+        }
+
+        if ($err) throw \Illuminate\Validation\ValidationException::withMessages($err);
     }
 
     /** أعمدة الجدول (من تعريف الوحدة) + أسماء العرض للمراجع الظاهرة في الصفحة */

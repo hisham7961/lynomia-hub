@@ -76,14 +76,32 @@
              البريد يقع تلقائياً؛ وهذا الخيار لفتح حسابٍ جديد لمن لا حساب له --}}
         @if ($module === 'hr' && ! $updating && hub_flag(auth()->user(), 'users'))
             <div class="fw" style="margin-top:8px;padding:11px 14px;border:1px dashed color-mix(in srgb,var(--p) 40%,var(--ln));border-radius:12px;background:color-mix(in srgb,var(--p) 4%,transparent)">
+                {{-- البريدُ والدورُ شرطان: يُطلبان **عند وضع العلامة** لا بعد الحفظ.
+                     وكان الطلب يُبتلع صامتاً فيُحفظ الموظف بلا حسابه ولا سبب --}}
                 <label class="chk">
-                    <input type="checkbox" name="_make_account" value="1"
-                           onchange="document.getElementById('acctrole').style.display=this.checked?'':'none'">
+                    <input type="checkbox" name="_make_account" value="1" id="mkacct"
+                           onchange="hubAcct(this.checked)">
                     🔑 <b>افتح له حساب نظام كذلك</b> — بكلمة مرورٍ مؤقتة تُعرض مرةً واحدة، يُلزَم بتبديلها عند أول دخول.
                 </label>
                 <div class="sub" style="margin-top:4px">
                     إن كان لبريده حسابٌ قائم فسيُربط به تلقائياً بلا حاجة لهذا الخيار — البريد هو الهوية.
                 </div>
+                <div class="ferr" id="acctneed" style="display:none;margin-top:4px">
+                    ⚠️ البريد الإلكتروني مطلوبٌ لفتح الحساب — البريد هو هوية الدخول.
+                </div>
+                <script>
+                function hubAcct(on) {
+                    document.getElementById('acctrole').style.display = on ? '' : 'none';
+                    var em = document.querySelector('[name="email"]');
+                    var sel = document.getElementById('acct-role');
+                    if (em) { em.required = on; }
+                    if (sel) { sel.required = on; }
+                    // التنبيهُ يظهر عند الحاجة فقط: علامةٌ موضوعةٌ وبريدٌ فارغ
+                    document.getElementById('acctneed').style.display =
+                        (on && em && !em.value.trim()) ? '' : 'none';
+                    if (on && em && !em.value.trim()) em.focus();
+                }
+                </script>
                 <div id="acctrole" style="display:none;margin-top:8px;max-width:320px">
                     <label for="acct-role">دور الحساب</label>
                     <select class="inp" id="acct-role" name="_account_role">
