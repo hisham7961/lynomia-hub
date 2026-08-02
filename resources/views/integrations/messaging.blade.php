@@ -155,7 +155,15 @@
             <span class="mono ltr">MAIL_FROM_ADDRESS=no-reply@نطاقك</span> · <span class="mono ltr">MAIL_FROM_NAME="اسم منشأتك"</span><br>
             ثم <span class="mono ltr">php artisan config:clear</span> واضغط <b>🧪 أرسل تجريبية</b>.<br>
             <b>تنبيه:</b> القيمة <span class="mono ltr">log</span> تعني أن البريد يُكتب في ملف السجل «بنجاح» ولا يصل أحداً —
-            وهي الافتراضيةُ عند التنصيب، فلا تظنّ البريدَ يعمل قبل التجريبية.
+            وهي الافتراضيةُ عند التنصيب، فلا تظنّ البريدَ يعمل قبل التجريبية.<br><br>
+            <b>مثال Zoho Mail جاهزاً:</b><br>
+            <span class="mono ltr">MAIL_HOST=smtp.zoho.com</span> (أو <span class="mono ltr">smtp.zoho.eu</span> / <span class="mono ltr">smtp.zoho.sa</span> بحسب مركز بيانات حسابك — تعرفه من رابط دخولك) ·
+            <span class="mono ltr">MAIL_PORT=587</span> · <span class="mono ltr">MAIL_ENCRYPTION=tls</span><br>
+            وثلاثُ عثراتٍ تخصّه: <b>١)</b> مع التحقق الثنائي كلمةُ المرور هي <b>App Password</b> تولَّد من
+            Settings ← Security ← App Passwords — كلمةُ الحساب العادية ترجع <span class="mono ltr">535</span>.
+            <b>٢)</b> اجعل <span class="mono ltr">MAIL_FROM_ADDRESS</span> هو <span class="mono ltr">MAIL_USERNAME</span> نفسَه —
+            Zoho يرفض مُرسِلاً مختلفاً عن الموثَّق.
+            <b>٣)</b> سجلا SPF/DKIM يعطيكهما Zoho Admin Console ← Domains — أضفهما عند مسجِّل نطاقك.
         </div>
     </details>
 
