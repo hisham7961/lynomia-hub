@@ -97,7 +97,9 @@ class FlowEditTest extends TestCase
         $this->assertFalse((bool) $copy->enabled, 'النسخة تولد معطّلة حتى تُراجَع');
         $this->assertSame(0, (int) $copy->runs, 'بعدّادٍ نظيف');
         $this->assertNull($copy->last_run_at);
-        $this->assertSame($f->actions, $copy->actions, 'وبالإجراءات نفسها');
+        // assertEquals لا assertSame: كائنُ JSON **غير مرتَّب بتعريفه**، وMySQL 8
+        // يُخزّنه بنوعٍ أصليّ يُعيد ترتيب مفاتيحه — فالترتيبُ ليس جزءاً من العقد
+        $this->assertEquals($f->actions, $copy->actions, 'وبالإجراءات نفسها');
     }
 
     public function test_edit_is_owner_only(): void

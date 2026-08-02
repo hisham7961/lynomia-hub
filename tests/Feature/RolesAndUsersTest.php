@@ -174,8 +174,9 @@ class RolesAndUsersTest extends TestCase
         $this->actingAs($this->owner)->post("/admin/roles/{$src->id}/clone")->assertRedirect();
 
         $copy = Role::where('name', 'LIKE', '%أصل%')->where('id', '!=', $src->id)->firstOrFail();
-        $this->assertSame(['v' => 1, 'e' => 1], $copy->matrix['tasks'] ?? null);
-        $this->assertSame(['exp' => 1], $copy->flags);
+        // ترتيبُ مفاتيح JSON ليس عقداً (انظر FlowEditTest) — المقياسُ المحتوى
+        $this->assertEquals(['v' => 1, 'e' => 1], $copy->matrix['tasks'] ?? null);
+        $this->assertEquals(['exp' => 1], $copy->flags);
         $this->assertSame('hide', $copy->field_rules['hr']['salary'] ?? null);
         $this->assertFalse((bool) $copy->is_owner, 'النسخة وُلدت مالكة');
     }

@@ -19,7 +19,9 @@ class AuditChainTest extends TestCase
 
         $rows = AuditEntry::whereNotNull('hash')->get();
         $this->assertGreaterThanOrEqual(3, $rows->count());
-        $this->assertSame(str_repeat('0', 64), $rows->sortBy('created_at')->first()->prev_hash);
+        // **بالمعرّف المتصاعد لا بالطابع الزمني**: القيود تُكتب في الثانية نفسها،
+        // وفضُّ التعادل يختلف بالمحرّك — فيصير «الأول» غيرَ الأول على MySQL
+        $this->assertSame(str_repeat('0', 64), $rows->sortBy('id')->first()->prev_hash);
 
         $this->assertSame(0, Artisan::call('hub:audit-verify'));
         $this->assertStringContainsString('سليمة', Artisan::output());
