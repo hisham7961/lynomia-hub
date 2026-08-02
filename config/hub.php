@@ -5,6 +5,14 @@
  */
 return [
     'version' => trim(@file_get_contents(base_path('VERSION')) ?: '1.0.0'),
+
+    /*
+     * **إذنُ الأوامر الهادمة.** افتراضُه `false`: `migrate:fresh` و`migrate:reset`
+     * و`db:wipe` و`migrate:rollback` مرفوضةٌ كلُّها — فحرفان يفرقان بين تحديثٍ
+     * ومحوٍ كامل، والسهوُ لا يُصلَح بعد وقوعه. ولمن أرادها عمداً وبنسخةٍ في يده:
+     * HUB_ALLOW_DESTRUCTIVE=1 في .env
+     */
+    'allow_destructive' => (bool) env('HUB_ALLOW_DESTRUCTIVE', false),
     'modules' => [
         'companies' => [
             'key' => 'companies',

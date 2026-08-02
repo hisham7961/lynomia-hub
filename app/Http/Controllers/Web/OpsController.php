@@ -183,6 +183,24 @@ class OpsController extends Controller
         $this->gate();
         @set_time_limit(300);
 
+        /*
+         * **نسخةٌ قبل الترحيل**: الترحيلُ يُشغَّل على القاعدة الحيّة، وشبكةٌ تحته
+         * أرخصُ من ندمٍ فوقه. وفشلُ النسخ لا يمنع الترحيل — لكنه يُقال صراحةً
+         * في النتيجة، فلا يظنّ أحدٌ أن له نسخةً وليست له.
+         */
+        $backup = '';
+        // تُطفأ بإعداد `ops.backup_before_migrate=0` لقاعدةٍ ضخمة تُثقلها النسخة،
+        // وتُتخطّى داخل الحزمة (الاختبارات تُرحّل عشرات المرات ولا بياناتٍ تُفقد)
+        if (! app()->runningUnitTests() && setting('ops.backup_before_migrate', '1') !== '0') {
+            try {
+                \Illuminate\Support\Facades\Artisan::call('hub:backup');
+                $backup = '✅ أُخذت نسخةٌ احتياطية قبل الترحيل.';
+            } catch (\Throwable $e) {
+                $backup = '⚠️ تعذّرت النسخة الاحتياطية قبل الترحيل ('
+                    . mb_substr($e->getMessage(), 0, 120) . ') — الترحيلُ مضى بلا شبكةٍ تحته.';
+            }
+        }
+
         try {
             \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
             $out = trim(\Illuminate\Support\Facades\Artisan::output());
@@ -191,9 +209,15 @@ class OpsController extends Controller
             \App\Models\AuditEntry::forgetColumnCache();
             Cache::forget('hub.pending_migrations');   // شارة التحذير تختفي فوراً
 
+            // وفروقاتُ ما بعد الترحيل تُقال: عمودٌ يقرؤه الكود ولم تُنشئه هجرة
+            $gaps = \App\Support\SchemaGuard::gaps();
+
             return redirect()->route('ops.index')
-                ->with('ok', 'اكتمل الترحيل بنجاح')
-                ->with('migrate_out', mb_substr($out, 0, 4000));
+                ->with('ok', 'اكتمل الترحيل بنجاح' . ($gaps
+                    ? ' — لكن بقي ' . count($gaps) . ' فرقاً بين ما يقرؤه الكود وما تملكه القاعدة؛ '
+                      . 'شغّل hub:schema-check لتفصيلها'
+                    : ' ولا فروقات بين الكود والقاعدة'))
+                ->with('migrate_out', trim($backup . "\n\n" . mb_substr($out, 0, 4000)));
         } catch (\Throwable $e) {
             return redirect()->route('ops.index')
                 ->with('err', 'فشل الترحيل: ' . mb_substr($e->getMessage(), 0, 300));
