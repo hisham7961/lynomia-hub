@@ -453,4 +453,31 @@ class StaffAccountLinkTest extends TestCase
         $this->assertSame($u->id, $emp->user_id, 'لم يُربط بالحساب القائم');
         $this->assertSame(1, User::where('email', 'exists@test.local')->count(), 'أُنشئ حسابٌ ثانٍ لنفس البريد');
     }
+
+    /**
+     * **وشاشةُ «الموظفون والحسابات» كانت تكذب بالكذبة نفسها.**
+     *
+     * زرُّ «🔑 افتح حساباً» يقرأ `null` فيقول «وُجد حسابٌ بهذا البريد فرُبط
+     * بالملف» — وهي صحيحةٌ في حالةٍ وخاطئةٌ في أخرى: إن كان الحساب **مربوطاً
+     * بملفٍّ وظيفيٍّ آخر** فلا رَبطَ وقع، والملفُّ باقٍ بلا حساب. فيُطمأَن
+     * صاحبُ النظام إلى ربطٍ لم يحدث.
+     */
+    public function test_the_staff_screen_does_not_claim_a_link_that_did_not_happen(): void
+    {
+        $this->seedCore();
+        $role = Role::create(['name' => 'موظف', 'scope' => 'own', 'flags' => [], 'matrix' => []]);
+        $u = User::create(['name' => 'مأخوذ', 'email' => 'dup@test.local',
+            'password' => 'Secret!2026x', 'role_id' => $this->employee->role_id,
+            'status' => 'نشط', 'password_changed_at' => now()]);
+        // الحساب مربوطٌ بملفٍّ أوّل
+        Employee::create(['name' => 'الأول', 'email' => 'first@test.local', 'status' => 'نشط', 'user_id' => $u->id]);
+        // وملفٌّ ثانٍ يحمل البريد نفسه
+        $second = Employee::create(['name' => 'الثاني', 'email' => 'dup@test.local', 'status' => 'نشط']);
+        $this->assertNull($second->fresh()->user_id);
+
+        $this->actingAs($this->owner)->post("/staff/{$second->id}/account", ['role_id' => $role->id])
+            ->assertSessionMissing('ok');
+
+        $this->assertNull($second->fresh()->user_id, 'رُبط حسابٌ مأخوذٌ لملفٍّ ثانٍ');
+    }
 }
