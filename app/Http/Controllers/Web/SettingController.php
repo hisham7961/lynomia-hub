@@ -33,7 +33,7 @@ class SettingController extends Controller
     ];
 
     /** المفاتيح التي تُخزَّن مشفّرةً ولا تُعرض بعد الحفظ */
-    protected const SECRETS = ['notify.tg_token', 'odoo.key', 'quoteflow.pass'];
+    protected const SECRETS = ['notify.tg_token', 'odoo.key', 'quoteflow.pass', 'mail.password'];
 
     /** كتالوج المجموعات: مجموعة => [مفتاح => وصفٌ كامل] */
     public static function catalog(): array

@@ -50,6 +50,7 @@ class MessagingController extends Controller
             'tgChat'     => (string) setting('notify.tg_chat', ''),
             'mailer'     => $mailer,
             'mailReal'   => ! in_array($mailer, ['log', 'array'], true),
+            'mailFromScreen' => \App\Support\MailSettings::fromScreen(),
             'inappCount' => (int) DB::table('notifications_hub')->count(),
             'inappWeek'  => (int) DB::table('notifications_hub')->where('created_at', '>=', now()->subDays(7))->count(),
             'prefsUsers' => (int) DB::table('users')->whereNull('deleted_at')
@@ -84,6 +85,43 @@ class MessagingController extends Controller
                 . ' — تفقد وصولها' . ($d['channel'] === 'mail' && in_array((string) config('mail.default'), ['log', 'array'], true)
                     ? '. ⚠️ لكن البريد على وضع «سجل»: كُتبت في ملف السجل ولم تغادر الخادم' : ''))
             : back()->with('err', 'فشلت التجريبية: ' . ($msg->error ?: 'ما تزال في الصف — راجع عامل التسليم'));
+    }
+
+    /**
+     * **حقولُ البريد في النظام لا في ملف الخادم** — تُكتب في جدول الإعدادات
+     * (كلمةُ المرور مشفَّرة) وتُطبَّق عند إقلاع كل طلبٍ فتغلب `.env`.
+     */
+    public function mail(Request $r)
+    {
+        $this->gate();
+        $d = $r->validate([
+            'host'         => ['required', 'string', 'max:200'],
+            'port'         => ['required', 'integer', 'between:1,65535'],
+            'encryption'   => ['required', 'in:tls,ssl,none'],
+            'username'     => ['required', 'string', 'max:200'],
+            'password'     => ['nullable', 'string', 'max:500'],
+            'from_address' => ['required', 'email', 'max:200'],
+            'from_name'    => ['nullable', 'string', 'max:120'],
+        ], [], ['host' => 'خادم SMTP', 'port' => 'المنفذ', 'encryption' => 'التشفير',
+                'username' => 'المستخدم', 'password' => 'كلمة المرور',
+                'from_address' => 'عنوان المُرسِل', 'from_name' => 'اسم المُرسِل']);
+
+        foreach (['host' => $d['host'], 'port' => (string) $d['port'],
+                  'encryption' => $d['encryption'] === 'none' ? '' : $d['encryption'],
+                  'username' => $d['username'], 'from_address' => $d['from_address'],
+                  'from_name' => (string) ($d['from_name'] ?? '')] as $k => $v) {
+            \App\Models\Setting::updateOrCreate(['key' => 'mail.' . $k], ['value' => $v]);
+        }
+        // كلمةٌ فارغة تُبقي المخزون — والمكتوبة تُشفَّر كنمط pass في الإعدادات
+        if (filled($d['password'] ?? null)) {
+            \App\Models\Setting::updateOrCreate(['key' => 'mail.password'],
+                ['value' => 'enc:' . \Illuminate\Support\Facades\Crypt::encryptString($d['password'])]);
+        }
+        \Illuminate\Support\Facades\Cache::forget('settings:all');
+        \App\Support\MailSettings::apply();   // يسري في هذا الطلب نفسه — للتجربة الفورية
+        hub_audit('تعديل إعدادات النظام', 'settings', null, 'mail.* — من مركز المراسلة');
+
+        return back()->with('ok', 'حُفظ ضبط البريد — جرّبه الآن بزر «أرسل تجريبية»');
     }
 
     /** إعادةُ الفاشل من الشاشة — كان أمرَ طرفيةٍ لا يعرفه إلا من قرأ التوثيق */

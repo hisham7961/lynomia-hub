@@ -35,19 +35,18 @@
         <h3>📧 البريد الإلكتروني
             <span class="bdg {{ $mailReal ? 'ok' : 'bad' }}">{{ $mailReal ? 'يرسل فعلاً' : 'وضع السجل!' }}</span></h3>
         <div class="sub" style="line-height:2">
-            المُرسِل الحالي: <span class="mono ltr">{{ $mailer }}</span><br>
+            المُرسِل الحالي: <span class="mono ltr">{{ $mailer }}</span>
+            · المصدر: <b>{{ $mailFromScreen ? 'حقول النظام أدناه' : 'ملف .env على الخادم' }}</b><br>
             @unless ($mailReal)
                 <b>⚠️ كلُّ بريدٍ «ينجح» يُكتب في ملف السجل ولا يغادر الخادم</b> —
-                رسائلُ التوقيع والتذكيرات لا تصل أحداً. اضبط <span class="mono ltr">MAIL_*</span> في
-                <span class="mono ltr">.env</span> (الدليل أدناه).
-            @else
-                يُرسل عبر إعدادات <span class="mono ltr">MAIL_*</span> في <span class="mono ltr">.env</span>.
+                رسائلُ التوقيع والتذكيرات لا تصل أحداً. <b>املأ حقول SMTP أدناه</b> — لا حاجة لملف الخادم.
             @endunless
         </div>
         <div class="crow" style="margin-top:8px">
             <form method="POST" action="{{ route('integrations.messaging.test') }}">@csrf
                 <input type="hidden" name="channel" value="mail">
                 <button class="btn p xs">🧪 أرسل تجريبية</button></form>
+            <a class="btn ghost xs" href="#mailcfg">⚙️ حقول SMTP</a>
         </div>
     </div>
 
@@ -59,6 +58,33 @@
             مستخدمون لهم تفضيلات وجهةٍ خاصة: <b>{{ $prefsUsers }}</b> — تُضبط من الملف الشخصي.
         </div>
     </div>
+</div>
+
+{{-- ═ حقول SMTP — داخل النظام لا في ملف الخادم ═ --}}
+<div class="card" id="mailcfg">
+    <h3>⚙️ ضبط البريد بالحقول — بلا لمس ملف الخادم</h3>
+    <div class="sub" style="margin-bottom:8px">
+        املأ الحقول واحفظ ثم جرّب — تُخزَّن في النظام (كلمةُ المرور مشفَّرة) وتغلب ما في
+        <span class="mono ltr">.env</span>. ولإفراغها والعودة للملف: امسح «خادم SMTP» واحفظ من شاشة الإعدادات.
+    </div>
+    <form method="POST" action="{{ route('integrations.messaging.mail') }}" class="frm">
+        @csrf
+        <label>خادم SMTP<input class="inp ltr" name="host" value="{{ old('host', setting('mail.host', '')) }}" required maxlength="200" dir="ltr" placeholder="smtp.zoho.com"></label>
+        <label>المنفذ<input class="inp ltr" type="number" name="port" value="{{ old('port', setting('mail.port', '587')) }}" required min="1" max="65535" dir="ltr"></label>
+        <label>التشفير
+            <select class="inp" name="encryption">
+                @foreach (['tls' => 'TLS (منفذ 587)', 'ssl' => 'SSL (منفذ 465)', 'none' => 'بلا تشفير — لخادم داخلي فقط'] as $ek => $el)
+                    <option value="{{ $ek }}" @selected(old('encryption', setting('mail.encryption', 'tls') ?: 'none') === $ek)>{{ $el }}</option>
+                @endforeach
+            </select>
+        </label>
+        <label>المستخدم (بريد الدخول)<input class="inp ltr" name="username" value="{{ old('username', setting('mail.username', '')) }}" required maxlength="200" dir="ltr" placeholder="no-reply@yourdomain.com"></label>
+        <label>كلمة المرور <span class="sub">(App Password مع التحقق الثنائي — واتركها فارغةً للإبقاء على المخزون)</span>
+            <input class="inp ltr" type="password" name="password" value="" maxlength="500" dir="ltr" placeholder="{{ setting('mail.password') ? '••••' : '' }}"></label>
+        <label>عنوان المُرسِل<input class="inp ltr" name="from_address" value="{{ old('from_address', setting('mail.from_address', '')) }}" required maxlength="200" dir="ltr" placeholder="no-reply@yourdomain.com"></label>
+        <label>اسم المُرسِل<input class="inp" name="from_name" value="{{ old('from_name', setting('mail.from_name', '')) }}" maxlength="120" placeholder="اسم منشأتك"></label>
+        <button class="btn p">حفظ ضبط البريد</button>
+    </form>
 </div>
 
 {{-- ═ الطوابير حيّة ═ --}}
