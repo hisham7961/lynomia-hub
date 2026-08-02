@@ -37,6 +37,9 @@ class AppServiceProvider extends ServiceProvider
         } catch (\Throwable $e) {
         }
 
+        // بريد SMTP من حقول مركز المراسلة — تغلب .env إن مُلئت، محصّنة مثلها
+        \App\Support\MailSettings::apply();
+
         // حد معدل طلبات API: ١٢٠ بالدقيقة لكل مفتاح/عنوان
         RateLimiter::for('api', fn ($request) => Limit::perMinute(120)->by(
             $request->bearerToken() ? hash('sha256', $request->bearerToken()) : $request->ip()

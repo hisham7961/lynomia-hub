@@ -358,6 +358,7 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/integrations/messaging', [\App\Http\Controllers\Web\MessagingController::class, 'index'])->name('integrations.messaging');
     Route::post('admin/integrations/messaging/test', [\App\Http\Controllers\Web\MessagingController::class, 'test'])->name('integrations.messaging.test');
     Route::post('admin/integrations/messaging/retry', [\App\Http\Controllers\Web\MessagingController::class, 'retry'])->name('integrations.messaging.retry');
+    Route::post('admin/integrations/messaging/mail', [\App\Http\Controllers\Web\MessagingController::class, 'mail'])->name('integrations.messaging.mail');
     // خوادم أودو المتعددة — الاتصال الافتراضي يبقى في الإعدادات، وهنا الإضافيون
     Route::get('admin/integrations/odoo', [\App\Http\Controllers\Web\OdooConnectionController::class, 'index'])->name('integrations.odoo');
     Route::post('admin/integrations/odoo', [\App\Http\Controllers\Web\OdooConnectionController::class, 'store'])->name('integrations.odoo.store');

@@ -175,6 +175,76 @@ class MessagingCenterTest extends TestCase
         $this->assertStringContainsString('وارد المستندات', $html);
     }
 
+    /* ── «ليش بالخادم؟ ليش ما أضيفها بالمشروع كخانات؟» — حقول SMTP في النظام ── */
+
+    public function test_mail_can_be_configured_from_fields_not_env(): void
+    {
+        $this->seedCore();
+
+        $this->actingAs($this->owner)->post('/admin/integrations/messaging/mail', [
+            'host' => 'smtp.zoho.com', 'port' => 587, 'encryption' => 'tls',
+            'username' => 'no-reply@x.com', 'password' => 'app-pass-1',
+            'from_address' => 'no-reply@x.com', 'from_name' => 'منشأتي',
+        ])->assertRedirect()->assertSessionHas('ok');
+
+        // تُخزَّن في النظام، وكلمة المرور مشفَّرة لا نصاً صريحاً
+        $this->assertSame('smtp.zoho.com', setting('mail.host'));
+        $this->assertSame('app-pass-1', setting('mail.password'));
+        $this->assertStringStartsWith('enc:',
+            (string) \App\Models\Setting::where('key', 'mail.password')->value('value'));
+
+        // وتُطبَّق على البريد الحي غالبةً .env
+        config(['mail.default' => 'log']);
+        \App\Support\MailSettings::apply();
+        $this->assertSame('smtp', config('mail.default'));
+        $this->assertSame('smtp.zoho.com', config('mail.mailers.smtp.host'));
+        $this->assertSame('app-pass-1', config('mail.mailers.smtp.password'));
+        $this->assertSame('no-reply@x.com', config('mail.from.address'));
+    }
+
+    public function test_blank_mail_password_keeps_stored_secret(): void
+    {
+        $this->seedCore();
+        $post = fn (string $pass) => $this->actingAs($this->owner)
+            ->post('/admin/integrations/messaging/mail', [
+                'host' => 'smtp.zoho.com', 'port' => 587, 'encryption' => 'tls',
+                'username' => 'a@x.com', 'password' => $pass,
+                'from_address' => 'a@x.com',
+            ]);
+
+        $post('secret-1');
+        $post('');   // فارغة = الإبقاء
+
+        $this->assertSame('secret-1', setting('mail.password'), 'الفراغ محا كلمة المرور المخزونة');
+    }
+
+    public function test_screen_shows_the_fields_and_the_source(): void
+    {
+        $this->seedCore();
+
+        // بلا حقول: المصدر ملف الخادم
+        $html = $this->actingAs($this->owner)->get('/admin/integrations/messaging')->getContent();
+        $this->assertStringContainsString('ضبط البريد بالحقول', $html);
+        $this->assertStringContainsString('ملف .env', $html);
+
+        // بعد ملء الحقول: المصدر حقول النظام
+        $this->hubSetting('mail.host', 'smtp.zoho.com');
+        $html2 = $this->actingAs($this->owner)->get('/admin/integrations/messaging')->getContent();
+        $this->assertStringContainsString('حقول النظام', $html2);
+    }
+
+    /** بلا حقول لا يتغير شيء — .env يبقى سيد الموقف: إضافة لا كسر */
+    public function test_env_untouched_when_fields_are_empty(): void
+    {
+        $this->seedCore();
+        config(['mail.default' => 'log', 'mail.mailers.smtp.host' => 'env-host']);
+
+        \App\Support\MailSettings::apply();
+
+        $this->assertSame('log', config('mail.default'));
+        $this->assertSame('env-host', config('mail.mailers.smtp.host'));
+    }
+
     public function test_mail_test_uses_laravel_mailer(): void
     {
         $this->seedCore();
