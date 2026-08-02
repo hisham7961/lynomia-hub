@@ -9,6 +9,24 @@
     <nav>
         <a class="ni top {{ request()->routeIs('dashboard') ? 'on' : '' }}" @if (request()->routeIs('dashboard')) aria-current="page" @endif href="{{ route('dashboard') }}">🏠 لوحة التحكم</a>
 
+        {{-- مثبّتاتي — رصيفٌ شخصيّ فوق كل شيء: نقرةٌ واحدة لوجهتك اليومية.
+             لا يظهر لمن لم يثبّت شيئاً بعد، فلا يزحم شريطَ المبتدئ. --}}
+        @php $pins = hub_pins(auth()->user()); @endphp
+        @if ($pins)
+            <div class="navsection">📌 مثبّتاتي</div>
+            @foreach ($pins as $p)
+                @php $pOn = request()->routeIs($p['route']) && ($p['args'] ? request()->is('m/' . $p['args'][0] . '*') : true); @endphp
+                <div class="pinrow">
+                    <a class="ni {{ $pOn ? 'on' : '' }}" @if ($pOn) aria-current="page" @endif
+                       href="{{ route($p['route'], $p['args']) }}">{{ $p['label'] }}</a>
+                    <form method="POST" action="{{ route('prefs.pin') }}" class="pinx">@csrf
+                        <input type="hidden" name="token" value="{{ $p['token'] }}">
+                        <button type="submit" title="إزالة من المثبّتات" aria-label="إزالة من المثبّتات">✕</button>
+                    </form>
+                </div>
+            @endforeach
+        @endif
+
         {{-- مساحات العمل — الطريق الأساسي للمجالات (CTO م2): كل مساحة صفحة مركزية
              تُبلّغ عن وحداتها بدل قائمة مسطّحة من ٧١ رابطاً. مرشّحة بصلاحية المستخدم. --}}
         @php $spaces = \App\Support\Workspaces::for(auth()->user()); @endphp

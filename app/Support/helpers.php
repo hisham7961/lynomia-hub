@@ -274,6 +274,58 @@ if (! function_exists('hub_top_links')) {
     }
 }
 
+if (! function_exists('hub_pin_targets')) {
+    /**
+     * **مثبّتاتي** — رصيفٌ شخصيّ لأكثر وجهاتٍ يستعملها المستخدم يومياً، نقرةٌ
+     * واحدة فوق كل شيء. لنظامٍ من ٧١ وحدةً ومساحاتٍ ومراكز، هذا هو المكسبُ:
+     * لا تنقيبَ في مجموعة ولا فتحَ مساحةٍ ولا ⌘K لوجهتك المتكررة.
+     *
+     * الرمز نصّ: `m:{مفتاح وحدة}` أو مفتاحُ رابطٍ علوي — نفسُ ترميز `home`.
+     * كلُّ وجهةٍ يجوز تثبيتُها لهذا المستخدم (وحدةٌ يراها أو رابطٌ يُسمح له به).
+     */
+    function hub_pin_targets($user): array
+    {
+        $out = [];
+        foreach (hub_top_links($user) as $l) {
+            $out[$l['key']] = ['token' => $l['key'], 'label' => $l['label'], 'route' => $l['route'], 'args' => []];
+        }
+        foreach (hub_modules() as $mk => $md) {
+            if (! hub_can($user, $mk, 'v') || $mk === 'users') continue;
+            $look = hub_mod_look($mk);
+            $out['m:' . $mk] = ['token' => 'm:' . $mk,
+                'label' => ($look['icon'] ?? '📄') . ' ' . ($md['label'] ?? $mk),
+                'route' => 'm.index', 'args' => [$mk]];
+        }
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_pins')) {
+    /** المثبّتات المحلولةُ للعرض — رموزٌ غير صالحةٍ تُسقَط بصمتٍ كسائر التفضيلات */
+    function hub_pins($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        $tokens = (array) hub_pref('nav.pins', [], $user);
+        if (! $tokens) return [];
+
+        $targets = hub_pin_targets($user);
+        $out = [];
+        foreach ($tokens as $t) {
+            if (isset($targets[$t])) $out[] = $targets[$t];
+        }
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_is_pinned')) {
+    function hub_is_pinned(string $token, $user = null): bool
+    {
+        return in_array($token, (array) hub_pref('nav.pins', [], $user), true);
+    }
+}
+
 if (! function_exists('hub_top_groups')) {
     /**
      * أدوات ولوحات الشريط الجانبي **مجموعةً في أقسام** بدل ٢١ رابطاً مسطّحاً.

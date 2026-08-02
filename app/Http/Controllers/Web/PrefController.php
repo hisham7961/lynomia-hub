@@ -80,6 +80,8 @@ class PrefController extends Controller
             'hidden_top' => array_values($data['hidden_top'] ?? []),
             'names'      => $names,
             'order'      => $order,
+            // المثبّتات يديرها مسار toggle مستقل — تُحمَل هنا كما هي فلا يمحوها حفظُ هذه الشاشة
+            'pins'       => array_values((array) data_get($u->prefs, 'nav.pins', [])),
         ]);
         $prefs['dash'] = array_filter([
             'hidden' => array_values(array_intersect($data['dash_hidden'] ?? [], array_keys($this->dashCards()))),
@@ -98,6 +100,42 @@ class PrefController extends Controller
         auth()->user()->update(['prefs' => null]);
 
         return back()->with('ok', 'أُعيد الضبط الافتراضي');
+    }
+
+    /**
+     * تثبيت/فكّ وجهةٍ في رصيف «مثبّتاتي». الرمزُ يُتحقَّق أنه وجهةٌ يجوز لهذا
+     * المستخدم تثبيتها (وحدةٌ يراها أو رابطٌ يُسمح له به) — فلا يُثبَّت ما لا
+     * يُفتح. سقفٌ ١٢ كي يبقى الرصيفُ رصيفاً لا قائمةً ثانية.
+     */
+    public function togglePin(Request $r)
+    {
+        $u = auth()->user();
+        $token = trim((string) $r->input('token'));
+
+        if (! isset(hub_pin_targets($u)[$token])) {
+            return back()->with('err', 'وجهةٌ لا تُثبَّت — غير معروفةٍ أو خارج صلاحيتك');
+        }
+
+        $pins = array_values((array) data_get($u->prefs, 'nav.pins', []));
+        if (in_array($token, $pins, true)) {
+            $pins = array_values(array_filter($pins, fn ($t) => $t !== $token));
+            $msg = 'أُزيل من مثبّتاتك';
+        } elseif (count($pins) >= 12) {
+            return back()->with('err', 'بلغتَ سقف ١٢ مثبَّتاً — أزِل واحداً قبل إضافة آخر');
+        } else {
+            $pins[] = $token;
+            $msg = '📌 أُضيف لمثبّتاتك — تجده أعلى الشريط';
+        }
+
+        $prefs = (array) $u->prefs;
+        $prefs['nav'] = array_filter(((array) ($prefs['nav'] ?? [])) + ['pins' => []]);
+        $prefs['nav']['pins'] = $pins;
+        if (! $pins) unset($prefs['nav']['pins']);
+        $prefs['nav'] = array_filter($prefs['nav']);
+        $u->prefs = array_filter($prefs, fn ($v) => $v !== null && $v !== [] && $v !== '') ?: null;
+        $u->save();
+
+        return back()->with('ok', $msg);
     }
 
     /** حفظ أعمدة الجدول الظاهرة لوحدة — تُخزَّن بترتيب سجل الوحدة */
