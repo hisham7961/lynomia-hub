@@ -46,7 +46,8 @@ class AuditChainTest extends TestCase
         Client::create(['name' => 'س٢']);
         Client::create(['name' => 'س٣']);
 
-        $mid = AuditEntry::whereNotNull('hash')->orderBy('created_at')->skip(1)->first();
+        // بـid لا بـcreated_at: الطابع بدقّة الثانية فتتساوى القيم، والترتيب عليها قرعة
+        $mid = AuditEntry::whereNotNull('hash')->orderBy('id')->skip(1)->first();
         DB::table('audits')->where('id', $mid->id)->delete();
 
         $this->assertSame(1, Artisan::call('hub:audit-verify'));

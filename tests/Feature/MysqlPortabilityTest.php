@@ -130,4 +130,69 @@ class MysqlPortabilityTest extends TestCase
         $this->assertSame([], $bad,
             'لهجةُ محرّكٍ بعينه — تنجح على واحدٍ وتفشل على الآخر: ' . implode(' · ', array_unique($bad)));
     }
+
+    /**
+     * **ترتيبُ السلسلة روابطُها لا ساعتُها.**
+     *
+     * `audits.created_at` طابعُ وقتٍ بدقّة **الثانية**: عشراتُ السجلات في الثانية
+     * الواحدة تحمل القيمة نفسها حرفياً. و`ORDER BY created_at` على قيمٍ متساوية
+     * **بلا ترتيبٍ مضمون** — لا في المعيار ولا في المحرّكات: MariaDB أعادتها
+     * بترتيب الإدراج صدفةً فمرّت الحزمةُ محلياً، وMySQL 8 أعادها بترتيبٍ آخر
+     * فانكسر إعادةُ بناء السلسلة في الاختبار وسقط CI.
+     *
+     * القاعدة: ترتيبُ السلسلة يُستخرج من **روابط `prev_hash`** (أو من `id`
+     * التزايديّ)، ولا يُبنى على طابع وقتٍ أبداً.
+     */
+    public function test_audit_chain_order_is_links_not_timestamps(): void
+    {
+        $this->seedCore();
+        $this->actingAs($this->owner);
+        foreach (['س١', 'س٢', 'س٣', 'س٤'] as $n) Client::create(['name' => $n]);
+
+        // الطابعُ مخزّنٌ بدقّة الثانية على المحرّكين — فالتساوي وارد، والترتيبُ عليه قرعة
+        $stamp = (string) DB::table('audits')->orderBy('id')->value('created_at');
+        $this->assertStringNotContainsString('.', $stamp,
+            'لو صار للطابع كسرُ ثانيةٍ لتغيّر أساسُ هذا الحارس — راجعه بدل حذفه');
+
+        // الترتيبُ الحقّ: مشيٌ على الروابط من الصفر — ولا بد أن يطابق ترتيب id
+        $rows = DB::table('audits')->whereNotNull('hash')->get(['id', 'prev_hash', 'hash']);
+        $byPrev = $rows->keyBy('prev_hash');
+        $walk = []; $prev = str_repeat('0', 64);
+        while ($r = $byPrev->get($prev)) { $walk[] = $r->id; $prev = $r->hash; }
+
+        $this->assertSame($rows->count(), count($walk), 'السلسلة لم تُمشَ كاملةً من الصفر');
+        $this->assertSame($rows->pluck('id')->sort()->values()->all(), $walk,
+            'ترتيبُ الروابط خالف ترتيب الإدراج — ولا يجوز الاستعاضة عنهما بـcreated_at');
+    }
+
+    /**
+     * وحارسُ المصدر يمنع عودةَ العادة: لا شيفرةَ ولا اختبارَ يرتّب سجلّ التدقيق
+     * بالساعة — والشيفرةُ اليوم نظيفةٌ منها (السلسلةُ تُبنى من `audit_chain.head`
+     * وتُتحقَّق بمشي الروابط)، فالحارسُ يحفظ نظافتها لا يُصلحها.
+     */
+    public function test_no_test_orders_the_audit_chain_by_timestamp(): void
+    {
+        $bad = [];
+        $it = new \AppendIterator();
+        foreach ([base_path('tests'), app_path()] as $root) {
+            $it->append(new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root)));
+        }
+        foreach ($it as $f) {
+            if (! $f->isFile() || ! str_ends_with($f->getFilename(), '.php')) continue;
+            // تُحفظ الأسطر عند إزالة التعليق الكتليّ: بلاغٌ برقم سطرٍ خاطئ يُضيّع وقت قارئه
+            $src = (string) preg_replace_callback('/\/\*.*?\*\//s',
+                fn ($m) => str_repeat("\n", substr_count($m[0], "\n")),
+                (string) preg_replace('/\/\/[^\n]*/', ' ',
+                    (string) file_get_contents($f->getPathname())));
+            foreach (explode("\n", $src) as $i => $line) {
+                if (! preg_match('/AuditEntry|[\'"]audits[\'"]/', $line)) continue;
+                if (preg_match('/(orderBy|orderByDesc|sortBy|sortByDesc)\([\'"]created_at[\'"]\)/', $line)) {
+                    $bad[] = $f->getFilename() . ':' . ($i + 1);
+                }
+            }
+        }
+
+        $this->assertSame([], $bad,
+            'ترتيبُ سجلّ التدقيق بطابع الوقت — قرعةٌ على المحرّكات عند تساوي الثانية: ' . implode(' · ', $bad));
+    }
 }

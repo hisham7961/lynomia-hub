@@ -106,31 +106,61 @@ class AlertRulesLibraryTest extends TestCase
         $this->assertSame($n, AlertRule::count(), 'المطابقة بالاسم فلا تكرار');
     }
 
-    /** قاعدةٌ مفعّلة تُطلق فعلاً على سجلٍ مطابق — المحرّك والعدّة متوافقان */
-    public function test_an_enabled_rule_actually_fires(): void
+    /**
+     * قاعدةٌ مفعّلة تُطلق فعلاً على سجلٍ مطابق — المحرّك والعدّة متوافقان.
+     *
+     * **وكلُّ قواعد الوحدة لا واحدةٌ منها بالقرعة.** كان الاختبار يأخذ
+     * `->first()` بلا ترتيب: على SQLite وMariaDB وقعت على قاعدة `due` فمرّ،
+     * وعلى MySQL 8 وقعت أحياناً على قاعدة `act_h` — ذاتِ مؤثّرٍ لا يعرفه
+     * الاختبار وحقلٍ مكتوبٍ باسم عمودٍ لا بمفتاح — فانفجر بـ«قراءة موضعٍ من
+     * فراغ». والأدهى أنّ **ثلاثاً من أربع** قواعد لم تكن تُختبَر أصلاً؛
+     * القرعةُ كانت تخفي النقصَ لا تكشفه.
+     */
+    public function test_every_enabled_rule_on_a_module_actually_fires(): void
     {
         $this->seedCore();
         $this->artisan('hub:alerts-starter')->assertSuccessful();
 
-        $rule = AlertRule::where('mod', 'tasks')->first();
-        $this->assertNotNull($rule, 'لا قاعدة على المهام');
-        $rule->forceFill(['status' => 'مفعّلة', 'to_id' => null])->save();
-
         $def = hub_mod('tasks');
-        $f = collect($def['fields'])->firstWhere('key', $rule->field);
-        $row = ['title' => 'مهمة مطابقة للقاعدة', 'status' => 'جديدة'];
-        $row[$f['col']] = match ($rule->op) {
-            'أيام متبقية أقل من' => today()->toDateString(),
-            'أيام مضت أكثر من'   => today()->subDays(400)->toDateString(),
-            'يساوي'              => $rule->val,
-            'أكبر من'            => (float) $rule->val + 1,
-            'أصغر من'            => (float) $rule->val - 1,
-            default              => null,
-        };
-        \App\Models\Task::create($row);
+        $rules = AlertRule::where('mod', 'tasks')->orderBy('id')->get();
+        $this->assertGreaterThanOrEqual(3, $rules->count(), 'لا قواعد كافية على المهام');
 
-        $this->artisan('hub:automation')->assertSuccessful();
-        $this->assertDatabaseHas('notifications_hub', ['kind' => 'rule:' . $rule->id]);
+        foreach ($rules as $rule) {
+            AlertRule::query()->update(['status' => 'متوقفة']);   // واحدةٌ في المرّة: لا تلوّث
+            $rule->forceFill(['status' => 'مفعّلة', 'to_id' => null])->save();
+
+            // يُحلّ الحقلُ كما يُحلّه المحرّك: **مفتاحٌ أو اسمُ عمود**
+            $f = collect($def['fields'])->firstWhere('key', $rule->field)
+                ?: collect($def['fields'])->firstWhere('col', $rule->field);
+            $this->assertNotNull($f, "قاعدة «{$rule->name}» تشير إلى حقلٍ لا يُحلّ: {$rule->field}");
+
+            $row = ['title' => 'مهمة مطابقة لـ' . $rule->name, 'status' => 'جديدة'];
+            // مؤثّرٌ لا يعرفه الاختبار **يُسقطه** — لا يكتب فراغاً فيمرّ صامتاً
+            $row[$f['col']] = match ($rule->op) {
+                'أيام متبقية أقل من' => today()->toDateString(),
+                'أيام مضت أكثر من'   => today()->subDays(400)->toDateString(),
+                'يساوي'              => $rule->val,
+                'يحتوي'              => $rule->val,
+                'أكبر من'            => (float) $rule->val + 1,
+                'أصغر من'            => (float) $rule->val - 1,
+                'أكبر من عمود'       => 10,
+                'أصغر من عمود'       => 1,
+                default              => $this->fail("مؤثّر لا يعرفه الاختبار: «{$rule->op}» في «{$rule->name}»"),
+            };
+            // المقارنةُ بعمود تحتاج طرفَها الآخر مملوءاً وإلا استبعده المحرّك
+            if (str_contains((string) $rule->op, 'عمود')) {
+                $f2 = collect($def['fields'])->firstWhere('key', $rule->val)
+                    ?: collect($def['fields'])->firstWhere('col', $rule->val);
+                $this->assertNotNull($f2, "عمود المقارنة لا يُحلّ في «{$rule->name}»");
+                $row[$f2['col']] = $rule->op === 'أكبر من عمود' ? 5 : 5;
+            }
+            \App\Models\Task::create($row);
+
+            $this->artisan('hub:automation')->assertSuccessful();
+            $this->assertSame(1, \Illuminate\Support\Facades\DB::table('notifications_hub')
+                ->where('kind', 'rule:' . $rule->id)->limit(1)->count(),
+                "القاعدة «{$rule->name}» مفعّلةٌ وسجلٌ مطابقٌ موجود ولم تُطلق");
+        }
     }
 
     /** كل القواعد مجموعةً: الأساسية + الموسّعة إن وُجدت */
