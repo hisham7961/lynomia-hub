@@ -40,9 +40,17 @@
     @endunless
 
     <div class="card pad0 dmlist">
-        <div style="padding:10px 12px;border-bottom:1px solid var(--ln)">
-            <input class="inp" id="dmq" placeholder="🔎 ابحث في المحادثات" autocomplete="off">
-        </div>
+        {{-- البحثُ يصل الخادم فيقرأ **نصّ الرسائل**، والترشيح الفوري يبقى
+             للقائمة الظاهرة — سرعةٌ بلا فقدِ ما لا يظهر --}}
+        <form method="GET" action="{{ route('dm.inbox') }}" data-noguard
+              style="padding:10px 12px;border-bottom:1px solid var(--ln);display:flex;gap:6px">
+            <input class="inp" id="dmq" name="q" value="{{ $q ?? '' }}"
+                   placeholder="🔎 ابحث في نصّ الرسائل" autocomplete="off" style="flex:1">
+            <button class="btn sm" type="submit">بحث</button>
+            @if (($q ?? '') !== '')
+                <a class="btn ghost sm" href="{{ route('dm.inbox') }}" title="امسح البحث">✕</a>
+            @endif
+        </form>
         {{-- الارتفاع المحجوز لِما فيه محادثاتٌ تُمرَّر؛ ولوحٌ فارغ لا يحجز شاشةً --}}
         <div @style(['max-height:62vh;overflow:auto' => count($threads) > 0])>
             @forelse ($threads as $t)
@@ -77,7 +85,26 @@
         </div>
     </div>
 
-    @if ($other)
+    @if (($q ?? '') !== '')
+        <div class="dmthread">
+            <div class="card">
+                <h3>🔎 نتائج البحث عن «{{ $q }}» ({{ count($hits) }})</h3>
+                @forelse ($hits as $h)
+                    <a class="hitrow" href="{{ route('dm.thread', $h['other']) }}">
+                        <div class="crow" style="gap:7px;align-items:baseline">
+                            <b>{{ $users[$h['other']] ?? 'مستخدم محذوف' }}</b>
+                            <span class="sub mono" style="font-size:11px">{{ $h['msg']->created_at?->format('Y-m-d H:i') }}</span>
+                            @if ($h['msg']->from_id === $me)<span class="bdg">أنت</span>@endif
+                        </div>
+                        <div class="sub" style="font-size:12.5px;line-height:1.8">{{ \Illuminate\Support\Str::limit($h['msg']->body, 160) }}</div>
+                    </a>
+                @empty
+                    <div class="empty" style="padding:26px 12px"><span class="big">🔎</span>
+                        لا رسالة تطابق «{{ $q }}» في محادثاتك.</div>
+                @endforelse
+            </div>
+        </div>
+    @elseif ($other)
     <div class="dmthread">
         @php $p = $presence[$other->id] ?? null; @endphp
             <div class="card" style="padding:10px 14px;display:flex;gap:10px;align-items:center">
@@ -117,17 +144,32 @@
                         </div>
                     @endif
                     {{-- الوارد يمين والصادر يسار كما في تطبيقات المحادثة العربية --}}
-                    <div style="max-width:76%;{{ $mine ? 'align-self:flex-end' : 'align-self:flex-start' }};
+                    <div class="msgw" style="max-width:76%;{{ $mine ? 'align-self:flex-end' : 'align-self:flex-start' }};
                                 margin-top:{{ $grouped ? '1px' : '7px' }}">
-                        <div style="padding:8px 12px;border-radius:14px;white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.85;
-                                    {{ $mine ? 'background:var(--p);color:#fff' : 'background:var(--pss)' }}">{{ $m->body }}</div>
-                        @if ($m->att)
-                            <a class="sub" style="font-size:12px" href="{{ route('file.show', $m->att) }}" target="_blank" rel="noopener">📎 مرفق</a>
+                        @if ($m->deleted_at)
+                            {{-- أثرٌ يقول ماذا جرى: الاختفاءُ بلا تفسيرٍ يجعل الطرف الآخر يظنّ أنه أخطأ القراءة --}}
+                            <div class="sub" style="padding:7px 12px;border:1px dashed var(--ln);border-radius:14px;font-size:12.5px">
+                                🚫 حُذفت رسالة{{ $mine ? '' : ' من ' . $other->name }}
+                            </div>
+                        @else
+                            <div style="padding:8px 12px;border-radius:14px;white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.85;
+                                        {{ $mine ? 'background:var(--p);color:#fff' : 'background:var(--pss)' }}">{{ $m->body }}</div>
+                            @if ($m->att)
+                                <a class="sub" style="font-size:12px" href="{{ route('file.show', $m->att) }}" target="_blank" rel="noopener">📎 مرفق</a>
+                            @endif
+                            <div class="sub" style="font-size:10px;margin-top:1px;{{ $mine ? 'text-align:end' : '' }}">
+                                {{ $m->created_at?->format('H:i') }}
+                                @if ($mine){{ $m->read_at ? ' ✓✓' : ' ✓' }}@endif
+                                {{-- السحبُ لصاحب الرسالة وحده — لا يمحو أحدٌ كلام غيره --}}
+                                @if ($mine)
+                                    <form method="POST" action="{{ route('dm.destroy', $m->id) }}" class="msgdel"
+                                          data-confirm="سحبُ هذه الرسالة؟ يبقى مكانُها يقول إنها حُذفت.">
+                                        @csrf @method('DELETE')
+                                        <button class="lnkbtn" type="submit" aria-label="سحب الرسالة" title="سحب">🚫</button>
+                                    </form>
+                                @endif
+                            </div>
                         @endif
-                        <div class="sub" style="font-size:10px;margin-top:1px;{{ $mine ? 'text-align:end' : '' }}">
-                            {{ $m->created_at?->format('H:i') }}
-                            @if ($mine){{ $m->read_at ? ' ✓✓' : ' ✓' }}@endif
-                        </div>
                     </div>
                 @empty
                     <div class="empty"><span class="big">✉️</span>ابدأ المحادثة — رسالتك تصل فوراً مع إشعار</div>
@@ -151,6 +193,13 @@
 </div>
 
 <style>
+.hitrow { display:block; padding:10px 2px; border-bottom:1px solid var(--ln); color:inherit; text-decoration:none }
+.hitrow:last-child { border-bottom:0 }
+.hitrow:hover { background:var(--pss) }
+/* زرُّ السحب يظهر عند لمس الفقاعة — حاضرٌ ولا يزاحم النصّ */
+.msgdel { display:inline }
+.lnkbtn { border:0; background:none; padding:0 2px; cursor:pointer; font-size:11px; opacity:.35; color:inherit }
+.msgw:hover .lnkbtn, .lnkbtn:focus-visible { opacity:1 }
 .dmwrap { display:grid; grid-template-columns:320px 1fr; gap:12px; align-items:start }
 /* الترتيب في المصدر يضع الكتابة أولاً، و`order` يُعيد العمودين إلى مكانيهما
    على الشاشة الواسعة: القائمة يميناً والخيط يساراً كما كانا تماماً */
