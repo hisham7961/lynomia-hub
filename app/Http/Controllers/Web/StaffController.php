@@ -77,12 +77,19 @@ class StaffController extends Controller
             return back()->withErrors(['email' => 'لا بريد في الملف — البريد هو هوية الحساب']);
         }
 
-        $temp = Staff::makeAccount($emp, hub_str($r->input('role_id')));
+        // **المآلُ يُقرأ لا يُخمَّن**: كان `null` يُترجَم دائماً «وُجد حسابٌ فرُبط»
+        // — وهي كذبةٌ حين يكون الحساب مربوطاً بملفٍّ آخر، فلا رَبطَ وقع والملفُّ
+        // باقٍ بلا حساب، وصاحبُ النظام مطمئنٌّ إلى ربطٍ لم يحدث.
+        $res = Staff::makeAccountResult($emp, hub_str($r->input('role_id')));
 
-        return $temp === null
-            ? back()->with('ok', 'وُجد حسابٌ بهذا البريد فرُبط بالملف')
-            : back()->with('ok', 'أُنشئ حساب «' . $emp->name . '»')
-                ->with('temp_password', $temp)->with('temp_password_for', (string) $emp->email);
+        return match ($res['outcome']) {
+            'created' => back()->with('ok', 'أُنشئ حساب «' . $emp->name . '»')
+                ->with('temp_password', $res['temp'])->with('temp_password_for', (string) $emp->email),
+            'linked'  => back()->with('ok', 'وُجد حسابٌ بهذا البريد فرُبط بالملف'),
+            'taken'   => back()->withErrors(['email' => 'لهذا البريد حسابٌ مرتبطٌ بملفٍّ وظيفيٍّ آخر،'
+                . ' ولا يُقتسَم حساب — استعمل بريداً آخر أو فُكّ ارتباط الملف الأول']),
+            default   => back()->withErrors(['email' => 'لا بريد في الملف — البريد هو هوية الحساب']),
+        };
     }
 
     /** ملفٌّ وظيفيّ لحسابٍ بلا ملف */
