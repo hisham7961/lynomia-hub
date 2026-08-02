@@ -36,44 +36,21 @@
     <div class="tblwrap"><table class="tbl">
         <thead><tr><th>ماذا</th><th>أين يُدار</th><th></th></tr></thead>
         <tbody>
-            <tr><td><b>🧩 خوادم أودو</b></td><td class="sub">الاتصالات المتعددة: إضافة واختبار وتعطيل، والمشاريع المرتبطة بكلٍّ منها</td>
+            <tr><td><b>🧩 أودو — كل شيء</b></td><td class="sub">الاتصال الافتراضي والخوادم الإضافية واختبارها، وأين ترتبط الوحدات، وقنوات البيع لكل مشروع، والدليل التفصيلي</td>
                 <td class="acts"><a class="btn ghost xs" href="{{ route('integrations.odoo') }}">فتح ↗</a></td></tr>
-            <tr><td><b>⚙️ اتصال أودو الافتراضي</b></td><td class="sub">مفاتيح odoo.* الأربعة وزر اختبار الاتصال — في إعدادات النظام</td>
-                <td class="acts"><a class="btn ghost xs" href="{{ route('settings.edit') }}">فتح ↗</a></td></tr>
             <tr><td><b>🪝 Webhooks</b></td><td class="sub">اشتراكات بثّ الأحداث بتوقيع HMAC وسجل المحاولات والإعادات</td>
                 <td class="acts"><a class="btn ghost xs" href="{{ route('webhooks.index') }}">فتح ↗</a></td></tr>
             <tr><td><b>🔑 مفاتيح REST API</b></td><td class="sub">توليد المفاتيح وتدويرها وإبطالها — في ملفك الشخصي</td>
                 <td class="acts"><a class="btn ghost xs" href="{{ route('profile.edit') }}">فتح ↗</a></td></tr>
-            <tr><td><b>📤 الصندوق الصادر</b></td><td class="sub">طوابير تلجرام والبريد وحالات التسليم — في مركز التشغيل</td>
+            <tr><td><b>📨 مركز المراسلة</b></td><td class="sub">تلجرام والبريد وداخل التطبيق: الحالة والاختبار والإعادة ودليل الإعداد التفصيلي</td>
+                <td class="acts"><a class="btn ghost xs" href="{{ route('integrations.messaging') }}">فتح ↗</a></td></tr>
+            <tr><td><b>📤 طوابير التشغيل</b></td><td class="sub">نبضات الوظائف المجدولة وطوابير الرسائل — في مركز التشغيل</td>
                 <td class="acts"><a class="btn ghost xs" href="{{ route('ops.index') }}">فتح ↗</a></td></tr>
         </tbody>
     </table></div>
 </div>
 
-{{-- أودو: أين يرتبط بالنظام --}}
-<div class="card">
-    <h3 class="cardtitle">🧩 أين يرتبط أودو بالنظام؟</h3>
-    <div class="sub" style="margin-bottom:8px">
-        بطاقة أودو تظهر تلقائياً في صفحة سجل هذه الوحدات — تبحث بالاسم، تقرن السجل بشريكٍ في أودو،
-        فتُعرض أرقامه <b>حيّةً بكاش ١٠ دقائق</b>. الاتجاه واحد: <b>قراءة فقط</b>، فلا يكتب الهَب في محاسبتك أبداً.
-    </div>
-    <div class="tblwrap"><table class="tbl">
-        <thead><tr><th>الوحدة</th><th>ما الذي يُقرأ</th><th>أين تراه</th></tr></thead>
-        <tbody>
-        @foreach ($odooMods as $mk => $what)
-            <tr>
-                <td><b>{{ hub_mod($mk)['label'] ?? $mk }}</b></td>
-                <td class="sub">{{ $what }}</td>
-                <td><a class="mono" href="{{ route('m.index', $mk) }}">/m/{{ $mk }}/{id}</a></td>
-            </tr>
-        @endforeach
-        </tbody>
-    </table></div>
-    <div class="sub" style="margin-top:8px">
-        الحقول <span class="mono ltr">odooId</span> موجودة أيضاً في <b>المالية</b> و<b>دليل الحسابات</b> و<b>قيود اليومية</b>
-        لحفظ معرّف السجل المقابل في أودو عند المطابقة اليدوية أو عبر n8n.
-    </div>
-</div>
+{{-- تفاصيل أودو كلُّها في بيتها الواحد (شاشة خوادم أودو) — لا تكرارَ هنا --}}
 
 {{-- الكتالوج: ما يمكن ربطه --}}
 <div class="card">

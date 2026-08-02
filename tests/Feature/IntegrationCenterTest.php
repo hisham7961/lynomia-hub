@@ -66,9 +66,9 @@ class IntegrationCenterTest extends TestCase
         $this->seedCore();
         $html = $this->actingAs($this->owner)->get('/admin/integrations')->assertOk()->getContent();
 
-        // البوابة الموحّدة تصل بكل شاشة إعداد
+        // البوابة الموحّدة تصل بكل شاشة إعداد — أودو صفٌّ واحدٌ جامع لا صفّان
         $this->assertStringContainsString('التكاملات وإعداداتها — في مكان واحد', $html);
-        foreach (['خوادم أودو', 'مفاتيح REST API', 'الصندوق الصادر'] as $rowName) {
+        foreach (['أودو — كل شيء', 'مفاتيح REST API', 'مركز المراسلة'] as $rowName) {
             $this->assertStringContainsString($rowName, $html, "صف «{$rowName}» غائب عن البوابة");
         }
 
@@ -77,6 +77,55 @@ class IntegrationCenterTest extends TestCase
         foreach (['ترنديول', 'أمازون', 'نون', 'المتجر الإلكتروني'] as $chan) {
             $this->assertStringContainsString($chan, $html, "قناة «{$chan}» غائبة عن الكتالوج");
         }
+    }
+
+    /**
+     * **«وجدتُ لخبطةً في أماكن التكاملات وتكراراً في أماكن ربط أودو».**
+     *
+     * كانت إدارةُ أودو موزَّعةً: الافتراضيُّ في الإعدادات والإضافيون في المركز،
+     * وجدولُ «أين يرتبط أودو» في الفهرس والدليلُ في شاشةٍ ثالثة. صار كلُّ
+     * شيءٍ في شاشة خوادم أودو، والفهرسُ بوابةً بلا تفاصيلَ مكررة.
+     */
+    public function test_odoo_is_managed_in_exactly_one_place(): void
+    {
+        $this->seedCore();
+
+        // شاشة أودو تدير الافتراضيَّ كاملاً: نموذجه وزر اختباره وجدول الارتباط
+        $odoo = $this->actingAs($this->owner)->get('/admin/integrations/odoo')->assertOk()->getContent();
+        $this->assertStringContainsString('الاتصال الافتراضي', $odoo);
+        $this->assertStringContainsString(route('integrations.odoo.defaults'), $odoo, 'لا نموذج للافتراضي في بيته');
+        $this->assertStringContainsString(route('settings.odoo.test'), $odoo, 'لا زر اختبارٍ للافتراضي في بيته');
+        $this->assertStringContainsString('أين يرتبط أودو بالنظام', $odoo, 'جدول الارتباط لم ينتقل لبيته');
+
+        // والفهرس بوابة: لا يكرر جدول الارتباط ولا يشتت لشاشة الإعدادات
+        $index = $this->actingAs($this->owner)->get('/admin/integrations')->assertOk()->getContent();
+        $this->assertStringNotContainsString('أين يرتبط أودو بالنظام', $index, 'الجدول مكرر في الفهرس');
+        $this->assertSame(0, substr_count($index, 'اتصال أودو الافتراضي'),
+            'الفهرس ما زال يوجه لشاشة الإعدادات لإدارة أودو — التشتت باقٍ');
+    }
+
+    /** حفظ الافتراضي من شاشة أودو يكتب المفاتيح نفسها — والمفتاح مشفَّر وبقاؤه عند الفراغ */
+    public function test_default_connection_saves_through_the_odoo_hub(): void
+    {
+        $this->seedCore();
+        $this->app->instance('hub.dns', fn (string $h) => ['93.184.216.34']);
+
+        $this->actingAs($this->owner)->post('/admin/integrations/odoo/defaults', [
+            'url' => 'https://main.example.com', 'db' => 'maindb',
+            'username' => 'ro@main.com', 'key' => 'sekret-1',
+        ])->assertRedirect()->assertSessionHas('ok');
+
+        $this->assertSame('https://main.example.com', setting('odoo.url'));
+        $this->assertSame('sekret-1', setting('odoo.key'), 'القراءة الشفافة تفك المشفر');
+        $this->assertStringStartsWith('enc:', (string) \App\Models\Setting::where('key', 'odoo.key')->value('value'),
+            'المفتاح كُتب نصاً صريحاً');
+
+        // مفتاح فارغ يبقي المخزون — نمط pass نفسه
+        $this->actingAs($this->owner)->post('/admin/integrations/odoo/defaults', [
+            'url' => 'https://main.example.com', 'db' => 'db2', 'username' => 'ro@main.com', 'key' => '',
+        ]);
+        $this->assertSame('db2', setting('odoo.db'));
+        $this->assertSame('sekret-1', setting('odoo.key'), 'الفراغ محا المفتاح المخزون');
     }
 
     /** الدليل التفصيلي على شاشة خوادم أودو يغطي الخطوات السبع */
