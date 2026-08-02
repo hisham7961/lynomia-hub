@@ -248,6 +248,9 @@ class HubDemo extends Command
                 str_contains($key, 'progress') || str_contains($key, 'percent') => random_int(10, 90),
                 (bool) preg_match('/amount|total|price|cost|salary|budget|value/', $key) => random_int(100, 3000),
                 (bool) preg_match('/qty|count|stock|hours|days/', $key) => random_int(1, 30),
+                // التقييمُ سُلَّمُ خمسٍ وعمودُه decimal(3,2): «١٠» تجاوزُ مدىً
+                // يمرّ على SQLite ويرمي على MySQL — فتسقط بذرةُ العرض كلُّها
+                (bool) preg_match('/rating|score|stars/', $key) => random_int(3, 5),
                 default => random_int(1, 10),
             },
             'date' => now()->addDays(random_int(-30, 45))->toDateString(),

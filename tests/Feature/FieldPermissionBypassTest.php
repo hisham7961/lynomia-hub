@@ -142,10 +142,17 @@ class FieldPermissionBypassTest extends TestCase
     public function test_sorting_by_a_hidden_column_is_refused(): void
     {
         $this->scene();
-        // ترتيب الإدخال معكوسٌ عن ترتيب الراتب: بهما وحدهما يُفرَّق «رُتِّب
-        // بالراتب» عن «رُتِّب بالافتراضي» حين تتساوى طوابع الوقت في الثانية
-        Employee::create(['name' => 'أدنى راتباً', 'status' => 'نشط', 'salary' => 100]);
-        Employee::create(['name' => 'أعلى راتباً', 'status' => 'نشط', 'salary' => 90000]);
+        /*
+         * **طابعان مختلفان صراحةً**: الترتيبُ الافتراضي `created_at desc`، وكان
+         * الصفّان يُكتبان في الثانية نفسها فيتوقّف الترتيبُ على فضّ التعادل —
+         * وهو يختلف بين SQLite وMySQL. فالاختبارُ كان يمرّ على محرّكٍ ويسقط على
+         * الآخر لسببٍ لا علاقة له بما يفحصه. الآن الأحدثُ أدنى راتباً: الافتراضيُّ
+         * يضعه أولاً، وترتيبُ الراتب تنازلياً يضع الآخر — فيفترقان حتماً.
+         */
+        Employee::create(['name' => 'أعلى راتباً', 'status' => 'نشط', 'salary' => 90000,
+            'created_at' => now()->subDay()]);
+        Employee::create(['name' => 'أدنى راتباً', 'status' => 'نشط', 'salary' => 100,
+            'created_at' => now()]);
 
         $html = $this->actingAs($this->clerk)->get('/m/hr?s=salary&d=desc')->assertOk()->getContent();
 

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  الحزمةُ على MySQL — لا على SQLite وحدها.
+
+  SQLite متساهلة حيث تكون MySQL صارمة: عمودٌ غائب، ونصٌّ أطول من عرض عموده،
+  ومفتاحٌ يُقرأ عموداً. وكلُّ صنفٍ من هذه أطفأ شاشةً على الخادم بينما الحزمةُ
+  خضراء. هذا الملفُّ يُشغّل الاختبارات نفسها على المحرّك الذي يعمل عليه النظام
+  فعلاً — فما يقع في الإنتاج يقع هنا أولاً.
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php" colors="true">
+    <testsuites>
+        <testsuite name="Feature"><directory>tests/Feature</directory></testsuite>
+        <testsuite name="Unit"><directory>tests/Unit</directory></testsuite>
+    </testsuites>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_KEY" value="base64:d92KgbaV+0prjiiNb0DgF3rVGDxuU+TEPisSXTG7H0Y="/>
+        <env name="APP_DEBUG" value="true"/>
+        <env name="DB_CONNECTION" value="mysql"/>
+        <env name="DB_HOST" value="127.0.0.1"/>
+        <env name="DB_PORT" value="3306"/>
+        <env name="DB_DATABASE" value="hub_test"/>
+        <env name="DB_USERNAME" value="root"/>
+        <env name="DB_PASSWORD" value=""/>
+        <env name="CACHE_STORE" value="array"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="FILESYSTEM_DISK" value="local"/>
+    </php>
+</phpunit>
