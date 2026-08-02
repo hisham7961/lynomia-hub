@@ -17,5 +17,8 @@
     </div>
 </div>
 
+{{-- حسابُ النظام: البابُ في المدخلين معاً — «كل الحقول» و«الملف الشامل» --}}
+@include('partials.staff_account_card', ['acctRow' => $emp])
+
 @include('portal._hr')
 @endsection
