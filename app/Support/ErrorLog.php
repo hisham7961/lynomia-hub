@@ -7,6 +7,13 @@ use App\Models\ErrorEvent;
 /** مسجل الأخطاء المجمّع — لا يرمي أبداً (فشل التسجيل لا يفاقم الخطأ الأصلي) */
 class ErrorLog
 {
+    /** أقصى إشعارٍ لكل مسؤولٍ في نافذة الانفجار — ونشرةٌ سيئة لا تُغرق صندوقاً */
+    public const NOTIFY_BURST_CAP = 8;
+    public const NOTIFY_BURST_MIN = 15;
+
+    /** حارسُ التكرار: إشعارٌ يفشل فيُلتقط خطؤه فيُشعر… لا حلقة بعد اليوم */
+    protected static bool $inNotify = false;
+
     public static function capture(string $kind, string $message, ?string $file = null, ?int $line = null,
                                    ?string $trace = null): void
     {
@@ -31,6 +38,9 @@ class ErrorLog
                     'trace' => $trace ? mb_substr($trace, 0, 12000) : null,
                     'first_seen' => now(), 'last_seen' => now(),
                 ]);
+
+                // بصمةٌ جديدة = خبرٌ جديد. والتكرارُ يُزاد عدّادُه في bump بلا تنبيه.
+                self::tell($message, $req);
             } catch (\Illuminate\Database\QueryException $e) {
                 self::bump($hash, $req);    // خسرنا سباق الإدراج — الصف موجود الآن فزده
             }
@@ -49,11 +59,61 @@ class ErrorLog
             'user_id' => auth()->id() ?? \Illuminate\Support\Facades\DB::raw('user_id'),
         ]);
         if ($hit) {
-            // خطأ محلول عاد للظهور → يعود «جديد» ليلفت النظر
-            ErrorEvent::where('hash', $hash)->where('status', 'محلول')->update(['status' => 'جديد']);
+            // خطأ محلول عاد للظهور → يعود «جديد» ليلفت النظر، **ويُنبَّه به**:
+            // عودةُ عطلٍ حُسب مُغلقاً أهمُّ من ظهوره الأول، وكانت تمرّ صامتة
+            $back = ErrorEvent::where('hash', $hash)->where('status', 'محلول')->first();
+            if ($back) {
+                ErrorEvent::whereKey($back->id)->update(['status' => 'جديد']);
+                self::tell('عاد بعد أن حُسب محلولاً — ' . $back->message, $req);
+            }
         }
 
         return (bool) $hit;
+    }
+
+    /**
+     * **الخطأ يصل صاحبه.** المركزُ يلتقط ويُجمّع ولا يُنبّه — فيجلس العطل في
+     * شاشةٍ لا يفتحها أحد حتى يصطدم به صاحبُ النظام بنفسه. وصاحبُ النظام ليس
+     * جهاز رصد.
+     *
+     * التنبيه لأول ظهورٍ وحده (التكرار يُزاد عدّادُه بلا صوت)، وبسقفٍ في نافذةٍ
+     * قصيرة كي لا تُغرِق نشرةٌ سيئةٌ الصندوقَ فيُهجَر — والإشعار الذي يُهجَر
+     * أسوأ من لا إشعار.
+     */
+    protected static function tell(string $message, $req): void
+    {
+        if (self::$inNotify) return;      // إشعارٌ يفشل فيُلتقط خطؤه فيُشعر… لا حلقة
+        self::$inNotify = true;
+
+        try {
+            $key = 'errnotify:burst:' . now()->format('YmdHi');
+            $n = (int) \Illuminate\Support\Facades\Cache::get($key, 0);
+            \Illuminate\Support\Facades\Cache::put($key, $n + 1, now()->addMinutes(self::NOTIFY_BURST_MIN));
+            if ($n >= self::NOTIFY_BURST_CAP) return;      // انفجار: البقيةُ في المركز
+
+            $last = $n + 1 === self::NOTIFY_BURST_CAP
+                ? ' — وثمة أخطاءٌ أخرى في المركز، افتحه'
+                : '';
+            $where = $req ? ' · ' . mb_substr((string) $req->path(), 0, 80) : ' · مهمّةٌ مجدولة';
+
+            foreach (self::watchers() as $uid) {
+                hub_notify($uid, 'error',
+                    '💥 عطلٌ جديد' . $where . ': ' . mb_substr($message, 0, 300) . $last,
+                    'errors', null);
+            }
+        } catch (\Throwable $e) {
+            // صمت: التنبيه خدمةٌ للخطأ لا عبءٌ عليه
+        } finally {
+            self::$inNotify = false;
+        }
+    }
+
+    /** من يعنيه العطل: المالكون وحاملو راية المراقبة — والموقوفُ لا يُراكَم عليه */
+    protected static function watchers(): array
+    {
+        return \App\Models\User::with('role')->whereNull('deleted_at')->where('status', 'نشط')->get()
+            ->filter(fn ($u) => $u->role?->is_owner || hub_flag($u, 'monitor'))
+            ->pluck('id')->all();
     }
 
     public static function exception(\Throwable $e): void
