@@ -392,4 +392,65 @@ class StaffAccountLinkTest extends TestCase
 
         $this->assertNull($second->fresh()->user_id);
     }
+
+    /* ── طلبٌ لا يُنفَّذ لا يُبتلع صامتاً ── */
+
+    /**
+     * **«حطّيت 🔑 وما عمله حساب — ليش؟»**
+     *
+     * البريد **اختياريّ** في نموذج الموظف، و`Staff::makeAccount` يعود بـ`null`
+     * صامتاً إن كان فارغاً — فيُحفظ الموظف، ولا يُفتح حساب، ويُقال للمستخدم
+     * «أُضيف السجل بنجاح». طلبٌ صريح ابتُلع بلا كلمة.
+     *
+     * والصمتُ هنا أسوأ من الرفض: صاحبُ النظام يظنّ أنّ للموظف حساباً، فلا
+     * يبحث عن السبب ولا يُعطيه كلمةَ مرور — ويكتشف بعد أسبوعٍ أنّ الرجل لا يدخل.
+     */
+    public function test_asking_for_an_account_without_an_email_says_why(): void
+    {
+        $this->seedCore();
+        $role = Role::create(['name' => 'موظف', 'scope' => 'own', 'flags' => [], 'matrix' => []]);
+
+        $this->actingAs($this->owner)->post('/m/hr', [
+            'name' => 'بلا بريد', 'status' => 'نشط',
+            '_make_account' => '1', '_account_role' => $role->id,
+        ])->assertSessionHasErrors('email');
+
+        // ولا يُخلَّف نصفُ عمل: لا موظفٌ بلا حسابه المطلوب
+        $this->assertNull(Employee::where('name', 'بلا بريد')->first(),
+            'حُفظ الموظف وطلبُ حسابه ابتُلع — نصفُ عملٍ يُقدَّم على أنه تمام');
+    }
+
+    /** واختيارُ الدور شرطٌ يُقال قبل الحفظ لا بعده */
+    public function test_asking_for_an_account_without_a_role_says_why(): void
+    {
+        $this->seedCore();
+
+        $this->actingAs($this->owner)->post('/m/hr', [
+            'name' => 'بلا دور', 'email' => 'norole@test.local', 'status' => 'نشط',
+            '_make_account' => '1', '_account_role' => '',
+        ])->assertSessionHasErrors('_account_role');
+
+        $this->assertNull(Employee::where('name', 'بلا دور')->first(),
+            'حُفظ الموظف ثم رُفض طلبُ حسابه — والرفضُ يسبق الحفظ');
+    }
+
+    /** ومن لبريده حسابٌ قائم: يُربط ويُقال إنه رُبط لا أنّ حساباً أُنشئ */
+    public function test_an_existing_account_is_linked_and_the_user_is_told(): void
+    {
+        $this->seedCore();
+        $role = Role::create(['name' => 'موظف', 'scope' => 'own', 'flags' => [], 'matrix' => []]);
+        $u = User::create(['name' => 'قائم', 'email' => 'exists@test.local',
+            'password' => 'Secret!2026x', 'role_id' => $this->employee->role_id,
+            'status' => 'نشط', 'password_changed_at' => now()]);
+
+        $this->actingAs($this->owner)->post('/m/hr', [
+            'name' => 'صاحب حسابٍ قائم', 'email' => 'exists@test.local', 'status' => 'نشط',
+            '_make_account' => '1', '_account_role' => $role->id,
+        ])->assertRedirect()->assertSessionHas('ok', fn ($msg) => str_contains((string) $msg, 'رُبط'));
+
+        $emp = Employee::where('email', 'exists@test.local')->first();
+        $this->assertNotNull($emp);
+        $this->assertSame($u->id, $emp->user_id, 'لم يُربط بالحساب القائم');
+        $this->assertSame(1, User::where('email', 'exists@test.local')->count(), 'أُنشئ حسابٌ ثانٍ لنفس البريد');
+    }
 }

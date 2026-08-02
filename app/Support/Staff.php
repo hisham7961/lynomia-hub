@@ -86,6 +86,21 @@ class Staff
      */
     public static function makeAccount(Employee $emp, string $roleId, $actor = null): ?string
     {
+        return self::makeAccountResult($emp, $roleId, $actor)['temp'];
+    }
+
+    /**
+     * كما `makeAccount` لكنها **تقول ما جرى** لا كلمةَ المرور وحدها.
+     *
+     * كان الطلبُ يُبتلع صامتاً: بريدٌ فارغ → `null`، وحسابٌ قائم → `null`،
+     * وحسابٌ مربوطٌ بملفٍّ آخر → `null` — ثلاثةُ مآلاتٍ مختلفة بجوابٍ واحد،
+     * فيُقال لصاحب النظام «أُضيف السجل بنجاح» ولا يعلم أنّ نصفَ طلبه سقط.
+     *
+     * @return array{temp: ?string, outcome: string, user: ?User}
+     *         outcome: created · linked · taken · no_email
+     */
+    public static function makeAccountResult(Employee $emp, string $roleId, $actor = null): array
+    {
         $actor = $actor ?? auth()->user();
         abort_unless(hub_flag($actor, 'users'), 403, 'فتحُ الحسابات يحتاج صلاحية إدارة المستخدمين');
 
@@ -94,11 +109,13 @@ class Staff
         abort_if($role->is_owner && ! hub_is_owner($actor), 403, 'منح دور المالك لا يكون إلا من مالك');
 
         $email = trim((string) $emp->email);
-        if ($email === '') return null;
-        if (User::whereNull('deleted_at')->where('email', $email)->exists()) {
-            self::linkByEmail($emp);
+        if ($email === '') return ['temp' => null, 'outcome' => 'no_email', 'user' => null];
 
-            return null;
+        if ($existing = User::whereNull('deleted_at')->where('email', $email)->first()) {
+            // حسابٌ بهذا البريد موجود: يُربط إن كان حرّاً، وإلا فهو لملفٍّ آخر
+            $linked = self::linkByEmail($emp);
+
+            return ['temp' => null, 'outcome' => $linked ? 'linked' : 'taken', 'user' => $existing];
         }
 
         $temp = Str::password(14);
@@ -121,7 +138,7 @@ class Staff
                 'users', $u->id);
         }
 
-        return $temp;
+        return ['temp' => $temp, 'outcome' => 'created', 'user' => $u];
     }
 
     /** ملفٌّ وظيفيّ لحسابٍ جديد — بيانات الحساب هي بذرته */
