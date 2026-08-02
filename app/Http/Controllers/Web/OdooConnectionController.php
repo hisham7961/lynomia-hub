@@ -41,8 +41,21 @@ class OdooConnectionController extends Controller
             $uses[$c->id] = $this->projectsUsing($c->id)->count();
         }
 
+        // المشاريع التي اختارت خادماً: اسمُها وخادمُها وعددُ قنواتها
+        $names = $rows->pluck('name', 'id');
+        $linked = DB::table('projects')->whereNull('deleted_at')
+            ->where('meta', 'LIKE', '%"conn":%')->orderBy('name')->orderBy('id')
+            ->get(['id', 'name', 'meta'])
+            ->map(function ($p) use ($names) {
+                $o = (array) (json_decode((string) $p->meta, true)['odoo'] ?? []);
+                $p->connName = $names[(string) ($o['conn'] ?? '')] ?? 'اتصال محذوف';
+                $p->chCount = count((array) ($o['channels'] ?? []));
+
+                return $p;
+            });
+
         return view('integrations.odoo', [
-            'rows' => $rows, 'uses' => $uses,
+            'rows' => $rows, 'uses' => $uses, 'linked' => $linked,
             'defaultReady' => Odoo::configured(),
         ]);
     }

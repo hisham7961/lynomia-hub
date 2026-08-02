@@ -29,6 +29,27 @@
     @endforeach
 </div>
 
+{{-- كل الإعدادات في مكان واحد: بوابة ملاحية — الشاشات باقية في أماكنها --}}
+<div class="card">
+    <h3 class="cardtitle">🗂️ التكاملات وإعداداتها — في مكان واحد</h3>
+    <div class="sub" style="margin-bottom:8px">من هنا تصل لكل إعدادٍ وتحكُّم — لا تبحث في شاشات متفرقة.</div>
+    <div class="tblwrap"><table class="tbl">
+        <thead><tr><th>ماذا</th><th>أين يُدار</th><th></th></tr></thead>
+        <tbody>
+            <tr><td><b>🧩 خوادم أودو</b></td><td class="sub">الاتصالات المتعددة: إضافة واختبار وتعطيل، والمشاريع المرتبطة بكلٍّ منها</td>
+                <td class="acts"><a class="btn ghost xs" href="{{ route('integrations.odoo') }}">فتح ↗</a></td></tr>
+            <tr><td><b>⚙️ اتصال أودو الافتراضي</b></td><td class="sub">مفاتيح odoo.* الأربعة وزر اختبار الاتصال — في إعدادات النظام</td>
+                <td class="acts"><a class="btn ghost xs" href="{{ route('settings.edit') }}">فتح ↗</a></td></tr>
+            <tr><td><b>🪝 Webhooks</b></td><td class="sub">اشتراكات بثّ الأحداث بتوقيع HMAC وسجل المحاولات والإعادات</td>
+                <td class="acts"><a class="btn ghost xs" href="{{ route('webhooks.index') }}">فتح ↗</a></td></tr>
+            <tr><td><b>🔑 مفاتيح REST API</b></td><td class="sub">توليد المفاتيح وتدويرها وإبطالها — في ملفك الشخصي</td>
+                <td class="acts"><a class="btn ghost xs" href="{{ route('profile.edit') }}">فتح ↗</a></td></tr>
+            <tr><td><b>📤 الصندوق الصادر</b></td><td class="sub">طوابير تلجرام والبريد وحالات التسليم — في مركز التشغيل</td>
+                <td class="acts"><a class="btn ghost xs" href="{{ route('ops.index') }}">فتح ↗</a></td></tr>
+        </tbody>
+    </table></div>
+</div>
+
 {{-- أودو: أين يرتبط بالنظام --}}
 <div class="card">
     <h3 class="cardtitle">🧩 أين يرتبط أودو بالنظام؟</h3>

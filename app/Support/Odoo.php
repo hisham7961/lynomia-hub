@@ -98,6 +98,11 @@ class Odoo
     /** سببُ موت النسخة إن ماتت — يُعرض في الشاشات بدل الصمت */
     public function error(): ?string { return $this->err; }
 
+    /** للعرض الإداري: الرابط والقاعدة — فلا تقرأ الشاشاتُ الإعداداتِ رأساً */
+    public function host(): string { return $this->url; }
+
+    public function database(): string { return $this->db; }
+
     /** جاهزة للنداء؟ الحقول الأربعة مكتملة ولا خطأ */
     public function ready(): bool
     {
