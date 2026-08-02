@@ -77,10 +77,18 @@ class StyleVocabularyTest extends TestCase
 
         $orphans = [];
         foreach ($this->views() as $v) {
-            // السمات الحرفية وحدها: ما فيه Blade يُبنى وقت العرض فلا يُقرأ من المصدر
-            preg_match_all('/class="([^"{@]*)"/', $this->src($v), $mm);
+            // **الحرفيُّ يُقرأ ولو جاوره Blade.** كان الشرط `[^"{@]` يُسقط
+            // السمةَ كاملةً إن كان فيها تعبير — فـ`class="pill {{ $on?'ok':'' }}"`
+            // يمرّ بصنفٍ مفقودٍ لا تعرفه الورقة، وهو ما وقع فعلاً. تُنزَع
+            // التعابير ويُفحَص ما بقي حرفياً.
+            preg_match_all('/class="([^"]*)"/', $this->src($v), $mm);
             foreach ($mm[1] ?? [] as $attr) {
+                $attr = (string) preg_replace(
+                    ['/\{\{.*?\}\}/s', '/\{!!.*?!!\}/s', '/@[a-zA-Z]+\s*\([^)]*\)/', '/@[a-zA-Z]+/'],
+                    ' ', $attr);
                 foreach (preg_split('/\s+/', trim($attr), -1, PREG_SPLIT_NO_EMPTY) as $c) {
+                    // فتاتُ Blade ليس صنفاً: ما ليس مُعرِّفَ CSS صحيحاً يُهمَل
+                    if (! preg_match('/^[a-zA-Z][\w-]*$/', $c)) continue;
                     if (isset($known[$c]) || in_array($c, self::HOOKS, true)) continue;
                     $orphans[$c][] = basename($v);
                 }

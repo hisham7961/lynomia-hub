@@ -480,4 +480,73 @@ class StaffAccountLinkTest extends TestCase
 
         $this->assertNull($second->fresh()->user_id, 'رُبط حسابٌ مأخوذٌ لملفٍّ ثانٍ');
     }
+
+    /* ── البابُ في مكان الحاجة: ملفُّ الموظف نفسه ── */
+
+    /**
+     * **«حطّ لي خيار حتى لو ما انضاف حساب، أدخل ع الموظف وأعمله حساب».**
+     *
+     * البابُ كان في شاشة «الموظفون والحسابات» وحدها — من فاته الخيارُ عند
+     * الإضافة عليه أن يعرف أنّ تلك الشاشة موجودة وأنّ فيها ما يريد. وأكثرُ
+     * مكانٍ يُطلَب فيه حسابُ الموظف هو **ملفُّ الموظف**.
+     */
+    public function test_the_employee_page_offers_to_open_an_account(): void
+    {
+        $this->seedCore();
+        $emp = Employee::create(['name' => 'بلا حساب', 'email' => 'noacct@test.local', 'status' => 'نشط']);
+
+        $html = $this->actingAs($this->owner)->get("/m/hr/{$emp->id}")->assertOk()->getContent();
+
+        $this->assertStringContainsString(route('staff.account', $emp->id), $html,
+            'ملفُّ موظفٍ بلا حساب ولا بابَ فيه لفتحه');
+    }
+
+    /** ويُفتح الحساب من ملفّه فعلاً لا صورةَ زرٍّ فحسب */
+    public function test_an_account_can_be_opened_from_the_employee_page(): void
+    {
+        $this->seedCore();
+        $role = Role::create(['name' => 'موظف', 'scope' => 'own', 'flags' => [], 'matrix' => []]);
+        $emp = Employee::create(['name' => 'يُفتح من ملفّه', 'email' => 'fromfile@test.local', 'status' => 'نشط']);
+
+        $this->actingAs($this->owner)
+            ->from("/m/hr/{$emp->id}")
+            ->post("/staff/{$emp->id}/account", ['role_id' => $role->id])
+            ->assertRedirect("/m/hr/{$emp->id}")           // يعود لملفّه لا لشاشةٍ أخرى
+            ->assertSessionHas('temp_password');
+
+        $u = User::where('email', 'fromfile@test.local')->first();
+        $this->assertNotNull($u, 'لم يُفتح الحساب من ملفّ الموظف');
+        $this->assertSame($u->id, $emp->fresh()->user_id);
+    }
+
+    /** ومن بلا بريد يُقال له ما ينقص، ولا يُعرض زرٌّ يفشل */
+    public function test_the_employee_page_says_what_is_missing_instead_of_a_dead_button(): void
+    {
+        $this->seedCore();
+        $emp = Employee::create(['name' => 'بلا بريد', 'status' => 'نشط']);
+
+        $html = $this->actingAs($this->owner)->get("/m/hr/{$emp->id}")->assertOk()->getContent();
+
+        $this->assertStringNotContainsString(route('staff.account', $emp->id), $html,
+            'عُرض زرُّ فتح حسابٍ لملفٍّ بلا بريد — زرٌّ يفشل حتماً');
+        $this->assertStringContainsString('هويةُ الدخول', $html,
+            'لم يُقل له ما ينقص — بابٌ مغلقٌ بلا سبب أسوأ من بابٍ مفتوح');
+        $this->assertStringContainsString(route('m.edit', ['hr', $emp->id]), $html,
+            'قيل له ما ينقص ولم يُدلّ على مكان إضافته');
+    }
+
+    /** ومن له حسابٌ لا يُعرض له الزرّ — الطلبُ منتهٍ */
+    public function test_the_button_is_gone_once_an_account_exists(): void
+    {
+        $this->seedCore();
+        $u = User::create(['name' => 'له حساب', 'email' => 'has@test.local',
+            'password' => 'Secret!2026x', 'role_id' => $this->employee->role_id,
+            'status' => 'نشط', 'password_changed_at' => now()]);
+        $emp = Employee::create(['name' => 'له حساب', 'email' => 'has@test.local',
+            'status' => 'نشط', 'user_id' => $u->id]);
+
+        $html = $this->actingAs($this->owner)->get("/m/hr/{$emp->id}")->assertOk()->getContent();
+
+        $this->assertStringNotContainsString(route('staff.account', $emp->id), $html);
+    }
 }
