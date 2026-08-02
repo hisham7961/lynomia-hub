@@ -731,8 +731,8 @@ class EsignController extends Controller
     public function decline(Request $r, string $token)
     {
         [$req, $viaSigner] = $this->resolveToken($token);
+        $this->assertLive($req);
         abort_unless(session("sign.ok.{$token}"), 403);
-        abort_if((bool) $req->cancelled_at, 410);
         abort_if($req->status !== 'بانتظار التوقيع', 410);
         $opts = $req->opts ?: [];
         abort_unless($opts['decline'] ?? true, 403, 'الرفض غير متاح لهذه الوثيقة');
@@ -966,9 +966,22 @@ class EsignController extends Controller
         ]);
     }
 
+    /**
+     * **حياةُ الطلب تُفحص في كل بابٍ لا في بعضها** — كان `sendOtp` وحده يفحص
+     * الانتهاء، بينما unlock/sign/decline تقبل رابطاً منتهياً: جلسةٌ فُتحت قبل
+     * الانتهاء بدقيقة توقّع بعده بأيام، ولا شيء يقلب حالة الطلب المنتهي.
+     */
+    protected function assertLive(\App\Models\SignRequest $req): void
+    {
+        abort_if((bool) $req->cancelled_at, 410, 'أُلغي هذا الطلب');
+        abort_if($req->status !== 'وُقّع' && $req->expires_at && now()->gt($req->expires_at),
+            410, 'انتهت صلاحية رابط التوقيع — اطلب رابطاً جديداً من مُرسِل الوثيقة');
+    }
+
     public function unlock(Request $r, string $token)
     {
         [$req, $signer] = $this->resolveToken($token);
+        $this->assertLive($req);
 
         $key = 'sign-unlock:' . $token . ':' . $r->ip();
         if (RateLimiter::tooManyAttempts($key, 5)) {
@@ -1003,8 +1016,8 @@ class EsignController extends Controller
     public function sign(Request $r, string $token)
     {
         [$req, $viaSigner] = $this->resolveToken($token);
+        $this->assertLive($req);   // جلسةٌ فُتحت قبل الانتهاء لا توقّع بعده
         abort_unless(session("sign.ok.{$token}"), 403);
-        abort_if((bool) $req->cancelled_at, 410, 'أُلغي هذا الطلب');
         abort_if($req->status !== 'بانتظار التوقيع', 410, 'هذه الوثيقة أُغلقت — وُقّعت أو رُفضت مسبقاً');
         if ($viaSigner) {
             abort_if($viaSigner->status === 'وُقّع', 410, 'وقّعت هذه الوثيقة مسبقاً');

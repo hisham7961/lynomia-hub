@@ -36,6 +36,19 @@ class FinController extends Controller
             'bankId' => 'nullable|string|exists:bank_accounts,id',
         ], [], ['amount' => 'مبلغ الدفعة', 'bankId' => 'الحساب البنكي']);
 
+        /*
+         * **تحريكُ بنكٍ كتابةٌ في وحدة البنوك** — بابٌ جانبيّ كان يفلت من
+         * الثلاثية: bankId إدخالُ مستخدمٍ يمرّ بـexists وحدها، فمعزولُ شركةٍ
+         * يحرّك رصيدَ بنك شركةٍ أخرى، وحاملُ fin.e بلا أي صلاحية بنوك يحرّك
+         * أرصدتها. الحارسان قبل أي كتابة — إمّا كلُّه وإمّا لا شيء.
+         */
+        if (! empty($d['bankId'])) {
+            abort_unless(hub_can(auth()->user(), 'banks', 'e'), 422,
+                'توجيه الدفعة لحساب بنكي يحرّك رصيده — ويتطلب صلاحية تعديل البنوك');
+            abort_unless(hub_scope(BankAccount::query(), 'banks')->whereKey($d['bankId'])->exists(), 422,
+                'الحساب البنكي خارج نطاقك — اختر حساباً من شركاتك');
+        }
+
         $paid = (float) ($doc->paid ?? 0);
         $total = (float) ($doc->total ?? 0);
         $remain = max(0, $total - $paid);

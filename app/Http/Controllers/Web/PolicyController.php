@@ -22,6 +22,9 @@ class PolicyController extends Controller
     {
         abort_unless(isset(hub_ack_modules()[$module]), 404);
         abort_unless(hub_can(auth()->user(), $module, 'e'), 403);
+        // السجل بالنطاق أولاً: خارجُه 404 صريحة لا «أُبلغ 0 مستخدماً» الموهمة
+        $class = '\\App\\Models\\' . hub_mod($module)['model'];
+        hub_scope($class::query(), $module)->findOrFail($id);
 
         $n = hub_ack_announce($module, $id);
         hub_audit('إعلان للإقرار', $module, $id, $n . ' مخاطَباً');

@@ -27,6 +27,27 @@ class Staff
     /** حالات الملف التي يبقى معها الحساب مفتوحاً */
     public const OPEN = ['نشط', 'إجازة'];
 
+    /**
+     * **حسابٌ ذو امتيازٍ لا يُمَسّ إلا بمن يعلوه** — حارسُ التصعيد المفروض في
+     * شاشة المستخدمين كان غائباً عن سكّة الموظفين: دورُ مواردَ بشريةٍ (hr.e
+     * فقط) يربط ملفاً بحساب مالكٍ ثم يعدّل حالتَه فيوقفه الإغلاقُ الآلي —
+     * بابٌ جانبيّ على ثابت «الملكية لا يمنحها (ولا يمسّها) إلا مالك».
+     */
+    public static function privileged(User $u): bool
+    {
+        return (bool) ($u->role?->is_owner) || hub_flag($u, 'users');
+    }
+
+    /** هل يجوز لهذا الفاعل المساسُ بحساب هذا المستخدم؟ */
+    public static function mayTouch(User $target, $actor = null): bool
+    {
+        $actor = $actor ?? auth()->user();
+        if ($target->role?->is_owner) return (bool) ($actor && hub_is_owner($actor));
+        if (hub_flag($target, 'users')) return (bool) ($actor && (hub_is_owner($actor) || hub_flag($actor, 'users')));
+
+        return true;
+    }
+
     /* ────────── الربط ────────── */
 
     /** حسابٌ حرّ بهذا البريد؟ (غير مرتبطٍ بملفٍّ آخر) */
@@ -181,6 +202,17 @@ class Staff
         if (! $u || $u->status === 'موقوف') return;
         if ($u->id === auth()->id()) return;
         if ($u->role?->is_owner && \App\Http\Controllers\Web\UserController::activeOwners() <= 1) return;
+
+        // حسابٌ ذو امتيازٍ لا يوقفه آلياً فاعلٌ أدنى منه — يُبلَّغ من يملك القرار بدل الصمت
+        if (! self::mayTouch($u)) {
+            foreach (hub_user_admins() as $adminId) {
+                hub_notify($adminId, 'مستخدمون',
+                    '⚠️ ملف «' . $emp->name . '» ' . $why . ' وحسابُه ذو امتياز — يحتاج إيقافاً يدوياً بقرارٍ ممن يملكه',
+                    'users', $u->id);
+            }
+
+            return;
+        }
 
         $u->forceFill(['status' => 'موقوف'])->save();
         hub_audit('إيقاف حساب تبعاً للملف الوظيفي', 'users', $u->id, $u->name . ' — ' . $why);

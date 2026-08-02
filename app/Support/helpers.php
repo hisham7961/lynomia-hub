@@ -3802,7 +3802,9 @@ if (! function_exists('hub_ack_announce')) {
 
         $def = hub_mod($module);
         $class = '\\App\\Models\\' . $def['model'];
-        $row = $class::find($recordId);
+        // بالنطاق لا خاماً: الإعلانُ كتابةٌ وإشعاراتٌ على السجل — سجلُّ شركةٍ
+        // أخرى ليس للمعزول أن يعلنه (كما يفرض AckController::target تماماً)
+        $row = hub_scope($class::query(), $module)->find($recordId);
         if (! $row) return 0;
 
         $ver = (string) ($row->{$spec['ver']} ?? '') ?: '1.0';
@@ -3846,7 +3848,7 @@ if (! function_exists('hub_ack_state')) {
         if (! $spec || ! $def) return $out;
 
         $class = '\\App\\Models\\' . $def['model'];
-        $row = $class::find($recordId);
+        $row = hub_scope($class::query(), $module)->find($recordId);   // بالنطاق لا خاماً
         if (! $row) return $out;
 
         $ver = (string) ($row->{$spec['ver']} ?? '') ?: '1.0';
@@ -3887,7 +3889,7 @@ if (! function_exists('hub_ack_do')) {
         if (! $spec || ! $def) return null;
 
         $class = '\\App\\Models\\' . $def['model'];
-        $row = $class::find($recordId);
+        $row = hub_scope($class::query(), $module)->find($recordId);   // بالنطاق لا خاماً
         if (! $row) return null;
 
         $ver = (string) ($row->{$spec['ver']} ?? '') ?: '1.0';
