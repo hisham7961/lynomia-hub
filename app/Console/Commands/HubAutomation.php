@@ -105,7 +105,9 @@ class HubAutomation extends Command
     {
         $expired = 0; $drafts = 0;
         try {
-            if (setting('contracts.auto_expire') === '1') {
+            // بالسلسلة لا بالنوع: hub:set يخزّن العدد 1 فيُقرأ int و`=== '1'` تفشل —
+            // كان التفعيلُ من الأمر الموثَّق نفسِه لا يعمل
+            if ((string) setting('contracts.auto_expire') === '1') {
                 $due = \App\Models\Contract::where('status', 'ساري')
                     ->whereNotNull('date_end')->whereDate('date_end', '<', today())->limit(200)->get();
                 foreach ($due as $c) {
