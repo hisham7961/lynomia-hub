@@ -1,27 +1,38 @@
-{{-- بطاقة أودو الذكية — يتوقع: $module $row --}}
+{{-- بطاقة أودو الذكية — يتوقع: $module $row.
+     الحلُّ لكل سجل: forRow يقرأ اختيارَ الخادم من meta['odoo']['conn'] —
+     الشركات والعملاء بلا اختيارٍ يبقون على الافتراضي بشفافية --}}
 @php
-    $odooOk = \App\Support\Odoo::configured();
+    $ocli = \App\Support\Odoo::forRow($row);
+    $odooOk = $ocli->ready();
     $meta = (array) $row->meta;
     $opid = (int) ($meta['odoo_partner_id'] ?? 0);
     $canE = hub_can(auth()->user(), $module, 'e');
     $stats = $err = $results = null;
-    if ($odooOk && $opid) {
-        try { $stats = \App\Support\Odoo::partnerStats($opid); }
+    if ($ocli->error()) {
+        $err = $ocli->error();
+    } elseif ($odooOk && $opid) {
+        try { $stats = $ocli->stats($opid); }
         catch (\Throwable $e) { $err = $e->getMessage(); }
     } elseif ($odooOk && $canE && ($oq = trim((string) request('odoo_q'))) !== '') {
-        try { $results = \App\Support\Odoo::searchPartners($oq); }
+        try { $results = $ocli->partners($oq); }
         catch (\Throwable $e) { $err = $e->getMessage(); }
     }
 @endphp
 <div class="card" id="odoo">
     <h3>🟣 أودو — محاسبة (عرض فقط)
+        @if ($ocli->id() !== 'default')<span class="bdg wn">{{ $ocli->label() }}</span>@endif
         @if ($opid)<span class="bdg ok">مربوط: {{ $meta['odoo_partner_name'] ?: '#' . $opid }}</span>@endif
     </h3>
 
     @unless ($odooOk)
-        <p class="sub">لم يُهيأ الربط بعد — {{ hub_is_owner() ? 'أدخل بيانات خادم أودو من' : 'اطلب من المالك تهيئته في' }}
-            @if (hub_is_owner())<a href="{{ route('settings.edit') }}">الإعدادات ← ربط أودو</a>@else الإعدادات @endif
-            — وستمتلئ هذه البطاقة بمبيعات وفواتير هذا السجل تلقائياً.</p>
+        @if ($ocli->error())
+            {{-- اتصالٌ معيّن لكنه ميت: السببُ يُقال — لا إيحاءَ بأن التهيئة ناقصة --}}
+            <div class="ferr">⚠️ {{ $ocli->error() }}</div>
+        @else
+            <p class="sub">لم يُهيأ الربط بعد — {{ hub_is_owner() ? 'أدخل بيانات خادم أودو من' : 'اطلب من المالك تهيئته في' }}
+                @if (hub_is_owner())<a href="{{ route('settings.edit') }}">الإعدادات ← ربط أودو</a>@else الإعدادات @endif
+                — وستمتلئ هذه البطاقة بمبيعات وفواتير هذا السجل تلقائياً.</p>
+        @endif
     @else
         @if ($err)<div class="ferr" style="margin-bottom:8px">⚠️ {{ $err }}</div>@endif
 

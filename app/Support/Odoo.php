@@ -212,6 +212,82 @@ class Odoo
         Cache::forget($this->cacheKey('stats:' . $pid));
     }
 
+    /* ───────────── قنوات البيع — مبيعات المنصات من أودو ───────────── */
+
+    /** المميِّزات المدعومة لتفريق قنوات البيع داخل أودو */
+    public const CHANNEL_MODES = ['team', 'journal', 'tag', 'website'];
+
+    /**
+     * خيارات المميِّز حيّةً من أودو — المالك غير متأكدٍ كيف تتمايز قنواته،
+     * فالشاشة تعرض ما في خادمه فعلاً بدل أن تطلب معرّفات غيبية.
+     */
+    public function channelOptions(string $mode): array
+    {
+        return (array) Cache::remember($this->cacheKey('opts:' . $mode), 600, fn () => match ($mode) {
+            'team'    => $this->call('crm.team', 'search_read', [[]],
+                            ['fields' => ['id', 'name'], 'limit' => 80]),
+            'journal' => $this->call('account.journal', 'search_read', [[['type', '=', 'sale']]],
+                            ['fields' => ['id', 'name', 'code'], 'limit' => 80]),
+            'tag'     => $this->call('crm.tag', 'search_read', [[]],
+                            ['fields' => ['id', 'name'], 'limit' => 120]),
+            'website' => $this->call('website', 'search_read', [[]],
+                            ['fields' => ['id', 'name'], 'limit' => 40]),
+            default   => throw new \RuntimeException('مميِّز غير معروف: ' . $mode),
+        });
+    }
+
+    /**
+     * أرقام قناةٍ واحدة: إجمالي + عدد.
+     *
+     * **الفرق الدلاليّ مقصود**: `team`/`tag`/`website` تُحصي **أوامر البيع**
+     * المؤكدة (`sale.order`)، بينما `journal` يخصّ الدفاتر المحاسبية فيُحصي
+     * **فواتير العملاء المرحّلة** (`account.move`) — والبطاقة تسمّي الوحدة
+     * («أمر»/«فاتورة») حتى لا يُقارَن تفاحٌ ببرتقال.
+     *
+     * العدُّ بـ`search_count` (رخيصٌ ومضمونٌ عبر الإصدارات)، والإجماليُّ
+     * بـ`read_group` — وأودو 17/18 بدأ يهجره، فله سقوطٌ احتياطي إلى
+     * `search_read` وجمعٍ محليّ بحدّ ٢٠٠٠، وعندها `approx` **تصدُق**.
+     */
+    public function channelStats(string $projectId, array $ch, bool $fresh = false): array
+    {
+        $key = $this->cacheKey('chan:' . $projectId . ':' . ($ch['key'] ?? '?'));
+        if ($fresh) Cache::forget($key);
+
+        return Cache::remember($key, 600, function () use ($ch) {
+            $refId = (int) ($ch['ref_id'] ?? 0);
+            [$model, $domain, $src] = match ((string) ($ch['mode'] ?? '')) {
+                'team'    => ['sale.order', [['team_id', '=', $refId], ['state', 'in', ['sale', 'done']]], 'orders'],
+                'tag'     => ['sale.order', [['tag_ids', 'in', [$refId]], ['state', 'in', ['sale', 'done']]], 'orders'],
+                'website' => ['sale.order', [['website_id', '=', $refId], ['state', 'in', ['sale', 'done']]], 'orders'],
+                'journal' => ['account.move', [['journal_id', '=', $refId], ['move_type', '=', 'out_invoice'], ['state', '=', 'posted']], 'invoices'],
+                default   => throw new \RuntimeException('مميِّز غير معروف: ' . ($ch['mode'] ?? '؟')),
+            };
+
+            $count = (int) $this->call($model, 'search_count', [$domain]);
+
+            $approx = false;
+            try {
+                $g = (array) $this->call($model, 'read_group',
+                    [$domain, ['amount_total'], []]);
+                $total = (float) ($g[0]['amount_total'] ?? 0);
+            } catch (\Throwable $e) {
+                $rows = (array) $this->call($model, 'search_read', [$domain],
+                    ['fields' => ['amount_total'], 'limit' => 2000]);
+                $total = (float) array_sum(array_column($rows, 'amount_total'));
+                $approx = count($rows) >= 2000;   // بلغ الحدّ: المجموع منقوص فيُقال
+            }
+
+            return ['total' => $total, 'count' => $count, 'src' => $src,
+                    'approx' => $approx, 'at' => now()->format('H:i')];
+        });
+    }
+
+    /** إسقاط كاش قناةٍ — عند حذفها أو طلب التحديث */
+    public function forgetChannel(string $projectId, string $chKey): void
+    {
+        Cache::forget($this->cacheKey('chan:' . $projectId . ':' . $chKey));
+    }
+
     /* ───────────── التوافق الساكن — المواقع القائمة كما هي ───────────── */
 
     /** هل اكتملت بيانات الاتصال الافتراضي في الإعدادات؟ */

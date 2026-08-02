@@ -269,6 +269,12 @@ Route::middleware('auth')->group(function () {
     Route::get('performance', [PerformanceController::class, 'index'])->name('performance');
 
     // ── الربط الذكي بأودو (عرض فقط) ──
+    // «projects» قبل «{module}»: المسار الأدقّ يُسجَّل أولاً فلا يبتلعه العام
+    Route::get('odoo/projects/{id}', [OdooController::class, 'project'])->name('odoo.project');
+    Route::post('odoo/projects/{id}/conn', [OdooController::class, 'setConn'])->name('odoo.project.conn');
+    Route::post('odoo/projects/{id}/channels', [OdooController::class, 'addChannel'])->name('odoo.project.channel.add');
+    Route::post('odoo/projects/{id}/channels/remove', [OdooController::class, 'removeChannel'])->name('odoo.project.channel.del');
+    Route::post('odoo/projects/{id}/channels/refresh', [OdooController::class, 'refreshChannels'])->name('odoo.project.refresh');
     Route::post('odoo/{module}/{id}/link', [OdooController::class, 'link'])->name('odoo.link');
     Route::post('odoo/{module}/{id}/unlink', [OdooController::class, 'unlink'])->name('odoo.unlink');
     Route::post('odoo/{module}/{id}/refresh', [OdooController::class, 'refresh'])->name('odoo.refresh');
