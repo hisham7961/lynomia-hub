@@ -120,6 +120,10 @@
         @if (in_array($module, ['projects', 'companies', 'clients'], true))
             @include('partials.odoo_card')
         @endif
+        {{-- مبيعات قنوات البيع (ترنديول/أمازون/نون/المتجر) من أودو — للمشاريع --}}
+        @if ($module === 'projects')
+            @include('partials.odoo_channels_card')
+        @endif
         @if (in_array($module, ['clients', 'companies', 'hr', 'suppliers', 'recruit', 'projects',
                                 'approvals', 'decisions', 'policies', 'policyacks', 'assets'], true) && hub_can(auth()->user(), 'contracts', 'v'))
             @include('partials.esign_linked')

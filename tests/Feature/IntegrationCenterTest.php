@@ -59,4 +59,37 @@ class IntegrationCenterTest extends TestCase
 
         $this->actingAs($this->owner)->get('/')->assertOk()->assertSee('التكاملات');
     }
+
+    /** «جمع كل التكاملات في مكان واحد»: بوابة موحّدة + قنوات البيع عبر أودو */
+    public function test_center_gathers_everything_and_marks_sales_channels_via_odoo(): void
+    {
+        $this->seedCore();
+        $html = $this->actingAs($this->owner)->get('/admin/integrations')->assertOk()->getContent();
+
+        // البوابة الموحّدة تصل بكل شاشة إعداد
+        $this->assertStringContainsString('التكاملات وإعداداتها — في مكان واحد', $html);
+        foreach (['خوادم أودو', 'مفاتيح REST API', 'الصندوق الصادر'] as $rowName) {
+            $this->assertStringContainsString($rowName, $html, "صف «{$rowName}» غائب عن البوابة");
+        }
+
+        // منصات البيع في الكتالوج موسومةً «عبر أودو» — لا مفاتيح منصات
+        $this->assertStringContainsString('قنوات البيع (عبر أودو)', $html);
+        foreach (['ترنديول', 'أمازون', 'نون', 'المتجر الإلكتروني'] as $chan) {
+            $this->assertStringContainsString($chan, $html, "قناة «{$chan}» غائبة عن الكتالوج");
+        }
+    }
+
+    /** الدليل التفصيلي على شاشة خوادم أودو يغطي الخطوات السبع */
+    public function test_odoo_hub_carries_the_detailed_connection_guide(): void
+    {
+        $this->seedCore();
+        $html = $this->actingAs($this->owner)->get('/admin/integrations/odoo')->assertOk()->getContent();
+
+        foreach (['مستخدمَ قراءةٍ مخصصاً', 'مفتاح API', 'اسم القاعدة', 'اختبره',
+                  'شريكَ كل مشروع', 'قنوات البيع لكل مشروع', 'استكشاف الأخطاء'] as $step) {
+            $this->assertStringContainsString($step, $html, "خطوة «{$step}» غائبة عن الدليل");
+        }
+        // وجدول الأعطال يشرح أخبثها: تبديل APP_KEY يفشل فك التشفير صامتاً
+        $this->assertStringContainsString('APP_KEY', $html);
+    }
 }

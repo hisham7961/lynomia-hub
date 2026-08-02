@@ -269,6 +269,12 @@ Route::middleware('auth')->group(function () {
     Route::get('performance', [PerformanceController::class, 'index'])->name('performance');
 
     // ── الربط الذكي بأودو (عرض فقط) ──
+    // «projects» قبل «{module}»: المسار الأدقّ يُسجَّل أولاً فلا يبتلعه العام
+    Route::get('odoo/projects/{id}', [OdooController::class, 'project'])->name('odoo.project');
+    Route::post('odoo/projects/{id}/conn', [OdooController::class, 'setConn'])->name('odoo.project.conn');
+    Route::post('odoo/projects/{id}/channels', [OdooController::class, 'addChannel'])->name('odoo.project.channel.add');
+    Route::post('odoo/projects/{id}/channels/remove', [OdooController::class, 'removeChannel'])->name('odoo.project.channel.del');
+    Route::post('odoo/projects/{id}/channels/refresh', [OdooController::class, 'refreshChannels'])->name('odoo.project.refresh');
     Route::post('odoo/{module}/{id}/link', [OdooController::class, 'link'])->name('odoo.link');
     Route::post('odoo/{module}/{id}/unlink', [OdooController::class, 'unlink'])->name('odoo.unlink');
     Route::post('odoo/{module}/{id}/refresh', [OdooController::class, 'refresh'])->name('odoo.refresh');
@@ -347,6 +353,13 @@ Route::middleware('auth')->group(function () {
     Route::post('jslog', [ErrorCenterController::class, 'jslog'])->name('jslog')->middleware('throttle:20,1');
     Route::get('admin/integrations', [\App\Http\Controllers\Web\IntegrationController::class, 'index'])->name('integrations.index');
     Route::get('admin/integrations/guide', [\App\Http\Controllers\Web\IntegrationController::class, 'guide'])->name('integrations.guide');
+    // خوادم أودو المتعددة — الاتصال الافتراضي يبقى في الإعدادات، وهنا الإضافيون
+    Route::get('admin/integrations/odoo', [\App\Http\Controllers\Web\OdooConnectionController::class, 'index'])->name('integrations.odoo');
+    Route::post('admin/integrations/odoo', [\App\Http\Controllers\Web\OdooConnectionController::class, 'store'])->name('integrations.odoo.store');
+    Route::put('admin/integrations/odoo/{id}', [\App\Http\Controllers\Web\OdooConnectionController::class, 'update'])->name('integrations.odoo.update');
+    Route::post('admin/integrations/odoo/{id}/toggle', [\App\Http\Controllers\Web\OdooConnectionController::class, 'toggle'])->name('integrations.odoo.toggle');
+    Route::post('admin/integrations/odoo/{id}/test', [\App\Http\Controllers\Web\OdooConnectionController::class, 'test'])->name('integrations.odoo.test');
+    Route::delete('admin/integrations/odoo/{id}', [\App\Http\Controllers\Web\OdooConnectionController::class, 'destroy'])->name('integrations.odoo.destroy');
     Route::get('admin/webhooks', [WebhookController::class, 'index'])->name('webhooks.index');
     Route::post('admin/webhooks', [WebhookController::class, 'store'])->name('webhooks.store');
     Route::post('admin/webhooks/{id}/toggle', [WebhookController::class, 'toggle'])->name('webhooks.toggle');
