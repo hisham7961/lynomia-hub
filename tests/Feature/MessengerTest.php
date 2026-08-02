@@ -29,7 +29,9 @@ class MessengerTest extends TestCase
         $html = $this->actingAs($this->owner)->get("/dm/{$this->employee->id}")->assertOk()->getContent();
 
         $this->assertStringContainsString('رسالةٌ من زميلة', $html);
-        $this->assertStringContainsString('ابحث في المحادثات', $html,
+        // v2.216: كان يقيس نصَّ العنصر النائب في صندوق البحث — وقد صار «ابحث في
+        // نصّ الرسائل». الخاصيةُ المقصودة هي حضورُ لوح المحادثات نفسه، فتُقاس به.
+        $this->assertStringContainsString('dmlist', $html,
             'الخيط يُفتح وحده بلا قائمة المحادثات — تنقّلٌ ذهاباً وإياباً');
         $this->assertStringContainsString('dmwrap', $html);
     }

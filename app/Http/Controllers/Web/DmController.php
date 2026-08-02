@@ -55,7 +55,24 @@ class DmController extends Controller
         if ($to !== '' && $to !== $me && User::whereNull('deleted_at')->whereKey($to)->exists()) {
             return redirect()->route('dm.thread', $to);
         }
-        $msgs = DmMessage::where('from_id', $me)->orWhere('to_id', $me)
+        /*
+         * **البحثُ في نصّ الرسائل لا في أسماء المحادثات.** كان صندوق البحث
+         * يُرشّح القائمةَ بالجافاسكربت على الاسم والسطر الأخير وحدهما — فمن يبحث
+         * عن رقم حسابٍ أُرسل قبل شهرين لا يجده إلا بالتمرير يدوياً في كل خيط.
+         * والبحثُ محصورٌ بمحادثاتي: لا يبلغ أحدٌ برسالةِ بحثٍ ما ليس طرفاً فيه.
+         */
+        $q = trim(hub_str($r->query('q')));
+        $hits = collect();
+        if ($q !== '') {
+            $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $q) . '%';
+            $hits = DmMessage::alive()
+                ->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
+                ->where('body', 'LIKE', $like)
+                ->orderByDesc('created_at')->limit(60)->get()
+                ->map(fn ($m) => ['msg' => $m, 'other' => $m->from_id === $me ? $m->to_id : $m->from_id]);
+        }
+
+        $msgs = DmMessage::alive()->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
             ->orderByDesc('created_at')->limit(500)->get();
 
         $threads = $msgs->groupBy('thread_key')->map(function ($g) use ($me) {
@@ -67,12 +84,13 @@ class DmController extends Controller
             ];
         })->values();
 
-        $users = User::whereIn('id', $threads->pluck('other'))->pluck('name', 'id');
+        $users = User::whereIn('id', $threads->pluck('other')->merge($hits->pluck('other')))
+            ->pluck('name', 'id');
         $all = User::whereNull('deleted_at')->where('id', '!=', $me)
             ->where('status', 'نشط')->orderBy('name')->pluck('name', 'id');
 
         return view('dm.inbox', ['threads' => $threads, 'users' => $users, 'all' => $all,
-            'open' => null, 'msgs' => collect(), 'other' => null,
+            'open' => null, 'msgs' => collect(), 'other' => null, 'q' => $q, 'hits' => $hits,
             'presence' => self::presence($threads->pluck('other')->all())]);
     }
 
@@ -86,11 +104,13 @@ class DmController extends Controller
         DmMessage::where('thread_key', $key)->where('to_id', auth()->id())
             ->whereNull('read_at')->update(['read_at' => now()]);
 
+        // المحذوفةُ تبقى في الخيط أثراً يقول «حُذفت رسالة» — المحادثةُ المبتورةُ
+        // بلا تفسيرٍ تجعل الطرفَ الآخر يظنّ أنه أخطأ القراءة
         $msgs = DmMessage::where('thread_key', $key)->orderBy('created_at')->limit(300)->get();
 
         // نفس الشاشة: قائمةُ المحادثات إلى جانب الخيط المفتوح — لا صفحتان منفصلتان
         $me = auth()->id();
-        $all = DmMessage::where('from_id', $me)->orWhere('to_id', $me)
+        $all = DmMessage::alive()->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
             ->orderByDesc('created_at')->limit(500)->get();
         $threads = $all->groupBy('thread_key')->map(function ($g) use ($me) {
             $last = $g->first();
@@ -104,7 +124,7 @@ class DmController extends Controller
         return view('dm.inbox', [
             'other' => $other, 'msgs' => $msgs, 'open' => $other->id,
             'threads' => $threads,
-            'users' => User::whereIn('id', $ids)->pluck('name', 'id'),
+            'users' => User::whereIn('id', $ids)->pluck('name', 'id'), 'q' => '', 'hits' => collect(),
             'all' => User::whereNull('deleted_at')->where('id', '!=', $me)
                 ->where('status', 'نشط')->orderBy('name')->pluck('name', 'id'),
             'presence' => self::presence($ids),
@@ -166,9 +186,31 @@ class DmController extends Controller
         return redirect()->route('dm.thread', $other->id)->withFragment('bottom');
     }
 
+    /**
+     * سحبُ رسالةٍ أُرسلت بالخطأ — **لصاحبها وحده**.
+     *
+     * لا يمحو أحدٌ كلام غيره: من تلقّى رسالةً لا يُخفيها عن نفسه ولا عن مُرسِلها،
+     * وغريبٌ عن المحادثة لا يمسّها. والحذفُ **ناعم**: مكانُ الرسالة يبقى يقول
+     * «حُذفت رسالة» بدل أن تختفي بلا تفسير فيظنّ الطرفُ الآخر أنه أخطأ القراءة.
+     */
+    public function destroy(string $id)
+    {
+        $m = DmMessage::findOrFail($id);
+        abort_unless(in_array(auth()->id(), [$m->from_id, $m->to_id], true), 403,
+            'لا شأن لك بهذه المحادثة');
+        abort_unless($m->from_id === auth()->id(), 403,
+            'الحذف لصاحب الرسالة وحده — لا يمحو أحدٌ كلام غيره');
+        abort_if($m->deleted_at !== null, 422, 'حُذفت هذه الرسالة من قبل');
+
+        $m->forceFill(['deleted_at' => now()])->save();
+        hub_data_bump('dm_messages');
+
+        return back()->with('ok', 'سُحبت الرسالة — يبقى مكانُها يقول إنها حُذفت');
+    }
+
     /** عدد غير المقروء للمستخدم الحالي — لشارة القائمة */
     public static function unreadCount(): int
     {
-        return DmMessage::where('to_id', auth()->id())->whereNull('read_at')->count();
+        return DmMessage::alive()->where('to_id', auth()->id())->whereNull('read_at')->count();
     }
 }
