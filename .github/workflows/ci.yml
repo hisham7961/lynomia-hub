@@ -80,12 +80,21 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - name: التحقق من رفع VERSION
+        # القاعدة كما في CLAUDE.md: «لا يُدفع **تغييرٌ وظيفيّ** دون رفع النسخة».
+        # فالمقياسُ تغيُّرُ الشيفرة لا وجودُ commits: دمجُ فرعٍ لا يُدخل تغييراً
+        # وظيفياً جديداً كان يُنذر كاذباً — وإنذارٌ كاذبٌ متكرّر يُدرّب على التجاهل.
         run: |
           base=$(git merge-base origin/${{ github.base_ref }} HEAD)
           old=$(git show "$base:VERSION" 2>/dev/null || echo "")
           new=$(cat VERSION)
+
+          if git diff --quiet "$base" HEAD -- app resources routes config database public; then
+            echo "ℹ️ لا تغيير وظيفيّ في هذه الدفعة (وثائق أو دمجٌ فقط) — لا يلزم رفع النسخة."
+            exit 0
+          fi
+
           if [ -n "$old" ] && [ "$old" = "$new" ]; then
-            echo "✗ الدفعة تحوي تحديثاً ولم تُرفع VERSION (لا تزال $new)"
+            echo "✗ الدفعة تحوي تغييراً وظيفياً ولم تُرفع VERSION (لا تزال $new)"
             echo "  ارفع الرقم وأضف مدخلاً في «سجل الإصدارات» بـREADME."
             exit 1
           fi
