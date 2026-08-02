@@ -475,6 +475,28 @@ if (! function_exists('hub_user_admins')) {
     }
 }
 
+if (! function_exists('hub_has_col')) {
+    /**
+     * **هل هذا العمود موجودٌ فعلاً؟** — مخبّأً، للمسارات التي تعمل في كل صفحة.
+     *
+     * نشرُ شيفرةٍ قبل تشغيل هجرتها أمرٌ يقع: يُرفع الكود وتُنسى `php artisan
+     * migrate` دقائق أو ساعة. وما دام القارئ شاشةً واحدة فالأثر شاشة؛ أما إن
+     * كان يعمل في **كل صفحة** — كشارة الشريط الجانبي — فالنظام كلُّه لا يفتح،
+     * و`Unknown column` في كل طلب. (وSQLite تتساهل حيث ترمي MySQL، فالحزمةُ
+     * خضراء والخادمُ واقف.)
+     *
+     * القاعدة: **الهجرةُ المتأخرة تُنقص ميزةً ولا تُطفئ نظاماً.**
+     */
+    function hub_has_col(string $table, string $col): bool
+    {
+        return (bool) \Illuminate\Support\Facades\Cache::remember(
+            'hub:hascol:' . $table . '.' . $col, 300,
+            fn () => \Illuminate\Support\Facades\Schema::hasTable($table)
+                  && \Illuminate\Support\Facades\Schema::hasColumn($table, $col)
+        );
+    }
+}
+
 if (! function_exists('hub_assignable_roles')) {
     /**
      * الأدوار القابلة للمنح من هذا المستخدم — **غير المالك لا يمنح ملكيةً فلا

@@ -200,6 +200,8 @@ class DmController extends Controller
             'لا شأن لك بهذه المحادثة');
         abort_unless($m->from_id === auth()->id(), 403,
             'الحذف لصاحب الرسالة وحده — لا يمحو أحدٌ كلام غيره');
+        abort_unless(hub_has_col('dm_messages', 'deleted_at'), 503,
+            'ميزةُ سحب الرسائل تحتاج ترحيلاً لم يُشغَّل بعد — نفّذ php artisan migrate');
         abort_if($m->deleted_at !== null, 422, 'حُذفت هذه الرسالة من قبل');
 
         $m->forceFill(['deleted_at' => now()])->save();
@@ -208,9 +210,18 @@ class DmController extends Controller
         return back()->with('ok', 'سُحبت الرسالة — يبقى مكانُها يقول إنها حُذفت');
     }
 
-    /** عدد غير المقروء للمستخدم الحالي — لشارة القائمة */
+    /**
+     * عدد غير المقروء للمستخدم الحالي — لشارة القائمة.
+     *
+     * **تعمل في كل صفحة**، فلا تعتمد على عمودٍ حديث بلا فحص: نشرٌ سبق هجرتَه
+     * كان سيُعطي `Unknown column` في كل طلب فلا يفتح النظام كلُّه. و`hub_has_col`
+     * مخبّأٌ فلا ثمنَ لهذا الأمان.
+     */
     public static function unreadCount(): int
     {
-        return DmMessage::alive()->where('to_id', auth()->id())->whereNull('read_at')->count();
+        $q = DmMessage::where('to_id', auth()->id())->whereNull('read_at');
+        if (hub_has_col('dm_messages', 'deleted_at')) $q->whereNull('deleted_at');
+
+        return $q->count();
     }
 }
