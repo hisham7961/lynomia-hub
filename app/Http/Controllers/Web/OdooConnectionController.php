@@ -92,7 +92,7 @@ class OdooConnectionController extends Controller
         if ($credChanged) {
             $c->last_ok_at = null;
             $c->last_version = null;
-            Cache::forget('odoo:' . $c->id . ':uid');
+            // لا نسفَ يدوياً: بصمةُ الاعتماد في مفاتيح الكاش تُدوّرها كلَّها تلقائياً
         }
         $c->save();
         hub_audit('تعديل اتصال أودو', 'settings', null, $c->name);
@@ -107,7 +107,6 @@ class OdooConnectionController extends Controller
         $c = OdooConnection::findOrFail($id);
         $c->active = ! $c->active;
         $c->save();
-        Cache::forget('odoo:' . $c->id . ':uid');
         hub_audit(($c->active ? 'تفعيل' : 'تعطيل') . ' اتصال أودو', 'settings', null, $c->name);
 
         return back()->with('ok', ($c->active ? 'فُعّل' : 'عُطّل') . ' اتصال «' . $c->name . '»'
@@ -139,7 +138,6 @@ class OdooConnectionController extends Controller
         $c = OdooConnection::findOrFail($id);
         $n = $this->projectsUsing($c->id)->count();
         $c->delete();
-        Cache::forget('odoo:' . $c->id . ':uid');
         hub_audit('حذف اتصال أودو', 'settings', null, $c->name);
 
         return back()->with('ok', 'حُذف اتصال «' . $c->name . '»'
@@ -178,8 +176,7 @@ class OdooConnectionController extends Controller
             \App\Models\Setting::updateOrCreate(['key' => 'odoo.key'],
                 ['value' => 'enc:' . \Illuminate\Support\Facades\Crypt::encryptString($d['key'])]);
         }
-        Cache::forget('settings:all');
-        Cache::forget('odoo:default:uid');
+        Cache::forget('settings:all');   // كاش أودو يتدوّر ببصمة الاعتماد في مفتاحه
         hub_audit('تعديل إعدادات النظام', 'settings', null, 'odoo.* — من مركز التكاملات');
 
         return back()->with('ok', 'حُفظ الاتصال الافتراضي — اختبره الآن');

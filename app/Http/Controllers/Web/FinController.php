@@ -36,26 +36,67 @@ class FinController extends Controller
             'bankId' => 'nullable|string|exists:bank_accounts,id',
         ], [], ['amount' => 'مبلغ الدفعة', 'bankId' => 'الحساب البنكي']);
 
-        $paid = (float) ($doc->paid ?? 0);
-        $total = (float) ($doc->total ?? 0);
-        $remain = max(0, $total - $paid);
-        abort_if($remain <= 0, 422, 'المستند مسدّد بالكامل أصلاً');
-
-        // لا دفعة تتجاوز المتبقي — الفائض خطأ إدخال لا إيراد
-        $amount = min((float) $d['amount'], $remain);
-
-        if (! empty($d['bankId'])) $doc->bank_id = $d['bankId'];
-        $doc->paid = $paid + $amount;
-        $prev = (string) $doc->state;
-        $doc->state = $doc->paid >= $total ? 'مدفوعة' : 'مدفوعة جزئياً';
-        $doc->save();
-
-        // رصيد البنك يتحرك باتجاه المستند: قبضٌ للدخل وصرفٌ للمصروف
-        if ($doc->bank_id && ($bank = BankAccount::find($doc->bank_id))) {
-            $sign = in_array((string) $doc->kind, config('hub.fin.income'), true) ? 1 : -1;
-            $bank->balance = (float) ($bank->balance ?? 0) + $sign * $amount;
-            $bank->saveQuietly();   // حركة مشتقة من الدفعة الموثقة — لا ضجيج تدقيق مزدوج
+        /*
+         * **تحريكُ بنكٍ كتابةٌ في وحدة البنوك** — بابٌ جانبيّ كان يفلت من
+         * الثلاثية: bankId إدخالُ مستخدمٍ يمرّ بـexists وحدها، فمعزولُ شركةٍ
+         * يحرّك رصيدَ بنك شركةٍ أخرى، وحاملُ fin.e بلا أي صلاحية بنوك يحرّك
+         * أرصدتها. الحارسان قبل أي كتابة — إمّا كلُّه وإمّا لا شيء.
+         */
+        if (! empty($d['bankId'])) {
+            abort_unless(hub_can(auth()->user(), 'banks', 'e'), 422,
+                'توجيه الدفعة لحساب بنكي يحرّك رصيده — ويتطلب صلاحية تعديل البنوك');
+            abort_unless(hub_scope(BankAccount::query(), 'banks')->whereKey($d['bankId'])->exists(), 422,
+                'الحساب البنكي خارج نطاقك — اختر حساباً من شركاتك');
         }
+
+        /*
+         * **عملةُ البنك عملةُ المستند أو لا تحريك**: كان المبلغ يُضاف 1:1 —
+         * دفعةُ 100 دولار ترفع رصيدَ حسابٍ دينariّ 100 ديناراً. لا محرّكَ
+         * أسعارٍ في النظام (بالتصميم — الإعدادُ app.currency «تسميةٌ لا
+         * تحويل»)، فالصادقُ رفضُ الخلط لا تحويلٌ مُخترَع.
+         */
+        if (! empty($d['bankId'])) {
+            $bcur = (string) BankAccount::whereKey($d['bankId'])->value('currency');
+            $dcur = (string) ($doc->currency ?? '');
+            abort_if($bcur !== '' && $dcur !== '' && $bcur !== $dcur, 422,
+                "عملة الحساب ({$bcur}) تخالف عملة المستند ({$dcur}) — لا تحويلَ أسعارٍ في النظام، اختر حساباً بعملة المستند");
+        }
+
+        /*
+         * **معاملةٌ وقفل**: كانت الدفعة ثلاث كتاباتٍ متفرقة (مستند، بنك، قيد)
+         * بلا معاملة — تداخلُ نقرتين يكرّر القيدَ ويشوّه الرصيد. القفلُ الصفّي
+         * يسلسل الدفعات على المستند الواحد، والمعاملةُ تجعلها كلَّها أو لا شيء.
+         */
+        $prev = (string) $doc->state;
+        $amount = \Illuminate\Support\Facades\DB::transaction(function () use ($d, $doc) {
+            $fresh = FinDocument::lockForUpdate()->findOrFail($doc->id);
+
+            $paid = (float) ($fresh->paid ?? 0);
+            $total = (float) ($fresh->total ?? 0);
+            $remain = max(0, $total - $paid);
+            abort_if($remain <= 0, 422, 'المستند مسدّد بالكامل أصلاً');
+
+            // لا دفعة تتجاوز المتبقي — الفائض خطأ إدخال لا إيراد
+            $amount = min((float) $d['amount'], $remain);
+
+            if (! empty($d['bankId'])) $fresh->bank_id = $d['bankId'];
+            $fresh->paid = $paid + $amount;
+            $fresh->state = $fresh->paid >= $total ? 'مدفوعة' : 'مدفوعة جزئياً';
+            $fresh->save();
+
+            // رصيد البنك يتحرك باتجاه المستند: قبضٌ للدخل وصرفٌ للمصروف
+            if ($fresh->bank_id && ($bank = BankAccount::lockForUpdate()->find($fresh->bank_id))) {
+                $sign = in_array((string) $fresh->kind, config('hub.fin.income'), true) ? 1 : -1;
+                $bank->balance = (float) ($bank->balance ?? 0) + $sign * $amount;
+                $bank->saveQuietly();   // حركة مشتقة من الدفعة الموثقة — لا ضجيج تدقيق مزدوج
+            }
+
+            // تُنسخ الحصيلة للنموذج الخارجي كي يكمل ما بعد المعاملة عليها
+            $doc->setRawAttributes($fresh->getAttributes(), true);
+
+            return $amount;
+        });
+        $total = (float) ($doc->total ?? 0);
 
         if ($doc->state !== $prev) {
             \App\Support\FlowRunner::fire('status', 'fin', $doc, $doc->state);
@@ -78,7 +119,8 @@ class FinController extends Controller
      */
     protected function autoJournal(FinDocument $doc, float $amount): void
     {
-        if (setting('finance.auto_journal') !== '1') return;
+        // بالسلسلة لا بالنوع — hub:set يخزّن العدد فتفشل === النوعية (داء contracts.auto_expire نفسه)
+        if ((string) setting('finance.auto_journal') !== '1') return;
 
         try {
             $map = setting('finance.accounts');
@@ -87,8 +129,11 @@ class FinController extends Controller
             $moneyCode = (string) ($doc->bank_id ? ($map['bank'] ?? '') : ($map['cash'] ?? ''));
             $otherCode = (string) ($income ? ($map['sales'] ?? '') : ($map['exp'] ?? ''));
 
+            // بترتيب id: code غير فريد في الدليل، وبلا ترتيبٍ يختار المحرّكان
+            // حسابين مختلفين للرمز المكرر — قيودٌ تتوزع على حسابين بالقرعة
             $accId = fn (string $code) => $code === '' ? null
-                : \App\Models\LedgerAccount::whereNull('deleted_at')->where('code', $code)->value('id');
+                : \App\Models\LedgerAccount::whereNull('deleted_at')->where('code', $code)
+                    ->orderBy('id')->value('id');
             $money = $accId($moneyCode);
             $other = $accId($otherCode);
             if (! $money || ! $other) return;   // خريطة غير مكتملة — لا قيد أعرج

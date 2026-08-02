@@ -40,17 +40,19 @@ class AdversarialAuditTest extends TestCase
             'اسم اللوحة وصل خاماً غير مُهرَّب — كسرُ سمة وحقن HTML');
     }
 
-    /** ونفس الفحص على القالب المُصرَّف مباشرةً، بلا اعتماد على شكل الصفحة */
-    public function test_board_delete_confirm_uses_json_encoding(): void
+    /**
+     * ونفس الفحص على مصدر القالب مباشرةً — **بلا شرطٍ يبتلع التأكيد**: النسخة
+     * السابقة اشترطت سطراً فيه `confirm(` وقد زال منذ v2.89، فما بقي إلا
+     * `assertTrue(true)` — اختبارٌ أخضرُ فارغٌ اصطاده فحصُ العشرين وكيلاً.
+     * الآن يُثبَّت العقدُ القائم صراحةً: تأكيدٌ بـdata-confirm ولا حقنَ خام.
+     */
+    public function test_board_delete_confirm_uses_safe_pattern_in_source(): void
     {
-        $src = file_get_contents(resource_path('views/boards/edit.blade.php'));
-        $line = collect(explode("\n", $src))->first(fn ($l) => str_contains($l, 'confirm(') && str_contains($l, 'board->name'));
+        $src = (string) file_get_contents(resource_path('views/boards/edit.blade.php'));
 
-        if ($line !== null) {
-            $this->assertStringContainsString('Js::from', $line,
-                'اسم اللوحة يُدرَج في JS بلا ترميز JSON');
-        }
-        $this->assertTrue(true);
+        $this->assertStringContainsString('data-confirm=', $src, 'نموذج الحذف بلا تأكيد في المصدر');
+        $this->assertStringNotContainsString('confirm({{', $src, 'عاد نمط confirm( بحقنٍ خام');
+        $this->assertStringNotContainsString('{!!', $src, 'إخراجٌ غير مُهرَّب في قالب اللوحات');
     }
 
     /**

@@ -44,7 +44,7 @@
                 <div class="stat"><span class="ico">📥</span><b>{{ number_format($stats['bills'], 0) }}</b><span>فواتير موردين ({{ $stats['billsN'] }})</span></div>
             </div>
             <div class="crow">
-                <span class="sub">آخر جلب: {{ $stats['at'] }} · تُخبأ ١٠ دقائق</span>
+                <span class="sub">آخر جلب: {{ $stats['at'] }} · تُخبأ ١٠ دقائق{{ ($stats['approx'] ?? false) ? ' · الأرقام تقريبية (تجاوز حد الجلب)' : '' }}</span>
                 <span class="spacer"></span>
                 @if ($canE)
                     <form method="POST" action="{{ route('odoo.refresh', [$module, $row->id]) }}">@csrf<button class="btn ghost xs">🔄 تحديث الآن</button></form>

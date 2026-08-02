@@ -43,6 +43,10 @@ class StaffController extends Controller
 
         $u = User::whereNull('deleted_at')->find($uid);
         if (! $u) return back()->withErrors(['user_id' => 'حسابٌ غير معروف']);
+        // حارس التصعيد: ربطُ الملف يجعل حالتَه تتحكم بالحساب (الإغلاق الآلي) —
+        // فحسابُ مالكٍ أو إداريٍّ لا يُربط إلا بمن يملك المساسَ به
+        abort_unless(Staff::mayTouch($u), 403,
+            'هذا الحساب ذو امتياز (مالك أو إدارة مستخدمين) — ربطُه بملفٍّ يتطلب صلاحيةً تعلوه');
         if (Staff::accountTaken($u->id, $emp->id)) {
             return back()->withErrors(['user_id' => 'هذا الحساب مربوطٌ بملفٍّ آخر — الحساب لصاحبه']);
         }

@@ -228,9 +228,28 @@ class AllWritePathsSmokeTest extends TestCase
         $u = User::create(['name' => 'بلا', 'email' => 'none@t.local', 'password' => 'Secret!2026x',
             'role_id' => $role->id, 'status' => 'نشط', 'password_changed_at' => now()]);
 
+        /*
+         * **العدُّ وحده أعمى عن التعديل في محلّه**: كشف فحصُ العشرين وكيلاً أن
+         * مقارنة عدد الصفوف تفوت PUT يعدّل سجلاً قائماً (العددُ ثابتٌ والمحتوى
+         * تبدّل). تُلتقط بصمةُ محتوى كل جدولٍ (أحدث updated_at + مجموع version)
+         * قبل الطرق وبعده — فالتعديلُ في محله يغيّر أحدهما حتماً.
+         */
         $tables = collect(hub_modules())->pluck('table')->unique()
             ->filter(fn ($t) => $t && Schema::hasTable($t))->values();
-        $before = $tables->mapWithKeys(fn ($t) => [$t => DB::table($t)->count()])->all();
+        $print = function () use ($tables, $u) {
+            return $tables->mapWithKeys(function ($t) use ($u) {
+                // صفُّ الفاعل نفسه مستثنى من users: «التخصيص الشخصي» يكتب
+                // تفضيلاتِ صاحبه بلا صلاحية وحدةٍ — بالتصميم لا تسريباً
+                $q = DB::table($t);
+                if ($t === 'users') $q->where('id', '!=', $u->id);
+                $row = ['n' => $q->count()];
+                if (Schema::hasColumn($t, 'updated_at')) $row['u'] = (string) (clone $q)->max('updated_at');
+                if (Schema::hasColumn($t, 'version')) $row['v'] = (int) (clone $q)->sum('version');
+
+                return [$t => $row];
+            })->all();
+        };
+        $before = $print();
 
         foreach ($routes as [$verb, $url]) {
             foreach ($this->payloads($ids) as $payload) {
@@ -238,13 +257,13 @@ class AllWritePathsSmokeTest extends TestCase
             }
         }
 
+        $after = $print();
         $changed = [];
-        foreach ($before as $t => $n) {
-            $now = DB::table($t)->count();
-            if ($now !== $n) $changed[] = "{$t}: {$n} → {$now}";
+        foreach ($before as $t => $sig) {
+            if ($after[$t] !== $sig) $changed[] = $t . ': ' . json_encode($sig) . ' → ' . json_encode($after[$t]);
         }
 
         $this->assertSame([], $changed,
-            'كتب من لا يملك صلاحيةً واحدة: ' . implode(' · ', $changed));
+            'كتب من لا يملك صلاحيةً واحدة (عدداً أو تعديلاً في محله): ' . implode(' · ', $changed));
     }
 }

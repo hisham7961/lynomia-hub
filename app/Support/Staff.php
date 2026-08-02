@@ -27,6 +27,27 @@ class Staff
     /** حالات الملف التي يبقى معها الحساب مفتوحاً */
     public const OPEN = ['نشط', 'إجازة'];
 
+    /**
+     * **حسابٌ ذو امتيازٍ لا يُمَسّ إلا بمن يعلوه** — حارسُ التصعيد المفروض في
+     * شاشة المستخدمين كان غائباً عن سكّة الموظفين: دورُ مواردَ بشريةٍ (hr.e
+     * فقط) يربط ملفاً بحساب مالكٍ ثم يعدّل حالتَه فيوقفه الإغلاقُ الآلي —
+     * بابٌ جانبيّ على ثابت «الملكية لا يمنحها (ولا يمسّها) إلا مالك».
+     */
+    public static function privileged(User $u): bool
+    {
+        return (bool) ($u->role?->is_owner) || hub_flag($u, 'users');
+    }
+
+    /** هل يجوز لهذا الفاعل المساسُ بحساب هذا المستخدم؟ */
+    public static function mayTouch(User $target, $actor = null): bool
+    {
+        $actor = $actor ?? auth()->user();
+        if ($target->role?->is_owner) return (bool) ($actor && hub_is_owner($actor));
+        if (hub_flag($target, 'users')) return (bool) ($actor && (hub_is_owner($actor) || hub_flag($actor, 'users')));
+
+        return true;
+    }
+
     /* ────────── الربط ────────── */
 
     /** حسابٌ حرّ بهذا البريد؟ (غير مرتبطٍ بملفٍّ آخر) */
@@ -35,7 +56,7 @@ class Staff
         $email = trim($email);
         if ($email === '') return null;
 
-        $u = User::whereNull('deleted_at')->where('email', $email)->first();
+        $u = User::whereNull('deleted_at')->where('email', $email)->orderBy('id')->first();   // بترتيبٍ حتمي: البريد غير فريد
         if (! $u) return null;
 
         return self::accountTaken($u->id, $exceptEmp) ? null : $u;
@@ -67,7 +88,7 @@ class Staff
         if (blank($u->email)) return null;
 
         $emp = Employee::whereNull('deleted_at')->where('email', $u->email)
-            ->whereNull('user_id')->first();
+            ->whereNull('user_id')->orderBy('id')->first();
         if (! $emp || self::accountTaken($u->id)) return null;
 
         $emp->forceFill(['user_id' => $u->id])->saveQuietly();
@@ -111,7 +132,7 @@ class Staff
         $email = trim((string) $emp->email);
         if ($email === '') return ['temp' => null, 'outcome' => 'no_email', 'user' => null];
 
-        if ($existing = User::whereNull('deleted_at')->where('email', $email)->first()) {
+        if ($existing = User::whereNull('deleted_at')->where('email', $email)->orderBy('id')->first()) {
             // حسابٌ بهذا البريد موجود: يُربط إن كان حرّاً، وإلا فهو لملفٍّ آخر
             $linked = self::linkByEmail($emp);
 
@@ -149,7 +170,7 @@ class Staff
 
         if (Employee::whereNull('deleted_at')->where('user_id', $u->id)->exists()) return null;
         if (filled($u->email) && ($emp = Employee::whereNull('deleted_at')
-            ->where('email', $u->email)->whereNull('user_id')->first())) {
+            ->where('email', $u->email)->whereNull('user_id')->orderBy('id')->first())) {
             $emp->forceFill(['user_id' => $u->id])->saveQuietly();
 
             return $emp;
@@ -181,6 +202,17 @@ class Staff
         if (! $u || $u->status === 'موقوف') return;
         if ($u->id === auth()->id()) return;
         if ($u->role?->is_owner && \App\Http\Controllers\Web\UserController::activeOwners() <= 1) return;
+
+        // حسابٌ ذو امتيازٍ لا يوقفه آلياً فاعلٌ أدنى منه — يُبلَّغ من يملك القرار بدل الصمت
+        if (! self::mayTouch($u)) {
+            foreach (hub_user_admins() as $adminId) {
+                hub_notify($adminId, 'مستخدمون',
+                    '⚠️ ملف «' . $emp->name . '» ' . $why . ' وحسابُه ذو امتياز — يحتاج إيقافاً يدوياً بقرارٍ ممن يملكه',
+                    'users', $u->id);
+            }
+
+            return;
+        }
 
         $u->forceFill(['status' => 'موقوف'])->save();
         hub_audit('إيقاف حساب تبعاً للملف الوظيفي', 'users', $u->id, $u->name . ' — ' . $why);

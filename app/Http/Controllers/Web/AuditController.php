@@ -47,7 +47,9 @@ class AuditController extends Controller
             ->when($r->input('to'), fn ($w, $d) => $w->whereDate('audits.created_at', '<=', $d))
             ->when($r->input('q'), fn ($w, $t) => $w->where(fn ($x) => $x
                 ->where('audits.name', 'LIKE', "%$t%")->orWhere('audits.reason', 'LIKE', "%$t%")))
-            ->orderByDesc('audits.created_at')
+            // فاصلُ id بعد الطابع: created_at بدقّة الثانية تتساوى قيمُه،
+            // والترتيبُ على المتساوي قرعةٌ تكرّر صفوفاً وتُسقط أخرى عبر الصفحات
+            ->orderByDesc('audits.created_at')->orderByDesc('audits.id')
             // بلا COUNT(*) إجمالي — أسرع الجداول نمواً والعدّ مع join يثقل كل صفحة
             ->simplePaginate(40)->withQueryString();
 
@@ -74,7 +76,10 @@ class AuditController extends Controller
         $hoursEnd   = (string) setting('sec.hours_end', '16:00');
 
         $today = $base()->get(['action', 'ip', 'created_at', 'user_id']);
+        // بحدّ تسعين يوماً: كان DISTINCT على كامل أسرع الجداول نمواً مع كل
+        // فتحة شاشة — وعنوانٌ غاب تسعين يوماً عودتُه «جديدة» عملياً بحق
         $seen = DB::table('audits')->where('created_at', '<', $day)
+            ->where('created_at', '>=', $day->copy()->subDays(90))
             ->whereNotNull('ip')->distinct()->pluck('ip')->all();
 
         return [

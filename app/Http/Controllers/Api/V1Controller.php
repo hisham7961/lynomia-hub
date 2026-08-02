@@ -51,7 +51,8 @@ class V1Controller extends ModuleController
         if ($term = trim(hub_str($r->query('q')))) $q->search($term);
         if (($st = hub_str($r->query('status'))) !== '' && ($sc = hub_status_col($module))) $q->where($sc, $st);
 
-        $page = $q->orderByDesc('created_at')
+        // فاصلُ id: الطابع بدقّة الثانية يتساوى فتتقلب الصفحات بين الطلبات
+        $page = $q->orderByDesc('created_at')->orderByDesc('id')
             ->paginate(min(100, max(1, (int) $r->query('per', 25))));
 
         $fields = $r->query('fields');

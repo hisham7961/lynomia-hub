@@ -66,7 +66,7 @@
         <div class="tblwrap"><table class="tbl">
             <thead><tr><th>التكامل</th><th>الطريق</th><th>كيف</th></tr></thead>
             <tbody>
-            @foreach ($items as [$name, $path, $how, $ok])
+            @foreach ($items as [$name, $path, $how])
                 <tr>
                     <td><b>{{ $name }}</b></td>
                     <td><span class="bdg {{ $path === 'أصيل' ? 'ok' : 'g' }}">{{ $path }}</span></td>
