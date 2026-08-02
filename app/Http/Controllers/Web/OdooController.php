@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 
 /** الربط الذكي بأودو: ربط سجل (مشروع/شركة/عميل) بشريك أودو — عرض فقط */
 class OdooController extends Controller
@@ -25,7 +24,7 @@ class OdooController extends Controller
         $meta['odoo_partner_name'] = (string) ($d['pname'] ?? '');
         $m->meta = $meta;
         $m->save();
-        Cache::forget('odoo:stats:' . $d['pid']);
+        \App\Support\Odoo::forRow($m)->forgetStats((int) $d['pid']);
 
         return back()->with('ok', '🔗 رُبط السجل بأودو — الأرقام ستظهر في البطاقة')->withFragment('odoo');
     }
@@ -45,7 +44,7 @@ class OdooController extends Controller
     {
         $m = $this->target($module, $id);
         if ($pid = (int) (((array) $m->meta)['odoo_partner_id'] ?? 0)) {
-            Cache::forget('odoo:stats:' . $pid);
+            \App\Support\Odoo::forRow($m)->forgetStats($pid);
         }
 
         return back()->with('ok', '🔄 حُدّثت أرقام أودو')->withFragment('odoo');

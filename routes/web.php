@@ -347,6 +347,13 @@ Route::middleware('auth')->group(function () {
     Route::post('jslog', [ErrorCenterController::class, 'jslog'])->name('jslog')->middleware('throttle:20,1');
     Route::get('admin/integrations', [\App\Http\Controllers\Web\IntegrationController::class, 'index'])->name('integrations.index');
     Route::get('admin/integrations/guide', [\App\Http\Controllers\Web\IntegrationController::class, 'guide'])->name('integrations.guide');
+    // خوادم أودو المتعددة — الاتصال الافتراضي يبقى في الإعدادات، وهنا الإضافيون
+    Route::get('admin/integrations/odoo', [\App\Http\Controllers\Web\OdooConnectionController::class, 'index'])->name('integrations.odoo');
+    Route::post('admin/integrations/odoo', [\App\Http\Controllers\Web\OdooConnectionController::class, 'store'])->name('integrations.odoo.store');
+    Route::put('admin/integrations/odoo/{id}', [\App\Http\Controllers\Web\OdooConnectionController::class, 'update'])->name('integrations.odoo.update');
+    Route::post('admin/integrations/odoo/{id}/toggle', [\App\Http\Controllers\Web\OdooConnectionController::class, 'toggle'])->name('integrations.odoo.toggle');
+    Route::post('admin/integrations/odoo/{id}/test', [\App\Http\Controllers\Web\OdooConnectionController::class, 'test'])->name('integrations.odoo.test');
+    Route::delete('admin/integrations/odoo/{id}', [\App\Http\Controllers\Web\OdooConnectionController::class, 'destroy'])->name('integrations.odoo.destroy');
     Route::get('admin/webhooks', [WebhookController::class, 'index'])->name('webhooks.index');
     Route::post('admin/webhooks', [WebhookController::class, 'store'])->name('webhooks.store');
     Route::post('admin/webhooks/{id}/toggle', [WebhookController::class, 'toggle'])->name('webhooks.toggle');

@@ -64,16 +64,22 @@ class Integrations
             }
         } catch (\Throwable $e) {}
 
-        $ok = Odoo::configured();
+        $extra = 0;
+        try {
+            $extra = \App\Models\OdooConnection::where('active', true)->count();
+        } catch (\Throwable $e) {}
+        $ok = Odoo::configured() || $extra > 0;
 
         return [
             'key' => 'odoo', 'icon' => '🧩', 'name' => 'أودو (Odoo) — قراءة محاسبية',
             'dir' => self::IN,
-            'desc' => 'يقرأ مبيعات العميل وفواتيره وغير المحصّل من أودو ويعرضها داخل سجله — قراءةٌ فقط، لا كتابة محاسبية إطلاقاً.',
+            'desc' => 'يقرأ مبيعات العميل وفواتيره وغير المحصّل من أودو ويعرضها داخل سجله — قراءةٌ فقط، لا كتابة محاسبية إطلاقاً. ويدعم خوادمَ متعددة: بعض المشاريع لها أودو خاص.',
             'ready' => $ok,
-            'state' => $ok ? "مربوط · {$linked} سجل مقرون" : 'غير مربوط — أكمل بياناته في الإعدادات',
-            'stats' => ['سجلات مقرونة' => $linked],
-            'route' => 'settings.edit',
+            'state' => $ok
+                ? 'مربوط · ' . ($extra ? "{$extra} خادم إضافي · " : '') . "{$linked} سجل مقرون"
+                : 'غير مربوط — أضف خادماً أو أكمل الافتراضي',
+            'stats' => ['سجلات مقرونة' => $linked, 'خوادم إضافية' => $extra],
+            'route' => 'integrations.odoo',
         ];
     }
 

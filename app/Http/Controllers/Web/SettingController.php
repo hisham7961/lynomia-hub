@@ -149,7 +149,7 @@ class SettingController extends Controller
         }
 
         Cache::forget('settings:all');
-        Cache::forget('odoo:uid');
+        Cache::forget('odoo:default:uid');   // مفتاح الاتصال الافتراضي — لكل اتصالٍ مفتاحُه
 
         if ($changed) {
             // الإعدادات لا تمرّ بسمة التدقيق التلقائي — وتغييرُ حارسٍ أمني
