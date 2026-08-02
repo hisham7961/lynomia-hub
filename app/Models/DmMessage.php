@@ -19,7 +19,9 @@ class DmMessage extends Model
      */
     public function scopeAlive($q)
     {
-        return $q->whereNull('deleted_at');
+        // العمودُ حديث: نشرٌ سبق هجرتَه لا يجوز أن يُسقط ما يقرأ الرسائل —
+        // تنقص ميزةُ «إخفاء المسحوب» ولا يُطفأ شيء
+        return hub_has_col('dm_messages', 'deleted_at') ? $q->whereNull('deleted_at') : $q;
     }
 
     /** مفتاح المحادثة: معرّفا الطرفين مرتبَين — الثنائي نفسه دائماً نفس الخيط */
