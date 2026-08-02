@@ -16,6 +16,15 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        /*
+         * **حارسُ القاعدة**: الأمرُ الهادم يُحجَب بأمرٍ يحمل اسمَه نفسه فيحلّ
+         * محلَّه — فالشيفرةُ الهادمة **لا تُحمَّل أصلاً**. وهذا أوثق من اعتراض
+         * حدثٍ قد لا يُطلَق في كل مسار. والإذنُ الصريح يرفع الحجب فيعود الأصل.
+         */
+        // تُستثنى الحزمةُ نفسها: أداةُ الاختبار تُعيد بناء قاعدةٍ مؤقتة بحقّ،
+        // ولا بياناتٍ فيها تُفقد. والاختبارُ الذي يفحص الحاجز يستدعيه صراحةً.
+        if (! $this->app->runningUnitTests()) \App\Support\SchemaGuard::shield();
+
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
         }
