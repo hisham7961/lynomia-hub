@@ -18,6 +18,13 @@ class SocialAnalyticsTest extends TestCase
 
     protected function scene(): void
     {
+        /*
+         * **زمنٌ مُجمَّد**: النقطة الأقدم موضوعةٌ على حافة نافذة الثلاثين يوماً
+         * تماماً، والنافذةُ تُقاس **وقت القراءة**. فأيُّ جزءٍ من ثانيةٍ يمرّ بين
+         * الكتابة والقراءة يُخرجها من النافذة، فيصير النموّ ٩٪ بدل ٢٠٪. يمرّ على
+         * SQLite (بالذاكرة، أسرع) ويسقط على MySQL — والفرقُ توقيتٌ لا منطق.
+         */
+        $this->freezeTime();
         $this->seedCore();
         $this->acc = SocialAccount::create(['platform' => 'Instagram', 'handle' => '@lynomia',
                                             'followers' => 12000, 'goal' => 20000, 'status' => 'نشط']);
