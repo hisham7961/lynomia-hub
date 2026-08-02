@@ -24,13 +24,13 @@
             <tbody>
                 @php $dflt = \App\Support\Odoo::for(null); @endphp
                 <tr>
-                    <td><b>الافتراضي</b> <span class="sub">— من الإعدادات</span></td>
+                    <td><b>الافتراضي</b></td>
                     <td class="mono ltr">{{ $dflt->host() ?: '—' }}</td>
                     <td class="mono ltr">{{ $dflt->database() ?: '—' }}</td>
                     <td>@if ($defaultReady)<span class="bdg ok">مكتمل</span>@else<span class="bdg wn">ناقص</span>@endif</td>
-                    <td class="sub">يُختبر من شاشة الإعدادات</td>
+                    <td class="sub">من زر الاختبار أدناه</td>
                     <td class="sub">كل ما لم يختر خادماً</td>
-                    <td class="acts"><a class="btn ghost xs" href="{{ route('settings.edit') }}">⚙️ الإعدادات</a></td>
+                    <td class="acts"><a class="btn ghost xs" href="#dflt">⚙️ إدارته أدناه</a></td>
                 </tr>
                 @forelse ($rows as $c)
                     <tr>
@@ -79,6 +79,27 @@
 </div>
 
 <div class="kids">
+    {{-- ═ الاتصال الافتراضي — إدارته هنا لا في شاشةٍ أخرى ═ --}}
+    <div class="card kid" id="dflt">
+        <h3>⚙️ الاتصال الافتراضي</h3>
+        <div class="sub" style="margin-bottom:8px">
+            خادمُ المنشأة الذي تتبعه كلُّ المشاريع التي لم تختر خادماً خاصاً.
+            (المفاتيحُ نفسُها تظهر في شاشة الإعدادات أيضاً — البابان يكتبان الشيءَ ذاته.)
+        </div>
+        @error('odoo')<div class="ferr" style="margin-bottom:6px">{{ $message }}</div>@enderror
+        <form method="POST" action="{{ route('integrations.odoo.defaults') }}" class="frm">
+            @csrf
+            <label>رابط الخادم<input class="inp ltr" name="url" value="{{ old('url', $dflt->host()) }}" required maxlength="300" dir="ltr" placeholder="https://mycompany.odoo.com"></label>
+            <label>اسم القاعدة<input class="inp ltr" name="db" value="{{ old('db', $dflt->database()) }}" required maxlength="120" dir="ltr"></label>
+            <label>بريد مستخدم القراءة<input class="inp ltr" name="username" value="{{ old('username', $dflt->account()) }}" required maxlength="200" dir="ltr" placeholder="readonly@mycompany.com"></label>
+            <label>مفتاح API <span class="sub">(اتركه فارغاً للإبقاء على المخزون)</span>
+                <input class="inp ltr" type="password" name="key" value="" maxlength="500" dir="ltr" placeholder="••••"></label>
+            <button class="btn">حفظ الافتراضي</button>
+        </form>
+        <form method="POST" action="{{ route('settings.odoo.test') }}" style="margin-top:8px">@csrf
+            <button class="btn ghost xs">🔌 اختبار الاتصال الافتراضي</button></form>
+    </div>
+
     {{-- ═ إضافة اتصال ═ --}}
     <div class="card kid">
         <h3>➕ خادم أودو جديد</h3>
@@ -112,6 +133,32 @@
                 @endforeach
             </table>
         @endif
+    </div>
+</div>
+
+{{-- ═ أين يرتبط أودو بالنظام — انتقلت من فهرس المركز: بيتُها هنا ═ --}}
+<div class="card">
+    <h3 class="cardtitle">🧩 أين يرتبط أودو بالنظام؟</h3>
+    <div class="sub" style="margin-bottom:8px">
+        بطاقة أودو تظهر تلقائياً في صفحة سجل هذه الوحدات — تبحث بالاسم، تقرن السجل بشريكٍ في أودو،
+        فتُعرض أرقامه <b>حيّةً بكاش ١٠ دقائق</b>. الاتجاه واحد: <b>قراءة فقط</b>، فلا يكتب الهَب في محاسبتك أبداً.
+        وللمشاريع فوقها <b>قنواتُ البيع</b> (ترنديول، أمازون، نون، المتجر…) من شاشة «تخصيص أودو».
+    </div>
+    <div class="tblwrap"><table class="tbl">
+        <thead><tr><th>الوحدة</th><th>ما الذي يُقرأ</th><th>أين تراه</th></tr></thead>
+        <tbody>
+        @foreach ($odooMods as $mk => $what)
+            <tr>
+                <td><b>{{ hub_mod($mk)['label'] ?? $mk }}</b></td>
+                <td class="sub">{{ $what }}</td>
+                <td><a class="mono" href="{{ route('m.index', $mk) }}">/m/{{ $mk }}/{id}</a></td>
+            </tr>
+        @endforeach
+        </tbody>
+    </table></div>
+    <div class="sub" style="margin-top:8px">
+        والحقول <span class="mono ltr">odooId</span> موجودة أيضاً في <b>المالية</b> و<b>دليل الحسابات</b> و<b>قيود اليومية</b>
+        لحفظ معرّف السجل المقابل في أودو عند المطابقة اليدوية أو عبر n8n.
     </div>
 </div>
 

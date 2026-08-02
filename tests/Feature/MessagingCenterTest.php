@@ -157,6 +157,24 @@ class MessagingCenterTest extends TestCase
         }
     }
 
+    /** «شرح طريقة ربط الإيميل من وإلى والتوسع بها» — الاتجاهان موثقان بالوصفة */
+    public function test_email_guide_covers_both_directions(): void
+    {
+        $this->seedCore();
+        $html = $this->actingAs($this->owner)->get('/admin/integrations/messaging')->getContent();
+
+        $this->assertStringContainsString('البريد من وإلى', $html);
+        // الصادر: التسليم الحقيقي وسمعة المرسِل
+        $this->assertStringContainsString('SPF/DKIM', $html, 'سمعة المرسِل غير مشروحة — البريد سيصل مزعجات');
+        // الوارد: وصفة n8n → تذاكر كاملةً بمنع الازدواج
+        $this->assertStringContainsString('Email Trigger (IMAP)', $html);
+        $this->assertStringContainsString('/api/v1/tickets', $html);
+        $this->assertStringContainsString('Idempotency-Key', $html, 'بلا منع ازدواجٍ ستتكرر التذاكر عند كل إعادة');
+        $this->assertStringContainsString('لا يسحب صندوقَ بريدٍ بنفسه', $html, 'حد التصميم غير مصرَّحٍ به');
+        // والتوسع: كل وحدة لها بابها
+        $this->assertStringContainsString('وارد المستندات', $html);
+    }
+
     public function test_mail_test_uses_laravel_mailer(): void
     {
         $this->seedCore();

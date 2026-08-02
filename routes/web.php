@@ -361,6 +361,7 @@ Route::middleware('auth')->group(function () {
     // خوادم أودو المتعددة — الاتصال الافتراضي يبقى في الإعدادات، وهنا الإضافيون
     Route::get('admin/integrations/odoo', [\App\Http\Controllers\Web\OdooConnectionController::class, 'index'])->name('integrations.odoo');
     Route::post('admin/integrations/odoo', [\App\Http\Controllers\Web\OdooConnectionController::class, 'store'])->name('integrations.odoo.store');
+    Route::post('admin/integrations/odoo/defaults', [\App\Http\Controllers\Web\OdooConnectionController::class, 'defaults'])->name('integrations.odoo.defaults');
     Route::put('admin/integrations/odoo/{id}', [\App\Http\Controllers\Web\OdooConnectionController::class, 'update'])->name('integrations.odoo.update');
     Route::post('admin/integrations/odoo/{id}/toggle', [\App\Http\Controllers\Web\OdooConnectionController::class, 'toggle'])->name('integrations.odoo.toggle');
     Route::post('admin/integrations/odoo/{id}/test', [\App\Http\Controllers\Web\OdooConnectionController::class, 'test'])->name('integrations.odoo.test');

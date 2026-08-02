@@ -160,6 +160,35 @@
     </details>
 
     <details style="margin-top:8px">
+        <summary class="sub pointer"><b>📧 البريد من وإلى — الاتجاهان بالتفصيل</b></summary>
+        <div class="sub" style="line-height:2;margin-top:6px">
+            <b>⬅ الصادر (النظام يُرسل):</b> رسائلُ التوقيع الإلكتروني ورموزُ التحقق والتذكيرات وتنبيهاتُ
+            القواعد والمسارات — كلُّها عبر SMTP المضبوط في <span class="mono ltr">.env</span> (القسم أعلاه).
+            المُرسِل يظهر بـ<span class="mono ltr">MAIL_FROM_ADDRESS</span> — اجعله بريداً على نطاقك
+            ومعه سجلا <span class="mono ltr">SPF/DKIM</span> عند مزوّدك وإلا سقط في الرسائل المزعجة.<br><br>
+
+            <b>➡ الوارد (النظام يستقبل):</b> النظام <b>لا يسحب صندوقَ بريدٍ بنفسه</b> — بالتصميم:
+            كلُّ جلبٍ خارجي يمرّ عبر n8n، فيبقى النظامُ بلا كلمات مرور بريدٍ مخزونة. الوصفةُ الجاهزة:<br>
+            <b>١)</b> في n8n: عقدة <span class="mono ltr">Email Trigger (IMAP)</span> على صندوق الدعم
+            (مثل <span class="mono ltr">support@نطاقك</span>).<br>
+            <b>٢)</b> بعدها عقدة <span class="mono ltr">HTTP Request</span>:
+            <span class="mono ltr">POST {{ url('/api/v1/tickets') }}</span>
+            بترويسة <span class="mono ltr">Authorization: Bearer &lt;مفتاح API بنطاق tickets:a&gt;</span>
+            وترويسة <span class="mono ltr">Idempotency-Key: &#123;&#123;message-id&#125;&#125;</span>
+            — فلا تُنشأ التذكرة مرتين مهما أُعيد التشغيل.<br>
+            <b>٣)</b> الجسم: <span class="mono ltr">subject</span> ← عنوان التذكرة،
+            <span class="mono ltr">body</span> ← الوصف، والقناة «بريد إلكتروني» — فيصير كلُّ بريد دعمٍ
+            <b>تذكرةً</b> تدخل دورةَ SLA والتنبيهات تلقائياً.<br>
+            <b>٤)</b> والمستنداتُ الواردة (فواتير الموردين والعقود الممسوحة): وجهتُها شاشةُ
+            <a href="{{ route('inboxdocs.index') }}">وارد المستندات</a> حيث تُصنَّف لوحدتها الصحيحة.<br><br>
+
+            <b>🔭 التوسع لاحقاً:</b> بالطريق نفسه تُوصل أي صندوق: بريد المبيعات ← عملاء محتملون
+            (<span class="mono ltr">POST /api/v1/clients</span>)، بريد التوظيف ← طلبات التوظيف،
+            وكلُّ وحدةٍ لها بابُها في <span class="mono ltr">/api/v1/&#123;module&#125;</span> بنفس الصلاحيات والنطاق.
+        </div>
+    </details>
+
+    <details style="margin-top:8px">
         <summary class="sub pointer"><b>♻️ التسليم والإعادة — كيف تعمل الطوابير</b></summary>
         <div class="sub" style="line-height:2;margin-top:6px">
             الرسائل تُصفّ في جدول <span class="mono ltr">outbox</span> ويسلّمها أمر

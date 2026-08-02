@@ -57,6 +57,7 @@ class OdooConnectionController extends Controller
         return view('integrations.odoo', [
             'rows' => $rows, 'uses' => $uses, 'linked' => $linked,
             'defaultReady' => Odoo::configured(),
+            'odooMods' => \App\Support\Integrations::odooModules(),
         ]);
     }
 
@@ -143,6 +144,45 @@ class OdooConnectionController extends Controller
 
         return back()->with('ok', 'حُذف اتصال «' . $c->name . '»'
             . ($n ? " — {$n} مشروع كان يستعمله وسيرى «اتصال محذوف» حتى تختار له غيرَه" : ''));
+    }
+
+    /**
+     * **إدارةُ الاتصال الافتراضي من هنا أيضاً** — كان موزَّعاً: الخوادمُ
+     * الإضافية في هذه الشاشة والافتراضيُّ في الإعدادات، فيتنقّل المرءُ بينهما
+     * ويظنّهما شيئين. المفاتيحُ هي نفسُها (`odoo.*`) تُكتب من البابين،
+     * وشاشةُ الإعدادات تبقى كما هي — إضافةٌ لا كسر.
+     */
+    public function defaults(Request $r): RedirectResponse
+    {
+        $this->gate();
+        $d = $r->validate([
+            'url'      => ['required', 'url', 'max:300'],
+            'db'       => ['required', 'string', 'max:120'],
+            'username' => ['required', 'string', 'max:200'],
+            'key'      => ['nullable', 'string', 'max:500'],
+        ], [], ['url' => 'رابط الخادم', 'db' => 'اسم القاعدة', 'username' => 'مستخدم القراءة', 'key' => 'مفتاح API']);
+
+        $guard = hub_outbound_ok($d['url']);
+        if (! $guard['ok']) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'url' => 'رُفض الرابط: ' . $guard['why']
+                    . ' — إن كان أودو داخل شبكتك المغلقة فعّل «السماح بالعناوين الخاصة» من الإعدادات',
+            ]);
+        }
+
+        \App\Models\Setting::updateOrCreate(['key' => 'odoo.url'], ['value' => $d['url']]);
+        \App\Models\Setting::updateOrCreate(['key' => 'odoo.db'], ['value' => $d['db']]);
+        \App\Models\Setting::updateOrCreate(['key' => 'odoo.user'], ['value' => $d['username']]);
+        // مفتاحٌ فارغ يُبقي المخزون — والمكتوب يُشفَّر كما تفعل شاشة الإعدادات
+        if (filled($d['key'] ?? null)) {
+            \App\Models\Setting::updateOrCreate(['key' => 'odoo.key'],
+                ['value' => 'enc:' . \Illuminate\Support\Facades\Crypt::encryptString($d['key'])]);
+        }
+        Cache::forget('settings:all');
+        Cache::forget('odoo:default:uid');
+        hub_audit('تعديل إعدادات النظام', 'settings', null, 'odoo.* — من مركز التكاملات');
+
+        return back()->with('ok', 'حُفظ الاتصال الافتراضي — اختبره الآن');
     }
 
     /** المشاريع التي تختار هذا الاتصال في meta['odoo']['conn'] */
