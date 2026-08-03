@@ -75,7 +75,9 @@ class DataRoomController extends Controller
         $link = $this->alive($token);
 
         if ($link->password_hash && ! $r->session()->get('share:' . $link->id)) {
-            return view('dataroom.gate', ['token' => $token, 'title' => $link->title]);
+            // العنوان لا يُكشف قبل كلمة المرور: «عرض استحواذ فلان» كثيراً ما يكون
+            // هو السرّ نفسه — وكلمةُ المرور وُضعت تحديداً لطبقةٍ ثانية عند تسرّب الرابط
+            return view('dataroom.gate', ['token' => $token, 'title' => 'مستند محمي']);
         }
 
         $this->logView($link);
@@ -106,14 +108,23 @@ class DataRoomController extends Controller
         $abs = storage_path('app/' . $link->path);
         abort_unless(file_exists($abs), 404);
 
-        $download = $r->boolean('dl');
+        /*
+         * سياسة النوع قبل سياسة التنزيل: الصور النقطية وPDF وحدها تُعاين
+         * inline — أي شيء آخر (HTML/SVG خاصةً) تنزيلٌ قسري، فهذا سطحٌ **عام
+         * بلا مصادقة** وملفٌ يُنفَّذ بأصل النظام هنا يصل لكوكي مدير عاين الرابط.
+         * ومعها: «عرض فقط» على نوعٍ لا يُعاين = لا مسار بثٍّ إطلاقاً، والجلبُ
+         * المباشر بلا dl كان **لا يُسجَّل** — فسجل المشاهدات أعمى عن أهم مسار.
+         */
+        $inline = in_array((string) $link->mime, AttachmentController::INLINE_MIMES, true);
+        $download = $r->boolean('dl') || ! $inline;
         abort_if($download && $link->no_download, 403, 'التنزيل ممنوع لهذا الرابط — عرض فقط');
-        if ($download) $this->logView($link);
+        $this->logView($link);
 
         return response()->file($abs, [
             'Content-Type' => $link->mime ?: 'application/octet-stream',
             'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . rawurlencode($link->title) . '"',
             'X-Robots-Tag' => 'noindex',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 

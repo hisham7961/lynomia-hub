@@ -586,6 +586,10 @@ class ModuleController extends Controller
                     elseif ($f['type'] === 'sec') $v = '••••';
                     elseif (is_array($v)) $v = implode('، ', $v);
                     elseif (is_string($v) && str_starts_with($v, '[')) { $d = json_decode($v, true); if (is_array($d)) $v = implode('، ', array_map(fn ($x) => is_scalar($x) ? $x : '', $d)); }
+                    // تحييد حقن الصيغ: قيمة تبدأ بـ= + - @ أو تبويب تُنفَّذ صيغةً
+                    // في Excel على جهاز المصدِّر (=HYPERLINK تسريب، =cmd تنفيذ) —
+                    // فاصلة عليا بادئة تجعلها نصاً بريئاً كما تفعل جداول Google
+                    if (is_string($v) && $v !== '' && strpbrk($v[0], "=+-@\t\r") !== false) $v = "'" . $v;
                     $line[] = $v;
                 }
                 fputcsv($out, $line);
@@ -1029,7 +1033,18 @@ class ModuleController extends Controller
                     ? [$r[0], "exists:$t,id"]
                     : [$r[0], 'array'];
             }
-            if (in_array($f['type'], ['file', 'img'], true)) $r = [$r[0], 'file', 'max:' . (int) setting('files.max_kb', 512000)];
+            if (in_array($f['type'], ['file', 'img'], true)) {
+                // امتداداتُ التنفيذ والترميز محظورة: SVG/HTML تحمل سكربتاً يعمل
+                // بأصل التطبيق إن فُتحت، وPHP قنبلةٌ إن لمسها الخادم يوماً.
+                // البوابة تخدم الغريب تنزيلاً قسرياً — وهذا حزامُ الأمان الثاني.
+                $r = [$r[0], 'file', 'max:' . (int) setting('files.max_kb', 512000),
+                    function ($attr, $file, $fail) {
+                        $ext = strtolower((string) $file->getClientOriginalExtension());
+                        if (in_array($ext, ['php', 'phtml', 'phar', 'html', 'htm', 'xhtml', 'svg', 'svgz', 'js', 'mjs'], true)) {
+                            $fail('هذا النوع من الملفات لا يُرفع — قد يحمل شيفرةً تنفيذية. حوّله إلى PDF أو صورة.');
+                        }
+                    }];
+            }
 
             // سقفُ الطول من **عرض العمود نفسه**: كان الحقل النصّي يُتحقّق منه
             // كـ`string` بلا حدّ، وSQLite لا يفرض طول varchar فتمرّ الحزمة،

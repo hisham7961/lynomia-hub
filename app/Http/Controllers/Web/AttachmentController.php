@@ -75,6 +75,11 @@ class AttachmentController extends Controller
         $a = Attachment::findOrFail($id);
         $this->guardRecord($a->module, $a->record_id, 'v');
 
+        // عمود av_status كان حبراً على ورق: مرفقٌ وُسم «مصاب» يُخدم كأن شيئاً
+        // لم يكن. لا ماسحَ مدمجاً بعد (يبقى 'pending' فيُخدم) — لكن متى وسمت
+        // أداةٌ خارجية ملفاً مصاباً توقّف تقديمه فوراً. 423 Locked: محجوز لا مفقود.
+        abort_if($a->av_status === 'infected', 423, 'حُجب هذا الملف — وُسم مصاباً بفحص الفيروسات');
+
         $abs = Storage::disk($a->disk ?: 'local')->path($a->path);
         abort_unless(is_file($abs), 404, 'الملف غير موجود على القرص');
 
@@ -90,7 +95,8 @@ class AttachmentController extends Controller
     }
 
     /** أنواع تُعاين حيّاً داخل المتصفح — صور نقطية وPDF فقط؛ SVG/HTML تبقى تنزيلاً (قد تحمل سكربتات) */
-    protected const INLINE_MIMES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp', 'image/avif', 'application/pdf'];
+    // عامة: بوابة ملفات الوحدات وغرفة البيانات تتبعان السياسة نفسها — تعريفٌ واحد
+    public const INLINE_MIMES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp', 'image/avif', 'application/pdf'];
 
     /**
      * معاينة حية: الصورة/الشهادة/اللوجو تُعرض مصغّرةً وكاملةً دون تنزيل،
