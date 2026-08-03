@@ -69,6 +69,12 @@ class ReportController extends Controller
 
         $currency = setting('app.currency', 'د.ك');
 
-        return view('reports.finance', compact('cards', 'months', 'max', 'unpaid', 'byState', 'topPartners', 'byCC', 'ccNames', 'currency'));
+        // صدقُ العملة: التقرير يجمع `total` بلا تحويل (لا محرّك في النظام). إن حملت
+        // المستنداتُ أكثرَ من عملةٍ فالأرقامُ المجمّعة تُخلط تحت لصيقةٍ واحدة — يُرفع
+        // علمٌ يُقرأ به الرقمُ مؤشّراً لا رقماً دقيقاً بدل إيهامِ عملةٍ واحدة.
+        $mixed = $base()->whereNotNull('currency')->where('currency', '!=', '')
+            ->distinct()->pluck('currency')->count() > 1;
+
+        return view('reports.finance', compact('cards', 'months', 'max', 'unpaid', 'byState', 'topPartners', 'byCC', 'ccNames', 'currency', 'mixed'));
     }
 }
