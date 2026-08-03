@@ -56,6 +56,7 @@ class V1Controller extends ModuleController
             ->paginate(min(100, max(1, (int) $r->query('per', 25))));
 
         $fields = $r->query('fields');
+        $this->auditApiSecretRead($def, count($page->items()));
 
         return response()->json([
             'data' => collect($page->items())->map(fn ($row) => $this->shape($def, $row, $fields)),
@@ -69,6 +70,7 @@ class V1Controller extends ModuleController
     {
         [$def, $class] = $this->resolveApi($module, 'v');
         $row = hub_scope($class::query(), $module)->findOrFail($id);
+        $this->auditApiSecretRead($def, 1, (string) $id);
 
         return response()->json(['data' => $this->shape($def, $row, $r->query('fields'))]);
     }
@@ -286,12 +288,13 @@ class V1Controller extends ModuleController
     {
         [$tokenId, $ikey] = $this->ikeyOf($r);
         if (! $ikey) return null;
+        $fp = $this->fingerprintOf($r);
 
         for ($try = 0; $try < 2; $try++) {
             try {
                 \Illuminate\Support\Facades\DB::table('idempotency_keys')->insert([
                     'id' => (string) \Illuminate\Support\Str::uuid(),
-                    'token_id' => $tokenId, 'ikey' => $ikey,
+                    'token_id' => $tokenId, 'ikey' => $ikey, 'fingerprint' => $fp,
                     'code' => null, 'response' => null,           // يُملآن عند الإتمام
                     'created_at' => now(),
                 ]);
@@ -301,6 +304,13 @@ class V1Controller extends ModuleController
                 $row = \Illuminate\Support\Facades\DB::table('idempotency_keys')
                     ->where('token_id', $tokenId)->where('ikey', $ikey)->first();
                 if (! $row) continue;                             // حُذف تحتنا (تنظيف) — أعد المحاولة
+
+                // مفتاحٌ أُعيد بطلبٍ مختلف (مسار/جسم): لا نعيد ردَّ الأول (بيانات وحدةٍ
+                // أخرى) ولا نُسقط الثاني بصمت — نرفض صراحةً كي يتبيّن العميلُ خطأه.
+                if (($row->fingerprint ?? null) !== null && ! hash_equals((string) $row->fingerprint, $fp)) {
+                    return response()->json(
+                        ['error' => 'مفتاح idempotency أُعيد بطلبٍ مختلف — استعمل مفتاحاً جديداً لكل طلب'], 422);
+                }
 
                 if ($row->response !== null) {
                     return response($row->response, $row->code)
@@ -360,6 +370,24 @@ class V1Controller extends ModuleController
         if ($ikey === '' || mb_strlen($ikey) > 120 || ! $token) return [null, null];
 
         return [$token->id, $ikey];
+    }
+
+    /** بصمةُ الطلب: مفتاحٌ واحد لا يخدم إلا طلباً واحداً (مسار + جسم) */
+    protected function fingerprintOf(Request $r): string
+    {
+        return hash('sha256', $r->method() . '|' . $r->path() . '|' . (string) $r->getContent());
+    }
+
+    /**
+     * قيدُ تدقيقٍ لقراءة الأسرار عبر API — كما يُدقَّق كل كشفٍ في الويب (revealSecret).
+     * يُسجَّل فقط حين تُعاد أسرارٌ صريحة فعلاً: وحدةٌ فيها حقل sec ومستخدمٌ يملك كشفها.
+     */
+    protected function auditApiSecretRead(array $def, int $count, ?string $recordId = null): void
+    {
+        if ($count < 1) return;
+        $hasSec = collect($def['fields'] ?? [])->contains(fn ($f) => ($f['type'] ?? '') === 'sec');
+        if (! $hasSec || ! hub_copy_secrets(auth()->user())) return;
+        hub_audit('عرض حساس عبر API', (string) ($def['key'] ?? ''), $recordId, $count . ' سجلّ أسرار');
     }
 
     /**
