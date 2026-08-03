@@ -115,7 +115,7 @@ class ImportController extends Controller
                         $v = trim((string) ($line[(int) $i] ?? ''));
                         if ($v === '') continue;
 
-                        $val = $this->cast($f, $v, $rowErr);
+                        $val = $this->cast($f, $v, $rowErr, $def['table']);
                         if ($rowErr) break;
                         $m->{$f['col']} = $val;
                     }
@@ -160,7 +160,7 @@ class ImportController extends Controller
     }
 
     /** تحويل قيمة نصية من الملف حسب نوع الحقل — المراجع تُحل بالاسم */
-    protected function cast(array $f, string $v, ?string &$err)
+    protected function cast(array $f, string $v, ?string &$err, ?string $table = null)
     {
         switch ($f['type']) {
             case 'num': case 'big':
@@ -183,13 +183,21 @@ class ImportController extends Controller
                 return array_values(array_filter(array_map('trim', preg_split('/[,،;]/u', $v))));
 
             case 'ref':
-                $table = hub_ref_table($f['ref']);
-                if (! $table) return null;
-                // معرف مباشر أو اسم عرض — مُخبّأ: الاسم المتكرر في آلاف الصفوف لا يُستعلم إلا مرة
-                $ck = $table . '|' . $v;
-                $hit = $this->refCache[$ck] ??= (DB::table($table)->where('id', $v)->value('id')
-                    ?? DB::table($table)->whereNull('deleted_at')->where(hub_ref_display($f['ref']), $v)->value('id')
-                    ?? false);
+                $refKey = (string) $f['ref'];
+                $refClass = '\\App\\Models\\' . (string) (hub_mod($refKey)['model'] ?? '');
+                if (! class_exists($refClass)) return null;
+                // **النطاق وعزل الشركات يسريان على حلّ المرجع كما على القراءة**: كان
+                // بـDB::table الخام، فالاسم يُحلُّ عبر كل الشركات (ربطٌ/تسريب لكيانٍ
+                // خارج العزل) وعند تكراره «قرعة» بلا orderBy. الآن Eloquent المنطَّق
+                // (SoftDeletes تُقصي المحذوف) + orderBy('id') حاسمٌ عند التساوي.
+                $ck = $refKey . '|' . $v;
+                $hit = $this->refCache[$ck] ??= (function () use ($refClass, $refKey, $v) {
+                    $scoped = fn () => hub_company_scope(hub_scope($refClass::query(), $refKey), $refKey);
+
+                    return $scoped()->whereKey($v)->value('id')
+                        ?? $scoped()->where(hub_ref_display($refKey), $v)->orderBy('id')->value('id')
+                        ?? false;
+                })();
                 if (! $hit) { $err = '«' . $f['label'] . '»: لا يوجد سجل باسم «' . Str::limit($v, 25) . '»'; return null; }
                 if (! empty($f['multi'])) return [$hit];
                 return $hit;
@@ -198,6 +206,13 @@ class ImportController extends Controller
                 return null;   // لا تُستورد
 
             default:
+                // فحص الطول مقابل عرض العمود: قيمةٌ أطول تُقبل صامتة على SQLite وتنفجر
+                // 22001 على MySQL الصارمة فتُلغى المعاملة كلها. تُتخطّى بوضوح كأي خطأ صف.
+                if ($table && ($max = hub_col_max($table, (string) $f['col'])) && mb_strlen($v) > $max) {
+                    $err = '«' . $f['label'] . '»: أطول من حدّ العمود (' . $max . ' حرف)';
+                    return null;
+                }
+
                 return $v;
         }
     }
