@@ -35,6 +35,10 @@ class PurchaseController extends Controller
         $items = \App\Support\Items::cartons(
             \App\Support\Items::parse((string) $p->items), $p->company_id);
 
+        // قفل الحقل يسري على مستند الطباعة كما على صفحة العرض (modules/show:90):
+        // دورٌ محجوبٌ عليه «الإجمالي» أو «البنود» لا يراهما عبر مسار الطباعة.
+        $u = auth()->user();
+
         return view('purchases.doc', [
             'p' => $p,
             'supplier' => $p->supplier_id ? Supplier::find($p->supplier_id) : null,
@@ -42,6 +46,8 @@ class PurchaseController extends Controller
             'showCartons' => \App\Support\Items::anyCartons($items),
             'totalCartons' => \App\Support\Items::totalCartons($items),
             'logo' => setting('app.logo'),
+            'hideAmount' => hub_field_mode($u, 'purchases', 'amount') === 'hide',
+            'hideItems'  => hub_field_mode($u, 'purchases', 'items') === 'hide',
         ]);
     }
 

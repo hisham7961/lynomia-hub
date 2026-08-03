@@ -504,6 +504,15 @@ class ModuleController extends Controller
         $refF = $refCands->first(fn ($f) => $rows->contains(fn ($r) => filled($r->{$f['col']} ?? null)))
              ?? $refCands->first();
 
+        // قفل الحقل يسري على بطاقات اللوحة كما على القائمة والصفحة والتصدير: الحقل
+        // المحجوب ('hide') لا يُثري البطاقة — وإلا سرّبت اللوحة (شاشةٌ موازية) ما
+        // تُخفيه القائمة عبر hub_visible_fields.
+        $fmHide = fn ($f) => $f && hub_field_mode(auth()->user(), $module, (string) ($f['key'] ?? '')) === 'hide';
+        if ($fmHide($assigneeF)) $assigneeF = null;
+        if ($fmHide($dueF)) $dueF = null;
+        if ($fmHide($prioF)) $prioF = null;
+        if ($fmHide($refF)) $refF = null;
+
         $assigneeNames = $assigneeF ? hub_ref_labels('users', $rows->pluck($assigneeF['col'])->all()) : [];
         $refNames = $refF ? hub_ref_labels($refF['ref'], $rows->pluck($refF['col'])->all()) : [];
 
