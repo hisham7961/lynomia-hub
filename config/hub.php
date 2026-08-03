@@ -2811,6 +2811,9 @@ return [
                     'type' => 'sel',
                     'required' => true,
                     'options' => ['معلّق', 'معتمد', 'مرفوض', 'ملغى'],
+                    // حالة الحسم تُكتب من مسار الاعتماد/الرفض وحده (مع ختم
+                    // decided_by/decided_at) — لا من CRUD ولا كانبان ولا جملة
+                    'locked' => true,
                 ],
                 [
                     'key' => 'type',

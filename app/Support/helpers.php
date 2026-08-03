@@ -1160,6 +1160,22 @@ if (! function_exists('hub_field_mode')) {
      */
     function hub_field_mode($user, string $module, string $fieldKey): string
     {
+        // الحقول المقفولة سجلّياً (`locked` في تعريف الحقل) قراءةٌ فقط للجميع —
+        // حتى المالك: حالةُ الموافقة مثلاً تُكتب من مسار الحسم وحده (حيث يُختم
+        // decided_by/decided_at معها)، وإلا زُوِّر اعتمادٌ أو نُقض رفضٌ من نموذج
+        // CRUD أو بسحب بطاقة كانبان. البوابة هنا تحرس كل المسارات دفعةً واحدة:
+        // fill والتحقق وsetStatus والإجراء الجماعي والنموذج — كلها تستشير هذه الدالة.
+        static $locked = null;
+        if ($locked === null) {
+            $locked = [];
+            foreach (hub_modules() as $mk => $d) {
+                foreach (($d['fields'] ?? []) as $f) {
+                    if (! empty($f['locked'])) $locked[$mk][(string) $f['key']] = true;
+                }
+            }
+        }
+        if (isset($locked[$module][$fieldKey])) return 'ro';
+
         $user = $user ?? auth()->user();
         if (! $user || $user->role?->is_owner) return '';
 
