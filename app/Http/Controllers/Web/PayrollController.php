@@ -35,7 +35,11 @@ class PayrollController extends Controller
         abort_unless($run->status === 'مسودة' || blank($run->status), 422,
             'المسيّر ' . $run->status . ' — التوليد على المسودة فقط');
 
-        $emps = Employee::whereNull('deleted_at')
+        // hub_scope على استعلام الموظفين: كان خاماً، فتشغيلةٌ بلا company_id
+        // تسحب موظفي كل الشركات — ومنشئٌ معزولٌ بشركةٍ يسحب من لا يراهم ويخلط
+        // عملاتهم في مجموعٍ وقيدٍ واحد. النطاق يحصر السحب بما يراه المنشئ.
+        $emps = hub_scope(Employee::query(), 'hr')
+            ->whereNull('deleted_at')
             ->whereNotIn('status', ['منتهية خدمته', 'مستقيل', 'موقوف'])
             ->when($run->company_id, fn ($q) => $q->where('company_id', $run->company_id))
             ->orderBy('name')->get();

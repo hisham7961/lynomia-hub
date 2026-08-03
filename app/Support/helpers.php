@@ -1458,7 +1458,8 @@ if (! function_exists('hub_mrr')) {
             $services = \Illuminate\Support\Facades\DB::table('services')->whereNull('deleted_at')
                 ->get(['id', 'name', 'cycle'])->keyBy('id');
 
-            $mrr = 0.0; $oneTime = 0.0; $unmapped = 0; $byService = [];
+            $default = (string) setting('app.currency', 'د.ك');
+            $mrr = 0.0; $oneTime = 0.0; $unmapped = 0; $byService = []; $byCur = [];
             foreach ($contracts as $c) {
                 $value = (float) ($c->value ?? 0);
                 if ($value <= 0) continue;
@@ -1467,12 +1468,21 @@ if (! function_exists('hub_mrr')) {
                 $sid = $c->service_id ?: ($plan->service_id ?? null);
                 $svc = $sid ? ($services[$sid] ?? null) : null;
                 $cycle = (string) ($plan->cycle ?? $svc->cycle ?? 'سنوي');   // بلا ربطٍ: سنويٌّ افتراضاً
+                $cur = (string) ($c->currency ?: $default);
 
                 if (! $sid) $unmapped++;
                 if ($cycle === 'مرة واحدة') { $oneTime += $value; continue; }
 
                 $monthly = $value / ($divisor[$cycle] ?? 12);
                 $mrr += $monthly;
+
+                // **الفصل بالعملة**: كان `currency` يُقرأ ولا يُستعمل فتُجمع عقودٌ
+                // بعملاتٍ شتّى في رقمٍ واحد تحت لصيقةٍ واحدة — كذبةٌ رقمية. لا
+                // محرّكَ أسعار في النظام (app.currency تسميةٌ لا تحويل)، فالصادق
+                // الفصلُ ورفعُ علم mixed لا جمعٌ مُخترَع.
+                $byCur[$cur] ??= ['currency' => $cur, 'mrr' => 0.0, 'arr' => 0.0, 'contracts' => 0];
+                $byCur[$cur]['mrr'] += $monthly;
+                $byCur[$cur]['contracts']++;
 
                 $key = $sid ?: '_none';
                 $byService[$key] ??= ['id' => $sid, 'name' => $svc->name ?? 'بلا خدمة مربوطة',
@@ -1482,12 +1492,19 @@ if (! function_exists('hub_mrr')) {
             }
 
             usort($byService, fn ($a, $b) => $b['mrr'] <=> $a['mrr']);
+            foreach ($byCur as &$bc) { $bc['mrr'] = round($bc['mrr'], 2); $bc['arr'] = round($bc['mrr'] * 12, 2); }
+            unset($bc);
+            usort($byCur, fn ($a, $b) => $b['mrr'] <=> $a['mrr']);
 
             return [
                 'mrr' => round($mrr, 2),
                 'arr' => round($mrr * 12, 2),
                 'contracts' => $contracts->count(),
                 'byService' => $byService,
+                'byCurrency' => $byCur,
+                // الرقم الموحّد أعلاه أمينٌ فقط بعملةٍ واحدة — mixed يخبر الواجهة
+                // أن تعرض التفصيل لا رقماً واحداً كاذباً
+                'mixed' => count($byCur) > 1,
                 'unmapped' => $unmapped,
                 'oneTime' => round($oneTime, 2),
             ];
