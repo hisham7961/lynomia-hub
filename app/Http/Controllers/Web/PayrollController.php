@@ -23,10 +23,55 @@ class PayrollController extends Controller
 
         return match (hub_str($r->input('do'))) {
             'generate' => $this->generate($run),
+            'adjust'   => $this->adjust($r, $run),
             'approve'  => $this->approve($run),
             'pay'      => $this->pay($run),
             default    => abort(422),
         };
+    }
+
+    /**
+     * تعديلات المسودة: إضافي/خصم/سلفة لكل سطر. كانت الأعمدة معروضةً في الشاشة
+     * ومخزَّنةً في الجدول **بلا مسار إدخالٍ إطلاقاً**، و`net` يتجاهلها — فالمحاسب
+     * لا يستطيع إدخال خصمٍ ولا سلفة، ولو أمكنه لما دخلت الصافي ولا القيد.
+     * الصافي = الأساسي + البدلات + الإضافي − الخصم − السلفة، والإجمالي من السطور.
+     */
+    protected function adjust(Request $r, PayrollRun $run)
+    {
+        abort_unless($run->status === 'مسودة' || blank($run->status), 422,
+            'المسيّر ' . $run->status . ' — التعديل على المسودة فقط');
+
+        $lines = PayrollLine::where('run_id', $run->id)->orderBy('id')->get();
+        abort_if($lines->isEmpty(), 422, 'ولّد سطور المسيّر أولاً');
+
+        // التحقق على الكل قبل كتابة أي سطر — لا كتابة نصفية عند رفض سطرٍ لاحق
+        $dirty = [];
+        foreach ($lines as $l) {
+            $val = function (string $k) use ($r, $l) {
+                $raw = data_get($r->input($k), $l->id);
+                if ($raw === null || $raw === '') return null;                 // لم يُرسَل — يبقى كما هو
+                abort_unless(is_numeric($raw), 422, 'قيمة تعديلٍ ليست رقماً');
+                abort_if((float) $raw < 0, 422, 'قيمة التعديل لا تكون سالبة — الخصم يُدخل موجباً في خانته');
+                return round((float) $raw, 3);
+            };
+            $ot = $val('ot') ?? (float) $l->overtime;
+            $de = $val('de') ?? (float) $l->deduct;
+            $ad = $val('ad') ?? (float) $l->advance;
+            $net = round((float) $l->base + (float) $l->allow + $ot - $de - $ad, 3);
+            abort_if($net < 0, 422,
+                'الخصومات والسلف تتجاوز مستحق السطر (' . number_format($net, 2) . ') — لا صافي سالب في مسيّر');
+            $dirty[$l->id] = ['overtime' => $ot, 'deduct' => $de, 'advance' => $ad, 'net' => $net];
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($lines, $dirty, $run) {
+            foreach ($lines as $l) $l->update($dirty[$l->id]);
+            $run->total = array_sum(array_column($dirty, 'net'));
+            $run->save();
+        });
+        hub_audit('تعديل مسيّر', 'payroll', $run->id,
+            $run->name . ' — إجمالي ' . number_format((float) $run->total, 2));
+
+        return back()->with('ok', '💾 حُفظت التعديلات — الإجمالي الجديد ' . number_format((float) $run->total, 2));
     }
 
     /** التوليد على المسودة فقط — يعاد بأمان: يمسح السطور ويبنيها من جديد */
