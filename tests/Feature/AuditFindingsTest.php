@@ -18,7 +18,7 @@ class AuditFindingsTest extends TestCase
     protected function vault(): VaultSecret
     {
         return VaultSecret::create([
-            'title' => 'سر الخادم', 'type' => 'خادم',
+            'title' => 'سر الخادم', 'type' => 'مفتاح SSH',
             'username' => 'root', 'secret_cipher' => 'P@ssw0rd-TOP-SECRET',
         ]);
     }
@@ -63,7 +63,7 @@ class AuditFindingsTest extends TestCase
 
         // ردّ التعديل كان يعيد السجل خاماً — بسره الصريح
         $put = $this->withHeader('Authorization', 'Bearer ' . $tok)
-            ->putJson('/api/v1/vault/' . $v->id, ['title' => 'سر الخادم', 'type' => 'خادم', 'user' => 'root'])
+            ->putJson('/api/v1/vault/' . $v->id, ['title' => 'سر الخادم', 'type' => 'مفتاح SSH', 'user' => 'root'])
             ->assertOk();
         $put->assertDontSee('TOP-SECRET');
         $this->assertSame('P@ssw0rd-TOP-SECRET', $v->fresh()->secret_cipher);   // ولم يُدهس السر
@@ -105,7 +105,7 @@ class AuditFindingsTest extends TestCase
         $this->assertSame(0, Artisan::call('hub:audit-verify'));
 
         // تزوير عنوان المصدر وحده — كان يمر بصمت قبل الإصلاح
-        $row = AuditEntry::whereNotNull('hash')->orderByDesc('created_at')->first();
+        $row = AuditEntry::whereNotNull('hash')->orderByDesc('id')->first();
         DB::table('audits')->where('id', $row->id)->update(['ip' => '66.66.66.66']);
 
         $this->assertSame(1, Artisan::call('hub:audit-verify'));
@@ -118,12 +118,15 @@ class AuditFindingsTest extends TestCase
         $this->actingAs($this->owner);
         Client::create(['name' => 'سجل قديم']);
 
-        // إعادة ختم صف بالبصمة القديمة كما كانت تكتبها النسخة السابقة
-        $row = AuditEntry::whereNotNull('hash')->orderBy('created_at')->first();
+        // إعادة ختم صف بالبصمة القديمة كما كانت تكتبها النسخة السابقة.
+        // الترتيب بـid — وهو ترتيبُ الإدراج نفسه: `created_at` بدقّة الثانية،
+        // فتتساوى قيمُ السجلات المكتوبة في الطلب الواحد ويصير الترتيبُ عليها قرعةً
+        // تختلف بين محرّكٍ وآخر، فيُعاد بناء السلسلة بترتيبٍ غير ترتيبها فتنقطع.
+        $row = AuditEntry::whereNotNull('hash')->orderBy('id')->first();
         $legacy = hash('sha256', $row->prev_hash . '|' . $row->canonical('v1'));
         $prev = $legacy;
         DB::table('audits')->where('id', $row->id)->update(['hash' => $legacy]);
-        foreach (AuditEntry::whereNotNull('hash')->orderBy('created_at')->get()->skip(1) as $next) {
+        foreach (AuditEntry::whereNotNull('hash')->orderBy('id')->get()->skip(1) as $next) {
             $h = hash('sha256', $prev . '|' . $next->canonical());
             DB::table('audits')->where('id', $next->id)->update(['prev_hash' => $prev, 'hash' => $h]);
             $prev = $h;

@@ -1,8 +1,10 @@
 @extends('layouts.app')
 @section('title', 'نتيجة الاستيراد — ' . $def['label'])
 @section('content')
+@include('partials.pagehead', ['icon' => $ok ? '✅' : '⚠️', 'title' => 'اكتمل الاستيراد إلى ' . $def['label'],
+    'crumb' => $def['label'], 'crumbUrl' => route('m.index', $module),
+    'back' => route('m.index', $module), 'backLabel' => $def['label']])
 <div class="card" style="max-width:620px">
-    <h3>{{ $ok ? '✅' : '⚠️' }} اكتمل الاستيراد إلى {{ $def['label'] }}</h3>
     <div class="cards" style="margin:12px 0">
         <div class="stat"><span class="ico">✔️</span><b>{{ number_format($ok) }}</b><span>سجل مستورد</span></div>
         <div class="stat"><span class="ico">⏭</span><b class="{{ count($skipped) ? 'txt-bad' : '' }}">{{ count($skipped) }}</b><span>صف متخطى</span></div>

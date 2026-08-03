@@ -4,13 +4,23 @@
     $rnames  = $readers->map(fn ($id) => $users[$id] ?? '؟')->implode('، ');
     $reactions = $reactions ?? \App\Http\Controllers\Web\CommentController::reactionsFor([$c]);
     $myReacts = collect($reactions[$c->id] ?? [])->filter(fn ($rs) => collect($rs)->contains('id', auth()->id()))->keys()->all();
+    // الحضور اختياري: تمرّره قناة الفريق، ولا تعرفه شاشات السجلات
+    $online = ($presence ?? [])[$c->user_id]['online'] ?? false;
 @endphp
 <div class="cmt {{ $c->pinned ? 'pin' : '' }}" id="c-{{ $c->id }}" style="margin-inline-start:{{ min($depth, 2) * 26 }}px">
     <div class="chead">
-        <span class="ava sm">{{ mb_substr($users[$c->user_id] ?? '؟', 0, 1) }}</span>
+        <span style="position:relative;flex:none;display:inline-block">
+            <span class="ava sm">{{ mb_substr($users[$c->user_id] ?? '؟', 0, 1) }}</span>
+            @if ($online)
+                <span class="onlinedot" title="متصل الآن" style="position:absolute;inset-inline-end:-1px;bottom:0;width:9px;height:9px;
+                            border-radius:50%;background:var(--ok);border:2px solid var(--bg)"></span>
+            @endif
+        </span>
         <b>{{ $users[$c->user_id] ?? 'مستخدم محذوف' }}</b>
         <span class="sub">{{ $c->created_at?->diffForHumans() }}</span>
         @if ($c->pinned)<span class="bdg wn">📌 مثبّت</span>@endif
+        @if ($c->internal ?? false)<span class="bdg" title="ملاحظة بين الفريق — لا تُحتسب رداً على العميل">🔒 داخلية</span>@endif
+        @if ($c->resolved_at)<span class="bdg ok" title="حلّه {{ $users[$c->resolved_by] ?? '؟' }}">✔ محلول</span>@endif
         @if ($c->task_id)<a class="bdg ok" href="{{ route('m.show', ['tasks', $c->task_id]) }}">✓ مهمة</a>@endif
         <span class="spacer"></span>
         @if ($readers->count())<span class="sub" title="{{ $rnames }}">👁 {{ $readers->count() }}</span>@endif
@@ -57,15 +67,18 @@
                 </form>
             </details>
         @endif
-        @php $canPin = $c->module === 'feed' ? (auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'monitor')) : hub_can(auth()->user(), $c->module, 'e'); @endphp
+        @php $canPin = $c->module === 'feed' ? (hub_monitor()) : hub_can(auth()->user(), $c->module, 'e'); @endphp
         @if ($canPin)
             <form method="POST" action="{{ route('comments.pin', $c->id) }}">@csrf<button class="lnk sub" type="submit">{{ $c->pinned ? 'فك التثبيت' : '📌 تثبيت' }}</button></form>
+        @endif
+        @if ($c->user_id === auth()->id() || $canPin)
+            <form method="POST" action="{{ route('comments.resolve', $c->id) }}">@csrf<button class="lnk sub" type="submit">{{ $c->resolved_at ? 'إعادة فتح' : '✔ حل' }}</button></form>
         @endif
         @if (! $c->task_id && hub_can(auth()->user(), 'tasks', 'a'))
             <form method="POST" action="{{ route('comments.task', $c->id) }}">@csrf<button class="lnk sub" type="submit">→ مهمة</button></form>
         @endif
-        @if ($c->user_id === auth()->id() || auth()->user()->role?->is_owner)
-            <form method="POST" action="{{ route('comments.destroy', $c->id) }}" onsubmit="return confirm('حذف التعليق؟')">@csrf @method('DELETE')<button class="lnk sub" type="submit">حذف</button></form>
+        @if ($c->user_id === auth()->id() || hub_is_owner())
+            <form method="POST" action="{{ route('comments.destroy', $c->id) }}" data-confirm="حذف التعليق؟">@csrf @method('DELETE')<button class="lnk sub" type="submit">حذف</button></form>
         @endif
     </div>
     @if ($depth === 0 && $c->relationLoaded('replies'))

@@ -34,7 +34,9 @@ class WebhookDispatcher
                 fn () => Webhook::where('active', true)->get());
             if ($hooks->isEmpty()) return;
 
-            $name = $module . '.' . $event;
+            // الحدث الدلالي مُسمّى بنطاقه أصلاً (`invoice.paid`) فلا يُسبق باسم الوحدة،
+            // والخام يبقى `module.event` كما كان — فاشتراكات الويبهوكس القائمة لا تتأثر.
+            $name = str_contains($event, '.') ? $event : $module . '.' . $event;
             $hooks = $hooks->filter(fn ($h) => $h->wants($name));
             if ($hooks->isEmpty()) return;
 
@@ -124,8 +126,12 @@ class WebhookDispatcher
         if ($ok) {
             self::persist($d, ['state' => 'sent', 'tries' => $d->tries + 1, 'next_at' => null,
                                'code' => $code, 'ms' => $ms, 'error' => null, 'delivered_at' => now()]);
+            $wasPaused = (bool) $h->paused_until;
             $h->forceFill(['fail_streak' => 0, 'paused_until' => null, 'runs' => $h->runs + 1,
                            'last_at' => now(), 'last_ok' => true])->save();
+            // رفعُ الإيقاف يظهر فوراً: كان كاشُ الاشتراكات الحية يبقى قديماً
+            // حتى دقيقة فتتأخر الأحداثُ اللاحقة بعد نجاحٍ يدويّ
+            if ($wasPaused) \Illuminate\Support\Facades\Cache::forget('webhooks:active');
 
             return true;
         }

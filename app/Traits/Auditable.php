@@ -24,7 +24,9 @@ trait Auditable
     {
         return collect($this->getAttributes())
             ->except(['search_vec', 'custom', 'meta'])
-            ->map(fn ($v) => is_string($v) && strlen($v) > 300 ? substr($v, 0, 300) . '…' : $v)
+            // بالمحارف لا بالبايتات: `substr` تقطع الحرف العربي نصفين فتُنتج
+            // UTF-8 فاسدةً يرفضها `json_encode` — فلا يُكتب القيد أصلاً
+            ->map(fn ($v) => is_string($v) && mb_strlen($v) > 300 ? mb_substr($v, 0, 300) . '…' : $v)
             ->all();
     }
 
@@ -36,13 +38,21 @@ trait Auditable
             'module'     => static::MODULE ?? $this->getTable(),
             'record_id'  => $this->getKey(),
             'project_id' => $this->project_id ?? null,
-'name' => (string) (
-    $this->{defined('static::DISPLAY') ? static::DISPLAY : 'name'} ?? ''
-),
+            // شركة السجل تُحفظ مع القيد: العزل يُفرض على التدقيق كما على البيانات،
+            // وجدول الشركات نفسه شركتُه هي سجلّه
+            'company_id' => $this->company_id
+                ?? ($this->getTable() === 'companies' ? $this->getKey() : null),
+            // اسمُ القيد من عمود العرض — وقد يكون نصّاً طويلاً (وحدة التحديثات
+            // عرضُها «ما أُنجز اليوم»)، فيُقصّ لعرض عموده لا يُرسل خاماً
+            'name'       => hub_fit((string) (
+                $this->{defined('static::DISPLAY') ? static::DISPLAY : 'name'} ?? ''
+            ), hub_col_max('audits', 'name') ?? 300),
             'before'     => $before,
             'after'      => $after,
-            'reason'     => Request::input('_reason') ?: Request::header('X-Change-Reason'),
-            'device'     => substr((string) Request::header('X-Device', Request::userAgent()), 0, 200),
+            // السبب يصل من نموذجٍ أو من API بلا حدٍّ في الخادم
+            'reason'     => hub_fit(Request::input('_reason') ?: Request::header('X-Change-Reason'),
+                hub_col_max('audits', 'reason') ?? 400),
+            'device'     => hub_fit((string) Request::header('X-Device', Request::userAgent()), 200),
             'ip'         => Request::ip(),
             'created_at' => now(),
         ]);

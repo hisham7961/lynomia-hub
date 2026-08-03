@@ -19,12 +19,12 @@
         }
     }
     $pending  = in_array($row->status, [null, '', 'معلّق'], true);
-    $canJudge = auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'approve');
+    $canJudge = hub_approver();
     $reqName  = $row->requested_by ? (\App\Models\User::find($row->requested_by)?->name ?? '—') : null;
 @endphp
 @if ($row->mod)
 <div class="card">
-    <h3 style="margin-bottom:8px">⚡ عملية محمية بانتظار الحسم</h3>
+    <h3>⚡ عملية محمية بانتظار الحسم</h3>
     <div class="crow" style="margin-bottom:10px">
         <span class="chip">{{ $row->op === 'd' ? '🗑 حذف' : '✏️ تعديل' }} في {{ $tdef['label'] ?? $row->mod }}</span>
         @if ($target)<a class="chip" href="{{ route('m.show', [$row->mod, $row->record_id]) }}">فتح السجل الهدف ←</a>@endif
@@ -54,7 +54,7 @@
     @if ($pending && $canJudge && $target)
         <div class="crow" style="margin-top:12px">
             <form method="POST" action="{{ route('approvals.approve', $row->id) }}"
-                  onsubmit="return confirm('اعتماد العملية وتنفيذها الآن؟')">
+                  data-confirm="اعتماد العملية وتنفيذها الآن؟">
                 @csrf<button class="btn p sm" type="submit">✓ اعتماد وتنفيذ</button>
             </form>
             <form method="POST" action="{{ route('approvals.reject', $row->id) }}" style="display:flex;gap:6px">

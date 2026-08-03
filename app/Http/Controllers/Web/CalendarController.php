@@ -39,8 +39,14 @@ class CalendarController extends Controller
 
         // مخبّأ لكل (شهر × نطاق المستخدم): يمنع إعادة عشرات الاستعلامات عند كل تنقّل
         // شهري — على غرار رادار الانتهاءات. المقيَّد (مشاريع/شركات) بمفتاح خاص به.
+        // **والمحتوى مُرشَّحٌ بالصلاحيات أيضاً**: مفتاحٌ باسم «all» لكل غير
+        // المُنطَّقين كان يُقدّم نتيجة أوسعِهم صلاحيةً لأضيقهم — فحسابٌ يرى وحدةً
+        // واحدة يرث ما رآه من فتح الشهر قبله. المفتاح يحمل الدور (ومنه تُشتقّ
+        // المصفوفة)، والمُنطَّق يحمل هويته.
         $scoped = hub_scoped(auth()->user()) || hub_company_ids() !== null;
-        $ckey = 'hub:calendar:' . $start->format('Y-m') . ':' . ($scoped ? 'u:' . auth()->id() : 'all');
+        $ckey = 'hub:calendar:' . $start->format('Y-m') . ':'
+              . ($scoped ? 'u:' . auth()->id() : 'r:' . (auth()->user()?->role_id ?? '0'))
+              . ':c:' . (string) session('hub.company', '');
         [$days, $overflow] = \Illuminate\Support\Facades\Cache::remember($ckey, $scoped ? 300 : 600, function () use ($start, $end) {
             $days = [];
             $overflow = 0;
@@ -50,8 +56,11 @@ class CalendarController extends Controller
                 $disp = hub_display_col($mk);
                 try {
                     $base = hub_scope(
+                        // نطاقٌ على العمود الخام لا DATE(col): الدالة على العمود
+                        // تُعمي الفهرس فيمسح المحرّك الجدول كله لكل وحدة شهرياً
                         DB::table($md['table'])->whereNull('deleted_at')->whereNotNull($f['col'])
-                            ->whereBetween(DB::raw("DATE(`{$f['col']}`)"), [$start->toDateString(), $end->toDateString()]),
+                            ->where($f['col'], '>=', $start->toDateString())
+                            ->where($f['col'], '<', $end->copy()->addDay()->toDateString()),
                         $mk
                     );
                     // نعدّ الكل ثم نجلب الأقرب زمنياً بترتيب صريح — الحدّ لم يعد يُسقط

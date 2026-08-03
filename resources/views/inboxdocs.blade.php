@@ -50,15 +50,15 @@
                     </div>
                 @endif
             </div>
-            @if (auth()->user()->role?->is_owner)
-                <form method="POST" action="{{ route('inboxdocs.destroy', $doc->id) }}" onsubmit="return confirm('حذف الوثيقة؟')">
+            @if (hub_is_owner())
+                <form method="POST" action="{{ route('inboxdocs.destroy', $doc->id) }}" data-confirm="حذف الوثيقة؟">
                     @csrf @method('DELETE')<button class="btn ghost xs" style="color:var(--bad)">🗑</button>
                 </form>
             @endif
         </div>
 
         @if ($doc->status === 'وارد')
-            <details style="margin-top:8px"><summary class="sub" style="cursor:pointer">🏷️ تصنيف الوثيقة ▾</summary>
+            <details style="margin-top:8px"><summary class="sub pointer">🏷️ تصنيف الوثيقة ▾</summary>
                 <form method="POST" action="{{ route('inboxdocs.classify', $doc->id) }}" class="frm" style="margin-top:8px">
                     @csrf
                     <div class="crow">

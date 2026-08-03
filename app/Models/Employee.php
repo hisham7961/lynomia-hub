@@ -36,6 +36,33 @@ class Employee extends Model
         'archived' => 'boolean',
     ];
 
+    /**
+     * **الملفُّ والحساب شخصٌ واحد** — السكّة في App\Support\Staff، والربط هنا
+     * لأنه يجب أن يقع من كل باب: النموذج العام، والاستيراد، والتعيين، والسكربت.
+     * ما يُترك للمتحكّمات وحدها يُنسى في بابٍ منها.
+     */
+    protected static function booted(): void
+    {
+        // إضافةُ ملفٍّ لبريدٍ له حسابٌ حرّ تربطهما فوراً — لا إنشاء ولا سرقةَ مربوط
+        static::created(fn (self $e) => \App\Support\Staff::linkByEmail($e));
+
+        static::updated(function (self $e) {
+            $was = (string) $e->getOriginal('status');
+            $now = (string) $e->status;
+            if ($was === $now) return;
+
+            $openBefore = in_array($was, \App\Support\Staff::OPEN, true);
+            $openNow = in_array($now, \App\Support\Staff::OPEN, true);
+
+            // انتهت خدمتُه أو أُوقف: يُغلق البابُ فوراً، لا حين يتذكّر أحد
+            if ($openBefore && ! $openNow) \App\Support\Staff::closeAccount($e, 'حالة الملف: ' . $now);
+            // وعاد: يُبلَّغ من يدير المستخدمين — إعادةُ الوصول قرارٌ لا أثرٌ جانبي
+            if (! $openBefore && $openNow) \App\Support\Staff::announceReturn($e);
+        });
+
+        static::deleted(fn (self $e) => \App\Support\Staff::closeAccount($e, 'حُذف ملفه الوظيفي'));
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class, 'user_id');

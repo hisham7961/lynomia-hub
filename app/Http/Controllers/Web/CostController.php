@@ -11,17 +11,21 @@ class CostController extends Controller
 {
     protected function gate(): void
     {
-        abort_unless(auth()->user()?->role?->is_owner || hub_flag(auth()->user(), 'monitor'),
+        abort_unless(hub_monitor(),
             403, 'لوحة التكاليف للمالكين ومن يحمل صلاحية المتابعة');
     }
 
-    /** تحليل تكلفة الخدمات والباقات */
+    /** تحليل تكلفة الخدمات والباقات — ومعه الإيراد الشهري المتكرر الحقيقي */
     public function services()
     {
         $this->gate();
         hub_org_analytics_guard();
+        $fresh = (bool) request()->query('fresh');
 
-        return view('service_costs', ['d' => hub_service_costs((bool) request()->query('fresh'))]);
+        return view('service_costs', [
+            'd' => hub_service_costs($fresh),
+            'mrr' => hub_mrr($fresh),
+        ]);
     }
 
     public function index(Request $r)
@@ -54,7 +58,7 @@ class CostController extends Controller
         return view('costs.index', [
             'rows' => $rows->sortByDesc(fn ($x) => $x['pl']['revenue']['invoiced'])->values(),
             'tot' => $tot,
-            'currency' => (string) setting('fin.currency', 'د.ك'),
+            'currency' => (string) setting('app.currency', 'د.ك'),
             'rates' => hub_hourly_rates(),
         ]);
     }

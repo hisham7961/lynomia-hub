@@ -12,10 +12,10 @@ class QualityController extends Controller
 {
     protected function gate(): void
     {
-        abort_unless(auth()->user()?->role?->is_owner, 403, 'مركز جودة البيانات للمالكين فقط');
+        abort_unless(hub_is_owner(), 403, 'مركز جودة البيانات للمالكين فقط');
     }
 
-    public function index()
+    public function index(Request $r)
     {
         $this->gate();
 
@@ -34,45 +34,17 @@ class QualityController extends Controller
             }
         }
 
-        // ٢) فحوص النواقص — كل فحص: عنوان، وحدة للرابط، عدد، عينة
-        $checks = [];
-        $mk = function (string $label, string $module, $q, string $hint = '') use (&$checks) {
-            $count = (clone $q)->count();
-            if (! $count) return;
-            $disp = hub_display_col($module);
-            $checks[] = ['label' => $label, 'module' => $module, 'count' => $count, 'hint' => $hint,
-                         'sample' => $q->limit(8)->get()->map(fn ($r) => ['id' => $r->id, 'name' => $r->{$disp} ?? $r->id])];
-        };
+        // ٢) المسح المشتقّ من سجل الوحدات — كل وحدةٍ وكل حقل، لا ثلاث وحدات
+        $scan = \App\Support\DataQuality::scan((bool) $r->query('fresh'));
 
-        foreach ([['clients', 'عملاء بلا شركة'], ['projects', 'مشاريع بلا شركة'], ['hr', 'موظفون بلا شركة']] as [$m, $lbl]) {
-            $def = hub_mod($m);
-            $mk($lbl, $m, DB::table($def['table'])->whereNull('deleted_at')->whereNull('company_id')
-                ->select('id', hub_display_col($m)), 'اربط السجل بشركته ليظهر في تقاريرها');
-        }
-        $mk('موظفون بلا مدير مباشر', 'hr',
-            DB::table('employees')->whereNull('deleted_at')->whereNull('manager_id')->select('id', 'name'),
-            'المدير المباشر يلزم لمسارات الإجازات والتقييم');
-        $mk('مشاريع بلا مسؤول', 'projects',
-            DB::table('projects')->whereNull('deleted_at')->whereNull('manager_id')->select('id', 'name'),
-            'مشروع بلا مسؤول = لا أحد يُسأل عنه');
-        $mk('دومينات بلا تاريخ انتهاء', 'domains',
-            DB::table('domains')->whereNull('deleted_at')->whereNull('expiry')->select('id', 'name'),
-            'بلا تاريخ لن يصلك تنبيه تجديد — خطر فقدان الدومين');
-        $mk('فواتير بلا طرف (عميل/مورد)', 'fin',
-            DB::table('fin_documents')->whereNull('deleted_at')->where('kind', 'فاتورة')
-                ->where(fn ($w) => $w->whereNull('partner')->orWhere('partner', ''))->select('id', 'doc_no'),
-            'حدد الطرف ليصح كشف الحساب');
-        $mk('بريد عملاء غير صالح', 'clients',
-            DB::table('clients')->whereNull('deleted_at')->whereNotNull('email')->where('email', '!=', '')
-                ->where('email', 'NOT LIKE', '%_@_%._%')->select('id', 'name'),
-            'صحح الصيغة أو أفرغ الحقل');
-        $mk('عملاء راكدون (بلا أي تحديث ٩٠ يوماً)', 'clients',
-            DB::table('clients')->whereNull('deleted_at')->where('updated_at', '<', now()->subDays(90))
-                ->select('id', 'name'),
-            'حدّث الموقف أو أرشف بحذف ناعم');
-
-        return view('admin.quality', ['groups' => $groups, 'checks' => $checks,
-                                      'clean' => empty($groups) && empty($checks)]);
+        return view('admin.quality', [
+            'groups'  => $groups,
+            'checks'  => $scan['checks'],
+            'byMod'   => $scan['byModule'],
+            'totals'  => $scan['totals'],
+            'history' => \App\Support\DataQuality::history(),
+            'clean'   => empty($groups) && empty($scan['checks']),
+        ]);
     }
 
     /** دمج مكررات عميل: يبقى الأساسي، تُعاد الإشارات إليه، وتُملأ فراغاته من المدموجين ثم يُحذفون ناعماً */
@@ -96,7 +68,10 @@ class QualityController extends Controller
                 foreach (config('hub.modules') as $md) {
                     foreach ($md['fields'] as $f) {
                         if (($f['ref'] ?? null) !== 'clients' || ($f['type'] ?? '') !== 'ref') continue;
-                        $moved += DB::table($md['table'])->where($f['col'], $dup->id)->update([$f['col'] => $keep->id]);
+                        $n = DB::table($md['table'])->where($f['col'], $dup->id)->update([$f['col'] => $keep->id]);
+                        // كتابةٌ خام لا تُطلق أحداث Eloquent — يُرفع ختم الجدول يدوياً
+                        if ($n) hub_data_bump($md['table']);
+                        $moved += $n;
                     }
                 }
                 // المرفقات الحيّة المشيرة للسجل بـ (وحدة + معرّف) خارج سجل الوحدات.

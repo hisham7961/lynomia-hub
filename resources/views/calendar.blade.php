@@ -3,6 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>الأدوات</span><span aria-hidden="true">‹</span><b>التقويم الموحّد</b></nav>
         <h2>📅 التقويم الموحّد</h2>
         <div class="sub">كل مواعيدك من كل الوحدات في شبكة واحدة — مهام واجتماعات وانتهاءات وإطلاقات، بصلاحياتك ونطاقك.</div>
     </div>
@@ -24,20 +25,24 @@
     $today = now()->toDateString();
 @endphp
 
-<div class="card" style="padding:10px;overflow-x:auto">
-    <div style="display:grid;grid-template-columns:repeat(7,minmax(120px,1fr));gap:6px;min-width:880px">
-        @foreach ($names as $n)<div class="mut" style="text-align:center;font-size:12.5px;padding:4px 0"><b>{{ $n }}</b></div>@endforeach
+{{-- v2.130: شبكة مرنة بلا min-width:880px — كانت الشبكة تجر الجوال أفقياً بأيامٍ فارغة.
+     على ≤760px: قائمةُ أيامٍ ذات أحداثٍ فقط باسم يومها. (وأصلحنا var(--brand) غير المعرف
+     الذي كان يُسقط إطار اليوم وخلفيات الأحداث بصمت — الهوية اسمها --p) --}}
+<div class="card" style="padding:10px">
+    <div class="cgrid">
+        @foreach ($names as $n)<div class="cwd mut"><b>{{ $n }}</b></div>@endforeach
 
-        @for ($i = 0; $i < $lead; $i++)<div></div>@endfor
+        @for ($i = 0; $i < $lead; $i++)<div class="cday lead"></div>@endfor
 
         @for ($day = 1; $day <= $dim; $day++)
             @php $dstr = $first->copy()->addDays($day - 1)->toDateString(); $evs = $days[$dstr] ?? []; @endphp
-            <div style="border:1px solid var(--line);border-radius:10px;min-height:86px;padding:6px;{{ $dstr === $today ? 'outline:2px solid var(--brand);outline-offset:-2px' : '' }}">
-                <div style="font-size:12px;{{ $dstr === $today ? 'font-weight:700' : '' }}" class="{{ $evs ? '' : 'mut' }}">{{ $day }}</div>
+            <div class="cday {{ $evs ? 'has-ev' : 'no-ev' }} {{ $dstr === $today ? 'ctoday' : '' }}">
+                <div style="font-size:12px;{{ $dstr === $today ? 'font-weight:700' : '' }}" class="{{ $evs ? '' : 'mut' }}">{{ $day }}
+                    <span class="cwdname mut">{{ $names[($lead + $day - 1) % 7] }}</span></div>
                 @foreach ($evs as $e)
                     <a href="{{ route('m.show', [$e['module'], $e['id']]) }}"
                        title="{{ $e['mlabel'] }} · {{ $e['label'] }} — {{ $e['name'] }}"
-                       style="display:block;font-size:11.5px;line-height:1.5;padding:1px 5px;margin-top:3px;border-radius:6px;background:color-mix(in srgb, var(--brand) 9%, transparent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:none">
+                       style="display:block;font-size:11.5px;line-height:1.5;padding:1px 5px;margin-top:3px;border-radius:6px;background:color-mix(in srgb, var(--p) 9%, transparent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:none">
                         {{ \Illuminate\Support\Str::limit($e['name'] !== '' ? $e['name'] : $e['mlabel'], 18) }}
                         <span class="mut">· {{ \Illuminate\Support\Str::limit($e['label'], 12) }}</span>
                     </a>
@@ -45,5 +50,6 @@
             </div>
         @endfor
     </div>
+    @if (! count($days))<div class="sub" style="padding:8px;text-align:center">لا مواعيد هذا الشهر</div>@endif
 </div>
 @endsection

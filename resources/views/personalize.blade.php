@@ -9,7 +9,7 @@
             <b>الإخفاء تنظيمٌ للعرض لا صلاحية</b> — ما تخفيه يبقى متاحاً بالرابط المباشر والبحث.
         </div>
     </div>
-    <form method="POST" action="{{ route('prefs.reset') }}" onsubmit="return confirm('مسح كل تخصيصك والعودة للافتراضي؟')">
+    <form method="POST" action="{{ route('prefs.reset') }}" data-confirm="مسح كل تخصيصك والعودة للافتراضي؟">
         @csrf<button class="btn ghost sm">↺ الضبط الافتراضي</button>
     </form>
 </div>
@@ -47,6 +47,21 @@
         </select>
     </div>
 
+    {{-- نمط القائمة الجانبية: مساحات عمل مختصرة أو القائمة الكاملة (CTO م2) --}}
+    @php $navStyle = hub_pref('nav.style', 'spaces'); @endphp
+    <div class="card" style="margin-top:12px">
+        <h3>🧭 نمط القائمة الجانبية</h3>
+        <div class="sub" style="margin-bottom:8px">كيف تتنقل بين أقسام النظام؟ الاختيار لك وحدك — لا يمسّ صلاحياتك، وكل رابط وحدة يبقى يعمل.</div>
+        <label class="chk" style="display:block;margin-bottom:6px">
+            <input type="radio" name="nav_style" value="spaces" @checked($navStyle !== 'classic')>
+            <b>مساحات العمل</b> (مختصر) — قائمة نظيفة بمساحات المجالات، وكل مساحة تُبلّغ عن وحداتها في صفحتها المركزية.
+        </label>
+        <label class="chk" style="display:block">
+            <input type="radio" name="nav_style" value="classic" @checked($navStyle === 'classic')>
+            <b>القائمة الكاملة</b> (كلاسيكي) — كل الوحدات مجموعةً في القائمة الجانبية كما اعتدت.
+        </label>
+    </div>
+
     <div class="card" style="margin-top:12px">
         <h3>📌 روابط القائمة العلوية</h3>
         <div class="sub" style="margin-bottom:8px">أزل ما لا تستخدمه — يختفي من قائمتك أنت فقط.</div>
@@ -74,7 +89,7 @@
                     <input class="inp ltr" id="ord-{{ $gi }}" type="number" name="order[{{ $g['g'] }}]" min="0" max="99" style="max-width:90px"
                            value="{{ ($oi = array_search($g['g'], $order, true)) === false ? '' : $oi }}" placeholder="—">
                 </div>
-                <table class="tbl">
+                <div class="tblwrap"><table class="tbl">
                     <thead><tr><th>الوحدة</th><th style="width:110px">إخفاء</th><th style="width:220px">تسمية بديلة</th></tr></thead>
                     <tbody>
                     @foreach ($g['items'] as $it)
@@ -87,7 +102,7 @@
                         </tr>
                     @endforeach
                     </tbody>
-                </table>
+                </table></div>
             </details>
         @endforeach
     </div>

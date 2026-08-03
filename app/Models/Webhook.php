@@ -19,11 +19,6 @@ class Webhook extends Model
     }
 
     /** هل الاشتراك جاهز للإرسال الآن؟ (مفعّل وغير موقوف مؤقتاً) */
-    public function deliverable(): bool
-    {
-        return $this->active && (! $this->paused_until || $this->paused_until->isPast());
-    }
-
     /**
      * هل يشمل هذا الاشتراك حدثاً مثل projects.created؟
      * الأنماط: «*» · «وحدة.حدث» · «وحدة.*» · «*.حدث» · و«وحدة» وحدها = كل أحداثها

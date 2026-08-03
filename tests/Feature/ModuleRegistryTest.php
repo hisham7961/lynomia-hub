@@ -114,4 +114,55 @@ class ModuleRegistryTest extends TestCase
         $this->assertSame('ميزة جديدة', $r->req_type);
         $this->assertEquals(500, (float) $r->est_cost);
     }
+
+    /**
+     * جولة تدقيق ٦ — حارس الأعمدة اليتيمة: columnsAndLabels يقاطع columns مع
+     * مفاتيح fields فيُسقط اليتيم بصمت — العمود المقصود يختفي ولا أحد يعلم
+     * (كانت سبع وحدات مصابة: عمود الحالة في الموافقات، معدل تفاعل المنشورات،
+     * وجدول تحديثات العمل كله بلا أعمدة).
+     */
+    public function test_declared_columns_are_subset_of_declared_fields(): void
+    {
+        foreach (hub_modules() as $mk => $md) {
+            $keys = array_column($md['fields'], 'key');
+            $cols = $md['columns'] ?? null;
+            if ($cols === null) continue;
+            $this->assertNotEmpty($cols, "وحدة {$mk} تعلن columns فارغة — جدولها يظهر بلا أي عمود بيانات");
+            foreach ($cols as $c) {
+                $this->assertContains($c, $keys,
+                    "عمود يتيم {$mk}.{$c}: معلن في columns بلا حقل يقابله — يُسقطه العرض بصمت");
+            }
+        }
+    }
+
+    /** حارس المرادفات: خياران بنفس اللفظ بعد التطبيع = عمودا كانبان مكرران ومطابقة منطق تتسرب */
+    public function test_no_normalized_duplicates_inside_field_options(): void
+    {
+        foreach (hub_modules() as $mk => $md) {
+            foreach ($md['fields'] as $f) {
+                if (empty($f['options'])) continue;
+                $norm = array_map(fn ($o) => hub_ar_norm((string) $o), $f['options']);
+                $this->assertSame(count($norm), count(array_unique($norm)),
+                    "خيارات {$mk}.{$f['key']} فيها مرادفان بعد التطبيع: " . implode('، ', $f['options']));
+            }
+        }
+    }
+
+    /** الموافقة تولد «معلّق» لا 'pending' — فلا تولد ميتة عن كل المحركات */
+    public function test_new_approval_is_born_pending_in_arabic(): void
+    {
+        $this->seedCore();
+
+        // الإنشاء البرمجي بلا حالة يأخذ افتراضي العمود — كان 'pending' فلا يراه أي منطق
+        $ap = \App\Models\Approval::create(['title' => 'موافقة برمجية', 'type' => 'مصروف']);
+        $this->assertSame('معلّق', $ap->fresh()->status,
+            'الافتراضي الإنجليزي pending كان يولّد موافقة لا يراها الموجز ولا بوابة /me ولا حالات الإغلاق');
+
+        // ومن النموذج: الحالة مطلوبة (كي لا يُكتب NULL فوق الافتراضي) وتظهر في العمود المعلن
+        $this->actingAs($this->owner)->post('/m/approvals', [
+            'title' => 'موافقة من النموذج', 'type' => 'مصروف',
+            'approverId' => $this->owner->id, 'status' => 'معلّق',
+        ])->assertSessionHasNoErrors();
+        $this->assertSame('معلّق', \App\Models\Approval::where('title', 'موافقة من النموذج')->firstOrFail()->status);
+    }
 }

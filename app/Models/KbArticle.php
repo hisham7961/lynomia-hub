@@ -18,6 +18,7 @@ class KbArticle extends Model
 
     protected $table = 'kb_articles';
     public const MODULE = 'kb';
+    public const ACK_FLAG = 'must_read';
     public const DISPLAY = 'title';
 
     protected $guarded = ['id', 'version', 'created_by'];
@@ -38,5 +39,21 @@ class KbArticle extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class, 'owner_id');
+    }
+
+    /**
+     * محرّكٌ **واحد** لدورة الإقرار، ومكانه النموذج لا المتحكّم: تغيّر النسخة
+     * يُسقط إقرارات ما قبلها ويُعيد الإعلان — أياً كان مصدر التغيير (واجهة،
+     * API، استيراد، أمر طرفية، بذرة). كان المنطق مكرَّراً في موضعين بمفردتَي
+     * حالةٍ مختلفتين، فيرسل إشعارين ويرى كلٌّ نصف السجلات.
+     */
+    protected static function booted(): void
+    {
+        static::updated(function (self $m) {
+            if (! $m->wasChanged('ver')) return;
+            if (! (bool) ($m->{static::ACK_FLAG} ?? false)) return;
+
+            hub_ack_reset(static::MODULE, $m->id, (string) ($m->ver ?: '1.0'));
+        });
     }
 }

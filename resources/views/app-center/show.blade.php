@@ -13,14 +13,14 @@
         </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-        @if (hub_can(auth()->user(), 'apps', 'e'))<a class="btn ghost sm" href="{{ route('m.edit', ['apps', $app->id]) }}" onclick="return Hub.modal(this.href)">✏️ تعديل</a>@endif
+        @if (hub_can(auth()->user(), 'apps', 'e'))<a class="btn ghost sm" href="{{ route('m.edit', ['apps', $app->id]) }}">✏️ تعديل</a>@endif
         <a class="btn ghost sm" href="{{ route('m.show', ['apps', $app->id]) }}">📄 كل الحقول</a>
     </div>
 </div>
 
 {{-- نسبة الإنجاز الحية --}}
 <div class="card">
-    <h3 style="margin-bottom:10px">🎯 نسبة الإنجاز
+    <h3>🎯 نسبة الإنجاز
         @if ($progress && $progress['pct'] !== null)<b style="font-size:22px;margin-inline-start:6px">{{ $progress['pct'] }}٪</b>@endif
     </h3>
     @if ($progress && $progress['pct'] !== null)
@@ -36,9 +36,61 @@
     @endif
 </div>
 
+{{-- أداء المتجر: التحميلات والتقييم — أَحيٌّ التطبيق أم ميت؟ --}}
+@php
+    $store = hub_app_store($app);
+    $sNum = fn ($v) => $v === null ? '—' : number_format((float) $v, ((float) $v == (int) $v) ? 0 : 1);
+@endphp
+<div class="card">
+    <h3>📊 أداء المتجر <span class="sub">· آخر {{ $store['days'] }} يوماً</span></h3>
+    <div class="cards" style="margin-bottom:10px">
+        <div class="stat"><span class="ico">⬇️</span><b>{{ $sNum($store['downloads']) }}</b><span>التحميلات</span></div>
+        <div class="stat"><span class="ico">{{ ($store['growth']['delta'] ?? 0) >= 0 ? '📈' : '📉' }}</span>
+            <b class="{{ ($store['growth']['delta'] ?? 0) < 0 ? 'txt-bad' : '' }}">
+                {{ $store['growth']['delta'] === null ? '—' : (($store['growth']['delta'] >= 0 ? '+' : '') . number_format($store['growth']['delta'])) }}</b>
+            <span>نمو التحميلات{{ $store['growth']['pct'] !== null ? ' · ' . $store['growth']['pct'] . '٪' : '' }}</span></div>
+        <div class="stat"><span class="ico">⭐</span>
+            <b class="{{ $store['ratingTone'] === 'bad' ? 'txt-bad' : '' }}">{{ $store['rating'] === null ? '—' : number_format($store['rating'], 1) }}</b>
+            <span>تقييم المتجر{{ $store['reviews'] !== null ? ' · ' . $sNum($store['reviews']) . ' مراجعة' : '' }}</span></div>
+        <div class="stat"><span class="ico">🔌</span>
+            <b class="{{ $store['feed']['tone'] === 'bad' ? 'txt-bad' : '' }}">{{ $store['feed']['label'] }}</b>
+            <span>{{ $store['feed']['at'] ? 'آخر قياس ' . $store['feed']['at']->diffForHumans() : 'لا قياس مسجّل' }}</span></div>
+    </div>
+
+    @if (count($store['spark']) > 1)
+        <div class="sub" style="margin-bottom:4px">منحنى التحميلات:</div>
+        <div style="display:flex;align-items:flex-end;gap:3px;height:70px">
+            @foreach ($store['spark'] as $s)
+                <div title="{{ $s['at']->format('Y-m-d') }} — {{ number_format($s['value']) }}"
+                     style="flex:1;min-width:4px;height:100%;display:flex;align-items:flex-end">
+                    <span style="display:block;width:100%;border-radius:3px 3px 0 0;background:var(--p);height:{{ max(6, $s['pct']) }}%"></span>
+                </div>
+            @endforeach
+        </div>
+    @endif
+
+    @if ($store['rating'] !== null && $store['ratingTone'] === 'bad')
+        <div class="sub" style="margin-top:10px;color:var(--bad)">
+            ⚠️ تقييمٌ دون ٣٫٥ يخنق التحميل في المتاجر قبل أي تسويق — عالج المراجعات أولاً.
+        </div>
+    @endif
+
+    @if (! $store['has'] || $store['feed']['mode'] === 'none')
+        <div class="sub" style="margin-top:10px;line-height:2">
+            <b>{{ $store['feed']['label'] }}</b> — أرقام هذا التطبيق لا تصل من نفسها.
+            @if ($store['auto']) («مزامنة المتجر تلقائياً» مؤشَّرة لكن لا نقاط تصل بعد.) @endif
+            دع n8n (أو أي مصدر يقرأ Play Console / App Store Connect) يدفعها إلى
+            <span class="mono ltr">POST /api/v1/metrics</span> بمقاييس
+            <span class="mono ltr">downloads, rating, reviews</span> —
+            التفصيل في <a href="{{ route('integrations.guide') }}">دليل الربط</a>.
+            وحتى ذلك، كل حفظٍ للحقول يسجّل نقطةً في السلسلة من نفسه.
+        </div>
+    @endif
+</div>
+
 {{-- المتاجر والمراجعات والروابط --}}
 <div class="card">
-    <h3 style="margin-bottom:8px">🏪 المتاجر والروابط</h3>
+    <h3>🏪 المتاجر والروابط</h3>
     <div class="crow">
         @if ($app->apple_rev && $app->apple_rev !== '—')<span class="chip">🍎 مراجعة آبل: <span class="bdg {{ hub_tone($app->apple_rev) }}">{{ $app->apple_rev }}</span></span>@endif
         @if ($app->google_rev && $app->google_rev !== '—')<span class="chip">🤖 مراجعة جوجل: <span class="bdg {{ hub_tone($app->google_rev) }}">{{ $app->google_rev }}</span></span>@endif
@@ -53,11 +105,11 @@
     <div class="card kid wide">
         <h3>🚀 الإصدارات والتحديثات <span class="bdg g">{{ $releases->count() }}</span>
             @if (hub_can(auth()->user(), 'code', 'a'))
-                <a class="btn ghost xs" style="margin-inline-start:auto" href="{{ route('m.create', 'code') }}" onclick="return Hub.modal(this.href)">＋ إصدار جديد</a>
+                <a class="btn ghost xs msauto" href="{{ route('m.create', 'code') }}">＋ إصدار جديد</a>
             @endif
         </h3>
         @forelse ($releases as $rel)
-            <div class="tl">
+            <div class="reltl">
                 <div class="tlv">{{ $rel->ver ?: '—' }}</div>
                 <div class="tlb">
                     <div class="chead">
@@ -87,7 +139,7 @@
                     <td>{{ \Illuminate\Support\Str::limit($f->title, 30) }}
                         <div class="pbar sm"><span style="width:{{ min(100, max(0, (int) ($f->progress ?? 0))) }}%"></span></div>
                         <div class="sub">{{ $f->type }} · وزن {{ $f->weight ?: 1 }}{{ $f->test && $f->test !== '—' ? ' · اختبار: ' . $f->test : '' }}</div></td>
-                    <td style="width:1%"><b>{{ (int) ($f->progress ?? 0) }}٪</b></td>
+                    <td class="acts"><b>{{ (int) ($f->progress ?? 0) }}٪</b></td>
                 </tr>
             @endforeach
         </table>
@@ -102,7 +154,7 @@
                 <tr>
                     <td>@if (hub_can(auth()->user(), 'issues', 'v'))<a href="{{ route('m.show', ['issues', $i->id]) }}">{{ \Illuminate\Support\Str::limit($i->title, 34) }}</a>@else {{ \Illuminate\Support\Str::limit($i->title, 34) }} @endif
                         @if ($i->severity)<div class="sub">{{ $i->severity }}</div>@endif</td>
-                    <td style="width:1%">@if ($i->status)<span class="bdg {{ hub_tone($i->status) }}">{{ $i->status }}</span>@endif</td>
+                    <td class="acts">@if ($i->status)<span class="bdg {{ hub_tone($i->status) }}">{{ $i->status }}</span>@endif</td>
                 </tr>
             @empty
                 <tr><td class="sub" style="padding:12px;text-align:center">لا أعطال مفتوحة 🎉</td></tr>
@@ -116,7 +168,7 @@
             @forelse ($tickets as $t)
                 <tr>
                     <td>@if (hub_can(auth()->user(), 'tickets', 'v'))<a href="{{ route('m.show', ['tickets', $t->id]) }}">{{ \Illuminate\Support\Str::limit($t->subject, 34) }}</a>@else {{ \Illuminate\Support\Str::limit($t->subject, 34) }} @endif</td>
-                    <td style="width:1%">@if ($t->status)<span class="bdg {{ hub_tone($t->status) }}">{{ $t->status }}</span>@endif</td>
+                    <td class="acts">@if ($t->status)<span class="bdg {{ hub_tone($t->status) }}">{{ $t->status }}</span>@endif</td>
                 </tr>
             @empty
                 <tr><td class="sub" style="padding:12px;text-align:center">لا تذاكر مفتوحة 🎉</td></tr>

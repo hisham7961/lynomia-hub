@@ -24,7 +24,17 @@ class AttachmentController extends Controller
             'module'    => ['required', 'string', 'max:60'],
             'record_id' => ['required', 'string', 'max:36'],
             'file'      => ['required', 'file', 'max:' . (int) setting('files.max_kb', 512000)],
-            'note'      => ['nullable', 'string', 'max:200'],
+            // الملاحظة كانت تُحقَّق ٢٠٠ حرفاً وتُحشر في عمود ٦٠ — صار لها عمودها
+            'note'      => ['nullable', 'string', 'max:300'],
+            // نوع الوثيقة من ملف الكيان — مفتاحٌ معلن لا نصٌّ حر
+            'kind'       => ['nullable', 'string', 'max:40',
+                             \Illuminate\Validation\Rule::in(collect(hub_doc_spec(hub_str($r->input('module'))))->pluck('key')->all())],
+            'doc_no'     => ['nullable', 'string', 'max:80'],
+            'issued_at'  => ['nullable', 'date'],
+            'expires_at' => ['nullable', 'date'],
+        ], [], [
+            'note' => 'الملاحظة', 'kind' => 'نوع الوثيقة', 'doc_no' => 'رقم الوثيقة',
+            'issued_at' => 'تاريخ الإصدار', 'expires_at' => 'تاريخ الانتهاء',
         ]);
 
         $this->guardRecord($data['module'], $data['record_id'], 'v');
@@ -38,7 +48,11 @@ class AttachmentController extends Controller
         $a = Attachment::create([
             'module'        => $data['module'],
             'record_id'     => $data['record_id'],
-            'field'         => ($data['note'] ?? null) ?: null,   // ملاحظة اختيارية تصف الملف
+            'note'          => ($data['note'] ?? null) ?: null,   // ملاحظة اختيارية تصف الملف
+            'kind'          => ($data['kind'] ?? null) ?: null,
+            'doc_no'        => ($data['doc_no'] ?? null) ?: null,
+            'issued_at'     => ($data['issued_at'] ?? null) ?: null,
+            'expires_at'    => ($data['expires_at'] ?? null) ?: null,
             'disk'          => 'local',
             'path'          => $path,
             'original_name' => Str::limit((string) $f->getClientOriginalName(), 290, ''),
@@ -48,13 +62,23 @@ class AttachmentController extends Controller
             'uploaded_by'   => auth()->id(),
         ]);
 
-        return back()->with('ok', 'أُرفق الملف')->withFragment('att-' . $a->id);
+        // وثيقةٌ لها مدّة تدخل رادار «ينتهي قريباً» فوراً لا بعد انقضاء المخبأ
+        if ($a->expires_at) hub_expiry_bust();
+
+        return back()->with('ok', $a->kind
+            ? 'أُرفقت الوثيقة: ' . (hub_doc_label($a->module, $a->kind) ?? '')
+            : 'أُرفق الملف')->withFragment('att-' . $a->id);
     }
 
     public function download(string $id)
     {
         $a = Attachment::findOrFail($id);
         $this->guardRecord($a->module, $a->record_id, 'v');
+
+        // عمود av_status كان حبراً على ورق: مرفقٌ وُسم «مصاب» يُخدم كأن شيئاً
+        // لم يكن. لا ماسحَ مدمجاً بعد (يبقى 'pending' فيُخدم) — لكن متى وسمت
+        // أداةٌ خارجية ملفاً مصاباً توقّف تقديمه فوراً. 423 Locked: محجوز لا مفقود.
+        abort_if($a->av_status === 'infected', 423, 'حُجب هذا الملف — وُسم مصاباً بفحص الفيروسات');
 
         $abs = Storage::disk($a->disk ?: 'local')->path($a->path);
         abort_unless(is_file($abs), 404, 'الملف غير موجود على القرص');
@@ -70,25 +94,51 @@ class AttachmentController extends Controller
         return response()->download($abs, $a->original_name ?: basename($a->path));
     }
 
+    /** أنواع تُعاين حيّاً داخل المتصفح — صور نقطية وPDF فقط؛ SVG/HTML تبقى تنزيلاً (قد تحمل سكربتات) */
+    // عامة: بوابة ملفات الوحدات وغرفة البيانات تتبعان السياسة نفسها — تعريفٌ واحد
+    public const INLINE_MIMES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp', 'image/avif', 'application/pdf'];
+
+    /**
+     * معاينة حية: الصورة/الشهادة/اللوجو تُعرض مصغّرةً وكاملةً دون تنزيل،
+     * وPDF يفتح في عارض المتصفح. بهوية المستخدم وصلاحيته نفسها، ويُسجَّل الاطلاع.
+     */
+    public function preview(string $id)
+    {
+        $a = Attachment::findOrFail($id);
+        $this->guardRecord($a->module, $a->record_id, 'v');
+        abort_unless(in_array($a->mime, self::INLINE_MIMES, true), 415, 'هذا النوع يُنزَّل ولا يُعاين');
+
+        $abs = Storage::disk($a->disk ?: 'local')->path($a->path);
+        abort_unless(is_file($abs), 404, 'الملف غير موجود على القرص');
+
+        DB::table('download_log')->insert([
+            'attachment_id' => $a->id, 'user_id' => auth()->id(),
+            'ip' => request()->ip(), 'device' => substr('معاينة · ' . request()->userAgent(), 0, 200),
+            'created_at' => now(),
+        ]);
+
+        return response()->file($abs, [
+            'Content-Type'           => $a->mime,
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'",
+            'Cache-Control'          => 'private, max-age=300',
+        ]);
+    }
+
     /** الحذف: من رفعه، أو من يملك تعديل الوحدة، أو المالك — ويُدوَّن في التدقيق */
     public function destroy(string $id)
     {
         $a = Attachment::findOrFail($id);
         $u = auth()->user();
         abort_unless(
-            $a->uploaded_by === $u->id || $u->role?->is_owner || hub_can($u, $a->module, 'e'),
+            $a->uploaded_by === $u->id || hub_is_owner($u) || hub_can($u, $a->module, 'e'),
             403, 'حذف المرفق لمن رفعه أو من يملك تعديل الوحدة'
         );
         $this->guardRecord($a->module, $a->record_id, 'v');
 
         $a->delete();   // حذف ناعم — الملف يبقى على القرص للاستعادة
 
-        \App\Models\AuditEntry::create([
-            'user_id' => $u->id, 'action' => 'حذف مرفق', 'module' => $a->module,
-            'record_id' => $a->record_id, 'name' => Str::limit((string) $a->original_name, 60),
-            'device' => substr((string) request()->userAgent(), 0, 200),
-            'ip' => request()->ip(), 'created_at' => now(),
-        ]);
+        hub_audit('حذف مرفق', $a->module, $a->record_id, (string) $a->original_name);
 
         return back()->with('ok', 'حُذف المرفق');
     }

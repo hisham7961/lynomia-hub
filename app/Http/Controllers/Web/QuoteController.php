@@ -23,9 +23,15 @@ class QuoteController extends Controller
         $q = hub_scope(Quote::query(), 'quotes')->findOrFail($id);
         $client = $q->client_id ? Client::find($q->client_id) : null;
 
+        // إثراء البنود بحساب الكراتين (تعبئة المنتجات) بعزل شركة المستند
+        $items = \App\Support\Items::cartons(
+            \App\Support\Items::parse((string) $q->items), $q->company_id);
+
         return view('quotes.doc', [
             'q' => $q, 'client' => $client,
-            'items' => \App\Support\Items::parse((string) $q->items),
+            'items' => $items,
+            'showCartons' => \App\Support\Items::anyCartons($items),
+            'totalCartons' => \App\Support\Items::totalCartons($items),
             'logo' => setting('app.logo'),
         ]);
     }
@@ -34,8 +40,9 @@ class QuoteController extends Controller
     public function act(Request $r, string $id)
     {
         abort_unless(hub_can(auth()->user(), 'quotes', 'e'), 403, 'إجراءات العرض تتطلب صلاحية تعديل');
+        if ($why = hub_block_if_queued('quotes')) return back()->with('err', $why);
         $q = hub_scope(Quote::query(), 'quotes')->findOrFail($id);
-        $action = (string) $r->input('do');
+        $action = hub_str($r->input('do'));
 
         return match ($action) {
             'send'     => $this->setStatus($q, 'مُرسل', '📨 حُدّد العرض كمُرسل للعميل'),
@@ -69,14 +76,17 @@ class QuoteController extends Controller
             'title'      => 'عقد بموجب عرض السعر ' . $q->doc_no,
             'type'       => 'عقد عميل',
             'client_id'  => $q->client_id,
+            'service_id' => $q->service_id,   // الخدمة تتبع البيع فيُقاس MRR من مصدره
             'company_id' => $q->company_id,
             'project_id' => $q->project_id,
             'party'      => $q->client_id ? Client::find($q->client_id)?->name : null,
             'value'      => $q->total,
             'currency'   => $q->currency,
-            'start'      => now()->toDateString(),
+            // v2.117: كان يكتب عمود start الوهمي (الصحيح date_start → انفجار 500 على
+            // MySQL) وحالة «نشط» الخارجة عن خيارات الوحدة فلا كانبان ولا حدث يلتقطها
+            'date_start' => now()->toDateString(),
             'owner_id'   => $q->owner_id ?: auth()->id(),
-            'status'     => 'نشط',
+            'status'     => 'ساري',
             'notes'      => 'أُنشئ تلقائياً من عرض السعر ' . $q->doc_no
                           . ($q->terms ? "\n\nالشروط المتفق عليها:\n" . Str::limit($q->terms, 1500) : ''),
         ]);
@@ -98,6 +108,8 @@ class QuoteController extends Controller
         $inv = FinDocument::create([
             'doc_no'      => 'INV-' . $q->doc_no,
             'kind'        => 'فاتورة مبيعات',
+            'client_id'   => $q->client_id,   // المرجع الصريح — الاسم النصي يضيع بالتكرار وتغيير الاسم
+            'service_id'  => $q->service_id,
             'partner'     => $q->client_id ? (Client::find($q->client_id)?->name ?? '') : '',
             'date'        => now()->toDateString(),
             'due'         => now()->addDays(14)->toDateString(),

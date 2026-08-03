@@ -12,7 +12,7 @@ class CapacityController extends Controller
 {
     protected function gate(): void
     {
-        abort_unless(auth()->user()?->role?->is_owner || hub_flag(auth()->user(), 'monitor'),
+        abort_unless(hub_monitor(),
             403, 'هذه اللوحة للمالكين ومن يحمل صلاحية المتابعة');
         // كل لوحات هذا المتحكم تجمع عبر المنشأة كلها بمخبّأ عام — تُمنع عن المعزول
         hub_org_analytics_guard();
@@ -23,7 +23,7 @@ class CapacityController extends Controller
         $this->gate();
 
         return view('capacity', [
-            'c' => hub_capacity($r->query('from'), $r->query('to')),
+            'c' => hub_capacity($r->query('from'), $r->query('to'), hub_lens()['id']), 'lens' => hub_lens(),
         ]);
     }
 
@@ -32,7 +32,8 @@ class CapacityController extends Controller
     {
         $this->gate();
 
-        return view('quality_apps', ['apps' => hub_app_quality((bool) request()->query('fresh'))]);
+        return view('quality_apps', ['apps' => hub_app_quality((bool) request()->query('fresh'), hub_lens()['id']),
+            'lens' => hub_lens()]);
     }
 
     /** مركز التوصيات: إشارات قابلة للتنفيذ مجموعة من محرّكات النظام */
@@ -40,7 +41,8 @@ class CapacityController extends Controller
     {
         $this->gate();
 
-        return view('recommendations', ['r' => hub_recommendations((bool) request()->query('fresh'))]);
+        return view('recommendations', ['r' => hub_recommendations((bool) request()->query('fresh'), hub_lens()['id']),
+            'lens' => hub_lens()]);
     }
 
     /**
@@ -52,9 +54,18 @@ class CapacityController extends Controller
         $this->gate();
         abort_unless(Schema::hasTable('dependencies'), 404, 'وحدة الاعتماديات غير مثبّتة');
 
-        $deps = DB::table('dependencies')->whereNull('deleted_at')
-            ->whereNotIn('status', ['ملغاة', 'مُستبدَلة'])
-            ->limit(500)->get();
+        // العدسة تدخل **قبل** limit(500): ترشيحٌ بعده يُخفي اعتماديات المشروع
+        // الواقعة خارج أول ٥٠٠ صف. والطريق ثلاثي: مباشرةً، أو عبر تطبيقها، أو سيرفرها.
+        $lens = hub_lens();
+        $q = DB::table('dependencies')->whereNull('deleted_at')
+            ->whereNotIn('status', ['ملغاة', 'مُستبدَلة']);
+        if ($lens['on']) {
+            $pid = $lens['id'];
+            $q->where(fn ($w) => $w->where('project_id', $pid)
+                ->orWhereIn('app_id', fn ($sub) => $sub->select('id')->from('applications')->where('project_id', $pid))
+                ->orWhereIn('server_id', fn ($sub) => $sub->select('id')->from('servers')->where('project_id', $pid)));
+        }
+        $deps = $q->limit(500)->get();
 
         $projects = hub_ref_labels('projects', $deps->pluck('project_id')->all());
         $apps     = hub_ref_labels('apps', $deps->pluck('app_id')->all());
@@ -99,6 +110,7 @@ class CapacityController extends Controller
             ->sortByDesc(fn ($n) => [$n['crit'], count($n['dependents'])])->values();
 
         return view('impact', [
+            'lens'  => $lens,
             'nodes' => $nodes,
             'spof'  => $nodes->filter(fn ($n) => $n['crit'] >= 4 || count($n['dependents']) > 1)->count(),
         ]);

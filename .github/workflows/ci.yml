@@ -1,0 +1,101 @@
+# ═══ حزمةُ الاختبارات على المحرّكين معاً ═══
+#
+# SQLite متساهلة حيث تكون MySQL صارمة: عمودٌ غائب، ونصٌّ أطول من عرض عموده،
+# وعددٌ خارج مداه، ولهجةُ استعلامٍ خاصة. وكلُّ صنفٍ من هذه أطفأ شاشةً على
+# الخادم بينما الحزمةُ خضراء على SQLite. فتُشغَّل الاختبارات نفسها على
+# **المحرّك الذي يعمل عليه النظام فعلاً** — ليقع ما يقع هنا لا عند صاحب النظام.
+#
+# ولا شيء كان يفرض خضرة الحزمة قبل هذا الملف: خطّاف pre-push يفرض رفع النسخة
+# وحدها، فكل «أخضر» كان يعتمد على أن يتذكّر أحدُهم تشغيل الأمر.
+
+name: الحزمة
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  suite:
+    name: PHP ${{ matrix.php }} · ${{ matrix.engine }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false          # نتيجةُ المحرّكين معاً تُقرأ في جولةٍ واحدة
+      matrix:
+        include:
+          - { php: '8.2', engine: sqlite, config: phpunit.xml }
+          - { php: '8.4', engine: sqlite, config: phpunit.xml }
+          - { php: '8.4', engine: mysql,  config: phpunit.mysql.xml }
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: hub_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: تهيئة PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, pdo_sqlite, pdo_mysql, intl, bcmath, gd, zip
+          coverage: none
+
+      - name: خبيئة الاعتماديات
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+
+      - name: تنصيب الاعتماديات
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: انتظار MySQL
+        if: matrix.engine == 'mysql'
+        run: |
+          for i in $(seq 1 30); do
+            mysqladmin ping -h 127.0.0.1 -P 3306 -uroot --silent && exit 0
+            sleep 2
+          done
+          echo "لم تجهز MySQL"; exit 1
+
+      - name: الحزمة
+        run: ./vendor/bin/phpunit -c ${{ matrix.config }}
+
+  # النسخةُ تُرفع مع كل تحديث — قاعدةُ CLAUDE.md مفروضةٌ في الخطّاف وهنا معاً،
+  # فالخطّافُ يُتجاوَز بـ--no-verify وهذا لا يُتجاوَز.
+  version:
+    name: رقم النسخة
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: التحقق من رفع VERSION
+        # القاعدة كما في CLAUDE.md: «لا يُدفع **تغييرٌ وظيفيّ** دون رفع النسخة».
+        # فالمقياسُ تغيُّرُ الشيفرة لا وجودُ commits: دمجُ فرعٍ لا يُدخل تغييراً
+        # وظيفياً جديداً كان يُنذر كاذباً — وإنذارٌ كاذبٌ متكرّر يُدرّب على التجاهل.
+        run: |
+          base=$(git merge-base origin/${{ github.base_ref }} HEAD)
+          old=$(git show "$base:VERSION" 2>/dev/null || echo "")
+          new=$(cat VERSION)
+
+          if git diff --quiet "$base" HEAD -- app resources routes config database public; then
+            echo "ℹ️ لا تغيير وظيفيّ في هذه الدفعة (وثائق أو دمجٌ فقط) — لا يلزم رفع النسخة."
+            exit 0
+          fi
+
+          if [ -n "$old" ] && [ "$old" = "$new" ]; then
+            echo "✗ الدفعة تحوي تغييراً وظيفياً ولم تُرفع VERSION (لا تزال $new)"
+            echo "  ارفع الرقم وأضف مدخلاً في «سجل الإصدارات» بـREADME."
+            exit 1
+          fi
+          echo "✅ النسخة: $old → $new"

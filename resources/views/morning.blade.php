@@ -29,7 +29,7 @@
                                 @else {{ \Illuminate\Support\Str::limit($r['t'], 60) }} @endif
                                 @if ($r['s'])<div class="sub">{{ $r['s'] }}</div>@endif
                             </td>
-                            <td style="width:1%">@if ($r['tone'])<span class="bdg {{ $r['tone'] }}">{{ $r['tone'] === 'bad' ? 'عاجل' : 'انتبه' }}</span>@endif</td>
+                            <td class="acts">@if ($r['tone'])<span class="bdg {{ $r['tone'] }}">{{ $r['tone'] === 'bad' ? 'عاجل' : 'انتبه' }}</span>@endif</td>
                         </tr>
                     @endforeach
                 </table>

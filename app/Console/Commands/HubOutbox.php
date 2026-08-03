@@ -62,9 +62,13 @@ class HubOutbox extends Command
                 $msg->forceFill(['state' => 'sent', 'error' => null, 'delivered_at' => now()])->save();
                 $sent++;
             } catch (\Throwable $e) {
-                $msg->forceFill(['state' => 'failed', 'error' => mb_substr($e->getMessage(), 0, 390)])->save();
+                // تنظيفُ رمز البوت: فشلُ اتصالٍ (DNS/timeout/TLS) يُلحق العنوانَ
+                // الفعّال برسالة الخطأ — أي «…/bot<TOKEN>/sendMessage» — فيتسرّب
+                // الرمز إلى outbox.error المعروض وإلى اللوج. يُطمَس قبل التخزين.
+                $emsg = preg_replace('#/bot[0-9]+:[A-Za-z0-9_-]+#', '/bot***', $e->getMessage());
+                $msg->forceFill(['state' => 'failed', 'error' => mb_substr($emsg, 0, 390)])->save();
                 $failed++;
-                $this->error("✗ {$msg->channel}: " . mb_substr($e->getMessage(), 0, 120));
+                $this->error("✗ {$msg->channel}: " . mb_substr($emsg, 0, 120));
             }
         }
 

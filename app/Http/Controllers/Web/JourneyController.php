@@ -26,14 +26,17 @@ class JourneyController extends Controller
 
         $add($client->created_at, '🌱', 'البداية', 'سُجّل العميل في النظام', null);
 
-        // الوحدات التي تشير للعميل بحقل مرجعي صريح
+        // الوحدات التي تشير للعميل بحقل مرجعي صريح — التذاكر كانت الحلقة المفقودة
+        // الوحيدة في الرؤية الشاملة (معلّقة على نص حر) حتى v2.144
         foreach ([['quotes', '🧾', 'عرض سعر'], ['contracts', '📜', 'عقد'],
-                  ['meetings', '🤝', 'اجتماع'], ['decisions', '⚖️', 'قرار']] as [$mk, $ico, $lbl]) {
+                  ['meetings', '🤝', 'اجتماع'], ['decisions', '⚖️', 'قرار'],
+                  ['tickets', '🎫', 'تذكرة']] as [$mk, $ico, $lbl]) {
             $md = hub_mod($mk);
             if (! $md || ! hub_can(auth()->user(), $mk, 'v')) continue;
             $disp = hub_display_col($mk);
-            $sc = $md['status'] ?? null;
-            $rows = DB::table($md['table'])->whereNull('deleted_at')
+            $sc = hub_status_col($mk);
+            // النطاق يُفرض على الابن نفسه: رؤية العميل لا تمنح رؤية عروضه وعقوده
+            $rows = hub_scope(DB::table($md['table'])->whereNull('deleted_at'), $mk)
                 ->where('client_id', $client->id)->limit(100)
                 ->get(array_values(array_unique(array_filter(['id', $disp, $sc, 'created_at']))));
             foreach ($rows as $r) {
@@ -42,13 +45,20 @@ class JourneyController extends Controller
             }
         }
 
-        // المستندات المالية بمطابقة اسم الطرف — لا رابط صريح فنقولها صراحةً في الصفحة
-        $fin = ['count' => 0, 'total' => 0.0, 'paid' => 0.0];
-        if (hub_can(auth()->user(), 'fin', 'v') && trim((string) $client->name) !== '') {
-            $docs = DB::table('fin_documents')->whereNull('deleted_at')
-                ->where('partner', $client->name)->limit(100)->get();
+        // المستندات المالية: المرجع الصريح أولاً، ثم مطابقة الاسم لما لم يُرحَّل بعد
+        // (الأسماء المكرّرة لا تُرحَّل عمداً). الصفحة تقول أيّهما جاء من أين.
+        $fin = ['count' => 0, 'total' => 0.0, 'paid' => 0.0, 'linked' => 0, 'byName' => 0];
+        if (hub_can(auth()->user(), 'fin', 'v')) {
+            $name = trim((string) $client->name);
+            $docs = hub_scope(DB::table('fin_documents')->whereNull('deleted_at'), 'fin')
+                ->where(fn ($w) => $w
+                    ->where('client_id', $client->id)
+                    ->when($name !== '', fn ($q) => $q->orWhere(fn ($x) => $x
+                        ->whereNull('client_id')->where('partner', $name))))
+                ->limit(100)->get();
             foreach ($docs as $d) {
                 $fin['count']++;
+                $d->client_id ? $fin['linked']++ : $fin['byName']++;
                 $fin['total'] += (float) ($d->total ?? 0);
                 $fin['paid'] += (float) ($d->paid ?? 0);
                 $add($d->date ?: $d->created_at, '💵', $d->kind ?: 'مستند مالي',

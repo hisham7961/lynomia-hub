@@ -12,17 +12,15 @@ use Illuminate\Http\Request;
  */
 class PrefController extends Controller
 {
-    /** بطاقات لوحة التحكم القابلة للإخفاء */
-    public const DASH_CARDS = [
-        'counts' => 'بطاقات العدّ العلوية',
-        'kpis'   => '📈 ودجات مؤشرات KPI',
-        'expiry' => '🔔 ينتهي قريباً',
-        'apps'   => '📱 تقدم التطبيقات',
-        'donut'  => '✅ المهام بالحالة',
-        'recent' => '📌 آخر ما فتحت',
-        'due'    => '⏰ مهام تقترب مواعيدها',
-        'audits' => '🕘 آخر النشاطات',
-    ];
+    /**
+     * بطاقات لوحة التحكم القابلة للإخفاء — مصدرها سجل الودجات.
+     * كانت قائمة ثابتة هنا لا يعرفها `DashboardController`، فإضافة ودجة تتطلب
+     * تعديل ملفين ونسيان أحدهما يعطي بطاقةً بلا اسم أو اسماً بلا بطاقة.
+     */
+    protected function dashCards(): array
+    {
+        return \App\Support\WidgetRegistry::labels();
+    }
 
     public function edit()
     {
@@ -31,7 +29,7 @@ class PrefController extends Controller
         return view('personalize', [
             'top'    => hub_top_links($u),
             'groups' => $this->rawGroups($u),
-            'cards'  => self::DASH_CARDS,
+            'cards'  => $this->dashCards(),
         ]);
     }
 
@@ -40,6 +38,7 @@ class PrefController extends Controller
         $u = auth()->user();
         $data = $r->validate([
             'home'         => ['nullable', 'string', 'max:60'],
+            'nav_style'    => ['nullable', 'in:spaces,classic'],
             'hidden'       => ['nullable', 'array'],
             'hidden.*'     => ['string', 'max:60'],
             'hidden_top'   => ['nullable', 'array'],
@@ -72,14 +71,20 @@ class PrefController extends Controller
         // (أعمدة الجداول) الذي يديره مسار آخر
         $prefs = (array) $u->prefs;
         $prefs['home'] = $validHome && $home !== '' && $home !== 'dashboard' ? $home : null;
+        // نمط التنقل: 'spaces' افتراضي (مساحات العمل) لا يُخزَّن، و'classic'
+        // (القائمة الكاملة) يُخزَّن صراحةً — فالافتراضي يبقى بلا أثر في prefs
+        $navStyle = ($data['nav_style'] ?? 'spaces') === 'classic' ? 'classic' : null;
         $prefs['nav'] = array_filter([
+            'style'      => $navStyle,
             'hidden'     => array_values($data['hidden'] ?? []),
             'hidden_top' => array_values($data['hidden_top'] ?? []),
             'names'      => $names,
             'order'      => $order,
+            // المثبّتات يديرها مسار toggle مستقل — تُحمَل هنا كما هي فلا يمحوها حفظُ هذه الشاشة
+            'pins'       => array_values((array) data_get($u->prefs, 'nav.pins', [])),
         ]);
         $prefs['dash'] = array_filter([
-            'hidden' => array_values(array_intersect($data['dash_hidden'] ?? [], array_keys(self::DASH_CARDS))),
+            'hidden' => array_values(array_intersect($data['dash_hidden'] ?? [], array_keys($this->dashCards()))),
         ]);
         // كتم أنواع الإشعارات — ضمن القائمة القابلة للكتم فقط
         $prefs['mute'] = array_values(array_intersect($data['mute'] ?? [], array_keys(\App\Models\HubNotification::MUTEABLE)));
@@ -95,6 +100,42 @@ class PrefController extends Controller
         auth()->user()->update(['prefs' => null]);
 
         return back()->with('ok', 'أُعيد الضبط الافتراضي');
+    }
+
+    /**
+     * تثبيت/فكّ وجهةٍ في رصيف «مثبّتاتي». الرمزُ يُتحقَّق أنه وجهةٌ يجوز لهذا
+     * المستخدم تثبيتها (وحدةٌ يراها أو رابطٌ يُسمح له به) — فلا يُثبَّت ما لا
+     * يُفتح. سقفٌ ١٢ كي يبقى الرصيفُ رصيفاً لا قائمةً ثانية.
+     */
+    public function togglePin(Request $r)
+    {
+        $u = auth()->user();
+        $token = trim((string) $r->input('token'));
+
+        if (! isset(hub_pin_targets($u)[$token])) {
+            return back()->with('err', 'وجهةٌ لا تُثبَّت — غير معروفةٍ أو خارج صلاحيتك');
+        }
+
+        $pins = array_values((array) data_get($u->prefs, 'nav.pins', []));
+        if (in_array($token, $pins, true)) {
+            $pins = array_values(array_filter($pins, fn ($t) => $t !== $token));
+            $msg = 'أُزيل من مثبّتاتك';
+        } elseif (count($pins) >= 12) {
+            return back()->with('err', 'بلغتَ سقف ١٢ مثبَّتاً — أزِل واحداً قبل إضافة آخر');
+        } else {
+            $pins[] = $token;
+            $msg = '📌 أُضيف لمثبّتاتك — تجده أعلى الشريط';
+        }
+
+        $prefs = (array) $u->prefs;
+        $prefs['nav'] = array_filter(((array) ($prefs['nav'] ?? [])) + ['pins' => []]);
+        $prefs['nav']['pins'] = $pins;
+        if (! $pins) unset($prefs['nav']['pins']);
+        $prefs['nav'] = array_filter($prefs['nav']);
+        $u->prefs = array_filter($prefs, fn ($v) => $v !== null && $v !== [] && $v !== '') ?: null;
+        $u->save();
+
+        return back()->with('ok', $msg);
     }
 
     /** حفظ أعمدة الجدول الظاهرة لوحدة — تُخزَّن بترتيب سجل الوحدة */

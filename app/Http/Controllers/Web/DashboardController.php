@@ -3,86 +3,115 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\DB;
+use App\Models\Dashboard;
+use App\Support\WidgetRegistry;
+use Illuminate\Http\Request;
 
+/**
+ * اللوحة مستهلكٌ رقيق لسجل الودجات.
+ *
+ * بلا لوحة مبنيّة يُعرض الترتيب الافتراضي كما كان حرفياً — فمن لم يبنِ شيئاً لا يرى
+ * تغييراً. ومع لوحة مبنيّة تُعرض ودجاتها بترتيبها المحفوظ، وكل ودجة تمرّ ببوابتها
+ * في السجل: **الاختيار في الباني لا يمنح صلاحية**.
+ */
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $r)
     {
-        $user  = auth()->user();
-        $hid   = (array) hub_pref('dash.hidden', [], $user);   // بطاقات أخفاها المستخدم: لا تُحسب أصلاً
-        $cards = [];
+        $user = auth()->user();
+        $hid  = WidgetRegistry::hiddenFor($user);
 
-        // ودجات مؤشرات KPI المخصصة — لمن يبنيها (مالك/متابعة)، وتُخفى بمفتاح kpis
-        $kpis = [];
-        if (! in_array('kpis', $hid, true)
-            && ($user->role?->is_owner || hub_flag($user, 'monitor'))
-            && \Illuminate\Support\Facades\Schema::hasTable('kpi_defs')) {
-            $kpis = hub_kpis($user);
+        $boards = Dashboard::query()
+            ->where(fn ($w) => $w->where('owner_id', $user->id)
+                ->orWhere('role_id', $user->role_id)
+                ->orWhere('shared', true))
+            ->orderBy('sort')->orderBy('name')->get()
+            ->filter(fn ($b) => $b->visibleTo($user))->values();
+
+        // لوحة مطلوبة صراحةً، وإلا الافتراضية المحفوظة إن وُجدت
+        $board = null;
+        if ($id = $r->query('d')) {
+            $board = $boards->firstWhere('id', $id);
+            abort_unless($board, 404);
+        } elseif (! $r->has('d')) {
+            $board = $boards->firstWhere('is_default', true);
         }
 
-        foreach ($hid && in_array('counts', $hid, true) ? [] : ['projects', 'clients', 'tasks', 'tickets', 'fin', 'contracts'] as $key) {
-            $def = hub_mod($key);
-            if (! $def || ! hub_can($user, $key, 'v')) continue;
-            $cards[] = [
-                'key'   => $key,
-                'label' => $def['label'],
-                'count' => hub_scope(DB::table($def['table'])->whereNull('deleted_at'), $key)->count(),
+        if ($board) {
+            return view('dashboard', [
+                'board' => $board, 'boards' => $boards, 'hid' => $hid,
+                'layout' => $this->layoutFor($board, $user),
+            ] + $this->legacyData($user));
+        }
+
+        return view('dashboard', ['board' => null, 'boards' => $boards, 'layout' => [],
+                                  'hid' => $hid] + $this->legacyData($user));
+    }
+
+    /** ودجات اللوحة بعد فرز البوابات — الممنوعة تسقط بلا أثر */
+    protected function layoutFor(Dashboard $board, $user): array
+    {
+        $out = [];
+        foreach ($board->widgets as $w) {
+            if (! WidgetRegistry::isVisible($w->widget_key, $user)) continue;
+            $out[] = [
+                'key'  => $w->widget_key,
+                'data' => WidgetRegistry::resolve($w->widget_key, $user),
+                'w'    => $w->w, 'h' => $w->h,
             ];
         }
 
-        // رادار الانتهاءات — أهم ٥
-        $expiry = in_array('expiry', $hid, true) ? collect()
-            : collect(hub_expiry())->filter(fn ($i) => hub_can($user, $i['module'], 'v'))->take(5)->values();
+        return $out;
+    }
 
-        // مهام تقترب مواعيدها
-        $due = collect(); $dueCol = $stCol = $disp = null;
-        $tdef = hub_mod('tasks');
-        if ($tdef && hub_can($user, 'tasks', 'v') && ! in_array('due', $hid, true)) {
-            $dueF   = collect($tdef['fields'])->firstWhere('key', 'due');
-            $stCol  = $tdef['status'] ?? null;
-            $disp   = hub_display_col('tasks');
-            if ($dueF) {
-                $dueCol = $dueF['col'];
-                $due = hub_scope(DB::table($tdef['table'])->whereNull('deleted_at'), 'tasks')
-                    ->whereNotNull($dueCol)->whereDate($dueCol, '>=', now()->toDateString())
-                    ->orderBy($dueCol)->limit(6)
-                    ->get(array_values(array_unique(array_filter(['id', $disp, $dueCol, $stCol]))));
+    /** بيانات الترتيب الافتراضي — تبقى مُمرَّرة كما كانت فلا يتغيّر القالب القديم */
+    protected function legacyData($user): array
+    {
+        $dueBox = WidgetRegistry::resolve('due', $user)
+            ?? ['rows' => collect(), 'dueCol' => null, 'stCol' => null, 'disp' => null];
+
+        return [
+            'cards'      => WidgetRegistry::resolve('counts', $user) ?? [],
+            'kpis'       => WidgetRegistry::resolve('kpis', $user) ?? [],
+            'expiry'     => WidgetRegistry::resolve('expiry', $user) ?? collect(),
+            'apps'       => WidgetRegistry::resolve('apps', $user) ?? collect(),
+            'taskSlices' => WidgetRegistry::resolve('donut', $user) ?? [],
+            'audits'     => WidgetRegistry::resolve('audits', $user) ?? collect(),
+            'links'      => WidgetRegistry::resolve('links', $user) ?? [],
+            'pending'    => $this->pendingLine($user),
+            'due'        => $dueBox['rows'],
+            'dueCol'     => $dueBox['dueCol'],
+            'stCol'      => $dueBox['stCol'],
+            'disp'       => $dueBox['disp'],
+        ];
+    }
+
+    /** سطر الترويسة: ما ينتظر المستخدم فعلاً — يُذكر الموجود فقط، ويصمت الصفر */
+    protected function pendingLine($user): string
+    {
+        $bits = [];
+        try {
+            $t = \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')
+                ->where('assignee_id', $user->id)
+                ->tap(fn ($q) => hub_open_scope($q))->count();
+            if ($t) $bits[] = "{$t} مهام مفتوحة عليك";
+
+            if (hub_can($user, 'tickets', 'v')) {
+                $k = hub_scope(\Illuminate\Support\Facades\DB::table('tickets')->whereNull('deleted_at'), 'tickets')
+                    ->where('priority', 'LIKE', '%عاجلة%')
+                    ->tap(fn ($q) => hub_open_scope($q))->count();
+                if ($k) $bits[] = "{$k} تذاكر عاجلة";
             }
+
+            if (hub_flag($user, 'approve') || hub_is_owner($user)) {
+                $a = \Illuminate\Support\Facades\DB::table('approvals')
+                    ->where('status', 'LIKE', '%بانتظار%')->count();
+                if ($a) $bits[] = "{$a} طلبات اعتماد بانتظارك";
+            }
+        } catch (\Throwable $e) {
+            return '';
         }
 
-        // تقدم التطبيقات — نسبة الإنجاز الحية من محرك النسبة
-        $apps = collect();
-        if (hub_can($user, 'apps', 'v') && ! in_array('apps', $hid, true)) {
-            $apps = hub_scope(DB::table('applications')->whereNull('deleted_at'), 'apps')
-                ->whereNotNull('project_id')
-                ->where(fn ($w) => $w->whereNull('status')->orWhere('status', 'NOT LIKE', '%موقوف%'))
-                ->orderByDesc('created_at')->limit(6)
-                ->get(['id', 'name', 'ver', 'status', 'project_id'])
-                ->map(function ($a) {
-                    $a->progress = hub_progress($a->project_id)['pct'];
-                    return $a;
-                });
-        }
-
-        // توزيع المهام بالحالة — للدونات
-        $taskSlices = [];
-        if (hub_can($user, 'tasks', 'v') && ! in_array('donut', $hid, true)) {
-            $taskSlices = hub_scope(DB::table('tasks')->whereNull('deleted_at'), 'tasks')
-                ->select('status', DB::raw('COUNT(*) c'))->groupBy('status')->orderByDesc('c')->limit(6)->get()
-                ->map(fn ($r) => ['label' => $r->status ?: 'بلا حالة', 'value' => (int) $r->c])->all();
-        }
-
-        $aq = DB::table('audits')
-            ->leftJoin('users', 'users.id', '=', 'audits.user_id')
-            ->select('audits.*', 'users.name as user_name');
-        if (hub_scoped($user)) {
-            $ids = $user->visibleProjectIds();
-            $aq->where(fn ($w) => $w->where('audits.user_id', $user->id)
-                                    ->orWhereIn('audits.project_id', $ids));
-        }
-        $audits = in_array('audits', $hid, true) ? collect() : $aq->orderByDesc('audits.created_at')->limit(10)->get();
-
-        return view('dashboard', compact('cards', 'audits', 'due', 'dueCol', 'stCol', 'disp', 'expiry', 'apps', 'taskSlices', 'hid', 'kpis'));
+        return $bits ? 'لديك ' . implode(' و', $bits) . '.' : 'لا شيء عاجل بانتظارك — يوم هادئ 🌿';
     }
 }

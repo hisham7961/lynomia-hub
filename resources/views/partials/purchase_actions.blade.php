@@ -3,10 +3,10 @@
     $st = $row->status ?? 'مسودة';
     $meta = (array) $row->meta;
     $canE = hub_can(auth()->user(), 'purchases', 'e');
-    $canApprove = auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'approve');
+    $canApprove = hub_approver();
 @endphp
 <div class="card">
-    <h3 style="margin-bottom:8px">🛒 مسار الشراء <span class="bdg {{ hub_tone($st) }}">{{ $st }}</span>
+    <h3>🛒 مسار الشراء <span class="bdg {{ hub_tone($st) }}">{{ $st }}</span>
         @if ($row->pay_state)<span class="bdg {{ $row->pay_state === 'مدفوع' ? 'ok' : 'wn' }}">{{ $row->pay_state }}</span>@endif
     </h3>
     <div class="crow">
@@ -30,7 +30,7 @@
                 @else
                     <form method="POST" action="{{ route('purchases.act', $row->id) }}">@csrf<input type="hidden" name="do" value="bill"><button class="btn p sm">🧾 فاتورة المورد</button></form>
                 @endif
-                <form method="POST" action="{{ route('purchases.act', $row->id) }}" onsubmit="return confirm('تسجيل المستند كمرتجع؟')">@csrf<input type="hidden" name="do" value="return"><button class="btn ghost sm" style="color:var(--bad)">↩ مرتجع</button></form>
+                <form method="POST" action="{{ route('purchases.act', $row->id) }}" data-confirm="تسجيل المستند كمرتجع؟">@csrf<input type="hidden" name="do" value="return"><button class="btn ghost sm" style="color:var(--bad)">↩ مرتجع</button></form>
             @endif
         @endif
     </div>

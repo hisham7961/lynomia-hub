@@ -27,5 +27,6 @@ class Competitor extends Model
         'custom' => 'array',
         'meta' => 'array',
         'archived' => 'boolean',
+        'free_tier' => 'boolean',   // كانت بلا صبٍّ خلافاً لعرف المستودع
     ];
 }

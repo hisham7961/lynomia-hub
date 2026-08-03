@@ -24,7 +24,8 @@ class Sheet
         $fh = fopen('php://temp', 'r+');
         fwrite($fh, $raw);
         rewind($fh);
-        while (($r = fgetcsv($fh, 0, $delim)) !== false) {
+        // معامل escape الفارغ صراحةً: سلوك RFC 4180، ويُسكت تحذير PHP 8.4 لكل سطر
+        while (($r = fgetcsv($fh, 0, $delim, '"', '')) !== false) {
             if (count($r) === 1 && trim((string) $r[0]) === '') continue;
             $rows[] = array_map(fn ($v) => trim((string) $v), $r);
         }
@@ -49,7 +50,25 @@ class Sheet
             }
         }
 
-        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        // الورقة الأولى من workbook.xml لا sheet1.xml الحرفي: مصنفٌ حُذفت ورقته
+        // الأولى يوماً يخزن ورقته الوحيدة باسم sheet2.xml — فكان يُقرأ فارغاً
+        // وتظهر رسالة «الملف فارغ» المضللة
+        $sheetXml = false;
+        if (($wb = $zip->getFromName('xl/workbook.xml')) !== false
+            && ($rels = $zip->getFromName('xl/_rels/workbook.xml.rels')) !== false) {
+            $wbX = @simplexml_load_string($wb);
+            $relX = @simplexml_load_string($rels);
+            if ($wbX && $relX && isset($wbX->sheets->sheet[0])) {
+                $rid = (string) $wbX->sheets->sheet[0]->attributes('r', true)->id;
+                foreach ($relX->Relationship as $rel) {
+                    if ((string) $rel['Id'] === $rid) {
+                        $sheetXml = $zip->getFromName('xl/' . ltrim((string) $rel['Target'], '/'));
+                        break;
+                    }
+                }
+            }
+        }
+        if ($sheetXml === false) $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
         $zip->close();
         if ($sheetXml === false || ! ($sheet = @simplexml_load_string($sheetXml))) return [];
 

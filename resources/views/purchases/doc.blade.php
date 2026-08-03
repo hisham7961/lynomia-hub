@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>أمر شراء {{ $p->doc_no }} — {{ setting('app.name', config('app.name')) }}</title>
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link href="{{ asset('css/fonts.css') }}?v={{ config('hub.version') }}" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Tajawal,sans-serif;color:#1c2b28;background:#f2f5f4;padding:20px;font-size:14px;line-height:1.7}
@@ -70,12 +70,15 @@ td{padding:9px 12px;border-bottom:1px solid #e3ecea}
 
     @if (count($items))
     <table>
-        <thead><tr><th>البيان</th><th style="width:70px">الكمية</th><th style="width:110px">سعر الوحدة</th><th style="width:110px">الإجمالي</th></tr></thead>
+        <thead><tr><th>البيان</th><th style="width:70px">الكمية</th>@if (! empty($showCartons))<th style="width:130px">الكراتين</th>@endif<th style="width:110px">سعر الوحدة</th><th style="width:110px">الإجمالي</th></tr></thead>
         <tbody>
             @foreach ($items as $it)
                 <tr>
                     <td>{{ $it['desc'] }}</td>
                     <td style="text-align:center">{{ $it['qty'] !== null ? rtrim(rtrim(number_format($it['qty'], 2), '0'), '.') : '—' }}</td>
+                    @if (! empty($showCartons))
+                        <td style="text-align:center">{{ $it['cartonText'] !== '' ? $it['cartonText'] : '—' }}@if (($it['per'] ?? null))<div style="font-size:10px;color:#888">الكرتونة {{ $it['per'] }} وحدة</div>@endif</td>
+                    @endif
                     <td>{{ $it['price'] !== null ? number_format($it['price'], 3) : '—' }}</td>
                     <td>{{ $it['sum'] !== null ? number_format($it['sum'], 3) : '—' }}</td>
                 </tr>
@@ -85,6 +88,7 @@ td{padding:9px 12px;border-bottom:1px solid #e3ecea}
     @endif
 
     <div class="tot"><table>
+        @if (! empty($showCartons) && ($totalCartons ?? 0) > 0)<tr><td>إجمالي الكراتين الكاملة</td><td>{{ $totalCartons }} كرتونة</td></tr>@endif
         <tr class="g"><td>الإجمالي</td><td>{{ number_format((float) $p->amount, 3) }} {{ $p->currency ?? '' }}</td></tr>
     </table></div>
 

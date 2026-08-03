@@ -21,6 +21,7 @@ class SupportController extends Controller
 
         $firstReplies = DB::table('comments')->where('module', 'tickets')
             ->whereIn('record_id', $open->pluck('id'))->whereNull('deleted_at')
+            ->where(fn ($q) => $q->where('internal', false)->orWhereNull('internal'))
             ->select('record_id', DB::raw('MIN(created_at) as at'))->groupBy('record_id')
             ->pluck('at', 'record_id');
 
@@ -41,6 +42,7 @@ class SupportController extends Controller
             ->limit(300)->get();
         $doneReplies = DB::table('comments')->where('module', 'tickets')
             ->whereIn('record_id', $doneRows->pluck('id'))->whereNull('deleted_at')
+            ->where(fn ($q) => $q->where('internal', false)->orWhereNull('internal'))
             ->select('record_id', DB::raw('MIN(created_at) as at'))->groupBy('record_id')
             ->pluck('at', 'record_id');
 

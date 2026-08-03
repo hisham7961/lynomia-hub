@@ -76,6 +76,10 @@ class AuditRound3Test extends TestCase
         $this->seedCore();
         Cache::forget('webhooks:active');
 
+        // مُحلِّلٌ للاختبار: إنشاء الويبهوك يمرّ بحارس SSRF (hub_outbound_ok)
+        // الذي يرفض مضيفاً لا يُحلّ — نجعل r.test يُحلّ لعنوانٍ عامّ
+        $this->app->instance('hub.dns', fn (string $h) => ['93.184.216.34']);
+
         $this->actingAs($this->owner)->post('/m/clients', ['name' => 'قبل الاشتراك'])->assertRedirect();
         $this->assertSame(0, WebhookDelivery::count());
 

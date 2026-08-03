@@ -26,7 +26,7 @@ class MorningController extends Controller
 
         // ── قرارات تنتظرك ──
         if (hub_can($u, 'approvals', 'v')) {
-            $ap = DB::table('approvals')->whereNull('deleted_at')->where('status', 'معلّق')
+            $ap = hub_scope(DB::table('approvals')->whereNull('deleted_at'), 'approvals')->where('status', 'معلّق')
                 ->orderBy('due')->limit(8)->get(['id', 'title', 'due']);
             $add('✋', 'قرارات تنتظر حسمك', 'عمليات موقوفة لن تُنفَّذ قبل اعتمادك',
                 $ap->map(fn ($r) => ['t' => $r->title, 's' => $r->due ? 'الموعد ' . substr((string) $r->due, 0, 10) : '',
@@ -36,7 +36,7 @@ class MorningController extends Controller
 
         // ── طلبات داخلية بانتظار تقييم ──
         if (Schema::hasTable('internal_requests') && hub_can($u, 'requests', 'v')) {
-            $rq = DB::table('internal_requests')->whereNull('deleted_at')
+            $rq = hub_scope(DB::table('internal_requests')->whereNull('deleted_at'), 'requests')
                 ->whereIn('status', ['جديد', 'قيد التقييم', 'بانتظار الاعتماد'])
                 ->orderByDesc('created_at')->limit(6)->get(['id', 'title', 'prio_req', 'status']);
             $add('📨', 'طلبات داخلية بلا قرار', 'طلبات فريقك واقفة عند التقييم',
@@ -47,7 +47,7 @@ class MorningController extends Controller
 
         // ── حوادث تقنية مفتوحة ──
         if (Schema::hasTable('incidents') && hub_can($u, 'incidents', 'v')) {
-            $inc = DB::table('incidents')->whereNull('deleted_at')
+            $inc = hub_scope(DB::table('incidents')->whereNull('deleted_at'), 'incidents')
                 ->whereNotIn('status', ['مغلق بتقرير', 'مُستعاد'])
                 ->orderByDesc('started_at')->limit(6)->get(['id', 'title', 'severity', 'status']);
             $add('🚨', 'حوادث تقنية مفتوحة', 'خدمات متأثرة الآن',
@@ -75,10 +75,14 @@ class MorningController extends Controller
         }
 
         // ── مهام متأخرة ──
-        $tk = hub_scope(DB::table('tasks')->whereNull('deleted_at'), 'tasks')
+        // كل بندٍ في هذه الصفحة يفحص صلاحية وحدته، وهذا وحده كان يكتفي بالنطاق:
+        // فمن لا يرى المهام أصلاً كان يقرأ عناوينها في ملخّص صباحه
+        $tk = hub_can($u, 'tasks', 'v')
+            ? hub_scope(DB::table('tasks')->whereNull('deleted_at'), 'tasks')
             ->whereNotNull('due')->whereDate('due', '<', today())
             ->whereNotIn('status', ['منجزة', 'مكتملة', 'ملغاة'])
-            ->orderBy('due')->limit(8)->get(['id', 'title', 'due']);
+            ->orderBy('due')->limit(8)->get(['id', 'title', 'due'])
+            : collect();
         $add('🔥', 'مهام تجاوزت موعدها', 'التزامات مضى وقتها ولم تُغلق',
             $tk->map(fn ($r) => ['t' => $r->title, 's' => 'كان ' . substr((string) $r->due, 0, 10),
                                  'u' => route('m.show', ['tasks', $r->id]), 'tone' => 'bad']),
@@ -86,7 +90,7 @@ class MorningController extends Controller
 
         // ── مستحقات مالية ──
         if (hub_can($u, 'fin', 'v')) {
-            $due = DB::table('fin_documents')->whereNull('deleted_at')
+            $due = hub_scope(DB::table('fin_documents')->whereNull('deleted_at'), 'fin')
                 ->whereNotNull('due')->whereDate('due', '<=', today()->addDays(7))
                 ->whereRaw('COALESCE(paid,0) < COALESCE(total,0)')
                 ->orderBy('due')->limit(8)->get(['id', 'doc_no', 'partner', 'total', 'paid', 'due']);
@@ -111,7 +115,7 @@ class MorningController extends Controller
 
         // ── غياب اليوم ──
         if (hub_can($u, 'leaves', 'v')) {
-            $lv = DB::table('leave_requests')->whereNull('deleted_at')->where('status', 'معتمدة')
+            $lv = hub_scope(DB::table('leave_requests')->whereNull('deleted_at'), 'leaves')->where('status', 'معتمد')
                 ->whereDate('date_from', '<=', today())->whereDate('date_to', '>=', today())
                 ->limit(8)->get(['id', 'emp_id', 'type']);
             $names = hub_ref_labels('hr', $lv->pluck('emp_id')->all());
@@ -121,7 +125,7 @@ class MorningController extends Controller
         }
 
         // ── تشغيلي وأمني (للمالك) ──
-        if ($u->role?->is_owner) {
+        if (hub_is_owner($u)) {
             $ops = collect();
             $bk = setting('heartbeat.backup');
             if (! $bk || \Illuminate\Support\Carbon::parse($bk)->lt(now()->subHours(26))) {
@@ -129,16 +133,22 @@ class MorningController extends Controller
                             's' => $bk ? 'آخر تشغيل ' . \Illuminate\Support\Carbon::parse($bk)->diffForHumans() : 'لم يعمل قط',
                             'u' => route('ops.index'), 'tone' => 'bad']);
             }
-            if (Schema::hasTable('restore_tests')) {
-                $lastTest = DB::table('restore_tests')->whereNull('deleted_at')->max('test_date');
-                if (! $lastTest || $lastTest < today()->subDays(90)->toDateString()) {
-                    $ops->push(['t' => 'لم تُختبر استعادة النسخ منذ أكثر من ٩٠ يوماً',
-                                's' => 'نسخة لم تُختبر ليست نسخة', 'u' => route('m.index', 'restores'), 'tone' => 'bad']);
-                }
-            }
-            if ($n = DB::table('error_events')->where('status', 'جديد')->count()) {
-                $ops->push(['t' => "{$n} خطأ جديد بانتظار المعالجة", 's' => 'من مركز الأخطاء',
-                            'u' => route('errors.index'), 'tone' => 'wn']);
+            // «اختبار استعادة النسخ» أُخرج من الواجهة بطلب المالك — لا تنبيه له.
+            // (المسار والبيانات باقيان: لا حذف ولا هجرة مدمّرة.)
+            // الأخطاء الجديدة بأسمائها لا بعددها: «٣ أخطاء بانتظار المعالجة» لا تقول
+            // شيئاً — الرسالة والموضع والتكرار هي ما يُبنى عليه قرار
+            $newErrs = DB::table('error_events')->where('status', 'جديد')
+                ->orderByDesc('count')->limit(4)->get(['id', 'message', 'file', 'line', 'kind', 'count']);
+            foreach ($newErrs as $er) {
+                $where = $er->file ? str_replace(base_path() . '/', '', $er->file) . ($er->line ? ':' . $er->line : '') : '';
+                $ops->push([
+                    't' => \Illuminate\Support\Str::limit($er->message, 80),
+                    's' => trim(($er->count > 1 ? "تكرّر {$er->count} مرة · " : '')
+                        . (['php' => 'استثناء PHP', 'api' => 'خطأ API', 'js' => 'خطأ متصفح', 'slow' => 'طلب بطيء'][$er->kind] ?? $er->kind))
+                        . ($where ? ' · ' . $where : ''),
+                    'u' => route('errors.show', $er->id),
+                    'tone' => $er->kind === 'slow' ? 'wn' : 'bad',
+                ]);
             }
             $fails = DB::table('audits')->where('action', 'دخول فاشل')
                 ->where('created_at', '>=', now()->subDay())->count();

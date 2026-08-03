@@ -19,7 +19,9 @@ class AuditChainTest extends TestCase
 
         $rows = AuditEntry::whereNotNull('hash')->get();
         $this->assertGreaterThanOrEqual(3, $rows->count());
-        $this->assertSame(str_repeat('0', 64), $rows->sortBy('created_at')->first()->prev_hash);
+        // **بالمعرّف المتصاعد لا بالطابع الزمني**: القيود تُكتب في الثانية نفسها،
+        // وفضُّ التعادل يختلف بالمحرّك — فيصير «الأول» غيرَ الأول على MySQL
+        $this->assertSame(str_repeat('0', 64), $rows->sortBy('id')->first()->prev_hash);
 
         $this->assertSame(0, Artisan::call('hub:audit-verify'));
         $this->assertStringContainsString('سليمة', Artisan::output());
@@ -44,7 +46,8 @@ class AuditChainTest extends TestCase
         Client::create(['name' => 'س٢']);
         Client::create(['name' => 'س٣']);
 
-        $mid = AuditEntry::whereNotNull('hash')->orderBy('created_at')->skip(1)->first();
+        // بـid لا بـcreated_at: الطابع بدقّة الثانية فتتساوى القيم، والترتيب عليها قرعة
+        $mid = AuditEntry::whereNotNull('hash')->orderBy('id')->skip(1)->first();
         DB::table('audits')->where('id', $mid->id)->delete();
 
         $this->assertSame(1, Artisan::call('hub:audit-verify'));
@@ -55,12 +58,17 @@ class AuditChainTest extends TestCase
         $this->seedCore();
         $v = \App\Models\VaultSecret::create(['title' => 'سر الخادم', 'type' => 'خادم', 'secret_cipher' => 'TopSecret']);
 
+        // v2.138: فتح الصفحة وحده لا يسم صاحبه كاشفاً — «عرض حساس» يُسجَّل عند الكشف الفعلي
         $this->actingAs($this->owner)->get('/m/vault/' . $v->id)->assertOk();
+        $this->assertDatabaseMissing('audits', ['action' => 'عرض حساس', 'module' => 'vault', 'record_id' => $v->id]);
+
+        $this->actingAs($this->owner)->post('/m/vault/' . $v->id . '/secret/secret')
+            ->assertOk()->assertJson(['v' => 'TopSecret']);
         $this->assertDatabaseHas('audits', ['action' => 'عرض حساس', 'module' => 'vault', 'record_id' => $v->id]);
 
-        // المشاهد لا يرى السر فلا يُسجل عليه عرض حساس
+        // المشاهد لا يملك علم الأسرار — الكشف مرفوض ولا يُسجل عليه عرض حساس
         AuditEntry::where('action', 'عرض حساس')->delete();
-        $this->actingAs($this->viewer)->get('/m/vault/' . $v->id);
+        $this->actingAs($this->viewer)->post('/m/vault/' . $v->id . '/secret/secret')->assertForbidden();
         $this->assertDatabaseMissing('audits', ['action' => 'عرض حساس', 'record_id' => $v->id]);
     }
 }

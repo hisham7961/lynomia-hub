@@ -15,7 +15,7 @@ class WebhookController extends Controller
 {
     protected function gate(): void
     {
-        abort_unless(auth()->user()?->role?->is_owner, 403, 'مركز Webhooks للمالكين فقط');
+        abort_unless(hub_is_owner(), 403, 'مركز Webhooks للمالكين فقط');
     }
 
     public function index()
@@ -36,6 +36,15 @@ class WebhookController extends Controller
             'url'    => ['required', 'url', 'max:500'],
             'events' => ['required', 'string', 'max:2000'],
         ], [], ['name' => 'الاسم', 'url' => 'الرابط', 'events' => 'الأحداث']);
+
+        // حارس SSRF عند الإنشاء: عنوانٌ خاصّ/داخليّ (169.254 بيانات السحابة،
+        // 127.0.0.1، ‏*.internal) يُرفض إلا بمهرب monitor.allow_private —
+        // للتنصيبات التي تُوجّه الويبهوك لـn8n داخليّ عمداً.
+        $chk = hub_outbound_ok($d['url']);
+        if (! $chk['ok']) {
+            return back()->withInput()->withErrors(['url' =>
+                'وجهة الويبهوك ' . $chk['why'] . ' — إن كان n8n داخليّاً مقصوداً، فعّل «السماح بالعناوين الخاصة» في الإعدادات']);
+        }
 
         Webhook::create($d + ['secret' => 'whs_' . Str::random(40), 'active' => true]);
         Cache::forget('webhooks:active');

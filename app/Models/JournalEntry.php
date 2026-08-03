@@ -30,6 +30,24 @@ class JournalEntry extends Model
         'archived' => 'boolean',
     ];
 
+    /** القيد المُرحَّل مقفل: يُعكس بقيدٍ جديد ولا يُعدَّل ولا يُحذف — على كل المنافذ */
+    protected static function booted(): void
+    {
+        $guard = function (self $m) {
+            if ($m->getOriginal('state') === 'مرحّل') {
+                throw \Illuminate\Validation\ValidationException::withMessages(
+                    ['state' => 'القيد المُرحَّل مقفل — أنشئ قيد عكسٍ بدلاً من تعديله أو حذفه']);
+            }
+        };
+        static::updating($guard);
+        static::deleting($guard);
+    }
+
+    public function lines()
+    {
+        return $this->hasMany(\App\Models\JournalLine::class, 'entry_id');
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(\App\Models\Project::class, 'project_id');

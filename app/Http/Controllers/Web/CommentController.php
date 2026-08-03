@@ -17,14 +17,42 @@ use Illuminate\Support\Str;
 class CommentController extends Controller
 {
     /** قناة الفريق — منشورات عامة يراها كل مستخدم */
-    public function feed()
+    public function feed(Request $r)
     {
-        $q = Comment::where('module', 'feed')->whereNull('parent_id')->with('user', 'replies.user');
-        $posts = (clone $q)->orderByDesc('pinned')->orderByDesc('created_at')->paginate(15);
+        $me = (string) auth()->id();
+        $tab = in_array($t = hub_str($r->query('t', 'all')), ['all', 'me', 'pin'], true) ? $t : 'all';
+
+        $posts = Comment::where('module', 'feed')->whereNull('parent_id')->with('user', 'replies.user')
+            // «ما ذكرني»: قناةٌ تنمو تُغرق ما يعنيك — والذكرُ هو ما يعنيك
+            ->when($tab === 'me', fn ($w) => self::mentioning($w, $me))
+            ->when($tab === 'pin', fn ($w) => $w->where('pinned', true))
+            ->orderByDesc('pinned')->orderByDesc('created_at')
+            ->paginate(15)->withQueryString();
 
         $this->markRead($posts->getCollection());
 
-        return view('feed.index', ['posts' => $posts, 'users' => $this->userNames()]);
+        // نبضُ القناة: قناةٌ صامتة تُقال لا تُخفى — والذكرُ يُعدّ كي لا يمرّ دون انتباه
+        $week = Comment::where('module', 'feed')->whereNull('parent_id')
+            ->where('created_at', '>=', now()->subDays(7))->get(['user_id']);
+
+        return view('feed.index', [
+            'posts' => $posts, 'users' => $this->userNames(), 'tab' => $tab,
+            'pulse' => [
+                'week'   => $week->count(),
+                'people' => $week->pluck('user_id')->filter()->unique()->count(),
+                'pinned' => Comment::where('module', 'feed')->where('pinned', true)->count(),
+                'mine'   => self::mentioning(
+                    Comment::where('module', 'feed')->whereNull('parent_id'), $me)->count(),
+            ],
+            'presence' => DmController::presence(
+                $posts->getCollection()->pluck('user_id')->filter()->unique()->values()->all()),
+        ]);
+    }
+
+    /** منشوراتٌ ذُكر فيها فلان — `mentions` عمودُ JSON يحمل قائمة المعرّفات */
+    protected static function mentioning($q, string $uid)
+    {
+        return $q->whereJsonContains('mentions', $uid);
     }
 
     public function store(Request $r)
@@ -36,6 +64,7 @@ class CommentController extends Controller
             'body'      => ['required', 'string', 'max:4000'],
             'att'       => ['nullable', 'file', 'max:512000'],
             'mention'   => ['nullable', 'array'],
+            'internal'  => ['nullable', 'boolean'],
         ]);
 
         [$module, $recordId] = $this->guardTarget($data['module'], $data['record_id'] ?? null);
@@ -49,6 +78,8 @@ class CommentController extends Controller
             'user_id'    => auth()->id(),
             'body'       => $data['body'],
             'att'        => $r->hasFile('att') ? $r->file('att')->store('hub', 'local') : null,
+            // ملاحظة داخلية: لا تُحتسب رداً على العميل في مؤشرات SLA
+            'internal'   => $module === 'tickets' && $r->boolean('internal'),
             'mentions'   => $mentions ?: null,
             'read_by'    => [auth()->id()],
             'created_at' => now(),
@@ -64,7 +95,7 @@ class CommentController extends Controller
     {
         $c = Comment::findOrFail($id);
         $can = $c->module === 'feed'
-            ? (auth()->user()->role?->is_owner || hub_flag(auth()->user(), 'monitor'))
+            ? hub_monitor()
             : hub_can(auth()->user(), $c->module, 'e');
         abort_unless($can, 403);
 
@@ -73,11 +104,29 @@ class CommentController extends Controller
         return back()->with('ok', $c->pinned ? 'ثُبّت' : 'أُلغي التثبيت');
     }
 
+    /**
+     * حلّ التعليق وعكسه (v2.123): نقاشٌ عولج يُعلَّم «محلولاً» فيهدأ بصرياً دون
+     * حذف أثره — لصاحب التعليق أو من يملك تعديل وحدة السجل.
+     */
+    public function resolve(string $id)
+    {
+        $c = Comment::findOrFail($id);
+        $can = $c->user_id === auth()->id()
+            || ($c->module === 'feed' ? hub_monitor() : hub_can(auth()->user(), $c->module, 'e'));
+        abort_unless($can, 403);
+
+        $done = $c->resolved_at === null;
+        $c->update(['resolved_at' => $done ? now() : null,
+            'resolved_by' => $done ? auth()->id() : null, 'updated_at' => now()]);
+
+        return back()->with('ok', $done ? 'عُلّم التعليق محلولاً' : 'أُعيد التعليق مفتوحاً');
+    }
+
     /** حذف — صاحب التعليق أو المالك */
     public function destroy(string $id)
     {
         $c = Comment::findOrFail($id);
-        abort_unless($c->user_id === auth()->id() || auth()->user()->role?->is_owner, 403);
+        abort_unless($c->user_id === auth()->id() || hub_is_owner(), 403);
         $c->delete();
 
         return back()->with('ok', 'حُذف التعليق');
@@ -88,6 +137,13 @@ class CommentController extends Controller
     {
         abort_unless(hub_can(auth()->user(), 'tasks', 'a'), 403, 'تحويل التعليقات لمهام يتطلب صلاحية إضافة مهام');
         $c = Comment::findOrFail($id);
+        /*
+         * **هدفُ التعليق يُفحص كما في كل فعلٍ عليه**: كان يكفي امتلاكُ «إضافة
+         * مهام» لتحويل **أي** تعليق — ونصُّ التعليق يُنسخ حرفياً في وصف المهمة.
+         * فمن لا يملك الموارد البشرية يقرأ تعليقاً على ملفٍّ وظيفيّ بتحويله.
+         * من يرى السجل يحوّل تعليقه، ولا أحد سواه.
+         */
+        $this->guardTarget($c->module, $c->record_id);
         abort_if($c->task_id, 422, 'حُوّل هذا التعليق لمهمة من قبل');
 
         // مشروع المهمة: من عمود مشروع السجل الأصلي إن وُجد
@@ -120,7 +176,7 @@ class CommentController extends Controller
         $c = Comment::findOrFail($id);
         $this->guardTarget($c->module, $c->record_id);          // يرى السجل = يتفاعل
 
-        $emoji = (string) $r->input('emoji');
+        $emoji = hub_str($r->input('emoji'));
         abort_unless(in_array($emoji, self::REACTIONS, true), 422, 'تفاعل غير معروف');
 
         $q = \Illuminate\Support\Facades\DB::table('reactions')
@@ -239,11 +295,9 @@ class CommentController extends Controller
 
     protected function notify(string $uid, string $kind, string $text, ?string $module, ?string $recordId): void
     {
-        HubNotification::create([
-            'user_id' => $uid, 'kind' => $kind, 'text' => Str::limit($text, 590),
-            'module' => $module === 'feed' ? null : $module, 'record_id' => $module === 'feed' ? null : $recordId,
-            'read' => false, 'created_at' => now(),
-        ]);
+        hub_notify($uid, $kind, $text,
+            $module === 'feed' ? null : $module,
+            $module === 'feed' ? null : $recordId);
     }
 
     /** سجل القراءة: يُضاف المستخدم الحالي لمن قرأ (التعليقات والردود المعروضة) */

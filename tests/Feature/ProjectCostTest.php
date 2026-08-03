@@ -14,6 +14,20 @@ use Tests\TestCase;
 /** محرك التكلفة الفعلية والربحية — كل رقم يُتحقق منه يدوياً */
 class ProjectCostTest extends TestCase
 {
+    /**
+     * تثبيت الساعة عند منتصف النهار.
+     *
+     * التكلفة الدورية تُضرب في `months = round(days/30, 2)`، و`days` تُقاس من منتصف ليل
+     * `start_date` إلى **اللحظة الراهنة بساعتها**. فمشروعٌ بدأ قبل ٦٠ يوماً يعطي 60.5 يوماً
+     * ظهراً (‏= 2.02 شهر) لكن 60.75 عند السادسة مساءً (‏= 2.03) — فكان الاختبار يخضرّ
+     * صباحاً ويحمرّ مساءً بلا تغيير في الكود. التثبيت عند الظهر يجعل الفارق 60.5 دائماً.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->travelTo(now()->startOfDay()->addHours(12));
+    }
+
     /** مشروع بأرقام معلومة سلفاً حتى تكون كل نتيجة قابلة للحساب باليد */
     protected function seedProject(): Project
     {
@@ -40,7 +54,9 @@ class ProjectCostTest extends TestCase
             'project_id' => $p->id, 'amount' => 30, 'cycle' => 'شهري',
             'renew' => now()->addMonth()->toDateString(), 'created_at' => now(), 'updated_at' => now()]);
 
-        FinDocument::create(['doc_no' => 'INV-1', 'kind' => 'فاتورة', 'project_id' => $p->id,
+        // النوع الحقيقي الذي يكتبه النظام (QuoteController وخيارات الوحدة) —
+        // الحرفي القديم «فاتورة» كان يُخضرّ الاختبار بينما الإنتاج يحسب إيراداً صفرياً
+        FinDocument::create(['doc_no' => 'INV-1', 'kind' => 'فاتورة مبيعات', 'project_id' => $p->id,
             'total' => 4000, 'paid' => 2500, 'date' => now()->toDateString()]);
         FinDocument::create(['doc_no' => 'EXP-1', 'kind' => 'مصروف', 'project_id' => $p->id,
             'total' => 300, 'date' => now()->toDateString()]);

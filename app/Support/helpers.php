@@ -230,31 +230,128 @@ if (! function_exists('hub_top_links')) {
         $owner = (bool) $user?->role?->is_owner;
         $mon = $owner || hub_flag($user, 'monitor');
 
+        // كل رابط مُصنَّف في قسم (group): daily/analytics/centers — تستعمله hub_top_groups
         $all = [
-            ['key' => 'morning',   'label' => '☀️ تشغيل اليوم',      'route' => 'morning',         'ok' => true],
-            ['key' => 'me',        'label' => '👤 بوابتي',           'route' => 'portal.me',       'ok' => true],
-            ['key' => 'feed',      'label' => '📣 قناة الفريق',      'route' => 'feed',            'ok' => true],
-            ['key' => 'dm',        'label' => '💬 الرسائل',          'route' => 'dm.inbox',        'ok' => true],
-            ['key' => 'inboxdocs', 'label' => '📥 صندوق الوثائق',    'route' => 'inboxdocs.index', 'ok' => true],
-            ['key' => 'alerts',    'label' => '🔔 ينتهي قريباً',     'route' => 'alerts',          'ok' => true],
-            ['key' => 'calendar',  'label' => '📅 التقويم',          'route' => 'calendar',        'ok' => true],
-            ['key' => 'finrep',    'label' => '📊 التقارير المالية', 'route' => 'reports.finance', 'ok' => hub_can($user, 'fin', 'v')],
-            ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'ok' => $mon],
-            ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'ok' => $mon],
-            ['key' => 'recs',      'label' => '💡 مركز التوصيات',    'route' => 'recs',            'ok' => $mon],
-            ['key' => 'kpis',      'label' => '📈 مؤشرات KPI',       'route' => 'kpis.index',      'ok' => $mon],
-            ['key' => 'innov',     'label' => '💡 مركز الابتكار',    'route' => 'innovation',      'ok' => hub_can($user, 'ideas', 'v')],
-            ['key' => 'supscores', 'label' => '🏅 تقييم الموردين',   'route' => 'supplierscores',  'ok' => hub_can($user, 'suppliers', 'v')],
-            ['key' => 'capacity',  'label' => '📊 القدرات والموارد', 'route' => 'capacity',        'ok' => $mon],
-            ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'ok' => $mon],
-            ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'ok' => $mon],
-            ['key' => 'legal',     'label' => '⚖️ القانوني',         'route' => 'legal',           'ok' => hub_can($user, 'contracts', 'v')],
-            ['key' => 'support',   'label' => '🎫 لوحة الدعم',       'route' => 'support',         'ok' => hub_can($user, 'tickets', 'v')],
-            ['key' => 'ceo',       'label' => '👑 لوحة CEO',         'route' => 'ceo',             'ok' => $owner],
-            ['key' => 'perf',      'label' => '📈 لوحة الأداء',      'route' => 'performance',     'ok' => $mon],
+            ['key' => 'morning',   'label' => '☀️ تشغيل اليوم',      'route' => 'morning',         'group' => 'daily',     'ok' => true],
+            ['key' => 'me',        'label' => '👤 بوابتي',           'route' => 'portal.me',       'group' => 'daily',     'ok' => true],
+            ['key' => 'alerts',    'label' => '🔔 ينتهي قريباً',     'route' => 'alerts',          'group' => 'daily',     'ok' => true],
+            ['key' => 'calendar',  'label' => '📅 التقويم',          'route' => 'calendar',        'group' => 'daily',     'ok' => true],
+            ['key' => 'feed',      'label' => '📣 قناة الفريق',      'route' => 'feed',            'group' => 'daily',     'ok' => true],
+            ['key' => 'dm',        'label' => '💬 الرسائل',          'route' => 'dm.inbox',        'group' => 'daily',     'ok' => true],
+            ['key' => 'inboxdocs', 'label' => '📥 صندوق الوثائق',    'route' => 'inboxdocs.index', 'group' => 'daily',     'ok' => hub_can($user, 'inboxdocs', 'v') || hub_can($user, 'files', 'v')],
+
+            ['key' => 'ceo',       'label' => '👑 لوحة CEO',         'route' => 'ceo',             'group' => 'analytics', 'ok' => $owner],
+            ['key' => 'perf',      'label' => '📈 لوحة الأداء',      'route' => 'performance',     'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'finrep',    'label' => '📊 التقارير المالية', 'route' => 'reports.finance', 'group' => 'analytics', 'ok' => hub_can($user, 'fin', 'v')],
+            ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'kpis',      'label' => '📈 مؤشرات KPI',       'route' => 'kpis.index',      'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'capacity',  'label' => '📊 القدرات والموارد', 'route' => 'capacity',        'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'recs',      'label' => '💡 مركز التوصيات',    'route' => 'recs',            'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'delivery',  'label' => '🛤️ مسار التسليم',     'route' => 'delivery',        'group' => 'analytics', 'ok' => hub_can($user, 'feats', 'v') || hub_can($user, 'deploys', 'v') || hub_can($user, 'requests', 'v') || hub_can($user, 'designs', 'v')],
+            ['key' => 'assetlife', 'label' => '💼 العهدة ودورة الحياة', 'route' => 'assets.life',  'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
+            ['key' => 'compb',     'label' => '⚖️ الامتثال وأثره',   'route' => 'compliance.board', 'group' => 'centers', 'ok' => hub_can($user, 'compliance', 'v')],
+            ['key' => 'appsproj',  'label' => '🔗 التطبيقات والمشاريع', 'route' => 'appsprojects', 'group' => 'centers', 'ok' => hub_can($user, 'apps', 'v') || hub_can($user, 'projects', 'v')],
+            ['key' => 'dassets',   'label' => '🔐 الأصول الرقمية',   'route' => 'digital.assets',  'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'pricing',   'label' => '💳 الباقات والتسعير', 'route' => 'pricing',         'group' => 'centers',   'ok' => hub_can($user, 'plans', 'v')],
+            ['key' => 'mediac',    'label' => '📣 مركز الإعلام',      'route' => 'media.center',    'group' => 'centers',   'ok' => hub_can($user, 'media', 'v') || hub_can($user, 'events', 'v')],
+            ['key' => 'teamdir',   'label' => '👥 دليل الفريق',       'route' => 'team',            'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
+            ['key' => 'staff',     'label' => '🪪 الموظفون وحساباتهم', 'route' => 'staff.index',    'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
+            ['key' => 'okrb',      'label' => '🎯 لوحة الأهداف',     'route' => 'okrs.board',      'group' => 'analytics', 'ok' => hub_can($user, 'okrs', 'v')],
+            ['key' => 'polb',      'label' => '📜 السياسات والإقرارات', 'route' => 'policies.board', 'group' => 'centers',   'ok' => hub_can($user, 'policies', 'v')],
+            ['key' => 'social',    'label' => '📣 مركز السوشال',     'route' => 'social.index',    'group' => 'analytics', 'ok' => hub_can($user, 'social', 'v')],
+
+            ['key' => 'legal',     'label' => '⚖️ القانوني',         'route' => 'legal',           'group' => 'centers',   'ok' => hub_can($user, 'contracts', 'v')],
+            ['key' => 'esign',     'label' => '✍️ توقيع العقود',     'route' => 'esign.index',     'group' => 'centers',   'ok' => hub_can($user, 'contracts', 'v')],
+            ['key' => 'support',   'label' => '🎫 لوحة الدعم',       'route' => 'support',         'group' => 'centers',   'ok' => hub_can($user, 'tickets', 'v')],
+            ['key' => 'innov',     'label' => '💡 مركز الابتكار',    'route' => 'innovation',      'group' => 'centers',   'ok' => hub_can($user, 'ideas', 'v')],
+            ['key' => 'supscores', 'label' => '🏅 تقييم الموردين',   'route' => 'supplierscores',  'group' => 'centers',   'ok' => hub_can($user, 'suppliers', 'v')],
         ];
 
         return array_values(array_filter($all, fn ($l) => $l['ok']));
+    }
+}
+
+if (! function_exists('hub_pin_targets')) {
+    /**
+     * **مثبّتاتي** — رصيفٌ شخصيّ لأكثر وجهاتٍ يستعملها المستخدم يومياً، نقرةٌ
+     * واحدة فوق كل شيء. لنظامٍ من ٧١ وحدةً ومساحاتٍ ومراكز، هذا هو المكسبُ:
+     * لا تنقيبَ في مجموعة ولا فتحَ مساحةٍ ولا ⌘K لوجهتك المتكررة.
+     *
+     * الرمز نصّ: `m:{مفتاح وحدة}` أو مفتاحُ رابطٍ علوي — نفسُ ترميز `home`.
+     * كلُّ وجهةٍ يجوز تثبيتُها لهذا المستخدم (وحدةٌ يراها أو رابطٌ يُسمح له به).
+     */
+    function hub_pin_targets($user): array
+    {
+        $out = [];
+        foreach (hub_top_links($user) as $l) {
+            $out[$l['key']] = ['token' => $l['key'], 'label' => $l['label'], 'route' => $l['route'], 'args' => []];
+        }
+        foreach (hub_modules() as $mk => $md) {
+            if (! hub_can($user, $mk, 'v') || $mk === 'users') continue;
+            $look = hub_mod_look($mk);
+            $out['m:' . $mk] = ['token' => 'm:' . $mk,
+                'label' => ($look['icon'] ?? '📄') . ' ' . ($md['label'] ?? $mk),
+                'route' => 'm.index', 'args' => [$mk]];
+        }
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_pins')) {
+    /** المثبّتات المحلولةُ للعرض — رموزٌ غير صالحةٍ تُسقَط بصمتٍ كسائر التفضيلات */
+    function hub_pins($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        $tokens = (array) hub_pref('nav.pins', [], $user);
+        if (! $tokens) return [];
+
+        $targets = hub_pin_targets($user);
+        $out = [];
+        foreach ($tokens as $t) {
+            if (isset($targets[$t])) $out[] = $targets[$t];
+        }
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_is_pinned')) {
+    function hub_is_pinned(string $token, $user = null): bool
+    {
+        return in_array($token, (array) hub_pref('nav.pins', [], $user), true);
+    }
+}
+
+if (! function_exists('hub_top_groups')) {
+    /**
+     * أدوات ولوحات الشريط الجانبي **مجموعةً في أقسام** بدل ٢١ رابطاً مسطّحاً.
+     * يحترم صلاحية كل رابط (من hub_top_links) وإخفاء المستخدم (nav.hidden_top).
+     * «مساحتي اليومية» مفتوحة افتراضياً؛ الباقي مطويّ ليبقى الشريط نظيفاً.
+     */
+    function hub_top_groups($user): array
+    {
+        $hidden = (array) hub_pref('nav.hidden_top', [], $user);
+        $links  = collect(hub_top_links($user))
+            ->reject(fn ($l) => in_array($l['key'], $hidden, true))
+            ->groupBy('group');
+
+        // مجموعتان لا ثلاث: «المراكز المتخصّصة» ضُمّت للتحليلات — تخفيفاً للعجقة
+        $defs = [
+            ['key' => ['daily'],                'label' => 'مساحتي اليومية',    'icon' => '🧭', 'open' => true],
+            ['key' => ['analytics', 'centers'], 'label' => 'اللوحات والمراكز',  'icon' => '📊', 'open' => false],
+        ];
+
+        $out = [];
+        foreach ($defs as $d) {
+            $items = collect($d['key'])->flatMap(fn ($k) => $links->get($k, collect()))->values()->all();
+            if ($items) $out[] = $d + ['items' => $items];
+        }
+
+        return $out;
     }
 }
 
@@ -375,6 +472,115 @@ if (! function_exists('hub_flag')) {
     }
 }
 
+/*
+ * السياسات المسمّاة — الطبقة الرقيقة التي تُسمّي «من يرى هذه الشاشة».
+ *
+ * كانت هذه السياسات السبع منسوخة في ~٤٠ تعبيراً مضمّناً، فتفرّقت صياغتها:
+ * بعضها يكتب `auth()->user()->role?->is_owner` وبعضها `auth()->user()?->role?->is_owner`،
+ * وكلها تُضيف `is_owner ||` قبل `hub_flag(...)` رغم أن `hub_flag` تُرجع true للمالك أصلاً.
+ * تسميتها هنا تجعل السياسة قابلة للقراءة والتغيير في موضع واحد، وتُؤمّن المستخدم المعدوم
+ * (أوامر الطرفية والمهام المجدولة) بلا اعتماد على وسيط auth.
+ */
+
+if (! function_exists('hub_is_owner')) {
+    /** مالك النظام — أعلى سلطة، يتجاوز المصفوفة والأعلام. تُفوِّض لـUser::isOwner فتبقى التعريفة واحدة */
+    function hub_is_owner($user = null): bool
+    {
+        $user = $user ?? auth()->user();
+        return $user instanceof \App\Models\User
+            ? $user->isOwner()
+            : (bool) ($user?->role?->is_owner);
+    }
+}
+
+if (! function_exists('hub_monitor')) {
+    /** المراقبة: لوحات الأداء والتكلفة والطاقة — بيانات أداء الأفراد حساسة */
+    function hub_monitor($user = null): bool
+    {
+        return hub_flag($user ?? auth()->user(), 'monitor');
+    }
+}
+
+if (! function_exists('hub_approver')) {
+    /** اعتماد الطلبات وأوامر الشراء */
+    function hub_approver($user = null): bool
+    {
+        return hub_flag($user ?? auth()->user(), 'approve');
+    }
+}
+
+if (! function_exists('hub_secrets')) {
+    /** الاطلاع على الأسرار المخزّنة (الخزنة، غرفة البيانات) */
+    function hub_secrets($user = null): bool
+    {
+        return hub_flag($user ?? auth()->user(), 'secrets');
+    }
+}
+
+if (! function_exists('hub_user_admins')) {
+    /** من يدير المستخدمين: المالكون وحاملو راية «إدارة المستخدمين» — لإشعارات مراجعة الصلاحيات */
+    function hub_user_admins(): array
+    {
+        return \App\Models\User::with('role')->whereNull('deleted_at')->where('status', 'نشط')->get()
+            ->filter(fn ($u) => $u->role?->is_owner || hub_flag($u, 'users'))
+            ->pluck('id')->all();
+    }
+}
+
+if (! function_exists('hub_has_col')) {
+    /**
+     * **هل هذا العمود موجودٌ فعلاً؟** — مخبّأً، للمسارات التي تعمل في كل صفحة.
+     *
+     * نشرُ شيفرةٍ قبل تشغيل هجرتها أمرٌ يقع: يُرفع الكود وتُنسى `php artisan
+     * migrate` دقائق أو ساعة. وما دام القارئ شاشةً واحدة فالأثر شاشة؛ أما إن
+     * كان يعمل في **كل صفحة** — كشارة الشريط الجانبي — فالنظام كلُّه لا يفتح،
+     * و`Unknown column` في كل طلب. (وSQLite تتساهل حيث ترمي MySQL، فالحزمةُ
+     * خضراء والخادمُ واقف.)
+     *
+     * القاعدة: **الهجرةُ المتأخرة تُنقص ميزةً ولا تُطفئ نظاماً.**
+     */
+    function hub_has_col(string $table, string $col): bool
+    {
+        return (bool) \Illuminate\Support\Facades\Cache::remember(
+            'hub:hascol:' . $table . '.' . $col, 300,
+            fn () => \Illuminate\Support\Facades\Schema::hasTable($table)
+                  && \Illuminate\Support\Facades\Schema::hasColumn($table, $col)
+        );
+    }
+}
+
+if (! function_exists('hub_assignable_roles')) {
+    /**
+     * الأدوار القابلة للمنح من هذا المستخدم — **غير المالك لا يمنح ملكيةً فلا
+     * تُعرض له**. الحارس مفروضٌ في الخادم كذلك (Staff::makeAccount)، وهذا
+     * إخفاءُ ما لا يُمنح حتى لا يُعرض خيارٌ يُرفض عند الحفظ.
+     */
+    function hub_assignable_roles($user = null)
+    {
+        $user = $user ?? auth()->user();
+
+        return \App\Models\Role::when(! hub_is_owner($user), fn ($q) => $q->where('is_owner', false))
+            ->orderByDesc('is_owner')->orderBy('name')->get(['id', 'name', 'is_owner']);
+    }
+}
+
+if (! function_exists('hub_copy_secrets')) {
+    /** نسخ سرّ إلى الحافظة — علم منفصل عن مجرد الاطلاع */
+    function hub_copy_secrets($user = null): bool
+    {
+        $user = $user ?? auth()->user();
+        return hub_flag($user, 'secrets') || hub_flag($user, 'copySec');
+    }
+}
+
+if (! function_exists('hub_exporter')) {
+    /** التصدير إلى CSV — مسرّب بيانات محتمل فله علمه */
+    function hub_exporter($user = null): bool
+    {
+        return hub_flag($user ?? auth()->user(), 'exp');
+    }
+}
+
 if (! function_exists('hub_safe_url')) {
     /**
      * رابط آمن للعرض: يسمح فقط بمخططات غير قابلة للتنفيذ (http/https/mailto/tel)
@@ -401,10 +607,44 @@ if (! function_exists('hub_tone')) {
     function hub_tone(?string $v): string
     {
         if (! $v) return 'g';
-        foreach (['مكتمل', 'منجز', 'نشط', 'مدفوع', 'مقبول', 'موافق', 'ناجح', 'مغلق', 'تم'] as $w) if (str_contains($v, $w)) return 'ok';
-        foreach (['متأخر', 'ملغ', 'مرفوض', 'موقوف', 'فشل', 'حرج', 'منته'] as $w) if (str_contains($v, $w)) return 'bad';
+        foreach (['مكتمل', 'منجز', 'نشط', 'مدفوع', 'مقبول', 'موافق', 'ناجح', 'مغلق', 'تم', 'ساري', 'معتمد', 'فوز'] as $w) if (str_contains($v, $w)) return 'ok';
+        foreach (['متأخر', 'ملغ', 'مرفوض', 'موقوف', 'فشل', 'حرج', 'منته', 'خسار'] as $w) if (str_contains($v, $w)) return 'bad';
         foreach (['قيد', 'انتظار', 'جديد', 'مسود', 'معلق', 'مراجعة', 'تجريب'] as $w) if (str_contains($v, $w)) return 'wn';
         return 'g';
+    }
+}
+
+if (! function_exists('hub_mod_look')) {
+    /**
+     * هوية بصرية للوحدة: أيقونة ولون — من مجموعتها في التنقل، مع تخصيصٍ للأشهر.
+     * تُغذي ترويسات صفحات الوحدات فيعرف المستخدم أين هو من نظرة.
+     */
+    function hub_mod_look(string $module): array
+    {
+        static $groupColor = [
+            'الكيانات' => '#4C6FA5', 'الأصول الرقمية' => '#2FB79A', 'العمل' => '#0E7C66',
+            'المالية والمشتريات' => '#B0568E', 'الموارد البشرية' => '#C08A3E',
+            'الأصول والعقود' => '#7C6FB0', 'المعرفة والملفات' => '#6B9080',
+        ];
+        static $icons = [
+            'projects' => '🚀', 'clients' => '🤝', 'tasks' => '✅', 'tickets' => '🎫',
+            'fin' => '💵', 'contracts' => '📜', 'companies' => '🏢', 'hr' => '👥',
+            'quotes' => '📝', 'suppliers' => '🚚', 'purchases' => '🛒', 'ideas' => '💡',
+            'leaves' => '🗓️', 'apps' => '📱', 'domains' => '🌐', 'servers' => '🖥️',
+            'vault' => '🔐', 'kb' => '📚', 'meetings' => '🪑', 'assets' => '📦',
+        ];
+
+        $icon = $icons[$module] ?? '📁';
+        $color = 'var(--p)';
+        foreach (config('hub_nav', []) as $g) {
+            if (in_array($module, $g['items'], true)) {
+                $color = $groupColor[$g['g']] ?? $color;
+                if (! isset($icons[$module])) $icon = $g['icon'];
+                break;
+            }
+        }
+
+        return ['icon' => $icon, 'color' => $color];
     }
 }
 
@@ -413,22 +653,76 @@ if (! function_exists('hub_children')) {
     function hub_children(string $module): array
     {
         static $map = null;
+
         if ($map === null) {
-            $map = [];
-            foreach (hub_modules() as $ck => $cd) {
-                foreach ($cd['fields'] as $f) {
-                    if (($f['type'] ?? '') === 'ref' && ($f['ref'] ?? '') !== '' && empty($f['multi'])) {
-                        $map[$f['ref']][] = [$ck, $f];
-                    }
-                }
+            // بناء الخريطة يستجوب مخطط القاعدة عن عمودَي الربط في ٧١ جدولاً. لو تُرك
+            // بلا تخبئة لأضاف ~١٤٠ استعلام استجواب إلى أول صفحة سجل في كل طلب.
+            // الخريطة تتبع الإعداد والمخطط معاً، وكلاهما لا يتغيّر إلا بإصدار — فمفتاحها الإصدار.
+            $key = 'hub:children:' . config('hub.version', '0');
+            try {
+                $map = \Illuminate\Support\Facades\Cache::rememberForever($key, fn () => hub_build_children_map());
+            } catch (\Throwable $e) {
+                $map = hub_build_children_map();     // تخبئة معطّلة لا تُعطّل العلاقات
             }
         }
+
         return $map[$module] ?? [];
     }
 }
 
+if (! function_exists('hub_build_children_map')) {
+    /** بناء خريطة العلاقات العكسية: المراجع المفردة والمتعددة وأعمدة الربط الضمنية */
+    function hub_build_children_map(): array
+    {
+        $map = [];
+
+        // أعمدة ربط موجودة في القاعدة ولا يُصرّح بها السجل كمراجع.
+        // قائمة بيضاء بعمودين لا غير: هما محورا النظام، وتوسيعها يفتح ترشيحاً
+        // على أعمدة عشوائية من الرابط.
+        $implicit = ['company_id' => 'companies', 'project_id' => 'projects'];
+
+        foreach (hub_modules() as $ck => $cd) {
+            $declared = [];
+            foreach ($cd['fields'] as $f) {
+                if (($f['type'] ?? '') !== 'ref' || ($f['ref'] ?? '') === '') continue;
+                $declared[] = $f['col'];
+                // المتعدد يُدرَج الآن: كان الشرط `empty($f['multi'])` يُسقط ١١ علاقة عكسية،
+                // فلا جواب لسؤال «أي موظف يحمل هذا الجهاز؟» ولا «أي عميل يشتري هذه الخدمة؟»
+                $map[$f['ref']][] = [$ck, $f];
+            }
+
+            // قراءة أعمدة الجدول مرة واحدة بدل استجواب لكل عمود
+            $table = $cd['table'] ?? null;
+            try {
+                $cols = $table ? \Illuminate\Support\Facades\Schema::getColumnListing($table) : [];
+            } catch (\Throwable $e) {
+                $cols = [];
+            }
+
+            foreach ($implicit as $col => $ref) {
+                if ($ck === $ref || in_array($col, $declared, true)) continue;
+                if (! in_array($col, $cols, true)) continue;
+
+                $map[$ref][] = [$ck, [
+                    'key' => $col, 'col' => $col, 'ref' => $ref, 'type' => 'ref',
+                    'label' => hub_mod($ref)['label'] ?? $ref,
+                    'implicit' => true,
+                ]];
+            }
+        }
+
+        return $map;
+    }
+}
+
 if (! function_exists('hub_expiry_fields')) {
-    /** حقول التواريخ المصيرية عبر كل الوحدات (انتهاء/تجديد/استحقاق) */
+    /**
+     * حقول التواريخ المصيرية عبر كل الوحدات (انتهاء/تجديد/استحقاق).
+     * راية 'expiry' المعلنة في السجل تُحترم أولاً وتحسم الاتجاهين: true تُدخل
+     * الحقل ولو لم يطابق الأنماط (الصيانة القادمة، متابعة العميل، صلاحية العرض)،
+     * وfalse تُخرجه ولو طابقها («تاريخ النهاية» لمعرضٍ ليس انتهاء رخصة).
+     * كانت الراية تُكتب في التعريفات ولا يقرؤها أي سطر.
+     */
     function hub_expiry_fields(): array
     {
         static $out = null;
@@ -436,11 +730,15 @@ if (! function_exists('hub_expiry_fields')) {
         $out = [];
         foreach (hub_modules() as $mk => $md) {
             foreach ($md['fields'] as $f) {
-                $isDate = in_array($f['type'], ['date', 'dt'], true);
+                if (! in_array($f['type'], ['date', 'dt'], true)) continue;
+                if (array_key_exists('expiry', $f)) {
+                    if ($f['expiry']) $out[] = [$mk, $f];
+                    continue;
+                }
                 $byKey  = in_array($f['key'], ['end', 'due', 'expiry', 'expires', 'renew', 'renewal', 'warranty'], true)
                           || preg_match('/exp$|Exp$/', $f['key']);
                 $byLbl  = preg_match('/انتها|تجديد|استحقاق|نهاية|ضمان/u', $f['label']);
-                if ($isDate && ($byKey || $byLbl)) $out[] = [$mk, $f];
+                if ($byKey || $byLbl) $out[] = [$mk, $f];
             }
         }
         return $out;
@@ -454,26 +752,42 @@ if (! function_exists('hub_expiry')) {
         $user   = $user ?? auth()->user();
         // مقيد = نطاق مشاريع أو عزل شركات — مخبأ خاص به كي لا تتسرب أسماء أجنبية عبر المخبأ المشترك
         $scoped = hub_scoped($user) || hub_company_ids($user) !== null;
-        $key    = $scoped ? 'hub:expiry:u:' . $user->id : 'hub:expiry';
+        // المخبأ يفصل بالدور أيضاً: وثائق الملفات تُرشَّح بصلاحية رؤية وحدتها،
+        // فمخبأٌ مشترك بين دورين مختلفين كان سيسرّب ما لا يُرى لأحدهما.
+        // و«الجيل» يُبطل المخبأ فور رفع وثيقةٍ مؤرَّخة — لا انتظارَ عشر دقائق.
+        $gen    = (int) Cache::get('hub:expiry:gen', 0);
+        $key    = ($scoped ? 'hub:expiry:u:' . $user->id : 'hub:expiry:r:' . ($user->role_id ?? '0')) . ':g' . $gen;
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
         return \Illuminate\Support\Facades\Cache::remember($key, $scoped ? 300 : 600, function () use ($scoped, $user) {
             $today = now()->toDateString();
             $limit = now()->addDays(30)->toDateString();
+            // عتبة التنبيه لكل سجل: حقول «تنبيه قبل (يوم)» كانت تُعرض ولا تُقرأ —
+            // وحدةٌ لها عمود عتبة تُجلب بنافذة موسّعة ثم يُرشَّح كل سجل بعتبته هو
+            $alertCols = ['domains' => 'alert', 'files' => 'alert', 'subs' => 'alerts'];
+            $wide = now()->addDays(120)->toDateString();
             $items = [];
             foreach (hub_expiry_fields() as [$mk, $f]) {
+                // **صلاحية الوحدة قبل نطاقها**: الرادار كان يُرشَّح بالنطاق وحده،
+                // فيسرد أسماء سجلاتٍ من وحداتٍ لا يملك المستخدم رؤيتها أصلاً —
+                // اسمُ العقد وتاريخُه إفشاءٌ ولو لم تُفتح الوحدة.
+                // وبلا مستخدم (طرفيةٌ أو مهمةٌ مجدولة) لا ترشيح: السياق نظاميّ،
+                // والمستقبِلون يُرشَّحون في موضعهم لا هنا.
+                if ($user && ! hub_can($user, $mk, 'v')) continue;
                 $md = hub_mod($mk);
                 $disp = hub_display_col($mk);
+                $acol = $alertCols[$mk] ?? null;
                 try {
+                    if ($acol && ! \Illuminate\Support\Facades\Schema::hasColumn($md['table'], $acol)) $acol = null;
                     $q = \Illuminate\Support\Facades\DB::table($md['table'])
                         ->whereNull('deleted_at')
                         ->whereNotNull($f['col'])
-                        ->whereBetween(\Illuminate\Support\Facades\DB::raw("DATE(`{$f['col']}`)"), [now()->subDays(60)->toDateString(), $limit]);
+                        ->whereBetween(\Illuminate\Support\Facades\DB::raw("DATE(`{$f['col']}`)"), [now()->subDays(60)->toDateString(), $acol ? $wide : $limit]);
                     if ($scoped) $q = hub_scope($q, $mk, $user);
 
                     // لا تنبيه على ما أُغلق: مهمة منجزة أو فاتورة مدفوعة أو عقد منتهٍ
                     // كانت تظل تنبّه إلى الأبد فتفقد الصفحة مصداقيتها.
-                    if (($sc = $md['status'] ?? null) && \Illuminate\Support\Facades\Schema::hasColumn($md['table'], $sc)) {
+                    if (($sc = hub_status_col($mk)) && \Illuminate\Support\Facades\Schema::hasColumn($md['table'], $sc)) {
                         $q->where(fn ($w) => $w->whereNull($sc)->orWhereNotIn($sc, hub_closed_states()));
                     }
 
@@ -485,16 +799,28 @@ if (! function_exists('hub_expiry')) {
 
                     // الترتيب تصاعدياً بالتاريخ قبل الحد: نُبقي الأربعين الأقرب/الأكثر تأخراً
                     // لا أربعين عشوائية بترتيب القاعدة (كان يُسقط أعجل السجلات صمتاً).
+                    $cols = ['id', $disp . ' as _n', $f['col'] . ' as _d'];
+                    if ($acol) $cols[] = $acol . ' as _a';
                     $rows = $q->orderBy(\Illuminate\Support\Facades\DB::raw("DATE(`{$f['col']}`)"))
-                        ->limit(40)->get(['id', $disp . ' as _n', $f['col'] . ' as _d']);
+                        ->limit(40)->get($cols);
                 } catch (\Throwable $e) { continue; }
                 foreach ($rows as $row) {
                     $d = substr((string) $row->_d, 0, 10);
                     $days = (int) now()->startOfDay()->diffInDays(\Illuminate\Support\Carbon::parse($d)->startOfDay(), false);
+                    if ($acol) {
+                        // عتبة السجل نفسه: رقم مفرد أو قائمة «90,60,30» تؤخذ أقصاها — والفارغ = 30
+                        $nums = array_filter(array_map('intval',
+                            preg_split('/[\s,،]+/u', (string) ($row->_a ?? ''), -1, PREG_SPLIT_NO_EMPTY)));
+                        if ($days > ($nums ? max($nums) : 30)) continue;
+                    }
                     $items[] = ['module' => $mk, 'mlabel' => $md['label'], 'flabel' => $f['label'],
                                 'id' => $row->id, 'name' => (string) $row->_n, 'date' => $d, 'days' => $days];
                 }
             }
+            // وثائق ملفات الكيانات: شهادةٌ منتهية أخطر من حقلٍ منتهٍ — بها
+            // يتوقف تعاملٌ أو يسقط ترخيص. تُضَمّ للرادار نفسه بنطاقها.
+            foreach (hub_doc_expiry($user) as $doc) $items[] = $doc;
+
             usort($items, fn ($a, $b) => $a['days'] <=> $b['days']);
             return array_slice($items, 0, 200);
         });
@@ -541,7 +867,9 @@ if (! function_exists('hub_sla')) {
         $resDue  = $created->copy()->addHours($resH);
 
         if ($firstReply === 'auto') {
+            // أول رد **غير داخلي**: الملاحظة بين موظفَين لا تصل العميل فلا توقف عدّاده
             $firstReply = \App\Models\Comment::where('module', 'tickets')->where('record_id', $t->id)
+                ->where(fn ($q) => $q->where('internal', false)->orWhereNull('internal'))
                 ->orderBy('created_at')->value('created_at');
         }
         $respAt = $firstReply ? \Illuminate\Support\Carbon::parse($firstReply) : null;
@@ -633,10 +961,9 @@ if (! function_exists('hub_health')) {
                     ->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة']);
                 $openN = (clone $open)->count();
                 $late  = $openN ? (clone $open)->whereNotNull('due')->where('due', '<', $today)->count() : 0;
-                $inc = (float) $db->table('fin_documents')->whereNull('deleted_at')->whereNotIn('state', ['ملغاة', 'مسودة'])
-                    ->whereIn('kind', ['فاتورة مبيعات', 'دفعة واردة'])->where('date', '>=', now()->startOfMonth()->toDateString())->sum('total');
-                $exp = (float) $db->table('fin_documents')->whereNull('deleted_at')->whereNotIn('state', ['ملغاة', 'مسودة'])
-                    ->whereIn('kind', ['مصروف', 'فاتورة مشتريات', 'دفعة صادرة'])->where('date', '>=', now()->startOfMonth()->toDateString())->sum('total');
+                $m0  = now()->startOfMonth()->toDateString();
+                $inc = hub_fin_sum(config('hub.fin.income'), $m0);
+                $exp = hub_fin_sum(config('hub.fin.expense'), $m0);
                 $score = 100 - ($openN ? ($late / $openN) * 60 : 0) - ($inc - $exp < 0 ? 20 : 0);
                 $out['المالية'] = ['score' => $clamp($score), 'note' => "{$late}/{$openN} مستحق متأخر · صافي الشهر " . ($inc - $exp >= 0 ? 'موجب' : 'سالب')];
             } catch (\Throwable $e) {}
@@ -675,7 +1002,9 @@ if (! function_exists('hub_health')) {
             // الامتثال: العقود والدومينات المنتهية أو القريبة
             try {
                 $c = $db->table('contracts')->whereNull('deleted_at'); $cn = (clone $c)->count();
-                $cLate = (clone $c)->whereNotNull('end')->where('end', '<', $today)->where(fn ($w) => $w->whereNull('status')->orWhere('status', 'NOT LIKE', '%منته%'))->count();
+                // العمود date_end لا end — الاسم الخاطئ كان يرمي «unknown column»
+                // فيبتلعه catch وتختفي بطاقة الامتثال صامتةً من صحة الشركة
+                $cLate = (clone $c)->whereNotNull('date_end')->where('date_end', '<', $today)->where(fn ($w) => $w->whereNull('status')->orWhere('status', 'NOT LIKE', '%منته%'))->count();
                 $d = $db->table('domains')->whereNull('deleted_at'); $dn = (clone $d)->count();
                 $dLate = (clone $d)->whereNotNull('expiry')->where('expiry', '<', $today)->count();
                 $tot = $cn + $dn;
@@ -690,8 +1019,15 @@ if (! function_exists('hub_health')) {
                 $ssl = $db->table('domains')->whereNull('deleted_at')->whereNotNull('ssl_exp')->where('ssl_exp', '<', $today)->count();
                 $crit = $db->table('issues')->whereNull('deleted_at')->where('severity', 'LIKE', '%حرج%')
                     ->where(fn ($w) => $w->whereNull('status')->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مغلق%')->where('status', 'NOT LIKE', '%محلول%')))->count();
-                $score = 100 - ($sn2 ? ($sLate / $sn2) * 30 : 0) - min(30, $ssl * 10) - min(40, $crit * 10);
-                $out['البنية التحتية'] = ['score' => $clamp($score), 'note' => "{$sLate} سيرفر منتهٍ · {$ssl} شهادة SSL منتهية · {$crit} عطل حرج مفتوح"];
+                // الحوادث المفتوحة تدخل الدرجة أخيراً — كانت وحدة إدارة الحوادث
+                // كاملةً خارج تقييم البنية التحتية، والدرجة تعدّ issues بدلاً منها
+                $inc = \Illuminate\Support\Facades\Schema::hasTable('incidents')
+                    ? $db->table('incidents')->whereNull('deleted_at')
+                        ->whereNotIn('status', ['مغلق بتقرير', 'مُستعاد'])->count() : 0;
+                $score = 100 - ($sn2 ? ($sLate / $sn2) * 30 : 0) - min(30, $ssl * 10)
+                       - min(40, $crit * 10) - min(30, $inc * 12);
+                $out['البنية التحتية'] = ['score' => $clamp($score),
+                    'note' => "{$sLate} سيرفر منتهٍ · {$ssl} شهادة SSL منتهية · {$crit} عطل حرج مفتوح · {$inc} حادثة مفتوحة"];
             } catch (\Throwable $e) {}
 
             return $out;
@@ -718,13 +1054,43 @@ if (! function_exists('hub_needs_approval')) {
     }
 }
 
+if (! function_exists('hub_block_if_queued')) {
+    /**
+     * **أزرارُ المسار لا تلتفّ على طابور الموافقات.**
+     *
+     * تعديلُ أمر الشراء من نموذج السجل يُصفّ طلب موافقة، وزرُّ «أرسل للمورد» في
+     * الشاشة نفسها كان يكتب الحالة مباشرة. والقاعدةُ التي يُلتَفُّ عليها بزرٍّ
+     * مجاورٍ ليست قاعدة.
+     *
+     * تعيد رسالةَ ردٍّ تُوجّه للمسار الموثَّق، أو `null` إن لم تكن الوحدة تحت قاعدة.
+     */
+    function hub_block_if_queued(string $module, string $op = 'e'): ?string
+    {
+        return hub_needs_approval(auth()->user(), $module, $op)
+            ? 'تعديلاتُك على هذه الوحدة تمر بالموافقات — عدّل السجل من نموذجه ليُصفّ الطلب ويُوثَّق، '
+              . 'فأزرارُ المسار لا تلتفّ على الطابور'
+            : null;
+    }
+}
+
 if (! function_exists('hub_approvers')) {
-    /** المعتمدون: المالكون + حاملو علم approve */
+    /**
+     * المعتمدون: المالكون + حاملو علم approve — بذاكرة طلبٍ واحد:
+     * إجراء notify في مسارٍ يُطلق على ٢٠٠ سجل جماعياً كان يحمّل جدول
+     * المستخدمين بأدواره ٢٠٠ مرة في الطلب الواحد.
+     */
     function hub_approvers(): array
     {
-        return \App\Models\User::whereNull('deleted_at')->with('role')->get()
+        // ذاكرة الحاوية لا static: الحاوية تُنسف بين الطلبات (وOctane والاختبارات)
+        // بينما static تعمّر عمر العملية فتخدم قائمة معتمدين قديمة
+        if (app()->bound('hub.approvers')) return app('hub.approvers');
+
+        $ids = \App\Models\User::whereNull('deleted_at')->with('role')->get()
             ->filter(fn ($u) => $u->role?->is_owner || hub_flag($u, 'approve'))
             ->pluck('id')->values()->all();
+        app()->instance('hub.approvers', $ids);
+
+        return $ids;
     }
 }
 
@@ -805,6 +1171,22 @@ if (! function_exists('hub_field_mode')) {
      */
     function hub_field_mode($user, string $module, string $fieldKey): string
     {
+        // الحقول المقفولة سجلّياً (`locked` في تعريف الحقل) قراءةٌ فقط للجميع —
+        // حتى المالك: حالةُ الموافقة مثلاً تُكتب من مسار الحسم وحده (حيث يُختم
+        // decided_by/decided_at معها)، وإلا زُوِّر اعتمادٌ أو نُقض رفضٌ من نموذج
+        // CRUD أو بسحب بطاقة كانبان. البوابة هنا تحرس كل المسارات دفعةً واحدة:
+        // fill والتحقق وsetStatus والإجراء الجماعي والنموذج — كلها تستشير هذه الدالة.
+        static $locked = null;
+        if ($locked === null) {
+            $locked = [];
+            foreach (hub_modules() as $mk => $d) {
+                foreach (($d['fields'] ?? []) as $f) {
+                    if (! empty($f['locked'])) $locked[$mk][(string) $f['key']] = true;
+                }
+            }
+        }
+        if (isset($locked[$module][$fieldKey])) return 'ro';
+
         $user = $user ?? auth()->user();
         if (! $user || $user->role?->is_owner) return '';
 
@@ -891,6 +1273,298 @@ if (! function_exists('hub_company_scope')) {
     }
 }
 
+if (! function_exists('hub_risk_score')) {
+    /**
+     * درجة المخاطرة = احتمال × أثر (١-٤ لكلٍّ، فالمدى ١-١٦) — كان سجل المخاطر
+     * بلا احتمال إطلاقاً، و`severity` وحدها لا تصنع درجةً ولا خريطة حرارية،
+     * وكل الأخطار متساوية في حساب صحة المشروع (عدٌّ لا وزن).
+     */
+    function hub_risk_score(?string $likelihood, ?string $severity): ?array
+    {
+        $L = ['نادر' => 1, 'محتمل' => 2, 'مرجّح' => 3, 'شبه مؤكد' => 4];
+        $S = ['منخفضة' => 1, 'متوسطة' => 2, 'عالية' => 3, 'حرجة' => 4, 'حرج' => 4];
+
+        $l = $L[trim((string) $likelihood)] ?? null;
+        $s = $S[trim((string) $severity)] ?? null;
+        if ($l === null || $s === null) return null;
+
+        $score = $l * $s;
+        $band = $score >= 12 ? 'حرجة' : ($score >= 6 ? 'عالية' : ($score >= 3 ? 'متوسطة' : 'منخفضة'));
+
+        return ['l' => $l, 's' => $s, 'score' => $score, 'band' => $band,
+                'tone' => $score >= 12 ? 'bad' : ($score >= 6 ? 'wn' : 'ok')];
+    }
+}
+
+if (! function_exists('hub_okr_progress')) {
+    /**
+     * تقدّم الهدف محسوباً من نتائجه الرئيسية (متوسط موزون) — كان `progress`
+     * رقماً يدوياً منفصلاً عن الواقع. النتيجة المربوطة بمؤشر تُحدَّث قيمتها
+     * الحالية من `hub_kpi_value` (المحرك مكتوبٌ وجاهز منذ إصدارات بلا مستهلك
+     * في الأهداف)، وهدفٌ بلا نتائج يبقى على رقمه اليدوي — لا نكذب بصفر.
+     */
+    function hub_okr_progress(string $objectiveId, bool $refresh = false, bool $withPace = false): ?array
+    {
+        // الملغاة تُستثنى — وبلا حالة تبقى (whereNotIn وحده يُقصي NULL صامتاً)
+        $krs = \App\Models\KeyResult::whereNull('deleted_at')
+            ->where('objective_id', $objectiveId)
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'ملغاة'))
+            ->get();
+        if ($krs->isEmpty()) return null;
+
+        $sum = 0.0; $weights = 0.0; $rows = [];
+        foreach ($krs as $kr) {
+            // القيمة الحالية من مصدرها — والمصدر الآلي **يغلب** أي كتابة يدوية،
+            // وإلا فما فائدة الأتمتة إن نقضتها آخر لمسةِ يد.
+            $auto = hub_kr_source($kr) !== 'manual';
+            if ($auto && $refresh) {
+                $val = hub_kr_read($kr);
+                if ($val !== null && (float) ($kr->current_value ?? PHP_FLOAT_MIN) !== $val) {
+                    $kr->current_value = $val;
+                    $kr->read_at = now();
+                    $kr->saveQuietly();
+                } elseif ($val !== null) {
+                    $kr->read_at = now();
+                    $kr->saveQuietly();
+                }
+            }
+
+            $pct = $kr->pct();
+            $w = (float) ($kr->weight ?? 0) ?: 1.0;
+            if ($pct !== null) { $sum += $pct * $w; $weights += $w; }
+            $rows[] = ['id' => $kr->id, 'title' => $kr->title, 'pct' => $pct,
+                       'current' => $kr->current_value, 'target' => $kr->target_value,
+                       'start' => $kr->start_value, 'weight' => $w,
+                       'unit' => $kr->unit, 'status' => $kr->status, 'auto' => $auto,
+                       'source' => hub_kr_source($kr), 'readAt' => $kr->read_at];
+        }
+
+        $pct = $weights > 0 ? (int) round($sum / $weights) : null;
+
+        $out = [
+            'pct' => $pct,
+            'krs' => $rows,
+            'count' => $krs->count(),
+            'measured' => count(array_filter($rows, fn ($r) => $r['pct'] !== null)),
+            'autoCount' => count(array_filter($rows, fn ($r) => $r['auto'])),
+        ];
+
+        $o = \App\Models\Objective::find($objectiveId);
+        if ($o) {
+            $out += hub_okr_pace($o, $pct);
+            // النسبة تُكتب على الهدف **دائماً** لا عند التحديث فقط: القوائم
+            // والتصدير والودجات تقرأ العمود، فيبقى صادقاً بلا أن يلمسه أحد.
+            if ($pct !== null && (int) ($o->progress ?? -1) !== $pct) {
+                $o->forceFill(['progress' => $pct, 'computed_at' => now(),
+                               'progress_at_risk' => $out['gap'] ?? null])->saveQuietly();
+            }
+        }
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_pipeline')) {
+    /**
+     * مسار المبيعات رقماً: قيمة كل مرحلة ومرجّحها باحتمال الإغلاق، وتشريح
+     * الخسائر بالسبب وبالمنافس — كانت `value` و`prob` تُملآن ولا تُجمعان،
+     * ووحدة المنافسين لا تُقرأ من أي شاشة إطلاقاً.
+     */
+    function hub_pipeline($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        $q = hub_scope(\Illuminate\Support\Facades\DB::table('clients')->whereNull('deleted_at'), 'clients', $user);
+        $rows = hub_company_scope($q, 'clients')
+            ->get(['id', 'name', 'stage', 'value', 'prob', 'lost_reason', 'competitor_id']);
+
+        $open = ['عميل محتمل', 'تم التواصل', 'عرض سعر', 'تفاوض'];
+        $stages = []; $lost = []; $byCompetitor = [];
+        $pipeline = 0.0; $weighted = 0.0; $won = 0.0; $lostValue = 0.0;
+
+        foreach ($rows as $r) {
+            $v = (float) ($r->value ?? 0);
+            $w = $v * ((float) ($r->prob ?? 0) / 100);
+            $st = (string) $r->stage;
+
+            $stages[$st] ??= ['stage' => $st, 'count' => 0, 'value' => 0.0, 'weighted' => 0.0];
+            $stages[$st]['count']++;
+            $stages[$st]['value'] += $v;
+            $stages[$st]['weighted'] += $w;
+
+            if (in_array($st, $open, true)) { $pipeline += $v; $weighted += $w; }
+            if ($st === 'فوز') $won += $v;
+            if ($st === 'خسارة') {
+                $lostValue += $v;
+                $reason = (string) ($r->lost_reason ?: 'غير مسجَّل');
+                $lost[$reason] ??= ['reason' => $reason, 'count' => 0, 'value' => 0.0];
+                $lost[$reason]['count']++;
+                $lost[$reason]['value'] += $v;
+                if ($r->competitor_id) {
+                    $byCompetitor[$r->competitor_id] ??= ['id' => $r->competitor_id, 'count' => 0, 'value' => 0.0];
+                    $byCompetitor[$r->competitor_id]['count']++;
+                    $byCompetitor[$r->competitor_id]['value'] += $v;
+                }
+            }
+        }
+
+        if ($byCompetitor) {
+            $names = \Illuminate\Support\Facades\DB::table('competitors')
+                ->whereIn('id', array_keys($byCompetitor))->pluck('name', 'id');
+            foreach ($byCompetitor as $cid => &$c) $c['name'] = $names[$cid] ?? '؟';
+            unset($c);
+        }
+
+        usort($lost, fn ($a, $b) => $b['value'] <=> $a['value']);
+        usort($byCompetitor, fn ($a, $b) => $b['value'] <=> $a['value']);
+        $decided = $won + $lostValue;
+
+        return [
+            'stages' => array_values($stages),
+            'pipeline' => round($pipeline, 2),
+            'weighted' => round($weighted, 2),
+            'won' => round($won, 2),
+            'lostValue' => round($lostValue, 2),
+            'winRate' => $decided > 0 ? (int) round($won / $decided * 100) : null,
+            'lostReasons' => $lost,
+            'lostToCompetitors' => $byCompetitor,
+        ];
+    }
+}
+
+if (! function_exists('hub_mrr')) {
+    /**
+     * الإيراد الشهري المتكرر (MRR) من العقود السارية — أثمن رقمٍ تجاري لم يكن
+     * قابلاً للقياس أصلاً: `hub_service_costs` كان يقيس هامشاً نظرياً من السعر
+     * المُعلن لا من عقدٍ مُوقَّع. قيمة كل عقد تُطبَّع شهرياً حسب دورة باقته أو
+     * خدمته (سنوي ÷ ١٢، ربع سنوي ÷ ٣)، و«مرة واحدة» لا تدخل التكرار.
+     * التوزيع بالخدمة يجعل «أي خدمة تحمل إيرادنا؟» سؤالاً له جواب.
+     */
+    function hub_mrr(bool $fresh = false): array
+    {
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget('rev:mrr');
+
+        return \Illuminate\Support\Facades\Cache::remember('rev:mrr', 300, function () {
+            $DB = \Illuminate\Support\Facades\DB::class;
+            $divisor = ['شهري' => 1, 'ربع سنوي' => 3, 'نصف سنوي' => 6, 'سنوي' => 12];
+
+            $contracts = \Illuminate\Support\Facades\DB::table('contracts')->whereNull('deleted_at')
+                ->where('status', 'ساري')->where('type', 'عقد عميل')
+                ->get(['id', 'title', 'value', 'currency', 'service_id', 'plan_id', 'client_id', 'date_end']);
+            if ($contracts->isEmpty()) return ['mrr' => 0.0, 'arr' => 0.0, 'contracts' => 0,
+                                               'byService' => [], 'unmapped' => 0, 'oneTime' => 0.0];
+
+            $plans = \Illuminate\Support\Facades\DB::table('pricing_plans')->whereNull('deleted_at')
+                ->get(['id', 'cycle', 'service_id'])->keyBy('id');
+            $services = \Illuminate\Support\Facades\DB::table('services')->whereNull('deleted_at')
+                ->get(['id', 'name', 'cycle'])->keyBy('id');
+
+            $default = (string) setting('app.currency', 'د.ك');
+            $mrr = 0.0; $oneTime = 0.0; $unmapped = 0; $byService = []; $byCur = [];
+            foreach ($contracts as $c) {
+                $value = (float) ($c->value ?? 0);
+                if ($value <= 0) continue;
+
+                $plan = $c->plan_id ? ($plans[$c->plan_id] ?? null) : null;
+                $sid = $c->service_id ?: ($plan->service_id ?? null);
+                $svc = $sid ? ($services[$sid] ?? null) : null;
+                $cycle = (string) ($plan->cycle ?? $svc->cycle ?? 'سنوي');   // بلا ربطٍ: سنويٌّ افتراضاً
+                $cur = (string) ($c->currency ?: $default);
+
+                if (! $sid) $unmapped++;
+                if ($cycle === 'مرة واحدة') { $oneTime += $value; continue; }
+
+                $monthly = $value / ($divisor[$cycle] ?? 12);
+                $mrr += $monthly;
+
+                // **الفصل بالعملة**: كان `currency` يُقرأ ولا يُستعمل فتُجمع عقودٌ
+                // بعملاتٍ شتّى في رقمٍ واحد تحت لصيقةٍ واحدة — كذبةٌ رقمية. لا
+                // محرّكَ أسعار في النظام (app.currency تسميةٌ لا تحويل)، فالصادق
+                // الفصلُ ورفعُ علم mixed لا جمعٌ مُخترَع.
+                $byCur[$cur] ??= ['currency' => $cur, 'mrr' => 0.0, 'arr' => 0.0, 'contracts' => 0];
+                $byCur[$cur]['mrr'] += $monthly;
+                $byCur[$cur]['contracts']++;
+
+                $key = $sid ?: '_none';
+                $byService[$key] ??= ['id' => $sid, 'name' => $svc->name ?? 'بلا خدمة مربوطة',
+                                      'mrr' => 0.0, 'contracts' => 0];
+                $byService[$key]['mrr'] += $monthly;
+                $byService[$key]['contracts']++;
+            }
+
+            usort($byService, fn ($a, $b) => $b['mrr'] <=> $a['mrr']);
+            foreach ($byCur as &$bc) { $bc['mrr'] = round($bc['mrr'], 2); $bc['arr'] = round($bc['mrr'] * 12, 2); }
+            unset($bc);
+            usort($byCur, fn ($a, $b) => $b['mrr'] <=> $a['mrr']);
+
+            return [
+                'mrr' => round($mrr, 2),
+                'arr' => round($mrr * 12, 2),
+                'contracts' => $contracts->count(),
+                'byService' => $byService,
+                'byCurrency' => $byCur,
+                // الرقم الموحّد أعلاه أمينٌ فقط بعملةٍ واحدة — mixed يخبر الواجهة
+                // أن تعرض التفصيل لا رقماً واحداً كاذباً
+                'mixed' => count($byCur) > 1,
+                'unmapped' => $unmapped,
+                'oneTime' => round($oneTime, 2),
+            ];
+        });
+    }
+}
+
+if (! function_exists('hub_stock_sync')) {
+    /**
+     * اشتقاق حالة الصنف من كميته وحدّه: نفد ⟵ صفر، منخفض ⟵ بلغ حد إعادة
+     * الطلب، متاح فيما سوى ذلك. الحالات اليدوية (تالف/محجوز) لا تُدهس.
+     * كانت مسارات «مخزون نفد/منخفض» الجاهزة معطلةً لأن لا شيء يضبط الحالة.
+     */
+    function hub_stock_sync(\App\Models\StockItem $item): void
+    {
+        $auto = ['متاح', 'منخفض', 'نفد'];
+        $cur = (string) $item->status;
+        if ($cur !== '' && ! in_array($cur, $auto, true)) return;
+
+        $qty = (float) ($item->qty ?? 0);
+        $reorder = (float) ($item->reorder ?? 0);
+        $new = $qty <= 0 ? 'نفد' : (($reorder > 0 && $qty <= $reorder) ? 'منخفض' : 'متاح');
+        if ($new === $cur) return;
+
+        $item->status = $new;
+        $item->saveQuietly();
+        \App\Support\FlowRunner::fire('status', 'stock', $item, $new);
+    }
+}
+
+if (! function_exists('hub_budget_actual')) {
+    /**
+     * المصروف الفعلي مقابل ميزانية: يجمع مستندات المصروف غير الملغاة المطابقة
+     * لأبعاد الميزانية (شركة، مشروع، مركز تكلفة، بند، فترة) — الأبعاد الفارغة
+     * لا تُقيّد، وبند «الكل» يشمل كل البنود. كانت الوحدة سجلَّ نوايا: كل
+     * الأبعاد جاهزة ومطابقة لبنود المالية حرفياً ولا استعلامَ واحد يقارنها.
+     */
+    function hub_budget_actual($b): array
+    {
+        $q = hub_fin_not_dead(\Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at')
+            ->whereIn('kind', config('hub.fin.expense')));
+        foreach (['company_id', 'project_id', 'cc_id'] as $col) {
+            if (! empty($b->{$col})) $q->where($col, $b->{$col});
+        }
+        if (! empty($b->cat) && $b->cat !== 'الكل') $q->where('cat', $b->cat);
+        if (! empty($b->date_from)) $q->whereDate('date', '>=', substr((string) $b->date_from, 0, 10));
+        if (! empty($b->date_to)) $q->whereDate('date', '<=', substr((string) $b->date_to, 0, 10));
+
+        $spent  = (float) $q->sum('total');
+        $amount = (float) ($b->amount ?? 0);
+
+        return [
+            'spent'  => $spent,
+            'amount' => $amount,
+            'remain' => $amount - $spent,
+            'pct'    => $amount > 0 ? (int) round($spent / $amount * 100) : null,
+        ];
+    }
+}
+
 if (! function_exists('hub_hourly_rates')) {
     /**
      * أجر الساعة لكل مستخدم — مشتقاً من راتب ملفه الوظيفي وبدلاته.
@@ -974,26 +1648,38 @@ if (! function_exists('hub_project_pl')) {
             foreach ($servers as $s) $serverCost += $norm($s->cost, $s->cycle) * $months + $oneOff($s->cost, $s->cycle);
 
             // ── ٣) الأدوات والاشتراكات ──
+            // الملغى/المنتهي لا يُحمَّل على كامل عمر المشروع — كما hub_service_costs
             $subs = \Illuminate\Support\Facades\DB::table('subscriptions')
-                ->whereNull('deleted_at')->where('project_id', $projectId)->get(['amount', 'cycle']);
+                ->whereNull('deleted_at')->where('project_id', $projectId)
+                ->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', ['ملغي', 'منتهي']))
+                ->get(['amount', 'cycle']);
             $toolCost = 0.0;
             foreach ($subs as $s) $toolCost += $norm($s->amount, $s->cycle) * $months + $oneOff($s->amount, $s->cycle);
 
             // ── ٤) الخدمات الخارجية: مشتريات + مصروفات مالية مرتبطة بالمشروع ──
+            // المصروف بتعريفه المعتمد config('hub.fin.expense') لا نوع «مصروف» وحده،
+            // والحالات الميتة (ملغاة/مسودة) خارج الحساب — كسائر التقارير
+            $finDoc = fn () => hub_fin_not_dead(\Illuminate\Support\Facades\DB::table('fin_documents')
+                ->whereNull('deleted_at')->where('project_id', $projectId));
             $purch = (float) \Illuminate\Support\Facades\DB::table('purchases')
                 ->whereNull('deleted_at')->where('project_id', $projectId)->sum('amount');
-            $expense = (float) \Illuminate\Support\Facades\DB::table('fin_documents')
-                ->whereNull('deleted_at')->where('project_id', $projectId)
-                ->where('kind', 'مصروف')->sum('total');
+            $expense = (float) $finDoc()
+                ->whereIn('kind', (array) config('hub.fin.expense', ['مصروف']))->sum('total');
             $externalCost = $purch + $expense;
 
             // ── الإيراد: مفوتر ومحصّل ──
-            $inv = \Illuminate\Support\Facades\DB::table('fin_documents')
-                ->whereNull('deleted_at')->where('project_id', $projectId)->where('kind', 'فاتورة')
-                ->selectRaw('COALESCE(SUM(total),0) t, COALESCE(SUM(paid),0) p, COUNT(*) n')->first();
+            // كان الشرط kind='فاتورة' — نوعٌ لا يكتبه النظام أصلاً (الحقيقي «فاتورة
+            // مبيعات» من QuoteController وخيارات الوحدة) فإيراد كل مشروع حقيقي = صفر.
+            // COALESCE(paid,0) داخل الجمع: فاتورة لم يُدفع منها شيء paid=NULL
+            // كانت تُفسد المجموع لا تُصفَّر.
+            $incKinds = (array) config('hub.fin.income', ['فاتورة مبيعات', 'دفعة واردة']);
+            $inv = $finDoc()->whereIn('kind', $incKinds)
+                ->selectRaw('COALESCE(SUM(total),0) t, COALESCE(SUM(COALESCE(paid,0)),0) p, COUNT(*) n')->first();
+            // «دفعة واردة» محصَّلة بطبيعتها: total هو المبلغ الواصل وإن لم يُملأ paid
+            $payExtra = (float) $finDoc()->where('kind', 'دفعة واردة')->whereNull('paid')->sum('total');
 
             $revenue   = (float) ($inv->t ?? 0);
-            $collected = (float) ($inv->p ?? 0);
+            $collected = (float) ($inv->p ?? 0) + $payExtra;
             $totalCost = $hoursCost + $serverCost + $toolCost + $externalCost;
             $profit    = $revenue - $totalCost;
 
@@ -1008,7 +1694,8 @@ if (! function_exists('hub_project_pl')) {
 
             return [
                 'project'  => $p->name,
-                'currency' => $p->currency ?: (string) setting('fin.currency', 'د.ك'),
+                // «العملة الافتراضية» من الإعدادات — المفتاح الموحد app.currency
+                'currency' => $p->currency ?: (string) setting('app.currency', 'د.ك'),
                 'months'   => $months, 'days' => $days,
                 'revenue'  => ['invoiced' => round($revenue, 2), 'collected' => round($collected, 2),
                                'docs' => (int) ($inv->n ?? 0),
@@ -1072,11 +1759,19 @@ if (! function_exists('hub_project_health')) {
                     's' => $tAll ? max(0, (int) (100 - $tLate / $tAll * 200)) : 100,
                     'note' => $tAll ? "{$tLate} متأخرة من {$tAll}" : 'لا مهام مسجَّلة'];
 
-            // ٤) المخاطر المفتوحة
-            $iss = \Illuminate\Support\Facades\DB::table('issues')->whereNull('deleted_at')->where('project_id', $projectId)
-                ->whereNotIn('status', ['مغلقة', 'محلولة', 'ملغاة'])->count();
+            // ٤) المخاطر المفتوحة — موزونةً بالخطورة: كان العدّ يساوي بين خطرٍ
+            // حرج وآخر منخفض، فمشروعٌ بخمسة أخطار تافهة يبدو أسوأ من واحدٍ قاتل
+            $risks = \Illuminate\Support\Facades\DB::table('issues')->whereNull('deleted_at')
+                ->where('project_id', $projectId)
+                ->whereNotIn('status', ['مغلقة', 'محلولة', 'ملغاة'])->pluck('severity');
+            $weights = ['حرجة' => 30, 'حرج' => 30, 'عالية' => 15, 'متوسطة' => 8, 'منخفضة' => 3];
+            $penalty = 0;
+            foreach ($risks as $sev) $penalty += $weights[trim((string) $sev)] ?? 10;
+            $iss = $risks->count();
+            $crit = $risks->filter(fn ($s) => in_array(trim((string) $s), ['حرجة', 'حرج'], true))->count();
             $f[] = ['k' => 'المخاطر المفتوحة', 'w' => 15,
-                    's' => max(0, 100 - $iss * 15), 'note' => $iss ? "{$iss} مخاطرة مفتوحة" : 'لا مخاطر مفتوحة'];
+                    's' => max(0, 100 - $penalty),
+                    'note' => $iss ? "{$iss} مخاطرة مفتوحة" . ($crit ? " (منها {$crit} حرجة)" : '') : 'لا مخاطر مفتوحة'];
 
             // ٥) الأعطال التقنية (٩٠ يوماً)
             $inc = \Illuminate\Support\Facades\Schema::hasTable('incidents')
@@ -1100,13 +1795,633 @@ if (! function_exists('hub_project_health')) {
     }
 }
 
+if (! function_exists('hub_ar_norm')) {
+    /**
+     * تطبيع عربي للمقارنة: يجرّد التشكيل والتطويل ويوحّد صور الألف والياء والتاء المربوطة.
+     *
+     * لا يُستخدم للعرض — للمقارنة فقط. سببه أن السجل يُصرّح بالكلمة نفسها بصور مختلفة
+     * (`مُنجزة` مقابل `منجزة`، `منفّذ` مقابل `منفذ`)، فكانت المقارنة الحرفية تعتبر
+     * السجل المنتهي مفتوحاً لمجرد شدّة أو ضمّة.
+     */
+    function hub_ar_norm(?string $s): string
+    {
+        $s = trim((string) $s);
+        if ($s === '') return '';
+        // التشكيل والتطويل: َ ً ُ ٌ ِ ٍ ّ ْ ٰ ـ
+        $s = preg_replace('/[\x{0610}-\x{061A}\x{064B}-\x{065F}\x{0670}\x{0640}]/u', '', $s);
+        $s = strtr($s, ['أ' => 'ا', 'إ' => 'ا', 'آ' => 'ا', 'ٱ' => 'ا', 'ى' => 'ي', 'ة' => 'ه']);
+
+        return preg_replace('/\s+/u', ' ', $s);
+    }
+}
+
 if (! function_exists('hub_closed_states')) {
-    /** حالات تعني «انتهى الأمر» — تُستثنى من تنبيهات الانتهاء وقوائم ما يحتاج تدخلاً */
+    /**
+     * حالات تعني «انتهى الأمر» — تُستثنى من التنبيهات وقوائم ما يحتاج تدخلاً.
+     *
+     * القائمة الحرفية أدناه هي المرجع، لكنها تُوسَّع تلقائياً بكل حالة **مُصرَّح بها في
+     * السجل** تطابق إحداها بعد التطبيع. فـ`مُنجزة` (الأفكار) و`منفّذ` (التغييرات) و`مدفوع`
+     * (الرواتب) كانت تُحسب مفتوحة لأنها تكتب الكلمة نفسها بصورة أخرى — لا لأن معناها مختلف.
+     */
     function hub_closed_states(): array
     {
-        return ['منجزة', 'منجز', 'مكتملة', 'مكتمل', 'مغلقة', 'مغلق', 'ملغاة', 'ملغى', 'ملغي',
-                'محلولة', 'تم الحل', 'مدفوعة', 'مسددة', 'منتهية', 'منتهي', 'مؤرشفة', 'مؤرشف',
-                'منفَّذ', 'منفذ', 'مرفوض', 'مرفوضة', 'مغلق بتقرير', 'مُستعاد', 'متراجع عنه'];
+        static $out = null;
+        if ($out !== null) return $out;
+
+        $base = ['منجزة', 'منجز', 'مكتملة', 'مكتمل', 'مغلقة', 'مغلق', 'ملغاة', 'ملغى', 'ملغي',
+                 'محلولة', 'تم الحل', 'مدفوعة', 'مسددة', 'منتهية', 'منتهي', 'مؤرشفة', 'مؤرشف',
+                 'منفَّذ', 'منفذ', 'مرفوض', 'مرفوضة', 'مغلق بتقرير', 'مُستعاد', 'متراجع عنه',
+                 // صور مذكّرة لكلمات موجودة أصلاً، لا يلتقطها التطبيع لأن الفرق في آخر
+                 // الكلمة لا في تشكيلها: «مدفوع» (مسيّرات الرواتب) و«منتهٍ» (الأحداث).
+                 'مدفوع', 'منتهٍ',
+
+                 /*
+                  * حالاتٌ نهائية بمفردات خاصة بوحدتها. المعيار هنا ليس «هل انتهى الحدث؟»
+                  * بل «هل بقي عملٌ على أحد؟» — لأن هذه القائمة تُغذّي قوائم ما يحتاج تدخلاً.
+                  */
+                 'خسارة',                    // عميل: فُقدت الفرصة، لا متابعة بعدها
+                 'تم التعيين',               // توظيف: اكتمل المسار
+                 'منتهية خدمته',             // موظف: انتهت العلاقة
+                 'مستبعد',                   // أصل: خرج من الخدمة نهائياً
+                 'خرج من السوق',             // منافس: لم يعد يُرصد
+                 'مُستبدَلة',                // اعتمادية: حلّ محلها غيرها
+                 'مرتجع',                    // أمر شراء: أُغلق بالإرجاع
+                 'متوقفة عن البيع',          // باقة: انتهى بيعها
+                 'مُقرّة',                   // إقرار سياسة: وقّعه صاحبه
+                 'منتهية بتحديث النسخة'];    // إقرار سياسة: نسخته تجاوزتها
+
+    /*
+     * وحالاتٌ **لم** تُدرج عمداً رغم أن حدثها انتهى:
+     *   «فشل» و«فشلت» (النشر والاستعادة) — الفشل أحوجُ ما يكون لتدخل، وإخفاؤه
+     *       من قوائم المتابعة أسوأ من إظهاره.
+     *   «فوز» (عميل) — نقيض «خسارة»: الفوز يفتح عمل التأهيل لا يُغلقه.
+     *   «نفد» و«تالف» (مخزون وأصول) — كلاهما يطلب إعادة طلبٍ أو إصلاحاً.
+     */
+
+        $norm = array_map('hub_ar_norm', $base);
+        $out  = $base;
+        foreach (hub_declared_states() as $s) {
+            if (! in_array($s, $out, true) && in_array(hub_ar_norm($s), $norm, true)) $out[] = $s;
+        }
+
+        return $out = array_values(array_unique($out));
+    }
+}
+
+if (! function_exists('hub_declared_states')) {
+    /** كل قيم الحالة المُصرَّح بها في سجل الوحدات — مصدر مفردات النظام الفعلية */
+    function hub_declared_states(): array
+    {
+        static $all = null;
+        if ($all !== null) return $all;
+
+        $all = [];
+        foreach (hub_modules() as $mk => $md) {
+            // بالمفتاح لا بالعمود: المطابقة كانت `col === $md['status']` و
+            // `status` مفتاحٌ — فخيارات وحدة الوثائق كانت تسقط من مفردات النظام
+            $f = hub_status_field($mk);
+            if ($f && ! empty($f['options'])) {
+                foreach ($f['options'] as $o) $all[] = $o;
+            }
+        }
+
+        return $all = array_values(array_unique($all));
+    }
+}
+
+if (! function_exists('hub_is_closed')) {
+    /** هل هذه الحالة تعني «انتهى الأمر»؟ — مقارنة مُطبَّعة */
+    function hub_is_closed(?string $status, array $alsoClosed = []): bool
+    {
+        $s = hub_ar_norm($status);
+        if ($s === '') return false;
+        $closed = array_map('hub_ar_norm', array_merge(hub_closed_states(), $alsoClosed));
+
+        return in_array($s, $closed, true);
+    }
+}
+
+if (! function_exists('hub_open_scope')) {
+    /**
+     * تقييد الاستعلام على السجلات **المفتوحة**: حالة معدومة، أو حالة ليست من المنتهية.
+     *
+     * كان هذا التعريف مكتوباً يدوياً في تسعة متحكمات بمفردات متضاربة (`%مغلق%` هنا،
+     * `%مكتمل%` هناك، `%منته%` ثالثاً) فكان السجل الواحد «مفتوحاً» في صفحة و«مغلقاً»
+     * في أخرى. صار مصدره واحداً هنا.
+     *
+     * `$alsoClosed` لما تنفرد به الوحدة: «موقوف» للمشاريع، و«موافق/معتمد» للموافقات —
+     * دلالاتٌ محلية صحيحة لا تعمّم على بقية النظام.
+     */
+    function hub_open_scope($q, string $col = 'status', array $alsoClosed = [])
+    {
+        $closed = array_values(array_unique(array_merge(hub_closed_states(), $alsoClosed)));
+
+        return $q->where(fn ($w) => $w->whereNull($col)->orWhereNotIn($col, $closed));
+    }
+}
+
+if (! function_exists('hub_timeline')) {
+    /**
+     * الخط الزمني الموحَّد لسجل — بلا جدول جديد.
+     *
+     * التاريخ كان موجوداً كاملاً موزّعاً على أربعة جداول تتشارك `(module, record_id)`
+     * ولا أحد يدمجها، فكان على المستخدم أن يفتح أربع بطاقات ليعرف ما جرى. هذا قارئٌ
+     * يوحّدها ويُطبّعها لشكل رحلة العميل — فتحصل الوحدات الـ٧١ على خط زمني دفعةً واحدة.
+     *
+     * لا يُخرج `before/after` من التدقيق: الخط الزمني يقول **من فعل ماذا ومتى**،
+     * أما القيم القديمة فلها سجل الإصدارات بصلاحيته.
+     */
+    function hub_timeline(string $module, string $recordId, int $limit = 60): array
+    {
+        $db = \Illuminate\Support\Facades\DB::class;
+        $ev = [];
+        $add = function ($at, string $ico, string $label, string $title,
+                         ?string $url = null, ?string $who = null) use (&$ev) {
+            if (! $at) return;
+            $ev[] = ['at' => (string) $at, 'ico' => $ico, 'label' => $label,
+                     'title' => $title, 'url' => $url, 'status' => null, 'who' => $who];
+        };
+
+        $users = [];
+        $name  = function ($id) use (&$users) {
+            if ($id === null) return null;
+            if (! array_key_exists($id, $users)) {
+                $users[$id] = \Illuminate\Support\Facades\DB::table('users')
+                    ->where('id', $id)->value('name');
+            }
+
+            return $users[$id];
+        };
+
+        $icons = ['إضافة' => '🌱', 'تعديل' => '✏️', 'حذف' => '🗑️', 'استعادة' => '♻️',
+                  'تصدير' => '📤', 'استيراد' => '📥', 'عرض حساس' => '👁️'];
+
+        // ١) التدقيق — من فعل ماذا
+        foreach (\Illuminate\Support\Facades\DB::table('audits')
+                    ->where('module', $module)->where('record_id', $recordId)
+                    ->orderByDesc('created_at')->limit($limit)
+                    ->get(['action', 'reason', 'user_id', 'created_at']) as $a) {
+            $add($a->created_at, $icons[$a->action] ?? '📌', (string) $a->action,
+                (string) ($a->reason ?: ''), null, $name($a->user_id));
+        }
+
+        // ٢) التعليقات
+        foreach (\Illuminate\Support\Facades\DB::table('comments')->whereNull('deleted_at')
+                    ->where('module', $module)->where('record_id', $recordId)
+                    ->orderByDesc('created_at')->limit($limit)
+                    ->get(['id', 'body', 'user_id', 'created_at']) as $c) {
+            $add($c->created_at, '💬', 'تعليق',
+                \Illuminate\Support\Str::limit((string) $c->body, 90),
+                '#c-' . $c->id, $name($c->user_id));
+        }
+
+        // ٣) المرفقات
+        foreach (\Illuminate\Support\Facades\DB::table('attachments')->whereNull('deleted_at')
+                    ->where('module', $module)->where('record_id', $recordId)
+                    ->orderByDesc('created_at')->limit($limit)
+                    ->get(['original_name', 'uploaded_by', 'created_at']) as $t) {
+            $add($t->created_at, '📎', 'مرفق',
+                \Illuminate\Support\Str::limit((string) $t->original_name, 60),
+                null, $name($t->uploaded_by));
+        }
+
+        // ٤) الإصدارات المحفوظة
+        foreach (\Illuminate\Support\Facades\DB::table('record_versions')
+                    ->where('module', $module)->where('record_id', $recordId)
+                    ->orderByDesc('created_at')->limit($limit)
+                    ->get(['version', 'changed_by', 'created_at']) as $v) {
+            $add($v->created_at, '🕐', 'نسخة', 'الإصدار ' . $v->version, null, $name($v->changed_by));
+        }
+
+        // ٥) سجل أدلة التوقيع (v2.118) — دورة التوقيع كاملة على صفحة العقد نفسها
+        if ($module === 'contracts') {
+            try {
+                $signIcons = ['created' => '📨', 'sent' => '📤', 'opened' => '👀',
+                    'otp_sent' => '🔑', 'otp_ok' => '🔓', 'signed' => '✍️', 'declined' => '🚫',
+                    'voided' => '❌', 'reminded' => '⏰', 'downloaded' => '⬇️'];
+                $signLabels = ['created' => 'أُنشئ طلب توقيع', 'sent' => 'أُرسل للتوقيع',
+                    'opened' => 'فُتحت الوثيقة', 'otp_sent' => 'أُرسل رمز تحقق', 'otp_ok' => 'تحقق ناجح',
+                    'signed' => 'وُقّعت الوثيقة', 'declined' => 'رُفض التوقيع', 'voided' => 'أُبطل الرابط',
+                    'reminded' => 'تذكير بالتوقيع', 'downloaded' => 'نُزّلت الوثيقة'];
+                foreach (\Illuminate\Support\Facades\DB::table('contract_events')
+                            ->where('contract_id', $recordId)
+                            ->orderByDesc('created_at')->limit($limit)
+                            ->get(['event', 'ip', 'actor_id', 'meta', 'created_at']) as $s) {
+                    $meta = json_decode((string) $s->meta, true) ?: [];
+                    $add($s->created_at, $signIcons[$s->event] ?? '🖊️',
+                        $signLabels[$s->event] ?? (string) $s->event,
+                        trim(($meta['name'] ?? $meta['reason'] ?? '') . ($s->ip ? ' — ' . $s->ip : '')),
+                        null, $name($s->actor_id));
+                }
+            } catch (\Throwable $e) {
+                // كودٌ وصل قبل هجرته — الخط الزمني لا ينفجر
+            }
+        }
+
+        // الأحدث أولاً — تاريخُ سجلٍ يُقرأ من آخره، بخلاف رحلة العميل
+        usort($ev, fn ($a, $b) => strcmp($b['at'], $a['at']));
+
+        return array_slice($ev, 0, $limit);
+    }
+}
+
+if (! function_exists('hub_notify')) {
+    /**
+     * إنشاء إشعار — نفس المصفوفة كانت منسوخة في ستة مواضع، وسقط `Str::limit`
+     * من إحداها (حسم الموافقات) فكان النص الطويل يُبتر في القاعدة لا في التطبيق.
+     * الكتم مفروض في طبقة الموديل فلا يُعاد هنا.
+     */
+    function hub_notify($userId, string $kind, string $text,
+                        ?string $module = null, ?string $recordId = null)
+    {
+        if (! $userId) return null;
+
+        return \App\Models\HubNotification::create([
+            'user_id'   => $userId,
+            'kind'      => $kind,
+            'text'      => \Illuminate\Support\Str::limit($text, 590),
+            'module'    => $module,
+            'record_id' => $recordId,
+            'read'      => false,
+            'created_at' => now(),
+        ]);
+    }
+}
+
+if (! function_exists('hub_audit')) {
+    /**
+     * قيد تدقيق يدوي — ثلاثي `device/ip/created_at` كان منسوخاً حرفياً في ستة مواضع.
+     * (سمة `Auditable` تتكفّل بقيود CRUD تلقائياً؛ هذه لما لا يمر بالموديل.)
+     */
+    function hub_audit(string $action, ?string $module = null, ?string $recordId = null,
+                       ?string $name = null, array $extra = [])
+    {
+        $companyId = (string) session('hub.company', '') ?: null;
+        $allowed = hub_company_ids();
+        if ($companyId !== null && $allowed !== null && ! in_array($companyId, $allowed, true)) {
+            $companyId = null;
+        }
+
+        return \App\Models\AuditEntry::create($extra + [
+            'user_id'   => auth()->id(),
+            // الشركة النشطة من الشريط العلوي، إن كانت ضمن المسموح لهذا المستخدم
+            'company_id' => $companyId,
+            'action'    => $action,
+            'module'    => $module,
+            'record_id' => $recordId,
+            'name'      => $name === null ? null : \Illuminate\Support\Str::limit($name, 60),
+            'device'    => substr((string) request()->userAgent(), 0, 200),
+            'ip'        => request()->ip(),
+            'created_at' => now(),
+        ]);
+    }
+}
+
+if (! function_exists('hub_fin_not_dead')) {
+    /**
+     * استثناء الحالات الميتة (ملغاة/مسودة) مع إبقاء «بلا حالة»:
+     * `whereNotIn('state', $dead)` وحدها تُسقط صفوف state=NULL صامتاً
+     * (‏NULL NOT IN (...) تُقيَّم NULL) — فمستندٌ أُدخل بلا حالة كان يختفي
+     * من كل التقارير واللوحات. حقل الحالة اختياري في الوحدة، فالغياب حياة لا موت.
+     */
+    function hub_fin_not_dead($q, ?array $dead = null)
+    {
+        $dead = $dead ?? (array) config('hub.fin.dead', []);
+
+        return $q->where(fn ($w) => $w->whereNull('state')->orWhereNotIn('state', $dead));
+    }
+}
+
+if (! function_exists('hub_fin_sum')) {
+    /** مجموع مستندات مالية من أنواع بعينها منذ تاريخ — يستثني الملغاة والمسودات دائماً */
+    function hub_fin_sum(array $kinds, ?string $from = null, string $col = 'total'): float
+    {
+        $q = hub_fin_not_dead(\Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at'))
+            ->whereIn('kind', $kinds);
+        if ($from) $q->where('date', '>=', $from);
+
+        return (float) $q->sum($col);
+    }
+}
+
+if (! function_exists('hub_cached')) {
+    /**
+     * غلاف التخبئة: `if ($fresh) forget; return remember(...)` كان منسوخاً ١٢ مرة،
+     * وكل نسخة فرصةٌ لنسيان `forget` فيبقى المحرّك يقرأ رقماً قديماً بعد التحديث.
+     */
+    function hub_cached(string $key, int $ttl, bool $fresh, \Closure $fn)
+    {
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
+
+        return \Illuminate\Support\Facades\Cache::remember($key, $ttl, $fn);
+    }
+}
+
+if (! function_exists('hub_scope_key')) {
+    /**
+     * بصمة نطاق القارئ لمفاتيح التخبئة.
+     *
+     * كل قارئٍ جديد يمرّ بـ`hub_scope` و`hub_can` و`hub_field_mode` — فنتيجته
+     * **تختلف باختلاف القارئ**. مفتاحٌ عامّ واحد يعني أن أول من يفتح الشاشة
+     * يخبّئ نسخته، ويقرؤها بعده من لا يملك رؤيتها. البصمة تحمل الدور والمستخدم
+     * والشركة النشطة وعدسة المشروع — وهي أربعة ما يغيّر النتيجة.
+     */
+    function hub_scope_key(string $prefix): string
+    {
+        $u = auth()->user();
+
+        // ختمُ `roles` و`users` جزءٌ من المفتاح: المفتاح كان يحمل **معرّف** الدور
+        // لا **صلاحياته**، فسحبُ صلاحيةٍ من دورٍ لا يغيّر المفتاح — ويبقى الموظف
+        // المسحوبة صلاحيتُه يقرأ الشاشة المخبّأة حتى تنتهي مهلتها. والعزل بالشركة
+        // مخزَّنٌ على المستخدم، فتغييره يجب أن يُبطل كذلك.
+        return $prefix . ':' . ($u?->role_id ?? '0') . ':' . ($u?->id ?? '0')
+            . ':' . (string) session('hub.company', '-') . hub_lens_key(hub_lens()['id'] ?? null)
+            . hub_data_stamp(['roles', 'users']);
+    }
+}
+
+if (! function_exists('hub_status_col')) {
+    /**
+     * **عمود** الحالة الفيزيائي لوحدة — لا مفتاحه.
+     *
+     * `$def['status']` مفتاحُ حقلٍ لا اسمُ عمود، وهما متطابقان في اثنتين
+     * وسبعين وحدة و**مختلفان في واحدة**: وحدة الوثائق مفتاحُها `docStatus`
+     * وعمودها `doc_status`. فكل قارئٍ يستعمل المفتاح مباشرةً يبني
+     * `where "docStatus" = ?` — يُعيده SQLite صفراً صامتاً، ويرفضه **MySQL**
+     * بـ`Unknown column` وخطأ ٥٠٠.
+     *
+     * وأثرُه أوسع من الترشيح: قائمةُ الحالات تُبنى بـ`firstWhere('col', ...)`
+     * فتعود فارغة، والحدث لا يُطلَق عند تغيّر الحالة، ووثيقةٌ ملغاة تبقى
+     * تُنبّه «تنتهي قريباً» لأن مرشّح المفتوح يُتخطّى.
+     *
+     * نظيرتُه `hub_display_col()` موجودةٌ منذ زمن — وهذه كانت ناقصة.
+     */
+    function hub_status_col(string $module): ?string
+    {
+        static $map = [];
+        if (array_key_exists($module, $map)) return $map[$module];
+
+        $def = hub_mod($module);
+        $key = $def['status'] ?? null;
+        if (! $key) return $map[$module] = null;
+
+        $f = collect($def['fields'] ?? [])->firstWhere('key', $key);
+
+        return $map[$module] = $f['col'] ?? $key;
+    }
+}
+
+if (! function_exists('hub_status_field')) {
+    /** تعريفُ حقل الحالة (بخياراته) — للقوائم المنسدلة */
+    function hub_status_field(string $module): ?array
+    {
+        $def = hub_mod($module);
+        $key = $def['status'] ?? null;
+
+        return $key ? (collect($def['fields'] ?? [])->firstWhere('key', $key) ?: null) : null;
+    }
+}
+
+if (! function_exists('hub_str')) {
+    /**
+     * نصٌّ من مدخلٍ لا يُوثَق به.
+     *
+     * `(string) $request->query('k')` يبدو بريئاً حتى يصل `?k[]=x`: تحويل
+     * المصفوفة إلى نصّ يرمي `Array to string conversion`، فتسقط الشاشة بخمسمئة
+     * برابطٍ يُلصق — بلا صلاحيةٍ ولا مهارة. وكلُّ موضعٍ يقرأ معامِلاً نصّياً
+     * يمرّ من هنا.
+     */
+    function hub_str($v, string $default = ''): string
+    {
+        if (is_string($v)) return $v;
+        if (is_int($v) || is_float($v) || is_bool($v)) return (string) $v;
+
+        return $default;      // مصفوفةٌ أو كائنٌ أو null — لا نصّ فيه
+    }
+}
+
+if (! function_exists('hub_num')) {
+    /**
+     * عددٌ منتهٍ من مدخلٍ لا يُوثَق به.
+     * `1e400` يمرّ من قاعدة `numeric` ويصير `INF`، فيُكتب في السجل ثم يفشل
+     * ترميز قيد التدقيق — فيقع خطأٌ **بعد** أن يكون التغيير قد وقع: تغييرٌ
+     * بلا أثر، وهو نقضُ «إثبات لا ادّعاء».
+     */
+    function hub_num($v): ?float
+    {
+        if ($v === null || $v === '' || is_array($v) || ! is_numeric($v)) return null;
+
+        $f = (float) $v;
+
+        return is_finite($f) ? $f : null;
+    }
+}
+
+if (! function_exists('hub_col_max')) {
+    /**
+     * أقصى طولٍ يقبله العمود فعلاً — من القاعدة لا من التخمين.
+     *
+     * هنا جذرُ عائلةٍ كاملة من الأعطال: `ModuleController::rules()` كان يُخرج
+     * `string` بلا `max` لكل حقل نصّي، و**SQLite لا يفرض طول varchar** فتمرّ
+     * الحزمة خضراء، ثم يرفضها MySQL في الإنتاج بـSQLSTATE 22001. هكذا وقع عطل
+     * `flows.event`، ونفس الشكل كامنٌ في عشرات الأعمدة.
+     *
+     * القياس بالمحارف لا بالبايتات: MySQL يعدّ `VARCHAR(N)` محارفَ، والعربية
+     * متعددةُ البايتات — فلو قِيس بالبايت لضاق الحدّ إلى ثلثه بلا سبب.
+     */
+    function hub_col_max(string $table, string $col): ?int
+    {
+        return hub_col_widths()[$table][$col] ?? null;
+    }
+}
+
+if (! function_exists('hub_col_widths')) {
+    /**
+     * خريطةُ أطوال الأعمدة النصّية، مقروءةً من **مصدر الهجرات**.
+     *
+     * ولمَ لا تُقرأ من القاعدة؟ لأن SQLite — محرّك الاختبارات — لا يصرّح بطول
+     * `varchar` أصلاً: هو يقبل أي طول ولا يذكره. فلو قِيس من القاعدة لعادت
+     * الحزمةُ عمياءَ عن العطل نفسه الذي جاءت تحرسه. والمصدر واحدٌ للمحرّكين.
+     *
+     * الأخيرُ يفوز: هجرةُ توسعةٍ لاحقة (`change()`) تنسخ الطول القديم.
+     */
+    function hub_col_widths(): array
+    {
+        static $map = null;
+        if ($map !== null) return $map;
+
+        $map = \Illuminate\Support\Facades\Cache::remember('hub:colwidths:' . config('hub.version'), 86400, function () {
+            $out = [];
+            foreach (glob(database_path('migrations/*.php')) ?: [] as $file) {
+                $src = (string) @file_get_contents($file);
+                // كل كتلة Schema::create/table ثم كل string/char فيها بطولها
+                preg_match_all("/Schema::(?:create|table)\\(\\s*'([a-z0-9_]+)'(.*?)(?=Schema::(?:create|table)\\(|\\z)/s",
+                    $src, $blocks, PREG_SET_ORDER);
+                foreach ($blocks as $b) {
+                    preg_match_all("/->(?:string|char)\\(\\s*'([a-z0-9_]+)'\\s*,\\s*(\\d+)/", $b[2], $cols, PREG_SET_ORDER);
+                    foreach ($cols as $c) $out[$b[1]][$c[1]] = (int) $c[2];
+                    // uuid() و char(36) الضمنيان — معرّفاتٌ بطول ٣٦
+                    preg_match_all("/->uuid\\(\\s*'([a-z0-9_]+)'/", $b[2], $uu, PREG_SET_ORDER);
+                    foreach ($uu as $c) $out[$b[1]][$c[1]] ??= 36;
+                }
+            }
+
+            return $out;
+        });
+
+        return $map;
+    }
+}
+
+if (! function_exists('hub_fit')) {
+    /**
+     * قصُّ نصٍّ ليسع عموداً — **بالمحارف** لا بالبايتات.
+     * `substr` تقطع الحرف العربي نصفين فتُنتج UTF-8 فاسدةً يرفضها MySQL
+     * بـ«Incorrect string value» ويبتلعها SQLite صامتاً.
+     */
+    function hub_fit(?string $v, int $max): ?string
+    {
+        if ($v === null) return null;
+
+        return mb_strlen($v) > $max ? mb_substr($v, 0, $max) : $v;
+    }
+}
+
+if (! function_exists('hub_read')) {
+    /**
+     * قارئُ وحدةٍ محروس — سكّةٌ واحدة لكل شاشةٍ تجمع من عدّة وحدات.
+     *
+     * جولةُ تدقيقٍ كشفت نمطاً يتكرّر: شاشةٌ تُقاس بصلاحية وحدةٍ **واحدة** ثم
+     * تقرأ خمس وحداتٍ أخرى بـ`DB::table(...)` خاماً — فتعرض لمن يملك «الأحداث»
+     * كتالوجَ الإعلام، ولمن يملك «الباقات» تكلفةَ الخدمات، ولمقاولٍ على مشروعٍ
+     * واحد أسماءَ المشاريع كلها.
+     *
+     * هذا القارئ يجمع الحرّاس الثلاثة في مكانٍ واحد: وجودُ الجدول، و`hub_can`
+     * للوحدة، و`hub_scope` لنطاق القارئ، وتصفيةُ المحذوف. ويعيد `null` عند
+     * المنع — فالمستدعي يعرف أن لا شيء له هنا ولا يقرأ خاماً «للاحتياط».
+     */
+    function hub_read(string $module, $user = null)
+    {
+        $user = $user ?? auth()->user();
+        $def = hub_mod($module);
+        if (! $def) return null;
+
+        $table = $def['table'] ?? null;
+        if (! $table || ! \Illuminate\Support\Facades\Schema::hasTable($table)) return null;
+        if (! hub_can($user, $module, 'v')) return null;
+
+        $q = \Illuminate\Support\Facades\DB::table($table);
+        if (\Illuminate\Support\Facades\Schema::hasColumn($table, 'deleted_at')) $q->whereNull('deleted_at');
+
+        return hub_scope($q, $module, $user);
+    }
+}
+
+if (! function_exists('hub_masked')) {
+    /** هل هذا الحقل محجوبٌ أو للقراءة فقط عن هذا القارئ؟ */
+    function hub_masked(string $module, string $field, $user = null): bool
+    {
+        return hub_field_mode($user ?? auth()->user(), $module, $field) !== '';
+    }
+}
+
+if (! function_exists('hub_data_bump')) {
+    /**
+     * ختمُ تغيّر جدول — عدّادٌ يزيد مع كل كتابةٍ على الجدول.
+     *
+     * التخبئة بمهلةٍ وحدها تكذب: تُعدِّل سجلاً فتبقى الشاشة تعرض الرقم القديم
+     * خمس دقائق، فيظنّ المستخدم أن تعديله لم يُحفظ فيعيده. الختم يجعل المفتاح
+     * نفسه يتغيّر ساعةَ تتغيّر البيانات — فلا نصّ يُبطَل يدوياً ولا رقمٌ يتأخّر.
+     */
+    function hub_data_bump(?string $table = null): void
+    {
+        $k = 'hub:stamp:' . ($table ?: '*');
+        try {
+            \Illuminate\Support\Facades\Cache::put($k,
+                ((int) \Illuminate\Support\Facades\Cache::get($k, 0)) + 1, 86400);
+        } catch (\Throwable $e) {
+            // خبيئةٌ معطّلة لا تُسقط عملية حفظ — أسوأ ما يقع أن تتأخر شاشةٌ محسوبة
+        }
+    }
+}
+
+if (! function_exists('hub_data_stamp')) {
+    /** ختم الجداول المطلوبة مجموعاً — جزءٌ من مفتاح الشاشة */
+    function hub_data_stamp(array $tables): string
+    {
+        if (! $tables) return '';
+
+        $c = \Illuminate\Support\Facades\Cache::class;
+
+        return ':' . implode('.', array_map(
+            fn ($t) => (string) (int) \Illuminate\Support\Facades\Cache::get('hub:stamp:' . $t, 0), $tables));
+    }
+}
+
+if (! function_exists('hub_screen')) {
+    /**
+     * غلاف شاشةٍ محسوبة: بصمة النطاق + ختم الجداول + مهلة + `?fresh=1`.
+     *
+     * الشاشات المحسوبة تقرأ عشرات الاستعلامات وقيمتُها لا تتغير كل ثانية —
+     * لكنها **تتغيّر ساعةَ تتغيّر بياناتها**، فالختم يسبق المهلة.
+     */
+    function hub_screen(string $prefix, int $ttl, \Closure $fn, array $tables = [])
+    {
+        return hub_cached(hub_scope_key($prefix) . hub_data_stamp($tables), $ttl,
+            (bool) request()->query('fresh'), $fn);
+    }
+}
+
+if (! function_exists('hub_related')) {
+    /**
+     * السجلات المرتبطة بسجل: كل وحدة تشير إليه بحقل مرجعي، مع صفوفها وعدّها.
+     *
+     * مستخرَجة من `ModuleController::show` لأن أربعة متحكمات (الرحلة، مركز التطبيق،
+     * السلسلة، البوابة) أعادت اختراعها بـ`DB::table` خام — وهناك تسرّب النطاق.
+     * هنا النطاق والصلاحية مفروضان **بالبناء**: `hub_can` قبل الوحدة و`hub_scope` على استعلامها.
+     */
+    function hub_related(string $module, string $recordId, int $limit = 8): array
+    {
+        $out = [];
+        foreach (hub_children($module) as [$ck, $cf]) {
+            if (! hub_can(auth()->user(), $ck, 'v')) continue;
+            $cd = hub_mod($ck);
+            $cc = '\\App\\Models\\' . ($cd['model'] ?? '');
+            if (! class_exists($cc)) continue;
+
+            // المرجع المتعدد يُخزَّن مصفوفةَ معرِّفات — فعكسه احتواءٌ لا مساواة
+            $base = hub_scope(
+                empty($cf['multi'])
+                    ? $cc::where($cf['col'], $recordId)
+                    : $cc::whereJsonContains($cf['col'], $recordId),
+                $ck
+            );
+            // الصفوف أولاً والعدّ عند الحاجة فقط — كان count(*) لكل وحدة بنت
+            // (٤٠+ استعلاماً على صفحة مشروع فارغ) قبل أي جلب
+            $rows = (clone $base)->orderByDesc('created_at')->limit($limit + 1)->get();
+            if ($rows->isEmpty()) continue;
+
+            $out[] = [
+                'module'  => $ck,
+                'label'   => $cd['label'],
+                'field'   => $cf,
+                'count'   => $rows->count() <= $limit ? $rows->count() : (clone $base)->count(),
+                'rows'    => $rows->take($limit),
+                'display' => hub_display_col($ck),
+            ];
+        }
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_closed_scope')) {
+    /** نقيض `hub_open_scope` — المنتهية وحدها. مصدرهما واحد فلا ينزلق تعريفٌ عن نقيضه */
+    function hub_closed_scope($q, string $col = 'status', array $alsoClosed = [])
+    {
+        $closed = array_values(array_unique(array_merge(hub_closed_states(), $alsoClosed)));
+
+        return $q->whereIn($col, $closed);
     }
 }
 
@@ -1134,7 +2449,7 @@ if (! function_exists('hub_capacity')) {
      *   المسجَّل = ساعاته الفعلية (من المهام والحضور)
      * الحمل = المحجوز ÷ المتاح · الاستغلال = المسجَّل ÷ المتاح · والاختناق حمل > ١٠٠٪.
      */
-    function hub_capacity(?string $from = null, ?string $to = null): array
+    function hub_capacity(?string $from = null, ?string $to = null, ?string $projectId = null): array
     {
         $f = \Illuminate\Support\Carbon::parse($from ?: now()->startOfMonth()->toDateString())->startOfDay();
         $t = \Illuminate\Support\Carbon::parse($to ?: now()->endOfMonth()->toDateString())->endOfDay();
@@ -1146,15 +2461,27 @@ if (! function_exists('hub_capacity')) {
         $emps = \Illuminate\Support\Facades\DB::table('employees')->whereNull('deleted_at')
             ->whereNotIn('status', ['منتهية خدمته', 'مستقيل', 'موقوف'])
             ->orderBy('name')->limit(300)->get(['id', 'name', 'dept', 'user_id']);
+        // تحت العدسة: الموظف ينتمي للمشروع **بعمله فيه** لا بعمود project_id على
+        // ملفه (وهو شبه فارغ دائماً — الموظف ليس ملكاً لمشروع). ترشيحه بالعمود
+        // كان سيُفرغ اللوحة كلها ويعرض أصفاراً تبدو حقيقةً لا فراغَ بيانات.
+        if ($projectId) {
+            $onProject = \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')
+                ->where('project_id', $projectId)->whereNotNull('assignee_id')
+                ->distinct()->pluck('assignee_id')->all();
+            $emps = $emps->filter(fn ($e) => in_array($e->user_id, $onProject, true))->values();
+        }
+
         if ($emps->isEmpty()) return ['rows' => [], 'from' => $f->toDateString(), 'to' => $t->toDateString(),
-                                      'workDays' => $workDays, 'hoursDay' => $hoursDay, 'totals' => []];
+                                      'workDays' => $workDays, 'hoursDay' => $hoursDay,
+                                      'lensed' => (bool) $projectId, 'totals' => []];
 
         $userIds = $emps->pluck('user_id')->filter()->all();
         $empIds  = $emps->pluck('id')->all();
 
-        // إجازات معتمدة متقاطعة مع الفترة
+        // إجازات معتمدة متقاطعة مع الفترة — «معتمد» هي قيمة السجل المعلنة
+        // (كانت «معتمدة» فلا تُخصم إجازة واحدة من الطاقة أبداً)
         $leaves = \Illuminate\Support\Facades\DB::table('leave_requests')->whereNull('deleted_at')
-            ->where('status', 'معتمدة')->whereIn('emp_id', $empIds)
+            ->where('status', 'معتمد')->whereIn('emp_id', $empIds)
             ->whereDate('date_from', '<=', $t->toDateString())
             ->whereDate('date_to', '>=', $f->toDateString())
             ->get(['emp_id', 'date_from', 'date_to']);
@@ -1169,6 +2496,7 @@ if (! function_exists('hub_capacity')) {
 
         // المحجوز: مهام مفتوحة مستحقة في الفترة (أو بلا موعد — تُحتسب على الفترة الحالية)
         $booked = $userIds ? \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')
+            ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
             ->whereIn('assignee_id', $userIds)->whereNotIn('status', $open)
             ->where(fn ($q) => $q->whereNull('due')->orWhereBetween('due', [$f->toDateString(), $t->toDateString()]))
             ->selectRaw('assignee_id, COALESCE(SUM(est_h),0) h, COUNT(*) n')
@@ -1176,6 +2504,7 @@ if (! function_exists('hub_capacity')) {
 
         // المسجَّل: ساعات فعلية على مهام حُدِّثت داخل الفترة
         $logged = $userIds ? \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')
+            ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
             ->whereIn('assignee_id', $userIds)->whereNotNull('act_h')
             ->whereBetween('updated_at', [$f, $t])
             ->selectRaw('assignee_id, COALESCE(SUM(act_h),0) h')
@@ -1188,6 +2517,7 @@ if (! function_exists('hub_capacity')) {
 
         // مشاريع مُسندة
         $projects = $userIds ? \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')
+            ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
             ->whereIn('assignee_id', $userIds)->whereNotIn('status', $open)->whereNotNull('project_id')
             ->selectRaw('assignee_id, COUNT(DISTINCT project_id) n')
             ->groupBy('assignee_id')->get()->keyBy('assignee_id') : collect();
@@ -1197,7 +2527,10 @@ if (! function_exists('hub_capacity')) {
             $lv  = (int) ($leaveDays[$e->id] ?? 0);
             $avail = max(0, ($workDays - $lv) * $hoursDay);
             $bk  = (float) ($booked[$e->user_id]->h ?? 0);
-            $lg  = max((float) ($logged[$e->user_id]->h ?? 0), (float) ($att[$e->id]->h ?? 0));
+            // بلا عدسة: أدقّ المصدرين. وتحتها: ساعات المهام وحدها — بصمة الحضور
+            // لا تُنسب لمشروع، ونسبتها إليه تعطي رقماً خاطئاً يبدو معقولاً.
+            $lg  = $projectId ? (float) ($logged[$e->user_id]->h ?? 0)
+                              : max((float) ($logged[$e->user_id]->h ?? 0), (float) ($att[$e->id]->h ?? 0));
 
             $rows[] = [
                 'id' => $e->id, 'name' => $e->name, 'dept' => $e->dept,
@@ -1216,12 +2549,17 @@ if (! function_exists('hub_capacity')) {
         return [
             'rows' => $rows, 'from' => $f->toDateString(), 'to' => $t->toDateString(),
             'workDays' => $workDays, 'hoursDay' => $hoursDay,
+            'lensed' => (bool) $projectId,
             'totals' => [
                 'available' => array_sum(array_column($rows, 'available')),
                 'booked'    => round(array_sum(array_column($rows, 'booked')), 1),
                 'logged'    => round(array_sum(array_column($rows, 'logged')), 1),
                 'over'      => count(array_filter($rows, fn ($r) => ($r['load'] ?? 0) > 100)),
-                'idle'      => count(array_filter($rows, fn ($r) => $r['available'] > 0 && ($r['load'] ?? 0) < 50)),
+                // «بلا شغل» يُقاس بطاقة الموظف الكاملة، وتحت العدسة ينكمش المحجوز
+                // وحده — فيُقال «الفريق عاطل» وهو محترقٌ على مشاريع أخرى. إنذارٌ
+                // كاذب يقود لقرار توظيفٍ خاطئ، فيُسكَت تحت العدسة عمداً.
+                'idle'      => $projectId ? 0
+                    : count(array_filter($rows, fn ($r) => $r['available'] > 0 && ($r['load'] ?? 0) < 50)),
                 'unlinked'  => count(array_filter($rows, fn ($r) => ! $r['linked'])),
             ],
         ];
@@ -1234,15 +2572,29 @@ if (! function_exists('hub_app_quality')) {
      * الأخطاء المفتوحة والحرجة وزمن حلها، نجاح الاختبارات من خطة العمل،
      * الأعطال بعد النشر من سجل الحوادث، ومعدل التراجع من سجل النشر.
      */
-    function hub_app_quality(bool $fresh = false): array
+    function hub_app_quality(bool $fresh = false, ?string $projectId = null): array
     {
-        if ($fresh) \Illuminate\Support\Facades\Cache::forget('quality:apps');
+        // صلاحية الوحدة أولاً: hub_scope يُنطّق بالمشاريع ولا يقرأ مصفوفة
+        // الصلاحيات، فمن يحمل عَلَم «المتابعة» بلا صلاحية رؤية التطبيقات كان
+        // يرى أسماءها وأرقامها كاملةً في هذه اللوحة.
+        $u = auth()->user();
+        if ($u && ! hub_can($u, 'apps', 'v')) return [];
 
-        return \Illuminate\Support\Facades\Cache::remember('quality:apps', 300, function () {
+        // ومفتاحٌ عامّ فوق استعلامٍ مُنطَّق بـhub_scope كان يُقدّم أرقام مستخدمٍ
+        // لآخر. المفتاح يفصل بالدور، وبالمستخدم نفسه حين يكون نطاقه مقيّداً.
+        $key = 'quality:apps:' . (hub_scoped($u) || hub_company_ids($u) !== null
+            ? 'u:' . ($u?->id ?? '0') : 'r:' . ($u?->role_id ?? '0')) . hub_lens_key($projectId);
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
+
+        return \Illuminate\Support\Facades\Cache::remember($key, 300, function () use ($projectId) {
             $DB = \Illuminate\Support\Facades\DB::class;
             $closed = hub_closed_states();
+            // الترشيح **داخل** الاستعلام قبل القصّ: ترشيحٌ بعده يُخفي تطبيقات
+            // المشروع الواقعة خارج أول ٨٠ اسماً أبجدياً بلا أثر
             $apps = hub_scope(\Illuminate\Support\Facades\DB::table('applications')->whereNull('deleted_at'), 'apps')
-                ->orderBy('name')->limit(80)->get(['id', 'name', 'ver', 'status', 'project_id']);
+                ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
+                ->orderBy('name')->limit(80)->get(['id', 'name', 'ver', 'status', 'project_id',
+                    'downloads', 'rating', 'reviews', 'auto_store']);
             if ($apps->isEmpty()) return [];
 
             $ids = $apps->pluck('id')->all();
@@ -1251,10 +2603,13 @@ if (! function_exists('hub_app_quality')) {
             $iss = \Illuminate\Support\Facades\DB::table('issues')->whereNull('deleted_at')
                 ->whereIn('app_id', $ids)->get(['app_id', 'severity', 'status', 'found', 'closed']);
 
+            // الحوادث ٩٠ يوماً: عدّها ومتوسط زمن تعافيها (MTTR) — كان زمن التعطل
+            // المسجَّل لا يُحوَّل إلى مؤشرٍ واحد رغم توفره في كل حادثة
             $inc = \Illuminate\Support\Facades\Schema::hasTable('incidents')
                 ? \Illuminate\Support\Facades\DB::table('incidents')->whereNull('deleted_at')
                     ->whereIn('app_id', $ids)->where('created_at', '>=', now()->subDays(90))
-                    ->selectRaw('app_id, COUNT(*) n')->groupBy('app_id')->get()->keyBy('app_id')
+                    ->selectRaw('app_id, COUNT(*) n, AVG(downtime_min) mttr')
+                    ->groupBy('app_id')->get()->keyBy('app_id')
                 : collect();
 
             $dep = \Illuminate\Support\Facades\Schema::hasTable('deployments')
@@ -1265,6 +2620,9 @@ if (! function_exists('hub_app_quality')) {
             $feats = $pids ? \Illuminate\Support\Facades\DB::table('plan_items')->whereNull('deleted_at')
                 ->whereIn('project_id', $pids)->whereNotNull('test')->where('test', '!=', '')
                 ->get(['project_id', 'test']) : collect();
+
+            // كل سلاسل المتاجر باستعلامٍ واحد بدل ~١٠ لكل تطبيق
+            $preMetrics = hub_metric_bulk_series('apps', $ids, ['downloads', 'rating', 'reviews'], 30);
 
             $out = [];
             foreach ($apps as $a) {
@@ -1290,9 +2648,14 @@ if (! function_exists('hub_app_quality')) {
                     'tested'   => $ft->count(),
                     'passRate' => $ft->count() ? (int) round($pass / $ft->count() * 100) : null,
                     'incidents' => (int) ($inc[$a->id]->n ?? 0),
+                    'mttr' => isset($inc[$a->id]->mttr) && $inc[$a->id]->mttr !== null
+                        ? (int) round((float) $inc[$a->id]->mttr) : null,
                     'deploys'  => $dp->count(),
                     'rollback' => $dp->count() ? (int) round($rolled / $dp->count() * 100) : null,
                     'lastDeploy' => $dp->max('deployed_at'),
+                    // واقع المتاجر: جودةٌ داخلية بلا تحميلٍ ولا تقييمٍ نصفُ صورة.
+                    // السلاسل مُجهَّزة دفعةً واحدة أعلاه — لا استعلام لكل صف.
+                    'store' => hub_app_store($a, 30, $preMetrics[$a->id] ?? []),
                 ];
             }
 
@@ -1447,11 +2810,17 @@ if (! function_exists('hub_recommendations')) {
      * انتهاءات وشيكة، مستحقات غير محصّلة. كلها من بياناتك المسجَّلة لا من تقدير،
      * وكل توصية تحمل سببها بالأرقام ورابط إجرائها. مرتّبة بالأولوية.
      */
-    function hub_recommendations(bool $fresh = false): array
+    function hub_recommendations(bool $fresh = false, ?string $projectId = null): array
     {
-        if ($fresh) \Illuminate\Support\Facades\Cache::forget('recs');
+        // المفتاح كان سلسلةً مسطّحة «recs»: بلا مستخدمٍ ولا دورٍ ولا مشروع —
+        // فوق استعلاماتٍ مُنطَّقة بـhub_scope. أي أن أول من يفتح اللوحة يُخبّئ
+        // نتائجه لكل من بعده خمس دقائق. يحمل المفتاح الثلاثة الآن.
+        $u = auth()->user();
+        $key = 'recs:' . (hub_scoped($u) || hub_company_ids($u) !== null
+            ? 'u:' . ($u?->id ?? '0') : 'r:' . ($u?->role_id ?? '0')) . hub_lens_key($projectId);
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
-        return \Illuminate\Support\Facades\Cache::remember('recs', 300, function () {
+        return \Illuminate\Support\Facades\Cache::remember($key, 300, function () use ($projectId) {
             $rank = ['حرج' => 3, 'مهم' => 2, 'اطّلاع' => 1];
             $out = [];
             $add = function ($sev, $ico, $title, $why, $url, $action) use (&$out) {
@@ -1476,7 +2845,7 @@ if (! function_exists('hub_recommendations')) {
 
             // ٢) فريق فوق طاقته هذا الأسبوع
             try {
-                $cap = hub_capacity();
+                $cap = hub_capacity(null, null, $projectId);
                 $over = array_filter($cap['rows'], fn ($r) => ($r['load'] ?? 0) > 100);
                 usort($over, fn ($a, $b) => $b['load'] <=> $a['load']);
                 foreach (array_slice($over, 0, 4) as $r) {
@@ -1491,6 +2860,7 @@ if (! function_exists('hub_recommendations')) {
             try {
                 $projects = \Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at')
                     ->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', hub_closed_states()))
+                    ->when($projectId, fn ($q) => $q->where('id', $projectId))
                     ->limit(40)->get(['id', 'name']);
                 $sick = [];
                 foreach ($projects as $p) {
@@ -1526,6 +2896,7 @@ if (! function_exists('hub_recommendations')) {
                     $overdue = \Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at')
                         ->where('kind', 'فاتورة')
                         ->whereRaw('COALESCE(paid,0) < COALESCE(total,0)')
+                        ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
                         ->whereNotNull('due')->whereDate('due', '<', now()->toDateString())
                         ->orderBy('due')->limit(6)->get(['id', 'doc_no', 'partner', 'total', 'paid', 'due']);
                     foreach ($overdue as $d) {
@@ -1594,10 +2965,11 @@ if (! function_exists('hub_supplier_scores')) {
                 $unpaid = $po->filter(fn ($p) => ! in_array($p->pay_state, ['مدفوع', 'مسدد'], true)
                     && in_array($p->status, ['مستلم', 'أُرسل للمورد', 'معتمد'], true))->count();
 
-                // الالتزام بالموعد: من الأوامر المستلمة التي لها موعد تسليم متوقع
+                // الالتزام بالموعد: تاريخ الاستلام الصريح (يُختم عند إجراء الاستلام) هو
+                // القياس — وآخر التحديث بديلٌ تقديري للأوامر السابقة لوجود العمود
                 $withDue = $received->filter(fn ($p) => filled($p->due));
                 $onTime = $withDue->filter(function ($p) {
-                    $recvAt = \Illuminate\Support\Carbon::parse($p->updated_at)->startOfDay();
+                    $recvAt = \Illuminate\Support\Carbon::parse($p->received_at ?? $p->updated_at)->startOfDay();
                     return $recvAt->lte(\Illuminate\Support\Carbon::parse($p->due)->startOfDay());
                 })->count();
                 $onTimeRate = $withDue->count() ? (int) round($onTime / $withDue->count() * 100) : null;
@@ -1656,18 +3028,19 @@ if (! function_exists('hub_kpi_metric')) {
      */
     function hub_kpi_metric(array $m, $user = null): ?float
     {
-        $mk = (string) ($m['module'] ?? '');
+        $mk = hub_str($m['module'] ?? '');
         $def = hub_mod($mk);
         if (! $def) return null;
         if ($user && ! hub_can($user, $mk, 'v')) return null;   // احترام الصلاحية
 
-        $agg = in_array($m['agg'] ?? '', ['count', 'sum', 'avg'], true) ? $m['agg'] : 'count';
+        $aggIn = hub_str($m['agg'] ?? '');
+        $agg = in_array($aggIn, ['count', 'sum', 'avg'], true) ? $aggIn : 'count';
         $q = \Illuminate\Support\Facades\DB::table($def['table'])->whereNull('deleted_at');
         if ($user) $q = hub_scope($q, $mk, $user);
 
         // فلتر الحالة: عمود الحالة **الفيزيائي** لا مفتاحه — في وحدة الوثائق
         // المفتاح docStatus والعمود doc_status، فالفحص بالمفتاح كان يُسقط الفلتر بصمت
-        if (($st = trim((string) ($m['st'] ?? ''))) !== '' && ($skey = $def['status'] ?? null)) {
+        if (($st = trim(hub_str($m['st'] ?? ''))) !== '' && ($skey = $def['status'] ?? null)) {
             $sfield = collect($def['fields'])->firstWhere('key', $skey);
             $scol = $sfield['col'] ?? $skey;
             if (\Illuminate\Support\Facades\Schema::hasColumn($def['table'], $scol)) $q->where($scol, $st);
@@ -1676,7 +3049,7 @@ if (! function_exists('hub_kpi_metric')) {
         if ($agg === 'count') return (float) $q->count();
 
         // sum/avg يتطلبان عموداً رقمياً من حقول الوحدة
-        $col = collect($def['fields'])->firstWhere('key', $m['col'] ?? '');
+        $col = collect($def['fields'])->firstWhere('key', hub_str($m['col'] ?? ''));
         if (! $col || ! in_array($col['type'], ['num', 'big'], true)) return null;
 
         // متوسط بلا صفوف = لا بيانات (null)، لا صفر مضلِّل
@@ -1714,25 +3087,1146 @@ if (! function_exists('hub_kpi_value')) {
     }
 }
 
+if (! function_exists('hub_kpi_explain')) {
+    /**
+     * المعادلة بالعربية. بطاقةٌ تقول «٤٥٪» ولا تقول **مِمَّ** حُسبت لا تُراجَع
+     * ولا تُصحَّح: من يحذفها لا يدري ما يحذف، ومن يشكّ فيها لا يدري أين يشكّ.
+     */
+    function hub_kpi_explain(array $formula): string
+    {
+        // كل عضوٍ في المعادلة قد يصل **مصفوفةً** من استيرادٍ أو صفٍّ قديم:
+        // `$arr['x']` على مصفوفة، و`(string) $arr` — كلاهما يرمي، وصفٌّ واحد
+        // مشوّه كان يُعطّل `/kpis` واللوحة الرئيسية **لكل المستخدمين**.
+        $one = function ($m) {
+            if (! is_array($m)) return '—';
+            $def = hub_mod(hub_str($m['module'] ?? ''));
+            if (! $def) return 'وحدة غير معروفة';
+            $aggKey = hub_str($m['agg'] ?? 'count');
+            $agg = ['count' => 'عدد سجلات', 'sum' => 'مجموع', 'avg' => 'متوسط'][$aggKey] ?? 'عدد سجلات';
+            $txt = $agg . ' ' . $def['label'];
+            if ($aggKey !== 'count' && ($ck = hub_str($m['col'] ?? '')) !== '') {
+                $col = collect($def['fields'])->firstWhere('key', $ck);
+                $txt = $agg . ' «' . ($col['label'] ?? $ck) . '» في ' . $def['label'];
+            }
+            if (($st = trim(hub_str($m['st'] ?? ''))) !== '') $txt .= ' بحالة «' . $st . '»';
+
+            return $txt;
+        };
+
+        $a = $one($formula['a'] ?? null);
+        $combine = $formula['combine'] ?? 'none';
+        if ($combine === 'none') return $a;
+
+        $b = $one($formula['b'] ?? null);
+
+        return match ($combine) {
+            'ratio_pct' => "({$a}) ÷ ({$b}) × ١٠٠",
+            'ratio'     => "({$a}) ÷ ({$b})",
+            'diff'      => "({$a}) − ({$b})",
+            'sum'       => "({$a}) + ({$b})",
+            default     => $a,
+        };
+    }
+}
+
 if (! function_exists('hub_kpis')) {
-    /** كل المؤشرات المخصصة محسوبةً — لصفحة العرض */
-    function hub_kpis($user = null): array
+    /**
+     * كل المؤشرات المخصصة محسوبةً — لصفحة العرض.
+     * `$withHidden` للباني وحده: اللوحات والملخّص لا ترى الموقوف.
+     */
+    function hub_kpis($user = null, bool $withHidden = false): array
     {
         if (! \Illuminate\Support\Facades\Schema::hasTable('kpi_defs')) return [];
         $user = $user ?? auth()->user();
+        $hasActive = \Illuminate\Support\Facades\Schema::hasColumn('kpi_defs', 'active');
 
-        return \App\Models\KpiDef::orderBy('sort')->orderBy('created_at')->get()->map(function ($k) use ($user) {
-            $val = hub_kpi_value((array) $k->formula, $user);
-            $tone = '';
-            if ($val !== null && $k->target !== null) {
-                $hit = ($k->good ?? 'up') === 'up' ? $val >= $k->target : $val <= $k->target;
-                $near = ($k->good ?? 'up') === 'up' ? $val >= $k->target * 0.8 : $val <= $k->target * 1.2;
-                $tone = $hit ? 'ok' : ($near ? 'wn' : 'bad');
+        return \App\Models\KpiDef::when($hasActive && ! $withHidden, fn ($q) => $q->where('active', true))
+            ->orderBy('sort')->orderBy('created_at')->get()->map(function ($k) use ($user, $hasActive) {
+                $val = hub_kpi_value((array) $k->formula, $user);
+                $tone = '';
+                if ($val !== null && $k->target !== null) {
+                    $hit = ($k->good ?? 'up') === 'up' ? $val >= $k->target : $val <= $k->target;
+                    $near = ($k->good ?? 'up') === 'up' ? $val >= $k->target * 0.8 : $val <= $k->target * 1.2;
+                    $tone = $hit ? 'ok' : ($near ? 'wn' : 'bad');
+                }
+
+                return ['id' => $k->id, 'name' => $k->name, 'unit' => $k->unit,
+                        'value' => $val, 'target' => $k->target, 'tone' => $tone,
+                        'good' => $k->good, 'formula' => (array) $k->formula,
+                        'active' => $hasActive ? (bool) $k->active : true,
+                        'explain' => hub_kpi_explain((array) $k->formula)];
+            })->all();
+    }
+}
+
+if (! function_exists('hub_pending_migrations')) {
+    /**
+     * عدد ترحيلات القاعدة المعلقة (ملفات في الكود لم تُطبَّق بعد) — مخبّأ دقيقتين
+     * كي لا يفحص كل طلب، ويُنسى فور تشغيل الترحيلات من مركز التشغيل.
+     */
+    function hub_pending_migrations(): int
+    {
+        return (int) Cache::remember('hub.pending_migrations', 120, function () {
+            try {
+                $ran = \Illuminate\Support\Facades\DB::table('migrations')->pluck('migration')->all();
+
+                return collect(glob(database_path('migrations/*.php')))
+                    ->map(fn ($f) => basename($f, '.php'))
+                    ->reject(fn ($m) => in_array($m, $ran, true))
+                    ->count();
+            } catch (\Throwable $e) {
+                return 0;   // تعذّر الفحص — لا نُقلق الواجهة، مركز التشغيل يكشف التفصيل
+            }
+        });
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// نواة المقاييس الزمنية — سلسلةٌ عامة لأي وحدةٍ وأي مقياس
+// كل رقمٍ متحرّك كان لقطةً تُدهس بالتي بعدها: «المتابعون ١٢٠٠٠» بلا ذاكرةٍ
+// لما كانوا أمس، فلا نمو ولا اتجاه ولا رسم. هذه المساعِدات هي السكة الوحيدة
+// للكتابة والقراءة كي لا يتفرّق الحساب في الشاشات.
+// ─────────────────────────────────────────────────────────────────────────
+
+if (! function_exists('hub_metric_put')) {
+    /**
+     * تسجيل نقطة قياس. النقطة تُعرَّف بـ(وحدة، سجل، مقياس، لحظة) — فإعادة
+     * الدفع بالقيمة نفسها أو بقيمةٍ مصحّحة **تُحدِّث** ولا تكرّر.
+     */
+    function hub_metric_put(string $module, string $recordId, string $metric, float $value,
+                            $at = null, string $source = 'manual', array $meta = []): \App\Models\MetricPoint
+    {
+        $at = $at ? \Illuminate\Support\Carbon::parse($at) : now();
+
+        // حزامُ أمانٍ للمسار الويبيّ أيضاً (Metrics::capture): العمود decimal(18,4)
+        // يفيض على قيمةٍ ≥ 10¹⁴ أو غير منتهية — نُقصّها للمدى الآمن فلا 500 صامت
+        if (! is_finite($value)) $value = 0.0;
+        $value = max(-9999999999999.9999, min(9999999999999.9999, $value));
+
+        return \App\Models\MetricPoint::updateOrCreate(
+            ['module' => $module, 'record_id' => $recordId, 'metric' => $metric, 'at' => $at],
+            ['value' => $value, 'source' => $source, 'meta' => $meta ?: null],
+        );
+    }
+}
+
+if (! function_exists('hub_metric_series')) {
+    /** السلسلة الزمنية لمقياسٍ على سجل — الأقدم أولاً، جاهزةً للرسم */
+    function hub_metric_series(string $module, string $recordId, string $metric, int $days = 90): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('metric_points')) return [];
+
+        return \App\Models\MetricPoint::where('module', $module)->where('record_id', $recordId)
+            ->where('metric', $metric)->where('at', '>=', now()->subDays($days))
+            ->orderBy('at')->get(['at', 'value', 'source'])
+            ->map(fn ($p) => ['at' => $p->at, 'value' => (float) $p->value, 'source' => $p->source])->all();
+    }
+}
+
+if (! function_exists('hub_metric_latest')) {
+    /** آخر قيمة مسجّلة — والافتراضي `null` لا صفر: «لا قياس» ليس «صفراً» */
+    function hub_metric_latest(string $module, string $recordId, string $metric): ?float
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('metric_points')) return null;
+
+        $p = \App\Models\MetricPoint::where('module', $module)->where('record_id', $recordId)
+            ->where('metric', $metric)->orderByDesc('at')->first(['value']);
+
+        return $p ? (float) $p->value : null;
+    }
+}
+
+if (! function_exists('hub_metric_growth')) {
+    /**
+     * النمو خلال مدة: من أول نقطةٍ داخل المدة إلى آخرها.
+     * `pct` تكون `null` إن كانت البداية صفراً — القسمة على صفر ليست «∞٪».
+     */
+    function hub_metric_growth(string $module, string $recordId, string $metric, int $days = 30): array
+    {
+        $s = hub_metric_series($module, $recordId, $metric, $days);
+        $out = ['from' => null, 'to' => null, 'delta' => null, 'pct' => null,
+                'points' => count($s), 'days' => $days, 'tone' => ''];
+        if (! $s) return $out;
+
+        $from = (float) $s[0]['value'];
+        $to = (float) end($s)['value'];
+        $delta = round($to - $from, 4);
+        $out = array_merge($out, [
+            'from' => $from, 'to' => $to, 'delta' => $delta,
+            'pct' => $from != 0.0 ? round($delta * 100 / abs($from), 2) : null,
+            'tone' => $delta > 0 ? 'ok' : ($delta < 0 ? 'bad' : ''),
+        ]);
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_metric_spark')) {
+    /** نِسبٌ مئوية جاهزة لرسم شريطٍ صغير — أعلى قيمةٍ = ١٠٠٪ */
+    function hub_metric_spark(array $series, int $max = 30): array
+    {
+        $series = array_slice($series, -$max);
+        $peak = max(1.0, max(array_map(fn ($p) => (float) $p['value'], $series ?: [['value' => 1]])));
+
+        return array_map(fn ($p) => [
+            'at' => $p['at'], 'value' => (float) $p['value'],
+            'pct' => (int) round((float) $p['value'] * 100 / $peak),
+        ], $series);
+    }
+}
+
+if (! function_exists('hub_metric_bulk_series')) {
+    /**
+     * سلاسل مقياسٍ واحد لعدة سجلات **باستعلامٍ واحد**.
+     * بدونها كانت كل بطاقةٍ في جدولٍ من ٨٠ صفاً تُطلق ~١٠ استعلامات (سلسلة
+     * وآخر قيمة ونموّ لكل مقياس) — أي مئات الاستعلامات للصفحة الواحدة.
+     */
+    function hub_metric_bulk_series(string $module, array $ids, array $metrics, int $days = 30): array
+    {
+        $out = [];
+        if (! $ids || ! $metrics || ! \Illuminate\Support\Facades\Schema::hasTable('metric_points')) return $out;
+
+        $rows = \Illuminate\Support\Facades\DB::table('metric_points')
+            ->where('module', $module)->whereIn('metric', $metrics)->whereIn('record_id', $ids)
+            ->where('at', '>=', now()->subDays($days))
+            ->orderBy('record_id')->orderBy('metric')->orderBy('at')
+            ->get(['record_id', 'metric', 'value', 'at', 'source']);
+
+        foreach ($rows as $r) {
+            $out[$r->record_id][$r->metric][] = [
+                'at' => \Illuminate\Support\Carbon::parse($r->at),
+                'value' => (float) $r->value, 'source' => $r->source,
+            ];
+        }
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_metric_bulk_latest')) {
+    /** آخر قيمة لمقياسٍ لعدة سجلات دفعةً — يمنع استعلاماً لكل صف في القوائم */
+    function hub_metric_bulk_latest(string $module, array $ids, string $metric): array
+    {
+        if (! $ids || ! \Illuminate\Support\Facades\Schema::hasTable('metric_points')) return [];
+
+        $rows = \Illuminate\Support\Facades\DB::table('metric_points')
+            ->where('module', $module)->where('metric', $metric)->whereIn('record_id', $ids)
+            ->orderBy('record_id')->orderBy('at')->get(['record_id', 'value']);
+
+        $out = [];
+        foreach ($rows as $r) $out[$r->record_id] = (float) $r->value;   // الأخير يغلب
+
+        return $out;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// السوشال ميديا: مراقبةٌ وتحليل — لا دفتر جرد
+// كانت الوحدة تخزّن أرقاماً خاماً بلا معدّل تفاعل ولا اتجاه ولا مقارنة.
+// ─────────────────────────────────────────────────────────────────────────
+
+if (! function_exists('hub_social_engagement')) {
+    /**
+     * معدّل التفاعل **محسوباً لا مُدخَلاً**: (إعجاب+تعليق+مشاركة+حفظ) ÷ قاعدة.
+     * القاعدة أوّل متاحٍ من الوصول ثم الظهور ثم المشاهدات ثم متابعي الحساب —
+     * فمنشورٌ بلا وصولٍ مسجَّل لا يُحرَم من نسبةٍ تقريبية، ويُصرَّح بأي قاعدةٍ حُسب.
+     */
+    function hub_social_engagement($post): array
+    {
+        $n = fn ($v) => (float) ($v ?? 0);
+        $inter = $n($post->likes) + $n($post->comments2) + $n($post->shares) + $n($post->saves);
+
+        $base = null;
+        $label = '';
+        foreach ([['reach', 'الوصول'], ['impr', 'الظهور'], ['views', 'المشاهدات']] as [$c, $l]) {
+            if ($n($post->{$c}) > 0) { $base = $n($post->{$c}); $label = $l; break; }
+        }
+        if ($base === null && ($post->social_id ?? null)) {
+            $f = \Illuminate\Support\Facades\DB::table('social_accounts')
+                ->where('id', $post->social_id)->value('followers');
+            if ((float) $f > 0) { $base = (float) $f; $label = 'المتابعون'; }
+        }
+
+        return [
+            'interactions' => $inter,
+            'base' => $base,
+            'baseLabel' => $label,
+            'rate' => $base ? round($inter * 100 / $base, 2) : null,
+            'clicks' => $n($post->clicks),
+            'spend' => $n($post->spend),
+            'cpe' => ($n($post->spend) > 0 && $inter > 0) ? round($n($post->spend) / $inter, 3) : null,
+        ];
+    }
+}
+
+if (! function_exists('hub_social_feed_state')) {
+    /**
+     * حال التغذية لحسابٍ أو منشور: أهي آلية (n8n/API) أم لقطةٌ داخلية أم لا شيء.
+     * «كله أوتو» يحتاج أولاً معرفة **ما ليس أوتو** — وإلا ظنّ المستخدم الرقم حيّاً وهو ميت.
+     */
+    function hub_social_feed_state(string $module, string $recordId, string $metric = 'followers'): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('metric_points')) {
+            return ['mode' => 'none', 'label' => 'غير مربوط', 'tone' => 'wn', 'at' => null, 'source' => null];
+        }
+
+        $p = \App\Models\MetricPoint::where('module', $module)->where('record_id', $recordId)
+            ->where('metric', $metric)->orderByDesc('at')->first(['at', 'source']);
+
+        if (! $p) return ['mode' => 'none', 'label' => 'غير مربوط', 'tone' => 'wn', 'at' => null, 'source' => null];
+
+        $auto = in_array($p->source, ['n8n', 'api', 'webhook'], true);
+        $stale = $p->at->lt(now()->subDays(3));
+
+        return [
+            'mode' => $auto ? ($stale ? 'stale' : 'auto') : 'internal',
+            'label' => $auto ? ($stale ? 'آلي لكنه متوقف' : 'آلي') : 'لقطة داخلية',
+            'tone' => $auto ? ($stale ? 'bad' : 'ok') : 'wn',
+            'at' => $p->at, 'source' => $p->source,
+        ];
+    }
+}
+
+if (! function_exists('hub_social_stats')) {
+    /**
+     * تحليل السوشال كاملاً — منطّقٌ بصلاحية المستخدم ونطاقه.
+     * كل رقمٍ هنا مشتقٌّ من السلسلة الزمنية أو محسوب، لا حقلٌ يُملأ يدوياً.
+     */
+    function hub_social_stats(int $days = 30): array
+    {
+        $accounts = hub_scope(\App\Models\SocialAccount::query(), 'social')
+            ->whereNull('deleted_at')->get();
+
+        $posts = hub_can(auth()->user(), 'posts', 'v')
+            ? hub_scope(\App\Models\SocialPost::query(), 'posts')->whereNull('deleted_at')->get()
+            : collect();
+
+        // ── الحسابات: المتابعون الآن ونموّهم من السلسلة ──
+        $rows = $accounts->map(function ($a) use ($days, $posts) {
+            $g = hub_metric_growth('social', $a->id, 'followers', $days);
+            $series = hub_metric_series('social', $a->id, 'followers', $days);
+            $mine = $posts->where('social_id', $a->id);
+            $rates = $mine->map(fn ($p) => hub_social_engagement($p)['rate'])->filter(fn ($r) => $r !== null);
+
+            return [
+                'id' => $a->id, 'platform' => $a->platform, 'handle' => $a->handle,
+                'url' => $a->url, 'status' => $a->status,
+                'followers' => hub_metric_latest('social', $a->id, 'followers') ?? (float) ($a->followers ?? 0),
+                'goal' => (float) ($a->goal ?? 0),
+                'growth' => $g, 'spark' => hub_metric_spark($series),
+                'posts' => $mine->count(),
+                'published' => $mine->where('status', 'منشور')->count(),
+                'rate' => $rates->count() ? round($rates->avg(), 2) : null,
+                'feed' => hub_social_feed_state('social', $a->id),
+            ];
+        })->sortByDesc('followers')->values()->all();
+
+        // ── المنشورات: التفاعل محسوباً ──
+        $pub = $posts->where('status', 'منشور');
+        $scored = $pub->map(function ($p) use ($accounts) {
+            $e = hub_social_engagement($p);
+
+            return ['id' => $p->id, 'title' => $p->title, 'type' => $p->type, 'pub_at' => $p->pub_at,
+                    'account' => $accounts->firstWhere('id', $p->social_id)?->handle,
+                    'reach' => (float) ($p->reach ?? 0)] + $e;
+        })->sortByDesc('interactions')->values();
+
+        // ── أداء أنواع المحتوى: أين يستحق الجهد ──
+        $byType = $scored->filter(fn ($p) => $p['type'])->groupBy('type')
+            ->map(fn ($g, $t) => [
+                'type' => $t, 'n' => $g->count(),
+                'rate' => $g->pluck('rate')->filter(fn ($r) => $r !== null)->avg(),
+                'inter' => $g->sum('interactions'),
+            ])->sortByDesc('rate')->values()->all();
+
+        // ── أفضل وقت للنشر: متوسط التفاعل بحسب ساعة النشر ──
+        $byHour = $scored->filter(fn ($p) => $p['pub_at'])->groupBy(fn ($p) => (int) $p['pub_at']->format('G'))
+            ->map(fn ($g, $h) => ['hour' => (int) $h, 'n' => $g->count(), 'inter' => round($g->avg('interactions'))])
+            ->sortByDesc('inter')->values()->all();
+
+        $recent = $pub->filter(fn ($p) => $p->pub_at && $p->pub_at->gte(now()->subDays($days)));
+        $rates = $scored->pluck('rate')->filter(fn ($r) => $r !== null);
+        $totalNow = collect($rows)->sum('followers');
+        $delta = collect($rows)->sum(fn ($r) => $r['growth']['delta'] ?? 0);
+
+        return [
+            'days' => $days,
+            'accounts' => $rows,
+            'top' => $scored->take(8)->all(),
+            'byType' => $byType,
+            'byHour' => array_slice($byHour, 0, 6),
+            'kpi' => [
+                'accounts' => count($rows),
+                'followers' => $totalNow,
+                'delta' => $delta,
+                'pct' => ($totalNow - $delta) > 0 ? round($delta * 100 / ($totalNow - $delta), 1) : null,
+                'posts' => $recent->count(),
+                'reach' => (float) $recent->sum('reach'),
+                'rate' => $rates->count() ? round($rates->avg(), 2) : null,
+                'spend' => (float) $pub->sum('spend'),
+                'unlinked' => collect($rows)->where('feed.mode', 'none')->count(),
+                'stalled' => collect($rows)->where('feed.mode', 'stale')->count(),
+            ],
+        ];
+    }
+}
+
+if (! function_exists('hub_app_store')) {
+    /**
+     * أداء التطبيق في المتاجر: الأرقام الحالية ونموّها من السلسلة الزمنية،
+     * وحالُ تغذيتها. كانت الوحدة تخبرك برقم Build ولا تخبرك أَحيٌّ هو أم ميت.
+     */
+    function hub_app_store($app, int $days = 30, ?array $pre = null): array
+    {
+        // $pre: سلاسل مُجهَّزة من hub_metric_bulk_series — في القوائم يُمرَّر
+        // فتُحسب البطاقة **بلا استعلامٍ واحد** بدل ~١٠ لكل صف.
+        $ser = fn (string $m) => $pre !== null
+            ? ($pre[$m] ?? [])
+            : hub_metric_series('apps', $app->id, $m, $days);
+
+        $last = fn (string $m) => ($x = $ser($m)) ? (float) end($x)['value'] : null;
+        $now = fn (string $m, $col) => $last($m) ?? (($app->{$col} ?? null) !== null ? (float) $app->{$col} : null);
+
+        $dl = $now('downloads', 'downloads');
+        $rt = $now('rating', 'rating');
+        $rv = $now('reviews', 'reviews');
+
+        $gDl = hub_metric_growth_of($ser('downloads'), $days);
+        $gRt = hub_metric_growth_of($ser('rating'), $days);
+        $feed = hub_feed_state_of($ser('downloads')) ;
+        if ($feed['mode'] === 'none') $feed = hub_feed_state_of($ser('rating'));
+
+        return [
+            'downloads' => $dl, 'rating' => $rt, 'reviews' => $rv,
+            'growth' => $gDl, 'ratingGrowth' => $gRt,
+            'spark' => hub_metric_spark($ser('downloads'), 40),
+            'ratingSpark' => hub_metric_spark($ser('rating'), 40),
+            'feed' => $feed,
+            'auto' => (bool) ($app->auto_store ?? false),
+            'days' => $days,
+            // تقييمٌ دون ٣٫٥ في المتاجر يخنق التحميل — يُلوَّن لا يُدفَن في خانة
+            'ratingTone' => $rt === null ? '' : ($rt >= 4.3 ? 'ok' : ($rt >= 3.5 ? 'wn' : 'bad')),
+            'has' => $dl !== null || $rt !== null || $rv !== null,
+        ];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// ملف الكيان: الوثائق المتعارف عليها لكل وحدة
+// كانت المرفقات كومةً بلا نوع: تُرفع فلا يُعرف ما نقص، ولا ينبّه انتهاءُ
+// سجلٍ تجاري أحداً. الآن للملف اكتمالٌ يُقاس ونواقصُ تُسمّى وانتهاءٌ يُرصد.
+// ─────────────────────────────────────────────────────────────────────────
+
+if (! function_exists('hub_doc_spec')) {
+    /** قائمة الوثائق المتوقّعة لوحدة — فارغةٌ لمن لا ملفَّ لها */
+    function hub_doc_spec(string $module): array
+    {
+        return (array) (config('hub_docs.' . $module) ?? []);
+    }
+}
+
+if (! function_exists('hub_doc_label')) {
+    /** اسم وثيقةٍ بمفتاحها — للعرض في الرادار والسجلات */
+    function hub_doc_label(string $module, ?string $kind): ?string
+    {
+        if (! $kind) return null;
+
+        return collect(hub_doc_spec($module))->firstWhere('key', $kind)['label'] ?? $kind;
+    }
+}
+
+if (! function_exists('hub_dossier')) {
+    /**
+     * حال ملف سجلٍ واحد: لكل وثيقةٍ متوقّعة حالتها ونسخها وتاريخ انتهائها.
+     * الحالات: مفقودة | سارية | تنتهي قريباً | منتهية | مرفوعة (بلا تاريخ).
+     * الاكتمال يُحسب على **الإلزامية** وحدها — وإلا بدا الملف ناقصاً أبداً.
+     */
+    function hub_dossier(string $module, string $recordId): array
+    {
+        $spec = hub_doc_spec($module);
+        $out = ['rows' => [], 'have' => 0, 'need' => 0, 'requiredMissing' => 0, 'pct' => 0,
+                'expiring' => 0, 'expired' => 0, 'extra' => 0];
+        if (! $spec) return $out;
+
+        $files = collect();
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('attachments')) {
+                $files = \App\Models\Attachment::whereNull('deleted_at')
+                    ->where('module', $module)->where('record_id', $recordId)
+                    ->orderByDesc('created_at')->get();
+            }
+        } catch (\Throwable $e) {
+        }
+
+        $today = now()->startOfDay();
+        foreach ($spec as $d) {
+            $mine = $files->where('kind', $d['key']);
+            $latest = $mine->sortByDesc(fn ($a) => $a->expires_at ?: $a->created_at)->first();
+            $exp = $latest?->expires_at;
+            $days = $exp ? (int) $today->diffInDays($exp->copy()->startOfDay(), false) : null;
+
+            $state = 'مفقودة';
+            $tone = ! empty($d['req']) ? 'bad' : 'wn';
+            if ($mine->count()) {
+                $out['have']++;
+                if ($days === null)        { $state = 'مرفوعة'; $tone = 'ok'; }
+                elseif ($days < 0)         { $state = 'منتهية'; $tone = 'bad'; $out['expired']++; }
+                elseif ($days <= 30)       { $state = 'تنتهي قريباً'; $tone = 'wn'; $out['expiring']++; }
+                else                       { $state = 'سارية'; $tone = 'ok'; }
+            } elseif (! empty($d['req'])) {
+                $out['requiredMissing']++;
+            }
+            if (! empty($d['req'])) $out['need']++;
+
+            $out['rows'][] = [
+                'key' => $d['key'], 'label' => $d['label'],
+                'req' => (bool) ($d['req'] ?? false), 'multi' => (bool) ($d['multi'] ?? false),
+                'expiry' => (bool) ($d['expiry'] ?? false), 'hint' => $d['hint'] ?? null,
+                'n' => $mine->count(), 'files' => $mine->values()->all(),
+                'latest' => $latest, 'expires' => $exp, 'days' => $days,
+                'state' => $state, 'tone' => $tone,
+            ];
+        }
+
+        // ملفاتٌ مرفوعة بلا نوعٍ معلن — تُحصى كي لا تُنسى في الكومة القديمة
+        $out['extra'] = $files->filter(fn ($f) => ! $f->kind
+            || ! collect($spec)->contains(fn ($d) => $d['key'] === $f->kind))->count();
+
+        $haveReq = collect($out['rows'])->where('req', true)->filter(fn ($r) => $r['n'] > 0)->count();
+        $out['pct'] = $out['need'] ? (int) round($haveReq * 100 / $out['need']) : ($out['have'] ? 100 : 0);
+        $out['tone'] = $out['pct'] >= 100 ? 'ok' : ($out['pct'] >= 60 ? 'wn' : 'bad');
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_doc_expiry')) {
+    /**
+     * وثائق على وشك الانتهاء عبر كل الوحدات — تُضَمّ لرادار «ينتهي قريباً».
+     * شهادةٌ منتهية أخطر من حقلٍ منتهٍ: بها يتوقف تعاملٌ أو يسقط ترخيص.
+     */
+    function hub_doc_expiry($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        if (! \Illuminate\Support\Facades\Schema::hasTable('attachments')) return [];
+        if (! \Illuminate\Support\Facades\Schema::hasColumn('attachments', 'expires_at')) return [];
+
+        // القصّ يقع **بعد** الترشيح بالنطاق لا قبله: سقفٌ من ٣٠٠ صفٍّ كان
+        // يُستهلك بوثائق سجلاتٍ خارج نطاق القارئ فتُقصى وثائقه هو. السقف هنا
+        // حارس ذاكرةٍ واسع، والحدّ الحقيقي (٢٠٠) يقع في hub_expiry بعد الترتيب.
+        $rows = \App\Models\Attachment::whereNull('deleted_at')->whereNotNull('expires_at')
+            ->whereBetween('expires_at', [now()->subDays(60)->toDateString(), now()->addDays(60)->toDateString()])
+            ->orderBy('expires_at')->limit(5000)->get(['module', 'record_id', 'kind', 'expires_at', 'doc_no']);
+
+        $out = [];
+        foreach ($rows->groupBy('module') as $mk => $group) {
+            $md = hub_mod($mk);
+            if (! $md || ! hub_can($user, $mk, 'v')) continue;   // لا يُسرّب الرادار ما لا يُرى
+            try {
+                $ids = hub_scope(\Illuminate\Support\Facades\DB::table($md['table'])->whereNull('deleted_at'), $mk, $user)
+                    ->whereIn('id', $group->pluck('record_id')->unique()->all())
+                    ->pluck(hub_display_col($mk), 'id');
+            } catch (\Throwable $e) { continue; }
+
+            foreach ($group as $a) {
+                if (! isset($ids[$a->record_id])) continue;      // خارج نطاقه
+                $d = $a->expires_at->toDateString();
+                $out[] = [
+                    'module' => $mk, 'mlabel' => $md['label'],
+                    'flabel' => hub_doc_label($mk, $a->kind) ?? 'وثيقة',
+                    'id' => $a->record_id, 'name' => (string) $ids[$a->record_id],
+                    'date' => $d, 'doc' => true,
+                    'days' => (int) now()->startOfDay()->diffInDays($a->expires_at->copy()->startOfDay(), false),
+                ];
+            }
+        }
+        usort($out, fn ($x, $y) => $x['days'] <=> $y['days']);
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_expiry_bust')) {
+    /** إبطال رادار «ينتهي قريباً» فوراً — يُستدعى عند تغيّر وثيقةٍ مؤرَّخة */
+    function hub_expiry_bust(): void
+    {
+        Cache::forever('hub:expiry:gen', (int) Cache::get('hub:expiry:gen', 0) + 1);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// المراقبة الحيّة: هدفٌ خارجيّ يُفحَص، وتوافرٌ يُشتق من سلسلةٍ لا من انطباع
+// ─────────────────────────────────────────────────────────────────────────
+
+if (! function_exists('hub_outbound_ok')) {
+    /**
+     * حارس الطلبات الصادرة (SSRF): لا يصير النظام مِجَسّاً على شبكته الداخلية.
+     * يُرفض غير http/https، والمضيف الذي يُحَلّ إلى عنوانٍ خاص أو محلي أو
+     * link-local (169.254.169.254 بوابة بيانات السحابة) أو محجوز.
+     * الإعداد `monitor.allow_private` يفتحها عمداً لتنصيبٍ داخلي مغلق.
+     */
+    function hub_outbound_ok(string $url): array
+    {
+        $no = fn (string $why) => ['ok' => false, 'why' => $why, 'ip' => null];
+
+        $url = trim($url);
+        $p = @parse_url($url);
+        if (! $p || empty($p['scheme']) || empty($p['host'])) return $no('رابط غير صالح');
+        if (! in_array(strtolower($p['scheme']), ['http', 'https'], true)) {
+            return $no('يُسمح بـ http/https فقط — لا ' . $p['scheme']);
+        }
+
+        $host = $p['host'];
+        if (setting('monitor.allow_private')) return ['ok' => true, 'why' => '', 'ip' => null];
+
+        // أسماءٌ محلية تُرفض قبل أي استعلام DNS
+        if (preg_match('/^(localhost|.*\.localhost|.*\.internal|.*\.local)$/i', $host)) {
+            return $no('مضيف داخلي: ' . $host);
+        }
+
+        // المُحلِّل قابلٌ للاستبدال (app('hub.dns')) كي تكون الاختبارات قاطعةً
+        // بلا اعتمادٍ على DNS حيّ — والسلوك في الإنتاج كما هو.
+        $resolve = app()->bound('hub.dns') ? app('hub.dns') : fn ($h) => @gethostbynamel($h);
+        $ips = filter_var($host, FILTER_VALIDATE_IP) ? [$host] : ($resolve($host) ?: []);
+        if (! $ips) return $no('تعذّر تحليل اسم المضيف: ' . $host);
+
+        foreach ($ips as $ip) {
+            $public = filter_var($ip, FILTER_VALIDATE_IP,
+                FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+            if ($public === false) return $no('عنوان داخلي أو محجوز: ' . $ip);
+            // 169.254.0.0/16 بوابة بيانات السحابة — يمر أحياناً من فلتر PHP
+            if (str_starts_with($ip, '169.254.')) return $no('عنوان link-local: ' . $ip);
+        }
+
+        return ['ok' => true, 'why' => '', 'ip' => $ips[0]];
+    }
+}
+
+if (! function_exists('hub_uptime')) {
+    /**
+     * التوافر الحقيقي لهدفٍ من سلسلته: نسبة الفحوص الناجحة، ومتوسط زمن
+     * الاستجابة، وآخر فحص. عتبات ٩٩٪ / ٩٥٪ — لا «يعمل/لا يعمل» عارية.
+     */
+    function hub_uptime(string $module, string $recordId, int $days = 30): array
+    {
+        $ups = hub_metric_series($module, $recordId, 'up', $days);
+        $lat = hub_metric_series($module, $recordId, 'latency', $days);
+
+        $n = count($ups);
+        $good = count(array_filter($ups, fn ($p) => (float) $p['value'] > 0));
+        $pct = $n ? round($good * 100 / $n, 2) : null;
+
+        return [
+            'checks' => $n, 'up' => $good, 'down' => $n - $good, 'pct' => $pct,
+            'last' => $n ? end($ups) : null,
+            'live' => $n ? ((float) end($ups)['value'] > 0) : null,
+            'ms' => $lat ? (int) round(array_sum(array_column($lat, 'value')) / count($lat)) : null,
+            'lastMs' => $lat ? (int) end($lat)['value'] : null,
+            'spark' => hub_metric_spark($lat, 40),
+            'days' => $days,
+            'tone' => $pct === null ? '' : ($pct >= 99 ? 'ok' : ($pct >= 95 ? 'wn' : 'bad')),
+            'label' => $pct === null ? 'غير مراقب' : ($pct >= 99 ? 'مستقر' : ($pct >= 95 ? 'متذبذب' : 'غير مستقر')),
+        ];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// OKR: نسبةٌ تُحسب لا تُكتب
+// كانت «نسبة الإنجاز» حقلاً يُملأ باليد على الهدف — وهذا ينقض OKR من أصله.
+// ─────────────────────────────────────────────────────────────────────────
+
+if (! function_exists('hub_kr_sources')) {
+    /** مصادر قياس النتيجة الرئيسية — معلَنةً في مكانٍ واحد تقرؤه الواجهة والحساب */
+    function hub_kr_sources(): array
+    {
+        return [
+            'manual' => 'يدوي — أسجّل القيمة بنفسي',
+            'count'  => 'عدّ سجلات وحدة',
+            'sum'    => 'مجموع عمود في وحدة',
+            'avg'    => 'متوسط عمود في وحدة',
+            'kpi'    => 'مؤشر KPI محفوظ',
+            'metric' => 'مقياس زمني على سجل',
+        ];
+    }
+}
+
+if (! function_exists('hub_kr_source')) {
+    /**
+     * مصدر النتيجة فعلياً. نتيجةٌ قديمة عليها `kpi_id` وحده (قبل وجود عمود
+     * المصدر) تبقى آليةً كما كانت — الإضافة لا الكسر.
+     */
+    function hub_kr_source($kr): string
+    {
+        $src = trim((string) ($kr->source ?? ''));
+        if ($src !== '') return $src;
+
+        return $kr->kpi_id ? 'kpi' : 'manual';
+    }
+}
+
+if (! function_exists('hub_kr_read')) {
+    /**
+     * قراءة القيمة الحالية لنتيجةٍ رئيسية من مصدرها.
+     * تُعيد `null` للمصدر اليدوي أو لتعذّر القراءة — و«لا قراءة» ليست صفراً.
+     * القراءة تمر بنطاق المستخدم وصلاحيته عبر hub_kpi_metric.
+     */
+    function hub_kr_read($kr, $user = null): ?float
+    {
+        // بلا مستخدم كانت hub_kpi_metric تتخطّى hub_scope و hub_can معاً،
+        // فتُحسب القيمة فوق **كل** سجلات الوحدة وتُعرض لمن لا يراها.
+        // (في سياق الطرفية والمجدول لا مستخدم — وذلك سياق نظامٍ مقصود.)
+        $user = $user ?? auth()->user();
+        $src = hub_kr_source($kr);
+        if ($src === 'manual') return null;
+
+        try {
+            if ($src === 'kpi') {
+                if (! $kr->kpi_id || ! \Illuminate\Support\Facades\Schema::hasTable('kpi_defs')) return null;
+                $def = \App\Models\KpiDef::find($kr->kpi_id);
+                if (! $def) return null;
+                $f = is_array($def->formula) ? $def->formula : (json_decode((string) $def->formula, true) ?: []);
+
+                return hub_kpi_value($f, $user);
             }
 
-            return ['id' => $k->id, 'name' => $k->name, 'unit' => $k->unit,
-                    'value' => $val, 'target' => $k->target, 'tone' => $tone,
-                    'good' => $k->good, 'formula' => (array) $k->formula];
-        })->all();
+            if ($src === 'metric') {
+                if (! $kr->src_module || ! $kr->src_record || ! $kr->src_metric) return null;
+
+                return hub_metric_latest($kr->src_module, $kr->src_record, $kr->src_metric);
+            }
+
+            if (in_array($src, ['count', 'sum', 'avg'], true)) {
+                if (! $kr->src_module) return null;
+
+                return hub_kpi_metric([
+                    'agg' => $src, 'module' => $kr->src_module,
+                    'col' => $kr->src_col, 'st' => $kr->src_status,
+                ], $user);
+            }
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        return null;
+    }
+}
+
+if (! function_exists('hub_okr_pace')) {
+    /**
+     * الإيقاع: أين **يُفترض** أن نكون الآن من الفترة، مقابل أين نحن فعلاً.
+     * روح OKR كلها هنا — «٣٠٪» وحدها لا تقول أمتقدّمون نحن أم متأخرون.
+     */
+    function hub_okr_pace($objective, ?int $pct): array
+    {
+        $out = ['expected' => null, 'gap' => null, 'pace' => '', 'tone' => '', 'daysLeft' => null];
+
+        $start = $objective->date_start ? \Illuminate\Support\Carbon::parse($objective->date_start)->startOfDay() : null;
+        $due = $objective->due ? \Illuminate\Support\Carbon::parse($objective->due)->startOfDay() : null;
+        if (! $start || ! $due || $due->lte($start)) return $out;
+
+        $total = max(1, $start->diffInDays($due));
+        $gone = max(0, min($total, $start->diffInDays(now()->startOfDay())));
+        $expected = (int) round($gone * 100 / $total);
+        $out['expected'] = $expected;
+        $out['daysLeft'] = (int) now()->startOfDay()->diffInDays($due, false);
+        if ($pct === null) return $out;
+
+        $gap = $pct - $expected;
+        $out['gap'] = $gap;
+        // هامش ٥٪ حول الخط: التقلّب اليومي ليس تعثّراً
+        $out['pace'] = $gap >= 10 ? 'متقدّم' : ($gap >= -5 ? 'على المسار' : 'متأخر');
+        $out['tone'] = $gap >= 10 ? 'ok' : ($gap >= -5 ? 'ok' : ($gap >= -20 ? 'wn' : 'bad'));
+        if ($out['pace'] === 'متأخر' && $out['tone'] === 'ok') $out['tone'] = 'wn';
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_okr_board')) {
+    /** لوحة OKR كاملةً — منطّقةً بصلاحية المستخدم ونطاقه */
+    function hub_okr_board($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        $objs = hub_scope(\App\Models\Objective::query(), 'okrs')->whereNull('deleted_at')
+            ->orderByRaw("CASE WHEN status IN ('مكتمل','ملغى') THEN 1 ELSE 0 END")
+            ->orderBy('due')->limit(120)->get();
+
+        $rows = [];
+        foreach ($objs as $o) {
+            $p = hub_okr_progress($o->id, true, true);
+            $rows[] = ['o' => $o, 'p' => $p];
+        }
+
+        $measured = array_filter($rows, fn ($r) => ($r['p']['pct'] ?? null) !== null);
+
+        return [
+            'rows' => $rows,
+            'n' => count($rows),
+            'measured' => count($measured),
+            'unmeasured' => count($rows) - count($measured),
+            'avg' => $measured ? (int) round(array_sum(array_map(fn ($r) => $r['p']['pct'], $measured)) / count($measured)) : null,
+            'behind' => count(array_filter($measured, fn ($r) => ($r['p']['pace'] ?? '') === 'متأخر')),
+            'ahead' => count(array_filter($measured, fn ($r) => ($r['p']['pace'] ?? '') === 'متقدّم')),
+            'auto' => count(array_filter($rows, fn ($r) => collect($r['p']['krs'] ?? [])->contains('auto', true))),
+        ];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// السياسات وقاعدة المعرفة: نصٌّ يُبلَّغ ويُقَرّ ويسقط إقراره بتحديث نسخته
+// كانت تُحفظ ثم تُنسى: لا إبلاغ، ولا معرفةَ من قرأ، ولا أثرَ لتحديث النسخة.
+// ─────────────────────────────────────────────────────────────────────────
+
+/*
+ * مفردات حالة الإقرار **واحدة** لا اثنتان: «بانتظار الإقرار» و«مُقرّة»
+ * و«منتهية بتحديث النسخة» — وهي خيارات وحدة policyacks في سجل الوحدات نفسه،
+ * وما يكتبه EsignController عند التوقيع. أي مفردةٍ موازية تجعل من وقّع
+ * إلكترونياً يظهر في اللوحة تحت «لم يُقِر».
+ */
+if (! function_exists('hub_ack_modules')) {
+    /** الوحدات التي تُقَرّ: مفتاحها ⟵ [عمود الإلزام، عمود النسخة، المسار] */
+    function hub_ack_modules(): array
+    {
+        return [
+            'policies' => ['col' => 'ack_required', 'ver' => 'ver', 'label' => 'سياسة'],
+            'kb'       => ['col' => 'must_read',    'ver' => 'ver', 'label' => 'مقال معرفة'],
+        ];
+    }
+}
+
+if (! function_exists('hub_ack_targets')) {
+    /**
+     * من يلزمه الإقرار بهذا السجل: الجميع، أو أعضاء مشروعه، أو منسوبو شركته.
+     * المستخدمون النشطون وحدهم — إقرارٌ من حسابٍ موقوف ليس إقراراً.
+     */
+    function hub_ack_targets(string $module, $row): array
+    {
+        $q = \App\Models\User::where('status', 'نشط');
+
+        $pid = $row->project_id ?? null;
+        $cid = $row->company_id ?? null;
+
+        if ($pid && ($p = \App\Models\Project::find($pid))) {
+            $members = array_values(array_filter(array_merge(
+                (array) ($p->members ?? []), [$p->manager_id ?? null])));
+            if ($members) $q->whereIn('id', $members);
+        } elseif ($cid && \Illuminate\Support\Facades\Schema::hasColumn('users', 'company_id')) {
+            $q->where('company_id', $cid);
+        }
+
+        return $q->pluck('id')->all();
+    }
+}
+
+if (! function_exists('hub_ack_announce')) {
+    /**
+     * إعلان السجل: يُفتح لكل مُخاطَبٍ **إقرارٌ معلّق** ويصله إشعار.
+     * فتح الإقرار سلفاً هو الفرق بين «من لم يُقِر؟» المُجاب عنها وبين التخمين.
+     */
+    function hub_ack_announce(string $module, string $recordId): int
+    {
+        $spec = hub_ack_modules()[$module] ?? null;
+        if (! $spec) return 0;
+
+        $def = hub_mod($module);
+        $class = '\\App\\Models\\' . $def['model'];
+        // بالنطاق لا خاماً: الإعلانُ كتابةٌ وإشعاراتٌ على السجل — سجلُّ شركةٍ
+        // أخرى ليس للمعزول أن يعلنه (كما يفرض AckController::target تماماً)
+        $row = hub_scope($class::query(), $module)->find($recordId);
+        if (! $row) return 0;
+
+        $ver = (string) ($row->{$spec['ver']} ?? '') ?: '1.0';
+        $title = (string) ($row->title ?? '');
+        $n = 0;
+
+        foreach (hub_ack_targets($module, $row) as $uid) {
+            $ack = \App\Models\PolicyAck::firstOrNew([
+                'src_module' => $module, 'record_id' => $recordId, 'user_id' => $uid, 'ver' => $ver,
+            ]);
+            if (! $ack->exists) {
+                $ack->fill([
+                    'title' => \Illuminate\Support\Str::limit($title, 200),
+                    'policy_id' => $module === 'policies' ? $recordId : null,
+                    'status' => 'بانتظار الإقرار',
+                ])->save();
+            }
+            hub_notify($uid, 'policy',
+                ($module === 'kb' ? 'قراءة إلزامية: ' : 'سياسة تحتاج إقرارك: ') . $title . ' (نسخة ' . $ver . ')',
+                $module, $recordId);
+            $n++;
+        }
+
+        try {
+            $row->forceFill(['announced_at' => now()])->saveQuietly();
+        } catch (\Throwable $e) {
+        }
+
+        return $n;
+    }
+}
+
+if (! function_exists('hub_ack_state')) {
+    /** حال الإقرار على سجل: من أقرّ ومن لم يُقِر — بالأسماء لا بالعدد وحده */
+    function hub_ack_state(string $module, string $recordId): array
+    {
+        $spec = hub_ack_modules()[$module] ?? null;
+        $def = hub_mod($module);
+        $out = ['ver' => null, 'done' => 0, 'pending' => 0, 'total' => 0, 'pct' => 0,
+                'doneRows' => [], 'pendingRows' => [], 'required' => false];
+        if (! $spec || ! $def) return $out;
+
+        $class = '\\App\\Models\\' . $def['model'];
+        $row = hub_scope($class::query(), $module)->find($recordId);   // بالنطاق لا خاماً
+        if (! $row) return $out;
+
+        $ver = (string) ($row->{$spec['ver']} ?? '') ?: '1.0';
+        $out['ver'] = $ver;
+        $out['required'] = (bool) ($row->{$spec['col']} ?? false);
+
+        $acks = \App\Models\PolicyAck::whereNull('deleted_at')
+            ->where(fn ($q) => $q->where('record_id', $recordId)
+                ->orWhere(fn ($w) => $w->whereNull('record_id')->where('policy_id', $recordId)))
+            ->where('ver', $ver)->get();
+
+        $names = \App\Models\User::whereIn('id', $acks->pluck('user_id')->filter()->all())
+            ->pluck('name', 'id');
+
+        foreach ($acks as $a) {
+            $entry = ['id' => $a->id, 'user' => $names[$a->user_id] ?? '—',
+                      'at' => $a->ack_at, 'signed' => (bool) $a->sign_request_id];
+            if ((string) $a->status === 'مُقرّة') $out['doneRows'][] = $entry;
+            elseif ((string) $a->status !== 'منتهية بتحديث النسخة') $out['pendingRows'][] = $entry;
+        }
+
+        $out['done'] = count($out['doneRows']);
+        $out['pending'] = count($out['pendingRows']);
+        $out['total'] = $out['done'] + $out['pending'];
+        $out['pct'] = $out['total'] ? (int) round($out['done'] * 100 / $out['total']) : 0;
+        $out['tone'] = $out['pct'] >= 100 ? 'ok' : ($out['pct'] >= 60 ? 'wn' : 'bad');
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_ack_do')) {
+    /** تسجيل إقرار المستخدم الحالي بنسخة السجل — مع دليله: وقتٌ وعنوانٌ وجهاز */
+    function hub_ack_do(string $module, string $recordId, ?string $signRequestId = null): ?\App\Models\PolicyAck
+    {
+        $spec = hub_ack_modules()[$module] ?? null;
+        $def = hub_mod($module);
+        if (! $spec || ! $def) return null;
+
+        $class = '\\App\\Models\\' . $def['model'];
+        $row = hub_scope($class::query(), $module)->find($recordId);   // بالنطاق لا خاماً
+        if (! $row) return null;
+
+        $ver = (string) ($row->{$spec['ver']} ?? '') ?: '1.0';
+        $ack = \App\Models\PolicyAck::firstOrNew([
+            'src_module' => $module, 'record_id' => $recordId,
+            'user_id' => auth()->id(), 'ver' => $ver,
+        ]);
+        $ack->fill([
+            'title' => \Illuminate\Support\Str::limit((string) ($row->title ?? ''), 200),
+            'policy_id' => $module === 'policies' ? $recordId : ($ack->policy_id ?? null),
+            'status' => 'مُقرّة', 'ack_at' => now(),
+            'ip' => substr((string) request()->ip(), 0, 60),
+            'device' => substr((string) request()->userAgent(), 0, 200),
+            'sign_request_id' => $signRequestId ?: $ack->sign_request_id,
+        ])->save();
+
+        hub_audit('إقرار ' . $spec['label'], $module, $recordId, 'نسخة ' . $ver);
+
+        return $ack;
+    }
+}
+
+if (! function_exists('hub_ack_reset')) {
+    /**
+     * تحديث النسخة يُسقط الإقرارات السابقة ويُعيد الإعلان.
+     * بلا هذا يبقى الجميع «مُقِرّين» بنسخةٍ ماتت — وهو أسوأ من ألّا يُقِرّ أحد،
+     * لأنه امتثالٌ ورقيٌّ كاذب.
+     */
+    function hub_ack_reset(string $module, string $recordId, string $currentVer): int
+    {
+        // نُسقط **كل ما ليس النسخة الحالية** لا نسخةً بعينها: بذلك يعمل الإسقاط
+        // أياً كان مصدر التغيير (واجهة، API، استيراد، أمر طرفية) ولا يعتمد على
+        // التقاط القيمة القديمة قبل الحفظ — وهو ما كان يفلت صامتاً.
+        $n = \App\Models\PolicyAck::whereNull('deleted_at')
+            ->where(fn ($q) => $q->where('record_id', $recordId)
+                ->orWhere(fn ($w) => $w->whereNull('record_id')->where('policy_id', $recordId)))
+            ->where(fn ($q) => $q->where('ver', '!=', $currentVer)->orWhereNull('ver'))
+            ->whereIn('status', ['بانتظار الإقرار', 'مُقرّة'])
+            ->update(['status' => 'منتهية بتحديث النسخة']);
+
+        hub_ack_announce($module, $recordId);
+
+        return (int) $n;
+    }
+}
+
+if (! function_exists('hub_ack_board')) {
+    /** لوحة الإقرارات: كل سجلٍ يلزمه إقرار بحاله — منطّقاً بصلاحية الرؤية */
+    function hub_ack_board($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        $out = [];
+        foreach (hub_ack_modules() as $mk => $spec) {
+            if (! hub_can($user, $mk, 'v')) continue;
+            $def = hub_mod($mk);
+            $class = '\\App\\Models\\' . $def['model'];
+            $rows = hub_scope($class::query(), $mk, $user)->whereNull('deleted_at')
+                ->where($spec['col'], true)->orderByDesc('created_at')->limit(60)->get();
+            foreach ($rows as $r) {
+                $out[] = ['module' => $mk, 'label' => $spec['label'], 'row' => $r,
+                          'state' => hub_ack_state($mk, $r->id)];
+            }
+        }
+        usort($out, fn ($a, $b) => $a['state']['pct'] <=> $b['state']['pct']);
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_metric_growth_of')) {
+    /** النمو محسوباً من سلسلةٍ **بين يديك** — بلا استعلامٍ جديد */
+    function hub_metric_growth_of(array $series, int $days = 30): array
+    {
+        $out = ['from' => null, 'to' => null, 'delta' => null, 'pct' => null,
+                'points' => count($series), 'days' => $days, 'tone' => ''];
+        if (! $series) return $out;
+
+        $from = (float) $series[0]['value'];
+        $to = (float) end($series)['value'];
+        $delta = round($to - $from, 4);
+
+        return array_merge($out, [
+            'from' => $from, 'to' => $to, 'delta' => $delta,
+            'pct' => $from != 0.0 ? round($delta * 100 / abs($from), 2) : null,
+            'tone' => $delta > 0 ? 'ok' : ($delta < 0 ? 'bad' : ''),
+        ]);
+    }
+}
+
+if (! function_exists('hub_feed_state_of')) {
+    /** حال التغذية من سلسلةٍ بين يديك — نظير hub_social_feed_state بلا استعلام */
+    function hub_feed_state_of(array $series): array
+    {
+        if (! $series) return ['mode' => 'none', 'label' => 'غير مربوط', 'tone' => 'wn', 'at' => null, 'source' => null];
+
+        $last = end($series);
+        $auto = in_array($last['source'] ?? '', ['n8n', 'api', 'webhook'], true);
+        $stale = $last['at']->lt(now()->subDays(3));
+
+        return [
+            'mode' => $auto ? ($stale ? 'stale' : 'auto') : 'internal',
+            'label' => $auto ? ($stale ? 'آلي لكنه متوقف' : 'آلي') : 'لقطة داخلية',
+            'tone' => $auto ? ($stale ? 'bad' : 'ok') : 'wn',
+            'at' => $last['at'], 'source' => $last['source'] ?? null,
+        ];
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// عدسة المشروع: مُرشِّحٌ واحد يمرّ بكل اللوحات التحليلية
+// كان كل مركزٍ يعرض المنشأة كلها مجموعةً — فلا يُعرف نصيب مشروعٍ بعينه من
+// القدرات ولا من التوصيات ولا من الأثر. عدسةٌ واحدة تخدمها كلها، وأي مركزٍ
+// جديد يرثها مجاناً.
+// ─────────────────────────────────────────────────────────────────────────
+
+if (! function_exists('hub_lens_path')) {
+    /**
+     * كيف يُوصَل من وحدةٍ إلى مشروعها: مباشرةً بعمود، أو بقفزةٍ واحدة، أو لا طريق.
+     * ٦٤ وحدة من ٧٣ مباشرة، واثنتان بقفزة، وسبعٌ لا علاقة لها بمشروع أصلاً —
+     * وهذه الأخيرة **تُقال صراحةً** بدل أن تعرض كل شيء وكأن المُرشِّح طُبّق.
+     */
+    function hub_lens_path(string $module): array
+    {
+        static $memo = [];
+        if (isset($memo[$module])) return $memo[$module];
+
+        $def = hub_mod($module);
+        $t = $def['table'] ?? null;
+        if (! $t || ! \Illuminate\Support\Facades\Schema::hasTable($t)) {
+            return $memo[$module] = ['mode' => 'none'];
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn($t, 'project_id')) {
+            return $memo[$module] = ['mode' => 'direct', 'col' => 'project_id'];
+        }
+
+        // قفزةٌ واحدة عبر مرجعٍ يحمل المشروع
+        foreach (['app_id' => 'applications', 'emp_id' => 'employees', 'client_id' => 'clients',
+                  'contract_id' => 'contracts', 'asset_id' => 'assets', 'objective_id' => 'objectives',
+                  'social_id' => 'social_accounts', 'policy_id' => 'policies'] as $c => $tt) {
+            if (\Illuminate\Support\Facades\Schema::hasColumn($t, $c)
+                && \Illuminate\Support\Facades\Schema::hasTable($tt)
+                && \Illuminate\Support\Facades\Schema::hasColumn($tt, 'project_id')) {
+                return $memo[$module] = ['mode' => 'via', 'col' => $c, 'table' => $tt];
+            }
+        }
+
+        return $memo[$module] = ['mode' => 'none'];
+    }
+}
+
+if (! function_exists('hub_lens')) {
+    /**
+     * العدسة النشطة من الرابط (`?p=`) — **مُتحقَّقاً من نطاقها**: لا يفتح
+     * المستخدم عدسةً على مشروعٍ لا يراه، فالمُرشِّح ليس باباً خلفياً.
+     */
+    function hub_lens($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        $out = ['id' => null, 'name' => null, 'on' => false];
+
+        $pid = trim(hub_str(request()->query('p', '')));
+        if ($pid === '' || ! $user) return $out;
+
+        $p = hub_scope(\App\Models\Project::query(), 'projects', $user)
+            ->whereNull('deleted_at')->whereKey($pid)->first(['id', 'name']);
+        if (! $p) return $out;      // خارج نطاقه — العدسة لا تُفتح ولا يُنبَّه على وجوده
+
+        return ['id' => $p->id, 'name' => $p->name, 'on' => true];
+    }
+}
+
+if (! function_exists('hub_lens_apply')) {
+    /** تطبيق العدسة على استعلام وحدةٍ ما — بلا عدسةٍ يعود الاستعلام كما هو */
+    function hub_lens_apply($q, string $module, ?string $projectId)
+    {
+        if (! $projectId) return $q;
+        $path = hub_lens_path($module);
+
+        if ($path['mode'] === 'direct') return $q->where($path['col'], $projectId);
+        if ($path['mode'] === 'via') {
+            return $q->whereIn($path['col'], function ($sub) use ($path, $projectId) {
+                $sub->select('id')->from($path['table'])->where('project_id', $projectId);
+            });
+        }
+
+        return $q;   // لا طريق — المسؤولية على الشاشة أن تقول ذلك لا أن تُخفي
+    }
+}
+
+if (! function_exists('hub_lens_projects')) {
+    /** مشاريع المستخدم لقائمة اختيار العدسة — المفتوحة أولاً */
+    function hub_lens_projects($user = null): array
+    {
+        $user = $user ?? auth()->user();
+
+        return hub_scope(\App\Models\Project::query(), 'projects', $user)
+            ->whereNull('deleted_at')
+            ->orderByRaw("CASE WHEN status IN ('مكتمل','ملغى') THEN 1 ELSE 0 END")
+            ->orderBy('name')->limit(300)->pluck('name', 'id')->all();
+    }
+}
+
+if (! function_exists('hub_lens_key')) {
+    /**
+     * لاحقة مفتاح التخبئة للعدسة. مفتاحٌ لا يحمل المشروع يُقدّم نتيجة مشروعٍ
+     * لآخر — وهو عيبٌ وقع في هذا المستودع من قبل، فلا يتكرر.
+     */
+    function hub_lens_key(?string $projectId): string
+    {
+        return $projectId ? ':p:' . $projectId : '';
     }
 }

@@ -15,14 +15,20 @@ class DemoTest extends TestCase
         $real = Client::create(['name' => 'عميل حقيقي']);
 
         Artisan::call('hub:demo');
-        $this->assertTrue((bool) DB::table('clients')->where('meta', 'LIKE', '%"demo":1%')->count());
-        $this->assertTrue((bool) DB::table('projects')->where('meta', 'LIKE', '%"demo":1%')->count());
-        $this->assertTrue((bool) DB::table('fin_documents')->where('meta', 'LIKE', '%"demo":1%')->count());
+        /*
+         * **بمسار JSON لا بمطابقة نصّ**: MySQL 8 يحفظ JSON بنوعٍ أصليّ فيُعيد
+         * صياغته `{"demo": 1}` بمسافة — فلا يطابق `%"demo":1%`. والتطبيق نفسه
+         * يستعمل `meta->demo` المحايد (HubDemo::purge)، فالاختبارُ وحده كان
+         * يتكلّم لهجةً لا يفهمها المحرّك الذي يعمل عليه النظام.
+         */
+        $this->assertTrue((bool) DB::table('clients')->where('meta->demo', 1)->count());
+        $this->assertTrue((bool) DB::table('projects')->where('meta->demo', 1)->count());
+        $this->assertTrue((bool) DB::table('fin_documents')->where('meta->demo', 1)->count());
         $this->assertDatabaseHas('settings', ['key' => 'demo.on']);
 
         Artisan::call('hub:demo', ['--purge' => true]);
-        $this->assertSame(0, DB::table('clients')->where('meta', 'LIKE', '%"demo":1%')->count());
-        $this->assertSame(0, DB::table('tasks')->where('meta', 'LIKE', '%"demo":1%')->count());
+        $this->assertSame(0, DB::table('clients')->where('meta->demo', 1)->count());
+        $this->assertSame(0, DB::table('tasks')->where('meta->demo', 1)->count());
         $this->assertNotNull(Client::find($real->id));                 // الحقيقي سليم
         $this->assertDatabaseMissing('settings', ['key' => 'demo.on']);
     }

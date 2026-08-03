@@ -12,6 +12,8 @@
     <a class="btn ghost sm" href="{{ route('m.index', 'deps') }}">سجل الاعتماديات ←</a>
 </div>
 
+@include('partials.lens', ['lensModules' => ['deps']])
+
 @if ($spof)
     <div class="flash bad" style="margin-bottom:12px">
         ⚠️ <b>{{ $spof }}</b> عنصراً يمثّل نقطة فشل مفردة — حرج أو يعتمد عليه أكثر من نظام. راجع بدائلها قبل أن تختبرك الحياة.

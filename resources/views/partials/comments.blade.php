@@ -1,7 +1,7 @@
 {{-- قسم التعليقات — يتوقع: $cModule $cRecordId $comments $users (id=>name) --}}
 @php $reactions = \App\Http\Controllers\Web\CommentController::reactionsFor($comments); @endphp
 <div class="card" id="comments">
-    <h3 style="margin-bottom:10px">💬 التعليقات <span class="bdg g">{{ $comments->count() }}</span></h3>
+    <h3>💬 التعليقات <span class="bdg g">{{ $comments->count() }}</span></h3>
 
     @forelse ($comments as $c)
         @include('partials._comment', ['c' => $c, 'users' => $users, 'depth' => 0])
@@ -22,6 +22,12 @@
                 @endforeach
             </select>
             <input class="inp" type="file" name="att" title="مرفق (اختياري)">
+            @if ($cModule === 'tickets')
+                {{-- الملاحظة الداخلية لا تُحتسب «أول رد» في مؤشرات الاتفاقية --}}
+                <label class="chk" title="ملاحظة بين الفريق — لا تُحتسب رداً على العميل في مؤشرات SLA">
+                    <input type="checkbox" name="internal" value="1"> 🔒 ملاحظة داخلية
+                </label>
+            @endif
             <button class="btn p sm" type="submit">نشر</button>
         </div>
         @error('body')<div class="err">{{ $message }}</div>@enderror

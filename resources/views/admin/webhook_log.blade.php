@@ -19,7 +19,7 @@
                 <td><b class="mono ltr" style="font-size:12px">{{ $d->event }}</b>
                     <div class="sub">{{ $d->created_at->diffForHumans() }} · <span class="mono ltr" style="font-size:10px">{{ substr($d->event_id, 0, 8) }}</span></div></td>
                 <td style="max-width:340px">
-                    <details><summary class="sub" style="cursor:pointer">JSON ▾</summary>
+                    <details><summary class="sub pointer">JSON ▾</summary>
                         <pre class="mono ltr" style="font-size:10.5px;background:var(--pss);border-radius:8px;padding:8px;margin-top:4px;max-height:200px;overflow:auto">{{ \Illuminate\Support\Str::limit($d->payload, 3000) }}</pre>
                     </details>
                 </td>

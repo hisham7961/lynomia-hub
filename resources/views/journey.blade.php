@@ -1,11 +1,12 @@
 @extends('layouts.app')
 @section('title', 'رحلة العميل — ' . $client->name)
 @section('content')
-<div class="toolbar">
-    <a class="btn ghost sm" href="{{ route('m.show', ['clients', $client->id]) }}">→ ملف العميل</a>
-</div>
 <div class="hero">
     <div>
+        <nav class="crumbs" aria-label="مسار التنقل">
+            <a href="{{ route('m.show', ['clients', $client->id]) }}">ملف العميل</a>
+            <span aria-hidden="true">‹</span><b>الرحلة</b>
+        </nav>
         <h2>🧭 رحلة {{ $client->name }} {{ $client->vip ? '👑' : '' }}</h2>
         <div class="sub">
             @if ($client->vip)<span class="bdg wn">عميل VIP</span>@endif
@@ -43,8 +44,14 @@
 <div class="card" style="margin-top:12px">
     <div class="sub" style="line-height:2">
         <b>من أين تُبنى الرحلة؟</b> العروض والعقود والاجتماعات والقرارات المرتبطة بالعميل مرجعياً، وتعليقات فريقك على ملفه.<br>
-        ⚠️ <b>الفواتير تُطابَق باسم الطرف نصياً</b> ({{ $fin['count'] }} مستند طابق «{{ $client->name }}») —
-        اكتب اسم العميل في حقل «العميل / المورد» كما هو في ملفه لتكتمل الصورة.
+        💵 <b>المستندات المالية:</b>
+        {{ $fin['linked'] }} مرتبط بالعميل مرجعياً
+        @if ($fin['byName'])
+            و<b>{{ $fin['byName'] }} مطابَق باسم الطرف نصياً</b> — الربط النصي يكسره تغيير الاسم
+            ويخلط عميلين متشابهي الاسم، فاختر العميل في حقل «العميل (مرتبط)» على تلك المستندات.
+        @else
+            — كلها مرتبطة مرجعياً.
+        @endif
     </div>
 </div>
 @endsection

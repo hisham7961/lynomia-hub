@@ -16,7 +16,15 @@ class InnovationController extends Controller
     {
         abort_unless(hub_can(auth()->user(), 'ideas', 'v'), 403);
 
-        $ideas = hub_scope(Idea::query(), 'ideas')->orderByDesc('created_at')->limit(300)->get()
+        // العدسة قبل القصّ لا بعده. والطريق مزدوج: عمود المشروع يعني «المشروع
+        // الناتج إن رُقّيت» — فوحده يُخفي كل فكرةٍ لم تُرقَّ بعد، وهي جوهر
+        // الصفحة. فيُضاف الطريق عبر الخدمة: فكرةٌ تطوّر خدمةً في المشروع.
+        $lens = hub_lens();
+        $ideas = hub_scope(Idea::query(), 'ideas')
+            ->when($lens['id'], fn ($q) => $q->where(fn ($w) => $w->where('project_id', $lens['id'])
+                ->orWhereIn('service_id', \Illuminate\Support\Facades\DB::table('services')
+                    ->select('id')->where('project_id', $lens['id']))))
+            ->orderByDesc('created_at')->limit(300)->get()
             ->map(function ($i) {
                 $i->ice = $i->iceScore();
                 return $i;
@@ -29,7 +37,11 @@ class InnovationController extends Controller
         return view('innovation', [
             'ideas' => $ideas,
             'byUsers' => $byUsers,
+            'contributors' => \App\Support\Innovation::contributors(),
+            'pulse' => \App\Support\Innovation::pulse(),
+            'atts' => \App\Support\Innovation::attachmentCounts($ideas->pluck('id')->all()),
             'scored' => $ideas->filter(fn ($i) => $i->ice !== null)->count(),
+            'lens' => $lens,
         ]);
     }
 
@@ -42,9 +54,18 @@ class InnovationController extends Controller
         $idea = hub_scope(Idea::query(), 'ideas')->findOrFail($id);
         abort_if($idea->project_id, 422, 'رُقّيت هذه الفكرة لمشروع من قبل');
 
+        // «تخطيط» من خيارات المشاريع المعلنة (كانت «قيد التخطيط» فلا يظهر المشروع
+        // في أي عمود كانبان)، والشركة تُورَّث كوراثة الإنشاء العادي — الشركة النشطة
+        // وإلا أولى شركات المعزول — فلا يولد المشروع يتيماً يختفي عن صاحبه
+        $cid = (string) session('hub.company', '');
+        $allowed = hub_company_ids();
+        if ($cid === '' || ($allowed !== null && ! in_array($cid, $allowed, true))) {
+            $cid = $allowed[0] ?? null;
+        }
         $project = Project::create([
             'name' => \Illuminate\Support\Str::limit((string) $idea->title, 120, ''),
-            'status' => 'قيد التخطيط',
+            'status' => 'تخطيط',
+            'company_id' => $cid ?: null,
             'description' => trim("من مركز الابتكار.\n\nالمشكلة: " . (string) $idea->problem . "\n\nالفكرة: " . (string) $idea->idea),
         ]);
 

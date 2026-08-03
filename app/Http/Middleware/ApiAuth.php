@@ -34,6 +34,17 @@ class ApiAuth
             return response()->json(['error' => 'الحساب موقوف أو مقفل'], 403);
         }
 
+        // **حارسا الحساب يسريان على API كما على الويب**: انتهاء الحساب وقائمة
+        // العناوين المسموحة كانا يُفحصان عند تسجيل الدخول فقط — فحسابُ متعاقدٍ
+        // انتهى عقده، أو حسابٌ محصورٌ بشبكة المكتب، يحتفظ بوصولٍ كاملٍ عبر
+        // مفتاحه من أي مكان في العالم إلى الأبد.
+        if ($user->expires_at && now()->toDateString() > substr((string) $user->expires_at, 0, 10)) {
+            return response()->json(['error' => 'انتهت صلاحية هذا الحساب'], 403);
+        }
+        if ($user->allowed_ips && ! ip_allowed((string) $request->ip(), (string) $user->allowed_ips)) {
+            return response()->json(['error' => 'هذا الحساب مقيد بعناوين شبكة محددة وعنوانك ليس منها'], 403);
+        }
+
         // قفل الطوارئ يسري على API أيضاً
         if (setting('security.lockdown') && ! $user->role?->is_owner) {
             return response()->json(['error' => 'النظام في قفل طوارئ — الوصول للمالكين فقط'], 503);

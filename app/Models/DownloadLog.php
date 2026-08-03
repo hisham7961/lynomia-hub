@@ -9,6 +9,7 @@ class DownloadLog extends Model
     protected $table = 'download_log';
     protected $guarded = [];
     public $timestamps = false;
-    protected $casts = ['before' => 'array', 'after' => 'array', 'snapshot' => 'array', 'value' => 'array', 'flags' => 'array'];
-    
+    // لا صبّات: أعمدة الجدول (attachment_id, user_id, ip, device, created_at)
+    // كلها بسيطة — الصبّات المنسوخة السابقة كانت لأعمدة لا وجود لها
+
 }

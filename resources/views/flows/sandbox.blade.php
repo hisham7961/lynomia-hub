@@ -47,11 +47,11 @@
         </div>
 
         {{-- تفصيل المطابقة --}}
-        <table class="tbl">
+        <div class="tblwrap"><table class="tbl">
             <tbody>
                 @if ($result['statusWhy'])
                     <tr>
-                        <td style="width:1%">{{ $result['statusMatch'] ? '✅' : '❌' }}</td>
+                        <td class="acts">{{ $result['statusMatch'] ? '✅' : '❌' }}</td>
                         <td>مطابقة الحالة</td>
                         <td class="sub">{{ $result['statusWhy'] }}</td>
                     </tr>
@@ -66,7 +66,7 @@
                     <tr><td>✅</td><td>الشرط</td><td class="sub">بلا شرط — يعمل على كل سجل يطابق الحدث</td></tr>
                 @endif
             </tbody>
-        </table>
+        </table></div>
     </div>
 
     <div class="card" style="margin-top:12px">

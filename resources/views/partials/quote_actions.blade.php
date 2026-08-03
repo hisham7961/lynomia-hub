@@ -5,7 +5,7 @@
     $canE = hub_can(auth()->user(), 'quotes', 'e');
 @endphp
 <div class="card">
-    <h3 style="margin-bottom:8px">🧭 مسار العرض <span class="bdg {{ hub_tone($st) }}">{{ $st }}</span></h3>
+    <h3>🧭 مسار العرض <span class="bdg {{ hub_tone($st) }}">{{ $st }}</span></h3>
     <div class="crow">
         <a class="btn ghost sm" href="{{ route('quotes.doc', $row->id) }}">🖨 المستند (طباعة / PDF)</a>
 
@@ -15,7 +15,7 @@
             @endif
             @if (in_array($st, ['مُرسل', 'قيد التفاوض'], true))
                 <form method="POST" action="{{ route('quotes.act', $row->id) }}">@csrf<input type="hidden" name="do" value="accept"><button class="btn p sm">✓ قبول العميل</button></form>
-                <form method="POST" action="{{ route('quotes.act', $row->id) }}" onsubmit="return confirm('تحديد العرض كمرفوض؟')">@csrf<input type="hidden" name="do" value="reject"><button class="btn ghost sm" style="color:var(--bad)">✕ رفض</button></form>
+                <form method="POST" action="{{ route('quotes.act', $row->id) }}" data-confirm="تحديد العرض كمرفوض؟">@csrf<input type="hidden" name="do" value="reject"><button class="btn ghost sm" style="color:var(--bad)">✕ رفض</button></form>
             @endif
             @if ($st === 'مقبول')
                 @if (! empty($meta['contract_id']))

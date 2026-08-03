@@ -18,13 +18,13 @@ class CustomFieldController extends Controller
 
     protected function gate(): void
     {
-        abort_unless(auth()->user()?->role?->is_owner, 403, 'باني الحقول للمالكين فقط');
+        abort_unless(hub_is_owner(), 403, 'باني الحقول للمالكين فقط');
     }
 
     public function index(Request $r)
     {
         $this->gate();
-        $module = (string) $r->query('m', '');
+        $module = hub_str($r->query('m', ''));
         if ($module !== '') abort_unless(hub_mod($module), 404);
 
         return view('fields.index', [

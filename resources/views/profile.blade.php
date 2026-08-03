@@ -20,7 +20,7 @@
             @csrf @method('PUT')
             <div class="fg">
                 <div class="fld fw">
-                    <label>الاسم <span class="req">*</span></label>
+                    <label>الاسم <b class="req">*</b></label>
                     <input class="inp @error('name') err @enderror" name="name" value="{{ old('name', $u->name) }}" required>
                     @error('name')<span class="ferr">{{ $message }}</span>@enderror
                 </div>
@@ -47,23 +47,51 @@
     </div>
 
     <div class="card kid">
+        <h3>🎯 وجهات التنبيه</h3>
+        @php $nprefs = is_array($u->notify_prefs) ? $u->notify_prefs : []; @endphp
+        <div class="sub" style="margin-bottom:8px">
+            تنبيهاتُك الشخصية (تلجرام وبريد) تُرسل لهذه الوجهات بدل القناة العامة —
+            اتركها فارغةً للبقاء على الافتراضي.
+        </div>
+        <form method="POST" action="{{ route('profile.notify') }}">
+            @csrf @method('PUT')
+            <div class="fg">
+                <div class="fld fw">
+                    <label>معرف محادثتك في تلجرام</label>
+                    <input class="inp ltr @error('tg') err @enderror" name="tg" value="{{ old('tg', $nprefs['tg'] ?? '') }}"
+                           placeholder="123456789" dir="ltr">
+                    @error('tg')<span class="ferr">{{ $message }}</span>@enderror
+                    <span class="sub">طريقة استخراجه خطوةً خطوة في مركز المراسلة (للمالك) أو من مديرك</span>
+                </div>
+                <div class="fld fw">
+                    <label>بريدٌ بديل للتنبيهات</label>
+                    <input class="inp ltr @error('email') err @enderror" name="email" value="{{ old('email', $nprefs['email'] ?? '') }}"
+                           placeholder="me@example.com" dir="ltr">
+                    @error('email')<span class="ferr">{{ $message }}</span>@enderror
+                </div>
+            </div>
+            <div class="formfoot"><button class="btn p" type="submit">حفظ الوجهات</button></div>
+        </form>
+    </div>
+
+    <div class="card kid">
         <h3>🔒 تغيير كلمة المرور</h3>
         <form method="POST" action="{{ route('profile.password') }}">
             @csrf @method('PUT')
             <div class="fg">
                 <div class="fld fw">
-                    <label>كلمة المرور الحالية <span class="req">*</span></label>
+                    <label>كلمة المرور الحالية <b class="req">*</b></label>
                     <input class="inp ltr @error('current') err @enderror" type="password" name="current" autocomplete="current-password" required>
                     @error('current')<span class="ferr">{{ $message }}</span>@enderror
                 </div>
                 <div class="fld fw">
-                    <label>كلمة المرور الجديدة <span class="req">*</span></label>
+                    <label>كلمة المرور الجديدة <b class="req">*</b></label>
                     <input class="inp ltr @error('password') err @enderror" type="password" name="password" autocomplete="new-password" required>
                     @error('password')<span class="ferr">{{ $message }}</span>@enderror
                     <span class="sub">{{ (int) setting('auth.pw_min', 10) }} خانات على الأقل، بأحرف كبيرة وصغيرة وأرقام</span>
                 </div>
                 <div class="fld fw">
-                    <label>تأكيد كلمة المرور الجديدة <span class="req">*</span></label>
+                    <label>تأكيد كلمة المرور الجديدة <b class="req">*</b></label>
                     <input class="inp ltr" type="password" name="password_confirmation" autocomplete="new-password" required>
                 </div>
             </div>
@@ -88,11 +116,11 @@
                         <div class="sub">أُنشئ {{ $t->created_at->diffForHumans() }}{{ $t->expires_at ? ' · ينتهي ' . $t->expires_at->format('Y-m-d') : '' }}{{ $t->last_used_at ? ' · آخر استخدام ' . $t->last_used_at->diffForHumans() : ' · لم يُستخدم' }}</div>
                         @if ($t->scopes)<div class="sub">🔬 نطاقات: <span class="mono ltr" style="font-size:10.5px">{{ \Illuminate\Support\Str::limit($t->scopes, 45) }}</span></div>@endif
                         @if ($t->allowed_ips)<div class="sub">📍 IP: <span class="mono ltr" style="font-size:10.5px">{{ \Illuminate\Support\Str::limit($t->allowed_ips, 45) }}</span></div>@endif</td>
-                    <td style="width:1%;white-space:nowrap">
-                        <form class="inline" method="POST" action="{{ route('profile.token.rotate', $t->id) }}" onsubmit="return confirm('تدوير المفتاح؟ القيمة القديمة ستتوقف فوراً وتحصل على قيمة جديدة بنفس النطاقات.')">
+                    <td class="acts">
+                        <form class="inline" method="POST" action="{{ route('profile.token.rotate', $t->id) }}" data-confirm="تدوير المفتاح؟ القيمة القديمة ستتوقف فوراً وتحصل على قيمة جديدة بنفس النطاقات.">
                             @csrf<button class="btn ghost xs">🔄 تدوير</button>
                         </form>
-                        <form class="inline" method="POST" action="{{ route('profile.token.revoke', $t->id) }}" onsubmit="return confirm('إبطال المفتاح؟ التطبيقات المستخدمة له ستتوقف.')">
+                        <form class="inline" method="POST" action="{{ route('profile.token.revoke', $t->id) }}" data-confirm="إبطال المفتاح؟ التطبيقات المستخدمة له ستتوقف.">
                             @csrf @method('DELETE')<button class="btn ghost xs" style="color:var(--bad)">إبطال</button>
                         </form></td>
                 </tr>
@@ -126,7 +154,7 @@
                 @csrf
                 <div class="crow">
                     <input class="inp ltr @error('code') err @enderror" name="code" placeholder="رمز التطبيق الحالي" maxlength="6" inputmode="numeric" style="max-width:170px" required>
-                    <button class="btn ghost sm" type="submit" onclick="return confirm('تعطيل المصادقة الثنائية؟')">تعطيل</button>
+                    <button class="btn ghost sm" type="submit" data-confirm="تعطيل المصادقة الثنائية؟">تعطيل</button>
                 </div>
                 @error('code')<span class="ferr">{{ $message }}</span>@enderror
             </form>

@@ -16,13 +16,13 @@
 @endif
 
 <div class="card">
-    <h3 style="margin-bottom:8px">＋ مشاركة مستند جديد</h3>
+    <h3>＋ مشاركة مستند جديد</h3>
     <form method="POST" action="{{ route('dataroom.store') }}" enctype="multipart/form-data">
         @csrf
         <div class="fg">
-            <div class="fld"><label>عنوان المستند <span class="req">*</span></label>
+            <div class="fld"><label>عنوان المستند <b class="req">*</b></label>
                 <input class="inp" name="title" required maxlength="190" placeholder="مثال: القوائم المالية 2026 للمحاسب"></div>
-            <div class="fld"><label>الملف <span class="req">*</span></label>
+            <div class="fld"><label>الملف <b class="req">*</b></label>
                 <input class="inp" type="file" name="file" required>
                 @error('file')<span class="ferr">{{ $message }}</span>@enderror</div>
             <div class="fld"><label>كلمة مرور <span class="sub">(اختياري)</span></label>
@@ -37,7 +37,7 @@
 </div>
 
 <div class="card pad0">
-    <table class="tbl">
+    <div class="tblwrap"><table class="tbl">
         <thead><tr><th>المستند</th><th>الحماية</th><th>المشاهدات</th><th>الحالة</th><th class="acts">إجراء</th></tr></thead>
         <tbody>
         @forelse ($links as $l)
@@ -58,7 +58,7 @@
                     @else<span class="bdg ok">نشط</span>@endif</td>
                 <td class="acts">
                     @unless ($dead)
-                        <form method="POST" action="{{ route('dataroom.revoke', $l->id) }}" onsubmit="return confirm('إلغاء الرابط فوراً؟ لا يمكن التراجع.')">
+                        <form method="POST" action="{{ route('dataroom.revoke', $l->id) }}" data-confirm="إلغاء الرابط فوراً؟ لا يمكن التراجع.">
                             @csrf<button class="btn ghost xs" style="color:var(--bad)">إلغاء</button>
                         </form>
                     @endunless
@@ -68,6 +68,6 @@
             <tr><td colspan="5" class="empty">لا روابط بعد — شارك أول مستند من الأعلى</td></tr>
         @endforelse
         </tbody>
-    </table>
+    </table></div>
 </div>
 @endsection

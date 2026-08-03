@@ -1,11 +1,10 @@
 @extends('layouts.app')
 @section('title', 'ينتهي قريباً')
 @section('content')
-<div class="toolbar">
-    <div class="sub">رادار تلقائي يمسح كل حقول الانتهاء والتجديد والاستحقاق في الوحدات الـ51 — يتحدث كل 10 دقائق</div>
-    <div class="spacer"></div>
+@component('partials.pagehead', ['icon' => '⏳', 'title' => 'ينتهي قريباً', 'crumb' => 'الأدوات',
+    'sub' => 'رادار تلقائي يمسح كل حقول الانتهاء والتجديد والاستحقاق في الوحدات — يتحدث كل 10 دقائق'])
     <a class="btn ghost sm" href="{{ route('alerts', ['fresh' => 1]) }}">↻ تحديث الآن</a>
-</div>
+@endcomponent
 @foreach ([['🔴 متأخر — انتهى فعلاً', $late, 'bad'], ['🟠 خلال ٧ أيام', $week, 'wn'], ['🟡 خلال ٣٠ يوماً', $month, 'g']] as [$title, $set, $tone])
     @if ($set->count())
     <div class="card pad0">

@@ -18,7 +18,7 @@ class V1Controller extends ModuleController
 
         return response()->json([
             'id' => $u->id, 'name' => $u->name, 'email' => $u->email,
-            'role' => $u->role?->name, 'is_owner' => (bool) $u->role?->is_owner,
+            'role' => $u->role?->name, 'is_owner' => hub_is_owner($u),
         ]);
     }
 
@@ -48,10 +48,11 @@ class V1Controller extends ModuleController
         [$def, $class] = $this->resolveApi($module, 'v');
 
         $q = hub_scope($class::query(), $module);
-        if ($term = trim((string) $r->query('q'))) $q->search($term);
-        if (($st = $r->query('status')) && ($def['status'] ?? null)) $q->where($def['status'], $st);
+        if ($term = trim(hub_str($r->query('q')))) $q->search($term);
+        if (($st = hub_str($r->query('status'))) !== '' && ($sc = hub_status_col($module))) $q->where($sc, $st);
 
-        $page = $q->orderByDesc('created_at')
+        // فاصلُ id: الطابع بدقّة الثانية يتساوى فتتقلب الصفحات بين الطلبات
+        $page = $q->orderByDesc('created_at')->orderByDesc('id')
             ->paginate(min(100, max(1, (int) $r->query('per', 25))));
 
         $fields = $r->query('fields');
@@ -118,7 +119,7 @@ class V1Controller extends ModuleController
 
         $m = $this->findScoped($class, $module, $id);
         $prev = ($af = $this->assigneeField($def)) ? $m->{$af['col']} : null;
-        $prevStatus = ($sc = $def['status'] ?? null) ? $m->{$sc} : null;
+        $prevStatus = ($sc = hub_status_col($module)) ? $m->{$sc} : null;
         $this->fill($def, $r, $m);
         $m->save();
         $this->notifyAssignee($def, $module, $m, $prev);
@@ -156,10 +157,104 @@ class V1Controller extends ModuleController
     /** GET /api/v1/reports/health — للمالكين */
     public function health()
     {
-        abort_unless(auth()->user()->role?->is_owner, 403);
+        abort_unless(hub_is_owner(), 403);
         abort_unless($this->tokenAllows('reports', 'v'), 403, 'نطاق هذا المفتاح لا يشمل «reports:v»');
 
         return response()->json(hub_health());
+    }
+
+    /**
+     * POST /api/v1/metrics — استقبال المقاييس الزمنية آلياً (n8n وغيره).
+     * دفعةٌ واحدة: `{"points":[{module, record_id, metric, value, at?, source?, meta?}, ...]}`
+     * أو نقطةٌ مفردة في جسم الطلب مباشرة. كل نقطةٍ تمر بصلاحية **تعديل** وحدتها
+     * وبنطاق المفتاح وبنطاق الرؤية — لا تُسجَّل قياساتٌ على سجلٍ لا يُرى.
+     */
+    public function metricsIngest(Request $r)
+    {
+        $points = $r->input('points');
+        if (! is_array($points)) $points = [$r->all()];
+
+        abort_if(count($points) > 500, 422, 'الدفعة الواحدة حتى ٥٠٠ نقطة');
+
+        $data = validator(['points' => $points], [
+            'points' => 'required|array|min:1',
+            'points.*.module' => 'required|string|max:40',
+            'points.*.record_id' => 'required|string|max:40',
+            'points.*.metric' => 'required|string|max:40',
+            // حدٌّ صريح: العمود decimal(18,4) (|القيمة| < 10¹⁴)، و«numeric» وحده
+            // يقبل 1e15 و«1e400»→INF فيُفيض العمود ويقع 500 وسط الدفعة. between
+            // يرفض الفائض وغير المنتهي معاً قبل أي كتابة.
+            'points.*.value' => 'required|numeric|between:-9999999999999,9999999999999',
+            'points.*.at' => 'nullable|date',
+            'points.*.source' => 'nullable|string|max:24',
+            'points.*.meta' => 'nullable|array',
+        ], [], [
+            'points' => 'النقاط', 'points.*.module' => 'الوحدة', 'points.*.record_id' => 'السجل',
+            'points.*.metric' => 'المقياس', 'points.*.value' => 'القيمة',
+        ])->validate()['points'];
+
+        // الوحدات والسجلات تُتحقّق **قبل** أي كتابة: دفعةٌ نصفها خطأ لا تُكتب نصفها
+        $seen = [];
+        foreach ($data as $i => $p) {
+            $mod = $p['module'];
+            if (! isset($seen[$mod])) {
+                // وحدةٌ مجهولة عيبُ حمولةٍ لا مسارٌ مفقود — ٤٢٢ لا ٤٠٤
+                if (! hub_mod($mod) || $mod === 'users') {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        "points.$i.module" => 'وحدة غير معروفة: «' . $mod . '»',
+                    ]);
+                }
+                [$def, $class] = $this->resolveApi($mod, 'e');   // القياس تعديلٌ على السجل
+                $seen[$mod] = $class;
+            }
+            $class = $seen[$mod];
+            if (! hub_scope($class::query(), $mod)->whereKey($p['record_id'])->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "points.$i.record_id" => 'سجل غير موجود أو خارج نطاقك في وحدة «' . $mod . '»',
+                ]);
+            }
+        }
+
+        // معاملةٌ تلفّ الكتابة كلها: تصدّق ضمان «دفعةٌ نصفها خطأ لا تُكتب نصفها»
+        // المعلن أعلاه — عطلٌ في نقطةٍ (بعد التحقق) كان يُبقي ما قبلها مكتوباً
+        $saved = \Illuminate\Support\Facades\DB::transaction(function () use ($data) {
+            $n = 0;
+            foreach ($data as $p) {
+                hub_metric_put($p['module'], $p['record_id'], $p['metric'], (float) $p['value'],
+                    $p['at'] ?? null, $p['source'] ?? 'api', $p['meta'] ?? []);
+                $n++;
+            }
+
+            return $n;
+        });
+
+        return response()->json(['saved' => $saved, 'at' => now()->toIso8601String()]);
+    }
+
+    /** GET /api/v1/metrics/{module}/{id}?metric=&days= — السلسلة والنمو */
+    public function metricsShow(Request $r, string $module, string $id)
+    {
+        [$def, $class] = $this->resolveApi($module, 'v');
+        hub_scope($class::query(), $module)->findOrFail($id);
+
+        $metric = trim(hub_str($r->query('metric')));
+        $days = min(730, max(1, (int) $r->query('days', 90)));
+
+        if ($metric === '') {
+            return response()->json(['metrics' => \App\Models\MetricPoint::where('module', $module)
+                ->where('record_id', $id)->distinct()->orderBy('metric')->pluck('metric')]);
+        }
+
+        $series = hub_metric_series($module, $id, $metric, $days);
+
+        return response()->json([
+            'module' => $module, 'record_id' => $id, 'metric' => $metric, 'days' => $days,
+            'latest' => hub_metric_latest($module, $id, $metric),
+            'growth' => hub_metric_growth($module, $id, $metric, $days),
+            'series' => array_map(fn ($p) => [
+                'at' => $p['at']->toIso8601String(), 'value' => $p['value'], 'source' => $p['source'],
+            ], $series),
+        ]);
     }
 
     /** حل الوحدة لطلبات API برسائل JSON */
@@ -279,12 +374,17 @@ class V1Controller extends ModuleController
     {
         $module = (string) ($def['key'] ?? '');
         $u = auth()->user();
-        $canSec = (bool) ($u?->role?->is_owner || hub_flag($u, 'secrets') || hub_flag($u, 'copySec'));
+        $canSec = hub_copy_secrets($u);
         $arr = is_array($row) ? $row : $row->toArray();
+
+        // «المستخدمون المخولون» في الخزنة تسري على الـ API كما تسري على الواجهة:
+        // قائمة غير فارغة تحجب السر عمّن ليس فيها (والمالك محصّن)
+        $allowed = array_values(array_filter(array_map('strval', (array) ($arr['allowed_ids'] ?? []))));
+        $inAllowed = ! $allowed || hub_is_owner($u) || in_array((string) $u?->id, $allowed, true);
 
         foreach ($def['fields'] as $f) {
             $hidden = hub_field_mode($u, $module, $f['key']) === 'hide';
-            $secret = ($f['type'] ?? '') === 'sec' && ! $canSec;
+            $secret = ($f['type'] ?? '') === 'sec' && (! $canSec || ! $inAllowed);
             if ($hidden || $secret) unset($arr[$f['col']]);
         }
 

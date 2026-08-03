@@ -20,3 +20,6 @@
 
 # ملفات أقراص الاختبار الوهمية
 /storage/framework/testing/
+
+# ملفات فحصٍ مؤقتة أثناء التحقيق — لا تُدفَع مع الحزمة
+tests/Feature/Zz*Test.php

@@ -1,10 +1,23 @@
 /* Lynomia Hub — عامل الخدمة: عمل بلا اتصال واتصال ضعيف
-   - الأصول الثابتة: من الكاش أولاً (سرعة)
+   - الأصول الثابتة: من الكاش فوراً + تحديثٌ بالخلفية (stale-while-revalidate) —
+     مع بصمة ?v=النسخة في روابط الأصول، فكل إصدارٍ رابطٌ جديد يفوّت الكاش القديم.
+     كان «كاش أولاً» جامداً: المستخدم يرى الشكل القديم حتى يضغط Ctrl+Shift+R.
    - التنقل بين الصفحات: الشبكة أولاً بمهلة، وإلا آخر نسخة محفوظة، وإلا صفحة «بلا اتصال»
    - لا يخبئ أبداً: API، الملفات الخاصة، الأسرار، مراكز الإدارة */
-var VER = 'hub-v1';
-var STATIC = ['/offline', '/css/app.css', '/js/app.js', '/js/htmx.min.js'];
-var NEVER = ['/api/', '/files/', '/m/vault', '/admin/', '/jslog', '/logout'];
+var VER = 'hub-v2.111';
+var STATIC = ['/offline', '/css/app.css', '/css/fonts.css', '/js/app.js', '/js/htmx.min.js',
+  // الجوهري من الخطوط يُخبأ مسبقاً (عربي + لاتيني)، وبقية الأطقم يخبئها مسار /fonts/ عند أول استعمال
+  '/fonts/plexarabic-400-arabic.woff2', '/fonts/plexarabic-400-latin.woff2',
+  '/fonts/plexarabic-500-arabic.woff2', '/fonts/plexarabic-500-latin.woff2',
+  '/fonts/plexarabic-600-arabic.woff2', '/fonts/plexarabic-600-latin.woff2',
+  '/fonts/plexarabic-700-arabic.woff2', '/fonts/plexarabic-700-latin.woff2',
+  '/fonts/plexmono-400-latin.woff2', '/fonts/plexmono-500-latin.woff2',
+  '/fonts/tajawal-400-arabic.woff2', '/fonts/tajawal-400-latin.woff2',
+  '/fonts/tajawal-500-arabic.woff2', '/fonts/tajawal-500-latin.woff2',
+  '/fonts/tajawal-700-arabic.woff2', '/fonts/tajawal-700-latin.woff2',
+  '/fonts/tajawal-800-arabic.woff2', '/fonts/tajawal-800-latin.woff2'];
+// /attachments/ ضمن الممنوع: معاينة PDF داخل iframe تُعد تنقلاً فكانت ستُخبأ — ملفات خاصة لا تُخبأ أبداً
+var NEVER = ['/api/', '/files/', '/attachments/', '/m/vault', '/admin/', '/apps/quoteflow', '/jslog', '/logout'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(VER).then(function (c) { return c.addAll(STATIC); }).then(function () { return self.skipWaiting(); }));
@@ -26,14 +39,17 @@ self.addEventListener('fetch', function (e) {
   var url = new URL(req.url);
   if (url.origin !== location.origin || never(url)) return;
 
-  // أصول ثابتة: كاش أولاً
-  if (url.pathname.indexOf('/css/') === 0 || url.pathname.indexOf('/js/') === 0) {
+  // أصول ثابتة: من الكاش فوراً + إعادة جلبٍ بالخلفية تُحدّث الكاش للزيارة التالية
+  if (url.pathname.indexOf('/css/') === 0 || url.pathname.indexOf('/js/') === 0 || url.pathname.indexOf('/fonts/') === 0) {
     e.respondWith(caches.match(req).then(function (hit) {
-      return hit || fetch(req).then(function (res) {
-        var copy = res.clone();
-        caches.open(VER).then(function (c) { c.put(req, copy); });
+      var refresh = fetch(req).then(function (res) {
+        if (res && res.ok) {
+          var copy = res.clone();
+          caches.open(VER).then(function (c) { c.put(req, copy); });
+        }
         return res;
-      });
+      }).catch(function () { return hit; });
+      return hit || refresh;
     }));
     return;
   }

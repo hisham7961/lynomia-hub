@@ -2,15 +2,14 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<script>(function(){var t=localStorage.getItem('lyn_theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.dataset.theme='dark'})()</script>
 <title>تسجيل الدخول — {{ setting('app.name', config('app.name')) }}</title>
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{{ asset('css/app.css') }}">
+@include('partials.standalone_head')
 @if ($brand = hub_brand_css())<style>{!! $brand !!}</style>@endif
 </head>
 <body class="loginbg">
 <div class="logincard">
-    @if ($logo = setting('app.logo'))<img src="{{ asset('storage/' . $logo) }}" alt="" style="height:52px;border-radius:10px;margin-bottom:8px">@endif
+    @if ($logo = setting('app.logo'))<img src="{{ asset('storage/' . $logo) }}" alt="" style="height:52px;border-radius:10px;margin-bottom:8px">
+    @else<div class="loginmark">🏢</div>@endif
     <h1>{{ setting('app.name', 'Lynomia Business Hub') }}</h1>
     <p class="sub">نظام إدارة الأعمال الموحّد</p>
     @if ($errors->any())<div class="flash bad">{{ $errors->first() }}</div>@endif

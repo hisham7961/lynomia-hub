@@ -8,15 +8,24 @@ use Illuminate\Support\Facades\DB;
 /** لوحة CEO — صورة الشركة كاملة في شاشة واحدة (للمالكين) */
 class CeoController extends Controller
 {
-    protected array $income  = ['فاتورة مبيعات', 'دفعة واردة'];
-    protected array $expense = ['مصروف', 'فاتورة مشتريات', 'دفعة صادرة'];
-    protected array $dead    = ['ملغاة', 'مسودة'];
+    /** تصنيف المستندات المالية — تعريف واحد في config('hub.fin') لكل التقارير */
+    protected array $income;
+    protected array $expense;
+    protected array $dead;
+
+    public function __construct()
+    {
+        $this->income  = config('hub.fin.income');
+        $this->expense = config('hub.fin.expense');
+        $this->dead    = config('hub.fin.dead');
+    }
 
     public function index()
     {
-        abort_unless(auth()->user()->role?->is_owner, 403, 'لوحة CEO للمالكين فقط');
+        abort_unless(hub_is_owner(), 403, 'لوحة CEO للمالكين فقط');
 
-        $fin = fn () => DB::table('fin_documents')->whereNull('deleted_at')->whereNotIn('state', $this->dead);
+        // hub_fin_not_dead تُبقي «بلا حالة»: whereNotIn وحدها كانت تُسقط state=NULL صامتاً
+        $fin = fn () => hub_fin_not_dead(DB::table('fin_documents')->whereNull('deleted_at'), $this->dead);
         $sum = fn ($kinds, $from) => (float) $fin()->whereIn('kind', $kinds)->where('date', '>=', $from)->sum('total');
         $m0 = now()->startOfMonth()->toDateString();
         $y0 = now()->startOfYear()->toDateString();
@@ -25,12 +34,13 @@ class CeoController extends Controller
         $kpi = [
             'netM'    => $sum($this->income, $m0) - $sum($this->expense, $m0),
             'netY'    => $sum($this->income, $y0) - $sum($this->expense, $y0),
-            'unpaid'  => (float) $fin()->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة'])->sum(DB::raw('total - paid')),
-            'projects'=> DB::table('projects')->whereNull('deleted_at')->where(fn ($w) => $w->whereNull('status')->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مكتمل%')->where('status', 'NOT LIKE', '%ملغ%')))->count(),
+            // COALESCE: فاتورة لم يُدفع منها شيء paid=NULL — «total - NULL» تُسقطها من المجموع وهي أسوأ الحالات
+            'unpaid'  => (float) $fin()->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة'])->sum(DB::raw('total - COALESCE(paid, 0)')),
+            'projects'=> hub_open_scope(DB::table('projects')->whereNull('deleted_at'))->count(),
             'clients' => DB::table('clients')->whereNull('deleted_at')->count(),
             'emps'    => DB::table('employees')->whereNull('deleted_at')->count(),
-            'openTasks' => DB::table('tasks')->whereNull('deleted_at')->where(fn ($w) => $w->whereNull('status')->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مكتمل%')->where('status', 'NOT LIKE', '%منجز%')->where('status', 'NOT LIKE', '%ملغ%')))->count(),
-            'lateTasks' => DB::table('tasks')->whereNull('deleted_at')->whereNotNull('due')->where('due', '<', now()->toDateString())->where(fn ($w) => $w->whereNull('status')->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مكتمل%')->where('status', 'NOT LIKE', '%منجز%')->where('status', 'NOT LIKE', '%ملغ%')))->count(),
+            'openTasks' => hub_open_scope(DB::table('tasks')->whereNull('deleted_at'))->count(),
+            'lateTasks' => hub_open_scope(DB::table('tasks')->whereNull('deleted_at')->whereNotNull('due')->where('due', '<', now()->toDateString()))->count(),
         ];
 
         // صحة الشركة
@@ -39,7 +49,8 @@ class CeoController extends Controller
         // ٦ أشهر دخل/مصروف
         $months = [];
         for ($i = 5; $i >= 0; $i--) {
-            $a = now()->subMonths($i)->startOfMonth();
+            // NoOverflow: من 31 أغسطس subMonths(2) يفيض إلى 1 يوليو فيتكرر شهر ويختفي آخر
+            $a = now()->subMonthsNoOverflow($i)->startOfMonth();
             $b = $a->copy()->endOfMonth();
             $in = fn ($kinds) => (float) $fin()->whereIn('kind', $kinds)->whereBetween('date', [$a->toDateString(), $b->toDateString()])->sum('total');
             $months[] = ['l' => $a->translatedFormat('M'), 'i' => $in($this->income), 'e' => $in($this->expense)];
@@ -47,8 +58,7 @@ class CeoController extends Controller
         $max = max(1, ...array_merge(array_column($months, 'i'), array_column($months, 'e')));
 
         // تقدم المشاريع الجارية
-        $projects = DB::table('projects')->whereNull('deleted_at')
-            ->where(fn ($w) => $w->whereNull('status')->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مكتمل%')->where('status', 'NOT LIKE', '%ملغ%')))
+        $projects = hub_open_scope(DB::table('projects')->whereNull('deleted_at'))
             ->orderByDesc('created_at')->limit(6)->get(['id', 'name', 'status'])
             ->map(function ($p) { $p->progress = hub_progress($p->id)['pct']; return $p; });
 
@@ -63,16 +73,30 @@ class CeoController extends Controller
 
         // أعلى المستحقات
         $unpaidTop = $fin()->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة'])
-            ->orderByRaw('(total - paid) DESC')->limit(6)->get(['id', 'doc_no as no', 'partner', 'total', 'paid', 'due', 'state']);
+            ->orderByRaw('(total - COALESCE(paid, 0)) DESC')->orderByDesc('id')
+            ->limit(6)->get(['id', 'doc_no as no', 'partner', 'total', 'paid', 'due', 'state']);
 
         // توزيع المهام المفتوحة بالحالة (للدونات)
         $taskSlices = DB::table('tasks')->whereNull('deleted_at')
             ->select('status', DB::raw('COUNT(*) c'))->groupBy('status')->orderByDesc('c')->limit(6)->get()
             ->map(fn ($r) => ['label' => $r->status ?: 'بلا حالة', 'value' => (int) $r->c])->all();
 
+        // مسار المبيعات والإيراد المتكرر — أرقام القرار التجاري في لوحة القيادة
+        $pipe = hub_pipeline();
+        $mrr = hub_mrr();
+
         $currency = setting('app.currency', 'د.ك');
 
+        // طبقة القرار فوق طبقة الأرقام: ما ينتظرني · أين ينزف المال · أين الخطر
+        $awaiting = \App\Support\CeoBoard::awaiting(auth()->user());
+        $leaks = \App\Support\CeoBoard::leaks();
+        $conc = \App\Support\CeoBoard::concentration();
+        $risks = \App\Support\CeoBoard::risks();
+        $trend = \App\Support\CeoBoard::trend($months);
+        $gov = \App\Support\CeoBoard::governance();
+
         return view('ceo.index', compact('kpi', 'health', 'months', 'max', 'projects',
-            'onLeave', 'attToday', 'unpaidTop', 'taskSlices', 'currency'));
+            'onLeave', 'attToday', 'unpaidTop', 'taskSlices', 'pipe', 'mrr', 'currency',
+            'awaiting', 'leaks', 'conc', 'risks', 'trend', 'gov'));
     }
 }

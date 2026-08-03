@@ -4,16 +4,26 @@
 @if ($v === null || $v === '' || $v === [])
     <span class="sub">—</span>
 @elseif ($t === 'sec')
-    @php $canSec = auth()->user()?->role?->is_owner || hub_flag(auth()->user(), 'secrets') || hub_flag(auth()->user(), 'copySec'); @endphp
+    @php $canSec = hub_copy_secrets(); @endphp
     @if ($canSec && ($ctx ?? 'table') === 'show')
-        <span class="mono" data-sec hidden>{{ $v }}</span><span class="mono" data-secmask>••••••</span>
+        {{-- السر لا يُزرع في مصدر الصفحة: يُجلب من الخادم عند الكشف، فيُفرض تخويل
+             الخزنة ويُسجَّل «عرض حساس» عند كل كشفٍ فعلي لا عند فتح الصفحة --}}
+        <span class="mono" data-secmask>••••••</span>
         <button class="btn ghost xs" type="button"
-                onclick="var w=this.parentNode,s=w.querySelector('[data-sec]'),m=w.querySelector('[data-secmask]');s.hidden=!s.hidden;m.hidden=!m.hidden;this.textContent=s.hidden?'إظهار':'إخفاء'">إظهار</button>
+                data-reveal="{{ route('m.secret', [$module ?? request()->route('module'), $row->id, $key]) }}"
+                onclick="(function(b){var m=b.parentNode.querySelector('[data-secmask]');
+                    if(b.dataset.open){m.textContent='••••••';delete b.dataset.open;b.textContent='إظهار';return}
+                    b.disabled=true;
+                    fetch(b.dataset.reveal,{method:'POST',headers:{'X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]').content,'Accept':'application/json'}})
+                    .then(function(r){if(!r.ok)throw r.status;return r.json()})
+                    .then(function(j){m.textContent=j.v||'—';b.dataset.open='1';b.textContent='إخفاء';b.disabled=false})
+                    .catch(function(s){b.textContent=s===403?'غير مخوّل':'تعذّر الكشف';b.disabled=false})})(this)">إظهار</button>
     @else
         <span class="mono">••••••</span>
     @endif
 @elseif ($t === 'bool')
-    <span class="bdg {{ $v ? 'ok' : '' }}">{{ $v ? 'نعم' : 'لا' }}</span>
+    {{-- «نعم» شارة تلفت النظر؛ «لا» نصٌّ هادئ — شارات النفي كانت ضجيجاً بصرياً في كل صف --}}
+    @if ($v)<span class="bdg ok">✓ نعم</span>@else<span class="sub">لا</span>@endif
 @elseif ($t === 'sel')
     <span class="bdg {{ hub_tone($v) }}">{{ $v }}</span>
 @elseif ($t === 'ref' && ! empty($f['multi']))
@@ -34,7 +44,9 @@
 @elseif ($t === 'dt')
     <span class="mono">{{ str_replace('T', ' ', substr($v, 0, 16)) }}</span>
 @elseif ($t === 'num' || $t === 'big')
-    <span class="mono">{{ is_numeric($v) ? number_format((float) $v, 2) : $v }}</span>
+    {{-- الحقول المالية (بدلالة تسميتها العربية) تُعرض بعملتها: عملة السجل إن وُجدت وإلا عملة المنصة --}}
+    @php $money = (bool) preg_match('/قيمة|مبلغ|راتب|تكلفة|سعر|ميزانية|أجر|رسوم|دفعة|إيراد|مصروف/u', $f['label']); @endphp
+    <span class="mono">{{ is_numeric($v) ? number_format((float) $v, 2) : $v }}</span>@if ($money && is_numeric($v)) <span class="sub">{{ $row->currency ?? setting('app.currency', 'د.ك') }}</span>@endif
 @elseif ($t === 'ta')
     @if (($ctx ?? 'table') === 'show'){!! nl2br(e($v)) !!}@else{{ \Illuminate\Support\Str::limit($v, 60) }}@endif
 @else

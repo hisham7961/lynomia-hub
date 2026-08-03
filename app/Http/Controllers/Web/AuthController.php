@@ -42,7 +42,7 @@ class AuthController extends Controller
         }
 
         // قفل الطوارئ: يدخل المالكون فقط
-        if (setting('security.lockdown') && $user && ! $user->role?->is_owner) {
+        if (setting('security.lockdown') && $user && ! hub_is_owner($user)) {
             return $fail('النظام في قفل طوارئ مؤقت — الدخول للمالكين فقط');
         }
 
@@ -56,13 +56,9 @@ class AuthController extends Controller
                 $user->saveQuietly();   // عدّاد أمني — بلا تدقيق ولا إصدارات
             }
             // بصمة المحاولة الفاشلة في التدقيق — تُعرض في مركز الأمان
-            \App\Models\AuditEntry::create([
-                'user_id' => $user?->id, 'action' => 'دخول فاشل',
-                'name'    => substr($data['email'], 0, 290),
-                'ip'      => $r->ip(),
-                'device'  => substr((string) $r->userAgent(), 0, 200),
-                'created_at' => now(),
-            ]);
+            // البريد يُحفظ كاملاً (٢٩٠) لا مبتوراً عند ٦٠ — أثرٌ أمني يُقرأ لاحقاً
+            hub_audit('دخول فاشل', null, null, null,
+                ['user_id' => $user?->id, 'name' => substr($data['email'], 0, 290)]);
 
             return $fail();
         }
@@ -94,7 +90,7 @@ class AuthController extends Controller
         $u = User::find($r->session()->get('2fa:uid'));
         abort_unless($u, 404);
 
-        if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, (string) $r->input('code'))) {
+        if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, hub_str($r->input('code')))) {
             return back()->withErrors(['code' => 'الرمز غير صحيح أو انتهى — جرّب الرمز الحالي في التطبيق']);
         }
 
@@ -114,7 +110,12 @@ class AuthController extends Controller
             'last_login_ip'   => $r->ip(),
         ])->saveQuietly();
 
-        \App\Models\SessionLog::create([
+        // حارس الدخول: يتعلم العناوين المعتادة ويرصد الغريب وخارج الدوام
+        \App\Support\LoginSentry::inspect($u, (string) $r->ip());
+
+        // معرّف صفّ الجلسة يُحفَظ في الجلسة نفسها: بغيره لا نبضةَ حضورٍ ولا
+        // إنهاءَ عن بُعد — وهو ما جعل عمود revoked ميتاً منذ الهجرة الأولى
+        $log = \App\Models\SessionLog::create([
             'user_id'      => $u->id,
             'device'       => substr((string) $r->header('X-Device', $r->userAgent()), 0, 200),
             'ip'           => $r->ip(),
@@ -124,6 +125,7 @@ class AuthController extends Controller
         ]);
 
         $r->session()->regenerate();
+        $r->session()->put('hub.sl', $log->id);
 
         // شاشة البداية من تفضيل المستخدم — والرابط المقصود قبل الدخول يفوز عليها
         return redirect()->intended(hub_home_url(auth()->user()));

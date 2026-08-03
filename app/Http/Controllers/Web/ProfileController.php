@@ -77,7 +77,7 @@ class ProfileController extends Controller
     {
         $secret = (string) $r->session()->get('2fa:pending');
         abort_unless($secret !== '', 422);
-        if (! \App\Support\Totp::verify($secret, (string) $r->input('code'))) {
+        if (! \App\Support\Totp::verify($secret, hub_str($r->input('code')))) {
             return back()->withErrors(['code' => 'الرمز غير صحيح — تأكد من إدخال السر في التطبيق وأن ساعة الجوال مضبوطة']);
         }
 
@@ -95,7 +95,7 @@ class ProfileController extends Controller
     {
         $u = auth()->user();
         abort_unless($u->totp_enabled, 422);
-        if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, (string) $r->input('code'))) {
+        if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, hub_str($r->input('code')))) {
             return back()->withErrors(['code' => 'الرمز غير صحيح']);
         }
 
@@ -117,6 +117,30 @@ class ProfileController extends Controller
         auth()->user()->fill($d)->save();
 
         return redirect()->route('profile.edit')->with('ok', 'حُفظت بياناتك');
+    }
+
+    /**
+     * **وجهات التنبيه الشخصية** — الحلقةُ التي كانت ميتة: عاملُ التسليم يقرأ
+     * `notify_prefs` (تلجرام المستخدم وبريده البديل) منذ بنائه، ولا واجهةَ
+     * كانت تكتبها — فمحطةُ «تفضيل المستخدم» في سلسلة الوجهات لم تعمل يوماً.
+     */
+    public function notifyPrefs(Request $r)
+    {
+        $d = $r->validate([
+            'tg'    => ['nullable', 'string', 'max:60', 'regex:/^-?\d+$/'],
+            'email' => ['nullable', 'email', 'max:200'],
+        ], ['tg.regex' => 'معرف تلجرام رقمٌ (موجب للمحادثات، سالب للقنوات والمجموعات) — يستخرجه دليل مركز المراسلة'],
+           ['tg' => 'معرف تلجرام', 'email' => 'البريد البديل']);
+
+        $u = auth()->user();
+        $prefs = is_array($u->notify_prefs) ? $u->notify_prefs : [];
+        foreach (['tg', 'email'] as $k) {
+            $v = trim((string) ($d[$k] ?? ''));
+            if ($v === '') unset($prefs[$k]); else $prefs[$k] = $v;
+        }
+        $u->forceFill(['notify_prefs' => $prefs])->save();
+
+        return redirect()->route('profile.edit')->with('ok', 'حُفظت وجهات تنبيهك — تنبيهاتك القادمة ستسلك الوجهة الجديدة');
     }
 
     public function password(Request $r)

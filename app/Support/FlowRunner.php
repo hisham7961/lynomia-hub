@@ -17,11 +17,19 @@ use Illuminate\Database\Eloquent\Model;
 class FlowRunner
 {
     /** @param string $event created|updated|status */
+    /**
+     * نقطة النداء التاريخية من المتحكمات — صارت تُفوِّض للناقل.
+     * الناقل يُنادي الويبهوكس ثم المسارات بالترتيب نفسه، فالسلوك القائم لم يتغيّر،
+     * ويُضاف فوقه بثُّ الأحداث الدلالية.
+     */
     public static function fire(string $event, string $module, Model $m, ?string $statusTo = null): void
     {
-        // نفس نقاط الأحداث تغذي مركز Webhooks (ويب + API + كانبان)
-        WebhookDispatcher::fire($event, $module, $m, $statusTo);
+        HubEvents::dispatch($event, $module, $m, $statusTo);
+    }
 
+    /** تنفيذ المسارات المطابقة — مشتركٌ في الناقل، لا يُنادى مباشرة */
+    public static function run(string $event, string $module, Model $m, ?string $statusTo = null): void
+    {
         try {
             $flows = Flow::where('enabled', true)->where('module', $module)->where('event', $event)->get();
             if ($flows->isEmpty()) return;
@@ -30,18 +38,27 @@ class FlowRunner
             if (! $def) return;
 
             foreach ($flows as $flow) {
+                // مطابقة مطبَّعة كطبقة الأحداث الدلالية: status_to يُدخل نصاً حراً،
+                // فتنويعة همزة/تاء مربوطة («منجزه» عن «منجزة») كانت تعطّل المسار بصمت
                 if ($event === 'status' && trim((string) $flow->status_to) !== ''
-                    && trim((string) $flow->status_to) !== trim((string) $statusTo)) continue;
+                    && hub_ar_norm(trim((string) $flow->status_to)) !== hub_ar_norm(trim((string) $statusTo))) continue;
                 if (! self::condPass($flow, $def, $m)) continue;
 
+                $ok = 0;
                 foreach ((array) $flow->actions as $a) {
-                    try { self::act($a, $def, $module, $m); } catch (\Throwable $e) { /* إجراء واحد لا يوقف البقية */ }
+                    // إجراء واحد لا يوقف البقية — لكن عطله يُبلَّغ لا يُبتلع
+                    try { self::act($a, $def, $module, $m); $ok++; } catch (\Throwable $e) { report($e); }
                 }
-                $flow->increment('runs');
-                $flow->forceFill(['last_run_at' => now()])->saveQuietly();
+                // «آخر تشغيل: قبل دقيقة» لا تُكتب وكلُّ الإجراءات فشلت —
+                // كانت الشاشة تُظهر مساراً معطوباً بمظهر السليم
+                if ($ok) {
+                    $flow->increment('runs');
+                    $flow->forceFill(['last_run_at' => now()])->saveQuietly();
+                }
             }
         } catch (\Throwable $e) {
-            // المسارات لا تكسر العملية الأصلية أبداً
+            // المسارات لا تكسر العملية الأصلية أبداً — وعطلها يُبلَّغ كما تفعل HubAutomation
+            report($e);
         }
     }
 
@@ -58,7 +75,7 @@ class FlowRunner
         // مطابقة الحالة (الحدث مضمون: المسار مُختار لحدثه في الواجهة)
         $statusMatch = true; $statusWhy = '';
         if ($flow->event === 'status' && trim((string) $flow->status_to) !== '') {
-            $statusMatch = trim((string) $flow->status_to) === trim((string) $statusTo);
+            $statusMatch = hub_ar_norm(trim((string) $flow->status_to)) === hub_ar_norm(trim((string) $statusTo));
             $statusWhy = "الحالة المطلوبة «{$flow->status_to}»، والمُختبَرة «" . ($statusTo ?: '—') . '»';
         }
 
@@ -118,7 +135,10 @@ class FlowRunner
     {
         if (! $f->cond_field) return true;
         $field = collect($def['fields'])->firstWhere('key', $f->cond_field);
-        if (! $field) return true;
+        // حقلٌ اختفى من التعريف (أُعيدت تسميته، أو بُدّلت وحدة المسار): الشرط
+        // لا يُقيَّم فلا يمرّ — المرورُ المفتوح كان يحوّل مساراً مشروطاً
+        // بـ«المبلغ أكبر من ١٠٠٠» إلى مسارٍ يطلق على كل سجل بصمت
+        if (! $field) return false;
         $v = $m->{$field['col']};
         if (is_array($v)) $v = implode('،', $v);
         $v = (string) $v;
@@ -128,7 +148,8 @@ class FlowRunner
             'has'   => $want !== '' && mb_stripos($v, $want) !== false,
             'gt'    => is_numeric($v) && is_numeric($want) && (float) $v > (float) $want,
             'lt'    => is_numeric($v) && is_numeric($want) && (float) $v < (float) $want,
-            default => trim($v) === trim($want),
+            // تطبيع عربي كمطابقة الحالة — التنويعة الإملائية لا تعطّل الشرط
+            default => hub_ar_norm(trim($v)) === hub_ar_norm(trim($want)),
         };
     }
 
@@ -146,7 +167,10 @@ class FlowRunner
                     if (! $uid) continue;
                     HubNotification::create([
                         'user_id' => $uid, 'kind' => 'flow',
-                        'text' => $text ?: ('حدث في ' . $def['label']),
+                        // نصُّ إجراء المسار يصل بلا حدٍّ من شاشة المسارات، والعمود
+                        // ٦٠٠ — والفشل هنا **صامت** لأن act() ملفوفةٌ بـcatch
+                        'text' => hub_fit($text ?: ('حدث في ' . $def['label']),
+                            hub_col_max('notifications_hub', 'text') ?? 590),
                         'module' => $module, 'record_id' => $m->id,
                         'read' => false, 'created_at' => now(),
                     ]);
@@ -155,7 +179,7 @@ class FlowRunner
 
             case 'tg':
                 OutboxMessage::create([
-                    'kind' => 'flow', 'channel' => 'tg', 'text' => mb_substr($text, 0, 790),
+                    'kind' => 'flow', 'channel' => 'tg', 'text' => hub_fit($text, hub_col_max('outbox', 'text') ?? 790),
                     'state' => 'queued', 'created_at' => now(),
                 ]);
                 break;
@@ -163,7 +187,8 @@ class FlowRunner
             case 'mail':
                 OutboxMessage::create([
                     'kind' => 'flow', 'channel' => 'mail',
-                    'target' => (string) ($a['to_email'] ?? ''), 'text' => mb_substr($text, 0, 790),
+                    'target' => hub_fit((string) ($a['to_email'] ?? ''), hub_col_max('outbox', 'target') ?? 290),
+                    'text' => hub_fit($text, hub_col_max('outbox', 'text') ?? 790),
                     'state' => 'queued', 'created_at' => now(),
                 ]);
                 break;
@@ -192,12 +217,22 @@ class FlowRunner
     protected static function tpl(string $t, array $def, string $module, Model $m): string
     {
         if ($t === '') return '';
-        $t = str_replace(['{_display}', '{_module}', '{_by}'],
-            [self::display($def, $module, $m), $def['label'], auth()->user()->name ?? 'النظام'], $t);
 
-        return preg_replace_callback('/\{([A-Za-z_][A-Za-z0-9_]*)\}/u', function ($mm) use ($def, $m) {
+        // **تمريرةٌ واحدة على القالب الأصلي وحده.** كانت {_display}/{_by} تُستبدل
+        // أولاً ثم يمرّ الناتج كله على حلّال رموز الحقول — فسجلٌّ سُمّي «{secret}»
+        // أو مستخدمٌ اسمه «{salary}» يُحلّ رمزُه المحقون إلى قيمة الحقل الفعلية
+        // ويخرج في إشعارٍ أو تلجرام أو بريد: تسريبٌ لا يحتاج صلاحية مالك.
+        return preg_replace_callback('/\{([A-Za-z_][A-Za-z0-9_]*)\}/u', function ($mm) use ($def, $module, $m) {
+            switch ($mm[1]) {
+                case '_display': return self::display($def, $module, $m);
+                case '_module':  return $def['label'];
+                case '_by':      return auth()->user()->name ?? 'النظام';
+            }
             $f = collect($def['fields'])->firstWhere('key', $mm[1]);
             if (! $f) return $mm[0];
+            // الحقول السرية والملفات لا تُحلّ قالباً: النموذج يستثنيها من القوائم
+            // والكتابة ترفضها — وكان القالب وحده يسرّبها خامّةً خارج الخزنة
+            if (in_array($f['type'] ?? '', ['sec', 'file', 'img'], true)) return $mm[0];
             $v = $m->{$f['col']};
 
             return is_array($v) ? implode('،', $v) : (string) $v;
