@@ -43,6 +43,19 @@ class Employee extends Model
      */
     protected static function booted(): void
     {
+        // حارس التصعيد على ربط الحساب: تغييرُ user_id — من أي مسار، وأخطرُها النموذجُ
+        // العام الذي يكتب الحقل خاماً بلا accountTaken/mayTouch — لا يربط حساباً ذا
+        // امتياز (مالك/إدارة مستخدمين) ولا حساباً مأخوذاً بملفٍّ آخر إلا لمن يملك
+        // المساسَ به. link() يحرس مساره، وهذا آخرُ خطِّ دفاع يحرس الباقي.
+        static::saving(function (self $e) {
+            if (! $e->isDirty('user_id') || blank($e->user_id) || ! auth()->check()) return;
+            if (! ($target = \App\Models\User::find($e->user_id))) return;   // exists:users للمجهول
+            abort_unless(\App\Support\Staff::mayTouch($target), 403,
+                'هذا الحساب ذو امتياز — ربطُه بملفٍّ يتطلب صلاحيةً تعلوه');
+            abort_if(\App\Support\Staff::accountTaken($target->id, $e->id), 403,
+                'هذا الحساب مربوطٌ بملفٍّ آخر — الحساب لصاحبه');
+        });
+
         // إضافةُ ملفٍّ لبريدٍ له حسابٌ حرّ تربطهما فوراً — لا إنشاء ولا سرقةَ مربوط
         static::created(fn (self $e) => \App\Support\Staff::linkByEmail($e));
 
