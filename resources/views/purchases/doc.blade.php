@@ -68,9 +68,10 @@ td{padding:9px 12px;border-bottom:1px solid #e3ecea}
         </div>
     </div>
 
-    @if (count($items))
+    @php $showPrice = empty($hideAmount); @endphp
+    @if (count($items) && empty($hideItems))
     <table>
-        <thead><tr><th>البيان</th><th style="width:70px">الكمية</th>@if (! empty($showCartons))<th style="width:130px">الكراتين</th>@endif<th style="width:110px">سعر الوحدة</th><th style="width:110px">الإجمالي</th></tr></thead>
+        <thead><tr><th>البيان</th><th style="width:70px">الكمية</th>@if (! empty($showCartons))<th style="width:130px">الكراتين</th>@endif @if ($showPrice)<th style="width:110px">سعر الوحدة</th><th style="width:110px">الإجمالي</th>@endif</tr></thead>
         <tbody>
             @foreach ($items as $it)
                 <tr>
@@ -79,8 +80,10 @@ td{padding:9px 12px;border-bottom:1px solid #e3ecea}
                     @if (! empty($showCartons))
                         <td style="text-align:center">{{ $it['cartonText'] !== '' ? $it['cartonText'] : '—' }}@if (($it['per'] ?? null))<div style="font-size:10px;color:#888">الكرتونة {{ $it['per'] }} وحدة</div>@endif</td>
                     @endif
-                    <td>{{ $it['price'] !== null ? number_format($it['price'], 3) : '—' }}</td>
-                    <td>{{ $it['sum'] !== null ? number_format($it['sum'], 3) : '—' }}</td>
+                    @if ($showPrice)
+                        <td>{{ $it['price'] !== null ? number_format($it['price'], 3) : '—' }}</td>
+                        <td>{{ $it['sum'] !== null ? number_format($it['sum'], 3) : '—' }}</td>
+                    @endif
                 </tr>
             @endforeach
         </tbody>
@@ -89,7 +92,7 @@ td{padding:9px 12px;border-bottom:1px solid #e3ecea}
 
     <div class="tot"><table>
         @if (! empty($showCartons) && ($totalCartons ?? 0) > 0)<tr><td>إجمالي الكراتين الكاملة</td><td>{{ $totalCartons }} كرتونة</td></tr>@endif
-        <tr class="g"><td>الإجمالي</td><td>{{ number_format((float) $p->amount, 3) }} {{ $p->currency ?? '' }}</td></tr>
+        @if ($showPrice)<tr class="g"><td>الإجمالي</td><td>{{ number_format((float) $p->amount, 3) }} {{ $p->currency ?? '' }}</td></tr>@endif
     </table></div>
 
     @if ($p->notes)<div class="box" style="margin-bottom:26px"><h3>ملاحظات</h3>{{ $p->notes }}</div>@endif
