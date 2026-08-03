@@ -26,6 +26,11 @@ class FileController extends Controller
 
         abort_unless($this->mayRead($path), 403, 'هذا الملف يخصّ سجلاً خارج صلاحيتك');
 
+        // حاجز الإصابة يسري على خدمة الملفات بالمسار كما على التنزيل والمعاينة:
+        // مرفقٌ وُسم مصاباً لا يُبَثّ من هنا (هذا المسار يخدم مسارات المرفقات أيضاً).
+        abort_if(\App\Models\Attachment::where('path', $path)->where('av_status', 'infected')->exists(),
+            423, 'حُجب هذا الملف — وُسم مصاباً بفحص الفيروسات');
+
         foreach ([storage_path('app/' . $path), storage_path('app/public/' . $path)] as $abs) {
             if (is_file($abs)) {
                 /*

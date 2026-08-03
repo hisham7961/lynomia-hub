@@ -106,6 +106,9 @@ class AttachmentController extends Controller
     {
         $a = Attachment::findOrFail($id);
         $this->guardRecord($a->module, $a->record_id, 'v');
+        // نفس حاجز التنزيل: الملف المصاب لا يُقدَّم على المعاينة أيضاً — والأخطر أن
+        // صفحة السجل تُحمّل المعاينة تلقائياً في <img>/<iframe> فيُعرَض بلا ضغطة.
+        abort_if($a->av_status === 'infected', 423, 'حُجب هذا الملف — وُسم مصاباً بفحص الفيروسات');
         abort_unless(in_array($a->mime, self::INLINE_MIMES, true), 415, 'هذا النوع يُنزَّل ولا يُعاين');
 
         $abs = Storage::disk($a->disk ?: 'local')->path($a->path);
