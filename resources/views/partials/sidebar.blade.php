@@ -29,12 +29,17 @@
 
         {{-- مساحات العمل — الطريق الأساسي للمجالات (CTO م2): كل مساحة صفحة مركزية
              تُبلّغ عن وحداتها بدل قائمة مسطّحة من ٧١ رابطاً. مرشّحة بصلاحية المستخدم. --}}
-        @php $spaces = \App\Support\Workspaces::for(auth()->user()); @endphp
+        @php
+            $spaces = \App\Support\Workspaces::for(auth()->user());
+            // شارة انتباه المساحة: مجموع ما يستحق/تأخّر في وحداتها — أهمُّ إشارةٍ
+            // ملاحيّة بعد العدّ نفسه، منطَّقةٌ بصلاحية المستخدم فلا تسرّب رقماً
+            $wsAtt = \App\Support\Workspaces::attentionByWorkspace(auth()->user());
+        @endphp
         @if ($spaces)
             <div class="navsection">مساحات العمل</div>
             @foreach ($spaces as $wk => $w)
-                @php $wOn = request()->is('w/' . $wk); @endphp
-                <a class="ni {{ $wOn ? 'on' : '' }}" @if ($wOn) aria-current="page" @endif href="{{ route('workspace', $wk) }}">{{ $w['icon'] }} {{ $w['label'] }}</a>
+                @php $wOn = request()->is('w/' . $wk); $wa = (int) ($wsAtt[$wk] ?? 0); @endphp
+                <a class="ni {{ $wOn ? 'on' : '' }}" @if ($wOn) aria-current="page" @endif href="{{ route('workspace', $wk) }}">{{ $w['icon'] }} {{ $w['label'] }}@if ($wa)<span class="nbdg wsatt" title="{{ $wa }} يستحق أو تأخّر">{{ $wa }}</span>@endif</a>
             @endforeach
         @endif
 
