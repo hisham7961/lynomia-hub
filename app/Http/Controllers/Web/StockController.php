@@ -99,7 +99,16 @@ class StockController extends Controller
 
             // إن كانت مُرحَّلة يُعكس أثرها أولاً — الإلغاء الصادق يعيد الرصيد
             if (! empty($meta['posted_at']) && ($item = StockItem::whereKey($mv->item_id)->lockForUpdate()->first())) {
-                $item->qty = (float) $item->qty - (float) ($meta['delta'] ?? 0);
+                $delta = (float) ($meta['delta'] ?? 0);
+                // حارس النقص نفسُه الذي يحرس الترحيل (confirm): عكسُ استلامٍ استُهلك
+                // رصيدُه بحركاتٍ لاحقة يُنزل qty تحت الصفر. يُرفض بوضوح لا بصمت.
+                if ((float) $item->qty - $delta < 0) {
+                    abort(422, 'لا يمكن إلغاء الحركة: عكسُ أثرها يُنزل الرصيد تحت الصفر — المتاح '
+                        . rtrim(rtrim(number_format((float) $item->qty, 3), '0'), '.')
+                        . ' وعكسُها يخصم ' . rtrim(rtrim(number_format($delta, 3), '0'), '.')
+                        . '. عالِج الحركات اللاحقة على الصنف أولاً.');
+                }
+                $item->qty = (float) $item->qty - $delta;
                 $item->saveQuietly();
                 hub_stock_sync($item);
             }
