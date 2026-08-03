@@ -159,9 +159,20 @@ class ProfileController extends Controller
         $u = auth()->user();
         $u->password = $r->input('password');            // cast hashed يتكفّل بالتجزئة
         $u->password_changed_at = now();
+        // تدوير رمز «تذكّرني»: كعكاتُه على كل الأجهزة (٤٠٠ يوم) تموت فوراً — وإلا
+        // بقيت بيد المهاجم صالحةً رغم تغيير الكلمة، فلا يتحقق غرضُ التغيير الأمني.
+        $u->setRememberToken(\Illuminate\Support\Str::random(60));
         $u->save();
 
-        // تدوير معرّف الجلسة بعد تغيير كلمة المرور
+        // وجلساتُ الأجهزة الأخرى الحيّة تُوسم منتهية فيطردها SessionSentry مع طلبها
+        // التالي — تغييرُ الكلمة عند الاشتباه بتسريبها يطرد المهاجم فعلاً.
+        \Illuminate\Support\Facades\DB::table('sessions_log')
+            ->where('user_id', $u->id)
+            ->where('id', '!=', (string) $r->session()->get('hub.sl', ''))
+            ->where('revoked', false)
+            ->update(['revoked' => true]);
+
+        // تدوير معرّف الجلسة الحالية بعد تغيير كلمة المرور
         $r->session()->regenerate();
 
         return redirect()->route('profile.edit')->with('ok', 'غُيّرت كلمة المرور بنجاح');
