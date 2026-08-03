@@ -5,6 +5,11 @@
     'sub' => 'مبنية مباشرة على وحدة المالية — الملغاة والمسودات مستثناة'])
     <button class="btn ghost sm" onclick="window.print()">🖨 طباعة</button>
 @endcomponent
+@if ($mixed ?? false)
+<div class="card" style="border-inline-start:3px solid var(--bad);margin-bottom:12px">
+    <div class="sub">⚠ <b>قد تختلط العملات:</b> مستنداتك تحمل أكثر من عملة، والأرقام المجمّعة هنا تُعرض بعملةٍ واحدة ({{ $currency }}) دون تحويل — لا محرّك أسعار في النظام. اقرأها مؤشّراً عاماً لا رقماً دقيقاً.</div>
+</div>
+@endif
 <div class="cards">
     <div class="stat"><span class="ico">📈</span><b>{{ number_format($cards['inc'], 2) }}</b><span>دخل هذا الشهر ({{ $currency }})</span></div>
     <div class="stat"><span class="ico">📉</span><b>{{ number_format($cards['exp'], 2) }}</b><span>مصروف هذا الشهر</span></div>
