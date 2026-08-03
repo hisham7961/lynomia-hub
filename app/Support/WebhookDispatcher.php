@@ -106,7 +106,11 @@ class WebhookDispatcher
         $code = null; $err = null; $ok = false;
 
         try {
-            $resp = Http::timeout(10)
+            // **لا اتّباع لإعادة التوجيه**: بوابة SSRF (hub_outbound_ok) تفحص الوجهة
+            // وقت الإنشاء فقط، ووجهةٌ عامّة تردّ 302 نحو 169.254.169.254/الداخل كانت
+            // تُتّبع فيصير التسليمُ مِجَسّاً على الشبكة الداخلية. نفس حارس Uptime.php.
+            $resp = Http::withOptions(['allow_redirects' => false])
+                ->timeout(10)
                 ->withBody($d->payload, 'application/json')
                 ->withHeaders([
                     'X-Hub-Event'     => $d->event,
