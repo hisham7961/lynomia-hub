@@ -262,7 +262,7 @@ class FlowController extends Controller
 
         $class = '\\App\\Models\\' . $def['model'];
         $recent = class_exists($class)
-            ? $class::query()->orderByDesc('created_at')->limit(20)
+            ? $class::query()->orderByDesc('created_at')->orderByDesc('id')->limit(20)
                 ->get(['id', hub_display_col($flow->module), 'created_at'])
             : collect();
 

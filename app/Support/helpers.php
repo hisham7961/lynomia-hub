@@ -1074,12 +1074,23 @@ if (! function_exists('hub_block_if_queued')) {
 }
 
 if (! function_exists('hub_approvers')) {
-    /** المعتمدون: المالكون + حاملو علم approve */
+    /**
+     * المعتمدون: المالكون + حاملو علم approve — بذاكرة طلبٍ واحد:
+     * إجراء notify في مسارٍ يُطلق على ٢٠٠ سجل جماعياً كان يحمّل جدول
+     * المستخدمين بأدواره ٢٠٠ مرة في الطلب الواحد.
+     */
     function hub_approvers(): array
     {
-        return \App\Models\User::whereNull('deleted_at')->with('role')->get()
+        // ذاكرة الحاوية لا static: الحاوية تُنسف بين الطلبات (وOctane والاختبارات)
+        // بينما static تعمّر عمر العملية فتخدم قائمة معتمدين قديمة
+        if (app()->bound('hub.approvers')) return app('hub.approvers');
+
+        $ids = \App\Models\User::whereNull('deleted_at')->with('role')->get()
             ->filter(fn ($u) => $u->role?->is_owner || hub_flag($u, 'approve'))
             ->pluck('id')->values()->all();
+        app()->instance('hub.approvers', $ids);
+
+        return $ids;
     }
 }
 

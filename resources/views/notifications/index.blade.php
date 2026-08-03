@@ -15,8 +15,9 @@
 
 <div class="card pad0">
     @forelse ($items as $n)
-        @php $url = ($n->module && $n->record_id && hub_mod($n->module)) ? route('m.show', [$n->module, $n->record_id]) : null; @endphp
-        {{-- v2.129: بلا وجهة = ليس رابطاً — كان href="javascript:void" يُعلن رابطاً كاذباً للقارئ الشاشي --}}
+        @php $url = ($n->module && $n->record_id && hub_mod($n->module)) ? route('notifications.go', $n->id) : null; @endphp
+        {{-- v2.129: بلا وجهة = ليس رابطاً — كان href="javascript:void" يُعلن رابطاً كاذباً للقارئ الشاشي.
+             الرابط عبر notifications.go: فتحُ الإشعار يُقرّئه ثم ينقل لوجهته --}}
         <{{ $url ? 'a' : 'div' }} class="gitem" @if($url) href="{{ hub_safe_url($url) }}" @endif
            style="padding:12px 16px;{{ $n->read ? 'opacity:.62' : '' }}">
             @unless ($n->read)<span style="width:8px;height:8px;border-radius:50%;background:var(--p);flex-shrink:0"></span>@endunless
@@ -26,7 +27,9 @@
                     @if ($n->module && hub_mod($n->module)) · {{ hub_mod($n->module)['label'] }} @endif
                 </span>
             </span>
-        </a>
+        {{-- وسم الإغلاق يطابق وسم الفتح: كان </a> حرفياً دائماً فيبقى div الإشعار
+             بلا وجهةٍ (الموجز اليومي، الأمنيات) مفتوحاً وتتعشّش العناصر بعده --}}
+        </{{ $url ? 'a' : 'div' }}>
     @empty
         @include('partials.empty', ['icon' => '🔔', 'text' => $unread ? 'لا إشعارات غير مقروءة 🎉' : 'لا إشعارات بعد'])
     @endforelse

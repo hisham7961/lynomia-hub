@@ -467,20 +467,25 @@ class ModuleController extends Controller
 
         $options = $this->statusOptions($def);
         if (! $options) {
-            $options = hub_scope($class::whereNotNull($statusCol), $module)->distinct()->limit(8)->pluck($statusCol)->all();
+            // ترتيبٌ صريح: distinct بلا orderBy كان يعيد الأعمدة بترتيبٍ يقترعه المحرّك
+            $options = hub_scope($class::whereNotNull($statusCol), $module)
+                ->distinct()->orderBy($statusCol)->limit(8)->pluck($statusCol)->all();
         }
         abort_unless($options, 404, 'لا حالات معرّفة بعد — أضف سجلات أولاً');
 
         $trash = false; $filters = [];
         $rows = $this->buildQuery($r->merge(['status' => null]), $def, $class, $trash, $filters)
-            ->orderByDesc('created_at')->limit(400)->get();
+            ->orderByDesc('created_at')->orderByDesc('id')->limit(400)->get();
 
         $disp = hub_display_col($module);
         $cols = [];
         foreach ($options as $o) $cols[$o] = [];
         foreach ($rows as $row) {
-            $st = $row->{$statusCol} ?? '';
-            if (! isset($cols[$st])) continue;
+            $st = (string) ($row->{$statusCol} ?? '');
+            // حالةٌ خارج أعمدة اللوحة (خيارٌ أُزيل من الإعداد، قيمة قديمة، فراغ):
+            // كانت تُتخطى بصمت — سجلٌّ ظاهر في القائمة مختفٍ من اللوحة ولا أحد
+            // يعلم أن لديه بطاقات ضائعة. عمودُ «غير مصنّفة» يُظهرها ليُصحَّح حالها.
+            if (! isset($cols[$st])) { $cols['⚠ غير مصنّفة'][] = $row; continue; }
             $cols[$st][] = $row;
         }
 
@@ -561,23 +566,26 @@ class ModuleController extends Controller
 
         $trash = false; $filters = [];
         $rows = $this->buildQuery($r, $def, $class, $trash, $filters)
-            ->orderByDesc('created_at')->limit(5000)->get();
+            ->orderByDesc('created_at')->orderByDesc('id')->limit(5000)->get();
 
         // بصمة التصدير في التدقيق — تُعرض في مركز الأمان
         hub_audit('تصدير', $module, null, $rows->count() . ' سجل (CSV)');
 
-        return $this->streamCsv($module, $def, $rows);
+        // البتر لا يكون صامتاً: من صدّر قائمةً أكبر من السقف يعلم أنها قُصّت
+        return $this->streamCsv($module, $def, $rows, $rows->count() >= 5000);
     }
 
     /** بث CSV بترويسة BOM (يقرأ Excel العربية) — تستعمله «تصدير القائمة» و«تصدير المحدد» */
-    protected function streamCsv(string $module, array $def, $rows)
+    protected function streamCsv(string $module, array $def, $rows, bool $truncated = false)
     {
         [$columns, $labels] = $this->columnsAndLabels($def, $rows->all());
 
-        return response()->streamDownload(function () use ($rows, $columns, $labels) {
+        return response()->streamDownload(function () use ($rows, $columns, $labels, $truncated) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, array_column($columns, 'label'));
+            // معامل escape الفارغ صراحةً: سلوك RFC 4180 كما يقرأ Excel، ويُسكت
+            // تحذير PHP 8.4 «$escape الافتراضي سيتغير» المتكرر مع كل سطر
+            fputcsv($out, array_column($columns, 'label'), ',', '"', '');
             foreach ($rows as $row) {
                 $line = [];
                 foreach ($columns as $f) {
@@ -592,7 +600,10 @@ class ModuleController extends Controller
                     if (is_string($v) && $v !== '' && strpbrk($v[0], "=+-@\t\r") !== false) $v = "'" . $v;
                     $line[] = $v;
                 }
-                fputcsv($out, $line);
+                fputcsv($out, $line, ',', '"', '');
+            }
+            if ($truncated) {
+                fputcsv($out, ['⚠ قُصّ التصدير عند ٥٠٠٠ صف — ضيّق الفلاتر وصدّر على دفعات'], ',', '"', '');
             }
             fclose($out);
         }, $module . '-' . now()->format('Y-m-d') . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);

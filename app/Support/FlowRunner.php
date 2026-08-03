@@ -38,8 +38,10 @@ class FlowRunner
             if (! $def) return;
 
             foreach ($flows as $flow) {
+                // مطابقة مطبَّعة كطبقة الأحداث الدلالية: status_to يُدخل نصاً حراً،
+                // فتنويعة همزة/تاء مربوطة («منجزه» عن «منجزة») كانت تعطّل المسار بصمت
                 if ($event === 'status' && trim((string) $flow->status_to) !== ''
-                    && trim((string) $flow->status_to) !== trim((string) $statusTo)) continue;
+                    && hub_ar_norm(trim((string) $flow->status_to)) !== hub_ar_norm(trim((string) $statusTo))) continue;
                 if (! self::condPass($flow, $def, $m)) continue;
 
                 $ok = 0;
@@ -73,7 +75,7 @@ class FlowRunner
         // مطابقة الحالة (الحدث مضمون: المسار مُختار لحدثه في الواجهة)
         $statusMatch = true; $statusWhy = '';
         if ($flow->event === 'status' && trim((string) $flow->status_to) !== '') {
-            $statusMatch = trim((string) $flow->status_to) === trim((string) $statusTo);
+            $statusMatch = hub_ar_norm(trim((string) $flow->status_to)) === hub_ar_norm(trim((string) $statusTo));
             $statusWhy = "الحالة المطلوبة «{$flow->status_to}»، والمُختبَرة «" . ($statusTo ?: '—') . '»';
         }
 
@@ -146,7 +148,8 @@ class FlowRunner
             'has'   => $want !== '' && mb_stripos($v, $want) !== false,
             'gt'    => is_numeric($v) && is_numeric($want) && (float) $v > (float) $want,
             'lt'    => is_numeric($v) && is_numeric($want) && (float) $v < (float) $want,
-            default => trim($v) === trim($want),
+            // تطبيع عربي كمطابقة الحالة — التنويعة الإملائية لا تعطّل الشرط
+            default => hub_ar_norm(trim($v)) === hub_ar_norm(trim($want)),
         };
     }
 

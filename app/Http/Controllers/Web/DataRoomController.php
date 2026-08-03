@@ -27,9 +27,11 @@ class DataRoomController extends Controller
     public function index()
     {
         $this->gate();
-        $links = ShareLink::orderByDesc('created_at')->limit(60)->get();
+        $links = ShareLink::orderByDesc('created_at')->orderByDesc('id')->limit(60)->get();
+        // سقفٌ صريح: كانت الشاشة تسحب كل السجل التاريخي للمشاهدات إلى الذاكرة —
+        // رابطٌ متداول واحد يعني آلاف الصفوف لمجرد عرض الأحدث
         $lastViews = DB::table('share_views')->whereIn('share_id', $links->pluck('id'))
-            ->orderByDesc('created_at')->get()->groupBy('share_id');
+            ->orderByDesc('created_at')->orderByDesc('id')->limit(300)->get()->groupBy('share_id');
 
         return view('dataroom.index', compact('links', 'lastViews'));
     }
@@ -63,9 +65,15 @@ class DataRoomController extends Controller
     public function revoke(string $id)
     {
         $this->gate();
-        ShareLink::findOrFail($id)->update(['revoked' => true]);
+        $link = ShareLink::findOrFail($id);
+        $link->update(['revoked' => true]);
+        // أقل احتفاظ: لا un-revoke في النظام، فالملف بعد الإلغاء غير قابل للوصول
+        // من أي مسار — إبقاؤه (مستندٌ وُصف حساساً أصلاً) على القرص أبداً تراكمُ خطر
+        if ($link->path && is_file(storage_path('app/' . $link->path))) {
+            @unlink(storage_path('app/' . $link->path));
+        }
 
-        return back()->with('ok', 'أُلغي الرابط فوراً — لن يفتح بعد الآن');
+        return back()->with('ok', 'أُلغي الرابط فوراً ومُحي ملفه من الخادم');
     }
 
     /* ────────── الوجه العام (بلا تسجيل دخول) ────────── */
