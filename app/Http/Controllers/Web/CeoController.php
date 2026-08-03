@@ -24,7 +24,8 @@ class CeoController extends Controller
     {
         abort_unless(hub_is_owner(), 403, 'لوحة CEO للمالكين فقط');
 
-        $fin = fn () => DB::table('fin_documents')->whereNull('deleted_at')->whereNotIn('state', $this->dead);
+        // hub_fin_not_dead تُبقي «بلا حالة»: whereNotIn وحدها كانت تُسقط state=NULL صامتاً
+        $fin = fn () => hub_fin_not_dead(DB::table('fin_documents')->whereNull('deleted_at'), $this->dead);
         $sum = fn ($kinds, $from) => (float) $fin()->whereIn('kind', $kinds)->where('date', '>=', $from)->sum('total');
         $m0 = now()->startOfMonth()->toDateString();
         $y0 = now()->startOfYear()->toDateString();
@@ -33,7 +34,8 @@ class CeoController extends Controller
         $kpi = [
             'netM'    => $sum($this->income, $m0) - $sum($this->expense, $m0),
             'netY'    => $sum($this->income, $y0) - $sum($this->expense, $y0),
-            'unpaid'  => (float) $fin()->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة'])->sum(DB::raw('total - paid')),
+            // COALESCE: فاتورة لم يُدفع منها شيء paid=NULL — «total - NULL» تُسقطها من المجموع وهي أسوأ الحالات
+            'unpaid'  => (float) $fin()->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة'])->sum(DB::raw('total - COALESCE(paid, 0)')),
             'projects'=> hub_open_scope(DB::table('projects')->whereNull('deleted_at'))->count(),
             'clients' => DB::table('clients')->whereNull('deleted_at')->count(),
             'emps'    => DB::table('employees')->whereNull('deleted_at')->count(),
@@ -47,7 +49,8 @@ class CeoController extends Controller
         // ٦ أشهر دخل/مصروف
         $months = [];
         for ($i = 5; $i >= 0; $i--) {
-            $a = now()->subMonths($i)->startOfMonth();
+            // NoOverflow: من 31 أغسطس subMonths(2) يفيض إلى 1 يوليو فيتكرر شهر ويختفي آخر
+            $a = now()->subMonthsNoOverflow($i)->startOfMonth();
             $b = $a->copy()->endOfMonth();
             $in = fn ($kinds) => (float) $fin()->whereIn('kind', $kinds)->whereBetween('date', [$a->toDateString(), $b->toDateString()])->sum('total');
             $months[] = ['l' => $a->translatedFormat('M'), 'i' => $in($this->income), 'e' => $in($this->expense)];
@@ -70,7 +73,8 @@ class CeoController extends Controller
 
         // أعلى المستحقات
         $unpaidTop = $fin()->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة'])
-            ->orderByRaw('(total - paid) DESC')->limit(6)->get(['id', 'doc_no as no', 'partner', 'total', 'paid', 'due', 'state']);
+            ->orderByRaw('(total - COALESCE(paid, 0)) DESC')->orderByDesc('id')
+            ->limit(6)->get(['id', 'doc_no as no', 'partner', 'total', 'paid', 'due', 'state']);
 
         // توزيع المهام المفتوحة بالحالة (للدونات)
         $taskSlices = DB::table('tasks')->whereNull('deleted_at')

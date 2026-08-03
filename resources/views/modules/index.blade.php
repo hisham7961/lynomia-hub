@@ -16,6 +16,12 @@
     <div class="spacer"></div>
     {{-- الإجراءات في الترويسة نفسها — نمط «رأس صفحةٍ» واحد: الهوية بدايةً والفعل نهايةً --}}
     <div class="rh-acts">
+        {{-- تثبيت الوحدة في رصيف «مثبّتاتي» بالشريط — نقرةٌ من مكانها --}}
+        @php $pinTok = 'm:' . $module; $isPin = hub_is_pinned($pinTok); @endphp
+        <form method="POST" action="{{ route('prefs.pin') }}" class="inline">@csrf
+            <input type="hidden" name="token" value="{{ $pinTok }}">
+            <button class="btn ghost sm" title="{{ $isPin ? 'مثبّتة — انقر للإزالة' : 'ثبّت في الشريط الجانبي' }}">{{ $isPin ? '📌 مثبّتة' : '📌 تثبيت' }}</button>
+        </form>
         @if (! $trash && ($def['status'] ?? null))
             <a class="btn ghost sm" href="{{ route('m.board', $module) }}">🗂 كانبان</a>
         @endif

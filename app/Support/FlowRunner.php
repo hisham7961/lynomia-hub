@@ -42,14 +42,21 @@ class FlowRunner
                     && trim((string) $flow->status_to) !== trim((string) $statusTo)) continue;
                 if (! self::condPass($flow, $def, $m)) continue;
 
+                $ok = 0;
                 foreach ((array) $flow->actions as $a) {
-                    try { self::act($a, $def, $module, $m); } catch (\Throwable $e) { /* إجراء واحد لا يوقف البقية */ }
+                    // إجراء واحد لا يوقف البقية — لكن عطله يُبلَّغ لا يُبتلع
+                    try { self::act($a, $def, $module, $m); $ok++; } catch (\Throwable $e) { report($e); }
                 }
-                $flow->increment('runs');
-                $flow->forceFill(['last_run_at' => now()])->saveQuietly();
+                // «آخر تشغيل: قبل دقيقة» لا تُكتب وكلُّ الإجراءات فشلت —
+                // كانت الشاشة تُظهر مساراً معطوباً بمظهر السليم
+                if ($ok) {
+                    $flow->increment('runs');
+                    $flow->forceFill(['last_run_at' => now()])->saveQuietly();
+                }
             }
         } catch (\Throwable $e) {
-            // المسارات لا تكسر العملية الأصلية أبداً
+            // المسارات لا تكسر العملية الأصلية أبداً — وعطلها يُبلَّغ كما تفعل HubAutomation
+            report($e);
         }
     }
 
@@ -126,7 +133,10 @@ class FlowRunner
     {
         if (! $f->cond_field) return true;
         $field = collect($def['fields'])->firstWhere('key', $f->cond_field);
-        if (! $field) return true;
+        // حقلٌ اختفى من التعريف (أُعيدت تسميته، أو بُدّلت وحدة المسار): الشرط
+        // لا يُقيَّم فلا يمرّ — المرورُ المفتوح كان يحوّل مساراً مشروطاً
+        // بـ«المبلغ أكبر من ١٠٠٠» إلى مسارٍ يطلق على كل سجل بصمت
+        if (! $field) return false;
         $v = $m->{$field['col']};
         if (is_array($v)) $v = implode('،', $v);
         $v = (string) $v;
@@ -204,12 +214,22 @@ class FlowRunner
     protected static function tpl(string $t, array $def, string $module, Model $m): string
     {
         if ($t === '') return '';
-        $t = str_replace(['{_display}', '{_module}', '{_by}'],
-            [self::display($def, $module, $m), $def['label'], auth()->user()->name ?? 'النظام'], $t);
 
-        return preg_replace_callback('/\{([A-Za-z_][A-Za-z0-9_]*)\}/u', function ($mm) use ($def, $m) {
+        // **تمريرةٌ واحدة على القالب الأصلي وحده.** كانت {_display}/{_by} تُستبدل
+        // أولاً ثم يمرّ الناتج كله على حلّال رموز الحقول — فسجلٌّ سُمّي «{secret}»
+        // أو مستخدمٌ اسمه «{salary}» يُحلّ رمزُه المحقون إلى قيمة الحقل الفعلية
+        // ويخرج في إشعارٍ أو تلجرام أو بريد: تسريبٌ لا يحتاج صلاحية مالك.
+        return preg_replace_callback('/\{([A-Za-z_][A-Za-z0-9_]*)\}/u', function ($mm) use ($def, $module, $m) {
+            switch ($mm[1]) {
+                case '_display': return self::display($def, $module, $m);
+                case '_module':  return $def['label'];
+                case '_by':      return auth()->user()->name ?? 'النظام';
+            }
             $f = collect($def['fields'])->firstWhere('key', $mm[1]);
             if (! $f) return $mm[0];
+            // الحقول السرية والملفات لا تُحلّ قالباً: النموذج يستثنيها من القوائم
+            // والكتابة ترفضها — وكان القالب وحده يسرّبها خامّةً خارج الخزنة
+            if (in_array($f['type'] ?? '', ['sec', 'file', 'img'], true)) return $mm[0];
             $v = $m->{$f['col']};
 
             return is_array($v) ? implode('،', $v) : (string) $v;

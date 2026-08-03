@@ -512,6 +512,11 @@ class ModuleController extends Controller
     public function setStatus(Request $r, string $module, string $id)
     {
         [$def, $class] = $this->resolve($module, 'e');
+
+        // سحبُ البطاقة تعديلُ حالةٍ كأي تعديل: التعديل الفردي يصفّ طلباً،
+        // والجماعي والاستعادة يُردّان — وكان السحب وحده يكتب مباشرةً.
+        // القاعدة التي يلتفّ عليها سحبُ إصبعٍ ليست قاعدة.
+        if ($msg = hub_block_if_queued($module, 'e')) abort(422, $msg);
         /*
          * **العمود لا المفتاح.** `$def['status']` مفتاحُ الحقل، وقد يخالف عمودَه
          * (`files`: `docStatus` ↔ `doc_status`). فسحبُ بطاقةٍ في لوحة كانبان على

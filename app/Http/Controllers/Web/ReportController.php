@@ -27,7 +27,7 @@ class ReportController extends Controller
         // النطاق والعزل يسريان على التقرير كما يسريان على القوائم — المعزول يرى شركاته فقط،
         // والشركة النشطة من المحوّل تركّز الأرقام عليها
         $base = fn () => hub_company_scope(
-            hub_scope(DB::table($t)->whereNull('deleted_at')->whereNotIn('state', $this->dead), 'fin'), 'fin');
+            hub_scope(hub_fin_not_dead(DB::table($t)->whereNull('deleted_at'), $this->dead), 'fin'), 'fin');
 
         $mStart = now()->startOfMonth()->toDateString();
         $sum = fn ($kinds, $from = null) => (float) $base()->whereIn('kind', $kinds)
@@ -42,7 +42,8 @@ class ReportController extends Controller
 
         $months = [];
         for ($i = 5; $i >= 0; $i--) {
-            $m0 = now()->subMonths($i)->startOfMonth();
+            // NoOverflow: من 31 أغسطس subMonths(2) يفيض إلى 1 يوليو فيتكرر شهر ويختفي آخر
+            $m0 = now()->subMonthsNoOverflow($i)->startOfMonth();
             $m1 = $m0->copy()->endOfMonth();
             $inRange = fn ($kinds) => (float) $base()->whereIn('kind', $kinds)
                 ->whereBetween('date', [$m0->toDateString(), $m1->toDateString()])->sum('total');

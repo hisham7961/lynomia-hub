@@ -54,7 +54,9 @@ class ProjectCostTest extends TestCase
             'project_id' => $p->id, 'amount' => 30, 'cycle' => 'شهري',
             'renew' => now()->addMonth()->toDateString(), 'created_at' => now(), 'updated_at' => now()]);
 
-        FinDocument::create(['doc_no' => 'INV-1', 'kind' => 'فاتورة', 'project_id' => $p->id,
+        // النوع الحقيقي الذي يكتبه النظام (QuoteController وخيارات الوحدة) —
+        // الحرفي القديم «فاتورة» كان يُخضرّ الاختبار بينما الإنتاج يحسب إيراداً صفرياً
+        FinDocument::create(['doc_no' => 'INV-1', 'kind' => 'فاتورة مبيعات', 'project_id' => $p->id,
             'total' => 4000, 'paid' => 2500, 'date' => now()->toDateString()]);
         FinDocument::create(['doc_no' => 'EXP-1', 'kind' => 'مصروف', 'project_id' => $p->id,
             'total' => 300, 'date' => now()->toDateString()]);

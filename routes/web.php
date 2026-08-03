@@ -207,6 +207,7 @@ Route::middleware('auth')->group(function () {
     Route::get('personalize', [PrefController::class, 'edit'])->name('prefs.edit');
     Route::post('personalize', [PrefController::class, 'update'])->name('prefs.update');
     Route::post('personalize/reset', [PrefController::class, 'reset'])->name('prefs.reset');
+    Route::post('personalize/pin', [PrefController::class, 'togglePin'])->name('prefs.pin');
     Route::post('personalize/cols', [PrefController::class, 'saveCols'])->name('prefs.cols');
     Route::post('views', [PrefController::class, 'storeView'])->name('views.store');
     Route::post('views/{id}/default', [PrefController::class, 'defaultView'])->name('views.default');
