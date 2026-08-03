@@ -34,7 +34,14 @@ class ApiToken extends Model
         foreach (preg_split('/[،,\s]+/u', $s, -1, PREG_SPLIT_NO_EMPTY) as $part) {
             [$mod, $ops] = array_pad(explode(':', $part, 2), 2, '');
             if ($mod !== $module && $mod !== '*') continue;
-            if ($ops === '' || str_contains($ops, $op)) return true;
+            if ($ops === '') return true;   // وحدة بلا تقييد عمليات = كل العمليات
+
+            // العمليات مجموعةُ رموزٍ من {v,a,e,d}؛ أيُّ حرفٍ خارجها يجعل النطاق مشوَّهاً
+            // (كلمةٌ مثل «read»/«view») فيُرفض بأمان لا يُطابَق حرفيّاً — «read» تحوي
+            // الحرف d لكنها لا تعني الحذف. str_contains القديم كان يمنحه.
+            $codes = str_split($ops);
+            if (array_diff($codes, ['v', 'a', 'e', 'd'])) continue;
+            if (in_array($op, $codes, true)) return true;
         }
 
         return false;
