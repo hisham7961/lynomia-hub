@@ -37,8 +37,10 @@ class HubAutomation extends Command
         $e = $this->esignReminders();
         $c = $this->contractsAuto();
         $b = $this->budgetsAuto();
+        $o = $this->obligationsAuto();
+        $p = $this->pruneNotifications();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم");
 
         \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.automation'], ['value' => now()->toIso8601String()]);
         \Illuminate\Support\Facades\Cache::forget('settings:all');
@@ -380,6 +382,52 @@ class HubAutomation extends Command
                 'read'       => false,
                 'created_at' => now(),
             ]);
+        }
+    }
+
+    /**
+     * الالتزام المتجاوز استحقاقَه يُقلب «متأخر» آلياً — كانت الحالة موثّقةً في
+     * الهجرة ومبذورةً قاعدةَ تنبيهٍ ومسارَ عملٍ («🔴 التزام تعاقدي متأخر»)
+     * ولا شيء في النظام يكتبها: حبرٌ على ورق لا يُطلق تنبيهاً أبداً.
+     */
+    protected function obligationsAuto(): int
+    {
+        try {
+            if (! \Illuminate\Support\Facades\Schema::hasTable('contract_obligations')) return 0;
+            $due = \App\Models\ContractObligation::where('status', 'قائم')
+                ->whereNotNull('due')->where('due', '<', now()->toDateString())->get();
+            if ($this->dry) return $due->count();
+
+            $n = 0;
+            foreach ($due as $ob) {
+                $ob->forceFill(['status' => 'متأخر'])->save();
+                // عبر النموذج لا update جماعي: مسارات «متأخر» وقواعده المبذورة تُطلَق
+                \App\Support\FlowRunner::fire('status', 'obligations', $ob, 'متأخر');
+                $n++;
+            }
+
+            return $n;
+        } catch (\Throwable $e) {
+            report($e);
+            return 0;
+        }
+    }
+
+    /**
+     * تقليم جرس الإشعارات: كان notifications_hub يتراكم بلا حذفٍ إطلاقاً بينما
+     * الجرسُ يَعُدّ عليه في كل تحميل صفحة — المقروء يذهب بعد ٩٠ يوماً،
+     * وكلُّ شيء بعد سنة (الأثر الدائم في سجل التدقيق لا هنا).
+     */
+    protected function pruneNotifications(): int
+    {
+        try {
+            if ($this->dry) return 0;
+
+            return HubNotification::where('read', true)->where('created_at', '<', now()->subDays(90))->delete()
+                 + HubNotification::where('created_at', '<', now()->subDays(365))->delete();
+        } catch (\Throwable $e) {
+            report($e);
+            return 0;
         }
     }
 }

@@ -76,7 +76,16 @@ class LegalController extends Controller
                 ->map(function ($s) {
                     $s->req = \App\Models\SignRequest::find($s->request_id);
                     return $s;
-                })->filter(fn ($s) => $s->req)
+                })
+                // filterVisible كما في بطاقة «العالقة» المجاورة: بلا عدسةٍ كانت
+                // البطاقة تجمع مراحل المنشأة كلها ثم تعرض عناوين طلبات شركاتٍ
+                // خارج عزل المستخدم — وعنوان طلب التوقيع كثيراً ما يكون هو السر
+                ->pipe(fn ($steps) => $steps->filter(fn ($s) => $s->req)
+                    ->pipe(function ($ss) {
+                        $visible = app(EsignController::class)->filterVisible($ss->pluck('req'))
+                            ->pluck('id')->flip();
+                        return $ss->filter(fn ($s) => isset($visible[$s->req->id]));
+                    }))
             : collect();
         $renewals = $base()
             ->where(fn ($q) => $q->where('status', 'قيد التجديد')

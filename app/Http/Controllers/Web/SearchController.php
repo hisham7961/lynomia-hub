@@ -28,7 +28,9 @@ class SearchController extends Controller
 
         $flat = [];
         foreach ($this->searchableModules() as $key => $def) {
-            $rows = $this->query($key, $def, $q)->limit(3)->get();
+            // ترتيبٌ صريح: limit بلا orderBy يجعل «أي ثلاثة تظهر» قرعةً بين المحرّكين
+            $rows = $this->query($key, $def, $q)
+                ->orderByDesc('created_at')->orderByDesc('id')->limit(3)->get();
             $disp = hub_display_col($key);
             foreach ($rows as $row) {
                 $flat[] = ['module' => $key, 'id' => $row->id,
@@ -111,7 +113,8 @@ class SearchController extends Controller
                 $groups[] = [
                     'module' => $key, 'label' => $def['label'], 'count' => $count,
                     'display' => hub_display_col($key), 'status' => $def['status'] ?? null,
-                    'rows' => $base->orderByDesc('created_at')->limit(8)->get(),
+                    // فاصل id: created_at بدقة الثانية يتساوى في الإدخال الدفعي فيقترع المحرّكان
+                    'rows' => $base->orderByDesc('created_at')->orderByDesc('id')->limit(8)->get(),
                 ];
             }
             usort($groups, fn ($a, $b) => $b['count'] <=> $a['count']);

@@ -28,7 +28,22 @@ class FileController extends Controller
 
         foreach ([storage_path('app/' . $path), storage_path('app/public/' . $path)] as $abs) {
             if (is_file($abs)) {
-                return response()->file($abs, ['X-Robots-Tag' => 'noindex']);
+                /*
+                 * **لا تنفيذَ لمرفوع.** كانت البوابة تبثّ بترويسة noindex وحدها
+                 * والنوعُ يُخمَّن من الملف — فـSVG/HTML مرفوعٌ في حقل وحدةٍ يعمل
+                 * سكربتُه بأصل التطبيق لدى كل من يفتح السجل (XSS مخزَّن).
+                 * سياسة المرفقات نفسها: الصور النقطية وPDF تُعاين حيّاً،
+                 * وكل ما سواها تنزيلٌ قسري — وnosniff دائماً فلا يجتهد المتصفح.
+                 */
+                $mime = (string) (mime_content_type($abs) ?: 'application/octet-stream');
+                $inline = in_array($mime, AttachmentController::INLINE_MIMES, true);
+
+                return response()->file($abs, [
+                    'X-Robots-Tag' => 'noindex',
+                    'X-Content-Type-Options' => 'nosniff',
+                    'Content-Disposition' => ($inline ? 'inline' : 'attachment')
+                        . '; filename="' . rawurlencode(basename($path)) . '"',
+                ]);
             }
         }
 
@@ -97,6 +112,16 @@ class FileController extends Controller
                     && (hub_can($u, 'inboxdocs', 'v') || hub_can($u, 'files', 'v'))
                     && DB::table('inbox_documents')->whereNull('deleted_at')
                         ->where('path', $path)->exists()) {
+                    return true;
+                }
+
+                // مرفقات الرسائل المباشرة: لطرفَي المحادثة وحدهما. dm ليست وحدةً
+                // في السجل فلم تكن البوابة تعرفها — وكل مرفقٍ يُرفض 403 حتى
+                // لمرسِله ومستلمه أنفسهما، والرابط في الخيط ميت.
+                if (Schema::hasTable('dm_messages')
+                    && DB::table('dm_messages')->where('att', $path)
+                        ->where(fn ($w) => $w->where('from_id', $u->id)->orWhere('to_id', $u->id))
+                        ->exists()) {
                     return true;
                 }
 

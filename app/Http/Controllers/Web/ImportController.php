@@ -14,6 +14,9 @@ use Illuminate\Support\Str;
  */
 class ImportController extends Controller
 {
+    /** خبيئة حلّ المراجع خلال طلب الاستيراد الواحد (جدول|قيمة ← معرف) */
+    protected array $refCache = [];
+
     protected function resolve(string $module): array
     {
         $def = hub_mod($module);
@@ -42,6 +45,12 @@ class ImportController extends Controller
 
         $ext = strtolower($r->file('file')->getClientOriginalExtension());
         abort_unless(in_array($ext, ['csv', 'txt', 'xlsx'], true), 422, 'الملفات المدعومة: CSV أو Excel (xlsx)');
+
+        // تنظيف اليتيم: ملفٌ رُفع ثم هُجرت شاشة المطابقة كان يبقى ببياناته
+        // التجارية الخام على القرص إلى الأبد — يوم كامل مهلةً ثم يُمحى
+        foreach (glob(storage_path('app/imports/*')) ?: [] as $old) {
+            if (@filemtime($old) < time() - 86400) @unlink($old);
+        }
 
         $stored = $r->file('file')->store('imports', 'local');   // القرص الخاص صراحةً — الافتراضي قد يكون public
         $rows = Sheet::read(storage_path('app/' . $stored), $ext);
@@ -76,57 +85,73 @@ class ImportController extends Controller
 
         $rows = Sheet::read(storage_path('app/' . $sess['path']), $sess['ext']);
         array_shift($rows);
+        // سقفٌ صريح: حدّ الرفع 20MB كان يسمح بمئات آلاف الصفوف في طلبٍ واحد
+        abort_if(count($rows) > 5000, 422, 'الملف يتجاوز ٥٠٠٠ صف — قسّمه على دفعات أصغر');
         $fields = collect($def['fields'])->keyBy('key');
 
+        // خارج الحلقة لا داخلها: فحص العمود استعلام information_schema ثابت
+        // النتيجة، وكان يُنفَّذ لكل صف؛ وحلّ المراجع يُخبّأ فاسم الشركة المتكرر
+        // في آلاف الصفوف لا يُستعلم إلا مرة
+        $hasCompany = \Illuminate\Support\Facades\Schema::hasColumn($def['table'], 'company_id');
+        $allowed = hub_company_ids();
+        $this->refCache = [];
+
         $ok = 0; $skipped = [];
-        foreach ($rows as $n => $line) {
-            $m = new $class;
-            $rowErr = null;
+        // معاملةٌ واحدة: عطلٌ في المنتصف (قيمة أطول من عمودها على MySQL الصارم،
+        // خرق unique) كان يترك استيراداً جزئياً صامتاً — الصفوف السابقة مكتوبة
+        // والملف باقٍ والجلسة حية، فإعادة المحاولة تُدرج المكرر. الآن كلٌّ أو لا شيء.
+        try {
+            DB::transaction(function () use ($rows, $mapping, $fields, $def, $class, $module, $hasCompany, $allowed, &$ok, &$skipped) {
+                foreach ($rows as $n => $line) {
+                    $m = new $class;
+                    $rowErr = null;
 
-            foreach ($mapping as $i => $fk) {
-                $f = $fields[$fk] ?? null;
-                if (! $f) continue;
-                // صلاحية الحقل تسري على الاستيراد كما تسري على النموذج: ملفٌّ
-                // بعمودٍ اسمه «الراتب» كان يكتبه لمن لا يملك حتى رؤيته
-                if (hub_field_mode(auth()->user(), $module, (string) $fk) !== '') continue;
-                $v = trim((string) ($line[(int) $i] ?? ''));
-                if ($v === '') continue;
+                    foreach ($mapping as $i => $fk) {
+                        $f = $fields[$fk] ?? null;
+                        if (! $f) continue;
+                        // صلاحية الحقل تسري على الاستيراد كما تسري على النموذج: ملفٌّ
+                        // بعمودٍ اسمه «الراتب» كان يكتبه لمن لا يملك حتى رؤيته
+                        if (hub_field_mode(auth()->user(), $module, (string) $fk) !== '') continue;
+                        $v = trim((string) ($line[(int) $i] ?? ''));
+                        if ($v === '') continue;
 
-                $val = $this->cast($f, $v, $rowErr);
-                if ($rowErr) break;
-                $m->{$f['col']} = $val;
-            }
-
-            // الحقول الإلزامية
-            if (! $rowErr) {
-                foreach ($def['fields'] as $f) {
-                    if (! empty($f['required']) && ($m->{$f['col']} ?? null) === null) {
-                        $rowErr = 'حقل «' . $f['label'] . '» إلزامي وفارغ';
-                        break;
+                        $val = $this->cast($f, $v, $rowErr);
+                        if ($rowErr) break;
+                        $m->{$f['col']} = $val;
                     }
-                }
-            }
 
-            // **عزل الشركات يسري على الإنشاء كما على القراءة**: المستوردُ المعزول
-            // كان يكتب سجلاً داخل شركةٍ لا يراها لمجرّد أن الملف يسمّيها، فيدسّ
-            // بياناتٍ في كيانٍ ليس له — والنتيجة لا تظهر له بعدها فلا يُكتشف.
-            $allowed = hub_company_ids();
-            if ($allowed !== null && \Illuminate\Support\Facades\Schema::hasColumn($def['table'], 'company_id')) {
-                $cid = (string) ($m->company_id ?? '');
-                if ($cid !== '' && ! in_array($cid, $allowed, true)) {
-                    $skipped[] = 'صف ' . ($n + 2) . ': شركة خارج نطاقك';
-                    continue;
-                }
-                if ($cid === '') $m->company_id = $allowed[0];      // شركته الافتراضية لا الفراغ
-            }
+                    // الحقول الإلزامية
+                    if (! $rowErr) {
+                        foreach ($def['fields'] as $f) {
+                            if (! empty($f['required']) && ($m->{$f['col']} ?? null) === null) {
+                                $rowErr = 'حقل «' . $f['label'] . '» إلزامي وفارغ';
+                                break;
+                            }
+                        }
+                    }
 
-            if ($rowErr) { $skipped[] = 'صف ' . ($n + 2) . ': ' . $rowErr; continue; }
-            $m->save();
-            $ok++;
+                    // **عزل الشركات يسري على الإنشاء كما على القراءة**: المستوردُ المعزول
+                    // كان يكتب سجلاً داخل شركةٍ لا يراها لمجرّد أن الملف يسمّيها، فيدسّ
+                    // بياناتٍ في كيانٍ ليس له — والنتيجة لا تظهر له بعدها فلا يُكتشف.
+                    if ($allowed !== null && $hasCompany) {
+                        $cid = (string) ($m->company_id ?? '');
+                        if ($cid !== '' && ! in_array($cid, $allowed, true)) {
+                            $skipped[] = 'صف ' . ($n + 2) . ': شركة خارج نطاقك';
+                            continue;
+                        }
+                        if ($cid === '') $m->company_id = $allowed[0];      // شركته الافتراضية لا الفراغ
+                    }
+
+                    if ($rowErr) { $skipped[] = 'صف ' . ($n + 2) . ': ' . $rowErr; continue; }
+                    $m->save();
+                    $ok++;
+                }
+            });
+        } finally {
+            // التنظيف يقع نجح الاستيراد أم انفجر — كان الملف والجلسة يبقيان بعد العطل
+            @unlink(storage_path('app/' . $sess['path']));
+            $r->session()->forget('import');
         }
-
-        @unlink(storage_path('app/' . $sess['path']));
-        $r->session()->forget('import');
 
         hub_audit('استيراد', $module, null,
             "{$ok} سجل" . ($skipped ? ' (' . count($skipped) . ' متخطى)' : ''));
@@ -143,6 +168,11 @@ class ImportController extends Controller
                 return (float) str_replace(['،', ','], ['', ''], $v);
 
             case 'date': case 'dt':
+                // تواريخ Excel التسلسلية: خلية التاريخ في xlsx رقمٌ (45292 = 2024-01-01)
+                // لا نص — كانت تُرفض «تاريخ غير مفهوم» فتتخطى كل صفوف ملف Excel أصلي
+                if (is_numeric($v) && (float) $v > 20000 && (float) $v < 80000) {
+                    return \Illuminate\Support\Carbon::create(1899, 12, 30)->addDays((int) $v)->toDateString();
+                }
                 try { return \Illuminate\Support\Carbon::parse($v)->toDateString(); }
                 catch (\Throwable $e) { $err = '«' . $f['label'] . '»: تاريخ غير مفهوم (' . Str::limit($v, 20) . ')'; return null; }
 
@@ -155,9 +185,11 @@ class ImportController extends Controller
             case 'ref':
                 $table = hub_ref_table($f['ref']);
                 if (! $table) return null;
-                // معرف مباشر أو اسم عرض
-                $hit = DB::table($table)->where('id', $v)->value('id')
-                    ?? DB::table($table)->whereNull('deleted_at')->where(hub_ref_display($f['ref']), $v)->value('id');
+                // معرف مباشر أو اسم عرض — مُخبّأ: الاسم المتكرر في آلاف الصفوف لا يُستعلم إلا مرة
+                $ck = $table . '|' . $v;
+                $hit = $this->refCache[$ck] ??= (DB::table($table)->where('id', $v)->value('id')
+                    ?? DB::table($table)->whereNull('deleted_at')->where(hub_ref_display($f['ref']), $v)->value('id')
+                    ?? false);
                 if (! $hit) { $err = '«' . $f['label'] . '»: لا يوجد سجل باسم «' . Str::limit($v, 25) . '»'; return null; }
                 if (! empty($f['multi'])) return [$hit];
                 return $hit;

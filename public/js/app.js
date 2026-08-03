@@ -62,6 +62,15 @@
   var tl = null;
   document.addEventListener('htmx:beforeRequest', function () { var b = $('#topload'); b.style.width = '68%'; b.style.opacity = 1; clearTimeout(tl); });
   document.addEventListener('htmx:afterSettle', function () { var b = $('#topload'); b.style.width = '100%'; tl = setTimeout(function () { b.style.opacity = 0; b.style.width = '0'; }, 350); });
+  /* فشل الطلب (4xx/5xx أو انقطاع) لا يطلق afterSettle — كان الشريط يعلق على
+     68٪ وحالة loading على الجدول للأبد، فيبدو النظام «يعمل» وهو فاشل */
+  ['htmx:responseError', 'htmx:sendError'].forEach(function (ev) {
+    document.addEventListener(ev, function () {
+      var b = $('#topload'); if (b) { b.style.opacity = 0; b.style.width = '0'; }
+      var z = $('#tblzone'); if (z) z.classList.remove('loading');
+      Hub.toast(ev === 'htmx:sendError' ? 'انقطع الاتصال — أعد المحاولة' : 'تعذّر تحميل المحتوى', 1);
+    });
+  });
 
   /* ── الاختصارات ── */
   document.addEventListener('keydown', function (e) {
@@ -149,11 +158,20 @@
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json' },
         body: JSON.stringify({ status: st })
       }).then(function (r) {
-        if (!r.ok) throw 0;
+        if (!r.ok) {
+          /* رسالة الخادم الدقيقة لا «تحقق من الاتصال» المضللة: 403 «حقل الحالة
+             غير قابل للكتابة بصلاحيتك» و422 «حالة غير معرّفة» و«يمر بالموافقات»
+             كلها كانت تُطمس بتشخيصِ اتصالٍ لا علاقة له */
+          return r.json().catch(function () { return {}; }).then(function (d) {
+            throw (d && d.message) ? d.message : 0;
+          });
+        }
         col.querySelector('.kbody').prepend(card);
         [from, col].forEach(function (c) { c.querySelector('.kcount').textContent = c.querySelectorAll('.kcard').length; });
         Hub.toast('نُقل إلى «' + st + '» ✓');
-      }).catch(function () { Hub.toast('تعذّر النقل — تحقق من الاتصال', 1); });
+      }).catch(function (err) {
+        Hub.toast(typeof err === 'string' && err ? err : 'تعذّر النقل — تحقق من الاتصال', 1);
+      });
     });
   }
 })();

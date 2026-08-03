@@ -27,9 +27,11 @@ class DataRoomController extends Controller
     public function index()
     {
         $this->gate();
-        $links = ShareLink::orderByDesc('created_at')->limit(60)->get();
+        $links = ShareLink::orderByDesc('created_at')->orderByDesc('id')->limit(60)->get();
+        // سقفٌ صريح: كانت الشاشة تسحب كل السجل التاريخي للمشاهدات إلى الذاكرة —
+        // رابطٌ متداول واحد يعني آلاف الصفوف لمجرد عرض الأحدث
         $lastViews = DB::table('share_views')->whereIn('share_id', $links->pluck('id'))
-            ->orderByDesc('created_at')->get()->groupBy('share_id');
+            ->orderByDesc('created_at')->orderByDesc('id')->limit(300)->get()->groupBy('share_id');
 
         return view('dataroom.index', compact('links', 'lastViews'));
     }
@@ -63,9 +65,15 @@ class DataRoomController extends Controller
     public function revoke(string $id)
     {
         $this->gate();
-        ShareLink::findOrFail($id)->update(['revoked' => true]);
+        $link = ShareLink::findOrFail($id);
+        $link->update(['revoked' => true]);
+        // أقل احتفاظ: لا un-revoke في النظام، فالملف بعد الإلغاء غير قابل للوصول
+        // من أي مسار — إبقاؤه (مستندٌ وُصف حساساً أصلاً) على القرص أبداً تراكمُ خطر
+        if ($link->path && is_file(storage_path('app/' . $link->path))) {
+            @unlink(storage_path('app/' . $link->path));
+        }
 
-        return back()->with('ok', 'أُلغي الرابط فوراً — لن يفتح بعد الآن');
+        return back()->with('ok', 'أُلغي الرابط فوراً ومُحي ملفه من الخادم');
     }
 
     /* ────────── الوجه العام (بلا تسجيل دخول) ────────── */
@@ -75,7 +83,9 @@ class DataRoomController extends Controller
         $link = $this->alive($token);
 
         if ($link->password_hash && ! $r->session()->get('share:' . $link->id)) {
-            return view('dataroom.gate', ['token' => $token, 'title' => $link->title]);
+            // العنوان لا يُكشف قبل كلمة المرور: «عرض استحواذ فلان» كثيراً ما يكون
+            // هو السرّ نفسه — وكلمةُ المرور وُضعت تحديداً لطبقةٍ ثانية عند تسرّب الرابط
+            return view('dataroom.gate', ['token' => $token, 'title' => 'مستند محمي']);
         }
 
         $this->logView($link);
@@ -106,14 +116,23 @@ class DataRoomController extends Controller
         $abs = storage_path('app/' . $link->path);
         abort_unless(file_exists($abs), 404);
 
-        $download = $r->boolean('dl');
+        /*
+         * سياسة النوع قبل سياسة التنزيل: الصور النقطية وPDF وحدها تُعاين
+         * inline — أي شيء آخر (HTML/SVG خاصةً) تنزيلٌ قسري، فهذا سطحٌ **عام
+         * بلا مصادقة** وملفٌ يُنفَّذ بأصل النظام هنا يصل لكوكي مدير عاين الرابط.
+         * ومعها: «عرض فقط» على نوعٍ لا يُعاين = لا مسار بثٍّ إطلاقاً، والجلبُ
+         * المباشر بلا dl كان **لا يُسجَّل** — فسجل المشاهدات أعمى عن أهم مسار.
+         */
+        $inline = in_array((string) $link->mime, AttachmentController::INLINE_MIMES, true);
+        $download = $r->boolean('dl') || ! $inline;
         abort_if($download && $link->no_download, 403, 'التنزيل ممنوع لهذا الرابط — عرض فقط');
-        if ($download) $this->logView($link);
+        $this->logView($link);
 
         return response()->file($abs, [
             'Content-Type' => $link->mime ?: 'application/octet-stream',
             'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . rawurlencode($link->title) . '"',
             'X-Robots-Tag' => 'noindex',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 

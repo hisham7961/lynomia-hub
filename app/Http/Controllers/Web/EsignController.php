@@ -466,6 +466,29 @@ class EsignController extends Controller
 
         $d = $r->validate(['title' => 'required|string|max:200', 'body' => 'required|string|max:200000']);
 
+        if ($d['body'] !== $req->body) {
+            // **توقيعٌ حيّ يجمّد النص**: في طلبٍ متعدد الموقّعين تبقى الحالة
+            // «بانتظار التوقيع» حتى يوقّع الجميع — فكان النص يُحرَّر بعد توقيع
+            // الطرف الأول ويبقى توقيعُه وsigned_at كما هما: توقيعٌ منسوبٌ
+            // لنصٍّ لم يره صاحبه قط، وdoc_hash تُستبدل فلا يبقى أثرٌ للأصل.
+            abort_if(\App\Models\ContractSigner::where('request_id', $req->id)
+                ->where('status', 'وُقّع')->exists(), 410,
+                'وقّع طرفٌ على هذا النص — لا يُحرَّر بعد توقيعٍ حيّ. ألغِ الطلب وأنشئ نسخةً جديدة يوقّعها الجميع.');
+
+            // **الاعتماد يلتصق بالنص لا بالطلب**: تحريرُ نصٍّ «بانتظار الموافقة»
+            // بعد اعتماد مرحلةٍ كان يُبقي الاعتماد ملصقاً بمحتوى لم يره صاحبه —
+            // فتعتمد المرحلة التالية النص الجديد وتظن الأولى معتمِدةً له.
+            // الاعتمادات السابقة تُصفَّر وتبدأ السلسلة من أولها على النص الجديد.
+            $reset = \App\Models\ContractApprovalStep::where('request_id', $req->id)
+                ->where('status', 'معتمد')
+                ->update(['status' => 'بانتظار', 'decided_by' => null, 'decided_at' => null, 'note' => null]);
+            if ($reset) {
+                hub_audit('تصفير اعتمادات بعد تحرير النص', 'contracts', $req->contract_id,
+                    $req->title . " — أُعيدت {$reset} مرحلة لبدايتها");
+                $this->notifyOwners('↩️ عُدّل نص «' . $req->title . '» بعد اعتماد مرحلةٍ — أُعيدت سلسلة الموافقات من أولها على النص الجديد');
+            }
+        }
+
         // v2.117: تعديل نصٍّ اطّلع عليه الموقّع كان صامتاً — الرابط والجلسة يبقيان
         // على النص الجديد بلا علمه. الآن يدور الرمز: الرابط القديم يموت، وجلسته معه
         // (مفتاحها الرمز)، ويُدقَّق التدوير، وعلى المرسل مشاركة الرابط الجديد
@@ -795,6 +818,10 @@ class EsignController extends Controller
         abort_if($req->status === 'وُقّع', 410, 'وثيقة موقعة لا تُلغى — أنشئ ملحق إنهاء');
 
         $req->forceFill(['status' => 'أُلغي', 'cancelled_at' => now()])->save();
+        // المراحل المعلقة تُنهى مع الطلب: كانت تبقى «بانتظار» للأبد فتظهر
+        // أشباحاً بزر قرارٍ في بطاقة المركز القانوني — قرارٌ على طلبٍ ميت
+        \App\Models\ContractApprovalStep::where('request_id', $req->id)
+            ->where('status', 'بانتظار')->update(['status' => 'ملغي']);
         \App\Models\ContractEvent::log('voided', $req,
             ['meta' => json_encode(['reason' => 'إلغاء من المرسل'], JSON_UNESCAPED_UNICODE)]);
         // عقد علّقه هذا الطلب يعود مسودة
@@ -894,6 +921,9 @@ class EsignController extends Controller
         $step->forceFill(['status' => 'مرفوض', 'decided_by' => auth()->id(),
             'decided_at' => now(), 'note' => $note])->save();
         $req->forceFill(['status' => 'أُلغي', 'cancelled_at' => now()])->save();
+        // المراحل اللاحقة تُنهى مع الرفض — لا «بانتظار» على طلبٍ أُلغي
+        \App\Models\ContractApprovalStep::where('request_id', $req->id)
+            ->where('status', 'بانتظار')->update(['status' => 'ملغي']);
         \App\Models\ContractEvent::log('voided', $req, ['meta' => json_encode(
             ['reason' => 'رُفضت الموافقة الداخلية — ' . $note], JSON_UNESCAPED_UNICODE)]);
         if ($req->contract_id && ($c = \App\Models\Contract::find($req->contract_id))) {
