@@ -37,6 +37,25 @@ class Project extends Model
         'archived' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        // عضوية المشاريع بياناتُ صلاحية: تغيّرها يُبطل خبيئة User::visibleProjectIds
+        // لكل متأثّر (مدير/عضو، قديماً وحديثاً) — وإلا ظل مسحوبُ الوصول يرى مهام
+        // المشروع ومستنداته حتى ٥ دقائق. الإبطال القديم كان يمسّ مفتاح المحرِّر وحده.
+        $bust = function (self $p) {
+            $orig = $p->getOriginal('members');
+            $origMembers = is_array($orig) ? $orig : (json_decode((string) $orig, true) ?: []);
+            collect([$p->manager_id, $p->getOriginal('manager_id')])
+                ->merge(is_array($p->members) ? $p->members : [])
+                ->merge($origMembers)
+                ->filter()->unique()
+                ->each(fn ($uid) => \Illuminate\Support\Facades\Cache::forget("user:{$uid}:projects"));
+        };
+        static::saved($bust);
+        static::deleted($bust);
+        static::restored($bust);
+    }
+
     public function company(): BelongsTo
     {
         return $this->belongsTo(\App\Models\Company::class, 'company_id');

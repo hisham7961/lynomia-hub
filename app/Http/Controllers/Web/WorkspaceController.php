@@ -43,6 +43,14 @@ class WorkspaceController extends Controller
         // **العزل الصارم أولاً**: كان الترشيح بالشركة **النشطة** وحدها، فمن لم
         // يختر شركةً (وهو الوضع الافتراضي) يقرأ أسماء سجلات الشركات كلها.
         $activity = \App\Models\AuditEntry::whereIn('module', $ws['modules'])
+            // **نطاق المشاريع أولاً**: كان الترشيح بالوحدة والشركة فقط، فالمحدود
+            // بالنطاق يقرأ أسماء سجلات مشاريعَ لا يراها (نظير عزل الشركات في v2.187
+            // مع إغفال المشاريع). القيد يحمل project_id منذ سمة Auditable.
+            ->when(hub_scoped(auth()->user()), function ($q) {
+                $u = auth()->user();
+                $q->where(fn ($w) => $w->where('user_id', $u->id)
+                    ->orWhereIn('project_id', $u->visibleProjectIds()));
+            })
             ->when(hub_company_ids() !== null, function ($q) {
                 $ids = hub_company_ids();
                 $uid = auth()->id();
