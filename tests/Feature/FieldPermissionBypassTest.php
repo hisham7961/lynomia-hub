@@ -168,9 +168,17 @@ class FieldPermissionBypassTest extends TestCase
         $this->actingAs($this->owner);
         $this->emp->update(['salary' => 7777]);
 
-        $html = $this->actingAs($this->clerk)->get('/admin/audit')->assertOk()->getContent();
+        // **مُرشَّحٌ على وحدة hr**: الصفحة العامة تعرض قيوداً من كل الوحدات، وقيمةٌ
+        // كـ7777 قد تظهر في قيد وحدةٍ **يراها الكاتب بحقّ** (فاتورة/أصل) فيسقط
+        // الاختبار زوراً بلا علاقةٍ بما يفحصه (تلوّثٌ عابرٌ بين الاختبارات، صنف
+        // «القرعة» الذي يحاربه المستودع). الترشيح يحصر الفحص بقيود hr حيث يعيش
+        // الحقّ الأمنيّ فعلاً — فالنتيجة حتميّةٌ على المحرّكين.
+        $html = $this->actingAs($this->clerk)->get('/admin/audit?module=hr')->assertOk()->getContent();
         $this->assertStringNotContainsString('7777', $html,
             'سجل التدقيق طبع راتباً محجوباً عن قارئه — نافذةٌ خلفية على كل حقلٍ مخفيّ');
+        // وليس أجوف: المسك طُبِّق فعلاً على قيد تغيير الراتب لا أنّ القيمة غابت صدفةً
+        $this->assertStringContainsString('••• محجوب', $html,
+            'لم يظهر أثرُ المسك — القيمة غابت لسببٍ آخر لا للمسك، فالاختبار لا يحرس شيئاً');
     }
 
     /**
