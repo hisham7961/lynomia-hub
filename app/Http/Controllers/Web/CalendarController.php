@@ -44,9 +44,15 @@ class CalendarController extends Controller
         // واحدة يرث ما رآه من فتح الشهر قبله. المفتاح يحمل الدور (ومنه تُشتقّ
         // المصفوفة)، والمُنطَّق يحمل هويته.
         $scoped = hub_scoped(auth()->user()) || hub_company_ids() !== null;
+        // **الختم يسبق المهلة**: المفتاح يحمل ختم الجداول المؤرَّخة + roles، ويدعم
+        // ?fresh — فاجتماعٌ يُضاف أو صلاحيةٌ تُسحب تظهر فوراً لا بعد انقضاء المهلة.
+        $tables = array_values(array_unique(array_filter(array_map(
+            fn ($x) => (string) (hub_mod($x[0])['table'] ?? ''), $this->fields()))));
+        $tables[] = 'roles';
         $ckey = 'hub:calendar:' . $start->format('Y-m') . ':'
               . ($scoped ? 'u:' . auth()->id() : 'r:' . (auth()->user()?->role_id ?? '0'))
-              . ':c:' . (string) session('hub.company', '');
+              . ':c:' . (string) session('hub.company', '') . hub_data_stamp($tables);
+        if (request()->boolean('fresh')) \Illuminate\Support\Facades\Cache::forget($ckey);
         [$days, $overflow] = \Illuminate\Support\Facades\Cache::remember($ckey, $scoped ? 300 : 600, function () use ($start, $end) {
             $days = [];
             $overflow = 0;

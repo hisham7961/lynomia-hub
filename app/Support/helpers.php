@@ -756,7 +756,13 @@ if (! function_exists('hub_expiry')) {
         // فمخبأٌ مشترك بين دورين مختلفين كان سيسرّب ما لا يُرى لأحدهما.
         // و«الجيل» يُبطل المخبأ فور رفع وثيقةٍ مؤرَّخة — لا انتظارَ عشر دقائق.
         $gen    = (int) Cache::get('hub:expiry:gen', 0);
-        $key    = ($scoped ? 'hub:expiry:u:' . $user->id : 'hub:expiry:r:' . ($user->role_id ?? '0')) . ':g' . $gen;
+        // **الختم يسبق المهلة**: المفتاح يحمل ختم الجداول المؤرَّخة التي يقرؤها +
+        // ختم roles — فتجديدُ عقدٍ أو سحبُ صلاحية عرضٍ يُبطله فوراً لا بعد 10 دقائق.
+        $tables = array_values(array_unique(array_filter(array_map(
+            fn ($x) => (string) (hub_mod($x[0])['table'] ?? ''), hub_expiry_fields()))));
+        $tables[] = 'roles';
+        $key    = ($scoped ? 'hub:expiry:u:' . $user->id : 'hub:expiry:r:' . ($user->role_id ?? '0'))
+                . ':g' . $gen . hub_data_stamp($tables);
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
         return \Illuminate\Support\Facades\Cache::remember($key, $scoped ? 300 : 600, function () use ($scoped, $user) {
