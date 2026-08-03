@@ -1002,7 +1002,9 @@ if (! function_exists('hub_health')) {
             // الامتثال: العقود والدومينات المنتهية أو القريبة
             try {
                 $c = $db->table('contracts')->whereNull('deleted_at'); $cn = (clone $c)->count();
-                $cLate = (clone $c)->whereNotNull('end')->where('end', '<', $today)->where(fn ($w) => $w->whereNull('status')->orWhere('status', 'NOT LIKE', '%منته%'))->count();
+                // العمود date_end لا end — الاسم الخاطئ كان يرمي «unknown column»
+                // فيبتلعه catch وتختفي بطاقة الامتثال صامتةً من صحة الشركة
+                $cLate = (clone $c)->whereNotNull('date_end')->where('date_end', '<', $today)->where(fn ($w) => $w->whereNull('status')->orWhere('status', 'NOT LIKE', '%منته%'))->count();
                 $d = $db->table('domains')->whereNull('deleted_at'); $dn = (clone $d)->count();
                 $dLate = (clone $d)->whereNotNull('expiry')->where('expiry', '<', $today)->count();
                 $tot = $cn + $dn;
@@ -1498,9 +1500,8 @@ if (! function_exists('hub_budget_actual')) {
      */
     function hub_budget_actual($b): array
     {
-        $q = \Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at')
-            ->whereIn('kind', config('hub.fin.expense'))
-            ->whereNotIn('state', config('hub.fin.dead'));
+        $q = hub_fin_not_dead(\Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at')
+            ->whereIn('kind', config('hub.fin.expense')));
         foreach (['company_id', 'project_id', 'cc_id'] as $col) {
             if (! empty($b->{$col})) $q->where($col, $b->{$col});
         }
@@ -1603,26 +1604,38 @@ if (! function_exists('hub_project_pl')) {
             foreach ($servers as $s) $serverCost += $norm($s->cost, $s->cycle) * $months + $oneOff($s->cost, $s->cycle);
 
             // ── ٣) الأدوات والاشتراكات ──
+            // الملغى/المنتهي لا يُحمَّل على كامل عمر المشروع — كما hub_service_costs
             $subs = \Illuminate\Support\Facades\DB::table('subscriptions')
-                ->whereNull('deleted_at')->where('project_id', $projectId)->get(['amount', 'cycle']);
+                ->whereNull('deleted_at')->where('project_id', $projectId)
+                ->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', ['ملغي', 'منتهي']))
+                ->get(['amount', 'cycle']);
             $toolCost = 0.0;
             foreach ($subs as $s) $toolCost += $norm($s->amount, $s->cycle) * $months + $oneOff($s->amount, $s->cycle);
 
             // ── ٤) الخدمات الخارجية: مشتريات + مصروفات مالية مرتبطة بالمشروع ──
+            // المصروف بتعريفه المعتمد config('hub.fin.expense') لا نوع «مصروف» وحده،
+            // والحالات الميتة (ملغاة/مسودة) خارج الحساب — كسائر التقارير
+            $finDoc = fn () => hub_fin_not_dead(\Illuminate\Support\Facades\DB::table('fin_documents')
+                ->whereNull('deleted_at')->where('project_id', $projectId));
             $purch = (float) \Illuminate\Support\Facades\DB::table('purchases')
                 ->whereNull('deleted_at')->where('project_id', $projectId)->sum('amount');
-            $expense = (float) \Illuminate\Support\Facades\DB::table('fin_documents')
-                ->whereNull('deleted_at')->where('project_id', $projectId)
-                ->where('kind', 'مصروف')->sum('total');
+            $expense = (float) $finDoc()
+                ->whereIn('kind', (array) config('hub.fin.expense', ['مصروف']))->sum('total');
             $externalCost = $purch + $expense;
 
             // ── الإيراد: مفوتر ومحصّل ──
-            $inv = \Illuminate\Support\Facades\DB::table('fin_documents')
-                ->whereNull('deleted_at')->where('project_id', $projectId)->where('kind', 'فاتورة')
-                ->selectRaw('COALESCE(SUM(total),0) t, COALESCE(SUM(paid),0) p, COUNT(*) n')->first();
+            // كان الشرط kind='فاتورة' — نوعٌ لا يكتبه النظام أصلاً (الحقيقي «فاتورة
+            // مبيعات» من QuoteController وخيارات الوحدة) فإيراد كل مشروع حقيقي = صفر.
+            // COALESCE(paid,0) داخل الجمع: فاتورة لم يُدفع منها شيء paid=NULL
+            // كانت تُفسد المجموع لا تُصفَّر.
+            $incKinds = (array) config('hub.fin.income', ['فاتورة مبيعات', 'دفعة واردة']);
+            $inv = $finDoc()->whereIn('kind', $incKinds)
+                ->selectRaw('COALESCE(SUM(total),0) t, COALESCE(SUM(COALESCE(paid,0)),0) p, COUNT(*) n')->first();
+            // «دفعة واردة» محصَّلة بطبيعتها: total هو المبلغ الواصل وإن لم يُملأ paid
+            $payExtra = (float) $finDoc()->where('kind', 'دفعة واردة')->whereNull('paid')->sum('total');
 
             $revenue   = (float) ($inv->t ?? 0);
-            $collected = (float) ($inv->p ?? 0);
+            $collected = (float) ($inv->p ?? 0) + $payExtra;
             $totalCost = $hoursCost + $serverCost + $toolCost + $externalCost;
             $profit    = $revenue - $totalCost;
 
@@ -2020,12 +2033,26 @@ if (! function_exists('hub_audit')) {
     }
 }
 
+if (! function_exists('hub_fin_not_dead')) {
+    /**
+     * استثناء الحالات الميتة (ملغاة/مسودة) مع إبقاء «بلا حالة»:
+     * `whereNotIn('state', $dead)` وحدها تُسقط صفوف state=NULL صامتاً
+     * (‏NULL NOT IN (...) تُقيَّم NULL) — فمستندٌ أُدخل بلا حالة كان يختفي
+     * من كل التقارير واللوحات. حقل الحالة اختياري في الوحدة، فالغياب حياة لا موت.
+     */
+    function hub_fin_not_dead($q, ?array $dead = null)
+    {
+        $dead = $dead ?? (array) config('hub.fin.dead', []);
+
+        return $q->where(fn ($w) => $w->whereNull('state')->orWhereNotIn('state', $dead));
+    }
+}
+
 if (! function_exists('hub_fin_sum')) {
     /** مجموع مستندات مالية من أنواع بعينها منذ تاريخ — يستثني الملغاة والمسودات دائماً */
     function hub_fin_sum(array $kinds, ?string $from = null, string $col = 'total'): float
     {
-        $q = \Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at')
-            ->whereNotIn('state', config('hub.fin.dead'))
+        $q = hub_fin_not_dead(\Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at'))
             ->whereIn('kind', $kinds);
         if ($from) $q->where('date', '>=', $from);
 

@@ -45,7 +45,8 @@ class PerformanceController extends Controller
     /* ── مؤشرات الشركة ── */
     protected function companyKpis(): array
     {
-        $fin = fn () => DB::table('fin_documents')->whereNull('deleted_at')->whereNotIn('state', $this->dead);
+        // hub_fin_not_dead تُبقي «بلا حالة»: whereNotIn وحدها كانت تُسقط state=NULL صامتاً
+        $fin = fn () => hub_fin_not_dead(DB::table('fin_documents')->whereNull('deleted_at'), $this->dead);
         $sum = fn ($kinds, $a, $b) => (float) $fin()->whereIn('kind', $kinds)->whereBetween('date', [$a, $b])->sum('total');
 
         $m0 = now()->startOfMonth()->toDateString(); $mEnd = now()->toDateString();
