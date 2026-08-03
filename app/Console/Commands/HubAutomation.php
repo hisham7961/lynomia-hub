@@ -197,6 +197,7 @@ class HubAutomation extends Command
             ->get();
 
         foreach ($due as $rec) {
+          try {
             $months = $cycles[$rec->cycle] ?? 1;
             $guard  = 0;
 
@@ -238,10 +239,20 @@ class HubAutomation extends Command
                         'recur', $rec->id);
                 }
 
-                $rec->next = Carbon::parse($rec->next)->addMonths($months)->toDateString();
-            }
+                // NoOverflow: مرساةُ ٣١ يناير كانت تقفز فبراير (addMonths يفيض
+                // إلى ٣ مارس) وتنجرف للأبد — نفس صنف عيب التقارير المُصلَح
+                $rec->next = Carbon::parse($rec->next)->addMonthsNoOverflow($months)->toDateString();
 
-            if (! $this->dry) $rec->saveQuietly();   // تقديم الموعد بلا ضجيج تدقيق
+                // **حفظُ next مع كل دورة لا بعد الحلقة كلها**: كانت الفواتير
+                // تُلتزم فوراً وnext يُحفظ مرةً واحدة في النهاية — فعطلٌ في الدورة
+                // الرابعة يترك الثلاث المُنشأة بمؤشّرٍ قديم فتُعاد. الآن كل دورةٍ
+                // تُقدّم المؤشّر فورَ إنشائها فلا إعادةَ توليد.
+                if (! $this->dry) $rec->saveQuietly();
+            }
+          } catch (\Throwable $e) {
+              // متكرّرٌ واحدٌ لا يوقف البقية، وعطلُه يُبلَّغ لا يُبتلع
+              report($e);
+          }
         }
 
         return ['docs' => $docs, 'manual' => $manual];
@@ -303,10 +314,13 @@ class HubAutomation extends Command
                 $canSee = $to->filter(fn ($ru) => isset($visible[$ru->id][(string) $row->id]));
                 if ($canSee->isEmpty()) continue;
 
-                // منع التكرار: نفس القاعدة ونفس السجل خلال «كل N يوم»
+                // منع التكرار: نفس القاعدة ونفس السجل خلال «كل N يوم».
+                // whereDate لا نافذة datetime: الإشعار يُختم now() (دقّة ثانية)
+                // والفحص كان now()-N days بالضبط — فانزياحُ الكرون ثوانٍ يُخرج
+                // إشعار الأمس من النافذة فتُعيد قواعد every=1 الإطلاق يوميّاً.
                 $dup = HubNotification::where('kind', 'rule:' . $rule->id)
                     ->where('record_id', $row->id)
-                    ->where('created_at', '>=', now()->subDays($every))
+                    ->whereDate('created_at', '>=', today()->subDays($every))
                     ->exists();
                 if ($dup) continue;
 

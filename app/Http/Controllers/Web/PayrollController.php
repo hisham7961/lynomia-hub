@@ -35,7 +35,11 @@ class PayrollController extends Controller
         abort_unless($run->status === 'مسودة' || blank($run->status), 422,
             'المسيّر ' . $run->status . ' — التوليد على المسودة فقط');
 
-        $emps = Employee::whereNull('deleted_at')
+        // hub_scope على استعلام الموظفين: كان خاماً، فتشغيلةٌ بلا company_id
+        // تسحب موظفي كل الشركات — ومنشئٌ معزولٌ بشركةٍ يسحب من لا يراهم ويخلط
+        // عملاتهم في مجموعٍ وقيدٍ واحد. النطاق يحصر السحب بما يراه المنشئ.
+        $emps = hub_scope(Employee::query(), 'hr')
+            ->whereNull('deleted_at')
             ->whereNotIn('status', ['منتهية خدمته', 'مستقيل', 'موقوف'])
             ->when($run->company_id, fn ($q) => $q->where('company_id', $run->company_id))
             ->orderBy('name')->get();
@@ -89,28 +93,37 @@ class PayrollController extends Controller
     /** قيد رواتب موزون: مدين مصروفات، دائن صندوق/بنك — من خريطة finance.accounts */
     protected function autoJournal(PayrollRun $run): void
     {
-        if (setting('finance.auto_journal') !== '1') return;
+        // بالسلسلة لا بالنوع — hub:set يخزّن العدد فتفشل === النوعية، فكان قيد
+        // الرواتب لا يُرحَّل أبداً حين يُفعَّل الإعداد بالطريقة الموثّقة (مصروف
+        // الرواتب لا يبلغ الدفتر → ربحٌ مُبالَغ). FinController أصلحها؛ هذا لحق به.
+        if ((string) setting('finance.auto_journal') !== '1') return;
         try {
             $map = setting('finance.accounts');
             $map = is_array($map) ? $map : (json_decode((string) $map, true) ?: []);
+            // بترتيب id: code غير فريد في الدليل — قيدٌ يتوزّع على حسابين بالقرعة
             $accId = fn (?string $code) => blank($code) ? null
-                : \App\Models\LedgerAccount::whereNull('deleted_at')->where('code', $code)->value('id');
+                : \App\Models\LedgerAccount::whereNull('deleted_at')->where('code', $code)
+                    ->orderBy('id')->value('id');
             $exp = $accId($map['exp'] ?? null);
             $cash = $accId($map['bank'] ?? null) ?: $accId($map['cash'] ?? null);
             if (! $exp || ! $cash) return;
 
-            $entry = \App\Models\JournalEntry::create([
-                'doc_no' => 'JE-PAYROLL-' . now()->format('ymHis'),
-                'date' => now()->toDateString(),
-                'description' => 'قيد رواتب: ' . $run->name . ($run->month ? ' — ' . $run->month : ''),
-                'reference' => (string) $run->name, 'state' => 'مرحّل',
-                'company_id' => $run->company_id,
-                'meta' => ['posted_at' => now()->toIso8601String(), 'auto' => 'payroll', 'payroll_id' => $run->id],
-            ]);
-            \App\Models\JournalLine::create(['entry_id' => $entry->id, 'acc_id' => $exp,
-                'debit' => (float) $run->total, 'credit' => 0, 'memo' => 'مصروف رواتب']);
-            \App\Models\JournalLine::create(['entry_id' => $entry->id, 'acc_id' => $cash,
-                'debit' => 0, 'credit' => (float) $run->total, 'memo' => 'صرف الرواتب']);
+            // معاملةٌ تلفّ القيد وسطريه: فشلُ السطر الثاني كان يترك قيداً مرحّلاً
+            // بسطرٍ واحد، وJournalEntry::booted يمنع تصحيحه أبداً → دفترٌ مختلٌّ للأبد
+            \Illuminate\Support\Facades\DB::transaction(function () use ($run, $exp, $cash) {
+                $entry = \App\Models\JournalEntry::create([
+                    'doc_no' => 'JE-PAYROLL-' . now()->format('ymHis'),
+                    'date' => now()->toDateString(),
+                    'description' => 'قيد رواتب: ' . $run->name . ($run->month ? ' — ' . $run->month : ''),
+                    'reference' => (string) $run->name, 'state' => 'مرحّل',
+                    'company_id' => $run->company_id,
+                    'meta' => ['posted_at' => now()->toIso8601String(), 'auto' => 'payroll', 'payroll_id' => $run->id],
+                ]);
+                \App\Models\JournalLine::create(['entry_id' => $entry->id, 'acc_id' => $exp,
+                    'debit' => (float) $run->total, 'credit' => 0, 'memo' => 'مصروف رواتب']);
+                \App\Models\JournalLine::create(['entry_id' => $entry->id, 'acc_id' => $cash,
+                    'debit' => 0, 'credit' => (float) $run->total, 'memo' => 'صرف الرواتب']);
+            });
         } catch (\Throwable $e) {
             report($e);   // القيد الآلي لا يُفشل الاعتماد نفسه
         }

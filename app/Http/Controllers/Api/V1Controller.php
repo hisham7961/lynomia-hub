@@ -181,7 +181,10 @@ class V1Controller extends ModuleController
             'points.*.module' => 'required|string|max:40',
             'points.*.record_id' => 'required|string|max:40',
             'points.*.metric' => 'required|string|max:40',
-            'points.*.value' => 'required|numeric',
+            // حدٌّ صريح: العمود decimal(18,4) (|القيمة| < 10¹⁴)، و«numeric» وحده
+            // يقبل 1e15 و«1e400»→INF فيُفيض العمود ويقع 500 وسط الدفعة. between
+            // يرفض الفائض وغير المنتهي معاً قبل أي كتابة.
+            'points.*.value' => 'required|numeric|between:-9999999999999,9999999999999',
             'points.*.at' => 'nullable|date',
             'points.*.source' => 'nullable|string|max:24',
             'points.*.meta' => 'nullable|array',
@@ -212,12 +215,18 @@ class V1Controller extends ModuleController
             }
         }
 
-        $saved = 0;
-        foreach ($data as $p) {
-            hub_metric_put($p['module'], $p['record_id'], $p['metric'], (float) $p['value'],
-                $p['at'] ?? null, $p['source'] ?? 'api', $p['meta'] ?? []);
-            $saved++;
-        }
+        // معاملةٌ تلفّ الكتابة كلها: تصدّق ضمان «دفعةٌ نصفها خطأ لا تُكتب نصفها»
+        // المعلن أعلاه — عطلٌ في نقطةٍ (بعد التحقق) كان يُبقي ما قبلها مكتوباً
+        $saved = \Illuminate\Support\Facades\DB::transaction(function () use ($data) {
+            $n = 0;
+            foreach ($data as $p) {
+                hub_metric_put($p['module'], $p['record_id'], $p['metric'], (float) $p['value'],
+                    $p['at'] ?? null, $p['source'] ?? 'api', $p['meta'] ?? []);
+                $n++;
+            }
+
+            return $n;
+        });
 
         return response()->json(['saved' => $saved, 'at' => now()->toIso8601String()]);
     }

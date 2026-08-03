@@ -36,8 +36,10 @@
         <h3>🗂 وحدات المساحة</h3>
         <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(min(210px,100%),1fr))">
             @foreach ($ws['modules'] as $mk)
-                @php $def = hub_mod($mk); $look = hub_mod_look($mk); $c = $cards[$mk] ?? null; @endphp
-                <a href="{{ route('m.index', $mk) }}" class="stat" style="--st:{{ $look['color'] }};text-decoration:none">
+                @php $def = hub_mod($mk); $look = hub_mod_look($mk); $c = $cards[$mk] ?? null; $att = (int) ($attention[$mk] ?? 0); @endphp
+                <a href="{{ route('m.index', $mk) }}" class="stat" style="--st:{{ $look['color'] }};text-decoration:none;position:relative">
+                    {{-- شارة الانتباه: يستحق أو تأخّر — النقطة الحمراء تقول أين يُنظر --}}
+                    @if ($att)<span class="nbdg wsatt" style="position:absolute;top:8px;left:8px" title="{{ $att }} يحتاج انتباهاً">{{ $att }}</span>@endif
                     <span class="ico" aria-hidden="true">{{ $look['icon'] }}</span>
                     <b>{{ number_format($c['count'] ?? 0) }}</b>
                     <span>{{ $def['label'] }}@if (($c['week'] ?? 0) > 0) · <b style="font-size:11px">+{{ $c['week'] }}</b> هذا الأسبوع @endif</span>

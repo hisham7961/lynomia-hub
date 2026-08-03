@@ -138,23 +138,27 @@ class FinController extends Controller
             $other = $accId($otherCode);
             if (! $money || ! $other) return;   // خريطة غير مكتملة — لا قيد أعرج
 
-            $entry = \App\Models\JournalEntry::create([
-                'doc_no' => 'JE-' . ($doc->doc_no ?: substr($doc->id, 0, 8)) . '-' . now()->format('His'),
-                'date' => now()->toDateString(),
-                'description' => ($income ? 'قبض' : 'صرف') . ' دفعة على ' . ($doc->doc_no ?: $doc->id),
-                'reference' => (string) $doc->doc_no,
-                'state' => 'مرحّل',
-                'fin_id' => $doc->id,
-                'project_id' => $doc->project_id,
-                'company_id' => $doc->company_id,
-                'meta' => ['posted_at' => now()->toIso8601String(), 'auto' => 'payment'],
-            ]);
-            \App\Models\JournalLine::create(['entry_id' => $entry->id, 'cc_id' => $doc->cc_id,
-                'acc_id' => $income ? $money : $other, 'debit' => $amount, 'credit' => 0,
-                'memo' => $income ? 'قبض الدفعة' : 'المصروف']);
-            \App\Models\JournalLine::create(['entry_id' => $entry->id, 'cc_id' => $doc->cc_id,
-                'acc_id' => $income ? $other : $money, 'debit' => 0, 'credit' => $amount,
-                'memo' => $income ? 'الإيراد' : 'سداد الدفعة']);
+            // معاملةٌ تلفّ القيد وسطريه: فشلُ السطر الثاني كان يترك قيداً مرحّلاً
+            // بسطرٍ واحد، وJournalEntry::booted يمنع تصحيحه أبداً → دفترٌ مختلٌّ للأبد
+            \Illuminate\Support\Facades\DB::transaction(function () use ($doc, $amount, $income, $money, $other) {
+                $entry = \App\Models\JournalEntry::create([
+                    'doc_no' => 'JE-' . ($doc->doc_no ?: substr($doc->id, 0, 8)) . '-' . now()->format('His'),
+                    'date' => now()->toDateString(),
+                    'description' => ($income ? 'قبض' : 'صرف') . ' دفعة على ' . ($doc->doc_no ?: $doc->id),
+                    'reference' => (string) $doc->doc_no,
+                    'state' => 'مرحّل',
+                    'fin_id' => $doc->id,
+                    'project_id' => $doc->project_id,
+                    'company_id' => $doc->company_id,
+                    'meta' => ['posted_at' => now()->toIso8601String(), 'auto' => 'payment'],
+                ]);
+                \App\Models\JournalLine::create(['entry_id' => $entry->id, 'cc_id' => $doc->cc_id,
+                    'acc_id' => $income ? $money : $other, 'debit' => $amount, 'credit' => 0,
+                    'memo' => $income ? 'قبض الدفعة' : 'المصروف']);
+                \App\Models\JournalLine::create(['entry_id' => $entry->id, 'cc_id' => $doc->cc_id,
+                    'acc_id' => $income ? $other : $money, 'debit' => 0, 'credit' => $amount,
+                    'memo' => $income ? 'الإيراد' : 'سداد الدفعة']);
+            });
         } catch (\Throwable $e) {
             report($e);   // القيد الآلي لا يُفشل تسجيل الدفعة نفسها
         }

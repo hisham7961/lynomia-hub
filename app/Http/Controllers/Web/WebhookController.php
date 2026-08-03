@@ -37,6 +37,15 @@ class WebhookController extends Controller
             'events' => ['required', 'string', 'max:2000'],
         ], [], ['name' => 'الاسم', 'url' => 'الرابط', 'events' => 'الأحداث']);
 
+        // حارس SSRF عند الإنشاء: عنوانٌ خاصّ/داخليّ (169.254 بيانات السحابة،
+        // 127.0.0.1، ‏*.internal) يُرفض إلا بمهرب monitor.allow_private —
+        // للتنصيبات التي تُوجّه الويبهوك لـn8n داخليّ عمداً.
+        $chk = hub_outbound_ok($d['url']);
+        if (! $chk['ok']) {
+            return back()->withInput()->withErrors(['url' =>
+                'وجهة الويبهوك ' . $chk['why'] . ' — إن كان n8n داخليّاً مقصوداً، فعّل «السماح بالعناوين الخاصة» في الإعدادات']);
+        }
+
         Webhook::create($d + ['secret' => 'whs_' . Str::random(40), 'active' => true]);
         Cache::forget('webhooks:active');
 

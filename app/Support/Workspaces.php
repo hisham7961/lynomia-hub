@@ -38,4 +38,44 @@ class Workspaces
     {
         return static::for($user)[$key] ?? null;
     }
+
+    /**
+     * عدّاد الانتباه لكل وحدة: كم سجلٍّ يستحق أو تأخّر أو يقارب الانتهاء —
+     * من رادار الانتهاء القائم (hub_expiry) المنطَّق بصلاحية المستخدم وعزله،
+     * فلا تُظهر الشارةُ انتباه شركةٍ لا يراها. أهمُّ من عدّ السجلات: يقول أين
+     * يُنظر لا كم يوجد. يُخبَّأ مع الرادار نفسه (لا استعلامَ إضافياً).
+     *
+     * @return array<string,int> module => count
+     */
+    public static function attentionByModule($user = null, bool $fresh = false): array
+    {
+        $user = $user ?? auth()->user();
+        $out = [];
+        foreach (hub_expiry($fresh, $user) as $i) {
+            $mk = (string) ($i['module'] ?? '');
+            if ($mk === '') continue;
+            $out[$mk] = ($out[$mk] ?? 0) + 1;
+        }
+
+        return $out;
+    }
+
+    /**
+     * مجموع الانتباه لكل مساحةٍ يراها المستخدم — لشارة الشريط الجانبي.
+     *
+     * @return array<string,int> workspaceKey => count
+     */
+    public static function attentionByWorkspace($user = null, bool $fresh = false): array
+    {
+        $user = $user ?? auth()->user();
+        $byMod = static::attentionByModule($user, $fresh);
+        $out = [];
+        foreach (static::for($user) as $key => $ws) {
+            $sum = 0;
+            foreach ($ws['modules'] as $mk) $sum += $byMod[$mk] ?? 0;
+            if ($sum) $out[$key] = $sum;
+        }
+
+        return $out;
+    }
 }

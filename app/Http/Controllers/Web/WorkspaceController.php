@@ -59,9 +59,13 @@ class WorkspaceController extends Controller
             ->filter(fn ($i) => in_array($i['module'] ?? '', $ws['modules'], true))
             ->take(6)->values();
 
+        // شارة الانتباه لكل وحدة: كم يستحق/تأخّر فيها — القُمرة تقول أين يُنظر
+        // لا كم يوجد فقط. من الرادار نفسه (مخبّأ) فلا استعلامَ إضافي.
+        $attention = Workspaces::attentionByModule($u);
+
         return view('workspaces.show', [
             'ws' => $ws, 'cards' => $cards, 'activity' => $activity,
-            'actors' => $actors, 'expiry' => $expiry,
+            'actors' => $actors, 'expiry' => $expiry, 'attention' => $attention,
             'all' => Workspaces::for($u),
         ]);
     }
