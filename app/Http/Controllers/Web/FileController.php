@@ -100,6 +100,16 @@ class FileController extends Controller
                     return true;
                 }
 
+                // مرفقات الرسائل المباشرة: لطرفَي المحادثة وحدهما. dm ليست وحدةً
+                // في السجل فلم تكن البوابة تعرفها — وكل مرفقٍ يُرفض 403 حتى
+                // لمرسِله ومستلمه أنفسهما، والرابط في الخيط ميت.
+                if (Schema::hasTable('dm_messages')
+                    && DB::table('dm_messages')->where('att', $path)
+                        ->where(fn ($w) => $w->where('from_id', $u->id)->orWhere('to_id', $u->id))
+                        ->exists()) {
+                    return true;
+                }
+
                 return false;
             }
         );

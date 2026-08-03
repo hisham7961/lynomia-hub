@@ -105,8 +105,13 @@ class DmController extends Controller
             ->whereNull('read_at')->update(['read_at' => now()]);
 
         // المحذوفةُ تبقى في الخيط أثراً يقول «حُذفت رسالة» — المحادثةُ المبتورةُ
-        // بلا تفسيرٍ تجعل الطرفَ الآخر يظنّ أنه أخطأ القراءة
-        $msgs = DmMessage::where('thread_key', $key)->orderBy('created_at')->limit(300)->get();
+        // بلا تفسيرٍ تجعل الطرفَ الآخر يظنّ أنه أخطأ القراءة.
+        // **أحدثُ ٣٠٠ لا أقدمُها**: الترتيب التصاعدي مع limit كان يُرجع أول ٣٠٠
+        // رسالة في عمر الخيط — فمتى تجاوزها لا يظهر أي جديدٍ أبداً: المرسل لا يرى
+        // رسالته بعد الإرسال، والمستلم لا يرى الوارد وقد خُتم مقروءاً أعلاه.
+        $msgs = DmMessage::where('thread_key', $key)
+            ->orderByDesc('created_at')->orderByDesc('id')->limit(300)->get()
+            ->reverse()->values();
 
         // نفس الشاشة: قائمةُ المحادثات إلى جانب الخيط المفتوح — لا صفحتان منفصلتان
         $me = auth()->id();
@@ -171,7 +176,7 @@ class DmController extends Controller
             'att'  => ['nullable', 'file', 'max:' . (int) setting('files.max_kb', 512000)],
         ], [], ['body' => 'نص الرسالة', 'att' => 'المرفق']);
 
-        DmMessage::create([
+        $msg = DmMessage::create([
             'thread_key' => DmMessage::threadKey(auth()->id(), $other->id),
             'from_id'    => auth()->id(),
             'to_id'      => $other->id,
@@ -180,8 +185,10 @@ class DmController extends Controller
             'created_at' => now(),
         ]);
 
+        // record_id بلا module: لا رابطَ يُبنى منه (الوجهة حوار لا سجل وحدة) —
+        // لكنه يُمكّن سحبَ الرسالة من سحب إشعارها معها
         hub_notify($other->id, 'dm',
-            '💬 رسالة من ' . auth()->user()->name . ': ' . trim($data['body']));
+            '💬 رسالة من ' . auth()->user()->name . ': ' . trim($data['body']), null, $msg->id);
 
         return redirect()->route('dm.thread', $other->id)->withFragment('bottom');
     }
@@ -216,6 +223,10 @@ class DmController extends Controller
 
         $m->forceFill(['deleted_at' => now()])->save();
         hub_data_bump('dm_messages');
+
+        // غايةُ السحب استرجاعُ ما أُرسل خطأً — وكان نصُّ الرسالة كاملاً (حتى ٥٩٠
+        // حرفاً) يبقى في جرس المستلم بعد السحب. الإشعار يُسحب مع رسالته.
+        \App\Models\HubNotification::where('kind', 'dm')->where('record_id', $m->id)->delete();
 
         return back()->with('ok', 'سُحبت الرسالة — يبقى مكانُها يقول إنها حُذفت');
     }
