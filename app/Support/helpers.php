@@ -3181,6 +3181,11 @@ if (! function_exists('hub_metric_put')) {
     {
         $at = $at ? \Illuminate\Support\Carbon::parse($at) : now();
 
+        // حزامُ أمانٍ للمسار الويبيّ أيضاً (Metrics::capture): العمود decimal(18,4)
+        // يفيض على قيمةٍ ≥ 10¹⁴ أو غير منتهية — نُقصّها للمدى الآمن فلا 500 صامت
+        if (! is_finite($value)) $value = 0.0;
+        $value = max(-9999999999999.9999, min(9999999999999.9999, $value));
+
         return \App\Models\MetricPoint::updateOrCreate(
             ['module' => $module, 'record_id' => $recordId, 'metric' => $metric, 'at' => $at],
             ['value' => $value, 'source' => $source, 'meta' => $meta ?: null],
