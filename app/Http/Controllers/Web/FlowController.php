@@ -113,6 +113,19 @@ class FlowController extends Controller
         ]);
         abort_unless(hub_mod($d['m']), 404);
 
+        // حقلا الشرط والتعيين ينتميان لوحدة المسار المختارة: تبديل الوحدة كان
+        // يترك cond_field معلّقاً في الهواء — وcondPass الآن fail-closed فيتعطّل
+        // المسار بصمت؛ الرفضُ هنا برسالةٍ خيرٌ من تعطّلٍ لا يفهمه أحد
+        $keys = collect(hub_mod($d['m'])['fields'])->pluck('key')->all();
+        $errors = [];
+        if (($d['cond_field'] ?? '') !== '' && ! in_array($d['cond_field'], $keys, true)) {
+            $errors['cond_field'] = 'حقل الشرط ليس من حقول الوحدة المختارة — اختر حقلاً منها أو أفرغ الشرط';
+        }
+        if ($r->boolean('a_set') && ! in_array(hub_str($r->input('a_set_field', '')), $keys, true)) {
+            $errors['a_set_field'] = 'حقل التعيين ليس من حقول الوحدة المختارة';
+        }
+        if ($errors) throw \Illuminate\Validation\ValidationException::withMessages($errors);
+
         return $d;
     }
 
