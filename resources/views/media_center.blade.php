@@ -102,7 +102,7 @@
                     @if ($c['speaker'])<div class="sub" style="font-size:12px">🎙️ {{ $c['speaker'] }}</div>@endif
                     @if ($c['brand'])<div class="sub" style="font-size:12px">🏷️ {{ $c['brand'] }}</div>@endif
                     @if ($c['url'])
-                        <a class="btn ghost xs" style="margin-top:auto" href="{{ $c['url'] }}" target="_blank" rel="noopener">المادة ↗</a>
+                        <a class="btn ghost xs" style="margin-top:auto" href="{{ hub_safe_url($c['url']) }}" target="_blank" rel="noopener">المادة ↗</a>
                     @endif
                 </div>
             </div>
