@@ -66,6 +66,10 @@ class QuoteController extends Controller
 
     protected function toContract(Quote $q)
     {
+        // صلاحيةُ الوحدة الهدف تُفرض هنا كما في المسار الرسمي (ContractActionsController::find):
+        // إجراءُ العرض (quotes:e) لا يسكّ عقداً لمن لا يملك إنشاء العقود.
+        abort_unless(hub_can(auth()->user(), 'contracts', 'a'), 403,
+            'تحويل العرض لعقد يتطلب صلاحية إنشاء العقود');
         abort_unless($q->status === 'مقبول', 422, 'حوّل العرض بعد قبوله أولاً');
         $meta = (array) $q->meta;
         if (! empty($meta['contract_id']) && Contract::find($meta['contract_id'])) {
@@ -99,6 +103,10 @@ class QuoteController extends Controller
 
     protected function toInvoice(Quote $q)
     {
+        // صلاحيةُ المالية تُفرض هنا كما في store لوحدة fin: الفاتورة تدخل MRR
+        // والتقارير، فلا تُسكّ لمن لا يملك إنشاء المستندات المالية.
+        abort_unless(hub_can(auth()->user(), 'fin', 'a'), 403,
+            'تحويل العرض لفاتورة يتطلب صلاحية إنشاء المستندات المالية');
         abort_unless($q->status === 'مقبول', 422, 'حوّل العرض بعد قبوله أولاً');
         $meta = (array) $q->meta;
         if (! empty($meta['invoice_id']) && FinDocument::find($meta['invoice_id'])) {
