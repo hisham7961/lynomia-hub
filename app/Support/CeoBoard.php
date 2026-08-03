@@ -90,14 +90,16 @@ class CeoBoard
             // ثلاثةُ تصحيحات: (١) النوع — كانت فواتير **المشتريات** تُحسب مستحقاتٍ
             // لنا؛ (٢) `total - NULL = NULL` فالفاتورة التي لم يُدفع منها شيء —
             // وهي أسوأها — كانت تسقط من المجموع؛ (٣) النطاق.
-            $aged = (float) $fin->whereIn('kind', (array) config('hub.fin.income', []) ?: ['فاتورة مبيعات'])
+            $agedQ = $fin->whereIn('kind', (array) config('hub.fin.income', []) ?: ['فاتورة مبيعات'])
                 ->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة'])
-                ->whereNotNull('due')->where('due', '<', now()->subDays(60)->toDateString())
-                ->sum(DB::raw('total - COALESCE(paid, 0)'));
-            if ($aged > 0) $out[] = ['icon' => '⏳', 'amount' => $aged, 'cur' => $cur,
+                ->whereNotNull('due')->where('due', '<', now()->subDays(60)->toDateString());
+            // استنساخٌ قبل التجميع: `sum()` ينفّذ الاستعلام، ونريد العملات أيضاً
+            $aged = (float) (clone $agedQ)->sum(DB::raw('total - COALESCE(paid, 0)'));
+            if ($aged > 0) $out[] = ['icon' => '⏳', 'amount' => $aged,
                 'label' => 'مستحقات متأخرة فوق ٦٠ يوماً',
                 'why' => 'كلما طال التقادم قلّت فرصة التحصيل — هذا أقرب ما يكون إلى خسارة مؤجّلة.',
-                'url' => route('m.index', 'fin'), 'tone' => 'bad'];
+                'url' => route('m.index', 'fin'), 'tone' => 'bad']
+                + self::curLabel((clone $agedQ)->distinct()->pluck('currency'), $cur);
         }
 
         // مشاريع تجاوزت ميزانيتها: الفرق هو النزف نفسه
@@ -105,12 +107,13 @@ class CeoBoard
             $over = hub_open_scope($pj)
                 ->whereNotNull('budget')->where('budget', '>', 0)
                 ->whereColumn('cost', '>', 'budget')
-                ->get(['name', 'budget', 'cost']);
+                ->get(['name', 'budget', 'cost', 'currency']);
             $gap = $over->sum(fn ($p) => (float) $p->cost - (float) $p->budget);
-            if ($over->count()) $out[] = ['icon' => '📉', 'amount' => $gap, 'cur' => $cur,
+            if ($over->count()) $out[] = ['icon' => '📉', 'amount' => $gap,
                 'label' => $over->count() . ' مشروع تجاوز ميزانيته',
                 'why' => 'أكبرها: ' . ($over->sortByDesc(fn ($p) => $p->cost - $p->budget)->first()->name ?? '—'),
-                'url' => route('m.index', 'projects'), 'tone' => 'bad'];
+                'url' => route('m.index', 'projects'), 'tone' => 'bad']
+                + self::curLabel($over->pluck('currency'), $cur);
         }
 
         // اشتراكات تتجدد تلقائياً خلال شهر: تُدفع بصمت ما لم تُراجَع قبل موعدها
@@ -118,15 +121,31 @@ class CeoBoard
             $subs = hub_open_scope($sb)
                 ->whereNotNull('renew')
                 ->whereBetween('renew', [now()->toDateString(), now()->addDays(30)->toDateString()])
-                ->get(['service', 'amount', 'auto_renew']);
+                ->get(['service', 'amount', 'auto_renew', 'currency']);
             $auto = $subs->where('auto_renew', 1);
-            if ($auto->count()) $out[] = ['icon' => '🔁', 'amount' => (float) $auto->sum('amount'), 'cur' => $cur,
+            if ($auto->count()) $out[] = ['icon' => '🔁', 'amount' => (float) $auto->sum('amount'),
                 'label' => $auto->count() . ' اشتراك يتجدد تلقائياً خلال شهر',
                 'why' => 'التجديد التلقائي يُدفع بلا قرار — راجع الحاجة قبل أن يُخصم.',
-                'url' => route('m.index', 'subs'), 'tone' => 'wn'];
+                'url' => route('m.index', 'subs'), 'tone' => 'wn']
+                + self::curLabel($auto->pluck('currency'), $cur);
         }
 
         return $out;
+    }
+
+    /**
+     * صدقُ اللصيقة: بطاقةٌ تجمع مبالغَ صفوفٍ قد تحمل عملاتٍ مختلفة. لا محرّكَ
+     * تحويلٍ في النظام (`app.currency` تسميةٌ لا تحويل)، فإن اتّحدت عملاتُ
+     * الصفوف عُنوِنت البطاقةُ بعملتها الحقيقية؛ وإن اختلفت رُفع علمُ `mixed`
+     * كي يُقرأ الرقمُ المخلوط مؤشّراً لا رقماً دقيقاً — بدل عنونةِ كلِّ شيءٍ
+     * بعملة النظام الافتراضية زوراً. القيمُ الفارغة تُنسَب للعملة الافتراضية.
+     */
+    protected static function curLabel($currencies, string $default): array
+    {
+        $set = collect($currencies)->map(fn ($c) => filled($c) ? (string) $c : $default)
+            ->unique()->values();
+
+        return ['cur' => $set->count() === 1 ? $set->first() : $default, 'mixed' => $set->count() > 1];
     }
 
     /**

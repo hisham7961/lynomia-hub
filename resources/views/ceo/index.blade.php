@@ -42,7 +42,7 @@
                 <td><a href="{{ $l['url'] }}"><b>{{ $l['label'] }}</b></a>
                     <div class="sub" style="font-size:12px">{{ $l['why'] }}</div></td>
                 <td class="acts mono"><b class="{{ $l['tone'] === 'bad' ? 'txt-bad' : '' }}">
-                    {{ number_format($l['amount'], 0) }}</b> <span class="sub">{{ $l['cur'] }}</span></td>
+                    {{ number_format($l['amount'], 0) }}</b> <span class="sub">{{ $l['cur'] }}</span>@if ($l['mixed'] ?? false)<span class="sub txt-bad" title="جُمعت مبالغُ بعملاتٍ مختلفة في رقمٍ واحد — لا محرّك تحويل في النظام، فاقرأه مؤشّراً لا رقماً دقيقاً">⚠</span>@endif</td>
             </tr>
         @endforeach
     </table>
