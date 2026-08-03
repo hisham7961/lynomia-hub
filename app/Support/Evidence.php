@@ -16,12 +16,27 @@ class Evidence
     /** السلسلة كاملة: [صفوف [event, hash]، الرأس الحالي] — بترتيب الوقوع الثابت */
     public static function chain(SignRequest $req): array
     {
+        // بصمات الموقّعين تدخل حلقاتهم: كانت الحلقة تُجزّئ الحدث وحده
+        // (id|event|signer|ip|created_at) بينما **أهم ما يُزوَّر خارجها كلياً**:
+        // صورة التوقيع نفسها، واسم الموقّع ورقم هويته وسيلفيه وsigned_at —
+        // وجدول «الأطراف» في الشهادة يُعرض من هذه الأعمدة غير المُجزّأة حرفياً.
+        $signers = \App\Models\ContractSigner::where('request_id', $req->id)->get()
+            ->mapWithKeys(fn ($s) => [$s->id => hash('sha256',
+                (string) $s->name . '|' . (string) $s->id_no . '|' . (string) $s->signed_at
+                . '|' . hash('sha256', (string) $s->signature) . '|' . hash('sha256', (string) $s->selfie))])
+            ->all();
+
         $prev = hash('sha256', 'lynomia-evidence:' . $req->id . ':' . (string) $req->doc_hash);
         $rows = [];
         foreach (ContractEvent::where('request_id', $req->id)
                      ->orderBy('created_at')->orderBy('id')->get() as $e) {
             $prev = hash('sha256', $prev . '|' . $e->id . '|' . $e->event . '|'
-                . ($e->signer_id ?: '') . '|' . ($e->ip ?: '') . '|' . (string) $e->created_at);
+                . ($e->signer_id ?: '') . '|' . ($e->ip ?: '') . '|' . (string) $e->created_at
+                // meta (سبب الرفض/الإبطال) وactor يدخلان الحلقة، وبصمة الموقّع
+                // على حلقتَي توقيعه/رفضه — عبثٌ بأيٍّ منها يكسر السلسلة
+                . '|' . hash('sha256', (string) $e->meta) . '|' . ($e->actor_id ?: '')
+                . '|' . (in_array($e->event, ['signed', 'declined'], true) && $e->signer_id
+                    ? ($signers[$e->signer_id] ?? '') : ''));
             $rows[] = ['e' => $e, 'hash' => $prev];
         }
 

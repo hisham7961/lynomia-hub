@@ -43,6 +43,16 @@ class Contract extends Model
             $c->kind = $c->kind ?: 'أصلي';
             if (! $c->doc_no) $c->doc_no = self::nextDocNo();
         });
+
+        // حذف العقد يُغلق التزاماته المفتوحة: كانت تبقى «قائمة» بمرجعٍ لسجل
+        // محذوف فتُنذر للأبد في رادار المركز القانوني والموجز اليومي ولوحة CEO —
+        // ولا شاشةَ تصل إليها لتُغلقها يدوياً لأن عقدها غاب من كل القوائم
+        static::deleting(function (self $c) {
+            \Illuminate\Support\Facades\DB::table('contract_obligations')
+                ->where('contract_id', $c->id)
+                ->whereNotIn('status', ['مكتمل', 'ملغي'])
+                ->update(['status' => 'ملغي', 'updated_at' => now()]);
+        });
     }
 
     public static function nextDocNo(): string
