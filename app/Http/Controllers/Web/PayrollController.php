@@ -112,14 +112,23 @@ class PayrollController extends Controller
     /** الاعتماد يقفل التوليد ويولّد قيد الرواتب (خلف إعداد الترحيل الآلي) */
     protected function approve(PayrollRun $run)
     {
-        abort_unless($run->status === 'مسودة' || blank($run->status), 422, 'المسيّر ' . $run->status . ' أصلاً');
         abort_unless(hub_approver(), 403, 'اعتماد المسيّرات للمالكين وحاملي صلاحية الاعتماد');
-        abort_if((float) $run->total <= 0 || ! PayrollLine::where('run_id', $run->id)->exists(), 422,
-            'ولّد سطور المسيّر أولاً — لا يُعتمد مسيّر فارغ');
 
-        $run->status = 'معتمد';
-        $run->save();
-        $this->autoJournal($run);
+        // معاملةٌ على صفٍّ مقفول: فحصُ الحالة + القلب + القيد يقرأ الحالة المُثبَتة
+        // لا نسخةً قديمة في الذاكرة — فنقرتان متزامنتان (نقر مزدوج/تبويبان/معتمدان)
+        // تتسلسلان فلا يُرحَّل قيدُ الرواتب مرتين (مصروفٌ مضاعف في الدفتر)، على نمط
+        // FinController::pay و ApprovalDecisionController المقفولَين. القيدُ نفسه بلا
+        // حاجزِ فرادةٍ في القاعدة (doc_no غير فريد)، فالقفلُ هو الحاجز.
+        \Illuminate\Support\Facades\DB::transaction(function () use (&$run) {
+            $run = PayrollRun::whereKey($run->getKey())->lockForUpdate()->firstOrFail();
+            abort_unless($run->status === 'مسودة' || blank($run->status), 422, 'المسيّر ' . $run->status . ' أصلاً');
+            abort_if((float) $run->total <= 0 || ! PayrollLine::where('run_id', $run->id)->exists(), 422,
+                'ولّد سطور المسيّر أولاً — لا يُعتمد مسيّر فارغ');
+
+            $run->status = 'معتمد';
+            $run->save();
+            $this->autoJournal($run);
+        });
         hub_audit('اعتماد مسيّر', 'payroll', $run->id, (string) $run->name);
 
         return back()->with('ok', '✅ اعتُمد المسيّر — سجّل الصرف عند التحويل الفعلي');
