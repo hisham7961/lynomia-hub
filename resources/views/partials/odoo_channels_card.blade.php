@@ -46,7 +46,8 @@
         </div>
         <div class="crow">
             <span class="sub">
-                @if ($chAllOk)المجموع: <b>{{ number_format($chTotal, 0) }}</b> بعملة أودو ·@endif
+                @if ($chAllOk)المجموع: <b>{{ number_format($chTotal, 0) }}</b> بعملة أودو
+                    @if (collect($chData)->where('ok', true)->count() > 1)<span class="bdg wn" title="جمعٌ خامٌّ عبر قنواتٍ قد تختلف عملاتها وأوضاعها (أوامر/فواتير) — رقمٌ إرشاديّ لا رسميّ">⚠️ قد تختلط العملات</span>@endif ·@endif
                 آخر جلب {{ collect($chData)->first()['at'] ?? now()->format('H:i') }} · تُخبأ ١٠ دقائق
             </span>
             <span class="spacer"></span>

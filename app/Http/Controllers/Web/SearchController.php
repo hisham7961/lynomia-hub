@@ -111,8 +111,10 @@ class SearchController extends Controller
                 $count = (clone $base)->count();
                 if (! $count) continue;
                 $groups[] = [
+                    // العمود الفيزيائيّ لا المفتاح: وحدةٌ مفتاحُ حالتها ≠ عمودها
+                    // (الوثائق: docStatus/doc_status) كانت شارةُ حالتها تختفي بصمت
                     'module' => $key, 'label' => $def['label'], 'count' => $count,
-                    'display' => hub_display_col($key), 'status' => $def['status'] ?? null,
+                    'display' => hub_display_col($key), 'status' => hub_status_col($key),
                     // فاصل id: created_at بدقة الثانية يتساوى في الإدخال الدفعي فيقترع المحرّكان
                     'rows' => $base->orderByDesc('created_at')->orderByDesc('id')->limit(8)->get(),
                 ];
