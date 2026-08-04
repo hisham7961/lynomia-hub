@@ -1065,32 +1065,34 @@ class EsignController extends Controller
                 : 'nullable|string|max:2000000|starts_with:data:image/',
         ]);
 
-        // كتابة أثر التوقيع على صف الموقّع (المستقل أو المرحّل الأول)
-        $signer = $viaSigner
-            ?: \App\Models\ContractSigner::where('request_id', $req->id)->orderBy('order')->first();
-        $signer?->forceFill([
-            'status' => 'وُقّع', 'name' => $d['signer_name'], 'signature' => $d['signature'],
-            'id_no' => $d['signer_id_no'] ?? null, 'selfie' => $d['selfie'] ?? null,
-            'signed_at' => now(), 'ip' => $r->ip(),
-            'agent' => substr((string) $r->userAgent(), 0, 250),
-            'locale' => substr((string) $r->header('Accept-Language'), 0, 60),
-        ])->save();
-        \App\Models\ContractEvent::log('signed', $req, ['signer_id' => $signer?->id,
-            'meta' => json_encode(['name' => $d['signer_name']], JSON_UNESCAPED_UNICODE)]);
+        // كتابة الأثر واكتمال الطلب ذرّيّاً: القفل الصفّيّ يسلسل الإرساليات
+        // المتزامنة فلا تُنفَّذ كتلة الاكتمال (إقرار السياسة/الأرشفة/بريد النسخ)
+        // إلا مرة، ثم آثارها الخارجية بعد المعاملة على من أغلق الطلب وحده.
+        [$pending, $completed] = $this->finalize($req, $viaSigner, $d, $r);
 
-        // اكتمال الطلب: كل من دوره «موقّع» وقّع — طلب الموقّع الواحد يكتمل فوراً كما كان
-        $pending = \App\Models\ContractSigner::where('request_id', $req->id)
-            ->where('role', 'موقّع')->where('status', '!=', 'وُقّع')->count();
+        // الإشعار يحمل رمز التحقق — تطابقه مع الوثيقة في صفحة /verify أو قائمة المركز
+        $this->notifyOwners('✍️ وُقّع «' . $req->title . '» [' . $req->verify_code . '] بواسطة '
+            . $d['signer_name'] . ' — IP ' . $r->ip() . ' في ' . now()->format('Y-m-d H:i'));
+        hub_audit('توقيع عقد إلكترونياً', 'contracts', $req->contract_id,
+            $req->title . ' — ' . $d['signer_name']);
 
-        if ($pending === 0) {
-            $req->forceFill([
-                'status' => 'وُقّع', 'signer_name' => $d['signer_name'], 'signature' => $d['signature'],
-                'signer_id_no' => $d['signer_id_no'] ?? null, 'selfie' => $d['selfie'] ?? null,
-                'signed_at' => now(), 'signed_ip' => $r->ip(),
-                'signed_agent' => substr((string) $r->userAgent(), 0, 250),
-                'signed_locale' => substr((string) $r->header('Accept-Language'), 0, 60),
-            ])->save();
+        return view('sign.done', ['req' => $req, 'partial' => $pending > 0, 'token' => $token]);
+    }
 
+    /**
+     * تطبيق التوقيع واكتمال الطلب ثم آثاره — بذرّيّة الاكتمال.
+     * applySignature تكتب صف الموقّع وتقلب الطلب «وُقّع» تحت قفلٍ صفّيّ، فتُعيد
+     * ما إذا اكتمل الطلب الآن (بيدنا). الآثار الخارجية (إسراء العقد، إكمال الجهة
+     * المربوطة، أرشفة النسخة وبريدها) تُنفَّذ بعد المعاملة على من أغلق الطلب وحده،
+     * فلا إقرارَ سياسةٍ مكرّر ولا مرفقَ نسخةٍ مزدوج مهما تزامنت الإرساليات.
+     *
+     * @return array{0:int,1:bool} [عدد المعلّقين، هل أُغلق الطلب بهذه الإرسالية]
+     */
+    protected function finalize(SignRequest $req, ?\App\Models\ContractSigner $viaSigner, array $d, Request $r): array
+    {
+        [$pending, $completed] = $this->applySignature($req, $viaSigner, $d, $r);
+
+        if ($completed) {
             // سير العملية يكتمل: العقد المربوط «ساري» — بحفظ Eloquent (v2.117) فيُدقَّق
             // ويُصدَر ويُطلق contract.signed فعلاً (كان التحديث المباشر يخرسه)
             if ($req->contract_id) {
@@ -1107,13 +1109,62 @@ class EsignController extends Controller
                 . '» — بقي ' . $pending . ' من الموقّعين');
         }
 
-        // الإشعار يحمل رمز التحقق — تطابقه مع الوثيقة في صفحة /verify أو قائمة المركز
-        $this->notifyOwners('✍️ وُقّع «' . $req->title . '» [' . $req->verify_code . '] بواسطة '
-            . $d['signer_name'] . ' — IP ' . $r->ip() . ' في ' . now()->format('Y-m-d H:i'));
-        hub_audit('توقيع عقد إلكترونياً', 'contracts', $req->contract_id,
-            $req->title . ' — ' . $d['signer_name']);
+        return [$pending, $completed];
+    }
 
-        return view('sign.done', ['req' => $req, 'partial' => $pending > 0, 'token' => $token]);
+    /**
+     * كتابة أثر التوقيع على صف الموقّع وقلبُ الطلب «وُقّع» إن اكتمل — ذرّيّاً.
+     * الكتلة كلها تُقرأ-ثم-تُفعل: الحالة، عدد المعلّقين، ثم الإغلاق. بلا تسلسل
+     * تمرّ إرساليتان متزامنتان معاً فيكتمل الطلب مرّتين. القفل الصفّيّ وإعادة قراءة
+     * الحالة داخل المعاملة يسلسلانها: من يمسك القفل أولاً يُغلق، والثاني يرى «وُقّع» فيُرفض.
+     *
+     * @return array{0:int,1:bool} [عدد المعلّقين بعد هذا التوقيع، هل أُغلق الطلب الآن]
+     */
+    protected function applySignature(SignRequest $req, ?\App\Models\ContractSigner $viaSigner, array $d, Request $r): array
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($req, $viaSigner, $d, $r) {
+            // إعادة قراءة حالة الطلب من صفٍّ مقفول: إرساليةٌ متزامنة أغلقته بيننا
+            // وقراءتنا الأولى (في sign) تُكشف الآن فتُرفض بدل أن تُكرّر الاكتمال.
+            $locked = SignRequest::whereKey($req->id)->lockForUpdate()->firstOrFail();
+            abort_if($locked->status !== 'بانتظار التوقيع', 410,
+                'هذه الوثيقة أُغلقت — وُقّعت أو رُفضت مسبقاً');
+
+            // صف الموقّع يُقرأ ويُقفل أيضاً: نفس الموقّع لا يوقّع مرتين متزامنتين
+            $signer = $viaSigner
+                ? \App\Models\ContractSigner::whereKey($viaSigner->id)->lockForUpdate()->first()
+                : \App\Models\ContractSigner::where('request_id', $locked->id)
+                    ->orderBy('order')->lockForUpdate()->first();
+            abort_if($signer && $signer->status === 'وُقّع', 410, 'وقّعت هذه الوثيقة مسبقاً');
+
+            $signer?->forceFill([
+                'status' => 'وُقّع', 'name' => $d['signer_name'], 'signature' => $d['signature'],
+                'id_no' => $d['signer_id_no'] ?? null, 'selfie' => $d['selfie'] ?? null,
+                'signed_at' => now(), 'ip' => $r->ip(),
+                'agent' => substr((string) $r->userAgent(), 0, 250),
+                'locale' => substr((string) $r->header('Accept-Language'), 0, 60),
+            ])->save();
+            \App\Models\ContractEvent::log('signed', $req, ['signer_id' => $signer?->id,
+                'meta' => json_encode(['name' => $d['signer_name']], JSON_UNESCAPED_UNICODE)]);
+
+            // اكتمال الطلب: كل من دوره «موقّع» وقّع — طلب الموقّع الواحد يكتمل فوراً كما كان
+            $pending = \App\Models\ContractSigner::where('request_id', $locked->id)
+                ->where('role', 'موقّع')->where('status', '!=', 'وُقّع')->count();
+
+            $completed = $pending === 0;
+            if ($completed) {
+                // القلب يقع تحت القفل: من يصل صفر المعلّقين أولاً يُغلق، وأي متزامنٍ
+                // بعده يرى «وُقّع» عند إعادة القراءة فيُرفض — فالاكتمال مرّةٌ واحدة.
+                $req->forceFill([
+                    'status' => 'وُقّع', 'signer_name' => $d['signer_name'], 'signature' => $d['signature'],
+                    'signer_id_no' => $d['signer_id_no'] ?? null, 'selfie' => $d['selfie'] ?? null,
+                    'signed_at' => now(), 'signed_ip' => $r->ip(),
+                    'signed_agent' => substr((string) $r->userAgent(), 0, 250),
+                    'signed_locale' => substr((string) $r->header('Accept-Language'), 0, 60),
+                ])->save();
+            }
+
+            return [$pending, $completed];
+        });
     }
 
     /** بريد الموقّع التالي في المتسلسل — أول موقّعٍ معلق دوره بريديٌّ ولم يُرسَل له بعد */

@@ -39,12 +39,29 @@ class EntryController extends Controller
         abort_if($debit <= 0 && $credit <= 0, 422, 'أدخل مبلغاً مديناً أو دائناً');
         abort_if($debit > 0 && $credit > 0, 422, 'السطر الواحد إما مدين أو دائن لا كلاهما');
 
-        JournalLine::create([
-            'entry_id' => $e->id, 'acc_id' => $d['accId'], 'cc_id' => $d['ccId'] ?? null,
+        $this->addLineTo($e, [
+            'acc_id' => $d['accId'], 'cc_id' => $d['ccId'] ?? null,
             'debit' => $debit, 'credit' => $credit, 'memo' => $d['memo'] ?? null,
         ]);
 
         return back()->with('ok', 'أُضيف السطر');
+    }
+
+    /**
+     * إضافة سطرٍ ذرّيّة: تُعيد قراءة حالة القيد من صفٍّ مقفول داخل معاملة قبل
+     * الكتابة. فحصُ الحالة في line() يقرأ نسخةً في الذاكرة، وبين قراءته وكتابة
+     * السطر قد يُرحّل القيدُ معالجٌ آخر (post) فيهبط السطر على قيدٍ مقفول غير
+     * موزون لا مسار لإصلاحه. القفل الصفّيّ هنا يسلسل الإضافة مع الترحيل: من
+     * يمسك القفل أولاً يفوز، والثاني يرى الحالة المُحدَّثة فيُرفض.
+     */
+    protected function addLineTo(JournalEntry $e, array $attrs): JournalLine
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($e, $attrs) {
+            $fresh = JournalEntry::whereKey($e->id)->lockForUpdate()->firstOrFail();
+            abort_if($fresh->state === 'مرحّل', 422, 'القيد المُرحَّل مقفل — رُحِّل قبل إضافة السطر');
+
+            return JournalLine::create(['entry_id' => $fresh->id] + $attrs);
+        });
     }
 
     public function dropLine(string $id, string $lineId)
@@ -61,16 +78,25 @@ class EntryController extends Controller
         $e = $this->entry($id);
         abort_if($e->state === 'مرحّل', 422, 'القيد مُرحَّل أصلاً');
 
-        $debit = (float) JournalLine::where('entry_id', $e->id)->sum('debit');
-        $credit = (float) JournalLine::where('entry_id', $e->id)->sum('credit');
-        abort_if($debit <= 0, 422, 'لا يُرحَّل قيدٌ بلا سطور');
-        abort_if(round($debit, 3) !== round($credit, 3), 422,
-            'القيد لا يوازن: مدين ' . number_format($debit, 3) . ' ≠ دائن ' . number_format($credit, 3));
+        // معاملةٌ بقفلٍ صفّيّ: الترحيل يعيد قراءة الحالة والسطور من صفٍّ مقفول،
+        // فيسلسل نفسه مع إضافة السطر (addLineTo). سطرٌ يُضاف بينما نمسك القفل
+        // ينتظر حتى ننتهي فيرى الحالة «مرحّل» ويُرفض؛ وإن سبقنا هو دخل مجموعَ
+        // التوازن. والفحص المُعاد يمنع ترحيلاً مزدوجاً من نسختين قديمتين.
+        \Illuminate\Support\Facades\DB::transaction(function () use ($e) {
+            $fresh = JournalEntry::whereKey($e->id)->lockForUpdate()->firstOrFail();
+            abort_if($fresh->state === 'مرحّل', 422, 'القيد مُرحَّل أصلاً');
 
-        $e->state = 'مرحّل';
-        $e->meta = (array) $e->meta + ['posted_at' => now()->toIso8601String(), 'posted_by' => auth()->id()];
-        $e->save();
-        hub_audit('ترحيل قيد', 'entries', $e->id, (string) $e->doc_no);
+            $debit = (float) JournalLine::where('entry_id', $fresh->id)->sum('debit');
+            $credit = (float) JournalLine::where('entry_id', $fresh->id)->sum('credit');
+            abort_if($debit <= 0, 422, 'لا يُرحَّل قيدٌ بلا سطور');
+            abort_if(round($debit, 3) !== round($credit, 3), 422,
+                'القيد لا يوازن: مدين ' . number_format($debit, 3) . ' ≠ دائن ' . number_format($credit, 3));
+
+            $fresh->state = 'مرحّل';
+            $fresh->meta = (array) $fresh->meta + ['posted_at' => now()->toIso8601String(), 'posted_by' => auth()->id()];
+            $fresh->save();
+            hub_audit('ترحيل قيد', 'entries', $fresh->id, (string) $fresh->doc_no);
+        });
 
         return back()->with('ok', '🔏 رُحّل القيد وقُفل — يُعكس بقيدٍ جديد لا بالتعديل');
     }
