@@ -1,0 +1,48 @@
+# n8n — محرّك سير العمل، خدمةٌ منفصلة بجوار Lynomia Hub (خادم=VPS يشغّل Docker).
+# ليس جزءاً من كود PHP — يعمل كخدمةٍ مستقلّة، ويُربَط بالنظام عبر:
+#   • الويبهوك الصادر من النظام  →  عُقَد Webhook في n8n.
+#   • عُقَد n8n (HTTP Request)     →  الويبهوك الوارد للنظام /hook/{token}.
+#
+# التشغيل:  cp .env.example .env  ثم حرّره، ثم:  docker compose up -d
+# ثم وجّه نطاقاً فرعيّاً (n8n.yourdomain.com) إلى المنفذ 5678 عبر reverse proxy.
+
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678"          # لا يُكشف علناً — خلف reverse proxy فقط
+    environment:
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=https://${N8N_HOST}/
+      - N8N_EDITOR_BASE_URL=https://${N8N_HOST}/
+      - GENERIC_TIMEZONE=${TZ:-Asia/Kuwait}
+      # المصادقة: تفعيل إدارة المستخدمين (أنشئ المالك من الواجهة أول مرة)
+      - N8N_USER_MANAGEMENT_DISABLED=false
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      # التخزين على PostgreSQL للثبات (لا SQLite داخل الحاوية)
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=n8n_db
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-n8n}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER:-n8n}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - n8n_db
+
+  n8n_db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-n8n}
+      - POSTGRES_USER=${POSTGRES_USER:-n8n}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - n8n_db_data:/var/lib/postgresql/data
+
+volumes:
+  n8n_data:
+  n8n_db_data:
