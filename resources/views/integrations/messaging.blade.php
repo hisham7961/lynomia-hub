@@ -18,7 +18,7 @@
     <div class="card kid" style="border-inline-start:4px solid {{ $tgReady ? 'var(--ok)' : 'var(--wn)' }}">
         <h3>✈️ تلجرام <span class="bdg {{ $tgReady ? 'ok' : 'wn' }}">{{ $tgReady ? 'مهيأ' : 'بلا توكن' }}</span></h3>
         <div class="sub" style="line-height:2">
-            التوكن: {{ $tgReady ? 'موجود (مشفَّر)' : 'غائب — ضعه في الإعدادات' }}<br>
+            التوكن: {{ $tgReady ? 'موجود (مشفَّر)' : 'غائب — اضبطه أدناه' }}<br>
             القناة الافتراضية: <span class="mono ltr">{{ $tgChat ?: '—' }}</span>
         </div>
         <div class="crow" style="margin-top:8px">
@@ -27,7 +27,7 @@
                     <input type="hidden" name="channel" value="tg">
                     <button class="btn p xs">🧪 أرسل تجريبية</button></form>
             @endif
-            <a class="btn ghost xs" href="{{ route('settings.edit') }}">⚙️ الإعدادات</a>
+            <a class="btn ghost xs" href="#tgcfg">⚙️ ضبط تلجرام</a>
         </div>
     </div>
 
@@ -57,6 +57,27 @@
             الكل: <b>{{ number_format($inappCount) }}</b> · آخر ٧ أيام: <b>{{ number_format($inappWeek) }}</b><br>
             مستخدمون لهم تفضيلات وجهةٍ خاصة: <b>{{ $prefsUsers }}</b> — تُضبط من الملف الشخصي.
         </div>
+    </div>
+</div>
+
+{{-- ═ ضبط تلجرام — في مركز التكامل لا في الإعدادات العامة ═ --}}
+<div class="card" id="tgcfg">
+    <h3>✈️ ضبط تلجرام — التوكن والقناة الافتراضية</h3>
+    <div class="sub" style="margin-bottom:8px">
+        اضبط توكن البوت والقناة الافتراضية هنا — بجوار زر الاختبار لا وسط الإعدادات العامة.
+        يُخزَّن التوكن <b>مشفَّراً</b>. اترك حقل التوكن فارغاً للإبقاء على المخزون.
+    </div>
+    <form method="POST" action="{{ route('integrations.messaging.telegram') }}" class="frm">
+        @csrf
+        <label>توكن بوت تلجرام <span class="sub">(من ‎@BotFather — يُخزَّن مشفَّراً)</span>
+            <input class="inp ltr" type="password" name="tg_token" value="" maxlength="200" dir="ltr" placeholder="{{ $tgReady ? '•••••• (محفوظ)' : '123456:ABC-DEF...' }}"></label>
+        <label>القناة الافتراضية <span class="sub">(‎@channel أو معرّفٌ رقميّ مثل ‎-100…)</span>
+            <input class="inp ltr" name="tg_chat" value="{{ old('tg_chat', $tgChat) }}" maxlength="120" dir="ltr" placeholder="@your_channel"></label>
+        <button class="btn p">حفظ ضبط تلجرام</button>
+    </form>
+    <div class="sub" style="margin-top:8px">
+        لاستخراج معرّف القناة: أضف البوت لقناتك، أرسل رسالة، ثم افتح
+        <span class="mono ltr">api.telegram.org/bot&lt;التوكن&gt;/getUpdates</span> وخذ <span class="mono ltr">chat.id</span>.
     </div>
 </div>
 
@@ -162,7 +183,7 @@
         <summary class="sub pointer"><b>✈️ تلجرام خطوةً خطوة — من الصفر إلى أول رسالة</b></summary>
         <div class="sub" style="line-height:2;margin-top:6px">
             <b>١)</b> افتح محادثةً مع <span class="mono ltr">@BotFather</span> في تلجرام ← <span class="mono ltr">/newbot</span> ← اتبع الأسئلة — يعطيك <b>التوكن</b>.<br>
-            <b>٢)</b> ضع التوكن في <a href="{{ route('settings.edit') }}">الإعدادات</a> ← «توكن بوت تلجرام» — يُخزَّن مشفَّراً.<br>
+            <b>٢)</b> ضع التوكن في <a href="#tgcfg">ضبط تلجرام أعلاه</a> ← «توكن بوت تلجرام» — يُخزَّن مشفَّراً.<br>
             <b>٣)</b> <b>معرف القناة/المجموعة:</b> أضف البوت لقناتك أو مجموعتك، أرسل فيها أي رسالة، ثم افتح
             <span class="mono ltr">api.telegram.org/bot&lt;التوكن&gt;/getUpdates</span> في المتصفح — تجد
             <span class="mono ltr">"chat":{"id":-100…}</span>. ضع هذا الرقم في «قناة تلجرام الافتراضية».<br>
