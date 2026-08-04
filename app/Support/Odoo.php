@@ -34,6 +34,13 @@ class Odoo
         protected ?string $err = null,
     ) {}
 
+    /**
+     * قاطعٌ داخل النسخة الواحدة: أول فشل اتصالٍ (خادمٌ لا يستجيب) يوسم الاتصال
+     * «ساقطاً» فتُرفض بقيةُ النداءات فوراً بلا شبكة. البطاقة تُنشئ نسخةً واحدة ثم
+     * تدور على القنوات عليها — فخادمٌ ميتٌ يحجب العاملَ مرةً واحدة لا مرةً لكل قناة.
+     */
+    protected ?string $down = null;
+
     /* ───────────── المصانع ───────────── */
 
     /** نسخة لاتصال: null أو 'default' = الافتراضي من الإعدادات، وإلا معرّف صف */
@@ -133,12 +140,24 @@ class Odoo
         if (! $this->ready()) {
             throw new \RuntimeException($this->err ?? 'بيانات الاتصال بأودو ناقصة');
         }
+        // القاطع مفتوح: سقط الاتصال في نداءٍ سابقٍ لهذه النسخة — لا نلمس الشبكة ثانيةً
+        if ($this->down !== null) {
+            throw new \RuntimeException($this->down);
+        }
 
         $url = rtrim($this->url, '/') . '/jsonrpc';
-        $resp = Http::timeout(12)->post($url, [
-            'jsonrpc' => '2.0', 'method' => 'call', 'id' => rand(1, 99999),
-            'params' => ['service' => $service, 'method' => $method, 'args' => $args],
-        ]);
+        try {
+            // connectTimeout منفصلٌ قصير: خادمٌ لا يقبل الاتصال (جدارٌ ناريّ يُسقط
+            // الحزم) يفشل بعد ٣ث لا ينتظر المهلة الكلية ١٢ث حاجزاً العامل.
+            $resp = Http::connectTimeout(3)->timeout(12)->post($url, [
+                'jsonrpc' => '2.0', 'method' => 'call', 'id' => rand(1, 99999),
+                'params' => ['service' => $service, 'method' => $method, 'args' => $args],
+            ]);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            // فشل اتصالٍ (لا استجابة/مهلة): افتح القاطع فلا تُحجب بقيةُ القنوات
+            $this->down = 'تعذّر الوصول لخادم أودو — لا استجابة، تحقق من الرابط والشبكة';
+            throw new \RuntimeException($this->down, 0, $e);
+        }
 
         if (! $resp->successful()) {
             throw new \RuntimeException('تعذر الوصول لخادم أودو (' . $resp->status() . ') — تحقق من الرابط');

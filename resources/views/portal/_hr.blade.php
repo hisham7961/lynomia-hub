@@ -4,20 +4,23 @@
     $days = fn ($d) => $d ? (int) now()->startOfDay()->diffInDays(\Illuminate\Support\Carbon::parse(substr((string) $d, 0, 10))->startOfDay(), false) : null;
     $iq = $emp ? $days($emp->iqama_exp) : null;
     $pp = $emp ? $days($emp->pass_exp) : null;
+    // قفل الحقل يسري على بطاقات البوابة كما على m.show (السطر 90): حقلٌ محجوبٌ
+    // ('hide') على دور المُشاهِد لا يظهر هنا — لا لموظفٍ آخر ولا في «بوابتي».
+    $fm = fn ($k) => hub_field_mode(auth()->user(), 'hr', $k) !== 'hide';
 @endphp
 
 @if ($emp)
 <div class="cards">
-    <div class="stat"><span class="ico">🏖️</span><b>{{ $emp->leave_bal ?? '—' }}</b><span>رصيد الإجازات (يوم)</span></div>
+    @if ($fm('leaveBal'))<div class="stat"><span class="ico">🏖️</span><b>{{ $emp->leave_bal ?? '—' }}</b><span>رصيد الإجازات (يوم)</span></div>@endif
     @if ($may['tasks'])<div class="stat"><span class="ico">✅</span><b>{{ number_format($openTasks) }}</b><span>مهام مفتوحة</span></div>@endif
     @if ($may['attend'])<div class="stat"><span class="ico">🕒</span><b>{{ $attMonth['days'] }} يوم / {{ number_format($attMonth['hours'], 1) }} س</b><span>حضور هذا الشهر</span></div>@endif
-    @if ($iq !== null)
+    @if ($iq !== null && $fm('iqamaExp'))
         <div class="stat"><span class="ico">🪪</span><b class="{{ $iq < 30 ? 'txt-bad' : '' }}">{{ $iq < 0 ? 'منتهية!' : $iq . ' يوم' }}</b><span>انتهاء الإقامة</span></div>
     @endif
-    @if ($pp !== null)
+    @if ($pp !== null && $fm('passExp'))
         <div class="stat"><span class="ico">🛂</span><b class="{{ $pp < 90 ? 'txt-bad' : '' }}">{{ $pp < 0 ? 'منتهٍ!' : $pp . ' يوم' }}</b><span>انتهاء الجواز</span></div>
     @endif
-    @if ($self && $emp->salary)
+    @if ($self && $emp->salary && $fm('salary'))
         <div class="stat"><span class="ico">💵</span><b>{{ number_format((float) $emp->salary, 0) }}</b><span>الراتب الأساسي</span></div>
     @endif
 </div>

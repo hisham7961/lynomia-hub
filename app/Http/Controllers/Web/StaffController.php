@@ -115,6 +115,10 @@ class StaffController extends Controller
         $emp = hub_scope(Employee::query(), 'hr')->findOrFail($id);
         $u = $emp->user_id ? User::find($emp->user_id) : null;
         abort_unless($u, 422, 'لا حساب مربوط بهذا الملف');
+        // حارس التصعيد نفسُه الذي في link(): التوحيد يكتب اسم/بريد الملف على الحساب —
+        // فحسابُ مالكٍ أو إداريٍّ لا تُدهس هويتُه إلا بمن يملك المساسَ به
+        abort_unless(Staff::mayTouch($u), 403,
+            'هذا الحساب ذو امتياز (مالك أو إدارة مستخدمين) — توحيدُ بياناته يتطلب صلاحيةً تعلوه');
 
         $patch = ['name' => $emp->name];
         // البريدُ لا يُنقل إن كان مأخوذاً بحسابٍ آخر — والتوحيد لا يكسر الدخول

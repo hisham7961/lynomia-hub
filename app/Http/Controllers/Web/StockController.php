@@ -37,32 +37,36 @@ class StockController extends Controller
 
     protected function confirm(StockMove $mv)
     {
-        $meta = (array) ($mv->meta ?? []);
-        abort_if(! empty($meta['posted_at']), 422, 'الحركة مُرحَّلة أصلاً — لا ترحيل مزدوج');
-        abort_if($mv->status === 'ملغاة', 422, 'حركة ملغاة لا تُرحَّل — أنشئ غيرها');
-        abort_unless(array_key_exists((string) $mv->kind, self::SIGNS), 422, 'نوع حركة غير معروف');
+        // كامل الترحيل داخل معاملة على صفٍّ مقفول: الحارس (posted_at/ملغاة) وفحص
+        // كفاية الرصيد والخصم يقرأون الحالة المُثبَتة لا نسخةً قديمة في الذاكرة —
+        // فتأكيدان متزامنان يتسلسلان بلا خصمٍ مزدوج ولا ضياع تحديث ولا رصيدٍ سالب.
+        $mv = DB::transaction(function () use ($mv) {
+            $mv = StockMove::whereKey($mv->getKey())->lockForUpdate()->firstOrFail();
+            $meta = (array) ($mv->meta ?? []);
+            abort_if(! empty($meta['posted_at']), 422, 'الحركة مُرحَّلة أصلاً — لا ترحيل مزدوج');
+            abort_if($mv->status === 'ملغاة', 422, 'حركة ملغاة لا تُرحَّل — أنشئ غيرها');
+            abort_unless(array_key_exists((string) $mv->kind, self::SIGNS), 422, 'نوع حركة غير معروف');
 
-        $item = $mv->item_id ? StockItem::find($mv->item_id) : null;
-        abort_unless($item, 422, 'اربط الحركة بصنفٍ من المخزون أولاً');
+            $item = $mv->item_id ? StockItem::whereKey($mv->item_id)->lockForUpdate()->first() : null;
+            abort_unless($item, 422, 'اربط الحركة بصنفٍ من المخزون أولاً');
 
-        // تحقق بنيوي حسب النوع قبل أي أثر
-        if ($mv->kind === 'تحويل بين المستودعات') {
-            abort_if(blank($mv->from_wh) || blank($mv->to_wh), 422, 'التحويل يلزمه المستودعان: من وإلى');
-        }
-        $qty = (float) $mv->qty;
-        abort_if($qty <= 0 && $mv->kind !== 'جرد', 422, 'كمية الحركة يجب أن تكون أكبر من صفر');
+            // تحقق بنيوي حسب النوع قبل أي أثر
+            if ($mv->kind === 'تحويل بين المستودعات') {
+                abort_if(blank($mv->from_wh) || blank($mv->to_wh), 422, 'التحويل يلزمه المستودعان: من وإلى');
+            }
+            $qty = (float) $mv->qty;
+            abort_if($qty <= 0 && $mv->kind !== 'جرد', 422, 'كمية الحركة يجب أن تكون أكبر من صفر');
 
-        $sign = self::SIGNS[$mv->kind];
-        $delta = $mv->kind === 'جرد'
-            ? $qty - (float) $item->qty          // الجرد تسوية إلى العدد المعدود
-            : $sign * $qty;
+            $sign = self::SIGNS[$mv->kind];
+            $delta = $mv->kind === 'جرد'
+                ? $qty - (float) $item->qty          // الجرد تسوية إلى العدد المعدود
+                : $sign * $qty;
 
-        if ($delta < 0 && (float) $item->qty + $delta < 0) {
-            abort(422, 'الرصيد لا يكفي: المتاح ' . rtrim(rtrim(number_format((float) $item->qty, 3), '0'), '.')
-                . ' والمطلوب صرف ' . rtrim(rtrim(number_format(abs($delta), 3), '0'), '.'));
-        }
+            if ($delta < 0 && (float) $item->qty + $delta < 0) {
+                abort(422, 'الرصيد لا يكفي: المتاح ' . rtrim(rtrim(number_format((float) $item->qty, 3), '0'), '.')
+                    . ' والمطلوب صرف ' . rtrim(rtrim(number_format(abs($delta), 3), '0'), '.'));
+            }
 
-        DB::transaction(function () use ($mv, $item, $delta, $meta) {
             $item->qty = (float) $item->qty + $delta;
             $item->saveQuietly();
             hub_stock_sync($item);
@@ -76,6 +80,8 @@ class StockController extends Controller
             } finally {
                 StockMove::$posting = false;
             }
+
+            return $mv;
         });
         hub_audit('ترحيل حركة مخزون', 'stockmv', $mv->id, (string) $mv->doc_no);
 
@@ -84,13 +90,25 @@ class StockController extends Controller
 
     protected function cancel(StockMove $mv)
     {
-        $meta = (array) ($mv->meta ?? []);
-        abort_if($mv->status === 'ملغاة', 422, 'الحركة ملغاة أصلاً');
+        // نفس التصليب: الصفّ يُقفل ويُعاد قراءة الحالة داخل المعاملة قبل عكس الأثر —
+        // فإلغاءان متزامنان لا يعكسان الدلتا مرتين.
+        $mv = DB::transaction(function () use ($mv) {
+            $mv = StockMove::whereKey($mv->getKey())->lockForUpdate()->firstOrFail();
+            $meta = (array) ($mv->meta ?? []);
+            abort_if($mv->status === 'ملغاة', 422, 'الحركة ملغاة أصلاً');
 
-        DB::transaction(function () use ($mv, $meta) {
             // إن كانت مُرحَّلة يُعكس أثرها أولاً — الإلغاء الصادق يعيد الرصيد
-            if (! empty($meta['posted_at']) && ($item = StockItem::find($mv->item_id))) {
-                $item->qty = (float) $item->qty - (float) ($meta['delta'] ?? 0);
+            if (! empty($meta['posted_at']) && ($item = StockItem::whereKey($mv->item_id)->lockForUpdate()->first())) {
+                $delta = (float) ($meta['delta'] ?? 0);
+                // حارس النقص نفسُه الذي يحرس الترحيل (confirm): عكسُ استلامٍ استُهلك
+                // رصيدُه بحركاتٍ لاحقة يُنزل qty تحت الصفر. يُرفض بوضوح لا بصمت.
+                if ((float) $item->qty - $delta < 0) {
+                    abort(422, 'لا يمكن إلغاء الحركة: عكسُ أثرها يُنزل الرصيد تحت الصفر — المتاح '
+                        . rtrim(rtrim(number_format((float) $item->qty, 3), '0'), '.')
+                        . ' وعكسُها يخصم ' . rtrim(rtrim(number_format($delta, 3), '0'), '.')
+                        . '. عالِج الحركات اللاحقة على الصنف أولاً.');
+                }
+                $item->qty = (float) $item->qty - $delta;
                 $item->saveQuietly();
                 hub_stock_sync($item);
             }
@@ -102,8 +120,11 @@ class StockController extends Controller
             } finally {
                 StockMove::$posting = false;
             }
+
+            return $mv;
         });
         hub_audit('إلغاء حركة مخزون', 'stockmv', $mv->id, (string) $mv->doc_no);
+        $meta = (array) ($mv->meta ?? []);
 
         return back()->with('ok', 'أُلغيت الحركة' . (! empty($meta['posted_at']) ? ' وعُكس أثرها على الرصيد' : ''));
     }

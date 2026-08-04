@@ -20,13 +20,20 @@ class Evidence
         // (id|event|signer|ip|created_at) بينما **أهم ما يُزوَّر خارجها كلياً**:
         // صورة التوقيع نفسها، واسم الموقّع ورقم هويته وسيلفيه وsigned_at —
         // وجدول «الأطراف» في الشهادة يُعرض من هذه الأعمدة غير المُجزّأة حرفياً.
+        // **والدور والحالة وIP الموقّع** تُعرض في الشهادة أيضاً خارج أي حلقة: قلبُ
+        // حالةٍ من «رُفض» إلى «وُقّع»، أو تغييرُ دورٍ، أو تزويرُ IP توقيعٍ — كلها
+        // كانت تُبقي السلسلة «سليمة» رغم الضمان المطبوع. ضُمّت الآن للبصمة.
         $signers = \App\Models\ContractSigner::where('request_id', $req->id)->get()
             ->mapWithKeys(fn ($s) => [$s->id => hash('sha256',
                 (string) $s->name . '|' . (string) $s->id_no . '|' . (string) $s->signed_at
+                . '|' . (string) $s->role . '|' . (string) $s->status . '|' . (string) $s->ip
                 . '|' . hash('sha256', (string) $s->signature) . '|' . hash('sha256', (string) $s->selfie))])
             ->all();
 
-        $prev = hash('sha256', 'lynomia-evidence:' . $req->id . ':' . (string) $req->doc_hash);
+        // مرساة الرأس تحمل signer_name على مستوى الطلب: تعرضه صفحة /verify، وهو
+        // عمودٌ مختلف عن meta حدث signed — فبقي خارج التجزئة حتى الآن.
+        $prev = hash('sha256', 'lynomia-evidence:' . $req->id . ':' . (string) $req->doc_hash
+            . ':' . (string) $req->signer_name);
         $rows = [];
         foreach (ContractEvent::where('request_id', $req->id)
                      ->orderBy('created_at')->orderBy('id')->get() as $e) {

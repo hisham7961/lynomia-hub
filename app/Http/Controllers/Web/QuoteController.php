@@ -8,6 +8,7 @@ use App\Models\Contract;
 use App\Models\FinDocument;
 use App\Models\Quote;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -58,6 +59,10 @@ class QuoteController extends Controller
 
     protected function setStatus(Quote $q, string $status, string $msg)
     {
+        // قفلُ الحقل يسري على أزرار المسار كما على النموذج: دورٌ حقلُ حالته «قراءة
+        // فقط» لا يقلبها من الأزرار (hub_field_mode توثّق setStatus كأحد مستهلكيها).
+        abort_if(hub_field_mode(auth()->user(), 'quotes', 'status') !== '', 403,
+            'حقل الحالة مقفولٌ لدورك (قراءة فقط) — لا يُغيَّر من أزرار المسار');
         $q->status = $status;
         $q->save();
 
@@ -66,68 +71,90 @@ class QuoteController extends Controller
 
     protected function toContract(Quote $q)
     {
+        // صلاحيةُ الوحدة الهدف تُفرض هنا كما في المسار الرسمي (ContractActionsController::find):
+        // إجراءُ العرض (quotes:e) لا يسكّ عقداً لمن لا يملك إنشاء العقود.
+        abort_unless(hub_can(auth()->user(), 'contracts', 'a'), 403,
+            'تحويل العرض لعقد يتطلب صلاحية إنشاء العقود');
         abort_unless($q->status === 'مقبول', 422, 'حوّل العرض بعد قبوله أولاً');
-        $meta = (array) $q->meta;
-        if (! empty($meta['contract_id']) && Contract::find($meta['contract_id'])) {
-            return redirect()->route('m.show', ['contracts', $meta['contract_id']])->with('ok', 'حُوّل من قبل — هذا عقده');
-        }
 
-        $c = Contract::create([
-            'title'      => 'عقد بموجب عرض السعر ' . $q->doc_no,
-            'type'       => 'عقد عميل',
-            'client_id'  => $q->client_id,
-            'service_id' => $q->service_id,   // الخدمة تتبع البيع فيُقاس MRR من مصدره
-            'company_id' => $q->company_id,
-            'project_id' => $q->project_id,
-            'party'      => $q->client_id ? Client::find($q->client_id)?->name : null,
-            'value'      => $q->total,
-            'currency'   => $q->currency,
-            // v2.117: كان يكتب عمود start الوهمي (الصحيح date_start → انفجار 500 على
-            // MySQL) وحالة «نشط» الخارجة عن خيارات الوحدة فلا كانبان ولا حدث يلتقطها
-            'date_start' => now()->toDateString(),
-            'owner_id'   => $q->owner_id ?: auth()->id(),
-            'status'     => 'ساري',
-            'notes'      => 'أُنشئ تلقائياً من عرض السعر ' . $q->doc_no
-                          . ($q->terms ? "\n\nالشروط المتفق عليها:\n" . Str::limit($q->terms, 1500) : ''),
-        ]);
-        $q->meta = $meta + ['contract_id' => $c->id];
-        $q->save();
+        // الفحص+الإنشاء+حفظ meta داخل معاملةٍ على صفٍّ مقفول: نقرتان متزامنتان لا
+        // تُنشئان عقدين. وwithTrashed: عقدٌ حُذف بنعومة يظل تحويلاً واقعاً فلا يُنشأ
+        // ثانٍ بالرقم نفسه (Contract::find كان يُقصي المحذوف فيسقط الحارس).
+        return DB::transaction(function () use ($q) {
+            $q = Quote::whereKey($q->getKey())->lockForUpdate()->firstOrFail();
+            $meta = (array) $q->meta;
+            if (! empty($meta['contract_id']) && Contract::withTrashed()->find($meta['contract_id'])) {
+                return redirect()->route('m.show', ['contracts', $meta['contract_id']])->with('ok', 'حُوّل من قبل — هذا عقده');
+            }
 
-        return redirect()->route('m.show', ['contracts', $c->id])
-            ->with('ok', '📜 أُنشئ العقد من العرض — راجع بنوده وتاريخ نهايته');
+            $c = Contract::create([
+                // عنوانٌ يُقصّ إلى عرض العمود (300) — doc_no قد يبلغ الحدّ فيفيض على MySQL
+                'title'      => mb_substr('عقد بموجب عرض السعر ' . $q->doc_no, 0, 300),
+                'type'       => 'عقد عميل',
+                'client_id'  => $q->client_id,
+                'service_id' => $q->service_id,   // الخدمة تتبع البيع فيُقاس MRR من مصدره
+                'company_id' => $q->company_id,
+                'project_id' => $q->project_id,
+                'party'      => $q->client_id ? Client::find($q->client_id)?->name : null,
+                'value'      => $q->total,
+                'currency'   => $q->currency,
+                // v2.117: كان يكتب عمود start الوهمي (الصحيح date_start → انفجار 500 على
+                // MySQL) وحالة «نشط» الخارجة عن خيارات الوحدة فلا كانبان ولا حدث يلتقطها
+                'date_start' => now()->toDateString(),
+                'owner_id'   => $q->owner_id ?: auth()->id(),
+                'status'     => 'ساري',
+                'notes'      => 'أُنشئ تلقائياً من عرض السعر ' . $q->doc_no
+                              . ($q->terms ? "\n\nالشروط المتفق عليها:\n" . Str::limit($q->terms, 1500) : ''),
+            ]);
+            $q->meta = $meta + ['contract_id' => $c->id];
+            $q->save();
+
+            return redirect()->route('m.show', ['contracts', $c->id])
+                ->with('ok', '📜 أُنشئ العقد من العرض — راجع بنوده وتاريخ نهايته');
+        });
     }
 
     protected function toInvoice(Quote $q)
     {
+        // صلاحيةُ المالية تُفرض هنا كما في store لوحدة fin: الفاتورة تدخل MRR
+        // والتقارير، فلا تُسكّ لمن لا يملك إنشاء المستندات المالية.
+        abort_unless(hub_can(auth()->user(), 'fin', 'a'), 403,
+            'تحويل العرض لفاتورة يتطلب صلاحية إنشاء المستندات المالية');
         abort_unless($q->status === 'مقبول', 422, 'حوّل العرض بعد قبوله أولاً');
-        $meta = (array) $q->meta;
-        if (! empty($meta['invoice_id']) && FinDocument::find($meta['invoice_id'])) {
-            return redirect()->route('m.show', ['fin', $meta['invoice_id']])->with('ok', 'حُوّل من قبل — هذه فاتورته');
-        }
 
-        $inv = FinDocument::create([
-            'doc_no'      => 'INV-' . $q->doc_no,
-            'kind'        => 'فاتورة مبيعات',
-            'client_id'   => $q->client_id,   // المرجع الصريح — الاسم النصي يضيع بالتكرار وتغيير الاسم
-            'service_id'  => $q->service_id,
-            'partner'     => $q->client_id ? (Client::find($q->client_id)?->name ?? '') : '',
-            'date'        => now()->toDateString(),
-            'due'         => now()->addDays(14)->toDateString(),
-            'amount'      => $q->amount ?? $q->total,
-            'tax'         => $q->tax ?? 0,
-            'total'       => $q->total,
-            'paid'        => 0,
-            'currency'    => $q->currency,
-            'state'       => 'مرسلة',
-            'project_id'  => $q->project_id,
-            'company_id'  => $q->company_id,
-            'description' => 'فاتورة بموجب عرض السعر ' . $q->doc_no,
-        ]);
-        $q->meta = $meta + ['invoice_id' => $inv->id];
-        $q->save();
+        // نفس التصليب: معاملةٌ على صفٍّ مقفول + withTrashed — لا فاتورتان بالرقم نفسه
+        // (من نقرٍ مزدوج أو من حذف الأولى بنعومة ثم إعادة التحويل).
+        return DB::transaction(function () use ($q) {
+            $q = Quote::whereKey($q->getKey())->lockForUpdate()->firstOrFail();
+            $meta = (array) $q->meta;
+            if (! empty($meta['invoice_id']) && FinDocument::withTrashed()->find($meta['invoice_id'])) {
+                return redirect()->route('m.show', ['fin', $meta['invoice_id']])->with('ok', 'حُوّل من قبل — هذه فاتورته');
+            }
 
-        return redirect()->route('m.show', ['fin', $inv->id])
-            ->with('ok', '🧾 أُنشئت الفاتورة من العرض — استحقاقها بعد ١٤ يوماً');
+            $inv = FinDocument::create([
+                'doc_no'      => mb_substr('INV-' . $q->doc_no, 0, 300),   // يُقصّ إلى عرض العمود
+                'kind'        => 'فاتورة مبيعات',
+                'client_id'   => $q->client_id,   // المرجع الصريح — الاسم النصي يضيع بالتكرار وتغيير الاسم
+                'service_id'  => $q->service_id,
+                'partner'     => $q->client_id ? (Client::find($q->client_id)?->name ?? '') : '',
+                'date'        => now()->toDateString(),
+                'due'         => now()->addDays(14)->toDateString(),
+                'amount'      => $q->amount ?? $q->total,
+                'tax'         => $q->tax ?? 0,
+                'total'       => $q->total,
+                'paid'        => 0,
+                'currency'    => $q->currency,
+                'state'       => 'مرسلة',
+                'project_id'  => $q->project_id,
+                'company_id'  => $q->company_id,
+                'description' => 'فاتورة بموجب عرض السعر ' . $q->doc_no,
+            ]);
+            $q->meta = $meta + ['invoice_id' => $inv->id];
+            $q->save();
+
+            return redirect()->route('m.show', ['fin', $inv->id])
+                ->with('ok', '🧾 أُنشئت الفاتورة من العرض — استحقاقها بعد ١٤ يوماً');
+        });
     }
 
 }

@@ -7,6 +7,7 @@ use App\Models\FinDocument;
 use App\Models\Purchase;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * مسار الشراء: طلب ← اعتماد ← إرسال للمورد ← استلام ← فاتورة مورد (تدخل المالية) / مرتجع.
@@ -34,6 +35,10 @@ class PurchaseController extends Controller
         $items = \App\Support\Items::cartons(
             \App\Support\Items::parse((string) $p->items), $p->company_id);
 
+        // قفل الحقل يسري على مستند الطباعة كما على صفحة العرض (modules/show:90):
+        // دورٌ محجوبٌ عليه «الإجمالي» أو «البنود» لا يراهما عبر مسار الطباعة.
+        $u = auth()->user();
+
         return view('purchases.doc', [
             'p' => $p,
             'supplier' => $p->supplier_id ? Supplier::find($p->supplier_id) : null,
@@ -41,6 +46,8 @@ class PurchaseController extends Controller
             'showCartons' => \App\Support\Items::anyCartons($items),
             'totalCartons' => \App\Support\Items::totalCartons($items),
             'logo' => setting('app.logo'),
+            'hideAmount' => hub_field_mode($u, 'purchases', 'amount') === 'hide',
+            'hideItems'  => hub_field_mode($u, 'purchases', 'items') === 'hide',
         ]);
     }
 
@@ -112,10 +119,19 @@ class PurchaseController extends Controller
      */
     protected function receive(Purchase $p)
     {
-        $meta = (array) $p->meta;
-        $made = 0; $skipped = 0;
+        // الاستلام داخل معاملة على صفٍّ مقفول: فحصُ «استُلم من قبل» يقرأ الحالة
+        // المُثبَتة لا نسخةً قديمة في الذاكرة — فنقرتان متزامنتان (نقر مزدوج/إعادة
+        // إرسال) تتسلسلان فلا تُضاعف حركات المخزون ولا يُزاد الرصيد مرتين.
+        [$made, $skipped] = DB::transaction(function () use ($p) {
+            $p = Purchase::whereKey($p->getKey())->lockForUpdate()->firstOrFail();
+            $meta = (array) $p->meta;
+            $made = 0; $skipped = 0;
 
-        if (empty($meta['stock_moves'])) {
+            // سبقتنا نقرةٌ متزامنة داخل القفل — لا تكرار للحركات (idempotent)
+            if ($p->status === 'مستلم' || ! empty($meta['stock_moves'])) {
+                return [$made, $skipped];
+            }
+
             $lines = \App\Support\Items::parse((string) $p->items);
             $supplierName = $p->supplier_id ? (Supplier::find($p->supplier_id)?->name ?? '') : '';
             $moveIds = [];
@@ -151,12 +167,14 @@ class PurchaseController extends Controller
                 $made++;
             }
             $meta['stock_moves'] = $moveIds;
-        }
 
-        $p->received_at = now()->toDateString();
-        $p->meta = $meta;
-        $p->status = 'مستلم';
-        $p->save();
+            $p->received_at = now()->toDateString();
+            $p->meta = $meta;
+            $p->status = 'مستلم';
+            $p->save();
+
+            return [$made, $skipped];
+        });
 
         return back()->with('ok', '📦 سُجّل الاستلام'
             . ($made ? " وتحرّك المخزون ({$made} حركة)" : '')
