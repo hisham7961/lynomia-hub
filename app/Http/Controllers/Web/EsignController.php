@@ -874,33 +874,40 @@ class EsignController extends Controller
         $this->gate();
         $req = SignRequest::findOrFail($id);
         $this->guardRequest($req);
-        abort_if($req->status !== 'بانتظار الموافقة' || $req->cancelled_at, 410, 'لا مرحلة معلقة لهذا الطلب');
-        $step = \App\Support\ContractApprovals::pending($req);
-        abort_unless($step, 410, 'لا مرحلة معلقة لهذا الطلب');
-        abort_unless(\App\Support\ContractApprovals::canDecide(auth()->user(), $step), 403,
-            'قرار هذه المرحلة ليس لك');
-
         $d = $r->validate(['note' => 'nullable|string|max:400']);
-        $step->forceFill(['status' => 'موافق', 'decided_by' => auth()->id(),
-            'decided_at' => now(), 'note' => $d['note'] ?? null])->save();
-        hub_audit('اعتماد مرحلة موافقة عقد', 'contracts', $req->contract_id,
-            $req->title . ' — مرحلة ' . $step->stage . ' (' . ($step->label ?: $step->kind) . ')');
 
-        // مرحلة تالية؟ يُخطَر صاحب قرارها ويبقى الطلب محجوزاً
-        if ($next = \App\Support\ContractApprovals::pending($req)) {
-            $this->notifyStage($next, $req);
+        // معاملةٌ على الطلب مقفولاً: فحصُ الحالة + المرحلة المعلقة + القرار + التسليم
+        // يتسلسل، فنقرتان متزامنتان على المرحلة الأخيرة لا تُسلّمان الطلبَ مرتين ولا
+        // تُطلقان حدثَ approved مرتين. الثاني يرى المرحلةَ محسومةً (pending فارغة) فيُرفض بـ410.
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($req, $d) {
+            $req = SignRequest::whereKey($req->id)->lockForUpdate()->firstOrFail();
+            abort_if($req->status !== 'بانتظار الموافقة' || $req->cancelled_at, 410, 'لا مرحلة معلقة لهذا الطلب');
+            $step = \App\Support\ContractApprovals::pending($req);
+            abort_unless($step, 410, 'لا مرحلة معلقة لهذا الطلب');
+            abort_unless(\App\Support\ContractApprovals::canDecide(auth()->user(), $step), 403,
+                'قرار هذه المرحلة ليس لك');
 
-            return back()->with('ok', 'اعتُمدت المرحلة — التالي: ' . ($next->label ?: $next->kind));
-        }
+            $step->forceFill(['status' => 'موافق', 'decided_by' => auth()->id(),
+                'decided_at' => now(), 'note' => $d['note'] ?? null])->save();
+            hub_audit('اعتماد مرحلة موافقة عقد', 'contracts', $req->contract_id,
+                $req->title . ' — مرحلة ' . $step->stage . ' (' . ($step->label ?: $step->kind) . ')');
 
-        // اكتملت السلسلة: الطلب يتحرر ويُسلَّم الآن، والحدث الدلالي ينطلق
-        $this->deliver($req);
-        if ($req->contract_id && ($c = \App\Models\Contract::find($req->contract_id))) {
-            \App\Support\FlowRunner::fire('approved', 'contracts', $c);
-        }
-        $this->notifyOwners('✅ اكتملت موافقات «' . $req->title . '» وأُرسل للموقّعين');
+            // مرحلة تالية؟ يُخطَر صاحب قرارها ويبقى الطلب محجوزاً
+            if ($next = \App\Support\ContractApprovals::pending($req)) {
+                $this->notifyStage($next, $req);
 
-        return back()->with('ok', 'اكتملت الموافقات — أُرسل الطلب للموقّعين');
+                return back()->with('ok', 'اعتُمدت المرحلة — التالي: ' . ($next->label ?: $next->kind));
+            }
+
+            // اكتملت السلسلة: الطلب يتحرر ويُسلَّم الآن، والحدث الدلالي ينطلق
+            $this->deliver($req);
+            if ($req->contract_id && ($c = \App\Models\Contract::find($req->contract_id))) {
+                \App\Support\FlowRunner::fire('approved', 'contracts', $c);
+            }
+            $this->notifyOwners('✅ اكتملت موافقات «' . $req->title . '» وأُرسل للموقّعين');
+
+            return back()->with('ok', 'اكتملت الموافقات — أُرسل الطلب للموقّعين');
+        });
     }
 
     /** رفض المرحلة المعلقة — يوقف الطلب كله ويميت روابطه، والعقد يبقى مسودة */
