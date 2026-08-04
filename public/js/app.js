@@ -914,3 +914,62 @@ document.addEventListener('input', function (e) {
     if (z) z.classList.remove('loading');
   });
 })();
+
+// ═ تنبيهاتٌ أشدُّ لفتاً: نبضةُ عدٍّ، عنوانُ تبويبٍ يحمل العدد، ووميضُ إطارِ
+//   الشاشة كل N دقيقة (افتراضياً ١٠) ما دام هناك غيرُ مقروء — لينتبه لِما لم يُحلّ.
+//   الوميض مضبوطٌ بالوقت الحقيقيّ عبر sessionStorage فلا يتكرّر مع كل تنقّل.
+(function () {
+  var bell = document.querySelector('.bell[data-count-url]');
+  if (!bell) return;
+  var url = bell.getAttribute('data-count-url');
+  var baseTitle = document.title.replace(/^\(\d+\)\s*/, '');
+  var flashMin = 10;
+
+  function paintBadge(n) {
+    var badge = document.getElementById('bellbadge');
+    if (badge) {
+      var dot = badge.querySelector('.nbdg');
+      if (n > 0) {
+        if (!dot) { dot = document.createElement('span'); dot.className = 'nbdg'; badge.appendChild(dot); }
+        dot.textContent = n > 99 ? '99+' : String(n);
+      } else if (dot) { dot.remove(); }
+    }
+    document.title = n > 0 ? '(' + n + ') ' + baseTitle : baseTitle;
+  }
+
+  function flashScreen() {
+    var o = document.getElementById('screenflash');
+    if (!o) {
+      o = document.createElement('div'); o.id = 'screenflash';
+      o.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9998;'
+        + 'border:6px solid var(--wn,#e0a800);border-radius:4px;'
+        + 'box-shadow:inset 0 0 44px rgba(224,168,0,.55);opacity:0;transition:opacity .22s';
+      document.body.appendChild(o);
+    }
+    var blinks = 0;
+    var iv = setInterval(function () {
+      o.style.opacity = o.style.opacity === '1' ? '0' : '1';
+      if (++blinks >= 6) { clearInterval(iv); o.style.opacity = '0'; }
+    }, 340);
+    try { if (navigator.vibrate) navigator.vibrate([130, 80, 130]); } catch (e) {}
+  }
+
+  function tick() {
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d) return;
+        flashMin = d.flashMin || 10;
+        var n = d.unread || 0;
+        paintBadge(n);
+        if (n > 0) {
+          var last = parseInt(sessionStorage.getItem('nflash') || '0', 10);
+          var now = Date.now();
+          if (now - last >= flashMin * 60000) { sessionStorage.setItem('nflash', String(now)); flashScreen(); }
+        }
+      }).catch(function () {});
+  }
+
+  setInterval(tick, 60000);   // نبضةٌ كل دقيقة تُحدِّث العدّ والعنوان
+  setTimeout(tick, 4000);     // أول قراءةٍ بعد استقرار الصفحة
+})();
