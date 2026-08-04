@@ -71,6 +71,10 @@ Route::middleware('guest')->group(function () {
 });
 
 // التوقيع الإلكتروني — الجهة العامة: العميل بلا حساب، برابط خاص وكلمة سر
+// الويبهوك الوارد — سطحٌ عامٌّ يُصادَق بالرمز في الرابط + توقيع HMAC اختياريّ
+Route::post('hook/{token}', [\App\Http\Controllers\Web\InboundHookController::class, 'receive'])
+    ->name('hook.receive')->middleware('throttle:120,1');
+
 Route::get('sign/{token}', [\App\Http\Controllers\Web\EsignController::class, 'show'])->name('sign.show');
 Route::post('sign/{token}/otp', [\App\Http\Controllers\Web\EsignController::class, 'sendOtp'])->name('sign.otp')->middleware('throttle:6,10');
 Route::post('sign/{token}/unlock', [\App\Http\Controllers\Web\EsignController::class, 'unlock'])->name('sign.unlock');
@@ -284,6 +288,7 @@ Route::middleware('auth')->group(function () {
     Route::get('alerts', [AlertController::class, 'index'])->name('alerts');
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::get('notifications/mini', [NotificationController::class, 'mini'])->name('notifications.mini');
+    Route::get('notifications/count', [NotificationController::class, 'count'])->name('notifications.count');
     Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.readall');
     Route::get('notifications/{id}/go', [NotificationController::class, 'go'])->name('notifications.go');
     Route::get('reports/finance', [ReportController::class, 'finance'])->name('reports.finance');
@@ -361,6 +366,7 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/integrations/messaging/test', [\App\Http\Controllers\Web\MessagingController::class, 'test'])->name('integrations.messaging.test');
     Route::post('admin/integrations/messaging/retry', [\App\Http\Controllers\Web\MessagingController::class, 'retry'])->name('integrations.messaging.retry');
     Route::post('admin/integrations/messaging/mail', [\App\Http\Controllers\Web\MessagingController::class, 'mail'])->name('integrations.messaging.mail');
+    Route::post('admin/integrations/messaging/telegram', [\App\Http\Controllers\Web\MessagingController::class, 'telegram'])->name('integrations.messaging.telegram');
     // خوادم أودو المتعددة — الاتصال الافتراضي يبقى في الإعدادات، وهنا الإضافيون
     Route::get('admin/integrations/odoo', [\App\Http\Controllers\Web\OdooConnectionController::class, 'index'])->name('integrations.odoo');
     Route::post('admin/integrations/odoo', [\App\Http\Controllers\Web\OdooConnectionController::class, 'store'])->name('integrations.odoo.store');
@@ -376,6 +382,14 @@ Route::middleware('auth')->group(function () {
     Route::delete('admin/webhooks/{id}', [WebhookController::class, 'destroy'])->name('webhooks.destroy');
     Route::get('admin/webhooks/{id}/log', [WebhookController::class, 'log'])->name('webhooks.log');
     Route::post('admin/webhooks/{id}/resend/{did}', [WebhookController::class, 'resend'])->name('webhooks.resend');
+    // الويبهوك الوارد — نقاطُ استقبالٍ أصلية (n8n/نماذج/خدمات → النظام)
+    Route::get('admin/integrations/hooks', [\App\Http\Controllers\Web\InboundHookController::class, 'index'])->name('hooks.index');
+    Route::post('admin/integrations/hooks', [\App\Http\Controllers\Web\InboundHookController::class, 'store'])->name('hooks.store');
+    Route::post('admin/integrations/hooks/{id}/toggle', [\App\Http\Controllers\Web\InboundHookController::class, 'toggle'])->name('hooks.toggle');
+    Route::delete('admin/integrations/hooks/{id}', [\App\Http\Controllers\Web\InboundHookController::class, 'destroy'])->name('hooks.destroy');
+    // n8n — ربطُ مثيلٍ منفصلٍ يعمل على الخادم (Docker) بالنظام
+    Route::get('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'index'])->name('integrations.n8n');
+    Route::post('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'save'])->name('integrations.n8n.save');
     Route::get('admin/security', [SecurityController::class, 'index'])->name('security.index');
     Route::post('admin/security/lockdown', [SecurityController::class, 'lockdown'])->name('security.lockdown');
     Route::post('admin/security/sessions/{id}/revoke', [SecurityController::class, 'revokeSession'])->name('security.session.revoke');

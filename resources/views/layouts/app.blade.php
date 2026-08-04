@@ -65,7 +65,7 @@
                     </form>
                 @endif
             @endif
-            <div class="bell">
+            <div class="bell" data-count-url="{{ route('notifications.count') }}">
                 <button class="btn ghost sm" type="button" title="التنبيهات"
                         hx-get="{{ route('notifications.mini') }}" hx-target="#bellbox" hx-swap="innerHTML">🔔<span id="bellbadge">@php $nbc = \App\Models\HubNotification::where('user_id', auth()->id())->where('read', false)->count(); @endphp@if($nbc)<span class="nbdg">{{ $nbc }}</span>@endif</span></button>
                 <div id="bellbox" class="gsr"></div>

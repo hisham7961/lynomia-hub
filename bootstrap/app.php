@@ -22,6 +22,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', \App\Http\Middleware\Observability::class);
         $middleware->appendToGroup('api', \App\Http\Middleware\SecurityHeaders::class);
         $middleware->appendToGroup('api', \App\Http\Middleware\Observability::class);
+        // الويبهوك الوارد سطحٌ آليّ لا نموذج له: يُصادَق بالرمز في الرابط + توقيع
+        // HMAC، فلا CSRF عليه (المُرسِل خدمةٌ خارجية لا متصفّح يحمل الرمز).
+        $middleware->validateCsrfTokens(except: ['hook/*']);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // كل استثناء يُجمَّع في مركز الأخطاء (بلا كسر المعالجة الأصلية)

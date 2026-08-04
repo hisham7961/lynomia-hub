@@ -126,6 +126,32 @@ class MessagingController extends Controller
         return back()->with('ok', 'حُفظ ضبط البريد — جرّبه الآن بزر «أرسل تجريبية»');
     }
 
+    /**
+     * **ضبطُ تلجرام من مركز التكامل** — كان توكن البوت والقناة مبعثرَين وسط عشرات
+     * مفاتيح الإعدادات العامة. هنا يُداران حيث تُختبر القناة وتُقرأ حالتها، بجوار
+     * البريد تماماً. التوكن يُخزَّن مشفَّراً (`enc:`) كنمط `mail.password`.
+     */
+    public function telegram(Request $r)
+    {
+        $this->gate();
+        $d = $r->validate([
+            'tg_token' => ['nullable', 'string', 'max:200'],
+            'tg_chat'  => ['nullable', 'string', 'max:120'],
+        ], [], ['tg_token' => 'توكن البوت', 'tg_chat' => 'القناة الافتراضية']);
+
+        // القناة الافتراضية نصّاً (‎@channel أو معرّفٌ رقميّ) — فارغةٌ تُلغي الوجهة الاحتياطية
+        \App\Models\Setting::updateOrCreate(['key' => 'notify.tg_chat'], ['value' => (string) ($d['tg_chat'] ?? '')]);
+        // التوكن: فارغٌ يُبقي المخزون؛ والمكتوب يُشفَّر — يقرؤه setting() فيفكّه للـBot API
+        if (filled($d['tg_token'] ?? null)) {
+            \App\Models\Setting::updateOrCreate(['key' => 'notify.tg_token'],
+                ['value' => 'enc:' . \Illuminate\Support\Facades\Crypt::encryptString($d['tg_token'])]);
+        }
+        \Illuminate\Support\Facades\Cache::forget('settings:all');
+        hub_audit('تعديل إعدادات النظام', 'settings', null, 'notify.tg_* — من مركز التكامل');
+
+        return back()->with('ok', 'حُفظ ضبط تلجرام — جرّبه الآن بزر «🧪 أرسل تجريبية»');
+    }
+
     /** إعادةُ الفاشل من الشاشة — كان أمرَ طرفيةٍ لا يعرفه إلا من قرأ التوثيق */
     public function retry()
     {
