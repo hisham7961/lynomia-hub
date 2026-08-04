@@ -146,13 +146,25 @@ class Odoo
         }
 
         $url = rtrim($this->url, '/') . '/jsonrpc';
+
+        // بوابة SSRF عند النداء نفسه لا وقت الحفظ وحده: رابطٌ عامٌّ يُبدّله DNS
+        // متقلّبٌ إلى داخليٍّ (169.254.169.254/127.0.0.1) وقت النداء، أو يردّ 302
+        // نحو الداخل فيُتّبع. نُعيد الفحص، ونثبّت العنوان (CURLOPT_RESOLVE) على ما
+        // أجازه الحارس، ولا نتّبع إعادة التوجيه — كنمط مسبار Uptime.
+        $gate = hub_outbound_ok($url);
+        if (! $gate['ok']) {
+            $this->down = 'رابط أودو مرفوض: ' . $gate['why'];
+            throw new \RuntimeException($this->down);
+        }
         try {
             // connectTimeout منفصلٌ قصير: خادمٌ لا يقبل الاتصال (جدارٌ ناريّ يُسقط
             // الحزم) يفشل بعد ٣ث لا ينتظر المهلة الكلية ١٢ث حاجزاً العامل.
-            $resp = Http::connectTimeout(3)->timeout(12)->post($url, [
-                'jsonrpc' => '2.0', 'method' => 'call', 'id' => rand(1, 99999),
-                'params' => ['service' => $service, 'method' => $method, 'args' => $args],
-            ]);
+            $resp = Http::connectTimeout(3)->timeout(12)
+                ->withOptions(['allow_redirects' => false, 'curl' => hub_resolve_pin($url, $gate['ip'])])
+                ->post($url, [
+                    'jsonrpc' => '2.0', 'method' => 'call', 'id' => rand(1, 99999),
+                    'params' => ['service' => $service, 'method' => $method, 'args' => $args],
+                ]);
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             // فشل اتصالٍ (لا استجابة/مهلة): افتح القاطع فلا تُحجب بقيةُ القنوات
             $this->down = 'تعذّر الوصول لخادم أودو — لا استجابة، تحقق من الرابط والشبكة';

@@ -19,6 +19,18 @@ abstract class TestCase extends BaseTestCase
     protected User $employee;
     protected User $viewer;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // مُحلِّل أسماءٍ افتراضيّ للاختبارات: أيُّ مضيفٍ يُحلّ لعنوانٍ عامّ، فبواباتُ
+        // SSRF (hub_outbound_ok) للمسارات الصادرة (المسبار/الويبهوك/أودو) تمرّ
+        // افتراضاً بأسماءٍ وهميّة — واختباراتُ الرفض تُبدّله لعنوانٍ خاصّ صراحةً.
+        if (! $this->app->bound('hub.dns')) {
+            $this->app->instance('hub.dns', fn (string $h) => ['93.184.216.34']);
+        }
+    }
+
     /** ضبط إعداد نظام مع إسقاط خبيئة الإعدادات — للاختبارات */
     protected function hubSetting(string $key, string $value): void
     {
