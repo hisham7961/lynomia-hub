@@ -3708,6 +3708,32 @@ if (! function_exists('hub_outbound_ok')) {
     }
 }
 
+if (! function_exists('hub_resolve_pin')) {
+    /**
+     * تثبيتُ اتصال curl على العنوان الذي أجازه `hub_outbound_ok`.
+     *
+     * الحارسُ يحلّ الاسمَ ويجيز عنوانه، لكنّ curl يُعيد التحليلَ وقت الاتصال —
+     * فـDNS متقلّبٌ (rebinding) يردّ عنواناً عامّاً للفحص ثم داخليّاً للاتصال،
+     * فيلتفّ حول الحارس (TOCTOU). `CURLOPT_RESOLVE` يربط `host:port` بالعنوان
+     * المُجاز فلا يُعيد curl التحليل ولا يُبدّله DNS بين الفحص والاتصال.
+     *
+     * يُمرَّر عبر `Http::withOptions(['curl' => hub_resolve_pin($url, $ip)])`.
+     * فارغٌ إن لا عنوان (السماح بالخاص، أو رابطٌ بلا مضيف) — فيُترك curl طبيعيّاً.
+     */
+    function hub_resolve_pin(string $url, ?string $ip): array
+    {
+        if (! $ip || ! defined('CURLOPT_RESOLVE')) return [];
+
+        $p = @parse_url(trim($url));
+        $host = $p['host'] ?? null;
+        if (! $host) return [];
+
+        $port = $p['port'] ?? (strtolower($p['scheme'] ?? 'http') === 'https' ? 443 : 80);
+
+        return [CURLOPT_RESOLVE => ["{$host}:{$port}:{$ip}"]];
+    }
+}
+
 if (! function_exists('hub_uptime')) {
     /**
      * التوافر الحقيقي لهدفٍ من سلسلته: نسبة الفحوص الناجحة، ومتوسط زمن

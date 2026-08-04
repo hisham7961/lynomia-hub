@@ -50,7 +50,13 @@ class Uptime
             // **لا اتّباع لإعادة التوجيه**: حارس hub_outbound_ok يفحص الهدف قبل
             // الطلب، وهدفٌ عامّ يردّ 302 نحو 169.254.169.254 كان يلتفّ حوله
             // فيصير النظام مِجَسّاً على شبكته. و3xx دليلُ حياةٍ كافٍ بذاته.
-            $res = Http::withOptions(['allow_redirects' => false])
+            // **وتثبيتُ العنوان**: curl كان يُعيد تحليلَ الاسم وقت الاتصال، فـDNS
+            // متقلّبٌ يجيز عامّاً في الفحص ثم يتصل بداخليّ (TOCTOU). نثبّته على
+            // العنوان الذي أجازه الحارس عبر CURLOPT_RESOLVE فلا يُعاد التحليل.
+            $res = Http::withOptions([
+                'allow_redirects' => false,
+                'curl'            => hub_resolve_pin($url, $gate['ip']),
+            ])
                 ->timeout((int) setting('monitor.timeout', 8))
                 ->withHeaders(['User-Agent' => 'LynomiaHub-Monitor/1.0'])
                 ->get($url);
