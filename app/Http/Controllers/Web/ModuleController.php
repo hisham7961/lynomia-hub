@@ -194,6 +194,10 @@ class ModuleController extends Controller
         }
         $dir     = $r->input('d') === 'asc' ? 'asc' : 'desc';
         $q->orderBy($sf['col'] ?? 'created_at', $sf ? $dir : 'desc');
+        // فاصل تعادلٍ حاسم: عمودُ الفرز قد تتساوى قيمُه (created_at بدقّة الثانية،
+        // إدراجٌ دفعيّ) فتُقرع الصفحاتُ على MySQL 8 — تخطٍّ أو تكرارٌ صامت. id
+        // (المفتاح) يمنح ترتيباً كليّاً ثابتاً على المحرّكين.
+        $q->orderBy('id', $sf ? $dir : 'desc');
 
         $rows = $q->paginate(25)->withQueryString();
 
