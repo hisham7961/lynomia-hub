@@ -1004,6 +1004,33 @@ class EsignController extends Controller
     }
 
     /**
+     * فتحُ الوثيقة الموقّعة مباشرةً بمسح QR المطبوع عليها — عامٌّ بلا حساب،
+     * للموقّعة فقط (كصفحة التحقّق: المسودةُ لا نسخةَ معتمدة لها فلا تُكشف)،
+     * ومقيّدٌ بالمعدّل. الرمزُ مطبوعٌ على الوثيقة فحاملُها يملكها أصلاً — والعرضُ
+     * للقراءة بلا أزرارٍ داخلية، مع بانرٍ يؤكّد الأصالة ويصل بتفاصيل التحقّق.
+     */
+    public function verifyDoc(Request $r, string $code)
+    {
+        $code = strtoupper(trim(hub_str($code)));
+        abort_if($code === '', 404);
+
+        $key = 'verify:' . $r->ip();
+        abort_if(RateLimiter::tooManyAttempts($key, 20), 429, 'محاولاتٌ كثيرة — انتظر دقيقة ثم أعد المسح');
+        RateLimiter::hit($key, 60);
+
+        $req = SignRequest::where('verify_code', $code)->where('status', 'وُقّع')->first();
+        abort_if(! $req, 404, 'لا وثيقة موقّعة بهذا الرمز');
+
+        // دليلٌ في السجل: فُتحت الوثيقة بمسح QR (الـIP والوكيل يُلتقطان تلقائياً)
+        \App\Models\ContractEvent::log('verified', $req, ['meta' => 'qr']);
+
+        return view('esign.doc', [
+            'req' => $req, 'public' => true,
+            'sgs' => $this->signedIndependents($req),
+        ]);
+    }
+
+    /**
      * **حياةُ الطلب تُفحص في كل بابٍ لا في بعضها** — كان `sendOtp` وحده يفحص
      * الانتهاء، بينما unlock/sign/decline تقبل رابطاً منتهياً: جلسةٌ فُتحت قبل
      * الانتهاء بدقيقة توقّع بعده بأيام، ولا شيء يقلب حالة الطلب المنتهي.
