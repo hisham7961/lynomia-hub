@@ -437,6 +437,7 @@ class ModuleController extends Controller
             return $this->queueApproval($def, $module, 'd', $m, request());
         }
         $m->delete();
+        $this->bustDerivedCache($module, $m);   // حذفٌ يغيّر نسبة الإنجاز والربحية — أبطلهما
 
         return redirect()->route('m.index', $module)->with('ok', 'نُقل السجل إلى السلة');
     }
@@ -444,7 +445,9 @@ class ModuleController extends Controller
     public function restore(string $module, string $id)
     {
         [$def, $class] = $this->resolve($module, 'd');
-        $this->findScoped($class, $module, $id, 'only')->restore();
+        $m = $this->findScoped($class, $module, $id, 'only');
+        $m->restore();
+        $this->bustDerivedCache($module, $m);   // استعادةٌ تعيد السجل للحساب — أبطل المشتقّ
 
         return redirect()->route('m.index', [$module, 'trash' => 1])->with('ok', 'استُعيد السجل');
     }
@@ -763,8 +766,12 @@ class ModuleController extends Controller
             ->with('ok', 'هذه العملية محمية — أُرسل طلب الموافقة للمعتمدين وسيصلك إشعار بالقرار');
     }
 
-    /** نسف كاش نسبة الإنجاز عند تغيّر مهمة أو بند خطة + ختم وقت حل التذاكر (SLA) */
-    protected function bustProgress(string $module, Model $m): void
+    /**
+     * إبطالُ الكاش المشتقّ (نسبة الإنجاز + ربحية المشروع + أجور الساعة) — يُشارَك
+     * بين الحفظ **والحذف والاستعادة**: حذفُ مهمةٍ أو مستندٍ ماليّ يغيّر الحساب كما
+     * الحفظُ، وكانا لا يُبطلانه فيبقى progress/pl قديماً حتى انتهاء عمر الكاش.
+     */
+    protected function bustDerivedCache(string $module, Model $m): void
     {
         if (in_array($module, ['tasks', 'feats'], true) && ($pid = $m->project_id ?? null)) {
             \Illuminate\Support\Facades\Cache::forget('hub:progress:' . $pid);
@@ -778,6 +785,12 @@ class ModuleController extends Controller
 
         // أجور الساعة مشتقة من رواتب الملفات الوظيفية — تعديلها يُبطل الجدول كله
         if ($module === 'hr') \Illuminate\Support\Facades\Cache::forget('cost:rates');
+    }
+
+    /** نسف كاش نسبة الإنجاز عند تغيّر مهمة أو بند خطة + ختم وقت حل التذاكر (SLA) */
+    protected function bustProgress(string $module, Model $m): void
+    {
+        $this->bustDerivedCache($module, $m);
 
         // حالة الصنف تُشتق من كميته وحدّه فور أي حفظ — نفد/منخفض/متاح
         if ($module === 'stock' && $m instanceof \App\Models\StockItem) hub_stock_sync($m);
@@ -1086,6 +1099,14 @@ class ModuleController extends Controller
             if (in_array($f['type'], ['text', 'sel', 'url', 'sec'], true)
                 && ($w = hub_col_max($def['table'] ?? '', $f['col'] ?? $f['key']))) {
                 $r[] = 'max:' . $w;
+            }
+            // سقفُ العدد من **دقّة العمود العشريّ**: كان num/big يُتحقّق كـ`numeric`
+            // بلا حدّ، فقيمةٌ تفوق decimal(M,D) تمرّ على SQLite ثم يرفضها MySQL بـ22003
+            // (٥٠٠ ورسالةٌ تُسرّب القيمة). الحدُّ يرفضها للمستخدم قبل القاعدة.
+            if (in_array($f['type'], ['num', 'big'], true)
+                && ($nm = hub_col_num_max($def['table'] ?? '', $f['col'] ?? $f['key'])) !== null) {
+                $r[] = 'between:' . rtrim(rtrim(number_format(-$nm, 3, '.', ''), '0'), '.')
+                    . ',' . rtrim(rtrim(number_format($nm, 3, '.', ''), '0'), '.');
             }
             // وقائمةُ الخيارات تُلزِم: شاشةُ الحالة تفرضها منذ v2.x والنموذج لا
             if (($f['type'] ?? '') === 'sel' && ! empty($f['options'])) {

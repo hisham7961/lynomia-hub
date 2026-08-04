@@ -158,7 +158,21 @@ class LeaveRequest extends Model
         \Illuminate\Support\Facades\DB::transaction(function () use ($emp, $delta) {
             $fresh = \App\Models\Employee::whereKey($emp->id)->lockForUpdate()->first();
             if (! $fresh) return;
-            $fresh->leave_bal = (float) ($fresh->leave_bal ?? 0) + $delta;
+            $current = (float) ($fresh->leave_bal ?? 0);
+
+            // سقفُ الرصيد يُفحَص في saving بقراءةٍ **غير مقفولة**، فاعتمادان متزامنان
+            // لنفس الموظف يمرّان معاً على رصيدٍ قديمٍ كافٍ ثم يخصمان تحت القفل فيهبط
+            // الرصيد تحت الصفر. إعادةُ فحص الكفاية تحت القفل تمنع السالب — كنمط
+            // حارس المخزون. الاستعادةُ (دلتا موجبة) لا تُحجب أبداً.
+            if ($delta < 0 && $current + $delta < 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'days' => 'الرصيد لا يكفي لهذا الخصم — المتاح '
+                        . rtrim(rtrim(number_format($current, 2), '0'), '.')
+                        . ' يوماً (قد يكون خُصم لطلبٍ آخر متزامن) — عدّل الأيام أو رصيد الموظف',
+                ]);
+            }
+
+            $fresh->leave_bal = $current + $delta;
             $fresh->saveQuietly();
             $emp->leave_bal = $fresh->leave_bal;   // اعكس القيمة في النسخة المستدعية
         });

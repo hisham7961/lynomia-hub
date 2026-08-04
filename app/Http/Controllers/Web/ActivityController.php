@@ -25,18 +25,27 @@ class ActivityController extends Controller
         $this->gate();
 
         $today = now()->startOfDay();
-        $users = User::whereNull('deleted_at')->orderBy('name')->get()->map(function ($u) use ($today) {
+        $onlineSince = now()->subMinutes(5);
+        $users = User::whereNull('deleted_at')->orderBy('name')->get()->map(function ($u) use ($today, $onlineSince) {
             $v = DB::table('page_visits')->where('user_id', $u->id)->where('at', '>=', $today);
+            $sess = DB::table('sessions_log')->where('user_id', $u->id);
+
+            // **آخر ظهورٍ موثوق من نبضة الجلسة** (`sessions_log.last_seen_at` تُحدَّث مع
+            // كل طلبٍ عبر SessionSentry) لا من `page_visits` وحدها — التي تُسجَّل
+            // للصفحات الكاملة فقط، فمستخدمٌ يعمل في الملفات والتفاصيل (htmx/تنزيل)
+            // كان يظهر فارغاً تماماً رغم نشاطه. النبضة تلتقط كلَّ طلبٍ فيبين حضورُه.
+            $lastSeen = (clone $sess)->max('last_seen_at');
 
             return (object) [
                 'u'       => $u,
                 'first'   => (clone $v)->min('at'),
-                'last'    => (clone $v)->max('at'),
+                'last'    => $lastSeen ?: (clone $v)->max('at'),
                 'visits'  => (clone $v)->count(),
                 'actions' => DB::table('audits')->where('user_id', $u->id)
                                  ->where('created_at', '>=', $today)->count(),
+                'online'  => (clone $sess)->where('last_seen_at', '>=', $onlineSince)->exists(),
             ];
-        });
+        })->sortByDesc(fn ($r) => (string) $r->last)->values();
 
         return view('activity.index', ['rows' => $users]);
     }
