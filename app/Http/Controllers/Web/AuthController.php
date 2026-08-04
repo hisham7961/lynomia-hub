@@ -90,7 +90,22 @@ class AuthController extends Controller
         $u = User::find($r->session()->get('2fa:uid'));
         abort_unless($u, 404);
 
+        // قفل الحساب يسري على خطوة الرمز أيضاً: خطوةُ كلمة المرور تقفل بعد
+        // محاولاتٍ فاشلة، وكان رمزُ TOTP بلا قفلٍ — تخمينٌ غير محدودٍ لحسابٍ بعينه.
+        if ($u->locked_until && now()->lt($u->locked_until)) {
+            $m = max(1, (int) ceil(now()->diffInSeconds($u->locked_until) / 60));
+
+            return back()->withErrors(['code' => "الحساب مقفل مؤقتاً بعد محاولات فاشلة — أعد المحاولة بعد {$m} دقيقة"]);
+        }
+
         if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, hub_str($r->input('code')))) {
+            $u->failed_attempts = ((int) $u->failed_attempts) + 1;
+            if ($u->failed_attempts >= (int) setting('auth.max_fail', 5)) {
+                $u->locked_until    = now()->addMinutes((int) setting('auth.lock_min', 15));
+                $u->failed_attempts = 0;
+            }
+            $u->saveQuietly();   // عدّاد أمني — بلا تدقيق ولا إصدارات
+
             return back()->withErrors(['code' => 'الرمز غير صحيح أو انتهى — جرّب الرمز الحالي في التطبيق']);
         }
 
