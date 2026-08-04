@@ -140,6 +140,9 @@ class AttachmentController extends Controller
         $this->guardRecord($a->module, $a->record_id, 'v');
 
         $a->delete();   // حذف ناعم — الملف يبقى على القرص للاستعادة
+        // مرفقٌ مؤرَّخٌ حُذف: يخرج من رادار «ينتهي قريباً» وعدّاد شارة التنبيهات —
+        // كان الرفعُ يُبطل الخبيئة والحذفُ لا، فيبقى المحذوفُ في الرادار حتى انتهائها
+        if ($a->expires_at) hub_expiry_bust();
 
         hub_audit('حذف مرفق', $a->module, $a->record_id, (string) $a->original_name);
 

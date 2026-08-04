@@ -108,10 +108,18 @@ class WebhookDispatcher
         $code = null; $err = null; $ok = false;
 
         try {
-            // **لا اتّباع لإعادة التوجيه**: بوابة SSRF (hub_outbound_ok) تفحص الوجهة
-            // وقت الإنشاء فقط، ووجهةٌ عامّة تردّ 302 نحو 169.254.169.254/الداخل كانت
-            // تُتّبع فيصير التسليمُ مِجَسّاً على الشبكة الداخلية. نفس حارس Uptime.php.
-            $resp = Http::withOptions(['allow_redirects' => false])
+            // **بوابة SSRF عند التسليم لا الإنشاء وحده**: وجهةٌ أُجيزت وقت الاشتراك
+            // قد يُبدّلها DNS متقلّبٌ إلى داخليٍّ وقت التسليم (rebinding). نُعيد الفحص،
+            // ونثبّت العنوان (CURLOPT_RESOLVE) على ما أجازه الحارس. **ولا اتّباع لإعادة
+            // التوجيه**: وجهةٌ عامّة تردّ 302 نحو الداخل كانت تُتّبع. نفس حارس Uptime.
+            $gate = hub_outbound_ok($h->url);
+            if (! $gate['ok']) {
+                throw new \RuntimeException('الوجهة مرفوضة وقت التسليم: ' . $gate['why']);
+            }
+            $resp = Http::withOptions([
+                'allow_redirects' => false,
+                'curl'            => hub_resolve_pin($h->url, $gate['ip']),
+            ])
                 ->timeout(10)
                 ->withBody($d->payload, 'application/json')
                 ->withHeaders([

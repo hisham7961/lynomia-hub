@@ -73,25 +73,32 @@ class ContractActionsController extends Controller
      */
     public static function spawnRenewal(Contract $c): ?Contract
     {
-        if (Contract::where('parent_id', $c->id)->where('kind', 'تجديد')
-                ->where('status', 'مسودة')->exists()) {
-            return null;
-        }
+        // معاملةٌ على العقد الأصل مقفولاً: فحصُ «مسودة تجديدٍ قائمة» + الإنشاء + قلبُ
+        // الأصل يتسلسلان — فزرُّ التجديد وأتمتةُ hub:automation (أو نقرتان) لا يمرّان
+        // معاً على فحصٍ فارغٍ فيُنشئان مسودتَي تجديدٍ ويقلبان الأصلَ ويُطلقان الحدثَ مرتين.
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($c) {
+            $c = Contract::whereKey($c->getKey())->lockForUpdate()->firstOrFail();
 
-        $data = collect(self::COPY)->mapWithKeys(fn ($col) => [$col => $c->{$col}])->all();
-        $data['title'] = 'تجديد — ' . mb_substr((string) $c->title, 0, 240);
-        $data['status'] = 'مسودة';
-        $data['parent_id'] = $c->id;
-        $data['kind'] = 'تجديد';
-        $new = Contract::create($data);
+            if (Contract::where('parent_id', $c->id)->where('kind', 'تجديد')
+                    ->where('status', 'مسودة')->exists()) {
+                return null;
+            }
 
-        if ($c->status === 'ساري' || $c->status === 'منتهي') {
-            $c->status = 'قيد التجديد';
-            $c->save();
-            \App\Support\FlowRunner::fire('renewed', 'contracts', $c);
-        }
+            $data = collect(self::COPY)->mapWithKeys(fn ($col) => [$col => $c->{$col}])->all();
+            $data['title'] = 'تجديد — ' . mb_substr((string) $c->title, 0, 240);
+            $data['status'] = 'مسودة';
+            $data['parent_id'] = $c->id;
+            $data['kind'] = 'تجديد';
+            $new = Contract::create($data);
 
-        return $new;
+            if ($c->status === 'ساري' || $c->status === 'منتهي') {
+                $c->status = 'قيد التجديد';
+                $c->save();
+                \App\Support\FlowRunner::fire('renewed', 'contracts', $c);
+            }
+
+            return $new;
+        });
     }
 
     /* ────────── مكتبة البنود (settings — الإدراج نسخٌ بالقيمة) ────────── */

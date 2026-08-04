@@ -2279,6 +2279,50 @@ if (! function_exists('hub_col_widths')) {
     }
 }
 
+if (! function_exists('hub_col_num_max')) {
+    /** أقصى قيمةٍ مطلقةٍ يسعها عمودٌ عشريّ — من عرض العمود في مصدر الهجرات */
+    function hub_col_num_max(string $table, string $col): ?float
+    {
+        return hub_col_nums()[$table][$col] ?? null;
+    }
+}
+
+if (! function_exists('hub_col_nums')) {
+    /**
+     * خريطةُ حدود الأعمدة العشرية (`decimal(M, D)`) من **مصدر الهجرات**.
+     *
+     * كحدّ الطول النصّيّ (`hub_col_widths`): SQLite لا يفرض دقّةَ decimal فتمرّ
+     * القيمةُ الفائضة في الاختبار، ثم يرفضها MySQL في الإنتاج بـ22003 (خطأ ٥٠٠،
+     * ورسالتُه تُسرّب القيمة إلى مركز الأخطاء). الحدُّ من العمود يرفضها برسالةٍ
+     * للمستخدم قبل القاعدة. أقصى مطلق = 10^(M−D) − 10^(−D).
+     */
+    function hub_col_nums(): array
+    {
+        static $map = null;
+        if ($map !== null) return $map;
+
+        $map = \Illuminate\Support\Facades\Cache::remember('hub:colnums:' . config('hub.version'), 86400, function () {
+            $out = [];
+            foreach (glob(database_path('migrations/*.php')) ?: [] as $file) {
+                $src = (string) @file_get_contents($file);
+                preg_match_all("/Schema::(?:create|table)\\(\\s*'([a-z0-9_]+)'(.*?)(?=Schema::(?:create|table)\\(|\\z)/s",
+                    $src, $blocks, PREG_SET_ORDER);
+                foreach ($blocks as $b) {
+                    preg_match_all("/->decimal\\(\\s*'([a-z0-9_]+)'\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)/", $b[2], $cols, PREG_SET_ORDER);
+                    foreach ($cols as $c) {
+                        $intDigits = max(0, (int) $c[2] - (int) $c[3]);
+                        $out[$b[1]][$c[1]] = 10 ** $intDigits - (10 ** -((int) $c[3]));
+                    }
+                }
+            }
+
+            return $out;
+        });
+
+        return $map;
+    }
+}
+
 if (! function_exists('hub_fit')) {
     /**
      * قصُّ نصٍّ ليسع عموداً — **بالمحارف** لا بالبايتات.

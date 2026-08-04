@@ -190,39 +190,45 @@ class PurchaseController extends Controller
     /** فاتورة المورد → المالية (فاتورة مشتريات) — بلا تكرار */
     protected function toBill(Purchase $p)
     {
-        abort_unless($p->status === 'مستلم', 422, 'سجّل الاستلام أولاً ثم أنشئ الفاتورة');
-        $meta = (array) $p->meta;
-        if (! empty($meta['bill_id']) && ($prev = FinDocument::withTrashed()->find($meta['bill_id']))) {
-            // withTrashed: فاتورةٌ سابقةٌ نُقلت للسلة كانت تُستبعَد بـfind فيُعاد
-            // إنشاؤها — فتتكرّر فاتورة المورد. المحذوفة تُوقف التكرار وتُوجَّه للاستعادة.
-            if ($prev->trashed()) {
-                return back()->with('err', 'فاتورة هذا الشراء محذوفةٌ في السلة — استعِدها من المالية بدل إنشاء نسخةٍ مكرّرة');
+        // معاملةٌ على صفٍّ مقفول كنمط receive(): فحصُ bill_id يقرأ الحالة المُثبَتة
+        // لا نسخةً قديمة في الذاكرة — فنقرتان متزامنتان (نقر مزدوج/تبويبان) تتسلسلان
+        // فلا تُنشئان فاتورتَي موردٍ مكرّرتين (التزامٌ مضاعف)؛ doc_no غير فريدٍ في القاعدة.
+        return DB::transaction(function () use ($p) {
+            $p = Purchase::whereKey($p->getKey())->lockForUpdate()->firstOrFail();
+            abort_unless($p->status === 'مستلم', 422, 'سجّل الاستلام أولاً ثم أنشئ الفاتورة');
+            $meta = (array) $p->meta;
+            if (! empty($meta['bill_id']) && ($prev = FinDocument::withTrashed()->find($meta['bill_id']))) {
+                // withTrashed: فاتورةٌ سابقةٌ نُقلت للسلة كانت تُستبعَد بـfind فيُعاد
+                // إنشاؤها — فتتكرّر فاتورة المورد. المحذوفة تُوقف التكرار وتُوجَّه للاستعادة.
+                if ($prev->trashed()) {
+                    return back()->with('err', 'فاتورة هذا الشراء محذوفةٌ في السلة — استعِدها من المالية بدل إنشاء نسخةٍ مكرّرة');
+                }
+
+                return redirect()->route('m.show', ['fin', $prev->id])->with('ok', 'أُنشئت من قبل — هذه فاتورتها');
             }
 
-            return redirect()->route('m.show', ['fin', $prev->id])->with('ok', 'أُنشئت من قبل — هذه فاتورتها');
-        }
+            $supplier = $p->supplier_id ? Supplier::find($p->supplier_id) : null;
+            $bill = FinDocument::create([
+                'doc_no'      => $p->invoice_no ?: 'BILL-' . $p->doc_no,
+                'kind'        => 'فاتورة مشتريات',
+                'partner'     => $supplier?->name ?? '',
+                'date'        => now()->toDateString(),
+                'due'         => now()->addDays(30)->toDateString(),
+                'amount'      => $p->amount,
+                'total'       => $p->amount,
+                'paid'        => $p->pay_state === 'مدفوع' ? $p->amount : 0,
+                'currency'    => $p->currency,
+                'state'       => $p->pay_state === 'مدفوع' ? 'مدفوعة' : 'مرسلة',
+                'project_id'  => $p->project_id,
+                'company_id'  => $p->company_id,
+                'description' => 'فاتورة مورد بموجب مستند الشراء ' . $p->doc_no,
+            ]);
+            $p->meta = $meta + ['bill_id' => $bill->id];
+            $p->save();
 
-        $supplier = $p->supplier_id ? Supplier::find($p->supplier_id) : null;
-        $bill = FinDocument::create([
-            'doc_no'      => $p->invoice_no ?: 'BILL-' . $p->doc_no,
-            'kind'        => 'فاتورة مشتريات',
-            'partner'     => $supplier?->name ?? '',
-            'date'        => now()->toDateString(),
-            'due'         => now()->addDays(30)->toDateString(),
-            'amount'      => $p->amount,
-            'total'       => $p->amount,
-            'paid'        => $p->pay_state === 'مدفوع' ? $p->amount : 0,
-            'currency'    => $p->currency,
-            'state'       => $p->pay_state === 'مدفوع' ? 'مدفوعة' : 'مرسلة',
-            'project_id'  => $p->project_id,
-            'company_id'  => $p->company_id,
-            'description' => 'فاتورة مورد بموجب مستند الشراء ' . $p->doc_no,
-        ]);
-        $p->meta = $meta + ['bill_id' => $bill->id];
-        $p->save();
-
-        return redirect()->route('m.show', ['fin', $bill->id])
-            ->with('ok', '🧾 أُنشئت فاتورة المورد — تظهر الآن في المالية والتقارير');
+            return redirect()->route('m.show', ['fin', $bill->id])
+                ->with('ok', '🧾 أُنشئت فاتورة المورد — تظهر الآن في المالية والتقارير');
+        });
     }
 
 }
