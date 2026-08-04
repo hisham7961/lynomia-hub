@@ -68,8 +68,11 @@ class FileController extends Controller
         if (! $u) return false;
         if (hub_is_owner($u)) return true;
 
+        // **الختم يسبق المهلة**: المفتاح يحمل ختم جدول الأدوار — فتعديلُ مصفوفة
+        // دورٍ (سحبُ رؤية وحدة) يُبطل القرار المخبّأ فوراً لا بعد انقضاء الـ١٢٠ث.
         return (bool) Cache::remember(
-            'fileacc:' . ($u->role_id ?? '0') . ':' . $u->id . ':' . sha1($path), 120,
+            'fileacc:' . ($u->role_id ?? '0') . ':' . $u->id . ':' . sha1($path)
+                . ':' . hub_data_stamp(['roles']), 120,
             function () use ($u, $path) {
                 foreach (hub_modules() as $mk => $def) {
                     $table = (string) ($def['table'] ?? '');
