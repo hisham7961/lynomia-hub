@@ -26,6 +26,41 @@
     @endif
 </div>
 
+{{-- ═ كيف أنصّبه؟ — الخطوات أمامك لا في ملفٍ على الخادم ═ --}}
+<div class="card">
+    <details @if (! $url) open @endif>
+        <summary style="cursor:pointer;font-weight:700;font-size:1.05em">🛠️ كيف أنصّب n8n على خادمي؟ — الخطوات الكاملة</summary>
+        <div style="margin-top:12px;line-height:1.9">
+            <div class="sub" style="border-inline-start:4px solid var(--wn);padding-inline-start:10px;margin-bottom:12px">
+                <b>شرطٌ أساسي:</b> n8n خدمةُ <b>Node.js</b> مستقلّة — لا صفحةٌ في هذا النظام ولا كود PHP.
+                يحتاج خادماً يشغّل <b>Docker</b> (VPS/خادم مخصّص بصلاحية <span class="mono ltr">root</span>).
+                على استضافة PHP المشتركة (cPanel) <b>لا يعمل</b> — استعمل حينها
+                <a href="{{ route('hooks.index') }}">الويبهوك الوارد</a> و<a href="{{ route('webhooks.index') }}">الصادر</a> بدلاً منه.
+            </div>
+
+            <b>١) على الخادم (VPS بصلاحية root)</b> — إن لم يكن Docker مثبَّتاً:
+            <pre class="mono ltr" style="background:var(--cd);border:1px solid var(--brd);border-radius:10px;padding:12px;overflow:auto;direction:ltr;text-align:left">curl -fsSL https://get.docker.com | sh</pre>
+
+            <b>٢) شغّل n8n من المستودع</b> (ملفات Docker Compose جاهزة مع PostgreSQL):
+            <pre class="mono ltr" style="background:var(--cd);border:1px solid var(--brd);border-radius:10px;padding:12px;overflow:auto;direction:ltr;text-align:left">cd deploy/n8n
+cp .env.example .env
+nano .env          # املأ: N8N_HOST ، N8N_ENCRYPTION_KEY ، POSTGRES_PASSWORD
+docker compose up -d</pre>
+
+            <b>٣) وجّه نطاقاً فرعيّاً إليه</b> — n8n يستمع على <span class="mono ltr">127.0.0.1:5678</span> (لا يُكشف علناً).
+            في DNS وجّه <span class="mono ltr">n8n.yourdomain.com</span> لخادمك، ثم في reverse proxy (Caddy مثالاً):
+            <pre class="mono ltr" style="background:var(--cd);border:1px solid var(--brd);border-radius:10px;padding:12px;overflow:auto;direction:ltr;text-align:left">n8n.yourdomain.com {
+    reverse_proxy 127.0.0.1:5678
+}</pre>
+
+            <b>٤) أنشئ حساب المالك</b> بفتح <span class="mono ltr">https://n8n.yourdomain.com</span> أول مرة،
+            ثم انسخ الرابط والصقه في <b>«ربط المثيل»</b> أدناه. تمّ.
+
+            <div class="sub" style="margin-top:10px">📖 التفاصيل الكاملة (التحديث، النسخ الاحتياطي، ربط الاتجاهين) في <span class="mono ltr">deploy/n8n/README.md</span>.</div>
+        </div>
+    </details>
+</div>
+
 {{-- ═ الربط ═ --}}
 <div class="card">
     <h3>⚙️ ربط المثيل</h3>
@@ -58,9 +93,5 @@
             <span class="mono ltr">X-Hub-Signature</span> (عقدة Crypto → HMAC SHA256 بالسرّ).
         </div>
     </div>
-</div>
-
-<div class="card">
-    <div class="sub">📖 خطوات التنصيب الكاملة على خادمك في <span class="mono ltr">deploy/n8n/README.md</span> — Docker Compose جاهز مع PostgreSQL و reverse proxy.</div>
 </div>
 @endsection
