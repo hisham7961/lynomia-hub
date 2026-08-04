@@ -38,8 +38,10 @@
         <tbody>
             <tr><td><b>🧩 أودو — كل شيء</b></td><td class="sub">الاتصال الافتراضي والخوادم الإضافية واختبارها، وأين ترتبط الوحدات، وقنوات البيع لكل مشروع، والدليل التفصيلي</td>
                 <td class="acts"><a class="btn ghost xs" href="{{ route('integrations.odoo') }}">فتح ↗</a></td></tr>
-            <tr><td><b>🪝 Webhooks</b></td><td class="sub">اشتراكات بثّ الأحداث بتوقيع HMAC وسجل المحاولات والإعادات</td>
+            <tr><td><b>🪝 Webhooks صادرة</b></td><td class="sub">اشتراكات بثّ الأحداث بتوقيع HMAC وسجل المحاولات والإعادات</td>
                 <td class="acts"><a class="btn ghost xs" href="{{ route('webhooks.index') }}">فتح ↗</a></td></tr>
+            <tr><td><b>📥 الويبهوك الوارد</b></td><td class="sub">نقاطُ استقبالٍ أصلية: n8n/نماذج/خدمات تُدخِل البيانات للنظام برابطٍ موقّع (HMAC)</td>
+                <td class="acts"><a class="btn ghost xs" href="{{ route('hooks.index') }}">فتح ↗</a></td></tr>
             <tr><td><b>🔑 مفاتيح REST API</b></td><td class="sub">توليد المفاتيح وتدويرها وإبطالها — في ملفك الشخصي</td>
                 <td class="acts"><a class="btn ghost xs" href="{{ route('profile.edit') }}">فتح ↗</a></td></tr>
             <tr><td><b>📨 مركز المراسلة</b></td><td class="sub">تلجرام والبريد وداخل التطبيق: الحالة والاختبار والإعادة ودليل الإعداد التفصيلي</td>

@@ -71,6 +71,10 @@ Route::middleware('guest')->group(function () {
 });
 
 // التوقيع الإلكتروني — الجهة العامة: العميل بلا حساب، برابط خاص وكلمة سر
+// الويبهوك الوارد — سطحٌ عامٌّ يُصادَق بالرمز في الرابط + توقيع HMAC اختياريّ
+Route::post('hook/{token}', [\App\Http\Controllers\Web\InboundHookController::class, 'receive'])
+    ->name('hook.receive')->middleware('throttle:120,1');
+
 Route::get('sign/{token}', [\App\Http\Controllers\Web\EsignController::class, 'show'])->name('sign.show');
 Route::post('sign/{token}/otp', [\App\Http\Controllers\Web\EsignController::class, 'sendOtp'])->name('sign.otp')->middleware('throttle:6,10');
 Route::post('sign/{token}/unlock', [\App\Http\Controllers\Web\EsignController::class, 'unlock'])->name('sign.unlock');
@@ -377,6 +381,11 @@ Route::middleware('auth')->group(function () {
     Route::delete('admin/webhooks/{id}', [WebhookController::class, 'destroy'])->name('webhooks.destroy');
     Route::get('admin/webhooks/{id}/log', [WebhookController::class, 'log'])->name('webhooks.log');
     Route::post('admin/webhooks/{id}/resend/{did}', [WebhookController::class, 'resend'])->name('webhooks.resend');
+    // الويبهوك الوارد — نقاطُ استقبالٍ أصلية (n8n/نماذج/خدمات → النظام)
+    Route::get('admin/integrations/hooks', [\App\Http\Controllers\Web\InboundHookController::class, 'index'])->name('hooks.index');
+    Route::post('admin/integrations/hooks', [\App\Http\Controllers\Web\InboundHookController::class, 'store'])->name('hooks.store');
+    Route::post('admin/integrations/hooks/{id}/toggle', [\App\Http\Controllers\Web\InboundHookController::class, 'toggle'])->name('hooks.toggle');
+    Route::delete('admin/integrations/hooks/{id}', [\App\Http\Controllers\Web\InboundHookController::class, 'destroy'])->name('hooks.destroy');
     Route::get('admin/security', [SecurityController::class, 'index'])->name('security.index');
     Route::post('admin/security/lockdown', [SecurityController::class, 'lockdown'])->name('security.lockdown');
     Route::post('admin/security/sessions/{id}/revoke', [SecurityController::class, 'revokeSession'])->name('security.session.revoke');
