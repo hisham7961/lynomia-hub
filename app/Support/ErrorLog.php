@@ -129,9 +129,26 @@ class ErrorLog
 
         self::capture(
             app()->runningInConsole() ? 'php' : (request()->is('api/*') ? 'api' : 'php'),
-            get_class($e) . ': ' . $e->getMessage(),
+            get_class($e) . ': ' . self::safeMessage($e),
             $e->getFile(), $e->getLine(),
             $e->getTraceAsString()
         );
+    }
+
+    /**
+     * رسالةٌ آمنةٌ للتخزين والإشعار: رسالةُ `QueryException` تُضمّن SQL بقيمه
+     * المربوطة، ورسائلُ المحرّك تُضمّن القيمَ المقتبسة (Duplicate entry '...')،
+     * فقد تُسرّب رواتبَ/أسراراً/PII إلى مركز الأخطاء وإشعارِ المراقبة. نُبقي رمزَ
+     * الحالة ووصفَ القيد/العمود، ونحذف مقطعَ SQL ونطمس القيمَ المقتبسة.
+     */
+    protected static function safeMessage(\Throwable $e): string
+    {
+        $msg = $e->getMessage();
+        if ($e instanceof \Illuminate\Database\QueryException) {
+            $msg = preg_replace('/\s*\(Connection:.*$/s', '', $msg);          // احذف SQL والقيمَ المربوطة
+            $msg = preg_replace("/'(?:[^'\\\\]|\\\\.){0,300}'/", "'…'", (string) $msg);  // اطمس القيمَ المقتبسة
+        }
+
+        return (string) $msg;
     }
 }

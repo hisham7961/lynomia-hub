@@ -1087,6 +1087,14 @@ class ModuleController extends Controller
                 && ($w = hub_col_max($def['table'] ?? '', $f['col'] ?? $f['key']))) {
                 $r[] = 'max:' . $w;
             }
+            // سقفُ العدد من **دقّة العمود العشريّ**: كان num/big يُتحقّق كـ`numeric`
+            // بلا حدّ، فقيمةٌ تفوق decimal(M,D) تمرّ على SQLite ثم يرفضها MySQL بـ22003
+            // (٥٠٠ ورسالةٌ تُسرّب القيمة). الحدُّ يرفضها للمستخدم قبل القاعدة.
+            if (in_array($f['type'], ['num', 'big'], true)
+                && ($nm = hub_col_num_max($def['table'] ?? '', $f['col'] ?? $f['key'])) !== null) {
+                $r[] = 'between:' . rtrim(rtrim(number_format(-$nm, 3, '.', ''), '0'), '.')
+                    . ',' . rtrim(rtrim(number_format($nm, 3, '.', ''), '0'), '.');
+            }
             // وقائمةُ الخيارات تُلزِم: شاشةُ الحالة تفرضها منذ v2.x والنموذج لا
             if (($f['type'] ?? '') === 'sel' && ! empty($f['options'])) {
                 $r[] = \Illuminate\Validation\Rule::in($f['options']);
