@@ -5,6 +5,14 @@ namespace App\Support;
 /** قارئ جداول بلا مكتبات: CSV (بفاصلة أو فاصلة منقوطة، مع BOM) و Excel xlsx (zip + XML) */
 class Sheet
 {
+    /**
+     * سقف صفوفٍ مبكّر أثناء التحليل: حدُّ الرفع (٢٠م.ب) لا يحدّ عدد الصفوف ولا حجم
+     * فكّ ضغط xlsx، وسقفُ الاستيراد (٥٠٠٠) كان يُطبَّق **بعد** تحميل كل الصفوف —
+     * فملفٌّ بملايين الصفوف يستنزف الذاكرة قبل رفضه. نتوقّف عند هذا الحدّ (أعلى من
+     * سقف الاستيراد فيبقى رفضُ المتجاوز قائماً) فلا يُحمَّل إلا قدرٌ مبوّأ.
+     */
+    public const MAX_ROWS = 6000;
+
     /** يقرأ الملف حسب امتداده ويعيد مصفوفة صفوف (أول صف = العناوين) */
     public static function read(string $path, string $ext): array
     {
@@ -27,6 +35,7 @@ class Sheet
         // معامل escape الفارغ صراحةً: سلوك RFC 4180، ويُسكت تحذير PHP 8.4 لكل سطر
         while (($r = fgetcsv($fh, 0, $delim, '"', '')) !== false) {
             if (count($r) === 1 && trim((string) $r[0]) === '') continue;
+            if (count($rows) >= self::MAX_ROWS) break;   // حدٌّ مبكّر: لا تحميل بلا سقف
             $rows[] = array_map(fn ($v) => trim((string) $v), $r);
         }
         fclose($fh);
@@ -74,6 +83,7 @@ class Sheet
 
         $rows = [];
         foreach ($sheet->sheetData->row as $row) {
+            if (count($rows) >= self::MAX_ROWS) break;   // حدٌّ مبكّر: لا تحميل بلا سقف
             $out = [];
             foreach ($row->c as $c) {
                 // العمود من مرجع الخلية (A1 → 0)
