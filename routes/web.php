@@ -288,6 +288,7 @@ Route::middleware('auth')->group(function () {
     Route::get('alerts', [AlertController::class, 'index'])->name('alerts');
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::get('notifications/mini', [NotificationController::class, 'mini'])->name('notifications.mini');
+    Route::get('notifications/count', [NotificationController::class, 'count'])->name('notifications.count');
     Route::post('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.readall');
     Route::get('notifications/{id}/go', [NotificationController::class, 'go'])->name('notifications.go');
     Route::get('reports/finance', [ReportController::class, 'finance'])->name('reports.finance');

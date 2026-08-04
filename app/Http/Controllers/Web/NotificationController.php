@@ -24,6 +24,18 @@ class NotificationController extends Controller
         ]);
     }
 
+    /**
+     * عدُّ غير المقروء — نقطةٌ خفيفة تستفتيها الواجهة دوريّاً فتُحدِّث الشارة
+     * وعنوانَ التبويب وتُطلق وميضَ الإطار، بلا إعادة تحميل الصفحة.
+     */
+    public function count()
+    {
+        return response()->json([
+            'unread' => (int) HubNotification::where('user_id', auth()->id())->where('read', false)->count(),
+            'flashMin' => max(1, (int) setting('notify.flash_min', 10)),
+        ]);
+    }
+
     public function mini()
     {
         $items = HubNotification::where('user_id', auth()->id())
