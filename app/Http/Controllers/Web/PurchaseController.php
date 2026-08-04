@@ -140,9 +140,14 @@ class PurchaseController extends Controller
                 $name = trim((string) ($line['desc'] ?? ''));
                 if ($qty <= 0 || $name === '') { $skipped++; continue; }
 
+                // مطابقةٌ منطَّقةٌ بالشركة وحاسمةُ الترتيب: أمرٌ بشركةٍ يطابق أصنافها
+                // أو المشتركة (بلا شركة)، وأمرٌ **بلا** شركة يطابق المشتركة وحدها —
+                // فلا يحرّك مخزون شركةٍ أخرى. والمخصَّصُ للشركة قبل المشترك ثم id ثابت.
                 $item = \App\Models\StockItem::whereNull('deleted_at')->where('name', $name)
-                    ->when($p->company_id, fn ($q) => $q
-                        ->where(fn ($w) => $w->where('company_id', $p->company_id)->orWhereNull('company_id')))
+                    ->when($p->company_id,
+                        fn ($q) => $q->where(fn ($w) => $w->where('company_id', $p->company_id)->orWhereNull('company_id')),
+                        fn ($q) => $q->whereNull('company_id'))
+                    ->orderByRaw('company_id IS NULL')->orderBy('id')
                     ->first();
                 if (! $item) { $skipped++; continue; }
 
@@ -187,8 +192,14 @@ class PurchaseController extends Controller
     {
         abort_unless($p->status === 'مستلم', 422, 'سجّل الاستلام أولاً ثم أنشئ الفاتورة');
         $meta = (array) $p->meta;
-        if (! empty($meta['bill_id']) && FinDocument::find($meta['bill_id'])) {
-            return redirect()->route('m.show', ['fin', $meta['bill_id']])->with('ok', 'أُنشئت من قبل — هذه فاتورتها');
+        if (! empty($meta['bill_id']) && ($prev = FinDocument::withTrashed()->find($meta['bill_id']))) {
+            // withTrashed: فاتورةٌ سابقةٌ نُقلت للسلة كانت تُستبعَد بـfind فيُعاد
+            // إنشاؤها — فتتكرّر فاتورة المورد. المحذوفة تُوقف التكرار وتُوجَّه للاستعادة.
+            if ($prev->trashed()) {
+                return back()->with('err', 'فاتورة هذا الشراء محذوفةٌ في السلة — استعِدها من المالية بدل إنشاء نسخةٍ مكرّرة');
+            }
+
+            return redirect()->route('m.show', ['fin', $prev->id])->with('ok', 'أُنشئت من قبل — هذه فاتورتها');
         }
 
         $supplier = $p->supplier_id ? Supplier::find($p->supplier_id) : null;
