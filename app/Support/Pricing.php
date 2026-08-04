@@ -274,8 +274,12 @@ class Pricing
 
     public static function all(bool $fresh = false): array
     {
-        // المفتاح ببصمة القارئ: المحتوى صار يختلف بصلاحيته ونطاقه وقيود حقوله
-        return hub_cached(hub_scope_key('pricing:all'), self::TTL, $fresh, function () {
+        // المفتاح ببصمة القارئ **وختم جداوله**: تعديلُ خدمةٍ أو باقةٍ أو منافسٍ
+        // أو تطبيقٍ يُبطل الخبيئة فوراً لا بعد انقضاء المهلة (الختم يسبق المهلة).
+        $key = hub_scope_key('pricing:all')
+            . hub_data_stamp(['pricing_plans', 'services', 'competitors', 'applications']);
+
+        return hub_cached($key, self::TTL, $fresh, function () {
             $cat = self::catalog();
 
             return ['catalog' => $cat, 'insights' => self::insights($cat), 'at' => now()->toDateTimeString()];
