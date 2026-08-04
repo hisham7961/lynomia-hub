@@ -55,6 +55,31 @@ class Contract extends Model
         });
     }
 
+    /**
+     * تخصيص رقم الوثيقة يتصادم عند التزامن: معالجان يقرآن أعلى تسلسلٍ معاً
+     * فيولّدان الرقم نفسه، وحلقةُ الوجود في nextDocNo تفحص المُثبَت لا المُدرَج
+     * قيد التنفيذ — فيقع خرقُ القيد الفريد (500 على MySQL). نعيد المحاولة بترقيمٍ
+     * جديد بدل إفشال الإنشاء (القفل الصفّيّ لا يسلسل عبر الاتصالات في كل محرّك).
+     */
+    public function save(array $options = []): bool
+    {
+        for ($attempt = 0; ; $attempt++) {
+            try {
+                return parent::save($options);
+            } catch (\Illuminate\Database\QueryException $e) {
+                if ($this->exists || $attempt >= 5 || ! self::isDupDocNo($e)) throw $e;
+                $this->doc_no = self::nextDocNo();   // رقمٌ جديد ثم أعِد المحاولة
+            }
+        }
+    }
+
+    /** أهذا خطأُ خرقٍ للقيد الفريد على doc_no؟ (23000 على المحرّكين، والرسالة تسمّي العمود) */
+    protected static function isDupDocNo(\Illuminate\Database\QueryException $e): bool
+    {
+        return (string) $e->getCode() === '23000'
+            && str_contains(mb_strtolower($e->getMessage()), 'doc_no');
+    }
+
     public static function nextDocNo(): string
     {
         $format = (string) (setting('contracts.doc_no_format') ?: 'CTR-{YEAR}-{SEQ}');

@@ -15,7 +15,10 @@ class PortalController extends Controller
     /** بوابتي — بيانات المستخدم الحالي نفسه (لا تتطلب صلاحية HR) */
     public function me()
     {
-        $emp = Employee::where('user_id', auth()->id())->whereNull('deleted_at')->first();
+        // ترتيبٌ حاسم: ربطٌ مزدوج (موظفان بنفس user_id، يُتيحه النموذج العام)
+        // كان first() بلا orderBy يعرض بيانات زميلٍ بالقرعة بين المحرّكين
+        $emp = Employee::where('user_id', auth()->id())->whereNull('deleted_at')
+            ->orderBy('id')->first();
         $inbox = \App\Support\Inbox::items(auth()->user());
 
         return view('portal.me', ['emp' => $emp, 'self' => true,
