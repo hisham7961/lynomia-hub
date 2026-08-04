@@ -54,6 +54,9 @@ class ModuleController extends Controller
             if ($fv === '' || ! is_string($fv) || ! is_string($fk)) continue;
 
             $f = $fields->firstWhere('key', $fk);
+            // حقلٌ محجوبٌ عن هذا المستخدم لا يُرشَّح به: الترشيح ثم رؤية النتائج
+            // كاشفٌ لقيمته بالاستدلال — نفس حارس الفلاتر المتقدمة (applyAdvancedFilters).
+            if ($f && hub_field_mode(auth()->user(), (string) ($def['key'] ?? ''), $fk) === 'hide') continue;
             if ($f && ($f['type'] ?? '') === 'ref') {
                 // المتعدد احتواءٌ في مصفوفة، والمفرد مساواة
                 empty($f['multi'])
@@ -191,6 +194,10 @@ class ModuleController extends Controller
         }
         $dir     = $r->input('d') === 'asc' ? 'asc' : 'desc';
         $q->orderBy($sf['col'] ?? 'created_at', $sf ? $dir : 'desc');
+        // فاصل تعادلٍ حاسم: عمودُ الفرز قد تتساوى قيمُه (created_at بدقّة الثانية،
+        // إدراجٌ دفعيّ) فتُقرع الصفحاتُ على MySQL 8 — تخطٍّ أو تكرارٌ صامت. id
+        // (المفتاح) يمنح ترتيباً كليّاً ثابتاً على المحرّكين.
+        $q->orderBy('id', $sf ? $dir : 'desc');
 
         $rows = $q->paginate(25)->withQueryString();
 
@@ -239,22 +246,7 @@ class ModuleController extends Controller
         $m = new $class;
         $this->fill($def, $r, $m);
 
-        // وراثة الشركة النشطة: وحدةٌ لها عمود شركة بلا حقلٍ في نموذجها (الخدمات،
-        // قواعد التنبيه، المهام...) كانت تولد سجلاً بلا شركة — فيختفي فوراً من
-        // القائمة المفلترة بالشركة النشطة في الشريط العلوي. صار السجل الجديد
-        // يرثها تلقائياً (إن كانت ضمن المسموح للمستخدم)، والفارغ المقصود يبقى
-        // ممكناً بالرجوع لوضع «كل الشركات» قبل الإضافة.
-        if ($module !== 'companies' && ($ccol = hub_company_col($module)) && empty($m->{$ccol})) {
-            $cid = (string) session('hub.company', '');
-            $allowed = hub_company_ids();
-            if ($cid !== '' && ($allowed === null || in_array($cid, $allowed, true))) {
-                $m->{$ccol} = $cid;
-            } elseif ($allowed !== null) {
-                // معزولٌ بلا شركة نشطة: سجلٌ بلا شركة يختفي من قوائمه فوراً
-                // (whereIn يُقصي NULL) — يُنسب لأولى شركاته المسموحة بدل أن يضيع
-                $m->{$ccol} = $allowed[0];
-            }
-        }
+        $this->inheritCompany($m, $module);
 
         // مستخدم محدود ينشئ مشروعاً: نضمن بقاءه ضمن نطاقه (مديراً أو عضواً)
         if ($module === 'projects' && hub_scoped(auth()->user())) {
@@ -908,6 +900,27 @@ class ModuleController extends Controller
         if ($val === '' || ! in_array($val, $ids, true)) {
             throw \Illuminate\Validation\ValidationException::withMessages(
                 [$pf['key'] => 'حسابك محدود النطاق — اختر مشروعاً من مشاريعك']);
+        }
+    }
+
+    /**
+     * وراثة الشركة النشطة لسجلٍ جديد في وحدةٍ لها عمود شركة بلا حقلٍ في نموذجها
+     * (الخدمات، قواعد التنبيه، المهام...) — وإلا وُلِد بلا شركة فاختفى فوراً من
+     * القائمة المفلترة بالشركة (whereIn يُقصي NULL). الويب يرث الشركة النشطة من
+     * الشريط، والـAPI (بلا جلسة) يرث أولى شركات المستخدم المسموحة إن كان معزولاً.
+     * يُستدعى من store وapiStore كليهما — فالمسارُ الآليّ لا يختلف عن اليدويّ.
+     */
+    protected function inheritCompany(Model $m, string $module): void
+    {
+        if ($module === 'companies' || ! ($ccol = hub_company_col($module)) || ! empty($m->{$ccol})) return;
+        $cid = (string) session('hub.company', '');
+        $allowed = hub_company_ids();
+        if ($cid !== '' && ($allowed === null || in_array($cid, $allowed, true))) {
+            $m->{$ccol} = $cid;
+        } elseif ($allowed !== null && ! empty($allowed)) {
+            // معزولٌ بلا شركة نشطة (وكلُّ نداءات API كذلك): يُنسب لأولى شركاته
+            // المسموحة بدل أن يُحفَظ بلا شركة فيختفي من قوائمه فوراً
+            $m->{$ccol} = $allowed[0];
         }
     }
 

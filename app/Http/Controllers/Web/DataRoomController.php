@@ -128,6 +128,29 @@ class DataRoomController extends Controller
         abort_if($download && $link->no_download, 403, 'التنزيل ممنوع لهذا الرابط — عرض فقط');
         $this->logView($link);
 
+        // «عرض فقط»: الوسمُ يُحرَق في نفس البايتات المخدومة — لا في غلافٍ يُتجاوَز
+        // بجلب هذا الرابط مباشرةً. بصمةُ المُشاهِد (النظام · IP · وقت) تلازم النسخة.
+        // يفشل **مغلقاً**: لا يُبَثّ الأصلُ النظيفُ لرابطٍ وُعد بالوسم.
+        if ($link->no_download) {
+            $stamp = setting('app.name', 'Lynomia') . ' · ' . $r->ip() . ' · ' . now()->format('Y-m-d H:i');
+            try {
+                $bytes = (string) $link->mime === 'application/pdf'
+                    ? \App\Support\Watermark::pdf($abs, $stamp)
+                    : \App\Support\Watermark::image($abs, $stamp, (string) $link->mime);
+            } catch (\Throwable $e) {
+                report($e);
+                abort(500, 'تعذّر تجهيز العرض الآمن لهذا المستند — راجع مُرسِل الرابط');
+            }
+
+            return response($bytes, 200, [
+                'Content-Type' => $link->mime ?: 'application/octet-stream',
+                'Content-Disposition' => 'inline; filename="' . rawurlencode($link->title) . '"',
+                'X-Robots-Tag' => 'noindex',
+                'X-Content-Type-Options' => 'nosniff',
+                'Cache-Control' => 'no-store, private',   // بصمةٌ لكل مُشاهِد — لا تُخبَّأ ولا تُشارَك
+            ]);
+        }
+
         return response()->file($abs, [
             'Content-Type' => $link->mime ?: 'application/octet-stream',
             'Content-Disposition' => ($download ? 'attachment' : 'inline') . '; filename="' . rawurlencode($link->title) . '"',

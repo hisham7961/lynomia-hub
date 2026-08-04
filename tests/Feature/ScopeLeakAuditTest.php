@@ -121,10 +121,13 @@ class ScopeLeakAuditTest extends TestCase
     public function test_pricing_hides_service_cost_when_the_field_is_masked(): void
     {
         $this->seedCore();
-        $sid = (string) Str::uuid();
+        // معرّفاتٌ ثابتةٌ بحروفٍ فقط (لا رقمَ إلا نبضةُ الإصدار 4): معرّفٌ عشوائيّ
+        // قد يحوي «4242» صدفةً فيظهر في رابط السجل ويُسقط تأكيدَ الحجب — قرعةٌ
+        // تخضرّ محليّاً وتسقط على MySQL. الثابتُ يقطع القرعة فالرقمُ لا يأتي إلا من الحقل.
+        $sid = 'aaaaaaaa-aaaa-4aaa-baaa-aaaaaaaaaaaa';
         DB::table('services')->insert(['id' => $sid, 'name' => 'خدمة', 'price' => 100,
             'cost' => 4242, 'status' => 'نشطة', 'created_at' => now(), 'updated_at' => now()]);
-        DB::table('pricing_plans')->insert(['id' => (string) Str::uuid(), 'name' => 'الباقة',
+        DB::table('pricing_plans')->insert(['id' => 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb', 'name' => 'الباقة',
             'service_id' => $sid, 'price' => 100, 'unit_cost' => 4242, 'status' => 'نشطة',
             'created_at' => now(), 'updated_at' => now()]);
 
@@ -163,7 +166,10 @@ class ScopeLeakAuditTest extends TestCase
     public function test_asset_life_hides_price_when_the_field_is_masked(): void
     {
         $this->seedCore();
-        \App\Models\Asset::create(['name' => 'جهاز', 'price' => 7777, 'status' => 'قيد الاستخدام',
+        // معرّفٌ ثابتٌ بحروفٍ فقط: عشوائيٌّ قد يحوي «7777» فيتسرّب عبر رابط السجل
+        // لا عبر الحقل المحجوب — فيسقط التأكيد قرعةً على MySQL دون خللٍ حقيقيّ.
+        \App\Models\Asset::forceCreate(['id' => 'dddddddd-dddd-4ddd-bddd-dddddddddddd',
+            'name' => 'جهاز', 'price' => 7777, 'status' => 'قيد الاستخدام',
             'holder_id' => $this->employee->id]);
 
         $u = $this->withRole(['assets' => ['v' => 1]], ['assets' => ['price' => 'hide']]);
@@ -179,7 +185,9 @@ class ScopeLeakAuditTest extends TestCase
     public function test_compliance_hides_fees_when_the_field_is_masked(): void
     {
         $this->seedCore();
-        DB::table('compliance_items')->insert(['id' => (string) Str::uuid(), 'title' => 'رخصة',
+        // معرّفٌ ثابتٌ بحروفٍ فقط: عشوائيٌّ قد يحوي «8888» فيظهر في رابط السجل
+        // (كما سقطت هذه الحالةُ فعلاً على MySQL) لا في الحقل المحجوب. الثابتُ يقطع القرعة.
+        DB::table('compliance_items')->insert(['id' => 'cccccccc-cccc-4ccc-bccc-cccccccccccc', 'title' => 'رخصة',
             'kind' => 'ترخيص تجاري', 'due' => now()->addDays(10)->toDateString(), 'fee' => 8888,
             'status' => 'مطلوب إجراء', 'created_at' => now(), 'updated_at' => now()]);
 

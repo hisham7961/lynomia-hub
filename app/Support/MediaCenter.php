@@ -223,8 +223,11 @@ class MediaCenter
 
     public static function all(bool $fresh = false): array
     {
-        // المفتاح ببصمة القارئ: المحتوى صار يختلف بصلاحيته ونطاقه
-        return hub_cached(hub_scope_key('media:all'), self::TTL, $fresh, function () {
+        // المفتاح ببصمة القارئ **وختم جداوله**: مادةٌ إعلاميةٌ أو حدثٌ جديد يظهر
+        // فوراً لا بعد انقضاء المهلة (الختم يسبق المهلة).
+        $key = hub_scope_key('media:all') . hub_data_stamp(['media_items', 'events', 'users']);
+
+        return hub_cached($key, self::TTL, $fresh, function () {
             $tl = self::timeline();
             $cat = self::catalogue();
             $ev = self::events();

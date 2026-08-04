@@ -44,6 +44,36 @@ class SessionSentry
             if ($u->allowed_ips && ! ip_allowed((string) $r->ip(), (string) $u->allowed_ips)) {
                 return $this->kick($r, 'الدخول غير مسموح من عنوان الشبكة الحالي');
             }
+
+            // **جلسةٌ أُعيد بعثها من كعكة «تذكّرني»** (viaRemember): صُودق المستخدم من
+            // الكعكة لا عبر تسجيل دخولٍ كامل، فلا hub.sl لها. الشرطان معاً يصيبان
+            // الجلسة المُعادة وحدها — actingAs والجلسات العادية viaRemember=false.
+            if (Auth::viaRemember() && ! session('hub.sl')) {
+                // 2FA لا تُتجاوَز بالكعكة: يُطالَب صاحبُ الحساب المُفعِّل بالرمز
+                // قبل الوصول — كعكةٌ مسروقةٌ أو عودةٌ بعد انتهاء الجلسة لا تكفي.
+                if ($u->totp_enabled) {
+                    Auth::logout();
+                    $r->session()->put('2fa:uid', $u->id);
+                    $r->session()->regenerate();
+
+                    return redirect()->route('login.otp');
+                }
+                // بلا 2FA: تُسجَّل الجلسةُ المُعادة (كـfinishLogin) فتصير قابلةً
+                // للإنهاء من مركز الأمان بدل أن تبقى شبحاً لا يُخرَج.
+                try {
+                    $log = \App\Models\SessionLog::create([
+                        'user_id'      => $u->id,
+                        'device'       => substr((string) $r->header('X-Device', $r->userAgent()), 0, 200),
+                        'ip'           => $r->ip(),
+                        'user_agent'   => substr((string) $r->userAgent(), 0, 400),
+                        'started_at'   => now(),
+                        'last_seen_at' => now(),
+                    ]);
+                    $r->session()->put('hub.sl', $log->id);
+                } catch (\Throwable $e) {
+                    // تسجيلٌ متعذّر لا يمنع الوصول — يفشل مفتوحاً
+                }
+            }
         }
 
         if ($id !== '' && auth()->check() && ! $r->routeIs(...self::SKIP)) {

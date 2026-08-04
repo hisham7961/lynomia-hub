@@ -69,7 +69,9 @@ class WebhookDispatcher
         }
 
         return [
-            'event'     => $module . '.' . $event,
+            // الحدث الدلاليّ مُسمّى بنطاقه أصلاً (invoice.paid) فلا يُسبق باسم الوحدة
+            // ثانيةً — تطبيعٌ يطابق اسمَ الحدث في fire وترويسةِ X-Hub-Event
+            'event'     => str_contains($event, '.') ? $event : $module . '.' . $event,
             'module'    => $module,
             'label'     => $def['label'] ?? $module,
             'record_id' => (string) $m->id,

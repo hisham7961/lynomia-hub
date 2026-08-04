@@ -31,7 +31,10 @@ class Inbox
         'kb_articles', 'internal_requests', 'leave_requests', 'tasks', 'decisions',
         // employees: يُقرأ للوثائق الشخصية (إقامةٌ تنتهي) وكان غائباً عن الختم —
         // فتعديلُ الملف لا يُبطل الخبيئة ويبقى المُنجَز معروضاً حتى تنتهي المهلة
-        'employees', 'tickets', 'meetings', 'contract_obligations', 'compliance_items'];
+        'employees', 'tickets', 'meetings', 'contract_obligations', 'compliance_items',
+        // assets: مصدرُ الإقرارات (Acks::pending) يقرأ عهدَ الأصول عبر holder_id،
+        // وكان غائباً عن الختم — فعهدةٌ جديدة تنتظر إقراري لا تُبطل الصندوق
+        'assets'];
 
     /** الحاويات مرتّبةً — الرقم هو الترتيب */
     public const BUCKETS = [

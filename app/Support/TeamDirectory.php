@@ -133,8 +133,10 @@ class TeamDirectory
     public static function all(bool $fresh = false): array
     {
         $u = auth()->user();
-        // المفتاح يحمل الدور والمستخدم: الحقول المحجوبة والنطاق يختلفان بينهما
-        $key = 'team:dir:' . ($u?->role_id ?? '0') . ':' . ($u?->id ?? '0');
+        // المفتاح يحمل الدور والمستخدم **وختم جداوله**: موظفٌ جديد أو مهارةٌ
+        // مُضافة يظهران فوراً لا بعد انقضاء المهلة (الختم يسبق المهلة).
+        $key = 'team:dir:' . ($u?->role_id ?? '0') . ':' . ($u?->id ?? '0')
+            . hub_data_stamp(['employees', 'skills', 'users']);
         if ($fresh) Cache::forget($key);
 
         return Cache::remember($key, self::TTL, function () {
