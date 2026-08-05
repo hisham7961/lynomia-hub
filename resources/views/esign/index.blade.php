@@ -1,9 +1,22 @@
 @extends('layouts.app')
 @section('title', 'توقيع العقود')
 @section('content')
-<div class="modhero" style="--mh:{{ hub_mod_look('contracts')['color'] }}">
-    <span class="mhico">✍️</span>
-    <div><div class="sub">مركز</div><h2>توقيع العقود الإلكتروني</h2></div>
+{{-- ═ مركز التوقيع المُعاد تصميمه (v2.311): الوثائقُ تتصدّر بطاقاتٍ بخطّ سير،
+     والإنشاءُ والقوالبُ لوحتان قابلتان للطيّ — لا جدولٌ يتصدّره نموذج ═ --}}
+@php
+    $nWait = $requests->where('status', 'بانتظار التوقيع')->count();
+    $nDone = $requests->where('status', 'وُقّع')->count();
+    $nHold = $requests->where('status', 'بانتظار الموافقة')->count();
+    $nBad  = $requests->whereIn('status', ['رُفض', 'ملغي', 'ملغى'])->count();
+@endphp
+<div class="lx-head" style="--mh:{{ hub_mod_look('contracts')['color'] }}">
+    <span class="lx-ico">✍️</span>
+    <div>
+        <div class="sub">مركز</div>
+        <h2>توقيع العقود الإلكتروني <span class="lx-count">{{ $requests->count() }} وثيقة</span></h2>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn p sm" type="button" onclick="document.getElementById('escreate').open=true;document.getElementById('escreate').scrollIntoView({behavior:'smooth'})">➕ طلب توقيع جديد</button>
 </div>
 
 @if (session('sign_link'))
@@ -14,9 +27,131 @@
     </div>
 @endif
 
-<div class="kids">
-    <div class="card kid">
-        <h3>➕ طلب توقيع جديد</h3>
+{{-- ألسنةُ التصفية بالحالة — عدّاداتٌ حيّةٌ وتصفيةٌ فورية في المتصفح --}}
+<div class="esg-tabs" id="esgtabs">
+    <button class="esg-tab on" type="button" data-f="">الكل <b>{{ $requests->count() }}</b></button>
+    <button class="esg-tab" type="button" data-f="بانتظار التوقيع">⏳ بانتظار التوقيع <b>{{ $nWait }}</b></button>
+    <button class="esg-tab" type="button" data-f="وُقّع">✅ وُقّع <b>{{ $nDone }}</b></button>
+    @if ($nHold)<button class="esg-tab" type="button" data-f="بانتظار الموافقة">🔏 بانتظار الموافقة <b>{{ $nHold }}</b></button>@endif
+    @if ($nBad)<button class="esg-tab" type="button" data-f="رُفض">🚫 مرفوض/ملغى <b>{{ $nBad }}</b></button>@endif
+</div>
+
+{{-- ═ بطاقات الوثائق: كلُّ طلبٍ وثيقةٌ بخطّ سيرها وموقّعيها وإجراءاتها ═ --}}
+<div class="esg-grid" id="esggrid">
+    @forelse ($requests as $q)
+        @php
+            $sgs = $signers[$q->id] ?? collect();
+            $tone = $q->status === 'وُقّع' ? 'ok' : (in_array($q->status, ['رُفض', 'ملغي', 'ملغى'], true) ? 'bad' : 'wn');
+            $dead = in_array($q->status, ['رُفض', 'ملغي', 'ملغى'], true) || $q->cancelled_at;
+            // خطُّ السير: أُنشئ ← أُرسل ← فُتح ← وُقّع — والمرفوض/الملغى يقطعه
+            $steps = [
+                ['أُنشئ', true],
+                ['أُرسل', (bool) $q->sent_at],
+                ['فُتح', (bool) $q->opened_at],
+                [$dead ? ($q->cancelled_at ? 'أُلغي' : 'رُفض') : 'وُقّع', $q->status === 'وُقّع' || $dead],
+            ];
+            $fGroup = in_array($q->status, ['رُفض', 'ملغي', 'ملغى'], true) ? 'رُفض' : $q->status;
+        @endphp
+        <div class="esg-card {{ $tone }}" data-status="{{ $fGroup }}">
+            <div class="esg-top">
+                <div class="esg-title">
+                    <b>{{ \Illuminate\Support\Str::limit($q->title, 60) }}</b>
+                    <div class="sub">
+                        @if ($l = $q->linkLabel())<a href="{{ $q->linkUrl() }}">{{ $l }}</a> · @endif
+                        <span class="mono ltr">{{ $q->verify_code }}</span>
+                    </div>
+                </div>
+                <span class="bdg {{ $tone }}">{{ $q->status }}</span>
+            </div>
+
+            <div class="esg-stages" aria-hidden="true">
+                @foreach ($steps as $i => [$label, $done])
+                    <div class="esg-step {{ $done ? ($dead && $i === 3 ? 'bad' : 'done') : '' }}">
+                        <span class="dot"></span><span class="lbl">{{ $label }}</span>
+                    </div>
+                    @unless ($loop->last)<span class="esg-rail {{ $steps[$i + 1][1] ? 'done' : '' }}"></span>@endunless
+                @endforeach
+            </div>
+
+            @if ($q->status === 'بانتظار الموافقة' && ($ap = ($apSteps[$q->id] ?? null)))
+                <div class="sub" style="margin-top:2px">🔏 مرحلة {{ $ap->stage }}: {{ $ap->label ?: $ap->kind }}</div>
+            @endif
+
+            {{-- الموقّعون رقائقُ حالة — وروابطُهم متاحةٌ من القائمة المنسدلة دائماً --}}
+            <div class="esg-sgs">
+                @forelse ($sgs as $s)
+                    <span class="esg-sgchip {{ hub_tone($s->status) }}" title="{{ $s->role }} · {{ $s->status }}{{ $s->email ? ' · ' . $s->email : '' }}">
+                        <i>{{ mb_substr($s->name, 0, 1) }}</i>{{ \Illuminate\Support\Str::limit($s->name, 16) }}
+                        {{ $s->status === 'وُقّع' ? '✓' : '' }}
+                    </span>
+                @empty
+                    <span class="esg-sgchip {{ $q->signer_name ? 'ok' : 'g' }}">
+                        <i>{{ mb_substr($q->signer_name ?: '؟', 0, 1) }}</i>{{ $q->signer_name ?: 'موقّع واحد — بكلمة سر' }}
+                        {{ $q->status === 'وُقّع' ? '✓' : '' }}
+                    </span>
+                @endforelse
+            </div>
+
+            <div class="esg-meta sub">
+                <span title="مرات الفتح">👁 {{ $q->opens }}×</span>
+                @if ($q->opened_at)<span>آخر فتح {{ $q->opened_at->format('m-d H:i') }}</span>@endif
+                @if ($q->signed_at)<span>وُقّع {{ $q->signed_at->format('Y-m-d H:i') }}</span>@endif
+                @if ($q->signed_ip)<span class="mono ltr">{{ $q->signed_ip }}</span>@endif
+            </div>
+
+            <div class="esg-acts">
+                <a class="btn ghost xs" href="{{ route('esign.doc', $q->id) }}">📄 الوثيقة</a>
+                @if ($q->status === 'وُقّع')
+                    <a class="btn ghost xs" href="{{ route('esign.cert', $q->id) }}" title="شهادة الإتمام بسجل الأدلة">📜 الشهادة</a>
+                @endif
+                @if ($sgs->count() > 0)
+                    <details class="inline sglinks"><summary class="btn ghost xs">🔗 الروابط ({{ $sgs->count() }})</summary>
+                        <div class="sgpop">
+                            @foreach ($sgs as $s)
+                                <div class="sgrow2">
+                                    <span class="bdg {{ hub_tone($s->status) }}">{{ $s->status }}</span>
+                                    <b>{{ \Illuminate\Support\Str::limit($s->name, 22) }}</b>
+                                    <span class="sub">{{ $s->role }}</span>
+                                    <span class="spacer"></span>
+                                    <button class="btn ghost xs" type="button"
+                                            onclick="navigator.clipboard.writeText(@js(route('sign.show', $s->token)));this.textContent='✓'">نسخ</button>
+                                </div>
+                            @endforeach
+                        </div>
+                    </details>
+                @else
+                    <button class="btn ghost xs" type="button"
+                            onclick="navigator.clipboard.writeText(@js(route('sign.show', $q->token)));this.textContent='✓ نُسخ'">🔗 نسخ الرابط</button>
+                @endif
+                <span class="spacer"></span>
+                @if ($q->status === 'بانتظار التوقيع' && ! $q->cancelled_at)
+                    <form method="POST" action="{{ route('esign.resend', $q->id) }}" class="inline">@csrf
+                        <button class="btn ghost xs" title="تذكير بريدي للموقّعين المعلقين">⏰</button></form>
+                    <form method="POST" action="{{ route('esign.cancel', $q->id) }}" class="inline">@csrf
+                        <button class="btn ghost xs dn" data-confirm="إلغاء الطلب وإبطال كل روابطه؟" title="إلغاء الطلب">🚫</button></form>
+                @endif
+                @if ($q->status === 'بانتظار الموافقة' && ($ap = ($apSteps[$q->id] ?? null))
+                     && \App\Support\ContractApprovals::canDecide(auth()->user(), $ap))
+                    <details class="inline"><summary class="btn ghost xs">🔏 قرار المرحلة</summary>
+                        <form method="POST" action="{{ route('esign.approve', $q->id) }}"
+                              style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">@csrf
+                            <input class="inp" name="note" maxlength="400" placeholder="ملاحظة / سبب الرفض" style="max-width:170px">
+                            <button class="btn xs p">✅ اعتماد</button>
+                            <button class="btn xs dn" formaction="{{ route('esign.reject', $q->id) }}">⛔ رفض</button>
+                        </form>
+                    </details>
+                @endif
+            </div>
+        </div>
+    @empty
+        <div class="card"><div class="empty">لا طلبات بعد — أنشئ أول طلب توقيع من زر «➕ طلب توقيع جديد» أعلاه</div></div>
+    @endforelse
+</div>
+
+{{-- ═ الإنشاء: المعالجُ نفسه بخطواته — في لوحةٍ قابلةٍ للطيّ تنفتح عند الحاجة ═ --}}
+<details class="esg-panel" id="escreate" {{ $requests->isEmpty() ? 'open' : '' }}>
+    <summary><span class="esg-pico">➕</span> طلب توقيع جديد <span class="sub">— قالبٌ أو نصٌّ حر، موقّعون متعددون، وخيارات تحقّق</span></summary>
+    <div class="esg-pbody">
         {{-- معالج بخطوات: قالب ← ربط ← متغيرات ← خيارات وإرسال — بلا JS تظهر الأقسام تباعاً --}}
         <div class="wchips" aria-hidden="true">
             <button type="button" class="wchip on">١ · القالب</button>
@@ -24,7 +159,7 @@
             <button type="button" class="wchip">٣ · المتغيرات</button>
             <button type="button" class="wchip">٤ · الإرسال</button>
         </div>
-        <form method="POST" action="{{ route('esign.store') }}" class="row" id="esignform">
+        <form method="POST" action="{{ route('esign.store') }}" class="row lx-form" id="esignform">
             @csrf
             <div data-wstep class="fw">
                 <div class="fld fw"><label>عنوان الطلب <b class="req">*</b></label>
@@ -101,9 +236,12 @@
             </div>
         </form>
     </div>
+</details>
 
-    <div class="card kid">
-        <h3>📋 القوالب</h3>
+{{-- ═ القوالب: لوحةٌ قابلةٌ للطيّ — التحرير والأرشفة والإنشاء كما هي ═ --}}
+<details class="esg-panel">
+    <summary><span class="esg-pico">📋</span> القوالب <span class="lx-count">{{ $templates->count() }}</span></summary>
+    <div class="esg-pbody">
         @foreach ($templates as $t)
             <div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid color-mix(in srgb,var(--ln) 45%,transparent)">
                 <div style="flex:1;min-width:0">
@@ -132,76 +270,7 @@
             </form>
         </details>
     </div>
-</div>
-
-<div class="card">
-    <h3>🗂 طلبات التوقيع</h3>
-    <div class="tblwrap"><table class="tbl">
-        <thead><tr><th>العنوان</th><th>الجهة</th><th>الحالة</th><th>الموقّع</th><th>فُتح</th><th>وُقّع في</th><th>IP</th><th class="acts">إجراءات</th></tr></thead>
-        <tbody>
-        @forelse ($requests as $q)
-            <tr>
-                <td>{{ $q->title }}</td>
-                <td>@if ($l = $q->linkLabel())<a href="{{ $q->linkUrl() }}" class="sub">{{ $l }}</a>@else<span class="sub">—</span>@endif</td>
-                <td><span class="bdg {{ $q->status === 'وُقّع' ? 'ok' : ($q->status === 'رُفض' ? 'bad' : 'wn') }}">{{ $q->status }}</span>
-                    @if ($q->status === 'بانتظار الموافقة' && ($ap = ($apSteps[$q->id] ?? null)))
-                        <div class="sub" style="margin-top:2px">مرحلة {{ $ap->stage }}: {{ $ap->label ?: $ap->kind }}</div>
-                    @endif</td>
-                <td>{{ $q->signer_name ?: '—' }}</td>
-                <td class="mono sub">{{ $q->opens }}×{{ $q->opened_at ? ' · ' . $q->opened_at->format('m-d H:i') : '' }}</td>
-                <td class="mono sub">{{ $q->signed_at?->format('Y-m-d H:i') ?: '—' }}</td>
-                <td class="mono ltr sub">{{ $q->signed_ip ?: '—' }}</td>
-                <td class="acts">
-                    <a class="btn ghost xs" href="{{ route('esign.doc', $q->id) }}">📄 الوثيقة</a>
-                    @if ($q->status === 'وُقّع')
-                        <a class="btn ghost xs" href="{{ route('esign.cert', $q->id) }}" title="شهادة الإتمام بسجل الأدلة">📜</a>
-                    @endif
-                    @php $sgs = $signers[$q->id] ?? collect(); @endphp
-                    @if ($sgs->count() > 0)
-                        {{-- موقّعون متعددون: كلُّ رابطٍ متاحٌ من المركز دائماً لا عند الإنشاء فقط --}}
-                        <details class="inline sglinks"><summary class="btn ghost xs">🔗 الروابط ({{ $sgs->count() }})</summary>
-                            <div class="sgpop">
-                                @foreach ($sgs as $s)
-                                    <div class="sgrow2">
-                                        <span class="bdg {{ hub_tone($s->status) }}">{{ $s->status }}</span>
-                                        <b>{{ \Illuminate\Support\Str::limit($s->name, 22) }}</b>
-                                        <span class="sub">{{ $s->role }}</span>
-                                        <span class="spacer"></span>
-                                        <button class="btn ghost xs" type="button"
-                                                onclick="navigator.clipboard.writeText(@js(route('sign.show', $s->token)));this.textContent='✓'">نسخ</button>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </details>
-                    @else
-                        <button class="btn ghost xs" type="button"
-                                onclick="navigator.clipboard.writeText(@js(route('sign.show', $q->token)));this.textContent='✓ نُسخ'">نسخ الرابط</button>
-                    @endif
-                    @if ($q->status === 'بانتظار التوقيع' && ! $q->cancelled_at)
-                        <form method="POST" action="{{ route('esign.resend', $q->id) }}" class="inline">@csrf
-                            <button class="btn ghost xs" title="تذكير بريدي للموقّعين المعلقين">⏰</button></form>
-                        <form method="POST" action="{{ route('esign.cancel', $q->id) }}" class="inline">@csrf
-                            <button class="btn ghost xs dn" data-confirm="إلغاء الطلب وإبطال كل روابطه؟" title="إلغاء الطلب">🚫</button></form>
-                    @endif
-                    @if ($q->status === 'بانتظار الموافقة' && ($ap = ($apSteps[$q->id] ?? null))
-                         && \App\Support\ContractApprovals::canDecide(auth()->user(), $ap))
-                        <details class="inline"><summary class="btn ghost xs">🔏 قرار المرحلة</summary>
-                            <form method="POST" action="{{ route('esign.approve', $q->id) }}"
-                                  style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">@csrf
-                                <input class="inp" name="note" maxlength="400" placeholder="ملاحظة / سبب الرفض" style="max-width:170px">
-                                <button class="btn xs p">✅ اعتماد</button>
-                                <button class="btn xs dn" formaction="{{ route('esign.reject', $q->id) }}">⛔ رفض</button>
-                            </form>
-                        </details>
-                    @endif
-                </td>
-            </tr>
-        @empty
-            <tr><td colspan="8" class="empty">لا طلبات بعد — أنشئ أول طلب توقيع من النموذج أعلاه</td></tr>
-        @endforelse
-        </tbody>
-    </table></div>
-</div>
+</details>
 
 <div class="modal" id="pvmodal" hidden>
     <div class="modalbox" style="max-width:760px">
@@ -219,5 +288,16 @@ function splitLink() {
     document.getElementById('link_id').value = p[1] || '';
 }
 if (linksel) { linksel.addEventListener('change', splitLink); splitLink(); /* تهيئة مسبقة من رابط الجهة */ }
+
+// ألسنة التصفية: إظهار/إخفاء البطاقات بالحالة — في المتصفح بلا طلب
+document.getElementById('esgtabs').addEventListener('click', function (e) {
+    var tab = e.target.closest('.esg-tab');
+    if (!tab) return;
+    this.querySelectorAll('.esg-tab').forEach(function (t) { t.classList.toggle('on', t === tab); });
+    var f = tab.dataset.f;
+    document.querySelectorAll('#esggrid .esg-card').forEach(function (c) {
+        c.style.display = (!f || c.dataset.status === f) ? '' : 'none';
+    });
+});
 </script>
 @endsection
