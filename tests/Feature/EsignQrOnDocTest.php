@@ -66,7 +66,7 @@ class EsignQrOnDocTest extends TestCase
             ->assertDontSee('عنوان الشبكة IP');          // بيانات الموقّع الحسّاسة محجوبة علناً
     }
 
-    /** العرضُ الداخليّ (بحساب) يُبقي بيانات الموقّع كاملة — الحجبُ للعامّ فقط */
+    /** العرضُ الداخليّ (بحساب) يُبقي بيانات الموقّع كاملة — الحجبُ للخارج فقط */
     public function test_internal_doc_keeps_full_signer_detail(): void
     {
         $this->seedCore();
@@ -75,6 +75,23 @@ class EsignQrOnDocTest extends TestCase
         $this->actingAs($this->owner)->get("/esign/{$req->id}/doc")
             ->assertOk()
             ->assertSee('عنوان الشبكة IP');              // ظاهرٌ للمخوَّل داخليّاً
+    }
+
+    /**
+     * نسخةُ العميل ($client) — تصل الموقّعين الآخرين ومستلمي النسخ عبر sign.doc —
+     * لا يجوز أن تكشف بيانات الموقّع الحسّاسة (IP/هوية/جهاز/سيلفي). كان الحجبُ
+     * مبنيّاً على $public وحده فيتسرّب على مسار client.
+     */
+    public function test_client_doc_hides_signer_pii_from_other_parties(): void
+    {
+        $this->seedCore();
+        $req = $this->makeSigned();   // يوقّع ويضبط signed_ip، وجلسة sign.ok مفتوحة
+
+        $this->get("/sign/{$req->token}/doc")
+            ->assertOk()
+            ->assertSee('اتفاقية موقّعة')                 // الوثيقة تُعرض
+            ->assertDontSee('عنوان الشبكة IP')            // بيانات الموقّع محجوبة عن الأطراف
+            ->assertDontSee('الجهاز');
     }
 
     /** لا يُفتَح إلا الموقّع: المسودة أو الرمز الخاطئ → ٤٠٤ (لا يكشف غير الموقّع) */

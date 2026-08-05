@@ -50,6 +50,10 @@
         </div>
         <div style="white-space:pre-wrap;line-height:2;font-size:14.5px">{{ $req->body }}</div>
 
+        {{-- بيانات الموقّع الحسّاسة (سيلفي/هوية/IP/جهاز) تُعرض للمالك داخليّاً فقط —
+             لا للعامّ عبر QR ($public) ولا لأطراف العقد عبر نسخة العميل ($client):
+             الموقّعُ الآخر ومستلمُ النسخة يريان الوثيقة والتوقيع لا آثارَ غيرهما البيومترية. --}}
+        @php $evidence = ! ($public ?? false) && ! ($client ?? false); @endphp
         @if (($sgs ?? collect())->isNotEmpty())
             {{-- v2.122: موقّعون مستقلون (م4) — توقيع كل واحد بأثره، والقديم على كتلته أدناه --}}
             @foreach ($sgs as $s)
@@ -59,19 +63,18 @@
                         @if (str_starts_with((string) $s->signature, 'data:image/png'))
                             <img src="{{ $s->signature }}" alt="التوقيع" style="max-width:300px;border:1px solid var(--ln);border-radius:10px;background:#fff">
                         @endif
-                        {{-- العرضُ العامّ عبر QR يحجب صورة السيلفي كما تحجبها صفحةُ التحقّق --}}
-                        @if ($s->selfie && ! ($public ?? false))
+                        @if ($s->selfie && $evidence)
                             <img src="{{ $s->selfie }}" alt="صورة التحقق" style="max-width:140px;border:1px solid var(--ln);border-radius:10px">
                         @endif
                     </div>
                     <table class="mini">
                         <tr><td>وقت التوقيع</td><td class="mono">{{ $s->signed_at?->format('Y-m-d H:i:s') }}</td></tr>
-                        @unless ($public ?? false)
-                            {{-- بياناتٌ حسّاسة (هوية/IP/جهاز) لا تُكشف في الفتح العامّ بالرمز --}}
+                        @if ($evidence)
+                            {{-- بياناتٌ حسّاسة (هوية/IP/جهاز) للمالك داخليّاً فقط — لا للعامّ ولا للأطراف --}}
                             @if ($s->id_no)<tr><td>رقم الهوية/السجل</td><td class="mono ltr">{{ $s->id_no }}</td></tr>@endif
                             <tr><td>عنوان الشبكة IP</td><td class="mono ltr">{{ $s->ip }}</td></tr>
                             <tr><td>الجهاز</td><td class="mono ltr" style="font-size:10.5px">{{ $s->agent }}</td></tr>
-                        @endunless
+                        @endif
                     </table>
                 </div>
             @endforeach
@@ -86,21 +89,21 @@
                 <b>توقيع الطرف الثاني:</b><br>
                 <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;margin:8px 0">
                     <img src="{{ $req->signature }}" alt="التوقيع" style="max-width:300px;border:1px solid var(--ln);border-radius:10px;background:#fff">
-                    @if ($req->selfie && ! ($public ?? false))
+                    @if ($req->selfie && $evidence)
                         <img src="{{ $req->selfie }}" alt="صورة التحقق" style="max-width:140px;border:1px solid var(--ln);border-radius:10px">
                     @endif
                 </div>
                 <table class="mini">
                     <tr><td>الاسم</td><td><b>{{ $req->signer_name }}</b></td></tr>
                     <tr><td>وقت التوقيع</td><td class="mono">{{ $req->signed_at?->format('Y-m-d H:i:s') }}</td></tr>
-                    @unless ($public ?? false)
-                        {{-- بياناتٌ حسّاسة (هوية/IP/جهاز/فتحات) لا تُكشف في الفتح العامّ بالرمز --}}
+                    @if ($evidence)
+                        {{-- بياناتٌ حسّاسة (هوية/IP/جهاز/فتحات) للمالك داخليّاً فقط — لا للعامّ ولا للأطراف --}}
                         @if ($req->signer_id_no)<tr><td>رقم الهوية/السجل</td><td class="mono ltr">{{ $req->signer_id_no }}</td></tr>@endif
                         <tr><td>عنوان الشبكة IP</td><td class="mono ltr">{{ $req->signed_ip }}</td></tr>
                         <tr><td>الجهاز</td><td class="mono ltr" style="font-size:10.5px">{{ $req->signed_agent }}</td></tr>
                         <tr><td>لغة الجهاز</td><td class="mono ltr">{{ $req->signed_locale }}</td></tr>
                         <tr><td>مرات الفتح</td><td class="mono">{{ $req->opens }} — أول فتح {{ $req->opened_at?->format('Y-m-d H:i') }}</td></tr>
-                    @endunless
+                    @endif
                     <tr><td>بصمة الوثيقة SHA-256</td><td class="mono ltr" style="font-size:9.5px;word-break:break-all">{{ $req->doc_hash }}</td></tr>
                 </table>
                 <div class="sub" style="margin-top:8px">للتحقّق من أصالة هذه الوثيقة أو فتحها مباشرةً: امسح رمز QR أعلاها، أو افتح {{ route('sign.verify.doc', $req->verify_code) }} — أو أدخل الرمز {{ $req->verify_code }} في {{ route('sign.verify') }}</div>
