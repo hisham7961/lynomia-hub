@@ -1085,7 +1085,11 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
   border-radius:var(--r) var(--r) 0 0;background:var(--wn)}
 .esg-card.ok::before{background:var(--ok)}
 .esg-card.bad::before{background:var(--bad)}
-.esg-card:hover{box-shadow:var(--shh);transform:translateY(-2px)}
+/* z-index مع الرفعة: transform يُنشئ سياقَ تراصٍّ كان يحبس منبثقة الروابط خلف
+   البطاقات المجاورة اللاحقة — فتظهر مقصوصةً «لا يمكن النسخ». الرفعُ عند المرور
+   وعند قائمةٍ مفتوحة (:has) يُعلي البطاقةَ الحاوية فتعلو منبثقتُها الجميع. */
+.esg-card:hover{box-shadow:var(--shh);transform:translateY(-2px);z-index:5}
+.esg-card:has(details[open]){z-index:40}
 .esg-top{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
 .esg-title{min-width:0}
 .esg-title b{font-size:14.5px;letter-spacing:-.01em}

@@ -106,4 +106,19 @@ class DesignSystemGuardTest extends TestCase
         $this->assertStringNotContainsString('font-weight:800', $css,
             'وزن 800 غير محمل لخط Plex Arabic — استعمل 700 الحقيقي بدل التسمين المركب');
     }
+
+    /**
+     * قائمةُ روابط الموقّعين تعلو البطاقات المجاورة: رفعةُ البطاقة عند المرور
+     * (transform) تُنشئ سياقَ تراصٍّ يحبس المنبثقة خلف أخواتها اللاحقات في
+     * الترتيب — فتظهر «مخفيةً لا يمكن النسخ». الحارس: البطاقةُ الحاوية تُرفَع
+     * بـz-index عند المرور وعند فتح القائمة (:has) فتعلو منبثقتُها الجميع.
+     */
+    public function test_signer_links_popup_escapes_sibling_cards(): void
+    {
+        $css = file_get_contents(public_path('css/app.css'));
+        $this->assertMatchesRegularExpression('/\.esg-card:hover\{[^}]*z-index/', $css,
+            'بطاقةُ المرور بلا z-index — رفعتُها (transform) تحبس منبثقة الروابط خلف البطاقات المجاورة');
+        $this->assertMatchesRegularExpression('/\.esg-card:has\([^)]*\[open\]\)\{[^}]*z-index/', $css,
+            'البطاقةُ ذات القائمة المفتوحة بلا z-index — تختفي المنبثقة حين يغادر المؤشرُ البطاقة');
+    }
 }
