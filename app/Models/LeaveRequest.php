@@ -14,7 +14,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 /** الإجازات والطلبات */
 class LeaveRequest extends Model
 {
-    use HasFactory, HasUuid, SoftDeletes, Auditable, HasVersions, Searchable;
+    use HasFactory, HasUuid, Auditable, HasVersions, Searchable;
+    // نُسمّي restore الأصليّة كي نلفّها بمعاملة (parent::restore غير موجودة —
+    // SoftDeletes سِمَةٌ لا صنفٌ أب، فالتسمية هي السبيل لاستدعاء الأصل)
+    use SoftDeletes { restore as protected restoreFromTrash; }
 
     protected $table = 'leave_requests';
     public const MODULE = 'leaves';
@@ -176,6 +179,28 @@ class LeaveRequest extends Model
             $fresh->saveQuietly();
             $emp->leave_bal = $fresh->leave_bal;   // اعكس القيمة في النسخة المستدعية
         });
+    }
+
+    /**
+     * كتابةُ الحالة والخصمُ ذرّيّان. الخصمُ يقع في حدث `created`/`updated` **بعد**
+     * كتابة الصف، وفشلُه تحت القفل (رصيدٌ لا يكفي عند تزامنِ اعتمادَين يمرّان معاً
+     * من فحص `saving` غير المقفول) كان يترك الإجازةَ «معتمدة» بلا خصم — إجازةٌ
+     * مجانية. لفُّ الحفظ بمعاملةٍ يجعل رميَ الخصم يرتدّ كتابةَ الحالة معه، فلا
+     * «معتمد» إلا بخصمٍ مثبَت. (معاملة applyBalance الداخلية تصير نقطة حفظٍ متداخلة.)
+     */
+    public function save(array $options = [])
+    {
+        return \Illuminate\Support\Facades\DB::transaction(fn () => parent::save($options));
+    }
+
+    /**
+     * الاستعادةُ من السلة تُعيد الخصم في حدث `restored` **بعد** إحياء الصف —
+     * وفشلُه (الرصيدُ لم يعد يكفي بعد خصومٍ لاحقة) كان يُحيي الإجازةَ معتمدةً بلا
+     * خصم. لفُّها بمعاملةٍ يجعل الرمي يرتدّ الإحياءَ معه فتبقى في السلة سليمةً.
+     */
+    public function restore()
+    {
+        return \Illuminate\Support\Facades\DB::transaction(fn () => $this->restoreFromTrash());
     }
 
     public function emp(): BelongsTo
