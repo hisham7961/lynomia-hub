@@ -7,11 +7,11 @@
 @includeIf('modules.catalog.' . $module)
 {{-- ترويسة هوية الوحدة: أيقونة ولون مجموعتها + العدد الحي --}}
 @php $look = hub_mod_look($module); @endphp
-<div class="modhero" style="--mh:{{ $look['color'] }}">
-    <span class="mhico">{{ $look['icon'] }}</span>
+<div class="lx-head" style="--mh:{{ $look['color'] }}">
+    <span class="lx-ico">{{ $look['icon'] }}</span>
     <div>
-        <h2>{{ $def['label'] }}@if ($trash) <span class="sub">— 🗑 السلة</span>@endif</h2>
-        <div class="sub">{{ number_format(method_exists($rows, 'total') ? $rows->total() : count($rows)) }} سجل</div>
+        <h2>{{ $def['label'] }}
+            <span class="lx-count">{{ number_format(method_exists($rows, 'total') ? $rows->total() : count($rows)) }} سجل</span>@if ($trash) <span class="sub">— 🗑 السلة</span>@endif</h2>
     </div>
     <div class="spacer"></div>
     {{-- الإجراءات في الترويسة نفسها — نمط «رأس صفحةٍ» واحد: الهوية بدايةً والفعل نهايةً --}}
@@ -36,12 +36,14 @@
         @endif
     </div>
 </div>
-<div class="toolbar">
+<div class="lx-tools">
     <form class="filters" method="GET"
           hx-boost="true" hx-target="#tblzone" hx-select="#tblzone" hx-swap="outerHTML" hx-push-url="true">
-        <input class="inp" type="search" name="q" value="{{ hub_str(request('q')) }}" placeholder="بحث حي في {{ $def['label'] }}…"
-               hx-get="{{ route('m.index', $module) }}" hx-include="closest form"
-               hx-trigger="input changed delay:400ms" hx-target="#tblzone" hx-select="#tblzone" hx-swap="outerHTML" hx-push-url="true">
+        <div class="lx-search">
+            <input class="inp" type="search" name="q" value="{{ hub_str(request('q')) }}" placeholder="بحث حي في {{ $def['label'] }}…"
+                   hx-get="{{ route('m.index', $module) }}" hx-include="closest form"
+                   hx-trigger="input changed delay:400ms" hx-target="#tblzone" hx-select="#tblzone" hx-swap="outerHTML" hx-push-url="true">
+        </div>
         @if ($statusOptions)
             <select class="inp" name="status"
                     hx-get="{{ route('m.index', $module) }}" hx-include="closest form"
@@ -81,8 +83,10 @@
         @endif
         <noscript><button class="btn sm" type="submit">بحث</button></noscript>
     </form>
+    <div class="spacer"></div>
     {{-- العروض والأعمدة خارج منطقة التبديل الحي (#tblzone): نماذج عادية غير مُعزَّزة
          كي لا يبتلع htmx تأكيد الحذف أو رد الحد ٤٢٢، ولا يمسحها البحث الحي --}}
+    <div class="lx-seg">
     <details class="ddwrap">
         <summary class="btn ghost sm ddsum">📑 {{ $activeView?->name ?? 'العروض' }} ▾</summary>
         <div class="card ddpanel">
@@ -127,7 +131,7 @@
             </form>
         </div>
     </details>
-    <div class="spacer"></div>
+    </div>
 </div>
 <div id="tblzone" hx-boost="true" hx-target="#tblzone" hx-select="#tblzone" hx-swap="outerHTML"
      hx-push-url="true" hx-select-oob="#flash:innerHTML">
@@ -154,7 +158,7 @@
         $statusOpts = $bulkStatus ? (hub_status_field($module)['options'] ?? []) : [];
         $bulkStatus = $bulkStatus && count($statusOpts) > 0;
     @endphp
-    <div class="card pad0">
+    <div class="card pad0 lx-list">
         <div class="tblwrap">
         <table class="tbl">
             <thead><tr>
@@ -172,14 +176,14 @@
                     @foreach ($columns as $f)
                         <td>@include('partials._display', ['f' => $f, 'row' => $row, 'labels' => $labels, 'ctx' => 'table'])</td>
                     @endforeach
-                    <td class="acts">
-                        <a class="btn ghost xs" hx-boost="false" href="{{ route('m.show', [$module, $row->id]) }}">عرض</a>
+                    <td class="acts lx-acts">
+                        <a class="lx-ib" hx-boost="false" href="{{ route('m.show', [$module, $row->id]) }}" title="عرض" aria-label="عرض السجل">👁</a>
                         @if ($trash)
-                            <form method="POST" action="{{ route('m.restore', [$module, $row->id]) }}" class="inline">@csrf<button class="btn xs" type="submit">استعادة</button></form>
+                            <form method="POST" action="{{ route('m.restore', [$module, $row->id]) }}" class="inline">@csrf<button class="lx-ib" type="submit" title="استعادة" aria-label="استعادة السجل">↩</button></form>
                         @else
-                            @if (hub_can(auth()->user(), $module, 'e'))<a class="btn ghost xs" hx-boost="false" href="{{ route('m.edit', [$module, $row->id]) }}">تعديل</a>@endif
+                            @if (hub_can(auth()->user(), $module, 'e'))<a class="lx-ib" hx-boost="false" href="{{ route('m.edit', [$module, $row->id]) }}" title="تعديل" aria-label="تعديل السجل">✎</a>@endif
                             @if (hub_can(auth()->user(), $module, 'd'))
-                                <form method="POST" action="{{ route('m.destroy', [$module, $row->id]) }}" class="inline" data-confirm="نقل السجل إلى السلة؟">@csrf @method('DELETE')<button class="btn ghost xs dn" type="submit">حذف</button></form>
+                                <form method="POST" action="{{ route('m.destroy', [$module, $row->id]) }}" class="inline" data-confirm="نقل السجل إلى السلة؟">@csrf @method('DELETE')<button class="lx-ib dn" type="submit" title="حذف" aria-label="حذف السجل">🗑</button></form>
                             @endif
                         @endif
                     </td>

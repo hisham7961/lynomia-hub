@@ -40,7 +40,7 @@ class HubAutomation extends Command
         $o = $this->obligationsAuto();
         $p = $this->pruneNotifications();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم");
 
         \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.automation'], ['value' => now()->toIso8601String()]);
         \Illuminate\Support\Facades\Cache::forget('settings:all');
@@ -261,7 +261,7 @@ class HubAutomation extends Command
     /* ───── 2) قواعد التنبيه ───── */
     protected function alertRules(): array
     {
-        $hits = 0; $rulesRun = 0; $outbox = 0;
+        $hits = 0; $rulesRun = 0; $outbox = 0; $esc = 0;
 
         $rules = AlertRule::whereNull('deleted_at')->where('status', 'مفعّلة')->get();
 
@@ -299,6 +299,11 @@ class HubAutomation extends Command
             $rulesRun++;
 
             $every = max(1, (int) ($rule->every ?: 7));
+            // عتبةُ التصعيد: مشكلةٌ ظلّت تُطلِق القاعدة أطولَ من ثلاث دوراتٍ كاملة
+            // «قيلَ لك ولم تُحلّ» — تُدفَع عبر كل القنوات ويُوسَم إشعارُها مُتصاعداً.
+            // قابلةٌ للضبط عالميّاً (notify.escalate_after)، وإلا تكيّفٌ مع دورية القاعدة.
+            $escAfter    = (int) setting('notify.escalate_after', 0);
+            $escalateAge = $escAfter > 0 ? $escAfter : max(3, $every * 3);
             $to    = $this->recipientUsers($rule->to_id);
 
             // النطاق يُفرض لكل مستلم على حدة — القاعدة لا تُسرّب عنوان سجل خارج نطاقه
@@ -324,8 +329,28 @@ class HubAutomation extends Command
                     ->exists();
                 if ($dup) continue;
 
-                $text = trim(($rule->msg ?: $rule->name) . ' — ' . Str::limit((string) $row->_n, 60));
+                // منذ متى ونحن نطلق على هذه المشكلة بعينها؟ أقدمُ إشعارٍ لنفس
+                // القاعدة والسجل هو ختمُ أوّل رصدٍ لها؛ تجاوزُه عتبةَ التصعيد يعني
+                // أنها لم تُحلّ رغم الإبلاغ — فيرتفع الإلحاح ويُدفَع عبر القنوات.
+                // بدايةُ السلسلة المتّصلة: نمشي الإشعارات من الأحدث، وأيُّ فجوةٍ أكبرَ
+                // من دورةٍ (every) تعني أنها حُلّت ثم عادت — فتبدأ سلسلةٌ جديدة. (كان
+                // min المطلق يجعل نوبةً قديمةً حُلّت تُصعّد النوبةَ الجديدةَ فور عودتها.)
+                $stamps = HubNotification::where('kind', 'rule:' . $rule->id)
+                    ->where('record_id', $row->id)->orderByDesc('created_at')
+                    ->pluck('created_at')->map(fn ($s) => Carbon::parse($s)->startOfDay())->values();
+                $chainStart = $stamps->first();
+                for ($i = 1; $i < $stamps->count(); $i++) {
+                    if ($chainStart->diffInDays($stamps[$i], true) > $every + 1) break;   // فجوةٌ ← انقطاع
+                    $chainStart = $stamps[$i];
+                }
+                $escalated = $chainStart && $chainStart->lte(today()->subDays($escalateAge));
+                // مطلقٌ لا موقّع — Carbon 3 يجعل diffInDays موقّعاً افتراضياً (أيامٌ سالبة)
+                $days      = $escalated ? (int) $chainStart->diffInDays(today(), true) : 0;
+
+                $base = trim(($rule->msg ?: $rule->name) . ' — ' . Str::limit((string) $row->_n, 60));
+                $text = $escalated ? "🔺 مُتصاعد (لم يُعالَج منذ {$days} يوماً): {$base}" : $base;
                 $hits++;
+                if ($escalated) $esc++;
 
                 foreach ($canSee as $ru) {
                     if ($this->dry) continue;
@@ -340,9 +365,11 @@ class HubAutomation extends Command
                     ]);
                 }
 
+                // القناة المعتادة، ويفرضها التصعيد جميعاً — المشكلة المزمنة لا
+                // تُترَك حبيسةَ الجرس وحده حين تكفّ عن كونها روتيناً يومياً.
                 $chan = (string) $rule->chan;
                 foreach (['تلجرام' => 'tg', 'بريد' => 'mail'] as $word => $ch) {
-                    if (str_contains($chan, $word) || str_contains($chan, 'الكل')) {
+                    if ($escalated || str_contains($chan, $word) || str_contains($chan, 'الكل')) {
                         $outbox++;
                         if (! $this->dry) OutboxMessage::create([
                             'user_id'    => $canSee->first()?->id,
@@ -358,7 +385,7 @@ class HubAutomation extends Command
             }
         }
 
-        return ['hits' => $hits, 'rules' => $rulesRun, 'outbox' => $outbox];
+        return ['hits' => $hits, 'rules' => $rulesRun, 'outbox' => $outbox, 'esc' => $esc];
     }
 
     /** المستلمون: المحدد في القاعدة، وإلا المالكون + حاملو علم monitor */

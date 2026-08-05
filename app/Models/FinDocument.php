@@ -35,6 +35,26 @@ class FinDocument extends Model
         'archived' => 'boolean',
     ];
 
+    /**
+     * مستندٌ مدفوعٌ لا يُحذف — كان الحذف يترك رصيدَ بنكٍ تحرّك بالدفعة يتيماً
+     * (لا مستندَ ظاهرٌ يوازيه، فالمبيعاتُ تسقط والدفترُ يبقى) وقيداً مرحّلاً
+     * مقفولاً لا يُصحَّح. يُعكَس بإلغاء الدفعة/القيد لا بالحذف. الحذفُ الصلب
+     * (صيانة/نسخ) يمرّ — الحارسُ على النقل للسلة فقط.
+     */
+    protected static function booted(): void
+    {
+        static::deleting(function (self $doc) {
+            if (method_exists($doc, 'isForceDeleting') && $doc->isForceDeleting()) return;
+            $paid = (float) ($doc->paid ?? 0);
+            $isPaid = $paid > 0 || in_array((string) $doc->state, ['مدفوعة', 'مدفوعة جزئياً'], true);
+            if ($isPaid) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'doc' => 'مستندٌ مدفوعٌ لا يُحذف — اعكس الدفعة أولاً كي لا يبقى رصيدُ بنكٍ يتيمٌ خلفه',
+                ]);
+            }
+        });
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(\App\Models\Project::class, 'project_id');

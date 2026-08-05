@@ -52,7 +52,8 @@ class ReportController extends Controller
         $max = max(1, ...array_merge(array_column($months, 'i'), array_column($months, 'e')));
 
         $unpaid = $base()->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة'])
-            ->orderBy('due')->limit(12)->get(['id', 'doc_no as no', 'partner', 'total', 'paid', 'due', 'state']);
+            ->orderBy('due')->orderBy('id')->limit(12)   // فاصلُ تعادلٍ: due يتساوى فيُقرَع بين المحرّكين بلا id
+            ->get(['id', 'doc_no as no', 'partner', 'total', 'paid', 'due', 'state']);
 
         $byState = $base()->select('state', DB::raw('COUNT(*) c'), DB::raw('SUM(total) s'))
             ->groupBy('state')->orderByDesc('s')->get();

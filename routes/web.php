@@ -84,6 +84,10 @@ Route::get('sign/{token}/doc', [\App\Http\Controllers\Web\EsignController::class
 Route::get('sign/{token}/certificate', [\App\Http\Controllers\Web\EsignController::class, 'clientCertificate'])->name('sign.cert');
 Route::get('sign/{token}/pdf', [\App\Http\Controllers\Web\EsignController::class, 'clientPdf'])->name('sign.pdf');
 Route::match(['get', 'post'], 'verify', [\App\Http\Controllers\Web\EsignController::class, 'verify'])->name('sign.verify');
+// فتحُ الوثيقة الموقّعة مباشرةً بمسح QR المطبوع عليها — عامٌّ بلا حساب، للموقّعة
+// فقط، مقيّدٌ بالمعدّل. الرمزُ مطبوعٌ على الوثيقة فحاملُها يملكها أصلاً.
+Route::get('verify/{code}/doc', [\App\Http\Controllers\Web\EsignController::class, 'verifyDoc'])
+    ->name('sign.verify.doc')->middleware('throttle:20,1');
 
 Route::middleware('auth')->group(function () {
     // التوقيع الإلكتروني — الجهة الداخلية (بصلاحية العقود)

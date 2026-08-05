@@ -14,7 +14,9 @@ class ModuleHeroTest extends TestCase
         \App\Models\Task::create(['title' => 'م٢']);
 
         $html = $this->actingAs($this->owner)->get('/m/tasks')->assertOk()->getContent();
-        $this->assertStringContainsString('class="modhero"', $html);
+        // v2.294: الترويسة المرتقاة — رأسٌ موحّد (lx-head) وعدّادٌ حيّ كوسام (lx-count)
+        $this->assertStringContainsString('class="lx-head"', $html);
+        $this->assertStringContainsString('class="lx-count"', $html);
         $this->assertStringContainsString('✅', $html);                    // أيقونة المهام
         $this->assertStringContainsString('#0E7C66', $html);               // لون مجموعة «العمل»
         $this->assertStringContainsString('2 سجل', $html);
@@ -33,6 +35,21 @@ class ModuleHeroTest extends TestCase
         $this->assertStringContainsString('مهمة الترويسة', $html);
         $this->assertStringContainsString('bdg wn', $html);               // «قيد التنفيذ» برتقالية
         $this->assertStringContainsString('tlv2', $html);                 // الخط الزمني الجديد
+    }
+
+    /**
+     * صفحةُ النموذج (v2.303): رأسٌ موحّد (lx-head) وبطاقةٌ مرتقاة (lx-form) تحمل لون
+     * الوحدة — فالنموذج يتّسق مع رأسه وقائمته بدل بطاقةٍ عارية، والعنوانُ الداخليّ
+     * المكرّر (mhead) يُخفى على الصفحة الكاملة (يبقى في النافذة المنبثقة).
+     */
+    public function test_module_form_uses_lifted_identity_card(): void
+    {
+        $this->seedCore();
+
+        $html = $this->actingAs($this->owner)->get('/m/tasks/create')->assertOk()->getContent();
+        $this->assertStringContainsString('class="lx-head"', $html);          // الرأس الموحّد
+        $this->assertStringContainsString('class="card lx-form"', $html);     // البطاقة المرتقاة
+        $this->assertStringContainsString('#0E7C66', $html);                  // لون مجموعة «العمل» يُمرَّر للنموذج
     }
 
     public function test_look_helper_covers_every_module(): void

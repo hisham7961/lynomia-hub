@@ -331,11 +331,16 @@ input[type=checkbox],input[type=radio]{accent-color:var(--p)}
 .pg.dis{opacity:.4;pointer-events:none}
 .pg.info{border:0;background:transparent;color:var(--sb)}
 
-/* ═ صفحات التفاصيل ═ */
-.detail .drow{display:grid;grid-template-columns:200px 1fr;gap:12px;padding:9px 0;
-  border-bottom:1px solid color-mix(in srgb,var(--ln) 55%,transparent)}
-.detail .drow:hover{background:color-mix(in srgb,var(--p) 2.5%,transparent)}
-.detail dt{color:var(--sb);font-size:12.5px;font-weight:700}
+/* ═ صفحات التفاصيل ═
+   بطاقةُ البيانات كصحيفة مواصفات (v2.304): اللصيقةُ خافتةٌ والقيمةُ تبرز عليها،
+   ولمسةُ لونِ الوحدة على حافة الصفّ عند المرور — كصفوف القائمة. */
+.detail .drow{display:grid;grid-template-columns:180px 1fr;gap:12px;padding:9px 10px;
+  border-bottom:1px solid color-mix(in srgb,var(--ln) 55%,transparent);
+  transition:background var(--t),box-shadow var(--t)}
+.detail .drow:hover{background:color-mix(in srgb,var(--mh,var(--p)) 4%,transparent);
+  box-shadow:inset 3px 0 0 var(--mh,var(--p))}
+.detail dt{color:var(--sb);font-size:12px;font-weight:700;letter-spacing:.01em}
+.detail dd{color:var(--tx);font-weight:600;font-size:13.5px;min-width:0;overflow-wrap:anywhere}
 /* v2.130: min(330px,100%) — أرضية 330px الصلبة كانت أضيق نقطة في التطبيق على شاشة 360px */
 .kids{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr));gap:14px}
 /* v2.125: .mini صنفٌ مستقل — كان مقيداً بـ.kid فتظهر جداول التوقيع والتحقق بأنماط المتصفح الخام */
@@ -819,15 +824,7 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
   .pbar span{transition:none}
 }
 
-/* ═ ترويسة هوية الوحدة — أيقونة ملونة بلون مجموعتها ═ */
-.modhero{--mh:var(--p);display:flex;gap:14px;align-items:center;margin-bottom:14px;
-  animation:rise .45s cubic-bezier(.2,.75,.3,1) backwards}
-.mhico{width:48px;height:48px;border-radius:14px;font-size:23px;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;
-  background:color-mix(in srgb,var(--mh) 13%,transparent);
-  box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--mh) 25%,transparent),
-             0 4px 14px color-mix(in srgb,var(--mh) 14%,transparent)}
-.modhero h2{font-size:19px;font-weight:700;letter-spacing:-.01em}
+/* ترويسة هوية الوحدة (.modhero) رُقّيت إلى البند الموحّد مع .lx-head أدناه (v2.294) */
 
 /* ═ الخط الزمني v2 — سكة عمودية ونقاط دائرية (يخص .tlv2 كي لا يمس استعمالات .tl الأخرى) ═ */
 .tlv2{position:relative;padding-inline-start:2px}
@@ -1001,6 +998,67 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .msauto{margin-inline-start:auto}
 .pointer{cursor:pointer}
 
+/* ═══ v2.294: قائمة الوحدة المرتقاة — رأسٌ موحّد وأدواتٌ مصقولة وصفوفٌ أرحب ═══
+   كلُّها من الرموز فتتبع الوضعين النهاريّ والليليّ، وبنية الأعمدة المرنة لا تُمَسّ.
+   تُدرَج قبل كتلة كثافة الجوال كي تبقى الأخيرةُ آخرَ الملف تملك غلبة الشلال */
+/* الرأسُ الموحّد يشمل .modhero القديمة أيضاً — فترتقي ترويساتُ النموذج والعرض
+   والنشاط وesign جميعاً إلى البند نفسه بلا تغيير قالبٍ واحد */
+.lx-head,.modhero{--mh:var(--p);display:flex;align-items:center;gap:14px;padding:14px 18px;margin-bottom:14px;
+  border-radius:16px;border:1px solid var(--ln);position:relative;overflow:hidden;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--mh) 9%,var(--cd)),var(--cd) 62%);box-shadow:var(--sh);
+  animation:rise .45s cubic-bezier(.2,.75,.3,1) backwards}
+.lx-head::before,.modhero::before{content:"";position:absolute;inset-block:0;inset-inline-start:0;width:4px;background:var(--mh)}
+.lx-ico,.mhico{width:50px;height:50px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:23px;flex-shrink:0;
+  background:color-mix(in srgb,var(--mh) 15%,var(--cd));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--mh) 30%,transparent)}
+.lx-head h2,.modhero h2{font-size:19px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.lx-count{font-size:12px;font-weight:700;color:var(--mh);background:color-mix(in srgb,var(--mh) 12%,transparent);border-radius:99px;padding:2px 11px}
+.lx-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.lx-search{position:relative;flex:1;min-width:180px;max-width:440px}
+.lx-search .inp{padding-inline-start:38px}
+.lx-search::before{content:"⌕";position:absolute;inset-inline-start:13px;top:50%;transform:translateY(-50%);font-size:17px;color:var(--sb);pointer-events:none}
+.lx-seg{display:flex;gap:2px;background:var(--bg2);border:1px solid var(--ln);border-radius:11px;padding:3px}
+.lx-seg .ddsum{border:0;background:transparent;box-shadow:none}
+.lx-seg .ddsum:hover{background:var(--cd)}
+/* صقلُ صفوف الجدول داخل القائمة — لمسةُ لونٍ على حافة الصف، بلا مساسٍ بالأعمدة */
+.lx-list .tbl td{padding:12px 14px}
+.lx-list .tbl tbody tr:hover td:first-child{box-shadow:inset 3px 0 0 var(--p)}
+/* أزرارُ إجراءٍ أيقونيّة — خفيفةٌ تُضيء عند المرور على الصف */
+.lx-acts{opacity:.6;transition:opacity var(--t)}
+.lx-list .tbl tbody tr:hover .lx-acts{opacity:1}
+.lx-ib{display:inline-flex;align-items:center;justify-content:center;width:31px;height:31px;border-radius:9px;
+  border:1px solid transparent;background:transparent;cursor:pointer;font-size:14px;color:var(--sb);transition:all var(--t);text-decoration:none}
+.lx-ib:hover{background:color-mix(in srgb,var(--p) 8%,transparent);color:var(--p)}
+.lx-ib.dn:hover{background:var(--badbg);color:var(--bad)}
+/* عند التسليح (data-confirm) يحمل الزرُّ نصَّ التأكيد — يتمدّد ليسعه بدل أن يقصّه عرضُه الثابت */
+.lx-ib.confirming{width:auto;height:auto;padding:4px 10px;white-space:nowrap;background:var(--badbg);color:var(--bad)}
+@media (max-width:720px){.lx-tools{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .lx-tools::-webkit-scrollbar{display:none}.lx-tools>*{flex-shrink:0}}
+
+/* ═ نموذجٌ مرتقى (v2.303): حقولٌ مملوءةٌ ترتفع بالتركيز، وتركيزٌ بلون هوية الوحدة ═
+   يُلبَّس على بطاقة النموذج (.card.lx-form) وتُمرَّر --mh لون الوحدة، فيتّسق النموذج
+   مع رأسه وقائمته. الحقلُ في راحته مملوءٌ خفيفاً، وبالتركيز يبيضّ ويتوشّح حلقةَ اللون. */
+.lx-form{--fc:var(--mh,var(--p))}
+.lx-form .fg{gap:16px 18px}
+.lx-form .fld label,.lx-form .fld .lbl{font-size:12px;font-weight:700;letter-spacing:.01em}
+.lx-form .fld>label:first-child{display:flex;align-items:center;gap:6px}
+.lx-form .inp{background:color-mix(in srgb,var(--tx) 3.5%,transparent);border-color:transparent;
+  padding:10px 14px;transition:background var(--t),border-color var(--t),box-shadow var(--t)}
+.lx-form .inp:hover{background:color-mix(in srgb,var(--tx) 6%,transparent);border-color:transparent}
+.lx-form .inp:focus{background:var(--cd);border-color:var(--fc);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--fc) 18%,transparent)}
+.lx-form textarea.inp{min-height:86px}
+/* على الصفحة الكاملة يعلو النموذجَ رأسُ .lx-head — فعنوانُ .mhead الداخليّ تكرارٌ
+   يُخفى هنا، ويبقى في النافذة المنبثقة (بلا رأس) حيث هو العنوان الوحيد */
+.lx-form .mhead{display:none}
+/* حقلٌ فيه خطأ يبقى محمرّاً ولو لُبِّس النموذج المرتقى */
+.lx-form .inp.err,.lx-form .fld.haserr .inp{border-color:var(--bad)}
+.lx-form .formfoot{margin-top:22px;padding-top:18px;gap:10px;align-items:center}
+.lx-form .formfoot .btn.p{padding-inline:24px}
+/* الشريطُ العلويّ الرفيع بلون الوحدة يربط النموذج بهويّتها */
+.lx-form.card{position:relative;overflow:hidden}
+.lx-form.card::before{content:"";position:absolute;inset-block-start:0;inset-inline:0;height:3px;
+  background:linear-gradient(90deg,var(--fc),color-mix(in srgb,var(--fc) 35%,transparent))}
+
 /* ═ كثافة الجوال (v2.115): الترويسات كانت تلتهم ٦٣٢ من ٨٤٤ بكسل قبل أول صف بيانات ═ */
 @media (max-width:760px){
   .demoband{font-size:11px;padding:3px 8px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}
@@ -1013,10 +1071,10 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
   .topbar .uname{display:none}
   .gsearch .inp{padding:6px 12px}
   .content{padding:10px 10px 30px}
-  .modhero{gap:10px;margin-bottom:8px}
-  .mhico{width:34px;height:34px;font-size:17px;border-radius:10px}
-  .modhero h2{font-size:16.5px}
-  .modhero .sub{font-size:11px}
+  .modhero,.lx-head{gap:10px;margin-bottom:8px;padding:11px 13px}
+  .mhico,.lx-ico{width:38px;height:38px;font-size:18px;border-radius:11px}
+  .modhero h2,.lx-head h2{font-size:16.5px}
+  .modhero .sub,.lx-head .sub{font-size:11px}
   /* أفعال الترويسة والفلاتر: سطرٌ واحد ينزلق أفقياً بدل التراص عمودياً */
   .rh-acts{flex-basis:100%;display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
   .rh-acts::-webkit-scrollbar{display:none}

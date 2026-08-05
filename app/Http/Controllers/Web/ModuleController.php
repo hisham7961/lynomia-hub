@@ -1105,8 +1105,7 @@ class ModuleController extends Controller
             // (٥٠٠ ورسالةٌ تُسرّب القيمة). الحدُّ يرفضها للمستخدم قبل القاعدة.
             if (in_array($f['type'], ['num', 'big'], true)
                 && ($nm = hub_col_num_max($def['table'] ?? '', $f['col'] ?? $f['key'])) !== null) {
-                $r[] = 'between:' . rtrim(rtrim(number_format(-$nm, 3, '.', ''), '0'), '.')
-                    . ',' . rtrim(rtrim(number_format($nm, 3, '.', ''), '0'), '.');
+                $r[] = 'between:-' . $nm . ',' . $nm;   // $nm نصٌّ دقيقٌ من دقّة العمود (لا float)
             }
             // وقائمةُ الخيارات تُلزِم: شاشةُ الحالة تفرضها منذ v2.x والنموذج لا
             if (($f['type'] ?? '') === 'sel' && ! empty($f['options'])) {

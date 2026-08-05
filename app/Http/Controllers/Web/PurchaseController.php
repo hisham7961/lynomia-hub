@@ -86,7 +86,7 @@ class PurchaseController extends Controller
             'approve' => $this->approve($p),
             'send'    => $this->setStatus($p, 'أُرسل للمورد', '📤 حُدّد كمُرسل للمورد — اطبع أمر الشراء وأرسله'),
             'receive' => $this->receive($p),
-            'return'  => $this->setStatus($p, 'مرتجع', 'سُجّل كمرتجع'),
+            'return'  => $this->returnStock($p),
             'bill'    => $this->toBill($p),
             default   => abort(422),
         };
@@ -143,11 +143,16 @@ class PurchaseController extends Controller
                 // مطابقةٌ منطَّقةٌ بالشركة وحاسمةُ الترتيب: أمرٌ بشركةٍ يطابق أصنافها
                 // أو المشتركة (بلا شركة)، وأمرٌ **بلا** شركة يطابق المشتركة وحدها —
                 // فلا يحرّك مخزون شركةٍ أخرى. والمخصَّصُ للشركة قبل المشترك ثم id ثابت.
+                // قفلٌ صفّيّ على الصنف: استلامان متزامنان لنفس الصنف كانا يقرآن
+                // الرصيد نفسه (اقرأ-ثم-اكتب) فيضيع أحد الزيادتين — تحديثٌ ضائع.
+                // القفل يسلسلهما فيُبنى كلُّ رصيدٍ على سابقه. (كلٌّ يقفل أمرَه أولاً
+                // ثم الصنف، والبنودُ بترتيب ظهورها — فلا تشابكَ أقفال.)
                 $item = \App\Models\StockItem::whereNull('deleted_at')->where('name', $name)
                     ->when($p->company_id,
                         fn ($q) => $q->where(fn ($w) => $w->where('company_id', $p->company_id)->orWhereNull('company_id')),
                         fn ($q) => $q->whereNull('company_id'))
                     ->orderByRaw('company_id IS NULL')->orderBy('id')
+                    ->lockForUpdate()
                     ->first();
                 if (! $item) { $skipped++; continue; }
 
@@ -185,6 +190,67 @@ class PurchaseController extends Controller
             . ($made ? " وتحرّك المخزون ({$made} حركة)" : '')
             . ($skipped ? " — {$skipped} بند بلا صنف مطابق في المخزون لم يُحرَّك" : '')
             . ' — أنشئ فاتورة المورد من الزر');
+    }
+
+    /**
+     * المرتجع يعكس حركات الاستلام: كان يقلب الحالة إلى «مرتجع» فقط، فيبقى الرصيد
+     * منفوخاً بعد خروج البضاعة (استُلمت فزادت، ثم رُدّت للمورد ولم تُخصَم). الآن
+     * لكل حركة استلامٍ مسجّلة تُنشأ حركةُ «مرتجع صادر» مقابلة ويُخصم رصيد الصنف —
+     * داخل معاملةٍ على صفٍّ مقفول، idempotent عبر meta['returned_at'] كي لا يُخصَم
+     * الرصيد مرتين. لا يهبط الرصيد تحت الصفر (نمط v2.260: البضاعة قد تكون استُهلكت).
+     */
+    protected function returnStock(Purchase $p)
+    {
+        [$reversed] = DB::transaction(function () use ($p) {
+            $p = Purchase::whereKey($p->getKey())->lockForUpdate()->firstOrFail();
+            abort_unless($p->status === 'مستلم', 422, 'المرتجع على المستلَم فقط');
+
+            $meta = (array) $p->meta;
+            $reversed = 0;
+
+            // سبقنا مرتجعٌ نُفّذ سلفاً — لا نعكس مرتين (خصمٌ مضاعف)
+            if (empty($meta['returned_at'])) {
+                $moves = \App\Models\StockMove::whereIn('id', (array) ($meta['stock_moves'] ?? []))->get();
+                $backIds = [];
+                foreach ($moves as $mv) {
+                    $item = \App\Models\StockItem::whereKey($mv->item_id)->lockForUpdate()->first();
+                    if (! $item) continue;
+                    $qty = (float) $mv->qty;
+
+                    \App\Models\StockMove::$posting = true;
+                    try {
+                        $rev = \App\Models\StockMove::create([
+                            'doc_no' => 'RET-' . $p->doc_no . '-' . ($reversed + 1),
+                            'kind' => 'مرتجع صادر', 'item_id' => $item->id, 'qty' => $qty,
+                            'from_wh' => $item->wh, 'date' => now()->toDateString(),
+                            'reference' => (string) $p->doc_no, 'company_id' => $p->company_id, 'status' => 'مؤكدة',
+                            'meta' => ['posted_at' => now()->toIso8601String(),
+                                       'posted_by' => auth()->id(), 'delta' => -$qty,
+                                       'purchase_id' => $p->id, 'reverses' => $mv->id],
+                        ]);
+                    } finally {
+                        \App\Models\StockMove::$posting = false;
+                    }
+                    // لا يهبط تحت الصفر: البضاعة قد تكون استُهلكت جزئياً قبل الرد
+                    $item->qty = max(0, (float) $item->qty - $qty);
+                    $item->saveQuietly();
+                    hub_stock_sync($item);
+                    $backIds[] = $rev->id;
+                    $reversed++;
+                }
+                $meta['returned_at'] = now()->toIso8601String();
+                $meta['return_moves'] = $backIds;
+                $p->meta = $meta;
+            }
+
+            $p->status = 'مرتجع';
+            $p->save();
+
+            return [$reversed];
+        });
+
+        return back()->with('ok', '↩️ سُجّل المرتجع'
+            . ($reversed ? " وعُكست حركات الاستلام ({$reversed} حركة)" : ''));
     }
 
     /** فاتورة المورد → المالية (فاتورة مشتريات) — بلا تكرار */

@@ -27,11 +27,22 @@ if (! function_exists('ip_allowed')) {
     function ip_allowed(string $ip, string $list): bool
     {
         foreach (array_filter(array_map('trim', explode(',', $list))) as $rule) {
-            if (str_contains($rule, '/')) {
-                [$net, $bits] = explode('/', $rule);
-                $mask = -1 << (32 - (int) $bits);
-                if ((ip2long($ip) & $mask) === (ip2long($net) & $mask)) return true;
-            } elseif ($ip === $rule || str_starts_with($ip, rtrim($rule, '*'))) {
+            // البدلُ الصريح (*) وحده يطابق بالبادئة — قاعدةٌ بلا نجمة لا تُطابِق
+            // بالبادئة (كان «203.0.113.7» يقبل «203.0.113.70»، و«10.0.0.1» يفتح مدىً).
+            if (str_ends_with($rule, '*')) {
+                if (str_starts_with($ip, rtrim($rule, '*'))) return true;
+            } elseif (str_contains($rule, '/')) {
+                // CIDR ببايتات inet_pton — يدعم IPv4 وIPv6 بلا إزاحةٍ سالبة تسقط بـ500
+                // ولا سماحٍ ضمنيّ بكل IPv6 (نظير ApiToken::ipAllowed المُصلَّب).
+                [$net, $bits] = array_pad(explode('/', $rule, 2), 2, '');
+                $bits = (int) $bits;
+                $ipBin = @inet_pton($ip); $netBin = @inet_pton($net);
+                if ($ipBin === false || $netBin === false || strlen($ipBin) !== strlen($netBin)) continue;
+                $bytes = intdiv($bits, 8); $rem = $bits % 8;
+                if ($bytes && substr($ipBin, 0, $bytes) !== substr($netBin, 0, $bytes)) continue;
+                if ($rem && ((ord($ipBin[$bytes]) ^ ord($netBin[$bytes])) >> (8 - $rem)) !== 0) continue;
+                return true;
+            } elseif (hash_equals($rule, $ip)) {
                 return true;
             }
         }
@@ -2280,8 +2291,8 @@ if (! function_exists('hub_col_widths')) {
 }
 
 if (! function_exists('hub_col_num_max')) {
-    /** أقصى قيمةٍ مطلقةٍ يسعها عمودٌ عشريّ — من عرض العمود في مصدر الهجرات */
-    function hub_col_num_max(string $table, string $col): ?float
+    /** أقصى قيمةٍ مطلقةٍ يسعها عمودٌ عشريّ — نصّاً دقيقاً (لا float يُقرِّب فيتسرّب الفيض) */
+    function hub_col_num_max(string $table, string $col): ?string
     {
         return hub_col_nums()[$table][$col] ?? null;
     }
@@ -2310,8 +2321,12 @@ if (! function_exists('hub_col_nums')) {
                 foreach ($blocks as $b) {
                     preg_match_all("/->decimal\\(\\s*'([a-z0-9_]+)'\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)/", $b[2], $cols, PREG_SET_ORDER);
                     foreach ($cols as $c) {
+                        // الحدُّ نصّاً دقيقاً (٩ لكل خانة) لا floatًا: `10**13 - 0.001`
+                        // لا يُمثَّل تماماً في double فيتسرّب فيضٌ يرفضه MySQL بـ22003.
                         $intDigits = max(0, (int) $c[2] - (int) $c[3]);
-                        $out[$b[1]][$c[1]] = 10 ** $intDigits - (10 ** -((int) $c[3]));
+                        $dec = (int) $c[3];
+                        $out[$b[1]][$c[1]] = (str_repeat('9', $intDigits) ?: '0')
+                            . ($dec > 0 ? '.' . str_repeat('9', $dec) : '');
                     }
                 }
             }

@@ -27,7 +27,7 @@ class InboxDocController extends Controller
     {
         $this->gate('v');
         $st = $r->query('st', 'وارد');
-        $q = InboxDocument::orderByDesc('created_at');
+        $q = InboxDocument::orderByDesc('created_at')->orderByDesc('id');   // فاصلُ تعادلٍ حاسم
         if (in_array($st, ['وارد', 'مصنف'], true)) $q->where('status', $st);
 
         return view('inboxdocs', [

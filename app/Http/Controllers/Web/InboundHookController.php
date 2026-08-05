@@ -18,7 +18,7 @@ use Illuminate\Support\Str;
 class InboundHookController extends Controller
 {
     /** أقصى حجمِ حمولةٍ تُخزَّن (٦٤ كيلوبايت) — ما زاد يُقتطع، لا يُرفض */
-    protected const MAX_BYTES = 65536;
+    protected const MAX_BYTES = 65535;   // حدُّ عمود TEXT بالضبط — 65536 يفيضه ببايتٍ فيسقط بـ1406 على MySQL
 
     protected function gate(): void
     {

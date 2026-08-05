@@ -83,7 +83,7 @@
         {{-- v2.123: خطاف مساحة عمل مخصصة للوحدة — لا أثر على وحدة بلا ملف مخصص --}}
         @includeIf('modules.custom.' . $module)
 
-        <div class="card">
+        <div class="card" style="--mh:{{ $look['color'] }}">
             <h3 class="cardtitle">📋 البيانات</h3>
             <dl class="detail">
                 @foreach ($def['fields'] as $f)

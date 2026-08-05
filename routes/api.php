@@ -7,7 +7,9 @@ use Illuminate\Support\Facades\Route;
 /** REST API v1 — Authorization: Bearer <token> · نفس صلاحيات ونطاق الواجهة.
  *  حدُّ المعدل (120/دقيقة لكل مفتاح) كان مُعرَّفاً في AppServiceProvider بلا
  *  مسارٍ يحمله — تعريفٌ بلا تطبيق: عميلٌ جامح كان يضرب بلا سقف. */
-Route::prefix('v1')->middleware([ApiAuth::class, 'throttle:api'])->group(function () {
+// throttle قبل ApiAuth: المحدِّد يفرز بـ bearerToken()/ip() لا بالمستخدم المُحلَّل،
+// فبهذا الترتيب يُحَدُّ المهاجمُ غير المُصادَق (رمزٌ خاطئ) قبل أن يقصّه ApiAuth بـ401.
+Route::prefix('v1')->middleware(['throttle:api', ApiAuth::class])->group(function () {
     Route::get('me', [V1Controller::class, 'me']);
     Route::get('modules', [V1Controller::class, 'modules']);
 

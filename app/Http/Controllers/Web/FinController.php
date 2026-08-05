@@ -37,32 +37,11 @@ class FinController extends Controller
         ], [], ['amount' => 'مبلغ الدفعة', 'bankId' => 'الحساب البنكي']);
 
         /*
-         * **تحريكُ بنكٍ كتابةٌ في وحدة البنوك** — بابٌ جانبيّ كان يفلت من
-         * الثلاثية: bankId إدخالُ مستخدمٍ يمرّ بـexists وحدها، فمعزولُ شركةٍ
-         * يحرّك رصيدَ بنك شركةٍ أخرى، وحاملُ fin.e بلا أي صلاحية بنوك يحرّك
-         * أرصدتها. الحارسان قبل أي كتابة — إمّا كلُّه وإمّا لا شيء.
-         */
-        if (! empty($d['bankId'])) {
-            abort_unless(hub_can(auth()->user(), 'banks', 'e'), 422,
-                'توجيه الدفعة لحساب بنكي يحرّك رصيده — ويتطلب صلاحية تعديل البنوك');
-            abort_unless(hub_scope(BankAccount::query(), 'banks')->whereKey($d['bankId'])->exists(), 422,
-                'الحساب البنكي خارج نطاقك — اختر حساباً من شركاتك');
-        }
-
-        /*
-         * **عملةُ البنك عملةُ المستند أو لا تحريك**: كان المبلغ يُضاف 1:1 —
-         * دفعةُ 100 دولار ترفع رصيدَ حسابٍ دينariّ 100 ديناراً. لا محرّكَ
-         * أسعارٍ في النظام (بالتصميم — الإعدادُ app.currency «تسميةٌ لا
-         * تحويل»)، فالصادقُ رفضُ الخلط لا تحويلٌ مُخترَع.
-         */
-        if (! empty($d['bankId'])) {
-            $bcur = (string) BankAccount::whereKey($d['bankId'])->value('currency');
-            $dcur = (string) ($doc->currency ?? '');
-            abort_if($bcur !== '' && $dcur !== '' && $bcur !== $dcur, 422,
-                "عملة الحساب ({$bcur}) تخالف عملة المستند ({$dcur}) — لا تحويلَ أسعارٍ في النظام، اختر حساباً بعملة المستند");
-        }
-
-        /*
+         * **تحريكُ بنكٍ كتابةٌ في وحدة البنوك** — الحرّاسُ الثلاثة (صلاحية/نطاق/عملة)
+         * على **البنك الفعليّ** الذي يتحرّك رصيده، داخل المعاملة قبل التحريك: كانت
+         * مشروطةً بوسيط `bankId`، فمستندٌ ضُبط بنكُه عبر النموذج (exists وحدها) ثم دُفع
+         * بلا bankId يحرّك رصيدَ بنكٍ خارج الصلاحية/النطاق/العملة عبر البابِ الجانبيّ.
+         *
          * **معاملةٌ وقفل**: كانت الدفعة ثلاث كتاباتٍ متفرقة (مستند، بنك، قيد)
          * بلا معاملة — تداخلُ نقرتين يكرّر القيدَ ويشوّه الرصيد. القفلُ الصفّي
          * يسلسل الدفعات على المستند الواحد، والمعاملةُ تجعلها كلَّها أو لا شيء.
@@ -80,6 +59,20 @@ class FinController extends Controller
             $amount = min((float) $d['amount'], $remain);
 
             if (! empty($d['bankId'])) $fresh->bank_id = $d['bankId'];
+
+            // الحرّاسُ الثلاثة على البنك الفعليّ الذي يتحرّك رصيده — لا على وسيط
+            // الطلب. abort داخل المعاملة يُرجِعها كاملةً فلا تُسجَّل دفعةٌ بلا بنكٍ مأذون.
+            if ($fresh->bank_id) {
+                abort_unless(hub_can(auth()->user(), 'banks', 'e'), 422,
+                    'توجيه الدفعة لحساب بنكي يحرّك رصيده — ويتطلب صلاحية تعديل البنوك');
+                abort_unless(hub_scope(BankAccount::query(), 'banks')->whereKey($fresh->bank_id)->exists(), 422,
+                    'الحساب البنكي خارج نطاقك — اختر حساباً من شركاتك');
+                $bcur = (string) BankAccount::whereKey($fresh->bank_id)->value('currency');
+                $dcur = (string) ($fresh->currency ?? '');
+                abort_if($bcur !== '' && $dcur !== '' && $bcur !== $dcur, 422,
+                    "عملة الحساب ({$bcur}) تخالف عملة المستند ({$dcur}) — لا تحويلَ أسعارٍ في النظام، اختر حساباً بعملة المستند");
+            }
+
             $fresh->paid = $paid + $amount;
             $fresh->state = $fresh->paid >= $total ? 'مدفوعة' : 'مدفوعة جزئياً';
             $fresh->save();
@@ -129,11 +122,21 @@ class FinController extends Controller
             $moneyCode = (string) ($doc->bank_id ? ($map['bank'] ?? '') : ($map['cash'] ?? ''));
             $otherCode = (string) ($income ? ($map['sales'] ?? '') : ($map['exp'] ?? ''));
 
-            // بترتيب id: code غير فريد في الدليل، وبلا ترتيبٍ يختار المحرّكان
-            // حسابين مختلفين للرمز المكرر — قيودٌ تتوزع على حسابين بالقرعة
-            $accId = fn (string $code) => $code === '' ? null
-                : \App\Models\LedgerAccount::whereNull('deleted_at')->where('code', $code)
+            // تحصيرٌ بالشركة ثم بترتيب id: code غير فريد و company_id قد يتكرّر
+            // عبر الشركات، فبلا التحصير يلتصق سطرُ قيدِ شركةٍ بحساب شركةٍ أخرى.
+            // نفضّل حساب شركة المستند، فحساباً عامّاً (company_id فارغ) احتياطاً،
+            // وترتيبُ id يحسم التعادل حتميّاً على المحرّكين — لا قرعة.
+            $accId = function (string $code) use ($doc) {
+                if ($code === '') return null;
+
+                return \App\Models\LedgerAccount::whereNull('deleted_at')->where('code', $code)
+                    ->where(function ($w) use ($doc) {
+                        $w->whereNull('company_id');
+                        if (filled($doc->company_id)) $w->orWhere('company_id', $doc->company_id);
+                    })
+                    ->orderByRaw('company_id IS NULL')   // الخاصّ بالشركة أولاً، العامّ احتياطاً
                     ->orderBy('id')->value('id');
+            };
             $money = $accId($moneyCode);
             $other = $accId($otherCode);
             if (! $money || ! $other) return;   // خريطة غير مكتملة — لا قيد أعرج
