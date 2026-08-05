@@ -332,11 +332,20 @@ class HubAutomation extends Command
                 // منذ متى ونحن نطلق على هذه المشكلة بعينها؟ أقدمُ إشعارٍ لنفس
                 // القاعدة والسجل هو ختمُ أوّل رصدٍ لها؛ تجاوزُه عتبةَ التصعيد يعني
                 // أنها لم تُحلّ رغم الإبلاغ — فيرتفع الإلحاح ويُدفَع عبر القنوات.
-                $firstAt   = HubNotification::where('kind', 'rule:' . $rule->id)
-                    ->where('record_id', $row->id)->min('created_at');
-                $escalated = $firstAt
-                    && Carbon::parse($firstAt)->startOfDay()->lte(today()->subDays($escalateAge));
-                $days      = $escalated ? today()->diffInDays(Carbon::parse($firstAt)->startOfDay()) : 0;
+                // بدايةُ السلسلة المتّصلة: نمشي الإشعارات من الأحدث، وأيُّ فجوةٍ أكبرَ
+                // من دورةٍ (every) تعني أنها حُلّت ثم عادت — فتبدأ سلسلةٌ جديدة. (كان
+                // min المطلق يجعل نوبةً قديمةً حُلّت تُصعّد النوبةَ الجديدةَ فور عودتها.)
+                $stamps = HubNotification::where('kind', 'rule:' . $rule->id)
+                    ->where('record_id', $row->id)->orderByDesc('created_at')
+                    ->pluck('created_at')->map(fn ($s) => Carbon::parse($s)->startOfDay())->values();
+                $chainStart = $stamps->first();
+                for ($i = 1; $i < $stamps->count(); $i++) {
+                    if ($chainStart->diffInDays($stamps[$i], true) > $every + 1) break;   // فجوةٌ ← انقطاع
+                    $chainStart = $stamps[$i];
+                }
+                $escalated = $chainStart && $chainStart->lte(today()->subDays($escalateAge));
+                // مطلقٌ لا موقّع — Carbon 3 يجعل diffInDays موقّعاً افتراضياً (أيامٌ سالبة)
+                $days      = $escalated ? (int) $chainStart->diffInDays(today(), true) : 0;
 
                 $base = trim(($rule->msg ?: $rule->name) . ' — ' . Str::limit((string) $row->_n, 60));
                 $text = $escalated ? "🔺 مُتصاعد (لم يُعالَج منذ {$days} يوماً): {$base}" : $base;

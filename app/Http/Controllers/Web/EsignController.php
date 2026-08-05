@@ -1021,9 +1021,8 @@ class EsignController extends Controller
         $req = SignRequest::where('verify_code', $code)->where('status', 'وُقّع')->first();
         abort_if(! $req, 404, 'لا وثيقة موقّعة بهذا الرمز');
 
-        // دليلٌ في السجل: فُتحت الوثيقة بمسح QR (الـIP والوكيل يُلتقطان تلقائياً)
-        \App\Models\ContractEvent::log('verified', $req, ['meta' => 'qr']);
-
+        // لا نكتب في سجل الأدلة القانوني (append-only) على فتحٍ عامٍّ مجهول — كان
+        // مهاجمٌ يُغرقه بأحداثٍ برموز IP يتحكّم بها. الفتحُ مقيّدٌ بالمعدّل ويكفي.
         return view('esign.doc', [
             'req' => $req, 'public' => true,
             'sgs' => $this->signedIndependents($req),

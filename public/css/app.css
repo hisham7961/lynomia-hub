@@ -1024,6 +1024,8 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
   border:1px solid transparent;background:transparent;cursor:pointer;font-size:14px;color:var(--sb);transition:all var(--t);text-decoration:none}
 .lx-ib:hover{background:color-mix(in srgb,var(--p) 8%,transparent);color:var(--p)}
 .lx-ib.dn:hover{background:var(--badbg);color:var(--bad)}
+/* عند التسليح (data-confirm) يحمل الزرُّ نصَّ التأكيد — يتمدّد ليسعه بدل أن يقصّه عرضُه الثابت */
+.lx-ib.confirming{width:auto;height:auto;padding:4px 10px;white-space:nowrap;background:var(--badbg);color:var(--bad)}
 @media (max-width:720px){.lx-tools{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
   .lx-tools::-webkit-scrollbar{display:none}.lx-tools>*{flex-shrink:0}}
 

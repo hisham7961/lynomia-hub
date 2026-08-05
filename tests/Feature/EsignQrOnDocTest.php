@@ -94,6 +94,24 @@ class EsignQrOnDocTest extends TestCase
             ->assertDontSee('الجهاز');
     }
 
+    /**
+     * الفتحُ العامّ عبر QR لا يلوّث سجل الأدلة القانوني (append-only) بأحداثٍ
+     * يتحكّم بها مجهول: كان verifyDoc يكتب حدثَ verified على كل طلبٍ غير مُصادَق.
+     */
+    public function test_public_open_does_not_pollute_the_evidence_log(): void
+    {
+        $this->seedCore();
+        $req = $this->makeSigned();
+        auth()->logout();
+
+        $this->get(route('sign.verify.doc', $req->verify_code))->assertOk();
+        $this->get(route('sign.verify.doc', $req->verify_code))->assertOk();
+
+        $this->assertSame(0, \App\Models\ContractEvent::where('request_id', $req->id)
+            ->where('event', 'verified')->count(),
+            'الفتحُ العامّ يكتب أحداثاً في سجل الأدلة يتحكّم بها مجهول');
+    }
+
     /** لا يُفتَح إلا الموقّع: المسودة أو الرمز الخاطئ → ٤٠٤ (لا يكشف غير الموقّع) */
     public function test_public_open_rejects_unsigned_and_bad_code(): void
     {

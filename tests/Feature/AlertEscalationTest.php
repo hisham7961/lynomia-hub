@@ -55,6 +55,40 @@ class AlertEscalationTest extends TestCase
         $this->assertTrue($fresh->isNotEmpty(), 'يُعاد الإشعار الداخليّ حين تبقى المشكلة دون حلّ');
         $this->assertStringContainsString('🔺 مُتصاعد', $fresh->pluck('text')->implode(' | '),
             'الإشعار المُعاد على مشكلةٍ مزمنة يُوسَم مُتصاعداً');
+        // عددُ الأيام موجبٌ لا موقّع — Carbon 3 يجعل diffInDays موقّعاً افتراضياً
+        $this->assertStringContainsString('منذ 10 يوماً', $fresh->pluck('text')->implode(' | '),
+            'عددُ أيام التصعيد يجب أن يكون موجباً (كان سالباً)');
+    }
+
+    /**
+     * مشكلةٌ حُلّت ثم عادت لا تُصنَّف «مزمنة» فور عودتها: كان أقدمُ إشعارٍ مطلقاً
+     * يُحسَب بدايةً، فنوبةٌ قديمةٌ حُلّت تُصعّد النوبةَ الجديدةَ خطأً. الآن العمرُ
+     * من بداية السلسلة المتّصلة (فجوةٌ أكبر من دورة = انقطاعٌ يبدأ سلسلةً جديدة).
+     */
+    public function test_recurred_after_resolution_does_not_escalate_immediately(): void
+    {
+        $this->seedCore();
+        $bank = BankAccount::create(['name' => 'صندوق عاود', 'balance' => 100, 'min_bal' => 500]);
+        $rule = AlertRule::create([
+            'name' => 'رصيد تحت الحد', 'mod' => 'banks', 'field' => 'balance',
+            'op' => 'أصغر من عمود', 'val' => 'minBal',
+            'chan' => 'داخل النظام', 'every' => 1, 'status' => 'مفعّلة',
+        ]);
+        // نوبةٌ قديمة (قبل ٣٠ يوماً) حُلّت، ثم فجوةٌ طويلة، ثم عودةٌ (قبل يومين).
+        foreach ([30, 2] as $ago) {
+            $n = HubNotification::create(['user_id' => $this->owner->id, 'kind' => 'rule:' . $rule->id,
+                'text' => 'x', 'module' => 'banks', 'record_id' => $bank->id, 'read' => false, 'created_at' => now()]);
+            DB::table('notifications_hub')->where('id', $n->id)->update(['created_at' => now()->subDays($ago)]);
+        }
+
+        $this->artisan('hub:automation')->assertExitCode(0);
+
+        // السلسلةُ المتّصلة تبدأ من قبل يومين (الفجوةُ ٢٨ يوماً كسرت القديمة) →
+        // دون عتبة التصعيد (every*3 = ٣) → لا دفعَ عبر القنوات ولا وسمَ تصاعد.
+        $this->assertSame(0, DB::table('outbox')->where('kind', 'rule:' . $rule->id)->count(),
+            'مشكلةٌ حُلّت ثم عادت صُعِّدت فور عودتها اعتماداً على نوبةٍ قديمة');
+        $texts = HubNotification::where('kind', 'rule:' . $rule->id)->whereDate('created_at', today())->pluck('text')->implode(' | ');
+        $this->assertStringNotContainsString('🔺 مُتصاعد', $texts, 'العودةُ الطازجة لا تُوسَم مُتصاعدة');
     }
 
     /** المشكلة الطازجة تبقى «داخل النظام» — لا إغراق قنوات قبل استحقاق التصعيد */
