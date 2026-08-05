@@ -106,7 +106,10 @@ class SettingController extends Controller
 
                 if ($type === 'img') {
                     if ($r->hasFile($input)) {
-                        $r->validate([$input => ['image', 'max:4096']]);
+                        // صيغٌ نقطية فقط: قاعدة image في Laravel تقبل SVG، وهو نصٌّ
+                        // قد يحمل سكربتاً — ويُخزَّن على القرص العام ويُخدَم مباشرةً
+                        // بلا Content-Disposition، فيصير XSS مخزَّناً. الحصرُ يمنعه.
+                        $r->validate([$input => ['image', 'mimes:jpg,jpeg,png,webp,gif', 'max:4096']]);
                         $this->put($key, $r->file($input)->store('hub/branding', 'public'), $changed);
                     } elseif ($r->boolean($input . '_clear')) {
                         Setting::where('key', $key)->delete();

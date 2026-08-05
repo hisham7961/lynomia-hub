@@ -122,11 +122,21 @@ class FinController extends Controller
             $moneyCode = (string) ($doc->bank_id ? ($map['bank'] ?? '') : ($map['cash'] ?? ''));
             $otherCode = (string) ($income ? ($map['sales'] ?? '') : ($map['exp'] ?? ''));
 
-            // بترتيب id: code غير فريد في الدليل، وبلا ترتيبٍ يختار المحرّكان
-            // حسابين مختلفين للرمز المكرر — قيودٌ تتوزع على حسابين بالقرعة
-            $accId = fn (string $code) => $code === '' ? null
-                : \App\Models\LedgerAccount::whereNull('deleted_at')->where('code', $code)
+            // تحصيرٌ بالشركة ثم بترتيب id: code غير فريد و company_id قد يتكرّر
+            // عبر الشركات، فبلا التحصير يلتصق سطرُ قيدِ شركةٍ بحساب شركةٍ أخرى.
+            // نفضّل حساب شركة المستند، فحساباً عامّاً (company_id فارغ) احتياطاً،
+            // وترتيبُ id يحسم التعادل حتميّاً على المحرّكين — لا قرعة.
+            $accId = function (string $code) use ($doc) {
+                if ($code === '') return null;
+
+                return \App\Models\LedgerAccount::whereNull('deleted_at')->where('code', $code)
+                    ->where(function ($w) use ($doc) {
+                        $w->whereNull('company_id');
+                        if (filled($doc->company_id)) $w->orWhere('company_id', $doc->company_id);
+                    })
+                    ->orderByRaw('company_id IS NULL')   // الخاصّ بالشركة أولاً، العامّ احتياطاً
                     ->orderBy('id')->value('id');
+            };
             $money = $accId($moneyCode);
             $other = $accId($otherCode);
             if (! $money || ! $other) return;   // خريطة غير مكتملة — لا قيد أعرج

@@ -90,6 +90,21 @@ class PayrollController extends Controller
             ->orderBy('name')->get();
         abort_if($emps->isEmpty(), 422, 'لا موظفين نشطين لهذا النطاق — أضف ملفاتهم الوظيفية أولاً');
 
+        // عملةٌ واحدة للتشغيلة: تشغيلةٌ بلا شركةٍ محدَّدة قد تضمّ موظفي شركاتٍ
+        // بعملاتٍ مختلفة، فيُجمع الإجمالي والقيد على عملاتٍ غير متجانسة — كذبةُ
+        // رقمٍ واحد. نرفضها ونطلب تحديد شركة التشغيلة كي تتوحّد العملة. (تشغيلةٌ
+        // بشركةٍ محدَّدة موحّدةُ العملة سلفاً فلا يمسّها الحارس.)
+        if (blank($run->company_id)) {
+            $def = trim((string) setting('app.currency', ''));
+            $curs = \App\Models\Company::whereIn('id', $emps->pluck('company_id')->filter()->unique()->all())
+                ->pluck('currency')->map(fn ($c) => trim((string) $c) ?: $def);
+            if ($emps->whereNull('company_id')->isNotEmpty()) $curs = $curs->push($def);
+            $distinct = $curs->filter()->unique()->values();
+            abort_if($distinct->count() > 1, 422,
+                'تشغيلةٌ بلا شركة تجمع موظفين بعملاتٍ مختلفة (' . $distinct->implode('، ')
+                . ') في مجموعٍ واحد — حدّد شركةَ التشغيلة كي تتوحّد العملة');
+        }
+
         PayrollLine::where('run_id', $run->id)->delete();
         $total = 0.0;
         foreach ($emps as $e) {
@@ -154,10 +169,20 @@ class PayrollController extends Controller
         try {
             $map = setting('finance.accounts');
             $map = is_array($map) ? $map : (json_decode((string) $map, true) ?: []);
-            // بترتيب id: code غير فريد في الدليل — قيدٌ يتوزّع على حسابين بالقرعة
-            $accId = fn (?string $code) => blank($code) ? null
-                : \App\Models\LedgerAccount::whereNull('deleted_at')->where('code', $code)
+            // تحصيرٌ بالشركة ثم بترتيب id: code غير فريد و company_id قد يتكرّر
+            // عبر الشركات، فبلا التحصير يلتصق سطرُ قيدِ مسيّرٍ بحساب شركةٍ أخرى.
+            // نفضّل حساب شركة المسيّر، فحساباً عامّاً احتياطاً، وid يحسم التعادل.
+            $accId = function (?string $code) use ($run) {
+                if (blank($code)) return null;
+
+                return \App\Models\LedgerAccount::whereNull('deleted_at')->where('code', $code)
+                    ->where(function ($w) use ($run) {
+                        $w->whereNull('company_id');
+                        if (filled($run->company_id)) $w->orWhere('company_id', $run->company_id);
+                    })
+                    ->orderByRaw('company_id IS NULL')   // الخاصّ بالشركة أولاً، العامّ احتياطاً
                     ->orderBy('id')->value('id');
+            };
             $exp = $accId($map['exp'] ?? null);
             $cash = $accId($map['bank'] ?? null) ?: $accId($map['cash'] ?? null);
             if (! $exp || ! $cash) return;
