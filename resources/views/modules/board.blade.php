@@ -24,7 +24,7 @@
             $kValue = collect($items)->sum(fn ($r) => (float) ($r->value ?? 0));
             $kWeighted = collect($items)->sum(fn ($r) => (float) ($r->value ?? 0) * ((float) ($r->prob ?? 0) / 100));
         @endphp
-        <div class="kcol" data-status="{{ $status }}">
+        <div class="kcol {{ hub_tone($status) }}" data-status="{{ $status }}">
             <div class="khead">
                 <span class="bdg {{ hub_tone($status) }}">{{ $status }}</span>
                 <span class="kcount sub">{{ count($items) }}</span>

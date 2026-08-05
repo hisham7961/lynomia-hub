@@ -457,6 +457,12 @@ html[data-theme="dark"] .seg{background:color-mix(in srgb,var(--cd) 88%,transpar
 .kav{width:17px;height:17px;border-radius:50%;display:inline-grid;place-items:center;flex-shrink:0;
   background:color-mix(in srgb,var(--p) 14%,transparent);color:var(--p);font-size:10px;font-weight:700}
 .kempty{border:1.5px dashed var(--ln);border-radius:10px;padding:14px 10px;text-align:center;font-size:12px}
+/* تمييزُ العمود بلمحة (v2.305): شريطُ لونِ الحالة أعلاه وترويسةٌ متوهّجةٌ بلونها —
+   فالعينُ تعرف «مكتمل» من «متأخر» من «قيد التنفيذ» قبل قراءة اللصيقة. */
+.kcol{position:relative;overflow:hidden}
+.kcol::before{content:"";position:absolute;inset-block-start:0;inset-inline:0;height:3px;background:var(--kt,var(--sb));z-index:1}
+.kcol.ok{--kt:var(--ok)}.kcol.bad{--kt:var(--bad)}.kcol.wn{--kt:var(--wn)}.kcol.g{--kt:var(--sb)}
+.khead{background:color-mix(in srgb,var(--kt,var(--sb)) 8%,transparent)}
 
 /* ═ بانر الوضع التجريبي ═ */
 .demoband{background:repeating-linear-gradient(45deg,#7c3aed,#7c3aed 14px,#6d28d9 14px,#6d28d9 28px);
