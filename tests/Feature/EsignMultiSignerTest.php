@@ -79,6 +79,26 @@ class EsignMultiSignerTest extends TestCase
         }
     }
 
+    /**
+     * روابطُ الموقّعين متاحةٌ من **المركز** دائماً — لا عند الإنشاء فقط: صفُّ
+     * الطلب في القائمة يفرد قائمةَ روابطَ لكل موقّعٍ برابطه الخاصّ.
+     */
+    public function test_center_list_exposes_every_signer_link_anytime(): void
+    {
+        $this->seedCore();
+        $req = $this->makeMulti();
+        $signers = ContractSigner::where('request_id', $req->id)->orderBy('order')->get();
+
+        $html = $this->actingAs($this->owner)->get('/esign')->assertOk()->getContent();
+
+        $this->assertStringContainsString('sglinks', $html, 'قائمةُ روابط الموقّعين غائبةٌ عن المركز');
+        foreach ($signers as $s) {
+            // الرمزُ لا الرابطُ الكامل: زرُّ النسخ يحمله عبر @js التي تُهرِّب الشرطات
+            $this->assertStringContainsString($s->token, $html,
+                'رابطُ الموقّع «' . $s->name . '» غير متاحٍ من المركز بعد الإنشاء');
+        }
+    }
+
     public function test_otp_gate_wrong_expired_and_correct(): void
     {
         $this->seedCore();
