@@ -1065,6 +1065,15 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .lx-form.card::before{content:"";position:absolute;inset-block-start:0;inset-inline:0;height:3px;
   background:linear-gradient(90deg,var(--fc),color-mix(in srgb,var(--fc) 35%,transparent))}
 
+/* ═ مركز الإعدادات (v2.307): رأسُ مجموعةٍ موسومٌ بنقطة، وكلُّ مفتاحٍ صفٌّ
+   يتنفّس ويُضيء عند المرور — بدل هوامشَ سطريةٍ وخطوطٍ رفيعةٍ متساوية ═ */
+.setgrp>h3{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;letter-spacing:-.01em;
+  padding-bottom:10px;margin-bottom:4px;border-bottom:2px solid color-mix(in srgb,var(--p) 20%,var(--ln))}
+.setgrp>h3::before{content:"";width:8px;height:8px;border-radius:3px;background:var(--p);flex-shrink:0}
+.setrow{padding:13px 10px;border-radius:10px;transition:background var(--t)}
+.setrow+.setrow{border-top:1px solid color-mix(in srgb,var(--ln) 55%,transparent)}
+.setrow:hover{background:color-mix(in srgb,var(--p) 3%,transparent)}
+
 /* ═ كثافة الجوال (v2.115): الترويسات كانت تلتهم ٦٣٢ من ٨٤٤ بكسل قبل أول صف بيانات ═ */
 @media (max-width:760px){
   .demoband{font-size:11px;padding:3px 8px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}

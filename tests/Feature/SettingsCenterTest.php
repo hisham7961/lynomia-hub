@@ -57,6 +57,9 @@ class SettingsCenterTest extends TestCase
 
         $this->assertStringContainsString('ابحث في الإعدادات', $html, 'بحثٌ داخل الشاشة');
         $this->assertStringContainsString('الافتراضي', $html, 'الافتراضي معروض');
+        // v2.307: النموذج بلغة الحقول المملوءة (lx-form) والمجموعات مصفوفة (setgrp)
+        $this->assertStringContainsString('class="lx-form"', $html, 'شاشة الإعدادات بلا لغة النموذج الموحّدة');
+        $this->assertStringContainsString('setgrp', $html, 'مجموعات الإعدادات غائبة');
         // مفاتيح كانت غائبة تماماً
         foreach (['cost_work_hours', 'ops_slow_ms', 'monitor_timeout', 'esign_remind_days'] as $input) {
             $this->assertStringContainsString('name="' . $input . '"', $html, "المفتاح $input ما زال بلا مدخل");

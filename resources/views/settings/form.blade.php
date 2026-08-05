@@ -30,7 +30,7 @@
 
 @if (session('warn'))<div class="card" style="border-color:var(--wn);margin-bottom:12px">⚠️ {{ session('warn') }}</div>@endif
 
-<form method="POST" action="{{ route('settings.update') }}" enctype="multipart/form-data" style="max-width:860px">
+<form method="POST" action="{{ route('settings.update') }}" enctype="multipart/form-data" class="lx-form" style="max-width:860px">
     @csrf
     @foreach ($groups as $gLabel => $items)
         <div class="card setgrp" id="g{{ $loop->index }}" style="margin-bottom:14px">
@@ -45,8 +45,7 @@
                     $risky = trim((string) ($meta['risk'] ?? '')) !== '';
                     $hay   = $key . ' ' . ($meta['label'] ?? '') . ' ' . ($meta['effect'] ?? '') . ' ' . ($meta['risk'] ?? '');
                 @endphp
-                <div class="setrow" data-q="{{ mb_strtolower($hay) }}" data-risk="{{ $risky ? 1 : 0 }}"
-                     style="padding:12px 0;border-top:1px solid var(--ln)">
+                <div class="setrow" data-q="{{ mb_strtolower($hay) }}" data-risk="{{ $risky ? 1 : 0 }}">
                     <div class="crow" style="gap:8px;align-items:baseline;flex-wrap:wrap">
                         <b>{{ $meta['label'] ?? $key }}</b>
                         @if ($risky)<span class="bdg wn" title="اقرأ التحذير قبل تغييره">⚠️</span>@endif
