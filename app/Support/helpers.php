@@ -2291,8 +2291,8 @@ if (! function_exists('hub_col_widths')) {
 }
 
 if (! function_exists('hub_col_num_max')) {
-    /** أقصى قيمةٍ مطلقةٍ يسعها عمودٌ عشريّ — من عرض العمود في مصدر الهجرات */
-    function hub_col_num_max(string $table, string $col): ?float
+    /** أقصى قيمةٍ مطلقةٍ يسعها عمودٌ عشريّ — نصّاً دقيقاً (لا float يُقرِّب فيتسرّب الفيض) */
+    function hub_col_num_max(string $table, string $col): ?string
     {
         return hub_col_nums()[$table][$col] ?? null;
     }
@@ -2321,8 +2321,12 @@ if (! function_exists('hub_col_nums')) {
                 foreach ($blocks as $b) {
                     preg_match_all("/->decimal\\(\\s*'([a-z0-9_]+)'\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)/", $b[2], $cols, PREG_SET_ORDER);
                     foreach ($cols as $c) {
+                        // الحدُّ نصّاً دقيقاً (٩ لكل خانة) لا floatًا: `10**13 - 0.001`
+                        // لا يُمثَّل تماماً في double فيتسرّب فيضٌ يرفضه MySQL بـ22003.
                         $intDigits = max(0, (int) $c[2] - (int) $c[3]);
-                        $out[$b[1]][$c[1]] = 10 ** $intDigits - (10 ** -((int) $c[3]));
+                        $dec = (int) $c[3];
+                        $out[$b[1]][$c[1]] = (str_repeat('9', $intDigits) ?: '0')
+                            . ($dec > 0 ? '.' . str_repeat('9', $dec) : '');
                     }
                 }
             }
