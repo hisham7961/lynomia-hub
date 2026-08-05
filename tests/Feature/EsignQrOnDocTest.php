@@ -112,6 +112,42 @@ class EsignQrOnDocTest extends TestCase
             'الفتحُ العامّ يكتب أحداثاً في سجل الأدلة يتحكّم بها مجهول');
     }
 
+    /**
+     * الوثيقةُ المنزَّلة/المرسَلة PDF تحمل QR أيضاً — لا الويب وحده. `docHtml`
+     * (مصدرُ الـPDF عبر mPDF) كان يذكر رمز التحقّق نصّاً بلا صورةِ رمز، فالوثيقةُ
+     * الرسمية التي تُطبَع وتُشارَك بلا QR. الآن الرمزُ مضمَّنٌ كصورةٍ (data-URI).
+     */
+    public function test_signed_pdf_document_embeds_the_qr(): void
+    {
+        $this->seedCore();
+        $req = \App\Models\SignRequest::create([
+            'title' => 'اتفاقية موقّعة', 'body' => 'نصُّ الاتفاقية الكامل.',
+            'pass' => bcrypt('p1234'), 'token' => \Illuminate\Support\Str::random(48),
+            'status' => 'وُقّع', 'verify_code' => 'LYN-TEST-0001',
+            'signer_name' => 'الموقّع', 'signature' => 'data:image/png;base64,AAA',
+            'signed_at' => now(), 'signed_ip' => '1.2.3.4',
+        ]);
+
+        $html = \App\Support\DocRenderer::docHtml($req->fresh());
+        $this->assertStringContainsString('data:image/svg+xml;base64,', $html,
+            'وثيقةُ PDF الموقّعة بلا رمز QR — كان على الويب فقط لا على المستند المنزَّل');
+        $this->assertStringContainsString($req->verify_code, $html);   // النصُّ يبقى للتحقّق اليدوي
+    }
+
+    /** غيرُ الموقّعة لا تحمل QR في الـPDF (كالويب) — الرمزُ للموقّع الأصيل فقط */
+    public function test_unsigned_pdf_document_has_no_qr(): void
+    {
+        $this->seedCore();
+        $req = \App\Models\SignRequest::create([
+            'title' => 'مسودة', 'body' => 'نصٌّ لم يُوقَّع.',
+            'pass' => bcrypt('p1234'), 'token' => \Illuminate\Support\Str::random(48),
+            'status' => 'بانتظار التوقيع', 'verify_code' => 'LYN-TEST-0002',
+        ]);
+
+        $this->assertStringNotContainsString('data:image/svg+xml;base64,',
+            \App\Support\DocRenderer::docHtml($req->fresh()));
+    }
+
     /** لا يُفتَح إلا الموقّع: المسودة أو الرمز الخاطئ → ٤٠٤ (لا يكشف غير الموقّع) */
     public function test_public_open_rejects_unsigned_and_bad_code(): void
     {
