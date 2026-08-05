@@ -59,6 +59,26 @@ class EsignMultiSignerTest extends TestCase
         $this->assertSame(2, ContractEvent::where('request_id', $req->id)->where('event', 'sent')->count());
     }
 
+    /**
+     * صفحةُ التحرير تسرد **كلَّ** موقّعٍ باسمه وحالته ورابطه الخاصّ — كانت تعرض
+     * رابطاً واحداً (رمز الطلب) فيبدو للمنشئ «موقّعٌ واحدٌ ورابطٌ واحد».
+     */
+    public function test_edit_page_lists_every_signer_and_their_own_link(): void
+    {
+        $this->seedCore();
+        $req = $this->makeMulti();
+        $signers = ContractSigner::where('request_id', $req->id)->orderBy('order')->get();
+
+        $html = $this->actingAs($this->owner)->get("/esign/{$req->id}/edit")->assertOk()->getContent();
+
+        $this->assertStringContainsString('الموقّع الأول', $html, 'الموقّع الأول غائبٌ عن صفحة التحرير');
+        $this->assertStringContainsString('الموقّع الثاني', $html, 'الموقّع الثاني غائبٌ عن صفحة التحرير');
+        foreach ($signers as $s) {
+            $this->assertStringContainsString(route('sign.show', $s->token), $html,
+                'رابطُ الموقّع «' . $s->name . '» الخاصّ غائبٌ عن صفحة التحرير');
+        }
+    }
+
     public function test_otp_gate_wrong_expired_and_correct(): void
     {
         $this->seedCore();

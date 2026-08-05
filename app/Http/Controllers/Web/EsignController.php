@@ -454,7 +454,13 @@ class EsignController extends Controller
         $req = SignRequest::findOrFail($id);
         $this->guardRequest($req);
 
-        return view('esign.edit', ['req' => $req]);
+        // الموقّعون المستقلون (م4) — كلٌّ برابطه ورمزه؛ صفحةُ التحرير تعرضهم جميعاً
+        // بدل رابطٍ واحد. (مسارُ الموقّع الواحد القديم صفٌّ برمز الطلب نفسه.)
+        $signers = \App\Models\ContractSigner::where('request_id', $req->id)
+            ->where('token', '!=', (string) $req->token)
+            ->orderBy('order')->get();
+
+        return view('esign.edit', ['req' => $req, 'signers' => $signers]);
     }
 
     public function update(Request $r, string $id)

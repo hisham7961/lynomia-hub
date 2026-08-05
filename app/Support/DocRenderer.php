@@ -47,10 +47,21 @@ class DocRenderer
     public static function docHtml(SignRequest $req): string
     {
         $h = fn ($v) => e((string) $v);
+
+        // رمز QR على متن الـPDF كما على الويب: مسحُه يفتح الوثيقة ويتحقّق منها —
+        // كان يُذكَر الرمزُ نصّاً فقط فتُطبَع الوثيقةُ الرسمية بلا رمزٍ يُمسَح.
+        // يُضمَّن صورةً (data-URI) — أوثقُ صيغةٍ في mPDF — وللموقّعة ذات الرمز فقط.
+        $qr = ($req->status === 'وُقّع' && $req->verify_code)
+            ? Qr::svg(route('sign.verify.doc', $req->verify_code), 90) : null;
+        $qrImg = $qr
+            ? '<br><img src="data:image/svg+xml;base64,' . base64_encode($qr) . '" style="width:90px;height:90px">'
+                . '<br><span style="font-size:8.5px;color:#777">امسح لفتح الوثيقة والتحقّق</span>'
+            : '';
+
         $out = '<div style="font-size:13px;line-height:1.9">'
             . '<table width="100%"><tr>'
             . '<td style="font-size:19px;font-weight:bold">' . $h($req->title) . '</td>'
-            . '<td style="text-align:left;font-size:11px">رمز التحقق<br><b dir="ltr">' . $h($req->verify_code) . '</b></td>'
+            . '<td style="text-align:left;font-size:11px">رمز التحقق<br><b dir="ltr">' . $h($req->verify_code) . '</b>' . $qrImg . '</td>'
             . '</tr></table><hr>'
             . '<div style="white-space:pre-wrap">' . nl2br($h($req->body)) . '</div>';
 
