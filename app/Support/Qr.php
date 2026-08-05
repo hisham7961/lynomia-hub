@@ -2,31 +2,25 @@
 
 namespace App\Support;
 
-use BaconQrCode\Common\ErrorCorrectionLevel;
-use BaconQrCode\Encoder\Encoder;
-
 /**
- * رمز QR كـ SVG — pure PHP بلا CDN ولا طلب خارجي ولا امتداد xmlwriter.
+ * رمز QR كـ SVG — **صرفُ PHP بلا مكتبةٍ خارجية ولا امتدادٍ ولا CDN**.
  *
- * كان يُبنى عبر SvgImageBackEnd في BaconQrCode، وهي **تشترط امتداد xmlwriter**:
- * على استضافةٍ عادية بلا هذا الامتداد كان الرمز يفشل صامتاً فيختفي من الوثيقة
- * («qr مش ظاهر»). أما **مُرمِّز** BaconQrCode (Encoder) فهو PHP صرفٌ لا يمسّ XML —
- * فنأخذ مصفوفته المُثبَتة ونرسمها SVG بأنفسنا ببناء نصٍّ بسيط. فالرمزُ يظهر على أي
- * استضافة PHP فيها ملفات المكتبة (المثبَّتة عبر composer)، بلا اشتراط امتدادٍ إضافي.
+ * تاريخُ العطل: كان يُبنى عبر BaconQrCode — مكتبةٌ تُثبَّت بـcomposer و`vendor/`
+ * مستبعدٌ من المستودع؛ فعلى استضافةٍ تُرفَع بنسخ الملفات (بلا composer install، أو
+ * بـvendor قديمٍ سابقٍ لإضافة المكتبة) تغيب المكتبة فيعيد الرمزُ null ويختفي من
+ * الوثيقة («qr مش ظاهر»). الحلّ: مُرمِّزٌ صرفُ PHP (App\Support\QrEncoder) يُشحَن
+ * مع الكود دائماً — فالرمزُ يظهر على أي استضافة PHP بلا شرط.
  *
- * غيابُ المكتبة أو أي فشلٍ يعيد null والواجهات تكتفي بالنص — لا كسر أبداً.
+ * أيُّ فشلٍ يعيد null والواجهاتُ تكتفي بالنص — لا كسر أبداً.
  */
 class Qr
 {
     public static function svg(string $text, int $size = 160): ?string
     {
-        if (! class_exists(Encoder::class)) return null;
-
         try {
-            // ECC مستوى M (تصحيحٌ ~15%): يتحمّل خدشاً/طيّةً في الوثيقة المطبوعة
-            $matrix = Encoder::encode($text, ErrorCorrectionLevel::M(), 'UTF-8')->getMatrix();
-            $n = $matrix->getWidth();
-            if ($n < 1) return null;
+            $matrix = QrEncoder::matrix($text);   // مصفوفةٌ ثنائية 0/1 (مظلم=1)
+            if (! $matrix) return null;
+            $n = count($matrix);
 
             $quiet = 4;                         // المنطقة الهادئة إلزامٌ للمسح — بلا هامشٍ لا يُقرأ
             $span = $n + $quiet * 2;
@@ -34,11 +28,12 @@ class Qr
             // مسارٌ واحدٌ لكل الوحدات الداكنة، بضغطٍ أفقيٍّ (run-length) — ملفٌّ صغير
             $path = '';
             for ($y = 0; $y < $n; $y++) {
+                $row = $matrix[$y];
                 $x = 0;
                 while ($x < $n) {
-                    if ($matrix->get($x, $y) !== 1) { $x++; continue; }
+                    if ($row[$x] !== 1) { $x++; continue; }
                     $run = 1;
-                    while ($x + $run < $n && $matrix->get($x + $run, $y) === 1) $run++;
+                    while ($x + $run < $n && $row[$x + $run] === 1) $run++;
                     $px = $x + $quiet;
                     $py = $y + $quiet;
                     $path .= "M{$px} {$py}h{$run}v1h-{$run}z";

@@ -74,11 +74,20 @@ class EsignController extends Controller
                 ->groupBy('request_id')->map->first()
             : collect();
 
+        // موقّعو كل طلبٍ بروابطهم — متاحون من المركز دائماً لا عند الإنشاء فقط
+        // (مسارُ الموقّع الواحد القديم صفُّه برمز الطلب نفسه فيُستثنى — رابطه رابطُ الطلب)
+        $signers = \App\Models\ContractSigner::whereIn('request_id', $requests->pluck('id'))
+            ->orderBy('order')->get()
+            ->filter(fn ($s) => ! $requests->firstWhere('id', $s->request_id)
+                || $s->token !== (string) $requests->firstWhere('id', $s->request_id)->token)
+            ->groupBy('request_id');
+
         return view('esign.index', [
             'templates' => SignTemplate::orderBy('sort')->orderBy('name')->get(),
             // v2.117: القائمة كانت تعرض طلبات كل الشركات بلا تنطيق — تُرشَّح الآن
             // عبر نطاق العقد/الجهة المربوطة والمنشئ (وcompany_id مباشرةً يأتي في م2)
             'requests'  => $requests,
+            'signers'   => $signers,
             'apSteps'   => $apSteps,
             'contracts' => hub_scope(\App\Models\Contract::query(), 'contracts')
                 ->orderByDesc('created_at')->limit(200)->pluck('title', 'id'),

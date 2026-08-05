@@ -156,8 +156,27 @@
                     @if ($q->status === 'وُقّع')
                         <a class="btn ghost xs" href="{{ route('esign.cert', $q->id) }}" title="شهادة الإتمام بسجل الأدلة">📜</a>
                     @endif
-                    <button class="btn ghost xs" type="button"
-                            onclick="navigator.clipboard.writeText(@js(route('sign.show', $q->token)));this.textContent='✓ نُسخ'">نسخ الرابط</button>
+                    @php $sgs = $signers[$q->id] ?? collect(); @endphp
+                    @if ($sgs->count() > 0)
+                        {{-- موقّعون متعددون: كلُّ رابطٍ متاحٌ من المركز دائماً لا عند الإنشاء فقط --}}
+                        <details class="inline sglinks"><summary class="btn ghost xs">🔗 الروابط ({{ $sgs->count() }})</summary>
+                            <div class="sgpop">
+                                @foreach ($sgs as $s)
+                                    <div class="sgrow2">
+                                        <span class="bdg {{ hub_tone($s->status) }}">{{ $s->status }}</span>
+                                        <b>{{ \Illuminate\Support\Str::limit($s->name, 22) }}</b>
+                                        <span class="sub">{{ $s->role }}</span>
+                                        <span class="spacer"></span>
+                                        <button class="btn ghost xs" type="button"
+                                                onclick="navigator.clipboard.writeText(@js(route('sign.show', $s->token)));this.textContent='✓'">نسخ</button>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </details>
+                    @else
+                        <button class="btn ghost xs" type="button"
+                                onclick="navigator.clipboard.writeText(@js(route('sign.show', $q->token)));this.textContent='✓ نُسخ'">نسخ الرابط</button>
+                    @endif
                     @if ($q->status === 'بانتظار التوقيع' && ! $q->cancelled_at)
                         <form method="POST" action="{{ route('esign.resend', $q->id) }}" class="inline">@csrf
                             <button class="btn ghost xs" title="تذكير بريدي للموقّعين المعلقين">⏰</button></form>
