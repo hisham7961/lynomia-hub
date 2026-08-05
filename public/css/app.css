@@ -819,15 +819,7 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
   .pbar span{transition:none}
 }
 
-/* ═ ترويسة هوية الوحدة — أيقونة ملونة بلون مجموعتها ═ */
-.modhero{--mh:var(--p);display:flex;gap:14px;align-items:center;margin-bottom:14px;
-  animation:rise .45s cubic-bezier(.2,.75,.3,1) backwards}
-.mhico{width:48px;height:48px;border-radius:14px;font-size:23px;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;
-  background:color-mix(in srgb,var(--mh) 13%,transparent);
-  box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--mh) 25%,transparent),
-             0 4px 14px color-mix(in srgb,var(--mh) 14%,transparent)}
-.modhero h2{font-size:19px;font-weight:700;letter-spacing:-.01em}
+/* ترويسة هوية الوحدة (.modhero) رُقّيت إلى البند الموحّد مع .lx-head أدناه (v2.294) */
 
 /* ═ الخط الزمني v2 — سكة عمودية ونقاط دائرية (يخص .tlv2 كي لا يمس استعمالات .tl الأخرى) ═ */
 .tlv2{position:relative;padding-inline-start:2px}
@@ -1004,13 +996,16 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 /* ═══ v2.294: قائمة الوحدة المرتقاة — رأسٌ موحّد وأدواتٌ مصقولة وصفوفٌ أرحب ═══
    كلُّها من الرموز فتتبع الوضعين النهاريّ والليليّ، وبنية الأعمدة المرنة لا تُمَسّ.
    تُدرَج قبل كتلة كثافة الجوال كي تبقى الأخيرةُ آخرَ الملف تملك غلبة الشلال */
-.lx-head{--mh:var(--p);display:flex;align-items:center;gap:14px;padding:14px 18px;margin-bottom:14px;
+/* الرأسُ الموحّد يشمل .modhero القديمة أيضاً — فترتقي ترويساتُ النموذج والعرض
+   والنشاط وesign جميعاً إلى البند نفسه بلا تغيير قالبٍ واحد */
+.lx-head,.modhero{--mh:var(--p);display:flex;align-items:center;gap:14px;padding:14px 18px;margin-bottom:14px;
   border-radius:16px;border:1px solid var(--ln);position:relative;overflow:hidden;
-  background:linear-gradient(135deg,color-mix(in srgb,var(--mh) 9%,var(--cd)),var(--cd) 62%);box-shadow:var(--sh)}
-.lx-head::before{content:"";position:absolute;inset-block:0;inset-inline-start:0;width:4px;background:var(--mh)}
-.lx-ico{width:50px;height:50px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:23px;flex-shrink:0;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--mh) 9%,var(--cd)),var(--cd) 62%);box-shadow:var(--sh);
+  animation:rise .45s cubic-bezier(.2,.75,.3,1) backwards}
+.lx-head::before,.modhero::before{content:"";position:absolute;inset-block:0;inset-inline-start:0;width:4px;background:var(--mh)}
+.lx-ico,.mhico{width:50px;height:50px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:23px;flex-shrink:0;
   background:color-mix(in srgb,var(--mh) 15%,var(--cd));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--mh) 30%,transparent)}
-.lx-head h2{font-size:19px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.lx-head h2,.modhero h2{font-size:19px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .lx-count{font-size:12px;font-weight:700;color:var(--mh);background:color-mix(in srgb,var(--mh) 12%,transparent);border-radius:99px;padding:2px 11px}
 .lx-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
 .lx-search{position:relative;flex:1;min-width:180px;max-width:440px}
@@ -1044,10 +1039,10 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
   .topbar .uname{display:none}
   .gsearch .inp{padding:6px 12px}
   .content{padding:10px 10px 30px}
-  .modhero{gap:10px;margin-bottom:8px}
-  .mhico{width:34px;height:34px;font-size:17px;border-radius:10px}
-  .modhero h2{font-size:16.5px}
-  .modhero .sub{font-size:11px}
+  .modhero,.lx-head{gap:10px;margin-bottom:8px;padding:11px 13px}
+  .mhico,.lx-ico{width:38px;height:38px;font-size:18px;border-radius:11px}
+  .modhero h2,.lx-head h2{font-size:16.5px}
+  .modhero .sub,.lx-head .sub{font-size:11px}
   /* أفعال الترويسة والفلاتر: سطرٌ واحد ينزلق أفقياً بدل التراص عمودياً */
   .rh-acts{flex-basis:100%;display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
   .rh-acts::-webkit-scrollbar{display:none}
