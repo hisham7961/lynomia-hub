@@ -103,7 +103,7 @@ class WebhookController extends Controller
         return view('admin.webhook_log', [
             'h'    => $h,
             'rows' => WebhookDelivery::where('webhook_id', $h->id)
-                        ->orderByDesc('created_at')->paginate(25),
+                        ->orderByDesc('created_at')->orderByDesc('id')->paginate(25),   // فاصلُ تعادلٍ حاسم
         ]);
     }
 

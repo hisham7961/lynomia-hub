@@ -209,6 +209,7 @@ class CeoBoard
         if ($iq = hub_read('issues')) {
             $rows = hub_open_scope($iq)
                 ->orderByRaw("CASE severity WHEN 'حرجة' THEN 0 WHEN 'عالية' THEN 1 WHEN 'متوسطة' THEN 2 ELSE 3 END")
+                ->orderByDesc('id')   // فاصلُ تعادلٍ: severity من أربع قيمٍ يُقرَع قصُّها بين المحرّكين
                 ->limit(6)->get(['id', 'title', 'severity', 'status', 'found']);
             foreach ($rows as $r) {
                 $age = $r->found ? (int) \Illuminate\Support\Carbon::parse($r->found)->diffInDays(now()) : null;
@@ -220,6 +221,7 @@ class CeoBoard
 
         if ($nq = hub_read('incidents')) {
             $rows = hub_open_scope($nq)
+                ->orderByDesc('id')   // كانت بلا ترتيبٍ البتّة — قصُّ ٤ من غير المرتَّب قرعةٌ صريحة
                 ->limit(4)->get(['id', 'title', 'severity', 'status', 'started_at']);
             foreach ($rows as $r) {
                 $age = $r->started_at ? (int) \Illuminate\Support\Carbon::parse($r->started_at)->diffInDays(now()) : null;
