@@ -1069,6 +1069,65 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .lx-form.card::before{content:"";position:absolute;inset-block-start:0;inset-inline:0;height:3px;
   background:linear-gradient(90deg,var(--fc),color-mix(in srgb,var(--fc) 35%,transparent))}
 
+/* ═ مركز التوقيع المُعاد تصميمه (v2.311): بطاقاتُ وثائق بخطّ سير، ألسنةُ تصفية،
+   رقائقُ موقّعين، ولوحاتٌ قابلةٌ للطيّ للإنشاء والقوالب ═ */
+.esg-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.esg-tab{border:1px solid var(--ln);background:var(--cd);border-radius:99px;padding:6px 14px;font-size:12.5px;
+  font-weight:600;color:var(--sb);cursor:pointer;transition:all var(--t);font-family:inherit}
+.esg-tab b{font-weight:700;margin-inline-start:3px;color:var(--tx)}
+.esg-tab:hover{border-color:var(--lnd)}
+.esg-tab.on{background:color-mix(in srgb,var(--p) 10%,var(--cd));border-color:var(--p);color:var(--p)}
+.esg-tab.on b{color:var(--p)}
+.esg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(360px,100%),1fr));gap:14px;margin-bottom:16px}
+.esg-card{background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);padding:14px 16px 12px;
+  position:relative;overflow:visible;transition:box-shadow .22s,transform .22s}
+.esg-card::before{content:"";position:absolute;inset-block-start:0;inset-inline:0;height:3px;
+  border-radius:var(--r) var(--r) 0 0;background:var(--wn)}
+.esg-card.ok::before{background:var(--ok)}
+.esg-card.bad::before{background:var(--bad)}
+.esg-card:hover{box-shadow:var(--shh);transform:translateY(-2px)}
+.esg-top{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.esg-title{min-width:0}
+.esg-title b{font-size:14.5px;letter-spacing:-.01em}
+.esg-title .sub{font-size:11.5px;margin-top:2px}
+/* خطُّ السير: نقاطٌ موصولةٌ بسكك — المنجزُ أخضر، والمقطوعُ (رُفض/أُلغي) أحمر */
+.esg-stages{display:flex;align-items:center;gap:2px;margin-bottom:10px}
+.esg-step{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:44px}
+.esg-step .dot{width:11px;height:11px;border-radius:50%;background:var(--bg2);border:2px solid var(--ln)}
+.esg-step .lbl{font-size:10px;color:var(--sb);white-space:nowrap}
+.esg-step.done .dot{background:var(--ok);border-color:var(--ok)}
+.esg-step.done .lbl{color:var(--ok);font-weight:700}
+.esg-step.bad .dot{background:var(--bad);border-color:var(--bad)}
+.esg-step.bad .lbl{color:var(--bad);font-weight:700}
+.esg-rail{flex:1;height:2px;background:var(--ln);border-radius:99px;margin-bottom:14px}
+.esg-rail.done{background:var(--ok)}
+/* رقائقُ الموقّعين: حرفٌ أوّل + اسمٌ + لونُ حالة */
+.esg-sgs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+.esg-sgchip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;
+  border-radius:99px;padding:3px 10px 3px 12px;background:color-mix(in srgb,var(--sb) 8%,transparent);color:var(--tx)}
+.esg-sgchip i{font-style:normal;width:18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;
+  font-size:10px;font-weight:700;background:color-mix(in srgb,var(--sb) 16%,transparent);color:var(--sb)}
+.esg-sgchip.ok{background:var(--okbg);color:var(--ok)}
+.esg-sgchip.ok i{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.esg-sgchip.wn{background:var(--wnbg);color:var(--wn)}
+.esg-sgchip.wn i{background:color-mix(in srgb,var(--wn) 18%,transparent);color:var(--wn)}
+.esg-sgchip.bad{background:var(--badbg);color:var(--bad)}
+.esg-sgchip.bad i{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.esg-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;margin-bottom:9px}
+.esg-acts{display:flex;gap:5px;align-items:center;flex-wrap:wrap;padding-top:9px;
+  border-top:1px solid color-mix(in srgb,var(--ln) 55%,transparent)}
+/* اللوحاتُ القابلةُ للطيّ: الإنشاء والقوالب */
+.esg-panel{background:var(--cd);border:1px solid var(--ln);border-radius:var(--r);margin-bottom:14px}
+.esg-panel>summary{list-style:none;cursor:pointer;padding:13px 17px;font-weight:700;font-size:14px;
+  display:flex;gap:9px;align-items:center;border-radius:var(--r);transition:background var(--t)}
+.esg-panel>summary::-webkit-details-marker{display:none}
+.esg-panel>summary:hover{background:color-mix(in srgb,var(--p) 3%,transparent)}
+.esg-panel>summary .sub{font-weight:500}
+.esg-panel[open]>summary{border-bottom:1px solid var(--ln);border-radius:var(--r) var(--r) 0 0}
+.esg-pico{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;font-size:15px;flex-shrink:0;
+  background:color-mix(in srgb,var(--p) 10%,transparent)}
+.esg-pbody{padding:15px 17px}
+
 /* ═ روابطُ الموقّعين المتعددين في مركز التوقيع (v2.310): قائمةٌ منسدلةٌ من صفّ
    الطلب — كلُّ موقّعٍ بحالته ورابطه، متاحةٌ دائماً لا عند الإنشاء فقط ═ */
 .sglinks{position:relative}
