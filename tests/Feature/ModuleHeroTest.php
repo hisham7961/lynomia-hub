@@ -37,6 +37,21 @@ class ModuleHeroTest extends TestCase
         $this->assertStringContainsString('tlv2', $html);                 // الخط الزمني الجديد
     }
 
+    /**
+     * صفحةُ النموذج (v2.303): رأسٌ موحّد (lx-head) وبطاقةٌ مرتقاة (lx-form) تحمل لون
+     * الوحدة — فالنموذج يتّسق مع رأسه وقائمته بدل بطاقةٍ عارية، والعنوانُ الداخليّ
+     * المكرّر (mhead) يُخفى على الصفحة الكاملة (يبقى في النافذة المنبثقة).
+     */
+    public function test_module_form_uses_lifted_identity_card(): void
+    {
+        $this->seedCore();
+
+        $html = $this->actingAs($this->owner)->get('/m/tasks/create')->assertOk()->getContent();
+        $this->assertStringContainsString('class="lx-head"', $html);          // الرأس الموحّد
+        $this->assertStringContainsString('class="card lx-form"', $html);     // البطاقة المرتقاة
+        $this->assertStringContainsString('#0E7C66', $html);                  // لون مجموعة «العمل» يُمرَّر للنموذج
+    }
+
     public function test_look_helper_covers_every_module(): void
     {
         $this->seedCore();

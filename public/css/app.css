@@ -1029,6 +1029,31 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 @media (max-width:720px){.lx-tools{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
   .lx-tools::-webkit-scrollbar{display:none}.lx-tools>*{flex-shrink:0}}
 
+/* ═ نموذجٌ مرتقى (v2.303): حقولٌ مملوءةٌ ترتفع بالتركيز، وتركيزٌ بلون هوية الوحدة ═
+   يُلبَّس على بطاقة النموذج (.card.lx-form) وتُمرَّر --mh لون الوحدة، فيتّسق النموذج
+   مع رأسه وقائمته. الحقلُ في راحته مملوءٌ خفيفاً، وبالتركيز يبيضّ ويتوشّح حلقةَ اللون. */
+.lx-form{--fc:var(--mh,var(--p))}
+.lx-form .fg{gap:16px 18px}
+.lx-form .fld label,.lx-form .fld .lbl{font-size:12px;font-weight:700;letter-spacing:.01em}
+.lx-form .fld>label:first-child{display:flex;align-items:center;gap:6px}
+.lx-form .inp{background:color-mix(in srgb,var(--tx) 3.5%,transparent);border-color:transparent;
+  padding:10px 14px;transition:background var(--t),border-color var(--t),box-shadow var(--t)}
+.lx-form .inp:hover{background:color-mix(in srgb,var(--tx) 6%,transparent);border-color:transparent}
+.lx-form .inp:focus{background:var(--cd);border-color:var(--fc);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--fc) 18%,transparent)}
+.lx-form textarea.inp{min-height:86px}
+/* على الصفحة الكاملة يعلو النموذجَ رأسُ .lx-head — فعنوانُ .mhead الداخليّ تكرارٌ
+   يُخفى هنا، ويبقى في النافذة المنبثقة (بلا رأس) حيث هو العنوان الوحيد */
+.lx-form .mhead{display:none}
+/* حقلٌ فيه خطأ يبقى محمرّاً ولو لُبِّس النموذج المرتقى */
+.lx-form .inp.err,.lx-form .fld.haserr .inp{border-color:var(--bad)}
+.lx-form .formfoot{margin-top:22px;padding-top:18px;gap:10px;align-items:center}
+.lx-form .formfoot .btn.p{padding-inline:24px}
+/* الشريطُ العلويّ الرفيع بلون الوحدة يربط النموذج بهويّتها */
+.lx-form.card{position:relative;overflow:hidden}
+.lx-form.card::before{content:"";position:absolute;inset-block-start:0;inset-inline:0;height:3px;
+  background:linear-gradient(90deg,var(--fc),color-mix(in srgb,var(--fc) 35%,transparent))}
+
 /* ═ كثافة الجوال (v2.115): الترويسات كانت تلتهم ٦٣٢ من ٨٤٤ بكسل قبل أول صف بيانات ═ */
 @media (max-width:760px){
   .demoband{font-size:11px;padding:3px 8px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}
