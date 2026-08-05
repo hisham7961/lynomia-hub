@@ -20,6 +20,22 @@ class ActivityController extends Controller
         abort_unless(hub_is_owner(), 403, 'مركز النشاط للمالكين فقط');
     }
 
+    /**
+     * مصدرُ بياناتٍ مساعدٍ محميّ: صفحةُ مراقبةٍ لا يُسقطها غيابُ جدولٍ واحد
+     * (استضافةٌ متأخّرةٌ في الهجرات، أو عمودٌ لم يُضَف بعد). الفشلُ يُبلَّغ ويُعاد
+     * الافتراضي — فتُعرَض التفاصيلُ المتاحة لا صفحةُ خطأ. (نمط PortalController وTrackVisits.)
+     */
+    protected function safe(callable $fn, $default)
+    {
+        try {
+            return $fn();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return $default;
+        }
+    }
+
     public function index()
     {
         $this->gate();
@@ -57,8 +73,8 @@ class ActivityController extends Controller
         $since = now()->subDays(14)->startOfDay();
 
         // اليوميات: أول/آخر ظهور، دقائق النشاط (كل سلة ٥ دقائق فيها زيارة = ٥ دقائق عمل)
-        $visits = DB::table('page_visits')->where('user_id', $u->id)
-            ->where('at', '>=', $since)->orderBy('at')->get();
+        $visits = $this->safe(fn () => DB::table('page_visits')->where('user_id', $u->id)
+            ->where('at', '>=', $since)->orderBy('at')->get(), collect());
 
         $days = [];
         foreach ($visits as $v) {
@@ -76,16 +92,16 @@ class ActivityController extends Controller
         }
         krsort($days);
 
-        // المؤشرات المجمّعة
-        $topPages = DB::table('page_visits')->where('user_id', $u->id)->where('at', '>=', $since)
-            ->select('path', DB::raw('COUNT(*) c'))->groupBy('path')->orderByDesc('c')->limit(12)->get();
-        $devices = DB::table('sessions_log')->where('user_id', $u->id)
-            ->orderByDesc('started_at')->limit(8)->get(['device', 'ip', 'started_at as created_at']);
-        $ips = DB::table('user_ips')->where('user_id', $u->id)->orderByDesc('hits')->get();
-        $trail = DB::table('page_visits')->where('user_id', $u->id)
-            ->orderByDesc('at')->limit(120)->get();
-        $suspects = DB::table('audits')->where('user_id', $u->id)
-            ->where('action', 'دخول مريب')->orderByDesc('created_at')->limit(10)->get();
+        // المؤشرات المجمّعة — كلٌّ محميٌّ على حدة فلا يُسقط غيابُ أحدها بقيّةَ الصفحة
+        $topPages = $this->safe(fn () => DB::table('page_visits')->where('user_id', $u->id)->where('at', '>=', $since)
+            ->select('path', DB::raw('COUNT(*) c'))->groupBy('path')->orderByDesc('c')->limit(12)->get(), collect());
+        $devices = $this->safe(fn () => DB::table('sessions_log')->where('user_id', $u->id)
+            ->orderByDesc('started_at')->limit(8)->get(['device', 'ip', 'started_at as created_at']), collect());
+        $ips = $this->safe(fn () => DB::table('user_ips')->where('user_id', $u->id)->orderByDesc('hits')->get(), collect());
+        $trail = $this->safe(fn () => DB::table('page_visits')->where('user_id', $u->id)
+            ->orderByDesc('at')->limit(120)->get(), collect());
+        $suspects = $this->safe(fn () => DB::table('audits')->where('user_id', $u->id)
+            ->where('action', 'دخول مريب')->orderByDesc('created_at')->limit(10)->get(), collect());
 
         return view('activity.show', compact('u', 'days', 'topPages', 'devices', 'ips', 'trail', 'suspects')
             + ['risk' => $this->riskProfile($u->id, $visits)]);
@@ -115,14 +131,16 @@ class ActivityController extends Controller
         }
         $totalMin = $inMin + $outMin + $nightMin;
 
-        $logins   = DB::table('sessions_log')->where('user_id', $uid)->where('started_at', '>=', $since)->count();
-        $strange  = DB::table('audits')->where('user_id', $uid)->where('action', 'دخول مريب')
-                        ->where('created_at', '>=', $since)->count();
-        $failed   = DB::table('audits')->where('user_id', $uid)->where('action', 'دخول فاشل')
-                        ->where('created_at', '>=', $since)->count();
-        $devCount = (int) DB::table('sessions_log')->where('user_id', $uid)->where('started_at', '>=', $since)
-                        ->distinct()->count('device');
-        $ipCount  = (int) DB::table('user_ips')->where('user_id', $uid)->count();
+        // كلٌّ محميٌّ: غيابُ جدولٍ مساعدٍ يعيد صفراً لا يُسقط ملفَّ الشك كاملاً
+        $logins   = (int) $this->safe(fn () => DB::table('sessions_log')->where('user_id', $uid)
+                        ->where('started_at', '>=', $since)->count(), 0);
+        $strange  = (int) $this->safe(fn () => DB::table('audits')->where('user_id', $uid)->where('action', 'دخول مريب')
+                        ->where('created_at', '>=', $since)->count(), 0);
+        $failed   = (int) $this->safe(fn () => DB::table('audits')->where('user_id', $uid)->where('action', 'دخول فاشل')
+                        ->where('created_at', '>=', $since)->count(), 0);
+        $devCount = (int) $this->safe(fn () => DB::table('sessions_log')->where('user_id', $uid)->where('started_at', '>=', $since)
+                        ->distinct()->count('device'), 0);
+        $ipCount  = (int) $this->safe(fn () => DB::table('user_ips')->where('user_id', $uid)->count(), 0);
 
         // معدل التلاعب: إشارات الدخول الشاذة منسوبةً لكل الدخول
         $tamper = $logins + $failed > 0
