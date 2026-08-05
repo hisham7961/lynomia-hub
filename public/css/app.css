@@ -1001,6 +1001,37 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .msauto{margin-inline-start:auto}
 .pointer{cursor:pointer}
 
+/* ═══ v2.294: قائمة الوحدة المرتقاة — رأسٌ موحّد وأدواتٌ مصقولة وصفوفٌ أرحب ═══
+   كلُّها من الرموز فتتبع الوضعين النهاريّ والليليّ، وبنية الأعمدة المرنة لا تُمَسّ.
+   تُدرَج قبل كتلة كثافة الجوال كي تبقى الأخيرةُ آخرَ الملف تملك غلبة الشلال */
+.lx-head{--mh:var(--p);display:flex;align-items:center;gap:14px;padding:14px 18px;margin-bottom:14px;
+  border-radius:16px;border:1px solid var(--ln);position:relative;overflow:hidden;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--mh) 9%,var(--cd)),var(--cd) 62%);box-shadow:var(--sh)}
+.lx-head::before{content:"";position:absolute;inset-block:0;inset-inline-start:0;width:4px;background:var(--mh)}
+.lx-ico{width:50px;height:50px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:23px;flex-shrink:0;
+  background:color-mix(in srgb,var(--mh) 15%,var(--cd));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--mh) 30%,transparent)}
+.lx-head h2{font-size:19px;font-weight:700;letter-spacing:-.02em;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.lx-count{font-size:12px;font-weight:700;color:var(--mh);background:color-mix(in srgb,var(--mh) 12%,transparent);border-radius:99px;padding:2px 11px}
+.lx-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.lx-search{position:relative;flex:1;min-width:180px;max-width:440px}
+.lx-search .inp{padding-inline-start:38px}
+.lx-search::before{content:"⌕";position:absolute;inset-inline-start:13px;top:50%;transform:translateY(-50%);font-size:17px;color:var(--sb);pointer-events:none}
+.lx-seg{display:flex;gap:2px;background:var(--bg2);border:1px solid var(--ln);border-radius:11px;padding:3px}
+.lx-seg .ddsum{border:0;background:transparent;box-shadow:none}
+.lx-seg .ddsum:hover{background:var(--cd)}
+/* صقلُ صفوف الجدول داخل القائمة — لمسةُ لونٍ على حافة الصف، بلا مساسٍ بالأعمدة */
+.lx-list .tbl td{padding:12px 14px}
+.lx-list .tbl tbody tr:hover td:first-child{box-shadow:inset 3px 0 0 var(--p)}
+/* أزرارُ إجراءٍ أيقونيّة — خفيفةٌ تُضيء عند المرور على الصف */
+.lx-acts{opacity:.6;transition:opacity var(--t)}
+.lx-list .tbl tbody tr:hover .lx-acts{opacity:1}
+.lx-ib{display:inline-flex;align-items:center;justify-content:center;width:31px;height:31px;border-radius:9px;
+  border:1px solid transparent;background:transparent;cursor:pointer;font-size:14px;color:var(--sb);transition:all var(--t);text-decoration:none}
+.lx-ib:hover{background:color-mix(in srgb,var(--p) 8%,transparent);color:var(--p)}
+.lx-ib.dn:hover{background:var(--badbg);color:var(--bad)}
+@media (max-width:720px){.lx-tools{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .lx-tools::-webkit-scrollbar{display:none}.lx-tools>*{flex-shrink:0}}
+
 /* ═ كثافة الجوال (v2.115): الترويسات كانت تلتهم ٦٣٢ من ٨٤٤ بكسل قبل أول صف بيانات ═ */
 @media (max-width:760px){
   .demoband{font-size:11px;padding:3px 8px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}

@@ -14,7 +14,9 @@ class ModuleHeroTest extends TestCase
         \App\Models\Task::create(['title' => 'م٢']);
 
         $html = $this->actingAs($this->owner)->get('/m/tasks')->assertOk()->getContent();
-        $this->assertStringContainsString('class="modhero"', $html);
+        // v2.294: الترويسة المرتقاة — رأسٌ موحّد (lx-head) وعدّادٌ حيّ كوسام (lx-count)
+        $this->assertStringContainsString('class="lx-head"', $html);
+        $this->assertStringContainsString('class="lx-count"', $html);
         $this->assertStringContainsString('✅', $html);                    // أيقونة المهام
         $this->assertStringContainsString('#0E7C66', $html);               // لون مجموعة «العمل»
         $this->assertStringContainsString('2 سجل', $html);
