@@ -55,7 +55,8 @@ class V1Controller extends ModuleController
         $page = $q->orderByDesc('created_at')->orderByDesc('id')
             ->paginate(min(100, max(1, (int) $r->query('per', 25))));
 
-        $fields = $r->query('fields');
+        // hub_str: shape() مُوقَّعةٌ ?string، و`?fields[]=` يمرّر مصفوفةً فترمي TypeError
+        $fields = hub_str($r->query('fields')) ?: null;
         $this->auditApiSecretRead($def, count($page->items()));
 
         return response()->json([

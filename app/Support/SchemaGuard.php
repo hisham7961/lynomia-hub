@@ -123,7 +123,10 @@ class SchemaGuard
                         'dt'           => $t->dateTime($g['col'])->nullable(),
                         'bool'         => $t->boolean($g['col'])->nullable(),
                         'ref'          => $t->string($g['col'], 36)->nullable(),
-                        'txt', 'json'  => $t->text($g['col'])->nullable(),
+                        // ta/tags/sec كانت تسقط إلى string(300) — أضيقُ ممّا تُصرّح
+                        // به الهجرات، و`gaps()` شرطُه hasColumn وحده فيُبلّغ «سليم»
+                        // بينما العمودُ الجديد يرفض ما يُكتب فيه على MySQL الصارمة
+                        'ta', 'tags', 'sec', 'txt', 'json' => $t->text($g['col'])->nullable(),
                         default        => $t->string($g['col'], 300)->nullable(),
                     };
                 });

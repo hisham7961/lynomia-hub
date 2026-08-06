@@ -13,7 +13,7 @@
     } elseif ($odooOk && $opid) {
         try { $stats = $ocli->stats($opid); }
         catch (\Throwable $e) { $err = $e->getMessage(); }
-    } elseif ($odooOk && $canE && ($oq = trim((string) request('odoo_q'))) !== '') {
+    } elseif ($odooOk && $canE && ($oq = trim(hub_str(request('odoo_q')))) !== '') {
         try { $results = $ocli->partners($oq); }
         catch (\Throwable $e) { $err = $e->getMessage(); }
     }
@@ -55,7 +55,7 @@
             @if ($canE)
                 <p class="sub">اربط هذا السجل بشريكه في أودو لعرض مبيعاته وفواتيره هنا:</p>
                 <form method="GET" action="{{ url()->current() }}#odoo" class="crow" style="margin-top:8px">
-                    <input class="inp" name="odoo_q" value="{{ request('odoo_q') }}" placeholder="ابحث باسم العميل في أودو…" style="max-width:260px">
+                    <input class="inp" name="odoo_q" value="{{ hub_str(request('odoo_q')) }}" placeholder="ابحث باسم العميل في أودو…" style="max-width:260px">
                     <button class="btn sm">بحث في أودو</button>
                 </form>
                 @if (is_array($results))

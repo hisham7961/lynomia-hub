@@ -47,12 +47,20 @@ class PayrollController extends Controller
         // التحقق على الكل قبل كتابة أي سطر — لا كتابة نصفية عند رفض سطرٍ لاحق
         $dirty = [];
         foreach ($lines as $l) {
-            $val = function (string $k) use ($r, $l) {
+            // **سقفٌ عدديّ من العمود نفسه** (v2.318): كان `round((float)…)` وحده،
+            // فقيمةٌ تسع العمود (`decimal(16,3)`) تُفيض `net` أو مجموعَ المسيّر
+            // فترمي MySQL `22003` غيرَ ملتقطة — ٥٠٠ على مسارٍ مصادَق، ونصُّ
+            // الاستعلام وقيمُ الربط يُخزَّنان في مركز الأخطاء. والحدُّ يُطبَّق قبل
+            // أيّ كتابة (الحلقةُ كلُّها تحقُّقٌ ثمّ كتابة).
+            $cap = (float) (hub_col_num_max('payroll_lines', 'net') ?? 9999999999999.999);
+            $val = function (string $k) use ($r, $l, $cap) {
                 $raw = data_get($r->input($k), $l->id);
                 if ($raw === null || $raw === '') return null;                 // لم يُرسَل — يبقى كما هو
-                abort_unless(is_numeric($raw), 422, 'قيمة تعديلٍ ليست رقماً');
-                abort_if((float) $raw < 0, 422, 'قيمة التعديل لا تكون سالبة — الخصم يُدخل موجباً في خانته');
-                return round((float) $raw, 3);
+                $n = hub_num($raw);
+                abort_unless($n !== null, 422, 'قيمة تعديلٍ ليست رقماً');
+                abort_if($n < 0, 422, 'قيمة التعديل لا تكون سالبة — الخصم يُدخل موجباً في خانته');
+                abort_if($n > $cap, 422, 'قيمة التعديل تتجاوز ما يسعه الحقل — راجع الرقم');
+                return round($n, 3);
             };
             $ot = $val('ot') ?? (float) $l->overtime;
             $de = $val('de') ?? (float) $l->deduct;
@@ -60,6 +68,7 @@ class PayrollController extends Controller
             $net = round((float) $l->base + (float) $l->allow + $ot - $de - $ad, 3);
             abort_if($net < 0, 422,
                 'الخصومات والسلف تتجاوز مستحق السطر (' . number_format($net, 2) . ') — لا صافي سالب في مسيّر');
+            abort_if($net > $cap, 422, 'صافي السطر يتجاوز ما يسعه الحقل — راجع التعديلات');
             $dirty[$l->id] = ['overtime' => $ot, 'deduct' => $de, 'advance' => $ad, 'net' => $net];
         }
 

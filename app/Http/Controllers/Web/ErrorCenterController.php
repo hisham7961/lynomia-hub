@@ -58,9 +58,22 @@ class ErrorCenterController extends Controller
         $this->gate();
         $e = ErrorEvent::findOrFail($id);
 
-        // مقتطف الشيفرة حول السطر — «أين» بالضبط لا مجرد اسم ملف
+        // مقتطف الشيفرة حول السطر — «أين» بالضبط لا مجرد اسم ملف.
+        // **ومن داخل جذر المشروع حصراً** (v2.318): `error_events.file` صفٌّ
+        // يزرعه أيُّ مستخدمٍ مسجَّل بإحداث خطأ، وقراءتُه كما هو تعني قراءةَ أيّ
+        // ملفٍ على القرص (‏`.env`، مفاتيح، `/etc/passwd`) وطباعتَه على الشاشة.
         $snippet = [];
-        if ($e->file && $e->line && is_file($e->file) && is_readable($e->file)) {
+        $path = (string) $e->file;
+        $real = $path !== '' ? @realpath($path) : false;
+        $root = @realpath(base_path()) ?: base_path();
+        $inRoot = $real !== false && str_starts_with($real, rtrim($root, '/') . '/')
+            && ! str_starts_with($real, rtrim($root, '/') . '/.env');
+
+        if ($inRoot && $e->line && is_file($real) && is_readable($real)) {
+            $e = clone $e;
+            $e->file = $real;
+        }
+        if ($inRoot && $e->line && is_file($e->file) && is_readable($e->file)) {
             try {
                 $lines = @file($e->file, FILE_IGNORE_NEW_LINES);
                 if ($lines !== false) {
