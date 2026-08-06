@@ -14,11 +14,22 @@ class ErrorLog
     /** حارسُ التكرار: إشعارٌ يفشل فيُلتقط خطؤه فيُشعر… لا حلقة بعد اليوم */
     protected static bool $inNotify = false;
 
+    /**
+     * طمسُ بيانات الاعتماد في المسارات العامة (v2.319): `/hook/<48 محرفاً>`
+     * و`/sign/<رمز>` و`/verify/<رمز>` — كلٌّ منها بيانُ الاعتماد **الوحيد**
+     * لنقطةٍ غير موقّعة. وكانت تُخزَّن في `error_events.url` و`message` وتُرسَل
+     * في نصّ الإشعار لكل المراقبين، ومنهم من يُردّ ٤٠٣ عن شاشة النقاط نفسها.
+     */
+    public static function redact(string $s): string
+    {
+        return (string) preg_replace('~/(hook|sign|verify)/[^/?\s&]{8,}~i', '/$1/{رمز}', $s);
+    }
+
     public static function capture(string $kind, string $message, ?string $file = null, ?int $line = null,
                                    ?string $trace = null): void
     {
         try {
-            $message = mb_substr($message, 0, 490);
+            $message = mb_substr(self::redact($message), 0, 490);
             $hash = hash('sha256', $kind . '|' . $message . '|' . $file . '|' . $line);
 
             $req = app()->runningInConsole() ? null : request();
@@ -31,11 +42,11 @@ class ErrorLog
                 ErrorEvent::create([
                     'hash' => $hash, 'kind' => $kind, 'message' => $message,
                     'file' => $file ? mb_substr($file, 0, 290) : null, 'line' => $line,
-                    'url' => $req ? mb_substr($req->fullUrl(), 0, 390) : null,
+                    'url' => $req ? mb_substr(self::redact($req->fullUrl()), 0, 390) : null,
                     'method' => $req?->method(),
                     'user_id' => auth()->id(),
                     'request_id' => $req?->attributes->get('request_id'),
-                    'trace' => $trace ? mb_substr($trace, 0, 12000) : null,
+                    'trace' => $trace ? mb_substr(self::redact($trace), 0, 12000) : null,
                     'first_seen' => now(), 'last_seen' => now(),
                 ]);
 
@@ -55,7 +66,7 @@ class ErrorLog
         $hit = ErrorEvent::where('hash', $hash)->update([
             'count' => \Illuminate\Support\Facades\DB::raw('count + 1'),
             'last_seen' => now(),
-            'url' => $req ? mb_substr($req->fullUrl(), 0, 390) : \Illuminate\Support\Facades\DB::raw('url'),
+            'url' => $req ? mb_substr(self::redact($req->fullUrl()), 0, 390) : \Illuminate\Support\Facades\DB::raw('url'),
             'user_id' => auth()->id() ?? \Illuminate\Support\Facades\DB::raw('user_id'),
         ]);
         if ($hit) {
@@ -94,11 +105,14 @@ class ErrorLog
             $last = $n + 1 === self::NOTIFY_BURST_CAP
                 ? ' — وثمة أخطاءٌ أخرى في المركز، افتحه'
                 : '';
-            $where = $req ? ' · ' . mb_substr((string) $req->path(), 0, 80) : ' · مهمّةٌ مجدولة';
+            // **طمسُ رموز المسارات العامة** (v2.319): `/hook/<48 محرفاً>` و
+            // `/sign/<رمز>` بيانا اعتمادٍ كاملان لنقطتين غير موقّعتين، وكانا
+            // يصلان كلَّ المراقبين في نصّ الإشعار — ومنهم من لا يملك رؤيتهما.
+            $where = $req ? ' · ' . mb_substr(self::redact((string) $req->path()), 0, 80) : ' · مهمّةٌ مجدولة';
 
             foreach (self::watchers() as $uid) {
                 hub_notify($uid, 'error',
-                    '💥 عطلٌ جديد' . $where . ': ' . mb_substr($message, 0, 300) . $last,
+                    '💥 عطلٌ جديد' . $where . ': ' . mb_substr(self::redact($message), 0, 300) . $last,
                     'errors', null);
             }
         } catch (\Throwable $e) {
