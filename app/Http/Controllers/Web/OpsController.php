@@ -257,6 +257,41 @@ class OpsController extends Controller
         }
     }
 
+    /**
+     * **فاحصان كانا يُرشَد إليهما بطرفيةٍ لا يملكها صاحبُ النظام.**
+     *
+     * هذا النظامُ يُرفع ملفّاتٍ على استضافةٍ مشتركة بلا shell — وكانت شاشةُ
+     * التدقيق تقول «شغّل `php artisan hub:audit-verify`» ومركزُ التشغيل يقول
+     * «شغّل `hub:schema-check`». فالنتيجةُ أنّ سلسلةَ التدقيق لا تُفحص أبداً
+     * وانحرافَ المخطّط لا يُكشف أبداً، بينما الشاشتان تُوهمان بوجود فاحص.
+     * وضمانٌ معلَنٌ بلا فاحصٍ يُسكِت السؤالَ الذي كان سيكشف الخلل.
+     *
+     * والمخرَجُ يُعرض كما هو — الفاحصُ يقول ما وجد، ولا يُعاد صوغُ حكمه.
+     */
+    public function verifyAudit()
+    {
+        $this->gate();
+
+        $code = \Illuminate\Support\Facades\Artisan::call('hub:audit-verify');
+        $out = trim(\Illuminate\Support\Facades\Artisan::output());
+        hub_audit('فحص سلسلة التدقيق', null, null, 'من مركز التشغيل');
+
+        return redirect()->route('ops.index')
+            ->with($code === 0 ? 'ok' : 'err', $out !== '' ? $out : 'الفاحصُ لم يُخرج شيئاً');
+    }
+
+    /** فحصُ انحراف المخطّط — الشقيقُ نفسُه: زرٌّ بدل سطرِ طرفية */
+    public function schemaCheck()
+    {
+        $this->gate();
+
+        $code = \Illuminate\Support\Facades\Artisan::call('hub:schema-check');
+        $out = trim(\Illuminate\Support\Facades\Artisan::output());
+
+        return redirect()->route('ops.index')
+            ->with($code === 0 ? 'ok' : 'err', $out !== '' ? $out : 'لا انحرافَ في المخطّط');
+    }
+
     /** توليد عدّة الانطلاق بضغطة: مسارات العمل + قواعد التنبيه — بلا طرفية */
     public function starters()
     {

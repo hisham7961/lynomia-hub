@@ -31,7 +31,17 @@
 @if (! $chain['ok'])
     <div class="card" style="border-color:var(--bad);margin-bottom:12px">
         <b>⚠️ سلسلة التدقيق مكسورة:</b> {{ $chain['why'] }}
-        <div class="sub" style="margin-top:6px">شغّل <span class="mono ltr">php artisan hub:audit-verify</span> لتحديد أول قيدٍ متأثّر ومدى الضرر. الشاشة تفحص الذيل فقط لأن فحص الجدول كاملاً لا يُحتمل مع كل فتحة.</div>
+        {{-- كان الإرشادُ سطرَ طرفيةٍ لا يملكها صاحبُ استضافةٍ مشتركة — فالفاحصُ
+             الوحيدُ لهذا الضمان لا يُشغَّل أبداً. الآن زرٌّ في مركز التشغيل. --}}
+        <div class="sub" style="margin-top:6px">الشاشة تفحص الذيل فقط لأن فحص الجدول كاملاً لا يُحتمل مع كل فتحة —
+            @if (hub_is_owner())
+                <form method="POST" action="{{ route('ops.verifyaudit') }}" class="inline">@csrf
+                    <button class="btn ghost xs">🔗 افحص السلسلة كاملةً الآن</button></form>
+                لتحديد أول قيدٍ متأثّر ومدى الضرر.
+            @else
+                اطلب من مالك النظام فحصَ السلسلة كاملةً من مركز التشغيل ⚙️ لتحديد أول قيدٍ متأثّر ومدى الضرر.
+            @endif
+        </div>
     </div>
 @endif
 

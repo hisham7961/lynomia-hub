@@ -127,6 +127,22 @@
                 @if ($q->status === 'بانتظار التوقيع' && ! $q->cancelled_at)
                     <form method="POST" action="{{ route('esign.resend', $q->id) }}" class="inline">@csrf
                         <button class="btn ghost xs" title="تذكير بريدي للموقّعين المعلقين">⏰</button></form>
+                    {{-- **تمديدُ الصلاحية**: المتحكّمُ والمسارُ كانا مبنيَّين ومحروسَين
+                         ومُوثَّقَين منذ v2.121 **بلا بابٍ واحدٍ إليهما** — فرابطٌ
+                         أوشك على الانتهاء والموقّعُ لم يوقّع بعدُ كان يُجبر صاحبَه
+                         على الإلغاء وإنشاء طلبٍ جديد: تنقطع سلسلةُ الأدلة ويبدأ
+                         الموقّعُ من الصفر، وهو بالضبط ما بُني `extend` لتفاديه. --}}
+                    <details class="inline"><summary class="btn ghost xs" title="تمديد صلاحية الرابط">📅</summary>
+                        <form method="POST" action="{{ route('esign.extend', $q->id) }}"
+                              style="display:flex;gap:4px;margin-top:4px;align-items:center">@csrf
+                            {{-- الافتراضيُّ من الإعداد نفسِه الذي يُنشئ به الرابط، لا رقمٌ مُلفَّق --}}
+                            <input class="inp" type="number" name="days" min="1" max="365"
+                                   value="{{ (int) (setting('esign.link_days_default') ?: 7) }}"
+                                   style="max-width:74px" aria-label="عدد الأيام">
+                            <button class="btn xs">مدِّد</button>
+                            @if ($q->expires_at)<span class="sub" style="font-size:11px">تنتهي {{ $q->expires_at->format('Y-m-d') }}</span>@endif
+                        </form>
+                    </details>
                     <form method="POST" action="{{ route('esign.cancel', $q->id) }}" class="inline">@csrf
                         <button class="btn ghost xs dn" data-confirm="إلغاء الطلب وإبطال كل روابطه؟" title="إلغاء الطلب">🚫</button></form>
                 @endif

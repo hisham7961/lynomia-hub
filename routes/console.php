@@ -20,3 +20,10 @@ Schedule::command('hub:digest')->weeklyOn(6, '07:00')->withoutOverlapping();   /
 Schedule::command('hub:metrics-snapshot')->dailyAt('23:45')->withoutOverlapping();   // لقطة الأرقام المتحرّكة قبل انقضاء اليوم
 Schedule::command('hub:uptime-check')->everyFiveMinutes()->withoutOverlapping();      // فحص حيّ للسيرفرات والمواقع المراقَبة
 Schedule::command('hub:quality-snapshot')->dailyAt('23:50')->withoutOverlapping();   // درجة جودة البيانات — بها يُقاس ما أُصلح
+/*
+| **وفاحصُ سلسلة التدقيق** (v2.336): كان الفاحصُ الوحيدُ لضمانِ عدم العبث بلا
+| جدولةٍ ولا زرّ — يُرشَد إليه بسطر طرفيةٍ لا يملكها صاحبُ استضافةٍ مشتركة.
+| فالسلسلةُ مختومةٌ ولا يفحصها شيء، والعبثُ يبقى غيرَ مكتشَفٍ إلى أن يخطر
+| لأحدٍ أن يسأل — وهو ما لا يقع. أسبوعيّاً قبل الفجر، وزرٌّ في مركز التشغيل.
+*/
+Schedule::command('hub:audit-verify')->weeklyOn(0, '04:30')->withoutOverlapping();
