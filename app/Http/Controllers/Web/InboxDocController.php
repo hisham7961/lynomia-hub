@@ -53,7 +53,12 @@ class InboxDocController extends Controller
                              ->selectRaw("status, COUNT(*) c")->groupBy('status')->pluck('c', 'status'),
             'users'   => \App\Models\User::pluck('name', 'id'),
             'modules' => collect(config('hub.modules'))->map(fn ($d) => $d['label']),
-            'companies' => hub_can(auth()->user(), 'companies', 'v') ? hub_ref_options('companies') : collect(),
+            // **وقائمةُ الشركات منطَّقة**: `hub_ref_options` تقرأ الجدولَ خاماً،
+            // فكانت الشاشةُ تبثّ أسماءَ كلِّ الشركات لمن لا يرى إلا واحدة.
+            'companies' => hub_can(auth()->user(), 'companies', 'v')
+                ? collect(hub_ref_options('companies'))->filter(
+                    fn ($n, $id) => ($cids = hub_company_ids()) === null || in_array((string) $id, $cids, true))
+                : collect(),
         ]);
     }
 
@@ -84,7 +89,11 @@ class InboxDocController extends Controller
     public function classify(Request $r, string $id)
     {
         $this->gate('e');
-        $doc = InboxDocument::findOrFail($id);
+        // **النطاقُ على التصنيف كما على القراءة** (v2.338): كان `findOrFail`
+        // خامّاً، فمعزولٌ يصنّف وثيقةَ شركةٍ لا يراها بمجرّد معرفة معرّفها —
+        // ويكتب فيها جهةً ونوعاً وتاريخاً. عزلٌ يُفرض في القراءة ويُرفع في
+        // الكتابة ليس عزلاً.
+        $doc = $this->scoped()->findOrFail($id);
         $d = $r->validate([
             'module'   => ['nullable', 'string', 'max:40'],
             'record'   => ['nullable', 'string', 'max:160'],
@@ -95,6 +104,12 @@ class InboxDocController extends Controller
             'expiry'   => ['nullable', 'date'],
         ], [], ['module' => 'الوحدة', 'record' => 'السجل', 'company_id' => 'الشركة',
                 'party' => 'الجهة', 'kind' => 'النوع', 'doc_date' => 'تاريخ الوثيقة', 'expiry' => 'الانتهاء']);
+
+        // والشركةُ المُسنَدة داخل نطاقه: `uuid` وحدها تقبل أيَّ شركةٍ في القاعدة
+        if (filled($d['company_id'] ?? null) && ($cids = hub_company_ids()) !== null
+            && ! in_array((string) $d['company_id'], $cids, true)) {
+            return back()->withErrors(['company_id' => 'هذه الشركة خارج نطاقك']);
+        }
 
         $module = $d['module'] ?? null;
         $recordId = null;

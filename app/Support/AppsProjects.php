@@ -178,15 +178,29 @@ class AppsProjects
      * الإصلاح الجماعي: ملء المشروع من التطبيق حيث كان **فارغاً** وحده.
      * لا يمسّ التناقض — من كتب مشروعاً مخالفاً يُسأل، ولا يُصحَّح عنه بصمت.
      */
-    public static function fixMissing($user = null): int
+    /**
+     * **وعدُّ المرفوض كعدِّ المُصلَح** (v2.336): كان التخطّي لانعدام الصلاحية
+     * `continue` صامتاً ولا يُرجَع إلا عدُّ الناجح — فيقلبه المتحكّمُ إلى رسالةٍ
+     * **واحدة** بلون النجاح تصف حالتين متناقضتين: «لا عملَ مطلوب» و«رُفض عملُك».
+     * فمن لا يملك الصلاحية يضغط الزرَّ فيرى أخضرَ ويطمئنّ أنّ لا نقصَ، والنقصُ
+     * قائمٌ وهو مُنِع من إصلاحه — ورسالةٌ تُغلق السؤالَ أسوأُ من رسالةِ خطأ.
+     *
+     * @return array{fixed: int, denied: int, modules: array<int, string>}
+     */
+    public static function fixMissing($user = null): array
     {
         $user = $user ?? auth()->user();
         $scan = self::scan($user);
-        $n = 0;
+        $n = 0; $denied = 0; $deniedMods = [];
 
         foreach ($scan['noProject'] as $it) {
             $d = self::dualModules()[$it['module']] ?? null;
-            if (! $d || ! hub_can($user, $it['module'], 'e')) continue;
+            if (! $d) continue;
+            if (! hub_can($user, $it['module'], 'e')) {
+                $denied++;
+                $deniedMods[$it['label'] ?? $it['module']] = true;
+                continue;
+            }
 
             DB::table($d['table'])->where('id', $it['id'])->whereNull($d['proj'])
                 ->update([$d['proj'] => $it['wantId'], 'updated_at' => now()]);
@@ -199,6 +213,6 @@ class AppsProjects
             foreach (self::dualModules() as $d) hub_data_bump($d['table']);
         }
 
-        return $n;
+        return ['fixed' => $n, 'denied' => $denied, 'modules' => array_keys($deniedMods)];
     }
 }

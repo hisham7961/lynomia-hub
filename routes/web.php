@@ -319,6 +319,8 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
     Route::put('admin/users/{user}', [UserController::class, 'update'])->name('users.update');
     Route::delete('admin/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+    // بابُ استردادٍ لمن ضاع جهازُ تحقّقه — وإلا فالقفلُ دائمٌ بلا مخرج
+    Route::post('admin/users/{user}/twofa-off', [UserController::class, 'twofaOff'])->name('users.twofa.off');
 
     Route::get('admin/roles', [RoleController::class, 'index'])->name('roles.index');
     Route::get('admin/roles/create', [RoleController::class, 'create'])->name('roles.create');
@@ -334,6 +336,9 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/ops/migrate', [OpsController::class, 'migrate'])->name('ops.migrate');
     Route::post('admin/ops/clear-cache', [OpsController::class, 'clearCache'])->name('ops.clearcache');
     Route::post('admin/ops/starters', [OpsController::class, 'starters'])->name('ops.starters');
+    // فاحصان كانا يُرشَد إليهما بطرفيةٍ لا يملكها صاحبُ استضافةٍ مشتركة
+    Route::post('admin/ops/verify-audit', [OpsController::class, 'verifyAudit'])->name('ops.verifyaudit');
+    Route::post('admin/ops/schema-check', [OpsController::class, 'schemaCheck'])->name('ops.schemacheck');
     Route::post('admin/ops/backup', [OpsController::class, 'backupNow'])->name('ops.backup');
     Route::post('admin/ops/maintenance', [OpsController::class, 'toggleMaintenance'])->name('ops.maintenance');
 

@@ -38,6 +38,20 @@
             <tr><td>نمط التوقيع</td><td>{{ $req->mode ?: 'مفرد' }} — {{ $signers->where('role', 'موقّع')->count() }} موقّع</td></tr>
             <tr><td>بصمة الوثيقة SHA-256</td><td class="mono ltr" style="font-size:9.5px;word-break:break-all">{{ $req->doc_hash }}</td></tr>
             <tr><td>رأس سلسلة الأدلة المجمّد</td><td class="mono ltr" style="font-size:9.5px;word-break:break-all">{{ $req->evidence_hash ?: $head }}</td></tr>
+            {{-- **الحكمُ لا الرقمُ وحدَه**: طباعةُ المُجمَّد كانت تحجب المحسوب،
+                 فعبثٌ بحدثٍ ماضٍ يبقى غيرَ مرئيّ على الوثيقة التي تدّعي إثباته --}}
+            @if ($verdict['checked'] ?? false)
+                <tr><td>فحصُ السلسلة</td><td>
+                    @if ($verdict['ok'])
+                        <b style="color:var(--ok)">✅ السلسلة سليمة</b> — أُعيد حسابُها الآن فطابقت الرأسَ المجمّد
+                        @if ($verdict['legacy'] ?? false)<span class="sub"> (بترتيبِ الأحداث المعتمد وقتَ التجميد)</span>@endif
+                    @else
+                        <b style="color:var(--bad)">⛔ السلسلة مكسورة</b> — إعادةُ الحساب لا تطابق الرأسَ المجمّد:
+                        عُدِّل أو حُذف حدثٌ في سجل الأدلة بعد الاكتمال
+                        <div class="mono ltr" style="font-size:9px;word-break:break-all">المحسوب الآن: {{ $verdict['head'] }}</div>
+                    @endif
+                </td></tr>
+            @endif
         </table>
 
         <h3>الأطراف</h3>

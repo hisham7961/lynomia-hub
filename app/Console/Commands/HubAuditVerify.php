@@ -19,7 +19,9 @@ use Illuminate\Support\Facades\Schema;
  */
 class HubAuditVerify extends Command
 {
-    protected $signature = 'hub:audit-verify {--reseal : ترقية السجلات المختومة ببصمة قديمة إلى البصمة الكاملة (بعد تحقق نظيف)}';
+    protected $signature = 'hub:audit-verify
+        {--reseal : ترقية السجلات المختومة ببصمة قديمة إلى البصمة الكاملة (بعد تحقق نظيف)}
+        {--strict : إفشال الأمر عند اختلاف عمود الشركة كذلك (لا تحذيراً)}';
     protected $description = 'التحقق من سلامة سلسلة تجزئة سجل التدقيق';
 
     protected const BATCH = 400;
@@ -96,14 +98,40 @@ class HubAuditVerify extends Command
             return self::FAILURE;
         }
 
-        // ٤) اتّساقُ عمود العزل — **خارج البصمة بقرارٍ مقصود**
-        $mismatch = $this->companyMismatch();
+        /*
+         * ٤) اتّساقُ عمود العزل — **تحذيرٌ لا إفشال**.
+         *
+         * `company_id` مشتقٌّ خارج البصمة، فيُفحص اشتقاقاً من `(module, record_id)`
+         * المختومَين. لكنّ **نقلَ سجلٍ بين الشركات فعلٌ مشروع**: قيودُه التاريخية
+         * تحتفظ بشركته القديمة (الهجرةُ تملأ الفارغَ ولا تُحدّث المملوء)، فتبدو
+         * كلُّها «مخالِفة» بلا عبثٍ وقع. وإفشالُ الأمر عندها يُدرّب صاحبَ النظام
+         * على تجاهله — وإنذارٌ كاذبٌ متكرّر يقتل الإنذارَ الحقيقيّ. يُبلَّغ ليُراجَع
+         * بعينٍ بشرية، ويُفشَل صراحةً بـ`--strict` لمن أراد بوابةً قاطعة.
+         */
+        ['diff' => $mismatch, 'blank' => $blank] = $this->companyMismatch();
+        $strictFail = false;
+
         if ($mismatch) {
-            $this->error("❌ {$mismatch} قيداً يخالف عمودُ الشركة فيه شركةَ السجل المختوم"
-                . ' — العمود مشتقٌّ ويُحدَّث بالهجرة فهو خارج البصمة عمداً، فيُفحص اشتقاقاً.'
-                . ' وتبديلُه يُخرج قيداً من نطاق مالكه (أو يُدخله في غيره) بلا كسر السلسلة.');
-            return self::FAILURE;
+            $msg = "⚠️ {$mismatch} قيداً يخالف عمودُ الشركة فيه شركةَ سجلِّه الحالية"
+                . ' — قد يكون نقلَ سجلٍ مشروعاً (القيودُ التاريخية تحتفظ بالشركة القديمة)'
+                . ' وقد يكون تبديلاً يُخرج قيداً من نطاق مالكه بلا كسر السلسلة. راجعها.';
+            if ($this->option('strict')) { $this->error($msg); $strictFail = true; }
+            else $this->warn($msg);
         }
+
+        // **الشكلُ الذي يُخفي القيد**: عمودٌ مفرَّغ لا يُطابق أيَّ شركة في
+        // `whereIn`، فيختفي القيدُ عن كلِّ صاحب نطاق — وكان الفاحصُ يستثنيه
+        // صراحةً بـ`whereNotNull`. وهو مألوفٌ مشروعٌ على تركيبةٍ سبقت عمودَ
+        // الشركة، فيُفصَل عن الأول بعبارته كي لا يُغرق الإشارةَ الحقيقية.
+        if ($blank) {
+            $msg = "⚠️ {$blank} قيداً بلا شركة وسجلُّه اليوم داخل شركة"
+                . ' — طبيعيٌّ على تركيبةٍ سبقت عمودَ الشركة أو على سجلٍ ضُمَّ لشركةٍ لاحقاً،'
+                . ' وقد يكون تفريغاً متعمَّداً يُخفي القيدَ عن كل نطاق. راجعها.';
+            if ($this->option('strict')) { $this->error($msg); $strictFail = true; }
+            else $this->warn($msg);
+        }
+
+        if ($strictFail) return self::FAILURE;
 
         $this->info("✅ السلسلة سليمة: {$ok} سجل متحقق"
             . ($legacyRows ? " · {$legacyRows} سجل سابق للسلسلة (خارج التحقق)" : ''));
@@ -129,30 +157,52 @@ class HubAuditVerify extends Command
      * غيره **بلا كسر السلسلة**. فيُحرَس اشتقاقاً: `(module, record_id)` مختومان
      * داخل البصمة، ومنهما تُقرأ شركةُ السجل الحقيقية وتُقارَن.
      */
-    protected function companyMismatch(): int
+    /**
+     * @return array{diff: int, blank: int}
+     *
+     * **وثلاثةُ أشكالٍ للانحراف لا شكلٌ واحد.** `company_id <> t.company_id`
+     * مقارنةٌ ثلاثيّة القيمة: أيُّ طرفٍ `NULL` يعطيها `NULL` لا `TRUE` —
+     * و`whereNotNull('audits.company_id')` كانت تُقصي شكلاً ثالثاً فوق ذلك.
+     * فيفلت من الفحص:
+     *
+     *  · قيدٌ عمودُه مفرَّغ وسجلُّه في شركة — وهو **أخطرُها**: `whereIn` لا
+     *    يُطابق `NULL` فيختفي القيدُ عن كلِّ صاحب نطاق. يُعدّ في `blank`
+     *    لأنّ له سبباً مشروعاً شائعاً (تركيبةٌ سبقت العمود).
+     *  · قيدٌ يحمل شركةً وسجلُّه فُرّغت شركتُه — انحرافُ قيمةٍ كالأوّل،
+     *    فيُضمّ إلى `diff`.
+     */
+    protected function companyMismatch(): array
     {
-        if (! Schema::hasColumn('audits', 'company_id')) return 0;
+        if (! Schema::hasColumn('audits', 'company_id')) return ['diff' => 0, 'blank' => 0];
 
-        $n = 0;
+        $diff = 0; $blank = 0;
         foreach (hub_modules() as $mk => $def) {
             $table = (string) ($def['table'] ?? '');
             $ccol = hub_company_col($mk);
             if ($table === '' || ! $ccol || ! Schema::hasTable($table)) continue;
 
+            $base = fn () => DB::table('audits')
+                ->join($table, 'audits.record_id', '=', "{$table}.id")
+                ->where('audits.module', $mk)
+                ->whereNotNull('audits.record_id');
+
             try {
-                $n += (int) DB::table('audits')
-                    ->join($table, "audits.record_id", '=', "{$table}.id")
-                    ->where('audits.module', $mk)
-                    ->whereNotNull('audits.record_id')
+                // قيمتان مختلفتان، أو قيدٌ بشركةٍ وسجلٌّ بلا شركة
+                $diff += (int) $base()
                     ->whereNotNull('audits.company_id')
-                    ->whereRaw("audits.company_id <> {$table}.{$ccol}")
+                    ->whereRaw("({$table}.{$ccol} is null or audits.company_id <> {$table}.{$ccol})")
+                    ->count();
+
+                $blank += (int) $base()
+                    ->whereNull('audits.company_id')
+                    ->whereNotNull("{$table}.{$ccol}")
                     ->count();
             } catch (\Throwable $e) {
                 continue;   // وحدةٌ بعمودٍ مغاير أو جدولٌ غير مطابق: تُتخطّى بلا إفشال
             }
         }
 
-        return $n;
+        return ['diff' => $diff, 'blank' => $blank];
     }
 
     /**

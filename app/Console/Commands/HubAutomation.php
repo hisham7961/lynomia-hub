@@ -202,9 +202,17 @@ class HubAutomation extends Command
                 if ($dup) continue;
                 $hits++;
                 if (! $this->dry) {
-                    foreach ($this->recipients(null) as $uid) {
+                    // **التنطيقُ لكل مستلمٍ على حدة** (v2.337): كانت الميزانياتُ
+                    // تُقرأ بلا نطاق ويُوزَّع نصُّها — اسمُ الميزانية ومبلغُها
+                    // ونسبتُها — على **كل** مالكٍ وحاملِ علم مراقبة، فيقرأ مراقبُ
+                    // شركةٍ ميزانيةَ شركةٍ أخرى. والحارسُ نفسُه قائمٌ في
+                    // `notifyMonitors` بهذا الملف، وهذا المسارُ لا يمرّ به.
+                    foreach ($this->recipientUsers(null) as $ru) {
+                        if (! hub_scope(DB::table('budgets')->whereNull('deleted_at')
+                            ->where('id', $b->id), 'budgets', $ru)->exists()) continue;
+
                         HubNotification::create([
-                            'user_id' => $uid, 'kind' => 'budget:' . $b->id,
+                            'user_id' => $ru->id, 'kind' => 'budget:' . $b->id,
                             'text' => Str::limit("📊 الميزانية «{$b->name}» بلغت {$ba['pct']}٪ من مخصصها"
                                 . ' (' . number_format($ba['spent'], 2) . ' من ' . number_format($ba['amount'], 2) . ')', 590),
                             'module' => 'budgets', 'record_id' => $b->id,
@@ -343,7 +351,37 @@ class HubAutomation extends Command
                 ->whereDate('created_at', '>=', today()->subDays($every))
                 ->distinct()->pluck('record_id')->all());
 
-            $rows = $q->orderBy('id')->limit(50)->get(['id', $disp . ' as _n']);
+            $to = $this->recipientUsers($rule->to_id);
+
+            /*
+             * **والتنطيقُ قبل الحدّ كذلك** (v2.337): v2.316 نقلت مانعَ التكرار
+             * إلى SQL قبل `limit(50)` وتركت التنطيقَ **بعده**. فقاعدةٌ موجَّهةٌ
+             * إلى مستخدمٍ معزول: خمسون صفّاً خارج نطاقه تملأ النافذة، وتسقط
+             * كلُّها عند فحص الرؤية بلا كتابةٍ ولا دخولٍ في سجلّ منع التكرار،
+             * فتعود **هي نفسُها** غداً و`orderBy('id')` حتميّ — والسجلُّ المرئيُّ
+             * لا يُشعَر عنه أبداً. نفسُ التجويع الذي عولج، من الباب الآخر.
+             *
+             * فتُقرأ الدفعاتُ بالتتابع ويُرشَّح كلٌّ برؤية المستلمين، حتى تكتمل
+             * خمسون **مرئية** أو تنفد المرشَّحات. والسقفُ عشرُ دفعاتٍ كي لا
+             * يتحوّل الحارسُ إلى مسحٍ كاملٍ لجدولٍ كبير.
+             */
+            $rows = collect();
+            $cursor = '';
+            for ($page = 0; $page < 10 && $rows->count() < 50; $page++) {
+                $batch = (clone $q)->where('id', '>', $cursor)
+                    ->orderBy('id')->limit(50)->get(['id', $disp . ' as _n']);
+                if ($batch->isEmpty()) break;
+                $cursor = (string) $batch->last()->id;
+
+                $ids = $batch->pluck('id')->all();
+                $seen = [];
+                foreach ($to as $ru) {
+                    foreach (hub_scope(DB::table($md['table'])->whereNull('deleted_at')->whereIn('id', $ids),
+                        $rule->mod, $ru)->pluck('id') as $vid) $seen[(string) $vid] = true;
+                }
+                $rows = $rows->concat($batch->filter(fn ($r) => isset($seen[(string) $r->id])));
+            }
+            $rows = $rows->take(50)->values();
             if ($rows->isEmpty()) continue;
             $rulesRun++;
             // عتبةُ التصعيد: مشكلةٌ ظلّت تُطلِق القاعدة أطولَ من ثلاث دوراتٍ كاملة
@@ -351,7 +389,6 @@ class HubAutomation extends Command
             // قابلةٌ للضبط عالميّاً (notify.escalate_after)، وإلا تكيّفٌ مع دورية القاعدة.
             $escAfter    = (int) setting('notify.escalate_after', 0);
             $escalateAge = $escAfter > 0 ? $escAfter : max(3, $every * 3);
-            $to    = $this->recipientUsers($rule->to_id);
 
             // النطاق يُفرض لكل مستلم على حدة — القاعدة لا تُسرّب عنوان سجل خارج نطاقه
             $rowIds = $rows->pluck('id')->all();
@@ -533,6 +570,15 @@ class HubAutomation extends Command
             if (\Illuminate\Support\Facades\Schema::hasTable('inbound_hook_events')) {
                 $n += DB::table('inbound_hook_events')
                     ->where('created_at', '<', now()->subDays(90))->delete();
+            }
+
+            // **ونقاطُ المقاييس** (v2.342): فحصُ التوافر يكتب نقطةً لكل موقعٍ
+            // وسيرفرٍ **كل خمس دقائق** — أي مئاتُ الآلاف سنويّاً — وكان الجدولُ
+            // الوحيدَ بلا تقليمٍ بين أربعةٍ شقيقة. والنظامُ يُرفع على استضافةٍ
+            // مشتركة بقرصٍ محدود. سنةٌ كاملة تكفي لكل رسمٍ زمنيّ في الشاشات.
+            if (\Illuminate\Support\Facades\Schema::hasTable('metric_points')) {
+                $n += DB::table('metric_points')
+                    ->where('at', '<', now()->subDays(365)->toDateTimeString())->delete();
             }
 
             return $n;

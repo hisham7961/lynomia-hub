@@ -91,7 +91,8 @@
                             <form method="POST" action="{{ route('esign.resend', $q->id) }}" class="inline">@csrf
                                 <button class="btn ghost xs">⏰ تذكير</button></form>
                         @endif
-                        <a class="btn ghost xs" href="{{ route('esign.index') }}">فتح</a>
+                        {{-- الصفُّ يعرف وثيقته: كان الزرُّ ينقل إلى القائمة العامة --}}
+                        <a class="btn ghost xs" href="{{ route('esign.doc', $q->id) }}">فتح</a>
                     </td>
                 </tr>
             @empty
@@ -107,7 +108,8 @@
             @forelse ($pendingSteps as $st)
                 <tr><td>{{ \Illuminate\Support\Str::limit($st->req->title, 34) }}
                     <div class="sub">مرحلة {{ $st->stage }}: {{ $st->label ?: $st->kind }}</div></td>
-                    <td class="acts"><a class="btn ghost xs" href="{{ route('esign.index') }}">قرار</a></td></tr>
+                    {{-- والقرارُ يفتح شهادةَ طلبه لا قائمةً تُبحث فيها من جديد --}}
+                    <td class="acts"><a class="btn ghost xs" href="{{ route('esign.doc', $st->req->id) }}">قرار</a></td></tr>
             @empty
                 <tr><td class="sub" style="padding:12px;text-align:center">لا موافقات معلقة</td></tr>
             @endforelse

@@ -38,7 +38,7 @@ return new class extends Migration
             foreach ($cols as $col) {
                 if (! Schema::hasColumn($table, $col)) continue;
                 try {
-                    DB::statement("ALTER TABLE `{$table}` MODIFY `{$col}` TIMESTAMP NOT NULL");
+                    DB::statement("ALTER TABLE `{$table}` MODIFY `{$col}` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
                 } catch (\Throwable $e) {
                     // عمودٌ يقبل NULL أو تعريفٌ مغاير: يُترك كما هو ولا يُكسر الترحيل
                 }

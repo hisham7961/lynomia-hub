@@ -27,10 +27,14 @@ return new class extends Migration
     {
         if (! Schema::hasTable('contracts') || ! Schema::hasColumn('contracts', 'doc_no')) return;
 
-        // أعلى تسلسلٍ مستعمَل لكل سنة — البدايةُ من فوقه لا من الواحد
+        // أعلى تسلسلٍ مستعمَل لكل سنة — البدايةُ من فوقه لا من الواحد.
+        // `lazyById` لا `pluck`: الأخيرةُ تسحب كلَّ أرقام العقود إلى الذاكرة
+        // دفعةً واحدة، والترحيلُ يعمل على استضافةٍ مشتركة بحدِّ ذاكرةٍ ضيّق —
+        // فترحيلٌ يقع بـOOM في المنتصف أسوأُ من بطيء.
         $seq = [];
-        foreach (DB::table('contracts')->whereNotNull('doc_no')->pluck('doc_no') as $no) {
-            if (preg_match('/^CTR-(\d{4})-(\d+)$/', (string) $no, $m)) {
+        foreach (DB::table('contracts')->whereNotNull('doc_no')
+            ->select(['id', 'doc_no'])->orderBy('id')->lazyById(1000) as $row) {
+            if (preg_match('/^CTR-(\d{4})-(\d+)$/', (string) $row->doc_no, $m)) {
                 $seq[$m[1]] = max($seq[$m[1]] ?? 0, (int) $m[2]);
             }
         }

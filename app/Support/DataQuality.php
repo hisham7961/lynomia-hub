@@ -61,6 +61,8 @@ class DataQuality
             // حقلٌ مطلوبٌ اليوم وفارغٌ في سجلاتٍ سبقت اشتراطه
             if (! empty($f['required'])) {
                 $out["req:$key"] = ['kind' => 'req', 'col' => $col,
+                    // العدديُّ لا يُقارَن بنصٍّ فارغ — انظر `apply('req')`
+                    'numeric' => in_array((string) ($f['type'] ?? ''), ['num', 'big', 'money', 'pct'], true),
                     'label' => "«{$label}» مطلوب وفارغ",
                     'why' => 'الحقل مشترطٌ في النموذج، وهذه سجلاتٌ سبقت الاشتراط أو دخلت باستيراد — فتكسر كل تقريرٍ يقوم عليه.',
                     'fix' => "افتح السجل واملأ «{$label}»."];
@@ -110,9 +112,14 @@ class DataQuality
         }
 
         // حالةٌ خارج خيارات الوحدة — انحرافٌ يكسر كل عدٍّ حسب الحالة
-        $statusCol = (string) ($def['status'] ?? '');
+        // **العمودُ لا المفتاح** (v2.339): `$def['status']` مفتاحُ الحقل، وقد
+        // يخالف عمودَه (`docStatus` ↔ `doc_status`) — فالمقارنةُ بأسماء الأعمدة
+        // كانت تُسقط الفحصَ كلياً عن كل وحدةٍ من هذا الصنف، وهي وحداتٌ حقيقيّة.
+        $statusKey = (string) ($def['status'] ?? '');
+        $statusCol = $statusKey ? (string) (hub_status_col((string) ($def['key'] ?? '')) ?: $statusKey) : '';
         if ($statusCol && in_array($statusCol, $cols, true)) {
-            $opts = collect($def['fields'] ?? [])->firstWhere('col', $statusCol)['options'] ?? [];
+            $opts = collect($def['fields'] ?? [])->firstWhere('key', $statusKey)['options']
+                 ?? collect($def['fields'] ?? [])->firstWhere('col', $statusCol)['options'] ?? [];
             if (is_array($opts) && count($opts) > 1) {
                 $out['status'] = ['kind' => 'status', 'col' => $statusCol, 'options' => array_values($opts),
                     'label' => 'حالةٌ خارج الخيارات المعرَّفة',
@@ -142,8 +149,13 @@ class DataQuality
                 'why' => 'مسارات الإجازات والتقييم والطلبات تصعد إلى المدير المباشر — وبلا مديرٍ تتوقف عنده.',
                 'fix' => 'حدّد المدير المباشر في ملف الموظف.']],
 
+            // **نوعُ المستند من سجلّ المال لا من نصٍّ لا يُكتب** (v2.339): كان
+            // الشرطُ `kind = 'فاتورة'` المجرّدة — ونوعٌ لا يكتبه النظام أصلاً
+            // (الحقيقيّ «فاتورة مبيعات»/«فاتورة مشتريات»). فالفحصُ يُعرض في مركز
+            // الجودة وعدُّه صفرٌ أبداً، وصفرٌ هناك يُقرأ «لا نقص» وهو «لم يُبحث».
             'fin' => ['partner' => ['kind' => 'blank_when', 'col' => 'partner',
-                'whenCol' => 'kind', 'whenVal' => 'فاتورة',
+                'whenCol' => 'kind', 'whenVal' => array_values(array_unique(array_merge(
+                    (array) config('hub.fin.income', []), (array) config('hub.fin.expense', [])))),
                 'label' => 'فاتورةٌ بلا طرف',
                 'why' => 'بلا عميلٍ أو مورد لا تدخل الفاتورة أي كشف حساب ولا تقرير أعمار ديون.',
                 'fix' => 'حدّد الطرف على المستند.']],
@@ -179,7 +191,14 @@ class DataQuality
         $col = (string) $r['col'];
 
         return match ($r['kind']) {
-            'req'  => $q->where(fn ($w) => $w->whereNull($col)->orWhere($col, '')),
+            // **والفراغُ نصٌّ لا صفر** (v2.339): `orWhere($col, '')` على عمودٍ
+            // عدديّ يُقارِن رقماً بنصٍّ فارغ — وMySQL يحوّله صفراً، فكميةٌ نافدة
+            // وباقةٌ مجانية تُعدّان «مطلوبٌ وفارغ». إنذارٌ كاذبٌ يُدرَّب المستخدمُ
+            // على تجاهله فيضيع الصادقُ معه. المقارنةُ النصّية للأعمدة النصّية وحدها.
+            'req'  => $q->where(function ($w) use ($col, $r) {
+                $w->whereNull($col);
+                if (($r['numeric'] ?? null) !== true) $w->orWhere($col, '');
+            }),
             'null' => $q->whereNull($col),
             'mail' => $q->whereNotNull($col)->where($col, '!=', '')->where($col, 'NOT LIKE', '%_@_%._%'),
             'url'  => $q->whereNotNull($col)->where($col, '!=', '')
@@ -189,7 +208,10 @@ class DataQuality
             'ref'  => $q->whereNotNull($col)->where($col, '!=', '')
                         ->whereNotIn($col, fn ($sub) => $sub->select('id')
                             ->from(hub_mod((string) $r['ref'])['table'])),
-            'blank_when' => $q->where((string) $r['whenCol'], $r['whenVal'])
+            // `whenVal` قد تكون قيمةً واحدة أو قائمةَ أنواعٍ من سجلّ المال
+            'blank_when' => $q->where(fn ($w) => is_array($r['whenVal'])
+                                  ? $w->whereIn((string) $r['whenCol'], $r['whenVal'])
+                                  : $w->where((string) $r['whenCol'], $r['whenVal']))
                               ->where(fn ($w) => $w->whereNull($col)->orWhere($col, '')),
             'stale' => $q->where($col, '<', now()->subDays((int) ($r['days'] ?? 90))),
             default => $q,

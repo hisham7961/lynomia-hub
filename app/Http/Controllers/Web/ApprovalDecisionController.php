@@ -108,6 +108,22 @@ class ApprovalDecisionController extends ModuleController
          * لا على صفّ الطلب: `queueApproval` لا يملأ `company_id` دائماً، فقياسُ
          * الصفّ وحده كان يُقصي الطلباتِ القائمةَ كلَّها.
          */
+        /*
+         * **والصلاحيةُ على الوحدة قبل النطاق فيها** (v2.338): كان الحارسُ
+         * `hub_approver()` وحدَه — عَلَمٌ واحدٌ يفتح **كلَّ** الوحدات. فمعتمِدٌ
+         * لا يملك على الرواتب صلاحيةَ عرضٍ يعتمد تعديلَ راتب، ومن مُنع الحذفَ
+         * في وحدةٍ يُنفّذه فيها باعتماد طلبِ غيره. والاعتمادُ **تنفيذٌ** لا
+         * تأشير: الحمولةُ تُكتب والسجلُّ يُحذف بيد الحاسم لا بيد الطالب —
+         * فيلزمه ما يلزم فاعلَها مباشرةً.
+         *
+         * والنطاقُ بعدها كما هو (v2.322)، مقيساً على السجل الهدف.
+         */
+        if ($ap->mod && ($md = hub_mod((string) $ap->mod))) {
+            $op = in_array((string) $ap->op, ['a', 'e', 'd'], true) ? (string) $ap->op : 'e';
+            abort_unless(hub_can(auth()->user(), (string) $ap->mod, $op), 403,
+                'حسمُ هذا الطلب يتطلب صلاحيتَه على وحدته — الاعتمادُ تنفيذٌ لا تأشير');
+        }
+
         if ($ap->mod && $ap->record_id && ($md = hub_mod((string) $ap->mod))) {
             $inScope = hub_scope(
                 \Illuminate\Support\Facades\DB::table($md['table'])->where('id', $ap->record_id),

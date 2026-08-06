@@ -27,7 +27,9 @@
             <span class="ltr mono sub">{{ $stAcct->email }}</span>
             <span class="chip">{{ $stAcct->status }}</span>
             @if ($stAcct->role)<span class="sub">دور: {{ $stAcct->role->name }}</span>@endif
-            @if (hub_can(auth()->user(), 'users', 'v'))
+            {{-- العَلَمُ لا الخانة: `UserController::gate` يحرس بـ`hub_flag(...,'users')`
+                 وحده، فرابطٌ يُعرض بخانةِ المصفوفة كان يظهر لمن يُردّ عنه ٤٠٣ --}}
+            @if (hub_flag(auth()->user(), 'users'))
                 <a class="btn ghost xs" href="{{ route('users.index') }}">إدارة المستخدمين</a>
             @endif
         </div>

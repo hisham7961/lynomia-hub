@@ -22,6 +22,9 @@ class VaultSecret extends Model
 
     protected $guarded = ['id', 'version', 'created_by'];
 
+    /** عمودُ السرّ لا تُكتب قيمتُه في سجل التدقيق — بصمةٌ فقط (انظر `Auditable::auditRedact`) */
+    public const AUDIT_SECRET = ['secret_cipher'];
+
     protected static function booted(): void
     {
         // ترقية صامتة: أي سجل قديم بقيمة غير مشفّرة يُشفَّر عند أول حفظ لأي حقل

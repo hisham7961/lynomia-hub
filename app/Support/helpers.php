@@ -791,6 +791,12 @@ if (! function_exists('hub_expiry')) {
                 // وبلا مستخدم (طرفيةٌ أو مهمةٌ مجدولة) لا ترشيح: السياق نظاميّ،
                 // والمستقبِلون يُرشَّحون في موضعهم لا هنا.
                 if ($user && ! hub_can($user, $mk, 'v')) continue;
+                // **وقناعُ الحقل بعد صلاحية الوحدة** (v2.337): الرادارُ كان
+                // يُرشّح بالوحدة وحدها، فمن حُجب عنه «انتهاء الإقامة» في ملفّات
+                // الموظفين يقرؤه هنا باسم صاحبه وتاريخِه — في «ينتهي قريباً»
+                // وفي مركز التنبيهات. والقناعُ إن سرى في بابٍ وسقط في آخر
+                // فليس قناعاً بل ظنُّ ساتر.
+                if ($user && hub_field_mode($user, $mk, (string) ($f['key'] ?? '')) === 'hide') continue;
                 $md = hub_mod($mk);
                 $disp = hub_display_col($mk);
                 $acol = $alertCols[$mk] ?? null;
@@ -804,7 +810,11 @@ if (! function_exists('hub_expiry')) {
 
                     // لا تنبيه على ما أُغلق: مهمة منجزة أو فاتورة مدفوعة أو عقد منتهٍ
                     // كانت تظل تنبّه إلى الأبد فتفقد الصفحة مصداقيتها.
-                    if (($sc = hub_status_col($mk)) && \Illuminate\Support\Facades\Schema::hasColumn($md['table'], $sc)) {
+                    // `expiryIgnoresStatus`: وحدةٌ «حالتُها» وصفٌ لا مرحلةٌ في
+                    // مسار (حالةُ شهادة الدومين مثلاً) — الإقصاءُ بها يُسقط من
+                    // الرادار أشدَّ السجلات حاجةً إليه
+                    if (empty($md['expiryIgnoresStatus'])
+                        && ($sc = hub_status_col($mk)) && \Illuminate\Support\Facades\Schema::hasColumn($md['table'], $sc)) {
                         $q->where(fn ($w) => $w->whereNull($sc)->orWhereNotIn($sc, hub_closed_states()));
                     }
 
@@ -1515,7 +1525,8 @@ if (! function_exists('hub_mrr')) {
             // `mixed`/`byCurrency` بلا شرط، فإسقاطُهما هنا فخُّ
             // `Undefined array key` ينتظر أوّلَ قاعدةٍ بلا عقدٍ سارٍ.
             $empty = ['mrr' => 0.0, 'arr' => 0.0, 'contracts' => 0, 'byService' => [],
-                      'byCurrency' => [], 'mixed' => false, 'unmapped' => 0, 'oneTime' => 0.0];
+                      'byCurrency' => [], 'mixed' => false, 'unmapped' => 0, 'oneTime' => 0.0,
+                      'oneTimeByCurrency' => [], 'oneTimeMixed' => false];
 
             $q = hub_read('contracts');
             if (! $q) return $empty;
@@ -1529,7 +1540,7 @@ if (! function_exists('hub_mrr')) {
                 ->get(['id', 'name', 'cycle'])->keyBy('id');
 
             $default = (string) setting('app.currency', 'د.ك');
-            $mrr = 0.0; $oneTime = 0.0; $unmapped = 0; $byService = []; $byCur = [];
+            $mrr = 0.0; $oneTime = 0.0; $unmapped = 0; $byService = []; $byCur = []; $otCur = [];
             foreach ($contracts as $c) {
                 $value = (float) ($c->value ?? 0);
                 if ($value <= 0) continue;
@@ -1541,7 +1552,17 @@ if (! function_exists('hub_mrr')) {
                 $cur = (string) ($c->currency ?: $default);
 
                 if (! $sid) $unmapped++;
-                if ($cycle === 'مرة واحدة') { $oneTime += $value; continue; }
+                // **و«مرة واحدة» تُفصل بالعملة كأختها المتكرّرة** (v2.335): كانت
+                // تُجمع خاماً قبل أيّ فصل، وعلمُ `mixed` مشتقٌّ من `byCur`
+                // المتكرّرة وحدها — فقاعدةٌ متكرّرُها بعملةٍ واحدة تُعلن
+                // «لا اختلاط» وتعرض `oneTime` جامعاً ديناراً ودولاراً.
+                if ($cycle === 'مرة واحدة') {
+                    $oneTime += $value;
+                    $otCur[$cur] ??= ['currency' => $cur, 'total' => 0.0, 'contracts' => 0];
+                    $otCur[$cur]['total'] += $value;
+                    $otCur[$cur]['contracts']++;
+                    continue;
+                }
 
                 $monthly = $value / ($divisor[$cycle] ?? 12);
                 $mrr += $monthly;
@@ -1565,6 +1586,9 @@ if (! function_exists('hub_mrr')) {
             foreach ($byCur as &$bc) { $bc['mrr'] = round($bc['mrr'], 2); $bc['arr'] = round($bc['mrr'] * 12, 2); }
             unset($bc);
             usort($byCur, fn ($a, $b) => $b['mrr'] <=> $a['mrr']);
+            foreach ($otCur as &$oc) { $oc['total'] = round($oc['total'], 2); }
+            unset($oc);
+            usort($otCur, fn ($a, $b) => $b['total'] <=> $a['total']);
 
             return [
                 'mrr' => round($mrr, 2),
@@ -1577,6 +1601,8 @@ if (! function_exists('hub_mrr')) {
                 'mixed' => count($byCur) > 1,
                 'unmapped' => $unmapped,
                 'oneTime' => round($oneTime, 2),
+                'oneTimeByCurrency' => $otCur,
+                'oneTimeMixed' => count($otCur) > 1,
             ];
         });
     }
@@ -4102,8 +4128,27 @@ if (! function_exists('hub_ack_targets')) {
             $members = array_values(array_filter(array_merge(
                 (array) ($p->members ?? []), [$p->manager_id ?? null])));
             if ($members) $q->whereIn('id', $members);
-        } elseif ($cid && \Illuminate\Support\Facades\Schema::hasColumn('users', 'company_id')) {
-            $q->where('company_id', $cid);
+        } elseif ($cid) {
+            /*
+             * **العضويةُ من حيث تُكتب لا من عمودٍ ميت** (v2.338): كان المُرشِّح
+             * `users.company_id` — **ولا كاتبَ لهذا العمود في المستودع كلِّه**؛
+             * عضويةُ الشركات تُخزَّن في `users.companies` (مصفوفة)، وهي التي
+             * يقرؤها `hub_company_ids` وعليها يقوم العزلُ كلُّه.
+             *
+             * فسياسةٌ تُعلَن لشركةٍ كانت **لا تبلغ أحداً**، والشاشةُ تقول «أُعلنت
+             * لِـ٠ شخص» فيُقرأ صفرُها «لا أحد معنيّ» لا «العمودُ ميت» — وإعلانُ
+             * التزامٍ لا يصل مسؤوليةٌ لم تُنقَل وهي تبدو منقولة.
+             *
+             * والترشيحُ في PHP لا في SQL: المصفوفةُ JSON، ودوالُّها تختلف بين
+             * MySQL وSQLite — والقائمةُ محدودةٌ بالمستخدمين النشطين فالكلفةُ لا
+             * تُذكر. ومن لا قائمةَ شركاتٍ له (مالكٌ أو غيرُ معزول) معنيٌّ بالكل.
+             */
+            return $q->get(['id', 'companies', 'role_id'])
+                ->filter(function ($u) use ($cid) {
+                    $ids = hub_company_ids($u);
+
+                    return $ids === null || in_array((string) $cid, $ids, true);
+                })->pluck('id')->values()->all();
         }
 
         return $q->pluck('id')->all();

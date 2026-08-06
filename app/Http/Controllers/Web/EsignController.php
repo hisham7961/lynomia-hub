@@ -571,6 +571,7 @@ class EsignController extends Controller
 
         return view('esign.certificate', [
             'req' => $req, 'chain' => $chain, 'head' => $head,
+            'verdict' => \App\Support\Evidence::verify($req),
             'signers' => \App\Models\ContractSigner::where('request_id', $req->id)->orderBy('order')->get(),
             'qr' => \App\Support\Qr::svg(route('sign.verify') . '?code=' . $req->verify_code, 132),
         ]);
@@ -587,6 +588,7 @@ class EsignController extends Controller
 
         return view('esign.certificate', [
             'req' => $req, 'chain' => $chain, 'head' => $head, 'client' => true,
+            'verdict' => \App\Support\Evidence::verify($req),
             'signers' => \App\Models\ContractSigner::where('request_id', $req->id)->orderBy('order')->get(),
             'qr' => \App\Support\Qr::svg(route('sign.verify') . '?code=' . $req->verify_code, 132),
         ]);
@@ -1002,9 +1004,13 @@ class EsignController extends Controller
         $found = null;
         $code = strtoupper(trim(hub_str($r->input('code'))));
         if ($code !== '') {
-            $key = 'verify:' . $r->ip();
+            // **دلوٌ لكل مسار** (v2.341): كان `verify:` مشتركاً بين هذا المسار
+            // (سقفُه ١٠) و`verifyDoc` (سقفُه ٢٠)، فأحدُهما يستهلك حصّةَ الآخر
+            // والحدُّ المُعلن ليس الحدَّ الواقع.
+            $key = 'verify:code:' . $r->ip();
             if (RateLimiter::tooManyAttempts($key, 10)) {
-                return view('sign.verify', ['code' => $code, 'found' => null, 'throttled' => true]);
+                return view('sign.verify', ['code' => $code, 'found' => null, 'throttled' => true,
+                    'verdict' => ['checked' => false, 'ok' => true]]);
             }
             RateLimiter::hit($key, 60);
             // v2.117: الموقعة فقط — الرد على رموز المسودات كان يكشف وجودها وعناوينها
@@ -1014,6 +1020,9 @@ class EsignController extends Controller
 
         return view('sign.verify', [
             'code' => $code, 'found' => $found, 'throttled' => false,
+            // **الرأسُ يُعاد حسابُه لا يُعرض وحدَه**: قيمةٌ مخزَّنةٌ تَعِد بإثباتٍ
+            // ولا فاحصَ خلفها تُسكِت السؤالَ الذي كان سيكشف العبث
+            'verdict' => $found ? \App\Support\Evidence::verify($found) : ['checked' => false, 'ok' => true],
             // v2.122: الموقّعون وأزمانهم (أسماء فقط — لا بريد ولا IP علناً) + QR للنسخ الورقية
             'signers' => $found
                 ? \App\Models\ContractSigner::where('request_id', $found->id)
@@ -1034,7 +1043,7 @@ class EsignController extends Controller
         $code = strtoupper(trim(hub_str($code)));
         abort_if($code === '', 404);
 
-        $key = 'verify:' . $r->ip();
+        $key = 'verify:doc:' . $r->ip();
         abort_if(RateLimiter::tooManyAttempts($key, 20), 429, 'محاولاتٌ كثيرة — انتظر دقيقة ثم أعد المسح');
         RateLimiter::hit($key, 60);
 

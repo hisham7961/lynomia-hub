@@ -213,6 +213,35 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('ok', 'حُفظ المستخدم');
     }
 
+    /**
+     * **فكُّ قفل التحقّق بخطوتين عن حسابٍ ضاع جهازُه.**
+     *
+     * كان المسارُ الوحيد لإطفائه (`ProfileController::twofaDisable`) يشترط
+     * **رمزاً صحيحاً من الجهاز المفقود نفسِه**، و`users.recovery_codes` عمودٌ
+     * قائمٌ لا يُكتب ولا يُقرأ في المستودع كلِّه. فمن ضاع هاتفُه كان مقفولاً
+     * خارج النظام إلى الأبد، ولا مالكَ يستطيع فكَّه. وميزةُ أمانٍ بلا بابِ
+     * استرداد ليست أماناً بل فخّاً — ونهايتُها أن يُطفئها الناسُ كلُّهم.
+     *
+     * والبابُ محروسٌ بثلاثة: عَلَمُ إدارة المستخدمين، وامتيازٌ يعلو الحساب
+     * الهدف (‏`Staff::mayTouch`) — فإطفاءُ تحقّقِ حسابٍ ذي امتياز ثم تصيُّدُ
+     * كلمته طريقُ اقتحامٍ كامل — وأثرُ تدقيقٍ باسم الفاعل والهدف.
+     */
+    public function twofaOff(User $user)
+    {
+        $this->gate();
+        abort_if($user->id === auth()->id(), 422,
+            'أطفئه من ملفك الشخصي برمزٍ صحيح — هذا البابُ لمن فقد جهازه');
+        abort_unless(\App\Support\Staff::mayTouch($user), 403,
+            'هذا الحساب ذو امتياز — فكُّ تحقّقه يتطلب صلاحيةً تعلوه');
+
+        $user->forceFill(['totp_enabled' => false, 'totp_secret_cipher' => null])->save();
+        hub_audit('إطفاء التحقق بخطوتين', 'users', $user->id, $user->name,
+            ['after' => ['totp_enabled' => false, 'by' => auth()->user()?->name]]);
+
+        return back()->with('ok', 'أُطفئ التحقّقُ بخطوتين عن «' . $user->name
+            . '» — أبلغه ليُعيد تفعيله من ملفه الشخصي فور استعادة جهازه');
+    }
+
     public function destroy(User $user)
     {
         $this->gate();

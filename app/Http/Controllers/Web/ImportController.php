@@ -120,9 +120,20 @@ class ImportController extends Controller
                         $m->{$f['col']} = $val;
                     }
 
-                    // الحقول الإلزامية
+                    /*
+                     * الحقول الإلزامية — **ممّا يستطيع الاستيرادُ ملأه وحده**
+                     * (v2.340): كان يفرض `required` على كل حقل، ومنها ما لا
+                     * يستورده أصلاً: `sec` و`file` و`img` تُتخطّى في `cast()`،
+                     * والحقلُ `locked` لا يُكتب من أيّ نموذج. فوحدةٌ مثل
+                     * «الموافقات» (حالةٌ مطلوبةٌ ومقفولة) أو «الخزنة» (سرٌّ
+                     * مطلوبٌ من نوع `sec`) كان يُرفض فيها **١٠٠٪ من الصفوف**
+                     * بحقلٍ لا سبيل لملئه من الملف — والرسالةُ تطالب المستخدم
+                     * بما لا يستطيع فعله. تُترك هذه الحقول لافتراضِ الموديل
+                     * والقاعدة، وهما مصدرُها الصحيح.
+                     */
                     if (! $rowErr) {
                         foreach ($def['fields'] as $f) {
+                            if (! $this->importable($f)) continue;
                             if (! empty($f['required']) && ($m->{$f['col']} ?? null) === null) {
                                 $rowErr = 'حقل «' . $f['label'] . '» إلزامي وفارغ';
                                 break;
@@ -143,7 +154,29 @@ class ImportController extends Controller
                     }
 
                     if ($rowErr) { $skipped[] = 'صف ' . ($n + 2) . ': ' . $rowErr; continue; }
-                    $m->save();
+
+                    // **رفضُ حارسِ النموذج خطأُ صفٍّ لا خطأُ ملف.** الحرّاس
+                    // (‏`StockMove` مثلاً) ترمي `ValidationException` أو `abort()`
+                    // من خطّاف `creating` — أي **قبل أيّ SQL**. وكان الإلقاء يخترق
+                    // المعاملة فيُلغي الملفَّ كلَّه، ثم يمحو `finally` الملفَّ وينسى
+                    // الجلسة: ألفُ صفٍّ سليم يضيع لأجل صفٍّ واحد، ولا قائمةَ متخطّى
+                    // أصلاً — بينما كلُّ خطأ صفٍّ آخر (قيمةٌ غير رقمية، مرجعٌ مفقود)
+                    // يُبلَّغ ويمضي الاستيراد. فيُلتقط هنا ويُصفّ مع أخواته.
+                    //
+                    // وما ليس رفضاً مقصوداً (‏`QueryException`: خرقُ unique، فيضُ
+                    // عمود) يبقى على حاله فيُلغي المعاملةَ كلَّها — فتلك أخطاءٌ
+                    // تُصيب حالةَ القاعدة داخل المعاملة، و«كلٌّ أو لا شيء» فيها
+                    // هو الضمانُ الصحيح.
+                    try {
+                        $m->save();
+                    } catch (\Illuminate\Validation\ValidationException $e) {
+                        $skipped[] = 'صف ' . ($n + 2) . ': '
+                            . (collect($e->errors())->flatten()->first() ?: $e->getMessage());
+                        continue;
+                    } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+                        $skipped[] = 'صف ' . ($n + 2) . ': ' . ($e->getMessage() ?: 'مرفوض');
+                        continue;
+                    }
                     $ok++;
                 }
             });
@@ -157,6 +190,14 @@ class ImportController extends Controller
             "{$ok} سجل" . ($skipped ? ' (' . count($skipped) . ' متخطى)' : ''));
 
         return view('import.result', compact('module', 'def', 'ok', 'skipped'));
+    }
+
+    /** أيُّ حقلٍ يستطيع الاستيرادُ ملأه فعلاً — به وحده يُقاس الإلزام */
+    protected function importable(array $f): bool
+    {
+        if (! empty($f['locked'])) return false;
+
+        return ! in_array((string) ($f['type'] ?? ''), ['sec', 'file', 'img'], true);
     }
 
     /** تحويل قيمة نصية من الملف حسب نوع الحقل — المراجع تُحل بالاسم */

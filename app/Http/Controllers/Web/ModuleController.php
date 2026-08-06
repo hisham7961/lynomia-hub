@@ -665,18 +665,23 @@ class ModuleController extends Controller
             $opts = $this->statusOptions($def);
             abort_unless($to !== '' && (! $opts || in_array($to, $opts, true)), 422, 'حالة غير معروفة');
 
-            $n = 0;
+            $n = 0; $failed = [];
             foreach ($ids as $id) {
                 $m = hub_scope($class::query(), $module)->whereKey($id)->first();
                 if (! $m || (string) $m->{$statusCol} === $to) continue;
                 $m->{$statusCol} = $to;
-                $m->save();
+                try {
+                    $m->save();
+                } catch (\Throwable $e) {
+                    $failed[] = $this->refusal($m, $e, $module);   // رفضُ حارسٍ خطأُ سجلٍّ لا خطأُ دفعة
+                    continue;
+                }
                 $this->bustProgress($module, $m);
                 \App\Support\FlowRunner::fire('status', $module, $m, $to);
                 $n++;
             }
 
-            return back()->with('ok', "غُيّرت حالة {$n} من السجلات إلى «{$to}»");
+            return $this->bulkResult($n, $failed, "غُيّرت حالة {$n} من السجلات إلى «{$to}»");
         }
 
         if ($do === 'delete') {
@@ -684,18 +689,66 @@ class ModuleController extends Controller
             if (hub_needs_approval(auth()->user(), $module, 'd')) {
                 return back()->with('err', 'حذفُك يمر بالموافقات — احذف السجلات فردياً ليُوثَّق كل طلب على حدة');
             }
-            $n = 0;
+            $n = 0; $failed = [];
             foreach ($ids as $id) {
                 $m = hub_scope($class::query(), $module)->whereKey($id)->first();
                 if (! $m) continue;
-                $m->delete();
+                try {
+                    $m->delete();
+                } catch (\Throwable $e) {
+                    $failed[] = $this->refusal($m, $e, $module);
+                    continue;
+                }
                 $n++;
             }
 
-            return back()->with('ok', "نُقل {$n} من السجلات إلى السلة");
+            return $this->bulkResult($n, $failed, "نُقل {$n} من السجلات إلى السلة");
         }
 
         abort(400, 'إجراء غير معروف');
+    }
+
+    /**
+     * سببُ امتناع سجلٍّ في إجراءٍ جماعيّ — مُسمّى بصاحبه.
+     *
+     * حرّاسُ النماذج ترمي `ValidationException` أو `abort()`، وكلاهما في المسار
+     * الفرديّ رسالةٌ صحيحة. أمّا في الحلقة فالإلقاءُ **يقطعها**، فتذهب السجلاتُ
+     * السابقةُ وتنجو التاليةُ ولا يُقال أيٌّ من أيّ. فيُلتقط الرفضُ هنا ويُنسب
+     * إلى سجلِّه بالاسم لا بالمعرّف الخام.
+     *
+     * وما ليس رفضاً مقصوداً (عطلُ قاعدةٍ مثلاً) يُسجَّل في مركز الأخطاء ولا
+     * تُعرض تفاصيلُه: الرسالةُ الخام قد تحمل جزءَ استعلامٍ أو قيمةَ عمود.
+     */
+    protected function refusal(Model $m, \Throwable $e, string $module): string
+    {
+        $name = hub_str($m->{hub_ref_display($module)} ?? null) ?: (string) $m->getKey();
+        $name = Str::limit($name, 40);
+
+        if ($e instanceof \Illuminate\Validation\ValidationException) {
+            $why = collect($e->errors())->flatten()->first() ?: $e->getMessage();
+        } elseif ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+            $why = $e->getMessage();
+        } else {
+            \App\Support\ErrorLog::capture('bulk', $e->getMessage(), $e->getFile(), $e->getLine());
+            $why = 'عطلٌ غير متوقع — سُجّل في مركز الأخطاء';
+        }
+
+        return '«' . $name . '»: ' . Str::limit(hub_str($why), 120);
+    }
+
+    /** حصيلةُ إجراءٍ جماعيّ: ما وقع وما امتنع، في رسالةٍ واحدة صادقة */
+    protected function bulkResult(int $n, array $failed, string $okMsg)
+    {
+        if (! $failed) return back()->with('ok', $okMsg);
+
+        $head = count($failed) . ' تعذّر';
+        $why  = implode('؛ ', array_slice($failed, 0, 3)) . (count($failed) > 3 ? ' …' : '');
+
+        // نجاحٌ جزئيّ يُعرض نجاحاً **وتحذيراً** معاً: إخفاءُ أحدهما يجعل
+        // المستخدم يظنّ أنّ شيئاً لم يقع، أو أنّ كلَّ شيءٍ وقع
+        return $n > 0
+            ? back()->with('ok', $okMsg)->with('warn', $head . ': ' . $why)
+            : back()->with('err', $head . ': ' . $why);
     }
 
     public function restoreVersion(string $module, string $id, int $version)

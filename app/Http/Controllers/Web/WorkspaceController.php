@@ -22,7 +22,12 @@ class WorkspaceController extends Controller
 
         // بطاقات الوحدات: عدّاد منطّق لكل وحدة — مخبأ 120 ثانية بمفتاح المستخدم
         // والشركة النشطة (تغيّر الصلاحيات أو الشركة يغيّر المفتاح فلا تسريب أرقام)
-        $cacheKey = 'ws:' . $key . ':u:' . $u->id . ':c:' . (string) session('hub.company', '');
+        // **والدورُ وختمُه في المفتاح** (v2.341): كان بالمستخدم والشركة وحدهما
+        // والتعليقُ فوقه يَعِد بأن «تغيّر الصلاحيات يغيّر المفتاح» — ولا يغيّره.
+        // فسحبُ صلاحيةِ عرضٍ عن دورٍ يُبقي الأرقامَ المعروضة على حالها دقيقتين،
+        // وهي أرقامُ ما لم يعد يُرى.
+        $cacheKey = 'ws:' . $key . ':u:' . $u->id . ':r:' . (string) ($u->role_id ?? '')
+                  . hub_data_stamp(['roles']) . ':c:' . (string) session('hub.company', '');
         $cards = Cache::remember($cacheKey, 120, function () use ($ws) {
             $out = [];
             foreach ($ws['modules'] as $mk) {

@@ -291,7 +291,9 @@
   var key = 'lyn_draft:' + form.getAttribute('data-draft');
 
   function fields() {
-    return Array.prototype.filter.call(form.elements, function (el) {
+    // و`form.elements` تُظلَّل بحقلٍ اسمه `elements` كما تُظلَّل `method` —
+    // فالاستعلامُ المباشر أمتنُ من خاصيةٍ يملك المحتوى أن يدهسها
+    return Array.prototype.filter.call(form.querySelectorAll('input, select, textarea'), function (el) {
       return el.name && el.name.indexOf('_') !== 0 && ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(el.tagName) >= 0
         && ['file', 'password', 'hidden', 'submit', 'button'].indexOf(el.type) < 0;
     });
@@ -516,8 +518,23 @@ document.addEventListener('input', function (e) {
   var dirty = false, submitting = false;
   document.addEventListener('input', function (e) {
     var f = e.target && e.target.form;
+    if (!f) return;
+    /*
+     * **الخاصية تُظلَّل بحقلٍ يحمل اسمها.**
+     *
+     * `form.method` كانت تُقرأ خاصيةً — وDOM يجعل عناصر النموذج خصائصَ عليه
+     * باسمها، فحقلٌ اسمه `method` (وهو موجود: «طريقة الدفع» في المالية
+     * والمشتريات) **يُظلّل** الخاصيةَ المبنية فتُعيد العنصرَ لا النصّ، فيرمي
+     * `toLowerCase` استثناءً في كل ضغطة مفتاح. وأثرُه ليس ضجيجاً في الكونسول:
+     * المستمعُ ينقطع قبل `dirty = true`، **فحارسُ المغادرة يُطفأ على تلك الشاشة
+     * بعينها** — يكتب المستخدم مستنداً ماليّاً كاملاً ثم يغادر فلا يُسأل ولا
+     * يُحذَّر، ويضيع ما كتب صامتاً. وهو بالضبط ما وُضع الحارسُ لأجله.
+     *
+     * السمةُ لا تُظلَّل — فتُقرأ منها.
+     */
+    var method = (f.getAttribute('method') || 'get').toLowerCase();
     // v2.128: نماذج الفلترة والبحث (data-noguard) لا تحبس المغادرة — لا بيانات تضيع فيها
-    if (f && (f.method || '').toLowerCase() === 'post' && !f.hasAttribute('data-noguard')) dirty = true;
+    if (method === 'post' && !f.hasAttribute('data-noguard')) dirty = true;
   });
   // غير رأسمالي (bubble): يعمل بعد محرك التأكيد — الضغطة المسلِّحة الممنوعة لا تُحسب إرسالاً
   document.addEventListener('submit', function (e) {

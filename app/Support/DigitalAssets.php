@@ -337,9 +337,15 @@ class DigitalAssets
     /** كل ما تحتاجه الشاشة — بمخبأٍ واحد */
     public static function all(bool $fresh = false): array
     {
-        if ($fresh) Cache::forget('da:all');
+        // **المفتاحُ يحمل بصمةَ قارئه** (v2.337): `da:all` كان واحداً للجميع،
+        // فأوّلُ من يسخّن الخبيئة يفرض رؤيتَه على من بعده — ويُلغى بذلك تنطيقُ
+        // `vaultHealth` وأخواتها كلُّه: معزولٌ يقرأ حصيلةَ المالك، أو المالكُ
+        // يقرأ حصيلةً منقوصة فيظنّ الخزنةَ سليمة. `hub_scope_key` هو المفتاحُ
+        // نفسُه المعتمَد في كل قارئٍ منطَّقٍ آخر.
+        $key = hub_scope_key('da:all');
+        if ($fresh) Cache::forget($key);
 
-        return Cache::remember('da:all', self::TTL, fn () => [
+        return Cache::remember($key, self::TTL, fn () => [
             'ownership' => self::ownership(),
             'mail'      => self::mailboxBlastRadius(),
             'infra'     => self::infraBlastRadius(),

@@ -7,6 +7,9 @@
         <b class="ltr mono">{{ session('temp_password') }}</b>
     </div>
 @endif
+{{-- نجاحٌ جزئيّ: ما وقع يُعرض في «ok» وما امتنع هنا — عرضُ أحدهما وحدَه كذبةٌ
+     بالحذف (الإجراءات الجماعية تستعمله: «نُقل ٣» + «٢ تعذّر: …») --}}
+@if (session('warn'))<div class="flash wn">⚠️ {{ session('warn') }}</div>@endif
 @if (session('err'))<div class="flash bad">{{ session('err') }}</div>@endif
 @if ($errors->any())
     <div class="flash bad"><b>تحقق من المدخلات:</b>

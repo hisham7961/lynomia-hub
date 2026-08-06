@@ -33,6 +33,16 @@
                     @if ($found->evidence_hash)
                         <tr><td>رأس سلسلة الأدلة</td><td class="mono ltr" style="font-size:10px;word-break:break-all">{{ $found->evidence_hash }}</td></tr>
                     @endif
+                    {{-- الرأسُ المخزَّن كان يُعرض بلا إعادةِ حساب: رقمٌ يُطمئن ولا يفحص --}}
+                    @if ($verdict['checked'] ?? false)
+                        <tr><td>فحصُ السلسلة</td><td>
+                            @if ($verdict['ok'])
+                                <b style="color:var(--ok)">✅ السلسلة سليمة</b>
+                            @else
+                                <b style="color:var(--bad)">⛔ السلسلة مكسورة</b> — تواصل مع الجهة المُصدِرة
+                            @endif
+                        </td></tr>
+                    @endif
                 </table>
                 @if (($signers ?? collect())->count() > 1 || (($signers ?? collect())->count() === 1 && ! $found->signer_name))
                     <table class="mini" style="margin-top:8px">

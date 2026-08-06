@@ -84,8 +84,12 @@ class OpsController extends Controller
         $errs = [
             'new'  => ErrorEvent::where('status', 'جديد')->count(),
             'week' => ErrorEvent::where('last_seen', '>=', now()->subDays(7))->sum('count'),
-            'slow' => ErrorEvent::where('kind', 'slow')->where('last_seen', '>=', now()->subDays(7))->count(),
-            'api'  => ErrorEvent::where('kind', 'api')->where('last_seen', '>=', now()->subDays(7))->count(),
+            // **وقائعُ لا بصمات** (v2.338): `count()` كان يعدّ صفوفَ الجدول
+            // المجمَّع — أي عددَ المسارات المتميّزة — بينما `week` فوقه يجمع
+            // `count`. فألفُ بطءٍ على مسارٍ واحد كانت تُعرض «١»، والبطاقةُ
+            // المخصَّصةُ لقياس الحمل تُطمئن حيث ينبغي أن تُنذر.
+            'slow' => (int) ErrorEvent::where('kind', 'slow')->where('last_seen', '>=', now()->subDays(7))->sum('count'),
+            'api'  => (int) ErrorEvent::where('kind', 'api')->where('last_seen', '>=', now()->subDays(7))->sum('count'),
         ];
 
         $pending = $this->pendingMigrations();
@@ -255,6 +259,41 @@ class OpsController extends Controller
             return redirect()->route('ops.index')
                 ->with('err', 'فشل مسح الكاش: ' . mb_substr($e->getMessage(), 0, 300));
         }
+    }
+
+    /**
+     * **فاحصان كانا يُرشَد إليهما بطرفيةٍ لا يملكها صاحبُ النظام.**
+     *
+     * هذا النظامُ يُرفع ملفّاتٍ على استضافةٍ مشتركة بلا shell — وكانت شاشةُ
+     * التدقيق تقول «شغّل `php artisan hub:audit-verify`» ومركزُ التشغيل يقول
+     * «شغّل `hub:schema-check`». فالنتيجةُ أنّ سلسلةَ التدقيق لا تُفحص أبداً
+     * وانحرافَ المخطّط لا يُكشف أبداً، بينما الشاشتان تُوهمان بوجود فاحص.
+     * وضمانٌ معلَنٌ بلا فاحصٍ يُسكِت السؤالَ الذي كان سيكشف الخلل.
+     *
+     * والمخرَجُ يُعرض كما هو — الفاحصُ يقول ما وجد، ولا يُعاد صوغُ حكمه.
+     */
+    public function verifyAudit()
+    {
+        $this->gate();
+
+        $code = \Illuminate\Support\Facades\Artisan::call('hub:audit-verify');
+        $out = trim(\Illuminate\Support\Facades\Artisan::output());
+        hub_audit('فحص سلسلة التدقيق', null, null, 'من مركز التشغيل');
+
+        return redirect()->route('ops.index')
+            ->with($code === 0 ? 'ok' : 'err', $out !== '' ? $out : 'الفاحصُ لم يُخرج شيئاً');
+    }
+
+    /** فحصُ انحراف المخطّط — الشقيقُ نفسُه: زرٌّ بدل سطرِ طرفية */
+    public function schemaCheck()
+    {
+        $this->gate();
+
+        $code = \Illuminate\Support\Facades\Artisan::call('hub:schema-check');
+        $out = trim(\Illuminate\Support\Facades\Artisan::output());
+
+        return redirect()->route('ops.index')
+            ->with($code === 0 ? 'ok' : 'err', $out !== '' ? $out : 'لا انحرافَ في المخطّط');
     }
 
     /** توليد عدّة الانطلاق بضغطة: مسارات العمل + قواعد التنبيه — بلا طرفية */

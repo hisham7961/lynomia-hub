@@ -20,6 +20,15 @@
     </div>
 </div>
 
+{{-- `hub_project_pl` يحسب `mixed` و`byCurrency` — وكانت الشاشةُ تقرأ `currency`
+     وحدها فتعرض إيراداً وتكلفةً وربحاً بلصيقةٍ واحدة فوق صفوفٍ بعملتين --}}
+@if ($pl['mixed'] ?? false)
+    @include('partials._mixedcur', ['currency' => $c, 'what' => 'أرقامُ الإيراد والتكلفة والربح هنا'])
+    @if ($pl['byCurrency'] ?? [])
+        <div class="card"><div class="sub">تفصيلُ الإيراد بالعملة:
+            {{ collect($pl['byCurrency'])->map(fn ($b) => $m($b['revenue']) . ' ' . $b['currency'] . ' (' . $b['docs'] . ' مستند)')->implode(' · ') }}</div></div>
+    @endif
+@endif
 <div class="cards">
     <div class="stat"><span class="ico">📈</span><b>{{ $m($pl['revenue']['invoiced']) }}</b><span>مفوتر ({{ $c }})</span></div>
     <div class="stat"><span class="ico">💵</span><b>{{ $m($pl['revenue']['collected']) }}</b>
