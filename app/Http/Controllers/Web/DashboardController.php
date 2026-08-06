@@ -103,10 +103,17 @@ class DashboardController extends Controller
                 if ($k) $bits[] = "{$k} تذاكر عاجلة";
             }
 
+            // **عطلٌ وتسريبٌ في سطرٍ واحد**: الاستعلامُ كان خاماً — بلا `hub_can`
+            // ولا `hub_scope` ولا استثناءِ المحذوف — فيُعدّ للقارئ ما لا يراه؛
+            // وكان يبحث عن `'%بانتظار%'` وهي **مفردةٌ لا وجودَ لها** في خيارات
+            // الوحدة (الحالات: معلّق/موافق/مرفوض)، فالسطرُ ميتٌ منذ كُتب.
+            // `hub_read` تجمع الحرّاسَ الثلاثة، و`hub_open_scope` تشتقّ «المفتوح»
+            // من سجلّ الحالات المغلقة لا من نصٍّ منسوخ — على نمط `CeoBoard::awaitingCalc`.
             if (hub_flag($user, 'approve') || hub_is_owner($user)) {
-                $a = \Illuminate\Support\Facades\DB::table('approvals')
-                    ->where('status', 'LIKE', '%بانتظار%')->count();
-                if ($a) $bits[] = "{$a} طلبات اعتماد بانتظارك";
+                if ($q = hub_read('approvals', $user)) {
+                    $a = hub_open_scope($q, 'status', ['موافق', 'موافقة', 'معتمد', 'معتمدة'])->count();
+                    if ($a) $bits[] = "{$a} طلبات اعتماد بانتظارك";
+                }
             }
         } catch (\Throwable $e) {
             return '';

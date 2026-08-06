@@ -34,8 +34,8 @@ class OdooConnectionController extends Controller
 
         $rows = OdooConnection::orderBy('name')->orderBy('id')->get();
 
-        // خريطة المزيج: كم مشروعاً يستعمل كلَّ اتصال — بنمط meta LIKE
-        // المجرَّب عبر المحرّكين في Integrations::odoo()
+        // خريطة المزيج: كم مشروعاً يستعمل كلَّ اتصال — بمسار JSON الذي يترجمه
+        // Laravel لكل محرّك (‏`LIKE` على عمود JSON أصيل يُخطئ على MySQL 8)
         $uses = [];
         foreach ($rows as $c) {
             $uses[$c->id] = $this->projectsUsing($c->id)->count();
@@ -44,7 +44,7 @@ class OdooConnectionController extends Controller
         // المشاريع التي اختارت خادماً: اسمُها وخادمُها وعددُ قنواتها
         $names = $rows->pluck('name', 'id');
         $linked = DB::table('projects')->whereNull('deleted_at')
-            ->where('meta', 'LIKE', '%"conn":%')->orderBy('name')->orderBy('id')
+            ->whereNotNull('meta->odoo->conn')->orderBy('name')->orderBy('id')
             ->get(['id', 'name', 'meta'])
             ->map(function ($p) use ($names) {
                 $o = (array) (json_decode((string) $p->meta, true)['odoo'] ?? []);
@@ -185,8 +185,12 @@ class OdooConnectionController extends Controller
     /** المشاريع التي تختار هذا الاتصال في meta['odoo']['conn'] */
     protected function projectsUsing(string $connId)
     {
+        // **مسارُ JSON لا `LIKE` على النصّ**: MySQL 8 يخزّن `json` أصيلاً ويُطبّعه
+        // (‏`"conn": "…"` بمسافةٍ بعد النقطتين) فلا يُطابق النمطُ الحرفيّ أبداً —
+        // فالعدُّ صفرٌ دائماً وحذفُ اتصالٍ مستعمَل يمرّ بلا تحذير. ومسارُ JSON
+        // يُترجمه Laravel لكل محرّك.
         return DB::table('projects')->whereNull('deleted_at')
-            ->where('meta', 'LIKE', '%"conn":"' . $connId . '"%');
+            ->where('meta->odoo->conn', $connId);
     }
 
     /** التحقق المشترك — ومعه حارس SSRF على الرابط */

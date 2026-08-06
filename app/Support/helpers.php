@@ -1320,8 +1320,22 @@ if (! function_exists('hub_okr_progress')) {
      * الحالية من `hub_kpi_value` (المحرك مكتوبٌ وجاهز منذ إصدارات بلا مستهلك
      * في الأهداف)، وهدفٌ بلا نتائج يبقى على رقمه اليدوي — لا نكذب بصفر.
      */
-    function hub_okr_progress(string $objectiveId, bool $refresh = false, bool $withPace = false): ?array
+    function hub_okr_progress(string $objectiveId, bool $refresh = false, bool $withPace = false,
+                              bool $persist = false): ?array
     {
+        /*
+         * **قراءةٌ لا تكتب.**
+         *
+         * القيمةُ الحالية تُقرأ من مصدرها بنطاق **المُشاهِد** (وهذا صحيح: لا
+         * يُعرض لأحدٍ رقمٌ من خارج نطاقه)، لكنّها كانت تُثبَّت في
+         * `key_results.current_value` و`objectives.progress` — وهما عمودان
+         * **مشتركان يقرؤهما الجميع**. فموظفٌ معزولٌ على شركةٍ واحدة يفتح اللوحة
+         * فيدهس رقمَ المؤسسة برقمِه الجزئيّ، ويبقى مدهوساً حتى يفتحها غيره.
+         *
+         * التثبيتُ الآن صريحٌ (`$persist`) **ولا يقع إلا من قارئٍ غير مقيَّد** —
+         * سياقُ النظام (الطرفية والمجدول، بلا مستخدم) أو مالكٌ يرى الكلّ.
+         */
+        $persist = $persist && ! hub_scoped() && hub_company_ids() === null;
         // الملغاة تُستثنى — وبلا حالة تبقى (whereNotIn وحده يُقصي NULL صامتاً)
         $krs = \App\Models\KeyResult::whereNull('deleted_at')
             ->where('objective_id', $objectiveId)
@@ -1337,10 +1351,12 @@ if (! function_exists('hub_okr_progress')) {
             if ($auto && $refresh) {
                 $val = hub_kr_read($kr);
                 if ($val !== null && (float) ($kr->current_value ?? PHP_FLOAT_MIN) !== $val) {
+                    // القيمةُ المعروضة تتحدّث دائماً؛ والعمودُ المشترك لا يُكتب
+                    // إلا بتثبيتٍ مأذون (انظر أعلى الدالة)
                     $kr->current_value = $val;
                     $kr->read_at = now();
-                    $kr->saveQuietly();
-                } elseif ($val !== null) {
+                    if ($persist) $kr->saveQuietly();
+                } elseif ($val !== null && $persist) {
                     $kr->read_at = now();
                     $kr->saveQuietly();
                 }
@@ -1371,7 +1387,7 @@ if (! function_exists('hub_okr_progress')) {
             $out += hub_okr_pace($o, $pct);
             // النسبة تُكتب على الهدف **دائماً** لا عند التحديث فقط: القوائم
             // والتصدير والودجات تقرأ العمود، فيبقى صادقاً بلا أن يلمسه أحد.
-            if ($pct !== null && (int) ($o->progress ?? -1) !== $pct) {
+            if ($persist && $pct !== null && (int) ($o->progress ?? -1) !== $pct) {
                 $o->forceFill(['progress' => $pct, 'computed_at' => now(),
                                'progress_at_risk' => $out['gap'] ?? null])->saveQuietly();
             }

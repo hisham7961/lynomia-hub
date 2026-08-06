@@ -39,12 +39,39 @@ class HubAutomation extends Command
         $b = $this->budgetsAuto();
         $o = $this->obligationsAuto();
         $p = $this->pruneNotifications();
+        $k = $this->okrRefresh();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث");
 
         \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.automation'], ['value' => now()->toIso8601String()]);
         \Illuminate\Support\Facades\Cache::forget('settings:all');
         return self::SUCCESS;
+    }
+
+    /**
+     * تثبيتُ قيم الأهداف من مصادرها — **في سياق النظام**.
+     *
+     * كانت الأعمدةُ المشتركة (`key_results.current_value` و`objectives.progress`)
+     * تُكتب من فتح الشاشة، فيدهسها قارئٌ مقيَّد النطاق برقمِه الجزئيّ (v2.331).
+     * والقراءةُ صارت لا تكتب — فالتثبيتُ يقع هنا بلا مستخدمٍ أصلاً: نطاقٌ كامل
+     * ورقمٌ واحدٌ صادقٌ للجميع، مرةً في كل دورةِ أتمتة لا مع كل نقرة.
+     */
+    protected function okrRefresh(): int
+    {
+        if ($this->dry || ! \Illuminate\Support\Facades\Schema::hasTable('objectives')) return 0;
+
+        $n = 0;
+        try {
+            foreach (\App\Models\Objective::whereNull('deleted_at')
+                        ->whereNotIn('status', ['ملغى', 'مكتمل'])
+                        ->orderBy('id')->limit(500)->pluck('id') as $id) {
+                if (hub_okr_progress($id, true, false, true)) $n++;
+            }
+        } catch (\Throwable $e) {
+            $this->warn('تعذّر تحديث الأهداف: ' . $e->getMessage());
+        }
+
+        return $n;
     }
 
     /**
