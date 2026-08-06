@@ -34,7 +34,9 @@ class ContractEvent extends Model
             'contract_id' => $req?->contract_id,
             'actor_id' => auth()->id(),
             'ip' => request()?->ip(),
-            'agent' => substr((string) request()?->userAgent(), 0, 250),
+            // hub_fit لا substr: هذا سجلُّ أدلةٍ قانونيّ، وبايتةٌ مقطوعة
+            // في منتصف حرفٍ عربيّ ترفضها MySQL فيسقط تسجيلُ الحدث كلّه
+            'agent' => hub_fit((string) request()?->userAgent(), 250),
             'created_at' => now(),
         ]);
     }

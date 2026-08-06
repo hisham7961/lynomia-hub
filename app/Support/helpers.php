@@ -2087,7 +2087,8 @@ if (! function_exists('hub_audit')) {
             'module'    => $module,
             'record_id' => $recordId,
             'name'      => $name === null ? null : \Illuminate\Support\Str::limit($name, 60),
-            'device'    => substr((string) request()->userAgent(), 0, 200),
+            // hub_fit لا substr: القصُّ بالبايتات يقطع الحرف العربي نصفين
+            'device'    => hub_fit((string) request()->userAgent(), 200),
             'ip'        => request()->ip(),
             'created_at' => now(),
         ]);
@@ -2343,10 +2344,23 @@ if (! function_exists('hub_fit')) {
      * قصُّ نصٍّ ليسع عموداً — **بالمحارف** لا بالبايتات.
      * `substr` تقطع الحرف العربي نصفين فتُنتج UTF-8 فاسدةً يرفضها MySQL
      * بـ«Incorrect string value» ويبتلعها SQLite صامتاً.
+     *
+     * والتطهيرُ قبل القصّ (v2.312): المصدرُ نفسه قد يصل فاسداً — ترويسة
+     * `User-Agent` يملكها الطالب فيرسل فيها ما شاء من بايتات. وبايتةٌ يتيمة
+     * واحدة تُسقط ثلاثة أشياء دفعةً: `json_encode` في سمة `Auditable`
+     * (فينهار مسارُ الكتابة كلّه بـJsonEncodingException)، وMySQL الصارمة،
+     * والنسخةَ الاحتياطية (`json_encode` تعيد false فتُكتب نسخةٌ صفريّة).
      */
     function hub_fit(?string $v, int $max): ?string
     {
         if ($v === null) return null;
+
+        // إسقاطُ ما ليس UTF-8 صالحاً بدل تمريره — الصمتُ هنا يُفسد ما بعده
+        if (! mb_check_encoding($v, 'UTF-8')) {
+            $v = (string) mb_convert_encoding($v, 'UTF-8', 'UTF-8');
+        }
+        // ‏NUL يقطع النصّ في بعض المحرّكات ويُفسد الفهارس
+        $v = str_replace("\0", '', $v);
 
         return mb_strlen($v) > $max ? mb_substr($v, 0, $max) : $v;
     }
@@ -4120,8 +4134,8 @@ if (! function_exists('hub_ack_do')) {
             'title' => \Illuminate\Support\Str::limit((string) ($row->title ?? ''), 200),
             'policy_id' => $module === 'policies' ? $recordId : ($ack->policy_id ?? null),
             'status' => 'مُقرّة', 'ack_at' => now(),
-            'ip' => substr((string) request()->ip(), 0, 60),
-            'device' => substr((string) request()->userAgent(), 0, 200),
+            'ip' => hub_fit((string) request()->ip(), 60),
+            'device' => hub_fit((string) request()->userAgent(), 200),
             'sign_request_id' => $signRequestId ?: $ack->sign_request_id,
         ])->save();
 
