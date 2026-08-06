@@ -35,6 +35,17 @@ class StockMove extends Model
 
     protected static function booted(): void
     {
+        // **وعند الإنشاء كذلك** (v2.322): الحارسُ كان على `updating` وحده، فحركةٌ
+        // تُولَد «مؤكدة» مباشرةً من النموذج العام تُعلن رصيداً تحرّك ولم يتحرّك.
+        static::creating(function (self $m) {
+            if (static::$posting) return;
+            $meta = (array) ($m->meta ?? []);
+            if ((string) $m->status === 'مؤكدة' && empty($meta['posted_at'])) {
+                throw \Illuminate\Validation\ValidationException::withMessages(
+                    ['status' => 'الحركةُ تُنشأ مسودةً ثمّ تُرحَّل من زر «ترحيل الحركة» — التأكيد اليدوي لا يحرّك المخزون']);
+            }
+        });
+
         static::updating(function (self $m) {
             if (static::$posting) return;
             $meta = (array) ($m->meta ?? []);

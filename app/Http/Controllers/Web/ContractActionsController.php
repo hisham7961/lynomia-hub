@@ -18,9 +18,19 @@ class ContractActionsController extends Controller
         'value', 'currency', 'date_start', 'date_end', 'renewal', 'notice', 'owner_id',
         'alerts', 'obligations', 'notes'];
 
-    protected function find(string $id): Contract
+    /**
+     * `$alsoEdit`: التجديدُ يكتب **حالةَ العقد الأصل** («جُدِّد») لا مسودةً فحسب،
+     * فيشترط صلاحيةَ التعديل معها (v2.322) — وإلا كان بابَ التفافٍ على `e`
+     * بصلاحية `a` وحدها. والتعديلُ (`amend`) يبقى على «إضافة» لأنه يُنشئ مسودةً
+     * ولا يمسّ الأصل.
+     */
+    protected function find(string $id, bool $alsoEdit = false): Contract
     {
         abort_unless(hub_can(auth()->user(), 'contracts', 'a'), 403);
+        if ($alsoEdit) {
+            abort_unless(hub_can(auth()->user(), 'contracts', 'e'), 403,
+                'التجديد يغيّر حالة العقد الأصل — يتطلب صلاحية تعديل العقود');
+        }
 
         return hub_scope(Contract::query(), 'contracts')->findOrFail($id);
     }
@@ -52,7 +62,7 @@ class ContractActionsController extends Controller
     {
         // التجديد يكتب «قيد التجديد» على العقد الأصل — فهو تعديلٌ يمرّ بالطابور
         if ($why = hub_block_if_queued('contracts')) return back()->with('err', $why);
-        $c = $this->find($id);
+        $c = $this->find($id, alsoEdit: true);
         // idempotent: مسودة تجديدٍ قائمة لهذا الأصل لا تُكرر بنقرة متعجلة
         if ($ex = Contract::where('parent_id', $c->id)->where('kind', 'تجديد')
                 ->where('status', 'مسودة')->first()) {
