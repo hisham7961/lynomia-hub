@@ -52,7 +52,15 @@ class RoleController extends Controller
             if ($items) $out[$g['g']] = ['icon' => $g['icon'] ?? '📁', 'items' => $items];
         }
 
-        $rest = array_diff_key($mods, $seen);
+        /*
+         * **و`users` خارج المصفوفة** (v2.338): خاناتُها الأربع كانت **عقيمةً
+         * تماماً** — `ModuleController::resolve` يردّ ٤٠٤ على `users`،
+         * و`UserController::gate` يحرس بعَلَم «إدارة المستخدمين» لا بالمصفوفة.
+         * فمن يُفرغ الخانات يظنّ أنه سحب إدارةَ المستخدمين ولم يسحب شيئاً،
+         * وأخطرُ مكانٍ لضابطٍ لا يضبط هو شاشةُ الصلاحيات نفسُها.
+         * إدارةُ المستخدمين تُمنح وتُسحب من العَلَم أعلاه، وهو المكانُ الوحيد.
+         */
+        $rest = array_diff_key($mods, $seen + ['users' => 1]);
         if ($rest) $out['أخرى'] = ['icon' => '📎', 'items' => $rest];
 
         return $out;

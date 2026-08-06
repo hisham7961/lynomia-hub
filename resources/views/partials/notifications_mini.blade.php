@@ -10,6 +10,12 @@
         </a>
     @endforeach
     <button class="palitem sub" type="button" style="width:100%;border:0;background:none;cursor:pointer;border-top:1px dashed var(--ln);justify-content:center"
+            {{-- **الرمزُ في الترويسة** (v2.338): الزرُّ خارج أيّ نموذج (يُحقن في
+                 `#bellbox` وهو div عارٍ)، وhtmx لا يجمع `_token` إلا من نموذجٍ
+                 حاوٍ — فكلُّ ضغطةٍ كانت تُردّ ٤١٩ قبل بلوغ المتحكّم، ويعرض
+                 app.js «تعذّر تحميل المحتوى» فيبدو عطلَ شبكة. والـ٤١٩ مستثناةٌ
+                 من مركز الأخطاء فلا أثرَ لها هناك أيضاً: عطلٌ صامتٌ تامّ. --}}
+            hx-headers='{"X-CSRF-TOKEN": "{{ csrf_token() }}"}'
             hx-post="{{ route('notifications.readall') }}" hx-target="#bellbox" hx-swap="innerHTML">✓ تحديد الكل كمقروء</button>
 @endif
 <a class="palitem sub" href="{{ route('notifications.index') }}" style="justify-content:center;border-top:1px solid var(--ln)">مركز الإشعارات ←</a>

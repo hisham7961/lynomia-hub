@@ -84,8 +84,12 @@ class OpsController extends Controller
         $errs = [
             'new'  => ErrorEvent::where('status', 'جديد')->count(),
             'week' => ErrorEvent::where('last_seen', '>=', now()->subDays(7))->sum('count'),
-            'slow' => ErrorEvent::where('kind', 'slow')->where('last_seen', '>=', now()->subDays(7))->count(),
-            'api'  => ErrorEvent::where('kind', 'api')->where('last_seen', '>=', now()->subDays(7))->count(),
+            // **وقائعُ لا بصمات** (v2.338): `count()` كان يعدّ صفوفَ الجدول
+            // المجمَّع — أي عددَ المسارات المتميّزة — بينما `week` فوقه يجمع
+            // `count`. فألفُ بطءٍ على مسارٍ واحد كانت تُعرض «١»، والبطاقةُ
+            // المخصَّصةُ لقياس الحمل تُطمئن حيث ينبغي أن تُنذر.
+            'slow' => (int) ErrorEvent::where('kind', 'slow')->where('last_seen', '>=', now()->subDays(7))->sum('count'),
+            'api'  => (int) ErrorEvent::where('kind', 'api')->where('last_seen', '>=', now()->subDays(7))->sum('count'),
         ];
 
         $pending = $this->pendingMigrations();

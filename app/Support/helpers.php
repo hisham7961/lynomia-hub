@@ -4124,8 +4124,27 @@ if (! function_exists('hub_ack_targets')) {
             $members = array_values(array_filter(array_merge(
                 (array) ($p->members ?? []), [$p->manager_id ?? null])));
             if ($members) $q->whereIn('id', $members);
-        } elseif ($cid && \Illuminate\Support\Facades\Schema::hasColumn('users', 'company_id')) {
-            $q->where('company_id', $cid);
+        } elseif ($cid) {
+            /*
+             * **العضويةُ من حيث تُكتب لا من عمودٍ ميت** (v2.338): كان المُرشِّح
+             * `users.company_id` — **ولا كاتبَ لهذا العمود في المستودع كلِّه**؛
+             * عضويةُ الشركات تُخزَّن في `users.companies` (مصفوفة)، وهي التي
+             * يقرؤها `hub_company_ids` وعليها يقوم العزلُ كلُّه.
+             *
+             * فسياسةٌ تُعلَن لشركةٍ كانت **لا تبلغ أحداً**، والشاشةُ تقول «أُعلنت
+             * لِـ٠ شخص» فيُقرأ صفرُها «لا أحد معنيّ» لا «العمودُ ميت» — وإعلانُ
+             * التزامٍ لا يصل مسؤوليةٌ لم تُنقَل وهي تبدو منقولة.
+             *
+             * والترشيحُ في PHP لا في SQL: المصفوفةُ JSON، ودوالُّها تختلف بين
+             * MySQL وSQLite — والقائمةُ محدودةٌ بالمستخدمين النشطين فالكلفةُ لا
+             * تُذكر. ومن لا قائمةَ شركاتٍ له (مالكٌ أو غيرُ معزول) معنيٌّ بالكل.
+             */
+            return $q->get(['id', 'companies', 'role_id'])
+                ->filter(function ($u) use ($cid) {
+                    $ids = hub_company_ids($u);
+
+                    return $ids === null || in_array((string) $cid, $ids, true);
+                })->pluck('id')->values()->all();
         }
 
         return $q->pluck('id')->all();
