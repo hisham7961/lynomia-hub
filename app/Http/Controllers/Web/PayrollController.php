@@ -189,6 +189,10 @@ class PayrollController extends Controller
 
             // معاملةٌ تلفّ القيد وسطريه: فشلُ السطر الثاني كان يترك قيداً مرحّلاً
             // بسطرٍ واحد، وJournalEntry::booted يمنع تصحيحه أبداً → دفترٌ مختلٌّ للأبد
+            // المولّد الداخلي يبني القيدَ مرحَّلاً ثمّ سطريه — الرايةُ حول كتلته
+            // ليمرّ حارسُ التوازن في النموذج (v2.314)
+            \App\Models\JournalEntry::$posting = true;
+            try {
             \Illuminate\Support\Facades\DB::transaction(function () use ($run, $exp, $cash) {
                 $entry = \App\Models\JournalEntry::create([
                     'doc_no' => 'JE-PAYROLL-' . now()->format('ymHis'),
@@ -203,6 +207,9 @@ class PayrollController extends Controller
                 \App\Models\JournalLine::create(['entry_id' => $entry->id, 'acc_id' => $cash,
                     'debit' => 0, 'credit' => (float) $run->total, 'memo' => 'صرف الرواتب']);
             });
+            } finally {
+                \App\Models\JournalEntry::$posting = false;
+            }
         } catch (\Throwable $e) {
             report($e);   // القيد الآلي لا يُفشل الاعتماد نفسه
         }

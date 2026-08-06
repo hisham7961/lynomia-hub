@@ -30,7 +30,25 @@ class JournalEntry extends Model
         'archived' => 'boolean',
     ];
 
-    /** القيد المُرحَّل مقفل: يُعكس بقيدٍ جديد ولا يُعدَّل ولا يُحذف — على كل المنافذ */
+    /**
+     * مولِّدٌ داخليّ موثوق يبني قيداً مرحَّلاً ثمّ سطورَه (قيدُ الدفعة الآليّ في
+     * `FinController::pay` وقيدُ الرواتب) — يرفع الرايةَ حول كتلته فقط، على نمط
+     * `StockMove::$posting`. لا يرفعها مسارُ مستخدمٍ أبداً.
+     */
+    public static bool $posting = false;
+
+    /**
+     * القيد المُرحَّل مقفل: يُعكس بقيدٍ جديد ولا يُعدَّل ولا يُحذف — على كل المنافذ.
+     *
+     * وحارسُ **الدخول** إلى «مرحّل» (v2.314): الحارسُ القديم يفحص
+     * `getOriginal('state')` على `updating/deleting`، فيمنع الخروجَ من «مرحّل»
+     * لا الدخولَ إليه. وحقلُ `state` قائمةٌ منسدلة في نموذج الوحدة العام، فقيدٌ
+     * غيرُ موزون كان يُرحَّل بـ`PUT /m/entries/{id}` أو يُنشأ «مرحّلاً» بلا سطرٍ
+     * واحد — ثمّ **يُقفل أبداً**: لا تعديلَ ولا حذفَ ولا إصلاحَ في التطبيق كلّه،
+     * ودفترٌ مختلٌّ دائم. بينما `EntryController::post` يرفض بـ422 لعدم التوازن.
+     * الآن الشرطُ في النموذج نفسه فيسدّ الأبوابَ الخمسة دفعةً واحدة (النموذج
+     * العام، والإنشاء، وسحبُ الكانبان، وAPI، وأيُّ منفذٍ لاحق).
+     */
     protected static function booted(): void
     {
         $guard = function (self $m) {
@@ -41,6 +59,22 @@ class JournalEntry extends Model
         };
         static::updating($guard);
         static::deleting($guard);
+
+        static::saving(function (self $m) {
+            if (static::$posting) return;                      // المولّد الداخلي يبني سطورَه بعدُ
+            if ($m->state !== 'مرحّل' || $m->getOriginal('state') === 'مرحّل') return;
+
+            $sum = \App\Models\JournalLine::where('entry_id', $m->getKey())
+                ->selectRaw('COALESCE(SUM(debit),0) d, COALESCE(SUM(credit),0) c')->first();
+            $debit = round((float) ($sum->d ?? 0), 3);
+            $credit = round((float) ($sum->c ?? 0), 3);
+
+            if ($debit <= 0 || $debit !== $credit) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['state' =>
+                    'لا يُرحَّل قيدٌ لا يوازن: مدين ' . number_format($debit, 3)
+                    . ' ≠ دائن ' . number_format($credit, 3) . ' — أضف سطورَه أولاً']);
+            }
+        });
     }
 
     public function lines()

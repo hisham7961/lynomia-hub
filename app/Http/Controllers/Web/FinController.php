@@ -143,6 +143,11 @@ class FinController extends Controller
 
             // معاملةٌ تلفّ القيد وسطريه: فشلُ السطر الثاني كان يترك قيداً مرحّلاً
             // بسطرٍ واحد، وJournalEntry::booted يمنع تصحيحه أبداً → دفترٌ مختلٌّ للأبد
+            // المولّد الداخلي يبني القيدَ مرحَّلاً ثمّ سطريه، فيرفع الرايةَ حول
+            // كتلته ليمرّ حارسُ التوازن في النموذج (v2.314) — والمعاملةُ تضمن
+            // أنّ القيد لا يبقى بسطرٍ واحد إن تعثّر الثاني.
+            \App\Models\JournalEntry::$posting = true;
+            try {
             \Illuminate\Support\Facades\DB::transaction(function () use ($doc, $amount, $income, $money, $other) {
                 $entry = \App\Models\JournalEntry::create([
                     'doc_no' => 'JE-' . ($doc->doc_no ?: substr($doc->id, 0, 8)) . '-' . now()->format('His'),
@@ -162,6 +167,9 @@ class FinController extends Controller
                     'acc_id' => $income ? $other : $money, 'debit' => 0, 'credit' => $amount,
                     'memo' => $income ? 'الإيراد' : 'سداد الدفعة']);
             });
+            } finally {
+                \App\Models\JournalEntry::$posting = false;
+            }
         } catch (\Throwable $e) {
             report($e);   // القيد الآلي لا يُفشل تسجيل الدفعة نفسها
         }

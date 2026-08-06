@@ -26,6 +26,9 @@ class StockController extends Controller
     public function act(Request $r, string $id)
     {
         abort_unless(hub_can(auth()->user(), 'stockmv', 'e'), 403, 'ترحيل الحركات يتطلب صلاحية تعديلها');
+        // زرُّ المسار لا يلتفّ على طابور الموافقات — نموذجُ الوحدة يسدّه
+        // (ModuleController) وPurchaseController::act يفعلها، وكان هذا وحده بلا حارس
+        if ($why = hub_block_if_queued('stockmv')) return back()->with('err', $why);
         $mv = hub_scope(StockMove::query(), 'stockmv')->findOrFail($id);
 
         return match (hub_str($r->input('do'))) {

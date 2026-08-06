@@ -210,9 +210,24 @@ class PurchaseController extends Controller
 
             // سبقنا مرتجعٌ نُفّذ سلفاً — لا نعكس مرتين (خصمٌ مضاعف)
             if (empty($meta['returned_at'])) {
-                $moves = \App\Models\StockMove::whereIn('id', (array) ($meta['stock_moves'] ?? []))->get();
+                // **لا يُعكَس إلا أثرٌ قائم** (v2.314): الحركةُ الملغاة رُدَّ أثرُها
+                // سلفاً (cancel أعاد الكمية)، والمعكوسةُ من قبل كذلك، وغيرُ
+                // المُرحَّلة لم تُحرّك الرصيد أصلاً. عكسُها هنا خصمٌ مضاعف يُبخّر
+                // مخزوناً حقيقياً بنقرتين. وwithTrashed كي لا يفلت المحذوف ناعماً.
+                $moves = \App\Models\StockMove::withTrashed()
+                    ->whereIn('id', (array) ($meta['stock_moves'] ?? []))
+                    ->orderBy('id')->get();
                 $backIds = [];
+                $skipped = [];
                 foreach ($moves as $mv) {
+                    $mvMeta = (array) ($mv->meta ?? []);
+                    if ((string) $mv->status === 'ملغاة' || ! empty($mvMeta['reversed_at']) || empty($mvMeta['posted_at'])) {
+                        $skipped[] = ['id' => $mv->id, 'doc_no' => $mv->doc_no,
+                                      'why' => (string) $mv->status === 'ملغاة' ? 'ملغاة'
+                                             : (! empty($mvMeta['reversed_at']) ? 'معكوسة سلفاً' : 'غير مُرحَّلة')];
+                        continue;
+                    }
+
                     $item = \App\Models\StockItem::whereKey($mv->item_id)->lockForUpdate()->first();
                     if (! $item) continue;
                     $qty = (float) $mv->qty;
@@ -235,11 +250,17 @@ class PurchaseController extends Controller
                     $item->qty = max(0, (float) $item->qty - $qty);
                     $item->saveQuietly();
                     hub_stock_sync($item);
+
+                    // وسمُ الحركة الأصل معكوسةً — فلا تُعكس ثانيةً من أي مسار
+                    $mv->meta = $mvMeta + ['reversed_at' => now()->toIso8601String(), 'reversed_by' => $rev->id];
+                    $mv->saveQuietly();
+
                     $backIds[] = $rev->id;
                     $reversed++;
                 }
                 $meta['returned_at'] = now()->toIso8601String();
                 $meta['return_moves'] = $backIds;
+                if ($skipped) $meta['return_skipped'] = $skipped;   // المتخطَّى وسببُه — لا صمت
                 $p->meta = $meta;
             }
 

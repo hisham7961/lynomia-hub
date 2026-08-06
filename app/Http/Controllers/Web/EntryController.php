@@ -34,6 +34,19 @@ class EntryController extends Controller
             'memo'   => 'nullable|string|max:300',
         ], [], ['accId' => 'الحساب', 'debit' => 'مدين', 'credit' => 'دائن', 'memo' => 'البيان']);
 
+        // **تنطيقٌ لا `exists` مجرّدة** (v2.314): القاعدةُ تُثبت وجودَ الحساب لا
+        // حقَّ القارئ فيه، فسطرُ قيدٍ لشركةٍ كان يُعلَّق على حساب دفترِ شركةٍ
+        // أخرى — تلوّثٌ مرجعيّ عابرٌ للمستأجرين على مسار كتابة، وهو بعينه ما
+        // يحرسه FinalAuditLedgerCompanyTest على المسار الآليّ. على نمط pay().
+        abort_unless(hub_scope(\App\Models\LedgerAccount::query(), 'accounts2')
+            ->whereKey($d['accId'])->whereNull('deleted_at')->exists(), 422,
+            'هذا الحساب خارج نطاقك — اختر حساباً من دليل شركتك');
+        if (! empty($d['ccId'])) {
+            abort_unless(hub_scope(\App\Models\CostCenter::query(), 'costc')
+                ->whereKey($d['ccId'])->whereNull('deleted_at')->exists(), 422,
+                'مركز التكلفة خارج نطاقك');
+        }
+
         $debit = (float) ($d['debit'] ?? 0);
         $credit = (float) ($d['credit'] ?? 0);
         abort_if($debit <= 0 && $credit <= 0, 422, 'أدخل مبلغاً مديناً أو دائناً');

@@ -57,7 +57,15 @@ class JournalLinesRound6Test extends TestCase
     {
         $this->seedCore();
         $this->seedLedger();
-        $e = JournalEntry::create(['doc_no' => 'JE-T2', 'date' => now()->toDateString(), 'state' => 'مرحّل']);
+        // القيدُ يُرحَّل بمساره الحقيقي — لا يُزرع «مرحّلاً» بلا سطور: حارسُ
+        // الدخول (v2.314) يرفض ذلك، وهو نفسه ما يمنع دفتراً مختلاً مقفولاً أبداً
+        $e = JournalEntry::create(['doc_no' => 'JE-T2', 'date' => now()->toDateString(), 'state' => 'مسودة']);
+        $this->actingAs($this->owner)->post('/entry/' . $e->id . '/line',
+            ['accId' => $this->acc('1010')->id, 'debit' => 40]);
+        $this->actingAs($this->owner)->post('/entry/' . $e->id . '/line',
+            ['accId' => $this->acc('4100')->id, 'credit' => 40]);
+        $this->actingAs($this->owner)->post('/entry/' . $e->id . '/post');
+        $this->assertSame('مرحّل', $e->fresh()->state, 'خطُّ الأساس: القيد رُحِّل فعلاً');
 
         // التعديل من النموذج مرفوض
         $this->actingAs($this->owner)->put('/m/entries/' . $e->id, [
@@ -68,7 +76,8 @@ class JournalLinesRound6Test extends TestCase
         // وإضافة سطر على المُرحَّل مرفوضة
         $this->actingAs($this->owner)->post('/entry/' . $e->id . '/line',
             ['accId' => $this->acc('1010')->id, 'debit' => 5])->assertStatus(422);
-        $this->assertSame(0, JournalLine::where('entry_id', $e->id)->count());
+        $this->assertSame(2, JournalLine::where('entry_id', $e->id)->count(),
+            'لم يُضَف سطرٌ إلى القيد المُرحَّل — سطراه الأصليان وحدهما');
     }
 
     public function test_payment_generates_balanced_locked_journal_when_enabled(): void
