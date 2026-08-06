@@ -126,8 +126,17 @@ class HubAutomation extends Command
                 }
             }
 
+            // **المرشّحُ الخشن في SQL قبل الحدّ** (v2.316): `limit(200)` كان يُطبَّق
+            // **قبل** مرشّح نافذة الإشعار في PHP، فمئتا عقدٍ مؤهّل تُخفي المستحقَّ
+            // إن وقع خارج أوّلها — وهو يبقى «ساري» فيحتلّ خانتَه للأبد ولا تُنشأ
+            // مسودةُ تجديده أبداً. ترتيبٌ حتميّ (`date_end` ثمّ `id`) والأقربُ
+            // نهايةً أولاً، بعد حصر SQL بما يمكن أن يستحقّ أصلاً.
+            $maxNotice = (int) \App\Models\Contract::where('status', 'ساري')->where('renewal', 'تلقائي')
+                ->max('notice');
             $renewable = \App\Models\Contract::where('status', 'ساري')->where('renewal', 'تلقائي')
-                ->whereNotNull('notice')->where('notice', '>', 0)->whereNotNull('date_end')->limit(200)->get()
+                ->whereNotNull('notice')->where('notice', '>', 0)->whereNotNull('date_end')
+                ->whereDate('date_end', '<=', today()->addDays(max(1, $maxNotice)))
+                ->orderBy('date_end')->orderBy('id')->limit(200)->get()
                 ->filter(fn ($c) => \Illuminate\Support\Carbon::parse($c->date_end)
                     ->lte(today()->addDays((int) $c->notice)));
             foreach ($renewable as $c) {
@@ -294,11 +303,22 @@ class HubAutomation extends Command
             };
 
             $disp = hub_display_col($rule->mod);
-            $rows = $q->limit(50)->get(['id', $disp . ' as _n']);
+            $every = max(1, (int) ($rule->every ?: 7));
+
+            // **مانعُ التكرار داخل SQL قبل الحدّ** (v2.316): كان `limit(50)` بلا
+            // ترتيب، ثمّ يُطبَّق مانعُ التكرار والتنطيق في PHP **بعد** القصّ. فمتى
+            // تجاوز المستحقّون خمسين، عادت الخمسون نفسُها كلَّ يوم ثمّ سقطت كلُّها
+            // بمانع التكرار، و**الباقي لا يُجلَب أبداً**: تجويعٌ دائم — والقاعدةُ
+            // تبدو ناجحةً في كلّ قياس، وهو فشلٌ يُنتج ثقةً كاذبة. وترتيبٌ حتميّ
+            // بـ`id` كي لا تختلف الخمسون بين المحرّكين.
+            $q->whereNotIn('id', HubNotification::where('kind', 'rule:' . $rule->id)
+                ->whereNotNull('record_id')
+                ->whereDate('created_at', '>=', today()->subDays($every))
+                ->distinct()->pluck('record_id')->all());
+
+            $rows = $q->orderBy('id')->limit(50)->get(['id', $disp . ' as _n']);
             if ($rows->isEmpty()) continue;
             $rulesRun++;
-
-            $every = max(1, (int) ($rule->every ?: 7));
             // عتبةُ التصعيد: مشكلةٌ ظلّت تُطلِق القاعدة أطولَ من ثلاث دوراتٍ كاملة
             // «قيلَ لك ولم تُحلّ» — تُدفَع عبر كل القنوات ويُوسَم إشعارُها مُتصاعداً.
             // قابلةٌ للضبط عالميّاً (notify.escalate_after)، وإلا تكيّفٌ مع دورية القاعدة.
@@ -409,13 +429,27 @@ class HubAutomation extends Command
 
     protected ?\Illuminate\Support\Collection $monitorUsers = null;
 
-    /** إشعار للمالكين وحاملي monitor */
+    /**
+     * إشعار للمالكين وحاملي monitor — **منطَّقاً لكلّ مستلم** (v2.316).
+     *
+     * كان يُرسَل للجميع بلا `hub_scope`، بخلاف `alertRules` في الملف نفسه الذي
+     * ينطّق لكلّ مستلم على حدة. فمراقبُ شركةٍ يُشعَر بعقود شركةٍ أخرى **وبأسمائها
+     * في نصّ الإشعار** — تسريبٌ يعبر حدَّ العزل من مسارٍ آليّ لا يراه أحد.
+     * والتنطيقُ لا يُخرس شيئاً: غيرُ المحدود (المالك) يمرّ كما كان، ومَن لا
+     * يُعرَف للسجلِّ وحدةٌ أو معرّف يُشعَر كما كان (لا سجلَّ يُقاس عليه).
+     */
     protected function notifyMonitors(string $kind, string $text, ?string $module, ?string $recordId): void
     {
         if ($this->dry) return;
-        foreach ($this->recipients(null) as $uid) {
+
+        $md = $module ? hub_mod($module) : null;
+        foreach ($this->recipientUsers(null) as $u) {
+            if ($md && $recordId && ! hub_scope(
+                DB::table($md['table'])->whereNull('deleted_at')->where('id', $recordId), $module, $u)->exists()) {
+                continue;   // السجلُّ خارج نطاق هذا المستلم — لا يُشعَر باسمه
+            }
             HubNotification::create([
-                'user_id'    => $uid,
+                'user_id'    => $u->id,
                 'kind'       => $kind,
                 'text'       => Str::limit($text, 590),
                 'module'     => $module,
