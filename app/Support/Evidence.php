@@ -35,8 +35,7 @@ class Evidence
         $prev = hash('sha256', 'lynomia-evidence:' . $req->id . ':' . (string) $req->doc_hash
             . ':' . (string) $req->signer_name);
         $rows = [];
-        foreach (ContractEvent::where('request_id', $req->id)
-                     ->orderBy('created_at')->orderBy('id')->get() as $e) {
+        foreach (ContractEvent::ordered(ContractEvent::where('request_id', $req->id))->get() as $e) {
             $prev = hash('sha256', $prev . '|' . $e->id . '|' . $e->event . '|'
                 . ($e->signer_id ?: '') . '|' . ($e->ip ?: '') . '|' . (string) $e->created_at
                 // meta (سبب الرفض/الإبطال) وactor يدخلان الحلقة، وبصمة الموقّع

@@ -151,7 +151,8 @@ class WidgetRegistry
                 'resolver' => fn ($u) => hub_scope(DB::table('applications')->whereNull('deleted_at'), 'apps')
                     ->whereNotNull('project_id')
                     ->tap(fn ($q) => hub_open_scope($q, 'status', ['موقوف']))   // «موقوف» دلالة التطبيقات وحدها
-                    ->orderByDesc('created_at')->limit(6)
+                    // فاصلُ تعادلٍ ثابت: `created_at` بدقّة الثانية تتساوى في الإدراج الدفعيّ
+                    ->orderByDesc('created_at')->orderByDesc('id')->limit(6)
                     ->get(['id', 'name', 'ver', 'status', 'project_id'])
                     ->map(function ($a) {
                         $a->progress = hub_progress($a->project_id)['pct'];
@@ -166,7 +167,8 @@ class WidgetRegistry
                 'gate'  => fn ($u) => hub_can($u, 'tasks', 'v'),
                 'resolver' => fn ($u) => hub_scope(DB::table('tasks')->whereNull('deleted_at'), 'tasks')
                     ->select('status', DB::raw('COUNT(*) c'))->groupBy('status')
-                    ->orderByDesc('c')->limit(6)->get()
+                    // تعادلُ العدّ يُقطع بالحالة لا بالقرعة — حالتان بالعدد نفسِه تتبادلان الظهور
+                    ->orderByDesc('c')->orderBy('status')->limit(6)->get()
                     ->map(fn ($r) => ['label' => $r->status ?: 'بلا حالة', 'value' => (int) $r->c])->all(),
             ],
 
@@ -186,7 +188,8 @@ class WidgetRegistry
                     return [
                         'rows' => hub_scope(DB::table($tdef['table'])->whereNull('deleted_at'), 'tasks')
                             ->whereNotNull($col)->whereDate($col, '>=', now()->toDateString())
-                            ->orderBy($col)->limit(6)
+                            // `due` تاريخٌ بلا وقت فالتعادلُ هو القاعدة: الأقدمُ إنشاءً أولاً، والـid فاصلٌ حاسم
+                            ->orderBy($col)->orderBy('created_at')->orderBy('id')->limit(6)
                             ->get(array_values(array_unique(array_filter(['id', $disp, $col, $st])))),
                         'dueCol' => $col, 'stCol' => $st, 'disp' => $disp,
                     ];
@@ -227,7 +230,8 @@ class WidgetRegistry
                                                 ->orWhereIn('audits.project_id', $ids));
                     }
 
-                    return $q->orderByDesc('audits.created_at')->limit(10)->get();
+                    // `audits.id` عدّادٌ تزايديّ — فاصلٌ دلاليّ لا مجرّد حتميّة
+                    return $q->orderByDesc('audits.created_at')->orderByDesc('audits.id')->limit(10)->get();
                 },
             ],
 

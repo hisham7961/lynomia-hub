@@ -28,7 +28,11 @@ return new class extends Migration
 
         // ترقيم قائم: CTR-{YEAR}-{SEQ} بتسلسل سنوي بترتيب الإنشاء
         $seq = [];
-        DB::table('contracts')->whereNull('doc_no')->orderBy('created_at')->orderBy('id')
+        // `chunkById` تُلاحق الصفحاتِ بـ`id > آخرِ معرّف`، ولا تزيل إلا ترتيبَ
+        // عمود المفتاح — فترتيبٌ آخرُ **قبله** يجعل آخرَ صفٍّ في الدفعة ليس
+        // صاحبَ أكبر `id` فيها، فيقفز المؤشّرُ فوق عقودٍ لا تُرقَّم أبداً.
+        // (‏`2026_08_06_000002` يُرمّم ما تخطّاه هذا الترحيلُ على القواعد القائمة.)
+        DB::table('contracts')->whereNull('doc_no')->orderBy('id')
             ->chunkById(200, function ($rows) use (&$seq) {
                 foreach ($rows as $c) {
                     $year = substr((string) $c->created_at, 0, 4) ?: date('Y');

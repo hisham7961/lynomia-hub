@@ -27,8 +27,12 @@ class ErrorCenterController extends Controller
         }
 
         // الترتيب: الأحدث افتراضاً، أو الأكثر تكراراً (الأكثر إيلاماً أولاً)
+        // **وفاصلُ تعادلٍ حاسم**: عاصفةُ أخطاءٍ تكتب عشراتِ الصفوف في الثانية
+        // الواحدة (و`count` يتساوى بداهةً)، والترقيمُ بلا فاصلٍ يعني `OFFSET`
+        // على ترتيبٍ يختلف بين استعلامٍ وآخر: خطأٌ يظهر في صفحتين وآخرُ لا يظهر
+        // أبداً — ومركزُ أخطاءٍ يُسقط خطأً أسوأ من غيابه.
         $sort = $r->query('sort') === 'count' ? 'count' : 'last_seen';
-        $q->orderByDesc($sort);
+        $q->orderByDesc($sort)->orderByDesc('first_seen')->orderByDesc('id');
 
         // مؤشرات تجيب «ما الوضع؟» قبل الغوص في القائمة
         $all = ErrorEvent::query();
@@ -90,7 +94,7 @@ class ErrorCenterController extends Controller
         $siblings = ErrorEvent::where('id', '!=', $e->id)
             ->where(fn ($q) => $q->when($e->file, fn ($w) => $w->orWhere('file', $e->file))
                 ->when($e->url, fn ($w) => $w->orWhere('url', $e->url)))
-            ->orderByDesc('last_seen')->limit(8)->get();
+            ->orderByDesc('last_seen')->orderByDesc('first_seen')->orderByDesc('id')->limit(8)->get();
 
         return view('ops.error_show', [
             'e' => $e, 'snippet' => $snippet, 'siblings' => $siblings,

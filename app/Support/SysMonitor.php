@@ -191,10 +191,14 @@ class SysMonitor
                 }
             }
             if (Schema::hasTable('error_events')) {
+                // **الوقائعُ لا البصمات**: `error_events` جدولٌ **مجمَّع** — صفٌّ
+                // واحدٌ لكل بصمةٍ بعمود `count` يحمل عددَ مرات الوقوع. وعدُّ
+                // الصفوف كان يرسم عطلاً وقع خمسين مرة شرطةً واحدة بجوار عطلٍ
+                // وقع مرة، فلا تُقرأ العاصفةُ عاصفةً في نبض اليوم.
                 foreach (DB::table('error_events')->where('last_seen', '>=', $from)
-                            ->get(['last_seen']) as $e) {
+                            ->get(['last_seen', 'count']) as $e) {
                     $k = \Illuminate\Support\Carbon::parse($e->last_seen)->format('Y-m-d H');
-                    if (isset($slots[$k])) $slots[$k]['errs']++;
+                    if (isset($slots[$k])) $slots[$k]['errs'] += max(1, (int) $e->count);
                 }
             }
         } catch (\Throwable $e) {

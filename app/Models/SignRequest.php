@@ -26,7 +26,9 @@ class SignRequest extends Model
 
     public function events()
     {
-        return $this->hasMany(ContractEvent::class, 'request_id')->orderBy('created_at');
+        // الترتيبُ نفسُه الذي تحسب به السلسلة — وإلا طبع الخطُّ الزمنيّ ترتيباً
+        // والبصمةُ تُحسب بآخر
+        return ContractEvent::ordered($this->hasMany(ContractEvent::class, 'request_id'));
     }
 
     public function contract()
