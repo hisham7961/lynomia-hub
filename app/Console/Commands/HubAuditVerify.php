@@ -96,6 +96,15 @@ class HubAuditVerify extends Command
             return self::FAILURE;
         }
 
+        // ٤) اتّساقُ عمود العزل — **خارج البصمة بقرارٍ مقصود**
+        $mismatch = $this->companyMismatch();
+        if ($mismatch) {
+            $this->error("❌ {$mismatch} قيداً يخالف عمودُ الشركة فيه شركةَ السجل المختوم"
+                . ' — العمود مشتقٌّ ويُحدَّث بالهجرة فهو خارج البصمة عمداً، فيُفحص اشتقاقاً.'
+                . ' وتبديلُه يُخرج قيداً من نطاق مالكه (أو يُدخله في غيره) بلا كسر السلسلة.');
+            return self::FAILURE;
+        }
+
         $this->info("✅ السلسلة سليمة: {$ok} سجل متحقق"
             . ($legacyRows ? " · {$legacyRows} سجل سابق للسلسلة (خارج التحقق)" : ''));
 
@@ -109,6 +118,41 @@ class HubAuditVerify extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * قيودٌ يخالف `company_id` فيها شركةَ سجلِّها المختوم.
+     *
+     * العمودُ **مشتقٌّ** لا مختوم: هجرةُ `add_company_to_audits` تملؤه **بعد**
+     * الختم، فضمُّه إلى البصمة يكسر تلك الهجرةَ واختبارَها معاً. لكنّه مع ذلك
+     * عمودُ العزل نفسُه — فتبديلُه يُخرج قيداً من نطاق مالكه أو يُدخله في نطاق
+     * غيره **بلا كسر السلسلة**. فيُحرَس اشتقاقاً: `(module, record_id)` مختومان
+     * داخل البصمة، ومنهما تُقرأ شركةُ السجل الحقيقية وتُقارَن.
+     */
+    protected function companyMismatch(): int
+    {
+        if (! Schema::hasColumn('audits', 'company_id')) return 0;
+
+        $n = 0;
+        foreach (hub_modules() as $mk => $def) {
+            $table = (string) ($def['table'] ?? '');
+            $ccol = hub_company_col($mk);
+            if ($table === '' || ! $ccol || ! Schema::hasTable($table)) continue;
+
+            try {
+                $n += (int) DB::table('audits')
+                    ->join($table, "audits.record_id", '=', "{$table}.id")
+                    ->where('audits.module', $mk)
+                    ->whereNotNull('audits.record_id')
+                    ->whereNotNull('audits.company_id')
+                    ->whereRaw("audits.company_id <> {$table}.{$ccol}")
+                    ->count();
+            } catch (\Throwable $e) {
+                continue;   // وحدةٌ بعمودٍ مغاير أو جدولٌ غير مطابق: تُتخطّى بلا إفشال
+            }
+        }
+
+        return $n;
     }
 
     /**

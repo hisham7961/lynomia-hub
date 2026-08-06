@@ -14,8 +14,16 @@ use Illuminate\Http\Request;
  */
 class WorkHours
 {
-    /** مسارات نقل الملفات الممنوعة خارج الدوام */
-    protected const FILE_ROUTES = ['file.show', 'att.dl', 'att.view', 'att.store', 'm.export'];
+    /**
+     * مسارات نقل الملفات الممنوعة خارج الدوام.
+     *
+     * القائمةُ كانت خمسةَ مساراتٍ تغفل **كلَّ الرفع** ووثائقَ صندوق الوارد
+     * وغرفةِ البيانات ونسخةَ esign — أي أن «حظرَ نقل الملفات» كان يحرس بابَ
+     * التنزيل ويترك بابَ الرفع مفتوحاً. وقائمةٌ يدويةٌ يدنو منها النسيان،
+     * فأُضيف معها حارسٌ **وصفيّ**: أيُّ طلبٍ يحمل ملفاً محجوبٌ مهما كان مساره.
+     */
+    protected const FILE_ROUTES = ['file.show', 'att.dl', 'att.view', 'att.store', 'm.export',
+                                   'esign.pdf', 'dataroom.store', 'inboxdocs.store', 'm.import.run'];
 
     public function handle(Request $r, Closure $next)
     {
@@ -49,8 +57,11 @@ class WorkHours
         }
         session(['wh.last' => now()->timestamp]);
 
-        // منع نقل الملفات خارج الدوام (قابل للإيقاف من الإعدادات)
-        if ((string) setting('sec.strict_files', '1') === '1' && $r->routeIs(...self::FILE_ROUTES)) {
+        // منع نقل الملفات خارج الدوام (قابل للإيقاف من الإعدادات).
+        // القائمةُ لِما هو معروفٌ اليوم، و`allFiles()` لِما يُضاف غداً: طلبٌ
+        // يحمل ملفاً هو نقلُ ملفٍ مهما كان اسمُ مساره.
+        if ((string) setting('sec.strict_files', '1') === '1'
+            && ($r->routeIs(...self::FILE_ROUTES) || $r->allFiles())) {
             abort(403, 'نقل الملفات ممنوع خارج وقت العمل — يعود متاحاً مع بداية الدوام');
         }
 

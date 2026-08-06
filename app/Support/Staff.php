@@ -50,6 +50,21 @@ class Staff
 
     /* ────────── الربط ────────── */
 
+    /**
+     * البريدُ محجوزٌ بحسابٍ **محذوفٍ ناعماً**؟
+     *
+     * فهرسُ التفرّد على `users.email` يشمل المحذوفَ ناعماً (الصفُّ باقٍ)، بينما
+     * كلُّ قراءات الربط تُرشّح `whereNull('deleted_at')` — فالبريدُ يبدو حرّاً
+     * ثم يرتدّ بـ1062 غير ملتقط عند الإنشاء: خمسمئةٌ على شاشة الموظفين بلا
+     * تفسير. من عرف الحجزَ أمكنه أن يقول للمستخدم ما يفعل.
+     */
+    public static function emailHeldByDeleted(string $email): bool
+    {
+        $email = trim($email);
+
+        return $email !== '' && User::onlyTrashed()->where('email', $email)->exists();
+    }
+
     /** حسابٌ حرّ بهذا البريد؟ (غير مرتبطٍ بملفٍّ آخر) */
     public static function freeAccountFor(string $email, ?string $exceptEmp = null): ?User
     {
@@ -137,6 +152,12 @@ class Staff
             $linked = self::linkByEmail($emp);
 
             return ['temp' => null, 'outcome' => $linked ? 'linked' : 'taken', 'user' => $existing];
+        }
+
+        // مآلٌ رابع: البريدُ محجوزٌ بحسابٍ محذوفٍ ناعماً. القراءةُ ترشّح المحذوف
+        // والفهرسُ الفريد لا يرشّحه — فبلا هذا الفرع يرتدّ 1062 خمسمئةً بلا تفسير.
+        if (self::emailHeldByDeleted($email)) {
+            return ['temp' => null, 'outcome' => 'email_held_by_deleted', 'user' => null];
         }
 
         $temp = Str::password(14);
