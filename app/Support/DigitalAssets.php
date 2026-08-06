@@ -216,7 +216,10 @@ class DigitalAssets
             return ['reused' => [], 'weak' => [], 'stale' => [], 'orphan' => [], 'total' => 0];
         }
 
-        $rows = \App\Models\VaultSecret::whereNull('deleted_at')
+        // **منطَّقة** (v2.317): كانت تقرأ الخزنة خاماً، فتُعرَض عناوينُ أسرارِ
+        // شركاتٍ أجنبية (ومَن يشاركها كلمةَ السرّ نفسها) لقارئٍ معزول
+        $rows = hub_scope(\App\Models\VaultSecret::query(), 'vault')->whereNull('deleted_at')
+            ->orderBy('id')
             ->get(['id', 'title', 'type', 'secret_cipher', 'updated_at',
                    'company_id', 'project_id', 'app_id', 'server_id']);
 

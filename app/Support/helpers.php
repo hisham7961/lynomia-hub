@@ -1458,14 +1458,21 @@ if (! function_exists('hub_mrr')) {
      */
     function hub_mrr(bool $fresh = false): array
     {
-        if ($fresh) \Illuminate\Support\Facades\Cache::forget('rev:mrr');
+        // **مفتاحٌ يحمل بصمةَ القارئ لا مفتاحٌ عامّ** (v2.317): `rev:mrr` كان
+        // واحداً للجميع، فقارئان مختلفا النطاق يتشاركان الرقمَ نفسَه — وأولُ من
+        // يسخّن الخبيئة يفرض رقمَه على من لا يرى نصفَ عقوده. والقراءةُ كانت
+        // خاماً بلا `hub_can` ولا `hub_scope` أصلاً.
+        $key = hub_scope_key('rev:mrr');
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
-        return \Illuminate\Support\Facades\Cache::remember('rev:mrr', 300, function () {
+        return \Illuminate\Support\Facades\Cache::remember($key, 300, function () {
             $DB = \Illuminate\Support\Facades\DB::class;
             $divisor = ['شهري' => 1, 'ربع سنوي' => 3, 'نصف سنوي' => 6, 'سنوي' => 12];
 
-            $contracts = \Illuminate\Support\Facades\DB::table('contracts')->whereNull('deleted_at')
-                ->where('status', 'ساري')->where('type', 'عقد عميل')
+            $q = hub_read('contracts');
+            if (! $q) return ['mrr' => 0.0, 'arr' => 0.0, 'contracts' => 0,
+                              'byService' => [], 'unmapped' => 0, 'oneTime' => 0.0];
+            $contracts = $q->where('status', 'ساري')->where('type', 'عقد عميل')
                 ->get(['id', 'title', 'value', 'currency', 'service_id', 'plan_id', 'client_id', 'date_end']);
             if ($contracts->isEmpty()) return ['mrr' => 0.0, 'arr' => 0.0, 'contracts' => 0,
                                                'byService' => [], 'unmapped' => 0, 'oneTime' => 0.0];

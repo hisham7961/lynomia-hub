@@ -23,26 +23,37 @@ class AppCenterController extends Controller
             ? DB::table('projects')->where('id', $app->project_id)->first(['id', 'name'])
             : null;
 
-        // خط الإصدارات الزمني — النطاق يُفرض على الابن: رؤية التطبيق لا تمنح رؤية إصداراته
-        $releases = hub_scope(DB::table('code_releases')->whereNull('deleted_at'), 'code')
-            ->where('app_id', $app->id)
-            ->orderByDesc('date')->orderByDesc('created_at')
-            ->limit(30)->get();
+        // **الصلاحيةُ قبل النطاق** (v2.317): كان النطاقُ وحده مفروضاً على الأبناء،
+        // فيكفي `apps:v` لقراءة عناوينِ أربع وحداتٍ لا رايةَ للمستخدم عليها —
+        // ورؤيةُ التطبيق ليست رؤيةَ إصداراته وأعطاله وتذاكره وبنود خطته.
+        // العدّادُ يُحجب كذلك: الرقمُ وحده يفضح المحجوب.
+        $may = fn (string $mk) => hub_can(auth()->user(), $mk, 'v');
+
+        $releases = $may('code')
+            ? hub_scope(DB::table('code_releases')->whereNull('deleted_at'), 'code')
+                ->where('app_id', $app->id)
+                ->orderByDesc('date')->orderByDesc('created_at')
+                ->limit(30)->get()
+            : collect();
 
         // الأعطال والتذاكر المفتوحة على هذا التطبيق — «مفتوح» من التعريف الموحَّد
         // كل استعلام يُبنى من جديد ومُنطَّقاً — والعدّاد يُنطَّق كذلك وإلا فضح الرقمُ المخفيَّ
         $scoped = fn (string $table, string $mk) => hub_open_scope(
             hub_scope(DB::table($table)->whereNull('deleted_at'), $mk)->where('app_id', $app->id)
         );
-        $issues = $scoped('issues', 'issues')
-            ->orderByDesc('created_at')->limit(6)->get(['id', 'title', 'severity', 'status']);
-        $issuesN = $scoped('issues', 'issues')->count();
-        $tickets = $scoped('tickets', 'tickets')
-            ->orderByDesc('created_at')->limit(6)->get(['id', 'subject', 'priority', 'status']);
-        $ticketsN = $scoped('tickets', 'tickets')->count();
+        $issues = $may('issues')
+            ? $scoped('issues', 'issues')->orderByDesc('created_at')->orderByDesc('id')
+                ->limit(6)->get(['id', 'title', 'severity', 'status'])
+            : collect();
+        $issuesN = $may('issues') ? $scoped('issues', 'issues')->count() : null;
+        $tickets = $may('tickets')
+            ? $scoped('tickets', 'tickets')->orderByDesc('created_at')->orderByDesc('id')
+                ->limit(6)->get(['id', 'subject', 'priority', 'status'])
+            : collect();
+        $ticketsN = $may('tickets') ? $scoped('tickets', 'tickets')->count() : null;
 
         // أثقل بنود الخطة — مصدر النسبة أمام الفريق
-        $feats = $app->project_id
+        $feats = ($app->project_id && $may('feats'))
             ? hub_scope(DB::table('plan_items')->whereNull('deleted_at'), 'feats')
                 ->where('project_id', $app->project_id)
                 ->tap(fn ($q) => hub_open_scope($q))
