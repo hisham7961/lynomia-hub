@@ -50,9 +50,11 @@ trait Auditable
             'before'     => $before,
             'after'      => $after,
             // السبب يصل من نموذجٍ أو من API بلا حدٍّ في الخادم
-            'reason'     => hub_fit(Request::input('_reason') ?: Request::header('X-Change-Reason'),
+            // hub_str قبل hub_fit (v2.324): `_reason` مصفوفةً كان يرمي TypeError
+            // فيُسقط قيدَ التدقيق **ويُبقي الكتابة** — تعديلٌ يقع بلا أثرٍ في السجل
+            'reason'     => hub_fit(hub_str(Request::input('_reason')) ?: hub_str(Request::header('X-Change-Reason')),
                 hub_col_max('audits', 'reason') ?? 400),
-            'device'     => hub_fit((string) Request::header('X-Device', Request::userAgent()), 200),
+            'device'     => hub_fit(hub_str(Request::header('X-Device', Request::userAgent())), 200),
             'ip'         => Request::ip(),
             'created_at' => now(),
         ]);

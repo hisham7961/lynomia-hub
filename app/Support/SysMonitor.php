@@ -64,10 +64,13 @@ class SysMonitor
         $used = $total - $avail;
         $pct = (int) round($used * 100 / $total);
 
-        return $out + [
+        // **array_replace لا `+`** (v2.324): عاملُ الاتحاد يُبقي مفتاحَ الطرف
+        // الأيسر، و`$out` يحمل `'ok' => false` — فبطاقةُ الذاكرة كانت تُعلن
+        // الفشلَ دائماً مهما نجحت القراءة، ويُقرأ ذلك «تعذّر القياس».
+        return array_replace($out, [
             'ok' => true, 'total' => $total, 'avail' => $avail, 'used' => $used, 'pct' => $pct,
             'tone' => $pct >= 90 ? 'bad' : ($pct >= 75 ? 'wn' : 'ok'),
-        ];
+        ]);
     }
 
     /** من يستهلك القرص: أكبر مجلدات التخزين — «امتلأ القرص» بلا سببٍ لا يُعالَج */

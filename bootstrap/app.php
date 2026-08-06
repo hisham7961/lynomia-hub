@@ -20,6 +20,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', \App\Http\Middleware\TrackVisits::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\SecurityHeaders::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\Observability::class);
+        // وضعُ الصيانة يسري على API كما على الويب (v2.324): كانت الكتابةُ تستمرّ
+        // من الباب الخلفيّ أثناء الترحيل — والصيانةُ تُعلَن لتتوقّف الكتابةُ كلُّها
+        $middleware->appendToGroup('api', \App\Http\Middleware\HubMaintenance::class);
         $middleware->appendToGroup('api', \App\Http\Middleware\SecurityHeaders::class);
         $middleware->appendToGroup('api', \App\Http\Middleware\Observability::class);
         // الويبهوك الوارد سطحٌ آليّ لا نموذج له: يُصادَق بالرمز في الرابط + توقيع

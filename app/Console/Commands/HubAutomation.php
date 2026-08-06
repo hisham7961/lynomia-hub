@@ -498,8 +498,17 @@ class HubAutomation extends Command
         try {
             if ($this->dry) return 0;
 
-            return HubNotification::where('read', true)->where('created_at', '<', now()->subDays(90))->delete()
-                 + HubNotification::where('created_at', '<', now()->subDays(365))->delete();
+            $n = HubNotification::where('read', true)->where('created_at', '<', now()->subDays(90))->delete()
+               + HubNotification::where('created_at', '<', now()->subDays(365))->delete();
+
+            // **وسجلُّ الويبهوك الوارد** (v2.324): سطحٌ عامّ يكتب صفّاً لكل نداء
+            // بحمولته، وكان بلا تقليمٍ إطلاقاً — نموٌّ غيرُ محدود يملأ القرص.
+            if (\Illuminate\Support\Facades\Schema::hasTable('inbound_hook_events')) {
+                $n += DB::table('inbound_hook_events')
+                    ->where('created_at', '<', now()->subDays(90))->delete();
+            }
+
+            return $n;
         } catch (\Throwable $e) {
             report($e);
             return 0;

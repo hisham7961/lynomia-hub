@@ -32,6 +32,19 @@ class HubMaintenance
         }
 
         if ($on && ! $isOwner && ! $authRoute) {
+            /*
+             * **وسطحُ API كذلك** (v2.324): كان الوسيطُ على مجموعة `web` وحدها،
+             * فالكتابةُ تستمرّ من الباب الخلفيّ أثناء الترحيل — والصيانةُ تُعلَن
+             * لتتوقّف الكتابةُ كلُّها. وعلى API يُحصر المنعُ بالطرق **غير
+             * الآمنة**: هويةُ حامل الرمز لا تُحلّ قبل `ApiAuth` فلا يُعرَف
+             * المالكُ هنا، ومنعُ القراءة كان سيُسقط كلَّ تكاملٍ بلا داعٍ.
+             */
+            if ($request->expectsJson() || $request->is('api/*')) {
+                if ($request->isMethodSafe()) return $next($request);
+
+                return response()->json(['error' => 'النظام في وضع الصيانة — الكتابة متوقفة مؤقتاً'], 503);
+            }
+
             return response()->view('maintenance', [
                 'msg' => (string) setting('maintenance.msg', ''),
             ], 503);

@@ -17,7 +17,10 @@ class SupportController extends Controller
 
         // التذاكر المفتوحة + أول رد لكل واحدة باستعلام واحد
         $open = hub_scope(Ticket::query()->whereNull('deleted_at'), 'tickets')
-            ->whereNotIn('status', $this->closed)->orderBy('created_at')->limit(60)->get();
+            // NULL NOT IN يُقيَّم «مجهولاً» لا «صحيحاً» على المحرّكين معاً، فتذكرةٌ
+            // بلا حالة كانت تسقط من اللوحة صامتةً: لا أحد يردّ ولا شيء يقول لماذا (v2.324)
+            ->where(fn ($q) => $q->whereNull('status')->orWhereNotIn('status', $this->closed))
+            ->orderBy('created_at')->orderBy('id')->limit(60)->get();
 
         $firstReplies = DB::table('comments')->where('module', 'tickets')
             ->whereIn('record_id', $open->pluck('id'))->whereNull('deleted_at')
