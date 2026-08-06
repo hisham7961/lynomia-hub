@@ -186,6 +186,17 @@ class UserController extends Controller
                 $ghosts = \App\Models\Company::onlyTrashed()->whereIn('id', $prev)->pluck('id')->all();
                 if (count($ghosts) === count($prev)) $sent = $prev;
             }
+            /*
+             * **يرث حصرَ محرّره كما يرث حصرَ منشئه** (نظير store:112، v2.319):
+             * `store` يطبّق تقاطعَ `hub_company_ids()` و`update` كان يُغفله — فإداريٌّ
+             * محصورٌ بشركةٍ يفكّ عزلَ غيره بضمّه لشركةٍ خارج نطاقه بحفظِ نموذج. المعزول
+             * لا يمنح إلا ما يملكه؛ وتقاطعٌ فارغٌ (أرسل شركةً خارج نطاقه، أو أفرغ
+             * القائمة) يسقط على **نطاقه** لا على قائمةٍ فارغة — فالفارغةُ تُقرأ
+             * «بلا قيد» (hub_company_ids تُعيد null) فتُطلق الحسابَ لا تحصره.
+             */
+            if (($mine = hub_company_ids()) !== null) {
+                $sent = array_values(array_intersect($sent ?: [], $mine)) ?: array_values($mine);
+            }
             $data['companies'] = $sent;
         }
         if (empty($data['password'])) unset($data['password']);

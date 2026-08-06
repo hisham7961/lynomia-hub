@@ -229,11 +229,20 @@ class EsignController extends Controller
         if ($contractId && ! hub_scope(\App\Models\Contract::query(), 'contracts')->whereKey($contractId)->exists()) {
             $contractId = null;
         }
+        // الربطُ يمرّ بحارس store نفسِه (LINKABLE + hub_can + hub_scope): كان
+        // preview يمرّره خاماً إلى resolve فيتسرّب اسمُ سجلٍ وبريدُه وهاتفُه عبر
+        // الشركات والوحدات في معاينةٍ لا تُخزَّن. العزلُ يسبق الحلّ.
+        $linkModule = $linkId = null;
+        if (($lm = $d['link_module'] ?? null) && ($li = $d['link_id'] ?? null)
+            && array_key_exists($lm, self::LINKABLE) && hub_can(auth()->user(), $lm, 'v')
+            && hub_scope(('\\App\\Models\\' . hub_mod($lm)['model'])::query(), $lm)->whereKey($li)->exists()) {
+            $linkModule = $lm; $linkId = $li;
+        }
         $body = ! empty($d['template_id'])
             ? SignTemplate::findOrFail($d['template_id'])->body
             : (string) ($d['free_body'] ?? '');
         $vals = array_merge(
-            \App\Support\ContractVars::resolve($contractId, $d['link_module'] ?? null, $d['link_id'] ?? null),
+            \App\Support\ContractVars::resolve($contractId, $linkModule, $linkId),
             array_filter((array) ($d['vars'] ?? []), fn ($v) => is_string($v) && trim($v) !== '')
         );
 

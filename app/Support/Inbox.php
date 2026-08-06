@@ -110,7 +110,7 @@ class Inbox
     {
         if (! Schema::hasTable('approvals') || ! hub_can($u, 'approvals', 'v')) return [];
 
-        return DB::table('approvals')->whereNull('deleted_at')
+        return hub_scope(DB::table('approvals')->whereNull('deleted_at'), 'approvals', $u)
             ->where(fn ($w) => $w->where('approver_id', $u->id)->orWhere('chain', 'LIKE', '%"' . $u->id . '"%'))
             ->tap(fn ($q) => hub_open_scope($q, 'status', ['موافق', 'موافقة', 'معتمد', 'معتمدة']))
             ->orderByRaw('due IS NULL, due')->limit(40)
@@ -277,7 +277,7 @@ class Inbox
     {
         if (! Schema::hasTable('decisions') || ! hub_can($u, 'decisions', 'v')) return [];
 
-        return DB::table('decisions')->whereNull('deleted_at')
+        return hub_scope(DB::table('decisions')->whereNull('deleted_at'), 'decisions', $u)
             ->where('exec_id', $u->id)
             ->whereIn('status', ['لم يبدأ', 'قيد التنفيذ', 'متعثر'])
             ->orderByRaw('due IS NULL, due')->limit(20)
@@ -294,7 +294,7 @@ class Inbox
     {
         if (! Schema::hasTable('tickets') || ! hub_can($u, 'tickets', 'v')) return [];
 
-        return hub_open_scope(DB::table('tickets')->whereNull('deleted_at')->where('assignee_id', $u->id))
+        return hub_scope(hub_open_scope(DB::table('tickets')->whereNull('deleted_at')->where('assignee_id', $u->id)), 'tickets', $u)
             ->orderByDesc('created_at')->limit(20)
             ->get(['id', 'subject', 'customer', 'priority', 'status', 'created_at'])
             ->map(fn ($t) => [
@@ -325,7 +325,7 @@ class Inbox
     {
         if (! Schema::hasTable('meetings') || ! hub_can($u, 'meetings', 'v')) return [];
 
-        return DB::table('meetings')->whereNull('deleted_at')
+        return hub_scope(DB::table('meetings')->whereNull('deleted_at'), 'meetings', $u)
             ->where('parts', 'LIKE', '%"' . $u->id . '"%')
             ->where('dt', '>=', now()->startOfDay())
             ->orderBy('dt')->limit(12)
@@ -344,8 +344,8 @@ class Inbox
     {
         if (! Schema::hasTable('contract_obligations') || ! hub_can($u, 'obligations', 'v')) return [];
 
-        return hub_open_scope(DB::table('contract_obligations')->whereNull('deleted_at')
-                ->where('owner_id', $u->id))
+        return hub_scope(hub_open_scope(DB::table('contract_obligations')->whereNull('deleted_at')
+                ->where('owner_id', $u->id)), 'obligations', $u)
             ->orderByRaw('due IS NULL, due')->limit(20)
             ->get(['id', 'title', 'due', 'amount', 'currency', 'status'])
             ->map(fn ($o) => [
@@ -362,8 +362,8 @@ class Inbox
     {
         if (! Schema::hasTable('compliance_items') || ! hub_can($u, 'compliance', 'v')) return [];
 
-        return hub_open_scope(DB::table('compliance_items')->whereNull('deleted_at')
-                ->where('owner_id', $u->id)->whereNotNull('due'))
+        return hub_scope(hub_open_scope(DB::table('compliance_items')->whereNull('deleted_at')
+                ->where('owner_id', $u->id)->whereNotNull('due')), 'compliance', $u)
             ->where('due', '<=', now()->addDays(60)->toDateString())
             ->orderBy('due')->limit(20)
             ->get(['id', 'title', 'due', 'kind', 'authority', 'status'])
