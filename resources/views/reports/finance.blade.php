@@ -6,9 +6,7 @@
     <button class="btn ghost sm" onclick="window.print()">🖨 طباعة</button>
 @endcomponent
 @if ($mixed ?? false)
-<div class="card" style="border-inline-start:3px solid var(--bad);margin-bottom:12px">
-    <div class="sub">⚠ <b>قد تختلط العملات:</b> مستنداتك تحمل أكثر من عملة، والأرقام المجمّعة هنا تُعرض بعملةٍ واحدة ({{ $currency }}) دون تحويل — لا محرّك أسعار في النظام. اقرأها مؤشّراً عاماً لا رقماً دقيقاً.</div>
-</div>
+    @include('partials._mixedcur', ['currency' => $currency, 'what' => 'مستنداتك ومجاميعُ هذا التقرير'])
 @endif
 <div class="cards">
     <div class="stat"><span class="ico">📈</span><b>{{ ($seesTotals ?? true) ? number_format($cards['inc'], 2) : '•••' }}</b><span>دخل هذا الشهر ({{ $currency }})</span></div>

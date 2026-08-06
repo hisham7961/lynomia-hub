@@ -68,13 +68,17 @@ class ReportController extends Controller
             ->groupBy('cc_id')->orderByDesc('s')->limit(12)->get();
         $ccNames = DB::table('cost_centers')->whereIn('id', $byCC->pluck('cc_id')->filter())->pluck('name', 'id');
 
-        $currency = setting('app.currency', 'د.ك');
-
         // صدقُ العملة: التقرير يجمع `total` بلا تحويل (لا محرّك في النظام). إن حملت
         // المستنداتُ أكثرَ من عملةٍ فالأرقامُ المجمّعة تُخلط تحت لصيقةٍ واحدة — يُرفع
         // علمٌ يُقرأ به الرقمُ مؤشّراً لا رقماً دقيقاً بدل إيهامِ عملةٍ واحدة.
-        $mixed = $base()->whereNotNull('currency')->where('currency', '!=', '')
-            ->distinct()->pluck('currency')->count() > 1;
+        //
+        // وكان المرشِّح يُسقط العملاتِ الفارغة من مجموعة التمييز، والفراغُ يُنتَج
+        // آليّاً (نسخُ عرضٍ، مشترياتٌ، أتمتة) — فـ«فارغ + دولار» يبدو متجانساً
+        // وهو مخلوط. واللصيقةُ كانت عملةَ النظام دائماً ولو كانت المستنداتُ كلُّها
+        // بالدولار. المساعدُ الموحَّد يعالج الاثنين.
+        $label = hub_cur_label($base()->distinct()->pluck('currency'));
+        $currency = $label['cur'];
+        $mixed = $label['mixed'];
 
         // **قفلُ الحقل يسري على التقرير كما يسري على القائمة** (v2.321): مبلغٌ
         // محجوبٌ عن قارئٍ في شاشة المالية كان يُطبع هنا كاملاً — فالتقريرُ

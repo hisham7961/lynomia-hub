@@ -103,9 +103,15 @@ class LegalController extends Controller
             ->where('status', '!=', 'مفعّلة')->orderBy('name')->limit(4)->get(['id', 'name']);
 
         $obUsers = \App\Models\User::whereIn('id', $obligations->pluck('owner_id')->filter())->pluck('name', 'id');
-        $currency = setting('app.currency', 'د.ك');
 
-        return view('legal.index', compact('kpi', 'types', 'expiring', 'obligations', 'currency',
+        // بطاقةُ «قيمة الساري» كانت تجمع العملات وتلصق عملةَ المنشأة، وتحتها في
+        // الشاشة نفسِها جدولُ `$values` يفصلها بتعليقٍ صريح — تناقضٌ داخل شاشةٍ
+        // واحدة. اللصيقةُ الآن حقيقيةٌ عند التوحّد، وموسومةٌ عند الاختلاط.
+        $curLabel = hub_cur_label($values->pluck('currency'));
+        $currency = $curLabel['cur'];
+        $mixed = $curLabel['mixed'];
+
+        return view('legal.index', compact('kpi', 'types', 'expiring', 'obligations', 'currency', 'mixed',
             'values', 'stuck', 'pendingSteps', 'renewals', 'byOwner', 'dormantRules', 'obUsers', 'lens'));
     }
 

@@ -1448,6 +1448,32 @@ if (! function_exists('hub_pipeline')) {
     }
 }
 
+if (! function_exists('hub_cur_label')) {
+    /**
+     * صدقُ اللصيقة — مساعدٌ واحدٌ لكل الشاشات.
+     *
+     * لا محرّكَ صرفٍ في النظام (`app.currency` **تسميةٌ لا تحويل**)، فبطاقةٌ
+     * تجمع مبالغَ صفوفٍ مختلفةِ العملات إمّا تُعنون بعملتها الحقيقية حين تتّحد،
+     * وإمّا تُوسَم `mixed` كي يُقرأ الرقمُ مؤشّراً لا رقماً دقيقاً. وعنونةُ كلِّ
+     * شيءٍ بعملة النظام زوراً هي ما نتجنّبه هنا.
+     *
+     * **والفارغُ عملةٌ أيضاً**: عمودُ `currency` يُترك فارغاً في مساراتٍ آليّة
+     * (نسخُ عرضٍ، مشترياتٌ، أتمتة)، فترشيحُه من مجموعة التمييز يجعل «فارغ +
+     * دولار» يبدو متجانساً وهو مخلوط. يُنسَب للعملة الافتراضية لا يُسقَط.
+     *
+     * @return array{cur: string, mixed: bool, set: array<int, string>}
+     */
+    function hub_cur_label($currencies, ?string $default = null): array
+    {
+        $default = $default ?? (string) setting('app.currency', 'د.ك');
+        $set = collect($currencies)->map(fn ($c) => filled($c) ? (string) $c : $default)
+            ->unique()->values();
+
+        return ['cur' => $set->count() === 1 ? (string) $set->first() : $default,
+                'mixed' => $set->count() > 1, 'set' => $set->all()];
+    }
+}
+
 if (! function_exists('hub_mrr')) {
     /**
      * الإيراد الشهري المتكرر (MRR) من العقود السارية — أثمن رقمٍ تجاري لم يكن
@@ -1469,13 +1495,17 @@ if (! function_exists('hub_mrr')) {
             $DB = \Illuminate\Support\Facades\DB::class;
             $divisor = ['شهري' => 1, 'ربع سنوي' => 3, 'نصف سنوي' => 6, 'سنوي' => 12];
 
+            // العودةُ المبكرة تحمل **مفاتيح الصدق نفسَها**: العرضُ يقرأ
+            // `mixed`/`byCurrency` بلا شرط، فإسقاطُهما هنا فخُّ
+            // `Undefined array key` ينتظر أوّلَ قاعدةٍ بلا عقدٍ سارٍ.
+            $empty = ['mrr' => 0.0, 'arr' => 0.0, 'contracts' => 0, 'byService' => [],
+                      'byCurrency' => [], 'mixed' => false, 'unmapped' => 0, 'oneTime' => 0.0];
+
             $q = hub_read('contracts');
-            if (! $q) return ['mrr' => 0.0, 'arr' => 0.0, 'contracts' => 0,
-                              'byService' => [], 'unmapped' => 0, 'oneTime' => 0.0];
+            if (! $q) return $empty;
             $contracts = $q->where('status', 'ساري')->where('type', 'عقد عميل')
                 ->get(['id', 'title', 'value', 'currency', 'service_id', 'plan_id', 'client_id', 'date_end']);
-            if ($contracts->isEmpty()) return ['mrr' => 0.0, 'arr' => 0.0, 'contracts' => 0,
-                                               'byService' => [], 'unmapped' => 0, 'oneTime' => 0.0];
+            if ($contracts->isEmpty()) return $empty;
 
             $plans = \Illuminate\Support\Facades\DB::table('pricing_plans')->whereNull('deleted_at')
                 ->get(['id', 'cycle', 'service_id'])->keyBy('id');
@@ -1699,6 +1729,22 @@ if (! function_exists('hub_project_pl')) {
             $incKinds = (array) config('hub.fin.income', ['فاتورة مبيعات', 'دفعة واردة']);
             $inv = $finDoc()->whereIn('kind', $incKinds)
                 ->selectRaw('COALESCE(SUM(total),0) t, COALESCE(SUM(COALESCE(paid,0)),0) p, COUNT(*) n')->first();
+
+            // **صدقُ العملة داخل المشروع الواحد**: `fin_documents.currency` حقلٌ
+            // مكشوفٌ بستّة خيارات، فمشروعٌ واحدٌ قد تحمل فواتيرُه عملتين — والربحُ
+            // والهامشُ يُبنيان على هذا الإيراد. لا محرّكَ تحويلٍ في النظام، فيُفصَّل
+            // بالعملة ويُرفع علمُ الاختلاط بدل رقمٍ واحدٍ يبدو دقيقاً.
+            $incByCur = $finDoc()->whereIn('kind', $incKinds)
+                ->selectRaw('currency, COALESCE(SUM(total),0) t, COUNT(*) n')
+                ->groupBy('currency')->get();
+            $plLabel = hub_cur_label($incByCur->pluck('currency'), (string) ($p->currency ?: setting('app.currency', 'د.ك')));
+            $byCurrency = $incByCur
+                ->map(fn ($r) => ['currency' => filled($r->currency) ? (string) $r->currency : $plLabel['cur'],
+                                  'revenue' => round((float) $r->t, 2), 'docs' => (int) $r->n])
+                ->groupBy('currency')
+                ->map(fn ($g, $c) => ['currency' => $c, 'revenue' => round($g->sum('revenue'), 2),
+                                      'docs' => (int) $g->sum('docs')])
+                ->sortByDesc('revenue')->values()->all();
             // «دفعة واردة» محصَّلة بطبيعتها: total هو المبلغ الواصل وإن لم يُملأ paid
             $payExtra = (float) $finDoc()->where('kind', 'دفعة واردة')->whereNull('paid')->sum('total');
 
@@ -1718,8 +1764,11 @@ if (! function_exists('hub_project_pl')) {
 
             return [
                 'project'  => $p->name,
-                // «العملة الافتراضية» من الإعدادات — المفتاح الموحد app.currency
-                'currency' => $p->currency ?: (string) setting('app.currency', 'د.ك'),
+                // اللصيقةُ الحقيقية حين تتّحد عملاتُ الفواتير، والافتراضيةُ عند
+                // الاختلاط مع رفع `mixed` — لا عنونةُ كلِّ شيءٍ بعملة النظام زوراً
+                'currency' => $plLabel['cur'],
+                'mixed'    => $plLabel['mixed'],
+                'byCurrency' => $byCurrency,
                 'months'   => $months, 'days' => $days,
                 'revenue'  => ['invoiced' => round($revenue, 2), 'collected' => round($collected, 2),
                                'docs' => (int) ($inv->n ?? 0),
