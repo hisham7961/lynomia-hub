@@ -1,7 +1,10 @@
 {{-- بنود المسيّر وإجراءاته — يتوقع $row (المسيّر) --}}
 @php
-    $plLines = \App\Models\PayrollLine::where('run_id', $row->id)->get();
-    $plNames = \App\Models\Employee::whereIn('id', $plLines->pluck('emp_id'))->pluck('name', 'id');
+    $plLines = \App\Models\PayrollLine::where('run_id', $row->id)->orderBy('id')->get();
+    // **منطَّقة**: كانت تقرأ أسماءَ الموظفين خاماً، فقارئٌ معزولٌ بشركةٍ يرى
+    // أسماءَ موظفي شركةٍ أخرى في بنود المسيّر (v2.321)
+    $plNames = hub_scope(\App\Models\Employee::query(), 'hr')
+        ->whereIn('id', $plLines->pluck('emp_id'))->pluck('name', 'id');
     $plDraft = $row->status === 'مسودة' || blank($row->status);
     $plCanE = hub_can(auth()->user(), 'payroll', 'e');
     $plCur = $row->currency ?: setting('app.currency', 'د.ك');

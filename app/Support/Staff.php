@@ -246,9 +246,21 @@ class Staff
         $linked = $emps->pluck('user_id')->filter()->all();
 
         $noAccount = $emps->filter(fn ($e) => ! $e->user_id)->values();
-        $noFile = User::whereNull('deleted_at')->with('role')
-            ->when($linked, fn ($q) => $q->whereNotIn('id', $linked))
-            ->orderBy('name')->get();
+        /*
+         * **قائمةُ الحسابات لمن يديرها وحده** (v2.321): كانت تُعيد كلَّ حسابات
+         * النظام باسمها وبريدها ودورها وحالتها لمن يملك `hr:v` وحده — بلا رايةِ
+         * `users` وبلا تنطيقِ شركات. وهي هنا لغرضٍ واحد: «افتح ملفاً لهذا
+         * الحساب»، وذلك فعلٌ لا يملكه إلا حاملُ الراية أصلاً.
+         */
+        $noFile = hub_flag(auth()->user(), 'users')
+            ? User::whereNull('deleted_at')->with('role')
+                ->when($linked, fn ($q) => $q->whereNotIn('id', $linked))
+                ->when(hub_company_ids() !== null, function ($q) {
+                    $ids = hub_company_ids();
+                    $q->where(fn ($x) => $x->whereIn('company_id', $ids)->orWhereNull('company_id'));
+                })
+                ->orderBy('name')->orderBy('id')->get()
+            : collect();
 
         // اختلافُ الاسم بين الطرفين: أحدُهما عُدّل ولم يُعدَّل الآخر
         $drift = $emps->filter(fn ($e) => $e->user && (

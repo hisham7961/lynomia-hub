@@ -76,6 +76,11 @@ class ReportController extends Controller
         $mixed = $base()->whereNotNull('currency')->where('currency', '!=', '')
             ->distinct()->pluck('currency')->count() > 1;
 
-        return view('reports.finance', compact('cards', 'months', 'max', 'unpaid', 'byState', 'topPartners', 'byCC', 'ccNames', 'currency', 'mixed'));
+        // **قفلُ الحقل يسري على التقرير كما يسري على القائمة** (v2.321): مبلغٌ
+        // محجوبٌ عن قارئٍ في شاشة المالية كان يُطبع هنا كاملاً — فالتقريرُ
+        // نافذةٌ خلفية على ما حُجب. العدُّ والحالاتُ والتواريخ تبقى.
+        $seesTotals = hub_field_mode(auth()->user(), 'fin', 'total') !== 'hide';
+
+        return view('reports.finance', compact('cards', 'months', 'max', 'unpaid', 'byState', 'topPartners', 'byCC', 'ccNames', 'currency', 'mixed', 'seesTotals'));
     }
 }
