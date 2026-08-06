@@ -572,6 +572,15 @@ class HubAutomation extends Command
                     ->where('created_at', '<', now()->subDays(90))->delete();
             }
 
+            // **ونقاطُ المقاييس** (v2.342): فحصُ التوافر يكتب نقطةً لكل موقعٍ
+            // وسيرفرٍ **كل خمس دقائق** — أي مئاتُ الآلاف سنويّاً — وكان الجدولُ
+            // الوحيدَ بلا تقليمٍ بين أربعةٍ شقيقة. والنظامُ يُرفع على استضافةٍ
+            // مشتركة بقرصٍ محدود. سنةٌ كاملة تكفي لكل رسمٍ زمنيّ في الشاشات.
+            if (\Illuminate\Support\Facades\Schema::hasTable('metric_points')) {
+                $n += DB::table('metric_points')
+                    ->where('at', '<', now()->subDays(365)->toDateTimeString())->delete();
+            }
+
             return $n;
         } catch (\Throwable $e) {
             report($e);

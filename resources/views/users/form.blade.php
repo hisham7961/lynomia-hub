@@ -97,7 +97,16 @@
         @endif
 
         <div class="sub" style="margin-top:10px;line-height:2">
-            🛡️ التحقق بخطوتين: <b>{{ $u->totp_enabled ? 'مفعَّل' : 'غير مفعَّل' }}</b> — يفعّله صاحب الحساب من ملفه الشخصي.<br>
+            🛡️ التحقق بخطوتين: <b>{{ $u->totp_enabled ? 'مفعَّل' : 'غير مفعَّل' }}</b> — يفعّله صاحب الحساب من ملفه الشخصي.
+            @if ($u->totp_enabled && $u->id !== auth()->id() && \App\Support\Staff::mayTouch($u))
+                {{-- بابُ استرداد: إطفاؤه من ملفه الشخصي يشترط رمزاً من الجهاز
+                     المفقود نفسِه، فمن ضاع هاتفُه كان مقفولاً خارج النظام أبداً --}}
+                <form method="POST" action="{{ route('users.twofa.off', $u) }}" class="inline"
+                      data-confirm="فكُّ التحقق بخطوتين عن «{{ $u->name }}»؟ يدخل بكلمته وحدها حتى يُعيد تفعيله.">
+                    @csrf<button class="btn ghost xs dn">🔓 فكّ القفل (ضاع جهازه)</button>
+                </form>
+            @endif
+            <br>
             🔑 آخر تجديدٍ لكلمة المرور: <b>{{ $u->password_changed_at ? \Illuminate\Support\Carbon::parse($u->password_changed_at)->diffForHumans() : 'غير معروف' }}</b><br>
             🕘 آخر دخول: <b>{{ $u->last_login_at ? \Illuminate\Support\Carbon::parse($u->last_login_at)->diffForHumans() : 'لم يدخل قط' }}</b>
             {{ $u->last_login_ip ? '· من ' . $u->last_login_ip : '' }}
