@@ -17,13 +17,18 @@ class Innovation
     /** درجة إسهام كل مقترِح — عددٌ وجودةٌ وما وصل إلى التنفيذ */
     public static function contributors(int $limit = 12): array
     {
-        if (! Schema::hasTable('ideas')) return [];
+        // القائمةُ منطَّقة والملخّصُ فوقها كان يقرأ الجدول خاماً: عددٌ واسمُ
+        // مقترِحٍ من شركةٍ لا يراها القارئ. `hub_read` تحرس الوجودَ والصلاحيةَ
+        // والنطاقَ والحذفَ الناعم دفعةً واحدة.
+        $q = hub_read('ideas');
+        if (! $q) return [];
 
-        $rows = DB::table('ideas')->whereNull('deleted_at')->whereNotNull('by_id')
+        $rows = $q->whereNotNull('by_id')
             ->get(['by_id', 'impact', 'confidence', 'ease', 'project_id', 'status', 'created_at']);
         if ($rows->isEmpty()) return [];
 
-        $names = DB::table('users')->whereNull('deleted_at')->pluck('name', 'id');
+        $names = DB::table('users')->whereNull('deleted_at')
+            ->whereIn('id', $rows->pluck('by_id')->filter()->unique()->all())->pluck('name', 'id');
 
         return $rows->groupBy('by_id')->map(function ($g, $uid) use ($names) {
             $scored = $g->filter(fn ($i) => $i->impact && $i->confidence && $i->ease);
@@ -45,10 +50,12 @@ class Innovation
     /** أفكار شخصٍ بعينه — لتظهر في ملفه لا في قائمةٍ عامة وحدها */
     public static function byPerson(?string $userId, int $limit = 12): array
     {
-        if (! $userId || ! Schema::hasTable('ideas')) return [];
+        if (! $userId) return [];
+        $q = hub_read('ideas');
+        if (! $q) return [];
 
-        return DB::table('ideas')->whereNull('deleted_at')->where('by_id', $userId)
-            ->orderByDesc('created_at')->limit($limit)
+        return $q->where('by_id', $userId)
+            ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)
             ->get(['id', 'title', 'cat', 'impact', 'confidence', 'ease', 'project_id', 'status', 'created_at'])
             ->map(fn ($i) => [
                 'id' => $i->id, 'title' => $i->title, 'cat' => $i->cat, 'status' => $i->status,
@@ -72,10 +79,10 @@ class Innovation
     /** نبض المركز */
     public static function pulse(): array
     {
-        if (! Schema::hasTable('ideas')) return ['n' => 0, 'scored' => 0, 'promoted' => 0, 'people' => 0, 'q90' => 0];
+        $q = hub_read('ideas');
+        if (! $q) return ['n' => 0, 'scored' => 0, 'promoted' => 0, 'people' => 0, 'q90' => 0];
 
-        $rows = DB::table('ideas')->whereNull('deleted_at')
-            ->get(['by_id', 'impact', 'confidence', 'ease', 'project_id', 'created_at']);
+        $rows = $q->get(['by_id', 'impact', 'confidence', 'ease', 'project_id', 'created_at']);
 
         return [
             'n' => $rows->count(),

@@ -19,6 +19,8 @@ class InnovationCenterTest extends TestCase
     protected function scene(): void
     {
         $this->seedCore();
+        // القرّاءُ الملخِّصون صاروا يمرّون بـ`hub_read` — فلا قراءةَ بلا قارئ
+        $this->actingAs($this->owner);
 
         Idea::create(['title' => 'أتمتة الفواتير', 'by_id' => $this->employee->id, 'cat' => 'تشغيل',
             'impact' => 9, 'confidence' => 8, 'ease' => 7, 'status' => 'معتمدة', 'problem' => 'إدخالٌ يدوي']);

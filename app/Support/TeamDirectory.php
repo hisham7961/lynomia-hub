@@ -46,11 +46,23 @@ class TeamDirectory
                 ->get(['emp_id', 'name', 'level', 'cert', 'cert_exp'])->groupBy('emp_id')
             : collect();
 
-        $managers = $emps->pluck('name', 'id');
-        // الراتب حقلٌ قد يكون محجوباً بدور القارئ — يُقرَّر مرةً لا لكل بطاقة
+        // «مديره المباشر» معرّفُ **مستخدم** (‏`hr.managerId` من نوع ref→users)،
+        // وكانت الخريطةُ تُبنى بمعرّفات **الموظفين** — فالبحثُ لا يُصيب أبداً
+        // والحقلُ يظهر فارغاً مهما مُلئ. تُحلّ من `users`، ويُبقى على مرتجَعِ
+        // الموظفين احتياطاً لبياناتٍ قديمة كُتب فيها معرّفُ موظف.
+        $mgrIds = $emps->pluck('manager_id')->filter()->unique()->all();
+        $managers = ($mgrIds && Schema::hasTable('users'))
+            ? DB::table('users')->whereNull('deleted_at')->whereIn('id', $mgrIds)->pluck('name', 'id')
+            : collect();
+        $managers = $managers->union($emps->pluck('name', 'id'));
+        // الراتب حقلٌ قد يكون محجوباً بدور القارئ — يُقرَّر مرةً لا لكل بطاقة.
+        // ومثلُه انتهاءُ الإقامة والجواز: قفلُ الحقل يحجبهما في نموذج الملف،
+        // وكان الدليلُ يطبعهما جهراً — فالقفلُ يُلتَفّ عليه بفتح شاشةٍ أخرى.
         $showSalary = hub_field_mode($user, 'hr', 'salary') === '';
+        $showId = hub_field_mode($user, 'hr', 'iqamaExp') === '';
+        $showPass = hub_field_mode($user, 'hr', 'passExp') === '';
 
-        return $emps->map(function ($e) use ($photos, $skills, $managers, $showSalary) {
+        return $emps->map(function ($e) use ($photos, $skills, $managers, $showSalary, $showId, $showPass) {
             $mine = collect($skills[$e->id] ?? []);
             $certs = $mine->filter(fn ($s) => trim((string) $s->cert) !== '');
             $expiringCert = $certs->first(fn ($s) => $s->cert_exp
@@ -58,8 +70,10 @@ class TeamDirectory
 
             $dossier = hub_dossier('hr', $e->id);
 
-            $idExp = self::daysTo($e->iqama_exp);
-            $passExp = self::daysTo($e->pass_exp);
+            // المحجوبُ يُصفَّر عند المنبع لا عند الطباعة: `alerts()` تُبنى من
+            // هذه البطاقات، فلو بقيت القيمةُ هنا لسرّبها سطرُ التنبيه نفسه.
+            $idExp = $showId ? self::daysTo($e->iqama_exp) : null;
+            $passExp = $showPass ? self::daysTo($e->pass_exp) : null;
 
             return [
                 'id' => $e->id, 'name' => $e->name, 'title' => $e->title,

@@ -29,6 +29,11 @@ class Totp
     /** تحقق بتسامح ±1 نافذة (ساعة الجوال قد تسبق أو تتأخر قليلاً) */
     public static function verify(string $secret, string $input): bool
     {
+        // سرٌّ فارغ (أو بلا محرفٍ صالح في Base32) يُنتج رمزاً **يحسبه أيُّ أحد**:
+        // فحسابٌ بـ`totp_enabled` وسرٍّ ضائع كان يُفتَح برمزٍ معلوم. الفشلُ هنا
+        // مغلقٌ لا مفتوح.
+        if (self::base32Decode($secret) === '') return false;
+
         $input = preg_replace('/\D/', '', $input);
         if (strlen($input) !== 6) return false;
         foreach ([-1, 0, 1] as $w) {

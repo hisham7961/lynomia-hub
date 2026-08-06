@@ -40,10 +40,21 @@ class AppServiceProvider extends ServiceProvider
         // بريد SMTP من حقول مركز المراسلة — تغلب .env إن مُلئت، محصّنة مثلها
         \App\Support\MailSettings::apply();
 
-        // حد معدل طلبات API: ١٢٠ بالدقيقة لكل مفتاح/عنوان
-        RateLimiter::for('api', fn ($request) => Limit::perMinute(120)->by(
-            $request->bearerToken() ? hash('sha256', $request->bearerToken()) : $request->ip()
-        ));
+        /*
+         * حدُّ معدّل API: ١٢٠ بالدقيقة لكل مفتاح — **وسقفٌ للعنوان لا يُفلَت منه**.
+         *
+         * الفرزُ بالرمز وحده كان يُلغي الحدَّ عمليّاً: الرمزُ نصٌّ يرسله الطالب،
+         * فيُدوّره كل ١٢٠ طلباً ويبدأ حصّةً جديدة بلا نهاية. والرمزُ الباطل يُردّ
+         * بـ401 لكن بعد إقلاعِ الإطار واستعلامِ قاعدةٍ للتحقق منه — فالطوفانُ
+         * يبلغ القاعدةَ بلا سقف. السقفُ الثاني مفروزٌ بما **لا** يملكه الطالب.
+         */
+        RateLimiter::for('api', function ($request) {
+            $tok = (string) $request->bearerToken();
+            $limits = [Limit::perMinute(300)->by('api-ip:' . $request->ip())];
+            if ($tok !== '') $limits[] = Limit::perMinute(120)->by('api-key:' . hash('sha256', $tok));
+
+            return $limits;
+        });
 
         /**
          * ختمُ تغيّر الجداول: كل كتابةٍ ترفع عدّاد جدولها، ومفاتيح الشاشات
