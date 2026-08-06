@@ -164,8 +164,19 @@ class ImportController extends Controller
     {
         switch ($f['type']) {
             case 'num': case 'big':
-                if (! is_numeric(str_replace(['،', ','], ['', ''], $v))) { $err = '«' . $f['label'] . '»: قيمة غير رقمية (' . Str::limit($v, 20) . ')'; return null; }
-                return (float) str_replace(['،', ','], ['', ''], $v);
+                $clean = str_replace(['،', ','], ['', ''], $v);
+                // hub_num ترفض غير المنتهي (`1e400` → INF) وغير الرقميّ معاً
+                $n = hub_num($clean);
+                if ($n === null) { $err = '«' . $f['label'] . '»: قيمة غير رقمية (' . Str::limit($v, 20) . ')'; return null; }
+                // **ومدى العمود** (v2.325): كان الطولُ النصّيّ وحده يُفحَص، فقيمةٌ
+                // فائضة تُقبل على SQLite وتُسقط **الدفعة كلَّها** بـ22003 على
+                // MySQL — والعطلُ في الإنتاج وحده بينما الحزمةُ خضراء.
+                if ($table && ($nm = hub_col_num_max($table, (string) $f['col'])) !== null && abs($n) > (float) $nm) {
+                    $err = '«' . $f['label'] . '»: خارج مدى العمود (أقصاه ' . $nm . ')';
+                    return null;
+                }
+
+                return $n;
 
             case 'date': case 'dt':
                 // تواريخ Excel التسلسلية: خلية التاريخ في xlsx رقمٌ (45292 = 2024-01-01)
@@ -210,6 +221,16 @@ class ImportController extends Controller
                 // 22001 على MySQL الصارمة فتُلغى المعاملة كلها. تُتخطّى بوضوح كأي خطأ صف.
                 if ($table && ($max = hub_col_max($table, (string) $f['col'])) && mb_strlen($v) > $max) {
                     $err = '«' . $f['label'] . '»: أطول من حدّ العمود (' . $max . ' حرف)';
+                    return null;
+                }
+
+                // **وقائمةُ الخيارات المعرَّفة** (v2.325): كان الاستيرادُ يزرع في
+                // حقول `sel` حالاتٍ لا يعرفها السجل — لا تظهر في مرشِّح ولا في
+                // لوحةٍ، والسجلُّ يعلق في حالةٍ لا مخرجَ منها.
+                if (($f['type'] ?? '') === 'sel' && ! empty($f['options'])
+                    && ! in_array($v, (array) $f['options'], true)) {
+                    $err = '«' . $f['label'] . '»: قيمةٌ خارج الخيارات المعرَّفة ('
+                         . Str::limit(implode('، ', (array) $f['options']), 60) . ')';
                     return null;
                 }
 

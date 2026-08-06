@@ -23,7 +23,8 @@ class CapacityController extends Controller
         $this->gate();
 
         return view('capacity', [
-            'c' => hub_capacity($r->query('from'), $r->query('to'), hub_lens()['id']), 'lens' => hub_lens(),
+            // hub_str: نصٌّ حرٌّ من الرابط يصل Carbon::parse فيرمي غير ملتقط (v2.325)
+            'c' => hub_capacity(hub_str($r->query('from')) ?: null, hub_str($r->query('to')) ?: null, hub_lens()['id']), 'lens' => hub_lens(),
         ]);
     }
 

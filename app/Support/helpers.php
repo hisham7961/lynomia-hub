@@ -2537,8 +2537,23 @@ if (! function_exists('hub_capacity')) {
      */
     function hub_capacity(?string $from = null, ?string $to = null, ?string $projectId = null): array
     {
-        $f = \Illuminate\Support\Carbon::parse($from ?: now()->startOfMonth()->toDateString())->startOfDay();
-        $t = \Illuminate\Support\Carbon::parse($to ?: now()->endOfMonth()->toDateString())->endOfDay();
+        // **تاريخٌ حرٌّ من الرابط لا يُسقط الشاشة** (v2.325): `Carbon::parse` على
+        // نصٍّ لا يُفهَم ترمي `InvalidFormatException` غيرَ ملتقطة — ٥٠٠ على
+        // مسارٍ مصادَق بمعاملٍ يتحكّم به الطالب. ما لا يُفهَم يرتدّ للافتراضي.
+        $safe = function ($v, \Closure $default) {
+            $v = hub_str($v);
+            if ($v === '') return $default();
+            try {
+                return \Illuminate\Support\Carbon::parse($v);
+            } catch (\Throwable $e) {
+                return $default();
+            }
+        };
+        $f = $safe($from, fn () => now()->startOfMonth())->startOfDay();
+        $t = $safe($to, fn () => now()->endOfMonth())->endOfDay();
+        // ومدىً معكوسٌ أو مفرطُ الطول يُقوَّم: حلقةُ الأيام أدناه تُحسب يوماً بيوم
+        if ($t->lt($f)) [$f, $t] = [$t->copy()->startOfDay(), $f->copy()->endOfDay()];
+        if ($f->diffInDays($t) > 732) $t = $f->copy()->addDays(732)->endOfDay();
 
         $hoursDay = max(1, (int) setting('cost.work_hours', 8));
         $workDays = hub_workdays($f, $t);

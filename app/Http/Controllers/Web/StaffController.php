@@ -120,11 +120,14 @@ class StaffController extends Controller
         abort_unless(Staff::mayTouch($u), 403,
             'هذا الحساب ذو امتياز (مالك أو إدارة مستخدمين) — توحيدُ بياناته يتطلب صلاحيةً تعلوه');
 
-        $patch = ['name' => $emp->name];
+        // **قصٌّ لعرض عمود الحساب** (v2.325): أعمدةُ الملف الوظيفيّ أوسعُ من
+        // أعمدة الحساب (`users.name` = 160)، فالتوحيدُ كان يدهسها بقيمةٍ أطول —
+        // 1406 على MySQL الصارمة، وقصٌّ صامت على SQLite.
+        $patch = ['name' => hub_fit((string) $emp->name, hub_col_max('users', 'name') ?? 160)];
         // البريدُ لا يُنقل إن كان مأخوذاً بحسابٍ آخر — والتوحيد لا يكسر الدخول
         if (filled($emp->email) && ! User::whereNull('deleted_at')
             ->where('email', $emp->email)->where('id', '!=', $u->id)->exists()) {
-            $patch['email'] = $emp->email;
+            $patch['email'] = hub_fit((string) $emp->email, hub_col_max('users', 'email') ?? 190);
         }
         $u->update($patch);
         hub_audit('توحيد بيانات الحساب مع الملف', 'users', $u->id, $emp->name);
