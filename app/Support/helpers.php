@@ -1757,8 +1757,16 @@ if (! function_exists('hub_project_pl')) {
             // والحالات الميتة (ملغاة/مسودة) خارج الحساب — كسائر التقارير
             $finDoc = fn () => hub_fin_not_dead(\Illuminate\Support\Facades\DB::table('fin_documents')
                 ->whereNull('deleted_at')->where('project_id', $projectId));
+            // العدّ المزدوج: زرُّ «فاتورة المورد» يولّد من أمر الشراء مستندَ مالية
+            // نوعُه «فاتورة مشتريات» (أحدُ أنواع المصروف)، فيُضاف `meta.bill_id` للأمر.
+            // فبلا استثنائه يُحتسب المبلغُ مرّتين: من صفّ الشراء ومن فاتورته. والحالاتُ
+            // الميتة (مسودة/ملغى/مرتجع) ليست تكلفةً كسائر التقارير. `whereNull('meta->bill_id')`
+            // تعمل على المحرّكين (json_extract يُعيد NULL حين لا مفتاح).
             $purch = (float) \Illuminate\Support\Facades\DB::table('purchases')
-                ->whereNull('deleted_at')->where('project_id', $projectId)->sum('amount');
+                ->whereNull('deleted_at')->where('project_id', $projectId)
+                ->whereNull('meta->bill_id')
+                ->whereNotIn('status', (array) config('hub.purchases.dead', ['مسودة', 'ملغى', 'مرتجع']))
+                ->sum('amount');
             $expense = (float) $finDoc()
                 ->whereIn('kind', (array) config('hub.fin.expense', ['مصروف']))->sum('total');
             $externalCost = $purch + $expense;

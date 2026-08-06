@@ -153,6 +153,15 @@ class PayrollController extends Controller
             abort_if((float) $run->total <= 0 || ! PayrollLine::where('run_id', $run->id)->exists(), 422,
                 'ولّد سطور المسيّر أولاً — لا يُعتمد مسيّر فارغ');
 
+            // الإجمالي مشتقٌّ من مجموع السطور: إن خالفه الحقلُ المخزّن (تلاعبٌ مباشر
+            // في القاعدة أو تعديلٌ التفَّ على القفل) لا يُرحَّل قيدٌ يبني على رقمٍ
+            // مختلَق — أعِد التوليد. والقيدُ يبني على المجموع لا على الحقل.
+            $sum = (float) PayrollLine::where('run_id', $run->id)->sum('net');
+            abort_if(abs($sum - (float) $run->total) > 0.005, 422,
+                'إجمالي المسيّر (' . number_format((float) $run->total, 3) . ') يخالف مجموع سطوره ('
+                . number_format($sum, 3) . ') — أعِد توليد المسيّر قبل اعتماده');
+            $run->total = $sum;
+
             $run->status = 'معتمد';
             $run->save();
             $this->autoJournal($run);
