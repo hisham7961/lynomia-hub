@@ -68,7 +68,16 @@ td{padding:9px 12px;border-bottom:1px solid #e3ecea}
         </div>
     </div>
 
-    @if (count($items))
+    {{-- **وقفلُ حقل البنود يسري هنا كما يسري على الشاشة**: `$hideItems` كان
+         يُحسب في `QuoteController` ويُمرَّر إلى هذه الورقة **ولا يُقرأ** سطراً
+         واحداً — فمن حُجبت عنه البنودُ في القائمة يقرؤها كاملةً في المستند
+         الذي يُطبَع ويُرسَل ويُؤرشَف. حسابٌ بلا قارئٍ ليس حراسةً بل قناعةٌ بها. --}}
+    @if (($hideItems ?? false) && count($items))
+        <div style="border:1px dashed #bbb;border-radius:8px;padding:14px;text-align:center;color:#888;margin-bottom:14px">
+            ••• بنودُ العرض محجوبةٌ عنك ({{ count($items) }} بنداً) •••
+        </div>
+    @endif
+    @if (! ($hideItems ?? false) && count($items))
     <table>
         <thead><tr><th>البيان</th><th style="width:70px">الكمية</th>@if (! empty($showCartons))<th style="width:130px">الكراتين</th>@endif<th style="width:110px">سعر الوحدة</th><th style="width:110px">الإجمالي</th></tr></thead>
         <tbody>

@@ -4,7 +4,7 @@
      كان «كاش أولاً» جامداً: المستخدم يرى الشكل القديم حتى يضغط Ctrl+Shift+R.
    - التنقل بين الصفحات: الشبكة أولاً بمهلة، وإلا آخر نسخة محفوظة، وإلا صفحة «بلا اتصال»
    - لا يخبئ أبداً: API، الملفات الخاصة، الأسرار، مراكز الإدارة */
-var VER = 'hub-v2.111';
+var VER = 'hub-v2.337';   // رفعُ اسم الخبيئة يُسقط ما خُبِّئ بالمنطق المعطوب
 var STATIC = ['/offline', '/css/app.css', '/css/fonts.css', '/js/app.js', '/js/htmx.min.js',
   // الجوهري من الخطوط يُخبأ مسبقاً (عربي + لاتيني)، وبقية الأطقم يخبئها مسار /fonts/ عند أول استعمال
   '/fonts/plexarabic-400-arabic.woff2', '/fonts/plexarabic-400-latin.woff2',
@@ -33,6 +33,29 @@ function never(url) {
   return NEVER.some(function (p) { return url.pathname.indexOf(p) === 0; });
 }
 
+/**
+ * **لا تخبئةَ لصفحةٍ مسجَّلةِ الدخول.**
+ *
+ * أُضيف هذا الحارسُ في v2.323 لكنّه وُضع في **فرع الأصول الثابتة** أعلاه —
+ * و`/css/` و`/js/` و`/fonts/` لا تحمل وسمَ الجلسة أصلاً ولا تحمل بياناتِ
+ * أحد. أمّا فرعُ التنقّل، وهو الذي وُصف العيبُ فيه حرفياً، فبقي يخبّئ **كلَّ**
+ * استجابةٍ ناجحة: لوحةُ التحكم والرواتبُ والمالية والعقود تُقدَّم من الخبيئة
+ * **بعد الخروج** ولمن يفتح المتصفّح بعده على جهازٍ مشترك. و`NEVER` تحمي
+ * `/admin/` و`/m/vault` وحدهما.
+ *
+ * الخادمُ يَسِم استجاباتِ المسجَّلين بـ`X-Lyn-Auth: 1` (‏`SecurityHeaders`)،
+ * فلا يُخبَّأ إلا ما لا يحملها — وما خُبِّئ قبل الدخول يُسقَط عند أوّل
+ * استجابةٍ موسومة لنفس العنوان، وإلا بقيت نسخةٌ قديمةٌ تُقدَّم بعد الخروج.
+ */
+function keepOffline(req, res) {
+  if (!res || !res.ok) return;
+  var authed = res.headers && res.headers.get('X-Lyn-Auth') === '1';
+  if (authed) { caches.open(VER).then(function (c) { c.delete(req); }); return; }
+  var copy = res.clone();
+  caches.open(VER).then(function (c) { c.put(req, copy); });
+}
+
+
 self.addEventListener('fetch', function (e) {
   var req = e.request;
   if (req.method !== 'GET') return;
@@ -43,17 +66,10 @@ self.addEventListener('fetch', function (e) {
   if (url.pathname.indexOf('/css/') === 0 || url.pathname.indexOf('/js/') === 0 || url.pathname.indexOf('/fonts/') === 0) {
     e.respondWith(caches.match(req).then(function (hit) {
       var refresh = fetch(req).then(function (res) {
-        // **لا تخبئةَ لصفحةٍ مسجَّلةِ الدخول** (v2.323): كان كلُّ تنقّلٍ ناجح
-        // يُخبَّأ، فصفحةُ مستخدمٍ بمحتواها تُقدَّم بعد خروجه — أو لمستخدمٍ آخر
-        // على الجهاز نفسه (جهازٌ مشترك في مكتبٍ يكفي). الخادمُ يَسِم صفحاتِ
-        // الجلسة بترويسة `X-Lyn-Auth`، ولا يُخبَّأ إلا ما لا يحملها.
-        var authed = res && res.headers && res.headers.get('X-Lyn-Auth') === '1';
-        if (res && res.ok && !authed) {
+        if (res && res.ok) {
           var copy = res.clone();
           caches.open(VER).then(function (c) { c.put(req, copy); });
         }
-        // وإن كانت الاستجابةُ لمسجَّلٍ فأسقِط ما خُبِّئ لهذا العنوان سابقاً
-        if (authed) caches.open(VER).then(function (c) { c.delete(req); });
         return res;
       }).catch(function () { return hit; });
       return hit || refresh;
@@ -74,10 +90,7 @@ self.addEventListener('fetch', function (e) {
       fetch(req).then(function (res) {
         if (done) return;
         done = true; clearTimeout(t);
-        if (res && res.ok) {
-          var copy = res.clone();
-          caches.open(VER).then(function (c) { c.put(req, copy); });
-        }
+        keepOffline(req, res);          // شاشةُ مسجَّلٍ لا تُخبَّأ — انظر أعلاه
         resolve(res);
       }).catch(function () { if (!done) { done = true; clearTimeout(t); fallback(); } });
     }));
