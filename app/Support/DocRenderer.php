@@ -41,10 +41,34 @@ class DocRenderer
     }
 
     /**
+     * صورةُ توقيعٍ آمنة للتضمين — أو `null`.
+     *
+     * التوقيعُ مدخلٌ خارجيّ يرسله طرفٌ **بلا حساب** عبر رابطه العام. وكان
+     * يُلصَق في الـHTML بلا تهريب بينما كل حقلٍ آخر هنا يمرّ بـ`e()`، فحمولةٌ
+     * تبدأ بالبادئة المسموحة ثم تكسر السمة (`AAAA" onerror="…"><h1>…`) تزرع
+     * وسماً في الوثيقة القانونية المؤرشَفة — تزويرٌ لا تكشفه `doc_hash` لأنها
+     * على النصّ لا على المخرَج — وتزرع طلباً صادراً من داخل الشبكة
+     * (`<img src="http://169.254.169.254/…">`) يرسمه mPDF على الخادم.
+     *
+     * الحارس قائمةُ سماحٍ صارمة: `data:image/png;base64,` ثمّ Base64 خالصة.
+     */
+    protected static function safeSignature($sig): ?string
+    {
+        $sig = (string) $sig;
+
+        return preg_match('#^data:image/png;base64,[A-Za-z0-9+/]+={0,2}$#', $sig) ? $sig : null;
+    }
+
+    /**
      * HTML مكتفٍ بذاته للوثيقة الموقعة — أنماط سطرية بسيطة يفهمها محرك PDF
      * (لا متغيرات CSS ولا ملفات خارجية)، والنص والأسماء كلها مُهرَّبة.
+     *
+     * `$evidence`: الأثرُ الحسّاس (IP ورقم الهوية) للمالك داخليّاً فقط. نسخةُ
+     * العميل تُمرّر `false` — بنفس سياسة `doc.blade.php` التي تحجبهما عن
+     * `$client` و`$public` صراحةً: الموقّعُ الآخر ومستلمُ النسخة يريان الوثيقة
+     * والتوقيع لا آثارَ غيرهما. وكان الـPDF يخالف هذه السياسة على مسار العميل.
      */
-    public static function docHtml(SignRequest $req): string
+    public static function docHtml(SignRequest $req, bool $evidence = true): string
     {
         $h = fn ($v) => e((string) $v);
 
@@ -80,14 +104,19 @@ class DocRenderer
             ]] : []);
 
         foreach ($blocks as $b) {
+            // الأثرُ الحسّاس للمالك وحده — نسخةُ العميل تحمل الوقتَ والتوقيع فقط
+            $trace = $evidence
+                ? ' — IP <span dir="ltr">' . $h($b['ip']) . '</span>'
+                    . ($b['id_no'] ? ' — هوية: <span dir="ltr">' . $h($b['id_no']) . '</span>' : '')
+                : '';
+            $sig = static::safeSignature($b['sig']);
+
             $out .= '<hr><table width="100%"><tr><td>'
                 . '<b>' . $h($b['name']) . '</b> (' . $h($b['role']) . ')<br>'
                 . '<span style="font-size:10.5px">وقّع في ' . $h($b['at']?->format('Y-m-d H:i:s'))
-                . ' — IP <span dir="ltr">' . $h($b['ip']) . '</span>'
-                . ($b['id_no'] ? ' — هوية: <span dir="ltr">' . $h($b['id_no']) . '</span>' : '')
+                . $trace
                 . '</span></td><td style="text-align:left">'
-                . (str_starts_with((string) $b['sig'], 'data:image/png')
-                    ? '<img src="' . $b['sig'] . '" style="width:150px">' : '')
+                . ($sig ? '<img src="' . $h($sig) . '" style="width:150px">' : '')
                 . '</td></tr></table>';
         }
 
