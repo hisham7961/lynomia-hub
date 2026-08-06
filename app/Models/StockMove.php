@@ -60,6 +60,20 @@ class StockMove extends Model
                     ['qty' => 'الحركة المُرحَّلة مقفلة — ألغِها لعكس أثرها ثم أنشئ حركة صحيحة']);
             }
         });
+
+        // **والحذفُ كذلك**: الحارسان أعلاه على الإنشاء والتعديل وحدهما، فحركةٌ
+        // مُرحَّلة كانت تُحذف من النموذج العام (فرداً أو جماعةً) **بلا عكسِ
+        // أثرها** — فيبقى رصيدُ الصنف متحرّكاً ولا مستندَ خلفه، وهو أسوأ من
+        // تعديلٍ خاطئ: التعديلُ يُرى والحذفُ لا يُرى.
+        static::deleting(function (self $m) {
+            if (static::$posting) return;
+            if (method_exists($m, 'isForceDeleting') && $m->isForceDeleting()) return;
+            $meta = (array) ($m->meta ?? []);
+            if (! empty($meta['posted_at']) && empty($meta['reversed_at'])) {
+                throw \Illuminate\Validation\ValidationException::withMessages(
+                    ['status' => 'الحركة المُرحَّلة لا تُحذف — ألغِها من زرّ «ألغِ واعكس الأثر» ليُعكس أثرها على الرصيد أولاً']);
+            }
+        });
     }
 
     public function item(): BelongsTo

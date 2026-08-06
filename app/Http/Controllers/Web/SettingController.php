@@ -109,7 +109,20 @@ class SettingController extends Controller
                         // صيغٌ نقطية فقط: قاعدة image في Laravel تقبل SVG، وهو نصٌّ
                         // قد يحمل سكربتاً — ويُخزَّن على القرص العام ويُخدَم مباشرةً
                         // بلا Content-Disposition، فيصير XSS مخزَّناً. الحصرُ يمنعه.
-                        $r->validate([$input => ['image', 'mimes:jpg,jpeg,png,webp,gif', 'max:4096']]);
+                        //
+                        // **ويُجمع الخطأُ ولا يُرمى**: `validate` من داخل الحلقة كان
+                        // يقطع الطلبَ فوراً — فما كُتب قبله يبقى بلا `Cache::forget`
+                        // ولا أثرِ تدقيق: الشاشةُ تعرض القديمَ والسجلُّ لا يعرف من
+                        // غيّر. والصفحةُ نفسُها تُعلن سياستَها: «حُفظ ما صحّ، ورُدّ
+                        // ما لا يسري».
+                        $v = \Illuminate\Support\Facades\Validator::make(
+                            [$input => $r->file($input)],
+                            [$input => ['image', 'mimes:jpg,jpeg,png,webp,gif', 'max:4096']]);
+                        if ($v->fails()) {
+                            $errors[$input] = ($meta['label'] ?? $key) . ' — صورة غير صالحة: '
+                                . 'يُقبل jpg أو png أو webp أو gif حتى ٤ ميجابايت';
+                            continue;
+                        }
                         $this->put($key, $r->file($input)->store('hub/branding', 'public'), $changed);
                     } elseif ($r->boolean($input . '_clear')) {
                         Setting::where('key', $key)->delete();

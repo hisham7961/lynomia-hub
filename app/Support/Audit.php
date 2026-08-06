@@ -106,13 +106,20 @@ class Audit
                         'why' => 'رأس السلسلة لا يطابق آخر قيد — حُذفت قيودٌ من الذيل على الأرجح'];
             }
 
+            // **والوصلُ بين القيود، لا بصمةُ كلٍّ وحدها.** حذفُ قيدٍ من المنتصف
+            // يُبقي الرأسَ مطابقاً وبصمةَ كلِّ قيدٍ باقٍ صحيحة — فكان يُبلَّغ
+            // «سلسلة سليمة»، وهذا بالضبط ما تُصان السلسلةُ من أجله. الصفوفُ
+            // مرتَّبةٌ تنازلياً، فـ`prev_hash` كلِّ قيدٍ لا بدّ أن يساوي `hash`
+            // تاليه في المصفوفة (وآخرُ عنصرٍ في النافذة سابقُه خارجها فيُتخطّى).
+            $rows = $rows->values();
             $broken = 0;
-            foreach ($rows as $row) {
+            foreach ($rows as $i => $row) {
                 $p = (string) $row->prev_hash;
                 $match = hash('sha256', $p . '|' . $row->canonical()) === $row->hash
                       || hash('sha256', $p . '|' . $row->canonical('v2raw')) === $row->hash
                       || hash('sha256', $p . '|' . $row->canonical('v1')) === $row->hash;
                 if (! $match) $broken++;
+                elseif ($i + 1 < $rows->count() && $p !== (string) $rows[$i + 1]->hash) $broken++;
             }
 
             $unsealed = self::unsealedAfterEpoch();

@@ -208,7 +208,8 @@ class PayrollController extends Controller
             try {
             \Illuminate\Support\Facades\DB::transaction(function () use ($run, $exp, $cash) {
                 $entry = \App\Models\JournalEntry::create([
-                    'doc_no' => 'JE-PAYROLL-' . now()->format('ymHis'),
+                    'doc_no' => hub_fit('JE-PAYROLL-' . now()->format('ymHis'),
+                        hub_col_max('journal_entries', 'doc_no') ?? 300),
                     'date' => now()->toDateString(),
                     'description' => 'قيد رواتب: ' . $run->name . ($run->month ? ' — ' . $run->month : ''),
                     'reference' => (string) $run->name, 'state' => 'مرحّل',
