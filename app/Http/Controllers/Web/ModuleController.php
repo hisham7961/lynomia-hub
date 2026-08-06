@@ -247,6 +247,7 @@ class ModuleController extends Controller
         $this->fill($def, $r, $m);
 
         $this->inheritCompany($m, $module);
+        $this->inheritProject($m, $module);
 
         // مستخدم محدود ينشئ مشروعاً: نضمن بقاءه ضمن نطاقه (مديراً أو عضواً)
         if ($module === 'projects' && hub_scoped(auth()->user())) {
@@ -937,6 +938,23 @@ class ModuleController extends Controller
         }
     }
 
+    /**
+     * ونظيرُها للمشروع (v2.314): `guardProject` يحرس ما **في النموذج**، لكن
+     * وحداتٍ كثيرة لها عمود `project_id` بلا حقلِ مشروعٍ في نموذجها (قاعدة
+     * المعرفة، والمهام، وغيرها). فمستخدمُ `scope='proj'` كان يُنشئ فيها سجلاً
+     * بـ`project_id = NULL` ثمّ يُقصيه `hub_scope` **فوراً**: يفتحه فيرى ٤٠٤،
+     * ولا يظهر في قائمته — سجلٌّ يتيمٌ على منشئه نفسه، بلا كلمةٍ تقول لماذا.
+     * يرثُ أولَ مشاريعه المرئية، بنفس منطق وراثة الشركة أعلاه.
+     */
+    protected function inheritProject(Model $m, string $module): void
+    {
+        if ($module === 'projects' || ! hub_scoped(auth()->user())) return;
+        if (! ($pcol = hub_project_col($module)) || ! empty($m->{$pcol})) return;
+
+        $ids = auth()->user()->visibleProjectIds();
+        if ($ids) $m->{$pcol} = $ids[0];
+    }
+
     /** العزل الصارم: من له شركات مسموحة يربط السجل بإحداها فقط عند الإضافة أو التعديل */
     protected function guardCompany(Request $r, string $module): void
     {
@@ -1162,6 +1180,9 @@ class ModuleController extends Controller
             }
             if ($t === 'bool') { $m->{$c} = $r->boolean($k); continue; }
             if ($t === 'tags') {
+                // **الغيابُ ليس تفريغاً**: طلبٌ لا يحمل المفتاح إطلاقاً (API أو
+                // نموذجٌ جزئي) كان يمحو وسومَ السجل — والحزامُ هنا يُبقيها
+                if (! $r->has($k)) continue;
                 $v = trim(hub_str($r->input($k)));
                 $arr = $v === '' ? null : array_values(array_filter(array_map('trim', preg_split('/[,،]/u', $v))));
                 $m->{$c} = $arr === null ? null : ($m->hasCast($c) ? $arr : json_encode($arr, JSON_UNESCAPED_UNICODE));

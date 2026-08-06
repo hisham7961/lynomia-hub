@@ -69,7 +69,8 @@ class OdooController extends Controller
         $row = $this->target('projects', $id);
         $cli = \App\Support\Odoo::forRow($row);
 
-        $mode = (string) $r->query('mode', 'team');
+        // hub_str لا (string): `?mode[]=x` مصفوفةٌ يرمي كاستُها ErrorException → ٥٠٠
+        $mode = hub_str($r->query('mode')) ?: 'team';
         if (! in_array($mode, \App\Support\Odoo::CHANNEL_MODES, true)) $mode = 'team';
 
         // الخيارات تُجلب مزامنةً في try/catch — الشاشة لا تسقط بخادمٍ غائب

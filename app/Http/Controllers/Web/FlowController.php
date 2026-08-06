@@ -267,7 +267,9 @@ class FlowController extends Controller
             : collect();
 
         $result = null; $record = null;
-        if ($rid = $r->query('rid')) {
+        // hub_str: `?rid[]=x` يُعيد مصفوفةً فيجلب find() مجموعةً ثم يرمي
+        // TypeError في FlowRunner::simulate — ٥٠٠ على مسارٍ مصادَق
+        if ($rid = hub_str($r->query('rid'))) {
             $record = class_exists($class) ? $class::find($rid) : null;
             if ($record) {
                 // للحدث «status» نحاكي التحول إلى الحالة المطلوبة في المسار

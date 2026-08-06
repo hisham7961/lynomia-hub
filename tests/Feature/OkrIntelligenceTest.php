@@ -33,7 +33,7 @@ class OkrIntelligenceTest extends TestCase
         KeyResult::create(['title' => 'إيراد', 'objective_id' => $o->id,
                            'start_value' => 0, 'target_value' => 100, 'current_value' => 80, 'weight' => 3]);
 
-        $p = hub_okr_progress($o->id);
+        $p = hub_okr_progress($o->id, false, false, persist: true);
         $this->assertSame(70, $p['pct'], 'المتوسط الموزون: (40×1 + 80×3) ÷ 4');
         $this->assertSame(70, (int) $o->fresh()->progress,
             'النسبة تُكتب على الهدف تلقائياً — لا تُملأ باليد');
@@ -66,7 +66,7 @@ class OkrIntelligenceTest extends TestCase
 
         $this->assertSame(3.0, hub_kr_read($kr), 'القيمة تُقرأ من عدّ السجلات لا من الكتابة');
 
-        hub_okr_progress($o->id, true);
+        hub_okr_progress($o->id, true, false, persist: true);
         $this->assertSame(3.0, (float) $kr->fresh()->current_value);
         $this->assertSame(50, $kr->fresh()->pct());
     }
@@ -104,7 +104,7 @@ class OkrIntelligenceTest extends TestCase
             'srcModule' => 'clients', 'startValue' => 0, 'targetValue' => 10, 'currentValue' => 999,
         ])->assertRedirect();
 
-        hub_okr_progress($o->id, true);
+        hub_okr_progress($o->id, true, false, persist: true);
         $this->assertSame(1.0, (float) $kr->fresh()->current_value,
             'المصدر الآلي يغلب الكتابة اليدوية — وإلا فما فائدة الأتمتة');
     }

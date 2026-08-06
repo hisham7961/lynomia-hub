@@ -92,6 +92,10 @@ class StaffController extends Controller
             'linked'  => back()->with('ok', 'وُجد حسابٌ بهذا البريد فرُبط بالملف'),
             'taken'   => back()->withErrors(['email' => 'لهذا البريد حسابٌ مرتبطٌ بملفٍّ وظيفيٍّ آخر،'
                 . ' ولا يُقتسَم حساب — استعمل بريداً آخر أو فُكّ ارتباط الملف الأول']),
+            // الفهرسُ الفريد يشمل المحذوفَ ناعماً والقراءةُ لا تشمله — فبلا هذا
+            // المآل يرتدّ 1062 خمسمئةً بلا تفسير، والمخرجُ في يد المستخدم فعلاً
+            'email_held_by_deleted' => back()->withErrors(['email' => 'هذا البريد محجوزٌ بحسابٍ محذوف —'
+                . ' استعِده من سلة المستخدمين ثم اربطه، أو استعمل بريداً آخر']),
             default   => back()->withErrors(['email' => 'لا بريد في الملف — البريد هو هوية الحساب']),
         };
     }
@@ -120,11 +124,14 @@ class StaffController extends Controller
         abort_unless(Staff::mayTouch($u), 403,
             'هذا الحساب ذو امتياز (مالك أو إدارة مستخدمين) — توحيدُ بياناته يتطلب صلاحيةً تعلوه');
 
-        $patch = ['name' => $emp->name];
+        // **قصٌّ لعرض عمود الحساب** (v2.325): أعمدةُ الملف الوظيفيّ أوسعُ من
+        // أعمدة الحساب (`users.name` = 160)، فالتوحيدُ كان يدهسها بقيمةٍ أطول —
+        // 1406 على MySQL الصارمة، وقصٌّ صامت على SQLite.
+        $patch = ['name' => hub_fit((string) $emp->name, hub_col_max('users', 'name') ?? 160)];
         // البريدُ لا يُنقل إن كان مأخوذاً بحسابٍ آخر — والتوحيد لا يكسر الدخول
         if (filled($emp->email) && ! User::whereNull('deleted_at')
             ->where('email', $emp->email)->where('id', '!=', $u->id)->exists()) {
-            $patch['email'] = $emp->email;
+            $patch['email'] = hub_fit((string) $emp->email, hub_col_max('users', 'email') ?? 190);
         }
         $u->update($patch);
         hub_audit('توحيد بيانات الحساب مع الملف', 'users', $u->id, $emp->name);

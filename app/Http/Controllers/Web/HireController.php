@@ -25,6 +25,11 @@ class HireController extends Controller
                 ->with('ok', 'عُيّن من قبل — هذا ملفه الوظيفي');
         }
 
+        // **التعيينُ ذرّيّ** (v2.319): كان `Employee::create` ثمّ فتحُ الحساب ثمّ
+        // كتابةُ `meta['employee_id']` — وهو **حارسُ عدم التكرار** نفسُه. فتعثُّرٌ
+        // بينهما يترك ملفاً وظيفياً يتيماً وحارساً لم يُكتب، فالتعيينُ التالي
+        // يُنشئ ملفاً ثانياً للمرشح نفسه. المعاملةُ تجعلها كلاً أو لا شيء.
+        [$emp, $temp] = \Illuminate\Support\Facades\DB::transaction(function () use ($c, $r, $meta) {
         $emp = Employee::create([
             'name' => $c->name,
             'title' => $c->job,
@@ -60,6 +65,10 @@ class HireController extends Controller
         $c->stage = 'تم التعيين';
         $c->meta = $meta + ['employee_id' => $emp->id];
         $c->save();
+
+            return [$emp, $temp];
+        });
+
         \App\Support\FlowRunner::fire('status', 'recruit', $c, 'تم التعيين');
         hub_audit('تعيين مرشح', 'recruit', $c->id, $c->name);
 

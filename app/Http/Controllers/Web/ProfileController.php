@@ -50,7 +50,24 @@ class ProfileController extends Controller
     {
         $t = \App\Models\ApiToken::where('user_id', auth()->id())->findOrFail($id);
         $plain = 'lyn_' . \Illuminate\Support\Str::random(44);
-        $t->forceFill(['token_hash' => hash('sha256', $plain), 'created_at' => now(), 'last_used_at' => null])->save();
+
+        /*
+         * **والمدّةُ تُجدَّد مع القيمة.**
+         *
+         * `created_at` كان يُعاد إلى الآن و`expires_at` يبقى كما هو — فمفتاحٌ
+         * انتهت مدّتُه يُدوَّر فيُسلَّم للمستخدم بقيمةٍ جديدة ورسالةِ نجاح تقول
+         * «انسخ الجديدة الآن»، **وهو ميتٌ لحظةَ نسخِه**. والتدويرُ فعلُ إحياءٍ
+         * لا فعلُ تسمية: تُمدَّد المدّةُ بطولها الأصليّ من الآن، ويبقى المفتاحُ
+         * الدائم دائماً.
+         */
+        $fill = ['token_hash' => hash('sha256', $plain), 'created_at' => now(), 'last_used_at' => null];
+        if ($t->expires_at) {
+            $span = max(1, (int) round(
+                \Illuminate\Support\Carbon::parse($t->created_at)->diffInDays(
+                    \Illuminate\Support\Carbon::parse($t->expires_at), false)));
+            $fill['expires_at'] = now()->addDays(min(730, $span));
+        }
+        $t->forceFill($fill)->save();
 
         return back()->with('ok', 'دُوّر المفتاح «' . $t->name . '» — القيمة القديمة توقفت فوراً، انسخ الجديدة الآن')
                      ->with('newtoken', $plain);

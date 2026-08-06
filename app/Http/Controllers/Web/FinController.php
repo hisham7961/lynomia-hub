@@ -50,6 +50,13 @@ class FinController extends Controller
         $amount = \Illuminate\Support\Facades\DB::transaction(function () use ($d, $doc) {
             $fresh = FinDocument::lockForUpdate()->findOrFail($doc->id);
 
+            // **والحارسُ يُعاد داخل القفل**: فحصُ الحالة الميتة أعلاه يقع على
+            // النموذج المحمَّل قبل المعاملة، فبين الفحص والكتابة نافذةٌ يُلغى
+            // فيها المستندُ من طلبٍ متزامن — فتُسجَّل دفعةٌ ويتحرّك رصيدُ بنكٍ
+            // ويُرحَّل قيدٌ على مستندٍ ملغى، والقيدُ المرحَّل لا يُصحَّح.
+            abort_if(in_array((string) $fresh->state, (array) config('hub.fin.dead'), true), 422,
+                'لا دفعات على مستند ملغى أو مسودة — فعّله أولاً');
+
             $paid = (float) ($fresh->paid ?? 0);
             $total = (float) ($fresh->total ?? 0);
             $remain = max(0, $total - $paid);
@@ -143,9 +150,18 @@ class FinController extends Controller
 
             // معاملةٌ تلفّ القيد وسطريه: فشلُ السطر الثاني كان يترك قيداً مرحّلاً
             // بسطرٍ واحد، وJournalEntry::booted يمنع تصحيحه أبداً → دفترٌ مختلٌّ للأبد
+            // المولّد الداخلي يبني القيدَ مرحَّلاً ثمّ سطريه، فيرفع الرايةَ حول
+            // كتلته ليمرّ حارسُ التوازن في النموذج (v2.314) — والمعاملةُ تضمن
+            // أنّ القيد لا يبقى بسطرٍ واحد إن تعثّر الثاني.
+            \App\Models\JournalEntry::$posting = true;
+            try {
             \Illuminate\Support\Facades\DB::transaction(function () use ($doc, $amount, $income, $money, $other) {
                 $entry = \App\Models\JournalEntry::create([
-                    'doc_no' => 'JE-' . ($doc->doc_no ?: substr($doc->id, 0, 8)) . '-' . now()->format('His'),
+                    // مشتقٌّ من عمودٍ بعرض ٣٠٠ ببادئةٍ ولاحقة — يتجاوز عمودَه حتماً
+                    // فيرمي 1406 على MySQL، **والاستثناءُ مُبتلَع** فالدفعةُ تنجح
+                    // والقيدُ لا يُكتب: دفترٌ ناقص صامت. القصُّ لعرض العمود نفسِه.
+                    'doc_no' => hub_fit('JE-' . ($doc->doc_no ?: substr($doc->id, 0, 8)) . '-' . now()->format('His'),
+                        hub_col_max('journal_entries', 'doc_no') ?? 300),
                     'date' => now()->toDateString(),
                     'description' => ($income ? 'قبض' : 'صرف') . ' دفعة على ' . ($doc->doc_no ?: $doc->id),
                     'reference' => (string) $doc->doc_no,
@@ -162,6 +178,9 @@ class FinController extends Controller
                     'acc_id' => $income ? $other : $money, 'debit' => 0, 'credit' => $amount,
                     'memo' => $income ? 'الإيراد' : 'سداد الدفعة']);
             });
+            } finally {
+                \App\Models\JournalEntry::$posting = false;
+            }
         } catch (\Throwable $e) {
             report($e);   // القيد الآلي لا يُفشل تسجيل الدفعة نفسها
         }

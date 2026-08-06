@@ -31,6 +31,7 @@ class MrrRound6Test extends TestCase
             'value' => 9000, 'service_id' => $monthly->id]);
         Contract::create(['title' => 'عقد مورد', 'type' => 'عقد مورد', 'status' => 'ساري', 'value' => 5000]);
 
+        $this->actingAs($this->owner);
         $m = hub_mrr(true);
         $this->assertEquals(200.0, $m['mrr'], 'الشهري ١٠٠ + السنوي ١٢٠٠÷١٢ = ٢٠٠');
         $this->assertEquals(2400.0, $m['arr']);
@@ -50,6 +51,7 @@ class MrrRound6Test extends TestCase
         Contract::create(['title' => 'عقد لمرة', 'type' => 'عقد عميل', 'status' => 'ساري',
             'value' => 5000, 'service_id' => $once->id]);
 
+        $this->actingAs($this->owner);
         $m = hub_mrr(true);
         $this->assertEquals(100.0, $m['mrr'], 'دورة الباقة (ربعية) تتقدم على دورة خدمتها: ٣٠٠÷٣');
         $this->assertEquals(5000.0, $m['oneTime'], '«مرة واحدة» لا تدخل التكرار');
@@ -63,6 +65,7 @@ class MrrRound6Test extends TestCase
         Contract::create(['title' => 'ع٢', 'type' => 'عقد عميل', 'status' => 'ساري', 'value' => 100, 'service_id' => $a->id]);
         Contract::create(['title' => 'ع٣ بلا خدمة', 'type' => 'عقد عميل', 'status' => 'ساري', 'value' => 1200]);
 
+        $this->actingAs($this->owner);
         $m = hub_mrr(true);
         $top = $m['byService'][0];
         $this->assertSame('خدمة ألف', $top['name'], 'الأعلى إيراداً أولاً');

@@ -18,7 +18,12 @@ class HubSet extends Command
         $key = (string) $this->argument('key');
         $val = (string) $this->argument('value');
 
-        Setting::updateOrCreate(['key' => $key], ['value' => is_numeric($val) ? +$val : $val]);
+        // **السلسلةُ كما هي** — مطابقاً لمسار الشاشة (`SettingController::put`).
+        // كان `is_numeric($val) ? +$val : $val` يُفسد كلَّ قيمةٍ نصّيةٍ تبدو رقماً:
+        // `'0071234'` تصير `71234` فيُدمَّر رقمُ حساب أو معرّفُ قناة، وعددٌ فوق
+        // مدى العدد الصحيح يفقد دقّتَه بالتحويل إلى float — وكلُّه في حزمة تحديثٍ
+        // صامتة لا يراها أحد. والمستهلكون يقارنون بـ`(string)` أصلاً.
+        Setting::updateOrCreate(['key' => $key], ['value' => $val]);
         Cache::forget('settings:all');
 
         $this->info("تم: $key = $val");

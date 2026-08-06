@@ -144,7 +144,8 @@ class KpiController extends Controller
             'name'     => ['required', 'string', 'max:190'],
             'unit'     => ['nullable', 'string', 'max:30'],
             // `1e400` عددٌ صالح نحوياً ولانهائيٌّ فعلاً — يُرفض قبل الكتابة لا بعدها
-            'target'   => ['nullable', 'numeric', 'max:999999999999'],
+            // وحدٌّ أدنى معه (v2.325): السالبُ الضخم كان يمرّ ثم يُسقط MySQL بـ22003
+            'target'   => ['nullable', 'numeric', 'min:-999999999999', 'max:999999999999'],
             'good'     => ['required', 'in:up,down'],
             'a_agg'    => ['required', 'in:count,sum,avg'],
             'a_module' => ['required', 'string', 'max:60'],

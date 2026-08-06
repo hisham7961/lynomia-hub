@@ -164,13 +164,17 @@ class MorningController extends Controller
         }
 
         // ── مشاريع متعثرة ──
+        // النطاقُ كان مفروضاً والصلاحيةُ منسيّة — فمن لا يملك وحدةَ المشاريع
+        // يقرأ أسماءَها وصحّتَها في ملخّص صباحه. الحارسُ على نمط بطاقة المهام.
         $bad = collect();
-        foreach (hub_scope(DB::table('projects')->whereNull('deleted_at'), 'projects')
-                    ->whereNotIn('status', ['مكتمل', 'ملغى'])->limit(25)->get(['id', 'name']) as $p) {
-            $h = hub_project_health($p->id);
-            if (($h['score'] ?? 100) < 55) {
-                $bad->push(['t' => $p->name, 's' => 'صحة ' . $h['score'] . '٪ — ' . $h['label'],
-                            'u' => route('costs.index', ['p' => $p->id]), 'tone' => 'bad']);
+        if (hub_can($u, 'projects', 'v')) {
+            foreach (hub_scope(DB::table('projects')->whereNull('deleted_at'), 'projects')
+                        ->whereNotIn('status', ['مكتمل', 'ملغى'])->limit(25)->get(['id', 'name']) as $p) {
+                $h = hub_project_health($p->id);
+                if (($h['score'] ?? 100) < 55) {
+                    $bad->push(['t' => $p->name, 's' => 'صحة ' . $h['score'] . '٪ — ' . $h['label'],
+                                'u' => route('costs.index', ['p' => $p->id]), 'tone' => 'bad']);
+                }
             }
         }
         $add('📉', 'مشاريع متعثرة', 'صحتها دون ٥٥٪ حسب التأخير والميزانية والمهام والمخاطر',

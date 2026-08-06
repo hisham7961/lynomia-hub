@@ -69,6 +69,16 @@ class CommentController extends Controller
 
         [$module, $recordId] = $this->guardTarget($data['module'], $data['record_id'] ?? null);
 
+        // **الردُّ يلتصق بخيطه** (v2.322): `exists:comments,id` تُثبت وجودَ الأب
+        // لا انتماءَه — فردٌّ يُدسّ في خيطِ سجلٍ لا يملك المستخدم رؤيته، ويظهر
+        // لقرّاء ذلك السجل تحت تعليقٍ لم يُكتب له.
+        if (! empty($data['parent_id'])) {
+            $p = \App\Models\Comment::find($data['parent_id']);
+            abort_if(! $p || (string) $p->module !== (string) $module
+                || (string) $p->record_id !== (string) $recordId, 422,
+                'الردُّ يكون داخل خيط السجل نفسه');
+        }
+
         $mentions = $this->extractMentions($data['body'], (array) $r->input('mention', []));
 
         $c = Comment::create([

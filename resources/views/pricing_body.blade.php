@@ -41,10 +41,16 @@
                     · {{ count($s['plans']) }} باقات
                 </div>
             </div>
-            @if ($s['market']['n'])
+            @if ($s['market']['n'] && $s['market']['min'] !== null)
                 <div style="text-align:center">
                     <div class="sub" style="font-size:11px">نطاق السوق ({{ $s['market']['n'] }} منافسين)</div>
-                    <span class="bdg">{{ number_format((float) $s['market']['min'], 0) }} — {{ number_format((float) $s['market']['max'], 0) }}</span>
+                    {{-- العملةُ مُعلَنةٌ لا مُضمَرة: النطاقُ يُحسب داخل عملةِ باقتنا وحدها --}}
+                    <span class="bdg">{{ number_format((float) $s['market']['min'], 0) }} — {{ number_format((float) $s['market']['max'], 0) }}
+                        {{ $s['market']['currency'] }}</span>
+                    @if ($s['market']['others'] ?? 0)
+                        <div class="sub" style="font-size:11px" title="لا محرّك تحويل في النظام — منافسٌ بعملةٍ أخرى لا يُقارَن عدديّاً">
+                            {{ $s['market']['others'] }} منافساً بعملةٍ أخرى خارج المقارنة</div>
+                    @endif
                 </div>
             @endif
         </div>

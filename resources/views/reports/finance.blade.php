@@ -6,15 +6,13 @@
     <button class="btn ghost sm" onclick="window.print()">🖨 طباعة</button>
 @endcomponent
 @if ($mixed ?? false)
-<div class="card" style="border-inline-start:3px solid var(--bad);margin-bottom:12px">
-    <div class="sub">⚠ <b>قد تختلط العملات:</b> مستنداتك تحمل أكثر من عملة، والأرقام المجمّعة هنا تُعرض بعملةٍ واحدة ({{ $currency }}) دون تحويل — لا محرّك أسعار في النظام. اقرأها مؤشّراً عاماً لا رقماً دقيقاً.</div>
-</div>
+    @include('partials._mixedcur', ['currency' => $currency, 'what' => 'مستنداتك ومجاميعُ هذا التقرير'])
 @endif
 <div class="cards">
-    <div class="stat"><span class="ico">📈</span><b>{{ number_format($cards['inc'], 2) }}</b><span>دخل هذا الشهر ({{ $currency }})</span></div>
-    <div class="stat"><span class="ico">📉</span><b>{{ number_format($cards['exp'], 2) }}</b><span>مصروف هذا الشهر</span></div>
-    <div class="stat"><span class="ico">⚖️</span><b style="color:{{ $cards['inc'] - $cards['exp'] >= 0 ? 'var(--ok)' : 'var(--bad)' }}">{{ number_format($cards['inc'] - $cards['exp'], 2) }}</b><span>صافي الشهر</span></div>
-    <div class="stat"><span class="ico">📅</span><b style="color:{{ $cards['incY'] - $cards['expY'] >= 0 ? 'var(--ok)' : 'var(--bad)' }}">{{ number_format($cards['incY'] - $cards['expY'], 2) }}</b><span>صافي السنة</span></div>
+    <div class="stat"><span class="ico">📈</span><b>{{ ($seesTotals ?? true) ? number_format($cards['inc'], 2) : '•••' }}</b><span>دخل هذا الشهر ({{ $currency }})</span></div>
+    <div class="stat"><span class="ico">📉</span><b>{{ ($seesTotals ?? true) ? number_format($cards['exp'], 2) : '•••' }}</b><span>مصروف هذا الشهر</span></div>
+    <div class="stat"><span class="ico">⚖️</span><b style="color:{{ $cards['inc'] - $cards['exp'] >= 0 ? 'var(--ok)' : 'var(--bad)' }}">{{ ($seesTotals ?? true) ? number_format($cards['inc'] - $cards['exp'], 2) : '•••' }}</b><span>صافي الشهر</span></div>
+    <div class="stat"><span class="ico">📅</span><b style="color:{{ $cards['incY'] - $cards['expY'] >= 0 ? 'var(--ok)' : 'var(--bad)' }}">{{ ($seesTotals ?? true) ? number_format($cards['incY'] - $cards['expY'], 2) : '•••' }}</b><span>صافي السنة</span></div>
 </div>
 <div class="card">
     <h3>📊 آخر ٦ أشهر — دخل مقابل مصروف</h3>
@@ -22,8 +20,8 @@
         @foreach ($months as $mo)
             <div class="cg">
                 <div class="cbars">
-                    <div class="cbar i" style="height:{{ max(3, round($mo['i'] / $max * 100)) }}%" title="دخل {{ number_format($mo['i']) }}"></div>
-                    <div class="cbar e" style="height:{{ max(3, round($mo['e'] / $max * 100)) }}%" title="مصروف {{ number_format($mo['e']) }}"></div>
+                    <div class="cbar i" style="height:{{ max(3, round($mo['i'] / $max * 100)) }}%" title="دخل {{ ($seesTotals ?? true) ? number_format($mo['i']) : '•••' }}"></div>
+                    <div class="cbar e" style="height:{{ max(3, round($mo['e'] / $max * 100)) }}%" title="مصروف {{ ($seesTotals ?? true) ? number_format($mo['e']) : '•••' }}"></div>
                 </div>
                 <div class="cl">{{ $mo['l'] }}</div>
             </div>
@@ -38,7 +36,7 @@
             @forelse ($unpaid as $u)
                 <tr>
                     <td><a href="{{ route('m.show', ['fin', $u->id]) }}">{{ $u->no ?: \Illuminate\Support\Str::limit($u->partner, 18) }}</a><div class="sub">{{ \Illuminate\Support\Str::limit($u->partner, 22) }}</div></td>
-                    <td class="mono acts">{{ number_format($u->total - $u->paid, 2) }}</td>
+                    <td class="mono acts">{{ ($seesTotals ?? true) ? number_format($u->total - $u->paid, 2) : '••• محجوب' }}</td>
                     <td class="acts"><span class="bdg {{ hub_tone($u->state) }}">{{ $u->state }}</span></td>
                     <td class="mono sub acts">{{ $u->due ? substr($u->due, 0, 10) : '—' }}</td>
                 </tr>
@@ -51,7 +49,7 @@
         <h3>🏆 أعلى مصادر الدخل</h3>
         <table class="mini">
             @forelse ($topPartners as $p)
-                <tr><td>{{ \Illuminate\Support\Str::limit($p->partner, 26) }}</td><td class="mono acts">{{ number_format($p->s, 2) }}</td></tr>
+                <tr><td>{{ \Illuminate\Support\Str::limit($p->partner, 26) }}</td><td class="mono acts">{{ ($seesTotals ?? true) ? number_format($p->s, 2) : '•••' }}</td></tr>
             @empty
                 <tr><td class="empty">لا بيانات بعد</td></tr>
             @endforelse
@@ -59,7 +57,7 @@
         <h3 style="margin-top:14px">📋 حسب الحالة</h3>
         <table class="mini">
             @foreach ($byState as $st)
-                <tr><td><span class="bdg {{ hub_tone($st->state) }}">{{ $st->state }}</span></td><td class="sub acts">{{ $st->c }}</td><td class="mono acts">{{ number_format($st->s, 2) }}</td></tr>
+                <tr><td><span class="bdg {{ hub_tone($st->state) }}">{{ $st->state }}</span></td><td class="sub acts">{{ $st->c }}</td><td class="mono acts">{{ ($seesTotals ?? true) ? number_format($st->s, 2) : '•••' }}</td></tr>
             @endforeach
         </table>
         <h3 style="margin-top:14px">🎯 مصروف السنة حسب مركز التكلفة</h3>
@@ -68,7 +66,7 @@
                 <tr>
                     <td>{{ $cc->cc_id ? ($ccNames[$cc->cc_id] ?? '؟') : 'بلا مركز' }}</td>
                     <td class="sub acts">{{ $cc->c }}</td>
-                    <td class="mono acts">{{ number_format($cc->s, 2) }}</td>
+                    <td class="mono acts">{{ ($seesTotals ?? true) ? number_format($cc->s, 2) : '•••' }}</td>
                 </tr>
             @empty
                 <tr><td class="empty">لا مصروفات هذه السنة</td></tr>

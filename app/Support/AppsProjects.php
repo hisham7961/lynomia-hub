@@ -103,9 +103,16 @@ class AppsProjects
         foreach (self::dualModules() as $mk => $d) {
             if (! hub_can($user, $mk, 'v') || ! Schema::hasTable($d['table'])) continue;
 
-            $rows = hub_scope(DB::table($d['table'])->whereNull('deleted_at'), $mk, $user)
-                ->whereNotNull($d['app'])->limit(200)
-                ->get(['id', $d['app'], $d['proj'], $d['display']]);
+            // **الحدُّ بعد المرشِّح لا قبله**: كان `limit(200)` يقع على كل صفٍّ
+            // مربوطٍ بتطبيق، ثم يُبحث داخل الشريحة عمّا ينقصه مشروع — فمئتا صفٍّ
+            // سليمٍ يحجبان النواقصَ كلَّها **إلى الأبد**، ولوحةُ نواقصَ لا تُظهر
+            // النقصَ أسوأ من غيابها: صفرُها يُقرأ «لا نقص» وهو «لم يُبحث».
+            // استعلامان محدَّدا الترتيب: للناقص وللمتناقض، ولكلٍّ حدُّه.
+            $base = fn () => hub_scope(DB::table($d['table'])->whereNull('deleted_at'), $mk, $user)
+                ->whereNotNull($d['app']);
+            $cols = ['id', $d['app'], $d['proj'], $d['display']];
+            $rows = $base()->whereNull($d['proj'])->orderBy('id')->limit(200)->get($cols)
+                ->concat($base()->whereNotNull($d['proj'])->orderBy('id')->limit(200)->get($cols));
 
             foreach ($rows as $r) {
                 $want = $map[$r->{$d['app']}] ?? null;

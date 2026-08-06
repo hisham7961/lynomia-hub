@@ -12,6 +12,11 @@
     </div>
 </div>
 
+@if ($mixed ?? false)
+    @include('partials._mixedcur', ['currency' => $currency,
+        'what' => 'الإيرادُ والربحُ والهامش أدناه'])
+@endif
+
 <div class="cards">
     <div class="stat"><span class="ico">📈</span><b>{{ $m($tot['revenue']) }}</b><span>الإيراد المفوتر ({{ $currency }})</span></div>
     <div class="stat"><span class="ico">📉</span><b>{{ $m($tot['cost']) }}</b><span>إجمالي التكلفة</span></div>

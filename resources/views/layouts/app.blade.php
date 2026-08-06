@@ -13,7 +13,9 @@
 <meta name="theme-color" content="{{ setting('app.color', '#6d28d9') }}">
 @if ($brand = hub_brand_css())<style>{!! $brand !!}</style>@endif
 </head>
-<body>
+{{-- بصمةُ صاحب الجلسة: مخازنُ المتصفح (آخرُ ما فتحت، المسودات) مقرونةٌ بها
+     فلا تُسترجَع لحسابٍ آخر على الجهاز المشترك نفسِه --}}
+<body data-uid="{{ auth()->id() ?? '' }}">
 {{-- v2.129: رابط تجاوز — مستخدم لوحة المفاتيح لا يجتاز الشريط الجانبي كاملاً كل صفحة --}}
 <a class="skiplink" href="#content">تجاوز إلى المحتوى</a>
 <div id="topload"></div>

@@ -243,8 +243,10 @@ Route::middleware('auth')->group(function () {
     Route::post('okrs/refresh', [\App\Http\Controllers\Web\OkrController::class, 'refresh'])->name('okrs.refresh');
 
     // ── المراقبة الحيّة: فحصٌ عند الطلب لسيرفر أو موقع ──
+    // حدُّ معدّل (v2.324): الفحصُ يحجز عاملاً ثوانيَ طويلة (مهلةُ الشبكة)، وكان
+    // بلا سقف — فضغطاتٌ متتالية تستهلك عمّالَ الخادم كلَّهم بلا أي استغلال
     Route::post('monitor/{module}/{id}/check', [\App\Http\Controllers\Web\MonitorController::class, 'check'])
-        ->name('monitor.check');
+        ->middleware('throttle:10,1')->name('monitor.check');
 
     // ── مركز السوشال ميديا: مراقبة وتحليل ──
     Route::get('social', [\App\Http\Controllers\Web\SocialController::class, 'index'])->name('social.index');

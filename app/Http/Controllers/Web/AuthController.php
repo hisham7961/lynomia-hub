@@ -25,25 +25,32 @@ class AuthController extends Controller
 
         $user = User::where('email', $data['email'])->first();
 
+        /*
+         * **لا إفصاحَ عن حالة الحساب قبل صحّة كلمة المرور** (v2.319).
+         *
+         * كانت خمسةُ فروعٍ تردّ برسائل مميَّزة (موقوف/منتهٍ/مقفول/محصورٌ بشبكة/
+         * قفلُ طوارئ) **قبل** `Auth::attempt` — فأربعُ رسائل مختلفة تقول للمهاجم
+         * «هذا البريد موجود» بطلبٍ واحد بلا كلمة سرّ: أوراكلُ تعدادٍ كامل.
+         * وأسوأُها رسالةُ القفل: تُخبره أن هجومَه نجح ومتى ينتهي.
+         *
+         * الآن تُحسَب الأسبابُ ولا يُفصَح عنها إلا بعد التحقق. والحسابُ الموقوف
+         * أو المقفول لا يدخل: `$blocked` تُفحَص بعد `attempt` فيُطرد ويُبلَّغ
+         * بسببه هو (وقد أثبت أنه صاحبُ الحساب).
+         */
+        $blocked = null;
         if ($user) {
             if ($user->status === 'موقوف') {
-                return $fail('الحساب موقوف — راجع مالك النظام');
-            }
-            if ($user->expires_at && now()->toDateString() > substr((string) $user->expires_at, 0, 10)) {
-                return $fail('انتهت صلاحية الحساب — راجع مالك النظام');
-            }
-            if ($user->locked_until && now()->lt($user->locked_until)) {
+                $blocked = 'الحساب موقوف — راجع مالك النظام';
+            } elseif ($user->expires_at && now()->toDateString() > substr((string) $user->expires_at, 0, 10)) {
+                $blocked = 'انتهت صلاحية الحساب — راجع مالك النظام';
+            } elseif ($user->locked_until && now()->lt($user->locked_until)) {
                 $m = max(1, (int) ceil(now()->diffInSeconds($user->locked_until) / 60));
-                return $fail("الحساب مقفل مؤقتاً بعد محاولات فاشلة — أعد المحاولة بعد {$m} دقيقة");
+                $blocked = "الحساب مقفل مؤقتاً بعد محاولات فاشلة — أعد المحاولة بعد {$m} دقيقة";
+            } elseif ($user->allowed_ips && ! ip_allowed((string) $r->ip(), $user->allowed_ips)) {
+                $blocked = 'الدخول غير مسموح من عنوان الشبكة الحالي';
+            } elseif (setting('security.lockdown') && ! hub_is_owner($user)) {
+                $blocked = 'النظام في قفل طوارئ مؤقت — الدخول للمالكين فقط';
             }
-            if ($user->allowed_ips && ! ip_allowed((string) $r->ip(), $user->allowed_ips)) {
-                return $fail('الدخول غير مسموح من عنوان الشبكة الحالي');
-            }
-        }
-
-        // قفل الطوارئ: يدخل المالكون فقط
-        if (setting('security.lockdown') && $user && ! hub_is_owner($user)) {
-            return $fail('النظام في قفل طوارئ مؤقت — الدخول للمالكين فقط');
         }
 
         if (! Auth::attempt($data, remember: true)) {
@@ -64,6 +71,15 @@ class AuthController extends Controller
         }
 
         $u = Auth::user();
+
+        // كلمةُ المرور صحيحة — الآن فقط يُفصَح عن سبب المنع، ولصاحب الحساب وحده
+        if ($blocked !== null) {
+            Auth::logout();
+            $r->session()->invalidate();
+            $r->session()->regenerateToken();
+
+            return $fail($blocked);
+        }
 
         // مصادقة ثنائية مفعّلة؟ أوقف الدخول حتى إدخال الرمز
         if ($u->totp_enabled) {

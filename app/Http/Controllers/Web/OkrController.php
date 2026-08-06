@@ -26,7 +26,9 @@ class OkrController extends Controller
 
         $n = 0;
         foreach (hub_scope(\App\Models\Objective::query(), 'okrs')->whereNull('deleted_at')->get() as $o) {
-            if (hub_okr_progress($o->id, true)) $n++;
+            // التثبيتُ من فعلٍ صريح لا من فتح شاشة — والحارسُ داخل الدالة يمنعه
+            // عن قارئٍ مقيَّد النطاق كي لا يُثبّت رقمَه الجزئيّ على عمودٍ مشترك
+            if (hub_okr_progress($o->id, true, false, true)) $n++;
         }
         hub_audit('تحديث الأهداف', 'okrs', null, $n . ' هدفاً');
 

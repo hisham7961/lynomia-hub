@@ -31,7 +31,8 @@ class CalendarController extends Controller
 
     public function index(Request $r)
     {
-        $month = $r->input('m');
+        // hub_str: `?m[]=` يصل preg_match مصفوفةً فيرمي TypeError — ٥٠٠ (v2.325)
+        $month = hub_str($r->input('m'));
         $start = ($month && preg_match('/^\d{4}-\d{2}$/', $month))
             ? Carbon::createFromFormat('Y-m-d', $month . '-01')->startOfDay()
             : now()->startOfMonth();

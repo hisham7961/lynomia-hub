@@ -105,7 +105,9 @@
   });
 
   /* ── آخر ما فتحت ── */
-  var KEY = 'lyn_recent';
+  /* **مقرونةٌ بصاحب الجلسة**: كانت بمفتاحٍ واحد، فعناوينُ ما فتحه الموظف تظهر
+     لمن يسجّل بعده على الجهاز نفسِه — وهي تصف بياناتٍ قد لا يراها. */
+  var KEY = 'lyn_recent:' + (document.body.dataset.uid || '-');
   function recents() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; } }
   var mk = $('[data-recent]');
   if (mk) {
@@ -238,10 +240,15 @@
     f.dataset.busy = '1';
     var btns = f.querySelectorAll('button[type="submit"],button:not([type])');
     setTimeout(function () { btns.forEach(function (b) { b.disabled = true; b.classList.add('busy'); }); }, 0);
-    setTimeout(function () {           /* فك القفل احتياطاً عند فشل الشبكة */
+    /* فكُّ القفل احتياطاً عند فشل الشبكة — **ولا يُفكّ ما دامت الصفحة تُغادَر**.
+       ثماني ثوانٍ سقفٌ عاديٌّ لرفع مرفقٍ أو تقريرٍ ثقيل، فكان القفلُ ينفكّ
+       والطلبُ في الطريق: نقرةٌ ثانية تُنشئ السجلَ مرتين. الفكُّ يُلغى إن بدأت
+       الصفحةُ بالانتقال فعلاً (‏`beforeunload`)، ويبقى شبكةَ أمانٍ لمن لم يصل. */
+    var unlock = setTimeout(function () {
       delete f.dataset.busy;
       btns.forEach(function (b) { b.disabled = false; b.classList.remove('busy'); });
-    }, 8000);
+    }, 20000);
+    window.addEventListener('beforeunload', function () { clearTimeout(unlock); }, { once: true });
   }, true);
   window.addEventListener('pageshow', function () {   /* عودة بزر الرجوع (bfcache) */
     document.querySelectorAll('form[data-busy]').forEach(function (f) { delete f.dataset.busy; });

@@ -37,7 +37,10 @@ class PwaTest extends TestCase
     public function test_module_form_carries_draft_key(): void
     {
         $this->seedCore();
+        // المفتاحُ يبدأ بمعرّف المستخدم (v2.323): مسوّدةُ حسابٍ كانت تُسترجَع في
+        // نموذج حسابٍ آخر على المتصفح نفسه — والحارسُ الدقيق في
+        // PrintAndBrowserLeaksRound6Test
         $this->actingAs($this->owner)->get('/m/clients/create')->assertOk()
-            ->assertSee('data-draft="clients:new"', false);
+            ->assertSee('data-draft="' . $this->owner->id . ':clients:new"', false);
     }
 }

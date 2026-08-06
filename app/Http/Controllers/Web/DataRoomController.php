@@ -29,9 +29,25 @@ class DataRoomController extends Controller
         $this->gate();
         $links = ShareLink::orderByDesc('created_at')->orderByDesc('id')->limit(60)->get();
         // سقفٌ صريح: كانت الشاشة تسحب كل السجل التاريخي للمشاهدات إلى الذاكرة —
-        // رابطٌ متداول واحد يعني آلاف الصفوف لمجرد عرض الأحدث
+        // رابطٌ متداول واحد يعني آلاف الصفوف لمجرد عرض الأحدث.
+        //
+        // لكن **السقفَ العامّ يبتلعه رابطٌ واحد**: ٣٠٠ مشاهدةٍ لأكثرِ الروابط
+        // تداولاً تُخرج بقيّةَ الروابط من النتيجة فتبدو «بلا مشاهدات» وسجلُّها
+        // قائمٌ في القاعدة. الحصّةُ الآن **لكل رابطٍ على حدة**: خمسٌ لكلٍّ،
+        // والسقفُ يتناسب مع عدد الروابط المعروضة لا مع نشاط أحدها.
         $lastViews = DB::table('share_views')->whereIn('share_id', $links->pluck('id'))
-            ->orderByDesc('created_at')->orderByDesc('id')->limit(300)->get()->groupBy('share_id');
+            ->orderByDesc('created_at')->orderByDesc('id')
+            ->limit(5 * max(1, $links->count()) + 300)->get()
+            ->groupBy('share_id')->map(fn ($g) => $g->take(5));
+
+        // ما لم تبلغه النافذةُ العامّة يُستكمل بصفٍّ واحدٍ لكل رابطٍ صامت — فلا
+        // يُقال «بلا مشاهدات» عن رابطٍ شوهد فعلاً
+        foreach ($links as $l) {
+            if (isset($lastViews[$l->id])) continue;
+            $row = DB::table('share_views')->where('share_id', $l->id)
+                ->orderByDesc('created_at')->orderByDesc('id')->limit(1)->get();
+            if ($row->isNotEmpty()) $lastViews[$l->id] = $row;
+        }
 
         return view('dataroom.index', compact('links', 'lastViews'));
     }

@@ -57,9 +57,25 @@ class CustomFieldController extends Controller
         $all = $this->all();
         $list = (array) ($all[$d['m']] ?? []);
 
-        // مفتاح متسلسل ثابت cf_1 cf_2 …
-        $n = 0;
+        /*
+         * **عدّادٌ لا يتراجع.**
+         *
+         * كان الرقمُ التالي يُشتقّ من أعلى `cf_N` **القائم**، فحذفُ حقلٍ يُنقصه
+         * ويُعيد المفتاحَ نفسَه للحقل التالي — و`destroy` لا يمسّ عمود `custom`
+         * في السجلات (ورسالتُها تقول ذلك صراحةً). فالحقلُ الجديد يرث **قيمَ
+         * القديم** في كل صفٍّ قديم: رقمُ ملفٍ ضريبيّ يظهر تحت «اسم المفوَّض».
+         * وبياناتٌ خاطئة تُقرأ صحيحةً أسوأ من بياناتٍ ضائعة.
+         *
+         * العدّادُ يُخزَّن مستقلاً عن القائمة فلا يتأثر بحذفٍ ولا بفراغها،
+         * ويُبذَر أوّلَ مرّة بأعلى مفتاحٍ قائمٍ توافقاً مع البيانات الحالية.
+         */
+        $seq = $this->all('custom.fields_seq');
+        $n = (int) ($seq[$d['m']] ?? 0);
         foreach ($list as $f) if (preg_match('/^cf_(\d+)$/', $f['key'], $mm)) $n = max($n, (int) $mm[1]);
+        $seq[$d['m']] = $n + 1;
+        Setting::updateOrCreate(['key' => 'custom.fields_seq'], ['value' => $seq]);
+        \Illuminate\Support\Facades\Cache::forget('settings:all');
+
         $field = [
             'key'      => 'cf_' . ($n + 1),
             'label'    => trim($d['label']),
@@ -87,9 +103,9 @@ class CustomFieldController extends Controller
         return redirect()->route('fields.index', ['m' => $module])->with('ok', 'حُذف الحقل من النماذج — القيم المخزنة في السجلات القديمة تبقى في مكانها');
     }
 
-    protected function all(): array
+    protected function all(string $key = 'custom.fields'): array
     {
-        $v = setting('custom.fields');
+        $v = setting($key);
 
         return is_array($v) ? $v : (json_decode((string) $v, true) ?: []);
     }

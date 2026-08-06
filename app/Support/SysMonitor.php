@@ -64,10 +64,13 @@ class SysMonitor
         $used = $total - $avail;
         $pct = (int) round($used * 100 / $total);
 
-        return $out + [
+        // **array_replace لا `+`** (v2.324): عاملُ الاتحاد يُبقي مفتاحَ الطرف
+        // الأيسر، و`$out` يحمل `'ok' => false` — فبطاقةُ الذاكرة كانت تُعلن
+        // الفشلَ دائماً مهما نجحت القراءة، ويُقرأ ذلك «تعذّر القياس».
+        return array_replace($out, [
             'ok' => true, 'total' => $total, 'avail' => $avail, 'used' => $used, 'pct' => $pct,
             'tone' => $pct >= 90 ? 'bad' : ($pct >= 75 ? 'wn' : 'ok'),
-        ];
+        ]);
     }
 
     /** من يستهلك القرص: أكبر مجلدات التخزين — «امتلأ القرص» بلا سببٍ لا يُعالَج */
@@ -188,10 +191,14 @@ class SysMonitor
                 }
             }
             if (Schema::hasTable('error_events')) {
+                // **الوقائعُ لا البصمات**: `error_events` جدولٌ **مجمَّع** — صفٌّ
+                // واحدٌ لكل بصمةٍ بعمود `count` يحمل عددَ مرات الوقوع. وعدُّ
+                // الصفوف كان يرسم عطلاً وقع خمسين مرة شرطةً واحدة بجوار عطلٍ
+                // وقع مرة، فلا تُقرأ العاصفةُ عاصفةً في نبض اليوم.
                 foreach (DB::table('error_events')->where('last_seen', '>=', $from)
-                            ->get(['last_seen']) as $e) {
+                            ->get(['last_seen', 'count']) as $e) {
                     $k = \Illuminate\Support\Carbon::parse($e->last_seen)->format('Y-m-d H');
-                    if (isset($slots[$k])) $slots[$k]['errs']++;
+                    if (isset($slots[$k])) $slots[$k]['errs'] += max(1, (int) $e->count);
                 }
             }
         } catch (\Throwable $e) {

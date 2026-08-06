@@ -125,8 +125,27 @@
 </div>
 
 {{-- مسار المبيعات والإيراد المتكرر — أرقام القرار التجاري --}}
+{{-- `hub_mrr` يحسب الاختلاط ويسلّمه للواجهة؛ وكان العرضُ يُسقط صدقَه ويطبع رقماً واحداً --}}
+@if ($mrr['mixed'] ?? false)
+    @include('partials._mixedcur', ['currency' => setting('app.currency', 'د.ك'),
+        'what' => 'الإيرادُ المتكرر (MRR/ARR) أدناه'])
+    <div class="card pad0" style="margin-bottom:12px">
+        <div class="tblwrap"><table class="tbl">
+            <thead><tr><th>العملة</th><th>MRR</th><th>ARR</th><th>عقود</th></tr></thead>
+            <tbody>
+            @foreach ($mrr['byCurrency'] ?? [] as $bc)
+                <tr><td>{{ $bc['currency'] }}</td>
+                    <td class="mono">{{ number_format($bc['mrr'], 2) }}</td>
+                    <td class="mono">{{ number_format($bc['arr'], 2) }}</td>
+                    <td class="mono sub">{{ $bc['contracts'] }}</td></tr>
+            @endforeach
+            </tbody>
+        </table></div>
+    </div>
+@endif
 <div class="cards">
-    <div class="stat"><span class="ico">📈</span><b>{{ number_format($mrr['mrr'], 0) }}</b><span>MRR — إيراد شهري متكرر</span></div>
+    <div class="stat"><span class="ico">📈</span><b>{{ number_format($mrr['mrr'], 0) }}</b>
+        <span>MRR — إيراد شهري متكرر{{ ($mrr['mixed'] ?? false) ? '' : ' (' . ($mrr['byCurrency'][0]['currency'] ?? setting('app.currency', 'د.ك')) . ')' }}</span></div>
     <div class="stat"><span class="ico">🎯</span><b>{{ number_format($pipe['pipeline'], 0) }}</b><span>مسار المبيعات المفتوح</span></div>
     <div class="stat"><span class="ico">⚖️</span><b>{{ number_format($pipe['weighted'], 0) }}</b><span>المرجّح باحتمال الإغلاق</span></div>
     @if ($pipe['winRate'] !== null)

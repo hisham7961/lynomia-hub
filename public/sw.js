@@ -43,10 +43,17 @@ self.addEventListener('fetch', function (e) {
   if (url.pathname.indexOf('/css/') === 0 || url.pathname.indexOf('/js/') === 0 || url.pathname.indexOf('/fonts/') === 0) {
     e.respondWith(caches.match(req).then(function (hit) {
       var refresh = fetch(req).then(function (res) {
-        if (res && res.ok) {
+        // **لا تخبئةَ لصفحةٍ مسجَّلةِ الدخول** (v2.323): كان كلُّ تنقّلٍ ناجح
+        // يُخبَّأ، فصفحةُ مستخدمٍ بمحتواها تُقدَّم بعد خروجه — أو لمستخدمٍ آخر
+        // على الجهاز نفسه (جهازٌ مشترك في مكتبٍ يكفي). الخادمُ يَسِم صفحاتِ
+        // الجلسة بترويسة `X-Lyn-Auth`، ولا يُخبَّأ إلا ما لا يحملها.
+        var authed = res && res.headers && res.headers.get('X-Lyn-Auth') === '1';
+        if (res && res.ok && !authed) {
           var copy = res.clone();
           caches.open(VER).then(function (c) { c.put(req, copy); });
         }
+        // وإن كانت الاستجابةُ لمسجَّلٍ فأسقِط ما خُبِّئ لهذا العنوان سابقاً
+        if (authed) caches.open(VER).then(function (c) { c.delete(req); });
         return res;
       }).catch(function () { return hit; });
       return hit || refresh;

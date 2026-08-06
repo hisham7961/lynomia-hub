@@ -65,7 +65,10 @@
         <label class="chk"><input type="checkbox" name="{{ $k }}" value="1" @checked(old($k, (bool) $raw))> نعم</label>
 
     @elseif ($t === 'tags')
-        @php $tv = old($k, is_string($raw) ? implode('، ', json_decode($raw, true) ?: []) : ''); @endphp
+        {{-- الكاست `'tags' => 'array'` يجعل $raw **مصفوفة**، وشرطُ is_string كان
+             يُسقطها فيُرسَم المربّع فارغاً ويمحو وسومَ السجل عند أي حفظ، في ٢٨
+             وحدة. تُقبل الصورتان — كما يفعل حقل ref المتعدد أعلاه. --}}
+        @php $tv = old($k, implode('، ', is_array($raw) ? $raw : (json_decode((string) $raw, true) ?: []))); @endphp
         <input class="inp" id="{{ $fid }}" name="{{ $k }}" value="{{ $tv }}" placeholder="افصل بينها بفواصل">
 
     @elseif ($t === 'sec')

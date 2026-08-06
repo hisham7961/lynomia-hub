@@ -70,7 +70,24 @@ class AuditController extends Controller
     protected function pulse(): array
     {
         $day = now()->startOfDay();
-        $base = fn () => DB::table('audits')->where('created_at', '>=', $day);
+        // **بنفس نطاق القائمة** (v2.321): كان النبضُ يقرأ الجدولَ كلَّه، فيُطبع
+        // عددُ الحذف والتصدير و«العناوين الجديدة» من شركاتٍ خارج نطاق القارئ —
+        // شاشةٌ واحدة، حارسان مختلفان.
+        $base = function () use ($day) {
+            $q = DB::table('audits')->where('created_at', '>=', $day);
+            if (hub_scoped(auth()->user())) {
+                $u = auth()->user();
+                $q->where(fn ($x) => $x->where('audits.user_id', $u->id)
+                                       ->orWhereIn('audits.project_id', $u->visibleProjectIds()));
+            }
+            if (($ids = hub_company_ids()) !== null) {
+                $uid = auth()->id();
+                $q->where(fn ($x) => $x->whereIn('audits.company_id', $ids)
+                    ->orWhere(fn ($y) => $y->whereNull('audits.company_id')->where('audits.user_id', $uid)));
+            }
+
+            return $q;
+        };
 
         $hoursStart = (string) setting('sec.hours_start', '08:00');
         $hoursEnd   = (string) setting('sec.hours_end', '16:00');
@@ -78,9 +95,22 @@ class AuditController extends Controller
         $today = $base()->get(['action', 'ip', 'created_at', 'user_id']);
         // بحدّ تسعين يوماً: كان DISTINCT على كامل أسرع الجداول نمواً مع كل
         // فتحة شاشة — وعنوانٌ غاب تسعين يوماً عودتُه «جديدة» عملياً بحق
-        $seen = DB::table('audits')->where('created_at', '<', $day)
+        // ومرجعُ «العناوين المعروفة» منطَّقٌ كذلك: بغيره يبدو عنوانُ شركةٍ أخرى
+        // «معروفاً» فيُخفى، أو يُقارَن به عنوانُ القارئ فيُوسَم جديداً بلا سبب
+        $seenQ = DB::table('audits')->where('created_at', '<', $day)
             ->where('created_at', '>=', $day->copy()->subDays(90))
-            ->whereNotNull('ip')->distinct()->pluck('ip')->all();
+            ->whereNotNull('ip');
+        if (hub_scoped(auth()->user())) {
+            $u = auth()->user();
+            $seenQ->where(fn ($x) => $x->where('audits.user_id', $u->id)
+                                       ->orWhereIn('audits.project_id', $u->visibleProjectIds()));
+        }
+        if (($ids = hub_company_ids()) !== null) {
+            $uid = auth()->id();
+            $seenQ->where(fn ($x) => $x->whereIn('audits.company_id', $ids)
+                ->orWhere(fn ($y) => $y->whereNull('audits.company_id')->where('audits.user_id', $uid)));
+        }
+        $seen = $seenQ->distinct()->pluck('ip')->all();
 
         return [
             'deletes' => $today->where('action', 'حذف')->count(),

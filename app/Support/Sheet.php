@@ -88,8 +88,15 @@ class Sheet
             foreach ($row->c as $c) {
                 // العمود من مرجع الخلية (A1 → 0)
                 $ref = (string) $c['r'];
+                $letters = (string) preg_replace('/[^A-Z]/', '', strtoupper($ref));
+                // **سقفُ Excel** (v2.322): مرجعٌ ملفَّق كـ`AAAAAAA1` يُنتج عموداً
+                // بمئات المليارات، ثمّ تُملأ الفجواتُ حتى أقصاه في حلقةٍ أدناه —
+                // ثمانيةُ جيجابايت من ملفٍّ بكيلوبايتات: سقوطُ العامل بملفٍّ يرفعه
+                // مستخدمٌ عاديّ. أقصى أعمدة Excel 16384 (XFD) وطولُ حروفها ثلاثة.
+                if ($letters === '' || strlen($letters) > 3) continue;
                 $col = 0;
-                foreach (str_split(preg_replace('/\d/', '', $ref)) as $ch) $col = $col * 26 + (ord($ch) - 64);
+                foreach (str_split($letters) as $ch) $col = $col * 26 + (ord($ch) - 64);
+                if ($col > 16384) continue;
                 $col = max(0, $col - 1);
 
                 $v = isset($c->v) ? (string) $c->v : (string) ($c->is->t ?? '');

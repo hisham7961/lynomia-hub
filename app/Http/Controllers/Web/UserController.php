@@ -102,6 +102,18 @@ class UserController extends Controller
             'allowed_ips' => 'nullable|string|max:400',
         ]);
         $data['companies'] = array_values($data['companies'] ?? []);
+
+        /*
+         * **العزلُ لا يُفكّ — ولا عن حسابٍ يُنشئه معزول** (v2.319): إداريُّ
+         * المستخدمين المحصورُ بشركاتٍ كان يُنشئ حساباً بلا `companies` فيولد
+         * غيرَ معزول — بابٌ خلفيّ يرى المنشأة كلها، ويصنعه لنفسه بسطرٍ واحد.
+         * الجديدُ يرث حصرَ منشئه، ولا يتجاوزه: التقاطعُ لا الاتحاد.
+         */
+        if (($mine = hub_company_ids()) !== null) {
+            $data['companies'] = $data['companies']
+                ? array_values(array_intersect($data['companies'], $mine))
+                : array_values($mine);
+        }
         // بصمة تجديد كلمة المرور: بغيرها يكذب فحص «لم تُجدَّد منذ سنة» على كل حسابٍ جديد
         $data['password_changed_at'] = now();
         $u = User::create($data);

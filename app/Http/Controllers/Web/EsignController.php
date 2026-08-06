@@ -494,8 +494,11 @@ class EsignController extends Controller
             // بعد اعتماد مرحلةٍ كان يُبقي الاعتماد ملصقاً بمحتوى لم يره صاحبه —
             // فتعتمد المرحلة التالية النص الجديد وتظن الأولى معتمِدةً له.
             // الاعتمادات السابقة تُصفَّر وتبدأ السلسلة من أولها على النص الجديد.
+            // **الحالتان معاً**: `approve()` (السطر ~٩٠٥) يكتب «موافق»، والاستعلام
+            // كان يبحث عن «معتمد» وحدها — فالضابط خامدٌ ١٠٠٪ ولا يُصفَّر اعتمادٌ
+            // واحد أبداً. «معتمد» تبقى في القائمة لبياناتٍ قديمة كُتبت بها.
             $reset = \App\Models\ContractApprovalStep::where('request_id', $req->id)
-                ->where('status', 'معتمد')
+                ->whereIn('status', ['موافق', 'معتمد'])
                 ->update(['status' => 'بانتظار', 'decided_by' => null, 'decided_at' => null, 'note' => null]);
             if ($reset) {
                 hub_audit('تصفير اعتمادات بعد تحرير النص', 'contracts', $req->contract_id,
@@ -614,7 +617,9 @@ class EsignController extends Controller
         [$req, $signer] = $this->resolveToken($token);
         abort_unless(session("sign.ok.{$token}"), 403);
 
-        $bin = \App\Support\DocRenderer::pdf(\App\Support\DocRenderer::docHtml($req), $req->title);
+        // نسخةُ العميل بلا أثرٍ حسّاس: الموقّعُ الآخر ومستلمُ النسخة يريان الوثيقة
+        // والتوقيع لا عنوانَ شبكة غيرهم ولا رقمَ هويته — نفس ما تفرضه doc.blade.php
+        $bin = \App\Support\DocRenderer::pdf(\App\Support\DocRenderer::docHtml($req, evidence: false), $req->title);
         if (! $bin) return redirect()->route('sign.doc', $token);
         \App\Models\ContractEvent::log('downloaded', $req, ['signer_id' => $signer?->id]);
 
@@ -1105,12 +1110,16 @@ class EsignController extends Controller
         $opts = $req->opts ?: [];
         $d = $r->validate([
             'signer_name' => 'required|string|max:160',
-            'signature'   => 'required|string|min:100|max:400000|starts_with:data:image/png',
+            // **قائمةُ سماحٍ لا بادئةٌ فقط**: `starts_with` يقبل ما بعدها أيَّ نصّ،
+            // فحمولةٌ كـ`data:image/png;base64,AAAA" onerror="…"><h1>` تمرّ ثمّ
+            // تُلصَق في وثيقة الـPDF. البصمةُ الكاملة تُغلق البابَ عند المدخل.
+            'signature'   => ['required', 'string', 'min:100', 'max:400000',
+                              'regex:#^data:image/png;base64,[A-Za-z0-9+/]+={0,2}$#'],
             // شروط هذا الطلب تحديداً — أنت اخترتها عند الإنشاء
             'signer_id_no' => ($opts['idno'] ?? false) ? 'required|string|max:60' : 'nullable|string|max:60',
             'selfie' => ($opts['selfie'] ?? false)
-                ? 'required|string|min:100|max:2000000|starts_with:data:image/'
-                : 'nullable|string|max:2000000|starts_with:data:image/',
+                ? ['required', 'string', 'min:100', 'max:2000000', 'regex:#^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$#']
+                : ['nullable', 'string', 'max:2000000', 'regex:#^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$#'],
         ]);
 
         // كتابة الأثر واكتمال الطلب ذرّيّاً: القفل الصفّيّ يسلسل الإرساليات

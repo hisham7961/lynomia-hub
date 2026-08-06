@@ -142,10 +142,11 @@ class CeoBoard
      */
     protected static function curLabel($currencies, string $default): array
     {
-        $set = collect($currencies)->map(fn ($c) => filled($c) ? (string) $c : $default)
-            ->unique()->values();
+        // المنطقُ نفسُه صار مساعداً عامّاً (v2.327) تستعمله التقاريرُ ولوحةُ
+        // التكاليف والمركزُ القانونيّ — نسخةٌ واحدةٌ من الحقيقة لا أربع.
+        $l = hub_cur_label($currencies, $default);
 
-        return ['cur' => $set->count() === 1 ? $set->first() : $default, 'mixed' => $set->count() > 1];
+        return ['cur' => $l['cur'], 'mixed' => $l['mixed']];
     }
 
     /**
@@ -168,8 +169,18 @@ class CeoBoard
             ->where(fn ($w) => $w->whereNull('state')->orWhereNotIn('state', $dead ?: ['ملغاة']))
             ->where('date', '>=', now()->subMonths(12)->toDateString())
             ->whereNotNull('client_id')
-            ->select('client_id', DB::raw('SUM(total) as t'))
-            ->groupBy('client_id')->orderByDesc('t')->get();
+            ->select('client_id', 'currency', DB::raw('SUM(total) as t'))
+            ->groupBy('client_id', 'currency')->orderByDesc('t')->get();
+
+        // **الحكمُ لا يُبنى على مقامٍ مخلوط**: نسبةُ «عميلٌ واحد ٤٠٪ من إيرادك»
+        // مشتقّةٌ من قسمةِ مجموعٍ على مجموع — فإن اختلفت عملاتُ الصفوف فالنسبةُ
+        // نفسُها مُخترَعة، والحكمُ القاطع فوقها («أزمة سيولة») أخطرُ من الرقم.
+        $label = self::curLabel($rows->pluck('currency'), (string) setting('app.currency', 'د.ك'));
+
+        // الصفوفُ مجمّعةٌ بالعميل والعملة — تُطوى على العميل لحساب التركّز
+        $rows = $rows->groupBy('client_id')->map(fn ($g, $cid) => (object) [
+            'client_id' => $cid, 't' => (float) $g->sum('t'),
+        ])->sortByDesc('t')->values();
 
         $total = (float) $rows->sum('t');
         if ($total <= 0 || $rows->count() < 2) return [];
@@ -187,12 +198,18 @@ class CeoBoard
 
         return ['top' => $top, 'total' => $total, 'n' => $rows->count(),
             'firstPct' => $first, 'top3Pct' => $top3,
-            'tone' => $first >= 40 ? 'bad' : ($first >= 25 ? 'wn' : 'ok'),
-            'verdict' => $first >= 40
-                ? "عميلٌ واحد {$first}٪ من إيراد سنة — فقدانه ليس تراجعاً، هو أزمة سيولة."
-                : ($first >= 25
-                    ? "أكبر عميل {$first}٪ من الإيراد — راقب، وابدأ بتنويعٍ مقصود."
-                    : "التوزيع صحّي: أكبر عميل {$first}٪ فقط."),
+            'cur' => $label['cur'], 'mixed' => $label['mixed'],
+            'tone' => $label['mixed'] ? 'wn' : ($first >= 40 ? 'bad' : ($first >= 25 ? 'wn' : 'ok')),
+            // مع الاختلاط يُكتم الحكمُ القاطع ويُستبدَل بما هو صحيحٌ فعلاً: النسبةُ
+            // مؤشّرٌ لا رقم، والسبيلُ إلى رقمٍ صادقٍ توحيدُ عملة الفوترة.
+            'verdict' => $label['mixed']
+                ? "أكبر عميل {$first}٪ تقريباً — والفواتير بأكثر من عملة بلا تحويل، "
+                  . 'فاقرأ النسبة مؤشّراً لا رقماً: وحّد عملة الفوترة ليصحّ الحكم.'
+                : ($first >= 40
+                    ? "عميلٌ واحد {$first}٪ من إيراد سنة — فقدانه ليس تراجعاً، هو أزمة سيولة."
+                    : ($first >= 25
+                        ? "أكبر عميل {$first}٪ من الإيراد — راقب، وابدأ بتنويعٍ مقصود."
+                        : "التوزيع صحّي: أكبر عميل {$first}٪ فقط.")),
         ];
     }
 

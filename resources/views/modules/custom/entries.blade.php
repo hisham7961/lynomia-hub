@@ -1,7 +1,13 @@
 {{-- سطور القيد المزدوج — يتوقع $row (القيد). الإضافة والحذف على المسودة فقط --}}
 @php
-    $jlLines = \App\Models\JournalLine::where('entry_id', $row->id)->orderBy('created_at')->get();
-    $jlAccounts = \App\Models\LedgerAccount::whereNull('deleted_at')->orderBy('code')->get(['id', 'code', 'name']);
+    // ترتيبٌ حتميّ: created_at بدقّة الثانية يتساوى لسطرين أُضيفا معاً فتختلف
+    // القرعةُ بين المحرّكين — الفاصلُ على id التزايديّ يحسمها
+    $jlLines = \App\Models\JournalLine::where('entry_id', $row->id)
+        ->orderBy('created_at')->orderBy('id')->get();
+    // **منطَّقة**: كانت تسكب دليلَ حساباتِ كلِّ الشركات في القائمة — تسريبُ
+    // أسماء، وبابُ ربطٍ بحسابِ شركةٍ أجنبية (v2.314)
+    $jlAccounts = hub_scope(\App\Models\LedgerAccount::query(), 'accounts2')
+        ->whereNull('deleted_at')->orderBy('code')->orderBy('id')->get(['id', 'code', 'name']);
     $jlNames = $jlAccounts->keyBy('id');
     $jlDebit = (float) $jlLines->sum('debit');
     $jlCredit = (float) $jlLines->sum('credit');

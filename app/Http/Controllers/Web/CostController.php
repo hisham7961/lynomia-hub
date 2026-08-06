@@ -55,10 +55,18 @@ class CostController extends Controller
         }
         $tot['margin'] = $tot['revenue'] > 0 ? round($tot['profit'] / $tot['revenue'] * 100, 1) : null;
 
+        // **الربحُ والهامشُ لا يُبنيان على مجموعٍ مخلوط بصمت**: العملةُ في هذا
+        // النظام لصيقةٌ لا تحويل، فمشروعٌ فواتيرُه بالدولار ومشروعٌ بالدينار
+        // يُجمعان هنا في رقمٍ واحد. يُرفع علمُ الاختلاط — من داخل المشروع الواحد
+        // ومن اختلاف المشاريع معاً — وتُعنون البطاقةُ بعملتها الحقيقية عند التوحّد.
+        $label = hub_cur_label($rows->pluck('pl.currency'));
+        $mixed = $label['mixed'] || $rows->contains(fn ($x) => $x['pl']['mixed'] ?? false);
+
         return view('costs.index', [
             'rows' => $rows->sortByDesc(fn ($x) => $x['pl']['revenue']['invoiced'])->values(),
             'tot' => $tot,
-            'currency' => (string) setting('app.currency', 'د.ك'),
+            'currency' => $label['cur'],
+            'mixed' => $mixed,
             'rates' => hub_hourly_rates(),
         ]);
     }

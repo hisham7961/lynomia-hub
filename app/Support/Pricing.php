@@ -89,6 +89,9 @@ class Pricing
             ])->values()->all();
 
             $paid = collect($rows)->filter(fn ($r) => ! $r['free'] && $r['price'] !== null);
+            // عملةُ باقتنا الأدنى — بها يُقاس نطاقُ السوق وبها تُكتب أرقامُ الملاحظة
+            $entryPlan = $paid->sortBy('price')->first();
+            $entryCur = $entryPlan['currency'] ?? null;
 
             $out[] = [
                 'serviceId' => $sid,
@@ -106,8 +109,9 @@ class Pricing
                 'plans'     => $rows,
                 'rivals'    => $comp,
                 'entry'     => $paid->min('price'),
+                'entryCur'  => $entryCur,
                 'top'       => $paid->max('price'),
-                'market'    => self::marketBand($comp),
+                'market'    => self::marketBand($comp, $entryCur),
             ];
         }
 
@@ -154,14 +158,45 @@ class Pricing
             ->map(fn ($x) => trim((string) $x, " \t-•*"))->filter()->take(12)->values()->all();
     }
 
-    /** نطاق السوق من أسعار المنافسين — أدنى وأعلى ووسيط */
-    protected static function marketBand(array $rivals): array
+    /**
+     * نطاق السوق من أسعار المنافسين — أدنى وأعلى ووسيط، **داخل عملةٍ واحدة**.
+     *
+     * كان النطاق يُبنى من أسعار كل المنافسين بلا نظرٍ إلى `currency` (وهي عمودٌ
+     * مقروءٌ فعلاً ومُمرَّرٌ في `$comp`)، ثم تقارن `insights()` باقتَنا بالدينار
+     * بأدنى منافسٍ بالدولار وتُفتي بـ«مالٌ متروك على الطاولة». لا محرّكَ تحويلٍ
+     * في النظام، والمقارنةُ الصامتة عبر العملات أسوأ من غيابها: فالنطاقُ يُحسب
+     * لعملة باقتنا وحدها، ويُترك `byCurrency` لمن أراد عرضَ البقية.
+     */
+    protected static function marketBand(array $rivals, ?string $currency = null): array
     {
-        $vals = collect($rivals)->flatMap(fn ($r) => array_filter([$r['from'], $r['to']], fn ($x) => $x !== null))->sort()->values();
-        if ($vals->isEmpty()) return ['min' => null, 'max' => null, 'mid' => null, 'n' => 0];
+        $default = (string) setting('app.currency', 'د.ك');
+        $cur = filled($currency) ? (string) $currency : $default;
 
-        return ['min' => (float) $vals->first(), 'max' => (float) $vals->last(),
-                'mid' => (float) $vals->median(), 'n' => count($rivals)];
+        $vals = []; $counts = [];
+        foreach ($rivals as $r) {
+            $c = filled($r['currency'] ?? null) ? (string) $r['currency'] : $default;
+            $counts[$c] = ($counts[$c] ?? 0) + 1;
+            foreach ([$r['from'] ?? null, $r['to'] ?? null] as $v) {
+                if ($v !== null) $vals[$c][] = (float) $v;
+            }
+        }
+
+        $band = function (string $c) use ($vals, $counts) {
+            $v = collect($vals[$c] ?? [])->sort()->values();
+
+            return $v->isEmpty()
+                ? ['currency' => $c, 'min' => null, 'max' => null, 'mid' => null, 'n' => $counts[$c] ?? 0]
+                : ['currency' => $c, 'min' => (float) $v->first(), 'max' => (float) $v->last(),
+                   'mid' => (float) $v->median(), 'n' => $counts[$c] ?? 0];
+        };
+
+        $mine = $band($cur);
+        $mine['byCurrency'] = collect(array_keys($counts))->map($band)->values()->all();
+        // `n` هنا عددُ المنافسين **القابلين للمقارنة**: صفرٌ يعني «لا نطاق» فتصمت
+        // `insights()` بدل أن تفتي بمقارنةٍ عبر عملات
+        $mine['others'] = max(0, count($rivals) - ($counts[$cur] ?? 0));
+
+        return $mine;
     }
 
     /**
@@ -207,12 +242,15 @@ class Pricing
             }
 
             $band = $s['market'];
+            // `min`/`max` صارا نطاقَ **عملة باقتنا** وحدها: منافسٌ بعملةٍ أخرى
+            // يُترك خارج المقارنة (‏`others`) بدل أن يُقارَن عدديّاً بلا تحويل
+            $bCur = $s['entryCur'] ?? null;
             if ($band['n'] && $s['entry'] !== null) {
                 if ($band['min'] !== null && $s['entry'] < $band['min']) {
                     $out[] = ['tone' => 'wn', 'icon' => '🏷️', 'title' => 'أرخص من السوق كلّه',
                         'what' => $s['service'],
-                        'why' => 'باقتنا الأدنى ' . self::money($s['entry'], null)
-                               . ' وأدنى منافسٍ ' . self::money($band['min'], null)
+                        'why' => 'باقتنا الأدنى ' . self::money($s['entry'], $bCur)
+                               . ' وأدنى منافسٍ ' . self::money($band['min'], $bCur)
                                . ' — إمّا ميزةٌ مقصودة أو مالٌ متروك على الطاولة.',
                         'id' => $s['serviceId']];
                 }

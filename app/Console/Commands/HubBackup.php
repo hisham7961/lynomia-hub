@@ -118,10 +118,40 @@ class HubBackup extends Command
         $dir = storage_path('app/backups');
         if (! is_dir($dir)) mkdir($dir, 0700, true);
         $file = $dir . '/hub-' . now()->format('Y-m-d-Hi') . '.json';
-        file_put_contents($file, json_encode($out, JSON_UNESCAPED_UNICODE));
+
+        // **الترميز أولاً، والتدوير آخراً** (v2.312): بايتةٌ واحدة فاسدة في أي صفّ
+        // تجعل json_encode تعيد `false`، فكانت تُكتب نسخةٌ بصفر بايت ثم يحذف
+        // التدويرُ آخرَ النسخ السليمة ثم يُبلَّغ نجاحاً — فتُعطَّل قدرةُ التعافي
+        // كلها بصمت، والمشغّل يقرأ «✓» ويطمئن. الآن: يُرمَّز ويُفحَص العائد،
+        // ثم يُكتب إلى ملفٍ مؤقّت ويُتحقّق من طول ما كُتب، ثم يُنقل، ثم يُدوَّر.
+        $json = json_encode($out, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        if ($json === false || $json === '') {
+            $this->error('✗ تعذّر ترميز النسخة: ' . json_last_error_msg()
+                       . ' — لم تُكتب نسخةٌ ولم يُحذف شيء. راجع صفوفاً بترميزٍ فاسد.');
+
+            return self::FAILURE;
+        }
+
+        $tmp = $file . '.tmp';
+        $written = @file_put_contents($tmp, $json);
+        if ($written !== strlen($json)) {
+            @unlink($tmp);
+            $this->error('✗ كتابةٌ ناقصة (' . (int) $written . ' من ' . strlen($json)
+                       . ' بايت) — لم تُبدَّل النسخة ولم يُحذف شيء.');
+
+            return self::FAILURE;
+        }
+        @chmod($tmp, 0600);
+        if (! @rename($tmp, $file)) {
+            @unlink($tmp);
+            $this->error('✗ تعذّر إتمام النسخة (rename) — لم يُحذف شيء.');
+
+            return self::FAILURE;
+        }
         @chmod($file, 0600);
         @chmod($dir, 0700);
 
+        // التدوير بعد كتابةٍ متحقَّقٍ منها فقط
         $keep = max(1, (int) $this->option('keep'));
         $old = glob($dir . '/hub-*.json');
         sort($old);

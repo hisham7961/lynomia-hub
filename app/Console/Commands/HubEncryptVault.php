@@ -25,8 +25,42 @@ class HubEncryptVault extends Command
                     ->update(['secret_cipher' => Crypt::encryptString($row->secret_cipher)]);
             }
         }
-        $this->info(($this->option('dry') ? 'سيُشفَّر: ' : 'شُفِّر: ') . $n . ' سجل');
+
+        $v = $this->option('dry') ? 0 : $this->scrubSnapshots();
+
+        $this->info(($this->option('dry') ? 'سيُشفَّر: ' : 'شُفِّر: ') . $n . ' سجل'
+            . ($v ? " · مُسح النصُّ الصريح من {$v} لقطة إصدار" : ''));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * **والنصُّ الصريح في اللقطات**: `record_versions` تحفظ لقطةَ كل تعديل
+     * كاملةً — بما فيها `secret_cipher` قبل التعمية. فتشفيرُ الجدول وحده يترك
+     * السرَّ مكشوفاً في تاريخِه، وفي **كل نسخةٍ احتياطية** تُؤخذ بعده: أمانٌ
+     * مُعلَنٌ لا يقع. تُنزَع القيمةُ من اللقطة ويُترك أثرُ حجبٍ صريح
+     * (‏`restoreVersion` تُبقي القيمةَ الحالية عند غياب المفتاح فلا يضيع شيء).
+     */
+    protected function scrubSnapshots(): int
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('record_versions')) return 0;
+
+        $n = 0;
+        DB::transaction(function () use (&$n) {
+            DB::table('record_versions')->where('module', 'vault')->orderBy('id')
+                ->chunkById(200, function ($rows) use (&$n) {
+                    foreach ($rows as $v) {
+                        $snap = json_decode((string) $v->snapshot, true);
+                        if (! is_array($snap) || ! array_key_exists('secret_cipher', $snap)) continue;
+                        if (($snap['secret_cipher'] ?? null) === '••• محجوب •••') continue;
+                        $snap['secret_cipher'] = '••• محجوب •••';
+                        DB::table('record_versions')->where('id', $v->id)
+                            ->update(['snapshot' => json_encode($snap, JSON_UNESCAPED_UNICODE)]);
+                        $n++;
+                    }
+                });
+        });
+
+        return $n;
     }
 }

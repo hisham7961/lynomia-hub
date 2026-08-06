@@ -16,7 +16,9 @@
 @if ($lead)
 <div class="cards">
     <div class="stat"><span class="ico">⏱️</span><b>{{ $lead['median'] }} يوم</b><span>وسيط زمن التسليم</span></div>
-    <div class="stat"><span class="ico">📐</span><b>{{ $lead['avg'] }} يوم</b><span>المتوسط ({{ $lead['n'] }} ميزة)</span></div>
+    <div class="stat"><span class="ico">📐</span><b>{{ $lead['avg'] }} يوم</b>
+        {{-- العيّنةُ تُعلَن: رقمٌ جزئيّ يُقرأ كأنه الكلُّ كذبة --}}
+        <span>المتوسط ({{ $lead['n'] }} ميزة{{ ($lead['sampled'] ?? false) ? ' — آخر ' . ($lead['sampleLimit'] ?? 300) . ' منشورة' : '' }})</span></div>
     <div class="stat"><span class="ico">⚡</span><b>{{ $lead['best'] }} يوم</b><span>أسرع تسليم</span></div>
     <div class="stat"><span class="ico">🐌</span><b class="{{ $lead['worst'] > 90 ? 'txt-bad' : '' }}">{{ $lead['worst'] }} يوم</b><span>أبطأ تسليم</span></div>
 </div>

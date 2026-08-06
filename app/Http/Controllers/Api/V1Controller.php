@@ -55,7 +55,8 @@ class V1Controller extends ModuleController
         $page = $q->orderByDesc('created_at')->orderByDesc('id')
             ->paginate(min(100, max(1, (int) $r->query('per', 25))));
 
-        $fields = $r->query('fields');
+        // hub_str: shape() مُوقَّعةٌ ?string، و`?fields[]=` يمرّر مصفوفةً فترمي TypeError
+        $fields = hub_str($r->query('fields')) ?: null;
         $this->auditApiSecretRead($def, count($page->items()));
 
         return response()->json([
@@ -93,6 +94,7 @@ class V1Controller extends ModuleController
             $m = new $class;
             $this->fill($def, $r, $m);
             $this->inheritCompany($m, $module);   // كالويب: معزولٌ يرث شركته فلا يختفي عنه
+            $this->inheritProject($m, $module);   // ومشروعَه — وإلا وُلد يتيماً لا يراه
             $m->save();
             $this->notifyAssignee($def, $module, $m);
             $this->bustProgress($module, $m);

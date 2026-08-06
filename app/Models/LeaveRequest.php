@@ -120,6 +120,17 @@ class LeaveRequest extends Model
                     $m->meta = $meta + ['balance_deducted' => $days];
                     $m->saveQuietly();
                 }
+            } elseif ($approved && (float) $meta['balance_deducted'] !== (float) ($m->days ?? 0)) {
+                // **المصالحةُ عند تغيّر الأيام** (v2.315): الخصمُ كان يقع مرّةً
+                // واحدة ولا يُصالَح `days` بعدها أبداً — فتمديدُ إجازةٍ معتمدة
+                // يلتفّ على سقف الرصيد (لا خصمَ للفارق)، وتقليصُها يُبقي الخصمَ
+                // الزائد فتضيع أيامٌ من رصيد الموظف بلا سجلّ.
+                $was = (float) $meta['balance_deducted'];
+                $now = (float) ($m->days ?? 0);
+                self::applyBalance($emp, $was - $now);   // موجبٌ يُعيد، سالبٌ يخصم الفارق
+                $meta['balance_deducted'] = $now;
+                $m->meta = $meta;
+                $m->saveQuietly();
             } elseif (! $approved && ! empty($meta['balance_deducted'])) {
                 self::applyBalance($emp, (float) $meta['balance_deducted']);
                 unset($meta['balance_deducted']);

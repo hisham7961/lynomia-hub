@@ -100,6 +100,20 @@ class ApprovalDecisionController extends ModuleController
     {
         abort_unless(hub_approver(), 403, 'الحسم للمعتمدين فقط');
         $ap = Approval::lockForUpdate()->findOrFail($id);
+
+        /*
+         * **والحسمُ داخل نطاق الحاسم** (v2.322): الطلبُ يحمل حمولةَ تعديلٍ
+         * تُنفَّذ على سجلٍ بعينه، وكان يُحسَم بلا تنطيق — فمعتمِدُ شركةٍ ينفّذ
+         * تعديلاً على سجلِ شركةٍ أخرى لا يراه أصلاً. يُقاس على **السجل الهدف**
+         * لا على صفّ الطلب: `queueApproval` لا يملأ `company_id` دائماً، فقياسُ
+         * الصفّ وحده كان يُقصي الطلباتِ القائمةَ كلَّها.
+         */
+        if ($ap->mod && $ap->record_id && ($md = hub_mod((string) $ap->mod))) {
+            $inScope = hub_scope(
+                \Illuminate\Support\Facades\DB::table($md['table'])->where('id', $ap->record_id),
+                (string) $ap->mod)->exists();
+            abort_unless($inScope, 403, 'هذا الطلب على سجلٍ خارج نطاقك');
+        }
         abort_unless($ap->mod && $ap->decided_at === null
             && in_array($ap->status, [null, '', 'معلّق'], true), 422, 'حُسم هذا الطلب من قبل');
 

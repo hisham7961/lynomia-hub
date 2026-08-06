@@ -32,6 +32,7 @@ class CurrencyHonestyTest extends TestCase
         Contract::create(['title' => 'عقد دولار', 'type' => 'عقد عميل', 'status' => 'ساري',
             'value' => 1000, 'currency' => 'دولار']);
 
+        $this->actingAs($this->owner);
         $mrr = hub_mrr(true);
 
         $this->assertArrayHasKey('byCurrency', $mrr, 'لا تفصيل بالعملة — الرقم الواحد يُخفي الخلط');
@@ -50,6 +51,7 @@ class CurrencyHonestyTest extends TestCase
         Contract::create(['title' => 'عقد', 'type' => 'عقد عميل', 'status' => 'ساري',
             'value' => 1200, 'currency' => 'د.ك']);
 
+        $this->actingAs($this->owner);
         $mrr = hub_mrr(true);
         $this->assertFalse($mrr['mixed']);
         $this->assertEqualsWithDelta(100.0, $mrr['mrr'], 0.01);   // 1200 سنويّ ÷ 12

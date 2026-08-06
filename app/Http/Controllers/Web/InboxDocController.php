@@ -23,17 +23,34 @@ class InboxDocController extends Controller
             403, 'صندوق الوثائق يحتاج صلاحية الوثائق');
     }
 
+    /** استعلامُ الصندوق معزولاً بشركات القارئ — سكّةٌ واحدة للقائمة والعدّادات */
+    protected function scoped()
+    {
+        $q = InboxDocument::query();
+        if (($cids = hub_company_ids()) !== null) {
+            $q->where(fn ($w) => $w->whereIn('company_id', $cids)->orWhereNull('company_id'));
+        }
+
+        return $q;
+    }
+
     public function index(Request $r)
     {
         $this->gate('v');
         $st = $r->query('st', 'وارد');
-        $q = InboxDocument::orderByDesc('created_at')->orderByDesc('id');   // فاصلُ تعادلٍ حاسم
+        // **منطَّق** (v2.317): كان يقرأ الجدول خاماً، فمستخدمٌ معزولٌ بشركةٍ يرى
+        // وثائقَ كلِّ الشركات — والعدّاداتُ تفضح الرقمَ كذلك. وصندوقُ الوثائق ليس
+        // وحدةً في `config/hub.php` فلا يعرفه `hub_company_col`، والعزلُ يُفرض
+        // هنا صراحةً على عموده: من له قائمةُ شركاتٍ لا يرى إلا وثائقَها
+        // (ووثيقةٌ بلا شركة تبقى مرئيةً للجميع — صندوقُ وارِدٍ لم يُصنَّف بعد).
+        $q = $this->scoped()->orderByDesc('created_at')->orderByDesc('id');   // فاصلُ تعادلٍ حاسم
         if (in_array($st, ['وارد', 'مصنف'], true)) $q->where('status', $st);
 
         return view('inboxdocs', [
             'rows'    => $q->paginate(25)->withQueryString(),
             'st'      => $st,
-            'counts'  => InboxDocument::selectRaw("status, COUNT(*) c")->groupBy('status')->pluck('c', 'status'),
+            'counts'  => $this->scoped()
+                             ->selectRaw("status, COUNT(*) c")->groupBy('status')->pluck('c', 'status'),
             'users'   => \App\Models\User::pluck('name', 'id'),
             'modules' => collect(config('hub.modules'))->map(fn ($d) => $d['label']),
             'companies' => hub_can(auth()->user(), 'companies', 'v') ? hub_ref_options('companies') : collect(),

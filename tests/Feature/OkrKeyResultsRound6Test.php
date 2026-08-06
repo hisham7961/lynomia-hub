@@ -68,7 +68,7 @@ class OkrKeyResultsRound6Test extends TestCase
         $kr = KeyResult::create(['title' => 'إنجاز المهام', 'objective_id' => $o->id,
             'kpi_id' => $kpiId, 'start_value' => 0, 'target_value' => 6, 'current_value' => 0]);
 
-        $p = hub_okr_progress($o->id, true);
+        $p = hub_okr_progress($o->id, true, false, persist: true);
         $this->assertEquals(3.0, (float) $kr->fresh()->current_value,
             'القيمة الحالية تُشتق من محرك المؤشرات — كان المحرك جاهزاً بلا قارئ في الأهداف');
         $this->assertSame(50, $p['pct']);

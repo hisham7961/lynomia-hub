@@ -46,11 +46,13 @@
             <tbody>
             @foreach ($signers as $s)
                 <tr>
-                    <td><b>{{ $s->name }}</b>@if ($s->id_no)<div class="sub mono ltr" style="font-size:10px">{{ $s->id_no }}</div>@endif</td>
+                    {{-- الأثرُ الحسّاس (هوية/IP) للمالك داخلياً فقط — نسخةُ العميل
+                         تحمل الاسمَ والوقت لا آثارَ غيره، بنفس سياسة doc.blade.php (v2.323) --}}
+                    <td><b>{{ $s->name }}</b>@if ($s->id_no && ! ($client ?? false))<div class="sub mono ltr" style="font-size:10px">{{ $s->id_no }}</div>@endif</td>
                     <td>{{ $s->role }}</td>
                     <td><span class="bdg {{ $s->status === 'وُقّع' ? 'ok' : ($s->status === 'رُفض' ? 'bad' : 'wn') }}">{{ $s->status }}</span></td>
                     <td class="mono sub">{{ $s->signed_at?->format('Y-m-d H:i:s') ?: '—' }}</td>
-                    <td class="mono ltr sub">{{ $s->ip ?: '—' }}</td>
+                    <td class="mono ltr sub">{{ ($client ?? false) ? '—' : ($s->ip ?: '—') }}</td>
                 </tr>
             @endforeach
             </tbody>
@@ -64,7 +66,7 @@
                 <tr>
                     <td class="mono sub">{{ $row['e']->created_at }}</td>
                     <td>{{ \App\Support\Evidence::label($row['e']->event) }}</td>
-                    <td class="mono ltr sub">{{ $row['e']->ip ?: '—' }}</td>
+                    <td class="mono ltr sub">{{ ($client ?? false) ? '—' : ($row['e']->ip ?: '—') }}</td>
                     <td class="mono ltr sub" style="font-size:9.5px">{{ substr($row['hash'], 0, 16) }}…</td>
                 </tr>
             @endforeach
