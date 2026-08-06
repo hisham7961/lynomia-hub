@@ -181,9 +181,18 @@ class Delivery
         if (($wu = hub_read('updates')) && ($pj = hub_read('projects'))) {
             $last = $wu->select('project_id', DB::raw('MAX(created_at) as last'))
                 ->groupBy('project_id')->pluck('last', 'project_id');
-            foreach (hub_open_scope($pj)->limit(30)->get(['id', 'name']) as $p) {
+            /*
+             * **الترشيحُ قبل القصّ** (v2.339): كان `limit(30)` يقع على المشاريع
+             * الجارية كلِّها ثم يُبحث داخل الشريحة عن الصامت — فثلاثون مشروعاً
+             * نشطاً يحجبون الصامتَ **إلى الأبد**، وهو كلُّ المقصود من البطاقة.
+             * الصامتُ يُستخرج أوّلاً (بترتيبٍ حاسم على `id` كي لا تختلف القائمة
+             * بين المحرّكين) ثم يُقصّ.
+             */
+            $silent = hub_open_scope($pj)->orderBy('id')->get(['id', 'name'])
+                ->filter(fn ($p) => ! (($l = $last[$p->id] ?? null) && Carbon::parse($l)->gt(now()->subDays(14))))
+                ->take(30);
+            foreach ($silent as $p) {
                 $l = $last[$p->id] ?? null;
-                if ($l && Carbon::parse($l)->gt(now()->subDays(14))) continue;
                 $out[] = ['icon' => '🤫', 'tone' => 'wn', 'kind' => 'مشروعٌ جارٍ صامت',
                     'title' => $p->name, 'module' => 'projects', 'id' => $p->id,
                     'why' => $l ? 'آخر تحديث عملٍ ' . Carbon::parse($l)->diffForHumans()

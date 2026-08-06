@@ -35,7 +35,13 @@ class CeoController extends Controller
             'netM'    => $sum($this->income, $m0) - $sum($this->expense, $m0),
             'netY'    => $sum($this->income, $y0) - $sum($this->expense, $y0),
             // COALESCE: فاتورة لم يُدفع منها شيء paid=NULL — «total - NULL» تُسقطها من المجموع وهي أسوأ الحالات
-            'unpaid'  => (float) $fin()->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة'])->sum(DB::raw('total - COALESCE(paid, 0)')),
+            // **ما لنا وحدَه** (v2.339): كان الاستعلامُ بلا فلترِ نوعٍ إطلاقاً،
+            // ففاتورةُ المشتريات غيرُ المسدَّدة تُعدّ ديناً **لنا**. صاحبُ القرار
+            // يقرأ رقمَ ما يُنتظر تحصيلُه وفيه ما عليه هو أن يدفع — وهو أسوأُ
+            // خطأٍ ممكنٍ في هذه البطاقة بعينها. الإيرادُ من `hub.fin.income`.
+            'unpaid'  => (float) $fin()->whereIn('kind', $this->income)
+                            ->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة'])
+                            ->sum(DB::raw('total - COALESCE(paid, 0)')),
             'projects'=> hub_open_scope(DB::table('projects')->whereNull('deleted_at'))->count(),
             'clients' => DB::table('clients')->whereNull('deleted_at')->count(),
             'emps'    => DB::table('employees')->whereNull('deleted_at')->count(),
