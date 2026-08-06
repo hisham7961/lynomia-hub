@@ -85,7 +85,11 @@ class PayrollController extends Controller
         // عملاتهم في مجموعٍ وقيدٍ واحد. النطاق يحصر السحب بما يراه المنشئ.
         $emps = hub_scope(Employee::query(), 'hr')
             ->whereNull('deleted_at')
-            ->whereNotIn('status', ['منتهية خدمته', 'مستقيل', 'موقوف'])
+            // **NULL NOT IN (…) يُقيَّم «مجهولاً» لا «صحيحاً»** على المحرّكين معاً،
+            // فموظفٌ بحالةٍ فارغة كان يسقط من كلّ مسيّرٍ صامتاً: راتبٌ لا يُصرَف
+            // ولا رسالةَ تقول لماذا. «بلا حالة» ليست «منتهيةَ خدمته».
+            ->where(fn ($q) => $q->whereNull('status')
+                ->orWhereNotIn('status', ['منتهية خدمته', 'مستقيل', 'موقوف']))
             ->when($run->company_id, fn ($q) => $q->where('company_id', $run->company_id))
             ->orderBy('name')->get();
         abort_if($emps->isEmpty(), 422, 'لا موظفين نشطين لهذا النطاق — أضف ملفاتهم الوظيفية أولاً');
