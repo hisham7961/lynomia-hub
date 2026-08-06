@@ -810,7 +810,11 @@ if (! function_exists('hub_expiry')) {
 
                     // لا تنبيه على ما أُغلق: مهمة منجزة أو فاتورة مدفوعة أو عقد منتهٍ
                     // كانت تظل تنبّه إلى الأبد فتفقد الصفحة مصداقيتها.
-                    if (($sc = hub_status_col($mk)) && \Illuminate\Support\Facades\Schema::hasColumn($md['table'], $sc)) {
+                    // `expiryIgnoresStatus`: وحدةٌ «حالتُها» وصفٌ لا مرحلةٌ في
+                    // مسار (حالةُ شهادة الدومين مثلاً) — الإقصاءُ بها يُسقط من
+                    // الرادار أشدَّ السجلات حاجةً إليه
+                    if (empty($md['expiryIgnoresStatus'])
+                        && ($sc = hub_status_col($mk)) && \Illuminate\Support\Facades\Schema::hasColumn($md['table'], $sc)) {
                         $q->where(fn ($w) => $w->whereNull($sc)->orWhereNotIn($sc, hub_closed_states()));
                     }
 
