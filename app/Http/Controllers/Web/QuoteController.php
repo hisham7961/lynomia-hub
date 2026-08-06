@@ -28,9 +28,16 @@ class QuoteController extends Controller
         $items = \App\Support\Items::cartons(
             \App\Support\Items::parse((string) $q->items), $q->company_id);
 
+        // **قفلُ الحقل يسري على الورقة كما على الشاشة** (v2.323): ما حُجب في
+        // القائمة كان يُطبع هنا كاملاً — والمستندُ يُرسَل للعميل ويُطبَع ويُؤرشَف.
+        $u = auth()->user();
+        $hide = fn (string $f) => hub_field_mode($u, 'quotes', $f) === 'hide';
+
         return view('quotes.doc', [
             'q' => $q, 'client' => $client,
             'items' => $items,
+            'hideTotal' => $hide('total'),
+            'hideItems' => $hide('items'),
             'showCartons' => \App\Support\Items::anyCartons($items),
             'totalCartons' => \App\Support\Items::totalCartons($items),
             'logo' => setting('app.logo'),

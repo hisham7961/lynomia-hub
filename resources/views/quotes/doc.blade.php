@@ -79,8 +79,8 @@ td{padding:9px 12px;border-bottom:1px solid #e3ecea}
                     @if (! empty($showCartons))
                         <td style="text-align:center">{{ $it['cartonText'] !== '' ? $it['cartonText'] : '—' }}@if (($it['per'] ?? null))<div style="font-size:10px;color:#888">الكرتونة {{ $it['per'] }} وحدة</div>@endif</td>
                     @endif
-                    <td>{{ $it['price'] !== null ? number_format($it['price'], 3) : '—' }}</td>
-                    <td>{{ $it['sum'] !== null ? number_format($it['sum'], 3) : '—' }}</td>
+                    <td>{{ ($hideTotal ?? false) ? '•••' : ($it['price'] !== null ? number_format($it['price'], 3) : '—') }}</td>
+                    <td>{{ ($hideTotal ?? false) ? '•••' : ($it['sum'] !== null ? number_format($it['sum'], 3) : '—') }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -89,9 +89,9 @@ td{padding:9px 12px;border-bottom:1px solid #e3ecea}
 
     <div class="tot"><table>
         @if (! empty($showCartons) && ($totalCartons ?? 0) > 0)<tr><td>إجمالي الكراتين الكاملة</td><td>{{ $totalCartons }} كرتونة</td></tr>@endif
-        @if ($q->amount !== null)<tr><td>الإجمالي قبل الضريبة</td><td>{{ number_format((float) $q->amount, 3) }}</td></tr>@endif
-        @if ($q->tax)<tr><td>الضريبة</td><td>{{ number_format((float) $q->tax, 3) }}</td></tr>@endif
-        <tr class="g"><td>الإجمالي المستحق</td><td>{{ number_format((float) $q->total, 3) }} {{ $q->currency ?? '' }}</td></tr>
+        @if ($q->amount !== null)<tr><td>الإجمالي قبل الضريبة</td><td>{{ ($hideTotal ?? false) ? '•••' : number_format((float) $q->amount, 3) }}</td></tr>@endif
+        @if ($q->tax)<tr><td>الضريبة</td><td>{{ ($hideTotal ?? false) ? '•••' : number_format((float) $q->tax, 3) }}</td></tr>@endif
+        <tr class="g"><td>الإجمالي المستحق</td><td>{{ ($hideTotal ?? false) ? '••• محجوب' : number_format((float) $q->total, 3) }} {{ ($hideTotal ?? false) ? '' : ($q->currency ?? '') }}</td></tr>
     </table></div>
 
     @if ($q->terms)<div class="terms"><b>الشروط والأحكام:</b>

@@ -6,7 +6,9 @@
     </div>
     <form method="POST"
           action="{{ $updating ? route('m.update', [$module, $row->id]) : route('m.store', $module) }}"
-          data-draft="{{ $module }}:{{ $updating ? $row->id : 'new' }}"
+          {{-- المفتاحُ يحمل المستخدم: مسوّدةُ حسابٍ كانت تُسترجَع في نموذج
+               حسابٍ آخر على المتصفح نفسه — جهازٌ مشترك يكفي (v2.323) --}}
+          data-draft="{{ auth()->id() }}:{{ $module }}:{{ $updating ? $row->id : 'new' }}"
           @if ($hasFile) enctype="multipart/form-data" @endif
           @if ($hx) hx-boost="true" hx-target="#recform" hx-select="#recform" hx-swap="outerHTML"
               hx-select-oob="#tblzone:outerHTML,#flash:innerHTML" hx-push-url="false" @endif>
