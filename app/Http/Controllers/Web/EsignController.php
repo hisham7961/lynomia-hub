@@ -571,6 +571,7 @@ class EsignController extends Controller
 
         return view('esign.certificate', [
             'req' => $req, 'chain' => $chain, 'head' => $head,
+            'verdict' => \App\Support\Evidence::verify($req),
             'signers' => \App\Models\ContractSigner::where('request_id', $req->id)->orderBy('order')->get(),
             'qr' => \App\Support\Qr::svg(route('sign.verify') . '?code=' . $req->verify_code, 132),
         ]);
@@ -587,6 +588,7 @@ class EsignController extends Controller
 
         return view('esign.certificate', [
             'req' => $req, 'chain' => $chain, 'head' => $head, 'client' => true,
+            'verdict' => \App\Support\Evidence::verify($req),
             'signers' => \App\Models\ContractSigner::where('request_id', $req->id)->orderBy('order')->get(),
             'qr' => \App\Support\Qr::svg(route('sign.verify') . '?code=' . $req->verify_code, 132),
         ]);
@@ -1004,7 +1006,8 @@ class EsignController extends Controller
         if ($code !== '') {
             $key = 'verify:' . $r->ip();
             if (RateLimiter::tooManyAttempts($key, 10)) {
-                return view('sign.verify', ['code' => $code, 'found' => null, 'throttled' => true]);
+                return view('sign.verify', ['code' => $code, 'found' => null, 'throttled' => true,
+                    'verdict' => ['checked' => false, 'ok' => true]]);
             }
             RateLimiter::hit($key, 60);
             // v2.117: الموقعة فقط — الرد على رموز المسودات كان يكشف وجودها وعناوينها
@@ -1014,6 +1017,9 @@ class EsignController extends Controller
 
         return view('sign.verify', [
             'code' => $code, 'found' => $found, 'throttled' => false,
+            // **الرأسُ يُعاد حسابُه لا يُعرض وحدَه**: قيمةٌ مخزَّنةٌ تَعِد بإثباتٍ
+            // ولا فاحصَ خلفها تُسكِت السؤالَ الذي كان سيكشف العبث
+            'verdict' => $found ? \App\Support\Evidence::verify($found) : ['checked' => false, 'ok' => true],
             // v2.122: الموقّعون وأزمانهم (أسماء فقط — لا بريد ولا IP علناً) + QR للنسخ الورقية
             'signers' => $found
                 ? \App\Models\ContractSigner::where('request_id', $found->id)

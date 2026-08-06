@@ -13,16 +13,60 @@ trait Auditable
     {
         static::created(fn ($m) => $m->writeAudit('إضافة', null, $m->auditable()));
         static::updated(function ($m) {
-            $before = collect($m->getOriginal())->only(array_keys($m->getDirty()))->all();
-            $after  = collect($m->getDirty())->except(['updated_at', 'search_vec'])->all();
+            $before = $m->auditRedact(collect($m->getOriginal())->only(array_keys($m->getDirty()))->all());
+            $after  = $m->auditRedact(collect($m->getDirty())->except(['updated_at', 'search_vec'])->all());
             if ($after) $m->writeAudit('تعديل', $before, $after);
         });
         static::deleted(fn ($m) => $m->writeAudit('حذف', $m->auditable(), null));
     }
 
+    /**
+     * أعمدةٌ لا تُكتب قيمتُها في سجل التدقيق أبداً — تُستبدَل ببصمةٍ قصيرة.
+     *
+     * **ولماذا بصمةٌ لا حذفٌ ولا نجوم؟** الحذفُ يُخفي أنّ الحقلَ تغيّر أصلاً،
+     * والنجومُ تتساوى فتقول «تغيّر» ولا تقول «إلى غيرِ ما كان». والبصمةُ تحفظ
+     * السؤالَ التدقيقيَّ كاملاً — تغيّر أم لا، ومتى عاد إلى قيمةٍ سابقة — بلا
+     * تسريبِ محرفٍ واحد.
+     *
+     * **والسببُ المباشر:** `VaultSecret::booted` تُرقّي سرّاً قديماً غيرَ مشفَّر
+     * عند أوّل حفظ، فيصير `getOriginal()` هو **النصَّ الصريح** ويُكتب في
+     * `audits.before`. و`before`/`after` من أعمدة بصمة التدقيق (`SEALED`)،
+     * فمحوُهما بعد الكتابة يكسر السلسلةَ نفسَها — أي يُتلف الضمانَ لإخفاء
+     * أثرِ خرقه. فالمنعُ عند المصدر هو العلاجُ الوحيد الذي لا يُتلف شيئاً.
+     */
+    public function auditSecretCols(): array
+    {
+        return (array) (defined('static::AUDIT_SECRET') ? static::AUDIT_SECRET : []);
+    }
+
+    /**
+     * استبدالُ قيَم الأعمدة السرّية ببصمةٍ لا تُعكس.
+     *
+     * والبصمةُ تقع على **القيمة الصريحة** لا على تخزينها: تعميةُ Laravel بمتّجهٍ
+     * ابتدائيّ عشوائيّ، فالسرُّ نفسُه يُنتج نصّاً مشفَّراً مختلفاً كلَّ مرة —
+     * وبصمةٌ على المشفَّر تقول «تغيّر السرّ» في كل حفظٍ لأيّ حقلٍ آخر. فتُفكّ
+     * التعميةُ للبصمة وحدها، وتُرمى القيمةُ فوراً.
+     */
+    public function auditRedact(array $data): array
+    {
+        foreach ($this->auditSecretCols() as $col) {
+            if (! array_key_exists($col, $data)) continue;
+            $v = $data[$col];
+            if ($v === null || $v === '') continue;
+
+            $plain = (string) $v;
+            try { $plain = \Illuminate\Support\Facades\Crypt::decryptString($plain); }
+            catch (\Throwable $e) { /* نصٌّ صريحٌ قديم — يُبصَم كما هو ولا يُكتب */ }
+
+            $data[$col] = 'sha256:' . substr(hash('sha256', $plain), 0, 16);
+        }
+
+        return $data;
+    }
+
     public function auditable(): array
     {
-        return collect($this->getAttributes())
+        return collect($this->auditRedact($this->getAttributes()))
             ->except(['search_vec', 'custom', 'meta'])
             // بالمحارف لا بالبايتات: `substr` تقطع الحرف العربي نصفين فتُنتج
             // UTF-8 فاسدةً يرفضها `json_encode` — فلا يُكتب القيد أصلاً

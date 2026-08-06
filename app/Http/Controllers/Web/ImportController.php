@@ -143,7 +143,29 @@ class ImportController extends Controller
                     }
 
                     if ($rowErr) { $skipped[] = 'صف ' . ($n + 2) . ': ' . $rowErr; continue; }
-                    $m->save();
+
+                    // **رفضُ حارسِ النموذج خطأُ صفٍّ لا خطأُ ملف.** الحرّاس
+                    // (‏`StockMove` مثلاً) ترمي `ValidationException` أو `abort()`
+                    // من خطّاف `creating` — أي **قبل أيّ SQL**. وكان الإلقاء يخترق
+                    // المعاملة فيُلغي الملفَّ كلَّه، ثم يمحو `finally` الملفَّ وينسى
+                    // الجلسة: ألفُ صفٍّ سليم يضيع لأجل صفٍّ واحد، ولا قائمةَ متخطّى
+                    // أصلاً — بينما كلُّ خطأ صفٍّ آخر (قيمةٌ غير رقمية، مرجعٌ مفقود)
+                    // يُبلَّغ ويمضي الاستيراد. فيُلتقط هنا ويُصفّ مع أخواته.
+                    //
+                    // وما ليس رفضاً مقصوداً (‏`QueryException`: خرقُ unique، فيضُ
+                    // عمود) يبقى على حاله فيُلغي المعاملةَ كلَّها — فتلك أخطاءٌ
+                    // تُصيب حالةَ القاعدة داخل المعاملة، و«كلٌّ أو لا شيء» فيها
+                    // هو الضمانُ الصحيح.
+                    try {
+                        $m->save();
+                    } catch (\Illuminate\Validation\ValidationException $e) {
+                        $skipped[] = 'صف ' . ($n + 2) . ': '
+                            . (collect($e->errors())->flatten()->first() ?: $e->getMessage());
+                        continue;
+                    } catch (\Symfony\Component\HttpKernel\Exception\HttpException $e) {
+                        $skipped[] = 'صف ' . ($n + 2) . ': ' . ($e->getMessage() ?: 'مرفوض');
+                        continue;
+                    }
                     $ok++;
                 }
             });

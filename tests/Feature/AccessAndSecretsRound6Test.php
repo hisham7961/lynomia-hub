@@ -69,6 +69,55 @@ class AccessAndSecretsRound6Test extends TestCase
             . 'تحمله مكشوفاً بعد «التعمية» بالضبط كما قبلها');
     }
 
+    /**
+     * **والمسحُ لا يُتلف ما ليس تسريباً، ولا يزرع قيمةً نائبة.**
+     *
+     * `restoreVersion` تفعل `fill($snapshot)` — فقيمةٌ نائبة في اللقطة تُكتب
+     * سرّاً حقيقيّاً عند الاستعادة فيُدمَّر السرُّ بضغطةٍ واحدة. وغيابُ المفتاح
+     * يُبقي القيمةَ الحالية. ولقطةٌ تحمل نصّاً **مشفَّراً** ليست تسريباً أصلاً.
+     */
+    public function test_scrubbing_spares_encrypted_snapshots_and_plants_no_placeholder(): void
+    {
+        $this->seedCore();
+
+        $s = \App\Models\VaultSecret::create(['title' => 'مفتاحٌ معمّى', 'kind' => 'مفتاح',
+            'secret_cipher' => \Illuminate\Support\Facades\Crypt::encryptString('REAL-SECRET')]);
+        $cipher = (string) DB::table('vault_secrets')->where('id', $s->id)->value('secret_cipher');
+
+        DB::table('record_versions')->updateOrInsert(
+            ['module' => 'vault', 'record_id' => $s->id, 'version' => 1],
+            ['snapshot' => json_encode(['title' => 'مفتاحٌ معمّى', 'secret_cipher' => $cipher],
+                JSON_UNESCAPED_UNICODE),
+             'changed_by' => $this->owner->id, 'created_at' => now()]);
+
+        $this->artisan('hub:encrypt-vault')->run();
+
+        $snap = json_decode((string) DB::table('record_versions')->where('module', 'vault')
+            ->where('record_id', $s->id)->where('version', 1)->value('snapshot'), true);
+
+        $this->assertSame($cipher, $snap['secret_cipher'] ?? null,
+            'مُسحت لقطةٌ مشفَّرة — تاريخٌ سليم أُتلف بلا تسريبٍ يُدفَع ثمنُه');
+
+        // ولقطةٌ صريحة: يُنزَع مفتاحُها ولا يُستبدَل بعلامةٍ تُكتب سرّاً عند الاستعادة
+        $p = \App\Models\VaultSecret::create(['title' => 'مفتاحٌ صريح', 'kind' => 'مفتاح',
+            'secret_cipher' => 'PLAIN-XYZ']);
+        DB::table('vault_secrets')->where('id', $p->id)->update(['secret_cipher' => 'PLAIN-XYZ']);
+        DB::table('record_versions')->updateOrInsert(
+            ['module' => 'vault', 'record_id' => $p->id, 'version' => 1],
+            ['snapshot' => json_encode(['title' => 'مفتاحٌ صريح', 'secret_cipher' => 'PLAIN-XYZ'],
+                JSON_UNESCAPED_UNICODE),
+             'changed_by' => $this->owner->id, 'created_at' => now()]);
+
+        $this->artisan('hub:encrypt-vault')->run();
+
+        $ps = json_decode((string) DB::table('record_versions')->where('module', 'vault')
+            ->where('record_id', $p->id)->where('version', 1)->value('snapshot'), true);
+
+        $this->assertArrayNotHasKey('secret_cipher', $ps,
+            'زُرعت قيمةٌ نائبة مكان السرّ — و`restoreVersion` تكتبها سرّاً حقيقيّاً '
+            . 'فتُدمّره؛ وغيابُ المفتاح يُبقي القيمةَ الحالية كما هي');
+    }
+
     /* ── ٢) مرفقُ التعليق يُقرأ لمن يرى سجلَّه ── */
 
     public function test_a_comment_attachment_is_served_to_whoever_sees_its_record(): void

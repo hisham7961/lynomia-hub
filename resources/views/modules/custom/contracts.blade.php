@@ -152,8 +152,13 @@
             <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
                 <form method="POST" action="{{ route('contract.amend', $row->id) }}" class="inline">@csrf
                     <button class="btn ghost sm">📎 ملحق تعديل</button></form>
-                <form method="POST" action="{{ route('contract.renew', $row->id) }}" class="inline">@csrf
-                    <button class="btn ghost sm">🔄 بدء التجديد</button></form>
+                {{-- التجديدُ يكتب «قيد التجديد» على العقد الأصل، فحارسُه يشترط
+                     صلاحيةَ التعديل (v2.322). وكان الزرُّ يُعرض بصلاحية «إضافة»
+                     وحدها — فيضغطه صاحبُها فيُردّ 403: خيارٌ معروضٌ لا يؤدّي شيئاً. --}}
+                @if (hub_can($u, 'contracts', 'e'))
+                    <form method="POST" action="{{ route('contract.renew', $row->id) }}" class="inline">@csrf
+                        <button class="btn ghost sm">🔄 بدء التجديد</button></form>
+                @endif
             </div>
         @endif
     </div>

@@ -99,7 +99,14 @@ class GuardsAndStampsRound6Test extends TestCase
         DB::table('audits')->where('module', 'clients')->where('record_id', $c->id)
             ->update(['company_id' => $b->id]);
 
-        $this->artisan('hub:audit-verify')->assertExitCode(1);
+        // **تحذيرٌ لا إفشال** بالافتراض: نقلُ سجلٍ بين الشركات فعلٌ مشروع تحتفظ
+        // قيودُه التاريخية بشركته القديمة، فالإفشالُ عندها إنذارٌ كاذب يُدرّب
+        // صاحبَ النظام على تجاهل الأمر. والبوابةُ القاطعة خلف `--strict`.
+        $this->artisan('hub:audit-verify')
+            ->expectsOutputToContain('يخالف عمودُ الشركة')
+            ->assertExitCode(0);
+
+        $this->artisan('hub:audit-verify', ['--strict' => true])->assertExitCode(1);
     }
 
     /* ── ٤+٥) مخازنُ المتصفح مقرونةٌ بصاحب الجلسة، والقفلُ لا ينفكّ باكراً ── */

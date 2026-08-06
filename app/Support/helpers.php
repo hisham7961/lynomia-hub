@@ -1515,7 +1515,8 @@ if (! function_exists('hub_mrr')) {
             // `mixed`/`byCurrency` بلا شرط، فإسقاطُهما هنا فخُّ
             // `Undefined array key` ينتظر أوّلَ قاعدةٍ بلا عقدٍ سارٍ.
             $empty = ['mrr' => 0.0, 'arr' => 0.0, 'contracts' => 0, 'byService' => [],
-                      'byCurrency' => [], 'mixed' => false, 'unmapped' => 0, 'oneTime' => 0.0];
+                      'byCurrency' => [], 'mixed' => false, 'unmapped' => 0, 'oneTime' => 0.0,
+                      'oneTimeByCurrency' => [], 'oneTimeMixed' => false];
 
             $q = hub_read('contracts');
             if (! $q) return $empty;
@@ -1529,7 +1530,7 @@ if (! function_exists('hub_mrr')) {
                 ->get(['id', 'name', 'cycle'])->keyBy('id');
 
             $default = (string) setting('app.currency', 'د.ك');
-            $mrr = 0.0; $oneTime = 0.0; $unmapped = 0; $byService = []; $byCur = [];
+            $mrr = 0.0; $oneTime = 0.0; $unmapped = 0; $byService = []; $byCur = []; $otCur = [];
             foreach ($contracts as $c) {
                 $value = (float) ($c->value ?? 0);
                 if ($value <= 0) continue;
@@ -1541,7 +1542,17 @@ if (! function_exists('hub_mrr')) {
                 $cur = (string) ($c->currency ?: $default);
 
                 if (! $sid) $unmapped++;
-                if ($cycle === 'مرة واحدة') { $oneTime += $value; continue; }
+                // **و«مرة واحدة» تُفصل بالعملة كأختها المتكرّرة** (v2.335): كانت
+                // تُجمع خاماً قبل أيّ فصل، وعلمُ `mixed` مشتقٌّ من `byCur`
+                // المتكرّرة وحدها — فقاعدةٌ متكرّرُها بعملةٍ واحدة تُعلن
+                // «لا اختلاط» وتعرض `oneTime` جامعاً ديناراً ودولاراً.
+                if ($cycle === 'مرة واحدة') {
+                    $oneTime += $value;
+                    $otCur[$cur] ??= ['currency' => $cur, 'total' => 0.0, 'contracts' => 0];
+                    $otCur[$cur]['total'] += $value;
+                    $otCur[$cur]['contracts']++;
+                    continue;
+                }
 
                 $monthly = $value / ($divisor[$cycle] ?? 12);
                 $mrr += $monthly;
@@ -1565,6 +1576,9 @@ if (! function_exists('hub_mrr')) {
             foreach ($byCur as &$bc) { $bc['mrr'] = round($bc['mrr'], 2); $bc['arr'] = round($bc['mrr'] * 12, 2); }
             unset($bc);
             usort($byCur, fn ($a, $b) => $b['mrr'] <=> $a['mrr']);
+            foreach ($otCur as &$oc) { $oc['total'] = round($oc['total'], 2); }
+            unset($oc);
+            usort($otCur, fn ($a, $b) => $b['total'] <=> $a['total']);
 
             return [
                 'mrr' => round($mrr, 2),
@@ -1577,6 +1591,8 @@ if (! function_exists('hub_mrr')) {
                 'mixed' => count($byCur) > 1,
                 'unmapped' => $unmapped,
                 'oneTime' => round($oneTime, 2),
+                'oneTimeByCurrency' => $otCur,
+                'oneTimeMixed' => count($otCur) > 1,
             ];
         });
     }

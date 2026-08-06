@@ -33,7 +33,7 @@ return new class extends Migration
         'audits'       => ['created_at'],
         'comments'     => ['created_at'],
         'error_events' => ['first_seen'],
-        'record_acks'  => ['created_at'],
+        'record_acks'  => ['ack_at'],
     ];
 
     public function up(): void
@@ -46,7 +46,7 @@ return new class extends Migration
                 if (! Schema::hasColumn($table, $col)) continue;
                 try {
                     // NOT NULL بلا افتراضٍ ولا ON UPDATE — الختمُ يُكتب مرّةً ويثبت
-                    DB::statement("ALTER TABLE `{$table}` MODIFY `{$col}` TIMESTAMP NOT NULL");
+                    DB::statement("ALTER TABLE `{$table}` MODIFY `{$col}` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
                 } catch (\Throwable $e) {
                     // عمودٌ يأبى التعديل يُترك — الهجرةُ لا تُوقف الترحيل
                 }

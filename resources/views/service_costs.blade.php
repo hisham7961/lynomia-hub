@@ -39,7 +39,12 @@
         <div class="stat"><span class="ico">🔗</span><b class="txt-bad">{{ $mrr['unmapped'] }}</b><span>عقد بلا خدمة مربوطة</span></div>
     @endif
     @if ($mrr['oneTime'])
-        <div class="stat"><span class="ico">1️⃣</span><b>{{ number_format($mrr['oneTime'], 1) }}</b><span>عقود مرة واحدة (خارج التكرار)</span></div>
+        {{-- العملةُ مُعلَنة، والاختلاطُ مُفصَّل: رقمٌ واحدٌ من عملتين بلا وسمٍ كذبة --}}
+        <div class="stat"><span class="ico">1️⃣</span><b>{{ number_format($mrr['oneTime'], 1) }}</b>
+            <span>عقود مرة واحدة (خارج التكرار)@if (! ($mrr['oneTimeMixed'] ?? false))
+                — {{ $mrr['oneTimeByCurrency'][0]['currency'] ?? setting('app.currency', 'د.ك') }}@else
+                <span class="bdg wn" title="لا محرّك تحويل في النظام — الرقمُ أعلاه مجموعُ عملاتٍ مختلفة، اقرأه مؤشّراً">⚠️ عملات مختلطة</span>
+                <br><span class="sub" style="font-size:11px">{{ collect($mrr['oneTimeByCurrency'])->map(fn ($o) => number_format($o['total'], 0) . ' ' . $o['currency'])->implode(' · ') }}</span>@endif</span></div>
     @endif
 </div>
 
