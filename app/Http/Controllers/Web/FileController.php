@@ -68,11 +68,12 @@ class FileController extends Controller
         if (! $u) return false;
         if (hub_is_owner($u)) return true;
 
-        // **الختم يسبق المهلة**: المفتاح يحمل ختم جدول الأدوار — فتعديلُ مصفوفة
-        // دورٍ (سحبُ رؤية وحدة) يُبطل القرار المخبّأ فوراً لا بعد انقضاء الـ١٢٠ث.
+        // **الختم يسبق المهلة، والمفتاحُ يحمل نطاقَ القارئ لا دورَه وحده.**
+        // كان يحمل الدورَ والمستخدمَ وختمَ الأدوار — فتبديلُ الشركة النشطة أو
+        // عدسةِ المشروع **لا يُبطله**، ويُقدَّم ملفٌ من شركةٍ خرج منها القارئ
+        // طَوالَ ١٢٠ث. `hub_scope_key` هي المعيارُ المرسَّخ لهذا بعينه.
         return (bool) Cache::remember(
-            'fileacc:' . ($u->role_id ?? '0') . ':' . $u->id . ':' . sha1($path)
-                . ':' . hub_data_stamp(['roles']), 120,
+            hub_scope_key('fileacc') . ':' . sha1($path) . ':' . hub_data_stamp(['roles']), 120,
             function () use ($u, $path) {
                 foreach (hub_modules() as $mk => $def) {
                     $table = (string) ($def['table'] ?? '');
@@ -131,6 +132,24 @@ class FileController extends Controller
                         ->where(fn ($w) => $w->where('from_id', $u->id)->orWhere('to_id', $u->id))
                         ->exists()) {
                     return true;
+                }
+
+                /*
+                 * **مرفقاتُ التعليقات**: `comments` ليست وحدةً في السجل فلم تكن
+                 * البوابةُ تعرفها — فكلُّ مرفق تعليقٍ يُردّ 403 لغير رافعه، ورابطُه
+                 * ظاهرٌ في الخيط يُغري بالضغط: ميزةٌ كاملةٌ ميتةٌ صامتة. الإذنُ
+                 * يُشتقّ من **سجلِّ التعليق** بالحارس نفسِه الذي يحرس كتابته.
+                 */
+                if (Schema::hasTable('comments')) {
+                    foreach (DB::table('comments')->whereNull('deleted_at')->where('att', $path)
+                                ->get(['module', 'record_id', 'user_id']) as $c) {
+                        if ((string) $c->user_id === (string) $u->id) return true;   // رافعُه يراه
+                        $mk = (string) $c->module;
+                        if ($mk === 'feed') return true;                             // قناةٌ عامّة لكل مصادَق
+                        if (! hub_mod($mk) || ! hub_can($u, $mk, 'v')) continue;
+                        if (! $c->record_id) continue;
+                        if (hub_read($mk, $u)?->where('id', $c->record_id)->exists()) return true;
+                    }
                 }
 
                 return false;

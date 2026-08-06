@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\InboundHook;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -42,13 +43,34 @@ class InboundHookController extends Controller
             abort_unless($sent !== '' && hash_equals($calc, $sent), 401, 'توقيعٌ غير صالح');
         }
 
-        DB::table('inbound_hook_events')->insert([
+        /*
+         * **حمايةُ إعادة التشغيل**: التوقيعُ يُثبت أن الجسمَ صدر من مالك السرّ،
+         * ولا يُثبت أنّه لم يُعَد إرساله — فمن التقط الطلب يُعيده كما هو بلا
+         * معرفةِ السرّ، ويتكرّر الحدثُ من سطحٍ عامّ. `X-Hub-Event-Id` (‏وهي
+         * الترويسةُ التي يرسلها صادرُ النظام نفسُه) + قيدٌ فريد + `insertOrIgnore`
+         * يجعلان الإعادةَ بلا أثر. ومُرسِلٌ لا يُرسل الترويسة يبقى يعمل كما كان.
+         */
+        $eventId = hub_fit(hub_str($r->header('X-Hub-Event-Id')), 190);
+        $eventId = $eventId === '' ? null : $eventId;
+
+        $row = [
             'hook_id'    => $hook->id,
             'payload'    => mb_strcut($raw, 0, self::MAX_BYTES),
             'ip'         => $r->ip(),
             'status'     => 200,
             'created_at' => now(),
-        ]);
+        ];
+        if (Schema::hasColumn('inbound_hook_events', 'event_id')) $row['event_id'] = $eventId;
+
+        $fresh = $eventId === null
+            ? (bool) DB::table('inbound_hook_events')->insert($row)
+            : (bool) DB::table('inbound_hook_events')->insertOrIgnore($row);
+
+        if (! $fresh) {
+            return response()->json(['ok' => true, 'event' => $hook->event,
+                                     'received' => strlen($raw), 'duplicate' => true]);
+        }
+
         // النبضة تُحدَّث بلا سباق: زيادةٌ ذرّية على مستوى القاعدة
         DB::table('inbound_hooks')->where('id', $hook->id)
             ->update(['hits' => DB::raw('hits + 1'), 'last_hit_at' => now()]);
