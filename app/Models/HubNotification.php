@@ -28,6 +28,16 @@ class HubNotification extends Model
      */
     protected static function booted(): void
     {
+        // قصُّ النصّ إلى عرض عموده مركزيّاً: نصٌّ أطولُ من `notifications_hub.text`
+        // يسقط على MySQL (‏22001) ويُقصّ صامتاً على SQLite — فقاعدةُ تنبيهٍ أو
+        // رفضُ توقيعٍ بسببٍ طويل كان يردّ ٥٠٠ على مسارٍ علنيّ ولا يُبلَّغ أحد.
+        // هنا يُحرَس كلُّ موضعِ إنشاءٍ بلا لمسه (نظير كتم الأنواع تحته).
+        static::creating(function (self $n) {
+            if ($n->text !== null) {
+                $n->text = hub_fit((string) $n->text, hub_col_max('notifications_hub', 'text') ?? 590);
+            }
+        });
+
         static::creating(function (self $n) {
             $kind = (string) $n->kind;
             if (! isset(self::MUTEABLE[$kind]) || ! $n->user_id) return;
