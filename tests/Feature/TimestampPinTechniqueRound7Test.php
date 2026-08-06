@@ -22,6 +22,13 @@ use Tests\TestCase;
  *
  * فالاختبارُ هنا لا يقرأ حالةَ خادمٍ سليم، بل **يصنع الظرفَ المعطوب بيده** في
  * جدولِ مسبارٍ مؤقّت، ثم يُجرّب التقنيةَ الحقيقية عليه.
+ *
+ * **وعلى اتصالٍ خاصٍّ به.** ‏MySQL 8 يرفض `SET SESSION
+ * explicit_defaults_for_timestamp` داخل معاملةٍ مفتوحة (خطأ 1766)، وحزمةُ
+ * الاختبار تلفّ كلَّ اختبارٍ في معاملة — بينما MariaDB تسمح بها. فمن يُشغّل
+ * محلياً على MariaDB يراه أخضر ويسقط على MySQL في الـCI. الظرفُ يُصنَع هنا
+ * على **جلسةٍ ثانية** لا معاملةَ فيها؛ والجدولُ مسبارٌ مؤقّتٌ باسمٍ عشوائيّ
+ * يُحذف في `finally`، فلا يمسّ معاملةَ الاختبار ولا جداولَه.
  */
 class TimestampPinTechniqueRound7Test extends TestCase
 {
@@ -33,32 +40,46 @@ class TimestampPinTechniqueRound7Test extends TestCase
             return;
         }
 
+        // جلسةٌ ثانية على القاعدة نفسِها: خارج معاملةِ الاختبار
+        $conn = 'ts_probe_conn';
+        config(['database.connections.' . $conn => config(
+            'database.connections.' . DB::getDefaultConnection())]);
+        $db = DB::connection($conn);
+
+        // الإثباتُ لا الادّعاء: الاتصالُ الافتراضيّ داخل معاملةِ الحزمة، وجلسةُ
+        // المسبار خارجها. لو عاد أحدٌ بالمسبار إلى الاتصال الافتراضيّ سقط هذا
+        // السطرُ فوراً — لا بعد رحلةٍ إلى الـCI على محرّكٍ آخر
+        $this->assertGreaterThan(0, DB::connection()->transactionLevel(),
+            'حزمةُ الاختبار لا تلفّ الاختبارَ في معاملة — فالحراسةُ هنا بلا معنى');
+        $this->assertSame(0, $db->transactionLevel(),
+            'جلسةُ المسبار داخل معاملة، و MySQL 8 يرفض ضبطَ المتغيّر حينها (خطأ 1766)');
+
         $t = 'ts_probe_' . Str::random(8);
-        $extra = fn () => strtolower((string) DB::table('information_schema.COLUMNS')
-            ->where('TABLE_SCHEMA', DB::getDatabaseName())
+        $extra = fn () => strtolower((string) $db->table('information_schema.COLUMNS')
+            ->where('TABLE_SCHEMA', $db->getDatabaseName())
             ->where('TABLE_NAME', $t)->where('COLUMN_NAME', 'stamp')->value('EXTRA'));
 
         try {
             // الظرفُ المعطوب كما هو في معظم الاستضافات المشتركة
-            DB::statement('SET SESSION explicit_defaults_for_timestamp = 0');
-            DB::statement("CREATE TABLE `{$t}` (id INT PRIMARY KEY, stamp TIMESTAMP NOT NULL, x INT)");
+            $db->statement('SET SESSION explicit_defaults_for_timestamp = 0');
+            $db->statement("CREATE TABLE `{$t}` (id INT PRIMARY KEY, stamp TIMESTAMP NOT NULL, x INT)");
 
             $this->assertStringContainsString('on update', $extra(),
                 'الظرفُ المعطوب لم يتحقّق على هذا الخادم — الاختبارُ سيمرّ فراغاً لا حراسة');
 
             // التقنيةُ القديمة: تُعيد كتابة التعريف المعطوب نفسِه
-            DB::statement("ALTER TABLE `{$t}` MODIFY `stamp` TIMESTAMP NOT NULL");
+            $db->statement("ALTER TABLE `{$t}` MODIFY `stamp` TIMESTAMP NOT NULL");
             $this->assertStringContainsString('on update', $extra(),
                 'إن نجحت التقنيةُ القديمة فقد تغيّر سلوكُ المحرّك — راجع الترحيلات');
 
             // والتقنيةُ الصحيحة: ذكرُ DEFAULT صراحةً يُلغي الإسنادَ الضمنيّ بشقّيه
-            DB::statement("ALTER TABLE `{$t}` MODIFY `stamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
+            $db->statement("ALTER TABLE `{$t}` MODIFY `stamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
             $this->assertStringNotContainsString('on update', $extra(),
                 'التقنيةُ المعتمدة في الترحيلات لا تنزع `ON UPDATE` — فالأختامُ تُدهَس '
                 . 'في الإنتاج والترحيلُ يبدو ناجحاً');
         } finally {
-            DB::statement("DROP TABLE IF EXISTS `{$t}`");
-            DB::statement('SET SESSION explicit_defaults_for_timestamp = DEFAULT');
+            $db->statement("DROP TABLE IF EXISTS `{$t}`");
+            DB::purge($conn);
         }
     }
 
