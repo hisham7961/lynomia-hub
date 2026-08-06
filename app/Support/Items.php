@@ -120,9 +120,17 @@ class Items
             $q->where(fn ($w) => $w->where('company_id', $companyId)->orWhereNull('company_id'));
         }
 
+        // **صنفُ الشركة يفوز، لا آخرُ صفٍّ يُرجعه المحرّك.** كانت الخريطة تُبنى
+        // بلا ترتيب و`$map[$key] = ...` يدهس ما سبقه — فحين يحمل صنفٌ مشترك
+        // وصنفُ شركةٍ الاسمَ نفسَه صار الفائزُ قرعةً تختلف بين المحرّكين، وهذه
+        // التعبئةُ **تُطبع على مستند العميل**. الترتيب: المخصَّص أوّلاً (‏NULL
+        // أخيراً) ثم `id` فاصلاً، ولا يُدهَس مفتاحٌ كُتب.
+        $q->orderByRaw('company_id is null')->orderBy('id');
+
         $map = [];
-        foreach ($q->get(['name', 'carton_qty']) as $row) {
-            $map[mb_strtolower(trim($row->name))] = (int) $row->carton_qty;
+        foreach ($q->get(['id', 'name', 'company_id', 'carton_qty']) as $row) {
+            $key = mb_strtolower(trim($row->name));
+            if (! array_key_exists($key, $map)) $map[$key] = (int) $row->carton_qty;
         }
 
         return $map;

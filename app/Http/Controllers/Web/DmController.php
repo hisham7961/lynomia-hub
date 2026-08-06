@@ -72,17 +72,37 @@ class DmController extends Controller
                 ->map(fn ($m) => ['msg' => $m, 'other' => $m->from_id === $me ? $m->to_id : $m->from_id]);
         }
 
-        $msgs = DmMessage::alive()->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
-            ->orderByDesc('created_at')->limit(500)->get();
+        /*
+         * **القائمةُ تُبنى على مستوى الخيط لا من شريحةٍ مسطّحة.**
+         *
+         * كانت تُجلب أحدثُ ٥٠٠ رسالةٍ ثم تُجمَّع — فخيطٌ ثرثارٌ واحد يبتلع النافذةَ
+         * كلَّها: رسالةٌ غير مقروءةٍ أقدمُ تسقط من الحساب، فيقول الشريطُ «غير
+         * مقروءة ٣» وتُظهر القائمةُ واحدة، ولا سبيلَ إلى فتح الباقي إلا بالصدفة.
+         * والعدُّ يُحسب الآن على **كل** الصفوف بتجميعٍ في القاعدة، فيطابق
+         * `unreadCount()` بالبناء لا بالاتفاق.
+         */
+        $unreadByThread = DmMessage::alive()->where('to_id', $me)->whereNull('read_at')
+            ->select('thread_key', \Illuminate\Support\Facades\DB::raw('COUNT(*) c'))
+            ->groupBy('thread_key')->pluck('c', 'thread_key');
 
-        $threads = $msgs->groupBy('thread_key')->map(function ($g) use ($me) {
-            $last = $g->first();
+        // أحدثُ خيطٍ أولاً — ٦٠ خيطاً لا ٥٠٠ رسالة، وغيرُ المقروء مضمومٌ دائماً
+        $recentKeys = DmMessage::alive()->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
+            ->select('thread_key', \Illuminate\Support\Facades\DB::raw('MAX(created_at) last_at'))
+            ->groupBy('thread_key')->orderByDesc('last_at')->limit(60)->pluck('thread_key');
+        $keys = $recentKeys->merge($unreadByThread->keys())->unique()->values();
+
+        // آخرُ رسالةٍ في كل خيطٍ مختار — صفٌّ واحدٌ لكل خيط لا نافذةٌ عامّة
+        $threads = $keys->map(function ($key) use ($me, $unreadByThread) {
+            $last = DmMessage::alive()->where('thread_key', $key)
+                ->orderByDesc('created_at')->orderByDesc('id')->first();
+            if (! $last) return null;
+
             return [
                 'other'  => $last->from_id === $me ? $last->to_id : $last->from_id,
                 'last'   => $last,
-                'unread' => $g->where('to_id', $me)->whereNull('read_at')->count(),
+                'unread' => (int) ($unreadByThread[$key] ?? 0),
             ];
-        })->values();
+        })->filter()->sortByDesc(fn ($t) => (string) $t['last']->created_at)->values();
 
         $users = User::whereIn('id', $threads->pluck('other')->merge($hits->pluck('other')))
             ->pluck('name', 'id');

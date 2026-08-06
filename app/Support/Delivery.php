@@ -40,10 +40,17 @@ class Delivery
     {
         if (! hub_read('feats')) return [];
 
+        // **عيّنةٌ محدّدةُ المعنى لا عيّنةٌ يقرّرها المحرّك**: `limit(300)` بلا ترتيب
+        // تعني «أيّ ثلاثمئة» — فالمتوسط والوسيط يتغيّران بتغيّر خطة التنفيذ.
+        // «أحدثُ ٣٠٠ ميزةٍ منشورة» معنىً يُدافَع عنه، والفاصلُ بالـ`id` لازمٌ لأن
+        // `updated_at` بدقّة الثانية تتساوى قيمُه في التوليد الدفعيّ.
+        $limit = 300;
         $feats = hub_read('feats')
             ->where('status', 'منشورة')->whereNotNull('request_id')
-            ->limit(300)->get(['id', 'title', 'request_id', 'due', 'updated_at']);
+            ->orderByDesc('updated_at')->orderByDesc('id')
+            ->limit($limit)->get(['id', 'title', 'request_id', 'due', 'updated_at']);
         if ($feats->isEmpty()) return [];
+        $sampled = $feats->count() >= $limit;
 
         $rq = hub_read('requests');
         $reqs = $rq ? $rq->whereIn('id', $feats->pluck('request_id'))->pluck('req_date', 'id') : collect();
@@ -68,6 +75,8 @@ class Delivery
 
         return ['n' => $n, 'avg' => (int) round(array_sum($days) / $n), 'median' => $median,
                 'best' => $days[0], 'worst' => $days[$n - 1],
+                // تقول الشاشةُ «آخر ٣٠٠» لا «كل»: رقمٌ جزئيّ يُقرأ كأنه الكلُّ كذبة
+                'sampled' => $sampled, 'sampleLimit' => $limit,
                 'slowest' => array_slice($slow, 0, 5)];
     }
 

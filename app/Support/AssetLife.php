@@ -106,9 +106,18 @@ class AssetLife
         // صيانةٌ مجدولة فات موعدها
         if (Schema::hasTable('asset_maintenance')) {
             $names = $q()->pluck('name', 'id');
+            // **التنطيقُ قبل الحدّ**: كان `limit(12)` يقع على صيانات الجميع ثم
+            // يُرشَّح ما يراه القارئ — فاثنتا عشرة صيانةً أقدمَ لشركةٍ لا يراها
+            // تُخفي صيانتَه الفائتة تماماً. و`orderBy('id')` فاصلُ تعادلٍ لأن
+            // `next` تاريخٌ بلا وقت فتتساوى قيمُه كثيراً.
+            // التنطيقُ من الأصل نفسِه: `$names` مُنطَّقةٌ أصلاً بـ`hub_scope` على
+            // `assets`، وعمودُ الشركة على جدول الصيانة يُترك فارغاً في مساراتٍ
+            // كثيرة — فالفرزُ به يُسقط صيانةً مملوكةً فعلاً.
+            $ids = $names->keys()->all();
             foreach (DB::table('asset_maintenance')->whereNull('deleted_at')
+                        ->whereIn('asset_id', $ids ?: ['-'])
                         ->where('status', 'مجدولة')->whereNotNull('next')
-                        ->where('next', '<', $today)->orderBy('next')->limit(12)
+                        ->where('next', '<', $today)->orderBy('next')->orderBy('id')->limit(12)
                         ->get(['id', 'title', 'asset_id', 'next']) as $m) {
                 if (! isset($names[$m->asset_id])) continue;      // خارج نطاق القارئ
                 $late = (int) Carbon::parse($m->next)->diffInDays(now());
