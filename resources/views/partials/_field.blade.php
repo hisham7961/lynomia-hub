@@ -69,9 +69,12 @@
              يُسقطها فيُرسَم المربّع فارغاً ويمحو وسومَ السجل عند أي حفظ، في ٢٨
              وحدة. تُقبل الصورتان — كما يفعل حقل ref المتعدد أعلاه. --}}
         @php $tv = old($k, implode('، ', is_array($raw) ? $raw : (json_decode((string) $raw, true) ?: []))); @endphp
-        <input class="inp" id="{{ $fid }}" name="{{ $k }}" value="{{ $tv }}" placeholder="افصل بينها بفواصل">
+        <input class="inp" id="{{ $fid }}" name="{{ $k }}" value="{{ $tv }}" placeholder="افصل بينها بفواصل"{!! $req !!}>
 
     @elseif ($t === 'sec')
+        {{-- **بلا `required` عمداً**: حقلُ السرّ يُعرض فارغاً دائماً حتى في
+             التعديل («اتركه فارغاً للإبقاء»)، فاشتراطُ الملء يمنع تعديلَ أيّ
+             حقلٍ آخر في السجل. الإلزامُ يُفرض عند الإنشاء في مسار الكتابة. --}}
         <input class="inp mono" id="{{ $fid }}" type="password" name="{{ $k }}" value="" placeholder="{{ $raw ? '•••••• (اتركه فارغاً للإبقاء)' : '' }}" autocomplete="new-password">
 
     @elseif ($t === 'file' || $t === 'img')
@@ -89,7 +92,9 @@
         @endif
 
     @elseif ($t === 'url')
-        <input class="inp mono ltr @error($k) err @enderror" id="{{ $fid }}" name="{{ $k }}" value="{{ old($k, $raw) }}" placeholder="https://…">
+        {{-- رايةُ الإلزام هنا كما في الفرع العام: كان الحقلُ عليه نجمةُ الإلزام
+             والمتصفحُ لا يمنع إرسالَه فارغاً — وعدٌ في الشاشة لا ينفّذه شيء --}}
+        <input class="inp mono ltr @error($k) err @enderror" id="{{ $fid }}" name="{{ $k }}" value="{{ old($k, $raw) }}" placeholder="https://…"{!! $req !!}>
 
     @else
         <input class="inp @error($k) err @enderror" id="{{ $fid }}" name="{{ $k }}" value="{{ old($k, $raw) }}"{!! $req !!}>

@@ -24,13 +24,15 @@
 
     <h3 style="margin:14px 0 6px" class="sub">شكل الحمولة (POST · JSON)</h3>
     <pre class="mono ltr" style="background:var(--cd);border:1px solid var(--brd);border-radius:10px;padding:12px;overflow:auto;direction:ltr;text-align:left">{
-  "event":    "tickets.status",
-  "module":   "tickets",
-  "id":       "9d8b...",
-  "display":  "تذكرة العميل",
-  "status":   "تم الحل",
-  "at":       "2026-07-31T20:00:00Z",
-  "data":     { "subject": "...", "priority": "عاجلة", ... }
+  "event":     "tickets.status",
+  "module":    "tickets",
+  "label":     "التذاكر",
+  "record_id": "9d8b...",
+  "display":   "تذكرة العميل",
+  "status_to": "تم الحل",
+  "by":        "اسم المنفّذ",
+  "at":        "2026-07-31T20:00:00Z",
+  "data":      { "subject": "...", "priority": "عاجلة", ... }
 }</pre>
     <div class="sub">الترويسات: <span class="mono ltr">X-Hub-Event</span> ·
         <span class="mono ltr">X-Hub-Event-Id</span> (لمنع التكرار عندك) ·
@@ -40,7 +42,8 @@
     <pre class="mono ltr" style="background:var(--cd);border:1px solid var(--brd);border-radius:10px;padding:12px;overflow:auto;direction:ltr;text-align:left">const crypto = require('crypto');
 const raw  = JSON.stringify($json.body);
 const mine = crypto.createHmac('sha256', 'سرّ_الاشتراك').update(raw).digest('hex');
-if (mine !== $json.headers['x-hub-signature']) throw new Error('توقيع غير صالح');
+// الترويسة تحمل البادئة sha256= — المقارنة بلا البادئة ترفض كل حمولة صحيحة
+if ('sha256=' + mine !== $json.headers['x-hub-signature']) throw new Error('توقيع غير صالح');
 return $input.all();</pre>
 </div>
 

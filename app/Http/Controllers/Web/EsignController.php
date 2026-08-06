@@ -1004,7 +1004,10 @@ class EsignController extends Controller
         $found = null;
         $code = strtoupper(trim(hub_str($r->input('code'))));
         if ($code !== '') {
-            $key = 'verify:' . $r->ip();
+            // **دلوٌ لكل مسار** (v2.341): كان `verify:` مشتركاً بين هذا المسار
+            // (سقفُه ١٠) و`verifyDoc` (سقفُه ٢٠)، فأحدُهما يستهلك حصّةَ الآخر
+            // والحدُّ المُعلن ليس الحدَّ الواقع.
+            $key = 'verify:code:' . $r->ip();
             if (RateLimiter::tooManyAttempts($key, 10)) {
                 return view('sign.verify', ['code' => $code, 'found' => null, 'throttled' => true,
                     'verdict' => ['checked' => false, 'ok' => true]]);
@@ -1040,7 +1043,7 @@ class EsignController extends Controller
         $code = strtoupper(trim(hub_str($code)));
         abort_if($code === '', 404);
 
-        $key = 'verify:' . $r->ip();
+        $key = 'verify:doc:' . $r->ip();
         abort_if(RateLimiter::tooManyAttempts($key, 20), 429, 'محاولاتٌ كثيرة — انتظر دقيقة ثم أعد المسح');
         RateLimiter::hit($key, 60);
 
