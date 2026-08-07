@@ -42,7 +42,12 @@ class UserController extends Controller
     {
         $this->gate();
 
+        // تبويبُ السلّة: حساباتٌ محذوفةٌ ناعماً تُستعاد — رسائلُ النظام تُحيل إليها
+        // (StaffController)، فوجودُها ليس ترفاً بل إتمامُ وعدٍ قائم.
+        $trash = $r->input('trash') === '1';
+
         $users = User::with('role')
+            ->when($trash, fn ($q) => $q->onlyTrashed())
             ->when($r->input('q'), fn ($q, $t) => $q->where(fn ($w) => $w->where('name', 'LIKE', "%$t%")->orWhere('email', 'LIKE', "%$t%")))
             ->when($r->input('role'), fn ($q, $v) => $q->where('role_id', $v))
             ->when($r->input('status'), fn ($q, $v) => $q->where('status', $v))
@@ -58,7 +63,8 @@ class UserController extends Controller
             ->whereIn('user_id', $users->pluck('id'))
             ->groupBy('user_id')->pluck(DB::raw('COUNT(*)'), 'user_id');
 
-        return view('users.index', ['users' => $users, 'live' => $live,
+        return view('users.index', ['users' => $users, 'live' => $live, 'trash' => $trash,
+            'trashCount' => User::onlyTrashed()->count(),
             'roles' => Role::orderBy('name')->pluck('name', 'id')]);
     }
 
@@ -258,11 +264,33 @@ class UserController extends Controller
         $this->gate();
         $this->guardEscalation(null, $user);
         abort_if($user->id === auth()->id(), 422, 'لا يمكنك حذف حسابك الحالي');
-        abort_if($user->role?->is_owner && self::activeOwners() <= 1, 422,
-            'هذا آخر مالكٍ نشط — عيّن مالكاً آخر قبل حذفه');
-        $user->delete();
+        // معاملةٌ تقفل صفوفَ المالكين النشطين قبل العدّ: عمليتان متزامنتان كانتا
+        // تقرآن العدّ نفسَه (٢) فتمرّان معاً وتُصفّران المالكين — قفلٌ دائمٌ لإدارة
+        // النظام لا فكاكَ منه إلا بتحرير القاعدة. القفلُ يُسلسلهما فيرى الثاني ١ فيُردّ.
+        \Illuminate\Support\Facades\DB::transaction(function () use ($user) {
+            abort_if($user->role?->is_owner && self::activeOwnersLocked() <= 1, 422,
+                'هذا آخر مالكٍ نشط — عيّن مالكاً آخر قبل حذفه');
+            $user->delete();
+        });
 
-        return redirect()->route('users.index')->with('ok', 'حُذف المستخدم');
+        return redirect()->route('users.index')->with('ok',
+            'حُذف المستخدم — يمكن استعادته من سلّة المستخدمين ما لم يُحرَق بريدُه بحسابٍ جديد');
+    }
+
+    /** استعادةُ حسابٍ محذوفٍ ناعماً — إتمامُ وعدِ الرسائل التي تُحيل إلى «السلّة» */
+    public function restore(string $id)
+    {
+        $this->gate();
+        $user = User::onlyTrashed()->findOrFail($id);
+        $this->guardEscalation(null, $user);
+
+        // لا تعارضَ بريدٍ ممكن: فهرسُ `email` الفريد يشمل المحذوفَ ناعماً، فلا يُنشأ
+        // حسابٌ حيٌّ ببريدِ محذوف أصلاً (‏StaffController يُحيل إلى الاستعادة). فالبريدُ
+        // محجوزٌ لصاحبه المحذوف، ويعود إليه سليماً.
+        $user->restore();
+        hub_audit('استعادة مستخدم', 'users', $user->id, $user->name);
+
+        return redirect()->route('users.index')->with('ok', 'استُعيد «' . $user->name . '» — يدخل بكلمة مروره كما كانت');
     }
 
     /** عدد المالكين النشطين — الحدّ الذي دونه يفقد النظام إدارته */
@@ -271,5 +299,14 @@ class UserController extends Controller
         $ids = Role::where('is_owner', true)->pluck('id')->all();
 
         return $ids ? User::whereNull('deleted_at')->where('status', 'نشط')->whereIn('role_id', $ids)->count() : 0;
+    }
+
+    /** كسابقتها لكن بقفلٍ صفّيّ — تُستدعى داخل معاملةٍ فتُسلسل العمليات المتزامنة */
+    protected static function activeOwnersLocked(): int
+    {
+        $ids = Role::where('is_owner', true)->pluck('id')->all();
+
+        return $ids ? User::whereNull('deleted_at')->where('status', 'نشط')
+            ->whereIn('role_id', $ids)->lockForUpdate()->count() : 0;
     }
 }

@@ -11,12 +11,13 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * الموجة الرابعة (مؤجّل) — عنقود المصادقة الثنائية و«تذكّرني»:
- * (٩٨) المصادقة الثنائية (TOTP) تُتجاوَز كلياً عند إعادة الدخول عبر كعكة «تذكّرني»:
- *      الجلسةُ تُبعَث من الكعكة (viaRemember) دون المرور ببوابة الرمز — فكعكةٌ
- *      مسروقةٌ أو عودةٌ بعد انتهاء الجلسة تدخل بلا رمز.
- * (١١٨) الجلساتُ المُعاد بعثها من الكعكة لا تُسجَّل في sessions_log فلا تُنهى من
- *      مركز الأمان — تبقى أشباحاً لا يراها المالك ولا يقدر على إخراجها.
+ * عنقود المصادقة الثنائية و«تذكّرني» — وقد شُدّد في v2.354.
+ *
+ * **لا دخول إلا بالبريد وكلمة المرور** (طلبُ المالك، v2.354): النظامُ لم يعد يُصدر
+ * كعكةَ «تذكّرني» (remember: false)، وأيُّ كعكةٍ قديمة باقيةٍ تُردّ إلى بوابة الدخول
+ * فلا عودةَ إلا بالبريد وكلمة المرور. فالاختباران أدناه صارا يؤكّدان **الردَّ الكامل**
+ * لا مجرّد «لا تجاوز للرمز» — الكعكةُ لا تدخل أصلاً، بـ2FA أو بدونها.
+ *
  * (٨٨) خطوةُ رمز TOTP بلا قفل حساب — تخمينٌ غير محدودٍ لرمز حسابٍ بعينه.
  *
  * harness «تذكّرني»: نبني كعكة recaller يدويّاً (id|remember_token|password) مشفّرةً
@@ -51,25 +52,26 @@ class TwoFactorRememberRound4Test extends TestCase
         return $this->withCookie($name, $recaller)->get($uri);
     }
 
-    /** (١١٨) جلسةٌ مُعادةٌ من كعكة «تذكّرني» تُسجَّل فتُنهى من مركز الأمان */
-    public function test_remember_rebuilt_session_is_logged(): void
+    /** كعكة «تذكّرني» وحدها (بلا 2FA) لا تدخل — تُردّ إلى بوابة الدخول بالبريد وكلمة المرور */
+    public function test_remember_cookie_without_2fa_is_refused_and_forces_full_login(): void
     {
         $this->seedCore();   // المالك بلا 2FA
 
-        $this->rememberVisit($this->owner, '/m/tasks')->assertOk();
+        $this->rememberVisit($this->owner, '/m/tasks')->assertRedirect(route('login'));
 
-        $this->assertGreaterThanOrEqual(1, SessionLog::where('user_id', $this->owner->id)->count(),
-            'الجلسة المُعادة من الكعكة لم تُسجَّل — لا تُنهى من مركز الأمان');
+        // ولا جلسةَ حضورٍ تُسجَّل لدخولٍ لم يقع — الكعكةُ رُدّت لا بُعثت
+        $this->assertSame(0, SessionLog::where('user_id', $this->owner->id)->count(),
+            'كعكةُ «تذكّرني» بعثت جلسةً بلا كلمة مرور — يجب ألّا تدخل أصلاً');
     }
 
-    /** (٩٨) كعكة «تذكّرني» لا تتجاوز بوابة المصادقة الثنائية */
-    public function test_remember_cookie_does_not_bypass_2fa(): void
+    /** كعكة «تذكّرني» مع 2FA كذلك لا تدخل — الردُّ الكامل أشدُّ من إعادة التحدّي بالرمز */
+    public function test_remember_cookie_with_2fa_is_also_refused(): void
     {
         $this->seedCore();
         $this->enable2fa($this->owner);
 
-        // عودةٌ بالكعكة وحدها: يجب أن يُعاد التحدّي بالرمز لا أن يُمنَح الوصول
-        $this->rememberVisit($this->owner, '/m/tasks')->assertRedirect(route('login.otp'));
+        // لا تجاوزَ للرمز، ولا حتى إعادةَ تحدٍّ به: عودةٌ كاملةٌ لبوابة الدخول
+        $this->rememberVisit($this->owner, '/m/tasks')->assertRedirect(route('login'));
     }
 
     /** (٨٨) خطوةُ رمز TOTP تقفل الحساب بعد محاولاتٍ فاشلة */

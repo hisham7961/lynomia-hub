@@ -1,0 +1,4 @@
+# Lynomia Business Hub — نظامٌ خاصٌّ خلف تسجيل دخول، لا مكان له في فهرس البحث.
+# A private, login-walled business system. Not for public search indexing.
+User-agent: *
+Disallow: /

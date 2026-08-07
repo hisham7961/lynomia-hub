@@ -27,6 +27,10 @@
         <button class="btn sm">بحث</button>
         @if (request()->query())<a class="btn ghost sm" href="{{ route('users.index') }}">✕ مسح</a>@endif
     </form>
+    <div class="tabs" style="margin-inline-start:auto">
+        <a class="btn {{ ($trash ?? false) ? 'ghost' : 'p' }} sm" href="{{ route('users.index') }}">النشطون</a>
+        <a class="btn {{ ($trash ?? false) ? 'p' : 'ghost' }} sm" href="{{ route('users.index', ['trash' => 1]) }}">🗑️ السلّة @if (($trashCount ?? 0))<span class="bdg">{{ $trashCount }}</span>@endif</a>
+    </div>
 </div>
 <div class="card pad0">
     <div class="tblwrap"><table class="tbl">
@@ -58,9 +62,13 @@
                     @if ($u->last_login_ip)<div class="sub ltr">{{ $u->last_login_ip }}</div>@endif
                 </td>
                 <td class="acts">
-                    <a class="btn ghost xs" href="{{ route('users.edit', $u) }}">تعديل</a>
-                    @if ($u->id !== auth()->id())
-                        <form class="inline" method="POST" action="{{ route('users.destroy', $u) }}" data-confirm="حذف المستخدم؟">@csrf @method('DELETE')<button class="btn ghost xs dn">حذف</button></form>
+                    @if ($trash ?? false)
+                        <form class="inline" method="POST" action="{{ route('users.restore', $u->id) }}" data-confirm="استعادة «{{ $u->name }}»؟">@csrf<button class="btn ghost xs">♻️ استعادة</button></form>
+                    @else
+                        <a class="btn ghost xs" href="{{ route('users.edit', $u) }}">تعديل</a>
+                        @if ($u->id !== auth()->id())
+                            <form class="inline" method="POST" action="{{ route('users.destroy', $u) }}" data-confirm="حذف المستخدم؟ يمكن استعادته من السلّة.">@csrf @method('DELETE')<button class="btn ghost xs dn">حذف</button></form>
+                        @endif
                     @endif
                 </td>
             </tr>

@@ -59,7 +59,54 @@
     <div class="stat"><span class="ico">🔒</span><b class="{{ $kpi['locked'] ? 'txt-bad' : '' }}">{{ $kpi['locked'] }}</b><span>حسابات مقفلة الآن</span></div>
     <div class="stat"><span class="ico">😴</span><b class="{{ $kpi['idle'] ? 'txt-bad' : '' }}">{{ $kpi['idle'] }}</b><span>خاملون +٦٠ يوماً</span></div>
     <div class="stat"><span class="ico">🚫</span><b class="{{ $kpi['failed7'] ? 'txt-bad' : '' }}">{{ $kpi['failed7'] }}</b><span>محاولات فاشلة (٧ أيام)</span></div>
+    <div class="stat"><span class="ico">📡</span><b class="{{ $kpi['denied7'] ? 'txt-bad' : '' }}">{{ $kpi['denied7'] }}</b><span>وصولٌ مرفوض (٧ أيام)</span></div>
     <div class="stat"><span class="ico">🗝️</span><b class="{{ $kpi['stale'] ? 'txt-bad' : '' }}">{{ $kpi['stale'] }}</b><span>أسرار لم تُغيَّر منذ ٦ أشهر</span></div>
+</div>
+
+{{-- رادارُ الكشف الحيّ: من طرق باباً لا يملك مفتاحه — وصولٌ مرفوض (٤٠٣) وتخمينُ روابط --}}
+<div class="card" style="margin-bottom:12px">
+    <div class="crow" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <h3 style="margin:0">📡 رادار الكشف الحيّ <span class="sub">(٧ أيام)</span></h3>
+        <div class="crow" style="gap:6px">
+            <span class="bdg {{ $radar['total'] ? 'bad' : 'ok' }}">{{ $radar['total'] }} محاولة مرفوضة</span>
+            <span class="bdg wn">{{ $radar['ips'] }} عنوان</span>
+            <span class="bdg {{ $radar['anon'] ? 'wn' : 'ok' }}">{{ $radar['anon'] }} من غير مستخدم</span>
+        </div>
+    </div>
+    <div class="sub" style="margin:4px 0 10px">
+        كل طرقةٍ على بابٍ بلا مفتاح: وصولٌ مرفوض (٤٠٣) خارج الصلاحية، أو تخمينُ رابط توقيعٍ من غير مستخدم.
+        مراقبةٌ حيّة — لا كلمةَ مرورٍ خاطئة (تلك في «المحاولات الفاشلة») بل محاولةُ فتحِ ما لا يُملَك.
+    </div>
+
+    @if ($threats->count())
+        <div style="margin-bottom:10px;padding:8px 10px;border-radius:9px;border:1px solid var(--ln);
+                    background:color-mix(in srgb, var(--bad) 9%, transparent)">
+            <b style="font-size:13px">⛔ عناوين تكرّر الطرق</b>
+            <div class="sub" style="margin-top:4px">عنوانٌ يطرق مراراً وأهدافُه تتعدّد تقصٍّ لا خطأ — راجعه، وفكّر في حصر الوصول بالشبكة من ملفات المستخدمين.</div>
+            @foreach ($threats as $t)
+                <div class="sub mono ltr" style="font-size:12px">
+                    {{ $t->ip }} — {{ $t->hits }} محاولة على {{ $t->targets }} مسار{{ (int) $t->anon ? ' · ' . $t->anon . ' من غير مستخدم' : '' }}
+                </div>
+            @endforeach
+        </div>
+    @endif
+
+    <table class="mini">
+        @forelse ($denials as $d)
+            <tr>
+                <td>
+                    <span class="bdg {{ $d->kind === 'تخمين رابط' ? 'wn' : 'bad' }}">{{ $d->kind }}</span>
+                    <b>{{ $d->uname ?? 'زائرٌ غير مستخدم' }}</b>
+                    <div class="sub mono ltr" title="{{ $d->path }}">
+                        {{ $d->method }} {{ \Illuminate\Support\Str::limit($d->path, 44) }} · {{ \Illuminate\Support\Carbon::parse($d->created_at)->diffForHumans() }}
+                    </div>
+                </td>
+                <td class="mono ltr acts">{{ $d->ip ?: '—' }}</td>
+            </tr>
+        @empty
+            <tr><td class="sub" style="padding:12px;text-align:center">لا محاولات وصولٍ مرفوضة — الرادار صافٍ 🟢</td></tr>
+        @endforelse
+    </table>
 </div>
 
 <div class="kids">

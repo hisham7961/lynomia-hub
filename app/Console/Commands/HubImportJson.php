@@ -132,6 +132,16 @@ class HubImportJson extends Command
         \Illuminate\Support\Facades\Cache::forget('settings:all');
 
         $this->info("تم الاستيراد: $total سجل.");
+
+        // **سلسلةُ التدقيق بعد الاستعادة**: سجلاتُ `audits` تُستعاد ببصماتها القديمة
+        // (`hash`/`prev_hash` من القاعدة المصدر) بينما رأسُ السلسلة (`audit_chain`)
+        // لا يُستعاد — فتلتقي لينتان لا تتّصلان، ويُبلّغ مركزُ الأمان «انقطاعاً» بلا
+        // عبثٍ وقع. المخرجُ الصريح: إعادةُ الوصل في سلسلةٍ واحدة.
+        if (! empty($db['_tables']['audits'])) {
+            $this->warn('استُعيدت سجلاتُ التدقيق ببصماتها القديمة ورأسُ السلسلة لم يُستعَد — '
+                . 'شغّل `php artisan hub:audit-verify --rebuild` لإعادة وصلها في سلسلةٍ واحدة.');
+        }
+
         return 0;
     }
 

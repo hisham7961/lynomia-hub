@@ -319,6 +319,7 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
     Route::put('admin/users/{user}', [UserController::class, 'update'])->name('users.update');
     Route::delete('admin/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
+    Route::post('admin/users/{id}/restore', [UserController::class, 'restore'])->name('users.restore');
     // بابُ استردادٍ لمن ضاع جهازُ تحقّقه — وإلا فالقفلُ دائمٌ بلا مخرج
     Route::post('admin/users/{user}/twofa-off', [UserController::class, 'twofaOff'])->name('users.twofa.off');
 

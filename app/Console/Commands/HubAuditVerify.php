@@ -21,6 +21,7 @@ class HubAuditVerify extends Command
 {
     protected $signature = 'hub:audit-verify
         {--reseal : ترقية السجلات المختومة ببصمة قديمة إلى البصمة الكاملة (بعد تحقق نظيف)}
+        {--rebuild : إعادةُ وصلِ سلسلةٍ مكسورة من البداية بترتيب الإدراج — بعد استعادةٍ موثوقة أو نقلٍ مقصود}
         {--strict : إفشال الأمر عند اختلاف عمود الشركة كذلك (لا تحذيراً)}';
     protected $description = 'التحقق من سلامة سلسلة تجزئة سجل التدقيق';
 
@@ -37,6 +38,17 @@ class HubAuditVerify extends Command
 
         // فهرس خفيف: ثلاث قيم قصيرة لكل سجل — المشي بلا تحميل المحتوى
         $index = DB::table('audits')->whereNotNull('hash')->get(['id', 'prev_hash', 'hash']);
+
+        // **مسارُ الاستعادة**: سلسلةٌ مكسورة (انقطاعٌ أو تفرّعٌ من لينَتين مختلطتين
+        // بعد استعادة نسخة) لا يُصلحها `--reseal` — فهو لا يُبلَغ أصلاً، إذ يُفشَل
+        // الأمرُ عند الانقطاع قبله. `--rebuild` يُعيد وصلَ السلسلة كاملةً من البداية
+        // بترتيب الإدراج (id تصاعديّ = ترتيب الإنشاء الحقيقي، فالعمود bigIncrements)،
+        // ويضبط الرأس، ويختم الفعلَ نفسَه في السلسلة الجديدة. فعلٌ مقصودٌ صريح لا
+        // يُثبت نظافةَ ما قبله — يُعيد الوصلَ على المحتوى الحالي، فيُستعمل بعد
+        // استعادةٍ موثوقة أو نقلٍ مقصود لا لإخفاء عبثٍ حقيقي.
+        if ($this->option('rebuild')) {
+            return $this->rebuild($index);
+        }
 
         if ($index->isEmpty() && ! $suspect) {
             $this->info('لا سجلات مسلسلة بعد' . ($legacyRows ? " ({$legacyRows} سجل سابق للسلسلة)" : ''));
@@ -144,6 +156,63 @@ class HubAuditVerify extends Command
         if ($this->option('reseal') && $weak) {
             $this->reseal(array_keys($order));
         }
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * إعادةُ بناء السلسلة كاملةً — مسارُ الاستعادة من كسرٍ بنيويّ.
+     *
+     * الفرق عن `reseal`: ذاك يُعيد ختمَ السلسلة **المتّصلة** بالبصمة الحالية (ترقيةُ
+     * صياغة)، ولا يُبلَغ إلا بعد مشيٍ نظيف. أمّا هذا فيُعيد **وصلَ** سلسلةٍ مكسورة:
+     * يأخذ كلَّ سجلٍ مختوم بترتيب `id` التصاعديّ (= ترتيب الإدراج، فالعمود
+     * bigIncrements) ويُعيد حسابَ `prev_hash`/`hash` من البداية، فتلتئم اللينَتان
+     * المختلطتان (أثرُ استعادة نسخة) في سلسلةٍ واحدة متّصلة.
+     *
+     * **لا يُثبت نظافةَ ما قبله**: يُعيد الوصلَ على المحتوى كما هو الآن. فيُختَم
+     * الفعلُ نفسُه في السلسلة الجديدة (سجلُّ تدقيقٍ بمن ومتى وكم) كي لا تكون
+     * إعادةُ البناء بابَ عبثٍ صامت: من يعيد البناء يترك بصمتَه فيها.
+     */
+    protected function rebuild(\Illuminate\Support\Collection $index): int
+    {
+        $total = $index->count();
+        if ($total === 0) {
+            $this->info('لا سجلات مسلسلة لإعادة بنائها.');
+            return self::SUCCESS;
+        }
+
+        // تقريرُ الحالة قبل العلاج: كم يتّصل من البداية فعلاً وكم منقطع
+        $byPrev = $index->groupBy('prev_hash');
+        $prev = str_repeat('0', 64);
+        $connected = 0;
+        while (($bucket = $byPrev->get($prev)) && $bucket->count() === 1) {
+            $connected++;
+            $prev = $bucket->first()->hash;
+        }
+        $this->warn("قبل: {$total} سجل مختوم، يتّصل من البداية {$connected} فقط، ومنقطعٌ " . ($total - $connected) . '.');
+
+        // إعادةُ الوصل بترتيب الإدراج — معاملةٌ واحدة (انقطاعها يترك سلسلةً مكسورة)
+        $ids = DB::table('audits')->whereNotNull('hash')->orderBy('id')->pluck('id')->all();
+        $head = str_repeat('0', 64);
+        DB::transaction(function () use ($ids, &$head) {
+            foreach (array_chunk($ids, self::BATCH) as $chunk) {
+                $rows = AuditEntry::whereIn('id', $chunk)->get()->keyBy('id');
+                foreach ($chunk as $id) {                 // ترتيب id محفوظٌ داخل الرزمة
+                    $hash = hash('sha256', $head . '|' . $rows[$id]->canonical());
+                    DB::table('audits')->where('id', $id)->update(['prev_hash' => $head, 'hash' => $hash]);
+                    $head = $hash;
+                }
+            }
+            DB::table('audit_chain')->where('id', 1)->update(['head' => $head]);
+        });
+
+        // بصمةُ الفعل نفسِه: تُلحَق على الرأس الجديد فتصير آخرَ حلقةٍ في السلسلة
+        // الملتئمة — لا إعادةَ بناءٍ بلا أثرٍ يُقرأ في مركز التدقيق.
+        hub_audit('إعادة بناء سلسلة التدقيق', null, null, null,
+            ['name' => "أُعيد وصلُ {$total} سجل من البداية بترتيب الإدراج"]);
+
+        $this->info("🔧 أُعيد بناءُ السلسلة: {$total} سجل أُعيد ختمُها من البداية، والرأسُ محدَّث. شغّل `php artisan hub:audit-verify` للتأكد.");
+        $this->warn('تذكير: إعادةُ البناء تُعيد الوصلَ على المحتوى الحالي ولا تُثبت أنه لم يُعبَث به قبلها — استعملها بعد استعادةٍ موثوقة أو نقلٍ مقصود فقط.');
 
         return self::SUCCESS;
     }

@@ -40,10 +40,9 @@ class TrackVisits
                         'route' => substr((string) $r->route()?->getName(), 0, 120),
                         'at' => now(),
                     ]);
-                    // تشذيب عرضي: ما جاوز ٩٠ يوماً يُحذف (فرصة ~١٪ لكل تسجيلة)
-                    if (random_int(1, 100) === 1) {
-                        DB::table('page_visits')->where('at', '<', now()->subDays(90))->delete();
-                    }
+                    // التشذيبُ نُقل إلى hub:automation (v2.350): حذفٌ على عمودٍ
+                    // في أثناء تحميل صفحةٍ يُبطئ الطلبَ ويقفل الجدول — لا مكانَ له
+                    // في مسار المستخدم.
                 }
             }
         } catch (\Throwable $e) {

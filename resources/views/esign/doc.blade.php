@@ -6,7 +6,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ $req->title }}</title>
 @include('partials.standalone_head')
-<style>@media print{.noprint{display:none!important}body{background:#fff!important}.card{box-shadow:none!important;border:0!important}}</style>
+<style>@media print{:root,html[data-theme="dark"]{--tx:#111;--cd:#fff;--bg:#fff;--ln:#ccc;color-scheme:light}.noprint{display:none!important}body{background:#fff!important;color:#111!important}.card{box-shadow:none!important;border:0!important}}</style>
 </head>
 <body class="pagedoc">
 <div style="max-width:800px;margin:0 auto">

@@ -41,6 +41,36 @@ class DmController extends Controller
     }
 
     /** قائمة المحادثات: آخر رسالة وغير المقروء لكل طرف */
+    /**
+     * قائمةُ المحادثات: أحدثُ ٦٠ خيطاً **وكلُّ خيطٍ فيه غيرُ مقروء** — مضمومٌ دائماً.
+     * تُبنى على مستوى الخيط لا من شريحةٍ مسطّحة، فخيطٌ ثرثارٌ واحد لا يبتلع النافذةَ
+     * ويُسقط محادثةً غير مقروءةٍ أقدم. مشتركةٌ بين الصندوق والخيط المفتوح كي لا يعود
+     * العيبُ في أحدهما (‏thread كان يبني من أحدث ٥٠٠ رسالةٍ بلا ضمِّ غير المقروء).
+     */
+    protected function threadList(string $me): \Illuminate\Support\Collection
+    {
+        $unreadByThread = DmMessage::alive()->where('to_id', $me)->whereNull('read_at')
+            ->select('thread_key', \Illuminate\Support\Facades\DB::raw('COUNT(*) c'))
+            ->groupBy('thread_key')->pluck('c', 'thread_key');
+
+        $recentKeys = DmMessage::alive()->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
+            ->select('thread_key', \Illuminate\Support\Facades\DB::raw('MAX(created_at) last_at'))
+            ->groupBy('thread_key')->orderByDesc('last_at')->limit(60)->pluck('thread_key');
+        $keys = $recentKeys->merge($unreadByThread->keys())->unique()->values();
+
+        return $keys->map(function ($key) use ($me, $unreadByThread) {
+            $last = DmMessage::alive()->where('thread_key', $key)
+                ->orderByDesc('created_at')->orderByDesc('id')->first();
+            if (! $last) return null;
+
+            return [
+                'other'  => $last->from_id === $me ? $last->to_id : $last->from_id,
+                'last'   => $last,
+                'unread' => (int) ($unreadByThread[$key] ?? 0),
+            ];
+        })->filter()->sortByDesc(fn ($t) => (string) $t['last']->created_at)->values();
+    }
+
     public function inbox(Request $r)
     {
         $me = auth()->id();
@@ -81,28 +111,7 @@ class DmController extends Controller
          * والعدُّ يُحسب الآن على **كل** الصفوف بتجميعٍ في القاعدة، فيطابق
          * `unreadCount()` بالبناء لا بالاتفاق.
          */
-        $unreadByThread = DmMessage::alive()->where('to_id', $me)->whereNull('read_at')
-            ->select('thread_key', \Illuminate\Support\Facades\DB::raw('COUNT(*) c'))
-            ->groupBy('thread_key')->pluck('c', 'thread_key');
-
-        // أحدثُ خيطٍ أولاً — ٦٠ خيطاً لا ٥٠٠ رسالة، وغيرُ المقروء مضمومٌ دائماً
-        $recentKeys = DmMessage::alive()->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
-            ->select('thread_key', \Illuminate\Support\Facades\DB::raw('MAX(created_at) last_at'))
-            ->groupBy('thread_key')->orderByDesc('last_at')->limit(60)->pluck('thread_key');
-        $keys = $recentKeys->merge($unreadByThread->keys())->unique()->values();
-
-        // آخرُ رسالةٍ في كل خيطٍ مختار — صفٌّ واحدٌ لكل خيط لا نافذةٌ عامّة
-        $threads = $keys->map(function ($key) use ($me, $unreadByThread) {
-            $last = DmMessage::alive()->where('thread_key', $key)
-                ->orderByDesc('created_at')->orderByDesc('id')->first();
-            if (! $last) return null;
-
-            return [
-                'other'  => $last->from_id === $me ? $last->to_id : $last->from_id,
-                'last'   => $last,
-                'unread' => (int) ($unreadByThread[$key] ?? 0),
-            ];
-        })->filter()->sortByDesc(fn ($t) => (string) $t['last']->created_at)->values();
+        $threads = $this->threadList((string) $me);
 
         $users = User::whereIn('id', $threads->pluck('other')->merge($hits->pluck('other')))
             ->pluck('name', 'id');
@@ -133,16 +142,11 @@ class DmController extends Controller
             ->orderByDesc('created_at')->orderByDesc('id')->limit(300)->get()
             ->reverse()->values();
 
-        // نفس الشاشة: قائمةُ المحادثات إلى جانب الخيط المفتوح — لا صفحتان منفصلتان
+        // نفس الشاشة: قائمةُ المحادثات إلى جانب الخيط المفتوح — لا صفحتان منفصلتان.
+        // القائمةُ المشتركة تضمّ غيرَ المقروء دائماً، فلا تختفي محادثةٌ قديمةٌ فيها
+        // واردٌ لم يُقرأ بينما الشريطُ يقول إن ثمّة غيرَ مقروء.
         $me = auth()->id();
-        $all = DmMessage::alive()->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
-            ->orderByDesc('created_at')->limit(500)->get();
-        $threads = $all->groupBy('thread_key')->map(function ($g) use ($me) {
-            $last = $g->first();
-
-            return ['other' => $last->from_id === $me ? $last->to_id : $last->from_id,
-                    'last' => $last, 'unread' => $g->where('to_id', $me)->whereNull('read_at')->count()];
-        })->values();
+        $threads = $this->threadList((string) $me);
 
         $ids = $threads->pluck('other')->push($other->id)->unique()->all();
 
