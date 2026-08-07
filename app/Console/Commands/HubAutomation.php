@@ -314,9 +314,14 @@ class HubAutomation extends Command
             if (! $md) continue;
 
             // الحقل: مفتاح من تعريف الوحدة أو اسم عمود مباشر
-            $col = collect($md['fields'])->firstWhere('key', $rule->field)['col']
+            $fdef = collect($md['fields'])->firstWhere('key', $rule->field);
+            $col = $fdef['col']
                 ?? (Schema::hasColumn($md['table'], (string) $rule->field) ? $rule->field : null);
             if (! $col) { $this->line("تخطٍ: {$rule->name} — حقل غير معروف"); continue; }
+            // نوعُ الحقل يحسم دلالة «فارغ»: على العدديّ والتاريخيّ = NULL وحده،
+            // فمقارنةُ '' على عمودٍ رقميّ تُطابق الصفرَ على MySQL (يحوّل '' إلى 0)
+            // ولا شيء على SQLite — انقسامٌ صامت. نظيرُ ModuleController:147.
+            $ftype = $fdef['type'] ?? null;
 
             $q = DB::table($md['table'])->whereNull('deleted_at');
             $v = (string) $rule->val;
@@ -331,7 +336,9 @@ class HubAutomation extends Command
                 'أصغر من عمود'          => ($c2 = $vcol()) ? $q->whereNotNull($c2)->whereColumn($col, '<', $c2) : $q->whereRaw('1=0'),
                 'يساوي'                 => $q->where($col, $v),
                 'يحتوي'                 => $q->where($col, 'LIKE', "%{$v}%"),
-                'فارغ'                  => $q->where(fn ($w) => $w->whereNull($col)->orWhere($col, '')),
+                'فارغ'                  => in_array($ftype, ['num', 'big', 'date', 'dt'], true)
+                                            ? $q->whereNull($col)
+                                            : $q->where(fn ($w) => $w->whereNull($col)->orWhere($col, '')),
                 'أيام متبقية أقل من'    => $q->whereNotNull($col)->whereDate($col, '<=', today()->addDays((int) $v)),
                 'أيام مضت أكثر من'      => $q->whereNotNull($col)->whereDate($col, '<=', today()->subDays((int) $v)),
                 default                 => $q->whereRaw('1=0'),
@@ -352,6 +359,16 @@ class HubAutomation extends Command
                 ->distinct()->pluck('record_id')->all());
 
             $to = $this->recipientUsers($rule->to_id);
+
+            // **الصلاحيةُ قبل النطاق**: النطاق يُفرض لكل مستلم أدناه، لكن مستلماً
+            // في الشركة الصحيحة قد لا يملك رؤيةَ الوحدة أصلاً (راية monitor لا
+            // تمنح مصفوفةَ الصلاحيات). فبلا هذا الفحص تصل مبالغُ ميزانياتٍ وأرقامُ
+            // فواتير من مُنع من الوحدة — تسريبٌ عبر التنبيه. رايةٌ عامةٌ بلا وحدة
+            // (`mod` فارغ) لا تُفحَص كي لا تُخرَس القواعدُ العامة.
+            if (filled($rule->mod)) {
+                $to = $to->filter(fn ($ru) => $ru->role?->is_owner || hub_can($ru, $rule->mod, 'v'))->values();
+            }
+            if ($to->isEmpty()) continue;
 
             /*
              * **والتنطيقُ قبل الحدّ كذلك** (v2.337): v2.316 نقلت مانعَ التكرار

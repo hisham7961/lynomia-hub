@@ -15,10 +15,17 @@
         <textarea class="inp @error($k) err @enderror" id="{{ $fid }}" name="{{ $k }}" rows="3"{!! $req !!}>{{ old($k, $raw) }}</textarea>
 
     @elseif ($t === 'sel')
+        @php $selRaw = old($k, $raw); @endphp
         <select class="inp @error($k) err @enderror" id="{{ $fid }}" name="{{ $k }}"{!! $req !!}>
             <option value=""></option>
+            {{-- قيمةٌ حاليةٌ خارج القائمة (عملةُ فاتورةٍ مولَّدةٍ بمفرداتٍ أخرى مثلاً)
+                 تُعرَض خياراً محدَّداً بدل إسقاطها صامتةً عند أوّل حفظ — فلا يُفرَّغ حقلٌ
+                 لم يُقصَد تفريغُه --}}
+            @if (filled($selRaw) && ! in_array($selRaw, $f['options'] ?? [], true))
+                <option value="{{ $selRaw }}" selected>{{ $selRaw }} — قيمةٌ حالية</option>
+            @endif
             @foreach ($f['options'] ?? [] as $o)
-                <option value="{{ $o }}" @selected(old($k, $raw) === $o)>{{ $o }}</option>
+                <option value="{{ $o }}" @selected($selRaw === $o)>{{ $o }}</option>
             @endforeach
         </select>
 

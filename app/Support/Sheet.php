@@ -24,6 +24,17 @@ class Sheet
         $raw = (string) file_get_contents($path);
         if (str_starts_with($raw, "\xEF\xBB\xBF")) $raw = substr($raw, 3);   // BOM
 
+        // تطبيعُ الترميز: ملفُّ Excel العربي على ويندوز يُصدَّر بـCP1256 (‏windows-1256)
+        // لا UTF-8 — بايتاتُه ليست UTF-8 صالحاً، فتسقط عند الكتابة في utf8mb4 على
+        // MySQL بـ1366 (‏٥٠٠ على مسارٍ يبتلعه المستخدم). نحوّله قبل التحليل. iconv
+        // يدعم CP1256 حيث لا تدعمه mbstring على كثيرٍ من الاستضافات؛ و`//TRANSLIT`
+        // يتسامح مع ما لا يُمثَّل بدل أن يرمي، وISO-8859-6 ملاذٌ أخير.
+        if (! mb_check_encoding($raw, 'UTF-8')) {
+            $conv = function_exists('iconv') ? @iconv('CP1256', 'UTF-8//TRANSLIT', $raw) : false;
+            if ($conv === false || $conv === '') $conv = @mb_convert_encoding($raw, 'UTF-8', 'ISO-8859-6');
+            if (is_string($conv) && $conv !== '') $raw = $conv;
+        }
+
         // الفاصل: الفاصلة المنقوطة إن كانت أكثر في أول سطر (تصدير Excel العربي)
         $first = strtok($raw, "\n") ?: '';
         $delim = substr_count($first, ';') > substr_count($first, ',') ? ';' : ',';

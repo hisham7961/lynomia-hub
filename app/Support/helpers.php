@@ -1757,8 +1757,16 @@ if (! function_exists('hub_project_pl')) {
             // والحالات الميتة (ملغاة/مسودة) خارج الحساب — كسائر التقارير
             $finDoc = fn () => hub_fin_not_dead(\Illuminate\Support\Facades\DB::table('fin_documents')
                 ->whereNull('deleted_at')->where('project_id', $projectId));
+            // العدّ المزدوج: زرُّ «فاتورة المورد» يولّد من أمر الشراء مستندَ مالية
+            // نوعُه «فاتورة مشتريات» (أحدُ أنواع المصروف)، فيُضاف `meta.bill_id` للأمر.
+            // فبلا استثنائه يُحتسب المبلغُ مرّتين: من صفّ الشراء ومن فاتورته. والحالاتُ
+            // الميتة (مسودة/ملغى/مرتجع) ليست تكلفةً كسائر التقارير. `whereNull('meta->bill_id')`
+            // تعمل على المحرّكين (json_extract يُعيد NULL حين لا مفتاح).
             $purch = (float) \Illuminate\Support\Facades\DB::table('purchases')
-                ->whereNull('deleted_at')->where('project_id', $projectId)->sum('amount');
+                ->whereNull('deleted_at')->where('project_id', $projectId)
+                ->whereNull('meta->bill_id')
+                ->whereNotIn('status', (array) config('hub.purchases.dead', ['مسودة', 'ملغى', 'مرتجع']))
+                ->sum('amount');
             $expense = (float) $finDoc()
                 ->whereIn('kind', (array) config('hub.fin.expense', ['مصروف']))->sum('total');
             $externalCost = $purch + $expense;
@@ -3388,7 +3396,12 @@ if (! function_exists('hub_metric_put')) {
     function hub_metric_put(string $module, string $recordId, string $metric, float $value,
                             $at = null, string $source = 'manual', array $meta = []): \App\Models\MetricPoint
     {
-        $at = $at ? \Illuminate\Support\Carbon::parse($at) : now();
+        // تطبيعُ المنطقة الزمنية لتوقيت النظام (Asia/Kuwait): النقطةُ تُعرَّف بلحظتها،
+        // ف«2026-07-31T22:00:00Z» و«2026-08-01T01:00:00+03:00» لحظةٌ واحدة — بلا
+        // التطبيع تُخزَّن بجدارِ ساعتها فتصير نقطتين، فتُكرَّر بدل أن تُحدَّث.
+        $at = $at
+            ? \Illuminate\Support\Carbon::parse($at)->setTimezone(config('app.timezone', 'Asia/Kuwait'))
+            : now();
 
         // حزامُ أمانٍ للمسار الويبيّ أيضاً (Metrics::capture): العمود decimal(18,4)
         // يفيض على قيمةٍ ≥ 10¹⁴ أو غير منتهية — نُقصّها للمدى الآمن فلا 500 صامت

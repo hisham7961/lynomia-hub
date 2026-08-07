@@ -110,7 +110,7 @@ class Inbox
     {
         if (! Schema::hasTable('approvals') || ! hub_can($u, 'approvals', 'v')) return [];
 
-        return DB::table('approvals')->whereNull('deleted_at')
+        return hub_scope(DB::table('approvals')->whereNull('deleted_at'), 'approvals', $u)
             ->where(fn ($w) => $w->where('approver_id', $u->id)->orWhere('chain', 'LIKE', '%"' . $u->id . '"%'))
             ->tap(fn ($q) => hub_open_scope($q, 'status', ['موافق', 'موافقة', 'معتمد', 'معتمدة']))
             ->orderByRaw('due IS NULL, due')->limit(40)
@@ -155,19 +155,25 @@ class Inbox
         if (! Schema::hasTable('policies') || ! Schema::hasTable('policy_acks')) return [];
         if (! hub_can($u, 'policies', 'v')) return [];
 
-        $mine = DB::table('policy_acks')->whereNull('deleted_at')->where('user_id', $u->id)
-            ->whereNotNull('ack_at')->get(['policy_id', 'ver']);
-        $acked = $mine->map(fn ($a) => $a->policy_id . '|' . (string) $a->ver)->all();
-
-        // مسودّةٌ أو مؤرشفة لا تُطالِب أحداً: الإقرار على نصٍّ **سارٍ**
+        // **الإقصاءُ داخل SQL قبل الحدّ** (v2.346): كان يُجلَب أربعون أقدمَ سياسةً
+        // ثمّ تُقصى المُقَرّة في PHP — فلو كانت الأربعون كلُّها مُقَرّةً (والترتيبُ
+        // بالأقدم) لم تصل السياسةُ الجديدةُ غيرُ المُقَرّة (الحادية والأربعون فصاعداً)
+        // صندوقَ المستخدم أبداً، ولوحةُ الامتثال تعدّه مخالفاً. الآن يُطابَق الإقرارُ
+        // على (policy_id, ver) داخل الاستعلام فلا يملأ المُقَرُّ النافذةَ.
+        // النسخة جزءٌ من المفتاح: سياسةٌ حُدّثت تعود تنتظر إقراراً جديداً.
         return hub_scope(DB::table('policies')->whereNull('deleted_at'), 'policies', $u)
             ->where('ack_required', 1)
             ->where(fn ($w) => $w->whereNull('status')
                 ->orWhereNotIn('status', ['مسودة', 'قيد الاعتماد', 'مؤرشفة', 'مؤرشف', 'ملغاة']))
-            ->orderByRaw('eff_date IS NULL, eff_date')->limit(40)
+            ->whereNotExists(fn ($q) => $q->from('policy_acks')
+                ->whereColumn('policy_acks.policy_id', 'policies.id')
+                ->whereRaw("COALESCE(policy_acks.ver, '') = COALESCE(policies.ver, '')")
+                ->where('policy_acks.user_id', $u->id)
+                ->whereNotNull('policy_acks.ack_at')
+                ->whereNull('policy_acks.deleted_at'))
+            // فاصلُ تعادلٍ على id: eff_date تاريخٌ بلا وقت، فتساوي القيم قرعةٌ بين المحرّكين
+            ->orderByRaw('eff_date IS NULL, eff_date')->orderBy('id')->limit(40)
             ->get(['id', 'title', 'ver', 'cat', 'eff_date'])
-            // النسخة جزءٌ من المفتاح: سياسةٌ حُدّثت تعود تنتظر إقراراً جديداً
-            ->reject(fn ($p) => in_array($p->id . '|' . (string) $p->ver, $acked, true))
             ->map(fn ($p) => [
                 'kind' => 'policy', 'icon' => '📜', 'label' => 'إقرار سياسة',
                 'title' => $p->title, 'due' => $p->eff_date,
@@ -277,7 +283,7 @@ class Inbox
     {
         if (! Schema::hasTable('decisions') || ! hub_can($u, 'decisions', 'v')) return [];
 
-        return DB::table('decisions')->whereNull('deleted_at')
+        return hub_scope(DB::table('decisions')->whereNull('deleted_at'), 'decisions', $u)
             ->where('exec_id', $u->id)
             ->whereIn('status', ['لم يبدأ', 'قيد التنفيذ', 'متعثر'])
             ->orderByRaw('due IS NULL, due')->limit(20)
@@ -294,7 +300,7 @@ class Inbox
     {
         if (! Schema::hasTable('tickets') || ! hub_can($u, 'tickets', 'v')) return [];
 
-        return hub_open_scope(DB::table('tickets')->whereNull('deleted_at')->where('assignee_id', $u->id))
+        return hub_scope(hub_open_scope(DB::table('tickets')->whereNull('deleted_at')->where('assignee_id', $u->id)), 'tickets', $u)
             ->orderByDesc('created_at')->limit(20)
             ->get(['id', 'subject', 'customer', 'priority', 'status', 'created_at'])
             ->map(fn ($t) => [
@@ -325,7 +331,7 @@ class Inbox
     {
         if (! Schema::hasTable('meetings') || ! hub_can($u, 'meetings', 'v')) return [];
 
-        return DB::table('meetings')->whereNull('deleted_at')
+        return hub_scope(DB::table('meetings')->whereNull('deleted_at'), 'meetings', $u)
             ->where('parts', 'LIKE', '%"' . $u->id . '"%')
             ->where('dt', '>=', now()->startOfDay())
             ->orderBy('dt')->limit(12)
@@ -344,8 +350,8 @@ class Inbox
     {
         if (! Schema::hasTable('contract_obligations') || ! hub_can($u, 'obligations', 'v')) return [];
 
-        return hub_open_scope(DB::table('contract_obligations')->whereNull('deleted_at')
-                ->where('owner_id', $u->id))
+        return hub_scope(hub_open_scope(DB::table('contract_obligations')->whereNull('deleted_at')
+                ->where('owner_id', $u->id)), 'obligations', $u)
             ->orderByRaw('due IS NULL, due')->limit(20)
             ->get(['id', 'title', 'due', 'amount', 'currency', 'status'])
             ->map(fn ($o) => [
@@ -362,8 +368,8 @@ class Inbox
     {
         if (! Schema::hasTable('compliance_items') || ! hub_can($u, 'compliance', 'v')) return [];
 
-        return hub_open_scope(DB::table('compliance_items')->whereNull('deleted_at')
-                ->where('owner_id', $u->id)->whereNotNull('due'))
+        return hub_scope(hub_open_scope(DB::table('compliance_items')->whereNull('deleted_at')
+                ->where('owner_id', $u->id)->whereNotNull('due')), 'compliance', $u)
             ->where('due', '<=', now()->addDays(60)->toDateString())
             ->orderBy('due')->limit(20)
             ->get(['id', 'title', 'due', 'kind', 'authority', 'status'])
