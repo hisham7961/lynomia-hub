@@ -53,7 +53,12 @@ class AuthController extends Controller
             }
         }
 
-        if (! Auth::attempt($data, remember: true)) {
+        // **لا دخول إلا بالبريد وكلمة المرور** (v2.354): `remember: false` — لا تُصدَر
+        // كعكةُ «تذكّرني» بعد اليوم. كانت الكعكةُ تُعيد بعثَ الجلسة دون كلمة مرور،
+        // فكعكةٌ مسروقةٌ أو عودةٌ بعد انتهاء الجلسة تدخل بلا الباسورد — وهو ما يناقض
+        // «لا يُدخَل إلا بالبريد وكلمة المرور». الجلسةُ تدوم عمرَها المعتاد ثم يُعاد
+        // الدخولُ بالبريد وكلمة المرور. (وحارسُ الجلسة يردّ أيَّ كعكةٍ قديمة باقية.)
+        if (! Auth::attempt($data, remember: false)) {
             if ($user) {
                 $this->bumpFailedAttempts($user);
             }
@@ -116,7 +121,7 @@ class AuthController extends Controller
         }
 
         $r->session()->forget('2fa:uid');
-        Auth::login($u, remember: true);
+        Auth::login($u, remember: false);   // لا كعكةَ «تذكّرني» — الدخول بالبريد وكلمة المرور فقط
 
         return $this->finishLogin($u, $r);
     }
