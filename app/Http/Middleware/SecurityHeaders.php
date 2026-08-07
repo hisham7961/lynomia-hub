@@ -18,6 +18,24 @@ class SecurityHeaders
             $response->header('Referrer-Policy', 'strict-origin-when-cross-origin');
             $response->header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 
+            // **HSTS — يُثبّت HTTPS ويمنع هبوطَ الاتصال** (v2.357): النظامُ خلف تسجيل
+            // دخولٍ وكعكةُ جلسته `secure`، فلا معنى لقبول HTTP. تُرسَل فقط على اتصالٍ
+            // آمن (أو خلف بروكسي ينهي TLS) كي لا تُثبَّت على http محليّ؛ والمتصفّح لا
+            // يعبأ بها إلا إذا وصلته عبر HTTPS، فإرسالُها بلا ضرر.
+            if ($request->isSecure() || strtolower((string) $request->header('X-Forwarded-Proto')) === 'https') {
+                $response->header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+            }
+
+            // **CSP دفاعيّة لا تكسر الواجهة** (v2.357): الواجهةُ تعتمد أنماطاً ونصوصاً
+            // مضمّنة، فحصرُ `script-src`/`style-src` يكسرها — لكنّ هذه الثلاثة أمانٌ
+            // خالصٌ بلا كسر: تمنع اختطافَ `<base>`، وحقنَ الإضافات (`object`)، وتأطيرَ
+            // الموقع من غيره. لا تُكتب إن كان متحكّمٌ قد ضبط سياسةً أخصّ (خدمةُ
+            // المرفقات تقفل `default-src 'none'`) كي لا تُضعَّف بالأوسع.
+            if (! $response->headers->has('Content-Security-Policy')) {
+                $response->header('Content-Security-Policy',
+                    "base-uri 'self'; object-src 'none'; frame-ancestors 'self'");
+            }
+
             // **لا يظهر في جوجل**: نظامٌ خاصٌّ خلف تسجيل دخول لا مكان له في فهرس
             // بحثٍ عامّ. الترويسة أقوى من robots.txt وحدها: تُطبَّق على **كل** استجابة
             // (حتى المرفقات وروابط التوقيع المشارَكة خارجاً)، وتقول للزاحف «لا تفهرس
