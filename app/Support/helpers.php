@@ -3396,7 +3396,12 @@ if (! function_exists('hub_metric_put')) {
     function hub_metric_put(string $module, string $recordId, string $metric, float $value,
                             $at = null, string $source = 'manual', array $meta = []): \App\Models\MetricPoint
     {
-        $at = $at ? \Illuminate\Support\Carbon::parse($at) : now();
+        // تطبيعُ المنطقة الزمنية لتوقيت النظام (Asia/Kuwait): النقطةُ تُعرَّف بلحظتها،
+        // ف«2026-07-31T22:00:00Z» و«2026-08-01T01:00:00+03:00» لحظةٌ واحدة — بلا
+        // التطبيع تُخزَّن بجدارِ ساعتها فتصير نقطتين، فتُكرَّر بدل أن تُحدَّث.
+        $at = $at
+            ? \Illuminate\Support\Carbon::parse($at)->setTimezone(config('app.timezone', 'Asia/Kuwait'))
+            : now();
 
         // حزامُ أمانٍ للمسار الويبيّ أيضاً (Metrics::capture): العمود decimal(18,4)
         // يفيض على قيمةٍ ≥ 10¹⁴ أو غير منتهية — نُقصّها للمدى الآمن فلا 500 صامت

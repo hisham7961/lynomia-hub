@@ -73,7 +73,11 @@ class V1Controller extends ModuleController
         $row = hub_scope($class::query(), $module)->findOrFail($id);
         $this->auditApiSecretRead($def, 1, (string) $id);
 
-        return response()->json(['data' => $this->shape($def, $row, $r->query('fields'))]);
+        // hub_str: shape() مُوقَّعةٌ ?string، و`?fields[]=` يمرّر مصفوفةً فترمي
+        // TypeError → ٥٠٠. أُصلحت الشقيقةُ (apiList) وبقيت هذه.
+        $fields = hub_str($r->query('fields')) ?: null;
+
+        return response()->json(['data' => $this->shape($def, $row, $fields)]);
     }
 
     /** POST /api/v1/{module} — نفس تحقق النماذج، مع Idempotency-Key اختيارية */
