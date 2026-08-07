@@ -46,12 +46,38 @@ class Contract extends Model
 
         // حذف العقد يُغلق التزاماته المفتوحة: كانت تبقى «قائمة» بمرجعٍ لسجل
         // محذوف فتُنذر للأبد في رادار المركز القانوني والموجز اليومي ولوحة CEO —
-        // ولا شاشةَ تصل إليها لتُغلقها يدوياً لأن عقدها غاب من كل القوائم
+        // ولا شاشةَ تصل إليها لتُغلقها يدوياً لأن عقدها غاب من كل القوائم.
+        // **والحالةُ السابقة تُختَم قبل الإلغاء** كي تعود عند الاستعادة: التزامٌ
+        // قانونيّ كان «متأخراً» لا يعود «قائماً» فيُغيّر معناه — يعود كما كان.
         static::deleting(function (self $c) {
-            \Illuminate\Support\Facades\DB::table('contract_obligations')
+            $open = \Illuminate\Support\Facades\DB::table('contract_obligations')
                 ->where('contract_id', $c->id)
                 ->whereNotIn('status', ['مكتمل', 'ملغي'])
-                ->update(['status' => 'ملغي', 'updated_at' => now()]);
+                ->get(['id', 'status', 'meta']);
+            foreach ($open as $o) {
+                $meta = json_decode((string) $o->meta, true) ?: [];
+                $meta['cancelled_by_contract_delete'] = $o->status;
+                \Illuminate\Support\Facades\DB::table('contract_obligations')->where('id', $o->id)
+                    ->update(['status' => 'ملغي',
+                        'meta' => json_encode($meta, JSON_UNESCAPED_UNICODE), 'updated_at' => now()]);
+            }
+        });
+
+        // **الاستعادةُ تُعيد ما أُلغي بالحذف** (تناظرَ LeaveRequest): كلُّ التزامٍ
+        // يحمل ختمَ الإلغاء يعود لحالته السابقة ويُمسح الختم — فلا يسقط التزامٌ
+        // قانونيّ من كل رادارٍ بلا أثرٍ حين يُستعاد عقدُه.
+        static::restored(function (self $c) {
+            $stamped = \Illuminate\Support\Facades\DB::table('contract_obligations')
+                ->where('contract_id', $c->id)->get(['id', 'meta']);
+            foreach ($stamped as $o) {
+                $meta = json_decode((string) $o->meta, true) ?: [];
+                if (! array_key_exists('cancelled_by_contract_delete', $meta)) continue;
+                $prev = (string) $meta['cancelled_by_contract_delete'];
+                unset($meta['cancelled_by_contract_delete']);
+                \Illuminate\Support\Facades\DB::table('contract_obligations')->where('id', $o->id)
+                    ->update(['status' => $prev,
+                        'meta' => $meta ? json_encode($meta, JSON_UNESCAPED_UNICODE) : null, 'updated_at' => now()]);
+            }
         });
     }
 
