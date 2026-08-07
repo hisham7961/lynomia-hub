@@ -155,19 +155,25 @@ class Inbox
         if (! Schema::hasTable('policies') || ! Schema::hasTable('policy_acks')) return [];
         if (! hub_can($u, 'policies', 'v')) return [];
 
-        $mine = DB::table('policy_acks')->whereNull('deleted_at')->where('user_id', $u->id)
-            ->whereNotNull('ack_at')->get(['policy_id', 'ver']);
-        $acked = $mine->map(fn ($a) => $a->policy_id . '|' . (string) $a->ver)->all();
-
-        // مسودّةٌ أو مؤرشفة لا تُطالِب أحداً: الإقرار على نصٍّ **سارٍ**
+        // **الإقصاءُ داخل SQL قبل الحدّ** (v2.346): كان يُجلَب أربعون أقدمَ سياسةً
+        // ثمّ تُقصى المُقَرّة في PHP — فلو كانت الأربعون كلُّها مُقَرّةً (والترتيبُ
+        // بالأقدم) لم تصل السياسةُ الجديدةُ غيرُ المُقَرّة (الحادية والأربعون فصاعداً)
+        // صندوقَ المستخدم أبداً، ولوحةُ الامتثال تعدّه مخالفاً. الآن يُطابَق الإقرارُ
+        // على (policy_id, ver) داخل الاستعلام فلا يملأ المُقَرُّ النافذةَ.
+        // النسخة جزءٌ من المفتاح: سياسةٌ حُدّثت تعود تنتظر إقراراً جديداً.
         return hub_scope(DB::table('policies')->whereNull('deleted_at'), 'policies', $u)
             ->where('ack_required', 1)
             ->where(fn ($w) => $w->whereNull('status')
                 ->orWhereNotIn('status', ['مسودة', 'قيد الاعتماد', 'مؤرشفة', 'مؤرشف', 'ملغاة']))
-            ->orderByRaw('eff_date IS NULL, eff_date')->limit(40)
+            ->whereNotExists(fn ($q) => $q->from('policy_acks')
+                ->whereColumn('policy_acks.policy_id', 'policies.id')
+                ->whereRaw("COALESCE(policy_acks.ver, '') = COALESCE(policies.ver, '')")
+                ->where('policy_acks.user_id', $u->id)
+                ->whereNotNull('policy_acks.ack_at')
+                ->whereNull('policy_acks.deleted_at'))
+            // فاصلُ تعادلٍ على id: eff_date تاريخٌ بلا وقت، فتساوي القيم قرعةٌ بين المحرّكين
+            ->orderByRaw('eff_date IS NULL, eff_date')->orderBy('id')->limit(40)
             ->get(['id', 'title', 'ver', 'cat', 'eff_date'])
-            // النسخة جزءٌ من المفتاح: سياسةٌ حُدّثت تعود تنتظر إقراراً جديداً
-            ->reject(fn ($p) => in_array($p->id . '|' . (string) $p->ver, $acked, true))
             ->map(fn ($p) => [
                 'kind' => 'policy', 'icon' => '📜', 'label' => 'إقرار سياسة',
                 'title' => $p->title, 'due' => $p->eff_date,

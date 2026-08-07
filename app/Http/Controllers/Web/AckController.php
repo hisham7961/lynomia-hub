@@ -69,7 +69,18 @@ class AckController extends Controller
         }
         \Illuminate\Support\Facades\Cache::put($key, 1, now()->addHours(self::REMIND_COOLDOWN_H));
 
-        $sent = $late->take(self::REMIND_CAP);
+        /*
+         * **مؤشّرٌ دوّار لا سقفٌ ثابت**: كان `take(REMIND_CAP)` يأخذ أوّلَ ٥٠ في
+         * كلّ مرة، فمن كان بعد الخمسين لا يُذكَّر أبداً — والرسالةُ تَعِد بأن
+         * «البقية في التذكير القادم» وهو وعدٌ لا يُنفَّذ. الآن يتقدّم المؤشّرُ
+         * عبر القائمة كلّ تذكيرة (مع التفافٍ عند النهاية) فيصل الجميعَ تباعاً.
+         */
+        $late   = $late->values();
+        $total  = $late->count();
+        $curKey = 'ack:remind:cursor:' . $module . ':' . $row->id;
+        $cursor = $total > 0 ? ((int) \Illuminate\Support\Facades\Cache::get($curKey, 0)) % $total : 0;
+        $sent   = $late->slice($cursor, self::REMIND_CAP)->values();
+        \Illuminate\Support\Facades\Cache::put($curKey, $cursor + $sent->count(), now()->addDays(30));
         foreach ($sent as $p) {
             hub_notify($p['id'], 'ack', '📝 ينتظرك ' . $def['label'] . ': '
                 . \Illuminate\Support\Str::limit((string) ($row->title ?? $row->name ?? ''), 50),

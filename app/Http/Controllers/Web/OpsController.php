@@ -194,11 +194,22 @@ class OpsController extends Controller
          */
         $backup = '';
         // تُطفأ بإعداد `ops.backup_before_migrate=0` لقاعدةٍ ضخمة تُثقلها النسخة،
-        // وتُتخطّى داخل الحزمة (الاختبارات تُرحّل عشرات المرات ولا بياناتٍ تُفقد)
-        if (! app()->runningUnitTests() && setting('ops.backup_before_migrate', '1') !== '0') {
+        // وتُتخطّى داخل الحزمة (الاختبارات تُرحّل عشرات المرات ولا بياناتٍ تُفقد) —
+        // إلا حين يُفعّلها اختبارٌ صراحةً بـ`hub.testing.allow_backup_before_migrate`
+        // ليحرس صدقَ الرسالة على مسارها الحقيقيّ.
+        $skipInTests = app()->runningUnitTests() && ! config('hub.testing.allow_backup_before_migrate', false);
+        if (! $skipInTests && setting('ops.backup_before_migrate', '1') !== '0') {
             try {
-                \Illuminate\Support\Facades\Artisan::call('hub:backup');
-                $backup = '✅ أُخذت نسخةٌ احتياطية قبل الترحيل.';
+                // **صدقُ الرسالة**: `Artisan::call` يعيد رمزَ الخروج ولا يرمي عند
+                // فشلٍ داخليّ (نسخةٌ لم تُكتب تعيد FAILURE بلا استثناء) — فكانت
+                // «✅ أُخذت نسخة» تُطبع مهما كان العائد، كذبٌ في اللحظة الوحيدة التي
+                // تُهمّ فيها الحقيقة. الآن يُقرأ الرمز.
+                $code = \Illuminate\Support\Facades\Artisan::call('hub:backup');
+                $backup = $code === 0
+                    ? '✅ أُخذت نسخةٌ احتياطية قبل الترحيل.'
+                    : '⚠️ فشلت النسخة الاحتياطية قبل الترحيل (رمز ' . $code . ': '
+                        . mb_substr(trim(\Illuminate\Support\Facades\Artisan::output()), 0, 160)
+                        . ') — الترحيلُ مضى بلا شبكةٍ تحته.';
             } catch (\Throwable $e) {
                 $backup = '⚠️ تعذّرت النسخة الاحتياطية قبل الترحيل ('
                     . mb_substr($e->getMessage(), 0, 120) . ') — الترحيلُ مضى بلا شبكةٍ تحته.';
