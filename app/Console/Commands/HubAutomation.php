@@ -598,6 +598,17 @@ class HubAutomation extends Command
                     ->where('at', '<', now()->subDays(365)->toDateTimeString())->delete();
             }
 
+            // **وزياراتُ الصفحات** (v2.350): كان التشذيبُ يقع **داخل طلب المستخدم**
+            // (فرصةُ ١٪) — حذفٌ على عمودٍ بلا فهرسٍ في أثناء تحميل صفحة. نُقل هنا
+            // بجوار إخوته، على دفعاتٍ محدودة كي لا يقفل الجدولَ طويلاً.
+            if (\Illuminate\Support\Facades\Schema::hasTable('page_visits')) {
+                do {
+                    $gone = DB::table('page_visits')->where('at', '<', now()->subDays(90))
+                        ->limit(5000)->delete();
+                    $n += $gone;
+                } while ($gone >= 5000);
+            }
+
             return $n;
         } catch (\Throwable $e) {
             report($e);

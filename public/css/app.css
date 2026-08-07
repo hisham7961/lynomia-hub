@@ -563,11 +563,17 @@ th.bsel,td.bsel{width:34px;text-align:center;padding-inline:8px}
 
 /* ═ الطباعة ═ */
 @media print{
+  /* الوضعُ الليلي كان يطبع حبراً أبيض (‏--tx فاتح) على ورقٍ أبيض = صفحةٌ فارغة.
+     نُعيد التوكنز إلى فاتحةٍ صريحة على الجذر فترثها كلُّ العناصر، والوثيقةُ
+     الموقّعة والشهادةُ أوّلُ من ينتفع. */
+  :root,html[data-theme="dark"]{
+    --bg:#fff;--bg2:#fff;--cd:#fff;--tx:#111;--sb:#444;--ln:#ccc;--lnd:#ddd;color-scheme:light;
+  }
   .sidebar,.topbar,.toolbar,.btn,#flash,.pager,.overlay,.menubtn{display:none!important}
   .shell,.main{display:block}
   .content{padding:0;max-width:none;animation:none}
   .card,.stat{box-shadow:none;break-inside:avoid}
-  body{background:#fff}
+  body{background:#fff;color:#111}
 }
 
 /* ═ الوضع الليلي — سطح داكن متزن ═ */
