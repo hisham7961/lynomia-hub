@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Support\SecurityPosture;
+use App\Support\SecurityRadar;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /** مركز الأمان — وضعيةٌ حيّة، وجلساتٌ تُنهى فعلاً، وقفل طوارئ */
@@ -33,6 +35,8 @@ class SecurityController extends Controller
                             ->where(fn ($w) => $w->whereNull('last_login_at')->orWhere('last_login_at', '<', now()->subDays(60)))->count(),
             'twofa'   => (clone $users)->where('totp_enabled', 1)->count(),
             'failed7' => DB::table('audits')->where('action', 'دخول فاشل')->where('created_at', '>=', now()->subDays(7))->count(),
+            'denied7' => Schema::hasTable('access_denials')
+                ? DB::table('access_denials')->where('created_at', '>=', now()->subDays(7))->count() : 0,
             'stale'   => DB::table('vault_secrets')->whereNull('deleted_at')->where('updated_at', '<', now()->subDays(180))->count(),
             'live'    => DB::table('sessions_log')->where('revoked', false)
                             ->where('last_seen_at', '>=', now()->subMinutes(self::LIVE_MIN))->count(),
@@ -105,6 +109,9 @@ class SecurityController extends Controller
             'roles' => $roles, 'exports' => $exports,
             'posture' => $posture, 'summary' => SecurityPosture::summary($posture),
             'lockdown' => (bool) setting('security.lockdown', false),
+            // رادارُ الكشف الحيّ: محاولاتُ الوصول المرفوضة وتخمينُ الروابط + العناوين الطارقة
+            'radar' => SecurityRadar::summary(), 'denials' => SecurityRadar::recent(),
+            'threats' => SecurityRadar::threats(),
         ]);
     }
 
