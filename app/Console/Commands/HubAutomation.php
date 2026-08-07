@@ -609,6 +609,10 @@ class HubAutomation extends Command
                 } while ($gone >= 5000);
             }
 
+            // **ورادارُ الكشف** (v2.356): كل ٤٠٣ أو تخمينِ رابطٍ يكتب صفّاً — سطحٌ
+            // قد يفيض تحت طرقٍ متعمَّد. حدٌّ زمنيٌّ وسقفٌ صلبٌ معاً كإخوته أعلاه.
+            $n += \App\Support\SecurityRadar::prune();
+
             return $n;
         } catch (\Throwable $e) {
             report($e);

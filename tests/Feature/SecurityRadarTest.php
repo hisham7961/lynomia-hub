@@ -68,4 +68,31 @@ class SecurityRadarTest extends TestCase
         $this->assertGreaterThanOrEqual(2, (int) $threats->first()->hits,
             'العنوانُ الطارقُ مراراً لم يُجمَّع بعدد محاولاته');
     }
+
+    /** الجدولُ لا ينمو بلا حدّ: تقليمٌ زمنيٌّ وسقفٌ صلب — دفاعٌ عن القرص المحدود */
+    public function test_prune_bounds_the_table_by_age_and_by_count(): void
+    {
+        $this->seedCore();
+
+        // ثلاثةٌ قديمة (١٠٠ يوماً) واثنتان طازجتان
+        foreach (range(1, 3) as $i) {
+            DB::table('access_denials')->insert(['kind' => 'وصول مرفوض', 'ip' => '1.1.1.1', 'created_at' => now()->subDays(100)]);
+        }
+        foreach (range(1, 2) as $i) {
+            DB::table('access_denials')->insert(['kind' => 'وصول مرفوض', 'ip' => '2.2.2.2', 'created_at' => now()]);
+        }
+
+        $removed = SecurityRadar::prune(90, 50000);
+        $this->assertSame(3, $removed, 'التقليمُ الزمنيّ لم يحذف ما تجاوز نافذة الاحتفاظ');
+        $this->assertSame(2, DB::table('access_denials')->count(), 'الصفوفُ الطازجة لا تُمَسّ');
+
+        // السقفُ الصلب: خمسةُ صفوفٍ، الاحتفاظُ بأحدث اثنين فقط
+        DB::table('access_denials')->delete();
+        foreach (range(1, 5) as $i) {
+            DB::table('access_denials')->insert(['kind' => 'وصول مرفوض', 'ip' => '3.3.3.3', 'created_at' => now()]);
+        }
+        SecurityRadar::prune(9999, 2);
+        $this->assertSame(2, DB::table('access_denials')->count(),
+            'السقفُ الصلب لم يحدّ فيضاً داخل نافذة الاحتفاظ');
+    }
 }
