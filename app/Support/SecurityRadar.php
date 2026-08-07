@@ -94,4 +94,25 @@ class SecurityRadar
             'anon'  => (int) $base()->whereNull('user_id')->count(),   // محاولاتُ غير المستخدمين
         ];
     }
+
+    /**
+     * تقليمُ الجدول — **حدٌّ زمنيٌّ وسقفٌ صلب معاً**.
+     *
+     * كلُّ منعٍ يكتب صفّاً، فالجدولُ سطحٌ قد يفيض تحت طرقٍ متعمَّد. تسعون يوماً
+     * تكفي للتقصّي، وسقفٌ صلبٌ (أحدث `maxRows`) يحدّ فيضاً **داخل** النافذة كي
+     * لا يملأ القرصَ على الاستضافة المشتركة. يُنفَّذ في دورة الأتمتة اليومية لا
+     * في طلب المستخدم — كما تُقلَّم إخوتُه (زيارات الصفحات، نقاط المقاييس).
+     */
+    public static function prune(int $keepDays = 90, int $maxRows = 50000): int
+    {
+        if (! Schema::hasTable('access_denials')) return 0;
+
+        $n = DB::table('access_denials')->where('created_at', '<', now()->subDays($keepDays))->delete();
+
+        // السقفُ الصلب: معرّفُ الصفّ عند حدّ الاحتفاظ، فيُحذف كلُّ ما قبله
+        $cut = DB::table('access_denials')->orderByDesc('id')->skip($maxRows)->take(1)->value('id');
+        if ($cut) $n += DB::table('access_denials')->where('id', '<=', $cut)->delete();
+
+        return $n;
+    }
 }
