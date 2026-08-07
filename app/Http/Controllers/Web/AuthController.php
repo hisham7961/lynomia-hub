@@ -55,12 +55,7 @@ class AuthController extends Controller
 
         if (! Auth::attempt($data, remember: true)) {
             if ($user) {
-                $user->failed_attempts = ((int) $user->failed_attempts) + 1;
-                if ($user->failed_attempts >= (int) setting('auth.max_fail', 5)) {
-                    $user->locked_until    = now()->addMinutes((int) setting('auth.lock_min', 15));
-                    $user->failed_attempts = 0;
-                }
-                $user->saveQuietly();   // عدّاد أمني — بلا تدقيق ولا إصدارات
+                $this->bumpFailedAttempts($user);
             }
             // بصمة المحاولة الفاشلة في التدقيق — تُعرض في مركز الأمان
             // البريد يُحفظ كاملاً (٢٩٠) لا مبتوراً عند ٦٠ — أثرٌ أمني يُقرأ لاحقاً
@@ -115,12 +110,7 @@ class AuthController extends Controller
         }
 
         if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, hub_str($r->input('code')))) {
-            $u->failed_attempts = ((int) $u->failed_attempts) + 1;
-            if ($u->failed_attempts >= (int) setting('auth.max_fail', 5)) {
-                $u->locked_until    = now()->addMinutes((int) setting('auth.lock_min', 15));
-                $u->failed_attempts = 0;
-            }
-            $u->saveQuietly();   // عدّاد أمني — بلا تدقيق ولا إصدارات
+            $this->bumpFailedAttempts($u);
 
             return back()->withErrors(['code' => 'الرمز غير صحيح أو انتهى — جرّب الرمز الحالي في التطبيق']);
         }
@@ -169,5 +159,29 @@ class AuthController extends Controller
         $r->session()->regenerateToken();
 
         return redirect()->route('login');
+    }
+
+    /**
+     * زيادةُ عدّاد المحاولات الفاشلة **ذرّيّاً** ثم قفلُ الحساب عند السقف.
+     *
+     * كان `$u->failed_attempts = $u->failed_attempts + 1; save()` قراءةً في الذاكرة
+     * ثم كتابةً — فطلبان متوازيان يقرآن القيمةَ نفسها فتُكتب زيادةٌ واحدةٌ عن اثنتين،
+     * فيضعف قفلُ الحساب أمام التخمين المتوازي. الآن الزيادةُ على مستوى القاعدة
+     * (`increment`) لا تُفقد شيئاً، والقفلُ يُكتب بشرطٍ يمنع كتابتين متسابقتين.
+     */
+    protected function bumpFailedAttempts(User $u): void
+    {
+        $max = max(1, (int) setting('auth.max_fail', 5));
+        $min = max(1, (int) setting('auth.lock_min', 15));
+        $t   = \Illuminate\Support\Facades\DB::table('users')->where('id', $u->id);
+
+        $t->increment('failed_attempts');
+        $n = (int) \Illuminate\Support\Facades\DB::table('users')->where('id', $u->id)->value('failed_attempts');
+        if ($n >= $max) {
+            // شرطُ `>= max` يمنع صفرَ العدّاد مرّتين متسابقتين: أوّلُ من يبلغ السقف
+            // يقفل ويُصفّر، والثاني لا يجد ما يصفّره فلا يُمدّد القفلَ بلا داعٍ.
+            $t->where('failed_attempts', '>=', $max)
+                ->update(['locked_until' => now()->addMinutes($min), 'failed_attempts' => 0]);
+        }
     }
 }

@@ -80,8 +80,14 @@ class EntryController extends Controller
     public function dropLine(string $id, string $lineId)
     {
         $e = $this->entry($id);
-        abort_if($e->state === 'مرحّل', 422, 'القيد المُرحَّل مقفل');
-        JournalLine::where('entry_id', $e->id)->where('id', $lineId)->delete();
+        // معاملةٌ بقفلٍ صفّيّ كنمط addLineTo/post: القراءةُ الطازجة تمنع الحذفَ عن
+        // قيدٍ مُرحَّلٍ سلفاً، لكن بلا القفل يبقى شقٌّ بين الفحص والحذف يهبط فيه
+        // السطرُ على قيدٍ رُحِّل بيننا (ترحيلٌ متزامن) — ميزانٌ مختلٌّ مقفولٌ أبداً.
+        \Illuminate\Support\Facades\DB::transaction(function () use ($e, $lineId) {
+            $fresh = JournalEntry::whereKey($e->id)->lockForUpdate()->firstOrFail();
+            abort_if($fresh->state === 'مرحّل', 422, 'القيد المُرحَّل مقفل — رُحِّل قبل حذف السطر');
+            JournalLine::where('entry_id', $fresh->id)->where('id', $lineId)->delete();
+        });
 
         return back()->with('ok', 'حُذف السطر');
     }

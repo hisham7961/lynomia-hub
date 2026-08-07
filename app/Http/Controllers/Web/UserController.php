@@ -264,9 +264,14 @@ class UserController extends Controller
         $this->gate();
         $this->guardEscalation(null, $user);
         abort_if($user->id === auth()->id(), 422, 'لا يمكنك حذف حسابك الحالي');
-        abort_if($user->role?->is_owner && self::activeOwners() <= 1, 422,
-            'هذا آخر مالكٍ نشط — عيّن مالكاً آخر قبل حذفه');
-        $user->delete();
+        // معاملةٌ تقفل صفوفَ المالكين النشطين قبل العدّ: عمليتان متزامنتان كانتا
+        // تقرآن العدّ نفسَه (٢) فتمرّان معاً وتُصفّران المالكين — قفلٌ دائمٌ لإدارة
+        // النظام لا فكاكَ منه إلا بتحرير القاعدة. القفلُ يُسلسلهما فيرى الثاني ١ فيُردّ.
+        \Illuminate\Support\Facades\DB::transaction(function () use ($user) {
+            abort_if($user->role?->is_owner && self::activeOwnersLocked() <= 1, 422,
+                'هذا آخر مالكٍ نشط — عيّن مالكاً آخر قبل حذفه');
+            $user->delete();
+        });
 
         return redirect()->route('users.index')->with('ok',
             'حُذف المستخدم — يمكن استعادته من سلّة المستخدمين ما لم يُحرَق بريدُه بحسابٍ جديد');
@@ -294,5 +299,14 @@ class UserController extends Controller
         $ids = Role::where('is_owner', true)->pluck('id')->all();
 
         return $ids ? User::whereNull('deleted_at')->where('status', 'نشط')->whereIn('role_id', $ids)->count() : 0;
+    }
+
+    /** كسابقتها لكن بقفلٍ صفّيّ — تُستدعى داخل معاملةٍ فتُسلسل العمليات المتزامنة */
+    protected static function activeOwnersLocked(): int
+    {
+        $ids = Role::where('is_owner', true)->pluck('id')->all();
+
+        return $ids ? User::whereNull('deleted_at')->where('status', 'نشط')
+            ->whereIn('role_id', $ids)->lockForUpdate()->count() : 0;
     }
 }
