@@ -101,6 +101,28 @@ class EsignController extends Controller
     }
 
     /**
+     * ربطُ طلب التوقيع بتصريح عهدة.
+     *
+     * الأصلُ الواحد قد تتعدّد تصاريحُه (خرج للصيانة مرّتين ونُقل مرّة)، فربطُ
+     * الطلب بالأصل وحده لا يقول **أيَّ ورقةٍ** وقّع هذا الطلبُ عليها. والتصريحُ
+     * يُقبل فقط إن كان تصريحاً لهذا الأصل بعينه — فمعرّفٌ من رابطٍ يُخمَّن لا
+     * يُعلّق توقيعاً على ورقةِ أصلٍ آخر. والفشلُ صامتٌ عمداً: الطلبُ أُنشئ فعلاً،
+     * وإسقاطُه بعد إنشائه أسوأُ من ربطٍ لم يقع.
+     */
+    protected function attachPermit(string $permitId, SignRequest $req, ?string $linkModule, ?string $linkId): void
+    {
+        if ($permitId === '' || $linkModule !== 'assets' || ! $linkId) return;
+        if (! \Illuminate\Support\Facades\Schema::hasTable('asset_custody')) return;
+
+        $p = \App\Models\AssetCustody::where('asset_id', $linkId)
+            ->whereIn('action', \App\Support\Custody::PERMITS)->find($permitId);
+        if (! $p) return;
+
+        $p->sign_id = $req->id;
+        $p->save();
+    }
+
+    /**
      * الرؤية المرحلية لطلب التوقيع (حتى تصل company_id في م2): المالك يرى الكل،
      * والمنشئ طلباته، وسوى ذلك عبر نطاق العقد أو الجهة المربوطة — استعلامٌ
      * مجمّع لكل مجموعة لا استعلامان لكل صف.
@@ -273,6 +295,7 @@ class EsignController extends Controller
             'free_body' => 'nullable|string|max:200000',
             'pass' => 'nullable|string|min:4|max:80', 'contract_id' => 'nullable|string',
             'link_module' => 'nullable|string|max:40', 'link_id' => 'nullable|string|max:64',
+            'permit' => 'nullable|string|max:64',       // تصريحُ عهدةٍ جاء منه الطلب
             'vars' => 'array',
             // v2.120: موقّعون متعددون — صفوف JSON من الواجهة، ووضع التوقيع
             'signers' => 'nullable|string|max:20000',
@@ -360,6 +383,9 @@ class EsignController extends Controller
 
         // v2.118: نطاق الطلب من عقده أو جهته المربوطة — به يعمل العزل الشركاتي مباشرة
         $this->stampScope($req);
+
+        // تصريحُ عهدةٍ أُرسل للتوقيع: يُربَط الطلبُ **بالتصريح** لا بالأصل وحده
+        $this->attachPermit((string) ($d['permit'] ?? ''), $req, $linkModule, $linkId);
 
         // v2.121: عقدٌ قيمته تبلغ عتبة موافقةٍ ما → الطلب يُحجز «بانتظار الموافقة»
         // ولا يُسلَّم ولا ينقلب العقد حتى تكتمل المراحل بالترتيب. بلا قواعد = صفر أثر

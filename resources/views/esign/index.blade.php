@@ -201,7 +201,15 @@
                         @endforeach
                     </select>
                     <input type="hidden" name="link_module" id="link_module">
-                    <input type="hidden" name="link_id" id="link_id"></div>
+                    <input type="hidden" name="link_id" id="link_id">
+                    {{-- قادمٌ من ورقة تصريح عهدة: الطلبُ يُربَط **بالتصريح نفسه** لا
+                         بالأصل وحده، فتعرض الورقةُ حالةَ توقيعها ولا يُخمَّن أيُّ
+                         طلبٍ يخصّ أيَّ تصريح حين تتعدّد تصاريحُ الأصل الواحد --}}
+                    @if (request('permit'))
+                        <input type="hidden" name="permit" value="{{ request('permit') }}">
+                        <div class="sub">📄 سيُربط هذا الطلب بتصريح العهدة الذي جئت منه.</div>
+                    @endif
+                </div>
                 <div class="fld fw"><label>ربط بعقد (اختياري) <span class="sub">· يملأ رقم العقد وقيمته وتواريخه تلقائياً</span></label>
                     <select class="inp" name="contract_id"><option value="">— بلا ربط —</option>
                         @foreach ($contracts as $cid => $ct)<option value="{{ $cid }}" @selected(($preContract ?? null) === $cid)>{{ \Illuminate\Support\Str::limit($ct, 40) }}</option>@endforeach
