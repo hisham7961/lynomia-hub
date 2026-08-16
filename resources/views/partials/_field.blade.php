@@ -92,9 +92,12 @@
             <span class="filename">لم يُحدَّد ملف</span>
         </label>
         @if ($raw)
-            <div class="sub">
+            <div class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 @if ($t === 'img')<img class="thumb" src="{{ route('file.show', $raw) }}" alt="">
-                @else<a href="{{ route('file.show', $raw) }}" target="_blank">الملف الحالي ↗</a>@endif
+                @else<a href="{{ route('file.show', $raw) }}" target="_blank" rel="noopener">الملف الحالي ↗</a>@endif
+                {{-- تنزيلُ القائم قبل استبداله: الرفعُ الجديد يدهس القديم بلا نسخة --}}
+                <a class="btn ghost xs" href="{{ route('file.show', ['path' => $raw, 'dl' => 1]) }}"
+                   title="تنزيل الملف الحالي بصيغته الأصلية">⬇ تحميل</a>
             </div>
         @endif
 

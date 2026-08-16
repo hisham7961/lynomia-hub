@@ -156,6 +156,7 @@
                                         {{ $mine ? 'background:var(--p);color:#fff' : 'background:var(--pss)' }}">{{ $m->body }}</div>
                             @if ($m->att)
                                 <a class="sub" style="font-size:12px" href="{{ route('file.show', $m->att) }}" target="_blank" rel="noopener">📎 مرفق</a>
+                                <a class="sub" style="font-size:12px" href="{{ route('file.show', ['path' => $m->att, 'dl' => 1]) }}" title="تنزيل المرفق">⬇</a>
                             @endif
                             <div class="sub" style="font-size:10px;margin-top:1px;{{ $mine ? 'text-align:end' : '' }}">
                                 {{ $m->created_at?->format('H:i') }}

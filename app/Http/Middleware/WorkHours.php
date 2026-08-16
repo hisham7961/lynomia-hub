@@ -22,8 +22,10 @@ class WorkHours
      * التنزيل ويترك بابَ الرفع مفتوحاً. وقائمةٌ يدويةٌ يدنو منها النسيان،
      * فأُضيف معها حارسٌ **وصفيّ**: أيُّ طلبٍ يحمل ملفاً محجوبٌ مهما كان مساره.
      */
-    protected const FILE_ROUTES = ['file.show', 'att.dl', 'att.view', 'att.store', 'm.export',
-                                   'esign.pdf', 'dataroom.store', 'inboxdocs.store', 'm.import.run'];
+    protected const FILE_ROUTES = ['file.show', 'att.dl', 'att.view', 'att.zip', 'att.store', 'm.export',
+                                   'esign.pdf', 'dataroom.store', 'inboxdocs.store', 'm.import.run',
+                                   // أوراقُ العهدة تُطبع وتُحفظ PDF — نقلُ ملفاتٍ بكل معنى
+                                   'custody.label', 'custody.spec', 'custody.permit.doc'];
 
     public function handle(Request $r, Closure $next)
     {

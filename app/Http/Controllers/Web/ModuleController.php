@@ -1228,7 +1228,10 @@ class ModuleController extends Controller
             if (hub_field_mode(auth()->user(), (string) ($def['key'] ?? ''), $k) !== '') continue;
 
             if (in_array($t, ['file', 'img'], true)) {
-                if ($r->hasFile($k)) $m->{$c} = $r->file($k)->store('hub', 'local');   // خاص — يُخدم عبر بوابة الملفات المصادَق عليها
+                if ($r->hasFile($k)) {
+                    $m->{$c} = $r->file($k)->store('hub', 'local');   // خاص — يُخدم عبر بوابة الملفات المصادَق عليها
+                    $this->stampFileName($m, $def, $c, $r->file($k));
+                }
                 continue;
             }
             if ($t === 'bool') { $m->{$c} = $r->boolean($k); continue; }
@@ -1279,5 +1282,32 @@ class ModuleController extends Controller
         }
 
         \App\Support\AppsProjects::inherit($def, $m);
+    }
+
+    /**
+     * **ختمُ اسم الملف الأصليّ** مع رفعه في حقل وحدة.
+     *
+     * `store()` تحفظ الملف باسمٍ مولَّدٍ عشوائياً (حمايةً من التخمين) وتُسقط
+     * اسمَه الأصليّ تماماً — فمن نزّل «الهوية البصرية» لاحقاً وجد
+     * `9f3c…e1.png` في تنزيلاته. الاسمُ يُختم هنا في `meta.files.{عمود}`
+     * فتقرؤه بوابةُ الملفات عند التنزيل وتعيده كما رُفع. عمودُ `meta` قائمٌ في
+     * جداول الوحدات، ومن لا يملكه لا يُكتب له شيء — والتنزيل يبقى عاملاً باسمٍ
+     * مشتقٍّ من السجل وحقله.
+     */
+    protected function stampFileName(Model $m, array $def, string $col, $file): void
+    {
+        $table = (string) ($def['table'] ?? '');
+        if ($table === '' || ! \Illuminate\Support\Facades\Schema::hasColumn($table, 'meta')) return;
+
+        $meta = $m->meta;
+        $arr = is_array($meta) ? $meta : (json_decode((string) $meta, true) ?: []);
+        $arr['files'][$col] = [
+            'name' => \Illuminate\Support\Str::limit((string) $file->getClientOriginalName(), 190, ''),
+            'size' => (int) $file->getSize(),
+            'at'   => now()->toDateTimeString(),
+        ];
+
+        // النموذجُ قد يصبّ meta مصفوفةً وقد لا يفعل — ترميزٌ مزدوجٌ يفسد العمود
+        $m->meta = $m->hasCast('meta') ? $arr : json_encode($arr, JSON_UNESCAPED_UNICODE);
     }
 }

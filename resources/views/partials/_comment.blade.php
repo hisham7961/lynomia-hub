@@ -28,6 +28,7 @@
     <div class="cbody">{{ $c->body }}</div>
     @if ($c->att)
         <a class="sub" href="{{ route('file.show', $c->att) }}" target="_blank" rel="noopener">📎 مرفق</a>
+        <a class="sub" href="{{ route('file.show', ['path' => $c->att, 'dl' => 1]) }}" title="تنزيل المرفق">⬇</a>
     @endif
     {{-- التفاعلات: الموجودة تظهر بعدّها، والضغط يضيف أو يزيل --}}
     <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">

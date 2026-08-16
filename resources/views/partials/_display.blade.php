@@ -35,8 +35,18 @@
     @php $ids = is_array($v) ? $v : (json_decode($v, true) ?: []); @endphp
     @foreach ($ids as $tg)<span class="bdg g">{{ $tg }}</span> @endforeach
 @elseif ($t === 'file' || $t === 'img')
-    @if ($t === 'img')<img class="thumb" src="{{ route('file.show', $v) }}" alt="">
-    @else<a href="{{ route('file.show', $v) }}" target="_blank">ملف ↗</a>@endif
+    {{-- الملفُ المرفوع يُفتح **ويُنزَّل**: كان يُعاين في تبويبٍ ولا بابَ لتنزيله،
+         فمن أراد نسخته حفظها بزرّ المتصفح باسم تخزينها العشوائيّ. `dl=1` تُنزّله
+         بصيغته كما هو وباسمٍ يُعرَف (الأصليّ إن حُفظ، وإلا من السجل وحقله). --}}
+    <span style="display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap">
+        @if ($t === 'img')<a href="{{ route('file.show', $v) }}" target="_blank" rel="noopener"><img class="thumb" src="{{ route('file.show', $v) }}" alt=""></a>
+        @else<a href="{{ route('file.show', $v) }}" target="_blank" rel="noopener">ملف ↗</a>@endif
+        {{-- في الجدول تبقى الخلية خفيفة: الزرّ في صفحة السجل حيث يُتّخذ القرار --}}
+        @if (($ctx ?? 'table') === 'show')
+            <a class="btn ghost xs" href="{{ route('file.show', ['path' => $v, 'dl' => 1]) }}"
+               title="تنزيل الملف بصيغته الأصلية">⬇ تحميل</a>
+        @endif
+    </span>
 @elseif ($t === 'url')
     <a class="mono ltr" href="{{ hub_safe_url($v) }}" target="_blank" rel="noopener">{{ \Illuminate\Support\Str::limit($v, 34) }}</a>
 @elseif ($t === 'date')
