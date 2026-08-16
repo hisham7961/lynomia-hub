@@ -1,6 +1,13 @@
 {{-- المرفقات الشاملة — يتوقع: $aModule $aRecordId $attachments $aUsers (id=>name) --}}
 <div class="card" id="attachments">
-    <h3>📎 المرفقات <span class="bdg g">{{ $attachments->count() }}</span></h3>
+    <h3>📎 المرفقات <span class="bdg g">{{ $attachments->count() }}</span>
+        {{-- حزمةٌ واحدةٌ بدل اثنتي عشرة ضغطة — بالأسماء الأصلية كما رُفعت --}}
+        @if ($attachments->count() > 1 && class_exists(\ZipArchive::class))
+            <a class="btn ghost xs" style="margin-inline-start:auto"
+               href="{{ route('att.zip', [$aModule, $aRecordId]) }}"
+               title="تنزيل كل مرفقات هذا السجل في ملف مضغوط">⬇ تحميل الكل (ZIP)</a>
+        @endif
+    </h3>
 
     @forelse ($attachments as $a)
         @php
@@ -34,6 +41,10 @@
                 @if ($isImg || $isPdf)
                     <a class="btn ghost xs" href="{{ route('att.view', $a->id) }}" target="_blank" rel="noopener" title="فتح المعاينة في تبويب">↗</a>
                 @endif
+                {{-- زرُّ تنزيلٍ صريح: الاسمُ كان رابطَ التنزيل الوحيد، ومن رآه
+                     ظنّه فتحاً للمعاينة فلم يجد باباً لأخذ نسخته. --}}
+                <a class="btn ghost xs" href="{{ route('att.dl', $a->id) }}"
+                   title="تنزيل «{{ \Illuminate\Support\Str::limit($a->original_name, 40) }}» بصيغته الأصلية">⬇ تحميل</a>
                 @if ($a->uploaded_by === auth()->id() || hub_is_owner() || hub_can(auth()->user(), $aModule, 'e'))
                     <form method="POST" action="{{ route('att.destroy', $a->id) }}" class="inline"
                           {{-- الاسم في سمة HTML مُهرَّبة — لا سياق JS فلا صنف الحقن القديم أصلاً --}}

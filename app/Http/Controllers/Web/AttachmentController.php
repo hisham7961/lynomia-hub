@@ -94,6 +94,107 @@ class AttachmentController extends Controller
         return response()->download($abs, $a->original_name ?: basename($a->path));
     }
 
+    /**
+     * **تنزيلُ مرفقات السجل كلِّها في ملفٍّ واحد.**
+     *
+     * سجلٌّ عليه اثنا عشر مرفقاً (هويّةٌ بصرية، وعقد، وتصاميم) كان يُنزَّل ضغطةً
+     * ضغطةً — ونافذةُ التنزيل تسأل عن كلٍّ منها. الحزمةُ تُبنى بالأسماء الأصلية
+     * كما رُفعت، ويُسجَّل كلُّ ملفٍّ فيها في سجل التنزيل كما لو نُزّل وحده:
+     * حزمةٌ تُخرج اثني عشر ملفاً لا يجوز أن تظهر في الأثر تنزيلاً واحداً.
+     *
+     * والمصابُ لا يدخل الحزمة (حاجزُ التنزيل نفسه)، والصلاحيةُ صلاحيةُ السجل.
+     */
+    public function zip(string $module, string $recordId)
+    {
+        $this->guardRecord($module, $recordId, 'v');
+
+        // خادمٌ بلا امتداد zip: **سطرٌ في مكان الزرّ لا صفحةُ خطأ** — الصفحة تعمل
+        // وبقيّةُ المرفقات تُنزَّل فرادى، فلا يُقطع المستخدم عمّا جاء له.
+        if (! class_exists(\ZipArchive::class)) {
+            return back()->with('err',
+                'ضغطُ الملفات غير متاح على هذا الخادم (امتداد zip غير مثبَّت) — نزّل المرفقات فرادى بزرّ «تحميل»');
+        }
+
+        // `!= 'infected'` وحدها تُسقط صفوف NULL صامتةً على المحرّكين — ومرفقٌ
+        // لم يُفحص بعد مرفقٌ سليمٌ حتى يُوسم، فلا يُحذف من الحزمة بلا سبب.
+        $items = Attachment::where('module', $module)->where('record_id', $recordId)
+            ->where(fn ($w) => $w->whereNull('av_status')->orWhere('av_status', '!=', 'infected'))
+            ->orderBy('created_at')->orderBy('id')->get();
+        abort_if($items->isEmpty(), 404, 'لا مرفقات في هذا السجل');
+
+        $dir = storage_path('app/hub/tmp');
+        if (! is_dir($dir)) @mkdir($dir, 0775, true);
+        $this->pruneTmp($dir);
+        $tmp = $dir . '/att-' . Str::random(24) . '.zip';
+
+        $zip = new \ZipArchive;
+        abort_unless($zip->open($tmp, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true,
+            500, 'تعذّر إنشاء ملف الحزمة');
+
+        $used = [];
+        $packed = [];
+        foreach ($items as $a) {
+            $abs = Storage::disk($a->disk ?: 'local')->path($a->path);
+            if (! is_file($abs)) continue;                      // ملفٌ مفقودٌ على القرص لا يُسقط الحزمة كلها
+
+            // اسمان متطابقان داخل الحزمة: الثاني يدهس الأول صامتاً — يُرقَّم
+            $name = $this->zipEntryName((string) ($a->original_name ?: basename($a->path)), $used);
+            $zip->addFile($abs, $name);
+            $packed[] = $a;
+        }
+        $zip->close();
+
+        abort_if(! $packed, 404, 'مرفقات هذا السجل غير موجودة على القرص');
+
+        foreach ($packed as $a) $a->increment('downloads');
+        DB::table('download_log')->insert(collect($packed)->map(fn ($a) => [
+            'attachment_id' => $a->id, 'user_id' => auth()->id(),
+            'ip' => request()->ip(),
+            'device' => substr('حزمة ZIP · ' . request()->userAgent(), 0, 200),
+            'created_at' => now(),
+        ])->all());
+
+        $label = (string) (hub_scope(('\\App\\Models\\' . hub_mod($module)['model'])::query(), $module)
+            ->whereKey($recordId)->value(hub_display_col($module)) ?: $recordId);
+
+        return response()->download($tmp, $this->safeZipName($label))->deleteFileAfterSend(true);
+    }
+
+    /**
+     * حزمةٌ لم تُرسَل تبقى على القرص: `deleteFileAfterSend` تُنفَّذ **بعد** إتمام
+     * الإرسال وحده — واتصالٌ انقطع في منتصف تنزيلٍ يترك ملفاً كاملاً وراءه.
+     * ساعةٌ تكفي أطولَ تنزيلٍ معقول، وما فوقها يُكنَس عند الحزمة التالية.
+     */
+    protected function pruneTmp(string $dir): void
+    {
+        foreach (glob($dir . '/att-*.zip') ?: [] as $old) {
+            if (is_file($old) && filemtime($old) < time() - 3600) @unlink($old);
+        }
+    }
+
+    /** اسمٌ فريدٌ داخل الحزمة (تكرارُ الاسم يدهس ملفاً بصمت) */
+    protected function zipEntryName(string $name, array &$used): string
+    {
+        $name = preg_replace('#[\\\\/:*?"<>|\x00-\x1F]#u', '-', trim($name)) ?: 'ملف';
+        $name = hub_fit($name, 120);
+        $try = $name;
+        for ($i = 2; isset($used[mb_strtolower($try)]); $i++) {
+            $ext = (string) pathinfo($name, PATHINFO_EXTENSION);
+            $stem = $ext !== '' ? mb_substr($name, 0, -1 * (mb_strlen($ext) + 1)) : $name;
+            $try = $stem . " ({$i})" . ($ext !== '' ? '.' . $ext : '');
+        }
+        $used[mb_strtolower($try)] = true;
+
+        return $try;
+    }
+
+    protected function safeZipName(string $label): string
+    {
+        $label = preg_replace('#[\\\\/:*?"<>|\x00-\x1F]#u', '-', trim($label)) ?: 'مرفقات';
+
+        return hub_fit('مرفقات — ' . $label, 100) . '.zip';
+    }
+
     /** أنواع تُعاين حيّاً داخل المتصفح — صور نقطية وPDF فقط؛ SVG/HTML تبقى تنزيلاً (قد تحمل سكربتات) */
     // عامة: بوابة ملفات الوحدات وغرفة البيانات تتبعان السياسة نفسها — تعريفٌ واحد
     public const INLINE_MIMES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp', 'image/avif', 'application/pdf'];

@@ -36,6 +36,8 @@
             <div>
                 <a href="{{ route('file.show', $doc->path) }}" target="_blank"><b>📄 {{ $doc->orig }}</b></a>
                 <span class="sub">({{ number_format($doc->size / 1024, 0) }} KB)</span>
+                <a class="btn ghost xs" href="{{ route('file.show', ['path' => $doc->path, 'dl' => 1]) }}"
+                   title="تنزيل الوثيقة باسمها الأصلي">⬇ تحميل</a>
                 <div class="sub">رفعها {{ $users[$doc->uploaded_by] ?? '؟' }} {{ $doc->created_at->diffForHumans() }}{{ $doc->note ? ' · «' . $doc->note . '»' : '' }}</div>
                 @if ($doc->status === 'مصنف')
                     <div class="sub" style="margin-top:4px">

@@ -276,6 +276,8 @@ Route::middleware('auth')->group(function () {
     Route::post('attachments', [AttachmentController::class, 'store'])->name('att.store');
     Route::get('attachments/{id}/dl', [AttachmentController::class, 'download'])->name('att.dl');
     Route::get('attachments/{id}/view', [AttachmentController::class, 'preview'])->name('att.view');
+    // حزمةُ مرفقات سجلٍّ واحد — بصلاحية السجل نفسه
+    Route::get('attachments/{module}/{recordId}/zip', [AttachmentController::class, 'zip'])->name('att.zip');
     Route::delete('attachments/{id}', [AttachmentController::class, 'destroy'])->name('att.destroy');
     Route::get('employee/{id}', [PortalController::class, 'employee'])->name('portal.employee');
     Route::get('app/{id}', [AppCenterController::class, 'show'])->name('apps.center');
