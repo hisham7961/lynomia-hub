@@ -153,6 +153,26 @@ Route::middleware('auth')->group(function () {
     Route::get('recommendations', [CapacityController::class, 'recommendations'])->name('recs');
     Route::get('delivery', [\App\Http\Controllers\Web\DeliveryController::class, 'index'])->name('delivery');
     Route::get('assets-life', [\App\Http\Controllers\Web\AssetLifeController::class, 'index'])->name('assets.life');
+
+    // مسحُ ملصق العهدة: مسارٌ قصيرٌ عمداً (`/c/{code}`) — رمزُ QR على ملصقٍ
+    // ٤٠×٣٠ مم لا يتّسع لرابطٍ فيه معرّفٌ عشوائيّ بستٍّ وثلاثين خانة: كثافةُ
+    // الرمز ترتفع فلا يقرؤه ماسحٌ حراريٌّ ولا هاتفٌ في إضاءةٍ ضعيفة.
+    Route::get('c/{code}', [\App\Http\Controllers\Web\CustodyController::class, 'byCode'])->name('custody.code');
+
+    // ── قسم العهد: كتالوجٌ بالأصناف وأكوادها، وملصقٌ وبطاقةٌ وتصاريحُ نقلٍ وخروج ──
+    Route::prefix('custody')->name('custody.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Web\CustodyController::class, 'catalog'])->name('catalog');
+        Route::get('cat/{code}', [\App\Http\Controllers\Web\CustodyController::class, 'category'])->name('category');
+        Route::get('{id}/label', [\App\Http\Controllers\Web\CustodyController::class, 'label'])->name('label');
+        Route::get('{id}/spec', [\App\Http\Controllers\Web\CustodyController::class, 'spec'])->name('spec');
+        Route::post('{id}/specs', [\App\Http\Controllers\Web\CustodyController::class, 'saveSpecs'])->name('specs');
+        Route::post('{id}/handover', [\App\Http\Controllers\Web\CustodyController::class, 'handover'])->name('handover');
+        Route::post('{id}/recover', [\App\Http\Controllers\Web\CustodyController::class, 'recover'])->name('recover');
+        Route::post('{id}/permit', [\App\Http\Controllers\Web\CustodyController::class, 'permit'])->name('permit');
+        Route::get('{id}/permit/{permitId}', [\App\Http\Controllers\Web\CustodyController::class, 'permitDoc'])->name('permit.doc');
+        Route::post('{id}/permit/{permitId}/return', [\App\Http\Controllers\Web\CustodyController::class, 'permitReturn'])->name('permit.return');
+        Route::post('{id}/permit/{permitId}/cancel', [\App\Http\Controllers\Web\CustodyController::class, 'permitCancel'])->name('permit.cancel');
+    });
     Route::get('compliance-board', [\App\Http\Controllers\Web\ComplianceController::class, 'index'])->name('compliance.board');
     Route::get('apps-projects', [\App\Http\Controllers\Web\AppsProjectsController::class, 'index'])->name('appsprojects');
     Route::post('apps-projects/fix', [\App\Http\Controllers\Web\AppsProjectsController::class, 'fix'])->name('appsprojects.fix');

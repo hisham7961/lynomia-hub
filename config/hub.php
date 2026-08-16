@@ -4097,6 +4097,7 @@ return [
             'display' => 'name',
             'status' => 'status',
             'columns' => [
+                'code',
                 'name',
                 'type',
                 'holderId',
@@ -4104,6 +4105,16 @@ return [
                 'warranty',
             ],
             'fields' => [
+                [
+                    'key' => 'code',
+                    'col' => 'code',
+                    'label' => 'كود العهدة',
+                    'type' => 'text',
+                    // يولّده النظام من صنف الأصل وسنته وتسلسله (Asset::nextCode)
+                    // ويُطبَع على ملصق العهدة — فلا يُكتب يدوياً من CRUD ولا API:
+                    // كودٌ مُعدَّلٌ بيدٍ يفصل الملصقَ الملصوق على الجهاز عن سجلّه.
+                    'locked' => true,
+                ],
                 [
                     'key' => 'name',
                     'col' => 'name',
@@ -4232,6 +4243,7 @@ return [
                 ],
             ],
             'search' => [
+                'code',
                 'name',
                 'tag',
                 'serial',
