@@ -1,22 +1,96 @@
 @extends('layouts.app')
 @section('title', 'مركز التطبيق — ' . $app->name)
 @section('content')
+{{-- ترويسةٌ بوجه التطبيق: أيقونتُه كما تُرى في المتجر لا سطرَ نصٍّ عنها --}}
 <div class="hero">
-    <div>
-        <h2>📱 {{ $app->name }}
-            @if ($app->status)<span class="bdg {{ hub_tone($app->status) }}">{{ $app->status }}</span>@endif
-        </h2>
-        <div class="sub">
-            {{ $app->platform }}{{ $app->ver ? ' · النسخة ' . $app->ver : '' }}{{ $app->build ? ' (' . $app->build . ')' : '' }}
-            {{ $app->last_up ? ' · آخر تحديث ' . substr($app->last_up, 0, 10) : '' }}
-            @if ($project) · مشروع: <a href="{{ route('m.show', ['projects', $project->id]) }}">{{ $project->name }}</a>@endif
+    <div style="display:flex;gap:14px;align-items:center;min-width:0">
+        @if ($app->logo_id)
+            <img class="appico" src="{{ route('file.show', $app->logo_id) }}" alt="أيقونة {{ $app->name }}">
+        @else
+            <span class="appico ph" aria-hidden="true">📱</span>
+        @endif
+        <div style="min-width:0">
+            <h2>{{ $app->name }}
+                @if ($app->status)<span class="bdg {{ hub_tone($app->status) }}">{{ $app->status }}</span>@endif
+            </h2>
+            <div class="sub">
+                {{ $app->platform }}{{ $app->ver ? ' · النسخة ' . $app->ver : '' }}{{ $app->build ? ' (' . $app->build . ')' : '' }}
+                {{ $app->last_up ? ' · آخر تحديث ' . substr($app->last_up, 0, 10) : '' }}
+                @if ($project) · مشروع: <a href="{{ route('m.show', ['projects', $project->id]) }}">{{ $project->name }}</a>@endif
+            </div>
         </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
         @if (hub_can(auth()->user(), 'apps', 'e'))<a class="btn ghost sm" href="{{ route('m.edit', ['apps', $app->id]) }}">✏️ تعديل</a>@endif
+        <a class="btn ghost sm" href="#shots">🖼️ اللقطات</a>
         <a class="btn ghost sm" href="{{ route('m.show', ['apps', $app->id]) }}">📄 كل الحقول</a>
     </div>
 </div>
+<style>
+.appico{width:64px;height:64px;flex:none;border-radius:16px;object-fit:cover;border:1px solid var(--ln);
+    background:var(--cd);box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.appico.ph{display:flex;align-items:center;justify-content:center;font-size:30px;background:var(--bg2)}
+</style>
+
+{{-- ما يراه المستخدمُ في المتجر: لقطاتُه ووصفُه — قبل الأرقام والإصدارات --}}
+@include('partials.app_gallery')
+
+{{-- وصفُ المتجر: نصٌّ يُقرأ بحدوده لا سطرٌ في جدول حقول --}}
+<div class="card" id="storedesc">
+    <h3>📝 وصف المتجر
+        <span class="bdg {{ $desc['tone'] }}">{{ number_format($desc['len']) }} / {{ number_format($desc['max']) }} حرف</span>
+        @if ($desc['text'])
+            <button class="btn ghost xs msauto" type="button" data-copydesc
+                    onclick="(function(b){var t=document.getElementById('descbody').innerText;
+                        (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject())
+                        .then(function(){b.textContent='✓ نُسخ'},function(){b.textContent='انسخه يدوياً'})})(this)">
+                ⧉ نسخ الوصف</button>
+        @endif
+    </h3>
+    @if ($desc['text'])
+        <div id="descbody" class="descbody">{!! nl2br(e($desc['text'])) !!}</div>
+    @endif
+    <div class="sub" style="margin-top:8px">
+        {{ $desc['tone'] === 'ok' ? '✅ ' : '⚠️ ' }}{{ $desc['hint'] }}
+        @if (hub_can(auth()->user(), 'apps', 'e'))
+            <a href="{{ route('m.edit', ['apps', $app->id]) }}">تحريره ←</a>
+        @endif
+    </div>
+</div>
+<style>
+.descbody{white-space:normal;line-height:2;font-size:14px;background:var(--bg2);border:1px solid var(--ln);
+    border-radius:12px;padding:14px 16px;max-height:340px;overflow:auto}
+</style>
+
+{{-- جاهزية النشر: ما ينقص قبل الرفع — ودورةُ مراجعةٍ ضائعة أغلى من فحصٍ هنا --}}
+<div class="card" id="ready">
+    <h3>🚦 جاهزية النشر
+        <span class="bdg {{ $ready['tone'] }}">{{ $ready['pct'] }}٪</span>
+        <span class="sub">{{ $ready['done'] }}/{{ $ready['need'] }} من الإلزامي</span>
+    </h3>
+    <div class="pbar sm" style="margin-bottom:12px"><span style="width:{{ $ready['pct'] }}%"></span></div>
+    <div class="rdgrid">
+        @foreach ($ready['items'] as $it)
+            <div class="rdrow {{ $it['ok'] ? 'on' : ($it['req'] ? 'off' : 'opt') }}">
+                <span class="rdi" aria-hidden="true">{{ $it['ok'] ? '✅' : ($it['req'] ? '❌' : '➖') }}</span>
+                <div style="min-width:0">
+                    <b>{{ $it['label'] }}</b>
+                    @if (! $it['req'])<span class="bdg g">مستحسن</span>@endif
+                    <div class="sub">{{ $it['why'] }}</div>
+                    @if (! $it['ok'])<div class="sub">↳ {{ $it['fix'] }}</div>@endif
+                </div>
+            </div>
+        @endforeach
+    </div>
+</div>
+<style>
+.rdgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+.rdrow{display:flex;gap:10px;align-items:flex-start;background:var(--bg2);border:1px solid var(--ln);
+    border-radius:12px;padding:11px 13px}
+.rdrow.off{border-color:color-mix(in srgb,var(--bad) 40%,var(--ln))}
+.rdrow.on{border-color:color-mix(in srgb,var(--ok) 35%,var(--ln))}
+.rdrow .rdi{font-size:15px;line-height:1.6}
+</style>
 
 {{-- نسبة الإنجاز الحية --}}
 <div class="card">
