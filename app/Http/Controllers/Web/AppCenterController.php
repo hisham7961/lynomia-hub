@@ -61,12 +61,7 @@ class AppCenterController extends Controller
                 ->get(['id', 'title', 'type', 'weight', 'progress', 'status', 'test'])
             : collect();
 
-        // ما يراه المستخدمُ في المتجر: لقطاتُه ووصفُه وما ينقص قبل النشر
-        $shots = \App\Support\AppStudio::shots($app);
-        $desc = \App\Support\AppStudio::description($app);
-        $ready = \App\Support\AppStudio::readiness($app, $shots);
-
         return view('app-center.show', compact('app', 'progress', 'project', 'releases',
-            'issues', 'issuesN', 'tickets', 'ticketsN', 'feats', 'shots', 'desc', 'ready'));
+            'issues', 'issuesN', 'tickets', 'ticketsN', 'feats'));
     }
 }
