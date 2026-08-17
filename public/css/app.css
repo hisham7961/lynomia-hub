@@ -1158,6 +1158,23 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 .setrow+.setrow{border-top:1px solid color-mix(in srgb,var(--ln) 55%,transparent)}
 .setrow:hover{background:color-mix(in srgb,var(--p) 3%,transparent)}
 
+
+/* ── لوحة تقدّم النقل: رفعٌ بنسبةٍ حقيقية وتنزيلٌ يقول متى بدأ ── */
+.xfer{position:fixed;inset-inline-end:18px;bottom:18px;z-index:80;width:min(340px,calc(100vw - 28px));
+  background:var(--cd);border:1px solid var(--ln);border-radius:16px;padding:13px 15px;box-shadow:var(--shh)}
+.xfer[hidden]{display:none}
+.xfer .xrow{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.xfer .xtitle{font-size:13px;font-weight:700;flex:1;min-width:0}
+.xfer .xcancel{border:0;background:transparent;color:var(--sb);font-size:15px;cursor:pointer;line-height:1}
+.xfer .xcancel:hover{color:var(--bad)}
+.xfer .xbar{height:8px;border-radius:99px;background:color-mix(in srgb,var(--p) 10%,transparent);overflow:hidden}
+.xfer .xbar span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--p),var(--pd));
+  transition:width .18s ease-out}
+/* بلا حجمٍ معلوم (تحضيرُ تنزيل): شريطٌ يتحرّك بلا نسبةٍ يكذبها */
+.xfer .xbar.indet span{animation:xslide 1.1s ease-in-out infinite}
+@keyframes xslide{0%{transform:translateX(100%)}100%{transform:translateX(-260%)}}
+.xfer .xmeta{margin-top:7px;font-variant-numeric:tabular-nums}
+
 /* ═ كثافة الجوال (v2.115): الترويسات كانت تلتهم ٦٣٢ من ٨٤٤ بكسل قبل أول صف بيانات ═ */
 @media (max-width:760px){
   .demoband{font-size:11px;padding:3px 8px;white-space:nowrap;overflow-x:auto;scrollbar-width:none}
@@ -1188,3 +1205,4 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
   .filters .inp{min-width:140px;flex-shrink:0}
   .filters select.inp{min-width:120px}
 }
+

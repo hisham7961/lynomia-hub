@@ -197,7 +197,7 @@ class DmController extends Controller
         $r->merge(['body' => trim(hub_str($r->input('body')))]);
         $data = $r->validate([
             'body' => ['required', 'string', 'max:4000'],
-            'att'  => ['nullable', 'file', 'max:' . (int) setting('files.max_kb', 512000)],
+            'att'  => ['nullable', 'file', 'max:' . hub_upload_cap()['kb']],
         ], [], ['body' => 'نص الرسالة', 'att' => 'المرفق']);
 
         $msg = DmMessage::create([

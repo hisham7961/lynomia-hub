@@ -19,3 +19,28 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# ── سقفُ الرفع حين يكون الخادم mod_php ──
+# محصورٌ في <IfModule mod_php> عمداً: كتابةُ php_value على خادمٍ بلا mod_php
+# ترمي «Internal Server Error» على كل صفحة — فحاجزُ الوحدة شرطُ سلامة.
+# وعلى PHP-FPM/CGI تسري القيمُ من public/.user.ini بدلَها.
+<IfModule mod_php.c>
+    php_value upload_max_filesize 1024M
+    php_value post_max_size 1056M
+    php_value max_execution_time 600
+    php_value max_input_time 600
+    php_value memory_limit 512M
+</IfModule>
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 1024M
+    php_value post_max_size 1056M
+    php_value max_execution_time 600
+    php_value max_input_time 600
+    php_value memory_limit 512M
+</IfModule>
+
+# حدُّ أباتشي لحجم جسم الطلب (بالبايت) — بلا رفعِه يردّ ٤١٣ قبل PHP
+<IfModule mod_reqtimeout.c>
+    RequestReadTimeout body=600,MinRate=500
+</IfModule>
+LimitRequestBody 1107296256

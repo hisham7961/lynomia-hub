@@ -35,9 +35,9 @@ class AttachmentController extends Controller
             'module'    => ['required', 'string', 'max:60'],
             'record_id' => ['required', 'string', 'max:36'],
             // أحدُهما يكفي: المفردُ أو الدفعة — والتحقق على كل ملفٍ في الدفعة
-            'file'      => ['required_without:files', 'nullable', 'file', 'max:' . (int) setting('files.max_kb', 512000)],
+            'file'      => ['required_without:files', 'nullable', 'file', 'max:' . hub_upload_cap()['kb']],
             'files'     => ['required_without:file', 'nullable', 'array', 'max:' . self::BATCH_MAX],
-            'files.*'   => ['file', 'max:' . (int) setting('files.max_kb', 512000)],
+            'files.*'   => ['file', 'max:' . hub_upload_cap()['kb']],
             // الملاحظة كانت تُحقَّق ٢٠٠ حرفاً وتُحشر في عمود ٦٠ — صار لها عمودها
             'note'      => ['nullable', 'string', 'max:300'],
             // نوع الوثيقة من ملف الكيان — مفتاحٌ معلن لا نصٌّ حر
