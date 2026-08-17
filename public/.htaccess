@@ -19,3 +19,21 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# ── سقفُ الرفع على الخادم ──
+#
+# **لا توجيهَ هنا عمداً.** كان في هذا الموضع `php_value` و`LimitRequestBody`
+# و`RequestReadTimeout` لرفع سقف الرفع — وثلاثتُها تُسقط الموقعَ كلَّه بـ٥٠٠
+# على استضافةٍ مشتركة:
+#
+#   · `RequestReadTimeout` سياقُه **إعدادُ الخادم أو المضيف الافتراضي** ولا
+#     يُقبل في .htaccess إطلاقاً — «not allowed here» على كل طلب، وحاجزُ
+#     `<IfModule>` لا يحمي منه لأن الوحدةَ محمّلةٌ فعلاً.
+#   · `LimitRequestBody` يحتاج `AllowOverride Limit` (أو All)، وأكثرُ
+#     الاستضافات تمنح `FileInfo Indexes` وحدها.
+#   · `php_value` يحتاج `AllowOverride Options` مع mod_php، ولا يُقبل أصلاً
+#     على PHP-FPM/CGI (وهو الأشيع اليوم).
+#
+# فسقفُ الرفع يُرفع من **`public/.user.ini`** (تقرؤه PHP-FPM/CGI تلقائياً بلا
+# أيّ خطرٍ على أباتشي)، أو من `php.ini` أو لوحة الاستضافة (PHP Selector)،
+# أو من كتلة المضيف الافتراضي على VPS كما في دليل التنصيب.

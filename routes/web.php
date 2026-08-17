@@ -153,6 +153,8 @@ Route::middleware('auth')->group(function () {
     Route::get('recommendations', [CapacityController::class, 'recommendations'])->name('recs');
     Route::get('delivery', [\App\Http\Controllers\Web\DeliveryController::class, 'index'])->name('delivery');
     Route::get('assets-life', [\App\Http\Controllers\Web\AssetLifeController::class, 'index'])->name('assets.life');
+    // مركزُ الكود المصدري: صفحةُ إصداراتٍ على شاكلة ما يعرفه المطوّرون
+    Route::get('code-center', [\App\Http\Controllers\Web\CodeCenterController::class, 'index'])->name('code.center');
 
     // مسحُ ملصق العهدة: مسارٌ قصيرٌ عمداً (`/c/{code}`) — رمزُ QR على ملصقٍ
     // ٤٠×٣٠ مم لا يتّسع لرابطٍ فيه معرّفٌ عشوائيّ بستٍّ وثلاثين خانة: كثافةُ
@@ -273,11 +275,19 @@ Route::middleware('auth')->group(function () {
     Route::post('social/snapshot', [\App\Http\Controllers\Web\SocialController::class, 'snapshot'])->name('social.snapshot');
 
     // ── المرفقات الشاملة على أي سجل ──
+    // ── الرفعُ المقطَّع: قطعٌ صغيرةٌ تصل حيث لا يمرّ الملفُّ الكبير ──
+    // معدّلٌ واسع: غيغابايتٌ بقطعٍ ٤ م.ب = ٢٥٦ طلباً — والحدُّ يحمي من الإغراق
+    Route::post('uploads/chunk', [\App\Http\Controllers\Web\UploadChunkController::class, 'chunk'])
+        ->name('upload.chunk')->middleware('throttle:900,1');
+    Route::post('uploads/finish', [\App\Http\Controllers\Web\UploadChunkController::class, 'finish'])
+        ->name('upload.finish')->middleware('throttle:120,1');
+
     Route::post('attachments', [AttachmentController::class, 'store'])->name('att.store');
     Route::get('attachments/{id}/dl', [AttachmentController::class, 'download'])->name('att.dl');
     Route::get('attachments/{id}/view', [AttachmentController::class, 'preview'])->name('att.view');
     // حزمةُ مرفقات سجلٍّ واحد — بصلاحية السجل نفسه
     Route::get('attachments/{module}/{recordId}/zip', [AttachmentController::class, 'zip'])->name('att.zip');
+    Route::post('attachments/{id}/move', [AttachmentController::class, 'move'])->name('att.move');
     Route::delete('attachments/{id}', [AttachmentController::class, 'destroy'])->name('att.destroy');
     Route::get('employee/{id}', [PortalController::class, 'employee'])->name('portal.employee');
     Route::get('app/{id}', [AppCenterController::class, 'show'])->name('apps.center');

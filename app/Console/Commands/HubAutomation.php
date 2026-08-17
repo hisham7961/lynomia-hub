@@ -613,6 +613,11 @@ class HubAutomation extends Command
             // قد يفيض تحت طرقٍ متعمَّد. حدٌّ زمنيٌّ وسقفٌ صلبٌ معاً كإخوته أعلاه.
             $n += \App\Support\SecurityRadar::prune();
 
+            // **وقطعُ الرفعات المهجورة**: اتصالٌ انقطع في منتصف رفعةٍ مقطَّعة يترك
+            // نصفَ ملفٍ على القرص. تُكنَس عند كل إنهاء رفعةٍ أيضاً، وهذه شبكةُ
+            // أمانٍ ليوم لا يُنهي فيه أحدٌ رفعةً أصلاً.
+            $n += \App\Support\ChunkedUpload::prune();
+
             return $n;
         } catch (\Throwable $e) {
             report($e);

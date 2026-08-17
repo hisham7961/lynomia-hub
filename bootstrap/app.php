@@ -18,6 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', \App\Http\Middleware\SessionSentry::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\WorkHours::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\TrackVisits::class);
+        // الملفُّ المقطَّع يصير ملفاً مرفوعاً عادياً قبل أن يصل المتحكّم
+        $middleware->appendToGroup('web', \App\Http\Middleware\ResolveChunkedUploads::class);
+        // ختمُ بدء البثّ للتنزيلات — تُخفي به الصفحةُ لوحةَ «يُحضَّر»
+        $middleware->appendToGroup('web', \App\Http\Middleware\DownloadPing::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\SecurityHeaders::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\Observability::class);
         // رادارُ الكشف: يُلحَق أخيراً (الأقربَ للمتحكّم) فيلتقط منعَ ٤٠٣ الذي يرميه

@@ -263,6 +263,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $mon],
             ['key' => 'delivery',  'label' => '🛤️ مسار التسليم',     'route' => 'delivery',        'group' => 'analytics', 'ok' => hub_can($user, 'feats', 'v') || hub_can($user, 'deploys', 'v') || hub_can($user, 'requests', 'v') || hub_can($user, 'designs', 'v')],
             ['key' => 'custody',   'label' => '🏷️ كتالوج العهد',      'route' => 'custody.catalog', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
+            ['key' => 'codehub',   'label' => '🌿 مركز الكود',        'route' => 'code.center',     'group' => 'centers',   'ok' => hub_can($user, 'code', 'v')],
             ['key' => 'assetlife', 'label' => '💼 العهدة ودورة الحياة', 'route' => 'assets.life',  'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
             ['key' => 'compb',     'label' => '⚖️ الامتثال وأثره',   'route' => 'compliance.board', 'group' => 'centers', 'ok' => hub_can($user, 'compliance', 'v')],
             ['key' => 'appsproj',  'label' => '🔗 التطبيقات والمشاريع', 'route' => 'appsprojects', 'group' => 'centers', 'ok' => hub_can($user, 'apps', 'v') || hub_can($user, 'projects', 'v')],
@@ -2862,6 +2863,90 @@ if (! function_exists('hub_app_quality')) {
 
             return $out;
         });
+    }
+}
+
+if (! function_exists('hub_size_kb')) {
+    /**
+     * حجمٌ مكتوبٌ بلاحقة php.ini («512M») بالكيلوبايت — و«0» أو «-1» بلا حدّ.
+     * منفصلةٌ عن قارئ ini عمداً كي تُختبَر بقيمٍ لا يملك الاختبارُ ضبطَها في ini.
+     */
+    function hub_size_kb(string $value): int
+    {
+        $v = trim($value);
+        if ($v === '' || $v === '0' || $v === '-1') return 0;
+
+        $unit = mb_strtolower(substr($v, -1));
+        $n = (float) $v;
+
+        return (int) match ($unit) {
+            'g' => $n * 1024 * 1024,
+            'm' => $n * 1024,
+            'k' => $n,
+            default => $n / 1024,      // بايتاتٌ مجرّدة
+        };
+    }
+}
+
+if (! function_exists('hub_ini_kb')) {
+    /** قيمةُ إعدادٍ في php.ini بالكيلوبايت («512M» → 524288) — صفرٌ يعني بلا حدّ */
+    function hub_ini_kb(string $key): int
+    {
+        return hub_size_kb((string) ini_get($key));
+    }
+}
+
+if (! function_exists('hub_upload_cap')) {
+    /**
+     * **السقفُ الفعليّ للرفع — لا السقف المُعلَن.**
+     *
+     * كان `setting('files.max_kb')` يُحقن في قواعد التحقق وحده، ويُعرض للمستخدم
+     * كأنه الحقيقة. وهو **نصفُ الحقيقة**: الخادم يقطع الطلب قبل أن يصل إلى
+     * Laravel أصلاً حين يتجاوز `upload_max_filesize` أو `post_max_size` — فيرى
+     * المستخدم صفحةً فارغةً أو خطأً غامضاً بعد انتظار رفعِ نصفِ غيغابايت،
+     * والنظامُ كان يَعِده بحدٍّ لا يملكه.
+     *
+     * فالسقفُ هنا **أصغرُ الثلاثة**، ومعه من أين جاء الحدّ — كي تُقال الحقيقة
+     * في الواجهة: «الحد ١ غيغابايت» أو «الحد ٢ م.ب — سقفُ الخادم، ارفعه من
+     * php.ini». `post_max_size` يُحسب بهامشٍ صغير لحقول النموذج الأخرى.
+     */
+    function hub_upload_cap(): array
+    {
+        $app = (int) setting('files.max_kb', 1048576);          // ١ غيغابايت افتراضاً
+        $up = hub_ini_kb('upload_max_filesize');
+        $post = hub_ini_kb('post_max_size');
+        // النموذجُ يحمل حقولاً غير الملف — فبضعةُ كيلوباياتٍ تُترك للبقية
+        $post = $post > 64 ? $post - 64 : $post;
+
+        $php = min(array_filter([$up ?: PHP_INT_MAX, $post ?: PHP_INT_MAX]));
+        $php = $php === PHP_INT_MAX ? 0 : (int) $php;           // بلا حدٍّ في الخادم
+
+        /*
+         * **والتقطيعُ يرفع سقفَ الطلب الواحد عن الطريق.**
+         *
+         * سقفُ PHP قيدٌ على **الطلب** لا على الملف: فإذا وصل الملفُّ قطعاً صغيرة
+         * وجُمِّع على القرص (`ChunkedUpload`) فلا شأنَ له به — والحدُّ الباقي حدُّ
+         * النظام وحده. فالطلبُ الذي حُقنت فيه ملفاتٌ مقطَّعة يُقاس بحدّ النظام،
+         * وإلا رُفض ملفٌ وصل كاملاً سليماً بحجّة سقفٍ لم يمرّ منه أصلاً.
+         */
+        $chunked = (bool) request()?->attributes?->get(\App\Http\Middleware\ResolveChunkedUploads::FLAG);
+
+        $kb = ($php > 0 && ! $chunked) ? min($app, $php) : $app;
+        $kb = max(1, $kb);
+
+        // عتبةُ التقطيع: أقلُّ من سقف الطلب بهامشٍ لحقول النموذج وحدود multipart
+        $chunkAt = $php > 0 ? max(512, (int) ($php * 0.7)) : max(4096, (int) ($app * 0.7));
+
+        return [
+            'kb'      => $kb,
+            'bytes'   => $kb * 1024,
+            'appKb'   => $app,
+            'phpKb'   => $php,
+            'byPhp'   => $php > 0 && $php < $app && ! $chunked,  // الخادمُ هو القاطع لا الإعداد
+            'chunked' => $chunked,
+            'chunkAt' => $chunkAt,                               // ما فوقها يُرفع مقطَّعاً
+            'label'   => hub_bytes($kb * 1024),
+        ];
     }
 }
 
