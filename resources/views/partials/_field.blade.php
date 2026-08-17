@@ -91,6 +91,9 @@
             <span class="filebtn">📎 اختر ملفاً</span>
             <span class="filename">لم يُحدَّد ملف</span>
         </label>
+        @php $fCap = hub_upload_cap(); @endphp
+        <span class="sub fhint">حتى {{ hub_bytes($fCap['appKb'] * 1024) }} — بعدّاد تقدّم،
+            @if ($fCap['byPhp'])والكبيرُ يُرفع مقطَّعاً تلقائياً@else ودفعةً واحدة@endif</span>
         @if ($raw)
             <div class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 @if ($t === 'img')<img class="thumb" src="{{ route('file.show', $raw) }}" alt="">

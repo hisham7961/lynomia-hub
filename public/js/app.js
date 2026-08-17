@@ -72,6 +72,238 @@
     });
   });
 
+  /* ── عدّاد تقدّم النقل: رفعٌ بنسبةٍ حقيقية، وتنزيلٌ يقول متى بدأ ──
+
+     رفعُ غيغابايتٍ عبر نموذجٍ عاديّ يعني شاشةً بيضاء ودائرةَ تحميلٍ في التبويب
+     بلا رقمٍ واحد: لا يُعرف أوصل عشرةَ بالمئة أم تسعين، ولا إن كان الاتصال قد
+     مات أصلاً — فيُعاد الرفع من الصفر ظنّاً. النموذجُ يُرسَل هنا بـXHR،
+     و`upload.onprogress` يعطي البايتاتِ الحقيقية: نسبةٌ وحجمٌ وسرعةٌ وزمنٌ
+     متبقٍّ وزرُّ إلغاء. وعند الفراغ يتبع المتصفحُ التحويلةَ كما لو أُرسل عادياً.
+
+     والتنزيلُ لا يُقاس من الصفحة (المتصفح يملكه)، لكن **انتظارَ التحضير** يُقاس:
+     الخادمُ يختم كعكةً عند بدء البثّ، فتُخفى اللوحةُ لحظةَ وصول أول بايت. */
+  var XF = {
+    box: null,
+    open: function (title) {
+      if (!XF.box) {
+        XF.box = document.createElement('div');
+        XF.box.className = 'xfer';
+        XF.box.innerHTML = '<div class="xrow"><b class="xtitle"></b><button type="button" class="xcancel" '
+          + 'aria-label="إلغاء">✕</button></div><div class="xbar"><span></span></div>'
+          + '<div class="xmeta sub"></div>';
+        document.body.appendChild(XF.box);
+      }
+      XF.box.querySelector('.xtitle').textContent = title;
+      XF.box.querySelector('.xbar span').style.width = '0%';
+      XF.box.querySelector('.xmeta').textContent = 'يُحضَّر…';
+      XF.box.hidden = false;
+      XF.box.classList.remove('done');
+      return XF.box;
+    },
+    close: function () { if (XF.box) XF.box.hidden = true; },
+    /* النسبة والحجم والسرعة والزمن المتبقّي — الأرقامُ وحدها تُطمئن */
+    paint: function (loaded, total, t0) {
+      if (!XF.box) return;
+      var pct = total ? Math.min(100, Math.round(loaded / total * 100)) : null;
+      XF.box.querySelector('.xbar span').style.width = (pct === null ? 30 : pct) + '%';
+      XF.box.querySelector('.xbar').classList.toggle('indet', pct === null);
+      var sec = Math.max(0.001, (Date.now() - t0) / 1000);
+      var rate = loaded / sec;
+      var left = (total && rate > 0) ? Math.round((total - loaded) / rate) : null;
+      XF.box.querySelector('.xmeta').textContent =
+        (pct === null ? '' : pct + '٪ · ')
+        + XF.size(loaded) + (total ? ' من ' + XF.size(total) : '')
+        + ' · ' + XF.size(rate) + '/ث'
+        + (left !== null ? ' · يتبقّى ' + XF.clock(left) : '');
+    },
+    size: function (b) {
+      var u = ['ب', 'ك.ب', 'م.ب', 'ج.ب'], i = 0;
+      while (b >= 1024 && i < 3) { b /= 1024; i++; }
+      return (b >= 100 || i === 0 ? Math.round(b) : b.toFixed(1)) + ' ' + u[i];
+    },
+    clock: function (s) {
+      return s < 60 ? s + ' ث' : (s < 3600 ? Math.round(s / 60) + ' د' : (s / 3600).toFixed(1) + ' س');
+    }
+  };
+  Hub.transfer = XF;
+
+  /* حدودُ هذا الخادم: [سقفُ النظام, عتبةُ التقطيع, سقفُ الإعداد] بالكيلوبايت */
+  function upLimits() {
+    var m = document.querySelector('meta[name="hub-upload"]');
+    var v = (m ? m.content : '').split(',').map(function (x) { return parseInt(x, 10) || 0; });
+    return { kb: v[0] || 0, chunkAt: v[1] || 0, appKb: v[2] || 0 };
+  }
+  function csrf() {
+    var m = document.querySelector('meta[name=csrf-token]');
+    return m ? m.content : '';
+  }
+  function rid() {
+    var s = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', o = '';
+    for (var i = 0; i < 32; i++) o += s.charAt(Math.floor(Math.random() * s.length));
+    return o;
+  }
+
+  /* رفعُ ملفٍ واحدٍ **مقطَّعاً**: قطعٌ أصغرُ من سقف الطلب الواحد، بالترتيب.
+     يُعيد وعداً برمزٍ يُستهلك في النموذج. onbit(bytes) للتقدّم التراكمي. */
+  function chunkUpload(file, chunkBytes, onbit) {
+    var uid = rid(), i = 0, n = Math.max(1, Math.ceil(file.size / chunkBytes));
+    return new Promise(function (resolve, reject) {
+      function step() {
+        if (i >= n) {
+          var fdF = new FormData();
+          fdF.append('uid', uid); fdF.append('n', String(n));
+          fetch('/uploads/finish', { method: 'POST', body: fdF, credentials: 'same-origin',
+            headers: { 'X-CSRF-TOKEN': csrf(), 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.json().catch(function () { return {}; }); })
+            .then(function (j) { j && j.ok ? resolve({ token: j.token, name: file.name }) : reject(j && j.msg); })
+            .catch(reject);
+          return;
+        }
+        var from = i * chunkBytes, blob = file.slice(from, Math.min(file.size, from + chunkBytes));
+        var fd = new FormData();
+        fd.append('uid', uid); fd.append('i', String(i)); fd.append('chunk', blob, 'part');
+        fetch('/uploads/chunk', { method: 'POST', body: fd, credentials: 'same-origin',
+          headers: { 'X-CSRF-TOKEN': csrf(), 'X-Requested-With': 'XMLHttpRequest' } })
+          .then(function (r) { return r.json().catch(function () { return {}; }); })
+          .then(function (j) {
+            if (!j || !j.ok) { reject(j && j.msg); return; }
+            if (onbit) onbit(blob.size);
+            i++; step();
+          }).catch(reject);
+      }
+      step();
+    });
+  }
+
+  /* الرفع: أيّ نموذج multipart فيه ملفٌ مختار — إلا ما وُسم data-noxhr */
+  document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (!f || f.tagName !== 'FORM' || f.hasAttribute('data-noxhr')) return;
+    if ((f.getAttribute('enctype') || '').indexOf('multipart') === -1) return;
+    if (!window.FormData || !window.XMLHttpRequest) return;
+    /* htmx يملك نماذجه — لا يُختطف نموذجٌ يديره غيرنا */
+    if (f.hasAttribute('hx-post') || f.hasAttribute('hx-put')) return;
+
+    var picked = 0, total = 0;
+    [].forEach.call(f.querySelectorAll('input[type=file]'), function (i) {
+      for (var k = 0; i.files && k < i.files.length; k++) { picked++; total += i.files[k].size; }
+    });
+    if (!picked) return;                       // نموذجٌ بلا ملفٍ مختار: أرسله كما هو
+
+    e.preventDefault();
+    var fd = new FormData(f);
+    var btn = f.querySelector('button[type=submit],button:not([type])');
+    if (btn) btn.disabled = true;
+
+    /* **ما يتجاوز سقفَ الطلب الواحد يُرفع مقطَّعاً**: الطلبُ الكامل يُرفض على
+       بوابة PHP قبل أن يصل التطبيق، فلا رسالةَ ولا نصفَ رفعة. القطعُ تصل
+       وتُجمَّع على الخادم، ثم يُرسَل النموذجُ برموزها بدل الملفات. */
+    var lim = upLimits();
+    var chunkBytes = Math.max(256 * 1024, (lim.chunkAt || 4096) * 1024);
+    var big = [];
+    [].forEach.call(f.querySelectorAll('input[type=file]'), function (inp) {
+      if (!inp.files || !inp.files.length) return;
+      for (var k = 0; k < inp.files.length; k++) {
+        if (inp.files[k].size > chunkBytes) big.push({ inp: inp, file: inp.files[k] });
+      }
+    });
+
+    if (big.length) {
+      var t0c = Date.now(), done = 0;
+      XF.open('⬆ يُرفع ' + picked + (picked > 1 ? ' ملفات' : ' ملف') + ' (مقطَّعاً)…');
+      XF.paint(0, total, t0c);
+
+      /* الملفاتُ الكبيرة تُنزع من النموذج ويحلّ محلَّها رمزُ رفعتها */
+      var names = {};
+      big.forEach(function (b) { names[b.inp.name] = true; });
+      Object.keys(names).forEach(function (nm) { fd.delete(nm); });
+
+      var chain = Promise.resolve(), slot = 0;
+      big.forEach(function (b) {
+        chain = chain.then(function () {
+          return chunkUpload(b.file, chunkBytes, function (bits) { done += bits; XF.paint(done, total, t0c); })
+            .then(function (res) {
+              /* حقلٌ متعدد (files[]) ← دفعة، وحقلٌ مفرد ← باسم حقله.
+                 **الفهرسُ صريحٌ لا `[]`**: كلُّ `[]` تفتح عنصراً جديداً في PHP،
+                 فيفترق الرمزُ عن اسمه ويصير لكلٍّ منهما صفٌّ وحده. */
+              if (b.inp.name.indexOf('[]') > -1) {
+                fd.append('_chunks[' + slot + '][token]', res.token);
+                fd.append('_chunks[' + slot + '][name]', res.name);
+                slot++;
+              } else {
+                fd.append('_chunk_' + b.inp.name + '[token]', res.token);
+                fd.append('_chunk_' + b.inp.name + '[name]', res.name);
+              }
+            });
+        });
+      });
+
+      chain.then(function () { send(fd); }, function (msg) {
+        XF.close(); if (btn) btn.disabled = false;
+        Hub.toast(typeof msg === 'string' && msg ? msg : 'تعذّر رفع الملف الكبير — أعد المحاولة', 1);
+      });
+      return;
+    }
+
+    send(fd);
+
+    function send(payload) {
+    var xhr = new XMLHttpRequest();
+    var t0 = Date.now();
+    var box = XF.open('⬆ يُرسَل ' + picked + (picked > 1 ? ' ملفات' : ' ملف') + '…');
+    box.querySelector('.xcancel').onclick = function () { xhr.abort(); };
+
+    xhr.upload.onprogress = function (ev) { XF.paint(ev.loaded, ev.lengthComputable ? ev.total : total, t0); };
+    xhr.upload.onload = function () {
+      /* اكتمل الإرسال ولم يردّ الخادم بعد: معالجةُ ملفٍ كبيرٍ تأخذ وقتها */
+      XF.paint(total, total, t0);
+      if (XF.box) XF.box.querySelector('.xmeta').textContent = 'وصل كاملاً — يُعالَج على الخادم…';
+    };
+    xhr.onload = function () {
+      XF.close();
+      if (btn) btn.disabled = false;
+      /* التحويلةُ تُتبَع تلقائياً — نمضي إلى وجهتها كما يفعل النموذج العادي */
+      if (xhr.status >= 200 && xhr.status < 400) { window.location = xhr.responseURL || location.href; return; }
+      if (xhr.status === 413) { Hub.toast('الملف أكبر من سقف الخادم — راجع «أقصى حجم للملف المرفوع»', 1); return; }
+      /* خطأُ تحقّقٍ أو غيره: أعد الإرسال عادياً كي تظهر الرسائل في مكانها */
+      f.setAttribute('data-noxhr', '1');
+      f.submit();
+    };
+    xhr.onerror = function () { XF.close(); if (btn) btn.disabled = false; Hub.toast('انقطع الاتصال أثناء الرفع — أعد المحاولة', 1); };
+    xhr.onabort = function () { XF.close(); if (btn) btn.disabled = false; Hub.toast('أُلغي الرفع'); };
+
+    xhr.open('POST', f.getAttribute('action') || location.href, true);
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+    xhr.send(payload);
+    }
+  }, true);
+
+  /* التنزيل: لوحةُ «يُحضَّر» تُخفى لحظة بدء البثّ (كعكةٌ يختمها الخادم) */
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('a[href]');
+    if (!a || a.hasAttribute('data-nodl') || a.target === '_blank') return;
+    var href = a.getAttribute('href') || '';
+    if (!/([?&]dl=1|\/dl$|\/zip$|\/export)/.test(href)) return;
+
+    var t = 'd' + Date.now() + Math.floor(Math.random() * 1000);
+    a.href = href + (href.indexOf('?') === -1 ? '?' : '&') + 'dlt=' + t;
+    var t0 = Date.now();
+    XF.open('⬇ يُحضَّر الملف…');
+    XF.paint(0, 0, t0);
+
+    /* الكعكةُ لا تصل إلا مع ترويسات الرد — أي لحظةَ بدء البثّ فعلاً */
+    var iv = setInterval(function () {
+      if (document.cookie.indexOf('hub_dl=') !== -1) {
+        clearInterval(iv);
+        document.cookie = 'hub_dl=; Max-Age=0; path=/';
+        if (XF.box) XF.box.querySelector('.xmeta').textContent = 'بدأ التنزيل — يكمله المتصفح';
+        setTimeout(XF.close, 1600);
+      } else if (Date.now() - t0 > 120000) {      // دقيقتان بلا بثّ: لا نُبقي لوحةً معلّقة
+        clearInterval(iv); XF.close();
+      }
+    }, 400);
+  });
+
   /* ── الاختصارات ── */
   document.addEventListener('keydown', function (e) {
     var typing = /INPUT|TEXTAREA|SELECT/.test(e.target.tagName);

@@ -76,8 +76,11 @@
         @csrf
         <input type="hidden" name="module" value="{{ $aModule }}">
         <input type="hidden" name="record_id" value="{{ $aRecordId }}">
-        <label class="vh" for="att-file">اختر ملفاً</label>
-        <input class="inp" id="att-file" type="file" name="file" required>
+        {{-- **رفعٌ متعدد**: لقطاتُ المتجر تُرفع ثمانياً وعشراً، وكانت دورةُ الرفع
+             كلُّها تُكرَّر لكل صورة — فمن ملّ في السادسة ترك النصف. --}}
+        <label class="vh" for="att-file">اختر ملفاً أو أكثر</label>
+        <input class="inp" id="att-file" type="file" name="files[]" multiple required
+               title="يمكن اختيار عدة ملفات معاً (حتى {{ \App\Http\Controllers\Web\AttachmentController::BATCH_MAX }})">
         <label class="vh" for="att-note">ملاحظة عن الملف</label>
         <input class="inp" id="att-note" type="text" name="note" maxlength="300" placeholder="ملاحظة (اختياري)">
         @php $aSpec = hub_doc_spec($aModule); @endphp
@@ -96,6 +99,22 @@
         @endif
         <button class="btn p sm" type="submit">إرفاق</button>
     </form>
+    @php $upCap = hub_upload_cap(); @endphp
+    <div class="sub" style="margin-top:6px">
+        الحدّ الأقصى للملف: <b>{{ hub_bytes($upCap['appKb'] * 1024) }}</b>
+        @if ($upCap['byPhp'])
+            {{-- الملفُّ الكبير لا يُرسَل دفعةً واحدة بل قطعاً تمرّ من سقف الخادم،
+                 فالسقفُ المعلن هو حدُّ النظام لا حدُّ الطلب الواحد --}}
+            — الأكبر من {{ hub_bytes($upCap['chunkAt'] * 1024) }} يُرفع
+            <b>مقطَّعاً تلقائياً</b> ليتجاوز سقفَ الخادم ({{ hub_bytes($upCap['phpKb'] * 1024) }})
+        @endif
+        · يظهر عدّادُ التقدّم أثناء الرفع.
+    </div>
     @error('kind')<div class="err">{{ $message }}</div>@enderror
     @error('file')<div class="err">{{ $message }}</div>@enderror
+    @error('files')<div class="err">{{ $message }}</div>@enderror
+    {{-- خطأُ ملفٍ بعينه في الدفعة يُسمّى: «الملف الثالث أكبر من الحد» لا رسالةٌ عامة --}}
+    @foreach ($errors->get('files.*') as $fkey => $fmsgs)
+        @foreach ($fmsgs as $fmsg)<div class="err">{{ $fmsg }}</div>@endforeach
+    @endforeach
 </div>
