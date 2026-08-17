@@ -20,27 +20,20 @@
     RewriteRule ^ index.php [L]
 </IfModule>
 
-# ── سقفُ الرفع حين يكون الخادم mod_php ──
-# محصورٌ في <IfModule mod_php> عمداً: كتابةُ php_value على خادمٍ بلا mod_php
-# ترمي «Internal Server Error» على كل صفحة — فحاجزُ الوحدة شرطُ سلامة.
-# وعلى PHP-FPM/CGI تسري القيمُ من public/.user.ini بدلَها.
-<IfModule mod_php.c>
-    php_value upload_max_filesize 1024M
-    php_value post_max_size 1056M
-    php_value max_execution_time 600
-    php_value max_input_time 600
-    php_value memory_limit 512M
-</IfModule>
-<IfModule mod_php7.c>
-    php_value upload_max_filesize 1024M
-    php_value post_max_size 1056M
-    php_value max_execution_time 600
-    php_value max_input_time 600
-    php_value memory_limit 512M
-</IfModule>
-
-# حدُّ أباتشي لحجم جسم الطلب (بالبايت) — بلا رفعِه يردّ ٤١٣ قبل PHP
-<IfModule mod_reqtimeout.c>
-    RequestReadTimeout body=600,MinRate=500
-</IfModule>
-LimitRequestBody 1107296256
+# ── سقفُ الرفع على الخادم ──
+#
+# **لا توجيهَ هنا عمداً.** كان في هذا الموضع `php_value` و`LimitRequestBody`
+# و`RequestReadTimeout` لرفع سقف الرفع — وثلاثتُها تُسقط الموقعَ كلَّه بـ٥٠٠
+# على استضافةٍ مشتركة:
+#
+#   · `RequestReadTimeout` سياقُه **إعدادُ الخادم أو المضيف الافتراضي** ولا
+#     يُقبل في .htaccess إطلاقاً — «not allowed here» على كل طلب، وحاجزُ
+#     `<IfModule>` لا يحمي منه لأن الوحدةَ محمّلةٌ فعلاً.
+#   · `LimitRequestBody` يحتاج `AllowOverride Limit` (أو All)، وأكثرُ
+#     الاستضافات تمنح `FileInfo Indexes` وحدها.
+#   · `php_value` يحتاج `AllowOverride Options` مع mod_php، ولا يُقبل أصلاً
+#     على PHP-FPM/CGI (وهو الأشيع اليوم).
+#
+# فسقفُ الرفع يُرفع من **`public/.user.ini`** (تقرؤه PHP-FPM/CGI تلقائياً بلا
+# أيّ خطرٍ على أباتشي)، أو من `php.ini` أو لوحة الاستضافة (PHP Selector)،
+# أو من كتلة المضيف الافتراضي على VPS كما في دليل التنصيب.
