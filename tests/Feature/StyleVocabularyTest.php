@@ -53,21 +53,8 @@ class StyleVocabularyTest extends TestCase
      */
     private function src(string $f): string
     {
-        $s = (string) preg_replace(['/\{\{--.*?--\}\}/s', '/<!--.*?-->/s'],
+        return (string) preg_replace(['/\{\{--.*?--\}\}/s', '/\/\*.*?\*\//s', '/<!--.*?-->/s'],
             ' ', file_get_contents($f));
-
-        // في ملفّ JS أو CSS التعليقُ تعليقٌ حيثما وقع
-        if (! str_ends_with($f, '.blade.php')) {
-            return (string) preg_replace('#/\*.*?\*/#s', ' ', $s);
-        }
-
-        // **أمّا في القالب فلا تعليقَ خارج كتلة نمطٍ أو سكربت.** كان النزعُ يبدأ
-        // من أيّ فاتحةِ تعليقٍ في المصدر — وسمةُ `accept` في حقل رفعٍ تكتب
-        // النجمةَ بعد شرطةٍ مائلة، وهي فاتحةُ تعليقٍ حرفياً: فيُمسح ما بعدها
-        // حتى أوّل خاتمة ولو ابتلع كتلةَ `<style>` كاملة، فتُبلَّغ أصنافُها
-        // «بلا نمط» وهي مُعرَّفةٌ في الملف نفسه — عطلُ الحارس لا عطلُ القالب.
-        return (string) preg_replace_callback('#<(style|script)\b[^>]*>.*?</\1>#si',
-            fn ($m) => (string) preg_replace('#/\*.*?\*/#s', ' ', $m[0]), $s);
     }
 
     /** @return string[] */
