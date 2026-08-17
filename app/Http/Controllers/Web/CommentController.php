@@ -62,7 +62,10 @@ class CommentController extends Controller
             'record_id' => ['nullable', 'string'],
             'parent_id' => ['nullable', 'exists:comments,id'],
             'body'      => ['required', 'string', 'max:4000'],
-            'att'       => ['nullable', 'file', 'max:512000'],
+            // السقفُ الفعليّ لا رقمٌ مكتوبٌ بيدٍ هنا: كان ٥٠٠ م.ب ثابتةً في هذا
+// المسار وحده، فتغييرُ الإعداد لا يمسّه — ومرفقُ التعليق يمرّ من
+// البوابة نفسها التي تمرّ منها بقيّة المرفقات.
+            'att'       => ['nullable', 'file', 'max:' . hub_upload_cap()['kb']],
             'mention'   => ['nullable', 'array'],
             'internal'  => ['nullable', 'boolean'],
         ]);

@@ -1154,7 +1154,7 @@ class ModuleController extends Controller
                 // امتداداتُ التنفيذ والترميز محظورة: SVG/HTML تحمل سكربتاً يعمل
                 // بأصل التطبيق إن فُتحت، وPHP قنبلةٌ إن لمسها الخادم يوماً.
                 // البوابة تخدم الغريب تنزيلاً قسرياً — وهذا حزامُ الأمان الثاني.
-                $r = [$r[0], 'file', 'max:' . (int) setting('files.max_kb', 512000),
+                $r = [$r[0], 'file', 'max:' . hub_upload_cap()['kb'],
                     function ($attr, $file, $fail) {
                         $ext = strtolower((string) $file->getClientOriginalExtension());
                         if (in_array($ext, ['php', 'phtml', 'phar', 'html', 'htm', 'xhtml', 'svg', 'svgz', 'js', 'mjs'], true)) {

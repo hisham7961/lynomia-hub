@@ -99,6 +99,15 @@
         @endif
         <button class="btn p sm" type="submit">إرفاق</button>
     </form>
+    @php $upCap = hub_upload_cap(); @endphp
+    <div class="sub" style="margin-top:6px">
+        الحدّ الأقصى للملف: <b>{{ $upCap['label'] }}</b>
+        @if ($upCap['byPhp'])
+            — <span title="upload_max_filesize / post_max_size">سقفُ الخادم أصغرُ من إعداد النظام
+            ({{ hub_bytes($upCap['appKb'] * 1024) }})، فهو الحدُّ الفعليّ</span>
+        @endif
+        · يظهر عدّادُ التقدّم أثناء الرفع.
+    </div>
     @error('kind')<div class="err">{{ $message }}</div>@enderror
     @error('file')<div class="err">{{ $message }}</div>@enderror
     @error('files')<div class="err">{{ $message }}</div>@enderror
