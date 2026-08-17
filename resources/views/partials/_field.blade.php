@@ -91,7 +91,6 @@
             <span class="filebtn">📎 اختر ملفاً</span>
             <span class="filename">لم يُحدَّد ملف</span>
         </label>
-        <span class="sub fhint">حتى {{ hub_upload_cap()['label'] }} — بعدّاد تقدّمٍ أثناء الرفع</span>
         @if ($raw)
             <div class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                 @if ($t === 'img')<img class="thumb" src="{{ route('file.show', $raw) }}" alt="">

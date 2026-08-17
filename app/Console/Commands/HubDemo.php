@@ -31,7 +31,7 @@ class HubDemo extends Command
         'auth.max_fail'    => '5',
         'auth.lock_min'    => '15',
         'auth.session_min' => '480',
-        'files.max_kb'     => '1048576',
+        'files.max_kb'     => '512000',
         'notify.tg_chat'   => '@demo_channel',
         'maintenance.msg'  => 'النظام تحت صيانة مجدولة — نعود خلال دقائق.',
         'sla.rules'        => 'عاجلة:1:8 عالية:4:24 افتراضي:8:72',

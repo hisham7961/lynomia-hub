@@ -49,7 +49,7 @@ class CoreSeeder extends Seeder
 
         foreach ([
             'auth.session_min' => 240, 'auth.max_fail' => 5, 'auth.lock_min' => 15, 'auth.pw_min' => 10,
-            'files.max_kb' => 1048576,   // ١ غيغابايت — والسقفُ الفعليّ أصغرُه وسقفِ الخادم (hub_upload_cap)
+            'files.max_kb' => 204800,
             'notify.quiet' => ['on' => false, 'from' => 22, 'to' => 7],
             'finance.accounts' => ['ar' => '1200', 'ap' => '2100', 'cash' => '1010', 'bank' => '1020',
                                    'sales' => '4100', 'tax' => '2200', 'exp' => '5200'],

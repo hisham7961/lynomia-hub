@@ -153,8 +153,6 @@ Route::middleware('auth')->group(function () {
     Route::get('recommendations', [CapacityController::class, 'recommendations'])->name('recs');
     Route::get('delivery', [\App\Http\Controllers\Web\DeliveryController::class, 'index'])->name('delivery');
     Route::get('assets-life', [\App\Http\Controllers\Web\AssetLifeController::class, 'index'])->name('assets.life');
-    // مركزُ الكود المصدري: صفحةُ إصداراتٍ على شاكلة ما يعرفه المطوّرون
-    Route::get('code-center', [\App\Http\Controllers\Web\CodeCenterController::class, 'index'])->name('code.center');
 
     // مسحُ ملصق العهدة: مسارٌ قصيرٌ عمداً (`/c/{code}`) — رمزُ QR على ملصقٍ
     // ٤٠×٣٠ مم لا يتّسع لرابطٍ فيه معرّفٌ عشوائيّ بستٍّ وثلاثين خانة: كثافةُ

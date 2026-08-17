@@ -92,8 +92,7 @@
             <input class="inp" id="shot-files" type="file" multiple required
                    name="files[]" accept="image/png,image/jpeg,image/webp">
             <button class="btn p sm" type="submit">＋ رفع اللقطات</button>
-            <span class="sub">تُرفع بترتيب اختيارها وتُضاف في آخر المعرض — حتى
-                {{ hub_upload_cap()['label'] }} للملف، بعدّاد تقدّمٍ أثناء الرفع.</span>
+            <span class="sub">تُرفع بترتيب اختيارها وتُضاف في آخر المعرض.</span>
         </form>
         @error('files')<div class="err">{{ $message }}</div>@enderror
         @foreach ($errors->get('files.*') as $fmsgs)
