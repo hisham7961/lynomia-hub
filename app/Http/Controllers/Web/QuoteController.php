@@ -53,13 +53,46 @@ class QuoteController extends Controller
         $action = hub_str($r->input('do'));
 
         return match ($action) {
-            'send'     => $this->setStatus($q, 'مُرسل', '📨 حُدّد العرض كمُرسل للعميل'),
+            'send'     => $this->send($q),
             'accept'   => $this->setStatus($q, 'مقبول', '🎉 قُبل العرض — حوّله لعقد أو فاتورة من الأزرار'),
             'reject'   => $this->setStatus($q, 'مرفوض', 'حُدّد العرض كمرفوض'),
             'contract' => $this->toContract($q),
             'invoice'  => $this->toInvoice($q),
             default    => abort(422),
         };
+    }
+
+    /**
+     * إرسالٌ للعميل بعتبةِ اعتماد: عرضٌ يتجاوز مبلغَ العتبة أو نسبةَ خصمها يتطلب
+     * اعتماداً داخلياً أولاً (على محرك الموافقات القائم عبر approval.rules) — أو
+     * يُرسَل مباشرةً إن كانت العتبتان مطفأتين. لا محرك موافقاتٍ ثانٍ.
+     */
+    protected function send(Quote $q)
+    {
+        $amountAt = (float) setting('quotes.approve_amount', 0);
+        $discAt = (float) setting('quotes.approve_discount', 0);
+        $discPct = ((float) $q->total + (float) $q->discount) > 0
+            ? (float) $q->discount / ((float) $q->total + (float) $q->discount) * 100 : 0;
+        $needs = ($amountAt > 0 && (float) $q->total >= $amountAt)
+            || ($discAt > 0 && $discPct >= $discAt);
+
+        if ($needs && ! hub_flag(auth()->user(), 'approve') && ! hub_is_owner()) {
+            // يُبلَّغ المعتمدون بطلبِ إرسالٍ يستحق نظرَهم — دون قلبِ الحالة
+            foreach (array_unique(hub_approvers()) as $oid) {
+                if ($oid && $oid !== auth()->id()) {
+                    hub_notify($oid, 'approval', 'عرضٌ ينتظر اعتمادَ الإرسال: ' . ($q->title ?: $q->doc_no)
+                        . ' — ' . number_format((float) $q->total, 3) . ' ' . $q->currency, 'quotes', $q->id);
+                }
+            }
+            $q->status = 'مراجعة داخلية';
+            $q->save();
+
+            return back()->with('warn', 'العرضُ يتجاوز عتبةَ الاعتماد — أُحيل «للمراجعة الداخلية» وأُبلغ المعتمدون.');
+        }
+
+        if (! $q->sent_at) $q->sent_at = now();
+
+        return $this->setStatus($q, 'مُرسل', '📨 حُدّد العرض كمُرسل للعميل');
     }
 
     /* ────────── داخلي ────────── */
@@ -71,7 +104,15 @@ class QuoteController extends Controller
         abort_if(hub_field_mode(auth()->user(), 'quotes', 'status') !== '', 403,
             'حقل الحالة مقفولٌ لدورك (قراءة فقط) — لا يُغيَّر من أزرار المسار');
         $q->status = $status;
+        if ($status === 'مقبول' && ! $q->accepted_at) {
+            $q->accepted_at = now();
+            $q->accepted_by = auth()->user()?->name;
+        }
         $q->save();
+
+        // **إطلاقُ الأحداث الدلالية**: كان setStatus يتجاوز FlowRunner فلا تُطلَق
+        // quote.accepted/rejected المعلَنة — الآن تُطلق فتعمل حِزمُ الاستجابة والتنبيهات.
+        \App\Support\FlowRunner::fire('status', 'quotes', $q, $status);
 
         return back()->with('ok', $msg);
     }

@@ -37,6 +37,7 @@ use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\PurchaseController;
 use App\Http\Controllers\Web\PwaController;
 use App\Http\Controllers\Web\QualityController;
+use App\Http\Controllers\Web\QuoteBuilderController;
 use App\Http\Controllers\Web\QuoteController;
 use App\Http\Controllers\Web\ReportController;
 use App\Http\Controllers\Web\RoleController;
@@ -339,6 +340,11 @@ Route::middleware('auth')->group(function () {
     Route::get('app/{id}', [AppCenterController::class, 'show'])->name('apps.center');
     Route::get('quote/{id}/doc', [QuoteController::class, 'doc'])->name('quotes.doc');
     Route::post('quote/{id}/act', [QuoteController::class, 'act'])->name('quotes.act');
+    // بنّاء العرض المهنيّ: بنودٌ مهيكلة ومراحلُ دفع (تُعيد حساب الإجمالي خادمياً)
+    Route::post('quote/{id}/line', [QuoteBuilderController::class, 'storeLine'])->name('quotes.line.store');
+    Route::delete('quote/{id}/line/{line}', [QuoteBuilderController::class, 'destroyLine'])->name('quotes.line.destroy');
+    Route::post('quote/{id}/milestone', [QuoteBuilderController::class, 'storeMilestone'])->name('quotes.ms.store');
+    Route::delete('quote/{id}/milestone/{ms}', [QuoteBuilderController::class, 'destroyMilestone'])->name('quotes.ms.destroy');
     Route::post('fin/{id}/act', [\App\Http\Controllers\Web\FinController::class, 'act'])->name('fin.act');
     Route::post('entry/{id}/line', [\App\Http\Controllers\Web\EntryController::class, 'line'])->name('entries.line');
     Route::delete('entry/{id}/line/{lineId}', [\App\Http\Controllers\Web\EntryController::class, 'dropLine'])->name('entries.line.drop');
