@@ -711,6 +711,7 @@ if (! function_exists('hub_mod_look')) {
             'الكيانات' => '#4C6FA5', 'الأصول الرقمية' => '#2FB79A', 'العمل' => '#0E7C66',
             'المالية والمشتريات' => '#B0568E', 'الموارد البشرية' => '#C08A3E',
             'الأصول والعقود' => '#7C6FB0', 'المعرفة والملفات' => '#6B9080',
+            'العمليات الميدانية' => '#3E8FB0',
         ];
         static $icons = [
             'projects' => '🚀', 'clients' => '🤝', 'tasks' => '✅', 'tickets' => '🎫',
@@ -718,6 +719,7 @@ if (! function_exists('hub_mod_look')) {
             'quotes' => '📝', 'suppliers' => '🚚', 'purchases' => '🛒', 'ideas' => '💡',
             'leaves' => '🗓️', 'apps' => '📱', 'domains' => '🌐', 'servers' => '🖥️',
             'vault' => '🔐', 'kb' => '📚', 'meetings' => '🪑', 'assets' => '📦',
+            'hcps' => '🩺', 'facilities' => '🏥', 'territories' => '🗺️',
         ];
 
         $icon = $icons[$module] ?? '📁';

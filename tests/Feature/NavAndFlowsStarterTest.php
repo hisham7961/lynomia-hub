@@ -48,7 +48,9 @@ class NavAndFlowsStarterTest extends TestCase
     public function test_sidebar_groups_are_merged(): void
     {
         $this->seedCore();
-        $this->assertCount(7, config('hub_nav'));
+        // ٧ مجموعات الدمج + «العمليات الميدانية» (v2.365): مجالٌ جديد كامل
+        // لا وحدةٌ تُدسّ في مجموعة قائمة — والحارس يبقى على العدد الصريح
+        $this->assertCount(8, config('hub_nav'));
         $this->assertCount(2, hub_top_groups($this->owner));
 
         $fin = collect(config('hub_nav'))->firstWhere('g', 'المالية والمشتريات');

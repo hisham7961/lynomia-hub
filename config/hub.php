@@ -3693,6 +3693,132 @@ return [
             'search' => ['name', 'scope', 'notes'],
         ],
 
+        /*
+         * ─── العمليات الميدانية (المندوب الطبي) ─────────────────────────
+         * دليلُ من نزور وأين، وهرميةُ من يغطي ماذا. **بلا أي حقلٍ بيعيّ
+         * على الطبيب** — لا باركود ولا إحالة ولا عمولة: قاعدةُ منتجٍ
+         * يفرضها FieldForceGuardrailsTest نصاً.
+         */
+        'hcps' => [
+            'key' => 'hcps',
+            'table' => 'hcps',
+            'model' => 'Hcp',
+            'label' => 'مقدمو الرعاية الصحية',
+            'display' => 'name',
+            'status' => 'status',
+            'columns' => ['name', 'specialty', 'class', 'territoryId', 'city', 'status'],
+            'fields' => [
+                ['key' => 'name', 'col' => 'name', 'label' => 'الاسم', 'type' => 'text', 'required' => true],
+                ['key' => 'title', 'col' => 'title', 'label' => 'اللقب المهني', 'type' => 'sel',
+                 'options' => ['د.', 'أ.د.', 'صيدلي', 'ممرض', 'فني', 'إداري', 'أخرى']],
+                ['key' => 'kind', 'col' => 'kind', 'label' => 'الصفة', 'type' => 'sel',
+                 'options' => ['طبيب', 'صيدلي', 'ممرض', 'مشتريات', 'إداري', 'أخرى']],
+                ['key' => 'specialty', 'col' => 'specialty', 'label' => 'التخصص', 'type' => 'sel',
+                 'options' => ['باطنية', 'أطفال', 'نساء وولادة', 'جلدية', 'عظام', 'قلب', 'أعصاب', 'نفسية', 'أسنان', 'عيون', 'أنف وأذن', 'جراحة عامة', 'مسالك', 'صدرية', 'غدد وسكري', 'طب عام', 'طوارئ', 'تخدير', 'أشعة', 'مختبر', 'صيدلة', 'أخرى']],
+                ['key' => 'class', 'col' => 'class', 'label' => 'التصنيف', 'type' => 'sel',
+                 'options' => ['أ — تأثير عالٍ', 'ب — تأثير متوسط', 'ج — تأثير محدود', 'غير مصنّف'],
+                 'hint' => 'تصنيفُ أهمية الزيارة لا قيمةً مالية — يحدد تكرار الزيارات المستهدف في الدورة.'],
+                ['key' => 'facilityIds', 'col' => 'facility_ids', 'label' => 'منشآت العمل', 'type' => 'ref', 'ref' => 'facilities', 'multi' => true,
+                 'hint' => 'الطبيب يعمل في أكثر من مكان — عيادته الخاصة صباحاً ومستشفى مساءً.'],
+                ['key' => 'territoryId', 'col' => 'territory_id', 'label' => 'المنطقة', 'type' => 'ref', 'ref' => 'territories'],
+                ['key' => 'phone', 'col' => 'phone', 'label' => 'الهاتف', 'type' => 'text'],
+                ['key' => 'email', 'col' => 'email', 'label' => 'البريد', 'type' => 'text'],
+                ['key' => 'city', 'col' => 'city', 'label' => 'المدينة', 'type' => 'text'],
+                ['key' => 'area', 'col' => 'area', 'label' => 'المنطقة السكنية', 'type' => 'text'],
+                ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
+                 'options' => ['نشط', 'غير نشط', 'منتقل', 'متقاعد']],
+                ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات مهنية', 'type' => 'ta',
+                 'hint' => 'اهتماماته العلمية وأسلوب الزيارة الأنسب — لا بيانات شخصية لا تخص العمل.'],
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
+                ['key' => 'tags', 'col' => 'tags', 'label' => 'وسوم', 'type' => 'tags'],
+            ],
+            'search' => ['name', 'specialty', 'city', 'area'],
+        ],
+
+        'facilities' => [
+            'key' => 'facilities',
+            'table' => 'facilities',
+            'model' => 'Facility',
+            'label' => 'المنشآت الصحية',
+            'display' => 'name',
+            'status' => 'status',
+            'columns' => ['name', 'type', 'city', 'territoryId', 'status'],
+            'fields' => [
+                ['key' => 'name', 'col' => 'name', 'label' => 'اسم المنشأة', 'type' => 'text', 'required' => true],
+                ['key' => 'type', 'col' => 'type', 'label' => 'النوع', 'type' => 'sel',
+                 'options' => ['مستشفى', 'مركز صحي', 'عيادة', 'مجمع عيادات', 'صيدلية', 'مستوصف', 'مختبر', 'أخرى']],
+                ['key' => 'territoryId', 'col' => 'territory_id', 'label' => 'المنطقة', 'type' => 'ref', 'ref' => 'territories'],
+                ['key' => 'city', 'col' => 'city', 'label' => 'المدينة', 'type' => 'text'],
+                ['key' => 'area', 'col' => 'area', 'label' => 'المنطقة السكنية', 'type' => 'text'],
+                ['key' => 'address', 'col' => 'address', 'label' => 'العنوان', 'type' => 'text'],
+                ['key' => 'phone', 'col' => 'phone', 'label' => 'الهاتف', 'type' => 'text'],
+                ['key' => 'lat', 'col' => 'lat', 'label' => 'خط العرض (Lat)', 'type' => 'num',
+                 'hint' => 'من خرائط الهاتف: ضغطة مطوّلة على المنشأة تعطي الإحداثيتين.'],
+                ['key' => 'lng', 'col' => 'lng', 'label' => 'خط الطول (Lng)', 'type' => 'num'],
+                ['key' => 'radiusM', 'col' => 'radius_m', 'label' => 'نطاق الوصول (متر)', 'type' => 'num',
+                 'hint' => 'زيارةٌ داخل هذا النطاق تُحسب «في المنشأة». مستشفى كبير ٣٠٠م، عيادة ١٠٠م.'],
+                ['key' => 'clientId', 'col' => 'client_id', 'label' => 'العميل (إن كانت المنشأة عميلاً)', 'type' => 'ref', 'ref' => 'clients'],
+                ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
+                 'options' => ['نشطة', 'مغلقة مؤقتاً', 'مغلقة نهائياً']],
+                ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات', 'type' => 'ta'],
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
+                ['key' => 'tags', 'col' => 'tags', 'label' => 'وسوم', 'type' => 'tags'],
+            ],
+            'search' => ['name', 'city', 'area', 'address'],
+        ],
+
+        'territories' => [
+            'key' => 'territories',
+            'table' => 'territories',
+            'model' => 'Territory',
+            'label' => 'المناطق الميدانية',
+            'display' => 'name',
+            'status' => 'status',
+            'columns' => ['name', 'kind', 'parentId', 'managerId', 'status'],
+            'fields' => [
+                ['key' => 'name', 'col' => 'name', 'label' => 'اسم المنطقة', 'type' => 'text', 'required' => true],
+                ['key' => 'code', 'col' => 'code', 'label' => 'الرمز', 'type' => 'text'],
+                // أول مرجعٍ ذاتي في السجل — النموذج يقطع الدور (cycle) عند الحفظ
+                ['key' => 'parentId', 'col' => 'parent_id', 'label' => 'المنطقة الأم', 'type' => 'ref', 'ref' => 'territories',
+                 'hint' => 'تُبنى الهرمية من الأعلى: بلد ← محافظة ← منطقة ← قطاع. المناطق التابعة تظهر في «السجلات المرتبطة».'],
+                ['key' => 'kind', 'col' => 'kind', 'label' => 'المستوى', 'type' => 'sel',
+                 'options' => ['بلد', 'محافظة', 'منطقة', 'قطاع']],
+                ['key' => 'managerId', 'col' => 'manager_id', 'label' => 'مشرف المنطقة', 'type' => 'ref', 'ref' => 'users'],
+                ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
+                 'options' => ['نشطة', 'موقوفة']],
+                ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات', 'type' => 'ta'],
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
+                ['key' => 'tags', 'col' => 'tags', 'label' => 'وسوم', 'type' => 'tags'],
+            ],
+            'search' => ['name', 'code'],
+        ],
+
+        'terrassigns' => [
+            'key' => 'terrassigns',
+            'table' => 'terrassigns',
+            'model' => 'TerritoryAssignment',
+            'label' => 'إسناد المناطق',
+            'display' => 'name',
+            'status' => 'status',
+            'columns' => ['name', 'territoryId', 'empId', 'role', 'dateStart', 'dateEnd', 'status'],
+            'fields' => [
+                ['key' => 'name', 'col' => 'name', 'label' => 'الإسناد', 'type' => 'text',
+                 'hint' => 'يُولَّد آلياً من المنطقة والمندوب إن تُرك فارغاً.'],
+                ['key' => 'territoryId', 'col' => 'territory_id', 'label' => 'المنطقة', 'type' => 'ref', 'ref' => 'territories', 'required' => true],
+                ['key' => 'empId', 'col' => 'emp_id', 'label' => 'المندوب', 'type' => 'ref', 'ref' => 'hr', 'required' => true],
+                ['key' => 'role', 'col' => 'role', 'label' => 'الصفة', 'type' => 'sel',
+                 'options' => ['أساسي', 'مساند', 'مشرف']],
+                ['key' => 'dateStart', 'col' => 'date_start', 'label' => 'من تاريخ', 'type' => 'date'],
+                ['key' => 'dateEnd', 'col' => 'date_end', 'label' => 'إلى تاريخ', 'type' => 'date'],
+                // النقل لا يمحو التاريخ: يُنهى الإسناد بحالته وتاريخه ويُفتح غيرُه
+                ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
+                 'options' => ['ساري', 'منتهٍ']],
+                ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات', 'type' => 'ta'],
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
+            ],
+            'search' => ['name', 'notes'],
+        ],
+
         'clients' => [
             'key' => 'clients',
             'table' => 'clients',
@@ -4741,6 +4867,15 @@ return [
                     'col' => 'title',
                     'label' => 'المسمى الوظيفي',
                     'type' => 'text',
+                ],
+                [
+                    // ملفُ المندوب هو ملفُ الموظف نفسه — امتدادٌ لا نظامٌ موازٍ:
+                    // الحقلُ يميّز من يعمل ميدانياً فتُبنى عليه شاشاتُ الميدان
+                    'key' => 'fieldRole',
+                    'col' => 'field_role',
+                    'label' => 'الدور الميداني',
+                    'type' => 'sel',
+                    'options' => ['—', 'مندوب طبي', 'مشرف ميداني', 'مندوب مبيعات ميداني'],
                 ],
                 [
                     'key' => 'managerId',
@@ -6857,6 +6992,9 @@ return [
                         // `krs` سقطت من القائمة فلم تُنشأ قاعدةُ تنبيهٍ واحدة على
                         // النتائج الرئيسية — وهي أكثرُ ما يستحقّ إنذاراً بالتأخّر
                         'krs', 'products', 'engagements',
+                        // العمليات الميدانية: قاعدةُ «أيام متبقية» على نهاية
+                        // الإسناد تنبّه قبل أن تبقى منطقةٌ بلا مندوب
+                        'hcps', 'facilities', 'territories', 'terrassigns',
                     ],
                 ],
                 [
