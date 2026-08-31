@@ -163,7 +163,8 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:30,1')->name('workday.out');
     Route::get('workforce', [\App\Http\Controllers\Web\WorkdayController::class, 'team'])->name('workforce.team');
 
-    // العرض الميدانيّ للمشرف: لوحةُ جلسات التتبّع وإعادةُ عرض المسار على الخريطة
+    // العرض الميدانيّ للمشرف: لوحةٌ تحليلية، وجلساتُ التتبّع، وإعادةُ عرض المسار
+    Route::get('field', [\App\Http\Controllers\Web\FieldController::class, 'dashboard'])->name('field.dashboard');
     Route::get('field/sessions', [\App\Http\Controllers\Web\FieldController::class, 'index'])->name('field.sessions');
     Route::get('field/route/{id}', [\App\Http\Controllers\Web\FieldController::class, 'route'])->name('field.route');
 

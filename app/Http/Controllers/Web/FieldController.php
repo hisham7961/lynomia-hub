@@ -23,6 +23,44 @@ class FieldController extends Controller
             'عرضُ المسار الميدانيّ لمشرفي الميدان');
     }
 
+    /**
+     * لوحةُ المشرف الميدانيّ: تغطيةُ الدورات، والتزامُ الزيارات (مخطط مقابل فعلي)،
+     * ونشاطُ المندوبين — كلُّها محسوبةٌ من بيانات الزيارات والدورات القائمة.
+     */
+    public function dashboard()
+    {
+        $this->gate();
+        $data = hub_screen('field.dash', 120, function () {
+            $vq = fn () => hub_scope(\App\Models\Visit::whereNull('deleted_at'), 'visits');
+            $monthStart = now()->startOfMonth()->toDateString();
+
+            // مخطط مقابل فعلي هذا الشهر (على تاريخ التخطيط)
+            $planned = (clone $vq())->where('planned_date', '>=', $monthStart)->count();
+            $done = (clone $vq())->where('status', 'تمت')->where('planned_date', '>=', $monthStart)->count();
+            $missed = (clone $vq())->where('status', 'فائتة')->where('planned_date', '>=', $monthStart)->count();
+
+            // الدورات النشطة بتغطيتها
+            $cycles = hub_scope(\App\Models\Cycle::whereNull('deleted_at')->where('status', 'نشط'), 'cycles')
+                ->orderByDesc('date_start')->limit(12)->get()
+                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'cov' => $c->coverage()]);
+
+            // نشاطُ المندوبين هذا الشهر
+            $byRep = (clone $vq())->where('planned_date', '>=', $monthStart)
+                ->selectRaw('emp_id, count(*) as planned, sum(case when status = ? then 1 else 0 end) as done', ['تمت'])
+                ->groupBy('emp_id')->orderByDesc('planned')->limit(20)->get();
+
+            return [
+                'planned' => $planned, 'done' => $done, 'missed' => $missed,
+                'pct' => $planned > 0 ? (int) round($done * 100 / $planned) : null,
+                'cycles' => $cycles, 'byRep' => $byRep,
+            ];
+        }, ['visits', 'cycles']);
+
+        $repNames = hub_ref_labels('hr', collect($data['byRep'])->pluck('emp_id')->all());
+
+        return view('field.dashboard', compact('data', 'repNames'));
+    }
+
     /** لوحةُ الجلسات — اليومَ والأحدث */
     public function index()
     {
