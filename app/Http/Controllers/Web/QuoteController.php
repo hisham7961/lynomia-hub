@@ -58,8 +58,115 @@ class QuoteController extends Controller
             'reject'   => $this->setStatus($q, 'مرفوض', 'حُدّد العرض كمرفوض'),
             'contract' => $this->toContract($q),
             'invoice'  => $this->toInvoice($q),
+            'project'  => $this->toProject($q),
             default    => abort(422),
         };
+    }
+
+    /**
+     * **تحويلُ عرضٍ مقبولٍ إلى ارتباطٍ ومشروعٍ خارجيّ** — جوهرةُ المواصفة.
+     *
+     * معاملاتيٌّ آمن كنمط `toContract`: قفلُ صفٍّ + فحصُ meta لمنع تحويلٍ مكرّر
+     * (عرضٌ واحدٌ لا يُنشئ مشروعين). يُنشئ ارتباطاً (إن لم يُختَر) ثم مشروعاً
+     * خارجياً موصولاً به وبالعميل — فتُضيء الربحيةُ والتقدّمُ القائمان تلقائياً.
+     * ينقل البنودَ ذاتَ النوع «مرحلة» إلى خطة العمل (plan_items) على المشروع،
+     * ويحفظ **خطَّ الأساس التجاريّ** (لقطةَ العرض المقبول) في meta المشروع —
+     * فالتغييرُ اللاحق تغييرٌ يُدار لا تعديلٌ للعرض. **بلا ازدواج بيانات**:
+     * المشروع يشير للعميل والارتباط والعرض، لا ينسخها.
+     */
+    protected function toProject(Quote $q)
+    {
+        abort_unless(hub_can(auth()->user(), 'projects', 'a'), 403, 'التحويل لمشروع يتطلب صلاحية إنشاء المشاريع');
+        abort_unless(hub_can(auth()->user(), 'engagements', 'a'), 403, 'التحويل يتطلب صلاحية إنشاء الارتباطات');
+        // مشروعٌ قائمٌ من هذا العرض يُفتَح مباشرةً — حتى بعد أن صار «محوّل»،
+        // فالحارسُ التالي (مقبول) لا يمنع إعادةَ الفتح المتكرّرة (idempotent).
+        $done = (array) $q->meta;
+        if (! empty($done['project_id']) && \App\Models\Project::withTrashed()->find($done['project_id'])) {
+            return redirect()->route('m.show', ['projects', $done['project_id']])->with('ok', 'حُوّل من قبل — هذا مشروعه');
+        }
+        abort_unless($q->status === 'مقبول', 422, 'حوّل العرض بعد قبوله أولاً');
+        abort_unless($q->client_id, 422, 'العرضُ بلا عميلٍ — لا يُحوَّل لمشروع عميل');
+
+        return DB::transaction(function () use ($q) {
+            $q = Quote::whereKey($q->getKey())->lockForUpdate()->firstOrFail();
+            $meta = (array) $q->meta;
+            // منعُ التحويل المكرّر: مشروعٌ قائمٌ من هذا العرض يُفتَح لا يُكرَّر
+            if (! empty($meta['project_id']) && \App\Models\Project::withTrashed()->find($meta['project_id'])) {
+                return redirect()->route('m.show', ['projects', $meta['project_id']])->with('ok', 'حُوّل من قبل — هذا مشروعه');
+            }
+
+            $name = $q->title ?: ('مشروع بموجب العرض ' . $q->doc_no);
+
+            // (١) ارتباطٌ: يُختار القائمُ إن مُرِّر، وإلا يُنشأ من العرض
+            $engagementId = $meta['engagement_id'] ?? $q->engagement_id;
+            if (! $engagementId || ! \App\Models\Engagement::find($engagementId)) {
+                $eng = \App\Models\Engagement::create([
+                    'name' => mb_substr($name, 0, 290),
+                    'client_id' => $q->client_id,
+                    'type' => 'تنفيذ مشروع',
+                    'status' => 'نشط',
+                    'contract_id' => $meta['contract_id'] ?? null,
+                    'am_id' => $q->am_id,
+                    'pm_id' => $q->pm_id,
+                    'billing' => $q->billing,
+                    'revenue' => $q->total,
+                    'currency' => $q->currency,
+                    'scope' => $q->scope,
+                    'company_id' => $q->company_id,
+                    'notes' => 'أُنشئ تلقائياً من العرض ' . $q->doc_no,
+                ]);
+                $engagementId = $eng->id;
+            }
+
+            // (٢) مشروعٌ خارجيّ موصولٌ بالعميل والارتباط — تُضيء الربحيةُ والتقدّم
+            $project = \App\Models\Project::create([
+                'name' => mb_substr($name, 0, 290),
+                'client_id' => $q->client_id,
+                'engagement_id' => $engagementId,
+                'company_id' => $q->company_id,
+                'manager_id' => $q->pm_id,
+                'type' => 'خدمة',
+                'status' => 'تخطيط',
+                'budget' => $q->cost,          // التكلفة التقديرية ميزانيةً مبدئية
+                'rev_exp' => $q->total,        // الإيراد المتوقّع = إجمالي العرض
+                'currency' => $q->currency,
+                'start_date' => now()->toDateString(),
+                'description' => $q->scope ?: $q->exec_summary,
+                // **خطُّ الأساس التجاريّ**: لقطةٌ للعرض المقبول لا تتغيّر بالتعديل اللاحق
+                'meta' => ['baseline' => [
+                    'quote_id' => $q->id, 'quote_no' => $q->doc_no,
+                    'amount' => (string) $q->total, 'currency' => $q->currency,
+                    'accepted_at' => optional($q->accepted_at)->toIso8601String(),
+                    'lines' => $q->lines()->get(['title', 'kind', 'phase', 'qty', 'unit_price', 'line_total'])->toArray(),
+                ]],
+            ]);
+
+            // (٣) نقلُ البنود ذات النوع «مرحلة» إلى خطة العمل (plan_items) بتتبّعٍ للعرض
+            foreach ($q->lines()->get() as $l) {
+                if ($l->kind !== 'مرحلة' && $l->phase === null) continue;
+                \App\Models\PlanItem::create([
+                    'title' => mb_substr($l->title, 0, 290),
+                    'type' => 'مرحلة',
+                    'project_id' => $project->id,
+                    'status' => 'مخططة',
+                    'weight' => 1,
+                    'description' => $l->description,
+                    'meta' => ['from_quote' => $q->id, 'from_line' => $l->id],
+                ]);
+            }
+
+            // (٤) الربطُ والحالة: العرض يشير لمشروعه وارتباطه، ويصير «محوّل»
+            $q->meta = $meta + ['engagement_id' => $engagementId, 'project_id' => $project->id,
+                'converted_at' => now()->toIso8601String(), 'converted_by' => auth()->id()];
+            $q->engagement_id = $engagementId;
+            $q->status = 'محوّل';
+            $q->save();
+            \App\Support\FlowRunner::fire('status', 'quotes', $q, 'محوّل');
+            hub_audit('تحويل عرض إلى مشروع', 'quotes', $q->id, $q->doc_no . ' → ' . $name);
+
+            return redirect()->route('m.show', ['projects', $project->id])
+                ->with('ok', '🚀 أُنشئ المشروع والارتباط من العرض — نُقل النطاق وحُفظ خطُّ الأساس التجاريّ');
+        });
     }
 
     /**

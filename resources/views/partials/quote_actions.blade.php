@@ -28,8 +28,14 @@
                 @else
                     <form method="POST" action="{{ route('quotes.act', $row->id) }}">@csrf<input type="hidden" name="do" value="invoice"><button class="btn p sm">🧾 تحويل لفاتورة</button></form>
                 @endif
+                {{-- التحويل الأهمّ: عرض ← ارتباط ← مشروع خارجي بنقلِ النطاق --}}
+                @if (! empty($meta['project_id']))
+                    <a class="btn ghost sm" href="{{ route('m.show', ['projects', $meta['project_id']]) }}">🚀 مشروعه ←</a>
+                @elseif (hub_can(auth()->user(), 'projects', 'a'))
+                    <form method="POST" action="{{ route('quotes.act', $row->id) }}" data-confirm="تحويل العرض إلى مشروعٍ وارتباط؟ يُنقل النطاق ويُحفظ خطُّ الأساس التجاريّ.">@csrf<input type="hidden" name="do" value="project"><button class="btn p sm">🚀 تحويل لمشروع</button></form>
+                @endif
             @endif
         @endif
     </div>
-    <div class="sub" style="margin-top:8px">مسودة ← مُرسل ← مقبول/مرفوض — وبعد القبول: عقد وفاتورة بنقرة، بلا إدخال مكرر</div>
+    <div class="sub" style="margin-top:8px">مسودة ← مُرسل ← مقبول/مرفوض — وبعد القبول: عقد وفاتورة ومشروع بنقرة، بلا إدخال مكرر</div>
 </div>
