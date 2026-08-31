@@ -1,6 +1,15 @@
 @extends('layouts.app')
 @section('title', 'مركز الكود المصدري')
 @section('content')
+@php
+    // اصطلاحُ المستودع: كلُّ قارئٍ جديد يمرّ بـhub_field_mode — الدورُ الذي
+    // أُخفي عنه حقلٌ في وحدة code (من مصفوفة الأدوار) لا يراه هنا أيضاً،
+    // في البطاقات والإحصاءات والنموذج سواء. صفحةُ الوحدة تحترمه أصلاً،
+    // والمركزُ واجهةٌ ثانية للبيانات نفسها لا باباً خلفياً عليها.
+    $cHide = collect(hub_mod('code')['fields'] ?? [])->pluck('key')
+        ->filter(fn ($k) => hub_field_mode(auth()->user(), 'code', (string) $k) === 'hide')
+        ->flip()->all();
+@endphp
 <div class="hero">
     <div>
         <h2>🌿 مركز الكود المصدري</h2>
@@ -9,7 +18,7 @@
         </div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-        @if ($repo)
+        @if ($repo && ! isset($cHide['repo']))
             <a class="btn ghost sm" href="{{ hub_safe_url($repo) }}" target="_blank" rel="noopener">🌿 المستودع ↗</a>
         @endif
         <a class="btn ghost sm" href="{{ route('m.index', 'code') }}">📋 الجدول الكامل</a>
@@ -27,7 +36,9 @@
     <div class="stat"><span class="ico">📅</span>
         <b>{{ $cadence['avg'] === null ? '—' : number_format($cadence['avg']) }}</b>
         <span>متوسط الأيام بين إصدارين</span></div>
-    <div class="stat"><span class="ico">🌿</span><b>{{ count($branches) ?: '—' }}</b><span>فرعاً مستعملاً</span></div>
+    @unless (isset($cHide['branch']))
+        <div class="stat"><span class="ico">🌿</span><b>{{ count($branches) ?: '—' }}</b><span>فرعاً مستعملاً</span></div>
+    @endunless
 </div>
 
 {{-- مرشّحات: تطبيقٌ أو مشروع — كما تُبدَّل المستودعات في GitHub --}}
@@ -59,10 +70,14 @@
             </div>
         </div>
     </form>
-    @if ($branches || $tags)
+    @php
+        $cBranches = isset($cHide['branch']) ? [] : $branches;
+        $cTags = isset($cHide['tags']) ? [] : $tags;
+    @endphp
+    @if ($cBranches || $cTags)
         <div class="crow" style="margin-top:8px">
-            @foreach ($branches as $b)<span class="chip mono">🌿 {{ $b }}</span>@endforeach
-            @foreach ($tags as $t => $n)<span class="chip">{{ $t }} <b>{{ $n }}</b></span>@endforeach
+            @foreach ($cBranches as $b)<span class="chip mono">🌿 {{ $b }}</span>@endforeach
+            @foreach ($cTags as $t => $n)<span class="chip">{{ $t }} <b>{{ $n }}</b></span>@endforeach
         </div>
     @endif
 </div>
@@ -79,11 +94,11 @@
 
                 <div class="relbody">
                     <div class="chead">
-                        @if ($rel['row']->type)<span class="bdg g">{{ $rel['row']->type }}</span>@endif
-                        @if ($rel['row']->status)<span class="bdg {{ hub_tone($rel['row']->status) }}">{{ $rel['row']->status }}</span>@endif
-                        @if ($rel['app'])<span class="chip">📱 {{ $rel['app'] }}</span>@endif
+                        @if ($rel['row']->type && ! isset($cHide['type']))<span class="bdg g">{{ $rel['row']->type }}</span>@endif
+                        @if ($rel['row']->status && ! isset($cHide['status']))<span class="bdg {{ hub_tone($rel['row']->status) }}">{{ $rel['row']->status }}</span>@endif
+                        @if ($rel['app'] && ! isset($cHide['appId']))<span class="chip">📱 {{ $rel['app'] }}</span>@endif
                         <span class="sub">{{ $rel['by'] }}</span>
-                        @if ($rel['date'])<span class="sub mono" title="{{ $rel['ago'] }}">{{ $rel['date'] }}</span>@endif
+                        @if ($rel['date'] && ! isset($cHide['date']))<span class="sub mono" title="{{ $rel['ago'] }}">{{ $rel['date'] }}</span>@endif
                         <span class="spacer"></span>
                         <a class="btn ghost xs" href="{{ route('m.show', ['code', $rel['id']]) }}">عرض</a>
                         @if (hub_can(auth()->user(), 'code', 'e'))
@@ -91,26 +106,32 @@
                         @endif
                     </div>
 
-                    @if ($rel['row']->branch || $rel['row']->commit)
+                    @php
+                        $rBranch = isset($cHide['branch']) ? null : $rel['row']->branch;
+                        $rCommit = isset($cHide['commit']) ? null : $rel['row']->commit;
+                    @endphp
+                    @if ($rBranch || $rCommit)
                         <div class="sub mono ltr" style="margin-top:4px">
-                            @if ($rel['row']->branch)🌿 {{ $rel['row']->branch }}@endif
-                            @if ($rel['row']->commit) · ⎇ {{ \Illuminate\Support\Str::limit($rel['row']->commit, 12, '') }}@endif
+                            @if ($rBranch)🌿 {{ $rBranch }}@endif
+                            @if ($rCommit) · ⎇ {{ \Illuminate\Support\Str::limit($rCommit, 12, '') }}@endif
                         </div>
                     @endif
 
-                    @if ($rel['tags'])
+                    @if ($rel['tags'] && ! isset($cHide['tags']))
                         <div class="crow" style="margin-top:6px">
                             @foreach ($rel['tags'] as $t)<span class="chip">{{ $t }}</span>@endforeach
                         </div>
                     @endif
 
-                    @if (trim($rel['notes']) !== '')
-                        <div class="relnotes">{!! \App\Support\CodeHub::notesHtml($rel['notes']) !!}</div>
-                    @else
-                        <div class="sub" style="margin-top:8px">لا سجلَّ تغييراتٍ لهذا الإصدار — وما لم يُكتب لا يُتذكَّر.</div>
-                    @endif
+                    @unless (isset($cHide['notes']))
+                        @if (trim($rel['notes']) !== '')
+                            <div class="relnotes">{!! \App\Support\CodeHub::notesHtml($rel['notes']) !!}</div>
+                        @else
+                            <div class="sub" style="margin-top:8px">لا سجلَّ تغييراتٍ لهذا الإصدار — وما لم يُكتب لا يُتذكَّر.</div>
+                        @endif
+                    @endunless
 
-                    @if ($rel['assets'])
+                    @if ($rel['assets'] && ! isset($cHide['file']))
                         <div class="relassets">
                             <div class="sub" style="margin-bottom:5px">📦 أصول التنزيل</div>
                             @foreach ($rel['assets'] as $as)
@@ -164,41 +185,55 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="fld">
-                        <label for="n-type">نوع الإصدار</label>
-                        <select class="inp" id="n-type" name="type">
-                            @foreach (collect(hub_mod('code')['fields'])->firstWhere('key', 'type')['options'] as $o)
-                                <option value="{{ $o }}">{{ $o }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="fld">
-                        <label for="n-status">الحالة</label>
-                        <select class="inp" id="n-status" name="status">
-                            @foreach (collect(hub_mod('code')['fields'])->firstWhere('key', 'status')['options'] as $o)
-                                <option value="{{ $o }}" @selected($o === 'مسودة')>{{ $o }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="fld">
-                        <label for="n-date">تاريخ الإصدار</label>
-                        <input class="inp" id="n-date" type="date" name="date" value="{{ now()->toDateString() }}">
-                    </div>
-                    <div class="fld">
-                        <label for="n-branch">الفرع</label>
-                        <input class="inp mono ltr" id="n-branch" name="branch" placeholder="main">
-                    </div>
-                    <div class="fld">
-                        <label for="n-notes">سجل التغييرات</label>
-                        <textarea class="inp" id="n-notes" name="notes" rows="6"
-                                  placeholder="- أضيف كذا&#10;- أُصلح كذا&#10;**ملاحظة:** …"></textarea>
-                        <span class="sub fhint">يُنسَّق بـMarkdown خفيف: قوائم، عناوين، **غامق**، `شيفرة`.</span>
-                    </div>
-                    <div class="fld">
-                        <label for="n-file">حزمة الإصدار</label>
-                        <input class="inp" id="n-file" type="file" name="file">
-                        <span class="sub fhint">حتى {{ hub_upload_cap()['label'] }} — بعدّاد تقدّمٍ أثناء الرفع</span>
-                    </div>
+                    {{-- الحقولُ المخفيّة عن الدور لا تُعرض في النموذج أيضاً —
+                         ومسارُ الكتابة (fill) يتجاهلها أصلاً فلا وعدَ كاذباً --}}
+                    @unless (isset($cHide['type']))
+                        <div class="fld">
+                            <label for="n-type">نوع الإصدار</label>
+                            <select class="inp" id="n-type" name="type">
+                                @foreach (collect(hub_mod('code')['fields'])->firstWhere('key', 'type')['options'] as $o)
+                                    <option value="{{ $o }}">{{ $o }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endunless
+                    @unless (isset($cHide['status']))
+                        <div class="fld">
+                            <label for="n-status">الحالة</label>
+                            <select class="inp" id="n-status" name="status">
+                                @foreach (collect(hub_mod('code')['fields'])->firstWhere('key', 'status')['options'] as $o)
+                                    <option value="{{ $o }}" @selected($o === 'مسودة')>{{ $o }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    @endunless
+                    @unless (isset($cHide['date']))
+                        <div class="fld">
+                            <label for="n-date">تاريخ الإصدار</label>
+                            <input class="inp" id="n-date" type="date" name="date" value="{{ now()->toDateString() }}">
+                        </div>
+                    @endunless
+                    @unless (isset($cHide['branch']))
+                        <div class="fld">
+                            <label for="n-branch">الفرع</label>
+                            <input class="inp mono ltr" id="n-branch" name="branch" placeholder="main">
+                        </div>
+                    @endunless
+                    @unless (isset($cHide['notes']))
+                        <div class="fld">
+                            <label for="n-notes">سجل التغييرات</label>
+                            <textarea class="inp" id="n-notes" name="notes" rows="6"
+                                      placeholder="- أضيف كذا&#10;- أُصلح كذا&#10;**ملاحظة:** …"></textarea>
+                            <span class="sub fhint">يُنسَّق بـMarkdown خفيف: قوائم، عناوين، **غامق**، `شيفرة`.</span>
+                        </div>
+                    @endunless
+                    @unless (isset($cHide['file']))
+                        <div class="fld">
+                            <label for="n-file">حزمة الإصدار</label>
+                            <input class="inp" id="n-file" type="file" name="file">
+                            <span class="sub fhint">حتى {{ hub_upload_cap()['label'] }} — بعدّاد تقدّمٍ أثناء الرفع</span>
+                        </div>
+                    @endunless
                     <button class="btn p" style="margin-top:10px">🏷️ إصدار</button>
                 </form>
             </div>

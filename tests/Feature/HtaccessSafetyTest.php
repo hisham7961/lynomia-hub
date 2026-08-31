@@ -34,6 +34,14 @@ class HtaccessSafetyTest extends TestCase
         'ServerName'         => 'سياقُه إعدادُ الخادم/المضيف الافتراضي',
     ];
 
+    /*
+     * لماذا ليس `Require` في القائمة؟ ملفُّ الجذر يحمي `.env` وأخواتِها بـ
+     * `Require all denied` — توجيهٌ يحتاج AllowOverride AuthConfig، لكنه
+     * **يخدم الإنتاجَ اليوم فعلاً** على استضافة المشروع (الجذرُ داخل
+     * public_html) فمضيفُه يسمح به مجرَّباً لا مظنوناً. حظرُه هنا كان سيُجبر
+     * على نزع حمايةِ الأسرار — والحارسُ يمنع ما يُسقط الموقعَ لا ما يحميه.
+     */
+
     public function test_htaccess_carries_no_directive_that_takes_the_site_down(): void
     {
         foreach ([public_path('.htaccess'), base_path('.htaccess')] as $file) {

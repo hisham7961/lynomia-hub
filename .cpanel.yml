@@ -1,0 +1,9 @@
+---
+# نشرُ cPanel (زرّ «Deploy HEAD Commit» في Git Version Control):
+# بعد السحب تُشغَّل هاتان الخطوتان تلقائياً — فلا حاجة لفتح التيرمنال في
+# التحديث المعتاد. (composer install تلزم فقط حين يتغيّر composer.lock —
+# حينها من التيرمنال: composer install --no-dev --optimize-autoloader)
+deployment:
+  tasks:
+    - php artisan migrate --force
+    - php artisan optimize:clear

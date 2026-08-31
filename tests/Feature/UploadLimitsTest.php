@@ -18,7 +18,8 @@ use Tests\TestCase;
  *
  * ما يحرسه هذا الملف:
  *  1) `hub_upload_cap()` أصغرُ الحدّين، ويقول أيُّهما القاطع.
- *  2) الحدُّ يسري على **كل** مسارات الرفع (لا رقمَ مكتوبٌ بيدٍ في واحدٍ منها).
+ *  2) الحدُّ يسري على **كل** مسارات تخزين الملفات (لا رقمَ مكتوبٌ بيدٍ في
+ *     واحدٍ منها — والاستيرادُ وحده حدُّه أدنى عمداً: تحليلُ صفوفٍ لا تخزين).
  *  3) الواجهةُ تقول السقفَ الفعليّ لا المُعلَن.
  *  4) ختمُ بدء التنزيل (`dlt` ← كعكة) يصل مع الردّ — به تُخفى لوحةُ «يُحضَّر».
  *  5) طبقةُ التقدّم موجودةٌ في الواجهة ولا تختطف نموذجاً بلا ملف.
@@ -49,6 +50,32 @@ class UploadLimitsTest extends TestCase
         $this->assertSame(1024, $small['kb']);
         $this->assertFalse($small['byPhp']);
         $this->assertStringContainsString('م.ب', $small['label'], 'السقفُ يُقال بوحدةٍ تُقرأ');
+    }
+
+    public function test_the_migration_raises_an_installed_cap_to_a_gigabyte(): void
+    {
+        // الخادمُ القائم زُرع يومَ تثبيته بـ٢٠٠ م.ب وبقيت في `settings` — والنشرُ
+        // لا يعيد الزرع. الهجرةُ هي ما يوصل الغيغابايت إلى الحيّ لا الجديد وحده.
+        $this->seedCore();
+        $this->hubSetting('files.max_kb', '204800');
+
+        (require base_path('database/migrations/2026_08_18_000001_raise_upload_cap_to_gigabyte.php'))->up();
+
+        // التحويل الصريح: SQLite يعيد القيمة عدداً وMySQL نصاً — والمقصود واحد
+        $this->assertSame('1048576', (string) \App\Models\Setting::where('key', 'files.max_kb')->value('value'));
+        $this->assertSame(1048576, hub_upload_cap()['appKb'], 'والكاشُ مُسِح — القيمةُ الجديدة تُرى فوراً');
+
+        // قيمةٌ فوق الغيغابايت لا تُخفَض: الهجرةُ ترفع سقفاً لا تفرضه
+        $this->hubSetting('files.max_kb', '2097152');
+        (require base_path('database/migrations/2026_08_18_000001_raise_upload_cap_to_gigabyte.php'))->up();
+        $this->assertSame('2097152', (string) \App\Models\Setting::where('key', 'files.max_kb')->value('value'));
+
+        // وغيابُ الصفّ يبقى غياباً — الافتراضيُّ في الشيفرة غيغابايت أصلاً
+        \App\Models\Setting::where('key', 'files.max_kb')->delete();
+        \Illuminate\Support\Facades\Cache::forget('settings:all');
+        (require base_path('database/migrations/2026_08_18_000001_raise_upload_cap_to_gigabyte.php'))->up();
+        $this->assertNull(\App\Models\Setting::where('key', 'files.max_kb')->value('value'));
+        $this->assertSame(1048576, hub_upload_cap()['appKb']);
     }
 
     public function test_ini_sizes_are_read_with_their_units(): void
@@ -87,6 +114,13 @@ class UploadLimitsTest extends TestCase
         $this->actingAs($this->owner)->post('/m/projects',
             ['name' => 'مشروع بملف كبير', 'logo' => $big()])
             ->assertSessionHasErrors('logo');
+
+        // غرفةُ البيانات — كان سقفُها ٥٠ م.ب مكتوباً بيدٍ لا يتبع الإعداد،
+        // وهي مخزنُ ملفاتٍ كغيرها. (الاستيرادُ وحده حدُّه أدنى **عمداً**:
+        // تحليلٌ يقرأ الصفوف في وقت الطلب لا تخزينٌ يضع ملفاً على قرص.)
+        $this->actingAs($this->owner)->post('/dataroom',
+            ['title' => 'ملف كبير', 'file' => $big()])
+            ->assertSessionHasErrors('file');
 
         $this->assertSame(0, Attachment::count(), 'لا شيء يُكتب على القرص قبل اجتياز الحدّ');
     }

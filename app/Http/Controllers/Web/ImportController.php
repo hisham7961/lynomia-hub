@@ -41,6 +41,10 @@ class ImportController extends Controller
     public function map(Request $r, string $module)
     {
         [$def] = $this->resolve($module);
+        // حدٌّ مقصودٌ أدنى من سقف النظام: الاستيرادُ **تحليلٌ** لا تخزين — الملف
+        // يُقرأ صفاً صفاً في الذاكرة ووقتِ الطلب، وCSV بغيغابايت يعني مئات آلاف
+        // الصفوف في طلبٍ واحد على استضافةٍ مشتركة. ٢٠ م.ب ≈ ١٥٠ ألف صف: من
+        // تجاوزها يقسّم ملفه — أسلم من طلبٍ يموت في منتصف إدراجه.
         $r->validate(['file' => ['required', 'file', 'max:20480']]);
 
         $ext = strtolower($r->file('file')->getClientOriginalExtension());

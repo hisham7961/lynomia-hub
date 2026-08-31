@@ -204,4 +204,29 @@ class CodeCenterTest extends TestCase
         $this->actingAs($u)->get('/code-center')
             ->assertOk()->assertSee('v1.0.0')->assertDontSee('🏷️ إصدار');
     }
+
+    public function test_a_field_hidden_from_the_role_stays_hidden_in_the_center_too(): void
+    {
+        // صفحةُ الوحدة تحترم قواعدَ الحقول (hub_field_mode)، والمركزُ واجهةٌ
+        // ثانية للبيانات نفسها — كان يعرض سجلَّ التغييرات والفرعَ لدورٍ أُخفيا
+        // عنه صراحةً: بابٌ خلفيّ على ما أغلقه ضبطُ الأدوار.
+        $this->seedCore();
+        $this->rel(['ver' => 'v3.3.0', 'branch' => 'secret-branch',
+            'notes' => 'ملاحظاتٌ داخلية عن الإصدار']);
+
+        $role = Role::create(['name' => 'قارئ مقيَّد', 'scope' => 'all', 'flags' => [],
+            'matrix' => ['code' => ['v' => 1]],
+            'field_rules' => ['code' => ['notes' => 'hide', 'branch' => 'hide']]]);
+        $u = User::create(['name' => 'مقيَّد', 'email' => 'ltd@test.local', 'password' => 'Secret!2026x',
+            'role_id' => $role->id, 'status' => 'نشط', 'password_changed_at' => now()]);
+
+        $this->actingAs($u)->get('/code-center')->assertOk()
+            ->assertSee('v3.3.0')
+            ->assertDontSee('ملاحظاتٌ داخلية')
+            ->assertDontSee('secret-branch');
+
+        // والمالكُ يراهما كما كان
+        $this->actingAs($this->owner)->get('/code-center')->assertOk()
+            ->assertSee('ملاحظاتٌ داخلية')->assertSee('secret-branch');
+    }
 }

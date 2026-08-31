@@ -293,6 +293,23 @@ class AppGalleryTest extends TestCase
         unset($a);
     }
 
+    public function test_a_new_app_lands_in_its_center_where_the_shots_are_uploaded(): void
+    {
+        // «لما اضيف تطبيق» — اللقطاتُ المتعددة لا تُرفع قبل وجود السجل، فالرمي
+        // على قائمة الوحدة بعد الحفظ كان يترك المضيفَ بلا طريقٍ ظاهرٍ لصوره.
+        // الآن يُستقبل في مركز التطبيق حيث المعرضُ والوصفُ والجاهزية.
+        $this->seedCore();
+
+        $res = $this->actingAs($this->owner)->post('/m/apps', ['name' => 'تطبيق وليد', 'platform' => 'iOS']);
+        $app = Application::where('name', 'تطبيق وليد')->first();
+        $this->assertNotNull($app);
+        $res->assertRedirect(route('apps.center', $app->id) . '#shots');
+
+        // و«حفظ وإضافة آخر» يبقى في نموذج الإدخال المتتابع كما كان
+        $this->actingAs($this->owner)->post('/m/apps', ['name' => 'تطبيق ثانٍ', 'platform' => 'iOS', '_stay' => 1])
+            ->assertRedirect(route('m.create', 'apps'));
+    }
+
     public function test_the_record_page_shows_the_store_face_not_only_fields(): void
     {
         $this->seedCore();
