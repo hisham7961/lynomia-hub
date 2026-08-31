@@ -1,6 +1,44 @@
 {{-- مساحةُ عمل العهدة: هويّةٌ (كودٌ وملصق) ← حيازةٌ ← مواصفاتٌ ← تصاريح ← سجل --}}
 @include('partials.custody_card')
 
+{{-- بطاقةُ الهوية الموحّدة: الطرازُ الأمّ، والباركود الخطي، وكلُّ معرّفات القطعة --}}
+@php
+    $aiIds = \App\Support\Identity::of('assets', $row->id);
+    $aiProduct = $row->product_id ? \App\Models\Product::find($row->product_id) : null;
+    $aiBar = \App\Support\Barcode::svg((string) $row->code, 38);
+@endphp
+@if ($aiProduct || $aiIds->count() > 1 || $aiBar)
+    <div class="card">
+        <h3 class="cardtitle">🆔 الهوية الموحّدة</h3>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+            @if ($aiBar)<div style="max-width:260px">{!! $aiBar !!}</div>@endif
+            @if ($aiProduct)
+                <div>
+                    <div class="sub">الطراز في سجل المنتجات</div>
+                    <a href="{{ route('m.show', ['products', $aiProduct->id]) }}">
+                        <b>{{ $aiProduct->name }}</b> <span class="mono ltr sub">{{ $aiProduct->code }}</span></a>
+                    @if ($aiProduct->barcode)
+                        <div class="sub mono ltr">GTIN {{ $aiProduct->barcode }}</div>
+                    @endif
+                </div>
+            @elseif (hub_can(auth()->user(), 'products', 'v'))
+                <div class="sub">لا طراز مربوطاً — اربط القطعة بمنتجها من حقل «المنتج (الطراز)» في التعديل،
+                    فترث اسمَه وباركودَه العالمي.</div>
+            @endif
+        </div>
+        @if ($aiIds->count() > 1)
+            <div class="crow" style="margin-top:8px">
+                @foreach ($aiIds as $rid)
+                    @continue($rid->kind === 'serial' && hub_masked('assets', 'serial'))
+                    <span class="chip" title="{{ $rid->source ?: '' }}">
+                        {{ \App\Support\Identity::KINDS[$rid->kind] ?? $rid->kind }}
+                        <b class="mono ltr">{{ \Illuminate\Support\Str::limit($rid->value, 24) }}</b></span>
+                @endforeach
+            </div>
+        @endif
+    </div>
+@endif
+
 {{-- بطاقة الإهلاك وتكلفة الملكية — تتوقع $row (الأصل). قسط ثابت من السعر والعمر --}}
 @php
     $adPrice = (float) ($row->price ?? 0);

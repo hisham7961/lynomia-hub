@@ -49,6 +49,14 @@ class Asset extends Model
         static::saving(function (self $a) {
             if (! $a->code) $a->code = self::nextCode($a->type);
         });
+        // هويّاتُ الأصل تدخل سجل الهوية الموحّد تلقائياً — فيجدها المحلّل
+        // بالمسح، وتعديلُ سيريالٍ من أي مسار (CRUD/API/استيراد) يلحق وحده
+        static::saved(function (self $a) {
+            if ($a->code) \App\Support\Identity::attach('assets', $a->id, 'lyn', $a->code,
+                ['is_primary' => true, 'verified' => true, 'source' => 'توليد']);
+            if ($a->serial) \App\Support\Identity::attach('assets', $a->id, 'serial', $a->serial);
+            if ($a->tag) \App\Support\Identity::attach('assets', $a->id, 'tag', $a->tag);
+        });
     }
 
     /**
