@@ -28,6 +28,9 @@ class QuoteFlowController extends Controller
         'qfu_active_company_v3', 'qfu_special_prices_v3', 'qfu_price_lists_v3',
         'qfu_templates_v3', 'qfu_documents_v3', 'qfu_exchange_rates_v3', 'qfu_invoices_v3',
         'qfu_suppliers_v3', 'qfu_purchase_orders_v3', 'qfu_backup_meta_v3',
+        // v2.366: قوائم التعبئة — مفتاحٌ غير مسجَّل هنا لا يصل الخادمَ أبداً
+        // (الحفظ يرفضه بصمت والبذرُ يمحوه من المتصفح عند كل فتح)
+        'qfu_packing_lists_v3',
     ];
 
     protected function gate(): void
@@ -153,6 +156,7 @@ class QuoteFlowController extends Controller
             'documents' => 'qfu_documents_v3', 'exchangeRates' => 'qfu_exchange_rates_v3',
             'invoices' => 'qfu_invoices_v3', 'suppliers' => 'qfu_suppliers_v3',
             'purchaseOrders' => 'qfu_purchase_orders_v3', 'backupMeta' => 'qfu_backup_meta_v3',
+            'packingLists' => 'qfu_packing_lists_v3',
         ];
 
         $map = [];

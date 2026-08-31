@@ -160,4 +160,43 @@ class QuoteFlowTest extends TestCase
         $this->actingAs($this->owner)->get('/')->assertSee('QuoteFlow');
         $this->actingAs($this->employee)->get('/')->assertDontSee('QuoteFlow');
     }
+
+    /**
+     * v2.366: مفاتيح التخزين في التطبيق نفسِه = قائمةُ السماح في المتحكم حرفياً.
+     * مفتاحٌ يُضاف في الواجهة وحدَها لا يصل الخادمَ أبداً (الحفظ يرفضه بصمت
+     * والبذرُ يمحوه من المتصفح عند كل فتح) — فبياناتُ ميزةٍ كاملة تتبخر.
+     * هذا الحارس يجعل النسيانَ فشلَ حزمةٍ لا خسارةَ بياناتٍ صامتة.
+     */
+    public function test_every_app_storage_key_is_allowed_by_the_server(): void
+    {
+        $html = (string) file_get_contents(resource_path('sideapps/quoteflow.html'));
+        preg_match_all("~'(qfu_[a-z_]+_v3)'~", $html, $m);
+        $appKeys = array_values(array_unique($m[1]));
+        $this->assertNotEmpty($appKeys);
+
+        $ref = new \ReflectionClass(\App\Http\Controllers\Web\QuoteFlowController::class);
+        $serverKeys = $ref->getConstant('KEYS');
+
+        $missing = array_diff($appKeys, $serverKeys);
+        $this->assertSame([], array_values($missing),
+            'مفاتيحُ تخزينٍ في التطبيق لا يقبلها الخادم — حالتُها ستضيع: ' . implode('، ', $missing));
+
+        // وقوائم التعبئة تحديداً مسجَّلة — الميزةُ الجديدة تصل الخادم
+        $this->assertContains('qfu_packing_lists_v3', $serverKeys);
+    }
+
+    public function test_saving_packing_lists_reaches_the_server_store(): void
+    {
+        $this->seedCore();
+        session(['quoteflow.ok' => true]);
+        $this->actingAs($this->owner)->postJson('/apps/quoteflow/save', ['data' => [
+            'qfu_packing_lists_v3' => '[{"id":"pl_x","number":"PL-2026-0001","status":"finalized"}]',
+        ]])->assertOk()->assertJson(['ok' => true]);
+
+        $stored = json_decode((string) \Illuminate\Support\Facades\DB::table('sideapp_stores')
+            ->where('app', 'quoteflow')->value('data'), true);
+        $this->assertArrayHasKey('qfu_packing_lists_v3', $stored,
+            'قائمة التعبئة لم تصل مخزن الخادم — المزامنة مقطوعة');
+        $this->assertStringContainsString('PL-2026-0001', $stored['qfu_packing_lists_v3']);
+    }
 }
