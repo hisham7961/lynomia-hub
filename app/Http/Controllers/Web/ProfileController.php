@@ -32,15 +32,29 @@ class ProfileController extends Controller
         ], [], ['tname' => 'اسم المفتاح', 'tdays' => 'أيام الصلاحية', 'tscopes' => 'النطاقات', 'tips' => 'قائمة IP']);
 
         $plain = 'lyn_' . \Illuminate\Support\Str::random(44);
-        \App\Models\ApiToken::create([
+        // انتهاءٌ افتراضيٌّ مضبوط: مفتاحٌ بلا مدّةٍ صار خطراً دائماً — إن لم
+        // يُحدَّد يوماً، تُفرض العتبة القصوى (api.token_max_days، ٣٦٥ افتراضاً).
+        // من أراد الدوام يضبطها إلى 0 من مركز الإعدادات صراحةً لا سهواً.
+        $cap = (int) setting('api.token_max_days', 365);
+        $days = filled($d['tdays'] ?? null) ? (int) $d['tdays'] : ($cap > 0 ? $cap : null);
+        if ($cap > 0 && $days !== null) $days = min($days, $cap);
+        $tok = \App\Models\ApiToken::create([
             'user_id'     => auth()->id(),
             'name'        => $d['tname'],
             'token_hash'  => hash('sha256', $plain),
-            'expires_at'  => filled($d['tdays'] ?? null) ? now()->addDays((int) $d['tdays']) : null,
+            'expires_at'  => $days !== null ? now()->addDays($days) : null,
             'scopes'      => trim((string) ($d['tscopes'] ?? '')) ?: null,
             'allowed_ips' => trim((string) ($d['tips'] ?? '')) ?: null,
             'created_at'  => now(),
         ]);
+        // سكُّ رمزٍ حدثٌ أمنيّ: كان يمرّ دون أثرٍ في السلسلة — يُدوَّن باسمه
+        // ونطاقه ومدّته (لا قيمته)، وحقلُ full يُنبّه إلى رمزٍ كامل الصلاحيات.
+        hub_audit('إنشاء مفتاح API', null, $tok->id, $d['tname'], ['after' => [
+            'scopes' => $tok->scopes ?: '(كامل صلاحيات المستخدم)',
+            'full' => $tok->scopes ? false : true,
+            'expires' => $tok->expires_at?->toDateString() ?: 'دائم',
+            'ips' => $tok->allowed_ips ?: '(أي عنوان)',
+        ]]);
 
         return back()->with('ok', 'أُنشئ المفتاح — انسخه الآن فلن يظهر مرة أخرى')->with('newtoken', $plain);
     }
@@ -68,6 +82,7 @@ class ProfileController extends Controller
             $fill['expires_at'] = now()->addDays(min(730, $span));
         }
         $t->forceFill($fill)->save();
+        hub_audit('تدوير مفتاح API', null, $t->id, $t->name);
 
         return back()->with('ok', 'دُوّر المفتاح «' . $t->name . '» — القيمة القديمة توقفت فوراً، انسخ الجديدة الآن')
                      ->with('newtoken', $plain);
@@ -76,7 +91,12 @@ class ProfileController extends Controller
     /** إبطال مفتاح API */
     public function tokenRevoke(string $id)
     {
-        \App\Models\ApiToken::where('user_id', auth()->id())->where('id', $id)->delete();
+        $t = \App\Models\ApiToken::where('user_id', auth()->id())->where('id', $id)->first();
+        if ($t) {
+            $name = $t->name;
+            $t->delete();
+            hub_audit('إبطال مفتاح API', null, $id, $name);
+        }
 
         return back()->with('ok', 'أُبطل المفتاح فوراً');
     }
@@ -191,6 +211,10 @@ class ProfileController extends Controller
 
         // تدوير معرّف الجلسة الحالية بعد تغيير كلمة المرور
         $r->session()->regenerate();
+
+        // تغييرُ كلمة المرور حدثٌ أمنيّ — يُدوَّن في السلسلة (بلا قيمةٍ طبعاً)
+        // كي يُرى في مركز الأمن وخطِّ المستخدم الزمني، وقد كان يمرّ صامتاً.
+        hub_audit('تغيير كلمة المرور', null, null, $u->name);
 
         return redirect()->route('profile.edit')->with('ok', 'غُيّرت كلمة المرور بنجاح');
     }

@@ -107,6 +107,9 @@ class CommentController extends Controller
     public function pin(string $id)
     {
         $c = Comment::findOrFail($id);
+        // تنطيقُ السجل الأمّ أولاً كما في toTask: تثبيتٌ على سجلٍ خارج النطاق
+        // كان يمرّ بمجرد امتلاك «تعديل» الوحدة دون فحص أن السجل نفسه مرئيّ
+        $this->guardTarget($c->module, $c->record_id);
         $can = $c->module === 'feed'
             ? hub_monitor()
             : hub_can(auth()->user(), $c->module, 'e');
@@ -124,6 +127,8 @@ class CommentController extends Controller
     public function resolve(string $id)
     {
         $c = Comment::findOrFail($id);
+        // السجلُّ الأمّ ضمن النطاق أولاً — ثم صاحبُ التعليق أو من يملك تعديله
+        $this->guardTarget($c->module, $c->record_id);
         $can = $c->user_id === auth()->id()
             || ($c->module === 'feed' ? hub_monitor() : hub_can(auth()->user(), $c->module, 'e'));
         abort_unless($can, 403);

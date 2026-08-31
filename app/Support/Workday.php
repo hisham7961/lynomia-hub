@@ -287,8 +287,8 @@ class Workday
             'emp' => $emp, 'att' => $row,
             'entries' => $entries->count(),
             'hours' => round((float) $entries->sum('hours'), 1),
-            'projects' => hub_ref_options('projects'),
-            'clients' => hub_can($user, 'clients', 'v') ? hub_ref_options('clients') : [],
+            'projects' => hub_ref_options_scoped('projects', null, $user),
+            'clients' => hub_can($user, 'clients', 'v') ? hub_ref_options_scoped('clients', null, $user) : [],
         ];
     }
 }

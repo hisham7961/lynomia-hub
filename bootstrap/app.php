@@ -32,6 +32,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('api', \App\Http\Middleware\HubMaintenance::class);
         $middleware->appendToGroup('api', \App\Http\Middleware\SecurityHeaders::class);
         $middleware->appendToGroup('api', \App\Http\Middleware\Observability::class);
+        // رادارُ الكشف على API أيضاً (v2.367): كان مقصوراً على الويب فمُنِعُ ٤٠٣
+        // على مسارات API (نطاقٌ ممنوع، سجلٌّ خارج الملكية) لا يُرصد إطلاقاً.
+        $middleware->appendToGroup('api', \App\Http\Middleware\AccessRadar::class);
         // الويبهوك الوارد سطحٌ آليّ لا نموذج له: يُصادَق بالرمز في الرابط + توقيع
         // HMAC، فلا CSRF عليه (المُرسِل خدمةٌ خارجية لا متصفّح يحمل الرمز).
         $middleware->validateCsrfTokens(except: ['hook/*']);

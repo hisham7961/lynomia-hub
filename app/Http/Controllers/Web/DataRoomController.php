@@ -78,6 +78,14 @@ class DataRoomController extends Controller
             'created_at'    => now(),
         ]);
 
+        // مشاركةُ مستندٍ حساسٍ خارج النظام حدثٌ أمنيّ — كان يمرّ دون أثرٍ في
+        // سلسلة التدقيق (صفٌّ created_by فقط): يُدوَّن الآن باسمه وحمايته ومدّته
+        hub_audit('إنشاء رابط مشاركة', null, $link->id, $d['title'], ['after' => [
+            'protected' => $link->password_hash ? true : false,
+            'expires' => $link->expires_at?->toDateString() ?: 'دائم',
+            'no_download' => (bool) $link->no_download,
+        ]]);
+
         return back()->with('ok', 'أُنشئ الرابط — انسخه من القائمة وشاركه')->with('newlink', route('share.show', $link->token));
     }
 
@@ -86,6 +94,7 @@ class DataRoomController extends Controller
         $this->gate();
         $link = ShareLink::findOrFail($id);
         $link->update(['revoked' => true]);
+        hub_audit('إلغاء رابط مشاركة', null, $link->id, $link->title);
         // أقل احتفاظ: لا un-revoke في النظام، فالملف بعد الإلغاء غير قابل للوصول
         // من أي مسار — إبقاؤه (مستندٌ وُصف حساساً أصلاً) على القرص أبداً تراكمُ خطر
         if ($link->path && is_file(storage_path('app/' . $link->path))) {

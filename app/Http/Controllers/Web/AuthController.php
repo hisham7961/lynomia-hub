@@ -116,6 +116,9 @@ class AuthController extends Controller
 
         if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, hub_str($r->input('code')))) {
             $this->bumpFailedAttempts($u);
+            // فشلُ الرمز الثاني حدثٌ أمنيّ يستحق أثراً كفشل كلمة المرور — كان
+            // يزيد العدّاد بصمتٍ فلا يظهر «كلمةٌ صحيحةٌ ورمزٌ يُخمَّن» في التدقيق
+            hub_audit('فشل رمز التحقق', null, null, $u->name, ['user_id' => $u->id]);
 
             return back()->withErrors(['code' => 'الرمز غير صحيح أو انتهى — جرّب الرمز الحالي في التطبيق']);
         }
@@ -136,14 +139,20 @@ class AuthController extends Controller
             'last_login_ip'   => $r->ip(),
         ])->saveQuietly();
 
+        // هوية الجهاز: كوكي ثابتٌ يُربط بصفٍّ «معلّق» عند أول ظهور — إشارةٌ
+        // لحارس الدخول ولخطر الجلسة، لا سلاحُ حجب. يُلحق الكوكي على الاستجابة.
+        $newDevice = ! \App\Support\Devices::isKnown($u, $r);
+        $device = \App\Support\Devices::bindOnLogin($u, $r);
+
         // حارس الدخول: يتعلم العناوين المعتادة ويرصد الغريب وخارج الدوام
-        \App\Support\LoginSentry::inspect($u, (string) $r->ip());
+        \App\Support\LoginSentry::inspect($u, (string) $r->ip(), $newDevice);
 
         // معرّف صفّ الجلسة يُحفَظ في الجلسة نفسها: بغيره لا نبضةَ حضورٍ ولا
         // إنهاءَ عن بُعد — وهو ما جعل عمود revoked ميتاً منذ الهجرة الأولى
         $log = \App\Models\SessionLog::create([
             'user_id'      => $u->id,
             'device'       => substr((string) $r->header('X-Device', $r->userAgent()), 0, 200),
+            'device_id'    => $device?->id,
             'ip'           => $r->ip(),
             'user_agent'   => substr((string) $r->userAgent(), 0, 400),
             'started_at'   => now(),
@@ -153,12 +162,24 @@ class AuthController extends Controller
         $r->session()->regenerate();
         $r->session()->put('hub.sl', $log->id);
 
+        // دخولٌ ناجح حدثٌ أمنيّ يدخل سلسلة التدقيق الموقَّعة — كان يُسجَّل في
+        // sessions_log فقط (بلا ختمٍ متسلسل)، فالتحقيق في «متى ومن أين دخل»
+        // لم يكن مضموناً ضد العبث كما الفشل. يُختم مع رقم صفّ الجلسة.
+        hub_audit('دخول ناجح', null, null, $u->name, ['after' => ['session' => $log->id, 'via' => $u->totp_enabled ? '2FA' : 'كلمة مرور']]);
+
         // شاشة البداية من تفضيل المستخدم — والرابط المقصود قبل الدخول يفوز عليها
         return redirect()->intended(hub_home_url(auth()->user()));
     }
 
     public function logout(Request $r)
     {
+        $name = auth()->user()?->name;
+        $sl = (string) $r->session()->get('hub.sl', '');
+        // خروجٌ مقصود: يُدوَّن قبل إبطال الجلسة، ويُعلَّم صفُّ الجلسة منتهياً
+        // كي لا يبقى «حيّاً» في مركز الأمن بعد خروج صاحبه.
+        if ($name !== null) hub_audit('خروج', null, null, $name);
+        if ($sl !== '') \Illuminate\Support\Facades\DB::table('sessions_log')->where('id', $sl)->update(['revoked' => true]);
+
         Auth::logout();
         $r->session()->invalidate();
         $r->session()->regenerateToken();

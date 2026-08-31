@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
  */
 class LoginSentry
 {
-    public static function inspect(User $u, string $ip): void
+    public static function inspect(User $u, string $ip, bool $newDevice = false): void
     {
         try {
             // كم مرة رأينا هذا العنوان لهذا المستخدم قبل الآن؟
@@ -33,8 +33,16 @@ class LoginSentry
             $outside = $t < (string) setting('sec.hours_start', '08:00')
                     || $t >= (string) setting('sec.hours_end', '16:00');
 
+            // جهازٌ جديد **إشارةُ خطرٍ** لمحرك الخطر (المرحلة ج) لا سببَ تنبيهٍ
+            // بذاته: لو أطلق «دخولاً مريباً» لَفعَّله أولُ دخولٍ لكل مستخدمٍ بعد
+            // النشر — فيضُ إنذاراتٍ يُدرَّب الناسُ على تجاهله. يُضمّ للسبب فقط
+            // حين يرافقه عنوانٌ غريبٌ أيضاً (جديدٌ + مكانٌ غريب = يستحق النظر).
             $reasons = [];
-            if (! $familiar) $reasons[] = 'من عنوان شبكة غير مألوف (' . $ip . ')';
+            if (! $familiar) {
+                $reasons[] = $newDevice
+                    ? 'من جهازٍ جديدٍ وعنوان شبكة غير مألوف (' . $ip . ')'
+                    : 'من عنوان شبكة غير مألوف (' . $ip . ')';
+            }
             if ($outside)    $reasons[] = 'خارج وقت العمل (' . now()->format('H:i') . ')';
             if (! $reasons) return;
 
