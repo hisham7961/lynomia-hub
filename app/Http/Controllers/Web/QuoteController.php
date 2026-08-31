@@ -80,8 +80,58 @@ class QuoteController extends Controller
             'contract' => $this->toContract($q),
             'invoice'  => $this->toInvoice($q),
             'project'  => $this->toProject($q),
+            'clone'    => $this->cloneQuote($q),
             default    => abort(422),
         };
+    }
+
+    /**
+     * **استنساخُ العرض عرضاً جديداً** — أساسُ القوالب القابلة لإعادة الاستخدام.
+     *
+     * يُنشئ مسودةً جديدةً تنسخ السرديّة (ملخّص/هدف/نطاق/افتراضات/شروط) وكلَّ
+     * البنود والمراحل — بلا إعادة إدخال. يُصفَّر ما يخصّ النسخة الأصل: الرقمُ
+     * يُولَّد جديداً، والحالةُ «مسودة»، والقبولُ والإرسالُ وربطُ التحويل تُمحى،
+     * والقالبيّةُ لا تُورَّث (النسخةُ عرضٌ حيّ لا قالب). صلاحيةُ التعديل تكفي
+     * (كإجراءات المسار) — النسخُ لا يسكّ عقداً ولا فاتورة.
+     */
+    protected function cloneQuote(Quote $q)
+    {
+        return DB::transaction(function () use ($q) {
+            $src = Quote::whereKey($q->getKey())->lockForUpdate()->firstOrFail();
+
+            $copy = ['company_id', 'client_id', 'project_id', 'service_id', 'owner_id',
+                'am_id', 'pm_id', 'title', 'currency', 'billing', 'discount',
+                'exec_summary', 'objective', 'scope', 'assumptions', 'exclusions',
+                'terms', 'items'];
+            $data = [];
+            foreach ($copy as $c) $data[$c] = $src->{$c};
+            $data['title'] = mb_substr('نسخة من ' . ($src->title ?: $src->doc_no), 0, 300);
+            $data['status'] = 'مسودة';
+            $data['is_template'] = false;   // النسخةُ عرضٌ حيّ لا قالب
+            // إجمالياتٌ صفريّةٌ ابتداءً (العمودُ غيرُ فارغ) — recalc يُعيد حسابها من البنود
+            $data['amount'] = $data['tax'] = $data['total'] = $data['cost'] = 0;
+            // doc_no/accepted/sent/meta/engagement تُترك فارغةً → ترقيمٌ جديد وسجلٌّ نظيف
+            $new = Quote::create($data);
+
+            // البنود ثم المراحل — بترتيبها، ويُعاد حساب الإجماليات خادمياً
+            foreach ($src->lines()->get() as $l) {
+                $ld = $l->only(['kind', 'service_id', 'product_id', 'phase', 'title',
+                    'description', 'qty', 'unit', 'unit_price', 'discount_pct',
+                    'tax_pct', 'unit_cost', 'sort', 'meta']);
+                $new->lines()->create($ld);
+            }
+            foreach ($src->milestones()->get() as $m) {
+                $md = $m->only(['title', 'pct', 'amount', 'trigger', 'phase',
+                    'due_note', 'sort', 'meta']);
+                $new->milestones()->create($md);
+            }
+            $new->recalc();
+
+            hub_audit('استنساخ عرض', 'quotes', $new->id, $new->doc_no . ' ← ' . $src->doc_no);
+
+            return redirect()->route('m.show', ['quotes', $new->id])
+                ->with('ok', '📋 أُنشئت مسودةٌ جديدةٌ من العرض — راجع العميلَ والتواريخ ثم أرسِل');
+        });
     }
 
     /**

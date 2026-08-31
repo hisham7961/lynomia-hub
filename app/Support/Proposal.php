@@ -15,9 +15,9 @@ use App\Models\Quote;
  */
 class Proposal
 {
-    public static function html(Quote $q): string
+    public static function html(Quote $q, bool $forWeb = false): string
     {
-        $co = self::brand($q);
+        $co = self::brand($q, $forWeb);
         $client = $q->client_id ? Client::find($q->client_id) : null;
         $cur = e((string) $q->currency);
         $lines = $q->lines()->get();
@@ -140,8 +140,12 @@ class Proposal
             . '<div style="font-size:14px;color:#333;white-space:pre-line">' . e($body) . '</div>';
     }
 
-    /** الهويّةُ البصرية: من الشركة المُصدِرة إن وُجدت، وإلا الإعدادات العامة */
-    protected static function brand(Quote $q): array
+    /**
+     * الهويّةُ البصرية: من الشركة المُصدِرة إن وُجدت، وإلا الإعدادات العامة.
+     * الشعارُ مسارُ ملفٍّ لـmPDF (public_path)، ورابطٌ عام للبوّابة الشبكية
+     * (`$forWeb`) — فالمتصفّح يحمّله من `storage/` لا من مسارٍ محلّيّ ميت.
+     */
+    protected static function brand(Quote $q, bool $forWeb = false): array
     {
         $logo = setting('app.logo');
 
@@ -149,7 +153,7 @@ class Proposal
             'company' => (string) setting('app.company', setting('app.name', 'Lynomia')),
             'name' => (string) setting('app.name', 'Lynomia'),
             'color' => (string) setting('app.color', '#0E7C66'),
-            'logo' => $logo ? public_path('storage/' . $logo) : null,
+            'logo' => $logo ? ($forWeb ? asset('storage/' . $logo) : public_path('storage/' . $logo)) : null,
         ];
     }
 }

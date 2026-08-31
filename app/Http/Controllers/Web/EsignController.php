@@ -777,9 +777,20 @@ class EsignController extends Controller
         }
         $req->increment('opens');
 
+        // **البوّابة العامة للعميل** (v2.377): إن كان الطلبُ مربوطاً بعرضِ مشروعٍ،
+        // يُعرَض العرضُ الاحترافيّ الكامل (غلاف/نطاق/مراحل/تسعير/مدفوعات) بدل نصٍّ
+        // خام — بلا حساب، خلف بوّابة الرمز نفسِها. **الخصوصيةُ المالية مصونةٌ بنيوياً**:
+        // Proposal لا يقرأ التكلفةَ ولا الهامشَ أصلاً. النصُّ الموقَّع يبقى مرجعاً قانونياً.
+        $proposalHtml = null;
+        if ($req->link_module === 'quotes' && $req->link_id) {
+            $quote = \App\Models\Quote::find($req->link_id);   // سطحٌ عامّ: الرمزُ هو التخويل
+            if ($quote) $proposalHtml = \App\Support\Proposal::html($quote, true);
+        }
+
         // v2.122: تمرير الرمز الحالي للنموذج — رمز الموقّع المستقل لا رمز الطلب،
         // فجلسة الفتح مفتاحها رمزه هو (كان النموذج يرسل برمز الطلب → 403 صامت)
-        return view('sign.show', ['req' => $req, 'opts' => $req->opts ?: [], 'signer' => $signer, 'token' => $token]);
+        return view('sign.show', ['req' => $req, 'opts' => $req->opts ?: [], 'signer' => $signer,
+            'token' => $token, 'proposalHtml' => $proposalHtml]);
     }
 
     /** إرسال رمز تحقق بريدي للموقّع المستقل — عبر صندوق الصادر */

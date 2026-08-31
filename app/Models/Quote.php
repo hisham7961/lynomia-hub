@@ -36,6 +36,7 @@ class Quote extends Model
         'custom' => 'array',
         'meta' => 'array',
         'archived' => 'boolean',
+        'is_template' => 'boolean',
     ];
 
     protected static function booted(): void
