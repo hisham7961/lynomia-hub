@@ -339,6 +339,7 @@ Route::middleware('auth')->group(function () {
     Route::get('employee/{id}', [PortalController::class, 'employee'])->name('portal.employee');
     Route::get('app/{id}', [AppCenterController::class, 'show'])->name('apps.center');
     Route::get('quote/{id}/doc', [QuoteController::class, 'doc'])->name('quotes.doc');
+    Route::get('quote/{id}/pdf', [QuoteController::class, 'pdf'])->name('quotes.pdf');
     Route::post('quote/{id}/act', [QuoteController::class, 'act'])->name('quotes.act');
     // بنّاء العرض المهنيّ: بنودٌ مهيكلة ومراحلُ دفع (تُعيد حساب الإجمالي خادمياً)
     Route::post('quote/{id}/line', [QuoteBuilderController::class, 'storeLine'])->name('quotes.line.store');

@@ -44,6 +44,7 @@ class EsignController extends Controller
         'policies' => '📜 سياسة',
         'policyacks' => '🖊️ إقرار سياسة',
         'assets'   => '🧰 أصل / عهدة',
+        'quotes'   => '💰 عرض سعر / مشروع',
     ];
 
     public function index()
@@ -1348,6 +1349,19 @@ class EsignController extends Controller
                 }
             } elseif ($req->link_module === 'decisions') {
                 hub_audit('توثيق قرار بتوقيع إلكتروني', 'decisions', $req->link_id, $req->title . ' — ' . $signer);
+            } elseif ($req->link_module === 'quotes') {
+                // **قبولُ العميل للعرض بتوقيعٍ إلكترونيّ**: يقلب العرضَ «مقبول»
+                // (فيُطلق quote.accepted) بأدلّةٍ كاملة — لا محرك قبولٍ ثانٍ.
+                $q = \App\Models\Quote::find($req->link_id);
+                if ($q && ! in_array($q->status, ['مقبول', 'محوّل'], true)) {
+                    $q->forceFill([
+                        'status' => 'مقبول', 'accepted_at' => now(), 'accepted_by' => $signer,
+                        'meta' => array_merge((array) $q->meta, ['accept_sign' => $req->verify_code]),
+                    ])->save();
+                    \App\Support\FlowRunner::fire('status', 'quotes', $q, 'مقبول');
+                    $this->notifyOwners('🎉 قَبِل العميلُ العرضَ «' . ($q->title ?: $q->doc_no) . '» بتوقيعٍ إلكترونيّ [' . $req->verify_code . ']');
+                    hub_audit('قبول عرض بتوقيع إلكتروني', 'quotes', $q->id, $q->doc_no . ' — ' . $signer);
+                }
             }
         } catch (\Throwable $e) {
             report($e);   // إكمال السير إضافة — فشله لا يُفشل التوقيع نفسه المحفوظ فعلاً

@@ -44,6 +44,27 @@ class QuoteController extends Controller
         ]);
     }
 
+    /**
+     * عرضُ المشروع الاحترافيّ PDF (mPDF، RTL) — عرضٌ تجاريٌّ لا فاتورة.
+     * يتساقط لعرض HTML إن غابت المكتبةُ أو فشل التوليد، فلا شاشةَ بيضاء.
+     */
+    public function pdf(string $id)
+    {
+        abort_unless(hub_can(auth()->user(), 'quotes', 'v'), 403);
+        $q = hub_scope(Quote::query(), 'quotes')->findOrFail($id);
+
+        $html = \App\Support\Proposal::html($q);
+        $bin = \App\Support\DocRenderer::pdf($html, 'عرض ' . $q->doc_no);
+        if ($bin === null) {
+            // بلا mPDF: تُقدَّم نسخةٌ HTML قابلةٌ للطباعة من المتصفح
+            return response($html)->header('Content-Type', 'text/html; charset=utf-8');
+        }
+        hub_audit('توليد عرض PDF', 'quotes', $q->id, $q->doc_no);
+
+        return response($bin)->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="proposal-' . $q->doc_no . '.pdf"');
+    }
+
     /** إجراءات المسار */
     public function act(Request $r, string $id)
     {
