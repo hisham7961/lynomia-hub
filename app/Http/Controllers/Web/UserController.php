@@ -250,6 +250,8 @@ class UserController extends Controller
             'أطفئه من ملفك الشخصي برمزٍ صحيح — هذا البابُ لمن فقد جهازه');
         abort_unless(\App\Support\Staff::mayTouch($user), 403,
             'هذا الحساب ذو امتياز — فكُّ تحقّقه يتطلب صلاحيةً تعلوه');
+        // إطفاءُ تحقّق غيرِك بابٌ لاختطاف حساب — يتطلب تأكيدَ هويتك أولاً
+        if ($resp = hub_require_stepup(route('users.index', absolute: false))) return $resp;
 
         $user->forceFill(['totp_enabled' => false, 'totp_secret_cipher' => null])->save();
         hub_audit('إطفاء التحقق بخطوتين', 'users', $user->id, $user->name,

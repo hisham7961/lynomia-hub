@@ -382,6 +382,12 @@ class ModuleController extends Controller
             abort(403, 'هذا السر محصور بقائمة مخولين لست منهم');
         }
 
+        // تصعيدُ المصادقة قبل الكشف — قابلٌ للضبط (مطفأٌ افتراضاً كي لا يعطّل
+        // كشفاً متكرراً مشروعاً؛ يُشعَل للمنشآت التي تريد إعادة تحقّقٍ قبل كل سرّ).
+        if ((string) setting('security.stepup_secrets', '0') === '1' && ($resp = hub_require_stepup())) {
+            return $resp;
+        }
+
         hub_audit('عرض حساس', $module, $row->id,
             (string) ($row->{hub_display_col($module)} ?? $row->id) . ' — ' . ($f['label'] ?? $field));
 
