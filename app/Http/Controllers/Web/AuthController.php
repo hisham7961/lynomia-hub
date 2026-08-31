@@ -206,8 +206,15 @@ class AuthController extends Controller
         if ($n >= $max) {
             // شرطُ `>= max` يمنع صفرَ العدّاد مرّتين متسابقتين: أوّلُ من يبلغ السقف
             // يقفل ويُصفّر، والثاني لا يجد ما يصفّره فلا يُمدّد القفلَ بلا داعٍ.
-            $t->where('failed_attempts', '>=', $max)
+            $locked = $t->where('failed_attempts', '>=', $max)
                 ->update(['locked_until' => now()->addMinutes($min), 'failed_attempts' => 0]);
+            // قفلُ حسابٍ حدثٌ أمنيّ يستحق **حالةً تُحقَّق** لا سطرَ تدقيقٍ يمرّ:
+            // يُفتح (أو يُثرى) حادثةٌ أمنيّة — للتحقيق البشريّ لا للعقاب الآليّ.
+            if ($locked) {
+                hub_security_incident('قفلُ حسابٍ بعد محاولاتٍ فاشلة: ' . $u->name, 'عالي', [
+                    'user_id' => $u->id, 'ip' => request()?->ip(), 'threshold' => $max,
+                ]);
+            }
         }
     }
 }

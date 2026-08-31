@@ -173,6 +173,11 @@ class AttachmentController extends Controller
             'created_at' => now(),
         ]);
 
+        // **تصنيف البيانات مُنفَّذاً**: تنزيلُ مرفقٍ على سجلٍّ مصنَّفٍ «سري» حدثُ
+        // وصولٍ حسّاسٍ يدخل سلسلةَ التدقيق (لا مجرد download_log) — فالمصنَّفُ
+        // يُرصَد في مركز الأمن. مرساةُ التصنيف حقلُ `secrecy` القائم على الوثائق.
+        self::auditClassifiedAccess($a);
+
         // Content-Disposition: attachment — ملف HTML/SVG مرفوع لا يُنفَّذ في المتصفح أبداً
         return response()->download($abs, $a->original_name ?: basename($a->path));
     }
@@ -347,6 +352,29 @@ class AttachmentController extends Controller
     /* ────────── داخلي ────────── */
 
     /** الهدف موجود، والوحدة مرئية للمستخدم، والسجل ضمن نطاقه */
+    /**
+     * يُدوّن وصولاً لبياناتٍ مصنَّفة إن كان السجلُّ الأمّ يحمل حقلَ سرّيةٍ مُقيَّداً.
+     * يقرأ الحقلَ من تعريف الوحدة (أيُّ حقلٍ اسمُه `secrecy`)، فلا يُخصّ وحدةً بعينها.
+     */
+    protected static function auditClassifiedAccess(Attachment $a): void
+    {
+        try {
+            $def = hub_mod((string) $a->module);
+            if (! $def) return;
+            $sf = collect($def['fields'] ?? [])->firstWhere('col', 'secrecy');
+            if (! $sf) return;
+            $class = '\\App\\Models\\' . ($def['model'] ?? '');
+            if (! class_exists($class)) return;
+            $val = (string) ($class::whereKey($a->record_id)->value('secrecy') ?? '');
+            if (in_array($val, ['سري', 'مقيّد', 'restricted', 'confidential'], true)) {
+                hub_audit('وصول لبيانات مصنَّفة', $a->module, $a->record_id,
+                    ($a->original_name ?: 'مرفق') . " — تصنيف: {$val}");
+            }
+        } catch (\Throwable $e) {
+            // التصنيفُ إثراءٌ للتدقيق لا يكسر تنزيلاً
+        }
+    }
+
     protected function guardRecord(?string $module, ?string $recordId, string $op): void
     {
         $def = hub_mod((string) $module);

@@ -61,6 +61,7 @@
     <div class="stat"><span class="ico">🚫</span><b class="{{ $kpi['failed7'] ? 'txt-bad' : '' }}">{{ $kpi['failed7'] }}</b><span>محاولات فاشلة (٧ أيام)</span></div>
     <div class="stat"><span class="ico">📡</span><b class="{{ $kpi['denied7'] ? 'txt-bad' : '' }}">{{ $kpi['denied7'] }}</b><span>وصولٌ مرفوض (٧ أيام)</span></div>
     <div class="stat"><span class="ico">🗝️</span><b class="{{ $kpi['stale'] ? 'txt-bad' : '' }}">{{ $kpi['stale'] }}</b><span>أسرار لم تُغيَّر منذ ٦ أشهر</span></div>
+    <a class="stat" href="{{ route('m.index', 'incidents') }}"><span class="ico">🚨</span><b class="{{ ($kpi['secinc'] ?? 0) ? 'txt-bad' : '' }}">{{ $kpi['secinc'] ?? 0 }}</b><span>حوادث أمنيّة مفتوحة</span></a>
 </div>
 
 {{-- رادارُ الكشف الحيّ: من طرق باباً لا يملك مفتاحه — وصولٌ مرفوض (٤٠٣) وتخمينُ روابط --}}
