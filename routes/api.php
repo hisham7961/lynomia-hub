@@ -20,6 +20,9 @@ Route::prefix('v1')->middleware(['throttle:api', ApiAuth::class])->group(functio
     Route::post('metrics', [V1Controller::class, 'metricsIngest']);
     Route::get('metrics/{module}/{id}', [V1Controller::class, 'metricsShow']);
 
+    // المحلّل الموحّد: «ما هذا المعرّف؟» — بصلاحيات صاحب المفتاح ونطاقه نفسِه
+    Route::get('identity/resolve/{q}', [V1Controller::class, 'identityResolve']);
+
     Route::get('{module}', [V1Controller::class, 'apiIndex']);
     Route::post('{module}', [V1Controller::class, 'apiStore']);
     Route::get('{module}/{id}', [V1Controller::class, 'apiShow']);

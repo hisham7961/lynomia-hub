@@ -263,6 +263,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $mon],
             ['key' => 'delivery',  'label' => '🛤️ مسار التسليم',     'route' => 'delivery',        'group' => 'analytics', 'ok' => hub_can($user, 'feats', 'v') || hub_can($user, 'deploys', 'v') || hub_can($user, 'requests', 'v') || hub_can($user, 'designs', 'v')],
             ['key' => 'custody',   'label' => '🏷️ كتالوج العهد',      'route' => 'custody.catalog', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
+            ['key' => 'identity',  'label' => '📷 مركز الهوية والمسح', 'route' => 'identity.center', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
             ['key' => 'codehub',   'label' => '🌿 مركز الكود',        'route' => 'code.center',     'group' => 'centers',   'ok' => hub_can($user, 'code', 'v')],
             ['key' => 'assetlife', 'label' => '💼 العهدة ودورة الحياة', 'route' => 'assets.life',  'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
             ['key' => 'compb',     'label' => '⚖️ الامتثال وأثره',   'route' => 'compliance.board', 'group' => 'centers', 'ok' => hub_can($user, 'compliance', 'v')],

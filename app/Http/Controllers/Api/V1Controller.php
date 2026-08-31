@@ -443,4 +443,29 @@ class V1Controller extends ModuleController
 
         return ! $t || $t->allows($module, $op);
     }
+
+    /**
+     * GET /api/v1/identity/resolve/{q} — المحلّل الموحّد عبر الـAPI: كودُ
+     * عهدة/منتج، باركود عالمي، سيريال… الحمولةُ معرِّفاتٌ لا حقولُ سجلٍّ
+     * كاملة — تفاصيلُ السجل من مساره القياسي `GET /{module}/{id}` بحقول دوره.
+     */
+    public function identityResolve(string $q)
+    {
+        $hit = \App\Support\Identity::resolve($q);
+        if ($hit['type'] !== 'none') {
+            $module = ['asset' => 'assets', 'product' => 'products', 'stock' => 'stock'][$hit['type']];
+            abort_unless($this->tokenAllows($module, 'v'), 403, "نطاق هذا المفتاح لا يشمل «{$module}:v»");
+        }
+
+        return response()->json(match ($hit['type']) {
+            'asset', 'product', 'stock' => [
+                'type' => $hit['type'], 'via' => $hit['via'] ?? null,
+                'module' => ['asset' => 'assets', 'product' => 'products', 'stock' => 'stock'][$hit['type']],
+                'id' => $hit['row']->id,
+                'code' => $hit['row']->code ?? null,
+                'name' => $hit['row']->name ?? null,
+            ],
+            default => ['type' => 'none', 'gtin' => (bool) ($hit['gtin'] ?? false)],
+        });
+    }
 }

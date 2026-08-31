@@ -175,6 +175,23 @@ Route::middleware('auth')->group(function () {
         Route::post('{id}/permit/{permitId}/return', [\App\Http\Controllers\Web\CustodyController::class, 'permitReturn'])->name('permit.return');
         Route::post('{id}/permit/{permitId}/cancel', [\App\Http\Controllers\Web\CustodyController::class, 'permitCancel'])->name('permit.cancel');
     });
+
+    // مسحُ ملصق منتجٍ (p/{code}) — نظيرُ c/{code} للعهدة: كودٌ ← سجلُّ طرازه
+    Route::get('p/{code}', [\App\Http\Controllers\Web\IdentityController::class, 'byCode'])->name('products.code');
+
+    // ── مركز الهوية: محلّلٌ موحّد، واستكشافٌ خارجي، وتسجيلٌ بالمسح في معاملةٍ واحدة ──
+    Route::prefix('identity')->name('identity.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Web\IdentityController::class, 'center'])->name('center');
+        // الحسمُ الداخلي رخيصٌ ومتكرر (كل مسحة)، والاستكشافُ نداءاتٌ خارجية تُقنَّن
+        Route::get('resolve', [\App\Http\Controllers\Web\IdentityController::class, 'resolve'])
+            ->middleware('throttle:240,1')->name('resolve');
+        Route::post('discover', [\App\Http\Controllers\Web\IdentityController::class, 'discover'])
+            ->middleware('throttle:30,1')->name('discover');
+        Route::post('register', [\App\Http\Controllers\Web\IdentityController::class, 'register'])->name('register');
+        Route::post('merge/{id}', [\App\Http\Controllers\Web\IdentityController::class, 'merge'])->name('merge');
+        Route::get('product/{id}/label', [\App\Http\Controllers\Web\IdentityController::class, 'productLabel'])->name('product.label');
+        Route::get('labels', [\App\Http\Controllers\Web\IdentityController::class, 'labels'])->name('labels');
+    });
     Route::get('compliance-board', [\App\Http\Controllers\Web\ComplianceController::class, 'index'])->name('compliance.board');
     Route::get('apps-projects', [\App\Http\Controllers\Web\AppsProjectsController::class, 'index'])->name('appsprojects');
     Route::post('apps-projects/fix', [\App\Http\Controllers\Web\AppsProjectsController::class, 'fix'])->name('appsprojects.fix');

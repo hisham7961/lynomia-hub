@@ -618,6 +618,12 @@ class HubAutomation extends Command
             // أمانٍ ليوم لا يُنهي فيه أحدٌ رفعةً أصلاً.
             $n += \App\Support\ChunkedUpload::prune();
 
+            // **وكاشُ الاستكشاف البائت**: باركود سُئل عنه المزوّدون قبل أشهرٍ
+            // طويلة لا يستحق صفاً — إعادةُ مسحِه تسألهم من جديد فتتجدد إجابتُه.
+            if (\Illuminate\Support\Facades\Schema::hasTable('identity_lookups')) {
+                $n += \App\Support\Discovery\Engine::prune();
+            }
+
             return $n;
         } catch (\Throwable $e) {
             report($e);
