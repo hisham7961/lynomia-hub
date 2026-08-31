@@ -159,6 +159,8 @@ class SecurityController extends Controller
     public function lockdown()
     {
         $this->gate();
+        // فعلٌ حرج (تعليقُ الوصول للجميع) — يتطلب تأكيدَ الهوية أولاً
+        if ($resp = hub_require_stepup(route('security.index', absolute: false))) return $resp;
         $on = ! setting('security.lockdown', false);
 
         if ($on) Setting::updateOrCreate(['key' => 'security.lockdown'], ['value' => '1']);

@@ -11,6 +11,23 @@
 </div>
 
 <div class="card">
+    <h3 class="cardtitle">📊 خطرُ جلستك الآن
+        <span class="bdg {{ $risk['tone'] }}">{{ $risk['band'] }} — {{ $risk['score'] }}</span>
+    </h3>
+    @if ($risk['factors'])
+        <div class="sub" style="margin-bottom:6px">لماذا هذه الدرجة — كلُّ عاملٍ ببنده:</div>
+        <div class="crow">
+            @foreach ($risk['factors'] as $fac)
+                <span class="chip">+{{ $fac['points'] }} {{ $fac['label'] }}</span>
+            @endforeach
+        </div>
+    @else
+        <div class="sub">لا عوامل خطرٍ على جلستك — جهازٌ وعنوانٌ معتادان في وقتٍ معتاد.</div>
+    @endif
+    <div class="sub" style="margin-top:8px">الخطرُ إشارةٌ للانتباه لا حكمٌ آليّ — ولا يُحدِّد حضورَك ولا يعاقبك.</div>
+</div>
+
+<div class="card">
     <h3 class="cardtitle">🖥️ الجلسات النشطة
         <form method="POST" action="{{ route('mysec.session.others') }}" class="inline" style="float:left">
             @csrf<button class="btn ghost sm" data-confirm="إنهاء كل جلساتك الأخرى؟ جلستُك الحالية تبقى.">إنهاء الجلسات الأخرى</button>

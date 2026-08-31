@@ -50,6 +50,8 @@ class LockoutAndDeadEndsRound7Test extends TestCase
             'password_changed_at' => now()]);
         $locked->forceFill(['totp_enabled' => true, 'totp_secret_cipher' => 'SECRETBASE32'])->save();
 
+        // إطفاءُ تحقّق غيرِك صار يتطلب تصعيدَ مصادقة (v2.368) — يؤكّد المدير هويته أولاً
+        $this->actingAs($mgr)->post('/stepup', ['answer' => 'Secret!2026x', 'next' => '/admin/users']);
         $this->actingAs($mgr)->post("/admin/users/{$locked->id}/twofa-off")->assertRedirect();
 
         $fresh = $locked->fresh();

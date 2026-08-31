@@ -27,6 +27,7 @@ use App\Http\Controllers\Web\InboxDocController;
 use App\Http\Controllers\Web\ModuleController;
 use App\Http\Controllers\Web\MorningController;
 use App\Http\Controllers\Web\MySecurityController;
+use App\Http\Controllers\Web\StepUpController;
 use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\OdooController;
 use App\Http\Controllers\Web\PerformanceController;
@@ -383,6 +384,10 @@ Route::middleware('auth')->group(function () {
     Route::post('profile/2fa/start', [ProfileController::class, 'twofaStart'])->name('profile.2fa.start');
     Route::post('profile/2fa/confirm', [ProfileController::class, 'twofaConfirm'])->name('profile.2fa.confirm');
     Route::post('profile/2fa/disable', [ProfileController::class, 'twofaDisable'])->name('profile.2fa.disable');
+
+    // تصعيد المصادقة (Step-Up): إعادةُ تحقّقٍ قبل الأفعال الحسّاسة
+    Route::get('stepup', [StepUpController::class, 'show'])->name('stepup.show');
+    Route::post('stepup', [StepUpController::class, 'verify'])->name('stepup.verify')->middleware('throttle:10,1');
 
     // أمني ذاتي: جلساتي وأجهزتي — لكل مستخدمٍ على نفسه (كان الإبطال للمالك فقط)
     Route::get('my/security', [MySecurityController::class, 'index'])->name('mysec.index');

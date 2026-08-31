@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', \App\Http\Middleware\HubMaintenance::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\SessionSentry::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\WorkHours::class);
+        // مصادقةٌ تكيفية: تفرض 2FA على الأدوار الحسّاسة إن فُعّلت السياسة (مطفأة افتراضاً)
+        $middleware->appendToGroup('web', \App\Http\Middleware\Require2faForPrivileged::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\TrackVisits::class);
         // الملفُّ المقطَّع يصير ملفاً مرفوعاً عادياً قبل أن يصل المتحكّم
         $middleware->appendToGroup('web', \App\Http\Middleware\ResolveChunkedUploads::class);

@@ -15,9 +15,12 @@
                     if(b.dataset.open){m.textContent='••••••';delete b.dataset.open;b.textContent='إظهار';return}
                     b.disabled=true;
                     fetch(b.dataset.reveal,{method:'POST',headers:{'X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]').content,'Accept':'application/json'}})
-                    .then(function(r){if(!r.ok)throw r.status;return r.json()})
+                    .then(function(r){
+                        // ٤٢٨ = يتطلب تأكيدَ الهوية: نُحوّل لشاشة التصعيد ثم يعود للكشف
+                        if(r.status===428){return r.json().then(function(j){if(j&&j.url){window.location=j.url}throw 428})}
+                        if(!r.ok)throw r.status;return r.json()})
                     .then(function(j){m.textContent=j.v||'—';b.dataset.open='1';b.textContent='إخفاء';b.disabled=false})
-                    .catch(function(s){b.textContent=s===403?'غير مخوّل':'تعذّر الكشف';b.disabled=false})})(this)">إظهار</button>
+                    .catch(function(s){if(s===428)return;b.textContent=s===403?'غير مخوّل':'تعذّر الكشف';b.disabled=false})})(this)">إظهار</button>
     @else
         <span class="mono">••••••</span>
     @endif

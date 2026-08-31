@@ -35,7 +35,10 @@ class MySecurityController extends Controller
             ? UserDevice::where('user_id', $u->id)->orderByDesc('last_seen_at')->get()
             : collect();
 
-        return view('security.mine', compact('sessions', 'devices'));
+        // خطرُ جلستك الحالية — مفسَّراً بعوامله لا رقماً أعمى
+        $risk = \App\Support\Risk::session($u);
+
+        return view('security.mine', compact('sessions', 'devices', 'risk'));
     }
 
     public function revokeSession(string $id)

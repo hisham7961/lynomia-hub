@@ -546,6 +546,40 @@ if (! function_exists('hub_ref_options')) {
     }
 }
 
+if (! function_exists('hub_stepup_ok')) {
+    /** هل تصعيدُ المصادقة ساري المفعول الآن؟ (نافذةٌ قصيرة بعد إعادة التحقّق) */
+    function hub_stepup_ok(): bool
+    {
+        return \App\Support\StepUp::fresh();
+    }
+}
+
+if (! function_exists('hub_require_stepup')) {
+    /**
+     * حارسُ فعلٍ حسّاس: إن لم يكن التصعيدُ سارياً يُعيد استجابةَ توجيهٍ (ويب)
+     * أو 428 بحمولةٍ (JSON) توجّه العميلَ لشاشة التأكيد. يُرجع `null` إن كان
+     * التصعيدُ سارياً فيمضي المتحكّمُ في فعله. المالكُ لا يُستثنى: القوّةُ
+     * أدعى للتأكيد لا أدعى للتجاوز.
+     */
+    function hub_require_stepup(?string $next = null)
+    {
+        if (\App\Support\StepUp::fresh()) return null;
+
+        $next = $next ?: request()->fullUrl();
+        // للويب: وجهةٌ داخلية فقط (المسار والاستعلام) لا رابطٌ مطلق
+        $path = request()->getRequestUri();
+        $url = route('stepup.show', ['next' => is_string($next) && str_starts_with($next, '/') ? $next : $path]);
+
+        if (request()->expectsJson() || request()->is('api/*')) {
+            return response()->json([
+                'error' => 'يتطلب تأكيدَ الهوية', 'stepup' => true, 'url' => $url,
+            ], 428);
+        }
+
+        return redirect($url);
+    }
+}
+
 if (! function_exists('hub_ref_options_scoped')) {
     /**
      * خيارات قائمة مرجعية **منطَّقة** — نظير `hub_ref_options` لكنه يحترم عزل

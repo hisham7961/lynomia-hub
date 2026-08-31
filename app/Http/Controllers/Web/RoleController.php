@@ -119,15 +119,63 @@ class RoleController extends Controller
      * كانت الوحيدة غير المرئية للتدقيق: تُوسَّع صلاحيات دورٍ فلا يبقى أثرٌ
      * لمن وسّعها ولا متى — وهو أوّل ما يُسأل عنه بعد أي حادث.
      */
-    protected function trail(string $action, Role $role): void
+    protected function trail(string $action, Role $role, ?array $before = null): void
     {
-        $x = self::reach($role);
-        hub_audit($action, 'roles', $role->id, $role->name, ['after' => [
+        $after = $this->snapshot($role);
+        $extra = ['after' => $after];
+
+        // «قبل» متاحٌ عند التعديل: التدقيقُ يعرض **ما تغيّر** لا الحصيلةَ وحدها —
+        // الرايةُ التي أُضيفت، والوحدةُ التي فُتحت صلاحيتُها. كان after وحده يقول
+        // «للدور الآن ١٢ وحدةً وراية users» ولا يقول ماذا كان قبلُ.
+        if ($before !== null) {
+            $extra['before'] = $before;
+            // ملخّصُ التغيير داخل «after» (عمودُ JSON) — «changed» ليس عموداً
+            // فيُجرَّد لو وُضع في الجذر؛ ووضعُه هنا يُبقيه ضمن اللقطة المختومة.
+            $after['_changed'] = self::changeSummary($before, $after);
+            $extra['after'] = $after;
+        }
+
+        hub_audit($action, 'roles', $role->id, $role->name, $extra);
+    }
+
+    /** لقطةٌ حبيّةٌ للدور: النطاق والرايات وصلاحيةُ كل وحدةٍ بأحرفها — للمقارنة */
+    protected function snapshot(Role $role): array
+    {
+        $mx = is_array($role->matrix) ? $role->matrix : (json_decode($role->matrix ?? '[]', true) ?: []);
+        $mods = [];
+        foreach ($mx as $mod => $ops) {
+            $letters = implode('', array_keys(array_filter((array) $ops)));
+            if ($letters !== '') $mods[$mod] = $letters;
+        }
+        ksort($mods);
+
+        return [
             'scope' => $role->scope,
-            'modules_view' => $x['v'], 'modules_edit' => $x['e'], 'modules_delete' => $x['d'],
-            'field_rules' => $x['fields'],
-            'flags' => array_keys(array_filter((array) ($role->flags ?? []))),
-        ]]);
+            'flags' => array_values(array_keys(array_filter((array) ($role->flags ?? [])))),
+            'modules' => $mods,
+        ];
+    }
+
+    /** ما الذي تغيّر بين لقطتين: رايات ووحدات أُضيفت أو نُزعت أو بُدّلت */
+    protected static function changeSummary(array $b, array $a): array
+    {
+        $out = [];
+        if (($b['scope'] ?? null) !== ($a['scope'] ?? null)) {
+            $out[] = 'النطاق: ' . ($b['scope'] ?? '؟') . ' ← ' . ($a['scope'] ?? '؟');
+        }
+        foreach (array_diff($a['flags'] ?? [], $b['flags'] ?? []) as $f) $out[] = 'راية+ ' . $f;
+        foreach (array_diff($b['flags'] ?? [], $a['flags'] ?? []) as $f) $out[] = 'راية− ' . $f;
+
+        $bm = $b['modules'] ?? []; $am = $a['modules'] ?? [];
+        foreach ($am as $mod => $ops) {
+            if (! isset($bm[$mod])) $out[] = "وحدة+ {$mod} ({$ops})";
+            elseif ($bm[$mod] !== $ops) $out[] = "وحدة~ {$mod}: {$bm[$mod]} ← {$ops}";
+        }
+        foreach ($bm as $mod => $ops) {
+            if (! isset($am[$mod])) $out[] = "وحدة− {$mod} ({$ops})";
+        }
+
+        return $out ?: ['لا تغيير جوهري'];
     }
 
     public function edit(Role $role)
@@ -150,8 +198,23 @@ class RoleController extends Controller
         // نفسها تحتاج مالكاً.
         abort_if((bool) $role->is_owner, 422, 'لا يُعدَّل دور المالك — ولا تُنزع ملكيته');
 
+        // اللقطةُ قبل الحفظ: التدقيقُ يحمل «قبل» و«بعد» لا «بعد» وحده — فتُقرأ
+        // الصلاحيةُ المُضافة والمنزوعة، لا مجرّد الحصيلة النهائية.
+        $before = $this->snapshot($role);
+
+        // **تصعيدُ المصادقة عند التصعيد فقط**: تعديلٌ يمنح رايةً حسّاسة (users/
+        // secrets/exp/audit/copySec) أو يوسّع النطاق (proj ← all) فعلٌ حرج يتطلب
+        // تأكيدَ الهوية. أما التسميةُ وقواعدُ الحقول وإضافةُ عرضٍ فلا احتكاكَ لها —
+        // فلا يُثقَل العملُ اليوميّ بتأكيدٍ لا يحرس شيئاً.
+        $newFlags = array_keys(array_filter((array) $r->input('flags', [])));
+        $riskyAdded = array_diff(array_intersect($newFlags, self::RISKY_FLAGS), $before['flags']);
+        $scopeBroadened = ($before['scope'] ?? 'all') === 'proj' && $r->input('scope') === 'all';
+        if (($riskyAdded || $scopeBroadened) && ($resp = hub_require_stepup(route('roles.index', absolute: false)))) {
+            return $resp;
+        }
+
         $role->update($this->data($r, $role));
-        $this->trail('تعديل دور', $role);
+        $this->trail('تعديل دور', $role, $before);
 
         return redirect()->route('roles.index')->with('ok', 'حُفظ الدور');
     }
