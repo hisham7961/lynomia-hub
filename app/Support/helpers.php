@@ -789,6 +789,7 @@ if (! function_exists('hub_mod_look')) {
             'leaves' => '🗓️', 'apps' => '📱', 'domains' => '🌐', 'servers' => '🖥️',
             'vault' => '🔐', 'kb' => '📚', 'meetings' => '🪑', 'assets' => '📦',
             'hcps' => '🩺', 'facilities' => '🏥', 'territories' => '🗺️',
+            'cycles' => '🔄', 'visits' => '📋',
         ];
 
         $icon = $icons[$module] ?? '📁';
