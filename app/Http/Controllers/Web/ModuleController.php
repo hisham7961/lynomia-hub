@@ -315,6 +315,14 @@ class ModuleController extends Controller
             return redirect()->route('m.create', $module)->with('ok', 'أُضيف «' . \Illuminate\Support\Str::limit((string) ($m->{hub_display_col($module)} ?? ''), 40) . '» — أدخل التالي');
         }
 
+        // تطبيقٌ جديد يُستقبل في مركزه لا في قائمة الوحدة: اللقطاتُ المتعددة
+        // والوصفُ يُرفعان من هناك، ولا سبيل إليهما قبل وجود السجل — فالرمي على
+        // القائمة كان يترك «أضف تطبيقاً» بلا طريقٍ ظاهرٍ لصوره.
+        if ($module === 'apps' && hub_can(auth()->user(), 'apps', 'v')) {
+            return redirect(route('apps.center', $m->id) . '#shots')
+                ->with('ok', 'أُضيف التطبيق — ارفع لقطات المتجر (عدة صور معاً) وأكمل وصفه من هنا');
+        }
+
         return redirect()->route('m.index', $module)->with('ok', 'أُضيف السجل بنجاح');
     }
 

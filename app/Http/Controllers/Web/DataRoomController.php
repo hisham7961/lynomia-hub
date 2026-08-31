@@ -57,7 +57,10 @@ class DataRoomController extends Controller
         $this->gate();
         $d = $r->validate([
             'title'    => ['required', 'string', 'max:190'],
-            'file'     => ['required', 'file', 'max:51200'],
+            // حدُّ النظام نفسُه لا رقمٌ مكتوبٌ بيد: كان ٥٠ م.ب صامتاً بينما بقية
+            // مسارات الرفع تتبع «files.max_kb» — فغرفةُ البيانات مخزنُ ملفاتٍ
+            // كغيرها، ومن رفع هويةً بصريةً هنا يستحق السقفَ ذاته.
+            'file'     => ['required', 'file', 'max:' . hub_upload_cap()['kb']],
             'password' => ['nullable', 'string', 'min:4', 'max:100'],
             'days'     => ['nullable', 'integer', 'min:1', 'max:365'],
             'no_download' => ['nullable'],

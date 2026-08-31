@@ -22,7 +22,9 @@ class UploadChunkController extends Controller
 
         $d = $r->validate([
             'uid'   => 'required|string|max:64',
-            'i'     => 'required|integer|min:0|max:' . ChunkedUpload::MAX_PARTS,
+            // الفهرسُ صفريّ البداية: أقصاه العددُ ناقصَ واحد — «max:MAX_PARTS»
+            // كانت تسمح بقطعةٍ زائدةٍ عن المقصود (٤٠٩٧ بدل ٤٠٩٦)
+            'i'     => 'required|integer|min:0|max:' . (ChunkedUpload::MAX_PARTS - 1),
             'chunk' => 'required|file',
         ], [], ['uid' => 'رمز الرفعة', 'i' => 'رقم القطعة', 'chunk' => 'القطعة']);
 

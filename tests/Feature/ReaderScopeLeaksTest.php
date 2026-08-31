@@ -39,8 +39,12 @@ class ReaderScopeLeaksTest extends TestCase
     public function test_the_calendar_does_not_serve_one_users_permissions_to_another(): void
     {
         $this->seedCore();
-        Task::create(['title' => 'مهمة ظاهرة', 'status' => 'جديدة', 'due' => now()->addDays(2)->toDateString()]);
-        Employee::create(['name' => 'موظفة', 'status' => 'نشط', 'hired_at' => now()->addDays(3)->toDateString()]);
+        // منتصفُ الشهر لا «بعد يومين»: التقويم يفتح على الشهر الحالي، وaddDays
+        // قرب نهايته تقفز إلى الشهر التالي فيفشل الاختبار في آخر يومين من كل شهر
+        // — قنبلةٌ زمنيةٌ لا علاقة لها بالتسريب الذي يُختبَر هنا.
+        $mid = now()->startOfMonth()->addDays(14)->toDateString();
+        Task::create(['title' => 'مهمة ظاهرة', 'status' => 'جديدة', 'due' => $mid]);
+        Employee::create(['name' => 'موظفة', 'status' => 'نشط', 'hired_at' => $mid]);
 
         $wide = $this->narrow('wide@test.local', ['tasks', 'hr']);
         $thin = $this->narrow('thin@test.local', ['hr']);
