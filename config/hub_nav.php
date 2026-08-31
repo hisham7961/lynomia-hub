@@ -6,7 +6,7 @@
  * و«الموارد» وُزّعت على أهلها — الاشتراكات مالية، والخزنة أصل رقمي، والملفات معرفة.
  */
 return [
-    ['g' => 'الكيانات',            'icon' => '🏢', 'items' => ['companies', 'projects', 'clients', 'services', 'brands', 'competitors']],
+    ['g' => 'الكيانات',            'icon' => '🏢', 'items' => ['companies', 'projects', 'clients', 'engagements', 'services', 'brands', 'competitors']],
     ['g' => 'الأصول الرقمية',      'icon' => '💠', 'items' => ['apps', 'code', 'websites', 'domains', 'servers', 'changes', 'accounts', 'vault', 'dbs', 'apis', 'social', 'posts', 'emails', 'phones', 'incidents', 'deploys', 'deps']],
     ['g' => 'العمل',               'icon' => '🗂️', 'items' => ['tasks', 'designs', 'updates', 'issues', 'tickets', 'meetings', 'decisions', 'approvals', 'okrs', 'krs', 'feats', 'requests']],
     ['g' => 'المالية والمشتريات',  'icon' => '💰', 'items' => ['fin', 'banks', 'quotes', 'budgets', 'subs', 'recur', 'costc', 'entries', 'accounts2', 'suppliers', 'purchases']],

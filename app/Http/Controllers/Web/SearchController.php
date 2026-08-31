@@ -197,6 +197,8 @@ class SearchController extends Controller
     {
         $class = '\\App\\Models\\' . $def['model'];
 
-        return hub_scope($class::query()->search($term), $key);
+        // مساحةُ عمل العميل تصفّي البحثَ كما تصفّي القوائم — من يعمل في مساحة
+        // «شركة أ» لا تقفز له نتائجُ عميلٍ آخر وهو يظن نفسه داخلها
+        return hub_client_scope(hub_scope($class::query()->search($term), $key), $key);
     }
 }

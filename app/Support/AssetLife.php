@@ -226,7 +226,10 @@ class AssetLife
 
         return [
             'n' => $q()->count(),
-            'value' => self::seesPrice() ? (float) $q()->sum('price') : null,
+            // قيمةُ ممتلكاتنا وحدها: أصلُ عميلٍ يُدار لدينا يُعدّ ولا يُقيَّم لنا
+            'value' => self::seesPrice()
+                ? (float) $q()->where(fn ($w) => $w->whereNull('owner_scope')->orWhere('owner_scope', 'لينوميا'))->sum('price')
+                : null,
             'held' => $q()->whereNotNull('holder_id')->count(),
             'inMaint' => $q()->where('status', 'صيانة')->count(),
             'spend12' => $spend,

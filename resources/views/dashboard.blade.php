@@ -38,6 +38,9 @@
 @else
     {{-- اللوحة الافتراضية بترتيب «قرارات أولاً»: ما يستحق تدخلك الآن (ينتهي قريباً،
          مواعيد تقترب) يتصدر — والمرجعيات (تقدم، حالات، سجل) بعده --}}
+    {{-- يومُ الموظف أولُ ما يلقاه: حضورٌ بضغطةٍ وبنودُ تقريره — لمن له ملفٌّ مربوط --}}
+    @php $wdMine = \App\Support\WidgetRegistry::resolve('checkin', auth()->user()); @endphp
+    @if ($wdMine)@include('partials.widgets.checkin', ['data' => $wdMine])@endif
     @include('partials.widgets.kpis',   ['data' => $kpis])
     @include('partials.widgets.counts', ['data' => $cards])
     <div class="kids">

@@ -99,6 +99,7 @@ class V1Controller extends ModuleController
             $this->fill($def, $r, $m);
             $this->inheritCompany($m, $module);   // كالويب: معزولٌ يرث شركته فلا يختفي عنه
             $this->inheritProject($m, $module);   // ومشروعَه — وإلا وُلد يتيماً لا يراه
+            $this->inheritClient($m, $module);    // وعميلَه — لنفس السبب
             $m->save();
             $this->notifyAssignee($def, $module, $m);
             $this->bustProgress($module, $m);

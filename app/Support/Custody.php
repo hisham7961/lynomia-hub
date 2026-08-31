@@ -130,11 +130,13 @@ class Custody
     {
         if (! hub_can(auth()->user(), 'assets', 'v') || ! Schema::hasTable('assets')) return [];
 
-        // بلا whereNull('deleted_at') يدويّاً: SoftDeletes على النموذج تُسقط المحذوف
+        // بلا whereNull('deleted_at') يدويّاً: SoftDeletes على النموذج تُسقط المحذوف.
+        // وقيمةُ الشراء لممتلكاتنا وحدها: أصلُ عميلٍ يُدار لدينا يُعدّ ويُدار
+        // ويُلصَق — ولا يدخل قيمةَ ما نملك (owner_scope الفارغ = لينوميا).
         $rows = self::scoped()
             ->select('type', DB::raw('COUNT(*) as n'),
                 DB::raw('SUM(CASE WHEN holder_id IS NULL THEN 0 ELSE 1 END) as held'),
-                DB::raw('SUM(price) as value'))
+                DB::raw("SUM(CASE WHEN owner_scope IS NULL OR owner_scope = 'لينوميا' THEN price ELSE 0 END) as value"))
             ->groupBy('type')->get();
 
         $out = [];
@@ -166,9 +168,9 @@ class Custody
      * صفقةٌ واحدة: أصلٌ تغيّر حائزُه بلا قيدٍ في السجل عهدةٌ انتقلت بلا إثبات.
      */
     public static function move(Asset $a, string $action, ?string $userId,
-                                string $at, ?string $note = null): AssetCustody
+                                string $at, ?string $note = null, array $ctx = []): AssetCustody
     {
-        return DB::transaction(function () use ($a, $action, $userId, $at, $note) {
+        return DB::transaction(function () use ($a, $action, $userId, $at, $note, $ctx) {
             $entry = AssetCustody::create([
                 'asset_id'   => $a->id,
                 'user_id'    => $userId,
@@ -177,6 +179,10 @@ class Custody
                 'at'         => $at,
                 'note'       => $note === null || $note === '' ? null : hub_fit($note, 500),
                 'by_id'      => auth()->id(),
+                // سياقُ الحركة: لأي مشروعٍ/عميلٍ سُلّمت — يبقى في السجل حتى
+                // بعد انتقال الموظف، فالتاريخُ لا يُعاد تفسيره بأثرٍ رجعي
+                'project_id' => $ctx['project_id'] ?? null,
+                'client_id'  => $ctx['client_id'] ?? ($a->client_id ?: null),
             ]);
 
             $a->holder_id = $userId;
@@ -317,9 +323,13 @@ class Custody
         $names = DB::table('users')
             ->whereIn('id', $rows->pluck('user_id')->merge($rows->pluck('by_id'))->filter()->unique())
             ->pluck('name', 'id');
+        $projects = DB::table('projects')
+            ->whereIn('id', $rows->pluck('project_id')->filter()->unique())
+            ->pluck('name', 'id');
 
         return $rows->map(fn ($r) => [
             'id'       => $r->id,
+            'project'  => $r->project_id ? ($projects[$r->project_id] ?? '—') : null,
             'action'   => (string) $r->action,
             'at'       => substr((string) $r->at, 0, 10),
             'who'      => $r->user_id ? ($names[$r->user_id] ?? 'حسابٌ محذوف') : 'المخزن',

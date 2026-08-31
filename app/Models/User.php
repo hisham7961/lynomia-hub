@@ -24,6 +24,7 @@ class User extends Authenticatable
         'notify_prefs' => 'array',
         'prefs' => 'array',
         'companies' => 'array',
+        'clients' => 'array',      // عزل العملاء — نظير عزل الشركات
         'recovery_codes' => 'array',
         'totp_enabled' => 'boolean',
         'totp_secret_cipher' => \App\Casts\EncryptedOrPlain::class,

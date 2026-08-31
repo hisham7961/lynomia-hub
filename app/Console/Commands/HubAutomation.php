@@ -22,6 +22,22 @@ use Illuminate\Support\Str;
 class HubAutomation extends Command
 {
     protected $signature = 'hub:automation {--dry : عرض ما سيحدث دون كتابة}';
+
+    /**
+     * ختمُ الغياب ليوم أمس: يومُ عملٍ مجدولٌ بلا حضورٍ ولا إجازةٍ معتمدة =
+     * غياب — **يختمه الكنسُ لا لحظةُ التقييم**، فمن سجّل متأخراً لم يُظلَم.
+     * (غيابُ التقرير وحدَه ليس غياباً أبداً — حالتُه «حاضر — بلا تقرير».)
+     */
+    protected function workdayClose(): int
+    {
+        if ($this->dry || ! \Illuminate\Support\Facades\Schema::hasTable('attendance')) return 0;
+        try {
+            return \App\Support\Workday::close();
+        } catch (\Throwable $e) {
+            report($e);
+            return 0;
+        }
+    }
     protected $description = 'توليد المستندات المتكررة وتقييم قواعد التنبيه';
 
     protected bool $dry = false;
@@ -40,8 +56,9 @@ class HubAutomation extends Command
         $o = $this->obligationsAuto();
         $p = $this->pruneNotifications();
         $k = $this->okrRefresh();
+        $w = $this->workdayClose();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم");
 
         \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.automation'], ['value' => now()->toIso8601String()]);
         \Illuminate\Support\Facades\Cache::forget('settings:all');

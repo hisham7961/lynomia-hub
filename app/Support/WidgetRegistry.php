@@ -98,6 +98,13 @@ class WidgetRegistry
     protected static function builtin(): array
     {
         return [
+            // بطاقةُ يوم العمل: حضورٌ وانصرافٌ وبنودُ اليوم — لمن له ملفُّ موظفٍ مربوط
+            'checkin' => [
+                'label' => '🕗 يومي — الحضور والتقرير',
+                'size' => ['w' => 12, 'h' => 1],
+                'gate' => fn ($u) => \App\Support\Workday::emp($u) !== null,
+                'resolver' => fn ($u) => \App\Support\Workday::mine($u),
+            ],
             'counts' => [
                 'label' => 'بطاقات العدّ العلوية',
                 'size'  => ['w' => 12, 'h' => 1],

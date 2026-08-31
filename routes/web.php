@@ -139,6 +139,28 @@ Route::middleware('auth')->group(function () {
         return back()->with('ok', $cid === '' ? 'عدت لعرض كل الشركات' : 'تُصفّى القوائم الآن على الشركة المختارة');
     })->name('company.switch');
 
+    // ── مبدّل مساحة عمل العميل: الوحداتُ نفسُها تعمل داخلياً أو لعميلٍ محدد ──
+    // نظيرُ مبدّل الشركة حرفياً: بوابةُ صلاحية، فعزلٌ صارم، فوجودٌ فعلي.
+    Route::post('client-switch', function (\Illuminate\Http\Request $r) {
+        $kid = (string) $r->input('client', '');
+        if ($kid !== '') {
+            abort_unless(hub_can(auth()->user(), 'clients', 'v'), 403);
+            $allowed = hub_client_ids();
+            abort_if($allowed !== null && ! in_array($kid, $allowed, true), 403, 'هذا العميل خارج نطاقك');
+            abort_unless(\App\Models\Client::whereNull('deleted_at')->whereKey($kid)->exists(), 404);
+        }
+        session(['hub.client' => $kid]);
+
+        return back()->with('ok', $kid === '' ? 'عدت للمساحة الداخلية — كل السجلات' : 'تعمل الآن في مساحة العميل المختار');
+    })->name('client.switch');
+
+    // ── يوم العمل: حضورٌ وانصرافٌ بضغطة، وشاشةُ الفريق اليومية للمدير ──
+    Route::post('workday/check-in', [\App\Http\Controllers\Web\WorkdayController::class, 'checkIn'])
+        ->middleware('throttle:30,1')->name('workday.in');
+    Route::post('workday/check-out', [\App\Http\Controllers\Web\WorkdayController::class, 'checkOut'])
+        ->middleware('throttle:30,1')->name('workday.out');
+    Route::get('workforce', [\App\Http\Controllers\Web\WorkdayController::class, 'team'])->name('workforce.team');
+
     Route::get('morning', [MorningController::class, 'index'])->name('morning');
     Route::get('calendar', [\App\Http\Controllers\Web\CalendarController::class, 'index'])->name('calendar');
     Route::get('costs', [CostController::class, 'index'])->name('costs.index');
