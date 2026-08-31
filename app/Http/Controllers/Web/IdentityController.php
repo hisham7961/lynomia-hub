@@ -155,6 +155,11 @@ class IdentityController extends Controller
             'serials.*' => 'nullable|string|max:300',
             'holder_id' => ['nullable', 'string', Rule::exists('users', 'id')->whereNull('deleted_at')],
             'company_id' => ['nullable', 'string', Rule::exists('companies', 'id')->whereNull('deleted_at')],
+            // «تُدار لدينا» ≠ «ملكُنا»: قطعةُ العميل تُسجَّل بكل وظائف العهدة
+            // وتخرج من ممتلكاتنا — والفارغ يعني «لينوميا» كما في كل النظام
+            'owner' => ['nullable', 'string', Rule::in(['لينوميا', 'عميل — يُدار لدينا', 'مشترك'])],
+            'client_id' => ['nullable', 'string', Rule::exists('clients', 'id')->whereNull('deleted_at')],
+            'project_id_ctx' => ['nullable', 'string', Rule::exists('projects', 'id')->whereNull('deleted_at')],
             'loc' => 'nullable|string|max:300',
             'note' => 'nullable|string|max:500',
         ], [], ['name' => 'اسم المنتج', 'qty' => 'الكمية', 'holder_id' => 'المستلم', 'serials' => 'السيريالات']);
@@ -223,12 +228,15 @@ class IdentityController extends Controller
                     'loc' => $d['loc'] ?? null,
                     'status' => 'متاح',
                     'vendor' => $product->supplier_id ? optional($product->supplier)->name : null,
+                    'owner_scope' => $d['owner'] ?? null,
+                    'client_id' => $d['client_id'] ?? null,
                 ]);
                 $a->save();
 
                 // ── العهدة: الإسنادُ جزءُ المعاملة — قطعةٌ بلا عهدةٍ فاشلة لا تُترك ──
                 if ($d['holder_id'] ?? null) {
-                    Custody::move($a, 'تسليم', $d['holder_id'], now()->toDateString(), $d['note'] ?? null);
+                    Custody::move($a, 'تسليم', $d['holder_id'], now()->toDateString(), $d['note'] ?? null,
+                        ['project_id' => $d['project_id_ctx'] ?? null, 'client_id' => $d['client_id'] ?? null]);
                 }
                 $assets[] = $a;
             }

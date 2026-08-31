@@ -217,6 +217,23 @@ return [
                     'ref' => 'companies',
                 ],
                 [
+                    // المشروع يعرف عميلَه أخيراً: كان الوصلُ الوحيد عبر العروض
+                    // والعقود — فمشروعُ عميلٍ ومشروعُنا الداخلي سيّان في كل شاشة
+                    'key' => 'clientId',
+                    'col' => 'client_id',
+                    'label' => 'العميل (إن كان مشروعَ عميل)',
+                    'type' => 'ref',
+                    'ref' => 'clients',
+                    'hint' => 'اتركه فارغاً للمشروع الداخلي — وعبّئه فيدخل المشروعُ مساحةَ عمل عميله وربحيةَ ارتباطه.',
+                ],
+                [
+                    'key' => 'engagementId',
+                    'col' => 'engagement_id',
+                    'label' => 'الارتباط',
+                    'type' => 'ref',
+                    'ref' => 'engagements',
+                ],
+                [
                     'key' => 'managerId',
                     'col' => 'manager_id',
                     'label' => 'مدير المشروع',
@@ -1974,6 +1991,12 @@ return [
                 'description',
             ],
         ],
+        /*
+         * **تحديثات العمل = بنودُ التقرير اليومي**: بندٌ لكل عملٍ في اليوم —
+         * موظفٌ عمل على ثلاثة مشاريع كتب ثلاثة بنود، لكلٍّ مهمتُه وساعاتُه
+         * وتاريخُه. والساعاتُ تغذّي «الوقت الفعلي» على المهمة تلقائياً فتعمل
+         * الربحيةُ والقدراتُ بلا إدخالٍ مزدوج (انظر WorkUpdate::booted).
+         */
         'updates' => [
             'key' => 'updates',
             'table' => 'work_updates',
@@ -1982,6 +2005,7 @@ return [
             'display' => 'done',
             'status' => null,
             'columns' => [
+                'workDate',
                 'projectId',
                 'done',
                 'progress',
@@ -1989,12 +2013,34 @@ return [
             ],
             'fields' => [
                 [
+                    'key' => 'workDate',
+                    'col' => 'work_date',
+                    'label' => 'يوم العمل',
+                    'type' => 'date',
+                    'hint' => 'يُملأ باليوم الحالي إن تُرك فارغاً — بنودُ اليوم الواحد هي تقريرُه اليومي.',
+                ],
+                [
                     'key' => 'projectId',
                     'col' => 'project_id',
                     'label' => 'المشروع',
                     'type' => 'ref',
                     'required' => true,
                     'ref' => 'projects',
+                ],
+                [
+                    'key' => 'taskId',
+                    'col' => 'task_id',
+                    'label' => 'المهمة',
+                    'type' => 'ref',
+                    'ref' => 'tasks',
+                    'hint' => 'اربط البندَ بمهمته فتُضاف ساعاتُه إلى وقتها الفعلي وتصل نسبتُه المقترحة لمديره.',
+                ],
+                [
+                    'key' => 'clientId',
+                    'col' => 'client_id',
+                    'label' => 'العميل',
+                    'type' => 'ref',
+                    'ref' => 'clients',
                 ],
                 [
                     'key' => 'done',
@@ -2038,6 +2084,13 @@ return [
                     'col' => 'hours',
                     'label' => 'الوقت المستغرق (س)',
                     'type' => 'num',
+                ],
+                [
+                    'key' => 'billable',
+                    'col' => 'billable',
+                    'label' => 'ساعاتٌ تُفوتر',
+                    'type' => 'bool',
+                    'hint' => 'لبنود مشاريع العملاء بنموذج «بالساعة» — تُجمع في ربحية الارتباط.',
                 ],
                 [
                     'key' => 'links',
@@ -3594,6 +3647,52 @@ return [
                 'reference',
             ],
         ],
+        /*
+         * **الارتباطات (Engagements)** — الطبقةُ المنظِّمة بين العميل ومشاريعه:
+         * عميلٌ واحد قد نديرُ له IT ونبني متجرَه ونشغّل تسويقَه — ثلاثةُ
+         * ارتباطاتٍ لكلٍّ عقودُه ومشاريعُه وفوترتُه وتجديدُه. والقاعدة:
+         * «تُدار لدينا» ≠ «ملكُنا» — الارتباطُ سياقُ إدارةٍ لا تملّك.
+         */
+        'engagements' => [
+            'key' => 'engagements',
+            'table' => 'engagements',
+            'model' => 'Engagement',
+            'label' => 'ارتباطات العملاء',
+            'display' => 'name',
+            'status' => 'status',
+            'columns' => ['name', 'clientId', 'type', 'status', 'renewal', 'amId'],
+            'fields' => [
+                ['key' => 'name', 'col' => 'name', 'label' => 'اسم الارتباط', 'type' => 'text', 'required' => true,
+                 'hint' => 'مثل «خدمات IT المُدارة» أو «تشغيل المتجر الإلكتروني» — علاقةٌ واحدةٌ محددة، لا اسم العميل.'],
+                ['key' => 'clientId', 'col' => 'client_id', 'label' => 'العميل', 'type' => 'ref', 'ref' => 'clients', 'required' => true],
+                ['key' => 'type', 'col' => 'type', 'label' => 'نوع الارتباط', 'type' => 'sel',
+                 'options' => ['تنفيذ مشروع', 'عقد شهري (Retainer)', 'خدمة مُدارة', 'استشارة', 'دعم وصيانة', 'تسويق', 'تطوير', 'بنية تحتية', 'تشغيل', 'أخرى']],
+                ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
+                 'options' => ['محتمل', 'نشط', 'متوقف مؤقتاً', 'قيد التجديد', 'منتهٍ', 'ملغى']],
+                ['key' => 'contractId', 'col' => 'contract_id', 'label' => 'العقد الأساس', 'type' => 'ref', 'ref' => 'contracts',
+                 'hint' => 'العقود الإضافية (ملاحق وتجديدات) تُربط من حقل «الارتباط» على العقد نفسه.'],
+                ['key' => 'amId', 'col' => 'am_id', 'label' => 'مدير الحساب', 'type' => 'ref', 'ref' => 'users'],
+                ['key' => 'pmId', 'col' => 'pm_id', 'label' => 'مدير التنفيذ', 'type' => 'ref', 'ref' => 'users'],
+                ['key' => 'start', 'col' => 'date_start', 'label' => 'تاريخ البداية', 'type' => 'date'],
+                ['key' => 'end', 'col' => 'date_end', 'label' => 'تاريخ النهاية', 'type' => 'date'],
+                ['key' => 'renewal', 'col' => 'renewal', 'label' => 'موعد التجديد', 'type' => 'date',
+                 'hint' => 'يدخل رادار «ينتهي قريباً» — فالتجديد يُطرق بابه قبل شهرٍ لا بعد فوات.'],
+                ['key' => 'billing', 'col' => 'billing', 'label' => 'نموذج الفوترة', 'type' => 'sel',
+                 'options' => ['سعر ثابت', 'بالساعة', 'عقد شهري', 'اشتراك', 'دفعات مراحل', 'تكلفة + هامش', 'حسب الاستخدام', 'عقد دعم', 'أخرى']],
+                ['key' => 'revenue', 'col' => 'revenue', 'label' => 'القيمة التعاقدية', 'type' => 'num'],
+                ['key' => 'budget', 'col' => 'budget', 'label' => 'الميزانية التقديرية للتكلفة', 'type' => 'num'],
+                ['key' => 'currency', 'col' => 'currency', 'label' => 'العملة', 'type' => 'sel',
+                 'options' => ['د.ك', 'دولار', 'ريال', 'درهم', 'يورو']],
+                ['key' => 'scope', 'col' => 'scope', 'label' => 'نطاق العمل (SOW)', 'type' => 'ta'],
+                ['key' => 'clientNote', 'col' => 'client_note', 'label' => 'ملاحظات تُشارك مع العميل', 'type' => 'ta',
+                 'hint' => 'ما يصلح أن يقرأه العميل — الملاحظات الداخلية في حقلها أدناه ولا تختلط بهذه أبداً.'],
+                ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات داخلية', 'type' => 'ta'],
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'شركتنا المنفّذة', 'type' => 'ref', 'ref' => 'companies'],
+                ['key' => 'tags', 'col' => 'tags', 'label' => 'وسوم', 'type' => 'tags'],
+            ],
+            'search' => ['name', 'scope', 'notes'],
+        ],
+
         'clients' => [
             'key' => 'clients',
             'table' => 'clients',
@@ -3977,6 +4076,14 @@ return [
                     'ref' => 'clients',
                 ],
                 [
+                    // عقودُ الارتباط الواحد تتجمع تحته: الأساسُ وملاحقُه وتجديداتُه
+                    'key' => 'engagementId',
+                    'col' => 'engagement_id',
+                    'label' => 'الارتباط',
+                    'type' => 'ref',
+                    'ref' => 'engagements',
+                ],
+                [
                     'key' => 'companyId',
                     'col' => 'company_id',
                     'label' => 'الشركة',
@@ -4195,6 +4302,23 @@ return [
                         'رخصة برمجية',
                         'أخرى',
                     ],
+                ],
+                [
+                    // «تُدار لدينا» ≠ «ملكُنا»: سيرفرُ العميل الذي نديره يُسجَّل
+                    // ويُلصَق ويُصان ويُسند عهدةً — لكنه لا يدخل قيمةَ ممتلكاتنا
+                    'key' => 'owner',
+                    'col' => 'owner_scope',
+                    'label' => 'الملكية',
+                    'type' => 'sel',
+                    'options' => ['لينوميا', 'عميل — يُدار لدينا', 'مشترك'],
+                    'hint' => 'فارغةً تعني «لينوميا». أصلُ العميل يبقى بكل وظائف العهدة والصيانة والملصقات — ويخرج من تقارير ممتلكاتنا.',
+                ],
+                [
+                    'key' => 'clientId',
+                    'col' => 'client_id',
+                    'label' => 'العميل المالك',
+                    'type' => 'ref',
+                    'ref' => 'clients',
                 ],
                 [
                     // القطعةُ تشير لطرازها: عشرون لابتوباً متطابقاً منتجٌ واحدٌ
@@ -6274,6 +6398,28 @@ return [
                     'ref' => 'hr',
                 ],
                 [
+                    // الحضورُ لا يعيش منفصلاً عن العمل: أين حضر ولمن — لا متى فقط
+                    'key' => 'mode',
+                    'col' => 'mode',
+                    'label' => 'وضع العمل',
+                    'type' => 'sel',
+                    'options' => ['مكتب', 'عن بعد', 'موقع عميل', 'عمل ميداني', 'مهمة خارجية'],
+                ],
+                [
+                    'key' => 'clientId',
+                    'col' => 'client_id',
+                    'label' => 'العميل (لموقع عميل)',
+                    'type' => 'ref',
+                    'ref' => 'clients',
+                ],
+                [
+                    'key' => 'projectId',
+                    'col' => 'project_id',
+                    'label' => 'المشروع',
+                    'type' => 'ref',
+                    'ref' => 'projects',
+                ],
+                [
                     'key' => 'date',
                     'col' => 'date',
                     'label' => 'التاريخ',
@@ -6310,6 +6456,10 @@ return [
                         'إجازة',
                         'عمل عن بعد',
                         'إجازة رسمية',
+                        'عمل ميداني',
+                        // حضورٌ صحيحٌ بلا تقريرٍ يومي — **ليس غياباً**: الغياب
+                        // لمن لم يحضر أصلاً، لا لمن حضر ونسي الكتابة
+                        'حاضر — بلا تقرير',
                     ],
                 ],
                 [
@@ -6706,7 +6856,7 @@ return [
                         'competitors', 'brands', 'media', 'ip', 'events', 'plans',
                         // `krs` سقطت من القائمة فلم تُنشأ قاعدةُ تنبيهٍ واحدة على
                         // النتائج الرئيسية — وهي أكثرُ ما يستحقّ إنذاراً بالتأخّر
-                        'krs', 'products',
+                        'krs', 'products', 'engagements',
                     ],
                 ],
                 [
@@ -7309,6 +7459,13 @@ return [
                  'options' => ['مسودة', 'بانتظار الاعتماد', 'معتمد', 'أُرسل للمورد', 'مستلم', 'مرتجع', 'ملغى']],
                 ['key' => 'payState', 'col' => 'pay_state', 'label' => 'حالة الدفع', 'type' => 'sel',
                  'options' => ['غير مدفوع', 'مدفوع جزئياً', 'مدفوع']],
+                // شراءٌ لصالح عميل: يُفوتر له بهامشٍ — استضافةٌ بألفٍ تُفوتر بألفٍ ومئتين
+                ['key' => 'clientId', 'col' => 'client_id', 'label' => 'لصالح العميل', 'type' => 'ref', 'ref' => 'clients',
+                 'hint' => 'اتركه فارغاً للشراء الداخلي. مع عميلٍ وراية «يُفوتر»، يُحسب مبلغُ الفوترة من الهامش.'],
+                ['key' => 'billable', 'col' => 'billable', 'label' => 'يُفوتر للعميل', 'type' => 'bool'],
+                ['key' => 'markup', 'col' => 'markup', 'label' => 'الهامش ٪', 'type' => 'num'],
+                ['key' => 'charge', 'col' => 'charge', 'label' => 'مبلغ الفوترة للعميل', 'type' => 'num',
+                 'hint' => 'يُحسب تلقائياً من الإجمالي والهامش إن تُرك فارغاً — وأدخِله يدوياً ليغلب.'],
                 ['key' => 'invoiceNo', 'col' => 'invoice_no', 'label' => 'رقم فاتورة المورد', 'type' => 'text'],
                 ['key' => 'att', 'col' => 'att_id', 'label' => 'مرفق (عرض المورد/الفاتورة)', 'type' => 'file'],
                 ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات', 'type' => 'ta'],
@@ -8026,6 +8183,11 @@ return [
         'quotes' => [
             ['on' => 'status', 'to' => ['مقبول'], 'emit' => 'quote.accepted', 'label' => 'قُبل عرض سعر'],
             ['on' => 'status', 'to' => ['مرفوض'], 'emit' => 'quote.rejected', 'label' => 'رُفض عرض سعر'],
+        ],
+        'engagements' => [
+            ['on' => 'status', 'to' => ['نشط'], 'emit' => 'engagement.started', 'label' => 'بدأ ارتباطُ عميل'],
+            ['on' => 'status', 'to' => ['قيد التجديد'], 'emit' => 'engagement.renewing', 'label' => 'ارتباطٌ قيد التجديد'],
+            ['on' => 'status', 'to' => ['منتهٍ', 'ملغى'], 'emit' => 'engagement.ended', 'label' => 'انتهى ارتباطُ عميل'],
         ],
         'purchases' => [
             ['on' => 'status', 'to' => ['معتمد'], 'emit' => 'purchase.approved', 'label' => 'اعتُمد أمر شراء'],

@@ -67,6 +67,17 @@
                         <label for="cu-at">تاريخ التسليم</label>
                         <input class="inp" id="cu-at" type="date" name="at" value="{{ $cuToday }}" required>
                     </div>
+                    <div class="fld">
+                        {{-- سياقُ التسليم: لأي مشروعٍ أُعطيت — يبقى في السجل بعد
+                             انتقال الموظف، فيُعرف أن اللابتوب كان لعُهدة مشروع كذا --}}
+                        <label for="cu-proj">لمشروع (اختياري)</label>
+                        <select class="inp" id="cu-proj" name="projectId">
+                            <option value=""></option>
+                            @foreach (hub_ref_options('projects') as $cupid => $cupname)
+                                <option value="{{ $cupid }}">{{ $cupname }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div class="fld fw">
                         <label for="cu-note">ملاحظة (اختياري)</label>
                         <input class="inp" id="cu-note" name="note" maxlength="500" placeholder="مثال: مع الشاحن والحقيبة">

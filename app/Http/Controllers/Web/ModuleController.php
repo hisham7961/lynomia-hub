@@ -31,6 +31,7 @@ class ModuleController extends Controller
         $q = $trash ? $class::onlyTrashed() : $class::query();
         $q = hub_scope($q, $def['key'] ?? '');          // نطاق المشاريع للحسابات المحدودة
         $q = hub_company_scope($q, $def['key'] ?? '');  // الشركة النشطة من الشريط العلوي
+        $q = hub_client_scope($q, $def['key'] ?? '');   // مساحة عمل العميل من الشريط العلوي
 
         if ($term = hub_str($r->input('q'))) $q->search($term);
 
@@ -248,6 +249,7 @@ class ModuleController extends Controller
 
         $this->inheritCompany($m, $module);
         $this->inheritProject($m, $module);
+        $this->inheritClient($m, $module);
 
         // مستخدم محدود ينشئ مشروعاً: نضمن بقاءه ضمن نطاقه (مديراً أو عضواً)
         if ($module === 'projects' && hub_scoped(auth()->user())) {
@@ -1007,6 +1009,23 @@ class ModuleController extends Controller
      * ولا يظهر في قائمته — سجلٌّ يتيمٌ على منشئه نفسه، بلا كلمةٍ تقول لماذا.
      * يرثُ أولَ مشاريعه المرئية، بنفس منطق وراثة الشركة أعلاه.
      */
+    /**
+     * ونظيرُها للعميل: من يعمل في مساحة عملِ عميلٍ يُنسب سجلُّه الجديد إليه
+     * تلقائياً، والمعزولُ على عملاء (بلا مساحةٍ نشطة أو عبر API) يُنسب لأولهم —
+     * فلا يُخلق سجلٌّ في مساحة عميلٍ ثم يختفي من قوائمها فوراً.
+     */
+    protected function inheritClient(Model $m, string $module): void
+    {
+        if ($module === 'clients' || ! ($kcol = hub_client_col($module)) || ! empty($m->{$kcol})) return;
+        $kid = (string) session('hub.client', '');
+        $allowed = hub_client_ids();
+        if ($kid !== '' && ($allowed === null || in_array($kid, $allowed, true))) {
+            $m->{$kcol} = $kid;
+        } elseif ($allowed !== null && ! empty($allowed)) {
+            $m->{$kcol} = $allowed[0];
+        }
+    }
+
     protected function inheritProject(Model $m, string $module): void
     {
         if ($module === 'projects' || ! hub_scoped(auth()->user())) return;

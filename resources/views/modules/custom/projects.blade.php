@@ -1,3 +1,50 @@
+{{-- سياقُ العميل ونشاطُ الأسبوع — قبل العدسات: لمن هذا المشروع وماذا جرى فيه --}}
+@php
+    $pcClient = $row->client_id ? \App\Models\Client::whereNull('deleted_at')->find($row->client_id) : null;
+    $pcEng = $row->engagement_id ? \App\Models\Engagement::whereNull('deleted_at')->find($row->engagement_id) : null;
+    $pcLogs = \Illuminate\Support\Facades\DB::table('work_updates')->whereNull('deleted_at')
+        ->where('project_id', $row->id)
+        ->where('work_date', '>=', now()->subDays(7)->toDateString())
+        ->get(['created_by', 'hours', 'problems', 'work_date']);
+    $pcPeople = hub_ref_labels('users', $pcLogs->pluck('created_by')->filter()->unique()->values()->all());
+    $pcBlockers = $pcLogs->pluck('problems')->filter(fn ($p) => trim((string) $p) !== '');
+@endphp
+@if ($pcClient)
+    <div class="card">
+        <h3 class="cardtitle">🤝 مشروعُ عميل</h3>
+        {{-- فتاتُ السياق: عميل / ارتباط / مشروع — فلا يُعدَّل سجلُّ عميلٍ بظنّه داخلياً --}}
+        <div class="crow">
+            <a class="chip" href="{{ route('m.show', ['clients', $pcClient->id]) }}">👤 {{ $pcClient->name }}</a>
+            @if ($pcEng)<span class="sub">/</span>
+                <a class="chip" href="{{ route('m.show', ['engagements', $pcEng->id]) }}">🤝 {{ $pcEng->name }}</a>@endif
+            <span class="sub">/</span>
+            <span class="chip">🗂️ {{ \Illuminate\Support\Str::limit($row->name, 30) }}</span>
+        </div>
+        <div class="sub" style="margin-top:6px">كلُّ ما هنا يدخل ربحيةَ الارتباط وتقاريرَ العميل —
+            والملاحظاتُ الداخلية تبقى داخلية.</div>
+    </div>
+@endif
+@if ($pcLogs->isNotEmpty())
+    <div class="card">
+        <h3 class="cardtitle">📅 نشاط آخر ٧ أيام
+            <span class="bdg g">{{ $pcLogs->count() }} بنداً</span>
+            @if ($pcBlockers->isNotEmpty())<span class="bdg bad">🚧 {{ $pcBlockers->count() }} عائقاً</span>@endif
+        </h3>
+        <div style="display:flex;gap:18px;flex-wrap:wrap">
+            <div><div class="sub">موظفون نشطون</div><b>{{ $pcLogs->pluck('created_by')->unique()->count() }}</b>
+                <div class="sub">{{ \Illuminate\Support\Str::limit(collect($pcPeople)->values()->implode('، '), 60) }}</div></div>
+            <div><div class="sub">ساعات مسجَّلة</div><b class="mono">{{ number_format((float) $pcLogs->sum('hours'), 1) }}</b></div>
+            <div><div class="sub">آخر بند</div><b class="mono">{{ substr((string) $pcLogs->max('work_date'), 0, 10) }}</b></div>
+        </div>
+        @if ($pcBlockers->isNotEmpty())
+            <div class="sub" style="margin-top:8px;color:var(--bad, inherit)">
+                أحدث عائق: {{ \Illuminate\Support\Str::limit($pcBlockers->last(), 120) }}
+            </div>
+        @endif
+        <a class="btn ghost xs" style="margin-top:8px" href="{{ route('m.index', 'updates') }}">📝 كل بنود العمل</a>
+    </div>
+@endif
+
 {{-- عدسات المشروع: كل لوحةٍ تحليلية مفتوحةً على هذا المشروع وحده --}}
 @php
     $plLenses = array_values(array_filter([

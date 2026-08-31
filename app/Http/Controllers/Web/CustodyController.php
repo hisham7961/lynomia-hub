@@ -180,9 +180,11 @@ class CustodyController extends Controller
             'userId' => ['required', 'string', Rule::exists('users', 'id')->whereNull('deleted_at')],
             'at'     => 'required|date',
             'note'   => 'nullable|string|max:500',
-        ], [], ['userId' => 'المستلم', 'at' => 'تاريخ التسليم', 'note' => 'ملاحظة']);
+            'projectId' => ['nullable', 'string', Rule::exists('projects', 'id')->whereNull('deleted_at')],
+        ], [], ['userId' => 'المستلم', 'at' => 'تاريخ التسليم', 'note' => 'ملاحظة', 'projectId' => 'المشروع']);
 
-        $entry = Custody::move($a, 'تسليم', $d['userId'], substr($d['at'], 0, 10), $d['note'] ?? null);
+        $entry = Custody::move($a, 'تسليم', $d['userId'], substr($d['at'], 0, 10), $d['note'] ?? null,
+            ['project_id' => $d['projectId'] ?? null]);
 
         hub_audit('تسليم عهدة', 'assets', $a->id, (string) $a->name,
             ['after' => ['المستلم' => $d['userId'], 'التاريخ' => $entry->at?->toDateString()]]);

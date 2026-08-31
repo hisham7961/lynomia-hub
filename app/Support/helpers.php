@@ -152,7 +152,78 @@ if (! function_exists('hub_scope')) {
             $q->whereIn($ccol, $cids);
         }
 
+        // عزلُ العملاء الصارم — نظيرُ عزل الشركات حرفياً: من له قائمةُ عملاء
+        // مسموحين لا يرى سجلات غيرهم في أي وحدةٍ لها عمودُ عميل. (وحدةٌ بلا
+        // عمودِ عميلٍ تبقى محكومةً بمصفوفة الصلاحيات — فدورُ «مستخدم عميل»
+        // يُمنح الوحداتِ السياقيةَ وحدها.)
+        if (($kids = hub_client_ids($user)) !== null && ($kcol = hub_client_col($module))) {
+            $q->whereIn($kcol, $kids);
+        }
+
         return $q;
+    }
+}
+
+if (! function_exists('hub_client_ids')) {
+    /**
+     * العملاء المسموحون للمستخدم — null = بلا قيد (الداخليون جميعاً)، ومصفوفةٌ
+     * غير فارغة = معزولٌ عليهم (حسابُ عميلٍ خارجي أو موظفٌ مخصَّص لعملاء بأعيانهم).
+     */
+    function hub_client_ids($user = null): ?array
+    {
+        $user = $user ?? auth()->user();
+        if (! $user || $user->role?->is_owner) return null;
+        $ids = is_array($user->clients) ? $user->clients : (json_decode($user->clients ?? '[]', true) ?: []);
+        $ids = array_values(array_filter(array_map('strval', $ids)));
+
+        return $ids ?: null;
+    }
+}
+
+if (! function_exists('hub_client_col')) {
+    /** عمودُ العميل للوحدة: من حقل ref→clients المفرد، أو العمود client_id الفعلي */
+    function hub_client_col(string $module): ?string
+    {
+        if ($module === 'clients') return 'id';
+        static $map = null;
+        if ($map === null) {
+            $map = [];
+            foreach (hub_modules() as $mk => $md) {
+                foreach ($md['fields'] as $f) {
+                    if (($f['type'] ?? '') === 'ref' && ($f['ref'] ?? '') === 'clients' && empty($f['multi'])) {
+                        $map[$mk] = $f['col'];
+                        break;
+                    }
+                }
+            }
+        }
+        if (array_key_exists($module, $map)) return $map[$module];
+
+        $table = hub_mod($module)['table'] ?? null;
+        try {
+            $has = $table && \Illuminate\Support\Facades\Schema::hasColumn($table, 'client_id');
+        } catch (\Throwable $e) {
+            $has = false;
+        }
+
+        return $map[$module] = $has ? 'client_id' : null;
+    }
+}
+
+if (! function_exists('hub_client_scope')) {
+    /**
+     * مساحةُ عمل العميل النشطة (المبدّل العلوي) — تركيزُ عرضٍ لا أمن، كنظيرتها
+     * hub_company_scope تماماً: الأمنُ الصارم في hub_scope أعلاه.
+     */
+    function hub_client_scope($q, string $module)
+    {
+        $kid = (string) session('hub.client', '');
+        if ($kid === '') return $q;
+        $allowed = hub_client_ids();
+        if ($allowed !== null && ! in_array($kid, $allowed, true)) return $q;
+        $col = hub_client_col($module);
+
+        return $col ? $q->where($col, $kid) : $q;
     }
 }
 
@@ -264,6 +335,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'delivery',  'label' => '🛤️ مسار التسليم',     'route' => 'delivery',        'group' => 'analytics', 'ok' => hub_can($user, 'feats', 'v') || hub_can($user, 'deploys', 'v') || hub_can($user, 'requests', 'v') || hub_can($user, 'designs', 'v')],
             ['key' => 'custody',   'label' => '🏷️ كتالوج العهد',      'route' => 'custody.catalog', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
             ['key' => 'identity',  'label' => '📷 مركز الهوية والمسح', 'route' => 'identity.center', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
+            ['key' => 'workteam',  'label' => '🕗 فريقي اليوم',        'route' => 'workforce.team',  'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
             ['key' => 'codehub',   'label' => '🌿 مركز الكود',        'route' => 'code.center',     'group' => 'centers',   'ok' => hub_can($user, 'code', 'v')],
             ['key' => 'assetlife', 'label' => '💼 العهدة ودورة الحياة', 'route' => 'assets.life',  'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
             ['key' => 'compb',     'label' => '⚖️ الامتثال وأثره',   'route' => 'compliance.board', 'group' => 'centers', 'ok' => hub_can($user, 'compliance', 'v')],
@@ -2261,8 +2333,11 @@ if (! function_exists('hub_scope_key')) {
         // لا **صلاحياته**، فسحبُ صلاحيةٍ من دورٍ لا يغيّر المفتاح — ويبقى الموظف
         // المسحوبة صلاحيتُه يقرأ الشاشة المخبّأة حتى تنتهي مهلتها. والعزل بالشركة
         // مخزَّنٌ على المستخدم، فتغييره يجب أن يُبطل كذلك.
+        // مساحةُ عمل العميل جزءٌ من المفتاح كالشركة سواء — وإلا قُدّمت شاشةُ
+        // عميلٍ مخبّأةٌ لمن بدّل إلى عميلٍ آخر
         return $prefix . ':' . ($u?->role_id ?? '0') . ':' . ($u?->id ?? '0')
-            . ':' . (string) session('hub.company', '-') . hub_lens_key(hub_lens()['id'] ?? null)
+            . ':' . (string) session('hub.company', '-')
+            . ':' . (string) session('hub.client', '-') . hub_lens_key(hub_lens()['id'] ?? null)
             . hub_data_stamp(['roles', 'users']);
     }
 }

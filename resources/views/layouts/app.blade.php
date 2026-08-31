@@ -72,6 +72,41 @@
                     </form>
                 @endif
             @endif
+            {{-- مبدّل مساحة عمل العميل: الوحداتُ والقوائمُ نفسُها — والبياناتُ
+                 بياناتُ العميل المختار. «لينوميا الداخلية» = بلا اختيار. --}}
+            @if (hub_can(auth()->user(), 'clients', 'v'))
+                @php
+                    // المساحاتُ هي عملاءُ الارتباطات الحية — لا كلُّ سجل CRM:
+                    // عميلٌ محتمل بلا ارتباطٍ ليس مساحةَ عمل، وأسماءُ العملاء لا
+                    // تُنثر في ترويسة كل صفحة. والكاش يحمل الشركةَ فيُعزل بها.
+                    $hubClientRows = \Illuminate\Support\Facades\Cache::remember('topbar:clients', 300,
+                        fn () => \App\Models\Client::whereNull('deleted_at')
+                            ->whereIn('id', \App\Models\Engagement::whereNull('deleted_at')
+                                ->whereNotIn('status', ['منتهٍ', 'ملغى'])->pluck('client_id')->filter())
+                            ->orderBy('name')->get(['id', 'name', 'company_id']));
+                    if (($hubKCos = hub_company_ids()) !== null) {
+                        $hubClientRows = $hubClientRows->whereIn('company_id', $hubKCos);
+                    }
+                    if (($hubKAllowed = hub_client_ids()) !== null) {
+                        $hubClientRows = $hubClientRows->whereIn('id', $hubKAllowed);
+                    }
+                    if (($hubKAct = (string) session('hub.company', '')) !== '') {
+                        $hubClientRows = $hubClientRows->filter(fn ($r) => ! $r->company_id || $r->company_id === $hubKAct);
+                    }
+                    $hubClients = $hubClientRows->pluck('name', 'id');
+                @endphp
+                @if ($hubClients->isNotEmpty())
+                    <form method="POST" action="{{ route('client.switch') }}" class="inline">
+                        @csrf
+                        <label class="vh" for="klsw">مساحة العمل — داخلية أو لعميل</label>
+                        <select class="inp" id="klsw" name="client" onchange="this.form.submit()" style="max-width:150px;font-size:12.5px">
+                            <option value="">🏠 لينوميا الداخلية</option>
+                            @foreach ($hubClients as $kid => $kn)<option value="{{ $kid }}" @selected(session('hub.client') === $kid)>👤 {{ \Illuminate\Support\Str::limit($kn, 20) }}</option>@endforeach
+                        </select>
+                        <noscript><button class="btn ghost sm">تطبيق</button></noscript>
+                    </form>
+                @endif
+            @endif
             <div class="bell" data-count-url="{{ route('notifications.count') }}">
                 <button class="btn ghost sm" type="button" title="التنبيهات"
                         hx-get="{{ route('notifications.mini') }}" hx-target="#bellbox" hx-swap="innerHTML">🔔<span id="bellbadge">@php $nbc = \App\Models\HubNotification::where('user_id', auth()->id())->where('read', false)->count(); @endphp@if($nbc)<span class="nbdg">{{ $nbc }}</span>@endif</span></button>
