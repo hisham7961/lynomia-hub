@@ -113,7 +113,7 @@
             <label class="vh" for="mg-into">المنتج الأصل</label>
             <select class="inp" id="mg-into" name="into" required>
                 <option value="">— اختر المنتج الأصل —</option>
-                @foreach (hub_ref_options('products') as $pid => $pname)
+                @foreach (hub_ref_options_scoped('products') as $pid => $pname)
                     @if ($pid !== $row->id)<option value="{{ $pid }}">{{ $pname }}</option>@endif
                 @endforeach
             </select>

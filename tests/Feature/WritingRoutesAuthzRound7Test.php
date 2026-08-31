@@ -39,6 +39,10 @@ class WritingRoutesAuthzRound7Test extends TestCase
         'acks.ack',                                                    // إقرارُه بسياسة
         'search.recent',
         'prefs.update',                                                // تخصيصُ شاشته هو
+        // أمنُه الذاتي: جلساتُه وأجهزتُه هو — يبطلها على صفوفه حصراً (mysec
+        // يفحص user_id === auth في كل فعل)، فلا صلاحيةَ فوق «أن تكون أنت»
+        'mysec.session.revoke', 'mysec.session.others',
+        'mysec.device.trust', 'mysec.device.revoke',
         // تبديلُ الشركة النشطة **تصفيةُ عرضٍ** لا كتابةَ بيانات: يُخزَّن في جلسته،
         // والتبديلُ إلى شركةٍ بعينها محروسٌ بـ`companies.v` + وجودِها + كونِها
         // داخل نطاقه (routes/web.php:129) — والقراءةُ تبقى منطَّقةً بعدها.

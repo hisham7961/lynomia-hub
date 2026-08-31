@@ -546,6 +546,41 @@ if (! function_exists('hub_ref_options')) {
     }
 }
 
+if (! function_exists('hub_ref_options_scoped')) {
+    /**
+     * خيارات قائمة مرجعية **منطَّقة** — نظير `hub_ref_options` لكنه يحترم عزل
+     * المستخدم: مشاريعه المرئية، وشركاته المسموحة، وعملاءه المسموحين. يُستعمل
+     * في كل نموذجٍ خارج المتحكم العام (الذي يعوّض بنفسه في `refOptions`) —
+     * فقائمةٌ خامٌّ كانت تسرّب أسماء مشاريع وعملاء لا يراهم صاحب الحساب.
+     */
+    function hub_ref_options_scoped(string $ref, $ensure = null, $user = null): array
+    {
+        $opts = hub_ref_options($ref, $ensure);
+        $user = $user ?? auth()->user();
+        if (! $user) return $opts;
+
+        if ($ref === 'projects' && hub_scoped($user)) {
+            $opts = array_intersect_key($opts, array_flip(array_map('strval', $user->visibleProjectIds())));
+        }
+        if (($cids = hub_company_ids($user)) !== null && ($ccol = hub_company_col($ref))) {
+            $allowed = \Illuminate\Support\Facades\DB::table(hub_ref_table($ref))
+                ->whereIn($ccol, $cids)->pluck('id')->map(fn ($v) => (string) $v)->all();
+            $opts = array_intersect_key($opts, array_flip($allowed));
+        }
+        if (($kids = hub_client_ids($user)) !== null && ($kcol = hub_client_col($ref))) {
+            $allowed = \Illuminate\Support\Facades\DB::table(hub_ref_table($ref))
+                ->whereIn($kcol, $kids)->pluck('id')->map(fn ($v) => (string) $v)->all();
+            $opts = array_intersect_key($opts, array_flip($allowed));
+        }
+        // وحدة العملاء نفسها معزولةٌ بمعرّفها المباشر لا بعمود عميلٍ فيها
+        if ($ref === 'clients' && ($kids = hub_client_ids($user)) !== null) {
+            $opts = array_intersect_key($opts, array_flip(array_map('strval', $kids)));
+        }
+
+        return $opts;
+    }
+}
+
 if (! function_exists('hub_flag')) {
     /** أعلام الدور الإدارية: users · audit · approve · secrets … — المالك يملكها كلها */
     function hub_flag($user, string $flag): bool

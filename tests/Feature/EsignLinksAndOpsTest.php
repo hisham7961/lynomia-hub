@@ -182,11 +182,19 @@ class EsignLinksAndOpsTest extends TestCase
             ->assertSee('/attachments/' . $img->id . '/view', false)
             ->assertSee('معاينة كاملة داخل الصفحة');
 
+        // SVG صار محجوباً عند الرفع (ناقلُ XSS — v2.367 وحّد الحاجزين على الأشد)
         $this->actingAs($this->owner)->post('/attachments', ['module' => 'projects',
             'record_id' => $p->id,
-            'file' => UploadedFile::fake()->createWithContent('logo.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>')]);
-        $svg = Attachment::where('original_name', 'logo.svg')->firstOrFail();
-        $this->actingAs($this->owner)->get('/attachments/' . $svg->id . '/view')->assertStatus(415);
+            'file' => UploadedFile::fake()->createWithContent('logo.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>')])
+            ->assertStatus(422);
+        $this->assertNull(Attachment::where('original_name', 'logo.svg')->first(), 'SVG لم يُحجب عند الرفع');
+
+        // وملفٌ نصيّ (مسموحٌ رفعُه) يُثبت أن المعاينة داخل الصفحة للصور وPDF فقط: ٤١٥
+        $this->actingAs($this->owner)->post('/attachments', ['module' => 'projects',
+            'record_id' => $p->id,
+            'file' => UploadedFile::fake()->createWithContent('notes.txt', 'نصّ')]);
+        $txt = Attachment::where('original_name', 'notes.txt')->firstOrFail();
+        $this->actingAs($this->owner)->get('/attachments/' . $txt->id . '/view')->assertStatus(415);
     }
 
     /** المعاينة تخضع لقفل نقل الملفات خارج الدوام كما التنزيل تماماً */

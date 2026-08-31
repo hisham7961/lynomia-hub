@@ -15,8 +15,14 @@ use Illuminate\Support\Str;
  */
 class AttachmentController extends Controller
 {
-    /** امتدادات تُرفض مهما كان الإعداد — تنفيذية على الخادم */
-    protected const BLOCKED = ['php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'phar', 'cgi', 'pl', 'sh', 'htaccess'];
+    /**
+     * امتدادات تُرفض مهما كان الإعداد. موحَّدةٌ على **الأشدّ** بين هذه القائمة
+     * وقائمة حقول الوحدة (ModuleController): كانت الأضيق تسمح بـhtml/svg/js —
+     * لا تُنفَّذ بذاتها هنا (التنزيل يُجبَر attachment والمعاينة تحصر أنواعها)،
+     * لكنّ توحيد الحاجزين على واحدٍ لا يترك ثغرةً بين بابين للملفات نفسها.
+     */
+    protected const BLOCKED = ['php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'phar', 'cgi', 'pl', 'sh', 'htaccess',
+        'html', 'htm', 'xhtml', 'svg', 'svgz', 'js', 'mjs'];
 
     /** أقصى ملفاتٍ في رفعةٍ واحدة — لقطاتُ متجرٍ لثلاث منصّاتٍ لا تتجاوزها */
     public const BATCH_MAX = 20;
@@ -51,6 +57,10 @@ class AttachmentController extends Controller
             'issued_at' => 'تاريخ الإصدار', 'expires_at' => 'تاريخ الانتهاء',
         ]);
 
+        // الإرفاق بصلاحية «عرض» قرارٌ منتجيّ مقصود ومُختبَر (AttachmentsTest):
+        // مشاهدٌ قد يُرفق مستنداً داعماً على سجلٍ يراه. الحمايةُ الحقيقية أن
+        // الملف يمرّ بحاجز الامتدادات، والتنزيل يُجبَر attachment، والمعاينة
+        // تحصر أنواعها — فلا تنفيذ. (لم نكسر سلوكاً قائماً لأجل تشدّدٍ نظريّ.)
         $this->guardRecord($data['module'], $data['record_id'], 'v');
 
         // الدفعةُ بترتيب اختيارها، والمفردُ دفعةٌ من واحد — مسارٌ واحدٌ لا مساران

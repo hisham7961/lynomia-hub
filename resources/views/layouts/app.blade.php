@@ -79,11 +79,19 @@
                     // المساحاتُ هي عملاءُ الارتباطات الحية — لا كلُّ سجل CRM:
                     // عميلٌ محتمل بلا ارتباطٍ ليس مساحةَ عمل، وأسماءُ العملاء لا
                     // تُنثر في ترويسة كل صفحة. والكاش يحمل الشركةَ فيُعزل بها.
-                    $hubClientRows = \Illuminate\Support\Facades\Cache::remember('topbar:clients', 300,
-                        fn () => \App\Models\Client::whereNull('deleted_at')
-                            ->whereIn('id', \App\Models\Engagement::whereNull('deleted_at')
-                                ->whereNotIn('status', ['منتهٍ', 'ملغى'])->pluck('client_id')->filter())
-                            ->orderBy('name')->get(['id', 'name', 'company_id']));
+                    // v2.365.1: محاطٌ بحارس — الترويسةُ تُرسم في **كل** صفحة، وخادمٌ
+                    // وصلته الملفاتُ قبل هجراتها (سحبٌ بلا نشر) كان يسقط كلُّه
+                    // بـ500 لأن جدول engagements لم يُخلق بعد. غيابُ الجدول يُفقد
+                    // المبدّلَ وحده لا الموقع — والنشرُ الصحيح يعيده.
+                    try {
+                        $hubClientRows = \Illuminate\Support\Facades\Cache::remember('topbar:clients', 300,
+                            fn () => \App\Models\Client::whereNull('deleted_at')
+                                ->whereIn('id', \App\Models\Engagement::whereNull('deleted_at')
+                                    ->whereNotIn('status', ['منتهٍ', 'ملغى'])->pluck('client_id')->filter())
+                                ->orderBy('name')->get(['id', 'name', 'company_id']));
+                    } catch (\Throwable $hubKe) {
+                        $hubClientRows = collect();
+                    }
                     if (($hubKCos = hub_company_ids()) !== null) {
                         $hubClientRows = $hubClientRows->whereIn('company_id', $hubKCos);
                     }

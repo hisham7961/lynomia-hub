@@ -12,6 +12,10 @@
     </div>
 </div>
 
+<div class="card" style="margin-bottom:14px">
+    <a class="btn ghost sm" href="{{ route('mysec.index') }}">🔐 جلساتي وأجهزتي — راجِع أين حسابُك مفتوحٌ وأبطِل ما لا تعرفه</a>
+</div>
+
 <div class="kids">
 
     <div class="card kid">

@@ -26,6 +26,7 @@ use App\Http\Controllers\Web\ImportController;
 use App\Http\Controllers\Web\InboxDocController;
 use App\Http\Controllers\Web\ModuleController;
 use App\Http\Controllers\Web\MorningController;
+use App\Http\Controllers\Web\MySecurityController;
 use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\OdooController;
 use App\Http\Controllers\Web\PerformanceController;
@@ -376,12 +377,19 @@ Route::middleware('auth')->group(function () {
     Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('profile/password', [ProfileController::class, 'password'])->name('profile.password');
     Route::put('profile/notify', [ProfileController::class, 'notifyPrefs'])->name('profile.notify');
-    Route::post('profile/token', [ProfileController::class, 'tokenStore'])->name('profile.token.store');
+    Route::post('profile/token', [ProfileController::class, 'tokenStore'])->name('profile.token.store')->middleware('throttle:10,1');
     Route::delete('profile/token/{id}', [ProfileController::class, 'tokenRevoke'])->name('profile.token.revoke');
     Route::post('profile/token/{id}/rotate', [ProfileController::class, 'tokenRotate'])->name('profile.token.rotate');
     Route::post('profile/2fa/start', [ProfileController::class, 'twofaStart'])->name('profile.2fa.start');
     Route::post('profile/2fa/confirm', [ProfileController::class, 'twofaConfirm'])->name('profile.2fa.confirm');
     Route::post('profile/2fa/disable', [ProfileController::class, 'twofaDisable'])->name('profile.2fa.disable');
+
+    // أمني ذاتي: جلساتي وأجهزتي — لكل مستخدمٍ على نفسه (كان الإبطال للمالك فقط)
+    Route::get('my/security', [MySecurityController::class, 'index'])->name('mysec.index');
+    Route::post('my/security/sessions/{id}/revoke', [MySecurityController::class, 'revokeSession'])->name('mysec.session.revoke');
+    Route::post('my/security/sessions/others', [MySecurityController::class, 'revokeOthers'])->name('mysec.session.others');
+    Route::post('my/security/devices/{id}/trust', [MySecurityController::class, 'trustDevice'])->name('mysec.device.trust');
+    Route::post('my/security/devices/{id}/revoke', [MySecurityController::class, 'revokeDevice'])->name('mysec.device.revoke');
 
     // ── الإدارة ──
     Route::get('admin/users', [UserController::class, 'index'])->name('users.index');
@@ -497,14 +505,16 @@ Route::middleware('auth')->group(function () {
     Route::prefix('m/{module}')->name('m.')->group(function () {
         Route::get('/', [ModuleController::class, 'index'])->name('index');
         Route::get('board', [ModuleController::class, 'board'])->name('board');
-        Route::get('export', [ModuleController::class, 'export'])->name('export');
+        // التصدير مسارُ استنزافٍ جماعي — يُحدّ معدله كبقية المسارات الحساسة (v2.367)
+        Route::get('export', [ModuleController::class, 'export'])->name('export')->middleware('throttle:20,1');
         Route::get('create', [ModuleController::class, 'create'])->name('create');
         Route::get('import', [ImportController::class, 'form'])->name('import');
         Route::post('import', [ImportController::class, 'map'])->name('import.map');
         Route::post('import/run', [ImportController::class, 'run'])->name('import.run');
         Route::post('{id}/status', [ModuleController::class, 'setStatus'])->name('status');
-        Route::post('{id}/secret/{field}', [ModuleController::class, 'revealSecret'])->name('secret');
-        Route::post('bulk', [ModuleController::class, 'bulk'])->name('bulk');
+        // كشفُ السرّ فعلٌ حسّاس: بلا حدٍّ كانت جلسةٌ مخترقةٌ تحصد الخزنة بسرعة HTTP
+        Route::post('{id}/secret/{field}', [ModuleController::class, 'revealSecret'])->name('secret')->middleware('throttle:20,1');
+        Route::post('bulk', [ModuleController::class, 'bulk'])->name('bulk')->middleware('throttle:30,1');
         Route::post('/', [ModuleController::class, 'store'])->name('store');
         Route::get('{id}', [ModuleController::class, 'show'])->name('show');
         Route::get('{id}/edit', [ModuleController::class, 'edit'])->name('edit');

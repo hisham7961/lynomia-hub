@@ -40,6 +40,7 @@
         <button class="nav-item" data-section="receivables">استلام المستحقات</button>
         <button class="nav-item" data-section="purchases">المشتريات والموردين</button>
         <button class="nav-item" data-section="documents">الطلبات والفواتير</button>
+        <button class="nav-item" data-section="packing">قوائم التعبئة</button>
         <button class="nav-item" data-section="analytics">تحليل الربح</button>
         <button class="nav-item" data-section="settings">الشركات والإعدادات</button>
       </nav>
@@ -89,6 +90,14 @@
               <label>المخزون الحالي<input id="productStock" type="number" step="1" value="0" /></label>
               <label>حد تنبيه المخزون<input id="productMinStock" type="number" step="1" min="0" value="0" /></label>
               <label>وحدات الكرتونة<input id="productCarton" type="number" step="1" min="0" value="0" placeholder="كم قطعة في الكرتونة" /></label>
+              <div class="price-suggestion" style="grid-column:1/-1">🚚 اللوجستيات — بيانات الوزن والأبعاد للشحن وقوائم التعبئة (اختيارية، ولا تمسّ الأسعار أبدًا)</div>
+              <label>الوزن الصافي للوحدة<input id="productWeight" type="number" min="0" step="0.001" placeholder="مثال: 0.500" /></label>
+              <label>وحدة الوزن<select id="productWeightUnit"><option value="kg">kg — كيلوغرام</option><option value="g">g — غرام</option></select></label>
+              <label>وزن التغليف الافتراضي للوحدة<input id="productPackWeight" type="number" min="0" step="0.001" placeholder="وزن علبة الوحدة إن وجد" /></label>
+              <label>الطول<input id="productDimL" type="number" min="0" step="0.1" /></label>
+              <label>العرض<input id="productDimW" type="number" min="0" step="0.1" /></label>
+              <label>الارتفاع<input id="productDimH" type="number" min="0" step="0.1" /></label>
+              <label>وحدة الأبعاد<select id="productDimUnit"><option value="cm">cm</option><option value="m">m</option><option value="in">in</option></select></label>
               <label>عملة التكلفة<select id="productCurrency"><option>KWD</option><option>AED</option><option>SAR</option><option>USD</option><option>EUR</option><option>IQD</option></select></label>
               <label><span id="productCostRateText">سعر الصرف لعملة الشركة</span><input id="productCostRate" type="number" min="0" step="0.000001" value="1" /></label>
               <div class="price-suggestion" id="productCurrencyNote" style="grid-column:1/-1"></div>
@@ -258,6 +267,52 @@
         <div class="panel"><div class="panel-head"><div><h2>Sales Orders وProforma Invoices</h2><p>تُنشأ من عروض السعر المقبولة بدون إعادة إدخال البيانات</p></div></div><div class="table-wrap"><table><thead><tr><th>النوع</th><th>الرقم</th><th>مرجع العرض</th><th>العميل</th><th>التاريخ</th><th>الإجمالي</th><th></th></tr></thead><tbody id="documentsBody"></tbody></table></div></div>
       </section>
 
+      <section class="page-section" id="packingSection">
+        <div class="panel"><div class="panel-head"><div><h2>إنشاء قائمة تعبئة</h2><p>من فاتورة أو عرض مقبول — البيانات تُسحب ولا يُعاد إدخالها، والوزن لوجستيات محضة لا تمسّ الحسابات المالية</p></div></div>
+          <div class="quote-add-row" style="grid-template-columns:1fr auto;align-items:end">
+            <label>المستند المصدر<select id="plSource"><option value="">اختر فاتورة أو عرضًا مقبولًا</option></select></label>
+            <button class="btn primary" type="button" id="plCreateBtn">📦 إنشاء قائمة التعبئة</button>
+          </div>
+          <div class="price-suggestion hidden" id="plReadiness" style="margin-top:8px"></div>
+        </div>
+        <div class="panel hidden" id="plEditorPanel">
+          <div class="panel-head"><div><h2 id="plEditorTitle">قائمة تعبئة</h2><p id="plEditorSub"></p></div></div>
+          <div class="form-grid quote-meta">
+            <label>رقم القائمة<input id="plNumber" /></label>
+            <label>التاريخ<input id="plDate" type="date" /></label>
+            <label>الوجهة<input id="plDestination" placeholder="مدينة/ميناء التسليم" /></label>
+            <label>المرسل إليه (Consignee)<input id="plConsignee" placeholder="افتراضيًا: العميل نفسه" /></label>
+            <label>عنوان الشحن<input id="plShipAddress" /></label>
+            <label>ملاحظات<input id="plNotes" /></label>
+          </div>
+          <h3 style="margin:16px 0 6px">بنود الشحنة <small class="muted">المطلوب هنا = كمية المصدر ناقص ما عُبّئ في قوائم أخرى لنفس المستند</small></h3>
+          <div class="table-wrap"><table><thead><tr><th>المنتج</th><th>المطلوب</th><th>المعبأ</th><th>المتبقي</th><th>وزن الوحدة</th><th>وزن البند</th><th>الحالة</th><th></th></tr></thead><tbody id="plLinesBody"></tbody></table></div>
+          <h3 style="margin:16px 0 6px">الطرود</h3>
+          <div id="plPackages"></div>
+          <div class="quote-add-row" style="grid-template-columns:1fr 1fr auto auto;align-items:end;margin-top:8px">
+            <label>نوع الطرد الجديد<select id="plPkgType"><option value="Carton">كرتونة (Carton)</option><option value="Box">صندوق (Box)</option><option value="Pallet">طبلية (Pallet)</option><option value="Bag">كيس (Bag)</option><option value="Crate">قفص (Crate)</option><option value="Other">أخرى (Other)</option></select></label>
+            <label>وزن الطرد الفارغ Tare (kg)<input id="plPkgTare" type="number" min="0" step="0.001" value="0" /></label>
+            <button class="btn secondary" type="button" id="plAddPkgBtn">➕ طرد جديد</button>
+            <button class="btn dark" type="button" id="plPackAllBtn">⚡ عبّئ الكل في طرد واحد</button>
+          </div>
+          <div class="summary-stack" id="plTotalsBox" style="margin-top:14px"></div>
+          <div class="actions-row" style="margin-top:12px">
+            <button class="btn primary" type="button" id="plSaveBtn">💾 حفظ القائمة</button>
+            <button class="btn secondary" type="button" id="plPreviewBtn">👁 معاينة</button>
+            <button class="btn secondary" type="button" id="plPdfBtn">⬇️ تصدير PDF</button>
+            <button class="btn approval" type="button" id="plFinalizeBtn">✅ إنهاء القائمة (تجميد الأوزان)</button>
+            <button class="btn secondary" type="button" id="plCloseBtn">إغلاق المحرر</button>
+          </div>
+        </div>
+        <div class="panel"><div class="panel-head"><div><h2>سجل قوائم التعبئة</h2><p>النهائية مجمّدة الأوزان — تعديل وزن المنتج لاحقًا لا يغيّر قائمةً صدرت</p></div></div>
+          <div class="history-filters">
+            <label>الحالة<select id="plStatusFilter"><option value="">الكل</option><option value="draft">مسودة</option><option value="finalized">نهائية</option><option value="cancelled">ملغاة</option></select></label>
+            <label>بحث<input id="plSearch" placeholder="رقم القائمة أو المصدر أو العميل" /></label>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>الرقم</th><th>المصدر</th><th>العميل</th><th>التاريخ</th><th>الطرود</th><th>القطع</th><th>صافي/إجمالي</th><th>الحالة</th><th>إجراءات</th></tr></thead><tbody id="plTableBody"></tbody></table></div>
+        </div>
+      </section>
+
       <section class="page-section" id="analyticsSection">
         <div class="cards-grid four"><div class="stat-card"><span>مبيعات مقبولة</span><strong id="analyticsSales">0</strong><small id="analyticsSalesCur">KWD</small></div><div class="stat-card profit-card"><span>ربح فعلي</span><strong id="analyticsProfit">0</strong><small id="analyticsProfitCur">KWD</small></div><div class="stat-card"><span>هامش إجمالي</span><strong id="analyticsMargin">0%</strong></div><div class="stat-card"><span>أفضل منتج ربحًا</span><strong id="analyticsTopProduct">—</strong></div></div>
         <div class="two-col"><div class="panel"><div class="panel-head"><div><h2>الربح حسب المنتج</h2><p>العروض المقبولة، محولة لعملة الشركة بسعر الصرف المحفوظ</p></div></div><div class="table-wrap"><table><thead><tr><th>المنتج</th><th>المبيعات</th><th>التكلفة</th><th>الربح</th><th>الهامش</th></tr></thead><tbody id="analyticsProductsBody"></tbody></table></div></div><div class="panel"><div class="panel-head"><div><h2>الربح حسب العميل</h2><p>من يشتري كثيرًا ومن يحقق ربحًا ضعيفًا</p></div></div><div class="table-wrap"><table><thead><tr><th>العميل</th><th>المبيعات</th><th>الربح</th><th>الهامش</th><th>التقييم</th></tr></thead><tbody id="analyticsCustomersBody"></tbody></table></div></div></div>
@@ -316,7 +371,8 @@ const load = (key, fallback) => { try { const v = JSON.parse(localStorage.getIte
 const KEYS = {
   products:'qfu_products_v3', customers:'qfu_customers_v3', quotes:'qfu_quotes_v3', companies:'qfu_companies_v3',
   activeCompany:'qfu_active_company_v3', specialPrices:'qfu_special_prices_v3', priceLists:'qfu_price_lists_v3',
-  templates:'qfu_templates_v3', documents:'qfu_documents_v3', exchangeRates:'qfu_exchange_rates_v3', invoices:'qfu_invoices_v3', suppliers:'qfu_suppliers_v3', purchaseOrders:'qfu_purchase_orders_v3', backupMeta:'qfu_backup_meta_v3'
+  templates:'qfu_templates_v3', documents:'qfu_documents_v3', exchangeRates:'qfu_exchange_rates_v3', invoices:'qfu_invoices_v3', suppliers:'qfu_suppliers_v3', purchaseOrders:'qfu_purchase_orders_v3', backupMeta:'qfu_backup_meta_v3',
+  packingLists:'qfu_packing_lists_v3'
 };
 const OLD = {
   products:'qfp_products_v2', customers:'qfp_customers_v2', quotes:'qfp_quotes_v2', companies:'qfp_companies_v2',
@@ -350,6 +406,7 @@ const state = {
   purchaseOrders: load(KEYS.purchaseOrders, []),
   poItems: [],
   backupMeta: load(KEYS.backupMeta, {lastBackupAt:'', docCount:0, autoBackup:false}),
+  packingLists: load(KEYS.packingLists, []),
   quoteItems: [],
   templateDraftItems: [],
   currentApprovalApproved: false
@@ -375,6 +432,7 @@ function saveAll(){
   localStorage.setItem(KEYS.suppliers, JSON.stringify(state.suppliers));
   localStorage.setItem(KEYS.purchaseOrders, JSON.stringify(state.purchaseOrders));
   localStorage.setItem(KEYS.backupMeta, JSON.stringify(state.backupMeta));
+  localStorage.setItem(KEYS.packingLists, JSON.stringify(state.packingLists));
   if(typeof refreshBackupBanner==='function' && document.getElementById('backupBanner')) refreshBackupBanner();
   if(typeof scheduleAutoFileWrite==='function') scheduleAutoFileWrite();
 }
@@ -386,7 +444,8 @@ const pageMeta = {
   calculator:['حاسبة التسعير','Landed Cost وFOC ومقارنة سيناريوهات السعر'], templates:['قوالب العروض','عروض متكررة جاهزة للاستخدام'],
   quotation:['عرض سعر جديد','تسعير داخلي آمن مع PDF نظيف للعميل'], followup:['المتابعة','العروض المنتهية والمتابعة القادمة'],
   history:['سجل العروض','الإصدارات والحالات والموافقات والتحويل'], invoices:['الفواتير','إصدار فواتير مباشرة وتسجيل الدفعات ومتابعة التحصيل'], receivables:['استلام المستحقات','المتبقي على العملاء من الفواتير وتسجيل التحصيل'], purchases:['المشتريات والموردين','أوامر الشراء واستلام البضاعة ومستحقات الموردين'], documents:['الطلبات والفواتير','Sales Orders وProforma Invoices'],
-  analytics:['تحليل الربح','تحليل الربح حسب المنتج والعميل'], settings:['الشركات والإعدادات','بيانات الشركات وقواعد الموافقة والنسخ الاحتياطي']
+  analytics:['تحليل الربح','تحليل الربح حسب المنتج والعميل'], settings:['الشركات والإعدادات','بيانات الشركات وقواعد الموافقة والنسخ الاحتياطي'],
+  packing:['قوائم التعبئة','تعبئة الشحنات بالطرود والأوزان من الفواتير والعروض — بلا أثر على الحسابات المالية']
 };
 
 function activeCompany(){ return state.companies.find(c => c.id === state.activeCompanyId) || state.companies[0]; }
@@ -403,8 +462,13 @@ function statusBadge(status){ return `<span class="badge status-${esc(status)}">
 function marginBadge(margin, companyId){ const min = minMargin(companyId); if(margin >= min + 5) return '<span class="badge good">جيد</span>'; if(margin >= min) return '<span class="badge warn">مقبول</span>'; return '<span class="badge bad">منخفض</span>'; }
 function quoteKey(q){ return q.rootId || q.number; }
 function latestQuotes(quotes=state.quotes){ const map = new Map(); quotes.forEach(q => { const key=quoteKey(q), prev=map.get(key); if(!prev || num(q.version)>num(prev.version) || (num(q.version)===num(prev.version) && String(q.createdAt||'')>String(prev.createdAt||''))) map.set(key,q); }); return [...map.values()]; }
-function qnum(){ const year=new Date().getFullYear(), companyId=$('quoteCompany')?.value || state.activeCompanyId; const roots=new Set(state.quotes.filter(q=>q.companyId===companyId).map(quoteKey)); return `QT-${year}-${String(roots.size+1).padStart(4,'0')}`; }
-function docNumber(type){ const year=new Date().getFullYear(), prefix=type==='sales_order'?'SO':'PI'; const count=state.documents.filter(d=>d.companyId===state.activeCompanyId && d.type===type).length+1; return `${prefix}-${year}-${String(count).padStart(4,'0')}`; }
+/* v2.366: الترقيم بمسح أقصى لاحقةٍ قائمة لا بعدّ الصفوف — العدُّ كان يعيد رقمًا محذوفَ الصف
+   (حذفُ مستندٍ قديم = تصادمُ الرقم التالي مع مستندٍ حيّ)، ولا يعرف السنةَ إلا اسمًا
+   (أولُ 2027 كان يكمل عدّادَ 2026). الصيغةُ نفسُها، والأرقامُ القائمة لا تُمَسّ. */
+function nextDocNo(numbers, prefix, year){ const re=new RegExp('^'+prefix+'-'+year+'-(\\d+)$'); let max=0; numbers.forEach(n=>{ const m=re.exec(String(n||'').trim()); if(m) max=Math.max(max,parseInt(m[1],10)); }); return `${prefix}-${year}-${String(max+1).padStart(4,'0')}`; }
+function qnum(){ const year=new Date().getFullYear(), companyId=$('quoteCompany')?.value || state.activeCompanyId; return nextDocNo(state.quotes.filter(q=>q.companyId===companyId).map(q=>q.number),'QT',year); }
+function docNumber(type){ const year=new Date().getFullYear(), prefix=type==='sales_order'?'SO':'PI'; return nextDocNo(state.documents.filter(d=>d.companyId===state.activeCompanyId && d.type===type).map(d=>d.number),prefix,year); }
+function plNumberGen(companyId){ const year=new Date().getFullYear(); return nextDocNo(state.packingLists.filter(x=>x.companyId===(companyId||state.activeCompanyId)).map(x=>x.number),'PL',year); }
 
 function showSection(name){
   document.querySelectorAll('.page-section').forEach(s=>s.classList.remove('active'));
@@ -425,6 +489,7 @@ function showSection(name){
   if(name==='receivables'){ if(!$('stmtTo').value)$('stmtTo').value=today(); renderReceivables(); }
   if(name==='purchases'){ refreshAllSelectors(); if(!editingPOId && !state.poItems.length) resetPOForm(); renderPurchases(); }
   if(name==='documents') renderDocuments();
+  if(name==='packing') renderPacking();
   if(name==='analytics') renderAnalytics();
   if(name==='settings') refreshCompanyUI();
   window.scrollTo({top:0, behavior:'smooth'});
@@ -463,13 +528,19 @@ function renderDashboard(){
 
 /* تعبئة المنتجات بالكراتين: وحدات الكرتونة تأتي من المنتج (بالمعرّف أو بمطابقة
    الاسم للمستندات المطبوعة)، والكمية الأقل من كرتونة تظهر ككسر لا تعيق شيئاً. */
+/* ── الوزن: تحويل مركزي واحد إلى الكيلوغرام — لا منطق تحويل مكرر في الشاشات ── */
+const WEIGHT_UNITS={kg:1, g:0.001};                    // lb:0.45359237 وoz:0.028349523125 عند الحاجة — البنية جاهزة
+function qfKg(value,unit){ const v=num(value); return v>0? round(v*(WEIGHT_UNITS[unit||'kg']||1),6) : 0; }
+function productKg(p){ return p&&p.weight!=null? qfKg(p.weight,p.weightUnit) : 0; }
+function fmtKg(kg){ kg=num(kg); if(kg<=0)return '—'; return kg<1? `${round(kg*1000,1)} g` : `${round(kg,3)} kg`; }
 function qfCartonPer(productId,name){ let per=0; const p=productId?productById(productId):null; if(p)per=num(p.carton); if(!(per>0)&&name){ const key=String(name).trim().toLowerCase(); const m=state.products.find(x=>x.name&&x.name.trim().toLowerCase()===key); if(m)per=num(m.carton); } return per>0?per:0; }
 function qfCartonBreak(qty,per){ qty=num(qty); if(!(per>0)||qty<=0)return ''; const full=Math.floor(qty/per), loose=Math.round((qty-full*per)*100)/100, parts=[]; if(full>0)parts.push(full+' كرتونة'); if(loose>0)parts.push(loose+' قطعة'); return parts.join(' + ')||'0'; }
 function qfCartonNote(productId,name,qty){ const per=qfCartonPer(productId,name), t=qfCartonBreak(qty,per); return t?`<small class="muted" style="display:block;margin-top:3px">📦 ${t} <span style="opacity:.7">(الكرتونة ${per})</span></small>`:''; }
-function qfCartonDocNote(name,qty){ const per=qfCartonPer(null,name), t=qfCartonBreak(qty,per); return t?`<div style="font-size:11px;color:#64748b;margin-top:2px">📦 ${t} (الكرتونة ${per})</div>`:''; }
+// v2.366: تُمرَّر هوية المنتج لا اسمه وحده (تعديلُ اسمٍ كان يقطع الملاحظة عن مستندٍ تاريخي)، وتُعدّ القطعُ المشحونة كلُّها — المدفوعة والمجانية
+function qfCartonDocNote(productId,name,qty){ const per=qfCartonPer(productId,name), t=qfCartonBreak(qty,per); return t?`<div style="font-size:11px;color:#64748b;margin-top:2px">📦 ${t} (الكرتونة ${per})</div>`:''; }
 function renderProducts(){
   const companyId=state.activeCompanyId;
-  $('productsTableBody').innerHTML=state.products.map(p=>{ const baseCur=activeCompany().currency||'KWD', cost=productCostBase(p,companyId), sell=cost*(1+effectiveMarkup(p,null,companyId)/100), profit=sell-cost, margin=sell?profit/sell*100:0, curTag=p.costCurrency&&p.costCurrency!==baseCur?` • تكلفة ${esc(p.costCurrency)}`:''; return `<tr><td><strong>${esc(p.name)}</strong><br><small class="muted">${esc(p.brand||'')} ${p.sku?`• ${esc(p.sku)}`:''}${curTag}${num(p.carton)>0?` • كرتونة ${num(p.carton)} قطعة`:''}</small></td><td>${cost.toFixed(3)} ${baseCur}</td><td>${sell.toFixed(3)}</td><td><strong>${profit.toFixed(3)}</strong></td><td>${margin.toFixed(2)}%</td><td><span class="badge ${num(p.stock)<0?'bad':(num(p.minStock)>0&&num(p.stock)<=num(p.minStock)?'warn':'neutral')}">${num(p.stock)}</span>${reservedQty(p.id)>0?`<br><small class="muted">محجوز ${reservedQty(p.id)} • متاح ${num(p.stock)-reservedQty(p.id)}</small>`:''}</td><td>${marginBadge(margin,companyId)}</td><td><button class="icon-btn" onclick="editProduct('${p.id}')">تعديل</button><button class="icon-btn danger" onclick="deleteProduct('${p.id}')">حذف</button></td></tr>`; }).join('')||'<tr><td colspan="8" class="empty">لا توجد منتجات</td></tr>';
+  $('productsTableBody').innerHTML=state.products.map(p=>{ const baseCur=activeCompany().currency||'KWD', cost=productCostBase(p,companyId), sell=cost*(1+effectiveMarkup(p,null,companyId)/100), profit=sell-cost, margin=sell?profit/sell*100:0, curTag=p.costCurrency&&p.costCurrency!==baseCur?` • تكلفة ${esc(p.costCurrency)}`:''; return `<tr><td><strong>${esc(p.name)}</strong><br><small class="muted">${esc(p.brand||'')} ${p.sku?`• ${esc(p.sku)}`:''}${curTag}${num(p.carton)>0?` • كرتونة ${num(p.carton)} قطعة`:''}${productKg(p)>0?` • ⚖️ ${fmtKg(productKg(p))}`:''}</small></td><td>${cost.toFixed(3)} ${baseCur}</td><td>${sell.toFixed(3)}</td><td><strong>${profit.toFixed(3)}</strong></td><td>${margin.toFixed(2)}%</td><td><span class="badge ${num(p.stock)<0?'bad':(num(p.minStock)>0&&num(p.stock)<=num(p.minStock)?'warn':'neutral')}">${num(p.stock)}</span>${reservedQty(p.id)>0?`<br><small class="muted">محجوز ${reservedQty(p.id)} • متاح ${num(p.stock)-reservedQty(p.id)}</small>`:''}</td><td>${marginBadge(margin,companyId)}</td><td><button class="icon-btn" onclick="editProduct('${p.id}')">تعديل</button><button class="icon-btn danger" onclick="deleteProduct('${p.id}')">حذف</button></td></tr>`; }).join('')||'<tr><td colspan="8" class="empty">لا توجد منتجات</td></tr>';
   $('landedCostBody').innerHTML=state.products.map(p=>{ const baseCur=activeCompany().currency||'KWD', cur=p.costCurrency||baseCur; return `<tr><td><strong>${esc(p.name)}</strong></td><td><span class="badge neutral">${esc(cur)}</span></td><td>${num(p.purchase).toFixed(3)}</td><td>${num(p.freight ?? p.shipping).toFixed(3)}</td><td>${num(p.customs).toFixed(3)}</td><td>${num(p.clearance).toFixed(3)}</td><td>${num(p.handling).toFixed(3)}</td><td>${num(p.other).toFixed(3)}</td><td><strong>${productCost(p).toFixed(3)} ${esc(cur)}</strong></td><td><strong>${productCostBase(p).toFixed(3)} ${baseCur}</strong></td></tr>`; }).join('')||'<tr><td colspan="10" class="empty">لا توجد منتجات</td></tr>';
 }
 function renderRates(){
@@ -490,8 +561,16 @@ function updateProductCurrencyNote(){ const base=activeCompany().currency||'KWD'
 $('productCurrency').addEventListener('change',()=>{ const base=activeCompany().currency||'KWD', cur=$('productCurrency').value, rateEl=$('productCostRate'); if(cur!==base){ const r=getRate(cur,base); rateEl.value = r>0 ? round(r,6) : ''; updateProductCurrencyNote(); if(!(r>0)) rateEl.focus(); } else updateProductCurrencyNote(); });
 $('productCostRate').addEventListener('input',updateProductCurrencyNote);
 function resetProductForm(){ editingProductId=null; $('productForm').reset(); ['productFreight','productCustoms','productClearance','productHandling','productOther'].forEach(id=>$(id).value=0); $('productMarkup').value=30; $('productStock').value=0; $('productMinStock').value=0; $('productCarton').value=0; $('productCurrency').value=activeCompany().currency||'KWD'; $('productCostRate').value=1; updateProductCurrencyNote(); $('productSubmitBtn').textContent='حفظ المنتج'; $('productCancelBtn').classList.add('hidden'); }
-$('productForm').addEventListener('submit',e=>{ e.preventDefault(); const base=activeCompany().currency||'KWD', costCurrency=$('productCurrency').value, costRate=costCurrency===base?1:(num($('productCostRate').value)||0); if(costCurrency!==base && costRate<=0){ toast('أدخل سعر الصرف لعملة الشركة'); return; } const data={name:$('productName').value.trim(), sku:$('productSku').value.trim(), brand:$('productBrand').value.trim(), purchase:num($('productPurchase').value), freight:num($('productFreight').value), customs:num($('productCustoms').value), clearance:num($('productClearance').value), handling:num($('productHandling').value), other:num($('productOther').value), markup:num($('productMarkup').value), retail:num($('productRetail').value), stock:num($('productStock').value), minStock:Math.max(0,num($('productMinStock').value)), carton:Math.max(0,num($('productCarton').value)), costCurrency, costRate}; if(editingProductId){ const p=productById(editingProductId); if(p){ Object.assign(p,data); delete p.shipping; toast('تم تعديل المنتج'); } } else { state.products.push({id:uid('p'), ...data}); toast('تم حفظ المنتج'); } saveAll(); resetProductForm(); renderProducts(); refreshAllSelectors(); });
-window.editProduct=id=>{ const p=productById(id); if(!p) return; editingProductId=id; $('productName').value=p.name||''; $('productSku').value=p.sku||''; $('productBrand').value=p.brand||''; $('productPurchase').value=num(p.purchase); $('productFreight').value=num(p.freight ?? p.shipping); $('productCustoms').value=num(p.customs); $('productClearance').value=num(p.clearance); $('productHandling').value=num(p.handling); $('productOther').value=num(p.other); $('productMarkup').value=num(p.markup); $('productRetail').value=num(p.retail); $('productStock').value=num(p.stock); $('productMinStock').value=num(p.minStock); $('productCarton').value=num(p.carton); $('productCurrency').value=p.costCurrency||activeCompany().currency||'KWD'; $('productCostRate').value=num(p.costRate)||1; updateProductCurrencyNote(); $('productSubmitBtn').textContent='تحديث المنتج'; $('productCancelBtn').classList.remove('hidden'); $('productName').scrollIntoView({behavior:'smooth',block:'center'}); $('productName').focus(); };
+$('productForm').addEventListener('submit',e=>{ e.preventDefault(); const base=activeCompany().currency||'KWD', costCurrency=$('productCurrency').value, costRate=costCurrency===base?1:(num($('productCostRate').value)||0); if(costCurrency!==base && costRate<=0){ toast('أدخل سعر الصرف لعملة الشركة'); return; } const data={name:$('productName').value.trim(), sku:$('productSku').value.trim(), brand:$('productBrand').value.trim(), purchase:num($('productPurchase').value), freight:num($('productFreight').value), customs:num($('productCustoms').value), clearance:num($('productClearance').value), handling:num($('productHandling').value), other:num($('productOther').value), markup:num($('productMarkup').value), retail:num($('productRetail').value), stock:num($('productStock').value), minStock:Math.max(0,num($('productMinStock').value)), carton:Math.max(0,num($('productCarton').value)), costCurrency, costRate,
+  weight:$('productWeight').value===''?null:Math.max(0,num($('productWeight').value)), weightUnit:$('productWeightUnit').value||'kg',
+  packWeight:$('productPackWeight').value===''?null:Math.max(0,num($('productPackWeight').value)),
+  dimL:$('productDimL').value===''?null:Math.max(0,num($('productDimL').value)), dimW:$('productDimW').value===''?null:Math.max(0,num($('productDimW').value)),
+  dimH:$('productDimH').value===''?null:Math.max(0,num($('productDimH').value)), dimUnit:$('productDimUnit').value||'cm'};
+ if(editingProductId){ const p=productById(editingProductId); if(p){
+   // تغيّرُ الوزن يُدوَّن قبل أن يُكتب فوقه — تاريخُ اللوجستيات يُسأل لا يُخمَّن
+   if(qfKg(p.weight,p.weightUnit)!==qfKg(data.weight,data.weightUnit)){ p.weightLog=[...(p.weightLog||[]).slice(-29),{at:new Date().toISOString(),old:p.weight??null,oldUnit:p.weightUnit||'kg',now:data.weight??null,nowUnit:data.weightUnit}]; }
+   Object.assign(p,data); delete p.shipping; toast('تم تعديل المنتج'); } } else { state.products.push({id:uid('p'), ...data}); toast('تم حفظ المنتج'); } saveAll(); resetProductForm(); renderProducts(); refreshAllSelectors(); });
+window.editProduct=id=>{ const p=productById(id); if(!p) return; editingProductId=id; $('productName').value=p.name||''; $('productSku').value=p.sku||''; $('productBrand').value=p.brand||''; $('productPurchase').value=num(p.purchase); $('productFreight').value=num(p.freight ?? p.shipping); $('productCustoms').value=num(p.customs); $('productClearance').value=num(p.clearance); $('productHandling').value=num(p.handling); $('productOther').value=num(p.other); $('productMarkup').value=num(p.markup); $('productRetail').value=num(p.retail); $('productStock').value=num(p.stock); $('productMinStock').value=num(p.minStock); $('productCarton').value=num(p.carton); $('productWeight').value=p.weight??''; $('productWeightUnit').value=p.weightUnit||'kg'; $('productPackWeight').value=p.packWeight??''; $('productDimL').value=p.dimL??''; $('productDimW').value=p.dimW??''; $('productDimH').value=p.dimH??''; $('productDimUnit').value=p.dimUnit||'cm'; $('productCurrency').value=p.costCurrency||activeCompany().currency||'KWD'; $('productCostRate').value=num(p.costRate)||1; updateProductCurrencyNote(); $('productSubmitBtn').textContent='تحديث المنتج'; $('productCancelBtn').classList.remove('hidden'); $('productName').scrollIntoView({behavior:'smooth',block:'center'}); $('productName').focus(); };
 $('productCancelBtn').addEventListener('click',resetProductForm);
 window.deleteProduct=id=>{ if(!confirm('حذف هذا المنتج؟')) return; if(editingProductId===id) resetProductForm(); state.products=state.products.filter(p=>p.id!==id); state.specialPrices=state.specialPrices.filter(x=>x.productId!==id); state.priceLists.forEach(pl=>pl.rules=(pl.rules||[]).filter(r=>r.productId!==id)); saveAll(); renderProducts(); refreshAllSelectors(); };
 
@@ -623,7 +702,7 @@ function validateQuote(q, forSending=false){if(!q.customer){toast('اختر ال
 
 function buildClientDocument(q, title='QUOTATION', number=q.number){
   const co=q.company||companyById(q.companyId), c=q.customer||{}, cur=q.currency;
-  const rows=(q.items||[]).map((i,idx)=>`<tr><td>${idx+1}</td><td>${esc(i.name)}${qfCartonDocNote(i.name,num(i.qty))}</td><td>${num(i.qty)}</td><td>${num(i.foc)||'—'}</td><td>${money(i.customerPrice,cur)}</td><td>${money(num(i.qty)*num(i.customerPrice),cur)}</td>${num(i.retail)?`<td>${money(i.retail,cur)}</td>`:'<td>—</td>'}</tr>`).join('');
+  const rows=(q.items||[]).map((i,idx)=>`<tr><td>${idx+1}</td><td>${esc(i.name)}${qfCartonDocNote(i.productId,i.name,num(i.qty)+num(i.foc))}</td><td>${num(i.qty)}</td><td>${num(i.foc)||'—'}</td><td>${money(i.customerPrice,cur)}</td><td>${money(num(i.qty)*num(i.customerPrice),cur)}</td>${num(i.retail)?`<td>${money(i.retail,cur)}</td>`:'<td>—</td>'}</tr>`).join('');
   return `<div class="q-head"><div class="q-company">${co.logo?`<img class="q-logo" src="${co.logo}" alt="logo"/>`:''}<h2>${esc(co.name)}</h2><p>${esc(co.address||'')}</p><p>${esc(co.phone||'')} ${co.email?`• ${esc(co.email)}`:''}</p></div><div class="q-title"><h1>${title}</h1><p>No: ${esc(number)}</p>${q.version?`<p>Version: V${num(q.version)}</p>`:''}<p>Date: ${esc(q.date)}</p>${title==='QUOTATION'?`<p>Valid Until: ${esc(q.validUntil)}</p>`:''}${q.dueDate?`<p>Due Date: ${esc(q.dueDate)}</p>`:''}</div></div><div class="q-parties"><div class="q-block"><h4>BILL TO</h4><p><strong>${esc(c.company||'')}</strong></p><p>${esc(c.contact||'')}</p><p>${esc(c.address||'')}</p><p>${esc(c.country||'')}</p><p>${esc(c.phone||'')}</p></div><div class="q-block"><h4>TERMS</h4><p>Payment: ${esc(q.paymentTerms||'—')}</p><p>Currency: ${esc(cur)}</p>${co.tax?`<p>Tax No: ${esc(co.tax)}</p>`:''}</div></div><table class="q-table"><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>FOC</th><th>Unit Price</th><th>Total</th><th>Retail Price</th></tr></thead><tbody>${rows}</tbody></table><div class="q-totals"><div class="q-total-row"><span>Subtotal</span><strong>${money(q.subtotal,cur)}</strong></div>${num(q.discount)?`<div class="q-total-row"><span>Discount</span><strong>- ${money(q.discount,cur)}</strong></div>`:''}${num(q.vat)?`<div class="q-total-row"><span>VAT</span><strong>${money(q.vat,cur)}</strong></div>`:''}<div class="q-total-row grand"><span>Grand Total</span><strong>${money(q.grandTotal,cur)}</strong></div>${q.paid!=null&&num(q.paid)>0?`<div class="q-total-row"><span>Paid</span><strong>- ${money(q.paid,cur)}</strong></div><div class="q-total-row grand"><span>Balance Due</span><strong>${money(num(q.grandTotal)-num(q.paid),cur)}</strong></div>`:''}</div><div class="q-notes"><div><h4>Bank Details</h4><p>${esc(co.bank||'—')}</p></div><div><h4>Terms & Conditions</h4><p>${esc(co.terms||'—')}</p></div></div><div class="q-footer">${esc(co.name)} ${co.website?`• ${esc(co.website)}`:''}</div>`;
 }
 $('previewQuoteBtn').addEventListener('click',()=>{const q=currentQuote();if(!validateQuote(q))return;$('previewTitle').textContent='معاينة عرض السعر';$('quoteDocument').innerHTML=buildClientDocument(q);$('previewModal').classList.add('open');});
@@ -717,7 +796,7 @@ $('newCompanyBtn').addEventListener('click',()=>{editingCompanyId=null;pendingLo
 $('deleteCompanyBtn').addEventListener('click',()=>{if(state.companies.length<=1){toast('يجب بقاء شركة واحدة على الأقل');return;}if(!editingCompanyId||!confirm('حذف هذه الشركة؟'))return;state.companies=state.companies.filter(c=>c.id!==editingCompanyId);if(state.activeCompanyId===editingCompanyId)state.activeCompanyId=state.companies[0].id;saveAll();refreshCompanyUI();renderDashboard();toast('تم حذف الشركة');});
 
 function docCountAll(){ return state.invoices.length+state.quotes.length+state.purchaseOrders.length; }
-function backupDataObject(){ return {version:5,exportedAt:new Date().toISOString(),products:state.products,customers:state.customers,quotes:state.quotes,companies:state.companies,activeCompanyId:state.activeCompanyId,specialPrices:state.specialPrices,priceLists:state.priceLists,templates:state.templates,documents:state.documents,invoices:state.invoices,exchangeRates:state.exchangeRates,suppliers:state.suppliers,purchaseOrders:state.purchaseOrders,backupMeta:state.backupMeta}; }
+function backupDataObject(){ return {version:5,exportedAt:new Date().toISOString(),products:state.products,customers:state.customers,quotes:state.quotes,companies:state.companies,activeCompanyId:state.activeCompanyId,specialPrices:state.specialPrices,priceLists:state.priceLists,templates:state.templates,documents:state.documents,invoices:state.invoices,exchangeRates:state.exchangeRates,suppliers:state.suppliers,purchaseOrders:state.purchaseOrders,backupMeta:state.backupMeta,packingLists:state.packingLists}; }
 function doExportBackup(){ const data=backupDataObject();const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`quoteflow-ultimate-backup-${today()}.json`;a.click();URL.revokeObjectURL(a.href); state.backupMeta.lastBackupAt=new Date().toISOString(); state.backupMeta.docCount=docCountAll(); saveAll(); }
 $('exportBackupBtn').addEventListener('click',()=>{ doExportBackup(); toast('تم تنزيل النسخة الاحتياطية'); });
 var backupBannerDismissed=false;
@@ -727,7 +806,7 @@ $('backupNowBtn').addEventListener('click',()=>{ doExportBackup(); toast('تم �
 $('backupLaterBtn').addEventListener('click',()=>{ backupBannerDismissed=true; refreshBackupBanner(); });
 function refreshAutoBackupBtn(){ $('autoBackupToggleBtn').textContent=state.backupMeta.autoBackup?'النسخ التلقائي الأسبوعي: مفعّل ✓':'تفعيل النسخ التلقائي الأسبوعي'; }
 $('autoBackupToggleBtn').addEventListener('click',()=>{ state.backupMeta.autoBackup=!state.backupMeta.autoBackup; saveAll(); refreshAutoBackupBtn(); toast(state.backupMeta.autoBackup?'تم التفعيل — سيُنزَّل ملف نسخة تلقائيًا عند فتح النظام إذا مضى أسبوع':'تم إيقاف النسخ التلقائي'); });
-function applyBackupData(d){ if(!Array.isArray(d.products)||!Array.isArray(d.customers)||!Array.isArray(d.quotes)||!Array.isArray(d.companies))throw new Error('invalid');state.products=d.products;state.customers=d.customers;state.quotes=d.quotes;state.companies=d.companies;state.activeCompanyId=d.activeCompanyId&&d.companies.some(c=>c.id===d.activeCompanyId)?d.activeCompanyId:d.companies[0].id;state.specialPrices=Array.isArray(d.specialPrices)?d.specialPrices:[];state.priceLists=Array.isArray(d.priceLists)?d.priceLists:[];state.templates=Array.isArray(d.templates)?d.templates:[];state.documents=Array.isArray(d.documents)?d.documents:[];state.invoices=Array.isArray(d.invoices)?d.invoices:[];if(d.exchangeRates&&d.exchangeRates.rates)state.exchangeRates=d.exchangeRates;state.suppliers=Array.isArray(d.suppliers)?d.suppliers:[];state.purchaseOrders=Array.isArray(d.purchaseOrders)?d.purchaseOrders:[];if(d.backupMeta)state.backupMeta={...state.backupMeta,...d.backupMeta};migratePaymentsAndStock();saveAll();refreshCompanyUI();refreshAllSelectors();renderProducts();renderCustomers();renderSpecialPrices();renderPriceLists();renderTemplates();renderHistory();renderDashboard();renderDocuments();renderAnalytics();resetQuote();resetInvoiceForm();renderInvoices();resetPOForm();resetSupplierForm();renderPurchases(); }
+function applyBackupData(d){ if(!Array.isArray(d.products)||!Array.isArray(d.customers)||!Array.isArray(d.quotes)||!Array.isArray(d.companies))throw new Error('invalid');state.products=d.products;state.customers=d.customers;state.quotes=d.quotes;state.companies=d.companies;state.activeCompanyId=d.activeCompanyId&&d.companies.some(c=>c.id===d.activeCompanyId)?d.activeCompanyId:d.companies[0].id;state.specialPrices=Array.isArray(d.specialPrices)?d.specialPrices:[];state.priceLists=Array.isArray(d.priceLists)?d.priceLists:[];state.templates=Array.isArray(d.templates)?d.templates:[];state.documents=Array.isArray(d.documents)?d.documents:[];state.invoices=Array.isArray(d.invoices)?d.invoices:[];if(d.exchangeRates&&d.exchangeRates.rates)state.exchangeRates=d.exchangeRates;state.suppliers=Array.isArray(d.suppliers)?d.suppliers:[];state.purchaseOrders=Array.isArray(d.purchaseOrders)?d.purchaseOrders:[];if(d.backupMeta)state.backupMeta={...state.backupMeta,...d.backupMeta};state.packingLists=Array.isArray(d.packingLists)?d.packingLists:[];migratePaymentsAndStock();saveAll();refreshCompanyUI();refreshAllSelectors();renderProducts();renderCustomers();renderSpecialPrices();renderPriceLists();renderTemplates();renderHistory();renderDashboard();renderDocuments();renderAnalytics();resetQuote();resetInvoiceForm();renderInvoices();resetPOForm();resetSupplierForm();renderPurchases(); }
 $('importBackupInput').addEventListener('change',e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{applyBackupData(JSON.parse(r.result));toast('تم استيراد النسخة الاحتياطية');}catch{toast('ملف النسخة الاحتياطية غير صالح');}};r.readAsText(f);});
 $('resetDataBtn').addEventListener('click',()=>{if(!confirm('سيتم حذف جميع البيانات. هل أنت متأكد؟'))return;Object.values(KEYS).forEach(k=>localStorage.removeItem(k));location.reload();});
 
@@ -738,7 +817,7 @@ function availabilityText(p,need){ const stock=num(p.stock), res=reservedQty(p.i
 function applyStock(items,sign){ (items||[]).forEach(i=>{ const p=productById(i.productId); if(p) p.stock=round(num(p.stock)+sign*(num(i.qty)+num(i.foc)),3); }); }
 function stockWarnings(){ const low=state.products.filter(p=>num(p.stock)<0).map(p=>p.name); return low.length?`تنبيه: مخزون سالب في ${low.join('، ')}`:''; }
 let editingInvoiceId=null, lastInvCurrency='';
-function invNumberGen(){ const year=new Date().getFullYear(), companyId=$('invCompany')?.value||state.activeCompanyId; const count=state.invoices.filter(v=>v.companyId===companyId).length+1; return `INV-${year}-${String(count).padStart(4,'0')}`; }
+function invNumberGen(){ const year=new Date().getFullYear(), companyId=$('invCompany')?.value||state.activeCompanyId; return nextDocNo(state.invoices.filter(v=>v.companyId===companyId).map(v=>v.number),'INV',year); }
 function autoFillInvRate(){ const base=companyById($('invCompany').value).currency||'KWD', cur=$('invCurrency').value, r=cur===base?1:getRate(cur,base); $('invExchangeRate').value = r>0 ? round(r,6) : 1; }
 function invoiceTotals(){ const subtotal=state.invoiceItems.reduce((s,i)=>s+num(i.qty)*num(i.price),0), discountRate=num($('invDiscount').value), discount=subtotal*discountRate/100, net=subtotal-discount, vatRate=num($('invVat').value), vat=net*vatRate/100, grand=net+vat; return {subtotal,discountRate,discount,net,vatRate,vat,grand}; }
 function renderInvItems(){ const cur=$('invCurrency').value||'KWD', rate=Math.max(0.000001,num($('invExchangeRate').value)||1); $('invItemsBody').innerHTML=state.invoiceItems.map((i,idx)=>{ const cost=num(i.unitCostBase)/rate, rev=num(i.qty)*num(i.price), profit=rev-(num(i.qty)+num(i.foc))*cost, mg=rev?profit/rev*100:0; return `<tr><td><strong>${esc(i.name)}</strong></td><td><input type="number" min="0" value="${num(i.qty)}" style="width:84px;border:1px solid var(--line);border-radius:8px;padding:7px;background:var(--field,#fff)" onchange="editInvItem(${idx},'qty',this.value)" />${qfCartonNote(i.productId,i.name,num(i.qty))}</td><td><input type="number" min="0" value="${num(i.foc)}" style="width:84px;border:1px solid var(--line);border-radius:8px;padding:7px;background:var(--field,#fff)" onchange="editInvItem(${idx},'foc',this.value)" /></td><td><input type="number" min="0" step="0.001" value="${num(i.price)}" style="width:84px;border:1px solid var(--line);border-radius:8px;padding:7px;background:var(--field,#fff)" onchange="editInvItem(${idx},'price',this.value)" /></td><td><strong>${money(rev,cur)}</strong></td><td><strong>${money(profit,cur)}</strong></td><td>${mg.toFixed(1)}% ${marginBadge(mg,$('invCompany').value)}</td><td><button class="icon-btn danger" onclick="removeInvItem(${idx})">حذف</button></td></tr>`; }).join('')||'<tr><td colspan="8" class="empty">أضف منتجات إلى الفاتورة</td></tr>'; updateInvSummary(); }
@@ -764,7 +843,7 @@ function resetInvoiceForm(){ editingInvoiceId=null; refreshCompanySelectors(); r
 function currentInvoice(){ const company=companyById($('invCompany').value), customer=customerById($('invCustomer').value)||null, t=invoiceTotals(), date=$('invDate').value||today(), dueDays=Math.max(0,num($('invDueDays').value)); return { id:editingInvoiceId||uid('inv'), number:$('invNumber').value.trim()||invNumberGen(), companyId:company.id, company:deep(company), customer:customer?deep(customer):null, date, dueDays, dueDate:addDays(date,dueDays), currency:$('invCurrency').value, exchangeRate:num($('invExchangeRate').value)||1, paymentTerms:$('invTerms').value.trim(), quoteRef:$('invQuoteRef').value.trim(), items:deep(state.invoiceItems), ...t, grandTotal:t.grand, paid:num($('invPaid').value), createdAt:new Date().toISOString() }; }
 function validateInvoice(v){ if(!v.customer){toast('اختر العميل');return false;} if(!v.items.length){toast('أضف منتجًا واحدًا على الأقل');return false;} return true; }
 $('invSaveBtn').addEventListener('click',()=>{ const v=currentInvoice(); if(!validateInvoice(v))return; if(editingInvoiceId){ const i=state.invoices.findIndex(x=>x.id===editingInvoiceId); if(i>-1){ const old=state.invoices[i]; v.createdAt=old.createdAt; v.payments=deep(old.payments||[]); applyStock(old.items,+1); applyStock(v.items,-1); state.invoices[i]=v; } toast(`تم تعديل ${v.number}`); } else { if(state.invoices.some(x=>x.number===v.number)){toast('رقم الفاتورة مستخدم مسبقًا');return;} v.payments=[]; applyStock(v.items,-1); state.invoices.push(v); toast(`تم حفظ ${v.number}`); } v.paid=round((v.payments||[]).reduce((s,p)=>s+num(p.amount),0),3); $('invPaid').value=v.paid; saveAll(); editingInvoiceId=v.id; $('invSaveBtn').textContent='تحديث الفاتورة'; renderInvoices(); renderReceivables(); renderProducts(); renderDashboard(); const w=stockWarnings(); if(w)toast(w); });
-function invoiceDocObject(v){ return {...deep(v), items:(v.items||[]).map(i=>({name:i.name,qty:i.qty,foc:i.foc,customerPrice:i.price,retail:0})), validUntil:'', version:0}; }
+function invoiceDocObject(v){ return {...deep(v), items:(v.items||[]).map(i=>({productId:i.productId,name:i.name,qty:i.qty,foc:i.foc,customerPrice:i.price,retail:0})), validUntil:'', version:0}; }
 $('invPreviewBtn').addEventListener('click',()=>{ const v=currentInvoice(); if(!validateInvoice(v))return; $('previewTitle').textContent='معاينة الفاتورة'; $('quoteDocument').innerHTML=buildClientDocument(invoiceDocObject(v),'INVOICE',v.number); $('previewModal').classList.add('open'); });
 $('invPdfBtn').addEventListener('click',async()=>{ const v=currentInvoice(); if(!validateInvoice(v))return; await downloadHtmlPdf(buildClientDocument(invoiceDocObject(v),'INVOICE',v.number),`${v.number}.pdf`); });
 function invStatusOf(v){ const bal=num(v.grandTotal)-num(v.paid), overdue=v.dueDate && v.dueDate<today(); if(bal<=0.0005)return {label:'مدفوعة',cls:'good'}; if(num(v.paid)>0)return overdue?{label:'جزئية متأخرة',cls:'bad'}:{label:'مدفوعة جزئيًا',cls:'warn'}; return overdue?{label:'متأخرة',cls:'bad'}:{label:'غير مدفوعة',cls:'neutral'}; }
@@ -809,7 +888,7 @@ $('invFoc').addEventListener('input',updateInvPriceSuggestion);
 /* ===== Suppliers & Purchase Orders ===== */
 let editingSupplierId=null, editingPOId=null;
 function supplierById(id){ return state.suppliers.find(s=>s.id===id); }
-function poNumberGen(){ const year=new Date().getFullYear(), count=state.purchaseOrders.filter(o=>o.companyId===state.activeCompanyId).length+1; return `PO-${year}-${String(count).padStart(4,'0')}`; }
+function poNumberGen(){ const year=new Date().getFullYear(); return nextDocNo(state.purchaseOrders.filter(o=>o.companyId===state.activeCompanyId).map(o=>o.number),'PO',year); }
 function resetSupplierForm(){ editingSupplierId=null; $('supplierForm').reset(); $('supCurrency').value='USD'; $('supSubmitBtn').textContent='حفظ المورد'; $('supCancelBtn').classList.add('hidden'); }
 $('supplierForm').addEventListener('submit',e=>{ e.preventDefault(); const data={name:$('supName').value.trim(), contact:$('supContact').value.trim(), phone:$('supPhone').value.trim(), email:$('supEmail').value.trim(), country:$('supCountry').value.trim(), currency:$('supCurrency').value, terms:$('supTerms').value.trim()}; if(editingSupplierId){ const s=supplierById(editingSupplierId); if(s){Object.assign(s,data); toast('تم تعديل المورد');} } else { state.suppliers.push({id:uid('sup'),...data}); toast('تم حفظ المورد'); } saveAll(); resetSupplierForm(); renderPurchases(); });
 window.editSupplier=id=>{ const s=supplierById(id); if(!s)return; editingSupplierId=id; $('supName').value=s.name||''; $('supContact').value=s.contact||''; $('supPhone').value=s.phone||''; $('supEmail').value=s.email||''; $('supCountry').value=s.country||''; $('supCurrency').value=s.currency||'USD'; $('supTerms').value=s.terms||''; $('supSubmitBtn').textContent='تحديث المورد'; $('supCancelBtn').classList.remove('hidden'); $('supName').scrollIntoView({behavior:'smooth',block:'center'}); $('supName').focus(); };
@@ -839,7 +918,7 @@ window.loadPO=id=>{ const o=state.purchaseOrders.find(x=>x.id===id); if(!o)retur
 window.receivePO=id=>{ const o=state.purchaseOrders.find(x=>x.id===id); if(!o||o.status==='received')return; if(!confirm(`تأكيد استلام ${o.number}؟ سيُضاف ${o.items.reduce((s,i)=>s+num(i.qty)+num(i.foc),0)} وحدة إلى المخزون (شامل FOC).`))return; o.status='received'; o.receivedAt=today(); applyStock(o.items,+1); saveAll(); renderPurchases(); renderProducts(); renderDashboard(); toast(`تم الاستلام — أُضيفت الكميات للمخزون`); };
 window.unreceivePO=id=>{ const o=state.purchaseOrders.find(x=>x.id===id); if(!o||o.status!=='received')return; if(!confirm('إلغاء الاستلام وخصم الكميات من المخزون؟'))return; o.status='ordered'; delete o.receivedAt; applyStock(o.items,-1); saveAll(); renderPurchases(); renderProducts(); renderDashboard(); };
 window.deletePO=id=>{ const o=state.purchaseOrders.find(x=>x.id===id); if(!o)return; if(!confirm(o.status==='received'?'حذف أمر الشراء وخصم كمياته من المخزون؟':'حذف أمر الشراء؟'))return; if(o.status==='received')applyStock(o.items,-1); if(editingPOId===id)resetPOForm(); state.purchaseOrders=state.purchaseOrders.filter(x=>x.id!==id); saveAll(); renderPurchases(); renderProducts(); renderDashboard(); };
-function poDocObject(o){ return {companyId:o.companyId, company:companyById(o.companyId), customer:{company:o.supplier?.name||'', contact:o.supplier?.contact||'', address:'', country:o.supplier?.country||'', phone:o.supplier?.phone||''}, items:(o.items||[]).map(i=>({name:i.name,qty:i.qty,foc:num(i.foc)||0,customerPrice:i.unitCost,retail:0})), subtotal:o.subtotal, discount:0, vat:0, grandTotal:o.grandTotal, currency:o.currency, date:o.date, dueDate:o.dueDate, paymentTerms:o.supplier?.terms||'', paid:o.paid, validUntil:'', version:0}; }
+function poDocObject(o){ return {companyId:o.companyId, company:companyById(o.companyId), customer:{company:o.supplier?.name||'', contact:o.supplier?.contact||'', address:'', country:o.supplier?.country||'', phone:o.supplier?.phone||''}, items:(o.items||[]).map(i=>({productId:i.productId,name:i.name,qty:i.qty,foc:num(i.foc)||0,customerPrice:i.unitCost,retail:0})), subtotal:o.subtotal, discount:0, vat:0, grandTotal:o.grandTotal, currency:o.currency, date:o.date, dueDate:o.dueDate, paymentTerms:o.supplier?.terms||'', paid:o.paid, validUntil:'', version:0}; }
 $('poPreviewBtn').addEventListener('click',()=>{ const oo=currentPO(); if(!validatePO(oo))return; $('previewTitle').textContent='معاينة أمر الشراء'; $('quoteDocument').innerHTML=poFullDoc(oo); $('previewModal').classList.add('open'); });
 $('poPdfBtn').addEventListener('click',async()=>{ const oo=currentPO(); if(!validatePO(oo))return; await downloadHtmlPdf(poFullDoc(oo),`${oo.number}.pdf`); });
 /* ===== Supplier price list + PO account history ===== */
@@ -935,6 +1014,176 @@ $('stmtPdfBtn').addEventListener('click',async()=>{ const ctx=statementCtx(); if
 window.recFilterCustomer=key=>{ $('recCustomerFilter').value=key; renderReceivables(); };
 $('recCustomerFilter').addEventListener('change',renderReceivables);
 $('recSearch').addEventListener('input',renderReceivables);
+
+/* ═════════ قوائم التعبئة (Packing Lists) — v2.366 ═════════
+   لوجستيات محضة فوق الفواتير والعروض القائمة: لا تلمس سعرًا ولا ضريبةً ولا رصيدًا.
+   البنودُ تلقّط وزنَ الوحدة لحظةَ الإنشاء (كما unitCostBase تمامًا) فالقائمةُ
+   النهائية تاريخٌ مجمّد لا يتغيّر بتعديل المنتج بعدها. */
+let plDraft=null;
+const PL_STATUS={draft:'مسودة', finalized:'نهائية', cancelled:'ملغاة'};
+const PL_PKG_AR={Carton:'كرتونة',Box:'صندوق',Pallet:'طبلية',Bag:'كيس',Crate:'قفص',Other:'أخرى'};
+function plById(id){ return state.packingLists.find(x=>x.id===id); }
+function plSourceDocs(){ const inv=state.invoices.filter(v=>v.companyId===state.activeCompanyId).map(v=>({kind:'invoice',doc:v,label:`فاتورة ${v.number} — ${v.customer?.company||'—'}`}));
+  const qs=latestQuotes().filter(q=>q.companyId===state.activeCompanyId&&q.status==='accepted').map(q=>({kind:'quote',doc:q,label:`عرض مقبول ${q.number} — ${q.customer?.company||'—'}`}));
+  return [...inv,...qs]; }
+/* ما عُبّئ من المستند نفسه في قوائم أخرى (غير الملغاة) — منعُ تعبئة الكمية مرتين عبر شحنات جزئية */
+function plPackedElsewhere(kind,sourceId,excludeId){ const m={}; state.packingLists.forEach(pl=>{ if(pl.id===excludeId||pl.status==='cancelled')return; if(pl.sourceKind!==kind||pl.sourceId!==sourceId)return; (pl.packages||[]).forEach(g=>(g.items||[]).forEach(it=>{ m[it.productId]=round((m[it.productId]||0)+num(it.qty),3); })); }); return m; }
+function plFromSource(kind,doc){ const used=plPackedElsewhere(kind,doc.id,null), lines=[];
+  (doc.items||[]).forEach(i=>{ const total=round(num(i.qty)+num(i.foc),3), prev=num(used[i.productId]), need=round(Math.max(0,total-prev),3); if(need<=0)return;
+    const p=productById(i.productId), kg=p?productKg(p):0;
+    lines.push({productId:i.productId,name:i.name,sku:i.sku||p?.sku||'',qty:need,sourceQty:total,prevPacked:prev,unitWeightKg:kg,weightSource:kg>0?'product':'missing',carton:p?num(p.carton):0}); });
+  if(!lines.length){ toast('لا كمية متبقية للتعبئة — عُبّئ هذا المستند كاملًا في قوائم سابقة'); return null; }
+  return {id:uid('pl'), number:plNumberGen(doc.companyId), status:'draft', date:today(), createdAt:new Date().toISOString(),
+    companyId:doc.companyId, company:deep(doc.company||companyById(doc.companyId)||{}), customer:doc.customer?deep(doc.customer):null,
+    sourceKind:kind, sourceId:doc.id, sourceNumber:doc.number, consignee:'', shipAddress:doc.customer?.address||'', destination:doc.customer?.country||'', notes:'', lines, packages:[], revisions:[]}; }
+function plLineOf(pl,productId){ return (pl.lines||[]).find(l=>l.productId===productId); }
+function plPacked(pl,productId){ let s=0; (pl.packages||[]).forEach(g=>(g.items||[]).forEach(it=>{ if(it.productId===productId)s+=num(it.qty); })); return round(s,3); }
+function plLineState(pl,l){ const packed=plPacked(pl,l.productId), rem=round(num(l.qty)-packed,3);
+  if(rem<0)return{packed,rem,label:'زائد عن المطلوب!',cls:'bad'}; if(packed<=0)return{packed,rem,label:'غير معبأ',cls:'neutral'};
+  return rem>0?{packed,rem,label:'جزئي',cls:'warn'}:{packed,rem,label:'مكتمل',cls:'good'}; }
+function plPkgCalc(pl,g){ let net=0,units=0; (g.items||[]).forEach(it=>{ const l=plLineOf(pl,it.productId); net+=num(it.qty)*num(l?.unitWeightKg); units+=num(it.qty); }); const tare=round(Math.max(0,num(g.tare)),6); net=round(net,6); return {net,units:round(units,3),tare,gross:round(net+tare,6)}; }
+function plTotals(pl){ let net=0,tare=0,units=0; (pl.packages||[]).forEach(g=>{ const c=plPkgCalc(pl,g); net+=c.net;tare+=c.tare;units+=c.units; }); return {packages:(pl.packages||[]).length,units:round(units,3),net:round(net,6),tare:round(tare,6),gross:round(net+tare,6)}; }
+function plCollectMeta(){ if(!plDraft)return; plDraft.number=$('plNumber').value.trim()||plDraft.number; plDraft.date=$('plDate').value||plDraft.date; plDraft.destination=$('plDestination').value.trim(); plDraft.consignee=$('plConsignee').value.trim(); plDraft.shipAddress=$('plShipAddress').value.trim(); plDraft.notes=$('plNotes').value.trim(); }
+function renderPacking(){
+  const opts=plSourceDocs(); $('plSource').innerHTML='<option value="">اختر فاتورة أو عرضًا مقبولًا</option>'+opts.map((s,i)=>`<option value="${i}">${esc(s.label)}</option>`).join('');
+  const noW=state.products.filter(p=>productKg(p)<=0); const rd=$('plReadiness');
+  if(noW.length){ rd.classList.remove('hidden'); rd.innerHTML=`⚖️ <b>${noW.length}</b> منتجًا بلا وزن مسجَّل: ${esc(noW.slice(0,6).map(p=>p.name).join('، '))}${noW.length>6?'…':''} — سجّل الوزن من نموذج المنتج (قسم اللوجستيات) ليدخل الحساب تلقائيًا.`; } else rd.classList.add('hidden');
+  const st=$('plStatusFilter').value, q=$('plSearch').value.trim().toLowerCase();
+  const rows=[...state.packingLists].filter(x=>x.companyId===state.activeCompanyId)
+    .filter(x=>!st||x.status===st)
+    .filter(x=>!q||String(x.number).toLowerCase().includes(q)||String(x.sourceNumber).toLowerCase().includes(q)||String(x.customer?.company||'').toLowerCase().includes(q))
+    .sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  $('plTableBody').innerHTML=rows.map(x=>{ const t=plTotals(x), cls=x.status==='finalized'?'good':(x.status==='cancelled'?'bad':'neutral');
+    const acts=[`<button class="icon-btn" onclick="plView('${x.id}')">عرض</button>`,`<button class="icon-btn" onclick="plPdfOf('${x.id}')">PDF</button>`];
+    if(x.status==='draft'){ acts.push(`<button class="icon-btn" onclick="plOpen('${x.id}')">تعديل</button>`,`<button class="icon-btn danger" onclick="plDelete('${x.id}')">حذف</button>`,`<button class="icon-btn danger" onclick="plCancel('${x.id}')">إلغاء</button>`); }
+    if(x.status==='finalized'){ acts.push(`<button class="icon-btn" onclick="plReopen('${x.id}')">إعادة فتح</button>`,`<button class="icon-btn danger" onclick="plCancel('${x.id}')">إلغاء</button>`); }
+    return `<tr><td><strong>${esc(x.number)}</strong>${(x.revisions||[]).length?`<br><small class="muted">مراجعات: ${x.revisions.length}</small>`:''}</td><td>${esc(x.sourceNumber||'—')}</td><td>${esc(x.customer?.company||'—')}</td><td>${esc(x.date)}</td><td>${t.packages}</td><td>${t.units}</td><td><small>صافي ${fmtKg(t.net)}<br>إجمالي ${fmtKg(t.gross)}</small></td><td><span class="badge ${cls}">${PL_STATUS[x.status]||esc(x.status)}</span></td><td>${acts.join('')}</td></tr>`;
+  }).join('')||'<tr><td colspan="9" class="empty">لا قوائم تعبئة بعد — أنشئ الأولى من فاتورة أعلاه</td></tr>';
+  if(plDraft) renderPLEditor(); else $('plEditorPanel').classList.add('hidden');
+}
+function renderPLEditor(){ const pl=plDraft; if(!pl)return; $('plEditorPanel').classList.remove('hidden');
+  $('plEditorTitle').textContent=`قائمة تعبئة ${pl.number}`;
+  $('plEditorSub').textContent=`المصدر: ${pl.sourceKind==='invoice'?'فاتورة':'عرض'} ${pl.sourceNumber} — ${pl.customer?.company||'بلا عميل'}`;
+  $('plNumber').value=pl.number; $('plDate').value=pl.date; $('plDestination').value=pl.destination||''; $('plConsignee').value=pl.consignee||''; $('plShipAddress').value=pl.shipAddress||''; $('plNotes').value=pl.notes||'';
+  $('plLinesBody').innerHTML=(pl.lines||[]).map(l=>{ const st=plLineState(pl,l), lw=num(l.unitWeightKg);
+    const wCell=lw>0?`${fmtKg(lw)}${l.weightSource==='manual'?' <small class="muted">(مؤقت)</small>':''}`:`<span class="badge bad">الوزن مفقود</span>`;
+    const wActs=lw>0?'':`<button class="icon-btn" onclick="plSetProductWeight('${l.productId}')">سجّل وزن المنتج</button><button class="icon-btn" onclick="plTempWeight('${l.productId}')">وزن مؤقت</button>`;
+    return `<tr><td><strong>${esc(l.name)}</strong>${l.sku?`<br><small class="muted">${esc(l.sku)}</small>`:''}${num(l.prevPacked)>0?`<br><small class="muted">عُبّئ سابقًا ${num(l.prevPacked)} من أصل ${num(l.sourceQty)}</small>`:''}</td><td>${num(l.qty)}</td><td>${st.packed}</td><td><strong>${st.rem}</strong></td><td>${wCell}</td><td>${fmtKg(round(st.packed*lw,6))}</td><td><span class="badge ${st.cls}">${st.label}</span></td><td>${wActs}</td></tr>`;
+  }).join('')||'<tr><td colspan="8" class="empty">لا بنود</td></tr>';
+  $('plPackages').innerHTML=(pl.packages||[]).map((g,gi)=>{ const c=plPkgCalc(pl,g);
+    const itemOpts=(pl.lines||[]).map(l=>`<option value="${l.productId}">${esc(l.name)}</option>`).join('');
+    const rows=(g.items||[]).map((it,ii)=>{ const l=plLineOf(pl,it.productId);
+      return `<tr><td>${esc(l?.name||'؟')}</td><td><input type="number" min="0" step="1" value="${num(it.qty)}" style="width:84px;border:1px solid var(--line);border-radius:8px;padding:6px" onchange="plSetItemQty(${gi},${ii},this.value)" /></td><td>${fmtKg(round(num(it.qty)*num(l?.unitWeightKg),6))}</td><td><button class="icon-btn danger" onclick="plDelItem(${gi},${ii})">إزالة</button></td></tr>`; }).join('')||'<tr><td colspan="4" class="empty">طرد فارغ — أضف بنودًا</td></tr>';
+    return `<div class="panel" style="margin:10px 0;padding:14px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+        <strong>📦 طرد ${gi+1} — ${PL_PKG_AR[g.type]||esc(g.type)}</strong>
+        <span><small class="muted">صافي ${fmtKg(c.net)} + فارغ ${fmtKg(c.tare)} = إجمالي <b>${fmtKg(c.gross)}</b> · ${c.units} قطعة</small></span>
+        <span><button class="icon-btn" onclick="plDupPkg(${gi})">تكرار</button><button class="icon-btn danger" onclick="plDelPkg(${gi})">حذف الطرد</button></span>
+      </div>
+      <div class="quote-add-row" style="grid-template-columns:repeat(3,1fr) 2fr;align-items:end;margin:8px 0">
+        <label>Tare (kg)<input type="number" min="0" step="0.001" value="${num(g.tare)}" onchange="plSetPkg(${gi},'tare',this.value)" /></label>
+        <label>الأبعاد سم (ط×ع×ا)<input value="${esc(g.dims||'')}" placeholder="اختياري: 40×30×30" onchange="plSetPkg(${gi},'dims',this.value)" /></label>
+        <label>ملاحظة الطرد<input value="${esc(g.note||'')}" onchange="plSetPkg(${gi},'note',this.value)" /></label>
+        <div class="quote-add-row" style="grid-template-columns:1fr auto auto auto;align-items:end;margin:0">
+          <label>البند<select id="plPkgItemSel${gi}">${itemOpts}</select></label>
+          <input id="plPkgItemQty${gi}" type="number" min="1" step="1" placeholder="كمية" style="width:80px;border:1px solid var(--line);border-radius:8px;padding:8px" />
+          <button class="icon-btn" onclick="plAddItem(${gi})">إضافة</button>
+          <button class="icon-btn" onclick="plAddRemaining(${gi})">أضف المتبقي</button>
+        </div>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>المنتج</th><th>الكمية</th><th>الوزن</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    </div>`; }).join('')||'<div class="empty-mini" style="padding:10px">لا طرود بعد — أنشئ طردًا ثم وزّع البنود عليه</div>';
+  const t=plTotals(pl);
+  $('plTotalsBox').innerHTML=`<div class="summary-box"><span>عدد الطرود</span><strong>${t.packages}</strong></div><div class="summary-box"><span>إجمالي القطع</span><strong>${t.units}</strong></div><div class="summary-box"><span>الوزن الصافي</span><strong>${fmtKg(t.net)}</strong></div><div class="summary-box"><span>وزن الفوارغ</span><strong>${fmtKg(t.tare)}</strong></div><div class="summary-box"><span>الوزن الإجمالي</span><strong>${fmtKg(t.gross)}</strong></div>`;
+}
+window.plView=id=>{ const pl=plById(id); if(!pl)return; $('previewTitle').textContent=`قائمة تعبئة ${pl.number}`; $('quoteDocument').innerHTML=buildPackingListDoc(pl); $('previewModal').classList.add('open'); };
+window.plPdfOf=async id=>{ const pl=plById(id); if(!pl)return; await downloadHtmlPdf(buildPackingListDoc(pl),`${pl.number}.pdf`); };
+window.plOpen=id=>{ const pl=plById(id); if(!pl)return; if(pl.status!=='draft'){ toast('القائمة النهائية لا تُحرَّر — أعد فتحها أولًا'); return; } plDraft=deep(pl); renderPLEditor(); $('plEditorPanel').scrollIntoView({behavior:'smooth'}); };
+window.plSetPkg=(gi,k,v)=>{ const g=plDraft?.packages[gi]; if(!g)return; g[k]=k==='tare'?Math.max(0,num(v)):String(v).trim(); renderPLEditor(); };
+window.plDelPkg=gi=>{ if(!plDraft)return; if(!confirm('حذف هذا الطرد وما فيه؟'))return; plDraft.packages.splice(gi,1); renderPLEditor(); };
+window.plDupPkg=gi=>{ const g=plDraft?.packages[gi]; if(!g)return; plDraft.packages.push({...deep(g), id:uid('pk'), items:[]}); renderPLEditor(); toast('كُرّر الطرد فارغًا — البضاعة لا تُنسخ كي لا تُعبأ مرتين'); };
+window.plAddItem=gi=>{ const g=plDraft?.packages[gi]; if(!g)return; const pid=$(`plPkgItemSel${gi}`).value, qty=Math.max(0,Math.round(num($(`plPkgItemQty${gi}`).value)));
+  if(!pid||qty<=0){ toast('اختر البند وأدخل كمية'); return; }
+  const st=plLineState(plDraft,plLineOf(plDraft,pid)); if(qty>st.rem){ toast(`⚠️ الكمية تتجاوز المتبقي (${st.rem}) — التعبئة الزائدة مرفوضة`); return; }
+  const ex=g.items.find(it=>it.productId===pid); if(ex)ex.qty=round(num(ex.qty)+qty,3); else g.items.push({productId:pid,qty});
+  renderPLEditor(); };
+window.plAddRemaining=gi=>{ const g=plDraft?.packages[gi]; if(!g)return; const pid=$(`plPkgItemSel${gi}`).value; if(!pid){toast('اختر البند');return;}
+  const st=plLineState(plDraft,plLineOf(plDraft,pid)); if(st.rem<=0){ toast('لا متبقي من هذا البند'); return; }
+  const ex=g.items.find(it=>it.productId===pid); if(ex)ex.qty=round(num(ex.qty)+st.rem,3); else g.items.push({productId:pid,qty:st.rem});
+  renderPLEditor(); };
+window.plDelItem=(gi,ii)=>{ plDraft?.packages[gi]?.items.splice(ii,1); renderPLEditor(); };
+window.plSetItemQty=(gi,ii,v)=>{ const g=plDraft?.packages[gi]; if(!g)return; const it=g.items[ii]; if(!it)return; const q=Math.max(0,Math.round(num(v)));
+  const others=plPacked(plDraft,it.productId)-num(it.qty), line=plLineOf(plDraft,it.productId);
+  if(others+q>num(line?.qty)){ toast(`⚠️ المجموع يتجاوز المطلوب (${num(line?.qty)}) — عُدّلت للكمية القصوى`); it.qty=Math.max(0,round(num(line?.qty)-others,3)); } else it.qty=q;
+  renderPLEditor(); };
+window.plSetProductWeight=pid=>{ const p=productById(pid); if(!p||!plDraft)return; const v=prompt(`وزن الوحدة الصافي بالكيلوغرام لـ«${p.name}» (مثال 0.5):`); if(v===null)return; const kg=num(v);
+  if(kg<=0){ toast('أدخل وزنًا موجبًا'); return; }
+  p.weightLog=[...(p.weightLog||[]).slice(-29),{at:new Date().toISOString(),old:p.weight??null,oldUnit:p.weightUnit||'kg',now:kg,nowUnit:'kg'}];
+  p.weight=kg; p.weightUnit='kg'; const l=plLineOf(plDraft,pid); if(l){ l.unitWeightKg=round(kg,6); l.weightSource='product'; }
+  saveAll(); renderPLEditor(); toast('سُجّل الوزن على المنتج نفسه — سيخدم كل القوائم القادمة'); };
+window.plTempWeight=pid=>{ if(!plDraft)return; const l=plLineOf(plDraft,pid); if(!l)return; const v=prompt(`وزن مؤقت بالكيلوغرام لهذه القائمة فقط — «${l.name}»:`); if(v===null)return; const kg=num(v);
+  if(kg<=0){ toast('أدخل وزنًا موجبًا'); return; }
+  l.unitWeightKg=round(kg,6); l.weightSource='manual'; renderPLEditor(); toast('وزن مؤقت على هذه القائمة فقط — المنتج نفسه بقي بلا وزن'); };
+function plPersistDraft(){ plCollectMeta(); const dup=state.packingLists.some(x=>x.id!==plDraft.id&&x.companyId===plDraft.companyId&&x.number===plDraft.number);
+  if(dup){ toast('رقم القائمة مستخدم — غيّره'); return false; }
+  const i=state.packingLists.findIndex(x=>x.id===plDraft.id); if(i>=0)state.packingLists[i]=deep(plDraft); else state.packingLists.push(deep(plDraft));
+  saveAll(); return true; }
+function plValidateFinalize(pl){ let packedAny=false;
+  for(const l of pl.lines){ const st=plLineState(pl,l); if(st.rem<0){ toast(`⚠️ «${l.name}» معبأ أكثر من المطلوب — صحّح قبل الإنهاء`); return false; }
+    if(st.packed>0){ packedAny=true; if(num(l.unitWeightKg)<=0){ toast(`⚖️ «${l.name}» بلا وزن — سجّل وزن المنتج أو وزنًا مؤقتًا قبل الإنهاء`); return false; } } }
+  if(!packedAny){ toast('لا شيء معبأ — وزّع البنود على الطرود أولًا'); return false; }
+  if(!(pl.packages||[]).length){ toast('أنشئ طردًا واحدًا على الأقل'); return false; }
+  const left=pl.lines.filter(l=>plLineState(pl,l).rem>0);
+  if(left.length&&!confirm(`سيبقى ${left.length} بندًا غير مكتمل التعبئة (يُعبأ في قائمة لاحقة لنفس المستند). إنهاء كشحنة جزئية؟`))return false;
+  return true; }
+$('plCreateBtn').addEventListener('click',()=>{ const i=$('plSource').value; if(i===''){ toast('اختر المستند المصدر'); return; }
+  const s=plSourceDocs()[num(i)]; if(!s)return; const pl=plFromSource(s.kind,s.doc); if(!pl)return; plDraft=pl; renderPLEditor(); $('plEditorPanel').scrollIntoView({behavior:'smooth'}); });
+$('plAddPkgBtn').addEventListener('click',()=>{ if(!plDraft){ toast('أنشئ أو افتح قائمة أولًا'); return; }
+  plDraft.packages.push({id:uid('pk'),type:$('plPkgType').value,tare:Math.max(0,num($('plPkgTare').value)),dims:'',note:'',items:[]}); renderPLEditor(); });
+$('plPackAllBtn').addEventListener('click',()=>{ if(!plDraft)return; const g={id:uid('pk'),type:$('plPkgType').value,tare:Math.max(0,num($('plPkgTare').value)),dims:'',note:'',items:[]};
+  plDraft.lines.forEach(l=>{ const st=plLineState(plDraft,l); if(st.rem>0)g.items.push({productId:l.productId,qty:st.rem}); });
+  if(!g.items.length){ toast('لا متبقي للتعبئة'); return; } plDraft.packages.push(g); renderPLEditor(); });
+$('plSaveBtn').addEventListener('click',()=>{ if(!plDraft)return; if(plPersistDraft()){ toast('حُفظت قائمة التعبئة'); renderPacking(); } });
+$('plPreviewBtn').addEventListener('click',()=>{ if(!plDraft)return; plCollectMeta(); $('previewTitle').textContent=`معاينة ${plDraft.number}`; $('quoteDocument').innerHTML=buildPackingListDoc(plDraft); $('previewModal').classList.add('open'); });
+$('plPdfBtn').addEventListener('click',async()=>{ if(!plDraft)return; plCollectMeta(); await downloadHtmlPdf(buildPackingListDoc(plDraft),`${plDraft.number}.pdf`); });
+$('plFinalizeBtn').addEventListener('click',()=>{ if(!plDraft)return; plCollectMeta(); if(!plValidateFinalize(plDraft))return;
+  plDraft.status='finalized'; plDraft.finalizedAt=new Date().toISOString(); if(plPersistDraft()){ toast('✅ أُنهيت القائمة وجُمّدت أوزانها'); plDraft=null; renderPacking(); } else plDraft.status='draft'; });
+$('plCloseBtn').addEventListener('click',()=>{ plDraft=null; renderPacking(); });
+window.plDelete=id=>{ const pl=plById(id); if(!pl||pl.status!=='draft')return; if(!confirm('حذف هذه المسودة نهائيًا؟'))return; state.packingLists=state.packingLists.filter(x=>x.id!==id); if(plDraft?.id===id)plDraft=null; saveAll(); renderPacking(); };
+window.plCancel=id=>{ const pl=plById(id); if(!pl)return; if(!confirm('إلغاء القائمة؟ تُستبعد كميّاتها من حساب «المعبأ سابقًا» ويحلّ محلّها غيرها'))return; pl.status='cancelled'; pl.cancelledAt=new Date().toISOString(); saveAll(); renderPacking(); };
+window.plReopen=id=>{ const pl=plById(id); if(!pl||pl.status!=='finalized')return; const reason=prompt('سبب إعادة الفتح (يُدوَّن في سجل المراجعات):'); if(reason===null)return;
+  pl.revisions=[...(pl.revisions||[]),{at:new Date().toISOString(),reason:String(reason).trim()||'—',from:'finalized'}]; pl.status='draft'; saveAll(); plDraft=deep(pl); renderPacking(); toast('أُعيد فتحها مسودةً — والمراجعة مدوَّنة'); };
+$('plStatusFilter').addEventListener('input',renderPacking); $('plSearch').addEventListener('input',renderPacking);
+/* PDF قائمة التعبئة — إنجليزي LTR كسائر المستندات المطبوعة، ويقرأ اللقطة لا المنتج الحي */
+function buildPackingListDoc(pl){ const co=pl.company||companyById(pl.companyId)||{}, c=pl.customer||{}, t=plTotals(pl);
+  const sumRows=(pl.lines||[]).filter(l=>plPacked(pl,l.productId)>0).map((l,i)=>{ const packed=plPacked(pl,l.productId), lw=num(l.unitWeightKg);
+    return `<tr><td>${i+1}</td><td>${esc(l.name)}</td><td>${esc(l.sku||'—')}</td><td>${packed}</td><td>${lw>0?round(lw,3)+' kg':'—'}</td><td>${lw>0?round(packed*lw,3)+' kg':'—'}</td></tr>`; }).join('');
+  const pkgBlocks=(pl.packages||[]).map((g,gi)=>{ const cc=plPkgCalc(pl,g);
+    const rows=(g.items||[]).map(it=>{ const l=plLineOf(pl,it.productId); const lw=num(l?.unitWeightKg);
+      return `<tr><td>${esc(l?.name||'?')}</td><td>${num(it.qty)}</td><td>${lw>0?round(num(it.qty)*lw,3)+' kg':'—'}</td></tr>`; }).join('');
+    return `<div style="margin-top:16px"><div style="font-size:12px;font-weight:700;color:#315efb">PACKAGE ${gi+1} — ${esc(String(g.type||'CARTON').toUpperCase())}${g.dims?` · ${esc(g.dims)} cm`:''}${g.note?` · ${esc(g.note)}`:''}</div>
+      <table class="q-table" style="margin-top:6px"><thead><tr><th>Description</th><th>Qty</th><th>Net Wt</th></tr></thead><tbody>${rows}</tbody></table>
+      <div style="text-align:right;font-size:11px;margin-top:4px;color:#334155">Net ${round(cc.net,3)} kg · Tare ${round(cc.tare,3)} kg · <b>Gross ${round(cc.gross,3)} kg</b></div></div>`; }).join('');
+  return `<div class="q-head">
+      <div class="q-company">${co.logo?`<img class="q-logo" src="${co.logo}" alt="logo"/>`:''}<h2>${esc(co.name||'')}</h2><p>${esc(co.address||'')}</p><p>${esc(co.phone||'')} ${co.email?`• ${esc(co.email)}`:''}</p></div>
+      <div class="q-title"><h1>PACKING LIST</h1><p>No: ${esc(pl.number)}</p><p>Date: ${esc(pl.date)}</p><p>Ref: ${esc(pl.sourceNumber||'—')}</p>${pl.status==='finalized'?'<p><b>FINAL</b></p>':'<p>DRAFT</p>'}</div>
+    </div>
+    <div class="q-parties">
+      <div class="q-block"><h4>SHIP TO / CONSIGNEE</h4><p><strong>${esc(pl.consignee||c.company||'')}</strong></p><p>${esc(pl.shipAddress||c.address||'')}</p><p>${esc(pl.destination||c.country||'')}</p><p>${esc(c.phone||'')}</p></div>
+      <div class="q-block"><h4>SHIPMENT</h4><p>Source: ${esc(pl.sourceKind==='invoice'?'Invoice':'Quotation')} ${esc(pl.sourceNumber||'')}</p><p>Total Packages: ${t.packages}</p><p>Total Units: ${t.units}</p></div>
+    </div>
+    <table class="q-table"><thead><tr><th>#</th><th>Description</th><th>SKU</th><th>Qty</th><th>Unit Net Wt</th><th>Total Net Wt</th></tr></thead><tbody>${sumRows||'<tr><td colspan="6">—</td></tr>'}</tbody></table>
+    ${pkgBlocks}
+    <div class="q-totals">
+      <div class="q-total-row"><span>Total Packages</span><strong>${t.packages}</strong></div>
+      <div class="q-total-row"><span>Total Units</span><strong>${t.units}</strong></div>
+      <div class="q-total-row"><span>Net Weight</span><strong>${round(t.net,3)} kg</strong></div>
+      <div class="q-total-row"><span>Tare Weight</span><strong>${round(t.tare,3)} kg</strong></div>
+      <div class="q-total-row grand"><span>Gross Weight</span><strong>${round(t.gross,3)} kg</strong></div>
+    </div>
+    ${pl.notes?`<div class="q-notes"><div><h4>Notes</h4><p>${esc(pl.notes)}</p></div><div></div></div>`:''}
+    ${poStampHtml({companyId:pl.companyId})}
+    <div class="q-footer">${esc(co.name||'')} ${co.website?`• ${esc(co.website)}`:''}</div>`; }
 
 /* ===== Auto save & restore to a real file (File System Access API) ===== */
 var autoFileState={supported:('showSaveFilePicker' in window), handle:null, ready:false};
