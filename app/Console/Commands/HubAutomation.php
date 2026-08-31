@@ -655,6 +655,10 @@ class HubAutomation extends Command
                     ->where('last_seen_at', '<', now()->subDays($ipKeep))->delete();
             }
 
+            // **ونقاطُ المسار الخام** (v2.371): سياسةُ خصوصيةٍ صريحة — الإحداثيات
+            // الدقيقة لا تبقى للأبد؛ المسارُ المبسَّط على الجلسة يكفي للتاريخ.
+            $n += \App\Support\Tracking::prune();
+
             return $n;
         } catch (\Throwable $e) {
             report($e);
