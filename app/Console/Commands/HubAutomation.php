@@ -641,6 +641,20 @@ class HubAutomation extends Command
                 $n += \App\Support\Discovery\Engine::prune();
             }
 
+            // **سياسة احتفاظٍ لبيانات الأمن** (v2.369): سجلُّ الجلسات وألفةُ العناوين
+            // لا يُحتفَظ بهما للأبد — بياناتُ تتبّعٍ حسّاسةٌ تُقلَّم بمدّةٍ مضبوطة.
+            // (السلسلةُ التدقيقيةُ تبقى للأبد عمداً: كشفُ العبث يحتاج التاريخَ كلَّه.)
+            $sessKeep = max(30, (int) setting('security.sessions_keep_days', 180));
+            if (\Illuminate\Support\Facades\Schema::hasTable('sessions_log')) {
+                $n += \Illuminate\Support\Facades\DB::table('sessions_log')
+                    ->where('last_seen_at', '<', now()->subDays($sessKeep))->where('revoked', true)->delete();
+            }
+            $ipKeep = max(30, (int) setting('security.ip_keep_days', 365));
+            if (\Illuminate\Support\Facades\Schema::hasTable('user_ips')) {
+                $n += \Illuminate\Support\Facades\DB::table('user_ips')
+                    ->where('last_seen_at', '<', now()->subDays($ipKeep))->delete();
+            }
+
             return $n;
         } catch (\Throwable $e) {
             report($e);
