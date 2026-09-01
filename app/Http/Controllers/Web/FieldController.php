@@ -65,9 +65,14 @@ class FieldController extends Controller
     public function index()
     {
         $this->gate();
-        $sessions = hub_screen('field.sessions', 60, function () {
-            return DB::table('track_sessions')->whereNull('deleted_at')
-                ->orderByDesc('started_at')->orderByDesc('id')->limit(50)
+        // **عزلُ الشركات على مسارات GPS الحسّاسة**: المشرفُ المحصورُ بشركاتٍ لا يرى
+        // جلساتِ غيرها (كما تُنطَّق الزياراتُ في dashboard). المالك = كل الشركات.
+        $cids = hub_company_ids();
+        $sessions = hub_screen('field.sessions', 60, function () use ($cids) {
+            $q = DB::table('track_sessions')->whereNull('deleted_at');
+            if ($cids !== null) $q->whereIn('company_id', $cids);
+
+            return $q->orderByDesc('started_at')->orderByDesc('id')->limit(50)
                 ->get(['id', 'emp_id', 'field_day', 'status', 'point_count', 'distance_m', 'started_at', 'ended_at']);
         }, ['track_sessions']);
         $names = hub_ref_labels('hr', collect($sessions)->pluck('emp_id')->unique()->values()->all());
@@ -80,6 +85,10 @@ class FieldController extends Controller
     {
         $this->gate();
         $s = TrackSession::whereKey($id)->firstOrFail();
+
+        // العزلُ الصارم: جلسةٌ خارج شركات المشرف = 404 (كنمط findOrFail بعد النطاق)
+        $cids = hub_company_ids();
+        abort_if($cids !== null && ! in_array((string) $s->company_id, $cids, true), 404);
 
         // المسارُ المبسَّط للمشرف؛ النقاطُ الخام للمالك وحده (سياسةُ الدور)
         $line = (array) ($s->simplified ?? []);
