@@ -3318,6 +3318,32 @@ if (! function_exists('hub_service_costs')) {
     }
 }
 
+if (! function_exists('hub_fin_outstanding')) {
+    /**
+     * **التعريفُ الواحدُ للمستحقّ المتأخّر** — كان مُكرَّراً في خمسةِ مواضعَ بقاعدتين
+     * متضاربتين (بعضُها يعتمد عمودَ `state` الذي لا محرّكَ يحوّله إلى «متأخرة»، وبعضُها
+     * يستعمل `kind = 'فاتورة'` المجرّدة التي لا تطابق أنواعَ الدخل الحقيقية «فاتورة
+     * مبيعات»/«دفعة واردة» — عيبٌ يحرسه `LyingMetricsRound7Test`). هنا يُوحَّد على
+     * الأساس **الموثوق**: نوعٌ من الدخل، وحالةٌ ليست مسدَّدةً/ملغاةً/مسودة، ومتبقٍّ
+     * موجبٌ حسابياً (`total − COALESCE(paid,0) > 0`)، واستحقاقٌ فات (اختياريّاً بعتبةِ أيام).
+     *
+     * يأخذ استعلامَ `fin_documents` (منطَّقاً مسبقاً بالمُنادي إن لزم) ويُطبّق المُرشِّح،
+     * فلا يفرض نطاقاً بنفسه — التنطيقُ مسؤوليةُ المُنادي كبقيّة الاستعلامات.
+     *
+     * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder  $q
+     */
+    function hub_fin_outstanding($q, int $minDays = 0)
+    {
+        $income = (array) (config('hub.fin.income', []) ?: ['فاتورة مبيعات']);
+        $cut = now()->subDays(max(0, $minDays))->toDateString();
+
+        return $q->whereIn('kind', $income)
+            ->whereNotIn('state', ['مدفوعة', 'ملغاة', 'مسودة'])
+            ->whereNotNull('due')->whereDate('due', '<', $cut)
+            ->whereRaw('COALESCE(total,0) - COALESCE(paid,0) > 0');
+    }
+}
+
 if (! function_exists('hub_recommendations')) {
     /**
      * مركز التوصيات: يجمع إشاراتٍ قابلة للتنفيذ من محرّكات النظام القائمة —
@@ -3423,12 +3449,12 @@ if (! function_exists('hub_recommendations')) {
             // ٥) مستحقات غير محصّلة قديمة
             try {
                 if (\Illuminate\Support\Facades\Schema::hasTable('fin_documents')) {
-                    $overdue = \Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at')
-                        ->where('kind', 'فاتورة')
-                        ->whereRaw('COALESCE(paid,0) < COALESCE(total,0)')
-                        ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
-                        ->whereNotNull('due')->whereDate('due', '<', now()->toDateString())
-                        ->orderBy('due')->limit(6)->get(['id', 'doc_no', 'partner', 'total', 'paid', 'due']);
+                    // التعريفُ الموحَّد `hub_fin_outstanding` (أنواعُ الدخل الحقيقية لا
+                    // «فاتورة» المجرّدة)، منطَّقٌ بـhub_scope كبقيّة كُتل المركز.
+                    $base = hub_scope(\Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at'), 'fin')
+                        ->when($projectId, fn ($q) => $q->where('project_id', $projectId));
+                    $overdue = hub_fin_outstanding($base)
+                        ->orderBy('due')->orderBy('id')->limit(6)->get(['id', 'doc_no', 'partner', 'total', 'paid', 'due']);
                     foreach ($overdue as $d) {
                         $rem = (float) ($d->total ?? 0) - (float) ($d->paid ?? 0);
                         $days = (int) \Illuminate\Support\Carbon::parse($d->due)->diffInDays(now());

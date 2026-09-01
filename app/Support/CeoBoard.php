@@ -90,9 +90,10 @@ class CeoBoard
             // ثلاثةُ تصحيحات: (١) النوع — كانت فواتير **المشتريات** تُحسب مستحقاتٍ
             // لنا؛ (٢) `total - NULL = NULL` فالفاتورة التي لم يُدفع منها شيء —
             // وهي أسوأها — كانت تسقط من المجموع؛ (٣) النطاق.
-            $agedQ = $fin->whereIn('kind', (array) config('hub.fin.income', []) ?: ['فاتورة مبيعات'])
-                ->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة'])
-                ->whereNotNull('due')->where('due', '<', now()->subDays(60)->toDateString());
+            // التعريفُ الموحَّد `hub_fin_outstanding` بعتبةِ ٦٠ يوماً — نفسُ حالات
+            // «مرسلة/مدفوعة جزئياً/متأخرة» (هنّ بالضبط ما ليس مسدَّداً/ملغىً/مسودة)
+            // مع اشتراطِ المتبقّي الموجب، فالمجموعُ لا يتغيّر ويُصبح تعريفاً واحداً.
+            $agedQ = hub_fin_outstanding(clone $fin, 60);
             // استنساخٌ قبل التجميع: `sum()` ينفّذ الاستعلام، ونريد العملات أيضاً
             $aged = (float) (clone $agedQ)->sum(DB::raw('total - COALESCE(paid, 0)'));
             if ($aged > 0) $out[] = ['icon' => '⏳', 'amount' => $aged,
