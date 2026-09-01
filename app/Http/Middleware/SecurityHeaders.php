@@ -16,7 +16,11 @@ class SecurityHeaders
             $response->header('X-Frame-Options', 'SAMEORIGIN');
             $response->header('X-Content-Type-Options', 'nosniff');
             $response->header('Referrer-Policy', 'strict-origin-when-cross-origin');
-            $response->header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+            // الكاميرا والميكروفون محظوران؛ والموقع **مسموحٌ لأصلنا وحده** `(self)`
+            // لا مفتوحٌ للجميع ولا محظورٌ كلياً: التقاطُ موقع الحضور والتنفيذ الميدانيّ
+            // يحتاجه (بموافقة المتصفح لحظياً)، وكان `geolocation=()` يحجبه بصمتٍ حتى
+            // عن صفحاتنا. `(self)` يقصره على مستنداتنا ويمنع أيَّ إطارٍ أجنبيّ من طلبه.
+            $response->header('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
 
             // **HSTS — يُثبّت HTTPS ويمنع هبوطَ الاتصال** (v2.357): النظامُ خلف تسجيل
             // دخولٍ وكعكةُ جلسته `secure`، فلا معنى لقبول HTTP. تُرسَل فقط على اتصالٍ

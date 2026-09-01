@@ -469,4 +469,69 @@ class V1Controller extends ModuleController
             default => ['type' => 'none', 'gtin' => (bool) ($hit['gtin'] ?? false)],
         });
     }
+
+    /* ────────── تتبّع المسار الميدانيّ (الجوال) ────────── */
+
+    /**
+     * موظفُ المستخدمِ صاحبِ المفتاح — الجلساتُ لصاحبها حصراً، لا يتتبّع أحدٌ غيرَه.
+     * ويجب أن يكون «مندوباً ميدانياً» (field_role) — لا تتبّعَ لمن ليس ميدانياً.
+     */
+    protected function fieldEmp(): \App\Models\Employee
+    {
+        $emp = \App\Support\Workday::emp(auth()->user());
+        abort_unless($emp, 403, 'لا ملفَ موظفٍ نشطاً مربوطاً بحسابك');
+        abort_if(empty($emp->field_role) || $emp->field_role === '—', 403,
+            'التتبّع الميدانيّ لأصحاب الدور الميدانيّ — يُضبط من ملف الموظف');
+
+        return $emp;
+    }
+
+    /** بدءُ جلسةٍ بموافقةٍ صريحة — لا تتبّعَ بلا إقرار */
+    public function trackStart(Request $r)
+    {
+        $emp = $this->fieldEmp();
+        abort_unless($r->boolean('consent'), 422, 'التتبّع يتطلب موافقةً صريحة (consent=true)');
+
+        $s = \App\Support\Tracking::start($emp, [
+            'user_id' => auth()->id(),
+            'field_day' => $r->input('field_day'),
+            'device' => $r->header('X-Device', $r->userAgent()),
+        ]);
+        hub_audit('بدء جلسة تتبّع ميدانيّ', 'tracks', $s->id, $emp->name);
+
+        return response()->json(['session' => $s->id, 'status' => $s->status, 'started_at' => $s->started_at?->toIso8601String()], 201);
+    }
+
+    /** استيعابُ دفعةِ نقاطٍ — للجلسة النشطة لصاحبها حصراً */
+    public function trackIngest(Request $r, string $session)
+    {
+        $emp = $this->fieldEmp();
+        $s = \App\Models\TrackSession::where('id', $session)->where('emp_id', $emp->id)->first();
+        abort_unless($s, 404);
+
+        $points = $r->input('points', []);
+        abort_if(! is_array($points), 422, 'points يجب أن تكون مصفوفة');
+        abort_if(count($points) > \App\Support\Tracking::BATCH_MAX, 422,
+            'الدفعةُ تتجاوز الحدّ (' . \App\Support\Tracking::BATCH_MAX . ' نقطة)');
+
+        $res = \App\Support\Tracking::ingest($s, $points);
+
+        return response()->json($res + ['session' => $s->id]);
+    }
+
+    /** إنهاءُ الجلسة — يبسّط المسار ويحسب المسافة */
+    public function trackEnd(Request $r, string $session)
+    {
+        $emp = $this->fieldEmp();
+        $s = \App\Models\TrackSession::where('id', $session)->where('emp_id', $emp->id)->first();
+        abort_unless($s, 404);
+
+        \App\Support\Tracking::end($s);
+        hub_audit('إنهاء جلسة تتبّع ميدانيّ', 'tracks', $s->id, $emp->name . " — {$s->point_count} نقطة");
+
+        return response()->json([
+            'session' => $s->id, 'status' => $s->status,
+            'points' => $s->point_count, 'distance_m' => $s->distance_m,
+        ]);
+    }
 }

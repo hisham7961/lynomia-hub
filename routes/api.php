@@ -23,6 +23,13 @@ Route::prefix('v1')->middleware(['throttle:api', ApiAuth::class])->group(functio
     // المحلّل الموحّد: «ما هذا المعرّف؟» — بصلاحيات صاحب المفتاح ونطاقه نفسِه
     Route::get('identity/resolve/{q}', [V1Controller::class, 'identityResolve']);
 
+    // تتبّعُ المسار الميدانيّ (الجوال): بدءُ جلسةٍ بموافقة، ثم استيعابُ نقاطٍ دفعيّ
+    // منعُ تكرارٍ بنيويّ، ثم إنهاء. الاستيعابُ حركةٌ مكثّفة فله سقفُ نقاطٍ لا معدل
+    // عاديّ (كنمط رفع القطع). قبل {module} كي لا يبتلعها.
+    Route::post('track/start', [V1Controller::class, 'trackStart']);
+    Route::post('track/{session}/points', [V1Controller::class, 'trackIngest']);
+    Route::post('track/{session}/end', [V1Controller::class, 'trackEnd']);
+
     Route::get('{module}', [V1Controller::class, 'apiIndex']);
     Route::post('{module}', [V1Controller::class, 'apiStore']);
     Route::get('{module}/{id}', [V1Controller::class, 'apiShow']);

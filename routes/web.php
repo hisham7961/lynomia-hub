@@ -37,6 +37,7 @@ use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\PurchaseController;
 use App\Http\Controllers\Web\PwaController;
 use App\Http\Controllers\Web\QualityController;
+use App\Http\Controllers\Web\QuoteBuilderController;
 use App\Http\Controllers\Web\QuoteController;
 use App\Http\Controllers\Web\ReportController;
 use App\Http\Controllers\Web\RoleController;
@@ -162,6 +163,11 @@ Route::middleware('auth')->group(function () {
     Route::post('workday/check-out', [\App\Http\Controllers\Web\WorkdayController::class, 'checkOut'])
         ->middleware('throttle:30,1')->name('workday.out');
     Route::get('workforce', [\App\Http\Controllers\Web\WorkdayController::class, 'team'])->name('workforce.team');
+
+    // العرض الميدانيّ للمشرف: لوحةٌ تحليلية، وجلساتُ التتبّع، وإعادةُ عرض المسار
+    Route::get('field', [\App\Http\Controllers\Web\FieldController::class, 'dashboard'])->name('field.dashboard');
+    Route::get('field/sessions', [\App\Http\Controllers\Web\FieldController::class, 'index'])->name('field.sessions');
+    Route::get('field/route/{id}', [\App\Http\Controllers\Web\FieldController::class, 'route'])->name('field.route');
 
     Route::get('morning', [MorningController::class, 'index'])->name('morning');
     Route::get('calendar', [\App\Http\Controllers\Web\CalendarController::class, 'index'])->name('calendar');
@@ -333,7 +339,13 @@ Route::middleware('auth')->group(function () {
     Route::get('employee/{id}', [PortalController::class, 'employee'])->name('portal.employee');
     Route::get('app/{id}', [AppCenterController::class, 'show'])->name('apps.center');
     Route::get('quote/{id}/doc', [QuoteController::class, 'doc'])->name('quotes.doc');
+    Route::get('quote/{id}/pdf', [QuoteController::class, 'pdf'])->name('quotes.pdf');
     Route::post('quote/{id}/act', [QuoteController::class, 'act'])->name('quotes.act');
+    // بنّاء العرض المهنيّ: بنودٌ مهيكلة ومراحلُ دفع (تُعيد حساب الإجمالي خادمياً)
+    Route::post('quote/{id}/line', [QuoteBuilderController::class, 'storeLine'])->name('quotes.line.store');
+    Route::delete('quote/{id}/line/{line}', [QuoteBuilderController::class, 'destroyLine'])->name('quotes.line.destroy');
+    Route::post('quote/{id}/milestone', [QuoteBuilderController::class, 'storeMilestone'])->name('quotes.ms.store');
+    Route::delete('quote/{id}/milestone/{ms}', [QuoteBuilderController::class, 'destroyMilestone'])->name('quotes.ms.destroy');
     Route::post('fin/{id}/act', [\App\Http\Controllers\Web\FinController::class, 'act'])->name('fin.act');
     Route::post('entry/{id}/line', [\App\Http\Controllers\Web\EntryController::class, 'line'])->name('entries.line');
     Route::delete('entry/{id}/line/{lineId}', [\App\Http\Controllers\Web\EntryController::class, 'dropLine'])->name('entries.line.drop');

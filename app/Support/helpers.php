@@ -546,6 +546,54 @@ if (! function_exists('hub_ref_options')) {
     }
 }
 
+if (! function_exists('hub_security_incident')) {
+    /**
+     * يفتح **حادثةً أمنيّة** على وحدة `incidents` القائمة (لا محرك حوادث ثانٍ):
+     * حدثُ المستوى الحرج (قفلُ حساب، سفرٌ مستحيلٌ لاحقاً، تصعيدُ صلاحية) يصير
+     * حالةً تُحقَّق لا إشعاراً يضيع. يمنع الإغراق: حادثةٌ مفتوحةٌ بالعنوان نفسه
+     * خلال النافذة تُعاد بدل فتح ثانية. الأدلّةُ في `meta` لا في متن يُفهرَس.
+     *
+     * @param array $meta أدلّةٌ وسياق (user_id, ip, evidence…)
+     */
+    function hub_security_incident(string $title, string $severity = 'عالي', array $meta = [], int $dedupHours = 6)
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('incidents')) return null;
+        try {
+            $open = \App\Models\Incident::whereNull('deleted_at')
+                ->where('title', $title)
+                ->whereNotIn('status', ['مغلق بتقرير', 'مُستعاد'])
+                ->where('created_at', '>=', now()->subHours(max(1, $dedupHours)))
+                ->orderByDesc('created_at')->orderByDesc('id')->first();
+            if ($open) {
+                // حادثةٌ قائمة — تُثرى بدليلٍ جديد لا تُكرَّر
+                $open->meta = array_merge((array) $open->meta, [
+                    'events' => array_merge((array) (($open->meta['events'] ?? [])), [[
+                        'at' => now()->toIso8601String(), 'evidence' => $meta,
+                    ]]),
+                ]);
+                $open->saveQuietly();
+
+                return $open;
+            }
+
+            return \App\Models\Incident::create([
+                'title' => \Illuminate\Support\Str::limit($title, 190, ''),
+                'severity' => in_array($severity, ['حرج', 'عالي', 'متوسط', 'منخفض'], true) ? $severity : 'عالي',
+                'status' => 'مفتوح',
+                'started_at' => now(),
+                'affected' => 'حادثةٌ أمنيّة مُولَّدة آلياً — للتحقيق البشريّ لا للعقاب الآليّ',
+                'meta' => ['kind' => 'security', 'auto' => true, 'events' => [[
+                    'at' => now()->toIso8601String(), 'evidence' => $meta,
+                ]]],
+            ]);
+        } catch (\Throwable $e) {
+            \App\Support\ErrorLog::capture('php', 'hub_security_incident: ' . $e->getMessage(), __FILE__, __LINE__);
+
+            return null;
+        }
+    }
+}
+
 if (! function_exists('hub_stepup_ok')) {
     /** هل تصعيدُ المصادقة ساري المفعول الآن؟ (نافذةٌ قصيرة بعد إعادة التحقّق) */
     function hub_stepup_ok(): bool
@@ -789,6 +837,7 @@ if (! function_exists('hub_mod_look')) {
             'leaves' => '🗓️', 'apps' => '📱', 'domains' => '🌐', 'servers' => '🖥️',
             'vault' => '🔐', 'kb' => '📚', 'meetings' => '🪑', 'assets' => '📦',
             'hcps' => '🩺', 'facilities' => '🏥', 'territories' => '🗺️',
+            'cycles' => '🔄', 'visits' => '📋',
         ];
 
         $icon = $icons[$module] ?? '📁';

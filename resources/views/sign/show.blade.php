@@ -6,8 +6,12 @@
 @include('partials.standalone_head')
 </head>
 <body class="pagedoc">
-@php $opts = $opts ?? []; @endphp
+@php $opts = $opts ?? []; $proposalHtml = $proposalHtml ?? null; @endphp
 <div style="max-width:800px;margin:0 auto">
+    {{-- البوّابة العامة: العرضُ الاحترافيّ للمشروع إن كان الطلبُ مربوطاً بعرض --}}
+    @if ($proposalHtml)
+        <div class="card" style="background:#fff">{!! $proposalHtml !!}</div>
+    @endif
     <div class="card">
         <h2 style="margin-bottom:4px">📄 {{ $req->title }}</h2>
         <div class="sub" style="margin-bottom:14px">اقرأ الوثيقة كاملة ثم وقّع في الأسفل ·

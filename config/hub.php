@@ -3819,6 +3819,75 @@ return [
             'search' => ['name', 'notes'],
         ],
 
+        'cycles' => [
+            'key' => 'cycles',
+            'table' => 'cycles',
+            'model' => 'Cycle',
+            'label' => 'الدورات والحملات',
+            'display' => 'name',
+            'status' => 'status',
+            'columns' => ['name', 'type', 'territoryId', 'dateStart', 'dateEnd', 'status'],
+            'fields' => [
+                ['key' => 'name', 'col' => 'name', 'label' => 'اسم الدورة', 'type' => 'text', 'required' => true,
+                 'hint' => 'مثل «حملة الربع الثالث — أدوية القلب» أو «دورة تغطية أبريل».'],
+                ['key' => 'code', 'col' => 'code', 'label' => 'الرمز', 'type' => 'text'],
+                ['key' => 'type', 'col' => 'type', 'label' => 'النوع', 'type' => 'sel',
+                 'options' => ['دورة تغطية', 'حملة منتج', 'إطلاق جديد', 'موسمية', 'أخرى']],
+                ['key' => 'territoryId', 'col' => 'territory_id', 'label' => 'المنطقة', 'type' => 'ref', 'ref' => 'territories'],
+                ['key' => 'productIds', 'col' => 'product_ids', 'label' => 'منتجات الحملة', 'type' => 'ref', 'ref' => 'products', 'multi' => true,
+                 'hint' => 'المنتجات التي تُعرَض في زيارات هذه الدورة — من سجل المنتجات القائم.'],
+                ['key' => 'dateStart', 'col' => 'date_start', 'label' => 'من تاريخ', 'type' => 'date'],
+                ['key' => 'dateEnd', 'col' => 'date_end', 'label' => 'إلى تاريخ', 'type' => 'date'],
+                ['key' => 'targetVisits', 'col' => 'target_visits', 'label' => 'هدف عدد الزيارات', 'type' => 'num',
+                 'hint' => 'التغطيةُ الفعلية تُقاس من الزيارات التي تمّت — لا تُملأ يدوياً.'],
+                ['key' => 'frequency', 'col' => 'frequency', 'label' => 'تكرار الزيارة لكل طبيب', 'type' => 'num'],
+                ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
+                 'options' => ['مخطط', 'نشط', 'منتهٍ', 'ملغى']],
+                ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات', 'type' => 'ta'],
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
+                ['key' => 'tags', 'col' => 'tags', 'label' => 'وسوم', 'type' => 'tags'],
+            ],
+            'search' => ['name', 'code', 'notes'],
+        ],
+
+        'visits' => [
+            'key' => 'visits',
+            'table' => 'visits',
+            'model' => 'Visit',
+            'label' => 'الزيارات',
+            'display' => 'name',
+            'status' => 'status',
+            'columns' => ['name', 'hcpId', 'empId', 'kind', 'plannedDate', 'status'],
+            'fields' => [
+                ['key' => 'name', 'col' => 'name', 'label' => 'عنوان الزيارة', 'type' => 'text',
+                 'hint' => 'يُولَّد من الطبيب والتاريخ إن تُرك فارغاً.'],
+                ['key' => 'hcpId', 'col' => 'hcp_id', 'label' => 'مقدم الرعاية', 'type' => 'ref', 'ref' => 'hcps', 'required' => true],
+                ['key' => 'facilityId', 'col' => 'facility_id', 'label' => 'المنشأة', 'type' => 'ref', 'ref' => 'facilities'],
+                ['key' => 'cycleId', 'col' => 'cycle_id', 'label' => 'الدورة/الحملة', 'type' => 'ref', 'ref' => 'cycles'],
+                ['key' => 'empId', 'col' => 'emp_id', 'label' => 'المندوب', 'type' => 'ref', 'ref' => 'hr'],
+                ['key' => 'kind', 'col' => 'kind', 'label' => 'النوع', 'type' => 'sel',
+                 'options' => ['مخططة', 'طارئة', 'فائتة']],
+                ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
+                 'options' => ['مخطط', 'تمت', 'فائتة', 'ملغاة']],
+                ['key' => 'plannedDate', 'col' => 'planned_date', 'label' => 'تاريخ التخطيط', 'type' => 'date'],
+                ['key' => 'visitAt', 'col' => 'visit_at', 'label' => 'لحظة التنفيذ', 'type' => 'dt'],
+                ['key' => 'objective', 'col' => 'objective', 'label' => 'هدف الزيارة', 'type' => 'ta'],
+                ['key' => 'discussion', 'col' => 'discussion', 'label' => 'ما دار في الزيارة', 'type' => 'ta'],
+                ['key' => 'outcome', 'col' => 'outcome', 'label' => 'النتيجة', 'type' => 'ta'],
+                ['key' => 'nextAction', 'col' => 'next_action', 'label' => 'الخطوة التالية', 'type' => 'ta'],
+                ['key' => 'productIds', 'col' => 'product_ids', 'label' => 'منتجات عُرِضت', 'type' => 'ref', 'ref' => 'products', 'multi' => true],
+                ['key' => 'samples', 'col' => 'samples', 'label' => 'عيّنات صُرِفت', 'type' => 'ta',
+                 'hint' => 'المنتج والكمية — تُخصَم من المخزون بحركةٍ منفصلة عند اعتمادها.'],
+                ['key' => 'geo', 'col' => 'geo', 'label' => 'الموقع لحظة التنفيذ', 'type' => 'text',
+                 'hint' => 'يُلتقط بموافقتك لحظةَ التنفيذ فقط — لا تتبّعَ بعدها.'],
+                ['key' => 'clientId', 'col' => 'client_id', 'label' => 'العميل', 'type' => 'ref', 'ref' => 'clients'],
+                ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات', 'type' => 'ta'],
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
+                ['key' => 'tags', 'col' => 'tags', 'label' => 'وسوم', 'type' => 'tags'],
+            ],
+            'search' => ['name', 'objective', 'discussion', 'outcome', 'notes'],
+        ],
+
         'clients' => [
             'key' => 'clients',
             'table' => 'clients',
@@ -5888,8 +5957,11 @@ return [
                     'col' => 'doc_no',
                     'label' => 'رقم العرض',
                     'type' => 'text',
-                    'required' => true,
+                    // يولّده النظام (QT-{سنة}-{تسلسل}) إن تُرك فارغاً — كنمط رقم العقد
+                    'hint' => 'يُترك فارغاً فيولّده النظام تلقائياً برقمٍ فريد.',
                 ],
+                ['key' => 'title', 'col' => 'title', 'label' => 'عنوان العرض/المشروع', 'type' => 'text',
+                 'hint' => 'مثل «تطوير متجر إلكتروني — الربع الثالث».'],
                 [
                     'key' => 'clientId',
                     'col' => 'client_id',
@@ -5949,7 +6021,9 @@ return [
                     'col' => 'total',
                     'label' => 'الإجمالي',
                     'type' => 'num',
-                    'required' => true,
+                    // يُحسَب خادمياً من البنود المهيكلة (recalc) — ويبقى قابلاً
+                    // للإدخال اليدويّ للعروض البسيطة القائمة على النصّ الحر.
+                    'hint' => 'يُحسَب تلقائياً من بنود العرض المهيكلة إن وُجدت.',
                 ],
                 [
                     'key' => 'currency',
@@ -5972,13 +6046,38 @@ return [
                     'type' => 'sel',
                     'options' => [
                         'مسودة',
+                        'مراجعة داخلية',
+                        'معتمد',
                         'مُرسل',
                         'قيد التفاوض',
+                        'اطُّلع عليه',
+                        'طُلب تعديل',
                         'مقبول',
                         'مرفوض',
                         'منتهي',
+                        'محوّل',
+                        'ملغى',
                     ],
                 ],
+                // نموذج الفوترة يُنقل للارتباط عند التحويل
+                ['key' => 'billing', 'col' => 'billing', 'label' => 'نموذج الفوترة', 'type' => 'sel',
+                 'options' => ['سعر ثابت', 'بالساعة', 'عقد شهري', 'دفعات مراحل', 'اشتراك', 'تكلفة + هامش', 'حسب الاستخدام', 'أخرى']],
+                ['key' => 'amId', 'col' => 'am_id', 'label' => 'مدير الحساب', 'type' => 'ref', 'ref' => 'users'],
+                ['key' => 'pmId', 'col' => 'pm_id', 'label' => 'مدير التنفيذ', 'type' => 'ref', 'ref' => 'users'],
+                ['key' => 'engagementId', 'col' => 'engagement_id', 'label' => 'الارتباط (يُملأ عند التحويل)', 'type' => 'ref', 'ref' => 'engagements'],
+                ['key' => 'discount', 'col' => 'discount', 'label' => 'خصمٌ على مستوى العرض', 'type' => 'num'],
+                // **التكلفة التقديرية الداخلية — تُخفى عن العميل**: حقلٌ يُقيَّد بقواعد
+                // الدور (hide) فلا يصل PDF العميل ولا عرضَه الخارجي. الهامشُ يُحسب منها.
+                ['key' => 'cost', 'col' => 'cost', 'label' => 'التكلفة التقديرية (داخليّ)', 'type' => 'num',
+                 'hint' => 'داخليٌّ بحت — لا يظهر للعميل. يُحسَب منه الهامشُ المتوقّع.'],
+                // قالبٌ قابلٌ للاستنساخ: عرضٌ مُعلَّمٌ قالباً يُستنسخ عروضاً جديدة بلا إعادة إدخال
+                ['key' => 'isTemplate', 'col' => 'is_template', 'label' => 'قالبٌ قابلٌ للاستنساخ', 'type' => 'bool',
+                 'hint' => 'العروضُ المُعلَّمةُ قوالبَ تُستنسَخ للمشاريع الجديدة بنقرة «استنساخ».'],
+                ['key' => 'execSummary', 'col' => 'exec_summary', 'label' => 'الملخّص التنفيذي', 'type' => 'ta'],
+                ['key' => 'objective', 'col' => 'objective', 'label' => 'هدف المشروع (للعميل)', 'type' => 'ta'],
+                ['key' => 'scope', 'col' => 'scope', 'label' => 'نطاق العمل (للعميل)', 'type' => 'ta'],
+                ['key' => 'assumptions', 'col' => 'assumptions', 'label' => 'الافتراضات', 'type' => 'ta'],
+                ['key' => 'exclusions', 'col' => 'exclusions', 'label' => 'خارج النطاق', 'type' => 'ta'],
                 [
                     'key' => 'terms',
                     'col' => 'terms',
@@ -5994,6 +6093,7 @@ return [
             ],
             'search' => [
                 'doc_no',
+                'title',
                 'items',
                 'terms',
             ],
@@ -6994,7 +7094,7 @@ return [
                         'krs', 'products', 'engagements',
                         // العمليات الميدانية: قاعدةُ «أيام متبقية» على نهاية
                         // الإسناد تنبّه قبل أن تبقى منطقةٌ بلا مندوب
-                        'hcps', 'facilities', 'territories', 'terrassigns',
+                        'hcps', 'facilities', 'territories', 'terrassigns', 'cycles', 'visits',
                     ],
                 ],
                 [
@@ -8319,13 +8419,24 @@ return [
             ['on' => 'status', 'emit' => 'project.status_changed', 'label' => 'تغيّرت حالة مشروع'],
         ],
         'quotes' => [
+            ['on' => 'status', 'to' => ['مُرسل'], 'emit' => 'quote.sent', 'label' => 'أُرسل عرض سعر للعميل'],
             ['on' => 'status', 'to' => ['مقبول'], 'emit' => 'quote.accepted', 'label' => 'قُبل عرض سعر'],
             ['on' => 'status', 'to' => ['مرفوض'], 'emit' => 'quote.rejected', 'label' => 'رُفض عرض سعر'],
+            ['on' => 'status', 'to' => ['محوّل'], 'emit' => 'quote.converted', 'label' => 'حُوّل عرضٌ إلى مشروع'],
         ],
         'engagements' => [
             ['on' => 'status', 'to' => ['نشط'], 'emit' => 'engagement.started', 'label' => 'بدأ ارتباطُ عميل'],
             ['on' => 'status', 'to' => ['قيد التجديد'], 'emit' => 'engagement.renewing', 'label' => 'ارتباطٌ قيد التجديد'],
             ['on' => 'status', 'to' => ['منتهٍ', 'ملغى'], 'emit' => 'engagement.ended', 'label' => 'انتهى ارتباطُ عميل'],
+        ],
+        // العمليات الميدانية: أحداثٌ دلالية تُطلق حِزم الاستجابة والتنبيهات
+        'cycles' => [
+            ['on' => 'status', 'to' => ['نشط'], 'emit' => 'cycle.started', 'label' => 'بدأت دورةٌ ميدانية'],
+            ['on' => 'status', 'to' => ['منتهٍ', 'ملغى'], 'emit' => 'cycle.closed', 'label' => 'أُغلقت دورةٌ ميدانية'],
+        ],
+        'visits' => [
+            ['on' => 'status', 'to' => ['تمت'], 'emit' => 'visit.completed', 'label' => 'تمّت زيارةٌ ميدانية'],
+            ['on' => 'status', 'to' => ['فائتة'], 'emit' => 'visit.missed', 'label' => 'فُوّتت زيارةٌ مخطّطة'],
         ],
         'purchases' => [
             ['on' => 'status', 'to' => ['معتمد'], 'emit' => 'purchase.approved', 'label' => 'اعتُمد أمر شراء'],

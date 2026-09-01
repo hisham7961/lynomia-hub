@@ -589,8 +589,15 @@ class ModuleController extends Controller
         $rows = $this->buildQuery($r, $def, $class, $trash, $filters)
             ->orderByDesc('created_at')->orderByDesc('id')->limit(5000)->get();
 
+        // تصديرٌ كبير = نقلُ بياناتٍ جماعيّ: فوق العتبة (security.export_stepup_rows،
+        // مطفأةٌ افتراضاً بـ0) يتطلب تأكيدَ الهوية، ويُوسَم الحدثُ «تصدير كبير»
+        // في التدقيق ليُرصد في مركز الأمن. لا يمسّ التصديرَ العاديّ الصغير.
+        $bigAt = (int) setting('security.export_stepup_rows', 0);
+        $isBig = $bigAt > 0 && $rows->count() >= $bigAt;
+        if ($isBig && ($resp = hub_require_stepup())) return $resp;
+
         // بصمة التصدير في التدقيق — تُعرض في مركز الأمان
-        hub_audit('تصدير', $module, null, $rows->count() . ' سجل (CSV)');
+        hub_audit($isBig ? 'تصدير كبير' : 'تصدير', $module, null, $rows->count() . ' سجل (CSV)');
 
         // البتر لا يكون صامتاً: من صدّر قائمةً أكبر من السقف يعلم أنها قُصّت
         return $this->streamCsv($module, $def, $rows, $rows->count() >= 5000);

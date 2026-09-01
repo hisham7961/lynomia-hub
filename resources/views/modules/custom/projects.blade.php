@@ -8,7 +8,22 @@
         ->get(['created_by', 'hours', 'problems', 'work_date']);
     $pcPeople = hub_ref_labels('users', $pcLogs->pluck('created_by')->filter()->unique()->values()->all());
     $pcBlockers = $pcLogs->pluck('problems')->filter(fn ($p) => trim((string) $p) !== '');
+    $pcBaseline = ((array) $row->meta)['baseline'] ?? null;
 @endphp
+@if ($pcBaseline)
+    {{-- خطُّ الأساس التجاريّ: العرضُ المقبول الذي وُلد منه المشروع — لا يتغيّر بالتعديل --}}
+    <div class="card">
+        <h3 class="cardtitle">📐 خطُّ الأساس التجاريّ <span class="bdg g">من عرضٍ مقبول</span></h3>
+        <div class="crow">
+            @if (! empty($pcBaseline['quote_id']))
+                <a class="chip" href="{{ route('m.show', ['quotes', $pcBaseline['quote_id']]) }}">🧾 {{ $pcBaseline['quote_no'] ?? 'العرض' }}</a>
+            @endif
+            <span class="chip">القيمة المعتمدة: <b class="mono">{{ number_format((float) ($pcBaseline['amount'] ?? 0), 3) }} {{ $pcBaseline['currency'] ?? '' }}</b></span>
+            @if (! empty($pcBaseline['accepted_at']))<span class="sub">قُبل {{ \Illuminate\Support\Str::limit(str_replace('T', ' ', $pcBaseline['accepted_at']), 16, '') }}</span>@endif
+        </div>
+        <div class="sub" style="margin-top:6px">هذا النطاقُ والمبلغُ الأصليّان — أيُّ تغييرٍ لاحقٍ يُدار بإدارة التغيير لا بتعديل العرض المقبول.</div>
+    </div>
+@endif
 @if ($pcClient)
     <div class="card">
         <h3 class="cardtitle">🤝 مشروعُ عميل</h3>

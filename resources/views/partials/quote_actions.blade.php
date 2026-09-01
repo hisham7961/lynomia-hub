@@ -7,7 +7,12 @@
 <div class="card">
     <h3>🧭 مسار العرض <span class="bdg {{ hub_tone($st) }}">{{ $st }}</span></h3>
     <div class="crow">
-        <a class="btn ghost sm" href="{{ route('quotes.doc', $row->id) }}">🖨 المستند (طباعة / PDF)</a>
+        <a class="btn ghost sm" href="{{ route('quotes.doc', $row->id) }}">🖨 المستند البسيط</a>
+        <a class="btn p sm" href="{{ route('quotes.pdf', $row->id) }}" target="_blank" rel="noopener">📄 عرض المشروع الاحترافيّ PDF</a>
+        @if ($canE && ! $row->trashed())
+            {{-- استنساخ: مسودةٌ جديدةٌ من هذا العرض (أساسُ القوالب) --}}
+            <form method="POST" action="{{ route('quotes.act', $row->id) }}" data-confirm="استنساخُ هذا العرض مسودةً جديدة؟ يُنسخ النطاقُ والبنودُ والمراحل.">@csrf<input type="hidden" name="do" value="clone"><button class="btn ghost sm">📋 استنساخ{{ $row->is_template ? ' القالب' : '' }}</button></form>
+        @endif
 
         @if ($canE && ! $row->trashed())
             @if (in_array($st, ['مسودة', 'قيد التفاوض'], true))
@@ -28,8 +33,14 @@
                 @else
                     <form method="POST" action="{{ route('quotes.act', $row->id) }}">@csrf<input type="hidden" name="do" value="invoice"><button class="btn p sm">🧾 تحويل لفاتورة</button></form>
                 @endif
+                {{-- التحويل الأهمّ: عرض ← ارتباط ← مشروع خارجي بنقلِ النطاق --}}
+                @if (! empty($meta['project_id']))
+                    <a class="btn ghost sm" href="{{ route('m.show', ['projects', $meta['project_id']]) }}">🚀 مشروعه ←</a>
+                @elseif (hub_can(auth()->user(), 'projects', 'a'))
+                    <form method="POST" action="{{ route('quotes.act', $row->id) }}" data-confirm="تحويل العرض إلى مشروعٍ وارتباط؟ يُنقل النطاق ويُحفظ خطُّ الأساس التجاريّ.">@csrf<input type="hidden" name="do" value="project"><button class="btn p sm">🚀 تحويل لمشروع</button></form>
+                @endif
             @endif
         @endif
     </div>
-    <div class="sub" style="margin-top:8px">مسودة ← مُرسل ← مقبول/مرفوض — وبعد القبول: عقد وفاتورة بنقرة، بلا إدخال مكرر</div>
+    <div class="sub" style="margin-top:8px">مسودة ← مُرسل ← مقبول/مرفوض — وبعد القبول: عقد وفاتورة ومشروع بنقرة، بلا إدخال مكرر</div>
 </div>
