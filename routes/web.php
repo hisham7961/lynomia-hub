@@ -500,6 +500,7 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'save'])->name('integrations.n8n.save');
     Route::get('admin/security', [SecurityController::class, 'index'])->name('security.index');
     Route::post('admin/security/lockdown', [SecurityController::class, 'lockdown'])->name('security.lockdown');
+    Route::post('admin/security/freeze/{key}', [SecurityController::class, 'freeze'])->name('security.freeze');
     Route::post('admin/security/sessions/{id}/revoke', [SecurityController::class, 'revokeSession'])->name('security.session.revoke');
     Route::post('admin/security/users/{id}/revoke', [SecurityController::class, 'revokeUser'])->name('security.user.revoke');
     Route::get('admin/settings', [SettingController::class, 'edit'])->name('settings.edit');

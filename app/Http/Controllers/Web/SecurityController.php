@@ -108,16 +108,54 @@ class SecurityController extends Controller
         // اثنان وثلاثون استعلاماً حيث يكفي ستة عشر
         $posture = SecurityPosture::checks();
 
+        // **خريطةُ الانكشاف**: من يطاله اختراقُ حسابٍ واحد — بعلاقاتٍ فعلية
+        $exposure = \App\Support\SecurityExposure::map();
+
         return view('security.index', [
             'kpi' => $kpi, 'sessions' => $sessions, 'failed' => $failed, 'knocking' => $knocking,
             'idleUsers' => $idleUsers, 'staleSecrets' => $staleSecrets,
             'roles' => $roles, 'exports' => $exports,
             'posture' => $posture, 'summary' => SecurityPosture::summary($posture),
             'lockdown' => (bool) setting('security.lockdown', false),
+            // مفاتيحُ الطوارئ المفصولة — كلٌّ يُدار وحدَه بأثره الظاهر
+            'freezeExports' => (string) setting('security.freeze_exports', '0') === '1',
+            'freezeTokens' => (string) setting('security.freeze_tokens', '0') === '1',
+            'exposure' => $exposure,
+            'exposureSummary' => \App\Support\SecurityExposure::summary($exposure),
             // رادارُ الكشف الحيّ: محاولاتُ الوصول المرفوضة وتخمينُ الروابط + العناوين الطارقة
             'radar' => SecurityRadar::summary(), 'denials' => SecurityRadar::recent(),
             'threats' => SecurityRadar::threats(),
         ]);
+    }
+
+    /**
+     * **مفاتيحُ الطوارئ المفصولة**: تجميدُ التصدير أو سكِّ الرموز — كلٌّ وحدَه،
+     * لا زرٌّ واحدٌ خطر. التفعيلُ (شدُّ الفرامل) فوريٌّ بلا احتكاك؛ ورفعُه (إعادةُ
+     * القدرة) يتطلب تأكيدَ الهوية — فالاتجاهُ الخطر وحدَه يُعاد التحقّق قبله.
+     */
+    public function freeze(string $key)
+    {
+        $this->gate();
+        $map = [
+            'exports' => ['security.freeze_exports', 'تصدير البيانات'],
+            'tokens'  => ['security.freeze_tokens', 'سكّ مفاتيح API'],
+        ];
+        abort_unless(isset($map[$key]), 404);
+        [$setKey, $label] = $map[$key];
+        $on = ! setting($setKey, false);
+
+        // رفعُ التجميد إعادةُ قدرةٍ حسّاسة — يتطلب تأكيدَ الهوية أولاً
+        if (! $on && ($resp = hub_require_stepup(route('security.index', absolute: false)))) return $resp;
+
+        if ($on) Setting::updateOrCreate(['key' => $setKey], ['value' => '1']);
+        else Setting::where('key', $setKey)->delete();
+        Cache::forget('settings:all');
+
+        hub_audit($on ? "تجميد {$label} (طوارئ)" : "رفع تجميد {$label}", null, null, auth()->user()->name);
+
+        return back()->with('ok', $on
+            ? "🧊 جُمِّد «{$label}» — يُصَدّ فوراً حتى يُرفع من هنا"
+            : "♻️ رُفع تجميد «{$label}»");
     }
 
     /** إنهاء جلسةٍ بعينها — يسري عند أول طلبٍ لصاحبها، ويُبطل كعكة «تذكّرني» */
@@ -147,6 +185,12 @@ class SecurityController extends Controller
 
         $name = DB::table('users')->where('id', $userId)->value('name');
         hub_audit('إنهاء جلسات مستخدم', null, null, $name . " — {$n} جلسة");
+
+        // **حزمةُ استجابة**: إنهاءُ جلسات مستخدمٍ حدثٌ أمنيّ دلاليّ — تعمل عليه
+        // التدفقاتُ (تنبيهٌ للمالكين، تليجرام…) كأي حدث. فشلُ الإطلاق لا يُفشل الفعل.
+        if ($u = \App\Models\User::find($userId)) {
+            try { \App\Support\FlowRunner::fire('sessions_revoked', 'users', $u); } catch (\Throwable $e) { report($e); }
+        }
 
         return back()->with('ok', "🔌 أُنهيت {$n} جلسة لـ«{$name}» على كل الأجهزة");
     }
