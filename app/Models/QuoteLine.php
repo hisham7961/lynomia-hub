@@ -25,6 +25,7 @@ class QuoteLine extends Model
         'tax_pct' => 'decimal:3',
         'line_total' => 'decimal:3',
         'unit_cost' => 'decimal:3',
+        'included' => 'boolean',
         'meta' => 'array',
     ];
 
@@ -33,6 +34,18 @@ class QuoteLine extends Model
         static::saving(function (self $l) {
             $l->line_total = $l->computeTotal();
         });
+    }
+
+    /**
+     * هل يدخل هذا البندُ **الخطَّ المُلتزَم** (الإجماليّ)؟ الأساسيّ دائماً؛ أما
+     * الاختياريّ/البديل/الإضافة فبحسب `included` — فغيرُ المُدرَج فرصةٌ عُلويّة
+     * لا التزام. (CPQ المرحلة ب)
+     */
+    public function countsToward(): bool
+    {
+        if (($this->line_mode ?: 'required') === 'required') return true;
+
+        return (bool) $this->included;
     }
 
     /**

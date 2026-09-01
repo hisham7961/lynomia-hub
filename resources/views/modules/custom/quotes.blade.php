@@ -6,6 +6,11 @@
     $canEdit = hub_can(auth()->user(), 'quotes', 'e') && ! $qLocked;
     // الربحيةُ الداخلية تظهر فقط لمن لا يُخفى عنه حقلُ التكلفة (قواعد الدور)
     $showInternal = hub_field_mode(auth()->user(), 'quotes', 'cost') !== 'hide';
+    // كتالوجُ الخدمات المنطَّق — لملء البند من مصدرٍ واحد (CPQ)
+    $qServices = \Illuminate\Support\Facades\Schema::hasTable('services')
+        ? hub_scope(\App\Models\Service::query(), 'services')->orderBy('name')->limit(400)->get(['id', 'name'])
+        : collect();
+    $modeLabels = ['required' => 'أساسيّ', 'optional' => 'اختياريّ', 'alternative' => 'بديل', 'addon' => 'إضافة'];
 @endphp
 
 <div class="card">
@@ -15,20 +20,28 @@
     </h3>
     @if ($qLines->isNotEmpty())
         <div class="tblwrap"><table>
-            <thead><tr><th>النوع</th><th>البند</th><th>المرحلة</th><th>كمية</th><th>سعر الوحدة</th><th>خصم%</th><th>ضريبة%</th><th>الإجمالي</th>@if ($canEdit)<th></th>@endif</tr></thead>
+            <thead><tr><th>النمط</th><th>النوع</th><th>البند</th><th>المرحلة</th><th>كمية</th><th>سعر الوحدة</th><th>الإجمالي</th>@if ($canEdit)<th></th>@endif</tr></thead>
             <tbody>
             @foreach ($qLines as $l)
-                <tr>
+                @php $lm = $l->line_mode ?: 'required'; $committed = $l->countsToward(); @endphp
+                <tr @if (! $committed) style="opacity:.62" @endif>
+                    <td>
+                        <span class="bdg {{ $lm === 'required' ? '' : 'wn' }}">{{ $modeLabels[$lm] ?? $lm }}</span>
+                        @if ($lm === 'alternative' && $l->opt_group)<div class="sub" style="font-size:11px">{{ $l->opt_group }}</div>@endif
+                    </td>
                     <td class="sub">{{ $l->kind ?: '—' }}</td>
                     <td>{{ $l->title }}@if ($l->description)<div class="sub">{{ \Illuminate\Support\Str::limit($l->description, 60) }}</div>@endif</td>
                     <td class="sub">{{ $l->phase ?: '—' }}</td>
                     <td class="mono">{{ rtrim(rtrim(number_format((float) $l->qty, 3), '0'), '.') }}</td>
                     <td class="mono">{{ number_format((float) $l->unit_price, 3) }}</td>
-                    <td class="mono">{{ (float) $l->discount_pct ?: '—' }}</td>
-                    <td class="mono">{{ (float) $l->tax_pct ?: '—' }}</td>
-                    <td class="mono"><b>{{ number_format((float) $l->line_total, 3) }}</b></td>
+                    <td class="mono"><b>{{ number_format((float) $l->line_total, 3) }}</b>@if (! $committed)<div class="sub" style="font-size:11px">غير مُدرَج</div>@endif</td>
                     @if ($canEdit)
-                        <td><form method="POST" action="{{ route('quotes.line.destroy', [$row->id, $l->id]) }}" class="inline">@csrf @method('DELETE')<button class="btn ghost xs bad" data-confirm="حذف البند؟">حذف</button></form></td>
+                        <td class="crow" style="gap:4px">
+                            @if ($lm !== 'required')
+                                <form method="POST" action="{{ route('quotes.line.toggle', [$row->id, $l->id]) }}" class="inline">@csrf<button class="btn ghost xs">{{ $committed ? 'إخراج' : 'إدراج' }}</button></form>
+                            @endif
+                            <form method="POST" action="{{ route('quotes.line.destroy', [$row->id, $l->id]) }}" class="inline">@csrf @method('DELETE')<button class="btn ghost xs bad" data-confirm="حذف البند؟">حذف</button></form>
+                        </td>
                     @endif
                 </tr>
             @endforeach
@@ -47,8 +60,21 @@
         <form method="POST" action="{{ route('quotes.line.store', $row->id) }}" style="margin-top:12px">
             @csrf
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">
-                <input class="inp" name="title" placeholder="وصف البند *" required>
+                @if ($qServices->isNotEmpty())
+                    <select class="inp" name="service_id" title="من كتالوج الخدمات — يملأ الفراغ">
+                        <option value="">من الكتالوج…</option>
+                        @foreach ($qServices as $svc)<option value="{{ $svc->id }}">{{ $svc->name }}</option>@endforeach
+                    </select>
+                @endif
+                <input class="inp" name="title" placeholder="وصف البند (أو من الكتالوج)">
                 <select class="inp" name="kind"><option value="">النوع…</option>@foreach (['خدمة','مرحلة','تسليم','رسوم ثابتة','بالساعة','اشتراك','بنية تحتية','رسوم إعداد','صيانة','تكلفة طرف ثالث','مخصص'] as $k)<option>{{ $k }}</option>@endforeach</select>
+                <select class="inp" name="line_mode" title="نمط البند">
+                    <option value="required">أساسيّ</option>
+                    <option value="optional">اختياريّ</option>
+                    <option value="alternative">بديل</option>
+                    <option value="addon">إضافة</option>
+                </select>
+                <input class="inp" name="opt_group" placeholder="مجموعة البدائل (للبديل)">
                 <input class="inp" name="phase" placeholder="المرحلة (اختياري)">
                 <input class="inp mono" name="qty" type="number" step="0.001" value="1" placeholder="الكمية">
                 <input class="inp mono" name="unit_price" type="number" step="0.001" placeholder="سعر الوحدة">
@@ -63,6 +89,7 @@
                 </select>
                 <select class="inp" name="rev_period" title="دوريّة المتكرّر"><option value="">— الدوريّة —</option><option>شهري</option><option>سنوي</option></select>
             </div>
+            <div class="sub" style="margin-top:4px">النمط «اختياريّ/بديل/إضافة» لا يدخل الإجماليَّ حتى تُدرِجه — والبديلُ واحدٌ من مجموعته.</div>
             <button class="btn p sm" style="margin-top:8px">➕ أضف بنداً</button>
         </form>
     @endif
@@ -77,6 +104,7 @@
             <div><div class="sub">شهريّ MRR</div><b class="mono">{{ number_format($cs['mrr'], 3) }}</b></div>
             <div><div class="sub">سنويّ ARR</div><b class="mono">{{ number_format($cs['arr'], 3) }}</b></div>
             <div><div class="sub">قيمة العقد TCV</div><b class="mono">{{ number_format($cs['tcv'], 3) }}</b></div>
+            @if (($cs['upside'] ?? 0) > 0)<div><div class="sub">فرصةٌ عُلويّة (اختياريّ)</div><b class="mono">{{ number_format($cs['upside'], 3) }}</b></div>@endif
             <div><div class="sub">التكلفة</div><b class="mono">{{ number_format($cs['cost'], 3) }}</b></div>
             <div><div class="sub">الربح</div><b class="mono">{{ number_format((float) $row->total - $cs['cost'], 3) }}</b></div>
             <div><div class="sub">الهامش</div>

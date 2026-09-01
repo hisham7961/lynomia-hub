@@ -97,7 +97,9 @@ class Quote extends Model
      */
     public function recalc(): void
     {
-        $lines = $this->lines()->get();
+        // يُحسَب الإجماليُّ من البنود **المُلتزَمة** فقط (الأساسيّ + الاختياريّ
+        // المُدرَج) — فالاختياريُّ غير المُدرَج فرصةٌ عُلويّة لا يُلزِم العميل.
+        $lines = $this->lines()->get()->filter(fn ($l) => $l->countsToward());
         $net = 0.0; $total = 0.0; $cost = 0.0;
         foreach ($lines as $l) {
             $net = round($net + $l->netBeforeTax(), 3);
@@ -154,7 +156,19 @@ class Quote extends Model
             'tcv' => (float) $this->tcv,
             'cost' => (float) $this->cost,
             'margin' => $this->margin(),
+            'upside' => $this->optionalUpside(),
         ];
+    }
+
+    /**
+     * **الفرصةُ العُلويّة**: مجموعُ صافي البنود الاختيارية/البديلة/الإضافية غير
+     * المُدرَجة في الخطّ المُلتزَم — ما قد يُضيفه العميلُ لو قَبِل الاختياريّ.
+     */
+    public function optionalUpside(): float
+    {
+        return round((float) $this->lines()->get()
+            ->reject(fn ($l) => $l->countsToward())
+            ->sum(fn ($l) => $l->netBeforeTax()), 3);
     }
 
     /**
@@ -171,9 +185,17 @@ class Quote extends Model
         $lines = $this->lines()->get();
         if ($lines->isEmpty()) $issues[] = 'العرضُ بلا بنود.';
         foreach ($lines as $l) {
-            $optional = (bool) (($l->meta['optional'] ?? false));
+            $optional = ($l->line_mode ?: 'required') !== 'required';
             if (! $optional && (float) $l->unit_price <= 0) {
                 $issues[] = 'بندٌ بلا سعر: «' . $l->title . '».';
+            }
+        }
+
+        // كلُّ مجموعةِ بدائل يجب أن يكون فيها بديلٌ واحدٌ مُدرَجٌ لا أكثر
+        foreach ($lines->where('line_mode', 'alternative')->groupBy('opt_group') as $grp => $alts) {
+            $on = $alts->where('included', true)->count();
+            if ($grp && $on !== 1) {
+                $issues[] = 'مجموعةُ البدائل «' . $grp . '» فيها ' . $on . ' بديلاً مُدرَجاً (المطلوب واحد).';
             }
         }
 

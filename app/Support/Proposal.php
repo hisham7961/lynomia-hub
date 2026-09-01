@@ -64,13 +64,17 @@ class Proposal
         }
 
         // ── العرض التجاريّ (جدول التسعير) — بلا تكلفةٍ ولا هامش ──
-        if ($lines->isNotEmpty()) {
+        // يُعرَض البنودُ المُلتزَمة (الأساسيّ + الاختياريّ المُدرَج)؛ أما الاختياريُّ
+        // غير المُدرَج فقسمٌ مستقلٌّ «بنودٌ اختيارية» فلا يُخلط بالإجماليّ المُلتزَم.
+        $committed = $lines->filter(fn ($l) => $l->countsToward());
+        $optional = $lines->reject(fn ($l) => $l->countsToward());
+        if ($committed->isNotEmpty()) {
             $h .= '<h2 style="color:' . $e($co['color']) . ';border-bottom:1px solid #ddd;padding-bottom:6px;margin-top:28px">العرض التجاريّ</h2>';
             $h .= '<table style="width:100%;border-collapse:collapse;font-size:13px">';
             $h .= '<tr style="background:' . $e($co['color']) . ';color:#fff">'
                 . '<th style="padding:8px;text-align:right">البند</th><th style="padding:8px">الكمية</th>'
                 . '<th style="padding:8px">سعر الوحدة</th><th style="padding:8px">الإجمالي</th></tr>';
-            foreach ($lines as $i => $l) {
+            foreach ($committed->values() as $i => $l) {
                 $bg = $i % 2 ? '#f7f7f7' : '#fff';
                 $h .= '<tr style="background:' . $bg . '">'
                     . '<td style="padding:8px;border-bottom:1px solid #eee">' . $e($l->title) . '</td>'
@@ -85,6 +89,24 @@ class Proposal
                 . '<tr><td style="padding:4px">الضريبة</td><td style="padding:4px;text-align:left">' . $money($q->tax) . '</td></tr>'
                 . '<tr style="font-weight:bold;font-size:16px;border-top:2px solid ' . $e($co['color']) . '"><td style="padding:6px 4px">الإجمالي</td><td style="padding:6px 4px;text-align:left">' . $money($q->total) . '</td></tr>'
                 . '</table>';
+        }
+
+        // ── بنودٌ اختيارية (لا تدخل الإجماليَّ حتى يُختارها العميل) ──
+        if ($optional->isNotEmpty()) {
+            $h .= '<h2 style="color:' . $e($co['color']) . ';border-bottom:1px solid #ddd;padding-bottom:6px;margin-top:28px">بنودٌ اختيارية</h2>';
+            $h .= '<div style="font-size:12px;color:#777;margin-bottom:6px">تُضاف باختيارك — لا تُحتسَب في الإجماليّ أعلاه.</div>';
+            $labels = ['optional' => 'اختياريّ', 'alternative' => 'بديل', 'addon' => 'إضافة'];
+            $h .= '<table style="width:100%;border-collapse:collapse;font-size:13px">';
+            foreach ($optional->values() as $i => $l) {
+                $bg = $i % 2 ? '#f7f7f7' : '#fff';
+                $tag = $labels[$l->line_mode] ?? 'اختياريّ';
+                if ($l->line_mode === 'alternative' && $l->opt_group) $tag .= ' · ' . $e($l->opt_group);
+                $h .= '<tr style="background:' . $bg . '">'
+                    . '<td style="padding:8px;border-bottom:1px solid #eee">' . $e($l->title)
+                    . ' <span style="color:#888;font-size:11px">(' . $tag . ')</span></td>'
+                    . '<td style="padding:8px;text-align:left;border-bottom:1px solid #eee;width:30%"><b>' . number_format((float) $l->line_total, 3) . ' ' . $cur . '</b></td></tr>';
+            }
+            $h .= '</table>';
         }
 
         // ── جدول المدفوعات ──
