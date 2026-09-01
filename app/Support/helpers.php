@@ -1317,6 +1317,33 @@ if (! function_exists('hub_approvers')) {
     }
 }
 
+if (! function_exists('hub_approvers_for')) {
+    /**
+     * المعتمِدون الذين **يرون هذا السجل** — نطاقٌ لكلّ مستلمٍ كنمط
+     * `HubAutomation::notifyMonitors`: فلا يُشعَر معتمِدٌ معزولٌ باسمِ/مبلغِ سجلٍّ
+     * خارج حدّه (تسريبٌ عبر حدّ العزل من مسار الطلب). المالكُ يمرّ دوماً، وحين لا
+     * وحدةَ/معرّف يُرجَع الكلُّ كما هو (لا سجلَّ يُقاس عليه) — فالتوافقُ محفوظ.
+     */
+    function hub_approvers_for(?string $module = null, ?string $recordId = null): array
+    {
+        $all = hub_approvers();
+        if (! $module || ! $recordId) return $all;
+        $md = hub_mod($module);
+        if (! $md || empty($md['table'])) return $all;
+
+        return array_values(array_filter($all, function ($uid) use ($md, $module, $recordId) {
+            $u = \App\Models\User::find($uid);
+            if (! $u) return false;
+            if ($u->role?->is_owner) return true;   // المالكُ يرى الكلّ
+
+            return hub_scope(
+                \Illuminate\Support\Facades\DB::table($md['table'])->whereNull('deleted_at')->where('id', $recordId),
+                $module, $u
+            )->exists();
+        }));
+    }
+}
+
 if (! function_exists('hub_progress')) {
     /**
      * محرك نسبة الإنجاز لمشروع: خطة العمل (وزن×تقدم) 50٪ + المهام 30٪ + الاختبارات 20٪

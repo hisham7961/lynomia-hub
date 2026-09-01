@@ -260,8 +260,10 @@ class QuoteController extends Controller
             || ($floorAt > 0 && $margin !== null && $margin < $floorAt);
 
         if ($needs && ! hub_flag(auth()->user(), 'approve') && ! hub_is_owner()) {
-            // يُبلَّغ المعتمدون بطلبِ إرسالٍ يستحق نظرَهم — دون قلبِ الحالة
-            foreach (array_unique(hub_approvers()) as $oid) {
+            // يُبلَّغ المعتمدون بطلبِ إرسالٍ يستحق نظرَهم — دون قلبِ الحالة.
+            // **نطاقٌ لكلّ مستلم**: لا يُسرَّب عنوانُ العرض ومبلغُه لمعتمِدٍ معزولٍ
+            // عن شركة/عميل العرض (كنمط notifyMonitors في المسار الآليّ).
+            foreach (array_unique(hub_approvers_for('quotes', $q->id)) as $oid) {
                 if ($oid && $oid !== auth()->id()) {
                     hub_notify($oid, 'approval', 'عرضٌ ينتظر اعتمادَ الإرسال: ' . ($q->title ?: $q->doc_no)
                         . ' — ' . number_format((float) $q->total, 3) . ' ' . $q->currency, 'quotes', $q->id);
