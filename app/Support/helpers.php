@@ -3515,6 +3515,24 @@ if (! function_exists('hub_recommendations')) {
                 }
             } catch (\Throwable $e) {}
 
+            // ١٠) تقاريرُ يوميّةٌ ناقصةٌ اليوم — من **محرّك يوم العمل** (لا محرّكَ حضورٍ
+            // ثانٍ): `Workday::teamToday` منطَّقٌ بمفتاح `hub_screen` (دورٌ/مستخدمٌ/شركةٌ/
+            // عميل) ومحروسٌ بصلاحية `hr` داخل `teamCalc` — فلا تسريبٌ ولا تكرار. القاعدةُ
+            // الذهبية محفوظة: تقريرٌ ناقصٌ ليس غياباً. (إشارةٌ للعدسة العامّة لا لمشروع.)
+            try {
+                if (! $projectId && hub_can(auth()->user(), 'hr', 'v')
+                    && \Illuminate\Support\Facades\Schema::hasTable('attendance')) {
+                    $team = \App\Support\Workday::teamToday();
+                    $missing = (int) ($team['n']['noreport'] ?? 0);
+                    if ($missing > 0) {
+                        $add($missing >= 5 ? 'مهم' : 'اطّلاع', '📝', $missing . ' تقريرٌ يوميٌّ ناقصٌ اليوم',
+                            'موظفون حاضرون اليوم بلا تقريرِ عمل (تقريرٌ ناقصٌ ليس غياباً). تابع مع فريقك.',
+                            route('workforce.team'), 'افتح فريقي اليوم',
+                            'report.missing:' . now()->toDateString(), 'attend', null);
+                    }
+                }
+            } catch (\Throwable $e) {}
+
             // الترتيب: الأشد أولاً، وضمن الدرجة يبقى ترتيب الاكتشاف
             usort($out, fn ($a, $b) => ($rank[$b['sev']] ?? 0) <=> ($rank[$a['sev']] ?? 0));
 
