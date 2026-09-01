@@ -55,6 +55,26 @@ class FinDocument extends Model
         });
     }
 
+    /**
+     * رقمُ مستندٍ دوريٍّ فريدٌ متسلسل — بديلٌ للاحقةٍ عشوائية (`Str::random(4)`)
+     * كانت تتصادم بحسبة عيد الميلاد عبر مئات المستندات. تسلسلٌ شهريٌّ مع فحصِ
+     * وجودٍ يضمن عدمَ التكرار. آمنٌ للتزامن هنا: `hub:automation` غيرُ متداخلٍ
+     * مع نفسه (`->withoutOverlapping()`)، فلا سباقَ بين تشغيلين.
+     */
+    public static function nextRecurringNo(): string
+    {
+        $prefix = 'REC-' . now()->format('ym') . '-';
+        $last = static::withTrashed()->where('doc_no', 'like', $prefix . '%')
+            ->orderByDesc('doc_no')->value('doc_no');
+        $n = $last ? ((int) preg_replace('/\D/', '', substr((string) $last, strlen($prefix))) + 1) : 1;
+        do {
+            $candidate = $prefix . sprintf('%04d', $n);
+            $n++;
+        } while (static::withTrashed()->where('doc_no', $candidate)->exists());
+
+        return $candidate;
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(\App\Models\Project::class, 'project_id');

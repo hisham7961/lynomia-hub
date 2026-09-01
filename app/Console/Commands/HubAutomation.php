@@ -270,7 +270,7 @@ class HubAutomation extends Command
                     $doc = null;
                     if (! $this->dry) {
                         $doc = FinDocument::create([
-                            'doc_no'     => 'REC-' . now()->format('ym') . '-' . strtoupper(Str::random(4)),
+                            'doc_no'     => FinDocument::nextRecurringNo(),   // متسلسلٌ فريدٌ لا عشوائيٌّ يتصادم
                             'kind'       => $rec->kind ?: 'مصروف',
                             'partner'    => $rec->partner,
                             'date'       => $onDate,
