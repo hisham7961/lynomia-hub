@@ -251,8 +251,13 @@ class QuoteController extends Controller
         $discAt = (float) setting('quotes.approve_discount', 0);
         $discPct = ((float) $q->total + (float) $q->discount) > 0
             ? (float) $q->discount / ((float) $q->total + (float) $q->discount) * 100 : 0;
+        // **حاجزُ الهامش** (CPQ): هامشٌ دون الحدّ المضبوط يستوجب اعتماداً كالمبلغ
+        // والخصم — لا مجرّد تلوينٍ أحمر يُتجاوَز. (٠ = مطفأ.)
+        $floorAt = (float) setting('quotes.margin_floor', 0);
+        $margin = $q->margin();
         $needs = ($amountAt > 0 && (float) $q->total >= $amountAt)
-            || ($discAt > 0 && $discPct >= $discAt);
+            || ($discAt > 0 && $discPct >= $discAt)
+            || ($floorAt > 0 && $margin !== null && $margin < $floorAt);
 
         if ($needs && ! hub_flag(auth()->user(), 'approve') && ! hub_is_owner()) {
             // يُبلَّغ المعتمدون بطلبِ إرسالٍ يستحق نظرَهم — دون قلبِ الحالة

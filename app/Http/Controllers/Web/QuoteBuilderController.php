@@ -44,6 +44,9 @@ class QuoteBuilderController extends Controller
             'unit_cost' => ['nullable', 'numeric', 'min:0', 'max:999999999'],
             'service_id' => ['nullable', 'string', 'max:36'],
             'product_id' => ['nullable', 'string', 'max:36'],
+            // تصنيفُ الإيراد (CPQ): لمرّة/دوري/استخدام/تكلفة ممرَّرة + دوريّته
+            'rev_type' => ['nullable', 'in:one_time,recurring,usage,pass_through'],
+            'rev_period' => ['nullable', 'string', 'max:20'],
         ]);
         $d['quote_id'] = $q->id;
         $d['sort'] = (int) QuoteLine::where('quote_id', $q->id)->max('sort') + 1;

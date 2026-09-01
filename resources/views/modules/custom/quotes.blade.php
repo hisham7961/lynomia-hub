@@ -55,6 +55,13 @@
                 <input class="inp mono" name="discount_pct" type="number" step="0.01" placeholder="خصم %">
                 <input class="inp mono" name="tax_pct" type="number" step="0.01" placeholder="ضريبة %">
                 @if ($showInternal)<input class="inp mono" name="unit_cost" type="number" step="0.001" placeholder="تكلفة (داخليّ)">@endif
+                <select class="inp" name="rev_type" title="تصنيف الإيراد">
+                    <option value="one_time">إيرادٌ لمرّة</option>
+                    <option value="recurring">إيرادٌ دوريّ</option>
+                    <option value="usage">حسب الاستخدام</option>
+                    <option value="pass_through">تكلفةٌ ممرَّرة</option>
+                </select>
+                <select class="inp" name="rev_period" title="دوريّة المتكرّر"><option value="">— الدوريّة —</option><option>شهري</option><option>سنوي</option></select>
             </div>
             <button class="btn p sm" style="margin-top:8px">➕ أضف بنداً</button>
         </form>
@@ -62,16 +69,32 @@
 </div>
 
 @if ($showInternal)
+    @php $cs = $row->commercialSummary(); $floor = (float) setting('quotes.margin_floor', 0); @endphp
     <div class="card">
-        <h3 class="cardtitle">💰 الربحية الداخلية <span class="bdg wn">لا يظهر للعميل</span></h3>
-        @php $margin = $row->margin(); @endphp
+        <h3 class="cardtitle">💰 الملخّص التجاريّ والربحية الداخلية <span class="bdg wn">لا يظهر للعميل</span></h3>
         <div style="display:flex;gap:18px;flex-wrap:wrap">
-            <div><div class="sub">إيراد العرض</div><b class="mono">{{ number_format((float) $row->total, 3) }} {{ $row->currency }}</b></div>
-            <div><div class="sub">التكلفة التقديرية</div><b class="mono">{{ number_format((float) $row->cost, 3) }}</b></div>
-            <div><div class="sub">الربح المتوقّع</div><b class="mono">{{ number_format((float) $row->total - (float) $row->cost, 3) }}</b></div>
-            <div><div class="sub">الهامش المتوقّع</div>
-                @if ($margin !== null)<b class="mono {{ $margin < 20 ? 'txt-bad' : '' }}">{{ $margin }}%</b>@else<span class="sub">—</span>@endif</div>
+            <div><div class="sub">إيرادٌ لمرّة</div><b class="mono">{{ number_format($cs['one_time'], 3) }} {{ $row->currency }}</b></div>
+            <div><div class="sub">شهريّ MRR</div><b class="mono">{{ number_format($cs['mrr'], 3) }}</b></div>
+            <div><div class="sub">سنويّ ARR</div><b class="mono">{{ number_format($cs['arr'], 3) }}</b></div>
+            <div><div class="sub">قيمة العقد TCV</div><b class="mono">{{ number_format($cs['tcv'], 3) }}</b></div>
+            <div><div class="sub">التكلفة</div><b class="mono">{{ number_format($cs['cost'], 3) }}</b></div>
+            <div><div class="sub">الربح</div><b class="mono">{{ number_format((float) $row->total - $cs['cost'], 3) }}</b></div>
+            <div><div class="sub">الهامش</div>
+                @if ($cs['margin'] !== null)<b class="mono {{ ($floor > 0 ? $cs['margin'] < $floor : $cs['margin'] < 20) ? 'txt-bad' : '' }}">{{ $cs['margin'] }}%</b>@else<span class="sub">—</span>@endif
+                @if ($floor > 0)<span class="sub"> (الحدّ {{ $floor }}%)</span>@endif
+            </div>
         </div>
+    </div>
+@endif
+
+@php $qc = $row->qualityCheck(); @endphp
+@if ($canEdit && ! empty($qc))
+    <div class="card" style="border-color:var(--wn)">
+        <h3 class="cardtitle">🧪 فحص الجودة التجاريّ <span class="bdg wn">{{ count($qc) }} تنبيه</span></h3>
+        <div class="sub" style="margin-bottom:6px">راجِعها قبل الإرسال — بعضُها قد يستوجب اعتماداً.</div>
+        <ul style="margin:0;padding-inline-start:20px">
+            @foreach ($qc as $issue)<li style="margin-bottom:4px">{{ $issue }}</li>@endforeach
+        </ul>
     </div>
 @endif
 

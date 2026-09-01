@@ -31,6 +31,9 @@ class Quote extends Model
         'total' => 'decimal:3',
         'discount' => 'decimal:3',
         'cost' => 'decimal:3',
+        'mrr' => 'decimal:3',
+        'arr' => 'decimal:3',
+        'tcv' => 'decimal:3',
         'accepted_at' => 'datetime',
         'sent_at' => 'datetime',
         'custom' => 'array',
@@ -110,9 +113,85 @@ class Quote extends Model
             $total = round($total - $disc, 3);
         }
         $tax = round($total - $net, 3);
+
+        // **الملخّصُ التجاريّ** (CPQ): تصنيفُ الإيراد بجانب الإجماليّ لا بدلاً منه.
+        // MRR من البنود الدوريّة (السنويّ ÷ ١٢)، ARR = MRR×١٢، وTCV = الإجماليُّ
+        // لمرّةٍ واحدة + الإيرادُ السنويّ المتكرّر. الاستخدامُ والتكلفةُ الممرَّرة
+        // لا يُدخَلان في MRR (لا يُتنبّأ بهما شهرياً).
+        $mrr = 0.0; $oneTime = 0.0;
+        foreach ($lines as $l) {
+            $lineNet = $l->netBeforeTax();
+            $rt = (string) ($l->rev_type ?: 'one_time');
+            if ($rt === 'recurring') {
+                $monthly = hub_ar_norm((string) $l->rev_period) === hub_ar_norm('سنوي')
+                    ? round($lineNet / 12, 3) : $lineNet;
+                $mrr = round($mrr + $monthly, 3);
+            } elseif ($rt === 'one_time' || $rt === 'pass_through') {
+                $oneTime = round($oneTime + $lineNet, 3);
+            }
+        }
+        $arr = round($mrr * 12, 3);
+        $tcv = round($oneTime + $arr, 3);
+
         $this->forceFill([
             'amount' => $net, 'tax' => $tax, 'total' => $total, 'cost' => $cost,
+            'mrr' => $mrr, 'arr' => $arr, 'tcv' => $tcv,
         ])->saveQuietly();
+    }
+
+    /**
+     * الملخّصُ التجاريّ الداخليّ: إيرادٌ لمرّة، شهريّ (MRR)، سنويّ (ARR)، قيمةُ
+     * العقد الكلّية (TCV)، والتكلفةُ والهامشُ — **داخليٌّ بحتٌ لا يُعرَض للعميل**.
+     */
+    public function commercialSummary(): array
+    {
+        return [
+            // خُزِّن TCV = إيرادُ المرّة + ARR، فإيرادُ المرّة = TCV − ARR (لا total
+            // الذي يضمّ القيمَ الاسميّة للبنود الدوريّة فيُفسِد الطرح)
+            'one_time' => round((float) $this->tcv - (float) $this->arr, 3),
+            'mrr' => (float) $this->mrr,
+            'arr' => (float) $this->arr,
+            'tcv' => (float) $this->tcv,
+            'cost' => (float) $this->cost,
+            'margin' => $this->margin(),
+        ];
+    }
+
+    /**
+     * فحصُ الجودة التجاريّ قبل الإرسال — تحذيراتٌ لا حجبٌ صامت: عميلٌ وعملة
+     * وبنودٌ وجدولُ دفعٍ يجمع ١٠٠٪ (حين تُستعمل النِّسب) وبنودٌ مسعَّرة. يُرجع
+     * قائمةَ مشكلاتٍ مفسَّرة (فارغةٌ = سليم).
+     */
+    public function qualityCheck(): array
+    {
+        $issues = [];
+        if (! $this->client_id) $issues[] = 'لا عميلَ محدَّدٌ للعرض.';
+        if (! $this->currency) $issues[] = 'العملةُ غير محدَّدة.';
+
+        $lines = $this->lines()->get();
+        if ($lines->isEmpty()) $issues[] = 'العرضُ بلا بنود.';
+        foreach ($lines as $l) {
+            $optional = (bool) (($l->meta['optional'] ?? false));
+            if (! $optional && (float) $l->unit_price <= 0) {
+                $issues[] = 'بندٌ بلا سعر: «' . $l->title . '».';
+            }
+        }
+
+        // جدولُ الدفع بالنِّسب يجب أن يجمع ١٠٠٪ (± ٠٫١)
+        $ms = $this->milestones()->get();
+        $pctSum = round($ms->sum(fn ($m) => (float) $m->pct), 3);
+        if ($ms->isNotEmpty() && $pctSum > 0 && abs($pctSum - 100) > 0.1) {
+            $issues[] = 'جدولُ الدفع بالنِّسب يجمع ' . rtrim(rtrim(number_format($pctSum, 2), '0'), '.') . '٪ لا ١٠٠٪.';
+        }
+
+        // هامشٌ دون الحدّ (إن ضُبط) — تحذيرٌ ظاهر (والحجبُ للاعتماد في send)
+        $floor = (float) setting('quotes.margin_floor', 0);
+        $m = $this->margin();
+        if ($floor > 0 && $m !== null && $m < $floor) {
+            $issues[] = 'الهامشُ ' . $m . '٪ دون الحدّ (' . $floor . '٪) — يتطلّب اعتماداً عند الإرسال.';
+        }
+
+        return $issues;
     }
 
     /** الهامش المتوقّع % (داخليّ) — لا يظهر للعميل */
