@@ -82,6 +82,9 @@ class BackupIntegrityGuardTest extends TestCase
     public function test_failed_write_does_not_rotate_away_good_backups(): void
     {
         $this->seedCore();
+        // تجميدُ الدقيقة: اسمُ الملفّ المؤقّت يُبنى من الوقت، فلو تدحرجت الدقيقةُ
+        // بين تجهيز الحاجز وتشغيلِ الأمر لاختلف المساران فأخفق الحجب (قرعةٌ زمنية).
+        \Illuminate\Support\Carbon::setTestNow(\Illuminate\Support\Carbon::now()->startOfMinute());
 
         $dir = storage_path('app/backups');
         File::ensureDirectoryExists($dir, 0700);
@@ -93,6 +96,7 @@ class BackupIntegrityGuardTest extends TestCase
         File::ensureDirectoryExists($blocked);
 
         $code = $this->artisan('hub:backup', ['--keep' => 1])->run();
+        \Illuminate\Support\Carbon::setTestNow();   // إعادةُ الساعة
 
         $this->assertNotSame(0, $code, 'الكتابةُ المتعذّرة تُبلَّغ فشلاً لا نجاحاً');
         $this->assertFileExists($good,
