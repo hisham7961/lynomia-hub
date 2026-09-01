@@ -108,13 +108,20 @@ class Quote extends Model
                 $cost = round($cost + (float) ($l->qty ?: 0) * (float) $l->unit_cost, 3);
             }
         }
-        // خصمٌ على مستوى العرض (اختياريّ) يُطرح من الصافي والإجمالي
+        $tax = round($total - $net, 3);   // ضريبةُ البنود قبل الخصم
+
+        // خصمٌ على مستوى العرض (اختياريّ): يُنقص **الوعاءَ الخاضع للضريبة**، فتُعاد
+        // الضريبةُ نسبةً للأساس بعد الخصم — لا تبقى ضريبةَ ما قبل الخصم. كان الخصمُ
+        // يُطرح بالتساوي من الصافي والإجماليّ، فتُحسَب الضريبةُ على وعاءٍ أكبرَ مما
+        // يُدفَع، والمستندُ لا يطابق «صافٍ − خصم + ضريبة = إجماليّ». ولا صافيَ سالبٌ
+        // حين يفوق الخصمُ البنودَ (كلُّها اختياريّةٌ غيرُ مُدرَجةٍ مثلاً).
         $disc = (float) ($this->discount ?: 0);
         if ($disc > 0) {
-            $net = round($net - $disc, 3);
-            $total = round($total - $disc, 3);
+            $base = $net;
+            $net = round(max(0.0, $net - $disc), 3);
+            $tax = $base > 0 ? round($tax * ($net / $base), 3) : 0.0;
         }
-        $tax = round($total - $net, 3);
+        $total = round($net + $tax, 3);
 
         // **الملخّصُ التجاريّ** (CPQ): تصنيفُ الإيراد بجانب الإجماليّ لا بدلاً منه.
         // MRR من البنود الدوريّة (السنويّ ÷ ١٢)، ARR = MRR×١٢، وTCV = الإجماليُّ
@@ -169,6 +176,37 @@ class Quote extends Model
         return round((float) $this->lines()->get()
             ->reject(fn ($l) => $l->countsToward())
             ->sum(fn ($l) => $l->netBeforeTax()), 3);
+    }
+
+    /**
+     * **أقسامُ العرض القابلة للإظهار/الإخفاء** (CPQ — أقسامٌ ديناميكية): عنوانُ كلٍّ
+     * بمفتاحه. الغلافُ والتسعيرُ والقبولُ ثابتةٌ لا تُخفى — أما السرديّةُ والجداولُ
+     * فاختياريّةُ العرض. الافتراض: كلُّها ظاهرة (سلوكٌ قائمٌ لا يتغيّر).
+     */
+    public const PROPOSAL_SECTIONS = [
+        'exec_summary' => 'الملخّص التنفيذي',
+        'objective'    => 'هدف المشروع',
+        'scope'        => 'نطاق العمل',
+        'phases'       => 'المراحل والتسليمات',
+        'optional'     => 'البنود الاختيارية',
+        'payments'     => 'جدول المدفوعات',
+        'assumptions'  => 'الافتراضات',
+        'exclusions'   => 'خارج النطاق',
+        'terms'        => 'الشروط والأحكام',
+    ];
+
+    /** مفاتيحُ الأقسام المخفيّة في هذا العرض (من meta) — الافتراضُ لا شيء */
+    public function hiddenSections(): array
+    {
+        $h = (array) (($this->meta['proposal_hidden'] ?? []));
+
+        return array_values(array_intersect($h, array_keys(self::PROPOSAL_SECTIONS)));
+    }
+
+    /** هل يُعرَض هذا القسمُ في مستند العميل؟ (غيرُ المخفيِّ يُعرَض) */
+    public function showsSection(string $key): bool
+    {
+        return ! in_array($key, $this->hiddenSections(), true);
     }
 
     /**

@@ -17,7 +17,11 @@ class ChangeOrderController extends Controller
     /** تطبيقُ أمر التغيير على المشروع — يمدّد القيمةَ التعاقدية والتكلفةَ والجدول */
     public function apply(string $id)
     {
+        // **التطبيقُ يُعدّل ماليّةَ المشروع** (`rev_exp`/`budget`) لا أمرَ التغيير
+        // وحده — فيلزم صلاحيةُ تعديلِ المشاريعِ أيضاً، لا صلاحيةُ أوامر التغيير فقط.
+        // بدونها كان حاملُ `changeorders.e` بلا `projects.e` يغيّر خطَّ أساسٍ ماليّ.
         abort_unless(hub_can(auth()->user(), 'changeorders', 'e'), 403, 'تطبيق أمر التغيير يتطلب صلاحية تعديل');
+        abort_unless(hub_can(auth()->user(), 'projects', 'e'), 403, 'تطبيق أمر التغيير يُعدّل المشروع فيتطلب صلاحية تعديل المشاريع');
         $co = hub_scope(ChangeOrder::query(), 'changeorders')->findOrFail($id);
         // **منعُ التطبيق المزدوج قبل حارس الحالة** (نمط toProject): المطبَّقُ سلفاً
         // يعود بردٍّ لطيفٍ لا بـ٤٢٢ — فحالتُه صارت «مطبَّق» لا «معتمد».

@@ -41,13 +41,13 @@ class Proposal
         if ($client) $h .= '<div style="font-size:15px">مُعدٌّ لـ: <b>' . $e($client->name) . '</b></div>';
         $h .= '</div>';
 
-        // ── الملخّص التنفيذي والهدف والنطاق ──
-        $h .= self::section('الملخّص التنفيذي', $q->exec_summary, $co['color']);
-        $h .= self::section('هدف المشروع', $q->objective, $co['color']);
-        $h .= self::section('نطاق العمل', $q->scope, $co['color']);
+        // ── الملخّص التنفيذي والهدف والنطاق (أقسامٌ قابلةٌ للإخفاء بحسب العرض) ──
+        if ($q->showsSection('exec_summary')) $h .= self::section('الملخّص التنفيذي', $q->exec_summary, $co['color']);
+        if ($q->showsSection('objective')) $h .= self::section('هدف المشروع', $q->objective, $co['color']);
+        if ($q->showsSection('scope')) $h .= self::section('نطاق العمل', $q->scope, $co['color']);
 
         // ── المراحل والتسليمات (البنود مجمَّعةً بالمرحلة) ──
-        if ($lines->isNotEmpty()) {
+        if ($q->showsSection('phases') && $lines->isNotEmpty()) {
             $byPhase = $lines->groupBy(fn ($l) => $l->phase ?: '—');
             $h .= '<h2 style="color:' . $e($co['color']) . ';border-bottom:1px solid #ddd;padding-bottom:6px;margin-top:28px">المراحل والتسليمات</h2>';
             foreach ($byPhase as $phase => $group) {
@@ -83,8 +83,11 @@ class Proposal
                     . '<td style="padding:8px;text-align:center;border-bottom:1px solid #eee"><b>' . number_format((float) $l->line_total, 3) . '</b></td></tr>';
             }
             $h .= '</table>';
+            // الصافيُّ المخزَّن (`amount`) بعد الخصم؛ فيُعرَض «قبل الخصم» = صافٍ + خصم
+            // كي يتصالح المستند: (صافٍ قبل الخصم) − خصم + ضريبة = الإجماليّ.
+            $subtotal = (float) $q->amount + (float) $q->discount;
             $h .= '<table style="width:40%;margin-top:10px;margin-inline-start:auto;font-size:14px">'
-                . '<tr><td style="padding:4px">الصافي قبل الضريبة</td><td style="padding:4px;text-align:left">' . $money($q->amount) . '</td></tr>'
+                . '<tr><td style="padding:4px">الصافي قبل الضريبة</td><td style="padding:4px;text-align:left">' . $money($subtotal) . '</td></tr>'
                 . ((float) $q->discount > 0 ? '<tr><td style="padding:4px">الخصم</td><td style="padding:4px;text-align:left">' . $money($q->discount) . '</td></tr>' : '')
                 . '<tr><td style="padding:4px">الضريبة</td><td style="padding:4px;text-align:left">' . $money($q->tax) . '</td></tr>'
                 . '<tr style="font-weight:bold;font-size:16px;border-top:2px solid ' . $e($co['color']) . '"><td style="padding:6px 4px">الإجمالي</td><td style="padding:6px 4px;text-align:left">' . $money($q->total) . '</td></tr>'
@@ -92,7 +95,7 @@ class Proposal
         }
 
         // ── بنودٌ اختيارية (لا تدخل الإجماليَّ حتى يُختارها العميل) ──
-        if ($optional->isNotEmpty()) {
+        if ($q->showsSection('optional') && $optional->isNotEmpty()) {
             $h .= '<h2 style="color:' . $e($co['color']) . ';border-bottom:1px solid #ddd;padding-bottom:6px;margin-top:28px">بنودٌ اختيارية</h2>';
             $h .= '<div style="font-size:12px;color:#777;margin-bottom:6px">تُضاف باختيارك — لا تُحتسَب في الإجماليّ أعلاه.</div>';
             $labels = ['optional' => 'اختياريّ', 'alternative' => 'بديل', 'addon' => 'إضافة'];
@@ -110,7 +113,7 @@ class Proposal
         }
 
         // ── جدول المدفوعات ──
-        if ($milestones->isNotEmpty()) {
+        if ($q->showsSection('payments') && $milestones->isNotEmpty()) {
             $h .= '<h2 style="color:' . $e($co['color']) . ';border-bottom:1px solid #ddd;padding-bottom:6px;margin-top:28px">جدول المدفوعات</h2>';
             $h .= '<table style="width:100%;border-collapse:collapse;font-size:13px">';
             $h .= '<tr style="background:#f0f0f0"><th style="padding:8px;text-align:right">الدفعة</th><th style="padding:8px">النسبة</th><th style="padding:8px">المبلغ</th><th style="padding:8px;text-align:right">المحفّز</th></tr>';
@@ -124,10 +127,10 @@ class Proposal
             $h .= '</table>';
         }
 
-        // ── الافتراضات وخارج النطاق والشروط ──
-        $h .= self::section('الافتراضات', $q->assumptions, $co['color']);
-        $h .= self::section('خارج النطاق', $q->exclusions, $co['color']);
-        $h .= self::section('الشروط والأحكام', $q->terms, $co['color']);
+        // ── الافتراضات وخارج النطاق والشروط (أقسامٌ قابلةٌ للإخفاء) ──
+        if ($q->showsSection('assumptions')) $h .= self::section('الافتراضات', $q->assumptions, $co['color']);
+        if ($q->showsSection('exclusions')) $h .= self::section('خارج النطاق', $q->exclusions, $co['color']);
+        if ($q->showsSection('terms')) $h .= self::section('الشروط والأحكام', $q->terms, $co['color']);
 
         // ── القبول ──
         $h .= '<div style="margin-top:36px;padding:18px;border:2px dashed ' . $e($co['color']) . ';border-radius:8px">';

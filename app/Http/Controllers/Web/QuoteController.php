@@ -81,8 +81,56 @@ class QuoteController extends Controller
             'invoice'  => $this->toInvoice($q),
             'project'  => $this->toProject($q),
             'clone'    => $this->cloneQuote($q),
+            'sections' => $this->setSections($r, $q),
+            'terms'    => $this->applyTerms($r, $q),
             default    => abort(422),
         };
+    }
+
+    /**
+     * **أقسامُ العرض الديناميكية**: يضبط أيّ الأقسامِ السرديّة تُخفى في مستند
+     * العميل (`meta['proposal_hidden']`). المُرسَلُ هو المرئيّ، فالمخفيّ = ما لم
+     * يُختَر من الأقسام القابلة للإخفاء. لا يمسّ التسعيرَ ولا الغلافَ ولا القبول.
+     */
+    protected function setSections(Request $r, Quote $q)
+    {
+        $keys = array_keys(Quote::PROPOSAL_SECTIONS);
+        $show = array_values(array_intersect((array) $r->input('show', []), $keys));
+        $hidden = array_values(array_diff($keys, $show));
+
+        $meta = (array) $q->meta;
+        $meta['proposal_hidden'] = $hidden;
+        $q->meta = $meta;
+        $q->save();
+        hub_audit('ضبط أقسام العرض', 'quotes', $q->id, $q->doc_no);
+
+        return back()->with('ok', 'حُدِّثت أقسامُ العرض الظاهرةُ في مستند العميل');
+    }
+
+    /**
+     * **مكتبةُ الشروط**: يُدرِج شروطَ عرضٍ قالبٍ (`is_template`) في هذا العرض — نصٌّ
+     * جاهزٌ يُعاد استعماله بلا إعادة كتابة. يُلحَق بالشروط القائمة أو يستبدلها
+     * (`mode=replace`). يُعاد استعمالُ آليّة القوالب القائمة لا جدولٌ جديد.
+     */
+    protected function applyTerms(Request $r, Quote $q)
+    {
+        $tplId = hub_str($r->input('from'));
+        // القالبُ يُنطَّق كأيّ عرض — لا يُقرأ شرطُ عرضٍ خارج نطاق المستخدم
+        $tpl = hub_scope(Quote::query(), 'quotes')->where('is_template', true)->find($tplId);
+        abort_unless($tpl, 422, 'قالبُ الشروط غير موجودٍ أو خارج نطاقك');
+
+        $snippet = trim((string) $tpl->terms);
+        if ($snippet === '') return back()->with('err', 'القالبُ المختارُ بلا شروط');
+
+        $mode = hub_str($r->input('mode'));
+        $current = trim((string) $q->terms);
+        $q->terms = ($mode === 'replace' || $current === '')
+            ? $snippet
+            : $current . "\n\n" . $snippet;
+        $q->save();
+        hub_audit('إدراج شروطٍ من قالب', 'quotes', $q->id, $q->doc_no . ' ← ' . $tpl->doc_no);
+
+        return back()->with('ok', 'أُدرجت الشروطُ من القالب — راجعها قبل الإرسال');
     }
 
     /**

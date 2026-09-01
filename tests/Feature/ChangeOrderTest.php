@@ -5,6 +5,8 @@ namespace Tests\Feature;
 use App\Models\ChangeOrder;
 use App\Models\Client;
 use App\Models\Project;
+use App\Models\Role;
+use App\Models\User;
 use Tests\TestCase;
 
 /**
@@ -66,6 +68,30 @@ class ChangeOrderTest extends TestCase
         $p->refresh();
         $this->assertSame(60000.0, (float) $p->rev_exp, 'لا تطبيقٌ مزدوج');
         $this->assertCount(1, ((array) $p->meta)['baseline']['change_orders']);
+    }
+
+    /**
+     * التطبيقُ يُعدّل ماليّةَ المشروع، فيتطلّب صلاحيةَ تعديلِ المشاريع لا أوامرِ
+     * التغيير وحدها. حاملُ `changeorders.e` بلا `projects.e` = ٤٠٣.
+     */
+    public function test_apply_requires_projects_edit_permission(): void
+    {
+        $this->seedCore();
+        $p = $this->projectWithBaseline();
+        $co = ChangeOrder::create(['title' => 'تغيير', 'project_id' => $p->id,
+            'value_delta' => 5000, 'currency' => 'د.ك', 'status' => 'معتمد']);
+
+        // دورٌ: أوامرُ التغيير تعديل، والمشاريعُ مشاهدةٌ فقط
+        $role = Role::create(['name' => 'منسّق أوامر', 'scope' => 'all', 'flags' => [],
+            'matrix' => ['changeorders' => ['v' => 1, 'e' => 1], 'projects' => ['v' => 1, 'e' => 0]]]);
+        $u = User::create(['name' => 'منسّق', 'email' => 'co@test.local',
+            'password' => 'Secret!2026x', 'role_id' => $role->id, 'status' => 'نشط', 'password_changed_at' => now()]);
+
+        $this->actingAs($u)->post("/changeorder/{$co->id}/apply")->assertForbidden();
+
+        // ماليّةُ المشروع لم تُمَسّ
+        $p->refresh();
+        $this->assertSame(50000.0, (float) $p->rev_exp, 'طُبِّق أمرُ التغيير بلا صلاحية تعديل المشاريع');
     }
 
     public function test_pdf_renders_without_internal_cost(): void

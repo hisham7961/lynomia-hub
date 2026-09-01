@@ -177,3 +177,47 @@
         </form>
     @endif
 </div>
+
+@if ($canEdit)
+    {{-- أقسامُ العرض الديناميكية: أيّ الأقسامِ السرديّة تظهر في مستند العميل --}}
+    @php $qHidden = $row->hiddenSections(); @endphp
+    <div class="card">
+        <h3 class="cardtitle">🧩 أقسامُ مستند العميل</h3>
+        <div class="sub" style="margin-bottom:8px">اختَر ما يظهر في العرض المطبوع — التسعيرُ والغلافُ والقبولُ ثابتةٌ دائماً.</div>
+        <form method="POST" action="{{ route('quotes.act', $row->id) }}">@csrf
+            <input type="hidden" name="do" value="sections">
+            <div class="crow" style="flex-wrap:wrap;gap:10px">
+                @foreach (\App\Models\Quote::PROPOSAL_SECTIONS as $key => $label)
+                    <label class="chip"><input type="checkbox" name="show[]" value="{{ $key }}" @checked(! in_array($key, $qHidden, true))> {{ $label }}</label>
+                @endforeach
+            </div>
+            <button class="btn ghost sm" style="margin-top:10px">حفظ الأقسام</button>
+        </form>
+    </div>
+
+    {{-- مكتبةُ الشروط: إدراجُ شروطِ عرضٍ قالبٍ جاهز بلا إعادة كتابة --}}
+    @php
+        $qTermTpls = hub_scope(\App\Models\Quote::query(), 'quotes')->where('is_template', true)
+            ->whereNotNull('terms')->where('terms', '!=', '')->orderBy('title')->limit(50)->get(['id', 'doc_no', 'title']);
+    @endphp
+    @if ($qTermTpls->isNotEmpty())
+        <div class="card">
+            <h3 class="cardtitle">📚 مكتبةُ الشروط</h3>
+            <div class="sub" style="margin-bottom:8px">أدرِج شروطاً جاهزةً من عرضٍ قالب — تُلحَق بشروطِك أو تستبدلها.</div>
+            <form method="POST" action="{{ route('quotes.act', $row->id) }}" class="crow" style="flex-wrap:wrap;gap:8px">@csrf
+                <input type="hidden" name="do" value="terms">
+                <select class="inp" name="from" required>
+                    <option value="">— اختَر قالباً —</option>
+                    @foreach ($qTermTpls as $t)
+                        <option value="{{ $t->id }}">{{ $t->title ?: $t->doc_no }}</option>
+                    @endforeach
+                </select>
+                <select class="inp" name="mode">
+                    <option value="append">إلحاق</option>
+                    <option value="replace">استبدال</option>
+                </select>
+                <button class="btn ghost sm">إدراج الشروط</button>
+            </form>
+        </div>
+    @endif
+@endif

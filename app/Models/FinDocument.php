@@ -75,6 +75,48 @@ class FinDocument extends Model
         return $candidate;
     }
 
+    /**
+     * رقمُ مستندٍ فريدٌ مقترَح — يُستعمل حين يُترك الحقلُ فارغاً (الترقيمُ اليدويُّ
+     * يبقى مسموحاً). تسلسلٌ سنويٌّ `INV-{YEAR}-{NNNN}` فوق أعلى تسلسلٍ مستعمَل.
+     */
+    public static function nextDocNo(): string
+    {
+        $year = now()->format('Y');
+        $prefix = 'INV-' . $year . '-';
+        $last = static::withTrashed()->where('doc_no', 'like', $prefix . '%')
+            ->orderByDesc('doc_no')->value('doc_no');
+        $n = $last ? ((int) preg_replace('/\D/', '', substr((string) $last, strlen($prefix))) + 1) : 1;
+        do {
+            $candidate = $prefix . sprintf('%04d', $n);
+            $n++;
+        } while (static::withTrashed()->where('doc_no', $candidate)->exists());
+
+        return $candidate;
+    }
+
+    /**
+     * حفظٌ يلتقط تصادمَ الفهرس الفريد على `doc_no` (سباقُ كتابةِ رقمين متطابقين)
+     * فيولّد بديلاً بدل أن يسقط الطلبُ بـ٥٠٠ — نمطُ Quote/Contract نفسُه. لا يُطبَّق
+     * إلا على الإدراج (`! $this->exists`): تحديثُ رقمٍ قائمٍ يبقى بيدِ المستخدم.
+     */
+    public function save(array $options = []): bool
+    {
+        for ($attempt = 0; ; $attempt++) {
+            try {
+                return parent::save($options);
+            } catch (\Illuminate\Database\QueryException $e) {
+                if ($this->exists || $attempt >= 5 || ! self::isDupDocNo($e)) throw $e;
+                $this->doc_no = self::nextDocNo();
+            }
+        }
+    }
+
+    protected static function isDupDocNo(\Illuminate\Database\QueryException $e): bool
+    {
+        return (string) $e->getCode() === '23000'
+            && str_contains(mb_strtolower($e->getMessage()), 'doc_no');
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(\App\Models\Project::class, 'project_id');
