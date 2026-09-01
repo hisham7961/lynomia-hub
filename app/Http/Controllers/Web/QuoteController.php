@@ -275,7 +275,82 @@ class QuoteController extends Controller
 
         if (! $q->sent_at) $q->sent_at = now();
 
+        // **أرشفةُ العرض المُصدَر** (CPQ هـ): لقطةٌ ثابتةٌ من العرض لحظةَ الإرسال —
+        // فالتاريخيُّ لا يُعاد توليدُه من بياناتٍ متغيّرة لاحقاً (سلامةٌ تاريخية).
+        $this->archiveProposal($q, 'إرسال');
+
         return $this->setStatus($q, 'مُرسل', '📨 حُدّد العرض كمُرسل للعميل');
+    }
+
+    /**
+     * أرشفةُ العرض الاحترافيّ كمرفقٍ ثابتٍ على السجل (نمط `archiveSignedCopy`):
+     * PDF إن توفّرت المكتبة وإلا HTML — فيبقى أثرٌ للمُصدَر دوماً. لا يُفشل الفعلَ.
+     */
+    protected function archiveProposal(Quote $q, string $tag): void
+    {
+        try {
+            $html = \App\Support\Proposal::html($q->fresh());
+            $pdf = \App\Support\DocRenderer::pdf($html, 'عرض ' . $q->doc_no);
+            [$blob, $mime, $ext] = $pdf
+                ? [$pdf, 'application/pdf', 'pdf']
+                : [$html, 'text/html', 'html'];
+            $path = 'hub/att/quote-' . $q->doc_no . '-v' . (int) $q->version . '-' . uniqid() . '.' . $ext;
+            \Illuminate\Support\Facades\Storage::disk('local')->put($path, $blob);
+            \App\Models\Attachment::create([
+                'module' => 'quotes', 'record_id' => $q->id,
+                'field' => 'عرض مؤرشَف — ' . $tag . ' (نسخة ' . (int) $q->version . ')',
+                'disk' => 'local', 'path' => $path,
+                'original_name' => 'proposal-' . $q->doc_no . '-v' . (int) $q->version . '.' . $ext,
+                'mime' => $mime, 'size' => strlen($blob),
+                'checksum' => hash('sha256', $blob),
+                'uploaded_by' => auth()->id(),
+            ]);
+        } catch (\Throwable $e) {
+            report($e);   // الأرشفةُ إضافةٌ — فشلُها لا يُفشل الإرسال
+        }
+    }
+
+    /**
+     * **مقارنةُ النسختين** (CPQ هـ): ما تغيّر بين نسخةٍ سابقةٍ والحاليّة —
+     * سعرٌ ونطاقٌ وحالةٌ وصلاحية. من `record_versions` (لقطاتُ الحفظ)، فالتفاوضُ
+     * يُقرأ بوضوح. لا يُعدَّل شيءٌ — عرضٌ فقط.
+     */
+    public function diff(Request $r, string $id)
+    {
+        abort_unless(hub_can(auth()->user(), 'quotes', 'v'), 403);
+        $q = hub_scope(Quote::query(), 'quotes')->findOrFail($id);
+        $versions = $q->versions()->get(['version', 'snapshot', 'created_at']);
+
+        // النسخةُ المرجعُ: من ?v= أو الأسبق مباشرةً قبل الحاليّة
+        $cur = (array) $q->getAttributes();
+        $want = (int) $r->query('v', 0);
+        $base = $want > 0
+            ? $versions->firstWhere('version', $want)
+            : $versions->where('version', '<', (int) $q->version)->sortByDesc('version')->first();
+        // اللقطةُ قد تُقرأ نصاً (DB خام) أو مصفوفةً (cast على النموذج) — الحالتان
+        $baseSnap = $base
+            ? (is_array($base->snapshot) ? $base->snapshot : (array) json_decode((string) $base->snapshot, true))
+            : [];
+
+        $watch = [
+            'total' => 'الإجمالي', 'amount' => 'الصافي', 'discount' => 'الخصم', 'tax' => 'الضريبة',
+            'cost' => 'التكلفة (داخليّ)', 'mrr' => 'MRR', 'arr' => 'ARR',
+            'status' => 'الحالة', 'title' => 'العنوان', 'scope' => 'النطاق',
+            'exec_summary' => 'الملخّص التنفيذي', 'valid' => 'صالح حتى', 'currency' => 'العملة',
+        ];
+        $hideCost = hub_field_mode(auth()->user(), 'quotes', 'cost') === 'hide';
+        $changes = [];
+        foreach ($watch as $col => $label) {
+            if ($hideCost && in_array($col, ['cost', 'mrr', 'arr'], true)) continue;
+            $old = (string) ($baseSnap[$col] ?? '');
+            $new = (string) ($cur[$col] ?? '');
+            if ($old !== $new) $changes[] = ['label' => $label, 'old' => $old, 'new' => $new];
+        }
+
+        return view('quotes.diff', [
+            'q' => $q, 'versions' => $versions,
+            'baseVersion' => $base->version ?? null, 'changes' => $changes,
+        ]);
     }
 
     /* ────────── داخلي ────────── */
@@ -292,6 +367,9 @@ class QuoteController extends Controller
             $q->accepted_by = auth()->user()?->name;
         }
         $q->save();
+
+        // أرشفةُ النسخة المقبولة — الوثيقةُ التي وافق عليها العميلُ تُجمَّد كما هي
+        if ($status === 'مقبول') $this->archiveProposal($q, 'مقبول');
 
         // **إطلاقُ الأحداث الدلالية**: كان setStatus يتجاوز FlowRunner فلا تُطلَق
         // quote.accepted/rejected المعلَنة — الآن تُطلق فتعمل حِزمُ الاستجابة والتنبيهات.
