@@ -391,6 +391,11 @@ class ModuleController extends Controller
         hub_audit('عرض حساس', $module, $row->id,
             (string) ($row->{hub_display_col($module)} ?? $row->id) . ' — ' . ($f['label'] ?? $field));
 
+        // **حزمةُ استجابة**: كشفُ سرٍّ من الخزنة حدثٌ دلاليّ (vault.revealed) —
+        // تعمل عليه التدفقات. يُطلق بالوحدة الفعلية فلا يُصدر إلا لـvault
+        // (config('hub.events') لا يعرّف الحدثَ لغيرها)، وفشلُه لا يُفشل الكشف.
+        try { \App\Support\FlowRunner::fire('revealed', $module, $row); } catch (\Throwable $e) { report($e); }
+
         return response()->json(['v' => (string) ($row->{$f['col']} ?? '')]);
     }
 
@@ -583,6 +588,11 @@ class ModuleController extends Controller
     {
         [$def, $class] = $this->resolve($module, 'v');
         abort_unless(hub_exporter(), 403, 'التصدير يتطلب صلاحية');
+        // **مفتاحُ طوارئٍ مفصول**: تجميدُ التصدير يصدّ سحبَ البيانات الجماعيّ لحظةَ
+        // الاشتباه — حتى للمالك، فالتجميدُ يُرفع من مركز الأمان لا بتصدير. (مطفأٌ
+        // افتراضاً فلا يمسّ العملَ العاديّ.)
+        abort_if((string) setting('security.freeze_exports', '0') === '1', 423,
+            'التصدير مجمَّدٌ الآن بمفتاح طوارئٍ أمنيّ — يُرفع من مركز الأمان');
         $def['key'] = $module;
 
         $trash = false; $filters = [];

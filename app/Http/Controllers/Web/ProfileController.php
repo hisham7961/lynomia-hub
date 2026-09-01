@@ -24,6 +24,10 @@ class ProfileController extends Controller
     /** إنشاء مفتاح API — يظهر النص الكامل مرة واحدة فقط */
     public function tokenStore(Request $r)
     {
+        // **مفتاحُ طوارئٍ مفصول**: تجميدُ الرموز يمنع فتحَ قنواتِ وصولٍ برمجيّةٍ
+        // جديدةٍ أثناء الحادثة (الإبطالُ يبقى متاحاً). يُرفع من مركز الأمان.
+        abort_if((string) setting('security.freeze_tokens', '0') === '1', 423,
+            'سكُّ مفاتيح API مجمَّدٌ الآن بمفتاح طوارئٍ أمنيّ — يُرفع من مركز الأمان');
         $d = $r->validate([
             'tname'   => ['required', 'string', 'max:110'],
             'tdays'   => ['nullable', 'integer', 'min:1', 'max:730'],
@@ -62,6 +66,9 @@ class ProfileController extends Controller
     /** تدوير مفتاح: قيمة جديدة بنفس الاسم والنطاقات — القديمة تتوقف فوراً */
     public function tokenRotate(string $id)
     {
+        // التدويرُ يسكّ قيمةً جديدة — فيخضع لتجميد الرموز نفسِه (الإبطالُ لا يخضع)
+        abort_if((string) setting('security.freeze_tokens', '0') === '1', 423,
+            'تدويرُ مفاتيح API مجمَّدٌ الآن بمفتاح طوارئٍ أمنيّ — يُرفع من مركز الأمان');
         $t = \App\Models\ApiToken::where('user_id', auth()->id())->findOrFail($id);
         $plain = 'lyn_' . \Illuminate\Support\Str::random(44);
 

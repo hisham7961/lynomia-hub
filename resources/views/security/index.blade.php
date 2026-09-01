@@ -19,6 +19,31 @@
 
 @if ($lockdown)<div class="flash bad" style="position:static;margin-bottom:12px">⚠️ قفل الطوارئ مفعّل — لا يستطيع أحد سوى المالكين الوصول للنظام الآن</div>@endif
 
+{{-- مفاتيحُ الطوارئ المفصولة: كلٌّ يشدّ فرملةً وحدَه — لا زرٌّ واحدٌ خطر --}}
+<div class="card" style="margin-bottom:12px">
+    <div class="crow" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <h3 style="margin:0">🧯 مفاتيح الطوارئ المفصولة</h3>
+        <div class="sub" style="margin:0">شدُّ الفرملة فوريّ؛ رفعُها يتطلّب تأكيدَ الهوية — كلُّ تبديلٍ مسجَّلٌ في التدقيق.</div>
+    </div>
+    <div class="crow" style="gap:10px;margin-top:10px;flex-wrap:wrap">
+        @foreach ([['exports', '📤 تصدير البيانات', $freezeExports], ['tokens', '🔑 سكّ مفاتيح API', $freezeTokens]] as [$fk, $flabel, $fon])
+            <form method="POST" action="{{ route('security.freeze', $fk) }}"
+                  data-confirm="{{ $fon ? 'رفعُ تجميد ' . $flabel . '؟ سيُعاد تفعيلُه — قد يُطلب تأكيدُ الهوية.' : 'تجميدُ ' . $flabel . ' فوراً؟' }}">
+                @csrf
+                <button class="btn {{ $fon ? '' : 'ghost' }} sm" type="submit"
+                        style="{{ $fon ? 'background:var(--bad);border-color:var(--bad);color:#fff' : '' }}">
+                    {{ $fon ? '♻️ رفع تجميد ' . $flabel . ' (مجمَّد الآن!)' : '🧊 تجميد ' . $flabel }}
+                </button>
+            </form>
+        @endforeach
+    </div>
+    @if ($freezeExports || $freezeTokens)
+        <div class="flash wn" style="position:static;margin-top:10px">🧊 مُجمَّدٌ الآن:
+            {{ $freezeExports ? 'التصدير' : '' }}{{ $freezeExports && $freezeTokens ? ' و' : '' }}{{ $freezeTokens ? 'سكّ الرموز' : '' }}
+            — يُصَدّ بالرمز ٤٢٣ حتى يُرفع من هنا.</div>
+    @endif
+</div>
+
 {{-- وضعية الأمان: فحوصٌ حيّة لكلٍّ منها علاجٌ وموضعه — لا أرقامٌ عارية --}}
 <div class="card" style="margin-bottom:12px">
     <div class="crow" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -62,6 +87,50 @@
     <div class="stat"><span class="ico">📡</span><b class="{{ $kpi['denied7'] ? 'txt-bad' : '' }}">{{ $kpi['denied7'] }}</b><span>وصولٌ مرفوض (٧ أيام)</span></div>
     <div class="stat"><span class="ico">🗝️</span><b class="{{ $kpi['stale'] ? 'txt-bad' : '' }}">{{ $kpi['stale'] }}</b><span>أسرار لم تُغيَّر منذ ٦ أشهر</span></div>
     <a class="stat" href="{{ route('m.index', 'incidents') }}"><span class="ico">🚨</span><b class="{{ ($kpi['secinc'] ?? 0) ? 'txt-bad' : '' }}">{{ $kpi['secinc'] ?? 0 }}</b><span>حوادث أمنيّة مفتوحة</span></a>
+</div>
+
+{{-- خريطةُ الانكشاف: من يطاله اختراقُ حسابٍ واحد — بعلاقاتٍ فعلية لا رقمٍ أسود --}}
+<div class="card" style="margin-bottom:12px">
+    <div class="crow" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <h3 style="margin:0">🗺️ خريطة الانكشاف — نطاقُ الأثر</h3>
+        <div class="crow" style="gap:6px">
+            <span class="bdg {{ $exposureSummary['high'] ? 'bad' : 'ok' }}">{{ $exposureSummary['exposed'] }} حسابٌ منكشف</span>
+            <span class="bdg wn">{{ $exposureSummary['owners'] }} مالك</span>
+            <span class="bdg {{ $exposureSummary['no2fa'] ? 'bad' : 'ok' }}">{{ $exposureSummary['no2fa'] }} بلا تحقّقٍ ثنائي</span>
+            <span class="bdg">{{ $exposureSummary['live'] }} حيٌّ الآن</span>
+        </div>
+    </div>
+    <div class="sub" style="margin:4px 0 10px">الحساباتُ عالية الامتياز مرتَّبةٌ بالأخطر أولاً — لو سُرق أحدُها، ماذا يطال؟ الدرجةُ مفسَّرةُ العوامل.</div>
+    @if (empty($exposure))
+        <div class="sub">لا حساباتٍ عالية الامتياز خارج المالك — انكشافٌ ضيّق.</div>
+    @else
+    <div class="tblwrap">
+        <table class="tbl">
+            <thead><tr><th>الحساب</th><th>الدور والنطاق</th><th>الرايات الحسّاسة</th><th>حيّ/أجهزة</th><th>الانكشاف</th></tr></thead>
+            <tbody>
+            @foreach ($exposure as $x)
+                <tr>
+                    <td>
+                        <b>{{ $x['name'] }}</b>{!! $x['is_owner'] ? ' <span class="bdg bad">مالك</span>' : '' !!}
+                        @if (! $x['twofa'])<span class="bdg wn" title="بلا تحقّقٍ بخطوتين">بلا 2FA</span>@endif
+                        @if ($x['locked'])<span class="bdg">مقفل</span>@endif
+                        <div class="sub" style="font-size:11px">{{ $x['email'] }}</div>
+                    </td>
+                    <td>{{ $x['role'] }}<div class="sub" style="font-size:11px">{{ $x['scope_label'] }}</div></td>
+                    <td>
+                        @forelse ($x['flag_labels'] as $fl)<span class="bdg wn" style="margin:1px">{{ $fl }}</span>@empty<span class="sub">—</span>@endforelse
+                    </td>
+                    <td>{{ $x['live'] }} / {{ $x['devices'] }}</td>
+                    <td>
+                        <span class="bdg {{ $x['band'] }}">{{ $x['score'] }}</span>
+                        <div class="sub" style="font-size:11px;line-height:1.7">{{ implode(' · ', $x['factors']) }}</div>
+                    </td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table>
+    </div>
+    @endif
 </div>
 
 {{-- رادارُ الكشف الحيّ: من طرق باباً لا يملك مفتاحه — وصولٌ مرفوض (٤٠٣) وتخمينُ روابط --}}
