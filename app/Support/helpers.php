@@ -3333,8 +3333,11 @@ if (! function_exists('hub_recommendations')) {
         return \Illuminate\Support\Facades\Cache::remember($key, 300, function () use ($projectId) {
             $rank = ['حرج' => 3, 'مهم' => 2, 'اطّلاع' => 1];
             $out = [];
-            $add = function ($sev, $ico, $title, $why, $url, $action) use (&$out) {
-                $out[] = compact('sev', 'ico', 'title', 'why', 'url', 'action');
+            // `key`/`module`/`record_id` إضافةٌ متوافقةٌ خلفياً (القرّاء القدامى يقرؤون
+            // الستّةَ الأولى ويتجاهلون الباقي): تجعل كلَّ إشارةٍ **قابلةً للتصرّف**
+            // (إقرار/تأجيل/رفض) في مركز الفعل بمفتاحٍ ثابتٍ يُدمَج لا يتكرّر.
+            $add = function ($sev, $ico, $title, $why, $url, $action, $key = null, $module = null, $recordId = null) use (&$out) {
+                $out[] = compact('sev', 'ico', 'title', 'why', 'url', 'action', 'key', 'module', 'recordId');
             };
 
             // ١) خدمات تبيع بأقل من كلفتها
@@ -3344,7 +3347,8 @@ if (! function_exists('hub_recommendations')) {
                     $add('حرج', '🌊', 'خدمة تبيع بخسارة: ' . $s['name'],
                         'سعرها الشهري ' . number_format((float) $s['priceM'], 1) . ' وكلفتها ' . number_format((float) $s['costM'], 1)
                         . ' — هامش ' . number_format((float) $s['margin'], 1) . ' شهرياً. راجع السعر أو الكلفة.',
-                        route('m.show', ['services', $s['id']]), 'راجع الخدمة');
+                        route('m.show', ['services', $s['id']]), 'راجع الخدمة',
+                        'svc.loss:' . $s['id'], 'services', $s['id']);
                 }
                 if (($svc['totals']['unpriced'] ?? 0) > 0) {
                     $add('اطّلاع', '🏷️', ($svc['totals']['unpriced']) . ' خدمة بلا سعر شهري',
@@ -3362,7 +3366,8 @@ if (! function_exists('hub_recommendations')) {
                     $add('مهم', '🔥', 'فوق طاقته: ' . $r['name'],
                         'حمله ' . $r['load'] . '٪ — محجوز ' . $r['booked'] . ' ساعة على متاح ' . $r['available']
                         . '. أجّل أو وزّع أو وظّف.',
-                        route('capacity'), 'افتح لوحة القدرات');
+                        route('capacity'), 'افتح لوحة القدرات',
+                        'cap.over:' . ($r['id'] ?? $r['name']), 'employees', $r['id'] ?? null);
                 }
             } catch (\Throwable $e) {}
 
@@ -3381,7 +3386,8 @@ if (! function_exists('hub_recommendations')) {
                 foreach (array_slice($sick, 0, 5) as $s) {
                     $add($s['h']['score'] < 40 ? 'حرج' : 'مهم', '🩺', 'مشروع متعثر: ' . $s['p']->name,
                         'صحته ' . $s['h']['score'] . '/١٠٠ (' . ($s['h']['label'] ?? '') . '). راجع عوامل التعثر في صفحته.',
-                        route('m.show', ['projects', $s['p']->id]), 'افتح المشروع');
+                        route('m.show', ['projects', $s['p']->id]), 'افتح المشروع',
+                        'proj.health:' . $s['p']->id, 'projects', $s['p']->id);
                 }
             } catch (\Throwable $e) {}
 
@@ -3414,7 +3420,8 @@ if (! function_exists('hub_recommendations')) {
                         $days = (int) \Illuminate\Support\Carbon::parse($d->due)->diffInDays(now());
                         $add($days > 60 ? 'حرج' : 'مهم', '💸', 'مستحق متأخر: ' . ($d->partner ?: ($d->doc_no ?: 'فاتورة')),
                             'باقٍ ' . number_format($rem, 1) . ' متأخر ' . $days . ' يوماً. تابع التحصيل.',
-                            route('m.show', ['fin', $d->id]), 'افتح الفاتورة');
+                            route('m.show', ['fin', $d->id]), 'افتح الفاتورة',
+                            'fin.overdue:' . $d->id, 'fin', $d->id);
                     }
                 }
             } catch (\Throwable $e) {}
@@ -3425,7 +3432,39 @@ if (! function_exists('hub_recommendations')) {
                 foreach ($soon as $i) {
                     $add($i['days'] < 0 ? 'حرج' : 'مهم', '⏳', 'ينتهي قريباً: ' . $i['name'],
                         $i['mlabel'] . ' · ' . $i['flabel'] . ' — ' . ($i['days'] < 0 ? 'متأخر' : ($i['days'] === 0 ? 'اليوم' : 'خلال ' . $i['days'] . ' يوم')) . '.',
-                        route('m.show', [$i['module'], $i['id']]), 'افتح السجل');
+                        route('m.show', [$i['module'], $i['id']]), 'افتح السجل',
+                        'expiry:' . $i['module'] . ':' . $i['id'], $i['module'], $i['id']);
+                }
+            } catch (\Throwable $e) {}
+
+            // ٧) عرضٌ مقبولٌ لم يُحوَّل إلى تسليم (فجوةُ CPQ→تنفيذ) — منطَّقٌ بـhub_scope
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('quotes')) {
+                    $stuck = hub_scope(\App\Models\Quote::query(), 'quotes')
+                        ->where('status', 'مقبول')->whereNotNull('accepted_at')
+                        ->where('accepted_at', '<', now()->subDays(2))
+                        ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
+                        ->orderByDesc('accepted_at')->limit(8)->get(['id', 'doc_no', 'title', 'accepted_at', 'meta']);
+                    foreach ($stuck as $q) {
+                        $meta = (array) (is_array($q->meta) ? $q->meta : (json_decode((string) $q->meta, true) ?: []));
+                        // حُوِّل فعلاً (مشروعٌ أو ارتباط) → لا إشارة (حلٌّ تلقائيّ عند التحويل)
+                        if (! empty($meta['project_id']) || ! empty($meta['engagement_id'])) continue;
+                        $days = (int) \Illuminate\Support\Carbon::parse($q->accepted_at)->diffInDays(now());
+                        $add($days > 7 ? 'حرج' : 'مهم', '🔗', 'عرضٌ مقبولٌ لم يُحوَّل: ' . ($q->title ?: $q->doc_no),
+                            'قُبل منذ ' . $days . ' يوماً ولا مشروعَ ولا ارتباط. حوّله لتبدأ التسليمَ والتحصيل.',
+                            route('m.show', ['quotes', $q->id]), 'حوّله لمشروع',
+                            'quote.unconverted:' . $q->id, 'quotes', $q->id);
+                    }
+                }
+            } catch (\Throwable $e) {}
+
+            // ٨) عهدةٌ متأخرةُ الاسترداد — من منتِج القائم `Custody::overdue` (منطَّقٌ سلفاً)
+            try {
+                foreach (\App\Support\Custody::overdue(8) as $c) {
+                    $add(($c['late'] ?? 0) > 14 ? 'حرج' : 'مهم', '📦', 'عهدةٌ متأخرةُ الاسترداد: ' . $c['asset'],
+                        'تصريحُ «' . $c['action'] . '» استحقّ رجوعُه ' . $c['due'] . ' — متأخرٌ ' . $c['late'] . ' يوماً. تابع الاسترداد.',
+                        route('m.show', ['assets', $c['assetId']]), 'افتح الأصل',
+                        'custody.overdue:' . $c['id'], 'assets', $c['assetId']);
                 }
             } catch (\Throwable $e) {}
 

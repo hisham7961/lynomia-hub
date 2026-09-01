@@ -188,6 +188,7 @@ Route::middleware('auth')->group(function () {
     Route::get('pricing', [\App\Http\Controllers\Web\PricingController::class, 'index'])->name('pricing');
     Route::get('digital-assets', [\App\Http\Controllers\Web\DigitalAssetsController::class, 'index'])->name('digital.assets');
     Route::get('recommendations', [CapacityController::class, 'recommendations'])->name('recs');
+    Route::post('recommendations/act', [CapacityController::class, 'recAct'])->name('recs.act');
     Route::get('delivery', [\App\Http\Controllers\Web\DeliveryController::class, 'index'])->name('delivery');
     Route::get('assets-life', [\App\Http\Controllers\Web\AssetLifeController::class, 'index'])->name('assets.life');
     // مركزُ الكود المصدري: صفحةُ إصداراتٍ على شاكلة ما يعرفه المطوّرون

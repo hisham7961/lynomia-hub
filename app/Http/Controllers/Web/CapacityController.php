@@ -37,13 +37,35 @@ class CapacityController extends Controller
             'lens' => hub_lens()]);
     }
 
-    /** مركز التوصيات: إشارات قابلة للتنفيذ مجموعة من محرّكات النظام */
+    /**
+     * مركزُ التوصيات — رُقّي إلى **مركز الفعل**: نفسُ الإشارات المحسوبة (لا محرّكٌ
+     * ثانٍ) مع **تصرّفٍ عليها** (إقرار/تأجيل/رفض) عبر `ActionCenter`، ومجمّعةً بالكيان،
+     * ومعها «ما ينتظرني» من الصندوق القائم. العنوانُ والحالةُ الفارغةُ محفوظان.
+     */
     public function recommendations()
     {
         $this->gate();
 
-        return view('recommendations', ['r' => hub_recommendations((bool) request()->query('fresh'), hub_lens()['id']),
-            'lens' => hub_lens()]);
+        return view('recommendations', [
+            'ac'   => \App\Support\ActionCenter::feed((bool) request()->query('fresh'), hub_lens()['id']),
+            'lens' => hub_lens(),
+        ]);
+    }
+
+    /** تصرّفٌ بإشارةٍ في مركز الفعل: إقرار/تأجيل/رفض/إعادةُ فتح — يُحرَس بأنها في صفّ المستخدم */
+    public function recAct(Request $r)
+    {
+        $this->gate();
+
+        $skey = hub_str($r->input('skey'));
+        $do   = hub_str($r->input('do'));
+        if (! in_array($do, ['ack', 'snooze', 'dismiss', 'reopen'], true)) {
+            return back()->with('err', 'إجراءٌ غير معروف');
+        }
+        $ok = \App\Support\ActionCenter::disposition($skey, $do, hub_str($r->input('until')) ?: null, hub_str($r->input('note')) ?: null);
+
+        return back()->with($ok ? 'ok' : 'err',
+            $ok ? '✔️ سُجّل تصرّفُك على الإشارة' : 'تعذّر — الإشارةُ ليست في صفّك أو زالت');
     }
 
     /**

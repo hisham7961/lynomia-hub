@@ -57,12 +57,30 @@ class HubAutomation extends Command
         $p = $this->pruneNotifications();
         $k = $this->okrRefresh();
         $w = $this->workdayClose();
+        $s = $this->signalsPrune();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب");
 
         \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.automation'], ['value' => now()->toIso8601String()]);
         \Illuminate\Support\Facades\Cache::forget('settings:all');
         return self::SUCCESS;
+    }
+
+    /**
+     * تشذيبُ تصرّفاتِ الإشارات اليتيمة: إشارةٌ حُلَّت وزالت (لم تُرَ منذ مدّة) فلا
+     * معنى لحالة تصرّفها. لا محرّكَ إشاراتٍ ثانٍ — الإشاراتُ تبقى محسوبةً حيّاً في
+     * `hub_recommendations`/مركز الفعل، وتصلُ الملخّصَ اليوميّ عبر `hub:digest` أصلاً.
+     */
+    protected function signalsPrune(): int
+    {
+        if ($this->dry) return 0;
+        try {
+            return \App\Support\ActionCenter::prune();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return 0;
+        }
     }
 
     /**
