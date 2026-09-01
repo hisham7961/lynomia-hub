@@ -5,6 +5,8 @@
     $c = $ac['counts'];
     $tone = ['حرج' => 'bad', 'مهم' => 'wn', 'اطّلاع' => ''];
     $stateLabel = ['ack' => 'مُقَرّة', 'open' => '', 'snoozed' => 'مؤجّلة', 'dismissed' => 'مرفوضة'];
+    // العدسةُ النشطة تُحمَل في مسار التصرّف فيُطابق الحارسُ الصفَّ المعروض تحت `?p=PID`.
+    $lensQ = request('p') ? ['p' => request('p')] : [];
 @endphp
 <div class="hero">
     <div>
@@ -44,23 +46,23 @@
         @if (! empty($it['can_act']))
             <div class="crow" style="margin-top:8px;gap:6px;flex-wrap:wrap">
                 @if (($it['state'] ?? 'open') !== 'ack')
-                    <form method="POST" action="{{ route('recs.act') }}" class="inline">@csrf
+                    <form method="POST" action="{{ route('recs.act', $lensQ) }}" class="inline">@csrf
                         <input type="hidden" name="skey" value="{{ $it['key'] }}"><input type="hidden" name="do" value="ack">
                         <button class="btn ghost sm">✔️ أقرّ</button>
                     </form>
                 @endif
-                <form method="POST" action="{{ route('recs.act') }}" class="inline">@csrf
+                <form method="POST" action="{{ route('recs.act', $lensQ) }}" class="inline">@csrf
                     <input type="hidden" name="skey" value="{{ $it['key'] }}"><input type="hidden" name="do" value="snooze">
                     <input type="hidden" name="until" value="{{ now()->addDay()->toDateString() }}">
                     <button class="btn ghost sm">💤 أجّل يوماً</button>
                 </form>
-                <form method="POST" action="{{ route('recs.act') }}" class="inline">@csrf
+                <form method="POST" action="{{ route('recs.act', $lensQ) }}" class="inline">@csrf
                     <input type="hidden" name="skey" value="{{ $it['key'] }}"><input type="hidden" name="do" value="snooze">
                     <input type="hidden" name="until" value="{{ now()->addDays(7)->toDateString() }}">
                     <button class="btn ghost sm">💤 أسبوعاً</button>
                 </form>
                 @if ($it['can_dismiss'] ?? false)
-                    <form method="POST" action="{{ route('recs.act') }}" class="inline">@csrf
+                    <form method="POST" action="{{ route('recs.act', $lensQ) }}" class="inline">@csrf
                         <input type="hidden" name="skey" value="{{ $it['key'] }}"><input type="hidden" name="do" value="dismiss">
                         <button class="btn ghost sm" data-confirm="إخفاءُ هذه الإشارة؟ تبقى مخفيّةً حتى تُعيدها من «المخفيّة».">🚫 أخفِ</button>
                     </form>
@@ -86,7 +88,7 @@
                 <div class="crow" style="gap:8px;flex-wrap:wrap;align-items:center">
                     <span class="bdg {{ ($h['state'] ?? '') === 'snoozed' ? 'wn' : '' }}">{{ ($h['state'] ?? '') === 'snoozed' ? 'مؤجّلة' . (! empty($h['snoozed_until']) ? ' حتى ' . $h['snoozed_until'] : '') : 'مرفوضة' }}</span>
                     <span style="flex:1;min-width:0">{{ $h['ico'] }} {{ $h['title'] }}</span>
-                    <form method="POST" action="{{ route('recs.act') }}" class="inline">@csrf
+                    <form method="POST" action="{{ route('recs.act', $lensQ) }}" class="inline">@csrf
                         <input type="hidden" name="skey" value="{{ $h['key'] }}"><input type="hidden" name="do" value="reopen">
                         <button class="btn ghost sm">↩️ أظهرها</button>
                     </form>

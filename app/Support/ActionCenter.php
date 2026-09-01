@@ -143,12 +143,17 @@ class ActionCenter
      * (فلا يُتصرَّف على إشارةِ عميلٍ خارج النطاق). يُدمَج بمفتاح `skey` فلا يتكرّر.
      *
      * @param  string  $do  ack | snooze | dismiss | reopen
+     * @param  ?string  $projectId  عدسةُ المشروع النشطة — **لازمةٌ** ليُعاد بناءُ الصفّ
+     *   نفسِه الذي رآه المستخدم: تحت `?p=PID` يعرض الصفُّ إشاراتٍ منطَّقةً بالمشروع قد
+     *   تغيب عن الصفّ العامّ (سادسُ أقدمِ مستحقٍّ للمشروع ليس سادسَ أقدمِ المنشأة). بلا
+     *   تمريرها كان الحارسُ يبني الصفَّ العامّ فيرفض إشارةً ظاهرةً في صفّ العدسة.
      */
-    public static function disposition(string $skey, string $do, ?string $until = null, ?string $note = null): bool
+    public static function disposition(string $skey, string $do, ?string $until = null, ?string $note = null, ?string $projectId = null): bool
     {
         // **خبيئةُ الصفّ نفسِه** (لا `fresh=true`): يكفي التحقّقُ من أنّ المفتاح في صفِّ
         // المستخدم كما رآه — لا إعادةُ بناءٍ قسريّةٌ لكلّ المحرّكات عند كلّ نقرة.
-        $live = self::liveByKey(false);
+        // والعدسةُ تُمرَّر فيُطابَق الصفُّ المعروض تماماً (لا الصفَّ العامّ).
+        $live = self::liveByKey(false, $projectId);
         if (! isset($live[$skey])) return false;   // ليست في صفّه → تُرفَض بصمت
 
         // module/record_id/sev من الإشارة نفسها (موثوقٌ) لا من تخمينِ المفتاح

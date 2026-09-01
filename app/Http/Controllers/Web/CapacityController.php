@@ -62,7 +62,9 @@ class CapacityController extends Controller
         if (! in_array($do, ['ack', 'snooze', 'dismiss', 'reopen'], true)) {
             return back()->with('err', 'إجراءٌ غير معروف');
         }
-        $ok = \App\Support\ActionCenter::disposition($skey, $do, hub_str($r->input('until')) ?: null, hub_str($r->input('note')) ?: null);
+        // العدسةُ النشطة (مُحقَّقةُ النطاق في hub_lens: تعود null لمشروعٍ خارج نطاقه)
+        // تُمرَّر ليُطابِق الحارسُ الصفَّ الذي رآه المستخدم تحت `?p=PID`.
+        $ok = \App\Support\ActionCenter::disposition($skey, $do, hub_str($r->input('until')) ?: null, hub_str($r->input('note')) ?: null, hub_lens()['id']);
 
         return back()->with($ok ? 'ok' : 'err',
             $ok ? '✔️ سُجّل تصرّفُك على الإشارة' : 'تعذّر — الإشارةُ ليست في صفّك أو زالت');

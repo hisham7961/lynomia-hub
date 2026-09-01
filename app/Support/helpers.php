@@ -957,8 +957,12 @@ if (! function_exists('hub_expiry')) {
     function hub_expiry(bool $fresh = false, $user = null): array
     {
         $user   = $user ?? auth()->user();
-        // مقيد = نطاق مشاريع أو عزل شركات — مخبأ خاص به كي لا تتسرب أسماء أجنبية عبر المخبأ المشترك
-        $scoped = hub_scoped($user) || hub_company_ids($user) !== null;
+        // مقيد = نطاق مشاريع أو عزل شركات **أو عزل عملاء** — مخبأ خاص به كي لا تتسرب
+        // أسماء أجنبية عبر المخبأ المشترك. كان عزلُ العميل غائباً عن هذا الشرط: مستخدمٌ
+        // محصورٌ بعميلٍ (hub_client_ids) وحده كان يُرى `$scoped=false` فلا يُطبَّق
+        // hub_scope أصلاً (السطر أدناه)، فيسرد رادارُ الانتهاءات سجلاتِ كلِّ العملاء —
+        // وفوقها يتقاسم مستخدمو الدور الواحد مخبأ `r:` فيسرّب أحدُهم للآخر.
+        $scoped = hub_scoped($user) || hub_company_ids($user) !== null || hub_client_ids($user) !== null;
         // المخبأ يفصل بالدور أيضاً: وثائق الملفات تُرشَّح بصلاحية رؤية وحدتها،
         // فمخبأٌ مشترك بين دورين مختلفين كان سيسرّب ما لا يُرى لأحدهما.
         // و«الجيل» يُبطل المخبأ فور رفع وثيقةٍ مؤرَّخة — لا انتظارَ عشر دقائق.
@@ -1036,7 +1040,11 @@ if (! function_exists('hub_expiry')) {
                             preg_split('/[\s,،]+/u', (string) ($row->_a ?? ''), -1, PREG_SPLIT_NO_EMPTY)));
                         if ($days > ($nums ? max($nums) : 30)) continue;
                     }
+                    // `fkey` مميّزٌ ثابتٌ للحقل: سجلٌّ بحقلَي تاريخٍ (نهايةٌ وتجديد)
+                    // يُنتج إشارتين تتقاسمان module+id — فبلا هذا المميّز تنهار حالتُهما
+                    // على مفتاحٍ واحدٍ في مركز الفعل (تأجيلُ إحداهما يُخفي الأخرى).
                     $items[] = ['module' => $mk, 'mlabel' => $md['label'], 'flabel' => $f['label'],
+                                'fkey' => (string) ($f['key'] ?? $f['col'] ?? ''),
                                 'id' => $row->id, 'name' => (string) $row->_n, 'date' => $d, 'days' => $days];
                 }
             }
@@ -3365,9 +3373,11 @@ if (! function_exists('hub_recommendations')) {
         // **مبدّلُ الشركة/العميل جزءٌ من المفتاح** كما في `hub_scope_key`: بعضُ الكُتل
         // (تقاريرُ اليوم عبر `hub_company_scope`) تضيق بالمبدّل النشط، فمستخدمان يريان
         // «كلَّ الشركات» بمبدّلين مختلفين كانا يتقاسمان مفتاحاً فيُقدَّم عدُّ شركةٍ لأخرى.
+        // ختمُ roles/users كما في `hub_scope_key` و`hub_expiry`: تغيّرُ صلاحيةٍ أو دورٍ
+        // يُبطل الخبيئةَ فوراً لا بعد انقضاء المهلة (نافذةُ صلاحيةٍ متقادمةٍ للمستخدم غيرِ المحصور).
         $key = 'recs:' . ($scopedKey ? 'u:' . ($u?->id ?? '0') : 'r:' . ($u?->role_id ?? '0'))
             . ':' . (string) session('hub.company', '-') . ':' . (string) session('hub.client', '-')
-            . hub_lens_key($projectId);
+            . hub_lens_key($projectId) . hub_data_stamp(['roles', 'users']);
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
         return \Illuminate\Support\Facades\Cache::remember($key, 300, function () use ($projectId) {
@@ -3383,7 +3393,11 @@ if (! function_exists('hub_recommendations')) {
             // ١) خدمات تبيع بأقل من كلفتها
             try {
                 $svc = hub_service_costs();
-                foreach (array_slice(array_filter($svc['rows'], fn ($r) => $r['margin'] !== null && $r['margin'] < 0), 0, 5) as $s) {
+                // ترتيبٌ حتميّ قبل القصّ: الأسوأ هامشاً أولاً ثم `id` فاصلاً — كان القصُّ
+                // يأخذ أوائلَ الصفوف بترتيب القاعدة (قرعةٌ بين المحرّكين عند تساوي الهامش).
+                $losers = array_filter($svc['rows'], fn ($r) => $r['margin'] !== null && $r['margin'] < 0);
+                usort($losers, fn ($a, $b) => [$a['margin'], $a['id'] ?? 0] <=> [$b['margin'], $b['id'] ?? 0]);
+                foreach (array_slice($losers, 0, 5) as $s) {
                     $add('حرج', '🌊', 'خدمة تبيع بخسارة: ' . $s['name'],
                         'سعرها الشهري ' . number_format((float) $s['priceM'], 1) . ' وكلفتها ' . number_format((float) $s['costM'], 1)
                         . ' — هامش ' . number_format((float) $s['margin'], 1) . ' شهرياً. راجع السعر أو الكلفة.',
@@ -3411,9 +3425,11 @@ if (! function_exists('hub_recommendations')) {
                 }
             } catch (\Throwable $e) {}
 
-            // ٣) مشاريع متعثرة الصحة
+            // ٣) مشاريع متعثرة الصحة — **منطَّقٌ بـhub_scope كأختيه (٩ و١١)**: كان
+            // يَسرد كلَّ مشاريع المنشأة (اسماً ودرجةَ صحّة) لمستخدمٍ محصورٍ بمشاريعه،
+            // بينما كتلتا الركود والحواجب على الجدول نفسِه تحصرانه — تسريبٌ ثابتُ التناقض.
             try {
-                $projects = \Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at')
+                $projects = hub_scope(\Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at'), 'projects')
                     ->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', hub_closed_states()))
                     ->when($projectId, fn ($q) => $q->where('id', $projectId))
                     ->orderBy('id')->limit(40)->get(['id', 'name']);   // حتميّةُ اختيار الأربعين بين المحرّكين
@@ -3473,7 +3489,10 @@ if (! function_exists('hub_recommendations')) {
                     $add($i['days'] < 0 ? 'حرج' : 'مهم', '⏳', 'ينتهي قريباً: ' . $i['name'],
                         $i['mlabel'] . ' · ' . $i['flabel'] . ' — ' . ($i['days'] < 0 ? 'متأخر' : ($i['days'] === 0 ? 'اليوم' : 'خلال ' . $i['days'] . ' يوم')) . '.',
                         route('m.show', [$i['module'], $i['id']]), 'افتح السجل',
-                        'expiry:' . $i['module'] . ':' . $i['id'], $i['module'], $i['id']);
+                        // المفتاح يحمل مميّزَ الحقل/الوثيقة (fkey) فلا تتصادم إشارتا انتهاءٍ
+                        // على السجل نفسِه على حالةٍ واحدة (كان module:id وحدهما يُدمجانهما).
+                        'expiry:' . $i['module'] . ':' . $i['id'] . ':' . ($i['fkey'] ?? ($i['flabel'] ?? '')),
+                        $i['module'], $i['id']);
                 }
             } catch (\Throwable $e) {}
 
@@ -4315,6 +4334,9 @@ if (! function_exists('hub_doc_expiry')) {
                 $out[] = [
                     'module' => $mk, 'mlabel' => $md['label'],
                     'flabel' => hub_doc_label($mk, $a->kind) ?? 'وثيقة',
+                    // مميّزٌ ثابتٌ يفصل الوثيقةَ عن حقلِ السجل نفسِه (وعن وثيقةٍ بنوعٍ آخر):
+                    // شهادةٌ منتهيةٌ وحقلُ نهايةٍ على العقد نفسِه لا يتقاسمان مفتاحَ إشارة.
+                    'fkey' => 'doc:' . (string) $a->kind,
                     'id' => $a->record_id, 'name' => (string) $ids[$a->record_id],
                     'date' => $d, 'doc' => true,
                     'days' => (int) now()->startOfDay()->diffInDays($a->expires_at->copy()->startOfDay(), false),
