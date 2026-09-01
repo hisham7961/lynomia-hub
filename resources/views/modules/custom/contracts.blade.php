@@ -22,7 +22,20 @@
             ->orderByDesc('date')->limit(10)->get()
         : collect();
     $wsUsers = \App\Models\User::whereIn('id', $wsObs->pluck('owner_id')->merge($wsSteps->pluck('approver_id'))->filter()->unique())->pluck('name', 'id');
+    $cwNext = \App\Support\NextAction::for('contracts', $row);
 @endphp
+@if (! empty($cwNext))
+    {{-- الفعلُ الأفضلُ التالي (محرّك NextAction): تجديدٌ وشيكٌ أو تذكيرُ توقيع --}}
+    <div class="card">
+        <h3 class="cardtitle">🎯 الخطوة التالية</h3>
+        <div class="crow" style="flex-wrap:wrap;gap:8px">
+            @foreach ($cwNext as $step)
+                <a class="chip" href="{{ $step['url'] }}" title="{{ $step['why'] }}">{{ $step['primary'] ? '⭐ ' : '' }}{{ $step['label'] }}</a>
+            @endforeach
+        </div>
+        <div class="sub" style="margin-top:6px">{{ $cwNext[0]['why'] }}</div>
+    </div>
+@endif
 <style>
 .cwtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .cwtabs button{border:1px solid var(--brd);background:transparent;color:inherit;border-radius:20px;padding:5px 12px;cursor:pointer;font-size:12.5px}
