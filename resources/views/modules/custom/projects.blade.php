@@ -9,7 +9,20 @@
     $pcPeople = hub_ref_labels('users', $pcLogs->pluck('created_by')->filter()->unique()->values()->all());
     $pcBlockers = $pcLogs->pluck('problems')->filter(fn ($p) => trim((string) $p) !== '');
     $pcBaseline = ((array) $row->meta)['baseline'] ?? null;
+    $pcNext = \App\Support\NextAction::for('projects', $row);
 @endphp
+@if (! empty($pcNext))
+    {{-- الفعلُ الأفضلُ التالي (محرّك NextAction) --}}
+    <div class="card">
+        <h3 class="cardtitle">🎯 الخطوة التالية</h3>
+        <div class="crow" style="flex-wrap:wrap;gap:8px">
+            @foreach ($pcNext as $step)
+                <a class="chip" href="{{ $step['url'] }}" title="{{ $step['why'] }}">{{ $step['primary'] ? '⭐ ' : '' }}{{ $step['label'] }}</a>
+            @endforeach
+        </div>
+        <div class="sub" style="margin-top:6px">{{ $pcNext[0]['why'] }}</div>
+    </div>
+@endif
 @if ($pcBaseline)
     {{-- خطُّ الأساس التجاريّ: العرضُ المقبول الذي وُلد منه المشروع — لا يتغيّر بالتعديل --}}
     <div class="card">

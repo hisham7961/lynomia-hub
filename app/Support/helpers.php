@@ -957,8 +957,12 @@ if (! function_exists('hub_expiry')) {
     function hub_expiry(bool $fresh = false, $user = null): array
     {
         $user   = $user ?? auth()->user();
-        // مقيد = نطاق مشاريع أو عزل شركات — مخبأ خاص به كي لا تتسرب أسماء أجنبية عبر المخبأ المشترك
-        $scoped = hub_scoped($user) || hub_company_ids($user) !== null;
+        // مقيد = نطاق مشاريع أو عزل شركات **أو عزل عملاء** — مخبأ خاص به كي لا تتسرب
+        // أسماء أجنبية عبر المخبأ المشترك. كان عزلُ العميل غائباً عن هذا الشرط: مستخدمٌ
+        // محصورٌ بعميلٍ (hub_client_ids) وحده كان يُرى `$scoped=false` فلا يُطبَّق
+        // hub_scope أصلاً (السطر أدناه)، فيسرد رادارُ الانتهاءات سجلاتِ كلِّ العملاء —
+        // وفوقها يتقاسم مستخدمو الدور الواحد مخبأ `r:` فيسرّب أحدُهم للآخر.
+        $scoped = hub_scoped($user) || hub_company_ids($user) !== null || hub_client_ids($user) !== null;
         // المخبأ يفصل بالدور أيضاً: وثائق الملفات تُرشَّح بصلاحية رؤية وحدتها،
         // فمخبأٌ مشترك بين دورين مختلفين كان سيسرّب ما لا يُرى لأحدهما.
         // و«الجيل» يُبطل المخبأ فور رفع وثيقةٍ مؤرَّخة — لا انتظارَ عشر دقائق.
@@ -1036,7 +1040,11 @@ if (! function_exists('hub_expiry')) {
                             preg_split('/[\s,،]+/u', (string) ($row->_a ?? ''), -1, PREG_SPLIT_NO_EMPTY)));
                         if ($days > ($nums ? max($nums) : 30)) continue;
                     }
+                    // `fkey` مميّزٌ ثابتٌ للحقل: سجلٌّ بحقلَي تاريخٍ (نهايةٌ وتجديد)
+                    // يُنتج إشارتين تتقاسمان module+id — فبلا هذا المميّز تنهار حالتُهما
+                    // على مفتاحٍ واحدٍ في مركز الفعل (تأجيلُ إحداهما يُخفي الأخرى).
                     $items[] = ['module' => $mk, 'mlabel' => $md['label'], 'flabel' => $f['label'],
+                                'fkey' => (string) ($f['key'] ?? $f['col'] ?? ''),
                                 'id' => $row->id, 'name' => (string) $row->_n, 'date' => $d, 'days' => $days];
                 }
             }
@@ -1502,7 +1510,12 @@ if (! function_exists('hub_org_analytics_guard')) {
      */
     function hub_org_analytics_guard(): void
     {
+        // لوحاتُ المنشأة كلّها (تكلفةٌ، قدراتٌ، صحّةُ مشاريعَ…) غيرُ منطَّقةٍ بعميل —
+        // فتُمنَع عن **كلّ حسابٍ معزول**: على شركاتٍ محددة **أو على عملاءَ محددين**.
+        // كان عزلُ العميل ثغرةً: حاملُ راية المراقبة المحصورُ بعميلٍ كان يرى أرقامَ
+        // المنشأة كلّها. (نظيرُ سدِّ تسريب الخبيئة في `hub_recommendations`.)
         abort_if(hub_company_ids() !== null, 403, 'هذه اللوحة على مستوى المنشأة كلها — غير متاحة لحسابٍ معزول على شركات محددة');
+        abort_if(hub_client_ids() !== null, 403, 'هذه اللوحة على مستوى المنشأة كلها — غير متاحة لحسابٍ معزول على عملاء محددين');
     }
 }
 
@@ -3313,6 +3326,32 @@ if (! function_exists('hub_service_costs')) {
     }
 }
 
+if (! function_exists('hub_fin_outstanding')) {
+    /**
+     * **التعريفُ الواحدُ للمستحقّ المتأخّر** — كان مُكرَّراً في خمسةِ مواضعَ بقاعدتين
+     * متضاربتين (بعضُها يعتمد عمودَ `state` الذي لا محرّكَ يحوّله إلى «متأخرة»، وبعضُها
+     * يستعمل `kind = 'فاتورة'` المجرّدة التي لا تطابق أنواعَ الدخل الحقيقية «فاتورة
+     * مبيعات»/«دفعة واردة» — عيبٌ يحرسه `LyingMetricsRound7Test`). هنا يُوحَّد على
+     * الأساس **الموثوق**: نوعٌ من الدخل، وحالةٌ ليست مسدَّدةً/ملغاةً/مسودة، ومتبقٍّ
+     * موجبٌ حسابياً (`total − COALESCE(paid,0) > 0`)، واستحقاقٌ فات (اختياريّاً بعتبةِ أيام).
+     *
+     * يأخذ استعلامَ `fin_documents` (منطَّقاً مسبقاً بالمُنادي إن لزم) ويُطبّق المُرشِّح،
+     * فلا يفرض نطاقاً بنفسه — التنطيقُ مسؤوليةُ المُنادي كبقيّة الاستعلامات.
+     *
+     * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder  $q
+     */
+    function hub_fin_outstanding($q, int $minDays = 0)
+    {
+        $income = (array) (config('hub.fin.income', []) ?: ['فاتورة مبيعات']);
+        $cut = now()->subDays(max(0, $minDays))->toDateString();
+
+        return $q->whereIn('kind', $income)
+            ->whereNotIn('state', ['مدفوعة', 'ملغاة', 'مسودة'])
+            ->whereNotNull('due')->whereDate('due', '<', $cut)
+            ->whereRaw('COALESCE(total,0) - COALESCE(paid,0) > 0');
+    }
+}
+
 if (! function_exists('hub_recommendations')) {
     /**
      * مركز التوصيات: يجمع إشاراتٍ قابلة للتنفيذ من محرّكات النظام القائمة —
@@ -3325,26 +3364,45 @@ if (! function_exists('hub_recommendations')) {
         // المفتاح كان سلسلةً مسطّحة «recs»: بلا مستخدمٍ ولا دورٍ ولا مشروع —
         // فوق استعلاماتٍ مُنطَّقة بـhub_scope. أي أن أول من يفتح اللوحة يُخبّئ
         // نتائجه لكل من بعده خمس دقائق. يحمل المفتاح الثلاثة الآن.
+        // المفتاحُ يفرّق **كلَّ أنماط العزل الثلاثة**: مشروعٌ وشركةٌ **وعميل**. كان
+        // عزلُ العميل غائباً — فمستخدمان محصوران بعميلين مختلفين يتقاسمان دورَهما
+        // كانا يتقاسمان مفتاحَ الدور (`r:`) فتُخبَّأ إشاراتُ عميلٍ وتُقدَّم لمستخدمِ
+        // آخر: تسريبُ عزلٍ عبر الخبيئة. من له أيُّ حصرٍ يأخذ مفتاحاً خاصّاً به.
         $u = auth()->user();
-        $key = 'recs:' . (hub_scoped($u) || hub_company_ids($u) !== null
-            ? 'u:' . ($u?->id ?? '0') : 'r:' . ($u?->role_id ?? '0')) . hub_lens_key($projectId);
+        $scopedKey = hub_scoped($u) || hub_company_ids($u) !== null || hub_client_ids($u) !== null;
+        // **مبدّلُ الشركة/العميل جزءٌ من المفتاح** كما في `hub_scope_key`: بعضُ الكُتل
+        // (تقاريرُ اليوم عبر `hub_company_scope`) تضيق بالمبدّل النشط، فمستخدمان يريان
+        // «كلَّ الشركات» بمبدّلين مختلفين كانا يتقاسمان مفتاحاً فيُقدَّم عدُّ شركةٍ لأخرى.
+        // ختمُ roles/users كما في `hub_scope_key` و`hub_expiry`: تغيّرُ صلاحيةٍ أو دورٍ
+        // يُبطل الخبيئةَ فوراً لا بعد انقضاء المهلة (نافذةُ صلاحيةٍ متقادمةٍ للمستخدم غيرِ المحصور).
+        $key = 'recs:' . ($scopedKey ? 'u:' . ($u?->id ?? '0') : 'r:' . ($u?->role_id ?? '0'))
+            . ':' . (string) session('hub.company', '-') . ':' . (string) session('hub.client', '-')
+            . hub_lens_key($projectId) . hub_data_stamp(['roles', 'users']);
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
         return \Illuminate\Support\Facades\Cache::remember($key, 300, function () use ($projectId) {
             $rank = ['حرج' => 3, 'مهم' => 2, 'اطّلاع' => 1];
             $out = [];
-            $add = function ($sev, $ico, $title, $why, $url, $action) use (&$out) {
-                $out[] = compact('sev', 'ico', 'title', 'why', 'url', 'action');
+            // `key`/`module`/`record_id` إضافةٌ متوافقةٌ خلفياً (القرّاء القدامى يقرؤون
+            // الستّةَ الأولى ويتجاهلون الباقي): تجعل كلَّ إشارةٍ **قابلةً للتصرّف**
+            // (إقرار/تأجيل/رفض) في مركز الفعل بمفتاحٍ ثابتٍ يُدمَج لا يتكرّر.
+            $add = function ($sev, $ico, $title, $why, $url, $action, $key = null, $module = null, $recordId = null) use (&$out) {
+                $out[] = compact('sev', 'ico', 'title', 'why', 'url', 'action', 'key', 'module', 'recordId');
             };
 
             // ١) خدمات تبيع بأقل من كلفتها
             try {
                 $svc = hub_service_costs();
-                foreach (array_slice(array_filter($svc['rows'], fn ($r) => $r['margin'] !== null && $r['margin'] < 0), 0, 5) as $s) {
+                // ترتيبٌ حتميّ قبل القصّ: الأسوأ هامشاً أولاً ثم `id` فاصلاً — كان القصُّ
+                // يأخذ أوائلَ الصفوف بترتيب القاعدة (قرعةٌ بين المحرّكين عند تساوي الهامش).
+                $losers = array_filter($svc['rows'], fn ($r) => $r['margin'] !== null && $r['margin'] < 0);
+                usort($losers, fn ($a, $b) => [$a['margin'], $a['id'] ?? 0] <=> [$b['margin'], $b['id'] ?? 0]);
+                foreach (array_slice($losers, 0, 5) as $s) {
                     $add('حرج', '🌊', 'خدمة تبيع بخسارة: ' . $s['name'],
                         'سعرها الشهري ' . number_format((float) $s['priceM'], 1) . ' وكلفتها ' . number_format((float) $s['costM'], 1)
                         . ' — هامش ' . number_format((float) $s['margin'], 1) . ' شهرياً. راجع السعر أو الكلفة.',
-                        route('m.show', ['services', $s['id']]), 'راجع الخدمة');
+                        route('m.show', ['services', $s['id']]), 'راجع الخدمة',
+                        'svc.loss:' . $s['id'], 'services', $s['id']);
                 }
                 if (($svc['totals']['unpriced'] ?? 0) > 0) {
                     $add('اطّلاع', '🏷️', ($svc['totals']['unpriced']) . ' خدمة بلا سعر شهري',
@@ -3362,16 +3420,19 @@ if (! function_exists('hub_recommendations')) {
                     $add('مهم', '🔥', 'فوق طاقته: ' . $r['name'],
                         'حمله ' . $r['load'] . '٪ — محجوز ' . $r['booked'] . ' ساعة على متاح ' . $r['available']
                         . '. أجّل أو وزّع أو وظّف.',
-                        route('capacity'), 'افتح لوحة القدرات');
+                        route('capacity'), 'افتح لوحة القدرات',
+                        'cap.over:' . ($r['id'] ?? $r['name']), 'employees', $r['id'] ?? null);
                 }
             } catch (\Throwable $e) {}
 
-            // ٣) مشاريع متعثرة الصحة
+            // ٣) مشاريع متعثرة الصحة — **منطَّقٌ بـhub_scope كأختيه (٩ و١١)**: كان
+            // يَسرد كلَّ مشاريع المنشأة (اسماً ودرجةَ صحّة) لمستخدمٍ محصورٍ بمشاريعه،
+            // بينما كتلتا الركود والحواجب على الجدول نفسِه تحصرانه — تسريبٌ ثابتُ التناقض.
             try {
-                $projects = \Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at')
+                $projects = hub_scope(\Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at'), 'projects')
                     ->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', hub_closed_states()))
                     ->when($projectId, fn ($q) => $q->where('id', $projectId))
-                    ->limit(40)->get(['id', 'name']);
+                    ->orderBy('id')->limit(40)->get(['id', 'name']);   // حتميّةُ اختيار الأربعين بين المحرّكين
                 $sick = [];
                 foreach ($projects as $p) {
                     $h = hub_project_health($p->id);
@@ -3381,7 +3442,8 @@ if (! function_exists('hub_recommendations')) {
                 foreach (array_slice($sick, 0, 5) as $s) {
                     $add($s['h']['score'] < 40 ? 'حرج' : 'مهم', '🩺', 'مشروع متعثر: ' . $s['p']->name,
                         'صحته ' . $s['h']['score'] . '/١٠٠ (' . ($s['h']['label'] ?? '') . '). راجع عوامل التعثر في صفحته.',
-                        route('m.show', ['projects', $s['p']->id]), 'افتح المشروع');
+                        route('m.show', ['projects', $s['p']->id]), 'افتح المشروع',
+                        'proj.health:' . $s['p']->id, 'projects', $s['p']->id);
                 }
             } catch (\Throwable $e) {}
 
@@ -3403,18 +3465,19 @@ if (! function_exists('hub_recommendations')) {
             // ٥) مستحقات غير محصّلة قديمة
             try {
                 if (\Illuminate\Support\Facades\Schema::hasTable('fin_documents')) {
-                    $overdue = \Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at')
-                        ->where('kind', 'فاتورة')
-                        ->whereRaw('COALESCE(paid,0) < COALESCE(total,0)')
-                        ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
-                        ->whereNotNull('due')->whereDate('due', '<', now()->toDateString())
-                        ->orderBy('due')->limit(6)->get(['id', 'doc_no', 'partner', 'total', 'paid', 'due']);
+                    // التعريفُ الموحَّد `hub_fin_outstanding` (أنواعُ الدخل الحقيقية لا
+                    // «فاتورة» المجرّدة)، منطَّقٌ بـhub_scope كبقيّة كُتل المركز.
+                    $base = hub_scope(\Illuminate\Support\Facades\DB::table('fin_documents')->whereNull('deleted_at'), 'fin')
+                        ->when($projectId, fn ($q) => $q->where('project_id', $projectId));
+                    $overdue = hub_fin_outstanding($base)
+                        ->orderBy('due')->orderBy('id')->limit(6)->get(['id', 'doc_no', 'partner', 'total', 'paid', 'due']);
                     foreach ($overdue as $d) {
                         $rem = (float) ($d->total ?? 0) - (float) ($d->paid ?? 0);
                         $days = (int) \Illuminate\Support\Carbon::parse($d->due)->diffInDays(now());
                         $add($days > 60 ? 'حرج' : 'مهم', '💸', 'مستحق متأخر: ' . ($d->partner ?: ($d->doc_no ?: 'فاتورة')),
                             'باقٍ ' . number_format($rem, 1) . ' متأخر ' . $days . ' يوماً. تابع التحصيل.',
-                            route('m.show', ['fin', $d->id]), 'افتح الفاتورة');
+                            route('m.show', ['fin', $d->id]), 'افتح الفاتورة',
+                            'fin.overdue:' . $d->id, 'fin', $d->id);
                     }
                 }
             } catch (\Throwable $e) {}
@@ -3425,7 +3488,129 @@ if (! function_exists('hub_recommendations')) {
                 foreach ($soon as $i) {
                     $add($i['days'] < 0 ? 'حرج' : 'مهم', '⏳', 'ينتهي قريباً: ' . $i['name'],
                         $i['mlabel'] . ' · ' . $i['flabel'] . ' — ' . ($i['days'] < 0 ? 'متأخر' : ($i['days'] === 0 ? 'اليوم' : 'خلال ' . $i['days'] . ' يوم')) . '.',
-                        route('m.show', [$i['module'], $i['id']]), 'افتح السجل');
+                        route('m.show', [$i['module'], $i['id']]), 'افتح السجل',
+                        // المفتاح يحمل مميّزَ الحقل/الوثيقة (fkey) فلا تتصادم إشارتا انتهاءٍ
+                        // على السجل نفسِه على حالةٍ واحدة (كان module:id وحدهما يُدمجانهما).
+                        'expiry:' . $i['module'] . ':' . $i['id'] . ':' . ($i['fkey'] ?? ($i['flabel'] ?? '')),
+                        $i['module'], $i['id']);
+                }
+            } catch (\Throwable $e) {}
+
+            // ٧) عرضٌ مقبولٌ لم يُحوَّل إلى تسليم (فجوةُ CPQ→تنفيذ) — منطَّقٌ بـhub_scope
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('quotes')) {
+                    $stuck = hub_scope(\App\Models\Quote::query(), 'quotes')
+                        ->where('status', 'مقبول')->whereNotNull('accepted_at')
+                        ->where('accepted_at', '<', now()->subDays(2))
+                        ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
+                        // فاصلٌ حتميّ: عروضٌ قُبلت في الثانية نفسها لا تُقترَع بين المحرّكين
+                        ->orderByDesc('accepted_at')->orderByDesc('id')->limit(8)->get(['id', 'doc_no', 'title', 'accepted_at', 'meta']);
+                    foreach ($stuck as $q) {
+                        $meta = (array) (is_array($q->meta) ? $q->meta : (json_decode((string) $q->meta, true) ?: []));
+                        // حُوِّل فعلاً (مشروعٌ أو ارتباط) → لا إشارة (حلٌّ تلقائيّ عند التحويل)
+                        if (! empty($meta['project_id']) || ! empty($meta['engagement_id'])) continue;
+                        $days = (int) \Illuminate\Support\Carbon::parse($q->accepted_at)->diffInDays(now());
+                        $add($days > 7 ? 'حرج' : 'مهم', '🔗', 'عرضٌ مقبولٌ لم يُحوَّل: ' . ($q->title ?: $q->doc_no),
+                            'قُبل منذ ' . $days . ' يوماً ولا مشروعَ ولا ارتباط. حوّله لتبدأ التسليمَ والتحصيل.',
+                            route('m.show', ['quotes', $q->id]), 'حوّله لمشروع',
+                            'quote.unconverted:' . $q->id, 'quotes', $q->id);
+                    }
+                }
+            } catch (\Throwable $e) {}
+
+            // ٨) عهدةٌ متأخرةُ الاسترداد — من منتِج القائم `Custody::overdue` (منطَّقٌ سلفاً)
+            try {
+                foreach (\App\Support\Custody::overdue(8) as $c) {
+                    $add(($c['late'] ?? 0) > 14 ? 'حرج' : 'مهم', '📦', 'عهدةٌ متأخرةُ الاسترداد: ' . $c['asset'],
+                        'تصريحُ «' . $c['action'] . '» استحقّ رجوعُه ' . $c['due'] . ' — متأخرٌ ' . $c['late'] . ' يوماً. تابع الاسترداد.',
+                        route('m.show', ['assets', $c['assetId']]), 'افتح الأصل',
+                        'custody.overdue:' . $c['id'], 'assets', $c['assetId']);
+                }
+            } catch (\Throwable $e) {}
+
+            // ٩) مشاريع راكدة: نشطةٌ (غيرُ مغلقةٍ ولا متوقّفة) بلا حِراكٍ منذ مدّة —
+            // **لا محرّكَ صحّةٍ ثانٍ**: إشارةٌ مستقلّةٌ تُشتقّ من آخرِ أثرٍ فعليّ
+            // (تدقيقُ المشروع + آخرُ تحديثِ مهمّة)، منطَّقةٌ بـhub_scope كالبقية.
+            try {
+                $paused = ['متوقف', 'موقوف', 'معلّق', 'مُعلّق', 'مؤجل', 'مجمّد'];
+                $projs = hub_scope(\Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at'), 'projects')
+                    ->where(fn ($w) => $w->whereNull('status')
+                        ->orWhere(fn ($q) => $q->whereNotIn('status', hub_closed_states())->whereNotIn('status', $paused)))
+                    ->when($projectId, fn ($q) => $q->where('id', $projectId))
+                    // ترتيبٌ حتميّ قبل الحدّ: بلا `orderBy` يختلف الستّون المُختارون
+                    // بين المحرّكين فيسقط راكدٌ خلف الصفّ ٦٠ بلا رصد. الأقدمُ تحديثاً
+                    // أولاً — أرجحُ للركود، والمعرّفُ فاصلٌ ثابت.
+                    ->orderBy('updated_at')->orderBy('id')
+                    ->limit(60)->get(['id', 'name', 'updated_at']);
+                if ($projs->isNotEmpty()) {
+                    $ids = $projs->pluck('id')->all();
+                    $auditMax = \Illuminate\Support\Facades\DB::table('audits')->where('module', 'projects')
+                        ->whereIn('record_id', $ids)->select('record_id', \Illuminate\Support\Facades\DB::raw('MAX(created_at) as m'))
+                        ->groupBy('record_id')->pluck('m', 'record_id');
+                    $taskMax = \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')
+                        ->whereIn('project_id', $ids)->select('project_id', \Illuminate\Support\Facades\DB::raw('MAX(updated_at) as m'))
+                        ->groupBy('project_id')->pluck('m', 'project_id');
+                    $threshold = (string) now()->subDays(7);
+                    $stalled = [];
+                    foreach ($projs as $p) {
+                        $last = collect([$p->updated_at, $auditMax[$p->id] ?? null, $taskMax[$p->id] ?? null])
+                            ->filter()->map(fn ($t) => (string) $t)->max();
+                        if (! $last || $last >= $threshold) continue;
+                        $stalled[] = ['p' => $p, 'last' => substr($last, 0, 10),
+                            'days' => (int) \Illuminate\Support\Carbon::parse($last)->diffInDays(now())];
+                    }
+                    usort($stalled, fn ($a, $b) => [$b['days'], $a['p']->id] <=> [$a['days'], $b['p']->id]);
+                    foreach (array_slice($stalled, 0, 6) as $s) {
+                        $add($s['days'] > 21 ? 'حرج' : 'مهم', '🕸️', 'مشروعٌ راكد: ' . $s['p']->name,
+                            'لا حِراكَ (مهامٌ أو تدقيق) منذ ' . $s['days'] . ' يوماً — آخرُ نشاطٍ ' . $s['last'] . '. راجعه أو اطلب تحديثاً.',
+                            route('m.show', ['projects', $s['p']->id]), 'افتح المشروع',
+                            'proj.stalled:' . $s['p']->id, 'projects', $s['p']->id);
+                    }
+                }
+            } catch (\Throwable $e) {}
+
+            // ١٠) تقاريرُ يوميّةٌ ناقصةٌ اليوم — من **محرّك يوم العمل** (لا محرّكَ حضورٍ
+            // ثانٍ): `Workday::teamToday` منطَّقٌ بمفتاح `hub_screen` (دورٌ/مستخدمٌ/شركةٌ/
+            // عميل) ومحروسٌ بصلاحية `hr` داخل `teamCalc` — فلا تسريبٌ ولا تكرار. القاعدةُ
+            // الذهبية محفوظة: تقريرٌ ناقصٌ ليس غياباً. (إشارةٌ للعدسة العامّة لا لمشروع.)
+            try {
+                if (! $projectId && hub_can(auth()->user(), 'hr', 'v')
+                    && \Illuminate\Support\Facades\Schema::hasTable('attendance')) {
+                    $team = \App\Support\Workday::teamToday();
+                    $missing = (int) ($team['n']['noreport'] ?? 0);
+                    if ($missing > 0) {
+                        $add($missing >= 5 ? 'مهم' : 'اطّلاع', '📝', $missing . ' تقريرٌ يوميٌّ ناقصٌ اليوم',
+                            'موظفون حاضرون اليوم بلا تقريرِ عمل (تقريرٌ ناقصٌ ليس غياباً). تابع مع فريقك.',
+                            route('workforce.team'), 'افتح فريقي اليوم',
+                            'report.missing:' . now()->toDateString(), 'attend', null);
+                    }
+                }
+            } catch (\Throwable $e) {}
+
+            // ١١) حواجبُ مبلَّغة: مشاريعُ فيها تقاريرُ عملٍ حديثةٌ ذاتُ «مشكلات» — **لا
+            // كيانَ حاجبٍ جديد**: يُقرأ من `work_updates.problems` (نفسُ ما يعدّه
+            // `teamCalc`)، منطَّقٌ بالمشروع عبر hub_scope، وعمرُ الحاجب من أقدمِ بلاغ.
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('work_updates')) {
+                    $projIds = hub_scope(\Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at'), 'projects')
+                        ->when($projectId, fn ($q) => $q->where('id', $projectId))->pluck('id');
+                    if ($projIds->isNotEmpty()) {
+                        $rows = \Illuminate\Support\Facades\DB::table('work_updates')->whereNull('deleted_at')
+                            ->whereIn('project_id', $projIds->all())
+                            ->whereNotNull('problems')->whereRaw("TRIM(problems) <> ''")
+                            ->where('work_date', '>=', now()->subDays(14)->toDateString())
+                            ->select('project_id', \Illuminate\Support\Facades\DB::raw('COUNT(*) as c'),
+                                \Illuminate\Support\Facades\DB::raw('MIN(work_date) as firstd'))
+                            ->groupBy('project_id')->orderByDesc('c')->orderBy('project_id')->limit(6)->get();
+                        $names = hub_ref_labels('projects', $rows->pluck('project_id')->all());
+                        foreach ($rows as $r) {
+                            $age = (int) \Illuminate\Support\Carbon::parse($r->firstd)->diffInDays(now());
+                            $add($r->c >= 3 ? 'حرج' : 'مهم', '🚧', 'حواجبُ مبلَّغة: ' . ($names[$r->project_id] ?? '—'),
+                                $r->c . ' تقريرُ عملٍ يذكر مشكلةً/حاجباً، أقدمُها منذ ' . $age . ' يوماً. راجع المعوّقات مع الفريق.',
+                                route('m.show', ['projects', $r->project_id]), 'افتح المشروع',
+                                'proj.blockers:' . $r->project_id, 'projects', $r->project_id);
+                        }
+                    }
                 }
             } catch (\Throwable $e) {}
 
@@ -4149,6 +4334,9 @@ if (! function_exists('hub_doc_expiry')) {
                 $out[] = [
                     'module' => $mk, 'mlabel' => $md['label'],
                     'flabel' => hub_doc_label($mk, $a->kind) ?? 'وثيقة',
+                    // مميّزٌ ثابتٌ يفصل الوثيقةَ عن حقلِ السجل نفسِه (وعن وثيقةٍ بنوعٍ آخر):
+                    // شهادةٌ منتهيةٌ وحقلُ نهايةٍ على العقد نفسِه لا يتقاسمان مفتاحَ إشارة.
+                    'fkey' => 'doc:' . (string) $a->kind,
                     'id' => $a->record_id, 'name' => (string) $ids[$a->record_id],
                     'date' => $d, 'doc' => true,
                     'days' => (int) now()->startOfDay()->diffInDays($a->expires_at->copy()->startOfDay(), false),

@@ -100,10 +100,11 @@ class Engagements
             }
 
             if (Schema::hasTable('fin_documents')) {
-                $n = DB::table('fin_documents')->whereNull('deleted_at')->where('client_id', $c->id)
-                    ->whereIn('kind', config('hub.fin.income', []))
-                    ->whereNotIn('state', ['مدفوعة', 'ملغاة', 'مسودة'])
-                    ->whereNotNull('due')->where('due', '<', now()->toDateString())->count();
+                // التعريفُ الموحَّد `hub_fin_outstanding` (يُضيف اشتراطَ المتبقّي الموجب
+                // فلا تُعَدّ فاتورةٌ سُدِّدت بالكامل وإن لم تُوسَم «مدفوعة»).
+                $n = hub_fin_outstanding(
+                    DB::table('fin_documents')->whereNull('deleted_at')->where('client_id', $c->id)
+                )->count();
                 if ($n) $why[] = ['w' => 2, 'txt' => $n . ' فاتورة متأخرة السداد'];
             }
 

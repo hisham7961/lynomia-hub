@@ -30,6 +30,20 @@
     </div>
 @endif
 
+{{-- الفعلُ الأفضلُ التالي (محرّك NextAction) — الخطوةُ المنطقيةُ حسب حالة العرض --}}
+@php $qNext = \App\Support\NextAction::for('quotes', $row); @endphp
+@if (! empty($qNext))
+    <div class="card">
+        <h3 class="cardtitle">🎯 الخطوة التالية</h3>
+        <div class="crow" style="flex-wrap:wrap;gap:8px">
+            @foreach ($qNext as $step)
+                <a class="chip" href="{{ $step['url'] }}" title="{{ $step['why'] }}">{{ $step['primary'] ? '⭐ ' : '' }}{{ $step['label'] }}</a>
+            @endforeach
+        </div>
+        <div class="sub" style="margin-top:6px">{{ $qNext[0]['why'] }}</div>
+    </div>
+@endif
+
 <div class="card">
     <h3 class="cardtitle">🧾 بنود العرض
         <span class="bdg">{{ $qLines->count() }} بند</span>

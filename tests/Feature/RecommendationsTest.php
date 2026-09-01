@@ -26,10 +26,10 @@ class RecommendationsTest extends TestCase
         Task::create(['title' => 'مهمة ثقيلة', 'project_id' => $p->id, 'assignee_id' => $this->employee->id,
             'est_h' => 100, 'due' => now()->addDays(6)->toDateString(), 'status' => 'قيد التنفيذ']);
 
-        // فاتورة متأخرة غير مسدَّدة
-        DB::table('fin_documents')->insert(['id' => (string) Str::uuid(), 'doc_no' => 'INV-OD', 'kind' => 'فاتورة',
+        // فاتورة متأخرة غير مسدَّدة — نوعُ دخلٍ حقيقيّ «فاتورة مبيعات» (لا «فاتورة» المجرّدة)
+        DB::table('fin_documents')->insert(['id' => (string) Str::uuid(), 'doc_no' => 'INV-OD', 'kind' => 'فاتورة مبيعات',
             'partner' => 'عميل متعثر', 'total' => 1000, 'paid' => 200, 'due' => now()->subDays(70)->toDateString(),
-            'state' => 'متأخر', 'created_at' => now(), 'updated_at' => now()]);
+            'state' => 'متأخرة', 'created_at' => now(), 'updated_at' => now()]);
 
         $r = hub_recommendations(true);
         $titles = collect($r['items'])->pluck('title')->implode(' | ');
