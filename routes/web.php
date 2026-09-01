@@ -172,6 +172,7 @@ Route::middleware('auth')->group(function () {
 
     // العرض الميدانيّ للمشرف: لوحةٌ تحليلية، وجلساتُ التتبّع، وإعادةُ عرض المسار
     Route::get('field', [\App\Http\Controllers\Web\FieldController::class, 'dashboard'])->name('field.dashboard');
+    Route::get('sales', [\App\Http\Controllers\Web\SalesController::class, 'dashboard'])->name('sales.dashboard');
     Route::get('field/sessions', [\App\Http\Controllers\Web\FieldController::class, 'index'])->name('field.sessions');
     Route::get('field/route/{id}', [\App\Http\Controllers\Web\FieldController::class, 'route'])->name('field.route');
 

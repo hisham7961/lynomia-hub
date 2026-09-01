@@ -11,7 +11,24 @@
         ? hub_scope(\App\Models\Service::query(), 'services')->orderBy('name')->limit(400)->get(['id', 'name'])
         : collect();
     $modeLabels = ['required' => 'أساسيّ', 'optional' => 'اختياريّ', 'alternative' => 'بديل', 'addon' => 'إضافة'];
+    $qMeta = (array) $row->meta;
 @endphp
+
+{{-- عرض ٣٦٠: سلسلةُ الأثر التجاريّ — من العميل حتى المشروع والفاتورة بنقرة --}}
+@if ($row->client_id || array_intersect_key($qMeta, array_flip(['contract_id','engagement_id','project_id','invoice_id'])))
+    <div class="card">
+        <h3 class="cardtitle">🧭 سلسلةُ الأثر التجاريّ</h3>
+        <div class="crow" style="flex-wrap:wrap;gap:6px">
+            @if ($row->client_id)<a class="chip" href="{{ route('m.show', ['clients', $row->client_id]) }}">👤 العميل</a><span class="sub">›</span>@endif
+            <span class="chip">🧾 {{ $row->doc_no }}</span>
+            @if (! empty($qMeta['contract_id']))<span class="sub">›</span><a class="chip" href="{{ route('m.show', ['contracts', $qMeta['contract_id']]) }}">📜 العقد</a>@endif
+            @if (! empty($qMeta['engagement_id']))<span class="sub">›</span><a class="chip" href="{{ route('m.show', ['engagements', $qMeta['engagement_id']]) }}">🤝 الارتباط</a>@endif
+            @if (! empty($qMeta['project_id']))<span class="sub">›</span><a class="chip" href="{{ route('m.show', ['projects', $qMeta['project_id']]) }}">🗂️ المشروع</a>@endif
+            @if (! empty($qMeta['invoice_id']))<span class="sub">›</span><a class="chip" href="{{ route('m.show', ['fin', $qMeta['invoice_id']]) }}">🧾 الفاتورة</a>@endif
+        </div>
+        <div class="sub" style="margin-top:6px">مصادرُ الحقيقة موصولة — العرضُ يشير لها لا ينسخها.</div>
+    </div>
+@endif
 
 <div class="card">
     <h3 class="cardtitle">🧾 بنود العرض

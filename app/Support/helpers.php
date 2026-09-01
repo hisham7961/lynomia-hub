@@ -324,6 +324,7 @@ if (! function_exists('hub_top_links')) {
 
             ['key' => 'ceo',       'label' => '👑 لوحة CEO',         'route' => 'ceo',             'group' => 'analytics', 'ok' => $owner],
             ['key' => 'perf',      'label' => '📈 لوحة الأداء',      'route' => 'performance',     'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'sales',     'label' => '💼 لوحة المبيعات',    'route' => 'sales.dashboard', 'group' => 'analytics', 'ok' => $mon],
             ['key' => 'finrep',    'label' => '📊 التقارير المالية', 'route' => 'reports.finance', 'group' => 'analytics', 'ok' => hub_can($user, 'fin', 'v')],
             ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'group' => 'analytics', 'ok' => $mon],
             ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'group' => 'analytics', 'ok' => $mon],
