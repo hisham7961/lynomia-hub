@@ -3568,6 +3568,33 @@ if (! function_exists('hub_recommendations')) {
                 }
             } catch (\Throwable $e) {}
 
+            // ١١) حواجبُ مبلَّغة: مشاريعُ فيها تقاريرُ عملٍ حديثةٌ ذاتُ «مشكلات» — **لا
+            // كيانَ حاجبٍ جديد**: يُقرأ من `work_updates.problems` (نفسُ ما يعدّه
+            // `teamCalc`)، منطَّقٌ بالمشروع عبر hub_scope، وعمرُ الحاجب من أقدمِ بلاغ.
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('work_updates')) {
+                    $projIds = hub_scope(\Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at'), 'projects')
+                        ->when($projectId, fn ($q) => $q->where('id', $projectId))->pluck('id');
+                    if ($projIds->isNotEmpty()) {
+                        $rows = \Illuminate\Support\Facades\DB::table('work_updates')->whereNull('deleted_at')
+                            ->whereIn('project_id', $projIds->all())
+                            ->whereNotNull('problems')->whereRaw("TRIM(problems) <> ''")
+                            ->where('work_date', '>=', now()->subDays(14)->toDateString())
+                            ->select('project_id', \Illuminate\Support\Facades\DB::raw('COUNT(*) as c'),
+                                \Illuminate\Support\Facades\DB::raw('MIN(work_date) as firstd'))
+                            ->groupBy('project_id')->orderByDesc('c')->orderBy('project_id')->limit(6)->get();
+                        $names = hub_ref_labels('projects', $rows->pluck('project_id')->all());
+                        foreach ($rows as $r) {
+                            $age = (int) \Illuminate\Support\Carbon::parse($r->firstd)->diffInDays(now());
+                            $add($r->c >= 3 ? 'حرج' : 'مهم', '🚧', 'حواجبُ مبلَّغة: ' . ($names[$r->project_id] ?? '—'),
+                                $r->c . ' تقريرُ عملٍ يذكر مشكلةً/حاجباً، أقدمُها منذ ' . $age . ' يوماً. راجع المعوّقات مع الفريق.',
+                                route('m.show', ['projects', $r->project_id]), 'افتح المشروع',
+                                'proj.blockers:' . $r->project_id, 'projects', $r->project_id);
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {}
+
             // الترتيب: الأشد أولاً، وضمن الدرجة يبقى ترتيب الاكتشاف
             usort($out, fn ($a, $b) => ($rank[$b['sev']] ?? 0) <=> ($rank[$a['sev']] ?? 0));
 
