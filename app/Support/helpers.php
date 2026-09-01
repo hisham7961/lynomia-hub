@@ -3478,6 +3478,43 @@ if (! function_exists('hub_recommendations')) {
                 }
             } catch (\Throwable $e) {}
 
+            // ٩) مشاريع راكدة: نشطةٌ (غيرُ مغلقةٍ ولا متوقّفة) بلا حِراكٍ منذ مدّة —
+            // **لا محرّكَ صحّةٍ ثانٍ**: إشارةٌ مستقلّةٌ تُشتقّ من آخرِ أثرٍ فعليّ
+            // (تدقيقُ المشروع + آخرُ تحديثِ مهمّة)، منطَّقةٌ بـhub_scope كالبقية.
+            try {
+                $paused = ['متوقف', 'موقوف', 'معلّق', 'مُعلّق', 'مؤجل', 'مجمّد'];
+                $projs = hub_scope(\Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at'), 'projects')
+                    ->where(fn ($w) => $w->whereNull('status')
+                        ->orWhere(fn ($q) => $q->whereNotIn('status', hub_closed_states())->whereNotIn('status', $paused)))
+                    ->when($projectId, fn ($q) => $q->where('id', $projectId))
+                    ->limit(60)->get(['id', 'name', 'updated_at']);
+                if ($projs->isNotEmpty()) {
+                    $ids = $projs->pluck('id')->all();
+                    $auditMax = \Illuminate\Support\Facades\DB::table('audits')->where('module', 'projects')
+                        ->whereIn('record_id', $ids)->select('record_id', \Illuminate\Support\Facades\DB::raw('MAX(created_at) as m'))
+                        ->groupBy('record_id')->pluck('m', 'record_id');
+                    $taskMax = \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')
+                        ->whereIn('project_id', $ids)->select('project_id', \Illuminate\Support\Facades\DB::raw('MAX(updated_at) as m'))
+                        ->groupBy('project_id')->pluck('m', 'project_id');
+                    $threshold = (string) now()->subDays(7);
+                    $stalled = [];
+                    foreach ($projs as $p) {
+                        $last = collect([$p->updated_at, $auditMax[$p->id] ?? null, $taskMax[$p->id] ?? null])
+                            ->filter()->map(fn ($t) => (string) $t)->max();
+                        if (! $last || $last >= $threshold) continue;
+                        $stalled[] = ['p' => $p, 'last' => substr($last, 0, 10),
+                            'days' => (int) \Illuminate\Support\Carbon::parse($last)->diffInDays(now())];
+                    }
+                    usort($stalled, fn ($a, $b) => [$b['days'], $a['p']->id] <=> [$a['days'], $b['p']->id]);
+                    foreach (array_slice($stalled, 0, 6) as $s) {
+                        $add($s['days'] > 21 ? 'حرج' : 'مهم', '🕸️', 'مشروعٌ راكد: ' . $s['p']->name,
+                            'لا حِراكَ (مهامٌ أو تدقيق) منذ ' . $s['days'] . ' يوماً — آخرُ نشاطٍ ' . $s['last'] . '. راجعه أو اطلب تحديثاً.',
+                            route('m.show', ['projects', $s['p']->id]), 'افتح المشروع',
+                            'proj.stalled:' . $s['p']->id, 'projects', $s['p']->id);
+                    }
+                }
+            } catch (\Throwable $e) {}
+
             // الترتيب: الأشد أولاً، وضمن الدرجة يبقى ترتيب الاكتشاف
             usort($out, fn ($a, $b) => ($rank[$b['sev']] ?? 0) <=> ($rank[$a['sev']] ?? 0));
 
