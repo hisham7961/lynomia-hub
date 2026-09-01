@@ -3336,7 +3336,12 @@ if (! function_exists('hub_recommendations')) {
         // آخر: تسريبُ عزلٍ عبر الخبيئة. من له أيُّ حصرٍ يأخذ مفتاحاً خاصّاً به.
         $u = auth()->user();
         $scopedKey = hub_scoped($u) || hub_company_ids($u) !== null || hub_client_ids($u) !== null;
-        $key = 'recs:' . ($scopedKey ? 'u:' . ($u?->id ?? '0') : 'r:' . ($u?->role_id ?? '0')) . hub_lens_key($projectId);
+        // **مبدّلُ الشركة/العميل جزءٌ من المفتاح** كما في `hub_scope_key`: بعضُ الكُتل
+        // (تقاريرُ اليوم عبر `hub_company_scope`) تضيق بالمبدّل النشط، فمستخدمان يريان
+        // «كلَّ الشركات» بمبدّلين مختلفين كانا يتقاسمان مفتاحاً فيُقدَّم عدُّ شركةٍ لأخرى.
+        $key = 'recs:' . ($scopedKey ? 'u:' . ($u?->id ?? '0') : 'r:' . ($u?->role_id ?? '0'))
+            . ':' . (string) session('hub.company', '-') . ':' . (string) session('hub.client', '-')
+            . hub_lens_key($projectId);
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
         return \Illuminate\Support\Facades\Cache::remember($key, 300, function () use ($projectId) {
@@ -3385,7 +3390,7 @@ if (! function_exists('hub_recommendations')) {
                 $projects = \Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at')
                     ->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', hub_closed_states()))
                     ->when($projectId, fn ($q) => $q->where('id', $projectId))
-                    ->limit(40)->get(['id', 'name']);
+                    ->orderBy('id')->limit(40)->get(['id', 'name']);   // حتميّةُ اختيار الأربعين بين المحرّكين
                 $sick = [];
                 foreach ($projects as $p) {
                     $h = hub_project_health($p->id);
@@ -3487,6 +3492,10 @@ if (! function_exists('hub_recommendations')) {
                     ->where(fn ($w) => $w->whereNull('status')
                         ->orWhere(fn ($q) => $q->whereNotIn('status', hub_closed_states())->whereNotIn('status', $paused)))
                     ->when($projectId, fn ($q) => $q->where('id', $projectId))
+                    // ترتيبٌ حتميّ قبل الحدّ: بلا `orderBy` يختلف الستّون المُختارون
+                    // بين المحرّكين فيسقط راكدٌ خلف الصفّ ٦٠ بلا رصد. الأقدمُ تحديثاً
+                    // أولاً — أرجحُ للركود، والمعرّفُ فاصلٌ ثابت.
+                    ->orderBy('updated_at')->orderBy('id')
                     ->limit(60)->get(['id', 'name', 'updated_at']);
                 if ($projs->isNotEmpty()) {
                     $ids = $projs->pluck('id')->all();
