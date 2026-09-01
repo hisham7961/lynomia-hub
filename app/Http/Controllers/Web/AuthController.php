@@ -130,7 +130,7 @@ class AuthController extends Controller
     }
 
     /** إتمام الدخول الموحد: تصفير العدادات + سجل الجلسة + تدوير المعرف */
-    protected function finishLogin(User $u, Request $r)
+    public function finishLogin(User $u, Request $r, ?string $via = null)
     {
         $u->forceFill([
             'failed_attempts' => 0,
@@ -165,7 +165,7 @@ class AuthController extends Controller
         // دخولٌ ناجح حدثٌ أمنيّ يدخل سلسلة التدقيق الموقَّعة — كان يُسجَّل في
         // sessions_log فقط (بلا ختمٍ متسلسل)، فالتحقيق في «متى ومن أين دخل»
         // لم يكن مضموناً ضد العبث كما الفشل. يُختم مع رقم صفّ الجلسة.
-        hub_audit('دخول ناجح', null, null, $u->name, ['after' => ['session' => $log->id, 'via' => $u->totp_enabled ? '2FA' : 'كلمة مرور']]);
+        hub_audit('دخول ناجح', null, null, $u->name, ['after' => ['session' => $log->id, 'via' => $via ?: ($u->totp_enabled ? '2FA' : 'كلمة مرور')]]);
 
         // شاشة البداية من تفضيل المستخدم — والرابط المقصود قبل الدخول يفوز عليها
         return redirect()->intended(hub_home_url(auth()->user()));

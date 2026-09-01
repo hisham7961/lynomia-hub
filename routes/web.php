@@ -78,6 +78,12 @@ Route::middleware('guest')->group(function () {
 Route::post('hook/{token}', [\App\Http\Controllers\Web\InboundHookController::class, 'receive'])
     ->name('hook.receive')->middleware('throttle:120,1');
 
+// مفاتيحُ المرور — الدخولُ بلا كلمة سر (زائر): خياراتٌ ثم تحقّق
+Route::post('passkey/login/options', [\App\Http\Controllers\Web\PasskeyController::class, 'loginOptions'])
+    ->name('passkey.login.options')->middleware('throttle:30,1');
+Route::post('passkey/login/verify', [\App\Http\Controllers\Web\PasskeyController::class, 'loginVerify'])
+    ->name('passkey.login.verify')->middleware('throttle:30,1');
+
 Route::get('sign/{token}', [\App\Http\Controllers\Web\EsignController::class, 'show'])->name('sign.show');
 Route::post('sign/{token}/otp', [\App\Http\Controllers\Web\EsignController::class, 'sendOtp'])->name('sign.otp')->middleware('throttle:6,10');
 Route::post('sign/{token}/unlock', [\App\Http\Controllers\Web\EsignController::class, 'unlock'])->name('sign.unlock');
@@ -402,6 +408,13 @@ Route::middleware('auth')->group(function () {
     Route::post('stepup', [StepUpController::class, 'verify'])->name('stepup.verify')->middleware('throttle:10,1');
 
     // أمني ذاتي: جلساتي وأجهزتي — لكل مستخدمٍ على نفسه (كان الإبطال للمالك فقط)
+    // مفاتيحُ المرور — التسجيلُ والتصعيدُ والإدارة (مستخدمٌ داخل)
+    Route::post('passkey/register/options', [\App\Http\Controllers\Web\PasskeyController::class, 'registerOptions'])->name('passkey.register.options');
+    Route::post('passkey/register/verify', [\App\Http\Controllers\Web\PasskeyController::class, 'registerVerify'])->name('passkey.register.verify');
+    Route::delete('passkey/{id}', [\App\Http\Controllers\Web\PasskeyController::class, 'destroy'])->name('passkey.destroy');
+    Route::post('passkey/stepup/options', [\App\Http\Controllers\Web\PasskeyController::class, 'stepupOptions'])->name('passkey.stepup.options');
+    Route::post('passkey/stepup/verify', [\App\Http\Controllers\Web\PasskeyController::class, 'stepupVerify'])->name('passkey.stepup.verify');
+
     Route::get('my/security', [MySecurityController::class, 'index'])->name('mysec.index');
     Route::post('my/security/sessions/{id}/revoke', [MySecurityController::class, 'revokeSession'])->name('mysec.session.revoke');
     Route::post('my/security/sessions/others', [MySecurityController::class, 'revokeOthers'])->name('mysec.session.others');

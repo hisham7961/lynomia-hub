@@ -20,10 +20,16 @@ class StepUpController extends Controller
             return redirect(self::safeNext($r->query('next')));
         }
 
+        // مفاتيحُ المرور بديلٌ للتصعيد: إن كان للمستخدم مفتاحٌ مسجَّلٌ والميزةُ مفعَّلة
+        $hasPasskeys = (string) setting('auth.passkeys_on', '1') === '1'
+            && \Illuminate\Support\Facades\Schema::hasTable('webauthn_credentials')
+            && \App\Models\WebauthnCredential::where('user_id', $u->id)->exists();
+
         return view('security.stepup', [
             'method' => StepUp::method($u),
             'next' => self::safeNext($r->query('next')),
             'minutes' => StepUp::windowMinutes(),
+            'hasPasskeys' => $hasPasskeys,
         ]);
     }
 

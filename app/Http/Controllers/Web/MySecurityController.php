@@ -38,7 +38,13 @@ class MySecurityController extends Controller
         // خطرُ جلستك الحالية — مفسَّراً بعوامله لا رقماً أعمى
         $risk = \App\Support\Risk::session($u);
 
-        return view('security.mine', compact('sessions', 'devices', 'risk'));
+        // مفاتيحُ المرور المسجَّلة (Passkeys) — إن كانت الميزةُ مفعَّلة
+        $passkeys = ((string) setting('auth.passkeys_on', '1') === '1'
+            && \Illuminate\Support\Facades\Schema::hasTable('webauthn_credentials'))
+            ? \App\Models\WebauthnCredential::where('user_id', $u->id)->orderByDesc('created_at')->get()
+            : collect();
+
+        return view('security.mine', compact('sessions', 'devices', 'risk', 'passkeys'));
     }
 
     public function revokeSession(string $id)
