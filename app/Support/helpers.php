@@ -3582,7 +3582,10 @@ if (! function_exists('hub_recommendations')) {
                         $add($missing >= 5 ? 'مهم' : 'اطّلاع', '📝', $missing . ' تقريرٌ يوميٌّ ناقصٌ اليوم',
                             'موظفون حاضرون اليوم بلا تقريرِ عمل (تقريرٌ ناقصٌ ليس غياباً). تابع مع فريقك.',
                             route('workforce.team'), 'افتح فريقي اليوم',
-                            'report.missing:' . now()->toDateString(), 'attend', null);
+                            // **تصرّفٌ لكلِّ مستخدمٍ على حِدة**: هذه إشارةٌ تجميعيّةٌ (لا سجلٌّ
+                            // واحد) يراها كلُّ مديري HR؛ فبمفتاحٍ مشترَكٍ كان تأجيلُ أحدهم
+                            // يُخفيها عن البقية. المستخدمُ جزءٌ من المفتاح فيستقلّ تصرّفُه.
+                            'report.missing:' . now()->toDateString() . ':u' . (auth()->id() ?? '0'), 'attend', null);
                     }
                 }
             } catch (\Throwable $e) {}
@@ -3611,6 +3614,77 @@ if (! function_exists('hub_recommendations')) {
                                 'proj.blockers:' . $r->project_id, 'projects', $r->project_id);
                         }
                     }
+                }
+            } catch (\Throwable $e) {}
+
+            // ١٢) خرقُ SLA: تذاكرُ دعمٍ مفتوحةٌ تجاوزت موعدَ حلّها وفق قواعد `hub_sla`
+            // القائمة — **لا محرّكَ SLA ثانٍ**: نفسُ الحاسبة (created_at + الأولوية + أوّلُ
+            // ردٍّ غيرِ داخليّ + حالةُ الإغلاق)، منطَّقةٌ بـhub_scope ومحروسةٌ بصلاحية الرؤية.
+            // تُحَلّ تلقائياً بحلِّ التذكرة (لا تعود resLate). لا مؤقّتاتٍ جديدة: تُشتقّ من القائم.
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('tickets') && hub_can(auth()->user(), 'tickets', 'v')) {
+                    $open = hub_scope(\Illuminate\Support\Facades\DB::table('tickets')->whereNull('deleted_at'), 'tickets')
+                        ->whereNotIn('status', ['تم الحل', 'مغلقة'])
+                        ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
+                        // الأقدمُ إنشاءً أولاً (أرجحُ للخرق)، والمعرّفُ فاصلٌ حتميّ
+                        ->orderBy('created_at')->orderBy('id')->limit(80)
+                        ->get(['id', 'subject', 'priority', 'status', 'meta', 'created_at', 'updated_at']);
+                    if ($open->isNotEmpty()) {
+                        // أوّلُ ردٍّ غيرِ داخليٍّ لكلِّ تذكرةٍ دفعةً واحدة — لا N+1 داخل hub_sla
+                        $firsts = \App\Models\Comment::where('module', 'tickets')
+                            ->whereIn('record_id', $open->pluck('id')->all())
+                            ->where(fn ($q) => $q->where('internal', false)->orWhereNull('internal'))
+                            ->select('record_id', \Illuminate\Support\Facades\DB::raw('MIN(created_at) as m'))
+                            ->groupBy('record_id')->pluck('m', 'record_id');
+                        $breached = [];
+                        foreach ($open as $t) {
+                            $s = hub_sla($t, $firsts[$t->id] ?? null);
+                            if (! ($s['resLate'] ?? false)) continue;   // لم يتجاوز موعدَ الحلّ بعد
+                            $over = (int) \Illuminate\Support\Carbon::parse($s['resDue'])->diffInDays(now());
+                            $breached[] = ['t' => $t, 'over' => $over, 'noresp' => (bool) ($s['respPending'] ?? false)];
+                        }
+                        usort($breached, fn ($a, $b) => [$b['over'], $a['t']->id] <=> [$a['over'], $b['t']->id]);
+                        foreach (array_slice($breached, 0, 6) as $b) {
+                            $add($b['over'] > 3 ? 'حرج' : 'مهم', '⏱️', 'خرقُ SLA: ' . ($b['t']->subject ?: 'تذكرة'),
+                                'تجاوزت موعدَ الحلّ بـ' . $b['over'] . ' يوماً' . ($b['noresp'] ? ' وبلا ردٍّ أوّلَ بعد' : '') . '. عالِجها أو صعّدها.',
+                                route('m.show', ['tickets', $b['t']->id]), 'افتح التذكرة',
+                                'sla.breach:' . $b['t']->id, 'tickets', $b['t']->id);
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {}
+
+            // ١٣) انحرافُ النطاق: مشروعٌ وُلد من عرضٍ مقبول (خطُّ أساسٍ محفوظ) تجاوزت
+            // أوامرُ التغيير المطبَّقةُ عليه نسبةً جوهريّةً من قيمته الأصلية. يُقرأ من
+            // `meta.baseline` القائم (الأصل + value_delta لكلِّ أمرٍ مطبَّق، يُحدَّث
+            // معاملاتيّاً عند التطبيق في ChangeOrderController) — منطَّقٌ بـhub_scope.
+            // نسبةٌ لا مبلغَ كلفةٍ داخليّ؛ القيمةُ التعاقدية إيرادٌ تراه لوحاتُ الرصد.
+            try {
+                $rows = hub_scope(\Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at'), 'projects')
+                    ->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', hub_closed_states()))
+                    ->when($projectId, fn ($q) => $q->where('id', $projectId))
+                    ->orderBy('id')->limit(80)->get(['id', 'name', 'meta']);
+                $drift = [];
+                foreach ($rows as $p) {
+                    $meta = (array) (is_array($p->meta) ? $p->meta : (json_decode((string) $p->meta, true) ?: []));
+                    $bl = $meta['baseline'] ?? null;
+                    $orig = (float) ($bl['amount'] ?? 0);
+                    if (! $bl || $orig <= 0) continue;   // لا خطَّ أساسٍ → لا مرجعَ للانحراف
+                    $cos = (array) ($bl['change_orders'] ?? []);
+                    $sum = 0.0;
+                    foreach ($cos as $co) $sum += (float) ($co['value_delta'] ?? 0);
+                    if ($sum == 0.0) continue;
+                    $pct = abs($sum) / $orig * 100;
+                    if ($pct < 25) continue;   // عتبةُ الانحراف الجوهريّ
+                    $drift[] = ['p' => $p, 'pct' => $pct, 'n' => count($cos)];
+                }
+                usort($drift, fn ($a, $b) => [$b['pct'], $a['p']->id] <=> [$a['pct'], $b['p']->id]);
+                foreach (array_slice($drift, 0, 6) as $d) {
+                    $add($d['pct'] >= 50 ? 'حرج' : 'مهم', '📐', 'انحرافُ نطاق: ' . $d['p']->name,
+                        'أوامرُ التغيير المطبَّقة (' . $d['n'] . ') غيّرت القيمةَ التعاقدية بنسبة '
+                        . number_format($d['pct'], 0) . '٪ عن خطِّ الأساس. راجع النطاقَ والتسعير.',
+                        route('m.show', ['projects', $d['p']->id]), 'افتح المشروع',
+                        'scope.drift:' . $d['p']->id, 'projects', $d['p']->id);
                 }
             } catch (\Throwable $e) {}
 
