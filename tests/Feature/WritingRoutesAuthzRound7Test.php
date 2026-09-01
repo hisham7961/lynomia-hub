@@ -45,6 +45,10 @@ class WritingRoutesAuthzRound7Test extends TestCase
         'mysec.device.trust', 'mysec.device.revoke',
         // تصعيدُ مصادقته هو على نفسه — يُعيد تحقّقَ هويته، لا فعلَ بياناتٍ فوقه إذن
         'stepup.verify',
+        // مفاتيحُ مروره هو: التسجيلُ والتصعيدُ والحذفُ على صفوفه حصراً (كلُّ فعلٍ
+        // يقيّد المفتاحَ بـuser_id === auth). هويّةٌ ذاتيةٌ لا كتابةَ بياناتٍ فوقه.
+        'passkey.register.options', 'passkey.register.verify', 'passkey.destroy',
+        'passkey.stepup.options', 'passkey.stepup.verify',
         // تبديلُ الشركة النشطة **تصفيةُ عرضٍ** لا كتابةَ بيانات: يُخزَّن في جلسته،
         // والتبديلُ إلى شركةٍ بعينها محروسٌ بـ`companies.v` + وجودِها + كونِها
         // داخل نطاقه (routes/web.php:129) — والقراءةُ تبقى منطَّقةً بعدها.

@@ -23,6 +23,39 @@
         </div>
         <div class="sub" style="margin-top:6px">هذا النطاقُ والمبلغُ الأصليّان — أيُّ تغييرٍ لاحقٍ يُدار بإدارة التغيير لا بتعديل العرض المقبول.</div>
     </div>
+    @php
+        $pcCOs = $pcBaseline['change_orders'] ?? [];
+        $pcOrig = (float) ($pcBaseline['amount'] ?? 0);
+        $pcCOsum = collect($pcCOs)->sum(fn ($c) => (float) ($c['value_delta'] ?? 0));
+        $pcCur = round($pcOrig + $pcCOsum, 3);
+        $pcDaysSum = collect($pcCOs)->sum(fn ($c) => (int) ($c['timeline_days'] ?? 0));
+        $pcShowInternal = hub_field_mode(auth()->user(), 'projects', 'budget') !== 'hide';
+    @endphp
+    @if (! empty($pcCOs))
+        {{-- التطوّرُ التجاريّ: الأصل + أوامرُ التغيير المطبَّقة = القيمة الحالية --}}
+        <div class="card">
+            <h3 class="cardtitle">📈 التطوّرُ التجاريّ للمشروع <span class="bdg g">{{ count($pcCOs) }} أمر تغيير</span></h3>
+            <div style="display:flex;gap:18px;flex-wrap:wrap">
+                <div><div class="sub">القيمة الأصلية</div><b class="mono">{{ number_format($pcOrig, 3) }} {{ $pcBaseline['currency'] ?? '' }}</b></div>
+                <div><div class="sub">أوامرُ التغيير المطبَّقة</div><b class="mono {{ $pcCOsum >= 0 ? '' : 'txt-bad' }}">{{ $pcCOsum >= 0 ? '+' : '' }}{{ number_format($pcCOsum, 3) }}</b></div>
+                <div><div class="sub">القيمة الحالية TCV</div><b class="mono">{{ number_format($pcCur, 3) }} {{ $pcBaseline['currency'] ?? '' }}</b></div>
+                @if ($pcDaysSum)<div><div class="sub">أثرُ الجدول</div><b class="mono">{{ $pcDaysSum > 0 ? '+' : '' }}{{ $pcDaysSum }} يوماً</b></div>@endif
+            </div>
+            <div class="tblwrap" style="margin-top:8px"><table>
+                <thead><tr><th>أمر التغيير</th><th>القيمة</th><th>الجدول</th><th>طُبّق</th></tr></thead>
+                <tbody>
+                @foreach ($pcCOs as $c)
+                    <tr>
+                        <td>@if (! empty($c['co_id']))<a class="chip" href="{{ route('m.show', ['changeorders', $c['co_id']]) }}">📋 {{ $c['co_no'] ?? 'أمر' }}</a>@else {{ $c['co_no'] ?? '—' }} @endif</td>
+                        <td class="mono">{{ (float) ($c['value_delta'] ?? 0) >= 0 ? '+' : '' }}{{ number_format((float) ($c['value_delta'] ?? 0), 3) }}</td>
+                        <td class="mono">{{ (int) ($c['timeline_days'] ?? 0) ? ((int) $c['timeline_days'] . ' يوماً') : '—' }}</td>
+                        <td class="sub">{{ ! empty($c['applied_at']) ? \Illuminate\Support\Str::limit(str_replace('T', ' ', $c['applied_at']), 16, '') : '—' }}</td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table></div>
+        </div>
+    @endif
 @endif
 @if ($pcClient)
     <div class="card">

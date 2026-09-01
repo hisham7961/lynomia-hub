@@ -324,6 +324,7 @@ if (! function_exists('hub_top_links')) {
 
             ['key' => 'ceo',       'label' => '👑 لوحة CEO',         'route' => 'ceo',             'group' => 'analytics', 'ok' => $owner],
             ['key' => 'perf',      'label' => '📈 لوحة الأداء',      'route' => 'performance',     'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'sales',     'label' => '💼 لوحة المبيعات',    'route' => 'sales.dashboard', 'group' => 'analytics', 'ok' => $mon],
             ['key' => 'finrep',    'label' => '📊 التقارير المالية', 'route' => 'reports.finance', 'group' => 'analytics', 'ok' => hub_can($user, 'fin', 'v')],
             ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'group' => 'analytics', 'ok' => $mon],
             ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'group' => 'analytics', 'ok' => $mon],
@@ -833,7 +834,7 @@ if (! function_exists('hub_mod_look')) {
         static $icons = [
             'projects' => '🚀', 'clients' => '🤝', 'tasks' => '✅', 'tickets' => '🎫',
             'fin' => '💵', 'contracts' => '📜', 'companies' => '🏢', 'hr' => '👥',
-            'quotes' => '📝', 'suppliers' => '🚚', 'purchases' => '🛒', 'ideas' => '💡',
+            'quotes' => '📝', 'changeorders' => '📋', 'suppliers' => '🚚', 'purchases' => '🛒', 'ideas' => '💡',
             'leaves' => '🗓️', 'apps' => '📱', 'domains' => '🌐', 'servers' => '🖥️',
             'vault' => '🔐', 'kb' => '📚', 'meetings' => '🪑', 'assets' => '📦',
             'hcps' => '🩺', 'facilities' => '🏥', 'territories' => '🗺️',
@@ -1313,6 +1314,33 @@ if (! function_exists('hub_approvers')) {
         app()->instance('hub.approvers', $ids);
 
         return $ids;
+    }
+}
+
+if (! function_exists('hub_approvers_for')) {
+    /**
+     * المعتمِدون الذين **يرون هذا السجل** — نطاقٌ لكلّ مستلمٍ كنمط
+     * `HubAutomation::notifyMonitors`: فلا يُشعَر معتمِدٌ معزولٌ باسمِ/مبلغِ سجلٍّ
+     * خارج حدّه (تسريبٌ عبر حدّ العزل من مسار الطلب). المالكُ يمرّ دوماً، وحين لا
+     * وحدةَ/معرّف يُرجَع الكلُّ كما هو (لا سجلَّ يُقاس عليه) — فالتوافقُ محفوظ.
+     */
+    function hub_approvers_for(?string $module = null, ?string $recordId = null): array
+    {
+        $all = hub_approvers();
+        if (! $module || ! $recordId) return $all;
+        $md = hub_mod($module);
+        if (! $md || empty($md['table'])) return $all;
+
+        return array_values(array_filter($all, function ($uid) use ($md, $module, $recordId) {
+            $u = \App\Models\User::find($uid);
+            if (! $u) return false;
+            if ($u->role?->is_owner) return true;   // المالكُ يرى الكلّ
+
+            return hub_scope(
+                \Illuminate\Support\Facades\DB::table($md['table'])->whereNull('deleted_at')->where('id', $recordId),
+                $module, $u
+            )->exists();
+        }));
     }
 }
 

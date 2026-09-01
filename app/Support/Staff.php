@@ -161,14 +161,20 @@ class Staff
         }
 
         $temp = Str::password(14);
-        $u = User::create([
-            'name' => $emp->name, 'email' => $email, 'phone' => $emp->phone,
-            'job_title' => $emp->title, 'role_id' => $role->id, 'status' => 'نشط',
-            'password' => $temp,
-            // بلا ختمِ تجديد: الحساب يبدأ بكلمةٍ مؤقتة يجب تبديلها عند أول دخول
-            'password_changed_at' => null,
-        ]);
-        $emp->forceFill(['user_id' => $u->id])->saveQuietly();
+        // **معاملةٌ ذرّية**: إنشاءُ الحساب وربطُه بالملف معاً — فلا يبقى حسابُ
+        // دخولٍ حيٌّ يتيمٌ بلا ملفٍ لو فشل الربطُ بعد إنشاء الصفّ (اعتمادُ حيٌّ معلَّق).
+        $u = \Illuminate\Support\Facades\DB::transaction(function () use ($emp, $email, $role, $temp) {
+            $u = User::create([
+                'name' => $emp->name, 'email' => $email, 'phone' => $emp->phone,
+                'job_title' => $emp->title, 'role_id' => $role->id, 'status' => 'نشط',
+                'password' => $temp,
+                // بلا ختمِ تجديد: الحساب يبدأ بكلمةٍ مؤقتة يجب تبديلها عند أول دخول
+                'password_changed_at' => null,
+            ]);
+            $emp->forceFill(['user_id' => $u->id])->saveQuietly();
+
+            return $u;
+        });
 
         // النصُّ كما كان: أثرُ التدقيق التاريخيّ يُبحث به، وتغييرُه يُيتّم ما مضى
         hub_audit('إنشاء حساب لموظف جديد', 'users', $u->id, $u->name . ' — دور ' . $role->name);

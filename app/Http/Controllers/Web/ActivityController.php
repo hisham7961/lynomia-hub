@@ -42,24 +42,40 @@ class ActivityController extends Controller
 
         $today = now()->startOfDay();
         $onlineSince = now()->subMinutes(5);
-        $users = User::whereNull('deleted_at')->orderBy('name')->get()->map(function ($u) use ($today, $onlineSince) {
-            $v = DB::table('page_visits')->where('user_id', $u->id)->where('at', '>=', $today);
-            $sess = DB::table('sessions_log')->where('user_id', $u->id);
 
-            // **آخر ظهورٍ موثوق من نبضة الجلسة** (`sessions_log.last_seen_at` تُحدَّث مع
-            // كل طلبٍ عبر SessionSentry) لا من `page_visits` وحدها — التي تُسجَّل
-            // للصفحات الكاملة فقط، فمستخدمٌ يعمل في الملفات والتفاصيل (htmx/تنزيل)
-            // كان يظهر فارغاً تماماً رغم نشاطه. النبضة تلتقط كلَّ طلبٍ فيبين حضورُه.
-            $lastSeen = (clone $sess)->max('last_seen_at');
+        // **تجميعٌ مسبقٌ لا استعلامٌ لكل مستخدم** (N+1): ثلاثةُ استعلاماتٍ مُجمَّعةٍ
+        // بـ`groupBy('user_id')` تُبنى مرّةً، ثم تُسقَط على المستخدمين — بدلاً من ~٥
+        // استعلاماتٍ داخل `map()` لكل مستخدمٍ (~5N على لوحة المالك). الخرجُ مطابقٌ
+        // بالضبط (يحرسه اختبارُ لقطة). النمطُ من `SecurityExposure::map`.
+        $visitsBy = DB::table('page_visits')->where('at', '>=', $today)
+            ->select('user_id', DB::raw('MIN(at) as first'), DB::raw('MAX(at) as vlast'), DB::raw('COUNT(*) as visits'))
+            ->groupBy('user_id')->get()->keyBy('user_id');
+
+        // **آخر ظهورٍ موثوق من نبضة الجلسة** (`sessions_log.last_seen_at` تُحدَّث مع
+        // كل طلبٍ عبر SessionSentry) لا من `page_visits` وحدها — التي تُسجَّل
+        // للصفحات الكاملة فقط، فمستخدمٌ يعمل في الملفات والتفاصيل (htmx/تنزيل)
+        // كان يظهر فارغاً تماماً رغم نشاطه. النبضة تلتقط كلَّ طلبٍ فيبين حضورُه.
+        // «متّصلٌ الآن» = آخرُ ظهورٍ ضمن آخر ٥ دقائق — مكافئٌ للفحص الأصليّ `exists`.
+        $seenBy = DB::table('sessions_log')
+            ->select('user_id', DB::raw('MAX(last_seen_at) as last_seen'))
+            ->groupBy('user_id')->get()->keyBy('user_id');
+
+        $actionsBy = DB::table('audits')->where('created_at', '>=', $today)
+            ->select('user_id', DB::raw('COUNT(*) as c'))
+            ->groupBy('user_id')->pluck('c', 'user_id');
+
+        $onlineStr = (string) $onlineSince;
+        $users = User::whereNull('deleted_at')->orderBy('name')->get()->map(function ($u) use ($visitsBy, $seenBy, $actionsBy, $onlineStr) {
+            $v = $visitsBy[$u->id] ?? null;
+            $lastSeen = $seenBy[$u->id]->last_seen ?? null;
 
             return (object) [
                 'u'       => $u,
-                'first'   => (clone $v)->min('at'),
-                'last'    => $lastSeen ?: (clone $v)->max('at'),
-                'visits'  => (clone $v)->count(),
-                'actions' => DB::table('audits')->where('user_id', $u->id)
-                                 ->where('created_at', '>=', $today)->count(),
-                'online'  => (clone $sess)->where('last_seen_at', '>=', $onlineSince)->exists(),
+                'first'   => $v->first ?? null,
+                'last'    => $lastSeen ?: ($v->vlast ?? null),
+                'visits'  => (int) ($v->visits ?? 0),
+                'actions' => (int) ($actionsBy[$u->id] ?? 0),
+                'online'  => $lastSeen && (string) $lastSeen >= $onlineStr,
             ];
         })->sortByDesc(fn ($r) => (string) $r->last)->values();
 

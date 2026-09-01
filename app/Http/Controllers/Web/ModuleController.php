@@ -824,7 +824,9 @@ class ModuleController extends Controller
         }
 
         $name = \Illuminate\Support\Str::limit((string) ($m->{hub_display_col($module)} ?? $m->id), 60);
-        $approvers = hub_approvers();
+        // **نطاقٌ لكلّ معتمِد**: لا يُسنَد ولا يُشعَر باسمِ سجلٍّ خارج حدّه — المالكُ
+        // في المجموعة دوماً فلا تبقى الموافقةُ بلا مُسنَد. (تسريبُ اسمٍ عبر العزل.)
+        $approvers = hub_approvers_for($module, $m->id) ?: hub_approvers();
 
         $ap = \App\Models\Approval::create([
             'title'        => ($op === 'd' ? 'حذف ' : 'تعديل ') . $def['label'] . ': ' . $name,

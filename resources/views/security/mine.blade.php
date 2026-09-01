@@ -97,4 +97,47 @@
         </tbody>
     </table></div>
 </div>
+
+@if ((string) setting('auth.passkeys_on', '1') === '1')
+{{-- مفاتيح المرور (Passkeys): بصمة/وجه/مفتاح أمان — دخولٌ بلا كلمة سر ومقاومٌ للتصيّد --}}
+<div class="card">
+    <div class="crow" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <h3 style="margin:0">🔑 مفاتيح المرور (Passkeys)</h3>
+        <button class="btn p sm" type="button" id="pk-add">➕ إضافة مفتاح مرور</button>
+    </div>
+    <div class="sub" style="margin:4px 0 10px">دخولٌ بلا كلمة سر ببصمتك أو وجهك أو مفتاح أمانٍ ماديّ — مقاومٌ للتصيّد. المفتاحُ الخاصُّ لا يغادر جهازك أبداً.</div>
+    <div class="tblwrap"><table class="tbl">
+        <thead><tr><th>الوسم</th><th>آخر استخدام</th><th>أُضيف</th><th></th></tr></thead>
+        <tbody>
+        @forelse ($passkeys as $pk)
+            <tr>
+                <td><b>{{ $pk->label ?: 'مفتاح مرور' }}</b></td>
+                <td class="sub">{{ $pk->last_used_at?->diffForHumans() ?? 'لم يُستخدم بعد' }}</td>
+                <td class="sub">{{ $pk->created_at?->format('Y-m-d') }}</td>
+                <td><form method="POST" action="{{ route('passkey.destroy', $pk->id) }}" data-confirm="حذفُ مفتاح المرور «{{ $pk->label }}»؟">@csrf @method('DELETE')<button class="btn ghost xs bad">حذف</button></form></td>
+            </tr>
+        @empty
+            <tr><td colspan="4" class="empty">لا مفاتيحَ بعد — أضِف واحداً لتدخل بلا كلمة سر وتؤكّد هويتك بلمسة</td></tr>
+        @endforelse
+        </tbody>
+    </table></div>
+</div>
+@include('partials.passkey_js')
+<script>
+(function () {
+    var btn = document.getElementById('pk-add'); if (!btn) return;
+    if (!window.LynPasskey || !LynPasskey.supported) { btn.disabled = true; btn.textContent = 'المتصفّح لا يدعم مفاتيح المرور'; return; }
+    btn.addEventListener('click', async function () {
+        var label = prompt('اسمٌ لهذا المفتاح (مثل: هاتفي، حاسوب العمل):', 'مفتاحي');
+        if (label === null) return;
+        btn.disabled = true; btn.textContent = '… بانتظار جهازك';
+        try {
+            var res = await LynPasskey.register('{{ route('passkey.register.options') }}', '{{ route('passkey.register.verify') }}', label);
+            if (res.ok && res.data.ok) { location.reload(); }
+            else { alert('تعذّر التسجيل: ' + (res.data.error || 'خطأ')); btn.disabled = false; btn.textContent = '➕ إضافة مفتاح مرور'; }
+        } catch (e) { alert('أُلغيت العملية أو تعذّرت: ' + e.message); btn.disabled = false; btn.textContent = '➕ إضافة مفتاح مرور'; }
+    });
+})();
+</script>
+@endif
 @endsection

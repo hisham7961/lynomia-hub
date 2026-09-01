@@ -5962,6 +5962,10 @@ return [
                 ],
                 ['key' => 'title', 'col' => 'title', 'label' => 'عنوان العرض/المشروع', 'type' => 'text',
                  'hint' => 'مثل «تطوير متجر إلكتروني — الربع الثالث».'],
+                // نوعُ العرض التجاريّ — يوجّه القالبَ والملخّصَ (لا يفرض كلَّ الحقول)
+                ['key' => 'qtype', 'col' => 'qtype', 'label' => 'نوع العرض', 'type' => 'sel',
+                 'options' => ['بسيط', 'مشروع', 'خدمة مُدارة', 'احتفاظ', 'اشتراك', 'استشارة', 'مختلط'],
+                 'hint' => 'يصف طبيعةَ العرض التجاريّة — بسيطٌ (منتجات/خدمات) أو مشروعٌ بمراحل أو خدمةٌ دوريّة…'],
                 [
                     'key' => 'clientId',
                     'col' => 'client_id',
@@ -6097,6 +6101,40 @@ return [
                 'items',
                 'terms',
             ],
+        ],
+        // أوامرُ التغيير (CPQ ج): تغييرٌ تجاريٌّ يمدّد خطَّ أساس المشروع بعد اعتماده
+        'changeorders' => [
+            'key' => 'changeorders',
+            'table' => 'change_orders',
+            'model' => 'ChangeOrder',
+            'label' => 'أوامر التغيير',
+            'display' => 'doc_no',
+            'status' => 'status',
+            'columns' => ['no', 'projectId', 'valueDelta', 'timelineDays', 'status'],
+            'fields' => [
+                ['key' => 'no', 'col' => 'doc_no', 'label' => 'رقم الأمر', 'type' => 'text',
+                 'hint' => 'يُترك فارغاً فيولّده النظام (CO-{سنة}-{تسلسل}).'],
+                ['key' => 'title', 'col' => 'title', 'label' => 'عنوان التغيير', 'type' => 'text', 'required' => true],
+                ['key' => 'projectId', 'col' => 'project_id', 'label' => 'المشروع', 'type' => 'ref', 'ref' => 'projects', 'required' => true],
+                ['key' => 'clientId', 'col' => 'client_id', 'label' => 'العميل', 'type' => 'ref', 'ref' => 'clients'],
+                ['key' => 'quoteId', 'col' => 'quote_id', 'label' => 'العرض المصدر', 'type' => 'ref', 'ref' => 'quotes'],
+                ['key' => 'engagementId', 'col' => 'engagement_id', 'label' => 'الارتباط', 'type' => 'ref', 'ref' => 'engagements'],
+                ['key' => 'description', 'col' => 'description', 'label' => 'النطاق المُضاف', 'type' => 'ta'],
+                ['key' => 'reason', 'col' => 'reason', 'label' => 'سبب التغيير', 'type' => 'text'],
+                ['key' => 'valueDelta', 'col' => 'value_delta', 'label' => 'تغيّر القيمة التعاقدية (±)', 'type' => 'num',
+                 'hint' => 'موجبٌ للزيادة وسالبٌ للنقص. يُضاف لخطّ الأساس عند التطبيق.'],
+                // التكلفةُ الداخلية تُخفى عن العميل بقواعد الدور (كحقل cost في العروض)
+                ['key' => 'costDelta', 'col' => 'cost_delta', 'label' => 'أثر التكلفة (داخليّ)', 'type' => 'num',
+                 'hint' => 'داخليٌّ بحت — لا يظهر للعميل.'],
+                ['key' => 'timelineDays', 'col' => 'timeline_days', 'label' => 'أثر الجدول (أيام ±)', 'type' => 'num'],
+                ['key' => 'currency', 'col' => 'currency', 'label' => 'العملة', 'type' => 'sel',
+                 'options' => ['د.ك', 'دولار', 'ريال', 'درهم', 'يورو', 'KWD']],
+                ['key' => 'ownerId', 'col' => 'owner_id', 'label' => 'المسؤول', 'type' => 'ref', 'ref' => 'users'],
+                ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
+                ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
+                 'options' => ['مسودة', 'قيد الاعتماد', 'معتمد', 'مرفوض', 'مطبَّق', 'ملغى']],
+            ],
+            'search' => ['doc_no', 'title', 'reason'],
         ],
         'budgets' => [
             'key' => 'budgets',
@@ -7098,6 +7136,8 @@ return [
                         // الأمن: قاعدةُ تنبيهٍ مجدولةٌ على المستخدمين (خاملٌ طويلاً،
                         // بلا تحقّقٍ بخطوتين، موقوفٌ) — رصدٌ دوريّ لا يحتاج فتحَ المركز
                         'users',
+                        // أوامرُ التغيير: تنبيهٌ على المعلَّق «قيد الاعتماد» طويلاً
+                        'changeorders',
                     ],
                 ],
                 [
@@ -8426,6 +8466,11 @@ return [
             ['on' => 'status', 'to' => ['مقبول'], 'emit' => 'quote.accepted', 'label' => 'قُبل عرض سعر'],
             ['on' => 'status', 'to' => ['مرفوض'], 'emit' => 'quote.rejected', 'label' => 'رُفض عرض سعر'],
             ['on' => 'status', 'to' => ['محوّل'], 'emit' => 'quote.converted', 'label' => 'حُوّل عرضٌ إلى مشروع'],
+        ],
+        // أوامر التغيير (CPQ ج): اعتمادٌ ثم تطبيقٌ يمدّد خطَّ أساس المشروع
+        'changeorders' => [
+            ['on' => 'status', 'to' => ['معتمد'], 'emit' => 'changeorder.approved', 'label' => 'اعتُمد أمرُ تغيير'],
+            ['on' => 'status', 'to' => ['مطبَّق'], 'emit' => 'changeorder.applied', 'label' => 'طُبّق أمرُ تغيير على المشروع'],
         ],
         'engagements' => [
             ['on' => 'status', 'to' => ['نشط'], 'emit' => 'engagement.started', 'label' => 'بدأ ارتباطُ عميل'],

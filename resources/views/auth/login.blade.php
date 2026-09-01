@@ -21,6 +21,30 @@
         <input class="inp" type="password" name="password" required>
         <button class="btn p full" type="submit">دخول</button>
     </form>
+    @if ((string) setting('auth.passkeys_on', '1') === '1')
+        <div class="sub" style="margin:12px 0 6px">أو</div>
+        <button class="btn full" type="button" id="pk-login">🔑 الدخول بمفتاح المرور</button>
+        <div class="flash bad" id="pk-err" style="display:none;margin-top:8px"></div>
+    @endif
 </div>
+@if ((string) setting('auth.passkeys_on', '1') === '1')
+@include('partials.passkey_js')
+<script>
+(function () {
+    var btn = document.getElementById('pk-login'); if (!btn) return;
+    if (!window.LynPasskey || !LynPasskey.supported) { btn.style.display = 'none'; return; }
+    var err = document.getElementById('pk-err');
+    btn.addEventListener('click', async function () {
+        err.style.display = 'none'; btn.disabled = true; btn.textContent = '… بانتظار جهازك';
+        try {
+            var res = await LynPasskey.assert('{{ route('passkey.login.options') }}', '{{ route('passkey.login.verify') }}');
+            if (res.ok && res.data.ok) { location.href = res.data.redirect || '/'; return; }
+            err.textContent = res.data.error || 'تعذّر الدخول بمفتاح المرور'; err.style.display = 'block';
+        } catch (e) { err.textContent = 'أُلغيت العملية أو تعذّرت'; err.style.display = 'block'; }
+        btn.disabled = false; btn.textContent = '🔑 الدخول بمفتاح المرور';
+    });
+})();
+</script>
+@endif
 </body>
 </html>

@@ -31,6 +31,9 @@ class Quote extends Model
         'total' => 'decimal:3',
         'discount' => 'decimal:3',
         'cost' => 'decimal:3',
+        'mrr' => 'decimal:3',
+        'arr' => 'decimal:3',
+        'tcv' => 'decimal:3',
         'accepted_at' => 'datetime',
         'sent_at' => 'datetime',
         'custom' => 'array',
@@ -94,7 +97,9 @@ class Quote extends Model
      */
     public function recalc(): void
     {
-        $lines = $this->lines()->get();
+        // يُحسَب الإجماليُّ من البنود **المُلتزَمة** فقط (الأساسيّ + الاختياريّ
+        // المُدرَج) — فالاختياريُّ غير المُدرَج فرصةٌ عُلويّة لا يُلزِم العميل.
+        $lines = $this->lines()->get()->filter(fn ($l) => $l->countsToward());
         $net = 0.0; $total = 0.0; $cost = 0.0;
         foreach ($lines as $l) {
             $net = round($net + $l->netBeforeTax(), 3);
@@ -103,16 +108,150 @@ class Quote extends Model
                 $cost = round($cost + (float) ($l->qty ?: 0) * (float) $l->unit_cost, 3);
             }
         }
-        // خصمٌ على مستوى العرض (اختياريّ) يُطرح من الصافي والإجمالي
+        $tax = round($total - $net, 3);   // ضريبةُ البنود قبل الخصم
+
+        // خصمٌ على مستوى العرض (اختياريّ): يُنقص **الوعاءَ الخاضع للضريبة**، فتُعاد
+        // الضريبةُ نسبةً للأساس بعد الخصم — لا تبقى ضريبةَ ما قبل الخصم. كان الخصمُ
+        // يُطرح بالتساوي من الصافي والإجماليّ، فتُحسَب الضريبةُ على وعاءٍ أكبرَ مما
+        // يُدفَع، والمستندُ لا يطابق «صافٍ − خصم + ضريبة = إجماليّ». ولا صافيَ سالبٌ
+        // حين يفوق الخصمُ البنودَ (كلُّها اختياريّةٌ غيرُ مُدرَجةٍ مثلاً).
         $disc = (float) ($this->discount ?: 0);
         if ($disc > 0) {
-            $net = round($net - $disc, 3);
-            $total = round($total - $disc, 3);
+            $base = $net;
+            $net = round(max(0.0, $net - $disc), 3);
+            $tax = $base > 0 ? round($tax * ($net / $base), 3) : 0.0;
         }
-        $tax = round($total - $net, 3);
+        $total = round($net + $tax, 3);
+
+        // **الملخّصُ التجاريّ** (CPQ): تصنيفُ الإيراد بجانب الإجماليّ لا بدلاً منه.
+        // MRR من البنود الدوريّة (السنويّ ÷ ١٢)، ARR = MRR×١٢، وTCV = الإجماليُّ
+        // لمرّةٍ واحدة + الإيرادُ السنويّ المتكرّر. الاستخدامُ والتكلفةُ الممرَّرة
+        // لا يُدخَلان في MRR (لا يُتنبّأ بهما شهرياً).
+        $mrr = 0.0; $oneTime = 0.0;
+        foreach ($lines as $l) {
+            $lineNet = $l->netBeforeTax();
+            $rt = (string) ($l->rev_type ?: 'one_time');
+            if ($rt === 'recurring') {
+                $monthly = hub_ar_norm((string) $l->rev_period) === hub_ar_norm('سنوي')
+                    ? round($lineNet / 12, 3) : $lineNet;
+                $mrr = round($mrr + $monthly, 3);
+            } elseif ($rt === 'one_time' || $rt === 'pass_through') {
+                $oneTime = round($oneTime + $lineNet, 3);
+            }
+        }
+        $arr = round($mrr * 12, 3);
+        $tcv = round($oneTime + $arr, 3);
+
         $this->forceFill([
             'amount' => $net, 'tax' => $tax, 'total' => $total, 'cost' => $cost,
+            'mrr' => $mrr, 'arr' => $arr, 'tcv' => $tcv,
         ])->saveQuietly();
+    }
+
+    /**
+     * الملخّصُ التجاريّ الداخليّ: إيرادٌ لمرّة، شهريّ (MRR)، سنويّ (ARR)، قيمةُ
+     * العقد الكلّية (TCV)، والتكلفةُ والهامشُ — **داخليٌّ بحتٌ لا يُعرَض للعميل**.
+     */
+    public function commercialSummary(): array
+    {
+        return [
+            // خُزِّن TCV = إيرادُ المرّة + ARR، فإيرادُ المرّة = TCV − ARR (لا total
+            // الذي يضمّ القيمَ الاسميّة للبنود الدوريّة فيُفسِد الطرح)
+            'one_time' => round((float) $this->tcv - (float) $this->arr, 3),
+            'mrr' => (float) $this->mrr,
+            'arr' => (float) $this->arr,
+            'tcv' => (float) $this->tcv,
+            'cost' => (float) $this->cost,
+            'margin' => $this->margin(),
+            'upside' => $this->optionalUpside(),
+        ];
+    }
+
+    /**
+     * **الفرصةُ العُلويّة**: مجموعُ صافي البنود الاختيارية/البديلة/الإضافية غير
+     * المُدرَجة في الخطّ المُلتزَم — ما قد يُضيفه العميلُ لو قَبِل الاختياريّ.
+     */
+    public function optionalUpside(): float
+    {
+        return round((float) $this->lines()->get()
+            ->reject(fn ($l) => $l->countsToward())
+            ->sum(fn ($l) => $l->netBeforeTax()), 3);
+    }
+
+    /**
+     * **أقسامُ العرض القابلة للإظهار/الإخفاء** (CPQ — أقسامٌ ديناميكية): عنوانُ كلٍّ
+     * بمفتاحه. الغلافُ والتسعيرُ والقبولُ ثابتةٌ لا تُخفى — أما السرديّةُ والجداولُ
+     * فاختياريّةُ العرض. الافتراض: كلُّها ظاهرة (سلوكٌ قائمٌ لا يتغيّر).
+     */
+    public const PROPOSAL_SECTIONS = [
+        'exec_summary' => 'الملخّص التنفيذي',
+        'objective'    => 'هدف المشروع',
+        'scope'        => 'نطاق العمل',
+        'phases'       => 'المراحل والتسليمات',
+        'optional'     => 'البنود الاختيارية',
+        'payments'     => 'جدول المدفوعات',
+        'assumptions'  => 'الافتراضات',
+        'exclusions'   => 'خارج النطاق',
+        'terms'        => 'الشروط والأحكام',
+    ];
+
+    /** مفاتيحُ الأقسام المخفيّة في هذا العرض (من meta) — الافتراضُ لا شيء */
+    public function hiddenSections(): array
+    {
+        $h = (array) (($this->meta['proposal_hidden'] ?? []));
+
+        return array_values(array_intersect($h, array_keys(self::PROPOSAL_SECTIONS)));
+    }
+
+    /** هل يُعرَض هذا القسمُ في مستند العميل؟ (غيرُ المخفيِّ يُعرَض) */
+    public function showsSection(string $key): bool
+    {
+        return ! in_array($key, $this->hiddenSections(), true);
+    }
+
+    /**
+     * فحصُ الجودة التجاريّ قبل الإرسال — تحذيراتٌ لا حجبٌ صامت: عميلٌ وعملة
+     * وبنودٌ وجدولُ دفعٍ يجمع ١٠٠٪ (حين تُستعمل النِّسب) وبنودٌ مسعَّرة. يُرجع
+     * قائمةَ مشكلاتٍ مفسَّرة (فارغةٌ = سليم).
+     */
+    public function qualityCheck(): array
+    {
+        $issues = [];
+        if (! $this->client_id) $issues[] = 'لا عميلَ محدَّدٌ للعرض.';
+        if (! $this->currency) $issues[] = 'العملةُ غير محدَّدة.';
+
+        $lines = $this->lines()->get();
+        if ($lines->isEmpty()) $issues[] = 'العرضُ بلا بنود.';
+        foreach ($lines as $l) {
+            $optional = ($l->line_mode ?: 'required') !== 'required';
+            if (! $optional && (float) $l->unit_price <= 0) {
+                $issues[] = 'بندٌ بلا سعر: «' . $l->title . '».';
+            }
+        }
+
+        // كلُّ مجموعةِ بدائل يجب أن يكون فيها بديلٌ واحدٌ مُدرَجٌ لا أكثر
+        foreach ($lines->where('line_mode', 'alternative')->groupBy('opt_group') as $grp => $alts) {
+            $on = $alts->where('included', true)->count();
+            if ($grp && $on !== 1) {
+                $issues[] = 'مجموعةُ البدائل «' . $grp . '» فيها ' . $on . ' بديلاً مُدرَجاً (المطلوب واحد).';
+            }
+        }
+
+        // جدولُ الدفع بالنِّسب يجب أن يجمع ١٠٠٪ (± ٠٫١)
+        $ms = $this->milestones()->get();
+        $pctSum = round($ms->sum(fn ($m) => (float) $m->pct), 3);
+        if ($ms->isNotEmpty() && $pctSum > 0 && abs($pctSum - 100) > 0.1) {
+            $issues[] = 'جدولُ الدفع بالنِّسب يجمع ' . rtrim(rtrim(number_format($pctSum, 2), '0'), '.') . '٪ لا ١٠٠٪.';
+        }
+
+        // هامشٌ دون الحدّ (إن ضُبط) — تحذيرٌ ظاهر (والحجبُ للاعتماد في send)
+        $floor = (float) setting('quotes.margin_floor', 0);
+        $m = $this->margin();
+        if ($floor > 0 && $m !== null && $m < $floor) {
+            $issues[] = 'الهامشُ ' . $m . '٪ دون الحدّ (' . $floor . '٪) — يتطلّب اعتماداً عند الإرسال.';
+        }
+
+        return $issues;
     }
 
     /** الهامش المتوقّع % (داخليّ) — لا يظهر للعميل */

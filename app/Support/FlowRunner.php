@@ -160,8 +160,10 @@ class FlowRunner
 
         switch ($a['type'] ?? '') {
             case 'notify':
+                // «owners» = المعتمِدون الذين يرون هذا السجل (نطاقٌ لكلّ مستلم) —
+                // فلا يُسرَّب اسمُ السجل عبر حدّ العزل من مسار عمل.
                 $targets = ($a['to'] ?? 'owners') === 'owners'
-                    ? hub_approvers()
+                    ? hub_approvers_for($module, $m->id)
                     : [(string) $a['to']];
                 foreach (array_unique($targets) as $uid) {
                     if (! $uid) continue;

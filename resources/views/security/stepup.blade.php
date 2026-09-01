@@ -27,5 +27,29 @@
         <button class="btn p" style="margin-top:10px">تأكيد ومتابعة</button>
         <a class="btn ghost" href="{{ $next }}" style="margin-top:10px">إلغاء</a>
     </form>
+    @if (! empty($hasPasskeys))
+        <div class="sub" style="margin:12px 0 6px">أو</div>
+        <button class="btn full" type="button" id="pk-stepup">🔑 أكّد بمفتاح المرور</button>
+        <div class="flash bad" id="pk-err" style="display:none;margin-top:8px"></div>
+    @endif
 </div>
+@if (! empty($hasPasskeys))
+@include('partials.passkey_js')
+<script>
+(function () {
+    var btn = document.getElementById('pk-stepup'); if (!btn) return;
+    if (!window.LynPasskey || !LynPasskey.supported) { btn.style.display = 'none'; return; }
+    var err = document.getElementById('pk-err');
+    btn.addEventListener('click', async function () {
+        err.style.display = 'none'; btn.disabled = true; btn.textContent = '… بانتظار جهازك';
+        try {
+            var res = await LynPasskey.assert('{{ route('passkey.stepup.options') }}', '{{ route('passkey.stepup.verify') }}');
+            if (res.ok && res.data.ok) { location.href = @json($next); return; }
+            err.textContent = res.data.error || 'تعذّر التأكيد'; err.style.display = 'block';
+        } catch (e) { err.textContent = 'أُلغيت العملية أو تعذّرت'; err.style.display = 'block'; }
+        btn.disabled = false; btn.textContent = '🔑 أكّد بمفتاح المرور';
+    });
+})();
+</script>
+@endif
 @endsection

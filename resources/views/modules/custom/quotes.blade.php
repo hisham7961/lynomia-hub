@@ -6,7 +6,29 @@
     $canEdit = hub_can(auth()->user(), 'quotes', 'e') && ! $qLocked;
     // الربحيةُ الداخلية تظهر فقط لمن لا يُخفى عنه حقلُ التكلفة (قواعد الدور)
     $showInternal = hub_field_mode(auth()->user(), 'quotes', 'cost') !== 'hide';
+    // كتالوجُ الخدمات المنطَّق — لملء البند من مصدرٍ واحد (CPQ)
+    $qServices = \Illuminate\Support\Facades\Schema::hasTable('services')
+        ? hub_scope(\App\Models\Service::query(), 'services')->orderBy('name')->limit(400)->get(['id', 'name'])
+        : collect();
+    $modeLabels = ['required' => 'أساسيّ', 'optional' => 'اختياريّ', 'alternative' => 'بديل', 'addon' => 'إضافة'];
+    $qMeta = (array) $row->meta;
 @endphp
+
+{{-- عرض ٣٦٠: سلسلةُ الأثر التجاريّ — من العميل حتى المشروع والفاتورة بنقرة --}}
+@if ($row->client_id || array_intersect_key($qMeta, array_flip(['contract_id','engagement_id','project_id','invoice_id'])))
+    <div class="card">
+        <h3 class="cardtitle">🧭 سلسلةُ الأثر التجاريّ</h3>
+        <div class="crow" style="flex-wrap:wrap;gap:6px">
+            @if ($row->client_id)<a class="chip" href="{{ route('m.show', ['clients', $row->client_id]) }}">👤 العميل</a><span class="sub">›</span>@endif
+            <span class="chip">🧾 {{ $row->doc_no }}</span>
+            @if (! empty($qMeta['contract_id']))<span class="sub">›</span><a class="chip" href="{{ route('m.show', ['contracts', $qMeta['contract_id']]) }}">📜 العقد</a>@endif
+            @if (! empty($qMeta['engagement_id']))<span class="sub">›</span><a class="chip" href="{{ route('m.show', ['engagements', $qMeta['engagement_id']]) }}">🤝 الارتباط</a>@endif
+            @if (! empty($qMeta['project_id']))<span class="sub">›</span><a class="chip" href="{{ route('m.show', ['projects', $qMeta['project_id']]) }}">🗂️ المشروع</a>@endif
+            @if (! empty($qMeta['invoice_id']))<span class="sub">›</span><a class="chip" href="{{ route('m.show', ['fin', $qMeta['invoice_id']]) }}">🧾 الفاتورة</a>@endif
+        </div>
+        <div class="sub" style="margin-top:6px">مصادرُ الحقيقة موصولة — العرضُ يشير لها لا ينسخها.</div>
+    </div>
+@endif
 
 <div class="card">
     <h3 class="cardtitle">🧾 بنود العرض
@@ -15,27 +37,36 @@
     </h3>
     @if ($qLines->isNotEmpty())
         <div class="tblwrap"><table>
-            <thead><tr><th>النوع</th><th>البند</th><th>المرحلة</th><th>كمية</th><th>سعر الوحدة</th><th>خصم%</th><th>ضريبة%</th><th>الإجمالي</th>@if ($canEdit)<th></th>@endif</tr></thead>
+            <thead><tr><th>النمط</th><th>النوع</th><th>البند</th><th>المرحلة</th><th>كمية</th><th>سعر الوحدة</th><th>الإجمالي</th>@if ($canEdit)<th></th>@endif</tr></thead>
             <tbody>
             @foreach ($qLines as $l)
-                <tr>
+                @php $lm = $l->line_mode ?: 'required'; $committed = $l->countsToward(); @endphp
+                <tr @if (! $committed) style="opacity:.62" @endif>
+                    <td>
+                        <span class="bdg {{ $lm === 'required' ? '' : 'wn' }}">{{ $modeLabels[$lm] ?? $lm }}</span>
+                        @if ($lm === 'alternative' && $l->opt_group)<div class="sub" style="font-size:11px">{{ $l->opt_group }}</div>@endif
+                    </td>
                     <td class="sub">{{ $l->kind ?: '—' }}</td>
                     <td>{{ $l->title }}@if ($l->description)<div class="sub">{{ \Illuminate\Support\Str::limit($l->description, 60) }}</div>@endif</td>
                     <td class="sub">{{ $l->phase ?: '—' }}</td>
                     <td class="mono">{{ rtrim(rtrim(number_format((float) $l->qty, 3), '0'), '.') }}</td>
                     <td class="mono">{{ number_format((float) $l->unit_price, 3) }}</td>
-                    <td class="mono">{{ (float) $l->discount_pct ?: '—' }}</td>
-                    <td class="mono">{{ (float) $l->tax_pct ?: '—' }}</td>
-                    <td class="mono"><b>{{ number_format((float) $l->line_total, 3) }}</b></td>
+                    <td class="mono"><b>{{ number_format((float) $l->line_total, 3) }}</b>@if (! $committed)<div class="sub" style="font-size:11px">غير مُدرَج</div>@endif</td>
                     @if ($canEdit)
-                        <td><form method="POST" action="{{ route('quotes.line.destroy', [$row->id, $l->id]) }}" class="inline">@csrf @method('DELETE')<button class="btn ghost xs bad" data-confirm="حذف البند؟">حذف</button></form></td>
+                        <td class="crow" style="gap:4px">
+                            @if ($lm !== 'required')
+                                <form method="POST" action="{{ route('quotes.line.toggle', [$row->id, $l->id]) }}" class="inline">@csrf<button class="btn ghost xs">{{ $committed ? 'إخراج' : 'إدراج' }}</button></form>
+                            @endif
+                            <form method="POST" action="{{ route('quotes.line.destroy', [$row->id, $l->id]) }}" class="inline">@csrf @method('DELETE')<button class="btn ghost xs bad" data-confirm="حذف البند؟">حذف</button></form>
+                        </td>
                     @endif
                 </tr>
             @endforeach
             </tbody>
         </table></div>
         <div class="crow" style="margin-top:8px">
-            <span class="chip">الصافي: <b class="mono">{{ number_format((float) $row->amount, 3) }}</b></span>
+            @if ((float) $row->discount > 0)<span class="chip">الصافي قبل الخصم: <b class="mono">{{ number_format((float) $row->amount + (float) $row->discount, 3) }}</b></span><span class="chip">الخصم: <b class="mono">−{{ number_format((float) $row->discount, 3) }}</b></span>@endif
+            <span class="chip">الصافي{{ (float) $row->discount > 0 ? ' الخاضع' : '' }}: <b class="mono">{{ number_format((float) $row->amount, 3) }}</b></span>
             <span class="chip">الضريبة: <b class="mono">{{ number_format((float) $row->tax, 3) }}</b></span>
             <span class="chip">الإجمالي: <b class="mono">{{ number_format((float) $row->total, 3) }} {{ $row->currency }}</b></span>
         </div>
@@ -47,31 +78,69 @@
         <form method="POST" action="{{ route('quotes.line.store', $row->id) }}" style="margin-top:12px">
             @csrf
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">
-                <input class="inp" name="title" placeholder="وصف البند *" required>
+                @if ($qServices->isNotEmpty())
+                    <select class="inp" name="service_id" title="من كتالوج الخدمات — يملأ الفراغ">
+                        <option value="">من الكتالوج…</option>
+                        @foreach ($qServices as $svc)<option value="{{ $svc->id }}">{{ $svc->name }}</option>@endforeach
+                    </select>
+                @endif
+                <input class="inp" name="title" placeholder="وصف البند (أو من الكتالوج)">
                 <select class="inp" name="kind"><option value="">النوع…</option>@foreach (['خدمة','مرحلة','تسليم','رسوم ثابتة','بالساعة','اشتراك','بنية تحتية','رسوم إعداد','صيانة','تكلفة طرف ثالث','مخصص'] as $k)<option>{{ $k }}</option>@endforeach</select>
+                <select class="inp" name="line_mode" title="نمط البند">
+                    <option value="required">أساسيّ</option>
+                    <option value="optional">اختياريّ</option>
+                    <option value="alternative">بديل</option>
+                    <option value="addon">إضافة</option>
+                </select>
+                <input class="inp" name="opt_group" placeholder="مجموعة البدائل (للبديل)">
                 <input class="inp" name="phase" placeholder="المرحلة (اختياري)">
                 <input class="inp mono" name="qty" type="number" step="0.001" value="1" placeholder="الكمية">
                 <input class="inp mono" name="unit_price" type="number" step="0.001" placeholder="سعر الوحدة">
                 <input class="inp mono" name="discount_pct" type="number" step="0.01" placeholder="خصم %">
                 <input class="inp mono" name="tax_pct" type="number" step="0.01" placeholder="ضريبة %">
                 @if ($showInternal)<input class="inp mono" name="unit_cost" type="number" step="0.001" placeholder="تكلفة (داخليّ)">@endif
+                <select class="inp" name="rev_type" title="تصنيف الإيراد">
+                    <option value="one_time">إيرادٌ لمرّة</option>
+                    <option value="recurring">إيرادٌ دوريّ</option>
+                    <option value="usage">حسب الاستخدام</option>
+                    <option value="pass_through">تكلفةٌ ممرَّرة</option>
+                </select>
+                <select class="inp" name="rev_period" title="دوريّة المتكرّر"><option value="">— الدوريّة —</option><option>شهري</option><option>سنوي</option></select>
             </div>
+            <div class="sub" style="margin-top:4px">النمط «اختياريّ/بديل/إضافة» لا يدخل الإجماليَّ حتى تُدرِجه — والبديلُ واحدٌ من مجموعته.</div>
             <button class="btn p sm" style="margin-top:8px">➕ أضف بنداً</button>
         </form>
     @endif
 </div>
 
 @if ($showInternal)
+    @php $cs = $row->commercialSummary(); $floor = (float) setting('quotes.margin_floor', 0); @endphp
     <div class="card">
-        <h3 class="cardtitle">💰 الربحية الداخلية <span class="bdg wn">لا يظهر للعميل</span></h3>
-        @php $margin = $row->margin(); @endphp
+        <h3 class="cardtitle">💰 الملخّص التجاريّ والربحية الداخلية <span class="bdg wn">لا يظهر للعميل</span></h3>
         <div style="display:flex;gap:18px;flex-wrap:wrap">
-            <div><div class="sub">إيراد العرض</div><b class="mono">{{ number_format((float) $row->total, 3) }} {{ $row->currency }}</b></div>
-            <div><div class="sub">التكلفة التقديرية</div><b class="mono">{{ number_format((float) $row->cost, 3) }}</b></div>
-            <div><div class="sub">الربح المتوقّع</div><b class="mono">{{ number_format((float) $row->total - (float) $row->cost, 3) }}</b></div>
-            <div><div class="sub">الهامش المتوقّع</div>
-                @if ($margin !== null)<b class="mono {{ $margin < 20 ? 'txt-bad' : '' }}">{{ $margin }}%</b>@else<span class="sub">—</span>@endif</div>
+            <div><div class="sub">إيرادٌ لمرّة</div><b class="mono">{{ number_format($cs['one_time'], 3) }} {{ $row->currency }}</b></div>
+            <div><div class="sub">شهريّ MRR</div><b class="mono">{{ number_format($cs['mrr'], 3) }}</b></div>
+            <div><div class="sub">سنويّ ARR</div><b class="mono">{{ number_format($cs['arr'], 3) }}</b></div>
+            <div><div class="sub">قيمة العقد TCV</div><b class="mono">{{ number_format($cs['tcv'], 3) }}</b></div>
+            @if (($cs['upside'] ?? 0) > 0)<div><div class="sub">فرصةٌ عُلويّة (اختياريّ)</div><b class="mono">{{ number_format($cs['upside'], 3) }}</b></div>@endif
+            <div><div class="sub">التكلفة</div><b class="mono">{{ number_format($cs['cost'], 3) }}</b></div>
+            <div><div class="sub">الربح</div><b class="mono">{{ number_format((float) $row->total - $cs['cost'], 3) }}</b></div>
+            <div><div class="sub">الهامش</div>
+                @if ($cs['margin'] !== null)<b class="mono {{ ($floor > 0 ? $cs['margin'] < $floor : $cs['margin'] < 20) ? 'txt-bad' : '' }}">{{ $cs['margin'] }}%</b>@else<span class="sub">—</span>@endif
+                @if ($floor > 0)<span class="sub"> (الحدّ {{ $floor }}%)</span>@endif
+            </div>
         </div>
+    </div>
+@endif
+
+@php $qc = $row->qualityCheck(); @endphp
+@if ($canEdit && ! empty($qc))
+    <div class="card" style="border-color:var(--wn)">
+        <h3 class="cardtitle">🧪 فحص الجودة التجاريّ <span class="bdg wn">{{ count($qc) }} تنبيه</span></h3>
+        <div class="sub" style="margin-bottom:6px">راجِعها قبل الإرسال — بعضُها قد يستوجب اعتماداً.</div>
+        <ul style="margin:0;padding-inline-start:20px">
+            @foreach ($qc as $issue)<li style="margin-bottom:4px">{{ $issue }}</li>@endforeach
+        </ul>
     </div>
 @endif
 
@@ -109,3 +178,47 @@
         </form>
     @endif
 </div>
+
+@if ($canEdit)
+    {{-- أقسامُ العرض الديناميكية: أيّ الأقسامِ السرديّة تظهر في مستند العميل --}}
+    @php $qHidden = $row->hiddenSections(); @endphp
+    <div class="card">
+        <h3 class="cardtitle">🧩 أقسامُ مستند العميل</h3>
+        <div class="sub" style="margin-bottom:8px">اختَر ما يظهر في العرض المطبوع — التسعيرُ والغلافُ والقبولُ ثابتةٌ دائماً.</div>
+        <form method="POST" action="{{ route('quotes.act', $row->id) }}">@csrf
+            <input type="hidden" name="do" value="sections">
+            <div class="crow" style="flex-wrap:wrap;gap:10px">
+                @foreach (\App\Models\Quote::PROPOSAL_SECTIONS as $key => $label)
+                    <label class="chip"><input type="checkbox" name="show[]" value="{{ $key }}" @checked(! in_array($key, $qHidden, true))> {{ $label }}</label>
+                @endforeach
+            </div>
+            <button class="btn ghost sm" style="margin-top:10px">حفظ الأقسام</button>
+        </form>
+    </div>
+
+    {{-- مكتبةُ الشروط: إدراجُ شروطِ عرضٍ قالبٍ جاهز بلا إعادة كتابة --}}
+    @php
+        $qTermTpls = hub_scope(\App\Models\Quote::query(), 'quotes')->where('is_template', true)
+            ->whereNotNull('terms')->where('terms', '!=', '')->orderBy('title')->limit(50)->get(['id', 'doc_no', 'title']);
+    @endphp
+    @if ($qTermTpls->isNotEmpty())
+        <div class="card">
+            <h3 class="cardtitle">📚 مكتبةُ الشروط</h3>
+            <div class="sub" style="margin-bottom:8px">أدرِج شروطاً جاهزةً من عرضٍ قالب — تُلحَق بشروطِك أو تستبدلها.</div>
+            <form method="POST" action="{{ route('quotes.act', $row->id) }}" class="crow" style="flex-wrap:wrap;gap:8px">@csrf
+                <input type="hidden" name="do" value="terms">
+                <select class="inp" name="from" required>
+                    <option value="">— اختَر قالباً —</option>
+                    @foreach ($qTermTpls as $t)
+                        <option value="{{ $t->id }}">{{ $t->title ?: $t->doc_no }}</option>
+                    @endforeach
+                </select>
+                <select class="inp" name="mode">
+                    <option value="append">إلحاق</option>
+                    <option value="replace">استبدال</option>
+                </select>
+                <button class="btn ghost sm">إدراج الشروط</button>
+            </form>
+        </div>
+    @endif
+@endif
