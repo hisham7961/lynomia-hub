@@ -26,7 +26,8 @@ class IntelligenceReportComplianceTest extends TestCase
         Attendance::create(['emp_id' => $emp->id, 'date' => now()->toDateString(),
             'time_in' => '09:00', 'status' => 'حاضر']);
 
-        $skey = 'report.missing:' . now()->toDateString();
+        // المفتاحُ صار لكلِّ مستخدمٍ على حِدة (تصرّفٌ مستقلٌّ لكلِّ مدير HR)
+        $skey = 'report.missing:' . now()->toDateString() . ':u' . $this->owner->id;
         $keys = collect(hub_recommendations(true)['items'])->pluck('key')->filter()->all();
         $this->assertContains($skey, $keys, 'التقريرُ الناقصُ لم يُرصَد');
 
@@ -46,6 +47,6 @@ class IntelligenceReportComplianceTest extends TestCase
         $this->actingAs($this->owner);
         // لا حضورَ اليوم إطلاقاً → لا تقريرَ ناقص (الغيابُ شأنٌ آخر)
         $keys = collect(hub_recommendations(true)['items'])->pluck('key')->filter()->all();
-        $this->assertNotContains('report.missing:' . now()->toDateString(), $keys);
+        $this->assertNotContains('report.missing:' . now()->toDateString() . ':u' . $this->owner->id, $keys);
     }
 }
