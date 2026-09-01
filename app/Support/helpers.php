@@ -1502,7 +1502,12 @@ if (! function_exists('hub_org_analytics_guard')) {
      */
     function hub_org_analytics_guard(): void
     {
+        // لوحاتُ المنشأة كلّها (تكلفةٌ، قدراتٌ، صحّةُ مشاريعَ…) غيرُ منطَّقةٍ بعميل —
+        // فتُمنَع عن **كلّ حسابٍ معزول**: على شركاتٍ محددة **أو على عملاءَ محددين**.
+        // كان عزلُ العميل ثغرةً: حاملُ راية المراقبة المحصورُ بعميلٍ كان يرى أرقامَ
+        // المنشأة كلّها. (نظيرُ سدِّ تسريب الخبيئة في `hub_recommendations`.)
         abort_if(hub_company_ids() !== null, 403, 'هذه اللوحة على مستوى المنشأة كلها — غير متاحة لحسابٍ معزول على شركات محددة');
+        abort_if(hub_client_ids() !== null, 403, 'هذه اللوحة على مستوى المنشأة كلها — غير متاحة لحسابٍ معزول على عملاء محددين');
     }
 }
 
@@ -3325,9 +3330,13 @@ if (! function_exists('hub_recommendations')) {
         // المفتاح كان سلسلةً مسطّحة «recs»: بلا مستخدمٍ ولا دورٍ ولا مشروع —
         // فوق استعلاماتٍ مُنطَّقة بـhub_scope. أي أن أول من يفتح اللوحة يُخبّئ
         // نتائجه لكل من بعده خمس دقائق. يحمل المفتاح الثلاثة الآن.
+        // المفتاحُ يفرّق **كلَّ أنماط العزل الثلاثة**: مشروعٌ وشركةٌ **وعميل**. كان
+        // عزلُ العميل غائباً — فمستخدمان محصوران بعميلين مختلفين يتقاسمان دورَهما
+        // كانا يتقاسمان مفتاحَ الدور (`r:`) فتُخبَّأ إشاراتُ عميلٍ وتُقدَّم لمستخدمِ
+        // آخر: تسريبُ عزلٍ عبر الخبيئة. من له أيُّ حصرٍ يأخذ مفتاحاً خاصّاً به.
         $u = auth()->user();
-        $key = 'recs:' . (hub_scoped($u) || hub_company_ids($u) !== null
-            ? 'u:' . ($u?->id ?? '0') : 'r:' . ($u?->role_id ?? '0')) . hub_lens_key($projectId);
+        $scopedKey = hub_scoped($u) || hub_company_ids($u) !== null || hub_client_ids($u) !== null;
+        $key = 'recs:' . ($scopedKey ? 'u:' . ($u?->id ?? '0') : 'r:' . ($u?->role_id ?? '0')) . hub_lens_key($projectId);
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
         return \Illuminate\Support\Facades\Cache::remember($key, 300, function () use ($projectId) {
@@ -3444,7 +3453,8 @@ if (! function_exists('hub_recommendations')) {
                         ->where('status', 'مقبول')->whereNotNull('accepted_at')
                         ->where('accepted_at', '<', now()->subDays(2))
                         ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
-                        ->orderByDesc('accepted_at')->limit(8)->get(['id', 'doc_no', 'title', 'accepted_at', 'meta']);
+                        // فاصلٌ حتميّ: عروضٌ قُبلت في الثانية نفسها لا تُقترَع بين المحرّكين
+                        ->orderByDesc('accepted_at')->orderByDesc('id')->limit(8)->get(['id', 'doc_no', 'title', 'accepted_at', 'meta']);
                     foreach ($stuck as $q) {
                         $meta = (array) (is_array($q->meta) ? $q->meta : (json_decode((string) $q->meta, true) ?: []));
                         // حُوِّل فعلاً (مشروعٌ أو ارتباط) → لا إشارة (حلٌّ تلقائيّ عند التحويل)

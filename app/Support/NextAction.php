@@ -75,11 +75,15 @@ class NextAction
         $show = route('m.show', ['contracts', $c->id]);
         $out = [];
         $end = $c->date_end ?? $c->end ?? null;
-        if ($end) {
+        $active = ! in_array((string) $c->status, ['منتهٍ', 'ملغى', 'مجدَّد', 'مسودة'], true);
+        if ($end && $active) {
             try {
+                // موجَبٌ = أيامٌ تبقّت للانتهاء؛ سالبٌ = مرّ الانتهاءُ (متأخرٌ عن التجديد)
                 $days = (int) \Illuminate\Support\Carbon::parse($end)->startOfDay()->diffInDays(now()->startOfDay(), false) * -1;
-                if ($days <= 30) {
-                    $out[] = self::step('ابدأ التجديد', 'العقدُ ينتهي خلال ' . max($days, 0) . ' يوماً — ابدأ التجديدَ الآن.', $show, true);
+                if ($days >= 0 && $days <= 30) {
+                    $out[] = self::step('ابدأ التجديد', 'العقدُ ينتهي خلال ' . $days . ' يوماً — ابدأ التجديدَ الآن.', $show, true);
+                } elseif ($days < 0) {
+                    $out[] = self::step('عالِج التجديدَ المتأخر', 'انتهى العقدُ منذ ' . abs($days) . ' يوماً — جدّده أو أغلِقه.', $show, true);
                 }
             } catch (\Throwable $e) {}
         }

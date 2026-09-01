@@ -112,6 +112,43 @@ class IntelligenceActionCenterTest extends TestCase
         $this->assertSame(1, SignalState::where('skey', $skey)->count());
     }
 
+    public function test_critical_signal_cannot_be_permanently_dismissed_only_snoozed(): void
+    {
+        $this->seedCore();
+        $this->actingAs($this->owner);
+        // عرضٌ قُبل منذ ١٠ أيام → إشارةٌ حرجة (days>7)
+        $q = Quote::create(['title' => 'حرجٌ عالق', 'total' => 1000, 'currency' => 'د.ك',
+            'status' => 'مقبول', 'accepted_at' => now()->subDays(10)]);
+        $skey = 'quote.unconverted:' . $q->id;
+        $sig = collect(ActionCenter::feed(true)['signals'])->firstWhere('key', $skey);
+        $this->assertSame('حرج', $sig['sev']);
+        $this->assertFalse($sig['can_dismiss'], 'الحرجُ لا يُعرَض له زرُّ إخفاء');
+
+        // الرفضُ الدائمُ مرفوضٌ خادمياً — لا يُسكَت خطرٌ حرج
+        $this->assertFalse(ActionCenter::disposition($skey, 'dismiss'));
+        $this->assertSame(0, SignalState::where('skey', $skey)->where('state', 'dismissed')->count());
+
+        // لكنّ التأجيلَ المؤقّتَ مسموح
+        $this->assertTrue(ActionCenter::disposition($skey, 'snooze', now()->addDay()->toDateString()));
+    }
+
+    public function test_hidden_signals_are_listed_and_reopenable(): void
+    {
+        $this->seedCore();
+        $this->actingAs($this->owner);
+        $q = $this->acceptedQuote();   // مهم (٤ أيام) → يقبل الإخفاء
+        $skey = 'quote.unconverted:' . $q->id;
+
+        ActionCenter::disposition($skey, 'dismiss');
+        $feed = ActionCenter::feed(true);
+        $this->assertNotContains($skey, collect($feed['signals'])->pluck('key')->all());
+        $this->assertContains($skey, collect($feed['hidden'])->pluck('key')->all(), 'المرفوضةُ تظهر في «المخفيّة» لإعادةِ فتحها');
+
+        // إعادةُ الفتح تُعيدها مرئيّة
+        ActionCenter::disposition($skey, 'reopen');
+        $this->assertContains($skey, collect(ActionCenter::feed(true)['signals'])->pluck('key')->all());
+    }
+
     public function test_disposition_rejects_a_key_not_in_the_users_feed(): void
     {
         $this->seedCore();

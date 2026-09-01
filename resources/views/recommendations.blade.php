@@ -59,10 +59,12 @@
                     <input type="hidden" name="until" value="{{ now()->addDays(7)->toDateString() }}">
                     <button class="btn ghost sm">💤 أسبوعاً</button>
                 </form>
-                <form method="POST" action="{{ route('recs.act') }}" class="inline">@csrf
-                    <input type="hidden" name="skey" value="{{ $it['key'] }}"><input type="hidden" name="do" value="dismiss">
-                    <button class="btn ghost sm" data-confirm="إخفاءُ هذه الإشارة؟ تعود إن تكرّر شرطُها.">🚫 أخفِ</button>
-                </form>
+                @if ($it['can_dismiss'] ?? false)
+                    <form method="POST" action="{{ route('recs.act') }}" class="inline">@csrf
+                        <input type="hidden" name="skey" value="{{ $it['key'] }}"><input type="hidden" name="do" value="dismiss">
+                        <button class="btn ghost sm" data-confirm="إخفاءُ هذه الإشارة؟ تبقى مخفيّةً حتى تُعيدها من «المخفيّة».">🚫 أخفِ</button>
+                    </form>
+                @endif
             </div>
         @endif
     </div>
@@ -74,6 +76,25 @@
     </div></div>
 @endforelse
 </div>
+
+@if (! empty($ac['hidden']))
+    <div class="card" style="margin-top:12px">
+        <h3 class="cardtitle">🙈 مخفيّةٌ ({{ count($ac['hidden']) }}) — مؤجَّلةٌ أو مرفوضة</h3>
+        <div class="sub" style="margin-bottom:6px">أخفيتَها عمداً — أعِدها متى شئت. (المؤجَّلةُ تعود وحدها في موعدها.)</div>
+        <div class="cards" style="grid-template-columns:1fr">
+            @foreach ($ac['hidden'] as $h)
+                <div class="crow" style="gap:8px;flex-wrap:wrap;align-items:center">
+                    <span class="bdg {{ ($h['state'] ?? '') === 'snoozed' ? 'wn' : '' }}">{{ ($h['state'] ?? '') === 'snoozed' ? 'مؤجّلة' . (! empty($h['snoozed_until']) ? ' حتى ' . $h['snoozed_until'] : '') : 'مرفوضة' }}</span>
+                    <span style="flex:1;min-width:0">{{ $h['ico'] }} {{ $h['title'] }}</span>
+                    <form method="POST" action="{{ route('recs.act') }}" class="inline">@csrf
+                        <input type="hidden" name="skey" value="{{ $h['key'] }}"><input type="hidden" name="do" value="reopen">
+                        <button class="btn ghost sm">↩️ أظهرها</button>
+                    </form>
+                </div>
+            @endforeach
+        </div>
+    </div>
+@endif
 
 @if (! empty($ac['awaiting']['items']))
     <div class="card" style="margin-top:12px">
@@ -95,7 +116,8 @@
         <b>المستحقات</b> من الفواتير المتأخرة · <b>الانتهاءات</b> خلال ٧ أيام ·
         <b>العروض غير المحوَّلة</b> من CPQ · <b>العُهد المتأخرة</b> من سجل التصاريح.<br>
         التصرّفُ لا يُخفي الحقيقة: <b>الإقرار</b> يعني «رأيتُها» لا «حُلَّت»، و<b>التأجيل</b> يُعيدها في موعدها،
-        و<b>الإخفاء</b> يُسكتها حتى يتكرّر شرطُها. وإذا زال السببُ اختفت الإشارةُ وحدها.<br>
+        و<b>الإخفاء</b> يُبقيها مخفيّةً حتى تُعيدها من «المخفيّة» — <b>والحرجُ لا يُخفى دائماً، يُؤجَّل فقط</b>.
+        وإذا زال السببُ اختفت الإشارةُ وحدها.<br>
         ⚠️ غيابُ الإشارة ليس شهادةَ سلامة — قد يعني أن مصدرها لم يُسجَّل بعد.
     </div>
 </div>

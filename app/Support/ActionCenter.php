@@ -42,6 +42,7 @@ class ActionCenter
 
         return [
             'signals'  => $signals['visible'],
+            'hidden'   => $signals['hidden'],
             'groups'   => array_values($groups),
             'counts'   => $signals['counts'],
             'snoozed'  => $signals['snoozed'],
@@ -75,20 +76,23 @@ class ActionCenter
             try { SignalState::whereIn('skey', $keys)->update(['last_seen_at' => now()]); } catch (\Throwable $e) {}
         }
 
-        $visible = []; $snoozed = 0; $dismissed = 0;
+        $visible = []; $hidden = []; $snoozed = 0; $dismissed = 0;
         foreach ($items as $s) {
             $k = $s['key'] ?? null;
             $st = $k ? ($states[$k] ?? null) : null;
             $s['state'] = $st?->state ?? 'open';
             $s['snoozed_until'] = $st?->snoozed_until ? substr((string) $st->snoozed_until, 0, 10) : null;
             $s['can_act'] = (bool) $k;   // بلا مفتاحٍ لا تصرّف (توصيةٌ عامّة)
-            if ($st && $st->state === 'dismissed') { $dismissed++; continue; }
-            if ($st && $st->state === 'snoozed' && $st->snoozed_until && $st->snoozed_until->isFuture()) { $snoozed++; continue; }
+            // الحرجُ لا يُرفَض رفضاً دائماً — يبقى الزرُّ للتأجيل/الإقرار لا الإخفاء
+            $s['can_dismiss'] = $s['can_act'] && ($s['sev'] ?? '') !== 'حرج';
+            if ($st && $st->state === 'dismissed') { $dismissed++; $hidden[] = $s; continue; }
+            if ($st && $st->state === 'snoozed' && $st->snoozed_until && $st->snoozed_until->isFuture()) { $snoozed++; $hidden[] = $s; continue; }
             $visible[] = $s;
         }
 
         return [
             'visible' => $visible,
+            'hidden'  => $hidden,   // المؤجَّلُ والمرفوض — لعرضِ «أظهرها» (إعادةُ فتح)
             'counts'  => [
                 'حرج'    => count(array_filter($visible, fn ($r) => $r['sev'] === 'حرج')),
                 'مهم'    => count(array_filter($visible, fn ($r) => $r['sev'] === 'مهم')),
@@ -142,23 +146,20 @@ class ActionCenter
      */
     public static function disposition(string $skey, string $do, ?string $until = null, ?string $note = null): bool
     {
-        $live = self::liveByKey(true);
+        // **خبيئةُ الصفّ نفسِه** (لا `fresh=true`): يكفي التحقّقُ من أنّ المفتاح في صفِّ
+        // المستخدم كما رآه — لا إعادةُ بناءٍ قسريّةٌ لكلّ المحرّكات عند كلّ نقرة.
+        $live = self::liveByKey(false);
         if (! isset($live[$skey])) return false;   // ليست في صفّه → تُرفَض بصمت
 
-        // module/record_id من الإشارة نفسها (موثوقٌ) لا من تخمينِ المفتاح
-        $module = $live[$skey]['module'] ?? null;
-        $recordId = $live[$skey]['record_id'] ?? null;
+        // module/record_id/sev من الإشارة نفسها (موثوقٌ) لا من تخمينِ المفتاح
+        $sig = $live[$skey];
+        $module = $sig['module'] ?? null;
+        $recordId = $sig['record_id'] ?? null;
         $u = auth()->user();
-
-        $data = [
-            'module' => $module, 'record_id' => $recordId,
-            'by' => $u?->id, 'at' => now(), 'last_seen_at' => now(),
-            'company_id' => $u?->company_id,
-        ];
 
         if ($do === 'reopen') {
             SignalState::where('skey', $skey)->delete();
-            hub_audit('إعادةُ فتح إشارة', 'signals', null, $skey);
+            hub_audit('إعادةُ فتح إشارة', 'signals', $recordId, $skey);
 
             return true;
         }
@@ -166,20 +167,40 @@ class ActionCenter
         $state = match ($do) { 'ack' => 'ack', 'snooze' => 'snoozed', 'dismiss' => 'dismissed', default => null };
         if ($state === null) return false;
 
-        $data['state'] = $state;
-        $data['note']  = $note ? mb_substr($note, 0, 300) : null;
-        $data['snoozed_until'] = $state === 'snoozed'
-            ? \Illuminate\Support\Carbon::parse($until ?: now()->addDay()->toDateString())->endOfDay()
-            : null;
+        // **لا إخفاءَ دائمٌ لإشارةٍ حرجة**: تُقَرّ أو تُؤجَّل تأجيلاً مؤقتاً فقط — فلا
+        // يُسكَت خطرٌ حرجٌ متكرّرٌ إلى الأبد (كان الرفضُ الدائمُ يُخفي حرجاً عائداً).
+        if ($state === 'dismissed' && ($sig['sev'] ?? '') === 'حرج') return false;
 
-        SignalState::updateOrCreate(['skey' => $skey], $data);
+        $data = [
+            'module' => $module, 'record_id' => $recordId,
+            'state' => $state, 'by' => $u?->id, 'at' => now(), 'last_seen_at' => now(),
+            'company_id' => $u?->company_id,
+            'note' => $note ? mb_substr($note, 0, 300) : null,
+            'snoozed_until' => $state === 'snoozed'
+                ? \Illuminate\Support\Carbon::parse($until ?: now()->addDay()->toDateString())->endOfDay()
+                : null,
+        ];
+
+        try {
+            SignalState::updateOrCreate(['skey' => $skey], $data);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // سباقُ نقرتين على المفتاح الفريد نفسه: الأولى كتبت الحالةَ المقصودة،
+            // فالثانيةُ «نجاحٌ» لا ٥٠٠ (updateOrCreate ليست ذرّيّةً على unique).
+            if ((string) $e->getCode() !== '23000') throw $e;
+            SignalState::where('skey', $skey)->update($data);
+        }
         hub_audit('تصرّفٌ بإشارة: ' . $do, 'signals', $recordId, $skey);
 
         return true;
     }
 
-    /** تشذيبُ التصرّفات اليتيمة: إشارةٌ حُلَّت وزالت منذ مدّة فلا معنى لحالتها */
-    public static function prune(int $days = 45): int
+    /**
+     * تشذيبُ التصرّفات اليتيمة: `last_seen_at` يُختَم كلّما رُئيت الإشارةُ حيّةً (عند
+     * عرضِ الصفّ أو التصرّف). فصفٌّ لم يُرَ حيّاً منذ مدّةٍ طويلة = إشارتُه حُلَّت
+     * وزالت فلا معنى لحالته. النافذةُ **طويلةٌ عمداً** (تشذيبُ اليتيم لا إسقاطُ
+     * الحيّ): تأجيلٌ أو رفضٌ لا يُنظَر إليه أشهراً يبقى محترَماً حتى تتجاوز النافذة.
+     */
+    public static function prune(int $days = 120): int
     {
         if (! Schema::hasTable('signal_states')) return 0;
 
