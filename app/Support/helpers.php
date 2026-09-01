@@ -833,7 +833,7 @@ if (! function_exists('hub_mod_look')) {
         static $icons = [
             'projects' => '🚀', 'clients' => '🤝', 'tasks' => '✅', 'tickets' => '🎫',
             'fin' => '💵', 'contracts' => '📜', 'companies' => '🏢', 'hr' => '👥',
-            'quotes' => '📝', 'suppliers' => '🚚', 'purchases' => '🛒', 'ideas' => '💡',
+            'quotes' => '📝', 'changeorders' => '📋', 'suppliers' => '🚚', 'purchases' => '🛒', 'ideas' => '💡',
             'leaves' => '🗓️', 'apps' => '📱', 'domains' => '🌐', 'servers' => '🖥️',
             'vault' => '🔐', 'kb' => '📚', 'meetings' => '🪑', 'assets' => '📦',
             'hcps' => '🩺', 'facilities' => '🏥', 'territories' => '🗺️',

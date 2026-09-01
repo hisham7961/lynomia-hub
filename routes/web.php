@@ -351,6 +351,9 @@ Route::middleware('auth')->group(function () {
     Route::post('quote/{id}/line', [QuoteBuilderController::class, 'storeLine'])->name('quotes.line.store');
     Route::delete('quote/{id}/line/{line}', [QuoteBuilderController::class, 'destroyLine'])->name('quotes.line.destroy');
     Route::post('quote/{id}/line/{line}/toggle', [QuoteBuilderController::class, 'toggleLine'])->name('quotes.line.toggle');
+    // أوامر التغيير: تطبيقٌ على المشروع + مستند PDF
+    Route::post('changeorder/{id}/apply', [\App\Http\Controllers\Web\ChangeOrderController::class, 'apply'])->name('changeorders.apply');
+    Route::get('changeorder/{id}/pdf', [\App\Http\Controllers\Web\ChangeOrderController::class, 'pdf'])->name('changeorders.pdf');
     Route::post('quote/{id}/milestone', [QuoteBuilderController::class, 'storeMilestone'])->name('quotes.ms.store');
     Route::delete('quote/{id}/milestone/{ms}', [QuoteBuilderController::class, 'destroyMilestone'])->name('quotes.ms.destroy');
     Route::post('fin/{id}/act', [\App\Http\Controllers\Web\FinController::class, 'act'])->name('fin.act');
