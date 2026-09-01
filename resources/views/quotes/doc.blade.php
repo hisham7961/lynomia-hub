@@ -98,7 +98,10 @@ td{padding:9px 12px;border-bottom:1px solid #e3ecea}
 
     <div class="tot"><table>
         @if (! empty($showCartons) && ($totalCartons ?? 0) > 0)<tr><td>إجمالي الكراتين الكاملة</td><td>{{ $totalCartons }} كرتونة</td></tr>@endif
-        @if ($q->amount !== null)<tr><td>الإجمالي قبل الضريبة</td><td>{{ ($hideTotal ?? false) ? '•••' : number_format((float) $q->amount, 3) }}</td></tr>@endif
+        {{-- الصافيُّ المخزَّن بعد الخصم؛ فيُعرَض «قبل الخصم» = صافٍ + خصم كي يتصالح
+             المستند: (صافٍ قبل الخصم) − خصم + ضريبة = المستحق (كما في Proposal). --}}
+        @if ($q->amount !== null)<tr><td>الإجمالي قبل الضريبة</td><td>{{ ($hideTotal ?? false) ? '•••' : number_format((float) $q->amount + (float) $q->discount, 3) }}</td></tr>@endif
+        @if ((float) $q->discount > 0)<tr><td>الخصم</td><td>{{ ($hideTotal ?? false) ? '•••' : '−' . number_format((float) $q->discount, 3) }}</td></tr>@endif
         @if ($q->tax)<tr><td>الضريبة</td><td>{{ ($hideTotal ?? false) ? '•••' : number_format((float) $q->tax, 3) }}</td></tr>@endif
         <tr class="g"><td>الإجمالي المستحق</td><td>{{ ($hideTotal ?? false) ? '••• محجوب' : number_format((float) $q->total, 3) }} {{ ($hideTotal ?? false) ? '' : ($q->currency ?? '') }}</td></tr>
     </table></div>

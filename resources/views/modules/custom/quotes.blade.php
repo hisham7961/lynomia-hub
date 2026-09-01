@@ -65,7 +65,8 @@
             </tbody>
         </table></div>
         <div class="crow" style="margin-top:8px">
-            <span class="chip">الصافي: <b class="mono">{{ number_format((float) $row->amount, 3) }}</b></span>
+            @if ((float) $row->discount > 0)<span class="chip">الصافي قبل الخصم: <b class="mono">{{ number_format((float) $row->amount + (float) $row->discount, 3) }}</b></span><span class="chip">الخصم: <b class="mono">−{{ number_format((float) $row->discount, 3) }}</b></span>@endif
+            <span class="chip">الصافي{{ (float) $row->discount > 0 ? ' الخاضع' : '' }}: <b class="mono">{{ number_format((float) $row->amount, 3) }}</b></span>
             <span class="chip">الضريبة: <b class="mono">{{ number_format((float) $row->tax, 3) }}</b></span>
             <span class="chip">الإجمالي: <b class="mono">{{ number_format((float) $row->total, 3) }} {{ $row->currency }}</b></span>
         </div>

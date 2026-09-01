@@ -60,6 +60,23 @@ class QuoteDiscountReconcileTest extends TestCase
         $this->assertStringContainsString(number_format(920, 3), $html);   // الإجمالي
     }
 
+    public function test_quote_doc_shows_discount_line_and_reconciles(): void
+    {
+        $this->seedCore();
+        $c = Client::create(['name_ar' => 'ع', 'name' => 'x']);
+        $q = Quote::create(['client_id' => $c->id, 'title' => 'عرض', 'total' => 0, 'currency' => 'د.ك']);
+        QuoteLine::create(['quote_id' => $q->id, 'title' => 'أساسيّ', 'qty' => 1, 'unit_price' => 1000,
+            'tax_pct' => 15, 'line_mode' => 'required', 'included' => true]);
+        $q->discount = 200;
+        $q->recalc();
+
+        $html = $this->actingAs($this->owner)->get("/quote/{$q->id}/doc")->assertOk()->getContent();
+        // الصافيُّ قبل الخصم ١٠٠٠، سطرُ خصمٍ ظاهر، الضريبةُ ١٢٠، المستحقُّ ٩٢٠ — يتصالح
+        $this->assertStringContainsString(number_format(1000, 3), $html);
+        $this->assertStringContainsString('الخصم', $html);
+        $this->assertStringContainsString(number_format(920, 3), $html);
+    }
+
     public function test_discount_exceeding_lines_never_goes_negative(): void
     {
         $q = $this->quote();
