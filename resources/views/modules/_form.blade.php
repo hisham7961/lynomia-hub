@@ -43,26 +43,26 @@
             @foreach (hub_custom_fields($module) as $cf)
                 @php $ck = $cf['key']; $cv = old("custom.$ck", data_get($row?->custom, $ck)); @endphp
                 <div class="fld {{ $errors->has("custom.$ck") ? 'haserr' : '' }}">
-                    <label>{{ $cf['label'] }} @if (! empty($cf['required']))<b class="req">*</b>@endif <span class="sub">· مخصص</span></label>
+                    <label for="cf-{{ $ck }}">{{ $cf['label'] }} @if (! empty($cf['required']))<b class="req">*</b>@endif <span class="sub">· مخصص</span></label>
                     @if (($cf['type'] ?? 'text') === 'sel')
-                        <select class="inp" name="custom[{{ $ck }}]">
+                        <select class="inp" id="cf-{{ $ck }}" name="custom[{{ $ck }}]">
                             <option value=""></option>
                             @foreach ((array) ($cf['options'] ?? []) as $o)<option @selected($cv === $o)>{{ $o }}</option>@endforeach
                         </select>
                     @elseif ($cf['type'] === 'bool')
                         <label class="chk"><input type="checkbox" name="custom[{{ $ck }}]" value="1" @checked($cv)> نعم</label>
                     @elseif ($cf['type'] === 'ref')
-                        <select class="inp" name="custom[{{ $ck }}]">
+                        <select class="inp" id="cf-{{ $ck }}" name="custom[{{ $ck }}]">
                             <option value=""></option>
                             {{-- $cv يمرَّر ليُضمن ظهور المختار حتى بعد سقف الـ٥٠٠ صف — وإلا حُذف المرجع بصمت عند الحفظ --}}
                             @foreach (hub_ref_options_scoped($cf['ref'], $cv) as $rid => $rname)<option value="{{ $rid }}" @selected((string) $cv === (string) $rid)>{{ $rname }}</option>@endforeach
                         </select>
                     @elseif ($cf['type'] === 'num')
-                        <input class="inp ltr" type="number" step="any" name="custom[{{ $ck }}]" value="{{ $cv }}">
+                        <input class="inp ltr" id="cf-{{ $ck }}" type="number" step="any" name="custom[{{ $ck }}]" value="{{ $cv }}">
                     @elseif ($cf['type'] === 'date')
-                        <input class="inp ltr" type="date" name="custom[{{ $ck }}]" value="{{ $cv }}">
+                        <input class="inp ltr" id="cf-{{ $ck }}" type="date" name="custom[{{ $ck }}]" value="{{ $cv }}">
                     @else
-                        <input class="inp" name="custom[{{ $ck }}]" value="{{ $cv }}">
+                        <input class="inp" id="cf-{{ $ck }}" name="custom[{{ $ck }}]" value="{{ $cv }}">
                     @endif
                     @error("custom.$ck")<span class="ferr">{{ $message }}</span>@enderror
                 </div>

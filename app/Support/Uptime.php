@@ -57,7 +57,7 @@ class Uptime
                 'allow_redirects' => false,
                 'curl'            => hub_resolve_pin($url, $gate['ip']),
             ])
-                ->timeout((int) setting('monitor.timeout', 8))
+                ->timeout(max(1, min(30, (int) setting('monitor.timeout', 8))))   // محصورةٌ [١، ٣٠] ثانية — إعدادٌ شاذّ لا يعلّق العامل (v2.399)
                 ->withHeaders(['User-Agent' => 'LynomiaHub-Monitor/1.0'])
                 ->get($url);
             $code = $res->status();

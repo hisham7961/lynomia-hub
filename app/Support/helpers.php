@@ -4579,6 +4579,7 @@ if (! function_exists('hub_outbound_ok')) {
     function hub_outbound_ok(string $url): array
     {
         $no = fn (string $why) => ['ok' => false, 'why' => $why, 'ip' => null];
+        if ((string) config('hub.outbound', 'on') === 'off') return $no('الاتصالُ الخارجي مُطفأ في هذه البيئة (HUB_OUTBOUND=off)');
 
         $url = trim($url);
         $p = @parse_url($url);

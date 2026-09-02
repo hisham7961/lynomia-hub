@@ -61,7 +61,7 @@ class DataRoomController extends Controller
             // مسارات الرفع تتبع «files.max_kb» — فغرفةُ البيانات مخزنُ ملفاتٍ
             // كغيرها، ومن رفع هويةً بصريةً هنا يستحق السقفَ ذاته.
             'file'     => ['required', 'file', 'max:' . hub_upload_cap()['kb']],
-            'password' => ['nullable', 'string', 'min:4', 'max:100'],
+            'password' => ['nullable', 'string', 'min:8', 'max:100'],   // سطحٌ عامّ: ٤ أحرف تُخمَّن (v2.399)
             'days'     => ['nullable', 'integer', 'min:1', 'max:365'],
             'no_download' => ['nullable'],
         ]);

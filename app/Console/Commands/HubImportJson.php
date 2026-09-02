@@ -24,9 +24,12 @@ class HubImportJson extends Command
         // **ملفٌ تالف لا يمرّ «بنجاح: 0 سجل»**: نسخةٌ مبتورة النقل كانت تعطي
         // null فتنزلق الحلقات على الفراغ ويُبلَّغ المشغّل أن الاستعادة تمّت —
         // ويكتشف الكارثة بعد فوات إمكانية الحصول على نسخة سليمة.
-        $db = json_decode(file_get_contents($path), true);
+        // نسخةٌ مشفَّرة (.json.enc) تُفكّ بمفتاح التطبيق (v2.399) — مفتاحٌ مختلف = رسالةٌ لا «0 سجل»
+        $db = \App\Console\Commands\HubBackup::readFile($path);
         if (! is_array($db)) {
-            $this->error('ملف النسخة غير صالح (JSON معطوب): ' . json_last_error_msg());
+            $this->error(str_ends_with($path, '.enc')
+                ? 'تعذّر فكُّ تشفير النسخة أو قراءتها — APP_KEY مختلفٌ عن الذي أُخذت به، أو الملف معطوب'
+                : 'ملف النسخة غير صالح (JSON معطوب)');
             return 1;
         }
 

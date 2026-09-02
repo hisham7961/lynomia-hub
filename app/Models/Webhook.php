@@ -11,7 +11,8 @@ class Webhook extends Model
 
     protected $guarded = [];
     protected $casts = ['active' => 'bool', 'last_ok' => 'bool',
-                        'paused_until' => 'datetime', 'last_at' => 'datetime'];
+                        'paused_until' => 'datetime', 'last_at' => 'datetime',
+                        'secret' => \App\Casts\EncryptedOrPlain::class];   // مشفَّرٌ في القاعدة كسائر الاعتمادات (v2.399)
 
     public function deliveries()
     {

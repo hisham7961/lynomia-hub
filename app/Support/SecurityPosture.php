@@ -20,7 +20,8 @@ class SecurityPosture
     /** ترتيب الفحوص — الأسماء وحدها كي تُنفَّذ كلٌّ منها معزولةً عن أخواتها */
     protected const ORDER = ['lockdown', 'maintenance', 'ssrf', 'quoteflowPass', 'twofaPrivileged',
                              'twofaCoverage', 'passwordPolicy', 'stalePasswords', 'idleUsers', 'lockedNow',
-                             'vaultRotation', 'apiStale', 'shareOpen', 'auditChain', 'demoMode', 'ownerCount'];
+                             'vaultRotation', 'apiStale', 'shareOpen', 'auditChain', 'demoMode', 'ownerCount',
+                             'defaultPassword', 'debugMode', 'backupFresh'];   // v2.399
 
     /**
      * كل فحص: key · label · tone (ok|wn|bad) · why · n · fix · url
@@ -265,6 +266,49 @@ class SecurityPosture
             $n === 0 ? 'لا مالك نشط — لا أحد يفتح مركز الأمان ولا الإعدادات.'
                      : ($n > 3 ? "{$n} مالكين — أنزِل من لا يحتاج الملكية إلى دورٍ برايات محدَّدة." : ''),
             route('users.index'));
+    }
+
+    /** كلمةُ المرور المنشورة في README ما زالت حيّة على حساب مالك (CFG-05) */
+    protected static function defaultPassword(): array
+    {
+        $n = 0;
+        $owners = \App\Models\User::with('role')->whereNull('deleted_at')->where('status', '!=', 'موقوف')->get()
+            ->filter(fn ($u) => $u->role?->is_owner);
+        foreach ($owners as $u) {
+            if ($u->password && \Illuminate\Support\Facades\Hash::check('ChangeMe!2026', $u->password)) $n++;
+        }
+
+        return self::row('default_pw', 'كلمة المرور الافتراضية للمالك', $n ? 'bad' : 'ok',
+            'كلمةُ المرور التي يبذرها المنصِّب منشورةٌ في التوثيق — بقاؤها حيّةً يعني أن أيَّ قارئٍ للتوثيق مالكٌ.',
+            $n, $n ? "{$n} حساب مالكٍ ما زال على ChangeMe!2026 — غيّرها الآن من ملف المستخدم." : '', route('users.index'));
+    }
+
+    /** APP_DEBUG في الإنتاج يكشف المكدّس والاستعلامات، والبيئةُ غيرُ الإنتاجية تعني إعداداتٍ متساهلة (CFG-12) */
+    protected static function debugMode(): array
+    {
+        $debug = (bool) config('app.debug');
+        $env = (string) config('app.env');
+        if ($debug && $env === 'production') $tone = 'bad';
+        elseif ($debug || $env !== 'production') $tone = 'wn';
+        else $tone = 'ok';
+        $why = 'APP_DEBUG يطبع المكدّسَ والاستعلامَ وقيمَ البيئة لكل زائرٍ يقع على خطأ؛ وبيئةٌ غير production تُطفئ حرّاساً وتُبقي بياناتِ عرض.';
+        $fix = $tone === 'ok' ? '' : "الحالي: APP_ENV={$env}، APP_DEBUG=" . ($debug ? 'true' : 'false') . " — اضبطهما في .env ثم optimize:clear.";
+
+        return self::row('debug_mode', 'وضعُ التصحيح والبيئة', $tone, $why, $tone === 'ok' ? 0 : 1, $fix, route('ops.index'));
+    }
+
+    /** آخرُ نسخةٍ احتياطية ناجحة: أقدمُ من يومين = لا تعافٍ (CFG-02/12) */
+    protected static function backupFresh(): array
+    {
+        $at = setting('heartbeat.backup');
+        $age = $at ? (int) \Illuminate\Support\Carbon::parse($at)->diffInHours(now()) : null;
+        $tone = $age === null ? 'wn' : ($age > 72 ? 'bad' : ($age > 30 ? 'wn' : 'ok'));
+        $fix = $age === null ? 'لم تُؤخذ نسخةٌ قطّ — فعّل سطر cron أو اضغط «نسخة الآن» في مركز التشغيل.'
+            : ($tone === 'ok' ? '' : "آخر نسخة منذ {$age} ساعة — راجع نبضة hub:backup في مركز التشغيل.");
+
+        return self::row('backup_fresh', 'حداثةُ النسخة الاحتياطية', $tone,
+            'نسخةٌ يوميةٌ حيّة هي كلُّ ما يفصل بين عطلٍ في القرص وفقدِ المنشأة — وتحتفظ محلياً فقط؛ انسخها خارج الخادم (كتيّب التشغيل).',
+            $tone === 'ok' ? 0 : 1, $fix, route('ops.index'));
     }
 
     protected static function row(string $key, string $label, string $tone, string $why,

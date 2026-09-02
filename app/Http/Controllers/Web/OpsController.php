@@ -75,7 +75,7 @@ class OpsController extends Controller
         // آخر نسخة احتياطية
         // بالأحدث زمنياً لا بترتيب الاسم: ملف بتسمية يدوية كان يتصدر الترتيب
         // الأبجدي فيُعرض كآخر نسخة ويوهم أن النسخ تعمل وهي متوقفة.
-        $bk = collect(glob(storage_path('app/backups/hub-*.json')))
+        $bk = collect(array_merge(glob(storage_path('app/backups/hub-*.json')) ?: [], glob(storage_path('app/backups/hub-*.json.enc')) ?: []))
             ->sortBy(fn ($f) => filemtime($f))->last();
         $backup = $bk ? ['name' => basename($bk), 'size' => filesize($bk),
                          'age' => now()->diffForHumans(\Illuminate\Support\Carbon::createFromTimestamp(filemtime($bk)), true)] : null;
@@ -140,7 +140,11 @@ class OpsController extends Controller
         @set_time_limit(300);
 
         try {
-            \Illuminate\Support\Facades\Artisan::call('hub:backup');
+            // رمزُ الخروج يُقرأ (v2.399): كان الفشلُ يُعرض بصيغة «أُخذت نسخة …» ثم نصُّ الخطأ
+            $code = \Illuminate\Support\Facades\Artisan::call('hub:backup');
+            if ($code !== 0) {
+                return redirect()->route('ops.index')->with('err', 'فشل النسخ: ' . mb_substr(trim(\Illuminate\Support\Facades\Artisan::output()), 0, 300));
+            }
             hub_audit('نسخة احتياطية يدوية', null, null, 'من مركز التشغيل');
 
             return redirect()->route('ops.index')

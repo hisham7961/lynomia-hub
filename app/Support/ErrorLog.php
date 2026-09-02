@@ -22,7 +22,8 @@ class ErrorLog
      */
     public static function redact(string $s): string
     {
-        return (string) preg_replace('~/(hook|sign|verify)/[^/?\s&]{8,}~i', '/$1/{رمز}', $s);
+        // (v2.399) ورموزُ المشاركة العامّة /s/{token} ومساحاتُ العمل /w/{key} — كانت تصل الإشعاراتِ والسجلَّ بنصّها
+        return (string) preg_replace('~/(hook|sign|verify|s|w)/[^/?\s&]{8,}~i', '/$1/{رمز}', $s);
     }
 
     /**

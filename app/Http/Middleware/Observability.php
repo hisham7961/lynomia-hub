@@ -13,7 +13,11 @@ class Observability
     public function handle(Request $request, Closure $next)
     {
         // معرّفٌ سابقٌ (وضعه ردُّ خطأٍ مبكّر عبر Api::requestId) يُحترَم فلا يتبدّل بين الجسم والترويسة
-        $rid = (string) ($request->attributes->get('request_id') ?: Str::uuid());
+        // معرّفٌ يرسله العميلُ (X-Request-Id) يُحترَم إن كان سليمَ الشكل (v2.399): التكاملُ يمرّر أثرَه فيُقرأ
+        // القيدُ والتسليمُ والسجلُّ بمعرّفه هو — وإلا يُولَّد هنا.
+        $sent = trim((string) $request->headers->get('X-Request-Id', ''));
+        $rid = (string) ($request->attributes->get('request_id')
+            ?: (preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]{7,63}$/', $sent) ? $sent : Str::uuid()));
         $request->attributes->set('request_id', $rid);
         $start = microtime(true);
 

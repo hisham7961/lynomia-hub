@@ -133,7 +133,8 @@ class PasskeyController extends Controller
         session()->forget('wa.stepup');
         abort_if($challenge === '', 422, 'انتهت الجلسة — أعد المحاولة');
 
-        $cred = $this->verifyAssertionInput($r, $challenge, $u->id);
+        // UV مطلوبٌ كما عند الدخول (v2.399): وجودُ المفتاح وحده (UP) لا يُثبت صاحبَه
+        $cred = $this->verifyAssertionInput($r, $challenge, $u->id, requireUv: true);
         if (! $cred instanceof WebauthnCredential) return $cred;   // استجابةُ خطأ
 
         StepUp::stamp();

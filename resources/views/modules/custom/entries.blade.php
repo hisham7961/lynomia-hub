@@ -31,7 +31,7 @@
                     <td class="sub">{{ $l->memo ?: '—' }}</td>
                     @if (! $jlPosted && $jlCanE)
                         <td><form method="POST" action="{{ route('entries.line.drop', [$row->id, $l->id]) }}" class="inline">
-                            @csrf @method('DELETE')<button class="btn ghost xs">🗑</button></form></td>
+                            @csrf @method('DELETE')<button class="btn ghost xs" aria-label="حذف" title="حذف">🗑</button></form></td>
                     @endif
                 </tr>
             @endforeach

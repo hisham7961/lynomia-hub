@@ -13,6 +13,8 @@ return [
      * HUB_ALLOW_DESTRUCTIVE=1 في .env
      */
     'allow_destructive' => (bool) env('HUB_ALLOW_DESTRUCTIVE', false),
+    // HUB_OUTBOUND=off يُطفئ كلَّ نداءٍ خارجيّ (تلجرام، بريد، ويبهوك، مراقبة، استكشاف، أودو) — لنسخة تجريبية أو تحليلٍ محليّ (v2.399)
+    'outbound' => env('HUB_OUTBOUND', 'on'),
     'modules' => [
         'companies' => [
             'key' => 'companies',

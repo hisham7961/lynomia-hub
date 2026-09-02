@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Schema;
  */
 class HubBackup extends Command
 {
-    protected $signature = 'hub:backup {--keep=14 : عدد النسخ المحفوظة}';
+    protected $signature = 'hub:backup {--keep=14 : عدد النسخ المحفوظة} {--verify : إعادةُ قراءة النسخة بعد كتابتها والتحقّق من عدّ سجلاتها}';
     protected $description = 'تصدير القاعدة كاملة إلى storage/app/backups مع تدوير النسخ';
 
     /**
@@ -35,6 +35,40 @@ class HubBackup extends Command
         'webauthn_credentials', 'user_devices', 'asset_custody', 'record_identifiers', 'identity_lookups',
         'inbox_documents', 'metric_points', 'audit_chain', 'signal_states', 'change_orders', 'screenshots',
     ];
+
+    /** قراءةُ ملف نسخةٍ (مشفَّرٍ أو صريح) وإعادتُه مصفوفةً — أو null إن تعذّر */
+    public static function readFile(string $path): ?array
+    {
+        $raw = @file_get_contents($path);
+        if ($raw === false || $raw === '') return null;
+        if (str_ends_with($path, '.enc')) {
+            try {
+                $raw = \Illuminate\Support\Facades\Crypt::decryptString($raw);
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+        $db = json_decode($raw, true);
+
+        return is_array($db) ? $db : null;
+    }
+
+    /** التحقّق: الملفُ يُقرأ ويُفكّ وعددُ سجلاته يطابق ما كُتب — أو سببُ الفشل */
+    public static function verifyFile(string $path, int $expected): ?string
+    {
+        $db = self::readFile($path);
+        if ($db === null) return 'الملفُ لا يُقرأ أو لا يُفكّ (APP_KEY؟) أو JSON معطوب';
+        $n = 0;
+        // العدُّ كما يعدّه الكاتب: جداولُ الوحدات + الجداولُ الخام (لا الغلاف ولا الأدوار والمستخدمون والإعدادات)
+        foreach ($db as $k => $v) {
+            if (in_array($k, ['_meta', 'roles', 'users', 'settings'], true)) continue;
+            if ($k === '_tables') { foreach ((array) $v as $rows) $n += count((array) $rows); continue; }
+            $n += count((array) $v);
+        }
+        if ($n !== $expected) return "عدُّ السجلات {$n} لا يطابق المكتوب {$expected}";
+
+        return null;
+    }
 
     /** جداولٌ عابرة لا تستحق نسخاً — لتوثيق قرار الاستثناء لا لنسيانه (يحرسها اختبارُ التغطية) */
     public const EPHEMERAL = [
@@ -153,7 +187,10 @@ class HubBackup extends Command
         // (هواتف، قيود IP، شفرات الخزنة) فلا يقرؤه حسابٌ محليّ آخر على الخادم
         $dir = storage_path('app/backups');
         if (! is_dir($dir)) mkdir($dir, 0700, true);
-        $file = $dir . '/hub-' . now()->format('Y-m-d-Hi') . '.json';
+        // **تشفيرٌ اختياري** (v2.399): `backup.encrypt=1` يكتب .json.enc بمفتاح التطبيق — قرصٌ
+        // مسرَّب أو حسابٌ محليّ آخر لا يقرأ المنشأة. الاستعادةُ تفكّه بالمفتاح نفسِه (احفظ APP_KEY خارج الخادم).
+        $encrypt = (string) setting('backup.encrypt', '0') === '1';
+        $file = $dir . '/hub-' . now()->format('Y-m-d-Hi') . ($encrypt ? '.json.enc' : '.json');
 
         // **الترميز أولاً، والتدوير آخراً** (v2.312): بايتةٌ واحدة فاسدة في أي صفّ
         // تجعل json_encode تعيد `false`، فكانت تُكتب نسخةٌ بصفر بايت ثم يحذف
@@ -169,11 +206,12 @@ class HubBackup extends Command
             return self::FAILURE;
         }
 
+        $payload = $encrypt ? \Illuminate\Support\Facades\Crypt::encryptString($json) : $json;
         $tmp = $file . '.tmp';
-        $written = @file_put_contents($tmp, $json);
-        if ($written !== strlen($json)) {
+        $written = @file_put_contents($tmp, $payload);
+        if ($written !== strlen($payload)) {
             @unlink($tmp);
-            $this->error('✗ كتابةٌ ناقصة (' . (int) $written . ' من ' . strlen($json)
+            $this->error('✗ كتابةٌ ناقصة (' . (int) $written . ' من ' . strlen($payload)
                        . ' بايت) — لم تُبدَّل النسخة ولم يُحذف شيء.');
 
             return self::FAILURE;
@@ -188,9 +226,22 @@ class HubBackup extends Command
         @chmod($file, 0600);
         @chmod($dir, 0700);
 
+        // **تحقّقٌ بإعادة القراءة** (--verify): النسخةُ تُقرأ من القرص وتُفكّ ويُعدّ ما فيها — تمرينُ استعادةٍ
+        // مصغّر يقوله رمزُ الخروج لا الأمل. (v2.399)
+        if ($this->option('verify')) {
+            $why = self::verifyFile($file, $total);
+            if ($why !== null) {
+                $this->recordFailure('فشل التحقق من النسخة: ' . $why);
+                $this->error('✗ النسخةُ كُتبت لكنها لا تجتاز التحقق: ' . $why);
+
+                return self::FAILURE;
+            }
+            $this->info('✓ تحقّقٌ بإعادة القراءة: ' . number_format($total) . ' سجل — سليمة');
+        }
+
         // التدوير بعد كتابةٍ متحقَّقٍ منها فقط
         $keep = max(1, (int) $this->option('keep'));
-        $old = glob($dir . '/hub-*.json');
+        $old = array_merge(glob($dir . '/hub-*.json') ?: [], glob($dir . '/hub-*.json.enc') ?: []);
         sort($old);
         foreach (array_slice($old, 0, max(0, count($old) - $keep)) as $f) @unlink($f);
 

@@ -16,6 +16,7 @@ class InboundHook extends Model
     protected $casts = [
         'enabled'     => 'boolean',
         'last_hit_at' => 'datetime',
+        'secret'      => \App\Casts\EncryptedOrPlain::class,   // مشفَّرٌ في القاعدة (v2.399)
     ];
 
     /** رابطُ الاستقبال العام الكامل */
