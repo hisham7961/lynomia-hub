@@ -174,6 +174,11 @@ class Odoo
 
         if (! $resp->successful()) {
             Integrations::pulse('odoo', false, 'HTTP ' . $resp->status());
+            // 5xx/429 = خادمٌ متعثّر: يفتح القاطعَ لهذه التشغيلة فلا تُطرق بقيّةُ القنوات (v2.399)
+            if ($resp->status() >= 500 || $resp->status() === 429) {
+                $this->down = 'خادم أودو متعثّر (HTTP ' . $resp->status() . ') — أُوقفت بقيّة النداءات في هذه الدورة';
+                throw new \RuntimeException($this->down);
+            }
             throw new \RuntimeException('تعذر الوصول لخادم أودو (' . $resp->status() . ') — تحقق من الرابط');
         }
         // نداءٌ وصل وأجاب: أثرُ نجاحٍ (مخنوقٌ كل خمس دقائق) — به يُعرف «آخرُ نجاح» في سجل التكاملات

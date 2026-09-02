@@ -33,8 +33,22 @@ class ProfileController extends Controller
         $d = $r->validate([
             'tname'   => ['required', 'string', 'max:110'],
             'tdays'   => ['nullable', 'integer', 'min:1', 'max:730'],
-            'tscopes' => ['nullable', 'string', 'max:1900'],
-            'tips'    => ['nullable', 'string', 'max:390'],
+            // (v2.399) نطاقٌ بوحدةٍ مجهولة أو عنوانٌ مشوَّه كانا يُخزَّنان صامتَين فيصير المفتاحُ «يرفض كلَّ شيء» بلا سبب
+            'tscopes' => ['nullable', 'string', 'max:1900', function ($attr, $v, $fail) {
+                foreach (preg_split('/[،,\s]+/u', (string) $v, -1, PREG_SPLIT_NO_EMPTY) as $part) {
+                    [$mod, $ops] = array_pad(explode(':', $part, 2), 2, '');
+                    if ($mod !== '*' && ! hub_mod($mod)) return $fail("نطاقٌ يسمّي وحدةً غير معروفة: {$mod}");
+                    if ($ops !== '' && preg_match('/[^vaed]/', $ops)) return $fail("عمليات النطاق «{$part}» يجب أن تكون من الحروف v a e d فقط");
+                }
+            }],
+            'tips'    => ['nullable', 'string', 'max:390', function ($attr, $v, $fail) {
+                foreach (preg_split('/[،,\s]+/u', (string) $v, -1, PREG_SPLIT_NO_EMPTY) as $e) {
+                    [$net, $bits] = array_pad(explode('/', $e, 2), 2, null);
+                    $bin = @inet_pton((string) $net);
+                    if ($bin === false) return $fail("عنوانٌ غير صالح: {$e}");
+                    if ($bits !== null && (! ctype_digit((string) $bits) || (int) $bits > (strlen($bin) === 4 ? 32 : 128))) return $fail("قناعٌ غير صالح: {$e}");
+                }
+            }],
         ], [], ['tname' => 'اسم المفتاح', 'tdays' => 'أيام الصلاحية', 'tscopes' => 'النطاقات', 'tips' => 'قائمة IP']);
 
         $plain = 'lyn_' . \Illuminate\Support\Str::random(44);
@@ -124,7 +138,7 @@ class ProfileController extends Controller
     {
         $secret = (string) $r->session()->get('2fa:pending');
         abort_unless($secret !== '', 422);
-        if (! \App\Support\Totp::verify($secret, hub_str($r->input('code')))) {
+        if (! \App\Support\Totp::verifyOnce($secret, hub_str($r->input('code')), '2fa-confirm:' . auth()->id())) {
             return back()->withErrors(['code' => 'الرمز غير صحيح — تأكد من إدخال السر في التطبيق وأن ساعة الجوال مضبوطة']);
         }
 
@@ -144,7 +158,7 @@ class ProfileController extends Controller
     {
         $u = auth()->user();
         abort_unless($u->totp_enabled, 422);
-        if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, hub_str($r->input('code')))) {
+        if (! \App\Support\Totp::verifyOnce((string) $u->totp_secret_cipher, hub_str($r->input('code')), '2fa-disable:' . $u->id)) {
             return back()->withErrors(['code' => 'الرمز غير صحيح']);
         }
 

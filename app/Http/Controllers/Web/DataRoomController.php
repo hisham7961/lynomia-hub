@@ -165,6 +165,9 @@ class DataRoomController extends Controller
                 $bytes = (string) $link->mime === 'application/pdf'
                     ? \App\Support\Watermark::pdf($abs, $stamp)
                     : \App\Support\Watermark::image($abs, $stamp, (string) $link->mime);
+            } catch (\App\Support\UnsupportedPdfException $e) {
+                // سببٌ مسمّى لا ٥٠٠ (v2.399): الملفُ بضغطٍ حديث لا يُوسم على هذا الخادم — يبقى مغلقاً
+                abort(415, 'هذا الملف بصيغة PDF مضغوطة (1.5+) لا تُوسم على هذا الخادم — اطلب من مُرسِل الرابط نسخةً قابلة للتنزيل أو ملفاً بصيغة PDF 1.4');
             } catch (\Throwable $e) {
                 report($e);
                 abort(500, 'تعذّر تجهيز العرض الآمن لهذا المستند — راجع مُرسِل الرابط');

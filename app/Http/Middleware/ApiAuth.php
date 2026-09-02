@@ -18,11 +18,13 @@ class ApiAuth
 
         $plain = (string) $request->bearerToken();
         if ($plain === '') {
+            \App\Support\SecurityRadar::record($request, 'وصول مرفوض', 'API بلا مفتاح');   // v2.399: تغطية ACCESS_DENIED
             return Api::error(Api::UNAUTHENTICATED, 401, 'أرسل المفتاح في ترويسة Authorization: Bearer <token>');
         }
 
         $token = ApiToken::where('token_hash', hash('sha256', $plain))->first();
         if (! $token || ($token->expires_at && now()->gt($token->expires_at))) {
+            \App\Support\SecurityRadar::record($request, 'وصول مرفوض', $token ? 'مفتاح API منتهٍ' : 'مفتاح API غير صالح');
             return Api::error(Api::UNAUTHENTICATED, 401, 'مفتاح غير صالح أو منتهٍ');
         }
 

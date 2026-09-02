@@ -702,6 +702,19 @@ if (! function_exists('hub_ref_options_scoped')) {
     }
 }
 
+if (! function_exists('hub_require_ops_stepup')) {
+    /**
+     * تأكيدُ الهوية قبل أفعال التشغيل عالية الأثر (ترحيل، صيانة، مسحُ الكاش، الوضعُ التجريبي) — v2.399.
+     * مفعّلٌ افتراضاً (`security.stepup_ops`=1): جلسةُ مالكٍ مختطفة كانت تُصفّر المنشأة بضغطة.
+     */
+    function hub_require_ops_stepup(?string $next = null)
+    {
+        if ((string) setting('security.stepup_ops', '1') !== '1') return null;
+
+        return hub_require_stepup($next);
+    }
+}
+
 if (! function_exists('hub_guard_scope_input')) {
     /**
      * حارسُ عزلٍ لمدخلاتِ نموذجٍ **خارج** محرّك الوحدات (v2.399): لكل مفتاحٍ في المصفوفة
@@ -2488,6 +2501,10 @@ if (! function_exists('hub_audit')) {
                        ?string $name = null, array $extra = [])
     {
         $companyId = (string) session('hub.company', '') ?: null;
+        // بلا جلسة (API/console): المعزولُ على شركةٍ واحدة يُنسب قيدُه إليها فيراه مدقّقُها (v2.399)
+        if ($companyId === null && auth()->check() && ($cids = hub_company_ids(auth()->user())) !== null && count($cids) === 1) {
+            $companyId = (string) $cids[0];
+        }
         $allowed = hub_company_ids();
         if ($companyId !== null && $allowed !== null && ! in_array($companyId, $allowed, true)) {
             $companyId = null;

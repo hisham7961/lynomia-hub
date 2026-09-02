@@ -154,6 +154,7 @@ class OpsController extends Controller
     public function toggleMaintenance()
     {
         $this->gate();
+        if ($resp = hub_require_ops_stepup()) return $resp;   // فعلٌ عالي الأثر: تأكيدُ هوية (v2.399)
         $on = ! (bool) setting('maintenance.on', false);
         \App\Models\Setting::updateOrCreate(['key' => 'maintenance.on'], ['value' => $on ? '1' : '']);
         Cache::forget('settings:all');
@@ -185,6 +186,7 @@ class OpsController extends Controller
     public function migrate()
     {
         $this->gate();
+        if ($resp = hub_require_ops_stepup()) return $resp;   // فعلٌ عالي الأثر: تأكيدُ هوية (v2.399)
         @set_time_limit(300);
 
         /*
@@ -306,6 +308,7 @@ class OpsController extends Controller
     public function clearCache()
     {
         $this->gate();
+        if ($resp = hub_require_ops_stepup()) return $resp;   // فعلٌ عالي الأثر: تأكيدُ هوية (v2.399)
 
         try {
             \Illuminate\Support\Facades\Artisan::call('optimize:clear');

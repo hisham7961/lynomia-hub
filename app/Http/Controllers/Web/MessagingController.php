@@ -76,7 +76,8 @@ class MessagingController extends Controller
             'state' => 'queued', 'created_at' => now(),
         ]);
 
-        Artisan::call('hub:outbox', ['--limit' => 25]);
+        // الرسالةُ التجريبية وحدَها (v2.399): كان الزرُّ يجرف الطابورَ كلَّه والويبهوك داخل طلب الويب
+        Artisan::call('hub:outbox', ['--only' => $msg->id]);
 
         $msg->refresh();
 

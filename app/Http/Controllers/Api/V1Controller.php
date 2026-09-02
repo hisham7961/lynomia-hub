@@ -97,6 +97,7 @@ class V1Controller extends ModuleController
     public function apiStore(Request $r, string $module)
     {
         [$def, $class] = $this->resolveApi($module, 'a');
+        $this->aliasColumns($r, $def);
 
         // الحجز **قبل** التنفيذ لا بعده: طلبان متزامنان بنفس المفتاح كانا ينفّذان
         // معاً (سجلان وويبهوكان) ولا يُحسم إلا تخزين الرد — الآن يُنفَّذ واحد فقط
@@ -133,6 +134,7 @@ class V1Controller extends ModuleController
     public function apiUpdate(Request $r, string $module, string $id)
     {
         [$def, $class] = $this->resolveApi($module, 'e');
+        $this->aliasColumns($r, $def);
         if (hub_needs_approval(auth()->user(), $module, 'e')) {
             return \App\Support\Api::error(\App\Support\Api::APPROVAL_REQUIRED, 409,
                 'هذه العملية محمية بالموافقات — نفّذها من الواجهة ليُصفّ الطلب');
@@ -168,6 +170,7 @@ class V1Controller extends ModuleController
     public function apiPatch(Request $r, string $module, string $id)
     {
         [$def, $class] = $this->resolveApi($module, 'e');
+        $this->aliasColumns($r, $def);
         if (hub_needs_approval(auth()->user(), $module, 'e')) {
             return \App\Support\Api::error(\App\Support\Api::APPROVAL_REQUIRED, 409,
                 'هذه العملية محمية بالموافقات — نفّذها من الواجهة ليُصفّ الطلب');
@@ -332,6 +335,23 @@ class V1Controller extends ModuleController
     }
 
     /** حل الوحدة لطلبات API برسائل JSON */
+    /**
+     * **جولةُ القراءة ثم الكتابة تعمل كما توثّقها الوثائق** (v2.399): القراءةُ تُخرج
+     * أسماءَ الأعمدة (`owner_id`, `next_step`) والكتابةُ تقرأ مفاتيحَ السجلّ (`ownerId`,
+     * `nextStep`) — فكان PUT بجسم GET يُصفّر ٥٦٢ حقلاً من ١٣٨٣ صامتاً. هنا يُقبل
+     * الاسمان: إن غاب المفتاحُ وحضر العمودُ نُسخت قيمتُه إلى المفتاح قبل التحقق.
+     */
+    protected function aliasColumns(Request $r, array $def): void
+    {
+        $merge = [];
+        foreach ($def['fields'] ?? [] as $f) {
+            $k = (string) ($f['key'] ?? ''); $c = (string) ($f['col'] ?? '');
+            if ($k === '' || $c === '' || $k === $c) continue;
+            if (! $r->has($k) && $r->has($c)) $merge[$k] = $r->input($c);
+        }
+        if ($merge) $r->merge($merge);
+    }
+
     protected function resolveApi(string $module, string $op): array
     {
         $def = hub_mod($module);
@@ -424,7 +444,8 @@ class V1Controller extends ModuleController
             \Illuminate\Support\Facades\DB::table('idempotency_keys')
                 ->where('created_at', '<', now()->subDays(2))->delete();
         } catch (\Throwable $e) {
-            // فشل التخزين لا يكسر الرد — أسوأ الأحوال إعادة تنفيذ مكشوفة لاحقاً
+            // فشل التخزين لا يكسر الرد — لكنه يُبلَّغ (v2.399): إعادةُ تنفيذٍ محتملة لا تبقى بلا أثر
+            report($e);
         }
     }
 
@@ -492,7 +513,18 @@ class V1Controller extends ModuleController
         foreach ($def['fields'] as $f) {
             $hidden = hub_field_mode($u, $module, $f['key']) === 'hide';
             $secret = ($f['type'] ?? '') === 'sec' && (! $canSec || ! $inAllowed);
-            if ($hidden || $secret) unset($arr[$f['col']]);
+            if ($hidden || $secret) { unset($arr[$f['col']]); continue; }
+            // **حقلُ التاريخ يوماً لا لحظةً** (v2.399): كان يُسلسَل `2026-01-05` طابعَ UTC
+            // `2026-01-04T21:00:00Z` (المنطقة +٣) فتُعيده جولةُ القراءة/الكتابة يوماً إلى الوراء.
+            // المواصفةُ تعلنه `format: date` — والإخراجُ يطابقها.
+            if (($f['type'] ?? '') === 'date' && ! empty($arr[$f['col']]) && is_string($arr[$f['col']])) {
+                try {
+                    $d = \Illuminate\Support\Carbon::parse($arr[$f['col']]);
+                    $arr[$f['col']] = (str_ends_with($arr[$f['col']], 'Z') || str_contains($arr[$f['col']], '+'))
+                        ? $d->setTimezone(config('app.timezone'))->toDateString() : $d->toDateString();
+                } catch (\Throwable $e) {
+                }
+            }
         }
 
         $want = preg_split('/[،,\s]+/u', (string) $fields, -1, PREG_SPLIT_NO_EMPTY);

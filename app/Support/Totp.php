@@ -27,6 +27,19 @@ class Totp
     }
 
     /** تحقق بتسامح ±1 نافذة (ساعة الجوال قد تسبق أو تتأخر قليلاً) */
+    /**
+     * كالتحقق لكن **بلا إعادة استعمال** (v2.399): الرمزُ الواحد كان يُقبل مرّتين داخل
+     * نافذته (٩٠ ثانية) — فمن التقطه يدخل بعد صاحبه. يُختم في الكاش بنطاقه
+     * (مستخدم + غرض) ذرّياً بـ add()، فالثاني يُرفض.
+     */
+    public static function verifyOnce(string $secret, string $input, string $scope): bool
+    {
+        if (! self::verify($secret, $input)) return false;
+        $key = 'totp:used:' . sha1($scope . '|' . preg_replace('/\D/', '', $input));
+
+        return \Illuminate\Support\Facades\Cache::add($key, 1, 95);
+    }
+
     public static function verify(string $secret, string $input): bool
     {
         // سرٌّ فارغ (أو بلا محرفٍ صالح في Base32) يُنتج رمزاً **يحسبه أيُّ أحد**:

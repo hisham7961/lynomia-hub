@@ -114,7 +114,17 @@ class WebhookController extends Controller
     public function resend(string $id, string $did)
     {
         $this->gate();
+        $h = Webhook::findOrFail($id);
         $d = WebhookDelivery::where('webhook_id', $id)->findOrFail($did);
+        // الإعادةُ اليدوية تحترم حالةَ الاشتراك وتحجز التسليمَ كما يحجزه العامل (v2.399):
+        // كانت تُرسل لاشتراكٍ معطَّل أو موقوف، وتُسابق العاملَ فتُرسل مرّتين.
+        if (! $h->active) return back()->with('err', 'الاشتراك معطَّل — فعّله أولاً ثم أعد الإرسال');
+        if ($h->paused_until && $h->paused_until->isFuture()) {
+            return back()->with('err', 'الاشتراك موقوفٌ مؤقتاً بعد فشلٍ متكرّر حتى ' . $h->paused_until->format('H:i') . ' — أو شغّله من جديد');
+        }
+        $claimed = WebhookDelivery::whereKey($d->id)->whereIn('state', ['queued', 'failed'])->update(['state' => 'sending']);
+        if (! $claimed) return back()->with('err', 'هذا التسليم قيد الإرسال الآن أو سُلّم من قبل');
+        $d->refresh();
         $ok = WebhookDispatcher::send($d);
         $d->refresh();
 

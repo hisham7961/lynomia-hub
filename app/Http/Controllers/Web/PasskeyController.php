@@ -188,6 +188,14 @@ class PasskeyController extends Controller
         if ($u->locked_until && now()->lt($u->locked_until)) {
             return response()->json(['ok' => false, 'error' => 'الحساب مقفلٌ مؤقتاً بعد محاولاتٍ فاشلة'], 423);
         }
+        // وانتهاءُ الحساب وقائمةُ IP كما عند باب كلمة المرور (v2.399): المفتاحُ لا يتجاوزهما
+        if ($u->expires_at && now()->toDateString() > substr((string) $u->expires_at, 0, 10)) {
+            return response()->json(['ok' => false, 'error' => 'انتهت صلاحية الحساب'], 403);
+        }
+        if ($u->allowed_ips && ! ip_allowed((string) $r->ip(), (string) $u->allowed_ips)) {
+            \App\Support\SecurityRadar::record($r, 'وصول مرفوض', 'مفتاح مرور من عنوان خارج القائمة');
+            return response()->json(['ok' => false, 'error' => 'الدخول من هذا العنوان غير مسموح لهذا الحساب'], 403);
+        }
 
         $verified = $this->verifyAssertionInput($r, $challenge, $u->id, requireUv: true);
         if (! $verified instanceof WebauthnCredential) return $verified;

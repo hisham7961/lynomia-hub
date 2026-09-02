@@ -231,7 +231,7 @@ class ErrorLog
      * فقد تُسرّب رواتبَ/أسراراً/PII إلى مركز الأخطاء وإشعارِ المراقبة. نُبقي رمزَ
      * الحالة ووصفَ القيد/العمود، ونحذف مقطعَ SQL ونطمس القيمَ المقتبسة.
      */
-    protected static function safeMessage(\Throwable $e): string
+    public static function safeMessage(\Throwable $e): string
     {
         $msg = $e->getMessage();
         if ($e instanceof \Illuminate\Database\QueryException) {

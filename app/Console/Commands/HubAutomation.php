@@ -50,7 +50,13 @@ class HubAutomation extends Command
         if ($this->dry) $this->warn('وضع المعاينة — لن يُكتب شيء');
 
         $g = $this->recurring();
-        $a = $this->alertRules();
+        // عزلُ الفشل كسائر الخطوات (v2.399): قاعدةٌ واحدة ترمي كانت تُسقط التذكيرات والعقود والنبضة
+        try {
+            $a = $this->alertRules();
+        } catch (\Throwable $e) {
+            report($e);
+            $a = ['hits' => 0, 'rules' => 0, 'esc' => 0, 'outbox' => 0];
+        }
         $e = $this->esignReminders();
         $c = $this->contractsAuto();
         $b = $this->budgetsAuto();

@@ -480,6 +480,7 @@ Route::middleware('auth')->group(function () {
     Route::post('apps/quoteflow/save', [QuoteFlowController::class, 'save'])->name('quoteflow.save');
     Route::post('admin/demo/reset', function () {
         abort_unless(auth()->user()?->role?->is_owner, 403);
+        if ($resp = hub_require_ops_stepup()) return $resp;   // يبذر بياناتٍ وهمية في كل الوحدات — بتأكيد هوية (v2.399)
         // شامل: كل وحدة من السجل تنال بيانات تجريبية، والإعدادات الفارغة تُملأ
         \Illuminate\Support\Facades\Artisan::call('hub:demo', ['--full' => true]);
 
@@ -487,6 +488,7 @@ Route::middleware('auth')->group(function () {
     })->name('demo.reset');
     Route::post('admin/demo/off', function () {
         abort_unless(auth()->user()?->role?->is_owner, 403);
+        if ($resp = hub_require_ops_stepup()) return $resp;
         \Illuminate\Support\Facades\Artisan::call('hub:demo', ['--purge' => true]);
 
         return back()->with('ok', 'انتهى الوضع التجريبي ومُسحت بياناته الوهمية كلها');

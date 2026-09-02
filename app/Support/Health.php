@@ -180,6 +180,32 @@ final class Health
         return self::c($issues ? self::DEGRADED : self::HEALTHY, 'الإعداد', $issues ? implode('؛ ', $issues) : 'سليم', ['issues' => $issues, 'env' => config('app.env')]);
     }
 
+    /**
+     * **مفتاحُ الرجل الميّت** (v2.399): إن لم تنبض المجدولاتُ (cron غيرُ مفعّل أو واقف) لم يعلم أحد —
+     * فالمنبّهُ نفسُه كان يعمل بالـcron. يُستدعى من طلبات الويب (مخنوقاً بالكاش كل نصف ساعة)
+     * ويُشعر المالكين والمراقبين مرّةً في اليوم حتى تعود النبضات. لا يُشعر في أول ساعاتِ تنصيب.
+     */
+    public static function watchdog(): void
+    {
+        try {
+            if ((string) setting('ops.watchdog', '1') !== '1') return;
+            if (! Cache::add('health:watchdog', 1, 1800)) return;
+            $s = self::scheduler();
+            if (($s['status'] ?? '') !== self::UNAVAILABLE) return;
+            $first = \App\Models\User::orderBy('created_at')->value('created_at');
+            if (! $first || Carbon::parse($first)->gt(now()->subHours(6))) return;   // تنصيبٌ حديث — لا صراخ
+            $last = setting('heartbeat.watchdog_notified');
+            if ($last && Carbon::parse($last)->gt(now()->subDay())) return;
+            \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.watchdog_notified'], ['value' => now()->toIso8601String()]);
+            Cache::forget('settings:all');
+            $text = '⏰ المجدولاتُ لا تنبض: ' . ($s['why'] ?? '') . ' — لا تسليمَ رسائل ولا نسخَ احتياطي ولا تنبيهات حتى يُصلَح سطر cron. راجع مركز التشغيل ← كتيّبات التشغيل.';
+            \App\Models\User::with('role')->whereNull('deleted_at')->get()
+                ->filter(fn ($u) => $u->role?->is_owner || hub_flag($u, 'monitor'))
+                ->each(fn ($u) => hub_notify($u->id, 'error', $text));
+        } catch (\Throwable $e) {
+        }
+    }
+
     /** المجدولات: كلُّ نبضةٍ بدورتها — متأخرةٌ ثم متعطّلة، والغائبةُ كلياً = cron غير مفعّل */
     public static function scheduler(): array
     {
