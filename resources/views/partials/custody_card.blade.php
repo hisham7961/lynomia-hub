@@ -73,7 +73,7 @@
                         <label for="cu-proj">لمشروع (اختياري)</label>
                         <select class="inp" id="cu-proj" name="projectId">
                             <option value=""></option>
-                            @foreach (hub_ref_options('projects') as $cupid => $cupname)
+                            @foreach (hub_ref_options_scoped('projects') as $cupid => $cupname)
                                 <option value="{{ $cupid }}">{{ $cupname }}</option>
                             @endforeach
                         </select>

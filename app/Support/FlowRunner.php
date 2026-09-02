@@ -47,7 +47,7 @@ class FlowRunner
                 $ok = 0;
                 foreach ((array) $flow->actions as $a) {
                     // إجراء واحد لا يوقف البقية — لكن عطله يُبلَّغ لا يُبتلع
-                    try { self::act($a, $def, $module, $m); $ok++; } catch (\Throwable $e) { report($e); }
+                    try { self::act($a + ['_flow' => (string) $flow->name], $def, $module, $m); $ok++; } catch (\Throwable $e) { report($e); }
                 }
                 // «آخر تشغيل: قبل دقيقة» لا تُكتب وكلُّ الإجراءات فشلت —
                 // كانت الشاشة تُظهر مساراً معطوباً بمظهر السليم
@@ -208,8 +208,19 @@ class FlowRunner
             case 'set':
                 $field = collect($def['fields'])->firstWhere('key', $a['field'] ?? '');
                 if ($field && ! in_array($field['type'], ['file', 'img', 'sec'], true)) {
+                    $old = $m->{$field['col']};
                     $m->{$field['col']} = (string) ($a['value'] ?? '');
                     $m->saveQuietly();   // بلا إطلاق مسارات جديدة — حماية من الحلقات
+                    // **لكن بأثرٍ تدقيقيّ** (v2.399): الحفظُ الصامت كان يغيّر سجلَّ أعمالٍ بلا قيدٍ
+                    // يقول ماذا تغيّر ولماذا — فتاريخُ السجل يناقض حالتَه.
+                    if ((string) $old !== (string) $m->{$field['col']} && method_exists($m, 'writeAudit')) {
+                        try {
+                            request()->merge(['_reason' => 'مسار عمل: ' . ($a['_flow'] ?? '')]);
+                            $m->writeAudit('تعديل', [$field['col'] => $old], [$field['col'] => $m->{$field['col']}]);
+                        } catch (\Throwable $e) {
+                            report($e);
+                        }
+                    }
                 }
                 break;
         }

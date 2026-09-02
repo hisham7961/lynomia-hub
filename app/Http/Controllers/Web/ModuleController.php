@@ -242,6 +242,7 @@ class ModuleController extends Controller
         $r->validate($this->rules($def), [], $this->attrs($def));
         $this->guardProject($r, $module);
         $this->guardCompany($r, $module);
+        $this->guardClient($r, $module);
         $this->guardAccountRequest($r, $module);
 
         $m = new $class;
@@ -416,6 +417,7 @@ class ModuleController extends Controller
         $r->validate($this->rules($def, creating: false), [], $this->attrs($def));
         $this->guardProject($r, $module);
         $this->guardCompany($r, $module);
+        $this->guardClient($r, $module);
 
         $m = $this->findScoped($class, $module, $id);
 
@@ -1060,6 +1062,28 @@ class ModuleController extends Controller
         if ($ids) $m->{$pcol} = $ids[0];
     }
 
+    /**
+     * ونظيرُها للعميل (v2.399): كان المعزولُ على عملاء يكتب `clientId` لعميلٍ أجنبيّ
+     * (‏`exists` وحدها) فيُنسب سجلُّه لمساحة عميلٍ آخر ويختفي عنه — التماثلُ الذي
+     * صُلِّح للشركات ولم يُعكَس للعملاء.
+     */
+    protected function guardClient(Request $r, string $module): void
+    {
+        $ids = hub_client_ids();
+        if ($ids === null || $module === 'clients') return;
+        $kf = collect(hub_mod($module)['fields'] ?? [])
+            ->first(fn ($f) => ($f['type'] ?? '') === 'ref' && ($f['ref'] ?? '') === 'clients' && empty($f['multi']));
+        if (! $kf) return;
+        if (hub_field_mode(auth()->user(), $module, $kf['key']) !== '') return;
+
+        $val = hub_str($r->input($kf['key']));
+        if ($val === '') return;   // الفراغُ يرثه inheritClient — لا حبسَ للحفظ
+        if (! in_array($val, $ids, true)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(
+                [$kf['key'] => 'حسابك معزول على عملاء محددين — اختر عميلاً من عملائك']);
+        }
+    }
+
     /** العزل الصارم: من له شركات مسموحة يربط السجل بإحداها فقط عند الإضافة أو التعديل */
     protected function guardCompany(Request $r, string $module): void
     {
@@ -1161,19 +1185,10 @@ class ModuleController extends Controller
         foreach (collect($def['fields'])->where('type', 'ref') as $f) {
             $cur = $row?->{$f['col']} ?? null;
             if (is_string($cur) && ! empty($f['multi'])) $cur = json_decode($cur, true) ?: [];
-            $opts = hub_ref_options($f['ref'], $cur);
-            if ($f['ref'] === 'projects' && hub_scoped(auth()->user())) {
-                $opts = array_intersect_key($opts, array_flip(auth()->user()->visibleProjectIds()));
-            }
-            // العزل الصارم: أي مرجعٍ لوحدةٍ معزولة على الشركات (الشركات نفسها،
-            // العملاء، الموردون…) تنحصر خياراته في شركات المستخدم المسموحة —
-            // وإلا سرّبت القائمة أسماء سجلات شركات أجنبية وسمحت بالربط بها.
-            if (($cids = hub_company_ids()) !== null && ($ccol = hub_company_col($f['ref']))) {
-                $allowed = \Illuminate\Support\Facades\DB::table(hub_ref_table($f['ref']))
-                    ->whereIn($ccol, $cids)->pluck('id')->map(fn ($v) => (string) $v)->all();
-                $opts = array_intersect_key($opts, array_flip($allowed));
-            }
-            $out[$f['key']] = $opts;
+            // **القارئُ المنطَّق الواحد** (v2.399): كان هذا الموضع يعيد بناء مرشّحَي المشاريع
+            // والشركات بيده ويُغفل العملاء — فالمعزولُ على عميلٍ يرى أسماءَ كل العملاء في
+            // القوائم المنسدلة. `hub_ref_options_scoped` يطبّق الثلاثة معاً في مكانٍ واحد.
+            $out[$f['key']] = hub_ref_options_scoped($f['ref'], $cur);
         }
         return $out;
     }

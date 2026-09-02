@@ -28,6 +28,8 @@ class ProfileController extends Controller
         // جديدةٍ أثناء الحادثة (الإبطالُ يبقى متاحاً). يُرفع من مركز الأمان.
         abort_if((string) setting('security.freeze_tokens', '0') === '1', 423,
             'سكُّ مفاتيح API مجمَّدٌ الآن بمفتاح طوارئٍ أمنيّ — يُرفع من مركز الأمان');
+        // سكُّ رمزٍ كامل الصلاحيات لسنة = اعتمادٌ دائم: يتطلب تأكيدَ الهوية أولاً (v2.399)
+        if ($resp = hub_require_credential_stepup()) return $resp;
         $d = $r->validate([
             'tname'   => ['required', 'string', 'max:110'],
             'tdays'   => ['nullable', 'integer', 'min:1', 'max:730'],
@@ -69,6 +71,7 @@ class ProfileController extends Controller
         // التدويرُ يسكّ قيمةً جديدة — فيخضع لتجميد الرموز نفسِه (الإبطالُ لا يخضع)
         abort_if((string) setting('security.freeze_tokens', '0') === '1', 423,
             'تدويرُ مفاتيح API مجمَّدٌ الآن بمفتاح طوارئٍ أمنيّ — يُرفع من مركز الأمان');
+        if ($resp = hub_require_credential_stepup()) return $resp;
         $t = \App\Models\ApiToken::where('user_id', auth()->id())->findOrFail($id);
         $plain = 'lyn_' . \Illuminate\Support\Str::random(44);
 
@@ -130,6 +133,8 @@ class ProfileController extends Controller
         $u->totp_enabled = true;
         $u->saveQuietly();
         $r->session()->forget('2fa:pending');
+        // حدثٌ أمنيّ قانونيّ (MFA_ENABLED) — كان يمرّ بلا أثر (v2.399)
+        hub_audit('تفعيل التحقق بخطوتين', 'users', $u->id, $u->name, ['after' => ['totp_enabled' => true, 'by' => 'صاحب الحساب']]);
 
         return redirect()->route('profile.edit')->with('ok', '✅ فُعّلت المصادقة الثنائية — ستُطلب عند كل دخول');
     }
@@ -146,6 +151,7 @@ class ProfileController extends Controller
         $u->totp_secret_cipher = null;
         $u->totp_enabled = false;
         $u->saveQuietly();
+        hub_audit('إطفاء التحقق بخطوتين', 'users', $u->id, $u->name, ['after' => ['totp_enabled' => false, 'by' => 'صاحب الحساب']]);
 
         return redirect()->route('profile.edit')->with('ok', 'عُطّلت المصادقة الثنائية');
     }
@@ -205,16 +211,11 @@ class ProfileController extends Controller
         $u->password_changed_at = now();
         // تدوير رمز «تذكّرني»: كعكاتُه على كل الأجهزة (٤٠٠ يوم) تموت فوراً — وإلا
         // بقيت بيد المهاجم صالحةً رغم تغيير الكلمة، فلا يتحقق غرضُ التغيير الأمني.
-        $u->setRememberToken(\Illuminate\Support\Str::random(60));
         $u->save();
 
         // وجلساتُ الأجهزة الأخرى الحيّة تُوسم منتهية فيطردها SessionSentry مع طلبها
-        // التالي — تغييرُ الكلمة عند الاشتباه بتسريبها يطرد المهاجم فعلاً.
-        \Illuminate\Support\Facades\DB::table('sessions_log')
-            ->where('user_id', $u->id)
-            ->where('id', '!=', (string) $r->session()->get('hub.sl', ''))
-            ->where('revoked', false)
-            ->update(['revoked' => true]);
+        // التالي، ويُدوَّر «تذكّرني» — بالسكّة الواحدة (Sessions::revokeAll).
+        \App\Support\Sessions::revokeAll($u, (string) $r->session()->get('hub.sl', '') ?: null);
 
         // تدوير معرّف الجلسة الحالية بعد تغيير كلمة المرور
         $r->session()->regenerate();

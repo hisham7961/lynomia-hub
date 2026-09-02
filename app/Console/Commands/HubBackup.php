@@ -28,7 +28,32 @@ class HubBackup extends Command
         'contract_signers', 'contract_events', 'contract_approval_steps',
         'sign_template_versions', 'record_versions', 'record_acks',
         'comments', 'audits', 'dm_messages', 'share_links', 'odoo_connections',
+        // **طبقةُ الأتمتة والاعتماد وبنودُ العروض** (v2.399): كانت خارج النسخة فتُستعاد المنشأة
+        // بلا مساراتٍ ولا ويبهوك ولا مفاتيح ولا بنودِ عرضٍ ولا رأسِ سلسلةِ التدقيق — «نجاحٌ» ناقص
+        'flows', 'kpi_defs', 'webhooks', 'inbound_hooks', 'api_tokens', 'sign_templates', 'sign_requests',
+        'quote_lines', 'quote_milestones', 'dashboards', 'dashboard_widgets', 'saved_views', 'work_hours',
+        'webauthn_credentials', 'user_devices', 'asset_custody', 'record_identifiers', 'identity_lookups',
+        'inbox_documents', 'metric_points', 'audit_chain', 'signal_states', 'change_orders', 'screenshots',
     ];
+
+    /** جداولٌ عابرة لا تستحق نسخاً — لتوثيق قرار الاستثناء لا لنسيانه (يحرسها اختبارُ التغطية) */
+    public const EPHEMERAL = [
+        'migrations', 'cache', 'cache_locks', 'sessions', 'jobs', 'job_batches', 'failed_jobs', 'password_reset_tokens',
+        'personal_access_tokens', 'idempotency_keys', 'page_visits', 'access_denials', 'activity_pings', 'error_events',
+        'notifications_hub', 'outbox', 'webhook_deliveries', 'inbound_hook_events', 'sessions_log', 'user_ips',
+        'download_log', 'imports_log', 'automation_log', 'kb_reads', 'track_points', 'track_sessions', 'api_usage',
+        'reactions', 'comment_reads', 'sideapp_stores', 'settings', 'roles', 'users',
+        'record_locks', 'share_views',   // أقفالُ تحريرٍ تنتهي بدقائق، وسجلُّ مشاهداتِ روابط المشاركة
+    ];
+
+    /** الجداولُ التي تنسخها النسخة: وحداتُ السجل + الخام + (users/roles/settings بصيغتها) */
+    public static function coveredTables(): array
+    {
+        $t = ['users', 'roles', 'settings'];
+        foreach (hub_modules() as $k => $def) if (! empty($def['table'])) $t[] = $def['table'];
+
+        return array_values(array_unique(array_merge($t, self::RAW_TABLES)));
+    }
 
     /** فشلٌ لا يحرّك موعدَ النبضة (الموعدُ للنجاح وحده) لكنه يُكتب نتيجةً فيقرؤه مركزُ التشغيل */
     protected function recordFailure(string $why): void

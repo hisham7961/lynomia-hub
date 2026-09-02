@@ -18,11 +18,12 @@ class ApiUsageAnalyticsTest extends TestCase
         $this->withHeaders($h)->getJson('/api/v1/nope')->assertStatus(404);
 
         $tid = DB::table('api_tokens')->value('id');
-        $rows = DB::table('metric_points')->where('module', Api::USAGE_MODULE)->where('record_id', $tid)->pluck('value', 'metric');
-        $this->assertSame(3.0, (float) $rows['requests']);
-        $this->assertSame(1.0, (float) $rows['errors']);
-        $this->assertGreaterThanOrEqual(0.0, (float) $rows['ms']);
-        $this->assertSame(1, DB::table('metric_points')->where('module', Api::USAGE_MODULE)->where('metric', 'requests')->count(), 'نقطةٌ واحدة لليوم لا صفٌّ لكل طلب');
+        $row = DB::table('api_usage')->where('token_id', $tid)->first();
+        $this->assertSame(3, (int) $row->requests);
+        $this->assertSame(1, (int) $row->errors);
+        $this->assertGreaterThanOrEqual(0, (int) $row->ms);
+        $this->assertSame(1, DB::table('api_usage')->count(), 'صفٌّ واحد لليوم لا صفٌّ لكل طلب');
+        $this->assertSame(0, DB::table('metric_points')->count(), 'مقاييسُ الأعمال لا تُلوَّث بعدّادات تقنية');
 
         $u = Api::usage(7);
         $this->assertSame(3, $u['total']['requests']);
@@ -37,6 +38,6 @@ class ApiUsageAnalyticsTest extends TestCase
     {
         $this->seedCore();
         $this->getJson('/api/v1/me')->assertStatus(401);
-        $this->assertSame(0, DB::table('metric_points')->where('module', Api::USAGE_MODULE)->count());
+        $this->assertSame(0, DB::table('api_usage')->count());
     }
 }

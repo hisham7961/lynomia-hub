@@ -674,6 +674,25 @@ class HubAutomation extends Command
             // **وزياراتُ الصفحات** (v2.350): كان التشذيبُ يقع **داخل طلب المستخدم**
             // (فرصةُ ١٪) — حذفٌ على عمودٍ بلا فهرسٍ في أثناء تحميل صفحة. نُقل هنا
             // بجوار إخوته، على دفعاتٍ محدودة كي لا يقفل الجدولَ طويلاً.
+            // عدّاداتُ استخدام API: ٩٠ يوماً تكفي للتحليل (v2.399)
+            \App\Support\Api::pruneUsage((int) setting('api.usage_keep_days', 90));
+
+            // **سياسةُ احتفاظٍ لسجلات التشغيل** (v2.399) — كانت بلا سقفٍ إطلاقاً:
+            // الصندوقُ الصادر المُسلَّم، وتسليماتُ الويبهوك الفاشلة، والأخطاءُ المحلولة أو البائتة.
+            // (سلسلةُ التدقيق تبقى للأبد عمداً.) المدَدُ من الإعدادات لا من الشيفرة.
+            if (\Illuminate\Support\Facades\Schema::hasTable('outbox')) {
+                $n += DB::table('outbox')->whereIn('state', ['sent', 'failed'])
+                    ->where('created_at', '<', now()->subDays(max(30, (int) setting('retention.outbox_days', 180))))->delete();
+            }
+            if (\Illuminate\Support\Facades\Schema::hasTable('webhook_deliveries')) {
+                $n += DB::table('webhook_deliveries')->where('state', 'failed')
+                    ->where('created_at', '<', now()->subDays(max(14, (int) setting('retention.webhook_failed_days', 90))))->delete();
+            }
+            if (\Illuminate\Support\Facades\Schema::hasTable('error_events')) {
+                $keep = max(30, (int) setting('retention.errors_days', 180));
+                $n += DB::table('error_events')->where('status', 'محلول')->where('last_seen', '<', now()->subDays($keep))->delete();
+                $n += DB::table('error_events')->where('last_seen', '<', now()->subDays($keep * 2))->delete();
+            }
             if (\Illuminate\Support\Facades\Schema::hasTable('page_visits')) {
                 do {
                     $gone = DB::table('page_visits')->where('at', '<', now()->subDays(90))

@@ -171,6 +171,9 @@ final class Health
         if (config('app.env') === 'production' && ! str_starts_with((string) config('app.url'), 'https://')) $issues[] = 'APP_URL ليس https';
         $maint = false;
         try { $maint = (bool) setting('maintenance.on', false); } catch (\Throwable $e) {}
+        $lock = false;
+        try { $lock = (bool) setting('security.lockdown', false); } catch (\Throwable $e) {}
+        if ($lock) return self::c(self::MAINTENANCE, 'الإعداد', 'قفل طوارئ مفعّل', ['issues' => $issues, 'lockdown' => true]);
         if ($maint) return self::c(self::MAINTENANCE, 'الإعداد', 'وضع الصيانة مفعّل', ['issues' => $issues]);
         if (in_array('APP_KEY غائب', $issues, true)) return self::c(self::UNAVAILABLE, 'الإعداد', 'APP_KEY غائب', ['issues' => $issues]);
 

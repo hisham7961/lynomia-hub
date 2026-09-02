@@ -121,6 +121,7 @@ class InboundHookController extends Controller
         $this->gate();
         $hook = InboundHook::findOrFail($id);
         $hook->update(['enabled' => ! $hook->enabled]);
+        hub_audit($hook->enabled ? 'تفعيل ويبهوك وارد' : 'تعطيل ويبهوك وارد', 'integrations', $hook->id, $hook->name);
 
         return back()->with('ok', $hook->enabled ? 'فُعّلت النقطة' : 'أُوقفت النقطة — لن تستقبل شيئاً');
     }

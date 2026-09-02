@@ -37,7 +37,7 @@ class Observability
         if (method_exists($response, 'header')) $response->header('X-Request-Id', $rid);
 
         $ms = (int) ((microtime(true) - $start) * 1000);
-        $limit = max(50, (int) setting('ops.slow_ms', 1000));   // عتبة البطء قابلة للضبط من الإعدادات
+        $limit = max(50, (int) rescue(fn () => setting('ops.slow_ms', 1000), 1000, false));   // عتبة البطء قابلة للضبط — ولا تسقط الطلب إن سقطت القاعدة
         if ($ms > $limit && ! $request->is('files/*', 'storage/*')) {
             // المدة تُقرَّب لمرتبة: لو دخلت الرسالةَ بالمللي ثانية لصار كل طلب بطيء
             // صفاً فريداً — فيغرق مركز الأخطاء بدل أن يعدّ تكرار البطء نفسه.

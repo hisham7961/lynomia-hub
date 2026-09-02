@@ -8,7 +8,10 @@
         <h2>🖥️ مركز مراقبة وتشغيل النظام</h2>
         <div class="sub">الفحص الخارجي: <span class="mono ltr">GET /healthz</span> — يصلح لمراقبات Uptime</div>
     </div>
-    <a class="btn ghost sm" href="{{ route('errors.index') }}">🐞 مركز الأخطاء ←</a>
+    <div class="crow" style="gap:6px">
+        <a class="btn ghost sm" href="{{ route('ops.runbooks') }}">📘 كتيّبات التشغيل</a>
+        <a class="btn ghost sm" href="{{ route('errors.index') }}">🐞 مركز الأخطاء ←</a>
+    </div>
 </div>
 
 {{-- نموذجُ الصحّة الواحد: الحالةُ لكل مكوّنٍ حرج — هي نفسُها التي يقرؤها /healthz --}}

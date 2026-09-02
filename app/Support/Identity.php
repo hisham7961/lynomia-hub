@@ -236,8 +236,9 @@ class Identity
                 ->each(fn ($p) => $out->push(['why' => 'الاسم نفسه', 'id' => $p->id]));
         }
 
+        // القراءةُ النهائية منطَّقة: مطابقةُ الباركود كانت تُعيد اسمَ منتجِ شركةٍ أخرى وكودَه
         $ids = $out->pluck('id')->unique()->values();
-        $rows = Product::whereIn('id', $ids)->get()->keyBy('id');
+        $rows = self::scopedProducts($user)->whereIn('id', $ids)->get()->keyBy('id');
 
         return $ids->map(fn ($id) => $rows->get($id))->filter()
             ->map(fn ($p) => ['id' => $p->id, 'code' => $p->code, 'name' => $p->name,

@@ -279,6 +279,17 @@ class OpsController extends Controller
         ], $down ? 503 : 200);
     }
 
+    /** كتيّباتُ التشغيل (docs/RUNBOOKS.md) مُصيَّرةً — الملفُّ نفسُه هو المصدر فلا نسخةٌ ثانية تتقادم */
+    public function runbooks()
+    {
+        $this->gate();
+        $md = (string) @file_get_contents(base_path('docs/RUNBOOKS.md'));
+        // محتوىً ثابت من المستودع لا مدخلاتُ مستخدم — تصييرٌ آمن بلا HTML خام
+        $html = $md !== '' ? (string) \Illuminate\Support\Str::markdown($md, ['html_input' => 'strip', 'allow_unsafe_links' => false]) : '<p>لا كتيّبات بعد.</p>';
+
+        return view('ops.runbooks', ['html' => $html]);
+    }
+
     /** الصحّةُ بتفاصيلها (رسائلُ وأرقامٌ وآخرُ أخطاء) — للمالك، JSON للأتمتة والشاشة */
     public function healthDetail()
     {

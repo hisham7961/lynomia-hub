@@ -160,6 +160,11 @@ class ErrorCenterController extends Controller
             'source'  => ['nullable', 'string', 'max:250'],
             'line'    => ['nullable', 'integer'],
         ]);
+        // سقفٌ لبصماتِ المتصفّح لكل مستخدمٍ في اليوم: بلاغٌ حرٌّ بلا سقفٍ كان يملأ الجدول بلا حدّ
+        $k = 'jslog:' . auth()->id() . ':' . now()->toDateString();
+        $n = (int) \Illuminate\Support\Facades\Cache::get($k, 0);
+        if ($n >= (int) setting('ops.jslog_daily_cap', 50)) return response()->noContent();
+        \Illuminate\Support\Facades\Cache::put($k, $n + 1, now()->endOfDay());
         ErrorLog::capture('js', $d['message'], $d['source'] ?? null, (int) ($d['line'] ?? 0));
 
         return response()->noContent();

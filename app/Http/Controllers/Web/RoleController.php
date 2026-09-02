@@ -149,10 +149,19 @@ class RoleController extends Controller
         }
         ksort($mods);
 
+        // قيودُ مستوى الحقل جزءٌ من اللقطة (v2.399): إزالةُ «إخفاء الراتب» كانت تُدوَّن «لا تغيير جوهري»
+        $fr = is_array($role->field_rules) ? $role->field_rules : (json_decode($role->field_rules ?? '[]', true) ?: []);
+        $rules = [];
+        foreach ($fr as $mod => $fields) {
+            foreach ((array) $fields as $fk => $mode) if ($mode !== '' && $mode !== null) $rules[$mod . '.' . $fk] = (string) $mode;
+        }
+        ksort($rules);
+
         return [
             'scope' => $role->scope,
             'flags' => array_values(array_keys(array_filter((array) ($role->flags ?? [])))),
             'modules' => $mods,
+            'fields' => $rules,
         ];
     }
 
@@ -173,6 +182,14 @@ class RoleController extends Controller
         }
         foreach ($bm as $mod => $ops) {
             if (! isset($am[$mod])) $out[] = "وحدة− {$mod} ({$ops})";
+        }
+        $bf = $b['fields'] ?? []; $af = $a['fields'] ?? [];
+        foreach ($af as $k => $mode) {
+            if (! isset($bf[$k])) $out[] = "حقل+ {$k} ({$mode})";
+            elseif ($bf[$k] !== $mode) $out[] = "حقل~ {$k}: {$bf[$k]} ← {$mode}";
+        }
+        foreach ($bf as $k => $mode) {
+            if (! isset($af[$k])) $out[] = "حقل− {$k} ({$mode})";
         }
 
         return $out ?: ['لا تغيير جوهري'];

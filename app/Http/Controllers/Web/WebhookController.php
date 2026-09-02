@@ -46,8 +46,9 @@ class WebhookController extends Controller
                 'وجهة الويبهوك ' . $chk['why'] . ' — إن كان n8n داخليّاً مقصوداً، فعّل «السماح بالعناوين الخاصة» في الإعدادات']);
         }
 
-        Webhook::create($d + ['secret' => 'whs_' . Str::random(40), 'active' => true]);
+        $h = Webhook::create($d + ['secret' => 'whs_' . Str::random(40), 'active' => true]);
         Cache::forget('webhooks:active');
+        hub_audit('إنشاء اشتراك ويبهوك', 'integrations', $h->id, $h->name, ['after' => ['url' => $h->url, 'events' => $h->events]]);
 
         return back()->with('ok', 'أُنشئ الاشتراك — انسخ السر من الجدول لتتحقق من التوقيع عند المستقبل');
     }
@@ -58,6 +59,7 @@ class WebhookController extends Controller
         $h = Webhook::findOrFail($id);
         $h->forceFill(['active' => ! $h->active, 'paused_until' => null, 'fail_streak' => 0])->save();
         Cache::forget('webhooks:active');
+        hub_audit($h->active ? 'تفعيل اشتراك ويبهوك' : 'تعطيل اشتراك ويبهوك', 'integrations', $h->id, $h->name);
 
         return back()->with('ok', $h->active ? 'فُعّل الاشتراك' : 'عُطّل الاشتراك');
     }
@@ -69,6 +71,7 @@ class WebhookController extends Controller
         WebhookDelivery::where('webhook_id', $h->id)->delete();
         $h->delete();
         Cache::forget('webhooks:active');
+        hub_audit('حذف اشتراك ويبهوك', 'integrations', $id, (string) $h->name, ['before' => ['url' => $h->url, 'events' => $h->events]]);
 
         return back()->with('ok', 'حُذف الاشتراك وسجل محاولاته');
     }

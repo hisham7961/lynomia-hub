@@ -64,7 +64,9 @@ class V1Controller extends ModuleController
 
         // فاصلُ id: عمودُ الفرز قد تتساوى قيمُه (الطابع بدقّة الثانية) فتتقلب الصفحات بين الطلبات
         $per = min(100, max(1, (int) $r->query('per', 25)));
-        $page = $q->orderBy($col, $dir)->orderBy('id', $dir)->paginate($per);
+        $page = ($sortKey === null
+            ? $q->orderByDesc('created_at')->orderByDesc('id')
+            : $q->orderBy($col, $dir)->orderBy('id', $dir))->paginate($per);
 
         // hub_str: shape() مُوقَّعةٌ ?string، و`?fields[]=` يمرّر مصفوفةً فترمي TypeError
         $fields = hub_str($r->query('fields')) ?: null;

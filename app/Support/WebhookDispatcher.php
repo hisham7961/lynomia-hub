@@ -107,7 +107,7 @@ class WebhookDispatcher
         if (! $h) { $d->forceFill(['state' => 'failed', 'error' => 'اشتراك محذوف'])->save(); return false; }
 
         $t0 = microtime(true);
-        $code = null; $err = null; $ok = false;
+        $code = null; $err = null; $ok = false; $resp = null;
 
         try {
             // **بوابة SSRF عند التسليم لا الإنشاء وحده**: وجهةٌ أُجيزت وقت الاشتراك
@@ -153,11 +153,19 @@ class WebhookDispatcher
         }
 
         $tries = $d->tries + 1;
-        $retry = $tries <= count(self::BACKOFF);
+        // **تصنيفُ الفشل** (v2.399): ٤xx دائم (400/401/403/404/410…) لا يُعاد — الإعادةُ لا
+        // تُصلح رابطاً محذوفاً ولا سرّاً مدوَّراً، وكانت تطرق ٧ مرّات وتوقف الاشتراك.
+        // أمّا 408/425/429 و5xx والمهلاتُ فمؤقّتة: تُعاد بالسلّم، ومع Retry-After إن أُرسلت.
+        $permanent = $code !== null && $code >= 400 && $code < 500 && ! in_array($code, [408, 425, 429], true);
+        $retry = ! $permanent && $tries <= count(self::BACKOFF);
+        $after = isset($resp) && $resp ? (int) $resp->header('Retry-After') : 0;
+        $minutes = $retry ? ($after > 0 ? max(1, (int) ceil(min($after, 86400) / 60)) : self::BACKOFF[$tries - 1]) : 0;
+        // ارتعاشٌ ±٢٠٪ كي لا تتزامن الإعاداتُ على مستقبلٍ متعثّر في اللحظة نفسها
+        if ($retry && $after <= 0) $minutes = max(1, (int) round($minutes * (0.8 + mt_rand(0, 40) / 100)));
         self::persist($d, [
             'state' => $retry ? 'queued' : 'failed', 'tries' => $tries,
-            'next_at' => $retry ? now()->addMinutes(self::BACKOFF[$tries - 1]) : null,
-            'code' => $code, 'ms' => $ms, 'error' => $err,
+            'next_at' => $retry ? now()->addMinutes($minutes) : null,
+            'code' => $code, 'ms' => $ms, 'error' => $permanent ? ($err . ' — ردٌّ دائم لا يُعاد') : $err,
         ]);
 
         $streak = $h->fail_streak + 1;

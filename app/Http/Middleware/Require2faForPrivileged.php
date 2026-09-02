@@ -30,8 +30,15 @@ class Require2faForPrivileged
 
         $name = (string) $request->route()?->getName();
         if (in_array($name, self::ALLOW, true)) return $next($request);
-        // لا نعترض نداءات API ولا الأصول — فقط تنقّل الويب العاديّ
-        if ($request->expectsJson() || $request->is('api/*')) return $next($request);
+        // سطحُ API له مصادقتُه (ApiAuth) ولا يُعترض هنا. أمّا طلبُ ويب يطلب JSON فكان يمرّ
+        // كاملاً (قراءةً وكتابة) — أي أنّ السياسة كانت تُلتفّ بترويسة Accept (v2.399).
+        // الآن يُردّ 428 بالغلاف الموحَّد ورابطِ التفعيل، ولا يمرّ.
+        if ($request->is('api/*')) return $next($request);
+        if ($request->expectsJson()) {
+            return \App\Support\Api::error(\App\Support\Api::STEP_UP_REQUIRED, 428,
+                'حسابُك صاحبُ صلاحياتٍ حسّاسة — فعّل التحقّقَ بخطوتين للمتابعة (سياسةُ المنشأة)',
+                ['policy' => 'auth.2fa_required_priv'], ['stepup' => true, 'url' => route('profile.edit')]);
+        }
 
         return redirect()->route('profile.edit')->with('warn',
             '🔐 حسابُك صاحبُ صلاحياتٍ حسّاسة — فعّل التحقّقَ بخطوتين للمتابعة (سياسةُ المنشأة).');

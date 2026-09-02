@@ -55,7 +55,7 @@
                         <select class="inp" name="custom[{{ $ck }}]">
                             <option value=""></option>
                             {{-- $cv يمرَّر ليُضمن ظهور المختار حتى بعد سقف الـ٥٠٠ صف — وإلا حُذف المرجع بصمت عند الحفظ --}}
-                            @foreach (hub_ref_options($cf['ref'], $cv) as $rid => $rname)<option value="{{ $rid }}" @selected((string) $cv === (string) $rid)>{{ $rname }}</option>@endforeach
+                            @foreach (hub_ref_options_scoped($cf['ref'], $cv) as $rid => $rname)<option value="{{ $rid }}" @selected((string) $cv === (string) $rid)>{{ $rname }}</option>@endforeach
                         </select>
                     @elseif ($cf['type'] === 'num')
                         <input class="inp ltr" type="number" step="any" name="custom[{{ $ck }}]" value="{{ $cv }}">

@@ -29,6 +29,8 @@ class PasskeyController extends Controller
     public function registerOptions(Request $r)
     {
         abort_unless($this->on(), 404);
+        // تسجيلُ مفتاح مرورٍ = اعتمادٌ دائم بلا كلمة: جلسةٌ مختطفة كانت تزرعه بلا إعادة تحقّق (v2.399)
+        if ($resp = hub_require_credential_stepup()) return $resp;
         $u = $r->user();
         $challenge = Webauthn::challenge();
         session(['wa.reg' => $challenge]);
@@ -55,6 +57,7 @@ class PasskeyController extends Controller
     public function registerVerify(Request $r)
     {
         abort_unless($this->on(), 404);
+        if ($resp = hub_require_credential_stepup()) return $resp;
         $u = $r->user();
         $challenge = (string) session('wa.reg', '');
         session()->forget('wa.reg');   // أحاديُّ الاستعمال
@@ -95,6 +98,7 @@ class PasskeyController extends Controller
 
     public function destroy(Request $r, string $id)
     {
+        if ($resp = hub_require_credential_stepup()) return $resp;
         $u = $r->user();
         $cred = WebauthnCredential::where('user_id', $u->id)->findOrFail($id);
         $cred->delete();

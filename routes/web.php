@@ -57,7 +57,14 @@ Route::post('s/{token}', [DataRoomController::class, 'unlock'])->name('share.unl
 Route::get('s/{token}/file', [DataRoomController::class, 'file'])->name('share.file');
 
 // ── فحص صحي عام لمراقبات Uptime (بلا تسجيل دخول) ──
-Route::get('healthz', [OpsController::class, 'health'])->name('healthz')->middleware('throttle:30,1');
+// **بلا وسطاء الجلسة والصيانة** (v2.399): كان وضعُ الصيانة يردّ صفحةَ HTML ٥٠٣ على المسبار
+// فتُنذر مراقبةُ Uptime بانقطاعٍ لا وجودَ له، وكان `setting()` في وسيطٍ سابقٍ يرمي ٥٠٠ حين
+// تسقط القاعدةُ فلا يقول المسبارُ «القاعدة ساقطة». الصحّةُ تُقال صريحةً: MAINTENANCE حالةٌ لا عطل.
+Route::get('healthz', [OpsController::class, 'health'])->name('healthz')->middleware('throttle:30,1')
+    ->withoutMiddleware([\App\Http\Middleware\HubMaintenance::class, \App\Http\Middleware\WorkHours::class,
+        \App\Http\Middleware\SessionSentry::class, \App\Http\Middleware\TrackVisits::class,
+        \App\Http\Middleware\Require2faForPrivileged::class, \App\Http\Middleware\ResolveChunkedUploads::class,
+        \App\Http\Middleware\DownloadPing::class, \App\Http\Middleware\AccessRadar::class]);
 
 // ── PWA: بيان وأيقونة وصفحة بلا اتصال (عامة) ──
 Route::get('manifest.webmanifest', [PwaController::class, 'manifest'])->name('pwa.manifest');
@@ -460,6 +467,8 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/ops/maintenance', [OpsController::class, 'toggleMaintenance'])->name('ops.maintenance');
     // الصحّةُ المفصّلة (نموذج الصحّة الواحد) — للمالك؛ /healthz العامّ يعرض الحالاتِ وحدها
     Route::get('admin/ops/health', [OpsController::class, 'healthDetail'])->name('ops.health');
+    // كتيّباتُ التشغيل من الملفّ الحيّ docs/RUNBOOKS.md — تُقرأ حيث يُحتاج إليها لا في المستودع وحده
+    Route::get('admin/ops/runbooks', [OpsController::class, 'runbooks'])->name('ops.runbooks');
 
     // مركز نشاط الموظفين — للمالك فقط
     Route::get('admin/activity', [\App\Http\Controllers\Web\ActivityController::class, 'index'])->name('activity.index');

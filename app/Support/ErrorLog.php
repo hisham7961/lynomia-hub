@@ -72,7 +72,9 @@ class ErrorLog
                 ErrorEvent::create($row);
 
                 // بصمةٌ جديدة = خبرٌ جديد. والتكرارُ يُزاد عدّادُه في bump بلا تنبيه.
-                self::tell($message, $req);
+                // أخطاءُ المتصفّح (jslog) نصٌّ يكتبه أيُّ مستخدمٍ مسجَّل: تُجمَّع في المركز ولا
+                // تُدفع إشعاراً للمالكين — وإلا صار البلاغُ قناةَ تصيّدٍ بنصٍّ حرّ (v2.399).
+                if ($kind !== 'js') self::tell($message, $req);
             } catch (\Illuminate\Database\QueryException $e) {
                 self::bump($hash, $req);    // خسرنا سباق الإدراج — الصف موجود الآن فزده
             }
@@ -167,7 +169,9 @@ class ErrorLog
         self::$inNotify = true;
 
         try {
-            $key = 'errnotify:burst:' . now()->format('YmdHi');
+            // نافذةٌ حقيقية (١٥ دقيقة) لا دقيقةٌ تقويمية: كان المفتاحُ يتجدّد كل دقيقة فيصير
+            // السقفُ ٨ في الدقيقة (٤٨٠ في الساعة) لا ٨ في النافذة (v2.399)
+            $key = 'errnotify:burst:' . intdiv(now()->timestamp, self::NOTIFY_BURST_MIN * 60);
             $n = (int) \Illuminate\Support\Facades\Cache::get($key, 0);
             \Illuminate\Support\Facades\Cache::put($key, $n + 1, now()->addMinutes(self::NOTIFY_BURST_MIN));
             if ($n >= self::NOTIFY_BURST_CAP) return;      // انفجار: البقيةُ في المركز
