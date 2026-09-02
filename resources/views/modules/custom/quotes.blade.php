@@ -169,19 +169,36 @@
             $msCanReach = $msTrack && hub_can(auth()->user(), 'quotes', 'e');
             // فاتورةٌ كاملةٌ حيّةٌ للعرض (do=invoice) تمنع فواتيرَ الدفعات — لا ازدواجَ فوترة
             $msFullInv = $msTrack && $row->hasLiveFullInvoice();
-            $msCanInvoice = $msTrack && ! $msFullInv && hub_can(auth()->user(), 'fin', 'a');
-            $msInvoices = $msTrack && $qMs->whereNotNull('invoice_id')->isNotEmpty()
-                ? \App\Models\FinDocument::query()->whereIn('id', $qMs->pluck('invoice_id')->filter()->all())->get(['id', 'doc_no', 'state'])->keyBy('id')
+            // عرضٌ لم يُسعَّر (إجماليُّه صفر): سقفُه صفرٌ فلا سكَّ — ويُقال سببُه لا «أَلغِ فاتورةً»
+            $msZeroTotal = $msTrack && (float) $row->total <= 0;
+            // سقفُ العقد: ما بقي من إجماليّ العرض بعد فواتير الدفعات الحيّة — صفرٌ فلا زرَّ سكّ
+            $msRemaining = $msTrack ? round((float) $row->total - $row->liveMilestoneInvoicedTotal(), 3) : 0.0;
+            $msCapped = $msTrack && ! $msFullInv && ! $msZeroTotal && $msRemaining <= 0;
+            // السكُّ فعلٌ على العرض (quotes:e — كما يفرضه المتحكّم) ويُنشئ مستنداً ماليّاً (fin:a)
+            $msCanInvoice = $msTrack && ! $msFullInv && ! $msCapped && ! $msZeroTotal && hub_can(auth()->user(), 'quotes', 'e') && hub_can(auth()->user(), 'fin', 'a');
+            // رقمُ الفاتورة ورابطُها لمن يرى الماليّة؛ وغيرُه يرى أنّ فاتورةً سُكّت لا أكثر
+            $msFinView = hub_can(auth()->user(), 'fin', 'v');
+            // فواتيرُ المعالم كلُّها — الحاليّةُ والسوابقُ (قد تعود سابقةٌ إلى الحياة من الماليّة)
+            $msInvIds = $msTrack ? $qMs->flatMap(fn ($m) => $m->invoiceIds())->unique()->values()->all() : [];
+            $msInvoices = $msInvIds
+                ? \App\Models\FinDocument::withTrashed()->whereIn('id', $msInvIds)->get(['id', 'doc_no', 'state', 'deleted_at'])->keyBy('id')
                 : collect();
             $finDead = (array) config('hub.fin.dead', []);
+            $msIsLive = fn ($fd) => $fd && ! $fd->trashed() && ($fd->state === null || ! in_array((string) $fd->state, $finDead, true));
         @endphp
         <div class="tblwrap"><table>
             <thead><tr><th>الدفعة</th><th>النسبة</th><th>المبلغ</th><th>المحفّز</th>@if ($msTrack)<th>الحالة</th><th>الفاتورة</th>@endif @if ($canEdit)<th></th>@endif</tr></thead>
             <tbody>
             @foreach ($qMs as $m)
                 @php
-                    $mInv = $m->invoice_id ? ($msInvoices[$m->invoice_id] ?? null) : null;
-                    $mInvLive = $mInv && ($mInv->state === null || ! in_array((string) $mInv->state, $finDead, true));
+                    // فاتورةُ المعلم المعروضة: الحيّةُ إن وُجدت (الحاليّةُ أو سابقةٌ عادت إلى الحياة —
+                    // القاعدةُ نفسُها التي يحكم بها المتحكّم)، وإلا الحاليّةُ الميتةُ مع بيان حالِها
+                    $mLiveId = collect($m->invoiceIds())->first(fn ($id) => $msIsLive($msInvoices[$id] ?? null));
+                    $mInv = $mLiveId ? $msInvoices[$mLiveId] : ($m->invoice_id ? ($msInvoices[$m->invoice_id] ?? null) : null);
+                    $mInvLive = (bool) $mLiveId;
+                    $mInvNote = $mInv && ! $mInvLive ? ' (' . ($mInv->trashed() ? 'محذوفة' : $mInv->state) . ')' : '';
+                    // قيمةُ الدفعة بقاعدة المتحكّم نفسِها (`amountDue`، مقرَّبةً) — ما يُقرَّب إلى صفر لا يُسكّ فلا يُعرَض زرُّه
+                    $mVal = $m->amountDue($row);
                 @endphp
                 <tr>
                     <td>{{ $m->title }}</td>
@@ -208,10 +225,12 @@
                             @endif
                         </td>
                         <td>
-                            @if ($mInv)
-                                <a class="chip" href="{{ route('m.show', ['fin', $mInv->id]) }}" title="{{ $mInv->state }}">🧾 {{ $mInv->doc_no }}{{ $mInvLive ? '' : ' (' . $mInv->state . ')' }}</a>
+                            @if ($mInv && $msFinView)
+                                <a class="chip" href="{{ route('m.show', ['fin', $mInv->id]) }}" title="{{ $mInv->state }}">🧾 {{ $mInv->doc_no }}{{ $mInvNote }}</a>
+                            @elseif ($mInv)
+                                <span class="chip" title="تفاصيلُ الفاتورة لمن يرى الماليّة">🧾 فاتورةٌ مسكوكة{{ $mInvNote }}</span>
                             @endif
-                            @if (! $mInvLive && $msCanInvoice)
+                            @if (! $mInvLive && $msCanInvoice && $mVal > 0)
                                 <form method="POST" action="{{ route('quotes.act', $row->id) }}" class="inline">@csrf
                                     <input type="hidden" name="do" value="ms.invoice"><input type="hidden" name="ms" value="{{ $m->id }}">
                                     <button class="btn ghost xs" data-confirm="سكُّ فاتورةِ هذه الدفعة الآن؟">🧾 سُكّ الفاتورة</button>
@@ -228,7 +247,9 @@
         </table></div>
         @if ($pctSum > 0)<div class="sub" style="margin-top:6px {{ abs($pctSum - 100) > 0.01 ? ';color:var(--bad,inherit)' : '' }}">مجموع النسب: {{ rtrim(rtrim(number_format($pctSum, 2), '0'), '.') }}%@if (abs($pctSum - 100) > 0.01) — يُفترض ١٠٠٪@endif</div>@endif
         @if ($msFullInv ?? false)<div class="sub" style="margin-top:4px">🧾 للعرض فاتورةٌ كاملةٌ حيّة — الدفعاتُ لا تُفوتَر فوقها (أَلغِها من الماليّة إن كان القصدُ الفوترةَ بالدفعات).</div>
-        @elseif ($msTrack)<div class="sub" style="margin-top:4px">بعد القبول يصير الجدولُ التزاماً: أعلِن بلوغَ الدفعة حين تتحقّق، وسُكّ فاتورتَها — معلمٌ بُلغ ولم يُفوتَر ٣ أيامٍ يظهر في مركز التوصيات.</div>@endif
+        @elseif ($msZeroTotal ?? false)<div class="sub" style="margin-top:4px">🧾 إجماليُّ العرض صفر — لا تُسكّ دفعاتٌ على عرضٍ لم يُسعَّر (اضبط إجماليَّه أولاً).</div>
+        @elseif ($msCapped ?? false)<div class="sub" style="margin-top:4px">🧾 فواتيرُ الدفعات الحيّةُ تغطّي إجماليَّ العرض — لا تُسكّ دفعةٌ أخرى (أَلغِ إحداها من الماليّة إن كان ثمّة خطأ).</div>
+        @elseif ($msTrack)<div class="sub" style="margin-top:4px">بعد القبول يصير الجدولُ التزاماً: أعلِن بلوغَ الدفعة حين تتحقّق، وسُكّ فاتورتَها — معلمٌ بُلغ ولم يُفوتَر ٣ أيامٍ يظهر في مركز التوصيات.@if ($msRemaining < (float) $row->total) المتبقّي من الإجماليّ بعد الفواتير الحيّة: <span class="mono">{{ number_format($msRemaining, 3) }}</span>.@endif</div>@endif
     @else
         <div class="sub">لا مدفوعات مجدولة — أضِف دفعاتٍ (٣٠٪ عند القبول، ٤٠٪ بعد المرحلة٢…).</div>
     @endif

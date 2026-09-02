@@ -278,11 +278,96 @@ class Quote extends Model
      * إن كانت، فإيرادُ العرض مُطالَبٌ به كلُّه — فلا تُسكّ فاتورةُ دفعةٍ فوقه ولا تُعدّ
      * معالمُه «بلا فاتورة» (v2.399: منعُ ازدواج الفوترة).
      */
-    public function hasLiveFullInvoice(): bool
+    public function hasLiveFullInvoice(bool $lock = false): bool
     {
         $id = ((array) $this->meta)['invoice_id'] ?? null;
 
-        return is_string($id) && $id !== '' && FinDocument::isLive($id);
+        return is_string($id) && $id !== '' && FinDocument::isLive($id, $lock);
+    }
+
+    /**
+     * هل لأيّ معلمٍ من معالم العرض فاتورةُ دفعةٍ حيّة؟ — الوجهُ المقابلُ لـ
+     * `hasLiveFullInvoice`: إن سُكّت فاتورةُ دفعةٍ حيّةٌ فلا تُسكّ الفاتورةُ الكاملةُ
+     * فوقها (v2.399.1: منعُ ازدواج الفوترة في الاتجاهين).
+     */
+    public function hasLiveMilestoneInvoice(bool $lock = false): bool
+    {
+        return FinDocument::anyLive(array_keys(static::milestoneInvoiceOwners([$this->getKey()], $lock)), $lock);
+    }
+
+    /**
+     * مجموعُ فواتير الدفعات الحيّة على هذا العرض — سقفُ ما يُسكّ بعدها هو
+     * `total − هذا المجموع` (v2.399.1: لا يتجاوز مجموعُ الدفعات إجماليَّ العرض).
+     * يشمل معالمَ حُذفت بنعومة كما `hasLiveMilestoneInvoice`: فاتورتُها ما زالت مطالبة.
+     *
+     * `$lock`: قراءةٌ قافلة (`FOR UPDATE`) لقرارات الحرّاس داخل معاملة — على InnoDB
+     * القراءةُ العاديّةُ تُجيب من صورةٍ ثبّتتها أوّلُ قراءةٍ في المعاملة، فلا ترى سكّاً
+     * أُودع بعدها ولو بعد قفلِ العرض؛ والقافلةُ ترى الأحدثَ المودَع دائماً.
+     */
+    public function liveMilestoneInvoicedTotal(bool $lock = false): float
+    {
+        return static::liveMilestoneInvoicedTotals([$this->getKey()], $lock)[$this->getKey()] ?? 0.0;
+    }
+
+    /**
+     * الصورةُ الجماعيّةُ لما سبق: `[quote_id => مجموع فواتير الدفعات الحيّة]` لعدّة عروضٍ
+     * باستعلامين — للإشارة ١٥ (صفحة معالم) بدل استعلامٍ لكلّ معلم.
+     *
+     * @param  array<int, string>  $quoteIds
+     * @return array<string, float>
+     */
+    public static function liveMilestoneInvoicedTotals(array $quoteIds, bool $lock = false): array
+    {
+        $owners = static::milestoneInvoiceOwners($quoteIds, $lock);
+        if (! $owners) {
+            return [];
+        }
+        $dead = (array) config('hub.fin.dead', []);
+        $out = [];
+        // مجموعُ الحيّة في PHP على خريطة «فاتورة ← عرض» — لا ربطَ في SQL على `invoice_id`
+        // وحده (كان يُسقط السابقةَ المُستعادة) ولا مقارنةَ مسار JSON بعمود (تباينُ المحرّكين)
+        \Illuminate\Support\Facades\DB::table('fin_documents')
+            ->whereIn('id', array_keys($owners))->whereNull('deleted_at')
+            ->when($dead, fn ($q) => $q->where(fn ($w) => $w->whereNull('state')->orWhereNotIn('state', $dead)))
+            ->when($lock, fn ($q) => $q->lockForUpdate())
+            ->get(['id', 'total'])
+            ->each(function ($fd) use (&$out, $owners) {
+                $qid = $owners[(string) $fd->id];
+                $out[$qid] = round(($out[$qid] ?? 0.0) + (float) $fd->total, 3);
+            });
+
+        return $out;
+    }
+
+    /**
+     * خريطةُ «معرّف فاتورة ← معرّف عرض» لكلّ فاتورةٍ رُبطت يوماً بمعلمٍ من معالم هذه
+     * العروض — الحاليّةُ والسوابقُ (`QuoteMilestone::invoiceIds`)، حتى في معالمَ حُذفت
+     * بنعومة (فاتورتُها الحيّةُ ما زالت مطالبةً للعميل). المصدرُ الواحدُ لقرّاء
+     * «فواتير دفعات العرض»: الحارسُ والسقفُ والشاشةُ والإشارة ١٥.
+     *
+     * @param  array<int, string>  $quoteIds
+     * @return array<string, string>
+     */
+    public static function milestoneInvoiceOwners(array $quoteIds, bool $lock = false): array
+    {
+        $quoteIds = array_values(array_filter(array_unique(array_map('strval', $quoteIds))));
+        if (! $quoteIds) {
+            return [];
+        }
+        $owners = [];
+        \Illuminate\Support\Facades\DB::table('quote_milestones')
+            ->whereIn('quote_id', $quoteIds)
+            ->where(fn ($w) => $w->whereNotNull('invoice_id')->orWhereNotNull('meta'))
+            ->orderBy('id')
+            ->when($lock, fn ($q) => $q->lockForUpdate())
+            ->get(['quote_id', 'invoice_id', 'meta'])
+            ->each(function ($m) use (&$owners) {
+                foreach (QuoteMilestone::invoiceIdsOf($m->invoice_id, $m->meta) as $id) {
+                    $owners[$id] ??= (string) $m->quote_id;
+                }
+            });
+
+        return $owners;
     }
 
     public function engagement(): BelongsTo
