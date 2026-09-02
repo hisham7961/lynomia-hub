@@ -33,6 +33,29 @@
     @endforeach
 </div>
 
+{{-- استخدامُ الـAPI (٧ أيام): من يستهلك، وكم يخطئ، وكم يستغرق — من metric_points القائم --}}
+<div class="card" id="apiusage">
+    <h3 class="cardtitle">📊 استخدام REST API <span class="sub">(٧ أيام)</span></h3>
+    @if ($apiUsage['total']['requests'] > 0)
+        <div class="cards">
+            <div class="stat"><span class="ico">🔁</span><b>{{ number_format($apiUsage['total']['requests']) }}</b><span>طلب</span></div>
+            <div class="stat"><span class="ico">⚠️</span><b class="{{ ($apiUsage['total']['error_rate'] ?? 0) > 10 ? 'txt-bad' : '' }}">{{ $apiUsage['total']['error_rate'] }}٪</b><span>نسبة الأخطاء (≥400) · {{ $apiUsage['total']['errors'] }} خطأ</span></div>
+            <div class="stat"><span class="ico">⏱</span><b>{{ $apiUsage['total']['avg_ms'] ?? '—' }}ms</b><span>متوسط زمن الرد</span></div>
+        </div>
+        <table class="mini">
+            <thead><tr><th>المفتاح</th><th>صاحبه</th><th class="acts">طلبات</th><th class="acts">أخطاء</th><th class="acts">متوسط</th></tr></thead>
+            @foreach (array_slice($apiUsage['tokens'], 0, 10) as $t)
+                <tr><td><b>{{ $t['name'] }}</b></td><td class="sub">{{ $t['user'] ?? '—' }}</td>
+                    <td class="acts mono">{{ number_format($t['requests']) }}</td>
+                    <td class="acts mono {{ ($t['error_rate'] ?? 0) > 10 ? 'txt-bad' : '' }}">{{ $t['errors'] }} ({{ $t['error_rate'] }}٪)</td>
+                    <td class="acts mono">{{ $t['avg_ms'] ?? '—' }}ms</td></tr>
+            @endforeach
+        </table>
+    @else
+        <div class="sub">لا طلبات API خلال ٧ أيام — تُعدّ منذ هذا الإصدار لكل مفتاحٍ في اليوم.</div>
+    @endif
+</div>
+
 {{-- كل الإعدادات في مكان واحد: بوابة ملاحية — الشاشات باقية في أماكنها --}}
 <div class="card">
     <h3 class="cardtitle">🗂️ التكاملات وإعداداتها — في مكان واحد</h3>

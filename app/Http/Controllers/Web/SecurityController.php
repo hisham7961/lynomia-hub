@@ -22,9 +22,13 @@ class SecurityController extends Controller
         abort_unless(hub_is_owner(), 403, 'مركز الأمان للمالكين فقط');
     }
 
-    public function index()
+    public function index(\Illuminate\Http\Request $r)
     {
         $this->gate();
+
+        // السجلُّ الأمنيّ الموحَّد (v2.399): تصنيفٌ قانونيّ فوق التدقيق ورادار المنع — يُصفّى بالكود
+        $eventCode = hub_str($r->query('ev'));
+        if ($eventCode !== '' && ! isset(\App\Support\SecurityEvents::CODES[$eventCode])) $eventCode = '';
 
         $users = DB::table('users')->whereNull('deleted_at');
 
@@ -125,6 +129,9 @@ class SecurityController extends Controller
             // رادارُ الكشف الحيّ: محاولاتُ الوصول المرفوضة وتخمينُ الروابط + العناوين الطارقة
             'radar' => SecurityRadar::summary(), 'denials' => SecurityRadar::recent(),
             'threats' => SecurityRadar::threats(),
+            'events' => \App\Support\SecurityEvents::recent(7, 40, $eventCode ?: null),
+            'eventCounts' => \App\Support\SecurityEvents::counts(7),
+            'eventCode' => $eventCode,
         ]);
     }
 

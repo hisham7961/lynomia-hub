@@ -273,6 +273,72 @@ final class Api
         return $applied;
     }
 
+    /** وحدةُ المقاييس التي تحمل عدّادات الـAPI (السجلُّ = معرّف المفتاح) */
+    public const USAGE_MODULE = 'api_tokens';
+
+    /**
+     * عدّاداتُ اليوم لمفتاح: `requests` و`errors` (≥400) و`ms` (مجموع الزمن) — زيادةٌ ذرّية على
+     * نقطة اليوم، وإدراجٌ عند الغياب. لا يرمي أبداً: التحليلُ إثراءٌ لا شرطٌ للردّ.
+     */
+    public static function countUsage(string $tokenId, int $status, int $ms): void
+    {
+        try {
+            if (! hub_has_col('metric_points', 'value')) return;
+            $day = now()->startOfDay();
+            $inc = ['requests' => 1, 'ms' => max(0, $ms)];
+            if ($status >= 400) $inc['errors'] = 1;
+            foreach ($inc as $metric => $by) {
+                $hit = \Illuminate\Support\Facades\DB::table('metric_points')
+                    ->where('module', self::USAGE_MODULE)->where('record_id', $tokenId)->where('metric', $metric)->where('at', $day)
+                    ->increment('value', $by, ['updated_at' => now()]);
+                if (! $hit) {
+                    \Illuminate\Support\Facades\DB::table('metric_points')->insertOrIgnore([
+                        'id' => (string) \Illuminate\Support\Str::uuid(), 'module' => self::USAGE_MODULE, 'record_id' => $tokenId,
+                        'metric' => $metric, 'value' => $by, 'at' => $day, 'source' => 'api', 'meta' => null,
+                        'created_at' => now(), 'updated_at' => now(),
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            // صمت: التحليلُ لا يكسر الطلب
+        }
+    }
+
+    /**
+     * استخدامُ الـAPI خلال أيام: لكل مفتاح (طلبات/أخطاء/متوسط زمن) + المجاميع.
+     *
+     * @return array{days:int,total:array{requests:int,errors:int,avg_ms:?int,error_rate:?float},tokens:array<int,array>}
+     */
+    public static function usage(int $days = 7): array
+    {
+        $out = ['days' => $days, 'total' => ['requests' => 0, 'errors' => 0, 'avg_ms' => null, 'error_rate' => null], 'tokens' => []];
+        try {
+            if (! hub_has_col('metric_points', 'value')) return $out;
+            $rows = \Illuminate\Support\Facades\DB::table('metric_points')
+                ->where('module', self::USAGE_MODULE)->where('at', '>=', now()->subDays($days)->startOfDay())
+                ->selectRaw('record_id, metric, SUM(value) v')->groupBy('record_id', 'metric')->get();
+            $by = [];
+            foreach ($rows as $r) $by[$r->record_id][$r->metric] = (float) $r->v;
+            $names = \Illuminate\Support\Facades\DB::table('api_tokens')->leftJoin('users', 'users.id', '=', 'api_tokens.user_id')
+                ->whereIn('api_tokens.id', array_keys($by))->get(['api_tokens.id', 'api_tokens.name', 'users.name as uname'])->keyBy('id');
+            foreach ($by as $tid => $m) {
+                $req = (int) ($m['requests'] ?? 0); $err = (int) ($m['errors'] ?? 0); $ms = (float) ($m['ms'] ?? 0);
+                $out['tokens'][] = ['token_id' => $tid, 'name' => $names[$tid]->name ?? 'مفتاح محذوف', 'user' => $names[$tid]->uname ?? null,
+                    'requests' => $req, 'errors' => $err, 'avg_ms' => $req ? (int) round($ms / $req) : null,
+                    'error_rate' => $req ? round($err * 100 / $req, 1) : null];
+                $out['total']['requests'] += $req; $out['total']['errors'] += $err; $out['total']['_ms'] = ($out['total']['_ms'] ?? 0) + $ms;
+            }
+            usort($out['tokens'], fn ($a, $b) => $b['requests'] <=> $a['requests']);
+            $tr = $out['total']['requests'];
+            $out['total']['avg_ms'] = $tr ? (int) round(($out['total']['_ms'] ?? 0) / $tr) : null;
+            $out['total']['error_rate'] = $tr ? round($out['total']['errors'] * 100 / $tr, 1) : null;
+            unset($out['total']['_ms']);
+        } catch (\Throwable $e) {
+        }
+
+        return $out;
+    }
+
     /**
      * شرطُ النسخة قبل التعديل: `If-Match: "3"` أو `_version` في الجسم. غيابُهما
      * لا يمنع (عميلٌ قديم)، وتخالفُهما مع نسخة السجل = 409 VERSION_CONFLICT.

@@ -154,8 +154,7 @@ final class Health
     protected static function migrations(): array
     {
         try {
-            $pending = hub_pending_migrations();
-            $n = count($pending);
+            $n = (int) hub_pending_migrations();
 
             return self::c($n ? self::DEGRADED : self::HEALTHY, 'مخطّط القاعدة',
                 $n ? "{$n} ترحيلاً معلّقاً — الكود يسبق القاعدة" : 'مطابق للكود', ['pending' => $n]);

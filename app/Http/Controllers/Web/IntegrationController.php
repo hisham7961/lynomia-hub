@@ -21,11 +21,11 @@ class IntegrationController extends Controller
     {
         $this->gate();
 
-        return view('integrations.index', [
+        return view('integrations.index', array_merge([
             'installed' => Integrations::installed(),
             'catalog'   => Integrations::catalog(),
             'odooMods'  => Integrations::odooModules(),
-        ]);
+        ], ['apiUsage' => \App\Support\Api::usage(7)]));
     }
 
     /** دليل الربط: الأحداث الصادرة، شكل الحمولة، التوقيع، وأين تنزل البيانات الواردة */

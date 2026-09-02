@@ -65,10 +65,16 @@ class ApiAuth
             $token->forceFill(['last_used_at' => now()])->saveQuietly();
         }
 
+        $t0 = microtime(true);
         $response = $next($request);
 
         // إصدارُ العقد على كل ردّ — به يعرف العميلُ أيَّ عقدٍ يخاطب، وبه تُعلَن الإهمالات لاحقاً
         if (method_exists($response, 'header')) $response->header('X-API-Version', Api::VERSION);
+
+        // **تحليلاتُ الاستخدام** (v2.399): طلباتٌ وأخطاءٌ ومللي ثانية لكل مفتاحٍ في اليوم —
+        // في `metric_points` القائم (وحدة api_tokens) لا في جدولٍ جديد؛ زياداتٌ ذرّية رخيصة.
+        Api::countUsage($token->id, method_exists($response, 'getStatusCode') ? $response->getStatusCode() : 200,
+            (int) round((microtime(true) - $t0) * 1000));
 
         return $response;
     }

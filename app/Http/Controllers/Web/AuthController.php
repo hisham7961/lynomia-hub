@@ -86,6 +86,8 @@ class AuthController extends Controller
             Auth::logout();
             $r->session()->put('2fa:uid', $u->id);
             $r->session()->regenerate();
+            // تحدّي الخطوة الثانية حدثٌ أمنيّ (MFA_CHALLENGE): كلمةٌ صحيحة بلا إتمامِ رمزٍ أثرٌ يُقرأ
+            hub_audit('تحدّي التحقق بخطوتين', null, null, $u->name, ['user_id' => $u->id]);
 
             return redirect()->route('login.otp');
         }
