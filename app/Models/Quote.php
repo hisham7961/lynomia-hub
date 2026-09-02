@@ -51,6 +51,14 @@ class Quote extends Model
         // المجموعُ عمودٌ إلزاميّ بلا افتراضي: نموذجٌ بلا بنود كان يسقط بـ500 (v2.399) — يُحسب من المبلغ والضريبة
         static::saving(function (self $q) {
             if ($q->total === null || $q->total === '') $q->total = round((float) ($q->amount ?? 0) + (float) ($q->tax ?? 0), 3);
+            // عرضٌ ببنودٍ مهيكلة: المبلغُ والضريبةُ والإجماليُّ تُحسَب من البنود (recalc) — كتابةٌ من
+            // النموذج العامّ أو الـAPI كانت تدوسها بلا إعادة حساب (ARCH-02, v2.399). recalc نفسُه يكتب
+            // بـsaveQuietly فلا يمرّ بهذا الحارس.
+            if ($q->exists && $q->isDirty(['amount', 'tax', 'total']) && $q->lines()->exists()) {
+                foreach (['amount', 'tax', 'total'] as $col) {
+                    if ($q->isDirty($col)) $q->{$col} = $q->getOriginal($col);
+                }
+            }
         });
     }
 

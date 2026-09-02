@@ -417,7 +417,8 @@ class EnterpriseHardeningRound1Test extends TestCase
     /** OPS-05: كلُّ جدولٍ في القاعدة إمّا في النسخة الاحتياطية أو مُعلَنٌ عابراً — ولا اسمَ في القائمة لجدولٍ لا وجودَ له */
     public function test_backup_covers_every_table_or_declares_it_ephemeral(): void
     {
-        $tables = collect(Schema::getTableListing())->map(fn ($t) => (string) $t)->all();
+        // Laravel 12 يُعيد الأسماءَ مؤهَّلةً بالمخطّط (main.tasks) — يُؤخذ الاسمُ وحده
+        $tables = collect(Schema::getTableListing())->map(fn ($t) => (string) (str_contains((string) $t, '.') ? substr((string) $t, strrpos((string) $t, '.') + 1) : $t))->all();
         $covered = HubBackup::coveredTables();
         $missing = array_values(array_diff($tables, $covered, HubBackup::EPHEMERAL));
         sort($missing);

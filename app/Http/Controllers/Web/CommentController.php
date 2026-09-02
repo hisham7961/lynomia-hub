@@ -335,14 +335,29 @@ class CommentController extends Controller
     protected function markRead($comments): void
     {
         $me = auth()->id();
+        // **استعلامٌ واحد** (PERF-04, v2.399): فتحُ سجلٍّ عليه خمسون تعليقاً غيرَ مقروء كان يكتب
+        // خمسين UPDATE في طلب GET. تُجمَع القيمُ الجديدة وتُكتب بجملة CASE واحدة — محمولةٌ على المحرّكين.
+        $pending = [];
         foreach ($comments as $c) {
             foreach ([$c, ...($c->relationLoaded('replies') ? $c->replies : [])] as $one) {
                 $rb = (array) $one->read_by;
                 if (! in_array($me, $rb, true)) {
                     $one->read_by = [...$rb, $me];
-                    $one->saveQuietly();
+                    $pending[(string) $one->id] = json_encode([...$rb, $me], JSON_UNESCAPED_UNICODE);
                 }
             }
+        }
+        if (! $pending) return;
+        try {
+            $case = ''; $bind = [];
+            foreach ($pending as $id => $json) { $case .= ' WHEN ? THEN ?'; $bind[] = $id; $bind[] = $json; }
+            $ids = array_keys($pending);
+            \Illuminate\Support\Facades\DB::update(
+                'UPDATE comments SET read_by = CASE id' . $case . ' END WHERE id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')',
+                array_merge($bind, $ids)
+            );
+        } catch (\Throwable $e) {
+            report($e);   // إيصالُ القراءة إثراءٌ — لا يكسر عرض التعليقات
         }
     }
 }

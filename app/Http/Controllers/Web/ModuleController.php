@@ -582,6 +582,9 @@ class ModuleController extends Controller
         $new = hub_str($r->input('status'));
         $options = (array) ($statusField['options'] ?? []);
         abort_if($options && ! in_array($new, $options, true), 422, 'حالة غير معرَّفة في هذه الوحدة');
+        // حالةٌ يعلنها السجلّ «تُشتقّ من فعل» (status_via_action) لا تُكتب بالسحب: كانت «مدفوعة»
+        // تُزرع بلا مبلغٍ مدفوع فتُطلق invoice.paid على فاتورةٍ لم تُدفع (ARCH-03, v2.399)
+        if ($why = ($def['status_via_action'][$new] ?? null)) abort(422, $why);
 
         $prevStatus = $m->{$statusCol};
         $m->{$statusCol} = $new;

@@ -56,7 +56,8 @@ class AuditController extends Controller
         return view('audit.index', [
             'rows'    => $q,
             'users'   => DB::table('users')->whereNull('deleted_at')->orderBy('name')->pluck('name', 'id'),
-            'actions' => DB::table('audits')->distinct()->orderBy('action')->limit(40)->pluck('action'),
+            // DISTINCT على أسرع الجداول نموّاً في كل فتحة (PERF-02): خمسُ دقائقَ خبيئة — والفهرسُ (action) يسنده (v2.399)
+            'actions' => \Illuminate\Support\Facades\Cache::remember('audit:actions', 300, fn () => DB::table('audits')->distinct()->orderBy('action')->limit(40)->pluck('action')),
             'chain'   => Audit::verifyTail(),
             'pulse'   => $this->pulse(),
         ]);
