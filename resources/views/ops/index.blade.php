@@ -11,6 +11,35 @@
     <a class="btn ghost sm" href="{{ route('errors.index') }}">🐞 مركز الأخطاء ←</a>
 </div>
 
+{{-- نموذجُ الصحّة الواحد: الحالةُ لكل مكوّنٍ حرج — هي نفسُها التي يقرؤها /healthz --}}
+@php $H = \App\Support\Health::class; @endphp
+<div class="card" id="health" style="border-inline-start:4px solid var(--{{ $health['status'] === $H::HEALTHY ? 'ok' : ($health['status'] === $H::UNAVAILABLE ? 'bad' : 'wn') }}, #999)">
+    <h3 class="cardtitle">🩺 صحّة المنصة
+        <span class="bdg {{ $H::TONE[$health['status']] }}">{{ $H::LABELS[$health['status']] }}</span>
+        <span class="sub">· حياة <span class="mono ltr">/healthz?probe=live</span> · جاهزية <span class="mono ltr">/healthz?probe=ready</span> · التفاصيل <a href="{{ route('ops.health') }}" class="mono ltr">/admin/ops/health</a></span>
+    </h3>
+    <div class="kids">
+        @foreach ($health['components'] as $key => $c)
+            <div class="stat" title="{{ $key }}">
+                <span class="ico">{{ ['db' => '🗄️', 'cache' => '⚡', 'storage' => '💽', 'migrations' => '🛢️', 'config' => '⚙️', 'scheduler' => '⏰', 'outbox' => '📨', 'webhooks' => '🪝', 'integrations' => '🔌', 'errors' => '🐞', 'security' => '🛡️', 'system' => '🖥️'][$key] ?? '•' }}</span>
+                <b><span class="bdg {{ $c['tone'] }}">{{ $H::LABELS[$c['status']] }}</span></b>
+                <span>{{ $c['label'] }}<div class="sub">{{ $c['why'] }}</div></span>
+            </div>
+        @endforeach
+    </div>
+    <details style="margin-top:8px">
+        <summary class="sub" style="cursor:pointer">🗺️ خريطة الاعتماديات — أيُّ قدرةٍ تتأثّر بأيّ مكوّن</summary>
+        <table class="mini" style="margin-top:6px">
+            @foreach ($deps as $cap => $needs)
+                @php $worst = collect($needs)->map(fn ($n) => $health['components'][$n]['status'] ?? $H::UNKNOWN)
+                        ->sortByDesc(fn ($s) => [$H::HEALTHY => 0, $H::UNKNOWN => 1, $H::MAINTENANCE => 2, $H::DEGRADED => 3, $H::UNAVAILABLE => 4][$s])->first(); @endphp
+                <tr><td>{{ $cap }}<div class="sub mono ltr">{{ implode(' → ', $needs) }}</div></td>
+                    <td class="acts"><span class="bdg {{ $H::TONE[$worst] }}">{{ $H::LABELS[$worst] }}</span></td></tr>
+            @endforeach
+        </table>
+    </details>
+</div>
+
 {{-- المؤشرات الحيّة: نِسبٌ لها معنى — «الحمل ٢٫٤» بلا عدد أنوية لا يقول شيئاً --}}
 <div class="cards">
     <div class="stat"><span class="ico">⚙️</span>
@@ -147,8 +176,14 @@
         <h3>⏰ الوظائف المجدولة (نبضات آخر تشغيل)</h3>
         <table class="mini">
             @foreach ($beats as $b)
-                <tr><td>{{ $b['label'] }}<div class="sub">{{ $b['at'] ? \Illuminate\Support\Carbon::parse($b['at'])->diffForHumans() : 'لم تعمل بعد' }}</div></td>
-                    <td class="acts"><span class="bdg {{ $b['late'] ? 'bad' : 'ok' }}">{{ $b['late'] ? '⚠️ متأخرة' : '✓ تعمل' }}</span></td></tr>
+                @php
+                    $when = $b['at'] ? \Illuminate\Support\Carbon::parse($b['at'])->diffForHumans() : 'لم تعمل بعد';
+                    $dur = isset($b['ms']) && $b['ms'] !== null ? ' · ' . $b['ms'] . 'ms' : '';
+                    $bad = ! empty($b['result']) && $b['result'] !== 'ok';
+                @endphp
+                <tr><td>{{ $b['label'] }}
+                        <div class="sub">{{ $when }}{{ $dur }}@if ($bad) · <b class="txt-bad">آخر نتيجة: {{ $b['result'] }}</b>@endif</div></td>
+                    <td class="acts"><span class="bdg {{ ($b['status'] ?? '') === \App\Support\Health::UNAVAILABLE ? 'bad' : ($b['late'] ? 'wn' : 'ok') }}">{{ ($b['status'] ?? '') === \App\Support\Health::UNKNOWN ? '— لم تنبض' : ($b['late'] ? '⚠️ متأخرة' : '✓ تعمل') }}</span></td></tr>
             @endforeach
         </table>
         <div class="sub" style="margin-top:6px">إن كانت كلها متأخرة فسطر cron غير مفعّل على الخادم (انظر README)</div>

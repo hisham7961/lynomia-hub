@@ -458,6 +458,8 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/ops/schema-check', [OpsController::class, 'schemaCheck'])->name('ops.schemacheck');
     Route::post('admin/ops/backup', [OpsController::class, 'backupNow'])->name('ops.backup');
     Route::post('admin/ops/maintenance', [OpsController::class, 'toggleMaintenance'])->name('ops.maintenance');
+    // الصحّةُ المفصّلة (نموذج الصحّة الواحد) — للمالك؛ /healthz العامّ يعرض الحالاتِ وحدها
+    Route::get('admin/ops/health', [OpsController::class, 'healthDetail'])->name('ops.health');
 
     // مركز نشاط الموظفين — للمالك فقط
     Route::get('admin/activity', [\App\Http\Controllers\Web\ActivityController::class, 'index'])->name('activity.index');

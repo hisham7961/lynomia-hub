@@ -12,9 +12,25 @@ class Observability
 {
     public function handle(Request $request, Closure $next)
     {
-        $rid = (string) Str::uuid();
+        // معرّفٌ سابقٌ (وضعه ردُّ خطأٍ مبكّر عبر Api::requestId) يُحترَم فلا يتبدّل بين الجسم والترويسة
+        $rid = (string) ($request->attributes->get('request_id') ?: Str::uuid());
         $request->attributes->set('request_id', $rid);
         $start = microtime(true);
+
+        // **سجلٌّ مهيكل**: كلُّ سطرٍ يُكتب أثناء هذا الطلب (Log::…/report) يحمل معرّفَه
+        // ومسارَه ومستخدمَه — فيُربط بمركز الأخطاء والتدقيق بالمعرّف نفسه.
+        try {
+            \Illuminate\Support\Facades\Log::withContext(array_filter([
+                'request_id' => $rid,
+                'method' => $request->method(),
+                'path' => '/' . ltrim($request->path(), '/'),
+                'user_id' => auth()->id(),
+                'ip' => $request->ip(),
+                'release' => (string) config('hub.version'),
+            ]));
+        } catch (\Throwable $e) {
+            // السياقُ إثراءٌ لا شرط
+        }
 
         $response = $next($request);
 

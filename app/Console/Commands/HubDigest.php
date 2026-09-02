@@ -88,8 +88,7 @@ class HubDigest extends Command
                 'text' => hub_fit($text, hub_col_max('outbox', 'text') ?? 790), 'state' => 'queued', 'created_at' => now()]);
         }
 
-        \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.digest'], ['value' => now()->toIso8601String()]);
-        \Illuminate\Support\Facades\Cache::forget('settings:all');
+        \App\Support\Health::beat('digest');
 
         $this->info('أُرسل التقرير إلى ' . $owners->count() . ' مالك');
 

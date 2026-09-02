@@ -39,6 +39,10 @@ class HubNotification extends Model
         });
 
         static::creating(function (self $n) {
+            if ($n->request_id === null && hub_has_col('notifications_hub', 'request_id')) $n->request_id = \App\Support\Api::requestId();
+        });
+
+        static::creating(function (self $n) {
             $kind = (string) $n->kind;
             if (! isset(self::MUTEABLE[$kind]) || ! $n->user_id) return;
 

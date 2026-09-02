@@ -620,9 +620,9 @@ if (! function_exists('hub_require_stepup')) {
         $url = route('stepup.show', ['next' => is_string($next) && str_starts_with($next, '/') ? $next : $path]);
 
         if (request()->expectsJson() || request()->is('api/*')) {
-            return response()->json([
-                'error' => 'يتطلب تأكيدَ الهوية', 'stepup' => true, 'url' => $url,
-            ], 428);
+            // الغلافُ الموحَّد: المفاتيحُ القديمة (error/stepup/url) كما هي + code + request_id
+            return \App\Support\Api::error(\App\Support\Api::STEP_UP_REQUIRED, 428,
+                'يتطلب تأكيدَ الهوية', null, ['stepup' => true, 'url' => $url]);
         }
 
         return redirect($url);
@@ -2432,6 +2432,7 @@ if (! function_exists('hub_audit')) {
             // hub_fit لا substr: القصُّ بالبايتات يقطع الحرف العربي نصفين
             'device'    => hub_fit((string) request()->userAgent(), 200),
             'ip'        => request()->ip(),
+            'request_id' => \App\Support\Api::requestId(),
             'created_at' => now(),
         ]);
     }

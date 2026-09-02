@@ -30,6 +30,17 @@ class HubBackup extends Command
         'comments', 'audits', 'dm_messages', 'share_links', 'odoo_connections',
     ];
 
+    /** فشلٌ لا يحرّك موعدَ النبضة (الموعدُ للنجاح وحده) لكنه يُكتب نتيجةً فيقرؤه مركزُ التشغيل */
+    protected function recordFailure(string $why): void
+    {
+        try {
+            \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.backup.meta'],
+                ['value' => ['ms' => null, 'result' => 'fail', 'note' => $why, 'at' => now()->toIso8601String()]]);
+            \Illuminate\Support\Facades\Cache::forget('settings:all');
+        } catch (\Throwable $e) {
+        }
+    }
+
     public function handle(): int
     {
         $out = ['_meta' => ['app' => (string) setting('app.name', config('app.name')),
@@ -126,6 +137,7 @@ class HubBackup extends Command
         // ثم يُكتب إلى ملفٍ مؤقّت ويُتحقّق من طول ما كُتب، ثم يُنقل، ثم يُدوَّر.
         $json = json_encode($out, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         if ($json === false || $json === '') {
+            $this->recordFailure('تعذّر ترميز النسخة');
             $this->error('✗ تعذّر ترميز النسخة: ' . json_last_error_msg()
                        . ' — لم تُكتب نسخةٌ ولم يُحذف شيء. راجع صفوفاً بترميزٍ فاسد.');
 
@@ -160,8 +172,7 @@ class HubBackup extends Command
         $this->info('✓ ' . basename($file) . ' — ' . number_format($total) . ' سجل، ' .
                     number_format(filesize($file) / 1024, 1) . ' KB (محفوظ آخر ' . $keep . ' نسخة)');
 
-        \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.backup'], ['value' => now()->toIso8601String()]);
-        \Illuminate\Support\Facades\Cache::forget('settings:all');
+        \App\Support\Health::beat('backup', null, 'ok', basename($file) . ' · ' . number_format($total) . ' سجل');
         return self::SUCCESS;
     }
 }

@@ -23,6 +23,7 @@ class HubOutbox extends Command
 
     public function handle(): int
     {
+        $t0 = microtime(true);
         if ($this->option('retry')) {
             $n = OutboxMessage::where('state', 'failed')->update(['state' => 'queued', 'error' => null]);
             $this->info("أُعيد صف {$n} رسالة فاشلة");
@@ -43,8 +44,7 @@ class HubOutbox extends Command
         if ($batch->isEmpty()) {
             $this->info('لا رسائل بانتظار الإرسال');
             $this->webhooks();
-            \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.outbox'], ['value' => now()->toIso8601String()]);
-            \Illuminate\Support\Facades\Cache::forget('settings:all');
+            \App\Support\Health::beat('outbox', (int) round((microtime(true) - $t0) * 1000));
             return self::SUCCESS;
         }
 
@@ -76,8 +76,9 @@ class HubOutbox extends Command
 
         $this->webhooks();
 
-        \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.outbox'], ['value' => now()->toIso8601String()]);
-        \Illuminate\Support\Facades\Cache::forget('settings:all');
+        // النبضةُ بمدّتها ونتيجتها: فشلٌ في الدفعة يُقال في مركز التشغيل لا في سطر طرفيةٍ لا يقرؤه أحد
+        \App\Support\Health::beat('outbox', (int) round((microtime(true) - $t0) * 1000),
+            $failed ? 'partial' : 'ok', $failed ? "فشل {$failed} من " . ($sent + $failed) : null);
         return self::SUCCESS;
     }
 

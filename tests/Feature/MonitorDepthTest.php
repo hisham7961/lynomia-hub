@@ -79,6 +79,8 @@ class MonitorDepthTest extends TestCase
     public function test_disk_consumers_are_broken_down(): void
     {
         $this->seedCore();
+        // الاختبارُ يقرأ مجلد النسخ من القرص الحقيقي — كان يعتمد على أن ينشئه اختبارٌ آخر قبله (ترتيبُ تشغيل)
+        @mkdir(storage_path('app/backups'), 0700, true);
         $html = $this->actingAs($this->owner)->get('/admin/ops')->assertOk()->getContent();
         $this->assertStringContainsString('النسخ الاحتياطية', $html);
         $this->assertStringContainsString('سجلات النظام', $html, 'تفصيل ما يشغل القرص لا نسبةٌ صمّاء');

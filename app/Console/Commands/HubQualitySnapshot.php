@@ -24,6 +24,7 @@ class HubQualitySnapshot extends Command
         $this->info("درجة الجودة {$t['score']}٪ · {$t['defects']} نقصاً في {$t['checks']} فحصاً · "
             . "{$t['clean']} وحدة نظيفة من {$t['modules']}");
 
+        \App\Support\Health::beat('quality');
         return self::SUCCESS;
     }
 }

@@ -26,4 +26,7 @@ Schedule::command('hub:quality-snapshot')->dailyAt('23:50')->withoutOverlapping(
 | فالسلسلةُ مختومةٌ ولا يفحصها شيء، والعبثُ يبقى غيرَ مكتشَفٍ إلى أن يخطر
 | لأحدٍ أن يسأل — وهو ما لا يقع. أسبوعيّاً قبل الفجر، وزرٌّ في مركز التشغيل.
 */
-Schedule::command('hub:audit-verify')->weeklyOn(0, '04:30')->withoutOverlapping();
+Schedule::command('hub:audit-verify')->weeklyOn(0, '04:30')->withoutOverlapping()
+    // نبضةُ الفاحص من المجدول نفسِه: نجاحٌ أو فشلٌ يُقرأ في نموذج الصحّة (v2.399)
+    ->onSuccess(fn () => \App\Support\Health::beat('audit'))
+    ->onFailure(fn () => \App\Support\Health::beat('audit', null, 'fail', 'فشل فحص سلسلة التدقيق — افتح مركز التشغيل'));

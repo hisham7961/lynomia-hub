@@ -44,6 +44,7 @@ class HubAutomation extends Command
 
     public function handle(): int
     {
+        $t0 = microtime(true);
         $this->monitorUsers = null;   // ذاكرة المستلمين تصلح لتشغيلةٍ واحدة
         $this->dry = (bool) $this->option('dry');
         if ($this->dry) $this->warn('وضع المعاينة — لن يُكتب شيء');
@@ -62,8 +63,7 @@ class HubAutomation extends Command
 
         $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة");
 
-        \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.automation'], ['value' => now()->toIso8601String()]);
-        \Illuminate\Support\Facades\Cache::forget('settings:all');
+        if (! $this->dry) \App\Support\Health::beat('automation', (int) round((microtime(true) - $t0) * 1000));
         return self::SUCCESS;
     }
 

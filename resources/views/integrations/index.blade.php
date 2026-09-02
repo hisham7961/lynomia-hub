@@ -13,8 +13,9 @@
 <div class="kids">
     @foreach ($installed as $i)
         <div class="card kid" style="border-inline-start:4px solid {{ $i['ready'] ? 'var(--ok, #27ae60)' : 'var(--wn, #e67e22)' }}">
+            @php $hk = $i['health'] ?? \App\Support\Integrations::UNKNOWN; @endphp
             <h3>{{ $i['icon'] }} {{ $i['name'] }}
-                <span class="bdg {{ $i['ready'] ? 'ok' : 'wn' }}">{{ $i['ready'] ? 'جاهز' : 'يحتاج إعداداً' }}</span>
+                <span class="bdg {{ \App\Support\Integrations::HEALTH_TONE[$hk] ?? 'g' }}" title="{{ $hk }}">{{ \App\Support\Integrations::HEALTH_LABELS[$hk] ?? $hk }}</span>
                 <span class="bdg g">{{ ['out' => '⬅ يرسل', 'in' => '➡ يستقبل', 'both' => '⬌ الاتجاهان'][$i['dir']] }}</span>
             </h3>
             <div class="sub" style="margin-bottom:8px">{{ $i['desc'] }}</div>
@@ -23,6 +24,9 @@
                 @foreach ($i['stats'] as $k => $v)
                     <tr><td class="sub">{{ $k }}</td><td class="mono acts">{{ $v }}</td></tr>
                 @endforeach
+                <tr><td class="sub">آخر نجاح</td><td class="acts sub">{{ ! empty($i['last_ok_at']) ? \Illuminate\Support\Carbon::parse($i['last_ok_at'])->diffForHumans() : '—' }}</td></tr>
+                <tr><td class="sub">آخر فشل</td><td class="acts sub">{{ ! empty($i['last_fail_at']) ? \Illuminate\Support\Carbon::parse($i['last_fail_at'])->diffForHumans() : '—' }}</td></tr>
+                @if (! empty($i['last_error']))<tr><td class="sub">السبب</td><td class="acts sub txt-bad" style="max-width:260px;word-break:break-word">{{ $i['last_error'] }}</td></tr>@endif
             </table>
             <a class="btn ghost sm" style="margin-top:8px" href="{{ route($i['route']) }}">فتح الإعداد ↗</a>
         </div>

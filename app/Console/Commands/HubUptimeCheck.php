@@ -34,9 +34,7 @@ class HubUptimeCheck extends Command
             }
         }
 
-        \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.uptime'],
-            ['value' => now()->toIso8601String()]);
-        \Illuminate\Support\Facades\Cache::forget('settings:all');
+        \App\Support\Health::beat('uptime', null, 'ok', $down ? "{$down} من {$n} معطّل" : null);
         $this->info("فُحص {$n} هدفاً، منها {$down} معطّل.");
 
         return self::SUCCESS;

@@ -36,13 +36,25 @@
             <option value="">كل الأنواع</option>
             @foreach (['php' => 'PHP', 'api' => 'API', 'js' => 'متصفح', 'slow' => 'بطيء'] as $kk => $kl)<option value="{{ $kk }}" @selected($k === $kk)>{{ $kl }}</option>@endforeach
         </select>
+        @if ($taxonomy)
+            <label class="vh" for="fcat">تصفية بالصنف</label>
+            <select class="inp" id="fcat" name="cat" onchange="this.form.submit()">
+                <option value="">كل الأصناف</option>
+                @foreach (\App\Support\ErrorTaxonomy::CATEGORIES as $c)<option value="{{ $c }}" @selected($cat === $c)>{{ \App\Support\ErrorTaxonomy::LABELS[$c] ?? $c }}</option>@endforeach
+            </select>
+            <label class="vh" for="fsev">تصفية بالشدّة</label>
+            <select class="inp" id="fsev" name="sev" onchange="this.form.submit()">
+                <option value="">كل الشدّات</option>
+                @foreach (\App\Support\ErrorTaxonomy::SEVERITIES as $sv)<option value="{{ $sv }}" @selected($sev === $sv)>{{ \App\Support\ErrorTaxonomy::LABELS[$sv] ?? $sv }}@if (isset($bySeverity[$sv])) ({{ $bySeverity[$sv] }})@endif</option>@endforeach
+            </select>
+        @endif
         <label class="vh" for="fsort">الترتيب</label>
         <select class="inp" id="fsort" name="sort" onchange="this.form.submit()">
             <option value="last_seen" @selected($sort === 'last_seen')>الأحدث ظهوراً</option>
             <option value="count" @selected($sort === 'count')>الأكثر تكراراً</option>
         </select>
         <button class="btn sm">تصفية</button>
-        @if ($q !== '' || $st !== '' || $k !== '')<a class="btn ghost sm" href="{{ route('errors.index') }}">مسح</a>@endif
+        @if ($q !== '' || $st !== '' || $k !== '' || $cat !== '' || $sev !== '')<a class="btn ghost sm" href="{{ route('errors.index') }}">مسح</a>@endif
     </form>
 </div>
 
@@ -55,6 +67,12 @@
             <tr>
                 <td style="max-width:560px">
                     {{-- الرسالة كاملةً (كانت تُبتر عند ٩٠ حرفاً فيضيع معناها) والموضع صريح --}}
+                    @if ($taxonomy && $e->severity)
+                        @php $sevTone = in_array($e->severity, ['CRITICAL', 'HIGH'], true) ? 'bad' : ($e->severity === 'ERROR' ? 'wn' : 'g'); @endphp
+                        <span class="bdg {{ $sevTone }}" title="الشدّة">{{ \App\Support\ErrorTaxonomy::LABELS[$e->severity] ?? $e->severity }}</span>
+                        <span class="bdg g" title="الصنف">{{ \App\Support\ErrorTaxonomy::LABELS[$e->category] ?? $e->category }}</span>
+                        @if ((int) $e->users > 1)<span class="bdg g" title="مستخدمون متأثرون">👥 {{ $e->users }}</span>@endif
+                    @endif
                     <a href="{{ route('errors.show', $e->id) }}"><b>{{ \Illuminate\Support\Str::limit($e->message, 200) }}</b></a>
                     <div class="sub mono ltr" style="font-size:11px;direction:ltr;text-align:left">
                         📍 {{ $e->file ? str_replace(base_path() . '/', '', $e->file) . ($e->line ? ':' . $e->line : '') : '— بلا موضع —' }}

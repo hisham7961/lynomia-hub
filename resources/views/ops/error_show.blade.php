@@ -40,6 +40,18 @@
             <td>{{ $e->user_id ? ($users[$e->user_id] ?? 'مستخدم محذوف') : 'زائر / نظام' }}</td></tr>
         <tr><td class="sub">معرّف الطلب</td>
             <td class="mono ltr">{{ $e->request_id ?: '—' }}</td></tr>
+        @if (isset($e->category))
+        <tr><td class="sub">الصنف والشدّة</td>
+            <td>{{ \App\Support\ErrorTaxonomy::LABELS[$e->category] ?? ($e->category ?: '—') }} ·
+                <b>{{ \App\Support\ErrorTaxonomy::LABELS[$e->severity] ?? ($e->severity ?: '—') }}</b>
+                <span class="sub">({{ $e->category ?: '—' }} / {{ $e->severity ?: '—' }})</span></td></tr>
+        <tr><td class="sub">الإصدار والبيئة</td>
+            <td class="mono ltr">{{ $e->release ?: '—' }} · {{ $e->env ?: '—' }}</td></tr>
+        <tr><td class="sub">المسار</td>
+            <td class="mono ltr">{{ $e->route ?: '—' }}</td></tr>
+        <tr><td class="sub">مستخدمون متأثرون</td>
+            <td>{{ (int) $e->users }}@if ((int) $e->users >= 50)<span class="sub"> (٥٠ فأكثر — عدٌّ تقريبيّ)</span>@endif</td></tr>
+        @endif
     </table>
 
     @if ($snippet)

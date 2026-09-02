@@ -42,28 +42,39 @@ class V1Controller extends ModuleController
         return response()->json(['modules' => $out]);
     }
 
-    /** GET /api/v1/{module}?q=&status=&page=&per= */
+    /**
+     * GET /api/v1/{module}?q=&status=&page=&per=&sort=&dir=&fields=&f[key]=&fl[i][f|o|v]=
+     *                     &created_from=&created_to=&updated_since=&trash=
+     *
+     * **محرّكُ القائمة نفسُه في الويب والـAPI** (`buildQuery`): بحثٌ وحالةٌ ومرشِّحاتُ
+     * مراجعَ ومرشِّحاتٌ متقدّمة — بالتنطيق نفسه وقناعِ الحقول نفسِه. كان الـAPI يبني
+     * استعلامه بيده (بحث + حالة فقط) بلا فرزٍ ولا مرشِّحات، فيُضطرّ التكاملُ إلى
+     * سحب الجدول كلِّه ليرشّح محلياً. الفرزُ بقائمةٍ بيضاء (Api::sort)، والغلافُ
+     * يُبقي المفاتيحَ القديمة ويضيف `meta` و`request_id`.
+     */
     public function apiIndex(Request $r, string $module)
     {
         [$def, $class] = $this->resolveApi($module, 'v');
+        $def['key'] = $module;
 
-        $q = hub_scope($class::query(), $module);
-        if ($term = trim(hub_str($r->query('q')))) $q->search($term);
-        if (($st = hub_str($r->query('status'))) !== '' && ($sc = hub_status_col($module))) $q->where($sc, $st);
+        $trash = false; $filters = [];
+        $q = $this->buildQuery($r, $def, $class, $trash, $filters);
+        $applied = \App\Support\Api::timeFilters($r, $q);
+        [$col, $dir, $sortKey] = \App\Support\Api::sort($r, $def, $module);
 
-        // فاصلُ id: الطابع بدقّة الثانية يتساوى فتتقلب الصفحات بين الطلبات
-        $page = $q->orderByDesc('created_at')->orderByDesc('id')
-            ->paginate(min(100, max(1, (int) $r->query('per', 25))));
+        // فاصلُ id: عمودُ الفرز قد تتساوى قيمُه (الطابع بدقّة الثانية) فتتقلب الصفحات بين الطلبات
+        $per = min(100, max(1, (int) $r->query('per', 25)));
+        $page = $q->orderBy($col, $dir)->orderBy('id', $dir)->paginate($per);
 
         // hub_str: shape() مُوقَّعةٌ ?string، و`?fields[]=` يمرّر مصفوفةً فترمي TypeError
         $fields = hub_str($r->query('fields')) ?: null;
         $this->auditApiSecretRead($def, count($page->items()));
 
-        return response()->json([
-            'data' => collect($page->items())->map(fn ($row) => $this->shape($def, $row, $fields)),
-            'total' => $page->total(),
-            'page' => $page->currentPage(), 'last_page' => $page->lastPage(),
-        ]);
+        return \App\Support\Api::list($page,
+            collect($page->items())->map(fn ($row) => $this->shape($def, $row, $fields)),
+            ['sort' => $sortKey ?? 'created_at', 'dir' => $dir, 'trash' => $trash,
+             'filters' => array_filter(['q' => hub_str($r->query('q')) ?: null,
+                                        'status' => hub_str($r->query('status')) ?: null]) + $applied]);
     }
 
     /** GET /api/v1/{module}/{id}?fields= */
@@ -77,7 +88,7 @@ class V1Controller extends ModuleController
         // TypeError → ٥٠٠. أُصلحت الشقيقةُ (apiList) وبقيت هذه.
         $fields = hub_str($r->query('fields')) ?: null;
 
-        return response()->json(['data' => $this->shape($def, $row, $fields)]);
+        return $this->one($def, $row, $fields);
     }
 
     /** POST /api/v1/{module} — نفس تحقق النماذج، مع Idempotency-Key اختيارية */
@@ -105,7 +116,7 @@ class V1Controller extends ModuleController
             $this->bustProgress($module, $m);
             \App\Support\FlowRunner::fire('created', $module, $m);
 
-            $resp = response()->json(['data' => $this->shape($def, $m->fresh())], 201);
+            $resp = $this->one($def, $m->fresh(), null, 201);
             $this->idempotentFinish($r, $resp);
 
             return $resp;
@@ -121,13 +132,16 @@ class V1Controller extends ModuleController
     {
         [$def, $class] = $this->resolveApi($module, 'e');
         if (hub_needs_approval(auth()->user(), $module, 'e')) {
-            return response()->json(['error' => 'هذه العملية محمية بالموافقات — نفّذها من الواجهة ليُصفّ الطلب'], 409);
+            return \App\Support\Api::error(\App\Support\Api::APPROVAL_REQUIRED, 409,
+                'هذه العملية محمية بالموافقات — نفّذها من الواجهة ليُصفّ الطلب');
         }
         $r->validate($this->rules($def, false), [], $this->attrs($def));
         $this->guardProject($r, $module);
         $this->guardCompany($r, $module);
 
         $m = $this->findScoped($class, $module, $id);
+        // القفلُ التفاؤليّ للـAPI: `If-Match: "n"` أو `_version` — تخالفٌ = 409 VERSION_CONFLICT
+        \App\Support\Api::assertVersion($r, $m);
         $prev = ($af = $this->assigneeField($def)) ? $m->{$af['col']} : null;
         $prevStatus = ($sc = hub_status_col($module)) ? $m->{$sc} : null;
         $this->fill($def, $r, $m);
@@ -139,7 +153,54 @@ class V1Controller extends ModuleController
             \App\Support\FlowRunner::fire('status', $module, $m, (string) $m->{$sc});
         }
 
-        return response()->json(['data' => $this->shape($def, $m->fresh())]);
+        return $this->one($def, $m->fresh());
+    }
+
+    /**
+     * PATCH /api/v1/{module}/{id} — **تعديلٌ جزئيّ**: يكتب الحقولَ المُرسَلة وحدها.
+     *
+     * PUT استبدالٌ كامل (الحقلُ الغائب يُفرَّغ) — عقدٌ موثَّقٌ لا يُكسر، لكنه فخٌّ
+     * للتكاملات: من أراد تعديلَ الهاتف كان يمحو البريدَ إن نسيه. PATCH يسدّ الفجوة
+     * بلا مساسٍ بـPUT: التحقّقُ والحرّاسُ على المُرسَل فقط، وبقيّةُ الحقول تبقى.
+     */
+    public function apiPatch(Request $r, string $module, string $id)
+    {
+        [$def, $class] = $this->resolveApi($module, 'e');
+        if (hub_needs_approval(auth()->user(), $module, 'e')) {
+            return \App\Support\Api::error(\App\Support\Api::APPROVAL_REQUIRED, 409,
+                'هذه العملية محمية بالموافقات — نفّذها من الواجهة ليُصفّ الطلب');
+        }
+
+        // المفاتيحُ المُرسَلة من حقول الوحدة (والمخصّصة) — لا غيرها
+        $keys = collect($def['fields'])->pluck('key')->filter(fn ($k) => $r->has($k))->values()->all();
+        $hasCustom = $r->has('custom');
+        if (! $keys && ! $hasCustom) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['_body' => 'لا حقولَ معروفة في الطلب']);
+        }
+
+        $rules = array_intersect_key($this->rules($def, false), array_flip($keys));
+        if ($hasCustom) {
+            $rules += array_filter($this->rules($def, false), fn ($k) => str_starts_with($k, 'custom.'), ARRAY_FILTER_USE_KEY);
+        }
+        $r->validate($rules, [], $this->attrs($def));
+        if (($pf = hub_project_field($module)) && in_array($pf['key'], $keys, true)) $this->guardProject($r, $module);
+        $cf = collect($def['fields'])->first(fn ($f) => ($f['type'] ?? '') === 'ref' && ($f['ref'] ?? '') === 'companies' && empty($f['multi']));
+        if ($cf && in_array($cf['key'], $keys, true)) $this->guardCompany($r, $module);
+
+        $m = $this->findScoped($class, $module, $id);
+        \App\Support\Api::assertVersion($r, $m);
+        $prev = ($af = $this->assigneeField($def)) ? $m->{$af['col']} : null;
+        $prevStatus = ($sc = hub_status_col($module)) ? $m->{$sc} : null;
+        $this->fill($def, $r, $m, $hasCustom ? array_merge($keys, ['custom']) : $keys);
+        $m->save();
+        $this->notifyAssignee($def, $module, $m, $prev);
+        $this->bustProgress($module, $m);
+        \App\Support\FlowRunner::fire('updated', $module, $m);
+        if ($sc && (string) $m->{$sc} !== (string) $prevStatus) {
+            \App\Support\FlowRunner::fire('status', $module, $m, (string) $m->{$sc});
+        }
+
+        return $this->one($def, $m->fresh());
     }
 
     /** DELETE /api/v1/{module}/{id} */
@@ -147,11 +208,12 @@ class V1Controller extends ModuleController
     {
         [$def, $class] = $this->resolveApi($module, 'd');
         if (hub_needs_approval(auth()->user(), $module, 'd')) {
-            return response()->json(['error' => 'هذه العملية محمية بالموافقات — نفّذها من الواجهة ليُصفّ الطلب'], 409);
+            return \App\Support\Api::error(\App\Support\Api::APPROVAL_REQUIRED, 409,
+                'هذه العملية محمية بالموافقات — نفّذها من الواجهة ليُصفّ الطلب');
         }
         $this->findScoped($class, $module, $id)->delete();
 
-        return response()->json(['deleted' => true]);
+        return response()->json(['deleted' => true, 'request_id' => \App\Support\Api::requestId()]);
     }
 
     /** GET /api/v1/reports/progress/{projectId} */
@@ -271,13 +333,19 @@ class V1Controller extends ModuleController
     protected function resolveApi(string $module, string $op): array
     {
         $def = hub_mod($module);
-        abort_if(! $def || $module === 'users', 404, 'وحدة غير معروفة');
-        abort_unless(hub_can(auth()->user(), $module, $op), 403, 'لا تملك هذه الصلاحية على الوحدة');
+        if (! $def || $module === 'users') {
+            \App\Support\Api::abort(\App\Support\Api::RESOURCE_NOT_FOUND, 404, 'وحدة غير معروفة', ['kind' => 'module', 'module' => $module]);
+        }
+        if (! hub_can(auth()->user(), $module, $op)) {
+            \App\Support\Api::abort(\App\Support\Api::FORBIDDEN, 403, 'لا تملك هذه الصلاحية على الوحدة', ['module' => $module, 'op' => $op]);
+        }
 
         // نطاقات المفتاح: مفتاح مقيد لا يتجاوز قيده حتى لو كان صاحبه يستطيع
         $token = request()->attributes->get('api_token');
         if ($token && ! $token->allows($module, $op)) {
-            abort(403, 'نطاق هذا المفتاح لا يشمل «' . $module . ':' . $op . '» — أنشئ مفتاحاً بنطاق أوسع أو عدّل النطاقات');
+            \App\Support\Api::abort(\App\Support\Api::INSUFFICIENT_SCOPE, 403,
+                'نطاق هذا المفتاح لا يشمل «' . $module . ':' . $op . '» — أنشئ مفتاحاً بنطاق أوسع أو عدّل النطاقات',
+                ['module' => $module, 'op' => $op, 'scopes' => (string) $token->scopes]);
         }
 
         $class = '\\App\\Models\\' . $def['model'];
@@ -316,8 +384,8 @@ class V1Controller extends ModuleController
                 // مفتاحٌ أُعيد بطلبٍ مختلف (مسار/جسم): لا نعيد ردَّ الأول (بيانات وحدةٍ
                 // أخرى) ولا نُسقط الثاني بصمت — نرفض صراحةً كي يتبيّن العميلُ خطأه.
                 if (($row->fingerprint ?? null) !== null && ! hash_equals((string) $row->fingerprint, $fp)) {
-                    return response()->json(
-                        ['error' => 'مفتاح idempotency أُعيد بطلبٍ مختلف — استعمل مفتاحاً جديداً لكل طلب'], 422);
+                    return \App\Support\Api::error(\App\Support\Api::IDEMPOTENCY_KEY_REUSED, 422,
+                        'مفتاح idempotency أُعيد بطلبٍ مختلف — استعمل مفتاحاً جديداً لكل طلب');
                 }
 
                 if ($row->response !== null) {
@@ -333,7 +401,8 @@ class V1Controller extends ModuleController
                     continue;
                 }
 
-                return response()->json(['error' => 'الطلب نفسه قيد المعالجة الآن — أعد المحاولة بعد لحظات'], 409);
+                return \App\Support\Api::error(\App\Support\Api::IDEMPOTENCY_IN_PROGRESS, 409,
+                    'الطلب نفسه قيد المعالجة الآن — أعد المحاولة بعد لحظات', null, [], ['Retry-After' => '5']);
             }
         }
 
@@ -468,6 +537,36 @@ class V1Controller extends ModuleController
             ],
             default => ['type' => 'none', 'gtin' => (bool) ($hit['gtin'] ?? false)],
         });
+    }
+
+    /** ردُّ سجلٍّ واحد: `data` + `request_id`، وترويسة ETag بنسخته للقفل التفاؤليّ (If-Match) */
+    protected function one(array $def, $row, ?string $fields = null, int $status = 200)
+    {
+        $resp = response()->json([
+            'data' => $this->shape($def, $row, $fields),
+            'request_id' => \App\Support\Api::requestId(),
+        ], $status);
+        if (isset($row->version)) $resp->header('ETag', '"' . (int) $row->version . '"');
+
+        return $resp;
+    }
+
+    /**
+     * GET /api/v1/openapi.json — مواصفةُ OpenAPI 3.1 **مولَّدةٌ من سجل الوحدات** لا
+     * مكتوبةٌ باليد (فلا تتقادم)، مقصورةً على الوحدات التي يراها صاحبُ المفتاح
+     * ونطاقُه — فلا يُوثَّق لعميلٍ ما لا يستطيع.
+     */
+    public function openapi()
+    {
+        $u = auth()->user();
+        $mods = [];
+        foreach (hub_modules() as $key => $def) {
+            if ($key === 'users' || ! hub_can($u, $key, 'v') || ! $this->tokenAllows($key, 'v')) continue;
+            $mods[] = $key;
+        }
+
+        return response()->json(\App\Support\OpenApi::spec($mods, $u), 200, [],
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     /* ────────── تتبّع المسار الميدانيّ (الجوال) ────────── */

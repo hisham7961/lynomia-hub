@@ -21,6 +21,10 @@ class ErrorCenterController extends Controller
         $q = ErrorEvent::query();
         if ($st = $r->query('st')) $q->where('status', $st);
         if ($k = $r->query('k')) $q->where('kind', $k);
+        // الصنفُ والشدّة (v2.399) — بحارس العمود كي لا تسقط الشاشة قبل الهجرة
+        $taxonomy = hub_has_col('error_events', 'category');
+        if ($taxonomy && ($cat = hub_str($r->query('cat'))) !== '' && in_array($cat, \App\Support\ErrorTaxonomy::CATEGORIES, true)) $q->where('category', $cat);
+        if ($taxonomy && ($sev = hub_str($r->query('sev'))) !== '' && in_array($sev, \App\Support\ErrorTaxonomy::SEVERITIES, true)) $q->where('severity', $sev);
         if ($term = trim(hub_str($r->query('q', '')))) {
             $q->where(fn ($w) => $w->where('message', 'LIKE', "%{$term}%")
                 ->orWhere('file', 'LIKE', "%{$term}%")->orWhere('url', 'LIKE', "%{$term}%"));
@@ -44,10 +48,17 @@ class ErrorCenterController extends Controller
         ];
         $byKind = (clone $all)->selectRaw('kind, COUNT(*) n, SUM(count) hits')
             ->groupBy('kind')->orderByDesc('hits')->get();
+        // الشدّةُ المفتوحة: «كم حرجاً ينتظر؟» يُقرأ قبل القائمة
+        $bySeverity = $taxonomy
+            ? (clone $all)->where('status', '!=', 'محلول')->selectRaw('severity, COUNT(*) n')
+                ->groupBy('severity')->pluck('n', 'severity')->all()
+            : [];
 
         return view('ops.errors', [
             'rows' => $q->paginate(25)->withQueryString(),
             'st' => $r->query('st', ''), 'k' => $r->query('k', ''),
+            'cat' => $taxonomy ? hub_str($r->query('cat')) : '', 'sev' => $taxonomy ? hub_str($r->query('sev')) : '',
+            'taxonomy' => $taxonomy, 'bySeverity' => $bySeverity,
             'q' => $term, 'sort' => $sort, 'kpi' => $kpi, 'byKind' => $byKind,
             'users' => \App\Models\User::pluck('name', 'id'),
         ]);
