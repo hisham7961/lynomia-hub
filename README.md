@@ -175,7 +175,7 @@ database/seeders/         ← الدور والمالك ودليل الحساب�
 - 🧪 **جودة:** ٦٤ اختباراً جديداً (`EnterpriseHardeningRound1/2/3Test`, `CriticalWorkflowsE2ETest`, `ApiContractTest`, `HealthModelTest`, …) كلُّها فشلت على الشجرة قبل الإصلاح؛ CI ببوّابات `composer audit` وانحرافِ OpenAPI وهجراتٍ + `hub:schema-check` على MySQL؛ اختبارُ اتّساق النسخة.
 - ⬆️ **الإطار:** Laravel **12.69.1** (كان 11.55 خارج نافذة الدعم الأمني بثلاث إرشادات منها CVE-2026-48019) و`league/commonmark` 2.10 — `composer audit` نظيف. **بعد السحب على الخادم:** `composer install --no-dev --optimize-autoloader` ثم `hub:backup --verify` ثم `migrate --force` (ستُّ هجراتٍ إضافية).
 
-الحزمة: ٢٠٨٣ اختباراً خضراء على SQLite وMySQL (MariaDB 10.11).
+الحزمة: ٢١٠٦ اختباراً خضراء على SQLite وMySQL (MariaDB 10.11) بعد الدمج مع v2.399.1.
 **v2.399.1 — «معلمُ الدفع بلا فاتورة: مراجعةٌ عدائيةٌ ثم تصليب» 🛡️**
 
 مراجعةٌ عدائيةٌ (٦ عدساتٍ و٣ مشكِّكين لكلِّ زعم) لزيادة v2.399 أثبتت ثمانيةَ عيوبٍ ورفضت واحداً؛ كلُّ مُثبَتٍ كُتب اختباراً يفشل أولاً ثم أُصلح:
