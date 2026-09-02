@@ -18,7 +18,13 @@ class HubOpenApi extends Command
     {
         $out = (string) $this->option('out');
         $path = str_starts_with($out, '/') ? $out : base_path($out);
-        $json = json_encode(OpenApi::spec(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+        // **ملفٌ محمول** (v2.400): الرابطُ الأساس واسمُ المنشأة يتبعان البيئةَ (APP_URL/الإعدادات)
+        // فكانا يجعلان الملفَ «منحرفاً» في CI وعلى كل تنصيب. الملفُ المصدَّر يحمل أصلاً نسبياً
+        // وعنواناً ثابتاً؛ والنسخةُ الحيّة على /api/v1/openapi.json تبقى بعنوان التنصيب الحقيقي.
+        $spec = OpenApi::spec();
+        $spec['servers'] = [['url' => '/', 'description' => 'أصلُ التنصيب نفسُه — يُستبدل برابط الخادم عند الاستيراد']];
+        $spec['info']['title'] = 'Lynomia Business Hub — REST API';
+        $json = json_encode($spec, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
         if ($json === false) {
             $this->error('✗ تعذّر ترميز المواصفة: ' . json_last_error_msg());
 
@@ -26,7 +32,6 @@ class HubOpenApi extends Command
         }
         if (! is_dir(dirname($path))) mkdir(dirname($path), 0755, true);
         file_put_contents($path, $json . "\n");
-        $spec = OpenApi::spec();
         $this->info('✓ ' . $out . ' — ' . count($spec['paths']) . ' مساراً، ' . count($spec['components']['schemas']) . ' مخطّطاً، الإصدار ' . $spec['info']['version']);
 
         return self::SUCCESS;
