@@ -173,7 +173,7 @@ database/seeders/         ← الدور والمالك ودليل الحساب�
 - 🖥️ **واجهة:** عاملُ الخدمة لا يخبّئ صفحاتِ الرموز العامّة؛ Leaflet محلّيٌّ لا من CDN بلا SRI؛ تسميةٌ برمجية للحقول المخصّصة وأزرارِ الأيقونات.
 - 🏎️ **أداء (مقاس):** مركزُ التشغيل ٢٥١ ← ٧١ استعلاماً؛ إيصالاتُ القراءة في استعلامٍ واحد بدل خمسين؛ بطاقاتُ العدّ وقائمةُ أفعال التدقيق مخبّأة.
 - 🧪 **جودة:** ٦٤ اختباراً جديداً (`EnterpriseHardeningRound1/2/3Test`, `CriticalWorkflowsE2ETest`, `ApiContractTest`, `HealthModelTest`, …) كلُّها فشلت على الشجرة قبل الإصلاح؛ CI ببوّابات `composer audit` وانحرافِ OpenAPI وهجراتٍ + `hub:schema-check` على MySQL؛ اختبارُ اتّساق النسخة.
-- ⬆️ **الإطار:** Laravel **12.69.1** (كان 11.55 خارج نافذة الدعم الأمني بثلاث إرشادات منها CVE-2026-48019) و`league/commonmark` 2.10 — `composer audit` نظيف. **بعد السحب على الخادم:** `composer install --no-dev --optimize-autoloader` ثم `hub:backup --verify` ثم `migrate --force` (خمسُ هجراتٍ إضافية).
+- ⬆️ **الإطار:** Laravel **12.69.1** (كان 11.55 خارج نافذة الدعم الأمني بثلاث إرشادات منها CVE-2026-48019) و`league/commonmark` 2.10 — `composer audit` نظيف. **بعد السحب على الخادم:** `composer install --no-dev --optimize-autoloader` ثم `hub:backup --verify` ثم `migrate --force` (ستُّ هجراتٍ إضافية).
 
 الحزمة: ٢٠٧٩ اختباراً خضراء على SQLite وMySQL.
 
