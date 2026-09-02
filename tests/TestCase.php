@@ -43,6 +43,10 @@ abstract class TestCase extends BaseTestCase
         // نظام ساعات العمل يُطفأ افتراضياً في الاختبارات — الحزمة تعمل بأي توقيت
         // فلا تتقلب النتائج بساعة الخادم. اختباراتُه تفعّله صراحةً بـhubSetting.
         $this->hubSetting('sec.hours_on', '0');
+        // وتأكيدُ كلمة المرور قبل سكّ الاعتماد (v2.399) يُطفأ كذلك — اختباراتُه تفعّله صراحةً
+        $this->hubSetting('security.stepup_credentials', '0');
+        $this->hubSetting('security.stepup_ops', '0');       // v2.399 — اختباراتُه تفعّله صراحةً
+        $this->hubSetting('ops.watchdog', '0');              // مفتاحُ الرجل الميّت — اختباراتُه تفعّله صراحةً
         $modules = array_keys(config('hub.modules'));
         $full = collect($modules)->mapWithKeys(fn ($m) => [$m => ['v' => 1, 'a' => 1, 'e' => 1, 'd' => 1]])->all();
         $edit = collect($modules)->mapWithKeys(fn ($m) => [$m => ['v' => 1, 'a' => 1, 'e' => 1, 'd' => 0]])->all();

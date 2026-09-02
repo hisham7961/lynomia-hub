@@ -39,7 +39,16 @@ class InboundHookController extends Controller
         // توقيعُ HMAC حين يكون للنقطة سرّ: X-Hub-Signature: sha256=<hmac>
         if (filled($hook->secret)) {
             $sent = (string) $r->header('X-Hub-Signature', '');
-            $calc = 'sha256=' . hash_hmac('sha256', $raw, (string) $hook->secret);
+            $ts = trim((string) $r->header('X-Hub-Timestamp', ''));
+            // (v2.399) ربطُ التوقيع بالزمن حين يرسل المصدرُ X-Hub-Timestamp: يُوقَّع "ts.body" ويُرفض
+            // ما تجاوز خمسَ دقائق — فالطلبُ الملتقَط لا يُعاد بعد نافذته. وبلا الترويسة يبقى
+            // التوقيعُ على الجسم كما كان (توافقٌ مع المُرسِلين القائمين).
+            if ($ts !== '') {
+                abort_unless(ctype_digit($ts) && abs(time() - (int) $ts) <= 300, 401, 'طابعُ الوقت خارج النافذة المسموحة (٥ دقائق)');
+                $calc = 'sha256=' . hash_hmac('sha256', $ts . '.' . $raw, (string) $hook->secret);
+            } else {
+                $calc = 'sha256=' . hash_hmac('sha256', $raw, (string) $hook->secret);
+            }
             abort_unless($sent !== '' && hash_equals($calc, $sent), 401, 'توقيعٌ غير صالح');
         }
 
@@ -121,6 +130,7 @@ class InboundHookController extends Controller
         $this->gate();
         $hook = InboundHook::findOrFail($id);
         $hook->update(['enabled' => ! $hook->enabled]);
+        hub_audit($hook->enabled ? 'تفعيل ويبهوك وارد' : 'تعطيل ويبهوك وارد', 'integrations', $hook->id, $hook->name);
 
         return back()->with('ok', $hook->enabled ? 'فُعّلت النقطة' : 'أُوقفت النقطة — لن تستقبل شيئاً');
     }

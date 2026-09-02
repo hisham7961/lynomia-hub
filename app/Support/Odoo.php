@@ -168,12 +168,21 @@ class Odoo
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             // فشل اتصالٍ (لا استجابة/مهلة): افتح القاطع فلا تُحجب بقيةُ القنوات
             $this->down = 'تعذّر الوصول لخادم أودو — لا استجابة، تحقق من الرابط والشبكة';
+            Integrations::pulse('odoo', false, $this->down);
             throw new \RuntimeException($this->down, 0, $e);
         }
 
         if (! $resp->successful()) {
+            Integrations::pulse('odoo', false, 'HTTP ' . $resp->status());
+            // 5xx/429 = خادمٌ متعثّر: يفتح القاطعَ لهذه التشغيلة فلا تُطرق بقيّةُ القنوات (v2.399)
+            if ($resp->status() >= 500 || $resp->status() === 429) {
+                $this->down = 'خادم أودو متعثّر (HTTP ' . $resp->status() . ') — أُوقفت بقيّة النداءات في هذه الدورة';
+                throw new \RuntimeException($this->down);
+            }
             throw new \RuntimeException('تعذر الوصول لخادم أودو (' . $resp->status() . ') — تحقق من الرابط');
         }
+        // نداءٌ وصل وأجاب: أثرُ نجاحٍ (مخنوقٌ كل خمس دقائق) — به يُعرف «آخرُ نجاح» في سجل التكاملات
+        Integrations::pulse('odoo', true);
         $j = $resp->json();
         if (isset($j['error'])) {
             throw new \RuntimeException('أودو رفض الطلب: ' . ($j['error']['data']['message'] ?? $j['error']['message'] ?? 'خطأ غير معروف'));

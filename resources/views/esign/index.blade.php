@@ -279,7 +279,7 @@
                 <form method="POST" action="{{ route('esign.tpl.archive', $t->id) }}" class="inline">@csrf
                     <button class="btn ghost xs" title="{{ $t->archived_at ? 'استعادة' : 'أرشفة — تختفي من الإرسال وتبقى وثائقها' }}">{{ $t->archived_at ? '♻️' : '🗄️' }}</button></form>
                 <form method="POST" action="{{ route('esign.tpl.destroy', $t->id) }}" class="inline" data-confirm="حذف القالب «{{ \Illuminate\Support\Str::limit($t->name, 30) }}»؟ الأرشفة أسلم.">
-                    @csrf @method('DELETE')<button class="btn ghost xs">✕</button></form>
+                    @csrf @method('DELETE')<button class="btn ghost xs" aria-label="حذف" title="حذف">✕</button></form>
             </div>
         @endforeach
         <details style="margin-top:10px">

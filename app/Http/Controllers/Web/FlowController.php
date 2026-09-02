@@ -93,6 +93,7 @@ class FlowController extends Controller
         $ids = Flow::all()->filter(fn ($f) => $this->groupOf($f->module) === $d['g'])->pluck('id');
         abort_if($ids->isEmpty(), 422, 'لا مسارات في هذه المجموعة');
         Flow::whereIn('id', $ids)->update(['enabled' => $d['do'] === 'on']);
+        hub_audit($d['do'] === 'on' ? 'تفعيل مسارات' : 'تعطيل مسارات', 'autos', null, $d['g'] . ' — ' . $ids->count() . ' مسار');
 
         return back()->with('ok', ($d['do'] === 'on' ? '✅ فُعّلت ' : '⏸ عُطّلت ')
             . $ids->count() . ' مسار في «' . $d['g'] . '»');
@@ -161,7 +162,7 @@ class FlowController extends Controller
         $actions = $this->collectActions($r);
         if (! $actions) return back()->withErrors(['actions' => 'فعّل إجراءً واحداً على الأقل'])->withInput();
 
-        Flow::create([
+        $flow = Flow::create([
             'name' => $d['name'], 'module' => $d['m'], 'event' => $d['event'],
             'status_to' => $d['status_to'] ?? null,
             'cond_field' => $d['cond_field'] ?? null,
@@ -169,6 +170,7 @@ class FlowController extends Controller
             'cond_value' => $d['cond_value'] ?? null,
             'actions' => $actions, 'enabled' => true, 'created_by' => auth()->id(),
         ]);
+        hub_audit('إنشاء مسار', 'autos', $flow->id, $flow->name, ['after' => ['module' => $flow->module, 'event' => $flow->event, 'actions' => array_column($actions, 'type')]]);
 
         return redirect()->route('flows.index', ['m' => $d['m']])->with('ok', '🪄 أُنشئ المسار وهو مفعّل الآن');
     }
@@ -237,6 +239,7 @@ class FlowController extends Controller
         $this->gate();
         $f = Flow::findOrFail($id);
         $f->update(['enabled' => ! $f->enabled]);
+        hub_audit($f->enabled ? 'تفعيل مسار' : 'تعطيل مسار', 'autos', $f->id, $f->name);
 
         return back()->with('ok', $f->enabled ? 'فُعّل المسار' : 'عُطّل المسار');
     }
@@ -244,7 +247,9 @@ class FlowController extends Controller
     public function destroy(string $id)
     {
         $this->gate();
-        Flow::findOrFail($id)->delete();
+        $f = Flow::findOrFail($id);
+        $f->delete();
+        hub_audit('حذف مسار', 'autos', $f->id, $f->name, ['before' => ['module' => $f->module, 'event' => $f->event]]);
 
         return back()->with('ok', 'حُذف المسار');
     }

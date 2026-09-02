@@ -13,8 +13,9 @@
 <div class="kids">
     @foreach ($installed as $i)
         <div class="card kid" style="border-inline-start:4px solid {{ $i['ready'] ? 'var(--ok, #27ae60)' : 'var(--wn, #e67e22)' }}">
+            @php $hk = $i['health'] ?? \App\Support\Integrations::UNKNOWN; @endphp
             <h3>{{ $i['icon'] }} {{ $i['name'] }}
-                <span class="bdg {{ $i['ready'] ? 'ok' : 'wn' }}">{{ $i['ready'] ? 'جاهز' : 'يحتاج إعداداً' }}</span>
+                <span class="bdg {{ \App\Support\Integrations::HEALTH_TONE[$hk] ?? 'g' }}" title="{{ $hk }}">{{ \App\Support\Integrations::HEALTH_LABELS[$hk] ?? $hk }}</span>
                 <span class="bdg g">{{ ['out' => '⬅ يرسل', 'in' => '➡ يستقبل', 'both' => '⬌ الاتجاهان'][$i['dir']] }}</span>
             </h3>
             <div class="sub" style="margin-bottom:8px">{{ $i['desc'] }}</div>
@@ -23,10 +24,36 @@
                 @foreach ($i['stats'] as $k => $v)
                     <tr><td class="sub">{{ $k }}</td><td class="mono acts">{{ $v }}</td></tr>
                 @endforeach
+                <tr><td class="sub">آخر نجاح</td><td class="acts sub">{{ ! empty($i['last_ok_at']) ? \Illuminate\Support\Carbon::parse($i['last_ok_at'])->diffForHumans() : '—' }}</td></tr>
+                <tr><td class="sub">آخر فشل</td><td class="acts sub">{{ ! empty($i['last_fail_at']) ? \Illuminate\Support\Carbon::parse($i['last_fail_at'])->diffForHumans() : '—' }}</td></tr>
+                @if (! empty($i['last_error']))<tr><td class="sub">السبب</td><td class="acts sub txt-bad" style="max-width:260px;word-break:break-word">{{ $i['last_error'] }}</td></tr>@endif
             </table>
             <a class="btn ghost sm" style="margin-top:8px" href="{{ route($i['route']) }}">فتح الإعداد ↗</a>
         </div>
     @endforeach
+</div>
+
+{{-- استخدامُ الـAPI (٧ أيام): من يستهلك، وكم يخطئ، وكم يستغرق — من metric_points القائم --}}
+<div class="card" id="apiusage">
+    <h3 class="cardtitle">📊 استخدام REST API <span class="sub">(٧ أيام)</span></h3>
+    @if ($apiUsage['total']['requests'] > 0)
+        <div class="cards">
+            <div class="stat"><span class="ico">🔁</span><b>{{ number_format($apiUsage['total']['requests']) }}</b><span>طلب</span></div>
+            <div class="stat"><span class="ico">⚠️</span><b class="{{ ($apiUsage['total']['error_rate'] ?? 0) > 10 ? 'txt-bad' : '' }}">{{ $apiUsage['total']['error_rate'] }}٪</b><span>نسبة الأخطاء (≥400) · {{ $apiUsage['total']['errors'] }} خطأ</span></div>
+            <div class="stat"><span class="ico">⏱</span><b>{{ $apiUsage['total']['avg_ms'] ?? '—' }}ms</b><span>متوسط زمن الرد</span></div>
+        </div>
+        <table class="mini">
+            <thead><tr><th>المفتاح</th><th>صاحبه</th><th class="acts">طلبات</th><th class="acts">أخطاء</th><th class="acts">متوسط</th></tr></thead>
+            @foreach (array_slice($apiUsage['tokens'], 0, 10) as $t)
+                <tr><td><b>{{ $t['name'] }}</b></td><td class="sub">{{ $t['user'] ?? '—' }}</td>
+                    <td class="acts mono">{{ number_format($t['requests']) }}</td>
+                    <td class="acts mono {{ ($t['error_rate'] ?? 0) > 10 ? 'txt-bad' : '' }}">{{ $t['errors'] }} ({{ $t['error_rate'] }}٪)</td>
+                    <td class="acts mono">{{ $t['avg_ms'] ?? '—' }}ms</td></tr>
+            @endforeach
+        </table>
+    @else
+        <div class="sub">لا طلبات API خلال ٧ أيام — تُعدّ منذ هذا الإصدار لكل مفتاحٍ في اليوم.</div>
+    @endif
 </div>
 
 {{-- كل الإعدادات في مكان واحد: بوابة ملاحية — الشاشات باقية في أماكنها --}}

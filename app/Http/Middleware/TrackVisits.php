@@ -19,6 +19,7 @@ class TrackVisits
     public function handle(Request $r, Closure $next)
     {
         $res = $next($r);
+        if (auth()->check()) \App\Support\Health::watchdog();   // مفتاحُ الرجل الميّت للمجدولات (مخنوقٌ بالكاش) — v2.399
 
         try {
             $u = auth()->user();

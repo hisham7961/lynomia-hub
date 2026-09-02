@@ -44,4 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions) {
         // كل استثناء يُجمَّع في مركز الأخطاء (بلا كسر المعالجة الأصلية)
         $exceptions->report(fn (\Throwable $e) => \App\Support\ErrorLog::exception($e));
+        // عقدُ API الواحد: كل استثناءٍ على /api/* يُصيَّر بالغلاف الموحَّد (كود آليّ +
+        // request_id + لا تسريبَ أسماء أصنافٍ داخلية) — وغيرُ API يمضي كما كان.
+        $exceptions->render(fn (\Throwable $e, \Illuminate\Http\Request $r) => \App\Support\Api::render($e, $r));
     })->create();

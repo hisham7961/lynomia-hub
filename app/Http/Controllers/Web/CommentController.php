@@ -170,7 +170,20 @@ class CommentController extends Controller
             $projectId = \Illuminate\Support\Facades\DB::table($md['table'])->where('id', $c->record_id)->value($col);
         }
 
-        $task = Task::create([
+        // وراثةُ الشركة والعميل من السجل الأصل أو من نطاق المحوِّل (v2.399): المعزولُ كان
+        // يُنشئ مهمةً بلا شركةٍ فلا يراها هو نفسُه بعد ثانية.
+        $inherit = [];
+        if ($c->record_id && $c->module !== 'feed' && ($md0 = hub_mod($c->module))) {
+            foreach (['company_id' => hub_company_col($c->module), 'client_id' => hub_client_col($c->module)] as $k => $col) {
+                if ($col && hub_has_col('tasks', $k)) {
+                    $inherit[$k] = \Illuminate\Support\Facades\DB::table($md0['table'])->where('id', $c->record_id)->value($col);
+                }
+            }
+        }
+        if (empty($inherit['company_id']) && hub_has_col('tasks', 'company_id') && ($cids = hub_company_ids()) !== null && $cids) $inherit['company_id'] = $cids[0];
+        if (empty($inherit['client_id']) && hub_has_col('tasks', 'client_id') && ($kids = hub_client_ids()) !== null && $kids) $inherit['client_id'] = $kids[0];
+
+        $task = Task::create(array_filter($inherit) + [
             'title'       => Str::limit(trim(preg_replace('/\s+/u', ' ', $c->body)), 70),
             'project_id'  => $projectId,
             'assignee_id' => $c->mentions[0] ?? $c->user_id,
@@ -322,14 +335,29 @@ class CommentController extends Controller
     protected function markRead($comments): void
     {
         $me = auth()->id();
+        // **استعلامٌ واحد** (PERF-04, v2.399): فتحُ سجلٍّ عليه خمسون تعليقاً غيرَ مقروء كان يكتب
+        // خمسين UPDATE في طلب GET. تُجمَع القيمُ الجديدة وتُكتب بجملة CASE واحدة — محمولةٌ على المحرّكين.
+        $pending = [];
         foreach ($comments as $c) {
             foreach ([$c, ...($c->relationLoaded('replies') ? $c->replies : [])] as $one) {
                 $rb = (array) $one->read_by;
                 if (! in_array($me, $rb, true)) {
                     $one->read_by = [...$rb, $me];
-                    $one->saveQuietly();
+                    $pending[(string) $one->id] = json_encode([...$rb, $me], JSON_UNESCAPED_UNICODE);
                 }
             }
+        }
+        if (! $pending) return;
+        try {
+            $case = ''; $bind = [];
+            foreach ($pending as $id => $json) { $case .= ' WHEN ? THEN ?'; $bind[] = $id; $bind[] = $json; }
+            $ids = array_keys($pending);
+            \Illuminate\Support\Facades\DB::update(
+                'UPDATE comments SET read_by = CASE id' . $case . ' END WHERE id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')',
+                array_merge($bind, $ids)
+            );
+        } catch (\Throwable $e) {
+            report($e);   // إيصالُ القراءة إثراءٌ — لا يكسر عرض التعليقات
         }
     }
 }

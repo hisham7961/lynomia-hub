@@ -61,21 +61,21 @@ class OpsController extends Controller
         // طوابير الرسائل
         $outbox = DB::table('outbox')->select('state', DB::raw('COUNT(*) c'))->groupBy('state')->pluck('c', 'state');
 
-        // نبضات المجدولات (متأخرة إن تجاوزت ضعف دورتها)
+        // **نموذجُ الصحّة الواحد** (v2.399): الحالةُ لكل مكوّنٍ حرج بخمس درجات — هي نفسُها
+        // التي يقرؤها /healthz، فلا يقول المركزُ «سليم» وتقول المراقبةُ غيرَه. النبضاتُ
+        // تُشتقّ منه (المتغيّر نفسُه للقالب) بمدّة آخر تشغيلٍ ونتيجته لا الموعدِ وحده.
+        $health = \App\Support\Health::check();
+        $deps = \App\Support\Health::dependencies();
         $beats = [];
-        foreach ([['outbox', 'عامل التسليم (كل ٥ دقائق)', 15],
-                  ['uptime', 'الفحص الحيّ (كل ٥ دقائق)', 15],
-                  ['automation', 'الأتمتة اليومية', 26 * 60],
-                  ['backup', 'النسخ الاحتياطي اليومي', 26 * 60]] as [$k, $label, $maxMin]) {
-            $at = setting('heartbeat.' . $k);
-            $late = ! $at || \Illuminate\Support\Carbon::parse($at)->diffInMinutes(now()) > $maxMin;
-            $beats[] = ['label' => $label, 'at' => $at, 'late' => $late];
+        foreach (($health['components']['scheduler']['data']['jobs'] ?? []) as $k => $j) {
+            $beats[] = ['key' => $k, 'label' => $j['label'], 'at' => $j['at'], 'late' => $j['late'],
+                        'status' => $j['status'], 'ms' => $j['ms'], 'result' => $j['result'], 'every' => $j['every_min']];
         }
 
         // آخر نسخة احتياطية
         // بالأحدث زمنياً لا بترتيب الاسم: ملف بتسمية يدوية كان يتصدر الترتيب
         // الأبجدي فيُعرض كآخر نسخة ويوهم أن النسخ تعمل وهي متوقفة.
-        $bk = collect(glob(storage_path('app/backups/hub-*.json')))
+        $bk = collect(array_merge(glob(storage_path('app/backups/hub-*.json')) ?: [], glob(storage_path('app/backups/hub-*.json.enc')) ?: []))
             ->sortBy(fn ($f) => filemtime($f))->last();
         $backup = $bk ? ['name' => basename($bk), 'size' => filesize($bk),
                          'age' => now()->diffForHumans(\Illuminate\Support\Carbon::createFromTimestamp(filemtime($bk)), true)] : null;
@@ -130,7 +130,7 @@ class OpsController extends Controller
         ];
 
         return view('ops.index', compact('db', 'sys', 'cpu', 'mem', 'consumers', 'pulse', 'outbox',
-            'beats', 'backup', 'errs', 'pending', 'live', 'logLines', 'env'));
+            'beats', 'backup', 'errs', 'pending', 'live', 'logLines', 'env', 'health', 'deps'));
     }
 
     /** نسخة احتياطية فورية بضغطة — دورة «النشر بلا طرفية» تكتمل بها */
@@ -140,7 +140,11 @@ class OpsController extends Controller
         @set_time_limit(300);
 
         try {
-            \Illuminate\Support\Facades\Artisan::call('hub:backup');
+            // رمزُ الخروج يُقرأ (v2.399): كان الفشلُ يُعرض بصيغة «أُخذت نسخة …» ثم نصُّ الخطأ
+            $code = \Illuminate\Support\Facades\Artisan::call('hub:backup');
+            if ($code !== 0) {
+                return redirect()->route('ops.index')->with('err', 'فشل النسخ: ' . mb_substr(trim(\Illuminate\Support\Facades\Artisan::output()), 0, 300));
+            }
             hub_audit('نسخة احتياطية يدوية', null, null, 'من مركز التشغيل');
 
             return redirect()->route('ops.index')
@@ -154,6 +158,7 @@ class OpsController extends Controller
     public function toggleMaintenance()
     {
         $this->gate();
+        if ($resp = hub_require_ops_stepup()) return $resp;   // فعلٌ عالي الأثر: تأكيدُ هوية (v2.399)
         $on = ! (bool) setting('maintenance.on', false);
         \App\Models\Setting::updateOrCreate(['key' => 'maintenance.on'], ['value' => $on ? '1' : '']);
         Cache::forget('settings:all');
@@ -185,6 +190,7 @@ class OpsController extends Controller
     public function migrate()
     {
         $this->gate();
+        if ($resp = hub_require_ops_stepup()) return $resp;   // فعلٌ عالي الأثر: تأكيدُ هوية (v2.399)
         @set_time_limit(300);
 
         /*
@@ -239,17 +245,64 @@ class OpsController extends Controller
         }
     }
 
-    /** فحص صحي داخلي عميق — JSON لمراقبات خارجية */
-    public function health()
+    /**
+     * فحصٌ صحيّ عامّ — JSON لمراقبات خارجية، على نموذج الصحّة الواحد.
+     *
+     *   GET /healthz             الصحّةُ الكاملة (حالاتٌ بلا تفاصيل للمجهول — لا أرقامَ ولا رسائل)
+     *   GET /healthz?probe=live  حياة: العمليةُ تُجيب (٢٠٠ دائماً إن أقلع التطبيق)
+     *   GET /healthz?probe=ready جاهزية: قاعدة/خبيئة/تخزين/مخطّط/إعداد — ٥٠٣ إن غاب ما لا يُخدَم بدونه
+     *
+     * الشكلُ القديم (`status: ok|degraded`، `checks.{db,cache,storage}: ok|fail`) محفوظٌ
+     * حرفياً لمراقباتٍ مضبوطة عليه، ويُضاف `health` (الحالة القياسية) و`components`.
+     * ٥٠٣ عند «متعطّل» فقط؛ «متدهور» يخدم الطلبات فيُعاد ٢٠٠ بحالته الصريحة.
+     */
+    public function health(\Illuminate\Http\Request $r)
     {
-        $checks = [];
-        try { DB::select('select 1'); $checks['db'] = 'ok'; } catch (\Throwable $e) { $checks['db'] = 'fail'; }
-        try { Cache::put('healthz', 1, 5); $checks['cache'] = Cache::get('healthz') ? 'ok' : 'fail'; } catch (\Throwable $e) { $checks['cache'] = 'fail'; }
-        $checks['storage'] = is_writable(storage_path('app')) ? 'ok' : 'fail';
-        $ok = ! in_array('fail', $checks, true);
+        $probe = (string) $r->query('probe', '');
+        if ($probe === 'live') {
+            return response()->json(['status' => 'ok', 'probe' => 'live'] + \App\Support\Health::live());
+        }
 
-        return response()->json(['status' => $ok ? 'ok' : 'degraded', 'checks' => $checks,
-                                 'version' => trim((string) @file_get_contents(base_path('VERSION')))], $ok ? 200 : 503);
+        $full = $probe === 'ready' ? \App\Support\Health::ready() : \App\Support\Health::check();
+        $pub = \App\Support\Health::publicView($full);
+        $c = $full['components'];
+        $legacy = fn (string $k) => in_array($c[$k]['status'] ?? \App\Support\Health::UNKNOWN,
+            [\App\Support\Health::HEALTHY, \App\Support\Health::DEGRADED, \App\Support\Health::MAINTENANCE], true) ? 'ok' : 'fail';
+        $checks = ['db' => $legacy('db'), 'cache' => $legacy('cache'), 'storage' => $legacy('storage')];
+        // **رمزُ HTTP من الجاهزية وحدها**: ٥٠٣ حين لا يُخدَم طلبٌ صحيح (قاعدة/خبيئة/تخزين/إعداد).
+        // أمّا المجدولاتُ والطوابيرُ والتكاملات فتُقال «متدهورة» في `health`/`components` —
+        // مراقبةُ Uptime تُنبّه على «الموقع لا يخدم» لا على «cron لم يُضبط بعد»، وذاك شأنُ مركز التشغيل.
+        $readiness = \App\Support\Health::readinessOf($full);
+        $down = $readiness === \App\Support\Health::UNAVAILABLE;
+
+        return response()->json([
+            // `status` بدلالته القديمة حرفياً (ok ما لم يفشل فحصٌ من الثلاثة) — العقدُ القديم لا يتبدّل؛
+            // والدلالةُ الأغنى في `health`/`ready`/`components`
+            'status' => in_array('fail', $checks, true) ? 'degraded' : 'ok',
+            'health' => $pub['status'], 'ready' => ! $down, 'probe' => $probe ?: 'full',
+            'checks' => $checks, 'components' => $pub['components'],
+            'version' => $pub['version'], 'at' => $pub['at'],
+        ], $down ? 503 : 200);
+    }
+
+    /** كتيّباتُ التشغيل (docs/RUNBOOKS.md) مُصيَّرةً — الملفُّ نفسُه هو المصدر فلا نسخةٌ ثانية تتقادم */
+    public function runbooks()
+    {
+        $this->gate();
+        $md = (string) @file_get_contents(base_path('docs/RUNBOOKS.md'));
+        // محتوىً ثابت من المستودع لا مدخلاتُ مستخدم — تصييرٌ آمن بلا HTML خام
+        $html = $md !== '' ? (string) \Illuminate\Support\Str::markdown($md, ['html_input' => 'strip', 'allow_unsafe_links' => false]) : '<p>لا كتيّبات بعد.</p>';
+
+        return view('ops.runbooks', ['html' => $html]);
+    }
+
+    /** الصحّةُ بتفاصيلها (رسائلُ وأرقامٌ وآخرُ أخطاء) — للمالك، JSON للأتمتة والشاشة */
+    public function healthDetail()
+    {
+        $this->gate();
+
+        return response()->json(\App\Support\Health::check() + ['dependencies' => \App\Support\Health::dependencies()],
+            200, [], JSON_UNESCAPED_UNICODE);
     }
 
     /**
@@ -259,6 +312,7 @@ class OpsController extends Controller
     public function clearCache()
     {
         $this->gate();
+        if ($resp = hub_require_ops_stepup()) return $resp;   // فعلٌ عالي الأثر: تأكيدُ هوية (v2.399)
 
         try {
             \Illuminate\Support\Facades\Artisan::call('optimize:clear');

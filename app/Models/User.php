@@ -17,6 +17,12 @@ class User extends Authenticatable
 
     public const MODULE = 'users';
 
+    /**
+     * أعمدةٌ لا تُكتب قيمتُها في سجل التدقيق أبداً — تُستبدَل ببصمة (Auditable::auditRedact).
+     * كان تجزيءُ كلمة المرور ورمزُ «تذكّرني» يُختمان في `audits.after` إلى الأبد (v2.399).
+     */
+    public const AUDIT_SECRET = ['password', 'remember_token', 'totp_secret_cipher', 'recovery_codes'];
+
     protected $guarded = ['id'];
     protected $hidden = ['password', 'totp_secret_cipher', 'recovery_codes', 'remember_token'];
 

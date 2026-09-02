@@ -227,6 +227,15 @@ class UserController extends Controller
 
         $user->update($data);
 
+        // **إعادةُ تعيين كلمة المرور من الإدارة تُغلق ما فُتح بالكلمة القديمة** (v2.399):
+        // كانت الجلساتُ الحيّة وكعكةُ «تذكّرني» تبقى صالحةً بعدها — فمهاجمٌ أُعيد ضبطُ
+        // كلمةِ ضحيّته يبقى داخلاً حتى يخرج بنفسه. الطرحُ نفسُه الذي يفعله تغييرُ الكلمة الذاتيّ.
+        if (! empty($data['password'])) {
+            \App\Support\Sessions::revokeAll($user, null);
+            hub_audit('إعادة تعيين كلمة مرور', 'users', $user->id, $user->name, ['after' => ['by' => auth()->user()?->name, 'sessions_revoked' => true]]);
+            hub_notify($user->id, 'security', 'أُعيد ضبطُ كلمة مرورك بواسطة ' . (auth()->user()?->name ?? 'الإدارة') . ' وأُنهيت جلساتُك القديمة — إن لم تطلب ذلك راجع مدير النظام فوراً', 'users', $user->id);
+        }
+
         return redirect()->route('users.index')->with('ok', 'حُفظ المستخدم');
     }
 

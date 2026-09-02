@@ -28,11 +28,27 @@ class ProfileController extends Controller
         // جديدةٍ أثناء الحادثة (الإبطالُ يبقى متاحاً). يُرفع من مركز الأمان.
         abort_if((string) setting('security.freeze_tokens', '0') === '1', 423,
             'سكُّ مفاتيح API مجمَّدٌ الآن بمفتاح طوارئٍ أمنيّ — يُرفع من مركز الأمان');
+        // سكُّ رمزٍ كامل الصلاحيات لسنة = اعتمادٌ دائم: يتطلب تأكيدَ الهوية أولاً (v2.399)
+        if ($resp = hub_require_credential_stepup()) return $resp;
         $d = $r->validate([
             'tname'   => ['required', 'string', 'max:110'],
             'tdays'   => ['nullable', 'integer', 'min:1', 'max:730'],
-            'tscopes' => ['nullable', 'string', 'max:1900'],
-            'tips'    => ['nullable', 'string', 'max:390'],
+            // (v2.399) نطاقٌ بوحدةٍ مجهولة أو عنوانٌ مشوَّه كانا يُخزَّنان صامتَين فيصير المفتاحُ «يرفض كلَّ شيء» بلا سبب
+            'tscopes' => ['nullable', 'string', 'max:1900', function ($attr, $v, $fail) {
+                foreach (preg_split('/[،,\s]+/u', (string) $v, -1, PREG_SPLIT_NO_EMPTY) as $part) {
+                    [$mod, $ops] = array_pad(explode(':', $part, 2), 2, '');
+                    if ($mod !== '*' && ! hub_mod($mod)) return $fail("نطاقٌ يسمّي وحدةً غير معروفة: {$mod}");
+                    if ($ops !== '' && preg_match('/[^vaed]/', $ops)) return $fail("عمليات النطاق «{$part}» يجب أن تكون من الحروف v a e d فقط");
+                }
+            }],
+            'tips'    => ['nullable', 'string', 'max:390', function ($attr, $v, $fail) {
+                foreach (preg_split('/[،,\s]+/u', (string) $v, -1, PREG_SPLIT_NO_EMPTY) as $e) {
+                    [$net, $bits] = array_pad(explode('/', $e, 2), 2, null);
+                    $bin = @inet_pton((string) $net);
+                    if ($bin === false) return $fail("عنوانٌ غير صالح: {$e}");
+                    if ($bits !== null && (! ctype_digit((string) $bits) || (int) $bits > (strlen($bin) === 4 ? 32 : 128))) return $fail("قناعٌ غير صالح: {$e}");
+                }
+            }],
         ], [], ['tname' => 'اسم المفتاح', 'tdays' => 'أيام الصلاحية', 'tscopes' => 'النطاقات', 'tips' => 'قائمة IP']);
 
         $plain = 'lyn_' . \Illuminate\Support\Str::random(44);
@@ -69,6 +85,7 @@ class ProfileController extends Controller
         // التدويرُ يسكّ قيمةً جديدة — فيخضع لتجميد الرموز نفسِه (الإبطالُ لا يخضع)
         abort_if((string) setting('security.freeze_tokens', '0') === '1', 423,
             'تدويرُ مفاتيح API مجمَّدٌ الآن بمفتاح طوارئٍ أمنيّ — يُرفع من مركز الأمان');
+        if ($resp = hub_require_credential_stepup()) return $resp;
         $t = \App\Models\ApiToken::where('user_id', auth()->id())->findOrFail($id);
         $plain = 'lyn_' . \Illuminate\Support\Str::random(44);
 
@@ -121,7 +138,7 @@ class ProfileController extends Controller
     {
         $secret = (string) $r->session()->get('2fa:pending');
         abort_unless($secret !== '', 422);
-        if (! \App\Support\Totp::verify($secret, hub_str($r->input('code')))) {
+        if (! \App\Support\Totp::verifyOnce($secret, hub_str($r->input('code')), '2fa-confirm:' . auth()->id())) {
             return back()->withErrors(['code' => 'الرمز غير صحيح — تأكد من إدخال السر في التطبيق وأن ساعة الجوال مضبوطة']);
         }
 
@@ -130,6 +147,8 @@ class ProfileController extends Controller
         $u->totp_enabled = true;
         $u->saveQuietly();
         $r->session()->forget('2fa:pending');
+        // حدثٌ أمنيّ قانونيّ (MFA_ENABLED) — كان يمرّ بلا أثر (v2.399)
+        hub_audit('تفعيل التحقق بخطوتين', 'users', $u->id, $u->name, ['after' => ['totp_enabled' => true, 'by' => 'صاحب الحساب']]);
 
         return redirect()->route('profile.edit')->with('ok', '✅ فُعّلت المصادقة الثنائية — ستُطلب عند كل دخول');
     }
@@ -139,13 +158,14 @@ class ProfileController extends Controller
     {
         $u = auth()->user();
         abort_unless($u->totp_enabled, 422);
-        if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, hub_str($r->input('code')))) {
+        if (! \App\Support\Totp::verifyOnce((string) $u->totp_secret_cipher, hub_str($r->input('code')), '2fa-disable:' . $u->id)) {
             return back()->withErrors(['code' => 'الرمز غير صحيح']);
         }
 
         $u->totp_secret_cipher = null;
         $u->totp_enabled = false;
         $u->saveQuietly();
+        hub_audit('إطفاء التحقق بخطوتين', 'users', $u->id, $u->name, ['after' => ['totp_enabled' => false, 'by' => 'صاحب الحساب']]);
 
         return redirect()->route('profile.edit')->with('ok', 'عُطّلت المصادقة الثنائية');
     }
@@ -205,16 +225,11 @@ class ProfileController extends Controller
         $u->password_changed_at = now();
         // تدوير رمز «تذكّرني»: كعكاتُه على كل الأجهزة (٤٠٠ يوم) تموت فوراً — وإلا
         // بقيت بيد المهاجم صالحةً رغم تغيير الكلمة، فلا يتحقق غرضُ التغيير الأمني.
-        $u->setRememberToken(\Illuminate\Support\Str::random(60));
         $u->save();
 
         // وجلساتُ الأجهزة الأخرى الحيّة تُوسم منتهية فيطردها SessionSentry مع طلبها
-        // التالي — تغييرُ الكلمة عند الاشتباه بتسريبها يطرد المهاجم فعلاً.
-        \Illuminate\Support\Facades\DB::table('sessions_log')
-            ->where('user_id', $u->id)
-            ->where('id', '!=', (string) $r->session()->get('hub.sl', ''))
-            ->where('revoked', false)
-            ->update(['revoked' => true]);
+        // التالي، ويُدوَّر «تذكّرني» — بالسكّة الواحدة (Sessions::revokeAll).
+        \App\Support\Sessions::revokeAll($u, (string) $r->session()->get('hub.sl', '') ?: null);
 
         // تدوير معرّف الجلسة الحالية بعد تغيير كلمة المرور
         $r->session()->regenerate();

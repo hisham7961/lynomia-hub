@@ -35,7 +35,7 @@ class SettingController extends Controller
     ];
 
     /** المفاتيح التي تُخزَّن مشفّرةً ولا تُعرض بعد الحفظ */
-    protected const SECRETS = ['notify.tg_token', 'odoo.key', 'quoteflow.pass', 'mail.password'];
+    public const SECRETS = ['notify.tg_token', 'odoo.key', 'quoteflow.pass', 'mail.password'];
 
     /** كتالوج المجموعات: مجموعة => [مفتاح => وصفٌ كامل] */
     public static function catalog(): array
@@ -100,6 +100,7 @@ class SettingController extends Controller
 
         $errors = [];
         $changed = [];
+        $diff = ['before' => [], 'after' => []];   // ماذا كان وماذا صار — للتدقيق (v2.399)
 
         foreach (self::catalog() as $items) {
             foreach ($items as $key => $meta) {
@@ -146,7 +147,7 @@ class SettingController extends Controller
                 if ($type === 'pass') {
                     $v = trim(hub_str($r->input($input, '')));
                     if ($v === '' || $v === '••••') continue;     // فارغ = إبقاء المخزَّن
-                    $this->put($key, 'enc:' . Crypt::encryptString($v), $changed);
+                    $this->put($key, 'enc:' . Crypt::encryptString($v), $changed, $diff);
                     continue;
                 }
 
@@ -162,7 +163,7 @@ class SettingController extends Controller
                     continue;
                 }
 
-                $this->put($key, $v, $changed);
+                $this->put($key, $v, $changed, $diff);
             }
         }
 
@@ -170,10 +171,11 @@ class SettingController extends Controller
         // كاش أودو الافتراضي يتدوّر ببصمة الاعتماد في مفتاحه — لا نسفَ يدوياً
 
         if ($changed) {
-            // الإعدادات لا تمرّ بسمة التدقيق التلقائي — وتغييرُ حارسٍ أمني
-            // يجب أن يبقى له أثرٌ باسم من غيّره ومتى.
-            hub_audit('تعديل إعدادات النظام', 'settings', null, implode(' · ', array_slice($changed, 0, 8)),
-                ['meta' => ['keys' => $changed]]);
+            // الإعدادات لا تمرّ بسمة التدقيق التلقائي — وتغييرُ حارسٍ أمني يجب أن يبقى له
+            // أثرٌ باسم من غيّره ومتى **وماذا كان وماذا صار** (v2.399): كان القيدُ أسماءَ
+            // مفاتيحَ مقصوصةً بلا قيم. القيمُ السرّية (enc:) تُكتب بصمةً لا نصّاً.
+            hub_audit('تعديل إعدادات النظام', 'settings', null, implode(' · ', $changed),
+                ['before' => $diff['before'] ?? [], 'after' => ($diff['after'] ?? []) + ['_keys' => $changed]]);
         }
 
         if ($errors) {
@@ -184,12 +186,18 @@ class SettingController extends Controller
         return back()->with('ok', 'حُفظت الإعدادات وطُبّقت فوراً' . ($changed ? ' — ' . count($changed) . ' مفتاحاً' : ''));
     }
 
-    protected function put(string $key, string $value, array &$changed = []): void
+    protected function put(string $key, string $value, array &$changed = [], array &$diff = []): void
     {
         $old = Setting::where('key', $key)->value('value');
         $old = is_scalar($old) || $old === null ? (string) $old : json_encode($old, JSON_UNESCAPED_UNICODE);
         Setting::updateOrCreate(['key' => $key], ['value' => $value]);
-        if ($old !== $value) $changed[] = $key;
+        if ($old !== $value) {
+            $changed[] = $key;
+            // السرّ لا يُكتب في التدقيق إلا بصمةً — كما تفعل Auditable::auditRedact
+            $mask = fn (string $v) => $v === '' ? '' : (str_starts_with($v, 'enc:') ? 'sha256:' . substr(hash('sha256', $v), 0, 16) : mb_substr($v, 0, 200));
+            $diff['before'][$key] = $mask($old);
+            $diff['after'][$key] = $mask($value);
+        }
     }
 
     /** اختبار اتصال أودو — يعرض إصدار الخادم أو سبب الفشل */

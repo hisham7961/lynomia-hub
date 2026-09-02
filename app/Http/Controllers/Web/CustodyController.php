@@ -182,6 +182,7 @@ class CustodyController extends Controller
             'note'   => 'nullable|string|max:500',
             'projectId' => ['nullable', 'string', Rule::exists('projects', 'id')->whereNull('deleted_at')],
         ], [], ['userId' => 'المستلم', 'at' => 'تاريخ التسليم', 'note' => 'ملاحظة', 'projectId' => 'المشروع']);
+        hub_guard_scope_input($d, ['projectId' => 'projects']);   // مشروعٌ خارج نطاق المسلِّم لا يُقبل (v2.399)
 
         $entry = Custody::move($a, 'تسليم', $d['userId'], substr($d['at'], 0, 10), $d['note'] ?? null,
             ['project_id' => $d['projectId'] ?? null]);

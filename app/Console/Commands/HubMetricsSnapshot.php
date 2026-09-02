@@ -21,6 +21,7 @@ class HubMetricsSnapshot extends Command
 
         if (! $out) {
             $this->info('لا حقول مقيسة فيها قيم بعد — لا نقاط.');
+            \App\Support\Health::beat('metrics', null, 'ok', 'لا نقاط');
 
             return self::SUCCESS;
         }
@@ -30,6 +31,7 @@ class HubMetricsSnapshot extends Command
         }
         $this->info('المجموع: ' . array_sum($out) . ' نقطة عند ' . now()->startOfDay()->toDateString());
 
+        \App\Support\Health::beat('metrics');
         return self::SUCCESS;
     }
 }

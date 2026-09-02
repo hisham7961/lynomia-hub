@@ -52,7 +52,7 @@
                             <form method="POST" action="{{ route('odoo.project.channel.del', $row->id) }}" class="inline"
                                   data-confirm="حذف قناة «{{ $c['label'] }}»؟">
                                 @csrf<input type="hidden" name="key" value="{{ $c['key'] }}">
-                                <button class="btn ghost xs danger">🗑</button>
+                                <button class="btn ghost xs danger" aria-label="حذف" title="حذف">🗑</button>
                             </form>
                         </td>
                     </tr>

@@ -235,6 +235,7 @@ class AttachmentController extends Controller
         abort_if(! $packed, 404, 'مرفقات هذا السجل غير موجودة على القرص');
 
         foreach ($packed as $a) $a->increment('downloads');
+        self::auditClassifiedAccess($packed[0]);   // الحزمةُ وصولٌ للسجل المصنَّف كلِّه (v2.399)
         DB::table('download_log')->insert(collect($packed)->map(fn ($a) => [
             'attachment_id' => $a->id, 'user_id' => auth()->id(),
             'ip' => request()->ip(),
@@ -308,6 +309,7 @@ class AttachmentController extends Controller
             'ip' => request()->ip(), 'device' => substr('معاينة · ' . request()->userAgent(), 0, 200),
             'created_at' => now(),
         ]);
+        self::auditClassifiedAccess($a);   // المعاينةُ وصولٌ كالتنزيل (v2.399)
 
         return response()->file($abs, [
             'Content-Type'           => $a->mime,

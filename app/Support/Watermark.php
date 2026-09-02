@@ -21,13 +21,32 @@ class Watermark
      * بايتات PDF موسومةٌ بنصٍّ مائلٍ شفيفٍ مكرّرٍ فوق كل صفحة (mPDF + FPDI).
      * الوسمُ يُرسَم **بعد** useTemplate فيُطلى فوق الصفحة المستوردة لا خلفها.
      */
+    /** هل يستطيع محلّلُ الوسم قراءةَ هذا الملف؟ — يُسأل عند إنشاء رابط «عرض فقط» لا عند فتحه */
+    public static function pdfSupported(string $abs): bool
+    {
+        try {
+            $tmp = storage_path('app/mpdf-tmp');
+            is_dir($tmp) || @mkdir($tmp, 0755, true);
+            (new Mpdf(['tempDir' => $tmp]))->setSourceFile($abs);
+
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     public static function pdf(string $abs, string $text): string
     {
         $tmp = storage_path('app/mpdf-tmp');
         is_dir($tmp) || @mkdir($tmp, 0755, true);
 
         $m     = new Mpdf(['tempDir' => $tmp]);
-        $pages = $m->setSourceFile($abs);
+        try {
+            $pages = $m->setSourceFile($abs);
+        } catch (\setasign\Fpdi\PdfParser\CrossReference\CrossReferenceException|\setasign\Fpdi\PdfParser\PdfParserException $e) {
+            // (v2.399) كان يسقط ٥٠٠ عامّاً على كل PDF حديث (1.5+ بجداول مضغوطة) — الآن سببٌ مسمّى
+            throw new UnsupportedPdfException('PDF بضغطٍ حديث لا يقرؤه محلّلُ الوسم: ' . $e->getMessage(), 0, $e);
+        }
 
         for ($p = 1; $p <= $pages; $p++) {
             $tpl  = $m->importPage($p);

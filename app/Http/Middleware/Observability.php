@@ -12,16 +12,36 @@ class Observability
 {
     public function handle(Request $request, Closure $next)
     {
-        $rid = (string) Str::uuid();
+        // معرّفٌ سابقٌ (وضعه ردُّ خطأٍ مبكّر عبر Api::requestId) يُحترَم فلا يتبدّل بين الجسم والترويسة
+        // معرّفٌ يرسله العميلُ (X-Request-Id) يُحترَم إن كان سليمَ الشكل (v2.399): التكاملُ يمرّر أثرَه فيُقرأ
+        // القيدُ والتسليمُ والسجلُّ بمعرّفه هو — وإلا يُولَّد هنا.
+        $sent = trim((string) $request->headers->get('X-Request-Id', ''));
+        $rid = (string) ($request->attributes->get('request_id')
+            ?: (preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]{7,63}$/', $sent) ? $sent : Str::uuid()));
         $request->attributes->set('request_id', $rid);
         $start = microtime(true);
+
+        // **سجلٌّ مهيكل**: كلُّ سطرٍ يُكتب أثناء هذا الطلب (Log::…/report) يحمل معرّفَه
+        // ومسارَه ومستخدمَه — فيُربط بمركز الأخطاء والتدقيق بالمعرّف نفسه.
+        try {
+            \Illuminate\Support\Facades\Log::withContext(array_filter([
+                'request_id' => $rid,
+                'method' => $request->method(),
+                'path' => '/' . ltrim($request->path(), '/'),
+                'user_id' => auth()->id(),
+                'ip' => $request->ip(),
+                'release' => (string) config('hub.version'),
+            ]));
+        } catch (\Throwable $e) {
+            // السياقُ إثراءٌ لا شرط
+        }
 
         $response = $next($request);
 
         if (method_exists($response, 'header')) $response->header('X-Request-Id', $rid);
 
         $ms = (int) ((microtime(true) - $start) * 1000);
-        $limit = max(50, (int) setting('ops.slow_ms', 1000));   // عتبة البطء قابلة للضبط من الإعدادات
+        $limit = max(50, (int) rescue(fn () => setting('ops.slow_ms', 1000), 1000, false));   // عتبة البطء قابلة للضبط — ولا تسقط الطلب إن سقطت القاعدة
         if ($ms > $limit && ! $request->is('files/*', 'storage/*')) {
             // المدة تُقرَّب لمرتبة: لو دخلت الرسالةَ بالمللي ثانية لصار كل طلب بطيء
             // صفاً فريداً — فيغرق مركز الأخطاء بدل أن يعدّ تكرار البطء نفسه.

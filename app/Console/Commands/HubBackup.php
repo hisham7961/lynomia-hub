@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Schema;
  */
 class HubBackup extends Command
 {
-    protected $signature = 'hub:backup {--keep=14 : عدد النسخ المحفوظة}';
+    protected $signature = 'hub:backup {--keep=14 : عدد النسخ المحفوظة} {--verify : إعادةُ قراءة النسخة بعد كتابتها والتحقّق من عدّ سجلاتها}';
     protected $description = 'تصدير القاعدة كاملة إلى storage/app/backups مع تدوير النسخ';
 
     /**
@@ -28,7 +28,77 @@ class HubBackup extends Command
         'contract_signers', 'contract_events', 'contract_approval_steps',
         'sign_template_versions', 'record_versions', 'record_acks',
         'comments', 'audits', 'dm_messages', 'share_links', 'odoo_connections',
+        // **طبقةُ الأتمتة والاعتماد وبنودُ العروض** (v2.399): كانت خارج النسخة فتُستعاد المنشأة
+        // بلا مساراتٍ ولا ويبهوك ولا مفاتيح ولا بنودِ عرضٍ ولا رأسِ سلسلةِ التدقيق — «نجاحٌ» ناقص
+        'flows', 'kpi_defs', 'webhooks', 'inbound_hooks', 'api_tokens', 'sign_templates', 'sign_requests',
+        'quote_lines', 'quote_milestones', 'dashboards', 'dashboard_widgets', 'saved_views', 'work_hours',
+        'webauthn_credentials', 'user_devices', 'asset_custody', 'record_identifiers', 'identity_lookups',
+        'inbox_documents', 'metric_points', 'audit_chain', 'signal_states', 'change_orders', 'screenshots',
     ];
+
+    /** قراءةُ ملف نسخةٍ (مشفَّرٍ أو صريح) وإعادتُه مصفوفةً — أو null إن تعذّر */
+    public static function readFile(string $path): ?array
+    {
+        $raw = @file_get_contents($path);
+        if ($raw === false || $raw === '') return null;
+        if (str_ends_with($path, '.enc')) {
+            try {
+                $raw = \Illuminate\Support\Facades\Crypt::decryptString($raw);
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+        $db = json_decode($raw, true);
+
+        return is_array($db) ? $db : null;
+    }
+
+    /** التحقّق: الملفُ يُقرأ ويُفكّ وعددُ سجلاته يطابق ما كُتب — أو سببُ الفشل */
+    public static function verifyFile(string $path, int $expected): ?string
+    {
+        $db = self::readFile($path);
+        if ($db === null) return 'الملفُ لا يُقرأ أو لا يُفكّ (APP_KEY؟) أو JSON معطوب';
+        $n = 0;
+        // العدُّ كما يعدّه الكاتب: جداولُ الوحدات + الجداولُ الخام (لا الغلاف ولا الأدوار والمستخدمون والإعدادات)
+        foreach ($db as $k => $v) {
+            if (in_array($k, ['_meta', 'roles', 'users', 'settings'], true)) continue;
+            if ($k === '_tables') { foreach ((array) $v as $rows) $n += count((array) $rows); continue; }
+            $n += count((array) $v);
+        }
+        if ($n !== $expected) return "عدُّ السجلات {$n} لا يطابق المكتوب {$expected}";
+
+        return null;
+    }
+
+    /** جداولٌ عابرة لا تستحق نسخاً — لتوثيق قرار الاستثناء لا لنسيانه (يحرسها اختبارُ التغطية) */
+    public const EPHEMERAL = [
+        'migrations', 'cache', 'cache_locks', 'sessions', 'jobs', 'job_batches', 'failed_jobs', 'password_reset_tokens',
+        'personal_access_tokens', 'idempotency_keys', 'page_visits', 'access_denials', 'activity_pings', 'error_events',
+        'notifications_hub', 'outbox', 'webhook_deliveries', 'inbound_hook_events', 'sessions_log', 'user_ips',
+        'download_log', 'imports_log', 'automation_log', 'kb_reads', 'track_points', 'track_sessions', 'api_usage',
+        'reactions', 'comment_reads', 'sideapp_stores', 'settings', 'roles', 'users',
+        'record_locks', 'share_views',   // أقفالُ تحريرٍ تنتهي بدقائق، وسجلُّ مشاهداتِ روابط المشاركة
+    ];
+
+    /** الجداولُ التي تنسخها النسخة: وحداتُ السجل + الخام + (users/roles/settings بصيغتها) */
+    public static function coveredTables(): array
+    {
+        $t = ['users', 'roles', 'settings'];
+        foreach (hub_modules() as $k => $def) if (! empty($def['table'])) $t[] = $def['table'];
+
+        return array_values(array_unique(array_merge($t, self::RAW_TABLES)));
+    }
+
+    /** فشلٌ لا يحرّك موعدَ النبضة (الموعدُ للنجاح وحده) لكنه يُكتب نتيجةً فيقرؤه مركزُ التشغيل */
+    protected function recordFailure(string $why): void
+    {
+        try {
+            \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.backup.meta'],
+                ['value' => ['ms' => null, 'result' => 'fail', 'note' => $why, 'at' => now()->toIso8601String()]]);
+            \Illuminate\Support\Facades\Cache::forget('settings:all');
+        } catch (\Throwable $e) {
+        }
+    }
 
     public function handle(): int
     {
@@ -117,7 +187,10 @@ class HubBackup extends Command
         // (هواتف، قيود IP، شفرات الخزنة) فلا يقرؤه حسابٌ محليّ آخر على الخادم
         $dir = storage_path('app/backups');
         if (! is_dir($dir)) mkdir($dir, 0700, true);
-        $file = $dir . '/hub-' . now()->format('Y-m-d-Hi') . '.json';
+        // **تشفيرٌ اختياري** (v2.399): `backup.encrypt=1` يكتب .json.enc بمفتاح التطبيق — قرصٌ
+        // مسرَّب أو حسابٌ محليّ آخر لا يقرأ المنشأة. الاستعادةُ تفكّه بالمفتاح نفسِه (احفظ APP_KEY خارج الخادم).
+        $encrypt = (string) setting('backup.encrypt', '0') === '1';
+        $file = $dir . '/hub-' . now()->format('Y-m-d-Hi') . ($encrypt ? '.json.enc' : '.json');
 
         // **الترميز أولاً، والتدوير آخراً** (v2.312): بايتةٌ واحدة فاسدة في أي صفّ
         // تجعل json_encode تعيد `false`، فكانت تُكتب نسخةٌ بصفر بايت ثم يحذف
@@ -126,17 +199,19 @@ class HubBackup extends Command
         // ثم يُكتب إلى ملفٍ مؤقّت ويُتحقّق من طول ما كُتب، ثم يُنقل، ثم يُدوَّر.
         $json = json_encode($out, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         if ($json === false || $json === '') {
+            $this->recordFailure('تعذّر ترميز النسخة');
             $this->error('✗ تعذّر ترميز النسخة: ' . json_last_error_msg()
                        . ' — لم تُكتب نسخةٌ ولم يُحذف شيء. راجع صفوفاً بترميزٍ فاسد.');
 
             return self::FAILURE;
         }
 
+        $payload = $encrypt ? \Illuminate\Support\Facades\Crypt::encryptString($json) : $json;
         $tmp = $file . '.tmp';
-        $written = @file_put_contents($tmp, $json);
-        if ($written !== strlen($json)) {
+        $written = @file_put_contents($tmp, $payload);
+        if ($written !== strlen($payload)) {
             @unlink($tmp);
-            $this->error('✗ كتابةٌ ناقصة (' . (int) $written . ' من ' . strlen($json)
+            $this->error('✗ كتابةٌ ناقصة (' . (int) $written . ' من ' . strlen($payload)
                        . ' بايت) — لم تُبدَّل النسخة ولم يُحذف شيء.');
 
             return self::FAILURE;
@@ -151,17 +226,29 @@ class HubBackup extends Command
         @chmod($file, 0600);
         @chmod($dir, 0700);
 
+        // **تحقّقٌ بإعادة القراءة** (--verify): النسخةُ تُقرأ من القرص وتُفكّ ويُعدّ ما فيها — تمرينُ استعادةٍ
+        // مصغّر يقوله رمزُ الخروج لا الأمل. (v2.399)
+        if ($this->option('verify')) {
+            $why = self::verifyFile($file, $total);
+            if ($why !== null) {
+                $this->recordFailure('فشل التحقق من النسخة: ' . $why);
+                $this->error('✗ النسخةُ كُتبت لكنها لا تجتاز التحقق: ' . $why);
+
+                return self::FAILURE;
+            }
+            $this->info('✓ تحقّقٌ بإعادة القراءة: ' . number_format($total) . ' سجل — سليمة');
+        }
+
         // التدوير بعد كتابةٍ متحقَّقٍ منها فقط
         $keep = max(1, (int) $this->option('keep'));
-        $old = glob($dir . '/hub-*.json');
+        $old = array_merge(glob($dir . '/hub-*.json') ?: [], glob($dir . '/hub-*.json.enc') ?: []);
         sort($old);
         foreach (array_slice($old, 0, max(0, count($old) - $keep)) as $f) @unlink($f);
 
         $this->info('✓ ' . basename($file) . ' — ' . number_format($total) . ' سجل، ' .
                     number_format(filesize($file) / 1024, 1) . ' KB (محفوظ آخر ' . $keep . ' نسخة)');
 
-        \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.backup'], ['value' => now()->toIso8601String()]);
-        \Illuminate\Support\Facades\Cache::forget('settings:all');
+        \App\Support\Health::beat('backup', null, 'ok', basename($file) . ' · ' . number_format($total) . ' سجل');
         return self::SUCCESS;
     }
 }

@@ -15,11 +15,19 @@ use Illuminate\Support\Facades\Schema;
  */
 class HubDigest extends Command
 {
-    protected $signature = 'hub:digest {--dry : عرض التقرير دون إرساله}';
+    protected $signature = 'hub:digest {--dry : عرض التقرير دون إرساله} {--force : إرسالٌ ولو أُرسل اليوم}';
     protected $description = 'إرسال التقرير التنفيذي الدوري للمالكين';
 
     public function handle(): int
     {
+        // (v2.399) تشغيلٌ يدويّ + الكرون الأسبوعي كانا يُرسلان التقريرَ مرّتين في اليوم نفسه
+        if (! $this->option('dry') && ! $this->option('force')) {
+            $last = setting('heartbeat.digest');
+            if ($last && \Illuminate\Support\Carbon::parse($last)->isToday()) {
+                $this->info('أُرسل التقرير اليوم — لا تكرار (استعمل --force)');
+                return self::SUCCESS;
+            }
+        }
         $owner = User::whereNull('deleted_at')->where('status', 'نشط')
             ->whereHas('role', fn ($q) => $q->where('is_owner', true))->first();
         if (! $owner) {
@@ -88,8 +96,7 @@ class HubDigest extends Command
                 'text' => hub_fit($text, hub_col_max('outbox', 'text') ?? 790), 'state' => 'queued', 'created_at' => now()]);
         }
 
-        \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.digest'], ['value' => now()->toIso8601String()]);
-        \Illuminate\Support\Facades\Cache::forget('settings:all');
+        \App\Support\Health::beat('digest');
 
         $this->info('أُرسل التقرير إلى ' . $owners->count() . ' مالك');
 

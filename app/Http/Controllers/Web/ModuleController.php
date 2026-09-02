@@ -64,7 +64,7 @@ class ModuleController extends Controller
                     ? $q->where($f['col'], $fv)
                     : $q->whereJsonContains($f['col'], $fv);
                 $filters[] = ['key' => $fk, 'label' => $f['label'], 'val' => $fv,
-                              'name' => hub_ref_labels($f['ref'], [$fv])[$fv] ?? $fv];
+                              'name' => $this->chipLabel((string) $f['ref'], $fv)];
                 continue;
             }
 
@@ -76,13 +76,22 @@ class ModuleController extends Controller
                 $q->where($fk, $fv);
                 $filters[] = ['key' => $fk, 'label' => hub_mod($implicit[$fk])['label'] ?? $fk,
                               'val' => $fv,
-                              'name' => hub_ref_labels($implicit[$fk], [$fv])[$fv] ?? $fv];
+                              'name' => $this->chipLabel((string) $implicit[$fk], $fv)];
             }
         }
 
         $this->applyAdvancedFilters($r, $def, $fields, $q, $filters);
 
         return $q;
+    }
+
+    /**
+     * اسمُ شريحة الترشيح **داخل النطاق وحده** (v2.399): `?f[clientId]=<uuid>` كان يُترجم أيَّ
+     * معرّفٍ إلى اسمه — عرّافاً لأسماء عملاء وشركات خارج العزل. خارجُ النطاق يبقى معرّفاً عارياً.
+     */
+    protected function chipLabel(string $ref, string $id): string
+    {
+        return (string) (hub_ref_options_scoped($ref, $id)[$id] ?? $id);
     }
 
     /** عوامل الفلاتر المتقدمة المسموحة لكل نوع حقل — ما خرج عنها يُتجاهل بصمت */
@@ -242,6 +251,7 @@ class ModuleController extends Controller
         $r->validate($this->rules($def), [], $this->attrs($def));
         $this->guardProject($r, $module);
         $this->guardCompany($r, $module);
+        $this->guardClient($r, $module);
         $this->guardAccountRequest($r, $module);
 
         $m = new $class;
@@ -416,6 +426,7 @@ class ModuleController extends Controller
         $r->validate($this->rules($def, creating: false), [], $this->attrs($def));
         $this->guardProject($r, $module);
         $this->guardCompany($r, $module);
+        $this->guardClient($r, $module);
 
         $m = $this->findScoped($class, $module, $id);
 
@@ -571,6 +582,9 @@ class ModuleController extends Controller
         $new = hub_str($r->input('status'));
         $options = (array) ($statusField['options'] ?? []);
         abort_if($options && ! in_array($new, $options, true), 422, 'حالة غير معرَّفة في هذه الوحدة');
+        // حالةٌ يعلنها السجلّ «تُشتقّ من فعل» (status_via_action) لا تُكتب بالسحب: كانت «مدفوعة»
+        // تُزرع بلا مبلغٍ مدفوع فتُطلق invoice.paid على فاتورةٍ لم تُدفع (ARCH-03, v2.399)
+        if ($why = ($def['status_via_action'][$new] ?? null)) abort(422, $why);
 
         $prevStatus = $m->{$statusCol};
         $m->{$statusCol} = $new;
@@ -762,7 +776,8 @@ class ModuleController extends Controller
         } elseif ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
             $why = $e->getMessage();
         } else {
-            \App\Support\ErrorLog::capture('bulk', $e->getMessage(), $e->getFile(), $e->getLine());
+            // بالرسالة الآمنة (v2.399): الخامُ يحمل قيمَ الأعمدة والاستعلامَ — ويُدفع إشعاراً للمالكين
+            \App\Support\ErrorLog::capture('bulk', \App\Support\ErrorLog::safeMessage($e), $e->getFile(), $e->getLine());
             $why = 'عطلٌ غير متوقع — سُجّل في مركز الأخطاء';
         }
 
@@ -796,9 +811,37 @@ class ModuleController extends Controller
                 'تعديلُك يمر بالموافقات — لا تُستعاد النسخ مباشرةً؛ افتح السجل وقدّم التعديل ليُوثَّق');
         }
 
+        // (v2.399) لقطةٌ قديمة قد تحمل شركةً/عميلاً/مشروعاً خارج نطاق المستعيد — الاستعادةُ
+        // لا تُخرج السجلَّ من نطاقه: حارسُ الشركة والمشروع نفسُه الذي يمرّ به نموذجُ التعديل.
+        if ($why = $this->snapshotScopeError($module, $row, $version)) return back()->with('err', $why);
+
         abort_unless($row->restoreVersion($version), 422, 'النسخة غير موجودة');
 
         return back()->with('ok', "استُعيدت النسخة $version وحُفظت كنسخة جديدة");
+    }
+
+    /** هل تُعيد النسخةُ أعمدةَ العزل إلى قيمٍ خارج نطاق المستخدم؟ — رسالةٌ أو null */
+    protected function snapshotScopeError(string $module, Model $row, int $version): ?string
+    {
+        $u = auth()->user();
+        if (! $u || hub_is_owner($u) || ! method_exists($row, 'versions')) return null;
+        $v = $row->versions()->where('version', $version)->first();
+        if (! $v) return null;
+        $snap = (array) $v->snapshot;
+        $checks = [
+            [hub_company_col($module), hub_company_ids($u), 'شركةٍ'],
+            [hub_client_col($module), hub_client_ids($u), 'عميلٍ'],
+            [hub_project_col($module), hub_scoped($u) ? $u->visibleProjectIds() : null, 'مشروعٍ'],
+        ];
+        foreach ($checks as [$col, $allowed, $label]) {
+            if (! $col || $allowed === null) continue;
+            $val = hub_str($snap[$col] ?? null);
+            if ($val !== '' && ! in_array($val, array_map('strval', $allowed), true)) {
+                return "هذه النسخة تُعيد السجلَّ إلى {$label} خارج نطاقك — لا تُستعاد من حسابك";
+            }
+        }
+
+        return null;
     }
 
     /* ────────── أدوات داخلية ────────── */
@@ -1060,6 +1103,28 @@ class ModuleController extends Controller
         if ($ids) $m->{$pcol} = $ids[0];
     }
 
+    /**
+     * ونظيرُها للعميل (v2.399): كان المعزولُ على عملاء يكتب `clientId` لعميلٍ أجنبيّ
+     * (‏`exists` وحدها) فيُنسب سجلُّه لمساحة عميلٍ آخر ويختفي عنه — التماثلُ الذي
+     * صُلِّح للشركات ولم يُعكَس للعملاء.
+     */
+    protected function guardClient(Request $r, string $module): void
+    {
+        $ids = hub_client_ids();
+        if ($ids === null || $module === 'clients') return;
+        $kf = collect(hub_mod($module)['fields'] ?? [])
+            ->first(fn ($f) => ($f['type'] ?? '') === 'ref' && ($f['ref'] ?? '') === 'clients' && empty($f['multi']));
+        if (! $kf) return;
+        if (hub_field_mode(auth()->user(), $module, $kf['key']) !== '') return;
+
+        $val = hub_str($r->input($kf['key']));
+        if ($val === '') return;   // الفراغُ يرثه inheritClient — لا حبسَ للحفظ
+        if (! in_array($val, $ids, true)) {
+            throw \Illuminate\Validation\ValidationException::withMessages(
+                [$kf['key'] => 'حسابك معزول على عملاء محددين — اختر عميلاً من عملائك']);
+        }
+    }
+
     /** العزل الصارم: من له شركات مسموحة يربط السجل بإحداها فقط عند الإضافة أو التعديل */
     protected function guardCompany(Request $r, string $module): void
     {
@@ -1161,19 +1226,10 @@ class ModuleController extends Controller
         foreach (collect($def['fields'])->where('type', 'ref') as $f) {
             $cur = $row?->{$f['col']} ?? null;
             if (is_string($cur) && ! empty($f['multi'])) $cur = json_decode($cur, true) ?: [];
-            $opts = hub_ref_options($f['ref'], $cur);
-            if ($f['ref'] === 'projects' && hub_scoped(auth()->user())) {
-                $opts = array_intersect_key($opts, array_flip(auth()->user()->visibleProjectIds()));
-            }
-            // العزل الصارم: أي مرجعٍ لوحدةٍ معزولة على الشركات (الشركات نفسها،
-            // العملاء، الموردون…) تنحصر خياراته في شركات المستخدم المسموحة —
-            // وإلا سرّبت القائمة أسماء سجلات شركات أجنبية وسمحت بالربط بها.
-            if (($cids = hub_company_ids()) !== null && ($ccol = hub_company_col($f['ref']))) {
-                $allowed = \Illuminate\Support\Facades\DB::table(hub_ref_table($f['ref']))
-                    ->whereIn($ccol, $cids)->pluck('id')->map(fn ($v) => (string) $v)->all();
-                $opts = array_intersect_key($opts, array_flip($allowed));
-            }
-            $out[$f['key']] = $opts;
+            // **القارئُ المنطَّق الواحد** (v2.399): كان هذا الموضع يعيد بناء مرشّحَي المشاريع
+            // والشركات بيده ويُغفل العملاء — فالمعزولُ على عميلٍ يرى أسماءَ كل العملاء في
+            // القوائم المنسدلة. `hub_ref_options_scoped` يطبّق الثلاثة معاً في مكانٍ واحد.
+            $out[$f['key']] = hub_ref_options_scoped($f['ref'], $cur);
         }
         return $out;
     }
@@ -1234,8 +1290,43 @@ class ModuleController extends Controller
             if (($f['type'] ?? '') === 'sel' && ! empty($f['options'])) {
                 $r[] = \Illuminate\Validation\Rule::in($f['options']);
             }
+            // **قيودٌ يعلنها السجلّ** (v2.399) — لا شيفرةَ لكل وحدة:
+            //  · `ta` بسقف عمود TEXT (كان بلا حدّ فيمرّ على SQLite ويرفضه MySQL بعد الكتابة)
+            //  · `min` للأعداد (كمّيةُ المخزون لا تكون سالبة من نموذج التعديل العامّ)
+            //  · `format: time` لحقول الوقت النصّية (كان «صباحاً 9» يُحسب ٤٩٦٧٦١ ساعة)
+            //  · `unique` لعمودٍ متفرّد (رقمُ العرض) — بالرسالة لا بفهرسٍ يسقط على بياناتٍ قائمة
+            if ($f['type'] === 'ta') $r[] = 'max:' . (hub_col_max($def['table'] ?? '', $f['col'] ?? $f['key']) ?: 65535);
+            if (isset($f['min']) && in_array($f['type'], ['num', 'big'], true)) $r[] = 'min:' . $f['min'];
+            if (($f['format'] ?? '') === 'time') $r[] = 'regex:/^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/';
+            if (! empty($f['unique']) && ! empty($def['table'])) {
+                $uq = \Illuminate\Validation\Rule::unique($def['table'], $f['col'] ?? $f['key'])->ignore(request()->route('id'));
+                if (hub_has_col($def['table'], 'deleted_at')) $uq->whereNull('deleted_at');
+                $r[] = $uq;
+            }
 
             $rules[$f['key']] = $r;
+        }
+
+        // **تفرّدٌ مركّب** (v2.399): `unique_together` في تعريف الوحدة — موظفٌ ويومٌ في الحضور
+        // مثلاً: صفّان بالمفاتيح نفسِها كانا يُقبلان ولا ترى الخدمةُ الذاتية إلا الأول.
+        foreach ((array) ($def['unique_together'] ?? []) as $combo) {
+            $combo = array_values((array) $combo);
+            $first = $combo[0] ?? null;
+            if (! $first || ! isset($rules[$first]) || empty($def['table'])) continue;
+            $rules[$first][] = function ($attr, $value, $fail) use ($def, $combo) {
+                $q = \Illuminate\Support\Facades\DB::table($def['table']);
+                foreach ($combo as $k) {
+                    $f = collect($def['fields'])->firstWhere('key', $k);
+                    $v = request()->input($k);
+                    if (! $f || $v === null || $v === '' || is_array($v)) return;
+                    ($f['type'] ?? '') === 'date'
+                        ? $q->whereDate($f['col'] ?? $k, substr((string) $v, 0, 10))
+                        : $q->where($f['col'] ?? $k, $v);
+                }
+                if ($id = request()->route('id')) $q->where('id', '!=', $id);
+                if (hub_has_col($def['table'], 'deleted_at')) $q->whereNull('deleted_at');
+                if ($q->exists()) $fail('يوجد سجلٌّ بهذه القيم نفسِها — لا يُكرَّر');
+            };
         }
 
         // الحقول المخصصة (باني الحقول)
@@ -1313,6 +1404,10 @@ class ModuleController extends Controller
 
             $v = $r->input($k);
             if ($t === 'sec' && ($v === null || $v === '')) continue;   // إبقاء السرّ القديم
+            // تاريخٌ وصل طابعَ لحظةٍ بمنطقةٍ زمنية (صيغةُ API القديمة `…T21:00:00Z`): يومُه في منطقة النظام (v2.399)
+            if ($t === 'date' && is_string($v) && preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/', $v)) {
+                try { $v = \Illuminate\Support\Carbon::parse($v)->setTimezone(config('app.timezone'))->toDateString(); } catch (\Throwable $e) {}
+            }
             $m->{$c} = ($v === '' ? null : $v);
         }
 

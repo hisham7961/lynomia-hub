@@ -294,7 +294,8 @@ class EsignController extends Controller
             'title' => 'required|string|max:200',
             'template_id' => 'nullable|exists:sign_templates,id',
             'free_body' => 'nullable|string|max:200000',
-            'pass' => 'nullable|string|min:4|max:80', 'contract_id' => 'nullable|string',
+            'pass' => 'nullable|string|min:4|max:80',   // يبقى ٤ (عقدٌ قائم مع المُرسِلين والقوالب) — انظر TECH_DEBT #24
+            'contract_id' => 'nullable|string',
             'link_module' => 'nullable|string|max:40', 'link_id' => 'nullable|string|max:64',
             'permit' => 'nullable|string|max:64',       // تصريحُ عهدةٍ جاء منه الطلب
             'vars' => 'array',

@@ -18,8 +18,9 @@
     @if (count($line) >= 2)
         <div id="map" style="height:460px;border-radius:var(--r);overflow:hidden"></div>
         <div class="sub" style="margin-top:8px">مسارٌ مبسَّط (Ramer–Douglas–Peucker) — يُبقي شكلَ الطريق ويُسقط التراصّ. النقاطُ الخام تُقلَّم بسياسة الاحتفاظ.</div>
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+        {{-- Leaflet مُضمَّنٌ محلياً (v2.399): كان يُحمَّل من CDN بلا SRI ولا script-src — سكربتُ طرفٍ ثالث بأصل النظام --}}
+        <link rel="stylesheet" href="{{ asset('vendor/leaflet/1.9.4/leaflet.min.css') }}">
+        <script src="{{ asset('vendor/leaflet/1.9.4/leaflet.min.js') }}"></script>
         <script>
         (function () {
             var line = @json($line);

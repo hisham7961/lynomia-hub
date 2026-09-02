@@ -5,5 +5,7 @@
 # حينها من التيرمنال: composer install --no-dev --optimize-autoloader)
 deployment:
   tasks:
+    - php artisan hub:backup --keep=14
     - php artisan migrate --force
     - php artisan optimize:clear
+    - php artisan hub:schema-check

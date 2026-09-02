@@ -4,7 +4,7 @@
      لا يعرفه أحد ← تسجيلٌ يدويٌّ سريع. كلُّ الحسم عبر المحلّل الموحّد. --}}
 @php
     $scUsers = hub_ref_options('users');
-    $scCompanies = hub_ref_options('companies');
+    $scCompanies = hub_ref_options_scoped('companies');   // شركاتُ المستخدم وحدها — لا كلُّ الشركات
     $scCanAst = hub_can(auth()->user(), 'assets', 'a');
     $scCanHold = hub_can(auth()->user(), 'assets', 'e');
     $scCanPrd = hub_can(auth()->user(), 'products', 'a');

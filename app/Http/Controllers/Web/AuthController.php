@@ -86,6 +86,8 @@ class AuthController extends Controller
             Auth::logout();
             $r->session()->put('2fa:uid', $u->id);
             $r->session()->regenerate();
+            // تحدّي الخطوة الثانية حدثٌ أمنيّ (MFA_CHALLENGE): كلمةٌ صحيحة بلا إتمامِ رمزٍ أثرٌ يُقرأ
+            hub_audit('تحدّي التحقق بخطوتين', null, null, $u->name, ['user_id' => $u->id]);
 
             return redirect()->route('login.otp');
         }
@@ -114,7 +116,7 @@ class AuthController extends Controller
             return back()->withErrors(['code' => "الحساب مقفل مؤقتاً بعد محاولات فاشلة — أعد المحاولة بعد {$m} دقيقة"]);
         }
 
-        if (! \App\Support\Totp::verify((string) $u->totp_secret_cipher, hub_str($r->input('code')))) {
+        if (! \App\Support\Totp::verifyOnce((string) $u->totp_secret_cipher, hub_str($r->input('code')), 'login:' . $u->id)) {
             $this->bumpFailedAttempts($u);
             // فشلُ الرمز الثاني حدثٌ أمنيّ يستحق أثراً كفشل كلمة المرور — كان
             // يزيد العدّاد بصمتٍ فلا يظهر «كلمةٌ صحيحةٌ ورمزٌ يُخمَّن» في التدقيق

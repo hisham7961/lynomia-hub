@@ -66,7 +66,7 @@
                             <form method="POST" action="{{ route('integrations.odoo.destroy', $c->id) }}" class="inline"
                                   data-confirm="حذف اتصال «{{ $c->name }}»؟ المشاريع المرتبطة به سترى «اتصال محذوف» حتى تختار غيره.">
                                 @csrf @method('DELETE')
-                                <button class="btn ghost xs danger">🗑</button>
+                                <button class="btn ghost xs danger" aria-label="حذف الربط" title="حذف الربط">🗑</button>
                             </form>
                         </td>
                     </tr>

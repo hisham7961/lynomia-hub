@@ -169,6 +169,15 @@ class IdentityController extends Controller
             abort(403, 'إسناد العهدة يتطلب صلاحية تعديل الأصول');
         }
 
+        // **حرّاسُ العزل كما في محرّك الوحدات** (v2.399): `exists` وحدها كانت تقبل شركةً أو
+        // عميلاً أو مشروعاً خارج نطاق المسجِّل — فيُنسب الأصلُ لشركةٍ أجنبية ويختفي عن
+        // صاحبه فوراً. والمعزولُ بلا شركةٍ مُرسَلة يرث أولى شركاته (نمط inheritCompany).
+        hub_guard_scope_input($d, [
+            'company_id' => 'companies', 'client_id' => 'clients', 'project_id_ctx' => 'projects',
+        ], $u);
+        if (empty($d['company_id']) && ($cids = hub_company_ids($u)) !== null && $cids) $d['company_id'] = $cids[0];
+        if (empty($d['client_id']) && ($kids = hub_client_ids($u)) !== null && $kids) $d['client_id'] = $kids[0];
+
         [$product, $assets, $warnings] = DB::transaction(function () use ($d, $qty, $u) {
             $warnings = [];
 
@@ -182,7 +191,15 @@ class IdentityController extends Controller
                 $norm = Identity::norm('gtin', (string) ($d['barcode'] ?? ''));
                 $owner = $norm !== ''
                     ? RecordIdentifier::where('module', 'products')->where('norm', $norm)->first() : null;
-                if ($owner && ($product = Product::find($owner->record_id))) {
+                // صاحبُ الباركود يُتبَع **داخل النطاق وحده**: منتجُ شركةٍ أخرى بالباركود نفسه
+                // كان يُتبنّى ويُطبع اسمُه في الرسالة، ويرث الأصلُ شركتَه الأجنبية.
+                $ownerProduct = $owner
+                    ? hub_company_scope(hub_scope(Product::query(), 'products', $u), 'products')->find($owner->record_id) : null;
+                if ($owner && ! $ownerProduct) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(
+                        ['barcode' => 'هذا الباركود مسجَّلٌ لمنتجٍ خارج نطاقك — راجع مدير النظام']);
+                }
+                if ($owner && ($product = $ownerProduct)) {
                     // مستخدمان مسحا المجهولَ نفسَه معاً: الثاني يلحق بالأول لا ينافسه
                     $warnings[] = 'الباركود مسجَّلٌ لمنتجٍ قائم — استُعمل «' . $product->name . '» بدل إنشاء مكرر';
                 } else {
@@ -210,7 +227,7 @@ class IdentityController extends Controller
                         // سباقُ اللحظة نفسِها على الفهرس الفريد: أعد القراءة — الفائز واحد
                         if ((string) $e->getCode() !== '23000' || $norm === '') throw $e;
                         $owner = RecordIdentifier::where('module', 'products')->where('norm', $norm)->firstOrFail();
-                        $product = Product::findOrFail($owner->record_id);
+                        $product = hub_company_scope(hub_scope(Product::query(), 'products', $u), 'products')->findOrFail($owner->record_id);
                     }
                 }
             }
@@ -279,8 +296,12 @@ class IdentityController extends Controller
             'into' => ['required', 'string', 'different:id', Rule::exists('products', 'id')->whereNull('deleted_at')],
         ], [], ['into' => 'المنتج الأصل']);
 
-        $dupe = Product::findOrFail($id);
-        $into = Product::findOrFail($d['into']);
+        // **بالقارئ المنطَّق لا بـfind الخام** (v2.399): كان المعزولُ بشركةٍ يدمج منتجَ شركةٍ
+        // أخرى (يؤرشفه ويعيد إشارة أصولها) ويقرأ اسمَه في رسالة النجاح — تجاوزٌ للعزل
+        // بمعرّفٍ واحد. سجلٌّ خارج نطاقك = ٤٠٤ كما في كل قارئٍ آخر في هذا الملف.
+        $scoped = hub_company_scope(hub_scope(Product::query(), 'products', auth()->user()), 'products');
+        $dupe = (clone $scoped)->findOrFail($id);
+        $into = (clone $scoped)->findOrFail($d['into']);
         abort_if($dupe->id === $into->id, 422, 'لا يُدمج المنتج في نفسه');
 
         $res = Identity::merge($dupe, $into);

@@ -77,11 +77,20 @@ class Engine
         $suggestion = $answers ? self::aggregate($answers, $norm) : null;
         $status = $suggestion ? 'found' : 'notfound';
 
-        // ── حفظ الكاش (updateOrCreate: مسحتان متزامنتان لا تفسدان شيئاً) ──
-        IdentityLookup::updateOrCreate(['norm' => $norm], [
-            'status' => $status, 'result' => $suggestion, 'providers' => $log,
-            'checked_at' => now(),
-        ]);
+        // **الفشلُ العابر ليس «غيرَ موجود»** (v2.399): حين لا يُجيب أيُّ مزوّدٍ إجابةً حاسمة
+        // (كلُّهم 429/مهلة/رفض) كان يُخزَّن notfound ثلاثين يوماً فيبقى المنتجُ المعروف
+        // «مجهولاً» شهراً. لا يُخزَّن إلا ما أُجيب عنه فعلاً — والعابرُ يُعاد سؤالُه في المسحة التالية.
+        // الحاسم: إجابةٌ بحقول، أو «لا يعرفه» (٢٠٠ بلا بيانات)، أو 404/410 من المزوّد (سجلٌّ غيرُ موجود عنده).
+        // أمّا 429 و5xx والمهلاتُ وحاجزُ الخروج (SSRF/DNS) فعابرة — لا تُخزَّن.
+        $definitive = $suggestion !== null
+            || collect($log)->contains(fn ($l) => in_array($l['why'] ?? '', ['لا يعرفه', 'HTTP 404', 'HTTP 410'], true));
+        if ($definitive) {
+            // ── حفظ الكاش (updateOrCreate: مسحتان متزامنتان لا تفسدان شيئاً) ──
+            IdentityLookup::updateOrCreate(['norm' => $norm], [
+                'status' => $status, 'result' => $suggestion, 'providers' => $log,
+                'checked_at' => now(),
+            ]);
+        }
 
         hub_audit('استكشاف خارجي', 'products', null, $norm,
             ['after' => ['status' => $status, 'providers' => collect($log)->map(fn ($l) => $l['key'] . ($l['ok'] ? '✓' : '✗'))->implode(' ')]]);

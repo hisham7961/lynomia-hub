@@ -55,7 +55,7 @@ class StepUp
     {
         if (! $user) return false;
         $ok = $user->totp_enabled
-            ? \App\Support\Totp::verify((string) $user->totp_secret_cipher, $input)
+            ? \App\Support\Totp::verifyOnce((string) $user->totp_secret_cipher, $input, 'stepup:' . $user->id)
             : ($user->password && Hash::check($input, $user->password));
         if ($ok) self::stamp();
 

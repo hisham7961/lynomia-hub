@@ -11,6 +11,11 @@
     <div class="mono ltr sub" style="font-size:13px;letter-spacing:3px">@yield('code')</div>
     <h1 style="margin:4px 0 8px">@yield('title')</h1>
     <p class="sub" style="margin-bottom:18px">@hasSection('msg')@yield('msg')@else{{ $exception?->getMessage() ?: '' }}@endif</p>
+    @php $rid = rescue(fn () => \App\Support\Api::requestId(), null, false); @endphp
+    @if ($rid)
+        {{-- معرّفُ الطلب: يربط هذه الشاشة بصفّ مركز الأخطاء والتدقيق نفسِه --}}
+        <div class="sub mono ltr" style="font-size:11px;margin-bottom:14px;opacity:.8" title="أرفقه عند طلب الدعم">request_id: {{ $rid }}</div>
+    @endif
     <div style="display:flex;gap:8px;justify-content:center">
         <a class="btn p" href="{{ url('/') }}">→ لوحة التحكم</a>
         <a class="btn ghost" href="javascript:history.back()">رجوع</a>

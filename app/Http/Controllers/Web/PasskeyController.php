@@ -29,6 +29,8 @@ class PasskeyController extends Controller
     public function registerOptions(Request $r)
     {
         abort_unless($this->on(), 404);
+        // تسجيلُ مفتاح مرورٍ = اعتمادٌ دائم بلا كلمة: جلسةٌ مختطفة كانت تزرعه بلا إعادة تحقّق (v2.399)
+        if ($resp = hub_require_credential_stepup()) return $resp;
         $u = $r->user();
         $challenge = Webauthn::challenge();
         session(['wa.reg' => $challenge]);
@@ -55,6 +57,7 @@ class PasskeyController extends Controller
     public function registerVerify(Request $r)
     {
         abort_unless($this->on(), 404);
+        if ($resp = hub_require_credential_stepup()) return $resp;
         $u = $r->user();
         $challenge = (string) session('wa.reg', '');
         session()->forget('wa.reg');   // أحاديُّ الاستعمال
@@ -95,6 +98,7 @@ class PasskeyController extends Controller
 
     public function destroy(Request $r, string $id)
     {
+        if ($resp = hub_require_credential_stepup()) return $resp;
         $u = $r->user();
         $cred = WebauthnCredential::where('user_id', $u->id)->findOrFail($id);
         $cred->delete();
@@ -129,7 +133,8 @@ class PasskeyController extends Controller
         session()->forget('wa.stepup');
         abort_if($challenge === '', 422, 'انتهت الجلسة — أعد المحاولة');
 
-        $cred = $this->verifyAssertionInput($r, $challenge, $u->id);
+        // UV مطلوبٌ كما عند الدخول (v2.399): وجودُ المفتاح وحده (UP) لا يُثبت صاحبَه
+        $cred = $this->verifyAssertionInput($r, $challenge, $u->id, requireUv: true);
         if (! $cred instanceof WebauthnCredential) return $cred;   // استجابةُ خطأ
 
         StepUp::stamp();
@@ -183,6 +188,14 @@ class PasskeyController extends Controller
         }
         if ($u->locked_until && now()->lt($u->locked_until)) {
             return response()->json(['ok' => false, 'error' => 'الحساب مقفلٌ مؤقتاً بعد محاولاتٍ فاشلة'], 423);
+        }
+        // وانتهاءُ الحساب وقائمةُ IP كما عند باب كلمة المرور (v2.399): المفتاحُ لا يتجاوزهما
+        if ($u->expires_at && now()->toDateString() > substr((string) $u->expires_at, 0, 10)) {
+            return response()->json(['ok' => false, 'error' => 'انتهت صلاحية الحساب'], 403);
+        }
+        if ($u->allowed_ips && ! ip_allowed((string) $r->ip(), (string) $u->allowed_ips)) {
+            \App\Support\SecurityRadar::record($r, 'وصول مرفوض', 'مفتاح مرور من عنوان خارج القائمة');
+            return response()->json(['ok' => false, 'error' => 'الدخول من هذا العنوان غير مسموح لهذا الحساب'], 403);
         }
 
         $verified = $this->verifyAssertionInput($r, $challenge, $u->id, requireUv: true);

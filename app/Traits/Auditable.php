@@ -100,6 +100,8 @@ trait Auditable
                 hub_col_max('audits', 'reason') ?? 400),
             'device'     => hub_fit(hub_str(Request::header('X-Device', Request::userAgent())), 200),
             'ip'         => Request::ip(),
+            // ربطُ الأثر بطلبه (v2.399): به يُجمَع ما كتبه طلبٌ واحد عبر التدقيق والصندوق الصادر والويبهوك
+            'request_id' => \App\Support\Api::requestId(),
             'created_at' => now(),
         ]);
     }

@@ -81,6 +81,8 @@ class SessionSentry
     /** إخراجٌ نظيف: `Auth::logout` يدوّر رمز «تذكّرني» فلا تُبعث الجلسة من الكعكة */
     protected function kick(Request $r, string $why)
     {
+        // الطردُ حدثٌ أمنيّ يُرى في الرادار (v2.399) — كان يخرج صامتاً بلا أثر
+        try { \App\Support\SecurityRadar::record($r, 'وصول مرفوض', 'طرد جلسة: ' . $why); } catch (\Throwable $e) {}
         Auth::logout();
         $r->session()->invalidate();
         $r->session()->regenerateToken();

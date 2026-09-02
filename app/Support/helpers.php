@@ -620,12 +620,50 @@ if (! function_exists('hub_require_stepup')) {
         $url = route('stepup.show', ['next' => is_string($next) && str_starts_with($next, '/') ? $next : $path]);
 
         if (request()->expectsJson() || request()->is('api/*')) {
-            return response()->json([
-                'error' => 'يتطلب تأكيدَ الهوية', 'stepup' => true, 'url' => $url,
-            ], 428);
+            // الغلافُ الموحَّد: المفاتيحُ القديمة (error/stepup/url) كما هي + code + request_id
+            return \App\Support\Api::error(\App\Support\Api::STEP_UP_REQUIRED, 428,
+                'يتطلب تأكيدَ الهوية', null, ['stepup' => true, 'url' => $url]);
         }
 
         return redirect($url);
+    }
+}
+
+if (! function_exists('hub_schedule_failed')) {
+    /**
+     * فشلُ مهمةٍ مجدولة **لا يبقى صامتاً** (v2.399): كانت الأوامرُ تعود برمزٍ غيرِ صفريّ
+     * ونصٍّ يذهب إلى /dev/null في cron — فيفشل فحصُ سلسلة التدقيق والنسخُ الاحتياطيّ
+     * أسابيعَ بلا إشعار. يُلتقط في مركز الأخطاء (فيُشعَر المالكون والمراقبون)، ويُكتب
+     * في نبضة المجدولة نتيجةً، وكسرُ السلسلة يفتح حادثةً أمنية.
+     */
+    function hub_schedule_failed(string $command, string $category = 'QUEUE', string $severity = 'ERROR'): void
+    {
+        $job = str_replace(['hub:', 'metrics-snapshot', 'quality-snapshot', 'uptime-check', 'audit-verify'], ['', 'metrics', 'quality', 'uptime', 'audit'], $command);
+        \App\Support\ErrorLog::capture('php', 'فشل مهمة مجدولة: ' . $command . ' — راجع مركز التشغيل وكتيّبات التشغيل',
+            'routes/console.php', null, null, ['category' => $category, 'severity' => $severity]);
+        try {
+            \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.' . $job . '.meta'],
+                ['value' => ['ms' => null, 'result' => 'fail', 'note' => 'فشل التشغيل المجدول', 'at' => now()->toIso8601String()]]);
+            \Illuminate\Support\Facades\Cache::forget('settings:all');
+        } catch (\Throwable $e) {
+        }
+        if ($command === 'hub:audit-verify') {
+            hub_security_incident('فشل فحص سلسلة التدقيق — عبثٌ محتمل أو ختمٌ مثقوب', 'حرج', ['command' => $command]);
+        }
+    }
+}
+
+if (! function_exists('hub_require_credential_stepup')) {
+    /**
+     * تصعيدُ المصادقة قبل سكّ اعتمادٍ طويل الأمد (رمز API، مفتاح مرور) — v2.399.
+     * مفعّلٌ افتراضاً (`security.stepup_credentials`=1): جلسةٌ مختطفة كانت تزرع مفتاحاً
+     * أو تسكّ رمزاً يبقى بعد تغيير الكلمة وإنهاء الجلسات. يُطفأ بالإعداد لمن يريد.
+     */
+    function hub_require_credential_stepup(?string $next = null)
+    {
+        if ((string) setting('security.stepup_credentials', '1') !== '1') return null;
+
+        return hub_require_stepup($next);
     }
 }
 
@@ -661,6 +699,53 @@ if (! function_exists('hub_ref_options_scoped')) {
         }
 
         return $opts;
+    }
+}
+
+if (! function_exists('hub_require_ops_stepup')) {
+    /**
+     * تأكيدُ الهوية قبل أفعال التشغيل عالية الأثر (ترحيل، صيانة، مسحُ الكاش، الوضعُ التجريبي) — v2.399.
+     * مفعّلٌ افتراضاً (`security.stepup_ops`=1): جلسةُ مالكٍ مختطفة كانت تُصفّر المنشأة بضغطة.
+     */
+    function hub_require_ops_stepup(?string $next = null)
+    {
+        if ((string) setting('security.stepup_ops', '1') !== '1') return null;
+
+        return hub_require_stepup($next);
+    }
+}
+
+if (! function_exists('hub_guard_scope_input')) {
+    /**
+     * حارسُ عزلٍ لمدخلاتِ نموذجٍ **خارج** محرّك الوحدات (v2.399): لكل مفتاحٍ في المصفوفة
+     * يُفحص أن قيمتَه (إن أُرسلت) داخل نطاق المستخدم — شركاته أو عملائه أو مشاريعه
+     * المرئية. يرمي `ValidationException` بالرسالة نفسِها التي يرميها المحرّك، فلا يختلف
+     * بابٌ مخصّص عن الباب العامّ. المالكُ يمرّ دائماً.
+     *
+     * @param array<string,string> $map  مفتاحُ المدخل ⟵ 'companies' | 'clients' | 'projects'
+     */
+    function hub_guard_scope_input(array $data, array $map, $user = null): void
+    {
+        $user = $user ?? auth()->user();
+        if (! $user || hub_is_owner($user)) return;
+        $errors = [];
+        foreach ($map as $key => $ref) {
+            $v = hub_str($data[$key] ?? null);
+            if ($v === '') continue;
+            $allowed = match ($ref) {
+                'companies' => hub_company_ids($user),
+                'clients' => hub_client_ids($user),
+                'projects' => hub_scoped($user) ? $user->visibleProjectIds() : null,
+                default => null,
+            };
+            if ($allowed === null || in_array($v, array_map('strval', $allowed), true)) continue;
+            $errors[$key] = match ($ref) {
+                'companies' => 'حسابك معزول على شركات محددة — اختر شركة من شركاتك',
+                'clients' => 'حسابك معزول على عملاء محددين — اختر عميلاً من عملائك',
+                default => 'حسابك محدود النطاق — اختر مشروعاً من مشاريعك',
+            };
+        }
+        if ($errors) throw \Illuminate\Validation\ValidationException::withMessages($errors);
     }
 }
 
@@ -2416,6 +2501,10 @@ if (! function_exists('hub_audit')) {
                        ?string $name = null, array $extra = [])
     {
         $companyId = (string) session('hub.company', '') ?: null;
+        // بلا جلسة (API/console): المعزولُ على شركةٍ واحدة يُنسب قيدُه إليها فيراه مدقّقُها (v2.399)
+        if ($companyId === null && auth()->check() && ($cids = hub_company_ids(auth()->user())) !== null && count($cids) === 1) {
+            $companyId = (string) $cids[0];
+        }
         $allowed = hub_company_ids();
         if ($companyId !== null && $allowed !== null && ! in_array($companyId, $allowed, true)) {
             $companyId = null;
@@ -2428,10 +2517,12 @@ if (! function_exists('hub_audit')) {
             'action'    => $action,
             'module'    => $module,
             'record_id' => $recordId,
-            'name'      => $name === null ? null : \Illuminate\Support\Str::limit($name, 60),
+            // بعرض العمود نفسِه (كالسمة) لا ٦٠ حرفاً: قائمةُ مفاتيح الإعدادات كانت تُقصّ بعد مفتاحين
+            'name'      => $name === null ? null : hub_fit($name, hub_col_max('audits', 'name') ?? 300),
             // hub_fit لا substr: القصُّ بالبايتات يقطع الحرف العربي نصفين
             'device'    => hub_fit((string) request()->userAgent(), 200),
             'ip'        => request()->ip(),
+            'request_id' => \App\Support\Api::requestId(),
             'created_at' => now(),
         ]);
     }
@@ -4597,6 +4688,7 @@ if (! function_exists('hub_outbound_ok')) {
     function hub_outbound_ok(string $url): array
     {
         $no = fn (string $why) => ['ok' => false, 'why' => $why, 'ip' => null];
+        if ((string) config('hub.outbound', 'on') === 'off') return $no('الاتصالُ الخارجي مُطفأ في هذه البيئة (HUB_OUTBOUND=off)');
 
         $url = trim($url);
         $p = @parse_url($url);

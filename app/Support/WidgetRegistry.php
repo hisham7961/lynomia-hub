@@ -109,7 +109,8 @@ class WidgetRegistry
                 'label' => 'بطاقات العدّ العلوية',
                 'size'  => ['w' => 12, 'h' => 1],
                 'gate'  => fn ($u) => true,
-                'resolver' => function ($u) {
+                // ١٨ عدّاً كاملاً في كل تحميلٍ للوحة (PERF-07): تُخبَّأ دقيقةً لكل مستخدم — النطاقُ يتبع المستخدم (v2.399)
+                'resolver' => fn ($u) => \Illuminate\Support\Facades\Cache::remember('dash:counts:' . $u->id, 60, function () use ($u) {
                     $out = [];
                     foreach (['projects', 'clients', 'tasks', 'tickets', 'fin', 'contracts'] as $key) {
                         $def = hub_mod($key);
@@ -132,7 +133,7 @@ class WidgetRegistry
                     }
 
                     return $out;
-                },
+                }),
             ],
 
             'kpis' => [

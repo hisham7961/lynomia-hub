@@ -44,12 +44,19 @@ class HubAutomation extends Command
 
     public function handle(): int
     {
+        $t0 = microtime(true);
         $this->monitorUsers = null;   // ذاكرة المستلمين تصلح لتشغيلةٍ واحدة
         $this->dry = (bool) $this->option('dry');
         if ($this->dry) $this->warn('وضع المعاينة — لن يُكتب شيء');
 
         $g = $this->recurring();
-        $a = $this->alertRules();
+        // عزلُ الفشل كسائر الخطوات (v2.399): قاعدةٌ واحدة ترمي كانت تُسقط التذكيرات والعقود والنبضة
+        try {
+            $a = $this->alertRules();
+        } catch (\Throwable $e) {
+            report($e);
+            $a = ['hits' => 0, 'rules' => 0, 'esc' => 0, 'outbox' => 0];
+        }
         $e = $this->esignReminders();
         $c = $this->contractsAuto();
         $b = $this->budgetsAuto();
@@ -62,8 +69,7 @@ class HubAutomation extends Command
 
         $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة");
 
-        \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.automation'], ['value' => now()->toIso8601String()]);
-        \Illuminate\Support\Facades\Cache::forget('settings:all');
+        if (! $this->dry) \App\Support\Health::beat('automation', (int) round((microtime(true) - $t0) * 1000));
         return self::SUCCESS;
     }
 
@@ -674,6 +680,25 @@ class HubAutomation extends Command
             // **وزياراتُ الصفحات** (v2.350): كان التشذيبُ يقع **داخل طلب المستخدم**
             // (فرصةُ ١٪) — حذفٌ على عمودٍ بلا فهرسٍ في أثناء تحميل صفحة. نُقل هنا
             // بجوار إخوته، على دفعاتٍ محدودة كي لا يقفل الجدولَ طويلاً.
+            // عدّاداتُ استخدام API: ٩٠ يوماً تكفي للتحليل (v2.399)
+            \App\Support\Api::pruneUsage((int) setting('api.usage_keep_days', 90));
+
+            // **سياسةُ احتفاظٍ لسجلات التشغيل** (v2.399) — كانت بلا سقفٍ إطلاقاً:
+            // الصندوقُ الصادر المُسلَّم، وتسليماتُ الويبهوك الفاشلة، والأخطاءُ المحلولة أو البائتة.
+            // (سلسلةُ التدقيق تبقى للأبد عمداً.) المدَدُ من الإعدادات لا من الشيفرة.
+            if (\Illuminate\Support\Facades\Schema::hasTable('outbox')) {
+                $n += DB::table('outbox')->whereIn('state', ['sent', 'failed'])
+                    ->where('created_at', '<', now()->subDays(max(30, (int) setting('retention.outbox_days', 180))))->delete();
+            }
+            if (\Illuminate\Support\Facades\Schema::hasTable('webhook_deliveries')) {
+                $n += DB::table('webhook_deliveries')->where('state', 'failed')
+                    ->where('created_at', '<', now()->subDays(max(14, (int) setting('retention.webhook_failed_days', 90))))->delete();
+            }
+            if (\Illuminate\Support\Facades\Schema::hasTable('error_events')) {
+                $keep = max(30, (int) setting('retention.errors_days', 180));
+                $n += DB::table('error_events')->where('status', 'محلول')->where('last_seen', '<', now()->subDays($keep))->delete();
+                $n += DB::table('error_events')->where('last_seen', '<', now()->subDays($keep * 2))->delete();
+            }
             if (\Illuminate\Support\Facades\Schema::hasTable('page_visits')) {
                 do {
                     $gone = DB::table('page_visits')->where('at', '<', now()->subDays(90))

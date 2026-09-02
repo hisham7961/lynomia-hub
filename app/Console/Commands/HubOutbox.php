@@ -18,13 +18,17 @@ use Illuminate\Support\Facades\Mail;
  */
 class HubOutbox extends Command
 {
-    protected $signature = 'hub:outbox {--retry : إعادة صف الرسائل الفاشلة} {--limit=50}';
+    protected $signature = 'hub:outbox {--retry : إعادة صف الرسائل الفاشلة} {--limit=50} {--only= : رسالةٌ واحدة بمعرّفها (زرّ الاختبار) — بلا ويبهوك ولا نبضة}';
     protected $description = 'إرسال رسائل outbox المصفوفة (تلجرام + بريد)';
 
     public function handle(): int
     {
+        $t0 = microtime(true);
+        $only = trim((string) $this->option('only'));
+        $retryCols = hub_has_col('outbox', 'attempts');   // قبل هجرة v2.399: يعمل بلا إعادةٍ آلية
         if ($this->option('retry')) {
-            $n = OutboxMessage::where('state', 'failed')->update(['state' => 'queued', 'error' => null]);
+            $n = OutboxMessage::where('state', 'failed')
+                ->update(['state' => 'queued', 'error' => null] + ($retryCols ? ['attempts' => 0, 'next_at' => null] : []));
             $this->info("أُعيد صف {$n} رسالة فاشلة");
         }
 
@@ -34,17 +38,23 @@ class HubOutbox extends Command
             ->where(fn ($q) => $q->whereNull('claimed_at')->orWhere('claimed_at', '<', now()->subMinutes(10)))
             ->update(['state' => 'queued', 'claimed_at' => null]);
 
+        // **الحسّاسُ زمنياً أولاً** (v2.399): رمزُ التوقيع صالحٌ عشرَ دقائق وكان يقف خلف
+        // ستّين تقريراً في طابور FIFO يُصرَف كل خمس دقائق بخمسين. ثم الأقدمُ فالأقدم.
+        // والمؤجَّلُ للإعادة (next_at) لا يُلتقط قبل موعده.
         $batch = OutboxMessage::where('state', 'queued')
             ->whereIn('channel', ['tg', 'mail'])
-            ->orderBy('created_at')
-            ->limit((int) $this->option('limit'))
+            ->when($only !== '', fn ($q) => $q->where('id', $only))
+            ->when($retryCols, fn ($q) => $q->where(fn ($w) => $w->whereNull('next_at')->orWhere('next_at', '<=', now())))
+            ->orderByRaw("CASE WHEN kind IN ('sign_otp', 'otp', 'test') THEN 0 ELSE 1 END")
+            ->orderBy('created_at')->orderBy('id')
+            ->limit($only !== '' ? 1 : (int) $this->option('limit'))
             ->get();
 
         if ($batch->isEmpty()) {
             $this->info('لا رسائل بانتظار الإرسال');
+            if ($only !== '') return self::SUCCESS;
             $this->webhooks();
-            \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.outbox'], ['value' => now()->toIso8601String()]);
-            \Illuminate\Support\Facades\Cache::forget('settings:all');
+            \App\Support\Health::beat('outbox', (int) round((microtime(true) - $t0) * 1000));
             return self::SUCCESS;
         }
 
@@ -53,6 +63,8 @@ class HubOutbox extends Command
             // sending أولاً حتى لا تُرسَل مرتين لو تداخل تشغيلان
             if (! OutboxMessage::where('id', $msg->id)->where('state', 'queued')
                     ->update(['state' => 'sending', 'claimed_at' => now()])) continue;
+            // مزامنةُ النموذج مع الحجز: بلا هذا يرى Eloquent «queued → queued» لا تغييراً فلا يكتب الإعادة (v2.399)
+            $msg->forceFill(['state' => 'sending', 'claimed_at' => now()])->syncOriginal();
 
             try {
                 match ($msg->channel) {
@@ -66,18 +78,31 @@ class HubOutbox extends Command
                 // الفعّال برسالة الخطأ — أي «…/bot<TOKEN>/sendMessage» — فيتسرّب
                 // الرمز إلى outbox.error المعروض وإلى اللوج. يُطمَس قبل التخزين.
                 $emsg = preg_replace('#/bot[0-9]+:[A-Za-z0-9_-]+#', '/bot***', $e->getMessage());
-                $msg->forceFill(['state' => 'failed', 'error' => mb_substr($emsg, 0, 390)])->save();
+                // **إعادةٌ آليةٌ محدودة** (v2.399): كان الفشلُ الأولُ نهائياً (dead letter) ولو كان
+                // انقطاعَ SMTP لحظةً. ثلاثُ محاولاتٍ بتباعدٍ (٥ → ٣٠ → ١٢٠ دقيقة) ثم failed حقّاً.
+                $attempts = $retryCols ? (int) $msg->attempts + 1 : 1;
+                // زرُّ الاختبار (--only) يريد الجوابَ الآن لا بعد خمس دقائق: فشلُه نهائيٌّ فوراً
+                $again = $retryCols && $only === '' && $attempts < max(1, (int) setting('outbox.max_attempts', 3));
+                $fill = ['state' => $again ? 'queued' : 'failed', 'error' => mb_substr($emsg, 0, 390)];
+                if ($retryCols) {
+                    $fill['attempts'] = $attempts;
+                    $fill['next_at'] = $again ? now()->addMinutes([5, 30, 120][$attempts - 1] ?? 120) : null;
+                }
+                $msg->forceFill($fill)->save();
                 $failed++;
-                $this->error("✗ {$msg->channel}: " . mb_substr($emsg, 0, 120));
+                $this->error("✗ {$msg->channel}: " . mb_substr($emsg, 0, 120) . ($again ? ' — تُعاد لاحقاً' : ''));
             }
         }
 
-        $this->info("أُرسل: {$sent} · فشل: {$failed}" . ($failed ? ' — أعدها لاحقاً بـ --retry' : ''));
+        $this->info("أُرسل: {$sent} · فشل: {$failed}" . ($failed ? ' — المؤقّتُ يُعاد آلياً، والنهائيُّ بـ --retry' : ''));
+
+        if ($only !== '') return $failed ? self::FAILURE : self::SUCCESS;
 
         $this->webhooks();
 
-        \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.outbox'], ['value' => now()->toIso8601String()]);
-        \Illuminate\Support\Facades\Cache::forget('settings:all');
+        // النبضةُ بمدّتها ونتيجتها: فشلٌ في الدفعة يُقال في مركز التشغيل لا في سطر طرفيةٍ لا يقرؤه أحد
+        \App\Support\Health::beat('outbox', (int) round((microtime(true) - $t0) * 1000),
+            $failed ? 'partial' : 'ok', $failed ? "فشل {$failed} من " . ($sent + $failed) : null);
         return self::SUCCESS;
     }
 

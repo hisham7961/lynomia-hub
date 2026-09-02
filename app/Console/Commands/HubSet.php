@@ -23,10 +23,15 @@ class HubSet extends Command
         // `'0071234'` تصير `71234` فيُدمَّر رقمُ حساب أو معرّفُ قناة، وعددٌ فوق
         // مدى العدد الصحيح يفقد دقّتَه بالتحويل إلى float — وكلُّه في حزمة تحديثٍ
         // صامتة لا يراها أحد. والمستهلكون يقارنون بـ`(string)` أصلاً.
+        // (v2.399) مفتاحُ سرٍّ (توكن، مفتاح API) يُخزَّن مشفَّراً enc: كما من الشاشة — كان يُكتب نصّاً صريحاً
+        $secret = in_array($key, \App\Http\Controllers\Web\SettingController::SECRETS, true);
+        if ($secret && $val !== '' && ! str_starts_with($val, 'enc:')) {
+            $val = 'enc:' . \Illuminate\Support\Facades\Crypt::encryptString($val);
+        }
         Setting::updateOrCreate(['key' => $key], ['value' => $val]);
         Cache::forget('settings:all');
 
-        $this->info("تم: $key = $val");
+        $this->info($secret ? "تم: $key = •••• (مشفَّر)" : "تم: $key = $val");
 
         return self::SUCCESS;
     }

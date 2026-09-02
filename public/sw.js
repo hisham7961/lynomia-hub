@@ -17,7 +17,8 @@ var STATIC = ['/offline', '/css/app.css', '/css/fonts.css', '/js/app.js', '/js/h
   '/fonts/tajawal-700-arabic.woff2', '/fonts/tajawal-700-latin.woff2',
   '/fonts/tajawal-800-arabic.woff2', '/fonts/tajawal-800-latin.woff2'];
 // /attachments/ ضمن الممنوع: معاينة PDF داخل iframe تُعد تنقلاً فكانت ستُخبأ — ملفات خاصة لا تُخبأ أبداً
-var NEVER = ['/api/', '/files/', '/attachments/', '/m/vault', '/admin/', '/apps/quoteflow', '/jslog', '/logout'];
+// v2.399: صفحاتُ الرموز العامّة (رابطُ مشاركة، توقيع، تحقّق) سرّيةٌ — لا تُخبَّأ في المتصفح
+var NEVER = ['/api/', '/files/', '/attachments/', '/m/vault', '/admin/', '/apps/quoteflow', '/jslog', '/logout', '/s/', '/sign/', '/verify', '/w/'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(VER).then(function (c) { return c.addAll(STATIC); }).then(function () { return self.skipWaiting(); }));

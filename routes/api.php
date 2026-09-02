@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->middleware(['throttle:api', ApiAuth::class])->group(function () {
     Route::get('me', [V1Controller::class, 'me']);
     Route::get('modules', [V1Controller::class, 'modules']);
+    // مواصفةُ OpenAPI مولَّدةٌ من سجل الوحدات — مقصورةً على ما يراه صاحبُ المفتاح (قبل {module} كي لا تبتلعها)
+    Route::get('openapi.json', [V1Controller::class, 'openapi']);
 
     Route::get('reports/progress/{projectId}', [V1Controller::class, 'progress']);
     Route::get('reports/health', [V1Controller::class, 'health']);
@@ -34,5 +36,7 @@ Route::prefix('v1')->middleware(['throttle:api', ApiAuth::class])->group(functio
     Route::post('{module}', [V1Controller::class, 'apiStore']);
     Route::get('{module}/{id}', [V1Controller::class, 'apiShow']);
     Route::put('{module}/{id}', [V1Controller::class, 'apiUpdate']);
+    // تعديلٌ جزئيّ: يكتب الحقول المُرسَلة وحدها — PUT يبقى استبدالاً كاملاً كما هو موثَّق (لا كسر)
+    Route::patch('{module}/{id}', [V1Controller::class, 'apiPatch']);
     Route::delete('{module}/{id}', [V1Controller::class, 'apiDestroy']);
 });

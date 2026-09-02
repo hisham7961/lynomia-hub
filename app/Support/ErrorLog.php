@@ -22,24 +22,34 @@ class ErrorLog
      */
     public static function redact(string $s): string
     {
-        return (string) preg_replace('~/(hook|sign|verify)/[^/?\s&]{8,}~i', '/$1/{رمز}', $s);
+        // (v2.399) ورموزُ المشاركة العامّة /s/{token} ومساحاتُ العمل /w/{key} — كانت تصل الإشعاراتِ والسجلَّ بنصّها
+        return (string) preg_replace('~/(hook|sign|verify|s|w)/[^/?\s&]{8,}~i', '/$1/{رمز}', $s);
     }
 
+    /**
+     * @param array{category?:string,severity?:string} $ctx تصنيفٌ صريح؛ وإلا يُشتقّ من نوع الالتقاط
+     */
     public static function capture(string $kind, string $message, ?string $file = null, ?int $line = null,
-                                   ?string $trace = null): void
+                                   ?string $trace = null, array $ctx = []): void
     {
         try {
             $message = mb_substr(self::redact($message), 0, 490);
-            $hash = hash('sha256', $kind . '|' . $message . '|' . $file . '|' . $line);
+            // البصمةُ على الرسالة **المعمَّمة** (بلا معرّفات متبدّلة) فيتجمّع الخطأُ الواحد
+            // بمئة معرّف في صفٍّ واحد — والرسالةُ المخزَّنة تبقى كما وقعت أوّلَ مرة
+            $hash = hash('sha256', $kind . '|' . ErrorTaxonomy::fingerprintOf($message) . '|' . $file . '|' . $line);
 
-            $req = app()->runningInConsole() ? null : request();
+            $req = self::httpRequest();
 
             // زيادة ذرّية أولاً: فحص-ثم-إدراج كان يسابق القيد الفريد على hash
             // فيضيع عدّ التكرارات المتزامنة — التحديث المشروط لا يسابق أحداً
             if (self::bump($hash, $req)) return;
 
+            [$category, $severity] = ErrorTaxonomy::forKind($kind);
+            $category = $ctx['category'] ?? $category;
+            $severity = $ctx['severity'] ?? $severity;
+
             try {
-                ErrorEvent::create([
+                $row = [
                     'hash' => $hash, 'kind' => $kind, 'message' => $message,
                     'file' => $file ? mb_substr($file, 0, 290) : null, 'line' => $line,
                     'url' => $req ? mb_substr(self::redact($req->fullUrl()), 0, 390) : null,
@@ -48,15 +58,47 @@ class ErrorLog
                     'request_id' => $req?->attributes->get('request_id'),
                     'trace' => $trace ? mb_substr(self::redact($trace), 0, 12000) : null,
                     'first_seen' => now(), 'last_seen' => now(),
-                ]);
+                ];
+                // أعمدةُ الإثراء (v2.399) — تُكتب حين تكون الهجرةُ قد طُبِّقت فلا يسقط الالتقاطُ قبلها
+                if (hub_has_col('error_events', 'category')) {
+                    $row += [
+                        'category' => $category, 'severity' => $severity,
+                        'release' => mb_substr((string) config('hub.version'), 0, 20),
+                        'env' => mb_substr((string) config('app.env'), 0, 16),
+                        'route' => $req ? mb_substr((string) ($req->route()?->getName() ?: self::routePattern($req)), 0, 160) : null,
+                        'users' => auth()->id() ? 1 : 0,
+                    ];
+                    if (auth()->id()) $row['meta'] = ['users' => [auth()->id()]];
+                }
+                ErrorEvent::create($row);
 
                 // بصمةٌ جديدة = خبرٌ جديد. والتكرارُ يُزاد عدّادُه في bump بلا تنبيه.
-                self::tell($message, $req);
+                // أخطاءُ المتصفّح (jslog) نصٌّ يكتبه أيُّ مستخدمٍ مسجَّل: تُجمَّع في المركز ولا
+                // تُدفع إشعاراً للمالكين — وإلا صار البلاغُ قناةَ تصيّدٍ بنصٍّ حرّ (v2.399).
+                if ($kind !== 'js') self::tell($message, $req);
             } catch (\Illuminate\Database\QueryException $e) {
                 self::bump($hash, $req);    // خسرنا سباق الإدراج — الصف موجود الآن فزده
             }
         } catch (\Throwable $e) {
             // صمت تام — التسجيل لا يكسر شيئاً
+        }
+    }
+
+    /**
+     * طلبُ HTTP الحاليّ أو null في الطرفية/المجدول. `runningInConsole()` وحده كان
+     * الفيصل — وهو صادقٌ أيضاً تحت phpunit فتُلتقط أخطاءُ الطلبات الاختبارية بلا
+     * رابطٍ ولا معرّف، وما لا يُختبَر لا يُثبَت. العلامةُ الأصدق: طلبٌ له مسارٌ أو معرّف.
+     */
+    protected static function httpRequest(): ?\Illuminate\Http\Request
+    {
+        try {
+            $req = request();
+            if (! $req instanceof \Illuminate\Http\Request) return null;
+            if (app()->runningInConsole() && $req->route() === null && ! $req->attributes->has('request_id')) return null;
+
+            return $req;
+        } catch (\Throwable $e) {
+            return null;
         }
     }
 
@@ -77,9 +119,40 @@ class ErrorLog
                 ErrorEvent::whereKey($back->id)->update(['status' => 'جديد']);
                 self::tell('عاد بعد أن حُسب محلولاً — ' . $back->message, $req);
             }
+            self::touchUsers($hash);
         }
 
         return (bool) $hit;
+    }
+
+    /**
+     * **من تأثّر؟** مستخدمٌ جديد يُضاف لقائمةٍ محدودة في meta ويُزاد العدّاد —
+     * تقريبٌ صادق (حتى ٥٠ هوية) لا عدُّ صفوفٍ لكل وقوع. قراءةٌ واحدة خفيفة.
+     */
+    protected static function touchUsers(string $hash): void
+    {
+        $uid = auth()->id();
+        if (! $uid || ! hub_has_col('error_events', 'users')) return;
+        try {
+            $row = ErrorEvent::where('hash', $hash)->first(['id', 'meta', 'users']);
+            if (! $row) return;
+            $meta = (array) ($row->meta ?? []);
+            $seen = (array) ($meta['users'] ?? []);
+            if (in_array($uid, $seen, true)) return;
+            if (count($seen) < 50) $meta['users'] = array_merge($seen, [$uid]);
+            ErrorEvent::whereKey($row->id)->update(['meta' => json_encode($meta, JSON_UNESCAPED_UNICODE), 'users' => (int) $row->users + 1]);
+        } catch (\Throwable $e) {
+            // إثراءٌ لا شرط — لا يكسر الالتقاط
+        }
+    }
+
+    /** نمطُ المسار للتجميع حين لا اسمَ له: المعرّفات تُعمَّم */
+    protected static function routePattern($req): string
+    {
+        return (string) preg_replace([
+            '/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i',
+            '/\/\d+(?=\/|$)/',
+        ], ['{id}', '/{n}'], (string) $req->path());
     }
 
     /**
@@ -97,7 +170,9 @@ class ErrorLog
         self::$inNotify = true;
 
         try {
-            $key = 'errnotify:burst:' . now()->format('YmdHi');
+            // نافذةٌ حقيقية (١٥ دقيقة) لا دقيقةٌ تقويمية: كان المفتاحُ يتجدّد كل دقيقة فيصير
+            // السقفُ ٨ في الدقيقة (٤٨٠ في الساعة) لا ٨ في النافذة (v2.399)
+            $key = 'errnotify:burst:' . intdiv(now()->timestamp, self::NOTIFY_BURST_MIN * 60);
             $n = (int) \Illuminate\Support\Facades\Cache::get($key, 0);
             \Illuminate\Support\Facades\Cache::put($key, $n + 1, now()->addMinutes(self::NOTIFY_BURST_MIN));
             if ($n >= self::NOTIFY_BURST_CAP) return;      // انفجار: البقيةُ في المركز
@@ -141,11 +216,13 @@ class ErrorLog
             if ($e instanceof $skip) return;
         }
 
+        [$category, $severity] = ErrorTaxonomy::classify($e);
         self::capture(
             app()->runningInConsole() ? 'php' : (request()->is('api/*') ? 'api' : 'php'),
             get_class($e) . ': ' . self::safeMessage($e),
             $e->getFile(), $e->getLine(),
-            $e->getTraceAsString()
+            $e->getTraceAsString(),
+            ['category' => $category, 'severity' => $severity]
         );
     }
 
@@ -155,7 +232,7 @@ class ErrorLog
      * فقد تُسرّب رواتبَ/أسراراً/PII إلى مركز الأخطاء وإشعارِ المراقبة. نُبقي رمزَ
      * الحالة ووصفَ القيد/العمود، ونحذف مقطعَ SQL ونطمس القيمَ المقتبسة.
      */
-    protected static function safeMessage(\Throwable $e): string
+    public static function safeMessage(\Throwable $e): string
     {
         $msg = $e->getMessage();
         if ($e instanceof \Illuminate\Database\QueryException) {
