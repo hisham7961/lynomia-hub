@@ -76,6 +76,12 @@ class SysMonitor
     /** من يستهلك القرص: أكبر مجلدات التخزين — «امتلأ القرص» بلا سببٍ لا يُعالَج */
     public static function diskConsumers(): array
     {
+        // مشيُ المجلدات في كل تحميلٍ لصفحة التشغيل (OPS-09): يُخبَّأ دقيقةً — الأرقامُ لا تتغيّر بين ضغطتين (v2.399)
+        return \Illuminate\Support\Facades\Cache::remember('sysmon:disk', 60, fn () => self::diskConsumersLive());
+    }
+
+    protected static function diskConsumersLive(): array
+    {
         $out = [];
         foreach (['app/backups' => 'النسخ الاحتياطية', 'app/hub' => 'المرفقات والملفات',
                   'logs' => 'سجلات النظام', 'framework' => 'مخبأ الإطار'] as $rel => $label) {
@@ -99,6 +105,12 @@ class SysMonitor
 
     /** من يستهلك القاعدة: أثقل الجداول صفوفاً — يكشف ما ينمو بلا حدّ */
     public static function tableConsumers(int $limit = 12): array
+    {
+        // عدُّ صفوفِ ٩٠ جدولاً في كل تحميل (OPS-09): يُخبَّأ دقيقةً (v2.399)
+        return \Illuminate\Support\Facades\Cache::remember('sysmon:tables:' . $limit, 60, fn () => self::tableConsumersLive($limit));
+    }
+
+    protected static function tableConsumersLive(int $limit = 12): array
     {
         $rows = [];
         // أحجام البايت متاحة على MySQL وحدها — وعلى غيرها يبقى عدّ الصفوف دليلاً
