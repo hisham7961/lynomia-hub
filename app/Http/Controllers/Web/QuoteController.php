@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\Contract;
 use App\Models\FinDocument;
 use App\Models\Quote;
+use App\Models\QuoteMilestone;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -83,8 +84,179 @@ class QuoteController extends Controller
             'clone'    => $this->cloneQuote($q),
             'sections' => $this->setSections($r, $q),
             'terms'    => $this->applyTerms($r, $q),
+            // معالمُ الدفع بعد القبول (v2.399): بلوغٌ/تراجعٌ/سكُّ فاتورةِ دفعة
+            'ms.reach'   => $this->msReach($r, $q),
+            'ms.unreach' => $this->msUnreach($r, $q),
+            'ms.invoice' => $this->msInvoice($r, $q),
             default    => abort(422),
         };
+    }
+
+    /* ────────── معالمُ الدفع (v2.399) ────────── */
+
+    /**
+     * معلمٌ من جدول مدفوعات هذا العرض تحديداً — معرّفٌ من عرضٍ آخر يسقط 404
+     * (المعلمُ يُقرأ عبر العرض المنطَّق، لا بمعرّفه المجرّد).
+     */
+    protected function milestone(Request $r, Quote $q): QuoteMilestone
+    {
+        return QuoteMilestone::query()->where('quote_id', $q->id)
+            ->findOrFail(hub_str($r->input('ms')));
+    }
+
+    /**
+     * إعلانُ بلوغ المعلم — فعلٌ بشريٌّ مسجَّلٌ (من ومتى). لا يُبلَغ معلمٌ في عرضٍ
+     * لم يُقبَل: جدولُ السداد يصير التزاماً بالقبول لا قبله. متكرّرٌ بلا أثر.
+     */
+    protected function msReach(Request $r, Quote $q)
+    {
+        abort_unless(in_array($q->status, ['مقبول', 'محوّل'], true), 422, 'المعالمُ تُبلَغ بعد قبول العرض');
+        $ms = $this->milestone($r, $q);
+        if ($ms->reached_at) return back()->with('ok', 'المعلمُ مُعلَنٌ بلوغُه من قبل');
+
+        $ms->reached_at = now();
+        $ms->reached_by = auth()->id();
+        $ms->save();
+        hub_audit('بلوغ معلم دفع', 'quotes', $q->id, $q->doc_no . ' — ' . $ms->title);
+
+        return back()->with('ok', '🏁 أُعلن بلوغُ المعلم «' . $ms->title . '» — سُكّ فاتورتَه حين تحين');
+    }
+
+    /**
+     * التراجعُ عن البلوغ — ممنوعٌ متى سُكّت فاتورةٌ حيّةٌ للمعلم (الفاتورةُ تسبق:
+     * تُلغى أو تُحذف أولاً من الماليّة، ثم يُتراجَع). يُبقي `invoice_id` كما هو.
+     */
+    protected function msUnreach(Request $r, Quote $q)
+    {
+        $msId = $this->milestone($r, $q)->id;
+
+        // على صفٍّ مقفول: فسكٌّ متزامنٌ (ms.invoice يقفل المعلمَ نفسَه) لا يسبق
+        // فحصَ «فاتورةٌ حيّة» ثم يجد البلوغَ قد مُحي من تحته.
+        return DB::transaction(function () use ($q, $msId) {
+            $ms = QuoteMilestone::whereKey($msId)->lockForUpdate()->firstOrFail();
+            if (! $ms->reached_at) return back()->with('ok', 'المعلمُ غيرُ مُعلَنٍ أصلاً');
+            abort_if($ms->hasLiveInvoice(), 422, 'للمعلم فاتورةٌ حيّة — أَلغِها أو احذفها من الماليّة قبل التراجع');
+
+            $ms->reached_at = null;
+            $ms->reached_by = null;
+            $ms->save();
+            hub_audit('تراجع عن بلوغ معلم دفع', 'quotes', $q->id, $q->doc_no . ' — ' . $ms->title);
+
+            return back()->with('ok', 'أُلغي إعلانُ بلوغ المعلم «' . $ms->title . '»');
+        });
+    }
+
+    /**
+     * سكُّ فاتورةِ دفعةٍ لمعلمٍ — تصليبُ `toInvoice` نفسُه: صلاحيةُ إنشاء المستندات
+     * الماليّة، ومعاملةٌ تقفل صفَّ العرض ثم صفَّ المعلم (ترتيبُ القفل نفسُه الذي
+     * يقفل به `toInvoice` العرضَ، فلا يتسابق سكُّ الكاملة وسكُّ الدفعة). فاتورةٌ
+     * **حيّة** للمعلم تُعيد إليها بلا سكّ (نقرٌ مزدوج)؛ أمّا الملغاةُ أو المحذوفةُ
+     * بنعومة فتُترَك أثراً في `meta.prev_invoices` وتُسكّ بدلَها فاتورةٌ جديدة —
+     * فالإشارةُ ١٥ وزرُّ الشاشة يَعِدان بسكٍّ يُنجَز لا بطريقٍ مسدود. يُعلِن
+     * البلوغَ إن لم يكن مُعلَناً. القيمةُ بقاعدة الشاشة والمستند (مبلغٌ صريحٌ وإلا
+     * نسبةٌ من الإجماليّ)، والضريبةُ بنسبتها من العرض. وسقفُ العقد محفوظ: لا يتجاوز
+     * مجموعُ فواتير الدفعات الحيّة إجماليَّ العرض — الدفعةُ التي تتعدّاه تُقصّ إلى
+     * المتبقّي (بتنبيهٍ صريح)، وإن لم يبقَ شيءٌ رُفض السكّ.
+     */
+    protected function msInvoice(Request $r, Quote $q)
+    {
+        abort_unless(hub_can(auth()->user(), 'fin', 'a'), 403,
+            'سكُّ فاتورة المعلم يتطلب صلاحية إنشاء المستندات المالية');
+        abort_unless(in_array($q->status, ['مقبول', 'محوّل'], true), 422, 'فواتيرُ المعالم تُسكّ بعد قبول العرض');
+        $msId = $this->milestone($r, $q)->id;
+
+        return DB::transaction(function () use ($q, $msId) {
+            // الصورةُ الطازجةُ للعرض على صفٍّ مقفول — لا نسخةُ المتحكّم
+            $fresh = Quote::whereKey($q->getKey())->lockForUpdate()->firstOrFail();
+            $ms = QuoteMilestone::whereKey($msId)->lockForUpdate()->firstOrFail();
+            // الحيّةُ قد تكون سابقةً عادت من الماليّة لا `invoice_id` الحاليّ — يُردّ إليها هي
+            if ($liveId = $ms->liveInvoiceId()) {
+                return redirect()->route('m.show', ['fin', $liveId])->with('ok', 'سُكّت من قبل — هذه فاتورةُ المعلم');
+            }
+            // لا ازدواجَ فوترة: العرضُ المفوتَرُ كاملاً (do=invoice) إيرادُه مُطالَبٌ به كلُّه.
+            abort_if($fresh->hasLiveFullInvoice(), 422,
+                'للعرض فاتورةٌ كاملةٌ حيّة — لا تُسكّ فاتورةُ دفعةٍ فوقها (أَلغِ الكاملةَ أولاً إن كان القصدُ الفوترةَ بالدفعات)');
+
+            $total = $ms->amountDue($fresh);
+            abort_if($total <= 0, 422, 'المعلمُ بلا قيمة (لا مبلغَ ولا نسبة) — لا تُسكّ فاتورةٌ صفريّة');
+
+            // سقفُ العقد: مجموعُ فواتير الدفعات الحيّة لا يتجاوز إجماليَّ العرض. جدولُ
+            // الدفعات يتجمّد بعد القبول فلا يُصلَح جدولٌ مُفرِط — لذا لا نرفض بل نقصّ
+            // الدفعةَ إلى المتبقّي (ويُنبَّه المستخدمُ صراحةً)، ولا نسكّ شيئاً إن لم يبقَ شيء.
+            // وعرضٌ إجماليُّه صفرٌ (لم يُسعَّر) سقفُه صفر — يُقال سببُه لا «أَلغِ فاتورةً» لا وجودَ لها.
+            abort_if((float) $fresh->total <= 0, 422,
+                'إجماليُّ العرض صفر — لا تُسكّ دفعاتٌ على عرضٍ لم يُسعَّر (اضبط إجماليَّه أولاً)');
+            $billed = $fresh->liveMilestoneInvoicedTotal();
+            $remaining = round((float) $fresh->total - $billed, 3);
+            abort_if($remaining <= 0, 422,
+                'لا متبقّيَ من إجماليّ العرض لسكّ دفعة — فواتيرُ الدفعات الحيّةُ تغطّيه كلَّه (أَلغِ إحداها أولاً إن كان ثمّة خطأ)');
+            $clamped = false;
+            if ($total > $remaining) {
+                $total = $remaining;
+                $clamped = true;
+            }
+            // الضريبةُ بنسبتها من العرض: (ضريبة/إجماليّ) × قيمةِ الدفعة
+            $ratio = (float) $fresh->total > 0 ? (float) ($fresh->tax ?? 0) / (float) $fresh->total : 0.0;
+            $tax = round($total * $ratio, 3);
+            $amount = round($total - $tax, 3);
+
+            // رقمٌ مميَّز: INV-<العرض>-M<ترتيب المعلم>؛ وإن اصطدم (معلمٌ حُذف وأُعيد
+            // بالترتيب نفسه) يُلحَق -2، -3… — الفريدُ على doc_no يبقى مصانا.
+            $base = mb_substr('INV-' . $q->doc_no . '-M' . max(1, (int) $ms->sort), 0, 290);
+            $docNo = $base;
+            for ($i = 2; FinDocument::withTrashed()->where('doc_no', $docNo)->exists() && $i < 50; $i++) {
+                $docNo = $base . '-' . $i;
+            }
+
+            // مشروعُ الفاتورة: مشروعُ العرض، وإلا المشروعُ الذي حُوِّل إليه (إن كان حيّاً)
+            $meta = (array) $q->meta;
+            $projectId = $q->project_id ?: null;
+            if (! $projectId && ! empty($meta['project_id'])
+                && \App\Models\Project::query()->whereKey($meta['project_id'])->exists()) {
+                $projectId = $meta['project_id'];
+            }
+
+            $inv = FinDocument::create([
+                'doc_no'      => mb_substr($docNo, 0, 300),
+                'kind'        => 'فاتورة مبيعات',
+                'client_id'   => $q->client_id,
+                'service_id'  => $q->service_id,
+                'partner'     => $q->client_id ? (Client::find($q->client_id)?->name ?? '') : '',
+                'date'        => now()->toDateString(),
+                'due'         => now()->addDays(14)->toDateString(),
+                'amount'      => $amount,
+                'tax'         => $tax,
+                'total'       => $total,
+                'paid'        => 0,
+                'currency'    => $q->currency,
+                'state'       => 'مرسلة',
+                'project_id'  => $projectId,
+                'company_id'  => $q->company_id,
+                'description' => mb_substr('فاتورة دفعة «' . $ms->title . '» بموجب عرض السعر ' . $q->doc_no
+                    . ($clamped ? ' — قُصّت إلى المتبقّي من إجماليّ العرض' : ''), 0, 1000),
+                'meta'        => ['quote_id' => $q->id, 'milestone_id' => $ms->id] + ($clamped ? ['clamped_to_remaining' => true] : []),
+            ]);
+
+            // الفاتورةُ الميتةُ السابقةُ (ملغاة/محذوفة) لا تُمحى من التاريخ: تُلحَق بأثر المعلم
+            if ($ms->invoice_id) {
+                $msMeta = (array) $ms->meta;
+                $prev = array_values(array_unique(array_merge((array) ($msMeta['prev_invoices'] ?? []), [$ms->invoice_id])));
+                $ms->meta = ['prev_invoices' => $prev] + $msMeta;
+            }
+            $ms->invoice_id = $inv->id;
+            if (! $ms->reached_at) {
+                $ms->reached_at = now();
+                $ms->reached_by = auth()->id();
+            }
+            $ms->save();
+            hub_audit('سكّ فاتورة معلم', 'quotes', $q->id, $q->doc_no . ' — ' . $ms->title . ' → ' . $inv->doc_no
+                . ($clamped ? ' (قُصّت إلى المتبقّي ' . number_format($total, 3) . ')' : ''));
+
+            return redirect()->route('m.show', ['fin', $inv->id])
+                ->with('ok', $clamped
+                    ? '🧾 سُكّت فاتورةُ الدفعة «' . $ms->title . '» بقيمة المتبقّي من إجماليّ العرض (' . number_format($total, 3) . ') لا بقيمتها المجدولة — استحقاقها بعد ١٤ يوماً'
+                    : '🧾 سُكّت فاتورةُ الدفعة «' . $ms->title . '» — استحقاقها بعد ١٤ يوماً');
+        });
     }
 
     /**
@@ -489,6 +661,10 @@ class QuoteController extends Controller
             if (! empty($meta['invoice_id']) && FinDocument::withTrashed()->find($meta['invoice_id'])) {
                 return redirect()->route('m.show', ['fin', $meta['invoice_id']])->with('ok', 'حُوّل من قبل — هذه فاتورته');
             }
+            // لا ازدواجَ فوترة في الاتجاه المقابل (v2.399.1): دفعةٌ مفوتَرةٌ حيّةٌ تعني أنّ
+            // جزءاً من الإيراد مُطالَبٌ به — فلا تُسكّ الكاملةُ فوقها.
+            abort_if($q->hasLiveMilestoneInvoice(), 422,
+                'للعرض فواتيرُ دفعاتٍ حيّة — لا تُسكّ فاتورةٌ كاملةٌ فوقها (أَلغِها أولاً إن كان القصدُ الفوترةَ الكاملة)');
 
             $inv = FinDocument::create([
                 'doc_no'      => mb_substr('INV-' . $q->doc_no, 0, 300),   // يُقصّ إلى عرض العمود

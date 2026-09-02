@@ -52,6 +52,9 @@
         "sort-packages": true,
         "audit": {
             "block-insecure": false
+        },
+        "platform": {
+            "php": "8.2.0"
         }
     },
     "minimum-stability": "stable",

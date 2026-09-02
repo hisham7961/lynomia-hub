@@ -33,6 +33,9 @@
                 @endif
                 @if (! empty($meta['invoice_id']))
                     <a class="btn ghost sm" href="{{ route('m.show', ['fin', $meta['invoice_id']]) }}">🧾 فاتورته ←</a>
+                @elseif (\Illuminate\Support\Facades\Schema::hasColumn('quote_milestones', 'invoice_id') && $row->hasLiveMilestoneInvoice())
+                    {{-- فواتيرُ دفعاتٍ حيّةٌ على العرض: الكاملةُ لا تُسكّ فوقها (المتحكّم يرفضها ٤٢٢) — يُفوتَر بالدفعات من بطاقة المدفوعات --}}
+                    <span class="btn ghost sm" title="للعرض فواتيرُ دفعاتٍ حيّة — يُفوتَر بالدفعات لا بفاتورةٍ كاملة" aria-disabled="true" style="opacity:.6;cursor:not-allowed">🧾 يُفوتَر بالدفعات</span>
                 @else
                     <form method="POST" action="{{ route('quotes.act', $row->id) }}">@csrf<input type="hidden" name="do" value="invoice"><button class="btn p sm">🧾 تحويل لفاتورة</button></form>
                 @endif

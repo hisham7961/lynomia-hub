@@ -3822,6 +3822,115 @@ if (! function_exists('hub_recommendations')) {
                 }
             } catch (\Throwable $e) {}
 
+            // ١٥) معلمُ دفعٍ بُلغ ولم يُفوتَر (v2.399): دفعةٌ في جدول مدفوعات عرضٍ
+            // مقبولٍ/محوَّلٍ أُعلن بلوغُها (`quote_milestones.reached_at` — فعلٌ بشريٌّ
+            // مسجَّل) منذ ٣ أيامٍ فأكثر ولا فاتورةَ حيّةً لها (`invoice_id` غائبٌ أو
+            // فاتورتُه محذوفةٌ/ملغاة). «حرج» بعد ٧ أيام. تنطفئ وحدها بسكّ الفاتورة،
+            // وتعود إن أُلغيت. القيمةُ إيرادٌ تعاقديٌّ (لا كلفة) بقاعدة الشاشة نفسها.
+            // منطَّقةٌ بعروضها (hub_scope quotes) خلف صلاحيةِ رؤية العروض.
+            //
+            // v2.399.1: الاستبعادُ في SQL قبل السقف لا بعده — فأربعون معلماً مفوتَراً
+            // أقدمَ لا تحجب معلماً مكشوفاً أحدث؛ والعروضُ المنطَّقةُ استعلامٌ فرعيٌّ بلا
+            // سقف ٢٠٠؛ وعدسةُ المشروع ترى العرضَ المحوَّل (`meta.project_id`) كما ترى
+            // عمودَ `project_id`؛ والمعلمُ الصفريّ (لا مبلغَ ولا نسبة) لا يُشار إليه
+            // لأنّ فاتورتَه لا تُسكّ أصلاً؛ وكذا معلمُ عرضٍ استوفت فواتيرُ دفعاتِه الحيّةُ
+            // إجماليَّه (سقفُ العقد) — سكُّه مرفوضٌ فلا تُطلَب.
+            //
+            // والاستبعاداتُ التي لا تُكتَب شرطَ SQL مباشراً (مسارُ JSON لا يُقارَن بعمودٍ
+            // لتباين المحرّكين؛ ومجموعُ الفواتير الحيّة بقاعدة PHP) لا تُترَك لما بعد الجلب
+            // — فالمستبعَدُ يتراكم في أقدم الصفوف ولا يُصنَّف أبداً، حتى يستنفد صفحاتِ
+            // المسح ويُحجَب معلمٌ أحدثُ سكُّه يُنجَز. تُحسَب مرّةً على مرشَّحي المسح كلِّهم
+            // ثم تُغلَق بـ`whereNotIn` (أعمدةٌ مقابلَ قيمٍ مربوطة — واحدةٌ على المحرّكين)،
+            // فلا يُنفِق مستبعَدٌ شيئاً من الميزانيّة. وفحصُ PHP بعد الجلب يبقى حزاماً.
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('quote_milestones')
+                    && \Illuminate\Support\Facades\Schema::hasColumn('quote_milestones', 'reached_at')
+                    && hub_can(auth()->user(), 'quotes', 'v')) {
+                    $dead = (array) config('hub.fin.dead', []);
+                    $qSub = hub_scope(\App\Models\Quote::query(), 'quotes')
+                        ->whereIn('status', ['مقبول', 'محوّل'])
+                        // عرضٌ لم يُسعَّر (إجماليُّه صفر): سقفُه صفرٌ فلا سكَّ (msInvoice) ولا طلبَ سكّ
+                        ->where('total', '>', 0)
+                        ->when($projectId, fn ($q) => $q->where(fn ($w) => $w->where('project_id', $projectId)
+                            ->orWhere('meta->project_id', $projectId)))
+                        ->select('id');
+                    $msQ = \Illuminate\Support\Facades\DB::table('quote_milestones')
+                        ->whereNull('deleted_at')->whereIn('quote_id', $qSub)
+                        ->whereNotNull('reached_at')
+                        ->where('reached_at', '<=', now()->subDays(3)->toDateTimeString())
+                        ->where(fn ($w) => $w->where('amount', '>', 0)->orWhere('pct', '>', 0))
+                        // فاتورةُ المعلم الحيّةُ (بتعريف FinDocument::isLive) تُستبعَد هنا لا في PHP
+                        ->where(fn ($w) => $w->whereNull('invoice_id')
+                            ->orWhereNotExists(fn ($s) => $s->select(\Illuminate\Support\Facades\DB::raw(1))->from('fin_documents')
+                                ->whereColumn('fin_documents.id', 'quote_milestones.invoice_id')
+                                ->whereNull('fin_documents.deleted_at')
+                                ->when($dead, fn ($x) => $x->where(fn ($y) => $y->whereNull('fin_documents.state')
+                                    ->orWhereNotIn('fin_documents.state', $dead)))))
+                        // الأقدمُ بلوغاً أولاً، وid فاصلٌ حتميّ
+                        ->orderBy('reached_at')->orderBy('id');
+                    $isLive = fn ($x) => $x->whereNull('deleted_at')
+                        ->when($dead, fn ($y) => $y->where(fn ($w) => $w->whereNull('state')->orWhereNotIn('state', $dead)));
+                    // عروضُ المرشَّحين كلُّها مرّةً (لا لكلّ صفحة) — منها تُحسَب استبعاداتُ العرض:
+                    $qs = \App\Models\Quote::query()->whereIn('id', (clone $msQ)->reorder()->distinct()->select('quote_id'))
+                        ->get(['id', 'doc_no', 'title', 'total', 'meta'])->keyBy('id');
+                    // (أ) عرضٌ مفوتَرٌ كاملاً بفاتورةٍ حيّة (meta.invoice_id من do=invoice): إيرادُه
+                    //     مُطالَبٌ به كلُّه، فمعالمُه ليست «بلا فاتورة» (لا إشارةَ كاذبة ولا ازدواجَ فوترة)
+                    $fullInv = $qs->map(fn ($q) => ((array) $q->meta)['invoice_id'] ?? null)
+                        ->filter(fn ($v) => is_string($v) && $v !== '');
+                    $live = $fullInv->isEmpty() ? [] : $isLive(\Illuminate\Support\Facades\DB::table('fin_documents')
+                        ->whereIn('id', $fullInv->unique()->values()->all()))->pluck('id')->flip()->all();
+                    // (ب) سقفُ العقد: عرضٌ غطّت فواتيرُ دفعاتِه الحيّةُ إجماليَّه لا يُطالَب بدفعةٍ
+                    //     أخرى — فالسكُّ مرفوضٌ هناك (msInvoice) ولا تُشار إليه إشارةٌ لا تُنجَز
+                    $billed = $qs->isEmpty() ? [] : \App\Models\Quote::liveMilestoneInvoicedTotals($qs->keys()->all());
+                    $skipQ = $qs->filter(fn ($q) => (($f = $fullInv[$q->id] ?? null) && isset($live[$f]))
+                        || round((float) $q->total - ($billed[$q->id] ?? 0.0), 3) <= 0)->keys()->all();
+                    if ($skipQ) $msQ->whereNotIn('quote_id', $skipQ);
+                    // (ج) معلمٌ عادت سابقتُه إلى الحياة (`meta.prev_invoices`: أُلغيت فسُكّ بدلُها ثم
+                    //     أُرجعت من الماليّة): مفوتَرٌ بها وإن مات `invoice_id` — السكُّ يُردّ إليها
+                    //     (msInvoice) فلا تُطلَب. `meta` لا يُكتَب على المعلم إلا لهذا، فمرشَّحوه قلّة.
+                    //     (invoiceIdsOf تشمل `invoice_id` نفسَه — ميتٌ بشرط SQL، ففحصُه ثانيةً لا يضرّ)
+                    $withPrev = (clone $msQ)->reorder()->whereNotNull('meta')->get(['id', 'invoice_id', 'meta'])
+                        ->mapWithKeys(fn ($m) => [$m->id => \App\Models\QuoteMilestone::invoiceIdsOf($m->invoice_id, $m->meta)]);
+                    $prevIds = $withPrev->flatten()->unique()->values()->all();
+                    $prevLive = ! $prevIds ? [] : $isLive(\Illuminate\Support\Facades\DB::table('fin_documents')
+                        ->whereIn('id', $prevIds))->pluck('id')->flip()->all();
+                    $skipMs = $withPrev->filter(fn ($ids) => (bool) array_intersect($ids, array_keys($prevLive)))->keys()->all();
+                    if ($skipMs) $msQ->whereNotIn('id', $skipMs);
+                    // ما بقي: معالمُ مكشوفةٌ فعلاً — تُقرأ صفحاتٍ (٤٠ × ٥) حتى تكتمل ثمانُ
+                    // إشاراتٍ أو ينفد المرشَّحون. (لا يستهلك الميزانيّةَ الآن إلا ما يُشار إليه —
+                    // عدا نسبةٍ ضئيلةٍ تُقرَّب قيمتُها إلى صفر، حزامٌ في PHP كبقيّة الفحوص)
+                    $n = 0;
+                    for ($page = 0; $page < 5 && $n < 8; $page++) {
+                        $ms = (clone $msQ)->offset($page * 40)->limit(40)
+                            ->get(['id', 'quote_id', 'title', 'pct', 'amount', 'reached_at', 'invoice_id', 'meta']);
+                        if ($ms->isEmpty()) break;
+                        foreach ($ms as $m) {
+                            $q = $qs[$m->quote_id] ?? null;
+                            if (! $q) continue;
+                            $full = $fullInv[$m->quote_id] ?? null;
+                            if ($full && isset($live[$full])) continue;                 // عرضُه مفوتَرٌ كاملاً
+                            foreach (\App\Models\QuoteMilestone::invoiceIdsOf($m->invoice_id, $m->meta) as $pid) {
+                                if (isset($prevLive[$pid])) continue 2;                  // سابقتُه عادت حيّة
+                            }
+                            if (round((float) $q->total - ($billed[$q->id] ?? 0.0), 3) <= 0) continue; // لا متبقّيَ من الإجماليّ
+                            // القيمةُ بقاعدة `amountDue` نفسِها (مقرَّبةً إلى ثلاث منازل) — فما يرفضه
+                            // المتحكّم صفراً لا يُطلَب هنا
+                            $amt = round((float) $m->amount > 0 ? (float) $m->amount
+                                : ((float) $m->pct > 0 ? (float) $q->total * (float) $m->pct / 100 : 0.0), 3);
+                            if ($amt <= 0) continue;                                    // بلا قيمةٍ تُسكّ
+                            if ($n++ >= 8) break 2;
+                            $days = (int) \Illuminate\Support\Carbon::parse($m->reached_at)->diffInDays(now());
+                            $add($days >= 7 ? 'حرج' : 'مهم', '🧾',
+                                'معلمُ دفعٍ بلا فاتورة: ' . $m->title . ' — ' . ($q->title ?: $q->doc_no),
+                                'أُعلن بلوغُه منذ ' . $days . ' يوماً بقيمة ' . number_format($amt, 3)
+                                . ' ولم تُسكّ فاتورتُه' . ($m->invoice_id ? ' (فاتورتُه السابقة أُلغيت أو حُذفت)' : '') . '. الإيرادُ المستحقّ لا يُحصَّل بلا فاتورة.',
+                                route('m.show', ['quotes', $q->id]), 'سُكّ الفاتورة',
+                                'milestone.uninvoiced:' . $m->id, 'quotes', $q->id);
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {}
+
             // الترتيب: الأشد أولاً، وضمن الدرجة يبقى ترتيب الاكتشاف
             usort($out, fn ($a, $b) => ($rank[$b['sev']] ?? 0) <=> ($rank[$a['sev']] ?? 0));
 

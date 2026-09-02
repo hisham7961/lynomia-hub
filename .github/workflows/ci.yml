@@ -65,8 +65,12 @@ jobs:
 
       - name: مواصفة OpenAPI لا تنحرف عن السجلّ
         # docs/openapi.json مولَّدٌ من config/hub.php؛ تغييرٌ في السجلّ بلا إعادة توليد = عقدٌ كاذب
+        # الإقلاعُ يقرأ الإعداداتِ من القاعدة (SchemaGuard + auth.session_min) — قاعدةُ SQLite مهاجَرة تكفي المولِّد
         run: |
           cp .env.example .env && php artisan key:generate --ansi -q
+          touch /tmp/ci.sqlite
+          export DB_CONNECTION=sqlite DB_DATABASE=/tmp/ci.sqlite CACHE_STORE=array CACHE_DRIVER=array SESSION_DRIVER=array
+          php artisan migrate --force -q
           php artisan hub:openapi --out=/tmp/openapi.json -q
           php -r '$a=json_decode(file_get_contents("docs/openapi.json"),true);$b=json_decode(file_get_contents("/tmp/openapi.json"),true);unset($a["info"]["version"],$b["info"]["version"]);if($a!==$b){fwrite(STDERR,"✗ docs/openapi.json منحرفٌ عن السجلّ — شغّل: php artisan hub:openapi --out=docs/openapi.json\n");exit(1);}echo "✅ OpenAPI مطابق\n";'
 
