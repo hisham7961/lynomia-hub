@@ -175,7 +175,7 @@ database/seeders/         ← الدور والمالك ودليل الحساب�
 - 🧪 **جودة:** ٦٤ اختباراً جديداً (`EnterpriseHardeningRound1/2/3Test`, `CriticalWorkflowsE2ETest`, `ApiContractTest`, `HealthModelTest`, …) كلُّها فشلت على الشجرة قبل الإصلاح؛ CI ببوّابات `composer audit` وانحرافِ OpenAPI وهجراتٍ + `hub:schema-check` على MySQL؛ اختبارُ اتّساق النسخة.
 - ⬆️ **الإطار:** Laravel **12.69.1** (كان 11.55 خارج نافذة الدعم الأمني بثلاث إرشادات منها CVE-2026-48019) و`league/commonmark` 2.10 — `composer audit` نظيف. **بعد السحب على الخادم:** `composer install --no-dev --optimize-autoloader` ثم `hub:backup --verify` ثم `migrate --force` (ستُّ هجراتٍ إضافية).
 
-الحزمة: ٢٠٧٩ اختباراً خضراء على SQLite وMySQL.
+الحزمة: ٢٠٨٣ اختباراً خضراء على SQLite وMySQL (MariaDB 10.11).
 
 **v2.398.0 — «طبقةُ الذكاء: تدهورُ الهامش زمنيّاً — آخرُ العالق» 📉**
 
