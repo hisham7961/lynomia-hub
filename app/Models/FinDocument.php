@@ -98,8 +98,30 @@ class FinDocument extends Model
      * حفظٌ يلتقط تصادمَ الفهرس الفريد على `doc_no` (سباقُ كتابةِ رقمين متطابقين)
      * فيولّد بديلاً بدل أن يسقط الطلبُ بـ٥٠٠ — نمطُ Quote/Contract نفسُه. لا يُطبَّق
      * إلا على الإدراج (`! $this->exists`): تحديثُ رقمٍ قائمٍ يبقى بيدِ المستخدم.
+     *
+     * والإحياءُ (v2.399.1) — مستندٌ ميتٌ (ملغاة/مسودة) يُرجَع إلى حالةٍ حيّة، أو
+     * محذوفٌ بنعومة يُستعاد بحالةٍ حيّة — يمرّ بحارس ازدواج فوترة العرض قبل الكتابة،
+     * في معاملةٍ على صفّ العرض المقفول (القفلُ خارج معاملةٍ لا أثرَ له). هنا لا في
+     * المتحكّم: فأبوابُ الإحياء كثيرة (نموذجُ التعديل، سحبُ الكانبان، الإجراءُ
+     * الجماعيّ، الاستعادةُ من السلّة، استعادةُ نسخة، تنفيذُ موافقة) والحارسُ الذي
+     * يُطبَّق في بابٍ ويُنسى في آخر ليس حارساً. والبابُ الثالثُ إلى الثابت نفسِه:
+     * **رفعُ قيمة** فاتورةِ دفعةٍ حيّةٍ فوق المتبقّي من إجماليّ العرض — يمرّ بالسقف نفسِه.
      */
     public function save(array $options = []): bool
+    {
+        $reviving = $this->isReviving();
+        if ($reviving || $this->isRaisingLiveMilestoneTotal()) {
+            return \Illuminate\Support\Facades\DB::transaction(function () use ($options, $reviving) {
+                $this->guardQuoteBilling($reviving);
+
+                return $this->saveRetryingDocNo($options);
+            });
+        }
+
+        return $this->saveRetryingDocNo($options);
+    }
+
+    protected function saveRetryingDocNo(array $options): bool
     {
         for ($attempt = 0; ; $attempt++) {
             try {
@@ -115,6 +137,123 @@ class FinDocument extends Model
     {
         return (string) $e->getCode() === '23000'
             && str_contains(mb_strtolower($e->getMessage()), 'doc_no');
+    }
+
+    /** حالةٌ ميتة؟ — التعريفُ الواحد: `config('hub.fin.dead')` (ملغاة/مسودة)؛ والفراغُ حيّ */
+    public static function isDeadState(mixed $state): bool
+    {
+        return $state !== null && $state !== ''
+            && in_array((string) $state, (array) config('hub.fin.dead', []), true);
+    }
+
+    /**
+     * هل هذه الكتابةُ إحياء؟ — مستندٌ قائمٌ سيكون بعدها حيّاً (لا محذوفَ ولا حالةَ
+     * ميتة) وكان قبلها ميتاً أو في السلّة. الإدراجُ ليس إحياءً (حرّاسُ السكّ في
+     * المتحكّم تحكمه)، والحفظُ في السلّة ليس إحياءً، والميتُ يُستعاد ميتاً بلا حارس.
+     */
+    protected function isReviving(): bool
+    {
+        if (! $this->exists || $this->{$this->getDeletedAtColumn()} !== null || self::isDeadState($this->state)) {
+            return false;
+        }
+
+        return $this->getRawOriginal($this->getDeletedAtColumn()) !== null
+            || self::isDeadState($this->getRawOriginal('state'));
+    }
+
+    /**
+     * هل هذه الكتابةُ رفعٌ لقيمة فاتورةِ دفعةٍ حيّة؟ — حيّةٌ قبلُ وبعدُ (لا سلّةَ ولا
+     * حالةَ ميتة)، موسومةٌ بمعلم، و`total` الجديدُ أكبرُ من المخزون. الخفضُ حرّ.
+     */
+    protected function isRaisingLiveMilestoneTotal(): bool
+    {
+        if (! $this->exists || ! $this->isDirty('total') || empty(((array) $this->meta)['milestone_id'])) {
+            return false;
+        }
+        if ($this->{$this->getDeletedAtColumn()} !== null || $this->getRawOriginal($this->getDeletedAtColumn()) !== null) {
+            return false;
+        }
+        if (self::isDeadState($this->state) || self::isDeadState($this->getRawOriginal('state'))) {
+            return false;
+        }
+
+        return (float) $this->total > (float) $this->getRawOriginal('total');
+    }
+
+    /**
+     * حارسُ فوترة العرض على بابِ العودة والرفع — مرآةُ حرّاس السكّ في
+     * `QuoteController::msInvoice/toInvoice`:
+     *
+     *   · فاتورةُ دفعةٍ (`meta.milestone_id`): لا تُحيا وللمعلم فاتورةٌ حيّةٌ أخرى
+     *     (الحاليّةُ أو سابقةٌ عادت)، ولا فوق فاتورةٍ كاملةٍ حيّةٍ للعرض، ولا إن رفعت —
+     *     إحياءً أو رفعَ قيمةٍ — مجموعَ الدفعات الحيّة فوق إجماليّ العرض.
+     *   · الفاتورةُ الكاملةُ للعرض (`quotes.meta.invoice_id` يشير إليها): لا تُحيا
+     *     وللعرض فواتيرُ دفعاتٍ حيّة.
+     *
+     * الرفضُ `ValidationException` كحارس الحذف: نموذجُ التعديل يعرضه، والكانبان
+     * يُظهره نصّاً (٤٢٢)، والإجراءُ الجماعيّ ينسبه إلى سجلّه، والاستعادةُ تُرجعه.
+     *
+     * الأقفالُ: العرضُ ثم المعلمُ — ترتيبُ `msInvoice` نفسُه فلا دورةَ تعطّل؛ ومعرّفُ
+     * العرض يُستخرج بلا قفلٍ (من `meta.quote_id`، وإلا من صفّ المعلم — لا يتغيّر)، ثم
+     * يُقفل بمفتاحه لا بمسار JSON (`FOR UPDATE` على مسارٍ بلا فهرسٍ يقفل الجدولَ كلَّه).
+     * و**قراءاتُ القرار كلُّها قافلة** (`$lock = true`): على InnoDB أوّلُ قراءةٍ عاديّةٍ في
+     * المعاملة تثبّت صورتَها، فسكٌّ أُودع بينما الإحياءُ ينتظر قفلَ العرض يبقى غيرَ
+     * مرئيٍّ لقراءةٍ عاديّةٍ ولو جاءت بعد القفل — والقافلةُ ترى الأحدثَ المودَع.
+     * والعرضُ يُقرأ `withTrashed` كالمعلم: عرضٌ في السلّة فواتيرُه مطالبةٌ يعدّها القرّاء
+     * (`DB::table`) وحارسُ السكّ مغلقٌ عليه (٤٠٤)، فلا يبقى الإحياءُ بابَه الوحيد.
+     * وما لا يُتحقَّق منه (معلمٌ موسومٌ لا يُعثر له على معلمٍ ولا عرض) يُرفض لا يُمرَّر بصمت.
+     */
+    protected function guardQuoteBilling(bool $reviving): void
+    {
+        $meta = (array) $this->meta;
+        $msId = is_scalar($meta['milestone_id'] ?? null) ? (string) $meta['milestone_id'] : '';
+        $me = (string) $this->getKey();
+
+        if ($msId !== '') {
+            $quoteId = is_scalar($meta['quote_id'] ?? null) && $meta['quote_id'] !== ''
+                ? (string) $meta['quote_id']
+                : (string) (QuoteMilestone::withTrashed()->whereKey($msId)->value('quote_id') ?? '');
+            $quote = $quoteId !== '' ? Quote::withTrashed()->whereKey($quoteId)->lockForUpdate()->first() : null;
+            $ms = QuoteMilestone::withTrashed()->whereKey($msId)->lockForUpdate()->first();
+            if (! $quote && ! $ms) {
+                self::refuseRevive('تعذّر التحقّق من فوترة العرض لهذه الفاتورة (لا معلمَ ولا عرضَ يُعثر عليهما) — راجع المستندَ قبل إحيائه', $reviving);
+            }
+
+            if ($reviving && $ms && ($liveId = $ms->liveInvoiceId(true)) && $liveId !== $me) {
+                $liveNo = (string) (self::query()->whereKey($liveId)->value('doc_no') ?? $liveId);
+                self::refuseRevive('للمعلم «' . $ms->title . '» فاتورةٌ حيّةٌ أخرى (' . $liveNo . ') — أَلغِها أولاً إن كان القصدُ إحياءَ هذه، فلا تُطالَب دفعةٌ مرّتين', $reviving);
+            }
+            if ($quote) {
+                if ($reviving && $quote->hasLiveFullInvoice(true)) {
+                    self::refuseRevive('للعرض ' . $quote->doc_no . ' فاتورةٌ كاملةٌ حيّة — لا تُحيا فاتورةُ دفعةٍ فوقها (أَلغِ الكاملةَ أولاً إن كان القصدُ الفوترةَ بالدفعات)', $reviving);
+                }
+                // المجموعُ الحيُّ بلا هذه الفاتورة: الميتةُ ليست فيه أصلاً، والحيّةُ التي تُرفع قيمتُها تُطرح بقيمتها المخزونة
+                $billed = $quote->liveMilestoneInvoicedTotal(true) - ($reviving ? 0.0 : (float) $this->getRawOriginal('total'));
+                if (round($billed + (float) $this->total, 3) > round((float) $quote->total, 3)) {
+                    self::refuseRevive(($reviving ? 'إحياءُ هذه الفاتورة يرفع' : 'رفعُ قيمة هذه الفاتورة يرفع') . ' فواتيرَ الدفعات الحيّةَ على العرض ' . $quote->doc_no
+                        . ' إلى ' . number_format($billed + (float) $this->total, 3) . ' فوق إجماليّ العرض (' . number_format((float) $quote->total, 3) . ') — '
+                        . ($reviving ? 'أَلغِ إحداها أولاً' : 'المتبقّي ' . number_format(max(0, (float) $quote->total - $billed), 3)), $reviving);
+                }
+            }
+
+            return;
+        }
+        if (! $reviving) {
+            return;
+        }
+
+        // الفاتورةُ الكاملةُ لعرضٍ: مسارُ JSON على قيمةٍ حرفيّة يعمل على المحرّكين (`json_extract`)
+        // — بلا قفلٍ لتحديد العرض، ثم قفلٌ بمفتاحه
+        $quoteId = Quote::withTrashed()->where('meta->invoice_id', $me)->orderBy('id')->value('id');
+        $quote = $quoteId ? Quote::withTrashed()->whereKey($quoteId)->lockForUpdate()->first() : null;
+        if ($quote && $quote->hasLiveMilestoneInvoice(true)) {
+            self::refuseRevive('للعرض ' . $quote->doc_no . ' فواتيرُ دفعاتٍ حيّة — لا تُحيا الفاتورةُ الكاملةُ فوقها (أَلغِها أولاً إن كان القصدُ الفوترةَ الكاملة)', $reviving);
+        }
+    }
+
+    protected static function refuseRevive(string $why, bool $reviving = true): never
+    {
+        throw \Illuminate\Validation\ValidationException::withMessages([$reviving ? 'state' : 'total' => $why]);
     }
 
     public function project(): BelongsTo
@@ -137,12 +276,29 @@ class FinDocument extends Model
      * (`config('hub.fin.dead')`: ملغاة/مسودة). تعريفٌ واحدٌ يُشارَك بين فاتورة العرض
      * الكاملة وفاتورة المعلم، فلا يختلف معنى «الحيّة» بين موضعٍ وآخر.
      */
-    public static function isLive(?string $id): bool
+    public static function isLive(?string $id, bool $lock = false): bool
     {
         if (! $id) return false;
-        $state = self::query()->whereKey($id)->value('state');
-        if ($state === null && ! self::query()->whereKey($id)->exists()) return false;
+        $q = fn () => self::query()->whereKey($id)->when($lock, fn ($x) => $x->lockForUpdate());
+        $state = $q()->value('state');
+        if ($state === null && ! $q()->exists()) return false;
 
         return $state === null || ! in_array((string) $state, (array) config('hub.fin.dead', []), true);
+    }
+
+    /**
+     * هل بين هذه المعرّفات مستندٌ حيٌّ واحدٌ على الأقلّ؟ — التعريفُ نفسُه في
+     * `isLive` لكن باستعلامٍ واحدٍ لمجموعة (فواتيرُ معالم العرض مثلاً).
+     */
+    public static function anyLive(array $ids, bool $lock = false): bool
+    {
+        $ids = array_values(array_filter(array_unique(array_map('strval', $ids))));
+        if (! $ids) return false;
+        $dead = (array) config('hub.fin.dead', []);
+
+        return self::query()->whereIn('id', $ids)
+            ->when($dead, fn ($q) => $q->where(fn ($w) => $w->whereNull('state')->orWhereNotIn('state', $dead)))
+            ->when($lock, fn ($q) => $q->lockForUpdate())
+            ->exists();
     }
 }
