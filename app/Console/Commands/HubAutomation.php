@@ -58,12 +58,50 @@ class HubAutomation extends Command
         $k = $this->okrRefresh();
         $w = $this->workdayClose();
         $s = $this->signalsPrune();
+        $m = $this->marginSnapshot();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة");
 
         \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.automation'], ['value' => now()->toIso8601String()]);
         \Illuminate\Support\Facades\Cache::forget('settings:all');
         return self::SUCCESS;
+    }
+
+    /**
+     * لقطةُ هامشِ المشاريع اليوميّة — بها وحدها يصير للهامش **تاريخ** (v2.398).
+     *
+     * `hub_project_pl` يحسب هامشَ اللحظة من الفواتير والساعات والسيرفرات، ولا يحفظ
+     * شيئاً — فلا سبيلَ لقول «الهامشُ يتدهور» بلا سلسلةٍ زمنية. تُكتب نقطةٌ واحدةٌ
+     * في اليوم لكلِّ مشروعٍ غيرِ مغلق في `metric_points` القائم (وحدة `projects`،
+     * مقياس `pl_margin`، مصدر `auto`) — لا مخزنَ جديد، والمفتاحُ الفريد يُحدّث لا
+     * يُكرّر إن أُعيد التشغيل في اليوم نفسه، والتقليمُ السنويّ أدناه يشمله.
+     * مشروعٌ بلا إيرادٍ هامشُه `null` فلا يُكتب — «لا قياس» ليس صفراً.
+     * تُقرأ في `hub_recommendations` (١٤: تدهورُ الهامش) — وفي سياق النظام بلا
+     * مستخدمٍ فتكون النقطةُ واحدةً صادقةً للجميع، كما okrRefresh.
+     */
+    protected function marginSnapshot(): int
+    {
+        if ($this->dry || ! \Illuminate\Support\Facades\Schema::hasTable('metric_points')) return 0;
+        try {
+            $ids = DB::table('projects')->whereNull('deleted_at')
+                ->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', hub_closed_states()))
+                ->orderBy('id')->pluck('id');
+            $n = 0;
+            $day = now()->startOfDay();
+            foreach ($ids as $id) {
+                $pl = hub_project_pl((string) $id, true);
+                if (! $pl || ($pl['margin'] ?? null) === null) continue;
+                hub_metric_put('projects', (string) $id, 'pl_margin', (float) $pl['margin'], $day, 'auto',
+                    ['profit' => (float) ($pl['profit'] ?? 0), 'revenue' => (float) ($pl['revenue']['invoiced'] ?? 0)]);
+                $n++;
+            }
+
+            return $n;
+        } catch (\Throwable $e) {
+            report($e);
+
+            return 0;
+        }
     }
 
     /**

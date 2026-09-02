@@ -3688,6 +3688,49 @@ if (! function_exists('hub_recommendations')) {
                 }
             } catch (\Throwable $e) {}
 
+            // ١٤) تدهورُ الهامش زمنيّاً: هامشُ المشروع اليومَ مقابلَ أوّلِ لقطةٍ له في
+            // آخر ٣٠ يوماً — من سلسلة `metric_points` (projects/pl_margin) التي يكتبها
+            // `hub:automation` يوميّاً. نقطتان على يومين مختلفين على الأقلّ، وإلا فلا
+            // إشارة — لا تُختلق سلسلةٌ من نقطةٍ واحدة. العتبةُ: هبوطٌ ≥ ١٠ نقاطٍ مئوية
+            // «مهم»، و≥ ٢٠ نقطةً أو انقلابُ الهامش إلى الخسارة «حرج». هامشٌ داخليٌّ
+            // بحت: يبقى خلف `hub_org_analytics_guard` وصلاحيةِ المالية كسائر الكلفة.
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('metric_points') && hub_can(auth()->user(), 'fin', 'v')) {
+                    $rows = hub_scope(\Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at'), 'projects')
+                        ->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', hub_closed_states()))
+                        ->when($projectId, fn ($q) => $q->where('id', $projectId))
+                        ->orderBy('id')->limit(200)->get(['id', 'name'])->keyBy('id');
+                    $pts = $rows->isEmpty() ? collect() : \Illuminate\Support\Facades\DB::table('metric_points')
+                        ->where('module', 'projects')->where('metric', 'pl_margin')
+                        ->whereIn('record_id', $rows->keys()->all())
+                        ->where('at', '>=', now()->subDays(30)->startOfDay()->toDateTimeString())
+                        ->orderBy('at')->orderBy('id')->get(['record_id', 'value', 'at']);
+                    $series = [];
+                    foreach ($pts as $pt) $series[(string) $pt->record_id][] = $pt;
+                    $decl = [];
+                    foreach ($series as $pid => $s) {
+                        if (count($s) < 2) continue;
+                        $first = $s[0]; $last = end($s);
+                        if (\Illuminate\Support\Carbon::parse($first->at)->isSameDay(\Illuminate\Support\Carbon::parse($last->at))) continue;
+                        $from = (float) $first->value; $to = (float) $last->value;
+                        $drop = $from - $to;
+                        $flip = $from >= 0 && $to < 0;   // انقلابٌ إلى الخسارة: حرجٌ مهما صغُر الهبوط
+                        if ($drop < 10 && ! $flip) continue;
+                        $decl[] = ['p' => $rows[$pid], 'from' => $from, 'to' => $to, 'drop' => $drop, 'flip' => $flip,
+                                   'days' => (int) \Illuminate\Support\Carbon::parse($first->at)->diffInDays(\Illuminate\Support\Carbon::parse($last->at))];
+                    }
+                    usort($decl, fn ($a, $b) => [$b['drop'], $a['p']->id] <=> [$a['drop'], $b['p']->id]);
+                    foreach (array_slice($decl, 0, 6) as $d) {
+                        $add(($d['drop'] >= 20 || $d['flip']) ? 'حرج' : 'مهم', '📉',
+                            'تدهورُ هامش: ' . $d['p']->name,
+                            'هبط الهامشُ من ' . number_format($d['from'], 1) . '٪ إلى ' . number_format($d['to'], 1)
+                            . '٪ خلال ' . $d['days'] . ' يوماً (−' . number_format($d['drop'], 1) . ' نقطة). راجع الكلفةَ والفوترة.',
+                            route('m.show', ['projects', $d['p']->id]), 'افتح المشروع',
+                            'margin.decline:' . $d['p']->id, 'projects', $d['p']->id);
+                    }
+                }
+            } catch (\Throwable $e) {}
+
             // الترتيب: الأشد أولاً، وضمن الدرجة يبقى ترتيب الاكتشاف
             usort($out, fn ($a, $b) => ($rank[$b['sev']] ?? 0) <=> ($rank[$a['sev']] ?? 0));
 
