@@ -3731,6 +3731,57 @@ if (! function_exists('hub_recommendations')) {
                 }
             } catch (\Throwable $e) {}
 
+            // ١٥) معلمُ دفعٍ بُلغ ولم يُفوتَر (v2.399): دفعةٌ في جدول مدفوعات عرضٍ
+            // مقبولٍ/محوَّلٍ أُعلن بلوغُها (`quote_milestones.reached_at` — فعلٌ بشريٌّ
+            // مسجَّل) منذ ٣ أيامٍ فأكثر ولا فاتورةَ حيّةً لها (`invoice_id` غائبٌ أو
+            // فاتورتُه محذوفةٌ/ملغاة). «حرج» بعد ٧ أيام. تنطفئ وحدها بسكّ الفاتورة،
+            // وتعود إن أُلغيت. القيمةُ إيرادٌ تعاقديٌّ (لا كلفة) بقاعدة الشاشة نفسها.
+            // منطَّقةٌ بعروضها (hub_scope quotes) خلف صلاحيةِ رؤية العروض.
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('quote_milestones')
+                    && \Illuminate\Support\Facades\Schema::hasColumn('quote_milestones', 'reached_at')
+                    && hub_can(auth()->user(), 'quotes', 'v')) {
+                    $qs = hub_scope(\App\Models\Quote::query(), 'quotes')
+                        ->whereIn('status', ['مقبول', 'محوّل'])
+                        ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
+                        ->orderBy('id')->limit(200)->get(['id', 'doc_no', 'title', 'total', 'meta'])->keyBy('id');
+                    $ms = $qs->isEmpty() ? collect() : \Illuminate\Support\Facades\DB::table('quote_milestones')
+                        ->whereNull('deleted_at')->whereIn('quote_id', $qs->keys()->all())
+                        ->whereNotNull('reached_at')
+                        ->where('reached_at', '<=', now()->subDays(3)->toDateTimeString())
+                        // الأقدمُ بلوغاً أولاً، وid فاصلٌ حتميّ
+                        ->orderBy('reached_at')->orderBy('id')->limit(40)
+                        ->get(['id', 'quote_id', 'title', 'pct', 'amount', 'reached_at', 'invoice_id']);
+                    // «الحيّة» بتعريفٍ واحد: فواتيرُ المعالم + الفواتيرُ الكاملةُ للعروض
+                    // (meta.invoice_id من do=invoice) — عرضٌ مفوتَرٌ كاملاً إيرادُه مُطالَبٌ به،
+                    // فمعالمُه ليست «بلا فاتورة» (لا إشارةَ كاذبة ولا ازدواجَ فوترة).
+                    $fullInv = $qs->map(fn ($q) => ((array) $q->meta)['invoice_id'] ?? null)
+                        ->filter(fn ($v) => is_string($v) && $v !== '');
+                    $invIds = $ms->pluck('invoice_id')->filter()->merge($fullInv->values())->unique()->values()->all();
+                    $live = $invIds ? \Illuminate\Support\Facades\DB::table('fin_documents')
+                        ->whereIn('id', $invIds)->whereNull('deleted_at')
+                        ->where(fn ($w) => $w->whereNull('state')->orWhereNotIn('state', (array) config('hub.fin.dead', [])))
+                        ->pluck('id')->flip()->all() : [];
+                    $n = 0;
+                    foreach ($ms as $m) {
+                        if ($m->invoice_id && isset($live[$m->invoice_id])) continue;   // فُوتر → حُلّت وحدها
+                        $full = $fullInv[$m->quote_id] ?? null;
+                        if ($full && isset($live[$full])) continue;                     // عرضُه مفوتَرٌ كاملاً
+                        if ($n++ >= 8) break;
+                        $q = $qs[$m->quote_id];
+                        $amt = (float) $m->amount > 0 ? (float) $m->amount
+                            : ((float) $m->pct > 0 ? (float) $q->total * (float) $m->pct / 100 : 0.0);
+                        $days = (int) \Illuminate\Support\Carbon::parse($m->reached_at)->diffInDays(now());
+                        $add($days >= 7 ? 'حرج' : 'مهم', '🧾',
+                            'معلمُ دفعٍ بلا فاتورة: ' . $m->title . ' — ' . ($q->title ?: $q->doc_no),
+                            'أُعلن بلوغُه منذ ' . $days . ' يوماً' . ($amt > 0 ? ' بقيمة ' . number_format($amt, 3) : '')
+                            . ' ولم تُسكّ فاتورتُه' . ($m->invoice_id ? ' (فاتورتُه السابقة أُلغيت أو حُذفت)' : '') . '. الإيرادُ المستحقّ لا يُحصَّل بلا فاتورة.',
+                            route('m.show', ['quotes', $q->id]), 'سُكّ الفاتورة',
+                            'milestone.uninvoiced:' . $m->id, 'quotes', $q->id);
+                    }
+                }
+            } catch (\Throwable $e) {}
+
             // الترتيب: الأشد أولاً، وضمن الدرجة يبقى ترتيب الاكتشاف
             usort($out, fn ($a, $b) => ($rank[$b['sev']] ?? 0) <=> ($rank[$a['sev']] ?? 0));
 

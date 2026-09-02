@@ -273,6 +273,18 @@ class Quote extends Model
         return $this->hasMany(QuoteMilestone::class, 'quote_id')->orderBy('sort')->orderBy('id');
     }
 
+    /**
+     * هل للعرض فاتورةٌ كاملةٌ حيّة (من `do=invoice`, المؤشَّرُ إليها بـ`meta.invoice_id`)؟
+     * إن كانت، فإيرادُ العرض مُطالَبٌ به كلُّه — فلا تُسكّ فاتورةُ دفعةٍ فوقه ولا تُعدّ
+     * معالمُه «بلا فاتورة» (v2.399: منعُ ازدواج الفوترة).
+     */
+    public function hasLiveFullInvoice(): bool
+    {
+        $id = ((array) $this->meta)['invoice_id'] ?? null;
+
+        return is_string($id) && $id !== '' && FinDocument::isLive($id);
+    }
+
     public function engagement(): BelongsTo
     {
         return $this->belongsTo(\App\Models\Engagement::class, 'engagement_id');

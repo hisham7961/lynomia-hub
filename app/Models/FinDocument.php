@@ -131,4 +131,18 @@ class FinDocument extends Model
     {
         return $this->belongsTo(\App\Models\CostCenter::class, 'cc_id');
     }
+
+    /**
+     * هل هذا المستندُ (بمعرّفه) حيٌّ؟ — موجودٌ، لا محذوفٌ بنعومة، وليس في حالةٍ ميتة
+     * (`config('hub.fin.dead')`: ملغاة/مسودة). تعريفٌ واحدٌ يُشارَك بين فاتورة العرض
+     * الكاملة وفاتورة المعلم، فلا يختلف معنى «الحيّة» بين موضعٍ وآخر.
+     */
+    public static function isLive(?string $id): bool
+    {
+        if (! $id) return false;
+        $state = self::query()->whereKey($id)->value('state');
+        if ($state === null && ! self::query()->whereKey($id)->exists()) return false;
+
+        return $state === null || ! in_array((string) $state, (array) config('hub.fin.dead', []), true);
+    }
 }
