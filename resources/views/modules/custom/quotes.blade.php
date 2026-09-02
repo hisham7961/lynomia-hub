@@ -161,22 +161,74 @@
 <div class="card">
     <h3 class="cardtitle">📅 جدول المدفوعات <span class="bdg">{{ $qMs->count() }}</span></h3>
     @if ($qMs->isNotEmpty())
-        @php $pctSum = $qMs->sum(fn ($m) => (float) $m->pct); @endphp
+        @php
+            $pctSum = $qMs->sum(fn ($m) => (float) $m->pct);
+            // بعد القبول يصير الجدولُ التزاماً: البلوغُ والفوترةُ (v2.399) تُتاح هنا
+            // تحديداً — الجدولُ نفسُه مجمَّدٌ في البنّاء (لا إضافةَ ولا حذف).
+            $msTrack = $qLocked && \Illuminate\Support\Facades\Schema::hasColumn('quote_milestones', 'reached_at');
+            $msCanReach = $msTrack && hub_can(auth()->user(), 'quotes', 'e');
+            // فاتورةٌ كاملةٌ حيّةٌ للعرض (do=invoice) تمنع فواتيرَ الدفعات — لا ازدواجَ فوترة
+            $msFullInv = $msTrack && $row->hasLiveFullInvoice();
+            $msCanInvoice = $msTrack && ! $msFullInv && hub_can(auth()->user(), 'fin', 'a');
+            $msInvoices = $msTrack && $qMs->whereNotNull('invoice_id')->isNotEmpty()
+                ? \App\Models\FinDocument::query()->whereIn('id', $qMs->pluck('invoice_id')->filter()->all())->get(['id', 'doc_no', 'state'])->keyBy('id')
+                : collect();
+            $finDead = (array) config('hub.fin.dead', []);
+        @endphp
         <div class="tblwrap"><table>
-            <thead><tr><th>الدفعة</th><th>النسبة</th><th>المبلغ</th><th>المحفّز</th>@if ($canEdit)<th></th>@endif</tr></thead>
+            <thead><tr><th>الدفعة</th><th>النسبة</th><th>المبلغ</th><th>المحفّز</th>@if ($msTrack)<th>الحالة</th><th>الفاتورة</th>@endif @if ($canEdit)<th></th>@endif</tr></thead>
             <tbody>
             @foreach ($qMs as $m)
+                @php
+                    $mInv = $m->invoice_id ? ($msInvoices[$m->invoice_id] ?? null) : null;
+                    $mInvLive = $mInv && ($mInv->state === null || ! in_array((string) $mInv->state, $finDead, true));
+                @endphp
                 <tr>
                     <td>{{ $m->title }}</td>
                     <td class="mono">{{ (float) $m->pct ? (float) $m->pct . '%' : '—' }}</td>
                     <td class="mono">{{ (float) $m->amount ? number_format((float) $m->amount, 3) : ((float) $m->pct ? number_format((float) $row->total * (float) $m->pct / 100, 3) : '—') }}</td>
                     <td class="sub">{{ $m->trigger ?: '—' }}</td>
+                    @if ($msTrack)
+                        <td>
+                            @if ($m->reached_at)
+                                <span class="bdg ok" title="أُعلن البلوغ">🏁 بُلغ {{ $m->reached_at->toDateString() }}</span>
+                                @if ($msCanReach && ! $mInvLive)
+                                    <form method="POST" action="{{ route('quotes.act', $row->id) }}" class="inline">@csrf
+                                        <input type="hidden" name="do" value="ms.unreach"><input type="hidden" name="ms" value="{{ $m->id }}">
+                                        <button class="btn ghost xs" data-confirm="التراجع عن إعلان البلوغ؟">↩︎</button>
+                                    </form>
+                                @endif
+                            @elseif ($msCanReach)
+                                <form method="POST" action="{{ route('quotes.act', $row->id) }}" class="inline">@csrf
+                                    <input type="hidden" name="do" value="ms.reach"><input type="hidden" name="ms" value="{{ $m->id }}">
+                                    <button class="btn ghost xs">🏁 بُلغ</button>
+                                </form>
+                            @else
+                                <span class="sub">لم يُبلَغ</span>
+                            @endif
+                        </td>
+                        <td>
+                            @if ($mInv)
+                                <a class="chip" href="{{ route('m.show', ['fin', $mInv->id]) }}" title="{{ $mInv->state }}">🧾 {{ $mInv->doc_no }}{{ $mInvLive ? '' : ' (' . $mInv->state . ')' }}</a>
+                            @endif
+                            @if (! $mInvLive && $msCanInvoice)
+                                <form method="POST" action="{{ route('quotes.act', $row->id) }}" class="inline">@csrf
+                                    <input type="hidden" name="do" value="ms.invoice"><input type="hidden" name="ms" value="{{ $m->id }}">
+                                    <button class="btn ghost xs" data-confirm="سكُّ فاتورةِ هذه الدفعة الآن؟">🧾 سُكّ الفاتورة</button>
+                                </form>
+                            @elseif (! $mInv)
+                                <span class="sub">—</span>
+                            @endif
+                        </td>
+                    @endif
                     @if ($canEdit)<td><form method="POST" action="{{ route('quotes.ms.destroy', [$row->id, $m->id]) }}" class="inline">@csrf @method('DELETE')<button class="btn ghost xs bad" data-confirm="حذف؟">حذف</button></form></td>@endif
                 </tr>
             @endforeach
             </tbody>
         </table></div>
         @if ($pctSum > 0)<div class="sub" style="margin-top:6px {{ abs($pctSum - 100) > 0.01 ? ';color:var(--bad,inherit)' : '' }}">مجموع النسب: {{ rtrim(rtrim(number_format($pctSum, 2), '0'), '.') }}%@if (abs($pctSum - 100) > 0.01) — يُفترض ١٠٠٪@endif</div>@endif
+        @if ($msFullInv ?? false)<div class="sub" style="margin-top:4px">🧾 للعرض فاتورةٌ كاملةٌ حيّة — الدفعاتُ لا تُفوتَر فوقها (أَلغِها من الماليّة إن كان القصدُ الفوترةَ بالدفعات).</div>
+        @elseif ($msTrack)<div class="sub" style="margin-top:4px">بعد القبول يصير الجدولُ التزاماً: أعلِن بلوغَ الدفعة حين تتحقّق، وسُكّ فاتورتَها — معلمٌ بُلغ ولم يُفوتَر ٣ أيامٍ يظهر في مركز التوصيات.</div>@endif
     @else
         <div class="sub">لا مدفوعات مجدولة — أضِف دفعاتٍ (٣٠٪ عند القبول، ٤٠٪ بعد المرحلة٢…).</div>
     @endif
