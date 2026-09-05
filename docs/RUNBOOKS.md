@@ -130,3 +130,23 @@ php artisan about
 **المعالجة:** في `.env` التجريبيّ ضع `HUB_OUTBOUND=off` ثم `php artisan optimize:clear` — كلُّ نداءٍ خارجيّ (رسائل، ويبهوك، مراقبة، استكشاف، أودو) يُرفض عند حاجز الخروج برسالةٍ تسمّي المفتاح. وضعيةُ الأمان تُظهر `APP_ENV`/`APP_DEBUG` الحاليَّين.
 
 **التحقق:** `php artisan hub:outbox` يطبع فشلَ الرسائل بسبب `HUB_OUTBOUND=off` ولا يغادر شيءٌ الخادم.
+
+## 10) بروفةُ الترقية قبل النشر (نسخةٌ من القاعدة)
+
+**الخطر:** هجرةٌ تنجح على قاعدةٍ فارغة (كما في CI) وتسقط على قاعدة الإنتاج: عمودٌ ممتلئ يُضيَّق، نوعٌ لا يقبل ما فيه، أو `explicit_defaults_for_timestamp=OFF` (TECH_DEBT DI-05) — أو تنجح ويُكتشف فقدُ قيمةٍ بعد النشر.
+
+**المعالجة:** بنسخةٍ من قاعدة الإنتاج و`APP_KEY` نفسِه (كي تُقرأ الأسرارُ المشفَّرة)، على الخادم أو محلياً بالشيفرة الجديدة:
+
+```bash
+mysql -e "CREATE DATABASE hub_rehearsal CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+mysqldump hub_prod | mysql hub_rehearsal
+export DB_DATABASE=hub_rehearsal HUB_OUTBOUND=off      # لا رسائلَ ولا ويبهوك تغادر من البروفة
+php artisan hub:backup --keep=1                        # الخطوةُ الأولى في .cpanel.yml نفسُها
+php artisan migrate --force
+php artisan optimize:clear
+php artisan hub:schema-check                           # يجب أن يطبع «لا فروقات»
+```
+
+**التحقق:** أعدادُ الصفوف في الجداول الرئيسية (`users`, `clients`, `tasks`, `fin_documents`, `audits`) قبل الترحيل وبعده متساوية؛ آخرُ `hash` في `audits` لم يتغيّر؛ تسجيلُ الدخول على النسخة يعمل بكلمة المرور القديمة؛ ويبهوك قديمٌ يُفتح من الإعدادات ويُقرأ سرُّه. ثم `DROP DATABASE hub_rehearsal`.
+
+> نُفّذت هذه البروفة لترقية v2.400 على مخطّط v2.399.1 ببياناتٍ ممثِّلة (سجل الإصدارات v2.400.2): ٧ هجرات في ٨٫٥ ثانية على قاعدةٍ صغيرة. على قاعدةٍ كبيرة، فهارسُ `created_at` على ~١٢٠ جدولاً تأخذ دقائق — نفّذ النشر خارج ساعات الذروة.
