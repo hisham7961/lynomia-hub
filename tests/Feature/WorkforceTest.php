@@ -32,6 +32,12 @@ use Tests\TestCase;
  */
 class WorkforceTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        \Illuminate\Support\Carbon::setTestNow(null);
+        parent::tearDown();
+    }
+
     protected function employee(?User $u = null): array
     {
         $u = $u ?: User::create(['name' => 'أحمد', 'email' => Str::random(8) . '@test.local',
@@ -74,6 +80,12 @@ class WorkforceTest extends TestCase
     public function test_late_arrival_is_flagged_by_the_configurable_grace(): void
     {
         $this->seedCore();
+        // تثبيتُ الساعة على ضحى النهار: بدايةُ الدوام 00:00 وسماحيةٌ صفر، فأيُّ
+        // حضورٍ بعد منتصف الليل «متأخر». بلا تثبيتٍ كان تشغيلُ الحزمة عند منتصف
+        // الليل بتوقيت الكويت (21:00 UTC على CI) يجعل دقيقةَ اليوم = 0، و‏«0 > 0»
+        // كاذبة، فيُوسَم «حاضر» لا «متأخر» — قرعةُ ساعةٍ لا عيبَ منطق.
+        \Illuminate\Support\Carbon::setTestNow(
+            \Illuminate\Support\Carbon::parse('2026-09-06 10:00:00', config('app.timezone', 'Asia/Kuwait')));
         $this->hubSetting('sec.hours_start', '00:00');
         $this->hubSetting('work.late_grace', '0');
         [$u, $e] = $this->employee();

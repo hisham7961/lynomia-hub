@@ -40,6 +40,59 @@ class DmController extends Controller
         return $out;
     }
 
+    /* ────────── (WP-A.5 · SF-4/SF-5) نطاقُ الشركة على المراسلة ────────── */
+
+    /**
+     * هل يبلغ المستخدمُ الحاليُّ زميلاً ضمن نطاق شركاته؟ — على السكّة نفسِها
+     * (`hub_company_ids`) لا محرّكَ عزلٍ ثانٍ. العزلُ يمنع مراسلةَ/تعدادَ مستخدمي
+     * شركةٍ أخرى، ويُبقي مراسلةَ الإدارة (غيرِ المقيَّدة) وزملاءِ الشركة نفسِها.
+     *   • المُرسِلُ غيرُ المقيَّد (المالك/بلا قائمة) يبلغ الجميعَ كما كان.
+     *   • زميلٌ غيرُ مقيَّدٍ (org-wide) يُبلَغ من أيّ مقيَّد.
+     *   • وإلّا: تقاطعُ شركةٍ واحدةٍ يكفي.
+     */
+    protected static function dmReachable(User $other, ?User $me = null): bool
+    {
+        $me = $me ?? auth()->user();
+        $mine = hub_company_ids($me);
+        if ($mine === null) return true;                 // غيرُ مقيَّد يراسل الجميع
+        $their = hub_company_ids($other);
+        if ($their === null) return true;                // زميلٌ غيرُ مقيَّد (org-wide)
+
+        return (bool) array_intersect($mine, $their);
+    }
+
+    /**
+     * وسمُ الرسالة بشركةٍ إن أمكن اشتقاقُها — كي تدخل نطاقَ طرفِها المقيَّد:
+     *   • طرفان مقيَّدان → شركتُهما المشترَكة (الحارسُ ضَمِن وجودَ تقاطع).
+     *   • أحدُهما مقيَّدٌ والآخرُ عابر → نطاقُ المقيَّد (فتراها شركتُه).
+     *   • كلاهما عابر (الإدارة) → فارغةٌ = رسالةٌ عامّةٌ غيرُ موسومة.
+     */
+    protected static function deriveDmCompany(User $from, User $to): ?string
+    {
+        $a = hub_company_ids($from);
+        $b = hub_company_ids($to);
+        if ($a !== null && $b !== null) {
+            $both = array_values(array_intersect($a, $b));
+
+            return $both[0] ?? null;
+        }
+        if ($a !== null) return $a[0];
+        if ($b !== null) return $b[0];
+
+        return null;
+    }
+
+    /** زملاءُ بدءِ محادثةٍ جديدة — مُنطَّقون بشركات المستخدم الحالي (لا تعدادَ خارج نطاقه) */
+    protected function startableUsers(string $me): \Illuminate\Support\Collection
+    {
+        $meUser = auth()->user();
+
+        return User::whereNull('deleted_at')->where('id', '!=', $me)->where('status', 'نشط')
+            ->with('role')->orderBy('name')->get()
+            ->filter(fn ($u) => self::dmReachable($u, $meUser))
+            ->pluck('name', 'id');
+    }
+
     /** قائمة المحادثات: آخر رسالة وغير المقروء لكل طرف */
     /**
      * قائمةُ المحادثات: أحدثُ ٦٠ خيطاً **وكلُّ خيطٍ فيه غيرُ مقروء** — مضمومٌ دائماً.
@@ -49,17 +102,20 @@ class DmController extends Controller
      */
     protected function threadList(string $me): \Illuminate\Support\Collection
     {
-        $unreadByThread = DmMessage::alive()->where('to_id', $me)->whereNull('read_at')
+        // نطاقُ الشركة على مستوى الرسالة (WP-A.5) دفاعاً في العمق فوق حارسِ الفتح/الإرسال:
+        // المقيَّدُ لا تظهر له إلا محادثاتُ شركاته وغيرُ الموسومة (لا تسرّبَ صفٍّ قديم).
+        $unreadByThread = DmMessage::alive()->inCompanyScope()->where('to_id', $me)->whereNull('read_at')
             ->select('thread_key', \Illuminate\Support\Facades\DB::raw('COUNT(*) c'))
             ->groupBy('thread_key')->pluck('c', 'thread_key');
 
-        $recentKeys = DmMessage::alive()->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
+        $recentKeys = DmMessage::alive()->inCompanyScope()
+            ->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
             ->select('thread_key', \Illuminate\Support\Facades\DB::raw('MAX(created_at) last_at'))
             ->groupBy('thread_key')->orderByDesc('last_at')->limit(60)->pluck('thread_key');
         $keys = $recentKeys->merge($unreadByThread->keys())->unique()->values();
 
         return $keys->map(function ($key) use ($me, $unreadByThread) {
-            $last = DmMessage::alive()->where('thread_key', $key)
+            $last = DmMessage::alive()->inCompanyScope()->where('thread_key', $key)
                 ->orderByDesc('created_at')->orderByDesc('id')->first();
             if (! $last) return null;
 
@@ -82,7 +138,9 @@ class DmController extends Controller
          * يصل هنا فعلاً ويُحوَّل إلى الخيط، والجافاسكربت تسريعٌ لا شرطُ عمل.
          */
         $to = hub_str($r->query('to'));
-        if ($to !== '' && $to !== $me && User::whereNull('deleted_at')->whereKey($to)->exists()) {
+        // (WP-A.5) لا تحويلَ إلى خيطِ زميلٍ خارج نطاق الشركات — يُبقى في الصندوق
+        if ($to !== '' && $to !== $me
+            && ($toU = User::whereNull('deleted_at')->find($to)) && self::dmReachable($toU)) {
             return redirect()->route('dm.thread', $to);
         }
         /*
@@ -95,7 +153,7 @@ class DmController extends Controller
         $hits = collect();
         if ($q !== '') {
             $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $q) . '%';
-            $hits = DmMessage::alive()
+            $hits = DmMessage::alive()->inCompanyScope()
                 ->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
                 ->where('body', 'LIKE', $like)
                 ->orderByDesc('created_at')->limit(60)->get()
@@ -115,8 +173,7 @@ class DmController extends Controller
 
         $users = User::whereIn('id', $threads->pluck('other')->merge($hits->pluck('other')))
             ->pluck('name', 'id');
-        $all = User::whereNull('deleted_at')->where('id', '!=', $me)
-            ->where('status', 'نشط')->orderBy('name')->pluck('name', 'id');
+        $all = $this->startableUsers((string) $me);
 
         return view('dm.inbox', ['threads' => $threads, 'users' => $users, 'all' => $all,
             'open' => null, 'msgs' => collect(), 'other' => null, 'q' => $q, 'hits' => $hits,
@@ -128,6 +185,8 @@ class DmController extends Controller
     {
         $other = User::findOrFail($userId);
         abort_if($other->id === auth()->id(), 404, 'لا محادثة مع النفس');
+        // (WP-A.5) لا يُفتح خيطٌ لزميلٍ خارج نطاق الشركات — ٤٠٤ لا كشفَ وجودٍ فوق العزل
+        abort_unless(self::dmReachable($other), 404);
 
         $key = DmMessage::threadKey(auth()->id(), $other->id);
         DmMessage::where('thread_key', $key)->where('to_id', auth()->id())
@@ -154,8 +213,7 @@ class DmController extends Controller
             'other' => $other, 'msgs' => $msgs, 'open' => $other->id,
             'threads' => $threads,
             'users' => User::whereIn('id', $ids)->pluck('name', 'id'), 'q' => '', 'hits' => collect(),
-            'all' => User::whereNull('deleted_at')->where('id', '!=', $me)
-                ->where('status', 'نشط')->orderBy('name')->pluck('name', 'id'),
+            'all' => $this->startableUsers((string) $me),
             'presence' => self::presence($ids),
         ]);
     }
@@ -185,8 +243,10 @@ class DmController extends Controller
          * إلى موقوفٍ تدخل صندوقاً لا يفتحه أحد، والمرسِلُ يرى «✓» ويبني عليها.
          */
         $other = User::whereNull('deleted_at')->find($userId);
+        // (WP-A.5) زميلٌ خارج نطاق الشركات يُطوى في «لا حساب» نفسِه — لا نُثبت وجودَ
+        // مستخدمٍ خارج العزل لمقيَّدٍ يُعدِّد بالمعرّفات (لا تمييزَ عن «لا حساب»).
         $why = match (true) {
-            ! $other                        => 'لا حساب بهذا المعرّف — اختر زميلاً من القائمة',
+            ! $other || ! self::dmReachable($other) => 'لا حساب بهذا المعرّف — اختر زميلاً من القائمة',
             $other->id === auth()->id()     => 'لا محادثة مع النفس',
             ($other->status ?? '') !== 'نشط' => 'حساب «' . $other->name . '» موقوف — رسالتُك لن يفتحها أحد',
             default                         => null,
@@ -200,14 +260,20 @@ class DmController extends Controller
             'att'  => ['nullable', 'file', 'max:' . hub_upload_cap()['kb']],
         ], [], ['body' => 'نص الرسالة', 'att' => 'المرفق']);
 
-        $msg = DmMessage::create([
+        $attrs = [
             'thread_key' => DmMessage::threadKey(auth()->id(), $other->id),
             'from_id'    => auth()->id(),
             'to_id'      => $other->id,
             'body'       => $data['body'],
             'att'        => $r->hasFile('att') ? $r->file('att')->store('hub', 'local') : null,
             'created_at' => now(),
-        ]);
+        ];
+        // (WP-A.5) وسمُ الرسالة بشركتها إن اشتُقّت — فتدخل نطاقَ طرفِها المقيَّد
+        if (hub_has_col('dm_messages', 'company_id')) {
+            $attrs['company_id'] = self::deriveDmCompany(auth()->user(), $other);
+        }
+
+        $msg = DmMessage::create($attrs);
 
         // record_id بلا module: لا رابطَ يُبنى منه (الوجهة حوار لا سجل وحدة) —
         // لكنه يُمكّن سحبَ الرسالة من سحب إشعارها معها

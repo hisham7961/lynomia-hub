@@ -62,6 +62,16 @@ class User extends Authenticatable
         return (bool) ($this->role?->is_owner);
     }
 
+    /**
+     * حسابُ عميلٍ خارجيّ — المصنِّفُ الصلب (Work OS · SF-1): يُقرأ من عمود
+     * `account_type` مباشرةً، ولا يُستنتج من `users.clients` (قد تكون فارغةً
+     * لعميلٍ جديدٍ أو مأهولةً لموظفٍ داخليٍّ مخصَّصٍ لعملاء). التصنيفُ بنيويٌّ لا نطاقيّ.
+     */
+    public function isClientAccount(): bool
+    {
+        return $this->account_type === 'client';
+    }
+
     /** صلاحية على وحدة: v=عرض a=إضافة e=تعديل d=حذف */
     public function can2(string $module, string $action): bool
     {

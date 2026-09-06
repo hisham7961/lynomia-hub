@@ -16,37 +16,57 @@ use Illuminate\Support\Str;
  */
 class CommentController extends Controller
 {
-    /** قناة الفريق — منشورات عامة يراها كل مستخدم */
+    /** قناة الفريق — منشورات داخلية منطَّقةٌ بشركة القارئ (WP-A.5) */
     public function feed(Request $r)
     {
         $me = (string) auth()->id();
         $tab = in_array($t = hub_str($r->query('t', 'all')), ['all', 'me', 'pin'], true) ? $t : 'all';
 
-        $posts = Comment::where('module', 'feed')->whereNull('parent_id')->with('user', 'replies.user')
-            // «ما ذكرني»: قناةٌ تنمو تُغرق ما يعنيك — والذكرُ هو ما يعنيك
-            ->when($tab === 'me', fn ($w) => self::mentioning($w, $me))
-            ->when($tab === 'pin', fn ($w) => $w->where('pinned', true))
+        $posts = self::feedCompanyFilter(
+            Comment::where('module', 'feed')->whereNull('parent_id')->with('user', 'replies.user')
+                // «ما ذكرني»: قناةٌ تنمو تُغرق ما يعنيك — والذكرُ هو ما يعنيك
+                ->when($tab === 'me', fn ($w) => self::mentioning($w, $me))
+                ->when($tab === 'pin', fn ($w) => $w->where('pinned', true)))
             ->orderByDesc('pinned')->orderByDesc('created_at')
             ->paginate(15)->withQueryString();
 
         $this->markRead($posts->getCollection());
 
-        // نبضُ القناة: قناةٌ صامتة تُقال لا تُخفى — والذكرُ يُعدّ كي لا يمرّ دون انتباه
-        $week = Comment::where('module', 'feed')->whereNull('parent_id')
-            ->where('created_at', '>=', now()->subDays(7))->get(['user_id']);
+        // نبضُ القناة: قناةٌ صامتة تُقال لا تُخفى — والذكرُ يُعدّ كي لا يمرّ دون انتباه.
+        // كلُّ عدّادٍ منطَّقٌ كالقائمة، فلا يُسرّب النبضُ عدداً من شركةٍ أخرى.
+        $week = self::feedCompanyFilter(Comment::where('module', 'feed')->whereNull('parent_id')
+            ->where('created_at', '>=', now()->subDays(7)))->get(['user_id']);
 
         return view('feed.index', [
             'posts' => $posts, 'users' => $this->userNames(), 'tab' => $tab,
             'pulse' => [
                 'week'   => $week->count(),
                 'people' => $week->pluck('user_id')->filter()->unique()->count(),
-                'pinned' => Comment::where('module', 'feed')->where('pinned', true)->count(),
-                'mine'   => self::mentioning(
-                    Comment::where('module', 'feed')->whereNull('parent_id'), $me)->count(),
+                'pinned' => self::feedCompanyFilter(
+                    Comment::where('module', 'feed')->where('pinned', true))->count(),
+                'mine'   => self::feedCompanyFilter(self::mentioning(
+                    Comment::where('module', 'feed')->whereNull('parent_id'), $me))->count(),
             ],
             'presence' => DmController::presence(
                 $posts->getCollection()->pluck('user_id')->filter()->unique()->values()->all()),
         ]);
+    }
+
+    /**
+     * (WP-A.5 · SF-4/SF-5) نطاقُ الشركة على قناة الفريق — على السكّة نفسِها
+     * (`hub_company_ids`) لا محرّكَ عزلٍ ثانٍ:
+     *  • المستخدمُ المقيَّدُ بشركاتٍ يرى منشوراتِ شركاته + الإعلاناتِ العامة
+     *    (`company_id` فارغ: منشورُ مالكٍ/غيرِ مقيَّد، أو منشورٌ قديمٌ قبل الهجرة).
+     *  • غيرُ المقيَّد (المالك/بلا قائمةِ شركات) يرى الكلَّ كما كان.
+     *  • العميلُ لا يبلغ القناةَ أصلاً (PortalGuard فوق هذا كلِّه).
+     * والعمودُ حديث: قبل الهجرة لا يُنطَّق شيءٌ (القناةُ كما كانت) — نظيرُ `scopeAlive`.
+     */
+    protected static function feedCompanyFilter($q)
+    {
+        if (! hub_has_col('comments', 'company_id')) return $q;      // ما قبل الهجرة
+        if (($cids = hub_company_ids()) === null) return $q;          // غيرُ مقيَّد يرى الكل
+
+        return $q->where(fn ($w) => $w->whereIn('company_id', $cids)->orWhereNull('company_id'));
     }
 
     /** منشوراتٌ ذُكر فيها فلان — `mentions` عمودُ JSON يحمل قائمة المعرّفات */
@@ -84,7 +104,7 @@ class CommentController extends Controller
 
         $mentions = $this->extractMentions($data['body'], (array) $r->input('mention', []));
 
-        $c = Comment::create([
+        $attrs = [
             'module'     => $module,
             'record_id'  => $recordId,
             'parent_id'  => $data['parent_id'] ?? null,
@@ -96,7 +116,17 @@ class CommentController extends Controller
             'mentions'   => $mentions ?: null,
             'read_by'    => [auth()->id()],
             'created_at' => now(),
-        ]);
+        ];
+
+        // (WP-A.5) منشورُ القناةِ يُوسَم بشركة ناشره المقيَّد فينعزل عنها القارئُ
+        // من شركةٍ أخرى؛ ناشرٌ غيرُ مقيَّد (المالك) يترك العمودَ فارغاً = إعلانٌ عامّ.
+        // خيوطُ السجلات لا تُوسَم هنا: نطاقُها من سجلِها الأمّ عبر `guardTarget`.
+        if ($module === 'feed' && hub_has_col('comments', 'company_id')
+            && ($cids = hub_company_ids()) !== null) {
+            $attrs['company_id'] = $cids[0];
+        }
+
+        $c = Comment::create($attrs);
 
         $this->notifyAround($c);
 
