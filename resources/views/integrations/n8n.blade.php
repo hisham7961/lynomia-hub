@@ -71,6 +71,15 @@ docker compose up -d</pre>
             <input class="inp ltr" type="password" name="key" value="" maxlength="500" dir="ltr" placeholder="{{ $hasKey ? '•••••• (محفوظ)' : 'n8n_api_...' }}"></label>
         <button class="btn p">حفظ الربط</button>
     </form>
+    @error('url')<div class="ferr" style="margin-top:6px">{{ $message }}</div>@enderror
+
+    {{-- (WP-9.4 · §7.10) فاحصُ اتصالٍ — لم يكن له فاحصٌ قطّ: يُحفظ الرابطُ ثم
+         يُفتح في لسانٍ جديد ليُعرف إن كان المثيلُ حيّاً. الفحصُ يمرّ بحارس
+         الطلبات الصادرة، ويقول الرمزَ والزمنَ ورسالةً مطموسة. --}}
+    <form method="POST" action="{{ route('integrations.n8n.test') }}" style="margin-top:10px">
+        @csrf<button class="btn sm" @disabled(! $url)>🔌 اختبر الاتصال الآن</button>
+        @if (! $url)<span class="sub">— احفظ الرابطَ أولاً</span>@endif
+    </form>
 </div>
 
 {{-- ═ الجسر ═ --}}

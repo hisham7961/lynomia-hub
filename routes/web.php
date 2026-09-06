@@ -516,7 +516,8 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/integrations/odoo/defaults', [\App\Http\Controllers\Web\OdooConnectionController::class, 'defaults'])->name('integrations.odoo.defaults');
     Route::put('admin/integrations/odoo/{id}', [\App\Http\Controllers\Web\OdooConnectionController::class, 'update'])->name('integrations.odoo.update');
     Route::post('admin/integrations/odoo/{id}/toggle', [\App\Http\Controllers\Web\OdooConnectionController::class, 'toggle'])->name('integrations.odoo.toggle');
-    Route::post('admin/integrations/odoo/{id}/test', [\App\Http\Controllers\Web\OdooConnectionController::class, 'test'])->name('integrations.odoo.test');
+    // (WP-9.4 · §7.10) كلُّ نقرةٍ تطرق خادماً خارجياً — خنقٌ كي لا يصير الزرُّ مسبارَ منافذ
+    Route::post('admin/integrations/odoo/{id}/test', [\App\Http\Controllers\Web\OdooConnectionController::class, 'test'])->name('integrations.odoo.test')->middleware('throttle:10,1');
     Route::delete('admin/integrations/odoo/{id}', [\App\Http\Controllers\Web\OdooConnectionController::class, 'destroy'])->name('integrations.odoo.destroy');
     Route::get('admin/webhooks', [WebhookController::class, 'index'])->name('webhooks.index');
     Route::post('admin/webhooks', [WebhookController::class, 'store'])->name('webhooks.store');
@@ -540,7 +541,7 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/security/users/{id}/revoke', [SecurityController::class, 'revokeUser'])->name('security.user.revoke');
     Route::get('admin/settings', [SettingController::class, 'edit'])->name('settings.edit');
     Route::post('admin/settings', [SettingController::class, 'update'])->name('settings.update');
-    Route::post('admin/settings/odoo-test', [SettingController::class, 'odooTest'])->name('settings.odoo.test');
+    Route::post('admin/settings/odoo-test', [SettingController::class, 'odooTest'])->name('settings.odoo.test')->middleware('throttle:10,1');   // (WP-9.4 · §7.10)
     Route::get('admin/flows', [FlowController::class, 'index'])->name('flows.index');
     Route::post('admin/flows', [FlowController::class, 'store'])->name('flows.store');
     Route::post('admin/flows/bulk', [FlowController::class, 'bulk'])->name('flows.bulk');
@@ -656,4 +657,34 @@ Route::middleware('auth')->group(function () {
     // (WP-5.5) محلّلُ تغطية التدقيق — الحارس في المتحكّم (مالكٌ فقط): الصفحةُ
     // خريطةُ ما يُدقَّق وما لا يُدقَّق، وهي لغير المالك خريطةُ ما لا يترك أثراً
     Route::get('admin/audit/coverage', [AuditController::class, 'coverage'])->name('audit.coverage');
+
+    // ── Control Plane: Phase 9 ──
+    // (WP-9.4 · §7.11) تصديرُ الإعدادات: مالكٌ (الحارس في المتحكّم) + مفتاحُ تجميد
+    // التصدير (٤٢٣) + أثرٌ يُصنَّف DATA_EXPORT. وحدُّ معدلٍ لأنه سحبُ بياناتٍ جماعيّ
+    // كتصدير الوحدات — و**لا سرَّ ولا صفَّ حالةٍ** يخرج منه (القرارُ في `Settings`).
+    Route::get('admin/settings/export', [SettingController::class, 'export'])
+        ->name('settings.export')->middleware('throttle:20,1');
+    // (WP-9.4 · §7.12) الاستيرادُ خطوتان لا واحدة: الرفعُ يقرأ ويقارن ويَسِم الخطر
+    // **ولا يكتب**، والتطبيقُ فعلٌ ثانٍ بتأكيدٍ (وتصعيدِ هويةٍ إن كان في الحمولة
+    // مفتاحٌ عالي الخطورة) يمرّ بالكاتب الواحد بمصدر `import`.
+    Route::post('admin/settings/import', [SettingController::class, 'import'])
+        ->name('settings.import')->middleware('throttle:20,1');
+    Route::post('admin/settings/import/apply', [SettingController::class, 'importApply'])
+        ->name('settings.import.apply')->middleware('throttle:20,1');
+    // (WP-9.4 · §7.10) فاحصُ n8n — لم يكن له فاحصٌ قطّ. مالكٌ + حارسُ الطلبات
+    // الصادرة داخل الفاحص + خنقٌ كأخويه
+    Route::post('admin/integrations/n8n/test', [\App\Http\Controllers\Web\N8nController::class, 'test'])
+        ->name('integrations.n8n.test')->middleware('throttle:10,1');
+    // (WP-9.3 · §7.7 · §18) معاينةُ الحفظ: خطوةٌ **جافّة** تعيد «من ماذا إلى ماذا»
+    // لكل مفتاحٍ يتبدّل وتَسِم عاليَ الخطورة، وتُسلّم الحمولةَ عبر الجلسة إلى
+    // تأكيدٍ على سكّة `data-confirm` القائمة. مالكٌ (الحارس في المتحكّم)، ولا
+    // تصعيدَ لها: لا تكتب حرفاً، وما تعرضه معروضٌ في الشاشة نفسِها أصلاً.
+    Route::post('admin/settings/preview', [SettingController::class, 'preview'])
+        ->name('settings.preview')->middleware('throttle:60,1');
+    // (WP-9.3 · §7.8 · critic #7) استعادةُ الافتراضي: **كتابةُ** قيمة `default`
+    // المُعلَنة لا حذفُ الصفّ (حذفُه يُعيد إشعالَ `sec.hours_on`/`sec.strict_files`
+    // لأنّ افتراضيَّهما مُشغَّل). مالكٌ + تأكيدٌ في الشاشة + `hub_require_stepup`
+    // لعالي الخطورة + أثرٌ بفعلٍ مستقلّ (`SETTINGS_RESTORED`).
+    Route::post('admin/settings/restore', [SettingController::class, 'restore'])
+        ->name('settings.restore')->middleware('throttle:30,1');
 });

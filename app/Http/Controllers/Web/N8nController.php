@@ -4,8 +4,6 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Crypt;
 
 /**
  * **لوحةُ n8n في مركز التكامل** — n8n خدمةٌ منفصلة (Node) تعمل على خادمك (VPS)،
@@ -31,6 +29,22 @@ class N8nController extends Controller
         ]);
     }
 
+    /**
+     * (WP-9.4 · §7.10) **فاحصُ اتصالٍ لـn8n** — لم يكن له فاحصٌ قطّ: يُحفظ الرابطُ
+     * ثم يُفتح في لسانٍ جديد ليُعرف إن كان المثيلُ حيّاً. والفحصُ يمرّ بحارس
+     * الطلبات الصادرة (`hub_outbound_ok`) كسائر الوجهات الخارجية، ورسالتُه
+     * مطموسةٌ بالمُطهِّر، ومعه زمنُ الاستجابة — بالشكل نفسِه الذي يراه فاحصُ أودو.
+     */
+    public function test()
+    {
+        $this->gate();
+        $res = \App\Support\ConnectionProbe::n8n();
+
+        return $res['up'] === true
+            ? back()->with('ok', \App\Support\ConnectionProbe::line($res))
+            : back()->withErrors(['url' => \App\Support\ConnectionProbe::line($res)]);
+    }
+
     public function save(Request $r)
     {
         $this->gate();
@@ -48,14 +62,12 @@ class N8nController extends Controller
             }
         }
 
-        \App\Models\Setting::updateOrCreate(['key' => 'n8n.url'], ['value' => (string) ($d['url'] ?? '')]);
-        // المفتاح: فارغٌ يُبقي المخزون؛ والمكتوب يُشفَّر (enc:)
-        if (filled($d['key'] ?? null)) {
-            \App\Models\Setting::updateOrCreate(['key' => 'n8n.key'],
-                ['value' => 'enc:' . Crypt::encryptString($d['key'])]);
-        }
-        Cache::forget('settings:all');
-        hub_audit('تعديل إعدادات النظام', 'settings', null, 'n8n.* — من مركز التكامل');
+        // (WP-9.2) على الكاتب الواحد: التشفيرُ والإبطالُ والتدقيقُ وصفُّ التاريخ عنده
+        \App\Support\Settings::batch('n8n', function () use ($d) {
+            \App\Support\Settings::put('n8n.url', (string) ($d['url'] ?? ''), 'n8n');
+            // المفتاح: فارغٌ يُبقي المخزون؛ والمكتوب يُشفَّر (enc:) عند الكاتب
+            if (filled($d['key'] ?? null)) \App\Support\Settings::put('n8n.key', $d['key'], 'n8n');
+        }, ['name' => 'n8n.* — من مركز التكامل']);
 
         return back()->with('ok', 'حُفظ ربط n8n — افتح لوحته من الزر أعلاه');
     }

@@ -35,13 +35,14 @@ class HubImportJson extends Command
 
         $modules = config('hub.modules');
         $total = 0;
+        $rejected = [];   // إعداداتٌ خالفت قاعدةَ الكتالوج فلم تُستعَد — تُقال لا تُبتلع
 
         // **‎--truncate كان معلَناً ولا يُقرأ**: من يستعيد نسخةً ظنّاً أنها
         // تستبدل القاعدة كان يحصل على دمجٍ صامت — سجلاتٌ قديمة تبقى مختلطةً
         // بالمستعادة، فتتضاعف الفواتير ويعود عميلٌ حُذف عمداً.
         $truncate = (bool) $this->option('truncate');
 
-        DB::transaction(function () use ($db, $modules, &$total, $truncate) {
+        DB::transaction(function () use ($db, $modules, &$total, $truncate, &$rejected) {
             if ($truncate) {
                 foreach ($modules as $key => $def) {
                     if ($key === 'users') continue;
@@ -123,18 +124,27 @@ class HubImportJson extends Command
                 $this->info("✓ {$t}: " . count($clean));
             }
 
-            // الإعدادات
-            foreach ((array) ($db['settings'] ?? []) as $k => $v) {
-                DB::table('settings')->updateOrInsert(['key' => $k],
-                    ['value' => json_encode($v, JSON_UNESCAPED_UNICODE), 'created_at' => now(), 'updated_at' => now()]);
-            }
+            // **الإعدادات** (WP-9.2): كانت تُكتب هنا خاماً — بلا تحقّقٍ من
+            // قواعد الكتالوج وبلا أثرِ تدقيقٍ إطلاقاً. فملفُّ نسخةٍ مُعدَّل كان
+            // يقلب سياسةَ أمنٍ في الاستعادة و**لا يعرف أحدٌ أن شيئاً تغيّر**.
+            // الآن على الكاتب الواحد: تحقّقٌ، وتشفيرٌ للحسّاس، وإبطالُ خبيئة،
+            // وقيدُ تدقيقٍ واحد، وصفُّ تاريخٍ لكل مفتاح.
+            \App\Support\Settings::batch('import', function () use ($db, &$rejected) {
+                foreach ((array) ($db['settings'] ?? []) as $k => $v) {
+                    try {
+                        \App\Support\Settings::put((string) $k, $v, 'import', 'استعادة نسخة (hub:import)');
+                    } catch (\InvalidArgumentException $e) {
+                        // قيمةٌ لا تسري لا تُخزَّن بصمت: تُذكر في المخرَج ويُكمَل
+                        $rejected[] = $k . ' — ' . $e->getMessage();
+                    }
+                }
+            }, ['name' => 'استعادة الإعدادات من نسخة (hub:import)']);
         });
 
-        // الإعدادات المستعادة تسري فوراً — لا تعمل المنشأة بإعدادات ما قبل
-        // الاستعادة من الخبيئة حتى تنتهي صلاحيتها (النسخ نفسه يفعلها، والاستيراد كان ينساها)
-        \Illuminate\Support\Facades\Cache::forget('settings:all');
+        // ولا `Cache::forget('settings:all')` هنا: الكاتبُ الواحد يُبطلها عند كل كتابة
 
         $this->info("تم الاستيراد: $total سجل.");
+        foreach ($rejected as $why) $this->warn('⚠️ إعدادٌ مرفوض ولم يُستعَد: ' . $why);
 
         // **سلسلةُ التدقيق بعد الاستعادة**: سجلاتُ `audits` تُستعاد ببصماتها القديمة
         // (`hash`/`prev_hash` من القاعدة المصدر) بينما رأسُ السلسلة (`audit_chain`)

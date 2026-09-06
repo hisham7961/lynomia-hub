@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\OdooConnection;
 use App\Support\Odoo;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 
@@ -113,23 +112,29 @@ class OdooConnectionController extends Controller
             . ($c->active ? '' : ' — المشاريع المرتبطة به سترى سببَ التعطّل لا أرقاماً'));
     }
 
+    /**
+     * (WP-9.4 · §7.10) اختبارُ اتصالٍ — **على الفاحص الواحد** `ConnectionProbe`.
+     *
+     * كان هنا فاحصٌ وفي شاشة الإعدادات فاحصٌ آخر لاتصالٍ من الطبيعة نفسِها،
+     * وكلاهما يعيد `$e->getMessage()` خاماً إلى الشاشة. الرسالةُ الآن مطموسةٌ
+     * بالمُطهِّر ومعها زمنُ الاستجابة، والشكلُ واحدٌ للشاشتين.
+     */
     public function test(string $id): RedirectResponse
     {
         $this->gate();
         $c = OdooConnection::findOrFail($id);
 
-        try {
-            $cli = Odoo::for($c);
-            $ver = $cli->serverVersion();
-            $uid = $cli->login();
-        } catch (\Throwable $e) {
+        $res = \App\Support\ConnectionProbe::odoo($c);
+        if ($res['up'] !== true) {
             // الفشل لا يمسّ آخر نجاحٍ مسجَّل — التاريخ يبقى صادقاً
-            return back()->withErrors(['conn' => 'فشل اختبار «' . $c->name . '»: ' . $e->getMessage()]);
+            return back()->withErrors(['conn' => 'اختبار «' . $c->name . '» — '
+                . \App\Support\ConnectionProbe::line($res)]);
         }
 
-        $c->forceFill(['last_ok_at' => now(), 'last_version' => $ver])->save();
+        $c->forceFill(['last_ok_at' => now(),
+            'last_version' => hub_str($res['detail']['version'] ?? '')])->save();
 
-        return back()->with('ok', "✅ الاتصال ناجح — أودو {$ver} · معرف المستخدم {$uid}");
+        return back()->with('ok', '«' . $c->name . '» — ' . \App\Support\ConnectionProbe::line($res));
     }
 
     public function destroy(string $id): RedirectResponse
@@ -168,16 +173,15 @@ class OdooConnectionController extends Controller
             ]);
         }
 
-        \App\Models\Setting::updateOrCreate(['key' => 'odoo.url'], ['value' => $d['url']]);
-        \App\Models\Setting::updateOrCreate(['key' => 'odoo.db'], ['value' => $d['db']]);
-        \App\Models\Setting::updateOrCreate(['key' => 'odoo.user'], ['value' => $d['username']]);
-        // مفتاحٌ فارغ يُبقي المخزون — والمكتوب يُشفَّر كما تفعل شاشة الإعدادات
-        if (filled($d['key'] ?? null)) {
-            \App\Models\Setting::updateOrCreate(['key' => 'odoo.key'],
-                ['value' => 'enc:' . \Illuminate\Support\Facades\Crypt::encryptString($d['key'])]);
-        }
-        Cache::forget('settings:all');   // كاش أودو يتدوّر ببصمة الاعتماد في مفتاحه
-        hub_audit('تعديل إعدادات النظام', 'settings', null, 'odoo.* — من مركز التكاملات');
+        // (WP-9.2) على الكاتب الواحد — والإبطالُ عنده (كاشُ أودو نفسُه يتدوّر
+        // ببصمة الاعتماد في مفتاحه، فلا نسفَ يدويّاً له)
+        \App\Support\Settings::batch('odoo', function () use ($d) {
+            \App\Support\Settings::put('odoo.url', $d['url'], 'odoo');
+            \App\Support\Settings::put('odoo.db', $d['db'], 'odoo');
+            \App\Support\Settings::put('odoo.user', $d['username'], 'odoo');
+            // مفتاحٌ فارغ يُبقي المخزون — والمكتوب يُشفَّر عند الكاتب كما من شاشة الإعدادات
+            if (filled($d['key'] ?? null)) \App\Support\Settings::put('odoo.key', $d['key'], 'odoo');
+        }, ['name' => 'odoo.* — من مركز التكاملات']);
 
         return back()->with('ok', 'حُفظ الاتصال الافتراضي — اختبره الآن');
     }
