@@ -16,11 +16,20 @@ class SupportController extends Controller
         abort_unless(hub_can(auth()->user(), 'tickets', 'v'), 403);
 
         // التذاكر المفتوحة + أول رد لكل واحدة باستعلام واحد
-        $open = hub_scope(Ticket::query()->whereNull('deleted_at'), 'tickets')
+        $openQ = fn () => hub_scope(Ticket::query()->whereNull('deleted_at'), 'tickets')
             // NULL NOT IN يُقيَّم «مجهولاً» لا «صحيحاً» على المحرّكين معاً، فتذكرةٌ
             // بلا حالة كانت تسقط من اللوحة صامتةً: لا أحد يردّ ولا شيء يقول لماذا (v2.324)
-            ->where(fn ($q) => $q->whereNull('status')->orWhereNotIn('status', $this->closed))
-            ->orderBy('created_at')->orderBy('id')->limit(60)->get();
+            ->where(fn ($q) => $q->whereNull('status')->orWhereNotIn('status', $this->closed));
+
+        /*
+         * (WP-8.4) **العدّادُ يُعَدّ، والطابورُ يُعرَض.** كان «تذاكر مفتوحة»
+         * يُقرأ من `$queue->count()` — أي من صفحةٍ محدودةٍ بستّين صفّاً: منشأةٌ
+         * عليها ٢٣٠ تذكرةً مفتوحة تقرأ «٦٠» وتطمئنّ. والرقمُ الناقصُ الذي يبدو
+         * كاملاً أخطرُ من الغائب لأنّ قارئَه لا يعرف أن يشكّ فيه. العدُّ الآن
+         * `COUNT(*)` على المرشِّح نفسِه، والمعروضُ يُعلَن على حِدة (`shown`/`capped`).
+         */
+        $openTotal = (int) $openQ()->count();
+        $open = $openQ()->orderBy('created_at')->orderBy('id')->limit(60)->get();
 
         $firstReplies = DB::table('comments')->where('module', 'tickets')
             ->whereIn('record_id', $open->pluck('id'))->whereNull('deleted_at')
@@ -34,7 +43,11 @@ class SupportController extends Controller
         })->sortBy(fn ($t) => $t->sla['resDue'])->values();
 
         $kpi = [
-            'open'     => $queue->count(),
+            'open'     => $openTotal,
+            // ما يعرضه الطابور فعلاً — عدّادا التأخّر أدناه محسوبان على هذه
+            // الصفحة وحدَها، فيُعلَن حجمُها بدل أن يُقرأ الجزءُ كأنه الكلّ
+            'shown'    => $queue->count(),
+            'capped'   => $openTotal > $queue->count(),
             'respLate' => $queue->filter(fn ($t) => $t->sla['respPending'] && $t->sla['respLate'])->count(),
             'resLate'  => $queue->filter(fn ($t) => $t->sla['resLate'])->count(),
         ];

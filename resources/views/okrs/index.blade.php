@@ -39,6 +39,58 @@
     <div class="stat"><span class="ico">🤖</span><b>{{ $b['auto'] }}</b><span>هدفاً يقرأ قيمه آلياً</span></div>
 </div>
 
+{{-- عدّاداتُ الأعلام (WP-8.5 · §47) — كلٌّ منها **محسوبٌ من عمودٍ حقيقي** لا
+     مكتوب: الاستحقاق من `due`، والتعثّرُ حالةٌ معلَنة في السجل، والركودُ من
+     آخر قراءةٍ آليّة (`key_results.read_at`) أو آخر تثبيتٍ (`objectives.computed_at`). --}}
+<div class="cards">
+    <div class="stat"><span class="ico">⏰</span><b class="{{ $b['overdue'] ? 'txt-bad' : '' }}">{{ $b['overdue'] }}</b>
+        <span>فات موعدَه ولم يكتمل</span></div>
+    <div class="stat"><span class="ico">🧱</span><b class="{{ $b['blocked'] ? 'txt-bad' : '' }}">{{ $b['blocked'] }}</b>
+        <span>متعثّر (حالةٌ معلَنة)</span></div>
+    <div class="stat"><span class="ico">🕸️</span><b class="{{ $b['stalled'] ? 'txt-bad' : '' }}">{{ $b['stalled'] }}</b>
+        <span>راكد — بلا قياسٍ منذ {{ $b['stallDays'] }} أيام</span></div>
+</div>
+
+{{-- ما يحتاج نظرةً الآن + فعلُ المعالجة (§6.13): زرٌّ يفتح **مهمّةً** في نظام
+     المهامّ القائم، بذاكرةٍ تمنع التكرار — لا جدولَ إجراءاتٍ تصحيحية ثانياً. --}}
+@if (count($b['attention']))
+    <div class="card">
+        <h3 class="cardtitle">🚩 أهدافٌ تحتاج معالجة</h3>
+        <div class="tblwrap"><table class="tbl">
+            <thead><tr><th scope="col">الهدف</th><th scope="col">المستوى</th><th scope="col">المالك</th>
+                <th scope="col">الإنجاز</th><th scope="col">العلَم</th><th scope="col">المعالجة</th></tr></thead>
+            <tbody>
+            @foreach ($b['attention'] as $r)
+                @php $o = $r['o']; @endphp
+                <tr>
+                    <td><a href="{{ route('m.show', ['okrs', $o->id]) }}">{{ $o->title }}</a>
+                        @if ($r['project'])<div class="sub">{{ $r['project'] }}</div>@endif</td>
+                    <td class="sub">{{ $r['level'] }}{{ $o->period ? ' · ' . $o->period : '' }}</td>
+                    <td class="sub">{{ $r['owner'] ?: '—' }}</td>
+                    <td><b>{{ $r['pct'] === null ? '—' : $r['pct'] . '٪' }}</b></td>
+                    <td>
+                        @if ($r['overdue'])<span class="bdg bad">فات موعدَه</span>@endif
+                        @if ($r['blocked'])<span class="bdg bad">متعثّر</span>@endif
+                        @if ($r['stalled'])<span class="bdg wn">راكد</span>@endif
+                    </td>
+                    <td>
+                        @if (hub_monitor() && hub_can(auth()->user(), 'tasks', 'a'))
+                            <form method="POST" action="{{ route('remediation.store') }}">@csrf
+                                <input type="hidden" name="kind" value="okr">
+                                <input type="hidden" name="ref" value="{{ $o->id }}">
+                                <button class="btn ghost xs" title="تفتح مهمّةً واحدةً لهذا الهدف — والنقرة الثانية تُعيدك إليها">🛠 مهمّة معالجة</button>
+                            </form>
+                        @else
+                            <span class="sub">—</span>
+                        @endif
+                    </td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table></div>
+    </div>
+@endif
+
 @forelse ($b['rows'] as $r)
     @php $o = $r['o']; $p = $r['p']; @endphp
     <div class="card" @if (($p['tone'] ?? '') === 'bad') style="border-inline-start:4px solid var(--bad,#c0392b)" @endif>
@@ -48,7 +100,7 @@
                     <a href="{{ route('m.show', ['okrs', $o->id]) }}">{{ $o->title }}</a>
                 </h3>
                 <div class="sub">
-                    {{ $o->level ?: '—' }}{{ $o->period ? ' · ' . $o->period : '' }}
+                    {{ $o->level ?: '—' }}{{ $o->period ? ' · ' . $o->period : '' }}{{ ! empty($r['owner']) ? ' · 👤 ' . $r['owner'] : '' }}{{ ! empty($r['project']) ? ' · 🚀 ' . $r['project'] : '' }}
                     @if ($o->due) · ينتهي {{ substr((string) $o->due, 0, 10) }}
                         @if (($p['daysLeft'] ?? null) !== null)
                             <span class="{{ $p['daysLeft'] < 0 ? 'txt-bad' : '' }}">({{ $p['daysLeft'] < 0 ? 'متأخر ' . abs($p['daysLeft']) . ' يوماً' : 'بقي ' . $p['daysLeft'] . ' يوماً' }})</span>

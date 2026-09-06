@@ -43,6 +43,34 @@ class ExecutionStats
     /** عتبةُ «تأخّرٌ كثيف»: موظفٌ عليه هذا العددُ فأكثر من المهام الفائتةِ موعدَها */
     public const HEAVY_OVERDUE_MIN = 3;
 
+    // ── Control Plane: Phase 8 (WP-8.4) — ثوابتُ تحليلات التنفيذ ──
+    /**
+     * مفردةُ التوقّف في وحدة المهامّ (`config/hub.php`) — **مكتوبةٌ مرّةً واحدة**:
+     * يقرؤها عدّادُ «متوقّف» في §6.5 وبطاقةُ الانتظار في قارئ الاختناقات معاً،
+     * فلا تنزلق نسخةٌ عن أختها إن تغيّرت المفردة.
+     */
+    public const PAUSED_STATUS = 'متوقفة';
+
+    /** سقفُ صفوف جدول المشاريع (§6.6) وسقفُ عيّنة زمن الدورة (§6.7) — يُعلَنان للقارئ */
+    public const PROJECTS_TABLE_CAP = 60;
+    public const CYCLE_SAMPLE_CAP = 500;
+
+    /** مقاييسُ لقطة التنفيذ اليومية (§6.12) — بهذا الترتيب في العرض */
+    public const SNAPSHOT_METRICS = ['completion_pct', 'ontime_pct', 'overdue', 'open_issues'];
+
+    /** نافذةُ اللقطة اليومية: نسبتا الإنجاز والالتزام تُقاسان على شهرٍ لا على يوم */
+    public const SNAPSHOT_RANGE = '30d';
+
+    /**
+     * **قاعدةُ خطر المشروع مكتوبةً لا مضمَرة** (§6.1: لا درجةَ مركّبةٌ بلا رياضياتٍ
+     * موثَّقة): الخطرُ عددُ الأعلام المرصودة في الصفّ نفسِه، وكلُّ علَمٍ يساوي
+     * استعلامَه المرجعيّ في العمود المجاور — فما من رقمٍ مخترعٍ يختبئ خلف لون.
+     */
+    public const RISK_RULE = 'خطرُ المشروع عددُ الأعلام المرصودة في صفّه: مهامُّ متأخّرة · مهامُّ متوقفة · معوّقاتٌ مبلَّغة. بلا علَمٍ ⇒ معلوماتي، وعلَمٌ ⇒ متوسط، وعلَمان ⇒ مرتفع، وثلاثةٌ ⇒ حرج. لا درجةَ مركّبةٌ ولا وزنَ مخترع.';
+
+    /** خريطةُ عدد الأعلام إلى درجة `Severity` — الرياضياتُ في RISK_RULE حرفياً */
+    protected const RISK_LEVELS = [0 => 'info', 1 => 'medium', 2 => 'high', 3 => 'critical'];
+
     // ── Control Plane: Phase 7 (WP-7.3) — ثوابتُ إسقاط الأشخاص ──
     /** سقفُ عيّنة قياس زمن الحل وعيّنة الاعتمادات المعلّقة في القراءة الجَماعية */
     public const PEOPLE_SAMPLE_CAP = 2000;
@@ -83,25 +111,14 @@ class ExecutionStats
             ->where('last_seen_at', '>=', now()->startOfDay())
             ->distinct()->count('user_id');
 
-        // ٢+٤) أُنجز في النافذة + الالتزامُ بالموعد — من completed_at حصراً.
-        //    «في الموعد» = يومُ الإنجاز <= الموعد (المقارنةُ بالتاريخ لا باللحظة —
-        //    الموعدُ يومٌ كامل). DATE() تعمل على المحرّكين معاً.
-        $doneAgg = fn (TimeRange $w) => DB::table('tasks')
-            ->whereNull('deleted_at')->whereNotNull('completed_at')
-            ->tap(fn ($q) => $w->apply($q, 'completed_at'))
-            ->selectRaw('COUNT(*) n,
-                COALESCE(SUM(CASE WHEN due IS NOT NULL THEN 1 ELSE 0 END), 0) with_due,
-                COALESCE(SUM(CASE WHEN due IS NOT NULL AND DATE(completed_at) <= due THEN 1 ELSE 0 END), 0) on_time')
-            ->first();
-        $dCur = $doneAgg($r);
-        $dPrev = $doneAgg($prev);
-        $pct = fn ($agg) => (int) $agg->with_due > 0
-            ? (int) round((int) $agg->on_time * 100 / (int) $agg->with_due) : null;
+        // ٢+٤) أُنجز في النافذة + الالتزامُ بالموعد — من completed_at حصراً،
+        //    بتعريفٍ **واحدٍ مشترك** (`doneAgg`/`onTimePct`) تقرؤه هذه الشاشةُ
+        //    ولوحُ التنفيذ (§6.5) معاً فلا يتباعد رقمان لمعنىً واحد.
+        $dCur = self::doneAgg($r);
+        $dPrev = self::doneAgg($prev);
 
-        // ٣) متأخّرٌ الآن — مفتوحةٌ فات موعدُها (لقطةُ اللحظة لا نافذة):
-        //    المدى `< اليوم` لا whereDate — والملغاةُ خارجةٌ عبر hub_closed_states.
-        $overdue = (int) hub_open_scope(DB::table('tasks')->whereNull('deleted_at'))
-            ->whereNotNull('due')->where('due', '<', $today)->count();
+        // ٣) متأخّرٌ الآن — لقطةُ اللحظة بتعريفٍ واحدٍ مشترك كذلك
+        $overdue = self::overdueNow($today);
 
         // ٥) تذاكرُ مفتوحةٌ الآن
         $openTickets = (int) hub_open_scope(DB::table('tickets')->whereNull('deleted_at'))->count();
@@ -147,7 +164,7 @@ class ExecutionStats
             'active_today' => $activeToday,
             'completed' => hub_compare((float) $dCur->n, (float) $dPrev->n),
             'on_time' => [
-                'pct' => $pct($dCur), 'prev_pct' => $pct($dPrev),
+                'pct' => self::onTimePct($dCur), 'prev_pct' => self::onTimePct($dPrev),
                 'on_time' => (int) $dCur->on_time, 'with_due' => (int) $dCur->with_due,
             ],
             'overdue' => $overdue,
@@ -673,7 +690,7 @@ class ExecutionStats
         // تذاكرُ «بانتظار العميل» ومهامُّ «متوقفة» الآن — الحالتان مفردتا وحدتيهما
         // في سجل الوحدات (config/hub.php) لا قائمةٌ حرّةٌ جديدة
         $tw = DB::table('tickets')->whereNull('deleted_at')->where('status', 'بانتظار العميل');
-        $tp = DB::table('tasks')->whereNull('deleted_at')->where('status', 'متوقفة');
+        $tp = DB::table('tasks')->whereNull('deleted_at')->where('status', self::PAUSED_STATUS);
 
         return [
             'approvals' => [
@@ -817,7 +834,7 @@ class ExecutionStats
     {
         $thr = now()->subDays(self::STALL_DAYS);
         $q = fn () => hub_open_scope(DB::table('tasks')->whereNull('deleted_at'))
-            ->where(fn ($w) => $w->whereNull('status')->orWhere('status', '<>', 'متوقفة'))
+            ->where(fn ($w) => $w->whereNull('status')->orWhere('status', '<>', self::PAUSED_STATUS))
             ->where('updated_at', '<', $thr);
 
         $n = (int) $q()->count();
@@ -891,5 +908,450 @@ class ExecutionStats
         }
 
         return $out;
+    }
+
+    // ════════ Control Plane: Phase 8 (WP-8.4) — تحليلاتُ التنفيذ ════════
+
+    /**
+     * **لوحُ التنفيذ كاملاً** (§6.5–§6.8 + §6.12): قراءةٌ واحدة يستهلكها تبويبُ
+     * «التنفيذ» في مركز الجودة — عدّاداتُ العمل، وجدولُ المشاريع بالجملة،
+     * وتدفّقُ المهامّ، وجودةُ التذاكر، واتّجاهُ اللقطة اليومية.
+     *
+     * تُستدعى خلف `hub_monitor()` + `hub_org_analytics_guard()` كإسقاط المنشأة
+     * (`org`) حرفياً: أرقامُها تجمع عبر الشركات كلِّها بلا تنطيق، فالحسابُ
+     * المعزول يُصَدّ في المتحكّم قبل الوصول هنا.
+     */
+    public static function center(TimeRange $r): array
+    {
+        return [
+            'range' => $r,
+            'summary' => self::executionSummary($r),
+            'projects' => self::projectExecution($r),
+            'flow' => self::taskFlow($r),
+            'tickets' => self::ticketQuality($r),
+            'history' => self::history(),
+        ];
+    }
+
+    /**
+     * §6.5 — عدّاداتُ التنفيذ: مخطّطٌ ومنجَزٌ ومفتوحٌ ومتأخّرٌ ومتوقّفٌ
+     * والإنجاز٪ والالتزام٪ والإنتاجية. **كلُّ رقمٍ يساوي استعلامَه المرجعيّ**
+     * ولا رقمَ مركّباً بلا رياضيات (§6.1):
+     *
+     *  - **المخطَّط** = المهامُّ التي يقع موعدُها (`due`) داخل أيام النافذة —
+     *    خطّةُ النافذة كما كُتبت، بأي حالةٍ كانت. و**الإنجاز٪** يُقاس على هذه
+     *    المجموعة نفسِها (كم منها خُتم إنجازُه) لا بقسمةِ مجموعتين مختلفتين
+     *    على بعضهما — فالنسبةُ تعني ما تقول.
+     *  - **المنجَز** = ما خُتم `completed_at` داخل النافذة (تعريفُ `org` نفسُه).
+     *  - **المفتوح/المتأخّر/المتوقّف** لقطاتُ اللحظة لا نوافذ: الراكدُ اليومَ
+     *    راكدٌ أيّاً كانت الكبسولة المختارة.
+     *  - **الإنتاجية** = المنجَزُ ÷ أيام النافذة (كسريّةً) — لا استقراءَ ولا تنعيم.
+     */
+    public static function executionSummary(TimeRange $r): array
+    {
+        $today = now()->toDateString();
+        [$lo, $hi] = self::dueBounds($r);
+
+        // المخطَّط وما أُنجز منه — تجميعٌ واحد على فهرس `tasks(due)`
+        $plan = DB::table('tasks')->whereNull('deleted_at')
+            ->whereNotNull('due')->where('due', '>=', $lo)->where('due', '<', $hi)
+            ->selectRaw('COUNT(*) n,
+                COALESCE(SUM(CASE WHEN completed_at IS NOT NULL THEN 1 ELSE 0 END), 0) done')
+            ->first();
+        $planN = (int) ($plan->n ?? 0);
+        $planDone = (int) ($plan->done ?? 0);
+
+        $d = self::doneAgg($r);
+        $completed = (int) $d->n;
+
+        return [
+            'range' => $r,
+            // بلا خطّةٍ لا نسبةَ إنجاز: `null` تقول «لا قياس»، والصفرُ يقول «فشلٌ تامّ»
+            'planned' => ['n' => $planN, 'done' => $planDone,
+                'pct' => $planN > 0 ? (int) round($planDone * 100 / $planN) : null],
+            'completed' => $completed,
+            'open' => (int) self::openTasks()->count(),
+            'overdue' => self::overdueNow($today),
+            'blocked' => (int) DB::table('tasks')->whereNull('deleted_at')
+                ->where('status', self::PAUSED_STATUS)->count(),
+            'on_time' => ['pct' => self::onTimePct($d),
+                'on_time' => (int) $d->on_time, 'with_due' => (int) $d->with_due],
+            'throughput' => self::throughput($completed, $r),
+        ];
+    }
+
+    /**
+     * §6.6 — جدولُ تنفيذ المشاريع **بتجميعٍ بالجملة**: أربعةُ استعلاماتٍ للجدول
+     * كلِّه مهما كثرت المشاريع. و`hub_project_health` **لا تُستدعى هنا**: سبعةُ
+     * استعلاماتٍ لكل صفٍّ تعني مئتين لثلاثين مشروعاً — والصحّةُ المركّبة لها
+     * مكانُها في بطاقة المشروع لا في جدولٍ عريض.
+     *
+     * وعمودُ المعوّقات من تجميع `work_updates.problems` القائم (ما كتبه الفريقُ
+     * فعلاً) لا من استنتاجٍ دلاليّ. والخطرُ أعلامٌ معدودةٌ بقاعدةٍ مكتوبة
+     * (`RISK_RULE`) لا درجةٌ مخترعة.
+     */
+    public static function projectExecution(TimeRange $r): array
+    {
+        $today = now()->toDateString();
+        $empty = ['rows' => [], 'n' => 0, 'of' => 0, 'capped' => false,
+                  'cap' => self::PROJECTS_TABLE_CAP, 'risk_rule' => self::RISK_RULE];
+
+        // ١) المشاريعُ المفتوحة — عيّنةٌ **معلَنةُ المعنى** (أحدثُها) بترتيبٍ حتميّ
+        $projects = hub_open_scope(DB::table('projects')->whereNull('deleted_at'))
+            ->orderByDesc('created_at')->orderByDesc('id')->limit(self::PROJECTS_TABLE_CAP)
+            ->get(['id', 'name', 'status', 'progress', 'manager_id']);
+        if ($projects->isEmpty()) return $empty;
+        $ids = $projects->pluck('id')->all();
+
+        // ٢) تجميعُ المهامّ لكل مشروع في استعلامٍ واحد: الإجمالي، والمنجَزُ في
+        //    النافذة، والمتأخّرُ الآن، والمتوقّفُ الآن. «المفتوح» داخل CASE يُبنى
+        //    من قاموس hub_closed_states نفسِه لا من قائمةٍ حرفيةٍ ثانية.
+        $closed = hub_closed_states();
+        $openExpr = 'status IS NULL OR status NOT IN (' . implode(',', array_fill(0, count($closed), '?')) . ')';
+        $tasks = DB::table('tasks')->whereNull('deleted_at')->whereIn('project_id', $ids)
+            ->selectRaw(
+                'project_id, COUNT(*) n,
+                 COALESCE(SUM(CASE WHEN completed_at IS NOT NULL AND completed_at >= ? AND completed_at < ? THEN 1 ELSE 0 END), 0) done_n,
+                 COALESCE(SUM(CASE WHEN (' . $openExpr . ') AND due IS NOT NULL AND due < ? THEN 1 ELSE 0 END), 0) late_n,
+                 COALESCE(SUM(CASE WHEN status = ? THEN 1 ELSE 0 END), 0) paused_n',
+                array_merge([$r->from->toDateTimeString(), $r->to->toDateTimeString()],
+                    $closed, [$today, self::PAUSED_STATUS]))
+            ->groupBy('project_id')->get()->keyBy('project_id');
+
+        // ٣) المعوّقاتُ المبلَّغة في النافذة — تجميعُ `work_updates.problems` القائم
+        $blockers = collect();
+        if (\Illuminate\Support\Facades\Schema::hasTable('work_updates')) {
+            $blockers = DB::table('work_updates')->whereNull('deleted_at')
+                ->whereIn('project_id', $ids)
+                ->whereNotNull('problems')->whereRaw("TRIM(problems) <> ''")
+                ->tap(fn ($q) => $r->apply($q))
+                ->selectRaw('project_id, COUNT(*) n')->groupBy('project_id')->pluck('n', 'project_id');
+        }
+
+        // ٤) أسماءُ المديرين دفعةً واحدة (لا استعلامَ لكل صف)
+        $owners = hub_ref_labels('users', $projects->pluck('manager_id')->filter()->all());
+
+        $rows = [];
+        foreach ($projects as $p) {
+            $t = $tasks[$p->id] ?? null;
+            $late = (int) ($t->late_n ?? 0);
+            $paused = (int) ($t->paused_n ?? 0);
+            $blk = (int) ($blockers[$p->id] ?? 0);
+
+            $flags = [];
+            if ($late > 0) $flags[] = 'مهامُّ متأخّرة';
+            if ($paused > 0) $flags[] = 'مهامُّ متوقفة';
+            if ($blk > 0) $flags[] = 'معوّقاتٌ مبلَّغة';
+
+            $rows[] = [
+                'id' => $p->id,
+                'name' => (string) $p->name,
+                'owner' => $p->manager_id ? ($owners[$p->manager_id] ?? null) : null,
+                'status' => $p->status !== null ? (string) $p->status : null,
+                'progress' => $p->progress !== null ? (float) $p->progress : null,
+                'tasks' => (int) ($t->n ?? 0),
+                'completed' => (int) ($t->done_n ?? 0),
+                'overdue' => $late,
+                'blocked' => $paused,
+                'blockers' => $blk,
+                'risk' => ['flags' => $flags, 'n' => count($flags),
+                           'sev' => self::RISK_LEVELS[count($flags)] ?? 'critical'],
+            ];
+        }
+
+        // الأشدُّ أولاً، والاسمُ فالمعرّفُ فاصلان حتميّان — لا قرعةَ محرّك
+        usort($rows, fn ($a, $b) => [
+            Severity::RANK[$b['risk']['sev']], $b['overdue'], $b['blockers'], $a['name'], $a['id'],
+        ] <=> [
+            Severity::RANK[$a['risk']['sev']], $a['overdue'], $a['blockers'], $b['name'], $b['id'],
+        ]);
+
+        return ['rows' => $rows, 'n' => count($rows), 'of' => $projects->count(),
+                'capped' => $projects->count() >= self::PROJECTS_TABLE_CAP,
+                'cap' => self::PROJECTS_TABLE_CAP, 'risk_rule' => self::RISK_RULE];
+    }
+
+    /**
+     * §6.7 — تدفّقُ المهامّ: أُنشئت، أُنجزت، أُعيد فتحُها، متأخّرة، زمنُ الدورة،
+     * الإنتاجية. وزمنُ الدورة بشكل `Delivery::leadTime`: **وسيطٌ بجانب المتوسّط**
+     * (مهمّةٌ عالقةٌ سنةً تسحب المتوسّطَ وحدَه) مع وسمِ عيّنةٍ معلَن — فما من رقمٍ
+     * جزئيٍّ يُقرأ كأنه الكلّ.
+     */
+    public static function taskFlow(TimeRange $r): array
+    {
+        $d = self::doneAgg($r);
+        $completed = (int) $d->n;
+
+        return [
+            'range' => $r,
+            'created' => (int) DB::table('tasks')->whereNull('deleted_at')
+                ->tap(fn ($q) => $r->apply($q))->count(),
+            'completed' => $completed,
+            'reopened' => self::reopenedTasks($r),
+            'overdue' => self::overdueNow(now()->toDateString()),
+            'cycle' => self::cycleTime($r),
+            'on_time' => ['pct' => self::onTimePct($d),
+                'on_time' => (int) $d->on_time, 'with_due' => (int) $d->with_due],
+            'throughput' => self::throughput($completed, $r),
+        ];
+    }
+
+    /**
+     * §6.8 — جودةُ التذاكر: فُتحت، حُلّت، الالتزام بـSLA٪، متوسّطُ أوّل ردٍّ
+     * ومتوسّطُ الحل، وإعادةُ الفتح. المهلُ من `hub_sla` (سياسةُ الإعدادات نفسُها
+     * التي تقرؤها لوحةُ الدعم) لا من عتبةٍ ثانيةٍ تُكتب هنا، وأوّلُ ردٍّ **غيرُ
+     * داخليّ** باستعلامٍ واحد لكل العيّنة.
+     *
+     * ولحظةُ الحل ختمُ `meta.resolved_at` حين وجوده وإلا آخرُ تعديل — وهو
+     * التقريبُ الذي تقرؤه الشاشاتُ اليوم حرفياً، ويُصرَّح به لا يُخفى.
+     *
+     * و**إعادةُ الفتح لقطةٌ تراكمية لا نافذة**: عدّادُ `meta.reopened` بلا ختمِ
+     * وقتٍ لكل ارتداد، فيُقرأ كما هو (`reopenedTickets`) ولا يُنسَب إلى النافذة
+     * زوراً — ونسبتُه إلى مدىً لم يُقَس فيه أسوأُ من غيابه.
+     */
+    public static function ticketQuality(TimeRange $r): array
+    {
+        $closedQ = fn () => hub_closed_scope(DB::table('tickets')->whereNull('deleted_at'))
+            ->tap(fn ($q) => $r->apply($q, 'updated_at'));
+
+        $rows = $closedQ()->orderBy('updated_at')->orderBy('id')->limit(self::SLA_SAMPLE_CAP)
+            ->get(['id', 'created_at', 'updated_at', 'priority', 'status', 'meta']);
+
+        $firsts = $rows->isEmpty() ? collect() : DB::table('comments')
+            ->where('module', 'tickets')->whereIn('record_id', $rows->pluck('id'))
+            ->whereNull('deleted_at')
+            ->where(fn ($q) => $q->where('internal', false)->orWhereNull('internal'))
+            ->select('record_id', DB::raw('MIN(created_at) as at'))->groupBy('record_id')
+            ->pluck('at', 'record_id');
+
+        $resp = [];
+        $res = [];
+        $met = 0;
+        foreach ($rows as $t) {
+            $s = hub_sla($t, $firsts[$t->id] ?? null);
+            $created = \Illuminate\Support\Carbon::parse($t->created_at);
+            if ($s['respAt']) $resp[] = abs($s['respAt']->diffInMinutes($created)) / 60;
+            if ($s['resAt']) {
+                $res[] = abs($s['resAt']->diffInMinutes($created)) / 60;
+                if (! $s['resLate']) $met++;
+            }
+        }
+
+        return [
+            'range' => $r,
+            'opened' => (int) DB::table('tickets')->whereNull('deleted_at')
+                ->tap(fn ($q) => $r->apply($q))->count(),
+            'resolved' => (int) $closedQ()->count(),
+            // الالتزام يُقاس على ما له لحظةُ حلٍّ فعلية — لا على ما لم يُقَس بعد
+            'sla' => ['pct' => $res ? (int) round($met * 100 / count($res)) : null,
+                'met' => $met, 'of' => count($res)],
+            'response' => self::hoursStat($resp),
+            'resolution' => self::hoursStat($res),
+            'reopened' => self::reopenedTickets(),
+            'sample' => $rows->count(),
+            'capped' => $rows->count() >= self::SLA_SAMPLE_CAP,
+            'cap' => self::SLA_SAMPLE_CAP,
+        ];
+    }
+
+    /**
+     * §6.12 — لقطةُ التنفيذ اليومية داخل `hub:quality-snapshot` القائم (لا أمرَ
+     * مجدولٌ ثانٍ ولا جدولَ جديد): `('execution','org',<metric>)` في
+     * `metric_points`. والنقطةُ معرَّفةٌ بـ(وحدة، سجل، مقياس، لحظة) فإعادةُ
+     * التشغيل في اليوم نفسِه **تُحدِّث** الصفَّ ولا تُنشئ ثانياً.
+     *
+     * و**ما لا يُقاس لا يُكتب صفراً**: بلا مهامٍّ مخطَّطةٍ لا نسبةَ إنجاز —
+     * والصفرُ المكتوبُ مكانَ «لا قياس» يرسم في السلسلة انهياراً لم يحدث.
+     *
+     * وتُعيد القراءةَ التي كتبتها كي يطبعها الأمرُ بلا حسابٍ ثانٍ.
+     */
+    public static function snapshot(?string $at = null, ?TimeRange $r = null): array
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('metric_points')) return [];
+
+        $t = $at ? \Illuminate\Support\Carbon::parse($at)->startOfDay() : now()->startOfDay();
+        // نافذةٌ ثابتةٌ لا تقرأ معاملات الطلب — اللقطةُ لا تتبدّل بكبسولةِ شاشة
+        $r = $r ?? TimeRange::fromRequest(new \Illuminate\Http\Request(), self::SNAPSHOT_RANGE);
+        $x = self::executionSummary($r);
+
+        $put = function (string $metric, ?float $v) use ($t) {
+            if ($v === null) return;
+            hub_metric_put('execution', 'org', $metric, $v, $t, 'auto');
+        };
+
+        $put('completion_pct', $x['planned']['pct'] === null ? null : (float) $x['planned']['pct']);
+        $put('ontime_pct', $x['on_time']['pct'] === null ? null : (float) $x['on_time']['pct']);
+        $put('overdue', (float) $x['overdue']);
+        $put('open_issues', (float) self::openIssues());
+
+        return $x;
+    }
+
+    /**
+     * تاريخُ التنفيذ من اللقطات — نقاطٌ مرتّبةٌ وفرقٌ بين طرفيها، بشكل
+     * `DataQuality::history`. **الفارغُ يبقى فارغاً**: قائمةُ نقاطٍ خالية
+     * و`delta = null` (نقطةٌ واحدة لا تصنع اتّجاهاً) — لا سلسلةَ أصفارٍ تُرسم
+     * هبوطاً لم يقع. واستعلامٌ واحدٌ للمقاييس الأربعة لا أربعة.
+     */
+    public static function history(int $days = 60): array
+    {
+        $out = ['days' => $days, 'metrics' => []];
+        foreach (self::SNAPSHOT_METRICS as $m) {
+            $out['metrics'][$m] = ['points' => [], 'first' => null, 'last' => null, 'delta' => null];
+        }
+        if (! \Illuminate\Support\Facades\Schema::hasTable('metric_points')) return $out;
+
+        $rows = DB::table('metric_points')->where('module', 'execution')->where('record_id', 'org')
+            ->whereIn('metric', self::SNAPSHOT_METRICS)
+            ->where('at', '>=', now()->subDays($days))
+            ->orderBy('metric')->orderBy('at')->orderBy('id')
+            ->get(['metric', 'value', 'at']);
+
+        foreach ($rows as $p) {
+            if (! isset($out['metrics'][$p->metric])) continue;
+            $out['metrics'][$p->metric]['points'][] = ['at' => $p->at, 'value' => (float) $p->value];
+        }
+        foreach (self::SNAPSHOT_METRICS as $m) {
+            $pts = $out['metrics'][$m]['points'];
+            $n = count($pts);
+            if (! $n) continue;
+            $out['metrics'][$m]['first'] = $pts[0]['value'];
+            $out['metrics'][$m]['last'] = $pts[$n - 1]['value'];
+            $out['metrics'][$m]['delta'] = $n > 1 ? round($pts[$n - 1]['value'] - $pts[0]['value'], 2) : null;
+        }
+
+        return $out;
+    }
+
+    /* ────────── تعريفاتُ الصدق المشتركة (يقرؤها `org` ولوحُ التنفيذ معاً) ────────── */
+
+    /**
+     * أُنجز في النافذة والتزامُه — من `completed_at` حصراً. «في الموعد» = يومُ
+     * الإنجاز <= الموعد (المقارنةُ بالتاريخ لا باللحظة — الموعدُ يومٌ كامل)،
+     * و`DATE()` تعمل على المحرّكين معاً.
+     */
+    protected static function doneAgg(TimeRange $w)
+    {
+        return DB::table('tasks')
+            ->whereNull('deleted_at')->whereNotNull('completed_at')
+            ->tap(fn ($q) => $w->apply($q, 'completed_at'))
+            ->selectRaw('COUNT(*) n,
+                COALESCE(SUM(CASE WHEN due IS NOT NULL THEN 1 ELSE 0 END), 0) with_due,
+                COALESCE(SUM(CASE WHEN due IS NOT NULL AND DATE(completed_at) <= due THEN 1 ELSE 0 END), 0) on_time')
+            ->first();
+    }
+
+    /** نسبةُ الالتزام من تجميع `doneAgg` — بلا مهامَّ ذاتِ موعدٍ لا نسبة (لا ١٠٠٪ مجانية) */
+    protected static function onTimePct($agg): ?int
+    {
+        return (int) $agg->with_due > 0
+            ? (int) round((int) $agg->on_time * 100 / (int) $agg->with_due) : null;
+    }
+
+    /** المهامُّ المفتوحةُ الآن — قاموسُ `hub_open_scope` لا قائمةُ حالاتٍ حرفية */
+    protected static function openTasks()
+    {
+        return hub_open_scope(DB::table('tasks')->whereNull('deleted_at'));
+    }
+
+    /**
+     * المتأخّرُ الآن — مفتوحةٌ فات موعدُها (لقطةُ اللحظة لا نافذة): المدى
+     * `< اليوم` لا `whereDate` على عمودٍ مفهرَس، والملغاةُ خارجةٌ بالقاموس.
+     */
+    protected static function overdueNow(string $today): int
+    {
+        return (int) self::openTasks()->whereNotNull('due')->where('due', '<', $today)->count();
+    }
+
+    /**
+     * حدُّ **أيام** النافذة لعمود تاريخٍ (`due`): [أوّلُ يومٍ، اليومُ التالي
+     * لآخرِ يوم) — مدىً سارغابل على فهرس `tasks(due)` بلا `whereDate`. والحدُّ
+     * الأعلى للنافذة حصريٌّ (`< to`) فيُؤخذ يومُ آخرِ لحظةٍ فيها لا يومُ `to`:
+     * وإلا لدخل في «المخطَّط» يومٌ كاملٌ خارج النافذة.
+     */
+    protected static function dueBounds(TimeRange $r): array
+    {
+        return [$r->from->toDateString(),
+                $r->to->copy()->subSecond()->startOfDay()->addDay()->toDateString()];
+    }
+
+    /** الإنتاجية: المنجَزُ ÷ أيام النافذة — قسمةٌ صريحة لا استقراء */
+    protected static function throughput(int $n, TimeRange $r): array
+    {
+        $days = max(0.0001, $r->days());
+
+        return ['n' => $n, 'days' => round($days, 2), 'per_day' => round($n / $days, 2),
+                'per_week' => round($n / $days * 7, 2)];
+    }
+
+    /**
+     * إعادةُ فتح المهامّ — **من تاريخ التدقيق لا من عمودٍ جديد**: قيدٌ ينقل
+     * الحالةَ من منتهيةٍ (`hub_closed_states`) إلى غيرِ منتهية هو إعادةُ فتحٍ
+     * بعينها. (لتذاكرِ الدعم عدّادٌ صريح `meta.reopened` يختمه ModuleController؛
+     * وللمهامّ لا عمودَ اليوم — فالحقيقةُ المتاحةُ هي الأثر، وتُقرأ كما هي.)
+     */
+    protected static function reopenedTasks(TimeRange $r): array
+    {
+        $closed = hub_closed_states();
+        $n = (int) DB::table('audits')->where('module', 'tasks')
+            ->whereNotNull('before->status')->whereNotNull('after->status')
+            ->whereIn('before->status', $closed)->whereNotIn('after->status', $closed)
+            ->tap(fn ($q) => $r->apply($q))
+            ->count();
+
+        return ['n' => $n, 'source' => 'audits'];
+    }
+
+    /**
+     * زمنُ الدورة أياماً (من الإنشاء إلى ختم الإنجاز) — عيّنةٌ **محدّدةُ المعنى**
+     * كما في `Delivery::leadTimeCalc`: أحدثُ ما أُنجز، بترتيبٍ حتميّ وسقفٍ معلَن،
+     * ووسيطٌ بجانب المتوسّط. وسجلٌّ متناقضٌ (أُنجز قبل أن يُنشأ) يُتجاهَل ولا يشوّه.
+     */
+    protected static function cycleTime(TimeRange $r): array
+    {
+        $rows = DB::table('tasks')->whereNull('deleted_at')->whereNotNull('completed_at')
+            ->tap(fn ($q) => $r->apply($q, 'completed_at'))
+            ->orderByDesc('completed_at')->orderByDesc('id')->limit(self::CYCLE_SAMPLE_CAP)
+            ->get(['created_at', 'completed_at']);
+
+        $days = [];
+        foreach ($rows as $t) {
+            if (! $t->created_at) continue;
+            $d = \Illuminate\Support\Carbon::parse($t->created_at)
+                ->diffInSeconds(\Illuminate\Support\Carbon::parse($t->completed_at)) / 86400;
+            if ($d < 0) continue;
+            $days[] = $d;
+        }
+        sort($days);
+        $n = count($days);
+        $out = ['n' => $n, 'avg' => null, 'median' => null, 'best' => null, 'worst' => null,
+                'capped' => $rows->count() >= self::CYCLE_SAMPLE_CAP, 'cap' => self::CYCLE_SAMPLE_CAP];
+        if (! $n) return $out;
+
+        $median = $n % 2 ? $days[intdiv($n, 2)] : ($days[$n / 2 - 1] + $days[$n / 2]) / 2;
+
+        return array_merge($out, [
+            'avg' => round(array_sum($days) / $n, 1), 'median' => round($median, 1),
+            'best' => round($days[0], 1), 'worst' => round($days[$n - 1], 1),
+        ]);
+    }
+
+    /** متوسّطٌ ووسيطٌ بالساعات لقائمةِ فوارق — والفارغُ `null` لا صفر */
+    protected static function hoursStat(array $hours): array
+    {
+        $n = count($hours);
+        if (! $n) return ['avg_h' => null, 'median_h' => null, 'n' => 0];
+        sort($hours);
+        $median = $n % 2 ? $hours[intdiv($n, 2)] : ($hours[$n / 2 - 1] + $hours[$n / 2]) / 2;
+
+        return ['avg_h' => round(array_sum($hours) / $n, 1), 'median_h' => round($median, 1), 'n' => $n];
+    }
+
+    /** المشاكلُ والمخاطرُ المفتوحةُ الآن (§6.12 «open issues») — بقاموس الحالات نفسِه */
+    protected static function openIssues(): int
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('issues')) return 0;
+
+        return (int) hub_open_scope(DB::table('issues')->whereNull('deleted_at'))->count();
     }
 }

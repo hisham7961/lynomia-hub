@@ -23,26 +23,35 @@
     <div class="stat"><span class="ico">🐞</span><b class="{{ $company['crit'] ? 'txt-bad' : '' }}">{{ $company['crit'] }}</b><span>أعطال حرجة مفتوحة</span></div>
 </div>
 
-{{-- الأهداف --}}
+{{-- الأهداف — النسبةُ **محسوبةٌ من نتائجها** (OkrCentre ⟵ hub_okr_progress) لا
+     مقروءةٌ من عمود `objectives.progress` المخزَّن: كانت هذه الشاشة تقرأ العمود
+     و/okrs تحسب، فيختلف رقمُ الهدف الواحد بين شاشتين وأحدُهما كاذبٌ حتماً. --}}
 <div class="card">
     <h3>🎯 الأهداف والنتائج (OKR)
-        @if (hub_can(auth()->user(), 'okrs', 'v'))<a class="btn ghost xs msauto" href="{{ route('m.index', 'okrs') }}">إدارة الأهداف ←</a>@endif
+        @if (hub_can(auth()->user(), 'okrs', 'v'))<a class="btn ghost xs msauto" href="{{ route('okrs.board') }}">مركز الأهداف ←</a>@endif
     </h3>
-    @forelse ($okrs as $level => $items)
+    <div class="sub" style="margin-bottom:8px">
+        {{ $okrs['n'] }} هدفاً · {{ $okrs['measured'] }} مقيساً ·
+        <b class="{{ $okrs['overdue'] ? 'txt-bad' : '' }}">{{ $okrs['overdue'] }}</b> فات موعدَه ·
+        <b class="{{ $okrs['blocked'] ? 'txt-bad' : '' }}">{{ $okrs['blocked'] }}</b> متعثّر ·
+        <b>{{ $okrs['stalled'] }}</b> راكد
+    </div>
+    @forelse ($okrs['levels'] as $level => $items)
         <h3 class="sub" style="margin:10px 0 6px">{{ $level === 'الشركة' ? '🏢' : ($level === 'قسم' ? '🗂️' : ($level === 'مشروع' ? '🚀' : '👤')) }} مستوى {{ $level }}</h3>
         <table class="mini">
-            @foreach ($items as $o)
+            @foreach ($items as $row)
+                @php $o = $row['o']; @endphp
                 <tr>
                     <td style="width:40%"><a href="{{ route('m.show', ['okrs', $o->id]) }}">{{ \Illuminate\Support\Str::limit($o->title, 46) }}</a>
-                        <div class="sub">{{ $o->period }}{{ $o->due ? ' · حتى ' . substr($o->due, 0, 10) : '' }}</div></td>
-                    <td><div class="pbar sm"><span style="width:{{ min(100, max(0, (int) ($o->progress ?? 0))) }}%"></span></div></td>
-                    <td class="acts"><b>{{ (int) ($o->progress ?? 0) }}٪</b></td>
+                        <div class="sub">{{ $o->period }}{{ $row['owner'] ? ' · ' . $row['owner'] : '' }}{{ $row['project'] ? ' · ' . $row['project'] : '' }}{{ $o->due ? ' · حتى ' . substr((string) $o->due, 0, 10) : '' }}</div></td>
+                    <td><div class="pbar sm"><span style="width:{{ min(100, max(0, (int) ($row['pct'] ?? 0))) }}%"></span></div></td>
+                    <td class="acts"><b>{{ $row['pct'] === null ? '—' : $row['pct'] . '٪' }}</b></td>
                     <td class="acts">@if ($o->status)<span class="bdg {{ hub_tone($o->status) }}">{{ $o->status }}</span>@endif</td>
                 </tr>
             @endforeach
         </table>
     @empty
-        <div class="sub" style="padding:14px;text-align:center">لا أهداف بعد — أنشئ أول هدف بمستواه (شركة/قسم/مشروع/موظف) ونسبة تقدمه</div>
+        <div class="sub" style="padding:14px;text-align:center">لا أهداف مفتوحة — أنشئ هدفاً بمستواه (شركة/قسم/مشروع/موظف) ونتائجَ رئيسية تُقاس منها نسبتُه</div>
     @endforelse
 </div>
 

@@ -22,6 +22,10 @@ use Illuminate\Support\Facades\Schema;
  *   • `status`   حالةٌ خارج خيارات الوحدة — انحرافُ بياناتٍ صامت
  *
  * وكل فحصٍ يحمل مفتاحه إلى شاشة الوحدة (`?qc=`)، فالنقص **يُفتح لا يُقرأ**.
+ *
+ * ولكلِّ فحصٍ **شدّةٌ** (`sev`) مشتقّةٌ من صنفه بمفردات `Severity` الواحدة — لا
+ * جدولَ شدّاتٍ ولا محرّكَ ثانٍ. بلا الشدّة كانت ستّمئةُ قاعدةٍ بمرتبةٍ واحدة،
+ * والترتيبُ بالعدد وحده يدفن مرجعاً ماليّاً مكسوراً تحت آلاف «بلا شركة».
  */
 class DataQuality
 {
@@ -31,6 +35,30 @@ class DataQuality
     /** أعمدةٌ يدل اسمها على انتهاء صلاحية */
     protected const EXPIRY_HINTS = ['expiry', 'expires', 'expire_at', 'date_end', 'end_date',
                                     'valid_to', 'renew_at', 'warranty_end', 'due'];
+
+    /**
+     * وحداتٌ يُسقِط كسرُ المرجع إليها المالَ أو المساءلة ⇒ **حرج** (spec §6.3:
+     * «broken financial reference · orphan security reference»). قيدٌ يشير إلى
+     * مستندٍ ماليٍّ محذوف يخرج من كل ميزان، وسجلٌّ يشير إلى مستخدمٍ محذوف لا
+     * يُسأل عنه أحد. و`purchases` مُدرَجةٌ وإن لم يشِر إليها حقلٌ اليوم — فالسجل
+     * ينمو، والقاعدةُ تسبق الحقل.
+     */
+    protected const CRITICAL_REFS = ['fin', 'contracts', 'purchases', 'users'];
+
+    /**
+     * شدّةُ كل صنفِ فحصٍ — الخريطةُ **بمفردات `Severity`** لا بسلّمٍ سادس:
+     *   • `ref`        مرجعٌ مكسور: بنيةٌ منقوضة ⇒ مرتفع (وحرجٌ إن كان هدفُه في CRITICAL_REFS)
+     *   • `req`        حقلٌ يشترطه النموذج وهو فارغ ⇒ مرتفع (spec: missing required business data)
+     *   • `blank_when` مطلوبٌ بشرطِ نوعِ المستند (فاتورةٌ بلا طرف) ⇒ مرتفع
+     *   • `mail|url|status` صيغةٌ أو حالةٌ خارج المعرَّف ⇒ متوسط (spec: invalid email/URL/state)
+     *   • `null|stale` عمودٌ اختياريٌّ فارغ (بلا شركة، بلا تاريخ انتهاء) وركودٌ ⇒ منخفض
+     * وspec §6.3 صريحة: **لا يُصنَّف كلُّ شيءٍ حرجاً** — إنذارٌ يصرخ دائماً لا يُسمَع.
+     */
+    protected const KIND_SEV = [
+        'ref' => 'high', 'req' => 'high', 'blank_when' => 'high',
+        'mail' => 'medium', 'url' => 'medium', 'status' => 'medium',
+        'null' => 'low', 'stale' => 'low',
+    ];
 
     /**
      * كل الفحوص الممكنة لوحدةٍ ما — من تعريفها في السجل.
@@ -128,7 +156,30 @@ class DataQuality
             }
         }
 
-        return $memo[$module] = $out + self::curated($module, $cols);
+        // الشدّةُ تُلحَق **في مكانٍ واحد** بالمشتقّ والمنتقى معاً — فأيُّ قاعدةٍ
+        // تُضاف غداً تولد بشدّةٍ ولا تظهر بمرتبة «بلا تصنيف».
+        $all = $out + self::curated($module, $cols);
+        foreach ($all as $k => $r) $all[$k]['sev'] = self::severity($r);
+
+        return $memo[$module] = $all;
+    }
+
+    /**
+     * شدّةُ قاعدةٍ من صنفها وهدفها — بمفردات `Severity` (spec §6.3).
+     *
+     * والمجهولُ يهبط إلى **الوسط** لا إلى أحد الطرفين: صنفٌ جديد لم يُصنَّف بعد
+     * إن جُعل «حرجاً» أطلق إنذاراً كاذباً يُدرَّب الناسُ على تجاهله، وإن جُعل
+     * «معلوماتياً» دُفن تحت السطر فلم يره أحد. الوسطُ يُبقيه مرئيّاً حتى يُصنَّف.
+     */
+    public static function severity(array $rule): string
+    {
+        $kind = (string) ($rule['kind'] ?? '');
+
+        if ($kind === 'ref' && in_array((string) ($rule['ref'] ?? ''), self::CRITICAL_REFS, true)) {
+            return 'critical';
+        }
+
+        return self::KIND_SEV[$kind] ?? 'medium';
     }
 
     /**
@@ -236,6 +287,15 @@ class DataQuality
             $byModule = [];
             $rows = 0;
             $bad = 0;
+            $sevAll = array_fill_keys(Severity::LEVELS, 0);
+
+            // الترتيبُ **بالشدّة قبل العدد**: خمسةُ آلافِ «بلا شركة» لا تسبق
+            // مرجعاً ماليّاً واحداً مكسوراً. وبعد الشدّة والعدد يُحسم التساوي
+            // بالوحدة ثم بالمفتاح — فترتيبُ الشاشة واحدٌ على المحرّكين.
+            $order = fn ($a, $b) => (Severity::rank($b['sev'] ?? '') <=> Severity::rank($a['sev'] ?? ''))
+                ?: ($b['count'] <=> $a['count'])
+                ?: (strcmp((string) $a['module'], (string) $b['module']))
+                ?: (strcmp((string) $a['key'], (string) $b['key']));
 
             foreach (hub_modules() as $mk => $def) {
                 $table = (string) ($def['table'] ?? '');
@@ -251,6 +311,7 @@ class DataQuality
                 $disp = hub_display_col($mk);
                 $modBad = 0;
                 $modChecks = [];
+                $modSev = array_fill_keys(Severity::LEVELS, 0);
 
                 foreach (self::rules($mk) as $rk => $rule) {
                     try {
@@ -267,24 +328,36 @@ class DataQuality
                     } catch (\Throwable $e) {
                     }
 
+                    $sev = (string) ($rule['sev'] ?? self::severity($rule));
+                    $modSev[$sev] = ($modSev[$sev] ?? 0) + $n;
+                    $sevAll[$sev] = ($sevAll[$sev] ?? 0) + $n;
+
                     $modBad += $n;
                     $modChecks[] = $rule + ['key' => $rk, 'module' => $mk, 'count' => $n,
-                                            'total' => $total, 'sample' => $sample];
+                                            'total' => $total, 'sample' => $sample, 'sev' => $sev];
                 }
 
                 if ($modChecks) {
-                    usort($modChecks, fn ($a, $b) => $b['count'] <=> $a['count']);
+                    usort($modChecks, $order);
                     $checks = array_merge($checks, $modChecks);
                 }
 
                 $bad += $modBad;
-                $byModule[$mk] = ['label' => $def['label'] ?? $mk, 'rows' => $total,
+                // `worst` = أشدُّ درجةٍ مأهولةٍ في الوحدة — عمودُ «بمَ نبدأ؟»
+                $worst = collect(Severity::LEVELS)->filter(fn ($l) => ($modSev[$l] ?? 0) > 0)
+                    ->sortByDesc(fn ($l) => Severity::rank($l))->first();
+                $byModule[$mk] = ['key' => $mk, 'label' => $def['label'] ?? $mk, 'rows' => $total,
                                   'defects' => $modBad, 'checks' => count($modChecks),
+                                  'sev' => $modSev, 'worst' => $worst,
                                   'score' => $total ? max(0, 100 - (int) round(min($modBad, $total) / $total * 100)) : 100];
             }
 
-            usort($checks, fn ($a, $b) => $b['count'] <=> $a['count']);
-            uasort($byModule, fn ($a, $b) => $a['score'] <=> $b['score']);
+            usort($checks, $order);
+            // الأسوأُ درجةً أولاً، ثم الأشدُّ نتائجَ حرجة، ثم المفتاح — لا قرعة
+            uasort($byModule, fn ($a, $b) => ($a['score'] <=> $b['score'])
+                ?: (($b['sev']['critical'] ?? 0) <=> ($a['sev']['critical'] ?? 0))
+                ?: ($b['defects'] <=> $a['defects'])
+                ?: strcmp((string) $a['key'], (string) $b['key']));
 
             return [
                 'checks' => $checks,
@@ -292,6 +365,8 @@ class DataQuality
                 'totals' => [
                     'rows' => $rows, 'defects' => $bad, 'checks' => count($checks),
                     'modules' => count($byModule),
+                    // عدّادُ الشدّة = مجموعُ سجلات الفحوص بتلك الشدّة، لا رقمٌ ثانٍ
+                    'sev' => $sevAll,
                     'clean' => count(array_filter($byModule, fn ($m) => $m['defects'] === 0)),
                     'score' => $rows ? max(0, 100 - (int) round(min($bad, $rows) / $rows * 100)) : 100,
                     'at' => now()->toDateTimeString(),
@@ -304,16 +379,133 @@ class DataQuality
      * لقطةٌ يومية في السلسلة الزمنية — بها وحدها يصير للجودة **تاريخٌ**:
      * ما تحسّن هذا الشهر، وكم عيباً أُغلق هذا الأسبوع. بلا لقطةٍ لا إنجاز
      * يُقاس، ورقمُ اليوم وحده لا يقول إن كنا نتقدّم أم نتراجع.
+     *
+     * وتُكتب نقطةٌ **لكل وحدة** لا لـ`org` وحدها (spec §6.11): درجةٌ واحدةٌ
+     * لثلاثٍ وسبعين وحدة تُجيب «هل تحسّنّا؟» ولا تُجيب أبداً «**أيُّ** وحدةٍ
+     * تتدهور؟» — والجوابُ بلا سلسلةٍ لكل وحدةٍ ادّعاءٌ لا حساب.
      */
     public static function snapshot(?string $at = null): void
     {
         if (! Schema::hasTable('metric_points')) return;
         $t = $at ? \Illuminate\Support\Carbon::parse($at) : now()->startOfDay();
-        $s = self::scan(true)['totals'];
+        $scan = self::scan(true);
+        $s = $scan['totals'];
 
         hub_metric_put('quality', 'org', 'score', (float) $s['score'], $t, 'auto');
         hub_metric_put('quality', 'org', 'defects', (float) $s['defects'], $t, 'auto');
         hub_metric_put('quality', 'org', 'clean_modules', (float) $s['clean'], $t, 'auto');
+
+        // مفتاحُ الوحدة يسع عمودَ `record_id` (أطولُ مفتاحٍ في السجل ١٢ حرفاً
+        // والعمود ٣٦) — وسابقةُ `org` قائمةٌ منذ أول لقطة. والوحداتُ الفارغة
+        // خارجَ `byModule` أصلاً: لا نكتب صفراً لوحدةٍ لم تُفحَص.
+        foreach ($scan['byModule'] as $mk => $m) {
+            hub_metric_put('quality', (string) $mk, 'defects', (float) $m['defects'], $t, 'auto');
+            hub_metric_put('quality', (string) $mk, 'score', (float) $m['score'], $t, 'auto');
+        }
+    }
+
+    /**
+     * اتّجاهُ كل وحدة من لقطاتها — «أيُّ الوحدات تتدهور؟ ما الذي تحسّن؟»
+     * (spec §6.11 · §47) **محسوباً** بفرقٍ بين نقطتين في السلسلة نفسِها.
+     *
+     * قاعدتان تحكمان الجواب:
+     *  • **بلا لقطتين لا اتّجاه**: `delta`/`dir` تبقى `null` — «صفرُ تغيّر»
+     *    جوابٌ كاذبٌ عن سؤالٍ لم يُقَس بعد، وبلا لقطةٍ واحدة تعود المصفوفة فارغة
+     *    فتُصارح الشاشة بدل أن تخترع.
+     *  • **العمرُ من أوّل نقطة**: `first_seen` أوّلُ لقطةٍ ظهر فيها نقصٌ في
+     *    الوحدة (بلا حدّ المدى — العمرُ لا تقصّه نافذةُ العرض)، و`age_days`
+     *    مسافتُها إلى اليوم؛ ووحدةٌ لم تعرف نقصاً قطُّ لا عمرَ لها (`null` لا صفر).
+     *
+     * @return array<string, array{key:string,label:string,points:int,defects:?int,was:?int,
+     *                             delta:?int,score:?int,score_delta:?int,dir:?string,
+     *                             first_seen:?string,age_days:?int}>
+     */
+    public static function moduleTrend(int $days = 60): array
+    {
+        if (! Schema::hasTable('metric_points')) return [];
+
+        // ١) **طرفا كل سلسلة بالتجميع** لا السلسلةُ كلُّها: ثلاثٌ وسبعون وحدةً ×
+        //    مقياسان × ستّون يوماً = نحوُ عشرةِ آلافِ صفٍّ تُسحب إلى الذاكرة عند كل
+        //    فتحةِ شاشةٍ لقراءة نقطتين. التجميعُ يردّها إلى صفٍّ لكل سلسلة.
+        $ends = DB::table('metric_points')->where('module', 'quality')
+            ->whereIn('metric', ['defects', 'score'])
+            ->where('at', '>=', now()->subDays($days))
+            ->groupBy('record_id', 'metric')->orderBy('record_id')->orderBy('metric')
+            ->get(['record_id', 'metric', DB::raw('MIN(at) as first_at'),
+                   DB::raw('MAX(at) as last_at'), DB::raw('COUNT(*) as n')]);
+        if ($ends->isEmpty()) return [];
+
+        // ٢) قيمُ تلك الأطراف وحدها — واللقطةُ اليومية تكتب كلَّ الوحدات بالطابع
+        //    نفسِه (`startOfDay`)، فالمجموعةُ طابعان في الغالب لا مئتان.
+        $stamps = $ends->flatMap(fn ($e) => [(string) $e->first_at, (string) $e->last_at])
+            ->unique()->values()->all();
+        $val = [];
+        foreach (DB::table('metric_points')->where('module', 'quality')
+            ->whereIn('metric', ['defects', 'score'])->whereIn('at', $stamps)
+            ->orderBy('at')->orderBy('id')->get(['record_id', 'metric', 'value', 'at']) as $v) {
+            $val[(string) $v->record_id][(string) $v->metric][self::stamp($v->at)] = (float) $v->value;
+        }
+
+        // ٣) أوّلُ رصدٍ فعليّ (نقصٌ > صفر) — باستعلامٍ مجمَّعٍ واحد لا واحدٍ لكل وحدة
+        $firstSeen = DB::table('metric_points')->where('module', 'quality')->where('metric', 'defects')
+            ->where('value', '>', 0)->groupBy('record_id')
+            ->pluck(DB::raw('MIN(at) as first_at'), 'record_id');
+
+        // فهرسةُ الأطراف مرّةً واحدة: (وحدة، مقياس) ⇒ الطرفان وعددُ النقاط
+        $idx = [];
+        foreach ($ends as $e) {
+            $rid = (string) $e->record_id;
+            if ($rid === 'org' || ! hub_mod($rid)) continue;      // `org` تجميعٌ لا وحدة
+            $m = (string) $e->metric;
+            $idx[$rid][$m] = ['n' => (int) $e->n,
+                              'first' => $val[$rid][$m][self::stamp($e->first_at)] ?? null,
+                              'last'  => $val[$rid][$m][self::stamp($e->last_at)] ?? null];
+        }
+
+        $out = [];
+        foreach ($idx as $mk => $metrics) {
+            $blank = ['n' => 0, 'first' => null, 'last' => null];
+            $d = $metrics['defects'] ?? $blank;
+            $sc = $metrics['score'] ?? $blank;
+            // نقطةٌ واحدة ⇒ لا فرق: «صفرُ تغيّر» جوابٌ عن سؤالٍ لم يُقَس بعد
+            $delta = $d['n'] > 1 && $d['first'] !== null && $d['last'] !== null
+                ? (int) round($d['last'] - $d['first']) : null;
+            $seen = $firstSeen[$mk] ?? null;
+
+            $out[$mk] = [
+                'key' => $mk,
+                'label' => hub_mod($mk)['label'] ?? $mk,
+                'points' => $d['n'],
+                'defects' => $d['last'] !== null ? (int) round($d['last']) : null,
+                'was' => $d['n'] > 1 && $d['first'] !== null ? (int) round($d['first']) : null,
+                'delta' => $delta,
+                'score' => $sc['last'] !== null ? (int) round($sc['last']) : null,
+                'score_delta' => $sc['n'] > 1 && $sc['first'] !== null && $sc['last'] !== null
+                    ? (int) round($sc['last'] - $sc['first']) : null,
+                // النقصُ ينزل ⇒ تحسّن، يصعد ⇒ تدهور، يثبت ⇒ استقرار
+                'dir' => $delta === null ? null : ($delta > 0 ? 'worsening' : ($delta < 0 ? 'improving' : 'stable')),
+                'first_seen' => $seen ? (string) $seen : null,
+                'age_days' => $seen ? (int) \Illuminate\Support\Carbon::parse($seen)->startOfDay()
+                    ->diffInDays(now()->startOfDay()) : null,
+            ];
+        }
+
+        // الأشدُّ تدهوراً أولاً، ثم الأكثرُ نقصاً، ثم المفتاح — والذي بلا اتّجاهٍ آخِراً
+        uasort($out, fn ($a, $b) => (($b['delta'] ?? PHP_INT_MIN) <=> ($a['delta'] ?? PHP_INT_MIN))
+            ?: (($b['defects'] ?? 0) <=> ($a['defects'] ?? 0))
+            ?: strcmp($a['key'], $b['key']));
+
+        return $out;
+    }
+
+    /**
+     * طابعُ لحظةٍ موحَّد للمطابقة بين استعلامَي التجميع والقيم — MIN/MAX تعودان
+     * نصّاً من المحرّك، وصيغةُ النصّ تختلف بين sqlite وMySQL. المطابقةُ على نصٍّ
+     * خامٍ **قرعةٌ** تُسقط القيمة صامتةً فتظهر الوحدةُ «بلا اتّجاه» وهي مقيسة.
+     */
+    protected static function stamp($at): string
+    {
+        return \Illuminate\Support\Carbon::parse($at)->format('Y-m-d H:i:s');
     }
 
     /** التاريخ: نقاطٌ مرتّبة + الفرق عن أول نقطةٍ في المدى */

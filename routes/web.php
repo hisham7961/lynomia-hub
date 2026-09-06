@@ -682,4 +682,22 @@ Route::middleware('auth')->group(function () {
     // وحدُّ معدلٍ لأن الصفحةَ تجميعاتٌ على الجداول الساخنة وفحصُ صحةِ مشاريع.
     Route::get('workforce/overview', [\App\Http\Controllers\Web\WorkforceController::class, 'overview'])
         ->name('workforce.overview')->middleware('throttle:60,1');
+
+    // ── Control Plane: Phase 8 ──
+    // (WP-8.5 · §6.13) فعلُ المعالجة: مدخلٌ واحدٌ لأربعة مصادر (نتيجةُ جودة ·
+    // مؤشّرٌ خارج الهدف · هدفٌ متعثّر · خرقُ SLA) يفتح **مهمّةً** في نظام المهامّ
+    // القائم — لا جدولَ «إجراءاتٍ تصحيحية» ثانياً بجانبه. الحارسُ في المتحكّم:
+    // monitor ثم `hub_can('tasks','a')` ثم تحقّقٌ من أنّ النتيجةَ نتيجةٌ فعلاً
+    // (٤٢٢ وإلا)، ونتائجُ الجودة للمالك وحدَه (المسحُ غيرُ منطَّق). وحدُّ معدلٍ
+    // يصدّ النقرَ الأعمى المتكرّر على زرٍّ يظهر في أكثر من شاشة.
+    Route::post('remediation', [\App\Http\Controllers\Web\RemediationController::class, 'store'])
+        ->name('remediation.store')->middleware('throttle:30,1');
+    // (WP-8.3 · §6.4 · §31 · §23.5) معاينةُ دمج المكررات: خطوةُ «ماذا سيقع» قبل
+    // فعلٍ لا رجعةَ فيه — نفسُ حلقة المراجع بـ`COUNT` بدل `UPDATE`، فما تَعِدُ به
+    // هو ما ينفّذه `quality.merge` بالضبط. الحارسُ في المتحكّم: المالكُ وحدَه
+    // (الكشفُ غيرُ منطَّق ويُظهر أسماءَ عملاءَ من كل الشركات)، ثم تحقّقٌ من أنّ
+    // المعرّفاتِ تنتمي لمجموعةِ تكرارٍ **مكتشَفة** (٤٢٢ وإلا). وحدُّ معدلٍ لأنّها
+    // تقرأ خمسةَ عشرَ جدولاً في كل نقرة.
+    Route::post('admin/quality/merge/preview', [QualityController::class, 'preview'])
+        ->name('quality.merge.preview')->middleware('throttle:30,1');
 });

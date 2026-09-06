@@ -21,7 +21,13 @@ class KpiController extends Controller
             403, 'باني المؤشرات للمالكين ومن يحمل صلاحية المتابعة');
     }
 
-    /** الوحدات المتاحة وأعمدتها الرقمية لبناء المقاييس */
+    /**
+     * الوحدات المتاحة وأعمدتها الرقمية لبناء المقاييس — **وهي مرجعُ الحالات
+     * الوحيد** (WP-8.5): ما ليس في `states` هنا لا يُكتب في معادلة. كانت
+     * القائمةُ تُملأ للواجهة وحدَها بينما الكاتبُ يقبل أيّ نصّ، فوُلدت مؤشّراتٌ
+     * تُرشِّح حالاتٍ لا وجودَ لها («متأخرة» في المهامّ، «مفتوحة» في التذاكر)
+     * فتقرأ صفراً أبداً — وصفرٌ مقابل هدفٍ صفرٍ نزولاً يُعرض «على الهدف».
+     */
     protected function catalog(): array
     {
         $mods = [];
@@ -40,6 +46,21 @@ class KpiController extends Controller
         return $mods;
     }
 
+    /**
+     * الحالةُ المطلوبة موجودةٌ في سجلّ وحدتها.
+     *
+     * وحدةٌ **بلا حقل حالة** تُرفض كذلك: `hub_kpi_metric` يُسقط الفلترَ صامتاً
+     * فتعدّ البطاقةُ كلَّ السجلات تحت اسمٍ يعد بالتصفية (وحدةُ الموردين مثالٌ حيّ).
+     */
+    protected function stateOk(string $module, ?string $state): bool
+    {
+        if (($state = trim(hub_str($state ?? ''))) === '') return true;
+
+        $states = (array) ($this->catalog()[$module]['states'] ?? []);
+
+        return $states !== [] && in_array($state, $states, true);
+    }
+
     public function index(Request $r)
     {
         $this->gate();
@@ -48,10 +69,20 @@ class KpiController extends Controller
         // `?edit[]=` كان يُمرَّر مصفوفةً إلى find() فتعود Collection ثم تسقط الشاشة
         $editing = ($id = hub_str($r->query('edit'))) ? KpiDef::find($id) : null;
 
+        // صفوفُ المركز (WP-8.5): القيمةُ من `hub_kpi_value` كما كانت، ومعها
+        // المالكُ والدورةُ والانحرافُ والاتّجاهُ والحالةُ الصحّية — قراءةٌ واحدة
+        $rows = \App\Support\KpiCentre::rows(auth()->user());
+
         return view('kpis.index', [
             'kpis'    => hub_kpis(null, true),
+            'rows'    => $rows,
+            'summary' => \App\Support\KpiCentre::summary($rows),
+            'off'     => \App\Support\KpiCentre::offTarget($rows),
             'catalog' => $this->catalog(),
             'editing' => $editing,
+            'people'  => \Illuminate\Support\Facades\DB::table('users')->whereNull('deleted_at')
+                ->where('status', '!=', 'موقوف')->orderBy('name')->orderBy('id')
+                ->limit(200)->get(['id', 'name']),
         ]);
     }
 
@@ -147,6 +178,9 @@ class KpiController extends Controller
             // وحدٌّ أدنى معه (v2.325): السالبُ الضخم كان يمرّ ثم يُسقط MySQL بـ22003
             'target'   => ['nullable', 'numeric', 'min:-999999999999', 'max:999999999999'],
             'good'     => ['required', 'in:up,down'],
+            // (WP-8.5) مالكٌ ودورة: «خارج الهدف» لا تصير فعلاً حتى يُعرف من يُسأل
+            'owner_id' => ['nullable', 'uuid', \Illuminate\Validation\Rule::exists('users', 'id')],
+            'period'   => ['nullable', 'string', 'max:20'],
             'a_agg'    => ['required', 'in:count,sum,avg'],
             'a_module' => ['required', 'string', 'max:60'],
             'a_col'    => ['nullable', 'string', 'max:60'],
@@ -164,6 +198,9 @@ class KpiController extends Controller
     {
         // الوحدات لا بد أن تكون مسجَّلة ومرئية — نفس حارس المقياس
         abort_unless(hub_mod($d['a_module']) && hub_can(auth()->user(), $d['a_module'], 'v'), 422);
+        // ...والحالةُ لا بد أن تكون في سجلّ وحدتها: فلترٌ ميّتٌ يُولد رقماً كاذباً
+        abort_unless($this->stateOk($d['a_module'], $d['a_st'] ?? null), 422,
+            'الحالة «' . trim(hub_str($d['a_st'] ?? '')) . '» ليست من خيارات هذه الوحدة — اختر حالةً من قائمتها');
 
         $formula = [
             'a' => ['agg' => $d['a_agg'], 'module' => $d['a_module'],
@@ -174,11 +211,23 @@ class KpiController extends Controller
         if ($d['combine'] !== 'none') {
             abort_unless(($d['b_module'] ?? null) && hub_mod($d['b_module']) && hub_can(auth()->user(), $d['b_module'], 'v'),
                 422, 'اختر وحدة المقياس الثاني');
+            abort_unless($this->stateOk($d['b_module'], $d['b_st'] ?? null), 422,
+                'حالةُ المقياس الثاني ليست من خيارات وحدته — اختر حالةً من قائمتها');
             $formula['b'] = ['agg' => $d['b_agg'] ?: 'count', 'module' => $d['b_module'],
                              'col' => $d['b_col'] ?? null, 'st' => $d['b_st'] ?? ''];
         }
 
-        return ['name' => $d['name'], 'unit' => $d['unit'] ?? null,
+        $out = ['name' => $d['name'], 'unit' => $d['unit'] ?? null,
                 'target' => hub_num($d['target'] ?? null), 'good' => $d['good'], 'formula' => $formula];
+
+        // العمودان مضافان في هجرة الطور ٨ — يُكتبان بحارسٍ فلا تسقط الكتابة
+        // على نسخةٍ لم تُرحَّل بعد (الإضافةُ لا الكسر)
+        if (hub_has_col('kpi_defs', 'owner_id')) $out['owner_id'] = $d['owner_id'] ?? null;
+        if (hub_has_col('kpi_defs', 'period')) {
+            $out['period'] = ($p = trim(hub_str($d['period'] ?? ''))) === ''
+                ? null : mb_substr($p, 0, 20);      // القصُّ بعرض العمود الصريح عند الكاتب
+        }
+
+        return $out;
     }
 }

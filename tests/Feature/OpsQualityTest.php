@@ -61,7 +61,8 @@ class OpsQualityTest extends TestCase
         $dup  = Client::create(['name' => 'شركه النور', 'email' => 'dup@x.co', 'notes' => 'ملاحظة مهمة']);
         $q = Quote::create(['doc_no' => 'Q-T-1', 'client_id' => $dup->id, 'title' => 'عرض', 'status' => 'مسودة', 'total' => 5]);
 
-        $this->actingAs($this->owner)->get('/admin/quality')->assertOk()->assertSee('يُرجّح تكرارهم');
+        // (WP-8.1) كشفُ التكرار في تبويب «البيانات» من المركز المبوَّب — للمالك وحدَه
+        $this->actingAs($this->owner)->get('/admin/quality?tab=data')->assertOk()->assertSee('يُرجّح تكرارهم');
 
         $ids = collect([$keep->id, $dup->id])->sort()->implode(',');
         $this->actingAs($this->owner)
