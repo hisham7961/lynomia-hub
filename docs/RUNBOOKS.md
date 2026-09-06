@@ -150,3 +150,30 @@ php artisan hub:schema-check                           # يجب أن يطبع «
 **التحقق:** أعدادُ الصفوف في الجداول الرئيسية (`users`, `clients`, `tasks`, `fin_documents`, `audits`) قبل الترحيل وبعده متساوية؛ آخرُ `hash` في `audits` لم يتغيّر؛ تسجيلُ الدخول على النسخة يعمل بكلمة المرور القديمة؛ ويبهوك قديمٌ يُفتح من الإعدادات ويُقرأ سرُّه. ثم `DROP DATABASE hub_rehearsal`.
 
 > نُفّذت هذه البروفة لترقية v2.400 على مخطّط v2.399.1 ببياناتٍ ممثِّلة (سجل الإصدارات v2.400.2): ٧ هجرات في ٨٫٥ ثانية على قاعدةٍ صغيرة. على قاعدةٍ كبيرة، فهارسُ `created_at` على ~١٢٠ جدولاً تأخذ دقائق — نفّذ النشر خارج ساعات الذروة.
+
+### بروفةٌ منفَّذة: v2.400.1 → v2.405.0 (٦ سبتمبر ٢٠٢٦)
+**الأساس:** قاعدةُ MySQL أُنشئت بشيفرة الفرع الأساس `claude/arfaah-uzt2d9` (0401692، v2.400.1 — ما يُنشر على الخادم اليوم): 152 جدولاً، 177 هجرة، بيانات ممثّلة (عميل، مهمة منجَزة، حادثة أمنية بـmeta.kind، خطأ مجمَّع، ويبهوك بسرٍّ صريح، قاعدة تنبيه، سلسلة تدقيق).
+
+**التسلسل المنفَّذ بشيفرة v2.405.0 (نفسُ خطوات `.cpanel.yml`):**
+| الخطوة | النتيجة |
+|---|---|
+| `hub:backup --keep=1` | ✓ 16 سجلاً · 13.4KB · 0.35s |
+| `migrate --force` | ✓ 12 هجرة · **0.71s** · 152→158 جدولاً · 177→189 هجرة |
+| `optimize:clear` | ✓ |
+| `hub:schema-check` | ✓ «القاعدة تطابق ما يقرؤه الكود — لا فروقات» |
+
+**حفظُ البيانات (كلُّها مطابقة قبل/بعد):** users · clients · tasks · incidents · error_events · alert_rules · webhooks · audits · **رأسُ سلسلة التدقيق (hash)** · **تجزئةُ كلمة مرور المالك**.
+
+**الاحتياطاتُ الكسولة تعمل على الصفوف القديمة:**
+- `incidents.kind` = NULL ⇒ القارئ يسقط إلى `meta` (لا ملءَ رجعيّ).
+- `audits.category/severity/...` = NULL ⇒ تُصنَّف عند القراءة (الختمُ لا يُمَسّ).
+- سرُّ ويبهوكٍ صريحٌ قديم ما زال يُقرأ (`EncryptedOrPlain`).
+
+**الجداولُ الستّة الجديدة موجودة:** http_metric_buckets · error_occurrences · security_findings · audit_verifications · alert_instances · incident_links.
+**الأعمدةُ الجديدة موجودة:** tasks.completed_at · error_events.assignee_id · audits.severity · api_tokens.last_ip · sessions_log.revoked_at · user_ips.first_seen_at · vault_secrets.rotated_at · alert_rules.cooldown_min · incidents.detected_at · access_denials.request_id.
+
+**الأوامرُ الستّة على القاعدة المُرقّاة (exit=0):** hub:ops-snapshot (لقطةُ جاهزية + 12 عدّادَ جدول) · hub:security-snapshot (الدرجة 68٪ · 7 نتائج) · hub:alerts-evaluate · hub:audit-verify (السلسلة سليمة) · hub:quality-snapshot · hub:metrics-snapshot.
+
+**١٥ شاشة تُجيب 200 في `APP_ENV=production` على القاعدة المُرقّاة:** /login · / · /admin/ops · /admin/security · /admin/security/{findings,identity,sessions,tokens} · /admin/audit · /admin/audit/coverage · /admin/errors · /admin/errors/logs · /admin/alerts · /workforce/overview · /admin/quality · /healthz.
+
+> تُعاد هذه البروفة قبل كل نشرةٍ كبيرة بالخطوات أعلاه على نسخةٍ من قاعدة الإنتاج.
