@@ -68,7 +68,10 @@ class Observability
             // تجميع — بالمطبِّع الواحد نفسِه الذي تجمع به دلاءُ RED (WP-2.2): نسخةٌ
             // محلية منه هنا انحرفت يوماً عن أختها فتشظّى التجميع، فحُذفت لصالحه.
             $path = ErrorLog::routePattern($request);
-            ErrorLog::capture('slow', 'طلب بطيء (' . $tier . '): ' . $request->method() . ' ' . $path);
+            // (WP-3.2) المدّةُ الحقيقية تُمرَّر مع الالتقاط فتحملها عيّنةُ الوقوع
+            // (error_occurrences.duration_ms) رقماً — لا «طبقةً» نصّيةً وحدها
+            ErrorLog::capture('slow', 'طلب بطيء (' . $tier . '): ' . $request->method() . ' ' . $path,
+                null, null, null, ['duration_ms' => $ms]);
         }
 
         return $response;
@@ -140,7 +143,11 @@ class Observability
                     'err5' => $status >= 500 ? 1 : 0,
                     'slow' => $ms > $slowAt ? 1 : 0,
                     'sum_ms' => $ms, 'max_ms' => $ms,
-                    'hist' => json_encode([(string) $b => 1]),
+                    // JSON_FORCE_OBJECT إلزامية: الدلو 0 (طلبٌ دون 1ms) يجعل ["0"=>1]
+                    // «قائمةً» في PHP فيُكتب `[1]` مصفوفةً لا كائناً — وسلوكُ المسار
+                    // $."0" على مصفوفةٍ يختلف بين إصدارات SQLite (سقط على عدّائي CI
+                    // الأسرع بينما خضِر محلياً). المدرَّج كائنٌ دائماً.
+                    'hist' => json_encode([(string) $b => 1], JSON_FORCE_OBJECT),
                     'updated_at' => now(),
                 ]);
             }

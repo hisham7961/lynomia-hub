@@ -103,7 +103,12 @@ class HttpMetricsTest extends TestCase
         $this->assertCount(1, $rows, 'كل معرّفٍ صار صفاً مستقلاً — لا تجميعَ بلا تطبيع');
         $this->assertSame('_wp22/rec/{id}/v/{n}', $rows[0]->route);
         $this->assertSame(2, (int) $rows[0]->count);
-        $this->assertSame(2, (int) array_sum((array) json_decode((string) $rows[0]->hist, true)));
+        // شكلُ المدرَّج كائنٌ لا مصفوفة — دلوُ الصفر (طلبٌ دون 1ms) كان يُكتب `[1]`
+        // (قائمةُ PHP) فيتصرّف مسارُ $."0" عليه تصرّفاً يختلف بين إصدارات SQLite:
+        // خضِر محلياً وسقط على CI. JSON_FORCE_OBJECT عند الكاتب يحرسه هذا السطر.
+        $this->assertStringStartsWith('{', (string) $rows[0]->hist, 'المدرَّج مصفوفةٌ لا كائن — دلوُ الصفر انزلق قائمةً');
+        $this->assertSame(2, (int) array_sum((array) json_decode((string) $rows[0]->hist, true)),
+            'زيادتان في المدرَّج لم تُسجَّلا — hist=' . $rows[0]->hist);
         $this->assertGreaterThanOrEqual((int) $rows[0]->max_ms,
             (int) $rows[0]->sum_ms, 'المجموع لا يقلّ عن الأقصى');
     }
