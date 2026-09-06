@@ -656,4 +656,13 @@ Route::middleware('auth')->group(function () {
     // (WP-5.5) محلّلُ تغطية التدقيق — الحارس في المتحكّم (مالكٌ فقط): الصفحةُ
     // خريطةُ ما يُدقَّق وما لا يُدقَّق، وهي لغير المالك خريطةُ ما لا يترك أثراً
     Route::get('admin/audit/coverage', [AuditController::class, 'coverage'])->name('audit.coverage');
+
+    // ── Control Plane: Phase 7 ──
+    // (WP-7.2) نظرةُ القوى العاملة: عدّاداتُ التنفيذ على مستوى المنشأة
+    // (ExecutionStats::org — القارئُ الواحد الذي سيعيد الطورُ ٨ استعمالَه).
+    // الاسمُ `workforce.overview` لأن `workforce.team` قائمٌ لشاشة «فريقي اليوم».
+    // الحارسُ في المتحكم: hub_monitor + hub_org_analytics_guard (نمطُ القدرات) —
+    // وحدُّ معدلٍ لأن الصفحةَ تجميعاتٌ على الجداول الساخنة وفحصُ صحةِ مشاريع.
+    Route::get('workforce/overview', [\App\Http\Controllers\Web\WorkforceController::class, 'overview'])
+        ->name('workforce.overview')->middleware('throttle:60,1');
 });

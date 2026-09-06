@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Support\ExecutionStats;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -24,6 +25,9 @@ class PerformanceController extends Controller
     }
 
     protected array $doneWords = ['مكتمل', 'منجز'];
+
+    /** سقفُ صفوف لوح الموظفين — عرضٌ لا حساب (الأرقامُ مُجمَّعةٌ لهؤلاء وحدهم) */
+    protected const PEOPLE_CAP = 30;
 
     public function index()
     {
@@ -90,46 +94,54 @@ class PerformanceController extends Controller
             ->groupBy(fn ($o) => $o->level ?: 'أخرى');
     }
 
-    /* ── KPI لكل موظف (آخر ٣٠ يوماً) ── */
+    /**
+     * KPI لكل موظف (آخر ٣٠ يوماً) — **قراءةٌ لا حساب** (WP-7.3):
+     *
+     * الأرقامُ كلُّها من `ExecutionStats::people` — القارئُ الواحد الذي تقرأ منه
+     * نظرةُ القوى العاملة وبطاقةُ الموظف كذلك؛ كانت هنا نسخةٌ ثالثةٌ متداخلة
+     * تحسب «أُنجز» من **آخر تعديل** فتُفسد تاريخَ الإنجاز عند أيّ لمسةٍ لاحقة،
+     * وتعدّ الملغى إنجازاً. والقراءةُ **دفعةً واحدة**: كانت ثلاثةَ استعلاماتٍ
+     * لكلٍّ من ثلاثين (تسعون في فتحةٍ واحدة) فصارت ثمانيةً مُجمَّعة.
+     *
+     * وعيبان يُصلَحان معها: سحبُ جدول الموظفين كاملاً لقراءة عمودين، و**قراءةُ
+     * `employees.perf` بلا `hub_field_mode`** — «تقييمُ المدير» حقلُ ملفٍّ
+     * وظيفيّ تحكمه صلاحيةُ الحقل كأيّ حقلٍ آخر، فكان دورٌ محجوبٌ عنه في شاشة
+     * الموظف يقرؤه هنا كاملاً.
+     */
     protected function peopleKpis()
     {
-        $since = now()->subDays(30);
+        // نافذةٌ ثابتةٌ كما تقول ترويسةُ اللوحة «آخر ٣٠ يوماً» — لا معاملَ رابطٍ جديد
+        $range = hub_range(new \Illuminate\Http\Request(), '30d');
+
+        // فاصلُ id بعد الاسم: أسماءٌ متساويةٌ ترتيبُها قرعةٌ تختلف بين المحرّكين
         $users = DB::table('users')->whereNull('deleted_at')->where('status', '!=', 'موقوف')
-            ->orderBy('name')->limit(30)->get(['id', 'name']);
-        $perf = DB::table('employees')->whereNull('deleted_at')->whereNotNull('user_id')->pluck('perf', 'user_id');
-        $empIds = DB::table('employees')->whereNull('deleted_at')->whereNotNull('user_id')->pluck('id', 'user_id');
+            ->orderBy('name')->orderBy('id')->limit(self::PEOPLE_CAP)->get(['id', 'name']);
+        $ids = $users->pluck('id')->all();
+        if (! $ids) return collect();
 
-        $doneLike = fn ($q) => hub_closed_scope($q);
-        $openLike = fn ($q) => hub_open_scope($q);
+        // ملفّاتُ هؤلاء وحدهم — لا سحبَ للجدول كلِّه، وترتيبٌ حتميّ عند ربطٍ مزدوج
+        $emp = DB::table('employees')->whereNull('deleted_at')->whereIn('user_id', $ids)
+            ->orderBy('id')->get(['id', 'user_id', 'perf'])->keyBy('user_id');
 
-        return $users->map(function ($u) use ($since, $perf, $empIds, $doneLike, $openLike) {
-            // المهام المنجزة (وقت الإغلاق التقريبي = آخر تعديل)
-            $done = $doneLike(DB::table('tasks')->whereNull('deleted_at')->where('assignee_id', $u->id))
-                ->where('updated_at', '>=', $since)->get(['due', 'updated_at']);
-            $withDue = $done->filter(fn ($t) => $t->due);
-            $onTime = $withDue->filter(fn ($t) => substr($t->updated_at, 0, 10) <= substr($t->due, 0, 10))->count();
+        // صلاحيةُ الحقل تسري على الشاشة كما على ملفّ الموظف — لا حقلَ محجوبٌ يُقرأ
+        $showPerf = hub_field_mode(auth()->user(), 'hr', 'perf') !== 'hide';
 
-            $lateNow = $openLike(DB::table('tasks')->whereNull('deleted_at')->where('assignee_id', $u->id))
-                ->whereNotNull('due')->where('due', '<', now()->toDateString())->count();
+        // إسقاطُ الأشخاص من القارئ الواحد؛ بلا قارئٍ لأن اللوحةَ خلف
+        // hub_org_analytics_guard() فأرقامُها أرقامُ المنشأة كاملةً
+        $stats = ExecutionStats::people($ids, $range);
 
-            // التذاكر المحلولة وزمنها
-            $tix = DB::table('tickets')->whereNull('deleted_at')->where('assignee_id', $u->id)
-                ->whereIn('status', ['تم الحل', 'مغلقة'])->where('updated_at', '>=', $since)
-                ->get(['created_at', 'updated_at', 'meta']);
-            $resHours = $tix->map(function ($t) {
-                $meta = json_decode((string) $t->meta, true) ?: [];
-                $end = $meta['resolved_at'] ?? $t->updated_at;
-                return abs(\Illuminate\Support\Carbon::parse($end)->diffInMinutes(\Illuminate\Support\Carbon::parse($t->created_at))) / 60;
-            });
+        return $users->map(function ($u) use ($emp, $stats, $showPerf) {
+            $x = $stats[$u->id] ?? [];
+            $e = $emp[$u->id] ?? null;
 
             return (object) [
-                'id' => $u->id, 'name' => $u->name, 'empId' => $empIds[$u->id] ?? null,
-                'done' => $done->count(),
-                'onTimePct' => $withDue->count() ? (int) round($onTime * 100 / $withDue->count()) : null,
-                'lateNow' => $lateNow,
-                'tix' => $tix->count(),
-                'avgRes' => $tix->count() ? round($resHours->avg(), 1) : null,
-                'rating' => $perf[$u->id] ?? null,
+                'id' => $u->id, 'name' => $u->name, 'empId' => $e->id ?? null,
+                'done' => $x['completed'] ?? 0,
+                'onTimePct' => $x['on_time']['pct'] ?? null,
+                'lateNow' => $x['overdue'] ?? 0,
+                'tix' => $x['tickets_resolved'] ?? 0,
+                'avgRes' => $x['resolution']['avg_h'] ?? null,
+                'rating' => $showPerf ? ($e->perf ?? null) : null,
             ];
         })->filter(fn ($p) => $p->done || $p->tix || $p->lateNow || $p->rating)->values();
     }

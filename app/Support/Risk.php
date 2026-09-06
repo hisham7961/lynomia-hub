@@ -18,8 +18,8 @@ use Illuminate\Support\Facades\Schema;
  * نملكها: يُقاس تغيُّرُ **عنوان الشبكة** ومعرفتُه من `user_ips`، والبلدُ
  * يبقى فراغاً حتى يُوصَل مزوِّدٌ لاحقاً (نطاقٌ موثَّقٌ في خريطة المنصة).
  *
- * ويُفصَل عمداً عن «نسبة الشك» في `ActivityController::riskProfile`
- * (ملفٌّ تاريخيٌّ للمستخدم على ١٤ يوماً): هذا **خطرُ الجلسة الآن**.
+ * ويُفصَل عمداً «خطرُ الجلسة الآن» (`session`) عن «مخاطر النشاط الأمني»
+ * (`activity` — ملفٌّ تاريخيٌّ للمستخدم على مدى، كان في ActivityController::riskProfile).
  */
 class Risk
 {
@@ -119,6 +119,91 @@ class Risk
         return [
             'score' => $score, 'band' => self::band($score), 'tone' => self::tone($score),
             'factors' => $factors,
+        ];
+    }
+
+    /**
+     * مخاطرُ النشاط الأمني لمستخدمٍ على مدى (WP-7.1 — spec §5.1/§46):
+     * الملفُّ التاريخيّ الذي كان في `ActivityController::riskProfile`، **معزولاً
+     * عزلاً تاماً عن أرقام الإنتاجية** — لا شاشةَ أداءٍ تقرأ هذه الدرجة، ولا
+     * تدخل ساعاتُ الليل في «أُنجز/في الموعد» (يحرسه SecurityActivitySplitTest).
+     *
+     * حدودُ الدوام من الإعدادات `sec.hours_start/end` (كما `session` أعلاه) لا
+     * من ٠٨–١٦ صلبةٍ في الشيفرة. كلُّ استعلامٍ محميٌّ على حدة: غيابُ جدولٍ
+     * مساعدٍ يُعيد صفراً ولا يُسقط الملفَّ (نمطُ ActivityController::safe —
+     * يحرسه ActivityResilienceTest). وتُقبل `$visits` المجلوبةُ مسبقاً (شاشةُ
+     * النشاط تجلبها لجدول الأيام أصلاً) فلا يُكرَّر استعلامُ الزيارات.
+     */
+    public static function activity(User $user, TimeRange $range, $visits = null): array
+    {
+        $safe = function (callable $fn, $default) {
+            try {
+                return $fn();
+            } catch (\Throwable $e) {
+                report($e);
+
+                return $default;
+            }
+        };
+
+        $visits ??= $safe(fn () => DB::table('page_visits')->where('user_id', $user->id)
+            ->where('at', '>=', $range->from)->where('at', '<', $range->to)
+            ->orderBy('at')->orderBy('id')->get(), collect());
+
+        // تصنيفُ سلال النشاط (كل سلة ٥ دقائق) — الليلُ ٠٠–٠٦ كما `session`،
+        // وحدودُ الدوام من الإعدادات لا ثابتةً في الشيفرة
+        $start = (string) setting('sec.hours_start', '08:00');
+        $end   = (string) setting('sec.hours_end', '16:00');
+        $seen = [];
+        $inMin = $outMin = $nightMin = 0;
+        foreach ($visits as $v) {
+            $ts = strtotime((string) $v->at);
+            $bucket = intdiv($ts, 300);
+            if (isset($seen[$bucket])) continue;
+            $seen[$bucket] = true;
+            $t = date('H:i', $ts);
+            if ((int) date('G', $ts) < 6)      $nightMin += 5;
+            elseif ($t >= $start && $t < $end) $inMin += 5;
+            else                               $outMin += 5;
+        }
+        $totalMin = $inMin + $outMin + $nightMin;
+
+        $logins   = (int) $safe(fn () => DB::table('sessions_log')->where('user_id', $user->id)
+                        ->where('started_at', '>=', $range->from)->where('started_at', '<', $range->to)->count(), 0);
+        $strange  = (int) $safe(fn () => DB::table('audits')->where('user_id', $user->id)->where('action', 'دخول مريب')
+                        ->where('created_at', '>=', $range->from)->where('created_at', '<', $range->to)->count(), 0);
+        $failed   = (int) $safe(fn () => DB::table('audits')->where('user_id', $user->id)->where('action', 'دخول فاشل')
+                        ->where('created_at', '>=', $range->from)->where('created_at', '<', $range->to)->count(), 0);
+        $devCount = (int) $safe(fn () => DB::table('sessions_log')->where('user_id', $user->id)
+                        ->where('started_at', '>=', $range->from)->where('started_at', '<', $range->to)
+                        ->distinct()->count('device'), 0);
+        $ipCount  = (int) $safe(fn () => DB::table('user_ips')->where('user_id', $user->id)->count(), 0);
+
+        // معدل التلاعب: إشاراتُ الدخول الشاذة منسوبةً لكل الدخول
+        $tamper = $logins + $failed > 0
+            ? (int) round(($strange + $failed) * 100 / ($logins + $failed)) : 0;
+        // معدل تعدد الأجهزة: دخولٌ من كم جهازاً مختلفاً وسطياً
+        $devRate = $logins > 0 ? round($devCount * 100 / $logins) : 0;
+
+        // نسبةُ الشك المركّبة (٠–١٠٠) — مكوّناتُها معلنةٌ في الواجهة كي تُفهم لا تُخشى
+        $parts = [
+            'دخول شاذ (مكان غريب/خارج الدوام)' => $logins > 0 ? min(40, (int) round($strange * 40 / $logins)) : 0,
+            'محاولات دخول فاشلة'               => min(15, $failed * 3),
+            'نشاط في ساعات مريبة (٠٠–٠٦)'      => $totalMin > 0 ? min(25, (int) round($nightMin * 25 / $totalMin)) : 0,
+            'نشاط خارج الدوام'                  => $totalMin > 0 ? min(10, (int) round($outMin * 10 / $totalMin)) : 0,
+            'تعدد الأجهزة'                      => min(10, max(0, $devCount - 1) * 3),
+        ];
+        $score = min(100, array_sum($parts));
+
+        // أمنيٌّ فقط: لا ساعاتِ «داخل الدوام» هنا — تلك أرقامُ عملٍ يقرؤها
+        // الجانبُ العمليّ وحده (ActivityController::workHours ثم ExecutionStats)
+        return [
+            'night_h' => round($nightMin / 60, 1), 'out_h' => round($outMin / 60, 1),
+            'logins'  => $logins, 'strange' => $strange, 'failed' => $failed,
+            'devices' => $devCount, 'ips' => $ipCount,
+            'tamper'  => $tamper, 'dev_rate' => $devRate,
+            'score'   => $score, 'parts' => $parts,
+            'tone'    => $score >= 55 ? 'bad' : ($score >= 25 ? 'wn' : 'ok'),
         ];
     }
 

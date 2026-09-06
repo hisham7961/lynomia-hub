@@ -748,9 +748,14 @@ class HubAutomation extends Command
                 } while ($gone >= 5000);
             }
             if (\Illuminate\Support\Facades\Schema::hasTable('page_visits')) {
+                // ── Control Plane: Phase 7 (WP-7.4) ── الزياراتُ وحدَها كانت بثابتِ
+                // ٩٠ في الشيفرة بينما إخوتُها بمفاتيحَ معلَنة — retention.visits_days
+                // (spec §13)، بحدٍّ أدنى ٣٠: مقصٌّ أقصرُ من شهرٍ يُفقد أثرَ التحقيق
+                // الأمنيّ قبل أن يُفتح. الافتراضيُّ ٩٠ حرفياً فلا يتغيّر سلوكُ أحد.
+                $vKeep = max(30, (int) setting('retention.visits_days', 90));
                 $per['page_visits'] = 0;
                 do {
-                    $gone = DB::table('page_visits')->where('at', '<', now()->subDays(90))
+                    $gone = DB::table('page_visits')->where('at', '<', now()->subDays($vKeep))
                         ->limit(5000)->delete();
                     $n += $gone; $per['page_visits'] += $gone;
                 } while ($gone >= 5000);
