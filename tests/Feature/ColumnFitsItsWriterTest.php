@@ -144,6 +144,29 @@ class ColumnFitsItsWriterTest extends TestCase
             'قيمةُ allowlist أطولُ من عمودها — تمرّ على SQLite وترمي على MySQL: ' . implode(' · ', $tight));
     }
 
+    /**
+     * (Work OS · الطور B · WP-B.5) عمودُ `documents.audience` يسع أطولَ قيمةٍ
+     * شرعيّةٍ فيه — القيَمُ allowlist في النموذج لا كـenum على القاعدة (C10)،
+     * فالعمودُ نصٌّ واسع؛ ولو ضاق عن أطولِ قيمةٍ لمرّ على SQLite ورمى على MySQL.
+     */
+    public function test_document_audience_values_fit_its_column(): void
+    {
+        $max = hub_col_max('documents', 'audience');
+        if ($max === null) {
+            $this->markTestSkipped('عمودُ documents.audience بلا عرضٍ معلن');
+        }
+
+        $tight = [];
+        foreach (\App\Models\Document::AUDIENCES as $val) {
+            if (mb_strlen($val) > $max) {
+                $tight[] = "documents.audience عرضُه {$max} والقيمة «{$val}» أطول";
+            }
+        }
+
+        $this->assertSame([], $tight,
+            'قيمةُ allowlist أطولُ من عمودها — تمرّ على SQLite وترمي على MySQL: ' . implode(' · ', $tight));
+    }
+
     /** والإشعارُ من قاعدة تنبيه يُكتب فعلاً — لا نظرياً */
     public function test_a_rule_notification_is_actually_written(): void
     {

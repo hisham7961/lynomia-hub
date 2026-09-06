@@ -8,6 +8,7 @@ use App\Http\Controllers\Web\DmController;
 use App\Http\Controllers\Web\JourneyController;
 use App\Http\Controllers\Web\PrefController;
 use App\Http\Controllers\Web\TraceController;
+use App\Http\Controllers\Web\ActivationController;
 use App\Http\Controllers\Web\AuditController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\CapacityController;
@@ -32,6 +33,8 @@ use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Web\OdooController;
 use App\Http\Controllers\Web\PerformanceController;
 use App\Http\Controllers\Web\PortalController;
+use App\Http\Controllers\Web\ClientPortalController;
+use App\Http\Controllers\Web\ClientMemberController;
 use App\Http\Controllers\Web\LegalController;
 use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\PurchaseController;
@@ -90,6 +93,15 @@ Route::post('passkey/login/options', [\App\Http\Controllers\Web\PasskeyControlle
     ->name('passkey.login.options')->middleware('throttle:30,1');
 Route::post('passkey/login/verify', [\App\Http\Controllers\Web\PasskeyController::class, 'loginVerify'])
     ->name('passkey.login.verify')->middleware('throttle:30,1');
+
+// تفعيلُ حساب العميل — عامٌّ (ما قبل المصادقة)، برموزٍ لمرّةٍ ومقيَّدةٍ بالمعدّل
+// (Work OS · الطور B · WP-B.1 · §12). حدُّ المعدّل يحاكي حدَّ الدخول (web.php:78):
+// العميلُ يفتح الرابطَ، يُدخل الرمزَ، ثم يضع كلمةَ سرّه بنفسه — لا كلمةَ سرٍّ تُرسَل.
+Route::middleware('throttle:10,1')->group(function () {
+    Route::get('activate/{token}', [ActivationController::class, 'show'])->name('activate.show');
+    Route::post('activate/{token}/otp', [ActivationController::class, 'otp'])->name('activate.otp');
+    Route::post('activate/{token}/set', [ActivationController::class, 'set'])->name('activate.set');
+});
 
 Route::get('sign/{token}', [\App\Http\Controllers\Web\EsignController::class, 'show'])->name('sign.show');
 Route::post('sign/{token}/otp', [\App\Http\Controllers\Web\EsignController::class, 'sendOtp'])->name('sign.otp')->middleware('throttle:6,10');
@@ -169,6 +181,33 @@ Route::middleware('auth')->group(function () {
 
         return back()->with('ok', $kid === '' ? 'عدت للمساحة الداخلية — كل السجلات' : 'تعمل الآن في مساحة العميل المختار');
     })->name('client.switch');
+
+    // ── مساحةُ العميل (Work OS · الطور B · WP-B.2) — شلٌّ منفصلٌ أبسطُ عمداً ──
+    // خلف PortalGuard (العميلُ فقط؛ الأسماءُ `portal.*` مُدرَجةٌ سلفاً في NAME_ALLOW)،
+    // والداخليُّ يُحوَّل للوحة داخل المتحكّم لا ٥٠٠. كلُّ قراءةٍ معزولةٌ بعملاءِ القارئ
+    // (`hub_client_ids`) + جمهورِ الوثيقة/المحادثة — لا رقمَ داخليٍّ ولا سجلَّ عميلٍ آخر.
+    Route::prefix('portal')->name('portal.')->group(function () {
+        Route::get('/', [ClientPortalController::class, 'home'])->name('home');
+        Route::get('engagements', [ClientPortalController::class, 'engagements'])->name('engagements');
+        Route::get('projects', [ClientPortalController::class, 'projects'])->name('projects');
+        Route::get('projects/{id}', [ClientPortalController::class, 'project'])->name('project');
+        Route::get('documents', [ClientPortalController::class, 'documents'])->name('documents');
+        Route::get('documents/{id}', [ClientPortalController::class, 'document'])->name('document');
+        Route::get('invoices', [ClientPortalController::class, 'invoices'])->name('invoices');
+        Route::get('invoices/{id}', [ClientPortalController::class, 'invoice'])->name('invoice');
+        Route::get('conversations', [ClientPortalController::class, 'conversations'])->name('conversations');
+        Route::get('conversations/{id}', [ClientPortalController::class, 'conversation'])->name('conversation');
+    });
+
+    // ── إدارةُ عضويّة العميل (Work OS · الطور B · WP-B.3) — داخليّةٌ فقط (مديرُ الحساب) ──
+    // لوحةٌ على «عميل ٣٦٠» تدعو زميلاً وتمنح دوراً وتسحب وصولاً. الحرسُ في المتحكّم
+    // (`hub_can('clients','e')` + `hub_scope`)، ومنحُ Owner/سحبُ الوصول = تصعيدُ هوية.
+    // حسابُ العميل نفسُه يُردّ هنا بـPortalGuard (٤٠٤) فوق مصفوفة الأدوار. تُقنَّن الكتابةُ.
+    Route::middleware('throttle:30,1')->group(function () {
+        Route::post('clients/{client}/members', [ClientMemberController::class, 'invite'])->name('clients.members.invite');
+        Route::post('clients/{client}/members/{membership}/role', [ClientMemberController::class, 'setRole'])->name('clients.members.role');
+        Route::post('clients/{client}/members/{membership}/revoke', [ClientMemberController::class, 'revoke'])->name('clients.members.revoke');
+    });
 
     // ── يوم العمل: حضورٌ وانصرافٌ بضغطة، وشاشةُ الفريق اليومية للمدير ──
     Route::post('workday/check-in', [\App\Http\Controllers\Web\WorkdayController::class, 'checkIn'])
