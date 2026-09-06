@@ -4,7 +4,7 @@
 @php $ipShown = $ipMasked ? '‹عنوان محجوب›' : $ip; @endphp
 <div class="hero">
     <div>
-        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><a href="{{ route('security.index') }}">مركز الأمان</a><span aria-hidden="true">‹</span><a href="{{ route('security.ips') }}">ذكاء العناوين</a><span aria-hidden="true">‹</span><b>تفصيل عنوان</b></nav>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span>@include('security.parts.root_crumb')<span aria-hidden="true">‹</span><a href="{{ route('security.ips') }}">ذكاء العناوين</a><span aria-hidden="true">‹</span><b>تفصيل عنوان</b></nav>
         <h2>🌐 @if ($ipMasked)<span>{{ $ipShown }}</span>@else<bdi class="mono ltr">{{ $ip }}</bdi>@endif
             @if ($row)<span class="bdg {{ $row->label['tone'] }}">{{ $row->label['label'] }}</span>@endif
         </h2>

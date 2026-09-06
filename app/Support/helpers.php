@@ -5506,36 +5506,82 @@ if (! function_exists('hub_range')) {
 
 if (! function_exists('hub_admin_links')) {
     /**
-     * كتالوجُ روابط الإدارة (WP-1.5) — المصدرُ الواحد الذي سيرسم منه الطورُ ١٠
-     * شريطَ الإدارة ووِجهاتِ البحث بدل القائمتين المتباعدتين اليوم. مشتقٌّ ١:١ من
-     * الشريط الحاليّ في `layouts/app.blade.php` — و`ControlCenterUiKitTest` يُبقيهما
-     * متطابقَين حتى يتسلّم الطورُ ١٠ الرسم. كلُّ مدخل: `{key, label, route, group, ok}`،
-     * و`ok` بنفس فحوص `hub_*` التي يكتبها الشريط (المالكُ تُرجِع له `hub_flag` صدقاً دائماً).
+     * كتالوجُ روابط الإدارة (WP-1.5) — المصدرُ **الواحد** الذي يُرسَم منه شريطُ
+     * الإدارة (`layouts/app.blade.php`) وتُقرأ منه وِجهاتُ البحث
+     * (`SearchController::destinations`) بدل القائمتين المتباعدتين.
+     *
+     * ── Control Plane: Phase 10 (WP-10.3 · spec §11) ──
+     * المجموعاتُ صارت مجموعاتِ §11 الأربع: الأمن والرقابة · التشغيل · الجودة
+     * والحوكمة · الإعدادات (كانت خمساً: شخصي/الفريق/الرقابة/البناء/النظام)،
+     * وانضمّ إليها المركزان الغائبان عن الشريط: **الحوادث** (`m.index incidents`)
+     * و**التنبيهات** (`alerts.center`). لا اسمَ مسارٍ حُذف ولا رابطٌ سقط.
+     *
+     * كلُّ مدخل: `{key, label, icon, route, args, group, ok, on, find}`
+     *  · `args` معاملاتُ المسار (وحدةٌ عامّة مثل `m.index` تحملها) — `route($route, $args)`.
+     *  · `ok`   **حارسُ الرابط نفسِه** لا حارسُ الشريط: `prefs.edit` مفتوحةٌ لكلّ
+     *           مستخدم، وظهورُ الشريط كلِّه شرطٌ مستقلٌّ يبقى في القالب. فالبحثُ
+     *           يقرأ الكتالوجَ نفسَه بلا أن يُخفي عن موظّفٍ صفحةً يملكها.
+     *  · `on`   أنماطُ `routeIs` التي تُضيء الرابط (وحدةٌ عامّة تُضاف إليها مطابقةُ
+     *           مُعاملها في القالب — `m.*` وحدَها تُضيء كلَّ وحدةٍ في النظام).
+     *  · `find` مرادفاتُ البحث: أسماءُ الشاشات القديمة في قائمة البحث تبقى تصل.
      */
     function hub_admin_links($user): array
     {
         $owner = hub_is_owner($user);
-        // رابطُ «التخصيص» يظهر متى ظهر الشريطُ نفسُه — شرطُ الشريط كما في القالب حرفياً
-        $bar = $owner || hub_flag($user, 'users') || hub_flag($user, 'audit') || hub_secrets($user);
-        $mk = fn (string $key, string $label, string $route, string $group, bool $ok) =>
-            ['key' => $key, 'label' => $label, 'route' => $route, 'group' => $group, 'ok' => $ok];
+        $mk = fn (string $key, string $label, string $icon, string $route, array $args,
+                  string $group, bool $ok, array $on, string $find = '') =>
+            compact('key', 'label', 'icon', 'route', 'args', 'group', 'ok', 'on', 'find');
 
         return [
-            $mk('prefs', 'التخصيص', 'prefs.edit', 'شخصي', $bar),
-            $mk('users', 'المستخدمون', 'users.index', 'الفريق', hub_flag($user, 'users')),
-            $mk('roles', 'الأدوار', 'roles.index', 'الفريق', $owner),
-            $mk('audit', 'التدقيق', 'audit.index', 'الرقابة', hub_flag($user, 'audit')),
-            $mk('security', 'الأمان', 'security.index', 'الرقابة', $owner),
-            $mk('ops', 'التشغيل', 'ops.index', 'الرقابة', $owner),
-            $mk('errors', 'الأخطاء', 'errors.index', 'الرقابة', $owner),
-            $mk('activity', 'نشاط الموظفين', 'activity.index', 'الرقابة', $owner),
-            $mk('dataroom', 'غرفة البيانات', 'dataroom.index', 'الرقابة', hub_secrets($user)),
-            $mk('fields', 'الحقول', 'fields.index', 'البناء', $owner),
-            $mk('flows', 'المسارات', 'flows.index', 'البناء', $owner),
-            $mk('integrations', 'التكاملات', 'integrations.index', 'البناء', $owner),
-            $mk('quality', 'الجودة', 'quality.index', 'البناء', $owner),
-            $mk('settings', 'الإعدادات', 'settings.edit', 'النظام', $owner),
-            $mk('quoteflow', 'QuoteFlow', 'quoteflow', 'النظام', $owner),
+            // ١) الأمن والرقابة — من يفعل ماذا، وما الذي يهدّد النظام
+            $mk('audit', 'التدقيق', '🕘', 'audit.index', [], 'الأمن والرقابة',
+                hub_flag($user, 'audit'), ['audit.*'], 'سجل التدقيق الأثر'),
+            $mk('security', 'الأمان', '🛡️', 'security.index', [], 'الأمن والرقابة',
+                $owner, ['security.*'], 'مركز الأمان الوضعية الجلسات'),
+            $mk('activity', 'نشاط الموظفين', '🧭', 'activity.index', [], 'الأمن والرقابة',
+                $owner, ['activity.*'], 'سجل النشاط القوى العاملة'),
+            $mk('dataroom', 'غرفة البيانات', '🔐', 'dataroom.index', [], 'الأمن والرقابة',
+                hub_secrets($user), ['dataroom.*'], 'الأسرار والوثائق الحسّاسة'),
+
+            // ٢) التشغيل — صحّةُ النظام وأعطالُه وحوادثُه وتنبيهاتُه
+            // نظرةُ التحكّم أوّلُها (§32): مفترقُ الطرق الذي يحيل إلى المراكز الستّة.
+            // كانت تُبلَغ من مركز التوصيات وحدَه — لا في شريطٍ ولا في بحث؛ وصفحةٌ
+            // لا يدلّ عليها شيءٌ صفحةٌ ميّتة. حارسُها حارسُ `ControlController::gate`
+            // حرفياً (مالكٌ أو حاملُ راية المراقبة) فلا يُوعَد أحدٌ ببابٍ يُصَدّ عنه.
+            $mk('control', 'نظرة التحكّم', '🎛️', 'control.index', [], 'التشغيل',
+                $owner || hub_monitor($user), ['control.*'], 'مستوى التحكّم النظرة العامة يستدعي تدخّلك'),
+            $mk('ops', 'التشغيل', '🖥️', 'ops.index', [], 'التشغيل',
+                $owner, ['ops.*'], 'مركز التشغيل الصحّة الطابور النسخ'),
+            $mk('errors', 'الأخطاء', '🐞', 'errors.index', [], 'التشغيل',
+                $owner, ['errors.*'], 'مركز الأخطاء الأعطال'),
+            // الحوادثُ وحدةٌ في السجل — حارسُها حارسُ صفحتها (`hub_can`) لا حارسٌ ثانٍ
+            $mk('incidents', 'الحوادث', '🚨', 'm.index', ['incidents'], 'التشغيل',
+                hub_can($user, 'incidents', 'v'), [], 'إدارة الحوادث التقنية الانقطاع'),
+            // مركزُ التنبيهات: القراءةُ للمالك أو حامل المراقبة (AlertCenterController::readGate)
+            $mk('alerts', 'التنبيهات', '🔔', 'alerts.center', [], 'التشغيل',
+                $owner || hub_monitor($user), ['alerts.center'], 'مركز التنبيهات قواعد التنبيه'),
+
+            // ٣) الجودة والحوكمة — قواعدُ البيانات وشكلُها ومساراتُها
+            $mk('quality', 'الجودة', '🧹', 'quality.index', [], 'الجودة والحوكمة',
+                $owner, ['quality.*'], 'جودة البيانات التكرار'),
+            $mk('fields', 'الحقول', '🧩', 'fields.index', [], 'الجودة والحوكمة',
+                $owner, ['fields.*'], 'باني الحقول'),
+            $mk('flows', 'المسارات', '🪄', 'flows.index', [], 'الجودة والحوكمة',
+                $owner, ['flows.*'], 'مسارات العمل الأتمتة'),
+
+            // ٤) الإعدادات — ضبطُ النظام ومن يدخله
+            $mk('settings', 'الإعدادات', '⚙️', 'settings.edit', [], 'الإعدادات',
+                $owner, ['settings.*'], 'إعدادات النظام المفاتيح'),
+            $mk('integrations', 'التكاملات', '🔌', 'integrations.index', [], 'الإعدادات',
+                $owner, ['integrations.*', 'webhooks.*'], 'التكاملات Webhooks أودو تلجرام n8n'),
+            $mk('roles', 'الأدوار', '🧑‍⚖️', 'roles.index', [], 'الإعدادات',
+                $owner, ['roles.*'], 'الأدوار والصلاحيات'),
+            $mk('users', 'المستخدمون', '👥', 'users.index', [], 'الإعدادات',
+                hub_flag($user, 'users'), ['users.*'], 'المستخدمون الحسابات'),
+            $mk('prefs', 'التخصيص', '🎛️', 'prefs.edit', [], 'الإعدادات',
+                true, ['prefs.*'], 'التخصيص تفضيلاتي'),
+            $mk('quoteflow', 'QuoteFlow', '🧾', 'quoteflow', [], 'الإعدادات',
+                $owner, ['quoteflow'], 'QuoteFlow عروض الأسعار'),
         ];
     }
 }

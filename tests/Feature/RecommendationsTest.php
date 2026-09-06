@@ -68,9 +68,37 @@ class RecommendationsTest extends TestCase
         $this->actingAs($this->employee->fresh())->get('/recommendations')->assertOk();
     }
 
+    /**
+     * الحالةُ الفارغة تبقى كما هي — لكنّ الصفَّ صار **منتِجَين** (WP-10.2):
+     * الإشاراتُ التجارية **وحالةُ النظام**. فـ«لا شيء» تعني الاثنين معاً، وقارئُ
+     * المتابعة (غيرُ المالك) لا تصله حالةُ النظام أصلاً بحكم ق١ — لا التشغيلُ
+     * ولا الأخطاءُ ولا الجودةُ ولا التدقيق. فهو الشاهدُ الصادق على أن الصفحةَ
+     * ما زالت تقول «لا شيء» حين لا شيءَ فعلاً، لا صندوقاً فارغاً بلا كلمة.
+     */
     public function test_empty_state_when_no_signals(): void
     {
         $this->seedCore();
-        $this->actingAs($this->owner)->get('/recommendations')->assertOk()->assertSee('لا توصيات الآن');
+        $role = $this->employee->role;
+        $role->update(['flags' => array_merge((array) $role->flags, ['monitor' => 1])]);
+
+        $this->actingAs($this->employee->fresh())->get('/recommendations')
+            ->assertOk()->assertSee('لا توصيات الآن');
+    }
+
+    /**
+     * **ولا يُقال للمالك «كلُّ شيءٍ بخير» والنظامُ لا ينبض** (WP-10.2 · §33):
+     * تنصيبٌ لم يُفعَّل فيه سطرُ cron قطّ شرطٌ حقيقيٌّ لا فراغ — وإخفاؤه خلف
+     * «لا توصيات الآن» هو بعينه ما كان يُطفئ التسليمَ والنسخَ الاحتياطيَّ صامتاً.
+     */
+    public function test_the_owner_is_never_told_all_is_well_while_the_schedulers_are_dead(): void
+    {
+        $this->seedCore();
+
+        $html = $this->actingAs($this->owner)->get('/recommendations')->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('لا توصيات الآن', $html,
+            'حالةٌ فارغةٌ معروضةٌ والمجدولاتُ لم تنبض قطّ');
+        $this->assertStringContainsString('متعطّل: المجدولات', $html);
+        $this->assertStringContainsString('فعّل سطرَ cron', $html, 'الإشارةُ بلا توصيةٍ لا تُنتج فعلاً (§34)');
     }
 }

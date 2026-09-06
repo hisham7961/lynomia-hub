@@ -351,16 +351,15 @@ class SecurityController extends Controller
             'مركز النتائج الأمنية للمالك أو حامل علم المراقبة');
     }
 
-    /** استعلامُ النتائج منطَّقاً: غيرُ المالك يرى نتائجَ المنظّمة وشركاتِه المسموحة فقط */
+    /**
+     * استعلامُ النتائج منطَّقاً: غيرُ المالك يرى نتائجَ المنظّمة وشركاتِه المسموحة
+     * فقط — والشرطُ نفسُه مكتوبٌ **مرّةً واحدة** في `SecurityFindings::scopeCompanies`
+     * ويقرؤه العدّادُ (`openCounts`) وصفُّ التدخّل معه، فلا يتباعد ثلاثةُ نُسَخ.
+     */
     protected function findingsQuery()
     {
-        $q = DB::table('security_findings');
-        $cids = hub_company_ids();
-        if ($cids !== null) {
-            $q->where(fn ($w) => $w->whereNull('company_id')->orWhereIn('company_id', $cids));
-        }
-
-        return $q;
+        return \App\Support\SecurityFindings::scopeCompanies(
+            DB::table('security_findings'), hub_company_ids());
     }
 
     /**

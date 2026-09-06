@@ -730,4 +730,15 @@ Route::middleware('auth')->group(function () {
     // تقرأ خمسةَ عشرَ جدولاً في كل نقرة.
     Route::post('admin/quality/merge/preview', [QualityController::class, 'preview'])
         ->name('quality.merge.preview')->middleware('throttle:30,1');
+
+    // ── Control Plane: Phase 10 ──
+    // (WP-10.1 · §32 · §12) نظرةُ التحكّم: ستُّ بطاقاتٍ **قارئةٍ فقط** تحيل إلى
+    // مراكزها — لا لوحةَ عملاقةٌ تكرّر التفاصيل، ولا رقمَ يُحسب في المتحكّم.
+    // الحارسُ في المتحكّم (نمطُ المستودع): مالكٌ، ولحاملِ راية المراقبة ما تمنحه
+    // ق١ وحدَه (النتائجُ الأمنية والجودةُ والتنفيذ) — وبطاقةٌ محجوبةٌ لا تُحسَب.
+    // وحدُّ معدلٍ لأنّ الفتحةَ الباردة تشمل `Health::check` (عشراتُ الاستعلامات)
+    // وإن كانت مخبّأةً ٦٠ ثانية بختمِ جداولها. و**لا مسارَ إقرارٍ جديد**:
+    // صفُّ «يستدعي تدخّلك» يُعرض هنا ويُتصرَّف به على `recs.act` القائم (WP-10.2).
+    Route::get('admin/control', [\App\Http\Controllers\Web\ControlController::class, 'index'])
+        ->name('control.index')->middleware('throttle:60,1');
 });

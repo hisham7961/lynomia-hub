@@ -3,7 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
-        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><a href="{{ route('security.index') }}">مركز الأمان</a><span aria-hidden="true">‹</span><b>صحّة الأسرار</b></nav>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span>@include('security.parts.root_crumb')<span aria-hidden="true">‹</span><b>صحّة الأسرار</b></nav>
         <h2>🗝️ صحّة الأسرار</h2>
         <div class="sub">عمرُ كل سرٍّ من آخر تدويرٍ فعليّ (لا من آخر تعديلِ ملاحظة) ومن كشَفه كم مرة — بلا قيمةٍ ولا بصمةٍ على هذه الصفحة إطلاقاً</div>
     </div>

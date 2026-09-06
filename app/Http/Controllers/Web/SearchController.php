@@ -133,7 +133,6 @@ class SearchController extends Controller
     protected function destinations(string $q): array
     {
         $u = auth()->user();
-        $owner = hub_is_owner();
 
         $cat = [['t' => '🏠 لوحة التحكم', 'u' => route('dashboard')]];
 
@@ -154,27 +153,96 @@ class SearchController extends Controller
             }
         }
 
-        // صفحات الإدارة — نفس شروط شريط الإدارة حرفياً
-        foreach ([
-            ['🎛️ التخصيص', 'prefs.edit', true],
-            ['👥 المستخدمون', 'users.index', hub_flag($u, 'users')],
-            ['🧑‍⚖️ الأدوار والصلاحيات', 'roles.index', $owner],
-            ['🕘 سجل التدقيق', 'audit.index', hub_flag($u, 'audit')],
-            ['🛡️ مركز الأمان', 'security.index', $owner],
-            ['🖥️ مركز التشغيل', 'ops.index', $owner],
-            ['🐞 مركز الأخطاء', 'errors.index', $owner],
-            ['🔐 غرفة البيانات', 'dataroom.index', hub_secrets()],
-            ['🧩 باني الحقول', 'fields.index', $owner],
-            ['🪄 مسارات العمل', 'flows.index', $owner],
-            ['🪝 Webhooks', 'webhooks.index', $owner],
-            ['🧹 جودة البيانات', 'quality.index', $owner],
-            ['⚙️ الإعدادات', 'settings.edit', $owner],
-            ['🧾 QuoteFlow', 'quoteflow', $owner],
-        ] as [$label, $route, $ok]) {
-            if ($ok) $cat[] = ['t' => $label, 'u' => route($route)];
+        // ── Control Plane: Phase 10 (WP-10.3 · §11) — صفحاتُ الإدارة من الكتالوج ──
+        // كانت قائمةً ثانيةً مكتوبةً بيدها، فتباعدت عن الشريط: بلا «نشاط الموظفين»
+        // وبـWebhooks بدل «التكاملات». الآن `hub_admin_links()` مصدرٌ واحدٌ للاثنين،
+        // وحارسُ كل وجهةٍ حارسُها هي. و`find` مرادفاتٌ تُبقي الأسماءَ القديمة تصل.
+        foreach (hub_admin_links($u) as $l) {
+            if (! $l['ok']) continue;
+            $cat[] = ['t' => trim($l['icon'] . ' ' . $l['label']),
+                      'u' => route($l['route'], $l['args']), 'find' => $l['find']];
         }
 
-        return array_values(array_filter($cat, fn ($d) => mb_stripos($d['t'], $q) !== false));
+        $hits = array_filter($cat,
+            fn ($d) => mb_stripos($d['t'] . ' ' . ($d['find'] ?? ''), $q) !== false);
+
+        // المطابقاتُ التشغيلية أوّلاً — أدقُّ من أيّ مطابقةِ اسمٍ ولا تُزاحَم في القصّ
+        $out = [];
+        $seen = [];
+        foreach (array_merge($this->operational($q, $u), $hits) as $d) {
+            // لا رابطَ مكرَّر: الوحدةُ نفسُها قد تأتي من قائمة الوحدات ومن الكتالوج
+            if (isset($seen[$d['u']])) continue;
+            $seen[$d['u']] = true;
+            $out[] = ['t' => $d['t'], 'u' => $d['u']];
+        }
+
+        return $out;
+    }
+
+    /**
+     * (WP-10.3 · §10) **مطابقاتٌ تشغيلية**: ما في يد المشغّل معرّفٌ لا اسم —
+     * معرّفُ طلب، بصمةُ خطأ، عنوانُ IP، مفتاحُ إعداد، بريدُ حساب.
+     *
+     * وكلُّ مطابقةٍ **خلفَ نمطٍ في النصّ**: ضغطةُ المفتاح تكلّف ٨١ استعلام LIKE
+     * سلفاً، فنصٌّ عاديّ لا يشبه شيئاً من هذه يخرج من هنا بلا استعلامٍ واحد
+     * (`OperationalSearchTest` يقيس العدد). ولكلٍّ حارسُ الشاشة التي تقصدها:
+     * الأثرُ والعنوان لحامل `audit` أو المالك، والأخطاءُ والإعداداتُ للمالك،
+     * والحساباتُ لحامل `users` — فلا يفتح البحثُ باباً أغلقه المتحكّم.
+     */
+    protected function operational(string $q, $u): array
+    {
+        if (mb_strlen($q) < 3 || mb_strlen($q) > 64) return [];
+
+        $owner = hub_is_owner($u);
+        $audit = $owner || hub_flag($u, 'audit');
+        $ip = filter_var($q, FILTER_VALIDATE_IP) !== false;
+        $out = [];
+
+        // معرّفٌ لاتينيّ داخل جملةٍ عربية يتشظّى ترتيبُه (النقطةُ والشرطةُ تقفزان
+        // إلى الطرف الخطأ). والوجهةُ نصٌّ مهروبٌ لا HTML، فلا مكانَ لـ<bdi> هنا —
+        // فيُعزَل بمعزول Unicode نفسِه: FSI…PDI، وهو ما يفعله <bdi> حرفياً.
+        $ltr = fn (string $s) => "\u{2068}" . $s . "\u{2069}";
+
+        // ١) معرّفُ طلب — بنمط `Observability` نفسِه، مشروطاً برقمٍ وفاصلٍ كي لا
+        //    تلتقطَه كلمةٌ إنجليزية عادية، وليس عنواناً (العنوانُ له بابُه).
+        if ($audit && ! $ip && preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]{7,39}$/', $q)
+            && preg_match('/\d/', $q) && preg_match('/[-._:]/', $q)) {
+            $out[] = ['t' => '🧵 أثرُ الطلب ' . $ltr($q), 'u' => route('system.trace', $q)];
+        }
+
+        // ٢) عنوانُ IP — التدقيقُ لحامل الراية، وذكاءُ العنوان بحارس شاشته
+        if ($ip && $audit) {
+            $out[] = ['t' => '🕘 تدقيقُ العنوان ' . $ltr($q), 'u' => route('audit.index', ['ip' => $q])];
+            if ($owner || hub_monitor($u)) {
+                $out[] = ['t' => '🛡️ ذكاءُ العنوان ' . $ltr($q), 'u' => route('security.ip', $q)];
+            }
+        }
+
+        // ٣) خطأٌ ببصمته (sha256) أو بمعرّفه (uuid) — استعلامٌ واحدٌ على عمودٍ
+        //    مفهرَس، وبعد النمط لا قبله. ولا رابطَ لصفٍّ لا وجودَ له.
+        if ($owner && preg_match('/^([0-9a-f]{64}|[0-9a-f-]{36})$/i', $q)) {
+            $col = str_contains($q, '-') ? 'id' : 'hash';
+            $id = \Illuminate\Support\Facades\DB::table('error_events')
+                ->where($col, $q)->orderBy('id')->value('id');
+            if ($id) $out[] = ['t' => '🐞 الخطأ ' . $ltr(mb_substr($q, 0, 12) . '…'), 'u' => route('errors.show', $id)];
+        }
+
+        // ٤) مفتاحُ إعداد — من كتالوج الإعدادات نفسِه (`Settings::entry`)، فلا
+        //    يُوعَد بمفتاحٍ لا تعرفه الشاشة. والقراءةُ من config بلا استعلام.
+        if ($owner && str_contains($q, '.') && preg_match('/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/i', $q)
+            && ($entry = \App\Support\Settings::entry($q)) !== null) {
+            $out[] = ['t' => '⚙️ الإعداد ' . ($entry['label'] ?? $q) . ' — ' . $ltr($q),
+                      'u' => route('settings.edit') . '#' . $q];
+        }
+
+        // ٥) بريدُ حساب — لحامل راية المستخدمين وحدَه، واستعلامٌ واحدٌ خلف النمط
+        if (filter_var($q, FILTER_VALIDATE_EMAIL) !== false && hub_flag($u, 'users')) {
+            $hit = \App\Models\User::whereNull('deleted_at')->where('email', $q)
+                ->orderBy('id')->value('id');
+            if ($hit) $out[] = ['t' => '👤 حسابُ ' . $ltr($q), 'u' => route('users.edit', $hit)];
+        }
+
+        return $out;
     }
 
     /* ────────── أدوات داخلية ────────── */

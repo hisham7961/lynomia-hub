@@ -3,7 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
-        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><a href="{{ route('security.index') }}">مركز الأمان</a><span aria-hidden="true">‹</span><b>خطر الهويّة</b></nav>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span>@include('security.parts.root_crumb')<span aria-hidden="true">‹</span><b>خطر الهويّة</b></nav>
         <h2>🪪 خطر الهويّة</h2>
         <div class="sub">كلُّ حسابٍ بدرجته وعواملِه المفسَّرة — امتيازٌ وخمولٌ وفشلُ دخولٍ وأجهزةٌ وعناوين. إشارةُ مراجعةٍ بشرية: لا امتيازَ يُسحب آلياً</div>
     </div>

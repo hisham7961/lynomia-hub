@@ -7,7 +7,7 @@
 @endphp
 <div class="hero">
     <div>
-        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><a href="{{ route('security.index') }}">مركز الأمان</a><span aria-hidden="true">‹</span><a href="{{ route('security.findings') }}">النتائج</a><span aria-hidden="true">‹</span><b><bdi class="mono ltr">{{ $f->code }}</bdi></b></nav>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span>@include('security.parts.root_crumb')<span aria-hidden="true">‹</span><a href="{{ route('security.findings') }}">النتائج</a><span aria-hidden="true">‹</span><b><bdi class="mono ltr">{{ $f->code }}</bdi></b></nav>
         <h2>🔎 {{ $f->title }}</h2>
         <div class="sub">
             <span class="bdg {{ \App\Support\Severity::tone($f->severity) }}">{{ \App\Support\Severity::label($f->severity) }}</span>

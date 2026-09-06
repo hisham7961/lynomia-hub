@@ -55,15 +55,13 @@ class ActionCenter
     /**
      * الإشاراتُ المحسوبةُ بعد إسقاط التصرّف. تُرجع المرئيَّ + المخفيَّ (مؤجَّل/مرفوض)
      * منفصلين، والعدّادات. تُحدَّث `last_seen_at` للمفاتيح الحيّة فقط (لتشذيب اليتيم).
+     *
+     * `$health` مزوّدٌ كسولٌ يُمرَّر إلى `AttentionQueue` (انظر `produced`).
      */
-    public static function signals(bool $fresh = false, ?string $projectId = null): array
+    public static function signals(bool $fresh = false, ?string $projectId = null,
+                                   ?\Closure $health = null): array
     {
-        $items = [];
-        try {
-            $items = hub_recommendations($fresh, $projectId)['items'] ?? [];
-        } catch (\Throwable $e) {
-            report($e);
-        }
+        $items = self::produced($fresh, $projectId, $health);
 
         // مفاتيحُ حيّة: تُبنى لكل إشارةٍ تحمل مفتاحاً (القابلةُ للتصرّف)
         $keys = array_values(array_filter(array_map(fn ($s) => $s['key'] ?? null, $items)));
@@ -112,6 +110,43 @@ class ActionCenter
     }
 
     /**
+     * **منتِجا الإشارات القابلة للتصرّف** — مصدرٌ واحدٌ يقرؤه العرضُ (`signals`)
+     * والحارسُ (`liveByKey`) معاً، فلا تظهر إشارةٌ في الصفّ ويرفض التصرّفُ بها.
+     *
+     * ① `hub_recommendations` — الإشاراتُ التجارية المنطَّقة (قائمٌ كما هو).
+     * ② `AttentionQueue::items` (WP-10.2) — حالةُ النظام: أمنٌ وتشغيلٌ وأخطاءٌ
+     *    وتدقيقٌ وجودةٌ وتنفيذ. **منتِجٌ لا محرّك**: يُسقَط عليه تصرّفُ المستخدم
+     *    من `signal_states` نفسِها بلا مخزنٍ ثالث، ويُحرَس بحارس مركز كلِّ مصدر
+     *    داخلَه — فمن لا يرى مركزاً لا تصله إشارتُه.
+     *
+     * وسقوطُ أحدِ المنتِجَين لا يُسقط الآخر: الصفُّ الناقصُ خيرٌ من صفحةٍ بيضاء.
+     *
+     * @param \Closure|null $health مزوّدٌ **كسول** لنموذج `Health::check()` حين
+     *        يكون المُنادي قد حسبه (أو سيحسبه) في الطلب نفسِه — فلا يُحسب أثقلُ
+     *        قارئٍ مرّتين. النمطُ نفسُه في `AlertEngine::detect($rules, $health)`،
+     *        وكسولٌ لا مصفوفةً لأنّ الطرفين مشروطان: صفحةٌ دافئةٌ لا تحتاجه أصلاً.
+     */
+    protected static function produced(bool $fresh = false, ?string $projectId = null,
+                                       ?\Closure $health = null): array
+    {
+        $items = [];
+        try {
+            $items = hub_recommendations($fresh, $projectId)['items'] ?? [];
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        // ── Control Plane: Phase 10 (WP-10.2) ──
+        try {
+            foreach (AttentionQueue::items(null, $fresh, $health) as $it) $items[] = $it;
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return $items;
+    }
+
+    /**
      * (WP-6.3 · ق٣) التنبيهاتُ المفتوحة إشاراتٍ: المُطلقُ «كما هو»، والمُقَرُّ به
      * يبقى ظاهراً بوسمه (شرطُه لم يزل — الإقرارُ سكوتُ جرسٍ لا شفاء). المفتاحُ هو
      * dedup_key نفسُه (يبدأ بـ`alert:`)، وliveByKey لا يعرفه فيرفض disposition
@@ -139,6 +174,9 @@ class ActionCenter
                     'url' => route('alerts.center'),
                     'state' => 'open', 'snoozed_until' => null,
                     'can_act' => false, 'can_dismiss' => false,
+                    // (WP-10.2) وسمُ النوع: به يفرز مستوى التحكّم إشارةَ النظام
+                    // عن الإشارة التجارية — إضافةٌ متوافقةٌ خلفياً لا تغيّر سلوكاً.
+                    'type' => 'alert',
                 ];
             }
 
@@ -156,8 +194,9 @@ class ActionCenter
      */
     public static function liveByKey(bool $fresh = false, ?string $projectId = null): array
     {
-        $items = [];
-        try { $items = hub_recommendations($fresh, $projectId)['items'] ?? []; } catch (\Throwable $e) {}
+        // المنتِجان معاً (WP-10.2): حارسُ التصرّف يقرأ ما يقرؤه العرضُ حرفياً —
+        // وإلا رُفض تأجيلُ بندٍ ظاهرٍ في الصفّ بلا سببٍ يفهمه المستخدم.
+        $items = self::produced($fresh, $projectId);
 
         $out = [];
         foreach ($items as $s) {

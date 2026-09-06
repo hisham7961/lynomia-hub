@@ -285,16 +285,38 @@ class SecurityFindings
      * العدّةُ نفسُها لكل الشدّات دفعةً واحدة (بوّابة الطور ٤ — ميزانيّة): لوحةُ
      * الأمان كانت تعدّ الحرجَ والمرتفعَ باستعلامين والفرقُ تجميعةٌ واحدة.
      *
+     * **والتنطيقُ معاملٌ لا قارئٌ ثانٍ** (§49 · ق١ · critic #9): `null` تعني
+     * «كلَّ المنشأة» — وهو ما تحتاجه اللقطةُ اليومية ولوحةُ المالك؛ ومصفوفةُ
+     * معرّفاتِ شركاتٍ تُقصر العدَّ على ما يراه قارئٌ معزول، بنفس شرط
+     * `SecurityController::findingsQuery` حرفياً (نتيجةُ المنظّمة بلا شركةٍ
+     * يراها الجميع). فرقمٌ يعدُّ ما لا يُفتَح تسريبٌ صامتٌ وكذبةٌ مزدوجة.
+     *
+     * @param  array<int, string>|null  $companyIds  مخرَجُ `hub_company_ids()`
      * @return array<string, int> شدّة ← عددُ المفتوح/المُقَرّ
      */
-    public static function openCounts(): array
+    public static function openCounts(?array $companyIds = null): array
     {
         if (! Schema::hasTable('security_findings')) return [];
 
-        return DB::table('security_findings')->whereIn('status', ['open', 'acknowledged'])
+        return self::scopeCompanies(
+            DB::table('security_findings')->whereIn('status', ['open', 'acknowledged']), $companyIds)
             ->groupBy('severity')->orderBy('severity')
             ->selectRaw('severity, COUNT(*) as n')->pluck('n', 'severity')
             ->map(fn ($n) => (int) $n)->all();
+    }
+
+    /**
+     * شرطُ «أيَّ نتيجةٍ يرى هذا القارئ» — **مكتوبٌ مرّةً واحدة** ويقرؤه العدّادُ
+     * والقائمةُ والصفُّ معاً. النتيجةُ بلا شركة (`company_id` فارغ) نتيجةُ منظّمةٍ
+     * يراها الجميع؛ وما عداها يُقصر على شركات القارئ.
+     *
+     * @param  array<int, string>|null  $companyIds  `null` = بلا تنطيق (مالكٌ)
+     */
+    public static function scopeCompanies($q, ?array $companyIds)
+    {
+        if ($companyIds === null) return $q;
+
+        return $q->where(fn ($w) => $w->whereNull('company_id')->orWhereIn('company_id', $companyIds));
     }
 
     /**

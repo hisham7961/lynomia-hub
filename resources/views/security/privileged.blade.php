@@ -3,7 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
-        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><a href="{{ route('security.index') }}">مركز الأمان</a><span aria-hidden="true">‹</span><b>مراجعة الامتيازات</b></nav>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span>@include('security.parts.root_crumb')<span aria-hidden="true">‹</span><b>مراجعة الامتيازات</b></nav>
         <h2>🗂️ مراجعة الامتيازات</h2>
         <div class="sub">من يملك ماذا ولماذا — ثماني فئاتٍ تُراجَع بيد المالك: لا امتيازَ يُسحب تلقائياً، والإقرارُ على سكّة النتائج الأمنية نفسِها</div>
     </div>

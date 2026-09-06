@@ -3,7 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
-        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><a href="{{ route('security.index') }}">مركز الأمان</a><span aria-hidden="true">‹</span><b>الجلسات</b></nav>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span>@include('security.parts.root_crumb')<span aria-hidden="true">‹</span><b>الجلسات</b></nav>
         <h2>🖥️ مركز الجلسات</h2>
         <div class="sub">من داخلٌ الآن ومن أيّ جهازٍ وعنوان، ومن أُخرج ولماذا — والوسمُ يلتقط العنوانَ الغريب على صاحبه</div>
     </div>

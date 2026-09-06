@@ -3,6 +3,15 @@
 @section('content')
 {{-- WP-7.2 · spec §46: ما أُنجز، ما تأخّر، الالتزام، اختلال التوزيع — أرقامُ تنفيذٍ
      لا مراقبةٌ شخصية: لا زيارات صفحات، ولا ترتيبَ موظفين بالنشاط، ولا درجاتٍ أمنية. --}}
+@php
+    /* (§49 · §25 — لا طريقَ مسدود) هذه الشاشةُ تُقرأ لحاملِ راية المراقبة، وأرقامُها
+       أرقامُ منشأةٍ يحقّ له. أمّا **الوجهات** فلكلٍّ حارسُها: `activity.index` للمالك
+       وحدَه، و`support` بـ`tickets:v`، و`workforce.team` بـ`hr:v`، وصفحاتُ الوحدات
+       بمصفوفة القارئ. فالرقمُ يبقى ويسقط الرابطُ وحدَه لمن لا يفتحه — لا رقمَ
+       يُحجب (ذلك كذبٌ)، ولا رابطٌ يَعِد ببابٍ يردّه ٤٠٣. */
+    $wfU = auth()->user();
+    $wfMod = fn (string $m, ...$args) => hub_can($wfU, $m, 'v') ? route(...$args) : null;
+@endphp
 <div class="hero">
     <div>
         <nav class="crumbs" aria-label="مسار التنقل"><span>الفريق</span><span aria-hidden="true">‹</span><b>نظرة القوى العاملة</b></nav>
@@ -11,7 +20,7 @@
     </div>
     <div class="crow" style="margin-top:0">
         <a class="btn ghost sm" href="{{ route('capacity') }}">📊 القدرات والاستغلال</a>
-        <a class="btn ghost sm" href="{{ route('workforce.team') }}">👥 فريقي اليوم</a>
+        @if (hub_can($wfU, 'hr', 'v'))<a class="btn ghost sm" href="{{ route('workforce.team') }}">👥 فريقي اليوم</a>@endif
     </div>
 </div>
 
@@ -26,28 +35,29 @@
 @include('partials.cc.kpis', ['items' => [
     ['label' => 'نشطون اليوم', 'value' => $x['active_today'], 'tone' => 'g',
      'hint' => 'مستخدمون لهم نبضةُ جلسةٍ منذ منتصف الليل — لقطةُ اليوم لا النافذة',
-     'url' => route('activity.index')],
+     'url' => hub_is_owner() ? route('activity.index') : null],
     ['label' => 'أُنجز في النافذة', 'value' => (int) $wfCmp['cur'], 'tone' => 'ok',
      'sub' => $wfCmp['pct'] === null ? 'النافذة السابقة: ' . (int) ($wfCmp['prev'] ?? 0)
             : ($wfCmp['pct'] >= 0 ? '▲' : '▼') . ' ' . abs($wfCmp['pct']) . '٪ عن النافذة السابقة (' . (int) $wfCmp['prev'] . ')',
      'hint' => 'من ختم الإنجاز completed_at — تعديلٌ لاحقٌ على مهمةٍ منجزة لا يغيّر الرقم',
-     'url' => route('m.index', 'tasks')],
+     'url' => $wfMod('tasks', 'm.index', 'tasks')],
     ['label' => 'متأخّرة الآن', 'value' => $x['overdue'], 'tone' => $x['overdue'] ? 'bad' : 'ok',
-     'hint' => 'مهامٌ مفتوحةٌ فات موعدُها — لقطةُ اللحظة', 'url' => route('m.index', 'tasks')],
+     'hint' => 'مهامٌ مفتوحةٌ فات موعدُها — لقطةُ اللحظة', 'url' => $wfMod('tasks', 'm.index', 'tasks')],
     ['label' => 'الالتزام بالموعد', 'value' => $wfOt['pct'] === null ? '—' : $wfOt['pct'] . '٪',
      'tone' => $wfOt['pct'] === null ? 'g' : ($wfOt['pct'] >= 80 ? 'ok' : ($wfOt['pct'] >= 50 ? 'wn' : 'bad')),
      'sub' => $wfOt['with_due'] ? $wfOt['on_time'] . ' في الموعد من ' . $wfOt['with_due'] . ' منجزةٍ لها موعد'
             : 'لا منجزاتٍ لها موعدٌ في النافذة',
      'hint' => 'يومُ الإنجاز (من completed_at) داخل يوم الموعد أو قبله'],
-    ['label' => 'تذاكر مفتوحة', 'value' => $x['open_tickets'], 'tone' => 'g', 'url' => route('support')],
+    ['label' => 'تذاكر مفتوحة', 'value' => $x['open_tickets'], 'tone' => 'g',
+     'url' => $wfMod('tickets', 'support')],
     ['label' => 'خرق SLA في النافذة', 'value' => $wfSla['n'], 'tone' => $wfSla['n'] ? 'bad' : 'ok',
      'sub' => 'من ' . $wfSla['of'] . ' تذكرة في النافذة' . ($wfSla['capped'] ? ' (عيّنة بسقف ' . \App\Support\ExecutionStats::SLA_SAMPLE_CAP . ')' : ''),
-     'url' => route('support')],
+     'url' => $wfMod('tickets', 'support')],
     ['label' => 'مشاريع في خطر', 'value' => $wfRisk['n'], 'tone' => $wfRisk['n'] ? 'bad' : 'ok',
      'sub' => 'صحةٌ دون ٥٥ من ' . $wfRisk['of'] . ' مشروعٍ مفتوح' . ($wfRisk['capped'] ? ' (بسقف ' . \App\Support\ExecutionStats::HEALTH_SAMPLE_CAP . ')' : ''),
-     'url' => route('m.index', 'projects')],
+     'url' => $wfMod('projects', 'm.index', 'projects')],
     ['label' => 'اعتمادات معلّقة', 'value' => $x['pending_approvals'], 'tone' => $x['pending_approvals'] ? 'wn' : 'ok',
-     'url' => route('m.index', 'approvals')],
+     'url' => $wfMod('approvals', 'm.index', 'approvals')],
 ]])
 
 <div class="card">
@@ -106,7 +116,7 @@
                 <div>
                     <div class="sub"><b>فوق طاقتهم:</b></div>
                     @foreach (array_slice($wfL['over'], 0, 5) as $wfO)
-                        <div class="sub">🔥 <a href="{{ route('m.show', ['hr', $wfO['id']]) }}">{{ $wfO['name'] }}</a> — حمله {{ $wfO['load'] }}٪</div>
+                        <div class="sub">🔥 @if (hub_can($wfU, 'hr', 'v'))<a href="{{ route('m.show', ['hr', $wfO['id']]) }}">{{ $wfO['name'] }}</a>@else{{ $wfO['name'] }}@endif — حمله {{ $wfO['load'] }}٪</div>
                     @endforeach
                 </div>
             @endif
@@ -122,7 +132,7 @@
                 <div>
                     <div class="sub"><b>بلا تكليفٍ مفتوح:</b></div>
                     @foreach (array_slice($wfL['idle'], 0, 5) as $wfI)
-                        <div class="sub">🌤️ <a href="{{ route('m.show', ['hr', $wfI['id']]) }}">{{ $wfI['name'] }}</a></div>
+                        <div class="sub">🌤️ @if (hub_can($wfU, 'hr', 'v'))<a href="{{ route('m.show', ['hr', $wfI['id']]) }}">{{ $wfI['name'] }}</a>@else{{ $wfI['name'] }}@endif</div>
                     @endforeach
                 </div>
             @endif
@@ -169,7 +179,7 @@
             <div>
                 <div class="sub"><b>الأقدمُ ركوداً:</b></div>
                 @foreach ($bnS['rows'] as $bnT)
-                    <div class="sub">🕸️ <a href="{{ route('m.show', ['tasks', $bnT['id']]) }}">{{ $bnT['title'] }}</a>
+                    <div class="sub">🕸️ @if (hub_can($wfU, 'tasks', 'v'))<a href="{{ route('m.show', ['tasks', $bnT['id']]) }}">{{ $bnT['title'] }}</a>@else{{ $bnT['title'] }}@endif
                         — {{ $bnT['days'] }} يوماً بلا مساس{{ $bnT['assignee'] ? ' (' . $bnT['assignee'] . ')' : '' }}</div>
                 @endforeach
             </div>
@@ -178,7 +188,7 @@
             <div>
                 <div class="sub"><b>الأكثرُ ارتداداً:</b></div>
                 @foreach ($bnR['rows'] as $bnRt)
-                    <div class="sub">🔁 <a href="{{ route('m.show', ['tickets', $bnRt['id']]) }}">{{ $bnRt['subject'] }}</a> — أُعيد فتحُها {{ $bnRt['n'] }} مرة</div>
+                    <div class="sub">🔁 @if (hub_can($wfU, 'tickets', 'v'))<a href="{{ route('m.show', ['tickets', $bnRt['id']]) }}">{{ $bnRt['subject'] }}</a>@else{{ $bnRt['subject'] }}@endif — أُعيد فتحُها {{ $bnRt['n'] }} مرة</div>
                 @endforeach
             </div>
         @endif

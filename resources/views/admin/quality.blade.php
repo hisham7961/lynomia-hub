@@ -5,6 +5,12 @@
     use App\Support\Severity;
     $qcNum = fn ($v, int $d = 0) => $v === null ? '—' : number_format((float) $v, $d);
     $qcPct = fn ($v) => $v === null ? '—' : $v . '٪';
+    /* (§49 · §25 — لا طريقَ مسدود) التبويباتُ غيرُ «البيانات» تُقرأ لحاملِ راية
+       المتابعة، وأرقامُها أرقامُ منشأةٍ يحقّ له. أمّا وجهاتُ الوحدات (المشكلات ·
+       لوحة الأهداف · لوحة الدعم) فبمصفوفة القارئ لا برايته — فالرقمُ يبقى ويسقط
+       الرابطُ وحدَه لمن لا يفتحه. (تبويبُ البيانات للمالك، وروابطُه سليمةٌ فيه.) */
+    $qcU = auth()->user();
+    $qcMod = fn (string $m, ...$args) => hub_can($qcU, $m, 'v') ? route(...$args) : null;
 @endphp
 
 <div class="hero">
@@ -82,7 +88,7 @@
         ['label' => '⚠️ مشكلاتٌ حرجة', 'value' => number_format($ov['risks']['critical']),
          'tone' => $ov['risks']['critical'] ? 'bad' : 'ok',
          'sub' => 'من ' . $ov['risks']['listed'] . ' في رأس طابور المخاطر',
-         'url' => route('m.index', 'issues'),
+         'url' => $qcMod('issues', 'm.index', 'issues'),
          'hint' => 'CeoBoard::risks — رأسُ الطابور المفتوح بنطاق القارئ وصلاحيته، لا إحصاءُ الكلّ'],
 
         ['label' => '📈 اتّجاه التحسّن',
@@ -597,7 +603,7 @@
         <h3 class="cardtitle" style="padding:12px 14px 0">🚩 أهدافٌ تحتاج نظرةً الآن</h3>
         <div class="sub" style="padding:0 14px 8px">
             فات موعدُه أو متعثّرٌ أو راكد — بهذا الترتيب. والتسلسلُ الكامل في
-            <a href="{{ route('okrs.board') }}">شاشة الأهداف</a>.
+            @if (hub_can($qcU, 'okrs', 'v'))<a href="{{ route('okrs.board') }}">شاشة الأهداف</a>@else<b>شاشة الأهداف</b>@endif.
         </div>
         @if (empty($okr['attention']))
             <div style="padding:0 14px 14px">
@@ -800,7 +806,7 @@
         <h3 class="cardtitle" style="padding:12px 14px 0">🎫 خروقات SLA</h3>
         <div class="sub" style="padding:0 14px 8px">
             من طابور التذاكر المفتوحة (أقدمُ {{ \App\Http\Controllers\Web\QualityController::SLA_QUEUE_CAP }} تذكرة)
-            بمحرّك <span class="mono ltr">hub_sla</span> نفسِه الذي تقرؤه <a href="{{ route('support') }}">لوحة الدعم</a> —
+            بمحرّك <span class="mono ltr">hub_sla</span> نفسِه الذي تقرؤه @if (hub_can($qcU, 'tickets', 'v'))<a href="{{ route('support') }}">لوحة الدعم</a>@else<b>لوحة الدعم</b>@endif —
             لا عتبةَ ثانيةٌ تُكتب هنا.
         </div>
         @include('partials.cc.findings', [

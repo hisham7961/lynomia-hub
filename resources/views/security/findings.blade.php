@@ -3,7 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
-        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><a href="{{ route('security.index') }}">مركز الأمان</a><span aria-hidden="true">‹</span><b>النتائج والتوصيات</b></nav>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span>@include('security.parts.root_crumb')<span aria-hidden="true">‹</span><b>النتائج والتوصيات</b></nav>
         <h2>🔎 النتائج الأمنية</h2>
         <div class="sub">صفٌّ واحد لكل مشكلة: منذ متى تُرصَد، ومن أقرّ بها، وكيف تُصلَح — يُغلَق تلقائياً ما زال شرطُه ولا يُحذف تاريخُه</div>
     </div>

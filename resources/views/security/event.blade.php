@@ -10,7 +10,7 @@
 @endphp
 <div class="hero">
     <div>
-        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><a href="{{ route('security.index') }}">مركز الأمان</a><span aria-hidden="true">‹</span><a href="{{ route('security.index') }}#secevents">السجل الأمني</a><span aria-hidden="true">‹</span><b><bdi class="mono ltr">{{ $e['source'] }}#{{ $e['id'] }}</bdi></b></nav>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span>@include('security.parts.root_crumb')<span aria-hidden="true">‹</span>@if (hub_is_owner())<a href="{{ route('security.index') }}#secevents">السجل الأمني</a>@else<span>السجل الأمني</span>@endif<span aria-hidden="true">‹</span><b><bdi class="mono ltr">{{ $e['source'] }}#{{ $e['id'] }}</bdi></b></nav>
         <h2>🧾 {{ $e['label'] }} <span class="bdg {{ $e['tone'] }}">{{ $sevLabel }}</span></h2>
         <div class="sub">
             <bdi class="mono ltr">{{ $e['code'] }}</bdi>

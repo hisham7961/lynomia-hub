@@ -3,7 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
-        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><a href="{{ route('security.index') }}">مركز الأمان</a><span aria-hidden="true">‹</span><b>ثقة الأجهزة</b></nav>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span>@include('security.parts.root_crumb')<span aria-hidden="true">‹</span><b>ثقة الأجهزة</b></nav>
         <h2>📱 ثقة الأجهزة</h2>
         <div class="sub">كلُّ جهازٍ عُرف لمستخدم: معلّقٌ حتى يُراجَع، موثوقٌ، أو مُبطَل — والمُبطَلُ يبقى ظاهراً هنا. بلا أيّ بصمةٍ غازية</div>
     </div>
