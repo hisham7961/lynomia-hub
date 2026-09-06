@@ -251,6 +251,13 @@
     </div>
 </div>
 
+{{-- (WP-6.2) اربط هذا الخطأ بحادثةٍ مفتوحة — المرجعُ بصمتُه، فإعادةُ الربط تحديث --}}
+@include('partials.incident_link', [
+    'ilKind' => 'error',
+    'ilRef' => $e->hash,
+    'ilSummary' => 'خطأ (' . $kindLabel . '): ' . \Illuminate\Support\Str::limit($e->message, 200),
+])
+
 {{-- أخطاء شقيقة --}}
 @if ($siblings->isNotEmpty())
     <div class="card pad0">

@@ -32,6 +32,9 @@ class ColumnFitsItsWriterTest extends TestCase
     private const PREFIXED = [
         ['notifications_hub', 'kind', 'rule:',  'HubAutomation::run — إشعارُ قاعدة تنبيه'],
         ['outbox',            'kind', 'rule:',  'نفسُ البادئة في الصادر'],
+        // (WP-6.3) مفتاحُ التنبيه: أطولُ بادئةٍ ممكنة (alert:<أطول مصدر>:) + uuid
+        // القاعدة — والموضوعُ (subject ≤ ١٢٠) فوقه يقصّه الكاتبُ عند ١٩١ صراحةً
+        ['alert_instances',   'dedup_key', 'alert:security.failed_logins:', 'AlertEngine::dedupKey'],
     ];
 
     public function test_every_prefixed_identifier_fits_its_column(): void
@@ -50,6 +53,65 @@ class ColumnFitsItsWriterTest extends TestCase
         $this->assertSame([], $tight,
             'عمودٌ أضيق ممّا يُكتب فيه — يمرّ على SQLite ويرمي على MySQL فيسقط ما يعتمد عليه: '
             . implode(' · ', $tight));
+    }
+
+    /**
+     * (WP-6.3 · critic #36) `alert_instances.title` عرضُه ٣٠٠ ويتغذّى من نصوصٍ
+     * حرّة (رسائلُ أخطاء، `Health::c()['why']`) — الكاتبُ (`AlertEngine::upsert`)
+     * يقصّ بـ`mb_substr` قبل الكتابة، وإلا مرّت على SQLite ورمت على MySQL.
+     */
+    public function test_alert_instance_title_is_clipped_by_its_writer(): void
+    {
+        $this->seedCore();
+        $rule = \App\Models\AlertRule::create(['name' => 'قاعدة قصّ', 'mod' => '', 'field' => 'x', 'op' => 'يساوي',
+            'status' => 'مفعّلة', 'source' => 'security.lockdown', 'window_min' => 5]);
+
+        $engine = new \App\Support\AlertEngine();
+        $m = new \ReflectionMethod($engine, 'upsert');
+        $out = ['fired' => 0, 'resolved' => 0, 'incidents' => 0, 'notifs' => 0];
+        $long = str_repeat('عنوانٌ طويلٌ جداً ', 40);   // > ٣٠٠ حرفاً بأحرفٍ عربية
+        $m->invokeArgs($engine, [$rule, 'alert:clip-test', ['title' => $long, 'count' => 1], &$out]);
+
+        $stored = (string) \Illuminate\Support\Facades\DB::table('alert_instances')
+            ->where('dedup_key', 'alert:clip-test')->value('title');
+        $this->assertNotSame('', $stored, 'لم يُكتب صفُّ التنبيه أصلاً');
+        $this->assertLessThanOrEqual(300, mb_strlen($stored),
+            'العنوانُ تجاوز عرضَ عموده — يمرّ على SQLite ويرمي على MySQL');
+        $this->assertSame(mb_substr($long, 0, 300), $stored, 'القصُّ عند الكاتب بـmb_substr لا بترُ بايتات');
+    }
+
+    /**
+     * (WP-6.2 · critic #36) `incident_links.summary` عرضُه ٣٠٠ ويتغذّى من نصوصٍ
+     * حرّة (رسالةُ خطأ، اسمُ سجلٍّ في قيد تدقيق، وصفُ حدثٍ أمنيّ) يمرّرها زرُّ
+     * «اربط بحادثة» من ثلاث شاشات — والكاتبُ (`IncidentLinkController::store`)
+     * يقصّ بـ`mb_substr` قبل الكتابة. بلا القصّ: SQLite تخزّن الفائضَ صامتةً
+     * وMySQL ترمي `Data too long` فيسقط الربطُ كلُّه من أطول رسالةِ خطأ.
+     */
+    public function test_incident_link_summary_is_clipped_by_its_writer(): void
+    {
+        $this->seedCore();
+        $i = \App\Models\Incident::create(['title' => 'حادثةُ قصّ', 'severity' => 'عالي', 'status' => 'مفتوح']);
+        $long = str_repeat('ملخّصٌ طويلٌ جداً ', 60);      // > ٣٠٠ حرفاً بأحرفٍ عربية
+
+        $this->actingAs($this->owner)
+            ->post("/admin/incidents/{$i->id}/link", ['kind' => 'note', 'summary' => $long])
+            ->assertRedirect();
+
+        $stored = (string) \Illuminate\Support\Facades\DB::table('incident_links')
+            ->where('incident_id', $i->id)->orderBy('id')->value('summary');
+        $this->assertNotSame('', $stored, 'لم يُكتب صفُّ الدليل أصلاً');
+        $this->assertLessThanOrEqual(300, mb_strlen($stored),
+            'الملخّصُ تجاوز عرضَ عموده — يمرّ على SQLite ويرمي على MySQL');
+        $this->assertSame(mb_substr(trim($long), 0, 300), $stored, 'القصُّ عند الكاتب بـmb_substr لا بترُ بايتات');
+
+        // والمرجعُ كذلك (١٢٠): بصمةُ خطأٍ أو معرّفُ طلبٍ طويل لا يُسقط الصفَّ
+        $longRef = str_repeat('r', 400);
+        $this->actingAs($this->owner)
+            ->post("/admin/incidents/{$i->id}/link", ['kind' => 'error', 'ref' => $longRef, 'summary' => 'دليل'])
+            ->assertRedirect();
+        $ref = (string) \Illuminate\Support\Facades\DB::table('incident_links')
+            ->where('incident_id', $i->id)->where('kind', 'error')->orderBy('id')->value('ref');
+        $this->assertSame(120, mb_strlen($ref), 'المرجعُ لم يُقصّ عند الكاتب بعرض عموده');
     }
 
     /** والإشعارُ من قاعدة تنبيه يُكتب فعلاً — لا نظرياً */

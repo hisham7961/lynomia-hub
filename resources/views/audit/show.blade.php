@@ -158,6 +158,15 @@
     </div>
 </div>
 
+{{-- (WP-6.2) اربط هذا القيدَ بحادثةٍ مفتوحة — المرجعُ رقمُ القيد، فلا يُربط مرتين --}}
+@include('partials.incident_link', [
+    'ilKind' => 'audit',
+    'ilRef' => 'audit#' . $a->id,
+    'ilSummary' => 'قيد تدقيق #' . $a->id . ': ' . $a->action
+        . ($a->module ? ' — ' . ($modDef['label'] ?? $a->module) : '')
+        . ($a->name ? ' — ' . \Illuminate\Support\Str::limit($a->name, 80) : ''),
+])
+
 {{-- العلاقات --}}
 <div class="card">
     <h3 class="cardtitle">🕸️ ماذا كتب الطلبُ نفسُه أيضاً؟</h3>

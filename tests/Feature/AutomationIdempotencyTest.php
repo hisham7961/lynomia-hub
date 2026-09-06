@@ -78,7 +78,8 @@ class AutomationIdempotencyTest extends TestCase
         $this->assertTrue($dupDate, 'نافذة اليوم تُبقي إشعار الأمس فلا تكرار');
 
         // حارس مصدر: الكود يستعمل whereDate لا نافذة datetime
-        $src = file_get_contents(app_path('Console/Commands/HubAutomation.php'));
+        // (WP-6.3) جوهرُ alertRules استُخرج إلى App\Support\AlertEngine — الحارسُ يتبعه
+        $src = file_get_contents(app_path('Support/AlertEngine.php'));
         $this->assertStringContainsString("whereDate('created_at'", $src,
             'دلو منع التكرار يقارن بالطابع الزمني لا باليوم — انزياح الكرون يُعيد الإطلاق');
     }

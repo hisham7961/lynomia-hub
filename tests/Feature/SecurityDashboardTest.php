@@ -108,9 +108,13 @@ class SecurityDashboardTest extends TestCase
             ->where(fn ($w) => $w->whereNull('expires_at')->orWhere('expires_at', '>', now()))->count();
         $this->assertSame($liveTokens, (int) $cards['tokens_live']['value']);
 
+        // المرجعُ يقرأ عمودَ kind (الطور ٦) مع احتياطٍ واسع النمط لصفوف ما قبله:
+        // MySQL 8 يطبّع JSON بمسافةٍ بعد النقطتين فالنمطُ الضيّق «"kind":"security"»
+        // كان يُرجع صفراً عليه وحده (سقطةُ CI على v2.404.0) بينما تمرّ MariaDB/SQLite.
         $secinc = (int) DB::table('incidents')->whereNull('deleted_at')
             ->whereNotIn('status', ['مغلق بتقرير', 'مُستعاد'])
-            ->where('meta', 'like', '%"kind":"security"%')->count();
+            ->where(fn ($w) => $w->where('kind', 'security')
+                ->orWhere(fn ($o) => $o->whereNull('kind')->where('meta', 'like', '%"kind"%security%')))->count();
         $this->assertSame($secinc, (int) $cards['incidents']['value']);
         $this->assertGreaterThanOrEqual(1, $secinc);
     }

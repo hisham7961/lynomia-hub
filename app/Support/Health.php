@@ -59,6 +59,7 @@ final class Health
         'outbox'     => ['عامل التسليم (كل ٥ دقائق)', 5, 15, 60],
         'uptime'     => ['الفحص الحيّ (كل ٥ دقائق)', 5, 15, 60],
         'ops'        => ['لقطةُ التشغيل (كل ٥ دقائق)', 5, 15, 60],   // ── Control Plane: Phase 2 (WP-2.3) ──
+        'alerts'     => ['تقييمُ التنبيهات (كل ٥ دقائق)', 5, 15, 60],   // ── Control Plane: Phase 6 (WP-6.3) ──
         'automation' => ['الأتمتة اليومية', 1440, 26 * 60, 50 * 60],
         'backup'     => ['النسخ الاحتياطي اليومي', 1440, 26 * 60, 50 * 60],
         'metrics'    => ['لقطة المقاييس اليومية', 1440, 26 * 60, 50 * 60],
@@ -380,8 +381,15 @@ final class Health
         try {
             $lock = (bool) setting('security.lockdown', false);
             $frozen = array_keys(array_filter(['exports' => (string) setting('security.freeze_exports', '0') === '1', 'tokens' => (string) setting('security.freeze_tokens', '0') === '1']));
+            // (WP-6.1) عمودُ `kind` المفهرسُ بدل مسح meta بـLIKE — فحصُ الصحة يعمل في
+            // كل نبضة؛ والصفوفُ القديمة (العمودُ فارغ) تُلتقط بسقوطٍ إلى meta
             $incidents = Schema::hasTable('incidents')
-                ? (int) DB::table('incidents')->whereNull('deleted_at')->whereNotIn('status', ['مغلق بتقرير', 'مُستعاد'])->where('meta', 'like', '%"kind":"security"%')->count() : 0;
+                ? (int) DB::table('incidents')->whereNull('deleted_at')->whereNotIn('status', ['مغلق بتقرير', 'مُستعاد'])
+                    ->when(hub_has_col('incidents', 'kind'),
+                        fn ($q) => $q->where(fn ($w) => $w->where('kind', 'security')
+                            ->orWhere(fn ($o) => $o->whereNull('kind')->where('meta', 'like', '%"kind"%security%'))),
+                        fn ($q) => $q->where('meta', 'like', '%"kind"%security%'))
+                    ->count() : 0;
             $chain = Audit::verifyTail(30);
             if ($lock) return self::c(self::MAINTENANCE, 'الأمن', 'قفل طوارئ مفعّل', ['lockdown' => true, 'frozen' => $frozen]);
             if (! $chain['ok']) return self::c(self::UNAVAILABLE, 'الأمن', 'سلسلة التدقيق مكسورة — ' . $chain['why'], ['chain' => $chain]);

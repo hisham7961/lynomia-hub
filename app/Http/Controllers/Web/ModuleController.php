@@ -606,6 +606,8 @@ class ModuleController extends Controller
 
         $prevStatus = $m->{$statusCol};
         $m->{$statusCol} = $new;
+        // ── Control Plane: Phase 6 (WP-6.1) ── السحبُ لا يلتفّ على بوّابة «الحالة تتطلب حقولاً»
+        $this->guardStatusRequires($def, $m);
         $this->stampTaskCompletion($module, $m, $prevStatus === null ? null : (string) $prevStatus);
         $m->save();
         $this->bustProgress($module, $m);
@@ -614,6 +616,48 @@ class ModuleController extends Controller
         }
 
         return response()->json(['ok' => 1]);
+    }
+
+    // ── Control Plane: Phase 6 (WP-6.1) ──
+    /**
+     * بوّابةُ «الحالة تتطلّب حقولاً» (§8.5) — مفتاحُ `requires` في سجلّ الوحدة
+     * (بجوار نمط `status_via_action`) لا فرعٌ لكل وحدةٍ في المتحكّم:
+     *
+     *   'requires' => ['مغلق بتقرير' => ['when' => ['severity' => ['حرج','عالي']],
+     *                                    'fields' => ['rootCause','steps','prevention'], 'why' => '…']]
+     *
+     * تُفحص **حالةُ النموذج بعد التعبئة** لا الطلبُ وحده — فالحقلُ المطلوب قد
+     * يكون محفوظاً سلفاً على السجل. تُستدعى من `fill()` (تحديثُ الويب والـAPI
+     * والإنشاء وتنفيذُ الموافقة — كلُّها تمرّ به) ومن `setStatus` (السحب) ومن
+     * حلقة `bulk(do=status)` — فالحارسُ الذي يُطبَّق في بابٍ ويُنسى في آخر
+     * ليس حارساً بل قناعةٌ كاذبة.
+     */
+    protected function guardStatusRequires(array $def, Model $m): void
+    {
+        $reqs = (array) ($def['requires'] ?? []);
+        if (! $reqs) return;
+
+        $fields = collect($def['fields'] ?? []);
+        $col = fn (string $key) => $fields->firstWhere('key', $key)['col'] ?? $key;
+
+        $rule = $reqs[(string) ($m->{$col((string) ($def['status'] ?? 'status'))} ?? '')] ?? null;
+        if (! $rule) return;
+
+        // شرطُ الانطباق (when): البوّابة لمن تلزمه وحده — الشدّةُ المنخفضة تمرّ
+        foreach ((array) ($rule['when'] ?? []) as $k => $vals) {
+            if (! in_array((string) ($m->{$col($k)} ?? ''), (array) $vals, true)) return;
+        }
+
+        $missing = [];
+        foreach ((array) ($rule['fields'] ?? []) as $k) {
+            if (trim((string) ($m->{$col($k)} ?? '')) === '') {
+                $missing[] = (string) ($fields->firstWhere('key', $k)['label'] ?? $k);
+            }
+        }
+        if ($missing) {
+            abort(422, (string) ($rule['why'] ?? 'هذه الحالة تتطلب حقولاً قبل بلوغها')
+                . ' — الناقص: ' . implode('، ', $missing));
+        }
     }
 
     /** تصدير CSV بنفس فلاتر القائمة الحالية (BOM ليقرأ Excel العربية) */
@@ -758,6 +802,9 @@ class ModuleController extends Controller
                 if (! $m || (string) $m->{$statusCol} === $to) continue;
                 $m->{$statusCol} = $to;
                 try {
+                    // ── Control Plane: Phase 6 (WP-6.1) ── البوّابة داخل try: رفضُها
+                    // رفضُ سجلٍّ يُنسب لصاحبه (refusal) ولا يقطع الدفعة
+                    $this->guardStatusRequires($def, $m);
                     $m->save();
                 } catch (\Throwable $e) {
                     $failed[] = $this->refusal($m, $e, $module);   // رفضُ حارسٍ خطأُ سجلٍّ لا خطأُ دفعة
@@ -1469,6 +1516,11 @@ class ModuleController extends Controller
         }
 
         \App\Support\AppsProjects::inherit($def, $m);
+
+        // ── Control Plane: Phase 6 (WP-6.1) ── بوّابةُ «الحالة تتطلب حقولاً» على
+        // حالة النموذج **بعد** التعبئة — تغطّي التحديث (ويب وAPI وPATCH) والإنشاء
+        // وتنفيذَ الموافقة معاً لأنها كلَّها تمرّ من هنا؛ السحبُ والجماعي يستدعيانها بأنفسهما
+        $this->guardStatusRequires($def, $m);
     }
 
     /**
