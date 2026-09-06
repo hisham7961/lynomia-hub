@@ -2,9 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Setting;
+use App\Support\Settings;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
 
 /** ضبط إعداد خادم من سطر الأوامر أو من حزم التحديث:  php artisan hub:set auth.session_min 0 */
 class HubSet extends Command
@@ -18,18 +17,25 @@ class HubSet extends Command
         $key = (string) $this->argument('key');
         $val = (string) $this->argument('value');
 
-        // **السلسلةُ كما هي** — مطابقاً لمسار الشاشة (`SettingController::put`).
+        // **السلسلةُ كما هي** — مطابقاً لمسار الشاشة.
         // كان `is_numeric($val) ? +$val : $val` يُفسد كلَّ قيمةٍ نصّيةٍ تبدو رقماً:
         // `'0071234'` تصير `71234` فيُدمَّر رقمُ حساب أو معرّفُ قناة، وعددٌ فوق
         // مدى العدد الصحيح يفقد دقّتَه بالتحويل إلى float — وكلُّه في حزمة تحديثٍ
         // صامتة لا يراها أحد. والمستهلكون يقارنون بـ`(string)` أصلاً.
-        // (v2.399) مفتاحُ سرٍّ (توكن، مفتاح API) يُخزَّن مشفَّراً enc: كما من الشاشة — كان يُكتب نصّاً صريحاً
-        $secret = in_array($key, \App\Http\Controllers\Web\SettingController::SECRETS, true);
-        if ($secret && $val !== '' && ! str_starts_with($val, 'enc:')) {
-            $val = 'enc:' . \Illuminate\Support\Facades\Crypt::encryptString($val);
+        //
+        // (WP-9.2) والكتابةُ عبر `Settings::put` وحدَه: التشفيرُ للحسّاس (وسمُ
+        // `sensitive` في الكتالوج — كان ثابتاً منسوخاً نسي `n8n.key` فيُكتب
+        // نصّاً صريحاً بينما شاشتُه تشفّره)، وإبطالُ الخبيئة، و**أثرُ تدقيقٍ
+        // لأول مرة**: كان مفتاحٌ أمنيٌّ يُطفأ من الطرفية بلا شاهدٍ إطلاقاً.
+        $secret = Settings::isSecret($key);
+
+        try {
+            Settings::put($key, $val, 'cli', 'php artisan hub:set');
+        } catch (\InvalidArgumentException $e) {
+            $this->error('رُفضت القيمة: ' . $e->getMessage());
+
+            return self::FAILURE;
         }
-        Setting::updateOrCreate(['key' => $key], ['value' => $val]);
-        Cache::forget('settings:all');
 
         $this->info($secret ? "تم: $key = •••• (مشفَّر)" : "تم: $key = $val");
 

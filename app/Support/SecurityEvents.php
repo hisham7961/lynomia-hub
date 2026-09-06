@@ -52,6 +52,10 @@ final class SecurityEvents
         'CLASSIFIED_ACCESS'       => ['وصول لبيانات مصنَّفة', 'high', ['وصول لبيانات مصنَّفة']],
         'SECURITY_POLICY_CHANGED' => ['تغيير سياسة أمنية', 'high', ['تفعيل قفل الطوارئ', 'رفع قفل الطوارئ', '@prefix:تجميد ', '@prefix:رفع تجميد ', '@settings:security']],
         'SETTINGS_CHANGED'        => ['تعديل إعدادات النظام', 'notice', ['تعديل إعدادات النظام']],
+        // (WP-9.3) الاستعادةُ فعلٌ مستقلّ: «أعاده إلى الافتراضيّ» جوابٌ آخرُ عن
+        // «ماذا فعل؟» غيرُ «ضبطه إلى كذا». ومفتاحٌ أمنيٌّ يرفعها إلى
+        // SECURITY_POLICY_CHANGED أعلاه (وسمُ ‎@settings:security يقبل الفعلين).
+        'SETTINGS_RESTORED'       => ['استعادة افتراضي الإعدادات', 'notice', ['استعادة افتراضي الإعدادات']],
         'API_CREDENTIAL_CREATED'  => ['إنشاء مفتاح API', 'high', ['إنشاء مفتاح API']],
         'API_CREDENTIAL_ROTATED'  => ['تدوير مفتاح API', 'notice', ['تدوير مفتاح API']],
         'API_CREDENTIAL_REVOKED'  => ['إبطال مفتاح API', 'notice', ['إبطال مفتاح API']],
@@ -69,6 +73,12 @@ final class SecurityEvents
     ];
 
     public const SEVERITY_TONE = ['info' => 'g', 'notice' => 'g', 'warning' => 'wn', 'high' => 'bad'];
+
+    /**
+     * (WP-9.3) أفعالُ جدول الإعدادات التي يرفعها وسمُ `@settings:security` إلى
+     * «تغيير سياسة أمنية» متى مسّت مفتاحاً أمنياً — التعديلُ والاستعادةُ سواء.
+     */
+    public const SETTINGS_ACTIONS = ['تعديل إعدادات النظام', 'استعادة افتراضي الإعدادات'];
 
     /** الصيغُ الحرفية من audits.action التي يُطابقها التصنيف (بلا الوسوم @) */
     public static function actions(?string $code = null): array
@@ -99,7 +109,10 @@ final class SecurityEvents
                         return $code;
                     }
                 }
-                if ($a === '@settings:security' && $action === 'تعديل إعدادات النظام'
+                // (WP-9.3) الاستعادةُ تُصنَّف كالتعديل: إعادةُ `auth.pw_min` أو
+                // `sec.strict_files` إلى افتراضيّه تغييرُ سياسةٍ أمنيةٍ بكل معنى،
+                // ولا فرقَ أمنيّاً بين «ضبطه إلى ١٠» و«أعاده إلى ١٠».
+                if ($a === '@settings:security' && in_array($action, self::SETTINGS_ACTIONS, true)
                     && preg_match('/security\.|auth\.|sec\.|api\.token|risk\.|2fa|maintenance\./u', (string) $name)) {
                     return $code;
                 }

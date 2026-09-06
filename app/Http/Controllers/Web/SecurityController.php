@@ -3,10 +3,8 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Setting;
 use App\Support\SecurityPosture;
 use App\Support\SecurityRadar;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -254,11 +252,16 @@ class SecurityController extends Controller
         // رفعُ التجميد إعادةُ قدرةٍ حسّاسة — يتطلب تأكيدَ الهوية أولاً
         if (! $on && ($resp = hub_require_stepup(route('security.index', absolute: false)))) return $resp;
 
-        if ($on) Setting::updateOrCreate(['key' => $setKey], ['value' => '1']);
-        else Setting::where('key', $setKey)->delete();
-        Cache::forget('settings:all');
-
-        hub_audit($on ? "تجميد {$label} (طوارئ)" : "رفع تجميد {$label}", null, null, auth()->user()->name);
+        // (WP-9.2) على الكاتب الواحد: الإبطالُ وقيدُ التدقيق وصفُّ التاريخ عنده.
+        // **والقيدُ هو حدثُ الأمن نفسُه** (‏`SECURITY_POLICY_CHANGED`) لا قيدَ
+        // إعداداتٍ ثانياً بجانبه — فالفعلُ يُمرَّر إلى الدفعة لا يُكتب مرّتين.
+        // ورفعُ التجميد **حذفُ صفّ**: افتراضيُّ هذا المفتاح «مطفأ» فالحذفُ عودةٌ
+        // إليه لا انقلابُ حالة — وهو غيرُ استعادةِ افتراضيٍّ مُعلَن (critic #7).
+        \App\Support\Settings::batch('security', function () use ($on, $setKey, $label) {
+            $on ? \App\Support\Settings::put($setKey, '1', 'security', "تجميد {$label} من مركز الأمان")
+                : \App\Support\Settings::forget($setKey, 'security', "رفع تجميد {$label} من مركز الأمان");
+        }, ['action' => $on ? "تجميد {$label} (طوارئ)" : "رفع تجميد {$label}",
+            'module' => null, 'name' => auth()->user()->name]);
 
         return back()->with('ok', $on
             ? "🧊 جُمِّد «{$label}» — يُصَدّ فوراً حتى يُرفع من هنا"
@@ -1045,11 +1048,12 @@ class SecurityController extends Controller
         if ($resp = hub_require_stepup(route('security.index', absolute: false))) return $resp;
         $on = ! setting('security.lockdown', false);
 
-        if ($on) Setting::updateOrCreate(['key' => 'security.lockdown'], ['value' => '1']);
-        else Setting::where('key', 'security.lockdown')->delete();
-        Cache::forget('settings:all');
-
-        hub_audit($on ? 'تفعيل قفل الطوارئ' : 'رفع قفل الطوارئ', null, null, auth()->user()->name);
+        // (WP-9.2) على الكاتب الواحد — والفعلُ الأمنيّ يُمرَّر للدفعة فيبقى قيداً واحداً
+        \App\Support\Settings::batch('security', function () use ($on) {
+            $on ? \App\Support\Settings::put('security.lockdown', '1', 'security', 'قفل الطوارئ من مركز الأمان')
+                : \App\Support\Settings::forget('security.lockdown', 'security', 'رفع قفل الطوارئ من مركز الأمان');
+        }, ['action' => $on ? 'تفعيل قفل الطوارئ' : 'رفع قفل الطوارئ',
+            'module' => null, 'name' => auth()->user()->name]);
 
         return back()->with('ok', $on ? '🔒 فُعّل قفل الطوارئ — الجلسات غير المالكة عُلّقت فوراً' : '🔓 رُفع قفل الطوارئ');
     }

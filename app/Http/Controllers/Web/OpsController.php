@@ -659,9 +659,13 @@ class OpsController extends Controller
         $this->gate();
         if ($resp = hub_require_ops_stepup()) return $resp;   // فعلٌ عالي الأثر: تأكيدُ هوية (v2.399)
         $on = ! (bool) setting('maintenance.on', false);
-        \App\Models\Setting::updateOrCreate(['key' => 'maintenance.on'], ['value' => $on ? '1' : '']);
-        Cache::forget('settings:all');
-        hub_audit($on ? 'تفعيل وضع الصيانة' : 'إنهاء وضع الصيانة', null, null, 'من مركز التشغيل');
+        // (WP-9.2) على الكاتب الواحد — والفعلُ الأمنيّ يُمرَّر للدفعة فيبقى قيداً واحداً.
+        // والإنهاءُ يكتب فراغاً ولا يحذف الصفَّ (كما كان): `setting()` تقرأ الفراغَ غياباً.
+        \App\Support\Settings::batch('ops', function () use ($on) {
+            \App\Support\Settings::put('maintenance.on', $on ? '1' : '', 'ops',
+                $on ? 'تفعيل وضع الصيانة من مركز التشغيل' : 'إنهاء وضع الصيانة من مركز التشغيل');
+        }, ['action' => $on ? 'تفعيل وضع الصيانة' : 'إنهاء وضع الصيانة',
+            'module' => null, 'name' => 'من مركز التشغيل']);
 
         return redirect()->route('ops.index')
             ->with('ok', $on ? 'فُعّل وضع الصيانة — الموظفون يرون رسالة الصيانة الآن' : 'أُنهي وضع الصيانة — عاد النظام للجميع');

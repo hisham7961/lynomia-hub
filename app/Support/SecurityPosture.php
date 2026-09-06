@@ -21,7 +21,12 @@ class SecurityPosture
     protected const ORDER = ['lockdown', 'maintenance', 'ssrf', 'quoteflowPass', 'twofaPrivileged',
                              'twofaCoverage', 'passwordPolicy', 'stalePasswords', 'idleUsers', 'lockedNow',
                              'vaultRotation', 'apiStale', 'shareOpen', 'auditChain', 'demoMode', 'ownerCount',
-                             'defaultPassword', 'debugMode', 'backupFresh'];   // v2.399
+                             'defaultPassword', 'debugMode', 'backupFresh',   // v2.399
+                             // (WP-9.4 · §7.13) مفتاحا الطوارئ المفصولان: كانا يُقرآن في
+                             // ثلاثة مواضع (‏`Health`, `SecurityController`, `Integrations`)
+                             // ولا يظهران في وضعيةِ الأمان — فرايةٌ رُفعت في حادثةٍ ونُسيت
+                             // مرفوعةً لا تقولها الوضعيةُ ولا تفتح لها نتيجةً في السجل.
+                             'freezeExports', 'freezeTokens'];
 
     /**
      * كل فحص: key · label · tone (ok|wn|bad) · why · n · fix · url
@@ -112,6 +117,34 @@ class SecurityPosture
             $on ? 1 : 0,
             $on ? 'مفعَّلٌ الآن ولا شيء ينهيه تلقائياً — أطفئه من لوحة التشغيل حالما ينتهي العمل.' : '',
             route('ops.index'));
+    }
+
+    /**
+     * (WP-9.4 · §7.13) تجميدُ التصدير — مفتاحُ طوارئٍ مفصول. مرفوعاً يُصَدّ كلُّ
+     * تصديرِ قائمةٍ وتصديرُ الإعدادات برمز ٤٢٣ حتى للمالك. حالةٌ **مقصودةٌ**
+     * تستحق الانتباه لا الذعر: مرفوعٌ ونُسي = بابُ تشغيلٍ مغلقٌ بلا سبب.
+     */
+    protected static function freezeExports(): array
+    {
+        $on = (string) setting('security.freeze_exports', '0') === '1';
+
+        return self::row('freeze_exports', 'تجميد التصدير', $on ? 'wn' : 'ok',
+            'مرفوعاً يُردّ كلُّ تصديرٍ (قوائمُ الوحدات وتصديرُ الإعدادات) برمز ٤٢٣ حتى للمالك — يوقف سحبَ البيانات الجماعيّ لحظةَ الاشتباه دون قفلٍ كامل.',
+            $on ? 1 : 0,
+            $on ? 'مرفوعٌ الآن ولا مؤقّت يُنزله — أنزِله من مركز الأمان متى انتهى سببُه، وإلا فكلُّ تصديرٍ مشروعٍ مصدودٌ بصمت.' : '',
+            route('security.index'));
+    }
+
+    /** (WP-9.4 · §7.13) تجميدُ سكّ الرموز — الإبطالُ يبقى متاحاً، والسكُّ وحده مصدود */
+    protected static function freezeTokens(): array
+    {
+        $on = (string) setting('security.freeze_tokens', '0') === '1';
+
+        return self::row('freeze_tokens', 'تجميد سكّ مفاتيح API', $on ? 'wn' : 'ok',
+            'مرفوعاً يُمنَع سكُّ مفاتيح API الجديدة وتدويرُها (والإبطالُ يبقى متاحاً) — يوقف فتحَ قنواتِ وصولٍ برمجيّةٍ جديدةٍ أثناء الحادثة.',
+            $on ? 1 : 0,
+            $on ? 'مرفوعٌ الآن — أنزِله من مركز الأمان بعد الحادثة، وإلا فكلُّ تكاملٍ جديدٍ يقف بلا سببٍ ظاهر.' : '',
+            route('security.index'));
     }
 
     protected static function ssrf(): array

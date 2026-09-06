@@ -139,8 +139,19 @@ class SecurityFindingsTest extends TestCase
             $this->assertSame(SecurityFindings::SEVERITY_BY_CODE[$f->code], $f->severity,
                 "شدّةُ {$f->code} لا تطابق خريطةَ SEVERITY_BY_CODE");
         }
-        // والخريطةُ تغطّي رموزَ الفحوص التسعةَ عشر كلَّها
-        $this->assertCount(19, SecurityFindings::SEVERITY_BY_CODE);
+        // والخريطةُ تغطّي رموزَ الفحوص كلَّها — لا رمزَ يسقط إلى الاستنتاج بالنبرة.
+        // (WP-9.4 أضاف التجميدَين، فالتغطيةُ تُشتقّ من الوضعية نفسِها بدل رقمٍ
+        //  مكتوبٍ بيدٍ يُنسى تحديثُه مع كل فحصٍ جديد.)
+        $postureKeys = array_column(\App\Support\SecurityPosture::checks(), 'key');
+        $this->assertSame([], array_values(array_diff($postureKeys,
+            array_keys(SecurityFindings::SEVERITY_BY_CODE))),
+            'فحصٌ في وضعية الأمان بلا شدّةٍ صريحة في SEVERITY_BY_CODE');
+        // **والاتجاه الآخر كذلك** — وهو ما كان `assertCount` يضمنه: مدخلٌ في
+        // الخريطة لا يقابله فحصٌ في الوضعية شدّةٌ ميّتة لرمزٍ لا يُنتَج أبداً،
+        // تبقى بعد حذف الفحص أو إعادة تسميته فتوهم بتغطيةٍ ليست هناك.
+        $this->assertSame([], array_values(array_diff(
+            array_keys(SecurityFindings::SEVERITY_BY_CODE), $postureKeys)),
+            'شدّةٌ في SEVERITY_BY_CODE لرمزٍ لا تنتجه وضعيةُ الأمان');
         foreach (SecurityFindings::SEVERITY_BY_CODE as $code => $sev) {
             $this->assertContains($sev, \App\Support\Severity::LEVELS, "شدّةُ {$code} خارج سلّم Severity");
         }
