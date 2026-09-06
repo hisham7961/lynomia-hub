@@ -680,10 +680,24 @@ if (! function_exists('hub_require_stepup')) {
     {
         if (\App\Support\StepUp::fresh()) return null;
 
-        $next = $next ?: request()->fullUrl();
-        // للويب: وجهةٌ داخلية فقط (المسار والاستعلام) لا رابطٌ مطلق
-        $path = request()->getRequestUri();
-        $url = route('stepup.show', ['next' => is_string($next) && str_starts_with($next, '/') ? $next : $path]);
+        // وجهةُ العودة بعد التأكيد: `stepup.verify` يُعيد التوجيه بـGET، فلا يصحّ أن
+        // تكون الوجهةُ مسارَ الفعل نفسِه إن كان POST/PUT/DELETE (ترحيلٌ، تصعيدٌ…) —
+        // وإلا ردَّ الخادمُ 405 بعد إدخال كلمة المرور. للأفعال غير الآمنة نعود إلى
+        // صفحةِ الإحالة (النموذج، وهي GET) فيُعيد المستخدمُ الفعلَ والهويةُ طازجة.
+        $safeLocal = fn ($u) => is_string($u) && str_starts_with($u, '/') && ! str_starts_with($u, '//');
+        $req = request();
+        if ($next === null) {
+            if ($req->isMethodSafe()) {
+                $next = $req->getRequestUri();               // GET: المسارُ نفسُه صالحٌ للعودة
+            } else {
+                $ref = $req->headers->get('referer');         // فعلٌ غيرُ آمن: صفحةُ النموذج
+                $refPath = $ref ? (parse_url($ref, PHP_URL_PATH) ?: '')
+                    . (($q = parse_url($ref, PHP_URL_QUERY)) ? "?{$q}" : '') : '';
+                $next = $safeLocal($refPath) ? $refPath : route('dashboard', absolute: false);
+            }
+        }
+        $path = $req->isMethodSafe() ? $req->getRequestUri() : route('dashboard', absolute: false);
+        $url = route('stepup.show', ['next' => $safeLocal($next) ? $next : $path]);
 
         if (request()->expectsJson() || request()->is('api/*')) {
             // الغلافُ الموحَّد: المفاتيحُ القديمة (error/stepup/url) كما هي + code + request_id
