@@ -84,14 +84,18 @@ class PerformanceController extends Controller
         ];
     }
 
-    /* ── الأهداف بمستوياتها ── */
-    protected function okrs()
+    /**
+     * الأهداف بمستوياتها — **من المصدر الواحد** (WP-8.5 · §6.10).
+     *
+     * كانت هذه الدالّة تقرأ عمودَ `objectives.progress` المخزَّن بينما `/okrs`
+     * تحسب النسبةَ من نتائجها (`hub_okr_progress`): رقمان لهدفٍ واحدٍ على
+     * شاشتين، وأحدُهما كاذبٌ حتماً — فالعمودُ لا يُكتب إلا بتثبيتٍ مأذونٍ من
+     * قارئٍ غيرِ مقيَّد، وقد يتخلّف أسابيع. الآن كلتاهما تقرأ `OkrCentre::board`
+     * (وهو `hub_okr_board` مُغنّى)، والعمودُ يبقى أثرَ آخر تثبيتٍ لا مصدرَ عرض.
+     */
+    protected function okrs(): array
     {
-        return hub_open_scope(DB::table('objectives')->whereNull('deleted_at'))
-            ->orderByRaw("CASE level WHEN 'الشركة' THEN 0 WHEN 'قسم' THEN 1 WHEN 'مشروع' THEN 2 ELSE 3 END")
-            ->orderByDesc('created_at')->limit(20)
-            ->get(['id', 'title', 'level', 'owner_id', 'period', 'due', 'progress', 'status'])
-            ->groupBy(fn ($o) => $o->level ?: 'أخرى');
+        return \App\Support\OkrCentre::board(auth()->user());
     }
 
     /**

@@ -19,6 +19,83 @@
     </div>
 </div>
 
+{{-- ═══ مركزُ المؤشّرات (WP-8.5 · §6.9 · §47) ═══
+     صحّةُ كل مؤشّرٍ في خانةٍ واحدة، ثم **قائمةُ «خارج الهدف»** صراحةً — وهي
+     سؤالُ §47 حرفياً. و«لا يُقاس» خانةٌ قائمةُ الذات: مؤشّرٌ يُرشِّح حالةً لا
+     يعرفها السجلّ يقرأ صفراً أبداً، وصفرٌ مقابلَ هدفٍ صفرٍ نزولاً كان يُعرض
+     «على الهدف» — فالنظامُ يهنّئ نفسَه على قياسٍ لم يقع. --}}
+@php
+    $healthTone = ['on' => 'ok', 'warn' => 'wn', 'off' => 'bad', 'dead' => 'wn', 'nodata' => 'g', 'notarget' => 'g'];
+    $H = \App\Support\KpiCentre::HEALTH;
+    $rowsById = collect($rows)->keyBy('id');
+    $canRemediate = hub_monitor() && hub_can(auth()->user(), 'tasks', 'a');
+@endphp
+
+@if (count($rows))
+    @include('partials.cc.kpis', ['items' => [
+        ['label' => 'مؤشّرات نشطة', 'value' => $summary['total'], 'sub' => 'في اللوحات والملخّص'],
+        ['label' => $H['on'], 'value' => $summary['on'], 'tone' => $summary['on'] ? 'ok' : ''],
+        ['label' => $H['warn'], 'value' => $summary['warn'], 'tone' => $summary['warn'] ? 'wn' : ''],
+        ['label' => 'خارج الهدف', 'value' => $summary['off'], 'tone' => $summary['off'] ? 'bad' : ''],
+        ['label' => 'لا يُقاس', 'value' => $summary['dead'] + $summary['nodata'], 'tone' => ($summary['dead'] + $summary['nodata']) ? 'wn' : '',
+         'hint' => 'فلترٌ لا يطابق سجلّ وحدته، أو معادلةٌ لا تُحسب'],
+        ['label' => 'بلا هدف', 'value' => $summary['notarget'], 'sub' => 'لا يُحكم عليه'],
+    ]])
+@endif
+
+@if (count($off))
+    <div class="card">
+        <h3 class="cardtitle">🎯 خارج الهدف — وما لا يُقاس معه</h3>
+        <div class="sub" style="margin-bottom:8px">
+            <b>الانحراف</b> = القيمة − الهدف، <b>بإشارة الاتجاه</b>: تحت الهدف سالبٌ صعوداً وموجبٌ نزولاً —
+            فالطرحُ وحده يقول العكسَ في نصف الحالات.
+        </div>
+        <div class="tblwrap"><table class="tbl">
+            <thead><tr><th scope="col">المؤشّر</th><th scope="col">المالك</th><th scope="col">الدورة</th>
+                <th scope="col">القيمة / الهدف</th><th scope="col">الانحراف</th>
+                <th scope="col">الحالة</th><th scope="col">المعالجة</th></tr></thead>
+            <tbody>
+            @foreach ($off as $k)
+                <tr>
+                    <td><b>{{ $k['name'] }}</b>
+                        <div class="sub mono" style="font-size:12px">🧮 {{ $k['explain'] }}</div>
+                        @foreach ($k['dead'] as $d)
+                            <div class="sub" style="color:var(--wn)">
+                                ⚠️ فلترٌ لا يطابق السجل: «{{ $d['status'] }}» في {{ $d['label'] }} — {{ $d['why'] }}
+                            </div>
+                        @endforeach
+                    </td>
+                    <td class="sub">{{ $k['owner'] ?: '—' }}</td>
+                    <td class="sub">{{ $k['period'] ?: '—' }}</td>
+                    <td class="mono">{{ $k['value'] === null ? '—' : $num($k['value']) }}
+                        / {{ $k['target'] === null ? '—' : $num($k['target']) }}</td>
+                    <td class="mono {{ ($k['variance'] ?? 0) < 0 ? 'txt-bad' : '' }}">
+                        {{ $k['variance'] === null ? '—' : ($k['variance'] > 0 ? '+' : '') . $num($k['variance']) }}
+                        @if ($k['variance_pct'] !== null)<span class="sub">({{ $k['variance_pct'] }}٪)</span>@endif
+                    </td>
+                    <td><span class="bdg {{ $healthTone[$k['health']] ?? '' }}">{{ $H[$k['health']] }}</span></td>
+                    <td>
+                        @if ($canRemediate)
+                            <form method="POST" action="{{ route('remediation.store') }}">@csrf
+                                <input type="hidden" name="kind" value="kpi">
+                                <input type="hidden" name="ref" value="{{ $k['id'] }}">
+                                <button class="btn ghost xs" title="تفتح مهمّةً واحدةً لهذا المؤشّر — والنقرة الثانية تُعيدك إليها">🛠 مهمّة معالجة</button>
+                            </form>
+                        @else
+                            <span class="sub">—</span>
+                        @endif
+                    </td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table></div>
+    </div>
+@elseif (count($rows))
+    <div class="card"><div class="sub" style="padding:14px;text-align:center">
+        ✅ لا مؤشّر خارج هدفه الآن — وكلُّ فلترٍ يطابق سجلّ وحدته.
+    </div></div>
+@endif
+
 {{-- المؤشرات: كل واحد بمعادلته وأزراره — لا بطاقةٌ صمّاء لا يُعرف مِمَّ حُسبت --}}
 @if (count($kpis))
     <div class="card pad0" style="margin-bottom:12px">
@@ -40,8 +117,34 @@
                     @if ($k['value'] === null)
                         <span class="bdg wn" title="وحدةٌ خارج نطاقك، أو عمودٌ غير رقمي، أو قسمةٌ على صفر">لا تُحسب</span>
                     @endif
+                    @php $x = $rowsById[$k['id']] ?? null; @endphp
+                    @if ($x)
+                        <span class="bdg {{ $healthTone[$x['health']] ?? '' }}">{{ $H[$x['health']] }}</span>
+                        @if ($x['variance'] !== null)
+                            <span class="bdg g mono" title="القيمة − الهدف، بإشارة الاتجاه">
+                                انحراف {{ $x['variance'] > 0 ? '+' : '' }}{{ $num($x['variance']) }}</span>
+                        @endif
+                        @if ($x['trend']['delta'] !== null)
+                            <span class="bdg g mono" title="من أوّل نقطةٍ إلى آخرها في اللقطة اليومية">
+                                {{ $x['trend']['dir'] === 'up' ? '↑' : ($x['trend']['dir'] === 'down' ? '↓' : '→') }}
+                                {{ $num($x['trend']['delta']) }} · {{ $x['trend']['points'] }} نقطة</span>
+                        @endif
+                    @endif
                     {{-- المعادلة بالعربية: تُقرأ قبل التعديل وقبل الحذف --}}
                     <div class="sub mono" style="font-size:12px">🧮 {{ $k['explain'] }}</div>
+                    @if ($x && ($x['owner'] || $x['period']))
+                        <div class="sub" style="font-size:12px">
+                            @if ($x['owner'])👤 {{ $x['owner'] }}@endif
+                            @if ($x['period'])@if ($x['owner']) · @endif🗓️ {{ $x['period'] }}@endif
+                        </div>
+                    @endif
+                    @if ($x)
+                        @foreach ($x['dead'] as $d)
+                            <div class="sub" style="font-size:12px;color:var(--wn)">
+                                ⚠️ فلترٌ لا يطابق السجل: «{{ $d['status'] }}» في {{ $d['label'] }} — {{ $d['why'] }}
+                            </div>
+                        @endforeach
+                    @endif
                 </div>
                 <div class="kpiacts">
                     <a class="btn ghost xs" href="{{ route('kpis.index') }}?edit={{ $k['id'] }}#kpiform"
@@ -103,6 +206,18 @@
                     <option value="up" @selected(($editing->good ?? 'up') === 'up')>الأعلى أفضل ↑</option>
                     <option value="down" @selected(($editing->good ?? '') === 'down')>الأقل أفضل ↓</option>
                 </select></div>
+            {{-- (WP-8.5) المالكُ والدورة: «خارج الهدف» لا تصير فعلاً حتى يُعرف
+                 مَن يُسأل وعلى أيّ مدىً يُقاس --}}
+            <div class="fld"><label for="k-owner">مالك المؤشر</label>
+                <select class="inp" id="k-owner" name="owner_id">
+                    <option value="">— بلا مالك —</option>
+                    @foreach ($people as $p)
+                        <option value="{{ $p->id }}" @selected(old('owner_id', $editing->owner_id ?? '') === $p->id)>{{ $p->name }}</option>
+                    @endforeach
+                </select></div>
+            <div class="fld"><label for="k-period">الدورة</label>
+                <input class="inp" id="k-period" name="period" maxlength="20" placeholder="شهري / ربع سنوي / سنوي"
+                       value="{{ old('period', $editing->period ?? '') }}"></div>
         </div>
 
         <h4 style="margin:12px 0 6px">المقياس الأول <b class="req">*</b></h4>

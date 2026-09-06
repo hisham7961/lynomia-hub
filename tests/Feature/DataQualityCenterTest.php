@@ -96,7 +96,9 @@ class DataQualityCenterTest extends TestCase
         Client::create(['name' => 'عميل يتيم']);
         Client::create(['name' => 'عميل ببريدٍ فاسد', 'email' => 'ليس-بريداً']);
 
-        $html = $this->actingAs($this->owner)->get('/admin/quality')->assertOk()->getContent();
+        // (WP-8.1) المسحُ وعيّناتُه صارا تبويبَ «البيانات» في المركز المبوَّب —
+        // للمالك وحدَه كما كان. المضمونُ المُتحقَّق منه لم يتغيّر، تغيّر مدخلُه.
+        $html = $this->actingAs($this->owner)->get('/admin/quality?tab=data')->assertOk()->getContent();
 
         $this->assertStringContainsString('درجة الجودة', $html);
         $this->assertStringContainsString('qc=', $html, 'الفحص لا يحمل رابطاً إلى سجلاته — عرضٌ لا قيادة');
