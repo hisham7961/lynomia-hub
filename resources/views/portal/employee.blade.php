@@ -21,4 +21,8 @@
 @include('partials.staff_account_card', ['acctRow' => $emp])
 
 @include('portal._hr')
+
+{{-- ملفُّ العمل وخطُّه الزمنيّ (WP-7.3) — بطاقاتٌ منفصلةٌ عن بطاقات الموارد البشرية،
+     والأمنُ فيها بطاقةٌ لا تلامس أرقامَ الأداء (spec §5.1) --}}
+@include('portal._work')
 @endsection

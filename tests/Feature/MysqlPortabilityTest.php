@@ -97,7 +97,11 @@ class MysqlPortabilityTest extends TestCase
                   // (WP-4.1 · critic #39) نتائجُ الأمن: الفريدُ (code, entity_type, entity_id)
                   // هو ما يمنع تكرارَ النتيجة الواحدة كلَّ تشغيلٍ لـreconcile — بقيمتَي
                   // الكيان الحارستين ('org','') لا NULL، فـNULL متمايزٌ في الفريد على المحرّكين.
-                  ['security_findings', 'sf_code_entity_unique']] as [$table, $index]) {
+                  ['security_findings', 'sf_code_entity_unique'],
+                  // (WP-6.3 · critic #39) ذاكرةُ التنبيه: الفريدُ على dedup_key هو ما
+                  // يجعل الشرطَ الواحد صفّاً واحداً (عدّادٌ وإقرارٌ وتعافٍ) لا سيلاً —
+                  // dropIndex لاحقٌ كان سيمرّ صامتاً بلا هذا السطر.
+                  ['alert_instances', 'ai_dedup_unique']] as [$table, $index]) {
             $found = collect(Schema::getIndexes($table))->pluck('name');
             $this->assertTrue($found->contains($index), "الفهرس {$index} مفقود على {$table}");
         }

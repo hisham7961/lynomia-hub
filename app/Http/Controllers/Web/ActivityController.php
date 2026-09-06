@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\Risk;
+use App\Support\TimeRange;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -90,7 +93,7 @@ class ActivityController extends Controller
 
         // اليوميات: أول/آخر ظهور، دقائق النشاط (كل سلة ٥ دقائق فيها زيارة = ٥ دقائق عمل)
         $visits = $this->safe(fn () => DB::table('page_visits')->where('user_id', $u->id)
-            ->where('at', '>=', $since)->orderBy('at')->get(), collect());
+            ->where('at', '>=', $since)->orderBy('at')->orderBy('id')->get(), collect());
 
         $days = [];
         foreach ($visits as $v) {
@@ -115,73 +118,49 @@ class ActivityController extends Controller
             ->orderByDesc('started_at')->limit(8)->get(['device', 'ip', 'started_at as created_at']), collect());
         $ips = $this->safe(fn () => DB::table('user_ips')->where('user_id', $u->id)->orderByDesc('hits')->get(), collect());
         $trail = $this->safe(fn () => DB::table('page_visits')->where('user_id', $u->id)
-            ->orderByDesc('at')->limit(120)->get(), collect());
+            ->orderByDesc('at')->orderByDesc('id')->limit(120)->get(), collect());
         $suspects = $this->safe(fn () => DB::table('audits')->where('user_id', $u->id)
             ->where('action', 'دخول مريب')->orderByDesc('created_at')->limit(10)->get(), collect());
 
+        // فصلُ الأمن عن الإنتاجية (WP-7.1 — spec §46): الدرجةُ الأمنية من
+        // Risk::activity وحده، وساعاتُ العمل من القارئ العمليّ المصغّر أدناه —
+        // مصفوفتان منفصلتان فلا يتسرّب رقمٌ أمنيٌّ إلى بطاقة عمل ولا العكس.
+        $range = TimeRange::fromRequest(new Request([
+            'from' => $since->format('Y-m-d H:i:s'), 'to' => now()->format('Y-m-d H:i:s'),
+        ]));
+
         return view('activity.show', compact('u', 'days', 'topPages', 'devices', 'ips', 'trail', 'suspects')
-            + ['risk' => $this->riskProfile($u->id, $visits)]);
+            + ['risk' => Risk::activity($u, $range, $visits), 'work' => $this->workHours($visits)]);
     }
 
     /**
-     * ملف الشك — أرقامٌ مشتقة من نشاط النظام نفسه (١٤ يوماً) بلا أي مراقبة خارجية:
-     *  - ساعات النشاط مصنفةً: دوام (٠٨–١٦)، خارج الدوام، مريبة (منتصف الليل–٠٦).
-     *  - معدل التلاعب: الدخول المريب + المحاولات الفاشلة نسبةً إلى الدخول الكلي.
-     *  - تعدد الأجهزة وعناوين الشبكة، ونسبة شكٍّ مركّبة معلنة المكوّنات.
+     * الجانبُ العمليّ من النشاط (WP-7.1): ساعاتُ الاستخدام الفعلية مصنّفةً بحدود
+     * الدوام من الإعدادات `sec.hours_start/end` — لا من ثابتٍ في الشيفرة.
+     * قارئٌ مصغَّرٌ عمداً: قارئا المنظمة والشخص يأتيان في WP-7.2/7.3
+     * (`ExecutionStats::org/person` — قارئُ تنفيذٍ واحدٌ لا عدّادَ ثانٍ).
+     * ولا يقرأ هذا الجانبُ شيئاً من الدرجة الأمنية — تلك في `Risk::activity`
+     * وحدها (فصلُ الأمن عن الإنتاجية — spec §46، يحرسه SecurityActivitySplitTest).
      */
-    protected function riskProfile(string $uid, $visits): array
+    protected function workHours($visits): array
     {
-        $since = now()->subDays(14);
-
-        // تصنيف سلال النشاط (كل سلة ٥ دقائق) حسب ساعتها المحلية
-        $seen = []; $inMin = $outMin = $nightMin = 0;
+        $start = (string) setting('sec.hours_start', '08:00');
+        $end   = (string) setting('sec.hours_end', '16:00');
+        $seen = []; $in = $out = $night = 0;
         foreach ($visits as $v) {
             $ts = strtotime((string) $v->at);
             $bucket = intdiv($ts, 300);
             if (isset($seen[$bucket])) continue;
             $seen[$bucket] = true;
-            $h = (int) date('G', $ts);
-            if ($h < 6)                 $nightMin += 5;
-            elseif ($h >= 8 && $h < 16) $inMin += 5;
-            else                        $outMin += 5;
+            $t = date('H:i', $ts);
+            if ((int) date('G', $ts) < 6)      $night += 5;
+            elseif ($t >= $start && $t < $end) $in += 5;
+            else                               $out += 5;
         }
-        $totalMin = $inMin + $outMin + $nightMin;
-
-        // كلٌّ محميٌّ: غيابُ جدولٍ مساعدٍ يعيد صفراً لا يُسقط ملفَّ الشك كاملاً
-        $logins   = (int) $this->safe(fn () => DB::table('sessions_log')->where('user_id', $uid)
-                        ->where('started_at', '>=', $since)->count(), 0);
-        $strange  = (int) $this->safe(fn () => DB::table('audits')->where('user_id', $uid)->where('action', 'دخول مريب')
-                        ->where('created_at', '>=', $since)->count(), 0);
-        $failed   = (int) $this->safe(fn () => DB::table('audits')->where('user_id', $uid)->where('action', 'دخول فاشل')
-                        ->where('created_at', '>=', $since)->count(), 0);
-        $devCount = (int) $this->safe(fn () => DB::table('sessions_log')->where('user_id', $uid)->where('started_at', '>=', $since)
-                        ->distinct()->count('device'), 0);
-        $ipCount  = (int) $this->safe(fn () => DB::table('user_ips')->where('user_id', $uid)->count(), 0);
-
-        // معدل التلاعب: إشارات الدخول الشاذة منسوبةً لكل الدخول
-        $tamper = $logins + $failed > 0
-            ? (int) round(($strange + $failed) * 100 / ($logins + $failed)) : 0;
-        // معدل تعدد الأجهزة: دخولٌ من كم جهازاً مختلفاً وسطياً
-        $devRate = $logins > 0 ? round($devCount * 100 / $logins) : 0;
-
-        // نسبة الشك المركبة (٠–١٠٠) — مكوناتها معلنة في الواجهة كي تُفهم لا تُخشى
-        $parts = [
-            'دخول شاذ (مكان غريب/خارج الدوام)' => $logins > 0 ? min(40, (int) round($strange * 40 / $logins)) : 0,
-            'محاولات دخول فاشلة'               => min(15, $failed * 3),
-            'نشاط في ساعات مريبة (٠٠–٠٦)'      => $totalMin > 0 ? min(25, (int) round($nightMin * 25 / $totalMin)) : 0,
-            'نشاط خارج الدوام'                  => $totalMin > 0 ? min(10, (int) round($outMin * 10 / $totalMin)) : 0,
-            'تعدد الأجهزة'                      => min(10, max(0, $devCount - 1) * 3),
-        ];
-        $score = min(100, array_sum($parts));
 
         return [
-            'in_h'    => round($inMin / 60, 1),  'out_h' => round($outMin / 60, 1),
-            'night_h' => round($nightMin / 60, 1),
-            'logins'  => $logins, 'strange' => $strange, 'failed' => $failed,
-            'devices' => $devCount, 'ips' => $ipCount,
-            'tamper'  => $tamper, 'dev_rate' => $devRate,
-            'score'   => $score, 'parts' => $parts,
-            'tone'    => $score >= 55 ? 'bad' : ($score >= 25 ? 'wn' : 'ok'),
+            'in_h' => round($in / 60, 1), 'out_h' => round($out / 60, 1),
+            'night_h' => round($night / 60, 1),
+            'start' => $start, 'end' => $end,
         ];
     }
 }

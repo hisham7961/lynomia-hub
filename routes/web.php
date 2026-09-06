@@ -656,4 +656,30 @@ Route::middleware('auth')->group(function () {
     // (WP-5.5) محلّلُ تغطية التدقيق — الحارس في المتحكّم (مالكٌ فقط): الصفحةُ
     // خريطةُ ما يُدقَّق وما لا يُدقَّق، وهي لغير المالك خريطةُ ما لا يترك أثراً
     Route::get('admin/audit/coverage', [AuditController::class, 'coverage'])->name('audit.coverage');
+
+    // ── Control Plane: Phase 6 ──
+    // (WP-6.3) مركزُ التنبيهات — حالةُ التنبيه (alert_instances) لا سيلُ إشعاراته.
+    // الاسمُ `alerts.center` لأن `alerts` مملوكٌ لرادار «ينتهي قريباً» القائم.
+    // القراءةُ مالكٌ أو monitor (ق١ — مطموسةَ البريد في المتحكّم)، والفعلُ
+    // (إقرار/فتحُ حادثة) مالكٌ وحدَه + قيدُ تدقيق، وبحدِّ معدلٍ يصدّ نقراً أعمى.
+    Route::get('admin/alerts', [\App\Http\Controllers\Web\AlertCenterController::class, 'index'])
+        ->name('alerts.center')->middleware('throttle:60,1');
+    Route::post('admin/alerts/{id}/ack', [\App\Http\Controllers\Web\AlertCenterController::class, 'ack'])
+        ->name('alerts.ack')->middleware('throttle:30,1');
+    Route::post('admin/alerts/{id}/incident', [\App\Http\Controllers\Web\AlertCenterController::class, 'incident'])
+        ->name('alerts.incident')->middleware('throttle:30,1');
+    // (WP-6.2) ربطُ دليلٍ بحادثة (§8.2): من يحرّر الحادثةَ يربط أدلّتَها
+    // (`hub_can('incidents','e')` في المتحكّم) + قيدُ تدقيق، والفريدُ المنطقيّ على
+    // (incident_id, kind, ref) يجعل إعادةَ الربط تحديثاً لا تكراراً. وحدُّ معدلٍ
+    // لأن الزرّ يظهر على ثلاث شاشاتِ مصادر فيسهل النقرُ الأعمى المتكرّر.
+    Route::post('admin/incidents/{id}/link', [\App\Http\Controllers\Web\IncidentLinkController::class, 'store'])
+        ->name('incidents.link')->middleware('throttle:30,1')->whereUuid('id');
+    // ── Control Plane: Phase 7 ──
+    // (WP-7.2) نظرةُ القوى العاملة: عدّاداتُ التنفيذ على مستوى المنشأة
+    // (ExecutionStats::org — القارئُ الواحد الذي سيعيد الطورُ ٨ استعمالَه).
+    // الاسمُ `workforce.overview` لأن `workforce.team` قائمٌ لشاشة «فريقي اليوم».
+    // الحارسُ في المتحكم: hub_monitor + hub_org_analytics_guard (نمطُ القدرات) —
+    // وحدُّ معدلٍ لأن الصفحةَ تجميعاتٌ على الجداول الساخنة وفحصُ صحةِ مشاريع.
+    Route::get('workforce/overview', [\App\Http\Controllers\Web\WorkforceController::class, 'overview'])
+        ->name('workforce.overview')->middleware('throttle:60,1');
 });

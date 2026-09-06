@@ -81,3 +81,22 @@ Schedule::command('hub:security-snapshot')->dailyAt('23:40')->withoutOverlapping
         } catch (\Throwable $e) {
         }
     });
+
+// ── Control Plane: Phase 6 ──
+/*
+| تقييمُ التنبيهات النافذية (WP-6.3 · §9.1/§3.9): كلَّ ٥ دقائق تُقيَّم قواعدُ
+| «X خلال Y دقيقة» وتُكشف الحوادثُ التشغيلية (ops:*) ببصماتها. مفتاحُ نبضته
+| 'alerts' وقائمةُ اشتقاق hub_schedule_failed (طور ١، لا تُحرَّر هنا) لا تعرفه —
+| فتُكتب نتيجةُ الفشل تحت المفتاح الصحيح صراحةً كي يراها نموذجُ الصحّة
+| (نمطُ hub:ops-snapshot نفسُه).
+*/
+Schedule::command('hub:alerts-evaluate')->everyFiveMinutes()->withoutOverlapping(20)
+    ->onFailure(function () {
+        hub_schedule_failed('hub:alerts-evaluate', 'QUEUE', 'ERROR');
+        try {
+            \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.alerts.meta'],
+                ['value' => ['ms' => null, 'result' => 'fail', 'note' => 'فشل التشغيل المجدول', 'at' => now()->toIso8601String()]]);
+            \Illuminate\Support\Facades\Cache::forget('settings:all');
+        } catch (\Throwable $e) {
+        }
+    });

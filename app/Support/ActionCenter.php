@@ -90,6 +90,14 @@ class ActionCenter
             $visible[] = $s;
         }
 
+        // ── Control Plane: Phase 6 (WP-6.3) ──
+        // التنبيهاتُ النافذية المفتوحة (alert_instances) إشاراتٌ في الصفّ (ق٣) —
+        // **بلا سكّة إقرارٍ ثانية** (critic #5): الإقرارُ الدائم يعيش في
+        // alert_instances.acknowledged_by/at وحدَه (مركز التنبيهات)، فالإشارةُ هنا
+        // بلا تصرّفٍ محليّ (can_act=false ⇒ لا صفَّ في signal_states أبداً) ورابطُها
+        // يودي إلى المركز. القراءةُ بحارس المركز نفسِه: مالكٌ أو monitor.
+        foreach (self::alertSignals() as $s) $visible[] = $s;
+
         return [
             'visible' => $visible,
             'hidden'  => $hidden,   // المؤجَّلُ والمرفوض — لعرضِ «أظهرها» (إعادةُ فتح)
@@ -101,6 +109,45 @@ class ActionCenter
             'snoozed' => $snoozed,
             'dismissed' => $dismissed,
         ];
+    }
+
+    /**
+     * (WP-6.3 · ق٣) التنبيهاتُ المفتوحة إشاراتٍ: المُطلقُ «كما هو»، والمُقَرُّ به
+     * يبقى ظاهراً بوسمه (شرطُه لم يزل — الإقرارُ سكوتُ جرسٍ لا شفاء). المفتاحُ هو
+     * dedup_key نفسُه (يبدأ بـ`alert:`)، وliveByKey لا يعرفه فيرفض disposition
+     * عليه بصمتٍ — الإقرارُ الوحيدُ في مركز التنبيهات.
+     */
+    protected static function alertSignals(): array
+    {
+        try {
+            if (! Schema::hasTable('alert_instances') || ! (hub_is_owner() || hub_monitor())) return [];
+
+            $sevWord = ['critical' => 'حرج', 'high' => 'مهم', 'medium' => 'مهم', 'low' => 'اطّلاع', 'info' => 'اطّلاع'];
+            $out = [];
+            $rows = DB::table('alert_instances')->where('status', '!=', 'resolved')
+                ->orderByDesc('last_at')->orderByDesc('id')->limit(20)->get();
+            foreach ($rows as $a) {
+                $lvl = Severity::normalize($a->severity);
+                $out[] = [
+                    'key' => (string) $a->dedup_key,
+                    'sev' => $sevWord[$lvl] ?? 'مهم',
+                    'title' => '🔔 ' . mb_substr((string) $a->title, 0, 160)
+                        . ($a->status === 'acknowledged' ? ' (مُقَرٌّ به)' : ''),
+                    'why' => 'تنبيهٌ نافذيّ ' . ($a->status === 'acknowledged' ? 'مُقَرٌّ به' : 'مُطلق')
+                        . ' — رُصد ×' . (int) $a->count,
+                    'module' => $a->module ?: null, 'record_id' => $a->record_id ?: null,
+                    'url' => route('alerts.center'),
+                    'state' => 'open', 'snoozed_until' => null,
+                    'can_act' => false, 'can_dismiss' => false,
+                ];
+            }
+
+            return $out;
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
+        }
     }
 
     /**

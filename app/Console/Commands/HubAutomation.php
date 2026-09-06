@@ -382,191 +382,15 @@ class HubAutomation extends Command
     }
 
     /* ───── 2) قواعد التنبيه ───── */
+    // ── Control Plane: Phase 6 (WP-6.3) ── الجوهرُ استُخرج إلى App\Support\AlertEngine
+    // **بلا تغيير سلوك** (الصلاحيةُ قبل النطاق، التنطيقُ لكل مستلمٍ قبل الحدّ،
+    // ترقيمٌ بمؤشّر المعرّف، التصعيد) — يستدعيه هذا الأمرُ اليوميّ هنا، ويستدعي
+    // `hub:alerts-evaluate` سكّتَه النافذية كلَّ ٥ دقائق.
     protected function alertRules(): array
     {
-        $hits = 0; $rulesRun = 0; $outbox = 0; $esc = 0;
-
-        $rules = AlertRule::whereNull('deleted_at')->where('status', 'مفعّلة')->get();
-
-        foreach ($rules as $rule) {
-            $md = hub_mod($rule->mod);
-            if (! $md) continue;
-
-            // الحقل: مفتاح من تعريف الوحدة أو اسم عمود مباشر
-            $fdef = collect($md['fields'])->firstWhere('key', $rule->field);
-            $col = $fdef['col']
-                ?? (Schema::hasColumn($md['table'], (string) $rule->field) ? $rule->field : null);
-            if (! $col) { $this->line("تخطٍ: {$rule->name} — حقل غير معروف"); continue; }
-            // نوعُ الحقل يحسم دلالة «فارغ»: على العدديّ والتاريخيّ = NULL وحده،
-            // فمقارنةُ '' على عمودٍ رقميّ تُطابق الصفرَ على MySQL (يحوّل '' إلى 0)
-            // ولا شيء على SQLite — انقسامٌ صامت. نظيرُ ModuleController:147.
-            $ftype = $fdef['type'] ?? null;
-
-            $q = DB::table($md['table'])->whereNull('deleted_at');
-            $v = (string) $rule->val;
-            // مقارنة عمود بعمود: القيمة اسم حقلٍ من الوحدة نفسها (قائمة بيضاء من سجلها)
-            // — بها يحيا «حد إعادة الطلب» لكل صنف و«حد التنبيه» لكل صندوق
-            $vcol = fn () => collect($md['fields'])->firstWhere('key', $v)['col']
-                ?? (Schema::hasColumn($md['table'], $v) ? $v : null);
-            match ($rule->op) {
-                'أكبر من'               => $q->where($col, '>', (float) $v),
-                'أصغر من'               => $q->where($col, '<', (float) $v),
-                'أكبر من عمود'          => ($c2 = $vcol()) ? $q->whereNotNull($c2)->whereColumn($col, '>', $c2) : $q->whereRaw('1=0'),
-                'أصغر من عمود'          => ($c2 = $vcol()) ? $q->whereNotNull($c2)->whereColumn($col, '<', $c2) : $q->whereRaw('1=0'),
-                'يساوي'                 => $q->where($col, $v),
-                'يحتوي'                 => $q->where($col, 'LIKE', "%{$v}%"),
-                'فارغ'                  => in_array($ftype, ['num', 'big', 'date', 'dt'], true)
-                                            ? $q->whereNull($col)
-                                            : $q->where(fn ($w) => $w->whereNull($col)->orWhere($col, '')),
-                'أيام متبقية أقل من'    => $q->whereNotNull($col)->whereDate($col, '<=', today()->addDays((int) $v)),
-                'أيام مضت أكثر من'      => $q->whereNotNull($col)->whereDate($col, '<=', today()->subDays((int) $v)),
-                default                 => $q->whereRaw('1=0'),
-            };
-
-            $disp = hub_display_col($rule->mod);
-            $every = max(1, (int) ($rule->every ?: 7));
-
-            // **مانعُ التكرار داخل SQL قبل الحدّ** (v2.316): كان `limit(50)` بلا
-            // ترتيب، ثمّ يُطبَّق مانعُ التكرار والتنطيق في PHP **بعد** القصّ. فمتى
-            // تجاوز المستحقّون خمسين، عادت الخمسون نفسُها كلَّ يوم ثمّ سقطت كلُّها
-            // بمانع التكرار، و**الباقي لا يُجلَب أبداً**: تجويعٌ دائم — والقاعدةُ
-            // تبدو ناجحةً في كلّ قياس، وهو فشلٌ يُنتج ثقةً كاذبة. وترتيبٌ حتميّ
-            // بـ`id` كي لا تختلف الخمسون بين المحرّكين.
-            $q->whereNotIn('id', HubNotification::where('kind', 'rule:' . $rule->id)
-                ->whereNotNull('record_id')
-                ->whereDate('created_at', '>=', today()->subDays($every))
-                ->distinct()->pluck('record_id')->all());
-
-            $to = $this->recipientUsers($rule->to_id);
-
-            // **الصلاحيةُ قبل النطاق**: النطاق يُفرض لكل مستلم أدناه، لكن مستلماً
-            // في الشركة الصحيحة قد لا يملك رؤيةَ الوحدة أصلاً (راية monitor لا
-            // تمنح مصفوفةَ الصلاحيات). فبلا هذا الفحص تصل مبالغُ ميزانياتٍ وأرقامُ
-            // فواتير من مُنع من الوحدة — تسريبٌ عبر التنبيه. رايةٌ عامةٌ بلا وحدة
-            // (`mod` فارغ) لا تُفحَص كي لا تُخرَس القواعدُ العامة.
-            if (filled($rule->mod)) {
-                $to = $to->filter(fn ($ru) => $ru->role?->is_owner || hub_can($ru, $rule->mod, 'v'))->values();
-            }
-            if ($to->isEmpty()) continue;
-
-            /*
-             * **والتنطيقُ قبل الحدّ كذلك** (v2.337): v2.316 نقلت مانعَ التكرار
-             * إلى SQL قبل `limit(50)` وتركت التنطيقَ **بعده**. فقاعدةٌ موجَّهةٌ
-             * إلى مستخدمٍ معزول: خمسون صفّاً خارج نطاقه تملأ النافذة، وتسقط
-             * كلُّها عند فحص الرؤية بلا كتابةٍ ولا دخولٍ في سجلّ منع التكرار،
-             * فتعود **هي نفسُها** غداً و`orderBy('id')` حتميّ — والسجلُّ المرئيُّ
-             * لا يُشعَر عنه أبداً. نفسُ التجويع الذي عولج، من الباب الآخر.
-             *
-             * فتُقرأ الدفعاتُ بالتتابع ويُرشَّح كلٌّ برؤية المستلمين، حتى تكتمل
-             * خمسون **مرئية** أو تنفد المرشَّحات. والسقفُ عشرُ دفعاتٍ كي لا
-             * يتحوّل الحارسُ إلى مسحٍ كاملٍ لجدولٍ كبير.
-             */
-            $rows = collect();
-            $cursor = '';
-            for ($page = 0; $page < 10 && $rows->count() < 50; $page++) {
-                $batch = (clone $q)->where('id', '>', $cursor)
-                    ->orderBy('id')->limit(50)->get(['id', $disp . ' as _n']);
-                if ($batch->isEmpty()) break;
-                $cursor = (string) $batch->last()->id;
-
-                $ids = $batch->pluck('id')->all();
-                $seen = [];
-                foreach ($to as $ru) {
-                    foreach (hub_scope(DB::table($md['table'])->whereNull('deleted_at')->whereIn('id', $ids),
-                        $rule->mod, $ru)->pluck('id') as $vid) $seen[(string) $vid] = true;
-                }
-                $rows = $rows->concat($batch->filter(fn ($r) => isset($seen[(string) $r->id])));
-            }
-            $rows = $rows->take(50)->values();
-            if ($rows->isEmpty()) continue;
-            $rulesRun++;
-            // عتبةُ التصعيد: مشكلةٌ ظلّت تُطلِق القاعدة أطولَ من ثلاث دوراتٍ كاملة
-            // «قيلَ لك ولم تُحلّ» — تُدفَع عبر كل القنوات ويُوسَم إشعارُها مُتصاعداً.
-            // قابلةٌ للضبط عالميّاً (notify.escalate_after)، وإلا تكيّفٌ مع دورية القاعدة.
-            $escAfter    = (int) setting('notify.escalate_after', 0);
-            $escalateAge = $escAfter > 0 ? $escAfter : max(3, $every * 3);
-
-            // النطاق يُفرض لكل مستلم على حدة — القاعدة لا تُسرّب عنوان سجل خارج نطاقه
-            $rowIds = $rows->pluck('id')->all();
-            $visible = [];
-            foreach ($to as $ru) {
-                $visible[$ru->id] = hub_scope(
-                    DB::table($md['table'])->whereNull('deleted_at')->whereIn('id', $rowIds),
-                    $rule->mod, $ru)->pluck('id')->map(fn ($i) => (string) $i)->flip()->all();
-            }
-
-            foreach ($rows as $row) {
-                $canSee = $to->filter(fn ($ru) => isset($visible[$ru->id][(string) $row->id]));
-                if ($canSee->isEmpty()) continue;
-
-                // منع التكرار: نفس القاعدة ونفس السجل خلال «كل N يوم».
-                // whereDate لا نافذة datetime: الإشعار يُختم now() (دقّة ثانية)
-                // والفحص كان now()-N days بالضبط — فانزياحُ الكرون ثوانٍ يُخرج
-                // إشعار الأمس من النافذة فتُعيد قواعد every=1 الإطلاق يوميّاً.
-                $dup = HubNotification::where('kind', 'rule:' . $rule->id)
-                    ->where('record_id', $row->id)
-                    ->whereDate('created_at', '>=', today()->subDays($every))
-                    ->exists();
-                if ($dup) continue;
-
-                // منذ متى ونحن نطلق على هذه المشكلة بعينها؟ أقدمُ إشعارٍ لنفس
-                // القاعدة والسجل هو ختمُ أوّل رصدٍ لها؛ تجاوزُه عتبةَ التصعيد يعني
-                // أنها لم تُحلّ رغم الإبلاغ — فيرتفع الإلحاح ويُدفَع عبر القنوات.
-                // بدايةُ السلسلة المتّصلة: نمشي الإشعارات من الأحدث، وأيُّ فجوةٍ أكبرَ
-                // من دورةٍ (every) تعني أنها حُلّت ثم عادت — فتبدأ سلسلةٌ جديدة. (كان
-                // min المطلق يجعل نوبةً قديمةً حُلّت تُصعّد النوبةَ الجديدةَ فور عودتها.)
-                $stamps = HubNotification::where('kind', 'rule:' . $rule->id)
-                    ->where('record_id', $row->id)->orderByDesc('created_at')
-                    ->pluck('created_at')->map(fn ($s) => Carbon::parse($s)->startOfDay())->values();
-                $chainStart = $stamps->first();
-                for ($i = 1; $i < $stamps->count(); $i++) {
-                    if ($chainStart->diffInDays($stamps[$i], true) > $every + 1) break;   // فجوةٌ ← انقطاع
-                    $chainStart = $stamps[$i];
-                }
-                $escalated = $chainStart && $chainStart->lte(today()->subDays($escalateAge));
-                // مطلقٌ لا موقّع — Carbon 3 يجعل diffInDays موقّعاً افتراضياً (أيامٌ سالبة)
-                $days      = $escalated ? (int) $chainStart->diffInDays(today(), true) : 0;
-
-                $base = trim(($rule->msg ?: $rule->name) . ' — ' . Str::limit((string) $row->_n, 60));
-                $text = $escalated ? "🔺 مُتصاعد (لم يُعالَج منذ {$days} يوماً): {$base}" : $base;
-                $hits++;
-                if ($escalated) $esc++;
-
-                foreach ($canSee as $ru) {
-                    if ($this->dry) continue;
-                    HubNotification::create([
-                        'user_id'   => $ru->id,
-                        'kind'      => 'rule:' . $rule->id,
-                        'text'      => Str::limit($text, 590),
-                        'module'    => $rule->mod,
-                        'record_id' => $row->id,
-                        'read'      => false,
-                        'created_at'=> now(),
-                    ]);
-                }
-
-                // القناة المعتادة، ويفرضها التصعيد جميعاً — المشكلة المزمنة لا
-                // تُترَك حبيسةَ الجرس وحده حين تكفّ عن كونها روتيناً يومياً.
-                $chan = (string) $rule->chan;
-                foreach (['تلجرام' => 'tg', 'بريد' => 'mail'] as $word => $ch) {
-                    if ($escalated || str_contains($chan, $word) || str_contains($chan, 'الكل')) {
-                        $outbox++;
-                        if (! $this->dry) OutboxMessage::create([
-                            'user_id'    => $canSee->first()?->id,
-                            'kind'       => 'rule:' . $rule->id,
-                            'channel'    => $ch,
-                            'target'     => null,               // يملؤها عامل التسليم (n8n)
-                            'text'       => Str::limit($text, 790),
-                            'state'      => 'queued',
-                            'created_at' => now(),
-                        ]);
-                    }
-                }
-            }
-        }
-
-        return ['hits' => $hits, 'rules' => $rulesRun, 'outbox' => $outbox, 'esc' => $esc];
+        return (new \App\Support\AlertEngine($this->dry, fn ($m) => $this->line($m)))->daily();
     }
+
 
     /** المستلمون: المحدد في القاعدة، وإلا المالكون + حاملو علم monitor */
     protected function recipients($toId): array
@@ -748,9 +572,14 @@ class HubAutomation extends Command
                 } while ($gone >= 5000);
             }
             if (\Illuminate\Support\Facades\Schema::hasTable('page_visits')) {
+                // ── Control Plane: Phase 7 (WP-7.4) ── الزياراتُ وحدَها كانت بثابتِ
+                // ٩٠ في الشيفرة بينما إخوتُها بمفاتيحَ معلَنة — retention.visits_days
+                // (spec §13)، بحدٍّ أدنى ٣٠: مقصٌّ أقصرُ من شهرٍ يُفقد أثرَ التحقيق
+                // الأمنيّ قبل أن يُفتح. الافتراضيُّ ٩٠ حرفياً فلا يتغيّر سلوكُ أحد.
+                $vKeep = max(30, (int) setting('retention.visits_days', 90));
                 $per['page_visits'] = 0;
                 do {
-                    $gone = DB::table('page_visits')->where('at', '<', now()->subDays(90))
+                    $gone = DB::table('page_visits')->where('at', '<', now()->subDays($vKeep))
                         ->limit(5000)->delete();
                     $n += $gone; $per['page_visits'] += $gone;
                 } while ($gone >= 5000);

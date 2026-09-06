@@ -554,23 +554,62 @@ if (! function_exists('hub_security_incident')) {
      * حالةً تُحقَّق لا إشعاراً يضيع. يمنع الإغراق: حادثةٌ مفتوحةٌ بالعنوان نفسه
      * خلال النافذة تُعاد بدل فتح ثانية. الأدلّةُ في `meta` لا في متن يُفهرَس.
      *
+     * ── Control Plane: Phase 6 (WP-6.3) ── **غلافٌ متوافق**: الجوهرُ انتقل إلى
+     * `hub_open_incident` المعمَّم (بصمةٌ ونوع) — النداءاتُ القائمة تعمل حرفياً
+     * كما كانت (تكرارٌ بالعنوان، نوعٌ security).
+     *
      * @param array $meta أدلّةٌ وسياق (user_id, ip, evidence…)
      */
     function hub_security_incident(string $title, string $severity = 'عالي', array $meta = [], int $dedupHours = 6)
     {
+        return hub_open_incident($title, $severity, 'security', null, $meta, $dedupHours);
+    }
+}
+
+if (! function_exists('hub_open_incident')) {
+    /**
+     * ── Control Plane: Phase 6 (WP-6.3) ──
+     * **فتحُ حادثةٍ آليّة معمَّم** (§3.9): أمنيّةً كانت (`kind=security`) أو
+     * تشغيليّةً (`kind=ops` — قاعدةٌ لا تُجيب، قرصٌ حرج، مجدولةٌ ميتة…).
+     *
+     * — **التكرارُ ببصمةٍ لا بنصّ العنوان** حين تُمرَّر `$fingerprint` (مثل
+     *   `ops:scheduler_dead:outbox`): العنوانُ نصٌّ للبشر يتغيّر بالتفاصيل،
+     *   والبصمةُ هويّةُ الشرط. حادثةٌ **مفتوحة** بالبصمة نفسِها تُثرى بدليلٍ
+     *   جديد بلا نافذةٍ زمنية — فما دامت مفتوحةً فهي الحادثةُ نفسُها (الإغلاقُ
+     *   قرارُ إنسانٍ لا مؤقّت). وبلا بصمةٍ يبقى تكرارُ العنوان/النافذة القديم.
+     * — **الإطلاقُ يمرّ بالناقل**: كانت `hub_security_incident` تنشئ الصفَّ ولا
+     *   تبثّ حدثاً، فمسارُ «🚨 حادث حرج» المبذور لا يعمل للحوادث الآليّة — وهي
+     *   أحوجُ ما يكون إليه. الآن `FlowRunner::fire('created')` بعد الإنشاء.
+     * — **الشفاء ليس إغلاقاً**: `AlertEngine` يُلحِق قيدَ «تعافت الخدمة» في
+     *   `meta.events` ويُبقي الحادثةَ مفتوحةً لقرار الإنسان (لا إغلاقَ صامتاً).
+     *
+     * @param array $meta أدلّةٌ وسياق — تُلحَق قيدَ حدثٍ في meta.events
+     */
+    function hub_open_incident(string $title, string $severity = 'عالي', string $kind = 'security',
+                               ?string $fingerprint = null, array $meta = [], int $dedupHours = 6)
+    {
         if (! \Illuminate\Support\Facades\Schema::hasTable('incidents')) return null;
         try {
-            $open = \App\Models\Incident::whereNull('deleted_at')
-                ->where('title', $title)
-                ->whereNotIn('status', ['مغلق بتقرير', 'مُستعاد'])
-                ->where('created_at', '>=', now()->subHours(max(1, $dedupHours)))
-                ->orderByDesc('created_at')->orderByDesc('id')->first();
+            $openQ = \App\Models\Incident::whereNull('deleted_at')
+                ->whereNotIn('status', ['مغلق بتقرير', 'مُستعاد']);
+            if ($fingerprint !== null && $fingerprint !== '') {
+                // بالبصمة: أيُّ حادثةٍ مفتوحةٍ بها هي الحادثةُ نفسُها — لا نافذة
+                // (meta->fingerprint استعلامُ JSON محايدٌ للمحرّكين — لا LIKE على
+                // نصّ meta: نوعُ JSON الأصليّ في MySQL يعيد ترتيبَ المفاتيح والمسافات)
+                $openQ->where('meta->fingerprint', $fingerprint);
+            } else {
+                $openQ->where('title', $title)
+                    ->where('created_at', '>=', now()->subHours(max(1, $dedupHours)));
+            }
+            $open = $openQ->orderByDesc('created_at')->orderByDesc('id')->first();
             if ($open) {
-                // حادثةٌ قائمة — تُثرى بدليلٍ جديد لا تُكرَّر
+                // حادثةٌ قائمة — تُثرى بدليلٍ جديد لا تُكرَّر؛ وعودةُ الشرط بعد
+                // «تعافٍ» تمحو وسمَ التعافي فيُكتب قيدُه من جديد عند الشفاء التالي
                 $open->meta = array_merge((array) $open->meta, [
                     'events' => array_merge((array) (($open->meta['events'] ?? [])), [[
                         'at' => now()->toIso8601String(), 'evidence' => $meta,
                     ]]),
+                    'recovered' => false,
                 ]);
                 $open->saveQuietly();
 
@@ -582,19 +621,40 @@ if (! function_exists('hub_security_incident')) {
                 'severity' => in_array($severity, ['حرج', 'عالي', 'متوسط', 'منخفض'], true) ? $severity : 'عالي',
                 'status' => 'مفتوح',
                 'started_at' => now(),
-                'affected' => 'حادثةٌ أمنيّة مُولَّدة آلياً — للتحقيق البشريّ لا للعقاب الآليّ',
-                'meta' => ['kind' => 'security', 'auto' => true, 'events' => [[
-                    'at' => now()->toIso8601String(), 'evidence' => $meta,
-                ]]],
+                'affected' => $kind === 'ops'
+                    ? 'حادثةٌ تشغيليّة مُولَّدة آلياً — كشفُ صحّةٍ لا بلاغُ بشر'
+                    : 'حادثةٌ أمنيّة مُولَّدة آلياً — للتحقيق البشريّ لا للعقاب الآليّ',
+                'meta' => array_filter([
+                    'kind' => $kind, 'auto' => true, 'fingerprint' => $fingerprint,
+                    'events' => [['at' => now()->toIso8601String(), 'evidence' => $meta]],
+                ], fn ($v) => $v !== null),
             ];
             // (WP-1.4) ربطُ الحادثة بالطلب الذي فجّرها — `system.trace` يجمع الأثرَ بالمعرّف
             if (hub_has_col('incidents', 'request_id')) {
                 $row['request_id'] = mb_substr((string) \App\Support\Api::requestId(), 0, 40) ?: null;
             }
+            // ── Control Plane: Phase 6 (WP-6.1) ──
+            // عمودُ `kind` مرآةُ meta.kind (عرضُه ٢٠ — mb_substr عند الكاتب) يُغني
+            // القُرّاء عن مسح meta بـLIKE، ووقتُ الكشف = لحظةُ فتح النظام للحادثة
+            if (hub_has_col('incidents', 'kind')) $row['kind'] = mb_substr($kind, 0, 20);
+            if (hub_has_col('incidents', 'detected_at')) $row['detected_at'] = now();
+            // قائدٌ افتراضيّ (critic #37): Acks::targets() يقرأ lead_id، وحادثةٌ
+            // آليّةٌ بلا قائدٍ يستحيل «إقرارُها» في الحالة الوحيدة التي تحتاجه —
+            // فأوّلُ مالكٍ نشطٍ قائدٌ حتى يُسنَد غيرُه (والرأسُ يقول «بلا قائد» إن غاب)
+            $row['lead_id'] = \Illuminate\Support\Facades\DB::table('users')
+                ->join('roles', 'roles.id', '=', 'users.role_id')
+                ->whereNull('users.deleted_at')->where('users.status', 'نشط')
+                ->where('roles.is_owner', true)
+                ->orderBy('users.created_at')->orderBy('users.id')->value('users.id');
 
-            return \App\Models\Incident::create($row);
+            $m = \App\Models\Incident::create($row);
+            // (WP-6.3) البثُّ على الناقل الواحد — فتعمل المساراتُ المبذورة
+            // («🚨 حادث حرج») والويبهوكس على الحوادث الآليّة كما اليدويّة تماماً
+            \App\Support\FlowRunner::fire('created', 'incidents', $m);
+
+            return $m;
         } catch (\Throwable $e) {
-            \App\Support\ErrorLog::capture('php', 'hub_security_incident: ' . $e->getMessage(), __FILE__, __LINE__);
+            \App\Support\ErrorLog::capture('php', 'hub_open_incident: ' . $e->getMessage(), __FILE__, __LINE__);
 
             return null;
         }
@@ -2477,6 +2537,106 @@ if (! function_exists('hub_timeline')) {
                 }
             } catch (\Throwable $e) {
                 // كودٌ وصل قبل هجرته — الخط الزمني لا ينفجر
+            }
+        }
+
+        // ── Control Plane: Phase 6 (WP-6.2) ──
+        // **فرعُ الحوادث** (§8.2 · §8.4): غرفةُ القيادة تحتاج خطّاً واحداً لا خمسةَ
+        // أماكن. المصادرُ الخمسة، كلٌّ محروسٌ بوجود جدوله ومحدودٌ بـ$limit:
+        //   ١) `incident_links` — أدلّةٌ ربطها إنسانٌ من صفحات المصادر.
+        //   ٢) `meta.events` — أدلّةٌ آليّة يكتبها `hub_open_incident`/`AlertEngine`
+        //      منذ اليوم الأول **ولا يعرضها أحد**؛ فتُستخرج هنا لا في جدولٍ ثانٍ.
+        //   ٣) `deployments.incident_id` — عمودُ مرجعٍ **قائم**، فلا صفَّ وصلٍ له
+        //      (وحدةُ النشر مفتاحُها `deploys` وجدولُها `deployments`).
+        //   ٤+٥) فرقا **الحالة والقائد** من التدقيق.
+        // والتاريخُ يُطبَّع لصيغةٍ واحدة (`Y-m-d H:i:s`) قبل الإضافة: قيدُ meta
+        // يُكتب ISO8601 و«T» تسبق الفراغَ في المقارنة النصّية فينهار فرزُ السطر
+        // الأخير على المصادر كلِّها.
+        // **الحجب**: اسمُ سجلٍّ من وحدةٍ لا يملك القارئُ عرضَها لا يظهر أبداً —
+        // نفسُ فلتر `hub_related` (`hub_can($module,'v')`)، فالملخّصُ نصٌّ حرٌّ قد
+        // يحمل اسمَ موظفٍ أو عميل.
+        if ($module === 'incidents') {
+            $at = fn ($t) => $t
+                ? \Illuminate\Support\Carbon::parse($t)
+                    ->setTimezone(config('app.timezone', 'Asia/Kuwait'))->format('Y-m-d H:i:s')
+                : null;
+
+            // ١) الأدلّةُ المرتبطة
+            if (\Illuminate\Support\Facades\Schema::hasTable('incident_links')) {
+                $kindLbl = ['error' => 'خطأ', 'audit' => 'قيد تدقيق', 'security' => 'حدث أمنيّ',
+                            'request' => 'طلب', 'alert' => 'تنبيه', 'task' => 'مهمة',
+                            'deploy' => 'نشر', 'note' => 'ملاحظة'];
+                $seen = [];
+                foreach (\Illuminate\Support\Facades\DB::table('incident_links')
+                            ->where('incident_id', $recordId)
+                            ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)
+                            ->get(['kind', 'module', 'record_id', 'summary', 'by', 'created_at']) as $l) {
+                    $lm = (string) ($l->module ?? '');
+                    if ($lm !== '' && ! array_key_exists($lm, $seen)) {
+                        $seen[$lm] = hub_can(auth()->user(), $lm, 'v');
+                    }
+                    $blind = $lm !== '' && ! $seen[$lm];
+                    $add($at($l->created_at), '🔗', 'دليل: ' . ($kindLbl[$l->kind] ?? $l->kind),
+                        $blind
+                            ? 'سجلٌّ خارج صلاحيتك — أُخفي ملخّصُه'
+                            : \Illuminate\Support\Str::limit(\App\Support\Redactor::text((string) $l->summary), 160),
+                        (! $blind && $lm !== '' && $l->record_id) ? route('m.show', [$lm, $l->record_id]) : null,
+                        $name($l->by));
+                }
+            }
+
+            // ٢) الأدلّةُ الآليّة المخزّنة في meta.events
+            $im = \Illuminate\Support\Facades\DB::table('incidents')->where('id', $recordId)->value('meta');
+            $im = is_string($im) ? (json_decode($im, true) ?: []) : (array) $im;
+            foreach (array_slice((array) ($im['events'] ?? []), -$limit) as $me) {
+                if (! is_array($me)) continue;
+                $txt = trim((string) ($me['note'] ?? ''));
+                if ($txt === '' && ! empty($me['evidence']) && is_array($me['evidence'])) {
+                    $txt = implode(' · ', array_map(
+                        fn ($k, $v) => $k . ': ' . (is_scalar($v) ? $v : json_encode($v, JSON_UNESCAPED_UNICODE)),
+                        array_keys($me['evidence']), array_values($me['evidence'])));
+                }
+                $add($at($me['at'] ?? null), '🤖', 'قيد آليّ',
+                    \Illuminate\Support\Str::limit(\App\Support\Redactor::text($txt), 160));
+            }
+
+            // ٣) النشرُ المرتبط بعمود المرجع القائم
+            if (\Illuminate\Support\Facades\Schema::hasTable('deployments')) {
+                $canDep = hub_can(auth()->user(), 'deploys', 'v');
+                foreach (\Illuminate\Support\Facades\DB::table('deployments')->whereNull('deleted_at')
+                            ->where('incident_id', $recordId)
+                            ->orderByDesc('deployed_at')->orderByDesc('id')->limit($limit)
+                            ->get(['id', 'ver', 'env', 'status', 'deployed_at', 'created_at', 'by_id']) as $d) {
+                    $add($at($d->deployed_at ?: $d->created_at), '🚀', 'نشر مرتبط',
+                        $canDep
+                            ? trim((string) $d->ver . ($d->env ? ' — ' . $d->env : '') . ($d->status ? ' · ' . $d->status : ''))
+                            : 'نشرٌ خارج صلاحيتك — أُخفيت تفاصيلُه',
+                        $canDep ? route('m.show', ['deploys', $d->id]) : null, $name($d->by_id));
+                }
+            }
+
+            // ٤+٥) فرقا الحالة والقائد — حقلان **بقائمةٍ بيضاء** لا فرقٌ عام: هما
+            // ما تعرضه بطاقةُ الرأس أصلاً، فلا قيمةَ قديمة تتسرّب خارجَ ما يُرى
+            // (قاعدةُ «لا before/after في الخط الزمني» تبقى قائمةً لكل ما عداهما)
+            $dLbl = ['status' => ['تغيّر الحالة', '🔁'], 'lead_id' => ['تغيّر القائد', '👤']];
+            foreach (\Illuminate\Support\Facades\DB::table('audits')
+                        ->where('module', 'incidents')->where('record_id', $recordId)
+                        ->where('action', 'تعديل')
+                        ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)
+                        ->get(['before', 'after', 'user_id', 'created_at']) as $a) {
+                $bf = json_decode((string) $a->before, true) ?: [];
+                $af = json_decode((string) $a->after, true) ?: [];
+                foreach ($dLbl as $col => [$lbl, $ico]) {
+                    if (! array_key_exists($col, $af)) continue;
+                    $from = $bf[$col] ?? null;
+                    $to = $af[$col] ?? null;
+                    if ($from === $to) continue;
+                    $show = fn ($v) => $col === 'lead_id'
+                        ? ($v ? ($name($v) ?: 'مستخدم محذوف') : 'بلا قائد')
+                        : ($v !== null && $v !== '' ? (string) $v : '—');
+                    $add($at($a->created_at), $ico, $lbl,
+                        'من «' . $show($from) . '» إلى «' . $show($to) . '»', null, $name($a->user_id));
+                }
             }
         }
 

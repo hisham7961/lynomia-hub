@@ -57,11 +57,17 @@ class SecurityController extends Controller
             'stale'   => count($staleIds),
             'live'    => DB::table('sessions_log')->where('revoked', false)
                             ->where('last_seen_at', '>=', now()->subMinutes(self::LIVE_MIN))->count(),
-            // حوادثُ أمنيّةٌ مفتوحة (مُولَّدةٌ آلياً بوسم kind=security) — تُحقَّق
+            // حوادثُ أمنيّةٌ مفتوحة (مُولَّدةٌ آلياً بوسم kind=security) — تُحقَّق.
+            // (WP-6.1) عمودُ `kind` المفهرسُ بدل مسح meta بـLIKE في كل فتحٍ للمركز؛
+            // الصفوفُ القديمة عمودُها فارغٌ فتُلتقط بسقوطٍ إلى meta (تعبئةٌ كسولة)
             'secinc'  => Schema::hasTable('incidents')
                 ? DB::table('incidents')->whereNull('deleted_at')
                     ->whereNotIn('status', ['مغلق بتقرير', 'مُستعاد'])
-                    ->where('meta', 'like', '%"kind":"security"%')->count() : 0,
+                    ->when(hub_has_col('incidents', 'kind'),
+                        fn ($q) => $q->where(fn ($w) => $w->where('kind', 'security')
+                            ->orWhere(fn ($o) => $o->whereNull('kind')->where('meta', 'like', '%"kind"%security%'))),
+                        fn ($q) => $q->where('meta', 'like', '%"kind"%security%'))
+                    ->count() : 0,
         ];
 
         // الجلسات: الأحدثُ ظهوراً أولاً بفاصل تعادلٍ حاسم (critic #19) — «أول ٢٥»

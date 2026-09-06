@@ -24,6 +24,7 @@ class Incident extends Model
 
     protected $casts = [
         'started_at' => 'datetime',
+        'detected_at' => 'datetime',   // (WP-6.1) متى عُلم بالحادثة
         'resolved_at' => 'datetime',
         'review_date' => 'date',
         'postmortem' => 'boolean',

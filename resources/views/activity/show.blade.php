@@ -8,9 +8,10 @@
     <a class="btn ghost sm" href="{{ route('activity.index') }}">→ كل الموظفين</a>
 </div>
 
-{{-- ملف الشك — مؤشرات مشتقة من نشاط النظام نفسه، بمكونات معلنة لا صندوق أسود --}}
+{{-- مخاطر النشاط الأمني — بطاقة منفصلة تماماً عن أرقام العمل (WP-7.1، spec §46):
+     الدرجة من Risk::activity وحده، بمكونات معلنة لا صندوق أسود، ولا تدخل في أي شاشة أداء --}}
 <div class="card">
-    <h3>🧿 مؤشرات الشك والسلوك <span class="sub">· آخر ١٤ يوماً</span></h3>
+    <h3>🛡️ مخاطر النشاط الأمني <span class="sub">· آخر ١٤ يوماً · معزولة عن أرقام الأداء</span></h3>
     <div class="statv2" style="margin-top:8px">
         <div class="stat" style="--st:{{ $risk['tone'] === 'bad' ? 'var(--bad)' : ($risk['tone'] === 'wn' ? '#C08A3E' : 'var(--p)') }}">
             <div class="sub">نسبة الشك بالمستخدم</div>
@@ -21,8 +22,6 @@
             <div class="sub">{{ $risk['strange'] }} دخول شاذ + {{ $risk['failed'] }} محاولة فاشلة من {{ $risk['logins'] + $risk['failed'] }}</div></div>
         <div class="stat"><div class="sub">التسجيل من أجهزة مختلفة</div><b style="font-size:26px">{{ $risk['devices'] }}</b>
             <div class="sub">جهازاً عبر {{ $risk['logins'] }} دخول · {{ $risk['ips'] }} عنوان شبكة</div></div>
-        <div class="stat"><div class="sub">ساعات داخل الدوام (٠٨–١٦)</div><b style="font-size:26px">{{ $risk['in_h'] }}</b><div class="sub">ساعة نشاط فعلي</div></div>
-        <div class="stat"><div class="sub">ساعات خارج الدوام</div><b style="font-size:26px">{{ $risk['out_h'] }}</b><div class="sub">ساعة (٠٦–٠٨ و١٦–٢٤)</div></div>
         <div class="stat" style="--st:{{ $risk['night_h'] > 0 ? 'var(--bad)' : 'var(--p)' }}">
             <div class="sub">الساعات المريبة (٠٠–٠٦)</div><b style="font-size:26px">{{ $risk['night_h'] }}</b><div class="sub">ساعة بعد منتصف الليل</div></div>
     </div>
@@ -37,9 +36,16 @@
 </div>
 
 <div class="kids">
+    {{-- الجانب العملي: ساعات العمل وحدها — لا درجة أمنية هنا (فصل §46) --}}
     <div class="card kid">
         <h3>🕗 ساعات العمل الفعلية (من فتح الحساب)</h3>
-        <table class="mini">
+        <div class="statv2" style="margin-top:8px">
+            <div class="stat"><div class="sub">ساعات داخل الدوام ({{ $work['start'] }}–{{ $work['end'] }})</div>
+                <b style="font-size:26px">{{ $work['in_h'] }}</b><div class="sub">ساعة نشاط فعلي · الحدود من إعدادات الدوام</div></div>
+            <div class="stat"><div class="sub">ساعات خارج الدوام</div>
+                <b style="font-size:26px">{{ $work['out_h'] }}</b><div class="sub">ساعة خارج حدود الدوام المضبوطة</div></div>
+        </div>
+        <table class="mini" style="margin-top:8px">
             <tr><th>اليوم</th><th>أول فتح</th><th>آخر ظهور</th><th>دقائق نشاط</th><th>زيارات</th><th>أفعال</th></tr>
             @forelse ($days as $d => $row)
                 <tr>
@@ -86,16 +92,25 @@
         @endif
     </div>
 
+    {{-- الأثر الخام مطويّ افتراضاً (spec §5.8): يُفتح عند حاجة تحقيق فقط — لا يُسكب --}}
     <div class="card kid">
         <h3>🧭 مسار التنقل داخل النظام</h3>
-        <div style="max-height:340px;overflow:auto">
-            <table class="mini">
-                @foreach ($trail as $v)
-                    <tr><td class="mono sub acts">{{ substr($v->at, 5, 11) }}</td>
-                        <td class="mono ltr" style="font-size:11.5px">{{ $v->path }}</td></tr>
-                @endforeach
-            </table>
-        </div>
+        @if (count($trail))
+            <div class="sub">{{ count($trail) }} زيارة مسجلة — الأثر الخام مطويّ، يُفتح عند حاجة تحقيق فقط.</div>
+            <details style="margin-top:6px">
+                <summary class="sub pointer">عرض أثر الزيارات الخام ({{ count($trail) }})</summary>
+                <div style="max-height:340px;overflow:auto">
+                    <table class="mini">
+                        @foreach ($trail as $v)
+                            <tr><td class="mono sub acts">{{ substr($v->at, 5, 11) }}</td>
+                                <td class="mono ltr" style="font-size:11.5px">{{ $v->path }}</td></tr>
+                        @endforeach
+                    </table>
+                </div>
+            </details>
+        @else
+            <div class="sub" style="padding:14px;text-align:center">لا زيارات مسجلة بعد — يتجمّع المسار تلقائياً مع استخدام النظام</div>
+        @endif
     </div>
 </div>
 @endsection
