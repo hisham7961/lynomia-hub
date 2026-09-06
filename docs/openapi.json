@@ -2,9 +2,9 @@
     "openapi": "3.1.0",
     "info": {
         "title": "Lynomia Business Hub — REST API",
-        "version": "2.404.0",
+        "version": "2.405.0",
         "description": "واجهة `/api/v1`: كل وحدات النظام بنفس صلاحيات صاحب المفتاح ونطاقه.\nمفتاح Bearer من «حسابي ← مفاتيح API». حدّ المعدل ١٢٠/دقيقة لكل مفتاح و٣٠٠/دقيقة لكل عنوان.\nكل ردٍّ يحمل `X-Request-Id` و`X-API-Version`، وكل خطأٍ يحمل `code` آلياً و`request_id`.",
-        "x-hub-version": "2.404.0"
+        "x-hub-version": "2.405.0"
     },
     "servers": [
         {
@@ -50713,6 +50713,58 @@
                         "type": "string",
                         "title": "ملاحظات"
                     },
+                    "severity": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "حرج",
+                            "عالي",
+                            "متوسط",
+                            "منخفض"
+                        ],
+                        "title": "الشدّة"
+                    },
+                    "domain": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "module",
+                            "security",
+                            "system",
+                            "error",
+                            "quality",
+                            "execution"
+                        ],
+                        "title": "المجال"
+                    },
+                    "source": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "security.failed_logins",
+                            "security.denials",
+                            "security.role_change",
+                            "security.lockdown",
+                            "errors.critical_count",
+                            "health.scheduler"
+                        ],
+                        "title": "المصدر المسمّى (للقواعد النافذية)"
+                    },
+                    "windowMin": {
+                        "nullable": true,
+                        "type": "number",
+                        "title": "نافذة التقييم (دقيقة)"
+                    },
+                    "cooldownMin": {
+                        "nullable": true,
+                        "type": "number",
+                        "title": "تبريد الإشعار (دقيقة)"
+                    },
+                    "autoIncident": {
+                        "nullable": true,
+                        "type": "boolean",
+                        "title": "فتح حادثة آلياً عند الإطلاق"
+                    },
                     "created_at": {
                         "type": "string",
                         "format": "date-time",
@@ -50891,6 +50943,58 @@
                         "nullable": true,
                         "type": "string",
                         "title": "ملاحظات"
+                    },
+                    "severity": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "حرج",
+                            "عالي",
+                            "متوسط",
+                            "منخفض"
+                        ],
+                        "title": "الشدّة"
+                    },
+                    "domain": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "module",
+                            "security",
+                            "system",
+                            "error",
+                            "quality",
+                            "execution"
+                        ],
+                        "title": "المجال"
+                    },
+                    "source": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "security.failed_logins",
+                            "security.denials",
+                            "security.role_change",
+                            "security.lockdown",
+                            "errors.critical_count",
+                            "health.scheduler"
+                        ],
+                        "title": "المصدر المسمّى (للقواعد النافذية)"
+                    },
+                    "windowMin": {
+                        "nullable": true,
+                        "type": "number",
+                        "title": "نافذة التقييم (دقيقة)"
+                    },
+                    "cooldownMin": {
+                        "nullable": true,
+                        "type": "number",
+                        "title": "تبريد الإشعار (دقيقة)"
+                    },
+                    "autoIncident": {
+                        "nullable": true,
+                        "type": "boolean",
+                        "title": "فتح حادثة آلياً عند الإطلاق"
                     }
                 },
                 "required": [
@@ -53769,6 +53873,12 @@
                         "format": "date-time",
                         "title": "وقت بداية الحادث"
                     },
+                    "detectedAt": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "وقت اكتشاف الحادث"
+                    },
                     "resolvedAt": {
                         "nullable": true,
                         "type": "string",
@@ -53927,6 +54037,12 @@
                         "type": "string",
                         "format": "date-time",
                         "title": "وقت بداية الحادث"
+                    },
+                    "detectedAt": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "وقت اكتشاف الحادث"
                     },
                     "resolvedAt": {
                         "nullable": true,
