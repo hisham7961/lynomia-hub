@@ -1307,7 +1307,11 @@ if (! function_exists('hub_health')) {
                 $sec = $db->table('vault_secrets')->whereNull('deleted_at');
                 $sn = (clone $sec)->count();
                 $stale = $sn ? (clone $sec)->where('updated_at', '<', now()->subDays(180))->count() : 0;
-                $score = 100 - ($un ? ($idle / $un) * 35 : 0) - ($sn ? ($stale / $sn) * 45 : 0);
+                // (الطور ٤ · §2.2 توحيدُ الدرجة) المصدرُ الواحد هو لقطةُ الوضعية اليومية
+                // (SecurityPosture::summary عبر hub:security-snapshot)؛ والمعادلةُ المحلية
+                // القديمة تبقى احتياطاً صادقاً قبل أول لقطة — لا درجتين متضاربتين بعدها.
+                $snap = hub_metric_latest('security', 'org', 'score');
+                $score = $snap !== null ? $snap : (100 - ($un ? ($idle / $un) * 35 : 0) - ($sn ? ($stale / $sn) * 45 : 0));
                 $out['الأمن'] = ['score' => $clamp($score), 'note' => "{$idle}/{$un} مستخدم خامل · {$stale}/{$sn} سر لم يُغيَّر منذ ٦ أشهر"];
             } catch (\Throwable $e) {}
 
