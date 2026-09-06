@@ -47,6 +47,99 @@
     <span class="sub" style="margin-inline-start:8px">تفاصيلُ كل صنفٍ في «السجلات المرتبطة» أدناه — لا نسخةَ ثانية.</span>
 </div>
 
+{{-- **أعضاءُ مساحة العميل** (Work OS · الطور B · WP-B.3 · §13/§98): لوحةٌ داخليّةٌ
+     لمديرِ الحساب — تُعدّد الأعضاءَ بأدوارهم وحالاتهم، وتدعو زميلاً للتفعيل، وتمنح
+     دوراً، وتسحب وصولاً. الحرسُ في المتحكّم (`hub_can('clients','e')` + تصعيدٌ
+     لمنح Owner/سحب الوصول)؛ هنا نُخفي أزرارَ الكتابة عمّن لا يملكها فحسب. --}}
+@php
+    $cmRoles = ['owner' => 'مالك (العميل)', 'lead' => 'قائد', 'technical' => 'تقنيّ', 'finance' => 'ماليّة', 'viewer' => 'مشاهد'];
+    $cmStatus = ['active' => ['فعّال', 'ok'], 'invited' => ['مدعوّ', 'wn'], 'suspended' => ['معلّق', 'bad']];
+    $cmCanManage = hub_can(auth()->user(), 'clients', 'e');
+    // العضويّاتُ + حسابُ كلٍّ (لعرض حالة التفعيل الحقيقية) — ترتيبٌ حتميّ (status ثم id)
+    $cmMembers = \App\Models\ClientMembership::where('client_id', $row->id)
+        ->with('user:id,name,email,password_changed_at,account_type')
+        ->orderBy('status')->orderBy('id')->get();
+@endphp
+<div class="card">
+    <h3 class="cardtitle">👥 أعضاءُ مساحة العميل
+        <span class="bdg" title="من يبلغ بوابةَ هذا العميل وبأيّ دور">{{ $cmMembers->count() }} عضواً</span>
+    </h3>
+    <span class="sub">مَن يبلغ مساحةَ العميل وبأيّ دور — الدعوةُ تُنشئ حسابَ عميلٍ ويضع هو كلمتَه بنفسه (لا كلمةَ سرٍّ تُرسَل).</span>
+
+    @if ($cmMembers->isEmpty())
+        <div class="empty" style="margin-top:10px">لا أعضاءَ بعد — ادعُ أوّلَ زميلٍ لمساحة هذا العميل.</div>
+    @else
+        <div style="overflow-x:auto;margin-top:10px">
+            <table class="tbl">
+                <thead><tr><th>العضو</th><th>الدور</th><th>الحالة</th><th>الحساب</th>@if ($cmCanManage)<th>إجراءات</th>@endif</tr></thead>
+                <tbody>
+                @foreach ($cmMembers as $mb)
+                    @php [$stLabel, $stTone] = $cmStatus[$mb->status] ?? [$mb->status, 'wn']; @endphp
+                    <tr>
+                        <td>
+                            <b>{{ $mb->user?->name ?? '—' }}</b>
+                            <div class="sub mono">{{ $mb->user?->email }}</div>
+                        </td>
+                        <td>
+                            @if ($cmCanManage)
+                                <form method="POST" action="{{ route('clients.members.role', [$row->id, $mb->id]) }}" class="inline">
+                                    @csrf
+                                    <select name="role" class="inp xs" onchange="this.form.submit()" aria-label="دورُ العضو">
+                                        @foreach ($cmRoles as $rk => $rl)
+                                            <option value="{{ $rk }}" @selected($mb->role === $rk)>{{ $rl }}</option>
+                                        @endforeach
+                                    </select>
+                                    <noscript><button class="btn xs">حفظ</button></noscript>
+                                </form>
+                            @else
+                                <span class="bdg">{{ $cmRoles[$mb->role] ?? $mb->role }}</span>
+                            @endif
+                        </td>
+                        <td><span class="bdg {{ $stTone }}">{{ $stLabel }}</span></td>
+                        <td>
+                            @if ($mb->user && $mb->user->password_changed_at === null)
+                                <span class="bdg wn" title="أُرسلت دعوةُ تفعيلٍ ولم يضع كلمتَه بعد">لم يُفعّل بعد</span>
+                            @else
+                                <span class="bdg ok">مُفعَّل</span>
+                            @endif
+                        </td>
+                        @if ($cmCanManage)
+                            <td>
+                                @if ($mb->status !== 'suspended')
+                                    <form method="POST" action="{{ route('clients.members.revoke', [$row->id, $mb->id]) }}" class="inline"
+                                          onsubmit="return confirm('سحبُ وصولِ هذا العضو؟ يسقط عن مساحة العميل فوراً.')">
+                                        @csrf
+                                        <button class="btn bad xs" title="يتطلّب تأكيدَ الهوية">سحبُ الوصول</button>
+                                    </form>
+                                @else
+                                    <span class="sub">—</span>
+                                @endif
+                            </td>
+                        @endif
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
+
+    @if ($cmCanManage)
+        <form method="POST" action="{{ route('clients.members.invite', $row->id) }}" class="crow" style="margin-top:12px;gap:8px;flex-wrap:wrap;align-items:end">
+            @csrf
+            <label class="fld"><span class="sub">بريدُ الزميل</span>
+                <input type="email" name="email" required class="inp" placeholder="name@company.com"></label>
+            <label class="fld"><span class="sub">الاسم (اختياري)</span>
+                <input type="text" name="name" maxlength="120" class="inp" placeholder="اسمُ الزميل"></label>
+            <label class="fld"><span class="sub">الدور</span>
+                <select name="role" class="inp">
+                    @foreach ($cmRoles as $rk => $rl)<option value="{{ $rk }}" @selected($rk === 'viewer')>{{ $rl }}</option>@endforeach
+                </select></label>
+            <button class="btn p">＋ دعوةُ زميل</button>
+        </form>
+        <span class="sub">منحُ «مالك (العميل)» أو سحبُ الوصول يتطلّب تأكيدَ الهوية.</span>
+    @endif
+</div>
+
 {{-- تشريح الخسارة على صفحة العميل الخاسر — يتوقع $row --}}
 @if ((string) $row->stage === 'خسارة')
     @php

@@ -129,7 +129,10 @@ class HubEventsTest extends TestCase
         // من شرط «وحدةٌ معروفة» بشرطٍ **أصرمَ** بدلاً منه: لا تحمل `to` — إذ لا
         // مجموعةَ حالاتٍ لغيرِ وحدةٍ يُتحقَّق منها. فيبقى حارسُ الأخطاء المطبعيّة
         // قائماً كاملاً لكلِّ وحدةٍ حقيقيّة، ولا يُفتح البابُ لمفتاحٍ مجهول.
-        $eventOnlyContainers = ['conversations'];
+        // وتُضاف (Work OS · الطور B · WP-B.3): `client_memberships` جدولُ عضويّةٍ
+        // يديره ClientMemberController لا سجلُّ الوحدات (hub_mod لها null)، يحمل
+        // حدثَي منح/سحبٍ دلاليّين بلا `to` — فيخضع للشرط الأصرم نفسِه لا لاستثناءٍ رخو.
+        $eventOnlyContainers = ['conversations', 'client_memberships'];
 
         foreach ((array) config('hub.events') as $module => $rules) {
             if (in_array($module, $eventOnlyContainers, true)) {

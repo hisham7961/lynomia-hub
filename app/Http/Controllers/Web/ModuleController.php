@@ -260,6 +260,7 @@ class ModuleController extends Controller
         $this->inheritCompany($m, $module);
         $this->inheritProject($m, $module);
         $this->inheritClient($m, $module);
+        $this->applyDocumentAudience($r, $module, $m);   // WP-B.5 — مشاركةُ وثيقةٍ مع عميل
 
         // مستخدم محدود ينشئ مشروعاً: نضمن بقاءه ضمن نطاقه (مديراً أو عضواً)
         if ($module === 'projects' && hub_scoped(auth()->user())) {
@@ -451,6 +452,7 @@ class ModuleController extends Controller
         $prevAssignee = ($af = $this->assigneeField($def)) ? $m->{$af['col']} : null;
         $prevStatus = ($sc = hub_status_col($module)) ? $m->{$sc} : null;
         $this->fill($def, $r, $m);
+        $this->applyDocumentAudience($r, $module, $m);   // WP-B.5 — مشاركةُ وثيقةٍ مع عميل
         $this->stampTaskCompletion($module, $m, $prevStatus === null ? null : (string) $prevStatus);
         $m->save();
         $this->notifyAssignee($def, $module, $m, $prevAssignee);
@@ -1182,6 +1184,44 @@ class ModuleController extends Controller
             $m->{$kcol} = $kid;
         } elseif ($allowed !== null && ! empty($allowed)) {
             $m->{$kcol} = $allowed[0];
+        }
+    }
+
+    /**
+     * **مشاركةُ وثيقةٍ مع عميل** (Work OS · الطور B · WP-B.5) — مسارُ الكتابةِ الوحيدُ
+     * الذي يجعل مستخدماً داخليّاً يعلّم وثيقةً «يراها العميل». حصريٌّ لوحدة `files`،
+     * وفوقَه بالفعل سياجان: `PortalGuard` (لا يبلغ حسابُ عميلٍ `/m/files` أصلاً)
+     * و`resolve()` (`hub_can`). فالكاتبُ هنا داخليٌّ لا محالة.
+     *
+     * يحترم `hub_field_mode`: دورٌ حُجب عنه `audience`/`clientId` (ro/hide) لا يكتبهما
+     * ولو حُقنا في الطلب. والغيابُ ليس تغييراً — طلبٌ لا يحمل المفتاح يُبقي القائم.
+     * القيمُ تُتحقَّق هنا وفي حارس النموذج (allowlist · C10)؛ و`client_id` يُقصر على
+     * عملاءِ الكاتب إن كان معزولاً (نظيرُ `guardClient` لوحدةٍ بلا حقل ref→clients).
+     */
+    protected function applyDocumentAudience(Request $r, string $module, Model $m): void
+    {
+        if ($module !== 'files') return;
+        $u = auth()->user();
+
+        if ($r->has('audience') && hub_field_mode($u, $module, 'audience') === '') {
+            $val = hub_str($r->input('audience'));
+            if (in_array($val, \App\Models\Document::AUDIENCES, true)) {
+                $m->audience = $val;
+            }
+        }
+
+        if ($r->has('clientId') && hub_field_mode($u, $module, 'clientId') === '') {
+            $val = hub_str($r->input('clientId'));
+            if ($val === '') {
+                $m->client_id = null;
+            } else {
+                $ids = hub_client_ids($u);
+                if ($ids !== null && ! in_array($val, $ids, true)) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(
+                        ['clientId' => 'حسابك معزول على عملاء محددين — اختر عميلاً من عملائك']);
+                }
+                $m->client_id = $val;
+            }
         }
     }
 

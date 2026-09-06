@@ -3,11 +3,15 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\AccountActivation;
 use App\Models\Client;
+use App\Models\ClientMembership;
 use App\Models\Contract;
 use App\Models\FinDocument;
+use App\Models\Project;
 use App\Models\Quote;
 use App\Models\QuoteMilestone;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -455,9 +459,100 @@ class QuoteController extends Controller
             \App\Support\FlowRunner::fire('status', 'quotes', $q, 'محوّل');
             hub_audit('تحويل عرض إلى مشروع', 'quotes', $q->id, $q->doc_no . ' → ' . $name);
 
+            // (٥) توفيرُ مساحةِ العميل الآليّ (Work OS · الطور B · WP-B.4 · §63/§98 · C8):
+            // **داخلَ** المعاملةِ والقفلِ نفسِهما، لا مسارَ توفيرٍ ثانٍ. مُتكرِّرةُ التنفيذ
+            // تحت حارسِ meta.project_id أعلاه (قبولٌ مكرَّرٌ يعود قبل الوصولِ هنا) + قيدِ
+            // العضويّةِ الفريد — فقبولان لا يُنشئان إلا مساحةً واحدةً ويُطلقان الحدثَ مرّةً.
+            $this->provisionClientWorkspace($q, $project);
+
             return redirect()->route('m.show', ['projects', $project->id])
-                ->with('ok', '🚀 أُنشئ المشروع والارتباط من العرض — نُقل النطاق وحُفظ خطُّ الأساس التجاريّ');
+                ->with('ok', '🚀 أُنشئ المشروع والارتباط من العرض — نُقل النطاق وحُفظ خطُّ الأساس التجاريّ، وأُنشئت مساحةُ العميل');
         });
+    }
+
+    /**
+     * **توفيرُ مساحةِ العميل الآليّ** (Work OS · الطور B · WP-B.4 · §63/§98 · C8) —
+     * يُستدعى **داخلَ** معاملةِ `toProject` المقفلةِ وحدَها (لا مسارَ توفيرٍ ثانٍ):
+     * عند صيرورةِ العرضِ مشروعاً تُنشأ لجهةِ اتصالِ العميل مساحةٌ — إن لم تكن قائمة:
+     *
+     *  (١) **مستخدمُ عميلٍ بلا كلمةِ سرّ** (C8): عبر سكّةِ B.1 الوحيدة
+     *      `AccountActivation::provisionClient` — تُنشئ الحسابَ بكلمةٍ عشوائيّةٍ لا
+     *      يعرفها أحدٌ (غيرِ قابلةٍ للدخول) و`account_type=client`. **لا كلمةَ سرٍّ
+     *      تُولَّد/تُرسَل/تُخزَّن صريحة** — والعميلُ يضعها بنفسه في خطوةِ التفعيل.
+     *  (٢) **عضويّةُ Client Owner واحدة** على `client_memberships` (القيدُ الفريدُ
+     *      `(client_id,user_id)` يمنع تكرارها).
+     *  (٣) **تفعيلٌ** يضع فيه العميلُ كلمتَه (يُصدره `provisionClient`؛ ولمستخدمٍ
+     *      قائمٍ بلا كلمةٍ وبلا تفعيلٍ حيٍّ يُصدَر واحدٌ فقط).
+     *  (٤) يُطلق **`client_workspace_created` مرّةً** (خامُّه `workspace_created` على
+     *      وحدة clients، يشتقّ الدلاليَّ المُصرَّحَ في config('hub.events.clients')).
+     *
+     * الوحدانيّةُ مضمونةٌ طبقيّاً — حارسُ meta.project_id (قبولٌ مكرَّرٌ يعود قبلها) +
+     * فحصُ الوجودِ على العضويّة قبل الإنشاء: قبولان متتاليان (أو عرضٌ ثانٍ لعميلٍ له
+     * مساحةٌ) لا يُضاعفان عضويّةً ولا تفعيلاً ولا حدثاً. والبريدُ هو الهوية: عميلٌ بلا
+     * بريدِ جهةِ اتصالٍ يُحوَّل بلا توفيرٍ — خطوةٌ إضافيّةٌ محروسةٌ لا شرطٌ للتحويل.
+     */
+    protected function provisionClientWorkspace(Quote $q, Project $project): void
+    {
+        $client = Client::find($q->client_id);
+        if (! $client) {
+            return;
+        }
+
+        // البريدُ هو الهوية: بلا بريدِ جهةِ اتصالٍ لا يُخلق مستخدمٌ — تُتخطّى المساحةُ بلا كسرِ التحويل
+        $email = mb_strtolower(trim((string) $client->email));
+        if ($email === '') {
+            return;
+        }
+
+        $existing = User::where('email', $email)->first();
+        // لا يُحوَّل موظفٌ داخليٌّ إلى عميلٍ خارجيّ — كـClientMemberController::invite
+        if ($existing && ! $existing->isClientAccount()) {
+            return;
+        }
+
+        if ($existing) {
+            $user = $existing;
+            // مستخدمُ عميلٍ قائمٌ لم يضع كلمتَه ولا تفعيلَ حيٌّ له — أصدِر واحداً (لا تُكرّر)
+            if ($user->password_changed_at === null
+                && ! AccountActivation::where('user_id', $user->id)->whereNull('consumed_at')->exists()) {
+                AccountActivation::issue($user);
+            }
+        } else {
+            // النقطةُ الوحيدةُ لخلقِ مستخدمِ عميلٍ بلا كلمةِ سرّ + إصدارِ تفعيله (C8)
+            [$user] = AccountActivation::provisionClient([
+                'name'  => hub_fit($client->contact ?: $client->name ?: Str::before($email, '@'), 190),
+                'email' => hub_fit($email, 190),
+            ]);
+        }
+
+        // عضويّةٌ واحدةٌ لكلِّ (عميل، مستخدم): قائمةٌ ⇐ المساحةُ مُوفَّرةٌ سلفاً فلا حدثَ ثانٍ
+        // (تشمل المحذوفَ ناعماً — القيدُ الفريدُ يشمله). idempotent عبرَ القبولاتِ والعروض.
+        $already = ClientMembership::withTrashed()
+            ->where('client_id', $client->id)->where('user_id', $user->id)->exists();
+        if ($already) {
+            return;
+        }
+
+        // مستخدمٌ وضع كلمتَه ⇐ عضويّةٌ فعّالةٌ فوراً؛ وإلا «مدعوّ» تصير فعّالةً لحظةَ التفعيل
+        // (ActivationController::set يرفع مدعوّاتِه إلى فعّالة) — نظيرُ B.3.
+        $activated = $user->password_changed_at !== null;
+        $membership = ClientMembership::create([
+            'client_id'    => $client->id,
+            'user_id'      => $user->id,
+            'role'         => 'owner',
+            'status'       => $activated ? 'active' : 'invited',
+            'invited_by'   => auth()->id(),
+            'invited_at'   => now(),
+            'activated_at' => $activated ? now() : null,
+        ]);
+
+        // الحدثُ يُطلَق مرّةً — بعد خلقِ العضويّةِ فعلاً، تحت القفلِ نفسِه.
+        \App\Support\FlowRunner::fire('workspace_created', 'clients', $client);
+
+        hub_audit('توفيرُ مساحةِ عميلٍ آليّاً عند قبولِ عرض', 'clients', $client->id, $client->name, [
+            'after' => ['membership_id' => $membership->id, 'user_id' => $user->id, 'role' => 'owner',
+                'project_id' => $project->id, 'quote_id' => $q->id],
+        ]);
     }
 
     /**

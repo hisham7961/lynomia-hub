@@ -8586,6 +8586,24 @@ return [
         // فتعمل عليها التدفقاتُ (تنبيه/تليجرام/مهمة) كأي حدثٍ آخر — لا محرك ثانٍ.
         'users' => [
             ['on' => 'sessions_revoked', 'emit' => 'user.sessions_revoked', 'label' => 'أُنهيت جلساتُ مستخدم'],
+            // (Work OS · الطور B · WP-B.1 · §12) فعّل عميلٌ حسابَه ووضع كلمتَه بنفسه —
+            // يُطلقه ActivationController::set داخلَ معاملة التفعيل، فتعمل عليه التدفّقاتُ كأيّ حدث.
+            ['on' => 'account_activated', 'emit' => 'client.account_activated', 'label' => 'فعّل عميلٌ حسابَه'],
+        ],
+        // (Work OS · الطور B · WP-B.3 · §13/§98) عضويّةُ العميل: يُطلقهما
+        // ClientMemberController (منح/سحب) فيدخلان سلسلةَ التدقيق وتعمل عليهما
+        // التدفّقاتُ كأيّ حدثٍ آخر — لا محرّكَ أحداثٍ ثانٍ. (client_memberships ليست
+        // وحدةَ سجلٍّ فلا يطالها تدفّقُ hub_mod؛ يكفي الاشتقاقُ الدلاليّ + hub_audit.)
+        'client_memberships' => [
+            ['on' => 'granted', 'emit' => 'client_membership_granted', 'label' => 'مُنِح عضوٌ عميلٌ دوراً'],
+            ['on' => 'revoked', 'emit' => 'client_membership_revoked', 'label' => 'سُحب وصولُ عضوِ عميل'],
+        ],
+        // (Work OS · الطور B · WP-B.4 · §63/§98) توفيرُ مساحةِ العميل الآليّ: يُطلقه
+        // QuoteController::toProject **داخلَ** معاملةِ التحويلِ المقفلة (لا مسارَ ثانٍ)
+        // عند صيرورةِ عرضٍ مشروعاً، فتعمل عليه حِزمُ onboarding والتدفّقاتُ كأيّ حدث.
+        // الخامُّ `workspace_created` على وحدة clients يشتقّ الدلاليَّ المُصرَّحَ هنا.
+        'clients' => [
+            ['on' => 'workspace_created', 'emit' => 'client_workspace_created', 'label' => 'أُنشئت مساحةُ عميلٍ آليّاً عند قبولِ عرض'],
         ],
         'vault' => [
             ['on' => 'revealed', 'emit' => 'vault.revealed', 'label' => 'كُشف سرٌّ من الخزنة'],

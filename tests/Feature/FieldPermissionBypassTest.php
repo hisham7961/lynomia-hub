@@ -186,6 +186,38 @@ class FieldPermissionBypassTest extends TestCase
     }
 
     /**
+     * **امتدادُ Work OS (WP-B.3 · §13/§98):** عضوُ عميلٍ بدور Finance يرى فواتيرَه،
+     * لكنّ التكلفةَ/الهامشَ الداخليَّين لا يبلغانه — لا عبر لوحته ولا عبر رقمٍ مسرَّب.
+     * الحقلُ الذي لا يراه القارئُ لا يُحمَّل أصلاً (نظير field-mode للداخليّ، وaudience
+     * للعميل): امتدادٌ لنفس العقد — «حقلٌ لا يملك القارئُ رؤيتَه لا يُطبَع».
+     */
+    public function test_a_client_finance_member_never_receives_internal_cost_or_margin(): void
+    {
+        $this->seedCore();
+
+        $client = \App\Models\Client::create(['name' => 'عميلُ الماليّة', 'stage' => 'عميل حالي']);
+        $u = User::create(['name' => 'ماليّةُ العميل', 'email' => 'fin.member@client.test',
+            'password' => 'Secret!2026x', 'status' => 'نشط', 'account_type' => 'client',
+            'password_changed_at' => now()]);
+        \App\Models\ClientMembership::create(['client_id' => $client->id, 'user_id' => $u->id,
+            'role' => 'finance', 'status' => 'active', 'activated_at' => now()]);
+
+        \App\Models\FinDocument::create(['doc_no' => 'INV-FM1', 'kind' => 'فاتورة مبيعات',
+            'client_id' => $client->id, 'total' => 6600, 'state' => 'مرسلة']);
+        \App\Models\Project::create(['name' => 'مشروعُ الماليّة', 'client_id' => $client->id,
+            'status' => 'نشط', 'cost' => 515151, 'budget' => 626262]);
+
+        foreach ([route('portal.home'), route('portal.invoices'), route('portal.projects')] as $url) {
+            $res = $this->actingAs($u)->get($url)->assertOk();
+            $res->assertDontSee('515151');   // تكلفةٌ داخليّة
+            $res->assertDontSee('626262');   // ميزانيّةٌ/هامشٌ داخليّ
+        }
+
+        // وفاتورتُه (رقمُ عميلٍ لا داخليّ) تبلغه بحقّ — لا حجبٌ شاملٌ يزوّر العزل
+        $this->actingAs($u)->get(route('portal.invoices'))->assertOk()->assertSee('INV-FM1');
+    }
+
+    /**
      * حارسا الحساب — انتهاء الصلاحية وقائمة العناوين — كانا يُفحصان عند تسجيل
      * الدخول فقط. فحسابُ متعاقدٍ انتهى عقده يحتفظ بوصولٍ كاملٍ عبر مفتاحه،
      * وحسابٌ محصورٌ بشبكة المكتب يعمل من أي مكانٍ في العالم إلى الأبد.
