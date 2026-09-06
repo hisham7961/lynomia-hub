@@ -56,8 +56,10 @@ class KpiStarterTest extends TestCase
         $this->seedCore();
         $this->artisan('hub:kpis-starter')->assertSuccessful();
 
+        // «التذاكر المفتوحة» صارت «التذاكر الجديدة» (WP-8.5): «مفتوحة» تجميعٌ لا
+        // حالةٌ في سجل التذاكر، فكانت البذرةُ تقرأ صفراً أبداً تحت اسمٍ يعد بعدٍّ.
         $this->actingAs($this->owner)->get('/kpis')->assertOk()
-            ->assertSee('نسبة التحصيل')->assertSee('التذاكر المفتوحة');
+            ->assertSee('نسبة التحصيل')->assertSee('التذاكر الجديدة');
     }
 
     public function test_ops_button_generates_them_without_a_terminal(): void
