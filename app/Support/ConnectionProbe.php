@@ -1,0 +1,172 @@
+<?php
+
+namespace App\Support;
+
+use App\Models\OdooConnection;
+use Illuminate\Support\Facades\Http;
+
+/**
+ * **فاحصُ الاتصال الواحد** (WP-9.4 · spec §7.10) — «هل التكاملُ يعمل الآن؟».
+ *
+ * كان لأودو فاحصان بشيفرتين لاتصالٍ واحد: `SettingController::odooTest` للاتصال
+ * الافتراضي و`OdooConnectionController::test` لصفوف الخوادم — كلٌّ برسالته
+ * وحرّاسه، وكلاهما يعيد **`$e->getMessage()` خاماً**. ورسالةُ خادمٍ خارجيّ ليست
+ * نصّاً بريئاً: ردُّ فشلِ مصادقةٍ قد يحمل سلسلةَ اتصالٍ فيها `password=…`، فتُطبع
+ * في الشاشة وتُخزَّن في الجلسة وتصل سجلَّ الأخطاء. ولا فاحصَ لـn8n أصلاً رغم أنّ
+ * رابطَه يُحفظ منذ إصدارات.
+ *
+ * فهنا واحدٌ لهم جميعاً:
+ *   · **شكلٌ واحد** — شكلُ `Uptime::check` نفسُه (`up · code · ms · error`) مضافاً
+ *     إليه `info` لسطر النجاح، فلا شكلَ لكل شاشة.
+ *   · **زمنُ استجابةٍ مقيس** لا انطباع — الفحصُ الذي لا يقول «كم استغرق» لا يكشف
+ *     خادماً يجيب في تسع ثوانٍ حتى يسقط بمهلةٍ في الإنتاج.
+ *   · **الرسالةُ تمرّ بالمُطهِّر الواحد** (`Redactor::text`) ثم تُقصّ — لا سرَّ يخرج.
+ *   · **حارسُ الطلبات الصادرة** على كل هدف (`hub_outbound_ok` + تثبيتُ العنوان
+ *     `hub_resolve_pin` + لا اتّباعَ لإعادة التوجيه) — زرُّ اختبارٍ لا يصير
+ *     مِجَسّاً على الشبكة الداخلية.
+ *
+ * و`up` ثلاثيّةٌ لا ثنائية: `true` نجح، `false` جُرّب وفشل، و**`null` لم يُجرَّب**
+ * (لا رابطَ مضبوط، أو ردّه الحارسُ قبل الشبكة) — و«لم يُجرَّب» ليس «فشل».
+ */
+class ConnectionProbe
+{
+    /** مفاتيحُ النتيجة بترتيبها — يثبّتها الاختبار كي لا تفترق الشاشات */
+    public const SHAPE = ['up', 'code', 'ms', 'error', 'info', 'detail'];
+
+    /** سقفُ رسالة الفشل المعروضة — بالحروف لا بالبايتات (العربيةُ تُقطع نصفين) */
+    public const ERROR_MAX = 180;
+
+    /** مهلتا الفحص: اتصالٌ قصير (جدارٌ ناريّ يُسقط الحزم) ثم قراءةٌ محدودة */
+    public const CONNECT_TIMEOUT = 3;
+    public const READ_TIMEOUT = 8;
+
+    /**
+     * فاحصُ أودو — للاتصال الافتراضي (`null`) أو لصفِّ خادمٍ بعينه.
+     *
+     * النداءُ حقيقيّ ومزدوج: `version` يقول إن الخادم يجيب، و`authenticate`
+     * يقول إن الاعتماد يعمل. الأولُ وحدَه كان يقول «سليم» لخادمٍ يرفض مفتاحَنا.
+     */
+    public static function odoo(OdooConnection|string|null $conn = null): array
+    {
+        $cli = Odoo::for($conn);
+        if (! $cli->ready()) {
+            return self::row(null, null, null,
+                $cli->error() ?? 'بيانات الاتصال بأودو ناقصة — أكمل الحقول الأربعة (الرابط والقاعدة والمستخدم والمفتاح) ثم احفظ');
+        }
+
+        $t0 = microtime(true);
+        try {
+            $ver = $cli->serverVersion();
+            $uid = $cli->login();
+        } catch (\Throwable $e) {
+            return self::row(false, self::statusIn($e->getMessage()), self::since($t0), $e->getMessage());
+        }
+
+        return self::row(true, 200, self::since($t0), null,
+            'أودو ' . $ver . ' · معرف المستخدم ' . $uid,
+            ['version' => $ver, 'uid' => $uid]);
+    }
+
+    /**
+     * فاحصُ n8n — لم يكن له فاحصٌ قطّ: يُحفظ الرابطُ ثم يُفتح في لسانٍ جديد
+     * ليُعرف إن كان حيّاً.
+     *
+     * حين يكون المفتاحُ مضبوطاً يُفحَص **مسارُ الواجهة البرمجية** لا الجذر — فردُّ
+     * ٤٠١ يقول «المثيلُ حيّ ومفتاحُك مرفوض»، وهو جوابٌ لا يعطيه فحصُ الجذر. ولا
+     * يخرج المفتاحُ من هنا إلى أيّ نصّ: ترويسةٌ فقط.
+     */
+    public static function n8n(): array
+    {
+        $url = trim((string) setting('n8n.url', ''));
+        if ($url === '') {
+            return self::row(null, null, null, 'لا رابطَ مضبوطاً لمثيل n8n — احفظ رابطَه أولاً');
+        }
+
+        $key = (string) setting('n8n.key', '');
+        $target = $key !== '' ? rtrim($url, '/') . '/api/v1/workflows?limit=1' : $url;
+
+        $gate = hub_outbound_ok($target);
+        if (! $gate['ok']) return self::row(null, null, null, $gate['why']);
+
+        $t0 = microtime(true);
+        try {
+            $res = Http::withOptions([
+                'allow_redirects' => false,
+                'curl'            => hub_resolve_pin($target, $gate['ip']),
+            ])
+                ->connectTimeout(self::CONNECT_TIMEOUT)->timeout(self::READ_TIMEOUT)
+                ->withHeaders(['User-Agent' => 'LynomiaHub-Probe/1.0']
+                    + ($key !== '' ? ['X-N8N-API-KEY' => $key] : []))
+                ->get($target);
+        } catch (\Throwable $e) {
+            return self::row(false, null, self::since($t0), $e->getMessage());
+        }
+
+        $code = $res->status();
+        $up = $code >= 200 && $code < 400;
+        $why = $up ? null : ('ردَّ المثيلُ HTTP ' . $code
+            . ($code === 401 || $code === 403 ? ' — المثيلُ حيّ ومفتاحُ n8n مرفوض' : ''));
+
+        return self::row($up, $code, self::since($t0), $why,
+            $up ? ('المثيلُ يجيب' . ($key !== '' ? ' ومفتاحُ الواجهة البرمجية مقبول' : '')) : null,
+            ['checked' => $key !== '' ? 'api' : 'root']);
+    }
+
+    /**
+     * سطرٌ واحدٌ للمشغّل من النتيجة — تُستهلكه الشاشاتُ الثلاث بحرفه فلا تفترق
+     * رسائلُها. والزمنُ فيه دائماً: فحصٌ ينجح في تسع ثوانٍ خبرٌ لا يقلّ عن الفشل.
+     */
+    public static function line(array $res): string
+    {
+        $ms = ($res['ms'] ?? null) === null ? '' : ' · ' . $res['ms'] . ' مللي ثانية';
+
+        if (($res['up'] ?? null) === true) {
+            return '✅ الاتصال ناجح — ' . ($res['info'] ?? 'الهدفُ يجيب') . $ms;
+        }
+        if (($res['up'] ?? null) === null) {
+            // لم يُجرَّب: لا رابطَ مضبوطٌ أو ردَّه الحارسُ قبل الشبكة — و«لم يُجرَّب» ليس «فشل»
+            return '⚠️ لم يُجرَّب الاتصال — ' . ($res['error'] ?? 'لا هدفَ مضبوط');
+        }
+
+        return '❌ فشل الاتصال' . (($res['code'] ?? null) ? ' (HTTP ' . $res['code'] . ')' : '')
+            . $ms . ' — ' . ($res['error'] ?? 'سببٌ غير معروف');
+    }
+
+    /* ───────────────────────── أدوات ───────────────────────── */
+
+    /** مللي ثانيةً منذ اللحظة — عددٌ صحيحٌ دائماً كي لا يفترق نوعُ الحقل */
+    protected static function since(float $t0): int
+    {
+        return (int) round((microtime(true) - $t0) * 1000);
+    }
+
+    /**
+     * رمزُ HTTP إن ذكرته الرسالةُ العربية — صيغتان قائمتان في `Odoo::rpc`:
+     * «تعذر الوصول لخادم أودو (503)» و«خادم أودو متعثّر (HTTP 500)». استخراجٌ
+     * لا اختراع: بلا ذكرٍ صريح يبقى `null` («لا نعرف» أصدقُ من صفر).
+     */
+    protected static function statusIn(string $msg): ?int
+    {
+        return preg_match('/\((?:HTTP\s*)?([1-5]\d{2})\)/', $msg, $m) ? (int) $m[1] : null;
+    }
+
+    /**
+     * النتيجةُ بشكلها الواحد — والرسالةُ **مطموسةٌ مقصوصةٌ قبل أن تخرج**: هذه
+     * النقطةُ الوحيدة التي تصنع `error`، فلا مسارَ يلتفّ حول المُطهِّر.
+     */
+    protected static function row(?bool $up, ?int $code, ?int $ms, ?string $error,
+                                  ?string $info = null, array $detail = []): array
+    {
+        return [
+            'up'     => $up,
+            'code'   => $code,
+            'ms'     => $ms,
+            'error'  => ($error === null || $error === '') ? null
+                : mb_substr(Redactor::text($error), 0, self::ERROR_MAX),
+            'info'   => ($info === null || $info === '') ? null : mb_substr($info, 0, self::ERROR_MAX),
+            // تفاصيلُ الهدف (إصدارُ أودو ومعرّفُ مستخدمه مثلاً) — تُطمَس بالمفتاح
+            // كسائر المصفوفات التشخيصية، فلا يتسرّب شيءٌ من ردٍّ خارجيّ
+            'detail' => Redactor::arr($detail),
+        ];
+    }
+}

@@ -109,20 +109,22 @@ class MessagingController extends Controller
 
         // «none» حرفيةً لا فراغاً: setting() يعامل '' كغيابٍ فيعيد الافتراضي tls —
         // فمن اختار «بلا تشفير» (خادم داخلي على 25) كان يُفرض عليه TLS فيفشل
-        foreach (['host' => $d['host'], 'port' => (string) $d['port'],
-                  'encryption' => $d['encryption'],
-                  'username' => $d['username'], 'from_address' => $d['from_address'],
-                  'from_name' => (string) ($d['from_name'] ?? '')] as $k => $v) {
-            \App\Models\Setting::updateOrCreate(['key' => 'mail.' . $k], ['value' => $v]);
-        }
-        // كلمةٌ فارغة تُبقي المخزون — والمكتوبة تُشفَّر كنمط pass في الإعدادات
-        if (filled($d['password'] ?? null)) {
-            \App\Models\Setting::updateOrCreate(['key' => 'mail.password'],
-                ['value' => 'enc:' . \Illuminate\Support\Facades\Crypt::encryptString($d['password'])]);
-        }
-        \Illuminate\Support\Facades\Cache::forget('settings:all');
+        // (WP-9.2) دفعةٌ واحدةٌ على الكاتب الواحد: التشفيرُ للحسّاس، وإبطالُ
+        // الخبيئة، وقيدُ التدقيق، وصفُّ تاريخٍ لكل مفتاح — من موضعٍ واحد.
+        \App\Support\Settings::batch('messaging', function () use ($d) {
+            foreach (['host' => $d['host'], 'port' => (string) $d['port'],
+                      'encryption' => $d['encryption'],
+                      'username' => $d['username'], 'from_address' => $d['from_address'],
+                      'from_name' => (string) ($d['from_name'] ?? '')] as $k => $v) {
+                \App\Support\Settings::put('mail.' . $k, $v, 'messaging');
+            }
+            // كلمةٌ فارغة تُبقي المخزون — والمكتوبة تُشفَّر عند الكاتب (وسمُ `sensitive`)
+            if (filled($d['password'] ?? null)) {
+                \App\Support\Settings::put('mail.password', $d['password'], 'messaging');
+            }
+        }, ['name' => 'mail.* — من مركز المراسلة']);
+
         \App\Support\MailSettings::apply();   // يسري في هذا الطلب نفسه — للتجربة الفورية
-        hub_audit('تعديل إعدادات النظام', 'settings', null, 'mail.* — من مركز المراسلة');
 
         return back()->with('ok', 'حُفظ ضبط البريد — جرّبه الآن بزر «أرسل تجريبية»');
     }
@@ -140,15 +142,14 @@ class MessagingController extends Controller
             'tg_chat'  => ['nullable', 'string', 'max:120'],
         ], [], ['tg_token' => 'توكن البوت', 'tg_chat' => 'القناة الافتراضية']);
 
-        // القناة الافتراضية نصّاً (‎@channel أو معرّفٌ رقميّ) — فارغةٌ تُلغي الوجهة الاحتياطية
-        \App\Models\Setting::updateOrCreate(['key' => 'notify.tg_chat'], ['value' => (string) ($d['tg_chat'] ?? '')]);
-        // التوكن: فارغٌ يُبقي المخزون؛ والمكتوب يُشفَّر — يقرؤه setting() فيفكّه للـBot API
-        if (filled($d['tg_token'] ?? null)) {
-            \App\Models\Setting::updateOrCreate(['key' => 'notify.tg_token'],
-                ['value' => 'enc:' . \Illuminate\Support\Facades\Crypt::encryptString($d['tg_token'])]);
-        }
-        \Illuminate\Support\Facades\Cache::forget('settings:all');
-        hub_audit('تعديل إعدادات النظام', 'settings', null, 'notify.tg_* — من مركز التكامل');
+        \App\Support\Settings::batch('messaging', function () use ($d) {
+            // القناة الافتراضية نصّاً (‎@channel أو معرّفٌ رقميّ) — فارغةٌ تُلغي الوجهة الاحتياطية
+            \App\Support\Settings::put('notify.tg_chat', (string) ($d['tg_chat'] ?? ''), 'messaging');
+            // التوكن: فارغٌ يُبقي المخزون؛ والمكتوب يُشفَّر عند الكاتب — يفكّه setting() للـBot API
+            if (filled($d['tg_token'] ?? null)) {
+                \App\Support\Settings::put('notify.tg_token', $d['tg_token'], 'messaging');
+            }
+        }, ['name' => 'notify.tg_* — من مركز التكامل']);
 
         return back()->with('ok', 'حُفظ ضبط تلجرام — جرّبه الآن بزر «🧪 أرسل تجريبية»');
     }
