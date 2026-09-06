@@ -23,7 +23,8 @@ class ErrorLog
     public static function redact(string $s): string
     {
         // (v2.399) ورموزُ المشاركة العامّة /s/{token} ومساحاتُ العمل /w/{key} — كانت تصل الإشعاراتِ والسجلَّ بنصّها
-        return (string) preg_replace('~/(hook|sign|verify|s|w)/[^/?\s&]{8,}~i', '/$1/{رمز}', $s);
+        // (WP-1.3) تفويضٌ للمُطهِّر الواحد: قاعدةُ المسارات بحرفها + Bearer/JWT/PEM/lyn_/رمز البوت/مفتاح=قيمة
+        return Redactor::text($s);
     }
 
     /**
@@ -235,10 +236,8 @@ class ErrorLog
     public static function safeMessage(\Throwable $e): string
     {
         $msg = $e->getMessage();
-        if ($e instanceof \Illuminate\Database\QueryException) {
-            $msg = preg_replace('/\s*\(Connection:.*$/s', '', $msg);          // احذف SQL والقيمَ المربوطة
-            $msg = preg_replace("/'(?:[^'\\\\]|\\\\.){0,300}'/", "'…'", (string) $msg);  // اطمس القيمَ المقتبسة
-        }
+        // (WP-1.3) تفويضٌ للمُطهِّر الواحد: قاعدةُ SQL بحرفها لرسائل QueryException وحدها
+        if ($e instanceof \Illuminate\Database\QueryException) $msg = Redactor::sql($msg);
 
         return (string) $msg;
     }

@@ -16,7 +16,7 @@
   /* الشريط الجانبي — كحليّ داكن أنيق (لا أخضر) */
   --sbbg:#111A28;--sbbg2:#0C1420;--sbi:#B9C2CF;--sbh:#1B2637;
   /* الدلالات */
-  --ok:#177E4D;--okbg:#E3F3E9;--bad:#B3372B;--badbg:#FBE6E1;--wn:#96660A;--wnbg:#FBF0D7;
+  --ok:#177E4D;--okbg:#E3F3E9;--bad:#B3372B;--badbg:#FBE6E1;--wn:#96660A;--wnbg:#FBF0D7;--info:#1F5F9E;--infobg:#E2EDF8;
   /* العمق — ظلالٌ كحليّة محايدة */
   --sh:0 1px 2px rgba(17,26,40,.05),0 2px 8px rgba(17,26,40,.05);
   --shh:0 2px 6px rgba(17,26,40,.07),0 14px 34px rgba(17,26,40,.11);
@@ -293,6 +293,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--p)}
 .bdg.bad{background:var(--badbg);color:var(--bad)}
 .bdg.wn{background:var(--wnbg);color:var(--wn)}
 .bdg.g{background:color-mix(in srgb,var(--sb) 10%,transparent);color:var(--sb)}
+/* الدلالة المعلوماتية — درجة info في سلّم الشدّة الموحّد (App\Support\Severity) */
+.bdg.i{background:var(--infobg);color:var(--info)}
 .chip{display:inline-flex;gap:7px;align-items:center;background:var(--pss);color:var(--pd);
   border:1px solid color-mix(in srgb,var(--p) 18%,var(--ln));border-radius:99px;padding:3px 7px 3px 13px;
   font-size:12px;font-weight:700;transition:border-color var(--t)}
@@ -580,7 +582,7 @@ th.bsel,td.bsel{width:34px;text-align:center;padding-inline:8px}
 /* v2.125: التوكنز على html لا body — فيرث scrollbar-color و::selection قيم الداكن أيضاً */
 html[data-theme="dark"]{color-scheme:dark;
   --bg:#0C1220;--bg2:#0F1726;--cd:#121B2B;--ln:#233149;--lnd:#2E3E56;--tx:#E8ECF3;--sb:#8A94A6;
-  --ps:#123027;--pss:#0F1B26;--ok:#5BD79B;--okbg:#123527;--bad:#F08A7A;--badbg:#3A1815;--wn:#EFC04B;--wnbg:#3A2E10;
+  --ps:#123027;--pss:#0F1B26;--ok:#5BD79B;--okbg:#123527;--bad:#F08A7A;--badbg:#3A1815;--wn:#EFC04B;--wnbg:#3A2E10;--info:#7FB5EA;--infobg:#152A42;
   --sbbg:#0A101B;--sbbg2:#070C15;--sbi:#93A0B4;--sbh:#152238;
   --sh:0 1px 2px rgba(0,0,0,.4),0 3px 10px rgba(0,0,0,.32);
   --shh:0 4px 14px rgba(0,0,0,.5),0 16px 38px rgba(0,0,0,.45)}

@@ -412,10 +412,10 @@ final class Health
         return trim((string) config('hub.version', @file_get_contents(base_path('VERSION')) ?: ''));
     }
 
-    /** رسالةُ عطلٍ آمنةٌ للعرض: بلا كلمات مرور DSN */
+    /** رسالةُ عطلٍ آمنةٌ للعرض: بلا كلمات مرور DSN — (WP-1.3) تفويضٌ للمُطهِّر الواحد */
     protected static function safe(string $m): string
     {
-        return mb_substr((string) preg_replace('/(password|pwd|passwd)=\S+/i', '$1=***', $m), 0, 200);
+        return mb_substr(Redactor::text($m), 0, 200);
     }
 
     /** ملخّصٌ عامٌّ آمن لمراقبات Uptime المجهولة: الحالاتُ وحدها بلا أرقامٍ أو رسائل */

@@ -117,18 +117,18 @@ class WidgetRegistry
                         if (! $def || ! hub_can($u, $key, 'v')) continue;
                         $q = fn () => hub_scope(DB::table($def['table'])->whereNull('deleted_at'), $key);
 
-                        // اتجاه الأسبوع: الجديد في ٧ أيام مقابل الـ٧ التي قبلها
+                        // اتجاه الأسبوع: الجديد في ٧ أيام مقابل الـ٧ التي قبلها —
+                        // بالمقارِن الموحّد (WP-1.6): نسبة فقط حين يوجد أساسٌ حقيقي
                         $thisW = $q()->where('created_at', '>=', now()->subDays(7))->count();
                         $prevW = $q()->whereBetween('created_at', [now()->subDays(14), now()->subDays(7)])->count();
+                        $cmp = hub_compare((float) $thisW, (float) $prevW);
 
                         $out[] = [
                             'key'   => $key,
                             'label' => $def['label'],
                             'count' => $q()->count(),
-                            // نسبة فقط حين يوجد أساس مقارنة حقيقي — «١٠٠٪» المُختلَقة حين
-                            // الأسبوع السابق صفر كانت تكذب على كل بطاقة وتُفقد الرقم معناه
-                            'trend' => $prevW > 0 ? (int) round(($thisW - $prevW) * 100 / $prevW) : null,
-                            'fresh' => $prevW === 0 ? $thisW : null,   // جديد بلا أساس مقارنة
+                            'trend' => $cmp['pct'],
+                            'fresh' => $cmp['n_ok'] ? null : $thisW,   // جديد بلا أساس مقارنة
                         ];
                     }
 

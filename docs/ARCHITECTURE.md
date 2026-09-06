@@ -110,3 +110,18 @@ Exception → bootstrap/app.php → Api::render (api/*) | صفحةُ خطأ عر
 3. **كلُّ عيبٍ أمنيّ اختبارٌ يفشل أولاً** ثم يُصلَح.
 4. **الترتيبُ صريح** (`orderBy(...)->orderBy('id')`) — لا قرعةَ صفوف.
 5. **لا سرَّ في السجلّات**: `AUDIT_SECRET`، بصماتٌ للقيم المشفَّرة، لا تتبّعَ مكدّسٍ للمستخدم.
+
+## مستوى التحكّم المؤسسي (Control Plane) — الطور الأول (v2.401)
+
+أعمدةٌ مشتركة تستهلكها كلُّ مراكز التحكّم اللاحقة ولا تُبنى مرّتين:
+
+| العمود | الواجهة | الملف |
+|---|---|---|
+| المدى الزمنيّ الموحّد | `TimeRange::fromRequest()` / `->prev()` / `->apply($q,$col)` + `hub_range()` + `partials/timerange` | `app/Support/TimeRange.php` |
+| خرائطُ الشدّة والحالة | `Severity::normalize/label/tone/rank` · `OpStatus::fromHealth` · `IssueState::MAP` — خرائطُ عرضٍ فوق المفردات القائمة، لا تحويلَ مخزَّن | `app/Support/Severity.php` وأخواها |
+| المُطهِّر الواحد | `Redactor::text/arr/fingerprint/sql/json` — تُفوَّض إليه السبعُ القائمة (ErrorLog، Health::safe، Integrations::pulse، HubOutbox، WebhookDispatcher، SecurityRadar، InboundHook) | `app/Support/Redactor.php` |
+| الترابط | `X-Request-Id` وحدَه (`Api::requestId/requestSource/requestIdIsExternal`)؛ قارئ `Correlation::forRequestId` وصفحة `system/trace/{rid}` (مالك أو علم `audit` منطَّقاً) | `app/Support/Correlation.php` |
+| عُدّةُ مركز التحكّم | `partials/cc/{kpis,trend,findings,freshness,tabs,th}` + `hub_admin_links()` + `hub_screen(..., stamped:)` | `resources/views/partials/cc/` |
+| أوّليّاتُ القياس | `hub_metric_bucket` · `hub_window_pair` · `hub_compare` (pct=null عند أساسٍ صفريّ) · `Series::percentiles/mergeHist` — و`metric_points` يبقى مخزنَ التاريخ الوحيد | `app/Support/Series.php` |
+
+وحاجزٌ أمنيّ أُغلق قبل البناء: التصدير الجَماعيّ يمرّ بحزام `export()` نفسِه (تجميد/تصعيد/أثر)، وتقليمُ الاحتفاظ لا يحذف أدلّةً غيرَ محلولة عاليةَ الشدّة ويكتب أثرَ ما حذف. التقريران الكاملان: `docs/control-plane/DISCOVERY.md` (تصنيفُ ١٥٢ بنداً بالأدلة) و`PLAN.md` (٤١ حزمةَ عملٍ للأطوار ١–١٠ + ٤٠ تفنيداً).

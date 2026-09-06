@@ -574,4 +574,9 @@ Route::middleware('auth')->group(function () {
         Route::post('{id}/restore', [ModuleController::class, 'restore'])->name('restore');
         Route::post('{id}/versions/{version}', [ModuleController::class, 'restoreVersion'])->name('version.restore');
     });
+
+    // ── Control Plane: Phase 1 ──
+    // أثرُ الطلب الواحد عبر الطبقات — الاسمُ `system.trace` لأن `trace` مملوكٌ لسلسلة التسليم
+    Route::get('system/trace/{rid}', [\App\Http\Controllers\Web\SystemTraceController::class, 'show'])
+        ->name('system.trace')->middleware('throttle:60,1')->where('rid', '[A-Za-z0-9._:-]{1,64}');
 });

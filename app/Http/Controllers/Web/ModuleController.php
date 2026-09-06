@@ -451,6 +451,7 @@ class ModuleController extends Controller
         $prevAssignee = ($af = $this->assigneeField($def)) ? $m->{$af['col']} : null;
         $prevStatus = ($sc = hub_status_col($module)) ? $m->{$sc} : null;
         $this->fill($def, $r, $m);
+        $this->stampTaskCompletion($module, $m, $prevStatus === null ? null : (string) $prevStatus);
         $m->save();
         $this->notifyAssignee($def, $module, $m, $prevAssignee);
         $this->bustProgress($module, $m);
@@ -551,6 +552,23 @@ class ModuleController extends Controller
     }
 
     /** تغيير حالة سجل (سحب وإفلات الكانبان) */
+    /**
+     * (WP-1.4) ختمُ إنجاز المهمة — «نسبةُ الالتزام» كانت ستُحسب من `updated_at`
+     * فأيُّ تعديلٍ لاحقٍ على مهمةٍ منجزة يُفسد تاريخَ إنجازها. يُختم `completed_at`
+     * عند دخول حالة الإنجاز («منجزة»/«مكتملة» — الإلغاءُ ليس إنجازاً) ويُمحى عند
+     * مغادرتها؛ للمهام وحدها، وبحارس العمود كي لا يسقط الحفظ قبل الهجرة.
+     */
+    protected function stampTaskCompletion(string $module, Model $m, ?string $prev): void
+    {
+        if ($module !== 'tasks' || ! hub_has_col('tasks', 'completed_at')) return;
+        $col = hub_status_col('tasks') ?: 'status';
+        $done = ['منجزة', 'مكتملة'];
+        $isDone = in_array((string) $m->{$col}, $done, true);
+        $wasDone = in_array((string) $prev, $done, true);
+        if ($isDone && ! $wasDone) $m->completed_at = now();
+        elseif (! $isDone && $wasDone) $m->completed_at = null;
+    }
+
     public function setStatus(Request $r, string $module, string $id)
     {
         [$def, $class] = $this->resolve($module, 'e');
@@ -588,6 +606,7 @@ class ModuleController extends Controller
 
         $prevStatus = $m->{$statusCol};
         $m->{$statusCol} = $new;
+        $this->stampTaskCompletion($module, $m, $prevStatus === null ? null : (string) $prevStatus);
         $m->save();
         $this->bustProgress($module, $m);
         if ((string) $m->{$statusCol} !== (string) $prevStatus) {
@@ -601,30 +620,49 @@ class ModuleController extends Controller
     public function export(Request $r, string $module)
     {
         [$def, $class] = $this->resolve($module, 'v');
-        abort_unless(hub_exporter(), 403, 'التصدير يتطلب صلاحية');
-        // **مفتاحُ طوارئٍ مفصول**: تجميدُ التصدير يصدّ سحبَ البيانات الجماعيّ لحظةَ
-        // الاشتباه — حتى للمالك، فالتجميدُ يُرفع من مركز الأمان لا بتصدير. (مطفأٌ
-        // افتراضاً فلا يمسّ العملَ العاديّ.)
-        abort_if((string) setting('security.freeze_exports', '0') === '1', 423,
-            'التصدير مجمَّدٌ الآن بمفتاح طوارئٍ أمنيّ — يُرفع من مركز الأمان');
         $def['key'] = $module;
 
         $trash = false; $filters = [];
         $rows = $this->buildQuery($r, $def, $class, $trash, $filters)
             ->orderByDesc('created_at')->orderByDesc('id')->limit(5000)->get();
 
-        // تصديرٌ كبير = نقلُ بياناتٍ جماعيّ: فوق العتبة (security.export_stepup_rows،
-        // مطفأةٌ افتراضاً بـ0) يتطلب تأكيدَ الهوية، ويُوسَم الحدثُ «تصدير كبير»
-        // في التدقيق ليُرصد في مركز الأمن. لا يمسّ التصديرَ العاديّ الصغير.
-        $bigAt = (int) setting('security.export_stepup_rows', 0);
-        $isBig = $bigAt > 0 && $rows->count() >= $bigAt;
-        if ($isBig && ($resp = hub_require_stepup())) return $resp;
-
-        // بصمة التصدير في التدقيق — تُعرض في مركز الأمان
-        hub_audit($isBig ? 'تصدير كبير' : 'تصدير', $module, null, $rows->count() . ' سجل (CSV)');
+        if ($resp = $this->exportBelt($module, $rows->count(), 'سجل (CSV)')) return $resp;
 
         // البتر لا يكون صامتاً: من صدّر قائمةً أكبر من السقف يعلم أنها قُصّت
         return $this->streamCsv($module, $def, $rows, $rows->count() >= 5000);
+    }
+
+    /**
+     * حزامُ أمان التصدير — بابٌ **واحد** لكل مسار يبثّ CSV (تصدير القائمة
+     * و«تصدير المحدد» الجماعي). كان الحزامُ على `export()` وحده بينما
+     * `bulk(do=export)` يبثّ بلا تجميدٍ ولا عتبةٍ ولا وسم — والحارسُ الذي
+     * يُطبَّق في بابٍ ويُنسى في آخر ليس حارساً بل قناعةٌ كاذبة:
+     *
+     *   · **صلاحيةُ المصدِّر** (٤٠٣) — علم `exp`.
+     *   · **مفتاحُ طوارئٍ مفصول** (٤٢٣): تجميدُ التصدير يصدّ سحبَ البيانات
+     *     الجماعيّ لحظةَ الاشتباه — حتى للمالك، فالتجميدُ يُرفع من مركز
+     *     الأمان لا بتصدير. (مطفأٌ افتراضاً فلا يمسّ العملَ العاديّ.)
+     *   · **تصديرٌ كبير** = نقلُ بياناتٍ جماعيّ: فوق العتبة
+     *     (security.export_stepup_rows، مطفأةٌ افتراضاً بـ0) يتطلب تأكيدَ
+     *     الهوية، ويُوسَم الحدثُ «تصدير كبير» في التدقيق ليُرصد في مركز الأمن.
+     *
+     * يعيد استجابةَ التصعيد إن لزمت، وإلا `null` بعد كتابة بصمة التدقيق —
+     * فلا بايتَ CSV قبل اجتياز الحزام كلِّه.
+     */
+    protected function exportBelt(string $module, int $count, string $unitLabel)
+    {
+        abort_unless(hub_exporter(), 403, 'التصدير يتطلب صلاحية');
+        abort_if((string) setting('security.freeze_exports', '0') === '1', 423,
+            'التصدير مجمَّدٌ الآن بمفتاح طوارئٍ أمنيّ — يُرفع من مركز الأمان');
+
+        $bigAt = (int) setting('security.export_stepup_rows', 0);
+        $isBig = $bigAt > 0 && $count >= $bigAt;
+        if ($isBig && ($resp = hub_require_stepup())) return $resp;
+
+        // بصمة التصدير في التدقيق — تُعرض في مركز الأمان
+        hub_audit($isBig ? 'تصدير كبير' : 'تصدير', $module, null, $count . ' ' . $unitLabel);
+
+        return null;
     }
 
     /** بث CSV بترويسة BOM (يقرأ Excel العربية) — تستعمله «تصدير القائمة» و«تصدير المحدد» */
@@ -675,10 +713,12 @@ class ModuleController extends Controller
 
         if ($do === 'export') {
             [$def, $class] = $this->resolve($module, 'v');
-            abort_unless(hub_exporter(), 403, 'التصدير يتطلب صلاحية');
             $def['key'] = $module;
-            $rows = hub_scope($class::query(), $module)->whereIn('id', $ids)->orderByDesc('created_at')->get();
-            hub_audit('تصدير', $module, null, $rows->count() . ' سجل محدد (CSV جماعي)');
+            $rows = hub_scope($class::query(), $module)->whereIn('id', $ids)
+                ->orderByDesc('created_at')->orderByDesc('id')->get();
+            // نفسُ حزام export(): تجميدُ الطوارئ وعتبةُ التصعيد ووسمُ التدقيق —
+            // «تصدير المحدد» تصديرٌ كاملٌ لا استثناءَ له من المفتاح
+            if ($resp = $this->exportBelt($module, $rows->count(), 'سجل محدد (CSV جماعي)')) return $resp;
 
             return $this->streamCsv($module, $def, $rows);
         }

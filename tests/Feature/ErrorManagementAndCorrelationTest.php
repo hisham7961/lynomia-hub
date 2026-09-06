@@ -124,6 +124,16 @@ class ErrorManagementAndCorrelationTest extends TestCase
 
         // والسلسلةُ التدقيقية سليمة: request_id ليس من الأعمدة المختومة فلا يمسّها
         $this->assertTrue(\App\Support\Audit::verifyTail()['ok']);
+
+        // (WP-1.4) والمنعُ والحادثةُ يحملان معرّفَ طلبِهما كذلك — الأثرُ يكتمل عبر الطبقات السبع
+        $deny = $this->actingAs($this->employee)->get('/admin/errors');
+        $deny->assertStatus(403);
+        $rid2 = $deny->headers->get('X-Request-Id');
+        $this->assertNotEmpty($rid2);
+        $this->assertSame($rid2, DB::table('access_denials')->orderByDesc('id')->value('request_id'), 'رادار المنع');
+
+        hub_security_incident('حادثة-الترابط', 'عالي', ['ip' => '10.0.0.1']);
+        $this->assertSame($rid2, DB::table('incidents')->where('title', 'حادثة-الترابط')->value('request_id'), 'الحادثة الأمنية');
     }
 
     public function test_log_lines_carry_request_context(): void

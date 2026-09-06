@@ -77,7 +77,8 @@ class HubOutbox extends Command
                 // تنظيفُ رمز البوت: فشلُ اتصالٍ (DNS/timeout/TLS) يُلحق العنوانَ
                 // الفعّال برسالة الخطأ — أي «…/bot<TOKEN>/sendMessage» — فيتسرّب
                 // الرمز إلى outbox.error المعروض وإلى اللوج. يُطمَس قبل التخزين.
-                $emsg = preg_replace('#/bot[0-9]+:[A-Za-z0-9_-]+#', '/bot***', $e->getMessage());
+                // (WP-1.3) تفويضٌ للمُطهِّر الواحد — قاعدةُ /bot… بحرفها وأخواتُها
+                $emsg = \App\Support\Redactor::text($e->getMessage());
                 // **إعادةٌ آليةٌ محدودة** (v2.399): كان الفشلُ الأولُ نهائياً (dead letter) ولو كان
                 // انقطاعَ SMTP لحظةً. ثلاثُ محاولاتٍ بتباعدٍ (٥ → ٣٠ → ١٢٠ دقيقة) ثم failed حقّاً.
                 $attempts = $retryCols ? (int) $msg->attempts + 1 : 1;

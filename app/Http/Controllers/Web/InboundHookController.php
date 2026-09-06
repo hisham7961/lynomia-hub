@@ -62,14 +62,21 @@ class InboundHookController extends Controller
         $eventId = hub_fit(hub_str($r->header('X-Hub-Event-Id')), 190);
         $eventId = $eventId === '' ? null : $eventId;
 
+        // (WP-1.3) الحمولةُ تُخزَّن **مطموسةً**: مفاتيحُ الأسرار (password/api_key/…) بالعمق
+        // في JSON، وأنماطُ الرموز (Bearer/JWT/PEM/…) في النص — بعد التحقق من التوقيع
+        // على الخام كما هو، فالطمسُ لا يمسّ HMAC.
         $row = [
             'hook_id'    => $hook->id,
-            'payload'    => mb_strcut($raw, 0, self::MAX_BYTES),
+            'payload'    => mb_strcut(\App\Support\Redactor::json($raw), 0, self::MAX_BYTES),
             'ip'         => $r->ip(),
             'status'     => 200,
             'created_at' => now(),
         ];
         if (Schema::hasColumn('inbound_hook_events', 'event_id')) $row['event_id'] = $eventId;
+        // (WP-1.4) ربطُ الحدث الوارد بطلبه — يظهر في صفحة `system.trace` بمعرّفه
+        if (Schema::hasColumn('inbound_hook_events', 'request_id')) {
+            $row['request_id'] = mb_substr((string) \App\Support\Api::requestId(), 0, 40) ?: null;
+        }
 
         $fresh = $eventId === null
             ? (bool) DB::table('inbound_hook_events')->insert($row)
