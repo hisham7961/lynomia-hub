@@ -594,4 +594,56 @@ Route::middleware('auth')->group(function () {
     // وحدُّ معدلٍ لأن كلَّ طلبٍ قراءةُ قرصٍ حقيقية
     Route::get('admin/errors/logs', [ErrorCenterController::class, 'logs'])
         ->name('errors.logs')->middleware('throttle:30,1');
+
+    // ── Control Plane: Phase 4 ──
+    // (WP-4.1/4.2) مركزُ النتائج الأمنية وتاريخُ الوضعية: القراءةُ مالكٌ أو حامل
+    // monitor (ق١ — منطَّقةً بالشركة ومطموسةَ البريد والعنوان في المتحكّم)، والفعلُ
+    // (إقرار/إغلاق) مالكٌ وحدَه + قيدُ تدقيق، وبحدِّ معدلٍ يصدّ نقراً أعمى.
+    Route::get('admin/security/findings', [SecurityController::class, 'findings'])->name('security.findings');
+    Route::get('admin/security/findings/{id}', [SecurityController::class, 'finding'])->name('security.finding');
+    Route::post('admin/security/findings/{id}/ack', [SecurityController::class, 'findingAck'])
+        ->name('security.finding.ack')->middleware('throttle:30,1');
+    Route::post('admin/security/findings/{id}/resolve', [SecurityController::class, 'findingResolve'])
+        ->name('security.finding.resolve')->middleware('throttle:30,1');
+    // (WP-4.3) خطرُ الهويّة ومراجعةُ الامتيازات: القراءةُ مالكٌ أو monitor (ق١ +
+    // critic #9 — منطَّقةً بالشركة ومطموسةَ البريد في المتحكّم، ولا عناوينَ شبكةٍ
+    // تُعرض أصلاً)، والأفعالُ كلُّها مساراتُها القائمة للمالك وحدَه (إنهاءُ الجلسات،
+    // إقرارُ النتيجة، الإيقافُ من ملف المستخدم). حدُّ معدلٍ لأن كلَّ طلبٍ ستُّ
+    // تجميعاتٍ على الجداول الساخنة.
+    Route::get('admin/security/identity', [SecurityController::class, 'identity'])
+        ->name('security.identity')->middleware('throttle:60,1');
+    Route::get('admin/security/privileged', [SecurityController::class, 'privileged'])
+        ->name('security.privileged')->middleware('throttle:60,1');
+    // (WP-4.4) الجلساتُ والأجهزة وذكاءُ العناوين: القراءةُ مالكٌ أو monitor —
+    // مطموسةَ البريد والعنوان (hub_field_mode + قناعُ IP) ومنطَّقةً بالشركة في
+    // المتحكّم (critic #9)، وبحدِّ معدلٍ لأنها تجميعاتٌ على الجداول الساخنة.
+    Route::get('admin/security/sessions', [SecurityController::class, 'sessions'])
+        ->name('security.sessions')->middleware('throttle:60,1');
+    Route::get('admin/security/devices', [SecurityController::class, 'devices'])
+        ->name('security.devices')->middleware('throttle:60,1');
+    Route::get('admin/security/ips', [SecurityController::class, 'ips'])
+        ->name('security.ips')->middleware('throttle:60,1');
+    Route::get('admin/security/ips/{ip}', [SecurityController::class, 'ip'])
+        ->name('security.ip')->middleware('throttle:60,1')->where('ip', '[0-9A-Fa-f:.]{3,45}');
+    // إنهاءُ «الباقي» لمستخدمٍ (§18): مالكٌ + تصعيدُ هويةٍ داخل الفعل + قيدُ تدقيق —
+    // جلسةُ المنفّذ الحالية تبقى. وحدُّ معدلٍ يصدّ نقراً أعمى.
+    Route::post('admin/security/users/{id}/revoke-others', [SecurityController::class, 'revokeOthers'])
+        ->name('security.user.revokeothers')->middleware('throttle:30,1');
+    // (WP-4.5) مركزُ رموز API وصحّةُ الأسرار: **للمالك وحدَه** (بياناتُ اعتمادٍ
+    // وأسرارُ منشأة — critic #9: monitor يُصَدّ هنا لا يُطمَس)، والإبطالُ الإداريّ
+    // بتصعيدِ اعتماد (§18) وقيدِ تدقيقٍ برمز API_CREDENTIAL_REVOKED. ولا مسارَ
+    // **تدويرٍ** لرمز مستخدمٍ آخر أصلاً (ق٧ — النصُّ الصريح كان سيصل المدير).
+    Route::get('admin/security/tokens', [SecurityController::class, 'tokens'])
+        ->name('security.tokens')->middleware('throttle:60,1');
+    Route::get('admin/security/secrets', [SecurityController::class, 'secrets'])
+        ->name('security.secrets')->middleware('throttle:60,1');
+    Route::post('admin/security/tokens/{id}/revoke', [SecurityController::class, 'revokeToken'])
+        ->name('security.token.revoke')->middleware('throttle:30,1');
+    // (WP-4.6) تفصيلُ الحدث الأمنيّ الواحد بمفتاح المصدر+المعرّف (audits.id أو
+    // access_denials.id — السجلُّ مشتقٌّ فلا جدولَ ولا معرّفَ جديدَين): القراءةُ
+    // بحارس المركز نفسِه (مالكٌ أو monitor مطموساً ومنطَّقاً — critic #9)، وزرُّ
+    // «افتح حادثة» يمرّر تعبئةً لآليّة m.create القائمة بلا مسارِ كتابةٍ جديد.
+    Route::get('admin/security/event/{source}/{id}', [SecurityController::class, 'event'])
+        ->name('security.event')->middleware('throttle:60,1')
+        ->where('source', 'audit|radar')->where('id', '[0-9]+');
 });

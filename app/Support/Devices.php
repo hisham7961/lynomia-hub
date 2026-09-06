@@ -19,6 +19,12 @@ class Devices
     public const COOKIE = 'lyn_did';
     public const TTL_DAYS = 400;
 
+    /**
+     * (WP-4.4) عتبةُ الألفة من ذاكرة العناوين: ثلاثُ زياراتٍ فأكثر = مكانٌ معتاد —
+     * نفسُ دلالة LoginSentry («ثالث دخولٍ من العنوان نفسه = مكان معتاد») باسمٍ واحد.
+     */
+    public const FAMILIAR_HITS = 3;
+
     /** القيمة الخام للكوكي إن وُجدت، وإلا null (لا نُنشئ في القارئ) */
     public static function currentCookie(Request $r): ?string
     {
@@ -67,6 +73,37 @@ class Devices
         ]);
     }
 
+    /**
+     * (WP-4.4) خريطةُ الألفة دفعةً واحدة: أيُّ أزواج (مستخدم، عنوان) بلغت عتبةَ
+     * الألفة في ذاكرة `user_ips`؟ قارئٌ واحد لوسم الجلسة «غير المعتادة» ووسم
+     * الجهاز «المريب» معاً — استعلامٌ واحد لصفحةٍ كاملة لا حلقةَ لكل صفّ.
+     *
+     * @param  array<int, string>  $userIds
+     * @return array<string, true>  مفاتيحُ "user_id|ip" المألوفة
+     */
+    public static function familiarMap(array $userIds): array
+    {
+        $userIds = array_values(array_unique(array_filter(array_map('strval', $userIds))));
+        if (! $userIds || ! \Illuminate\Support\Facades\Schema::hasTable('user_ips')) return [];
+
+        $out = [];
+        foreach (\Illuminate\Support\Facades\DB::table('user_ips')
+            ->whereIn('user_id', $userIds)->where('hits', '>=', self::FAMILIAR_HITS)
+            ->get(['user_id', 'ip']) as $r) {
+            $out[$r->user_id . '|' . $r->ip] = true;
+        }
+
+        return $out;
+    }
+
+    /** هل هذا العنوانُ مألوفٌ لهذا المستخدم بحسب خريطة `familiarMap`؟ */
+    public static function isFamiliar(array $map, ?string $userId, ?string $ip): bool
+    {
+        if (! $userId || ! $ip) return false;
+
+        return isset($map[$userId . '|' . $ip]);
+    }
+
     /** هل هذا جهازٌ معروفٌ للمستخدم (رأيناه قبل الآن)؟ — إشارةٌ لحارس الدخول */
     public static function isKnown($user, Request $r): bool
     {
@@ -77,8 +114,13 @@ class Devices
             ->where('cookie_hash', hash('sha256', $raw))->exists();
     }
 
-    /** وسمٌ خفيفٌ يقرأه الإنسان من سلسلة المتصفح — لا بصمة */
-    protected static function describe(string $ua): array
+    /**
+     * وسمٌ خفيفٌ يقرأه الإنسان من سلسلة المتصفح — لا بصمة.
+     * (WP-4.4) رُفعت إلى public لتقرأها شاشةُ الجلسات — **لا محلِّلَ UA ثانياً**.
+     *
+     * @return array{0: string, 1: string} [تسمية «متصفح · نظام»، النظام]
+     */
+    public static function describe(string $ua): array
     {
         $ua = trim($ua);
         $os = 'نظام غير معروف';

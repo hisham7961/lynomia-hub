@@ -52,6 +52,8 @@ class SecurityCenterTest extends TestCase
             'user_id' => $this->employee->id, 'ip' => '10.0.0.9',
             'started_at' => now(), 'last_seen_at' => now()]);
 
+        // (WP-4.4 · §18) إنهاءُ كل الجلسات صار يتطلّب تصعيدَ هوية — يُختم أولاً
+        $this->actingAs($this->owner)->post('/stepup', ['answer' => 'Secret!2026x', 'next' => '/admin/security']);
         $this->actingAs($this->owner)->post("/admin/security/users/{$this->employee->id}/revoke")->assertRedirect();
 
         $this->assertNotSame('tok-before-revoke', User::find($this->employee->id)->remember_token,

@@ -62,3 +62,22 @@ Schedule::command('hub:ops-snapshot')->everyFiveMinutes()->withoutOverlapping(20
         } catch (\Throwable $e) {
         }
     });
+
+// ── Control Plane: Phase 4 ──
+/*
+| لقطةُ الوضعية الأمنية اليومية (WP-4.2): درجةُ SecurityPosture واتجاهُها في
+| metric_points ثم تسويةُ النتائج (security_findings). قبل منتصف الليل بثلثِ
+| ساعةٍ كي تلحق باليوم الذي تقيسه. مفتاحُ نبضتها 'security' وقائمةُ اشتقاق
+| hub_schedule_failed (طور ١، لا تُحرَّر هنا) لا تعرفه — فتُكتب نتيجةُ الفشل
+| تحت المفتاح الصحيح صراحةً كي يراها نموذجُ الصحّة (نمطُ hub:ops-snapshot نفسُه).
+*/
+Schedule::command('hub:security-snapshot')->dailyAt('23:40')->withoutOverlapping(240)
+    ->onFailure(function () {
+        hub_schedule_failed('hub:security-snapshot', 'SECURITY', 'ERROR');
+        try {
+            \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.security.meta'],
+                ['value' => ['ms' => null, 'result' => 'fail', 'note' => 'فشل التشغيل المجدول', 'at' => now()->toIso8601String()]]);
+            \Illuminate\Support\Facades\Cache::forget('settings:all');
+        } catch (\Throwable $e) {
+        }
+    });

@@ -63,28 +63,149 @@ class SecurityRadar
     }
 
     /**
-     * العناوين الطارقة: من كثُرت محاولاتُه المرفوضة وتعدّدت أهدافُه — تقصٍّ لا خطأ.
-     * مجمَّعٌ في try كتوأمه في مركز الأمان: HAVING/تجميعٌ قد يُرفض على محرّكٍ صارم،
-     * وبطاقةٌ ناقصة أهون من لوحةٍ لا تُفتح.
+     * (WP-4.4) **القارئُ الواحد لكل عنوان** — يوحّد نسختَي «العناوين الطارقة»
+     * (threats هنا وknocking في مركز الأمان): صفٌّ لكل IP فيه أوّل/آخر ظهور،
+     * دخولٌ ناجح/فاشل، أهدافُ فشلٍ متمايزة، مستخدمون، أفعالٌ مريبة، ورفضٌ —
+     * ثم وسمٌ (عاديّ/جديد/فشل متكرّر/تعدّد حسابات/مريب). **بلا geo خارجيّ.**
+     *
+     * كلُّ عمودٍ إما مفتاحُ التجميع (ip) وإما تجميعيّ — فيعمل تحت
+     * ONLY_FULL_GROUP_BY على MySQL 8 كما على SQLite. المفرداتُ من
+     * `SecurityEvents::actions` الواحدة لا قوائمَ حرفيةً متباعدة.
+     *
+     * **أوّلُ الظهور تقريبيّ** (critic: لا مصدرَ لما قبل `user_ips.first_seen_at`):
+     * يُشتقّ عند القراءة من `MIN(audits.created_at)` على كامل السجلّ — والشاشةُ
+     * تصرّح بذلك بوسم «تقريبيّ» لا تدّعي تاريخاً مضبوطاً.
      */
-    public static function threats(int $days = 7, int $limit = 6): Collection
+    public static function intel(\DateTimeInterface $from, ?\DateTimeInterface $to = null,
+        ?string $ip = null, int $cap = 300): Collection
     {
-        if (! Schema::hasTable('access_denials')) return collect();
+        // `$to = null` ذيلٌ حيّ حتى هذه اللحظة (الرادار)؛ ومع TimeRange يبقى
+        // الحدُّ الأعلى حصرياً `< to` كاصطلاح المنصّة كلِّها
+        if (! Schema::hasTable('audits')) return collect();
 
+        $ok = SecurityEvents::actions('AUTH_SUCCESS');
+        $fail = array_merge(SecurityEvents::actions('AUTH_FAILURE'), SecurityEvents::actions('MFA_FAILURE'));
+        $sus = SecurityEvents::actions('SUSPICIOUS_ACTIVITY');
+        $ph = fn (array $a) => implode(',', array_fill(0, count($a), '?'));
+
+        // ١) التدقيق مجمَّعاً بالعنوان — والفشلُ في التجميع يُنقص بطاقةً لا شاشة
+        $rows = collect();
         try {
-            return DB::table('access_denials')
-                ->where('created_at', '>=', now()->subDays($days))->whereNotNull('ip')
-                ->groupBy('ip')
-                ->orderByRaw('COUNT(*) DESC')->limit($limit)
-                ->get([DB::raw('ip'), DB::raw('COUNT(*) as hits'),
-                       DB::raw('COUNT(DISTINCT path) as targets'),
-                       DB::raw('SUM(CASE WHEN user_id IS NULL THEN 1 ELSE 0 END) as anon')]);
+            $q = DB::table('audits')->whereNotNull('ip')->where('ip', '!=', '')
+                ->where('created_at', '>=', $from)
+                    ->when($to !== null, fn ($w) => $w->where('created_at', '<', $to));
+            if ($ip !== null) $q->where('ip', $ip);
+            $rows = $q->groupBy('ip')
+                ->selectRaw('ip, COUNT(*) as events, MAX(created_at) as last_seen'
+                    . ', SUM(CASE WHEN action IN (' . $ph($ok) . ') THEN 1 ELSE 0 END) as success'
+                    . ', SUM(CASE WHEN action IN (' . $ph($fail) . ') THEN 1 ELSE 0 END) as fails'
+                    . ', COUNT(DISTINCT CASE WHEN action IN (' . $ph($fail) . ') THEN name END) as fail_targets'
+                    . ', COUNT(DISTINCT user_id) as users'
+                    . ', SUM(CASE WHEN action IN (' . $ph($sus) . ') THEN 1 ELSE 0 END) as suspicious',
+                    array_merge($ok, $fail, $fail, $sus))
+                ->orderByRaw('MAX(created_at) DESC')->orderBy('ip')
+                ->limit($cap)->get()->keyBy('ip');
         } catch (\Throwable $e) {
-            ErrorLog::capture('php', 'security-radar: تعذّر تجميع العناوين — ' . $e->getMessage(),
+            ErrorLog::capture('php', 'security-radar: تعذّر تجميعُ ذكاء العناوين — ' . $e->getMessage(),
                 $e->getFile(), $e->getLine());
-
-            return collect();
         }
+
+        // ٢) الرفضُ المسجَّل مجمَّعاً بالعنوان — عنوانٌ يطرق ٤٠٣ فقط يظهر أيضاً
+        $den = collect();
+        if (Schema::hasTable('access_denials')) {
+            try {
+                $dq = DB::table('access_denials')->whereNotNull('ip')->where('ip', '!=', '')
+                    ->where('created_at', '>=', $from)
+                    ->when($to !== null, fn ($w) => $w->where('created_at', '<', $to));
+                if ($ip !== null) $dq->where('ip', $ip);
+                $den = $dq->groupBy('ip')
+                    ->selectRaw('ip, COUNT(*) as denials, COUNT(DISTINCT path) as paths'
+                        . ', SUM(CASE WHEN user_id IS NULL THEN 1 ELSE 0 END) as anon'
+                        . ', MAX(created_at) as last_denial, MIN(created_at) as first_denial')
+                    ->orderByRaw('COUNT(*) DESC')->orderBy('ip')->limit($cap)->get()->keyBy('ip');
+            } catch (\Throwable $e) {
+                $den = collect();
+            }
+        }
+
+        // ٣) الدمجُ: اتحادُ العنوانين — وقيمُ الغائب أصفارٌ صريحة لا null غامض
+        $out = collect();
+        foreach ($rows as $k => $r) {
+            $d = $den->get($k);
+            $r->denials = (int) ($d->denials ?? 0);
+            $r->denial_paths = (int) ($d->paths ?? 0);
+            $r->anon = (int) ($d->anon ?? 0);
+            // آخرُ الظهور من المصدرين معاً (صيغةُ التاريخ تقارَن نصياً بأمان)
+            if ($d && $d->last_denial && (string) $d->last_denial > (string) $r->last_seen) {
+                $r->last_seen = $d->last_denial;
+            }
+            $out->put($k, $r);
+        }
+        foreach ($den as $k => $d) {
+            if ($out->has($k)) continue;
+            $out->put($k, (object) ['ip' => $k, 'events' => 0, 'last_seen' => $d->last_denial,
+                'success' => 0, 'fails' => 0, 'fail_targets' => 0, 'users' => 0, 'suspicious' => 0,
+                'denials' => (int) $d->denials, 'denial_paths' => (int) $d->paths, 'anon' => (int) $d->anon]);
+        }
+
+        // ٤) أوّلُ ظهورٍ تقريبيّ من كامل سجلّ التدقيق (لا من النافذة وحدها)
+        $firsts = [];
+        if ($out->isNotEmpty()) {
+            try {
+                $firsts = DB::table('audits')->whereIn('ip', $out->keys()->all())
+                    ->groupBy('ip')->selectRaw('ip, MIN(created_at) as first_seen')
+                    ->pluck('first_seen', 'ip')->all();
+            } catch (\Throwable $e) {
+            }
+        }
+        foreach ($out as $k => $r) {
+            $r->first_seen = $firsts[$k] ?? ($den->get($k)->first_denial ?? null);
+            $r->label = self::ipLabel($r);
+        }
+
+        // الترتيبُ الحتميّ: الأحدثُ ظهوراً أولاً وفاصلُ التعادل العنوانُ نفسُه (فريد)
+        return $out->sortBy([['last_seen', 'desc'], ['ip', 'asc']])->values();
+    }
+
+    /** عتبتا الوسم: فشلٌ متكرّرٌ يستحق النظر، ورفضٌ غزيرٌ وحدَه يكفي ريبةً */
+    public const REPEAT_FAILS = 5;
+    public const SUSPECT_DENIALS = 10;
+
+    /**
+     * وسمُ العنوان — بأولويةٍ تنازلية: مريب (نشاطٌ مريبٌ مرصود أو رفضٌ غزير) ثم
+     * تعدّدُ حسابات (فشلٌ على أكثر من هدف) ثم فشلٌ متكرّر ثم جديدٌ (أوّلُ ظهورٍ
+     * خلال ٧ أيام) ثم عاديّ.
+     *
+     * @return array{key: string, label: string, tone: string}
+     */
+    public static function ipLabel(object $x): array
+    {
+        if ((int) ($x->suspicious ?? 0) > 0 || (int) ($x->denials ?? 0) >= self::SUSPECT_DENIALS) {
+            return ['key' => 'suspicious', 'label' => 'مريب', 'tone' => 'bad'];
+        }
+        if ((int) ($x->fail_targets ?? 0) > 1) return ['key' => 'multi', 'label' => 'تعدّد حسابات', 'tone' => 'bad'];
+        if ((int) ($x->fails ?? 0) >= self::REPEAT_FAILS) return ['key' => 'fails', 'label' => 'فشل متكرّر', 'tone' => 'wn'];
+        if (! empty($x->first_seen)
+            && \Illuminate\Support\Carbon::parse($x->first_seen)->gt(now()->subDays(7))) {
+            return ['key' => 'new', 'label' => 'جديد', 'tone' => 'wn'];
+        }
+
+        return ['key' => 'normal', 'label' => 'عاديّ', 'tone' => 'ok'];
+    }
+
+    /**
+     * العناوين الطارقة: من كثُرت محاولاتُه المرفوضة وتعدّدت أهدافُه — تقصٍّ لا خطأ.
+     * (WP-4.4) صارت إسقاطاً على القارئ الواحد `intel` — لا نسخةَ تجميعٍ ثانية.
+     */
+    public static function threats(int $days = 7, int $limit = 6, ?Collection $intel = null): Collection
+    {
+        // ذكاءٌ محسوبٌ لتوّه في الطلب نفسه (النافذةُ ذاتُها) يُغني عن تجميعٍ ثانٍ
+        return ($intel ?? self::intel(now()->subDays($days)))
+            ->filter(fn ($r) => (int) $r->denials > 0)
+            ->sortBy([['denials', 'desc'], ['ip', 'asc']])->take($limit)
+            ->map(fn ($r) => (object) ['ip' => $r->ip, 'hits' => (int) $r->denials,
+                'targets' => (int) $r->denial_paths, 'anon' => (int) $r->anon])
+            ->values();
     }
 
     /** ملخّصٌ للشريط العلوي: كم محاولة، من كم عنوان، وكم منها من غير مستخدم */

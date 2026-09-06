@@ -34,6 +34,9 @@ class HubBackup extends Command
         'quote_lines', 'quote_milestones', 'dashboards', 'dashboard_widgets', 'saved_views', 'work_hours',
         'webauthn_credentials', 'user_devices', 'asset_custody', 'record_identifiers', 'identity_lookups',
         'inbox_documents', 'metric_points', 'audit_chain', 'signal_states', 'change_orders', 'screenshots',
+        // (الطور ٤ · WP-4.1) نتائجُ الأمن: حالةُ حَوكمةٍ لا تليمتري — أعمارُ المشكلات
+        // (first_seen/resolved) وإقراراتُها لا تُعاد تعبئتُها من الفحوص، فتُنسخ خاماً.
+        'security_findings',
     ];
 
     /** قراءةُ ملف نسخةٍ (مشفَّرٍ أو صريح) وإعادتُه مصفوفةً — أو null إن تعذّر */

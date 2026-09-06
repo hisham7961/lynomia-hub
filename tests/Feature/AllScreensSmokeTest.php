@@ -140,6 +140,11 @@ class AllScreensSmokeTest extends TestCase
                 $module = 'hr';
                 $uri = str_replace('{module}', $module, $uri);
             }
+            // (WP-4.6 · critic #33) تفصيلُ الحدث الأمنيّ {source}/{id}: يُشبَع بقيدِ
+            // تدقيقٍ أمنيٍّ مزروع — فتنضمّ الصفحةُ للمسح بدل السقوط الصامت من الشبكة
+            if (str_contains($uri, '{source}')) {
+                $uri = strtr($uri, ['{source}' => 'audit', '{id}' => (string) $this->securityAuditId()]);
+            }
             $uri = strtr($uri, [
                 '{id}'        => $module ? ($ids[$module] ?? 'x') : ($ids['tasks'] ?? 'x'),
                 '{projectId}' => $ids['projects'] ?? 'x',
@@ -151,6 +156,8 @@ class AllScreensSmokeTest extends TestCase
                 '{version}'   => '1',
                 // (WP-1.4) صفحةُ أثر الطلب — معرّفٌ لا أثرَ له يفتح حالةً فارغة لا ٥٠٠
                 '{rid}'       => 'trace-smoke-00',
+                // (WP-4.4 · critic #33) تفصيلُ عنوانٍ بلا أثرٍ يفتح حالةً فارغة لا ٥٠٠
+                '{ip}'        => '127.0.0.1',
             ]);
             if (str_contains($uri, '{')) continue;      // معاملٌ لا نعرف كيف نُشبعه
 
@@ -158,6 +165,17 @@ class AllScreensSmokeTest extends TestCase
         }
 
         return $out;
+    }
+
+    /** قيدُ تدقيقٍ أمنيٌّ واحد يُشبِع مسارَ تفصيل الحدث — يُزرع مرّةً ويُعاد معرّفُه */
+    private ?int $secAuditId = null;
+
+    private function securityAuditId(): int
+    {
+        return $this->secAuditId ??= (int) DB::table('audits')->insertGetId([
+            'action' => 'دخول فاشل', 'name' => 'smoke@t.local', 'ip' => '127.0.0.1',
+            'created_at' => now(),
+        ]);
     }
 
     /* ────────── المسح ────────── */

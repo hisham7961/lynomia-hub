@@ -119,7 +119,10 @@ final class SecurityEvents
     /**
      * السجلُّ الأمنيّ الموحَّد: التدقيق + رادار المنع، مطبَّعاً وبالأحدث أولاً.
      *
-     * @return Collection<int, array{at:string,code:string,label:string,severity:string,tone:string,user_id:?string,user:?string,ip:?string,device:?string,module:?string,record_id:?string,name:?string,request_id:?string,source:string}>
+     * (WP-4.6) كلُّ صفٍّ يحمل **مصدرَه ومعرّفَه** (`audits.id` أو `access_denials.id`)
+     * — مفتاحُ صفحة التفصيل `security.event`؛ فالسجلُّ مشتقٌّ ولا معرّفَ ثانياً له.
+     *
+     * @return Collection<int, array{at:string,code:string,label:string,severity:string,tone:string,user_id:?string,user:?string,ip:?string,device:?string,module:?string,record_id:?string,name:?string,request_id:?string,source:string,id:?string}>
      */
     public static function recent(int $days = 7, int $limit = 60, ?string $code = null): Collection
     {
@@ -139,14 +142,14 @@ final class SecurityEvents
                     }
                 })
                 ->orderByDesc('audits.created_at')->orderByDesc('audits.id')->limit($limit * 3)
-                ->get(['audits.action', 'audits.module', 'audits.record_id', 'audits.name', 'audits.after', 'audits.user_id',
+                ->get(['audits.id', 'audits.action', 'audits.module', 'audits.record_id', 'audits.name', 'audits.after', 'audits.user_id',
                        'audits.ip', 'audits.device', 'audits.created_at', 'users.name as uname',
                        ...(hub_has_col('audits', 'request_id') ? ['audits.request_id'] : [])]);
             foreach ($q as $r) {
                 $c = self::codeFor((string) $r->action, $r->module, $r->after, $r->name);
                 if ($c === null || ($code !== null && $c !== $code)) continue;
                 $out->push(self::row($c, (string) $r->created_at, $r->user_id, $r->uname, $r->ip, $r->device, $r->module,
-                    $r->record_id, $r->name ?: $r->action, $r->request_id ?? null, 'audit'));
+                    $r->record_id, $r->name ?: $r->action, $r->request_id ?? null, 'audit', (string) $r->id));
             }
         }
 
@@ -155,35 +158,132 @@ final class SecurityEvents
                 ->where('access_denials.created_at', '>=', $since)
                 ->when($code !== null, fn ($w) => $w->where('access_denials.kind', $code === 'ACCESS_DENIED' ? 'وصول مرفوض' : 'تخمين رابط'))
                 ->orderByDesc('access_denials.id')->limit($limit)
-                ->get(['access_denials.kind', 'access_denials.user_id', 'access_denials.ip', 'access_denials.method',
+                ->get(['access_denials.id', 'access_denials.kind', 'access_denials.user_id', 'access_denials.ip', 'access_denials.method',
                        'access_denials.path', 'access_denials.created_at', 'users.name as uname']);
             foreach ($q as $r) {
                 $c = $r->kind === 'تخمين رابط' ? 'LINK_GUESS' : 'ACCESS_DENIED';
                 $out->push(self::row($c, (string) $r->created_at, $r->user_id, $r->uname, $r->ip, null, null, null,
-                    trim($r->method . ' ' . $r->path), null, 'radar'));
+                    trim($r->method . ' ' . $r->path), null, 'radar', (string) $r->id));
             }
         }
 
         return $out->sortByDesc('at')->values()->take($limit);
     }
 
-    /** عدُّ الأحداث بالكود خلال مدّة — لبطاقات مركز الأمن */
+    /**
+     * عدُّ الأحداث بالكود خلال مدّة — لبطاقات مركز الأمن.
+     *
+     * (WP-4.5 · §2.1) **عدّاتُ SQL لا تصنيفَ PHP**: كانت تُحمَّل ٢٠٠٠–٦٠٠٠ صفٍّ
+     * وتُصنَّف واحداً واحداً عند كل فتحةِ صفحة. الآن ثلاثةُ استعلاماتِ تجميعٍ على
+     * `whereIn(action, actions(code))` — يقودها فهرسُ `audits(action, created_at)`
+     * (WP-1.4) — وواحدٌ على `access_denials.kind`. القيدُ المعلَن: صيغُ الوسوم
+     * المركّبة (`@module:users:تعديل` بشرط الحقول، و`@settings/@prefix`) لا تُعدّ
+     * هنا — فالعدّادُ يُقلّل لا يبالغ، وسجلُّ `recent()` يبقى المصنِّفَ الكامل للصفوف.
+     */
     public static function counts(int $days = 7): array
     {
+        $since = now()->subDays($days);
         $counts = [];
-        foreach (self::recent($days, 2000) as $e) $counts[$e['code']] = ($counts[$e['code']] ?? 0) + 1;
+
+        if (Schema::hasTable('audits')) {
+            // كلُّ صيغةٍ حرفيّة تُعَدّ مرّةً في القاعدة ثم تُجمع بالكود في الذاكرة
+            $byAction = DB::table('audits')->where('created_at', '>=', $since)
+                ->whereIn('action', self::actions())
+                ->groupBy('action')->orderBy('action')
+                ->selectRaw('action, COUNT(*) as n')->pluck('n', 'action');
+            foreach (self::CODES as $code => [, , $acts]) {
+                $n = 0;
+                foreach ($acts as $a) {
+                    if (! str_starts_with($a, '@')) $n += (int) ($byAction[$a] ?? 0);
+                }
+                if ($n) $counts[$code] = ($counts[$code] ?? 0) + $n;
+            }
+
+            // وسما الوحدات الصِّرفان (roles كلُّه، وusers بفعل إضافة/حذف) SQL خالصةٌ
+            // أيضاً — يُستثنى ما طابق صيغةً حرفيّةً كي لا يُعَدّ الصفُّ مرّتين
+            $byModule = DB::table('audits')->where('created_at', '>=', $since)
+                ->whereIn('module', ['roles', 'users'])
+                ->whereNotIn('action', self::actions())
+                ->groupBy('module', 'action')->orderBy('module')->orderBy('action')
+                ->selectRaw('module, action, COUNT(*) as n')->get();
+            foreach ($byModule as $r) {
+                $code = $r->module === 'roles' ? 'ROLE_CHANGED'
+                    : ($r->action === 'إضافة' ? 'USER_CREATED' : ($r->action === 'حذف' ? 'USER_DELETED' : null));
+                if ($code) $counts[$code] = ($counts[$code] ?? 0) + (int) $r->n;
+            }
+        }
+
+        if (Schema::hasTable('access_denials')) {
+            $byKind = DB::table('access_denials')->where('created_at', '>=', $since)
+                ->groupBy('kind')->orderBy('kind')
+                ->selectRaw('kind, COUNT(*) as n')->pluck('n', 'kind');
+            foreach ($byKind as $kind => $n) {
+                $counts[$kind === 'تخمين رابط' ? 'LINK_GUESS' : 'ACCESS_DENIED'] =
+                    (($counts[$kind === 'تخمين رابط' ? 'LINK_GUESS' : 'ACCESS_DENIED'] ?? 0)) + (int) $n;
+            }
+        }
+
         arsort($counts);
 
         return $counts;
     }
 
-    protected static function row(string $code, string $at, $userId, $user, $ip, $device, $module, $recordId, $name, $rid, string $source): array
+    /**
+     * (WP-4.6) صفٌّ واحد من السجلّ الأمنيّ بمفتاح **المصدر+المعرّف** — قارئُ
+     * صفحة التفصيل `security.event`. `audit` قيدُ تدقيقٍ يُصنَّف بالكود نفسِه
+     * (غيرُ الأمنيّ ⇒ null فلا صفحةَ له)، و`radar` صفُّ منعٍ من `access_denials`.
+     *
+     * **لا اعتمادَ في الناتج:** `audits.after` يُقرأ **للتصنيف فقط** (شرطُ
+     * PERMISSION_CHANGED) ولا يُعاد أبداً — فما زُرع فيه من ترويساتٍ أو أسرارٍ
+     * لا يبلغ الشاشة. والبريدُ يُعاد خاماً ليطمسه المتحكّم لغير المالك (critic #9).
+     */
+    public static function find(string $source, string $id): ?array
+    {
+        if (! ctype_digit($id)) return null;
+
+        if ($source === 'audit' && Schema::hasTable('audits')) {
+            $r = DB::table('audits')->leftJoin('users', 'users.id', '=', 'audits.user_id')
+                ->where('audits.id', (int) $id)
+                ->first(['audits.id', 'audits.action', 'audits.module', 'audits.record_id', 'audits.name',
+                         'audits.after', 'audits.user_id', 'audits.ip', 'audits.device', 'audits.created_at',
+                         'users.name as uname', 'users.email as uemail',
+                         ...(hub_has_col('audits', 'request_id') ? ['audits.request_id'] : [])]);
+            if (! $r) return null;
+            $c = self::codeFor((string) $r->action, $r->module, $r->after, $r->name);
+            if ($c === null) return null;
+
+            return self::row($c, (string) $r->created_at, $r->user_id, $r->uname, $r->ip, $r->device, $r->module,
+                    $r->record_id, $r->name ?: $r->action, $r->request_id ?? null, 'audit', (string) $r->id)
+                + ['action' => (string) $r->action, 'email' => $r->uemail];
+        }
+
+        if ($source === 'radar' && Schema::hasTable('access_denials')) {
+            $r = DB::table('access_denials')->leftJoin('users', 'users.id', '=', 'access_denials.user_id')
+                ->where('access_denials.id', (int) $id)
+                ->first(['access_denials.id', 'access_denials.kind', 'access_denials.user_id', 'access_denials.ip',
+                         'access_denials.method', 'access_denials.path', 'access_denials.detail', 'access_denials.created_at',
+                         'users.name as uname', 'users.email as uemail',
+                         ...(hub_has_col('access_denials', 'request_id') ? ['access_denials.request_id'] : [])]);
+            if (! $r) return null;
+
+            return self::row($r->kind === 'تخمين رابط' ? 'LINK_GUESS' : 'ACCESS_DENIED',
+                    (string) $r->created_at, $r->user_id, $r->uname, $r->ip, null, null, null,
+                    trim($r->method . ' ' . $r->path), $r->request_id ?? null, 'radar', (string) $r->id)
+                + ['method' => $r->method, 'path' => $r->path, 'detail' => $r->detail, 'email' => $r->uemail];
+        }
+
+        return null;
+    }
+
+    protected static function row(string $code, string $at, $userId, $user, $ip, $device, $module, $recordId, $name, $rid, string $source, ?string $id = null): array
     {
         [$label, $sev] = self::CODES[$code];
 
         return ['at' => $at, 'code' => $code, 'label' => $label, 'severity' => $sev, 'tone' => self::SEVERITY_TONE[$sev],
                 'user_id' => $userId, 'user' => $user, 'ip' => $ip, 'device' => $device ? mb_substr((string) $device, 0, 60) : null,
                 'module' => $module, 'record_id' => $recordId, 'name' => $name ? mb_substr((string) $name, 0, 120) : null,
-                'request_id' => $rid, 'source' => $source];
+                'request_id' => $rid, 'source' => $source,
+                // (WP-4.6) معرّفُ الجدول الأصليّ — مفتاحُ صفحة التفصيل مع source
+                'id' => $id];
     }
 }
