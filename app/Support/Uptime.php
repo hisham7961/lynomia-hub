@@ -76,6 +76,77 @@ class Uptime
         return ['up' => $up, 'code' => $code, 'ms' => $ms, 'error' => $err];
     }
 
+    /**
+     * (WP-2.6) تاريخُ التوافر **مجمَّعاً في قاعدة البيانات** داخل TimeRange —
+     * لا كما تفعل `hub_uptime` التي تجلب سلسلتَي ٣٠ يوماً كاملتين إلى PHP ثم
+     * تعدّ (spec §14). الأرقامُ نفسُها حرفياً (يثبتها اختبارُ مساواة)، وزيادةً:
+     * **فتراتُ الانقطاع** = كلُّ تتابعِ فحوصٍ `up=0` (gaps-and-islands بنافذتين —
+     * فرقُ ترقيمين ثابتٌ داخل التتابع الواحد؛ يعمل على SQLite 3.25+ وMySQL 8).
+     *
+     * يعيد: checks/up/down/pct/ms/last/live/outages[{from,to,checks,open}] —
+     * وبلا نقاطٍ يعيد null لا أصفاراً مُختلَقة: «لا قياس» ليس «صفراً».
+     */
+    public static function history(string $module, string $recordId, TimeRange $range): array
+    {
+        $empty = ['checks' => 0, 'up' => 0, 'down' => 0, 'pct' => null, 'ms' => null,
+                  'last' => null, 'live' => null, 'outages' => []];
+        if (! \Illuminate\Support\Facades\Schema::hasTable('metric_points')) return $empty;
+
+        try {
+            $db = \Illuminate\Support\Facades\DB::table('metric_points')
+                ->where('module', $module)->where('record_id', $recordId);
+            $win = fn ($q) => $range->apply($q, 'at');   // >= from و< to — سارغابل، لا whereDate
+
+            // التوافر: عدٌّ وجمعٌ في القاعدة — صفّان يعودان لا آلاف النقاط
+            $up = $win((clone $db)->where('metric', 'up'))
+                ->selectRaw('COUNT(*) AS n, SUM(CASE WHEN value > 0 THEN 1 ELSE 0 END) AS good')->first();
+            $n = (int) ($up->n ?? 0);
+            $good = (int) ($up->good ?? 0);
+
+            // زمنُ الاستجابة: متوسّطٌ في القاعدة (يطابق array_sum/count القديمة)
+            $lat = $win((clone $db)->where('metric', 'latency'))
+                ->selectRaw('COUNT(*) AS n, AVG(value) AS avg_ms')->first();
+
+            // آخرُ فحصٍ — ترتيبٌ حتميّ: at ثم id (نقطتان في اللحظة نفسِها قرعةٌ بدونه)
+            $last = $win((clone $db)->where('metric', 'up'))
+                ->orderByDesc('at')->orderByDesc('id')->first(['at', 'value']);
+
+            // فتراتُ الانقطاع: تجميعُ تتابعات up=0 داخل القاعدة — لا تحميلَ للسلسلة
+            $fmt = fn ($c) => $c->format('Y-m-d H:i:s');
+            $outages = \Illuminate\Support\Facades\DB::select(
+                'SELECT MIN(at) AS from_at, MAX(at) AS to_at, COUNT(*) AS checks FROM ('
+                . ' SELECT at, (CASE WHEN value > 0 THEN 1 ELSE 0 END) AS ok,'
+                . '        ROW_NUMBER() OVER (ORDER BY at, id)'
+                . '      - ROW_NUMBER() OVER (PARTITION BY (CASE WHEN value > 0 THEN 1 ELSE 0 END) ORDER BY at, id) AS grp'
+                . ' FROM metric_points'
+                . ' WHERE module = ? AND record_id = ? AND metric = ? AND at >= ? AND at < ?'
+                . ') t WHERE ok = 0 GROUP BY grp ORDER BY MIN(at)',
+                [$module, $recordId, 'up', $fmt($range->from), $fmt($range->to)]);
+
+            $lastAt = $last ? \Illuminate\Support\Carbon::parse($last->at) : null;
+            $live = $last ? ((float) $last->value > 0) : null;
+            $out = [];
+            foreach ($outages as $o) {
+                $to = \Illuminate\Support\Carbon::parse($o->to_at);
+                $out[] = [
+                    'from' => \Illuminate\Support\Carbon::parse($o->from_at),
+                    'to' => $to, 'checks' => (int) $o->checks,
+                    // مفتوحٌ = آخرُ فحصٍ في النافذة فاشلٌ وهذا الانقطاعُ ذيلُها — «تعافى» لا تُقال قبل نجاح
+                    'open' => $live === false && $lastAt !== null && $to->equalTo($lastAt),
+                ];
+            }
+
+            return [
+                'checks' => $n, 'up' => $good, 'down' => $n - $good,
+                'pct' => $n ? round($good * 100 / $n, 2) : null,
+                'ms' => ((int) ($lat->n ?? 0)) ? (int) round((float) $lat->avg_ms) : null,
+                'last' => $lastAt, 'live' => $live, 'outages' => $out,
+            ];
+        } catch (\Throwable $e) {
+            return $empty;   // قارئُ شاشةٍ لا يُسقطها — «غير متاح» أصدقُ من ٥٠٠
+        }
+    }
+
     /** كل الأهداف المفعّلة عبر الوحدات القابلة للمراقبة */
     public static function enabled(): array
     {

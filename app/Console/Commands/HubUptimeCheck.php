@@ -16,6 +16,7 @@ class HubUptimeCheck extends Command
 
     public function handle(): int
     {
+        $t0 = microtime(true);   // (WP-2.3) مدّةُ الدورة الحقيقية تُنبَض — لا نبضةَ بلا مدّة
         $only = $this->option('module');
         $n = $down = 0;
 
@@ -34,7 +35,7 @@ class HubUptimeCheck extends Command
             }
         }
 
-        \App\Support\Health::beat('uptime', null, 'ok', $down ? "{$down} من {$n} معطّل" : null);
+        \App\Support\Health::beat('uptime', (int) round((microtime(true) - $t0) * 1000), 'ok', $down ? "{$down} من {$n} معطّل" : null);
         $this->info("فُحص {$n} هدفاً، منها {$down} معطّل.");
 
         return self::SUCCESS;

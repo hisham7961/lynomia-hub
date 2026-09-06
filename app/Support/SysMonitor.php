@@ -37,13 +37,17 @@ class SysMonitor
         if (! $load) return ['ok' => false, 'cores' => $cores];
 
         $pct = (int) round(($load[0] / $cores) * 100);
+        // عتبتا المعالج قابلتان للضبط (WP-2.1) — والقراءةُ داخل rescue فلا يسقط
+        // القياسُ إن سقطت قاعدةُ الإعدادات (نمط Observability::handle نفسه)
+        $warn = max(1, (int) rescue(fn () => setting('ops.cpu_warn', 60), 60, false));
+        $crit = max($warn, (int) rescue(fn () => setting('ops.cpu_crit', 90), 90, false));
 
         return [
             'ok' => true, 'cores' => $cores,
             'load1' => round($load[0], 2), 'load5' => round($load[1], 2), 'load15' => round($load[2], 2),
             'pct' => $pct,
-            'band' => $pct >= 90 ? 'مرتفع' : ($pct >= 60 ? 'متوسط' : 'مرتاح'),
-            'tone' => $pct >= 90 ? 'bad' : ($pct >= 60 ? 'wn' : 'ok'),
+            'band' => $pct >= $crit ? 'مرتفع' : ($pct >= $warn ? 'متوسط' : 'مرتاح'),
+            'tone' => $pct >= $crit ? 'bad' : ($pct >= $warn ? 'wn' : 'ok'),
         ];
     }
 
@@ -63,13 +67,16 @@ class SysMonitor
 
         $used = $total - $avail;
         $pct = (int) round($used * 100 / $total);
+        // عتبتا الذاكرة قابلتان للضبط (WP-2.1) — بافتراضيّاتٍ تساوي ثوابتَ الأمس حرفياً
+        $warn = max(1, (int) rescue(fn () => setting('ops.mem_warn', 75), 75, false));
+        $crit = max($warn, (int) rescue(fn () => setting('ops.mem_crit', 90), 90, false));
 
         // **array_replace لا `+`** (v2.324): عاملُ الاتحاد يُبقي مفتاحَ الطرف
         // الأيسر، و`$out` يحمل `'ok' => false` — فبطاقةُ الذاكرة كانت تُعلن
         // الفشلَ دائماً مهما نجحت القراءة، ويُقرأ ذلك «تعذّر القياس».
         return array_replace($out, [
             'ok' => true, 'total' => $total, 'avail' => $avail, 'used' => $used, 'pct' => $pct,
-            'tone' => $pct >= 90 ? 'bad' : ($pct >= 75 ? 'wn' : 'ok'),
+            'tone' => $pct >= $crit ? 'bad' : ($pct >= $warn ? 'wn' : 'ok'),
         ]);
     }
 
@@ -155,6 +162,13 @@ class SysMonitor
     /** من يستهلك الوقت: أبطأ المسارات من سجل الأخطاء (نوع slow) مجمّعةً بالرابط */
     public static function slowRoutes(int $limit = 10): array
     {
+        // (WP-2.7) تجميعُ أسبوعٍ لا يتغيّر بين ضغطتين — دقيقةٌ كأخوَيه disk/tables
+        return \Illuminate\Support\Facades\Cache::remember('sysmon:slow:' . $limit, 60,
+            fn () => self::slowRoutesLive($limit));
+    }
+
+    protected static function slowRoutesLive(int $limit = 10): array
+    {
         try {
             if (! Schema::hasTable('error_events')) return [];
 
@@ -171,6 +185,13 @@ class SysMonitor
     /** أكثر الصفحات استدعاءً — أين يذهب الحمل فعلاً */
     public static function busyRoutes(int $limit = 10): array
     {
+        // (WP-2.7) تجميعُ أسبوعٍ من الزيارات — يُخبَّأ دقيقةً كأخوَيه disk/tables
+        return \Illuminate\Support\Facades\Cache::remember('sysmon:busy:' . $limit, 60,
+            fn () => self::busyRoutesLive($limit));
+    }
+
+    protected static function busyRoutesLive(int $limit = 10): array
+    {
         try {
             if (! Schema::hasTable('page_visits')) return [];
 
@@ -186,6 +207,12 @@ class SysMonitor
     /**
      * نبض ٢٤ ساعة: طلبات وأخطاء لكل ساعة — الرقم اللحظي وحده لا يقول
      * أهذا الحملُ عادةٌ أم قفزة. الشكل الزمني هو ما يُقرأ منه العطل.
+     *
+     * (WP-2.7) **المصدرُ دلاءُ HTTP لا صفوفُ الزيارات**: كان النبضُ يجلب كلَّ صفوف
+     * `page_visits` في النافذة (صفٌّ لكل زيارة — بلا سقف) ليعدّها في PHP؛ الآن
+     * يقرأ دلاءَ `http_metric_buckets` المجمَّعةَ سلفاً (≤ ٢٨٨ صفاً لليوم مهما بلغ
+     * الحمل) ويطويها ساعات. والأخطاء تبقى من `error_events` المجمَّع أصلاً
+     * (صفٌّ لكل بصمة بعدّاد تكراراتها — **وقائعُ لا بصمات**، v2.338).
      */
     public static function pulse(int $hours = 24): array
     {
@@ -196,10 +223,15 @@ class SysMonitor
         }
 
         try {
-            if (Schema::hasTable('page_visits')) {
-                foreach (DB::table('page_visits')->where('at', '>=', $from)->get(['at']) as $v) {
-                    $k = \Illuminate\Support\Carbon::parse($v->at)->format('Y-m-d H');
-                    if (isset($slots[$k])) $slots[$k]['hits']++;
+            if (Schema::hasTable('http_metric_buckets')) {
+                // تجميعٌ في القاعدة على مفتاح الدلو (فريدٌ زمنياً) — طيُّه ساعاتٍ هنا
+                // طيُّ ≤ ٢٨٨ صفاً مجمَّعاً، لا عدُّ الزيارات واحدةً واحدة
+                $rows = DB::table('http_metric_buckets')->where('bucket_at', '>=', $from)
+                    ->selectRaw('bucket_at, SUM(count) c')
+                    ->groupBy('bucket_at')->orderBy('bucket_at')->get();
+                foreach ($rows as $b) {
+                    $k = \Illuminate\Support\Carbon::parse($b->bucket_at)->format('Y-m-d H');
+                    if (isset($slots[$k])) $slots[$k]['hits'] += (int) $b->c;
                 }
             }
             if (Schema::hasTable('error_events')) {

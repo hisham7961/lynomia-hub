@@ -34,10 +34,21 @@ class VaultSecret extends Model
             try { \Illuminate\Support\Facades\Crypt::decryptString($raw); }
             catch (\Throwable $e) { $m->secret_cipher = $raw; }   // التعيين يمرّ بالكاست فيشفِّر
         });
+
+        // (WP-4.5) ختمُ التدوير الصادق: يتحرّك حين يتغيّر secret_cipher **فقط** —
+        // تعديلُ ملاحظةٍ كان «يجدّد» السرَّ زوراً عبر updated_at فيسقط من فحص
+        // التدوير وهو بائت. الإنشاءُ أولُ تدوير. (يُسجَّل بعد خطّاف الترقية أعلاه
+        // عمداً — فترقيةُ نصٍّ قديم غير مشفَّر تغييرٌ فعليّ للعمود تُختم كذلك.)
+        static::saving(function (self $m) {
+            if ($m->isDirty('secret_cipher') && hub_has_col('vault_secrets', 'rotated_at')) {
+                $m->rotated_at = now();
+            }
+        });
     }
 
     protected $casts = [
         'secret_cipher' => \App\Casts\EncryptedOrPlain::class,
+        'rotated_at' => 'datetime',   // آخرُ تدويرٍ فعليّ (WP-4.5) — يُختم في booted أعلاه
         'allowed_ids' => 'array',
         'custom' => 'array',
         'meta' => 'array',

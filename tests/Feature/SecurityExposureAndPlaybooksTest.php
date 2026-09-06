@@ -123,6 +123,8 @@ class SecurityExposureAndPlaybooksTest extends TestCase
                 'text' => 'أُنهيت جلساتُ {name}']],
         ]);
 
+        // (WP-4.4 · §18) إنهاءُ كل الجلسات صار يتطلّب تصعيدَ هوية — يُختم أولاً
+        $this->actingAs($this->owner)->post('/stepup', ['answer' => 'Secret!2026x', 'next' => '/admin/security']);
         $this->actingAs($this->owner)->post('/admin/security/users/' . $target->id . '/revoke')
             ->assertRedirect();
 

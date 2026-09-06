@@ -417,8 +417,21 @@ class EnterpriseHardeningRound1Test extends TestCase
     /** OPS-05: كلُّ جدولٍ في القاعدة إمّا في النسخة الاحتياطية أو مُعلَنٌ عابراً — ولا اسمَ في القائمة لجدولٍ لا وجودَ له */
     public function test_backup_covers_every_table_or_declares_it_ephemeral(): void
     {
-        // Laravel 12 يُعيد الأسماءَ مؤهَّلةً بالمخطّط (main.tasks) — يُؤخذ الاسمُ وحده
-        $tables = collect(Schema::getTableListing())->map(fn ($t) => (string) (str_contains((string) $t, '.') ? substr((string) $t, strrpos((string) $t, '.') + 1) : $t))->all();
+        // Laravel 12 يُعيد الأسماءَ مؤهَّلةً بالمخطّط (main.tasks) — ويُعيد على
+        // MySQL/MariaDB جداولَ **كلِّ** المخطّطات التي يراها الاتصال لا قاعدتَنا
+        // وحدَها، فيتسرّب جدولُ قاعدةٍ مجاورةٍ على الخادم المشترك إلى «الناقص»
+        // (بوّابة الطور ٤: audit_verifications من قاعدة worktree آخر). فالنطاقُ
+        // يُقصر على مخطّطنا (main في SQLite، واسمُ قاعدة الاتصال في MySQL) ثم
+        // يُؤخذ الاسمُ وحده — والفحصُ نفسُه بحاله: كلُّ جداولنا مغطّاةٌ أو عابرة.
+        $schema = DB::connection()->getDatabaseName();
+        $tables = collect(Schema::getTableListing())
+            ->map(fn ($t) => (string) $t)
+            ->filter(fn ($t) => ! str_contains($t, '.')
+                || in_array(substr($t, 0, strrpos($t, '.')), ['main', $schema], true))
+            ->map(fn ($t) => str_contains($t, '.') ? substr($t, strrpos($t, '.') + 1) : $t)
+            ->values()->all();
+        $this->assertNotEmpty($tables, 'قصرُ النطاق أفرغ القائمة — الفحصُ كان سيمرّ فراغاً لا حراسة');
+        $this->assertContains('audits', $tables, 'جداولُ قاعدتنا نفسِها غائبةٌ عن الحصر — النطاقُ انحرف');
         $covered = HubBackup::coveredTables();
         $missing = array_values(array_diff($tables, $covered, HubBackup::EPHEMERAL));
         sort($missing);

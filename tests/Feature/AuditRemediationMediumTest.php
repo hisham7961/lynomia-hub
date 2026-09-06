@@ -98,8 +98,11 @@ class AuditRemediationMediumTest extends TestCase
     /** ترقيم سجل التدقيق والـAPI بفاصل id — لا صفوف تتكرر أو تسقط عبر الصفحات */
     public function test_paginators_carry_id_tiebreakers_in_source(): void
     {
+        // (WP-5.3) صار الفرزُ خلف رؤوس cc/th عموداً واتجاهاً متغيّرين — والفاصلُ
+        // باقٍ بعده حرفياً؛ وسلوكُه محروسٌ حيّاً في
+        // AuditInvestigationTest::test_pagination_is_stable_with_equal_timestamps
         $audit = (string) file_get_contents(app_path('Http/Controllers/Web/AuditController.php'));
-        $this->assertStringContainsString("orderByDesc('audits.created_at')->orderByDesc('audits.id')", $audit);
+        $this->assertStringContainsString("->orderBy(\$sort, \$dir)->orderBy('audits.id', \$dir)", $audit);
 
         $api = (string) file_get_contents(app_path('Http/Controllers/Api/V1Controller.php'));
         $this->assertStringContainsString("orderByDesc('created_at')->orderByDesc('id')", $api);

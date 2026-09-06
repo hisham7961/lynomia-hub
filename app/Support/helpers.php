@@ -1307,7 +1307,11 @@ if (! function_exists('hub_health')) {
                 $sec = $db->table('vault_secrets')->whereNull('deleted_at');
                 $sn = (clone $sec)->count();
                 $stale = $sn ? (clone $sec)->where('updated_at', '<', now()->subDays(180))->count() : 0;
-                $score = 100 - ($un ? ($idle / $un) * 35 : 0) - ($sn ? ($stale / $sn) * 45 : 0);
+                // (الطور ٤ · §2.2 توحيدُ الدرجة) المصدرُ الواحد هو لقطةُ الوضعية اليومية
+                // (SecurityPosture::summary عبر hub:security-snapshot)؛ والمعادلةُ المحلية
+                // القديمة تبقى احتياطاً صادقاً قبل أول لقطة — لا درجتين متضاربتين بعدها.
+                $snap = hub_metric_latest('security', 'org', 'score');
+                $score = $snap !== null ? $snap : (100 - ($un ? ($idle / $un) * 35 : 0) - ($sn ? ($stale / $sn) * 45 : 0));
                 $out['الأمن'] = ['score' => $clamp($score), 'note' => "{$idle}/{$un} مستخدم خامل · {$stale}/{$sn} سر لم يُغيَّر منذ ٦ أشهر"];
             } catch (\Throwable $e) {}
 
@@ -2409,9 +2413,17 @@ if (! function_exists('hub_timeline')) {
         // ١) التدقيق — من فعل ماذا
         foreach (\Illuminate\Support\Facades\DB::table('audits')
                     ->where('module', $module)->where('record_id', $recordId)
-                    ->orderByDesc('created_at')->limit($limit)
-                    ->get(['action', 'reason', 'user_id', 'created_at']) as $a) {
-            $add($a->created_at, $icons[$a->action] ?? '📌', (string) $a->action,
+                    ->orderByDesc('created_at')->orderByDesc('id')->limit($limit)
+                    ->get(['action', 'after', 'reason', 'user_id', 'created_at']) as $a) {
+            // (WP-5.2) الاستعادةُ تُشتقّ من الفرق: restore() يكتب «تعديل»
+            // بـdeleted_at:null ولا أحدَ يكتب فعل «استعادة» — كان الرمز ♻️
+            // معرَّفاً لفعلٍ لا يقع، فيقرأ المستخدم «تعديل» عن سجلٍّ عاد من الحذف
+            $act = (string) $a->action;
+            if ($act === 'تعديل') {
+                $af = json_decode((string) $a->after, true) ?: [];
+                if (array_key_exists('deleted_at', $af) && $af['deleted_at'] === null) $act = 'استعادة';
+            }
+            $add($a->created_at, $icons[$act] ?? '📌', $act,
                 (string) ($a->reason ?: ''), null, $name($a->user_id));
         }
 
@@ -2520,7 +2532,11 @@ if (! function_exists('hub_audit')) {
             'user_id'   => auth()->id(),
             // الشركة النشطة من الشريط العلوي، إن كانت ضمن المسموح لهذا المستخدم
             'company_id' => $companyId,
-            'action'    => $action,
+            // الفعلُ بعرض عموده (WP-5.2): SQLite تخزّن الفائضَ صامتةً وMySQL ترمي
+            // فيسقط القيدُ كلُّه — القصُّ عند الكاتب قبل الختم (فالبصمةُ تُحسب على
+            // المخزون فتبقى مطابقة)، والتصنيفُ (hub_audit_norm أدناه) يقرأ الصيغةَ
+            // كاملةً قبل القصّ فلا تضيع فئتُها
+            'action'    => hub_fit($action, hub_col_max('audits', 'action') ?? 120),
             'module'    => $module,
             'record_id' => $recordId,
             // بعرض العمود نفسِه (كالسمة) لا ٦٠ حرفاً: قائمةُ مفاتيح الإعدادات كانت تُقصّ بعد مفتاحين
@@ -2530,7 +2546,8 @@ if (! function_exists('hub_audit')) {
             'ip'        => request()->ip(),
             'request_id' => \App\Support\Api::requestId(),
             'created_at' => now(),
-        ]);
+            // (WP-5.2) أعمدةُ التطبيع — خارج البصمة؛ و$extra يغلبها لمن صرّح بفئته
+        ] + hub_audit_norm($action, $module, $extra['before'] ?? null, $extra['after'] ?? null, $name));
     }
 }
 
@@ -5415,6 +5432,99 @@ if (! function_exists('hub_compare')) {
             'delta' => $prev === null ? null : $cur - $prev,
             'pct' => $ok ? (int) round(($cur - $prev) * 100 / abs($prev)) : null,
             'n_ok' => $ok,
+        ];
+    }
+}
+
+// ── Control Plane: Phase 5 ──
+
+if (! function_exists('hub_audit_class')) {
+    /**
+     * (WP-5.2) تصنيفُ قيد تدقيقٍ واحد: `['category' => ..., 'severity' => ...]`.
+     *
+     * مُصنِّفُ الكتابة و**مُترجِمُ القراءة** معاً — الدالةُ نفسُها تملأ الأعمدةَ
+     * للقيود الجديدة وتُصنِّف الصفوفَ القديمة (category=null) وقتَ العرض، فلا
+     * يفترق التصنيفان أبداً ولا يُملأ الجدولُ المختوم رجعياً (TECH_DEBT AUD-07).
+     *
+     * الأسبقية: ١) الفعلُ الأمنيّ يحمل كودَه القانونيَّ فئةً وشدّتَه من تصنيفه
+     * (`SecurityEvents::CODES` — أطولُ كودٍ ٢٣ حرفاً يسعه العمود ٢٤).
+     * ٢) الاستعادةُ تُشتقّ من الفرق لا من فعلٍ جديد: `$m->restore()` يكتب
+     * «تعديل» بـ`deleted_at:null` فلا فعلَ «استعادة» يكتبه أحد. ٣) الفعلُ
+     * الأخطر يغلب المجموعة (حذفٌ في وحدةٍ مالية DELETE لا FINANCE).
+     * ٤) مجموعةُ الوحدة من `config/hub_nav.php` (سجلُّ المجموعات الواحد).
+     */
+    function hub_audit_class(string $action, ?string $module = null, $before = null, $after = null, ?string $name = null): array
+    {
+        // ١) الأفعال الأمنية — الكودُ القانونيّ هو الفئة والشدّةُ من تصنيفه
+        if ($code = \App\Support\SecurityEvents::codeFor($action, $module, $after, $name)) {
+            return ['category' => $code, 'severity' => \App\Support\SecurityEvents::CODES[$code][1] ?? 'info'];
+        }
+
+        // ٢) الاستعادة من الفرق: «تعديل» أعاد deleted_at إلى null = استعادةُ محذوف
+        $a = is_array($after) ? $after : (json_decode((string) $after, true) ?: []);
+        if ($action === 'تعديل' && array_key_exists('deleted_at', $a) && $a['deleted_at'] === null) {
+            return ['category' => 'RESTORE', 'severity' => 'notice'];
+        }
+
+        // ٣) الفعل يقود — الأخطرُ قبل مجموعة الوحدة
+        if ($action === 'حذف' || str_starts_with($action, 'حذف ')) return ['category' => 'DELETE', 'severity' => 'notice'];
+        if (mb_strpos($action, 'استيراد') !== false) return ['category' => 'IMPORT', 'severity' => 'notice'];
+        if (mb_strpos($action, 'تصدير') !== false || mb_strpos($action, 'طباعة') !== false) return ['category' => 'EXPORT', 'severity' => 'notice'];
+        if (mb_strpos($action, 'عرض حساس') !== false || mb_strpos($action, 'كشف') !== false) return ['category' => 'SECRET_ACCESS', 'severity' => 'high'];
+        if (mb_strpos($action, 'إعدادات') !== false) return ['category' => 'SETTINGS', 'severity' => 'notice'];
+
+        // ٤) مجموعةُ الوحدة — المالية من سجل المجموعات لا من قائمةٍ منسوخة
+        if ($module !== null && $module !== '') {
+            static $finance = null;
+            if ($finance === null) {
+                $finance = [];
+                foreach (config('hub_nav', []) as $g) {
+                    if (in_array('fin', (array) ($g['items'] ?? []), true)) { $finance = (array) $g['items']; break; }
+                }
+            }
+            if (in_array($module, $finance, true)) return ['category' => 'FINANCE', 'severity' => 'info'];
+            if ($module === 'apis') return ['category' => 'API', 'severity' => 'notice'];
+            if (in_array($module, ['autos', 'integrations', 'webhooks', 'odoo'], true)) return ['category' => 'INTEGRATION', 'severity' => 'notice'];
+            if (in_array($module, ['users', 'roles', 'settings', 'backups'], true)) return ['category' => 'ADMINISTRATION', 'severity' => 'notice'];
+
+            return ['category' => 'DATA_CHANGE', 'severity' => 'info'];
+        }
+
+        // ٥) بلا وحدة: قيودٌ نظامية (صيانة/طرفية/جدولة) — إدارةٌ لا بيانات
+        return ['category' => 'ADMINISTRATION', 'severity' => 'notice'];
+    }
+}
+
+if (! function_exists('hub_audit_norm')) {
+    /**
+     * (WP-5.2) الأعمدةُ المطبَّعة لقيدٍ يُكتب **الآن** — كلُّها خارج البصمة
+     * (`AuditEntry::SEALED`) فلا تمسّ الختم، وكلُّها مقصوصةٌ بالمحارف لعرض
+     * عمودها (SQLite تبتر صامتةً وMySQL ترمي — فالقصُّ عند الكاتب لا القارئ).
+     * يستهلكها الكاتبان الوحيدان: `Auditable::writeAudit` و`hub_audit`.
+     */
+    function hub_audit_norm(string $action, ?string $module = null, $before = null, $after = null, ?string $name = null): array
+    {
+        $c = hub_audit_class($action, $module, $before, $after, $name);
+
+        // مصدرُ الطلب للوسم لا للتخويل (الطور ١): web|api|console|hook
+        $src = \App\Support\Api::requestSource();
+
+        // المآل من صيغة الفعل نفسِها — الفاشلُ يُكتب فعلاً فاشلاً لا ناجحاً بملحق
+        $outcome = 'success';
+        if (preg_match('/فاشل|فشل|أخفق/u', $action)) $outcome = 'failed';
+        elseif (preg_match('/مرفوض|رفض /u', $action)) $outcome = 'denied';
+
+        // جلسةُ الكاتب: صفُّ sessions_log الموضوع عند الدخول — غيابُها (API/طرفية) قيمةٌ صادقة
+        $sid = null;
+        try { $sid = (string) session('hub.sl', '') ?: null; } catch (\Throwable $e) {}
+
+        return [
+            'category'   => hub_fit($c['category'], hub_col_max('audits', 'category') ?? 24),
+            'severity'   => hub_fit($c['severity'], hub_col_max('audits', 'severity') ?? 12),
+            'source'     => hub_fit($src, hub_col_max('audits', 'source') ?? 12),
+            'outcome'    => hub_fit($outcome, hub_col_max('audits', 'outcome') ?? 12),
+            'actor_type' => auth()->check() ? 'user' : ($src === 'console' ? 'system' : 'guest'),
+            'session_id' => $sid,
         ];
     }
 }

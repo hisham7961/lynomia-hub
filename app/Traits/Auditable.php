@@ -103,6 +103,8 @@ trait Auditable
             // ربطُ الأثر بطلبه (v2.399): به يُجمَع ما كتبه طلبٌ واحد عبر التدقيق والصندوق الصادر والويبهوك
             'request_id' => \App\Support\Api::requestId(),
             'created_at' => now(),
-        ]);
+            // (WP-5.2) أعمدةُ التطبيع (فئة/شدّة/مصدر/مآل/فاعل/جلسة) — كلُّها خارج
+            // البصمة (SEALED) فلا تمسّ الختم، وliveColumns تجرّدها على قاعدةٍ لم تُرحَّل
+        ] + hub_audit_norm($action, static::MODULE ?? $this->getTable(), $before, $after));
     }
 }

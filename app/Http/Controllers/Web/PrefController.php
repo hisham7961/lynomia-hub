@@ -172,7 +172,13 @@ class PrefController extends Controller
             'query'   => ['nullable', 'string', 'max:2000'],
             'default' => ['nullable', 'boolean'],
         ]);
-        abort_unless(hub_mod($data['module']) && hub_can(auth()->user(), $data['module'], 'v'), 404);
+        // (WP-5.3) التحقيقاتُ المحفوظة: module='audit' وجهةٌ خاصة ليست في سجلّ
+        // الوحدات — يحرسها علمُ التدقيق نفسُه الذي يحرس الشاشة، لا hub_mod
+        if ($data['module'] === 'audit') {
+            abort_unless(hub_flag(auth()->user(), 'audit'), 403);
+        } else {
+            abort_unless(hub_mod($data['module']) && hub_can(auth()->user(), $data['module'], 'v'), 404);
+        }
 
         // تُحفظ معايير العرض فقط — لا صفحة ولا معرف عرض سابق
         parse_str((string) ($data['query'] ?? ''), $qs);
@@ -195,6 +201,12 @@ class PrefController extends Controller
             'name' => $data['name'], 'query' => $query ?: null,
             'is_default' => $r->boolean('default'),
         ]);
+
+        // (WP-5.3) إنشاءُ تحقيقٍ محفوظٍ أثرٌ يُدقَّق — من حفظ أيَّ سؤالٍ عن السجل
+        // سؤالٌ مشروع للمدقّق نفسِه. عروضُ الوحدات العادية تفضيلٌ شخصيّ لا يُدقَّق.
+        if ($data['module'] === 'audit') {
+            hub_audit('حفظ تحقيق تدقيق', null, $v->id, $v->name);
+        }
 
         return redirect($v->url())->with('ok', 'حُفظ العرض «' . $v->name . '»');
     }

@@ -87,7 +87,17 @@ class MysqlPortabilityTest extends TestCase
         $this->seedCore();
         foreach ([['idempotency_keys', 'idem_gc_idx'],
                   ['webhook_deliveries', 'wd_due_idx'],
-                  ['inbox_documents', 'inbox_list_idx']] as [$table, $index]) {
+                  ['inbox_documents', 'inbox_list_idx'],
+                  // (WP-2.2) دلاءُ RED: الفريدُ تقوم عليه الكتابةُ الذرّية
+                  // (UPDATE ثم insertOrIgnore) وتقودُ مقدّمتُه تقليمَ bucket_at،
+                  // والثنائيُّ يخدم رسمَ مسارٍ واحدٍ عبر الزمن — dropIndex لاحقٌ
+                  // كان سيمرّ صامتاً بلا هذين السطرين.
+                  ['http_metric_buckets', 'hmb_bucket_unique'],
+                  ['http_metric_buckets', 'hmb_route_at_idx'],
+                  // (WP-4.1 · critic #39) نتائجُ الأمن: الفريدُ (code, entity_type, entity_id)
+                  // هو ما يمنع تكرارَ النتيجة الواحدة كلَّ تشغيلٍ لـreconcile — بقيمتَي
+                  // الكيان الحارستين ('org','') لا NULL، فـNULL متمايزٌ في الفريد على المحرّكين.
+                  ['security_findings', 'sf_code_entity_unique']] as [$table, $index]) {
             $found = collect(Schema::getIndexes($table))->pluck('name');
             $this->assertTrue($found->contains($index), "الفهرس {$index} مفقود على {$table}");
         }

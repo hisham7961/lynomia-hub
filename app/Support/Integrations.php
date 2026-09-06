@@ -54,8 +54,10 @@ class Integrations
     /**
      * أثرُ آخر نداءٍ لتكاملٍ لا يترك صفوفاً (أودو): يُكتب في الإعدادات مرّةً كلَّ
      * خمس دقائق للنجاح، وفوراً للفشل — فيصير للتكامل «آخرُ نجاح/آخرُ فشل/السبب».
+     * (WP-2.6) ومعها **مدّةُ النداء** `integration.<key>.last_ms` حين يقيسها
+     * المُنادي — بنفس انضباط الخنق: تُكتب حيث يُكتب الأثر لا مع كل نداء.
      */
-    public static function pulse(string $key, bool $ok, ?string $error = null): void
+    public static function pulse(string $key, bool $ok, ?string $error = null, ?int $ms = null): void
     {
         try {
             $now = now()->toIso8601String();
@@ -69,10 +71,59 @@ class Integrations
                 \App\Models\Setting::updateOrCreate(['key' => 'integration.' . $key . '.last_error'],
                     ['value' => mb_substr(Redactor::text((string) $error), 0, 180)]);
             }
+            if ($ms !== null) {
+                \App\Models\Setting::updateOrCreate(['key' => 'integration.' . $key . '.last_ms'],
+                    ['value' => (string) max(0, $ms)]);
+            }
             \Illuminate\Support\Facades\Cache::forget('settings:all');
         } catch (\Throwable $e) {
             // الأثرُ إثراءٌ لا شرط
         }
+    }
+
+    /** (WP-2.6) آخرُ مدّةِ نداءٍ ملتقطةٍ لتكامل — null حين لا قياس (لا صفرٌ مُختلَق) */
+    public static function lastMs(string $key): ?int
+    {
+        try {
+            $v = (string) setting('integration.' . $key . '.last_ms', '');
+
+            return $v === '' ? null : (int) $v;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * (WP-2.6) مقنِّعُ وجهة الرسائل الصادرة — للعرض التشخيصيّ وحده: بريدٌ يصير
+     * `س…@م….com` ومعرّفُ محادثةٍ/هاتفٍ يصير `…555`. الوجهةُ الكاملة تسريبُ
+     * بياناتِ تواصلٍ في شاشةٍ يفتحها كلُّ مالك.
+     */
+    public static function maskDestination(?string $t): string
+    {
+        $t = trim((string) $t);
+        if ($t === '') return '—';
+        if (str_contains($t, '@')) {
+            [$local, $domain] = explode('@', $t, 2);
+            $tld = ($p = strrchr($domain, '.')) !== false ? $p : '';
+
+            return mb_substr($local, 0, 1) . '…@' . mb_substr($domain, 0, 1) . '…' . $tld;
+        }
+
+        return (mb_strlen($t) > 3 ? '…' : '') . mb_substr($t, -3);
+    }
+
+    /**
+     * (WP-2.6) معاينةُ نصِّ رسالةٍ صادرةٍ للعرض التشخيصيّ: أنواعُ رموز التحقّق
+     * (`sign_otp`/`otp`) تُحجب كلياً — رمزٌ ساري المفعول معروضٌ على شاشةٍ هو
+     * تجاوزُ قناة التحقّق نفسِها — وسائرُ الأنواع تمرّ بالمُطهِّر الواحد ثم تُقصّ.
+     */
+    public static function outboxPreview(?string $kind, ?string $text, int $limit = 70): string
+    {
+        if (in_array((string) $kind, ['sign_otp', 'otp'], true)) {
+            return 'محتوى محجوب — رسالة رمز تحقّق لا يُعرض نصُّها';
+        }
+
+        return \Illuminate\Support\Str::limit(Redactor::text((string) $text), $limit);
     }
 
     /** آخرُ نجاحٍ/فشلٍ مسجَّلين لتكامل */
@@ -89,8 +140,11 @@ class Integrations
         }
     }
 
-    /** حكمُ الصحّة من آخر نجاحٍ وآخر فشل: الفشلُ الأحدث = FAILED، فشلٌ خلال يومٍ بعده نجاح = DEGRADED */
-    protected static function judge(?string $ok, ?string $fail): string
+    /**
+     * حكمُ الصحّة من آخر نجاحٍ وآخر فشل: الفشلُ الأحدث = FAILED، فشلٌ خلال يومٍ بعده نجاح = DEGRADED.
+     * عامّةٌ منذ WP-2.6: بطاقةُ البريد في مركز التشغيل تحكم بها من طوابع outbox — قاعدةٌ واحدة لا نسخة.
+     */
+    public static function judge(?string $ok, ?string $fail): string
     {
         if (! $ok && ! $fail) return self::UNKNOWN;
         if ($fail && (! $ok || \Illuminate\Support\Carbon::parse($fail)->gte(\Illuminate\Support\Carbon::parse($ok)))) return self::FAILED;

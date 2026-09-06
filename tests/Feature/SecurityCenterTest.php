@@ -52,6 +52,8 @@ class SecurityCenterTest extends TestCase
             'user_id' => $this->employee->id, 'ip' => '10.0.0.9',
             'started_at' => now(), 'last_seen_at' => now()]);
 
+        // (WP-4.4 · §18) إنهاءُ كل الجلسات صار يتطلّب تصعيدَ هوية — يُختم أولاً
+        $this->actingAs($this->owner)->post('/stepup', ['answer' => 'Secret!2026x', 'next' => '/admin/security']);
         $this->actingAs($this->owner)->post("/admin/security/users/{$this->employee->id}/revoke")->assertRedirect();
 
         $this->assertNotSame('tok-before-revoke', User::find($this->employee->id)->remember_token,
@@ -220,8 +222,10 @@ class SecurityCenterTest extends TestCase
         $mine = \App\Models\Company::create(['name_ar' => 'شركتي', 'status' => 'نشطة']);
         $other = \App\Models\Company::create(['name_ar' => 'شركة أخرى', 'status' => 'نشطة']);
 
+        // clients:v صريحةٌ منذ WP-5.1: مرشِّحُ الوحدات المرئية يسبق عزلَ الشركات،
+        // وبلا صلاحية الوحدة يُحجَب القيدان معاً فلا يُختبَر العزل أصلاً
         $role = \App\Models\Role::create(['name' => 'محاسبة شركة', 'scope' => 'all',
-            'flags' => ['audit' => 1], 'matrix' => []]);
+            'flags' => ['audit' => 1], 'matrix' => ['clients' => ['v' => 1]]]);
         $u = User::create(['name' => 'معزولة', 'email' => 'iso@test.local', 'password' => 'Secret!2026x',
             'role_id' => $role->id, 'status' => 'نشط', 'password_changed_at' => now(),
             'companies' => [$mine->id]]);

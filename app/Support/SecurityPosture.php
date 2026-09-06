@@ -31,23 +31,50 @@ class SecurityPosture
      * أسوأ ما يمكن أن تكون. الساقط يظهر بطاقةَ تحذيرٍ تحيل إلى مركز الأخطاء،
      * والخمسة عشر الباقية تعمل.
      */
-    public static function checks(): array
+    /**
+     * قوائمُ محسوبةٌ مسبقاً لنداء checks() الجاري وحدَه (بوّابة الطور ٤ — ميزانيّة):
+     * لوحةُ الأمان تحسب `vault_stale_ids`/`api_stale_parts` لجداولها المصغّرة ثم
+     * تمرّرها كي لا يُعيد الفحصان الاستعلامَ نفسَه في الطلب الواحد. تُضبط في أول
+     * checks() وتُصفَّر في `finally` — فلا حالةَ تعبر نداءً آخر (ولا اختباراً آخر).
+     */
+    protected static array $pre = [];
+
+    public static function checks(?array $pre = null): array
     {
+        self::$pre = $pre ?? [];
         $out = [];
-        foreach (self::ORDER as $check) {
-            try {
-                $row = self::$check();
-                if ($row) $out[] = $row;
-            } catch (\Throwable $e) {
-                \App\Support\ErrorLog::capture('php',
-                    "security-posture: سقط فحص {$check} — " . $e->getMessage(), $e->getFile(), $e->getLine());
-                $out[] = self::row($check, 'فحصٌ تعذّر تنفيذه: ' . $check, 'wn',
-                    'لم يُنفَّذ هذا الفحص على هذا التنصيب، فحالتُه مجهولة لا سليمة.', 0,
-                    'التفصيل مسجَّلٌ في مركز الأخطاء باسم security-posture.', route('errors.index'));
+        try {
+            foreach (self::ORDER as $check) {
+                try {
+                    $row = self::$check();
+                    if ($row) $out[] = $row;
+                } catch (\Throwable $e) {
+                    \App\Support\ErrorLog::capture('php',
+                        "security-posture: سقط فحص {$check} — " . $e->getMessage(), $e->getFile(), $e->getLine());
+                    $out[] = self::row($check, 'فحصٌ تعذّر تنفيذه: ' . $check, 'wn',
+                        'لم يُنفَّذ هذا الفحص على هذا التنصيب، فحالتُه مجهولة لا سليمة.', 0,
+                        'التفصيل مسجَّلٌ في مركز الأخطاء باسم security-posture.', route('errors.index'));
+                }
             }
+        } finally {
+            self::$pre = [];
         }
 
         return $out;
+    }
+
+    /**
+     * (WP-4.1) عتباتُ الخمول الثلاث بالأيام (٣٠/٦٠/٩٠) — من الإعدادات لا ثوابتَ
+     * منسوخة: كانت الأرقامُ مكرّرةً حرفياً بين القرّاء فيُعدَّل أحدُها ويُنسى أخوه.
+     * الفحصُ هنا يقرأ الوسطى (٦٠)، وتستهلك WP-4.3 الدنيا والعليا لتدرّج الهوية.
+     */
+    public static function idleTiers(): array
+    {
+        return [
+            max(1, (int) setting('security.idle_days_1', 30)),
+            max(1, (int) setting('security.idle_days_2', 60)),
+            max(1, (int) setting('security.idle_days_3', 90)),
+        ];
     }
 
     /** ملخّصٌ للشريط العلوي: كم مكسور وكم تحذير */
@@ -118,19 +145,25 @@ class SecurityPosture
             route('settings.edit'));
     }
 
+    /**
+     * (WP-4.1 · critic #25) معرّفاتُ المميّزين بلا تحقّقٍ بخطوتين — **المصدرُ الواحد**:
+     * الفحصُ أدناه يَعُدّها بـcount() فلا يتفرّع المنطق، وتستهلكها WP-4.3/4.5 كياناتٍ.
+     */
+    public static function privilegedNoMfaIds(): array
+    {
+        // تعريفُ «المميَّز» الواحد (WP-4.5): مصدرُه ApiTokens::privilegedRoleIds —
+        // مركزُ الرموز يقرؤه أيضاً لعمود الامتياز، فلا تعريفين للراية الخطرة
+        $risky = ApiTokens::privilegedRoleIds();
+
+        return $risky ? DB::table('users')->whereNull('deleted_at')->where('status', '!=', 'موقوف')
+            ->whereIn('role_id', $risky)->where('totp_enabled', 0)
+            ->orderBy('id')->pluck('id')->all() : [];
+    }
+
     /** رايات الصلاحيات الخطرة: من يديرها بلا تحقّقٍ بخطوتين ثغرةٌ بحسابٍ واحد */
     protected static function twofaPrivileged(): array
     {
-        $roles = DB::table('roles')->get(['id', 'is_owner', 'flags']);
-        $risky = $roles->filter(function ($r) {
-            if ($r->is_owner) return true;
-            $f = json_decode($r->flags ?? '[]', true) ?: [];
-
-            return (bool) array_intersect(array_keys(array_filter($f)), ['users', 'secrets', 'exp', 'audit']);
-        })->pluck('id')->all();
-
-        $n = $risky ? DB::table('users')->whereNull('deleted_at')->where('status', '!=', 'موقوف')
-            ->whereIn('role_id', $risky)->where('totp_enabled', 0)->count() : 0;
+        $n = count(self::privilegedNoMfaIds());
 
         return self::row('twofa_priv', 'التحقق بخطوتين لأصحاب الصلاحيات الخطرة', $n ? 'bad' : 'ok',
             'من يملك إدارة المستخدمين أو الأسرار أو التصدير أو التدقيق — وكل مالك — يفتح النظام كله بحسابٍ واحد. كلمةُ مرورٍ وحدها لا تكفي هنا.',
@@ -174,9 +207,11 @@ class SecurityPosture
 
     protected static function idleUsers(): array
     {
+        // العتبةُ الوسطى (افتراضياً ٦٠) من الإعدادات — لا ثابتاً مكرّراً (WP-4.1)
+        [, $idleDays] = self::idleTiers();
         $n = DB::table('users')->whereNull('deleted_at')->where('status', '!=', 'موقوف')
             ->where(fn ($w) => $w->whereNull('last_login_at')
-                ->orWhere('last_login_at', '<', now()->subDays(60)))->count();
+                ->orWhere('last_login_at', '<', now()->subDays($idleDays)))->count();
 
         return self::row('idle', 'حسابات نشطة بلا دخولٍ ٦٠ يوماً', $n ? ($n > 2 ? 'bad' : 'wn') : 'ok',
             'حسابٌ لا يستعمله صاحبه يبقى صلاحيةً حيّةً بلا رقيب — وأول ما يُجرَّب في أي تسريبٍ لكلمات المرور.',
@@ -194,24 +229,75 @@ class SecurityPosture
             route('security.index'));
     }
 
+    /**
+     * (WP-4.1 · critic #25) معرّفاتُ الأسرار البائتة — المصدرُ الواحد: الفحصُ يعدّها
+     * والذيولُ اللاحقة (WP-4.3) تستهلكها كياناتٍ. العتبةُ من الإعدادات (افتراضياً ١٨٠).
+     */
+    public static function vaultStaleIds(): array
+    {
+        if (! Schema::hasTable('vault_secrets')) return [];
+        $staleDays = max(1, (int) setting('security.secret_stale_days', 180));
+        $cut = now()->subDays($staleDays);
+        $q = DB::table('vault_secrets')->whereNull('deleted_at');
+
+        // (WP-4.5) العمرُ من آخر **تدويرٍ فعليّ** لا من updated_at: تعديلُ ملاحظةٍ كان
+        // «يجدّد» السرَّ زوراً فيسقط من الفحص وهو بائت. من لم يُدوَّر قطُّ (rotated_at
+        // فارغ) عمرُه من إنشائه — بلا اختلاقِ تاريخٍ رجعيّ. الحارسُ للنشر قبل الهجرة.
+        if (hub_has_col('vault_secrets', 'rotated_at')) {
+            $q->whereRaw('COALESCE(rotated_at, created_at) < ?', [$cut->toDateTimeString()]);
+        } else {
+            $q->where('updated_at', '<', $cut);
+        }
+
+        return $q->orderBy('id')->pluck('id')->all();
+    }
+
     protected static function vaultRotation(): array
     {
         if (! Schema::hasTable('vault_secrets')) return [];
-        $n = DB::table('vault_secrets')->whereNull('deleted_at')
-            ->where('updated_at', '<', now()->subDays(180))->count();
+        // القائمةُ الممرَّرة من اللوحة إن وُجدت — وإلا فالمصدرُ الواحد نفسُه
+        $n = count(array_key_exists('vault_stale_ids', self::$pre)
+            ? (array) self::$pre['vault_stale_ids'] : self::vaultStaleIds());
 
         return self::row('vault_stale', 'أسرار لم تُدوَّر منذ ٦ أشهر', $n ? ($n > 5 ? 'bad' : 'wn') : 'ok',
             'كل سرٍّ يمرّ عليه ستة أشهر رآه كل من دخل الخزنة في تلك المدة، ومن غادر الفريق فيها.',
             $n, $n ? "{$n} سرّاً — دوّرها في مصدرها ثم حدّثها في الخزنة." : '', route('m.index', 'vault'));
     }
 
+    /**
+     * (WP-4.1 · critic #25) رموزُ API الخطرة بقسمَيها — المصدرُ الواحد للاستعلام:
+     * `idle` لم تُستعمل منذ عتبة `security.token_unused_days` (افتراضياً ٩٠)،
+     * و`noexp` بلا تاريخ انتهاء — كلاهما بين غير المنتهية. الفحصُ أدناه يعدّهما،
+     * وتستهلكهما WP-4.5 كياناتٍ فلا يتفرّع المنطق.
+     */
+    protected static function apiStaleParts(): array
+    {
+        // (WP-4.5) تفويضٌ للتصنيف الواحد: العتبةُ والاستعلامُ في ApiTokens::staleParts
+        // وحدَها — مركزُ الرموز وذيلُ النتائج يقرآن المصدرَ نفسَه فلا عتبتين.
+        // والقائمةُ الممرَّرة من اللوحة إن وُجدت تُغني عن إعادة الاستعلام في الطلب نفسه
+        if (array_key_exists('api_stale_parts', self::$pre)) {
+            $p = (array) self::$pre['api_stale_parts'];
+
+            return ['idle' => (array) ($p['idle'] ?? []), 'noexp' => (array) ($p['noexp'] ?? [])];
+        }
+
+        return ApiTokens::staleParts();
+    }
+
+    /** معرّفاتُ الرموز الخطرة موحَّدةً (خاملة أو بلا انتهاء) — كيانُ نتيجةٍ لكل رمز */
+    public static function apiStaleIds(): array
+    {
+        $p = self::apiStaleParts();
+
+        return array_values(array_unique(array_merge($p['idle'], $p['noexp'])));
+    }
+
     protected static function apiStale(): array
     {
         if (! Schema::hasTable('api_tokens')) return [];
-        $q = DB::table('api_tokens')
-            ->where(fn ($w) => $w->whereNull('expires_at')->orWhere('expires_at', '>', now()));
-        $n = (clone $q)->where(fn ($w) => $w->whereNull('last_used_at')->orWhere('last_used_at', '<', now()->subDays(90)))->count();
-        $noExp = (clone $q)->whereNull('expires_at')->count();
+        $p = self::apiStaleParts();
+        $n = count($p['idle']);
+        $noExp = count($p['noexp']);
 
         return self::row('api_stale', 'مفاتيح API خاملة أو بلا انتهاء', ($n || $noExp) ? ($n > 2 ? 'bad' : 'wn') : 'ok',
             'مفتاحٌ لم يُستعمل تسعين يوماً غالباً منسيّ في سكربتٍ أو جهازٍ قديم، ومفتاحٌ بلا انتهاء يبقى صالحاً للأبد.',
@@ -297,13 +383,20 @@ class SecurityPosture
         return self::row('debug_mode', 'وضعُ التصحيح والبيئة', $tone, $why, $tone === 'ok' ? 0 : 1, $fix, route('ops.index'));
     }
 
-    /** آخرُ نسخةٍ احتياطية ناجحة: أقدمُ من يومين = لا تعافٍ (CFG-02/12) */
+    /**
+     * آخرُ نسخةٍ احتياطية ناجحة: لا تعافٍ بدونها (CFG-02/12).
+     * (WP-2.1) العتبتان **هما نافذتا Health::JOBS['backup']** نفساهما (٢٦/٥٠ ساعة بمعامل
+     * التأخّر) — كان الفحصان يختلفان (٣٠/٧٢ هنا) فيقول مركزُ الأمان «سليم» ومركزُ
+     * التشغيل «متأخّرة» عن النبضة الواحدة.
+     */
     protected static function backupFresh(): array
     {
         $at = setting('heartbeat.backup');
-        $age = $at ? (int) \Illuminate\Support\Carbon::parse($at)->diffInHours(now()) : null;
-        $tone = $age === null ? 'wn' : ($age > 72 ? 'bad' : ($age > 30 ? 'wn' : 'ok'));
-        $fix = $age === null ? 'لم تُؤخذ نسخةٌ قطّ — فعّل سطر cron أو اضغط «نسخة الآن» في مركز التشغيل.'
+        $ageMin = $at ? (int) \Illuminate\Support\Carbon::parse($at)->diffInMinutes(now()) : null;
+        $age = $ageMin === null ? null : intdiv($ageMin, 60);
+        [$late, $dead] = Health::jobWindows('backup');
+        $tone = $ageMin === null ? 'wn' : ($ageMin > $dead ? 'bad' : ($ageMin > $late ? 'wn' : 'ok'));
+        $fix = $ageMin === null ? 'لم تُؤخذ نسخةٌ قطّ — فعّل سطر cron أو اضغط «نسخة الآن» في مركز التشغيل.'
             : ($tone === 'ok' ? '' : "آخر نسخة منذ {$age} ساعة — راجع نبضة hub:backup في مركز التشغيل.");
 
         return self::row('backup_fresh', 'حداثةُ النسخة الاحتياطية', $tone,

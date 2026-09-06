@@ -25,7 +25,9 @@ class MySecurityController extends Controller
             ->orderByDesc('last_seen_at')->limit(40)
             ->get(['id', 'device', 'device_id', 'ip', 'started_at', 'last_seen_at', 'revoked'])
             ->map(function ($s) use ($mine) {
-                $s->live = ! $s->revoked && $s->last_seen_at && now()->diffInMinutes($s->last_seen_at) < 30;
+                // (WP-4.4) عتبةُ الحياة من الثابت الواحد Sessions::LIVE_MIN — لا نسخةً رابعة
+                $s->live = ! $s->revoked && $s->last_seen_at
+                    && now()->diffInMinutes($s->last_seen_at) < \App\Support\Sessions::LIVE_MIN;
                 $s->mine = $s->id === $mine;
 
                 return $s;
@@ -47,26 +49,25 @@ class MySecurityController extends Controller
         return view('security.mine', compact('sessions', 'devices', 'risk', 'passkeys'));
     }
 
+    /** (WP-4.4) عبر سكّة `Sessions` الواحدة — ختمُ الأثر (revoked_at/by/reason) والتدوير معاً */
     public function revokeSession(string $id)
     {
         $u = auth()->user();
         $s = DB::table('sessions_log')->where('id', $id)->where('user_id', $u->id)->first(['id', 'ip']);
         abort_unless($s, 404);
 
-        DB::table('sessions_log')->where('id', $id)->update(['revoked' => true]);
-        $u->forceFill(['remember_token' => Str::random(60)])->saveQuietly();
+        \App\Support\Sessions::revokeOne($u, $id, 'إنهاء ذاتي لجلسة');
         hub_audit('إنهاء جلستي', null, null, ($s->ip ?: 'بلا عنوان'));
 
         return back()->with('ok', '🔌 أُنهيت الجلسة — يخرج جهازُها عند أول طلب');
     }
 
+    /** (WP-4.4) «إنهاءُ الباقي» عبر السكّة الواحدة — جلستي الحالية تبقى ويموت سواها */
     public function revokeOthers()
     {
         $u = auth()->user();
         $mine = (string) session('hub.sl', '');
-        $n = DB::table('sessions_log')->where('user_id', $u->id)
-            ->where('id', '!=', $mine)->where('revoked', false)->update(['revoked' => true]);
-        $u->forceFill(['remember_token' => Str::random(60)])->saveQuietly();
+        $n = \App\Support\Sessions::revokeAll($u, $mine !== '' ? $mine : null, 'إنهاء بقية أجهزتي');
         hub_audit('إنهاء جلساتي الأخرى', null, null, "{$n} جلسة");
 
         return back()->with('ok', "🔌 أُنهيت {$n} جلسة على أجهزتك الأخرى — جلستُك الحالية باقية");
@@ -85,9 +86,10 @@ class MySecurityController extends Controller
     {
         $u = auth()->user();
         $dev = UserDevice::where('id', $id)->where('user_id', $u->id)->firstOrFail();
-        // إبطالُ الجهاز يبطل جلساتِه دفعةً — الجلساتُ الموسومةُ به تُنهى
+        // إبطالُ الجهاز يبطل جلساتِه دفعةً — بختم الأثر الموحَّد نفسِه (WP-4.4)
         DB::table('sessions_log')->where('user_id', $u->id)
-            ->where('device_id', $dev->id)->where('revoked', false)->update(['revoked' => true]);
+            ->where('device_id', $dev->id)->where('revoked', false)
+            ->update(\App\Support\Sessions::revocationStamp('إبطال جهاز'));
         $u->forceFill(['remember_token' => Str::random(60)])->saveQuietly();
         $dev->update(['trust' => 'مبطَل']);
         $dev->delete();

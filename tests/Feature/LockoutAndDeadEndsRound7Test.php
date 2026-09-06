@@ -124,7 +124,9 @@ class LockoutAndDeadEndsRound7Test extends TestCase
 
         $this->artisan('hub:automation');
 
-        $this->assertSame(1, DB::table('metric_points')->count(),
+        // العدُّ مقصورٌ على صفوف الاختبار: منذ WP-2.3 تكتب نبضةُ hub:automation نفسِها
+        // صفَّ تاريخِ تشغيلٍ ('ops','automation','run') في الجدول — مقصودٌ لا تسريب.
+        $this->assertSame(1, DB::table('metric_points')->where('module', 'websites')->count(),
             'جدولُ نقاط المقاييس ينمو بلا سقفٍ من فحص التوافر كل خمس دقائق، '
             . 'بينما تُقلَّم أربعةُ جداولٍ شقيقة — والنظامُ يُرفع على استضافةٍ '
             . 'مشتركة بقرصٍ محدود');

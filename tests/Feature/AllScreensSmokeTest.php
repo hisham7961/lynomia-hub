@@ -135,10 +135,27 @@ class AllScreensSmokeTest extends TestCase
             if (str_starts_with($r->uri(), 'api/') || str_starts_with($r->uri(), '_')) continue;
 
             $uri = $r->uri();
+            // (WP-5.4) صفحةُ تفصيل قيد التدقيق: معرّفُها رقميّ تسلسليّ لا uuid —
+            // الاستبدالُ العامّ أدناه كان يُطعمها uuid فتخرج من المسح بجوابٍ
+            // فارغ 404 (critic #33: الشاشةُ الجديدة تدخل الشبكةَ بمعرّفٍ حقيقيّ)
+            if ($name === 'audit.show') {
+                $aid = DB::table('audits')->min('id');
+                if (! $aid) {
+                    DB::table('audits')->insert(['action' => 'تعديل', 'module' => 'tasks',
+                        'name' => 'قيدٌ يُزرع ليدخل المسح', 'created_at' => now()]);
+                    $aid = DB::table('audits')->min('id');
+                }
+                $uri = str_replace('{id}', (string) $aid, $uri);
+            }
             $module = null;
             if (str_contains($uri, '{module}')) {
                 $module = 'hr';
                 $uri = str_replace('{module}', $module, $uri);
+            }
+            // (WP-4.6 · critic #33) تفصيلُ الحدث الأمنيّ {source}/{id}: يُشبَع بقيدِ
+            // تدقيقٍ أمنيٍّ مزروع — فتنضمّ الصفحةُ للمسح بدل السقوط الصامت من الشبكة
+            if (str_contains($uri, '{source}')) {
+                $uri = strtr($uri, ['{source}' => 'audit', '{id}' => (string) $this->securityAuditId()]);
             }
             $uri = strtr($uri, [
                 '{id}'        => $module ? ($ids[$module] ?? 'x') : ($ids['tasks'] ?? 'x'),
@@ -151,6 +168,8 @@ class AllScreensSmokeTest extends TestCase
                 '{version}'   => '1',
                 // (WP-1.4) صفحةُ أثر الطلب — معرّفٌ لا أثرَ له يفتح حالةً فارغة لا ٥٠٠
                 '{rid}'       => 'trace-smoke-00',
+                // (WP-4.4 · critic #33) تفصيلُ عنوانٍ بلا أثرٍ يفتح حالةً فارغة لا ٥٠٠
+                '{ip}'        => '127.0.0.1',
             ]);
             if (str_contains($uri, '{')) continue;      // معاملٌ لا نعرف كيف نُشبعه
 
@@ -158,6 +177,17 @@ class AllScreensSmokeTest extends TestCase
         }
 
         return $out;
+    }
+
+    /** قيدُ تدقيقٍ أمنيٌّ واحد يُشبِع مسارَ تفصيل الحدث — يُزرع مرّةً ويُعاد معرّفُه */
+    private ?int $secAuditId = null;
+
+    private function securityAuditId(): int
+    {
+        return $this->secAuditId ??= (int) DB::table('audits')->insertGetId([
+            'action' => 'دخول فاشل', 'name' => 'smoke@t.local', 'ip' => '127.0.0.1',
+            'created_at' => now(),
+        ]);
     }
 
     /* ────────── المسح ────────── */

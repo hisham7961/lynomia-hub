@@ -17,11 +17,12 @@ class HubMetricsSnapshot extends Command
 
     public function handle(): int
     {
+        $t0 = microtime(true);   // (WP-2.3) مدّةُ اللقطة الحقيقية تُنبَض — لا نبضةَ بلا مدّة
         $out = Metrics::snapshotAll((string) $this->option('source'));
 
         if (! $out) {
             $this->info('لا حقول مقيسة فيها قيم بعد — لا نقاط.');
-            \App\Support\Health::beat('metrics', null, 'ok', 'لا نقاط');
+            \App\Support\Health::beat('metrics', (int) round((microtime(true) - $t0) * 1000), 'ok', 'لا نقاط');
 
             return self::SUCCESS;
         }
@@ -31,7 +32,7 @@ class HubMetricsSnapshot extends Command
         }
         $this->info('المجموع: ' . array_sum($out) . ' نقطة عند ' . now()->startOfDay()->toDateString());
 
-        \App\Support\Health::beat('metrics');
+        \App\Support\Health::beat('metrics', (int) round((microtime(true) - $t0) * 1000));
         return self::SUCCESS;
     }
 }

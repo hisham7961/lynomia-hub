@@ -34,6 +34,12 @@ class HubBackup extends Command
         'quote_lines', 'quote_milestones', 'dashboards', 'dashboard_widgets', 'saved_views', 'work_hours',
         'webauthn_credentials', 'user_devices', 'asset_custody', 'record_identifiers', 'identity_lookups',
         'inbox_documents', 'metric_points', 'audit_chain', 'signal_states', 'change_orders', 'screenshots',
+        // (الطور ٤ · WP-4.1) نتائجُ الأمن: حالةُ حَوكمةٍ لا تليمتري — أعمارُ المشكلات
+        // (first_seen/resolved) وإقراراتُها لا تُعاد تعبئتُها من الفحوص، فتُنسخ خاماً.
+        'security_findings',
+        // ── Control Plane: Phase 5 (WP-5.5) ── تاريخُ فحوص نزاهة سلسلة التدقيق:
+        // دليلُ نزاهةٍ لا تليمتري — فلا يُدفع إلى metric_points الذي يُقلَّم بعد ٣٦٥ يوماً
+        'audit_verifications',
     ];
 
     /** قراءةُ ملف نسخةٍ (مشفَّرٍ أو صريح) وإعادتُه مصفوفةً — أو null إن تعذّر */
@@ -78,6 +84,12 @@ class HubBackup extends Command
         'download_log', 'imports_log', 'automation_log', 'kb_reads', 'track_points', 'track_sessions', 'api_usage',
         'reactions', 'comment_reads', 'sideapp_stores', 'settings', 'roles', 'users',
         'record_locks', 'share_views',   // أقفالُ تحريرٍ تنتهي بدقائق، وسجلُّ مشاهداتِ روابط المشاركة
+        // (الطور ٢ · WP-2.2) دلاءُ قياس طلبات HTTP — تليمتريا لا سجلُّ أعمال:
+        // تُعاد تعبئتُها من الطلبات الحيّة خلال دقائق ولا تُستعاد من نسخة.
+        'http_metric_buckets',
+        // (الطور ٣ · WP-3.2) عيّناتُ وقوع الأخطاء — عابرةٌ كأخيها error_events:
+        // سقفٌ لكل حدثٍ ومقصُّ عمرٍ في hub:automation، ولا تُستعاد من نسخة.
+        'error_occurrences',
     ];
 
     /** الجداولُ التي تنسخها النسخة: وحداتُ السجل + الخام + (users/roles/settings بصيغتها) */
@@ -102,6 +114,7 @@ class HubBackup extends Command
 
     public function handle(): int
     {
+        $t0 = microtime(true);   // (WP-2.3) مدّةُ النسخة الحقيقية تُنبَض — لا نبضةَ بلا مدّة
         $out = ['_meta' => ['app' => (string) setting('app.name', config('app.name')),
                             'version' => config('hub.version'), 'at' => now()->toIso8601String()]];
 
@@ -248,7 +261,7 @@ class HubBackup extends Command
         $this->info('✓ ' . basename($file) . ' — ' . number_format($total) . ' سجل، ' .
                     number_format(filesize($file) / 1024, 1) . ' KB (محفوظ آخر ' . $keep . ' نسخة)');
 
-        \App\Support\Health::beat('backup', null, 'ok', basename($file) . ' · ' . number_format($total) . ' سجل');
+        \App\Support\Health::beat('backup', (int) round((microtime(true) - $t0) * 1000), 'ok', basename($file) . ' · ' . number_format($total) . ' سجل');
         return self::SUCCESS;
     }
 }

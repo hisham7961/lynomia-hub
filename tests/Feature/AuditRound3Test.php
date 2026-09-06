@@ -144,9 +144,16 @@ class AuditRound3Test extends TestCase
         $html = $this->actingAs($this->owner)->get('/admin/ops')->assertOk()->getContent();
         @unlink($old); @unlink($new);
 
-        // الاسم اليدوي كان يتصدر الترتيب الأبجدي فيُعرض كآخر نسخة ويوهم أن النسخ تعمل
-        $this->assertStringContainsString('hub-2026-07-30-090000.json', $html);
-        $this->assertStringNotContainsString('hub-zzz-manual.json', $html);
+        // الاسم اليدوي كان يتصدر الترتيب الأبجدي فيُعرض كآخر نسخة ويوهم أن النسخ تعمل.
+        // (WP-2.7) الشاشةُ صارت تعرض قائمةَ «أحدث الملفات» عمداً فوجودُ الاسم اليدوي في
+        // القائمة مشروع — والحارسُ الحقيقي: خانةُ «آخر نسخة» زمنيةٌ لا أبجدية، والأحدثُ
+        // يسبق اليدويَّ في العرض (الأبجديةُ التنازلية كانت ستقدّم zzz فيسقط الشرطان).
+        $this->assertStringContainsString('<b><bdi class="mono ltr">hub-2026-07-30-090000.json', $html,
+            'خانةُ آخر نسخةٍ يجب أن تحمل الأحدثَ زمنياً');
+        $this->assertStringNotContainsString('<b><bdi class="mono ltr">hub-zzz-manual.json', $html,
+            'الاسمُ اليدوي تصدّر خانةَ آخر نسخةٍ بالترتيب الأبجدي');
+        $this->assertLessThan(strpos($html, 'hub-zzz-manual.json'), strpos($html, 'hub-2026-07-30-090000.json'),
+            'الأحدثُ زمنياً يجب أن يسبق الاسمَ اليدوي في العرض');
     }
 
     public function test_new_ui_classes_are_defined_in_the_stylesheet(): void

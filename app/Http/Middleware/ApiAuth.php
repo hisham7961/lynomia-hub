@@ -28,6 +28,13 @@ class ApiAuth
             return Api::error(Api::UNAUTHENTICATED, 401, 'مفتاح غير صالح أو منتهٍ');
         }
 
+        // (WP-4.5) المُبطَل إدارياً ميتٌ فوراً — الإبطالُ الناعم (revoked_at) يُبقي
+        // الصفَّ شاهداً للمراجعة، وهذا الرفضُ هو ما يجعله إبطالاً لا وسماً للعرض
+        if ($token->revoked_at) {
+            \App\Support\SecurityRadar::record($request, 'وصول مرفوض', 'مفتاح API مُبطَل');
+            return Api::error(Api::UNAUTHENTICATED, 401, 'هذا المفتاح أُبطل — أنشئ مفتاحاً جديداً من ملفك الشخصي');
+        }
+
         if (! $token->ipAllowed($request->ip())) {
             return Api::error(Api::ACCOUNT_RESTRICTED, 403,
                 'هذا المفتاح مقيد بعناوين IP محددة وعنوانك ليس منها', ['reason' => 'token_ip_allowlist']);
@@ -62,9 +69,14 @@ class ApiAuth
         } catch (\Throwable $e) {
         }
 
-        // آخر استخدام — كتابة واحدة بالدقيقة كحد أقصى
+        // آخر استخدام + آخر عنوان (WP-4.5) — كتابة واحدة بالدقيقة كحد أقصى: العنوانُ
+        // يركب خنقَ الدقيقة القائمَ نفسَه فلا يضيف الرصدُ كتابةً لكل طلب
         if (! $token->last_used_at || $token->last_used_at->lt(now()->subMinute())) {
-            $token->forceFill(['last_used_at' => now()])->saveQuietly();
+            $fill = ['last_used_at' => now()];
+            if (hub_has_col('api_tokens', 'last_ip')) {
+                $fill['last_ip'] = mb_substr((string) $request->ip(), 0, 60);
+            }
+            $token->forceFill($fill)->saveQuietly();
         }
 
         $t0 = microtime(true);

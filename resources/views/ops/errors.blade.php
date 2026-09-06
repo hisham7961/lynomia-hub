@@ -10,17 +10,76 @@
     <a class="btn ghost sm" href="{{ route('ops.index') }}">🖥️ مركز التشغيل ←</a>
 </div>
 
-{{-- المؤشرات: «ما الوضع؟» قبل الغوص في القائمة --}}
+{{-- (WP-3.4) البطاقاتُ التنفيذية العشر — من القارئ الواحد ErrorStats. «—» تعني
+     أن المصدر (عمود/جدول) لم يُرحَّل بعد — صراحةٌ لا صفرٌ كاذب. --}}
 <div class="cards">
-    <div class="stat"><span class="ico">🆕</span><b class="{{ $kpi['new'] ? 'txt-bad' : '' }}">{{ $kpi['new'] }}</b><span>خطأ جديد لم يُراجَع</span></div>
-    <div class="stat"><span class="ico">🔧</span><b>{{ $kpi['working'] }}</b><span>قيد المعالجة</span></div>
-    <div class="stat"><span class="ico">📅</span><b>{{ $kpi['today'] }}</b><span>ظهر خلال ٢٤ ساعة</span></div>
-    <div class="stat"><span class="ico">🔁</span><b>{{ number_format($kpi['hits24']) }}</b><span>مرة تكرار (٢٤ ساعة)</span></div>
-    @foreach ($byKind as $bk)
-        <div class="stat"><span class="ico">{{ ['php' => '🐘', 'api' => '🔌', 'js' => '🌐', 'slow' => '🐌'][$bk->kind] ?? '❓' }}</span>
-            <b>{{ $bk->n }}</b><span>{{ ['php' => 'استثناء PHP', 'api' => 'خطأ API', 'js' => 'خطأ متصفح', 'slow' => 'طلب بطيء'][$bk->kind] ?? $bk->kind }} · {{ number_format($bk->hits) }} تكرار</span></div>
+    <div class="stat"><span class="ico">📌</span>
+        <b class="{{ ($stats['open'] ?? 0) ? 'txt-bad' : '' }}" data-card="open">{{ number_format($stats['open']) }}</b>
+        <span>خطأ مفتوح — منها <b data-card="new_status">{{ $stats['new_status'] }}</b> خطأ جديد لم يُراجَع</span></div>
+    <div class="stat"><span class="ico">🚨</span>
+        <b class="{{ ($stats['critical'] ?? 0) ? 'txt-bad' : '' }}" data-card="critical">{{ is_null($stats['critical']) ? '—' : number_format($stats['critical']) }}</b>
+        <span>حرج غير محلول — المتجاهَل يبقى محسوباً (دلالة الصحّة)</span></div>
+    <div class="stat"><span class="ico">🆕</span>
+        <b data-card="new24">{{ number_format($stats['new24']) }}</b>
+        <span>بصمة ظهرت أول مرة خلال ٢٤ ساعة</span></div>
+    <div class="stat"><span class="ico">🔁</span>
+        <b data-card="hits24">{{ is_null($stats['hits24']) ? '—' : number_format($stats['hits24']) }}</b>
+        <span>مرة تكرار خلال ٢٤ ساعة — من عيّنات الوقوع</span></div>
+    <div class="stat"><span class="ico">↩️</span>
+        <b class="{{ ($stats['regressions'] ?? 0) ? 'txt-bad' : '' }}" data-card="regressions">{{ is_null($stats['regressions']) ? '—' : number_format($stats['regressions']) }}</b>
+        <span>انحدار: عاد بعد أن حُسب محلولاً</span></div>
+    <div class="stat"><span class="ico">👥</span>
+        <b data-card="users24">{{ is_null($stats['users24']) ? '—' : number_format($stats['users24']) }}</b>
+        <span>مستخدماً متأثراً خلال ٢٤ ساعة — من العيّنات</span></div>
+    @foreach (['php' => ['🐘', 'استثناء PHP'], 'api' => ['🔌', 'خطأ API'], 'js' => ['🌐', 'خطأ متصفح'], 'slow' => ['🐌', 'طلب بطيء']] as $kk => $ki)
+        <div class="stat"><span class="ico">{{ $ki[0] }}</span>
+            <b data-card="kind-{{ $kk }}">{{ number_format($stats['kinds'][$kk] ?? 0) }}</b>
+            <span>{{ $ki[1] }} مفتوح</span></div>
     @endforeach
 </div>
+
+{{-- (WP-3.4) «الأخطاء عبر الزمن» من عيّنات الوقوع الحقيقية — لا من last_seen الذي
+     ينسب عدَّ البصمة كلَّه لساعةٍ واحدة فتُقرأ العاصفةُ نقطة. المدى بكبسولات TimeRange. --}}
+<div class="card">
+    <h3 class="cardtitle">📊 الأخطاء عبر الزمن <span class="sub">· {{ $range->label() }} — كل وقوعٍ في {{ $chart['unit'] === 'hour' ? 'ساعته' : 'يومه' }} الحقيقي من العيّنات</span></h3>
+    @include('partials.timerange', ['range' => $range])
+    @if (! $chart['ok'])
+        @include('partials.empty', ['text' => 'جدول عيّنات الوقوع غير متاح بعد — الرسم يبدأ بعد ترحيله', 'icon' => '📊'])
+    @elseif ($chart['total'] === 0)
+        @include('partials.empty', ['text' => 'لا وقوعات معيَّنة خلال هذا المدى — العيّنات تُلتقط من لحظة تفعيلها فصاعداً', 'icon' => '📊'])
+    @else
+        <div data-chart="errors-over-time" role="img" aria-label="وقوعات الأخطاء عبر الزمن — {{ $chart['total'] }} وقوعاً"
+             style="display:flex;align-items:flex-end;gap:2px;height:78px;padding-top:6px">
+            @foreach ($chart['buckets'] as $b)
+                <div title="{{ $b['at']->format($chart['unit'] === 'hour' ? 'Y-m-d H:00' : 'Y-m-d') }} — {{ $b['n'] }} وقوعاً"
+                     style="flex:1;min-width:2px;height:100%;display:flex;align-items:flex-end">
+                    <span style="display:block;width:100%;border-radius:3px 3px 0 0;min-height:2px;
+                                 height:{{ max(2, (int) round($b['n'] * 100 / $chart['max'])) }}%;
+                                 background:var(--bad);opacity:{{ $b['n'] ? 1 : .15 }}"></span>
+                </div>
+            @endforeach
+        </div>
+        <div class="sub" style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:4px">
+            <span><bdi class="mono ltr">{{ $range->from->format('Y-m-d H:i') }}</bdi></span>
+            <span>{{ number_format($chart['total']) }} وقوعاً معيَّناً · الدلو {{ $chart['unit'] === 'hour' ? 'ساعة' : 'يوم' }}</span>
+            <span><bdi class="mono ltr">{{ $range->to->format('Y-m-d H:i') }}</bdi></span>
+        </div>
+    @endif
+</div>
+
+{{-- دوناتا الصنف والشدّة — للمفتوح فقط (المحلول والمتجاهَل محسومان) --}}
+@if ($taxonomy && collect($donuts['category'])->sum('value') > 0)
+    <div class="grid2" style="margin-bottom:18px">
+        <div class="card" style="margin:0">
+            <h3 class="cardtitle">🧭 المفتوح حسب الصنف</h3>
+            @include('partials.chart_donut', ['slices' => $donuts['category']])
+        </div>
+        <div class="card" style="margin:0">
+            <h3 class="cardtitle">🌡️ المفتوح حسب الشدّة</h3>
+            @include('partials.chart_donut', ['slices' => $donuts['severity']])
+        </div>
+    </div>
+@endif
 
 <div class="toolbar">
     <form class="filters" method="GET">
@@ -29,7 +88,8 @@
         <label class="vh" for="fst">تصفية بالحالة</label>
         <select class="inp" id="fst" name="st" onchange="this.form.submit()">
             <option value="">كل الحالات</option>
-            @foreach (['جديد', 'قيد المعالجة', 'محلول'] as $s)<option @selected($st === $s)>{{ $s }}</option>@endforeach
+            {{-- (WP-3.3) الحالاتُ الخمس من خريطة IssueState (الطور ١) — القيمةُ هي التسمية المخزَّنة فتُطابَق الصفوفُ الموروثة كما هي --}}
+            @foreach (\App\Support\IssueState::MAP as $s)<option @selected($st === $s)>{{ $s }}</option>@endforeach
         </select>
         <label class="vh" for="fk">تصفية بالنوع</label>
         <select class="inp" id="fk" name="k" onchange="this.form.submit()">
@@ -86,7 +146,9 @@
                 <td><span class="bdg {{ $e->kind === 'slow' ? 'wn' : ($e->kind === 'js' ? 'g' : 'bad') }}">{{ ['php' => 'PHP', 'api' => 'API', 'js' => 'متصفح', 'slow' => 'بطيء'][$e->kind] ?? $e->kind }}</span></td>
                 <td><b>{{ $e->count }}</b></td>
                 <td class="sub">{{ $e->last_seen->diffForHumans() }}</td>
-                <td><span class="bdg {{ $e->status === 'محلول' ? 'ok' : ($e->status === 'جديد' ? 'bad' : 'wn') }}">{{ $e->status }}</span></td>
+                {{-- (WP-3.3) العرضُ عبر خريطة IssueState: الموروثُ العربيّ يمرّ كما هو والمفتاحُ يُترجم --}}
+                @php $stLbl = \App\Support\IssueState::label($e->status); @endphp
+                <td><span class="bdg {{ $stLbl === 'محلول' ? 'ok' : ($stLbl === 'جديد' ? 'bad' : ($stLbl === 'متجاهَل' ? 'g' : 'wn')) }}">{{ $stLbl }}</span></td>
                 <td class="acts">
                     <a class="btn ghost xs" href="{{ route('errors.show', $e->id) }}">🔍 تفاصيل</a>
                     @foreach (['قيد المعالجة', 'محلول'] as $to)
