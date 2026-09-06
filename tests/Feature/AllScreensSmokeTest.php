@@ -149,6 +149,8 @@ class AllScreensSmokeTest extends TestCase
                 '{key}'       => 'app.name',
                 '{token}'     => 'x',
                 '{version}'   => '1',
+                // (WP-1.4) صفحةُ أثر الطلب — معرّفٌ لا أثرَ له يفتح حالةً فارغة لا ٥٠٠
+                '{rid}'       => 'trace-smoke-00',
             ]);
             if (str_contains($uri, '{')) continue;      // معاملٌ لا نعرف كيف نُشبعه
 

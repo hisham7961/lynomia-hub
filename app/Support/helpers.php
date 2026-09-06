@@ -577,7 +577,7 @@ if (! function_exists('hub_security_incident')) {
                 return $open;
             }
 
-            return \App\Models\Incident::create([
+            $row = [
                 'title' => \Illuminate\Support\Str::limit($title, 190, ''),
                 'severity' => in_array($severity, ['حرج', 'عالي', 'متوسط', 'منخفض'], true) ? $severity : 'عالي',
                 'status' => 'مفتوح',
@@ -586,7 +586,13 @@ if (! function_exists('hub_security_incident')) {
                 'meta' => ['kind' => 'security', 'auto' => true, 'events' => [[
                     'at' => now()->toIso8601String(), 'evidence' => $meta,
                 ]]],
-            ]);
+            ];
+            // (WP-1.4) ربطُ الحادثة بالطلب الذي فجّرها — `system.trace` يجمع الأثرَ بالمعرّف
+            if (hub_has_col('incidents', 'request_id')) {
+                $row['request_id'] = mb_substr((string) \App\Support\Api::requestId(), 0, 40) ?: null;
+            }
+
+            return \App\Models\Incident::create($row);
         } catch (\Throwable $e) {
             \App\Support\ErrorLog::capture('php', 'hub_security_incident: ' . $e->getMessage(), __FILE__, __LINE__);
 
@@ -2879,9 +2885,18 @@ if (! function_exists('hub_screen')) {
      *
      * الشاشات المحسوبة تقرأ عشرات الاستعلامات وقيمتُها لا تتغير كل ثانية —
      * لكنها **تتغيّر ساعةَ تتغيّر بياناتها**، فالختم يسبق المهلة.
+     *
+     * `$stamped` (WP-1.5): براية `true` تعود `['at' => لحظة الحساب, 'data' => النتيجة]`
+     * لتغذية سطرِ «آخر حساب» (`partials/cc/freshness`) — قارئٌ واحدٌ لا دالّةٌ توأم،
+     * واللاحقة `:st` تعزل شكلَ الغلاف عن مفتاح الشكل الخام. بلاها السلوكُ كما هو حرفياً.
      */
-    function hub_screen(string $prefix, int $ttl, \Closure $fn, array $tables = [])
+    function hub_screen(string $prefix, int $ttl, \Closure $fn, array $tables = [], bool $stamped = false)
     {
+        if ($stamped) {
+            return hub_cached(hub_scope_key($prefix) . hub_data_stamp($tables) . ':st', $ttl,
+                (bool) request()->query('fresh'), fn () => ['at' => now(), 'data' => $fn()]);
+        }
+
         return hub_cached(hub_scope_key($prefix) . hub_data_stamp($tables), $ttl,
             (bool) request()->query('fresh'), $fn);
     }
@@ -5294,5 +5309,112 @@ if (! function_exists('hub_lens_key')) {
     function hub_lens_key(?string $projectId): string
     {
         return $projectId ? ':p:' . $projectId : '';
+    }
+}
+
+// ── Control Plane: Phase 1 ──
+
+if (! function_exists('hub_range')) {
+    /**
+     * المدى الزمنيّ الموحّد (WP-1.1) — غلافُ TimeRange::fromRequest: كبسولات
+     * `?range=1h|6h|24h|7d|30d|90d` ومخصّصٌ بـ`from/to`، والمعاملاتُ القائمة
+     * (from/to وحدهما، created_from/created_to/updated_since، days/d العدديّان)
+     * تُقرأ كما هي بلا إعادة تسمية. العرضُ في `partials/timerange.blade.php`.
+     */
+    function hub_range(?\Illuminate\Http\Request $r = null, string $default = '7d'): \App\Support\TimeRange
+    {
+        return \App\Support\TimeRange::fromRequest($r, $default);
+    }
+}
+
+if (! function_exists('hub_admin_links')) {
+    /**
+     * كتالوجُ روابط الإدارة (WP-1.5) — المصدرُ الواحد الذي سيرسم منه الطورُ ١٠
+     * شريطَ الإدارة ووِجهاتِ البحث بدل القائمتين المتباعدتين اليوم. مشتقٌّ ١:١ من
+     * الشريط الحاليّ في `layouts/app.blade.php` — و`ControlCenterUiKitTest` يُبقيهما
+     * متطابقَين حتى يتسلّم الطورُ ١٠ الرسم. كلُّ مدخل: `{key, label, route, group, ok}`،
+     * و`ok` بنفس فحوص `hub_*` التي يكتبها الشريط (المالكُ تُرجِع له `hub_flag` صدقاً دائماً).
+     */
+    function hub_admin_links($user): array
+    {
+        $owner = hub_is_owner($user);
+        // رابطُ «التخصيص» يظهر متى ظهر الشريطُ نفسُه — شرطُ الشريط كما في القالب حرفياً
+        $bar = $owner || hub_flag($user, 'users') || hub_flag($user, 'audit') || hub_secrets($user);
+        $mk = fn (string $key, string $label, string $route, string $group, bool $ok) =>
+            ['key' => $key, 'label' => $label, 'route' => $route, 'group' => $group, 'ok' => $ok];
+
+        return [
+            $mk('prefs', 'التخصيص', 'prefs.edit', 'شخصي', $bar),
+            $mk('users', 'المستخدمون', 'users.index', 'الفريق', hub_flag($user, 'users')),
+            $mk('roles', 'الأدوار', 'roles.index', 'الفريق', $owner),
+            $mk('audit', 'التدقيق', 'audit.index', 'الرقابة', hub_flag($user, 'audit')),
+            $mk('security', 'الأمان', 'security.index', 'الرقابة', $owner),
+            $mk('ops', 'التشغيل', 'ops.index', 'الرقابة', $owner),
+            $mk('errors', 'الأخطاء', 'errors.index', 'الرقابة', $owner),
+            $mk('activity', 'نشاط الموظفين', 'activity.index', 'الرقابة', $owner),
+            $mk('dataroom', 'غرفة البيانات', 'dataroom.index', 'الرقابة', hub_secrets($user)),
+            $mk('fields', 'الحقول', 'fields.index', 'البناء', $owner),
+            $mk('flows', 'المسارات', 'flows.index', 'البناء', $owner),
+            $mk('integrations', 'التكاملات', 'integrations.index', 'البناء', $owner),
+            $mk('quality', 'الجودة', 'quality.index', 'البناء', $owner),
+            $mk('settings', 'الإعدادات', 'settings.edit', 'النظام', $owner),
+            $mk('quoteflow', 'QuoteFlow', 'quoteflow', 'النظام', $owner),
+        ];
+    }
+}
+
+if (! function_exists('hub_metric_bucket')) {
+    /**
+     * حاويةُ الزمن (WP-1.6): تقريبُ اللحظة **لأسفل** لبداية حاويةٍ بدقّة
+     * `$minutes` (الافتراض ٥) — بعد تطبيع المنطقة لتوقيت النظام كما تفعل
+     * `hub_metric_put` حرفياً، فلا تتشظّى اللحظةُ الواحدة بجدار ساعة مصدرها.
+     * الحاويةُ تُحسب من بداية اليوم المحلّي، فعبورُ حدود الساعة سليم
+     * (9:59 ⇒ 9:55 لا 10:00) وكذا منتصفُ الليل.
+     */
+    function hub_metric_bucket(\DateTimeInterface|string $at, int $minutes = 5): \Illuminate\Support\Carbon
+    {
+        $c = \Illuminate\Support\Carbon::parse($at)->setTimezone(config('app.timezone', 'Asia/Kuwait'));
+        $m = max(1, $minutes);
+        $floored = intdiv($c->hour * 60 + $c->minute, $m) * $m;
+
+        return $c->copy()->startOfDay()->addMinutes($floored);
+    }
+}
+
+if (! function_exists('hub_window_pair')) {
+    /**
+     * نافذتان متساويتان متجاورتان (WP-1.6 · spec §36): الحاليةُ تنتهي الآن،
+     * والسابقةُ تنتهي حيث تبدأ الحالية — لا فجوةَ ولا تداخل، فالمقارنةُ
+     * «نافذة بنافذة» عادلةٌ لا برقمٍ يتيم. الحدُّ الأعلى حصريٌّ (>= from و< to).
+     */
+    function hub_window_pair(int $hours): array
+    {
+        $h = max(1, $hours);
+        $to = now();
+        $from = $to->copy()->subHours($h);
+
+        return ['cur' => [$from, $to], 'prev' => [$from->copy()->subHours($h), $from]];
+    }
+}
+
+if (! function_exists('hub_compare')) {
+    /**
+     * المقارِنُ الواحد (WP-1.6 · spec §26/§43) بدل نسختين متباعدتين كانتا في
+     * WidgetRegistry وCeoBoard: `pct === null` حين الأساسُ صفرٌ أو غائب —
+     * «١٠٠٪» المُختلَقةُ حين الأساس صفر كانت تكذب على كل بطاقة وتُفقد الرقمَ
+     * معناه. القسمةُ على |prev| كي يصحّ الاتجاه مع أساسٍ سالب (صافي CeoBoard)،
+     * و`$minN` أدنى حجمِ أساسٍ تُعرَض عنده نسبة — دونَه n_ok=false وpct=null.
+     * يعيد ['cur','prev','delta','pct'(int|null),'n_ok'] — وdelta=null بلا أساس.
+     */
+    function hub_compare(float $cur, ?float $prev, int $minN = 0): array
+    {
+        $ok = $prev !== null && $prev != 0.0 && abs($prev) >= $minN;
+
+        return [
+            'cur' => $cur, 'prev' => $prev,
+            'delta' => $prev === null ? null : $cur - $prev,
+            'pct' => $ok ? (int) round(($cur - $prev) * 100 / abs($prev)) : null,
+            'n_ok' => $ok,
+        ];
     }
 }

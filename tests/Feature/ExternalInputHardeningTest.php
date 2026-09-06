@@ -73,11 +73,14 @@ class ExternalInputHardeningTest extends TestCase
         ])->assertSessionDoesntHaveErrors('url');
     }
 
-    /** (٣) رمز تلجرام لا يتسرّب إلى الخطأ المخزَّن — حارس مصدر */
+    /** (٣) رمز تلجرام لا يتسرّب إلى الخطأ المخزَّن — حارس مصدر (القاعدة في Redactor والتفويض في HubOutbox) */
     public function test_telegram_token_is_scrubbed_from_errors(): void
     {
         $src = file_get_contents(app_path('Console/Commands/HubOutbox.php'));
-        $this->assertMatchesRegularExpression('#/bot\[0-9\]|bot\*\*\*|preg_replace.*bot#u', $src,
-            'رمز البوت في مسار الطلب يتسرّب إلى outbox.error المعروض عند فشل اتصال');
+        $this->assertMatchesRegularExpression('#Redactor::text\(\s*\$e->getMessage\(\)#u', $src,
+            'رمز البوت في مسار الطلب يتسرّب إلى outbox.error المعروض عند فشل اتصال — لا تفويض للمُطهِّر');
+        $rules = file_get_contents(app_path('Support/Redactor.php'));
+        $this->assertMatchesRegularExpression('#/bot\[0-9\]#u', $rules,
+            'قاعدة /bot<id>:<token> غابت عن Redactor — رمز البوت يتسرّب من كل الكتّاب المفوِّضين');
     }
 }

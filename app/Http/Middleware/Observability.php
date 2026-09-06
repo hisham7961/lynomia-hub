@@ -15,10 +15,19 @@ class Observability
         // معرّفٌ سابقٌ (وضعه ردُّ خطأٍ مبكّر عبر Api::requestId) يُحترَم فلا يتبدّل بين الجسم والترويسة
         // معرّفٌ يرسله العميلُ (X-Request-Id) يُحترَم إن كان سليمَ الشكل (v2.399): التكاملُ يمرّر أثرَه فيُقرأ
         // القيدُ والتسليمُ والسجلُّ بمعرّفه هو — وإلا يُولَّد هنا.
+        // السقف ٤٠ محرفاً = عرضُ أعمدة `request_id` كلِّها: أطولُ منه كان يُكتب خاماً في
+        // audits على MySQL الصارمة فيُسقط أيَّ طلبٍ مدقَّق — يُستبدل به UUID فيبقى الأثرُ سليماً.
         $sent = trim((string) $request->headers->get('X-Request-Id', ''));
         $rid = (string) ($request->attributes->get('request_id')
-            ?: (preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]{7,63}$/', $sent) ? $sent : Str::uuid()));
+            ?: (preg_match('/^[A-Za-z0-9][A-Za-z0-9._:-]{7,39}$/', $sent) ? $sent : Str::uuid()));
         $request->attributes->set('request_id', $rid);
+        // (WP-1.4) وسمُ المصدر والخارجيّ — **لا معرّفَ جديداً**: `Api::requestId` يبقى المصدرَ
+        // الوحيد. «خارجيّ» يعني أنّ العميل أرسل المعرّفَ فاحتُرم ⇒ لا يُفترَض تفرّدُه،
+        // والمصدرُ (web|api|hook) وسمُ عرضٍ وترابطٍ لا تخويل.
+        $request->attributes->set('request_id_external', $sent !== '' && $rid === $sent);
+        $path = ltrim($request->path(), '/');
+        $request->attributes->set('request_source',
+            str_starts_with($path, 'api/') ? 'api' : (str_starts_with($path, 'hook/') ? 'hook' : 'web'));
         $start = microtime(true);
 
         // **سجلٌّ مهيكل**: كلُّ سطرٍ يُكتب أثناء هذا الطلب (Log::…/report) يحمل معرّفَه

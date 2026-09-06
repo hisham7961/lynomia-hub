@@ -26,16 +26,23 @@ class SecurityRadar
         if (! Schema::hasTable('access_denials')) return;   // قبل الهجرة: لا نكسر الطلب
 
         try {
-            DB::table('access_denials')->insert([
+            $row = [
                 'kind'       => mb_substr($kind, 0, 40),
                 // صاحبُ المحاولة إن كان مسجّلاً — و`null` تعني **زائراً غير مستخدم**
                 'user_id'    => auth()->id(),
                 'ip'         => $r->ip(),
                 'method'     => mb_substr((string) $r->method(), 0, 10),
-                'path'       => mb_substr('/' . ltrim((string) $r->path(), '/'), 0, 300),
-                'detail'     => $detail !== null ? mb_substr($detail, 0, 300) : null,
+                // (WP-1.3) المسارُ والتفصيل عبر المُطهِّر الواحد: رمزُ رابطٍ عامٍّ مخمَّن
+                // (`/sign/<رمز>`) كان يُخزَّن بنصّه — بيانُ اعتمادٍ في متناول قارئ الرادار
+                'path'       => mb_substr(Redactor::text('/' . ltrim((string) $r->path(), '/')), 0, 300),
+                'detail'     => $detail !== null ? mb_substr(Redactor::text($detail), 0, 300) : null,
                 'created_at' => now(),
-            ]);
+            ];
+            // (WP-1.4) ربطُ المنع بطلبه — صفحةُ `system.trace` تجمع الأثرَ بالمعرّف الواحد
+            if (hub_has_col('access_denials', 'request_id')) {
+                $row['request_id'] = mb_substr((string) Api::requestId(), 0, 40) ?: null;
+            }
+            DB::table('access_denials')->insert($row);
         } catch (\Throwable $e) {
             // رادارٌ معطوب لا يُسقط الطلب — الكشفُ إضافةٌ لا شرطٌ للخدمة
         }

@@ -134,7 +134,8 @@ class WebhookDispatcher
             $ok = $resp->successful();
             if (! $ok) $err = 'رد غير ناجح: HTTP ' . $code;
         } catch (\Throwable $e) {
-            $err = mb_substr($e->getMessage(), 0, 390);
+            // (WP-1.3) تفويضٌ للمُطهِّر الواحد: رسالةُ فشل الاتصال قد تحمل رابطَ الوجهة برموزه
+            $err = mb_substr(Redactor::text($e->getMessage()), 0, 390);
         }
 
         $ms = (int) round((microtime(true) - $t0) * 1000);

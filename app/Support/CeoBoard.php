@@ -261,8 +261,10 @@ class CeoBoard
         $net = fn ($m) => (float) $m['i'] - (float) $m['e'];
         $now = $net($months[$n - 1]);
         $prev = $net($months[$n - 2]);
-        $delta = $now - $prev;
-        $pct = $prev != 0.0 ? (int) round($delta / abs($prev) * 100) : null;
+        // المقارِنُ الموحّد (WP-1.6): pct=null حين الأساس صفر، والقسمة على |prev|
+        $cmp = hub_compare($now, $prev);
+        $delta = $cmp['delta'];
+        $pct = $cmp['pct'];
 
         // متوسط الأشهر السابقة كخطّ أساس — شهرٌ واحد قد يكون صدفة
         $base = collect(array_slice($months, 0, $n - 1))->avg($net);

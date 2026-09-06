@@ -65,8 +65,9 @@ class Integrations
                 \App\Models\Setting::updateOrCreate(['key' => 'integration.' . $key . '.last_ok'], ['value' => $now]);
             } else {
                 \App\Models\Setting::updateOrCreate(['key' => 'integration.' . $key . '.last_fail'], ['value' => $now]);
+                // (WP-1.3) تفويضٌ للمُطهِّر الواحد — قاعدةُ password/pwd/key=… القائمة وأخواتُها
                 \App\Models\Setting::updateOrCreate(['key' => 'integration.' . $key . '.last_error'],
-                    ['value' => mb_substr((string) preg_replace('/(password|pwd|key)=\S+/i', '$1=***', (string) $error), 0, 180)]);
+                    ['value' => mb_substr(Redactor::text((string) $error), 0, 180)]);
             }
             \Illuminate\Support\Facades\Cache::forget('settings:all');
         } catch (\Throwable $e) {

@@ -95,6 +95,40 @@ final class Api
     }
 
     /**
+     * (WP-1.4) مصدرُ الطلب الحاليّ — **للوسم لا للتخويل**: web|api|console|hook.
+     * يقرأ ما وسمه وسيطُ Observability، ويستنتج من المسار حين يسبقه ردٌّ مبكّر.
+     */
+    public static function requestSource(): string
+    {
+        try {
+            if (app()->runningInConsole() && ! app()->runningUnitTests()) return 'console';
+            $req = request();
+            $src = $req->attributes->get('request_source');
+            if (is_string($src) && $src !== '') return $src;
+            $path = ltrim($req->path(), '/');
+            if (str_starts_with($path, 'api/')) return 'api';
+            if (str_starts_with($path, 'hook/')) return 'hook';
+
+            return 'web';
+        } catch (\Throwable $e) {
+            return 'console';
+        }
+    }
+
+    /**
+     * (WP-1.4) هل معرّفُ الطلب الحاليّ **أرسله العميل** (X-Request-Id)؟
+     * خارجيٌّ ⇒ لا يُفترَض تفرّدُه ولا يُشتقّ منه تخويل — وسمُ عرضٍ فقط.
+     */
+    public static function requestIdIsExternal(): bool
+    {
+        try {
+            return (bool) request()->attributes->get('request_id_external', false);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * ردُّ خطأٍ بالغلاف الموحَّد.
      *
      * @param array $legacy مفاتيحُ إضافية للتوافق (مثل `errors` للتحقق، أو `stepup`/`url`)

@@ -658,13 +658,16 @@ class HubAutomation extends Command
         try {
             if ($this->dry) return 0;
 
-            $n = HubNotification::where('read', true)->where('created_at', '<', now()->subDays(90))->delete()
+            // عدّادٌ لكل جدولٍ على حدة — فالتقليم ليس صامتاً (§13): في آخر
+            // التشغيلة يُكتب سطرُ تدقيقٍ واحدٌ لكل جدولٍ قُلّم فعلاً بعدده.
+            $per = [];
+            $n = $per['notifications_hub'] = HubNotification::where('read', true)->where('created_at', '<', now()->subDays(90))->delete()
                + HubNotification::where('created_at', '<', now()->subDays(365))->delete();
 
             // **وسجلُّ الويبهوك الوارد** (v2.324): سطحٌ عامّ يكتب صفّاً لكل نداء
             // بحمولته، وكان بلا تقليمٍ إطلاقاً — نموٌّ غيرُ محدود يملأ القرص.
             if (\Illuminate\Support\Facades\Schema::hasTable('inbound_hook_events')) {
-                $n += DB::table('inbound_hook_events')
+                $n += $per['inbound_hook_events'] = DB::table('inbound_hook_events')
                     ->where('created_at', '<', now()->subDays(90))->delete();
             }
 
@@ -673,7 +676,7 @@ class HubAutomation extends Command
             // الوحيدَ بلا تقليمٍ بين أربعةٍ شقيقة. والنظامُ يُرفع على استضافةٍ
             // مشتركة بقرصٍ محدود. سنةٌ كاملة تكفي لكل رسمٍ زمنيّ في الشاشات.
             if (\Illuminate\Support\Facades\Schema::hasTable('metric_points')) {
-                $n += DB::table('metric_points')
+                $n += $per['metric_points'] = DB::table('metric_points')
                     ->where('at', '<', now()->subDays(365)->toDateTimeString())->delete();
             }
 
@@ -681,45 +684,55 @@ class HubAutomation extends Command
             // (فرصةُ ١٪) — حذفٌ على عمودٍ بلا فهرسٍ في أثناء تحميل صفحة. نُقل هنا
             // بجوار إخوته، على دفعاتٍ محدودة كي لا يقفل الجدولَ طويلاً.
             // عدّاداتُ استخدام API: ٩٠ يوماً تكفي للتحليل (v2.399)
-            \App\Support\Api::pruneUsage((int) setting('api.usage_keep_days', 90));
+            $per['api_usage'] = \App\Support\Api::pruneUsage((int) setting('api.usage_keep_days', 90));
 
             // **سياسةُ احتفاظٍ لسجلات التشغيل** (v2.399) — كانت بلا سقفٍ إطلاقاً:
             // الصندوقُ الصادر المُسلَّم، وتسليماتُ الويبهوك الفاشلة، والأخطاءُ المحلولة أو البائتة.
             // (سلسلةُ التدقيق تبقى للأبد عمداً.) المدَدُ من الإعدادات لا من الشيفرة.
             if (\Illuminate\Support\Facades\Schema::hasTable('outbox')) {
-                $n += DB::table('outbox')->whereIn('state', ['sent', 'failed'])
+                $n += $per['outbox'] = DB::table('outbox')->whereIn('state', ['sent', 'failed'])
                     ->where('created_at', '<', now()->subDays(max(30, (int) setting('retention.outbox_days', 180))))->delete();
             }
             if (\Illuminate\Support\Facades\Schema::hasTable('webhook_deliveries')) {
-                $n += DB::table('webhook_deliveries')->where('state', 'failed')
+                $n += $per['webhook_deliveries'] = DB::table('webhook_deliveries')->where('state', 'failed')
                     ->where('created_at', '<', now()->subDays(max(14, (int) setting('retention.webhook_failed_days', 90))))->delete();
             }
             if (\Illuminate\Support\Facades\Schema::hasTable('error_events')) {
                 $keep = max(30, (int) setting('retention.errors_days', 180));
-                $n += DB::table('error_events')->where('status', 'محلول')->where('last_seen', '<', now()->subDays($keep))->delete();
-                $n += DB::table('error_events')->where('last_seen', '<', now()->subDays($keep * 2))->delete();
+                $per['error_events'] = DB::table('error_events')->where('status', 'محلول')->where('last_seen', '<', now()->subDays($keep))->delete();
+                // الصفُّ العمريّ (ضعفُ الاحتفاظ) كان يحذف **كلَّ شيء** بصرف النظر
+                // عن الحالة — فيختفي عطلٌ حرجٌ مفتوح صامتاً (§13: لا تقليمَ أدلةٍ
+                // إنتاجيةٍ صامتاً). الآن يُقلَّم بالعمر ما دون HIGH شدّةً فقط
+                // (قيمُ ErrorTaxonomy المخزّنة كما هي)؛ المفتوحُ HIGH/CRITICAL —
+                // وكذلك القديمُ غيرُ المصنَّف (severity فارغة: صفوفٌ سبقت أعمدةَ
+                // التصنيف، وقد تكون حرجة) — يبقى حتى يُحلّ فيلتقطه الصفُّ الأول.
+                $per['error_events'] += DB::table('error_events')
+                    ->where('last_seen', '<', now()->subDays($keep * 2))
+                    ->whereIn('severity', ['INFO', 'WARNING', 'ERROR'])->delete();
+                $n += $per['error_events'];
             }
             if (\Illuminate\Support\Facades\Schema::hasTable('page_visits')) {
+                $per['page_visits'] = 0;
                 do {
                     $gone = DB::table('page_visits')->where('at', '<', now()->subDays(90))
                         ->limit(5000)->delete();
-                    $n += $gone;
+                    $n += $gone; $per['page_visits'] += $gone;
                 } while ($gone >= 5000);
             }
 
             // **ورادارُ الكشف** (v2.356): كل ٤٠٣ أو تخمينِ رابطٍ يكتب صفّاً — سطحٌ
             // قد يفيض تحت طرقٍ متعمَّد. حدٌّ زمنيٌّ وسقفٌ صلبٌ معاً كإخوته أعلاه.
-            $n += \App\Support\SecurityRadar::prune();
+            $n += $per['access_denials'] = \App\Support\SecurityRadar::prune();
 
             // **وقطعُ الرفعات المهجورة**: اتصالٌ انقطع في منتصف رفعةٍ مقطَّعة يترك
             // نصفَ ملفٍ على القرص. تُكنَس عند كل إنهاء رفعةٍ أيضاً، وهذه شبكةُ
             // أمانٍ ليوم لا يُنهي فيه أحدٌ رفعةً أصلاً.
-            $n += \App\Support\ChunkedUpload::prune();
+            $n += $per['chunk_files'] = \App\Support\ChunkedUpload::prune();
 
             // **وكاشُ الاستكشاف البائت**: باركود سُئل عنه المزوّدون قبل أشهرٍ
             // طويلة لا يستحق صفاً — إعادةُ مسحِه تسألهم من جديد فتتجدد إجابتُه.
             if (\Illuminate\Support\Facades\Schema::hasTable('identity_lookups')) {
-                $n += \App\Support\Discovery\Engine::prune();
+                $n += $per['identity_lookups'] = \App\Support\Discovery\Engine::prune();
             }
 
             // **سياسة احتفاظٍ لبيانات الأمن** (v2.369): سجلُّ الجلسات وألفةُ العناوين
@@ -727,18 +740,26 @@ class HubAutomation extends Command
             // (السلسلةُ التدقيقيةُ تبقى للأبد عمداً: كشفُ العبث يحتاج التاريخَ كلَّه.)
             $sessKeep = max(30, (int) setting('security.sessions_keep_days', 180));
             if (\Illuminate\Support\Facades\Schema::hasTable('sessions_log')) {
-                $n += \Illuminate\Support\Facades\DB::table('sessions_log')
+                $n += $per['sessions_log'] = \Illuminate\Support\Facades\DB::table('sessions_log')
                     ->where('last_seen_at', '<', now()->subDays($sessKeep))->where('revoked', true)->delete();
             }
             $ipKeep = max(30, (int) setting('security.ip_keep_days', 365));
             if (\Illuminate\Support\Facades\Schema::hasTable('user_ips')) {
-                $n += \Illuminate\Support\Facades\DB::table('user_ips')
+                $n += $per['user_ips'] = \Illuminate\Support\Facades\DB::table('user_ips')
                     ->where('last_seen_at', '<', now()->subDays($ipKeep))->delete();
             }
 
             // **ونقاطُ المسار الخام** (v2.371): سياسةُ خصوصيةٍ صريحة — الإحداثيات
             // الدقيقة لا تبقى للأبد؛ المسارُ المبسَّط على الجلسة يكفي للتاريخ.
-            $n += \App\Support\Tracking::prune();
+            $n += $per['track_points'] = \App\Support\Tracking::prune();
+
+            // أثرُ التقليم (§13): لا حذفَ صامتاً — سطرُ تدقيقٍ واحدٌ لكل جدولٍ
+            // قُلّم فعلاً، بعدد المحذوف. يعمل بلا مستخدمٍ مسجَّل (console):
+            // hub_audit تترك user_id فارغاً كما في أمر hub:audit-verify.
+            // والتشغيلةُ النظيفة (لا محذوف) لا تكتب شيئاً.
+            foreach ($per as $table => $gone) {
+                if ((int) $gone > 0) hub_audit('تقليم احتفاظ', null, null, $table . ': ' . (int) $gone . ' صف');
+            }
 
             return $n;
         } catch (\Throwable $e) {
