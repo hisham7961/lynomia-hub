@@ -108,6 +108,19 @@ class QualityController extends Controller
         hub_org_analytics_guard();
     }
 
+    /**
+     * التبويباتُ التي يفتحها القارئُ فعلاً — مشتقّةٌ من `OWNER_TABS` نفسِها التي
+     * يحرسها `tabGate`، فلا قائمتان تتباعدان: من يمنعه الحارسُ لا يراه الشريط.
+     *
+     * @return array<string, string>
+     */
+    protected function visibleTabs(): array
+    {
+        if (hub_is_owner()) return self::TABS;
+
+        return array_diff_key(self::TABS, array_flip(self::OWNER_TABS));
+    }
+
     /** التبويبُ المطلوب — وما لا يُعرَف يرتدّ للنظرة التنفيذية بلا سقوط */
     protected function tab(Request $r): string
     {
@@ -124,7 +137,10 @@ class QualityController extends Controller
         $this->tabGate($tab);
         $range = hub_range($r, self::RANGE);
 
-        $d = ['tab' => $tab, 'tabs' => self::TABS, 'range' => $range, 'ttl' => self::TTL];
+        // (§49 · §25) الشريطُ يعرض ما يفتحه قارئُه: `OWNER_TABS` تُسقَط عن غير
+        // المالك — وإلا وجد حاملُ راية المتابعة في كل تبويبٍ يفتحه تبويباً يردّه
+        // ٤٠٣. والحارسُ نفسُه (`tabGate`) يبقى على المسار، فالحجبُ عرضٌ لا أمن.
+        $d = ['tab' => $tab, 'tabs' => $this->visibleTabs(), 'range' => $range, 'ttl' => self::TTL];
 
         return view('admin.quality', $d + match ($tab) {
             'data'      => $this->dataTab($r),

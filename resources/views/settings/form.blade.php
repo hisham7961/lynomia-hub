@@ -166,7 +166,9 @@
                     // (WP-9.2) «من غيّره آخر مرة ومتى؟» — من التاريخ أو ارتداداً من التدقيق
                     $last  = $lastBy[$key] ?? null;
                 @endphp
-                <div class="setrow" data-q="{{ mb_strtolower($hay) }}" data-risk="{{ $risky ? 1 : 0 }}">
+                {{-- (WP-10.3) مرساةُ المفتاح: البحثُ العابر يدلّ على `settings.edit#<key>`
+                     — ورابطٌ لا هدفَ له وعدٌ كاذب، فالصفُّ يحمل مفتاحَه معرّفاً له. --}}
+                <div class="setrow" id="{{ $key }}" data-q="{{ mb_strtolower($hay) }}" data-risk="{{ $risky ? 1 : 0 }}">
                     <div class="crow" style="gap:8px;align-items:baseline;flex-wrap:wrap">
                         <b>{{ $meta['label'] ?? $key }}</b>
                         @if ($risky)<span class="bdg wn" title="اقرأ التحذير قبل تغييره">⚠️</span>@endif

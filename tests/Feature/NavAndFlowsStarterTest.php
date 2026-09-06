@@ -23,9 +23,10 @@ class NavAndFlowsStarterTest extends TestCase
         $this->assertStringContainsString('class="adminbar"', $html);
         $this->assertStringContainsString('class="seg"', $html);
         $this->assertStringNotContainsString('gearmenu', $html);
-        // عناوين الكبسولات الخمس + عينة من روابطها
-        foreach (['شخصي', 'الفريق', 'الرقابة', 'البناء', 'النظام',
-                  'الإعدادات', 'المسارات', 'الأمان', 'التدقيق', 'التخصيص'] as $l) {
+        // عناوين الكبسولات + عينة من روابطها. (WP-10.3) صارت الكبسولاتُ مجموعاتِ
+        // spec §11 الأربع بدل الخمس — والروابطُ نفسُها لم يسقط منها واحد.
+        foreach (['الأمن والرقابة', 'التشغيل', 'الجودة والحوكمة', 'الإعدادات',
+                  'المسارات', 'الأمان', 'التدقيق', 'التخصيص'] as $l) {
             $this->assertStringContainsString($l, $html);
         }
         // الجانبي تخفف: لا قسم «النظام» فيه بعد اليوم

@@ -109,6 +109,46 @@ class WorkforceOverviewTest extends TestCase
         $this->actingAs($mon)->get('/workforce/overview')->assertOk();
     }
 
+    /**
+     * (§49 · §25 — لا طريقَ مسدود) **بطاقةٌ لا تربط إلى بابٍ يُصَدّ عنه قارئُها.**
+     *
+     * الشاشةُ تُقرأ لحاملِ راية المراقبة، وبطاقتُها الأولى كانت تربط إلى
+     * `activity.index` **للمالك وحدَه**، وبقيّتُها إلى وحداتٍ ومركزِ دعمٍ بحسب
+     * مصفوفة القارئ. فحاملُ الراية بلا مصفوفةٍ كان يجد سبعَ بطاقاتٍ كلُّها ٤٠٣.
+     * الرقمُ يبقى (وهو رقمُ منشأةٍ يحقّ له)، والرابطُ يسقط لمن لا يفتحه.
+     */
+    public function test_no_card_links_to_a_door_this_reader_cannot_open(): void
+    {
+        $this->seedCore();
+
+        $role = Role::create(['name' => 'مراقب بلا مصفوفة', 'scope' => 'all',
+            'flags' => ['monitor' => 1], 'matrix' => []]);
+        $mon = User::create(['name' => 'مراقب', 'email' => 'wf-links@test.local',
+            'password' => 'Secret!2026x', 'role_id' => $role->id, 'status' => 'نشط',
+            'password_changed_at' => now()]);
+
+        $html = $this->actingAs($mon)->get('/workforce/overview')->assertOk()->getContent();
+        foreach (['activity.index' => route('activity.index'), 'support' => route('support'),
+                  'workforce.team' => route('workforce.team'),
+                  'm.index tasks' => route('m.index', 'tasks'),
+                  'm.index projects' => route('m.index', 'projects'),
+                  'm.index approvals' => route('m.index', 'approvals')] as $name => $url) {
+            $this->assertStringNotContainsString('href="' . $url . '"', $html,
+                "بطاقةُ القوى العاملة تربط المراقبَ إلى {$name} وهو يُصَدّ عنها");
+        }
+
+        // والأرقامُ نفسُها باقية — الحجبُ للرابط لا للرقم
+        $this->assertStringContainsString('نشطون اليوم', $html);
+        $this->assertStringContainsString('تذاكر مفتوحة', $html);
+
+        // والمالكُ يفتح كلَّ شيء، فالروابطُ كلُّها عنده
+        $ownerHtml = $this->actingAs($this->owner)->get('/workforce/overview')->assertOk()->getContent();
+        foreach ([route('activity.index'), route('support'), route('m.index', 'tasks')] as $url) {
+            $this->assertStringContainsString('href="' . $url . '"', $ownerHtml,
+                "رابطٌ سقط عن المالك: {$url}");
+        }
+    }
+
     /* ────────── ٢) كلُّ بطاقةٍ تساوي مرجعَها ────────── */
 
     public function test_every_card_matches_its_reference_on_crafted_seeds(): void

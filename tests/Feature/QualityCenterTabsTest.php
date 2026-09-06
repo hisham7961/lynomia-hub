@@ -302,4 +302,57 @@ class QualityCenterTabsTest extends TestCase
         $this->assertNull($ov['completion']['kpi']);
         $this->assertNull($ov['completion']['value']);
     }
+
+    /**
+     * (§49 · §25 — لا طريقَ مسدود) **لا تبويبَ ولا رابطَ يَعِد ببابٍ يردّه ٤٠٣.**
+     *
+     * شريطُ التبويبات كان يرسم السبعةَ لكل قارئ — و«جودة البيانات» للمالك وحدَه
+     * (`OWNER_TABS`)، فحاملُ راية المتابعة يجد في كل تبويبٍ يفتحه تبويباً ثامناً
+     * يردّه. والروابطُ داخل التبويبات (المشكلات · لوحة الأهداف · لوحة الدعم)
+     * تتبع مصفوفةَ القارئ لا رايةَ المتابعة — فمن لا يملك الوحدةَ لا يُوعَد بها.
+     */
+    public function test_no_tab_and_no_link_promises_a_door_the_reader_is_refused(): void
+    {
+        $this->seedCore();
+        $this->actingAs($this->owner);
+        $this->seedWorld();
+        auth()->logout();
+
+        // ① التبويبُ المملوكُ للمالك لا يُرسَم لغيره — والمالكُ يبقى يراه
+        $dataUrl = route('quality.index', ['tab' => 'data']);
+        $mon = $this->monitor();
+        foreach (array_diff($this->tabs(), ['data']) as $tab) {
+            $html = $this->actingAs($mon)->get(route('quality.index', ['tab' => $tab]))
+                ->assertOk()->getContent();
+            $this->assertStringNotContainsString('tab=data', $html,
+                "تبويب «{$tab}» يعرض للمراقب تبويبَ البيانات وهو يُصَدّ عنه");
+            auth()->logout();
+        }
+        $this->assertStringContainsString('tab=data',
+            $this->actingAs($this->owner)->get(route('quality.index', ['tab' => 'overview']))
+                ->assertOk()->getContent(), 'تبويبُ البيانات اختفى عن المالك');
+        auth()->logout();
+
+        // ② روابطُ الوحدات تتبع مصفوفةَ القارئ: مراقبٌ بلا مصفوفةٍ لا يُوعَد بها
+        $bare = Role::create(['name' => 'مراقب بلا مصفوفة', 'scope' => 'all',
+            'flags' => ['monitor' => 1], 'matrix' => []]);
+        $bareMon = User::create(['name' => 'مراقب بلا مصفوفة', 'email' => 'qc-bare@test.local',
+            'password' => 'Secret!2026x', 'role_id' => $bare->id, 'status' => 'نشط',
+            'password_changed_at' => now()]);
+
+        foreach (['overview' => route('m.index', 'issues'), 'okr' => route('okrs.board'),
+                  'actions' => route('support')] as $tab => $url) {
+            $html = $this->actingAs($bareMon)->get(route('quality.index', ['tab' => $tab]))
+                ->assertOk()->getContent();
+            $this->assertStringNotContainsString('href="' . $url . '"', $html,
+                "تبويب «{$tab}» يربط قارئاً بلا صلاحيةٍ إلى {$url}");
+            auth()->logout();
+        }
+
+        // والمراقبُ صاحبُ المصفوفة الكاملة يبقى يجد روابطَه — الحجبُ بالصلاحية لا بالراية
+        $full = $this->actingAs($mon)->get(route('quality.index', ['tab' => 'okr']))
+            ->assertOk()->getContent();
+        $this->assertStringContainsString('href="' . route('okrs.board') . '"', $full,
+            'رابطُ لوحة الأهداف سقط عمّن يملك عرضَها');
+    }
 }

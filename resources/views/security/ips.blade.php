@@ -3,7 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
-        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><a href="{{ route('security.index') }}">مركز الأمان</a><span aria-hidden="true">‹</span><b>ذكاء العناوين</b></nav>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span>@include('security.parts.root_crumb')<span aria-hidden="true">‹</span><b>ذكاء العناوين</b></nav>
         <h2>🌐 ذكاء العناوين</h2>
         <div class="sub">كلُّ عنوانِ شبكةٍ بما فعل: دخولٌ ناجحٌ وفاشل، رفضٌ، وأفعالٌ تستحق النظر — من سجلّ التدقيق نفسِه، بلا خدمةِ geo خارجية</div>
     </div>

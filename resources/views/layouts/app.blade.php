@@ -116,7 +116,8 @@
                 @endif
             @endif
             <div class="bell" data-count-url="{{ route('notifications.count') }}">
-                <button class="btn ghost sm" type="button" title="التنبيهات"
+                {{-- زرٌّ برمزٍ وحدَه: اسمٌ صريحٌ للقارئ الشاشيّ لا عنوانَ تلميحٍ فقط (§29) --}}
+                <button class="btn ghost sm" type="button" title="التنبيهات" aria-label="التنبيهات"
                         hx-get="{{ route('notifications.mini') }}" hx-target="#bellbox" hx-swap="innerHTML">🔔<span id="bellbadge">@php $nbc = \App\Models\HubNotification::where('user_id', auth()->id())->where('read', false)->count(); @endphp@if($nbc)<span class="nbdg">{{ $nbc }}</span>@endif</span></button>
                 <div id="bellbox" class="gsr"></div>
             </div>
@@ -129,46 +130,49 @@
                 <form method="POST" action="{{ route('logout') }}">@csrf<button class="btn ghost sm" type="submit">خروج</button></form>
             </div>
         </header>
-        {{-- شريط الإدارة — كبسولات ظاهرة دائماً، لكل عائلةٍ عنوانٌ ولونُ هوية (--seg) --}}
+        {{-- ── Control Plane: Phase 10 (WP-10.3 · spec §11 · §29) ──
+             شريط الإدارة — كبسولاتٌ ظاهرة دائماً، لكل عائلةٍ عنوانٌ ولونُ هوية (--seg).
+             لم يعد مكتوباً بيده: يُرسَم من **`hub_admin_links()`** (كتالوجُ الطور ١)
+             وتقرأ منه وِجهاتُ البحث كذلك — فلا تتباعد القائمتان مرّةً أخرى. وشرطُ
+             ظهورِ الشريط نفسِه يبقى كما كان حرفياً؛ وحارسُ كل رابطٍ من الكتالوج.
+             الوصولية (critic #13): كلُّ كبسولةٍ قائمةٌ `<ul>` باسمٍ صريح، وعنوانُها
+             المرئيّ `aria-hidden` كي لا يُنطَق مرتين، والصفحةُ الحالية `aria-current`
+             لا لونٌ وحدَه، وترتيبُ التنقّل ترتيبُ المصدر (لا `tabindex`). --}}
         @php $isOwner = hub_is_owner(); @endphp
         @if ($isOwner || hub_flag(auth()->user(), 'users') || hub_flag(auth()->user(), 'audit') || hub_secrets())
+            @php
+                $hubBarGroups = collect(hub_admin_links(auth()->user()))
+                    ->filter(fn ($l) => $l['ok'])->groupBy('group');
+                // لونُ الهوية لكل مجموعة — عرضٌ محضٌ فمكانُه القالب لا الكتالوج
+                $hubSegColor = ['الأمن والرقابة' => '#C08A3E', 'التشغيل' => '#4C6FA5',
+                                'الجودة والحوكمة' => '#7C6FB0', 'الإعدادات' => 'var(--p)'];
+                // الرابطُ الحاليّ: أنماطُه من الكتالوج، والوحدةُ العامّة تُطابَق بمعاملها
+                // كي لا يُضيء `m.*` كلَّ وحدةٍ في النظام
+                $hubBarOn = function (array $l) {
+                    if (($l['args'][0] ?? null) !== null) {
+                        return request()->routeIs('m.*') && request()->route('module') === $l['args'][0];
+                    }
+                    foreach ($l['on'] as $p) if (request()->routeIs($p)) return true;
+                    return false;
+                };
+            @endphp
             <nav class="adminbar" aria-label="الإدارة والنظام">
-                <div class="seg" style="--seg:var(--ac)">
-                    <span class="seglbl">شخصي</span>
-                    <a class="{{ request()->routeIs('prefs.*') ? 'on' : '' }}" href="{{ route('prefs.edit') }}">التخصيص</a>
-                </div>
-                @if (hub_flag(auth()->user(), 'users') || $isOwner)
-                    <div class="seg" style="--seg:#4C6FA5">
-                        <span class="seglbl">الفريق</span>
-                        @if (hub_flag(auth()->user(), 'users'))<a class="{{ request()->routeIs('users.*') ? 'on' : '' }}" href="{{ route('users.index') }}">المستخدمون</a>@endif
-                        @if ($isOwner)<a class="{{ request()->routeIs('roles.*') ? 'on' : '' }}" href="{{ route('roles.index') }}">الأدوار</a>@endif
-                    </div>
-                @endif
-                @if (hub_flag(auth()->user(), 'audit') || $isOwner || hub_secrets())
-                    <div class="seg" style="--seg:#C08A3E">
-                        <span class="seglbl">الرقابة</span>
-                        @if (hub_flag(auth()->user(), 'audit'))<a class="{{ request()->routeIs('audit.*') ? 'on' : '' }}" href="{{ route('audit.index') }}">التدقيق</a>@endif
-                        @if ($isOwner)<a class="{{ request()->routeIs('security.*') ? 'on' : '' }}" href="{{ route('security.index') }}">الأمان</a>@endif
-                        @if ($isOwner)<a class="{{ request()->routeIs('ops.*') ? 'on' : '' }}" href="{{ route('ops.index') }}">التشغيل</a>@endif
-                        @if ($isOwner)<a class="{{ request()->routeIs('errors.*') ? 'on' : '' }}" href="{{ route('errors.index') }}">الأخطاء</a>@endif
-                        @if ($isOwner)<a class="{{ request()->routeIs('activity.*') ? 'on' : '' }}" href="{{ route('activity.index') }}">نشاط الموظفين</a>@endif
-                        @if (hub_secrets())<a class="{{ request()->routeIs('dataroom.*') ? 'on' : '' }}" href="{{ route('dataroom.index') }}">غرفة البيانات</a>@endif
-                    </div>
-                @endif
-                @if ($isOwner)
-                    <div class="seg" style="--seg:#7C6FB0">
-                        <span class="seglbl">البناء</span>
-                        <a class="{{ request()->routeIs('fields.*') ? 'on' : '' }}" href="{{ route('fields.index') }}">الحقول</a>
-                        <a class="{{ request()->routeIs('flows.*') ? 'on' : '' }}" href="{{ route('flows.index') }}">المسارات</a>
-                        <a class="{{ request()->routeIs('integrations.*') || request()->routeIs('webhooks.*') ? 'on' : '' }}" href="{{ route('integrations.index') }}">التكاملات</a>
-                        <a class="{{ request()->routeIs('quality.*') ? 'on' : '' }}" href="{{ route('quality.index') }}">الجودة</a>
-                    </div>
-                    <div class="seg" style="--seg:var(--p)">
-                        <span class="seglbl">النظام</span>
-                        <a class="{{ request()->routeIs('settings.*') ? 'on' : '' }}" href="{{ route('settings.edit') }}">الإعدادات</a>
-                        <a href="{{ route('quoteflow') }}" title="تطبيق جانبي معزول — يفتح في تبويبه" target="_blank" rel="noopener">QuoteFlow ↗</a>
-                    </div>
-                @endif
+                @foreach ($hubBarGroups as $hubGroup => $hubLinks)
+                    <ul class="seg" style="--seg:{{ $hubSegColor[$hubGroup] ?? 'var(--p)' }};list-style:none;margin:0"
+                        aria-label="{{ $hubGroup }}">
+                        <li class="seglbl" aria-hidden="true">{{ $hubGroup }}</li>
+                        {{-- لا فراغَ داخل `<li>`: عنصرُ صفٍّ مرنٌ يبتلع الفراغَ عرضاً --}}
+                        @foreach ($hubLinks as $hubLink)
+                            @php $hubOn = $hubBarOn($hubLink); @endphp
+                            @if ($hubLink['key'] === 'quoteflow')
+                                {{-- QuoteFlow تطبيقٌ جانبيّ معزول: يفتح في تبويبه كما كان --}}
+                                <li><a href="{{ route($hubLink['route']) }}" target="_blank" rel="noopener" title="تطبيق جانبي معزول — يفتح في تبويبه">{{ $hubLink['label'] }} ↗</a></li>
+                            @else
+                                <li><a class="{{ $hubOn ? 'on' : '' }}" @if ($hubOn) aria-current="page" @endif href="{{ route($hubLink['route'], $hubLink['args']) }}">{{ $hubLink['label'] }}</a></li>
+                            @endif
+                        @endforeach
+                    </ul>
+                @endforeach
             </nav>
         @endif
         {{-- منطقة حية: قارئ الشاشة يقرأ الرسالة حين تُحقن بعد htmx أو تتبدل --}}

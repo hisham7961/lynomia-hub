@@ -3,7 +3,7 @@
 @section('content')
 <div class="hero">
     <div>
-        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span><a href="{{ route('security.index') }}">مركز الأمان</a><span aria-hidden="true">‹</span><b>رموز API</b></nav>
+        <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span>@include('security.parts.root_crumb')<span aria-hidden="true">‹</span><b>رموز API</b></nav>
         <h2>🔑 مركز رموز API</h2>
         <div class="sub">كلُّ مفتاحٍ باسمه وصاحبه ونطاقه وحالته من التصنيف الواحد — الإبطالُ هنا، والتدويرُ لصاحب الرمز وحدَه من ملفه (فالنصُّ الصريح لا يمرّ بأحدٍ سواه)</div>
     </div>

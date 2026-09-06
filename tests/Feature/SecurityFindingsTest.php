@@ -263,4 +263,42 @@ class SecurityFindingsTest extends TestCase
         $this->actingAs($this->owner)->get('/admin/security/findings')
             ->assertOk()->assertSee('نتيجة شركة أخرى معزولة');
     }
+
+    /**
+     * (§49 · §25 — لا طريقَ مسدود) **فتاتُ «مركز الأمان» لا يقود المراقبَ إلى ٤٠٣.**
+     *
+     * تسعُ شاشاتٍ من الطور الرابع تُقرأ لحاملِ راية المراقبة (`findingsReadGate`)
+     * بينما مركزُ الأمان نفسُه للمالك وحدَه (`gate`) — وكلُّها تكتب في فتات التنقّل
+     * رابطاً ثابتاً إليه. فالقارئُ الذي فُتحت له الشاشةُ يجد أوّلَ رابطٍ فيها بابَ
+     * رفضٍ. الرابطُ يبقى لمن يفتحه، ويصير نصّاً لمن لا يفتحه.
+     */
+    public function test_the_security_centre_crumb_is_not_a_dead_end_for_the_monitor(): void
+    {
+        $this->seedCore();
+        $monitor = $this->monitorUser();
+        $ip = '10.9.8.7';
+        DB::table('user_ips')->insert(['id' => (string) Str::uuid(), 'user_id' => $this->owner->id,
+            'ip' => $ip, 'hits' => 1, 'last_seen_at' => now()]);
+
+        $href = 'href="' . route('security.index') . '"';
+
+        // المالكُ يفتح المركز، فالفتاتُ رابطٌ عنده
+        $this->actingAs($this->owner)->get('/admin/security/findings')
+            ->assertOk()->assertSee($href, false);
+        auth()->logout();
+
+        // والمراقبُ يُصَدّ عن المركز — فلا يُعرَض له رابطٌ إليه في أيّ شاشة
+        $this->actingAs($monitor)->get(route('security.index'))->assertForbidden();
+
+        foreach (['/admin/security/findings', '/admin/security/identity', '/admin/security/privileged',
+                  '/admin/security/sessions', '/admin/security/devices', '/admin/security/ips',
+                  '/admin/security/ips/' . $ip] as $path) {
+            $html = $this->actingAs($monitor)->get($path)->assertOk()->getContent();
+            $this->assertStringNotContainsString($href, $html,
+                "الشاشة {$path} تعرض للمراقب رابطاً إلى مركزٍ يُصَدّ عنه بـ٤٠٣");
+            // ولا يختفي النصُّ: الفتاتُ يبقى يقول أين هو، بلا وعدٍ كاذب
+            $this->assertStringContainsString('مركز الأمان', $html,
+                "الشاشة {$path} فقدت موضعَها في فتات التنقّل");
+        }
+    }
 }

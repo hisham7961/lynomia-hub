@@ -143,7 +143,16 @@ class ControlCenterUiKitTest extends TestCase
         $this->assertStringContainsString('sort=email', $off);
     }
 
-    /** الكتالوج يطابق شريطَ الإدارة المرسوم اليوم ١:١ — لمالكٍ ولحامل رايةٍ واحدة ولموظفٍ بلا رايات */
+    /**
+     * الكتالوج يطابق شريطَ الإدارة المرسوم ١:١ — لمالكٍ ولحامل رايةٍ واحدة.
+     *
+     * (WP-10.3) تسلّم الطورُ ١٠ الرسمَ: الشريطُ يُرسَم من الكتالوج لا بيده،
+     * فالمطابقةُ صارت **تعريفاً** لا مصادفة. وتبعاً لذلك تبدّل شيئان: مجموعاتُ
+     * spec §11 الأربع بدل الخمس، و`ok` صار حارسَ الرابط نفسِه لا حارسَ الشريط
+     * (فـ`prefs.edit` مفتوحةٌ لكلّ مستخدم بينما الشريطُ كلُّه لا يظهر إلا لإداريّ)
+     * — ولذا يُقاس التطابقُ حيث يُرسَم الشريط، ولمن لا شريطَ له يُتحقَّق أنه غائبٌ
+     * أصلاً. تفاصيلُ الشريط الجديد وحِراسةُ الوصولية في `NavCatalogTest`.
+     */
     public function test_admin_links_catalogue_matches_the_admin_bar_rendered_today(): void
     {
         $this->seedCore();
@@ -152,30 +161,35 @@ class ControlCenterUiKitTest extends TestCase
             'password' => 'Secret!2026x', 'role_id' => $auditRole->id, 'status' => 'نشط',
             'password_changed_at' => now()]);
 
-        foreach ([$this->owner, $auditor, $this->employee] as $u) {
+        foreach ([$this->owner, $auditor] as $u) {
             $html = $this->actingAs($u)->get('/')->assertOk()->getContent();
             $rendered = $this->adminbarHrefs($html);
             $catalogue = collect(hub_admin_links($u));
 
-            // البنية المعلنة: {key, label, route, group, ok} لا غير
+            // البنية المعلنة: {key, label, icon, route, args, group, ok, on, find} لا غير
             $catalogue->each(fn ($l) => $this->assertSame(
-                ['key', 'label', 'route', 'group', 'ok'], array_keys($l)));
+                ['key', 'label', 'icon', 'route', 'args', 'group', 'ok', 'on', 'find'], array_keys($l)));
 
             $expected = $catalogue->filter(fn ($l) => $l['ok'])
-                ->map(fn ($l) => route($l['route']))->sort()->values()->all();
+                ->map(fn ($l) => route($l['route'], $l['args']))->sort()->values()->all();
             sort($rendered);
             $this->assertSame($expected, $rendered,
                 "كتالوج hub_admin_links لا يطابق شريطَ الإدارة المرسوم للمستخدم {$u->name}");
             auth()->logout();
         }
 
-        // للمالك: كلُّ التسميات والمجموعات الخمس حاضرةٌ في الشريط نفسِه
+        // والموظّفةُ بلا رايةٍ إدارية: لا شريطَ لها أصلاً
+        $empHtml = $this->actingAs($this->employee)->get('/')->assertOk()->getContent();
+        $this->assertSame([], $this->adminbarHrefs($empHtml));
+        auth()->logout();
+
+        // للمالك: كلُّ التسميات ومجموعاتُ §11 الأربع حاضرةٌ في الشريط نفسِه
         $html = $this->actingAs($this->owner)->get('/')->assertOk()->getContent();
         preg_match('/<nav class="adminbar".*?<\/nav>/s', $html, $m);
         foreach (hub_admin_links($this->owner) as $l) {
             $this->assertStringContainsString($l['label'], $m[0], "التسمية {$l['label']} غائبة عن الشريط");
         }
-        $this->assertSame(['شخصي', 'الفريق', 'الرقابة', 'البناء', 'النظام'],
+        $this->assertSame(['الأمن والرقابة', 'التشغيل', 'الجودة والحوكمة', 'الإعدادات'],
             collect(hub_admin_links($this->owner))->pluck('group')->unique()->values()->all());
     }
 

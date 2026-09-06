@@ -2,22 +2,32 @@
 @section('title', 'مركز التوصيات')
 @section('content')
 @php
+    use App\Support\AttentionQueue;
     $c = $ac['counts'];
     $tone = ['حرج' => 'bad', 'مهم' => 'wn', 'اطّلاع' => ''];
     $stateLabel = ['ack' => 'مُقَرّة', 'open' => '', 'snoozed' => 'مؤجّلة', 'dismissed' => 'مرفوضة'];
     // العدسةُ النشطة تُحمَل في مسار التصرّف فيُطابق الحارسُ الصفَّ المعروض تحت `?p=PID`.
     $lensQ = request('p') ? ['p' => request('p')] : [];
+    // (WP-10.2) إشاراتُ النظام في الصفّ نفسِه بمنتِجٍ ثانٍ — تُوسَم بنوعها فيُعرَف
+    // مصدرُها، وتتصرّف بها السكّةُ نفسُها (recs.act) بلا مسارٍ ولا مخزنٍ ثانٍ.
+    $ccSystem = count(array_filter($ac['signals'], fn ($s) => in_array($s['type'] ?? '', AttentionQueue::TYPES, true)));
 @endphp
 <div class="hero">
     <div>
         <h2>💡 مركز التوصيات</h2>
         <div class="sub">
             ماذا يستحق تدخّلك الآن؟ إشاراتٌ مجموعةٌ من كل محرّكات النظام — التكلفة والقدرات
-            وصحة المشاريع والجودة والتحصيل والانتهاءات والعروض التي لم تُحوَّل والعُهد المتأخرة.
+            وصحة المشاريع والجودة والتحصيل والانتهاءات والعروض التي لم تُحوَّل والعُهد المتأخرة،
+            <b>ومعها حالةُ النظام نفسِه</b> (أمنٌ وتشغيلٌ وأخطاءٌ وتدقيقٌ وجودةُ بياناتٍ وأهدافٌ متأخّرة).
             <b>كلها من بياناتك المسجَّلة، وكل إشارةٍ بسببها بالأرقام — تُقِرّها أو تؤجّلها أو ترفضها.</b>
         </div>
     </div>
-    <a class="btn ghost sm" href="{{ route('recs', ['fresh' => 1]) }}">↻ تحديث</a>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        @if (hub_is_owner() || hub_monitor())
+            <a class="btn ghost sm" href="{{ route('control.index') }}">🎛️ نظرة التحكّم ←</a>
+        @endif
+        <a class="btn ghost sm" href="{{ route('recs', ['fresh' => 1]) }}">↻ تحديث</a>
+    </div>
 </div>
 
 @include('partials.lens', ['lensModules' => ['services', 'fin']])
@@ -27,6 +37,7 @@
     <div class="stat"><span class="ico">🟠</span><b>{{ $c['مهم'] }}</b><span>مهمة</span></div>
     <div class="stat"><span class="ico">🔵</span><b>{{ $c['اطّلاع'] }}</b><span>للاطّلاع</span></div>
     <div class="stat"><span class="ico">💤</span><b>{{ $ac['snoozed'] }}</b><span>مؤجّلة</span></div>
+    <div class="stat"><span class="ico">🚨</span><b>{{ $ccSystem }}</b><span>حالةُ النظام</span></div>
     <div class="stat"><span class="ico">📥</span><b>{{ $ac['awaiting']['count'] }}</b><span>تنتظرني</span></div>
 </div>
 
@@ -38,8 +49,26 @@
             <div style="min-width:0;flex:1">
                 <b>{{ $it['title'] }}</b>
                 <span class="bdg {{ $tone[$it['sev']] }}">{{ $it['sev'] }}</span>
+                @if (! empty($it['type']))
+                    <span class="bdg g">{{ AttentionQueue::TYPE_LABELS[$it['type']] ?? $it['type'] }}</span>
+                @endif
                 @if (($it['state'] ?? 'open') === 'ack')<span class="bdg">✔️ مُقَرّة</span>@endif
                 <div class="sub" style="margin-top:3px">{{ $it['why'] }}</div>
+                {{-- (§34) التوصيةُ الحتميّة لإشارات النظام: «ماذا أفعل» بجانب «لماذا» --}}
+                @if (! empty($it['fix']))
+                    <div class="sub" style="margin-top:3px"><b>التوصية:</b> {{ $it['fix'] }}</div>
+                @endif
+                {{-- «رُصد» و«المسؤول» يُكتبان **إن وُجدا فقط**: نموذجُ الصحّة لقطةٌ
+                     بلا ذاكرةِ «منذ متى»، والتنبيهُ لا يُسنَد إلى شخص — فمسؤولٌ
+                     مفترَضٌ أسوأُ من لا مسؤول. --}}
+                @if (! empty($it['detected']) || ! empty($it['owner']))
+                    <div class="sub" style="margin-top:3px">
+                        @if (! empty($it['detected']))
+                            رُصد <span title="{{ $it['detected'] }}">{{ \Illuminate\Support\Carbon::parse($it['detected'])->diffForHumans() }}</span>@if (! empty($it['owner'])) · @endif
+                        @endif
+                        @if (! empty($it['owner']))المسؤول: {{ $it['owner'] }}@endif
+                    </div>
+                @endif
             </div>
             <a class="btn ghost sm" href="{{ $it['url'] }}">{{ $it['action'] }} ←</a>
         </div>
@@ -121,6 +150,11 @@
         <b>انحرافُ النطاق</b> من أوامر التغيير مقابل خطِّ الأساس ·
         <b>تدهورُ الهامش</b> من اللقطات اليومية لهامش المشروع (أوّلُ نقطةٍ في ٣٠ يوماً مقابل آخرها — تحتاج يومين على الأقلّ) ·
         <b>معلمُ دفعٍ بلا فاتورة</b> من جدول مدفوعات العرض المقبول (دفعةٌ أُعلن بلوغُها منذ ٣ أيامٍ ولا فاتورةَ حيّةً لها — تنطفئ بسكّ الفاتورة).<br>
+        و<b>حالةُ النظام</b> (الموسومةُ بنوعها: أمن · تشغيل · أخطاء · تدقيق · جودة · تنفيذ · تنبيه) من محرّكاتها وحدَها:
+        <b>النتائجُ الأمنية الحرجة</b> من سجلّ النتائج · <b>المكوّناتُ الساقطة والمجدولاتُ المتوقّفة</b> من نموذج الصحّة ·
+        <b>الأعطالُ الحرجة المفتوحة</b> من مركز الأخطاء · <b>نزاهةُ سلسلة التدقيق</b> من آخر تشغيل تحقّقٍ كامل ·
+        <b>نقصُ الجودة الحرج</b> من مسح الجودة · <b>الأهدافُ الحرجة المتأخّرة</b> من سجلّ الأهداف ·
+        <b>التنبيهاتُ المفتوحة</b> من مركز التنبيهات (وإقرارُها هناك لا هنا). ولكلٍّ منها <b>توصيةٌ مكتوبةٌ لا مستنتَجة</b>.<br>
         التصرّفُ لا يُخفي الحقيقة: <b>الإقرار</b> يعني «رأيتُها» لا «حُلَّت»، و<b>التأجيل</b> يُعيدها في موعدها،
         و<b>الإخفاء</b> يُبقيها مخفيّةً حتى تُعيدها من «المخفيّة» — <b>والحرجُ لا يُخفى دائماً، يُؤجَّل فقط</b>.
         وإذا زال السببُ اختفت الإشارةُ وحدها.<br>

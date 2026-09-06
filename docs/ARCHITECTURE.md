@@ -80,7 +80,7 @@ Exception → bootstrap/app.php → Api::render (api/*) | صفحةُ خطأ عر
 - **المراسلة**: بريد/تلجرام عبر `outbox` (لا إرسالَ مباشرٌ من الطلب إلا زرُّ الاختبار).
 - **الاستكشاف** (`Discovery\Engine`): مزوّدو الباركود (UPCitemdb, OpenFoodFacts, OpenLibrary) بكاشٍ ٣٠ يوماً **للحاسم فقط**.
 - **n8n**: رابطٌ ومفتاح من مركز التكامل.
-- **الصحّة**: `Integrations::health()` لكل تكامل (`ok/degraded/down/unknown/off`) + آخرُ نجاح/فشل — تُعرض في مركز التكامل.
+- **الصحّة**: `Integrations::installed()` + `Integrations::judge()` لكل تكامل (`ok/degraded/down/unknown/off`) + آخرُ نجاح/فشل — تُعرض في مركز التكامل.
 
 ## ٧) الملاحظة والتشغيل
 
@@ -125,3 +125,27 @@ Exception → bootstrap/app.php → Api::render (api/*) | صفحةُ خطأ عر
 | أوّليّاتُ القياس | `hub_metric_bucket` · `hub_window_pair` · `hub_compare` (pct=null عند أساسٍ صفريّ) · `Series::percentiles/mergeHist` — و`metric_points` يبقى مخزنَ التاريخ الوحيد | `app/Support/Series.php` |
 
 وحاجزٌ أمنيّ أُغلق قبل البناء: التصدير الجَماعيّ يمرّ بحزام `export()` نفسِه (تجميد/تصعيد/أثر)، وتقليمُ الاحتفاظ لا يحذف أدلّةً غيرَ محلولة عاليةَ الشدّة ويكتب أثرَ ما حذف. التقريران الكاملان: `docs/control-plane/DISCOVERY.md` (تصنيفُ ١٥٢ بنداً بالأدلة) و`PLAN.md` (٤١ حزمةَ عملٍ للأطوار ١–١٠ + ٤٠ تفنيداً).
+
+## المراكزُ السبعة وقارئوها — الأطوار ٢–١٠
+
+> **الوثيقةُ الكاملة: `docs/CONTROL_PLANE.md`** — ثمانيةُ موضوعات spec §38 (البنية · الاحتفاظ ·
+> الحدث/النتيجة/الحادثة · الشدّة · SLO · الترابط · التنقية · تصدير الإعدادات) + نقاطُ الامتداد (§28).
+> ما هنا خريطةٌ مختصرة: أينَ يقع كلُّ مركز، ومن **يملك** أرقامَه.
+
+| المركز | الشاشة (اسمُ المسار) | القارئُ المالك للأرقام | جديدُه في القاعدة |
+|---|---|---|---|
+| التشغيل | `ops.index` · `ops.health` | `Health::check` · `SysMonitor` · `Series::percentiles` (مدرَّجٌ لوغاريتميّ) | `http_metric_buckets` |
+| الأخطاء | `errors.index` · `errors.show` · `errors.logs` | `ErrorStats` · `ErrorTaxonomy` · `ErrorLog::capture` | `error_occurrences` + دورةُ حياةٍ على `error_events` |
+| الأمن | `security.index` · `security.findings` · `security.identity` · `security.privileged` · `security.sessions` · `security.tokens` · `security.secrets` · `security.event` | `SecurityPosture` · `SecurityFindings` · `IdentityRisk` · `SecurityEvents` | `security_findings` |
+| التدقيق | `audit.index` · `audit.show` · `audit.coverage` | `Audit::scopedQuery` · `Audit::verifyTail` | `audit_verifications` + أعمدةُ تصنيفٍ **خارج** الختم |
+| الحوادثُ والتنبيه | `m.index` (‏`incidents`) · `alerts.center` · `incidents.link` | `AlertEngine` (‏`daily` + `evaluate` كلَّ ٥ د) | `alert_instances` · `incident_links` |
+| الجودةُ والتنفيذ | `quality.index` · `workforce.overview` | `DataQuality` · `ExecutionStats` (‏`org`/`person` — عدّادٌ واحد بإسقاطات) · `KpiCentre` · `OkrCentre` | — (نقاطٌ في `metric_points`) |
+| تهيئةُ النظام | `settings.edit` · `settings.preview` · `settings.restore` · `settings.export` · `settings.import` | `Settings` (‏`effective` · `put` — الكاتبُ الواحد) | `setting_changes` |
+
+وفوقها مستوى القيادة: `control.index` (‏`ControlController` — ستُّ بطاقاتٍ قارئةٍ فقط تحيل ولا تحسب)
+و`AttentionQueue::items` (صفُّ «يستدعي تدخّلك») يُدمج في `ActionCenter::signals` القائم ويُتصرَّف به
+على `recs.act` — بلا مخزنِ إقرارٍ ثالث. والقاعدةُ في كلّ ما سبق: **لا رقمَ يُعاد حسابُه خارج مالكه**،
+وما لا قياسَ له يُعرَض «—» لا صفراً.
+
+وثلاثةُ مجدولاتٍ جديدة بنبضاتها في `Health::JOBS`: `hub:ops-snapshot` (كل ٥ د) ·
+`hub:alerts-evaluate` (كل ٥ د) · `hub:security-snapshot` (يومياً).
