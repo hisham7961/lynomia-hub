@@ -661,23 +661,40 @@ class HubAutomation extends Command
             // عدّادٌ لكل جدولٍ على حدة — فالتقليم ليس صامتاً (§13): في آخر
             // التشغيلة يُكتب سطرُ تدقيقٍ واحدٌ لكل جدولٍ قُلّم فعلاً بعدده.
             $per = [];
-            $n = $per['notifications_hub'] = HubNotification::where('read', true)->where('created_at', '<', now()->subDays(90))->delete()
-               + HubNotification::where('created_at', '<', now()->subDays(365))->delete();
+            // مدّتا الجرس من الإعدادات لا من الشيفرة (WP-2.3 · critic #16) — بافتراضيّي
+            // الأمس حرفياً: المقروءُ ٩٠ يوماً، وكلُّ شيءٍ (غيرُ المقروء المُهمَل) بعد سنةٍ
+            // على الأقل مهما صغُر المفتاح — الأثرُ الدائم في سجل التدقيق لا هنا.
+            $nKeep = max(7, (int) setting('retention.notifications_days', 90));
+            $n = $per['notifications_hub'] = HubNotification::where('read', true)->where('created_at', '<', now()->subDays($nKeep))->delete()
+               + HubNotification::where('created_at', '<', now()->subDays(max(365, $nKeep)))->delete();
 
             // **وسجلُّ الويبهوك الوارد** (v2.324): سطحٌ عامّ يكتب صفّاً لكل نداء
             // بحمولته، وكان بلا تقليمٍ إطلاقاً — نموٌّ غيرُ محدود يملأ القرص.
             if (\Illuminate\Support\Facades\Schema::hasTable('inbound_hook_events')) {
                 $n += $per['inbound_hook_events'] = DB::table('inbound_hook_events')
-                    ->where('created_at', '<', now()->subDays(90))->delete();
+                    ->where('created_at', '<', now()->subDays(max(7, (int) setting('retention.inbound_hooks_days', 90))))->delete();
             }
 
             // **ونقاطُ المقاييس** (v2.342): فحصُ التوافر يكتب نقطةً لكل موقعٍ
             // وسيرفرٍ **كل خمس دقائق** — أي مئاتُ الآلاف سنويّاً — وكان الجدولُ
             // الوحيدَ بلا تقليمٍ بين أربعةٍ شقيقة. والنظامُ يُرفع على استضافةٍ
             // مشتركة بقرصٍ محدود. سنةٌ كاملة تكفي لكل رسمٍ زمنيّ في الشاشات.
+            // والمدّةُ من مفتاح retention.metric_points_days (WP-2.3 · critic #16)
+            // بعدما ضاعف الطورُ الثاني الحجمَ (لقطاتُ ops كلَّ ٥ دقائق + تاريخُ النبضات).
+            // **وتاريخُ تشغيل المجدولات** ('ops', <job>, 'run') الذي تكتبه Health::beat
+            // تليمترٌ عمرُه سنةٌ **عمداً** (critic #23): اتجاهُ المدّة والفشل المتتالي
+            // يكفيهما ذلك — الأثرُ الدائم في سجل التدقيق، لا صفوفُ قياسٍ تعيش للأبد.
+            // والحذفُ **على دفعاتٍ** (نمطُ page_visits · critic #28): مسحةٌ واحدة على
+            // جدولٍ بلغ مئاتِ الآلاف كانت تقفله طويلاً تحت محرّكٍ صارم.
             if (\Illuminate\Support\Facades\Schema::hasTable('metric_points')) {
-                $n += $per['metric_points'] = DB::table('metric_points')
-                    ->where('at', '<', now()->subDays(365)->toDateTimeString())->delete();
+                $mpKeep = max(30, (int) setting('retention.metric_points_days', 365));
+                $per['metric_points'] = 0;
+                do {
+                    $gone = DB::table('metric_points')
+                        ->where('at', '<', now()->subDays($mpKeep)->toDateTimeString())
+                        ->limit(5000)->delete();
+                    $n += $gone; $per['metric_points'] += $gone;
+                } while ($gone >= 5000);
             }
 
             // **وزياراتُ الصفحات** (v2.350): كان التشذيبُ يقع **داخل طلب المستخدم**
@@ -752,6 +769,23 @@ class HubAutomation extends Command
             // **ونقاطُ المسار الخام** (v2.371): سياسةُ خصوصيةٍ صريحة — الإحداثيات
             // الدقيقة لا تبقى للأبد؛ المسارُ المبسَّط على الجلسة يكفي للتاريخ.
             $n += $per['track_points'] = \App\Support\Tracking::prune();
+
+            // ── Control Plane: Phase 2 (WP-2.2) ──
+            // **ودلاءُ قياس HTTP**: صفٌّ لكل (حاوية ٥ دقائق × سطح × فعل × مسار)
+            // يكتبه Observability::terminate مع كل طلب — تليمتريا لا سجلُّ أعمال،
+            // و٩٠ يوماً تكفي لكل اتجاهٍ تعرضه شاشاتُ RED. الحذفُ على دفعاتٍ
+            // (نمطُ page_visits) كي لا يُقفَل جدولٌ ساخنٌ يكتب فيه كلُّ طلبٍ حيّ؛
+            // والفريدُ (bucket_at, …) يقود شرطَ bucket_at وحدَه فلا مسحَ كاملاً.
+            if (\Illuminate\Support\Facades\Schema::hasTable('http_metric_buckets')) {
+                $keep = max(7, (int) setting('retention.http_buckets_days', 90));
+                $per['http_metric_buckets'] = 0;
+                do {
+                    $gone = DB::table('http_metric_buckets')
+                        ->where('bucket_at', '<', now()->subDays($keep)->toDateTimeString())
+                        ->limit(5000)->delete();
+                    $n += $gone; $per['http_metric_buckets'] += $gone;
+                } while ($gone >= 5000);
+            }
 
             // أثرُ التقليم (§13): لا حذفَ صامتاً — سطرُ تدقيقٍ واحدٌ لكل جدولٍ
             // قُلّم فعلاً، بعدد المحذوف. يعمل بلا مستخدمٍ مسجَّل (console):

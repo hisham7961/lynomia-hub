@@ -78,6 +78,9 @@ class HubBackup extends Command
         'download_log', 'imports_log', 'automation_log', 'kb_reads', 'track_points', 'track_sessions', 'api_usage',
         'reactions', 'comment_reads', 'sideapp_stores', 'settings', 'roles', 'users',
         'record_locks', 'share_views',   // أقفالُ تحريرٍ تنتهي بدقائق، وسجلُّ مشاهداتِ روابط المشاركة
+        // (الطور ٢ · WP-2.2) دلاءُ قياس طلبات HTTP — تليمتريا لا سجلُّ أعمال:
+        // تُعاد تعبئتُها من الطلبات الحيّة خلال دقائق ولا تُستعاد من نسخة.
+        'http_metric_buckets',
     ];
 
     /** الجداولُ التي تنسخها النسخة: وحداتُ السجل + الخام + (users/roles/settings بصيغتها) */
@@ -102,6 +105,7 @@ class HubBackup extends Command
 
     public function handle(): int
     {
+        $t0 = microtime(true);   // (WP-2.3) مدّةُ النسخة الحقيقية تُنبَض — لا نبضةَ بلا مدّة
         $out = ['_meta' => ['app' => (string) setting('app.name', config('app.name')),
                             'version' => config('hub.version'), 'at' => now()->toIso8601String()]];
 
@@ -248,7 +252,7 @@ class HubBackup extends Command
         $this->info('✓ ' . basename($file) . ' — ' . number_format($total) . ' سجل، ' .
                     number_format(filesize($file) / 1024, 1) . ' KB (محفوظ آخر ' . $keep . ' نسخة)');
 
-        \App\Support\Health::beat('backup', null, 'ok', basename($file) . ' · ' . number_format($total) . ' سجل');
+        \App\Support\Health::beat('backup', (int) round((microtime(true) - $t0) * 1000), 'ok', basename($file) . ' · ' . number_format($total) . ' سجل');
         return self::SUCCESS;
     }
 }

@@ -20,6 +20,7 @@ class HubDigest extends Command
 
     public function handle(): int
     {
+        $t0 = microtime(true);   // (WP-2.3) مدّةُ التأليف والإرسال الحقيقية تُنبَض — لا نبضةَ بلا مدّة
         // (v2.399) تشغيلٌ يدويّ + الكرون الأسبوعي كانا يُرسلان التقريرَ مرّتين في اليوم نفسه
         if (! $this->option('dry') && ! $this->option('force')) {
             $last = setting('heartbeat.digest');
@@ -96,7 +97,7 @@ class HubDigest extends Command
                 'text' => hub_fit($text, hub_col_max('outbox', 'text') ?? 790), 'state' => 'queued', 'created_at' => now()]);
         }
 
-        \App\Support\Health::beat('digest');
+        \App\Support\Health::beat('digest', (int) round((microtime(true) - $t0) * 1000));
 
         $this->info('أُرسل التقرير إلى ' . $owners->count() . ' مالك');
 

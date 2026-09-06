@@ -297,13 +297,20 @@ class SecurityPosture
         return self::row('debug_mode', 'وضعُ التصحيح والبيئة', $tone, $why, $tone === 'ok' ? 0 : 1, $fix, route('ops.index'));
     }
 
-    /** آخرُ نسخةٍ احتياطية ناجحة: أقدمُ من يومين = لا تعافٍ (CFG-02/12) */
+    /**
+     * آخرُ نسخةٍ احتياطية ناجحة: لا تعافٍ بدونها (CFG-02/12).
+     * (WP-2.1) العتبتان **هما نافذتا Health::JOBS['backup']** نفساهما (٢٦/٥٠ ساعة بمعامل
+     * التأخّر) — كان الفحصان يختلفان (٣٠/٧٢ هنا) فيقول مركزُ الأمان «سليم» ومركزُ
+     * التشغيل «متأخّرة» عن النبضة الواحدة.
+     */
     protected static function backupFresh(): array
     {
         $at = setting('heartbeat.backup');
-        $age = $at ? (int) \Illuminate\Support\Carbon::parse($at)->diffInHours(now()) : null;
-        $tone = $age === null ? 'wn' : ($age > 72 ? 'bad' : ($age > 30 ? 'wn' : 'ok'));
-        $fix = $age === null ? 'لم تُؤخذ نسخةٌ قطّ — فعّل سطر cron أو اضغط «نسخة الآن» في مركز التشغيل.'
+        $ageMin = $at ? (int) \Illuminate\Support\Carbon::parse($at)->diffInMinutes(now()) : null;
+        $age = $ageMin === null ? null : intdiv($ageMin, 60);
+        [$late, $dead] = Health::jobWindows('backup');
+        $tone = $ageMin === null ? 'wn' : ($ageMin > $dead ? 'bad' : ($ageMin > $late ? 'wn' : 'ok'));
+        $fix = $ageMin === null ? 'لم تُؤخذ نسخةٌ قطّ — فعّل سطر cron أو اضغط «نسخة الآن» في مركز التشغيل.'
             : ($tone === 'ok' ? '' : "آخر نسخة منذ {$age} ساعة — راجع نبضة hub:backup في مركز التشغيل.");
 
         return self::row('backup_fresh', 'حداثةُ النسخة الاحتياطية', $tone,

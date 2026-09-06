@@ -579,4 +579,10 @@ Route::middleware('auth')->group(function () {
     // أثرُ الطلب الواحد عبر الطبقات — الاسمُ `system.trace` لأن `trace` مملوكٌ لسلسلة التسليم
     Route::get('system/trace/{rid}', [\App\Http\Controllers\Web\SystemTraceController::class, 'show'])
         ->name('system.trace')->middleware('throttle:60,1')->where('rid', '[A-Za-z0-9._:-]{1,64}');
+
+    // ── Control Plane: Phase 2 ──
+    // (WP-2.6) إعادةُ رسالةٍ صادرةٍ واحدة من مركز التشغيل — مالكٌ + تأكيدُ هوية داخل
+    // الفعل (hub_require_ops_stepup) + قيدُ تدقيق، وحدُّ معدلٍ يصدّ حلقةَ إعادةٍ عمياء
+    Route::post('admin/ops/outbox/{id}/retry', [OpsController::class, 'outboxRetry'])
+        ->name('ops.outbox.retry')->middleware('throttle:30,1');
 });

@@ -147,8 +147,13 @@ class ErrorLog
         }
     }
 
-    /** نمطُ المسار للتجميع حين لا اسمَ له: المعرّفات تُعمَّم */
-    protected static function routePattern($req): string
+    /**
+     * نمطُ المسار للتجميع حين لا اسمَ له: المعرّفات تُعمَّم (UUID ⇒ {id}،
+     * رقمٌ ⇒ {n}). **المطبِّعُ الواحد** (WP-2.2): يستهلكه التقاطُ البطء ودلاءُ
+     * RED في Observability أيضاً — نسخةٌ محليةٌ هناك حُذفت لصالحه كي لا
+     * ينحرف تجميعُ الأخطاء عن تجميع القياس.
+     */
+    public static function routePattern($req): string
     {
         return (string) preg_replace([
             '/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i',

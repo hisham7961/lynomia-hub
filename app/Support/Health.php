@@ -42,12 +42,23 @@ final class Health
     protected const RANK = [self::HEALTHY => 0, self::UNKNOWN => 1, self::MAINTENANCE => 2, self::DEGRADED => 3, self::UNAVAILABLE => 4];
 
     /**
+     * رتبةُ حالةٍ رقماً (WP-2.3): المصدرُ الواحد لسُلَّم السوء — تقرؤه لقطةُ
+     * hub:ops-snapshot فتُخزَّن سلسلةُ ('ops','health','rank') بأرقامٍ قابلةٍ
+     * للرسم بدل أن يخترع كلُّ قارئٍ سُلَّمَه الخاص.
+     */
+    public static function rank(string $status): int
+    {
+        return self::RANK[$status] ?? self::RANK[self::UNKNOWN];
+    }
+
+    /**
      * المجدولاتُ ودورتُها بالدقائق: [التسمية، الدورة، متأخرة بعد، متعطّلة بعد].
      * النبضةُ تُكتب في `heartbeat.<key>` (قائمٌ منذ v2.26) ولا تُغيَّر صيغتُها.
      */
     public const JOBS = [
         'outbox'     => ['عامل التسليم (كل ٥ دقائق)', 5, 15, 60],
         'uptime'     => ['الفحص الحيّ (كل ٥ دقائق)', 5, 15, 60],
+        'ops'        => ['لقطةُ التشغيل (كل ٥ دقائق)', 5, 15, 60],   // ── Control Plane: Phase 2 (WP-2.3) ──
         'automation' => ['الأتمتة اليومية', 1440, 26 * 60, 50 * 60],
         'backup'     => ['النسخ الاحتياطي اليومي', 1440, 26 * 60, 50 * 60],
         'metrics'    => ['لقطة المقاييس اليومية', 1440, 26 * 60, 50 * 60],
@@ -55,6 +66,20 @@ final class Health
         'digest'     => ['التقرير الأسبوعي', 7 * 1440, 8 * 1440, 15 * 1440],
         'audit'      => ['فاحص سلسلة التدقيق (أسبوعي)', 7 * 1440, 8 * 1440, 15 * 1440],
     ];
+
+    /**
+     * نافذتا «متأخرة/متعطّلة» لمجدولةٍ بالدقائق بعد تطبيق معامل التأخّر القابل للضبط
+     * (WP-2.1: ops.scheduler_late_factor، افتراضيُّه ١ فلا يتغيّر شيءٌ بلا ضبط).
+     * المصدرُ الواحد لكل قارئ: scheduler() هنا وفحصُ حداثة النسخة في مركز الأمان —
+     * كانا عتبتين مختلفتين تقولان قولين في المجدولة الواحدة.
+     */
+    public static function jobWindows(string $job): array
+    {
+        [, , $late, $dead] = self::JOBS[$job] ?? [null, 0, 0, 0];
+        $factor = max(0.1, (float) rescue(fn () => setting('ops.scheduler_late_factor', 1), 1, false));
+
+        return [(int) round($late * $factor), (int) round($dead * $factor)];
+    }
 
     /* ────────── الأسطح الثلاثة ────────── */
 
@@ -112,13 +137,16 @@ final class Health
 
     protected static function db(): array
     {
+        // عتبة بطء القاعدة قابلة للضبط (WP-2.1) — والقراءة داخل rescue فلا يعتمد
+        // فحصُ القاعدة على القاعدة نفسِها (نمط Observability::handle)
+        $warnMs = max(1, (int) rescue(fn () => setting('ops.db_ms_warn', 500), 500, false));
         try {
             $t0 = microtime(true);
             DB::select('select 1');
             $ms = (int) round((microtime(true) - $t0) * 1000);
 
-            return self::c($ms > 500 ? self::DEGRADED : self::HEALTHY, 'قاعدة البيانات',
-                $ms > 500 ? "بطيئة: {$ms}ms" : "{$ms}ms", ['ms' => $ms, 'driver' => config('database.default')]);
+            return self::c($ms > $warnMs ? self::DEGRADED : self::HEALTHY, 'قاعدة البيانات',
+                $ms > $warnMs ? "بطيئة: {$ms}ms" : "{$ms}ms", ['ms' => $ms, 'driver' => config('database.default')]);
         } catch (\Throwable $e) {
             return self::c(self::UNAVAILABLE, 'قاعدة البيانات', 'لا تُجيب', ['error' => self::safe($e->getMessage())]);
         }
@@ -145,10 +173,24 @@ final class Health
         $free = @disk_free_space(storage_path());
         $total = @disk_total_space(storage_path());
         $pct = ($free !== false && $total) ? (int) round(($total - $free) * 100 / $total) : null;
-        $status = ! $writable ? self::UNAVAILABLE : ($pct === null ? self::HEALTHY : ($pct >= 97 ? self::UNAVAILABLE : ($pct >= 85 ? self::DEGRADED : self::HEALTHY)));
+        $status = ! $writable ? self::UNAVAILABLE : self::diskStatus($pct);
         $why = ! $writable ? 'مجلد التخزين غير قابل للكتابة' : ($pct === null ? 'قابل للكتابة' : "القرص مستخدم {$pct}٪");
 
         return self::c($status, 'التخزين', $why, ['writable' => $writable, 'disk_pct' => $pct]);
+    }
+
+    /**
+     * حالةُ امتلاء القرص من نسبته وحدها — العتبتان قابلتان للضبط (WP-2.1) بافتراضيّاتِ
+     * الأمس (85/97)، والقراءةُ داخل rescue فلا يعتمد فحصُ الجاهزية على قاعدة الإعدادات.
+     * عامّةٌ ليختبرها الاختبارُ بنسبةٍ معلومة، وليقرأها عرضُ مركز التشغيل نفسُه.
+     */
+    public static function diskStatus(?int $pct): string
+    {
+        if ($pct === null) return self::HEALTHY;
+        $warn = max(1, (int) rescue(fn () => setting('ops.disk_warn', 85), 85, false));
+        $crit = max($warn, (int) rescue(fn () => setting('ops.disk_crit', 97), 97, false));
+
+        return $pct >= $crit ? self::UNAVAILABLE : ($pct >= $warn ? self::DEGRADED : self::HEALTHY);
     }
 
     protected static function migrations(): array
@@ -212,7 +254,8 @@ final class Health
         $rows = [];
         $worst = self::HEALTHY;
         $never = 0;
-        foreach (self::JOBS as $key => [$label, $every, $late, $dead]) {
+        foreach (self::JOBS as $key => [$label, $every]) {
+            [$late, $dead] = self::jobWindows($key);
             $at = null; $meta = [];
             try {
                 $at = setting('heartbeat.' . $key);
@@ -250,9 +293,12 @@ final class Health
             $stuckMin = $oldest ? Carbon::parse($oldest)->diffInMinutes(now()) : 0;
             $lastError = DB::table('outbox')->where('state', 'failed')->orderByDesc('created_at')->value('error');
 
+            // عتبتا عمر الطابور قابلتان للضبط (WP-2.1) — بافتراضيّي الأمس (٢٠/٦٠ دقيقة)
+            $warnAge = max(1, (int) rescue(fn () => setting('ops.queue_age_warn', 20), 20, false));
+            $critAge = max($warnAge, (int) rescue(fn () => setting('ops.queue_age_crit', 60), 60, false));
             $st = self::HEALTHY; $why = "{$queued} في الطابور";
-            if ($stuckMin > 60) { $st = self::UNAVAILABLE; $why = "رسالةٌ تنتظر منذ {$stuckMin} دقيقة — العامل لا يُفرغ الطابور"; }
-            elseif ($stuckMin > 20 || $failed24 > 0) { $st = self::DEGRADED; $why = $failed24 ? "{$failed24} فشلت خلال ٢٤ ساعة" : "الطابور يتأخّر ({$stuckMin} دقيقة)"; }
+            if ($stuckMin > $critAge) { $st = self::UNAVAILABLE; $why = "رسالةٌ تنتظر منذ {$stuckMin} دقيقة — العامل لا يُفرغ الطابور"; }
+            elseif ($stuckMin > $warnAge || $failed24 > 0) { $st = self::DEGRADED; $why = $failed24 ? "{$failed24} فشلت خلال ٢٤ ساعة" : "الطابور يتأخّر ({$stuckMin} دقيقة)"; }
 
             return self::c($st, 'الصندوق الصادر', $why, ['queued' => $queued, 'failed_24h' => $failed24, 'oldest_min' => $stuckMin, 'last_error' => $lastError ? mb_substr((string) $lastError, 0, 160) : null]);
         } catch (\Throwable $e) {
@@ -366,11 +412,31 @@ final class Health
     public static function beat(string $job, ?int $ms = null, string $result = 'ok', ?string $note = null): void
     {
         try {
-            \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.' . $job], ['value' => now()->toIso8601String()]);
-            \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.' . $job . '.meta'], ['value' => [
-                'ms' => $ms, 'result' => $result, 'note' => $note ? mb_substr($note, 0, 180) : null, 'at' => now()->toIso8601String(),
-            ]]);
-            Cache::forget('settings:all');
+            $iso = now()->toIso8601String();
+            $meta = ['ms' => $ms, 'result' => $result, 'note' => $note ? mb_substr($note, 0, 180) : null, 'at' => $iso];
+            \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.' . $job], ['value' => $iso]);
+            \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.' . $job . '.meta'], ['value' => $meta]);
+
+            // **لا `Cache::forget('settings:all')` هنا** (WP-2.3 · critic #29): أربعُ مجدولاتٍ
+            // كلَّ ٥ دقائق تعني إبطالاً كلَّ ~دقيقة وربع، فيقرأ كلُّ طلبِ ويبٍ تقريباً جدولَ
+            // الإعدادات كاملاً. النبضةُ تُرقَّع في الكاش **موضعياً** بمفتاحَيها وحدهما —
+            // فيبقى كلُّ قارئِ `setting('heartbeat.*')` طازجاً بلا نسفِ الكاش كلِّه.
+            try {
+                $all = Cache::get('settings:all');
+                if (is_array($all)) {
+                    $all['heartbeat.' . $job] = $iso;
+                    $all['heartbeat.' . $job . '.meta'] = $meta;
+                    Cache::put('settings:all', $all, 600);
+                }
+            } catch (\Throwable $e) {
+            }
+
+            // **تاريخُ التشغيل** (WP-2.3): صفٌّ لكل نبضةٍ في metric_points — فتاريخُ كل
+            // مجدولٍ (المدّةُ والنتيجة) يوجد بلا جدولٍ جديد، ويرسمه جدولُ المجدولات في
+            // مركز التشغيل. مدّةٌ غائبة تُخزَّن -1 لا null (critic #30: التوقيع float
+            // يرمي TypeError) ولا صفراً كاذباً — القارئُ يميّز «بلا قياس» عن «فوريّ».
+            hub_metric_put('ops', $job, 'run', $ms === null ? -1.0 : (float) $ms, now(), 'auto',
+                ['result' => $result, 'note' => $note ? mb_substr($note, 0, 180) : null]);
         } catch (\Throwable $e) {
             // النبضةُ إثراءٌ لا شرطٌ لإتمام المهمّة
         }

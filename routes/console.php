@@ -35,7 +35,30 @@ Schedule::command('hub:quality-snapshot')->dailyAt('23:50')->withoutOverlapping(
 | فالسلسلةُ مختومةٌ ولا يفحصها شيء، والعبثُ يبقى غيرَ مكتشَفٍ إلى أن يخطر
 | لأحدٍ أن يسأل — وهو ما لا يقع. أسبوعيّاً قبل الفجر، وزرٌّ في مركز التشغيل.
 */
+$auditT0 = null;   // (WP-2.3) يلتقطه before ويقرؤه onSuccess — الإغلاقان يتشاركان المرجع
 Schedule::command('hub:audit-verify')->weeklyOn(0, '04:30')->withoutOverlapping(240)
-    // نبضةُ الفاحص من المجدول نفسِه: نجاحٌ أو فشلٌ يُقرأ في نموذج الصحّة (v2.399)
-    ->onSuccess(fn () => \App\Support\Health::beat('audit'))
+    ->before(function () use (&$auditT0) { $auditT0 = microtime(true); })
+    // نبضةُ الفاحص من المجدول نفسِه: نجاحٌ أو فشلٌ يُقرأ في نموذج الصحّة (v2.399)،
+    // وبمدّتها الحقيقية (WP-2.3) — فاتّجاهُ مدّة الفحص يُرسم في جدول المجدولات
+    ->onSuccess(function () use (&$auditT0) {
+        \App\Support\Health::beat('audit', $auditT0 !== null ? (int) round((microtime(true) - $auditT0) * 1000) : null);
+    })
     ->onFailure(fn () => hub_schedule_failed('hub:audit-verify', 'SECURITY', 'HIGH'));   // نبضة fail + خطأ + حادثة أمنية
+
+// ── Control Plane: Phase 2 ──
+/*
+| لقطةُ التشغيل (WP-2.3): كلَّ ٥ دقائق تُكتب رتبةُ الجاهزية وموارد الخادم في
+| metric_points — رخيصةٌ عمداً (critic #38)، والعدّاداتُ الثقيلةُ يوميّاً خلف حارس.
+| مفتاحُ نبضتها 'ops' وقائمةُ اشتقاق hub_schedule_failed (طور ١، لا تُحرَّر هنا)
+| لا تعرفه — فتُكتب نتيجةُ الفشل تحت المفتاح الصحيح صراحةً كي يراها نموذجُ الصحّة.
+*/
+Schedule::command('hub:ops-snapshot')->everyFiveMinutes()->withoutOverlapping(20)
+    ->onFailure(function () {
+        hub_schedule_failed('hub:ops-snapshot', 'QUEUE', 'ERROR');
+        try {
+            \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.ops.meta'],
+                ['value' => ['ms' => null, 'result' => 'fail', 'note' => 'فشل التشغيل المجدول', 'at' => now()->toIso8601String()]]);
+            \Illuminate\Support\Facades\Cache::forget('settings:all');
+        } catch (\Throwable $e) {
+        }
+    });
