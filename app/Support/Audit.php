@@ -24,6 +24,92 @@ class Audit
     protected const NOISE = ['updated_at', 'search_vec', 'version', 'updated_by', 'hash', 'prev_hash'];
 
     /**
+     * قاعدةُ قراءة سجلّ التدقيق **منطَّقةً** — كلُّ قارئٍ للجدول (القائمة، النبض،
+     * أيُّ عدّاد) يبدأ من هنا لا من `DB::table('audits')` الخام.
+     *
+     * القاعدة: **قارئ الأثر لا يرى أثرَ ما لا يراه.** كان النطاقُ منسوخاً في
+     * ثلاثة مواضع داخل شاشة التدقيق وحدها وكلُّها تنسى المرشِّحين الأهمّ:
+     * وحدةٌ لا يملك القارئ عرضَها كان **اسمُ** سجلّها يُطبع ويُربَط بشاشته —
+     * والاسمُ وحده تسريب («مسيّر رواتب أبريل» يقول ما يكفي) — وعزلُ العملاء
+     * (`hub_client_ids`) لم يُطبَّق مطلقاً رغم أنّ ١٦ وحدةً تحمل عمودَ عميل.
+     * النمطُ المرجعيّ: بلاطةُ «آخر النشاطات» في WidgetRegistry — معمَّماً هنا.
+     */
+    public static function scopedQuery($user = null)
+    {
+        $user = $user ?? auth()->user();
+        $q = DB::table('audits');
+        // بلا مستخدمٍ لا قراءة — درعٌ لمستهلكٍ يُستدعى خارج سياق مصادقة
+        if (! $user) return $q->whereRaw('1 = 0');
+
+        // ١) وحدةٌ لا يراها المستخدم لا يظهر أثرُها. القيدُ النظاميّ — module
+        //    فارغ، أو خارجَ سجلّ الوحدات كـ`settings` — تحكمه رايةُ `audit`
+        //    وحدها، كما في Audit::diff تماماً (حجبٌ بقائمة المسجَّل المحجوب لا
+        //    بقائمة المسموح، كي لا تختفي القيودُ النظامية عن المالك نفسِه).
+        $hidden = array_values(array_filter(array_keys(hub_modules()),
+            fn ($m) => ! hub_can($user, $m, 'v')));
+        if ($hidden) {
+            $q->where(fn ($w) => $w->whereNull('audits.module')
+                                   ->orWhereNotIn('audits.module', $hidden));
+        }
+
+        // ٢) النطاق المشاريعي: فعلُه هو، أو ما جرى في مشاريعه
+        if (hub_scoped($user)) {
+            $ids = $user->visibleProjectIds();
+            $q->where(fn ($w) => $w->where('audits.user_id', $user->id)
+                                   ->orWhereIn('audits.project_id', $ids));
+        }
+
+        // ٣) عزل الشركات: القيد يحمل شركته منذ سمة Auditable، والمعدومُ الشركةِ
+        //    يبقى لصاحبه وحده. (درعُ النشر-قبل-الترحيل: إن غاب العمودُ بعدُ
+        //    نتحفّظ على نشاط المستخدم نفسِه — لا تسريبَ ولا انهيار.)
+        if (($cids = hub_company_ids($user)) !== null) {
+            if (Schema::hasColumn('audits', 'company_id')) {
+                $uid = $user->id;
+                $q->where(fn ($w) => $w->whereIn('audits.company_id', $cids)
+                    ->orWhere(fn ($y) => $y->whereNull('audits.company_id')
+                                           ->where('audits.user_id', $uid)));
+            } else {
+                $q->where('audits.user_id', $user->id);
+            }
+        }
+
+        // ٤) عزل العملاء — نظيرُ hub_scope حرفياً منقولاً إلى الأثر: وحدةٌ لها
+        //    عمودُ عميلٍ لا يُعرَض قيدُها للمحصور إلا إن كان سجلُّه لعميلٍ مسموح.
+        //    القيدُ اليتيم (بلا record_id، أو سجلُّه لم يعد في جدوله) يُحجَب
+        //    **تحفّظاً** لا يُكشف قرعةً. الوحداتُ بلا عمودِ عميلٍ والقيودُ
+        //    النظامية تبقى محكومةً بالمصفوفة — كما في hub_scope سواء.
+        if (($kids = hub_client_ids($user)) !== null) {
+            $clientMods = array_values(array_filter(array_keys(hub_modules()),
+                fn ($m) => hub_client_col($m) !== null));
+            if ($clientMods) {
+                $q->where(function ($w) use ($clientMods, $kids, $user) {
+                    $w->whereNull('audits.module')->orWhereNotIn('audits.module', $clientMods);
+                    foreach ($clientMods as $mk) {
+                        if (! hub_can($user, $mk, 'v')) continue;   // محجوبةٌ أصلاً بالمرشِّح ١
+                        $col = hub_client_col($mk);
+                        if ($col === 'id') {                        // وحدة العملاء نفسها: السجلُّ هو العميل
+                            $w->orWhere(fn ($x) => $x->where('audits.module', $mk)
+                                                     ->whereIn('audits.record_id', $kids));
+                            continue;
+                        }
+                        $table = hub_mod($mk)['table'] ?? null;
+                        try {
+                            if (! $table || ! Schema::hasTable($table)) continue; // بلا جدولٍ تُحجَب الوحدة تحفّظاً
+                        } catch (\Throwable $e) {
+                            continue;
+                        }
+                        $w->orWhere(fn ($x) => $x->where('audits.module', $mk)
+                            ->whereIn('audits.record_id',
+                                fn ($s) => $s->select('id')->from($table)->whereIn($col, $kids)));
+                    }
+                });
+            }
+        }
+
+        return $q;
+    }
+
+    /**
      * الفرق المقروء: الحقول **المتغيّرة وحدها**، بأسمائها العربية من سجل الوحدات.
      *
      * @return array<int, array{label:string, col:string, from:string, to:string}>
@@ -136,6 +222,33 @@ class Audit
         }
     }
 
+    /**
+     * (WP-5.4) التحقّق الموضعيّ لقيدٍ واحد — منطقُ نافذة `verifyTail` نفسُه
+     * (المطابقة الثلاثية v2/v2raw/v1) على هذا الصفّ وحده، بلا استعلامٍ إضافيّ.
+     * **ولا فحصَ سلسلةٍ كاملاً في طلبٍ أبداً** — التغطيةُ الكاملة (الوصلُ بين
+     * القيود ورأسُ السلسلة) لأمر `hub:audit-verify` وزرِّ مركز التشغيل.
+     *
+     * @return array{status:string, label:string, tone:string, why:string}
+     */
+    public static function verifyRow(AuditEntry $row): array
+    {
+        if ((string) $row->hash === '') {
+            return ['status' => 'unsealed', 'label' => 'بلا ختم', 'tone' => 'wn',
+                    'why' => 'القيد كُتب بلا بصمة — طبيعيٌّ لما قبل بدء السلسلة، وعيبٌ يكشفه hub:audit-verify لما بعده'];
+        }
+
+        $p = (string) $row->prev_hash;
+        $match = hash('sha256', $p . '|' . $row->canonical()) === $row->hash
+              || hash('sha256', $p . '|' . $row->canonical('v2raw')) === $row->hash
+              || hash('sha256', $p . '|' . $row->canonical('v1')) === $row->hash;
+
+        return $match
+            ? ['status' => 'ok', 'label' => 'بصمة مطابقة', 'tone' => 'ok',
+               'why' => 'أُعيد حسابُ بصمة القيد من محتواه المخزّن فطابقت المختومة']
+            : ['status' => 'tampered', 'label' => '⚠️ عبث', 'tone' => 'bad',
+               'why' => 'بصمةُ القيد لا تطابق محتواه — عُدِّل مباشرةً في القاعدة بعد الختم'];
+    }
+
     protected static function unsealedAfterEpoch(): int
     {
         if (! Schema::hasColumn('audit_chain', 'started_at')) return 0;
@@ -160,7 +273,11 @@ class Audit
         if (in_array($col, self::MASKED, true)) return $v === null || $v === '' ? '—' : '••• مخفيّ';
         if ($v === null || $v === '') return '—';
         if (is_bool($v)) return $v ? 'نعم' : 'لا';
-        if (is_array($v)) return \Illuminate\Support\Str::limit((string) json_encode($v, JSON_UNESCAPED_UNICODE), 120);
+        // المُطهِّرُ الواحد هنا لا في متحكّمٍ بعينه (WP-5.4 مُعمَّماً): رمزٌ داخل
+        // قيمةٍ بريئة (lyn_/JWT/token=) يُطمَس لدى **كلِّ** عارضٍ للفرق — القائمة
+        // والتفصيل سواء. والطمسُ **قبل** القصّ: رمزٌ بُتر نصفُه يفلت من نمطه.
+        if (is_array($v)) return \Illuminate\Support\Str::limit(
+            \App\Support\Redactor::text((string) json_encode($v, JSON_UNESCAPED_UNICODE)), 120);
 
         $s = (string) $v;
         // المعرّفات الطويلة تُستبدل باسم صاحبها متى أمكن — «uuid ← uuid» لا يقول شيئاً
@@ -168,7 +285,7 @@ class Audit
             return self::refLabel($col, $s) ?? \Illuminate\Support\Str::limit($s, 12);
         }
 
-        return \Illuminate\Support\Str::limit($s, 140);
+        return \Illuminate\Support\Str::limit(\App\Support\Redactor::text($s), 140);
     }
 
     /** اسمٌ لمعرّفٍ مرجعي — يُقرأ من الجدول المرجَّح للعمود، بلا كسرٍ إن غاب */

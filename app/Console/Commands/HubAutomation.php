@@ -705,7 +705,9 @@ class HubAutomation extends Command
 
             // **سياسةُ احتفاظٍ لسجلات التشغيل** (v2.399) — كانت بلا سقفٍ إطلاقاً:
             // الصندوقُ الصادر المُسلَّم، وتسليماتُ الويبهوك الفاشلة، والأخطاءُ المحلولة أو البائتة.
-            // (سلسلةُ التدقيق تبقى للأبد عمداً.) المدَدُ من الإعدادات لا من الشيفرة.
+            // (سلسلةُ التدقيق لا يقلّمها هذا الأمر ولا غيرُه: سياسةُ احتفاظها وصفيّةٌ
+            // معلَنة — audit.retention_days للأبد افتراضاً، ولا كودَ تقليمٍ لها عمداً · ق٦.)
+            // المدَدُ من الإعدادات لا من الشيفرة.
             if (\Illuminate\Support\Facades\Schema::hasTable('outbox')) {
                 $n += $per['outbox'] = DB::table('outbox')->whereIn('state', ['sent', 'failed'])
                     ->where('created_at', '<', now()->subDays(max(30, (int) setting('retention.outbox_days', 180))))->delete();
@@ -771,7 +773,8 @@ class HubAutomation extends Command
 
             // **سياسة احتفاظٍ لبيانات الأمن** (v2.369): سجلُّ الجلسات وألفةُ العناوين
             // لا يُحتفَظ بهما للأبد — بياناتُ تتبّعٍ حسّاسةٌ تُقلَّم بمدّةٍ مضبوطة.
-            // (السلسلةُ التدقيقيةُ تبقى للأبد عمداً: كشفُ العبث يحتاج التاريخَ كلَّه.)
+            // (سلسلةُ التدقيق خارج كل تقليم: كشفُ العبث يحتاج التاريخَ كلَّه —
+            // سياسةُ احتفاظها وصفيّةٌ معلَنة في audit.retention_days، للأبد افتراضاً · ق٦.)
             $sessKeep = max(30, (int) setting('security.sessions_keep_days', 180));
             if (\Illuminate\Support\Facades\Schema::hasTable('sessions_log')) {
                 $n += $per['sessions_log'] = \Illuminate\Support\Facades\DB::table('sessions_log')

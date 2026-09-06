@@ -222,8 +222,10 @@ class SecurityCenterTest extends TestCase
         $mine = \App\Models\Company::create(['name_ar' => 'شركتي', 'status' => 'نشطة']);
         $other = \App\Models\Company::create(['name_ar' => 'شركة أخرى', 'status' => 'نشطة']);
 
+        // clients:v صريحةٌ منذ WP-5.1: مرشِّحُ الوحدات المرئية يسبق عزلَ الشركات،
+        // وبلا صلاحية الوحدة يُحجَب القيدان معاً فلا يُختبَر العزل أصلاً
         $role = \App\Models\Role::create(['name' => 'محاسبة شركة', 'scope' => 'all',
-            'flags' => ['audit' => 1], 'matrix' => []]);
+            'flags' => ['audit' => 1], 'matrix' => ['clients' => ['v' => 1]]]);
         $u = User::create(['name' => 'معزولة', 'email' => 'iso@test.local', 'password' => 'Secret!2026x',
             'role_id' => $role->id, 'status' => 'نشط', 'password_changed_at' => now(),
             'companies' => [$mine->id]]);

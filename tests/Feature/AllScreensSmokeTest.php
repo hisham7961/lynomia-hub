@@ -135,6 +135,18 @@ class AllScreensSmokeTest extends TestCase
             if (str_starts_with($r->uri(), 'api/') || str_starts_with($r->uri(), '_')) continue;
 
             $uri = $r->uri();
+            // (WP-5.4) صفحةُ تفصيل قيد التدقيق: معرّفُها رقميّ تسلسليّ لا uuid —
+            // الاستبدالُ العامّ أدناه كان يُطعمها uuid فتخرج من المسح بجوابٍ
+            // فارغ 404 (critic #33: الشاشةُ الجديدة تدخل الشبكةَ بمعرّفٍ حقيقيّ)
+            if ($name === 'audit.show') {
+                $aid = DB::table('audits')->min('id');
+                if (! $aid) {
+                    DB::table('audits')->insert(['action' => 'تعديل', 'module' => 'tasks',
+                        'name' => 'قيدٌ يُزرع ليدخل المسح', 'created_at' => now()]);
+                    $aid = DB::table('audits')->min('id');
+                }
+                $uri = str_replace('{id}', (string) $aid, $uri);
+            }
             $module = null;
             if (str_contains($uri, '{module}')) {
                 $module = 'hr';
