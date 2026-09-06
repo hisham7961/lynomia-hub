@@ -674,4 +674,12 @@ Route::middleware('auth')->group(function () {
     // لأن الزرّ يظهر على ثلاث شاشاتِ مصادر فيسهل النقرُ الأعمى المتكرّر.
     Route::post('admin/incidents/{id}/link', [\App\Http\Controllers\Web\IncidentLinkController::class, 'store'])
         ->name('incidents.link')->middleware('throttle:30,1')->whereUuid('id');
+    // ── Control Plane: Phase 7 ──
+    // (WP-7.2) نظرةُ القوى العاملة: عدّاداتُ التنفيذ على مستوى المنشأة
+    // (ExecutionStats::org — القارئُ الواحد الذي سيعيد الطورُ ٨ استعمالَه).
+    // الاسمُ `workforce.overview` لأن `workforce.team` قائمٌ لشاشة «فريقي اليوم».
+    // الحارسُ في المتحكم: hub_monitor + hub_org_analytics_guard (نمطُ القدرات) —
+    // وحدُّ معدلٍ لأن الصفحةَ تجميعاتٌ على الجداول الساخنة وفحصُ صحةِ مشاريع.
+    Route::get('workforce/overview', [\App\Http\Controllers\Web\WorkforceController::class, 'overview'])
+        ->name('workforce.overview')->middleware('throttle:60,1');
 });

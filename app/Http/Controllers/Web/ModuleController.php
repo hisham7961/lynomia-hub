@@ -1067,6 +1067,10 @@ class ModuleController extends Controller
                 $m->saveQuietly();
             } elseif (! $closed && ! empty($meta['resolved_at'])) {
                 unset($meta['resolved_at']);          // أُعيد فتحها
+                // ── Control Plane: Phase 7 (WP-7.4) ── الارتدادُ كان يُمحى بصمت:
+                // عدّادٌ تراكميّ على meta يقرؤه قارئُ الاختناقات
+                // (ExecutionStats::bottlenecks) — لا عمودَ ولا جدولَ جديد.
+                $meta['reopened'] = (int) ($meta['reopened'] ?? 0) + 1;
                 $m->meta = $meta ?: null;
                 $m->saveQuietly();
             }

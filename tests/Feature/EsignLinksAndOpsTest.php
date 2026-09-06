@@ -288,12 +288,13 @@ class EsignLinksAndOpsTest extends TestCase
             'started_at' => now()->subDay(), 'last_seen_at' => now()->subDay()]);
         hub_audit('دخول مريب', null, null, $e->name, ['user_id' => $e->id]);
 
+        // WP-7.1: التسمية صارت «مخاطر النشاط الأمني» ببطاقةٍ منفصلة عن ساعات العمل
         $r = $this->actingAs($this->owner)->get('/admin/activity/' . $e->id);
-        $r->assertOk()->assertSee('مؤشرات الشك')->assertSee('نسبة الشك بالمستخدم')
+        $r->assertOk()->assertSee('مخاطر النشاط الأمني')->assertSee('نسبة الشك بالمستخدم')
             ->assertSee('معدل التلاعب')->assertSee('الساعات المريبة')
             ->assertSee('التسجيل من أجهزة مختلفة');
 
-        // ساعات مصنفة فعلاً: ٤ سلال دوام = ٠٫٣ ساعة، وسلتا فجرٍ = ٠٫٢
+        // ساعات مصنفة فعلاً: ٤ سلال دوام = ٠٫٣ ساعة (بطاقة العمل)، وسلتا فجرٍ = ٠٫٢ (بطاقة الأمن)
         $r->assertSee('0.3')->assertSee('0.2');
     }
 }

@@ -33,7 +33,54 @@ class PortalController extends Controller
         // النطاق يسري كما في كل قارئ: ملفٌّ خارج شركتي أو مشاريعي = ٤٠٤ لا ٢٠٠
         $emp = hub_scope(Employee::query(), 'hr')->findOrFail($id);
 
-        return view('portal.employee', ['emp' => $emp, 'self' => false] + $this->bundle($emp, $emp->user_id));
+        return view('portal.employee', ['emp' => $emp, 'self' => false]
+            + $this->bundle($emp, $emp->user_id)
+            + $this->workProfile($emp));
+    }
+
+    /**
+     * **ملفُّ العمل** (WP-7.3 · spec §5.3 · §5.8) — ثلاثُ بطاقاتٍ منفصلةُ الطبيعة
+     * عمداً، ولكلٍّ حارسُها:
+     *
+     *  • **العمل** (`ExecutionStats::person`): مهامٌّ ومنجَزٌ والتزامٌ وتذاكرُ
+     *    ومشاريعُ واعتمادات — **القارئُ الواحد** الذي تقرأ منه نظرةُ القوى
+     *    العاملة ولوحُ الأداء، بقارئٍ ممرَّرٍ فيسري `hub_can` لكل وحدةٍ و
+     *    `hub_scope` لكل صفّ. الحارس: `hr:v` أعلاه + صلاحيةُ كل وحدةٍ داخله.
+     *  • **النشاط** (`personActivity` + `personTimeline`): أوّلُ وآخرُ ظهورٍ من
+     *    نبضة الجلسة، وأفعالٌ ذاتُ معنى، وخطٌّ زمنيٌّ من عملٍ حقيقيّ — **بلا
+     *    زياراتِ صفحاتٍ خام**. الحارس: `hub_monitor()` (ق١: القراءةُ للمراقب).
+     *  • **الأمن** (`Risk::activity`): بطاقةٌ **منفصلةٌ تماماً** للمالك وحدَه —
+     *    الدرجةُ الأمنية لا تُخلط بأرقام الأداء بحال (WP-7.1 · spec §5.1).
+     */
+    protected function workProfile(?Employee $emp): array
+    {
+        $u = auth()->user();
+        $range = hub_range(request(), '30d');
+        $uid = $emp && $emp->user_id ? (string) $emp->user_id : null;
+
+        $out = ['wRange' => $range, 'work' => null, 'act' => null, 'wTl' => [],
+                'sec' => null, 'rating' => null];
+
+        // «تقييم المدير» حقلُ ملفٍّ وظيفيّ تحكمه صلاحيةُ الحقل — العيبُ نفسُه
+        // كان في لوح الأداء (peopleKpis) فأُصلح هناك وهنا بالقاعدة الواحدة
+        if ($emp && hub_field_mode($u, 'hr', 'perf') !== 'hide') $out['rating'] = $emp->perf;
+
+        // حسابٌ غير مربوطٍ بالملفّ: لا أرقامَ عملٍ له — حالةٌ فارغةٌ صادقة لا أصفار
+        if ($uid === null) return $out;
+
+        $out['work'] = \App\Support\ExecutionStats::person($uid, $range, $u);
+
+        if (hub_monitor($u)) {
+            $out['act'] = \App\Support\ExecutionStats::personActivity($uid, $range, $u);
+            $out['wTl'] = \App\Support\ExecutionStats::personTimeline($uid, $range, $u);
+        }
+
+        // الأمنُ للمالك وحدَه وفي بطاقةٍ لا تلامس بطاقاتِ العمل
+        if (hub_is_owner($u) && ($su = \App\Models\User::find($uid))) {
+            $out['sec'] = \App\Support\Risk::activity($su, $range);
+        }
+
+        return $out;
     }
 
     /* ────────── تجميع البيانات ────────── */
