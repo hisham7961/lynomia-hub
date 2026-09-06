@@ -27,8 +27,19 @@ class HubAuditVerify extends Command
 
     protected const BATCH = 400;
 
+    /** (WP-5.5) توقيتُ التشغيل الجاري — يقرؤهما `record()` عند كل مخرج */
+    protected float $t0 = 0.0;
+    protected ?\Illuminate\Support\Carbon $startedAt = null;
+
     public function handle(): int
     {
+        // (WP-5.5) كلُّ تشغيلِ تحقّقٍ يؤرَّخ صفاً في `audit_verifications` —
+        // النتيجةُ كانت تتبخّر مع سطر الطرفية أو رسالة الفلاش، فسؤالُ «متى
+        // فُحصت السلسلة آخرَ مرة وبماذا خرجت؟» (§1.6) كان بلا جواب.
+        // (--rebuild علاجٌ لا تحقّقٌ فلا يؤرَّخ هنا — أثرُه قيدُ تدقيقٍ مختومٌ يكتبه بنفسه.)
+        $this->t0 = microtime(true);
+        $this->startedAt = now();
+
         $epoch = Schema::hasColumn('audit_chain', 'started_at')
             ? DB::table('audit_chain')->where('id', 1)->value('started_at') : null;
 
@@ -52,6 +63,7 @@ class HubAuditVerify extends Command
 
         if ($index->isEmpty() && ! $suspect) {
             $this->info('لا سجلات مسلسلة بعد' . ($legacyRows ? " ({$legacyRows} سجل سابق للسلسلة)" : ''));
+            $this->record('ok', [], null, 'لا سجلات مسلسلة بعد' . ($legacyRows ? " ({$legacyRows} سجل سابق للسلسلة)" : ''));
             return self::SUCCESS;
         }
 
@@ -64,6 +76,8 @@ class HubAuditVerify extends Command
             if (! $bucket) break;
             if ($bucket->count() > 1) {
                 $this->error('⚠️ تفرع في السلسلة بعد ' . count($order) . ' سجل — تجزئتان تشيران لنفس السابق (عبث محتمل)');
+                $this->record('fail', ['checked_rows' => count($order)], (int) $bucket->min('id'),
+                    'تفرع في السلسلة بعد ' . count($order) . ' سجل — تجزئتان تشيران لنفس السابق (عبث محتمل)');
                 return self::FAILURE;
             }
             $row = $bucket->first();
@@ -72,13 +86,20 @@ class HubAuditVerify extends Command
         }
 
         if (count($order) < $index->count()) {
-            $this->error('❌ انقطاع: ' . ($index->count() - count($order)) . ' سجل مسلسل غير موصول بالسلسلة (حذف أو تزوير محتمل) — سلِم منها: ' . count($order));
+            $orphans = $index->count() - count($order);
+            $this->error("❌ انقطاع: {$orphans} سجل مسلسل غير موصول بالسلسلة (حذف أو تزوير محتمل) — سلِم منها: " . count($order));
+            // أولُ قيدٍ متأثّر: أصغرُ id مختومٍ خارج المشي المتّصل
+            $this->record('fail', ['checked_rows' => count($order)],
+                (int) $index->pluck('id')->diff(array_keys($order))->min(),
+                "انقطاع: {$orphans} سجل مسلسل غير موصول بالسلسلة (حذف أو تزوير محتمل) — سلِم منها: " . count($order));
             return self::FAILURE;
         }
 
         $head = (string) DB::table('audit_chain')->where('id', 1)->value('head');
         if ($head !== $prev) {
             $this->error('❌ رأس السلسلة المخزن لا يطابق آخر سجل — حُذفت سجلات من الذيل على الأرجح');
+            $this->record('fail', ['checked_rows' => count($order)], null,
+                'رأس السلسلة المخزن لا يطابق آخر سجل — حُذفت سجلات من الذيل على الأرجح');
             return self::FAILURE;
         }
 
@@ -97,6 +118,8 @@ class HubAuditVerify extends Command
                     $weak++;
                 } else {
                     $this->error("❌ سجل معدَّل بعد كتابته: {$row->id} ({$row->action} / {$row->module}) — التجزئة لا تطابق المحتوى");
+                    $this->record('fail', ['checked_rows' => $ok, 'weak_rows' => $weak], (int) $row->id,
+                        "سجل معدَّل بعد كتابته: {$row->id} ({$row->action} / {$row->module}) — التجزئة لا تطابق المحتوى");
                     return self::FAILURE;
                 }
                 $ok++;
@@ -107,6 +130,11 @@ class HubAuditVerify extends Command
         if ($suspect) {
             $this->error("❌ {$suspect} سجل بلا بصمة كُتب بعد بدء السلسلة — فشل ختمٍ لا تاريخ قديم."
                 . ' راجع مركز الأخطاء (audit-chain) لمعرفة السبب؛ هذه السجلات خارج ضمان كشف العبث.');
+            $firstUnsealed = $epoch
+                ? AuditEntry::whereNull('hash')->where('created_at', '>=', $epoch)->min('id') : null;
+            $this->record('fail', ['checked_rows' => $ok, 'weak_rows' => $weak, 'unsealed_rows' => $suspect],
+                $firstUnsealed !== null ? (int) $firstUnsealed : null,
+                "{$suspect} سجل بلا بصمة كُتب بعد بدء السلسلة — فشل ختمٍ لا تاريخ قديم");
             return self::FAILURE;
         }
 
@@ -143,7 +171,14 @@ class HubAuditVerify extends Command
             else $this->warn($msg);
         }
 
-        if ($strictFail) return self::FAILURE;
+        $counters = ['checked_rows' => $ok, 'weak_rows' => $weak,
+                     'mismatch_rows' => $mismatch, 'blank_rows' => $blank];
+
+        if ($strictFail) {
+            $this->record('fail', $counters, null,
+                "اختلافُ عمود الشركة تحت --strict: {$mismatch} مخالفاً و{$blank} بلا شركة — راجعها بعين بشرية");
+            return self::FAILURE;
+        }
 
         $this->info("✅ السلسلة سليمة: {$ok} سجل متحقق"
             . ($legacyRows ? " · {$legacyRows} سجل سابق للسلسلة (خارج التحقق)" : ''));
@@ -157,7 +192,46 @@ class HubAuditVerify extends Command
             $this->reseal(array_keys($order));
         }
 
+        // warn: نجاحٌ بملاحظاتٍ تستحق عيناً (بصمة جيلٍ أول / اختلافُ عمود الشركة) — لا «سليم» يبتلعها
+        $this->record(($weak || $mismatch || $blank) ? 'warn' : 'ok', $counters, null,
+            "السلسلة سليمة: {$ok} سجل متحقق"
+            . ($legacyRows ? " · {$legacyRows} سجل سابق للسلسلة (خارج التحقق)" : '')
+            . ($weak ? " · {$weak} ببصمة الجيل الأول" : '')
+            . ($mismatch ? " · {$mismatch} يخالف عمودُ الشركة شركةَ سجلّه" : '')
+            . ($blank ? " · {$blank} بلا شركة وسجلُّه داخل شركة" : ''));
+
         return self::SUCCESS;
+    }
+
+    /**
+     * (WP-5.5) أرشفةُ التشغيل صفاً في `audit_verifications` — الوضعُ من سياق
+     * المُشغِّل نفسِه: مستخدمٌ مصادَق (زرُّ مركز التشغيل يستدعي الأمرَ داخل
+     * الطلب) = manual بمُشغِّله، وبلا مصادقة (المجدولُ والطرفية) = auto.
+     *
+     * درعُ «النشر قبل الترحيل»: غيابُ الجدول أو فشلُ الكتابة لا يغيّر حكمَ
+     * الفاحص ولا يكسر التشغيل — السجلُّ التاريخي مرآةُ الحكم لا شرطُه.
+     */
+    protected function record(string $result, array $counters = [], ?int $firstBad = null, string $message = ''): void
+    {
+        try {
+            if (! Schema::hasTable('audit_verifications')) return;
+
+            DB::table('audit_verifications')->insert($counters + [
+                'mode'         => auth()->check() ? 'manual' : 'auto',
+                'initiated_by' => auth()->id(),
+                'request_id'   => hub_fit(\App\Support\Api::requestId(), 40),
+                'started_at'   => $this->startedAt ?? now(),
+                'finished_at'  => now(),
+                'duration_ms'  => (int) round((microtime(true) - $this->t0) * 1000),
+                'result'       => $result,
+                'first_bad_id' => $firstBad,
+                'message'      => $message === '' ? null : hub_fit($message, 500),
+            ]);
+        } catch (\Throwable $e) {
+            // تعذُّرُ الأرشفة لا يُسقط التحقق — لكنه لا يمرّ صامتاً
+            \App\Support\ErrorLog::capture('php',
+                'audit-verify: تعذّر تسجيل صفّ تاريخ التحقق — ' . $e->getMessage(), __FILE__, __LINE__);
+        }
     }
 
     /**

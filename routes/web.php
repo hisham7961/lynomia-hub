@@ -594,4 +594,15 @@ Route::middleware('auth')->group(function () {
     // وحدُّ معدلٍ لأن كلَّ طلبٍ قراءةُ قرصٍ حقيقية
     Route::get('admin/errors/logs', [ErrorCenterController::class, 'logs'])
         ->name('errors.logs')->middleware('throttle:30,1');
+
+    // ── Control Plane: Phase 5 ──
+    // (WP-5.4) صفحةُ تفصيل قيد التدقيق — الحارس في المتحكّم: راية audit ثم
+    // Audit::scopedQuery فالخارجُ عن النطاق 404 لا 403 يفشي الوجود. القيدُ
+    // رقميٌّ تسلسليّ ({id} عدديّ حصراً) فلا يظلّل مساراتِ الطور اللاحقة (coverage)
+    Route::get('admin/audit/{id}', [AuditController::class, 'show'])
+        ->name('audit.show')->where('id', '[0-9]+');
+
+    // (WP-5.5) محلّلُ تغطية التدقيق — الحارس في المتحكّم (مالكٌ فقط): الصفحةُ
+    // خريطةُ ما يُدقَّق وما لا يُدقَّق، وهي لغير المالك خريطةُ ما لا يترك أثراً
+    Route::get('admin/audit/coverage', [AuditController::class, 'coverage'])->name('audit.coverage');
 });

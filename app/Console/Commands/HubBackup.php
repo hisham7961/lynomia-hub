@@ -34,6 +34,9 @@ class HubBackup extends Command
         'quote_lines', 'quote_milestones', 'dashboards', 'dashboard_widgets', 'saved_views', 'work_hours',
         'webauthn_credentials', 'user_devices', 'asset_custody', 'record_identifiers', 'identity_lookups',
         'inbox_documents', 'metric_points', 'audit_chain', 'signal_states', 'change_orders', 'screenshots',
+        // ── Control Plane: Phase 5 (WP-5.5) ── تاريخُ فحوص نزاهة سلسلة التدقيق:
+        // دليلُ نزاهةٍ لا تليمتري — فلا يُدفع إلى metric_points الذي يُقلَّم بعد ٣٦٥ يوماً
+        'audit_verifications',
     ];
 
     /** قراءةُ ملف نسخةٍ (مشفَّرٍ أو صريح) وإعادتُه مصفوفةً — أو null إن تعذّر */
