@@ -123,7 +123,22 @@ class HubEventsTest extends TestCase
     {
         $declared = array_map('hub_ar_norm', hub_declared_states());
 
+        // حاوياتُ أحداثٍ دلاليّةٍ ليست وحداتِ سجلٍّ (Work OS · الطور A · WP-A.4):
+        // الحاويةُ `conversations` تحمل حدثاً دلاليّاً (conversation.created) دون أن
+        // تكون وحدةَ CRUD في السجل (لا شاشةَ، لا مسار، فـhub_mod لها null). تُستثنى
+        // من شرط «وحدةٌ معروفة» بشرطٍ **أصرمَ** بدلاً منه: لا تحمل `to` — إذ لا
+        // مجموعةَ حالاتٍ لغيرِ وحدةٍ يُتحقَّق منها. فيبقى حارسُ الأخطاء المطبعيّة
+        // قائماً كاملاً لكلِّ وحدةٍ حقيقيّة، ولا يُفتح البابُ لمفتاحٍ مجهول.
+        $eventOnlyContainers = ['conversations'];
+
         foreach ((array) config('hub.events') as $module => $rules) {
+            if (in_array($module, $eventOnlyContainers, true)) {
+                foreach ($rules as $r) {
+                    $this->assertEmpty($r['to'] ?? [],
+                        "حاويةُ الأحداث «{$module}» ليست وحدةً فلا تُصرِّح حالاتِ انتقال (بلا to)");
+                }
+                continue;
+            }
             $this->assertNotNull(hub_mod($module), "وحدة غير معروفة في الخريطة: {$module}");
             foreach ($rules as $r) {
                 foreach ((array) ($r['to'] ?? []) as $s) {

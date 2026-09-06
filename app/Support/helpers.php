@@ -168,13 +168,53 @@ if (! function_exists('hub_client_ids')) {
     /**
      * العملاء المسموحون للمستخدم — null = بلا قيد (الداخليون جميعاً)، ومصفوفةٌ
      * غير فارغة = معزولٌ عليهم (حسابُ عميلٍ خارجي أو موظفٌ مخصَّص لعملاء بأعيانهم).
+     *
+     * ── الطور A (WP-A.2 · SF-2) ── مصدرُ الحقيقةِ صار جدولَ العضويّات المطبَّع
+     * `client_memberships`: العملاءُ المسموحون = عضويّاتُه الفعّالة (status=active)
+     * وحدَها؛ المعلَّقةُ/المدعوّة (suspended/invited) والمحذوفةُ ناعماً لا تمنح
+     * وصولاً. و`users.clients` (JSON) يبقى عموداً توافقيّاً رجعيّاً يُقرأ في حالتين
+     * فقط لئلّا يفقد حسابٌ قائمٌ وصولَه (C3):
+     *   (١) الجدولُ غائبٌ بعدُ — أمانُ ما قبل الهجرة أثناء الترقية.
+     *   (٢) لا صفَّ عضويّةٍ له أصلاً (لم يُنقَل/يُدعَ بعد) — فيُقرأ سلوكُه القديمُ
+     *       حرفاً بحرف حتى تُعبَّأ له العضويّاتُ (نظيرُ تعبئةِ الهجرة).
+     * فمتى وُجد له صفٌّ واحدٌ فأكثر (ولو معلَّقاً أو محذوفاً ناعماً) صارت العضويّاتُ
+     * هي الحَكَم — تعليقُ عضويّةٍ يُسقط عميلَها فوراً، ولا يتسرّب عميلٌ من القائمةِ
+     * القديمة (العزلُ يُشدّ لا يُرخى).
      */
     function hub_client_ids($user = null): ?array
     {
         $user = $user ?? auth()->user();
         if (! $user || $user->role?->is_owner) return null;
-        $ids = is_array($user->clients) ? $user->clients : (json_decode($user->clients ?? '[]', true) ?: []);
-        $ids = array_values(array_filter(array_map('strval', $ids)));
+
+        // السلوكُ القديم — القائمةُ الخام users.clients (توافقٌ رجعيّ)
+        $legacy = static function ($u): ?array {
+            $ids = is_array($u->clients) ? $u->clients : (json_decode($u->clients ?? '[]', true) ?: []);
+            $ids = array_values(array_filter(array_map('strval', $ids)));
+
+            return $ids ?: null;
+        };
+
+        // الجدولُ يُفحَص مرةً ويُخبَّأ (لا يختفي بعد ظهوره)؛ قبل جاهزيّةِ القاعدة نرجع للقديم
+        static $hasTable = false;
+        if (! $hasTable) {
+            try {
+                $hasTable = \Illuminate\Support\Facades\Schema::hasTable('client_memberships');
+            } catch (\Throwable $e) {
+                return $legacy($user);                              // (١) القاعدةُ غيرُ جاهزة
+            }
+            if (! $hasTable) return $legacy($user);                 // (١) الجدولُ غائبٌ بعد
+        }
+
+        // اكتُتب أم لا؟ نعدّ صفوفَه كلَّها (بالمحذوفِ ناعماً) — فالحذفُ المتعمَّد لا يُرجعه للقديم
+        $rows = \App\Models\ClientMembership::withTrashed()
+            ->where('user_id', $user->getKey())
+            ->orderBy('client_id')->orderBy('id')
+            ->get(['client_id', 'status', 'deleted_at']);
+
+        if ($rows->isEmpty()) return $legacy($user);                // (٢) لا عضويّةَ له بعد — توافقٌ رجعيّ
+
+        $ids = $rows->whereNull('deleted_at')->where('status', 'active')
+            ->pluck('client_id')->map('strval')->filter()->unique()->values()->all();
 
         return $ids ?: null;
     }
@@ -680,10 +720,24 @@ if (! function_exists('hub_require_stepup')) {
     {
         if (\App\Support\StepUp::fresh()) return null;
 
-        $next = $next ?: request()->fullUrl();
-        // للويب: وجهةٌ داخلية فقط (المسار والاستعلام) لا رابطٌ مطلق
-        $path = request()->getRequestUri();
-        $url = route('stepup.show', ['next' => is_string($next) && str_starts_with($next, '/') ? $next : $path]);
+        // وجهةُ العودة بعد التأكيد: `stepup.verify` يُعيد التوجيه بـGET، فلا يصحّ أن
+        // تكون الوجهةُ مسارَ الفعل نفسِه إن كان POST/PUT/DELETE (ترحيلٌ، تصعيدٌ…) —
+        // وإلا ردَّ الخادمُ 405 بعد إدخال كلمة المرور. للأفعال غير الآمنة نعود إلى
+        // صفحةِ الإحالة (النموذج، وهي GET) فيُعيد المستخدمُ الفعلَ والهويةُ طازجة.
+        $safeLocal = fn ($u) => is_string($u) && str_starts_with($u, '/') && ! str_starts_with($u, '//');
+        $req = request();
+        if ($next === null) {
+            if ($req->isMethodSafe()) {
+                $next = $req->getRequestUri();               // GET: المسارُ نفسُه صالحٌ للعودة
+            } else {
+                $ref = $req->headers->get('referer');         // فعلٌ غيرُ آمن: صفحةُ النموذج
+                $refPath = $ref ? (parse_url($ref, PHP_URL_PATH) ?: '')
+                    . (($q = parse_url($ref, PHP_URL_QUERY)) ? "?{$q}" : '') : '';
+                $next = $safeLocal($refPath) ? $refPath : route('dashboard', absolute: false);
+            }
+        }
+        $path = $req->isMethodSafe() ? $req->getRequestUri() : route('dashboard', absolute: false);
+        $url = route('stepup.show', ['next' => $safeLocal($next) ? $next : $path]);
 
         if (request()->expectsJson() || request()->is('api/*')) {
             // الغلافُ الموحَّد: المفاتيحُ القديمة (error/stepup/url) كما هي + code + request_id
@@ -5732,5 +5786,24 @@ if (! function_exists('hub_audit_norm')) {
             'actor_type' => auth()->check() ? 'user' : ($src === 'console' ? 'system' : 'guest'),
             'session_id' => $sid,
         ];
+    }
+}
+
+// ── Work OS: Phase A ──
+// ركائزُ العزل والقنوات (SF-1..SF-5). مساعِداتٌ صغيرةٌ يستهلكها كلُّ حارسِ بوابة؛
+// لا تُكرّر رصيفاً قائماً (لا عزلَ عميلٍ ثانٍ: hub_client_ids/hub_scope تبقى المصدر).
+
+if (! function_exists('hub_is_client')) {
+    /**
+     * (SF-1) هل الحسابُ حسابَ عميلٍ خارجيّ؟ — يُقرأ من المصنِّف الصلب
+     * `users.account_type` مباشرةً، **لا يُستنتج** من `users.clients`: تلك قد
+     * تكون فارغةً لعميلٍ جديدٍ بلا عضوياتٍ بعد، أو مأهولةً لموظفٍ داخليٍّ
+     * مخصَّصٍ لعملاءَ بأعيانهم. التصنيفُ بنيويٌّ (من هو) لا نطاقيٌّ (ماذا يرى).
+     */
+    function hub_is_client($user = null): bool
+    {
+        $user = $user ?? auth()->user();
+
+        return $user instanceof \App\Models\User && $user->isClientAccount();
     }
 }

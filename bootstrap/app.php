@@ -19,6 +19,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', \App\Http\Middleware\WorkHours::class);
         // مصادقةٌ تكيفية: تفرض 2FA على الأدوار الحسّاسة إن فُعّلت السياسة (مطفأة افتراضاً)
         $middleware->appendToGroup('web', \App\Http\Middleware\Require2faForPrivileged::class);
+        // حارسُ البوابة (Work OS · SF-5): يُلحَق بعد المصادَقة (StartSession جهّز
+        // الجلسة، وauth الروتيّ يردّ الضيف) فيقرأ حسابَ المستخدم؛ حسابُ العميل
+        // (account_type=client) لا يبلغ إلا قائمةً بيضاءَ محدودة، وكلُّ ما عداه ٤٠٤
+        // فوق مصفوفة الأدوار. الداخليّ لا يمسّه — فلا انحدارَ على شاشةٍ داخلية.
+        $middleware->appendToGroup('web', \App\Http\Middleware\PortalGuard::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\TrackVisits::class);
         // الملفُّ المقطَّع يصير ملفاً مرفوعاً عادياً قبل أن يصل المتحكّم
         $middleware->appendToGroup('web', \App\Http\Middleware\ResolveChunkedUploads::class);

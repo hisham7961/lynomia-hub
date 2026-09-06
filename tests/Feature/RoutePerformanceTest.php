@@ -16,6 +16,12 @@ use Tests\TestCase;
  */
 class RoutePerformanceTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        \Illuminate\Support\Carbon::setTestNow(null);
+        parent::tearDown();
+    }
+
     /** بذرُ حاويةِ RED واحدة بالشكل الذي يكتبه Observability::terminate حرفياً */
     protected function bucket(string $route, $at, int $count, int $sumMs, array $o = []): void
     {
@@ -61,6 +67,12 @@ class RoutePerformanceTest extends TestCase
     public function test_uuid_paths_land_in_one_normalized_row(): void
     {
         $this->seedCore();
+        // تثبيتُ الساعة على لحظةٍ **داخل** حاوية الـ٥ دقائق لا على حدّها: الكتابةُ
+        // (Observability::terminate) والقراءةُ (نافذةُ TimeRange المنتهيةُ «الآن»)
+        // تتشاركان اللحظةَ نفسَها، فحاويةُ الطلبين (أرضيةُ الدقائق الخمس) أقلُّ من
+        // «الآن» حتماً. بلا تثبيتٍ كان العدّاءُ الأبطأ يعبر الحدَّ فيغيب الصف (MySQL CI).
+        \Illuminate\Support\Carbon::setTestNow(
+            \Illuminate\Support\Carbon::parse('2026-09-06 10:02:00', config('app.timezone', 'Asia/Kuwait')));
         $this->actingAs($this->owner)->get('/admin/errors/' . Str::uuid())->assertNotFound();
         $this->actingAs($this->owner)->get('/admin/errors/' . Str::uuid())->assertNotFound();
 
