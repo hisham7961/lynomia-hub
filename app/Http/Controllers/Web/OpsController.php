@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\ErrorEvent;
 use App\Support\Series;
 use App\Support\SysMonitor;
 use Illuminate\Http\Request;
@@ -90,18 +89,11 @@ class OpsController extends Controller
         // ٦٠ ثانية خلف hub_screen المختوم، وسطرُ الطزاجة يقولها (cc/freshness)
         $bkW = hub_screen('ops.backups', 60, fn () => $this->backupsPanel(), ['backups'], true);
 
-        // أخطاء وبطء (٧ أيام) — ملفوفةٌ (§25: جدولٌ ساقط يعرض «غير متاح» لا أصفاراً
+        // أخطاء وبطء (٧ أيام) — من القارئ الواحد (WP-3.4: ErrorStats — كانت نسخةً
+        // من خمسٍ متباعدة)، ملفوفةٌ (§25: جدولٌ ساقط يعرض «غير متاح» لا أصفاراً
         // كاذبة) ومخبّأةٌ ٦٠ ثانية: أرقامُ أسبوعٍ كاملٍ لا تتغيّر بين ضغطتين
-        $errsW = hub_screen('ops.errs', 60, fn () => rescue(fn () => [
-            'new'  => ErrorEvent::where('status', 'جديد')->count(),
-            'week' => ErrorEvent::where('last_seen', '>=', now()->subDays(7))->sum('count'),
-            // **وقائعُ لا بصمات** (v2.338): `count()` كان يعدّ صفوفَ الجدول
-            // المجمَّع — أي عددَ المسارات المتميّزة — بينما `week` فوقه يجمع
-            // `count`. فألفُ بطءٍ على مسارٍ واحد كانت تُعرض «١»، والبطاقةُ
-            // المخصَّصةُ لقياس الحمل تُطمئن حيث ينبغي أن تُنذر.
-            'slow' => (int) ErrorEvent::where('kind', 'slow')->where('last_seen', '>=', now()->subDays(7))->sum('count'),
-            'api'  => (int) ErrorEvent::where('kind', 'api')->where('last_seen', '>=', now()->subDays(7))->sum('count'),
-        ], null, false), [], true);
+        $errsW = hub_screen('ops.errs', 60,
+            fn () => rescue(fn () => \App\Support\ErrorStats::opsSummary(), null, false), [], true);
 
         // (WP-2.7 · §3.14) الترحيلات بعدّادٍ واحدٍ متّفق (hub_pending_migrations) —
         // النسخةُ الخاصة القديمة (pendingMigrations) حُذفت فلا يقول المركزُ قولاً
@@ -123,20 +115,10 @@ class OpsController extends Controller
         } catch (\Throwable $e) {
         }
 
-        // آخر أسطر الأخطاء من ملف اللوغ — بلا SSH: آخر ٦٤ك.ب فقط ثم سطور ERROR الأخيرة
-        $logLines = [];
-        try {
-            $lf = storage_path('logs/laravel.log');
-            if (is_file($lf)) {
-                $fh = fopen($lf, 'r');
-                fseek($fh, max(0, filesize($lf) - 65536));
-                $chunk = (string) stream_get_contents($fh);
-                fclose($fh);
-                $logLines = array_slice(array_values(array_filter(explode("\n", $chunk),
-                    fn ($l) => str_contains($l, '.ERROR') || str_contains($l, '.CRITICAL'))), -25);
-            }
-        } catch (\Throwable $e) {
-        }
+        // (WP-3.5 · critic #18) كتلةُ «ذيل laravel.log» حُذفت: السائق daily يكتب
+        // laravel-YYYY-MM-DD.log فكان is_file كاذباً دائماً والبطاقةُ ميتةً منذ
+        // ولادتها — سطحُ السجلّ الواحد صار صفحةَ البحث المحدود (errors.logs)
+        // والبطاقةُ (ops/parts/logtail) رابطٌ إليها لا نسخةٌ ثانية ميتة.
 
         // بيئة التشغيل — ما يحدد سلوك النظام فعلياً على هذا الخادم
         $env = [
@@ -153,7 +135,7 @@ class OpsController extends Controller
         // فيرسم كلُّ قسمٍ سطرَ الطزاجة (cc/freshness) لخبيئته البالغة ٦٠ ثانية
         return view('ops.index', array_merge(
             compact('db', 'sys', 'cpu', 'mem', 'consumers', 'pulse', 'outbox',
-                'beats', 'live', 'logLines', 'env', 'health', 'deps', 'rp', 'slo'),
+                'beats', 'live', 'env', 'health', 'deps', 'rp', 'slo'),
             ['errs' => $errsW['data'], 'errsAt' => $errsW['at'],
              'bk' => $bkW['data'], 'bkAt' => $bkW['at'],
              'mig' => $migW['data'], 'migAt' => $migW['at'],

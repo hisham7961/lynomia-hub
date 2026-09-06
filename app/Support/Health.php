@@ -358,10 +358,13 @@ final class Health
     {
         if (! Schema::hasTable('error_events')) return self::c(self::UNKNOWN, 'الأخطاء', 'الجدول غائب', []);
         try {
-            $q = DB::table('error_events')->where('status', '!=', 'محلول')->where('last_seen', '>=', now()->subHour());
-            $crit = hub_has_col('error_events', 'severity') ? (int) (clone $q)->where('severity', 'CRITICAL')->count() : 0;
-            $high = hub_has_col('error_events', 'severity') ? (int) (clone $q)->where('severity', 'HIGH')->count() : 0;
-            $hits = (int) (clone $q)->sum('count');
+            // (WP-3.4) الأعدادُ من القارئ الواحد — الدلالةُ نفسُها التي تعرضها بطاقةُ
+            // «حرجة» في لوحة الأخطاء، فلا يقول النموذجُ قولاً واللوحةُ غيرَه.
+            // المتجاهَلُ يبقى محسوباً عمداً: إخفاءُ الحرج قرارُ عرضٍ لا شفاء.
+            $w = ErrorStats::healthWindow();
+            $crit = $w['critical_1h'];
+            $high = $w['high_1h'];
+            $hits = $w['hits_1h'];
             $st = $crit ? self::UNAVAILABLE : ($high || $hits >= 50 ? self::DEGRADED : self::HEALTHY);
 
             return self::c($st, 'الأخطاء', $crit ? "{$crit} حرج خلال ساعة" : ($high ? "{$high} عالٍ خلال ساعة" : ($hits ? "{$hits} تكراراً خلال ساعة" : 'لا أخطاء جديدة')),

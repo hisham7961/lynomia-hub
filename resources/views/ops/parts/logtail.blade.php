@@ -1,10 +1,7 @@
     <div class="card kid">
-        {{-- (WP-2.7 · critic #19) السقفُ معلَن: «آخر ٢٥ سطراً» لا قائمةٌ توهم بالكمال --}}
-        <h3>📜 آخر أخطاء ملف السجل <span class="sub">· آخر ٢٥ سطر خطأ من laravel.log بلا SSH</span></h3>
-        @if (count($logLines))
-            <div class="mono ltr" style="font-size:10.5px;max-height:220px;overflow:auto;background:var(--bg2);border-radius:10px;padding:8px;white-space:pre-wrap;word-break:break-all">@foreach ($logLines as $l){{ $l }}
-@endforeach</div>
-        @else
-            <div class="sub">✅ لا أسطر أخطاء في نهاية ملف السجل.</div>
-        @endif
+        {{-- (WP-3.5 · critic #18) الكتلةُ القديمة كانت تقرأ laravel.log بينما السائق daily
+             يكتب laravel-YYYY-MM-DD.log — فالبطاقةُ ميتةٌ منذ ولادتها. سطحُ السجلّ
+             الواحد هو صفحةُ البحث المحدود: ملفٌّ صحيح، سقفُ بايتات، مرشِّحات، وطمس. --}}
+        <h3>📜 سجلّ الملفات <span class="sub">· بحثٌ محدود في الملفات المؤرَّخة — المستوى والمدى ومعرّف الطلب</span></h3>
+        <a class="btn ghost sm" href="{{ route('errors.logs') }}">🔎 افتح بحث السجلّ ←</a>
     </div>

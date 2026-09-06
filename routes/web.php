@@ -496,7 +496,9 @@ Route::middleware('auth')->group(function () {
     Route::get('admin/quality', [QualityController::class, 'index'])->name('quality.index');
     Route::post('admin/quality/merge', [QualityController::class, 'merge'])->name('quality.merge');
     Route::get('admin/errors', [ErrorCenterController::class, 'index'])->name('errors.index');
-    Route::get('admin/errors/{id}', [ErrorCenterController::class, 'show'])->name('errors.show');
+    // معرّفُ الخطأ UUID دائماً (HasUuid) — القيدُ يُفسح `admin/errors/logs` (الطور ٣)
+    // لمساره بدل أن يبتلعه {id} فيردّ ٤٠٤ عن صفحةٍ حيّة
+    Route::get('admin/errors/{id}', [ErrorCenterController::class, 'show'])->name('errors.show')->whereUuid('id');
     Route::post('admin/errors/{id}/status', [ErrorCenterController::class, 'status'])->name('errors.status');
     Route::post('admin/errors/{id}/task', [ErrorCenterController::class, 'toTask'])->name('errors.task');
     Route::post('jslog', [ErrorCenterController::class, 'jslog'])->name('jslog')->middleware('throttle:20,1');
@@ -585,4 +587,11 @@ Route::middleware('auth')->group(function () {
     // الفعل (hub_require_ops_stepup) + قيدُ تدقيق، وحدُّ معدلٍ يصدّ حلقةَ إعادةٍ عمياء
     Route::post('admin/ops/outbox/{id}/retry', [OpsController::class, 'outboxRetry'])
         ->name('ops.outbox.retry')->middleware('throttle:30,1');
+
+    // ── Control Plane: Phase 3 ──
+    // (WP-3.5) بحثُ السجلّ المحدود: يقرأ ذيلَ الملفات المؤرَّخة (السائق daily —
+    // laravel-YYYY-MM-DD.log) بسقفِ بايتات. الحارسُ في المتحكّم (مالكٌ فقط)،
+    // وحدُّ معدلٍ لأن كلَّ طلبٍ قراءةُ قرصٍ حقيقية
+    Route::get('admin/errors/logs', [ErrorCenterController::class, 'logs'])
+        ->name('errors.logs')->middleware('throttle:30,1');
 });

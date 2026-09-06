@@ -136,9 +136,9 @@ class MorningController extends Controller
             // «اختبار استعادة النسخ» أُخرج من الواجهة بطلب المالك — لا تنبيه له.
             // (المسار والبيانات باقيان: لا حذف ولا هجرة مدمّرة.)
             // الأخطاء الجديدة بأسمائها لا بعددها: «٣ أخطاء بانتظار المعالجة» لا تقول
-            // شيئاً — الرسالة والموضع والتكرار هي ما يُبنى عليه قرار
-            $newErrs = DB::table('error_events')->where('status', 'جديد')
-                ->orderByDesc('count')->limit(4)->get(['id', 'message', 'file', 'line', 'kind', 'count']);
+            // شيئاً — الرسالة والموضع والتكرار هي ما يُبنى عليه قرار.
+            // (WP-3.4) من القارئ الواحد ErrorStats — كانت نسخةً من خمسٍ متباعدة.
+            $newErrs = \App\Support\ErrorStats::topNew(4);
             foreach ($newErrs as $er) {
                 $where = $er->file ? str_replace(base_path() . '/', '', $er->file) . ($er->line ? ':' . $er->line : '') : '';
                 $ops->push([

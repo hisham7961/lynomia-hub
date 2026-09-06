@@ -728,6 +728,23 @@ class HubAutomation extends Command
                     ->whereIn('severity', ['INFO', 'WARNING', 'ERROR'])->delete();
                 $n += $per['error_events'];
             }
+
+            // ── Control Plane: Phase 3 (WP-3.2) ──
+            // **وعيّناتُ وقوع الأخطاء** (error_occurrences): سقفَ الصفوف لكل حدثٍ
+            // يفرضه الكاتبُ نفسُه (ErrorLog::occurrence)، وهذا مقصُّ العمر —
+            // عيّنةٌ أقدمُ من retention.error_occurrences_days لا تفيد التشخيص،
+            // والأثرُ الباقي هو الحدثُ المجمَّع أعلاه. حذفٌ على دفعاتٍ (نمطُ
+            // page_visits) يقوده فهرسُ (occurred_at) فلا مسحَ كاملاً.
+            if (\Illuminate\Support\Facades\Schema::hasTable('error_occurrences')) {
+                $oKeep = max(7, (int) setting('retention.error_occurrences_days', 30));
+                $per['error_occurrences'] = 0;
+                do {
+                    $gone = DB::table('error_occurrences')
+                        ->where('occurred_at', '<', now()->subDays($oKeep)->toDateTimeString())
+                        ->limit(5000)->delete();
+                    $n += $gone; $per['error_occurrences'] += $gone;
+                } while ($gone >= 5000);
+            }
             if (\Illuminate\Support\Facades\Schema::hasTable('page_visits')) {
                 $per['page_visits'] = 0;
                 do {
