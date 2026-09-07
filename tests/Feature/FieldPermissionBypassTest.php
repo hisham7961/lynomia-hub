@@ -225,6 +225,38 @@ class FieldPermissionBypassTest extends TestCase
     }
 
     /**
+     * **امتدادُ Work OS (WP-G.1 · §22):** حجبُ حقلٍ سرّيٍّ على الاتصالات لا يُغسَل كشفاً.
+     *
+     * دورٌ يحمل علمَ الأسرار (secrets) يكشف ما يراه دورُه — لكنّ حقلاً محجوباً عنه
+     * بـfield-mode (`phones.puk = hide`) لا يُكشف ولو عبر مسارِ `revealSecret`: الحجبُ
+     * يُفرض في الشاشة (لا زرَّ كشف) ولا يُلتَفّ عليه بنداءٍ مباشرٍ للمسار (٤٠٣). يمتدّ
+     * نمطَ هذا الملف: حارسٌ يُفرض في بابٍ ولا يُغسل في آخر — والكشفُ لا يكون البابَ الجديد.
+     * والحقلُ غيرُ المحجوب (PIN) يُكشف بحقّ فلا حجبٌ شاملٌ يزوّر العزل.
+     */
+    public function test_a_field_hidden_telecom_secret_is_not_revealable(): void
+    {
+        $this->seedCore();
+
+        $role = Role::create(['name' => 'تقنيُّ اتصالات ' . Str::random(4), 'scope' => 'all',
+            'flags' => ['secrets' => 1],
+            'matrix' => ['phones' => ['v' => 1, 'a' => 1, 'e' => 1, 'd' => 0]],
+            'field_rules' => ['phones' => ['puk' => 'hide']]]);
+        $u = User::create(['name' => 'تقنيّ', 'email' => Str::random(6) . '@int.local',
+            'password' => 'Secret!2026x', 'role_id' => $role->id, 'status' => 'نشط',
+            'password_changed_at' => now()]);
+
+        $line = \App\Models\PhoneNumber::create(['number' => '+96550000123', 'status' => 'نشط',
+            'pin' => 'PINseenByRole', 'puk' => 'PUKhiddenFromRole']);
+
+        // PIN مرئيٌّ لدوره → يُكشف بحقّ (لا حجبٌ شامل)
+        $this->actingAs($u)->postJson("/m/phones/{$line->id}/secret/pin")
+            ->assertOk()->assertJson(['v' => 'PINseenByRole']);
+
+        // PUK محجوبٌ بـfield-mode → ٤٠٣ ولو حمل علمَ الأسرار — الحجبُ لا يُغسل كشفاً
+        $this->actingAs($u)->postJson("/m/phones/{$line->id}/secret/puk")->assertForbidden();
+    }
+
+    /**
      * حارسا الحساب — انتهاء الصلاحية وقائمة العناوين — كانا يُفحصان عند تسجيل
      * الدخول فقط. فحسابُ متعاقدٍ انتهى عقده يحتفظ بوصولٍ كاملٍ عبر مفتاحه،
      * وحسابٌ محصورٌ بشبكة المكتب يعمل من أي مكانٍ في العالم إلى الأبد.

@@ -74,6 +74,29 @@
         </div>
     </div>
 
+@elseif ($tab360 === 'telecom')
+    {{-- الاتصالات (الطور G · §28): خطوطُه (SIM/eSIM) — القراءةُ فقط، والتفاصيلُ والأسرارُ
+         (PIN/PUK المقنَّعان) في شاشةِ السجل. لا زرَّ تفعيل/تعليقٍ يُوهم بتوفيرٍ حيٍّ
+         لدى المشغّل (النقد C15) — السجلُّ config-only. --}}
+    <div class="kids">
+        <div class="card kid">
+            <h3>📡 خطوطُه (الاتصالات)
+                @if (hub_can(auth()->user(), 'phones', 'v'))<a class="btn ghost xs msauto" href="{{ route('m.index', 'phones') }}">الكل ←</a>@endif
+            </h3>
+            <table class="mini">
+                @forelse (($phones ?? collect()) as $p)
+                    <tr>
+                        <td>@if (hub_can(auth()->user(), 'phones', 'v'))<a href="{{ route('m.show', ['phones', $p->id]) }}" dir="ltr">{{ $p->number }}</a>@else <span dir="ltr">{{ $p->number }}</span> @endif
+                            <div class="sub">{{ collect([$p->line_type, $p->carrier])->filter()->implode(' · ') ?: '—' }}@if ($p->msisdn) · <span class="mono" dir="ltr">{{ \Illuminate\Support\Str::limit($p->msisdn, 24) }}</span>@endif</div></td>
+                        <td class="acts">@if ($p->status)<span class="bdg {{ hub_tone($p->status) }}">{{ $p->status }}</span>@endif</td>
+                    </tr>
+                @empty
+                    <tr><td class="sub" style="padding:14px;text-align:center">لا خطَّ مُخصَّصٌ له</td></tr>
+                @endforelse
+            </table>
+        </div>
+    </div>
+
 @elseif ($tab360 === 'wallet')
     {{-- العهدة المالية (الطور E): رصيدُ ذمّته المشتقّ — يحرسه field-mode، والكشفُ الكاملُ
          محرّكُه الوحيد `EmployeeCustodyController` (لا محرّكَ ثانٍ). --}}

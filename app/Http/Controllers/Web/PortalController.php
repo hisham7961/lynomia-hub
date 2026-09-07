@@ -51,6 +51,8 @@ class PortalController extends Controller
 
         // تبويبُ المحطة (F.1) يُحمَّل عند فتحه وحدَه — مقاعدُ الموظف بـcurrent_employee_id
         if ($tab === 'station') $data['stations'] = $this->stationsFor($u, $emp->user_id);
+        // (الطور G · WP-G.2) تبويبُ الاتصالات يُحمَّل عند فتحه — خطوطُ الموظف بـemployee_id
+        if ($tab === 'telecom') $data['phones'] = $this->phonesFor($u, $emp->id);
 
         return view('portal.employee', $data);
     }
@@ -67,6 +69,9 @@ class PortalController extends Controller
             'profile' => ['mod' => 'hr',       'label' => '🗂️ الملف والعمل'],
             'assets'  => ['mod' => 'assets',   'label' => '💻 العهدة والأجهزة'],
             'station' => ['mod' => 'stations', 'label' => '🪑 المحطة'],
+            // (Work OS · الطور G · WP-G.2 · §28) سكّةُ الاتصالات وصلت: خطوطُ الموظف
+            // (SIM/eSIM) تُضيء تبويبَها هنا — لا بطاقةٌ زائفةٌ قبل السكّة (§82).
+            'telecom' => ['mod' => 'phones',   'label' => '📡 الاتصالات'],
             'wallet'  => ['mod' => 'custody',  'label' => '💰 العهدة المالية'],
         ];
     }
@@ -94,6 +99,22 @@ class PortalController extends Controller
             ->where('current_employee_id', $userId)
             ->orderBy('code')->orderBy('id')
             ->limit(20)->get(['id', 'code', 'facility', 'zone', 'room', 'desk', 'type', 'dept', 'status']);
+    }
+
+    /**
+     * (WP-G.2 · §22/§28) خطوطُ الاتصالات المُخصَّصةُ للموظف — منطَّقةٌ بالشركة كأيّ
+     * قارئ (نطاقٌ لكلّ ابن: خطُّ شركةٍ أجنبيةٍ لا يبلغ مديراً معزولاً)، وبترتيبٍ حتميّ
+     * (الأحدثُ أعلى ثم `id` — لا قرعةَ ترتيب). القراءةُ فقط؛ لا سرّ (pin/puk) يُنتقى
+     * أصلاً — أعمدةُ العرضِ حرّة، والأسرارُ تُكشف عبر شاشةِ السجل ومسارِ revealSecret.
+     */
+    protected function phonesFor($u, ?string $empId)
+    {
+        if (! $empId || ! hub_can($u, 'phones', 'v')) return collect();
+
+        return hub_scope(DB::table('phone_numbers')->whereNull('deleted_at'), 'phones')
+            ->where('employee_id', $empId)
+            ->orderByDesc('created_at')->orderByDesc('id')
+            ->limit(20)->get(['id', 'number', 'line_type', 'carrier', 'msisdn', 'status', 'expiry']);
     }
 
     /**

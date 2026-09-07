@@ -112,7 +112,8 @@ class WorkOsEmployee360TabsTest extends TestCase
         $this->actingAs($hrOnly)->get(route('portal.employee', $emp->id))->assertOk();
 
         // وكلُّ تبويبٍ لا يملك وحدتَه: ٤٠٣ — لا صفحةٌ صامتةٌ ولا لوحةٌ مخفيّة
-        foreach (['assets', 'station', 'wallet'] as $tab) {
+        // (telecom أُضيف في الطور G: hr:v وحدها لا تفتح تبويبَ الاتصالات — يتطلب phones:v)
+        foreach (['assets', 'station', 'telecom', 'wallet'] as $tab) {
             $this->actingAs($hrOnly)->get(route('portal.employee', $emp->id) . '?tab=' . $tab)
                 ->assertForbidden();
         }
@@ -122,22 +123,33 @@ class WorkOsEmployee360TabsTest extends TestCase
         $this->actingAs($withSta)->get(route('portal.employee', $emp->id) . '?tab=station')->assertOk();
     }
 
-    /** ④ لا بطاقةٌ زائفةٌ لسكّةٍ لم تصل (§82): Telecom/Systems/EndpointSecurity غائبةٌ عن الشريط */
+    /**
+     * ④ لا بطاقةٌ زائفةٌ لسكّةٍ لم تصل (§82): سكّةُ الاتصالات (الطور G) **وصلت** فتبويبُها
+     * حقيقيٌّ على الشريط ويُفتَح؛ أمّا Systems/EndpointSecurity (الأطوار H/J) فما زالت
+     * غائبةً حتى تصل سككها — يُضاف التبويبُ عند وصولِ سكّته لا قبل.
+     */
     public function test_no_placeholder_tab_for_an_unbuilt_rail(): void
     {
         ['emp' => $emp] = $this->scene();
 
-        // المالكُ يملك كلَّ الوحدات — ومع ذلك لا تبويبَ لسكّةٍ لم تُبنَ بعد
+        // المالكُ يملك كلَّ الوحدات — الشريطُ يعرض ما بُنيَ فقط
         $html = $this->actingAs($this->owner)->get(route('portal.employee', $emp->id))
             ->assertOk()->getContent();
 
-        foreach (['tab=telecom', 'tab=systems', 'tab=endpoints', 'tab=endpoint'] as $ghost) {
+        // سكّةُ الاتصالات وصلت (الطور G · WP-G.2): تبويبُها حقيقيٌّ على الشريط ويُفتَح فعلاً
+        $this->assertStringContainsString('tab=telecom', $html,
+            'تبويبُ الاتصالات (سكّةُ الطور G) لم يظهر على شريط الملفّ الشامل');
+        $this->actingAs($this->owner)->get(route('portal.employee', $emp->id) . '?tab=telecom')
+            ->assertOk();
+
+        // وسككٌ لم تُبنَ بعد (Systems/EndpointSecurity — الأطوار H/J): لا بطاقةَ زائفة
+        foreach (['tab=systems', 'tab=endpoints', 'tab=endpoint'] as $ghost) {
             $this->assertStringNotContainsString($ghost, $html,
                 "شريطُ الملفّ عرض تبويباً لسكّةٍ لم تُبنَ بعد ({$ghost}) — بطاقةٌ زائفةٌ يمنعها §82");
         }
 
-        // وطلبُ تبويبٍ مجهولٍ باليد لا يفتح لوحةً صامتة — ٤٠٤ لا ٢٠٠
-        $this->actingAs($this->owner)->get(route('portal.employee', $emp->id) . '?tab=telecom')
+        // وطلبُ تبويبٍ لسكّةٍ لم تُبنَ باليد لا يفتح لوحةً صامتة — ٤٠٤ لا ٢٠٠
+        $this->actingAs($this->owner)->get(route('portal.employee', $emp->id) . '?tab=systems')
             ->assertNotFound();
     }
 

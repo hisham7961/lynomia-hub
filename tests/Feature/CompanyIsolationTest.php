@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\EmployeeCustodyMove;
+use App\Models\PhoneNumber;
 use App\Models\Project;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -153,6 +154,26 @@ class CompanyIsolationTest extends TestCase
             ['employee_id' => $empB->id, 'amount' => 50])->assertNotFound();
         $this->assertSame(0, EmployeeCustodyMove::where('employee_id', $empB->id)->count(),
             'كُتبت حركةُ عهدةٍ لموظفِ شركةٍ أجنبية — عزلُ الشركة انثقب');
+    }
+
+    /**
+     * (Work OS · الطور G · WP-G.1 · §22) أصلُ الاتصالات (`phone_numbers`) معزولٌ
+     * كسائرِ وحداتِ السجل: المعزولةُ على شركة ألف ترى خطَّ شركتِها ولا ترى خطَّ
+     * شركةٍ أجنبية — لا في القائمة، ولا بالوصولِ المباشر (٤٠٤ · IDOR).
+     */
+    public function test_phone_numbers_are_company_isolated(): void
+    {
+        $this->seedCompanies();
+        $lineA = PhoneNumber::create(['number' => 'خطُّ-ألف-9001', 'status' => 'نشط',
+            'company_id' => $this->coA->id]);
+        $lineB = PhoneNumber::create(['number' => 'خطُّ-باء-9002', 'status' => 'نشط',
+            'company_id' => $this->coB->id]);
+
+        $this->actingAs($this->employee)->get('/m/phones')->assertOk()
+            ->assertSee('خطُّ-ألف-9001')->assertDontSee('خطُّ-باء-9002');
+
+        $this->actingAs($this->employee)->get('/m/phones/' . $lineA->id)->assertOk();
+        $this->actingAs($this->employee)->get('/m/phones/' . $lineB->id)->assertNotFound();
     }
 
     public function test_soft_deleted_company_rejected_in_user_form(): void

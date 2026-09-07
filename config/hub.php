@@ -1620,6 +1620,7 @@ return [
             'status' => 'status',
             'columns' => [
                 'number',
+                'lineType',
                 'country',
                 'usage',
                 'wa',
@@ -1645,6 +1646,123 @@ return [
                     'col' => 'carrier',
                     'label' => 'شركة الاتصالات',
                     'type' => 'text',
+                ],
+                // ── هويّةُ الشريحة (Work OS · الطور G · WP-G.1 · §22) ──
+                [
+                    'key' => 'lineType',
+                    'col' => 'line_type',
+                    'label' => 'نوع الخط',
+                    'type' => 'sel',
+                    'options' => ['SIM', 'eSIM', 'رقم ثابت', 'رقم مجاني', 'بيانات (M2M)'],
+                ],
+                [
+                    'key' => 'iccid',
+                    'col' => 'iccid',
+                    'label' => 'ICCID (رقم الشريحة)',
+                    'type' => 'text',
+                ],
+                [
+                    'key' => 'imsi',
+                    'col' => 'imsi',
+                    'label' => 'IMSI',
+                    'type' => 'text',
+                ],
+                [
+                    'key' => 'msisdn',
+                    'col' => 'msisdn',
+                    'label' => 'MSISDN (رقم الخدمة)',
+                    'type' => 'text',
+                ],
+                [
+                    'key' => 'apn',
+                    'col' => 'apn',
+                    'label' => 'APN',
+                    'type' => 'text',
+                ],
+                // ── الأسرار: PIN/PUK مراجعُ خزنة (VaultSecret) — تُقنَّع •••• ولا تُطبع ──
+                // كشفُ PUK يتطلب تصعيدَ المصادقة (stepup) لأنه يفكّ قفلَ الشريحة نهائياً.
+                [
+                    'key' => 'pin',
+                    'col' => 'pin',
+                    'label' => 'PIN',
+                    'type' => 'sec',
+                ],
+                [
+                    'key' => 'puk',
+                    'col' => 'puk',
+                    'label' => 'PUK',
+                    'type' => 'sec',
+                    'stepup' => true,
+                ],
+                // ── الباقة ──
+                [
+                    'key' => 'planName',
+                    'col' => 'plan_name',
+                    'label' => 'اسم الباقة',
+                    'type' => 'text',
+                ],
+                [
+                    'key' => 'planData',
+                    'col' => 'plan_data',
+                    'label' => 'بيانات الباقة',
+                    'type' => 'text',
+                ],
+                [
+                    'key' => 'planVoice',
+                    'col' => 'plan_voice',
+                    'label' => 'دقائق الباقة',
+                    'type' => 'text',
+                ],
+                [
+                    'key' => 'planSms',
+                    'col' => 'plan_sms',
+                    'label' => 'رسائل الباقة',
+                    'type' => 'text',
+                ],
+                [
+                    'key' => 'roaming',
+                    'col' => 'roaming',
+                    'label' => 'التجوال مُفعَّل',
+                    'type' => 'bool',
+                ],
+                [
+                    'key' => 'billingCycle',
+                    'col' => 'billing_cycle',
+                    'label' => 'دورة الفوترة',
+                    'type' => 'sel',
+                    'options' => ['شهري', 'ربع سنوي', 'نصف سنوي', 'سنوي', 'مسبق الدفع', 'لاحق الدفع'],
+                ],
+                // ── روابطُ الأصل (Work OS · الطور G · WP-G.2 · §22/§23/§28) ──
+                // مراجعُ تُضيء علاقاتِ hub_children/hub_related تلقائياً: مزوّدٌ (خياراتُه
+                // مُنطَّقةٌ بالشركة عبر hub_ref_options_scoped)، وموظفٌ (يُضيء تبويبَ
+                // الاتصالات في الموظف 360)، وجهازٌ، ومحطة — والعزلُ الأدقّ يبقى في hub_scope.
+                [
+                    'key' => 'carrierId',
+                    'col' => 'carrier_id',
+                    'label' => 'المزوّد (السجل)',
+                    'type' => 'ref',
+                    'ref' => 'carriers',
+                ],
+                [
+                    'key' => 'employeeId',
+                    'col' => 'employee_id',
+                    'label' => 'الموظف المُخصَّص له',
+                    'type' => 'ref',
+                    'ref' => 'hr',
+                ],
+                [
+                    'key' => 'deviceId',
+                    'col' => 'device_id',
+                    'label' => 'الجهاز',
+                    'type' => 'ref',
+                    'ref' => 'assets',
+                ],
+                [
+                    'key' => 'stationId',
+                    'col' => 'station_id',
+                    'label' => 'المحطة',
+                    'type' => 'ref',
+                    'ref' => 'stations',
                 ],
                 [
                     'key' => 'companyId',
@@ -1703,11 +1821,34 @@ return [
                     'col' => 'status',
                     'label' => 'الحالة',
                     'type' => 'sel',
+                    // الحالاتُ الثلاثُ القديمةُ تبقى (توافقٌ رجعيّ — aliases)، ثم دورةُ حياةٍ
+                    // أغنى للشريحة. **صدقُ التأجيل (النقد C15):** الحالةُ سجلٌّ يحرّره
+                    // مسؤولٌ يدوياً — لا توفيرٌ حيٌّ عبر APIs المشغّلين (تفعيل/تعليق
+                    // حقيقيّ) في هذه الدفعة؛ ذلك يتطلب اتفاقيةَ مشغّلٍ ولم يُبنَ.
                     'options' => [
                         'نشط',
                         'موقوف',
                         'منتهي',
+                        'مخزون',
+                        'قيد التفعيل',
+                        'مُعلَّق',
+                        'منتهي الاشتراك',
+                        'مُلغى',
+                        'مفقود',
+                        'بدل فاقد',
                     ],
+                ],
+                [
+                    'key' => 'activatedAt',
+                    'col' => 'activated_at',
+                    'label' => 'تاريخ التفعيل',
+                    'type' => 'date',
+                ],
+                [
+                    'key' => 'deactivatedAt',
+                    'col' => 'deactivated_at',
+                    'label' => 'تاريخ الإيقاف',
+                    'type' => 'date',
                 ],
                 [
                     'key' => 'notes',
@@ -1720,6 +1861,91 @@ return [
                 'number',
                 'carrier',
                 'usage',
+                'iccid',
+                'msisdn',
+                'plan_name',
+            ],
+        ],
+        // ── سجلُّ مزوّدي الاتصالات (Carrier Registry) — Work OS · الطور G · WP-G.2 · §22/§23 ──
+        // كيانٌ داخليٌّ فوق ModuleController (لا CarrierController). عزلُ الشركات عبر
+        // companyId ref→companies (فخياراتُ carrier_id في الخطّ تُنطَّق بالشركة تلقائياً).
+        // **داخليٌّ فقط:** بلا client_id — ممنوعٌ على حساب العميل عبر PortalGuard.
+        // **صدقُ التأجيل (النقد C15):** السجلُّ config-only يحرّره مسؤولٌ يدوياً — لا
+        // توفيرٌ حيٌّ عبر APIs المشغّلين (تفعيل/تعليق SIM حقيقيّ)؛ ذلك يتطلب اتفاقيةَ
+        // مشغّلٍ وواجهتَه ولم يُبنَ. لا زرَّ «تفعيل» زائفٌ ولا حالةَ تكاملٍ مزعومة.
+        'carriers' => [
+            'key' => 'carriers',
+            'table' => 'carriers',
+            'model' => 'Carrier',
+            'label' => 'مزوّدو الاتصالات',
+            'display' => 'name',
+            'status' => null,
+            'columns' => [
+                'name',
+                'companyId',
+                'portalUrl',
+                'supportPhone',
+                'accountNo',
+            ],
+            'fields' => [
+                [
+                    'key' => 'name',
+                    'col' => 'name',
+                    'label' => 'اسم المزوّد',
+                    'type' => 'text',
+                    'required' => true,
+                ],
+                [
+                    'key' => 'companyId',
+                    'col' => 'company_id',
+                    'label' => 'الشركة',
+                    'type' => 'ref',
+                    'ref' => 'companies',
+                ],
+                [
+                    'key' => 'portalUrl',
+                    'col' => 'portal_url',
+                    'label' => 'رابط بوّابة المزوّد',
+                    'type' => 'url',
+                ],
+                [
+                    'key' => 'portalUsername',
+                    'col' => 'portal_username',
+                    'label' => 'اسم المستخدم للبوّابة',
+                    'type' => 'text',
+                ],
+                // سرٌّ (VaultSecret): كلمةُ مرور البوّابة — تُقنَّع •••• ولا تُطبع،
+                // تُكشف عبر revealSecret وحدَه بأثرِ «عرض حساس».
+                [
+                    'key' => 'portalPassword',
+                    'col' => 'portal_password',
+                    'label' => 'كلمة مرور البوّابة',
+                    'type' => 'sec',
+                ],
+                [
+                    'key' => 'supportPhone',
+                    'col' => 'support_phone',
+                    'label' => 'هاتف الدعم',
+                    'type' => 'text',
+                ],
+                [
+                    'key' => 'accountNo',
+                    'col' => 'account_no',
+                    'label' => 'رقم الحساب لدى المزوّد',
+                    'type' => 'text',
+                ],
+                [
+                    'key' => 'notes',
+                    'col' => 'notes',
+                    'label' => 'ملاحظات',
+                    'type' => 'ta',
+                ],
+            ],
+            'search' => [
+                'name',
+                'portal_username',
+                'account_no',
+                'support_phone',
             ],
         ],
         'vault' => [
@@ -7300,6 +7526,8 @@ return [
                         // (Work OS · الطور F · WP-F.1) المحطات: قاعدةُ تنبيهٍ على
                         // الحالة/الإشغال (مقعدٌ في «صيانة» طويلاً مثلاً)
                         'stations',
+                        // (Work OS · الطور G · WP-G.2) مزوّدو الاتصالات
+                        'carriers',
                     ],
                 ],
                 [

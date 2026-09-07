@@ -7,7 +7,7 @@
  */
 return [
     ['g' => 'الكيانات',            'icon' => '🏢', 'items' => ['companies', 'projects', 'clients', 'engagements', 'services', 'brands', 'competitors']],
-    ['g' => 'الأصول الرقمية',      'icon' => '💠', 'items' => ['apps', 'code', 'websites', 'domains', 'servers', 'changes', 'accounts', 'vault', 'dbs', 'apis', 'social', 'posts', 'emails', 'phones', 'incidents', 'deploys', 'deps']],
+    ['g' => 'الأصول الرقمية',      'icon' => '💠', 'items' => ['apps', 'code', 'websites', 'domains', 'servers', 'changes', 'accounts', 'vault', 'dbs', 'apis', 'social', 'posts', 'emails', 'phones', 'carriers', 'incidents', 'deploys', 'deps']],
     ['g' => 'العمل',               'icon' => '🗂️', 'items' => ['tasks', 'designs', 'updates', 'issues', 'tickets', 'meetings', 'decisions', 'approvals', 'okrs', 'krs', 'feats', 'requests']],
     ['g' => 'المالية والمشتريات',  'icon' => '💰', 'items' => ['fin', 'banks', 'quotes', 'changeorders', 'budgets', 'subs', 'recur', 'costc', 'entries', 'accounts2', 'suppliers', 'purchases']],
     ['g' => 'الموارد البشرية',     'icon' => '👥', 'items' => ['hr', 'attend', 'leaves', 'payroll', 'recruit', 'hrlog', 'skills']],

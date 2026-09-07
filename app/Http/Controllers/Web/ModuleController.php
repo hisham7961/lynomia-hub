@@ -409,9 +409,13 @@ class ModuleController extends Controller
             abort(403, 'هذا السر محصور بقائمة مخولين لست منهم');
         }
 
-        // تصعيدُ المصادقة قبل الكشف — قابلٌ للضبط (مطفأٌ افتراضاً كي لا يعطّل
-        // كشفاً متكرراً مشروعاً؛ يُشعَل للمنشآت التي تريد إعادة تحقّقٍ قبل كل سرّ).
-        if ((string) setting('security.stepup_secrets', '0') === '1' && ($resp = hub_require_stepup())) {
+        // تصعيدُ المصادقة قبل الكشف. عامّاً: قابلٌ للضبط (مطفأٌ افتراضاً كي لا
+        // يعطّل كشفاً متكرراً مشروعاً؛ يُشعَل للمنشآت التي تريد إعادة تحقّقٍ قبل كل
+        // سرّ). وحقلٌ يعلن `stepup` (كـ PUK الذي يفكّ قفلَ الشريحةِ نهائياً —
+        // Work OS · الطور G · §22) **يفرضه دائماً** بمعزلٍ عن المفتاح العامّ.
+        // يُحسب قبل كتابةِ أثرِ «عرض حساس» فلا يُختم كشفٌ لم يقع.
+        $needStepup = ! empty($f['stepup']) || (string) setting('security.stepup_secrets', '0') === '1';
+        if ($needStepup && ($resp = hub_require_stepup())) {
             return $resp;
         }
 
@@ -688,7 +692,7 @@ class ModuleController extends Controller
         $rows = $this->buildQuery($r, $def, $class, $trash, $filters)
             ->orderByDesc('created_at')->orderByDesc('id')->limit(5000)->get();
 
-        if ($resp = $this->exportBelt($module, $rows->count(), 'سجل (CSV)')) return $resp;
+        if ($resp = $this->exportBelt($module, $rows->count(), 'سجل (CSV)', $def)) return $resp;
 
         // البتر لا يكون صامتاً: من صدّر قائمةً أكبر من السقف يعلم أنها قُصّت
         return $this->streamCsv($module, $def, $rows, $rows->count() >= 5000);
@@ -711,7 +715,7 @@ class ModuleController extends Controller
      * يعيد استجابةَ التصعيد إن لزمت، وإلا `null` بعد كتابة بصمة التدقيق —
      * فلا بايتَ CSV قبل اجتياز الحزام كلِّه.
      */
-    protected function exportBelt(string $module, int $count, string $unitLabel)
+    protected function exportBelt(string $module, int $count, string $unitLabel, array $def = [])
     {
         abort_unless(hub_exporter(), 403, 'التصدير يتطلب صلاحية');
         abort_if((string) setting('security.freeze_exports', '0') === '1', 423,
@@ -719,12 +723,37 @@ class ModuleController extends Controller
 
         $bigAt = (int) setting('security.export_stepup_rows', 0);
         $isBig = $bigAt > 0 && $count >= $bigAt;
-        if ($isBig && ($resp = hub_require_stepup())) return $resp;
 
-        // بصمة التصدير في التدقيق — تُعرض في مركز الأمان
-        hub_audit($isBig ? 'تصدير كبير' : 'تصدير', $module, null, $count . ' ' . $unitLabel);
+        // (Work OS · الطور G · §22) تصديرُ ICCID الجماعيّ = سحبُ هويّاتِ شرائحَ خام —
+        // خطرُ انتحالِ/استبدالِ SIM — فيتطلب تأكيدَ الهوية بمعزلٍ عن عتبةِ الحجم
+        // العامّة، ومنطَّقاً بالعمود لا شاملاً (تصديرٌ بلا عمود ICCID لا يُعطَّل).
+        $iccidBulk = $module === 'phones' && $count > 0 && $this->exportColumnsInclude($def, 'iccid');
+
+        if (($isBig || $iccidBulk) && ($resp = hub_require_stepup())) return $resp;
+
+        // بصمة التصدير في التدقيق — تُعرض في مركز الأمان (ICCID الجماعيّ موسومٌ بذاته)
+        $label = $iccidBulk ? 'تصدير ICCID جماعي' : ($isBig ? 'تصدير كبير' : 'تصدير');
+        hub_audit($label, $module, null, $count . ' ' . $unitLabel);
 
         return null;
+    }
+
+    /**
+     * هل يشمل التصديرُ عموداً بعينه؟ — يعيد بناءَ مجموعةِ أعمدة التصدير كما تفعل
+     * `columnsAndLabels` (أعمدةُ المستخدم المخصّصةُ مقاطَعةً بالمرئي لدوره، أو
+     * الافتراضيّة)، فحزامُ ICCID يُشعَل فقط حين يكون العمودُ فعلاً في المُخرَج
+     * (لا محجوباً بـfield-mode، ولا خارجَ تفضيل الأعمدة).
+     */
+    protected function exportColumnsInclude(array $def, string $key): bool
+    {
+        if (empty($def)) return false;
+        $fields = collect(hub_visible_fields(auth()->user(), (string) ($def['key'] ?? ''), $def));
+        if (! $fields->contains('key', $key)) return false;             // محجوبٌ عن الدور → ليس في المُخرَج
+        $userCols = array_values(array_intersect(
+            (array) hub_pref('cols.' . ($def['key'] ?? ''), []), $fields->pluck('key')->all()));
+        $keys = $userCols ?: ($def['columns'] ?? $fields->take(4)->pluck('key')->all());
+
+        return in_array($key, $keys, true);
     }
 
     /** بث CSV بترويسة BOM (يقرأ Excel العربية) — تستعمله «تصدير القائمة» و«تصدير المحدد» */
@@ -780,7 +809,7 @@ class ModuleController extends Controller
                 ->orderByDesc('created_at')->orderByDesc('id')->get();
             // نفسُ حزام export(): تجميدُ الطوارئ وعتبةُ التصعيد ووسمُ التدقيق —
             // «تصدير المحدد» تصديرٌ كاملٌ لا استثناءَ له من المفتاح
-            if ($resp = $this->exportBelt($module, $rows->count(), 'سجل محدد (CSV جماعي)')) return $resp;
+            if ($resp = $this->exportBelt($module, $rows->count(), 'سجل محدد (CSV جماعي)', $def)) return $resp;
 
             return $this->streamCsv($module, $def, $rows);
         }
