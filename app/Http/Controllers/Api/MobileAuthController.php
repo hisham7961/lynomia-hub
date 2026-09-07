@@ -276,45 +276,62 @@ class MobileAuthController extends Controller
         return $this->ok($this->sessionPayload($session, $res['access'], $res['refresh']));
     }
 
-    /** **GET app-config** (عامّ · ما قبل الدخول) — صادقٌ بلا أسرار (يُكمَل في الطور C.3). */
+    /**
+     * **C.3 · GET app-config** (عامّ · ما قبل الدخول · throttle:60,1) — صادقٌ بلا أسرار.
+     *
+     * يجمع من `setting()` فوق افتراضاتِ `config('hub.mobile')`: الوقتُ والمنطقةُ،
+     * إصدارُ عقد الجوال، حالةُ الصيانة/القفل وتوفّرُ الدخول، **بوّابةُ الإصدار**
+     * (حدٌّ أدنى/أحدثُ لكلِّ منصّة + الإجبار)، وروابطُ الدعم/المتجر. القيمةُ
+     * الخارجيّةُ الغائبة تُعاد `null` صادقةً (NOT_CONFIGURED) لا مُختلَقة، والبوّابةُ
+     * الفارغةُ **لا تحجب نسخَ التطوير**. يبقى عامّاً وصولاً دائماً كي يقرأ التطبيقُ
+     * منه رابطَ التحديث حتى حين يكون التحديثُ إلزاميّاً (لا حجبَ لهذه النقطة نفسِها).
+     */
     public function appConfig(Request $r)
     {
         $this->tagMobile($r);
         $maintenance = (bool) setting('maintenance.on', false);
         $lockdown    = (bool) setting('security.lockdown', false);
+        $gate        = $this->mobileVersionGate();
+        $updateReq   = $this->clientUpdateRequired($r, $gate);
 
         return $this->ok([
-            'mobile_api_version' => Api::VERSION,               // '1'
-            'server_time'        => now()->toIso8601String(),
-            'maintenance'        => $maintenance,
-            'lockdown'           => $lockdown,
-            'login_available'    => ! $maintenance && ! $lockdown,
-            // بوّابةُ الإصدار فارغةٌ **عمداً** في الطور B كي لا تُحجَب نسخُ التطوير (تُملأ في C.3)
-            'version_gate'       => [
-                'ios'          => ['min' => null, 'latest' => null],
-                'android'      => ['min' => null, 'latest' => null],
-                'force_update' => false,
+            'mobile_api_version'  => (string) config('hub.mobile.api_version', Api::VERSION),   // '1'
+            'server_time'         => now()->toIso8601String(),
+            'timezone'            => (string) config('app.timezone', 'UTC'),
+            'maintenance'         => $maintenance,
+            // رسالةُ الصيانةُ تُعرَض فقط حين تكون الصيانةُ قائمةً (وإلا null — لا نصَّ بائت)
+            'maintenance_message' => $maintenance ? $this->normStr(setting('maintenance.msg', '')) : null,
+            'lockdown'            => $lockdown,
+            'login_available'     => ! $maintenance && ! $lockdown,
+            'version_gate'        => $gate,             // ios/android {min,latest} + force_update — فارغٌ = لا حجب
+            'update_required'     => $updateReq,        // مُحسَبٌ لإصدار هذا العميل (من ترويسات المنصّة/الإصدار)
+            'support_url'         => $this->normStr(setting('mobile.support_url', '')),
+            'store_urls'          => [
+                'ios'     => $this->normStr(setting('mobile.store_url_ios', data_get(config('hub.mobile.store_urls'), 'ios', ''))),
+                'android' => $this->normStr(setting('mobile.store_url_android', data_get(config('hub.mobile.store_urls'), 'android', ''))),
             ],
-            'support_url'        => (string) setting('mobile.support_url', '') ?: null,
-            'store_urls'         => ['ios' => null, 'android' => null],
-            'stage'              => 'B',
         ]);
     }
 
-    /** **GET health** (عامّ) — حالةٌ صادقة بلا تليمتري بنية ولا أسرار. */
+    /**
+     * **C.3 · GET health** (عامّ · throttle:60,1) — حالةٌ صادقة بلا تليمتري بنيةٍ ولا أسرار.
+     * الحالةُ بأسبقيّة: قفلٌ ← صيانةٌ ← تحديثٌ مطلوبٌ (لهذا العميل) ← سليم.
+     */
     public function health(Request $r)
     {
         $this->tagMobile($r);
         $maintenance = (bool) setting('maintenance.on', false);
         $lockdown    = (bool) setting('security.lockdown', false);
+        $gate        = $this->mobileVersionGate();
+        $updateReq   = $this->clientUpdateRequired($r, $gate);
 
         return $this->ok([
-            'status'          => $lockdown ? 'lockdown' : ($maintenance ? 'maintenance' : 'ok'),
+            'status'          => $lockdown ? 'lockdown'
+                : ($maintenance ? 'maintenance' : ($updateReq ? 'update_required' : 'ok')),
             'maintenance'     => $maintenance,
             'lockdown'        => $lockdown,
-            'update_required' => false,   // بوّابةُ الإصدار فارغةٌ في الطور B (C.3 تملؤها)
+            'update_required' => $updateReq,
             'server_time'     => now()->toIso8601String(),
-            'stage'           => 'B',
         ]);
     }
 
@@ -464,6 +481,56 @@ class MobileAuthController extends Controller
     private function tagMobile(Request $r): void
     {
         $r->attributes->set('request_source', 'mobile');
+    }
+
+    /** نصٌّ مُقلَّم أو null للفارغ — القيمةُ الغائبة null صادقةٌ لا نصٌّ فارغٌ مُختلَق (C.3) */
+    private function normStr($v): ?string
+    {
+        $v = trim((string) $v);
+
+        return $v === '' ? null : $v;
+    }
+
+    /**
+     * **بوّابةُ إصدارِ التطبيق** (C.3 · SF-5): `setting('mobile.*')` فوق افتراضاتِ
+     * `config('hub.mobile.version_gate')`. الفارغُ ⇒ `null` (لا حدَّ = **لا حجبَ**
+     * لنسخ التطوير). `force_update` رايةُ الإلزام حين يكون العميلُ دون الحدِّ الأدنى.
+     */
+    private function mobileVersionGate(): array
+    {
+        $cfg = (array) config('hub.mobile.version_gate', []);
+
+        return [
+            'ios' => [
+                'min'    => $this->normStr(setting('mobile.min_version_ios',    data_get($cfg, 'ios.min', ''))),
+                'latest' => $this->normStr(setting('mobile.latest_version_ios', data_get($cfg, 'ios.latest', ''))),
+            ],
+            'android' => [
+                'min'    => $this->normStr(setting('mobile.min_version_android',    data_get($cfg, 'android.min', ''))),
+                'latest' => $this->normStr(setting('mobile.latest_version_android', data_get($cfg, 'android.latest', ''))),
+            ],
+            'force_update' => (bool) setting('mobile.force_update', (bool) data_get($cfg, 'force_update', false)),
+        ];
+    }
+
+    /**
+     * هل يلزم إصدارَ **هذا العميل** تحديثٌ؟ — منصّةُ العميل وإصدارُه من ترويسات
+     * التليمتري (`X-Lynomia-App-Platform`/`-Version`، أو معلمتَي استعلامٍ بديلتين).
+     * منصّةٌ مجهولةٌ أو حدٌّ فارغٌ أو إصدارُ عميلٍ مجهولٌ ⇒ **لا حجب** (نسخُ التطوير
+     * تمرّ). المقارنةُ `version_compare` (semver). لا يُخوّل شيئاً — إشارةُ عرضٍ فقط.
+     */
+    private function clientUpdateRequired(Request $r, array $gate): bool
+    {
+        $platform = strtolower(trim((string) ($r->header('X-Lynomia-App-Platform') ?: $r->query('platform', ''))));
+        if (! in_array($platform, ['ios', 'android'], true)) return false;
+
+        $min = $gate[$platform]['min'] ?? null;
+        if ($min === null) return false;   // بوّابةٌ فارغةٌ لهذه المنصّة ⇒ لا حجب
+
+        $appVer = $this->normStr($r->header('X-Lynomia-App-Version') ?: $r->query('app_version', ''));
+        if ($appVer === null) return false;   // إصدارُ العميل مجهولٌ ⇒ لا نحجب على شكّ
+
+        return version_compare($appVer, $min, '<');
     }
 
     /** غلافُ نجاحٍ موحَّد: `data` + `request_id` (نمطُ ردود `/api`) */

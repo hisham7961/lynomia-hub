@@ -112,10 +112,26 @@ Route::prefix('mobile/v1')->group(function () {
         ->middleware('throttle:60,1')->name('mobile.health');
 });
 
-Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session'])->group(function () {
+// المجموعةُ المُصادَقة: الخنقُ قبل المصادقة (نمطُ v1)، ثم `mobile.session` (تُرسي
+// الهويّة)، ثم `mobile.context` (تحلّ X-Lynomia-Company/-Client تضييقاً للعرض لا
+// تخويلاً · SF-4 · C). الترتيبُ مقصود: السياقُ يقرأ المستخدمَ الذي أرسته الجلسة.
+Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobile.context'])->group(function () {
     Route::post('auth/logout', [\App\Http\Controllers\Api\MobileAuthController::class, 'logout'])->name('mobile.auth.logout');
     Route::post('auth/logout-all', [\App\Http\Controllers\Api\MobileAuthController::class, 'logoutAll'])->name('mobile.auth.logout_all');
     Route::get('auth/sessions', [\App\Http\Controllers\Api\MobileAuthController::class, 'sessions'])->name('mobile.auth.sessions.index');
     Route::delete('auth/sessions/{id}', [\App\Http\Controllers\Api\MobileAuthController::class, 'destroySession'])->name('mobile.auth.sessions.destroy');
     Route::post('auth/step-up', [\App\Http\Controllers\Api\MobileAuthController::class, 'stepUp'])->name('mobile.auth.step_up');
+
+    /*
+     * ── السياقُ + الإقلاعُ + المخطّط (Mobile Readiness · الطور C · §109) ──
+     * قراءةٌ فقط: C.1 السياق (شركاتُ/عملاءُ المستخدم + التضييقُ النشط)، C.2 الإقلاعُ
+     * المبصوم (لقطةُ إقلاعٍ باردةٍ · ETag/304)، C.4 المخطّطُ المُنطَّق (بلا اسمِ
+     * جدولٍ/عمودٍ فيزيائيّ · ETag/304). **مساراتٌ حرفيّةٌ كلُّها — تُسجَّل قبل أيّ
+     * catch-all (`{module}`) يأتي في الطور D كي لا يبتلعها (Critic F9).** الأخصُّ
+     * (`schema/modules`) قبل الأعمّ (`schema`) انضباطاً.
+     */
+    Route::get('context', [\App\Http\Controllers\Api\MobileContextController::class, 'context'])->name('mobile.context');
+    Route::get('bootstrap', [\App\Http\Controllers\Api\MobileContextController::class, 'bootstrap'])->name('mobile.bootstrap');
+    Route::get('schema/modules', [\App\Http\Controllers\Api\MobileContextController::class, 'schemaModules'])->name('mobile.schema.modules');
+    Route::get('schema', [\App\Http\Controllers\Api\MobileContextController::class, 'schema'])->name('mobile.schema');
 });

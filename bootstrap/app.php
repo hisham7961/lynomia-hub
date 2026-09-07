@@ -59,9 +59,14 @@ return Application::configure(basePath: dirname(__DIR__))
         // `api/mobile/v1` المُصادَقة (لا إلحاقٌ عامّ). المسارُ العامُّ (دخول/تحديث/
         // إعدادات) لا يحملها — التدويرُ يصادِق بـrefresh في معالجه الخاصّ (F5).
         // كلا الاسمين في نداءٍ واحد: `alias()` يستبدل الخريطة كاملةً لا يدمج.
+        // سياقُ عرضِ الجوال (Mobile Readiness · الطور C · SF-4): يُلحَق **بعد**
+        // `mobile.session` على المجموعة المُصادَقة — يقرأ X-Lynomia-Company/-Client
+        // ويتحقّقهما مقابل مجموعةِ المستخدم المسموحة (تضييقُ عرضٍ لا تخويل، لا يوسّع
+        // أبداً). اسمٌ مستعارٌ تلتقطه المجموعة لا إلحاقٌ عامّ.
         $middleware->alias([
             'endpoint.signature' => \App\Http\Middleware\EndpointSignature::class,
             'mobile.session'     => \App\Http\Middleware\MobileSessionAuth::class,
+            'mobile.context'     => \App\Http\Middleware\MobileContext::class,
         ]);
         // الويبهوك الوارد سطحٌ آليّ لا نموذج له: يُصادَق بالرمز في الرابط + توقيع
         // HMAC، فلا CSRF عليه (المُرسِل خدمةٌ خارجية لا متصفّح يحمل الرمز).

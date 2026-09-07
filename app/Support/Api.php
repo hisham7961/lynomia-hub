@@ -411,4 +411,77 @@ final class Api
                 ['current_version' => $cur, 'your_version' => (int) $seen]);
         }
     }
+
+    /**
+     * **بصمةٌ ثابتة (ETag) على حمولةٍ** — Mobile Readiness · الطور C · SF (C.2/C.4).
+     *
+     * تُحوسَب على **المحتوى الدلاليّ** لا على ترتيب المفاتيح: ترتيبٌ عميقٌ
+     * (`ksort` تعاوديّ على المصفوفات الترابطيّة، والقوائمُ المرقّمة تبقى بترتيبها)
+     * ثم `json_encode` ثابتٌ ثم `sha256`. فحمولتان متطابقتان دلاليّاً تُنتجان
+     * البصمةَ نفسَها ولو اختلف ترتيبُ بناء المفاتيح (نظيرُ حذرِ CLAUDE.md من قرعة
+     * ترتيبِ مفاتيح JSON). بصمةٌ قويّة (strong ETag) بين علامتَي اقتباس.
+     */
+    public static function etag(array $data): string
+    {
+        $json = json_encode(self::canonicalize($data),
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR);
+
+        return '"' . hash('sha256', (string) $json) . '"';
+    }
+
+    /** ترتيبٌ تعاوديّ حتميّ: المصفوفةُ الترابطيّة تُرتَّب بمفاتيحها، والقائمةُ تبقى */
+    private static function canonicalize($v)
+    {
+        if (! is_array($v)) return $v;
+        $out = array_map([self::class, 'canonicalize'], $v);
+        if (! array_is_list($out)) ksort($out);
+
+        return $out;
+    }
+
+    /**
+     * هل تطابق بصمةُ الحمولة ترويسةَ `If-None-Match` للعميل؟ — تدعم `*`، والقائمةَ
+     * المفصولةَ بفواصل، وبادئةَ الضعيف `W/`. حقيقيةٌ ⇒ للمُنادي أن يردَّ 304.
+     */
+    public static function etagMatches(Request $r, string $etag): bool
+    {
+        $header = trim((string) $r->header('If-None-Match', ''));
+        if ($header === '') return false;
+        if ($header === '*') return true;
+
+        $bare = static fn (string $t): string => trim(preg_replace('/^W\//', '', trim($t)), " \t\"");
+        $want = $bare($etag);
+        foreach (explode(',', $header) as $candidate) {
+            if ($bare($candidate) === $want) return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * **ردُّ JSON مبصوم** لنقاط القراءة القابلة للتخبئة (bootstrap/schema · C.2/C.4):
+     * يحسب البصمةَ على `$data`، فإن طابقت `If-None-Match` ردّ **304** بلا جسمٍ
+     * (البصمةُ + `X-Request-Id`)، وإلا **200** بالغلاف الموحَّد `{data, request_id}`
+     * (‏+ `meta` إن مُرِّرت) وترويسةِ `ETag`. البصمةُ على الحمولة الدلاليّة وحدها
+     * — لا `request_id` (يتغيّر كلَّ طلب) فلا يُفسد التخبئة.
+     */
+    public static function etagJson(Request $r, array $data, array $meta = []): JsonResponse
+    {
+        $etag = self::etag($data);
+        $rid  = self::requestId();
+
+        if (self::etagMatches($r, $etag)) {
+            return response()->json(null, 304, [
+                'ETag' => $etag, 'X-Request-Id' => (string) $rid, 'X-API-Version' => self::VERSION,
+            ]);
+        }
+
+        $body = ['data' => $data];
+        if ($meta !== []) $body['meta'] = $meta;
+        $body['request_id'] = $rid;
+
+        return response()->json($body, 200, [
+            'ETag' => $etag, 'X-Request-Id' => (string) $rid, 'X-API-Version' => self::VERSION,
+        ]);
+    }
 }

@@ -1676,6 +1676,31 @@ if (! function_exists('hub_visible_fields')) {
     }
 }
 
+if (! function_exists('hub_sync_class')) {
+    /**
+     * **تصنيفُ مزامنةِ الجوال لوحدة** (Mobile Readiness · الطور C · SF-5) — يقود
+     * مخطّطَ الطور C.4 ومحرّكَ المزامنة في الطور G.
+     *
+     * يقرأ خريطةَ `config('hub.mobile_sync')`، ويسقط إلى الافتراض الآمن
+     * `ONLINE_ONLY` لأيِّ وحدةٍ **غيرِ مصنَّفةٍ صراحةً** — «لا يُفترَض قابلاً
+     * للتخبئة أبداً» (spec §C). فوحدةٌ جديدةٌ في السجلّ دون مدخلٍ في الخريطة لا
+     * تُخبَّأ على الأجهزة حتى تُصنَّف عمداً. القيمُ من `mobile_sync.classes`:
+     * CACHEABLE_INCREMENTAL · CACHEABLE_READ_ONLY · ONLINE_ONLY ·
+     * SENSITIVE_NO_PERSIST · NOT_APPLICABLE.
+     */
+    function hub_sync_class(string $module): string
+    {
+        $default = (string) config('hub.mobile_sync.default', 'ONLINE_ONLY');
+        $cls     = config("hub.mobile_sync.modules.$module");
+        if (! is_string($cls) || $cls === '') return $default;
+
+        // صمّامُ أمان: قيمةٌ خارجَ الأصناف المعلَنة تسقط للافتراض الآمن لا تُمرَّر
+        $allowed = (array) config('hub.mobile_sync.classes', []);
+
+        return in_array($cls, $allowed, true) ? $cls : $default;
+    }
+}
+
 if (! function_exists('hub_company_col')) {
     /**
      * عمود الشركة للعزل: من تعريف الوحدة، أو العمود الفعلي company_id في الجدول
