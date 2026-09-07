@@ -310,6 +310,24 @@ Route::middleware('auth')->group(function () {
     // المتحكّم؛ وعزلُ الشركة على كل قارئ (جهازٌ أجنبيّ ٤٠٤). الوضعيّةُ تُعرَض
     // **صادقةً** (C15): الممنوعُ «غير مُهيّأ» لا «فعّالة»، وUSB بلا MDM رصدٌ فقط.
     Route::get('endpoints', [\App\Http\Controllers\Web\EndpointCentreController::class, 'index'])->name('endpoints.index');
+
+    // ── مركزُ تنزيل الوكيل (Work OS · الطور L · WP-L.2 · §44/§62) ──
+    // انضباطُ AttachmentController — **لا سكّةَ تقديمٍ ثانية ولا public storage**:
+    // ملفاتٌ تحت storage/app/agent-releases/ تُقدَّم attachment وتُسجَّل في
+    // download_log. داخليٌّ حصراً (PortalGuard قائمةٌ بيضاءُ لا تضمّ
+    // endpoints.releases* → العميلُ ٤٠٤ فوق المصفوفة + دفاعٌ في المتحكّم)؛
+    // الإدارةُ (نشر/سحب) للمالك وحدَه خلف hub_require_stepup — نشرُ ثنائيّةٍ
+    // يبتلعها الأسطولُ كلُّه قرارُ سلسلةِ توريد؛ والتنزيلُ لكل داخليٍّ مُصادَق.
+    // sha256 تُحسب خادمياً، وsigning_status **صادقةٌ دوماً**: unsigned-dev —
+    // لا شهادةَ مُهيّأةً فلا ادّعاءَ توقيعٍ (C15). **قبل** endpoints/{id} كي
+    // لا يبتلع الوسيطُ الجامح كلمةَ releases.
+    Route::get('endpoints/releases', [\App\Http\Controllers\Web\EndpointReleaseController::class, 'index'])->name('endpoints.releases');
+    Route::get('endpoints/releases/{id}/download', [\App\Http\Controllers\Web\EndpointReleaseController::class, 'download'])->name('endpoints.releases.download');
+    Route::middleware('throttle:30,1')->group(function () {
+        Route::post('endpoints/releases', [\App\Http\Controllers\Web\EndpointReleaseController::class, 'store'])->name('endpoints.releases.store');
+        Route::post('endpoints/releases/{id}/delete', [\App\Http\Controllers\Web\EndpointReleaseController::class, 'destroy'])->name('endpoints.releases.delete');
+    });
+
     Route::get('endpoints/{id}', [\App\Http\Controllers\Web\EndpointCentreController::class, 'show'])->name('endpoints.show');
 
     // ── عهدةُ الموظف المالية (Work OS · الطور E · WP-E.3 · §19/§28/§98) ──

@@ -123,3 +123,93 @@ jobs:
             exit 1
           fi
           echo "✅ النسخة: $old → $new"
+
+  # ═══ وكيلُ Go (الطور L · WP-L.1 · §62) — وظيفةٌ مستقلّةٌ إضافيّة ═══
+  #
+  # لا `needs` من/إلى وظائف PHP: سقوطُها لا يحجب المصفوفةَ ولا البوّابات،
+  # وسقوطُ المصفوفة لا يحجبها — كلٌّ يُقرأ على حدة (نقد C12).
+  #
+  # الصدقُ قبل كل شيء (نقد C15): لا شهادةَ توقيعٍ مضبوطة — لا Windows
+  # Authenticode (OV/EV) ولا macOS Developer ID + notarization — فكلُّ
+  # أرتيفاكت يُوسَم «UNSIGNED DEVELOPMENT BUILD» حرفيّاً: ثنائيّاتٌ خام
+  # (لا ‎.msi/.pkg يوحيان بتوقيعٍ غيرِ موجود) + SHA-256 حقيقيّ محسوبٌ على
+  # المبنيّ فعلاً — وهو نفسُه الذي يتحقّق منه التحديثُ الذاتيّ
+  # (agent/internal/update: بيانُ {url, sha256} يُرفَض أيُّ انحرافٍ عنه).
+  agent:
+    name: وكيلُ Go
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: تهيئة Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          # الخبيئة الافتراضية تُقفَل على go.sum — وهو في agent/ لا الجذر
+          cache-dependency-path: agent/go.sum
+
+      - name: gofmt — لا ملفَ غيرَ منسَّق
+        run: |
+          fmt=$(gofmt -l .)
+          if [ -n "$fmt" ]; then
+            echo "✗ ملفاتٌ غيرُ منسَّقة:"; echo "$fmt"; exit 1
+          fi
+          echo "✅ gofmt نظيف"
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: اختبارات الوكيل
+        run: go test ./...
+
+      # البناءُ المتقاطع للمعماريّات الأربع. CGO_ENABLED=0 حتماً (لا سلسلةَ
+      # أدوات C متقاطعة، والناتجُ ساكنٌ حتميّ)، و-trimpath لبناءٍ قابلٍ
+      # للإعادة. لا ختمَ نسخةٍ بـ-X: النسخةُ في cmd/agent/main.go ثابتةٌ
+      # (const Version) لا متغيّرٌ قابلٌ للحقن — فتسافر كما في الشيفرة.
+      - name: البناء المتقاطع (windows/darwin × amd64/arm64)
+        run: |
+          mkdir -p dist
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o dist/lynomia-agent-windows-amd64.exe ./cmd/agent
+          CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -trimpath -ldflags "-s -w" -o dist/lynomia-agent-windows-arm64.exe ./cmd/agent
+          CGO_ENABLED=0 GOOS=darwin  GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o dist/lynomia-agent-darwin-amd64 ./cmd/agent
+          CGO_ENABLED=0 GOOS=darwin  GOARCH=arm64 go build -trimpath -ldflags "-s -w" -o dist/lynomia-agent-darwin-arm64 ./cmd/agent
+          ls -la dist/
+
+      # حالةُ التوقيع تُعلَن صادقةً: إن ضُبطت أسرارُ توقيعٍ مستقبلاً جاز وصلُ
+      # خطِّ توقيعٍ هنا؛ وفي غيابها لا تمثيلَ ولا سقوط — وسمٌ صريح لا غير.
+      - name: حالة التوقيع — UNSIGNED DEVELOPMENT BUILD صادقاً
+        env:
+          WINDOWS_CODESIGN_PFX: ${{ secrets.WINDOWS_CODESIGN_PFX }}
+          APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+        run: |
+          if [ -n "$WINDOWS_CODESIGN_PFX" ] || [ -n "$APPLE_DEVELOPER_ID_P12" ]; then
+            echo "⚠ رُصدت أسرارُ توقيعٍ لكن خطَّ التوقيع غيرُ موصولٍ في هذه الوظيفة بعدُ —"
+            echo "  تبقى الأرتيفاكتات موسومةً unsigned بصدقٍ إلى أن يُوصَل ويُتحقَّق منه."
+          else
+            echo "UNSIGNED DEVELOPMENT BUILD — code-signing certificates not configured"
+            echo "بناءٌ تطويريٌّ غيرُ موقَّع — لا Windows Authenticode (OV/EV) ولا macOS Developer ID/notarization."
+          fi
+          {
+            echo "UNSIGNED DEVELOPMENT BUILD — code-signing certificates not configured"
+            echo "بناءٌ تطويريٌّ غيرُ موقَّع: لا Windows Authenticode (OV/EV) ولا macOS Developer ID + notarization."
+            echo "التحقّقُ من السلامة عبر checksums.txt (SHA-256) المرفق لا عبر توقيعِ منصّة."
+          } > dist/UNSIGNED-DEVELOPMENT-BUILD.txt
+          echo "UNSIGNED DEVELOPMENT BUILD — code-signing certificates not configured" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+
+      # SHA-256 على المبنيّ فعلاً — وذاتُ التحقّقِ فوراً (sha256sum -c)
+      - name: checksums.txt (SHA-256 حقيقيّ)
+        working-directory: agent/dist
+        run: |
+          sha256sum lynomia-agent-* > checksums.txt
+          sha256sum -c checksums.txt
+          cat checksums.txt
+
+      - name: رفع الأرتيفاكتات (موسومةً unsigned-dev)
+        uses: actions/upload-artifact@v4
+        with:
+          name: lynomia-agent-unsigned-dev
+          path: agent/dist/
+          if-no-files-found: error

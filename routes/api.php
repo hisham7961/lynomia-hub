@@ -70,4 +70,14 @@ Route::prefix('v1/endpoint')->middleware(['throttle:120,1', 'endpoint.signature'
     Route::post('event', [\App\Http\Controllers\Api\EndpointProtocolController::class, 'event'])->name('endpoint.event');
     Route::post('commands/pull', [\App\Http\Controllers\Api\EndpointProtocolController::class, 'commandsPull'])->name('endpoint.commands.pull');
     Route::post('commands/result', [\App\Http\Controllers\Api\EndpointProtocolController::class, 'commandResult'])->name('endpoint.commands.result');
+
+    // ── بيانُ تحديث الوكيل وتنزيلُه (الطور L · WP-L.2 · §44/§62) ──
+    // خلف التوقيع نفسِه — **لا مصادقةَ ثانية ولا public storage**: البيانُ
+    // `{url, sha256}` بالشكل الذي يستهلكه agent/internal/update.Apply حرفياً
+    // (التجزئةُ الحقيقيةُ المحسوبةُ خادمياً عند النشر — انحرافُها رفضُ تبديلٍ
+    // قاطعٌ على الجهاز)، والنطاقُ نظامُ الجهاز المصادَق ومعماريّتُه، والتنزيلُ
+    // مُسجَّلٌ في download_log (السكّةُ الواحدة). GET والجسدُ فارغٌ — عقدُ
+    // Es256 يوقّع (method, path, ts, nonce, body) فيبقى الطلبُ محكماً.
+    Route::get('agent/manifest', [\App\Http\Controllers\Api\EndpointProtocolController::class, 'agentManifest'])->name('endpoint.agent.manifest');
+    Route::get('agent/download/{id}', [\App\Http\Controllers\Api\EndpointProtocolController::class, 'agentDownload'])->name('endpoint.agent.download');
 });

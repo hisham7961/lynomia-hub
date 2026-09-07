@@ -101,6 +101,42 @@ class ReaderScopeLeaksTest extends TestCase
         @unlink(storage_path('app/' . $rel));
     }
 
+    /**
+     * (الطور L · WP-L.2) بوّابةُ ملفاتٍ رابعة — مركزُ تنزيل الوكيل: يرث انضباطَ
+     * أخواته لا عيوبَها. ضيفٌ بلا جلسة يُحوَّل للدخول ولا يبلغ بايتاً واحداً
+     * (الملفُ تحت storage/app لا public/)، والداخليُّ المُصادَقُ — ولو ضيّقَ
+     * الصلاحياتِ (جمهورُ المركز داخليٌّ لا صلاحيةَ وحدةٍ: من يثبّت الوكيلَ على
+     * جهازه) — يُقدَّم له attachment ويُسجَّل تنزيلُه في download_log.
+     */
+    public function test_the_agent_release_download_is_never_served_without_a_session(): void
+    {
+        $this->seedCore();
+
+        $bytes = 'AGENT-BIN-' . \Illuminate\Support\Str::random(24);
+        \Illuminate\Support\Facades\Storage::disk('local')
+            ->put($p = 'agent-releases/leak-' . \Illuminate\Support\Str::random(8) . '.bin', $bytes);
+        $rel = \App\Models\EndpointRelease::create([
+            'version' => '9.0.1', 'os' => 'windows', 'arch' => 'amd64',
+            'path' => $p, 'sha256' => hash('sha256', $bytes), 'size' => strlen($bytes),
+            'published_by' => $this->owner->id,
+        ]);
+
+        // ضيفٌ: تحويلٌ — أبداً لا المحتوى ولا صفُّ سجلّ
+        $this->get(route('endpoints.releases.download', $rel->id))->assertRedirect();
+        $this->assertSame(0, \Illuminate\Support\Facades\DB::table('download_log')->count());
+
+        // داخليٌّ ضيّقُ الصلاحيات: يُقدَّم attachment ويُسجَّل — الجمهورُ داخليّ
+        $narrow = $this->narrow('rel@test.local', ['hr']);
+        $r = $this->actingAs($narrow)->get(route('endpoints.releases.download', $rel->id));
+        $r->assertOk();
+        $this->assertStringContainsString('attachment', (string) $r->headers->get('content-disposition'));
+        $this->assertSame(1, \Illuminate\Support\Facades\DB::table('download_log')
+            ->where('attachment_id', $rel->id)->where('user_id', $narrow->id)->count(),
+            'تنزيلُ إصدارٍ ناجحٌ بلا صفِّ سجلّ');
+
+        \Illuminate\Support\Facades\Storage::disk('local')->delete($p);
+    }
+
     public function test_the_morning_brief_filters_overdue_tasks_by_permission(): void
     {
         $this->seedCore();
