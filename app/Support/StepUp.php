@@ -50,13 +50,25 @@ class StepUp
         return $user && $user->totp_enabled ? 'totp' : 'password';
     }
 
-    /** يتحقّق من المُدخَل ويختم النافذة عند النجاح */
-    public static function verify($user, string $input): bool
+    /**
+     * **فحصُ الاعتماد وحدَه** — دون أيّ حالة (لا `session()`): TOTP لمن فعّله وإلا
+     * كلمةُ المرور. استُخرج كي يُعاد استعمالُه من سطحٍ عديمِ الحالة (الجوال · Mobile
+     * Readiness · الطور B · Critic F11): الجوالُ يُثبِت المِنحةَ في
+     * `mobile_stepup_grants` لا في الجلسة، فيحتاج الفحصَ مجرّداً من الختم.
+     */
+    public static function checkCredential($user, string $input): bool
     {
         if (! $user) return false;
-        $ok = $user->totp_enabled
+
+        return $user->totp_enabled
             ? \App\Support\Totp::verifyOnce((string) $user->totp_secret_cipher, $input, 'stepup:' . $user->id)
             : ($user->password && Hash::check($input, $user->password));
+    }
+
+    /** يتحقّق من المُدخَل ويختم النافذة (في الجلسة) عند النجاح — سطحُ الويب */
+    public static function verify($user, string $input): bool
+    {
+        $ok = self::checkCredential($user, $input);
         if ($ok) self::stamp();
 
         return $ok;

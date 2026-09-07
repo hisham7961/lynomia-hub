@@ -192,31 +192,13 @@ class AuthController extends Controller
     /**
      * زيادةُ عدّاد المحاولات الفاشلة **ذرّيّاً** ثم قفلُ الحساب عند السقف.
      *
-     * كان `$u->failed_attempts = $u->failed_attempts + 1; save()` قراءةً في الذاكرة
-     * ثم كتابةً — فطلبان متوازيان يقرآن القيمةَ نفسها فتُكتب زيادةٌ واحدةٌ عن اثنتين،
-     * فيضعف قفلُ الحساب أمام التخمين المتوازي. الآن الزيادةُ على مستوى القاعدة
-     * (`increment`) لا تُفقد شيئاً، والقفلُ يُكتب بشرطٍ يمنع كتابتين متسابقتين.
+     * كان المنطقُ هنا حرفيّاً؛ استُخرج إلى `App\Support\AccountLockout::bump` كي
+     * يتقاسمه الويبُ وسطحُ الجوال الأصيل (Mobile Readiness · الطور B) — محرّكُ قفلٍ
+     * **واحد** لا موازٍ أضعف (spec §Auth · Critic F4). هذه الدالةُ تبقى (يعتمدها
+     * `CheckThenWriteRound8Test` بالانعكاس) وتفوّض إلى المحرّك المشترك بسلوكٍ مطابق.
      */
     protected function bumpFailedAttempts(User $u): void
     {
-        $max = max(1, (int) setting('auth.max_fail', 5));
-        $min = max(1, (int) setting('auth.lock_min', 15));
-        $t   = \Illuminate\Support\Facades\DB::table('users')->where('id', $u->id);
-
-        $t->increment('failed_attempts');
-        $n = (int) \Illuminate\Support\Facades\DB::table('users')->where('id', $u->id)->value('failed_attempts');
-        if ($n >= $max) {
-            // شرطُ `>= max` يمنع صفرَ العدّاد مرّتين متسابقتين: أوّلُ من يبلغ السقف
-            // يقفل ويُصفّر، والثاني لا يجد ما يصفّره فلا يُمدّد القفلَ بلا داعٍ.
-            $locked = $t->where('failed_attempts', '>=', $max)
-                ->update(['locked_until' => now()->addMinutes($min), 'failed_attempts' => 0]);
-            // قفلُ حسابٍ حدثٌ أمنيّ يستحق **حالةً تُحقَّق** لا سطرَ تدقيقٍ يمرّ:
-            // يُفتح (أو يُثرى) حادثةٌ أمنيّة — للتحقيق البشريّ لا للعقاب الآليّ.
-            if ($locked) {
-                hub_security_incident('قفلُ حسابٍ بعد محاولاتٍ فاشلة: ' . $u->name, 'عالي', [
-                    'user_id' => $u->id, 'ip' => request()?->ip(), 'threshold' => $max,
-                ]);
-            }
-        }
+        \App\Support\AccountLockout::bump($u);
     }
 }

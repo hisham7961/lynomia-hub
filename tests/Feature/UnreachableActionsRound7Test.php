@@ -106,6 +106,12 @@ class UnreachableActionsRound7Test extends TestCase
             if (! $n || in_array($n, $allowed, true)) continue;
             if (! array_intersect($r->methods(), ['POST', 'PUT', 'PATCH', 'DELETE'])) continue;
 
+            // سطحُ الجوال الأصيل (Mobile Readiness · الطور B+): API يستهلكه تطبيقٌ
+            // خارجيٌّ (iOS/Android) — لا بابَ ويب له **بحكم التصميم**، فمصدرُ التطبيق
+            // ليس في هذا المستودع. بابُه المُثبَت هو اختباراتُ عقده (MobileAuthContractTest)
+            // لا قالبٌ ولا جافاسكربت. هذا الحارسُ عن مسارات الويب الكاتبة، لا عن API.
+            if (str_starts_with($r->uri(), 'api/mobile/')) continue;
+
             if (str_contains($src, "route('" . $n . "'") || str_contains($src, 'route("' . $n . '"')) continue;
 
             // إشارةٌ بالمسار النصّيّ (fetch/sendBeacon). ومسارٌ فيه عنصرٌ متغيّر

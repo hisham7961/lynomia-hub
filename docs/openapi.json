@@ -2,9 +2,9 @@
     "openapi": "3.1.0",
     "info": {
         "title": "Lynomia Business Hub — REST API",
-        "version": "2.421.1",
+        "version": "2.422.0",
         "description": "واجهة `/api/v1`: كل وحدات النظام بنفس صلاحيات صاحب المفتاح ونطاقه.\nمفتاح Bearer من «حسابي ← مفاتيح API». حدّ المعدل ١٢٠/دقيقة لكل مفتاح و٣٠٠/دقيقة لكل عنوان.\nكل ردٍّ يحمل `X-Request-Id` و`X-API-Version`، وكل خطأٍ يحمل `code` آلياً و`request_id`.",
-        "x-hub-version": "2.421.1"
+        "x-hub-version": "2.422.0"
     },
     "servers": [
         {
@@ -36332,7 +36332,11 @@
                             "MAINTENANCE",
                             "LOCKDOWN",
                             "SERVICE_UNAVAILABLE",
-                            "INTERNAL_ERROR"
+                            "INTERNAL_ERROR",
+                            "MFA_REQUIRED",
+                            "REFRESH_TOKEN_INVALID",
+                            "SESSION_REVOKED",
+                            "APP_UPDATE_REQUIRED"
                         ]
                     },
                     "message": {
@@ -59877,7 +59881,11 @@
         "MAINTENANCE": "وضع الصيانة — الكتابة متوقفة مؤقتاً (503)",
         "LOCKDOWN": "قفلُ طوارئ — سطحُ API معلَّق (503)",
         "SERVICE_UNAVAILABLE": "الخدمة غير متاحة مؤقتاً (503)",
-        "INTERNAL_ERROR": "عطلٌ داخليّ سُجّل تلقائياً — أرفق request_id (500)"
+        "INTERNAL_ERROR": "عطلٌ داخليّ سُجّل تلقائياً — أرفق request_id (500)",
+        "MFA_REQUIRED": "تسجيلُ الدخول يتطلّب خطوةً ثانية — challenge_id وmethods في details (401)",
+        "REFRESH_TOKEN_INVALID": "رمزُ التحديث غير صالحٍ أو منتهٍ أو أُعيد استعمالُه — سجّل الدخول من جديد (401)",
+        "SESSION_REVOKED": "أُبطلت هذه الجلسة (خروجٌ أو إلغاءٌ عن بُعد) — سجّل الدخول من جديد (401)",
+        "APP_UPDATE_REQUIRED": "إصدارُ التطبيق أقدمُ من الحدِّ الأدنى المطلوب — حدّثه للمتابعة (426)"
     },
     "x-deprecations": []
 }

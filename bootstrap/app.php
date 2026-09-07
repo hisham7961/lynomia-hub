@@ -54,7 +54,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // ES256 (docblock ‏App\Support\Es256) — طابعٌ ±300ث + nonce فريد + تحقّقٌ
         // بالمفتاح العامّ المخزَّن — على مجموعة مسارات الأجهزة التي يصلها WP-J.2
         // (heartbeat/أحداث/أوامر). اسمٌ مستعارٌ تلتقطه المجموعة لا إلحاقٌ عامّ.
-        $middleware->alias(['endpoint.signature' => \App\Http\Middleware\EndpointSignature::class]);
+        // بوّابةُ جلسة الجوال (Mobile Readiness · الطور B · SF-2): تُطابِق ترتيبَ
+        // حراس `ApiAuth` وتصادِق رمزَ الوصول في `mobile_sessions` — تلتقطها مجموعةُ
+        // `api/mobile/v1` المُصادَقة (لا إلحاقٌ عامّ). المسارُ العامُّ (دخول/تحديث/
+        // إعدادات) لا يحملها — التدويرُ يصادِق بـrefresh في معالجه الخاصّ (F5).
+        // كلا الاسمين في نداءٍ واحد: `alias()` يستبدل الخريطة كاملةً لا يدمج.
+        $middleware->alias([
+            'endpoint.signature' => \App\Http\Middleware\EndpointSignature::class,
+            'mobile.session'     => \App\Http\Middleware\MobileSessionAuth::class,
+        ]);
         // الويبهوك الوارد سطحٌ آليّ لا نموذج له: يُصادَق بالرمز في الرابط + توقيع
         // HMAC، فلا CSRF عليه (المُرسِل خدمةٌ خارجية لا متصفّح يحمل الرمز).
         $middleware->validateCsrfTokens(except: ['hook/*']);

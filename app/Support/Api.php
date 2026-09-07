@@ -47,6 +47,14 @@ final class Api
     public const SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE';
     public const INTERNAL_ERROR = 'INTERNAL_ERROR';
 
+    // ── أكوادُ الجوال (Mobile Readiness · الطور B · SF-3) — إضافةٌ فقط، لا تُعاد
+    //    تسميةُ كودٍ قائمٍ ولا يُحذف (يكسر n8n). تظهر أيضاً في /api/v1/openapi.json
+    //    كقيَمِ enum إضافيّة — توافقيّةٌ لا كاسرة (Critic F14).
+    public const MFA_REQUIRED = 'MFA_REQUIRED';
+    public const REFRESH_TOKEN_INVALID = 'REFRESH_TOKEN_INVALID';
+    public const SESSION_REVOKED = 'SESSION_REVOKED';
+    public const APP_UPDATE_REQUIRED = 'APP_UPDATE_REQUIRED';
+
     /** إصدارُ العقد الحاليّ — يُبثّ ترويسةً على كل ردّ */
     public const VERSION = '1';
 
@@ -74,6 +82,11 @@ final class Api
         self::LOCKDOWN => 'قفلُ طوارئ — سطحُ API معلَّق (503)',
         self::SERVICE_UNAVAILABLE => 'الخدمة غير متاحة مؤقتاً (503)',
         self::INTERNAL_ERROR => 'عطلٌ داخليّ سُجّل تلقائياً — أرفق request_id (500)',
+        // ── أكوادُ الجوال (Mobile Readiness · الطور B · SF-3) ──
+        self::MFA_REQUIRED => 'تسجيلُ الدخول يتطلّب خطوةً ثانية — challenge_id وmethods في details (401)',
+        self::REFRESH_TOKEN_INVALID => 'رمزُ التحديث غير صالحٍ أو منتهٍ أو أُعيد استعمالُه — سجّل الدخول من جديد (401)',
+        self::SESSION_REVOKED => 'أُبطلت هذه الجلسة (خروجٌ أو إلغاءٌ عن بُعد) — سجّل الدخول من جديد (401)',
+        self::APP_UPDATE_REQUIRED => 'إصدارُ التطبيق أقدمُ من الحدِّ الأدنى المطلوب — حدّثه للمتابعة (426)',
     ];
 
     /** معرّفُ الطلب الحاليّ (يضعه وسيط Observability) — أو null خارج الطلب */
@@ -163,6 +176,7 @@ final class Api
             413 => self::PAYLOAD_TOO_LARGE,
             422 => self::VALIDATION_FAILED,
             423 => self::LOCKED,
+            426 => self::APP_UPDATE_REQUIRED,   // بوّابةُ إصدارِ الجوال (Mobile · SF-3) — ٤٢٦ بلا كودٍ سابق
             428 => self::STEP_UP_REQUIRED,
             429 => self::RATE_LIMITED,
             502, 504 => self::INTEGRATION_UNAVAILABLE,

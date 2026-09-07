@@ -81,3 +81,41 @@ Route::prefix('v1/endpoint')->middleware(['throttle:120,1', 'endpoint.signature'
     Route::get('agent/manifest', [\App\Http\Controllers\Api\EndpointProtocolController::class, 'agentManifest'])->name('endpoint.agent.manifest');
     Route::get('agent/download/{id}', [\App\Http\Controllers\Api\EndpointProtocolController::class, 'agentDownload'])->name('endpoint.agent.download');
 });
+
+/*
+ * ── سطحُ الجوال الأصيل (Mobile Readiness · الطور B · §109) ──
+ * نطاقٌ **مستقلٌّ** عن `/api/v1` (مفتاحُ التكامل) — لا يمسّه ولا يظلّله. جلسةُ
+ * الجوال زوجُ رمزَين (وصولٌ قصيرٌ + تحديثٌ متجدّدٌ لمرّة)، مفهومٌ غيرُ `ApiToken`.
+ *
+ * **الفصلُ إلى مجموعتين (Critic F5):**
+ *  • **عامّةٌ** (بلا `mobile.session`): دخولٌ/تحقّقٌ ثنائيٌّ/تحديثٌ/إعداداتٌ/صحّة —
+ *    لا رمزَ وصولٍ بعد. لكلٍّ خنقُه الخاصّ الضيّق (لا `throttle:api` الفضفاض
+ *    ٣٠٠/دقيقة · F4): دخولٌ `10,1` (نظيرُ الويب web.php:90)، تحقّقٌ ثنائيٌّ
+ *    `6,1` (نظيرُ الويب web.php:93)، تحديثٌ `20,1` ضيّق. و`refresh` يصادِق
+ *    بـ**رمز التحديث** في معالجه لا عبر `mobile.session` (التي تصادِق رمزَ الوصول).
+ *  • **مُصادَقةٌ** خلف `['throttle:api','mobile.session']` (الخنقُ قبل المصادقة،
+ *    نمطُ v1 أعلاه): خروجٌ/خروجٌ شامل/إدارةُ الجلسات/تصعيد.
+ *
+ * المساراتُ الحرفيّةُ كلُّها قبل أيّ catch-all (لا يوجد في الطور B — انضباطٌ
+ * محفوظٌ · F9). الأسماء `mobile.auth.*` (والعامّتان الخفيفتان `mobile.*`).
+ */
+Route::prefix('mobile/v1')->group(function () {
+    Route::post('auth/login', [\App\Http\Controllers\Api\MobileAuthController::class, 'login'])
+        ->middleware('throttle:10,1')->name('mobile.auth.login');
+    Route::post('auth/mfa/verify', [\App\Http\Controllers\Api\MobileAuthController::class, 'mfaVerify'])
+        ->middleware('throttle:6,1')->name('mobile.auth.mfa_verify');
+    Route::post('auth/refresh', [\App\Http\Controllers\Api\MobileAuthController::class, 'refresh'])
+        ->middleware('throttle:20,1')->name('mobile.auth.refresh');
+    Route::get('app-config', [\App\Http\Controllers\Api\MobileAuthController::class, 'appConfig'])
+        ->middleware('throttle:60,1')->name('mobile.app_config');
+    Route::get('health', [\App\Http\Controllers\Api\MobileAuthController::class, 'health'])
+        ->middleware('throttle:60,1')->name('mobile.health');
+});
+
+Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session'])->group(function () {
+    Route::post('auth/logout', [\App\Http\Controllers\Api\MobileAuthController::class, 'logout'])->name('mobile.auth.logout');
+    Route::post('auth/logout-all', [\App\Http\Controllers\Api\MobileAuthController::class, 'logoutAll'])->name('mobile.auth.logout_all');
+    Route::get('auth/sessions', [\App\Http\Controllers\Api\MobileAuthController::class, 'sessions'])->name('mobile.auth.sessions.index');
+    Route::delete('auth/sessions/{id}', [\App\Http\Controllers\Api\MobileAuthController::class, 'destroySession'])->name('mobile.auth.sessions.destroy');
+    Route::post('auth/step-up', [\App\Http\Controllers\Api\MobileAuthController::class, 'stepUp'])->name('mobile.auth.step_up');
+});
