@@ -347,4 +347,45 @@ class FieldPermissionBypassTest extends TestCase
         $this->actingAs($officer)->delete('/comments/' . $msg->id)->assertForbidden();
         $this->assertNotNull(Comment::find($msg->id), 'حذف الرقيبُ رسالةَ غيره');
     }
+
+    /**
+     * **امتدادُ Work OS (WP-D.2 · §11):** مركزُ قيادةِ المشروع الجديدُ لا يغسل حجبَ الحقل.
+     *
+     * البطاقاتُ المسطّحةُ صارت تبويبات (نظرة/تسليم/أساس/غرف/مالية/نشاط)، ومعها وُلد
+     * تبويبُ ماليةٍ يقرأ `hub_project_pl` (تكلفةٌ · هامشٌ · ميزانيّة · cost_delta). دورٌ
+     * داخليٌّ يُخفي `projects.cost`/`budget` **يجب ألا يبلغه هذا التبويبُ ولا أرقامُه** —
+     * كما لا يبلغه الحقلُ في الشاشة المباشرة. يمتدّ نمطَ هذا الملف: حارسٌ (field-mode)
+     * يُفرض في مسارٍ ولا يُلتَفّ عليه بمسارٍ جديد — والتبويبُ لا يكون الالتفافَ الجديد.
+     */
+    public function test_the_project_command_centre_tabs_do_not_launder_a_hidden_field(): void
+    {
+        $this->seedCore();
+
+        // مشروعٌ خارجيٌّ بتكلفةٍ وميزانيّةٍ متمايزتين — كي يُثبَت غيابُهما لا فراغُهما
+        $client = \App\Models\Client::create(['name' => 'عميلُ الحجب', 'stage' => 'عميل حالي']);
+        $project = \App\Models\Project::create(['name' => 'مشروعُ الحجب', 'client_id' => $client->id,
+            'status' => 'نشط', 'manager_id' => $this->owner->id,
+            'cost' => 717171, 'budget' => 818181,
+            'url' => 'https://prod.laundry-9007.example', 'git' => 'https://git.laundry-9007.example']);
+
+        // المالكُ يرى التكلفةَ في تبويب المالية (حجبُ الدورِ لا حجبٌ شامل)
+        $this->actingAs($this->owner)->get('/m/projects/' . $project->id)->assertOk()
+            ->assertSee('717,171')->assertSee('data-cctab="finance"', false);
+
+        // دورٌ داخليٌّ يرى المشاريعَ لكن التكلفةَ والميزانيةَ محجوبتان عنه
+        $role = Role::create(['name' => 'داخليٌّ بلا مالية', 'scope' => 'all', 'flags' => [],
+            'matrix' => collect(array_keys(config('hub.modules')))
+                ->mapWithKeys(fn ($m) => [$m => ['v' => 1, 'e' => 1]])->all(),
+            'field_rules' => ['projects' => ['cost' => 'hide', 'budget' => 'hide']]]);
+        $u = User::create(['name' => 'داخليٌّ بلا مالية', 'email' => Str::random(6) . '@int.local',
+            'password' => 'Secret!2026x', 'role_id' => $role->id, 'status' => 'نشط',
+            'password_changed_at' => now()]);
+
+        $res = $this->actingAs($u)->get('/m/projects/' . $project->id)->assertOk();
+        // لا تبويبَ ماليةٍ، ولا رقمَ تكلفة/ميزانية بأيِّ صورة (خامٍ أو منسّق) — لا يغسله التبويب
+        $res->assertDontSee('data-cctab="finance"', false);
+        foreach (['717171', '717,171', '818181', '818,181'] as $n) {
+            $res->assertDontSee($n);
+        }
+    }
 }

@@ -237,6 +237,9 @@ Route::middleware('auth')->group(function () {
     Route::get('recommendations', [CapacityController::class, 'recommendations'])->name('recs');
     Route::post('recommendations/act', [CapacityController::class, 'recAct'])->name('recs.act');
     Route::get('delivery', [\App\Http\Controllers\Web\DeliveryController::class, 'index'])->name('delivery');
+    // لوحةُ PSA التشغيليّة (Work OS · الطور D · WP-D.3 · §17) — داخليّةٌ حصراً:
+    // PortalGuard يردّ العميلَ ٤٠٤ فوق المصفوفة، والمتحكّمُ يحرسها بـprojects:v.
+    Route::get('delivery/psa', [\App\Http\Controllers\Web\DeliveryController::class, 'psa'])->name('delivery.psa');
     Route::get('assets-life', [\App\Http\Controllers\Web\AssetLifeController::class, 'index'])->name('assets.life');
     // مركزُ الكود المصدري: صفحةُ إصداراتٍ على شاكلة ما يعرفه المطوّرون
     Route::get('code-center', [\App\Http\Controllers\Web\CodeCenterController::class, 'index'])->name('code.center');

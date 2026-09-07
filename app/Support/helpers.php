@@ -3143,9 +3143,10 @@ if (! function_exists('hub_related')) {
      */
     function hub_related(string $module, string $recordId, int $limit = 8): array
     {
+        $u = auth()->user();
         $out = [];
         foreach (hub_children($module) as [$ck, $cf]) {
-            if (! hub_can(auth()->user(), $ck, 'v')) continue;
+            if (! hub_can($u, $ck, 'v')) continue;
             $cd = hub_mod($ck);
             $cc = '\\App\\Models\\' . ($cd['model'] ?? '');
             if (! class_exists($cc)) continue;
@@ -3157,9 +3158,25 @@ if (! function_exists('hub_related')) {
                     : $cc::whereJsonContains($cf['col'], $recordId),
                 $ck
             );
+
+            // (WP-D.1 · نقدُ C4 · §9) عزلُ الجمهور للقارئ العميليّ — سدُّ ثغرة
+            // helpers:3104: أبناءُ المشروع كانوا يُعرَضون بلا فلترِ جمهور، فيبلغ العميلُ
+            // ابناً داخليّاً. لا فلترَ `whereIn('audience',...)` أعمى: عمودُ `audience`
+            // مُثقَلُ الدلالة عبر المستودع (مصنِّفٌ internal|client|both على
+            // documents/conversations، لكنه «الجميع|مشروع|شركة» على policies/kb، ونصٌّ
+            // تسويقيٌّ حرٌّ على services) — فالفلترُ الأعمى يُخطئ. نُعيد بدلَه تعريفَ
+            // النموذجِ نفسِه لرؤيةِ العميل (`scopeVisibleToClient`: جمهور∈{client,both}
+            // ∧ عميلٌ في نطاق القارئ) حيث وُجد — لا محرّكَ حجبٍ ثانٍ. القارئُ الداخليّ
+            // يرى الكلَّ بلا فلتر. فشلٌ مغلق: عميلٌ بلا نطاقٍ لا يرى شيئاً.
+            if (hub_is_client($u) && method_exists($cc, 'scopeVisibleToClient')) {
+                $base->visibleToClient(hub_client_ids($u) ?? []);
+            }
+
             // الصفوف أولاً والعدّ عند الحاجة فقط — كان count(*) لكل وحدة بنت
-            // (٤٠+ استعلاماً على صفحة مشروع فارغ) قبل أي جلب
-            $rows = (clone $base)->orderByDesc('created_at')->limit($limit + 1)->get();
+            // (٤٠+ استعلاماً على صفحة مشروع فارغ) قبل أي جلب. وترتيبٌ حتميّ (نقدُ C4):
+            // `created_at` بدقّة الثانية قد يتساوى فيُكسَر بـid — لا قرعةَ ترتيبٍ تُخفي
+            // نقصاً (درسُ CLAUDE.md: الترتيبُ ليس مضموناً إلا بما يُطلَب صراحةً).
+            $rows = (clone $base)->orderByDesc('created_at')->orderByDesc('id')->limit($limit + 1)->get();
             if ($rows->isEmpty()) continue;
 
             $out[] = [

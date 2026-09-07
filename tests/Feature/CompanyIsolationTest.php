@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Client;
 use App\Models\Company;
+use App\Models\Project;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -106,6 +107,22 @@ class CompanyIsolationTest extends TestCase
         // نموذج الاجتماعات يرجع للعملاء — المعزول لا يرى عميل الشركة الأجنبية في القائمة
         $resp = $this->actingAs($this->employee)->get('/m/meetings/create');
         $resp->assertOk()->assertSee('عميل ألف')->assertDontSee('عميل باء');
+    }
+
+    /**
+     * (Work OS · الطور D · WP-D.3) لوحةُ PSA التشغيليّة معزولةٌ كسائر الشاشات:
+     * المعزولةُ على شركة ألف ترى مشروعَ عميلها الخارجيَّ ولا ترى مشروعَ شركةٍ أجنبية.
+     */
+    public function test_psa_delivery_board_is_company_isolated(): void
+    {
+        $this->seedCompanies();
+        $pa = Project::create(['name' => 'مشروعُ ألف الخارجيّ', 'client_id' => $this->clientA->id,
+            'company_id' => $this->coA->id, 'status' => 'قيد التنفيذ']);
+        $pb = Project::create(['name' => 'مشروعُ باء الخارجيّ', 'client_id' => $this->clientB->id,
+            'company_id' => $this->coB->id, 'status' => 'قيد التنفيذ']);
+
+        $this->actingAs($this->employee)->get('/delivery/psa')->assertOk()
+            ->assertSee('مشروعُ ألف الخارجيّ')->assertDontSee('مشروعُ باء الخارجيّ');
     }
 
     public function test_soft_deleted_company_rejected_in_user_form(): void

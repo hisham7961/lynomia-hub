@@ -7,6 +7,7 @@ use App\Models\Client;
 use App\Models\Comment;
 use App\Models\Conversation;
 use App\Models\ConversationMember;
+use App\Models\Document;
 use App\Models\Engagement;
 use App\Models\FinDocument;
 use App\Models\Project;
@@ -273,5 +274,46 @@ class ClientOperationsTest extends TestCase
         $h = Engagements::health(Client::find($c->id));
         $this->assertNotSame('أخضر', $h['tone']);
         $this->assertNotEmpty($h['why'], 'الإشارةُ تسمّي أسبابها لا تكتفي باللون');
+    }
+
+    /* ────────── ٦) عزلُ جمهورِ الأبناء يستهدف حسابَ العميل لا الموظفَ المقيَّد ────────── */
+
+    /**
+     * (Work OS · الطور D · WP-D.1 · نقدُ C4) فلترُ الجمهور في `hub_related` يُطبَّق
+     * على **حسابِ العميل الصلب** (account_type=client) لا على كلِّ من له نطاقُ عميل.
+     * الموظفُ الداخليُّ المقيَّدُ بعميلٍ (clients=[c] · account_type=internal) لا يزال
+     * داخليّاً فيرى الأبناءَ الداخليّين؛ حسابُ العميل وحدَه يُحجَب عنه الداخليّ. حارسٌ
+     * ضد ربطِ الفلتر بـ`hub_client_ids` (يملكه المقيَّدُ أيضاً) بدل التصنيف الصلب.
+     */
+    public function test_related_children_audience_filter_targets_client_accounts_not_restricted_staff(): void
+    {
+        $this->seedCore();
+        $c = $this->client();
+        $p = Project::create(['name' => 'مشروعُ ألف', 'client_id' => $c->id, 'status' => 'نشط']);
+
+        // ابنٌ داخليٌّ وابنٌ عميليٌّ تحت المشروع — Document/files يحمل مصنِّفَ الجمهور الحقيقيّ
+        Document::create(['name' => 'محضرٌ داخليّ', 'audience' => 'internal',
+            'client_id' => $c->id, 'project_id' => $p->id]);
+        $clientDoc = Document::create(['name' => 'تقريرٌ للعميل', 'audience' => 'client',
+            'client_id' => $c->id, 'project_id' => $p->id]);
+
+        // موظفٌ داخليٌّ مقيَّدٌ بهذا العميل (account_type=internal) — يرى الابنين
+        $staff = $this->isolated(['files' => ['v' => 1]], [$c->id]);
+        $this->actingAs($staff);
+        $filesStaff = collect(hub_related('projects', $p->id))->firstWhere('module', 'files');
+        $this->assertNotNull($filesStaff);
+        $this->assertSame(2, (int) $filesStaff['count'], 'الموظفُ المقيَّدُ (داخليّ) حُجب عنه ابنٌ داخليّ');
+
+        // حسابُ عميلٍ صلبٍ لنفس العميل — لا يرى إلا الابنَ العميليّ (كلُّ الصفوف)
+        $role = Role::create(['name' => 'عميل ' . Str::random(5), 'scope' => 'all',
+            'flags' => [], 'matrix' => ['files' => ['v' => 1]]]);
+        $clientAcc = User::create(['name' => 'حسابُ عميل', 'email' => Str::random(8) . '@client.local',
+            'password' => 'Secret!2026x', 'role_id' => $role->id, 'status' => 'نشط',
+            'account_type' => 'client', 'clients' => [$c->id], 'password_changed_at' => now()]);
+        $this->actingAs($clientAcc);
+        $filesClient = collect(hub_related('projects', $p->id))->firstWhere('module', 'files');
+        $this->assertNotNull($filesClient);
+        $ids = collect($filesClient['rows'])->pluck('id')->map('strval')->all();
+        $this->assertSame([(string) $clientDoc->id], $ids, 'حسابُ العميل رأى ابناً داخليّاً');
     }
 }

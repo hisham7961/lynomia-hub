@@ -8533,6 +8533,12 @@ return [
         'projects' => [
             ['on' => 'status', 'to' => ['مكتمل'], 'emit' => 'project.completed', 'label' => 'اكتمل مشروع'],
             ['on' => 'status', 'emit' => 'project.status_changed', 'label' => 'تغيّرت حالة مشروع'],
+            // (Work OS · الطور D · WP-D.4 · §63–73) توفيرُ المشروع: يُطلقه
+            // QuoteController::toProject **داخلَ** معاملةِ التحويلِ المقفلةِ نفسِها (لا مسارَ
+            // توفيرٍ ثانٍ) مرّةً واحدةً بجانبِ quote.converted — تحت حارسِ meta.project_id
+            // (قبولٌ مكرَّرٌ يعود قبله)، فتعمل عليه حِزمُ onboarding والتدفّقاتُ كأيّ حدث.
+            // الخامُّ `provisioned` على وحدة projects يشتقّ الدلاليَّ المُصرَّحَ هنا.
+            ['on' => 'provisioned', 'emit' => 'project.provisioned', 'label' => 'وُفِّر مشروعٌ من عرضٍ محوّل'],
         ],
         'quotes' => [
             ['on' => 'status', 'to' => ['مُرسل'], 'emit' => 'quote.sent', 'label' => 'أُرسل عرض سعر للعميل'],

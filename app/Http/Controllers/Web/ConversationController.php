@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Conversation;
 use App\Models\ConversationMember;
+use App\Models\Project;
 use App\Models\User;
 use App\Support\ChatCommands;
 use App\Support\FlowRunner;
@@ -78,6 +79,68 @@ class ConversationController extends Controller
         }
 
         return [$conv, $role];
+    }
+
+    /* ────────── الغرفتان لمشروعٍ خارجيّ (WP-D.1 · §9) ────────── */
+
+    /**
+     * **الغرفتان الفيزيائيّتان لمشروعٍ خارجيّ** — صفّا محادثةٍ منفصلان فوق حاويةِ
+     * الطور C: غرفةٌ داخليّة (`audience=internal`) وغرفةُ عميل (`audience=client`)،
+     * كلتاهما `kind=channel` تحملان `module=projects`+`record_id`+`project_id`.
+     *
+     * **لماذا صفّان لا `audience` لكلِّ رسالة (قاعدةُ §9 الصلبة):** الفصلُ فيزيائيّ
+     * عمداً — رسالةٌ داخليّةٌ **لا تتسرّب أبداً** لغرفة العميل لأنها في حاويةٍ أخرى،
+     * لا بعلامةٍ على الرسالةِ قد تُخطئ فتُظهر سرّاً. العميلُ يبلغ غرفتَه عبر البوابة
+     * (`ClientPortalController`، الطور B — تُرشّح `audience∈{client,both}`)، والغرفةُ
+     * الداخليّة `audience=internal` فلا تظهر له بتاتاً؛ ونشرُه في الداخليّة مردودٌ
+     * (ليس عضواً فيها → `guardConversation` ٤٠٤، وحاجزُ `PortalGuard` فوقها).
+     *
+     * **idempotent:** يُنشئ الغائبَ فقط ولا يكرّر — مفتاحُ التمييز
+     * `(project_id, kind=channel, audience)` غيرُ المؤرشف. يُبذَر مالكٌ داخليٌّ
+     * (مديرُ المشروع أو منشئُه) إن وُجد كي لا تبقى الغرفةُ بلا مالك.
+     *
+     * @return array{internal: Conversation, client: Conversation}
+     */
+    public static function ensureProjectRooms(Project $project): array
+    {
+        $rooms = [];
+        $ownerId = $project->manager_id ?? $project->created_by;
+
+        foreach ([Project::AUDIENCE_INTERNAL, Project::AUDIENCE_CLIENT] as $aud) {
+            // البحثُ بترتيبٍ حتميّ — لو وُجد أكثرُ من صفٍّ (سباقٌ نادر) نختار الأقدمَ ثباتاً
+            $conv = Conversation::where('project_id', $project->getKey())
+                ->where('kind', 'channel')->where('audience', $aud)
+                ->whereNull('deleted_at')
+                ->orderBy('created_at')->orderBy('id')->first();
+
+            if ($conv === null) {
+                $label = $aud === Project::AUDIENCE_CLIENT ? 'غرفةُ العميل' : 'الغرفةُ الداخلية';
+                $conv = Conversation::create([
+                    'kind'       => 'channel',
+                    'title'      => mb_substr($label . ' · ' . (string) $project->name, 0, 200),
+                    'audience'   => $aud,
+                    'visibility' => 'members',
+                    'company_id' => $project->company_id,
+                    'client_id'  => $project->client_id,   // النطاقُ نفسُه للغرفتين — الجمهورُ يفصل
+                    'project_id' => $project->getKey(),
+                    'module'     => 'projects',
+                    'record_id'  => $project->getKey(),
+                    'created_by' => $ownerId,
+                ]);
+
+                // بذرُ مالكٍ داخليّ (المدير/المنشئ) إن وُجد — لا غرفةَ بلا مالك
+                if ($ownerId) {
+                    ConversationMember::firstOrCreate(
+                        ['conversation_id' => $conv->id, 'user_id' => $ownerId],
+                        ['role' => 'owner', 'source' => 'system']
+                    );
+                }
+            }
+
+            $rooms[$aud] = $conv;
+        }
+
+        return $rooms;
     }
 
     /* ────────── الفهرسُ والعرض ────────── */
