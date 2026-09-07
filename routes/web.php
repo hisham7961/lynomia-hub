@@ -764,6 +764,19 @@ Route::middleware('auth')->group(function () {
         ->name('security.ips')->middleware('throttle:60,1');
     Route::get('admin/security/ips/{ip}', [SecurityController::class, 'ip'])
         ->name('security.ip')->middleware('throttle:60,1')->where('ip', '[0-9A-Fa-f:.]{3,45}');
+    // ── Work OS · الطور I (WP-I.3 · §39/§42) — قواعدُ الحظر والسماح ──
+    // الشاشةُ والأفعالُ **للمالك وحدَه و٤٠٤ لغيره** (الحارسُ في المتحكّم —
+    // blocksGate: سطحُ دفاعٍ لا يُثبَت وجودُه)، وكلُّ إضافة/تمديد/إلغاء خلف
+    // step-up + قيدِ تدقيقٍ بدلالة SECURITY_POLICY_CHANGED + حمايةِ حبس آخرِ
+    // مالكٍ الخادمية. حدُّ معدلٍ كسائر سطوح الأمن الحساسة.
+    Route::get('admin/security/blocks', [SecurityController::class, 'blocks'])
+        ->name('security.blocks')->middleware('throttle:60,1');
+    Route::post('admin/security/blocks', [SecurityController::class, 'blockStore'])
+        ->name('security.blocks.store')->middleware('throttle:30,1');
+    Route::post('admin/security/blocks/{id}/extend', [SecurityController::class, 'blockExtend'])
+        ->name('security.blocks.extend')->middleware('throttle:30,1');
+    Route::post('admin/security/blocks/{id}/revoke', [SecurityController::class, 'blockRevoke'])
+        ->name('security.blocks.revoke')->middleware('throttle:30,1');
     // إنهاءُ «الباقي» لمستخدمٍ (§18): مالكٌ + تصعيدُ هويةٍ داخل الفعل + قيدُ تدقيق —
     // جلسةُ المنفّذ الحالية تبقى. وحدُّ معدلٍ يصدّ نقراً أعمى.
     Route::post('admin/security/users/{id}/revoke-others', [SecurityController::class, 'revokeOthers'])

@@ -1056,4 +1056,231 @@ class SecurityController extends Controller
 
         return back()->with('ok', $on ? '🔒 فُعّل قفل الطوارئ — الجلسات غير المالكة عُلّقت فوراً' : '🔓 رُفع قفل الطوارئ');
     }
+
+    /* ────────── (Work OS · الطور I · WP-I.3 · §39/§42) قواعدُ الحظر والسماح ────────── */
+
+    /**
+     * بوابةُ شاشة القواعد: **مالكٌ وحدَه، وغيرُه ٤٠٤ لا ٤٠٣** — قواعدُ الدفاع
+     * سطحٌ أمنيٌّ لا يُثبَت وجودُه لغير صاحبه (دلالةُ findScoped/PortalGuard،
+     * لا دلالةُ gate() العامة): حسابُ عميلٍ يصدّه PortalGuard قبلنا أصلاً،
+     * والموظفُ الداخليُّ غيرُ المالك يلقى الجوابَ نفسَه هنا.
+     */
+    protected function blocksGate(): void
+    {
+        abort_unless(hub_is_owner(), 404);
+    }
+
+    /**
+     * شاشةُ قواعد IP (security.blocks — تمتدّ عائلةَ security.ips/ip): القائمةُ
+     * بترتيبٍ حتميّ، وبطاقةُ الحالة **الصادقة**: حظرُ التطبيق فعّالٌ دائماً
+     * (السلطةُ القاطعة — IpDefense بلا تبعية)، وحظرُ حافّة الشبكة «غير مُهيّأ»
+     * ما لم يكتمل اعتمادٌ حقيقيّ (EdgeDefense::status — عائلة C15).
+     */
+    public function blocks(\Illuminate\Http\Request $r)
+    {
+        $this->blocksGate();
+
+        $now = now();
+        $live = fn ($q) => $q->whereNull('revoked_at')
+            ->where(fn ($w) => $w->whereNull('expires_at')->orWhere('expires_at', '>', $now));
+
+        $kpi = [
+            'blocks' => $live(\App\Models\IpRule::query()->where('mode', 'block'))->count(),
+            'allows' => $live(\App\Models\IpRule::query()->where('mode', 'allow'))->count(),
+            'auto'   => $live(\App\Models\IpRule::query()->where('origin', 'auto'))->count(),
+            'hits'   => (int) \App\Models\IpRule::query()->sum('hits'),
+        ];
+
+        // الأحدثُ قراراً أولاً بفاصل تعادلٍ حاسم (درسُ CLAUDE.md) — والصفوفُ كلُّها
+        // تُعرض بما فيها المنتهي والملغى: الشاشةُ ذاكرةُ القرار لا المجموعةَ الحيّة وحدها
+        $rows = \App\Models\IpRule::query()->with(['author', 'revoker'])
+            ->orderByDesc('created_at')->orderByDesc('id')->paginate(25);
+
+        return view('security.blocks', [
+            'rows' => $rows, 'kpi' => $kpi, 'edge' => \App\Support\EdgeDefense::status(),
+            'prefill' => preg_match('/^[0-9A-Fa-f:.\/]{3,64}$/', (string) $r->query('ip')) === 1
+                ? (string) $r->query('ip') : '',
+        ]);
+    }
+
+    /** صيغةُ القاعدة المقبولة إدارياً: عنوانٌ دقيق أو CIDR (رابعة/سادسة) — لا بدل */
+    protected function validIpRule(string $rule): bool
+    {
+        if (str_contains($rule, '/')) {
+            [$net, $bits] = array_pad(explode('/', $rule, 2), 2, '');
+            if ($bits === '' || ! ctype_digit($bits)) return false;
+            $bin = @inet_pton($net);
+            if ($bin === false) return false;
+
+            return (int) $bits <= (strlen($bin) === 4 ? 32 : 128);
+        }
+
+        return filter_var($rule, FILTER_VALIDATE_IP) !== false;
+    }
+
+    /**
+     * **حمايةُ حبس المالك — خادميّةٌ وإلزامية** (§39): تُرفض قاعدةُ حظرٍ (إنشاءً
+     * أو تمديداً) تحجب قنواتِ وصول آخرِ مالك، مهما أرسل النموذج. قنواتُ المالك:
+     * عنوانُه الحاليّ (إن كان هو المنفّذ) + عناوينُه المعروفة (`user_ips` —
+     * ذاكرةُ LoginSentry القائمة، لا حاسبَ ألفةٍ ثانياً). والعنوانُ المحميُّ
+     * بقاعدةِ سماحٍ حيّة أو بـ`security.trusted_ips` ليس محجوباً (allow يفوز).
+     *
+     * مالكٌ وحيد: أيُّ قناةٍ من قنواته تُحجب ⇒ رفض. عدّةُ مالكين: يُرفض ما
+     * يحبسهم جميعاً (لكلٍّ قنواتُه كلُّها محجوبة). يعيد رسالةَ الرفض أو null.
+     */
+    protected function blockLockoutRefusal(string $ruleIp): ?string
+    {
+        $owners = DB::table('users')->join('roles', 'roles.id', '=', 'users.role_id')
+            ->whereNull('users.deleted_at')->where('users.status', 'نشط')->where('roles.is_owner', true)
+            ->orderBy('users.created_at')->orderBy('users.id')->get(['users.id', 'users.name']);
+        if ($owners->isEmpty()) return null;
+
+        $trusted = (string) setting('security.trusted_ips', '');
+        $allows = \App\Models\IpRule::query()->active()->where('mode', 'allow')->orderBy('id')->get();
+        $blocked = function (string $ip) use ($ruleIp, $trusted, $allows): bool {
+            if (! ip_allowed($ip, $ruleIp)) return false;
+            if ($trusted !== '' && ip_allowed($ip, $trusted)) return false;
+
+            return ! $allows->contains(fn ($a) => $a->matches($ip));
+        };
+
+        $ipsRows = Schema::hasTable('user_ips')
+            ? DB::table('user_ips')->whereIn('user_id', $owners->pluck('id'))
+                ->orderBy('id')->get(['user_id', 'ip'])
+            : collect();
+        $channels = function ($owner) use ($ipsRows): array {
+            $set = $ipsRows->where('user_id', $owner->id)->pluck('ip')->all();
+            if ((string) auth()->id() === (string) $owner->id) $set[] = (string) request()->ip();
+
+            return array_values(array_unique(array_filter(array_map('trim', $set))));
+        };
+
+        if ($owners->count() === 1) {
+            // آخرُ مالك: حجبُ **أيّ** قناةٍ من قنواته رفضٌ — لا هامشَ مقامرةٍ هنا
+            foreach ($channels($owners->first()) as $ip) {
+                if ($blocked($ip)) {
+                    return "مرفوض: هذه القاعدة تحجب العنوان {$ip} وهو قناةُ وصول آخرِ مالكٍ للنظام — "
+                        . 'أضف سماحاً صريحاً أو عنواناً موثوقاً (security.trusted_ips) أولاً إن كنت متأكداً';
+                }
+            }
+
+            return null;
+        }
+
+        // عدّةُ مالكين: يكفي مالكٌ واحدٌ ناجٍ (له قناةٌ غيرُ محجوبة أو لا قنواتَ معلومة)
+        foreach ($owners as $o) {
+            $set = $channels($o);
+            if ($set === [] || collect($set)->contains(fn ($ip) => ! $blocked($ip))) return null;
+        }
+
+        return 'مرفوض: هذه القاعدة تحجب كلَّ قنوات الوصول المعروفة لكل المالكين — حبسٌ تامٌّ للنظام';
+    }
+
+    /** وصفُ أجل القاعدة للتدقيق والرسائل */
+    protected function ruleTermLabel(?\Illuminate\Support\Carbon $expires): string
+    {
+        return $expires === null ? 'دائمة' : 'حتى ' . $expires->format('Y-m-d H:i');
+    }
+
+    /**
+     * إضافةُ قاعدة (حظر/سماح): مالكٌ + step-up + حمايةُ الحبس الخادمية + قيدُ
+     * تدقيقٍ بدلالة SECURITY_POLICY_CHANGED. الحظرُ يُدفَع للحافّة **بأفضل جهدٍ**
+     * إن كانت مُهيّأةً فعلاً — وإخفاقُها لا يُذكر نجاحاً (الحظرُ التطبيقيّ السلطة).
+     */
+    public function blockStore(\Illuminate\Http\Request $r)
+    {
+        $this->blocksGate();
+        if ($resp = hub_require_stepup(route('security.blocks', absolute: false))) return $resp;
+
+        $data = $r->validate([
+            'ip'      => 'required|string|max:64',
+            'mode'    => 'required|in:block,allow',
+            'minutes' => 'nullable|integer|min:1|max:527040',   // حتى سنة — والدائمُ فراغُ الحقل
+            'reason'  => 'nullable|string|max:400',
+        ]);
+
+        $ip = trim((string) $data['ip']);
+        if (! $this->validIpRule($ip)) {
+            return back()->with('err', 'صيغةُ القاعدة غير صالحة — عنوانٌ دقيق أو شبكةُ CIDR (IPv4/IPv6)')->withInput();
+        }
+
+        $expires = isset($data['minutes']) && $data['minutes'] !== null
+            ? now()->addMinutes((int) $data['minutes']) : null;
+
+        if ($data['mode'] === 'block' && ($why = $this->blockLockoutRefusal($ip)) !== null) {
+            hub_audit('رفض قاعدة حظر IP — حماية حبس المالك', null, null, $ip . ' — ' . $why,
+                ['category' => 'SECURITY_POLICY_CHANGED', 'severity' => 'high']);
+
+            return back()->with('err', $why)->withInput();
+        }
+
+        $rule = \App\Models\IpRule::create([
+            'ip' => $ip, 'mode' => $data['mode'], 'origin' => 'manual',
+            'reason' => $data['reason'] ?? null, 'expires_at' => $expires,
+            'by_id' => auth()->id(),
+            'request_id' => mb_substr((string) \App\Support\Api::requestId(), 0, 64) ?: null,
+        ]);
+
+        $verb = $data['mode'] === 'block' ? 'حظر' : 'سماح';
+        hub_audit("إضافة قاعدة {$verb} IP", null, (string) $rule->id,
+            $ip . ' — ' . $this->ruleTermLabel($expires),
+            ['category' => 'SECURITY_POLICY_CHANGED', 'severity' => 'high']);
+
+        // الحافّةُ أفضلُ جهدٍ صادق: غيرُ المُهيّأة لا تُنادى، والإخفاقُ لا يُدّعى نجاحاً
+        $edge = $data['mode'] === 'block' && \App\Support\EdgeDefense::push($rule);
+
+        return back()->with('ok', "⛔ أُضيفت قاعدةُ {$verb} للعنوان {$ip} ("
+            . $this->ruleTermLabel($expires) . ') — حظرُ التطبيق ساري المفعول فوراً'
+            . ($edge ? '، ودُفعت للحافّة (أفضل جهد)' : ''));
+    }
+
+    /** تمديدُ أجل قاعدة: الحارسُ نفسُه + حمايةُ الحبس (التمديدُ «تعديلٌ» بالمواصفة) */
+    public function blockExtend(\Illuminate\Http\Request $r, string $id)
+    {
+        $this->blocksGate();
+        if ($resp = hub_require_stepup(route('security.blocks', absolute: false))) return $resp;
+
+        $rule = \App\Models\IpRule::find($id);
+        abort_unless($rule !== null, 404);
+        if ($rule->revoked_at !== null) {
+            return back()->with('err', 'قاعدةٌ ملغاة لا تُمدَّد — أنشئ قاعدةً جديدة إن لزم');
+        }
+
+        $data = $r->validate(['minutes' => 'required|integer|min:1|max:527040']);
+        $expires = now()->addMinutes((int) $data['minutes']);
+
+        if ($rule->mode === 'block' && ($why = $this->blockLockoutRefusal((string) $rule->ip)) !== null) {
+            hub_audit('رفض تمديد قاعدة حظر IP — حماية حبس المالك', null, (string) $rule->id,
+                $rule->ip . ' — ' . $why, ['category' => 'SECURITY_POLICY_CHANGED', 'severity' => 'high']);
+
+            return back()->with('err', $why);
+        }
+
+        $rule->update(['expires_at' => $expires]);
+        hub_audit('تمديد قاعدة IP', null, (string) $rule->id,
+            $rule->ip . ' — ' . $this->ruleTermLabel($expires),
+            ['category' => 'SECURITY_POLICY_CHANGED', 'severity' => 'high']);
+
+        return back()->with('ok', "⏳ مُدّدت قاعدةُ {$rule->ip} " . $this->ruleTermLabel($expires));
+    }
+
+    /** إلغاءُ قاعدة: إلغاءٌ صريحٌ بأثرِه (الصفُّ يبقى تاريخاً) — يرفع الصدَّ فوراً */
+    public function blockRevoke(\Illuminate\Http\Request $r, string $id)
+    {
+        $this->blocksGate();
+        if ($resp = hub_require_stepup(route('security.blocks', absolute: false))) return $resp;
+
+        $rule = \App\Models\IpRule::find($id);
+        abort_unless($rule !== null, 404);
+        if ($rule->revoked_at !== null) {
+            return back()->with('warn', 'القاعدةُ ملغاةٌ أصلاً');
+        }
+
+        $rule->update(['revoked_at' => now(), 'revoked_by' => auth()->id()]);
+        hub_audit('إلغاء قاعدة IP', null, (string) $rule->id,
+            $rule->ip . ' — ' . ($rule->mode === 'block' ? 'حظر' : 'سماح') . ' (' . $rule->origin . ')',
+            ['category' => 'SECURITY_POLICY_CHANGED', 'severity' => 'high']);
+
+        return back()->with('ok', "♻️ أُلغيت قاعدةُ {$rule->ip} — سرى الأثرُ فوراً");
+    }
 }

@@ -33,7 +33,11 @@ class OperationalSearchTest extends TestCase
     // و+1 أخرى مع وحدة `carriers` (Work OS · الطور G · WP-G.2): البحثُ العاديّ يستعلم
     // مرّةً واحدةً لكلّ وحدةٍ قابلةٍ للبحث — ووحدةٌ جديدةٌ = استعلامٌ واحدٌ متوقَّع، لا
     // تسرّبٌ (حرّاسُ error_events/email أعلاه بلا مساس، والزيادةُ نمطُ LIKE للاسم لا استجوابٌ تشغيليّ).
-    private const PLAIN_BUDGET = ['sqlite' => 90, 'mysql' => 89, 'mariadb' => 89];
+    // و+3 مع وسيط الدفاع التكيّفي `IpDefense` (Work OS · الطور I · WP-I.3): تحميلُ
+    // مجموعة القواعد **عند برد الخبيئة فقط** (hasTable + تقليمٌ + جلبُ الحيّة —
+    // ٣٠ ثانية TTL في الإنتاج، وخبيئةُ الاختبار array باردةٌ لكل حالة فتُقاس حتماً).
+    // ليست كلفةَ ضغطةِ مفتاحٍ — كلفةُ إعادةِ تحميلٍ مُخبّأة، وحرّاسُ التسرّب أعلاه بلا مساس.
+    private const PLAIN_BUDGET = ['sqlite' => 93, 'mysql' => 92, 'mariadb' => 92];
 
     private const RID = '0198f0c2-77aa-4a11-9a1e-5f4d2b7c1e33';
     private const IP = '203.0.113.9';

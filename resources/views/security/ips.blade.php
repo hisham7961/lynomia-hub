@@ -7,7 +7,13 @@
         <h2>🌐 ذكاء العناوين</h2>
         <div class="sub">كلُّ عنوانِ شبكةٍ بما فعل: دخولٌ ناجحٌ وفاشل، رفضٌ، وأفعالٌ تستحق النظر — من سجلّ التدقيق نفسِه، بلا خدمةِ geo خارجية</div>
     </div>
-    <a class="btn ghost sm" href="{{ route('security.sessions') }}">🖥️ مركز الجلسات</a>
+    <div class="crow" style="gap:8px">
+        @if ($isOwner)
+            {{-- (WP-I.3) قواعدُ الدفاع للمالك وحدَه — لغيره لا رابطَ أصلاً (الشاشةُ ٤٠٤ له) --}}
+            <a class="btn ghost sm" href="{{ route('security.blocks') }}">⛔ قواعد الحظر والسماح</a>
+        @endif
+        <a class="btn ghost sm" href="{{ route('security.sessions') }}">🖥️ مركز الجلسات</a>
+    </div>
 </div>
 
 @include('partials.cc.kpis', ['items' => [

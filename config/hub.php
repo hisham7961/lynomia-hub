@@ -8931,6 +8931,15 @@ return [
         'inventory' => [
             ['on' => 'session_closed', 'emit' => 'inventory.session_closed', 'label' => 'أُغلقت جلسةُ جرد'],
         ],
+        // (Work OS · الطور I · WP-I.2 · §41/§68) حدثُ الحظر الآليّ — يُطلقه
+        // AlertEngine::autoBlock عبر FlowRunner::fire عند **إنشاء** قاعدةِ حظرٍ
+        // آليّة (origin=auto) لا مع كل تقييم (نمطُ custody: بلا `to` — إنشاءُ
+        // قاعدةٍ لا تحوّلَ حالةٍ في CRUD؛ `ip_rules` ليست وحدةَ hub.modules).
+        // الاسمُ الدلاليّ كما تسمّيه المواصفة (§68): `ip_auto_blocked` حرفياً.
+        // NOTE openapi: اسمٌ دلاليٌّ جديد (ip_auto_blocked).
+        'ip_rules' => [
+            ['on' => 'auto_blocked', 'emit' => 'ip_auto_blocked', 'label' => 'حُظر عنوانُ IP آلياً (تصعيدٌ متدرّج)'],
+        ],
         'contracts' => [
             ['on' => 'status', 'to' => ['ساري'], 'emit' => 'contract.signed', 'label' => 'سرى عقد'],
             ['on' => 'status', 'to' => ['منتهي'], 'emit' => 'contract.expired', 'label' => 'انتهى عقد'],

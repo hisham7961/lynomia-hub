@@ -10,6 +10,10 @@
         </h2>
         <div class="sub">أثرُ العنوان خلال {{ (int) round($range->days()) }} يوماً — وأوّلُ الظهور <b>تقريبيٌّ</b> من سجلّ التدقيق (لا سجلَّ أقدمَ منه)</div>
     </div>
+    @if ($isOwner && ! $ipMasked)
+        {{-- (WP-I.3) زرُّ الحظر يمرّ بشاشة القواعد بتعبئةٍ — لا مسارَ كتابةٍ من هنا --}}
+        <a class="btn ghost sm" href="{{ route('security.blocks', ['ip' => $ip]) }}">⛔ حظر/سماح لهذا العنوان</a>
+    @endif
 </div>
 
 @if (! $row && $known->isEmpty() && $trail->isEmpty() && $denials->isEmpty())
