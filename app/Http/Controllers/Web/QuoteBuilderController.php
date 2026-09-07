@@ -68,12 +68,46 @@ class QuoteBuilderController extends Controller
         // الاختياريُّ/البديل لا يدخل الخطَّ المُلتزَم افتراضياً؛ الأساسيُّ يدخل
         $d['included'] = ($d['line_mode'] ?? 'required') === 'required';
         $d['quote_id'] = $q->id;
-        $d['sort'] = (int) QuoteLine::where('quote_id', $q->id)->max('sort') + 1;
-        QuoteLine::create($d);   // line_total يُحسب في saving()
-        $q->recalc();
-        hub_audit('إضافة بند عرض', 'quotes', $q->id, $q->doc_no . ' — ' . $d['title']);
 
-        return back()->with('ok', 'أُضيف البند وأُعيد حساب الإجمالي');
+        // **دمجُ الكميّات لا تكرارُ الصنف**: إضافةُ نفسِ المنتج/الخدمة بنفسِ السعر
+        // والشروطِ إلى بندٍ قائمٍ **تزيد كميّتَه** لا تُنشئ سطراً مكرّراً. المطابقةُ
+        // صارمة: نفسُ المعرّف (product_id ثم service_id) ونفسُ كلِّ حقلٍ سِعريّ
+        // (سعر/خصم/ضريبة/وحدة/مرحلة/نمط/مجموعة) — فبندٌ يختلف في أيٍّ منها يبقى
+        // مستقلاً (خصمٌ مختلفٌ أو مرحلةٌ مختلفةٌ سطرٌ مقصودٌ لا تكرار). إضافيٌّ فقط:
+        // لا يمسّ البنودَ القائمة إلا بزيادةِ كميّةِ المطابِق التامّ.
+        $mergeCol = ! empty($d['product_id']) ? 'product_id'
+            : (! empty($d['service_id']) ? 'service_id' : null);
+        $merged = false;
+        if ($mergeCol && hub_has_col('quote_lines', $mergeCol)) {
+            $sameNum = fn ($a, $b) => round((float) ($a ?: 0), 3) === round((float) ($b ?: 0), 3);
+            $sameStr = fn ($a, $b) => (string) ($a ?? '') === (string) ($b ?? '');
+            foreach (QuoteLine::where('quote_id', $q->id)->where($mergeCol, $d[$mergeCol])->get() as $c) {
+                if ($sameNum($c->unit_price, $d['unit_price'] ?? 0)
+                    && $sameNum($c->discount_pct, $d['discount_pct'] ?? 0)
+                    && $sameNum($c->tax_pct, $d['tax_pct'] ?? 0)
+                    && $sameStr($c->unit, $d['unit'] ?? null)
+                    && $sameStr($c->phase, $d['phase'] ?? null)
+                    && $sameStr($c->line_mode ?: 'required', $d['line_mode'] ?? 'required')
+                    && $sameStr($c->opt_group, $d['opt_group'] ?? null)) {
+                    $c->qty = round((float) ($c->qty ?: 0) + (float) ($d['qty'] ?: 0), 3);
+                    $c->save();   // line_total يُعاد حسابه في saving()
+                    $merged = true;
+                    break;
+                }
+            }
+        }
+
+        if (! $merged) {
+            $d['sort'] = (int) QuoteLine::where('quote_id', $q->id)->max('sort') + 1;
+            QuoteLine::create($d);   // line_total يُحسب في saving()
+        }
+        $q->recalc();
+        hub_audit($merged ? 'زيادة كمية بند عرض' : 'إضافة بند عرض', 'quotes', $q->id,
+            $q->doc_no . ' — ' . ($d['title'] ?? ''));
+
+        return back()->with('ok', $merged
+            ? 'زِيدت كميةُ البند القائم وأُعيد حساب الإجمالي'
+            : 'أُضيف البند وأُعيد حساب الإجمالي');
     }
 
     public function destroyLine(string $id, string $line)

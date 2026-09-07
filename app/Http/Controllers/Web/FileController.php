@@ -167,6 +167,18 @@ class FileController extends Controller
         return (bool) Cache::remember(
             hub_scope_key('fileacc') . ':' . sha1($path) . ':' . hub_data_stamp(['roles']), 120,
             function () use ($u, $path) {
+                // **مرفقُ رسالةٍ مباشرة**: يراه طرفا المحادثةِ وحدَهما (خصوصيّةُ DM).
+                // مرفقُ الـDM يُخزَّن في `dm_messages.att` لا في `attachments` ولا في
+                // حقلِ ملفٍّ لوحدةٍ مسجَّلة، فكان يسقط من كلِّ الفحص أدناه ويُرفَض ٤٠٣
+                // لغيرِ المالك — أي رسالةٌ بمرفقٍ لا يفتحها متلقّيها. يُحرَس بطرفَيه:
+                // المُرسِلُ أو المُستقبِل فقط، ولا ثالثَ لهما.
+                if (Schema::hasTable('dm_messages') && Schema::hasColumn('dm_messages', 'att')
+                    && DB::table('dm_messages')->where('att', $path)
+                        ->where(fn ($w) => $w->where('from_id', $u->id)->orWhere('to_id', $u->id))
+                        ->exists()) {
+                    return true;
+                }
+
                 foreach (hub_modules() as $mk => $def) {
                     $table = (string) ($def['table'] ?? '');
                     if ($table === '' || ! Schema::hasTable($table)) continue;
