@@ -138,7 +138,10 @@ class HubEventsTest extends TestCase
         // وتُضاف (Work OS · الطور F · WP-F.3): `inventory` حاويةُ جلساتِ جردٍ يديرها
         // InventoryController لا سجلُّ الوحدات (hub_mod لها null)، تحمل حدثَ إغلاقٍ
         // دلاليّاً (inventory.session_closed) بلا `to` — فتخضع للشرط الأصرم نفسِه لا لاستثناءٍ رخو.
-        $eventOnlyContainers = ['conversations', 'client_memberships', 'custody', 'inventory'];
+        // وتُضاف (Work OS · الطور I · WP-I.2): `ip_rules` مخزنُ قواعد الدفاع التكيّفي
+        // تُدار من شاشات الأمن (WP-I.3) لا سجلِّ الوحدات (hub_mod لها null)، تحمل حدثَ
+        // الحظر الآليّ (ip_auto_blocked) بلا `to` — فتخضع للشرط الأصرم نفسِه.
+        $eventOnlyContainers = ['conversations', 'client_memberships', 'custody', 'inventory', 'ip_rules'];
 
         foreach ((array) config('hub.events') as $module => $rules) {
             if (in_array($module, $eventOnlyContainers, true)) {

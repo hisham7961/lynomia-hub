@@ -253,6 +253,46 @@ class ColumnFitsItsWriterTest extends TestCase
         }
     }
 
+    /**
+     * (Work OS · الطور J · WP-J.1 · C10) أعمدةُ allowlist في سجل النقاط الطرفية
+     * تسع أطولَ قيمةٍ شرعيّةٍ فيها — القيَمُ تُفرَض في النموذج لا كـenum على
+     * القاعدة (status=١٢ · os=٢٠)، وبصمةُ sha256 hex (٦٤ حرفاً) تملأ عموديها
+     * (`pubkey_fp` و`token_hash`) بالضبط؛ ولو ضاق عمودٌ لمرّ على SQLite ورمى
+     * على MySQL فسقط تسجيلُ جهازٍ أو تعليقُه.
+     */
+    public function test_endpoint_allowlist_values_and_hashes_fit_their_columns(): void
+    {
+        $checks = [
+            ['endpoint_devices', 'status', \App\Models\EndpointDevice::STATUSES],
+            ['endpoint_devices', 'os', \App\Models\EndpointDevice::OSES],
+            // (WP-J.2) قوائمُ البروتوكول الموقَّع — كلُّها allowlist تطبيقيّ (C10)
+            ['endpoint_events', 'kind', \App\Models\EndpointEvent::KINDS],
+            ['endpoint_events', 'severity', \App\Models\EndpointEvent::SEVERITIES],
+            ['endpoint_commands', 'type', \App\Models\EndpointCommand::TYPES],
+            ['endpoint_commands', 'state', \App\Models\EndpointCommand::STATES],
+            ['endpoint_policies', 'usb_mode', \App\Models\EndpointPolicy::USB_MODES],
+        ];
+
+        $tight = [];
+        foreach ($checks as [$table, $col, $allow]) {
+            $max = hub_col_max($table, $col);
+            if ($max === null) continue;
+            foreach ($allow as $val) {
+                if (mb_strlen($val) > $max) {
+                    $tight[] = "{$table}.{$col} عرضُه {$max} والقيمة «{$val}» أطول";
+                }
+            }
+        }
+        $this->assertSame([], $tight,
+            'قيمةُ allowlist أطولُ من عمودها — تمرّ على SQLite وترمي على MySQL: ' . implode(' · ', $tight));
+
+        // sha256 hex = ٦٤ حرفاً بالضبط — عموداها معلَنان بهذا العرض حرفياً
+        $this->assertSame(64, hub_col_max('endpoint_devices', 'pubkey_fp'),
+            'عرضُ pubkey_fp يجب أن يسع sha256 hex (٦٤) بالضبط');
+        $this->assertSame(64, hub_col_max('enrollment_tokens', 'token_hash'),
+            'عرضُ token_hash يجب أن يسع sha256 hex (٦٤) بالضبط');
+    }
+
     /** والإشعارُ من قاعدة تنبيه يُكتب فعلاً — لا نظرياً */
     public function test_a_rule_notification_is_actually_written(): void
     {

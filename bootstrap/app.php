@@ -15,6 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->redirectUsersTo(fn () => route('dashboard'));
         $middleware->appendToGroup('web', \App\Http\Middleware\HubMaintenance::class);
+        // فرضُ الدفاع التكيّفي (Work OS · الطور I · WP-I.3): يقرأ مخزنَ ip_rules من
+        // خبيئةٍ قصيرة ويصدّ المحظورَ بردٍّ مفاوَضِ النوع — fail-open بالبناء (عطلُ
+        // الدفاع لا يصير عطلَ موقع)، والمالكُ المصادَقُ لا يُحظر أبداً وضربتُه تشفي.
+        $middleware->appendToGroup('web', \App\Http\Middleware\IpDefense::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\SessionSentry::class);
         $middleware->appendToGroup('web', \App\Http\Middleware\WorkHours::class);
         // مصادقةٌ تكيفية: تفرض 2FA على الأدوار الحسّاسة إن فُعّلت السياسة (مطفأة افتراضاً)
@@ -37,11 +41,20 @@ return Application::configure(basePath: dirname(__DIR__))
         // وضعُ الصيانة يسري على API كما على الويب (v2.324): كانت الكتابةُ تستمرّ
         // من الباب الخلفيّ أثناء الترحيل — والصيانةُ تُعلَن لتتوقّف الكتابةُ كلُّها
         $middleware->appendToGroup('api', \App\Http\Middleware\HubMaintenance::class);
+        // الدفاعُ التكيّفي على API كذلك (WP-I.3): «الحظرُ يعمل في كل مكان» (§42) —
+        // الردُّ غلافُ JSON الموحَّد؛ وهويةُ حامل الرمز تُستطلَع عند مطابقة حظرٍ
+        // فقط (المالكُ المصادَق بمفتاحه لا يُحظر — نظيرُ استثناء الويب).
+        $middleware->appendToGroup('api', \App\Http\Middleware\IpDefense::class);
         $middleware->appendToGroup('api', \App\Http\Middleware\SecurityHeaders::class);
         $middleware->appendToGroup('api', \App\Http\Middleware\Observability::class);
         // رادارُ الكشف على API أيضاً (v2.367): كان مقصوراً على الويب فمُنِعُ ٤٠٣
         // على مسارات API (نطاقٌ ممنوع، سجلٌّ خارج الملكية) لا يُرصد إطلاقاً.
         $middleware->appendToGroup('api', \App\Http\Middleware\AccessRadar::class);
+        // وسيطُ توقيع النقاط الطرفية (Work OS · الطور J · WP-J.1): يفرض عقدَ
+        // ES256 (docblock ‏App\Support\Es256) — طابعٌ ±300ث + nonce فريد + تحقّقٌ
+        // بالمفتاح العامّ المخزَّن — على مجموعة مسارات الأجهزة التي يصلها WP-J.2
+        // (heartbeat/أحداث/أوامر). اسمٌ مستعارٌ تلتقطه المجموعة لا إلحاقٌ عامّ.
+        $middleware->alias(['endpoint.signature' => \App\Http\Middleware\EndpointSignature::class]);
         // الويبهوك الوارد سطحٌ آليّ لا نموذج له: يُصادَق بالرمز في الرابط + توقيع
         // HMAC، فلا CSRF عليه (المُرسِل خدمةٌ خارجية لا متصفّح يحمل الرمز).
         $middleware->validateCsrfTokens(except: ['hook/*']);

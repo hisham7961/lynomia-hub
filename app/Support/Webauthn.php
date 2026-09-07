@@ -136,23 +136,13 @@ class Webauthn
     /* ───────────────── COSE ES256 → PEM ───────────────── */
 
     /**
-     * يحوّل مفتاحَ COSE (EC2/P-256) إلى PEM بتجميع DER SubjectPublicKeyInfo
-     * قياسيّ. البادئةُ ثابتةٌ لـP-256 (منحنى prime256v1)، ثم `04 || x || y`.
+     * يحوّل مفتاحَ COSE (EC2/P-256) إلى PEM — **تفويضٌ كامل** للبدائيّة الواحدة
+     * `Es256::coseToPem` (WP-J.1 · درسُ C5): المنطقُ انتقل إلى هناك حرفياً كي
+     * تتشاركه مفاتيحُ المرور وتوقيعُ النقاط الطرفية — لا مسارَ تعميةٍ ثانٍ هنا.
      */
     public static function coseEs256ToPem(array $cose): string
     {
-        // 1=kty(2 EC2) · 3=alg(-7) · -1=crv(1 P-256) · -2=x · -3=y
-        if (($cose[1] ?? null) !== 2 || ($cose[3] ?? null) !== self::ES256 || ($cose[-1] ?? null) !== 1) {
-            throw new \RuntimeException('مفتاحٌ غير مدعوم — ES256/P-256 فقط');
-        }
-        $x = (string) ($cose[-2] ?? '');
-        $y = (string) ($cose[-3] ?? '');
-        if (strlen($x) !== 32 || strlen($y) !== 32) throw new \RuntimeException('إحداثيّاتٌ غير صالحة');
-
-        $der = hex2bin('3059301306072a8648ce3d020106082a8648ce3d030107034200') . "\x04" . $x . $y;
-        $pem = "-----BEGIN PUBLIC KEY-----\n" . chunk_split(base64_encode($der), 64, "\n") . "-----END PUBLIC KEY-----\n";
-
-        return $pem;
+        return Es256::coseToPem($cose);
     }
 
     /* ───────────────── تحليل authenticatorData ───────────────── */
@@ -258,12 +248,13 @@ class Webauthn
         if (! $auth['up']) throw new \RuntimeException('حضورُ المستخدم غير مؤكَّد');
         if ($requireUv && ! $auth['uv']) throw new \RuntimeException('تحقّقُ المستخدم مطلوبٌ ولم يتمّ');
 
-        // التوقيعُ على authenticatorData الخام + تجزئة clientDataJSON
+        // التوقيعُ على authenticatorData الخام + تجزئة clientDataJSON — التحقّقُ
+        // بالبدائيّة الواحدة `Es256::verify` (WP-J.1 · C5): المفتاحُ الفاسد يرمي
+        // «مفتاحٌ عامٌّ غير صالح» هناك كما كان يرمي هنا — سلوكٌ محفوظٌ حرفياً.
         $signed = $authenticatorData . hash('sha256', $clientDataJSON, true);
-        $key = openssl_pkey_get_public($publicKeyPem);
-        if ($key === false) throw new \RuntimeException('مفتاحٌ عامٌّ غير صالح');
-        $ok = openssl_verify($signed, $signature, $key, OPENSSL_ALGO_SHA256);
-        if ($ok !== 1) throw new \RuntimeException('التوقيعُ غير صحيح');
+        if (! Es256::verify($signed, $signature, $publicKeyPem)) {
+            throw new \RuntimeException('التوقيعُ غير صحيح');
+        }
 
         // كشفُ الاستنساخ: العدّادُ تصاعديٌّ إلا أن يكون الطرفان صفراً (مفاتيحُ
         // المنصّة كثيراً ما تُبقيه صفراً — فالصفرُ مقابلَ الصفر مقبول).

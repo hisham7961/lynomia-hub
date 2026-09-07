@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\AlertRule;
 use App\Models\HubNotification;
+use App\Models\IpRule;
 use App\Models\OutboxMessage;
 use App\Models\User;
 use Illuminate\Support\Carbon;
@@ -57,6 +58,15 @@ class AlertEngine
         'security.role_change'   => 'high',   'security.lockdown' => 'critical',
         'errors.critical_count'  => 'critical', 'health.scheduler' => 'high',
     ];
+
+    /**
+     * (Work OS · الطور I · WP-I.2 · §41/§68) المصدران اللذان تصلح إشارتُهما
+     * لكل-IP (subject=عنوان) تغذيةً للحظر الآليّ — **استهلاكٌ لا اشتقاق**:
+     * التجميعُ والعتبةُ والنافذة كلُّها في `fireSource` القائم، وهذا المُطلِقُ
+     * لا يعيد عدَّ صفٍّ واحد. سلّمُ التصعيد الافتراضيّ حين يفسد الإعداد.
+     */
+    protected const AUTOBLOCK_SOURCES = ['security.failed_logins', 'security.denials'];
+    protected const AUTOBLOCK_DEFAULT_STEPS = [15, 60, 1440];
 
     /** ذاكرةُ المستلمين لتشغيلةٍ واحدة (كما كانت في HubAutomation) */
     protected ?\Illuminate\Support\Collection $monitorUsers = null;
@@ -286,7 +296,7 @@ class AlertEngine
      */
     public function evaluate(?array $health = null): array
     {
-        $out = ['fired' => 0, 'resolved' => 0, 'incidents' => 0, 'notifs' => 0];
+        $out = ['fired' => 0, 'resolved' => 0, 'incidents' => 0, 'notifs' => 0, 'autoblocks' => 0];
         if (! Schema::hasTable('alert_instances')) return $out;
 
         $health ??= Health::check();
@@ -310,6 +320,9 @@ class AlertEngine
             foreach ($fired as $f) {
                 $liveKeys[] = $key = $this->dedupKey($rule, $f['subject'] ?? null);
                 $this->upsert($rule, $key, $f, $out);
+                // (WP-I.2) الحظرُ الآليّ يستهلك إشارةَ الرشق نفسَها لحظةَ إطلاقها —
+                // لا مسحَ ثانٍ ولا عدَّ ثانٍ؛ وعطلُه لا يمسّ التنبيه (معزولٌ داخله)
+                $this->autoBlock($rule, $f, $out);
             }
             $this->resolveCleared($rule, $liveKeys, $out);
         }
@@ -509,6 +522,134 @@ class AlertEngine
                     'تعافت الخدمة — زال شرطُ التنبيه: ' . mb_substr((string) $row->title, 0, 180));
             }
         }
+    }
+
+    /* ═════════ (Work OS · الطور I · WP-I.2 · §41/§68) الحظرُ الآليّ المتصاعد ═════════ */
+
+    /**
+     * **المُطلِقُ الآليّ — يستهلك إشارةَ الرشق القائمة ولا يعيد اشتقاقَها.**
+     *
+     * يُنادى لكل إطلاقةٍ من `fireSource` لحظةَ خروجها: إن كانت لكل-IP
+     * (subject=عنوان، من مصدرَي `AUTOBLOCK_SOURCES`) والمفتاحُ مشتعلاً
+     * (`security.autoblock_enabled` — **مطفأٌ افتراضياً**) والعدُّ المحسوبُ سلفاً
+     * فوق عتبةِ الحظر، أُنشئت قاعدةُ `IpRule` (origin=auto) بمدّةِ درجتها من
+     * سلّم `security.autoblock_steps` (١٥←٦٠←١٤٤٠ دقيقة افتراضاً) وبُثّ
+     * `ip_auto_blocked` عبر الناقل الواحد — **مرّةً لكل إنشاء**.
+     *
+     * القواعدُ الصلبة (المواصفة §39–42):
+     *  · **فشلٌ مفردٌ لا يحظر أبداً**: أرضيةُ عتبةٍ ٢ مفروضةٌ هنا لا في الإعداد.
+     *  · **لا حظرَ لمحميّ**: عنوانٌ موثوق (`security.trusted_ips` عبر المُطابِق
+     *    الواحد `ip_allowed`)، أو معروفٌ لمالكٍ (`user_ips` — قناةُ التعافي)،
+     *    أو تحميه قاعدةُ سماحٍ حيّة (allow يفوز block دائماً).
+     *  · **لا عاصفةَ أحداث**: قاعدةُ حظرٍ حيّةٌ تُطابق العنوانَ = رشقٌ مستمرٌّ
+     *    مُعالَجٌ فعلاً — لا قاعدةَ ثانية ولا حدثاً ثانياً؛ الحدثُ التالي بعد
+     *    انقضائها فقط (وهو درجةُ السلّم التالية إن عاد ضمن النافذة).
+     *  · **العودُ يُصعِّد**: آخرُ قاعدةٍ آليّةٍ (غيرِ ملغاة) للعنوان انقضت قبل
+     *    أقلَّ من `security.autoblock_window_min` دقيقة ⇒ الدرجةُ التالية بسقفِ
+     *    أعلى السلّم؛ والملغاةُ قرارُ إنسانٍ فلا تُصعِّد. وعند القمة تُفتح
+     *    حادثةٌ آليّة واحدة (بصمة `autoblock:<ip>` — تُثرى لا تُكرَّر).
+     *  · **العطلُ لا يُعدي**: كلُّه في try — جدولٌ غائبٌ أو خطأُ كتابةٍ لا
+     *    يُسقط التقييمَ ولا التنبيه (والفرضُ نفسُه fail-open في WP-I.3).
+     */
+    protected function autoBlock(AlertRule $rule, array $f, array &$out): void
+    {
+        if ($this->dry) return;
+        if (! in_array((string) $rule->source, self::AUTOBLOCK_SOURCES, true)) return;
+
+        $ip = trim((string) ($f['subject'] ?? ''));
+        if ($ip === '' || filter_var($ip, FILTER_VALIDATE_IP) === false) return;
+        if ((string) setting('security.autoblock_enabled', '0') !== '1') return;
+
+        try {
+            if (! Schema::hasTable('ip_rules')) return;
+
+            // العتبةُ من الإعداد بأرضيةٍ صلبة ٢: فشلٌ مفردٌ لا يصنع حظراً ولو
+            // ضُبط الإعدادُ صفراً — والعدُّ هو الذي حسبه fireSource سلفاً (استهلاك)
+            if ((int) ($f['count'] ?? 0) < max(2, (int) setting('security.autoblock_threshold', 10))) return;
+
+            // الموثوقُ عبر المُطابِق الواحد ip_allowed (دقيق/CIDR/عائلتان) — لا محلِّلَ ثانٍ
+            if (ip_allowed($ip, (string) setting('security.trusted_ips', ''))) return;
+
+            // القواعدُ الحيّة دفعةً واحدة: سماحٌ يُطابِق = محميّ؛ حظرٌ يُطابِق = مُعالَجٌ فعلاً
+            $live = IpRule::query()->active()->orderBy('created_at')->orderBy('id')->get();
+            foreach ($live as $r) {
+                if ($r->matches($ip)) return;
+            }
+
+            // عنوانٌ معروفٌ لمالكٍ (ذاكرةُ user_ips القائمة) — قناةُ تعافٍ لا هدفُ حظر
+            if ($this->ownerKnownIp($ip)) return;
+
+            // درجةُ السلّم: آخرُ قاعدةٍ آليّةٍ غيرِ ملغاةٍ للعنوان نفسِه انقضت ضمن
+            // نافذة العود ⇒ التالية؛ وإلا فمن أوّل السلّم. ترتيبٌ حتميّ (id قاطع).
+            $steps = $this->autoblockSteps();
+            $level = 0;
+            $prev = IpRule::query()->where('origin', 'auto')->where('mode', 'block')
+                ->where('ip', $ip)->whereNull('revoked_at')
+                ->orderByDesc('created_at')->orderByDesc('id')->first();
+            if ($prev) {
+                $ended = $prev->expires_at ?? $prev->created_at;
+                $win = max(1, (int) setting('security.autoblock_window_min', 60));
+                if ($ended !== null && $ended->gt(now()->subMinutes($win))) {
+                    $level = min((int) $prev->escalation_level + 1, count($steps) - 1);
+                }
+            }
+
+            $minutes = $steps[$level];
+            $sev = Severity::normalize((string) ($f['severity'] ?? (self::SOURCE_SEV[$rule->source] ?? 'high')));
+            $block = IpRule::create([
+                'ip'               => $ip,
+                'mode'             => 'block',
+                'origin'           => 'auto',
+                'severity'         => $sev,
+                'reason'           => mb_substr("حظرٌ آليّ (درجة {$level} — {$minutes} دقيقة): " . (string) ($f['title'] ?? ''), 0, 400),
+                'expires_at'       => now()->addMinutes($minutes),
+                'escalation_level' => $level,
+                'request_id'       => mb_substr((string) Api::requestId(), 0, 64) ?: null,
+                'by_id'            => null,          // آليٌّ — لا فاعلَ بشريّاً
+            ]);
+            $out['autoblocks']++;
+
+            // الحدثُ الدلاليّ ip_auto_blocked — مرّةً لكل إنشاءٍ (لا لكل تقييم):
+            // يمرّ بالناقل الواحد فتعمل الويبهوكس والمسارات عليه كأيّ حدث
+            FlowRunner::fire('auto_blocked', 'ip_rules', $block);
+
+            // قمةُ السلّم = معتدٍ عاد رغم كل الدرجات — حادثةٌ للتحقيق البشريّ،
+            // ببصمةٍ فتُثرى المفتوحةُ ولا تتكرّر (hub_open_incident يتكفّل)
+            if ($level === count($steps) - 1) {
+                $inc = hub_open_incident(
+                    "العنوان {$ip} بلغ أعلى درجات الحظر الآليّ ({$minutes} دقيقة) — عودٌ متكرّر رغم الحظر",
+                    self::SEV_AR[$sev] ?? 'عالي', 'security', 'autoblock:' . $ip,
+                    ['ip' => $ip, 'rule_id' => (string) $rule->id, 'ip_rule_id' => (string) $block->id,
+                     'count' => (int) ($f['count'] ?? 0), 'escalation_level' => $level], 24);
+                if ($inc && $inc->wasRecentlyCreated) $out['incidents']++;
+            }
+        } catch (\Throwable $e) {
+            // انقطاعُ الدفاع لا يصير انقطاعَ تنبيه — يُبلَّغ ولا يكسر التقييم
+            report($e);
+        }
+    }
+
+    /** سلّمُ التصعيد من `security.autoblock_steps` (دقائق) — وإلا الافتراضيُّ الصلب */
+    protected function autoblockSteps(): array
+    {
+        $steps = [];
+        foreach (explode(',', (string) setting('security.autoblock_steps', '15,60,1440')) as $s) {
+            if ((int) trim($s) >= 1) $steps[] = (int) trim($s);
+        }
+
+        return $steps !== [] ? $steps : self::AUTOBLOCK_DEFAULT_STEPS;
+    }
+
+    /** هل العنوانُ معروفٌ لمالكٍ؟ — ذاكرةُ `user_ips` القائمة، لا حاسبَ ألفةٍ ثانياً */
+    protected function ownerKnownIp(string $ip): bool
+    {
+        if (! Schema::hasTable('user_ips')) return false;
+
+        return DB::table('user_ips')
+            ->join('users', 'users.id', '=', 'user_ips.user_id')
+            ->join('roles', 'roles.id', '=', 'users.role_id')
+            ->whereNull('users.deleted_at')->where('roles.is_owner', true)
+            ->where('user_ips.ip', $ip)->exists();
     }
 
     /** إشعارُ مستلمي القاعدة (الجرسُ دائماً، والقنواتُ الخارجية بحسب chan) */

@@ -22,8 +22,8 @@ use Tests\TestCase;
  *    الجهازَ لكن **الراتبَ محجوبٌ عنه** — كلاهما في الملفّ نفسِه، بتبويبَين.
  *  • **الحرسُ الخادميّ:** GET مباشرٌ لتبويبٍ لا يملك القارئُ وحدتَه → **٤٠٣** لا
  *    مجرَّدُ غيابٍ في الشريط؛ فلا يُغسَل عزلُ الوحدة بطلبِ `?tab=` مصنوعٍ باليد.
- *  • **لا سكّةٌ زائفة (§82):** تبويباتُ الاتصالات/الأنظمة/أمنِ النقاط (الأطوار G/J)
- *    **لا تُعرَض** حتى تصل سككُها — لا بطاقةٌ فارغةٌ ولا لوحةٌ صامتة (٤٠٤ لِـtab مجهول).
+ *  • **لا سكّةٌ زائفة (§82):** التبويبُ لا يُعرَض حتى تصل سكّتُه — الاتصالاتُ وصلت
+ *    في G وأمنُ النقاط في J (WP-J.3)، وSystems ما زال غائباً (٤٠٤ لِـtab مجهول).
  *  • **تبويبُ المحطة (F.1) يتّصل حقّاً:** يقرأ محطاتِ الموظف بـ`current_employee_id`،
  *    منطَّقاً بالشركة كأيّ قارئ.
  */
@@ -112,8 +112,9 @@ class WorkOsEmployee360TabsTest extends TestCase
         $this->actingAs($hrOnly)->get(route('portal.employee', $emp->id))->assertOk();
 
         // وكلُّ تبويبٍ لا يملك وحدتَه: ٤٠٣ — لا صفحةٌ صامتةٌ ولا لوحةٌ مخفيّة
-        // (telecom أُضيف في الطور G: hr:v وحدها لا تفتح تبويبَ الاتصالات — يتطلب phones:v)
-        foreach (['assets', 'station', 'telecom', 'wallet'] as $tab) {
+        // (telecom أُضيف في الطور G — يتطلب phones:v؛ وendpoint في الطور J · WP-J.3
+        //  — يتطلب endpoints:v: hr:v وحدها لا تفتح أيّاً منهما)
+        foreach (['assets', 'station', 'telecom', 'endpoint', 'wallet'] as $tab) {
             $this->actingAs($hrOnly)->get(route('portal.employee', $emp->id) . '?tab=' . $tab)
                 ->assertForbidden();
         }
@@ -124,9 +125,10 @@ class WorkOsEmployee360TabsTest extends TestCase
     }
 
     /**
-     * ④ لا بطاقةٌ زائفةٌ لسكّةٍ لم تصل (§82): سكّةُ الاتصالات (الطور G) **وصلت** فتبويبُها
-     * حقيقيٌّ على الشريط ويُفتَح؛ أمّا Systems/EndpointSecurity (الأطوار H/J) فما زالت
-     * غائبةً حتى تصل سككها — يُضاف التبويبُ عند وصولِ سكّته لا قبل.
+     * ④ لا بطاقةٌ زائفةٌ لسكّةٍ لم تصل (§82): سكّتا الاتصالات (الطور G) وأمنِ النقاط
+     * (الطور J · WP-J.3) **وصلتا** فتبويباهما حقيقيّان على الشريط ويُفتَحان؛ أمّا
+     * Systems (الطور H لم يبنِ تبويباً) فما زال غائباً — يُضاف التبويبُ عند وصولِ
+     * سكّته لا قبل.
      */
     public function test_no_placeholder_tab_for_an_unbuilt_rail(): void
     {
@@ -142,8 +144,14 @@ class WorkOsEmployee360TabsTest extends TestCase
         $this->actingAs($this->owner)->get(route('portal.employee', $emp->id) . '?tab=telecom')
             ->assertOk();
 
-        // وسككٌ لم تُبنَ بعد (Systems/EndpointSecurity — الأطوار H/J): لا بطاقةَ زائفة
-        foreach (['tab=systems', 'tab=endpoints', 'tab=endpoint'] as $ghost) {
+        // وسكّةُ أمنِ النقاط وصلت (الطور J · WP-J.3): تبويبُها حقيقيٌّ ويُفتَح فعلاً
+        $this->assertStringContainsString('tab=endpoint', $html,
+            'تبويبُ أمنِ النقاط (سكّةُ الطور J) لم يظهر على شريط الملفّ الشامل');
+        $this->actingAs($this->owner)->get(route('portal.employee', $emp->id) . '?tab=endpoint')
+            ->assertOk();
+
+        // وسككٌ لم تُبنَ بعد (Systems): لا بطاقةَ زائفة
+        foreach (['tab=systems'] as $ghost) {
             $this->assertStringNotContainsString($ghost, $html,
                 "شريطُ الملفّ عرض تبويباً لسكّةٍ لم تُبنَ بعد ({$ghost}) — بطاقةٌ زائفةٌ يمنعها §82");
         }

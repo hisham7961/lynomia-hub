@@ -22,7 +22,8 @@
 
 {{-- (WP-F.4 · §28) تبويباتٌ محروسةٌ خادميّاً: كلُّ تبويبٍ خلف وحدته (hub_can)، وطلبُ
      `?tab=` لتبويبٍ بلا صلاحيةٍ يُردّ ٤٠٣ من المتحكّم — لا مجرَّدَ إخفاءٍ هنا. السككُ
-     غيرُ المبنيّة (Telecom/Systems/EndpointSecurity) لا تُدرَج أصلاً (§82). --}}
+     غيرُ المبنيّة (Systems) لا تُدرَج أصلاً (§82) — والاتصالاتُ وصلت في G وأمنُ
+     النقاط في J (WP-J.3). --}}
 @include('partials.cc.tabs', ['tabs' => $tabs360, 'active' => $tab360])
 
 @if ($tab360 === 'profile')
@@ -92,6 +93,56 @@
                     </tr>
                 @empty
                     <tr><td class="sub" style="padding:14px;text-align:center">لا خطَّ مُخصَّصٌ له</td></tr>
+                @endforelse
+            </table>
+        </div>
+    </div>
+
+@elseif ($tab360 === 'endpoint')
+    {{-- أمنُ النقاط (الطور J · WP-J.3 · §28/§43): أجهزتُه المسجَّلة وملخّصُ وضعيّتها
+         **الصادقة** — قراءةٌ منعها النظامُ «غير مُهيّأ» لا «سليمة» (C15). الهويّةُ
+         التقنية (السيريال من hw وهويّةُ الوكيل) خلف مفتاح الحقل hw في field-mode —
+         نظيرُ سيريال العهدة أعلاه (الحقولُ المقفولة locked تعود 'ro' لا 'hide'). --}}
+    @php
+        $epTech = hub_field_mode(auth()->user(), 'endpoints', 'hw') !== 'hide';
+        $epFleet = hub_is_owner() || hub_monitor();
+        $epStatus = ['active' => ['نشط', 'g'], 'suspended' => ['موقوف', 'wn'],
+                     'locked' => ['مقفول', 'bad'], 'retired' => ['مسحوب', 'wn']];
+    @endphp
+    <div class="kids">
+        <div class="card kid">
+            <h3>🛡️ أجهزتُه (النقاط الطرفية)
+                @if ($epFleet)<a class="btn ghost xs msauto" href="{{ route('endpoints.index') }}">المركز ←</a>@endif
+            </h3>
+            <table class="mini">
+                @forelse (($endpointDevices ?? collect()) as $dv)
+                    @php
+                        $dvPosture = json_decode((string) ($dv->posture ?? ''), true) ?: [];
+                        $dvOk = count(array_filter($dvPosture, fn ($v) => $v === 'active'));
+                        $dvNc = count(array_filter($dvPosture, fn ($v) => $v !== 'active' && $v !== 'inactive'));
+                        $dvHw = json_decode((string) ($dv->hw ?? ''), true) ?: [];
+                        [$dvStLabel, $dvStTone] = $epStatus[$dv->status] ?? [$dv->status, 'wn'];
+                    @endphp
+                    <tr>
+                        <td>
+                            @if ($epFleet)<a href="{{ route('endpoints.show', $dv->id) }}">{{ $dv->hostname }}</a>@else {{ $dv->hostname }} @endif
+                            <div class="sub">{{ $dv->os }}
+                                @if ($epTech && ($dvHw['serial'] ?? null)) · <span class="mono" dir="ltr">S/N {{ \Illuminate\Support\Str::limit((string) $dvHw['serial'], 24) }}</span>@endif
+                                @if ($epTech && $dv->device_uuid) · <span class="mono" dir="ltr">{{ \Illuminate\Support\Str::limit((string) $dv->device_uuid, 24) }}</span>@endif
+                            </div>
+                        </td>
+                        <td>
+                            @if ($dvPosture === [])
+                                <span class="sub">لا قراءةَ وضعيّةٍ بعد</span>
+                            @else
+                                سليمة {{ $dvOk }}/{{ count($dvPosture) }}@if ($dvNc > 0) · <span class="bdg wn">غير مُهيّأ {{ $dvNc }}</span>@endif
+                            @endif
+                            <div class="sub">آخر نبضة: {{ $dv->last_heartbeat_at ? substr((string) $dv->last_heartbeat_at, 0, 16) : 'لم ينبض بعد' }}</div>
+                        </td>
+                        <td class="acts"><span class="bdg {{ $dvStTone }}">{{ $dvStLabel }}</span></td>
+                    </tr>
+                @empty
+                    <tr><td class="sub" style="padding:14px;text-align:center">لا جهازَ مسجَّلٌ بحسابه</td></tr>
                 @endforelse
             </table>
         </div>
