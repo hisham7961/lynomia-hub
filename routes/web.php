@@ -504,6 +504,18 @@ Route::middleware('auth')->group(function () {
     Route::get('purchase/{id}/doc', [PurchaseController::class, 'doc'])->name('purchases.doc');
     Route::post('purchase/{id}/act', [PurchaseController::class, 'act'])->name('purchases.act');
     // CTO م2 (v2.134): صفحات مساحات العمل المركزية
+    // (الطور H · WP-H.3 · §37–38) مساحةُ العمل التقنية — توسيعٌ لمساحة /w/digital:
+    // تبويباتٌ تجمع وحداتِ البنية القائمة + تحليلاتِ DigitalAssets. داخليّةٌ حصراً:
+    // PortalGuard يردّ حسابَ العميل ٤٠٤ قبلها، والمتحكّمُ يعيد الرفضَ الصلبَ فوق
+    // المصفوفة (عميلٌ أو معزولٌ بعملاء → ٤٠٤) ثم `$owner || hub_monitor`.
+    Route::get('w/digital/tech', [\App\Http\Controllers\Web\TechWorkspaceController::class, 'index'])->name('tech.workspace');
+    // (الطور H · WP-H.2 · §33–36) مستكشفُ العلاقات — إسقاطٌ فوق النماذج الحيّة
+    // (لا شجرةَ مخزّنة): كلُّ عقدةٍ عبر hub_read داخل RelationshipProjection.
+    // داخليٌّ حصراً: PortalGuard يردّ حسابَ العميل ٤٠٤ قبله، والمتحكّمُ يعيد
+    // الرفضَ الصلب (عميلٌ أو معزولٌ بعملاء → ٤٠٤) دفاعاً في العمق.
+    // معاملاتُ الهدف query لا مسار — كي تركبها عروضُ SavedView (module='graph') حرفياً.
+    Route::get('graph/explore', [\App\Http\Controllers\Web\RelationshipExplorerController::class, 'explore'])->name('graph.explore');
+    Route::get('graph/expand', [\App\Http\Controllers\Web\RelationshipExplorerController::class, 'expandNode'])->name('graph.expand');
     Route::get('w/{key}', [\App\Http\Controllers\Web\WorkspaceController::class, 'show'])->name('workspace');
     Route::get('legal', [LegalController::class, 'index'])->name('legal');
     Route::post('legal/rules/{id}/enable', [LegalController::class, 'enableRule'])->name('legal.rule.enable');

@@ -16,6 +16,15 @@
     @foreach ($all as $k => $w)
         <a class="btn {{ $k === $ws['key'] ? 'p' : 'ghost' }} xs" href="{{ route('workspace', $k) }}">{{ $w['icon'] }} {{ $w['label'] }}</a>
     @endforeach
+    {{-- (الطور H · WP-H.3 · §37–38) توسيعُ مساحة التقنية: بابُ مساحةِ العمل التقنية —
+         الرابطُ يظهر لمن يبلغها فعلاً (داخليٌّ غيرُ معزولٍ بعملاءَ ولا بشركات، مالكٌ
+         أو مراقب)، والحرسُ الحقيقيُّ في متحكّمها لا في إخفاء الرابط. --}}
+    @if ($ws['key'] === 'digital'
+         && ! hub_is_client(auth()->user()) && hub_client_ids() === null
+         && (hub_is_owner(auth()->user()) || hub_monitor(auth()->user()))
+         && hub_company_ids() === null)
+        <a class="btn ghost xs" style="border-color:var(--p)" href="{{ route('tech.workspace') }}">🛠️ مساحة العمل التقنية</a>
+    @endif
 </div>
 
 {{-- مؤشرات حقيقية: مجاميع محسوبة فعلاً لا نسب مزعومة --}}

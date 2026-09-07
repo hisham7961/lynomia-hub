@@ -43,4 +43,24 @@ class Server extends Model
     {
         return $this->belongsTo(\App\Models\User::class, 'owner_id');
     }
+
+    // ── (الطور H · WP-H.1 · §37) حوافُّ البنية — المرجعُ هو الحافّة، لا جدولَ حوافٍّ ثانٍ ──
+
+    /** المقعدُ الفعليُّ الذي يقف عليه العتاد */
+    public function station(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Station::class, 'station_id');
+    }
+
+    /** سجلُّ العهدة العتاديُّ للجهاز نفسِه */
+    public function asset(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Asset::class, 'asset_id');
+    }
+
+    /** ملفُّ الموظف المسؤول تشغيليّاً (وحدة hr) — منفصلٌ عن owner_id (حسابُ نظام) */
+    public function employeeFile(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Employee::class, 'hr_id');
+    }
 }

@@ -40,6 +40,12 @@
             @if ($module === 'clients')
                 <a class="btn ghost sm" href="{{ route('journey', $row->id) }}">🧭 رحلة العميل</a>
             @endif
+            {{-- (الطور H · WP-H.2 · §63) روابطُ علاقاتٍ من كل صفحة: إسقاطُ السجل في
+                 مستكشف العلاقات. محجوبٌ عمّن نافذتُه نافذةُ عميل (حسابُ عميلٍ أو
+                 معزولٌ بعملاء) — المسارُ نفسُه يردّهما ٤٠٤ والزرُّ لا يَعِد بما يُرَدّ. --}}
+            @if (! hub_is_client(auth()->user()) && hub_client_ids() === null)
+                <a class="btn ghost sm" href="{{ route('graph.explore', ['m' => $module, 'id' => $row->id]) }}">🕸️ افتح في المستكشف</a>
+            @endif
             @if (hub_can(auth()->user(), $module, 'a'))
                 <a class="btn ghost sm" href="{{ route('m.create', [$module, 'from' => $row->id]) }}">⎘ نسخ كسجل جديد</a>
             @endif

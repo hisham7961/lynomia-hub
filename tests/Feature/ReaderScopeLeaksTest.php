@@ -68,6 +68,19 @@ class ReaderScopeLeaksTest extends TestCase
         $this->actingAs(User::find($u->id))->get('/capacity')->assertForbidden();
     }
 
+    public function test_the_tech_workspace_refuses_a_company_isolated_account(): void
+    {
+        $this->seedCore();
+        $co = Company::create(['name_ar' => 'شركة', 'status' => 'نشطة']);
+        $u = $this->narrow('techws@test.local', ['servers', 'vault']);
+        User::whereKey($u->id)->update(['companies' => json_encode([$co->id])]);
+
+        // (الطور H · WP-H.3) مساحةُ العمل التقنية تجمع تحليلاتِ DigitalAssets على
+        // مستوى المنشأة كلِّها — فتَرِث حارسَ أخواتها: المعزولُ بشركاتٍ يُردّ ٤٠٣
+        // (نظيرُ /performance و/capacity أعلاه) لا صفحةً بأرقام شركاتٍ أجنبية.
+        $this->actingAs(User::find($u->id))->get('/w/digital/tech')->assertForbidden();
+    }
+
     public function test_the_file_gate_refuses_a_file_from_a_module_you_cannot_see(): void
     {
         $this->seedCore();
