@@ -101,9 +101,12 @@ class SearchDmLeakTest extends TestCase
         $this->assertMatchesRegularExpression(
             "/orderByDesc\('created_at'\)->orderByDesc\('id'\)/",
             $src, 'ترتيب نتائج البحث بلا فاصل id — قرعة بين المحرّكين');
+        // المحرّكُ انتقل إلى `results()` المشتركة (يستدعيها الويبُ والجوال · الطور D · F2)،
+        // والقصُّ صار بـ`limit($perModule)` (افتراضُه ٣) — والحارسُ يبقى: قصٌّ **مسبوقٌ**
+        // بترتيبٍ حتميّ، لا قصٌّ بلا orderBy (أيُّ صفوفٍ تظهر مسألةَ حظّ).
         $this->assertMatchesRegularExpression(
-            "/orderByDesc\('id'\)->limit\(3\)/", $src,
-            'mini يقتطع ٣ صفوف بلا orderBy — أي ثلاثة تظهر مسألة حظ');
+            "/orderByDesc\('id'\)->limit\(\\\$?\w+\)/", $src,
+            'القصُّ بلا orderBy — أي صفوفٍ تظهر مسألة حظ بين المحرّكين');
     }
 
     /* ── ٤) بطاقة الموافقات المعلقة في /legal منطَّقة ── */

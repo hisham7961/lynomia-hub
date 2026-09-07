@@ -134,4 +134,44 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     Route::get('bootstrap', [\App\Http\Controllers\Api\MobileContextController::class, 'bootstrap'])->name('mobile.bootstrap');
     Route::get('schema/modules', [\App\Http\Controllers\Api\MobileContextController::class, 'schemaModules'])->name('mobile.schema.modules');
     Route::get('schema', [\App\Http\Controllers\Api\MobileContextController::class, 'schema'])->name('mobile.schema');
+
+    /*
+     * ── تكافؤُ واجهةِ الأعمال (Mobile Readiness · الطور D · §109) ──
+     *
+     * **ترتيبُ التسجيلُ عقدٌ أمنيّ (Critic F9):** كلُّ المسارات الحرفيّة
+     * (اعتمادات/لوحة/بحث/تفضيلات + لاحقةُ `/actions` على المورد) تُسجَّل **قبل**
+     * الـcatch-all `{module}` (CRUD) الذي يأتي **أخيراً** — وإلّا ابتلعها `{module}`
+     * (`GET approvals` يُحلّ إلى `apiIndex('approvals')`, و`GET approvals/{id}` إلى
+     * `show`, …). نظيرُ انضباطِ `/api/v1` (`api.php:15,21,26` قبل `{module}`).
+     * التوجيهُ «أوّلُ مطابقٍ يفوز»، فالحرفيُّ الأخصُّ يسبق العامَّ الأعمَّ.
+     *
+     * والهيكلُ يملؤه بناةُ D.1-D.7 اللاحقون؛ الأساسُ المشترك (الجواهرُ + مالكُ
+     * الـIdempotency + ApprovalService + محرّكُ البحث) جاهزٌ في هذه الدفعة.
+     */
+
+    // D.4 — الاعتمادات (حرفيّةٌ: `approvals` قبل `{module}` كي لا يُحلّ إلى apiIndex)
+    Route::get('approvals', [\App\Http\Controllers\Api\MobileWorkController::class, 'approvals'])->name('mobile.approvals.index');
+    Route::get('approvals/{id}', [\App\Http\Controllers\Api\MobileWorkController::class, 'approvalShow'])->name('mobile.approvals.show');
+    Route::post('approvals/{id}/approve', [\App\Http\Controllers\Api\MobileWorkController::class, 'approvalApprove'])->name('mobile.approvals.approve');
+    Route::post('approvals/{id}/reject', [\App\Http\Controllers\Api\MobileWorkController::class, 'approvalReject'])->name('mobile.approvals.reject');
+
+    // D.5 — اللوحة · D.6 — البحث · D.7 — التفضيلات (حرفيّةٌ أُحاديّةُ المقطع قبل `{module}`)
+    Route::get('home', [\App\Http\Controllers\Api\MobileWorkController::class, 'home'])->name('mobile.home');
+    Route::get('search', [\App\Http\Controllers\Api\MobileWorkController::class, 'search'])->name('mobile.search');
+    Route::get('prefs', [\App\Http\Controllers\Api\MobileWorkController::class, 'prefs'])->name('mobile.prefs.index');
+    Route::put('prefs', [\App\Http\Controllers\Api\MobileWorkController::class, 'prefsUpdate'])->name('mobile.prefs.update');
+    Route::post('prefs/pin', [\App\Http\Controllers\Api\MobileWorkController::class, 'pin'])->name('mobile.prefs.pin');
+
+    // D.2/D.3 — إجراءاتُ المورد: لاحقةُ `/actions` **قبل** `{module}/{id}` (المقطعُ
+    // الحرفيّ `actions` يميّزها، ومع ذلك تُسجَّل أوّلاً انضباطاً · F9)
+    Route::get('{module}/{id}/actions', [\App\Http\Controllers\Api\MobileResourceController::class, 'listActions'])->name('mobile.resource.actions');
+    Route::post('{module}/{id}/actions/{action}', [\App\Http\Controllers\Api\MobileResourceController::class, 'runAction'])->name('mobile.resource.run_action');
+
+    // D.1 — الـcatch-all العامّ (CRUD) **أخيراً** بعد كلِّ حرفيّ (F9)
+    Route::get('{module}', [\App\Http\Controllers\Api\MobileResourceController::class, 'listRecords'])->name('mobile.resource.index');
+    Route::post('{module}', [\App\Http\Controllers\Api\MobileResourceController::class, 'createRecord'])->name('mobile.resource.store');
+    Route::get('{module}/{id}', [\App\Http\Controllers\Api\MobileResourceController::class, 'showRecord'])->name('mobile.resource.show');
+    Route::put('{module}/{id}', [\App\Http\Controllers\Api\MobileResourceController::class, 'replaceRecord'])->name('mobile.resource.update');
+    Route::patch('{module}/{id}', [\App\Http\Controllers\Api\MobileResourceController::class, 'patchRecord'])->name('mobile.resource.patch');
+    Route::delete('{module}/{id}', [\App\Http\Controllers\Api\MobileResourceController::class, 'deleteRecord'])->name('mobile.resource.destroy');
 });

@@ -9342,5 +9342,11 @@ return [
             'android' => '',   // setting('mobile.store_url_android')
         ],
         // رابطُ الدعم يُقرأ من setting('mobile.support_url') (مفتاحٌ قائمٌ منذ الطور B)
+
+        // إجراءاتٌ تتطلّب تصعيدَ مصادقةٍ (Step-Up) في الجوال — الطور D · D.3. الأنماط:
+        // "module:action" | "module:*" | "*:action" (action ∈ status|restore|restore-version|ack).
+        // **فارغٌ افتراضاً = لا تصعيد لإجراءٍ عامّ** (نظيرُ الويب الذي لا يُصعّد إجراءَ الحالة) —
+        // فلا يُفرَض تأكيدُ هويّةٍ حيث لا يفرضه الويبُ (لا سطحَ جوالٍ أشدَّ ولا أضعف بلا سبب).
+        'stepup_actions' => [],
     ],
 ];
