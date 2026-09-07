@@ -21,9 +21,9 @@
 @include('partials.staff_account_card', ['acctRow' => $emp])
 
 {{-- (WP-F.4 · §28) تبويباتٌ محروسةٌ خادميّاً: كلُّ تبويبٍ خلف وحدته (hub_can)، وطلبُ
-     `?tab=` لتبويبٍ بلا صلاحيةٍ يُردّ ٤٠٣ من المتحكّم — لا مجرَّدَ إخفاءٍ هنا. السككُ
-     غيرُ المبنيّة (Systems) لا تُدرَج أصلاً (§82) — والاتصالاتُ وصلت في G وأمنُ
-     النقاط في J (WP-J.3). --}}
+     `?tab=` لتبويبٍ بلا صلاحيةٍ يُردّ ٤٠٣ من المتحكّم — لا مجرَّدَ إخفاءٍ هنا.
+     الاتصالاتُ وصلت في G وأمنُ النقاط في J والأنظمةُ في M (WP-M.3 فوق حافّة H.1) —
+     فالسجلُّ مكتملٌ بصفرِ بطاقاتٍ زائفة (§82)، وتبويبٌ مجهولٌ يبقى ٤٠٤. --}}
 @include('partials.cc.tabs', ['tabs' => $tabs360, 'active' => $tab360])
 
 @if ($tab360 === 'profile')
@@ -77,8 +77,11 @@
 
 @elseif ($tab360 === 'telecom')
     {{-- الاتصالات (الطور G · §28): خطوطُه (SIM/eSIM) — القراءةُ فقط، والتفاصيلُ والأسرارُ
-         (PIN/PUK المقنَّعان) في شاشةِ السجل. لا زرَّ تفعيل/تعليقٍ يُوهم بتوفيرٍ حيٍّ
+         (PIN/PUK المقنَّعان) في شاشةِ السجل: **لا يُنتقيان أصلاً** من قارئ التبويب فلا
+         يبلغان HTML بحال (WP-M.3). ICCID هويّةُ الشريحة التقنيّة خلف hub_field_mode —
+         نظيرُ سيريال العهدة أعلاه. لا زرَّ تفعيل/تعليقٍ يُوهم بتوفيرٍ حيٍّ
          لدى المشغّل (النقد C15) — السجلُّ config-only. --}}
+    @php $tcIccid = hub_field_mode(auth()->user(), 'phones', 'iccid') !== 'hide'; @endphp
     <div class="kids">
         <div class="card kid">
             <h3>📡 خطوطُه (الاتصالات)
@@ -88,11 +91,36 @@
                 @forelse (($phones ?? collect()) as $p)
                     <tr>
                         <td>@if (hub_can(auth()->user(), 'phones', 'v'))<a href="{{ route('m.show', ['phones', $p->id]) }}" dir="ltr">{{ $p->number }}</a>@else <span dir="ltr">{{ $p->number }}</span> @endif
-                            <div class="sub">{{ collect([$p->line_type, $p->carrier])->filter()->implode(' · ') ?: '—' }}@if ($p->msisdn) · <span class="mono" dir="ltr">{{ \Illuminate\Support\Str::limit($p->msisdn, 24) }}</span>@endif</div></td>
+                            <div class="sub">{{ collect([$p->line_type, $p->carrier])->filter()->implode(' · ') ?: '—' }}@if ($p->msisdn) · <span class="mono" dir="ltr">{{ \Illuminate\Support\Str::limit($p->msisdn, 24) }}</span>@endif @if ($p->iccid && $tcIccid) · <span class="mono" dir="ltr">{{ \Illuminate\Support\Str::limit($p->iccid, 26) }}</span>@endif</div></td>
                         <td class="acts">@if ($p->status)<span class="bdg {{ hub_tone($p->status) }}">{{ $p->status }}</span>@endif</td>
                     </tr>
                 @empty
                     <tr><td class="sub" style="padding:14px;text-align:center">لا خطَّ مُخصَّصٌ له</td></tr>
+                @endforelse
+            </table>
+        </div>
+    </div>
+
+@elseif ($tab360 === 'systems')
+    {{-- الأنظمة (الطور M · WP-M.3 · §28 فوق حافّة H.1): السيرفراتُ التي يتولّاها
+         (`servers.hr_id`) — طرفا الحافّة محروسان بالبناء (الصفحةُ hr:v والتبويبُ
+         servers:v) فقاعدةُ «الحافّةُ لمن يملك طرفَيها» مستوفاة. القراءةُ فقط؛
+         IP خلف hub_field_mode، واعتمادُ الدخول (vault) لا يُنتقى أصلاً. --}}
+    @php $svIp = hub_field_mode(auth()->user(), 'servers', 'ip') !== 'hide'; @endphp
+    <div class="kids">
+        <div class="card kid">
+            <h3>🖥️ أنظمتُه (السيرفرات)
+                @if (hub_can(auth()->user(), 'servers', 'v'))<a class="btn ghost xs msauto" href="{{ route('m.index', 'servers') }}">الكل ←</a>@endif
+            </h3>
+            <table class="mini">
+                @forelse (($servers ?? collect()) as $s)
+                    <tr>
+                        <td>@if (hub_can(auth()->user(), 'servers', 'v'))<a href="{{ route('m.show', ['servers', $s->id]) }}">{{ $s->name }}</a>@else {{ $s->name }} @endif
+                            <div class="sub">{{ collect([$s->provider, $s->type, $s->os])->filter()->implode(' · ') ?: '—' }}@if ($s->ip && $svIp) · <span class="mono" dir="ltr">{{ \Illuminate\Support\Str::limit($s->ip, 40) }}</span>@endif{{ $s->expiry ? ' · ينتهي ' . substr((string) $s->expiry, 0, 10) : '' }}</div></td>
+                        <td class="acts">@if ($s->status)<span class="bdg {{ hub_tone($s->status) }}">{{ $s->status }}</span>@endif</td>
+                    </tr>
+                @empty
+                    <tr><td class="sub" style="padding:14px;text-align:center">لا سيرفرَ مُسنَدٌ إليه</td></tr>
                 @endforelse
             </table>
         </div>

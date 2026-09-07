@@ -40,7 +40,12 @@ class OperationalSearchTest extends TestCase
     // و+1 مع وحدة النقاط الطرفية `endpoints` (Work OS · الطور J · WP-J.1): وحدةُ
     // سجلٍّ بمفاتيح `search` (hostname/device_uuid/os) فيستجوبها البحثُ الموحَّد
     // كسائر الوحدات — استعلامُ وحدةٍ واحدٌ لا نمطٌ تشغيليّ، وحرّاسُ التسرّب أعلاه بلا مساس.
-    private const PLAIN_BUDGET = ['sqlite' => 94, 'mysql' => 93, 'mariadb' => 93];
+    // و+2 مع مسارَي فهرسة Work OS المُصرَّحَين (الطور M · WP-M.1 · C14): استعلامُ
+    // **القنوات** (LIKE على العنوان مقيَّداً بعضويّة القارئ EXISTS) واستعلامُ **كشوف
+    // العهدة** (Searchable لوحدة hr مقيَّداً بوجود حركاتٍ في نطاق الشركة) — نظيرُ
+    // «+1 لكل وحدةٍ قابلةٍ للبحث» أعلاه حرفاً بحرف: مطابقةُ اسمٍ محروسةٌ لكل ضغطة،
+    // لا استجوابٌ تشغيليّ، وحرّاسُ error_events/email بلا مساس (التأكيدان أعلاه يقيسانهما).
+    private const PLAIN_BUDGET = ['sqlite' => 96, 'mysql' => 95, 'mariadb' => 95];
 
     private const RID = '0198f0c2-77aa-4a11-9a1e-5f4d2b7c1e33';
     private const IP = '203.0.113.9';

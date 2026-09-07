@@ -122,6 +122,91 @@ class BackupRestoreTest extends TestCase
         $this->assertSame('قيد تجريبي', DB::table('journal_lines')->where('id', $jid)->value('memo'));
     }
 
+    /**
+     * (٧ · Work OS · الطور M · WP-M.3 · §74–81) **جولةُ Work OS الكاملة**: صفٌّ
+     * في كلِّ جدولٍ أرسته الأطوار A–L يدخل النسخةَ ويعود بالاستعادة — امتدادُ (٤)
+     * من عيّنتين إلى **كلِّ** سكّةِ Work OS: عضويّاتُ العملاء والمحادثاتُ والتفعيلُ
+     * ودفترُ العهدة والمحطاتُ والجردُ وقواعدُ IP وأسطولُ النقاط بمفاتيحه ورموزِه
+     * وذاكرةِ الإعادة وأحداثِه وأوامرِه وسياساتِه وإصداراتِه والمزوّدون. غيابُ
+     * جدولٍ واحد = استعادةٌ «ناجحة» تُطفئ عزلاً أو تُصمِت أسطولاً بصمت.
+     */
+    public function test_every_work_os_table_round_trips_through_backup_and_restore(): void
+    {
+        $this->seedCore();
+        $mk = fn () => (string) Str::uuid();
+
+        // جدولٌ ⟵ [الصفُّ المبذور، عمودُ العلامة] — علامةٌ مميِّزةٌ تُتعقَّب حرفيّاً
+        $seed = [
+            'client_memberships'     => [['client_id' => $mk(), 'user_id' => $this->employee->id,
+                                          'role' => 'member', 'status' => 'active'], 'status'],
+            'conversations'          => [['kind' => 'channel', 'audience' => 'internal',
+                                          'visibility' => 'private', 'title' => 'قناةُ جولة النسخ'], 'title'],
+            'conversation_members'   => [['conversation_id' => $mk(), 'user_id' => $this->employee->id,
+                                          'role' => 'member', 'source' => 'explicit'], 'role'],
+            'account_activations'    => [['user_id' => $this->employee->id, 'email' => 'roundtrip@act.local',
+                                          'token_hash' => hash('sha256', 'rt-token'), 'attempts' => 0], 'email'],
+            'employee_custody_moves' => [['employee_id' => $mk(), 'kind' => 'صرف عهدة',
+                                          'amount' => 10, 'sign' => 1, 'approval_state' => 'posted'], 'kind'],
+            'stations'               => [['code' => 'ST-RT-77', 'facility' => 'مقرُّ الجولة',
+                                          'status' => 'شاغرة'], 'code'],
+            'station_assignments'    => [['station_id' => $mk(), 'user_id' => $this->employee->id,
+                                          'action' => 'assign', 'note' => 'إسنادُ الجولة'], 'note'],
+            'inventory_sessions'     => [['status' => 'مفتوحة', 'by_id' => $this->owner->id], 'status'],
+            'inventory_items'        => [['session_id' => $mk(), 'asset_id' => $mk(),
+                                          'verdict' => 'معلّق'], 'verdict'],
+            'inventory_scans'        => [['session_id' => $mk(), 'result' => 'مطابق',
+                                          'by_id' => $this->owner->id], 'result'],
+            'ip_rules'               => [['ip' => '203.0.113.77', 'mode' => 'block',
+                                          'origin' => 'manual', 'reason' => 'حظرُ الجولة'], 'ip'],
+            'endpoint_devices'       => [['device_uuid' => $mk(), 'hostname' => 'RT-LAPTOP-01',
+                                          'os' => 'windows', 'status' => 'active',
+                                          'public_key' => 'PUB-KEY-RT', 'pubkey_fp' => 'fp-rt-1'], 'pubkey_fp'],
+            'enrollment_tokens'      => [['token_hash' => hash('sha256', 'rt-enroll'), 'company_id' => $mk(),
+                                          'expires_at' => now()->addDay(), 'minted_by' => $this->owner->id], 'token_hash'],
+            'endpoint_nonces'        => [['id' => 424242, 'device_id' => $mk(), 'nonce' => 'nonce-rt-1'], 'nonce'],
+            'endpoint_events'        => [['device_id' => $mk(), 'kind' => 'usb.plug', 'severity' => 'info',
+                                          'summary' => 'حدثُ جولة النسخ', 'nonce' => 'nonce-rt-2'], 'summary'],
+            'endpoint_commands'      => [['device_id' => $mk(), 'type' => 'lock', 'state' => 'pending',
+                                          'ikey' => 'ikey-rt-1', 'reason' => 'سببُ الجولة'], 'ikey'],
+            'endpoint_policies'      => [['name' => 'سياسةُ الجولة', 'usb_mode' => 'audit'], 'name'],
+            'endpoint_releases'      => [['version' => '9.9.9-rt', 'os' => 'windows', 'arch' => 'amd64',
+                                          'path' => 'agents/rt.exe', 'sha256' => str_repeat('ab', 32),
+                                          'size' => 10, 'signing_status' => 'unsigned-dev'], 'sha256'],
+            'carriers'               => [['name' => 'مزوّدُ الجولة'], 'name'],
+        ];
+
+        $ids = [];
+        foreach ($seed as $t => [$row, $marker]) {
+            $ids[$t] = $row['id'] ?? $mk();
+            // الطوابعُ تُقصَر على أعمدة الجدول الفعليّة (endpoint_nonces بلا updated_at مثلاً)
+            $full = $row + ['id' => $ids[$t], 'created_at' => now(), 'updated_at' => now()];
+            DB::table($t)->insert(array_intersect_key($full,
+                array_flip(\Illuminate\Support\Facades\Schema::getColumnListing($t))));
+        }
+
+        $this->artisan('hub:backup')->assertExitCode(0);
+
+        // كلُّ جدولٍ حاضرٌ في النسخة بصفِّه المبذور — لا تغطيةَ بالاسم وحده
+        $dump = json_decode(file_get_contents($this->latestBackup()), true);
+        foreach ($seed as $t => [$row, $marker]) {
+            $rows = collect($dump['_tables'][$t] ?? []);
+            $this->assertTrue($rows->contains('id', $ids[$t]),
+                "جدولُ Work OS «{$t}» غائبٌ عن النسخة (أو صفُّه المبذور لم يُصدَّر) — WP-M.3");
+        }
+
+        // الكارثة ثم الاستعادة: تُمحى الجداول كلُّها ويُستورَد الملفُ نفسُه
+        foreach (array_keys($seed) as $t) DB::table($t)->delete();
+        $this->artisan('hub:import', ['file' => $this->latestBackup()])->assertExitCode(0);
+
+        // كلُّ صفٍّ عاد بعلامته حرفيّاً — حضورٌ وقيمةٌ لا حضورٌ فحسب
+        foreach ($seed as $t => [$row, $marker]) {
+            $back = DB::table($t)->where('id', $ids[$t])->first();
+            $this->assertNotNull($back, "صفُّ «{$t}» لم يعُد بالاستعادة — الجولةُ مبتورة");
+            $this->assertSame((string) $row[$marker], (string) $back->{$marker},
+                "علامةُ «{$t}.{$marker}» انحرفت في الجولة — قيمةٌ ضاعت أو انزلقت");
+        }
+    }
+
     /** (٥) الإعدادات المستعادة تسري فوراً لا بعد انتهاء الخبيئة */
     public function test_restore_busts_the_settings_cache(): void
     {
