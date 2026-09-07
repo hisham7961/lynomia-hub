@@ -33,6 +33,10 @@ class HubBackup extends Command
         'flows', 'kpi_defs', 'webhooks', 'inbound_hooks', 'api_tokens', 'sign_templates', 'sign_requests',
         'quote_lines', 'quote_milestones', 'dashboards', 'dashboard_widgets', 'saved_views', 'work_hours',
         'webauthn_credentials', 'user_devices', 'asset_custody', 'record_identifiers', 'identity_lookups',
+        // (الطور F · WP-F.1) المحطاتُ وتاريخُ إسنادها — `stations` وحدةُ سجلٍّ فتُغطَّى
+        // ضمناً، لكنها هنا صراحةً؛ و`station_assignments` سجلُّ حركاتٍ ليس وحدةً فيلزم
+        // إدراجُه خاماً وإلا استُعيدت المحطاتُ بلا تاريخِ من جلس عليها ومتى أُخلي.
+        'stations', 'station_assignments',
         'inbox_documents', 'metric_points', 'audit_chain', 'signal_states', 'change_orders', 'screenshots',
         // (الطور ٤ · WP-4.1) نتائجُ الأمن: حالةُ حَوكمةٍ لا تليمتري — أعمارُ المشكلات
         // (first_seen/resolved) وإقراراتُها لا تُعاد تعبئتُها من الفحوص، فتُنسخ خاماً.
@@ -71,6 +75,11 @@ class HubBackup extends Command
         // فلولا إدراجُه لعادت المنشأةُ بمحافظِ عهدةٍ فارغةٍ (رصيدٌ صفريٌّ زائف) عند
         // الاستعادة. حركةٌ ثابتةٌ لا تُعاد بنقر المستخدمين، فتُنسخ خاماً.
         'employee_custody_moves',
+        // ── Work OS: الطور F (WP-F.3 · §32) ── جلساتُ الجرد ولقطتُها ومسحاتُها:
+        // خارجَ سجل الوحدات (لا `table` في hub_modules)، ولقطةٌ مجمَّدةٌ لا تُعاد بناؤها
+        // من الأصولِ الحيّة (فالأصلُ تبدّل بعد التجميد)، ومسحاتٌ مختومةٌ بالماسِح لا تُعاد
+        // اشتقاقاً — فلولا إدراجُها لعادت المنشأةُ بلا جلساتِ جردٍ ولا أثرِ من مسح ومتى.
+        'inventory_sessions', 'inventory_items', 'inventory_scans',
     ];
 
     /** قراءةُ ملف نسخةٍ (مشفَّرٍ أو صريح) وإعادتُه مصفوفةً — أو null إن تعذّر */

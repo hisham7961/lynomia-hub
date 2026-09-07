@@ -120,6 +120,12 @@ class Asset extends Model
         return $this->belongsTo(\App\Models\User::class, 'holder_id');
     }
 
+    /** المقعدُ الذي يعيش عليه الأصل — منفصلٌ عن الحائز (Work OS · الطور F · WP-F.2) */
+    public function station(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Station::class, 'station_id');
+    }
+
     /** سجلُّ الحيازة: من حملها ومتى — الأثرُ الذي لا يحمله `holder_id` */
     public function custodyLog(): \Illuminate\Database\Eloquent\Relations\HasMany
     {

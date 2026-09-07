@@ -40,6 +40,201 @@ class Custody
         'خروج نهائي'  => 'خروجٌ بلا عودة (بيعٌ أو إتلافٌ أو ردٌّ للمورد) — يُستبعَد الأصل ويُختم تاريخُ استبعاده.',
     ];
 
+    /* ══════════ دورةُ حياة الأصل (Work OS · الطور F · WP-F.2 · §29–31 · C11) ══════════ */
+
+    /**
+     * **الحالاتُ الإحدى عشرة** — القائمةُ المرجعُ الوحيدة، تُعكَس في خيارات
+     * `config/hub.php` (يحرس التطابقَ `WorkOsAssetUpgradeTest`). الحالةُ حقلٌ
+     * **مقفل**: تُكتَب عبر هذا الصنف وحدَه (`transition`/`move`/`permit`)، لا من
+     * نموذج CRUD العامّ ولا من سحب الكانبان — فلا حالةَ إلا بانتقالٍ شرعيّ مُدقَّق.
+     *
+     * الخمسُ الأُولى هي حالاتُ ما قبل الطور F (`LEGACY_STATUSES`) وتبقى **قيمها
+     * كما هي** — توافقٌ رجعيٌّ تامّ (§86): بياناتٌ ومسارٌ قديمان يعملان بلا مساس.
+     */
+    public const STATUSES = [
+        // ── الخمسُ القديمة (تبقى حرفاً — أساسُ التوافق الرجعيّ) ──
+        'قيد الاستخدام',   // بيد حائزٍ أو على محطةٍ عاملة
+        'متاح',            // في المخزن جاهزٌ للإسناد
+        'صيانة',           // قيد الإصلاح
+        'تالف',            // معطوبٌ ينتظر قراراً (إصلاحٌ أو استبعاد) — **مفتوحة**
+        'مستبعد',          // خرج من الخدمة نهائياً — **نهائيّة**
+        // ── الستُّ الجديدة (الطور F) ──
+        'قيد الطلب',       // مطلوبٌ لم يُستلَم بعد
+        'محجوز',           // مخصَّصٌ لجهةٍ لم يُسلَّم بعد
+        'خارج مؤقتاً',      // خارج المقرّ بموعد عودة (تصريحُ خروجٍ مؤقت)
+        'مفقود',           // غير موجودٍ يحتاج تحرّياً/شطباً — **مفتوحة**
+        'مباع',            // بِيع — **نهائيّة**
+        'مُعاد للمورد',    // رُدَّ للمورد/الضمان — **نهائيّة**
+    ];
+
+    /** الحالاتُ الخمس السابقة للطور F — تبقى عاملةً قيمةً وتصنيفاً (§86) */
+    public const LEGACY_STATUSES = ['قيد الاستخدام', 'متاح', 'صيانة', 'تالف', 'مستبعد'];
+
+    /**
+     * **مُرادفاتُ التوافق الرجعيّ:** صيغٌ حرّةٌ قديمةٌ محتملةٌ في بياناتٍ مُرحَّلة
+     * تُحلُّ لقيمتها المعياريّة. الخمسُ القديمةُ **قيمٌ معياريّةٌ بذاتها** (لا تُرحَّل)،
+     * وهذه لالتقاط ما كُتب بصيغةٍ مغايرة. والتشكيلُ/الهمزاتُ يحلُّها `hub_ar_norm`.
+     */
+    public const STATUS_ALIASES = [
+        'مستخدم'       => 'قيد الاستخدام',
+        'قيد التشغيل'  => 'قيد الاستخدام',
+        'متوفر'        => 'متاح',
+        'في الصيانة'   => 'صيانة',
+        'معطل'         => 'تالف',
+        'خارج الخدمة'  => 'مستبعد',
+        'ضائع'         => 'مفقود',
+        'مفقودة'       => 'مفقود',
+        'مُعاد'         => 'مُعاد للمورد',
+    ];
+
+    /**
+     * **خريطةُ الانتقال:** من كلِّ حالةٍ إلى الحالاتِ المشروعةِ بعدها فقط — فلا
+     * تُبلَغ حالةٌ إلا بانتقالٍ صحيح (`transition`). الحالاتُ النهائيّةُ الثلاث
+     * (مستبعد/مباع/مُعاد للمورد) بلا مخرج — لا رجوعَ من الاستبعاد. والحالةُ المعدومة
+     * (أصلٌ لم يُصنَّف) تدخل `ENTRY_STATES` أوّلَ مرةٍ (`canTransition`).
+     */
+    public const TRANSITIONS = [
+        'قيد الطلب'      => ['متاح', 'محجوز', 'مُعاد للمورد', 'مفقود'],
+        'متاح'          => ['محجوز', 'قيد الاستخدام', 'صيانة', 'خارج مؤقتاً', 'تالف', 'مفقود', 'مستبعد', 'مباع', 'مُعاد للمورد'],
+        'محجوز'         => ['متاح', 'قيد الاستخدام'],
+        'قيد الاستخدام' => ['متاح', 'صيانة', 'خارج مؤقتاً', 'تالف', 'مفقود', 'مستبعد'],
+        'صيانة'         => ['متاح', 'قيد الاستخدام', 'تالف', 'مستبعد', 'مُعاد للمورد'],
+        'خارج مؤقتاً'    => ['متاح', 'قيد الاستخدام', 'مفقود', 'تالف', 'مستبعد'],
+        'تالف'          => ['صيانة', 'مستبعد', 'مباع', 'مُعاد للمورد'],
+        'مفقود'         => ['متاح', 'قيد الاستخدام', 'مستبعد'],
+        'مستبعد'        => [],   // نهائيّة — لا رجوع
+        'مباع'          => [],   // نهائيّة
+        'مُعاد للمورد'   => [],   // نهائيّة
+    ];
+
+    /**
+     * **حالاتُ الدخول:** ما يجوز أن تبدأ به دورةُ حياة أصلٍ لم تُصنَّف بعد (حالةٌ
+     * معدومة). الحالةُ مقفلةٌ عن CRUD، فأصلٌ حديثٌ يبدأ بلا حالة (مفتوح)؛ ثم يُصنَّف
+     * أولَ مرةٍ عبر `transition` إلى إحدى هذه: مطلوبٌ بعد، أو في المخزن، أو محجوز.
+     */
+    public const ENTRY_STATES = ['قيد الطلب', 'متاح', 'محجوز'];
+
+    /**
+     * القيمةُ المعياريّة لحالةٍ مُدخَلة: تُقبل المعياريّةُ كما هي، ثم المُرادفُ
+     * المُعلَن، ثم مطابقةٌ مُطبَّعة (تشكيل/همزات) — فقيمةٌ قديمةٌ بصورةٍ أخرى تُحلّ
+     * لقيمتها. المجهولةُ تُعاد كما هي فيرفضها المتحقّق. الفارغةُ → null.
+     */
+    public static function canonicalStatus(?string $s): ?string
+    {
+        $s = trim((string) $s);
+        if ($s === '') return null;
+        if (in_array($s, self::STATUSES, true)) return $s;
+        if (isset(self::STATUS_ALIASES[$s])) return self::STATUS_ALIASES[$s];
+
+        $n = hub_ar_norm($s);
+        foreach (self::STATUS_ALIASES as $alias => $canon) {
+            if (hub_ar_norm($alias) === $n) return $canon;
+        }
+        foreach (self::STATUSES as $canon) {
+            if (hub_ar_norm($canon) === $n) return $canon;
+        }
+
+        return $s;
+    }
+
+    /**
+     * هل الانتقالُ من حالةٍ إلى أخرى مشروع؟ الحالةُ المعدومة (أصلٌ لم يُصنَّف) تدخل
+     * إحدى `ENTRY_STATES` فقط (مطلوب/متاح/محجوز)؛ وما عداها يتبع `TRANSITIONS`.
+     * الثباتُ (الحالةُ نفسُها) مقبولٌ (idempotent).
+     */
+    public static function canTransition(?string $from, ?string $to): bool
+    {
+        $to = self::canonicalStatus($to);
+        if ($to === null || ! in_array($to, self::STATUSES, true)) return false;
+
+        $from = self::canonicalStatus($from);
+        if ($from === null) return in_array($to, self::ENTRY_STATES, true);   // تصنيفٌ أوّل
+        if (! in_array($from, self::STATUSES, true)) $from = 'متاح';          // قيمةٌ قديمةٌ لا تُعرَف → مبدأٌ متاح
+        if ($from === $to) return true;                                       // ثباتٌ (idempotent)
+
+        return in_array($to, self::TRANSITIONS[$from] ?? [], true);
+    }
+
+    /**
+     * **تغييرُ حالة الأصل — الطريقُ الوحيدُ المقفل المُدقَّق (C11).** الحالةُ حقلٌ
+     * مقفلٌ عن CRUD؛ فتغييرُها يمرّ هنا: معاملةٌ واحدةٌ تُقفل الأصلَ (`lockForUpdate`)
+     * فلا يتسابق معالجان، وتتحقّق من مشروعيّة الانتقال (`canTransition`) قبل الكتابة،
+     * وتكتب صفَّ حركةٍ في السجل يحفظ «من ← إلى» — فلا حالةَ تتبدّل بلا أثر ولا قفزةَ
+     * تتخطّى الخريطة. انتقالٌ غير مشروعٍ يرمي `InvalidArgumentException` (٤٢٢ في المتحكّم).
+     */
+    public static function transition(Asset $a, string $to, string $at,
+                                      ?string $note = null, array $ctx = []): AssetCustody
+    {
+        return DB::transaction(function () use ($a, $to, $at, $note, $ctx) {
+            $locked = Asset::whereKey($a->id)->lockForUpdate()->firstOrFail();
+
+            $from = self::canonicalStatus($locked->status);
+            $canon = self::canonicalStatus($to);
+            if (! self::canTransition($from, $to)) {
+                throw new \InvalidArgumentException(
+                    'انتقالُ حالةٍ غير مشروع: «' . ($from ?? '—') . '» ⟵ «' . ((string) $to) . '»');
+            }
+
+            $entry = AssetCustody::create([
+                'asset_id'   => $locked->id,
+                'user_id'    => $locked->holder_id,      // من يحمله حين تغيّرت حالتُه (أثرٌ لا حائزٌ جديد)
+                'station_id' => $locked->station_id,
+                'company_id' => $locked->company_id,
+                'action'     => 'تغيير حالة',
+                'at'         => substr($at, 0, 10),
+                'note'       => $note === null || $note === '' ? null : hub_fit($note, 500),
+                'by_id'      => auth()->id(),
+                'meta'       => ['from' => $from, 'to' => $canon],
+                'project_id' => $ctx['project_id'] ?? null,
+                'client_id'  => $ctx['client_id'] ?? ($locked->client_id ?: null),
+            ]);
+
+            $locked->status = $canon;
+            $locked->save();
+            $a->setRawAttributes($locked->getAttributes(), true);
+
+            return $entry;
+        });
+    }
+
+    /**
+     * **إسنادُ الأصل لمحطةٍ (أو إخلاؤه منها) — عبر Custody وحدَها (قاعدةُ الطور F).**
+     * المقعدُ (`station_id`) حقلٌ مقفلٌ عن CRUD؛ فتغييرُه يمرّ هنا: معاملةٌ مقفلةٌ
+     * (`lockForUpdate`) تكتب صفَّ حركةٍ في السجل (`إسناد لمحطة`/`إخلاء من محطة`)
+     * **وتحدّث** `assets.station_id` معاً — الأثرُ والحالةُ أو لا شيء.
+     *
+     * `station_id` عمودٌ **منفصلٌ عن holder_id**: أصلٌ قد يكون بيد موظفٍ وعلى محطةٍ
+     * معاً، وإسنادُه لمحطةٍ لا يمسّ حائزَه ولا حالتَه (لا إجبار §30). `$stationId=null`
+     * إخلاءٌ من المحطة.
+     */
+    public static function assignStation(Asset $a, ?string $stationId, string $at,
+                                         ?string $note = null, array $ctx = []): AssetCustody
+    {
+        return DB::transaction(function () use ($a, $stationId, $at, $note, $ctx) {
+            $locked = Asset::whereKey($a->id)->lockForUpdate()->firstOrFail();
+
+            $entry = AssetCustody::create([
+                'asset_id'   => $locked->id,
+                'user_id'    => null,                    // إسنادُ مقعدٍ لا حائزٌ شخص
+                'station_id' => $stationId,
+                'company_id' => $locked->company_id,
+                'action'     => $stationId === null ? 'إخلاء من محطة' : 'إسناد لمحطة',
+                'at'         => substr($at, 0, 10),
+                'note'       => $note === null || $note === '' ? null : hub_fit($note, 500),
+                'by_id'      => auth()->id(),
+                'meta'       => ['from_station' => $locked->station_id, 'to_station' => $stationId],
+                'project_id' => $ctx['project_id'] ?? null,
+                'client_id'  => $ctx['client_id'] ?? ($locked->client_id ?: null),
+            ]);
+
+            $locked->station_id = $stationId;
+            $locked->save();
+            $a->setRawAttributes($locked->getAttributes(), true);
+
+            return $entry;
+        });
+    }
+
     /** سجل الأصناف كما هو */
     public static function cats(): array
     {
@@ -174,6 +369,9 @@ class Custody
             $entry = AssetCustody::create([
                 'asset_id'   => $a->id,
                 'user_id'    => $userId,
+                // المحطةُ الحاليّةُ للأصل تُختم في صفِّ الحركة (أثرٌ لا إسناد):
+                // تسليمٌ لموظفٍ لا يمسّ المقعد — المقعدُ يُغيَّر بـassignStation وحدَها
+                'station_id' => $ctx['station_id'] ?? ($a->station_id ?: null),
                 'company_id' => $a->company_id,
                 'action'     => $action,
                 'at'         => $at,

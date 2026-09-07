@@ -4548,6 +4548,18 @@ return [
                     'locked' => true,   // يُكتب من دفتر العهدة (تسليم/استرداد) وحده — لا من النموذج العامّ بلا قيدٍ (ARCH-01, v2.399)
                 ],
                 [
+                    // (Work OS · الطور F · WP-F.2 · §30) المقعدُ الذي يعيش عليه الأصل —
+                    // **منفصلٌ عن holder_id**: أصلٌ يُسنَد لموظفٍ أو لمحطةٍ أو لكليهما (لا
+                    // إجبار). **مقفلٌ** يُكتَب عبر `Custody::assignStation` المقفلة المُدقَّقة
+                    // وحدَها لا من النموذج العامّ (نظيرُ holder_id · قاعدةُ الطور F الأمنيّة).
+                    'key' => 'stationId',
+                    'col' => 'station_id',
+                    'label' => 'المحطة',
+                    'type' => 'ref',
+                    'ref' => 'stations',
+                    'locked' => true,
+                ],
+                [
                     'key' => 'loc',
                     'col' => 'loc',
                     'label' => 'الموقع / الراك',
@@ -4579,17 +4591,18 @@ return [
                     'expiry' => true,
                 ],
                 [
+                    // (Work OS · الطور F · WP-F.2 · §29–31 · C11) دورةُ حياةٍ أغنى:
+                    // إحدى عشرة حالةً مصدرُها الوحيد `Custody::STATUSES` (الخمسُ القديمةُ
+                    // تبقى حرفاً — توافقٌ رجعيّ §86). و**مقفلةٌ**: تُكتَب عبر `Custody`
+                    // وحدَها (transition/move/permit) بانتقالٍ شرعيٍّ مُدقَّق — لا من هذا
+                    // النموذج ولا من سحب الكانبان (locked ⟵ hub_field_mode='ro'). العمود
+                    // string(80) واسعٌ أصلاً (لا ALTER · درسُ C10). NOTE: openapi يُعاد توليدُه.
                     'key' => 'status',
                     'col' => 'status',
                     'label' => 'الحالة',
                     'type' => 'sel',
-                    'options' => [
-                        'قيد الاستخدام',
-                        'متاح',
-                        'صيانة',
-                        'تالف',
-                        'مستبعد',
-                    ],
+                    'options' => \App\Support\Custody::STATUSES,
+                    'locked' => true,
                 ],
                 [
                     'key' => 'maint',
@@ -4629,6 +4642,138 @@ return [
                 'serial',
                 'loc',
                 'vendor',
+            ],
+        ],
+        // ── المحطات (Work OS · الطور F · WP-F.1 · §25–27) — المقعدُ الدائم ──
+        // وحدةٌ مُدارةٌ بالبيانات فوق ModuleController (CRUD/scope مجّاناً)، **داخليّةٌ
+        // فقط**: بلا حقلِ عميلٍ عمداً — فلا يعزلها hub_scope بعميل، والعزلُ الصلبُ عن
+        // حساب العميل في PortalGuard (ليست في قائمته البيضاء → ٤٠٤). العزلُ بين
+        // الشركات عبر حقل companyId (رصيفُ hub_company_col). الكودُ وcurrent_employee
+        // مقفلان: الأولُ يُولَّد (Station::nextCode)، والثاني يُكتَب عبر مسار الإسناد
+        // المقفل وحدَه (StationController على نمط Custody::move) — لا CRUD عامٌّ عليه.
+        'stations' => [
+            'key' => 'stations',
+            'table' => 'stations',
+            'model' => 'Station',
+            'label' => 'المحطات',
+            'display' => 'code',
+            'status' => 'status',
+            'columns' => [
+                'code',
+                'facility',
+                'zone',
+                'desk',
+                'type',
+                'dept',
+                'currentEmployeeId',
+                'status',
+            ],
+            'fields' => [
+                [
+                    'key' => 'code',
+                    'col' => 'code',
+                    'label' => 'كود المحطة',
+                    'type' => 'text',
+                    // يولّده النظام (Station::nextCode) ويُطبَع على الملصق ويُمسَح
+                    // بـs/{code} — فلا يُكتب يدوياً من CRUD ولا API (نمطُ assets.code).
+                    'locked' => true,
+                ],
+                [
+                    'key' => 'facility',
+                    'col' => 'facility',
+                    'label' => 'المبنى / المنشأة',
+                    'type' => 'text',
+                ],
+                [
+                    'key' => 'floor',
+                    'col' => 'floor',
+                    'label' => 'الطابق',
+                    'type' => 'text',
+                ],
+                [
+                    'key' => 'zone',
+                    'col' => 'zone',
+                    'label' => 'المنطقة',
+                    'type' => 'text',
+                ],
+                [
+                    'key' => 'room',
+                    'col' => 'room',
+                    'label' => 'الغرفة',
+                    'type' => 'text',
+                ],
+                [
+                    'key' => 'desk',
+                    'col' => 'desk',
+                    'label' => 'المكتب / الرقم',
+                    'type' => 'text',
+                ],
+                [
+                    'key' => 'type',
+                    'col' => 'type',
+                    'label' => 'النوع',
+                    'type' => 'sel',
+                    'options' => [
+                        'مكتب',
+                        'استقبال',
+                        'مختبر',
+                        'قاعة اجتماعات',
+                        'مستودع',
+                        'ميداني',
+                        'أخرى',
+                    ],
+                ],
+                [
+                    'key' => 'dept',
+                    'col' => 'dept',
+                    'label' => 'القسم',
+                    'type' => 'text',
+                ],
+                [
+                    'key' => 'companyId',
+                    'col' => 'company_id',
+                    'label' => 'الشركة',
+                    'type' => 'ref',
+                    'ref' => 'companies',
+                ],
+                [
+                    'key' => 'projectId',
+                    'col' => 'project_id',
+                    'label' => 'المشروع',
+                    'type' => 'ref',
+                    'ref' => 'projects',
+                ],
+                [
+                    'key' => 'currentEmployeeId',
+                    'col' => 'current_employee_id',
+                    'label' => 'المُسنَد إليه الآن',
+                    'type' => 'ref',
+                    'ref' => 'users',
+                    // يُكتب من مسار الإسناد/الإخلاء المقفل وحدَه (StationController)،
+                    // لا من النموذج العامّ بلا قيدٍ — فكلُّ تغييرِ مقعدٍ مُدقَّق (نمطُ assets.holderId).
+                    'locked' => true,
+                ],
+                [
+                    'key' => 'status',
+                    'col' => 'status',
+                    'label' => 'الحالة',
+                    'type' => 'sel',
+                    'options' => [
+                        'متاحة',
+                        'مشغولة',
+                        'محجوزة',
+                        'صيانة',
+                        'معطّلة',
+                    ],
+                ],
+            ],
+            'search' => [
+                'code',
+                'facility',
+                'zone',
+                'room',
+                'desk',
+                'dept',
             ],
         ],
         'assetlog' => [
@@ -7152,6 +7297,9 @@ return [
                         'users',
                         // أوامرُ التغيير: تنبيهٌ على المعلَّق «قيد الاعتماد» طويلاً
                         'changeorders',
+                        // (Work OS · الطور F · WP-F.1) المحطات: قاعدةُ تنبيهٍ على
+                        // الحالة/الإشغال (مقعدٌ في «صيانة» طويلاً مثلاً)
+                        'stations',
                     ],
                 ],
                 [
@@ -8526,6 +8674,20 @@ return [
             ['on' => 'charged',  'emit' => 'custody.charged',  'label' => 'شُحنت عهدةُ موظف'],
             ['on' => 'approved', 'emit' => 'custody.approved', 'label' => 'اعتُمد مصروفُ عهدة'],
             ['on' => 'reversed', 'emit' => 'custody.reversed', 'label' => 'عُكست حركةُ عهدة'],
+        ],
+        // (Work OS · الطور F · WP-F.1 · §26) أحداثُ المحطة — يُطلقها
+        // StationController::assign/vacate عبر FlowRunner::fire داخلَ معاملةِ الإسنادِ
+        // المقفلة (نمطُ custody أعلاه: بلا `to` — حركةُ مقعدٍ لا تحوّلَ حالةٍ في CRUD).
+        // NOTE openapi: أسماءٌ دلاليّةٌ جديدة (station.assigned/station.vacated).
+        'stations' => [
+            ['on' => 'assigned', 'emit' => 'station.assigned', 'label' => 'أُسنِدت محطةٌ لموظف'],
+            ['on' => 'vacated',  'emit' => 'station.vacated',  'label' => 'أُخليت محطة'],
+        ],
+        // (Work OS · الطور F · WP-F.3 · §32) حدثُ الجرد — يُطلقه InventoryController::close
+        // عبر FlowRunner::fire (بلا `to` — إغلاقُ جلسةٍ لا تحوّلَ حالةٍ في CRUD؛ الجلسةُ ليست
+        // وحدةَ hub.modules). NOTE openapi: اسمٌ دلاليٌّ جديد (inventory.session_closed).
+        'inventory' => [
+            ['on' => 'session_closed', 'emit' => 'inventory.session_closed', 'label' => 'أُغلقت جلسةُ جرد'],
         ],
         'contracts' => [
             ['on' => 'status', 'to' => ['ساري'], 'emit' => 'contract.signed', 'label' => 'سرى عقد'],

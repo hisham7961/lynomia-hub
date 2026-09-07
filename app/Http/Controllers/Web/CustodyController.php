@@ -217,6 +217,78 @@ class CustodyController extends Controller
         return back()->with('ok', '📦 سُجّل الاسترداد — عاد الأصل «متاحاً» بلا حائز');
     }
 
+    /* ────────── تغييرُ حالة الأصل: مقفلٌ يُكتَب عبر Custody وحدَها (§29–31 · C11) ────────── */
+
+    /**
+     * تغييرُ حالة الأصل — الحالةُ حقلٌ **مقفل** (لا يُكتَب من النموذج العامّ ولا من
+     * سحب الكانبان)، فتغييرُها يمرّ هنا: `Custody::transition` تتحقّق من مشروعيّة
+     * الانتقال (خريطةُ الحالات) في معاملةٍ مقفلةٍ وتكتب صفَّ حركةٍ يحفظ «من ← إلى».
+     * انتقالٌ غير مشروع ⟵ ٤٢٢ لا كتابةَ صامتة.
+     */
+    public function changeStatus(Request $r, string $id)
+    {
+        $a = $this->asset($id, 'e');
+
+        $d = $r->validate([
+            'status' => ['required', 'string', Rule::in(\App\Support\Custody::STATUSES)],
+            'at'     => 'required|date',
+            'note'   => 'nullable|string|max:500',
+        ], [], ['status' => 'الحالة', 'at' => 'التاريخ', 'note' => 'ملاحظة']);
+
+        $from = (string) $a->status;
+        try {
+            \App\Support\Custody::transition($a, $d['status'], substr($d['at'], 0, 10), $d['note'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            abort(422, $e->getMessage());
+        }
+
+        hub_audit('تغيير حالة أصل', 'assets', $a->id, (string) $a->name,
+            ['before' => ['الحالة' => $from ?: '—'], 'after' => ['الحالة' => $d['status']]]);
+
+        return back()->with('ok', '🔧 حُدِّثت الحالة إلى «' . $d['status'] . '»');
+    }
+
+    /* ────────── إسنادُ الأصل لمحطةٍ (أو إخلاؤه) — عبر Custody وحدَها ────────── */
+
+    /**
+     * إسنادُ الأصل لمحطةٍ أو إخلاؤه منها — `station_id` حقلٌ **مقفل** يُكتَب عبر
+     * `Custody::assignStation` المقفلة المُدقَّقة وحدَها. المحطةُ تُنطَّق بشركة القارئ
+     * (`hub_scope`) فلا يُسنَد الأصلُ لمحطةِ شركةٍ أجنبية، والإسنادُ لا يمسّ الحائزَ
+     * ولا الحالة (لا إجبار §30). `station_id` فارغاً = إخلاءٌ من المحطة.
+     */
+    public function assignStation(Request $r, string $id)
+    {
+        $a = $this->asset($id, 'e');
+
+        $d = $r->validate([
+            'station_id' => ['nullable', 'uuid'],
+            'at'         => 'required|date',
+            'note'       => 'nullable|string|max:500',
+        ], [], ['station_id' => 'المحطة', 'at' => 'التاريخ', 'note' => 'ملاحظة']);
+
+        $stationId = null;
+        if (! empty($d['station_id'])) {
+            // المحطةُ بنطاق القارئ وشركته — محطةٌ أجنبيةٌ لا تُقبل (لا ٤٠٤ يكشف، بل تحقّقٌ)
+            $station = hub_company_scope(hub_scope(\App\Models\Station::query(), 'stations'), 'stations')
+                ->find($d['station_id']);
+            if (! $station) {
+                throw \Illuminate\Validation\ValidationException::withMessages(
+                    ['station_id' => 'المحطةُ غير موجودةٍ في نطاقك']);
+            }
+            $stationId = $station->id;
+        }
+
+        $was = $a->station_id;
+        \App\Support\Custody::assignStation($a, $stationId, substr($d['at'], 0, 10), $d['note'] ?? null);
+
+        hub_audit($stationId ? 'إسناد أصل لمحطة' : 'إخلاء أصل من محطة', 'assets', $a->id, (string) $a->name,
+            ['before' => ['المحطة' => $was ?: '—'], 'after' => ['المحطة' => $stationId ?: '—']]);
+
+        return back()->with('ok', $stationId
+            ? '🪑 أُسنِد الأصل إلى المحطة'
+            : '📤 أُخلي الأصل من المحطة');
+    }
+
     /* ────────── تصاريحُ النقل والخروج ────────── */
 
     public function permit(Request $r, string $id)

@@ -29,7 +29,10 @@ class OperationalSearchTest extends TestCase
      * يُثبَّت لكلِّ محرّكٍ رقمُه لا سقفٌ متساهلٌ يبتلع زيادةً على أحدهما. أيُّ
      * زيادةٍ هنا تعني أنّ مطابقةً تشغيليةً تسرّبت خارجَ نمطها إلى كل ضغطة مفتاح.
      */
-    private const PLAIN_BUDGET = ['sqlite' => 88, 'mysql' => 87, 'mariadb' => 87];
+    // +1 لكل محرّك مع وحدة `stations` القابلة للبحث (Work OS · الطور F · WP-F.1):
+    // البحثُ العاديّ يستعلم مرّةً واحدةً لكلّ وحدةٍ قابلةٍ للبحث — ووحدةٌ جديدةٌ = استعلامٌ
+    // واحدٌ متوقَّع، لا تسرّبٌ (حرّاسُ error_events/email أعلاه بلا مساس).
+    private const PLAIN_BUDGET = ['sqlite' => 89, 'mysql' => 88, 'mariadb' => 88];
 
     private const RID = '0198f0c2-77aa-4a11-9a1e-5f4d2b7c1e33';
     private const IP = '203.0.113.9';

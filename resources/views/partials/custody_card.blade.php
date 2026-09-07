@@ -114,6 +114,85 @@
     @endif
 </div>
 
+{{-- ── الحالة والمقعد: قيمتان مقفلتان تُكتبان عبر Custody وحدَها (الطور F · WP-F.2 · C11) ── --}}
+@php
+    $cuStatus  = (string) ($row->status ?? '');
+    $cuCanon   = \App\Support\Custody::canonicalStatus($cuStatus);
+    // الحالاتُ المشروعةُ بعد الحالة الحالية فقط — لا قائمةٌ كاملةٌ تُغري بقفزةٍ ممنوعة
+    $cuTargets = $cuCanon === null
+        ? \App\Support\Custody::ENTRY_STATES
+        : (\App\Support\Custody::TRANSITIONS[$cuCanon] ?? []);
+    $cuStation = $row->station_id ? (hub_ref_labels('stations', [$row->station_id])[$row->station_id] ?? '—') : null;
+@endphp
+<div class="card">
+    <h3 class="cardtitle">🔧 الحالة والمقعد
+        <span class="bdg {{ hub_is_closed($cuStatus) ? 'g' : 'ok' }}">{{ $cuStatus ?: 'غير مصنّف' }}</span>
+        @if ($cuStation)<span class="bdg">🪑 {{ \Illuminate\Support\Str::limit($cuStation, 40) }}</span>@endif
+    </h3>
+
+    @if ($cuCan)
+        <div class="two-forms">
+            {{-- تغييرُ الحالة عبر انتقالٍ شرعيّ (لا من النموذج العامّ ولا سحب الكانبان) --}}
+            <form method="POST" action="{{ route('custody.status', $row->id) }}">
+                @csrf
+                <div class="sub" style="margin-bottom:7px">🔧 <b>تغيير الحالة</b> — بانتقالٍ شرعيٍّ مُدقَّق فحسب.</div>
+                @if (! count($cuTargets))
+                    <div class="sub">حالةٌ نهائيّة «{{ $cuStatus }}» — لا انتقالَ بعدها.</div>
+                @else
+                    <div class="fg">
+                        <div class="fld">
+                            <label for="cu-status">الحالة الجديدة</label>
+                            <select class="inp" id="cu-status" name="status" required>
+                                <option value=""></option>
+                                @foreach ($cuTargets as $st)
+                                    <option value="{{ $st }}">{{ $st }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="fld">
+                            <label for="cu-sat">التاريخ</label>
+                            <input class="inp" id="cu-sat" type="date" name="at" value="{{ $cuToday }}" required>
+                        </div>
+                        <div class="fld fw">
+                            <label for="cu-snote">ملاحظة (اختياري)</label>
+                            <input class="inp" id="cu-snote" name="note" maxlength="500">
+                        </div>
+                    </div>
+                    <button class="btn p sm" style="margin-top:10px">🔧 تحديث الحالة</button>
+                @endif
+            </form>
+
+            {{-- إسنادُ الأصل لمحطةٍ أو إخلاؤه — منفصلٌ عن الحائز، عبر Custody وحدَها --}}
+            <form method="POST" action="{{ route('custody.station', $row->id) }}">
+                @csrf
+                <div class="sub" style="margin-bottom:7px">🪑 <b>المقعد (المحطة)</b> — منفصلٌ عن الحائز؛ يُسنَد أو يُخلى.</div>
+                <div class="fg">
+                    <div class="fld">
+                        <label for="cu-station">المحطة</label>
+                        <select class="inp" id="cu-station" name="station_id">
+                            <option value="">— بلا محطة (إخلاء) —</option>
+                            @foreach (hub_ref_options_scoped('stations') as $sid => $sname)
+                                <option value="{{ $sid }}" @selected((string) $row->station_id === (string) $sid)>{{ $sname }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="fld">
+                        <label for="cu-stat">التاريخ</label>
+                        <input class="inp" id="cu-stat" type="date" name="at" value="{{ $cuToday }}" required>
+                    </div>
+                    <div class="fld fw">
+                        <label for="cu-stnote">ملاحظة (اختياري)</label>
+                        <input class="inp" id="cu-stnote" name="note" maxlength="500">
+                    </div>
+                </div>
+                <button class="btn sm" style="margin-top:10px">🪑 تحديث المقعد</button>
+            </form>
+        </div>
+    @else
+        <div class="sub">تغييرُ الحالة والمقعد يتطلّب صلاحية تعديل الأصول.</div>
+    @endif
+</div>
+
 {{-- ── المواصفات الداخلية: قالبٌ لكل صنف ── --}}
 <div class="card">
     <h3 class="cardtitle">⚙️ المواصفات الداخلية

@@ -7,6 +7,9 @@
     // قفل الحقل يسري على بطاقات البوابة كما على m.show (السطر 90): حقلٌ محجوبٌ
     // ('hide') على دور المُشاهِد لا يظهر هنا — لا لموظفٍ آخر ولا في «بوابتي».
     $fm = fn ($k) => hub_field_mode(auth()->user(), 'hr', $k) !== 'hide';
+    // (WP-F.4) وضعُ التبويبات في الملفّ الشامل: العهدةُ لها تبويبُها المستقلّ فلا
+    // تُكرَّر هنا. «بوابتي» غيرُ مبوَّبةٍ فتبقى العهدةُ ضمنَها كما كانت.
+    $hr360 = $hr360 ?? false;
 @endphp
 
 @if ($emp)
@@ -20,7 +23,9 @@
     @if ($pp !== null && $fm('passExp'))
         <div class="stat"><span class="ico">🛂</span><b class="{{ $pp < 90 ? 'txt-bad' : '' }}">{{ $pp < 0 ? 'منتهٍ!' : $pp . ' يوم' }}</b><span>انتهاء الجواز</span></div>
     @endif
-    @if ($self && $emp->salary && $fm('salary'))
+    {{-- الراتب: حقلٌ يحرسه field-mode — يراه المالكُ ومن لم يُحجب عنه في «بوابتي»
+         وفي الملفّ الشامل معاً (لا حجبٌ شاملٌ يزوّر العزل: الحجبُ صلاحيةٌ لا حذف). --}}
+    @if ($emp->salary && $fm('salary'))
         <div class="stat"><span class="ico">💵</span><b>{{ number_format((float) $emp->salary, 0) }}</b><span>الراتب الأساسي</span></div>
     @endif
 </div>
@@ -176,7 +181,7 @@
     </div>
     @endif
 
-    @if ($may['assets'])
+    @if (! $hr360 && $may['assets'])
     <div class="card kid">
         <h3>💻 العهدة والأجهزة</h3>
         <table class="mini">

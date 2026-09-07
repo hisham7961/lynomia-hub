@@ -55,6 +55,15 @@ use App\Http\Controllers\Web\UserController;
 use App\Http\Controllers\Web\WebhookController;
 use Illuminate\Support\Facades\Route;
 
+// ── مسحُ ملصق المحطة (s/{code}) — نظيرُ c/{code} للعهدة وp/{code} للمنتج
+//    (Work OS · الطور F · WP-F.1 · §26). **QR يتطلّب دخولاً**: بوسيطِ `auth`
+//    (الضيفُ يُحوَّل للدخول) وحرسُ العميل عبر PortalGuard (في مجموعة web) → ٤٠٤.
+//    مُقدَّمٌ عمداً على رابط المشاركة العام `s/{token}` أدناه، ومُقيَّدٌ بشكل كود
+//    المحطة (يحوي شرطة: ST-2026-0001) — بينما رمزُ المشاركة `Str::random(48)` بلا
+//    شرطة — فلا يتقاطعان، ولا يُكسَر رابطُ المشاركة القائم (إضافةٌ لا تغيير).
+Route::middleware('auth')->get('s/{code}', [\App\Http\Controllers\Web\StationController::class, 'byCode'])
+    ->where('code', '[A-Za-z0-9]+-[A-Za-z0-9-]+')->name('stations.code');
+
 // ── الوجه العام لغرفة البيانات (بلا تسجيل دخول — الرمز هو المفتاح) ──
 Route::get('s/{token}', [DataRoomController::class, 'show'])->name('share.show');
 Route::post('s/{token}', [DataRoomController::class, 'unlock'])->name('share.unlock')->middleware('throttle:10,1');
@@ -258,10 +267,24 @@ Route::middleware('auth')->group(function () {
         Route::post('{id}/specs', [\App\Http\Controllers\Web\CustodyController::class, 'saveSpecs'])->name('specs');
         Route::post('{id}/handover', [\App\Http\Controllers\Web\CustodyController::class, 'handover'])->name('handover');
         Route::post('{id}/recover', [\App\Http\Controllers\Web\CustodyController::class, 'recover'])->name('recover');
+        // (الطور F · WP-F.2 · §29–31 · C11) الحالةُ والمحطةُ حقلان مقفلان يُكتبان
+        // عبر Custody المقفلة المُدقَّقة وحدَها — لا من النموذج العامّ ولا سحب الكانبان
+        Route::post('{id}/status', [\App\Http\Controllers\Web\CustodyController::class, 'changeStatus'])->name('status');
+        Route::post('{id}/station', [\App\Http\Controllers\Web\CustodyController::class, 'assignStation'])->name('station');
         Route::post('{id}/permit', [\App\Http\Controllers\Web\CustodyController::class, 'permit'])->name('permit');
         Route::get('{id}/permit/{permitId}', [\App\Http\Controllers\Web\CustodyController::class, 'permitDoc'])->name('permit.doc');
         Route::post('{id}/permit/{permitId}/return', [\App\Http\Controllers\Web\CustodyController::class, 'permitReturn'])->name('permit.return');
         Route::post('{id}/permit/{permitId}/cancel', [\App\Http\Controllers\Web\CustodyController::class, 'permitCancel'])->name('permit.cancel');
+    });
+
+    // ── المحطات: الإسناد والإخلاء (Work OS · الطور F · WP-F.1 · §26) ──
+    // الـCRUD/العرض من m.* (وحدةُ stations في السجل). هذان المساران يكتبان شاغلَ
+    // المقعد عبر المعاملةِ المقفلةِ المُدقَّقة وحدَها (نمطُ Custody::move) — فحقلُ
+    // current_employee_id مقفلٌ عن CRUD. داخليّةٌ فقط: العميلُ ٤٠٤ (PortalGuard فوق
+    // المصفوفة)، والحرسُ في المتحكّم (stations:e + عزلُ الشركة). حدٌّ للمعدل كبقية الكتابة.
+    Route::middleware('throttle:60,1')->group(function () {
+        Route::post('stations/{id}/assign', [\App\Http\Controllers\Web\StationController::class, 'assign'])->name('stations.assign');
+        Route::post('stations/{id}/vacate', [\App\Http\Controllers\Web\StationController::class, 'vacate'])->name('stations.vacate');
     });
 
     // ── عهدةُ الموظف المالية (Work OS · الطور E · WP-E.3 · §19/§28/§98) ──
@@ -282,6 +305,23 @@ Route::middleware('auth')->group(function () {
             Route::post('settlement', [\App\Http\Controllers\Web\EmployeeCustodyController::class, 'settlement'])->name('settlement');
             Route::post('correct',    [\App\Http\Controllers\Web\EmployeeCustodyController::class, 'correct'])->name('correct');
             Route::post('{id}/reverse', [\App\Http\Controllers\Web\EmployeeCustodyController::class, 'reverse'])->name('reverse');
+        });
+    });
+
+    // ── جلساتُ الجرد (Work OS · الطور F · WP-F.3 · §32/§99) ──
+    // حاويةٌ يقودها InventoryController (لقطةٌ مجمَّدة → مسحٌ مُصادَق → مصالحة) فوق سكّتين
+    // قائمتين: `Custody::scoped` (الأصولُ المنطَّقة) و`Identity::resolve` (المحلِّلُ الموحّد).
+    // داخليّةٌ حصراً: `PortalGuard` قائمةٌ بيضاءُ لا تضمّ inventory.* → حسابُ العميل ٤٠٤ فوق
+    // المصفوفة. المتحكّمُ يحرس كلَّ مسارٍ بـ`hub_can('assets',...)`+عزلِ الشركة؛ والإغلاقُ/
+    // المصالحةُ الكتابيّة خلفَ `hub_require_stepup`. حدٌّ للمعدل على المسح كبقية الكتابة.
+    Route::prefix('inventory')->name('inventory.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Web\InventoryController::class, 'center'])->name('center');
+        Route::get('{id}', [\App\Http\Controllers\Web\InventoryController::class, 'show'])->name('show');
+        Route::middleware('throttle:120,1')->group(function () {
+            Route::post('freeze', [\App\Http\Controllers\Web\InventoryController::class, 'freeze'])->name('freeze');
+            Route::post('{id}/scan', [\App\Http\Controllers\Web\InventoryController::class, 'scan'])->name('scan');
+            Route::post('{id}/reconcile', [\App\Http\Controllers\Web\InventoryController::class, 'reconcile'])->name('reconcile');
+            Route::post('{id}/close', [\App\Http\Controllers\Web\InventoryController::class, 'close'])->name('close');
         });
     });
 
