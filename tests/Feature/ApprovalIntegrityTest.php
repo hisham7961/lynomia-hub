@@ -121,10 +121,17 @@ class ApprovalIntegrityTest extends TestCase
 
     public function test_decision_path_locks_inside_a_transaction(): void
     {
-        $src = file_get_contents(app_path('Http/Controllers/Web/ApprovalDecisionController.php'));
+        // المنطقُ انتقل إلى السكّة المشتركة `ApprovalService` (Mobile Readiness · الطور D ·
+        // Critic F2) كي يستدعيه الويبُ والجوالُ معاً بلا نسخٍ — والقفلُ والمعاملةُ معه.
+        $src = file_get_contents(app_path('Support/ApprovalService.php'));
         $this->assertStringContainsString('lockForUpdate', $src,
             'الحسم بلا قفل — معتمِدان متزامنان يجتازان فحص «معلّق» معاً');
         $this->assertStringContainsString('DB::transaction', $src,
             'الحسم بلا معاملة — سباق اعتماد/رفض ينفّذ ويكتب «مرفوض»');
+
+        // والمتحكّمُ لا يزال بابَ الويب: يفوّض للخدمة (لا معالجَ ويبٍ يُستدعى من الجوال)
+        $ctrl = file_get_contents(app_path('Http/Controllers/Web/ApprovalDecisionController.php'));
+        $this->assertStringContainsString('ApprovalService::decide', $ctrl,
+            'متحكّمُ الويب يجب أن يفوّض الحسمَ للخدمة المشتركة (F2)');
     }
 }

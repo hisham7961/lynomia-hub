@@ -502,10 +502,38 @@ class ModuleController extends Controller
     {
         [$def, $class] = $this->resolve($module, 'd');
         $m = $this->findScoped($class, $module, $id, 'only');
-        $m->restore();
-        $this->bustDerivedCache($module, $m);   // استعادةٌ تعيد السجل للحساب — أبطل المشتقّ
+        $this->performRestore($module, $m);
 
         return redirect()->route('m.index', [$module, 'trash' => 1])->with('ok', 'استُعيد السجل');
+    }
+
+    /**
+     * **جوهرُ الاستعادة من السلة** — يُعاد استعمالُه من الويب وسطح الجوال (الطور D · F2):
+     * استعادةٌ ثم إبطالُ الحساب المشتقّ (الاستعادةُ تعيد السجل للحساب).
+     */
+    public function performRestore(string $module, Model $m): void
+    {
+        $m->restore();
+        $this->bustDerivedCache($module, $m);
+    }
+
+    /**
+     * **جوهرُ استعادةِ نسخةٍ سابقة** — يُعاد استعمالُه من الويب وسطح الجوال (الطور D · F2):
+     * لقطةٌ خارجُ نطاقِ المستعيد لا تُعاد (نفسُ حرّاسِ التعديل)، ثم استعادةُ النسخة.
+     *
+     * يعيد رسالةَ خطأٍ (لقطةٌ خارج النطاق) أو null للنجاح؛ ويضع في `$restored` هل وُجدت
+     * النسخةُ فعلاً (بوّابةُ الموافقة تُحسم في المُنادي قبله · F3).
+     */
+    public function performRestoreVersion(string $module, Model $row, int $version, bool &$restored): ?string
+    {
+        if ($why = $this->snapshotScopeError($module, $row, $version)) {
+            $restored = false;
+
+            return $why;
+        }
+        $restored = (bool) $row->restoreVersion($version);
+
+        return null;
     }
 
     /** كانبان عام: أعمدة من خيارات الحالة، أو من القيم الفعلية إن لم تُعرّف */
@@ -611,33 +639,54 @@ class ModuleController extends Controller
 
         $m = $this->findScoped($class, $module, $id);
 
-        // السحب والإفلات كان يكتب عمود الحالة مباشرةً: لا فحصَ لصلاحية الحقل
-        // (فيُكتب عمودٌ «قراءة فقط» بجرّة إصبع) ولا تحقّقَ من الخيارات المعرَّفة
-        // (فتُزرع حالةٌ لا يعرفها السجل فلا تُعدّ في إحصاء ولا تُطلق أتمتة).
+        // جوهرُ الانتقال مشترَكٌ مع سطح الجوال (الطور D · Critic F2): الحرّاسُ نفسُها
+        // (قناعُ الحقل، الخياراتُ المعرَّفة، status_via_action، requires) ثم الختمُ والحفظ.
+        $this->applyStatusTransition($def, $module, $m, hub_str($r->input('status')));
+
+        return response()->json(['ok' => 1]);
+    }
+
+    /**
+     * **جوهرُ انتقالِ الحالة** — يُعاد استعمالُه من الويب (`setStatus`/السحب) ومن سطح
+     * الجوال (الطور D · تنفيذُ الإجراءات · Critic F2): الحرّاسُ (قناعُ الحقل، الخياراتُ
+     * المعرَّفة، `status_via_action`، `requires`) ثم الختمُ والحفظُ وإطلاقُ حدثِ الحالة.
+     *
+     * **بوّابةُ الموافقة تُحسم قبل هذا الجوهر (F3):** الويبُ عبر `hub_block_if_queued`
+     * (٤٢٢)، والجوالُ عبر تصفيفِ طلبٍ (`ApprovalService::submit`) — فالجوهرُ انتقالٌ صافٍ
+     * لا يعرف الموافقات. يعيد `['changed', 'from', 'to']`.
+     */
+    public function applyStatusTransition(array $def, string $module, Model $m, string $newStatus): array
+    {
+        $statusCol = hub_status_col($module);
+        abort_unless($statusCol, 404);
+
+        // قناعُ الحقل: عمودُ حالةٍ «قراءة فقط» لدور المستخدم لا يُكتب بجرّة إصبع
         $statusField = hub_status_field($module);
         $statusKey = (string) ($statusField['key'] ?? $statusCol);
         abort_if(hub_field_mode(auth()->user(), $module, $statusKey) !== '', 403,
             'حقل الحالة غير قابل للكتابة بصلاحيتك');
 
-        $new = hub_str($r->input('status'));
+        // خيارٌ غيرُ معرَّفٍ لا يُزرع (فلا يُعدّ في إحصاء ولا يُطلق أتمتة)
         $options = (array) ($statusField['options'] ?? []);
-        abort_if($options && ! in_array($new, $options, true), 422, 'حالة غير معرَّفة في هذه الوحدة');
-        // حالةٌ يعلنها السجلّ «تُشتقّ من فعل» (status_via_action) لا تُكتب بالسحب: كانت «مدفوعة»
+        abort_if($options && ! in_array($newStatus, $options, true), 422, 'حالة غير معرَّفة في هذه الوحدة');
+        // حالةٌ يعلنها السجلّ «تُشتقّ من فعل» (status_via_action) لا تُكتب مباشرةً: كانت «مدفوعة»
         // تُزرع بلا مبلغٍ مدفوع فتُطلق invoice.paid على فاتورةٍ لم تُدفع (ARCH-03, v2.399)
-        if ($why = ($def['status_via_action'][$new] ?? null)) abort(422, $why);
+        if ($why = ($def['status_via_action'][$newStatus] ?? null)) abort(422, $why);
 
         $prevStatus = $m->{$statusCol};
-        $m->{$statusCol} = $new;
-        // ── Control Plane: Phase 6 (WP-6.1) ── السحبُ لا يلتفّ على بوّابة «الحالة تتطلب حقولاً»
+        $m->{$statusCol} = $newStatus;
+        // ── Control Plane: Phase 6 (WP-6.1) ── بوّابةُ «الحالة تتطلب حقولاً» بعد الضبط
         $this->guardStatusRequires($def, $m);
         $this->stampTaskCompletion($module, $m, $prevStatus === null ? null : (string) $prevStatus);
         $m->save();
         $this->bustProgress($module, $m);
-        if ((string) $m->{$statusCol} !== (string) $prevStatus) {
+
+        $changed = (string) $m->{$statusCol} !== (string) $prevStatus;
+        if ($changed) {
             \App\Support\FlowRunner::fire('status', $module, $m, (string) $m->{$statusCol});
         }
 
-        return response()->json(['ok' => 1]);
+        return ['changed' => $changed, 'from' => $prevStatus, 'to' => (string) $m->{$statusCol}];
     }
 
     // ── Control Plane: Phase 6 (WP-6.1) ──
@@ -656,18 +705,37 @@ class ModuleController extends Controller
      */
     protected function guardStatusRequires(array $def, Model $m): void
     {
+        if ($rule = $this->statusRequiresRule($def, $m)) {
+            abort(422, $rule['why'] . ' — الناقص: ' . implode('، ', $rule['fields']));
+        }
+    }
+
+    /**
+     * **قاعدةُ «الحالة تتطلّب حقولاً» مُقيَّمةً على السجل** — جوهرٌ مقروءٌ استُخرج من
+     * `guardStatusRequires` (Mobile Readiness · الطور D · Critic F2): يعيد الحقولَ
+     * الناقصةَ و«لماذا» إن كانت قاعدةُ `requires` لحالةِ السجل **الحاليّة** تنطبق
+     * وتنقصها حقول؛ وإلا `null`. يُستدعى من:
+     *   · `guardStatusRequires` (الويبُ والـAPI والسحبُ والجماعيّ) — يُجهض ٤٢٢ به،
+     *   · معاينةُ إجراءاتِ الجوال (D.2) — تُسقط من الـallowlist انتقالاً محظوراً
+     *     (على نسخةٍ مستنسخةٍ حالتُها الهدف) **بلا تنفيذٍ ولا إجهاض**.
+     * فلا يُكرَّر منطقُ القاعدة في سطحين. الرسالةُ والإجهاضُ يبقيان حرفاً بحرف.
+     *
+     * @return array{fields:array<int,string>,why:string}|null
+     */
+    protected function statusRequiresRule(array $def, Model $m): ?array
+    {
         $reqs = (array) ($def['requires'] ?? []);
-        if (! $reqs) return;
+        if (! $reqs) return null;
 
         $fields = collect($def['fields'] ?? []);
         $col = fn (string $key) => $fields->firstWhere('key', $key)['col'] ?? $key;
 
         $rule = $reqs[(string) ($m->{$col((string) ($def['status'] ?? 'status'))} ?? '')] ?? null;
-        if (! $rule) return;
+        if (! $rule) return null;
 
         // شرطُ الانطباق (when): البوّابة لمن تلزمه وحده — الشدّةُ المنخفضة تمرّ
         foreach ((array) ($rule['when'] ?? []) as $k => $vals) {
-            if (! in_array((string) ($m->{$col($k)} ?? ''), (array) $vals, true)) return;
+            if (! in_array((string) ($m->{$col($k)} ?? ''), (array) $vals, true)) return null;
         }
 
         $missing = [];
@@ -676,10 +744,10 @@ class ModuleController extends Controller
                 $missing[] = (string) ($fields->firstWhere('key', $k)['label'] ?? $k);
             }
         }
-        if ($missing) {
-            abort(422, (string) ($rule['why'] ?? 'هذه الحالة تتطلب حقولاً قبل بلوغها')
-                . ' — الناقص: ' . implode('، ', $missing));
-        }
+
+        return $missing
+            ? ['fields' => $missing, 'why' => (string) ($rule['why'] ?? 'هذه الحالة تتطلب حقولاً قبل بلوغها')]
+            : null;
     }
 
     /** تصدير CSV بنفس فلاتر القائمة الحالية (BOM ليقرأ Excel العربية) */
@@ -946,10 +1014,12 @@ class ModuleController extends Controller
         }
 
         // (v2.399) لقطةٌ قديمة قد تحمل شركةً/عميلاً/مشروعاً خارج نطاق المستعيد — الاستعادةُ
-        // لا تُخرج السجلَّ من نطاقه: حارسُ الشركة والمشروع نفسُه الذي يمرّ به نموذجُ التعديل.
-        if ($why = $this->snapshotScopeError($module, $row, $version)) return back()->with('err', $why);
-
-        abort_unless($row->restoreVersion($version), 422, 'النسخة غير موجودة');
+        // لا تُخرج السجلَّ من نطاقه: حارسُ الشركة والمشروع نفسُه عبر السكّة المشتركة (الطور D · F2).
+        $restored = false;
+        if ($why = $this->performRestoreVersion($module, $row, $version, $restored)) {
+            return back()->with('err', $why);
+        }
+        abort_unless($restored, 422, 'النسخة غير موجودة');
 
         return back()->with('ok', "استُعيدت النسخة $version وحُفظت كنسخة جديدة");
     }
@@ -981,55 +1051,39 @@ class ModuleController extends Controller
     /* ────────── أدوات داخلية ────────── */
 
     /**
-     * العمليات المحمية: بدل التنفيذ يُصفّ طلب موافقة بحمولة التعديل،
-     * ويُشعَر المعتمدون — الملفات المرفوعة لا تُؤجل (تُستثنى من الحمولة).
+     * العمليات المحمية: بدل التنفيذ يُصفّ طلب موافقة بحمولة التعديل، ويُشعَر المعتمدون.
+     *
+     * المنطقُ (التقاطُ الحمولة المنقّاة + إنشاءُ الطلب + الإشعار) انتقل إلى السكّة
+     * المشتركة `ApprovalService::submit` (Mobile Readiness · الطور D · Critic F3) —
+     * يستدعيها الويبُ هنا فيعيد التوجيهَ كما كان، وتستدعيها الكتابةُ المحمية في الجوال
+     * فتعيد `APPROVAL_REQUIRED` بوجهةِ اعتماداتٍ بدل «نفّذها من الواجهة» المسدودة.
      */
     protected function queueApproval(array $def, string $module, string $op, Model $m, Request $r)
     {
-        $payload = null;
-        if ($op === 'e') {
-            // **التنقية عند الالتقاط لا عند التنفيذ**: الحمولة كانت تُلتقط خاماً
-            // ثم يعيد المعتمِد تشغيلها بصلاحياته هو — فمن لا يملك رؤية الراتب
-            // يضبطه بوكيلٍ يوقّع بحسن نية. ما لا يملك الطالب كتابته لا يدخل
-            // الطابور أصلاً، فلا يُوقَّع على ما لا يُرى.
-            $u = auth()->user();
-            $keys = collect($def['fields'])
-                ->reject(fn ($f) => in_array($f['type'], ['file', 'img'], true))
-                ->reject(fn ($f) => hub_field_mode($u, $module, (string) ($f['key'] ?? '')) !== '')
-                ->pluck('key')->push('custom')->all();
-            $payload = collect($r->only($keys))->filter(fn ($v) => $v !== null)->all();
-        }
-
-        $name = \Illuminate\Support\Str::limit((string) ($m->{hub_display_col($module)} ?? $m->id), 60);
-        // **نطاقٌ لكلّ معتمِد**: لا يُسنَد ولا يُشعَر باسمِ سجلٍّ خارج حدّه — المالكُ
-        // في المجموعة دوماً فلا تبقى الموافقةُ بلا مُسنَد. (تسريبُ اسمٍ عبر العزل.)
-        $approvers = hub_approvers_for($module, $m->id) ?: hub_approvers();
-
-        $ap = \App\Models\Approval::create([
-            'title'        => ($op === 'd' ? 'حذف ' : 'تعديل ') . $def['label'] . ': ' . $name,
-            'type'         => 'عملية محمية',
-            'reason'       => $r->input('_reason'),
-            'due'          => now()->addDays(3)->toDateString(),
-            'project_id'   => $m->project_id ?? null,
-            'approver_id'  => $approvers[0] ?? null,
-            'mod'          => $module,
-            'record_id'    => $m->id,
-            'op'           => $op,
-            'payload'      => $payload,
-            'requested_by' => auth()->id(),
-            'status'       => 'معلّق',
-            // نسخة السجل وقت الطلب — بها يُكشف عند الحسم أنّ أحداً عدّله في الطابور
-            'meta'         => ['ver' => (int) ($m->version ?? 0)],
-        ]);
-
-        foreach ($approvers as $uid) {
-            if ($uid === auth()->id()) continue;
-            hub_notify($uid, 'approval',
-                'طلب موافقة من ' . auth()->user()->name . ': ' . $ap->title, 'approvals', $ap->id);
-        }
+        \App\Support\ApprovalService::submit($def, $module, $op, $m, $r);
 
         return redirect()->route('m.index', $module)
             ->with('ok', 'هذه العملية محمية — أُرسل طلب الموافقة للمعتمدين وسيصلك إشعار بالقرار');
+    }
+
+    /**
+     * **إعادةُ حمولةِ موافقةٍ معتمدة على السجل** بمحرّك `fill` نفسِه — سِنُّ عرضٍ عامٌّ
+     * يستدعيه `ApprovalService::decide` (Mobile Readiness · الطور D · Critic F2). لا
+     * نسخَ لمنطق التعبئة: الكتابةُ محصورةٌ بمفاتيح الحمولة (المعتمِد وافق على **هذه**
+     * التغييرات)، ويُبطَل المشتقُّ إن تغيّر شيءٌ فعلاً. يعيد هل تغيّر السجلُّ حقّاً.
+     */
+    public function applyApprovedPayload(array $def, string $module, Model $m, array $payload): bool
+    {
+        $req = Request::create('/', 'POST', $payload);
+        $this->fill($def, $req, $m, array_keys($payload));
+        // لا يُقال «نُفّذ» وشيءٌ لم يُنفَّذ: حمولةٌ تطابق الحاضر تُحفظ بلا أثر
+        $did = $m->isDirty();
+        if ($did) {
+            $m->save();
+            $this->bustProgress($module, $m);
+        }
+
+        return $did;
     }
 
     /**

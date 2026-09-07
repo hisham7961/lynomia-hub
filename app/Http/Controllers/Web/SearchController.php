@@ -26,24 +26,45 @@ class SearchController extends Controller
         }
         if (mb_strlen($q) < 2) return response('');
 
+        return view('partials.searchmini', [
+            'flat' => array_slice($this->results($q, 3, 9), 0, 9), 'q' => $q,
+            'dests' => array_slice($this->destinations($q), 0, 4),
+            'acts' => $this->quickActions($q, 3),
+        ]);
+    }
+
+    /**
+     * **محرّكُ نتائجِ السجلات المُنطَّق** — سكّةٌ واحدةٌ يستدعيها عرضُ الويب (`mini`)
+     * وسطحُ الجوال (الطور D · البحث · Critic F2). لكلِّ وحدةٍ يراها المستخدمُ
+     * (`searchableModules`: `hub_can(v)` + موديلٌ موجود) استعلامٌ داخلَ نطاقه
+     * (`query`: `hub_scope` + `hub_client_scope` + `->search`), مرتَّبٌ حتميّاً
+     * (`created_at,id` — لا قرعة)، محدودٌ `$perModule` لكلِّ وحدة ومسقوفٌ بـ`$cap`.
+     *
+     * كلُّ نتيجةٍ نوعيّةٌ `{module, id, name, label}` — و`{module, id}` هي وجهةُ
+     * الرابط العميق نفسُها للجوال. لا يمسّ الصلاحيةَ ولا النطاق: يعيد ما يراه المستخدمُ
+     * فقط (لا IDOR).
+     *
+     * @return array<int,array{module:string,id:mixed,name:string,label:string}>
+     */
+    public function results(string $q, int $perModule = 3, int $cap = 9): array
+    {
+        $q = trim($q);
+        if (mb_strlen($q) < 2) return [];
+
         $flat = [];
         foreach ($this->searchableModules() as $key => $def) {
-            // ترتيبٌ صريح: limit بلا orderBy يجعل «أي ثلاثة تظهر» قرعةً بين المحرّكين
+            // ترتيبٌ صريح: limit بلا orderBy يجعل «أي عددٍ يظهر» قرعةً بين المحرّكين
             $rows = $this->query($key, $def, $q)
-                ->orderByDesc('created_at')->orderByDesc('id')->limit(3)->get();
+                ->orderByDesc('created_at')->orderByDesc('id')->limit($perModule)->get();
             $disp = hub_display_col($key);
             foreach ($rows as $row) {
                 $flat[] = ['module' => $key, 'id' => $row->id,
                            'name' => (string) $row->{$disp}, 'label' => $def['label']];
             }
-            if (count($flat) >= 9) break;
+            if (count($flat) >= $cap) break;
         }
 
-        return view('partials.searchmini', [
-            'flat' => array_slice($flat, 0, 9), 'q' => $q,
-            'dests' => array_slice($this->destinations($q), 0, 4),
-            'acts' => $this->quickActions($q, 3),
-        ]);
+        return $flat;
     }
 
     /**
@@ -349,6 +370,12 @@ class SearchController extends Controller
 
         // مساحةُ عمل العميل تصفّي البحثَ كما تصفّي القوائم — من يعمل في مساحة
         // «شركة أ» لا تقفز له نتائجُ عميلٍ آخر وهو يظن نفسه داخلها
-        return hub_client_scope(hub_scope($class::query()->search($term), $key), $key);
+        $q = hub_client_scope(hub_scope($class::query()->search($term), $key), $key);
+
+        // تضييقُ سياقِ الجوال النشط (X-Lynomia-Company/-Client) **فوق** النطاق —
+        // Mobile Readiness · الطور D · البحث (D.6): طبقةٌ (AND) على مجموعةٍ ⊆ المسموح
+        // فلا توسيعَ أبداً. على الويب لا سماتِ سياقٍ (لم يمرَّ `mobile.context`) فهي
+        // لا شيء (`company()`/`client()` تعيدان null) — سلوكُ الويب لم يتغيّر حرفاً.
+        return \App\Http\Middleware\MobileContext::apply($q, $key);
     }
 }

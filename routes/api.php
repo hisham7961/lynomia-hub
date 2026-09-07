@@ -81,3 +81,97 @@ Route::prefix('v1/endpoint')->middleware(['throttle:120,1', 'endpoint.signature'
     Route::get('agent/manifest', [\App\Http\Controllers\Api\EndpointProtocolController::class, 'agentManifest'])->name('endpoint.agent.manifest');
     Route::get('agent/download/{id}', [\App\Http\Controllers\Api\EndpointProtocolController::class, 'agentDownload'])->name('endpoint.agent.download');
 });
+
+/*
+ * ── سطحُ الجوال الأصيل (Mobile Readiness · الطور B · §109) ──
+ * نطاقٌ **مستقلٌّ** عن `/api/v1` (مفتاحُ التكامل) — لا يمسّه ولا يظلّله. جلسةُ
+ * الجوال زوجُ رمزَين (وصولٌ قصيرٌ + تحديثٌ متجدّدٌ لمرّة)، مفهومٌ غيرُ `ApiToken`.
+ *
+ * **الفصلُ إلى مجموعتين (Critic F5):**
+ *  • **عامّةٌ** (بلا `mobile.session`): دخولٌ/تحقّقٌ ثنائيٌّ/تحديثٌ/إعداداتٌ/صحّة —
+ *    لا رمزَ وصولٍ بعد. لكلٍّ خنقُه الخاصّ الضيّق (لا `throttle:api` الفضفاض
+ *    ٣٠٠/دقيقة · F4): دخولٌ `10,1` (نظيرُ الويب web.php:90)، تحقّقٌ ثنائيٌّ
+ *    `6,1` (نظيرُ الويب web.php:93)، تحديثٌ `20,1` ضيّق. و`refresh` يصادِق
+ *    بـ**رمز التحديث** في معالجه لا عبر `mobile.session` (التي تصادِق رمزَ الوصول).
+ *  • **مُصادَقةٌ** خلف `['throttle:api','mobile.session']` (الخنقُ قبل المصادقة،
+ *    نمطُ v1 أعلاه): خروجٌ/خروجٌ شامل/إدارةُ الجلسات/تصعيد.
+ *
+ * المساراتُ الحرفيّةُ كلُّها قبل أيّ catch-all (لا يوجد في الطور B — انضباطٌ
+ * محفوظٌ · F9). الأسماء `mobile.auth.*` (والعامّتان الخفيفتان `mobile.*`).
+ */
+Route::prefix('mobile/v1')->group(function () {
+    Route::post('auth/login', [\App\Http\Controllers\Api\MobileAuthController::class, 'login'])
+        ->middleware('throttle:10,1')->name('mobile.auth.login');
+    Route::post('auth/mfa/verify', [\App\Http\Controllers\Api\MobileAuthController::class, 'mfaVerify'])
+        ->middleware('throttle:6,1')->name('mobile.auth.mfa_verify');
+    Route::post('auth/refresh', [\App\Http\Controllers\Api\MobileAuthController::class, 'refresh'])
+        ->middleware('throttle:20,1')->name('mobile.auth.refresh');
+    Route::get('app-config', [\App\Http\Controllers\Api\MobileAuthController::class, 'appConfig'])
+        ->middleware('throttle:60,1')->name('mobile.app_config');
+    Route::get('health', [\App\Http\Controllers\Api\MobileAuthController::class, 'health'])
+        ->middleware('throttle:60,1')->name('mobile.health');
+});
+
+// المجموعةُ المُصادَقة: الخنقُ قبل المصادقة (نمطُ v1)، ثم `mobile.session` (تُرسي
+// الهويّة)، ثم `mobile.context` (تحلّ X-Lynomia-Company/-Client تضييقاً للعرض لا
+// تخويلاً · SF-4 · C). الترتيبُ مقصود: السياقُ يقرأ المستخدمَ الذي أرسته الجلسة.
+Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobile.context'])->group(function () {
+    Route::post('auth/logout', [\App\Http\Controllers\Api\MobileAuthController::class, 'logout'])->name('mobile.auth.logout');
+    Route::post('auth/logout-all', [\App\Http\Controllers\Api\MobileAuthController::class, 'logoutAll'])->name('mobile.auth.logout_all');
+    Route::get('auth/sessions', [\App\Http\Controllers\Api\MobileAuthController::class, 'sessions'])->name('mobile.auth.sessions.index');
+    Route::delete('auth/sessions/{id}', [\App\Http\Controllers\Api\MobileAuthController::class, 'destroySession'])->name('mobile.auth.sessions.destroy');
+    Route::post('auth/step-up', [\App\Http\Controllers\Api\MobileAuthController::class, 'stepUp'])->name('mobile.auth.step_up');
+
+    /*
+     * ── السياقُ + الإقلاعُ + المخطّط (Mobile Readiness · الطور C · §109) ──
+     * قراءةٌ فقط: C.1 السياق (شركاتُ/عملاءُ المستخدم + التضييقُ النشط)، C.2 الإقلاعُ
+     * المبصوم (لقطةُ إقلاعٍ باردةٍ · ETag/304)، C.4 المخطّطُ المُنطَّق (بلا اسمِ
+     * جدولٍ/عمودٍ فيزيائيّ · ETag/304). **مساراتٌ حرفيّةٌ كلُّها — تُسجَّل قبل أيّ
+     * catch-all (`{module}`) يأتي في الطور D كي لا يبتلعها (Critic F9).** الأخصُّ
+     * (`schema/modules`) قبل الأعمّ (`schema`) انضباطاً.
+     */
+    Route::get('context', [\App\Http\Controllers\Api\MobileContextController::class, 'context'])->name('mobile.context');
+    Route::get('bootstrap', [\App\Http\Controllers\Api\MobileContextController::class, 'bootstrap'])->name('mobile.bootstrap');
+    Route::get('schema/modules', [\App\Http\Controllers\Api\MobileContextController::class, 'schemaModules'])->name('mobile.schema.modules');
+    Route::get('schema', [\App\Http\Controllers\Api\MobileContextController::class, 'schema'])->name('mobile.schema');
+
+    /*
+     * ── تكافؤُ واجهةِ الأعمال (Mobile Readiness · الطور D · §109) ──
+     *
+     * **ترتيبُ التسجيلُ عقدٌ أمنيّ (Critic F9):** كلُّ المسارات الحرفيّة
+     * (اعتمادات/لوحة/بحث/تفضيلات + لاحقةُ `/actions` على المورد) تُسجَّل **قبل**
+     * الـcatch-all `{module}` (CRUD) الذي يأتي **أخيراً** — وإلّا ابتلعها `{module}`
+     * (`GET approvals` يُحلّ إلى `apiIndex('approvals')`, و`GET approvals/{id}` إلى
+     * `show`, …). نظيرُ انضباطِ `/api/v1` (`api.php:15,21,26` قبل `{module}`).
+     * التوجيهُ «أوّلُ مطابقٍ يفوز»، فالحرفيُّ الأخصُّ يسبق العامَّ الأعمَّ.
+     *
+     * والهيكلُ يملؤه بناةُ D.1-D.7 اللاحقون؛ الأساسُ المشترك (الجواهرُ + مالكُ
+     * الـIdempotency + ApprovalService + محرّكُ البحث) جاهزٌ في هذه الدفعة.
+     */
+
+    // D.4 — الاعتمادات (حرفيّةٌ: `approvals` قبل `{module}` كي لا يُحلّ إلى apiIndex)
+    Route::get('approvals', [\App\Http\Controllers\Api\MobileWorkController::class, 'approvals'])->name('mobile.approvals.index');
+    Route::get('approvals/{id}', [\App\Http\Controllers\Api\MobileWorkController::class, 'approvalShow'])->name('mobile.approvals.show');
+    Route::post('approvals/{id}/approve', [\App\Http\Controllers\Api\MobileWorkController::class, 'approvalApprove'])->name('mobile.approvals.approve');
+    Route::post('approvals/{id}/reject', [\App\Http\Controllers\Api\MobileWorkController::class, 'approvalReject'])->name('mobile.approvals.reject');
+
+    // D.5 — اللوحة · D.6 — البحث · D.7 — التفضيلات (حرفيّةٌ أُحاديّةُ المقطع قبل `{module}`)
+    Route::get('home', [\App\Http\Controllers\Api\MobileWorkController::class, 'home'])->name('mobile.home');
+    Route::get('search', [\App\Http\Controllers\Api\MobileWorkController::class, 'search'])->name('mobile.search');
+    Route::get('prefs', [\App\Http\Controllers\Api\MobileWorkController::class, 'prefs'])->name('mobile.prefs.index');
+    Route::put('prefs', [\App\Http\Controllers\Api\MobileWorkController::class, 'prefsUpdate'])->name('mobile.prefs.update');
+    Route::post('prefs/pin', [\App\Http\Controllers\Api\MobileWorkController::class, 'pin'])->name('mobile.prefs.pin');
+
+    // D.2/D.3 — إجراءاتُ المورد: لاحقةُ `/actions` **قبل** `{module}/{id}` (المقطعُ
+    // الحرفيّ `actions` يميّزها، ومع ذلك تُسجَّل أوّلاً انضباطاً · F9)
+    Route::get('{module}/{id}/actions', [\App\Http\Controllers\Api\MobileResourceController::class, 'listActions'])->name('mobile.resource.actions');
+    Route::post('{module}/{id}/actions/{action}', [\App\Http\Controllers\Api\MobileResourceController::class, 'runAction'])->name('mobile.resource.run_action');
+
+    // D.1 — الـcatch-all العامّ (CRUD) **أخيراً** بعد كلِّ حرفيّ (F9)
+    Route::get('{module}', [\App\Http\Controllers\Api\MobileResourceController::class, 'listRecords'])->name('mobile.resource.index');
+    Route::post('{module}', [\App\Http\Controllers\Api\MobileResourceController::class, 'createRecord'])->name('mobile.resource.store');
+    Route::get('{module}/{id}', [\App\Http\Controllers\Api\MobileResourceController::class, 'showRecord'])->name('mobile.resource.show');
+    Route::put('{module}/{id}', [\App\Http\Controllers\Api\MobileResourceController::class, 'replaceRecord'])->name('mobile.resource.update');
+    Route::patch('{module}/{id}', [\App\Http\Controllers\Api\MobileResourceController::class, 'patchRecord'])->name('mobile.resource.patch');
+    Route::delete('{module}/{id}', [\App\Http\Controllers\Api\MobileResourceController::class, 'deleteRecord'])->name('mobile.resource.destroy');
+});

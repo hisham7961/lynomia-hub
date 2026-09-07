@@ -47,6 +47,14 @@ final class Api
     public const SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE';
     public const INTERNAL_ERROR = 'INTERNAL_ERROR';
 
+    // ── أكوادُ الجوال (Mobile Readiness · الطور B · SF-3) — إضافةٌ فقط، لا تُعاد
+    //    تسميةُ كودٍ قائمٍ ولا يُحذف (يكسر n8n). تظهر أيضاً في /api/v1/openapi.json
+    //    كقيَمِ enum إضافيّة — توافقيّةٌ لا كاسرة (Critic F14).
+    public const MFA_REQUIRED = 'MFA_REQUIRED';
+    public const REFRESH_TOKEN_INVALID = 'REFRESH_TOKEN_INVALID';
+    public const SESSION_REVOKED = 'SESSION_REVOKED';
+    public const APP_UPDATE_REQUIRED = 'APP_UPDATE_REQUIRED';
+
     /** إصدارُ العقد الحاليّ — يُبثّ ترويسةً على كل ردّ */
     public const VERSION = '1';
 
@@ -74,6 +82,11 @@ final class Api
         self::LOCKDOWN => 'قفلُ طوارئ — سطحُ API معلَّق (503)',
         self::SERVICE_UNAVAILABLE => 'الخدمة غير متاحة مؤقتاً (503)',
         self::INTERNAL_ERROR => 'عطلٌ داخليّ سُجّل تلقائياً — أرفق request_id (500)',
+        // ── أكوادُ الجوال (Mobile Readiness · الطور B · SF-3) ──
+        self::MFA_REQUIRED => 'تسجيلُ الدخول يتطلّب خطوةً ثانية — challenge_id وmethods في details (401)',
+        self::REFRESH_TOKEN_INVALID => 'رمزُ التحديث غير صالحٍ أو منتهٍ أو أُعيد استعمالُه — سجّل الدخول من جديد (401)',
+        self::SESSION_REVOKED => 'أُبطلت هذه الجلسة (خروجٌ أو إلغاءٌ عن بُعد) — سجّل الدخول من جديد (401)',
+        self::APP_UPDATE_REQUIRED => 'إصدارُ التطبيق أقدمُ من الحدِّ الأدنى المطلوب — حدّثه للمتابعة (426)',
     ];
 
     /** معرّفُ الطلب الحاليّ (يضعه وسيط Observability) — أو null خارج الطلب */
@@ -163,6 +176,7 @@ final class Api
             413 => self::PAYLOAD_TOO_LARGE,
             422 => self::VALIDATION_FAILED,
             423 => self::LOCKED,
+            426 => self::APP_UPDATE_REQUIRED,   // بوّابةُ إصدارِ الجوال (Mobile · SF-3) — ٤٢٦ بلا كودٍ سابق
             428 => self::STEP_UP_REQUIRED,
             429 => self::RATE_LIMITED,
             502, 504 => self::INTEGRATION_UNAVAILABLE,
@@ -396,5 +410,78 @@ final class Api
                 'عدّل شخصٌ آخر هذا السجل بعد النسخة التي تحملها — اقرأه من جديد وراجع تغييرك',
                 ['current_version' => $cur, 'your_version' => (int) $seen]);
         }
+    }
+
+    /**
+     * **بصمةٌ ثابتة (ETag) على حمولةٍ** — Mobile Readiness · الطور C · SF (C.2/C.4).
+     *
+     * تُحوسَب على **المحتوى الدلاليّ** لا على ترتيب المفاتيح: ترتيبٌ عميقٌ
+     * (`ksort` تعاوديّ على المصفوفات الترابطيّة، والقوائمُ المرقّمة تبقى بترتيبها)
+     * ثم `json_encode` ثابتٌ ثم `sha256`. فحمولتان متطابقتان دلاليّاً تُنتجان
+     * البصمةَ نفسَها ولو اختلف ترتيبُ بناء المفاتيح (نظيرُ حذرِ CLAUDE.md من قرعة
+     * ترتيبِ مفاتيح JSON). بصمةٌ قويّة (strong ETag) بين علامتَي اقتباس.
+     */
+    public static function etag(array $data): string
+    {
+        $json = json_encode(self::canonicalize($data),
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PARTIAL_OUTPUT_ON_ERROR);
+
+        return '"' . hash('sha256', (string) $json) . '"';
+    }
+
+    /** ترتيبٌ تعاوديّ حتميّ: المصفوفةُ الترابطيّة تُرتَّب بمفاتيحها، والقائمةُ تبقى */
+    private static function canonicalize($v)
+    {
+        if (! is_array($v)) return $v;
+        $out = array_map([self::class, 'canonicalize'], $v);
+        if (! array_is_list($out)) ksort($out);
+
+        return $out;
+    }
+
+    /**
+     * هل تطابق بصمةُ الحمولة ترويسةَ `If-None-Match` للعميل؟ — تدعم `*`، والقائمةَ
+     * المفصولةَ بفواصل، وبادئةَ الضعيف `W/`. حقيقيةٌ ⇒ للمُنادي أن يردَّ 304.
+     */
+    public static function etagMatches(Request $r, string $etag): bool
+    {
+        $header = trim((string) $r->header('If-None-Match', ''));
+        if ($header === '') return false;
+        if ($header === '*') return true;
+
+        $bare = static fn (string $t): string => trim(preg_replace('/^W\//', '', trim($t)), " \t\"");
+        $want = $bare($etag);
+        foreach (explode(',', $header) as $candidate) {
+            if ($bare($candidate) === $want) return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * **ردُّ JSON مبصوم** لنقاط القراءة القابلة للتخبئة (bootstrap/schema · C.2/C.4):
+     * يحسب البصمةَ على `$data`، فإن طابقت `If-None-Match` ردّ **304** بلا جسمٍ
+     * (البصمةُ + `X-Request-Id`)، وإلا **200** بالغلاف الموحَّد `{data, request_id}`
+     * (‏+ `meta` إن مُرِّرت) وترويسةِ `ETag`. البصمةُ على الحمولة الدلاليّة وحدها
+     * — لا `request_id` (يتغيّر كلَّ طلب) فلا يُفسد التخبئة.
+     */
+    public static function etagJson(Request $r, array $data, array $meta = []): JsonResponse
+    {
+        $etag = self::etag($data);
+        $rid  = self::requestId();
+
+        if (self::etagMatches($r, $etag)) {
+            return response()->json(null, 304, [
+                'ETag' => $etag, 'X-Request-Id' => (string) $rid, 'X-API-Version' => self::VERSION,
+            ]);
+        }
+
+        $body = ['data' => $data];
+        if ($meta !== []) $body['meta'] = $meta;
+        $body['request_id'] = $rid;
+
+        return response()->json($body, 200, [
+            'ETag' => $etag, 'X-Request-Id' => (string) $rid, 'X-API-Version' => self::VERSION,
+        ]);
     }
 }

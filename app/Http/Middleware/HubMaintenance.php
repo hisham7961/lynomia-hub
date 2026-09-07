@@ -23,8 +23,15 @@ class HubMaintenance
         $isOwner   = (bool) $request->user()?->role?->is_owner;
         $authRoute = $request->routeIs('login', 'login.attempt', 'login.otp', 'login.otp.verify', 'logout');
 
+        // نقاطُ حالةِ الجوال العامّةُ (Mobile Readiness · C.3) تبقى **دائماً** مبلَّغةً —
+        // كنظير استثناءِ مسارات الدخول أعلاه: وظيفتُها الوحيدةُ أن تُخبر التطبيقَ
+        // **بصدقٍ** أنّ النظامَ في صيانةٍ/قفلٍ (login_available=false / status=lockdown)،
+        // فحجبُها بـ٥٠٣ عامٍّ يُعمي العميلَ عن الحالة نفسِها التي جاء يقرؤها. لا سرَّ
+        // فيها ولا بيانات — بوليّاتُ حالةٍ وروابطُ متجرٍ/دعمٍ فقط، فإبقاؤها مفتوحةً آمن.
+        $statusRoute = $request->routeIs('mobile.app_config', 'mobile.health');
+
         // قفل الطوارئ أشد من الصيانة: يطرد حتى الجلسات القائمة لغير المالكين
-        if ($lock && ! $isOwner && ! $authRoute) {
+        if ($lock && ! $isOwner && ! $authRoute && ! $statusRoute) {
             /*
              * **ويردّ بلغة طالبه** (v2.337): كان يُرجع صفحةَ HTML لكل طلب —
              * فالتكاملُ عبر API يتلقّى ٥٠٣ بجسمٍ لا يفهمه ولا يعرف السبب، بينما
@@ -46,7 +53,7 @@ class HubMaintenance
             ], 503);
         }
 
-        if ($on && ! $isOwner && ! $authRoute) {
+        if ($on && ! $isOwner && ! $authRoute && ! $statusRoute) {
             /*
              * **وسطحُ API كذلك** (v2.324): كان الوسيطُ على مجموعة `web` وحدها،
              * فالكتابةُ تستمرّ من الباب الخلفيّ أثناء الترحيل — والصيانةُ تُعلَن

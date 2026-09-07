@@ -9194,4 +9194,159 @@ return [
             ['on' => 'created', 'emit' => 'conversation.created', 'label' => 'أُنشئت محادثةٌ أو قناة'],
         ],
     ],
+
+    /*
+     * ── تصنيفُ مزامنةِ الجوال لكلِّ وحدة (Mobile Readiness · الطور C · SF-5 · §109) ──
+     *
+     * خريطةٌ إضافيّةٌ (لا تمسّ سجلَّ الوحدات ولا عقدَ `/api/v1`) تُعلن **هل** — وكيف —
+     * تُخبَّأ بياناتُ كلِّ وحدةٍ على جهاز الجوال. تقودُ مخطّطَ الطور C.4 ومحرّكَ
+     * المزامنة في الطور G. الأصنافُ الخمسة (INVENTORY §9):
+     *
+     *  • `CACHEABLE_INCREMENTAL` — الشكلُ القياسيّ (HasVersions + SoftDeletes +
+     *    الطوابعُ الزمنية): مزامنةٌ تراكميّةٌ بـ`updated_since`، ترتيبٌ حتميٌّ
+     *    `updated_at,id`, صفوفُ `deleted_at` = شواهدُ حذفٍ (tombstones)، و`version`
+     *    رمزُ التعارض. ٨١ من ٨٥ وحدةً على هذا الشكل بالضبط.
+     *  • `CACHEABLE_READ_ONLY` — بلا `version` (لا رمزَ تعارض) أو دليلٌ مرجعيٌّ
+     *    يُقرأ لا يُكتب: مؤشّرٌ بـ`created_at`/`updated_at`+`id`، لا كتابةَ جوالٍ
+     *    عليه. (`users`: بلا HasVersions — دليلٌ يُقرأ فقط من الجوال.)
+     *  • `ONLINE_ONLY` — يُقرأ مباشرةً من الخادم ولا يُخبَّأ سجلّاً (تدفّقاتٌ
+     *    ملحقةٌ فقط، أو ما لم يُصنَّف بعدُ — **الافتراضُ الآمن**).
+     *  • `SENSITIVE_NO_PERSIST` — لا يُكتَب على خبيئة الجهاز أبداً: وحداتٌ حاملةُ
+     *    أسرار (`sec`): `vault` (خزنةُ الأسرار)، `phones`/`carriers` (اعتمادُ
+     *    شرائحَ/بوّاباتِ مشغّلين). الحمولةُ لا تُخبَّأ ولا يحمل الدفعُ محتواها.
+     *  • `NOT_APPLICABLE` — لا مزامنةَ لها أصلاً (يُحجَز للأطوار اللاحقة عند الحاجة).
+     *
+     * **قاعدةُ الأمان:** ما ليس في هذه الخريطة صراحةً يسقط إلى `default`
+     * (`ONLINE_ONLY`) — **لا يُفترَض قابلاً للتخبئة أبداً**. فوحدةٌ جديدةٌ تُضاف
+     * لسجلِّ الوحدات دون تصنيفٍ هنا لا تُخبَّأ على الأجهزة حتى تُصنَّف عمداً.
+     * تُقرأ عبر المساعِد `hub_sync_class($module)` (helpers.php).
+     */
+    'mobile_sync' => [
+        'default' => 'ONLINE_ONLY',   // الافتراضُ الآمن لكلِّ ما لم يُصنَّف — لا تخبئةَ بلا قصد
+        'classes' => [
+            'CACHEABLE_INCREMENTAL', 'CACHEABLE_READ_ONLY',
+            'ONLINE_ONLY', 'SENSITIVE_NO_PERSIST', 'NOT_APPLICABLE',
+        ],
+        'modules' => [
+            'companies'     => 'CACHEABLE_INCREMENTAL',
+            'projects'      => 'CACHEABLE_INCREMENTAL',
+            'apps'          => 'CACHEABLE_INCREMENTAL',
+            'code'          => 'CACHEABLE_INCREMENTAL',
+            'websites'      => 'CACHEABLE_INCREMENTAL',
+            'domains'       => 'CACHEABLE_INCREMENTAL',
+            'servers'       => 'CACHEABLE_INCREMENTAL',
+            'accounts'      => 'CACHEABLE_INCREMENTAL',
+            'emails'        => 'CACHEABLE_INCREMENTAL',
+            'phones'        => 'SENSITIVE_NO_PERSIST',
+            'carriers'      => 'SENSITIVE_NO_PERSIST',
+            'vault'         => 'SENSITIVE_NO_PERSIST',
+            'tasks'         => 'CACHEABLE_INCREMENTAL',
+            'updates'       => 'CACHEABLE_INCREMENTAL',
+            'issues'        => 'CACHEABLE_INCREMENTAL',
+            'files'         => 'CACHEABLE_INCREMENTAL',
+            'subs'          => 'CACHEABLE_INCREMENTAL',
+            'meetings'      => 'CACHEABLE_INCREMENTAL',
+            'decisions'     => 'CACHEABLE_INCREMENTAL',
+            'approvals'     => 'CACHEABLE_INCREMENTAL',
+            'social'        => 'CACHEABLE_INCREMENTAL',
+            'posts'         => 'CACHEABLE_INCREMENTAL',
+            'fin'           => 'CACHEABLE_INCREMENTAL',
+            'accounts2'     => 'CACHEABLE_INCREMENTAL',
+            'entries'       => 'CACHEABLE_INCREMENTAL',
+            'engagements'   => 'CACHEABLE_INCREMENTAL',
+            'hcps'          => 'CACHEABLE_INCREMENTAL',
+            'facilities'    => 'CACHEABLE_INCREMENTAL',
+            'territories'   => 'CACHEABLE_INCREMENTAL',
+            'terrassigns'   => 'CACHEABLE_INCREMENTAL',
+            'cycles'        => 'CACHEABLE_INCREMENTAL',
+            'visits'        => 'CACHEABLE_INCREMENTAL',
+            'clients'       => 'CACHEABLE_INCREMENTAL',
+            'services'      => 'CACHEABLE_INCREMENTAL',
+            'contracts'     => 'CACHEABLE_INCREMENTAL',
+            'products'      => 'CACHEABLE_INCREMENTAL',
+            'assets'        => 'CACHEABLE_INCREMENTAL',
+            'stations'      => 'CACHEABLE_INCREMENTAL',
+            'endpoints'     => 'CACHEABLE_INCREMENTAL',
+            'assetlog'      => 'CACHEABLE_INCREMENTAL',
+            'stock'         => 'CACHEABLE_INCREMENTAL',
+            'hr'            => 'CACHEABLE_INCREMENTAL',
+            'leaves'        => 'CACHEABLE_INCREMENTAL',
+            'banks'         => 'CACHEABLE_INCREMENTAL',
+            'okrs'          => 'CACHEABLE_INCREMENTAL',
+            'krs'           => 'CACHEABLE_INCREMENTAL',
+            'kb'            => 'CACHEABLE_INCREMENTAL',
+            'autos'         => 'CACHEABLE_INCREMENTAL',
+            'dbs'           => 'CACHEABLE_INCREMENTAL',
+            'apis'          => 'CACHEABLE_INCREMENTAL',
+            'quotes'        => 'CACHEABLE_INCREMENTAL',
+            'changeorders'  => 'CACHEABLE_INCREMENTAL',
+            'budgets'       => 'CACHEABLE_INCREMENTAL',
+            'costc'         => 'CACHEABLE_INCREMENTAL',
+            'recur'         => 'CACHEABLE_INCREMENTAL',
+            'stockmv'       => 'CACHEABLE_INCREMENTAL',
+            'attend'        => 'CACHEABLE_INCREMENTAL',
+            'payroll'       => 'CACHEABLE_INCREMENTAL',
+            'recruit'       => 'CACHEABLE_INCREMENTAL',
+            'hrlog'         => 'CACHEABLE_INCREMENTAL',
+            'rules'         => 'CACHEABLE_INCREMENTAL',
+            'feats'         => 'CACHEABLE_INCREMENTAL',
+            'designs'       => 'CACHEABLE_INCREMENTAL',
+            'tickets'       => 'CACHEABLE_INCREMENTAL',
+            'users'         => 'CACHEABLE_READ_ONLY',
+            'suppliers'     => 'CACHEABLE_INCREMENTAL',
+            'purchases'     => 'CACHEABLE_INCREMENTAL',
+            'changes'       => 'CACHEABLE_INCREMENTAL',
+            'skills'        => 'CACHEABLE_INCREMENTAL',
+            'policies'      => 'CACHEABLE_INCREMENTAL',
+            'obligations'   => 'CACHEABLE_INCREMENTAL',
+            'compliance'    => 'CACHEABLE_INCREMENTAL',
+            'ideas'         => 'CACHEABLE_INCREMENTAL',
+            'policyacks'    => 'CACHEABLE_INCREMENTAL',
+            'incidents'     => 'CACHEABLE_INCREMENTAL',
+            'deploys'       => 'CACHEABLE_INCREMENTAL',
+            'restores'      => 'CACHEABLE_INCREMENTAL',
+            'requests'      => 'CACHEABLE_INCREMENTAL',
+            'deps'          => 'CACHEABLE_INCREMENTAL',
+            'competitors'   => 'CACHEABLE_INCREMENTAL',
+            'brands'        => 'CACHEABLE_INCREMENTAL',
+            'media'         => 'CACHEABLE_INCREMENTAL',
+            'ip'            => 'CACHEABLE_INCREMENTAL',
+            'events'        => 'CACHEABLE_INCREMENTAL',
+            'plans'         => 'CACHEABLE_INCREMENTAL',
+        ],
+    ],
+
+    /*
+     * ── إعداداتُ تطبيق الجوال + بوّابةُ الإصدار (Mobile Readiness · الطور C · SF-5) ──
+     *
+     * **الشكلُ وافتراضيّاتُه الآمنة** لِما تعرضه `GET app-config` (قبل الدخول، بلا
+     * سرّ). القيمُ التشغيليّةُ الحيّةُ (الحدُّ الأدنى/الأحدثُ للإصدار، الإجبار،
+     * روابطُ المتجر) تُقرأ عبر `setting('mobile.*', <الافتراضُ هنا>)` — فالإعدادُ
+     * يغلب الافتراض، وهذا الملفُّ يوثّق العقدَ وافتراضَه المشحون.
+     *
+     * **بوّابةُ الإصدار فارغةٌ عمداً:** فراغُ الحدِّ الأدنى ⇒ **لا حجبَ أبداً** —
+     * نسخُ التطوير لا تُحجَب حتى يُضبط حدٌّ صراحةً (spec §Version gate). ولا سرَّ
+     * هنا؛ والقيمةُ الخارجيّةُ الغائبة (رابطُ متجرٍ/دعمٍ) تُعاد `null` صادقةً
+     * (NOT_CONFIGURED) لا مُختلَقة.
+     */
+    'mobile' => [
+        'api_version' => '1',   // = App\Support\Api::VERSION
+        'version_gate' => [
+            // فارغٌ = لا حدَّ = لا حجب. يُقرأ الحيُّ من setting('mobile.min_version_ios') ...
+            'ios'          => ['min' => '', 'latest' => ''],
+            'android'      => ['min' => '', 'latest' => ''],
+            'force_update' => false,   // setting('mobile.force_update')
+        ],
+        'store_urls' => [
+            'ios'     => '',   // setting('mobile.store_url_ios')
+            'android' => '',   // setting('mobile.store_url_android')
+        ],
+        // رابطُ الدعم يُقرأ من setting('mobile.support_url') (مفتاحٌ قائمٌ منذ الطور B)
+
+        // إجراءاتٌ تتطلّب تصعيدَ مصادقةٍ (Step-Up) في الجوال — الطور D · D.3. الأنماط:
+        // "module:action" | "module:*" | "*:action" (action ∈ status|restore|restore-version|ack).
+        // **فارغٌ افتراضاً = لا تصعيد لإجراءٍ عامّ** (نظيرُ الويب الذي لا يُصعّد إجراءَ الحالة) —
+        // فلا يُفرَض تأكيدُ هويّةٍ حيث لا يفرضه الويبُ (لا سطحَ جوالٍ أشدَّ ولا أضعف بلا سبب).
+        'stepup_actions' => [],
+    ],
 ];

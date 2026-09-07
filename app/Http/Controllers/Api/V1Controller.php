@@ -465,11 +465,15 @@ class V1Controller extends ModuleController
 
     protected function ikeyOf(Request $r): array
     {
-        $ikey = trim((string) $r->header('Idempotency-Key'));
-        $token = $r->attributes->get('api_token');
-        if ($ikey === '' || mb_strlen($ikey) > 120 || ! $token) return [null, null];
+        // مالكُ المفتاح عبر سكّةٍ مشتركة (Critic F1): `api_token->id` لسطح التكامل
+        // (كما كان حرفاً بحرف — السمةُ مضمونةٌ في مجموعة ApiAuth فيفوز الفرعُ الأوّل)،
+        // و`mobile_session->id` لسطح الجوال (كلُّ جلسةٍ مالكٌ مستقلٌّ — لا إعادةَ ردٍّ
+        // عبر المستخدمين). لا NULL لطلبٍ مُصادَق — فلا حجزٌ صامتٌ متجاوَزٌ في الجوال.
+        $ikey  = trim((string) $r->header('Idempotency-Key'));
+        $owner = \App\Support\Idempotency::owner($r);
+        if ($ikey === '' || mb_strlen($ikey) > 120 || ! $owner) return [null, null];
 
-        return [$token->id, $ikey];
+        return [$owner, $ikey];
     }
 
     /** بصمةُ الطلب: مفتاحٌ واحد لا يخدم إلا طلباً واحداً (مسار + جسم) */

@@ -86,8 +86,9 @@ class PrefController extends Controller
         $prefs['dash'] = array_filter([
             'hidden' => array_values(array_intersect($data['dash_hidden'] ?? [], array_keys($this->dashCards()))),
         ]);
-        // كتم أنواع الإشعارات — ضمن القائمة القابلة للكتم فقط
-        $prefs['mute'] = array_values(array_intersect($data['mute'] ?? [], array_keys(\App\Models\HubNotification::MUTEABLE)));
+        // كتم أنواع الإشعارات — ضمن القائمة القابلة للكتم فقط (سكّةٌ واحدة يتقاسمها
+        // الجوالُ D.7 · Critic F2: العقدُ الذي يقرؤه HubNotification في مصدرٍ واحد)
+        $prefs['mute'] = \App\Support\PrefService::filterMute($data['mute'] ?? []);
         $u->prefs = array_filter($prefs, fn ($v) => $v !== null && $v !== [] && $v !== '') ?: null;
         $u->save();
 
@@ -109,33 +110,12 @@ class PrefController extends Controller
      */
     public function togglePin(Request $r)
     {
-        $u = auth()->user();
-        $token = trim((string) $r->input('token'));
+        // الجوهرُ الدلاليّ (تحقّقُ الوجهة + سقفُ ١٢ + شكلُ الحفظ) انتقل إلى
+        // `PrefService::togglePin` سكّةً واحدةً يتقاسمها الجوالُ D.7 (Critic F2) —
+        // والويبُ يترجم النتيجةَ إعادةَ توجيهٍ كما كان حرفاً (لا تغيّرَ في السلوك).
+        $res = \App\Support\PrefService::togglePin(auth()->user(), trim((string) $r->input('token')));
 
-        if (! isset(hub_pin_targets($u)[$token])) {
-            return back()->with('err', 'وجهةٌ لا تُثبَّت — غير معروفةٍ أو خارج صلاحيتك');
-        }
-
-        $pins = array_values((array) data_get($u->prefs, 'nav.pins', []));
-        if (in_array($token, $pins, true)) {
-            $pins = array_values(array_filter($pins, fn ($t) => $t !== $token));
-            $msg = 'أُزيل من مثبّتاتك';
-        } elseif (count($pins) >= 12) {
-            return back()->with('err', 'بلغتَ سقف ١٢ مثبَّتاً — أزِل واحداً قبل إضافة آخر');
-        } else {
-            $pins[] = $token;
-            $msg = '📌 أُضيف لمثبّتاتك — تجده أعلى الشريط';
-        }
-
-        $prefs = (array) $u->prefs;
-        $prefs['nav'] = array_filter(((array) ($prefs['nav'] ?? [])) + ['pins' => []]);
-        $prefs['nav']['pins'] = $pins;
-        if (! $pins) unset($prefs['nav']['pins']);
-        $prefs['nav'] = array_filter($prefs['nav']);
-        $u->prefs = array_filter($prefs, fn ($v) => $v !== null && $v !== [] && $v !== '') ?: null;
-        $u->save();
-
-        return back()->with('ok', $msg);
+        return back()->with($res['ok'] ? 'ok' : 'err', $res['message']);
     }
 
     /** حفظ أعمدة الجدول الظاهرة لوحدة — تُخزَّن بترتيب سجل الوحدة */
