@@ -246,4 +246,34 @@ class WorkOsProjectRoomsTest extends TestCase
         $res->assertDontSee('🔒 الغرفة الداخلية');
         $res->assertDontSee('سرٌّ داخليٌّ محجوبٌ عن العميل');
     }
+
+    /* ────────── ٦) عزلُ العميل فوق المصفوفة: لا مرفقٌ داخليٌّ على الشاشة الداخليّة ────────── */
+
+    /**
+     * محقّق C1 «الحارسُ يغلب المصفوفة»: عميلٌ مُساءُ الضبط (دورُه يمنحه projects:v بالخطأ)
+     * يبلغ /m/projects/{id} — لكن المرفقاتِ والإصداراتِ والخطَّ الزمنيَّ الداخليّةَ محجوبةٌ
+     * عنه في المتحكّم (ModuleController::show) حتى لو نفذ من المصفوفة. سطحُه بوّابتُه.
+     */
+    public function test_a_misconfigured_client_never_sees_internal_attachments_on_the_internal_screen(): void
+    {
+        $this->seedCore();
+        $a = $this->client();
+        $p = $this->externalProject($a);
+        $cu = $this->clientUser([$a], ['projects' => ['v' => 1]]);   // دورٌ مُساءُ الضبط
+
+        \Illuminate\Support\Facades\DB::table('attachments')->insert([
+            'id' => (string) Str::uuid(), 'module' => 'projects', 'record_id' => $p->id,
+            'disk' => 'local', 'path' => 'x/y.pdf', 'original_name' => 'عقدٌ_داخليٌّ_سرّيّ.pdf',
+            'mime' => 'application/pdf', 'size' => 10,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        // ضبطٌ مضادّ: المستخدمُ الداخليُّ يرى المرفقَ الداخليّ
+        $this->actingAs($this->owner)->get('/m/projects/' . $p->id)->assertOk()
+            ->assertSee('عقدٌ_داخليٌّ_سرّيّ');
+
+        // العميلُ يبلغ الشاشةَ (مصفوفتُه مُساءةُ الضبط) لكن لا يرى المرفقَ الداخليّ
+        $this->actingAs($cu)->get('/m/projects/' . $p->id)->assertOk()
+            ->assertDontSee('عقدٌ_داخليٌّ_سرّيّ');
+    }
 }
