@@ -2,12 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Models\Asset;
+use App\Models\AssetCustody;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\LedgerAccount;
 use App\Models\Purchase;
+use App\Models\Station;
 use App\Models\StockItem;
 use App\Models\StockMove;
+use App\Support\Custody;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -230,5 +234,43 @@ class LedgerAndStockIntegrityTest extends TestCase
 
         $this->assertStringNotContainsString('حسابُ ب السرّي', $html,
             'قائمةُ الحسابات تعرض دليلَ شركةٍ أجنبية — تسريبٌ وبابُ ربطٍ بها');
+    }
+
+    /* ── ٥) حالةُ الأصل ومحطتُه قيمتان مقفلتان تُكتبان عبر Custody وحدَها (الطور F · C11) ── */
+
+    /**
+     * على نمطِ القيد المُقفل بعد ترحيله: حالةُ الأصل (`assets.status`) قيمةٌ **مقفلة**
+     * لا تُكتَب من النموذج العامّ ولا من سحب الكانبان، بل بانتقالٍ شرعيٍّ عبر
+     * `Custody::transition` وحدَها — فلا تُزرَع حالةٌ خارجَ الخريطة ولا تُقفَز حالةٌ
+     * نهائيّة. ونظيرُه `station_id` (منفصلٌ عن `holder_id`) عبر `Custody::assignStation`.
+     */
+    public function test_asset_status_and_station_are_locked_to_the_custody_path(): void
+    {
+        $this->seedCore();
+        $a = Asset::create(['name' => 'أصلٌ مقفول', 'type' => 'شاشة', 'status' => 'متاح']);
+        $station = Station::create(['facility' => 'المقرّ', 'type' => 'مكتب']);
+
+        // النموذجُ العامّ لا يكتب الحالةَ ولا المحطة (كلاهما locked)
+        $this->actingAs($this->owner)->put('/m/assets/' . $a->id, [
+            'name' => 'أصلٌ مقفول', 'status' => 'مستبعد', 'stationId' => $station->id,
+        ])->assertRedirect();
+        $a->refresh();
+        $this->assertSame('متاح', $a->status, 'الحالةُ كُتبت من النموذج العامّ — قيمةٌ مقفلة');
+        $this->assertNull($a->station_id, 'المحطةُ كُتبت من النموذج العامّ — قيمةٌ مقفلة');
+        $this->assertSame(0, AssetCustody::where('asset_id', $a->id)->count(),
+            'كتابةٌ عامّةٌ سرّبت صفَّ حركةٍ — لا حركةَ إلا عبر Custody');
+
+        // المسارُ الشرعيّ يعمل: انتقالٌ صحيح + إسنادُ محطة، كلٌّ بصفِّ حركةٍ مُدقَّق
+        Custody::transition($a->fresh(), 'صيانة', now()->toDateString());
+        Custody::assignStation($a->fresh(), $station->id, now()->toDateString());
+        $a->refresh();
+        $this->assertSame('صيانة', $a->status);
+        $this->assertSame($station->id, $a->station_id);
+        $this->assertSame(2, AssetCustody::where('asset_id', $a->id)->count(),
+            'المسارُ الشرعيّ يجب أن يكتب صفَّ حركةٍ لكلِّ تغيير');
+
+        // والقفزةُ النهائيّةُ غير المشروعة مرفوضةٌ حتى من المسار الشرعيّ نفسِه
+        $this->assertFalse(Custody::canTransition('مستبعد', 'متاح'),
+            'خريطةُ الانتقال تسمح بالرجوع من حالةٍ نهائيّة — دفترُ حالاتٍ مختلّ');
     }
 }

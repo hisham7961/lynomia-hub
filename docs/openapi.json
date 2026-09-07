@@ -2,9 +2,9 @@
     "openapi": "3.1.0",
     "info": {
         "title": "Lynomia Business Hub — REST API",
-        "version": "2.410.0",
+        "version": "2.414.0",
         "description": "واجهة `/api/v1`: كل وحدات النظام بنفس صلاحيات صاحب المفتاح ونطاقه.\nمفتاح Bearer من «حسابي ← مفاتيح API». حدّ المعدل ١٢٠/دقيقة لكل مفتاح و٣٠٠/دقيقة لكل عنوان.\nكل ردٍّ يحمل `X-Request-Id` و`X-API-Version`، وكل خطأٍ يحمل `code` آلياً و`request_id`.",
-        "x-hub-version": "2.410.0"
+        "x-hub-version": "2.414.0"
     },
     "servers": [
         {
@@ -177,6 +177,10 @@
         {
             "name": "assets",
             "description": "الأصول والعهد"
+        },
+        {
+            "name": "stations",
+            "description": "المحطات"
         },
         {
             "name": "assetlog",
@@ -16075,6 +16079,426 @@
                 ],
                 "summary": "نقل الأصول والعهد إلى السلة",
                 "operationId": "delete_assets",
+                "responses": {
+                    "200": {
+                        "description": "نُقل للسلة",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "deleted": {
+                                            "type": "boolean"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/409"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            }
+        },
+        "/api/v1/stations": {
+            "get": {
+                "tags": [
+                    "stations"
+                ],
+                "summary": "قائمة المحطات",
+                "operationId": "list_stations",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/q"
+                    },
+                    {
+                        "$ref": "#/components/parameters/status"
+                    },
+                    {
+                        "$ref": "#/components/parameters/page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/per"
+                    },
+                    {
+                        "$ref": "#/components/parameters/sort"
+                    },
+                    {
+                        "$ref": "#/components/parameters/dir"
+                    },
+                    {
+                        "$ref": "#/components/parameters/fields"
+                    },
+                    {
+                        "$ref": "#/components/parameters/f"
+                    },
+                    {
+                        "$ref": "#/components/parameters/fl"
+                    },
+                    {
+                        "$ref": "#/components/parameters/created_from"
+                    },
+                    {
+                        "$ref": "#/components/parameters/created_to"
+                    },
+                    {
+                        "$ref": "#/components/parameters/updated_since"
+                    },
+                    {
+                        "$ref": "#/components/parameters/trash"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "قائمة مرقَّمة",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Stations"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        },
+                                        "page": {
+                                            "type": "integer"
+                                        },
+                                        "last_page": {
+                                            "type": "integer"
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/ListMeta"
+                                        },
+                                        "request_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/422"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/503"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "stations"
+                ],
+                "summary": "إنشاء المحطات",
+                "operationId": "create_stations",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/Idempotency-Key"
+                    },
+                    {
+                        "$ref": "#/components/parameters/X-Change-Reason"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StationsWrite"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "أُنشئ",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Stations"
+                                        },
+                                        "request_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/409"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/422"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/503"
+                    }
+                }
+            }
+        },
+        "/api/v1/stations/{id}": {
+            "parameters": [
+                {
+                    "$ref": "#/components/parameters/id"
+                }
+            ],
+            "get": {
+                "tags": [
+                    "stations"
+                ],
+                "summary": "سجل المحطات",
+                "operationId": "show_stations",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/fields"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "السجل",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Stations"
+                                        },
+                                        "request_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "stations"
+                ],
+                "summary": "استبدال المحطات كاملاً (الحقل الغائب يُفرَّغ)",
+                "operationId": "replace_stations",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/If-Match"
+                    },
+                    {
+                        "$ref": "#/components/parameters/X-Change-Reason"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StationsWrite"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "حُفظ",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Stations"
+                                        },
+                                        "request_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/409"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/422"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            },
+            "patch": {
+                "tags": [
+                    "stations"
+                ],
+                "summary": "تعديل المحطات جزئياً (الحقول المُرسَلة فقط)",
+                "operationId": "update_stations",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/If-Match"
+                    },
+                    {
+                        "$ref": "#/components/parameters/X-Change-Reason"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StationsWrite"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "حُفظ",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Stations"
+                                        },
+                                        "request_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/409"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/422"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "stations"
+                ],
+                "summary": "نقل المحطات إلى السلة",
+                "operationId": "delete_stations",
                 "responses": {
                     "200": {
                         "description": "نُقل للسلة",
@@ -45302,6 +45726,13 @@
                         "x-ref": "users",
                         "title": "المستلم"
                     },
+                    "stationId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "stations",
+                        "title": "المحطة"
+                    },
                     "loc": {
                         "nullable": true,
                         "type": "string",
@@ -45337,7 +45768,13 @@
                             "متاح",
                             "صيانة",
                             "تالف",
-                            "مستبعد"
+                            "مستبعد",
+                            "قيد الطلب",
+                            "محجوز",
+                            "خارج مؤقتاً",
+                            "مفقود",
+                            "مباع",
+                            "مُعاد للمورد"
                         ],
                         "title": "الحالة"
                     },
@@ -45461,6 +45898,13 @@
                         "x-ref": "users",
                         "title": "المستلم"
                     },
+                    "stationId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "stations",
+                        "title": "المحطة"
+                    },
                     "loc": {
                         "nullable": true,
                         "type": "string",
@@ -45496,7 +45940,13 @@
                             "متاح",
                             "صيانة",
                             "تالف",
-                            "مستبعد"
+                            "مستبعد",
+                            "قيد الطلب",
+                            "محجوز",
+                            "خارج مؤقتاً",
+                            "مفقود",
+                            "مباع",
+                            "مُعاد للمورد"
                         ],
                         "title": "الحالة"
                     },
@@ -45531,6 +45981,203 @@
                 "required": [
                     "name"
                 ]
+            },
+            "Stations": {
+                "type": "object",
+                "title": "المحطات",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "version": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "description": "نسخة السجل — تُرسَل في If-Match"
+                    },
+                    "code": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "كود المحطة"
+                    },
+                    "facility": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "المبنى / المنشأة"
+                    },
+                    "floor": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "الطابق"
+                    },
+                    "zone": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "المنطقة"
+                    },
+                    "room": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "الغرفة"
+                    },
+                    "desk": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "المكتب / الرقم"
+                    },
+                    "type": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "مكتب",
+                            "استقبال",
+                            "مختبر",
+                            "قاعة اجتماعات",
+                            "مستودع",
+                            "ميداني",
+                            "أخرى"
+                        ],
+                        "title": "النوع"
+                    },
+                    "dept": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "القسم"
+                    },
+                    "companyId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "companies",
+                        "title": "الشركة"
+                    },
+                    "projectId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "projects",
+                        "title": "المشروع"
+                    },
+                    "currentEmployeeId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "users",
+                        "title": "المُسنَد إليه الآن"
+                    },
+                    "status": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "متاحة",
+                            "مشغولة",
+                            "محجوزة",
+                            "صيانة",
+                            "معطّلة"
+                        ],
+                        "title": "الحالة"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    }
+                }
+            },
+            "StationsWrite": {
+                "type": "object",
+                "title": "المحطات",
+                "properties": {
+                    "code": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "كود المحطة"
+                    },
+                    "facility": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "المبنى / المنشأة"
+                    },
+                    "floor": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "الطابق"
+                    },
+                    "zone": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "المنطقة"
+                    },
+                    "room": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "الغرفة"
+                    },
+                    "desk": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "المكتب / الرقم"
+                    },
+                    "type": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "مكتب",
+                            "استقبال",
+                            "مختبر",
+                            "قاعة اجتماعات",
+                            "مستودع",
+                            "ميداني",
+                            "أخرى"
+                        ],
+                        "title": "النوع"
+                    },
+                    "dept": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "القسم"
+                    },
+                    "companyId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "companies",
+                        "title": "الشركة"
+                    },
+                    "projectId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "projects",
+                        "title": "المشروع"
+                    },
+                    "currentEmployeeId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "users",
+                        "title": "المُسنَد إليه الآن"
+                    },
+                    "status": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "متاحة",
+                            "مشغولة",
+                            "محجوزة",
+                            "صيانة",
+                            "معطّلة"
+                        ],
+                        "title": "الحالة"
+                    }
+                }
             },
             "Assetlog": {
                 "type": "object",
@@ -50641,7 +51288,8 @@
                             "cycles",
                             "visits",
                             "users",
-                            "changeorders"
+                            "changeorders",
+                            "stations"
                         ],
                         "title": "القسم"
                     },
@@ -50872,7 +51520,8 @@
                             "cycles",
                             "visits",
                             "users",
-                            "changeorders"
+                            "changeorders",
+                            "stations"
                         ],
                         "title": "القسم"
                     },

@@ -2,7 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Comment;
 use App\Models\Company;
+use App\Models\Conversation;
+use App\Models\ConversationMember;
 use App\Models\DmMessage;
 use App\Models\HubNotification;
 use App\Models\Role;
@@ -187,6 +190,30 @@ class SearchDmLeakTest extends TestCase
         } finally {
             Storage::disk('local')->delete('hub/dm-att-test.txt');
         }
+    }
+
+    /* ── ٨) ردٌّ لا يُحقَن في قناةٍ لا يراها القارئ (Work OS · WP-C.1 · §3–5) ── */
+
+    public function test_channel_reply_cannot_be_injected_by_non_member(): void
+    {
+        $this->seedCore();
+
+        // قناةٌ يملكها الموظفُ — والمشاهدُ ليس عضواً فيها
+        $conv = Conversation::create(['kind' => 'channel', 'title' => 'قناةٌ خاصّة',
+            'audience' => 'internal', 'visibility' => 'private', 'created_by' => $this->employee->id]);
+        ConversationMember::create(['conversation_id' => $conv->id, 'user_id' => $this->employee->id,
+            'role' => 'owner', 'source' => 'explicit']);
+
+        // غيرُ العضو يحاول حقنَ رسالةٍ عبر مسار التعليقات — يُردّ ٤٠٤ بالعضويّة، لا صفَّ يُكتب
+        $this->actingAs($this->viewer)->post('/comments', [
+            'module' => 'channel', 'record_id' => $conv->id, 'conversation_id' => $conv->id,
+            'body' => 'حقنٌ في قناةٍ لا أراها',
+        ])->assertNotFound();
+
+        $this->assertSame(0, Comment::where('conversation_id', $conv->id)->count(),
+            'رسالةٌ دُسّت في قناةٍ لا يراها المُرسِل');
+        // والقناةُ نفسُها ٤٠٤ عليه (لا كشفَ وجود)
+        $this->actingAs($this->viewer)->get('/conversations/' . $conv->id)->assertNotFound();
     }
 
     /* ── ٧) سحب الرسالة يسحب إشعارها ── */

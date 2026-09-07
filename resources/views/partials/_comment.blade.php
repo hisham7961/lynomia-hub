@@ -68,7 +68,14 @@
                 </form>
             </details>
         @endif
-        @php $canPin = $c->module === 'feed' ? (hub_monitor()) : hub_can(auth()->user(), $c->module, 'e'); @endphp
+        @php
+            // (WP-C.1) رسالةُ قناةٍ: التثبيت/الحلّ لأصحابها ومشرفيها — دورٌ عضويّةٌ لا مصفوفة
+            $canPin = match ($c->module) {
+                'feed'    => hub_monitor(),
+                'channel' => ($channelMod ?? false),
+                default   => hub_can(auth()->user(), $c->module, 'e'),
+            };
+        @endphp
         @if ($canPin)
             <form method="POST" action="{{ route('comments.pin', $c->id) }}">@csrf<button class="lnk sub" type="submit">{{ $c->pinned ? 'فك التثبيت' : '📌 تثبيت' }}</button></form>
         @endif

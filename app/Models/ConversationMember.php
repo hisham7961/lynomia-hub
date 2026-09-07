@@ -75,4 +75,24 @@ class ConversationMember extends Model
     {
         return $q->whereNull('muted_at');
     }
+
+    /* ────────── مساعِداتُ الدور (الطور C · WP-C.1) ────────── */
+
+    /** هذا العضوُ مالكُ الحاوية */
+    public function isOwner(): bool
+    {
+        return $this->role === 'owner';
+    }
+
+    /** يقدر الكتابةَ في الحاوية — الضيفُ يقرأ ولا يكتب */
+    public function canPost(): bool
+    {
+        return Conversation::roleCanPost($this->role);
+    }
+
+    /** يقدر إدارةَ الأعضاء (إضافة/إزالة/دور) — المشرفُ فأعلى */
+    public function canManage(): bool
+    {
+        return Conversation::roleCanManage($this->role);
+    }
 }

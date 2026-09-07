@@ -29,13 +29,71 @@ class PortalController extends Controller
     /** الملف الشامل لموظف — لمن يملك عرض وحدة HR */
     public function employee(string $id)
     {
-        abort_unless(hub_can(auth()->user(), 'hr', 'v'), 403, 'عرض ملفات الموظفين يتطلب صلاحية الموارد البشرية');
+        $u = auth()->user();
+        abort_unless(hub_can($u, 'hr', 'v'), 403, 'عرض ملفات الموظفين يتطلب صلاحية الموارد البشرية');
         // النطاق يسري كما في كل قارئ: ملفٌّ خارج شركتي أو مشاريعي = ٤٠٤ لا ٢٠٠
         $emp = hub_scope(Employee::query(), 'hr')->findOrFail($id);
 
-        return view('portal.employee', ['emp' => $emp, 'self' => false]
+        // (WP-F.4 · §28) الملفُّ ٣٦٠ تبويباتٌ **محروسةٌ خادميّاً**: كلُّ تبويبٍ مرتبطٌ
+        // بوحدةٍ يحرسها hub_can — و`?tab=` مصنوعٌ باليد لوحدةٍ لا يملكها القارئُ يُردّ
+        // ٤٠٣ (لا مجرَّدَ إخفاءٍ في الشريط). سككٌ قائمةٌ فقط تظهر (لا بطاقةٌ زائفة §82).
+        $tabs = $this->emp360Tabs($u);
+        $req  = request()->query('tab');
+        $tab  = (is_string($req) && $req !== '') ? $req : $tabs[0]['key'];
+        // تبويبٌ لا وجود له في السجلّ أصلاً (سكّةٌ لم تُبنَ) → ٤٠٤ لا لوحةٌ صامتة
+        abort_unless(array_key_exists($tab, $this->emp360Catalog()), 404);
+        // تبويبٌ معروفٌ لكنّ القارئَ لا يملك وحدتَه → ٤٠٣ (الحرسُ فوق الشريط)
+        abort_unless(collect($tabs)->contains('key', $tab), 403, 'لا تملك عرضَ هذا التبويب');
+
+        $data = ['emp' => $emp, 'self' => false, 'tab360' => $tab, 'tabs360' => $tabs]
             + $this->bundle($emp, $emp->user_id)
-            + $this->workProfile($emp));
+            + $this->workProfile($emp);
+
+        // تبويبُ المحطة (F.1) يُحمَّل عند فتحه وحدَه — مقاعدُ الموظف بـcurrent_employee_id
+        if ($tab === 'station') $data['stations'] = $this->stationsFor($u, $emp->user_id);
+
+        return view('portal.employee', $data);
+    }
+
+    /**
+     * (WP-F.4 · §28) سجلُّ تبويبات الملفّ ٣٦٠: مفتاحٌ ⟵ [الوحدةُ الحارسة, التسمية].
+     * **سككٌ قائمةٌ فقط** — تبويباتُ الاتصالات/الأنظمة/أمنِ النقاط (الأطوار G/J)
+     * تُضاف عند وصولِ سككها لا قبل (لا بطاقةٌ زائفة §82). ترتيبُ الإدراج = ترتيبُ
+     * العرض، و`profile` أوّلاً فهو الافتراضيُّ (الصفحةُ تتطلب hr:v أصلاً).
+     */
+    protected function emp360Catalog(): array
+    {
+        return [
+            'profile' => ['mod' => 'hr',       'label' => '🗂️ الملف والعمل'],
+            'assets'  => ['mod' => 'assets',   'label' => '💻 العهدة والأجهزة'],
+            'station' => ['mod' => 'stations', 'label' => '🪑 المحطة'],
+            'wallet'  => ['mod' => 'custody',  'label' => '💰 العهدة المالية'],
+        ];
+    }
+
+    /** التبويباتُ المسموحةُ للقارئ — كلُّ ما يملك وحدتَه (hub_can) من السجلّ */
+    protected function emp360Tabs($u): array
+    {
+        $out = [];
+        foreach ($this->emp360Catalog() as $key => $t) {
+            if (hub_can($u, $t['mod'], 'v')) $out[] = ['key' => $key, 'label' => $t['label']];
+        }
+
+        return $out;
+    }
+
+    /**
+     * (WP-F.4 · §28 · F.1) مقاعدُ الموظف الآن — منطَّقةٌ بالشركة كأيّ قارئ، بترتيبٍ
+     * حتميّ (C13). القراءةُ فقط؛ الإسنادُ/الإخلاءُ يمرّان بـ`StationController` المقفل.
+     */
+    protected function stationsFor($u, ?string $userId)
+    {
+        if (! $userId || ! hub_can($u, 'stations', 'v')) return collect();
+
+        return hub_scope(DB::table('stations')->whereNull('deleted_at'), 'stations')
+            ->where('current_employee_id', $userId)
+            ->orderBy('code')->orderBy('id')
+            ->limit(20)->get(['id', 'code', 'facility', 'zone', 'room', 'desk', 'type', 'dept', 'status']);
     }
 
     /**
@@ -120,8 +178,8 @@ class PortalController extends Controller
             }
 
             if ($out['may']['assets']) $out['assets'] = hub_scope(DB::table('assets')->whereNull('deleted_at'), 'assets')
-                ->where('holder_id', $userId)->orderBy('name')
-                ->limit(12)->get(['id', 'name', 'type', 'tag', 'status']);
+                ->where('holder_id', $userId)->orderBy('name')->orderBy('id')
+                ->limit(12)->get(['id', 'name', 'type', 'tag', 'serial', 'status']);
 
             /* ── الصندوق الموحد: كل ما ينتظر تصرفي ── */
 

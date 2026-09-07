@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Conversation;
+use App\Models\ConversationMember;
 use App\Models\DmMessage;
 use App\Models\HubNotification;
 use App\Models\User;
@@ -80,6 +82,58 @@ class DmController extends Controller
         if ($b !== null) return $b[0];
 
         return null;
+    }
+
+    /**
+     * (WP-C.4 · §6/§7) طيُّ خيطِ DM في حاويةِ المحادثةِ الواحدة — هويّةٌ واحدة.
+     *
+     * لكلِّ ثنائيٍّ حاويةُ `kind='dm'` واحدةٌ هويّتُها مشتقّةٌ حتميّاً من `thread_key`
+     * (`DmMessage::conversationIdForThread`)، فالمفتاحان — `thread_key`
+     * و`conversation_id` — يحلّان إلى الحاويةِ نفسِها لا هويّتَين. والمفتاحُ الأساس
+     * (PK) يفرض الوحدانيّةَ حتى تحت التسابق. فتصبح العضويّةُ والرقابةُ (§6) والبحثُ
+     * نظاماً واحداً على DM والقنوات معاً — ولا محرّكَ حاويةٍ ثانٍ: النصُّ يبقى في
+     * `dm_messages`، والحاويةُ تحمل *مَن يرى ومَن عضو* لا نصَّ الرسالة.
+     *
+     * idempotent: تُنشئ الحاويةَ والعضويّتَين مرةً، ثم تعيد استعمالَهما — نظيرُ
+     * هجرةِ التعبئةِ حرفاً بحرف كي لا تنشأ هويّتان لخيطٍ واحد.
+     */
+    protected static function ensureDmConversation(User $from, User $to, ?string $company): string
+    {
+        $key = DmMessage::threadKey($from->id, $to->id);
+        $cid = DmMessage::conversationIdForThread($key);
+
+        if (! Conversation::whereKey($cid)->exists()) {
+            try {
+                $c = new Conversation();
+                $c->id         = $cid;          // هويّةٌ حتميّةٌ من thread_key لا Str::uuid عشوائيّ
+                $c->kind       = 'dm';
+                $c->company_id = $company;      // نطاقُ الشركةِ نفسُه الموسومُ به الرسالة (A.5)
+                $c->audience   = 'internal';    // DM داخليٌّ دائماً — البوابةُ تمنع العميلَ أصلاً
+                $c->visibility = 'private';
+                $c->created_by = $from->id;
+                $c->save();
+            } catch (\Illuminate\Database\QueryException $e) {
+                // سباقٌ: أنشأها طلبٌ متزامن بالهويّةِ عينِها — نمضي، فالوحدانيّةُ محفوظة
+            }
+        }
+
+        foreach ([$from->id, $to->id] as $uid) {
+            $has = ConversationMember::where('conversation_id', $cid)->where('user_id', $uid)->exists();
+            if (! $has) {
+                try {
+                    $m = new ConversationMember();
+                    $m->conversation_id = $cid;
+                    $m->user_id         = $uid;
+                    $m->role            = 'member';
+                    $m->source          = 'system';   // عضويّةٌ يُديرها النظامُ آليّاً من الخيط
+                    $m->save();
+                } catch (\Illuminate\Database\QueryException $e) {
+                    // سباقٌ على UNIQUE(conversation_id,user_id) — العضويّةُ موجودة، نمضي
+                }
+            }
+        }
+
+        return $cid;
     }
 
     /** زملاءُ بدءِ محادثةٍ جديدة — مُنطَّقون بشركات المستخدم الحالي (لا تعدادَ خارج نطاقه) */
@@ -260,6 +314,10 @@ class DmController extends Controller
             'att'  => ['nullable', 'file', 'max:' . hub_upload_cap()['kb']],
         ], [], ['body' => 'نص الرسالة', 'att' => 'المرفق']);
 
+        // (WP-A.5) شركةُ الرسالةِ إن اشتُقّت — تدخل نطاقَ طرفِها المقيَّد؛
+        // (WP-C.4) والحاويةُ تُوسَم بالشركةِ نفسِها فتتّسق الرقابةُ والبحثُ معها.
+        $company = self::deriveDmCompany(auth()->user(), $other);
+
         $attrs = [
             'thread_key' => DmMessage::threadKey(auth()->id(), $other->id),
             'from_id'    => auth()->id(),
@@ -268,9 +326,15 @@ class DmController extends Controller
             'att'        => $r->hasFile('att') ? $r->file('att')->store('hub', 'local') : null,
             'created_at' => now(),
         ];
-        // (WP-A.5) وسمُ الرسالة بشركتها إن اشتُقّت — فتدخل نطاقَ طرفِها المقيَّد
         if (hub_has_col('dm_messages', 'company_id')) {
-            $attrs['company_id'] = self::deriveDmCompany(auth()->user(), $other);
+            $attrs['company_id'] = $company;
+        }
+        // (WP-C.4 · §6/§7) طيُّ الخيطِ في حاويةِ المحادثةِ الواحدة قبل الكتابة:
+        // نضمن صفَّ conversation(kind='dm') وعضويّتَي الطرفين ونسِمُ الرسالةَ
+        // بهويّتها — فتُصبح الرقابةُ (§6) والبحثُ نظاماً واحداً على DM والقنوات.
+        // محروسٌ بالعمود: قبل هجرتِه لا شيءَ يُكتَب (توافقٌ رجعيّ مع ما قبل الترحيل).
+        if (hub_has_col('dm_messages', 'conversation_id')) {
+            $attrs['conversation_id'] = self::ensureDmConversation(auth()->user(), $other, $company);
         }
 
         $msg = DmMessage::create($attrs);

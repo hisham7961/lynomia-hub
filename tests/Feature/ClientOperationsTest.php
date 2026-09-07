@@ -4,6 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\Asset;
 use App\Models\Client;
+use App\Models\Comment;
+use App\Models\Conversation;
+use App\Models\ConversationMember;
+use App\Models\Document;
 use App\Models\Engagement;
 use App\Models\FinDocument;
 use App\Models\Project;
@@ -152,6 +156,37 @@ class ClientOperationsTest extends TestCase
         $this->actingAs($u)->post('/client-switch', ['client' => $b->id])->assertForbidden();
     }
 
+    /**
+     * (Work OS · WP-C.1 · §3–5) نطاقُ العميل يحرس القنواتِ كما يحرس السجلات:
+     * قارئٌ معزولٌ على عميلٍ لا يبلغ قناةً موسومةً بعميلٍ آخر — **حتى لو دُسّ عضواً
+     * فيها**. `guardConversation` يعزل بالنطاق فوق العضويّة (دفاعٌ في العمق) تماماً
+     * كما يعزل `hub_scope` سجلَّ وحدةٍ خارج نطاق قارئه.
+     */
+    public function test_a_client_scoped_reader_cannot_reach_an_out_of_scope_channel(): void
+    {
+        $this->seedCore();
+        $a = $this->client('شركة ألف');
+        $b = $this->client('شركة باء');
+        $u = $this->isolated(['clients' => ['v' => 1]], [$a->id]);
+
+        // قناةُ عميلٍ آخر (باء) — والقارئُ معزولٌ على (ألف)، لكنّه دُسّ عضواً فيها خطأً
+        $conv = Conversation::create(['kind' => 'channel', 'title' => 'قناةُ باء السرّية',
+            'audience' => 'client', 'client_id' => $b->id, 'visibility' => 'private']);
+        ConversationMember::create(['conversation_id' => $conv->id, 'user_id' => $u->id, 'role' => 'member']);
+        Comment::create(['module' => 'channel', 'record_id' => $conv->id, 'conversation_id' => $conv->id,
+            'user_id' => $this->owner->id, 'body' => 'سرُّ عميلٍ آخر', 'read_by' => [$this->owner->id],
+            'created_at' => now()]);
+
+        // عضوٌ نعم، لكنّ نطاقَ العميلِ يردّه ٤٠٤ (عضويّةٌ خاطئةٌ لا تُسرّب صفّاً)
+        $this->actingAs($u)->get('/conversations/' . $conv->id)->assertNotFound();
+        // ولا يكتب فيها
+        $this->actingAs($u)->post('/comments', [
+            'module' => 'channel', 'record_id' => $conv->id, 'conversation_id' => $conv->id,
+            'body' => 'حقنٌ عابرٌ للنطاق',
+        ])->assertNotFound();
+        $this->assertSame(0, Comment::where('body', 'حقنٌ عابرٌ للنطاق')->count());
+    }
+
     /* ────────── ٤) الملكية ≠ الإدارة ────────── */
 
     public function test_client_owned_assets_are_managed_but_not_counted_as_our_property(): void
@@ -239,5 +274,46 @@ class ClientOperationsTest extends TestCase
         $h = Engagements::health(Client::find($c->id));
         $this->assertNotSame('أخضر', $h['tone']);
         $this->assertNotEmpty($h['why'], 'الإشارةُ تسمّي أسبابها لا تكتفي باللون');
+    }
+
+    /* ────────── ٦) عزلُ جمهورِ الأبناء يستهدف حسابَ العميل لا الموظفَ المقيَّد ────────── */
+
+    /**
+     * (Work OS · الطور D · WP-D.1 · نقدُ C4) فلترُ الجمهور في `hub_related` يُطبَّق
+     * على **حسابِ العميل الصلب** (account_type=client) لا على كلِّ من له نطاقُ عميل.
+     * الموظفُ الداخليُّ المقيَّدُ بعميلٍ (clients=[c] · account_type=internal) لا يزال
+     * داخليّاً فيرى الأبناءَ الداخليّين؛ حسابُ العميل وحدَه يُحجَب عنه الداخليّ. حارسٌ
+     * ضد ربطِ الفلتر بـ`hub_client_ids` (يملكه المقيَّدُ أيضاً) بدل التصنيف الصلب.
+     */
+    public function test_related_children_audience_filter_targets_client_accounts_not_restricted_staff(): void
+    {
+        $this->seedCore();
+        $c = $this->client();
+        $p = Project::create(['name' => 'مشروعُ ألف', 'client_id' => $c->id, 'status' => 'نشط']);
+
+        // ابنٌ داخليٌّ وابنٌ عميليٌّ تحت المشروع — Document/files يحمل مصنِّفَ الجمهور الحقيقيّ
+        Document::create(['name' => 'محضرٌ داخليّ', 'audience' => 'internal',
+            'client_id' => $c->id, 'project_id' => $p->id]);
+        $clientDoc = Document::create(['name' => 'تقريرٌ للعميل', 'audience' => 'client',
+            'client_id' => $c->id, 'project_id' => $p->id]);
+
+        // موظفٌ داخليٌّ مقيَّدٌ بهذا العميل (account_type=internal) — يرى الابنين
+        $staff = $this->isolated(['files' => ['v' => 1]], [$c->id]);
+        $this->actingAs($staff);
+        $filesStaff = collect(hub_related('projects', $p->id))->firstWhere('module', 'files');
+        $this->assertNotNull($filesStaff);
+        $this->assertSame(2, (int) $filesStaff['count'], 'الموظفُ المقيَّدُ (داخليّ) حُجب عنه ابنٌ داخليّ');
+
+        // حسابُ عميلٍ صلبٍ لنفس العميل — لا يرى إلا الابنَ العميليّ (كلُّ الصفوف)
+        $role = Role::create(['name' => 'عميل ' . Str::random(5), 'scope' => 'all',
+            'flags' => [], 'matrix' => ['files' => ['v' => 1]]]);
+        $clientAcc = User::create(['name' => 'حسابُ عميل', 'email' => Str::random(8) . '@client.local',
+            'password' => 'Secret!2026x', 'role_id' => $role->id, 'status' => 'نشط',
+            'account_type' => 'client', 'clients' => [$c->id], 'password_changed_at' => now()]);
+        $this->actingAs($clientAcc);
+        $filesClient = collect(hub_related('projects', $p->id))->firstWhere('module', 'files');
+        $this->assertNotNull($filesClient);
+        $ids = collect($filesClient['rows'])->pluck('id')->map('strval')->all();
+        $this->assertSame([(string) $clientDoc->id], $ids, 'حسابُ العميل رأى ابناً داخليّاً');
     }
 }

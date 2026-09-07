@@ -20,7 +20,24 @@ class Project extends Model
     public const MODULE = 'projects';
     public const DISPLAY = 'name';
 
+    /**
+     * جمهورُ المشروع (Work OS · الطور D · WP-D.1 · SF-4) — المصنِّفُ الصلب:
+     *   • `internal` — مشروعٌ داخليٌّ لِـلينوميا (الافتراض).
+     *   • `client`   — مشروعٌ خارجيٌّ لعميلٍ بعينه، له غرفتاه المنفصلتان.
+     * allowlist في التطبيق لا كـenum على القاعدة (درسُ C10): إضافةُ قيمةٍ مستقبلاً
+     * سطرٌ هنا لا ALTER. والافتراضُ داخليّ — لا يتحوّل مشروعٌ لخارجيٍّ بالسهو.
+     */
+    public const AUDIENCE_INTERNAL = 'internal';
+    public const AUDIENCE_CLIENT = 'client';
+
+    public const AUDIENCES = [self::AUDIENCE_INTERNAL, self::AUDIENCE_CLIENT];
+
     protected $guarded = ['id', 'version', 'created_by'];
+
+    /** الجمهورُ الافتراضيّ على النموذج نفسِه — داخليّ، لا يُترك للقاعدة وحدَها (SF-4) */
+    protected $attributes = [
+        'audience' => self::AUDIENCE_INTERNAL,
+    ];
 
     protected $casts = [
         'members' => 'array',
@@ -35,6 +52,9 @@ class Project extends Model
         'custom' => 'array',
         'meta' => 'array',
         'archived' => 'boolean',
+        // (Work OS · الطور D · WP-D.3) إشارةُ الحجب الداخليّ — إضافيّةٌ لا حالةُ حياة.
+        // `hold_reason` نصٌّ حرٌّ فلا cast له؛ كلاهما قابلُ الإسناد عبر $guarded القائم.
+        'blocked' => 'boolean',
     ];
 
     protected static function booted(): void
@@ -54,6 +74,28 @@ class Project extends Model
         static::saved($bust);
         static::deleted($bust);
         static::restored($bust);
+
+        // حارسُ الجمهور — «enum التطبيق» البديلُ عن DB enum (C10): الفراغُ يعود إلى
+        // `internal` (مشروعٌ بلا جمهورٍ صريحٍ داخليٌّ لا يتحوّل بالسهو)، وأيُّ قيمةٍ
+        // خارج allowlist تُرفض قبل الكتابة. إضافةُ قيمةٍ مستقبلاً سطرٌ هنا لا ALTER.
+        static::saving(function (self $p): void {
+            if ($p->audience === null || $p->audience === '') {
+                $p->audience = self::AUDIENCE_INTERNAL;
+            }
+            if (! in_array($p->audience, self::AUDIENCES, true)) {
+                throw new \InvalidArgumentException("جمهورُ مشروعٍ غيرُ صالح: {$p->audience}");
+            }
+        });
+    }
+
+    /**
+     * مشروعٌ خارجيّ (Work OS · الطور D) — منسوبٌ لعميلٍ فله غرفتاه المنفصلتان.
+     * الكاشفُ العمليُّ هو وجودُ `client_id` (المشاريعُ القائمةُ من سكّة العرض تحمله
+     * قبل أن يُملأ `audience`)، ويُشدّ بجمهورٍ صريحٍ `client` متى وُسم.
+     */
+    public function isExternal(): bool
+    {
+        return $this->client_id !== null || $this->audience === self::AUDIENCE_CLIENT;
     }
 
     public function company(): BelongsTo

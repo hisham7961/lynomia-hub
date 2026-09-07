@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Comment;
+use App\Models\Conversation;
 use App\Models\HubNotification;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\ChatCommands;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -90,7 +92,34 @@ class CommentController extends Controller
             'internal'  => ['nullable', 'boolean'],
         ]);
 
-        [$module, $recordId] = $this->guardTarget($data['module'], $data['record_id'] ?? null);
+        // (WP-C.1) رسالةُ قناةٍ: تُنسَب لحاويتها عبر `conversation_id` — لا محرّكَ
+        // رسائلَ ثانٍ. الحرسُ بالعضويّة (`guardConversation`) لا بمصفوفةِ وحدةٍ:
+        // ردٌّ لا يُحقَن في قناةٍ لا يراها القارئ (٤٠٤)، والضيفُ لا يكتب (٤٠٣).
+        $conversationId = null;
+        $reqConv = trim(hub_str($r->input('conversation_id')));
+        if (($data['module'] ?? '') === 'channel' || $reqConv !== '') {
+            $convId = $reqConv !== '' ? $reqConv : (string) ($data['record_id'] ?? '');
+            [$conv] = ConversationController::guardConversation($convId, 'post');
+            [$module, $recordId] = ['channel', (string) $conv->id];
+            $conversationId = (string) $conv->id;
+        } else {
+            [$module, $recordId] = $this->guardTarget($data['module'], $data['record_id'] ?? null);
+        }
+
+        // (WP-C.3 · §8) **أوامرُ المحادثة**: رسالةٌ تبدأ بـ/task ‏/issue ‏/assign تُنفَّذ
+        // خدمةً حقيقيّةً لا نصّاً يُخزَّن — والحرسُ هنا فوق حرسِ السياقِ الذي مرّ توّاً:
+        // السياقُ (القناة/السجل) مضمونُ الرؤية سلفاً (guardConversation/guardTarget)، ثم
+        // يفرض المُوزِّعُ `hub_can(op)` على الوحدةِ الهدف. مجهولٌ → ٤٢٢، غيرُ مصرّحٍ → ٤٠٣،
+        // ولا نصٌّ يُخزَّن في أيّ الحالتين (لا نجاحٌ زائف). الأمرُ فعلٌ رأسيّ لا ردٌّ على خيط.
+        if (empty($data['parent_id']) && ($parsed = ChatCommands::parse($data['body'])) !== null) {
+            $res = ChatCommands::dispatch($parsed, auth()->user(), [
+                'module'          => $module,
+                'record_id'       => $recordId,
+                'conversation_id' => $conversationId,
+            ]);
+
+            return back()->with('ok', $res['message'])->withFragment('c-' . $res['backlink']->id);
+        }
 
         // **الردُّ يلتصق بخيطه** (v2.322): `exists:comments,id` تُثبت وجودَ الأب
         // لا انتماءَه — فردٌّ يُدسّ في خيطِ سجلٍ لا يملك المستخدم رؤيته، ويظهر
@@ -118,6 +147,12 @@ class CommentController extends Controller
             'created_at' => now(),
         ];
 
+        // (WP-C.1) نسبةُ رسالةِ القناةِ إلى حاويتها المطبَّعة — عمودٌ حديثٌ يُكتَب فقط
+        // حين وُجد (نشرٌ سبق هجرتَه لا يُطفئ الكتابة، نظيرُ hub_has_col في كل مكان).
+        if ($conversationId !== null && hub_has_col('comments', 'conversation_id')) {
+            $attrs['conversation_id'] = $conversationId;
+        }
+
         // (WP-A.5) منشورُ القناةِ يُوسَم بشركة ناشره المقيَّد فينعزل عنها القارئُ
         // من شركةٍ أخرى؛ ناشرٌ غيرُ مقيَّد (المالك) يترك العمودَ فارغاً = إعلانٌ عامّ.
         // خيوطُ السجلات لا تُوسَم هنا: نطاقُها من سجلِها الأمّ عبر `guardTarget`.
@@ -140,9 +175,12 @@ class CommentController extends Controller
         // تنطيقُ السجل الأمّ أولاً كما في toTask: تثبيتٌ على سجلٍ خارج النطاق
         // كان يمرّ بمجرد امتلاك «تعديل» الوحدة دون فحص أن السجل نفسه مرئيّ
         $this->guardTarget($c->module, $c->record_id);
-        $can = $c->module === 'feed'
-            ? hub_monitor()
-            : hub_can(auth()->user(), $c->module, 'e');
+        $can = match ($c->module) {
+            'feed'    => hub_monitor(),
+            // تثبيتُ رسالةِ قناةٍ لأصحابها ومشرفيها — الدورُ عضويّةٌ لا مصفوفة
+            'channel' => Conversation::roleCanManage(Conversation::roleOf($c->record_id, (string) auth()->id())),
+            default   => hub_can(auth()->user(), $c->module, 'e'),
+        };
         abort_unless($can, 403);
 
         $c->update(['pinned' => ! $c->pinned, 'updated_at' => now()]);
@@ -159,8 +197,11 @@ class CommentController extends Controller
         $c = Comment::findOrFail($id);
         // السجلُّ الأمّ ضمن النطاق أولاً — ثم صاحبُ التعليق أو من يملك تعديله
         $this->guardTarget($c->module, $c->record_id);
-        $can = $c->user_id === auth()->id()
-            || ($c->module === 'feed' ? hub_monitor() : hub_can(auth()->user(), $c->module, 'e'));
+        $can = $c->user_id === auth()->id() || match ($c->module) {
+            'feed'    => hub_monitor(),
+            'channel' => Conversation::roleCanManage(Conversation::roleOf($c->record_id, (string) auth()->id())),
+            default   => hub_can(auth()->user(), $c->module, 'e'),
+        };
         abort_unless($can, 403);
 
         $done = $c->resolved_at === null;
@@ -310,6 +351,15 @@ class CommentController extends Controller
     {
         if ($module === 'feed') return ['feed', null];
 
+        // (WP-C.1) رسالةُ قناةٍ: الهدفُ حاويةٌ لا سجلُّ وحدة — الحرسُ بالعضويّة عبر
+        // `guardConversation` (نظيرُ هذا الحارس تماماً: يرى = يتفاعل). فتُعاد
+        // كلُّ أفعالِ التعليق (تفاعل/تثبيت/حل/تحويل) على رسائل القناة بالسكّة نفسها.
+        if ($module === 'channel') {
+            [$conv] = ConversationController::guardConversation((string) $recordId, 'v');
+
+            return ['channel', (string) $conv->id];
+        }
+
         $def = hub_mod($module);
         abort_unless($def && $recordId, 404);
         abort_unless(hub_can(auth()->user(), $module, 'v'), 403);
@@ -359,6 +409,12 @@ class CommentController extends Controller
         hub_notify($uid, $kind, $text,
             $module === 'feed' ? null : $module,
             $module === 'feed' ? null : $recordId);
+    }
+
+    /** غلافٌ عامٌّ لسجل القراءة — تستدعيه شاشةُ القناة (نفسُ سكّة read_by) */
+    public function markReadPublic($comments): void
+    {
+        $this->markRead($comments);
     }
 
     /** سجل القراءة: يُضاف المستخدم الحالي لمن قرأ (التعليقات والردود المعروضة) */

@@ -465,6 +465,14 @@ class QuoteController extends Controller
             // العضويّةِ الفريد — فقبولان لا يُنشئان إلا مساحةً واحدةً ويُطلقان الحدثَ مرّةً.
             $this->provisionClientWorkspace($q, $project);
 
+            // (٦) حدثُ توفيرِ المشروع (Work OS · الطور D · WP-D.4 · §63–73): يُطلَق **داخلَ**
+            // المعاملةِ والقفلِ نفسِهما — لا مسارَ توفيرٍ ثانٍ — مرّةً واحدةً بجانبِ
+            // quote.converted (السطرُ ٤٥٩). مُتكرِّرةُ التنفيذ تحت حارسِ meta.project_id
+            // أعلاه (قبولٌ مكرَّرٌ يعود قبل الوصولِ هنا)، فقبولان لا يُطلقانه مرّتين، ويرتدّ
+            // مع ارتدادِ المعاملة. الخامُّ `provisioned` يشتقّ project.provisioned
+            // المُصرَّحَ في config('hub.events.projects').
+            \App\Support\FlowRunner::fire('provisioned', 'projects', $project);
+
             return redirect()->route('m.show', ['projects', $project->id])
                 ->with('ok', '🚀 أُنشئ المشروع والارتباط من العرض — نُقل النطاق وحُفظ خطُّ الأساس التجاريّ، وأُنشئت مساحةُ العميل');
         });

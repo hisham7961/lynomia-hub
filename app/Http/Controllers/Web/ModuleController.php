@@ -367,6 +367,22 @@ class ModuleController extends Controller
         // الخط الزمني الموحَّد — يدمج التدقيق والتعليقات والمرفقات والإصدارات
         $timeline = hub_timeline($module, $row->id);
 
+        // عزلُ العميل (محقّق C1 — الحارسُ يغلب المصفوفة): حسابُ العميل — ولو مُنِح دورُه
+        // صلاحيّةَ عرضِ وحدةٍ من قائمة PortalGuard البيضاء (projects/engagements/fin)
+        // بالخطأ — لا يرى على الشاشة الداخليّة أثراً داخليّاً: لا مرفقاتٍ (ملفّاتٌ داخليّة)،
+        // ولا إصداراتٍ (تاريخُ تحريرٍ داخليّ)، ولا خطاً زمنيّاً (يدمج التدقيق)، ولا تعليقاتِ
+        // السجلّ الداخليّة. سطحُ العميلِ الصحيحُ بوّابتُه (/portal): وثائقُ audience المُنطَّقة
+        // وغرفةُ العميل. الأبناءُ (children) مُرشَّحون audience سلفاً في hub_related (الطور D).
+        if (hub_is_client(auth()->user())) {
+            $attachments = collect();
+            $aUsers      = collect();
+            $versions    = collect();
+            $verUsers    = collect();
+            $comments    = collect();
+            $cUsers      = [];
+            $timeline    = [];
+        }
+
         return view('modules.show', compact('module', 'def', 'row', 'labels', 'children', 'versions', 'verUsers', 'comments', 'cUsers', 'attachments', 'aUsers', 'timeline'));
     }
 

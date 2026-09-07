@@ -1,18 +1,22 @@
-{{-- قسم التعليقات — يتوقع: $cModule $cRecordId $comments $users (id=>name) --}}
+{{-- قسم التعليقات — يتوقع: $cModule $cRecordId $comments $users (id=>name)
+     واختيارياً (رسائلُ قناةٍ · WP-C.1): $cConversationId · $cCanPost · $cChannelMod --}}
 @php $reactions = \App\Http\Controllers\Web\CommentController::reactionsFor($comments); @endphp
 <div class="card" id="comments">
     <h3>💬 التعليقات <span class="bdg g">{{ $comments->count() }}</span></h3>
 
     @forelse ($comments as $c)
-        @include('partials._comment', ['c' => $c, 'users' => $users, 'depth' => 0])
+        @include('partials._comment', ['c' => $c, 'users' => $users, 'depth' => 0,
+            'channelMod' => $cChannelMod ?? false])
     @empty
         <div class="sub" style="padding:8px 0 14px">لا تعليقات بعد — كن أول من يعلّق</div>
     @endforelse
 
+    @if ($cCanPost ?? true)
     <form method="POST" action="{{ route('comments.store') }}" enctype="multipart/form-data" class="cform">
         @csrf
         <input type="hidden" name="module" value="{{ $cModule }}">
         <input type="hidden" name="record_id" value="{{ $cRecordId }}">
+        @isset($cConversationId)<input type="hidden" name="conversation_id" value="{{ $cConversationId }}">@endisset
         <textarea class="inp" name="body" rows="2" required maxlength="4000"
                   placeholder="اكتب تعليقاً… استخدم @الاسم لذكر زميل"></textarea>
         <div class="crow">
@@ -32,4 +36,5 @@
         </div>
         @error('body')<div class="err">{{ $message }}</div>@enderror
     </form>
+    @endif
 </div>

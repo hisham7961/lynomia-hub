@@ -44,4 +44,21 @@ class DmMessage extends Model
     {
         return implode('-', collect([$a, $b])->sort()->values()->all());
     }
+
+    /**
+     * (WP-C.4 · §6/§7) هويّةُ حاويةِ المحادثة المشتقّةُ حتميّاً من `thread_key`.
+     *
+     * uuid5 (اسميّةٌ لا عشوائيّة): المفتاحُ نفسُه يُنتج الهويّةَ نفسَها دائماً —
+     * فـ`thread_key` و`conversation_id` يحلّان إلى **حاويةٍ واحدة** لا هويّتَين.
+     * وبما أنها المفتاحُ الأساس (PK) لجدول `conversations`، تفرض الوحدانيّةَ حتى
+     * تحت التسابق: إرسالان أوّلان متزامنان يحسبان الهويّةَ عينَها فيفوز أحدُهما
+     * والآخرُ يعيد استعمالَها؛ ولا مسارَ يخلق حاويتَين للثنائيّ الواحد. تُستدعى من
+     * الكاتب الحيّ (`DmController`) ومن هجرةِ التعبئة معاً فتُقفَل الحتميّةُ بينهما.
+     */
+    public static function conversationIdForThread(string $threadKey): string
+    {
+        return \Ramsey\Uuid\Uuid::uuid5(
+            \Ramsey\Uuid\Uuid::NAMESPACE_URL, 'lynomia:dm:' . $threadKey
+        )->toString();
+    }
 }

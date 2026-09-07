@@ -80,9 +80,13 @@
         @endif
         {{-- الإقرار الموثَّق — يظهر للوحدات المسجَّلة في config/hub_acks.php وحدها --}}
         @include('partials.acks')
-        {{-- v2.123: خطاف مساحة عمل مخصصة للوحدة — لا أثر على وحدة بلا ملف مخصص --}}
+        {{-- v2.123: خطاف مساحة عمل مخصصة للوحدة — لا أثر على وحدة بلا ملف مخصص.
+             (Work OS · الطور D · WP-D.2 · §11) المشاريعُ تملك قشرةَ تبويبات: مركزُ
+             قيادةٍ يُجمّع البطاقاتِ ويُلبِس البياناتِ والملفَّ والخطَّ الزمنيَّ والغرفَ
+             في تبويبات — فيُدار جسدُها كلُّه هناك، لا مكرَّراً أسفلَ القشرة. --}}
         @includeIf('modules.custom.' . $module)
 
+        @unless ($module === 'projects')
         <div class="card" style="--mh:{{ $look['color'] }}">
             <h3 class="cardtitle">📋 البيانات</h3>
             <dl class="detail">
@@ -114,14 +118,17 @@
         @include('partials.record_list', ['children' => $children, 'ownerId' => $row->id])
         @include('partials.timeline', ['timeline' => $timeline])
         @include('partials.comments', ['cModule' => $module, 'cRecordId' => $row->id, 'comments' => $comments, 'users' => $cUsers])
+        @endunless
     </div>
 
     <aside class="rec-rail">
-        @if (in_array($module, ['projects', 'companies', 'clients'], true))
+        {{-- بطاقاتُ أودو (إيراداتٌ ومبيعاتُ قنوات) اقتصادٌ داخليّ — تُحجب عن حساب
+             العميل ولو بلغ الشاشةَ (Work OS · الطور D · §9: لا مالية للعميل). --}}
+        @if (in_array($module, ['projects', 'companies', 'clients'], true) && ! ($module === 'projects' && hub_is_client(auth()->user())))
             @include('partials.odoo_card')
         @endif
-        {{-- مبيعات قنوات البيع (ترنديول/أمازون/نون/المتجر) من أودو — للمشاريع --}}
-        @if ($module === 'projects')
+        {{-- مبيعات قنوات البيع (ترنديول/أمازون/نون/المتجر) من أودو — للمشاريع الداخلية --}}
+        @if ($module === 'projects' && ! hub_is_client(auth()->user()))
             @include('partials.odoo_channels_card')
         @endif
         @if (in_array($module, ['clients', 'companies', 'hr', 'suppliers', 'recruit', 'projects',

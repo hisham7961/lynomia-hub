@@ -2,8 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\Comment;
+use App\Models\Conversation;
+use App\Models\ConversationMember;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\StepUp;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -157,5 +161,50 @@ class AuditScopeLeakTest extends TestCase
             ->assertSee('قيد نظامي بلا وحدة')
             // والقائمةُ المنسدلة تعرض له كلَّ الوحدات
             ->assertSee('ملفات الموظفين');
+    }
+
+    /**
+     * **امتدادُ Work OS (WP-C.2 · §6):** الوصولُ الرقابيُّ إلى محادثةٍ **هو سجلُّ
+     * التدقيق نفسُه لا سجلٌّ ثانٍ** — القراءةُ الرقابيّةُ تكتب صفَّ `hub_audit` يحمل
+     * القارئَ والسببَ ومعرّفَ المحادثة، فيقرؤه مالكُ السجل في `/admin/audit` كأيّ قيد.
+     * (لا جدولَ «سجلِّ وصولٍ» موازٍ — سلسلةُ التدقيق المختومةُ هي دفترُ الرقابة.)
+     */
+    public function test_an_oversight_read_lands_in_the_audit_chain_not_a_second_log(): void
+    {
+        $this->seedCore();
+        $this->hubSetting('collab.oversight_role', 'مراقبُ الامتثال');
+
+        // قناةٌ يملكها الموظفُ برسالةٍ فيها
+        $conv = new Conversation();
+        $conv->kind = 'channel';
+        $conv->title = 'قناةُ التحقيق الرقابيّ';
+        $conv->audience = 'internal';
+        $conv->visibility = 'private';
+        $conv->created_by = $this->employee->id;
+        $conv->save();
+        ConversationMember::create(['conversation_id' => $conv->id, 'user_id' => $this->employee->id,
+            'role' => 'owner', 'source' => 'explicit']);
+        Comment::create(['module' => 'channel', 'record_id' => $conv->id, 'conversation_id' => $conv->id,
+            'user_id' => $this->employee->id, 'body' => 'محتوى القناة', 'read_by' => [$this->employee->id],
+            'created_at' => now()]);
+
+        // ضابطُ رقابةٍ (دورٌ غير المالك) — تصعيدٌ حقيقيّ ثم قراءةٌ بسببٍ مميَّز
+        $role = Role::create(['name' => 'مراقبُ الامتثال', 'scope' => 'all', 'flags' => [], 'matrix' => []]);
+        $officer = User::create(['name' => 'ضابطُ الرقابة', 'email' => Str::random(8) . '@test.local',
+            'password' => 'Secret!2026x', 'role_id' => $role->id, 'status' => 'نشط', 'password_changed_at' => now()]);
+        $this->actingAs($officer)->post('/stepup', ['answer' => 'Secret!2026x', 'next' => '/'])->assertRedirect();
+        $this->assertTrue(StepUp::fresh());
+
+        $reason = 'تحقيقٌ رقابيٌّ موثَّق-' . Str::random(4);
+        $this->actingAs($officer)->get('/oversight/' . $conv->id . '?reason=' . urlencode($reason))->assertOk();
+
+        // القيدُ في السلسلة نفسِها — يحمل القارئَ والمحادثةَ والسبب
+        $this->assertDatabaseHas('audits', ['user_id' => $officer->id, 'module' => 'oversight',
+            'action' => 'oversight.read', 'record_id' => $conv->id, 'reason' => $reason]);
+
+        // ومالكُ السجل يقرؤه في شاشة التدقيق كأيّ قيد — لا دفترَ رقابةٍ ثانٍ مخبّأ
+        $this->actingAs($this->owner)->get('/admin/audit')->assertOk()
+            ->assertSee('oversight.read')
+            ->assertSee($reason);
     }
 }

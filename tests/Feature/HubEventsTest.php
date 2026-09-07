@@ -132,7 +132,13 @@ class HubEventsTest extends TestCase
         // وتُضاف (Work OS · الطور B · WP-B.3): `client_memberships` جدولُ عضويّةٍ
         // يديره ClientMemberController لا سجلُّ الوحدات (hub_mod لها null)، يحمل
         // حدثَي منح/سحبٍ دلاليّين بلا `to` — فيخضع للشرط الأصرم نفسِه لا لاستثناءٍ رخو.
-        $eventOnlyContainers = ['conversations', 'client_memberships'];
+        // وتُضاف (Work OS · الطور E · WP-E.2): `custody` حاويةُ حركاتِ عهدةٍ تُطلق
+        // أحداثَها خدمةُ الترحيل عبر FlowRunner لا تحوّلَ حالةٍ في سجلّ — حدثٌ دلاليٌّ
+        // بلا `to` (وحدتُها ومسارُها في WP-E.3)، فيخضع للشرط الأصرم نفسِه.
+        // وتُضاف (Work OS · الطور F · WP-F.3): `inventory` حاويةُ جلساتِ جردٍ يديرها
+        // InventoryController لا سجلُّ الوحدات (hub_mod لها null)، تحمل حدثَ إغلاقٍ
+        // دلاليّاً (inventory.session_closed) بلا `to` — فتخضع للشرط الأصرم نفسِه لا لاستثناءٍ رخو.
+        $eventOnlyContainers = ['conversations', 'client_memberships', 'custody', 'inventory'];
 
         foreach ((array) config('hub.events') as $module => $rules) {
             if (in_array($module, $eventOnlyContainers, true)) {

@@ -167,6 +167,92 @@ class ColumnFitsItsWriterTest extends TestCase
             'قيمةُ allowlist أطولُ من عمودها — تمرّ على SQLite وترمي على MySQL: ' . implode(' · ', $tight));
     }
 
+    /**
+     * (Work OS · الطور E · WP-E.1) أعمدةُ allowlist في دفترِ العهدة المالية تسع
+     * أطولَ قيمةٍ شرعيّةٍ فيها — القيَمُ تُفرَض في النموذج لا كـenum على القاعدة
+     * (C10)، فالعمودُ نصٌّ واسع (kind=٢٠، approval_state=١٢). ولو ضاق عن أطولِ
+     * قيمةٍ لمرّ على SQLite ورمى على MySQL فسقط ترحيلُ حركةٍ ماليّة.
+     */
+    public function test_custody_allowlist_values_fit_their_columns(): void
+    {
+        // العرضُ المعلَنُ صراحةً في الهجرة — يُقرأ من المصدر لا من القاعدة
+        $this->assertSame(20, hub_col_max('employee_custody_moves', 'kind'),
+            'عرضُ employee_custody_moves.kind يجب أن يكون ٢٠ كما تعلنه الهجرة');
+
+        $checks = [
+            ['employee_custody_moves', 'kind', \App\Models\EmployeeCustodyMove::KINDS],
+            ['employee_custody_moves', 'approval_state', \App\Models\EmployeeCustodyMove::APPROVAL_STATES],
+        ];
+
+        $tight = [];
+        foreach ($checks as [$table, $col, $allow]) {
+            $max = hub_col_max($table, $col);
+            if ($max === null) continue;
+            foreach ($allow as $val) {
+                if (mb_strlen($val) > $max) {
+                    $tight[] = "{$table}.{$col} عرضُه {$max} والقيمة «{$val}» أطول";
+                }
+            }
+        }
+
+        $this->assertSame([], $tight,
+            'قيمةُ allowlist أطولُ من عمودها — تمرّ على SQLite وترمي على MySQL: ' . implode(' · ', $tight));
+    }
+
+    /**
+     * (Work OS · الطور F · WP-F.2 · C11) الحالاتُ الإحدى عشرة تسع عمودَ
+     * `assets.status` (٨٠)، وأفعالُ العهدة الجديدة تسع `asset_custody.action` (٤٠) —
+     * allowlist في التطبيق لا enum على القاعدة (C10)، فإضافةُ حالةٍ سطرٌ لا ALTER؛
+     * ولو ضاق عمودٌ عن أطولِ قيمةٍ لمرّ على SQLite ورمى على MySQL فسقط انتقالُ حالة.
+     */
+    public function test_asset_lifecycle_allowlist_values_fit_their_columns(): void
+    {
+        $tight = [];
+
+        $statusMax = hub_col_max('assets', 'status');
+        if ($statusMax !== null) {
+            foreach (\App\Support\Custody::STATUSES as $val) {
+                if (mb_strlen($val) > $statusMax) {
+                    $tight[] = "assets.status عرضُه {$statusMax} والحالة «{$val}» أطول";
+                }
+            }
+        }
+
+        $actionMax = hub_col_max('asset_custody', 'action');
+        if ($actionMax !== null) {
+            foreach (['تسليم', 'استرداد', 'نقل', 'خروج مؤقت', 'خروج نهائي',
+                      'إسناد لمحطة', 'إخلاء من محطة', 'تغيير حالة'] as $val) {
+                if (mb_strlen($val) > $actionMax) {
+                    $tight[] = "asset_custody.action عرضُه {$actionMax} والفعل «{$val}» أطول";
+                }
+            }
+        }
+
+        $this->assertSame([], $tight,
+            'قيمةُ allowlist أطولُ من عمودها — تمرّ على SQLite وترمي على MySQL: ' . implode(' · ', $tight));
+    }
+
+    /**
+     * (Work OS · الطور F · WP-F.2 · C11) خياراتُ حالة الأصل في سجل الوحدة **مصدرها
+     * الوحيد** `Custody::STATUSES` — فلا تنحرف القائمتان (توسيعُ إحداهما دون الأخرى
+     * يترك خريطةَ الانتقال أو الكانبان على مفرداتٍ قديمة). ١١ حالةً، والخمسُ القديمةُ
+     * ضمنها حرفاً (توافقٌ رجعيّ §86).
+     */
+    public function test_asset_status_options_are_single_sourced_from_custody(): void
+    {
+        $field = collect(config('hub.modules.assets.fields'))->firstWhere('key', 'status');
+        $this->assertNotNull($field, 'حقلُ الحالة اختفى من سجل وحدة الأصول');
+        $this->assertSame(\App\Support\Custody::STATUSES, (array) ($field['options'] ?? []),
+            'خياراتُ حالة الأصل في config انحرفت عن Custody::STATUSES — مصدرٌ واحدٌ لا مصدران');
+        $this->assertTrue((bool) ($field['locked'] ?? false),
+            'حقلُ الحالة يجب أن يكون locked — يُكتَب عبر Custody لا من النموذج العامّ');
+        $this->assertCount(11, \App\Support\Custody::STATUSES, 'الحالاتُ يجب أن تكون إحدى عشرة');
+        foreach (\App\Support\Custody::LEGACY_STATUSES as $legacy) {
+            $this->assertContains($legacy, \App\Support\Custody::STATUSES,
+                "الحالةُ القديمة «{$legacy}» أُسقِطت — كسرُ توافقٍ رجعيّ (§86)");
+        }
+    }
+
     /** والإشعارُ من قاعدة تنبيه يُكتب فعلاً — لا نظرياً */
     public function test_a_rule_notification_is_actually_written(): void
     {
