@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Asset;
+use App\Models\PhoneNumber;
 use App\Models\Product;
 use App\Models\RecordIdentifier;
 use App\Models\StockItem;
@@ -30,6 +31,7 @@ class Identity
         'lyn' => 'كود Lynomia', 'gtin' => 'GTIN', 'ean' => 'EAN', 'upc' => 'UPC',
         'barcode' => 'باركود', 'serial' => 'الرقم التسلسلي', 'mpn' => 'رقم قطعة المصنع',
         'sku' => 'SKU', 'tag' => 'وسم أصل', 'alias' => 'كود سابق (دمج)',
+        'iccid' => 'ICCID', 'msisdn' => 'MSISDN',   // هويّةُ الاتصالات (Work OS · الطور G)
     ];
 
     /** أقصى قطع التسجيل الدفعي في طلبٍ واحد */
@@ -144,7 +146,9 @@ class Identity
         ])));
         $ids = RecordIdentifier::whereIn('norm', $norms)
             ->orderBy('created_at')->orderBy('id')->get();
-        foreach (['assets', 'products', 'stock'] as $module) {          // الأصلُ قبل الطراز قبل الصنف
+        // الأصلُ قبل الطراز قبل الصنف قبل خط الاتصالات (ICCID/MSISDN — الطور G):
+        // خطُّ الاتصالاتِ آخرُ المطابقين فلا يزاحمُ هويّةَ أصلٍ أو منتجٍ سابقة.
+        foreach (['assets', 'products', 'stock', 'phones'] as $module) {
             foreach ($ids->where('module', $module) as $hit) {
                 $found = self::openScoped($module, $hit->record_id, $user);
                 if ($found) return $found + ['via' => $hit->kind];
@@ -178,6 +182,10 @@ class Identity
             'stock' => hub_can($user, 'stock', 'v')
                 ? (($r = hub_company_scope(hub_scope(StockItem::query(), 'stock', $user), 'stock')->find($recordId))
                     ? ['type' => 'stock', 'row' => $r] : null) : null,
+            // خطُّ الاتصالات (Work OS · الطور G · §22): ICCID/MSISDN يُحلّان بنطاق
+            // القارئ نفسِه — الاتصالاتُ بنيةٌ داخليّة، فما لا تراه شاشتُه لا يراه بالمسح.
+            'phones' => hub_can($user, 'phones', 'v')
+                ? (($r = self::scopedPhones($user)->find($recordId)) ? ['type' => 'phone', 'row' => $r] : null) : null,
             default => null,
         };
     }
@@ -204,6 +212,11 @@ class Identity
     protected static function scopedProducts($user)
     {
         return hub_company_scope(hub_scope(Product::query(), 'products', $user), 'products');
+    }
+
+    protected static function scopedPhones($user)
+    {
+        return hub_company_scope(hub_scope(PhoneNumber::query(), 'phones', $user), 'phones');
     }
 
     /* ────────── منع التكرار ────────── */

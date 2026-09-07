@@ -2,9 +2,9 @@
     "openapi": "3.1.0",
     "info": {
         "title": "Lynomia Business Hub — REST API",
-        "version": "2.414.0",
+        "version": "2.415.0",
         "description": "واجهة `/api/v1`: كل وحدات النظام بنفس صلاحيات صاحب المفتاح ونطاقه.\nمفتاح Bearer من «حسابي ← مفاتيح API». حدّ المعدل ١٢٠/دقيقة لكل مفتاح و٣٠٠/دقيقة لكل عنوان.\nكل ردٍّ يحمل `X-Request-Id` و`X-API-Version`، وكل خطأٍ يحمل `code` آلياً و`request_id`.",
-        "x-hub-version": "2.414.0"
+        "x-hub-version": "2.415.0"
     },
     "servers": [
         {
@@ -73,6 +73,10 @@
         {
             "name": "phones",
             "description": "أرقام الهواتف"
+        },
+        {
+            "name": "carriers",
+            "description": "مزوّدو الاتصالات"
         },
         {
             "name": "vault",
@@ -5159,6 +5163,426 @@
                 ],
                 "summary": "نقل أرقام الهواتف إلى السلة",
                 "operationId": "delete_phones",
+                "responses": {
+                    "200": {
+                        "description": "نُقل للسلة",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "deleted": {
+                                            "type": "boolean"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/409"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            }
+        },
+        "/api/v1/carriers": {
+            "get": {
+                "tags": [
+                    "carriers"
+                ],
+                "summary": "قائمة مزوّدو الاتصالات",
+                "operationId": "list_carriers",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/q"
+                    },
+                    {
+                        "$ref": "#/components/parameters/status"
+                    },
+                    {
+                        "$ref": "#/components/parameters/page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/per"
+                    },
+                    {
+                        "$ref": "#/components/parameters/sort"
+                    },
+                    {
+                        "$ref": "#/components/parameters/dir"
+                    },
+                    {
+                        "$ref": "#/components/parameters/fields"
+                    },
+                    {
+                        "$ref": "#/components/parameters/f"
+                    },
+                    {
+                        "$ref": "#/components/parameters/fl"
+                    },
+                    {
+                        "$ref": "#/components/parameters/created_from"
+                    },
+                    {
+                        "$ref": "#/components/parameters/created_to"
+                    },
+                    {
+                        "$ref": "#/components/parameters/updated_since"
+                    },
+                    {
+                        "$ref": "#/components/parameters/trash"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "قائمة مرقَّمة",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Carriers"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        },
+                                        "page": {
+                                            "type": "integer"
+                                        },
+                                        "last_page": {
+                                            "type": "integer"
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/ListMeta"
+                                        },
+                                        "request_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/422"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/503"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "carriers"
+                ],
+                "summary": "إنشاء مزوّدو الاتصالات",
+                "operationId": "create_carriers",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/Idempotency-Key"
+                    },
+                    {
+                        "$ref": "#/components/parameters/X-Change-Reason"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CarriersWrite"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "أُنشئ",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Carriers"
+                                        },
+                                        "request_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/409"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/422"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/503"
+                    }
+                }
+            }
+        },
+        "/api/v1/carriers/{id}": {
+            "parameters": [
+                {
+                    "$ref": "#/components/parameters/id"
+                }
+            ],
+            "get": {
+                "tags": [
+                    "carriers"
+                ],
+                "summary": "سجل مزوّدو الاتصالات",
+                "operationId": "show_carriers",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/fields"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "السجل",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Carriers"
+                                        },
+                                        "request_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "carriers"
+                ],
+                "summary": "استبدال مزوّدو الاتصالات كاملاً (الحقل الغائب يُفرَّغ)",
+                "operationId": "replace_carriers",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/If-Match"
+                    },
+                    {
+                        "$ref": "#/components/parameters/X-Change-Reason"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CarriersWrite"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "حُفظ",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Carriers"
+                                        },
+                                        "request_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/409"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/422"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            },
+            "patch": {
+                "tags": [
+                    "carriers"
+                ],
+                "summary": "تعديل مزوّدو الاتصالات جزئياً (الحقول المُرسَلة فقط)",
+                "operationId": "update_carriers",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/If-Match"
+                    },
+                    {
+                        "$ref": "#/components/parameters/X-Change-Reason"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CarriersWrite"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "حُفظ",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Carriers"
+                                        },
+                                        "request_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/409"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/422"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "carriers"
+                ],
+                "summary": "نقل مزوّدو الاتصالات إلى السلة",
+                "operationId": "delete_carriers",
                 "responses": {
                     "200": {
                         "description": "نُقل للسلة",
@@ -38767,6 +39191,118 @@
                         "type": "string",
                         "title": "شركة الاتصالات"
                     },
+                    "lineType": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "SIM",
+                            "eSIM",
+                            "رقم ثابت",
+                            "رقم مجاني",
+                            "بيانات (M2M)"
+                        ],
+                        "title": "نوع الخط"
+                    },
+                    "iccid": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "ICCID (رقم الشريحة)"
+                    },
+                    "imsi": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "IMSI"
+                    },
+                    "msisdn": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "MSISDN (رقم الخدمة)"
+                    },
+                    "apn": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "APN"
+                    },
+                    "pin": {
+                        "nullable": true,
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "سرّ — لا يُعاد إلا لمن يملك علم الأسرار",
+                        "title": "PIN"
+                    },
+                    "puk": {
+                        "nullable": true,
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "سرّ — لا يُعاد إلا لمن يملك علم الأسرار",
+                        "title": "PUK"
+                    },
+                    "planName": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "اسم الباقة"
+                    },
+                    "planData": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "بيانات الباقة"
+                    },
+                    "planVoice": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "دقائق الباقة"
+                    },
+                    "planSms": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "رسائل الباقة"
+                    },
+                    "roaming": {
+                        "nullable": true,
+                        "type": "boolean",
+                        "title": "التجوال مُفعَّل"
+                    },
+                    "billingCycle": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "شهري",
+                            "ربع سنوي",
+                            "نصف سنوي",
+                            "سنوي",
+                            "مسبق الدفع",
+                            "لاحق الدفع"
+                        ],
+                        "title": "دورة الفوترة"
+                    },
+                    "carrierId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "carriers",
+                        "title": "المزوّد (السجل)"
+                    },
+                    "employeeId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "hr",
+                        "title": "الموظف المُخصَّص له"
+                    },
+                    "deviceId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "assets",
+                        "title": "الجهاز"
+                    },
+                    "stationId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "stations",
+                        "title": "المحطة"
+                    },
                     "companyId": {
                         "nullable": true,
                         "type": "string",
@@ -38820,9 +39356,28 @@
                         "enum": [
                             "نشط",
                             "موقوف",
-                            "منتهي"
+                            "منتهي",
+                            "مخزون",
+                            "قيد التفعيل",
+                            "مُعلَّق",
+                            "منتهي الاشتراك",
+                            "مُلغى",
+                            "مفقود",
+                            "بدل فاقد"
                         ],
                         "title": "الحالة"
+                    },
+                    "activatedAt": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "date",
+                        "title": "تاريخ التفعيل"
+                    },
+                    "deactivatedAt": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "date",
+                        "title": "تاريخ الإيقاف"
                     },
                     "notes": {
                         "nullable": true,
@@ -38872,6 +39427,118 @@
                         "type": "string",
                         "title": "شركة الاتصالات"
                     },
+                    "lineType": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "SIM",
+                            "eSIM",
+                            "رقم ثابت",
+                            "رقم مجاني",
+                            "بيانات (M2M)"
+                        ],
+                        "title": "نوع الخط"
+                    },
+                    "iccid": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "ICCID (رقم الشريحة)"
+                    },
+                    "imsi": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "IMSI"
+                    },
+                    "msisdn": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "MSISDN (رقم الخدمة)"
+                    },
+                    "apn": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "APN"
+                    },
+                    "pin": {
+                        "nullable": true,
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "سرّ — لا يُعاد إلا لمن يملك علم الأسرار",
+                        "title": "PIN"
+                    },
+                    "puk": {
+                        "nullable": true,
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "سرّ — لا يُعاد إلا لمن يملك علم الأسرار",
+                        "title": "PUK"
+                    },
+                    "planName": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "اسم الباقة"
+                    },
+                    "planData": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "بيانات الباقة"
+                    },
+                    "planVoice": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "دقائق الباقة"
+                    },
+                    "planSms": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "رسائل الباقة"
+                    },
+                    "roaming": {
+                        "nullable": true,
+                        "type": "boolean",
+                        "title": "التجوال مُفعَّل"
+                    },
+                    "billingCycle": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "شهري",
+                            "ربع سنوي",
+                            "نصف سنوي",
+                            "سنوي",
+                            "مسبق الدفع",
+                            "لاحق الدفع"
+                        ],
+                        "title": "دورة الفوترة"
+                    },
+                    "carrierId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "carriers",
+                        "title": "المزوّد (السجل)"
+                    },
+                    "employeeId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "hr",
+                        "title": "الموظف المُخصَّص له"
+                    },
+                    "deviceId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "assets",
+                        "title": "الجهاز"
+                    },
+                    "stationId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "stations",
+                        "title": "المحطة"
+                    },
                     "companyId": {
                         "nullable": true,
                         "type": "string",
@@ -38925,9 +39592,28 @@
                         "enum": [
                             "نشط",
                             "موقوف",
-                            "منتهي"
+                            "منتهي",
+                            "مخزون",
+                            "قيد التفعيل",
+                            "مُعلَّق",
+                            "منتهي الاشتراك",
+                            "مُلغى",
+                            "مفقود",
+                            "بدل فاقد"
                         ],
                         "title": "الحالة"
+                    },
+                    "activatedAt": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "date",
+                        "title": "تاريخ التفعيل"
+                    },
+                    "deactivatedAt": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "date",
+                        "title": "تاريخ الإيقاف"
                     },
                     "notes": {
                         "nullable": true,
@@ -38937,6 +39623,132 @@
                 },
                 "required": [
                     "number"
+                ]
+            },
+            "Carriers": {
+                "type": "object",
+                "title": "مزوّدو الاتصالات",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "version": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "description": "نسخة السجل — تُرسَل في If-Match"
+                    },
+                    "name": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "اسم المزوّد"
+                    },
+                    "companyId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "companies",
+                        "title": "الشركة"
+                    },
+                    "portalUrl": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uri",
+                        "title": "رابط بوّابة المزوّد"
+                    },
+                    "portalUsername": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "اسم المستخدم للبوّابة"
+                    },
+                    "portalPassword": {
+                        "nullable": true,
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "سرّ — لا يُعاد إلا لمن يملك علم الأسرار",
+                        "title": "كلمة مرور البوّابة"
+                    },
+                    "supportPhone": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "هاتف الدعم"
+                    },
+                    "accountNo": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "رقم الحساب لدى المزوّد"
+                    },
+                    "notes": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "ملاحظات"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    }
+                }
+            },
+            "CarriersWrite": {
+                "type": "object",
+                "title": "مزوّدو الاتصالات",
+                "properties": {
+                    "name": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "اسم المزوّد"
+                    },
+                    "companyId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "companies",
+                        "title": "الشركة"
+                    },
+                    "portalUrl": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uri",
+                        "title": "رابط بوّابة المزوّد"
+                    },
+                    "portalUsername": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "اسم المستخدم للبوّابة"
+                    },
+                    "portalPassword": {
+                        "nullable": true,
+                        "type": "string",
+                        "writeOnly": true,
+                        "description": "سرّ — لا يُعاد إلا لمن يملك علم الأسرار",
+                        "title": "كلمة مرور البوّابة"
+                    },
+                    "supportPhone": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "هاتف الدعم"
+                    },
+                    "accountNo": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "رقم الحساب لدى المزوّد"
+                    },
+                    "notes": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "ملاحظات"
+                    }
+                },
+                "required": [
+                    "name"
                 ]
             },
             "Vault": {
@@ -51289,7 +52101,8 @@
                             "visits",
                             "users",
                             "changeorders",
-                            "stations"
+                            "stations",
+                            "carriers"
                         ],
                         "title": "القسم"
                     },
@@ -51521,7 +52334,8 @@
                             "visits",
                             "users",
                             "changeorders",
-                            "stations"
+                            "stations",
+                            "carriers"
                         ],
                         "title": "القسم"
                     },

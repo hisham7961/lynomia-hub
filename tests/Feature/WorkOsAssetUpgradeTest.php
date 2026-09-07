@@ -62,9 +62,13 @@ class WorkOsAssetUpgradeTest extends TestCase
         $this->assertSame(1, AssetCustody::where('asset_id', $a->id)->where('action', 'تغيير حالة')->count(),
             'تغييرُ الحالة لم يكتب صفَّ حركةٍ في السجل — حالةٌ تبدّلت بلا أثر');
 
+        // تأكيدٌ على القيمتين لا على ترتيب المفاتيح: عمودُ JSON في MySQL 8 يعيد ترتيبَ
+        // مفاتيح الكائن عند التخزين (الأقصرُ أولاً: to قبل from) بينما تحفظ SQLite/MariaDB
+        // ترتيبَ الإدراج — فـ assertSame على المصفوفة كلِّها قرعةُ محرّكٍ (سقطت CI الـ480 بها).
         $row = AssetCustody::where('asset_id', $a->id)->where('action', 'تغيير حالة')->firstOrFail();
-        $this->assertSame(['from' => 'متاح', 'to' => 'صيانة'], (array) $row->meta,
-            'صفُّ الحركة لم يحفظ «من ← إلى»');
+        $meta = (array) $row->meta;
+        $this->assertSame('متاح', $meta['from'] ?? null, 'صفُّ الحركة لم يحفظ «من»');
+        $this->assertSame('صيانة', $meta['to'] ?? null, 'صفُّ الحركة لم يحفظ «إلى»');
     }
 
     /** ٣) كلُّ حالةٍ جديدة تُبلَغ بانتقالٍ شرعيّ — لا حالةَ يتيمةٌ لا تُطال */
