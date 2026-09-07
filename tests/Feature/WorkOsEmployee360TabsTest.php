@@ -23,7 +23,9 @@ use Tests\TestCase;
  *  • **الحرسُ الخادميّ:** GET مباشرٌ لتبويبٍ لا يملك القارئُ وحدتَه → **٤٠٣** لا
  *    مجرَّدُ غيابٍ في الشريط؛ فلا يُغسَل عزلُ الوحدة بطلبِ `?tab=` مصنوعٍ باليد.
  *  • **لا سكّةٌ زائفة (§82):** التبويبُ لا يُعرَض حتى تصل سكّتُه — الاتصالاتُ وصلت
- *    في G وأمنُ النقاط في J (WP-J.3)، وSystems ما زال غائباً (٤٠٤ لِـtab مجهول).
+ *    في G وأمنُ النقاط في J (WP-J.3) والأنظمةُ في M (WP-M.3 فوق حافّة H.1)،
+ *    فالسجلُّ مكتمل، وتبويبٌ مجهولٌ يبقى ٤٠٤ (والاكتمالُ نفسُه يُثبته
+ *    `WorkOsEmployee360CompletionTest` الممتدُّ من هذا الملف).
  *  • **تبويبُ المحطة (F.1) يتّصل حقّاً:** يقرأ محطاتِ الموظف بـ`current_employee_id`،
  *    منطَّقاً بالشركة كأيّ قارئ.
  */
@@ -113,8 +115,9 @@ class WorkOsEmployee360TabsTest extends TestCase
 
         // وكلُّ تبويبٍ لا يملك وحدتَه: ٤٠٣ — لا صفحةٌ صامتةٌ ولا لوحةٌ مخفيّة
         // (telecom أُضيف في الطور G — يتطلب phones:v؛ وendpoint في الطور J · WP-J.3
-        //  — يتطلب endpoints:v: hr:v وحدها لا تفتح أيّاً منهما)
-        foreach (['assets', 'station', 'telecom', 'endpoint', 'wallet'] as $tab) {
+        //  — يتطلب endpoints:v؛ وsystems في الطور M · WP-M.3 — يتطلب servers:v:
+        //  hr:v وحدها لا تفتح أيّاً منها)
+        foreach (['assets', 'station', 'telecom', 'systems', 'endpoint', 'wallet'] as $tab) {
             $this->actingAs($hrOnly)->get(route('portal.employee', $emp->id) . '?tab=' . $tab)
                 ->assertForbidden();
         }
@@ -125,10 +128,10 @@ class WorkOsEmployee360TabsTest extends TestCase
     }
 
     /**
-     * ④ لا بطاقةٌ زائفةٌ لسكّةٍ لم تصل (§82): سكّتا الاتصالات (الطور G) وأمنِ النقاط
-     * (الطور J · WP-J.3) **وصلتا** فتبويباهما حقيقيّان على الشريط ويُفتَحان؛ أمّا
-     * Systems (الطور H لم يبنِ تبويباً) فما زال غائباً — يُضاف التبويبُ عند وصولِ
-     * سكّته لا قبل.
+     * ④ لا بطاقةٌ زائفةٌ لسكّةٍ لم تصل (§82): سككُ الاتصالات (الطور G) وأمنِ النقاط
+     * (الطور J · WP-J.3) والأنظمةِ (الطور M · WP-M.3 فوق حافّة H.1) **وصلت كلُّها**
+     * فتبويباتُها حقيقيّةٌ على الشريط وتُفتَح؛ والقاعدةُ نفسُها بحالها: تبويبٌ
+     * لا سكّةَ له لا يُعرَض ولا يُفتَح — ٤٠٤ لِـtab مجهول.
      */
     public function test_no_placeholder_tab_for_an_unbuilt_rail(): void
     {
@@ -150,14 +153,21 @@ class WorkOsEmployee360TabsTest extends TestCase
         $this->actingAs($this->owner)->get(route('portal.employee', $emp->id) . '?tab=endpoint')
             ->assertOk();
 
-        // وسككٌ لم تُبنَ بعد (Systems): لا بطاقةَ زائفة
-        foreach (['tab=systems'] as $ghost) {
+        // وسكّةُ الأنظمة وصلت (الطور M · WP-M.3 فوق حافّة servers.hr_id من H.1):
+        // تبويبُها حقيقيٌّ ويُفتَح فعلاً — فالسجلُّ اكتمل بصفرِ بطاقاتٍ زائفة
+        $this->assertStringContainsString('tab=systems', $html,
+            'تبويبُ الأنظمة (سكّةُ WP-M.3 فوق حافّة H.1) لم يظهر على شريط الملفّ الشامل');
+        $this->actingAs($this->owner)->get(route('portal.employee', $emp->id) . '?tab=systems')
+            ->assertOk();
+
+        // وتبويبٌ لا سكّةَ له أصلاً: لا بطاقةَ زائفةً على الشريط
+        foreach (['tab=ghost'] as $ghost) {
             $this->assertStringNotContainsString($ghost, $html,
-                "شريطُ الملفّ عرض تبويباً لسكّةٍ لم تُبنَ بعد ({$ghost}) — بطاقةٌ زائفةٌ يمنعها §82");
+                "شريطُ الملفّ عرض تبويباً لسكّةٍ لا وجودَ لها ({$ghost}) — بطاقةٌ زائفةٌ يمنعها §82");
         }
 
-        // وطلبُ تبويبٍ لسكّةٍ لم تُبنَ باليد لا يفتح لوحةً صامتة — ٤٠٤ لا ٢٠٠
-        $this->actingAs($this->owner)->get(route('portal.employee', $emp->id) . '?tab=systems')
+        // وطلبُ تبويبٍ مجهولٍ باليد لا يفتح لوحةً صامتة — ٤٠٤ لا ٢٠٠
+        $this->actingAs($this->owner)->get(route('portal.employee', $emp->id) . '?tab=ghost')
             ->assertNotFound();
     }
 

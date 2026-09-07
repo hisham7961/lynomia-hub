@@ -166,10 +166,12 @@ class SearchController extends Controller
         $hits = array_filter($cat,
             fn ($d) => mb_stripos($d['t'] . ' ' . ($d['find'] ?? ''), $q) !== false);
 
-        // المطابقاتُ التشغيلية أوّلاً — أدقُّ من أيّ مطابقةِ اسمٍ ولا تُزاحَم في القصّ
+        // المطابقاتُ التشغيلية أوّلاً — أدقُّ من أيّ مطابقةِ اسمٍ ولا تُزاحَم في القصّ.
+        // ثم كياناتُ Work OS غيرُ الوحداتِ (القنواتُ بعضويّتها وكشوفُ العهدة بنطاقها —
+        // WP-M.1 · C14): نتائجُ سجلاتٍ محروسةٌ أدقُّ من مطابقةِ اسمِ صفحة، فقبل hits.
         $out = [];
         $seen = [];
-        foreach (array_merge($this->operational($q, $u), $hits) as $d) {
+        foreach (array_merge($this->operational($q, $u), $this->workOs($q, $u), $hits) as $d) {
             // لا رابطَ مكرَّر: الوحدةُ نفسُها قد تأتي من قائمة الوحدات ومن الكتالوج
             if (isset($seen[$d['u']])) continue;
             $seen[$d['u']] = true;
@@ -245,6 +247,80 @@ class SearchController extends Controller
         return $out;
     }
 
+    /**
+     * (Work OS · الطور M · WP-M.1 · C14) **مسارُ فهرسةٍ مُصرَّحٌ لِما ليس وحدةَ
+     * سجلّ** — البحثُ لا يعرف من كيانات Work OS إلا ما أُعلن هنا، وكلُّ إعلانٍ
+     * يحمل فلترَ شاشتِه الخادميَّ نفسَه (لا فهرسَ أوسعَ من بابه):
+     *
+     *  · **القنوات** (`conversations.kind=channel`): العضويّةُ الفعّالة شرطُ
+     *    الظهور ذاتُه — غيرُ العضو لا يرى حتى العنوان (العنوانُ وحدَه كشفُ وجودٍ،
+     *    نظيرُ ٤٠٤ `guardConversation`)، ومالكُ النظام نفسُه بلا عضويّةٍ لا
+     *    يُفهرَس له (بابُ الرقابة `comms_oversight` لا البحث). وفوق العضويّة
+     *    دفاعُ نطاقِ الشركة/العميل حرفاً بحرفٍ كما في `ConversationController@index`،
+     *    وخيطُ سجلٍّ يشترط صلاحيّةَ وحدتِه كما في `guardConversation` ٤.
+     *    (الخلاصةُ وDM بلا عناوينَ تُبحث — القنواتُ وحدَها تحمل عنواناً حرّاً.)
+     *  · **العهدةُ المالية** (`custody` — ليست وحدةَ سجلٍّ عمداً كي لا يُفتح لها
+     *    CRUD عامّ): يُفهرَس **كشفُ الموظف** لا حركاتُه — `hub_can('custody','v')`
+     *    + عزلُ الشركة على الموظف (`hub_scope('hr')`) وعلى وجودِ حركاتِه معاً
+     *    (نظيرُ `EmployeeCustodyController::moves`). والنتيجةُ اسمٌ ورابطٌ **بلا
+     *    أرقام**: المبالغُ خلف `hub_field_mode` في شاشتها، والبحثُ لا يسبقها.
+     *  · حسابُ العميل لا يبلغ البحثَ أصلاً (`PortalGuard` قائمةٌ بيضاءُ لا تضمّ
+     *    `search`/`search.mini` → ٤٠٤) — والفحصُ هنا دفاعٌ في العمق لا بابٌ بديل.
+     *
+     * (النقاطُ الطرفية والمحطاتُ والمزوّدون وحداتُ سجلٍّ تمرّ بسكّة الوحدات
+     * الموحَّدة — و`endpoints` وحدَها مشدودةٌ لمالك/مراقب في `searchableModules`.)
+     *
+     * كلفةُ الضغطة: استعلامان اثنان مُوثَّقان (قناةٌ وعهدة) — نظيرُ «+1 لكل وحدةٍ
+     * قابلةٍ للبحث» في ميزانية `OperationalSearchTest`، لا استجوابٌ تشغيليّ.
+     */
+    protected function workOs(string $q, $u): array
+    {
+        if (mb_strlen($q) < 2 || hub_is_client($u)) return [];
+
+        $out = [];
+        // هروبُ أحرف البدل بنمط Searchable نفسِه — «!» حرفُ الهروب الواحدُ في المحرّكين
+        $like = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $q) . '%';
+
+        // ١) القنوات — استعلامٌ واحد: عضويّةُ القارئ EXISTS داخلَه (صفُّ عضويّةٍ
+        //    = عضوٌ فعّال، مصدرُ الحسم نفسُه الذي يقرؤه Conversation::roleOf)
+        $rows = \App\Models\Conversation::channels()->active()->whereNull('deleted_at')
+            ->whereRaw("title LIKE ? ESCAPE '!'", [$like])
+            ->whereExists(fn ($s) => $s->selectRaw('1')->from('conversation_members')
+                ->whereColumn('conversation_members.conversation_id', 'conversations.id')
+                ->where('conversation_members.user_id', $u->id))
+            ->when(($cids = hub_company_ids($u)) !== null, fn ($qq) => $qq->where(
+                fn ($w) => $w->whereIn('company_id', $cids)->orWhereNull('company_id')))
+            ->when(($kids = hub_client_ids($u)) !== null, fn ($qq) => $qq->where(
+                fn ($w) => $w->whereIn('client_id', $kids)->orWhereNull('client_id')))
+            ->orderBy('title')->orderBy('id')->limit(3)
+            ->get(['id', 'title', 'module', 'record_id']);
+        foreach ($rows as $c) {
+            // خيطُ سجلٍّ على وحدةٍ حقيقية: صلاحيّةُ وحدتِه شرطٌ (guardConversation ٤)
+            if ($c->module && $c->record_id && hub_mod($c->module)
+                && ! hub_can($u, $c->module, 'v')) continue;
+            $out[] = ['t' => '#️⃣ قناة ' . $c->title, 'u' => route('conversations.show', $c->id)];
+        }
+
+        // ٢) كشوفُ العهدة المالية — Searchable لوحدة hr نفسُه (الحقولُ المحجوبةُ عن
+        //    الدور لا تُبحث، وأحرفُ البدل مهرَّبة) + عزلُ الشركة على الطرفين
+        if (hub_can($u, 'custody', 'v')) {
+            $ccids = hub_company_ids($u);
+            $emps = hub_scope(\App\Models\Employee::query()->search($q), 'hr')
+                ->whereExists(function ($s) use ($ccids) {
+                    $s->selectRaw('1')->from('employee_custody_moves')
+                        ->whereColumn('employee_custody_moves.employee_id', 'employees.id');
+                    if ($ccids !== null) $s->whereIn('employee_custody_moves.company_id', $ccids);
+                })
+                ->orderBy('name')->orderBy('id')->limit(3)->get(['id', 'name']);
+            foreach ($emps as $e) {
+                $out[] = ['t' => '👛 كشفُ عهدة ' . $e->name,
+                          'u' => route('custody.wallet.employee', $e->id)];
+            }
+        }
+
+        return $out;
+    }
+
     /* ────────── أدوات داخلية ────────── */
 
     /** الوحدات المؤهلة: يملك المستخدم عرضها وموديلها موجود (users لها صفحتها الإدارية) */
@@ -253,6 +329,12 @@ class SearchController extends Controller
         $out = [];
         foreach (hub_modules() as $key => $def) {
             if ($key === 'users') continue;
+            // (WP-M.1 · C14) أسطولُ النقاط الطرفية «رقابةٌ لا شاشةَ عموم» (قاعدةُ
+            // الطور J في مركزه): فهرسُ البحث يطابق حارسَ EndpointCentre — مالكٌ أو
+            // حاملُ رايةِ المراقبة فقط؛ صلاحيّةُ المصفوفة وحدَها لا تجعل الأسطولَ
+            // قابلاً للاستطلاع بالكتابة الحرّة. (شدٌّ للعزل لا كسرٌ: صفحاتُ الوحدة
+            // القائمةُ على حالها — الفهرسُ وحدَه يضيق.)
+            if ($key === 'endpoints' && ! (hub_is_owner(auth()->user()) || hub_monitor())) continue;
             if (! hub_can(auth()->user(), $key, 'v')) continue;
             if (! class_exists('\\App\\Models\\' . $def['model'])) continue;
             $out[$key] = $def;

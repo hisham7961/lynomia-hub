@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\EndpointCommand;
 use App\Models\EndpointDevice;
 use App\Models\EndpointEvent;
+use App\Models\EndpointRelease;
 use App\Support\Api;
 use App\Support\EndpointPrivacy;
 use App\Support\Es256;
@@ -306,6 +307,78 @@ class EndpointProtocolController extends Controller
         }
 
         return response()->json(['ok' => true, 'state' => $d['state']]);
+    }
+
+    /* ───────── بيانُ تحديث الوكيل (الطور L · WP-L.2 · §44/§62) ───────── */
+
+    /**
+     * **البيانُ الموقَّع**: أحدثُ إصدارٍ منشورٍ لنظامِ الجهاز ومعماريّته — بالشكل
+     * الذي يستهلكه `agent/internal/update.Apply` حرفياً: `{url, sha256}` (ومعهما
+     * `version` و`signing_status` — المفاتيحُ الزائدة تُهمَل في Go فلا تكسر).
+     *
+     * النطاقُ نطاقُ الجهاز لا الطلب: `os` من صفّ الجهاز المصادَق حصراً؛ و`arch`
+     * من جردِ نبضته **الموقَّعة** (`hw.arch` — يبلّغه الوكيلُ runtime.GOARCH)
+     * أولاً، فإن غاب فتلميحُ الاستعلام `?arch=` (خارجُ التوقيع — path() لا يحمل
+     * الاستعلام، فلا يغلب قراءةً موقَّعة)، وإلا amd64. والتجزئةُ في البيان هي
+     * تجزئةُ الأرتيفاكت الحقيقية المحسوبةُ خادمياً عند النشر — انحرافُها على
+     * الجهاز رفضُ تبديلٍ قاطعٌ (عقدُ Apply).
+     *
+     * **الصدقُ (C15):** `signing_status` يسافر كما خُزّن — 'unsigned-dev' ما لم
+     * يوقَّع توقيعٌ حقيقيّ ويُقرَّ تحقّقُه؛ لا ادّعاءَ في البيان أبداً.
+     */
+    public function agentManifest(Request $r)
+    {
+        $device = $this->device($r);
+
+        // المعماريّة: القراءةُ الموقَّعة (نبضةُ hw) تغلب تلميحَ الاستعلام غيرَ الموقَّع
+        $hwArch = strtolower(trim((string) data_get($device->hw, 'arch', '')));
+        $qArch = strtolower(trim((string) $r->query('arch', '')));
+        $arch = in_array($hwArch, EndpointRelease::ARCHES, true) ? $hwArch
+            : (in_array($qArch, EndpointRelease::ARCHES, true) ? $qArch : 'amd64');
+
+        // «الأحدثُ لمنصّتي» بترتيبٍ حتميّ (created_at ثم id كاسرُ تعادل — لا قرعة)
+        $rel = EndpointRelease::where('os', (string) $device->os)->where('arch', $arch)
+            ->orderByDesc('created_at')->orderByDesc('id')->first();
+        if (! $rel) {
+            return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'لا إصدارَ منشوراً لهذه المنصّة بعد');
+        }
+
+        return response()->json([
+            'version' => $rel->version,
+            'url' => route('endpoint.agent.download', $rel->id),   // مسارُ التنزيل الموقَّع نفسُه
+            'sha256' => $rel->sha256,
+            'signing_status' => $rel->signing_status,              // الصدقُ يسافر مع البيان (C15)
+        ]);
+    }
+
+    /**
+     * **تنزيلُ الجهاز الموقَّع** — خلف `EndpointSignature` كأخواته (لا public
+     * storage ولا سكّةَ تقديمٍ ثانية): الإصدارُ يُقدَّم لجهازٍ نظامُه نظامُ
+     * الإصدار حصراً (عبرَ نظامٍ ٤٠٤ — لا تسريبَ وجود)، من القرص المحليّ، بصفِّ
+     * `download_log` لكل نجاحٍ (السكّةُ الواحدة — user_id فارغٌ فالهويّةُ آلة)
+     * وبـContent-Disposition: attachment (انضباطُ AttachmentController).
+     */
+    public function agentDownload(Request $r, string $id)
+    {
+        $device = $this->device($r);
+
+        $rel = EndpointRelease::whereKey($id)->where('os', (string) $device->os)->first();
+        if (! $rel) {
+            return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'إصدارٌ غيرُ معروفٍ لمنصّة هذا الجهاز');
+        }
+        $abs = \Illuminate\Support\Facades\Storage::disk('local')->path($rel->path);
+        if (! is_file($abs)) {
+            return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'الأرتيفاكت غير موجود على القرص');
+        }
+
+        DB::table('download_log')->insert([
+            'attachment_id' => $rel->id, 'user_id' => null,
+            'ip' => $r->ip(),
+            'device' => substr('وكيل طرفيّ ' . $device->hostname . ' · إصدار ' . $rel->version, 0, 200),
+            'created_at' => now(),
+        ]);
+
+        return response()->download($abs, $rel->fileName());
     }
 
     /* ───────── الإصدار (ويب · داخليّ · القائمةُ المغلقة) ───────── */

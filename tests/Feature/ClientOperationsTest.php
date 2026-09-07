@@ -347,4 +347,42 @@ class ClientOperationsTest extends TestCase
         $ids = collect($filesClient['rows'])->pluck('id')->map('strval')->all();
         $this->assertSame([(string) $clientDoc->id], $ids, 'حسابُ العميل رأى ابناً داخليّاً');
     }
+
+    /* ────────── مركزُ تنزيل الوكيل: العميلُ ٤٠٤ على كل سطح (الطور L · WP-L.2) ────────── */
+
+    public function test_a_client_account_gets_404_on_the_agent_release_centre(): void
+    {
+        $this->seedCore();
+
+        $bytes = 'AGENT-' . Str::random(20);
+        \Illuminate\Support\Facades\Storage::disk('local')
+            ->put($p = 'agent-releases/cli-' . Str::random(8) . '.bin', $bytes);
+        $rel = \App\Models\EndpointRelease::create([
+            'version' => '9.0.2', 'os' => 'windows', 'arch' => 'amd64',
+            'path' => $p, 'sha256' => hash('sha256', $bytes), 'size' => strlen($bytes),
+            'published_by' => $this->owner->id,
+        ]);
+
+        // حسابُ عميلٍ صلبٍ **بمصفوفةٍ كاملة** — PortalGuard قائمةٌ بيضاءُ فوقها:
+        // endpoints.releases* ليست فيها → ٤٠٤ على كل سطحٍ مهما مُنح الدور
+        $full = collect(array_keys(config('hub.modules')))
+            ->mapWithKeys(fn ($m) => [$m => ['v' => 1, 'a' => 1, 'e' => 1, 'd' => 1]])->all();
+        $role = Role::create(['name' => 'عميل مُوسَّع ' . Str::random(5), 'scope' => 'all',
+            'flags' => [], 'matrix' => $full]);
+        $client = User::create(['name' => 'حسابُ عميل', 'email' => Str::random(8) . '@client.local',
+            'password' => 'Secret!2026x', 'role_id' => $role->id, 'status' => 'نشط',
+            'account_type' => 'client', 'password_changed_at' => now()]);
+
+        $this->actingAs($client)->get(route('endpoints.releases'))->assertNotFound();
+        $this->actingAs($client)->get(route('endpoints.releases.download', $rel->id))->assertNotFound();
+        $this->actingAs($client)->post(route('endpoints.releases.store'),
+            ['version' => '9.9.9', 'os' => 'windows', 'arch' => 'amd64'])->assertNotFound();
+        $this->actingAs($client)->post(route('endpoints.releases.delete', $rel->id))->assertNotFound();
+
+        $this->assertNotNull(\App\Models\EndpointRelease::find($rel->id), 'حسابُ عميلٍ سحب إصداراً');
+        $this->assertSame(0, \Illuminate\Support\Facades\DB::table('download_log')->count(),
+            'حسابُ عميلٍ بلغ ملفَّ إصدارٍ');
+
+        \Illuminate\Support\Facades\Storage::disk('local')->delete($p);
+    }
 }

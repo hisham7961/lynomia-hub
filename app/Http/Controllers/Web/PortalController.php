@@ -53,6 +53,8 @@ class PortalController extends Controller
         if ($tab === 'station') $data['stations'] = $this->stationsFor($u, $emp->user_id);
         // (الطور G · WP-G.2) تبويبُ الاتصالات يُحمَّل عند فتحه — خطوطُ الموظف بـemployee_id
         if ($tab === 'telecom') $data['phones'] = $this->phonesFor($u, $emp->id);
+        // (الطور M · WP-M.3) تبويبُ الأنظمة — سيرفراتُ الموظف بحافّة H.1 (servers.hr_id)
+        if ($tab === 'systems') $data['servers'] = $this->serversFor($u, $emp->id);
         // (الطور J · WP-J.3) تبويبُ أمنِ النقاط — أجهزةُ الموظف بحسابه (employee_id مرجعُ users)
         if ($tab === 'endpoint') $data['endpointDevices'] = $this->endpointDevicesFor($u, $emp->user_id);
 
@@ -74,6 +76,10 @@ class PortalController extends Controller
             // (Work OS · الطور G · WP-G.2 · §28) سكّةُ الاتصالات وصلت: خطوطُ الموظف
             // (SIM/eSIM) تُضيء تبويبَها هنا — لا بطاقةٌ زائفةٌ قبل السكّة (§82).
             'telecom' => ['mod' => 'phones',   'label' => '📡 الاتصالات'],
+            // (Work OS · الطور M · WP-M.3 · §28) سكّةُ الأنظمة وصلت في H.1
+            // (حافّةُ `servers.hr_id`) — وبهذا التبويب اكتمل السجلُّ: سبعُ سككٍ
+            // حقيقيّةٍ بصفرِ بطاقاتٍ زائفة (§82). يحرسه `servers:v` كسائر التبويبات.
+            'systems' => ['mod' => 'servers',  'label' => '🖥️ الأنظمة'],
             // (Work OS · الطور J · WP-J.3 · §28/§43) سكّةُ النقاط الطرفية وصلت:
             // أجهزةُ الموظف المسجَّلة ووضعيّتُها **الصادقة** (C15) — التبويبُ حقيقيٌّ
             // الآن لا بطاقةٌ زائفة، ويحرسه `endpoints:v` كسائر التبويبات.
@@ -117,10 +123,30 @@ class PortalController extends Controller
     {
         if (! $empId || ! hub_can($u, 'phones', 'v')) return collect();
 
+        // iccid هويّةُ الشريحة التقنيّة: تُنتقى لتُعرض خلف hub_field_mode في العرض
+        // (WP-M.3 — نظيرُ سيريال العهدة)، أمّا pin/puk فلا يُنتقيان أصلاً.
         return hub_scope(DB::table('phone_numbers')->whereNull('deleted_at'), 'phones')
             ->where('employee_id', $empId)
             ->orderByDesc('created_at')->orderByDesc('id')
-            ->limit(20)->get(['id', 'number', 'line_type', 'carrier', 'msisdn', 'status', 'expiry']);
+            ->limit(20)->get(['id', 'number', 'line_type', 'carrier', 'iccid', 'msisdn', 'status', 'expiry']);
+    }
+
+    /**
+     * (WP-M.3 · §28/§37) سيرفراتُ الموظف المسؤول — حافّةُ البنية `servers.hr_id`
+     * التي أرستها H.1: طرفاها محروسان بالبناء (الصفحةُ `hr:v` والتبويبُ `servers:v`)
+     * فقاعدةُ «الحافّةُ لمن يملك طرفَيها» مستوفاةٌ قبل حلِّ اسمِ سيرفرٍ واحد.
+     * منطَّقةٌ بالشركة كأيّ قارئ وبترتيبٍ حتميّ (name ثم id — لا قرعةَ إدراج).
+     * القراءةُ فقط، وأعمدةُ العرض حرّةٌ عدا IP (خلف hub_field_mode في العرض) —
+     * ولا يُنتقى `vault_id` (اعتمادُ الدخول) بحالٍ: كشفُه سكّةُ الخزنة وحدَها.
+     */
+    protected function serversFor($u, ?string $empId)
+    {
+        if (! $empId || ! hub_can($u, 'servers', 'v')) return collect();
+
+        return hub_scope(DB::table('servers')->whereNull('deleted_at'), 'servers')
+            ->where('hr_id', $empId)
+            ->orderBy('name')->orderBy('id')
+            ->limit(20)->get(['id', 'name', 'provider', 'type', 'ip', 'os', 'status', 'expiry']);
     }
 
     /**
