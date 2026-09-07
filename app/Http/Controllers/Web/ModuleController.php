@@ -1380,6 +1380,16 @@ class ModuleController extends Controller
                     $ids[] = $v;
                 }
             }
+            // (الطور H · WP-H.1 · §37) حافّةُ بنيةٍ مُعلَنة (`edge` في السجل): الاسمُ
+            // لا يُحَلُّ إلا لقارئٍ يملك وحدةَ الطرف الآخر — «الحافّةُ لمن يملك
+            // طرفَيها». القناعُ «—» لا المعرِّفُ الخام: الاسمُ وحده تسريبٌ (نمطُ
+            // AuditScopeLeakTest) والمعرِّفُ إفشاءُ وجودٍ — ترشيحٌ خادميٌّ هنا
+            // (يسري على الصفحة والجدول والتصدير معاً) لا إخفاءُ JS.
+            if (! empty($f['edge']) && ! hub_can(auth()->user(), (string) $f['ref'], 'v')) {
+                $labels[$f['key']] = array_fill_keys(
+                    array_values(array_unique(array_map('strval', array_filter($ids)))), '—');
+                continue;
+            }
             $labels[$f['key']] = hub_ref_labels($f['ref'], $ids);
         }
 
@@ -1402,6 +1412,15 @@ class ModuleController extends Controller
         foreach (collect($def['fields'])->where('type', 'ref') as $f) {
             $cur = $row?->{$f['col']} ?? null;
             if (is_string($cur) && ! empty($f['multi'])) $cur = json_decode($cur, true) ?: [];
+            // (الطور H · WP-H.1) حافّةُ بنيةٍ (`edge`) والقارئُ لا يملك وحدةَ طرفها
+            // الآخر: لا تعدادَ لخياراتها في النموذج (تعدادُ أكوادِ المحطات تسريبُ
+            // وجود) — تبقى القيمةُ الحاليّةُ وحدَها مقنَّعةً «—» كي لا يُفرَّغ الرابطُ
+            // القائم صامتاً عند الحفظ (درسُ hub_ref_options عن القيمة خارج الحدّ).
+            if (! empty($f['edge']) && ! hub_can(auth()->user(), (string) $f['ref'], 'v')) {
+                $out[$f['key']] = array_fill_keys(
+                    array_map('strval', array_filter((array) $cur)), '—');
+                continue;
+            }
             // **القارئُ المنطَّق الواحد** (v2.399): كان هذا الموضع يعيد بناء مرشّحَي المشاريع
             // والشركات بيده ويُغفل العملاء — فالمعزولُ على عميلٍ يرى أسماءَ كل العملاء في
             // القوائم المنسدلة. `hub_ref_options_scoped` يطبّق الثلاثة معاً في مكانٍ واحد.

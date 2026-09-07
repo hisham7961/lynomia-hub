@@ -173,9 +173,13 @@ class PrefController extends Controller
             'default' => ['nullable', 'boolean'],
         ]);
         // (WP-5.3) التحقيقاتُ المحفوظة: module='audit' وجهةٌ خاصة ليست في سجلّ
-        // الوحدات — يحرسها علمُ التدقيق نفسُه الذي يحرس الشاشة، لا hub_mod
+        // الوحدات — يحرسها علمُ التدقيق نفسُه الذي يحرس الشاشة، لا hub_mod.
+        // (الطور H · WP-H.2) وعروضُ المستكشف: module='graph' يحرسها حارسُ
+        // المستكشف نفسُه — مَن نافذتُه نافذةُ عميلٍ لا يحفظ عرضَ جرافٍ أصلاً (٤٠٤)
         if ($data['module'] === 'audit') {
             abort_unless(hub_flag(auth()->user(), 'audit'), 403);
+        } elseif ($data['module'] === 'graph') {
+            abort_if(hub_is_client(auth()->user()) || hub_client_ids() !== null, 404);
         } else {
             abort_unless(hub_mod($data['module']) && hub_can(auth()->user(), $data['module'], 'v'), 404);
         }
