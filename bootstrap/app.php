@@ -50,6 +50,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // رادارُ الكشف على API أيضاً (v2.367): كان مقصوراً على الويب فمُنِعُ ٤٠٣
         // على مسارات API (نطاقٌ ممنوع، سجلٌّ خارج الملكية) لا يُرصد إطلاقاً.
         $middleware->appendToGroup('api', \App\Http\Middleware\AccessRadar::class);
+        // وسيطُ توقيع النقاط الطرفية (Work OS · الطور J · WP-J.1): يفرض عقدَ
+        // ES256 (docblock ‏App\Support\Es256) — طابعٌ ±300ث + nonce فريد + تحقّقٌ
+        // بالمفتاح العامّ المخزَّن — على مجموعة مسارات الأجهزة التي يصلها WP-J.2
+        // (heartbeat/أحداث/أوامر). اسمٌ مستعارٌ تلتقطه المجموعة لا إلحاقٌ عامّ.
+        $middleware->alias(['endpoint.signature' => \App\Http\Middleware\EndpointSignature::class]);
         // الويبهوك الوارد سطحٌ آليّ لا نموذج له: يُصادَق بالرمز في الرابط + توقيع
         // HMAC، فلا CSRF عليه (المُرسِل خدمةٌ خارجية لا متصفّح يحمل الرمز).
         $middleware->validateCsrfTokens(except: ['hook/*']);

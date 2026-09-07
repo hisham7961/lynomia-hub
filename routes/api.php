@@ -32,6 +32,8 @@ Route::prefix('v1')->middleware(['throttle:api', ApiAuth::class])->group(functio
     Route::post('track/{session}/points', [V1Controller::class, 'trackIngest']);
     Route::post('track/{session}/end', [V1Controller::class, 'trackEnd']);
 
+    // تسجيلُ النقاط الطرفية (Work OS · WP-J.1): عامٌّ بالرمز المسكوك لا بمفتاح API —
+    // فهو **خارج** مجموعة ApiAuth أدناه (يُعرَّف بعد المجموعة بمساره الكامل).
     Route::get('{module}', [V1Controller::class, 'apiIndex']);
     Route::post('{module}', [V1Controller::class, 'apiStore']);
     Route::get('{module}/{id}', [V1Controller::class, 'apiShow']);
@@ -39,4 +41,33 @@ Route::prefix('v1')->middleware(['throttle:api', ApiAuth::class])->group(functio
     // تعديلٌ جزئيّ: يكتب الحقول المُرسَلة وحدها — PUT يبقى استبدالاً كاملاً كما هو موثَّق (لا كسر)
     Route::patch('{module}/{id}', [V1Controller::class, 'apiPatch']);
     Route::delete('{module}/{id}', [V1Controller::class, 'apiDestroy']);
+});
+
+/*
+ * ── النقاط الطرفية (Work OS · الطور J · WP-J.1 · §43) ──
+ * `enroll` **عامٌّ عمداً**: الجهازُ الجديد لا يملك جلسةً ولا مفتاحَ API — يصادِقه
+ * رمزُ التسجيل المسكوك (sha256، لمرّةٍ، قصيرُ المهلة) وحدَه، والحمولةُ لا تحمل
+ * إلا هويّةً ومفتاحاً **عامّاً** (الخاصُّ لا يُرسَل قط — عقدُ Es256). ثلاثةُ
+ * أجزاءٍ في المسار فلا يبتلعه `{module}` أعلاه، وحدُّ معدلٍ ضيّقٌ يصدّ التخمين.
+ *
+ * بقيةُ مسارات الأجهزة (heartbeat/أحداث/أوامر) تهبط في WP-J.2 داخل مجموعةٍ
+ * خلف الوسيط المسجَّل `endpoint.signature` (بوّابة العقد قبل أيّ معالج).
+ */
+Route::post('v1/endpoint/enroll', [\App\Http\Controllers\Api\EndpointEnrollController::class, 'enroll'])
+    ->middleware('throttle:20,1')->name('enroll.device');
+
+/*
+ * ── بروتوكولُ الجهاز الموقَّع (Work OS · الطور J · WP-J.2 · §43) ──
+ * أربعةُ مسارات خلف وسيط `endpoint.signature` (المسجَّل في bootstrap/app.php):
+ * عقدُ Es256 كاملاً — طابعٌ ±300ث، nonce فريدٌ لكل جهاز (الإعادةُ 409)، تحقّقٌ
+ * بالمفتاح العامّ المخزَّن — **قبل أيّ منطقِ معالج**. لا جلسةَ ولا ApiAuth:
+ * التوقيعُ هو المصادقة كلُّها، والجمهورُ أجهزةُ الشركة الداخلية لا حساباتٌ.
+ * الخصوصيّةُ تُفرَض في المتحكّم (حقولُ المراقبة 422 مسجَّلةً لا تُخزَّن)،
+ * وسحبُ الأوامر ادّعاءٌ ذرّيّ (آلةُ حالة outbox — لا ازدواجَ إرسال).
+ */
+Route::prefix('v1/endpoint')->middleware(['throttle:120,1', 'endpoint.signature'])->group(function () {
+    Route::post('heartbeat', [\App\Http\Controllers\Api\EndpointProtocolController::class, 'heartbeat'])->name('endpoint.heartbeat');
+    Route::post('event', [\App\Http\Controllers\Api\EndpointProtocolController::class, 'event'])->name('endpoint.event');
+    Route::post('commands/pull', [\App\Http\Controllers\Api\EndpointProtocolController::class, 'commandsPull'])->name('endpoint.commands.pull');
+    Route::post('commands/result', [\App\Http\Controllers\Api\EndpointProtocolController::class, 'commandResult'])->name('endpoint.commands.result');
 });

@@ -53,6 +53,8 @@ class PortalController extends Controller
         if ($tab === 'station') $data['stations'] = $this->stationsFor($u, $emp->user_id);
         // (الطور G · WP-G.2) تبويبُ الاتصالات يُحمَّل عند فتحه — خطوطُ الموظف بـemployee_id
         if ($tab === 'telecom') $data['phones'] = $this->phonesFor($u, $emp->id);
+        // (الطور J · WP-J.3) تبويبُ أمنِ النقاط — أجهزةُ الموظف بحسابه (employee_id مرجعُ users)
+        if ($tab === 'endpoint') $data['endpointDevices'] = $this->endpointDevicesFor($u, $emp->user_id);
 
         return view('portal.employee', $data);
     }
@@ -72,6 +74,10 @@ class PortalController extends Controller
             // (Work OS · الطور G · WP-G.2 · §28) سكّةُ الاتصالات وصلت: خطوطُ الموظف
             // (SIM/eSIM) تُضيء تبويبَها هنا — لا بطاقةٌ زائفةٌ قبل السكّة (§82).
             'telecom' => ['mod' => 'phones',   'label' => '📡 الاتصالات'],
+            // (Work OS · الطور J · WP-J.3 · §28/§43) سكّةُ النقاط الطرفية وصلت:
+            // أجهزةُ الموظف المسجَّلة ووضعيّتُها **الصادقة** (C15) — التبويبُ حقيقيٌّ
+            // الآن لا بطاقةٌ زائفة، ويحرسه `endpoints:v` كسائر التبويبات.
+            'endpoint' => ['mod' => 'endpoints', 'label' => '🛡️ أمن النقاط'],
             'wallet'  => ['mod' => 'custody',  'label' => '💰 العهدة المالية'],
         ];
     }
@@ -115,6 +121,24 @@ class PortalController extends Controller
             ->where('employee_id', $empId)
             ->orderByDesc('created_at')->orderByDesc('id')
             ->limit(20)->get(['id', 'number', 'line_type', 'carrier', 'msisdn', 'status', 'expiry']);
+    }
+
+    /**
+     * (WP-J.3 · §28/§43) أجهزةُ النقاط الطرفية المسجَّلةُ بحساب الموظف — منطَّقةٌ
+     * بالشركة كأيّ قارئ وبترتيبٍ حتميّ (hostname ثم id — لا قرعةَ إدراج). القراءةُ
+     * فقط؛ الأوامرُ والتسجيلُ بمساراتها المقفلة (step-up للخطيرين). الهويّةُ
+     * التقنية (السيريال من `hw` وهويّةُ الوكيل) يحجبها field-mode في العرض —
+     * مفتاحُ الحقل `hw` (فحقولُ السجل المقفولة locked تعود 'ro' لا 'hide').
+     */
+    protected function endpointDevicesFor($u, ?string $userId)
+    {
+        if (! $userId || ! hub_can($u, 'endpoints', 'v')) return collect();
+
+        return hub_scope(DB::table('endpoint_devices')->whereNull('deleted_at'), 'endpoints')
+            ->where('employee_id', $userId)
+            ->orderBy('hostname')->orderBy('id')
+            ->limit(20)->get(['id', 'hostname', 'os', 'device_uuid', 'hw', 'agent_version',
+                              'status', 'posture', 'last_heartbeat_at']);
     }
 
     /**

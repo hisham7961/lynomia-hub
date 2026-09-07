@@ -70,6 +70,25 @@ final class SecurityEvents
         'ERROR_ASSIGNED'          => ['إسناد خطأ لمهمة', 'notice', ['إسناد خطأ لمهمة']],
         'ACCESS_DENIED'           => ['وصول مرفوض', 'warning', ['@denial:وصول مرفوض']],
         'LINK_GUESS'              => ['تخمين رابط عام', 'warning', ['@denial:تخمين رابط']],
+        /*
+         * (Work OS · الطور J · WP-J.3 · §43/§63) **النقاط الطرفية** — التصنيفُ فوق
+         * ما يُكتب فعلاً كسائر الكتالوج: التسجيلُ والأمران الخطيران قيودُ تدقيقٍ
+         * تُكتب في مساراتها (WP-J.1/J.2) وتُصنَّف هنا؛ أمّا أحداثُ الوكيل
+         * (USB/الوضعيّة) فتتدفق بالعشرات في `endpoint_events` — قيدُها الأمنيّ
+         * يُكتب **بالعتبة لا لكل حدث** (تنبيهُ تكرارٍ واحدٌ للنافذة، لا ضجيج).
+         *
+         * **حملُ العتبة في الكود نفسِه:** عنصرٌ رابعٌ اختياريّ في المدخل —
+         * `['kind' => نوعُ endpoint_events, 'severities' => قائمةٌ أو null للكل,
+         *   'n' => العتبة, 'window_min' => النافذة]` — يقرؤه `endpointAlerts()`
+         * أدناه، وموضعُ الكتابة الحرفيّ في `EndpointProtocolController::event`
+         * (فتثبته خريطةُ التغطية «proven» — هذا الملفُّ مُستثنىً من مسحها عمداً).
+         */
+        'ENDPOINT_ENROLLED'       => ['تسجيل جهاز طرفي', 'notice', ['تسجيلُ جهازٍ طرفيّ', 'سكُّ رمزِ تسجيلِ جهازٍ طرفيّ']],
+        'ENDPOINT_CMD_CRITICAL'   => ['أمر عزل/قفل جهاز طرفي', 'high', ['أمرُ عزلِ جهازٍ طرفيّ', 'أمرُ قفلِ جهازٍ طرفيّ']],
+        'ENDPOINT_USB_SURGE'      => ['تكرار أحداث USB على جهاز طرفي', 'warning', ['تكرارُ أحداث USB على جهازٍ طرفيّ'],
+                                      ['kind' => 'usb', 'severities' => null, 'n' => 5, 'window_min' => 15]],
+        'ENDPOINT_POSTURE_ALERT'  => ['تدهور وضعية جهاز طرفي', 'high', ['تدهورُ وضعيّةِ جهازٍ طرفيّ'],
+                                      ['kind' => 'posture', 'severities' => ['warning', 'high'], 'n' => 3, 'window_min' => 60]],
     ];
 
     public const SEVERITY_TONE = ['info' => 'g', 'notice' => 'g', 'warning' => 'wn', 'high' => 'bad'];
@@ -79,6 +98,47 @@ final class SecurityEvents
      * «تغيير سياسة أمنية» متى مسّت مفتاحاً أمنياً — التعديلُ والاستعادةُ سواء.
      */
     public const SETTINGS_ACTIONS = ['تعديل إعدادات النظام', 'استعادة افتراضي الإعدادات'];
+
+    /**
+     * (WP-J.3 · §43/§63) **عتباتُ النقاط الطرفية**: أيُّ أكوادِ ENDPOINT_* بلغ
+     * حدثُ الجهاز هذا عتبتَها الآن **ولم يُقيَّد لها** قيدٌ داخل النافذة؟
+     *
+     * القرارُ هنا والكتابةُ عند المُبتلِع (`EndpointProtocolController::event`
+     * بالصيغة الحرفية — نمطُ الكتالوج كلِّه: الصيغةُ عند كاتبها والتصنيفُ هنا).
+     * العدُّ على `endpoint_events` بفهرس `(device_id, created_at)` القائم؛
+     * والتفرّدُ للنافذة من `audits` نفسِه (action + record_id=الجهاز) — فلا
+     * عدّادَ ثانياً ولا مخزنَ حالةٍ جديداً، والقيدُ واحدٌ مهما تدفّقت الأحداث.
+     *
+     * @return array<string, array{action:string,n:int,window_min:int}>
+     */
+    public static function endpointAlerts(\App\Models\EndpointEvent $e): array
+    {
+        $out = [];
+        foreach (self::CODES as $code => $def) {
+            $t = $def[3] ?? null;
+            if (! is_array($t) || ($t['kind'] ?? null) !== (string) $e->kind) continue;
+            if (($t['severities'] ?? null) !== null
+                && ! in_array((string) $e->severity, $t['severities'], true)) continue;
+
+            $since = now()->subMinutes((int) $t['window_min']);
+            $q = DB::table('endpoint_events')->where('device_id', $e->device_id)
+                ->where('kind', $t['kind'])->where('created_at', '>=', $since);
+            if (($t['severities'] ?? null) !== null) $q->whereIn('severity', $t['severities']);
+            $n = $q->count();
+            if ($n < (int) $t['n']) continue;
+
+            // قيدٌ قائمٌ لهذا الجهاز داخل النافذة = التنبيهُ صدر — لا تكرارَ ضجيج
+            $action = (string) $def[2][0];
+            $already = DB::table('audits')->where('action', $action)
+                ->where('module', 'endpoints')->where('record_id', (string) $e->device_id)
+                ->where('created_at', '>=', $since)->exists();
+            if ($already) continue;
+
+            $out[$code] = ['action' => $action, 'n' => $n, 'window_min' => (int) $t['window_min']];
+        }
+
+        return $out;
+    }
 
     /** الصيغُ الحرفية من audits.action التي يُطابقها التصنيف (بلا الوسوم @) */
     public static function actions(?string $code = null): array

@@ -2,9 +2,9 @@
     "openapi": "3.1.0",
     "info": {
         "title": "Lynomia Business Hub — REST API",
-        "version": "2.417.0",
+        "version": "2.418.0",
         "description": "واجهة `/api/v1`: كل وحدات النظام بنفس صلاحيات صاحب المفتاح ونطاقه.\nمفتاح Bearer من «حسابي ← مفاتيح API». حدّ المعدل ١٢٠/دقيقة لكل مفتاح و٣٠٠/دقيقة لكل عنوان.\nكل ردٍّ يحمل `X-Request-Id` و`X-API-Version`، وكل خطأٍ يحمل `code` آلياً و`request_id`.",
-        "x-hub-version": "2.417.0"
+        "x-hub-version": "2.418.0"
     },
     "servers": [
         {
@@ -185,6 +185,10 @@
         {
             "name": "stations",
             "description": "المحطات"
+        },
+        {
+            "name": "endpoints",
+            "description": "النقاط الطرفية"
         },
         {
             "name": "assetlog",
@@ -16923,6 +16927,426 @@
                 ],
                 "summary": "نقل المحطات إلى السلة",
                 "operationId": "delete_stations",
+                "responses": {
+                    "200": {
+                        "description": "نُقل للسلة",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "deleted": {
+                                            "type": "boolean"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/409"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            }
+        },
+        "/api/v1/endpoints": {
+            "get": {
+                "tags": [
+                    "endpoints"
+                ],
+                "summary": "قائمة النقاط الطرفية",
+                "operationId": "list_endpoints",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/q"
+                    },
+                    {
+                        "$ref": "#/components/parameters/status"
+                    },
+                    {
+                        "$ref": "#/components/parameters/page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/per"
+                    },
+                    {
+                        "$ref": "#/components/parameters/sort"
+                    },
+                    {
+                        "$ref": "#/components/parameters/dir"
+                    },
+                    {
+                        "$ref": "#/components/parameters/fields"
+                    },
+                    {
+                        "$ref": "#/components/parameters/f"
+                    },
+                    {
+                        "$ref": "#/components/parameters/fl"
+                    },
+                    {
+                        "$ref": "#/components/parameters/created_from"
+                    },
+                    {
+                        "$ref": "#/components/parameters/created_to"
+                    },
+                    {
+                        "$ref": "#/components/parameters/updated_since"
+                    },
+                    {
+                        "$ref": "#/components/parameters/trash"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "قائمة مرقَّمة",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Endpoints"
+                                            }
+                                        },
+                                        "total": {
+                                            "type": "integer"
+                                        },
+                                        "page": {
+                                            "type": "integer"
+                                        },
+                                        "last_page": {
+                                            "type": "integer"
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/ListMeta"
+                                        },
+                                        "request_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/422"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/503"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "endpoints"
+                ],
+                "summary": "إنشاء النقاط الطرفية",
+                "operationId": "create_endpoints",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/Idempotency-Key"
+                    },
+                    {
+                        "$ref": "#/components/parameters/X-Change-Reason"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EndpointsWrite"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "أُنشئ",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Endpoints"
+                                        },
+                                        "request_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/409"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/422"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/503"
+                    }
+                }
+            }
+        },
+        "/api/v1/endpoints/{id}": {
+            "parameters": [
+                {
+                    "$ref": "#/components/parameters/id"
+                }
+            ],
+            "get": {
+                "tags": [
+                    "endpoints"
+                ],
+                "summary": "سجل النقاط الطرفية",
+                "operationId": "show_endpoints",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/fields"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "السجل",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Endpoints"
+                                        },
+                                        "request_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "endpoints"
+                ],
+                "summary": "استبدال النقاط الطرفية كاملاً (الحقل الغائب يُفرَّغ)",
+                "operationId": "replace_endpoints",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/If-Match"
+                    },
+                    {
+                        "$ref": "#/components/parameters/X-Change-Reason"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EndpointsWrite"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "حُفظ",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Endpoints"
+                                        },
+                                        "request_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/409"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/422"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            },
+            "patch": {
+                "tags": [
+                    "endpoints"
+                ],
+                "summary": "تعديل النقاط الطرفية جزئياً (الحقول المُرسَلة فقط)",
+                "operationId": "update_endpoints",
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/If-Match"
+                    },
+                    {
+                        "$ref": "#/components/parameters/X-Change-Reason"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EndpointsWrite"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "حُفظ",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/Endpoints"
+                                        },
+                                        "request_id": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/409"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/422"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "endpoints"
+                ],
+                "summary": "نقل النقاط الطرفية إلى السلة",
+                "operationId": "delete_endpoints",
                 "responses": {
                     "200": {
                         "description": "نُقل للسلة",
@@ -47033,6 +47457,179 @@
                     }
                 }
             },
+            "Endpoints": {
+                "type": "object",
+                "title": "النقاط الطرفية",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "version": {
+                        "type": "integer",
+                        "readOnly": true,
+                        "description": "نسخة السجل — تُرسَل في If-Match"
+                    },
+                    "hostname": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "اسم الجهاز"
+                    },
+                    "deviceUuid": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "هويّة الوكيل"
+                    },
+                    "os": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "windows",
+                            "macos",
+                            "linux"
+                        ],
+                        "title": "نظام التشغيل"
+                    },
+                    "companyId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "companies",
+                        "title": "الشركة"
+                    },
+                    "employeeId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "users",
+                        "title": "الموظف الحامل"
+                    },
+                    "assetId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "assets",
+                        "title": "الأصل المرتبط"
+                    },
+                    "stationId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "stations",
+                        "title": "المحطة"
+                    },
+                    "pubkeyFp": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "بصمة المفتاح العامّ"
+                    },
+                    "status": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "suspended",
+                            "locked",
+                            "retired"
+                        ],
+                        "title": "الحالة"
+                    },
+                    "lastHeartbeatAt": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "آخر نبضة"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true,
+                        "nullable": true
+                    }
+                }
+            },
+            "EndpointsWrite": {
+                "type": "object",
+                "title": "النقاط الطرفية",
+                "properties": {
+                    "hostname": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "اسم الجهاز"
+                    },
+                    "deviceUuid": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "هويّة الوكيل"
+                    },
+                    "os": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "windows",
+                            "macos",
+                            "linux"
+                        ],
+                        "title": "نظام التشغيل"
+                    },
+                    "companyId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "companies",
+                        "title": "الشركة"
+                    },
+                    "employeeId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "users",
+                        "title": "الموظف الحامل"
+                    },
+                    "assetId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "assets",
+                        "title": "الأصل المرتبط"
+                    },
+                    "stationId": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "uuid",
+                        "x-ref": "stations",
+                        "title": "المحطة"
+                    },
+                    "pubkeyFp": {
+                        "nullable": true,
+                        "type": "string",
+                        "title": "بصمة المفتاح العامّ"
+                    },
+                    "status": {
+                        "nullable": true,
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "suspended",
+                            "locked",
+                            "retired"
+                        ],
+                        "title": "الحالة"
+                    },
+                    "lastHeartbeatAt": {
+                        "nullable": true,
+                        "type": "string",
+                        "format": "date-time",
+                        "title": "آخر نبضة"
+                    }
+                }
+            },
             "Assetlog": {
                 "type": "object",
                 "title": "سجل الصيانة",
@@ -52144,7 +52741,8 @@
                             "users",
                             "changeorders",
                             "stations",
-                            "carriers"
+                            "carriers",
+                            "endpoints"
                         ],
                         "title": "القسم"
                     },
@@ -52377,7 +52975,8 @@
                             "users",
                             "changeorders",
                             "stations",
-                            "carriers"
+                            "carriers",
+                            "endpoints"
                         ],
                         "title": "القسم"
                     },

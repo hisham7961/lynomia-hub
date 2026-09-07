@@ -5016,6 +5016,125 @@ return [
                 'dept',
             ],
         ],
+        /*
+         * (Work OS · الطور J · WP-J.1 · §43) **النقاط الطرفية** — سجلُّ أجهزة
+         * الشركة المسجَّلة بالتسجيل اللاتماثليّ (عقدُ Es256). وحدةٌ **داخليّةٌ
+         * تميل للقراءة**: لا `client_id` (العميلُ ٤٠٤ عبر PortalGuard — قائمةٌ
+         * بيضاءُ لا تضمّها)، والحقولُ الآليّة (الهويّة/المفتاح/الحالة/النبض)
+         * **مقفولة**: يكتبها مسارُ التسجيل (WP-J.1) وheartbeat/الأوامرُ خلف
+         * step-up (WP-J.2) لا نموذجُ CRUD العامّ؛ شاشاتُ المركز في WP-J.3.
+         * NOTE openapi: وحدةٌ جديدة تُغيّر المواصفة — تُولَّد بـhub:openapi
+         * في خطوة التحقّق المركزية لا تُحرَّر يدوياً.
+         */
+        'endpoints' => [
+            'key' => 'endpoints',
+            'table' => 'endpoint_devices',
+            'model' => 'EndpointDevice',
+            'label' => 'النقاط الطرفية',
+            'display' => 'hostname',
+            'status' => 'status',
+            'columns' => [
+                'hostname',
+                'os',
+                'companyId',
+                'employeeId',
+                'status',
+                'lastHeartbeatAt',
+            ],
+            'fields' => [
+                [
+                    'key' => 'hostname',
+                    'col' => 'hostname',
+                    'label' => 'اسم الجهاز',
+                    'type' => 'text',
+                    // يعلنه وكيلُ الجهاز لحظةَ التسجيل ويحدّثه heartbeat (WP-J.2)
+                    // — لا يُكتب يدوياً فتفترق الشاشةُ عن الجهاز.
+                    'locked' => true,
+                ],
+                [
+                    'key' => 'deviceUuid',
+                    'col' => 'device_uuid',
+                    'label' => 'هويّة الوكيل',
+                    'type' => 'text',
+                    'locked' => true,
+                ],
+                [
+                    'key' => 'os',
+                    'col' => 'os',
+                    'label' => 'نظام التشغيل',
+                    'type' => 'sel',
+                    // allowlist مصدرُها الواحد النموذج (نمطُ assets/Custody::STATUSES)
+                    // — `sel` محكومٌ بخياراته فعرضُ العمود (٢٠) يسع أطولَها.
+                    'options' => \App\Models\EndpointDevice::OSES,
+                    'locked' => true,
+                ],
+                // (لا حقلَ `agentVersion` في السجل عمداً: قيمةٌ آليّةٌ يبلّغها
+                // الوكيلُ وتُعرض في شاشات WP-J.3 من الصفّ نفسِه — وعمودُها (٣٠)
+                // أضيقُ من عتبة الحقل النصّيّ الحرّ، والكاتبُ الوحيد يقصّها
+                // بـmb_substr في النموذج.)
+                [
+                    'key' => 'companyId',
+                    'col' => 'company_id',
+                    'label' => 'الشركة',
+                    'type' => 'ref',
+                    'ref' => 'companies',
+                    // تُسنَد من رمز التسجيل لحظةَ السكّ — لا تُنقل من CRUD فيقفز
+                    // جهازٌ بين شركتين خارج مسارِ الأمن.
+                    'locked' => true,
+                ],
+                [
+                    'key' => 'employeeId',
+                    'col' => 'employee_id',
+                    'label' => 'الموظف الحامل',
+                    'type' => 'ref',
+                    'ref' => 'users',
+                ],
+                [
+                    'key' => 'assetId',
+                    'col' => 'asset_id',
+                    'label' => 'الأصل المرتبط',
+                    'type' => 'ref',
+                    'ref' => 'assets',
+                ],
+                [
+                    'key' => 'stationId',
+                    'col' => 'station_id',
+                    'label' => 'المحطة',
+                    'type' => 'ref',
+                    'ref' => 'stations',
+                ],
+                [
+                    'key' => 'pubkeyFp',
+                    'col' => 'pubkey_fp',
+                    'label' => 'بصمة المفتاح العامّ',
+                    'type' => 'text',
+                    // تُشتقّ من المفتاح المخزَّن نفسِه في النموذج — لا تُدَّعى.
+                    'locked' => true,
+                ],
+                [
+                    'key' => 'status',
+                    'col' => 'status',
+                    'label' => 'الحالة',
+                    'type' => 'sel',
+                    // allowlist مصدرُها الواحد النموذج (لا DB enum — C10)؛ مقفولةٌ:
+                    // isolate/lock تمرّ بأوامر WP-J.2 خلف step-up لا من CRUD.
+                    'options' => \App\Models\EndpointDevice::STATUSES,
+                    'locked' => true,
+                ],
+                [
+                    'key' => 'lastHeartbeatAt',
+                    'col' => 'last_heartbeat_at',
+                    'label' => 'آخر نبضة',
+                    'type' => 'dt',
+                    'locked' => true,
+                ],
+            ],
+            'search' => [
+                'hostname',
+                'device_uuid',
+                'os',
+            ],
+        ],
         'assetlog' => [
             'key' => 'assetlog',
             'table' => 'asset_maintenance',
@@ -7542,6 +7661,9 @@ return [
                         'stations',
                         // (Work OS · الطور G · WP-G.2) مزوّدو الاتصالات
                         'carriers',
+                        // (Work OS · الطور J · WP-J.3) النقاط الطرفية: قاعدةُ
+                        // «أيام مضت أكثر من» على آخرِ نبضة تنبّه على الجهاز الصامت
+                        'endpoints',
                     ],
                 ],
                 [
@@ -8939,6 +9061,20 @@ return [
         // NOTE openapi: اسمٌ دلاليٌّ جديد (ip_auto_blocked).
         'ip_rules' => [
             ['on' => 'auto_blocked', 'emit' => 'ip_auto_blocked', 'label' => 'حُظر عنوانُ IP آلياً (تصعيدٌ متدرّج)'],
+        ],
+        // (Work OS · الطور J · WP-J.1 · §43) حدثُ تسجيل جهازٍ طرفيّ — يُطلقه
+        // EndpointEnrollController::enroll عبر FlowRunner::fire داخلَ معاملةِ
+        // الاستهلاك الذرّيّ نفسِها (نمطُ custody: بلا `to` — تسجيلٌ لا تحوّلَ
+        // حالةٍ في CRUD). NOTE openapi: اسمٌ دلاليٌّ جديد (endpoint.enrolled).
+        'endpoints' => [
+            ['on' => 'enrolled', 'emit' => 'endpoint.enrolled', 'label' => 'سُجّل جهازٌ طرفيّ'],
+            // (WP-J.2) يُطلقهما ابتلاعُ الأحداث الموقَّع (EndpointProtocolController::event):
+            // `usb` مع كل حدثِ USB مبلَّغ، و`posture_alert` حين تعلو شدّةُ حدثِ
+            // الوضعيّة (warning/high) — العتباتُ الأغنى وأكوادُ SecurityEvents
+            // ENDPOINT_* في WP-J.3 (بعتباتٍ لا لكل حدث). NOTE openapi: اسمان
+            // دلاليّان جديدان (endpoint.usb_event / endpoint.posture_alert).
+            ['on' => 'usb_event', 'emit' => 'endpoint.usb_event', 'label' => 'حدثُ USB على جهازٍ طرفيّ'],
+            ['on' => 'posture_alert', 'emit' => 'endpoint.posture_alert', 'label' => 'إنذارُ وضعيّةِ جهازٍ طرفيّ'],
         ],
         'contracts' => [
             ['on' => 'status', 'to' => ['ساري'], 'emit' => 'contract.signed', 'label' => 'سرى عقد'],

@@ -287,6 +287,31 @@ Route::middleware('auth')->group(function () {
         Route::post('stations/{id}/vacate', [\App\Http\Controllers\Web\StationController::class, 'vacate'])->name('stations.vacate');
     });
 
+    // ── النقاط الطرفية: سكُّ رمزِ تسجيلٍ (Work OS · الطور J · WP-J.1 · §43) ──
+    // داخليٌّ حصراً: PortalGuard قائمةٌ بيضاءُ لا تضمّ enroll.* → حسابُ العميل ٤٠٤
+    // فوق المصفوفة (ودفاعٌ ثانٍ في المتحكّم). المتحكّمُ يحرس: مالك/مراقب +
+    // `hub_require_stepup` + إسنادُ شركةٍ ضمن نطاق الساكّ (عبرَ شركةٍ ٤٠٤) +
+    // قيدُ تدقيق. النصُّ الصريح يُعرَض مرةً واحدةً — القاعدةُ لا تحمل إلا sha256.
+    Route::post('endpoints/enroll-token', [\App\Http\Controllers\Api\EndpointEnrollController::class, 'mint'])
+        ->middleware('throttle:30,1')->name('enroll.mint');
+
+    // ── النقاط الطرفية: إصدارُ أمرٍ لجهاز (Work OS · الطور J · WP-J.2 · §43) ──
+    // داخليٌّ حصراً كنظيره أعلاه (PortalGuard قائمةٌ بيضاء → العميل ٤٠٤ + دفاعٌ
+    // في المتحكّم). القائمةُ المغلقة الخمسة لا غير (C10 — لا shell)؛ isolate/lock
+    // تصعيدُ هويةٍ + سببٌ إلزاميّ + قيدُ تدقيق؛ وUNIQUE(device_id,ikey) يجعل
+    // الإصدارَ المكرَّر يعيد الأمرَ القائم لا أمراً ثانياً.
+    Route::post('endpoints/{id}/command', [\App\Http\Controllers\Api\EndpointProtocolController::class, 'issue'])
+        ->middleware('throttle:60,1')->name('endpoints.command');
+
+    // ── مركزُ النقاط الطرفية (Work OS · الطور J · WP-J.3 · §43/§63) ──
+    // قراءةٌ للمالك/المراقب فوق سجل J.1 وبروتوكول J.2 — لا كاتبَ فيه (الأوامرُ
+    // والسكُّ بمساريهما المقفلين أعلاه). داخليٌّ حصراً: PortalGuard قائمةٌ بيضاءُ
+    // لا تضمّ endpoints.* → حسابُ العميل ٤٠٤ فوق المصفوفة، ودفاعٌ ثانٍ في
+    // المتحكّم؛ وعزلُ الشركة على كل قارئ (جهازٌ أجنبيّ ٤٠٤). الوضعيّةُ تُعرَض
+    // **صادقةً** (C15): الممنوعُ «غير مُهيّأ» لا «فعّالة»، وUSB بلا MDM رصدٌ فقط.
+    Route::get('endpoints', [\App\Http\Controllers\Web\EndpointCentreController::class, 'index'])->name('endpoints.index');
+    Route::get('endpoints/{id}', [\App\Http\Controllers\Web\EndpointCentreController::class, 'show'])->name('endpoints.show');
+
     // ── عهدةُ الموظف المالية (Work OS · الطور E · WP-E.3 · §19/§28/§98) ──
     // محفظةٌ مشتقّةُ الرصيد **منفصلةٌ تماماً** عن عهدة الأصول أعلاه (تلك وحدةُ `assets`،
     // وهذه وحدةُ `custody`). داخليّةٌ حصراً: `PortalGuard` قائمةٌ بيضاء والعهدةُ ليست

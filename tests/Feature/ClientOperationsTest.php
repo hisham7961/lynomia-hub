@@ -285,6 +285,37 @@ class ClientOperationsTest extends TestCase
      * داخليّاً فيرى الأبناءَ الداخليّين؛ حسابُ العميل وحدَه يُحجَب عنه الداخليّ. حارسٌ
      * ضد ربطِ الفلتر بـ`hub_client_ids` (يملكه المقيَّدُ أيضاً) بدل التصنيف الصلب.
      */
+    /* ────────── ٧) (Work OS · WP-J.3) النقاطُ الطرفية بنيةٌ داخلية: العميلُ ٤٠٤ ────────── */
+
+    /**
+     * (§43 · قاعدةُ الطور J) أسطولُ النقاط الطرفية لا يبلغه حسابُ عميلٍ **بأيّ
+     * حال**: لا المركزُ ولا صفحةُ الجهاز ولا سطحا الكتابة (سكُّ رمزِ التسجيل
+     * وإصدارُ الأمر) — ٤٠٤ لا ٤٠٣ (لا إثباتَ وجود)، ولو حمل الدورُ المصفوفةَ
+     * كاملةً **ورايةَ المراقب** (الحارسُ فوق المصفوفة والرايات معاً).
+     */
+    public function test_a_client_account_is_404_on_the_endpoint_fleet_even_with_a_full_matrix(): void
+    {
+        $this->seedCore();
+        $co = \App\Models\Company::create(['name_ar' => 'شركة التشغيل']);
+        $d = \App\Models\EndpointDevice::create(['company_id' => $co->id, 'hostname' => 'LT-OPS-01',
+            'os' => 'windows', 'device_uuid' => 'uuid-clientops-1', 'status' => 'active']);
+
+        $full = collect(array_keys(config('hub.modules')))
+            ->mapWithKeys(fn ($m) => [$m => ['v' => 1, 'a' => 1, 'e' => 1, 'd' => 1]])->all();
+        $role = Role::create(['name' => 'دور عميل مضبوطٌ خطأً ' . Str::random(4), 'scope' => 'all',
+            'flags' => ['monitor' => 1], 'matrix' => $full]);
+        $client = User::create(['name' => 'حسابُ عميل', 'email' => Str::random(8) . '@client.local',
+            'password' => 'Secret!2026x', 'role_id' => $role->id, 'status' => 'نشط',
+            'account_type' => 'client', 'password_changed_at' => now()]);
+
+        $this->actingAs($client)->get('/endpoints')->assertNotFound();
+        $this->actingAs($client)->get('/endpoints/' . $d->id)->assertNotFound();
+        $this->actingAs($client)->withSession(['stepup.ok_until' => now()->addMinutes(10)->timestamp])
+            ->post(route('enroll.mint'), ['companyId' => $co->id])->assertNotFound();
+        $this->actingAs($client)->withSession(['stepup.ok_until' => now()->addMinutes(10)->timestamp])
+            ->postJson(route('endpoints.command', $d->id), ['type' => 'refresh_posture'])->assertNotFound();
+    }
+
     public function test_related_children_audience_filter_targets_client_accounts_not_restricted_staff(): void
     {
         $this->seedCore();

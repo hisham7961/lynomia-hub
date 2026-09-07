@@ -37,7 +37,10 @@ class OperationalSearchTest extends TestCase
     // مجموعة القواعد **عند برد الخبيئة فقط** (hasTable + تقليمٌ + جلبُ الحيّة —
     // ٣٠ ثانية TTL في الإنتاج، وخبيئةُ الاختبار array باردةٌ لكل حالة فتُقاس حتماً).
     // ليست كلفةَ ضغطةِ مفتاحٍ — كلفةُ إعادةِ تحميلٍ مُخبّأة، وحرّاسُ التسرّب أعلاه بلا مساس.
-    private const PLAIN_BUDGET = ['sqlite' => 93, 'mysql' => 92, 'mariadb' => 92];
+    // و+1 مع وحدة النقاط الطرفية `endpoints` (Work OS · الطور J · WP-J.1): وحدةُ
+    // سجلٍّ بمفاتيح `search` (hostname/device_uuid/os) فيستجوبها البحثُ الموحَّد
+    // كسائر الوحدات — استعلامُ وحدةٍ واحدٌ لا نمطٌ تشغيليّ، وحرّاسُ التسرّب أعلاه بلا مساس.
+    private const PLAIN_BUDGET = ['sqlite' => 94, 'mysql' => 93, 'mariadb' => 93];
 
     private const RID = '0198f0c2-77aa-4a11-9a1e-5f4d2b7c1e33';
     private const IP = '203.0.113.9';
