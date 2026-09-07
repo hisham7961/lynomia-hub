@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Client;
 use App\Models\Company;
+use App\Models\Employee;
+use App\Models\EmployeeCustodyMove;
 use App\Models\Project;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -123,6 +125,34 @@ class CompanyIsolationTest extends TestCase
 
         $this->actingAs($this->employee)->get('/delivery/psa')->assertOk()
             ->assertSee('مشروعُ ألف الخارجيّ')->assertDontSee('مشروعُ باء الخارجيّ');
+    }
+
+    /**
+     * (Work OS · الطور E · WP-E.3 · §98) عهدةُ الموظف المالية معزولةٌ كسائر الشاشات:
+     * المعزولةُ على شركة ألف تقرأ عهدةَ موظفِ شركتها ولا تقرأ ولا تشحن عهدةَ موظفِ
+     * شركةٍ أجنبية — ٤٠٤ (IDOR)، ولا حركةَ تُكتب.
+     */
+    public function test_employee_custody_wallet_is_company_isolated(): void
+    {
+        $this->seedCompanies();
+        // المعزولةُ على ألف تُمنح صلاحيةَ العهدة (custody ليست وحدةَ مصفوفةٍ افتراضيّة)
+        $role = $this->employee->role;
+        $matrix = $role->matrix;
+        $matrix['custody'] = ['v' => 1, 'e' => 1, 'approve' => 1];
+        $role->update(['matrix' => $matrix]);
+
+        $empA = Employee::create(['name' => 'موظفُ ألف', 'status' => 'نشط', 'company_id' => $this->coA->id]);
+        $empB = Employee::create(['name' => 'موظفُ باء', 'status' => 'نشط', 'company_id' => $this->coB->id]);
+
+        // القراءة: عهدةُ موظفِ شركتها تُفتح، وعهدةُ شركةٍ أجنبيةٍ ٤٠٤
+        $this->actingAs($this->employee)->get(route('custody.wallet.employee', $empA->id))->assertOk();
+        $this->actingAs($this->employee)->get(route('custody.wallet.employee', $empB->id))->assertNotFound();
+
+        // الكتابة: شحنُ عهدةِ موظفِ شركةٍ أجنبيةٍ ٤٠٤ ولا حركةَ تُكتب
+        $this->actingAs($this->employee)->post(route('custody.wallet.advance'),
+            ['employee_id' => $empB->id, 'amount' => 50])->assertNotFound();
+        $this->assertSame(0, EmployeeCustodyMove::where('employee_id', $empB->id)->count(),
+            'كُتبت حركةُ عهدةٍ لموظفِ شركةٍ أجنبية — عزلُ الشركة انثقب');
     }
 
     public function test_soft_deleted_company_rejected_in_user_form(): void

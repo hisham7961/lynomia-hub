@@ -264,6 +264,27 @@ Route::middleware('auth')->group(function () {
         Route::post('{id}/permit/{permitId}/cancel', [\App\Http\Controllers\Web\CustodyController::class, 'permitCancel'])->name('permit.cancel');
     });
 
+    // ── عهدةُ الموظف المالية (Work OS · الطور E · WP-E.3 · §19/§28/§98) ──
+    // محفظةٌ مشتقّةُ الرصيد **منفصلةٌ تماماً** عن عهدة الأصول أعلاه (تلك وحدةُ `assets`،
+    // وهذه وحدةُ `custody`). داخليّةٌ حصراً: `PortalGuard` قائمةٌ بيضاء والعهدةُ ليست
+    // فيها، فحسابُ العميل ٤٠٤ على كلّ مسارٍ هنا فوق المصفوفة. المتحكّمُ يحرس كلَّ مسارٍ
+    // بـ`hub_can('custody',...)`+عزلِ الشركة؛ والعكسُ/التصحيحُ خلفَ `hub_require_stepup`.
+    Route::prefix('custody-wallet')->name('custody.wallet.')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Web\EmployeeCustodyController::class, 'center'])->name('center');
+        Route::get('e/{id}', [\App\Http\Controllers\Web\EmployeeCustodyController::class, 'employee'])->name('employee');
+        Route::middleware('throttle:60,1')->group(function () {
+            Route::post('advance',    [\App\Http\Controllers\Web\EmployeeCustodyController::class, 'advance'])->name('advance');
+            Route::post('charge',     [\App\Http\Controllers\Web\EmployeeCustodyController::class, 'charge'])->name('charge');
+            Route::post('expense',    [\App\Http\Controllers\Web\EmployeeCustodyController::class, 'expense'])->name('expense');
+            Route::post('repayment',  [\App\Http\Controllers\Web\EmployeeCustodyController::class, 'repayment'])->name('repayment');
+            Route::post('transfer',   [\App\Http\Controllers\Web\EmployeeCustodyController::class, 'transfer'])->name('transfer');
+            Route::post('deduction',  [\App\Http\Controllers\Web\EmployeeCustodyController::class, 'deduction'])->name('deduction');
+            Route::post('settlement', [\App\Http\Controllers\Web\EmployeeCustodyController::class, 'settlement'])->name('settlement');
+            Route::post('correct',    [\App\Http\Controllers\Web\EmployeeCustodyController::class, 'correct'])->name('correct');
+            Route::post('{id}/reverse', [\App\Http\Controllers\Web\EmployeeCustodyController::class, 'reverse'])->name('reverse');
+        });
+    });
+
     // مسحُ ملصق منتجٍ (p/{code}) — نظيرُ c/{code} للعهدة: كودٌ ← سجلُّ طرازه
     Route::get('p/{code}', [\App\Http\Controllers\Web\IdentityController::class, 'byCode'])->name('products.code');
 

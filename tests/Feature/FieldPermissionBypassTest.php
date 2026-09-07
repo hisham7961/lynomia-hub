@@ -6,6 +6,7 @@ use App\Models\Comment;
 use App\Models\Conversation;
 use App\Models\ConversationMember;
 use App\Models\Employee;
+use App\Models\EmployeeCustodyMove;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
@@ -387,5 +388,42 @@ class FieldPermissionBypassTest extends TestCase
         foreach (['717171', '717,171', '818181', '818,181'] as $n) {
             $res->assertDontSee($n);
         }
+    }
+
+    /**
+     * **امتدادُ Work OS (WP-E.3 · §19/§28):** كشفُ عهدةِ الموظف لا يغسل حجبَ الحقل.
+     *
+     * دورٌ داخليٌّ يُخفي `hr.iban` و`custody.amount` **يجب ألا يبلغه** IBAN الموظف
+     * ولا مبالغُ عهدته — لا خاماً ولا منسّقاً — لا في الكشف ولا في تبويب الموظف 360.
+     * يمتدّ نمطَ هذا الملف: حارسٌ (field-mode) يُفرض في الشاشة المباشرة ولا يُلتَفّ
+     * عليه بشاشةٍ جديدة — وكشفُ العهدة لا يكون الالتفافَ الجديد. والمالكُ يراهما
+     * (حجبُ دورٍ لا حجبٌ شامل يزوّر العزل).
+     */
+    public function test_the_custody_wallet_does_not_launder_a_hidden_amount_or_iban(): void
+    {
+        $this->seedCore();
+
+        $emp = Employee::create(['name' => 'موظفُ العهدة', 'status' => 'نشط',
+            'iban' => 'KW99HIDDENIBAN0007']);
+        EmployeeCustodyMove::create(['employee_id' => $emp->id, 'kind' => 'advance', 'sign' => 1,
+            'amount' => 838383, 'approval_state' => 'approved', 'at' => now(), 'posted_at' => now()]);
+
+        // المالكُ يرى الاثنين
+        $this->actingAs($this->owner)->get(route('custody.wallet.employee', $emp->id))->assertOk()
+            ->assertSee('KW99HIDDENIBAN0007')->assertSee('838383');
+
+        // دورٌ داخليٌّ يُخفي IBAN والمبلغ — لا يبلغانه ولو خاماً، وأثرُ المسك ظاهر
+        $role = Role::create(['name' => 'داخليٌّ بلا عهدة ' . Str::random(4), 'scope' => 'all', 'flags' => [],
+            'matrix' => ['custody' => ['v' => 1, 'e' => 1], 'hr' => ['v' => 1]],
+            'field_rules' => ['hr' => ['iban' => 'hide'], 'custody' => ['amount' => 'hide']]]);
+        $u = User::create(['name' => 'داخليٌّ بلا عهدة', 'email' => Str::random(6) . '@int.local',
+            'password' => 'Secret!2026x', 'role_id' => $role->id, 'status' => 'نشط', 'password_changed_at' => now()]);
+
+        $res = $this->actingAs($u)->get(route('custody.wallet.employee', $emp->id))->assertOk();
+        $res->assertDontSee('KW99HIDDENIBAN0007');
+        foreach (['838383', '838,383', '838383.000'] as $n) {
+            $res->assertDontSee($n);
+        }
+        $res->assertSee('••• محجوب');
     }
 }

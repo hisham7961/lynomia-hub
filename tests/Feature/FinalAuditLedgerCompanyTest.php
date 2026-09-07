@@ -5,14 +5,17 @@ namespace Tests\Feature;
 use App\Models\BankAccount;
 use App\Models\Company;
 use App\Models\Employee;
+use App\Models\EmployeeCustodyMove;
 use App\Models\FinDocument;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\LedgerAccount;
 use App\Models\PayrollRun;
 use App\Models\Setting;
+use App\Support\CustodyPostingService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -136,6 +139,66 @@ class FinalAuditLedgerCompanyTest extends TestCase
             ->count();
         $this->assertSame(0, $foreign,
             'قيدُ دفعةِ مستندِ الشركة ب التصق بحساب دفترٍ يخصّ شركةً أخرى');
+    }
+
+    /**
+     * (Work OS · الطور E · WP-E.2 · #6 عهدة) قيدُ عهدةِ موظفٍ في شركةٍ لا يلتصق
+     * بحساب دفترٍ يخصّ شركةً أخرى — الترحيلُ يمرّ بالخدمة المشترَكة المُحصَّرة نفسِها.
+     * حساباتُ العهدة/البنك للشركة أ وحدها، والموظفُ/الحركةُ للشركة ب — بلا نظيرٍ
+     * لـب فلا قيدَ أعرج ولا سطرٌ يشير إلى حساب أ.
+     */
+    public function test_custody_journal_never_binds_to_a_foreign_company_account(): void
+    {
+        $this->seedCore();
+        $a = Company::create(['name_ar' => 'شركة أ', 'currency' => 'د.ك']);
+        $b = Company::create(['name_ar' => 'شركة ب', 'currency' => 'د.ك']);
+
+        // حسابا العهدة/البنك بشركة أ فقط — لا نظير لهما بشركة ب
+        LedgerAccount::create(['code' => '1250', 'name' => 'عهدة أ', 'type' => 'أصول', 'company_id' => $a->id]);
+        LedgerAccount::create(['code' => '1020', 'name' => 'بنك أ', 'type' => 'أصول', 'company_id' => $a->id]);
+        $this->enableAutoJournal(['custody' => '1250', 'bank' => '1020']);
+
+        $emp = Employee::create(['name' => 'موظف ب', 'status' => 'نشط', 'company_id' => $b->id]);
+        $move = (new CustodyPostingService())->record([
+            'employee_id' => $emp->id, 'company_id' => $b->id, 'kind' => 'charge', 'sign' => 1,
+            'amount' => 200, 'source_module' => 'custody_charge', 'source_id' => (string) Str::uuid(),
+        ]);
+
+        // لا قيدَ أعرج، ولا سطرَ قيدٍ يشير إلى حسابٍ يخصّ شركةً غير شركة الحركة
+        $this->assertNull($move->entry_id, 'رُحّل قيدُ عهدةٍ رغم غياب حساباتِ شركة الحركة');
+        $foreign = JournalLine::query()
+            ->join('ledger_accounts', 'ledger_accounts.id', '=', 'journal_lines.acc_id')
+            ->whereNotNull('ledger_accounts.company_id')
+            ->where('ledger_accounts.company_id', '!=', $b->id)
+            ->count();
+        $this->assertSame(0, $foreign, 'قيدُ عهدةِ الشركة ب التصق بحساب دفترٍ يخصّ شركةً أخرى');
+    }
+
+    /**
+     * (Work OS · الطور E · WP-E.2 · #6 عهدة) عند وجود حسابِ عهدةٍ عامٍّ وآخرَ خاصٍّ
+     * بالشركة لنفس الرمز — يُفضَّل الخاصّ (حتميٌّ: `company_id IS NULL` يُرتَّب أخيراً).
+     */
+    public function test_custody_journal_prefers_company_specific_custody_account(): void
+    {
+        $this->seedCore();
+        $b = Company::create(['name_ar' => 'شركة ب', 'currency' => 'د.ك']);
+
+        LedgerAccount::create(['code' => '1250', 'name' => 'عهدة عامّة', 'type' => 'أصول', 'company_id' => null]);
+        LedgerAccount::create(['code' => '1020', 'name' => 'بنك عامّ', 'type' => 'أصول', 'company_id' => null]);
+        $custB = LedgerAccount::create(['code' => '1250', 'name' => 'عهدة ب', 'type' => 'أصول', 'company_id' => $b->id]);
+        $bankB = LedgerAccount::create(['code' => '1020', 'name' => 'بنك ب', 'type' => 'أصول', 'company_id' => $b->id]);
+        $this->enableAutoJournal(['custody' => '1250', 'bank' => '1020']);
+
+        $emp = Employee::create(['name' => 'موظف ب', 'status' => 'نشط', 'company_id' => $b->id]);
+        $move = (new CustodyPostingService())->record([
+            'employee_id' => $emp->id, 'company_id' => $b->id, 'kind' => 'charge', 'sign' => 1,
+            'amount' => 150, 'source_module' => 'custody_charge', 'source_id' => (string) Str::uuid(),
+        ]);
+
+        $this->assertNotNull($move->entry_id, 'لم يُرحّل قيدُ العهدة رغم توفّر حسابَي الشركة');
+        $accs = JournalLine::where('entry_id', $move->entry_id)->pluck('acc_id')->all();
+        $this->assertContains($custB->id, $accs, 'لم يُفضَّل حسابُ العهدة الخاصّ بالشركة على العامّ');
+        $this->assertContains($bankB->id, $accs, 'لم يُفضَّل حسابُ البنك الخاصّ بالشركة على العامّ');
     }
 
     /**

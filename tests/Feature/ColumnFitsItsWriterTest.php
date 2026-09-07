@@ -167,6 +167,38 @@ class ColumnFitsItsWriterTest extends TestCase
             'قيمةُ allowlist أطولُ من عمودها — تمرّ على SQLite وترمي على MySQL: ' . implode(' · ', $tight));
     }
 
+    /**
+     * (Work OS · الطور E · WP-E.1) أعمدةُ allowlist في دفترِ العهدة المالية تسع
+     * أطولَ قيمةٍ شرعيّةٍ فيها — القيَمُ تُفرَض في النموذج لا كـenum على القاعدة
+     * (C10)، فالعمودُ نصٌّ واسع (kind=٢٠، approval_state=١٢). ولو ضاق عن أطولِ
+     * قيمةٍ لمرّ على SQLite ورمى على MySQL فسقط ترحيلُ حركةٍ ماليّة.
+     */
+    public function test_custody_allowlist_values_fit_their_columns(): void
+    {
+        // العرضُ المعلَنُ صراحةً في الهجرة — يُقرأ من المصدر لا من القاعدة
+        $this->assertSame(20, hub_col_max('employee_custody_moves', 'kind'),
+            'عرضُ employee_custody_moves.kind يجب أن يكون ٢٠ كما تعلنه الهجرة');
+
+        $checks = [
+            ['employee_custody_moves', 'kind', \App\Models\EmployeeCustodyMove::KINDS],
+            ['employee_custody_moves', 'approval_state', \App\Models\EmployeeCustodyMove::APPROVAL_STATES],
+        ];
+
+        $tight = [];
+        foreach ($checks as [$table, $col, $allow]) {
+            $max = hub_col_max($table, $col);
+            if ($max === null) continue;
+            foreach ($allow as $val) {
+                if (mb_strlen($val) > $max) {
+                    $tight[] = "{$table}.{$col} عرضُه {$max} والقيمة «{$val}» أطول";
+                }
+            }
+        }
+
+        $this->assertSame([], $tight,
+            'قيمةُ allowlist أطولُ من عمودها — تمرّ على SQLite وترمي على MySQL: ' . implode(' · ', $tight));
+    }
+
     /** والإشعارُ من قاعدة تنبيه يُكتب فعلاً — لا نظرياً */
     public function test_a_rule_notification_is_actually_written(): void
     {

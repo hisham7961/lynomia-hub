@@ -66,7 +66,7 @@ class Settings
         'files.max_kb'     => 1048576,
         'notify.quiet'     => ['on' => false, 'from' => 22, 'to' => 7],
         'finance.accounts' => ['ar' => '1200', 'ap' => '2100', 'cash' => '1010', 'bank' => '1020',
-                               'sales' => '4100', 'tax' => '2200', 'exp' => '5200'],
+                               'sales' => '4100', 'tax' => '2200', 'exp' => '5200', 'custody' => '1250'],
     ];
 
     /**

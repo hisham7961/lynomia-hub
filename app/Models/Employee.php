@@ -9,6 +9,7 @@ use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /** ملفات الموظفين */
@@ -89,5 +90,33 @@ class Employee extends Model
     public function manager(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class, 'manager_id');
+    }
+
+    /* ────────── العهدة المالية (Work OS · الطور E · WP-E.1) ────────── */
+
+    /**
+     * حركاتُ عهدةِ الموظف المالية — دفترٌ ثابتٌ يُضاف ولا يُعدَّل. ترتيبٌ حتميّ
+     * (زمنُ الحركة ثم id) فلا قرعةَ عند تساوي الأزمنة (درسُ CLAUDE.md · C13).
+     */
+    public function custodyMoves(): HasMany
+    {
+        return $this->hasMany(\App\Models\EmployeeCustodyMove::class, 'employee_id')
+            ->orderBy('at')->orderBy('id');
+    }
+
+    /**
+     * رصيدُ العهدة **مشتقٌّ لا مخزَّن** — مجموعُ (الإشارة × المبلغ) يُحسَب على
+     * القراءة. لا عمودَ رصيدٍ يُحرَّر أو يُزوَّر (نمطُ الرصيد المشتقّ)؛ حركةُ العكس
+     * تُصافي الأصلَ إلى صفرٍ بلا مسحِ الأثر. الاستعلامُ يختار **مُجمَّعاً فقط** فهو
+     * آمنٌ تحت `ONLY_FULL_GROUP_BY` (C13).
+     */
+    public function getCustodyBalanceAttribute(): float
+    {
+        $row = \App\Models\EmployeeCustodyMove::query()
+            ->where('employee_id', $this->getKey())
+            ->selectRaw('COALESCE(SUM(sign * amount), 0) AS bal')
+            ->first();
+
+        return round((float) ($row->bal ?? 0), 3);
     }
 }

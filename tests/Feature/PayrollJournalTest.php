@@ -82,14 +82,24 @@ class PayrollJournalTest extends TestCase
             'قيد الرواتب توزّع على حسابٍ بالقرعة — code غير فريد بلا orderBy(id)');
     }
 
-    /** (٣) فشلُ السطر الثاني لا يترك قيداً مرحّلاً معطوباً — حارس مصدر */
+    /**
+     * (٣) فشلُ السطر الثاني لا يترك قيداً مرحّلاً معطوباً — حارس مصدر.
+     *
+     * (Work OS · الطور E · WP-E.2) بعد استخراج الترحيل إلى `JournalPostingService`
+     * المشترَكة، انتقلت المعاملةُ التي تلفّ القيدَ وسطريه إلى `postBalanced`؛
+     * فالحارسُ يتأكّد أنّها هناك، وأنّ المتحكّمَين يفوّضان إليها لا ينسخانها (لا
+     * نسخةَ محرّكٍ ثالثة). الحرفُ نفسُه: قيدٌ لا يبقى بسطرٍ واحدٍ إن تعثّر ما بعده.
+     */
     public function test_autojournal_is_transaction_wrapped(): void
     {
+        $svc = file_get_contents(app_path('Support/JournalPostingService.php'));
+        $this->assertMatchesRegularExpression('/postBalanced.*?DB::transaction/su', $svc,
+            'خدمةُ الترحيل تبني القيدَ وسطريه بلا معاملة — فشلُ السطر الثاني يترك قيداً أعرج');
+
         foreach (['FinController', 'PayrollController'] as $c) {
             $src = file_get_contents(app_path("Http/Controllers/Web/{$c}.php"));
-            // موضع autoJournal يلفّ إنشاء القيد وسطريه في معاملة
-            $this->assertMatchesRegularExpression('/autoJournal.*?DB::transaction/su', $src,
-                "{$c}::autoJournal بلا معاملة — فشلُ السطر الثاني يترك قيداً مرحّلاً بسطرٍ واحد لا يُصحَّح");
+            $this->assertMatchesRegularExpression('/autoJournal.*?postBalanced/su', $src,
+                "{$c}::autoJournal لم يعد يفوّض إلى خدمة الترحيل المشترَكة — نسخةٌ ثالثةٌ محتملة");
         }
     }
 

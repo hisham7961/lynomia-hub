@@ -181,58 +181,38 @@ class PayrollController extends Controller
         return back()->with('ok', '💸 سُجّل صرف المسيّر بتاريخ اليوم');
     }
 
-    /** قيد رواتب موزون: مدين مصروفات، دائن صندوق/بنك — من خريطة finance.accounts */
+    /**
+     * قيد رواتب موزون: مدين مصروفات، دائن صندوق/بنك — من خريطة finance.accounts.
+     *
+     * (Work OS · الطور E · WP-E.2) البوابةُ والخريطةُ وحلُّ الرمز الحتميّ وكتلةُ
+     * الترحيل الموزونة استُخرِجت إلى `JournalPostingService` المشترَكة — لا نسخةَ
+     * ثانيةً من المحرّك هنا. السلوكُ محفوظٌ حرفيّاً: نفسُ القيد وسطريه.
+     */
     protected function autoJournal(PayrollRun $run): void
     {
-        // بالسلسلة لا بالنوع — hub:set يخزّن العدد فتفشل === النوعية، فكان قيد
-        // الرواتب لا يُرحَّل أبداً حين يُفعَّل الإعداد بالطريقة الموثّقة (مصروف
-        // الرواتب لا يبلغ الدفتر → ربحٌ مُبالَغ). FinController أصلحها؛ هذا لحق به.
-        if ((string) setting('finance.auto_journal') !== '1') return;
+        $svc = new \App\Support\JournalPostingService();
+        if (! $svc->enabled()) return;
         try {
-            $map = setting('finance.accounts');
-            $map = is_array($map) ? $map : (json_decode((string) $map, true) ?: []);
-            // تحصيرٌ بالشركة ثم بترتيب id: code غير فريد و company_id قد يتكرّر
-            // عبر الشركات، فبلا التحصير يلتصق سطرُ قيدِ مسيّرٍ بحساب شركةٍ أخرى.
-            // نفضّل حساب شركة المسيّر، فحساباً عامّاً احتياطاً، وid يحسم التعادل.
-            $accId = function (?string $code) use ($run) {
-                if (blank($code)) return null;
-
-                return \App\Models\LedgerAccount::whereNull('deleted_at')->where('code', $code)
-                    ->where(function ($w) use ($run) {
-                        $w->whereNull('company_id');
-                        if (filled($run->company_id)) $w->orWhere('company_id', $run->company_id);
-                    })
-                    ->orderByRaw('company_id IS NULL')   // الخاصّ بالشركة أولاً، العامّ احتياطاً
-                    ->orderBy('id')->value('id');
-            };
-            $exp = $accId($map['exp'] ?? null);
-            $cash = $accId($map['bank'] ?? null) ?: $accId($map['cash'] ?? null);
+            $map = $svc->accountsMap();
+            // حلٌّ مُحصَّرٌ بالشركة ثم بترتيب id (لا قرعة) — عبر الخدمة المشترَكة
+            $exp = $svc->resolveAccount($map['exp'] ?? null, $run->company_id);
+            $cash = $svc->resolveAccount($map['bank'] ?? null, $run->company_id)
+                ?: $svc->resolveAccount($map['cash'] ?? null, $run->company_id);
             if (! $exp || ! $cash) return;
 
-            // معاملةٌ تلفّ القيد وسطريه: فشلُ السطر الثاني كان يترك قيداً مرحّلاً
-            // بسطرٍ واحد، وJournalEntry::booted يمنع تصحيحه أبداً → دفترٌ مختلٌّ للأبد
-            // المولّد الداخلي يبني القيدَ مرحَّلاً ثمّ سطريه — الرايةُ حول كتلته
-            // ليمرّ حارسُ التوازن في النموذج (v2.314)
-            \App\Models\JournalEntry::$posting = true;
-            try {
-            \Illuminate\Support\Facades\DB::transaction(function () use ($run, $exp, $cash) {
-                $entry = \App\Models\JournalEntry::create([
-                    'doc_no' => hub_fit('JE-PAYROLL-' . now()->format('ymHis'),
-                        hub_col_max('journal_entries', 'doc_no') ?? 300),
-                    'date' => now()->toDateString(),
-                    'description' => 'قيد رواتب: ' . $run->name . ($run->month ? ' — ' . $run->month : ''),
-                    'reference' => (string) $run->name, 'state' => 'مرحّل',
-                    'company_id' => $run->company_id,
-                    'meta' => ['posted_at' => now()->toIso8601String(), 'auto' => 'payroll', 'payroll_id' => $run->id],
-                ]);
-                \App\Models\JournalLine::create(['entry_id' => $entry->id, 'acc_id' => $exp,
-                    'debit' => (float) $run->total, 'credit' => 0, 'memo' => 'مصروف رواتب']);
-                \App\Models\JournalLine::create(['entry_id' => $entry->id, 'acc_id' => $cash,
-                    'debit' => 0, 'credit' => (float) $run->total, 'memo' => 'صرف الرواتب']);
-            });
-            } finally {
-                \App\Models\JournalEntry::$posting = false;
-            }
+            // معاملةٌ تلفّ القيد وسطريه ورايةُ التوازن — كلُّها في postBalanced
+            $svc->postBalanced([
+                'doc_no' => hub_fit('JE-PAYROLL-' . now()->format('ymHis'),
+                    hub_col_max('journal_entries', 'doc_no') ?? 300),
+                'date' => now()->toDateString(),
+                'description' => 'قيد رواتب: ' . $run->name . ($run->month ? ' — ' . $run->month : ''),
+                'reference' => (string) $run->name, 'state' => 'مرحّل',
+                'company_id' => $run->company_id,
+                'meta' => ['posted_at' => now()->toIso8601String(), 'auto' => 'payroll', 'payroll_id' => $run->id],
+            ], [
+                ['acc_id' => $exp, 'debit' => (float) $run->total, 'credit' => 0, 'memo' => 'مصروف رواتب'],
+                ['acc_id' => $cash, 'debit' => 0, 'credit' => (float) $run->total, 'memo' => 'صرف الرواتب'],
+            ]);
         } catch (\Throwable $e) {
             report($e);   // القيد الآلي لا يُفشل الاعتماد نفسه
         }

@@ -116,71 +116,48 @@ class FinController extends Controller
      * البداية بلا مستهلك. خلف إعداد finance.auto_journal (معطل افتراضياً —
      * قرار الترحيل الآلي للمنشأة لا لنا): قبضُ دخلٍ يدين البنك/الصندوق ويُدين
      * المبيعات، وصرفُ مصروفٍ يعكس. القيد يولد مُرحَّلاً مقفلاً بسطرين موزونين.
+     *
+     * (Work OS · الطور E · WP-E.2) كان منطقُ الترحيل مكرَّراً حرفاً بحرفٍ هنا وفي
+     * `PayrollController::autoJournal`؛ استُخرِج إلى `JournalPostingService` المشترَكة
+     * — البوابةُ والخريطةُ وحلُّ الرمز الحتميّ وكتلةُ الترحيل الموزونة كلُّها هناك
+     * مرّةً واحدة، تستهلكها العهدةُ كذلك. السلوكُ محفوظٌ حرفيّاً: نفسُ القيد وسطريه.
      */
     protected function autoJournal(FinDocument $doc, float $amount): void
     {
-        // بالسلسلة لا بالنوع — hub:set يخزّن العدد فتفشل === النوعية (داء contracts.auto_expire نفسه)
-        if ((string) setting('finance.auto_journal') !== '1') return;
+        $svc = new \App\Support\JournalPostingService();
+        if (! $svc->enabled()) return;
 
         try {
-            $map = setting('finance.accounts');
-            $map = is_array($map) ? $map : (json_decode((string) $map, true) ?: []);
+            $map = $svc->accountsMap();
             $income = in_array((string) $doc->kind, config('hub.fin.income'), true);
             $moneyCode = (string) ($doc->bank_id ? ($map['bank'] ?? '') : ($map['cash'] ?? ''));
             $otherCode = (string) ($income ? ($map['sales'] ?? '') : ($map['exp'] ?? ''));
 
-            // تحصيرٌ بالشركة ثم بترتيب id: code غير فريد و company_id قد يتكرّر
-            // عبر الشركات، فبلا التحصير يلتصق سطرُ قيدِ شركةٍ بحساب شركةٍ أخرى.
-            // نفضّل حساب شركة المستند، فحساباً عامّاً (company_id فارغ) احتياطاً،
-            // وترتيبُ id يحسم التعادل حتميّاً على المحرّكين — لا قرعة.
-            $accId = function (string $code) use ($doc) {
-                if ($code === '') return null;
-
-                return \App\Models\LedgerAccount::whereNull('deleted_at')->where('code', $code)
-                    ->where(function ($w) use ($doc) {
-                        $w->whereNull('company_id');
-                        if (filled($doc->company_id)) $w->orWhere('company_id', $doc->company_id);
-                    })
-                    ->orderByRaw('company_id IS NULL')   // الخاصّ بالشركة أولاً، العامّ احتياطاً
-                    ->orderBy('id')->value('id');
-            };
-            $money = $accId($moneyCode);
-            $other = $accId($otherCode);
+            // حلٌّ مُحصَّرٌ بالشركة ثم بترتيب id (لا قرعة) — عبر الخدمة المشترَكة
+            $money = $svc->resolveAccount($moneyCode, $doc->company_id);
+            $other = $svc->resolveAccount($otherCode, $doc->company_id);
             if (! $money || ! $other) return;   // خريطة غير مكتملة — لا قيد أعرج
 
-            // معاملةٌ تلفّ القيد وسطريه: فشلُ السطر الثاني كان يترك قيداً مرحّلاً
-            // بسطرٍ واحد، وJournalEntry::booted يمنع تصحيحه أبداً → دفترٌ مختلٌّ للأبد
-            // المولّد الداخلي يبني القيدَ مرحَّلاً ثمّ سطريه، فيرفع الرايةَ حول
-            // كتلته ليمرّ حارسُ التوازن في النموذج (v2.314) — والمعاملةُ تضمن
-            // أنّ القيد لا يبقى بسطرٍ واحد إن تعثّر الثاني.
-            \App\Models\JournalEntry::$posting = true;
-            try {
-            \Illuminate\Support\Facades\DB::transaction(function () use ($doc, $amount, $income, $money, $other) {
-                $entry = \App\Models\JournalEntry::create([
-                    // مشتقٌّ من عمودٍ بعرض ٣٠٠ ببادئةٍ ولاحقة — يتجاوز عمودَه حتماً
-                    // فيرمي 1406 على MySQL، **والاستثناءُ مُبتلَع** فالدفعةُ تنجح
-                    // والقيدُ لا يُكتب: دفترٌ ناقص صامت. القصُّ لعرض العمود نفسِه.
-                    'doc_no' => hub_fit('JE-' . ($doc->doc_no ?: substr($doc->id, 0, 8)) . '-' . now()->format('His'),
-                        hub_col_max('journal_entries', 'doc_no') ?? 300),
-                    'date' => now()->toDateString(),
-                    'description' => ($income ? 'قبض' : 'صرف') . ' دفعة على ' . ($doc->doc_no ?: $doc->id),
-                    'reference' => (string) $doc->doc_no,
-                    'state' => 'مرحّل',
-                    'fin_id' => $doc->id,
-                    'project_id' => $doc->project_id,
-                    'company_id' => $doc->company_id,
-                    'meta' => ['posted_at' => now()->toIso8601String(), 'auto' => 'payment'],
-                ]);
-                \App\Models\JournalLine::create(['entry_id' => $entry->id, 'cc_id' => $doc->cc_id,
-                    'acc_id' => $income ? $money : $other, 'debit' => $amount, 'credit' => 0,
-                    'memo' => $income ? 'قبض الدفعة' : 'المصروف']);
-                \App\Models\JournalLine::create(['entry_id' => $entry->id, 'cc_id' => $doc->cc_id,
-                    'acc_id' => $income ? $other : $money, 'debit' => 0, 'credit' => $amount,
-                    'memo' => $income ? 'الإيراد' : 'سداد الدفعة']);
-            });
-            } finally {
-                \App\Models\JournalEntry::$posting = false;
-            }
+            // معاملةٌ تلفّ القيد وسطريه ورايةُ التوازن — كلُّها في postBalanced، فلا
+            // يبقى القيدُ بسطرٍ واحد إن تعثّر الثاني، ولا نسخةَ ثالثةً من المحرّك.
+            $svc->postBalanced([
+                // مشتقٌّ من عمودٍ بعرض ٣٠٠ — يُقصّ لعرض العمود (درسُ notifications_hub / hub_fit)
+                'doc_no' => hub_fit('JE-' . ($doc->doc_no ?: substr($doc->id, 0, 8)) . '-' . now()->format('His'),
+                    hub_col_max('journal_entries', 'doc_no') ?? 300),
+                'date' => now()->toDateString(),
+                'description' => ($income ? 'قبض' : 'صرف') . ' دفعة على ' . ($doc->doc_no ?: $doc->id),
+                'reference' => (string) $doc->doc_no,
+                'state' => 'مرحّل',
+                'fin_id' => $doc->id,
+                'project_id' => $doc->project_id,
+                'company_id' => $doc->company_id,
+                'meta' => ['posted_at' => now()->toIso8601String(), 'auto' => 'payment'],
+            ], [
+                ['cc_id' => $doc->cc_id, 'acc_id' => $income ? $money : $other, 'debit' => $amount, 'credit' => 0,
+                 'memo' => $income ? 'قبض الدفعة' : 'المصروف'],
+                ['cc_id' => $doc->cc_id, 'acc_id' => $income ? $other : $money, 'debit' => 0, 'credit' => $amount,
+                 'memo' => $income ? 'الإيراد' : 'سداد الدفعة'],
+            ]);
         } catch (\Throwable $e) {
             report($e);   // القيد الآلي لا يُفشل تسجيل الدفعة نفسها
         }

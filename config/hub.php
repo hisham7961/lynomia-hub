@@ -8518,6 +8518,15 @@ return [
             ['on' => 'status', 'to' => ['مدفوعة'], 'emit' => 'invoice.paid', 'label' => 'سُدّدت فاتورة'],
             ['on' => 'status', 'to' => ['متأخرة'], 'emit' => 'invoice.overdue', 'label' => 'تأخّرت فاتورة'],
         ],
+        // (Work OS · الطور E · WP-E.2 · §21a/b) أحداثُ العهدة المالية — تُطلقها
+        // خدمةُ الترحيل المشترَكة `CustodyPostingService` عبر FlowRunner::fire لا
+        // تحوّلَ حالةٍ في سجلٍّ، فبلا `to` (حاويةُ حركاتٍ لا وحدةَ CRUD بعد — مسارُها
+        // وتسجيلُها كوحدةٍ في WP-E.3). NOTE openapi: أسماءٌ دلاليّةٌ جديدة.
+        'custody' => [
+            ['on' => 'charged',  'emit' => 'custody.charged',  'label' => 'شُحنت عهدةُ موظف'],
+            ['on' => 'approved', 'emit' => 'custody.approved', 'label' => 'اعتُمد مصروفُ عهدة'],
+            ['on' => 'reversed', 'emit' => 'custody.reversed', 'label' => 'عُكست حركةُ عهدة'],
+        ],
         'contracts' => [
             ['on' => 'status', 'to' => ['ساري'], 'emit' => 'contract.signed', 'label' => 'سرى عقد'],
             ['on' => 'status', 'to' => ['منتهي'], 'emit' => 'contract.expired', 'label' => 'انتهى عقد'],

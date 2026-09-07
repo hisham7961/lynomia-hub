@@ -34,3 +34,40 @@
         <div style="margin-top:8px"><a class="btn ghost xs" href="{{ route('innovation') }}">مركز الابتكار ←</a></div>
     </div>
 @endif
+
+{{-- تبويبُ العهدة المالية في الموظف 360 (Work OS · الطور E · WP-E.3 · §19/§28) —
+     رصيدٌ مشتقٌّ (لا عمودَ رصيدٍ يُحرَّر) وأحدثُ الحركات، بحجبِ المبلغ عبر
+     `custody.amount`؛ الإدارةُ الكاملةُ في مركز العهدة. يظهر لمن يملك عرضَ العهدة. --}}
+@if (hub_can(auth()->user(), 'custody', 'v'))
+    @php
+        $cAmt = hub_field_mode(auth()->user(), 'custody', 'amount');
+        $cBal = $row->custody_balance;
+        $cMoves = \App\Models\EmployeeCustodyMove::where('employee_id', $row->id)
+            ->orderByDesc('at')->orderByDesc('id')->limit(6)->get();
+        $cCur = setting('app.currency', 'د.ك');
+        $cKinds = ['advance' => 'سلفة', 'charge' => 'شحن', 'expense' => 'مصروف', 'repayment' => 'سداد',
+            'transfer_in' => 'تحويل وارد', 'transfer_out' => 'تحويل صادر', 'deduction' => 'خصم راتب',
+            'settlement' => 'تسوية', 'correction' => 'تصحيح', 'reversal' => 'عكس'];
+    @endphp
+    <div class="card" data-cctab="custody">
+        <div class="crow" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <h3 style="margin:0">💰 العهدة المالية</h3>
+            <span class="bdg {{ (float) $cBal > 0 ? 'wn' : 'ok' }}">{{ $cAmt === 'hide' ? '••• محجوب' : number_format((float) $cBal, 3, '.', '') }} {{ $cCur }}</span>
+        </div>
+        @if ($cMoves->isEmpty())
+            <div class="sub" style="margin-top:6px">لا حركاتِ عهدةٍ بعد.</div>
+        @else
+            <table class="mini" style="margin-top:6px">
+                @foreach ($cMoves as $cm)
+                    <tr>
+                        <td>{{ $cKinds[$cm->kind] ?? $cm->kind }}</td>
+                        <td>{{ $cAmt === 'hide' ? '••• محجوب' : number_format((float) $cm->amount, 3, '.', '') }}</td>
+                        <td>{{ (int) $cm->sign > 0 ? '➕' : '➖' }}</td>
+                        <td class="sub">{{ optional($cm->at)->format('Y-m-d') }}</td>
+                    </tr>
+                @endforeach
+            </table>
+        @endif
+        <div style="margin-top:8px"><a class="btn ghost xs" href="{{ route('custody.wallet.employee', $row->id) }}">كشفُ العهدة وإدارتها ←</a></div>
+    </div>
+@endif
