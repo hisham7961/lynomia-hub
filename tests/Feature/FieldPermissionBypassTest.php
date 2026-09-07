@@ -2,10 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Models\Comment;
+use App\Models\Conversation;
+use App\Models\ConversationMember;
 use App\Models\Employee;
 use App\Models\Role;
+use App\Models\Task;
 use App\Models\User;
+use App\Support\StepUp;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
@@ -241,5 +247,104 @@ class FieldPermissionBypassTest extends TestCase
         User::whereKey($this->employee->id)->update(['allowed_ips' => '127.0.0.1']);
         $this->withHeader('Authorization', 'Bearer ' . $token)
             ->getJson('/api/v1/modules')->assertOk();
+    }
+
+    /**
+     * **أوامرُ المحادثة مسارُ كتابةٍ جديدٌ — فلا يغسل صلاحية** (WP-C.3 · §8):
+     * عضوٌ يكتب في قناةٍ لكنّه لا يملك «إضافةَ مهام» (tasks:a=0) لا يخلق مهمةً بأمرِ
+     * `/task` — كما لا يخلقها من الشاشة. الرفضُ صريحٌ (٤٠٣) ولا نصٌّ يُخزَّن كنجاحٍ زائف.
+     * وأمرٌ مجهولٌ لا يمرّ صامتاً (٤٢٢). يمتدّ نمطَ هذا الملف: حارسٌ يُفرض في مسارٍ
+     * ويُلتَفّ عليه في آخر — والأمرُ لا يكون الالتفافَ الجديد.
+     */
+    public function test_a_chat_command_does_not_launder_module_add_permission(): void
+    {
+        $this->seedCore();
+
+        // قناةٌ يملكها مصرَّحٌ، وعضوٌ يحادثُ فيها بلا صلاحيةِ إضافةِ مهام
+        $ownerRole = Role::create(['name' => 'مالكُ قناة ' . Str::random(4), 'scope' => 'all',
+            'flags' => [], 'matrix' => ['tasks' => ['v' => 1, 'a' => 1, 'e' => 1, 'd' => 0]]]);
+        $owner = User::create(['name' => 'صاحبُ القناة', 'email' => Str::random(6) . '@int.local',
+            'password' => 'Secret!2026x', 'role_id' => $ownerRole->id, 'status' => 'نشط',
+            'password_changed_at' => now()]);
+
+        $poorRole = Role::create(['name' => 'محدود ' . Str::random(4), 'scope' => 'all',
+            'flags' => [], 'matrix' => ['tasks' => ['v' => 1, 'a' => 0]]]);
+        $poor = User::create(['name' => 'عضوٌ محدود', 'email' => Str::random(6) . '@int.local',
+            'password' => 'Secret!2026x', 'role_id' => $poorRole->id, 'status' => 'نشط',
+            'password_changed_at' => now()]);
+
+        $conv = Conversation::create(['kind' => 'channel', 'title' => 'قناةٌ للحدود',
+            'audience' => 'internal', 'visibility' => 'private', 'created_by' => $owner->id]);
+        ConversationMember::create(['conversation_id' => $conv->id, 'user_id' => $owner->id,
+            'role' => 'owner', 'source' => 'explicit', 'last_read_at' => now()]);
+        ConversationMember::create(['conversation_id' => $conv->id, 'user_id' => $poor->id,
+            'role' => 'member', 'source' => 'explicit', 'last_read_at' => now()]);
+
+        // العضوُ المحدودُ يحادثُ بحقّ (رسالةٌ عاديّة تمرّ)
+        $this->actingAs($poor)->post('/comments', [
+            'module' => 'channel', 'record_id' => $conv->id, 'conversation_id' => $conv->id,
+            'body' => 'مرحباً بالفريق',
+        ])->assertRedirect();
+
+        // لكنّ /task لا يغسل صلاحيةً لا يملكها — ٤٠٣ ولا مهمة ولا نصٌّ مخزَّن
+        $before = Task::count();
+        $this->actingAs($poor)->post('/comments', [
+            'module' => 'channel', 'record_id' => $conv->id, 'conversation_id' => $conv->id,
+            'body' => '/task مهمةٌ عبر بابٍ خلفيّ',
+        ])->assertForbidden();
+        $this->assertSame($before, Task::count(), 'أمرُ محادثةٍ خلق مهمةً بلا صلاحية');
+        $this->assertSame(0, Comment::where('body', '/task مهمةٌ عبر بابٍ خلفيّ')->count(),
+            'أمرٌ مرفوضٌ خُزّن كتعليق — نجاحٌ زائف');
+
+        // وأمرٌ مجهولٌ لا يمرّ صامتاً حتى للمالك المصرَّح
+        $this->actingAs($owner)->post('/comments', [
+            'module' => 'channel', 'record_id' => $conv->id, 'conversation_id' => $conv->id,
+            'body' => '/wipe كلَّ شيء',
+        ])->assertStatus(422);
+    }
+
+    /**
+     * **امتدادُ Work OS (WP-C.2 · §6):** سلطةُ القراءةِ الرقابيّةِ لا تُغسَل كتابةً.
+     *
+     * القارئُ الرقابيُّ يرى محادثةً ليس عضواً فيها (بحقٍّ، للامتثال) — لكنّ قدرتَه
+     * على *القراءة* لا تمنحه *الكتابةَ*: لا يحقن رسالةً في القناة (guardConversation
+     * يردّه غيرَ عضوٍ ٤٠٤)، ولا يحذف رسالةَ غيره (٤٠٣). يمتدّ نمطَ هذا الملف: صلاحيةٌ
+     * تُفرض في مسارٍ ولا تُلتَفّ عليها في آخر — والرقابةُ لا تكون الالتفافَ الجديد.
+     */
+    public function test_oversight_read_power_does_not_launder_into_write_access(): void
+    {
+        $this->seedCore();
+        $this->hubSetting('collab.oversight_role', 'مراقبُ الامتثال');
+
+        // قناةٌ يملكها الموظفُ برسالةٍ فيها — والرقيبُ ليس عضواً
+        $conv = Conversation::create(['kind' => 'channel', 'title' => 'قناةٌ لا يكتبها الرقيب',
+            'audience' => 'internal', 'visibility' => 'private', 'created_by' => $this->employee->id]);
+        ConversationMember::create(['conversation_id' => $conv->id, 'user_id' => $this->employee->id,
+            'role' => 'owner', 'source' => 'explicit', 'last_read_at' => now()]);
+        $msg = Comment::create(['module' => 'channel', 'record_id' => $conv->id,
+            'conversation_id' => $conv->id, 'user_id' => $this->employee->id,
+            'body' => 'رسالةٌ لا يمسّها الرقيب', 'read_by' => [$this->employee->id], 'created_at' => now()]);
+
+        $role = Role::create(['name' => 'مراقبُ الامتثال', 'scope' => 'all', 'flags' => [], 'matrix' => []]);
+        $officer = User::create(['name' => 'ضابطُ الرقابة', 'email' => Str::random(8) . '@int.local',
+            'password' => 'Secret!2026x', 'role_id' => $role->id, 'status' => 'نشط', 'password_changed_at' => now()]);
+        $this->actingAs($officer)->post('/stepup', ['answer' => 'Secret!2026x', 'next' => '/'])->assertRedirect();
+        $this->assertTrue(StepUp::fresh());
+
+        // يقرأ بحقٍّ (رقابةٌ) — القدرةُ على الرؤية ثابتة
+        $this->actingAs($officer)->get('/oversight/' . $conv->id . '?reason=' . urlencode('مراجعةُ امتثال'))
+            ->assertOk()->assertSee('رسالةٌ لا يمسّها الرقيب');
+
+        // لكنّه لا يحقن رسالةً في قناةٍ ليس عضواً فيها — الرؤيةُ لا تصير كتابةً
+        $this->actingAs($officer)->post('/comments', [
+            'module' => 'channel', 'record_id' => $conv->id, 'conversation_id' => $conv->id,
+            'body' => 'حقنٌ من الرقيب',
+        ])->assertNotFound();
+        $this->assertSame(0, Comment::where('body', 'حقنٌ من الرقيب')->count(),
+            'الرقيبُ حقن رسالةً في قناةٍ يقرؤها فقط — سلطةُ قراءةٍ غُسلت كتابةً');
+
+        // ولا يحذف رسالةَ غيره — القراءةُ فقط (لا تحرير/حذف)
+        $this->actingAs($officer)->delete('/comments/' . $msg->id)->assertForbidden();
+        $this->assertNotNull(Comment::find($msg->id), 'حذف الرقيبُ رسالةَ غيره');
     }
 }

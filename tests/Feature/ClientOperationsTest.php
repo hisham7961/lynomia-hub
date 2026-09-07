@@ -4,6 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Asset;
 use App\Models\Client;
+use App\Models\Comment;
+use App\Models\Conversation;
+use App\Models\ConversationMember;
 use App\Models\Engagement;
 use App\Models\FinDocument;
 use App\Models\Project;
@@ -150,6 +153,37 @@ class ClientOperationsTest extends TestCase
 
         // ومحاولةُ التبديل لعميلٍ خارج نطاقه: 403 صريحة
         $this->actingAs($u)->post('/client-switch', ['client' => $b->id])->assertForbidden();
+    }
+
+    /**
+     * (Work OS · WP-C.1 · §3–5) نطاقُ العميل يحرس القنواتِ كما يحرس السجلات:
+     * قارئٌ معزولٌ على عميلٍ لا يبلغ قناةً موسومةً بعميلٍ آخر — **حتى لو دُسّ عضواً
+     * فيها**. `guardConversation` يعزل بالنطاق فوق العضويّة (دفاعٌ في العمق) تماماً
+     * كما يعزل `hub_scope` سجلَّ وحدةٍ خارج نطاق قارئه.
+     */
+    public function test_a_client_scoped_reader_cannot_reach_an_out_of_scope_channel(): void
+    {
+        $this->seedCore();
+        $a = $this->client('شركة ألف');
+        $b = $this->client('شركة باء');
+        $u = $this->isolated(['clients' => ['v' => 1]], [$a->id]);
+
+        // قناةُ عميلٍ آخر (باء) — والقارئُ معزولٌ على (ألف)، لكنّه دُسّ عضواً فيها خطأً
+        $conv = Conversation::create(['kind' => 'channel', 'title' => 'قناةُ باء السرّية',
+            'audience' => 'client', 'client_id' => $b->id, 'visibility' => 'private']);
+        ConversationMember::create(['conversation_id' => $conv->id, 'user_id' => $u->id, 'role' => 'member']);
+        Comment::create(['module' => 'channel', 'record_id' => $conv->id, 'conversation_id' => $conv->id,
+            'user_id' => $this->owner->id, 'body' => 'سرُّ عميلٍ آخر', 'read_by' => [$this->owner->id],
+            'created_at' => now()]);
+
+        // عضوٌ نعم، لكنّ نطاقَ العميلِ يردّه ٤٠٤ (عضويّةٌ خاطئةٌ لا تُسرّب صفّاً)
+        $this->actingAs($u)->get('/conversations/' . $conv->id)->assertNotFound();
+        // ولا يكتب فيها
+        $this->actingAs($u)->post('/comments', [
+            'module' => 'channel', 'record_id' => $conv->id, 'conversation_id' => $conv->id,
+            'body' => 'حقنٌ عابرٌ للنطاق',
+        ])->assertNotFound();
+        $this->assertSame(0, Comment::where('body', 'حقنٌ عابرٌ للنطاق')->count());
     }
 
     /* ────────── ٤) الملكية ≠ الإدارة ────────── */

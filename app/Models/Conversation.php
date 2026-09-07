@@ -110,4 +110,60 @@ class Conversation extends Model
     {
         return $q->whereNull('archived_at');
     }
+
+    /** القنواتُ وحدَها (kind=channel) — الفضاءاتُ من الطور C */
+    public function scopeChannels($q)
+    {
+        return $q->where('kind', 'channel');
+    }
+
+    /* ────────── مساعِداتُ العضويّة (الطور C · WP-C.1) — RBAC واحد لا ثانٍ ────────── */
+
+    /**
+     * دورُ مستخدمٍ في حاويةٍ — أو `null` إن لم يكن عضواً. مصدرُ حسمِ «من عضوٌ في
+     * هذه المحادثة» (بخلاف «من يقدر» الذي يحسمه `hub_can`). الضيفُ والمكتومُ
+     * أعضاءٌ لهم دورٌ — الكتمُ عرضٌ لا صلاحية، فلا يُسقِط العضويّة.
+     */
+    public static function roleOf(?string $conversationId, ?string $userId): ?string
+    {
+        if ($conversationId === null || $conversationId === '' || $userId === null || $userId === '') {
+            return null;
+        }
+
+        return ConversationMember::where('conversation_id', $conversationId)
+            ->where('user_id', $userId)->value('role');
+    }
+
+    /** هل المستخدمُ عضوٌ في هذه الحاوية؟ (أيَّ دورٍ كان) */
+    public function hasMember(?string $userId): bool
+    {
+        return self::roleOf($this->getKey(), $userId) !== null;
+    }
+
+    /**
+     * ترتيبُ الأدوار — مقياسٌ عدديٌّ صريحٌ تُبنى عليه حدودُ الإدارة (من يفوق مَن).
+     * owner=3 · moderator=2 · member=1 · guest=0 · غيرُ العضو=-1.
+     */
+    public static function roleRank(?string $role): int
+    {
+        return match ($role) {
+            'owner'     => 3,
+            'moderator' => 2,
+            'member'    => 1,
+            'guest'     => 0,
+            default     => -1,
+        };
+    }
+
+    /** هل الدورُ يخوّل الكتابةَ؟ — الضيفُ يقرأ ولا يكتب */
+    public static function roleCanPost(?string $role): bool
+    {
+        return self::roleRank($role) >= self::roleRank('member');
+    }
+
+    /** هل الدورُ يخوّل إدارةَ الأعضاء (إضافة/إزالة/دور)؟ — المشرفُ فأعلى */
+    public static function roleCanManage(?string $role): bool
+    {
+        return self::roleRank($role) >= self::roleRank('moderator');
+    }
 }

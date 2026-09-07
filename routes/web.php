@@ -14,6 +14,7 @@ use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\CapacityController;
 use App\Http\Controllers\Web\CeoController;
 use App\Http\Controllers\Web\CommentController;
+use App\Http\Controllers\Web\ConversationController;
 use App\Http\Controllers\Web\CostController;
 use App\Http\Controllers\Web\CustomFieldController;
 use App\Http\Controllers\Web\BoardController;
@@ -326,6 +327,28 @@ Route::middleware('auth')->group(function () {
     Route::post('contract/{id}/renew', [\App\Http\Controllers\Web\ContractActionsController::class, 'renew'])->name('contract.renew');
     Route::post('esign/clauses', [\App\Http\Controllers\Web\ContractActionsController::class, 'storeClause'])->name('esign.clause.store');
     Route::delete('esign/clauses', [\App\Http\Controllers\Web\ContractActionsController::class, 'destroyClause'])->name('esign.clause.destroy');
+
+    // ── القنواتُ والفضاءات (Work OS · الطور C · WP-C.1) — رسائلُها تعليقاتٌ عبر
+    //    conversation_id (لا محرّكَ ثانٍ). داخليّةٌ افتراضاً؛ العميلُ لا يبلغها
+    //    (PortalGuard فوق الكل) — قناةُ جمهورِه تصله عبر portal.conversation.
+    //    الحرسُ في المتحكّم: عضويّةٌ فعّالة + نطاقٌ + صلاحيةُ الوحدةِ الهدف. ──
+    Route::get('conversations', [ConversationController::class, 'index'])->name('conversations.index');
+    Route::post('conversations', [ConversationController::class, 'store'])
+        ->middleware('throttle:30,1')->name('conversations.store');
+    Route::get('conversations/{id}', [ConversationController::class, 'show'])->name('conversations.show');
+    Route::middleware('throttle:60,1')->group(function () {
+        Route::post('conversations/{id}/members', [ConversationController::class, 'addMember'])->name('conversations.member.add');
+        Route::post('conversations/{id}/members/remove', [ConversationController::class, 'removeMember'])->name('conversations.member.remove');
+        Route::post('conversations/{id}/members/role', [ConversationController::class, 'setRole'])->name('conversations.member.role');
+    });
+
+    // ── رقابةُ الاتصالات (Work OS · الطور C · WP-C.2 · §6) — بابٌ ظاهرٌ مُدقَّقٌ لا
+    //    خفيّ: قارئٌ للقراءة فقط خلفَ دورِ الرقابة المُسنَد (collab.oversight_role،
+    //    غيرُ المالك) + hub_require_stepup + سببٍ إلزاميّ؛ لا يمسّ read_at/read_by،
+    //    وكلُّ قراءةٍ تكتب hub_audit. يغطّي محرّكَي الرسائل (Comment + DM عبر الحاوية).
+    //    الحرسُ كلُّه في المتحكّم؛ والعميلُ لا يبلغها (PortalGuard فوقها → ٤٠٤). ──
+    Route::get('oversight', [\App\Http\Controllers\Web\OversightController::class, 'index'])->name('oversight.index');
+    Route::get('oversight/{id}', [\App\Http\Controllers\Web\OversightController::class, 'show'])->name('oversight.show');
 
     // ── المراسلة الداخلية المباشرة ──
     Route::get('dm', [DmController::class, 'inbox'])->name('dm.inbox');
