@@ -91,18 +91,23 @@
         <h3 class="cardtitle">🔑 تسجيلُ جهازٍ جديد</h3>
         <div class="sub" style="margin-bottom:8px">
             يُسَكّ رمزٌ لمرّةٍ واحدة (بمهلة {{ max(5, (int) setting('endpoint.enroll_ttl_min', 15)) }} دقيقة)
-            مُسنَدٌ لشركةٍ سلفاً — الجهازُ يولّد زوجَ مفاتيحه محلياً ويرسل العامَّ وحدَه.
+            مربوطٌ بأصلٍ <b>مملوكٍ للشركة</b> — الشركةُ والحاملُ والمحطّةُ تُشتقّ من الأصل خادميّاً
+            (§2)؛ الجهازُ يولّد زوجَ مفاتيحه محلياً ويرسل العامَّ وحدَه.
         </div>
         <form method="post" action="{{ route('enroll.mint') }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             @csrf
-            <select name="companyId" class="inp" required>
-                <option value="">— الشركة —</option>
-                @foreach (hub_scope(\App\Models\Company::query(), 'companies')->orderBy('name_ar')->orderBy('id')->limit(50)->get(['id', 'name_ar']) as $co)
-                    <option value="{{ $co->id }}">{{ $co->name_ar }}</option>
+            <select name="assetId" class="inp" required>
+                <option value="">— أصلٌ مملوكٌ للشركة —</option>
+                @foreach (hub_scope(\App\Models\Asset::query(), 'assets')
+                    ->whereNotNull('company_id')
+                    ->where(fn ($q) => $q->whereNull('owner_scope')->orWhere('owner_scope', '!=', \App\Models\Asset::OWNER_BYOD))
+                    ->whereNotIn('status', \App\Models\Asset::ENDPOINT_INELIGIBLE_STATUSES)
+                    ->orderBy('name')->orderBy('id')->limit(100)->get(['id', 'code', 'name']) as $as)
+                    <option value="{{ $as->id }}">{{ $as->code ? $as->code . ' — ' : '' }}{{ $as->name }}</option>
                 @endforeach
             </select>
             <button class="btn sm">سكُّ رمزِ تسجيل</button>
-            <span class="sub">يتطلب تصعيدَ هوية (step-up).</span>
+            <span class="sub">يتطلب تصعيدَ هوية (step-up). الأصلُ الشخصيّ (BYOD) لا يظهر ولا يُقبَل.</span>
         </form>
     </div>
 @endif

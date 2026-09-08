@@ -121,7 +121,7 @@
 | DeepLink | AASA | `web.php:91` | `MobileWellKnownController::appleAppSiteAssociation` | — | `GET /.well-known/apple-app-site-association` | عامّ | **DONE (NOT_CONFIGURED)** — `MobileOpenApiTest` |
 | DeepLink | assetlinks | `web.php:98` | `MobileWellKnownController::assetLinks` | — | `GET /.well-known/assetlinks.json` | عامّ | **DONE (NOT_CONFIGURED)** — `MobileOpenApiTest` |
 
-## I · تجربةُ العميل (§12–§18 · v2.447.0) — التفعيلُ والبوّابةُ وإدارةُ الأعضاء
+## I · تجربةُ العميل (§12–§18 · v2.451.0) — التفعيلُ والبوّابةُ وإدارةُ الأعضاء
 
 حساباتُ `account_type='client'` خلف **`MobilePortalGuard`** (`mobile.portal` في
 مجموعة المصادقة كلِّها): قائمةٌ بيضاءُ **فوق** المصفوفة — نظيرُ `PortalGuard` الويب

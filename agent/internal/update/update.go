@@ -23,10 +23,15 @@ import (
 	"strings"
 )
 
-// Manifest — بيانُ التحديث: عنوانُ الثنائيّة وتجزئتُها sha256 (hex-64).
+// Manifest — بيانُ التحديث: عنوانُ الثنائيّة وتجزئتُها sha256 (hex-64)، ومعها
+// حقولُ سلسلةِ الثقة (§5–§7) التي يرسلها الخادم: `Version` النسخةُ المعروضة،
+// و`MinAgentVersion` أدنى نسخةِ وكيلٍ متوافقةٍ للترقية الآمنة (جسرُ الترقية).
+// الحقولُ الزائدةُ الأخرى في JSON تُهمَل بلا كسر — العقدُ الأدنى {url, sha256}.
 type Manifest struct {
-	URL    string `json:"url"`
-	SHA256 string `json:"sha256"`
+	URL             string `json:"url"`
+	SHA256          string `json:"sha256"`
+	Version         string `json:"version"`
+	MinAgentVersion string `json:"min_agent_version"`
 }
 
 // maxBinary — سقفُ حجم الثنائيّة الهابطة (دفاعاً عن القرص) — 256 م.ب.

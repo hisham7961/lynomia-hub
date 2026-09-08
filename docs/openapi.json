@@ -2,9 +2,9 @@
     "openapi": "3.1.0",
     "info": {
         "title": "Lynomia Business Hub — REST API",
-        "version": "2.447.0",
+        "version": "2.451.0",
         "description": "واجهة `/api/v1`: كل وحدات النظام بنفس صلاحيات صاحب المفتاح ونطاقه.\nمفتاح Bearer من «حسابي ← مفاتيح API». حدّ المعدل ١٢٠/دقيقة لكل مفتاح و٣٠٠/دقيقة لكل عنوان.\nكل ردٍّ يحمل `X-Request-Id` و`X-API-Version`، وكل خطأٍ يحمل `code` آلياً و`request_id`.",
-        "x-hub-version": "2.447.0"
+        "x-hub-version": "2.451.0"
     },
     "servers": [
         {
@@ -46976,7 +46976,8 @@
                         "enum": [
                             "لينوميا",
                             "عميل — يُدار لدينا",
-                            "مشترك"
+                            "مشترك",
+                            "شخصي — BYOD"
                         ],
                         "title": "الملكية"
                     },
@@ -47148,7 +47149,8 @@
                         "enum": [
                             "لينوميا",
                             "عميل — يُدار لدينا",
-                            "مشترك"
+                            "مشترك",
+                            "شخصي — BYOD"
                         ],
                         "title": "الملكية"
                     },
@@ -47490,8 +47492,7 @@
                         "type": "string",
                         "enum": [
                             "windows",
-                            "macos",
-                            "linux"
+                            "macos"
                         ],
                         "title": "نظام التشغيل"
                     },
@@ -47577,8 +47578,7 @@
                         "type": "string",
                         "enum": [
                             "windows",
-                            "macos",
-                            "linux"
+                            "macos"
                         ],
                         "title": "نظام التشغيل"
                     },

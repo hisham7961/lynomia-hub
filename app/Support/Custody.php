@@ -193,6 +193,11 @@ class Custody
             $locked->save();
             $a->setRawAttributes($locked->getAttributes(), true);
 
+            // §3 — اتساقُ النقطةِ الطرفية: أصلٌ بلغ حالةً نهائيّة ⇒ يُعلَّق جهازُه النشط
+            // (داخلَ المعاملة نفسِها — الأثرُ والتعليقُ أو لا شيء). لا يمسّ ذلك أصلاً
+            // بلا جهاز، ولا يُعيد كتابةَ حدثٍ تاريخيّ.
+            \App\Support\Endpoint::onAssetStatusChanged($a);
+
             return $entry;
         });
     }

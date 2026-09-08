@@ -37,6 +37,8 @@ use Tests\TestCase;
  */
 class WorkOsAgentReleasesTest extends TestCase
 {
+    use \Tests\Concerns\EnrollsEndpoints;
+
     protected function tearDown(): void
     {
         // ملفاتُ الاختبار على القرص الحقيقيّ (نمطُ ReaderScopeLeaksTest) — تُكنَس
@@ -78,7 +80,7 @@ class WorkOsAgentReleasesTest extends TestCase
     {
         $c = Company::create(['name_ar' => 'شركة ألف']);
         $this->actingAs($this->owner)->withStepup()
-            ->post(route('enroll.mint'), ['companyId' => $c->id])->assertSessionHas('enroll_token');
+            ->post(route('enroll.mint'), ['assetId' => $this->eligibleAsset($c)->id])->assertSessionHas('enroll_token');
         $plain = (string) session('enroll_token');
 
         [$priv, $pub] = $this->keypair();

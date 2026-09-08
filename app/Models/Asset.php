@@ -110,6 +110,53 @@ class Asset extends Model
         return $candidate;
     }
 
+    /* ════════════ أهليّةُ النقطة الطرفية (التصحيح §2) — يُعاد استعمالُها لا تُكرَّر ════════════ */
+
+    /** قيمةُ `owner_scope` التي تعني جهازاً شخصيّاً (BYOD) — لا يُسجَّل نقطةً طرفيّة */
+    public const OWNER_BYOD = 'شخصي — BYOD';
+
+    /** حالاتُ الأصلِ غيرُ المؤهّلةِ لنقطةٍ طرفيّة (منتهية/مفقودة/تالفة — §2 fail-closed) */
+    public const ENDPOINT_INELIGIBLE_STATUSES = ['مستبعد', 'مباع', 'مُعاد للمورد', 'مفقود', 'تالف'];
+
+    /**
+     * أصلٌ **مُدارٌ للشركة** (لا شخصيّ/BYOD)؟ — كلُّ قيمِ `owner_scope` (لينوميا/عميل
+     * يُدار لدينا/مشترك، أو فارغةٌ = لينوميا) مُدارةٌ للشركة؛ «شخصي — BYOD» وحدَها ليست.
+     */
+    public function isCompanyManaged(): bool
+    {
+        return trim((string) $this->owner_scope) !== self::OWNER_BYOD;
+    }
+
+    /**
+     * **سببُ عدمِ أهليّةِ الأصلِ لتسجيلِ نقطةٍ طرفيّة** (§2) — أو `null` إن مؤهّل.
+     * fail-closed: بلا شركةٍ، أو شخصيٌّ/BYOD، أو حالتُه منتهية/مفقودة/تالفة ⇒ مرفوض.
+     * الحالةُ تُطبَّع عبر `Custody::canonicalStatus` (لا مقارنةَ نصٍّ حرّ).
+     */
+    public function endpointIneligibleReason(): ?string
+    {
+        if (! $this->company_id) return 'الأصلُ بلا شركة';
+        if (! $this->isCompanyManaged()) return 'الأصلُ شخصيٌّ (BYOD) — لا يُدار للشركة';
+        $status = \App\Support\Custody::canonicalStatus($this->status);
+        if ($status !== null && in_array($status, self::ENDPOINT_INELIGIBLE_STATUSES, true)) {
+            return 'حالةُ الأصلِ غيرُ مؤهّلة: ' . $status;
+        }
+
+        return null;
+    }
+
+    /** مؤهّلٌ لتسجيلِ نقطةٍ طرفيّة؟ (§2) */
+    public function endpointEligible(): bool
+    {
+        return $this->endpointIneligibleReason() === null;
+    }
+
+    /** جهازُ النقطةِ الطرفيّةِ النشطُ المربوطُ بهذا الأصل (إن وُجد) — لمنعِ التسجيلِ المكرَّر */
+    public function activeEndpoint(): ?\App\Models\EndpointDevice
+    {
+        return \App\Models\EndpointDevice::where('asset_id', $this->id)
+            ->where('status', '!=', 'retired')->orderByDesc('id')->first();
+    }
+
     public function company(): BelongsTo
     {
         return $this->belongsTo(\App\Models\Company::class, 'company_id');

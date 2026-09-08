@@ -28,19 +28,24 @@ class EnrollmentToken extends Model
     ];
 
     /**
-     * سكُّ رمزٍ جديد — يُعيد `[الموديل, النصَّ الصريح]`؛ النصُّ لا يُخزَّن ولا
-     * يُدوَّن، ويُعرَض لمن سكّه مرةً واحدة. المهلةُ من `endpoint.enroll_ttl_min`
-     * (افتراضاً ١٥ دقيقة، بأرضيةٍ صلبة ٥ — نمطُ `AccountActivation::issue`).
+     * سكُّ رمزٍ جديد **مربوطٍ بأصلٍ مملوكٍ للشركة** (التصحيح §2) — يُعيد `[الموديل,
+     * النصَّ الصريح]`؛ النصُّ لا يُخزَّن ولا يُدوَّن، ويُعرَض لمن سكّه مرةً واحدة.
+     *
+     * **الإسنادُ خادميٌّ من الأصل لا من الحمولة:** الشركةُ والحاملُ والمحطّةُ تُقرأ من
+     * الأصلِ المُختار (`company_id`/`holder_id`/`station_id`) — الجهازُ لا يختار أيّاً منها.
+     * المهلةُ من `endpoint.enroll_ttl_min` (افتراضاً ١٥، بأرضيةٍ صلبة ٥).
      */
-    public static function mint(string $companyId, ?string $employeeId, string $mintedBy): array
+    public static function mint(\App\Models\Asset $asset, string $mintedBy): array
     {
         $plain = 'enr_' . Str::random(40);
         $ttl = max(5, (int) setting('endpoint.enroll_ttl_min', 15));
 
         $t = static::create([
             'token_hash' => hash('sha256', $plain),
-            'company_id' => $companyId,
-            'employee_id' => $employeeId,
+            'company_id' => $asset->company_id,     // خادميٌّ من الأصل
+            'asset_id' => $asset->id,
+            'employee_id' => $asset->holder_id,     // الحاملُ الحاليُّ للأصل
+            'station_id' => $asset->station_id,     // محطّةُ الأصل
             'expires_at' => now()->addMinutes($ttl),
             'minted_by' => $mintedBy,
         ]);
@@ -70,6 +75,11 @@ class EnrollmentToken extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function asset(): BelongsTo
+    {
+        return $this->belongsTo(Asset::class);
     }
 
     public function minter(): BelongsTo

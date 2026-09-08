@@ -31,14 +31,24 @@ class EndpointRelease extends Model
 
     protected $guarded = ['id'];
 
-    /** الأنظمةُ المنشورُ لها — allowlist مفروضٌ في `saving` (C10) */
-    public const OSES = ['windows', 'macos'];
+    /** الأنظمةُ المنشورُ لها — من المصدرِ الواحد `Endpoint::SUPPORTED` (§1، لا linux) */
+    public const OSES = \App\Support\Endpoint::SUPPORTED;
 
     /** المعماريّتان — allowlist مفروضٌ في `saving` (C10) */
     public const ARCHES = ['amd64', 'arm64'];
 
     /** حالتا التوقيع لا غير — و'signed' خلف إقرارِ التحقّق الصريح وحدَه (C15) */
     public const SIGNING_STATUSES = ['unsigned-dev', 'signed'];
+
+    /** حالتا التوثيق (Apple notarytool) — محورٌ منفصلٌ عن التوقيع؛ 'notarized' خلف
+     *  إقرارٍ متحقَّقٍ صريحٍ فوقَ توقيعٍ على ماك وحدَه (لا شهادةَ مُهيّأة اليوم — §5/C15) */
+    public const NOTARIZATION_STATUSES = ['not-configured', 'notarized'];
+
+    /** حالاتُ دورةِ حياةِ الإصدار — و«withdrawn» **حذفٌ ناعم** (softDeletes) لا حالةٌ تُزوَّر (§6) */
+    public const STATES = ['draft', 'published'];
+
+    /** نطاقاتُ الطرح المرحليّ (§7) — 'all' الافتراضُ فالطرحُ المرحليّ غيرُ مُلزَمٍ افتراضاً */
+    public const ROLLOUT_SCOPES = ['all', 'company', 'percentage'];
 
     /** ملصقُ الصدق الذي تعرضه كلُّ واجهة بجانب الإصدار غير الموقَّع */
     public const UNSIGNED_LABEL = 'UNSIGNED DEVELOPMENT BUILD';
@@ -60,6 +70,25 @@ class EndpointRelease extends Model
 
         return $this;
     }
+
+    /**
+     * إقرارُ توثيقٍ متحقَّقٍ **لهذا الحفظ وحدَه** — البابُ الشرعيّ الوحيد لحالة
+     * 'notarized'. نظيرُ إقرارِ التوقيع تماماً: لا شهادةَ Apple notarytool مُهيّأةً
+     * اليوم، فالتوثيقُ 'not-configured' صادقاً حتى يوثَّق الأرتيفاكتُ فعلاً ويُقرَّ.
+     */
+    protected bool $notarizationAttested = false;
+
+    public function attestVerifiedNotarization(): static
+    {
+        $this->notarizationAttested = true;
+
+        return $this;
+    }
+
+    protected $casts = [
+        'rollout_percentage' => 'integer',
+        'size' => 'integer',
+    ];
 
     protected static function booted(): void
     {
@@ -107,8 +136,62 @@ class EndpointRelease extends Model
                     . 'ولا شهادةَ مُهيّأةً اليوم، فالإصداراتُ unsigned-dev صادقةً');
             }
 
-            // الإقرارُ لحفظةٍ واحدة — لا يبقى عالقاً فيُشرعن حفظاً لاحقاً خلسة
+            // **حاجزُ التوثيق (C15 — نظيرُ التوقيع):** الفارغُ 'not-configured'؛
+            // وخارجُ القائمة يُرمى؛ و'notarized' لا تمرّ إلا بإقرارِ توثيقٍ متحقَّقٍ
+            // صريحٍ **فوقَ** توقيعٍ متحقَّقٍ (signed) **وعلى ماك** (notarytool أداةُ
+            // آبل حصراً) — لا توثيقَ ويندوز، ولا توثيقٌ لغيرِ الموقَّع، ولا ادّعاء.
+            if (trim((string) $r->notarization_status) === '') $r->notarization_status = 'not-configured';
+            if (! in_array((string) $r->notarization_status, self::NOTARIZATION_STATUSES, true)) {
+                throw new \InvalidArgumentException('حالةُ توثيقٍ خارج القائمة: ' . $r->notarization_status);
+            }
+            if ($r->notarization_status === 'notarized') {
+                if (! $r->notarizationAttested) {
+                    throw new \InvalidArgumentException(
+                        "لا ادّعاءَ توثيقٍ: 'notarized' تتطلب إقرارَ توثيقٍ متحقَّقٍ صريحاً (attestVerifiedNotarization) — "
+                        . 'ولا شهادةَ notarytool مُهيّأةً اليوم');
+                }
+                if ($r->signing_status !== 'signed') {
+                    throw new \InvalidArgumentException("لا توثيقَ لغيرِ الموقَّع: 'notarized' تستلزم 'signed' أولاً");
+                }
+                if ((string) $r->os !== 'macos') {
+                    throw new \InvalidArgumentException('التوثيقُ (notarytool) لماك حصراً — لا توثيقَ لويندوز');
+                }
+            }
+
+            // **حالةُ دورةِ الحياة (§6):** الفارغُ 'published' (توافقُ السلوك القائم:
+            // الرفعُ يقدّم فوراً)؛ وخارجُ القائمة يُرمى. «withdrawn» حذفٌ ناعمٌ لا حالة.
+            if (trim((string) $r->state) === '') $r->state = 'published';
+            if (! in_array((string) $r->state, self::STATES, true)) {
+                throw new \InvalidArgumentException('حالةُ إصدارٍ خارج القائمة: ' . $r->state);
+            }
+
+            // **رقعةُ الطرح المرحليّ (§7):** الفارغُ 'all' 100% (غيرُ مُلزَمٍ افتراضاً)؛
+            // 'company' يستلزم شركةً؛ والنسبةُ تُقصَر [0..100]؛ وحقولُ نطاقٍ لا يخصّه تُصفَّر.
+            if (trim((string) $r->rollout_scope) === '') $r->rollout_scope = 'all';
+            if (! in_array((string) $r->rollout_scope, self::ROLLOUT_SCOPES, true)) {
+                throw new \InvalidArgumentException('نطاقُ طرحٍ خارج القائمة: ' . $r->rollout_scope);
+            }
+            $r->rollout_percentage = max(0, min(100, (int) ($r->rollout_percentage ?? 100)));
+            if ($r->rollout_scope === 'company') {
+                if (trim((string) $r->rollout_company_id) === '') {
+                    throw new \InvalidArgumentException("طرحٌ بنطاق 'company' بلا شركةٍ مستهدفة (rollout_company_id)");
+                }
+                $r->rollout_percentage = 100;                 // النطاقُ يحدّد الجمهورَ لا النسبة
+            } else {
+                $r->rollout_company_id = null;                // لا شركةَ عالقةٌ خارج نطاقها
+            }
+            if ($r->rollout_scope !== 'percentage') {
+                $r->rollout_percentage = 100;                 // 'all'/'company' جمهورُهما كامل
+            }
+
+            // الوسومُ النصّية تُقصّ عند الكاتب (MySQL يرفض الفائض حيث تمرّره SQLite)
+            $r->build_number = filled($r->build_number) ? mb_substr(trim((string) $r->build_number), 0, 40) : null;
+            $r->min_agent_version = filled($r->min_agent_version) ? mb_substr(trim((string) $r->min_agent_version), 0, 20) : null;
+            $r->min_server_version = filled($r->min_server_version) ? mb_substr(trim((string) $r->min_server_version), 0, 20) : null;
+
+            // الإقراراتُ لحفظةٍ واحدة — لا تبقى عالقةً فتُشرعن حفظاً لاحقاً خلسة
             $r->signatureAttested = false;
+            $r->notarizationAttested = false;
         });
     }
 
@@ -117,5 +200,42 @@ class EndpointRelease extends Model
     {
         return 'lynomia-agent-' . $this->version . '-' . $this->os . '-' . $this->arch
             . ($this->os === 'windows' ? '.exe' : '');
+    }
+
+    /**
+     * **حالةُ دورةِ الحياة الصادقة للعرض:** المحذوفُ ناعماً «withdrawn» فعلاً
+     * (بيانُ التحديث لا يقدّمه)، وإلا حالةُ العمود ('draft'/'published').
+     */
+    public function lifecycleState(): string
+    {
+        if ($this->trashed()) {
+            return 'withdrawn';
+        }
+
+        return (string) ($this->state ?: 'published');
+    }
+
+    /**
+     * **هل يستهدف هذا الإصدارُ هذا الجهاز؟** (رقعةُ الطرح المرحليّ — §7)
+     *  • 'all'        → الأسطولُ كلُّه (الافتراض).
+     *  • 'company'    → جهازُ الشركةِ المستهدفة وحدَه.
+     *  • 'percentage' → حلقةُ canary **حتميّةٌ لكل جهاز** (نفسُ الجهاز يقع دوماً في
+     *    نفس الشريحة — لا رفرفةَ ترقيةٍ ذهاباً وإياباً): الأجهزةُ ذاتُ الشريحة
+     *    الأدنى من النسبة تتلقّى الطرحَ، وما فوقها يبقى على الإصدار المستقرّ السابق.
+     */
+    public function targetsDevice(\App\Models\EndpointDevice $device): bool
+    {
+        return match ((string) $this->rollout_scope) {
+            'company' => $this->rollout_company_id !== null
+                && (string) $device->company_id === (string) $this->rollout_company_id,
+            'percentage' => $this->rolloutBucket($device) < max(0, min(100, (int) $this->rollout_percentage)),
+            default => true, // 'all' وأيُّ قيمةٍ قديمةٍ قبل التصحيح ⇒ الأسطولُ كلُّه
+        };
+    }
+
+    /** شريحةُ الجهاز [0..99] — حتميّةٌ من هويّته الثابتة (حلقةُ canary لا تتبدّل بين الطلبات) */
+    protected function rolloutBucket(\App\Models\EndpointDevice $device): int
+    {
+        return crc32((string) $device->device_uuid) % 100;
     }
 }
