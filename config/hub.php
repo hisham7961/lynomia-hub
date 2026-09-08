@@ -9292,7 +9292,12 @@ return [
             'feats'         => 'CACHEABLE_INCREMENTAL',
             'designs'       => 'CACHEABLE_INCREMENTAL',
             'tickets'       => 'CACHEABLE_INCREMENTAL',
-            'users'         => 'CACHEABLE_READ_ONLY',
+            // «users» غيرُ قابلٍ للمزامنة صدقاً (Hardener G · Finding#1): عقدُ v1 المجمّد
+            // يرفضه في resolveApi (RESOURCE_NOT_FOUND) لأنّ مُشكّلَ الأعمال لم يُصمَّم
+            // لقناعِ أعمدته الداخليّة (allowed_ips/prefs/totp_secret_cipher). فتصنيفُه
+            // NOT_APPLICABLE كي يتّفقَ المخطّطُ (schema) والمزامنةُ: كلاهما يعلن «غيرُ
+            // قابلٍ للتخبئة» بلا سجلّ — دليلُ المستخدمين يأتي من context/bootstrap (C.1/C.2).
+            'users'         => 'NOT_APPLICABLE',
             'suppliers'     => 'CACHEABLE_INCREMENTAL',
             'purchases'     => 'CACHEABLE_INCREMENTAL',
             'changes'       => 'CACHEABLE_INCREMENTAL',
@@ -9348,5 +9353,47 @@ return [
         // **فارغٌ افتراضاً = لا تصعيد لإجراءٍ عامّ** (نظيرُ الويب الذي لا يُصعّد إجراءَ الحالة) —
         // فلا يُفرَض تأكيدُ هويّةٍ حيث لا يفرضه الويبُ (لا سطحَ جوالٍ أشدَّ ولا أضعف بلا سبب).
         'stepup_actions' => [],
+
+        // ── دفعُ الجوال (Mobile Readiness · الطور E · spec §Push) ──
+        // السائقُ فارغٌ افتراضاً ⇒ `NullPushProvider` ⇒ **NOT_CONFIGURED صدقاً** (لا
+        // نجاحٌ مُزيَّف). الاعتماداتُ الحقيقيّة (`project_id`/رمزُ الوصول) **إعدادٌ خارجيٌّ**
+        // يُقرأ الحيُّ من `setting('mobile.push_driver'|'mobile.push_fcm_project_id'|
+        // 'mobile.push_fcm_access_token')` — يُوثَّق ولا يُختلَق، ولا مفتاحَ خاصٌّ هنا.
+        'push' => [
+            'driver' => '',                    // '' | 'fcm' — setting('mobile.push_driver')
+            'fcm'    => [
+                'project_id' => '',            // setting('mobile.push_fcm_project_id') — حضورٌ لا سرّ
+            ],
+        ],
+
+        // ── المزامنةُ التزايُديّة (Mobile Readiness · الطور G · G.1) ──
+        // حجمُ صفحةِ `GET sync/{module}`: الافتراضُ حين لا يطلب العميلُ `?limit=`،
+        // والحدُّ الأقصى الذي لا يتجاوزه مهما طلب (تدفّقٌ عالي الحجم لا يُغرِق الخادمَ
+        // بصفحةٍ ضخمة). التصنيفُ نفسُه في `hub.mobile_sync` (أعلاه) — هذا حجمُ الصفحةِ فقط.
+        'sync' => [
+            'default_limit' => 100,            // صفحةٌ افتراضيّةٌ معقولة
+            'max_limit'     => 500,            // سقفٌ صلبٌ للصفحة الواحدة
+        ],
+
+        // ── الروابطُ العالميّة (Universal Links / App Links) — سقالةٌ مُهيّأةٌ لا مُختلَقة (الطور H · H.3) ──
+        // **كلُّ المعرّفاتِ الخارجيّة NOT_CONFIGURED** حتى يُصدرها فريقُ التطبيق: معرّفُ الفريق
+        // (Apple Team ID)، ومُعرّفُ الحزمة (bundle id)، واسمُ حزمةِ Android، وبصماتُ شهادةِ
+        // التوقيع (SHA-256). تُخدَم /.well-known/apple-app-site-association و/.well-known/
+        // assetlinks.json صادقةً **تربط صفرَ تطبيق** حتى تُضبط (spec §Deep links: «documented,
+        // not fabricated»). القيمُ الحيّةُ تغلب عبر setting('mobile.dl_*'). المسارُ `/m/*` هو
+        // ترميزُ الرابطِ العميق القانونيّ {module,id,action} (App\Support\NotificationLink).
+        'deep_links' => [
+            'serve'   => true,                 // هل تُخدَم /.well-known/* (تبقى صادقةً NOT_CONFIGURED دون معرّفات)
+            'host'    => '',                   // النطاقُ المُصرَّح — فارغٌ ⇒ config('app.url')
+            'paths'   => ['/m/*', '/app/*'],   // أنماطُ المسار التي يلتقطها التطبيق (وجهةُ الرابط العميق)
+            'apple'   => [
+                'team_id'   => '',             // NOT_CONFIGURED — Apple Developer Team ID (10 حروف) · setting('mobile.dl_apple_team_id')
+                'bundle_id' => '',             // NOT_CONFIGURED — مُعرّفُ حزمة iOS (com.example.app) · setting('mobile.dl_apple_bundle_id')
+            ],
+            'android' => [
+                'package_name'             => '',   // NOT_CONFIGURED — اسمُ حزمة Android · setting('mobile.dl_android_package')
+                'sha256_cert_fingerprints' => [],   // NOT_CONFIGURED — بصماتُ التوقيع SHA-256 · setting('mobile.dl_android_fingerprints') (مفصولة بفاصلة)
+            ],
+        ],
     ],
 ];

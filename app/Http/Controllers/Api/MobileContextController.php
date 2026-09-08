@@ -79,7 +79,7 @@ class MobileContextController extends Controller
     public function bootstrap(Request $r): JsonResponse
     {
         $u  = auth()->user();
-        $sv = $this->schemaVersion();
+        $sv = self::schemaVersion();
 
         $stable = [
             'user' => [
@@ -139,7 +139,7 @@ class MobileContextController extends Controller
     public function schema(Request $r): JsonResponse
     {
         return Api::etagJson($r, [
-            'schema_version'     => $this->schemaVersion(),
+            'schema_version'     => self::schemaVersion(),
             'mobile_api_version' => (string) config('hub.mobile.api_version', Api::VERSION),
             'modules'            => $this->buildSchemaModules(auth()->user()),
         ]);
@@ -153,7 +153,7 @@ class MobileContextController extends Controller
     public function schemaModules(Request $r): JsonResponse
     {
         return Api::etagJson($r, [
-            'schema_version' => $this->schemaVersion(),
+            'schema_version' => self::schemaVersion(),
             'modules'        => $this->buildSchemaModules(auth()->user()),
         ]);
     }
@@ -263,8 +263,12 @@ class MobileContextController extends Controller
      * **الفصلُ عن ETag مقصود:** هذه نسخةُ العقد العامّة (واحدةٌ للجميع)، أما البصمةُ
      * (ETag) فمُنطَّقةٌ لكلِّ مستخدمٍ على ما يراه فعلاً — فتغيّرُ صلاحيةِ حقلٍ لدور
      * ما يبدّل بصمتَه (٢٠٠) دون أن يمسّ نسخةَ العقد العامّة. تُحوسَب مرّةً وتُخبَّأ.
+     *
+     * **`public static` (الطور G · G.1):** مصدرٌ واحدٌ لنسخةِ العقد — يعيد استعمالها
+     * محرّكُ المزامنة كـ`sync_version` في كلِّ ردّ (`MobileSyncController`)، فيحمل
+     * العميلُ مفهومَ نسخةٍ واحداً عبر الإقلاعِ والمخطّطِ والمزامنة (لا نظامَ نسخٍ ثانٍ).
      */
-    private function schemaVersion(): string
+    public static function schemaVersion(): string
     {
         static $v = null;
         if ($v !== null) return $v;

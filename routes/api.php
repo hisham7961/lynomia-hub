@@ -110,6 +110,15 @@ Route::prefix('mobile/v1')->group(function () {
         ->middleware('throttle:60,1')->name('mobile.app_config');
     Route::get('health', [\App\Http\Controllers\Api\MobileAuthController::class, 'health'])
         ->middleware('throttle:60,1')->name('mobile.health');
+
+    // ── مواصفةُ OpenAPI للجوال (الطور H · H.2) ──
+    // **عامّةٌ عمداً** (لا رمزَ وصول): كي يقرأها التطبيقُ وأدواتُ التوليد قبل الدخول.
+    // **مولَّدةٌ من المسارات الحيّة** (`MobileOpenApi::spec`) لا مكتوبةٌ باليد — وثيقةٌ
+    // **منفصلةٌ تماماً** عن `/api/v1/openapi.json` (لا تمسّه ولا `docs/openapi.json`).
+    // في المجموعةِ العامّةِ (قبل المجموعةِ المُصادَقةِ التي فيها catch-all `{module}`)
+    // فلا يبتلعها — نظيرُ انضباطِ `/api/v1` (`api.php:16` قبل `{module}`).
+    Route::get('openapi.json', [\App\Http\Controllers\Api\MobileDocsController::class, 'openapi'])
+        ->middleware('throttle:60,1')->name('mobile.openapi');
 });
 
 // المجموعةُ المُصادَقة: الخنقُ قبل المصادقة (نمطُ v1)، ثم `mobile.session` (تُرسي
@@ -161,6 +170,100 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     Route::get('prefs', [\App\Http\Controllers\Api\MobileWorkController::class, 'prefs'])->name('mobile.prefs.index');
     Route::put('prefs', [\App\Http\Controllers\Api\MobileWorkController::class, 'prefsUpdate'])->name('mobile.prefs.update');
     Route::post('prefs/pin', [\App\Http\Controllers\Api\MobileWorkController::class, 'pin'])->name('mobile.prefs.pin');
+
+    /*
+     * ── الاتصال (Mobile Readiness · الطور E · §109) ──
+     *
+     * **ترتيبُ التسجيلِ عقدٌ أمنيّ (Critic F9):** كلُّ حرفيّاتِ الطور E
+     * (إشعارات/تعليقات/DM/دفع) تُسجَّل **قبل** الـcatch-all `{module}` أدناه — وإلّا
+     * ابتلعها (`GET notifications` ⇒ `apiIndex('notifications')`, و`GET
+     * notifications/unread-count` ⇒ `{module}/{id}`, و`POST push/register` ⇒
+     * `{module}/{id}`, …). الهيكلُ يملؤه بناةُ E.1–E.5؛ الأساسُ المشترك
+     * (`NotificationLink`/`CommentService`/`DmService`/`PushService`) جاهزٌ في هذه الدفعة.
+     */
+
+    // E.1/E.2 — الإشعارات (هويّةٌ خاصّةٌ فقط) + وجهةُ الرابطِ العميق
+    Route::get('notifications', [\App\Http\Controllers\Api\MobileCommController::class, 'notifications'])->name('mobile.notifications.index');
+    Route::get('notifications/unread-count', [\App\Http\Controllers\Api\MobileCommController::class, 'unreadCount'])->name('mobile.notifications.unread');
+    Route::post('notifications/read-all', [\App\Http\Controllers\Api\MobileCommController::class, 'markAllRead'])->name('mobile.notifications.read_all');
+    Route::get('notifications/{id}/target', [\App\Http\Controllers\Api\MobileCommController::class, 'notificationTarget'])->name('mobile.notifications.target');
+    Route::post('notifications/{id}/read', [\App\Http\Controllers\Api\MobileCommController::class, 'markRead'])->name('mobile.notifications.read');
+
+    // E.3 — التعليقات (reuse CommentService::guardTarget — نقطةُ التخويلِ الوحيدة · F2)
+    Route::get('comments', [\App\Http\Controllers\Api\MobileCommController::class, 'comments'])->name('mobile.comments.index');
+    Route::post('comments', [\App\Http\Controllers\Api\MobileCommController::class, 'postComment'])->name('mobile.comments.store');
+
+    // E.4 — DM (خصوصيّةُ الطرفَين · F8: `{user}` = الطرفُ الآخر، المفتاحُ من auth لا العميل)
+    Route::get('dm/threads', [\App\Http\Controllers\Api\MobileCommController::class, 'dmThreads'])->name('mobile.dm.threads');
+    Route::get('dm/threads/{user}/messages', [\App\Http\Controllers\Api\MobileCommController::class, 'dmMessages'])->name('mobile.dm.messages');
+    Route::post('dm/threads/{user}/send', [\App\Http\Controllers\Api\MobileCommController::class, 'dmSend'])->name('mobile.dm.send');
+    Route::post('dm/threads/{user}/read', [\App\Http\Controllers\Api\MobileCommController::class, 'dmMarkRead'])->name('mobile.dm.read');
+
+    // E.5 — تسجيلُ الدفع (dedupe عابرُ المستخدمين · F7)
+    Route::post('push/register', [\App\Http\Controllers\Api\MobilePushController::class, 'register'])->name('mobile.push.register');
+    Route::post('push/unregister', [\App\Http\Controllers\Api\MobilePushController::class, 'unregister'])->name('mobile.push.unregister');
+
+    // E.7 — إدارةُ الدفع (للمالكِ وحدَه · صادقةٌ بلا سرّ): حالةٌ + اختبارٌ آمنٌ يقول
+    // NOT_CONFIGURED حين لا اعتمادات. حرفيّةٌ ثلاثيّةُ المقطع (`push/admin/*`) — لا
+    // يبتلعها `{module}/{id}` (مقطعان) ولا `{module}/{id}/actions` (المقطعُ الثالثُ
+    // حرفيٌّ `actions`)؛ ومع ذلك تُسجَّل قبل الـcatch-all انضباطاً (F9).
+    Route::get('push/admin/status', [\App\Http\Controllers\Api\MobilePushController::class, 'adminStatus'])->name('mobile.push.admin.status');
+    Route::post('push/admin/test', [\App\Http\Controllers\Api\MobilePushController::class, 'adminTest'])->name('mobile.push.admin.test');
+
+    /*
+     * ── ملفّاتٌ + ماسحٌ + موقع (Mobile Readiness · الطور F · §109) ──
+     *
+     * **ترتيبُ التسجيلِ عقدٌ أمنيّ (Critic F9):** كلُّ حرفيّاتِ الطور F
+     * (files/identity/tracking) تُسجَّل **قبل** الـcatch-all `{module}` أدناه — وإلّا
+     * ابتلعها (`GET files/x/download` سليمٌ لأنّ المقطعَ الثالثَ حرفيٌّ، لكنّ الانضباطَ
+     * يُبقيها أوّلاً؛ و`POST files/attach` قد يلتبس، و`identity`/`tracking` أحاديّاتُ
+     * المقطع يبتلعها `GET/POST {module}`). نظيرُ انضباطِ `/api/v1` (`api.php:26,31-33`
+     * حيث identity/track قبل `{module}`).
+     *
+     * **هيكلٌ في دفعةِ الأساس:** المعالجاتُ في `MobileFileController` موصَّفةٌ بخطّةِ
+     * إعادةِ الاستعمال (AttachmentService · ChunkedUpload · parent::identityResolve ·
+     * parent::track*) وتُملأ في دفعةِ التنفيذ. الجوهرُ المشترك (`AttachmentService`)
+     * والقرارُ (إعادةُ استعمالِ `ChunkedUpload` بلا جدولٍ جديد) جاهزان في هذه الدفعة.
+     */
+
+    // F.1 — الرفعُ المقطَّع (جلسة ← قطعة ← إتمام) + الرفعُ المفرد. حرفيّاتٌ:
+    // `files/upload-session*` و`files/attach` قبل الـcatch-all (F9).
+    Route::post('files/upload-session', [\App\Http\Controllers\Api\MobileFileController::class, 'uploadSession'])->name('mobile.files.upload_session');
+    Route::put('files/upload-session/{id}/chunk', [\App\Http\Controllers\Api\MobileFileController::class, 'uploadChunk'])->name('mobile.files.upload_chunk');
+    Route::post('files/upload-session/{id}/complete', [\App\Http\Controllers\Api\MobileFileController::class, 'uploadComplete'])->name('mobile.files.upload_complete');
+    Route::post('files/attach', [\App\Http\Controllers\Api\MobileFileController::class, 'attach'])->name('mobile.files.attach');
+
+    // F.2 — التنزيل/البثّ المُصادَق (`files/{id}/download|stream` · مقطعٌ ثالثٌ حرفيّ
+    // يميّزها عن `{module}/{id}/actions`، ومع ذلك أوّلاً انضباطاً · F9). لا رابطٌ عامّ.
+    Route::get('files/{id}/download', [\App\Http\Controllers\Api\MobileFileController::class, 'download'])->name('mobile.files.download');
+    Route::get('files/{id}/stream', [\App\Http\Controllers\Api\MobileFileController::class, 'stream'])->name('mobile.files.stream');
+
+    // F.3 — الماسح: المحلّلُ الموحّد (reuse V1Controller::identityResolve). حرفيّةٌ
+    // `identity/resolve/{q}` — لا يبتلعها `{module}/{id}` (المقطعُ الأوّلُ حرفيٌّ).
+    Route::get('identity/resolve/{q}', [\App\Http\Controllers\Api\MobileFileController::class, 'identityResolve'])
+        ->name('mobile.identity.resolve');   // مقطعٌ مفردٌ كنظيرِ v1 (api.php:26) — لا `.*`
+
+    // F.4 — الموقع: تتبّعٌ بموافقةٍ صريحة (reuse V1Controller::trackStart/Ingest/End).
+    // حرفيّاتٌ `tracking/*` قبل الـcatch-all (F9) — لا تتبّعٌ خفيٌّ دائم.
+    Route::post('tracking/start', [\App\Http\Controllers\Api\MobileFileController::class, 'trackingStart'])->name('mobile.tracking.start');
+    Route::post('tracking/{session}/points', [\App\Http\Controllers\Api\MobileFileController::class, 'trackingPoints'])->name('mobile.tracking.points');
+    Route::post('tracking/{session}/end', [\App\Http\Controllers\Api\MobileFileController::class, 'trackingEnd'])->name('mobile.tracking.end');
+
+    /*
+     * ── المزامنة/الصمود (Mobile Readiness · الطور G · §109) ──
+     *
+     * **`GET sync/{module}`** — مزامنةٌ تزايُديّةٌ يقودها تصنيفُ الوحدة
+     * (`hub_sync_class`): CACHEABLE_INCREMENTAL/READ_ONLY تبثّ سجلّاتٍ مُقنَّعةً +
+     * شواهدَ حذفٍ بمؤشّرٍ حتميّ (updated_at,id)؛ والباقي (ONLINE_ONLY/
+     * SENSITIVE_NO_PERSIST/NOT_APPLICABLE) يعيد سياسةً صادقةً بلا سجلّات.
+     *
+     * **ترتيبُ التسجيلِ عقدٌ أمنيّ (Critic F9):** `sync/{module}` (مقطعان، الأوّلُ
+     * حرفيٌّ `sync`) تُسجَّل **قبل** الـcatch-all `GET {module}/{id}` (مقطعان كلاهما
+     * وسيط) — وإلّا حلَّ `GET sync/tickets` إلى `showRecord('sync','tickets')`. نظيرُ
+     * انضباطِ `/api/v1` (الحرفيُّ قبل `{module}`). التنطيقُ/التعارُض/الـIdempotency
+     * (G.2/G.3/G.4) في المحرّكِ المُعادِ استعمالُه لا في مسارٍ ثانٍ.
+     */
+    Route::get('sync/{module}', [\App\Http\Controllers\Api\MobileSyncController::class, 'sync'])->name('mobile.sync');
 
     // D.2/D.3 — إجراءاتُ المورد: لاحقةُ `/actions` **قبل** `{module}/{id}` (المقطعُ
     // الحرفيّ `actions` يميّزها، ومع ذلك تُسجَّل أوّلاً انضباطاً · F9)

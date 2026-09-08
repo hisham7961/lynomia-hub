@@ -1228,6 +1228,11 @@ return [
         'mobile.refresh_ttl_days' => 'مهلةُ رمز تحديثِ الجوال بالأيام (يُدوَّر لمرّةٍ واحدة عند كل استعمال). افتراضياً ٣٠. يقرؤها MobileSessionService.',
         'mobile.mfa_challenge_min' => 'كم دقيقةً يبقى تحدّي التحقق بخطوتين على الجوال صالحاً بين تسجيل الدخول وإدخال الرمز. افتراضياً ٥. يقرؤها MobileAuthController.',
         'mobile.support_url' => 'رابطُ الدعم المعروض في app-config للتطبيق (قبل الدخول، بلا سرّ). فارغٌ افتراضاً. يقرؤه MobileAuthController.',
+        // ── Mobile Readiness · الطور H (H.3) — معرّفا الروابط العميقة (Universal/App
+        // Links): فارغان افتراضاً ⇒ well-known يُخدَم NOT_CONFIGURED صدقاً (لا يربط أيَّ
+        // تطبيق) حتى تُضبط معرّفاتٌ حقيقيّة. لا سرَّ فيهما (معرّفٌ علنيّ + بصمةُ شهادة).
+        'mobile.dl_apple_team_id' => 'معرّفُ فريق Apple (Team ID) لربط Universal Links في apple-app-site-association. فارغٌ افتراضاً = غير مُهيّأ (لا يربط تطبيقاً). يقرؤه MobileWellKnownController.',
+        'mobile.dl_android_fingerprints' => 'بصماتُ شهادةِ توقيع Android (sha256، مفصولةٌ بفاصلة) لربط App Links في assetlinks.json. فارغٌ افتراضاً = غير مُهيّأ. يقرؤه MobileWellKnownController.',
         // ── Mobile Readiness · الطور C (SF-5 · C.3) — بوّابةُ إصدارِ التطبيق وروابطُ
         // المتجر: تُقرأ في app-config/health (قبل الدخول، بلا سرّ). افتراضُها **فارغٌ
         // عمداً ⇒ لا حجبَ لنسخ التطوير** حتى يُضبط حدٌّ صراحةً (spec §Version gate).
@@ -1239,6 +1244,16 @@ return [
         'mobile.force_update' => 'حين يكون ١: التحديثُ إلزاميٌّ لا اختياريٌّ حين يكون إصدارُ العميل دون الحدِّ الأدنى (force_update في app-config) — يوجّه التطبيقُ لبوّابة التحديث الحاجزة. صفرٌ (الافتراض) = تلميحٌ لا حجب. يقرؤه MobileAuthController.',
         'mobile.store_url_ios' => 'رابطُ App Store لتطبيق iOS (يُعرض في app-config لتوجيه التحديث). فارغٌ افتراضاً ⇒ null صادقة (NOT_CONFIGURED، لا يُختلَق). يقرؤه MobileAuthController.',
         'mobile.store_url_android' => 'رابطُ Google Play لتطبيق Android. فارغٌ افتراضاً ⇒ null صادقة (NOT_CONFIGURED). يقرؤه MobileAuthController.',
+        // ── Mobile Readiness · الطور E (E.6/E.7 · spec §Push) — سائقُ دفعِ الجوال
+        // واعتماداتُه: **إعدادٌ خارجيٌّ يُقرأ الحيُّ لا يُختلَق**. فارغٌ افتراضاً ⇒
+        // `NullPushProvider` ⇒ NOT_CONFIGURED صدقاً (لا نجاحٌ مُزيَّف). تقرؤها
+        // `PushService`، وحالتُها الصادقةُ (بلا سرّ) تُعرَض عبر `push/admin/status`. ──
+        'mobile.push_driver' => 'سائقُ دفعِ الجوال: فارغٌ (الافتراض) ⇒ NullPushProvider ⇒ NOT_CONFIGURED صدقاً (لا نجاحٌ مُزيَّف)، أو «fcm» لتفعيل Firebase Cloud Messaging (يحتاج project_id + رمز الوصول). يقرؤه PushService.',
+        'mobile.push_fcm_project_id' => 'معرّفُ مشروع Firebase لدفع FCM — إعدادٌ خارجيٌّ (لا سرّ، يُعرَض حضورُه لا قيمتُه). فارغٌ افتراضاً ⇒ الدفعُ غيرُ مهيّأ (NOT_CONFIGURED). يقرؤه PushService.',
+        'mobile.push_fcm_access_token' => [
+            'why'       => 'رمزُ وصولِ حساب خدمة Firebase لإرسال FCM — **سرٌّ**: يُخزَّن مشفَّراً ولا يُعرَض قط (يُعرَض حضورُه فقط في push/admin/status). فارغٌ افتراضاً ⇒ NOT_CONFIGURED (لا يُختلَق نجاحٌ). يقرؤه PushService.',
+            'sensitive' => true,
+        ],
         'heartbeat.backup' => 'نبضةٌ يكتبها كل أمرٍ مجدول عند نجاحه (نسخة احتياطية · صادر · ملخّص · مراقبة · أتمتة) لتقول متى عمل آخر مرة. تُقرأ في لوحة التشغيل وملخّص الصباح — كتابتها يدوياً تكذب على المراقبة.',
         // ── v2.399: مفاتيحُ تشغيلٍ داخلية (تُضبط من القاعدة عند الحاجة، ولها افتراضيّاتٌ آمنة) ──
         'api.usage_keep_days' => 'كم يوماً تُحفظ عدّاداتُ استخدام API اليومية (لكل مفتاح: طلبات/أخطاء/زمن) قبل أن يقصّها hub:automation. افتراضياً ٩٠. تُقرأ في مركز التكامل.',

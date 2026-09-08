@@ -54,10 +54,9 @@ class NotificationController extends Controller
         $n = HubNotification::where('user_id', auth()->id())->findOrFail($id);
         if (! $n->read) $n->forceFill(['read' => true])->save();
 
-        $url = ($n->module && $n->record_id && hub_mod($n->module))
-            ? route('m.show', [$n->module, $n->record_id]) : route('notifications.index');
-
-        return redirect($url);
+        // الخريطةُ مُستخرَجةٌ إلى محلِّلٍ واحدٍ يشترك فيه الويبُ والجوال (E.2) — سلوكُ
+        // الويبِ **غيرُ متغيّر**: `webUrl` تُنتج الرابطَ نفسَه الذي كان هنا حرفيّاً.
+        return redirect(\App\Support\NotificationLink::webUrl($n));
     }
 
     public function readAll()
