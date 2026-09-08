@@ -34,6 +34,8 @@ use Tests\TestCase;
  */
 class WorkOsAcceptanceEndpointTest extends TestCase
 {
+    use \Tests\Concerns\EnrollsEndpoints;
+
     protected function tearDown(): void
     {
         foreach (glob(storage_path('app/agent-releases/*')) ?: [] as $f) @unlink($f);
@@ -82,12 +84,14 @@ class WorkOsAcceptanceEndpointTest extends TestCase
 
         /* ── (١) السكّ: بلا تصعيدٍ يُحال ولا يُسكّ — وبالتصعيد يُسكّ sha256 ── */
 
-        $this->actingAs($this->owner)->post(route('enroll.mint'), ['companyId' => $company->id])
+        $asset = $this->eligibleAsset($company);   // §2 — أصلٌ مملوكٌ للشركة مؤهّل
+
+        $this->actingAs($this->owner)->post(route('enroll.mint'), ['assetId' => $asset->id])
             ->assertRedirect();
         $this->assertSame(0, EnrollmentToken::count(), 'رمزٌ سُكّ دون تصعيد هوية');
 
         $this->actingAs($this->owner)->withStepup()
-            ->post(route('enroll.mint'), ['companyId' => $company->id])
+            ->post(route('enroll.mint'), ['assetId' => $asset->id])
             ->assertSessionHas('enroll_token');
         $plain = (string) session('enroll_token');
         $this->assertSame(hash('sha256', $plain), EnrollmentToken::firstOrFail()->token_hash,

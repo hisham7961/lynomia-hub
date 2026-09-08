@@ -34,6 +34,8 @@ use Tests\TestCase;
  */
 class WorkOsEndpointCentreTest extends TestCase
 {
+    use \Tests\Concerns\EnrollsEndpoints;
+
     /* ───────────────────── العتاد المشترك (نمطُ WorkOsEndpointProtocolTest حرفياً) ───────────────────── */
 
     protected function withStepup()
@@ -56,7 +58,7 @@ class WorkOsEndpointCentreTest extends TestCase
     {
         $c ??= Company::create(['name_ar' => 'شركة ألف']);
         $this->actingAs($this->owner)->withStepup()
-            ->post(route('enroll.mint'), ['companyId' => $c->id])->assertSessionHas('enroll_token');
+            ->post(route('enroll.mint'), ['assetId' => $this->eligibleAsset($c)->id])->assertSessionHas('enroll_token');
         $plain = (string) session('enroll_token');
 
         [$priv, $pub] = $this->keypair();

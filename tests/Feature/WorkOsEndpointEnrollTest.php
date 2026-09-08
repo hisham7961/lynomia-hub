@@ -59,10 +59,14 @@ class WorkOsEndpointEnrollTest extends TestCase
     }
 
     /** سكُّ رمزٍ عبر المسار الحقيقيّ (مالك + step-up) — يُعيد النصَّ الصريح المعروضَ مرةً */
+    use \Tests\Concerns\EnrollsEndpoints;
+
     protected function mintFor(Company $c, ?string $employeeId = null): string
     {
+        // §2 — الرمزُ يُربَط بأصلٍ مملوكٍ للشركة؛ الحاملُ يصير حاملَ الأصل
+        $asset = $this->eligibleAsset($c, $employeeId);
         $resp = $this->actingAs($this->owner)->withStepup()
-            ->post(route('enroll.mint'), array_filter(['companyId' => $c->id, 'employeeId' => $employeeId]));
+            ->post(route('enroll.mint'), ['assetId' => $asset->id]);
         $resp->assertSessionHas('enroll_token');
 
         return (string) session('enroll_token');
@@ -272,13 +276,14 @@ class WorkOsEndpointEnrollTest extends TestCase
             'password' => 'Secret!2026x', 'role_id' => $monRole->id, 'status' => 'نشط',
             'companies' => [$b->id], 'password_changed_at' => now()]);
 
+        // أصلٌ في شركة (أ) — معزولُ (ب) لا يسكّ له (٤٠٤ لا تسريب)
         $this->actingAs($bUser)->withStepup()
-            ->post(route('enroll.mint'), ['companyId' => $a->id])->assertNotFound();
+            ->post(route('enroll.mint'), ['assetId' => $this->eligibleAsset($a)->id])->assertNotFound();
         $this->assertSame(0, EnrollmentToken::count());
 
-        // ولشركته: يمرّ
+        // ولأصلٍ في شركته: يمرّ
         $this->actingAs($bUser)->withStepup()
-            ->post(route('enroll.mint'), ['companyId' => $b->id])->assertSessionHas('enroll_token');
+            ->post(route('enroll.mint'), ['assetId' => $this->eligibleAsset($b)->id])->assertSessionHas('enroll_token');
 
         // جهازُ ألف لا يُقرأ من معزولِ باء (findScoped→404) — والمالكُ يراه
         $plainA = $this->mintFor($a);
