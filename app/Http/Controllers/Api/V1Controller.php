@@ -476,10 +476,37 @@ class V1Controller extends ModuleController
         return [$owner, $ikey];
     }
 
-    /** بصمةُ الطلب: مفتاحٌ واحد لا يخدم إلا طلباً واحداً (مسار + جسم) */
+    /**
+     * بصمةُ الطلب: مفتاحٌ واحد لا يخدم إلا طلباً واحداً (مسار + جسم).
+     *
+     * **متعدّدُ الأجزاء (multipart · Mobile F · LOW-1):** يُفرّغ PHP الجسمَ الخام إلى
+     * `$_FILES`/`$_POST` فيعود `getContent()` فارغاً — فطلبان مختلفان (ملفٌّ آخرُ أو
+     * سجلٌّ آخر) بالمفتاح نفسِه يتطابقان في البصمة، فيُعاد ردُّ الأوّل **زائفاً** بدل
+     * `IDEMPOTENCY_KEY_REUSED`. لذا **عند وجودِ ملفٍّ فقط** نطوي هويّةَ الملفّات
+     * (اسمٌ + حجم) وحقولَ النموذج (مرتَّبةً للحتميّة) في البصمة — فطلبُ JSON يبقى
+     * حرفاً بحرف (لا ملفَ ⇒ لا إضافة)، وإعادةُ المحاولةِ المشروعة (الطلبُ نفسُه)
+     * تبقى بصمةً واحدةً فتُعاد كردٍّ مخزَّن.
+     */
     protected function fingerprintOf(Request $r): string
     {
-        return hash('sha256', $r->method() . '|' . $r->path() . '|' . (string) $r->getContent());
+        $base = $r->method() . '|' . $r->path() . '|' . (string) $r->getContent();
+
+        $files = $r->allFiles();
+        if ($files) {
+            $names = [];
+            array_walk_recursive($files, function ($f) use (&$names) {
+                if ($f instanceof \Illuminate\Http\UploadedFile) {
+                    $names[] = $f->getClientOriginalName() . ':' . (int) $f->getSize();
+                }
+            });
+            sort($names);                                  // ترتيبُ الملفّات لا يغيّر الطلب
+            $post = $r->post();
+            ksort($post);                                  // حتميّةٌ لا قرعةَ ترتيبِ مفاتيح
+            $base .= '|files:' . implode(',', $names)
+                   . '|post:' . hash('sha256', (string) json_encode($post));
+        }
+
+        return hash('sha256', $base);
     }
 
     /**

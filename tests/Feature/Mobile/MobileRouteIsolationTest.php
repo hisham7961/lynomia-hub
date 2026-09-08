@@ -246,4 +246,90 @@ class MobileRouteIsolationTest extends TestCase
         $this->assertNotSame($crudStore, $this->resolveMethod('/api/mobile/v1/push/register', 'POST')->getActionName(),
             '«POST push/register» ابتلعه {module}/{id} (F9)');
     }
+
+    /* ══════════════════ الطور F — ملفّات/ماسح/موقع (Critic F9) ══════════════════ */
+
+    /**
+     * كلُّ مسارٍ حرفيٍّ في الطور F (files/identity/tracking) يحلّ إلى معالجه الخاصّ في
+     * `MobileFileController` — **لا يبتلعه** الـcatch-all `{module}` المُسجَّلُ بعده. لو
+     * سبَقَ الـcatch-all لحلَّ `POST tracking/start` إلى `{module}/{id}` و`GET
+     * identity/resolve/x` إلى `{module}/{id}/actions` — فيسقط هذا فوراً بدل أن يمرّ
+     * التسريبُ صامتاً. المقطعُ الثالثُ الحرفيّ (download/stream/complete/chunk) يميّزها
+     * عن `actions`، لكنّ الانضباطَ يُبقيها أوّلاً على كل حال (نصُّ المهمّة · F9).
+     */
+    public function test_phase_f_literal_routes_are_not_swallowed_by_the_module_catch_all(): void
+    {
+        $F = 'App\\Http\\Controllers\\Api\\MobileFileController@';
+
+        $expected = [
+            // [uri, method] => [name, action]
+            ['/api/mobile/v1/files/upload-session',                 'POST', 'mobile.files.upload_session',  $F . 'uploadSession'],
+            ['/api/mobile/v1/files/upload-session/sess-1/chunk',    'PUT',  'mobile.files.upload_chunk',     $F . 'uploadChunk'],
+            ['/api/mobile/v1/files/upload-session/sess-1/complete', 'POST', 'mobile.files.upload_complete',  $F . 'uploadComplete'],
+            ['/api/mobile/v1/files/attach',                         'POST', 'mobile.files.attach',           $F . 'attach'],
+            ['/api/mobile/v1/files/att-9/download',                 'GET',  'mobile.files.download',         $F . 'download'],
+            ['/api/mobile/v1/files/att-9/stream',                   'GET',  'mobile.files.stream',           $F . 'stream'],
+            ['/api/mobile/v1/identity/resolve/ABC-123',             'GET',  'mobile.identity.resolve',       $F . 'identityResolve'],
+            ['/api/mobile/v1/tracking/start',                       'POST', 'mobile.tracking.start',         $F . 'trackingStart'],
+            ['/api/mobile/v1/tracking/trk-1/points',                'POST', 'mobile.tracking.points',        $F . 'trackingPoints'],
+            ['/api/mobile/v1/tracking/trk-1/end',                   'POST', 'mobile.tracking.end',           $F . 'trackingEnd'],
+        ];
+
+        foreach ($expected as [$uri, $method, $name, $action]) {
+            $route = $this->resolveMethod($uri, $method);
+            $this->assertSame($name, $route->getName(),
+                "«{$method} {$uri}» حُلّ إلى «{$route->getName()}» لا «{$name}» — هل ابتلعه catch-all؟ (F9)");
+            $this->assertSame($action, $route->getActionName(),
+                "«{$method} {$uri}» يجب أن يحلَّ إلى معالجه الحرفيّ الخاصّ (F9)");
+        }
+    }
+
+    /**
+     * حرّاسٌ أخصّ لعقد F: أحاديّاتُ/ثنائيّاتُ المقطع لا يبتلعها الجوهرُ العامّ. `POST
+     * tracking/start` و`POST files/attach` (مقطعان) لا يحلّان إلى `{module}` (POST
+     * أحاديُّ المقطع فقط)، و`GET identity/resolve/x` (ثلاثةُ مقاطعَ، الأوّلُ حرفيّ)
+     * لا يحلّ إلى `{module}/{id}/actions` (المقطعُ الثالثُ حرفيٌّ `actions`). برهانٌ
+     * صريحٌ على أنّ الحرفيَّ يسبق العامّ.
+     */
+    public function test_phase_f_literals_never_shadowed_by_generic_crud(): void
+    {
+        $crudStore   = 'App\\Http\\Controllers\\Api\\MobileResourceController@createRecord';
+        $crudActions = 'App\\Http\\Controllers\\Api\\MobileResourceController@listActions';
+
+        $this->assertNotSame($crudStore, $this->resolveMethod('/api/mobile/v1/tracking/start', 'POST')->getActionName(),
+            '«POST tracking/start» ابتلعه {module} (F9)');
+        $this->assertNotSame($crudStore, $this->resolveMethod('/api/mobile/v1/files/attach', 'POST')->getActionName(),
+            '«POST files/attach» ابتلعه {module} (F9)');
+        $this->assertNotSame($crudActions, $this->resolve('/api/mobile/v1/identity/resolve/ABC-123')->getActionName(),
+            '«GET identity/resolve/x» ابتلعه {module}/{id}/actions (F9)');
+        // `files/{id}/download` (المقطعُ الثالثُ `download`) لا يُخلط بـ`{module}/{id}/actions`
+        $this->assertNotSame($crudActions, $this->resolve('/api/mobile/v1/files/att-9/download')->getActionName(),
+            '«GET files/{id}/download» ابتلعه {module}/{id}/actions (F9)');
+    }
+
+    /**
+     * العقدُ الأمنيّ: كلُّ حرفيّاتِ الطور F خلف `mobile.session` (الهويّة) +
+     * `mobile.context` (التضييق) — فلا رفعٌ/تنزيلٌ/تتبّعٌ بلا جلسةٍ مُصادَقة.
+     */
+    public function test_phase_f_routes_carry_session_and_context_middleware(): void
+    {
+        $uris = [
+            ['/api/mobile/v1/files/upload-session',                 'POST'],
+            ['/api/mobile/v1/files/upload-session/sess-1/chunk',    'PUT'],
+            ['/api/mobile/v1/files/upload-session/sess-1/complete', 'POST'],
+            ['/api/mobile/v1/files/attach',                         'POST'],
+            ['/api/mobile/v1/files/att-9/download',                 'GET'],
+            ['/api/mobile/v1/files/att-9/stream',                   'GET'],
+            ['/api/mobile/v1/identity/resolve/ABC-123',             'GET'],
+            ['/api/mobile/v1/tracking/start',                       'POST'],
+            ['/api/mobile/v1/tracking/trk-1/points',                'POST'],
+            ['/api/mobile/v1/tracking/trk-1/end',                   'POST'],
+        ];
+
+        foreach ($uris as [$uri, $method]) {
+            $mw = $this->resolveMethod($uri, $method)->gatherMiddleware();
+            $this->assertContains('mobile.session', $mw, "«{$method} {$uri}» يجب أن تكون خلف mobile.session");
+            $this->assertContains('mobile.context', $mw, "«{$method} {$uri}» يجب أن تحمل mobile.context (SF-4)");
+        }
+    }
 }

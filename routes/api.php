@@ -201,6 +201,45 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     Route::get('push/admin/status', [\App\Http\Controllers\Api\MobilePushController::class, 'adminStatus'])->name('mobile.push.admin.status');
     Route::post('push/admin/test', [\App\Http\Controllers\Api\MobilePushController::class, 'adminTest'])->name('mobile.push.admin.test');
 
+    /*
+     * ── ملفّاتٌ + ماسحٌ + موقع (Mobile Readiness · الطور F · §109) ──
+     *
+     * **ترتيبُ التسجيلِ عقدٌ أمنيّ (Critic F9):** كلُّ حرفيّاتِ الطور F
+     * (files/identity/tracking) تُسجَّل **قبل** الـcatch-all `{module}` أدناه — وإلّا
+     * ابتلعها (`GET files/x/download` سليمٌ لأنّ المقطعَ الثالثَ حرفيٌّ، لكنّ الانضباطَ
+     * يُبقيها أوّلاً؛ و`POST files/attach` قد يلتبس، و`identity`/`tracking` أحاديّاتُ
+     * المقطع يبتلعها `GET/POST {module}`). نظيرُ انضباطِ `/api/v1` (`api.php:26,31-33`
+     * حيث identity/track قبل `{module}`).
+     *
+     * **هيكلٌ في دفعةِ الأساس:** المعالجاتُ في `MobileFileController` موصَّفةٌ بخطّةِ
+     * إعادةِ الاستعمال (AttachmentService · ChunkedUpload · parent::identityResolve ·
+     * parent::track*) وتُملأ في دفعةِ التنفيذ. الجوهرُ المشترك (`AttachmentService`)
+     * والقرارُ (إعادةُ استعمالِ `ChunkedUpload` بلا جدولٍ جديد) جاهزان في هذه الدفعة.
+     */
+
+    // F.1 — الرفعُ المقطَّع (جلسة ← قطعة ← إتمام) + الرفعُ المفرد. حرفيّاتٌ:
+    // `files/upload-session*` و`files/attach` قبل الـcatch-all (F9).
+    Route::post('files/upload-session', [\App\Http\Controllers\Api\MobileFileController::class, 'uploadSession'])->name('mobile.files.upload_session');
+    Route::put('files/upload-session/{id}/chunk', [\App\Http\Controllers\Api\MobileFileController::class, 'uploadChunk'])->name('mobile.files.upload_chunk');
+    Route::post('files/upload-session/{id}/complete', [\App\Http\Controllers\Api\MobileFileController::class, 'uploadComplete'])->name('mobile.files.upload_complete');
+    Route::post('files/attach', [\App\Http\Controllers\Api\MobileFileController::class, 'attach'])->name('mobile.files.attach');
+
+    // F.2 — التنزيل/البثّ المُصادَق (`files/{id}/download|stream` · مقطعٌ ثالثٌ حرفيّ
+    // يميّزها عن `{module}/{id}/actions`، ومع ذلك أوّلاً انضباطاً · F9). لا رابطٌ عامّ.
+    Route::get('files/{id}/download', [\App\Http\Controllers\Api\MobileFileController::class, 'download'])->name('mobile.files.download');
+    Route::get('files/{id}/stream', [\App\Http\Controllers\Api\MobileFileController::class, 'stream'])->name('mobile.files.stream');
+
+    // F.3 — الماسح: المحلّلُ الموحّد (reuse V1Controller::identityResolve). حرفيّةٌ
+    // `identity/resolve/{q}` — لا يبتلعها `{module}/{id}` (المقطعُ الأوّلُ حرفيٌّ).
+    Route::get('identity/resolve/{q}', [\App\Http\Controllers\Api\MobileFileController::class, 'identityResolve'])
+        ->name('mobile.identity.resolve');   // مقطعٌ مفردٌ كنظيرِ v1 (api.php:26) — لا `.*`
+
+    // F.4 — الموقع: تتبّعٌ بموافقةٍ صريحة (reuse V1Controller::trackStart/Ingest/End).
+    // حرفيّاتٌ `tracking/*` قبل الـcatch-all (F9) — لا تتبّعٌ خفيٌّ دائم.
+    Route::post('tracking/start', [\App\Http\Controllers\Api\MobileFileController::class, 'trackingStart'])->name('mobile.tracking.start');
+    Route::post('tracking/{session}/points', [\App\Http\Controllers\Api\MobileFileController::class, 'trackingPoints'])->name('mobile.tracking.points');
+    Route::post('tracking/{session}/end', [\App\Http\Controllers\Api\MobileFileController::class, 'trackingEnd'])->name('mobile.tracking.end');
+
     // D.2/D.3 — إجراءاتُ المورد: لاحقةُ `/actions` **قبل** `{module}/{id}` (المقطعُ
     // الحرفيّ `actions` يميّزها، ومع ذلك تُسجَّل أوّلاً انضباطاً · F9)
     Route::get('{module}/{id}/actions', [\App\Http\Controllers\Api\MobileResourceController::class, 'listActions'])->name('mobile.resource.actions');

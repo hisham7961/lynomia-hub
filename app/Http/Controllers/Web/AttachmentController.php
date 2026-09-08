@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attachment;
+use App\Support\AttachmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -16,16 +17,12 @@ use Illuminate\Support\Str;
 class AttachmentController extends Controller
 {
     /**
-     * امتدادات تُرفض مهما كان الإعداد. موحَّدةٌ على **الأشدّ** بين هذه القائمة
-     * وقائمة حقول الوحدة (ModuleController): كانت الأضيق تسمح بـhtml/svg/js —
-     * لا تُنفَّذ بذاتها هنا (التنزيل يُجبَر attachment والمعاينة تحصر أنواعها)،
-     * لكنّ توحيد الحاجزين على واحدٍ لا يترك ثغرةً بين بابين للملفات نفسها.
+     * أقصى ملفاتٍ في رفعةٍ واحدة — لقطاتُ متجرٍ لثلاث منصّاتٍ لا تتجاوزها.
+     * يشير إلى مصدر الحقيقة الواحد في `AttachmentService` (يقرؤه القالبُ أيضاً)
+     * كي لا يفترق حاجزُ الويب عن جوهرِ الجوال المشترك (F.2). وحاجزُ الامتدادات
+     * ونطاقُ التحقّق كلُّها هناك أيضاً — سكّةٌ واحدة لا نسختان.
      */
-    protected const BLOCKED = ['php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'phar', 'cgi', 'pl', 'sh', 'htaccess',
-        'html', 'htm', 'xhtml', 'svg', 'svgz', 'js', 'mjs'];
-
-    /** أقصى ملفاتٍ في رفعةٍ واحدة — لقطاتُ متجرٍ لثلاث منصّاتٍ لا تتجاوزها */
-    public const BATCH_MAX = 20;
+    public const BATCH_MAX = AttachmentService::BATCH_MAX;
 
     /**
      * الرفع — **ملفٌ واحدٌ أو عدّة**.
@@ -37,74 +34,22 @@ class AttachmentController extends Controller
      */
     public function store(Request $r)
     {
-        $data = $r->validate([
-            'module'    => ['required', 'string', 'max:60'],
-            'record_id' => ['required', 'string', 'max:36'],
-            // أحدُهما يكفي: المفردُ أو الدفعة — والتحقق على كل ملفٍ في الدفعة
-            'file'      => ['required_without:files', 'nullable', 'file', 'max:' . hub_upload_cap()['kb']],
-            'files'     => ['required_without:file', 'nullable', 'array', 'max:' . self::BATCH_MAX],
-            'files.*'   => ['file', 'max:' . hub_upload_cap()['kb']],
-            // الملاحظة كانت تُحقَّق ٢٠٠ حرفاً وتُحشر في عمود ٦٠ — صار لها عمودها
-            'note'      => ['nullable', 'string', 'max:300'],
-            // نوع الوثيقة من ملف الكيان — مفتاحٌ معلن لا نصٌّ حر
-            'kind'       => ['nullable', 'string', 'max:40',
-                             \Illuminate\Validation\Rule::in(collect(hub_doc_spec(hub_str($r->input('module'))))->pluck('key')->all())],
-            'doc_no'     => ['nullable', 'string', 'max:80'],
-            'issued_at'  => ['nullable', 'date'],
-            'expires_at' => ['nullable', 'date'],
-        ], [], [
-            'note' => 'الملاحظة', 'kind' => 'نوع الوثيقة', 'doc_no' => 'رقم الوثيقة',
-            'issued_at' => 'تاريخ الإصدار', 'expires_at' => 'تاريخ الانتهاء',
-        ]);
+        // التحقّقُ + حاجزُ الامتداد + قائمةُ الكتابة البيضاء + البصمة كلُّها في الجوهرِ
+        // المشترك `AttachmentService` (F.2) — الويبُ والجوالُ يستدعيانه، لا نسختان.
+        $data = AttachmentService::validateUpload($r);
 
         // الإرفاق بصلاحية «عرض» قرارٌ منتجيّ مقصود ومُختبَر (AttachmentsTest):
         // مشاهدٌ قد يُرفق مستنداً داعماً على سجلٍ يراه. الحمايةُ الحقيقية أن
         // الملف يمرّ بحاجز الامتدادات، والتنزيل يُجبَر attachment، والمعاينة
         // تحصر أنواعها — فلا تنفيذ. (لم نكسر سلوكاً قائماً لأجل تشدّدٍ نظريّ.)
-        $this->guardRecord($data['module'], $data['record_id'], 'v');
+        AttachmentService::guardRecord($data['module'], $data['record_id'], 'v');
 
         // الدفعةُ بترتيب اختيارها، والمفردُ دفعةٌ من واحد — مسارٌ واحدٌ لا مساران
-        $files = $r->hasFile('files') ? array_values(array_filter((array) $r->file('files'))) : [];
-        if ($r->hasFile('file')) array_unshift($files, $r->file('file'));
-        abort_if(! $files, 422, 'لا ملف في الطلب');
-        $files = array_slice($files, 0, self::BATCH_MAX);
-
-        // **الترتيبُ يتبع الوصول**: اللقطةُ الجديدة تُذيَّل ولا تقفز إلى الصدارة —
-        // وصدارةُ المعرض هي أولُ ما يراه المستخدم في المتجر.
-        $sort = (int) Attachment::where('module', $data['module'])
-            ->where('record_id', $data['record_id'])->max('sort');
-
-        $made = [];
-        foreach ($files as $f) {
-            $ext = mb_strtolower((string) $f->getClientOriginalExtension());
-            abort_if(in_array($ext, self::BLOCKED, true), 422,
-                'هذا النوع من الملفات غير مسموح: ' . Str::limit((string) $f->getClientOriginalName(), 40));
-
-            $path = $f->store('hub/att', 'local');
-
-            $made[] = Attachment::create([
-                'module'        => $data['module'],
-                'record_id'     => $data['record_id'],
-                'note'          => ($data['note'] ?? null) ?: null,   // ملاحظة اختيارية تصف الملف
-                'kind'          => ($data['kind'] ?? null) ?: null,
-                'doc_no'        => ($data['doc_no'] ?? null) ?: null,
-                'issued_at'     => ($data['issued_at'] ?? null) ?: null,
-                'expires_at'    => ($data['expires_at'] ?? null) ?: null,
-                'disk'          => 'local',
-                'path'          => $path,
-                'original_name' => Str::limit((string) $f->getClientOriginalName(), 290, ''),
-                'mime'          => substr((string) $f->getMimeType(), 0, 160),
-                'size'          => (int) $f->getSize(),
-                'checksum'      => hash_file('sha256', $f->getRealPath()) ?: null,
-                'sort'          => ++$sort,
-                'uploaded_by'   => auth()->id(),
-            ]);
-        }
+        // (المقطَّعُ يكون قد حُقن في `files` بوسيط ResolveChunkedUploads قبل هذا)
+        $files = AttachmentService::filesFromRequest($r);
+        $made = AttachmentService::attach($data['module'], $data['record_id'], $files, $data);
 
         $a = $made[0];
-        // وثيقةٌ لها مدّة تدخل رادار «ينتهي قريباً» فوراً لا بعد انقضاء المخبأ
-        if ($a->expires_at) hub_expiry_bust();
-
         $n = count($made);
         $label = $a->kind ? (hub_doc_label($a->module, $a->kind) ?? '') : null;
 
@@ -155,31 +100,9 @@ class AttachmentController extends Controller
 
     public function download(string $id)
     {
-        $a = Attachment::findOrFail($id);
-        $this->guardRecord($a->module, $a->record_id, 'v');
-
-        // عمود av_status كان حبراً على ورق: مرفقٌ وُسم «مصاب» يُخدم كأن شيئاً
-        // لم يكن. لا ماسحَ مدمجاً بعد (يبقى 'pending' فيُخدم) — لكن متى وسمت
-        // أداةٌ خارجية ملفاً مصاباً توقّف تقديمه فوراً. 423 Locked: محجوز لا مفقود.
-        abort_if($a->av_status === 'infected', 423, 'حُجب هذا الملف — وُسم مصاباً بفحص الفيروسات');
-
-        $abs = Storage::disk($a->disk ?: 'local')->path($a->path);
-        abort_unless(is_file($abs), 404, 'الملف غير موجود على القرص');
-
-        $a->increment('downloads');
-        DB::table('download_log')->insert([
-            'attachment_id' => $a->id, 'user_id' => auth()->id(),
-            'ip' => request()->ip(), 'device' => substr((string) request()->userAgent(), 0, 200),
-            'created_at' => now(),
-        ]);
-
-        // **تصنيف البيانات مُنفَّذاً**: تنزيلُ مرفقٍ على سجلٍّ مصنَّفٍ «سري» حدثُ
-        // وصولٍ حسّاسٍ يدخل سلسلةَ التدقيق (لا مجرد download_log) — فالمصنَّفُ
-        // يُرصَد في مركز الأمن. مرساةُ التصنيف حقلُ `secrecy` القائم على الوثائق.
-        self::auditClassifiedAccess($a);
-
-        // Content-Disposition: attachment — ملف HTML/SVG مرفوع لا يُنفَّذ في المتصفح أبداً
-        return response()->download($abs, $a->original_name ?: basename($a->path));
+        // الجوهرُ المشترك (F.2): حارسٌ + حاجزُ الإصابة + عدّاد + سجلُّ تنزيلٍ + تدقيقُ
+        // الوصولِ المصنَّف + ردُّ ملفٍّ بترويسة attachment — الويبُ والجوالُ يستدعيانه.
+        return AttachmentService::download(Attachment::findOrFail($id));
     }
 
     /**
@@ -285,38 +208,21 @@ class AttachmentController extends Controller
     }
 
     /** أنواع تُعاين حيّاً داخل المتصفح — صور نقطية وPDF فقط؛ SVG/HTML تبقى تنزيلاً (قد تحمل سكربتات) */
-    // عامة: بوابة ملفات الوحدات وغرفة البيانات تتبعان السياسة نفسها — تعريفٌ واحد
-    public const INLINE_MIMES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp', 'image/avif', 'application/pdf'];
+    // عامة: بوابة ملفات الوحدات وغرفة البيانات تتبعان السياسة نفسها — تعريفٌ واحد.
+    // مصدرُ الحقيقة الآن في `AttachmentService` (سكّةٌ واحدة للويب والجوال · F.2)؛ يبقى الاسمُ
+    // هنا كي تظلّ `FileController`/`DataRoomController`/`preview` تشير إليه دون تغيير.
+    public const INLINE_MIMES = AttachmentService::INLINE_MIMES;
 
     /**
      * معاينة حية: الصورة/الشهادة/اللوجو تُعرض مصغّرةً وكاملةً دون تنزيل،
      * وPDF يفتح في عارض المتصفح. بهوية المستخدم وصلاحيته نفسها، ويُسجَّل الاطلاع.
+     *
+     * الجوهرُ المشترك (F.2): حارسٌ + حاجزُ الإصابة + حصرُ الأنواع + سجلُّ معاينةٍ + تدقيقٌ
+     * + ردُّ ملفٍّ inline بترويسات أمانٍ — الويبُ والجوالُ (`stream`) يستدعيانه، لا نسختان.
      */
     public function preview(string $id)
     {
-        $a = Attachment::findOrFail($id);
-        $this->guardRecord($a->module, $a->record_id, 'v');
-        // نفس حاجز التنزيل: الملف المصاب لا يُقدَّم على المعاينة أيضاً — والأخطر أن
-        // صفحة السجل تُحمّل المعاينة تلقائياً في <img>/<iframe> فيُعرَض بلا ضغطة.
-        abort_if($a->av_status === 'infected', 423, 'حُجب هذا الملف — وُسم مصاباً بفحص الفيروسات');
-        abort_unless(in_array($a->mime, self::INLINE_MIMES, true), 415, 'هذا النوع يُنزَّل ولا يُعاين');
-
-        $abs = Storage::disk($a->disk ?: 'local')->path($a->path);
-        abort_unless(is_file($abs), 404, 'الملف غير موجود على القرص');
-
-        DB::table('download_log')->insert([
-            'attachment_id' => $a->id, 'user_id' => auth()->id(),
-            'ip' => request()->ip(), 'device' => substr('معاينة · ' . request()->userAgent(), 0, 200),
-            'created_at' => now(),
-        ]);
-        self::auditClassifiedAccess($a);   // المعاينةُ وصولٌ كالتنزيل (v2.399)
-
-        return response()->file($abs, [
-            'Content-Type'           => $a->mime,
-            'X-Content-Type-Options' => 'nosniff',
-            'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'",
-            'Cache-Control'          => 'private, max-age=300',
-        ]);
+        return AttachmentService::stream(Attachment::findOrFail($id));
     }
 
     /** الحذف: من رفعه، أو من يملك تعديل الوحدة، أو المالك — ويُدوَّن في التدقيق */
@@ -353,36 +259,21 @@ class AttachmentController extends Controller
 
     /* ────────── داخلي ────────── */
 
-    /** الهدف موجود، والوحدة مرئية للمستخدم، والسجل ضمن نطاقه */
     /**
-     * يُدوّن وصولاً لبياناتٍ مصنَّفة إن كان السجلُّ الأمّ يحمل حقلَ سرّيةٍ مُقيَّداً.
-     * يقرأ الحقلَ من تعريف الوحدة (أيُّ حقلٍ اسمُه `secrecy`)، فلا يُخصّ وحدةً بعينها.
+     * تفويضٌ لجوهرِ المرفقات المشترك (F.2) — نسخةٌ واحدة لكلا السطحَين. تبقى هنا
+     * كي يستدعيها بقيّةُ طرائقِ الويب (`preview`/`zip`) بالتوقيع نفسِه دون تغيير.
      */
     protected static function auditClassifiedAccess(Attachment $a): void
     {
-        try {
-            $def = hub_mod((string) $a->module);
-            if (! $def) return;
-            $sf = collect($def['fields'] ?? [])->firstWhere('col', 'secrecy');
-            if (! $sf) return;
-            $class = '\\App\\Models\\' . ($def['model'] ?? '');
-            if (! class_exists($class)) return;
-            $val = (string) ($class::whereKey($a->record_id)->value('secrecy') ?? '');
-            if (in_array($val, ['سري', 'مقيّد', 'restricted', 'confidential'], true)) {
-                hub_audit('وصول لبيانات مصنَّفة', $a->module, $a->record_id,
-                    ($a->original_name ?: 'مرفق') . " — تصنيف: {$val}");
-            }
-        } catch (\Throwable $e) {
-            // التصنيفُ إثراءٌ للتدقيق لا يكسر تنزيلاً
-        }
+        AttachmentService::auditClassifiedAccess($a);
     }
 
+    /**
+     * نقطةُ التخويلِ الوحيدة — تفويضٌ للجوهرِ المشترك (F.2). تبقى هنا كي تستدعيها
+     * طرائقُ الويب (`move`/`preview`/`zip`/`destroy`) عبر `$this` دون تغيير.
+     */
     protected function guardRecord(?string $module, ?string $recordId, string $op): void
     {
-        $def = hub_mod((string) $module);
-        abort_unless($def && $recordId, 404);
-        abort_unless(hub_can(auth()->user(), $module, $op), 403);
-        $class = '\\App\\Models\\' . $def['model'];
-        hub_scope($class::query(), $module)->findOrFail($recordId);
+        AttachmentService::guardRecord($module, $recordId, $op);
     }
 }
