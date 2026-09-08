@@ -27,19 +27,40 @@
             @endforeach
         @endif
 
-        {{-- مساحات العمل — الطريق الأساسي للمجالات (CTO م2): كل مساحة صفحة مركزية
-             تُبلّغ عن وحداتها بدل قائمة مسطّحة من ٧١ رابطاً. مرشّحة بصلاحية المستخدم. --}}
+        {{-- مساحات العمل — المجالاتُ من IA (مصدرُ الحقيقةِ الواحد · P4): بترتيب IA،
+             كلُّ مجالٍ قابلٌ للطيّ يكشف «نظرة عامة» (صفحةَ /w) وأقسامَه المرئيّة. لا حذف:
+             كلُّ مساحةٍ كانت رابطاً صار «نظرة عامة» بنقرةٍ داخل مجالها، وبيانُ الوحدات
+             حيٌّ عبر صفحة المساحة و⌘K. مرشّحةٌ بالصلاحية (لا يظهر مجالٌ بلا محتوى مرئيّ).
+             التسمية/الأيقونة من المساحة نفسها (اتّساقٌ مع ترويسة الصفحة)؛ الإدارةُ (نظام)
+             تبقى في ترس البار العلوي لا هنا. --}}
         @php
-            $spaces = \App\Support\Workspaces::for(auth()->user());
+            $ia = \App\Support\InformationArchitecture::make();
+            $iaUser = auth()->user();
+            $spaces = \App\Support\Workspaces::for($iaUser);   // المساحاتُ ذاتُ صفحةٍ (ترى ≥١ وحدة)
             // شارة انتباه المساحة: مجموع ما يستحق/تأخّر في وحداتها — أهمُّ إشارةٍ
             // ملاحيّة بعد العدّ نفسه، منطَّقةٌ بصلاحية المستخدم فلا تسرّب رقماً
-            $wsAtt = \App\Support\Workspaces::attentionByWorkspace(auth()->user());
+            $wsAtt = \App\Support\Workspaces::attentionByWorkspace($iaUser);
+            // ترتيبُ المجالاتِ من IA (سطحُ العمل فقط — لا الإدارة)، ثمّ ما له صفحةُ مساحة
+            $iaWorkDomains = array_keys(array_filter($ia->visibleDomains($iaUser),
+                fn ($d) => ($d['plane'] ?? '') === 'work'));
+            $sidebarDomains = array_values(array_filter($iaWorkDomains, fn ($dk) => isset($spaces[$dk])));
         @endphp
-        @if ($spaces)
+        @if ($sidebarDomains)
             <div class="navsection">مساحات العمل</div>
-            @foreach ($spaces as $wk => $w)
-                @php $wOn = request()->is('w/' . $wk); $wa = (int) ($wsAtt[$wk] ?? 0); @endphp
-                <a class="ni {{ $wOn ? 'on' : '' }}" @if ($wOn) aria-current="page" @endif href="{{ route('workspace', $wk) }}">{{ $w['icon'] }} {{ $w['label'] }}@if ($wa)<span class="nbdg wsatt" title="{{ $wa }} يستحق أو تأخّر">{{ $wa }}</span>@endif</a>
+            @foreach ($sidebarDomains as $dk)
+                @php
+                    $w   = $spaces[$dk];
+                    $dOn = request()->is('w/' . $dk) || request()->is('w/' . $dk . '/*');
+                    $wa  = (int) ($wsAtt[$dk] ?? 0);
+                    $secs = $ia->visibleSections($iaUser, $dk);
+                @endphp
+                <details data-nav="d:{{ $dk }}" @class(['act' => $dOn]) {{ $dOn ? 'open' : '' }}>
+                    <summary>{{ $w['icon'] }} {{ $w['label'] }}@if ($wa)<span class="nbdg wsatt" title="{{ $wa }} يستحق أو تأخّر">{{ $wa }}</span>@endif</summary>
+                    <a class="ni {{ request()->is('w/' . $dk) ? 'on' : '' }}" @if (request()->is('w/' . $dk)) aria-current="page" @endif href="{{ route('workspace', $dk) }}">🗂 نظرة عامة</a>
+                    @foreach ($secs as $sk => $s)
+                        <a class="ni" href="{{ route('workspace', $dk) }}#sec-{{ $sk }}">{{ $s['label'] }}</a>
+                    @endforeach
+                </details>
             @endforeach
         @endif
 

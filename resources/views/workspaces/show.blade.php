@@ -45,7 +45,7 @@
     <div class="card kid wide">
         <h3>🗂 وحدات المساحة</h3>
         @foreach ($layout['sections'] as $sec)
-            <h4 style="margin:14px 0 6px;font-size:13px;opacity:.75">{{ $sec['label'] }}</h4>
+            <h4 id="sec-{{ $sec['key'] }}" style="margin:14px 0 6px;font-size:13px;opacity:.75">{{ $sec['label'] }}</h4>
             @if (count($sec['modules']))
                 <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(min(210px,100%),1fr))">
                     @foreach ($sec['modules'] as $mk)
