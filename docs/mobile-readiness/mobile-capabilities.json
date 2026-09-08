@@ -457,9 +457,15 @@
                     "path": "/api/mobile/v1/context",
                     "name": "mobile.context",
                     "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/navigation",
+                    "name": "mobile.navigation",
+                    "auth": "mobile.session"
                 }
             ],
-            "count": 2
+            "count": 3
         },
         "crud": {
             "endpoints": [

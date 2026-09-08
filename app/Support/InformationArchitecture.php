@@ -707,6 +707,53 @@ class InformationArchitecture
         return $out;
     }
 
+    /**
+     * حمولةُ التنقّلِ للجوال (الطور 9) — **نفسُ IA** مُنطَّقةً ومُسلسَلةً لسطحِ الجوال
+     * (لا `mobile_nav.php` ثانٍ): سطوحٌ + مجالاتٌ بأقسامها ووجهاتها المرئيّة، كلُّ
+     * وجهةٍ بتسميتها ونوعها ومفتاحِها الرابط (module/route) وأهمّيّتها وملاءمتها للجوال.
+     * لا تشخيصَ مالكٍ ولا بنيةً فيزيائيّة — تسمياتُ موقعٍ فقط (نظيرُ systemMap بلا diagnostic).
+     * التنطيقُ سابقٌ للتسلسل: وجهةٌ محجوبةٌ لا تُسلسَل (لا تسريبَ اسمِ وحدةٍ/مركز).
+     *
+     * @return array{surfaces:array<int,array>,domains:array<int,array>}
+     */
+    public function navigationPayload($user): array
+    {
+        $shapeSections = function (array $sections): array {
+            $out = [];
+            foreach ($sections as $s) {
+                $dests = [];
+                foreach ($s['destinations'] as $d) {
+                    $item = [
+                        'label'      => (string) ($d['label'] ?? ''),
+                        'type'       => (string) ($d['type'] ?? ''),
+                        'importance' => (string) ($d['importance'] ?? 'secondary'),
+                        'mobile'     => (string) ($d['mobile'] ?? 'suitable'),   // suitable|deep-link-only|web-only
+                    ];
+                    if (! empty($d['module'])) $item['module'] = $d['module'];   // مفتاحٌ منطقيّ لشاشةِ الجوال
+                    if (! empty($d['route']))  $item['route']  = $d['route'];    // اسمُ مسارِ الويب (مرجعُ ربطٍ عميق)
+                    if (! empty($d['args']))   $item['args']   = array_values((array) $d['args']);
+                    $dests[] = $item;
+                }
+                $out[] = ['key' => $s['key'], 'label' => $s['label'], 'destinations' => $dests];
+            }
+
+            return $out;
+        };
+
+        $surfaces = [];
+        foreach ($this->visibleSurfaces($user) as $k => $sf) {
+            $surfaces[] = ['key' => $k, 'label' => $sf['label'], 'icon' => $sf['icon'],
+                'sections' => $shapeSections($this->visibleSections($user, $k))];
+        }
+        $domains = [];
+        foreach ($this->visibleDomains($user) as $k => $d) {
+            $domains[] = ['key' => $k, 'label' => $d['label'], 'icon' => $d['icon'], 'plane' => $d['plane'],
+                'sections' => $shapeSections($this->visibleSections($user, $k))];
+        }
+
+        return ['surfaces' => $surfaces, 'domains' => $domains];
+    }
+
     /* ══════════════════════ خريطةُ النظام ══════════════════════ */
 
     /**

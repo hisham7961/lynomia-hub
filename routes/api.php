@@ -143,6 +143,8 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     Route::get('bootstrap', [\App\Http\Controllers\Api\MobileContextController::class, 'bootstrap'])->name('mobile.bootstrap');
     Route::get('schema/modules', [\App\Http\Controllers\Api\MobileContextController::class, 'schemaModules'])->name('mobile.schema.modules');
     Route::get('schema', [\App\Http\Controllers\Api\MobileContextController::class, 'schema'])->name('mobile.schema');
+    // الطور 9 · تنقّلُ IA المُنطَّق (نفسُ معماريةِ الويب — لا mobile_nav ثانٍ)
+    Route::get('navigation', [\App\Http\Controllers\Api\MobileContextController::class, 'navigation'])->name('mobile.navigation');
 
     /*
      * ── تكافؤُ واجهةِ الأعمال (Mobile Readiness · الطور D · §109) ──
