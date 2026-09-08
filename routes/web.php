@@ -964,4 +964,7 @@ Route::middleware('auth')->group(function () {
         ->name('mobileplatform.index')->middleware('throttle:60,1');
     Route::post('admin/mobile-platform/sessions/{id}/revoke', [\App\Http\Controllers\Web\MobilePlatformController::class, 'revokeSession'])
         ->name('mobileplatform.session.revoke')->middleware('throttle:30,1');
+    // اختبارُ دفعٍ إداريٌّ آمن — إلى جهازِ المُختبِرِ وحدَه عبر المزوّدِ القائم (لا تجاوزَ ضبط). خنقٌ ضيّق.
+    Route::post('admin/mobile-platform/push/test', [\App\Http\Controllers\Web\MobilePlatformController::class, 'pushTest'])
+        ->name('mobileplatform.push.test')->middleware('throttle:6,1');
 });

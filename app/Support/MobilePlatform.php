@@ -74,6 +74,44 @@ class MobilePlatform
         return ['recent_ok' => $ok, 'recent_failed' => $failed, 'recent_total' => (clone $base)->count()];
     }
 
+    /**
+     * سجلُّ محاولاتِ التسليم (§17) — مُرشَّحٌ مُصفَّحٌ مرتّبٌ حتميّاً. صفوفٌ **آمنةٌ
+     * بالبناء**: `push_deliveries` لا يحمل رمزاً ولا نصَّ إشعارٍ أصلاً (هويّاتٌ وحالةٌ
+     * وصنفُ خطأٍ فقط) — فلا سرَّ يُعرَض. الترشيحُ بـallowlist (لا حقنَ عمود).
+     */
+    public static function deliveries(array $f = [], int $per = 25)
+    {
+        if (! self::tableReady('push_deliveries', 'status')) {
+            return new \Illuminate\Pagination\Paginator([], $per);
+        }
+        $q = PushDelivery::query();
+        if (($s = $f['status'] ?? '') !== '' && in_array($s, PushDelivery::STATUSES, true)) $q->where('status', $s);
+        if (($p = $f['provider'] ?? '') !== '' && in_array($p, PushToken::PROVIDERS, true)) $q->where('provider', $p);
+
+        return $q->orderByDesc('queued_at')->orderByDesc('id')->simplePaginate($per)->withQueryString();
+    }
+
+    /**
+     * تفصيلُ التسليم آخرَ N يوم (§18): عددٌ لكلِّ حالةٍ + لكلِّ صنفِ خطأٍ تقنيّ — كي
+     * يرى المسؤولُ **لماذا** فشل الدفعُ (مزوّد/رمزٌ باطل/خنق) لا مجرّدَ رقمٍ إجماليّ.
+     */
+    public static function deliveryBreakdown(int $days = 7): array
+    {
+        if (! self::tableReady('push_deliveries', 'status')) {
+            return ['statuses' => [], 'errors' => [], 'total' => 0, 'days' => $days];
+        }
+        $since = now()->subDays(max(1, $days));
+        $base = PushDelivery::where('queued_at', '>=', $since);
+
+        $statuses = (clone $base)->selectRaw('status, COUNT(*) c')->groupBy('status')
+            ->orderBy('status')->pluck('c', 'status')->all();
+        $errors = (clone $base)->whereNotNull('error_category')
+            ->selectRaw('error_category, COUNT(*) c')->groupBy('error_category')
+            ->orderBy('error_category')->pluck('c', 'error_category')->all();
+
+        return ['statuses' => $statuses, 'errors' => $errors, 'total' => (clone $base)->count(), 'days' => $days];
+    }
+
     /* ════════════════════════ الجلسات والأجهزة ════════════════════════ */
 
     /** إحصاءُ الجلسات — نشطة/مُبطَلة/مستعملة حديثاً (لا تجزئةَ رمزٍ قط) */
