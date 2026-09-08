@@ -119,12 +119,22 @@ Route::prefix('mobile/v1')->group(function () {
     // فلا يبتلعها — نظيرُ انضباطِ `/api/v1` (`api.php:16` قبل `{module}`).
     Route::get('openapi.json', [\App\Http\Controllers\Api\MobileDocsController::class, 'openapi'])
         ->middleware('throttle:60,1')->name('mobile.openapi');
+
+    // ── تفعيلُ حساب العميل (تطبيق العميل · §13) — عامٌّ بخنقٍ ضيّق ──
+    // سكّةُ `AccountActivation` الويبية نفسُها (لا محرّكَ ثانٍ)؛ الخطوتان مدموجتان
+    // ذرّيّاً لغياب جلسة الويب. المجهولُ/المُستهلَك 404 (لا كشفَ وجود).
+    Route::get('activation/{token}', [\App\Http\Controllers\Api\MobileActivationController::class, 'show'])
+        ->middleware('throttle:12,1')->name('mobile.activation.show');
+    Route::post('activation/{token}/complete', [\App\Http\Controllers\Api\MobileActivationController::class, 'complete'])
+        ->middleware('throttle:6,1')->name('mobile.activation.complete');
 });
 
 // المجموعةُ المُصادَقة: الخنقُ قبل المصادقة (نمطُ v1)، ثم `mobile.session` (تُرسي
 // الهويّة)، ثم `mobile.context` (تحلّ X-Lynomia-Company/-Client تضييقاً للعرض لا
 // تخويلاً · SF-4 · C). الترتيبُ مقصود: السياقُ يقرأ المستخدمَ الذي أرسته الجلسة.
-Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobile.context'])->group(function () {
+// `mobile.portal` (سياجُ حساب العميل — قائمةٌ بيضاءُ فوق المصفوفة، نظيرُ PortalGuard
+// الويبيّ) بعد `mobile.session` (يحتاج الهويّةَ) وقبل `mobile.context` والمتحكّمات.
+Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobile.portal', 'mobile.context'])->group(function () {
     Route::post('auth/logout', [\App\Http\Controllers\Api\MobileAuthController::class, 'logout'])->name('mobile.auth.logout');
     Route::post('auth/logout-all', [\App\Http\Controllers\Api\MobileAuthController::class, 'logoutAll'])->name('mobile.auth.logout_all');
     Route::get('auth/sessions', [\App\Http\Controllers\Api\MobileAuthController::class, 'sessions'])->name('mobile.auth.sessions.index');
@@ -172,6 +182,27 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     Route::get('prefs', [\App\Http\Controllers\Api\MobileWorkController::class, 'prefs'])->name('mobile.prefs.index');
     Route::put('prefs', [\App\Http\Controllers\Api\MobileWorkController::class, 'prefsUpdate'])->name('mobile.prefs.update');
     Route::post('prefs/pin', [\App\Http\Controllers\Api\MobileWorkController::class, 'pin'])->name('mobile.prefs.pin');
+
+    // ── بوّابةُ العميل (تطبيق العميل · §12/§18) — حرفيّةُ `portal/*` قبل الـcatch-all ──
+    // لحسابات العملاء حصراً (mobile.portal يردّ الداخليَّ 403 — له لوحتُه)؛ القرّاءُ
+    // مشترَكون مع الويب (`ClientPortalData`) بفشلٍ مغلقٍ وأعمدةٍ عميليّةٍ حصراً.
+    Route::get('portal/home', [\App\Http\Controllers\Api\MobileClientPortalController::class, 'home'])->name('mobile.portal.home');
+    Route::get('portal/engagements', [\App\Http\Controllers\Api\MobileClientPortalController::class, 'engagements'])->name('mobile.portal.engagements');
+    Route::get('portal/projects', [\App\Http\Controllers\Api\MobileClientPortalController::class, 'projects'])->name('mobile.portal.projects.index');
+    Route::get('portal/projects/{id}', [\App\Http\Controllers\Api\MobileClientPortalController::class, 'project'])->name('mobile.portal.projects.show');
+    Route::get('portal/documents', [\App\Http\Controllers\Api\MobileClientPortalController::class, 'documents'])->name('mobile.portal.documents.index');
+    Route::get('portal/documents/{id}', [\App\Http\Controllers\Api\MobileClientPortalController::class, 'document'])->name('mobile.portal.documents.show');
+    Route::get('portal/invoices', [\App\Http\Controllers\Api\MobileClientPortalController::class, 'invoices'])->name('mobile.portal.invoices.index');
+    Route::get('portal/invoices/{id}', [\App\Http\Controllers\Api\MobileClientPortalController::class, 'invoice'])->name('mobile.portal.invoices.show');
+    Route::get('portal/conversations', [\App\Http\Controllers\Api\MobileClientPortalController::class, 'conversations'])->name('mobile.portal.conversations.index');
+    Route::get('portal/conversations/{id}', [\App\Http\Controllers\Api\MobileClientPortalController::class, 'conversation'])->name('mobile.portal.conversations.show');
+
+    // ── إدارةُ أعضاء العميل (§15) — لوحةُ المدير الداخليّ (العميلُ محجوبٌ بالسياج) ──
+    // حرفيّةُ `clients/{client}/members*` قبل الـcatch-all؛ owner/سحب خلف تصعيد الجوال.
+    Route::get('clients/{client}/members', [\App\Http\Controllers\Api\MobileClientMembersController::class, 'index'])->name('mobile.clients.members.index');
+    Route::post('clients/{client}/members', [\App\Http\Controllers\Api\MobileClientMembersController::class, 'invite'])->name('mobile.clients.members.invite');
+    Route::put('clients/{client}/members/{membership}', [\App\Http\Controllers\Api\MobileClientMembersController::class, 'setRole'])->name('mobile.clients.members.role');
+    Route::delete('clients/{client}/members/{membership}', [\App\Http\Controllers\Api\MobileClientMembersController::class, 'revoke'])->name('mobile.clients.members.revoke');
 
     /*
      * ── الاتصال (Mobile Readiness · الطور E · §109) ──

@@ -66,7 +66,7 @@ POST auth/refresh { refresh_token }
 
 ---
 
-## 4) خريطةُ النقاط الكاملة (٥٨ مساراً · كلُّها في `routes/api.php`)
+## 4) خريطةُ النقاط الكاملة (٧٥ مساراً · كلُّها في `routes/api.php`)
 
 **عامّةٌ (بلا رمز وصول):**
 
@@ -75,8 +75,9 @@ POST auth/refresh { refresh_token }
 | `POST auth/login` · `POST auth/mfa/verify` · `POST auth/refresh` | `mobile.auth.login/mfa_verify/refresh` |
 | `GET app-config` · `GET health` | `mobile.app_config` · `mobile.health` |
 | `GET openapi.json` | `mobile.openapi` (مواصفةٌ حيّةٌ 3.1 منفصلةٌ عن v1) |
+| `GET activation/{token}` · `POST activation/{token}/complete` | `mobile.activation.show/complete` (تفعيلُ حساب عميل — §10 أدناه) |
 
-**مُصادَقة** (خلف `mobile.session` + `mobile.context`):
+**مُصادَقة** (خلف `mobile.session` + `mobile.portal` + `mobile.context`):
 
 | المجال | المسارات |
 |---|---|
@@ -86,6 +87,8 @@ POST auth/refresh { refresh_token }
 | الاتصال | `GET notifications` · `GET notifications/unread-count` · `POST notifications/read-all` · `GET notifications/{id}/target` · `POST notifications/{id}/read` · `GET comments` · `POST comments` · `GET dm/threads` · `GET dm/threads/{user}/messages` · `POST dm/threads/{user}/send` · `POST dm/threads/{user}/read` · `POST push/register` · `POST push/unregister` · `GET push/admin/status` · `POST push/admin/test` |
 | الملفّات/الماسح/الموقع | `POST files/upload-session` · `PUT files/upload-session/{id}/chunk` · `POST files/upload-session/{id}/complete` · `POST files/attach` · `GET files/{id}/download` · `GET files/{id}/stream` · `GET identity/resolve/{q}` · `POST tracking/start` · `POST tracking/{session}/points` · `POST tracking/{session}/end` |
 | المزامنة + CRUD | `GET sync/{module}` · `GET {module}` · `POST {module}` · `GET {module}/{id}` · `PUT {module}/{id}` · `PATCH {module}/{id}` · `DELETE {module}/{id}` · `GET {module}/{id}/actions` · `POST {module}/{id}/actions/{action}` |
+| بوّابةُ العميل (§10) | `GET portal/home` · `GET portal/engagements` · `GET portal/projects[/{id}]` · `GET portal/documents[/{id}]` · `GET portal/invoices[/{id}]` · `GET portal/conversations[/{id}]` |
+| إدارةُ أعضاء العميل (§10) | `GET clients/{client}/members` · `POST clients/{client}/members` · `PUT clients/{client}/members/{id}` · `DELETE clients/{client}/members/{id}` |
 
 كلُّ الحرفيّاتِ مُسجَّلةٌ **قبل** الـcatch-all `{module}` كي لا يبتلعها (عقدٌ أمنيٌّ · F9)، ومواصفةُ
 `GET /api/mobile/v1/openapi.json` مولّدةٌ من المسارات الحيّة — **هي المرجعُ الآليُّ لتوليد عميلٍ**.
@@ -170,3 +173,42 @@ POST auth/refresh { refresh_token }
 - **التنطيقُ سابقٌ للتسلسل:** ما لا يراه المستخدمُ لا يُسلسَل — لا تسريبَ اسمِ وحدةٍ/مركزٍ محجوب.
   ومطابقةُ الصلاحيةِ لِـ`visibleDomains` على الويب مضمونةٌ باختبار (`MobileIaTest`).
 - **الحرسُ لا يُبنى على التنقّل:** كلُّ وجهةٍ تبقى محروسةً بمتحكّمها؛ ظهورُها في القائمة عرضٌ لا تخويل.
+
+---
+
+## 10) تجربةُ العميل — الجمهورُ الثاني (v2.447.0 · §12–§18)
+
+التطبيقُ يخدم جمهورَين على سكّةِ دخولٍ **واحدة**: الداخليَّ والعميلَ. **وضعُ الحساب
+حقيقةٌ خادميّة** — `users.account_type` (`internal|client` · `hub_is_client()`)، لا
+يُستنتَج من نطاقِ بريدٍ ولا يقرّره التطبيق:
+
+- **الوضعُ يصل في `bootstrap`**: `user.account_type` + `memberships[]` (عضويّاتُه
+  الفعّالة `{client_id, client_name, role}`) + `feature_flags.is_client`. ولحسابِ
+  العميل تعود `ia` **بوّابيّةً** (مجالٌ واحد `portal` بوجهاتٍ `type:'portal'`:
+  home/engagements/projects/documents/invoices/conversations) و`nav=[]` — لا
+  وجهةَ داخليّةً تُسلسَل أصلاً. و`GET home` يعيد `data.mode` = `client|internal`
+  ولحسابِ العميل حمولةَ بيتِ البوّابة نفسَها (لا لوحةٌ داخليّةٌ بأزرارٍ مخفيّة).
+- **`MobilePortalGuard` (`mobile.portal`) على مجموعةِ المصادقة كلِّها**: قائمةٌ بيضاءُ
+  **فوق** مصفوفةِ الأدوار — نظيرُ `PortalGuard` الويب. حسابُ العميل خارجَها ⇒
+  `404 RESOURCE_NOT_FOUND` (دورٌ مضبوطٌ خطأً لا يُسرِّب شيئاً)، والداخليُّ على
+  `portal/*` ⇒ `403 FORBIDDEN`. فلا يبني التطبيقُ أمناً على إخفاءِ تنقّل — الخادمُ
+  يصدّ النداءَ المباشر (مُثبَتٌ في `MobilePortalGuardTest` بموظّفٍ كاملِ المصفوفة
+  حُوِّل `client`).
+- **قرّاءُ البوّابة جوهرُ الويب نفسُه** (`ClientPortalData`): فشلٌ مغلقٌ على العضويّة
+  الفعّالة (معلَّقٌ = عالمٌ فارغ)، أعمدةٌ آمنةٌ فقط (لا `cost`/`budget`/تكلفة —
+  **ما لا يُحمَّل لا يُسرَّب**)، فواتيرُ مبيعاتٍ حصراً، وثائقُ `audience='client'`،
+  وغرفٌ بعضويّةٍ **وجمهورٍ** معاً ورسائلُ `internal` محجوبةٌ بنيويّاً.
+- **تفعيلُ الحساب (سكّة B.1):** الدعوةُ تُنشئ مستخدمَ `client` **بلا كلمةِ سرٍّ تُرسَل
+  أبداً**؛ رسالةُ الصادر تحمل رابطَ `activate/{token}` ورمزَ ٦ أرقام. التطبيقُ يلتقط
+  الرابطَ: `GET activation/{token}` ⇒ `{status: pending|expired, email_masked}`، ثم
+  `POST activation/{token}/complete {otp, password, password_confirmation}` — إتمامٌ
+  ذرّيٌّ (حرقٌ لمرّة، سقفُ محاولات، كلمةٌ ضعيفةٌ لا تحرق الرمز، ترقيةُ العضويّات
+  `invited→active`) يعيد `{activated:true, email}` **بلا جلسة** — الدخولُ بعدها عبر
+  `auth/login` الواحدة.
+- **إدارةُ الأعضاء (للمدير الداخليّ · `clients:e` + `hub_scope`):** منحُ `owner`
+  خلف تصعيدِ `action:clients:member_owner` وسحبُ الوصول خلف
+  `action:clients:member_revoke` (428 `STEP_UP_REQUIRED` مع `details.purpose` —
+  المِنحةُ مربوطةٌ بالغرض لا تتبادل). السحبُ تعليقٌ فوريُّ الأثر.
+- **قائمةُ المحظور على العميل قطعيّاً** (تُفرَض خادميّاً): الخوادم/الخزنة/الأمن/
+  التدقيق/ماليّةُ الداخل (تكلفة/هامش/رواتب)/غرفُ الداخل وتعليقاتُ `internal`
+  ومرفقاتُها/الموظّفون/الإعدادات — كلُّها 404 بالنداء المباشر لا إخفاءَ زرّ.
