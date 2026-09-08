@@ -344,6 +344,14 @@ class MobileOpenApi
             'mobile.schema' => ['tag' => 'schema', 'etag' => true, 'okHeaders' => ['ETag'], 'params' => ['If-None-Match'],
                 'summary' => 'المخطّطُ الكامل (نسخة + عقد الجوال + الوحدات بحقولها) — ETag/304',
                 'ok' => $env($obj(['schema_version' => $str, 'mobile_api_version' => $str, 'modules' => ['type' => 'array', 'items' => $ref('SchemaModule')]])), 'errors' => []],
+            'mobile.navigation' => ['tag' => 'context', 'etag' => true, 'okHeaders' => ['ETag'], 'params' => ['If-None-Match'],
+                'summary' => 'تنقّلُ IA المُنطَّق (سطوح/مجالات/أقسام/وجهات — نفسُ معماريةِ الويب) + أعلامُ القدرة — ETag/304',
+                'ok' => $env($obj([
+                    'schema_version' => $str,
+                    'feature_flags' => $obj(['can_approve' => $bool, 'can_monitor' => $bool, 'can_secrets' => $bool,
+                        'mfa_enrolled' => $bool, 'restricted_company' => $bool, 'restricted_client' => $bool]),
+                    'ia' => $obj(['surfaces' => ['type' => 'array'], 'domains' => ['type' => 'array']]),
+                ])), 'errors' => []],
 
             // ── D · الأعمال ──
             'mobile.approvals.index' => ['tag' => 'approvals', 'summary' => 'طابورُ اعتماداتي المعلّقة (المعتمِدون فقط) — كلٌّ بوجهةِ رابطٍ عميق',
@@ -978,7 +986,7 @@ class MobileOpenApi
             'mobile.auth.logout' => 'auth', 'mobile.auth.logout_all' => 'auth', 'mobile.auth.sessions.index' => 'auth',
             'mobile.auth.sessions.destroy' => 'auth', 'mobile.auth.step_up' => 'auth',
             'mobile.app_config' => 'auth', 'mobile.openapi' => 'meta', 'mobile.health' => 'health',
-            'mobile.context' => 'context', 'mobile.bootstrap' => 'context',
+            'mobile.context' => 'context', 'mobile.bootstrap' => 'context', 'mobile.navigation' => 'context',
             'mobile.schema' => 'schema', 'mobile.schema.modules' => 'schema',
             'mobile.approvals.index' => 'approvals', 'mobile.approvals.show' => 'approvals',
             'mobile.approvals.approve' => 'approvals', 'mobile.approvals.reject' => 'approvals',

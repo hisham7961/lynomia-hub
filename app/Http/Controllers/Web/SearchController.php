@@ -155,45 +155,64 @@ class SearchController extends Controller
     {
         $u = auth()->user();
 
-        $cat = [['t' => '🏠 لوحة التحكم', 'u' => route('dashboard')]];
+        // تركيزٌ بلا كتابة: الكتالوجُ الكاملُ المُنطَّق (لوحةُ التحكم + المساحات + كلُّ
+        // وجهاتِ IA المرئيّة) — «البحثُ يقرأ الكتالوجَ نفسَه»: كلُّ ما في الشريط/الإدارة
+        // مبلوغٌ بالبحث. mini يقصُّه لِـ4–6 على التركيز؛ صفحةُ البحث تعرضه كلَّه.
+        if ($q === '') {
+            $out = [];
+            $seen = [];
+            $push = function (string $t, string $urlName, array $args = []) use (&$out, &$seen) {
+                try {
+                    $url = route($urlName, $args);
+                } catch (\Throwable $e) {
+                    return;
+                }
+                if (isset($seen[$url])) return;
+                $seen[$url] = true;
+                $out[] = ['t' => $t, 'u' => $url];
+            };
+            $push('🏠 لوحة التحكم', 'dashboard');
+            foreach (\App\Support\Workspaces::for($u) as $key => $ws) {
+                $push($ws['icon'] . ' مساحة ' . $ws['label'], 'workspace', [$key]);
+            }
+            foreach (\App\Support\InformationArchitecture::make()->catalogDestinations($u) as $d) {
+                if (! empty($d['route'])) $push($d['label'], $d['route'], $d['args'] ?? []);
+            }
 
-        // أدوات ولوحات القائمة (بصلاحياتها المضمّنة أصلاً)
-        foreach (hub_top_links($u) as $l) {
-            $cat[] = ['t' => $l['label'], 'u' => route($l['route'])];
+            return $out;
         }
 
-        // مساحات العمل — الصفحات المركزية للمجالات (مرشّحة بصلاحية المستخدم)
+        // ── شريحةُ وجهاتِ IA (الطور 7 · C3) — المصدرُ الواحدُ لمطابقةِ الوجهات ──
+        // وحدات/مراكز/إدارة/شخصيّ/نظام/كيان، بتسمياتٍ ومرادفاتٍ ar/en (ومرادفاتُ
+        // `find` الإداريّةُ القديمةُ محفوظةٌ داخلَ الخدمة). **حارسُ كلِّ وجهةٍ حارسُها هي**.
+        // لا تمسُّ operational()/workOs()/ترتيبَ الدمجِ/الإزالةَ بالرابط (C3).
+        $iaHits = [];
+        foreach (\App\Support\InformationArchitecture::make()->searchDestinations($u, $q) as $d) {
+            if (empty($d['route'])) continue;   // وجهةٌ سياقيّةٌ بلا رابطٍ عامّ — لا تُقترح هنا
+            try {
+                $url = route($d['route'], $d['args'] ?? []);
+            } catch (\Throwable $e) {
+                continue;   // مسارٌ يحتاج معاملاً غيرَ متاح — يُتخطّى (لا رابطٌ مكسور)
+            }
+            $iaHits[] = ['t' => $d['label'], 'u' => $url];
+        }
+
+        // صفحاتُ المساحات المركزيّة (/w/{key}) — ليست وجهةَ IA (المساحةُ مجالٌ)، تبقى
+        // قابلةً للإيجاد بالاسم كما كانت (صفر فقدان)
+        $wsHits = [];
         foreach (\App\Support\Workspaces::for($u) as $key => $ws) {
-            $cat[] = ['t' => $ws['icon'] . ' مساحة ' . $ws['label'], 'u' => route('workspace', $key)];
-        }
-
-        // صفحات الوحدات الـ٧١ بأسمائها (المخصصة إن سمّاها المستخدم)
-        foreach (hub_nav($u) as $g) {
-            foreach ($g['items'] as $it) {
-                $cat[] = ['t' => $g['icon'] . ' ' . $it['label'], 'u' => route('m.index', $it['key'])];
+            if (mb_stripos('مساحة ' . $ws['label'], $q) !== false) {
+                $wsHits[] = ['t' => $ws['icon'] . ' مساحة ' . $ws['label'], 'u' => route('workspace', $key)];
             }
         }
 
-        // ── Control Plane: Phase 10 (WP-10.3 · §11) — صفحاتُ الإدارة من الكتالوج ──
-        // كانت قائمةً ثانيةً مكتوبةً بيدها، فتباعدت عن الشريط: بلا «نشاط الموظفين»
-        // وبـWebhooks بدل «التكاملات». الآن `hub_admin_links()` مصدرٌ واحدٌ للاثنين،
-        // وحارسُ كل وجهةٍ حارسُها هي. و`find` مرادفاتٌ تُبقي الأسماءَ القديمة تصل.
-        foreach (hub_admin_links($u) as $l) {
-            if (! $l['ok']) continue;
-            $cat[] = ['t' => trim($l['icon'] . ' ' . $l['label']),
-                      'u' => route($l['route'], $l['args']), 'find' => $l['find']];
-        }
-
-        $hits = array_filter($cat,
-            fn ($d) => mb_stripos($d['t'] . ' ' . ($d['find'] ?? ''), $q) !== false);
-
         // المطابقاتُ التشغيلية أوّلاً — أدقُّ من أيّ مطابقةِ اسمٍ ولا تُزاحَم في القصّ.
         // ثم كياناتُ Work OS غيرُ الوحداتِ (القنواتُ بعضويّتها وكشوفُ العهدة بنطاقها —
-        // WP-M.1 · C14): نتائجُ سجلاتٍ محروسةٌ أدقُّ من مطابقةِ اسمِ صفحة، فقبل hits.
+        // WP-M.1 · C14): نتائجُ سجلاتٍ محروسةٌ أدقُّ من مطابقةِ اسمِ صفحة، فقبل الوجهات.
         $out = [];
         $seen = [];
-        foreach (array_merge($this->operational($q, $u), $this->workOs($q, $u), $hits) as $d) {
-            // لا رابطَ مكرَّر: الوحدةُ نفسُها قد تأتي من قائمة الوحدات ومن الكتالوج
+        foreach (array_merge($this->operational($q, $u), $this->workOs($q, $u), $iaHits, $wsHits) as $d) {
+            // لا رابطَ مكرَّر: الوحدةُ نفسُها قد تأتي من مصدرين
             if (isset($seen[$d['u']])) continue;
             $seen[$d['u']] = true;
             $out[] = ['t' => $d['t'], 'u' => $d['u']];

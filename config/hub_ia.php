@@ -46,10 +46,10 @@ return [
                         'label' => 'البحث الموحّد', 'icon' => '🔎', 'synonyms' => ['search', 'بحث', 'find', 'ابحث']],
                     ['type' => 'personal', 'route' => 'search.mini', 'guard' => 'authed', 'importance' => 'advanced',
                         'label' => 'بحث سريع', 'synonyms' => ['search', 'palette', 'command']],
-                    // system-map مسارٌ جديدٌ في P6 — مُصمَّمٌ هنا، غيرُ منفَّذٍ بعد (لا يُحلّه routeLocation حتى ينشأ)
+                    // خريطةُ النظام — مسارٌ حيٌّ (الطور 6): SystemMapController@index، بيتُها هنا (سطحُ الرئيسية)
                     ['type' => 'system', 'route' => 'system-map', 'guard' => 'authed', 'importance' => 'primary',
-                        'key' => 'system_map', 
-                        'label' => 'خريطة النظام', 'icon' => '🗺️', 'pending_route' => 'P6',
+                        'key' => 'system_map',
+                        'label' => 'خريطة النظام', 'icon' => '🗺️',
                         'synonyms' => ['system map', 'خريطة', 'map', 'الخريطة']],
                 ]],
                 'executive' => ['label' => 'لوحات تنفيذية', 'order' => 3, 'destinations' => [

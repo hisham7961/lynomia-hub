@@ -596,6 +596,8 @@ Route::middleware('auth')->group(function () {
     Route::post('odoo/{module}/{id}/refresh', [OdooController::class, 'refresh'])->name('odoo.refresh');
     Route::get('search', [SearchController::class, 'index'])->name('search');
     Route::get('search/mini', [SearchController::class, 'mini'])->name('search.mini');
+    // خريطةُ النظام (IA · الطور 6): الشجرةُ المُنطَّقةُ الكاملة — اسمٌ جديدٌ لا يصطدم
+    Route::get('system-map', [\App\Http\Controllers\Web\SystemMapController::class, 'index'])->name('system-map');
     Route::get('alerts', [AlertController::class, 'index'])->name('alerts');
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::get('notifications/mini', [NotificationController::class, 'mini'])->name('notifications.mini');

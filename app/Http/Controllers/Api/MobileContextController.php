@@ -96,14 +96,7 @@ class MobileContextController extends Controller
             // أعلامُ قدرةٍ آمنة — كلُّها **هويّةُ المُنادي نفسِه** لا أسرار: تقود إظهارَ
             // تبويباتِ التطبيق (اعتماداتٌ/مراقبةٌ/أسرار) دون أن تُخوّل شيئاً (الخادمُ
             // يعيد فحصَ الصلاحية في كل نقطةٍ لاحقة — العميلُ غيرُ موثوق).
-            'feature_flags' => [
-                'can_approve'        => hub_approver($u),
-                'can_monitor'        => hub_monitor($u),
-                'can_secrets'        => hub_secrets($u),
-                'mfa_enrolled'       => (bool) $u->totp_enabled,
-                'restricted_company' => hub_company_ids($u) !== null,
-                'restricted_client'  => hub_client_ids($u) !== null,
-            ],
+            'feature_flags' => $this->featureFlags($u),
             'timezone' => (string) config('app.timezone', 'UTC'),
             'versions' => [
                 'app'        => (string) config('hub.version', ''),
@@ -111,7 +104,10 @@ class MobileContextController extends Controller
                 'schema'     => $sv,
             ],
             'unread_notifications' => (int) HubNotification::where('user_id', $u->id)->where('read', false)->count(),
-            'nav'                  => hub_nav($u),   // مجموعاتٌ مُنطَّقةٌ سلفاً — الوحدةُ بلا عرضٍ تسقط
+            'nav'                  => hub_nav($u),   // مجموعاتٌ مُنطَّقةٌ سلفاً (توافقٌ خلفيّ) — الوحدةُ بلا عرضٍ تسقط
+            // تنقّلُ IA (الطور 9): نفسُ معماريةِ الويب مُنطَّقةً — سطوحٌ ومجالاتٌ وأقسام.
+            // داخلَ البصمة عمداً (تغيّرُ ما يراه المستخدمُ لقطةٌ جديدة). لا تسريب: مُنطَّقٌ سلفاً.
+            'ia'                   => \App\Support\InformationArchitecture::make()->navigationPayload($u),
             'schema_version'       => $sv,
         ];
 
@@ -158,12 +154,48 @@ class MobileContextController extends Controller
         ]);
     }
 
+    // ══════════════════════════ الطور 9 · GET navigation ══════════════════════════
+
+    /**
+     * **الطور 9 · GET navigation** (ETag/304) — تنقّلُ IA المُنطَّق: **نفسُ معماريةِ
+     * الويب** (سطوحٌ ومجالاتٌ وأقسامٌ ووجهات) لا `mobile_nav.php` ثانٍ. مع أعلامِ
+     * القدرة (كالإقلاع) ونسخةِ المخطّط. مُرشَّحٌ سلفاً بالصلاحية — لا يُسلسَل ما لا يراه
+     * المستخدمُ (لا تسريبَ اسمِ وحدةٍ/مركزٍ محجوب). بصمةٌ لكلِّ مستخدمٍ على ما يراه.
+     */
+    public function navigation(Request $r): JsonResponse
+    {
+        $u = auth()->user();
+
+        return Api::etagJson($r, [
+            'schema_version' => self::schemaVersion(),
+            'feature_flags'  => $this->featureFlags($u),
+            'ia'             => \App\Support\InformationArchitecture::make()->navigationPayload($u),
+        ]);
+    }
+
     // ══════════════════════════ مساعِداتٌ داخلية ══════════════════════════
 
     /** غلافُ نجاحٍ موحَّد: `data` + `request_id` (نمطُ ردود `/api` · X-API-Version من الوسيط) */
     private function ok(array $data): JsonResponse
     {
         return response()->json(['data' => $data, 'request_id' => Api::requestId()], 200);
+    }
+
+    /**
+     * أعلامُ القدرةِ الآمنة (هويّةُ المُنادي نفسِه — لا أسرار): تقود إظهارَ تبويباتِ
+     * التطبيق دون أن تُخوّل شيئاً (الخادمُ يعيد الفحصَ في كلِّ نقطة). موضعٌ واحدٌ
+     * يستعمله الإقلاعُ والتنقّل.
+     */
+    private function featureFlags($u): array
+    {
+        return [
+            'can_approve'        => hub_approver($u),
+            'can_monitor'        => hub_monitor($u),
+            'can_secrets'        => hub_secrets($u),
+            'mfa_enrolled'       => (bool) $u->totp_enabled,
+            'restricted_company' => hub_company_ids($u) !== null,
+            'restricted_client'  => hub_client_ids($u) !== null,
+        ];
     }
 
     /**
