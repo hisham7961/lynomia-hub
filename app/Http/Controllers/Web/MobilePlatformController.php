@@ -32,6 +32,7 @@ class MobilePlatformController extends Controller
         'security'   => 'الأمن والتليمتري',
         'field'      => 'الملفات والماسح والتتبّع',
         'operations' => 'التشغيل والصحّة',
+        'docs'       => 'الوثائق',
     ];
 
     /** هل يرى المستخدمُ المركز؟ (مالكٌ أو رايةُ mobile) — المصدرُ الوحيد للحرس */
@@ -67,6 +68,7 @@ class MobilePlatformController extends Controller
                 'tracking' => MobilePlatform::trackingStatus(),
             ],
             'operations' => ['health' => MobilePlatform::health()],
+            'docs'       => $this->docsData($r),
             default      => ['ov' => MobilePlatform::overview(), 'scorecard' => MobilePlatform::scorecard()],
         };
 
@@ -185,6 +187,24 @@ class MobilePlatformController extends Controller
             'filters'    => $filters,
             'audit'      => MobilePlatform::mobileAudit($filters),
             'adoption'   => MobilePlatform::adoption(),
+        ];
+    }
+
+    /**
+     * بياناتُ تبويب «الوثائق» (§43/§88): فهرسُ وثائقِ الجاهزية والمركز + مراجعُ حيّة،
+     * وعارضٌ **آمنٌ** لوثيقةٍ مُختارة (قراءةٌ من allowlist عبر realpath — لا اجتيازَ مسار،
+     * والنصُّ يُطمَس بـBlade — لا حقنَ HTML). قراءةٌ صرفة.
+     */
+    private function docsData(Request $r): array
+    {
+        $set = (string) $r->query('doc_set', '');
+        $name = (string) $r->query('doc', '');
+
+        return [
+            'docs'       => MobilePlatform::documentation(),
+            'docSet'     => $set,
+            'docName'    => $name,
+            'docContent' => ($set !== '' && $name !== '') ? MobilePlatform::docContent($set, $name) : null,
         ];
     }
 

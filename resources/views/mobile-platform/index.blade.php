@@ -28,6 +28,8 @@
     @include('mobile-platform.tabs.security')
 @elseif ($active === 'field')
     @include('mobile-platform.tabs.field')
+@elseif ($active === 'docs')
+    @include('mobile-platform.tabs.docs')
 @else
     @include('mobile-platform.tabs.overview', ['ov' => $ov, 'scorecard' => $scorecard])
 @endif

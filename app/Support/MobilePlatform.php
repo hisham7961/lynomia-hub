@@ -738,6 +738,75 @@ class MobilePlatform
             'core' => $core, 'external' => $external, 'at' => now()->toIso8601String()];
     }
 
+    /* ════════════════════════ الوثائق (§43/§88) ════════════════════════ */
+
+    /** مجلّداتُ الوثائق المسموحة (allowlist — لا مسارَ عشوائيّ) */
+    private const DOC_DIRS = ['readiness' => 'mobile-readiness', 'center' => 'mobile-platform-center'];
+
+    /**
+     * **فهرسُ الوثائق** (§88) — يُبنى من نظامِ الملفات الحيّ (لا قائمةٌ يدويّةٌ تتباعد):
+     * وثائقُ جاهزيّة الجوال ووثائقُ المركز، مع مراجعَ حيّةٍ مخدومة (OpenAPI/well-known).
+     */
+    public static function documentation(): array
+    {
+        $set = function (string $key): array {
+            $dir = base_path('docs/' . self::DOC_DIRS[$key]);
+            if (! is_dir($dir)) return [];
+            $files = glob($dir . '/*.md') ?: [];
+            sort($files);
+
+            return array_map(fn ($f) => [
+                'set' => $key, 'name' => basename($f),
+                'path' => 'docs/' . self::DOC_DIRS[$key] . '/' . basename($f),
+                'title' => self::docTitle($f),
+            ], $files);
+        };
+
+        return [
+            'readiness' => $set('readiness'),
+            'center'    => $set('center'),
+            'live'      => [
+                'openapi'    => '/' . MobileOpenApi::PREFIX . '/openapi.json',
+                'aasa'       => '/.well-known/apple-app-site-association',
+                'assetlinks' => '/.well-known/assetlinks.json',
+            ],
+        ];
+    }
+
+    /** عنوانٌ ودّيٌّ لوثيقةٍ — أوّلُ عنوانِ Markdown (`# …`) أو اسمُ الملف */
+    private static function docTitle(string $path): string
+    {
+        if (($fh = @fopen($path, 'r')) !== false) {
+            for ($i = 0; $i < 15 && ($line = fgets($fh)) !== false; $i++) {
+                $line = trim($line);
+                if (str_starts_with($line, '# ')) { fclose($fh); return trim(substr($line, 2)); }
+            }
+            fclose($fh);
+        }
+
+        return basename($path, '.md');
+    }
+
+    /**
+     * **قراءةٌ آمنةٌ لوثيقةٍ** (§88 · عرضٌ آمن) — تُتحقَّق المجموعةُ من allowlist والاسمُ
+     * من قائمةِ الملفات الحقيقيّة عبر `realpath` (لا اجتيازَ مسار `../`). تعيد النصَّ
+     * الخام (يُطمَس بـBlade عند العرض — لا حقنَ HTML) أو null. مقصوصةٌ بحدٍّ أقصى.
+     */
+    public static function docContent(string $set, string $name): ?string
+    {
+        if (! isset(self::DOC_DIRS[$set])) return null;
+        $name = basename($name);
+        if (! preg_match('/^[A-Za-z0-9._-]+\.md$/', $name)) return null;
+
+        $real = realpath(base_path('docs/' . self::DOC_DIRS[$set] . '/' . $name));
+        $allowed = array_map('realpath', glob(base_path('docs/' . self::DOC_DIRS[$set] . '/*.md')) ?: []);
+        if ($real === false || ! in_array($real, $allowed, true)) return null;
+
+        $raw = @file_get_contents($real);
+
+        return $raw === false ? null : mb_substr($raw, 0, 100000);
+    }
+
     /* ════════════════════════ داخليّ ════════════════════════ */
 
     /** مكوّنُ صحّةٍ بنمطِ Health::c */
