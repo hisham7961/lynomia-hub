@@ -30,6 +30,7 @@ class MobilePlatformController extends Controller
         'config'     => 'التطبيق والإطلاق',
         'api'        => 'الـAPI والقدرات',
         'security'   => 'الأمن والتليمتري',
+        'field'      => 'الملفات والماسح والتتبّع',
         'operations' => 'التشغيل والصحّة',
     ];
 
@@ -60,6 +61,11 @@ class MobilePlatformController extends Controller
             'config'     => $this->configData($r),
             'api'        => $this->apiData($r),
             'security'   => $this->securityData($r),
+            'field'      => [
+                'files'    => MobilePlatform::filesStatus(),
+                'scanner'  => MobilePlatform::scannerStatus(),
+                'tracking' => MobilePlatform::trackingStatus(),
+            ],
             'operations' => ['health' => MobilePlatform::health()],
             default      => ['ov' => MobilePlatform::overview(), 'scorecard' => MobilePlatform::scorecard()],
         };

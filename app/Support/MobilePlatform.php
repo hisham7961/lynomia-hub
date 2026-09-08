@@ -557,6 +557,72 @@ class MobilePlatform
         return \App\Support\SecurityEvents::CODES[$code][0] ?? $code;
     }
 
+    /* ════════════════════════ الملفات والماسح والتتبّع (§40–42) ════════════════════════ */
+
+    /**
+     * **حالةُ الملفات** (§40) — القدرةُ (مسارات) + موقفُ فحصِ الفيروسات **تجميعاً**
+     * (عددٌ لكلِّ حالةِ av_status) لا أسماءَ ملفاتٍ ولا محتوى. الوصولُ المصابُ محجوبٌ
+     * ٤٢٣ عبر `AttachmentService` القائم (لا سكّةَ تنزيلٍ ثانية). لا مراقبة.
+     */
+    public static function filesStatus(): array
+    {
+        $has = fn (string $n) => RouteFacade::getRoutes()->getByName($n) !== null;
+        $av = ['clean' => 0, 'infected' => 0, 'pending' => 0, 'error' => 0, 'total' => 0];
+        if (self::tableReady('attachments', 'av_status')) {
+            $rows = \Illuminate\Support\Facades\DB::table('attachments')
+                ->selectRaw('av_status, COUNT(*) c')->groupBy('av_status')->orderBy('av_status')->pluck('c', 'av_status');
+            foreach ($rows as $k => $v) $av[$k] = (int) $v;
+            $av['total'] = array_sum(array_map('intval', $rows->all()));
+        }
+
+        return [
+            'implemented' => $has('mobile.files.upload_session') && $has('mobile.files.upload_complete') && $has('mobile.files.download'),
+            'av'          => $av,
+            'infected_blocked' => true,   // AttachmentService يحجب المصابَ ٤٢٣ (نفسُ سكّة الويب)
+            'private_only'     => true,    // قرصٌ خاصّ + توقيعٌ — لا رابطٌ عامّ (F.2)
+        ];
+    }
+
+    /**
+     * **حالةُ الماسح** (§41) — قدرةُ `identity/resolve` فقط (يحلّ الهويّةَ من مسحٍ عبر
+     * `App\Support\Identity` القائم). **لا يخزّن صوراً ولا يراقب** — حالةٌ لا مراقبة.
+     */
+    public static function scannerStatus(): array
+    {
+        $has = fn (string $n) => RouteFacade::getRoutes()->getByName($n) !== null;
+
+        return [
+            'implemented' => $has('mobile.identity.resolve'),
+            'reuses'      => 'App\\Support\\Identity (حلُّ الهويّة الموحَّد — لا مخزنَ ثانٍ)',
+        ];
+    }
+
+    /**
+     * **حالةُ التتبّع** (§42) — **تجميعٌ وموافقةٌ فقط، لا نقاطَ ولا مساراتٍ قطّ**
+     * (`track_points`/`simplified` لا تُقرأ أبداً — لا مراقبة). يكشف عددَ الجلسات
+     * وحالتَها وتغطيةَ الموافقة (شذوذُ «تتبّعٌ بلا إقرار» يظهر صادقاً إن وُجد).
+     */
+    public static function trackingStatus(): array
+    {
+        $has = fn (string $n) => RouteFacade::getRoutes()->getByName($n) !== null;
+        $out = [
+            'implemented'      => $has('mobile.tracking.start') && $has('mobile.tracking.points') && $has('mobile.tracking.end'),
+            'consent_required' => true,
+            'sessions'         => ['active' => 0, 'ended' => 0, 'total' => 0],
+            'consent'          => ['with' => 0, 'without' => 0],
+        ];
+        if (self::tableReady('track_sessions', 'consent_at')) {
+            $q = \Illuminate\Support\Facades\DB::table('track_sessions');
+            $out['sessions']['total']  = (clone $q)->count();
+            $out['sessions']['active'] = (clone $q)->where('status', 'نشطة')->count();
+            $out['sessions']['ended']  = (clone $q)->where('status', 'منتهية')->count();
+            $out['consent']['with']    = (clone $q)->whereNotNull('consent_at')->count();
+            $out['consent']['without'] = (clone $q)->whereNull('consent_at')->count();
+        }
+
+        return $out;
+    }
+
     /* ════════════════════════ نظرةٌ عامّة + بطاقة الجاهزية ════════════════════════ */
 
     /**
