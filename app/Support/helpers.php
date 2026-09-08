@@ -5662,6 +5662,10 @@ if (! function_exists('hub_admin_links')) {
             // مركزُ التنبيهات: القراءةُ للمالك أو حامل المراقبة (AlertCenterController::readGate)
             $mk('alerts', 'التنبيهات', '🔔', 'alerts.center', [], 'التشغيل',
                 $owner || hub_monitor($user), ['alerts.center'], 'مركز التنبيهات قواعد التنبيه'),
+            // مركزُ منصّة الجوال: مالكٌ أو حاملُ رايةِ الجوال (MobilePlatformController::canView)
+            $mk('mobileplatform', 'منصّة تطبيق الهاتف', '📱', 'mobileplatform.index', [], 'التشغيل',
+                $owner || hub_flag($user, 'mobile'), ['mobileplatform.*'],
+                'الجوال mobile app-config الروابط العميقة الجلسات الأجهزة الدفع push OpenAPI'),
 
             // ٣) الجودة والحوكمة — قواعدُ البيانات وشكلُها ومساراتُها
             $mk('quality', 'الجودة', '🧹', 'quality.index', [], 'الجودة والحوكمة',

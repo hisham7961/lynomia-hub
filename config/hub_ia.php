@@ -451,6 +451,10 @@ return [
                     ['type' => 'admin', 'admin' => 'errors', 'importance' => 'secondary', 'route_prefix' => 'errors',
                         'routes' => ['errors.index', 'errors.logs', 'errors.show']],
                     ['type' => 'admin', 'admin' => 'alerts', 'importance' => 'secondary'],   // route alerts.center
+                    // مركزُ منصّة تطبيق الهاتف (يلفُّ كتالوجَ الجوال — يشارك في الشريط/البحث/الخريطة)
+                    ['type' => 'admin', 'admin' => 'mobileplatform', 'importance' => 'primary',
+                        'route_prefix' => 'mobileplatform', 'routes' => ['mobileplatform.index'],
+                        'synonyms' => ['mobile', 'الجوال', 'الهاتف', 'push', 'app-config', 'deep links', 'الروابط العميقة', 'الجلسات']],
                     // incidents منظورٌ تشغيليّ ثانويّ (بيتُه الأساسيّ Technology — primary_at)
                     ['type' => 'admin', 'admin' => 'incidents', 'importance' => 'advanced', 'primary_at' => 'digital'],
                     // restores — يتيمٌ أُسند هنا؛ وحدةٌ (m.index) SYSTEM_ONLY بحارس hub_can

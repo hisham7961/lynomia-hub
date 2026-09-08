@@ -1232,6 +1232,8 @@ return [
         // Links): فارغان افتراضاً ⇒ well-known يُخدَم NOT_CONFIGURED صدقاً (لا يربط أيَّ
         // تطبيق) حتى تُضبط معرّفاتٌ حقيقيّة. لا سرَّ فيهما (معرّفٌ علنيّ + بصمةُ شهادة).
         'mobile.dl_apple_team_id' => 'معرّفُ فريق Apple (Team ID) لربط Universal Links في apple-app-site-association. فارغٌ افتراضاً = غير مُهيّأ (لا يربط تطبيقاً). يقرؤه MobileWellKnownController.',
+        'mobile.dl_apple_bundle_id' => 'مُعرّفُ حزمة iOS (bundle id مثل com.example.app) لربط Universal Links مع Team ID. فارغٌ افتراضاً = غير مُهيّأ. يقرؤه MobileWellKnownController ومركزُ منصّة الجوال.',
+        'mobile.dl_android_package' => 'اسمُ حزمة Android (package name) لربط App Links مع بصمة التوقيع. فارغٌ افتراضاً = غير مُهيّأ. يقرؤه MobileWellKnownController ومركزُ منصّة الجوال.',
         'mobile.dl_android_fingerprints' => 'بصماتُ شهادةِ توقيع Android (sha256، مفصولةٌ بفاصلة) لربط App Links في assetlinks.json. فارغٌ افتراضاً = غير مُهيّأ. يقرؤه MobileWellKnownController.',
         // ── Mobile Readiness · الطور C (SF-5 · C.3) — بوّابةُ إصدارِ التطبيق وروابطُ
         // المتجر: تُقرأ في app-config/health (قبل الدخول، بلا سرّ). افتراضُها **فارغٌ
