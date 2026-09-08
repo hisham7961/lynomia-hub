@@ -40,21 +40,39 @@
 </div>
 
 <div class="kids">
-    {{-- بطاقات الوحدات: عدّاد + جديد الأسبوع + دخول وإنشاء --}}
+    {{-- بطاقات الوحدات مُقسَّمةً حسب IA (P3): نفسُ الوحدات والمراكز، مجموعةً في أقسام
+         مجالها بدل قائمةٍ مسطّحة — بطاقاتٌ ومراكزُ الترميزِ نفسِها (لا تغييرَ بصريّ). --}}
     <div class="card kid wide">
         <h3>🗂 وحدات المساحة</h3>
-        <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(min(210px,100%),1fr))">
-            @foreach ($ws['modules'] as $mk)
-                @php $def = hub_mod($mk); $look = hub_mod_look($mk); $c = $cards[$mk] ?? null; $att = (int) ($attention[$mk] ?? 0); @endphp
-                <a href="{{ route('m.index', $mk) }}" class="stat" style="--st:{{ $look['color'] }};text-decoration:none;position:relative">
-                    {{-- شارة الانتباه: يستحق أو تأخّر — النقطة الحمراء تقول أين يُنظر --}}
-                    @if ($att)<span class="nbdg wsatt" style="position:absolute;top:8px;left:8px" title="{{ $att }} يحتاج انتباهاً">{{ $att }}</span>@endif
-                    <span class="ico" aria-hidden="true">{{ $look['icon'] }}</span>
-                    <b>{{ number_format($c['count'] ?? 0) }}</b>
-                    <span>{{ $def['label'] }}@if (($c['week'] ?? 0) > 0) · <b style="font-size:11px">+{{ $c['week'] }}</b> هذا الأسبوع @endif</span>
-                </a>
-            @endforeach
-        </div>
+        @foreach ($layout['sections'] as $sec)
+            <h4 id="sec-{{ $sec['key'] }}" style="margin:14px 0 6px;font-size:13px;opacity:.75">{{ $sec['label'] }}</h4>
+            @if (count($sec['modules']))
+                <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(min(210px,100%),1fr))">
+                    @foreach ($sec['modules'] as $mk)
+                        @include('workspaces._modcard', ['mk' => $mk, 'cards' => $cards, 'attention' => $attention])
+                    @endforeach
+                </div>
+            @endif
+            {{-- مراكزُ هذا القسم (مجموعةً تحت قسمها — WP-3.3) --}}
+            @if (count($sec['centers']))
+                <div class="crow" style="margin-top:8px">
+                    @foreach ($sec['centers'] as $c)
+                        <a class="btn ghost xs" href="{{ route($c['route']) }}">{{ $c['label'] }}</a>
+                    @endforeach
+                </div>
+            @endif
+        @endforeach
+
+        {{-- وحداتٌ لم يُصنّفها IA في قسمٍ — تبقى معروضةً (صفر فقدان) --}}
+        @if (count($layout['ungrouped_modules']))
+            <h4 style="margin:14px 0 6px;font-size:13px;opacity:.75">أخرى</h4>
+            <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(min(210px,100%),1fr))">
+                @foreach ($layout['ungrouped_modules'] as $mk)
+                    @include('workspaces._modcard', ['mk' => $mk, 'cards' => $cards, 'attention' => $attention])
+                @endforeach
+            </div>
+        @endif
+
         <div class="crow" style="margin-top:10px">
             @foreach ($ws['modules'] as $mk)
                 @if (hub_can(auth()->user(), $mk, 'a'))
@@ -64,11 +82,11 @@
         </div>
     </div>
 
-    {{-- مراكز المساحة ولوحاتها --}}
-    @if (count($ws['centerLinks']))
+    {{-- مراكزُ المساحة غيرُ المنتمية لقسمٍ (بيتُها مجالٌ آخر) — تبقى معروضةً هنا (صفر فقدان) --}}
+    @if (count($layout['ungrouped_centers']))
         <div class="card kid">
             <h3>📊 مراكز المساحة</h3>
-            @foreach ($ws['centerLinks'] as $c)
+            @foreach ($layout['ungrouped_centers'] as $c)
                 <a class="btn ghost sm" style="display:flex;margin-bottom:6px;justify-content:flex-start" href="{{ route($c['route']) }}">{{ $c['label'] }}</a>
             @endforeach
         </div>

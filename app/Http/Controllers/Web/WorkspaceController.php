@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Support\InformationArchitecture;
 use App\Support\Workspaces;
 use Illuminate\Support\Facades\Cache;
 
@@ -76,10 +77,14 @@ class WorkspaceController extends Controller
         // لا كم يوجد فقط. من الرادار نفسه (مخبّأ) فلا استعلامَ إضافي.
         $attention = Workspaces::attentionByModule($u);
 
+        // تخطيطُ IA: نفسُ وحدات/مراكز المساحة موزّعةً على أقسام مجالها (P3 — عرضٌ فقط،
+        // لا مصدرٌ ثانٍ ولا إعادةُ تصفية: hub_scope/hub_can طُبّقا سلفاً في Workspaces::for)
+        $layout = InformationArchitecture::make()->workspaceLayout($u, $key);
+
         return view('workspaces.show', [
             'ws' => $ws, 'cards' => $cards, 'activity' => $activity,
             'actors' => $actors, 'expiry' => $expiry, 'attention' => $attention,
-            'all' => Workspaces::for($u),
+            'all' => Workspaces::for($u), 'layout' => $layout,
         ]);
     }
 }

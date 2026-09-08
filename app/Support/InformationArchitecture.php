@@ -307,6 +307,80 @@ class InformationArchitecture
         return $this->sortByOrderKey($out);
     }
 
+    /* ══════════════════════ تخطيطُ مساحةِ العمل (P3 — محوّلٌ لا مصدرٌ ثانٍ) ══════════════════════ */
+
+    /**
+     * تخطيطُ مساحةِ عملٍ **مُقسَّمٌ حسب IA**: يأخذ **نفسَ** مجموعة الوحدات والمراكز
+     * التي تُعيدها `Workspaces::for()` (مصدرُها الوحيد hub_nav — لا ازدواج، لا إعادةَ
+     * ترتيبٍ للقائمة المسطّحة، لا حقنَ يتيم) ويوزّعها على أقسام مجالها في هذا السجلّ.
+     *
+     * صفرُ فقدان (spec): كلُّ وحدةٍ/مركزٍ لا يُطابق قسماً مرئيّاً يقعُ في «غير المصنّف»
+     * فيبقى معروضاً. الوحداتُ تحفظ ترتيبَها المسطّح داخل القسم؛ الأقسامُ بترتيب `order`.
+     *
+     * لا يُطبّق صلاحيةً من جديد: `Workspaces::for()` رشّح سلفاً بـ`hub_can`، وحضورُ
+     * مركزٍ في `centerLinks` = مروره بحارس `hub_top_links`. IA هنا **يرتّب لا يَحرُس**.
+     *
+     * @return array{sections:array<int,array{key:string,label:string,order:int,modules:array<int,string>,centers:array<int,array>}>,ungrouped_modules:array<int,string>,ungrouped_centers:array<int,array>}
+     */
+    public function workspaceLayout($user, string $workspaceKey): array
+    {
+        $empty = ['sections' => [], 'ungrouped_modules' => [], 'ungrouped_centers' => []];
+
+        $ws = \App\Support\Workspaces::find($workspaceKey, $user);
+        if (! $ws) return $empty;
+
+        // مفتاحُ المساحة = مفتاحُ المجال (entities/work/…)، فمجالُها هو نفسُه في السجلّ
+        $node = $this->ia['domains'][$workspaceKey] ?? null;
+        if (! $node) {
+            // مساحةٌ بلا مجالٍ مُناظر: تُعرض بلا تقسيمٍ (صفر فقدان)
+            return ['sections' => [], 'ungrouped_modules' => array_values($ws['modules']),
+                'ungrouped_centers' => array_values($ws['centerLinks'] ?? [])];
+        }
+
+        // خرائطُ التصنيف من السجلِّ الخام: وحدة/مركز → قسمُه الأوّل + بياناتُ الأقسام مرتّبة
+        $moduleSection = []; $centerSection = []; $sectionMeta = [];
+        foreach ($node['sections'] ?? [] as $sk => $s) {
+            $sectionMeta[$sk] = ['key' => (string) $sk, 'label' => $s['label'] ?? $sk, 'order' => $s['order'] ?? 999];
+            foreach ($s['destinations'] ?? [] as $dest) {
+                if (($dest['type'] ?? '') === 'module' && isset($dest['module'])
+                    && ! isset($moduleSection[$dest['module']])) {
+                    $moduleSection[$dest['module']] = (string) $sk;
+                }
+                if (($dest['type'] ?? '') === 'center' && isset($dest['center'])
+                    && ! isset($centerSection[$dest['center']])) {
+                    $centerSection[$dest['center']] = (string) $sk;
+                }
+            }
+        }
+
+        // توزيعُ وحدات المساحة (بترتيبها المسطّح) ومراكزها على أقسامها
+        $bucket = [];   // sk => ['modules'=>[], 'centers'=>[]]
+        $ungroupedM = []; $ungroupedC = [];
+        foreach ($ws['modules'] as $mk) {
+            $sk = $moduleSection[$mk] ?? null;
+            if ($sk !== null) $bucket[$sk]['modules'][] = $mk;
+            else $ungroupedM[] = $mk;
+        }
+        foreach ($ws['centerLinks'] ?? [] as $c) {
+            $ck = $c['key'] ?? null;
+            $sk = $ck !== null ? ($centerSection[$ck] ?? null) : null;
+            if ($sk !== null) $bucket[$sk]['centers'][] = $c;
+            else $ungroupedC[] = $c;
+        }
+
+        // بناءُ الأقسام بترتيب IA — فقط ما فيه وحدةٌ أو مركز
+        $sections = [];
+        foreach ($sectionMeta as $sk => $meta) {
+            $mods = $bucket[$sk]['modules'] ?? [];
+            $cens = $bucket[$sk]['centers'] ?? [];
+            if (! $mods && ! $cens) continue;
+            $sections[] = $meta + ['modules' => $mods, 'centers' => $cens];
+        }
+        usort($sections, fn ($a, $b) => [$a['order'], $a['key']] <=> [$b['order'], $b['key']]);
+
+        return ['sections' => $sections, 'ungrouped_modules' => $ungroupedM, 'ungrouped_centers' => $ungroupedC];
+    }
+
     /* ══════════════════════ البيتُ الأساسيّ وموقعُ المسار ══════════════════════ */
 
     /**
