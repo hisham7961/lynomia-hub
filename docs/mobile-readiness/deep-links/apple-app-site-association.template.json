@@ -1,0 +1,21 @@
+{
+  "__README__": "قالبُ Apple App Site Association (AASA) — Mobile Readiness · الطور H · H.3. لا يُخدَم هذا الملفُّ مباشرةً؛ الخادمُ يولّده حيّاً من config('hub.mobile.deep_links') عبر App\\Http\\Controllers\\Web\\MobileWellKnownController على /.well-known/apple-app-site-association. هذا القالبُ يوثّق الشكلَ والمعرّفاتِ الغائبة (NOT_CONFIGURED). استبدل __NOT_CONFIGURED__* بالقيم الحقيقية حين يصدرها فريقُ iOS، أو اضبطها في الإعدادات (mobile.dl_apple_team_id / mobile.dl_apple_bundle_id) فيخدمها الخادمُ تلقائياً دون نشرِ كود.",
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["__NOT_CONFIGURED_APPLE_TEAM_ID__.__NOT_CONFIGURED_BUNDLE_ID__"],
+        "components": [
+          { "/": "/m/*", "comment": "وجهةُ الرابطِ العميق القانونيّ {module,id,action}" },
+          { "/": "/app/*", "comment": "مسارٌ بديلٌ للرابط العميق" }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["__NOT_CONFIGURED_APPLE_TEAM_ID__.__NOT_CONFIGURED_BUNDLE_ID__"]
+  },
+  "__not_configured__": {
+    "apple.team_id": "Apple Developer Team ID (10 حروف) — setting('mobile.dl_apple_team_id')",
+    "apple.bundle_id": "مُعرّفُ حزمة iOS (com.example.app) — setting('mobile.dl_apple_bundle_id')"
+  }
+}

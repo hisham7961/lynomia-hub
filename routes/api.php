@@ -110,6 +110,15 @@ Route::prefix('mobile/v1')->group(function () {
         ->middleware('throttle:60,1')->name('mobile.app_config');
     Route::get('health', [\App\Http\Controllers\Api\MobileAuthController::class, 'health'])
         ->middleware('throttle:60,1')->name('mobile.health');
+
+    // ── مواصفةُ OpenAPI للجوال (الطور H · H.2) ──
+    // **عامّةٌ عمداً** (لا رمزَ وصول): كي يقرأها التطبيقُ وأدواتُ التوليد قبل الدخول.
+    // **مولَّدةٌ من المسارات الحيّة** (`MobileOpenApi::spec`) لا مكتوبةٌ باليد — وثيقةٌ
+    // **منفصلةٌ تماماً** عن `/api/v1/openapi.json` (لا تمسّه ولا `docs/openapi.json`).
+    // في المجموعةِ العامّةِ (قبل المجموعةِ المُصادَقةِ التي فيها catch-all `{module}`)
+    // فلا يبتلعها — نظيرُ انضباطِ `/api/v1` (`api.php:16` قبل `{module}`).
+    Route::get('openapi.json', [\App\Http\Controllers\Api\MobileDocsController::class, 'openapi'])
+        ->middleware('throttle:60,1')->name('mobile.openapi');
 });
 
 // المجموعةُ المُصادَقة: الخنقُ قبل المصادقة (نمطُ v1)، ثم `mobile.session` (تُرسي

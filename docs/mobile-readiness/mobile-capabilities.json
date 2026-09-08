@@ -1,0 +1,769 @@
+{
+    "_generator": "App\\Support\\MobileOpenApi::capabilities() — مُشتقٌّ من المسارات الحيّة (php artisan tinker / اختبار الانحراف)",
+    "_note": "بيانٌ آليّ — لا يُحرَّر يدويّاً؛ يُعاد توليدُه من المسارات فلا يصف قدرةً غيرَ مبنيّة",
+    "namespace": "/api/mobile/v1",
+    "mobile_api_version": "1",
+    "schema_version": "4a9f8b3a502e",
+    "openapi": {
+        "live": "/api/mobile/v1/openapi.json",
+        "generator": "App\\Support\\MobileOpenApi::spec()"
+    },
+    "auth": {
+        "type": "first_party_session",
+        "independent_of": "/api/v1 (ApiToken — مفتاحُ التكامل، غيرُ مَمسوس)",
+        "access_token": {
+            "transport": "Authorization: Bearer",
+            "storage": "sha256 خادميّاً",
+            "lifetime": "قصير (setting mobile.access_ttl_min)",
+            "device_bound": true,
+            "never_logged": true
+        },
+        "refresh_token": {
+            "single_use": true,
+            "rotation": true,
+            "reuse_defense": "إعادةُ استعمالِ رمزٍ مُدوَّرٍ ⇒ إبطالُ العائلة + SecurityRadar + تنبيهٌ أمنيّ",
+            "error": "REFRESH_TOKEN_INVALID"
+        },
+        "account_gates": [
+            "نظيرُ ApiAuth/الويب: موقوف/منتهٍ/مقفول/حصرُ عناوين/قفلُ طوارئ — بعد إثبات الاعتماد وحدَه (لا أوراكل تعداد)"
+        ],
+        "mfa": {
+            "methods": [
+                "totp"
+            ],
+            "note": "webauthn غيرُ مُعلَنٍ حتى يُبنى دورانُه للجوال (لا قدرةٌ مُختلَقة · F10)",
+            "code": "MFA_REQUIRED"
+        },
+        "step_up": {
+            "bound_to": "user+mobile_session+purpose+expiry",
+            "methods": [
+                "totp",
+                "password"
+            ],
+            "code": "STEP_UP_REQUIRED"
+        },
+        "biometrics": "جانبُ التطبيق فقط — الخادمُ لا يستقبل قوالبَ حيويّة قط"
+    },
+    "error_codes": {
+        "contract": "App\\Support\\Api::CODES (موحَّدٌ مع /api/v1 — لا يُعاد تسميةُ كودٍ قائم)",
+        "reused": [
+            "UNAUTHENTICATED",
+            "ACCOUNT_RESTRICTED",
+            "FORBIDDEN",
+            "INSUFFICIENT_SCOPE",
+            "RESOURCE_NOT_FOUND",
+            "METHOD_NOT_ALLOWED",
+            "VALIDATION_FAILED",
+            "CONFLICT",
+            "VERSION_CONFLICT",
+            "APPROVAL_REQUIRED",
+            "IDEMPOTENCY_IN_PROGRESS",
+            "IDEMPOTENCY_KEY_REUSED",
+            "PAYLOAD_TOO_LARGE",
+            "LOCKED",
+            "STEP_UP_REQUIRED",
+            "RATE_LIMITED",
+            "BUSINESS_RULE_VIOLATION",
+            "INTEGRATION_UNAVAILABLE",
+            "MAINTENANCE",
+            "LOCKDOWN",
+            "SERVICE_UNAVAILABLE",
+            "INTERNAL_ERROR"
+        ],
+        "mobile_added": [
+            "MFA_REQUIRED",
+            "REFRESH_TOKEN_INVALID",
+            "SESSION_REVOKED",
+            "APP_UPDATE_REQUIRED"
+        ]
+    },
+    "concurrency": {
+        "optimistic_lock": "If-Match ⇒ VERSION_CONFLICT (409)",
+        "version_column": "version (HasVersions)",
+        "etag": "على السجل المفرد ونقاط الإقلاع/المخطّط"
+    },
+    "idempotency": {
+        "header": "Idempotency-Key",
+        "owner": "mobile_session id (Critic F1 — لا يُعاد ردُّ مستخدمٍ لآخر)",
+        "applies_to": [
+            "create",
+            "approval decide",
+            "comment post",
+            "dm send",
+            "file complete",
+            "file attach",
+            "action run",
+            "tracking points",
+            "pin toggle",
+            "protected-write submit"
+        ]
+    },
+    "context_headers": {
+        "note": "ترويساتُ سياقٍ/تليمتري — **تضييقُ عرضٍ ووسمٌ لا تخويل**؛ لا توسّع صلاحيةً أبداً (تُقاطَع مع المسموح)",
+        "X-Lynomia-App-Platform": "ios|android — بوّابةُ الإصدار/التليمتري",
+        "X-Lynomia-App-Version": "إصدارُ التطبيق (semver) — بوّابةُ الإصدار",
+        "X-Lynomia-App-Build": "رقمُ البناء — تليمتري",
+        "X-Lynomia-Installation-Id": "مُعرّفُ التنصيب — تليمتري (الحقيقةُ من الجلسة)",
+        "X-Request-Id": "معرّفُ طلبٍ من العميل (خارجيٌّ — لا يُشتقّ منه تخويل)",
+        "X-Lynomia-Company": "تضييقُ العرضِ على شركةٍ ⊆ المسموح (تُتجاهَل إن وسّعت)",
+        "X-Lynomia-Client": "تضييقُ العرضِ على عميلٍ ⊆ المسموح (تُتجاهَل إن وسّعت)"
+    },
+    "deep_link": {
+        "canonical": {
+            "module": "string (مفتاحُ وحدةٍ مسجَّلة)",
+            "id": "string (UUID)",
+            "action": "show"
+        },
+        "source_of_truth": "App\\Support\\NotificationLink::target() — نفسُها التي تصدرها notifications/{id}/target والبحثُ واللوحة",
+        "null_semantics": "target=null ⇒ لا وجهةَ سجلٍّ (يعود التطبيقُ لقائمة الإشعارات) — نظيرُ الويب",
+        "no_hardcoded_screens": true,
+        "universal_link_encoding": {
+            "path_template": "/m/{module}/{id}",
+            "with_action": "/m/{module}/{id}/{action} (action=show هو الافتراض فيُحذَف)",
+            "host": "راجع x-not-configured.universal_links (NOT_CONFIGURED حتى يُصدَر النطاق)",
+            "well_known": [
+                "/.well-known/apple-app-site-association",
+                "/.well-known/assetlinks.json"
+            ]
+        },
+        "emitted_by": [
+            "GET notifications/{id}/target",
+            "POST notifications/{id}/read",
+            "GET notifications (كلُّ عنصر)",
+            "GET search (كلُّ نتيجة {module,id})",
+            "GET home (عناصرُ my_work/due/attention/recent/projects)",
+            "GET approvals (target للسجل الهدف)"
+        ]
+    },
+    "sync": {
+        "endpoint": "/api/mobile/v1/sync/{module}",
+        "default_class": "ONLINE_ONLY",
+        "classes": [
+            "CACHEABLE_INCREMENTAL",
+            "CACHEABLE_READ_ONLY",
+            "ONLINE_ONLY",
+            "SENSITIVE_NO_PERSIST",
+            "NOT_APPLICABLE"
+        ],
+        "coverage": {
+            "CACHEABLE_INCREMENTAL": 81,
+            "CACHEABLE_READ_ONLY": 0,
+            "ONLINE_ONLY": 0,
+            "SENSITIVE_NO_PERSIST": 3,
+            "NOT_APPLICABLE": 1
+        },
+        "page": {
+            "default_limit": 100,
+            "max_limit": 500
+        },
+        "modules": {
+            "accounts": "CACHEABLE_INCREMENTAL",
+            "accounts2": "CACHEABLE_INCREMENTAL",
+            "apis": "CACHEABLE_INCREMENTAL",
+            "approvals": "CACHEABLE_INCREMENTAL",
+            "apps": "CACHEABLE_INCREMENTAL",
+            "assetlog": "CACHEABLE_INCREMENTAL",
+            "assets": "CACHEABLE_INCREMENTAL",
+            "attend": "CACHEABLE_INCREMENTAL",
+            "autos": "CACHEABLE_INCREMENTAL",
+            "banks": "CACHEABLE_INCREMENTAL",
+            "brands": "CACHEABLE_INCREMENTAL",
+            "budgets": "CACHEABLE_INCREMENTAL",
+            "carriers": "SENSITIVE_NO_PERSIST",
+            "changeorders": "CACHEABLE_INCREMENTAL",
+            "changes": "CACHEABLE_INCREMENTAL",
+            "clients": "CACHEABLE_INCREMENTAL",
+            "code": "CACHEABLE_INCREMENTAL",
+            "companies": "CACHEABLE_INCREMENTAL",
+            "competitors": "CACHEABLE_INCREMENTAL",
+            "compliance": "CACHEABLE_INCREMENTAL",
+            "contracts": "CACHEABLE_INCREMENTAL",
+            "costc": "CACHEABLE_INCREMENTAL",
+            "cycles": "CACHEABLE_INCREMENTAL",
+            "dbs": "CACHEABLE_INCREMENTAL",
+            "decisions": "CACHEABLE_INCREMENTAL",
+            "deploys": "CACHEABLE_INCREMENTAL",
+            "deps": "CACHEABLE_INCREMENTAL",
+            "designs": "CACHEABLE_INCREMENTAL",
+            "domains": "CACHEABLE_INCREMENTAL",
+            "emails": "CACHEABLE_INCREMENTAL",
+            "endpoints": "CACHEABLE_INCREMENTAL",
+            "engagements": "CACHEABLE_INCREMENTAL",
+            "entries": "CACHEABLE_INCREMENTAL",
+            "events": "CACHEABLE_INCREMENTAL",
+            "facilities": "CACHEABLE_INCREMENTAL",
+            "feats": "CACHEABLE_INCREMENTAL",
+            "files": "CACHEABLE_INCREMENTAL",
+            "fin": "CACHEABLE_INCREMENTAL",
+            "hcps": "CACHEABLE_INCREMENTAL",
+            "hr": "CACHEABLE_INCREMENTAL",
+            "hrlog": "CACHEABLE_INCREMENTAL",
+            "ideas": "CACHEABLE_INCREMENTAL",
+            "incidents": "CACHEABLE_INCREMENTAL",
+            "ip": "CACHEABLE_INCREMENTAL",
+            "issues": "CACHEABLE_INCREMENTAL",
+            "kb": "CACHEABLE_INCREMENTAL",
+            "krs": "CACHEABLE_INCREMENTAL",
+            "leaves": "CACHEABLE_INCREMENTAL",
+            "media": "CACHEABLE_INCREMENTAL",
+            "meetings": "CACHEABLE_INCREMENTAL",
+            "obligations": "CACHEABLE_INCREMENTAL",
+            "okrs": "CACHEABLE_INCREMENTAL",
+            "payroll": "CACHEABLE_INCREMENTAL",
+            "phones": "SENSITIVE_NO_PERSIST",
+            "plans": "CACHEABLE_INCREMENTAL",
+            "policies": "CACHEABLE_INCREMENTAL",
+            "policyacks": "CACHEABLE_INCREMENTAL",
+            "posts": "CACHEABLE_INCREMENTAL",
+            "products": "CACHEABLE_INCREMENTAL",
+            "projects": "CACHEABLE_INCREMENTAL",
+            "purchases": "CACHEABLE_INCREMENTAL",
+            "quotes": "CACHEABLE_INCREMENTAL",
+            "recruit": "CACHEABLE_INCREMENTAL",
+            "recur": "CACHEABLE_INCREMENTAL",
+            "requests": "CACHEABLE_INCREMENTAL",
+            "restores": "CACHEABLE_INCREMENTAL",
+            "rules": "CACHEABLE_INCREMENTAL",
+            "servers": "CACHEABLE_INCREMENTAL",
+            "services": "CACHEABLE_INCREMENTAL",
+            "skills": "CACHEABLE_INCREMENTAL",
+            "social": "CACHEABLE_INCREMENTAL",
+            "stations": "CACHEABLE_INCREMENTAL",
+            "stock": "CACHEABLE_INCREMENTAL",
+            "stockmv": "CACHEABLE_INCREMENTAL",
+            "subs": "CACHEABLE_INCREMENTAL",
+            "suppliers": "CACHEABLE_INCREMENTAL",
+            "tasks": "CACHEABLE_INCREMENTAL",
+            "terrassigns": "CACHEABLE_INCREMENTAL",
+            "territories": "CACHEABLE_INCREMENTAL",
+            "tickets": "CACHEABLE_INCREMENTAL",
+            "updates": "CACHEABLE_INCREMENTAL",
+            "users": "NOT_APPLICABLE",
+            "vault": "SENSITIVE_NO_PERSIST",
+            "visits": "CACHEABLE_INCREMENTAL",
+            "websites": "CACHEABLE_INCREMENTAL"
+        }
+    },
+    "not_configured": {
+        "push_fcm": {
+            "status": "NOT_CONFIGURED",
+            "configured_via": [
+                "setting: mobile.push_driver=fcm",
+                "setting: mobile.push_fcm_project_id",
+                "setting: mobile.push_fcm_access_token"
+            ],
+            "behavior_when_absent": "NullPushProvider — التسليمُ not_configured، لا نجاحٌ مُزيَّف، والإشعارُ الداخليُّ لا يُفقَد",
+            "no_secret_exposed": true
+        },
+        "push_apns": {
+            "status": "NOT_CONFIGURED",
+            "note": "مزوّدُ APNs المباشرُ غيرُ مبنيٍّ — iOS عبر FCM حالياً؛ واجهةٌ محجوزة"
+        },
+        "app_attest_ios": {
+            "status": "NOT_CONFIGURED",
+            "note": "App Attest — واجهةٌ فقط؛ لا يُخوَّل على حالةِ عميلٍ مُدَّعاة"
+        },
+        "device_check_ios": {
+            "status": "NOT_CONFIGURED",
+            "note": "DeviceCheck — واجهةٌ فقط"
+        },
+        "play_integrity_android": {
+            "status": "NOT_CONFIGURED",
+            "note": "Play Integrity — واجهةٌ فقط"
+        },
+        "root_jailbreak_posture": {
+            "status": "NOT_CONFIGURED",
+            "note": "إشارةُ العميلِ غيرُ موثوقة — لا تُخوَّل عليها؛ للعرض/الرصدِ لا للتحكّم"
+        },
+        "version_gate": {
+            "status": "NOT_CONFIGURED",
+            "configured_via": [
+                "setting: mobile.min_version_ios|latest_version_ios",
+                "setting: mobile.min_version_android|latest_version_android",
+                "setting: mobile.force_update"
+            ],
+            "behavior_when_absent": "فارغٌ = لا حجب (نسخُ التطوير تمرّ)"
+        },
+        "store_urls": {
+            "status": "NOT_CONFIGURED",
+            "configured_via": [
+                "setting: mobile.store_url_ios",
+                "setting: mobile.store_url_android"
+            ]
+        },
+        "support_url": {
+            "status": "NOT_CONFIGURED",
+            "configured_via": [
+                "setting: mobile.support_url"
+            ]
+        },
+        "universal_links": {
+            "apple_app_site_association": {
+                "status": "NOT_CONFIGURED",
+                "needs": [
+                    "apple.team_id (Apple Team ID)",
+                    "apple.bundle_id (bundle identifier)"
+                ],
+                "served_at": "/.well-known/apple-app-site-association",
+                "behavior_when_absent": "يُخدَم AASA صادقٌ يربط 0 تطبيقاً (لا رابطَ عالميٌّ يعمل) + X-Deep-Links-Status: NOT_CONFIGURED"
+            },
+            "assetlinks": {
+                "status": "NOT_CONFIGURED",
+                "needs": [
+                    "android.package_name",
+                    "android.sha256_cert_fingerprints[]"
+                ],
+                "served_at": "/.well-known/assetlinks.json",
+                "behavior_when_absent": "يُخدَم [] (لا تطبيقَ مربوط) + X-Deep-Links-Status: NOT_CONFIGURED"
+            },
+            "configured_via": [
+                "config: hub.mobile.deep_links (أو setting: mobile.dl_*)"
+            ]
+        }
+    },
+    "areas": {
+        "actions": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/{module}/{id}/actions",
+                    "name": "mobile.resource.actions",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/{module}/{id}/actions/{action}",
+                    "name": "mobile.resource.run_action",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 2
+        },
+        "approvals": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/approvals",
+                    "name": "mobile.approvals.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/approvals/{id}",
+                    "name": "mobile.approvals.show",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/approvals/{id}/approve",
+                    "name": "mobile.approvals.approve",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/approvals/{id}/reject",
+                    "name": "mobile.approvals.reject",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 4
+        },
+        "auth": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/app-config",
+                    "name": "mobile.app_config",
+                    "auth": "public"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/auth/login",
+                    "name": "mobile.auth.login",
+                    "auth": "public"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/auth/logout",
+                    "name": "mobile.auth.logout",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/auth/logout-all",
+                    "name": "mobile.auth.logout_all",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/auth/mfa/verify",
+                    "name": "mobile.auth.mfa_verify",
+                    "auth": "public"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/auth/refresh",
+                    "name": "mobile.auth.refresh",
+                    "auth": "public"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/auth/sessions",
+                    "name": "mobile.auth.sessions.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "DELETE",
+                    "path": "/api/mobile/v1/auth/sessions/{id}",
+                    "name": "mobile.auth.sessions.destroy",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/auth/step-up",
+                    "name": "mobile.auth.step_up",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 9
+        },
+        "comments": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/comments",
+                    "name": "mobile.comments.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/comments",
+                    "name": "mobile.comments.store",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 2
+        },
+        "context": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/bootstrap",
+                    "name": "mobile.bootstrap",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/context",
+                    "name": "mobile.context",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 2
+        },
+        "crud": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/{module}",
+                    "name": "mobile.resource.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/{module}",
+                    "name": "mobile.resource.store",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "DELETE",
+                    "path": "/api/mobile/v1/{module}/{id}",
+                    "name": "mobile.resource.destroy",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/{module}/{id}",
+                    "name": "mobile.resource.show",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "PATCH",
+                    "path": "/api/mobile/v1/{module}/{id}",
+                    "name": "mobile.resource.patch",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "PUT",
+                    "path": "/api/mobile/v1/{module}/{id}",
+                    "name": "mobile.resource.update",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 6
+        },
+        "dm": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/dm/threads",
+                    "name": "mobile.dm.threads",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/dm/threads/{user}/messages",
+                    "name": "mobile.dm.messages",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/dm/threads/{user}/read",
+                    "name": "mobile.dm.read",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/dm/threads/{user}/send",
+                    "name": "mobile.dm.send",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 4
+        },
+        "files": {
+            "endpoints": [
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/files/attach",
+                    "name": "mobile.files.attach",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/files/upload-session",
+                    "name": "mobile.files.upload_session",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "PUT",
+                    "path": "/api/mobile/v1/files/upload-session/{id}/chunk",
+                    "name": "mobile.files.upload_chunk",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/files/upload-session/{id}/complete",
+                    "name": "mobile.files.upload_complete",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/files/{id}/download",
+                    "name": "mobile.files.download",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/files/{id}/stream",
+                    "name": "mobile.files.stream",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 6
+        },
+        "health": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/health",
+                    "name": "mobile.health",
+                    "auth": "public"
+                }
+            ],
+            "count": 1
+        },
+        "home": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/home",
+                    "name": "mobile.home",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 1
+        },
+        "meta": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/openapi.json",
+                    "name": "mobile.openapi",
+                    "auth": "public"
+                }
+            ],
+            "count": 1
+        },
+        "notifications": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/notifications",
+                    "name": "mobile.notifications.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/notifications/read-all",
+                    "name": "mobile.notifications.read_all",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/notifications/unread-count",
+                    "name": "mobile.notifications.unread",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/notifications/{id}/read",
+                    "name": "mobile.notifications.read",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/notifications/{id}/target",
+                    "name": "mobile.notifications.target",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 5
+        },
+        "prefs": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/prefs",
+                    "name": "mobile.prefs.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "PUT",
+                    "path": "/api/mobile/v1/prefs",
+                    "name": "mobile.prefs.update",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/prefs/pin",
+                    "name": "mobile.prefs.pin",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 3
+        },
+        "push": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/push/admin/status",
+                    "name": "mobile.push.admin.status",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/push/admin/test",
+                    "name": "mobile.push.admin.test",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/push/register",
+                    "name": "mobile.push.register",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/push/unregister",
+                    "name": "mobile.push.unregister",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 4
+        },
+        "scanner": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/identity/resolve/{q}",
+                    "name": "mobile.identity.resolve",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 1
+        },
+        "schema": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/schema",
+                    "name": "mobile.schema",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/schema/modules",
+                    "name": "mobile.schema.modules",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 2
+        },
+        "search": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/search",
+                    "name": "mobile.search",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 1
+        },
+        "sync": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/sync/{module}",
+                    "name": "mobile.sync",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 1
+        },
+        "tracking": {
+            "endpoints": [
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/tracking/start",
+                    "name": "mobile.tracking.start",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/tracking/{session}/end",
+                    "name": "mobile.tracking.end",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/tracking/{session}/points",
+                    "name": "mobile.tracking.points",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 3
+        }
+    }
+}

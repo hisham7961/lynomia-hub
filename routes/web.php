@@ -84,6 +84,25 @@ Route::get('manifest.webmanifest', [PwaController::class, 'manifest'])->name('pw
 Route::get('pwa-icon.svg', [PwaController::class, 'icon'])->name('pwa.icon');
 Route::get('offline', [PwaController::class, 'offline'])->name('pwa.offline');
 
+// ── سقالةُ الروابط العالميّة للجوال (Mobile Readiness · الطور H · H.3) ──
+// تفرض Apple/Google هاتين الوثيقتين عند جذر النطاق **بلا إعادةِ توجيه** وبنوع JSON.
+// عامّتان — كنظيرِ `healthz` تُجرَّدان من وسطاء الجلسة/الصيانة كي يبقى ردُّ CDN نظيفاً.
+// **صادقتان NOT_CONFIGURED** حتى تُصدَر المعرّفاتُ الحقيقيّة (تربطان صفرَ تطبيق) — لا اختلاق.
+Route::get('.well-known/apple-app-site-association',
+    [\App\Http\Controllers\Web\MobileWellKnownController::class, 'appleAppSiteAssociation'])
+    ->name('mobile.aasa')->middleware('throttle:60,1')
+    ->withoutMiddleware([\App\Http\Middleware\HubMaintenance::class, \App\Http\Middleware\WorkHours::class,
+        \App\Http\Middleware\SessionSentry::class, \App\Http\Middleware\TrackVisits::class,
+        \App\Http\Middleware\Require2faForPrivileged::class, \App\Http\Middleware\ResolveChunkedUploads::class,
+        \App\Http\Middleware\DownloadPing::class, \App\Http\Middleware\AccessRadar::class]);
+Route::get('.well-known/assetlinks.json',
+    [\App\Http\Controllers\Web\MobileWellKnownController::class, 'assetLinks'])
+    ->name('mobile.assetlinks')->middleware('throttle:60,1')
+    ->withoutMiddleware([\App\Http\Middleware\HubMaintenance::class, \App\Http\Middleware\WorkHours::class,
+        \App\Http\Middleware\SessionSentry::class, \App\Http\Middleware\TrackVisits::class,
+        \App\Http\Middleware\Require2faForPrivileged::class, \App\Http\Middleware\ResolveChunkedUploads::class,
+        \App\Http\Middleware\DownloadPing::class, \App\Http\Middleware\AccessRadar::class]);
+
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'show'])->name('login');
     Route::post('login', [AuthController::class, 'login'])->name('login.attempt')

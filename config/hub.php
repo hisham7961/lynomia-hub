@@ -9374,5 +9374,26 @@ return [
             'default_limit' => 100,            // صفحةٌ افتراضيّةٌ معقولة
             'max_limit'     => 500,            // سقفٌ صلبٌ للصفحة الواحدة
         ],
+
+        // ── الروابطُ العالميّة (Universal Links / App Links) — سقالةٌ مُهيّأةٌ لا مُختلَقة (الطور H · H.3) ──
+        // **كلُّ المعرّفاتِ الخارجيّة NOT_CONFIGURED** حتى يُصدرها فريقُ التطبيق: معرّفُ الفريق
+        // (Apple Team ID)، ومُعرّفُ الحزمة (bundle id)، واسمُ حزمةِ Android، وبصماتُ شهادةِ
+        // التوقيع (SHA-256). تُخدَم /.well-known/apple-app-site-association و/.well-known/
+        // assetlinks.json صادقةً **تربط صفرَ تطبيق** حتى تُضبط (spec §Deep links: «documented,
+        // not fabricated»). القيمُ الحيّةُ تغلب عبر setting('mobile.dl_*'). المسارُ `/m/*` هو
+        // ترميزُ الرابطِ العميق القانونيّ {module,id,action} (App\Support\NotificationLink).
+        'deep_links' => [
+            'serve'   => true,                 // هل تُخدَم /.well-known/* (تبقى صادقةً NOT_CONFIGURED دون معرّفات)
+            'host'    => '',                   // النطاقُ المُصرَّح — فارغٌ ⇒ config('app.url')
+            'paths'   => ['/m/*', '/app/*'],   // أنماطُ المسار التي يلتقطها التطبيق (وجهةُ الرابط العميق)
+            'apple'   => [
+                'team_id'   => '',             // NOT_CONFIGURED — Apple Developer Team ID (10 حروف) · setting('mobile.dl_apple_team_id')
+                'bundle_id' => '',             // NOT_CONFIGURED — مُعرّفُ حزمة iOS (com.example.app) · setting('mobile.dl_apple_bundle_id')
+            ],
+            'android' => [
+                'package_name'             => '',   // NOT_CONFIGURED — اسمُ حزمة Android · setting('mobile.dl_android_package')
+                'sha256_cert_fingerprints' => [],   // NOT_CONFIGURED — بصماتُ التوقيع SHA-256 · setting('mobile.dl_android_fingerprints') (مفصولة بفاصلة)
+            ],
+        ],
     ],
 ];

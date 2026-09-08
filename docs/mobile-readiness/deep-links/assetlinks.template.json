@@ -1,0 +1,13 @@
+[
+  {
+    "__README__": "قالبُ Android App Links (assetlinks.json) — Mobile Readiness · الطور H · H.3. لا يُخدَم هذا القالبُ؛ الخادمُ يولّد /.well-known/assetlinks.json حيّاً من config('hub.mobile.deep_links') عبر MobileWellKnownController. assetlinks بنيتُها مصفوفةٌ صارمة (لا مفتاحَ حالةٍ داخلها) — لذا حالةُ NOT_CONFIGURED تُعلَن في ترويسة X-Deep-Links-Status، والخادمُ يخدم [] (لا تطبيقَ مربوط) حتى تُضبط المعرّفات. استبدل __NOT_CONFIGURED__* أو اضبط mobile.dl_android_package / mobile.dl_android_fingerprints.",
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "__NOT_CONFIGURED_ANDROID_PACKAGE_NAME__",
+      "sha256_cert_fingerprints": [
+        "__NOT_CONFIGURED_SHA256_CERT_FINGERPRINT__"
+      ]
+    }
+  }
+]
