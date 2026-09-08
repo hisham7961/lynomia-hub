@@ -956,4 +956,10 @@ Route::middleware('auth')->group(function () {
     // صفُّ «يستدعي تدخّلك» يُعرض هنا ويُتصرَّف به على `recs.act` القائم (WP-10.2).
     Route::get('admin/control', [\App\Http\Controllers\Web\ControlController::class, 'index'])
         ->name('control.index')->middleware('throttle:60,1');
+
+    // مركزُ منصّة تطبيق الهاتف (Mobile Platform Center) — قنصليّةٌ إداريّةٌ فوق قدرات
+    // الجوال القائمة. الاسمُ `mobileplatform.*` متمايزٌ عن بادئةِ `mobile` (دلو IA/الـAPI).
+    // الحرسُ في المتحكّم (مالك/رايةُ mobile) — لا middleware مسارٍ (كسائر مراكز الإدارة).
+    Route::get('admin/mobile-platform', [\App\Http\Controllers\Web\MobilePlatformController::class, 'index'])
+        ->name('mobileplatform.index')->middleware('throttle:60,1');
 });

@@ -20,10 +20,11 @@ class RoleController extends Controller
         // الكشف واحد، والنصّ يصل جهاز المستخدم في الحالين — والفرق عرضٌ لا منع.
         'copySec' => 'نسخ السرّ للحافظة — نصّه يصل الجهاز',
         'exp'     => 'تصدير البيانات',
+        'mobile'  => 'منصّة تطبيق الهاتف — إدارةٌ وتشغيل',
     ];
 
     /** رايات يترتّب على منحها وصولٌ واسع — تُوسَم في الشاشة لا تُدسّ بين البقية */
-    public const RISKY_FLAGS = ['users', 'secrets', 'copySec', 'exp', 'audit'];
+    public const RISKY_FLAGS = ['users', 'secrets', 'copySec', 'exp', 'audit', 'mobile'];
 
     protected array $ops = ['v' => 'عرض', 'a' => 'إضافة', 'e' => 'تعديل', 'd' => 'حذف'];
 
