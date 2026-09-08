@@ -42,6 +42,8 @@ use Tests\TestCase;
  */
 class WorkOsEventRailTest extends TestCase
 {
+    use \Tests\Concerns\EnrollsEndpoints;
+
     /**
      * الأحداثُ الدلاليّةُ المُعلَنة في Work OS (الأطوار A–L) حرفيّاً:
      * `الاسمُ الدلاليّ => [وحدةُ الخريطة في config('hub.events'), الحدثُ الخامُّ المُشتَقُّ منه]`.
@@ -301,7 +303,7 @@ class WorkOsEventRailTest extends TestCase
         // السكُّ عبر المسار الحقيقيّ (مالك + step-up) — نمطُ WorkOsEndpointEnrollTest::mintFor
         $this->actingAs($this->owner)
             ->withSession(['stepup.ok_until' => now()->addMinutes(10)->timestamp])
-            ->post(route('enroll.mint'), ['companyId' => $co->id])->assertSessionHas('enroll_token');
+            ->post(route('enroll.mint'), ['assetId' => $this->eligibleAsset($co)->id])->assertSessionHas('enroll_token');
         $token = (string) session('enroll_token');
 
         // زوجُ P-256 حقيقيّ — العامُّ وحده يُرسَل (نمطُ WorkOsEndpointEnrollTest::keypair)

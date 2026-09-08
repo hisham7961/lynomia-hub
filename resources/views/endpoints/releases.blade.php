@@ -30,13 +30,26 @@
     @if ($releases->isEmpty())
         <div class="sub">لا إصدارَ منشوراً بعد — يُبنى الوكيلُ في CI (‏go build عبر المنصّات) ويُنشر هنا مع تجزئته.</div>
     @else
+        @php
+            $stateBadge = ['published' => ['منشور', 'g'], 'draft' => ['مسوَّدة', 'wn']];
+            $rolloutLabel = ['all' => 'الأسطول كاملاً', 'company' => 'شركةٌ بعينها', 'percentage' => 'canary مرحليّ'];
+        @endphp
         <table class="mini">
-            <thead><tr><th>النسخة</th><th>المنصّة</th><th>sha256</th><th>الحجم</th><th>حالة التوقيع</th><th>تنزيلات</th><th>نُشر</th><th></th></tr></thead>
+            <thead><tr><th>النسخة</th><th>المنصّة</th><th>الحالة</th><th>الطرح</th><th>sha256</th><th>الحجم</th><th>التوقيع / التوثيق</th><th>تنزيلات</th><th>نُشر</th><th></th></tr></thead>
             <tbody>
             @foreach ($releases as $rel)
+                @php [$stLbl, $stTone] = $stateBadge[$rel->state] ?? [$rel->state, 'wn']; @endphp
                 <tr>
-                    <td><b>{{ $rel->version }}</b>@if ($rel->notes)<div class="sub">{{ $rel->notes }}</div>@endif</td>
+                    <td><b>{{ $rel->version }}</b>
+                        @if ($rel->build_number)<div class="sub" dir="ltr">build {{ $rel->build_number }}</div>@endif
+                        @if ($rel->min_agent_version)<div class="sub" dir="ltr">≥ وكيل {{ $rel->min_agent_version }}</div>@endif
+                        @if ($rel->notes)<div class="sub">{{ $rel->notes }}</div>@endif</td>
                     <td><span class="mono" dir="ltr">{{ $rel->os }}/{{ $rel->arch }}</span></td>
+                    <td><span class="bdg {{ $stTone }}">{{ $stLbl }}</span></td>
+                    <td class="sub">
+                        {{ $rolloutLabel[$rel->rollout_scope] ?? $rel->rollout_scope }}
+                        @if ($rel->rollout_scope === 'percentage')<span dir="ltr"> {{ (int) $rel->rollout_percentage }}%</span>@endif
+                    </td>
                     {{-- التجزئةُ كاملةً قابلةً للنسخ — المثبِّتُ اليدويّ يقارنها قبل التشغيل --}}
                     <td><span class="mono" dir="ltr" style="word-break:break-all">{{ $rel->sha256 }}</span></td>
                     <td class="sub">{{ number_format((int) $rel->size / 1024, 0) }} ك.ب</td>
@@ -47,11 +60,24 @@
                             {{-- الصدقُ حرفياً (C15): لا «موقَّع» زائفاً ولا توقيعَ ذاتيّاً مسرحيّاً --}}
                             <span class="bdg wn" dir="ltr">{{ \App\Models\EndpointRelease::UNSIGNED_LABEL }}</span>
                         @endif
+                        {{-- محورُ التوثيق المنفصل (ماك) — 'not-configured' صادقٌ بلا notarytool --}}
+                        @if ($rel->notarization_status === 'notarized')
+                            <span class="bdg g" dir="ltr">notarized</span>
+                        @elseif ($rel->os === 'macos')
+                            <span class="bdg wn" dir="ltr">notarization: not-configured</span>
+                        @endif
                     </td>
                     <td>{{ $downloads[$rel->id] ?? 0 }}</td>
                     <td class="sub">{{ $rel->created_at?->format('Y-m-d H:i') }}</td>
                     <td class="acts">
                         <a class="btn sm" href="{{ route('endpoints.releases.download', $rel->id) }}">⬇️ تنزيل</a>
+                        @if ($rel->state === 'draft')
+                            <form method="post" action="{{ route('endpoints.releases.publish', $rel->id) }}" style="display:inline"
+                                  onsubmit="return confirm('نشرُ المسوَّدة {{ $rel->version }}؟ سيبتلعها الأسطولُ ضمن رقعة طرحها.')">
+                                @csrf
+                                <button class="btn sm">نشر</button>
+                            </form>
+                        @endif
                         <form method="post" action="{{ route('endpoints.releases.delete', $rel->id) }}" style="display:inline"
                               onsubmit="return confirm('سحبُ الإصدار {{ $rel->version }}؟ بيانُ التحديث لن يقدّمه بعد الآن.')">
                             @csrf
@@ -82,9 +108,27 @@
             @foreach (\App\Models\EndpointRelease::ARCHES as $a)<option value="{{ $a }}">{{ $a }}</option>@endforeach
         </select>
         <input type="file" name="file" class="inp" required>
-        <input class="inp" name="notes" placeholder="ملاحظات (اختياري)" style="min-width:200px">
+        <input class="inp" name="build_number" placeholder="رقم البناء (اختياري)" dir="ltr" style="width:130px">
+        <input class="inp" name="min_agent_version" placeholder="أدنى نسخةِ وكيل (اختياري)" dir="ltr" style="width:150px">
+        <input class="inp" name="notes" placeholder="ملاحظات (اختياري)" style="min-width:160px">
+        {{-- دورةُ الحياة (§6): منشورٌ فوراً (توافقُ السلوك) أو مسوَّدةٌ لا يقدّمها البيان --}}
+        <select name="state" class="inp" title="الحالة">
+            <option value="published">نشرٌ فوريّ</option>
+            <option value="draft">مسوَّدة</option>
+        </select>
+        {{-- رقعةُ الطرح المرحليّ (§7): الأسطولُ كاملاً افتراضاً (غيرُ مُلزَمٍ) --}}
+        <select name="rollout_scope" class="inp" title="نطاق الطرح">
+            <option value="all">الأسطول كاملاً</option>
+            <option value="percentage">canary بنسبة</option>
+            <option value="company">شركةٌ بعينها</option>
+        </select>
+        <input class="inp" name="rollout_percentage" type="number" min="0" max="100" value="100" title="نسبة canary" style="width:90px">
+        <select name="rollout_company_id" class="inp" title="شركةُ الطرح">
+            <option value="">— شركةُ الطرح —</option>
+            @foreach ($companies as $co)<option value="{{ $co->id }}">{{ $co->name_ar }}</option>@endforeach
+        </select>
         <button class="btn sm">نشر</button>
-        <span class="sub">يتطلب تصعيدَ هوية (step-up).</span>
+        <span class="sub">يتطلب تصعيدَ هوية (step-up). التوقيعُ والتوثيقُ صادقان بالبناء — لا يُدخَلان.</span>
     </form>
 </div>
 @endsection

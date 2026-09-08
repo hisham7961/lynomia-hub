@@ -172,6 +172,17 @@ func cmdUpdate(args []string) error {
 	if err != nil {
 		return err
 	}
+
+	// **الترقيةُ الآمنة (§7):** حارسٌ دلاليٌّ قبل أي تنزيل — لا تنازل، ولا عملَ على
+	// المطابق، وجسرُ ترقيةٍ حين تكون النسخةُ الحالية أقدمَ من الأدنى المتوافق.
+	if err := update.Precheck(Version, m); err != nil {
+		if errors.Is(err, update.ErrUpToDate) {
+			fmt.Println("الوكيلُ محدَّثٌ سلفاً — لا نسخةَ أحدثَ في البيان.")
+			return nil // نجاحٌ صامتٌ لا خطأ
+		}
+		return err
+	}
+
 	if err := update.Apply(context.Background(), httpc, m, *target); err != nil {
 		return err
 	}

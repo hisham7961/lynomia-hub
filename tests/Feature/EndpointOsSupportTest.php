@@ -31,10 +31,12 @@ class EndpointOsSupportTest extends TestCase
         return [$priv, $d['key']];
     }
 
+    use \Tests\Concerns\EnrollsEndpoints;
+
     protected function mintFor(Company $c): string
     {
         $this->actingAs($this->owner)->withStepup()
-            ->post(route('enroll.mint'), ['companyId' => $c->id])->assertSessionHas('enroll_token');
+            ->post(route('enroll.mint'), ['assetId' => $this->eligibleAsset($c)->id])->assertSessionHas('enroll_token');
 
         return (string) session('enroll_token');
     }

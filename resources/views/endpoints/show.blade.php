@@ -36,6 +36,17 @@
     <div><a class="btn ghost sm" href="{{ route('endpoints.index') }}">→ الأسطول</a></div>
 </div>
 
+@php $assetReason = $device->asset?->endpointIneligibleReason(); @endphp
+@if ($assetReason)
+    <div class="flash wn" style="margin-top:10px">⚠️ الأصلُ المرتبط: {{ $assetReason }} —
+        @if ($device->status !== 'active')
+            إدارةُ هذا الجهازِ مُعلَّقةٌ تبعاً لحالة الأصل (لا تُصدَر له أوامرُ جديدة).
+        @else
+            انتبه: قد يلزم قفلُه/عزلُه أو تقاعُدُ الجهاز.
+        @endif
+    </div>
+@endif
+
 <div class="kids">
     <div class="card kid">
         <h3>🪪 الهويّة</h3>
@@ -88,7 +99,9 @@
 <div class="kids">
     <div class="card kid">
         <h3>🎛️ الأوامر <span class="sub">(قائمةٌ مغلقة — لا أوامرَ حرّة)</span></h3>
-        @if (hub_is_owner() || hub_monitor())
+        @if ((hub_is_owner() || hub_monitor()) && $device->status !== 'active')
+            <div class="sub">الجهازُ غيرُ نشط ({{ $stLabel }}) — لا تُصدَر له أوامر.</div>
+        @elseif (hub_is_owner() || hub_monitor())
             <form method="post" action="{{ route('endpoints.command', $device->id) }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
                 @csrf
                 <select name="type" class="inp">

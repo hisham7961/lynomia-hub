@@ -61,4 +61,33 @@ final class Endpoint
 
         return self::LABELS[$os] ?? ($os !== '' ? $os : '—');
     }
+
+    /* ════════════ اتساقُ دورةِ الحياة مع الأصل (التصحيح §3) ════════════ */
+
+    /** حالاتُ الأصلِ **النهائيّة** — تُنهي إدارةَ النقطة (تُعلَّق الجهاز، تُلغى الأوامر) */
+    public const ASSET_TERMINAL_STATUSES = ['مستبعد', 'مباع', 'مُعاد للمورد'];
+
+    /**
+     * **مزامنةُ حالةِ الجهاز مع حالةِ الأصل** (§3) — تُستدعى من `Custody::transition`
+     * (السكّةُ الوحيدة، لا محرّكٌ ثانٍ). حين يبلغ الأصلُ حالةً **نهائيّة** (مستبعد/مباع/
+     * مُعاد) يُعلَّق جهازُه النشطُ (`active→suspended`) بتدقيقٍ: إدارةٌ تنتهي وأهليّةُ
+     * الأوامر تُلغى. الحالاتُ **المفتوحة** (مفقود/تالف) لا تُعلِّق الجهازَ — يبقى نشطاً
+     * كي يُقفَل/يُعزَل عند الحاجة، ويُنبَّه في المركز (يُحسَب من حالة الأصل، لا يُخزَّن).
+     *
+     * **لا حذفَ، ولا إعادةَ كتابةِ أحداثٍ تاريخيّة** — تغييرُ حالةٍ ناعمٌ فقط (§17).
+     */
+    public static function onAssetStatusChanged(\App\Models\Asset $asset): void
+    {
+        if (! hub_has_col('endpoint_devices', 'asset_id')) return;
+
+        $status = \App\Support\Custody::canonicalStatus($asset->status);
+        if ($status === null || ! in_array($status, self::ASSET_TERMINAL_STATUSES, true)) return;
+
+        $device = \App\Models\EndpointDevice::where('asset_id', $asset->id)->where('status', 'active')->first();
+        if ($device === null) return;
+
+        $device->forceFill(['status' => 'suspended'])->saveQuietly();   // ناعمٌ — لا حدثَ يُعاد كتابتُه
+        hub_audit('تعليقُ إدارةِ نقطةٍ طرفية — حالةُ الأصلِ النهائيّة', 'endpoints', $device->id,
+            (string) $device->hostname, ['after' => ['reason' => 'asset_status:' . $status]]);
+    }
 }

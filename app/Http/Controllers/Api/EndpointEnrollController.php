@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Asset;
 use App\Models\EndpointDevice;
 use App\Models\EnrollmentToken;
 use App\Support\Api;
 use App\Support\Es256;
+use App\Support\SecurityRadar;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -35,20 +37,41 @@ class EndpointEnrollController extends Controller
         abort_unless(hub_is_owner() || hub_monitor(), 403, 'سكُّ رموز التسجيل للمالك أو المراقب');
         if ($resp = hub_require_stepup()) return $resp;
 
+        // §2 — الرمزُ يُربَط بأصلٍ مؤهّلٍ مملوكٍ للشركة (لا بشركةٍ مجرّدة). الشركةُ
+        // والحاملُ والمحطّةُ تُشتقّ من الأصل خادميّاً — لا يختارها الجهازُ ولا المُدخِل.
         $d = $r->validate([
-            'companyId' => ['required', 'string', 'exists:companies,id'],
-            'employeeId' => ['nullable', 'string', 'exists:users,id'],
-        ], [], ['companyId' => 'الشركة', 'employeeId' => 'الموظف']);
+            'assetId' => ['required', 'string', 'exists:assets,id'],
+            'employeeId' => ['nullable', 'string'],   // تأكيدٌ اختياريّ — يجب أن يطابق حاملَ الأصل
+            'stationId' => ['nullable', 'string'],     // تأكيدٌ اختياريّ — يجب أن يطابق محطّةَ الأصل
+        ], [], ['assetId' => 'الأصل']);
 
-        // عبرَ شركةٍ: ٤٠٤ لا تسريبَ وجود — معزولُ شركاتٍ لا يسكّ لغير شركاته
+        // عبرَ شركةٍ: ٤٠٤ لا تسريبَ وجود — أصلٌ خارج شركاتِ المُصرَّح له كأنّه غيرُ موجود
+        $asset = Asset::find($d['assetId']);
         $cids = hub_company_ids();
-        abort_if($cids !== null && ! in_array((string) $d['companyId'], $cids, true), 404);
+        abort_if(! $asset || ($cids !== null && ! in_array((string) $asset->company_id, $cids, true)), 404);
 
-        [$token, $plain] = EnrollmentToken::mint((string) $d['companyId'], $d['employeeId'] ?? null, (string) auth()->id());
+        // §2 — أهليّةٌ خادميّةٌ fail-closed: مملوكٌ للشركة، له شركة، حالتُه صالحة
+        if ($reason = $asset->endpointIneligibleReason()) {
+            SecurityRadar::record($r, 'endpoint-enroll-blocked', 'asset ' . $asset->id . ' — ' . $reason);
+            return back()->with('err', 'الأصلُ غيرُ مؤهّلٍ للتسجيل: ' . $reason);
+        }
+        // تأكيدُ الحامل/المحطّة إن مُرِّرا — يمنعان الخطأ ولا يوسّعان شيئاً (§2)
+        if (($e = (string) ($d['employeeId'] ?? '')) !== '' && $e !== (string) $asset->holder_id) {
+            return back()->with('err', 'الموظّفُ المؤكَّد لا يطابق حاملَ الأصل');
+        }
+        if (($s = (string) ($d['stationId'] ?? '')) !== '' && $s !== (string) $asset->station_id) {
+            return back()->with('err', 'المحطّةُ المؤكَّدة لا تطابق محطّةَ الأصل');
+        }
+        // تسجيلٌ مكرَّرٌ نشط: أصلٌ له جهازٌ نشطٌ فعلاً — يُتقاعَد أولاً (دورةُ الاستبدال)
+        if ($asset->activeEndpoint() !== null) {
+            return back()->with('err', 'للأصلِ جهازٌ نشطٌ مسجَّلٌ فعلاً — أبطِله (تقاعُد) قبل تسجيلِ بديل');
+        }
+
+        [$token, $plain] = EnrollmentToken::mint($asset, (string) auth()->id());
 
         // القيدُ بلا النصّ الصريح أبداً — البصمةُ المخزَّنة تكفي للمطابقة لاحقاً
         hub_audit('سكُّ رمزِ تسجيلِ جهازٍ طرفيّ', 'endpoints', $token->id,
-            'ينتهي ' . $token->expires_at->format('Y-m-d H:i'));
+            'أصل ' . ($asset->code ?? $asset->id) . ' — ينتهي ' . $token->expires_at->format('Y-m-d H:i'));
 
         return back()->with('ok', 'سُكَّ رمزُ التسجيل — انسخه الآن: لن يظهر ثانيةً')
             ->with('enroll_token', $plain)
@@ -98,6 +121,17 @@ class EndpointEnrollController extends Controller
             return Api::error(Api::CONFLICT, 409, 'رمزُ التسجيل استُهلك — يُسَكّ رمزٌ جديد لكل جهاز');
         }
 
+        // §2 — الرمزُ يجب أن يحمل أصلاً ما زال مؤهّلاً لحظةَ التسجيل (fail-closed):
+        // رمزٌ قديمٌ بلا أصلٍ (ما قبل التصحيح) أو أصلٌ صار غيرَ مؤهّلٍ (تقاعد/بيع/فقد
+        // بعد السكّ) لا يُنشئ جهازاً. الإسنادُ كلُّه من الأصل — لا من الحمولة.
+        $asset = $token->asset_id ? Asset::find($token->asset_id) : null;
+        if (! $asset || $asset->endpointIneligibleReason() !== null) {
+            return Api::error(Api::VALIDATION_FAILED, 422, 'رمزُ التسجيل غيرُ مربوطٍ بأصلٍ مؤهّل');
+        }
+        if ($asset->activeEndpoint() !== null) {
+            return Api::error(Api::CONFLICT, 409, 'للأصلِ جهازٌ نشطٌ مسجَّلٌ فعلاً — يُتقاعَد قبل تسجيلِ بديل');
+        }
+
         // هويّةٌ مكرَّرة: جهازٌ قائمٌ بالهويّة أو بالمفتاح نفسِه لا يُنشأ ثانيةً
         $fp = Es256::fingerprint((string) $d['public_key']);
         if (EndpointDevice::withTrashed()->where('device_uuid', $d['device_uuid'])->exists()
@@ -117,8 +151,10 @@ class EndpointEnrollController extends Controller
             try {
                 $device = EndpointDevice::create([
                     'device_uuid' => $d['device_uuid'],
-                    'company_id' => $token->company_id,
-                    'employee_id' => $token->employee_id,
+                    'company_id' => $token->company_id,     // خادميٌّ من الأصل عبر الرمز
+                    'asset_id' => $token->asset_id,         // §2 — الأصلُ المؤهّلُ المربوط
+                    'employee_id' => $token->employee_id,   // حاملُ الأصل
+                    'station_id' => $token->station_id,     // محطّةُ الأصل
                     'hostname' => $d['hostname'],
                     'os' => $d['os'],
                     'agent_version' => $d['agent_version'] ?? null,
