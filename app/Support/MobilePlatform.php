@@ -461,6 +461,102 @@ class MobilePlatform
         return MobileOpenApi::capabilities();
     }
 
+    /* ════════════════════════ الأمن والتليمتري (§32–36) ════════════════════════ */
+
+    /** أكوادُ الأحداثِ الأمنيّة — من `SecurityEvents::CODES` (لا تصنيفَ ثانٍ) */
+    private static function securityCategories(): array
+    {
+        return array_keys(\App\Support\SecurityEvents::CODES);
+    }
+
+    /**
+     * **موقفُ أمنِ مصادقةِ الجوال** (§32/§33) — من عقدِ المصادقة الحيّ (`capabilities`)
+     * وبطاقةِ الجاهزية (`scorecard`) معاً؛ لا حقائقَ مُختلَقة ولا تكرار.
+     */
+    public static function securityPosture(): array
+    {
+        $caps = self::capabilities();
+
+        return [
+            'auth' => $caps['auth'] ?? [],
+            'rows' => collect(self::scorecard())->whereIn('key', ['auth', 'mfa', 'stepup', 'permissions'])->values()->all(),
+        ];
+    }
+
+    /**
+     * **تدقيقُ الجوال** (§35) — قيودُ التدقيقِ ذاتُ `source='mobile'` (السكّةُ القائمة،
+     * لا سجلَّ ثانٍ)، مُرشَّحةٌ مُصفَّحةٌ مرتّبةٌ حتميّاً، بأعمدةٍ **آمنة** (لا `before`/`after`
+     * كي لا يبلغ ما زُرع فيهما الشاشة). فئةُ «security» = المجموعةُ الأمنيّةُ كلُّها.
+     */
+    public static function mobileAudit(array $f = [], int $per = 25)
+    {
+        if (! hub_has_col('audits', 'source')) {
+            return new \Illuminate\Pagination\Paginator([], $per);
+        }
+        $q = \App\Models\AuditEntry::query()
+            ->leftJoin('users', 'users.id', '=', 'audits.user_id')
+            ->where('audits.source', 'mobile')
+            ->select('audits.id', 'audits.user_id', 'audits.action', 'audits.module', 'audits.category',
+                'audits.severity', 'audits.outcome', 'audits.ip', 'audits.created_at', 'users.name as user_name');
+
+        $cat = $f['category'] ?? '';
+        if ($cat === 'security') $q->whereIn('audits.category', self::securityCategories());
+        elseif ($cat !== '' && in_array($cat, self::securityCategories(), true)) $q->where('audits.category', $cat);
+        if (in_array($out = $f['outcome'] ?? '', ['success', 'failed', 'denied'], true)) $q->where('audits.outcome', $out);
+
+        return $q->orderByDesc('audits.created_at')->orderByDesc('audits.id')->simplePaginate($per)->withQueryString();
+    }
+
+    /** ملخّصُ تدقيقِ الجوال آخرَ N يوم: مآلٌ + أعلى الفئات + عددُ الأمنيّة (لا أسرار) */
+    public static function mobileAuditStats(int $days = 30): array
+    {
+        if (! hub_has_col('audits', 'source')) {
+            return ['total' => 0, 'outcomes' => [], 'top_categories' => [], 'security' => 0, 'days' => $days];
+        }
+        $since = now()->subDays(max(1, $days));
+        $base = \App\Models\AuditEntry::query()->where('source', 'mobile')->where('created_at', '>=', $since);
+
+        $outcomes = (clone $base)->whereNotNull('outcome')->selectRaw('outcome, COUNT(*) c')
+            ->groupBy('outcome')->orderBy('outcome')->pluck('c', 'outcome')->all();
+        $cats = (clone $base)->whereNotNull('category')->selectRaw('category, COUNT(*) c')
+            ->groupBy('category')->orderByDesc('c')->orderBy('category')->limit(8)->pluck('c', 'category')->all();
+        $security = (clone $base)->whereIn('category', self::securityCategories())->count();
+
+        return ['total' => (clone $base)->count(), 'outcomes' => $outcomes, 'top_categories' => $cats,
+            'security' => $security, 'days' => $days];
+    }
+
+    /**
+     * **تبنّي الإصدارات والمنصّات** (§36) — تليمتري **حقيقيّ** من `mobile_installations`
+     * (توزيعُ الإصدار/المنصّة/النشاطِ الحديث). **صادقٌ فارغٌ قبل الإطلاق** — لا أجهزةَ
+     * ولا تبنٍّ مُختلَق. الترتيبُ حتميّ (عددٌ ثم مفتاح).
+     */
+    public static function adoption(): array
+    {
+        if (! self::tableReady('mobile_installations', 'platform')) {
+            return ['total' => 0, 'platforms' => [], 'versions' => [], 'active_7d' => 0];
+        }
+        $q = MobileInstallation::query();
+        $platforms = (clone $q)->selectRaw('platform, COUNT(*) c')->groupBy('platform')->orderBy('platform')->pluck('c', 'platform')->all();
+        $versions = (clone $q)->whereNotNull('app_version')->where('app_version', '!=', '')
+            ->selectRaw('app_version, COUNT(*) c')->groupBy('app_version')->orderByDesc('c')->orderBy('app_version')->limit(10)->pluck('c', 'app_version')->all();
+
+        return [
+            'total'     => (clone $q)->count(),
+            'platforms' => $platforms,
+            'versions'  => $versions,
+            'active_7d' => (clone $q)->where('last_seen_at', '>=', now()->subDays(7))->count(),
+        ];
+    }
+
+    /** تسميةُ فئةِ الحدثِ الأمنيّ بالعربية (من SecurityEvents — أو الرمزُ خاماً) */
+    public static function categoryLabel(?string $code): string
+    {
+        if ($code === null || $code === '') return '—';
+
+        return \App\Support\SecurityEvents::CODES[$code][0] ?? $code;
+    }
+
     /* ════════════════════════ نظرةٌ عامّة + بطاقة الجاهزية ════════════════════════ */
 
     /**

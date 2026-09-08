@@ -29,6 +29,7 @@ class MobilePlatformController extends Controller
         'push'       => 'الدفع',
         'config'     => 'التطبيق والإطلاق',
         'api'        => 'الـAPI والقدرات',
+        'security'   => 'الأمن والتليمتري',
         'operations' => 'التشغيل والصحّة',
     ];
 
@@ -58,6 +59,7 @@ class MobilePlatformController extends Controller
             'push'       => $this->pushData($r),
             'config'     => $this->configData($r),
             'api'        => $this->apiData($r),
+            'security'   => $this->securityData($r),
             'operations' => ['health' => MobilePlatform::health()],
             default      => ['ov' => MobilePlatform::overview(), 'scorecard' => MobilePlatform::scorecard()],
         };
@@ -156,6 +158,27 @@ class MobilePlatformController extends Controller
             'caps'       => $caps,
             'areaFilter' => array_key_exists($area, $caps['areas'] ?? []) ? $area : '',
             'authFilter' => in_array($auth, ['public', 'mobile.session'], true) ? $auth : '',
+        ];
+    }
+
+    /**
+     * بياناتُ تبويب «الأمن والتليمتري» (§32–36): موقفُ أمنِ المصادقة، تدقيقُ الجوال
+     * (source=mobile) مُرشَّحاً مُصفَّحاً + ملخّصُه، وتبنّي الإصدارات/المنصّات الحقيقيّ.
+     * **قراءةٌ صرفة** — تُعيد استعمالَ سجلِّ التدقيق و`SecurityEvents` (لا مخزنَ ثانٍ، لا سرّ).
+     */
+    private function securityData(Request $r): array
+    {
+        $filters = [
+            'category' => (string) hub_str($r->query('category', '')),
+            'outcome'  => (string) $r->query('outcome', ''),
+        ];
+
+        return [
+            'posture'    => MobilePlatform::securityPosture(),
+            'auditStats' => MobilePlatform::mobileAuditStats(),
+            'filters'    => $filters,
+            'audit'      => MobilePlatform::mobileAudit($filters),
+            'adoption'   => MobilePlatform::adoption(),
         ];
     }
 
