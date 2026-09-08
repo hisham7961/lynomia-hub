@@ -5855,3 +5855,15 @@ if (! function_exists('hub_is_client')) {
         return $user instanceof \App\Models\User && $user->isClientAccount();
     }
 }
+
+if (! function_exists('hub_ia')) {
+    /**
+     * سجلُّ الهندسة المعلوماتية — `config/hub_ia.php` (المصدرُ الواحد لتنظيم
+     * الوجهات في مجالاتٍ وأقسام). يشيرُ لمفاتيح hub.php/hub_top_links/hub_admin_links
+     * ولا يكرّرها. الرؤيةُ والحلُّ عبر خدمةِ `App\Support\InformationArchitecture`.
+     */
+    function hub_ia(): array
+    {
+        return (array) config('hub_ia', []);
+    }
+}
