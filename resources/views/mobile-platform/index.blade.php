@@ -22,6 +22,8 @@
     @include('mobile-platform.tabs.push')
 @elseif ($active === 'config')
     @include('mobile-platform.tabs.config')
+@elseif ($active === 'api')
+    @include('mobile-platform.tabs.api')
 @else
     @include('mobile-platform.tabs.overview', ['ov' => $ov, 'scorecard' => $scorecard])
 @endif

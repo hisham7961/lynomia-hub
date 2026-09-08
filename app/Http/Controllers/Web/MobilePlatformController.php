@@ -28,6 +28,7 @@ class MobilePlatformController extends Controller
         'devices'    => 'المستخدمون والأجهزة',
         'push'       => 'الدفع',
         'config'     => 'التطبيق والإطلاق',
+        'api'        => 'الـAPI والقدرات',
         'operations' => 'التشغيل والصحّة',
     ];
 
@@ -56,6 +57,7 @@ class MobilePlatformController extends Controller
             'devices'    => $this->devicesData($r),
             'push'       => $this->pushData($r),
             'config'     => $this->configData($r),
+            'api'        => $this->apiData($r),
             'operations' => ['health' => MobilePlatform::health()],
             default      => ['ov' => MobilePlatform::overview(), 'scorecard' => MobilePlatform::scorecard()],
         };
@@ -135,6 +137,25 @@ class MobilePlatformController extends Controller
                 ? MobilePlatform::deepLinkResolve($dlModule, $dlId, $dlAction) : null,
             'dlInput'   => ['module' => $dlModule, 'id' => $dlId, 'action' => $dlAction],
             'cvInput'   => ['ios' => $cvIos, 'android' => $cvAnd],
+        ];
+    }
+
+    /**
+     * بياناتُ تبويب «الـAPI والقدرات» (§26–31): معلوماتُ الـAPI + سجلُّ القدرات الحيّ
+     * (مُستكشِفُ المسارات، المصادقة، الأكواد، التزامن، عدمُ التكرار، المزامنة/التغطية،
+     * حالاتُ «غير مُهيّأ»). **قراءةٌ صرفة** من `MobileOpenApi` — لا سجلَّ ثانٍ، لا سرّ.
+     */
+    private function apiData(Request $r): array
+    {
+        $caps = MobilePlatform::capabilities();
+        $area = (string) hub_str($r->query('area', ''));
+        $auth = (string) $r->query('auth', '');
+
+        return [
+            'api'        => MobilePlatform::apiInfo(),
+            'caps'       => $caps,
+            'areaFilter' => array_key_exists($area, $caps['areas'] ?? []) ? $area : '',
+            'authFilter' => in_array($auth, ['public', 'mobile.session'], true) ? $auth : '',
         ];
     }
 
