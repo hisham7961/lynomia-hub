@@ -240,6 +240,22 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     Route::post('tracking/{session}/points', [\App\Http\Controllers\Api\MobileFileController::class, 'trackingPoints'])->name('mobile.tracking.points');
     Route::post('tracking/{session}/end', [\App\Http\Controllers\Api\MobileFileController::class, 'trackingEnd'])->name('mobile.tracking.end');
 
+    /*
+     * ── المزامنة/الصمود (Mobile Readiness · الطور G · §109) ──
+     *
+     * **`GET sync/{module}`** — مزامنةٌ تزايُديّةٌ يقودها تصنيفُ الوحدة
+     * (`hub_sync_class`): CACHEABLE_INCREMENTAL/READ_ONLY تبثّ سجلّاتٍ مُقنَّعةً +
+     * شواهدَ حذفٍ بمؤشّرٍ حتميّ (updated_at,id)؛ والباقي (ONLINE_ONLY/
+     * SENSITIVE_NO_PERSIST/NOT_APPLICABLE) يعيد سياسةً صادقةً بلا سجلّات.
+     *
+     * **ترتيبُ التسجيلِ عقدٌ أمنيّ (Critic F9):** `sync/{module}` (مقطعان، الأوّلُ
+     * حرفيٌّ `sync`) تُسجَّل **قبل** الـcatch-all `GET {module}/{id}` (مقطعان كلاهما
+     * وسيط) — وإلّا حلَّ `GET sync/tickets` إلى `showRecord('sync','tickets')`. نظيرُ
+     * انضباطِ `/api/v1` (الحرفيُّ قبل `{module}`). التنطيقُ/التعارُض/الـIdempotency
+     * (G.2/G.3/G.4) في المحرّكِ المُعادِ استعمالُه لا في مسارٍ ثانٍ.
+     */
+    Route::get('sync/{module}', [\App\Http\Controllers\Api\MobileSyncController::class, 'sync'])->name('mobile.sync');
+
     // D.2/D.3 — إجراءاتُ المورد: لاحقةُ `/actions` **قبل** `{module}/{id}` (المقطعُ
     // الحرفيّ `actions` يميّزها، ومع ذلك تُسجَّل أوّلاً انضباطاً · F9)
     Route::get('{module}/{id}/actions', [\App\Http\Controllers\Api\MobileResourceController::class, 'listActions'])->name('mobile.resource.actions');

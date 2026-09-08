@@ -9292,7 +9292,12 @@ return [
             'feats'         => 'CACHEABLE_INCREMENTAL',
             'designs'       => 'CACHEABLE_INCREMENTAL',
             'tickets'       => 'CACHEABLE_INCREMENTAL',
-            'users'         => 'CACHEABLE_READ_ONLY',
+            // «users» غيرُ قابلٍ للمزامنة صدقاً (Hardener G · Finding#1): عقدُ v1 المجمّد
+            // يرفضه في resolveApi (RESOURCE_NOT_FOUND) لأنّ مُشكّلَ الأعمال لم يُصمَّم
+            // لقناعِ أعمدته الداخليّة (allowed_ips/prefs/totp_secret_cipher). فتصنيفُه
+            // NOT_APPLICABLE كي يتّفقَ المخطّطُ (schema) والمزامنةُ: كلاهما يعلن «غيرُ
+            // قابلٍ للتخبئة» بلا سجلّ — دليلُ المستخدمين يأتي من context/bootstrap (C.1/C.2).
+            'users'         => 'NOT_APPLICABLE',
             'suppliers'     => 'CACHEABLE_INCREMENTAL',
             'purchases'     => 'CACHEABLE_INCREMENTAL',
             'changes'       => 'CACHEABLE_INCREMENTAL',
@@ -9359,6 +9364,15 @@ return [
             'fcm'    => [
                 'project_id' => '',            // setting('mobile.push_fcm_project_id') — حضورٌ لا سرّ
             ],
+        ],
+
+        // ── المزامنةُ التزايُديّة (Mobile Readiness · الطور G · G.1) ──
+        // حجمُ صفحةِ `GET sync/{module}`: الافتراضُ حين لا يطلب العميلُ `?limit=`،
+        // والحدُّ الأقصى الذي لا يتجاوزه مهما طلب (تدفّقٌ عالي الحجم لا يُغرِق الخادمَ
+        // بصفحةٍ ضخمة). التصنيفُ نفسُه في `hub.mobile_sync` (أعلاه) — هذا حجمُ الصفحةِ فقط.
+        'sync' => [
+            'default_limit' => 100,            // صفحةٌ افتراضيّةٌ معقولة
+            'max_limit'     => 500,            // سقفٌ صلبٌ للصفحة الواحدة
         ],
     ],
 ];

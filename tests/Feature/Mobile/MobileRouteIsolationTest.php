@@ -332,4 +332,36 @@ class MobileRouteIsolationTest extends TestCase
             $this->assertContains('mobile.context', $mw, "«{$method} {$uri}» يجب أن تحمل mobile.context (SF-4)");
         }
     }
+
+    /* ══════════════════ الطور G — المزامنة/الصمود (Critic F9) ══════════════════ */
+
+    /**
+     * `GET sync/{module}` (مقطعان، الأوّلُ حرفيٌّ `sync`) يحلّ إلى `MobileSyncController@sync`
+     * — **لا يبتلعه** الـcatch-all `GET {module}/{id}` (مقطعان كلاهما وسيط) المُسجَّلُ
+     * بعده. لو سبَقَ الـcatch-all لحلَّ `GET sync/tickets` إلى `showRecord('sync','tickets')`
+     * فيسقط هذا فوراً بدل أن يمرّ التسريبُ صامتاً (نظيرُ انضباط F9 في الأطوار D/E/F).
+     */
+    public function test_phase_g_sync_route_is_not_swallowed_by_the_module_catch_all(): void
+    {
+        $route = $this->resolveMethod('/api/mobile/v1/sync/tickets', 'GET');
+        $this->assertSame('mobile.sync', $route->getName(),
+            "«GET sync/tickets» حُلّ إلى «{$route->getName()}» لا «mobile.sync» — هل ابتلعه catch-all؟ (F9)");
+        $this->assertSame('App\\Http\\Controllers\\Api\\MobileSyncController@sync', $route->getActionName(),
+            '«GET sync/tickets» يجب أن يحلَّ إلى معالجه الحرفيّ الخاصّ (F9)');
+
+        // برهانٌ صريحٌ: لا يحلّ إلى الـcatch-all `{module}/{id}` (showRecord)
+        $this->assertNotSame('App\\Http\\Controllers\\Api\\MobileResourceController@showRecord',
+            $route->getActionName(), '«GET sync/tickets» ابتلعه {module}/{id} — الحرفيُّ `sync` يجب أن يسبق (F9)');
+    }
+
+    /**
+     * العقدُ الأمنيّ: مسارُ المزامنة خلف `mobile.session` (الهويّة) + `mobile.context`
+     * (التضييق) — فلا مزامنةَ بلا جلسةٍ مُصادَقة، والتضييقُ فعّالٌ فوق `hub_scope`.
+     */
+    public function test_phase_g_sync_route_carries_session_and_context_middleware(): void
+    {
+        $mw = $this->resolveMethod('/api/mobile/v1/sync/tickets', 'GET')->gatherMiddleware();
+        $this->assertContains('mobile.session', $mw, '«GET sync/{module}» يجب أن تكون خلف mobile.session');
+        $this->assertContains('mobile.context', $mw, '«GET sync/{module}» يجب أن تحمل mobile.context (SF-4)');
+    }
 }
