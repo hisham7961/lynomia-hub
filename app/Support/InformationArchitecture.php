@@ -219,6 +219,8 @@ class InformationArchitecture
                     $route = $route ?? $l['route'];
                     $label = $label ?? $l['label'];
                     $dest['args'] = $dest['args'] ?? $l['args'];
+                    // مرادفاتُ `find` القديمةُ (أسماءُ الشاشات الإنجليزية) تبقى تُطابَق (C3)
+                    if (! empty($l['find'])) $dest['find'] = $l['find'];
                     break;
                 }
             }
@@ -666,7 +668,8 @@ class InformationArchitecture
             $hay = mb_strtolower(implode(' ', array_merge(
                 [(string) ($r['label'] ?? '')],
                 (array) ($dest['synonyms'] ?? []),
-                [$dest['module'] ?? '', $dest['center'] ?? '', $dest['admin'] ?? '', $r['route'] ?? '']
+                [$dest['module'] ?? '', $dest['center'] ?? '', $dest['admin'] ?? '', $r['route'] ?? '',
+                    (string) ($r['find'] ?? '')]   // مرادفاتُ find الإداريّةُ القديمة (C3)
             )));
             if (! str_contains($hay, $q)) return;
             $hits[] = [
@@ -682,6 +685,26 @@ class InformationArchitecture
             <=> [$rank[$b['importance']] ?? 9, $b['label'], (string) $b['route']]);
 
         return $hits;
+    }
+
+    /**
+     * كلُّ الوجهاتِ المرئيّةِ محلولةً (الكتالوجُ الكامل) — لتركيزِ البحث بلا كتابة
+     * (يعرض أهمَّ الوجهاتِ فوراً) و«البحثُ يقرأ الكتالوجَ نفسَه». مُنطَّقٌ بالصلاحية،
+     * بلا منظوريّةٍ/إحالةٍ (لا تكرار). كلُّ عنصرٍ {label, route, args}.
+     *
+     * @return array<int,array{label:string,route:?string,args:array}>
+     */
+    public function catalogDestinations($user): array
+    {
+        $out = [];
+        $this->walk(function (array $dest, string $scope, string $container, string $section) use ($user, &$out) {
+            if (isset($dest['perspective']) || isset($dest['primary_at'])) return;
+            if (! $this->destinationVisible($dest, $user)) return;
+            $r = $this->resolveDestination($dest, $user);
+            $out[] = ['label' => $r['label'] ?? '', 'route' => $r['route'] ?? null, 'args' => $r['args'] ?? []];
+        });
+
+        return $out;
     }
 
     /* ══════════════════════ خريطةُ النظام ══════════════════════ */
