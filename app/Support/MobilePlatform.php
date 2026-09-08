@@ -109,6 +109,99 @@ class MobilePlatform
         ];
     }
 
+    /* ════════════════════════ قوائمُ الجلسات والأجهزة (§12–15) ════════════════════════ */
+
+    /** الأعمدةُ الآمنةُ للجلسة — **بلا تجزئةِ رمزٍ قط** (access/refresh/prev_refresh مُستبعَدة) */
+    private const SESSION_COLS = ['id', 'user_id', 'installation_id', 'family_id', 'platform',
+        'app_version', 'last_ip', 'last_used_at', 'access_expires_at', 'refresh_expires_at',
+        'revoked_at', 'revoked_reason', 'created_at'];
+
+    /** جلساتٌ مُرشَّحةٌ مُصفَّحة (paginator) — أعمدةٌ آمنةٌ فقط، مرتّبةٌ حتميّاً */
+    public static function sessions(array $f = [], int $per = 25)
+    {
+        if (! self::tableReady('mobile_sessions', 'family_id')) {
+            return new \Illuminate\Pagination\Paginator([], $per);
+        }
+        $q = MobileSession::query()->select(self::SESSION_COLS)->with('user:id,name,email');
+
+        if (($p = $f['platform'] ?? '') !== '' && in_array($p, ['ios', 'android'], true)) $q->where('platform', $p);
+        if (($s = $f['status'] ?? '') === 'active') $q->whereNull('revoked_at')->where('refresh_expires_at', '>', now());
+        elseif ($s === 'revoked') $q->whereNotNull('revoked_at');
+        self::applyUserFilter($q, $f['q'] ?? '');
+
+        return $q->orderByDesc('last_used_at')->orderByDesc('id')->simplePaginate($per)->withQueryString();
+    }
+
+    /** تنصيباتٌ مُرشَّحةٌ مُصفَّحة (paginator) */
+    public static function installations(array $f = [], int $per = 25)
+    {
+        if (! self::tableReady('mobile_installations', 'platform')) {
+            return new \Illuminate\Pagination\Paginator([], $per);
+        }
+        $q = MobileInstallation::query()->with('user:id,name,email');
+        if (($p = $f['platform'] ?? '') !== '' && in_array($p, ['ios', 'android'], true)) $q->where('platform', $p);
+        self::applyUserFilter($q, $f['q'] ?? '');
+
+        return $q->orderByDesc('last_seen_at')->orderByDesc('id')->simplePaginate($per)->withQueryString();
+    }
+
+    /** ترشيحٌ باسم/بريدِ المستخدم (LIKE مهرَّبٌ في المحرّكين) */
+    protected static function applyUserFilter($q, string $term): void
+    {
+        $term = trim($term);
+        if ($term === '') return;
+        $like = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $term) . '%';
+        $q->whereHas('user', fn ($u) => $u->where(fn ($w) => $w
+            ->whereRaw('name LIKE ? ESCAPE \'!\'', [$like])
+            ->orWhereRaw('email LIKE ? ESCAPE \'!\'', [$like])));
+    }
+
+    /** حالةُ الجلسة الدلاليّة: revoked | active | expired (+ نبرة) */
+    public static function sessionStatus(MobileSession $s): array
+    {
+        if ($s->revoked_at) return ['key' => 'revoked', 'label' => 'مُبطَلة', 'tone' => 'bad'];
+        if ($s->refresh_expires_at && now()->lte($s->refresh_expires_at)) return ['key' => 'active', 'label' => 'نشطة', 'tone' => 'ok'];
+
+        return ['key' => 'expired', 'label' => 'منتهية', 'tone' => 'g'];
+    }
+
+    /** جلسةٌ واحدةٌ بأعمدتها الآمنة (للتفتيش) أو null */
+    public static function session(string $id): ?MobileSession
+    {
+        if (! self::tableReady('mobile_sessions', 'family_id')) return null;
+
+        return MobileSession::query()->select(self::SESSION_COLS)->with('user:id,name,email')->find($id);
+    }
+
+    /**
+     * جهاز 360 (§15): بياناتُ التنصيب + جلساتُه + حالةُ رموز دفعِه + آخرُ تسليماته.
+     * **لا رمزَ دفعٍ ولا تجزئةَ جلسةٍ** — حضورٌ وحالةٌ لا قيمة.
+     */
+    public static function deviceDetail(string $installId): ?array
+    {
+        if (! self::tableReady('mobile_installations', 'platform')) return null;
+        $inst = MobileInstallation::with('user:id,name,email')->find($installId);
+        if (! $inst) return null;
+
+        $sessions = self::tableReady('mobile_sessions', 'family_id')
+            ? MobileSession::query()->select(self::SESSION_COLS)
+                ->where('installation_id', $inst->id)->orderByDesc('last_used_at')->orderByDesc('id')->limit(20)->get()
+            : collect();
+
+        $tokens = self::tableReady('push_tokens', 'token')
+            ? PushToken::where('installation_id', $inst->id)
+                ->orderByDesc('created_at')->orderBy('id')
+                ->get(['id', 'platform', 'provider', 'last_confirmed_at', 'revoked_at'])   // لا عمودَ token
+            : collect();
+
+        $deliveries = self::tableReady('push_deliveries', 'status')
+            ? PushDelivery::where('installation_id', $inst->id)
+                ->orderByDesc('queued_at')->orderByDesc('id')->limit(10)->get()
+            : collect();
+
+        return ['inst' => $inst, 'sessions' => $sessions, 'tokens' => $tokens, 'deliveries' => $deliveries];
+    }
+
     /* ════════════════════════ الإصدارات وبوّابة التحديث ════════════════════════ */
 
     /** إعداداتُ إصدارِ التطبيق + صحّةُ الضبط (min ≤ latest حين يُدعَم semver) */

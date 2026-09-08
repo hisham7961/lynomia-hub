@@ -962,4 +962,6 @@ Route::middleware('auth')->group(function () {
     // الحرسُ في المتحكّم (مالك/رايةُ mobile) — لا middleware مسارٍ (كسائر مراكز الإدارة).
     Route::get('admin/mobile-platform', [\App\Http\Controllers\Web\MobilePlatformController::class, 'index'])
         ->name('mobileplatform.index')->middleware('throttle:60,1');
+    Route::post('admin/mobile-platform/sessions/{id}/revoke', [\App\Http\Controllers\Web\MobilePlatformController::class, 'revokeSession'])
+        ->name('mobileplatform.session.revoke')->middleware('throttle:30,1');
 });

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\MobileSession;
 use App\Support\MobilePlatform;
+use App\Support\MobileSessionService;
 use Illuminate\Http\Request;
 
 /**
@@ -21,6 +23,7 @@ class MobilePlatformController extends Controller
     /** التبويباتُ المُنفَّذة (تنمو مع الأطوار) — key ⇒ label */
     private const TABS = [
         'overview'   => 'نظرة عامّة',
+        'devices'    => 'المستخدمون والأجهزة',
         'operations' => 'التشغيل والصحّة',
     ];
 
@@ -46,10 +49,54 @@ class MobilePlatformController extends Controller
 
         $data = ['tabs' => self::TABS, 'active' => $tab];
         $data += match ($tab) {
+            'devices'    => $this->devicesData($r),
             'operations' => ['health' => MobilePlatform::health()],
             default      => ['ov' => MobilePlatform::overview(), 'scorecard' => MobilePlatform::scorecard()],
         };
 
         return view('mobile-platform.index', $data);
+    }
+
+    /** بياناتُ تبويب الأجهزة: تفصيلُ جهازٍ/جلسةٍ، أو قائمةٌ مُصفَّحةٌ مُرشَّحة */
+    private function devicesData(Request $r): array
+    {
+        if (($iid = (string) $r->query('install', '')) !== '') {
+            return ['view' => 'device', 'device' => MobilePlatform::deviceDetail($iid)];
+        }
+        if (($sid = (string) $r->query('session', '')) !== '') {
+            return ['view' => 'session', 'session' => MobilePlatform::session($sid)];
+        }
+
+        $sub = in_array($v = (string) $r->query('view', 'sessions'), ['sessions', 'installs'], true) ? $v : 'sessions';
+        $filters = [
+            'platform' => (string) $r->query('platform', ''),
+            'status'   => (string) $r->query('status', ''),
+            'q'        => (string) hub_str($r->query('q', '')),
+        ];
+
+        return [
+            'view'     => $sub,
+            'filters'  => $filters,
+            'rows'     => $sub === 'installs' ? MobilePlatform::installations($filters) : MobilePlatform::sessions($filters),
+        ];
+    }
+
+    /**
+     * **إبطالُ جلسةِ جوال** (§13) — عبر السكّة القائمة `MobileSessionService::revokeSession`
+     * (لا حذفَ صفٍّ — يبقى الشاهد)، مع تدقيقٍ. مقصورٌ على المُصرَّح له (مالك/رايةُ mobile).
+     */
+    public function revokeSession(Request $r, string $id)
+    {
+        $this->gate();
+        $s = MobileSession::find($id);
+        abort_unless($s, 404);
+
+        if (! $s->revoked_at) {
+            MobileSessionService::revokeSession($s, 'إبطالٌ إداريٌّ من مركز منصّة الجوال');
+            hub_audit('إبطالُ جلسةِ جوال', null, null, $s->user?->name,
+                ['after' => ['mobile_session' => $s->id]]);
+        }
+
+        return back()->with('ok', '🔌 أُبطِلت الجلسة — يخرج جهازُها عند أول طلب');
     }
 }

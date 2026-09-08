@@ -16,6 +16,8 @@
 
 @if ($active === 'operations')
     @include('mobile-platform.tabs.operations', ['health' => $health])
+@elseif ($active === 'devices')
+    @include('mobile-platform.tabs.devices')
 @else
     @include('mobile-platform.tabs.overview', ['ov' => $ov, 'scorecard' => $scorecard])
 @endif
