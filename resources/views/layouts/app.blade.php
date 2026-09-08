@@ -204,7 +204,7 @@
                 </div>
             </div>
         @endif
-        <div class="content" id="content" tabindex="-1">@yield('content')</div>
+        <div class="content" id="content" tabindex="-1">@include('partials.breadcrumbs')@yield('content')</div>
     </main>
 </div>
 <div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-label="نافذة حوارية">
