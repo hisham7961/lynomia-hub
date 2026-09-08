@@ -162,6 +162,45 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     Route::put('prefs', [\App\Http\Controllers\Api\MobileWorkController::class, 'prefsUpdate'])->name('mobile.prefs.update');
     Route::post('prefs/pin', [\App\Http\Controllers\Api\MobileWorkController::class, 'pin'])->name('mobile.prefs.pin');
 
+    /*
+     * ── الاتصال (Mobile Readiness · الطور E · §109) ──
+     *
+     * **ترتيبُ التسجيلِ عقدٌ أمنيّ (Critic F9):** كلُّ حرفيّاتِ الطور E
+     * (إشعارات/تعليقات/DM/دفع) تُسجَّل **قبل** الـcatch-all `{module}` أدناه — وإلّا
+     * ابتلعها (`GET notifications` ⇒ `apiIndex('notifications')`, و`GET
+     * notifications/unread-count` ⇒ `{module}/{id}`, و`POST push/register` ⇒
+     * `{module}/{id}`, …). الهيكلُ يملؤه بناةُ E.1–E.5؛ الأساسُ المشترك
+     * (`NotificationLink`/`CommentService`/`DmService`/`PushService`) جاهزٌ في هذه الدفعة.
+     */
+
+    // E.1/E.2 — الإشعارات (هويّةٌ خاصّةٌ فقط) + وجهةُ الرابطِ العميق
+    Route::get('notifications', [\App\Http\Controllers\Api\MobileCommController::class, 'notifications'])->name('mobile.notifications.index');
+    Route::get('notifications/unread-count', [\App\Http\Controllers\Api\MobileCommController::class, 'unreadCount'])->name('mobile.notifications.unread');
+    Route::post('notifications/read-all', [\App\Http\Controllers\Api\MobileCommController::class, 'markAllRead'])->name('mobile.notifications.read_all');
+    Route::get('notifications/{id}/target', [\App\Http\Controllers\Api\MobileCommController::class, 'notificationTarget'])->name('mobile.notifications.target');
+    Route::post('notifications/{id}/read', [\App\Http\Controllers\Api\MobileCommController::class, 'markRead'])->name('mobile.notifications.read');
+
+    // E.3 — التعليقات (reuse CommentService::guardTarget — نقطةُ التخويلِ الوحيدة · F2)
+    Route::get('comments', [\App\Http\Controllers\Api\MobileCommController::class, 'comments'])->name('mobile.comments.index');
+    Route::post('comments', [\App\Http\Controllers\Api\MobileCommController::class, 'postComment'])->name('mobile.comments.store');
+
+    // E.4 — DM (خصوصيّةُ الطرفَين · F8: `{user}` = الطرفُ الآخر، المفتاحُ من auth لا العميل)
+    Route::get('dm/threads', [\App\Http\Controllers\Api\MobileCommController::class, 'dmThreads'])->name('mobile.dm.threads');
+    Route::get('dm/threads/{user}/messages', [\App\Http\Controllers\Api\MobileCommController::class, 'dmMessages'])->name('mobile.dm.messages');
+    Route::post('dm/threads/{user}/send', [\App\Http\Controllers\Api\MobileCommController::class, 'dmSend'])->name('mobile.dm.send');
+    Route::post('dm/threads/{user}/read', [\App\Http\Controllers\Api\MobileCommController::class, 'dmMarkRead'])->name('mobile.dm.read');
+
+    // E.5 — تسجيلُ الدفع (dedupe عابرُ المستخدمين · F7)
+    Route::post('push/register', [\App\Http\Controllers\Api\MobilePushController::class, 'register'])->name('mobile.push.register');
+    Route::post('push/unregister', [\App\Http\Controllers\Api\MobilePushController::class, 'unregister'])->name('mobile.push.unregister');
+
+    // E.7 — إدارةُ الدفع (للمالكِ وحدَه · صادقةٌ بلا سرّ): حالةٌ + اختبارٌ آمنٌ يقول
+    // NOT_CONFIGURED حين لا اعتمادات. حرفيّةٌ ثلاثيّةُ المقطع (`push/admin/*`) — لا
+    // يبتلعها `{module}/{id}` (مقطعان) ولا `{module}/{id}/actions` (المقطعُ الثالثُ
+    // حرفيٌّ `actions`)؛ ومع ذلك تُسجَّل قبل الـcatch-all انضباطاً (F9).
+    Route::get('push/admin/status', [\App\Http\Controllers\Api\MobilePushController::class, 'adminStatus'])->name('mobile.push.admin.status');
+    Route::post('push/admin/test', [\App\Http\Controllers\Api\MobilePushController::class, 'adminTest'])->name('mobile.push.admin.test');
+
     // D.2/D.3 — إجراءاتُ المورد: لاحقةُ `/actions` **قبل** `{module}/{id}` (المقطعُ
     // الحرفيّ `actions` يميّزها، ومع ذلك تُسجَّل أوّلاً انضباطاً · F9)
     Route::get('{module}/{id}/actions', [\App\Http\Controllers\Api\MobileResourceController::class, 'listActions'])->name('mobile.resource.actions');

@@ -180,4 +180,70 @@ class MobileRouteIsolationTest extends TestCase
         $this->assertSame($catchAll, $this->resolve('/api/mobile/v1/some_unknown_module')->getActionName(),
             'المقطعُ المفردُ المجهولُ يجب أن يحلَّ إلى CRUD `{module}`');
     }
+
+    /* ══════════════════ الطور E — الاتصال (Critic F9) ══════════════════ */
+
+    /**
+     * كلُّ مسارٍ حرفيٍّ في الطور E (إشعارات/تعليقات/DM/دفع) يحلّ إلى معالجه الخاصّ —
+     * **لا يبتلعه** الـcatch-all `{module}` المُسجَّلُ بعده. لو سبَقَ الـcatch-all
+     * لحلَّ `GET notifications` إلى `apiIndex('notifications')` و`GET
+     * notifications/unread-count` إلى `{module}/{id}` و`POST push/register` إلى
+     * `{module}/{id}` — فيسقط هذا فوراً بدل أن يمرّ التسريبُ صامتاً.
+     */
+    public function test_phase_e_literal_routes_are_not_swallowed_by_the_module_catch_all(): void
+    {
+        $C = 'App\\Http\\Controllers\\Api\\MobileCommController@';
+        $P = 'App\\Http\\Controllers\\Api\\MobilePushController@';
+
+        $expected = [
+            // [uri, method] => [name, action]
+            ['/api/mobile/v1/notifications',              'GET',  'mobile.notifications.index',    $C . 'notifications'],
+            ['/api/mobile/v1/notifications/unread-count', 'GET',  'mobile.notifications.unread',    $C . 'unreadCount'],
+            ['/api/mobile/v1/notifications/read-all',     'POST', 'mobile.notifications.read_all',  $C . 'markAllRead'],
+            ['/api/mobile/v1/notifications/n-1/target',   'GET',  'mobile.notifications.target',    $C . 'notificationTarget'],
+            ['/api/mobile/v1/notifications/n-1/read',     'POST', 'mobile.notifications.read',      $C . 'markRead'],
+            ['/api/mobile/v1/comments',                   'GET',  'mobile.comments.index',          $C . 'comments'],
+            ['/api/mobile/v1/comments',                   'POST', 'mobile.comments.store',          $C . 'postComment'],
+            ['/api/mobile/v1/dm/threads',                 'GET',  'mobile.dm.threads',              $C . 'dmThreads'],
+            ['/api/mobile/v1/dm/threads/u-7/messages',    'GET',  'mobile.dm.messages',             $C . 'dmMessages'],
+            ['/api/mobile/v1/dm/threads/u-7/send',        'POST', 'mobile.dm.send',                 $C . 'dmSend'],
+            ['/api/mobile/v1/dm/threads/u-7/read',        'POST', 'mobile.dm.read',                 $C . 'dmMarkRead'],
+            ['/api/mobile/v1/push/register',              'POST', 'mobile.push.register',           $P . 'register'],
+            ['/api/mobile/v1/push/unregister',            'POST', 'mobile.push.unregister',         $P . 'unregister'],
+        ];
+
+        foreach ($expected as [$uri, $method, $name, $action]) {
+            $route = $this->resolveMethod($uri, $method);
+            $this->assertSame($name, $route->getName(),
+                "«{$method} {$uri}» حُلّ إلى «{$route->getName()}» لا «{$name}» — هل ابتلعه catch-all؟ (F9)");
+            $this->assertSame($action, $route->getActionName(),
+                "«{$method} {$uri}» يجب أن يحلَّ إلى معالجه الحرفيّ الخاصّ (F9)");
+        }
+    }
+
+    /**
+     * حرّاسٌ أخصّ لعقد E: أحاديّاتُ المقطع (`notifications`/`comments`) لا يبتلعها
+     * `GET {module}`، وثنائيّاتُ المقطع (`dm/threads`, `push/register`) لا يبتلعها
+     * `{module}/{id}` — برهانٌ صريحٌ على أنّ الحرفيَّ يسبق العامّ (F9).
+     */
+    public function test_phase_e_literals_never_shadowed_by_generic_crud(): void
+    {
+        $crudIndex = 'App\\Http\\Controllers\\Api\\MobileResourceController@listRecords';
+        $crudShow  = 'App\\Http\\Controllers\\Api\\MobileResourceController@showRecord';
+        $crudStore = 'App\\Http\\Controllers\\Api\\MobileResourceController@createRecord';
+
+        // أحاديّةُ المقطع لا تحلّ إلى `{module}` CRUD
+        $this->assertNotSame($crudIndex, $this->resolve('/api/mobile/v1/notifications')->getActionName(),
+            '«GET notifications» ابتلعه {module} (F9)');
+        $this->assertNotSame($crudIndex, $this->resolve('/api/mobile/v1/comments')->getActionName(),
+            '«GET comments» ابتلعه {module} (F9)');
+
+        // ثنائيّةُ المقطع لا تحلّ إلى `{module}/{id}` CRUD
+        $this->assertNotSame($crudShow, $this->resolve('/api/mobile/v1/dm/threads')->getActionName(),
+            '«GET dm/threads» ابتلعه {module}/{id} (F9)');
+        $this->assertNotSame($crudShow, $this->resolve('/api/mobile/v1/notifications/unread-count')->getActionName(),
+            '«GET notifications/unread-count» ابتلعه {module}/{id} (F9)');
+        $this->assertNotSame($crudStore, $this->resolveMethod('/api/mobile/v1/push/register', 'POST')->getActionName(),
+            '«POST push/register» ابتلعه {module}/{id} (F9)');
+    }
 }

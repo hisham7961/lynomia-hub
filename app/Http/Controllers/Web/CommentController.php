@@ -9,6 +9,7 @@ use App\Models\HubNotification;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\ChatCommands;
+use App\Support\CommentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -121,49 +122,20 @@ class CommentController extends Controller
             return back()->with('ok', $res['message'])->withFragment('c-' . $res['backlink']->id);
         }
 
-        // **الردُّ يلتصق بخيطه** (v2.322): `exists:comments,id` تُثبت وجودَ الأب
-        // لا انتماءَه — فردٌّ يُدسّ في خيطِ سجلٍ لا يملك المستخدم رؤيته، ويظهر
-        // لقرّاء ذلك السجل تحت تعليقٍ لم يُكتب له.
-        if (! empty($data['parent_id'])) {
-            $p = \App\Models\Comment::find($data['parent_id']);
-            abort_if(! $p || (string) $p->module !== (string) $module
-                || (string) $p->record_id !== (string) $recordId, 422,
-                'الردُّ يكون داخل خيط السجل نفسه');
-        }
+        // **الردُّ يلتصق بخيطه** — قبل رفعِ أيّ مرفقٍ (نظيرُ الترتيب الأصليّ: لا يُخزَّن
+        // مرفقٌ لطلبٍ سيُرفَض)، عبر الحارسِ المشترك (Critic F2).
+        CommentService::assertReplyIntegrity($data['parent_id'] ?? null, $module, $recordId);
 
-        $mentions = $this->extractMentions($data['body'], (array) $r->input('mention', []));
-
-        $attrs = [
-            'module'     => $module,
-            'record_id'  => $recordId,
-            'parent_id'  => $data['parent_id'] ?? null,
-            'user_id'    => auth()->id(),
-            'body'       => $data['body'],
-            'att'        => $r->hasFile('att') ? $r->file('att')->store('hub', 'local') : null,
-            // ملاحظة داخلية: لا تُحتسب رداً على العميل في مؤشرات SLA
-            'internal'   => $module === 'tickets' && $r->boolean('internal'),
-            'mentions'   => $mentions ?: null,
-            'read_by'    => [auth()->id()],
-            'created_at' => now(),
-        ];
-
-        // (WP-C.1) نسبةُ رسالةِ القناةِ إلى حاويتها المطبَّعة — عمودٌ حديثٌ يُكتَب فقط
-        // حين وُجد (نشرٌ سبق هجرتَه لا يُطفئ الكتابة، نظيرُ hub_has_col في كل مكان).
-        if ($conversationId !== null && hub_has_col('comments', 'conversation_id')) {
-            $attrs['conversation_id'] = $conversationId;
-        }
-
-        // (WP-A.5) منشورُ القناةِ يُوسَم بشركة ناشره المقيَّد فينعزل عنها القارئُ
-        // من شركةٍ أخرى؛ ناشرٌ غيرُ مقيَّد (المالك) يترك العمودَ فارغاً = إعلانٌ عامّ.
-        // خيوطُ السجلات لا تُوسَم هنا: نطاقُها من سجلِها الأمّ عبر `guardTarget`.
-        if ($module === 'feed' && hub_has_col('comments', 'company_id')
-            && ($cids = hub_company_ids()) !== null) {
-            $attrs['company_id'] = $cids[0];
-        }
-
-        $c = Comment::create($attrs);
-
-        $this->notifyAround($c);
+        // **الفرعُ العاديُّ** يُنشأ عبر `CommentService::create` (سكّةٌ تعيد الموديل ·
+        // Critic F2) — نفسُ المنشن وبناءِ الصفِّ و`notifyAround` حرفاً بحرف، يشترك فيها
+        // الويبُ والجوال. الويبُ يترجم النتيجةَ إعادةَ توجيه.
+        $c = CommentService::create(auth()->user(), $module, $recordId, $data['body'], [
+            'parent_id'       => $data['parent_id'] ?? null,
+            'att'             => $r->hasFile('att') ? $r->file('att')->store('hub', 'local') : null,
+            'internal'        => $r->boolean('internal'),
+            'mention'         => (array) $r->input('mention', []),
+            'conversation_id' => $conversationId,
+        ]);
 
         return back()->with('ok', 'نُشر التعليق')->withFragment('c-' . $c->id);
     }
@@ -346,69 +318,19 @@ class CommentController extends Controller
 
     /* ────────── داخلي ────────── */
 
-    /** التحقق من هدف التعليق وصلاحية رؤيته */
+    /**
+     * التحقق من هدف التعليق وصلاحية رؤيته — يفوّض إلى `CommentService::guardTarget`
+     * (نقطةُ التخويلِ الوحيدة، مشتركةٌ مع الجوال · Critic F2). السلوكُ غيرُ متغيّر.
+     */
     protected function guardTarget(string $module, ?string $recordId): array
     {
-        if ($module === 'feed') return ['feed', null];
-
-        // (WP-C.1) رسالةُ قناةٍ: الهدفُ حاويةٌ لا سجلُّ وحدة — الحرسُ بالعضويّة عبر
-        // `guardConversation` (نظيرُ هذا الحارس تماماً: يرى = يتفاعل). فتُعاد
-        // كلُّ أفعالِ التعليق (تفاعل/تثبيت/حل/تحويل) على رسائل القناة بالسكّة نفسها.
-        if ($module === 'channel') {
-            [$conv] = ConversationController::guardConversation((string) $recordId, 'v');
-
-            return ['channel', (string) $conv->id];
-        }
-
-        $def = hub_mod($module);
-        abort_unless($def && $recordId, 404);
-        abort_unless(hub_can(auth()->user(), $module, 'v'), 403);
-        // ضمن نطاق المستخدم — الوصول لسجل خارج نطاقه = 404
-        $class = '\\App\\Models\\' . $def['model'];
-        hub_scope($class::query(), $module)->findOrFail($recordId);
-
-        return [$module, $recordId];
+        return CommentService::guardTarget(auth()->user(), $module, $recordId);
     }
 
-    /** المنشن: من القائمة الصريحة + @اسم في النص (تطابق بادئة الاسم) */
-    protected function extractMentions(string $body, array $explicit): array
-    {
-        $users = self::userNames();
-        $ids = array_values(array_intersect(array_keys($users), array_filter($explicit)));
-
-        preg_match_all('/@([\p{Arabic}\w]+)/u', $body, $m);
-        foreach ($m[1] ?? [] as $token) {
-            foreach ($users as $uid => $name) {
-                if (mb_stripos($name, $token) === 0) { $ids[] = $uid; break; }
-            }
-        }
-
-        return array_values(array_unique(array_diff($ids, [auth()->id()])));
-    }
-
-    /** إشعارات التعليق: للمذكورين، ولصاحب التعليق الأصلي عند الرد */
-    protected function notifyAround(Comment $c): void
-    {
-        $label = $c->module === 'feed' ? 'قناة الفريق' : (hub_mod($c->module)['label'] ?? $c->module);
-        $excerpt = Str::limit(trim($c->body), 60);
-
-        foreach ((array) $c->mentions as $uid) {
-            $this->notify($uid, 'mention', 'ذكرك ' . auth()->user()->name . " في {$label}: {$excerpt}", $c->module, $c->record_id);
-        }
-
-        if ($c->parent_id) {
-            $parent = Comment::find($c->parent_id);
-            if ($parent && $parent->user_id !== auth()->id() && ! in_array($parent->user_id, (array) $c->mentions, true)) {
-                $this->notify($parent->user_id, 'reply', 'ردّ ' . auth()->user()->name . " على تعليقك في {$label}: {$excerpt}", $c->module, $c->record_id);
-            }
-        }
-    }
-
+    /** إشعارٌ حول التعليق — يفوّض إلى الخدمة (يشترك فيه toTask/react والويب/الجوال) */
     protected function notify(string $uid, string $kind, string $text, ?string $module, ?string $recordId): void
     {
-        hub_notify($uid, $kind, $text,
-            $module === 'feed' ? null : $module,
-            $module === 'feed' ? null : $recordId);
+        CommentService::notify($uid, $kind, $text, $module, $recordId);
     }
 
     /** غلافٌ عامٌّ لسجل القراءة — تستدعيه شاشةُ القناة (نفسُ سكّة read_by) */

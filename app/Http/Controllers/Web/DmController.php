@@ -8,6 +8,7 @@ use App\Models\ConversationMember;
 use App\Models\DmMessage;
 use App\Models\HubNotification;
 use App\Models\User;
+use App\Support\DmService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -52,7 +53,7 @@ class DmController extends Controller
      *   • زميلٌ غيرُ مقيَّدٍ (org-wide) يُبلَغ من أيّ مقيَّد.
      *   • وإلّا: تقاطعُ شركةٍ واحدةٍ يكفي.
      */
-    protected static function dmReachable(User $other, ?User $me = null): bool
+    public static function dmReachable(User $other, ?User $me = null): bool
     {
         $me = $me ?? auth()->user();
         $mine = hub_company_ids($me);
@@ -69,7 +70,7 @@ class DmController extends Controller
      *   • أحدُهما مقيَّدٌ والآخرُ عابر → نطاقُ المقيَّد (فتراها شركتُه).
      *   • كلاهما عابر (الإدارة) → فارغةٌ = رسالةٌ عامّةٌ غيرُ موسومة.
      */
-    protected static function deriveDmCompany(User $from, User $to): ?string
+    public static function deriveDmCompany(User $from, User $to): ?string
     {
         $a = hub_company_ids($from);
         $b = hub_company_ids($to);
@@ -97,7 +98,7 @@ class DmController extends Controller
      * idempotent: تُنشئ الحاويةَ والعضويّتَين مرةً، ثم تعيد استعمالَهما — نظيرُ
      * هجرةِ التعبئةِ حرفاً بحرف كي لا تنشأ هويّتان لخيطٍ واحد.
      */
-    protected static function ensureDmConversation(User $from, User $to, ?string $company): string
+    public static function ensureDmConversation(User $from, User $to, ?string $company): string
     {
         $key = DmMessage::threadKey($from->id, $to->id);
         $cid = DmMessage::conversationIdForThread($key);
@@ -158,27 +159,9 @@ class DmController extends Controller
     {
         // نطاقُ الشركة على مستوى الرسالة (WP-A.5) دفاعاً في العمق فوق حارسِ الفتح/الإرسال:
         // المقيَّدُ لا تظهر له إلا محادثاتُ شركاته وغيرُ الموسومة (لا تسرّبَ صفٍّ قديم).
-        $unreadByThread = DmMessage::alive()->inCompanyScope()->where('to_id', $me)->whereNull('read_at')
-            ->select('thread_key', \Illuminate\Support\Facades\DB::raw('COUNT(*) c'))
-            ->groupBy('thread_key')->pluck('c', 'thread_key');
-
-        $recentKeys = DmMessage::alive()->inCompanyScope()
-            ->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
-            ->select('thread_key', \Illuminate\Support\Facades\DB::raw('MAX(created_at) last_at'))
-            ->groupBy('thread_key')->orderByDesc('last_at')->limit(60)->pluck('thread_key');
-        $keys = $recentKeys->merge($unreadByThread->keys())->unique()->values();
-
-        return $keys->map(function ($key) use ($me, $unreadByThread) {
-            $last = DmMessage::alive()->inCompanyScope()->where('thread_key', $key)
-                ->orderByDesc('created_at')->orderByDesc('id')->first();
-            if (! $last) return null;
-
-            return [
-                'other'  => $last->from_id === $me ? $last->to_id : $last->from_id,
-                'last'   => $last,
-                'unread' => (int) ($unreadByThread[$key] ?? 0),
-            ];
-        })->filter()->sortByDesc(fn ($t) => (string) $t['last']->created_at)->values();
+        // **الجوهرُ مُستخرَجٌ إلى `DmService::threadRows`** (Critic F2 · سكّةٌ واحدةٌ يشترك
+        // فيها الويبُ والجوال · E.4) — المخرجُ **غيرُ متغيّر** حرفاً بحرف.
+        return DmService::threadRows($me);
     }
 
     public function inbox(Request $r)
@@ -242,18 +225,12 @@ class DmController extends Controller
         // (WP-A.5) لا يُفتح خيطٌ لزميلٍ خارج نطاق الشركات — ٤٠٤ لا كشفَ وجودٍ فوق العزل
         abort_unless(self::dmReachable($other), 404);
 
-        $key = DmMessage::threadKey(auth()->id(), $other->id);
-        DmMessage::where('thread_key', $key)->where('to_id', auth()->id())
-            ->whereNull('read_at')->update(['read_at' => now()]);
-
-        // المحذوفةُ تبقى في الخيط أثراً يقول «حُذفت رسالة» — المحادثةُ المبتورةُ
-        // بلا تفسيرٍ تجعل الطرفَ الآخر يظنّ أنه أخطأ القراءة.
-        // **أحدثُ ٣٠٠ لا أقدمُها**: الترتيب التصاعدي مع limit كان يُرجع أول ٣٠٠
-        // رسالة في عمر الخيط — فمتى تجاوزها لا يظهر أي جديدٍ أبداً: المرسل لا يرى
-        // رسالته بعد الإرسال، والمستلم لا يرى الوارد وقد خُتم مقروءاً أعلاه.
-        $msgs = DmMessage::where('thread_key', $key)
-            ->orderByDesc('created_at')->orderByDesc('id')->limit(300)->get()
-            ->reverse()->values();
+        // ختمُ القراءةِ وجلبُ الرسائل عبر السكّةِ المشتركة (`DmService` · Critic F2 ·
+        // E.4) — المفتاحُ من `auth()->id()`+الطرفِ الآخر خادميّاً (F8). سلوكٌ **غيرُ
+        // متغيّر**: يختم الواردَ غيرَ المقروء، ويجلب أحدثَ ٣٠٠ تصاعديّاً (المحذوفةُ
+        // تبقى أثراً يقول «حُذفت رسالة»).
+        DmService::markThreadRead((string) auth()->id(), (string) $other->id);
+        $msgs = DmService::thread((string) auth()->id(), (string) $other->id);
 
         // نفس الشاشة: قائمةُ المحادثات إلى جانب الخيط المفتوح — لا صفحتان منفصلتان.
         // القائمةُ المشتركة تضمّ غيرَ المقروء دائماً، فلا تختفي محادثةٌ قديمةٌ فيها
@@ -314,35 +291,11 @@ class DmController extends Controller
             'att'  => ['nullable', 'file', 'max:' . hub_upload_cap()['kb']],
         ], [], ['body' => 'نص الرسالة', 'att' => 'المرفق']);
 
-        // (WP-A.5) شركةُ الرسالةِ إن اشتُقّت — تدخل نطاقَ طرفِها المقيَّد؛
-        // (WP-C.4) والحاويةُ تُوسَم بالشركةِ نفسِها فتتّسق الرقابةُ والبحثُ معها.
-        $company = self::deriveDmCompany(auth()->user(), $other);
-
-        $attrs = [
-            'thread_key' => DmMessage::threadKey(auth()->id(), $other->id),
-            'from_id'    => auth()->id(),
-            'to_id'      => $other->id,
-            'body'       => $data['body'],
-            'att'        => $r->hasFile('att') ? $r->file('att')->store('hub', 'local') : null,
-            'created_at' => now(),
-        ];
-        if (hub_has_col('dm_messages', 'company_id')) {
-            $attrs['company_id'] = $company;
-        }
-        // (WP-C.4 · §6/§7) طيُّ الخيطِ في حاويةِ المحادثةِ الواحدة قبل الكتابة:
-        // نضمن صفَّ conversation(kind='dm') وعضويّتَي الطرفين ونسِمُ الرسالةَ
-        // بهويّتها — فتُصبح الرقابةُ (§6) والبحثُ نظاماً واحداً على DM والقنوات.
-        // محروسٌ بالعمود: قبل هجرتِه لا شيءَ يُكتَب (توافقٌ رجعيّ مع ما قبل الترحيل).
-        if (hub_has_col('dm_messages', 'conversation_id')) {
-            $attrs['conversation_id'] = self::ensureDmConversation(auth()->user(), $other, $company);
-        }
-
-        $msg = DmMessage::create($attrs);
-
-        // record_id بلا module: لا رابطَ يُبنى منه (الوجهة حوار لا سجل وحدة) —
-        // لكنه يُمكّن سحبَ الرسالة من سحب إشعارها معها
-        hub_notify($other->id, 'dm',
-            '💬 رسالة من ' . auth()->user()->name . ': ' . trim($data['body']), null, $msg->id);
+        // **جوهرُ الإرسال عبر `DmService::send`** (سكّةٌ تعيد الرسالة · Critic F2/F8):
+        // نفسُ الاشتقاقِ والوسمِ وطيِّ الحاوية والإشعار حرفاً بحرف — يشترك فيه الويبُ
+        // والجوال. رفعُ المرفقِ في طبقة الطلب هنا، والوجهةُ (redirect) للويب وحدَه.
+        $attPath = $r->hasFile('att') ? $r->file('att')->store('hub', 'local') : null;
+        DmService::send(auth()->user(), $other, $data['body'], $attPath);
 
         return redirect()->route('dm.thread', $other->id)->withFragment('bottom');
     }

@@ -9348,5 +9348,17 @@ return [
         // **فارغٌ افتراضاً = لا تصعيد لإجراءٍ عامّ** (نظيرُ الويب الذي لا يُصعّد إجراءَ الحالة) —
         // فلا يُفرَض تأكيدُ هويّةٍ حيث لا يفرضه الويبُ (لا سطحَ جوالٍ أشدَّ ولا أضعف بلا سبب).
         'stepup_actions' => [],
+
+        // ── دفعُ الجوال (Mobile Readiness · الطور E · spec §Push) ──
+        // السائقُ فارغٌ افتراضاً ⇒ `NullPushProvider` ⇒ **NOT_CONFIGURED صدقاً** (لا
+        // نجاحٌ مُزيَّف). الاعتماداتُ الحقيقيّة (`project_id`/رمزُ الوصول) **إعدادٌ خارجيٌّ**
+        // يُقرأ الحيُّ من `setting('mobile.push_driver'|'mobile.push_fcm_project_id'|
+        // 'mobile.push_fcm_access_token')` — يُوثَّق ولا يُختلَق، ولا مفتاحَ خاصٌّ هنا.
+        'push' => [
+            'driver' => '',                    // '' | 'fcm' — setting('mobile.push_driver')
+            'fcm'    => [
+                'project_id' => '',            // setting('mobile.push_fcm_project_id') — حضورٌ لا سرّ
+            ],
+        ],
     ],
 ];

@@ -58,5 +58,24 @@ class HubNotification extends Model
 
             if (in_array($kind, $muted[$n->user_id], true)) return false;   // كتم — لا يُنشأ
         });
+
+        /*
+         * ── تفريعُ الدفع (Mobile Readiness · الطور E · E.6 · Critic F6) ──
+         *
+         * كلُّ إشعارٍ **مُنشأٍ فعلاً** يُفرَّع إلى دفعِ الجوال عبر `PushService`. هنا
+         * على حدث **created** لا `hub_notify`: فيغطّي كلَّ مواضع الإنشاء الستّةِ
+         * المباشرة (AlertEngine/FlowRunner/LoginSentry/Esign/HubDigest/HubAutomation)
+         * التي تتجاوز `hub_notify` — بلا لمسِ أيٍّ منها.
+         *
+         * **مؤجَّلٌ لا سطريّ:** `scheduleFanout` يجدوله عبر `DB::afterCommit`، فاستثناءُ
+         * مزوّدٍ لا يقع **داخلَ** المعاملة المحيطة (اعتمادٌ/استيعابُ مقاييس/مسار) فيُرجِعَ
+         * الإشعارَ الملتزَم (spec §Push: «failed push must not lose internal notification»).
+         *
+         * والأنواعُ المكتومة لا تبلغ هنا أصلاً: hook الكتمِ أعلاه يُلغي «creating»
+         * بـ`return false`، فلا يقع «created» لها — فلا تُدفَع (Critic F6، بلا حارسٍ زائد).
+         */
+        static::created(function (self $n) {
+            \App\Support\PushService::scheduleFanout($n);
+        });
     }
 }

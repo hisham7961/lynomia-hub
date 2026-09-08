@@ -1239,6 +1239,16 @@ return [
         'mobile.force_update' => 'حين يكون ١: التحديثُ إلزاميٌّ لا اختياريٌّ حين يكون إصدارُ العميل دون الحدِّ الأدنى (force_update في app-config) — يوجّه التطبيقُ لبوّابة التحديث الحاجزة. صفرٌ (الافتراض) = تلميحٌ لا حجب. يقرؤه MobileAuthController.',
         'mobile.store_url_ios' => 'رابطُ App Store لتطبيق iOS (يُعرض في app-config لتوجيه التحديث). فارغٌ افتراضاً ⇒ null صادقة (NOT_CONFIGURED، لا يُختلَق). يقرؤه MobileAuthController.',
         'mobile.store_url_android' => 'رابطُ Google Play لتطبيق Android. فارغٌ افتراضاً ⇒ null صادقة (NOT_CONFIGURED). يقرؤه MobileAuthController.',
+        // ── Mobile Readiness · الطور E (E.6/E.7 · spec §Push) — سائقُ دفعِ الجوال
+        // واعتماداتُه: **إعدادٌ خارجيٌّ يُقرأ الحيُّ لا يُختلَق**. فارغٌ افتراضاً ⇒
+        // `NullPushProvider` ⇒ NOT_CONFIGURED صدقاً (لا نجاحٌ مُزيَّف). تقرؤها
+        // `PushService`، وحالتُها الصادقةُ (بلا سرّ) تُعرَض عبر `push/admin/status`. ──
+        'mobile.push_driver' => 'سائقُ دفعِ الجوال: فارغٌ (الافتراض) ⇒ NullPushProvider ⇒ NOT_CONFIGURED صدقاً (لا نجاحٌ مُزيَّف)، أو «fcm» لتفعيل Firebase Cloud Messaging (يحتاج project_id + رمز الوصول). يقرؤه PushService.',
+        'mobile.push_fcm_project_id' => 'معرّفُ مشروع Firebase لدفع FCM — إعدادٌ خارجيٌّ (لا سرّ، يُعرَض حضورُه لا قيمتُه). فارغٌ افتراضاً ⇒ الدفعُ غيرُ مهيّأ (NOT_CONFIGURED). يقرؤه PushService.',
+        'mobile.push_fcm_access_token' => [
+            'why'       => 'رمزُ وصولِ حساب خدمة Firebase لإرسال FCM — **سرٌّ**: يُخزَّن مشفَّراً ولا يُعرَض قط (يُعرَض حضورُه فقط في push/admin/status). فارغٌ افتراضاً ⇒ NOT_CONFIGURED (لا يُختلَق نجاحٌ). يقرؤه PushService.',
+            'sensitive' => true,
+        ],
         'heartbeat.backup' => 'نبضةٌ يكتبها كل أمرٍ مجدول عند نجاحه (نسخة احتياطية · صادر · ملخّص · مراقبة · أتمتة) لتقول متى عمل آخر مرة. تُقرأ في لوحة التشغيل وملخّص الصباح — كتابتها يدوياً تكذب على المراقبة.',
         // ── v2.399: مفاتيحُ تشغيلٍ داخلية (تُضبط من القاعدة عند الحاجة، ولها افتراضيّاتٌ آمنة) ──
         'api.usage_keep_days' => 'كم يوماً تُحفظ عدّاداتُ استخدام API اليومية (لكل مفتاح: طلبات/أخطاء/زمن) قبل أن يقصّها hub:automation. افتراضياً ٩٠. تُقرأ في مركز التكامل.',
