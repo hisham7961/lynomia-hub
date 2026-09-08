@@ -50,6 +50,8 @@
                 <kbd class="kbdhint" aria-hidden="true">Ctrl K</kbd>
                 <div id="gsr" class="gsr" role="listbox" aria-label="نتائج البحث والأوامر"></div>
             </div>
+            {{-- خريطةُ النظام (IA · الطور 6): مدخلٌ ظاهرٌ بجانب البحث — أداةُ اكتشافٍ لكلِّ مستخدم --}}
+            <a class="btn ghost sm" href="{{ route('system-map') }}" title="خريطة النظام" aria-label="خريطة النظام" style="flex-shrink:0">🗺️</a>
             <div class="spacer"></div>
             @if (hub_can(auth()->user(), 'companies', 'v'))
                 @php
