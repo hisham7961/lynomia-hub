@@ -69,14 +69,18 @@ class EndpointEnrollController extends Controller
                 'المفتاحُ الخاصّ لا يُرسَل إلى الخادم أبداً — أرسل المفتاحَ العامَّ وحدَه');
         }
 
+        // النظامُ المدعومُ رسميّاً من المصدرِ الواحد (§1): Windows/macOS فقط —
+        // Linux (أو أيُّ نظامٍ آخر) يُرَدّ ٤٢٢ صراحةً، لا يُعامَل مدعوماً صامتاً.
         $d = $r->validate([
             'token' => ['required', 'string', 'max:120'],
             'device_uuid' => ['required', 'string', 'max:64', 'regex:/^[A-Za-z0-9._:-]{8,64}$/'],
             'hostname' => ['required', 'string', 'max:120'],
-            'os' => ['required', 'string', 'in:' . implode(',', EndpointDevice::OSES)],
+            'os' => ['required', 'string', 'in:' . implode(',', \App\Support\Endpoint::SUPPORTED)],
             'agent_version' => ['nullable', 'string', 'max:30'],
             'hw' => ['nullable', 'array'],
             'public_key' => ['required', 'string', 'max:4000'],
+        ], [
+            'os.in' => 'نظامُ التشغيل غيرُ مدعوم — النقاطُ الطرفيّة تدعم Windows وmacOS فقط',
         ]);
 
         // مفتاحُ العقد حصراً: PEM عامّ على P-256 — RSA/P-384/نصٌّ مهمل = 422

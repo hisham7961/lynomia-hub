@@ -5063,9 +5063,9 @@ return [
                     'col' => 'os',
                     'label' => 'نظام التشغيل',
                     'type' => 'sel',
-                    // allowlist مصدرُها الواحد النموذج (نمطُ assets/Custody::STATUSES)
-                    // — `sel` محكومٌ بخياراته فعرضُ العمود (٢٠) يسع أطولَها.
-                    'options' => \App\Models\EndpointDevice::OSES,
+                    // المدعومُ رسميّاً من المصدرِ الواحد (§1): Windows/macOS — لا يُنشأ
+                    // سجلٌّ جديدٌ بنظامٍ غيرِ مدعوم؛ والصفوفُ القديمة (linux) تبقى تُعرَض.
+                    'options' => \App\Support\Endpoint::SUPPORTED,
                     'locked' => true,
                 ],
                 // (لا حقلَ `agentVersion` في السجل عمداً: قيمةٌ آليّةٌ يبلّغها

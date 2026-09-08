@@ -3,7 +3,7 @@
     "_note": "بيانٌ آليّ — لا يُحرَّر يدويّاً؛ يُعاد توليدُه من المسارات فلا يصف قدرةً غيرَ مبنيّة",
     "namespace": "/api/mobile/v1",
     "mobile_api_version": "1",
-    "schema_version": "4a9f8b3a502e",
+    "schema_version": "186a94e15f6d",
     "openapi": {
         "live": "/api/mobile/v1/openapi.json",
         "generator": "App\\Support\\MobileOpenApi::spec()"
