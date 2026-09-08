@@ -35,6 +35,12 @@ class MobilePlatformController extends Controller
         'docs'       => 'الوثائق',
     ];
 
+    /** مفاتيحُ التبويبات المُنفَّذة — لاختبارِ مصفوفةِ التغطية (§86) */
+    public static function tabKeys(): array
+    {
+        return array_keys(self::TABS);
+    }
+
     /** هل يرى المستخدمُ المركز؟ (مالكٌ أو رايةُ mobile) — المصدرُ الوحيد للحرس */
     public static function canView($user = null): bool
     {

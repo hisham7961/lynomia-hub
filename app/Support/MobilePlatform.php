@@ -807,6 +807,44 @@ class MobilePlatform
         return $raw === false ? null : mb_substr($raw, 0, 100000);
     }
 
+    /* ════════════════════════ مصفوفةُ التغطية (§86/§87) ════════════════════════ */
+
+    /**
+     * **خريطةُ مجالِ القدرة ⇐ تبويبِ المركز** (§86) — أين يفهم المسؤولُ كلَّ مجالِ
+     * قدرةٍ ويشخّصه. الغايةُ **صفرُ قدرةٍ غيرِ مُغطّاة**: أيُّ مجالٍ جديدٍ في الـAPI
+     * الجوال بلا مدخلٍ هنا يُسقِط اختبارَ التغطية — فلا تتباعد المنصّةُ عن مركزها.
+     */
+    private const AREA_TAB = [
+        'auth' => 'security', 'meta' => 'docs', 'health' => 'operations',
+        'context' => 'api', 'schema' => 'api', 'crud' => 'api', 'actions' => 'api',
+        'approvals' => 'api', 'home' => 'api', 'search' => 'api', 'prefs' => 'api',
+        'notifications' => 'push', 'comments' => 'api', 'dm' => 'api', 'push' => 'push',
+        'files' => 'field', 'scanner' => 'field', 'tracking' => 'field', 'sync' => 'api',
+    ];
+
+    /**
+     * **مصفوفةُ التغطية** (§86/§87) — لكلِّ مجالِ قدرةٍ حيٍّ (من `capabilities`) تبويبُ
+     * المركزِ الذي يُغطّيه، أو `null` (غيرُ مُغطّى). صفٌّ لكلِّ مجال، مرتّبٌ حتميّاً.
+     *
+     * @return array<int,array{area:string,tab:?string,mapped:bool}>
+     */
+    public static function coverageMatrix(): array
+    {
+        $rows = [];
+        foreach (array_keys(self::capabilities()['areas'] ?? []) as $area) {
+            $rows[] = ['area' => $area, 'tab' => self::AREA_TAB[$area] ?? null, 'mapped' => array_key_exists($area, self::AREA_TAB)];
+        }
+        usort($rows, fn ($a, $b) => $a['area'] <=> $b['area']);
+
+        return $rows;
+    }
+
+    /** المجالاتُ غيرُ المُغطّاة (§87 · الغاية: صفر) */
+    public static function unmappedAreas(): array
+    {
+        return array_values(array_map(fn ($r) => $r['area'], array_filter(self::coverageMatrix(), fn ($r) => ! $r['mapped'])));
+    }
+
     /* ════════════════════════ داخليّ ════════════════════════ */
 
     /** مكوّنُ صحّةٍ بنمطِ Health::c */
