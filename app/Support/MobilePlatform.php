@@ -272,6 +272,116 @@ class MobilePlatform
         return version_compare($min, $latest, '>');
     }
 
+    /**
+     * **معاينةُ app-config** (§21/§23) — تستدعي نقطةَ `MobileAuthController@appConfig`
+     * **الحيّةَ نفسَها** بترويسات المنصّة/الإصدار، فتُظهر **ما يتلقّاه العميلُ فعلاً**
+     * (بوّابةُ الإصدارِ وفعّاليّتها `update_required` لإصدارٍ مُفترَض، روابطُ المتجر،
+     * الصيانة). لا إعادةَ بناءِ منطقٍ (تكرارُ الخلفيّة = 0) ولا سرّ (النقطةُ عامّةٌ
+     * مُنقّاةٌ سلفاً). فشلٌ ⇒ مصفوفةٌ فارغةٌ صادقةٌ لا اختلاق.
+     */
+    public static function appConfigPreview(string $platform = '', string $appVersion = ''): array
+    {
+        $req = \Illuminate\Http\Request::create('/' . MobileOpenApi::PREFIX . '/app-config', 'GET');
+        $platform = strtolower(trim($platform));
+        if (in_array($platform, ['ios', 'android'], true)) $req->headers->set('X-Lynomia-App-Platform', $platform);
+        if (($v = trim($appVersion)) !== '') $req->headers->set('X-Lynomia-App-Version', $v);
+
+        try {
+            $resp = app(\App\Http\Controllers\Api\MobileAuthController::class)->appConfig($req);
+            $data = json_decode($resp->getContent(), true);
+
+            return is_array($data) && isset($data['data']) && is_array($data['data']) ? $data['data'] : [];
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
+        }
+    }
+
+    /**
+     * **مُختبِرُ الرابطِ العميقِ الدلاليّ** (§24) — يتحقّق من الوجهةِ القانونيّة
+     * `{module,id,action}` على **سجلِّ الوحدات الحقيقيّ** (`hub_mod`) ويُظهر الرابطَ
+     * العالميَّ المُقابِل (`route('m.show')` — نفسُ ما يُنتجه `NotificationLink::webUrl`،
+     * لا خريطةَ ثانية). **قراءةٌ صرفة:** لا يجلب السجلَّ ولا يكشف بياناته (لا IDOR)،
+     * و`linkable` يقول صدقاً هل ثمّة رابطٌ عالميٌّ فعّالٌ يفتح التطبيق (روابطُ مضبوطة).
+     */
+    public static function deepLinkResolve(string $module, string $id, string $action = 'show'): array
+    {
+        $module = trim($module);
+        $id = trim($id);
+        $action = trim($action) !== '' ? trim($action) : 'show';
+        $registered = $module !== '' && hub_mod($module) !== null;
+        $valid = $registered && $id !== '';
+        $dl = self::deepLinks();
+        $url = null;
+        if ($valid) {
+            try { $url = route('m.show', [$module, $id]); } catch (\Throwable $e) { $url = null; }
+        }
+
+        return [
+            'module'     => $module, 'id' => $id, 'action' => $action,
+            'registered' => $registered, 'valid' => $valid,
+            'canonical'  => $valid ? ['module' => $module, 'id' => $id, 'action' => $action] : null,
+            'path'       => $valid ? '/m/' . rawurlencode($module) . '/' . rawurlencode($id) : null,
+            'url'        => $url,
+            'linkable'   => $dl['apple']['configured'] || $dl['android']['configured'],
+        ];
+    }
+
+    /**
+     * **حالةُ وثيقتَي الربطِ العالميّة** (§25/§39) — تستدعي `MobileWellKnownController`
+     * الحيَّ نفسَه فتقرأ ترويسةَ `X-Deep-Links-Status` (CONFIGURED/NOT_CONFIGURED) —
+     * لا إعادةَ بناء. `serve=false` ⇒ الوثيقتان معطّلتان (تُخدَمان 404 عمداً).
+     */
+    public static function wellKnown(): array
+    {
+        $serve = (bool) data_get((array) config('hub.mobile.deep_links', []), 'serve', true);
+        $out = [
+            'serve'          => $serve,
+            'aasa_url'       => url('/.well-known/apple-app-site-association'),
+            'assetlinks_url' => url('/.well-known/assetlinks.json'),
+            'aasa'           => ['status' => 'DISABLED', 'configured' => false],
+            'assetlinks'     => ['status' => 'DISABLED', 'configured' => false],
+        ];
+        if (! $serve) return $out;
+
+        $c = app(\App\Http\Controllers\Web\MobileWellKnownController::class);
+        $read = fn ($resp) => [
+            'status'     => (string) $resp->headers->get('X-Deep-Links-Status', 'NOT_CONFIGURED'),
+            'configured' => $resp->headers->get('X-Deep-Links-Status') === 'CONFIGURED',
+        ];
+        try { $out['aasa'] = $read($c->appleAppSiteAssociation()); } catch (\Throwable $e) { report($e); }
+        try { $out['assetlinks'] = $read($c->assetLinks()); } catch (\Throwable $e) { report($e); }
+
+        return $out;
+    }
+
+    /**
+     * **قائمةُ فحصِ الإطلاق** (§38/§39) — ما يحتاجه فريقُ التطبيق قبل النشر، بحالاتٍ
+     * حقيقيّة (READY/NOT_CONFIGURED) من الإعدادات القائمة. لكلِّ بندٍ مِرساةُ ضبطٍ في
+     * صفحةِ الإعدادات (لا نظامَ إعداداتٍ ثانٍ). صدقٌ: `NOT_CONFIGURED` شرطُ إطلاقٍ لا عُطل.
+     *
+     * @return array<int,array{label:string,state:string,hint:string,anchor:string}>
+     */
+    public static function launchChecklist(): array
+    {
+        $ver = self::versions();
+        $dl = self::deepLinks();
+        $push = self::push();
+        $row = fn (string $label, bool $ok, string $hint, string $anchor) => [
+            'label' => $label, 'state' => $ok ? self::READY : self::NOT_CONFIGURED, 'hint' => $hint, 'anchor' => $anchor];
+
+        return [
+            $row('روابطُ iOS العميقة (Team ID + Bundle ID)', $dl['apple']['configured'], 'Universal Links', 'mobile.dl_apple_team_id'),
+            $row('روابطُ Android العميقة (Package + بصمات SHA-256)', $dl['android']['configured'], 'App Links', 'mobile.dl_android_fingerprints'),
+            $row('رابطُ متجرِ iOS', $ver['ios']['store'] !== '', 'App Store', 'mobile.store_url_ios'),
+            $row('رابطُ متجرِ Android', $ver['android']['store'] !== '', 'Google Play', 'mobile.store_url_android'),
+            $row('إصدارُ iOS (الأحدث + الأدنى)', $ver['ios']['latest'] !== '' && $ver['ios']['min'] !== '', 'بوّابةُ التحديث', 'mobile.min_version_ios'),
+            $row('إصدارُ Android (الأحدث + الأدنى)', $ver['android']['latest'] !== '' && $ver['android']['min'] !== '', 'بوّابةُ التحديث', 'mobile.min_version_android'),
+            $row('مزوّدُ الدفع (FCM)', $push['configured'], 'الإشعارات', 'mobile.push_driver'),
+        ];
+    }
+
     /* ════════════════════════ الروابط العميقة ════════════════════════ */
 
     /**

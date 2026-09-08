@@ -27,6 +27,7 @@ class MobilePlatformController extends Controller
         'overview'   => 'نظرة عامّة',
         'devices'    => 'المستخدمون والأجهزة',
         'push'       => 'الدفع',
+        'config'     => 'التطبيق والإطلاق',
         'operations' => 'التشغيل والصحّة',
     ];
 
@@ -54,6 +55,7 @@ class MobilePlatformController extends Controller
         $data += match ($tab) {
             'devices'    => $this->devicesData($r),
             'push'       => $this->pushData($r),
+            'config'     => $this->configData($r),
             'operations' => ['health' => MobilePlatform::health()],
             default      => ['ov' => MobilePlatform::overview(), 'scorecard' => MobilePlatform::scorecard()],
         };
@@ -103,6 +105,36 @@ class MobilePlatformController extends Controller
             'filters'   => $filters,
             'log'       => MobilePlatform::deliveries($filters),
             'myTokens'  => self::myActiveTokens()->count(),
+        ];
+    }
+
+    /**
+     * بياناتُ تبويب «التطبيق والإطلاق» (§20–25، §38–39): إعداداتُ الإصدار (تُدار في
+     * الإعدادات)، معاينةُ app-config الحيّة لكلتا المنصّتين + فعّاليّةُ بوّابةِ التحديث،
+     * حالةُ الروابطِ العميقة ووثائقِها العالميّة، مُختبِرٌ دلاليّ، وقائمةُ فحصِ الإطلاق.
+     * كلُّه **قراءةٌ صرفة** (لا كتابة، لا سرّ) عبر معاملات الاستعلام.
+     */
+    private function configData(Request $r): array
+    {
+        $dlModule = (string) hub_str($r->query('dl_module', ''));
+        $dlId     = (string) hub_str($r->query('dl_id', ''));
+        $dlAction = (string) hub_str($r->query('dl_action', 'show'));
+        $cvIos    = (string) $r->query('cv_ios', '');
+        $cvAnd    = (string) $r->query('cv_android', '');
+
+        return [
+            'versions'  => MobilePlatform::versions(),
+            'preview'   => [
+                'ios'     => MobilePlatform::appConfigPreview('ios', $cvIos),
+                'android' => MobilePlatform::appConfigPreview('android', $cvAnd),
+            ],
+            'dl'        => MobilePlatform::deepLinks(),
+            'wellknown' => MobilePlatform::wellKnown(),
+            'checklist' => MobilePlatform::launchChecklist(),
+            'dlTest'    => ($dlModule !== '' || $dlId !== '')
+                ? MobilePlatform::deepLinkResolve($dlModule, $dlId, $dlAction) : null,
+            'dlInput'   => ['module' => $dlModule, 'id' => $dlId, 'action' => $dlAction],
+            'cvInput'   => ['ios' => $cvIos, 'android' => $cvAnd],
         ];
     }
 
