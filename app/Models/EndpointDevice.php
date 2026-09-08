@@ -47,8 +47,12 @@ class EndpointDevice extends Model
     /** حالاتُ الجهاز — allowlist مفروضٌ في `saving` (لا DB enum · C10) */
     public const STATUSES = ['active', 'suspended', 'locked', 'retired'];
 
-    /** أنظمةُ التشغيل المقبولة عند التسجيل — allowlist في التطبيق (C10) */
-    public const OSES = ['windows', 'macos', 'linux'];
+    /**
+     * **قائمةُ تخزينِ عمود `os`** — تشمل المدعومَ + القديمَ (linux) كي تبقى صفوفُ
+     * التسجيلِ التاريخيّة مقروءةً غيرَ محذوفة (§17). **المدعومُ رسميّاً للتسجيل**
+     * `App\Support\Endpoint::SUPPORTED` (Windows/macOS) — لا يُسجَّل جديدٌ بغيره.
+     */
+    public const OSES = \App\Support\Endpoint::STORED;
 
     protected static function booted(): void
     {

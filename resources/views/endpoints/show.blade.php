@@ -26,9 +26,10 @@
 @endphp
 <div class="hero">
     <div>
-        <h2>💻 {{ $device->hostname }} <span class="bdg {{ $stTone }}">{{ $stLabel }}</span></h2>
+        <h2>💻 {{ $device->hostname }} <span class="bdg {{ $stTone }}">{{ $stLabel }}</span>
+            @unless (\App\Support\Endpoint::isSupported($device->os))<span class="bdg wn">نظامٌ قديمٌ — غيرُ مدعوم</span>@endunless</h2>
         <div class="sub">
-            {{ $device->os }}{{ $device->agent_version ? ' · وكيل ' . $device->agent_version : '' }}
+            {{ \App\Support\Endpoint::label($device->os) }}{{ $device->agent_version ? ' · وكيل ' . $device->agent_version : '' }}
             · آخر نبضة: {{ $device->last_heartbeat_at?->format('Y-m-d H:i') ?? 'لم ينبض بعد' }}
         </div>
     </div>
