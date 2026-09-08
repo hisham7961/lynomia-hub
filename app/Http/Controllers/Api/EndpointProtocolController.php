@@ -336,11 +336,17 @@ class EndpointProtocolController extends Controller
         $arch = in_array($hwArch, EndpointRelease::ARCHES, true) ? $hwArch
             : (in_array($qArch, EndpointRelease::ARCHES, true) ? $qArch : 'amd64');
 
-        // «الأحدثُ لمنصّتي» بترتيبٍ حتميّ (created_at ثم id كاسرُ تعادل — لا قرعة)
+        // «الأحدثُ **المنشورُ المستهدِفُ لجهازي**» — بترتيبٍ حتميّ (created_at ثم id
+        // كاسرُ تعادل، لا قرعة)، وبين المرشّحين يُنتقى أوّلُ من تستهدفه رقعةُ طرحه:
+        // فـcanary أحدثُ (10%) يُقدَّم لعُشرِ الأسطول بينما يبقى الباقي على المستقرّ
+        // السابق (الأقدمُ 100%). المسوَّدةُ (draft) لا تُقدَّم أبداً (§6)، والمحذوفُ
+        // ناعماً «withdrawn» يُستبعَد تلقائياً (SoftDeletes) — لا بيانَ لمسحوب.
         $rel = EndpointRelease::where('os', (string) $device->os)->where('arch', $arch)
-            ->orderByDesc('created_at')->orderByDesc('id')->first();
+            ->where('state', 'published')
+            ->orderByDesc('created_at')->orderByDesc('id')->limit(50)->get()
+            ->first(fn (EndpointRelease $r) => $r->targetsDevice($device));
         if (! $rel) {
-            return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'لا إصدارَ منشوراً لهذه المنصّة بعد');
+            return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'لا إصدارَ منشوراً مستهدِفاً لهذه المنصّة بعد');
         }
 
         return response()->json([
@@ -348,6 +354,11 @@ class EndpointProtocolController extends Controller
             'url' => route('endpoint.agent.download', $rel->id),   // مسارُ التنزيل الموقَّع نفسُه
             'sha256' => $rel->sha256,
             'signing_status' => $rel->signing_status,              // الصدقُ يسافر مع البيان (C15)
+            'notarization_status' => $rel->notarization_status,    // محورُ التوثيق المنفصل (C15)
+            'build_number' => $rel->build_number,                  // وسمُ بناءِ CI (اختياريّ)
+            // جسرُ الترقية الآمن (§7): وكيلٌ أقدمُ من الأدنى لا يقفز مباشرةً — يفرضه Precheck
+            'min_agent_version' => $rel->min_agent_version,
+            'min_server_version' => $rel->min_server_version,
         ]);
     }
 
@@ -362,7 +373,10 @@ class EndpointProtocolController extends Controller
     {
         $device = $this->device($r);
 
-        $rel = EndpointRelease::whereKey($id)->where('os', (string) $device->os)->first();
+        // المسوَّدةُ لا تُقدَّم للأجهزة (البيانُ لا يشير إليها أصلاً — دفاعُ عمقٍ لو
+        // خمّن جهازٌ معرّفَها)، والمحذوفُ ناعماً «withdrawn» يُستبعَد تلقائياً.
+        $rel = EndpointRelease::whereKey($id)->where('os', (string) $device->os)
+            ->where('state', 'published')->first();
         if (! $rel) {
             return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'إصدارٌ غيرُ معروفٍ لمنصّة هذا الجهاز');
         }

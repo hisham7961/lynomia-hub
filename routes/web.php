@@ -344,6 +344,7 @@ Route::middleware('auth')->group(function () {
     Route::get('endpoints/releases/{id}/download', [\App\Http\Controllers\Web\EndpointReleaseController::class, 'download'])->name('endpoints.releases.download');
     Route::middleware('throttle:30,1')->group(function () {
         Route::post('endpoints/releases', [\App\Http\Controllers\Web\EndpointReleaseController::class, 'store'])->name('endpoints.releases.store');
+        Route::post('endpoints/releases/{id}/publish', [\App\Http\Controllers\Web\EndpointReleaseController::class, 'publish'])->name('endpoints.releases.publish');
         Route::post('endpoints/releases/{id}/delete', [\App\Http\Controllers\Web\EndpointReleaseController::class, 'destroy'])->name('endpoints.releases.delete');
     });
 

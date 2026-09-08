@@ -54,9 +54,13 @@ class EndpointReleaseController extends Controller
             ->groupBy('attachment_id')->selectRaw('attachment_id, count(*) as n')
             ->pluck('n', 'attachment_id');
 
+        // شركاتُ نطاقِ الطرح 'company' — المالكُ يرى كلَّها (guardOwner فوقُ يحصر الجمهور)
+        $companies = \App\Models\Company::orderBy('name_ar')->limit(500)->get(['id', 'name_ar']);
+
         return view('endpoints.releases', [
             'releases' => $releases,
             'downloads' => $downloads,
+            'companies' => $companies,
         ]);
     }
 
@@ -69,14 +73,30 @@ class EndpointReleaseController extends Controller
         $this->guardOwner();
         if ($resp = hub_require_stepup()) return $resp;
 
+        $semver = '/^\d{1,4}\.\d{1,5}\.\d{1,6}([.-][A-Za-z0-9.]{1,8})?$/';
         $d = $r->validate([
             // semver صريح (لاحقةٌ قصيرة اختيارية: 1.2.3-rc.1) — عرضُ العمود ٢٠
-            'version' => ['required', 'string', 'max:20', 'regex:/^\d{1,4}\.\d{1,5}\.\d{1,6}([.-][A-Za-z0-9.]{1,8})?$/'],
+            'version' => ['required', 'string', 'max:20', 'regex:' . $semver],
             'os' => ['required', 'string', Rule::in(EndpointRelease::OSES)],       // allowlist لا نصٌّ حر (C10)
             'arch' => ['required', 'string', Rule::in(EndpointRelease::ARCHES)],
             'file' => ['required', 'file', 'max:' . hub_upload_cap()['kb']],
             'notes' => ['nullable', 'string', 'max:400'],
-        ], [], ['version' => 'النسخة', 'os' => 'النظام', 'arch' => 'المعماريّة', 'file' => 'الأرتيفاكت', 'notes' => 'الملاحظات']);
+            // سلسلةُ الثقة (§5): وسمُ بناءٍ وأدنى نسخٍ متوافقةٍ للترقية الآمنة —
+            // التوثيقُ (notarization) **لا يُقرأ من النموذج أبداً** (كالتوقيع: صادقٌ بالبناء C15)
+            'build_number' => ['nullable', 'string', 'max:40'],
+            'min_agent_version' => ['nullable', 'string', 'max:20', 'regex:' . $semver],
+            'min_server_version' => ['nullable', 'string', 'max:20', 'regex:' . $semver],
+            // دورةُ الحياة (§6): الافتراضُ 'published' (توافقُ السلوك القائم) أو مسوَّدةٌ لا يقدّمها البيان
+            'state' => ['nullable', 'string', Rule::in(EndpointRelease::STATES)],
+            // رقعةُ الطرح (§7): 'all' افتراضاً (غيرُ مُلزَمٍ) — أو شركةٌ أو نسبةُ canary
+            'rollout_scope' => ['nullable', 'string', Rule::in(EndpointRelease::ROLLOUT_SCOPES)],
+            'rollout_percentage' => ['nullable', 'integer', 'between:0,100'],
+            'rollout_company_id' => ['nullable', 'string', 'exists:companies,id',
+                Rule::requiredIf(fn () => $r->input('rollout_scope') === 'company')],
+        ], [], ['version' => 'النسخة', 'os' => 'النظام', 'arch' => 'المعماريّة', 'file' => 'الأرتيفاكت',
+            'notes' => 'الملاحظات', 'build_number' => 'رقم البناء', 'min_agent_version' => 'أدنى نسخةِ وكيل',
+            'min_server_version' => 'أدنى نسخةِ خادم', 'state' => 'الحالة', 'rollout_scope' => 'نطاق الطرح',
+            'rollout_percentage' => 'نسبة الطرح', 'rollout_company_id' => 'شركةُ الطرح']);
 
         $f = $r->file('file');
         $ext = mb_strtolower((string) $f->getClientOriginalExtension());
@@ -103,9 +123,18 @@ class EndpointReleaseController extends Controller
                 // **خادمياً من الملف المخزَّن نفسِه** — أيُّ sha256/size في النموذج لا يُقرأ
                 'sha256' => (string) hash_file('sha256', $abs),
                 'size' => (int) filesize($abs),
-                // **الصدقُ مُصمَتٌ بالبناء (C15)**: لا يُقرأ من النموذج أبداً — وحاجزُ
-                // النموذج الأخير يرمي أيَّ 'signed' بلا إقرارِ توقيعٍ متحقَّق
+                // **الصدقُ مُصمَتٌ بالبناء (C15)**: التوقيعُ والتوثيقُ لا يُقرآن من النموذج
+                // أبداً — وحاجزُ النموذج الأخير يرمي أيَّ 'signed'/'notarized' بلا إقرارِ تحقّق
                 'signing_status' => 'unsigned-dev',
+                'notarization_status' => 'not-configured',
+                'build_number' => ($d['build_number'] ?? null) ?: null,
+                'min_agent_version' => ($d['min_agent_version'] ?? null) ?: null,
+                'min_server_version' => ($d['min_server_version'] ?? null) ?: null,
+                // دورةُ الحياة ورقعةُ الطرح — النموذجُ يفوّض والنموذجُ (Model) يفرض القائمةَ والحدّ
+                'state' => ($d['state'] ?? null) ?: 'published',
+                'rollout_scope' => ($d['rollout_scope'] ?? null) ?: 'all',
+                'rollout_percentage' => $d['rollout_percentage'] ?? 100,
+                'rollout_company_id' => ($d['rollout_scope'] ?? 'all') === 'company' ? ($d['rollout_company_id'] ?? null) : null,
                 'notes' => ($d['notes'] ?? null) ?: null,
                 'published_by' => auth()->id(),
             ]);
@@ -116,12 +145,35 @@ class EndpointReleaseController extends Controller
             return back()->withErrors(['version' => 'هذه النسخةُ لهذه المنصّة منشورةٌ سلفاً'])->withInput();
         }
 
-        // الأثرُ الإلزاميّ: من نشر أيَّ نسخةٍ لأيّ منصّةٍ وبأيّ تجزئة
+        // الأثرُ الإلزاميّ: من نشر أيَّ نسخةٍ لأيّ منصّةٍ وبأيّ تجزئةٍ وأيّ حالةٍ ونطاقِ طرح
         hub_audit('نشرُ إصدارِ وكيل', 'endpoints', $rel->id,
-            $rel->version . ' · ' . $rel->os . '/' . $rel->arch . ' · sha256:' . mb_substr($rel->sha256, 0, 16) . '…');
+            $rel->version . ' · ' . $rel->os . '/' . $rel->arch . ' · ' . $rel->lifecycleState()
+                . '/' . $rel->rollout_scope . ' · sha256:' . mb_substr($rel->sha256, 0, 16) . '…');
 
-        return back()->with('ok', '⬆️ نُشر الإصدار ' . $rel->version . ' (' . $rel->os . '/' . $rel->arch . ') — '
-            . EndpointRelease::UNSIGNED_LABEL);
+        return back()->with('ok', ($rel->state === 'draft' ? '📝 حُفظ مسوَّدةً: ' : '⬆️ نُشر الإصدار ')
+            . $rel->version . ' (' . $rel->os . '/' . $rel->arch . ') — ' . EndpointRelease::UNSIGNED_LABEL);
+    }
+
+    /**
+     * **ترقيةُ مسوَّدةٍ إلى منشور** (§6) — مالكٌ + تصعيدٌ. المسوَّدةُ لا يقدّمها بيانُ
+     * التحديث؛ نشرُها يجعل الأسطولَ (ضمن رقعة طرحها) يبتلعها — قرارُ سلسلةِ توريدٍ
+     * كالرفع، فخلف تصعيدِ الهوية وبأثرٍ صريح.
+     */
+    public function publish(string $id)
+    {
+        $this->guardOwner();
+        if ($resp = hub_require_stepup()) return $resp;
+
+        $rel = EndpointRelease::findOrFail($id);
+        if ($rel->state !== 'draft') {
+            return back()->with('err', 'هذا الإصدارُ ليس مسوَّدةً — لا شيء لنشره');
+        }
+        $rel->forceFill(['state' => 'published'])->save();
+
+        hub_audit('نشرُ مسوَّدةِ إصدارِ وكيل', 'endpoints', $rel->id,
+            $rel->version . ' · ' . $rel->os . '/' . $rel->arch . ' · ' . $rel->rollout_scope);
+
+        return back()->with('ok', '⬆️ نُشرت المسوَّدة ' . $rel->version . ' (' . $rel->os . '/' . $rel->arch . ')');
     }
 
     /** الحذف — مالكٌ + تصعيد. حذفٌ ناعم: الملفُ يبقى على القرص للاستعادة (نمطُ المرفقات) */
