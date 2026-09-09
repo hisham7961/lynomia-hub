@@ -88,7 +88,9 @@ class CommentService
     {
         $parentId = $opts['parent_id'] ?? null;
 
-        $mentions = self::extractMentions($actor, $body, (array) ($opts['mention'] ?? []));
+        // الإشارةُ تُحلّ **ضمن نطاق الهدف** (§16/§18): عضوُ القناة، أو من يرى السجلّ —
+        // فلا يصل مقتطفُ الرسالةِ إلى من لا يقدر فتحَها. النطاقُ من `$module`+`$recordId`.
+        $mentions = self::extractMentions($actor, $body, (array) ($opts['mention'] ?? []), $module, $recordId);
 
         $attrs = [
             'module'     => $module,
@@ -123,20 +125,86 @@ class CommentService
         return $c;
     }
 
-    /** المنشن: من القائمة الصريحة + @اسم في النص (تطابق بادئة الاسم) — منقولٌ من store */
-    public static function extractMentions(User $actor, string $body, array $explicit): array
+    /**
+     * **المنشن مُنطَّقٌ بالهدف** (§16/§18): من القائمة الصريحة + `@اسم` في النص
+     * (تطابقُ بادئةِ الاسم) — لكن **لا يُحلّ إلّا لمن يقدر فتحَ الهدف**. الإشارةُ
+     * إشعارٌ يحمل مقتطفَ الرسالة؛ فحلُّها على كلِّ المنظّمة كان يُسرّب سطراً من
+     * محادثةٍ لا يراها المُشار إليه (قناةٌ ليس عضواً فيها، أو سجلٌّ خارجَ صلاحيته).
+     *
+     * قناة/خلاصة: يُبنى مجموعُ المرشَّحين المرئيّ **سلفاً** (رخيصٌ ودقيق، فتُطابَق
+     * البادئةُ داخلَه فتُختار الشخصُ الصحيح). سجلُّ وحدةٍ: بوّابةُ الرؤية استعلامُ
+     * نطاقٍ لكلِّ سجلّ، فنُطابق على الكلِّ ثم **نُسقِط** المُشار إليهم القلائلَ الذين
+     * لا يرون السجلَّ — عملٌ محدود، والبوّابةُ لا تُضيف مُستقبِلاً بل تحذفه فقط.
+     */
+    public static function extractMentions(User $actor, string $body, array $explicit, string $module = 'feed', ?string $recordId = null): array
     {
-        $users = self::userNames();
-        $ids = array_values(array_intersect(array_keys($users), array_filter($explicit)));
+        $prescoped = in_array($module, ['channel', 'feed'], true);
+        $names = $prescoped ? self::mentionCandidates($actor, $module, $recordId) : self::userNames();
+
+        $ids = array_values(array_intersect(array_keys($names), array_filter($explicit)));
 
         preg_match_all('/@([\p{Arabic}\w]+)/u', $body, $m);
         foreach ($m[1] ?? [] as $token) {
-            foreach ($users as $uid => $name) {
+            foreach ($names as $uid => $name) {
                 if (mb_stripos($name, $token) === 0) { $ids[] = $uid; break; }
             }
         }
 
-        return array_values(array_unique(array_diff($ids, [$actor->id])));
+        $ids = array_values(array_unique(array_diff($ids, [$actor->id])));
+
+        // سجلُّ وحدةٍ: تُسقَط أيُّ إشارةٍ لمن لا يقدر فعلاً فتحَ السجلّ (بوّابةُ الرؤية)
+        if (! $prescoped && $ids) {
+            $ids = self::filterRecordVisible($ids, $module, $recordId);
+        }
+
+        return $ids;
+    }
+
+    /**
+     * **مرشَّحو الإشارةِ المرئيّون للهدف** (قناة/خلاصة) — [id => name] مرتَّبٌ بالاسم:
+     *  • `channel` ⇒ أعضاءُ الحاويةِ حصراً (الجمهورُ الدقيقُ للقناة، ورخيص).
+     *  • `feed`    ⇒ منشورُ القناةِ العامّة منطَّقٌ بشركة ناشره المقيَّد (نظيرُ
+     *    `feedCompanyFilter`): المنشورُ العامُّ (ناشرٌ غيرُ مقيَّد) يراه الكلُّ،
+     *    والمنشورُ الموسومُ بشركةٍ لا يراه إلّا أهلُها + غيرُ المقيَّدين.
+     */
+    private static function mentionCandidates(User $actor, string $module, ?string $recordId): array
+    {
+        if ($module === 'channel') {
+            if (! $recordId) return [];
+            $memberIds = \App\Models\ConversationMember::where('conversation_id', $recordId)->pluck('user_id');
+
+            return User::whereNull('deleted_at')->whereIn('id', $memberIds)
+                ->orderBy('name')->pluck('name', 'id')->all();
+        }
+
+        // feed: شركةُ المنشورِ من ناشره المقيَّد (فارغٌ = منشورٌ عامّ يراه الكلّ)
+        $postCompany = (($cids = hub_company_ids($actor)) !== null && $cids) ? $cids[0] : null;
+        if ($postCompany === null) return self::userNames();
+
+        return User::whereNull('deleted_at')->with('role:id,is_owner')
+            ->orderBy('name')->get(['id', 'name', 'role_id', 'companies'])
+            ->filter(function (User $u) use ($postCompany) {
+                $uc = hub_company_ids($u);   // غيرُ المقيَّدِ يرى الكلَّ، والمقيَّدُ إن شارك الشركة
+
+                return $uc === null || in_array($postCompany, $uc, true);
+            })->pluck('name', 'id')->all();
+    }
+
+    /**
+     * **إسقاطُ المُشار إليهم الذين لا يرون السجلَّ** (§18) — البوّابةُ نفسُها التي
+     * يفرضها `guardTarget` عند الفتح: `hub_can(v)` + وقوعُ السجلِّ في نطاق المستخدم.
+     * محدودٌ بعددِ المُشار إليهم (لا بكلِّ المستخدمين) — لا استعلامَ لغيرِ المرشَّح.
+     */
+    private static function filterRecordVisible(array $ids, string $module, ?string $recordId): array
+    {
+        $def = hub_mod($module);
+        if (! $def || ! $recordId) return [];
+        $class = '\\App\\Models\\' . $def['model'];
+
+        return User::whereNull('deleted_at')->whereIn('id', $ids)->get()
+            ->filter(fn (User $u) => hub_can($u, $module, 'v')
+                && hub_scope($class::query(), $module, $u)->whereKey($recordId)->exists())
+            ->pluck('id')->values()->all();
     }
 
     /** إشعارات التعليق: للمذكورين، ولصاحب التعليق الأصلي عند الرد — منقولٌ من store */

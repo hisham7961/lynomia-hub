@@ -155,7 +155,15 @@ class CommentController extends Controller
         };
         abort_unless($can, 403);
 
-        $c->update(['pinned' => ! $c->pinned, 'updated_at' => now()]);
+        // §28 بيانُ التثبيت فوق العلَم `pinned`: مَن ثبّت ومتى — عمودٌ حديثٌ يُكتب
+        // حين وُجد (قبل الهجرة يبقى العلَمُ وحدَه كما كان).
+        $now = ! $c->pinned;   // الحالةُ الجديدة
+        $attrs = ['pinned' => $now, 'updated_at' => now()];
+        if (hub_has_col('comments', 'pinned_at')) {
+            $attrs['pinned_at'] = $now ? now() : null;
+            $attrs['pinned_by'] = $now ? auth()->id() : null;
+        }
+        $c->update($attrs);
 
         return back()->with('ok', $c->pinned ? 'ثُبّت' : 'أُلغي التثبيت');
     }

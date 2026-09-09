@@ -28,6 +28,46 @@ class Comment extends Model
         'reply_count'   => 'integer',    // §19 عدّادُ الخيط
     ];
 
+    /**
+     * §19 **عدّادُ الخيطِ يُصان عند الرد لا بالاستعلام** — نموذجيّاً في مكانٍ واحدٍ
+     * يغطّي كلَّ سطحٍ يُنشئ/يحذف رداً (الويب/الجوال/الخدمة): إنشاءُ ردٍّ يرفع
+     * `reply_count` ويختم `last_reply_at`، وحذفُه/استعادتُه يُعيد الحساب من الردود
+     * الحيّة. تحديثٌ جماعيٌّ على الأبِ (لا يُطلق أحداثاً) فلا تكرارَ ولا لمسَ updated_at.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (self $c): void {
+            if ($c->parent_id) self::bumpThread((string) $c->parent_id, $c->created_at);
+        });
+        static::deleted(function (self $c): void {
+            if ($c->parent_id) self::recountThread((string) $c->parent_id);
+        });
+        static::restored(function (self $c): void {
+            if ($c->parent_id) self::recountThread((string) $c->parent_id);
+        });
+    }
+
+    /** رفعُ عدّادِ الخيطِ وختمُ آخرِ ردٍّ — عمودٌ حديث: قبل الهجرة لا يُكتب شيء */
+    protected static function bumpThread(string $parentId, $at): void
+    {
+        if (! hub_has_col('comments', 'reply_count')) return;
+
+        self::whereKey($parentId)->update([
+            'reply_count'   => \Illuminate\Support\Facades\DB::raw('reply_count + 1'),
+            'last_reply_at' => $at,
+        ]);
+    }
+
+    /** إعادةُ حساب الخيطِ من الردود الحيّة (بعد حذفٍ/استعادة) — الصدقُ فوق التقريب */
+    protected static function recountThread(string $parentId): void
+    {
+        if (! hub_has_col('comments', 'reply_count')) return;
+
+        $count = self::where('parent_id', $parentId)->count();
+        $last  = self::where('parent_id', $parentId)->max('created_at');
+        self::whereKey($parentId)->update(['reply_count' => $count, 'last_reply_at' => $last]);
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);
