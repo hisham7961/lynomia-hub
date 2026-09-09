@@ -137,9 +137,13 @@ return [
         'assets.reconciliation' => ['domain' => 'assets', 'category' => 'inventory', 'title_ar' => 'مطابقة الجرد', 'title_en' => 'Reconciliation', 'status' => 'ENABLED'],
         'assets.endpoint_eligibility' => ['domain' => 'assets', 'category' => 'inventory', 'title_ar' => 'أهليّة النقطة الطرفيّة', 'title_en' => 'Endpoint Eligibility', 'status' => 'ENABLED'],
         'assets.relationship' => ['domain' => 'assets', 'category' => 'graph', 'title_ar' => 'استكشاف علاقات الأصول', 'title_en' => 'Asset Relationship Exploration', 'status' => 'ENABLED'],
-        'assets.project_assignment' => ['domain' => 'assets', 'category' => 'inventory', 'title_ar' => 'إسناد الأصل للمشروع مباشرةً', 'title_en' => 'Direct Asset → Project Assignment', 'status' => 'DEFERRED',
-            'desc_ar' => 'غيرُ أوّليّةٍ للأصول الماديّة: تُسنَد للموظّف/المحطّة لا للمشروع مباشرةً.',
-            'deferred_notes' => 'غيرُ first-class للأصول الماديّة — الربطُ المباشر بالمشروع قائمٌ للأصول الرقميّة (DigitalAssets) وحدها. يُسجَّل بصدق لا يُختلَق ENABLED.'],
+        // سياقيّةٌ (تُكتشَف من المشروع 360 وتفصيلِ الأصل، لا وجهةَ GET مستقلّةً — كنظائرِها
+        // assets.employee_assignment/station_assignment). مساراتُ التغييرِ لها «أبوابٌ» في العرض.
+        'assets.project_assignment' => ['domain' => 'assets', 'category' => 'inventory', 'title_ar' => 'تخصيص الأصل للمشروع', 'title_en' => 'Asset → Project Assignment', 'status' => 'ENABLED',
+            'desc_ar' => 'علاقةٌ زمنيّةٌ أوّليّة (asset_project_assignments): تاريخٌ محفوظ، تعدّدُ مشاريع، مستقلّةٌ عن العهدة/الحائز/المحطّة.',
+            'desc_en' => 'First-class temporal assignment history — independent of custody/holder/station; an asset may support multiple projects.',
+            'api_routes' => ['api.v1.projects.assets', 'api.v1.assets.projects'],
+            'introduced' => 'v2.472.0', 'docs' => 'docs/project360/03-asset-project-assignment.md'],
 
         /* ───────── 7E · الاتصالات (Work OS · الطور G) ───────── */
         'telecom.sim_registry' => ['domain' => 'telecom', 'category' => 'registry', 'title_ar' => 'سجلّ الشرائح (SIM)', 'title_en' => 'SIM Registry', 'status' => 'ENABLED', 'permissions' => ['sims']],

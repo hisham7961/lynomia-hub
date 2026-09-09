@@ -292,6 +292,35 @@ class OpenApi
             '/api/v1/track/{session}/end' => ['post' => ['tags' => ['field'], 'summary' => 'إنهاء الجلسة وحساب المسافة', 'operationId' => 'track_end',
                 'parameters' => [['name' => 'session', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string']]],
                 'responses' => ['200' => self::ok('أُنهيت', ['type' => 'object', 'additionalProperties' => true])] + self::refs([401, 403, 404, 429])]],
+            // ── المشروع 360 (§56) ── تخصيصُ الأصلِ للمشروع: علاقةٌ زمنيّةٌ لا عهدة —
+            // بوّابتُها assets:e + projects:v، والعميلُ محجوب (٤٠٤). خدمةٌ واحدةٌ للويب والـAPI.
+            '/api/v1/projects/{id}/assets' => [
+                'get' => ['tags' => ['assets'], 'summary' => 'الأصولُ النشطةُ المخصَّصةُ للمشروع (يتطلب assets:e وprojects:v)', 'operationId' => 'project_assets',
+                    'parameters' => [['name' => 'id', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string', 'format' => 'uuid']]],
+                    'responses' => ['200' => self::ok('أصولُ المشروع', $obj(['project_id' => ['type' => 'string', 'format' => 'uuid'], 'assets' => ['type' => 'array', 'items' => $obj([
+                        'assignment_id' => ['type' => 'string', 'format' => 'uuid'], 'asset_id' => ['type' => 'string', 'format' => 'uuid'],
+                        'asset_code' => ['type' => 'string', 'nullable' => true], 'asset_name' => ['type' => 'string', 'nullable' => true],
+                        'purpose' => ['type' => 'string', 'nullable' => true], 'assigned_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
+                    ])]]))] + self::refs([401, 403, 404, 429])],
+                'post' => ['tags' => ['assets'], 'summary' => 'تخصيصُ أصلٍ للمشروع — علاقةٌ زمنيّةٌ لا عهدة (idempotent)', 'operationId' => 'project_assign_asset',
+                    'parameters' => [['name' => 'id', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string', 'format' => 'uuid']]],
+                    'requestBody' => ['required' => true, 'content' => ['application/json' => ['schema' => ['type' => 'object', 'required' => ['asset_id'], 'properties' => [
+                        'asset_id' => ['type' => 'string', 'format' => 'uuid'], 'purpose' => ['type' => 'string', 'maxLength' => 120, 'nullable' => true], 'note' => ['type' => 'string', 'maxLength' => 500, 'nullable' => true],
+                    ]]]]],
+                    'responses' => ['201' => self::ok('خُصِّص', $obj(['assignment_id' => ['type' => 'string', 'format' => 'uuid'], 'asset_id' => ['type' => 'string', 'format' => 'uuid'], 'project_id' => ['type' => 'string', 'format' => 'uuid'], 'active' => ['type' => 'boolean']]))] + self::refs([401, 403, 404, 422, 429])]],
+            '/api/v1/assets/{id}/projects' => [
+                'get' => ['tags' => ['assets'], 'summary' => 'المشاريعُ النشطةُ لهذا الأصل (يتطلب assets:e وprojects:v)', 'operationId' => 'asset_projects',
+                    'parameters' => [['name' => 'id', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string', 'format' => 'uuid']]],
+                    'responses' => ['200' => self::ok('مشاريعُ الأصل', $obj(['asset_id' => ['type' => 'string', 'format' => 'uuid'], 'projects' => ['type' => 'array', 'items' => $obj([
+                        'assignment_id' => ['type' => 'string', 'format' => 'uuid'], 'project_id' => ['type' => 'string', 'format' => 'uuid'],
+                        'project_name' => ['type' => 'string', 'nullable' => true], 'purpose' => ['type' => 'string', 'nullable' => true],
+                        'assigned_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
+                    ])]]))] + self::refs([401, 403, 404, 429])]],
+            '/api/v1/asset-project/{id}/end' => [
+                'post' => ['tags' => ['assets'], 'summary' => 'إنهاءُ تخصيصِ أصلٍ لمشروع — يحفظ التاريخ (idempotent)', 'operationId' => 'asset_project_end',
+                    'parameters' => [['name' => 'id', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string', 'format' => 'uuid']]],
+                    'requestBody' => ['content' => ['application/json' => ['schema' => $obj(['reason' => ['type' => 'string', 'nullable' => true]])]]],
+                    'responses' => ['200' => self::ok('أُنهي', $obj(['assignment_id' => ['type' => 'string', 'format' => 'uuid'], 'active' => ['type' => 'boolean']]))] + self::refs([401, 403, 404, 429])]],
         ];
     }
 }

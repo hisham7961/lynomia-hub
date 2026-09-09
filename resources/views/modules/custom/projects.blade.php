@@ -56,6 +56,7 @@
         : array_values(array_filter([
             ['overview', '🗂️ النظرة'],
             ['delivery', '🚦 التسليم'],
+            ['assets', '🖥️ الأصول'],
             ['baseline', '📐 الأساس التجاري'],
             $pcExternal ? ['rooms', '💬 الغرف'] : null,
             $pcFin ? ['finance', '💰 المالية'] : null,
@@ -193,6 +194,11 @@
             @include('partials.record_list', ['children' => $children, 'ownerId' => $row->id])
         </section>
 
+        {{-- ═══════════ الأصول (Project 360 · §19-23 · تخصيصٌ لا عهدة) ═══════════ --}}
+        <section id="ccp-assets" data-ccpanel="assets" class="ccpanel {{ $pcFirst === 'assets' ? 'on' : '' }}">
+            @include('partials.project_assets', ['row' => $row])
+        </section>
+
         {{-- ═══════════ ③ الأساس التجاريّ (ChangeOrder وحدَه يطوّره) ═══════════ --}}
         <section id="ccp-baseline" data-ccpanel="baseline" class="ccpanel {{ $pcFirst === 'baseline' ? 'on' : '' }}">
             @if ($pcBaseline)
@@ -266,8 +272,10 @@
                         $pcMsgs = $pcRoom->messages()->whereNull('parent_id')->with('user', 'replies.user')->get();
                         $pcRole = Conversation::roleOf((string) $pcRoom->id, $pcUid);
                     @endphp
-                    <div class="sub" style="margin:12px 0 -6px;font-weight:600;border-inline-start:3px solid {{ $pcColor }};padding-inline-start:8px">
-                        {{ $pcTitle }} <span class="sub" style="font-weight:400">— {{ $pcWhy }}</span>
+                    <div class="sub" style="margin:12px 0 -6px;font-weight:600;border-inline-start:3px solid {{ $pcColor }};padding-inline-start:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        <span>{{ $pcTitle }} <span class="sub" style="font-weight:400">— {{ $pcWhy }}</span></span>
+                        {{-- §37 افتح الغرفةَ في مركزِ التواصلِ الموحّد (لا صفحاتٍ قديمة) --}}
+                        <a class="btn ghost xs" href="{{ route('collab.center', ['c' => $pcRoom->id]) }}" style="margin-inline-start:auto">💬 افتح في مركز التواصل ⤢</a>
                     </div>
                     @include('partials.comments', [
                         'cModule'         => 'channel',

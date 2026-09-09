@@ -170,6 +170,32 @@ class RelationshipProjection
                 // تُرفَع الرايةُ صراحةً هنا أيضاً، لا اقتطاعَ نافذةٍ صامتاً (نقدُ C4).
                 if ($cnt > $rows->count()) $capped = true;
             }
+
+            // ── (Project 360 · §40) حافّةُ التخصيصِ النشطِ للأصل↔المشروع ──
+            // علاقةٌ خارجَ حقولِ الـref (تاريخٌ زمنيّ في `asset_project_assignments`)، تُقرأ حيّاً،
+            // وكلُّ طرفٍ يمرّ بقارئه المحروس (`hub_read`) — لا رافدٌ ثانٍ، ولا مخزنَ رسمٍ ثانٍ: من لا
+            // يرى الطرفَ الآخرَ لا يرى الحافّة. الحافّةُ موجّهةٌ من الأصلِ للمشروعِ دائماً (تسميةٌ واضحة).
+            if ($hop < $hops && in_array($m, ['assets', 'projects'], true)
+                && hub_has_col('asset_project_assignments', 'asset_id')) {
+                $isAsset = $m === 'assets';
+                $other   = $isAsset ? 'projects' : 'assets';
+                $col     = $isAsset ? 'asset_id' : 'project_id';
+                $ocol    = $isAsset ? 'project_id' : 'asset_id';
+                $otherIds = \App\Models\AssetProjectAssignment::active()->where($col, $row->id)
+                    ->orderByDesc('assigned_at')->orderByDesc('id')
+                    ->limit($maxNodes)->pluck($ocol)->unique()->all();
+                if ($otherIds && ($oq = hub_read($other))) {
+                    foreach ($oq->whereIn('id', $otherIds)->get() as $orow) {
+                        $k2 = $push($other, $orow, $hop + 1);
+                        if ($k2 === null) { $capped = true; break; }
+                        [$from, $to] = $isAsset ? [$mkey, $k2] : [$k2, $mkey];
+                        $ek = "{$from}|{$to}|asset_project";
+                        $edges[$ek] ??= ['from' => $from, 'to' => $to,
+                            'via' => 'asset_project', 'label' => 'مخصّص للمشروع'];
+                        if ($hop + 1 < $hops) $queue[] = [$other, $orow, $hop + 1];
+                    }
+                }
+            }
         }
 
         return [

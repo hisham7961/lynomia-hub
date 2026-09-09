@@ -422,6 +422,15 @@ Route::middleware('auth')->group(function () {
     Route::get('compliance-board', [\App\Http\Controllers\Web\ComplianceController::class, 'index'])->name('compliance.board');
     Route::get('apps-projects', [\App\Http\Controllers\Web\AppsProjectsController::class, 'index'])->name('appsprojects');
     Route::post('apps-projects/fix', [\App\Http\Controllers\Web\AppsProjectsController::class, 'fix'])->name('appsprojects.fix');
+
+    // (Project 360 · §19/§20/§21) تخصيصُ الأصولِ للمشاريع — علاقةٌ زمنيّةٌ لا عهدةٌ، بخدمةٍ واحدة.
+    // العميلُ محجوبٌ (PortalGuard + abort)، والحلُّ ضمنَ النطاق (٤٠٤ عبر الشركات).
+    Route::post('projects/{id}/assets', [\App\Http\Controllers\Web\AssetProjectController::class, 'assignFromProject'])
+        ->middleware('throttle:30,1')->name('projects.assets.assign');
+    Route::post('assets/{id}/projects', [\App\Http\Controllers\Web\AssetProjectController::class, 'assignFromAsset'])
+        ->middleware('throttle:30,1')->name('assets.projects.assign');
+    Route::post('asset-project/{id}/end', [\App\Http\Controllers\Web\AssetProjectController::class, 'end'])
+        ->middleware('throttle:30,1')->name('assetproject.end');
     Route::get('kpis', [\App\Http\Controllers\Web\KpiController::class, 'index'])->name('kpis.index');
     Route::post('kpis', [\App\Http\Controllers\Web\KpiController::class, 'store'])->name('kpis.store');
     Route::put('kpis/{id}', [\App\Http\Controllers\Web\KpiController::class, 'update'])->name('kpis.update');

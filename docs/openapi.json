@@ -2,9 +2,9 @@
     "openapi": "3.1.0",
     "info": {
         "title": "Lynomia Business Hub — REST API",
-        "version": "2.471.1",
+        "version": "2.472.0",
         "description": "واجهة `/api/v1`: كل وحدات النظام بنفس صلاحيات صاحب المفتاح ونطاقه.\nمفتاح Bearer من «حسابي ← مفاتيح API». حدّ المعدل ١٢٠/دقيقة لكل مفتاح و٣٠٠/دقيقة لكل عنوان.\nكل ردٍّ يحمل `X-Request-Id` و`X-API-Version`، وكل خطأٍ يحمل `code` آلياً و`request_id`.",
-        "x-hub-version": "2.471.1"
+        "x-hub-version": "2.472.0"
     },
     "servers": [
         {
@@ -987,6 +987,347 @@
                                 "schema": {
                                     "type": "object",
                                     "additionalProperties": true
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            }
+        },
+        "/api/v1/projects/{id}/assets": {
+            "get": {
+                "tags": [
+                    "assets"
+                ],
+                "summary": "الأصولُ النشطةُ المخصَّصةُ للمشروع (يتطلب assets:e وprojects:v)",
+                "operationId": "project_assets",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "أصولُ المشروع",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "project_id": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "assets": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "assignment_id": {
+                                                        "type": "string",
+                                                        "format": "uuid"
+                                                    },
+                                                    "asset_id": {
+                                                        "type": "string",
+                                                        "format": "uuid"
+                                                    },
+                                                    "asset_code": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "asset_name": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "purpose": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "assigned_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "nullable": true
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "assets"
+                ],
+                "summary": "تخصيصُ أصلٍ للمشروع — علاقةٌ زمنيّةٌ لا عهدة (idempotent)",
+                "operationId": "project_assign_asset",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "asset_id"
+                                ],
+                                "properties": {
+                                    "asset_id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                    },
+                                    "purpose": {
+                                        "type": "string",
+                                        "maxLength": 120,
+                                        "nullable": true
+                                    },
+                                    "note": {
+                                        "type": "string",
+                                        "maxLength": 500,
+                                        "nullable": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "خُصِّص",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "assignment_id": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "asset_id": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "project_id": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "active": {
+                                            "type": "boolean"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/422"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            }
+        },
+        "/api/v1/assets/{id}/projects": {
+            "get": {
+                "tags": [
+                    "assets"
+                ],
+                "summary": "المشاريعُ النشطةُ لهذا الأصل (يتطلب assets:e وprojects:v)",
+                "operationId": "asset_projects",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "مشاريعُ الأصل",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "asset_id": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "projects": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "assignment_id": {
+                                                        "type": "string",
+                                                        "format": "uuid"
+                                                    },
+                                                    "project_id": {
+                                                        "type": "string",
+                                                        "format": "uuid"
+                                                    },
+                                                    "project_name": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "purpose": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "assigned_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "nullable": true
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/401"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/403"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/404"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/429"
+                    }
+                }
+            }
+        },
+        "/api/v1/asset-project/{id}/end": {
+            "post": {
+                "tags": [
+                    "assets"
+                ],
+                "summary": "إنهاءُ تخصيصِ أصلٍ لمشروع — يحفظ التاريخ (idempotent)",
+                "operationId": "asset_project_end",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "أُنهي",
+                        "headers": {
+                            "X-Request-Id": {
+                                "$ref": "#/components/headers/X-Request-Id"
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "assignment_id": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "active": {
+                                            "type": "boolean"
+                                        }
+                                    }
                                 }
                             }
                         }

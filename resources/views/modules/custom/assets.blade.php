@@ -1,6 +1,11 @@
 {{-- مساحةُ عمل العهدة: هويّةٌ (كودٌ وملصق) ← حيازةٌ ← مواصفاتٌ ← تصاريح ← سجل --}}
 @include('partials.custody_card')
 
+{{-- مشاريعُ الأصل (Project 360 · §20) — تخصيصٌ تشغيليٌّ لا عهدة. داخليٌّ حصراً. --}}
+@unless (hub_is_client(auth()->user()))
+    @include('partials.asset_projects', ['row' => $row])
+@endunless
+
 {{-- بطاقةُ الهوية الموحّدة: الطرازُ الأمّ، والباركود الخطي، وكلُّ معرّفات القطعة --}}
 @php
     $aiIds = \App\Support\Identity::of('assets', $row->id);
