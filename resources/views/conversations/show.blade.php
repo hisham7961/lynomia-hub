@@ -125,4 +125,9 @@
     </div>
 </div>
 
+{{-- §39 الاستطلاعُ التدريجيّ — رسائلُ القناةِ الجديدةُ منذ مؤشّرٍ بلا إعادةِ جلبِ الخيط --}}
+<div hidden data-collab-poll data-kind="channel" data-target="cmt-list"
+     data-poll-url="{{ route('conversations.since', $conv->id) }}" data-cursor="{{ $sinceCursor ?? '' }}"></div>
+<script src="{{ asset('js/collab-poll.js') }}?v={{ config('hub.version') }}" defer></script>
+
 @endsection

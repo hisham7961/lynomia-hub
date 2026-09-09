@@ -127,6 +127,9 @@
                 </div>
             @endif
 
+            {{-- §39 الاستطلاعُ التدريجيّ — رسائلُ جديدةٌ منذ مؤشّرٍ بلا إعادةِ جلبِ الخيط --}}
+            <div hidden data-collab-poll data-kind="dm" data-target="dmbox"
+                 data-poll-url="{{ route('dm.since', $other->id) }}" data-cursor="{{ $sinceCursor ?? '' }}"></div>
             <div class="card" id="dmbox" style="display:flex;flex-direction:column;gap:5px;min-height:320px;max-height:56vh;overflow:auto;margin-top:10px">
                 @php $lastDay = null; $lastFrom = null; @endphp
                 @forelse ($msgs as $m)
@@ -262,4 +265,7 @@
     });
 })();
 </script>
+@if ($open)
+    <script src="{{ asset('js/collab-poll.js') }}?v={{ config('hub.version') }}" defer></script>
+@endif
 @endsection

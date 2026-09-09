@@ -4,12 +4,16 @@
 <div class="card" id="comments">
     <h3>💬 التعليقات <span class="bdg g">{{ $comments->count() }}</span></h3>
 
+    {{-- قائمةُ الرسائل في حاويةٍ خاصّة كي يُلحِقَ الاستطلاعُ التدريجيّ (§39) الجديدَ
+         قبل الناشر لا بعده — لا يمسّ عرضَ السجلات (حاويةٌ فارغةٌ حيث لا استطلاع) --}}
+    <div id="cmt-list">
     @forelse ($comments as $c)
         @include('partials._comment', ['c' => $c, 'users' => $users, 'depth' => 0,
             'channelMod' => $cChannelMod ?? false])
     @empty
         <div class="sub" style="padding:8px 0 14px">لا تعليقات بعد — كن أول من يعلّق</div>
     @endforelse
+    </div>
 
     @if ($cCanPost ?? true)
     <form method="POST" action="{{ route('comments.store') }}" enctype="multipart/form-data" class="cform">

@@ -240,6 +240,10 @@ class DmController extends Controller
 
         $ids = $threads->pluck('other')->push($other->id)->unique()->all();
 
+        // §39 مؤشّرُ البدءِ للاستطلاعِ التدريجيّ — رأسُ الخيط (أحدثُ رسالة، محذوفةً كانت أو لا)
+        $tip = DmMessage::where('thread_key', DmMessage::threadKey((string) $me, (string) $other->id))
+            ->orderByDesc('created_at')->orderByDesc('id')->first(['id', 'created_at']);
+
         return view('dm.inbox', [
             'other' => $other, 'msgs' => $msgs, 'open' => $other->id,
             'threads' => $threads,
@@ -247,6 +251,7 @@ class DmController extends Controller
             'all' => $this->startableUsers((string) $me),
             'presence' => self::presence($ids),
             'dmReactions' => self::dmReactionsFor($msgs->pluck('id')->all()),
+            'sinceCursor' => $tip ? \App\Support\Collaboration::encodeCursor((string) $tip->created_at, (string) $tip->id) : '',
         ]);
     }
 
@@ -356,6 +361,55 @@ class DmController extends Controller
         \App\Models\HubNotification::where('kind', 'dm')->where('record_id', $m->id)->delete();
 
         return back()->with('ok', 'سُحبت الرسالة — يبقى مكانُها يقول إنها حُذفت');
+    }
+
+    /**
+     * **رسائلُ الخيطِ الجديدةُ منذ مؤشّر** (§39) — استطلاعٌ تدريجيٌّ بمؤشّر `since`
+     * (keyset على `(created_at, id)`) لا إعادةُ جلبِ أحدثِ ٣٠٠ في كلِّ نبضة. المفتاحُ
+     * من `auth()`+الطرفِ الآخر خادميّاً (F8) لا من العميل. المحذوفةُ تُرسَل أثراً
+     * (deleted) كي يُظهرها العميل «حُذفت»، والواردُ الجديدُ يُختَم مقروءاً (المستخدمُ يقرأ).
+     */
+    public function since(Request $r, string $userId)
+    {
+        $other = User::findOrFail($userId);
+        abort_if($other->id === auth()->id(), 404);
+        abort_unless(self::dmReachable($other), 404);
+
+        $me = (string) auth()->id();
+        $key = DmMessage::threadKey($me, (string) $other->id);
+        $cursor = \App\Support\Collaboration::decodeCursor($r->query('cursor'));
+
+        $q = DmMessage::where('thread_key', $key)->inCompanyScope();
+        if ($cursor !== null) {
+            [$t, $cid] = $cursor;
+            $q->where(fn ($w) => $w->where('created_at', '>', $t)
+                ->orWhere(fn ($x) => $x->where('created_at', $t)->where('id', '>', $cid)));
+        }
+
+        $rows = $q->orderBy('created_at')->orderBy('id')->limit(50)->get();
+
+        // الواردُ الجديدُ إليّ يُختَم مقروءاً — المستخدمُ يقرأ الخيطَ الآن
+        $incoming = $rows->where('to_id', $me)->whereNull('read_at')->pluck('id');
+        if ($incoming->isNotEmpty()) {
+            DmMessage::whereIn('id', $incoming)->update(['read_at' => now()]);
+        }
+
+        $events = $rows->map(fn (DmMessage $m) => [
+            'type'       => $m->deleted_at !== null ? \App\Support\Collaboration::EV_MESSAGE_DELETED : \App\Support\Collaboration::EV_MESSAGE_CREATED,
+            'id'         => (string) $m->id,
+            'mine'       => $m->from_id === $me,
+            'body'       => $m->deleted_at !== null ? null : (string) $m->body,
+            'created_at' => optional($m->created_at)->toIso8601String(),
+            'edited'     => $m->edited_at !== null,
+            'deleted'    => $m->deleted_at !== null,
+        ])->all();
+
+        $last = $rows->last();
+        $next = $last
+            ? \App\Support\Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
+            : (string) $r->query('cursor', '');
+
+        return response()->json(['events' => $events, 'cursor' => $next]);
     }
 
     /**

@@ -481,6 +481,8 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:30,1')->name('conversations.store');
     Route::post('conversations/{id}/join', [ConversationController::class, 'join'])
         ->middleware('throttle:30,1')->name('conversations.join');
+    Route::get('conversations/{id}/since', [ConversationController::class, 'since'])
+        ->middleware('throttle:120,1')->name('conversations.since');
     Route::get('conversations/{id}', [ConversationController::class, 'show'])->name('conversations.show');
     Route::post('conversations/{id}/notify', [ConversationController::class, 'setNotifyPref'])
         ->middleware('throttle:60,1')->name('conversations.notify');
@@ -508,6 +510,8 @@ Route::middleware('auth')->group(function () {
     Route::post('dm/msg/{id}/edit', [DmController::class, 'edit'])->name('dm.edit');
     Route::post('dm/msg/{id}/react', [DmController::class, 'react'])->name('dm.react');
     Route::delete('dm/msg/{id}', [DmController::class, 'destroy'])->name('dm.destroy');
+    Route::get('dm/{userId}/since', [DmController::class, 'since'])
+        ->middleware('throttle:120,1')->name('dm.since');
     Route::get('dm/{userId}', [DmController::class, 'thread'])->name('dm.thread');
     Route::post('dm/{userId}', [DmController::class, 'send'])->name('dm.send');
 
