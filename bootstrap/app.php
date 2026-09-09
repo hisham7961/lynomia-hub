@@ -67,6 +67,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'endpoint.signature' => \App\Http\Middleware\EndpointSignature::class,
             'mobile.session'     => \App\Http\Middleware\MobileSessionAuth::class,
             'mobile.context'     => \App\Http\Middleware\MobileContext::class,
+            // سياجُ حساب العميل على سطح الجوال (نظيرُ PortalGuard الويبيّ) — بعد
+            // الجلسة (يحتاج الهويّةَ) وقبل المتحكّمات: قائمةٌ بيضاءُ فوق المصفوفة
+            'mobile.portal'      => \App\Http\Middleware\MobilePortalGuard::class,
         ]);
         // الويبهوك الوارد سطحٌ آليّ لا نموذج له: يُصادَق بالرمز في الرابط + توقيع
         // HMAC، فلا CSRF عليه (المُرسِل خدمةٌ خارجية لا متصفّح يحمل الرمز).

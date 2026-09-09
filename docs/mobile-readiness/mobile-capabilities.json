@@ -339,6 +339,23 @@
             ],
             "count": 2
         },
+        "activation": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/activation/{token}",
+                    "name": "mobile.activation.show",
+                    "auth": "public"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/activation/{token}/complete",
+                    "name": "mobile.activation.complete",
+                    "auth": "public"
+                }
+            ],
+            "count": 2
+        },
         "approvals": {
             "endpoints": [
                 {
@@ -426,6 +443,35 @@
                 }
             ],
             "count": 9
+        },
+        "clients": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/clients/{client}/members",
+                    "name": "mobile.clients.members.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/clients/{client}/members",
+                    "name": "mobile.clients.members.invite",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "DELETE",
+                    "path": "/api/mobile/v1/clients/{client}/members/{membership}",
+                    "name": "mobile.clients.members.revoke",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "PUT",
+                    "path": "/api/mobile/v1/clients/{client}/members/{membership}",
+                    "name": "mobile.clients.members.role",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 4
         },
         "comments": {
             "endpoints": [
@@ -645,6 +691,71 @@
                 }
             ],
             "count": 5
+        },
+        "portal": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/portal/conversations",
+                    "name": "mobile.portal.conversations.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/portal/conversations/{id}",
+                    "name": "mobile.portal.conversations.show",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/portal/documents",
+                    "name": "mobile.portal.documents.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/portal/documents/{id}",
+                    "name": "mobile.portal.documents.show",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/portal/engagements",
+                    "name": "mobile.portal.engagements",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/portal/home",
+                    "name": "mobile.portal.home",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/portal/invoices",
+                    "name": "mobile.portal.invoices.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/portal/invoices/{id}",
+                    "name": "mobile.portal.invoices.show",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/portal/projects",
+                    "name": "mobile.portal.projects.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/portal/projects/{id}",
+                    "name": "mobile.portal.projects.show",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 10
         },
         "prefs": {
             "endpoints": [

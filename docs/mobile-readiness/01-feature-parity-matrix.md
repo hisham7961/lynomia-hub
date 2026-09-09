@@ -6,9 +6,9 @@
 > Permission · MobileStatus. `MobileStatus = DONE` يعني **مسارٌ حيٌّ في
 > `routes/api.php` + اختبارٌ يمرّ على المحرّكين**.
 
-**تحقّقُ الاكتمال:** كلُّ مسارٍ في مجموعتَي `api/mobile/v1` (`routes/api.php:102-280`)
-مُمثَّلٌ أدناه — **٥٨ مساراً** (`php artisan route:list --path=api/mobile`): ٦ عامّة
-+ ٥٢ مُصادَقة. لا مسارٌ بلا صفّ، ولا صفٌّ بلا مسار.
+**تحقّقُ الاكتمال:** كلُّ مسارٍ في مجموعتَي `api/mobile/v1`
+مُمثَّلٌ أدناه — **٧٥ مساراً** (`php artisan route:list --path=api/mobile`): ٨ عامّة
++ ٦٧ مُصادَقة. لا مسارٌ بلا صفّ، ولا صفٌّ بلا مسار.
 
 ## B · المصادقة (`MobileAuthController` · `mobile.auth.*`)
 
@@ -121,6 +121,33 @@
 | DeepLink | AASA | `web.php:91` | `MobileWellKnownController::appleAppSiteAssociation` | — | `GET /.well-known/apple-app-site-association` | عامّ | **DONE (NOT_CONFIGURED)** — `MobileOpenApiTest` |
 | DeepLink | assetlinks | `web.php:98` | `MobileWellKnownController::assetLinks` | — | `GET /.well-known/assetlinks.json` | عامّ | **DONE (NOT_CONFIGURED)** — `MobileOpenApiTest` |
 
+## I · تجربةُ العميل (§12–§18 · v2.451.0) — التفعيلُ والبوّابةُ وإدارةُ الأعضاء
+
+حساباتُ `account_type='client'` خلف **`MobilePortalGuard`** (`mobile.portal` في
+مجموعة المصادقة كلِّها): قائمةٌ بيضاءُ **فوق** المصفوفة — نظيرُ `PortalGuard` الويب
+حرفاً، فالدورُ المضبوطُ خطأً لا يُسرِّب. خارجُ القائمة ⇒ `404 RESOURCE_NOT_FOUND`
+(لا كشفَ وجود)، والداخليُّ على `portal/*` ⇒ `403` (له لوحتُه). القرّاءُ جوهرٌ مشتركٌ
+مع الويب: `ClientPortalData` + `ClientMembers` (لا محرّكَ ثانٍ).
+
+| Area | Feature | Web Route | Backend Action | Existing API | Mobile API | Permission | MobileStatus |
+|---|---|---|---|---|---|---|---|
+| Activation | فحصُ رابط التفعيل | `web.php` activate/{token} | `AccountActivation` (نفسُ السكّة) | — | `GET activation/{token}` (`api.php:126`) | عامّ (throttle 12/د · بريدٌ مقنَّع) | **DONE** — `MobileActivationTest` |
+| Activation | إتمامٌ ذرّيّ (رمز + كلمة) | `web.php` activate إتمام | `MobileActivationController::complete` (حرقٌ لمرّة، سقفُ محاولات، ترقيةُ العضويّات) | — | `POST activation/{token}/complete` (`api.php:128`) | عامّ (throttle 6/د + RateLimiter) | **DONE** — `MobileActivationTest` |
+| Portal | بيتُ العميل | `web.php` portal | `MobileClientPortalController::home` عبر `ClientPortalData` | — | `GET portal/home` (`api.php:189`) | عضويّةٌ فعّالة (فشلٌ مغلق) | **DONE** — `MobileClientPortalTest` |
+| Portal | ارتباطاتُه | portal engagements | `ClientPortalData::engagements` | — | `GET portal/engagements` (`api.php:190`) | عضويّةٌ فعّالة | **DONE** — `MobileClientPortalTest` |
+| Portal | مشاريعُه + تفصيل | portal projects | `ClientPortalData::projects/project` (أعمدةٌ آمنة — لا cost/budget) | — | `GET portal/projects[/{id}]` (`api.php:191-192`) | عضويّة + 404 عابرُ العملاء | **DONE** — `MobileClientPortalTest` |
+| Portal | وثائقُه + تفصيل | portal documents | `ClientPortalData::documents` (`audience='client'` حصراً) | — | `GET portal/documents[/{id}]` (`api.php:193-194`) | عضويّة + جمهور | **DONE** — `MobileClientPortalTest` |
+| Portal | فواتيرُه + تفصيل | portal invoices | `ClientPortalData::invoices` (مبيعاتٌ فقط — لا مشتريات/تكلفة) | — | `GET portal/invoices[/{id}]` (`api.php:195-196`) | عضويّة + نوعٌ مسموح | **DONE** — `MobileClientPortalTest` |
+| Portal | غرفُه + رسائل | portal conversations | `ClientPortalData::conversations` (عضويّةٌ **وجمهورٌ** معاً · `internal` محجوبٌ بنيوياً) | — | `GET portal/conversations[/{id}]` (`api.php:197-198`) | عضويّة + جمهور | **DONE** — `MobileClientPortalTest` |
+| Clients | قائمةُ أعضاء عميل | `clients/{id}/members` | `ClientMembers` (جوهرُ الويب نفسُه) | — | `GET clients/{client}/members` (`api.php:202`) | `clients:e` + `hub_scope` | **DONE** — `MobileClientMembersTest` |
+| Clients | دعوةُ عضو (B.1) | members store | `ClientMembers::invite` (بلا كلمةِ سرٍّ تُرسَل + Idempotency) | — | `POST clients/{client}/members` (`api.php:203`) | `clients:e` · owner ⇒ تصعيدُ `action:clients:member_owner` | **DONE** — `MobileClientMembersTest` |
+| Clients | تغييرُ دور | members role | `ClientMembers::setRole` | — | `PUT clients/{client}/members/{id}` (`api.php:204`) | `clients:e` · إلى owner ⇒ تصعيد | **DONE** — `MobileClientMembersTest` |
+| Clients | سحبُ الوصول | members revoke | `ClientMembers::revoke` (تعليقٌ فوريُّ الأثر) | — | `DELETE clients/{client}/members/{id}` (`api.php:205`) | `clients:e` + تصعيدُ `action:clients:member_revoke` | **DONE** — `MobileClientMembersTest` |
+
+والسياجُ نفسُه مُثبَتٌ هجوميّاً في `MobilePortalGuardTest` بموظّفٍ كاملِ المصفوفة
+حُوِّل حسابُه `client`: كلُّ سطحٍ داخليّ (crud/sync/approvals/dm/schema/search/
+تعليقاتُ feed وملفّاتُ الوحدات المحجوبة) ⇒ 404 عبر النداء المباشر لا إخفاءَ تنقّل.
+
 ## عزلُ المسارات — العقدُ الأمنيّ (Critic F9)
 
 كلُّ حرفيٍّ (context/bootstrap/schema/approvals/home/search/prefs/notifications/
@@ -143,6 +170,6 @@ comments/dm/push/files/identity/tracking/sync) مُسجَّلٌ **قبل** ال�
 
 ---
 
-**التحقّق:** المصفوفةُ تغطّي ٥٨ مساراً في `routes/api.php` + وثيقتَي well-known.
+**التحقّق:** المصفوفةُ تغطّي ٧٥ مساراً في `routes/api.php` + وثيقتَي well-known.
 كلُّ `DONE` مسنودٌ باختبارٍ مذكورٍ في `tests/Feature/Mobile/`. لا مسارٌ موثَّقٌ غيرُ
 موجود، ولا قدرةٌ مُدَّعاةٌ بلا كودٍ + اختبار.

@@ -69,6 +69,9 @@ class MobileFileController extends V1Controller
             'size'      => ['nullable', 'integer', 'min:0'],
         ], [], ['filename' => 'اسم الملف', 'mime' => 'نوع المحتوى', 'size' => 'الحجم']);
 
+        // حسابُ العميل: الرفعُ على سجلات وحدات سطحه فقط (منعٌ فوق المصفوفة · §28/§47)
+        $this->guardClientModule($data['module']);
+
         // نقطةُ التخويلِ نفسُها التي يفرضها «الإتمام» — إخفاقٌ مبكّرٌ لا IDOR
         AttachmentService::guardRecord($data['module'], $data['record_id'], 'v');
 
@@ -221,6 +224,7 @@ class MobileFileController extends V1Controller
 
         try {
             $data = AttachmentService::validateUpload($r);
+            $this->guardClientModule($data['module']);   // سطحُ العميل فقط (§28/§47)
             AttachmentService::guardRecord($data['module'], $data['record_id'], 'v');
             $files = AttachmentService::filesFromRequest($r);
             $made = AttachmentService::attach($data['module'], $data['record_id'], $files, $data);
@@ -254,7 +258,11 @@ class MobileFileController extends V1Controller
     {
         $this->tagMobile($r);
 
-        return AttachmentService::download(Attachment::findOrFail($id));
+        $att = Attachment::findOrFail($id);
+        // حسابُ العميل: مرفقُ وحدةٍ خارج سطحه 404 قبل أيّ بايت (منعٌ فوق المصفوفة)
+        $this->guardClientModule((string) $att->module);
+
+        return AttachmentService::download($att);
     }
 
     /**
@@ -270,7 +278,23 @@ class MobileFileController extends V1Controller
     {
         $this->tagMobile($r);
 
-        return AttachmentService::stream(Attachment::findOrFail($id));
+        $att = Attachment::findOrFail($id);
+        $this->guardClientModule((string) $att->module);   // سطحُ العميل فقط
+
+        return AttachmentService::stream($att);
+    }
+
+    /**
+     * سياجُ وحدةِ الملفّ لحساب العميل (تطبيق العميل · §28/§47): وحدةٌ خارج
+     * `MobilePortalGuard::MODULE_ALLOW` ⇒ 404 (لا كشفَ وجود) — فوق `guardRecord`
+     * لا بديلاً عنه (منعٌ فوق المصفوفة ولو منح دورٌ مُساءُ الضبط وحدةً داخلية).
+     */
+    private function guardClientModule(string $module): void
+    {
+        if (hub_is_client(auth()->user())
+            && ! \App\Http\Middleware\MobilePortalGuard::clientModuleAllowed($module)) {
+            abort(Api::error(Api::RESOURCE_NOT_FOUND, 404, 'غير موجود'));
+        }
     }
 
     // ═══════════════════════ F.3 · الماسح (QR/سيريال) ═══════════════════════
