@@ -504,6 +504,9 @@ Route::middleware('auth')->group(function () {
     Route::get('dm/{userId}', [DmController::class, 'thread'])->name('dm.thread');
     Route::post('dm/{userId}', [DmController::class, 'send'])->name('dm.send');
 
+    // ── بحثُ الرسائل عبر السطوح (§25) — في نصّ الخلاصة/القنوات/المحادثات، ما يراه القارئ ──
+    Route::get('search/messages', [\App\Http\Controllers\Web\MessageSearchController::class, 'index'])->name('search.messages');
+
     // ── المحفوظاتُ الشخصيّة (§27) — «احفظ لاحقاً» لأيّ رسالة، مرجعٌ لا نسخُ محتوى ──
     Route::get('saved', [SavedController::class, 'index'])->name('saved.index');
     Route::post('saved', [SavedController::class, 'toggle'])->name('saved.toggle');

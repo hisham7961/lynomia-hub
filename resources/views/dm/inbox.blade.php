@@ -143,8 +143,8 @@
                             {{ $m->created_at?->isToday() ? 'اليوم' : ($m->created_at?->isYesterday() ? 'أمس' : $m->created_at?->format('Y-m-d')) }}
                         </div>
                     @endif
-                    {{-- الوارد يمين والصادر يسار كما في تطبيقات المحادثة العربية --}}
-                    <div class="msgw" style="max-width:76%;{{ $mine ? 'align-self:flex-end' : 'align-self:flex-start' }};
+                    {{-- الوارد يمين والصادر يسار كما في تطبيقات المحادثة العربية · مرساةُ الرابط الدائم --}}
+                    <div class="msgw" id="dm-{{ $m->id }}" style="max-width:76%;{{ $mine ? 'align-self:flex-end' : 'align-self:flex-start' }};
                                 margin-top:{{ $grouped ? '1px' : '7px' }}">
                         @if ($m->deleted_at)
                             {{-- أثرٌ يقول ماذا جرى: الاختفاءُ بلا تفسيرٍ يجعل الطرف الآخر يظنّ أنه أخطأ القراءة --}}

@@ -114,13 +114,12 @@ class SavedController extends Controller
 
             $m = DmMessage::find($s->target_id);
             if (! $m || ! in_array($me->id, [$m->from_id, $m->to_id], true)) return $base;
-            $otherId = $m->from_id === $me->id ? $m->to_id : $m->from_id;
 
             return array_merge($base, [
                 'available' => $m->deleted_at === null,
                 'title'     => $m->deleted_at === null ? Str::limit(trim((string) $m->body), 90) : 'حُذفت رسالة',
                 'author'    => optional(User::find($m->from_id))->name,
-                'link'      => route('dm.thread', $otherId),
+                'link'      => \App\Support\MessageLink::dm($m, (string) $me->id),
             ]);
         } catch (\Throwable $e) {
             return $base;   // لم يعد يُرى — يبقى صفُّ المحفوظةِ كي يُزيلها صاحبُها

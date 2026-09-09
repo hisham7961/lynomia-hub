@@ -93,6 +93,9 @@ return [
                     ['type' => 'personal', 'route' => 'saved.index', 'guard' => 'authed', 'importance' => 'secondary',
                         'label' => 'المحفوظات', 'icon' => '🔖', 'route_prefix' => 'saved', 'routes' => ['saved.index'],
                         'synonyms' => ['saved', 'محفوظات', 'bookmarks', 'احفظ لاحقاً']],
+                    ['type' => 'personal', 'route' => 'search.messages', 'guard' => 'authed', 'importance' => 'secondary',
+                        'label' => 'بحثُ الرسائل', 'icon' => '🔎', 'routes' => ['search.messages'],
+                        'synonyms' => ['message search', 'بحث الرسائل', 'ابحث في المحادثات']],
                 ]],
                 'inbox' => ['label' => 'صندوقي', 'order' => 4, 'destinations' => [
                     ['type' => 'center', 'center' => 'inboxdocs', 'importance' => 'primary', 'center_relation' => ['knowledge']],
