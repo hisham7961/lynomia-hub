@@ -450,7 +450,20 @@ class ConversationController extends Controller
             ? Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
             : (string) $r->query('cursor', '');
 
-        return response()->json(['events' => $events, 'cursor' => $next]);
+        // §typing مؤشّرُ الكتابةِ العابر — أسماءُ الأعضاءِ الكاتبين الآن (عدا القارئ)
+        $typing = User::whereIn('id', \App\Support\Typing::current((string) $conv->id, (string) auth()->id()))
+            ->pluck('name')->all();
+
+        return response()->json(['events' => $events, 'cursor' => $next, 'typing' => $typing]);
+    }
+
+    /** §typing نبضةُ «أكتب الآن» — عضويّةٌ تكفي، عابرةٌ لا تُدقَّق (Typing) */
+    public function typing(string $id)
+    {
+        [$conv] = self::guardConversation($id, 'v');
+        \App\Support\Typing::ping((string) $conv->id, (string) auth()->id());
+
+        return response()->noContent();
     }
 
     /* ────────── تفضيلُ الإشعار لكلِّ عضوٍ (§16) ────────── */

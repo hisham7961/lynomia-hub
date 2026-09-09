@@ -37,7 +37,9 @@ class DmController extends Controller
         foreach ($rows as $uid => $at) {
             if (! $at) continue;
             $c = \Illuminate\Support\Carbon::parse($at);
-            $out[$uid] = ['online' => $c->gt(now()->subMinutes(5)), 'at' => $c];
+            // الحالةُ الخشنة (§presence) فوق «متصل» الثنائيّ — للتواصل لا للمراقبة
+            $out[$uid] = ['online' => $c->gt(now()->subMinutes(5)), 'at' => $c,
+                'state' => \App\Support\Presence::state($c)];
         }
 
         return $out;
@@ -409,7 +411,23 @@ class DmController extends Controller
             ? \App\Support\Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
             : (string) $r->query('cursor', '');
 
-        return response()->json(['events' => $events, 'cursor' => $next]);
+        // §typing الطرفُ الآخرُ يكتب الآن؟ (عابرٌ لا يُدقَّق) — الاسمُ إن كان في النافذة
+        $typing = in_array((string) $other->id, \App\Support\Typing::current($key, $me), true)
+            ? [$other->name] : [];
+
+        return response()->json(['events' => $events, 'cursor' => $next, 'typing' => $typing]);
+    }
+
+    /** §typing نبضةُ «أكتب الآن» في خيطِ محادثة — المفتاحُ من auth+الطرف (F8)، عابرة */
+    public function typing(string $userId)
+    {
+        $other = User::findOrFail($userId);
+        abort_if($other->id === auth()->id(), 404);
+        abort_unless(self::dmReachable($other), 404);
+
+        \App\Support\Typing::ping(DmMessage::threadKey((string) auth()->id(), (string) $other->id), (string) auth()->id());
+
+        return response()->noContent();
     }
 
     /**

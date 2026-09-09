@@ -51,11 +51,40 @@
     target.appendChild(el);
   }
 
+  function renderTyping(box, names) {
+    if (!box) return;
+    if (!names || !names.length) { box.textContent = ''; box.hidden = true; return; }
+    var t = names.length === 1 ? (names[0] + ' يكتب…')
+      : (names.length === 2 ? (names[0] + ' و' + names[1] + ' يكتبان…')
+      : (names.length + ' أشخاص يكتبون…'));
+    box.textContent = '✍️ ' + t; box.hidden = false;
+  }
+
+  function wireComposer(host) {
+    var typeUrl = host.getAttribute('data-typing-url');
+    var csrf = host.getAttribute('data-csrf');
+    var sel = host.getAttribute('data-composer');
+    if (!typeUrl || !sel) return;
+    var box = sel && document.querySelector(sel);
+    if (!box) return;
+    var last = 0;
+    box.addEventListener('input', function () {
+      var now = Date.now();
+      if (now - last < 3000) return;   // مضبوطُ المعدّل: نبضةٌ كلَّ ٣ ثوانٍ على الأكثر
+      last = now;
+      fetch(typeUrl, { method: 'POST', credentials: 'same-origin',
+        headers: { 'X-CSRF-TOKEN': csrf || '', 'X-Requested-With': 'XMLHttpRequest' } }).catch(function () {});
+    });
+  }
+
   function start(host) {
     var url = host.getAttribute('data-poll-url');
     var kind = host.getAttribute('data-kind');
     var target = document.getElementById(host.getAttribute('data-target'));
     if (!url || !target) return;
+
+    var typingBox = document.getElementById(host.getAttribute('data-typing-box') || '');
+    wireComposer(host);
 
     var cursor = host.getAttribute('data-cursor') || '';
     var errors = 0;
@@ -77,6 +106,7 @@
           else appendChannel(target, ev);
           added = true;
         });
+        renderTyping(typingBox, data && data.typing);
         if (added && kind === 'dm') target.scrollTop = target.scrollHeight;
       }).catch(function () {
         if (++errors >= MAX_ERRORS) clearInterval(timer);   // تدهورٌ رشيق

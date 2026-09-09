@@ -71,6 +71,9 @@
             'comments'        => $messages,
             'users'           => $users,
         ])
+        {{-- مؤشّرُ الكتابةِ العابر — يُملأ حيّاً من النبضة، ويختفي عند غيابِ الإشارة --}}
+        <div class="sub" id="conv-typing" hidden aria-live="polite"
+             style="font-size:12px;padding:4px 2px;min-height:16px"></div>
     </div>
 
     <div class="card">
@@ -150,9 +153,14 @@
     </div>
 </div>
 
-{{-- §39 الاستطلاعُ التدريجيّ — رسائلُ القناةِ الجديدةُ منذ مؤشّرٍ بلا إعادةِ جلبِ الخيط --}}
+{{-- §39 الاستطلاعُ التدريجيّ — رسائلُ القناةِ الجديدةُ منذ مؤشّرٍ بلا إعادةِ جلبِ الخيط.
+     ومؤشّرُ الكتابةِ العابر (Typing): يُلمِّح عند إدخالِ حقلِ الناشر ويُعرَض في النبضة. --}}
 <div hidden data-collab-poll data-kind="channel" data-target="cmt-list"
-     data-poll-url="{{ route('conversations.since', $conv->id) }}" data-cursor="{{ $sinceCursor ?? '' }}"></div>
+     data-poll-url="{{ route('conversations.since', $conv->id) }}" data-cursor="{{ $sinceCursor ?? '' }}"
+     @if ($canPost)
+        data-typing-url="{{ route('conversations.typing', $conv->id) }}" data-composer="#comments .cform textarea[name=body]"
+        data-typing-box="conv-typing" data-csrf="{{ csrf_token() }}"
+     @endif>
 <script src="{{ asset('js/collab-poll.js') }}?v={{ config('hub.version') }}" defer></script>
 
 @endsection
