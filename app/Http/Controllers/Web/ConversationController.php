@@ -450,9 +450,11 @@ class ConversationController extends Controller
             ? Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
             : (string) $r->query('cursor', '');
 
-        // §typing مؤشّرُ الكتابةِ العابر — أسماءُ الأعضاءِ الكاتبين الآن (عدا القارئ)
-        $typing = User::whereIn('id', \App\Support\Typing::current((string) $conv->id, (string) auth()->id()))
-            ->pluck('name')->all();
+        // §typing مؤشّرُ الكتابةِ العابر — أسماءُ الأعضاءِ الكاتبين الآن (عدا القارئ).
+        // بوّابةُ القدرة: إن أُطفئ «مؤشّر الكتابة» لا تُبثّ إشارةٌ (فشلٌ آمنٌ لا تسريب).
+        $typing = hub_capability('collab.typing')
+            ? User::whereIn('id', \App\Support\Typing::current((string) $conv->id, (string) auth()->id()))->pluck('name')->all()
+            : [];
 
         return response()->json(['events' => $events, 'cursor' => $next, 'typing' => $typing]);
     }
@@ -460,6 +462,8 @@ class ConversationController extends Controller
     /** §typing نبضةُ «أكتب الآن» — عضويّةٌ تكفي، عابرةٌ لا تُدقَّق (Typing) */
     public function typing(string $id)
     {
+        // بوّابةُ القدرة: «مؤشّر الكتابة» اختياريّة — إن أُطفئت يفشل المسارُ بأمان (٤٠٤)
+        abort_unless(hub_capability('collab.typing'), 404);
         [$conv] = self::guardConversation($id, 'v');
         \App\Support\Typing::ping((string) $conv->id, (string) auth()->id());
 

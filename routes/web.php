@@ -800,6 +800,13 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/security/users/{id}/revoke', [SecurityController::class, 'revokeUser'])->name('security.user.revoke');
     Route::get('admin/settings', [SettingController::class, 'edit'])->name('settings.edit');
     Route::post('admin/settings', [SettingController::class, 'update'])->name('settings.update');
+    // سجلُّ القدرات — الإدارة ← التهيئة ← القدرات (المالك حصراً · FeatureController::gate).
+    //    القراءةُ للسجلّ، والتبديلُ عبر Settings::put (كاتبٌ واحد). {key} يحمل نقاطاً.
+    Route::get('admin/features', [\App\Http\Controllers\Web\FeatureController::class, 'index'])->name('features.index');
+    Route::get('admin/features/{key}', [\App\Http\Controllers\Web\FeatureController::class, 'show'])
+        ->where('key', '[A-Za-z0-9_.\-]+')->name('features.show');
+    Route::post('admin/features/{key}/toggle', [\App\Http\Controllers\Web\FeatureController::class, 'toggle'])
+        ->where('key', '[A-Za-z0-9_.\-]+')->middleware('throttle:30,1')->name('features.toggle');
     Route::post('admin/settings/odoo-test', [SettingController::class, 'odooTest'])->name('settings.odoo.test')->middleware('throttle:10,1');   // (WP-9.4 · §7.10)
     Route::get('admin/flows', [FlowController::class, 'index'])->name('flows.index');
     Route::post('admin/flows', [FlowController::class, 'store'])->name('flows.store');

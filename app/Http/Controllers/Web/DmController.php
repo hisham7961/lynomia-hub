@@ -26,6 +26,9 @@ class DmController extends Controller
      */
     public static function presence(array $userIds): array
     {
+        // بوّابةُ القدرة (سجلّ القدرات · §11): «الحضور» اختياريّة — إن أُطفئت من مركز
+        // القدرات لا حضورَ في أيِّ سطح (فشلٌ آمنٌ لا تسريب). مستقلّةٌ عن الصلاحية.
+        if (! hub_capability('collab.presence')) return [];
         if (! $userIds || ! \Illuminate\Support\Facades\Schema::hasTable('sessions_log')) return [];
 
         $rows = \Illuminate\Support\Facades\DB::table('sessions_log')
@@ -411,8 +414,9 @@ class DmController extends Controller
             ? \App\Support\Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
             : (string) $r->query('cursor', '');
 
-        // §typing الطرفُ الآخرُ يكتب الآن؟ (عابرٌ لا يُدقَّق) — الاسمُ إن كان في النافذة
-        $typing = in_array((string) $other->id, \App\Support\Typing::current($key, $me), true)
+        // §typing الطرفُ الآخرُ يكتب الآن؟ (عابرٌ لا يُدقَّق) — الاسمُ إن كان في النافذة.
+        // بوّابةُ القدرة: إن أُطفئ «مؤشّر الكتابة» لا إشارةَ (فشلٌ آمن).
+        $typing = (hub_capability('collab.typing') && in_array((string) $other->id, \App\Support\Typing::current($key, $me), true))
             ? [$other->name] : [];
 
         return response()->json(['events' => $events, 'cursor' => $next, 'typing' => $typing]);
@@ -421,6 +425,8 @@ class DmController extends Controller
     /** §typing نبضةُ «أكتب الآن» في خيطِ محادثة — المفتاحُ من auth+الطرف (F8)، عابرة */
     public function typing(string $userId)
     {
+        // بوّابةُ القدرة: «مؤشّر الكتابة» اختياريّة — إن أُطفئت يفشل المسارُ بأمان (٤٠٤)
+        abort_unless(hub_capability('collab.typing'), 404);
         $other = User::findOrFail($userId);
         abort_if($other->id === auth()->id(), 404);
         abort_unless(self::dmReachable($other), 404);
