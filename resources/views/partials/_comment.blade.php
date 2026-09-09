@@ -79,6 +79,23 @@
         @if ($canPin)
             <form method="POST" action="{{ route('comments.pin', $c->id) }}">@csrf<button class="lnk sub" type="submit">{{ $c->pinned ? 'فك التثبيت' : '📌 تثبيت' }}</button></form>
         @endif
+        {{-- §27 احفظ لاحقاً — مرجعٌ شخصيّ لأيّ رسالة (متاحٌ لمن يراها) --}}
+        <form method="POST" action="{{ route('saved.toggle') }}" class="inline">
+            @csrf<input type="hidden" name="target_type" value="comment"><input type="hidden" name="target_id" value="{{ $c->id }}">
+            <button class="lnk sub" type="submit">🔖 حفظ</button>
+        </form>
+        {{-- §22 تعديلٌ لصاحب الرسالة (غيرِ المحوَّلة لمهمة) — نموذجٌ يُكشف بلا جافاسكربت --}}
+        @if ($c->user_id === auth()->id() && ! $c->task_id)
+            <details class="inline">
+                <summary class="lnk sub" style="cursor:pointer;display:inline">✏ تعديل</summary>
+                <form method="POST" action="{{ route('comments.edit', $c->id) }}" style="margin-top:6px">
+                    @csrf
+                    <label class="vh" for="edit-{{ $c->id }}">تعديل النص</label>
+                    <textarea class="inp" id="edit-{{ $c->id }}" name="body" rows="2" maxlength="4000" required>{{ $c->body }}</textarea>
+                    <button class="btn sm" type="submit" style="margin-top:6px">حفظ التعديل</button>
+                </form>
+            </details>
+        @endif
         @if ($c->user_id === auth()->id() || $canPin)
             <form method="POST" action="{{ route('comments.resolve', $c->id) }}">@csrf<button class="lnk sub" type="submit">{{ $c->resolved_at ? 'إعادة فتح' : '✔ حل' }}</button></form>
         @endif

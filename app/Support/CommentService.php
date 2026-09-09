@@ -126,6 +126,36 @@ class CommentService
     }
 
     /**
+     * **تحريرُ تعليقٍ يعيد الموديل** (§22) — نقطةُ التحرير الواحدة (ويب/جوال): يُحدّث
+     * النصَّ ويختم `edited_at` الصادق، ويعيد استخلاصَ الإشارات **مُنطَّقةً بالهدف**
+     * (نظيرُ الإنشاء) كي يبقى تبويبُ «ما ذكرني» صادقاً. لا يُعيد الحرسَ — يفترض أنّ
+     * المُنادي تحقّق من الملكيّة ورؤيةِ الهدف سلفاً (نظيرُ `create`).
+     *
+     * **لا سبامَ تحريرٍ:** يُشعَر **المُضافون حديثاً** فقط (فرقُ المجموعتين) — لا
+     * يُعاد إشعارُ من كان مذكوراً قبلاً على تحريرٍ لا يخصّه.
+     */
+    public static function edit(User $actor, Comment $c, string $body): Comment
+    {
+        $old = array_map('strval', (array) $c->mentions);
+        $mentions = self::extractMentions($actor, $body, [], (string) $c->module, $c->record_id);
+
+        $attrs = ['body' => $body, 'mentions' => $mentions ?: null, 'updated_at' => now()];
+        if (hub_has_col('comments', 'edited_at')) $attrs['edited_at'] = now();
+        $c->update($attrs);
+
+        $added = array_values(array_diff($mentions, $old, [$actor->id]));
+        if ($added) {
+            $label = $c->module === 'feed' ? 'قناة الفريق' : (hub_mod($c->module)['label'] ?? $c->module);
+            $excerpt = Str::limit(trim($c->body), 60);
+            foreach ($added as $uid) {
+                self::notify($uid, 'mention', 'ذكرك ' . $actor->name . " في {$label}: {$excerpt}", $c->module, $c->record_id);
+            }
+        }
+
+        return $c;
+    }
+
+    /**
      * **المنشن مُنطَّقٌ بالهدف** (§16/§18): من القائمة الصريحة + `@اسم` في النص
      * (تطابقُ بادئةِ الاسم) — لكن **لا يُحلّ إلّا لمن يقدر فتحَ الهدف**. الإشارةُ
      * إشعارٌ يحمل مقتطفَ الرسالة؛ فحلُّها على كلِّ المنظّمة كان يُسرّب سطراً من
@@ -207,22 +237,49 @@ class CommentService
             ->pluck('id')->values()->all();
     }
 
-    /** إشعارات التعليق: للمذكورين، ولصاحب التعليق الأصلي عند الرد — منقولٌ من store */
+    /**
+     * إشعارات التعليق: للمذكورين، ولصاحب التعليق الأصلي عند الرد. و**تفضيلُ إشعارِ
+     * المحادثة** (§16) يُحترَم لرسائل القنوات (التي تحمل `conversation_id`): «muted»
+     * يكتم كلَّ إشعارٍ من القناة، و«mentions» يمرّر الإشاراتِ ويكتم إشعارَ الرد،
+     * و«all» يمرّ الكلَّ. الخلاصةُ والسجلاتُ (بلا حاوية) بلا تفضيلٍ لكلِّ محادثة.
+     */
     public static function notifyAround(Comment $c, User $actor): void
     {
         $label = $c->module === 'feed' ? 'قناة الفريق' : (hub_mod($c->module)['label'] ?? $c->module);
         $excerpt = Str::limit(trim($c->body), 60);
+        $convId = $c->conversation_id ?? null;   // رسائلُ القنوات تحمله؛ الخلاصةُ/السجلُّ لا
 
         foreach ((array) $c->mentions as $uid) {
+            if (self::convMutes($convId, (string) $uid, true)) continue;
             self::notify($uid, 'mention', 'ذكرك ' . $actor->name . " في {$label}: {$excerpt}", $c->module, $c->record_id);
         }
 
         if ($c->parent_id) {
             $parent = Comment::find($c->parent_id);
-            if ($parent && $parent->user_id !== $actor->id && ! in_array($parent->user_id, (array) $c->mentions, true)) {
+            if ($parent && $parent->user_id !== $actor->id && ! in_array($parent->user_id, (array) $c->mentions, true)
+                && ! self::convMutes($convId, (string) $parent->user_id, false)) {
                 self::notify($parent->user_id, 'reply', 'ردّ ' . $actor->name . " على تعليقك في {$label}: {$excerpt}", $c->module, $c->record_id);
             }
         }
+    }
+
+    /**
+     * **هل يكتم تفضيلُ محادثةٍ إشعاراً لعضوٍ؟** (§16) — «muted» يكتم الكلَّ،
+     * و«mentions» يكتم غيرَ الإشارة (الرد)، و«all» لا يكتم. بلا حاويةٍ (خلاصة/سجل)
+     * أو بلا عضويّة: لا كتمَ لكلِّ محادثة (يبقى الكتمُ العامّ على مستوى المستخدم كما هو).
+     */
+    private static function convMutes(?string $convId, string $uid, bool $isMention): bool
+    {
+        if (! $convId) return false;
+
+        $m = \App\Models\ConversationMember::where('conversation_id', $convId)
+            ->where('user_id', $uid)->first();
+        if (! $m) return false;
+
+        $pref = $m->effectiveNotifyPref();
+
+        return $pref === \App\Support\Collaboration::NOTIFY_MUTED
+            || ($pref === \App\Support\Collaboration::NOTIFY_MENTIONS && ! $isMention);
     }
 
     /** غلافُ الإشعار — `feed` بلا وحدة/سجل (لا رابطَ يُبنى منه) — منقولٌ من store */

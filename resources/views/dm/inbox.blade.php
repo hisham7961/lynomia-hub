@@ -143,8 +143,8 @@
                             {{ $m->created_at?->isToday() ? 'اليوم' : ($m->created_at?->isYesterday() ? 'أمس' : $m->created_at?->format('Y-m-d')) }}
                         </div>
                     @endif
-                    {{-- الوارد يمين والصادر يسار كما في تطبيقات المحادثة العربية --}}
-                    <div class="msgw" style="max-width:76%;{{ $mine ? 'align-self:flex-end' : 'align-self:flex-start' }};
+                    {{-- الوارد يمين والصادر يسار كما في تطبيقات المحادثة العربية · مرساةُ الرابط الدائم --}}
+                    <div class="msgw" id="dm-{{ $m->id }}" style="max-width:76%;{{ $mine ? 'align-self:flex-end' : 'align-self:flex-start' }};
                                 margin-top:{{ $grouped ? '1px' : '7px' }}">
                         @if ($m->deleted_at)
                             {{-- أثرٌ يقول ماذا جرى: الاختفاءُ بلا تفسيرٍ يجعل الطرف الآخر يظنّ أنه أخطأ القراءة --}}
@@ -169,6 +169,28 @@
                                         <button class="lnkbtn" type="submit" aria-label="سحب الرسالة" title="سحب">🚫</button>
                                     </form>
                                 @endif
+                            </div>
+                            {{-- §21 تفاعلاتُ الرسالة — على جدول reactions نفسِه، لطرفَي المحادثة --}}
+                            @php $mReacts = ($dmReactions ?? [])[$m->id] ?? []; @endphp
+                            <div class="crow" style="gap:4px;flex-wrap:wrap;margin-top:2px;{{ $mine ? 'justify-content:flex-end' : '' }}">
+                                @foreach ($mReacts as $emoji => $people)
+                                    <form method="POST" action="{{ route('dm.react', $m->id) }}" class="inline">
+                                        @csrf<input type="hidden" name="emoji" value="{{ $emoji }}">
+                                        <button class="lnkbtn" type="submit" style="border:1px solid var(--ln);border-radius:99px;padding:1px 7px;font-size:12px"
+                                                title="{{ collect($people)->pluck('name')->join('، ') }}">{{ $emoji }} {{ count($people) }}</button>
+                                    </form>
+                                @endforeach
+                                <details class="inline">
+                                    <summary class="lnkbtn" style="cursor:pointer;list-style:none;font-size:12px" title="تفاعل" aria-label="تفاعل">☺</summary>
+                                    <div class="crow" style="gap:2px;margin-top:2px">
+                                        @foreach (\App\Http\Controllers\Web\CommentController::REACTIONS as $e)
+                                            <form method="POST" action="{{ route('dm.react', $m->id) }}" class="inline">
+                                                @csrf<input type="hidden" name="emoji" value="{{ $e }}">
+                                                <button class="lnkbtn" type="submit" style="font-size:14px">{{ $e }}</button>
+                                            </form>
+                                        @endforeach
+                                    </div>
+                                </details>
                             </div>
                         @endif
                     </div>

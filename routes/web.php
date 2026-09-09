@@ -14,6 +14,7 @@ use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\CapacityController;
 use App\Http\Controllers\Web\CeoController;
 use App\Http\Controllers\Web\CommentController;
+use App\Http\Controllers\Web\SavedController;
 use App\Http\Controllers\Web\ConversationController;
 use App\Http\Controllers\Web\CostController;
 use App\Http\Controllers\Web\CustomFieldController;
@@ -458,6 +459,7 @@ Route::middleware('auth')->group(function () {
     // ── التعليقات وقناة الفريق ──
     Route::get('feed', [CommentController::class, 'feed'])->name('feed');
     Route::post('comments', [CommentController::class, 'store'])->name('comments.store');
+    Route::post('comments/{id}/edit', [CommentController::class, 'edit'])->name('comments.edit');
     Route::post('comments/{id}/pin', [CommentController::class, 'pin'])->name('comments.pin');
     Route::post('comments/{id}/task', [CommentController::class, 'toTask'])->name('comments.task');
     Route::delete('comments/{id}', [CommentController::class, 'destroy'])->name('comments.destroy');
@@ -474,9 +476,18 @@ Route::middleware('auth')->group(function () {
     //    (PortalGuard فوق الكل) — قناةُ جمهورِه تصله عبر portal.conversation.
     //    الحرسُ في المتحكّم: عضويّةٌ فعّالة + نطاقٌ + صلاحيةُ الوحدةِ الهدف. ──
     Route::get('conversations', [ConversationController::class, 'index'])->name('conversations.index');
+    Route::get('conversations/directory', [ConversationController::class, 'directory'])->name('conversations.directory');
     Route::post('conversations', [ConversationController::class, 'store'])
         ->middleware('throttle:30,1')->name('conversations.store');
+    Route::post('conversations/{id}/join', [ConversationController::class, 'join'])
+        ->middleware('throttle:30,1')->name('conversations.join');
     Route::get('conversations/{id}', [ConversationController::class, 'show'])->name('conversations.show');
+    Route::post('conversations/{id}/notify', [ConversationController::class, 'setNotifyPref'])
+        ->middleware('throttle:60,1')->name('conversations.notify');
+    Route::post('conversations/{id}/favorite', [ConversationController::class, 'toggleFavorite'])
+        ->middleware('throttle:60,1')->name('conversations.favorite');
+    Route::post('conversations/{id}/archive', [ConversationController::class, 'toggleArchive'])
+        ->middleware('throttle:60,1')->name('conversations.archive');
     Route::middleware('throttle:60,1')->group(function () {
         Route::post('conversations/{id}/members', [ConversationController::class, 'addMember'])->name('conversations.member.add');
         Route::post('conversations/{id}/members/remove', [ConversationController::class, 'removeMember'])->name('conversations.member.remove');
@@ -494,9 +505,19 @@ Route::middleware('auth')->group(function () {
     // ── المراسلة الداخلية المباشرة ──
     Route::get('dm', [DmController::class, 'inbox'])->name('dm.inbox');
     Route::post('dm', [DmController::class, 'start'])->name('dm.start');
+    Route::post('dm/msg/{id}/edit', [DmController::class, 'edit'])->name('dm.edit');
+    Route::post('dm/msg/{id}/react', [DmController::class, 'react'])->name('dm.react');
     Route::delete('dm/msg/{id}', [DmController::class, 'destroy'])->name('dm.destroy');
     Route::get('dm/{userId}', [DmController::class, 'thread'])->name('dm.thread');
     Route::post('dm/{userId}', [DmController::class, 'send'])->name('dm.send');
+
+    // ── بحثُ الرسائل عبر السطوح (§25) — في نصّ الخلاصة/القنوات/المحادثات، ما يراه القارئ ──
+    Route::get('search/messages', [\App\Http\Controllers\Web\MessageSearchController::class, 'index'])->name('search.messages');
+
+    // ── المحفوظاتُ الشخصيّة (§27) — «احفظ لاحقاً» لأيّ رسالة، مرجعٌ لا نسخُ محتوى ──
+    Route::get('saved', [SavedController::class, 'index'])->name('saved.index');
+    Route::post('saved', [SavedController::class, 'toggle'])->name('saved.toggle');
+    Route::delete('saved/{id}', [SavedController::class, 'destroy'])->name('saved.destroy');
 
     // ── التخصيص الشخصي ──
     Route::get('personalize', [PrefController::class, 'edit'])->name('prefs.edit');
