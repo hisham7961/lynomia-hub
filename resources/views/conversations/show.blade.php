@@ -10,9 +10,16 @@
 
 <div class="hero">
     <div>
-        <h2># {{ $conv->title ?: 'قناة' }}</h2>
+        @if (($isGroup ?? false))
+            @php $gnames = $members->where('user_id', '!=', auth()->id())->map(fn ($m) => $m->user?->name)->filter()->take(4)->implode('، '); @endphp
+            <h2>👥 {{ $conv->title ?: ($gnames ?: 'مجموعة') }}</h2>
+        @else
+            <h2># {{ $conv->title ?: 'قناة' }}</h2>
+        @endif
         <div class="sub">
-            @if (in_array($conv->audience, ['client', 'both'], true))
+            @if (($isGroup ?? false))
+                <span class="bdg">🔒 مجموعةٌ خاصّة</span>
+            @elseif (in_array($conv->audience, ['client', 'both'], true))
                 <span class="bdg wn">👥 يبلغها العميل عبر بوابته</span>
             @else
                 <span class="bdg">🔒 قناةٌ داخليّة</span>
@@ -99,7 +106,25 @@
             </div>
         @endforeach
 
-        @if ($canManage)
+        @if (($isGroup ?? false))
+            {{-- §35 مجموعة: الإضافةُ تُنشئ مجموعةً جديدة (حفظُ الجمهور التاريخيّ) --}}
+            <form method="POST" action="{{ route('groups.fork', $conv->id) }}" style="margin-top:10px">
+                @csrf
+                <label class="lbl">إضافةُ مشاركين</label>
+                <select class="inp" name="participants[]" multiple size="4" required>
+                    @foreach ($users as $uid => $name)
+                        @unless ($members->contains('user_id', $uid))
+                            <option value="{{ $uid }}">{{ $name }}</option>
+                        @endunless
+                    @endforeach
+                </select>
+                <div class="sub" style="margin-top:4px">تُنشئ الإضافةُ مجموعةً جديدة — لا يرى المُضافون ما مضى.</div>
+                <button class="btn sm" type="submit" style="margin-top:6px">مجموعةٌ جديدةٌ بالمُضافين</button>
+            </form>
+            <form method="POST" action="{{ route('groups.leave', $conv->id) }}" style="margin-top:10px" data-confirm="مغادرةُ المجموعة؟">
+                @csrf<button class="lnk sub" type="submit">↩ مغادرةُ المجموعة</button>
+            </form>
+        @elseif ($canManage)
             <form method="POST" action="{{ route('conversations.member.add', $conv->id) }}" style="margin-top:10px">
                 @csrf
                 <label class="lbl">إضافةُ عضو</label>
