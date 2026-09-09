@@ -11,7 +11,7 @@ class DmMessage extends Model
 
     public $timestamps = false;
     protected $guarded = ['id'];
-    protected $casts = ['read_at' => 'datetime', 'created_at' => 'datetime', 'deleted_at' => 'datetime'];
+    protected $casts = ['read_at' => 'datetime', 'created_at' => 'datetime', 'deleted_at' => 'datetime', 'edited_at' => 'datetime'];
 
     /**
      * الرسائل الحيّة — والمحذوفةُ تبقى صفّاً يُقرأ منه «حُذفت رسالة».
