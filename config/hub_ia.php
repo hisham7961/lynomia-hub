@@ -90,6 +90,9 @@ return [
                         'label' => 'المحادثات', 'route_prefix' => 'conversations', 'routes' => ['conversations.index', 'conversations.show'],
                         'synonyms' => ['conversations', 'محادثات', 'chat']],
                     ['type' => 'center', 'center' => 'feed', 'importance' => 'primary'],
+                    ['type' => 'personal', 'route' => 'saved.index', 'guard' => 'authed', 'importance' => 'secondary',
+                        'label' => 'المحفوظات', 'icon' => '🔖', 'route_prefix' => 'saved', 'routes' => ['saved.index'],
+                        'synonyms' => ['saved', 'محفوظات', 'bookmarks', 'احفظ لاحقاً']],
                 ]],
                 'inbox' => ['label' => 'صندوقي', 'order' => 4, 'destinations' => [
                     ['type' => 'center', 'center' => 'inboxdocs', 'importance' => 'primary', 'center_relation' => ['knowledge']],

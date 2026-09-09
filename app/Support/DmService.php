@@ -67,6 +67,20 @@ class DmService
     }
 
     /**
+     * **تحريرُ رسالةٍ مباشرة** (§22) — نقطةُ التحرير الواحدة (ويب/جوال): يُحدّث النصَّ
+     * ويختم `edited_at` الصادق. لا يُعيد الحرسَ — يفترض أنّ المُنادي تحقّق من أنّ
+     * المُحرِّرَ صاحبُ الرسالةِ وأنها غيرُ محذوفة (نظيرُ حرّاسِ `DmController`).
+     */
+    public static function edit(User $actor, DmMessage $m, string $body): DmMessage
+    {
+        $attrs = ['body' => $body];
+        if (hub_has_col('dm_messages', 'edited_at')) $attrs['edited_at'] = now();
+        $m->forceFill($attrs)->save();
+
+        return $m;
+    }
+
+    /**
      * **بوّابةُ الوصول** — هل يبلغ `$me` الطرفَ `$other` ضمن نطاق الشركات؟ (F8).
      * غلافٌ لـ`DmController::dmReachable` (السكّةُ نفسُها، لا محرّكَ عزلٍ ثانٍ).
      */

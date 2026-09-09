@@ -126,6 +126,36 @@ class CommentService
     }
 
     /**
+     * **تحريرُ تعليقٍ يعيد الموديل** (§22) — نقطةُ التحرير الواحدة (ويب/جوال): يُحدّث
+     * النصَّ ويختم `edited_at` الصادق، ويعيد استخلاصَ الإشارات **مُنطَّقةً بالهدف**
+     * (نظيرُ الإنشاء) كي يبقى تبويبُ «ما ذكرني» صادقاً. لا يُعيد الحرسَ — يفترض أنّ
+     * المُنادي تحقّق من الملكيّة ورؤيةِ الهدف سلفاً (نظيرُ `create`).
+     *
+     * **لا سبامَ تحريرٍ:** يُشعَر **المُضافون حديثاً** فقط (فرقُ المجموعتين) — لا
+     * يُعاد إشعارُ من كان مذكوراً قبلاً على تحريرٍ لا يخصّه.
+     */
+    public static function edit(User $actor, Comment $c, string $body): Comment
+    {
+        $old = array_map('strval', (array) $c->mentions);
+        $mentions = self::extractMentions($actor, $body, [], (string) $c->module, $c->record_id);
+
+        $attrs = ['body' => $body, 'mentions' => $mentions ?: null, 'updated_at' => now()];
+        if (hub_has_col('comments', 'edited_at')) $attrs['edited_at'] = now();
+        $c->update($attrs);
+
+        $added = array_values(array_diff($mentions, $old, [$actor->id]));
+        if ($added) {
+            $label = $c->module === 'feed' ? 'قناة الفريق' : (hub_mod($c->module)['label'] ?? $c->module);
+            $excerpt = Str::limit(trim($c->body), 60);
+            foreach ($added as $uid) {
+                self::notify($uid, 'mention', 'ذكرك ' . $actor->name . " في {$label}: {$excerpt}", $c->module, $c->record_id);
+            }
+        }
+
+        return $c;
+    }
+
+    /**
      * **المنشن مُنطَّقٌ بالهدف** (§16/§18): من القائمة الصريحة + `@اسم` في النص
      * (تطابقُ بادئةِ الاسم) — لكن **لا يُحلّ إلّا لمن يقدر فتحَ الهدف**. الإشارةُ
      * إشعارٌ يحمل مقتطفَ الرسالة؛ فحلُّها على كلِّ المنظّمة كان يُسرّب سطراً من

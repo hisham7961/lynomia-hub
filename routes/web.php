@@ -14,6 +14,7 @@ use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\CapacityController;
 use App\Http\Controllers\Web\CeoController;
 use App\Http\Controllers\Web\CommentController;
+use App\Http\Controllers\Web\SavedController;
 use App\Http\Controllers\Web\ConversationController;
 use App\Http\Controllers\Web\CostController;
 use App\Http\Controllers\Web\CustomFieldController;
@@ -458,6 +459,7 @@ Route::middleware('auth')->group(function () {
     // ── التعليقات وقناة الفريق ──
     Route::get('feed', [CommentController::class, 'feed'])->name('feed');
     Route::post('comments', [CommentController::class, 'store'])->name('comments.store');
+    Route::post('comments/{id}/edit', [CommentController::class, 'edit'])->name('comments.edit');
     Route::post('comments/{id}/pin', [CommentController::class, 'pin'])->name('comments.pin');
     Route::post('comments/{id}/task', [CommentController::class, 'toTask'])->name('comments.task');
     Route::delete('comments/{id}', [CommentController::class, 'destroy'])->name('comments.destroy');
@@ -494,9 +496,15 @@ Route::middleware('auth')->group(function () {
     // ── المراسلة الداخلية المباشرة ──
     Route::get('dm', [DmController::class, 'inbox'])->name('dm.inbox');
     Route::post('dm', [DmController::class, 'start'])->name('dm.start');
+    Route::post('dm/msg/{id}/edit', [DmController::class, 'edit'])->name('dm.edit');
     Route::delete('dm/msg/{id}', [DmController::class, 'destroy'])->name('dm.destroy');
     Route::get('dm/{userId}', [DmController::class, 'thread'])->name('dm.thread');
     Route::post('dm/{userId}', [DmController::class, 'send'])->name('dm.send');
+
+    // ── المحفوظاتُ الشخصيّة (§27) — «احفظ لاحقاً» لأيّ رسالة، مرجعٌ لا نسخُ محتوى ──
+    Route::get('saved', [SavedController::class, 'index'])->name('saved.index');
+    Route::post('saved', [SavedController::class, 'toggle'])->name('saved.toggle');
+    Route::delete('saved/{id}', [SavedController::class, 'destroy'])->name('saved.destroy');
 
     // ── التخصيص الشخصي ──
     Route::get('personalize', [PrefController::class, 'edit'])->name('prefs.edit');

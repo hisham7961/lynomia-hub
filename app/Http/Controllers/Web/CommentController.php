@@ -140,6 +140,25 @@ class CommentController extends Controller
         return back()->with('ok', 'نُشر التعليق')->withFragment('c-' . $c->id);
     }
 
+    /**
+     * تحريرُ رسالةٍ/تعليق (§22) — **لصاحبه وحده**، والهدفُ ما زال مرئيّاً له
+     * (`guardTarget` نظيرُ react/pin: قناةٌ لم يعد عضواً فيها = ٤٠٤). المحوَّلُ إلى
+     * مهمةٍ لا يُحرَّر (نصُّه صار وصفَ مهمة). الجوهرُ عبر `CommentService::edit`
+     * (ختمُ `edited_at` + إعادةُ استخلاص الإشارات المُنطَّقة) — يشترك فيه الويبُ والجوال.
+     */
+    public function edit(Request $r, string $id)
+    {
+        $c = Comment::findOrFail($id);
+        abort_unless($c->user_id === auth()->id(), 403, 'التحريرُ لصاحب الرسالة وحده');
+        $this->guardTarget($c->module, $c->record_id);
+        abort_if($c->task_id, 422, 'حُوّل هذا التعليق لمهمة — لا يُحرَّر');
+
+        $data = $r->validate(['body' => ['required', 'string', 'max:4000']], [], ['body' => 'النص']);
+        CommentService::edit(auth()->user(), $c, trim($data['body']));
+
+        return back()->with('ok', 'عُدّلت الرسالة')->withFragment('c-' . $c->id);
+    }
+
     /** تثبيت/فك تثبيت — لمن يملك تعديل الوحدة (وللقناة: المالك أو صاحب علم monitor) */
     public function pin(string $id)
     {

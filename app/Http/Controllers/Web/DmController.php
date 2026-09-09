@@ -301,6 +301,25 @@ class DmController extends Controller
     }
 
     /**
+     * تحريرُ رسالةٍ مباشرة (§22) — **لصاحبها وحده**، وليست محذوفة. لا يمسّ إيصالَ
+     * القراءةِ ولا الطرفَ الآخر: نصٌّ يُصحَّح وختمُ `edited_at` صادقٌ يقول إنها عُدّلت.
+     * الجوهرُ عبر `DmService::edit` (يشترك فيه الويبُ والجوال).
+     */
+    public function edit(Request $r, string $id)
+    {
+        $m = DmMessage::findOrFail($id);
+        abort_unless(in_array(auth()->id(), [$m->from_id, $m->to_id], true), 403, 'لا شأن لك بهذه المحادثة');
+        abort_unless($m->from_id === auth()->id(), 403, 'التحريرُ لصاحب الرسالة وحده — لا يُعدّل أحدٌ كلام غيره');
+        abort_if($m->deleted_at !== null, 422, 'لا تُحرَّر رسالةٌ محذوفة');
+
+        $r->merge(['body' => trim(hub_str($r->input('body')))]);
+        $data = $r->validate(['body' => ['required', 'string', 'max:4000']], [], ['body' => 'نص الرسالة']);
+        DmService::edit(auth()->user(), $m, $data['body']);
+
+        return back()->with('ok', 'عُدّلت الرسالة');
+    }
+
+    /**
      * سحبُ رسالةٍ أُرسلت بالخطأ — **لصاحبها وحده**.
      *
      * لا يمحو أحدٌ كلام غيره: من تلقّى رسالةً لا يُخفيها عن نفسه ولا عن مُرسِلها،
