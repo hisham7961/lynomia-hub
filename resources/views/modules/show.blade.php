@@ -121,6 +121,8 @@
 
         {{-- ملف الكيان: الوثائق المتعارف عليها — ما يوجد وما ينقص وما ينتهي --}}
         @include('partials.dossier')
+        {{-- (§15) النقاطُ الطرفيّة المرتبطة — أصلٌ/موظفٌ/محطّة؛ داخليٌّ + منطَّقٌ + صادق --}}
+        @include('partials.endpoint_devices')
         @include('partials.record_list', ['children' => $children, 'ownerId' => $row->id])
         @include('partials.timeline', ['timeline' => $timeline])
         @include('partials.comments', ['cModule' => $module, 'cRecordId' => $row->id, 'comments' => $comments, 'users' => $cUsers])
