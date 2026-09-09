@@ -85,9 +85,9 @@ return [
                 ]],
                 'messages' => ['label' => 'رسائلي', 'order' => 3, 'destinations' => [
                     ['type' => 'center', 'center' => 'dm', 'importance' => 'primary', 'route_prefix' => 'dm',
-                        'routes' => ['dm.inbox', 'dm.thread']],
+                        'routes' => ['dm.inbox', 'dm.thread', 'dm.since']],
                     ['type' => 'personal', 'route' => 'conversations.index', 'guard' => 'authed', 'importance' => 'primary',
-                        'label' => 'المحادثات', 'route_prefix' => 'conversations', 'routes' => ['conversations.index', 'conversations.show', 'conversations.directory'],
+                        'label' => 'المحادثات', 'route_prefix' => 'conversations', 'routes' => ['conversations.index', 'conversations.show', 'conversations.directory', 'conversations.since'],
                         'synonyms' => ['conversations', 'محادثات', 'chat', 'قنوات', 'دليل القنوات']],
                     ['type' => 'center', 'center' => 'feed', 'importance' => 'primary'],
                     ['type' => 'personal', 'route' => 'saved.index', 'guard' => 'authed', 'importance' => 'secondary',

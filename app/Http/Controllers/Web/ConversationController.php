@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Comment;
 use App\Models\Conversation;
 use App\Models\ConversationMember;
 use App\Models\Project;
 use App\Models\User;
 use App\Support\ChatCommands;
+use App\Support\Collaboration;
 use App\Support\FlowRunner;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -243,14 +245,20 @@ class ConversationController extends Controller
             ->orderByRaw("CASE role WHEN 'owner' THEN 0 WHEN 'moderator' THEN 1 WHEN 'member' THEN 2 ELSE 3 END")
             ->orderBy('id')->get();
 
+        // §39 مؤشّرُ البدءِ للاستطلاعِ التدريجيّ — رأسُ الخيطِ (أحدثُ رسالةٍ حيّةٍ في
+        // الحاوية، جذراً كانت أو رداً). فارغٌ = قناةٌ خاليةٌ (يبدأ العميلُ من البداية).
+        $tip = Comment::where('conversation_id', $conv->id)->whereNull('deleted_at')
+            ->orderByDesc('created_at')->orderByDesc('id')->first(['id', 'created_at']);
+
         return view('conversations.show', [
-            'conv'      => $conv,
-            'role'      => $role,
-            'canPost'   => Conversation::roleCanPost($role),
-            'canManage' => Conversation::roleCanManage($role),
-            'messages'  => $messages,
-            'members'   => $members,
-            'users'     => CommentController::userNames(),
+            'conv'        => $conv,
+            'role'        => $role,
+            'canPost'     => Conversation::roleCanPost($role),
+            'canManage'   => Conversation::roleCanManage($role),
+            'messages'    => $messages,
+            'members'     => $members,
+            'users'       => CommentController::userNames(),
+            'sinceCursor' => $tip ? Collaboration::encodeCursor((string) $tip->created_at, (string) $tip->id) : '',
         ]);
     }
 
@@ -396,6 +404,52 @@ class ConversationController extends Controller
         }
 
         return redirect()->route('conversations.show', $conv->id)->with('ok', 'أُنشئت القناة');
+    }
+
+    /* ────────── الزمنُ الحقيقيّ: الجلبُ التدريجيّ (§38/§39) ────────── */
+
+    /**
+     * **رسائلُ القناةِ الجديدةُ منذ مؤشّر** (§39) — استطلاعٌ تدريجيٌّ بمؤشّر `since`
+     * (keyset على `(created_at, id)`) لا إعادةُ جلبِ الخيطِ كلِّه في كلِّ نبضة. عقدُ
+     * الأحداثِ من `App\Support\Collaboration` — نفسُه سواءٌ وصله استطلاعاً أو بثّاً
+     * مستقبلاً (بلا كسرِ عقد العميل · §38). العزلُ خادميّ: `guardConversation` أولاً.
+     *
+     * مؤشّرٌ غائب/فاسد ⇒ من الذيل (أحدثُ ٥٠) — تمهيدٌ آمن. يُرجِع أحداثاً + مؤشّراً جديداً.
+     */
+    public function since(Request $r, string $id)
+    {
+        [$conv] = self::guardConversation($id, 'v');
+
+        $cursor = Collaboration::decodeCursor($r->query('cursor'));
+
+        $q = Comment::where('conversation_id', $conv->id)->whereNull('deleted_at')
+            ->with('user:id,name');
+
+        if ($cursor !== null) {
+            [$t, $cid] = $cursor;
+            $q->where(fn ($w) => $w->where('created_at', '>', $t)
+                ->orWhere(fn ($x) => $x->where('created_at', $t)->where('id', '>', $cid)));
+        }
+
+        $rows = $q->orderBy('created_at')->orderBy('id')->limit(50)->get();
+
+        $events = $rows->map(fn (Comment $c) => [
+            'type'       => Collaboration::EV_MESSAGE_CREATED,
+            'id'         => (string) $c->id,
+            'parent_id'  => $c->parent_id ? (string) $c->parent_id : null,
+            'user_id'    => (string) $c->user_id,
+            'author'     => optional($c->user)->name,
+            'body'       => (string) $c->body,
+            'created_at' => optional($c->created_at)->toIso8601String(),
+            'edited'     => $c->edited_at !== null,
+        ])->all();
+
+        $last = $rows->last();
+        $next = $last
+            ? Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
+            : (string) $r->query('cursor', '');
+
+        return response()->json(['events' => $events, 'cursor' => $next]);
     }
 
     /* ────────── تفضيلُ الإشعار لكلِّ عضوٍ (§16) ────────── */
