@@ -116,7 +116,9 @@ class MobileCollabController extends V1Controller
         $next = $last ? Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
             : (string) $r->query('cursor', '');
 
-        $typing = User::whereIn('id', Typing::current((string) $conv->id, (string) auth()->id()))->pluck('name')->all();
+        $typing = hub_capability('collab.typing')
+            ? User::whereIn('id', Typing::current((string) $conv->id, (string) auth()->id()))->pluck('name')->all()
+            : [];
 
         return $this->ok(['events' => $events, 'cursor' => $next, 'typing' => array_values($typing)]);
     }
@@ -126,6 +128,7 @@ class MobileCollabController extends V1Controller
     {
         $this->tagMobile($r);
         if ($deny = $this->denyClient()) return $deny;
+        if (! hub_capability('collab.typing')) return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'غير متاح');
 
         [$conv] = ConversationController::guardConversation($id, 'v');
         Typing::ping((string) $conv->id, (string) auth()->id());
@@ -177,8 +180,8 @@ class MobileCollabController extends V1Controller
         $next = $last ? Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
             : (string) $r->query('cursor', '');
 
-        // الطرفُ الآخرُ يكتب الآن؟ (عابرٌ) — الاسمُ إن كان في النافذة
-        $typing = in_array((string) $other->id, Typing::current($key, (string) $me->id), true)
+        // الطرفُ الآخرُ يكتب الآن؟ (عابرٌ) — الاسمُ إن كان في النافذة (وإن كانت القدرةُ مُفعَّلة)
+        $typing = (hub_capability('collab.typing') && in_array((string) $other->id, Typing::current($key, (string) $me->id), true))
             ? [(string) $other->name] : [];
 
         return $this->ok(['events' => $events, 'cursor' => $next, 'typing' => $typing]);
@@ -190,6 +193,7 @@ class MobileCollabController extends V1Controller
         $this->tagMobile($r);
         $me = auth()->user();
 
+        if (! hub_capability('collab.typing')) return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'غير متاح');
         $other = User::whereNull('deleted_at')->find($user);
         if (! $other || ! DmService::reachable($me, $other) || (string) $other->id === (string) $me->id) {
             return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'لا محادثة بهذا المعرّف');
@@ -207,6 +211,7 @@ class MobileCollabController extends V1Controller
     {
         $this->tagMobile($r);
         if ($deny = $this->denyClient()) return $deny;
+        if (! hub_capability('collab.presence')) return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'غير متاح');
         $me = auth()->user();
 
         $ids = collect(explode(',', (string) $r->query('users', '')))

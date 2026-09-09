@@ -84,8 +84,10 @@ return [
                         'synonyms' => ['boards', 'لوحات', 'dashboards', 'ودجات']],
                 ]],
                 'messages' => ['label' => 'رسائلي', 'order' => 3, 'destinations' => [
-                    ['type' => 'personal', 'route' => 'collab.center', 'guard' => 'authed', 'importance' => 'primary',
-                        'label' => 'مركز التواصل', 'icon' => '💬', 'route_prefix' => 'collab', 'routes' => ['collab.center'],
+                    // مركزُ التواصل — بيتُه الكتالوجيُّ الواحد hub_top_links['collab'] (C6): المسارُ/التسمية/الحارس
+                    // من الكتالوج، فيرسمه الشريطُ الجانبيّ تلقائيّاً (DEFECT A) ويبقى مصدرُ الحقيقةِ واحداً.
+                    ['type' => 'center', 'center' => 'collab', 'importance' => 'primary',
+                        'route_prefix' => 'collab', 'routes' => ['collab.center', 'collab.attention'],
                         'synonyms' => ['collaboration', 'مركز التواصل', 'unified', 'الموحّد', 'workspace', 'communication hub']],
                     ['type' => 'center', 'center' => 'dm', 'importance' => 'primary', 'route_prefix' => 'dm',
                         'routes' => ['dm.inbox', 'dm.thread', 'dm.since']],
@@ -485,6 +487,10 @@ return [
                 'settings' => ['label' => 'الإعدادات والتكاملات', 'order' => 4, 'destinations' => [
                     ['type' => 'admin', 'admin' => 'settings', 'importance' => 'primary', 'route_prefix' => 'settings',
                         'routes' => ['settings.edit', 'settings.export']],
+                    // سجلُّ القدرات — الإدارة ← التهيئة ← القدرات (guard من hub_admin_links['features'] = المالك)
+                    ['type' => 'admin', 'admin' => 'features', 'importance' => 'primary', 'route_prefix' => 'features',
+                        'routes' => ['features.index', 'features.show'],
+                        'synonyms' => ['features', 'capabilities', 'القدرات', 'المزايا', 'feature registry', 'flags', 'سجل القدرات']],
                     ['type' => 'admin', 'admin' => 'integrations', 'importance' => 'primary', 'route_prefix' => 'integrations',
                         'routes' => ['integrations.index', 'integrations.guide', 'hooks.index', 'integrations.messaging',
                             'integrations.n8n', 'integrations.odoo', 'webhooks.index', 'webhooks.log']],

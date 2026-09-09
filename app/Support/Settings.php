@@ -40,7 +40,7 @@ class Settings
      * أيّها جاء، فسؤالُ «من غيّره؟» يسبقه «من أين؟». عرضُ العمود ٢٠ حرفاً.
      */
     public const WRITERS = ['screen', 'messaging', 'odoo', 'n8n', 'security',
-                            'ops', 'cli', 'import', 'restore', 'demo'];
+                            'ops', 'cli', 'import', 'restore', 'demo', 'features'];
 
     /**
      * كم قيدَ تدقيقٍ يُمسح ارتداداً حين لا صفَّ تاريخٍ للمفتاح. الجدولُ حديث،

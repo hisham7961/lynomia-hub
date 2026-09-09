@@ -117,17 +117,23 @@
 
         @if (($isGroup ?? false))
             {{-- §35 مجموعة: الإضافةُ تُنشئ مجموعةً جديدة (حفظُ الجمهور التاريخيّ) --}}
+            @php
+                // مرشّحو الإضافة — كلُّ من ليس عضواً بعد (غيرُ محدَّدٍ ابتداءً)
+                $forkCands = [];
+                foreach ($users as $uid => $name) {
+                    if (! $members->contains('user_id', $uid)) $forkCands[(string) $uid] = $name;
+                }
+            @endphp
             <form method="POST" action="{{ route('groups.fork', $conv->id) }}" style="margin-top:10px">
                 @csrf
-                <label class="lbl">إضافةُ مشاركين</label>
-                <select class="inp" name="participants[]" multiple size="4" required>
-                    @foreach ($users as $uid => $name)
-                        @unless ($members->contains('user_id', $uid))
-                            <option value="{{ $uid }}">{{ $name }}</option>
-                        @endunless
-                    @endforeach
-                </select>
-                <div class="sub" style="margin-top:4px">تُنشئ الإضافةُ مجموعةً جديدة — لا يرى المُضافون ما مضى.</div>
+                @include('partials.participant_picker', [
+                    'candidates' => $forkCands,
+                    'pickerId'   => 'grp-fork',
+                    'label'      => 'إضافةُ مشاركين',
+                    'emptyHint'  => 'لا زملاءَ آخرين لإضافتهم.',
+                ])
+                {{-- تفسيرٌ عربيٌّ صريحٌ لدلالةِ الفرع الآمن (§16) — بلا مصطلحاتٍ تقنيّة --}}
+                <div class="sub" style="margin-top:4px">سيتم إنشاء مجموعةٍ جديدةٍ بالمشاركين المضافين، ولن تظهر لهم الرسائلُ السابقة.</div>
                 <button class="btn sm" type="submit" style="margin-top:6px">مجموعةٌ جديدةٌ بالمُضافين</button>
             </form>
             <form method="POST" action="{{ route('groups.leave', $conv->id) }}" style="margin-top:10px" data-confirm="مغادرةُ المجموعة؟">

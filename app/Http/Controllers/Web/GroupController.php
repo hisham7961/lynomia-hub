@@ -45,11 +45,8 @@ class GroupController extends Controller
         // أسماءُ الأعضاء للعنوان (مجموعةٌ بلا عنوانٍ تُسمّى بأعضائها)
         $names = $this->memberNamesFor($groups->pluck('id')->all(), (string) $me->getKey());
 
-        // مرشَّحو الإنشاء — زملاءُ الفريق الداخليُّون ضمن النطاق (نفسُ سكّة DM)
-        $candidates = User::whereNull('deleted_at')->where('status', 'نشط')
-            ->where('id', '!=', $me->getKey())->with('role')->orderBy('name')->get()
-            ->filter(fn ($u) => ! hub_is_client($u) && DmController::dmReachable($u, $me))
-            ->pluck('name', 'id');
+        // مرشَّحو الإنشاء — زملاءُ الفريق الداخليُّون ضمن النطاق (المصدرُ الواحد لمنتقي المشاركين)
+        $candidates = DmController::reachableColleagues($me);
 
         return view('groups.index', ['groups' => $groups, 'unread' => $unread,
             'memberNames' => $names, 'candidates' => $candidates]);
@@ -77,7 +74,18 @@ class GroupController extends Controller
             \App\Support\CommentService::create($me, 'channel', (string) $conv->id, $body, ['conversation_id' => (string) $conv->id]);
         }
 
-        return redirect()->route('conversations.show', $conv->id)->with('ok', 'أُنشئت المجموعة');
+        // من داخلِ مركزِ التواصل: يُفتَح الخيطُ الجديدُ في المركزِ نفسِه (لا مغادرة · §13)
+        return $this->afterCreate($r, $conv, 'أُنشئت المجموعة');
+    }
+
+    /** يفتح الحاويةَ الجديدةَ في مركزِ التواصل إن جاء الطلبُ منه، وإلّا في صفحتها المعتادة */
+    private function afterCreate(Request $r, Conversation $conv, string $ok)
+    {
+        if (hub_str($r->input('origin')) === 'collab') {
+            return redirect()->route('collab.center', ['c' => $conv->id])->with('ok', $ok);
+        }
+
+        return redirect()->route('conversations.show', $conv->id)->with('ok', $ok);
     }
 
     /**
@@ -103,8 +111,8 @@ class GroupController extends Controller
 
         $new = $this->createGroup($me, $union, $conv->title);
 
-        return redirect()->route('conversations.show', $new->id)
-            ->with('ok', 'أُنشئت مجموعةٌ جديدةٌ بالمشاركين المُضافين — القديمةُ محفوظةٌ لجمهورها');
+        return $this->afterCreate($r, $new,
+            'أُنشئت مجموعةٌ جديدةٌ بالمشاركين المُضافين — القديمةُ محفوظةٌ لجمهورها');
     }
 
     /** مغادرةُ مجموعةٍ — تُزيل عضويّتي فقط (لا تكشف ماضياً). آخرُ عضوٍ يؤرشفها */

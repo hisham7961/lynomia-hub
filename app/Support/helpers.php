@@ -296,6 +296,24 @@ if (! function_exists('hub_can')) {
     }
 }
 
+if (! function_exists('hub_capability')) {
+    /**
+     * **هل القدرةُ متاحةٌ تشغيليّاً؟** (سجلّ القدرات · §11) — بوّابةُ التوافرِ المركزيّة،
+     * **مستقلّةٌ عن الصلاحية** (`hub_can`). كلاهما يجب أن يمرّ: «أمتاحةٌ القدرة؟»
+     * (هذه) و«أمصرَّحٌ للمستخدم؟» (`hub_can`/الحرّاس). لا `if(feature())` متناثرٌ في
+     * التطبيق — النداءُ من هنا حصراً كي لا يتشعّب المنطق.
+     *
+     * قدرةٌ غيرُ مسجَّلةٍ ⇒ `true` (لا نكسر ما ليس تحت السجلّ). الثوابتُ النظاميّةُ متاحةٌ
+     * دائماً. والاختياريّةُ المُطفأةُ ⇒ `false` (يفشل مسارُها بأمان: ٤٠٤/حجب).
+     */
+    function hub_capability(string $key): bool
+    {
+        if (! in_array($key, \App\Support\FeatureRegistry::keys(), true)) return true;
+
+        return \App\Support\FeatureRegistry::available($key);
+    }
+}
+
 if (! function_exists('hub_nav')) {
     /** مجموعات التنقل الجانبي — تُخفى الوحدات التي لا يملك المستخدم عرضها */
     /**
@@ -355,6 +373,10 @@ if (! function_exists('hub_top_links')) {
         // كل رابط مُصنَّف في قسم (group): daily/analytics/centers — تستعمله hub_top_groups
         $all = [
             ['key' => 'morning',   'label' => '☀️ تشغيل اليوم',      'route' => 'morning',         'group' => 'daily',     'ok' => true],
+            // مركزُ التواصلِ الموحّد — وجهةٌ أساسيّةٌ في التنقّل العاديّ (لا بحثٌ فقط · DEFECT A).
+            // بيتُها الكتالوجيُّ الواحد: IA يشير إليها center=collab، والشريطُ يرسمها من هنا.
+            // للفريق الداخليِّ حصراً (العميلُ يستعمل البوّابةَ لا هذا الشريط) — دفاعٌ في العمق.
+            ['key' => 'collab',    'label' => '💬 مركز التواصل',     'route' => 'collab.center',   'group' => 'daily',     'ok' => ! hub_is_client($user)],
             ['key' => 'me',        'label' => '👤 بوابتي',           'route' => 'portal.me',       'group' => 'daily',     'ok' => true],
             ['key' => 'alerts',    'label' => '🔔 ينتهي قريباً',     'route' => 'alerts',          'group' => 'daily',     'ok' => true],
             ['key' => 'calendar',  'label' => '📅 التقويم',          'route' => 'calendar',        'group' => 'daily',     'ok' => true],
@@ -5678,6 +5700,10 @@ if (! function_exists('hub_admin_links')) {
             // ٤) الإعدادات — ضبطُ النظام ومن يدخله
             $mk('settings', 'الإعدادات', '⚙️', 'settings.edit', [], 'الإعدادات',
                 $owner, ['settings.*'], 'إعدادات النظام المفاتيح'),
+            // سجلُّ القدرات — مصدرُ حقيقةِ القدرات الواحد (FeatureRegistry). حارسُه المالكُ
+            // حرفياً (FeatureController::gate) فلا يُوعَد بابٌ يُصَدّ عنه؛ والعميلُ محجوبٌ ببوّابته.
+            $mk('features', 'سجلّ القدرات', '🧩', 'features.index', [], 'الإعدادات',
+                $owner, ['features.*'], 'القدرات المزايا capabilities features flags سجل القدرات جاهزة مؤجلة'),
             $mk('integrations', 'التكاملات', '🔌', 'integrations.index', [], 'الإعدادات',
                 $owner, ['integrations.*', 'webhooks.*'], 'التكاملات Webhooks أودو تلجرام n8n'),
             $mk('roles', 'الأدوار', '🧑‍⚖️', 'roles.index', [], 'الإعدادات',

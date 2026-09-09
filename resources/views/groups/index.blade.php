@@ -37,13 +37,14 @@
         <h3>➕ مجموعةٌ جديدة</h3>
         <form method="POST" action="{{ route('groups.store') }}">
             @csrf
-            <label class="lbl">المشاركون</label>
-            <select class="inp" name="participants[]" multiple size="6" required>
-                @foreach ($candidates as $uid => $name)
-                    <option value="{{ $uid }}">{{ $name }}</option>
-                @endforeach
-            </select>
-            <div class="sub" style="margin-top:4px">زملاءُ الفريق الداخليُّون فقط — لا يُضاف عميل.</div>
+            {{-- منتقي المشاركين — الجميعُ غيرُ محدَّدٍ ابتداءً، اختيارٌ صريحٌ بالبحث والمربّعات (DEFECT B) --}}
+            @include('partials.participant_picker', [
+                'candidates' => $candidates,
+                'pickerId'   => 'grp-new',
+                'label'      => 'المشاركون — اختر زملاءك',
+                'emptyHint'  => 'لا زملاءَ داخليّين متاحين للإضافة ضمن نطاقك.',
+            ])
+            <div class="sub" style="margin-top:4px">زملاءُ الفريق الداخليُّون فقط — لا يُضاف عميل. من لا تختاره يبقى خارجَ المجموعة.</div>
 
             <label class="lbl" style="margin-top:8px">اسمٌ (اختياريّ)</label>
             <input class="inp" name="title" maxlength="200" placeholder="مثال: تنسيق الإطلاق">
