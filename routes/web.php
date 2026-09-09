@@ -475,6 +475,10 @@ Route::middleware('auth')->group(function () {
     //    conversation_id (لا محرّكَ ثانٍ). داخليّةٌ افتراضاً؛ العميلُ لا يبلغها
     //    (PortalGuard فوق الكل) — قناةُ جمهورِه تصله عبر portal.conversation.
     //    الحرسُ في المتحكّم: عضويّةٌ فعّالة + نطاقٌ + صلاحيةُ الوحدةِ الهدف. ──
+    // مركزُ التواصلِ الموحّد — الألواحُ الثلاثة فوق المحرّكِ الواحد (المرحلة ٦ · §106).
+    //    الحرسُ في المتحكّم: guardConversation للقناة و dmReachable للمحادثة عند الاختيار،
+    //    والعميلُ لا يبلغه (PortalGuard + abort_if أدناه).
+    Route::get('collab', [\App\Http\Controllers\Web\CollaborationController::class, 'center'])->name('collab.center');
     Route::get('conversations', [ConversationController::class, 'index'])->name('conversations.index');
     Route::get('conversations/directory', [ConversationController::class, 'directory'])->name('conversations.directory');
     Route::post('conversations', [ConversationController::class, 'store'])

@@ -84,6 +84,9 @@ return [
                         'synonyms' => ['boards', 'لوحات', 'dashboards', 'ودجات']],
                 ]],
                 'messages' => ['label' => 'رسائلي', 'order' => 3, 'destinations' => [
+                    ['type' => 'personal', 'route' => 'collab.center', 'guard' => 'authed', 'importance' => 'primary',
+                        'label' => 'مركز التواصل', 'icon' => '💬', 'route_prefix' => 'collab', 'routes' => ['collab.center'],
+                        'synonyms' => ['collaboration', 'مركز التواصل', 'unified', 'الموحّد', 'workspace', 'communication hub']],
                     ['type' => 'center', 'center' => 'dm', 'importance' => 'primary', 'route_prefix' => 'dm',
                         'routes' => ['dm.inbox', 'dm.thread', 'dm.since']],
                     ['type' => 'personal', 'route' => 'groups.index', 'guard' => 'authed', 'importance' => 'secondary',

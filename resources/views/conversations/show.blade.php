@@ -61,6 +61,12 @@
 
 <div class="grid" style="grid-template-columns:2fr 1fr;gap:16px;align-items:start">
     <div>
+        {{-- §7 تحذيرُ الجمهور — غرفةٌ/قناةٌ يبلغها العميل: لا يُخطئ أحدٌ فيكتب سرّاً داخليّاً.
+             العزلُ فيزيائيٌّ صلبٌ (§9 صفّان لا علامةُ رسالة)؛ التحذيرُ تمييزٌ عرضيٌّ فوقه. --}}
+        @if (! ($isGroup ?? false) && in_array($conv->audience, ['client', 'both'], true))
+            <div class="note wn" style="margin-bottom:10px">👥 <b>هذه المحادثةُ يبلغها العميل عبر بوابته.</b>
+                كلُّ ما يُكتب هنا يراه — لا تُدرِج تكلفةً أو ملاحظةً داخليّة.</div>
+        @endif
         {{-- قائمةُ الرسائل: نفسُ محرّك التعليقات (comments) عبر conversation_id --}}
         @include('partials.comments', [
             'cModule'         => 'channel',
