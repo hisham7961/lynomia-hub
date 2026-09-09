@@ -528,7 +528,7 @@ return [
             'routes' => ['file.show', 'changeorders.pdf', 'purchases.doc']],
         'system' => ['label' => 'بنية تحتية', 'prefixes' => ['pwa'],
             'routes' => ['up', 'healthz', 'mobile.aasa', 'mobile.assetlinks', 'trace']],
-        'api' => ['label' => 'واجهة الموبايل والـAPI', 'prefixes' => ['mobile', 'endpoint'],
+        'api' => ['label' => 'واجهة الموبايل والـAPI', 'prefixes' => ['mobile', 'endpoint', 'api'],
             'routes' => []],
     ],
 

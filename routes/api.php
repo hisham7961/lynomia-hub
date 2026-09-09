@@ -32,6 +32,13 @@ Route::prefix('v1')->middleware(['throttle:api', ApiAuth::class])->group(functio
     Route::post('track/{session}/points', [V1Controller::class, 'trackIngest']);
     Route::post('track/{session}/end', [V1Controller::class, 'trackEnd']);
 
+    // (Project 360 · §56) تخصيصُ الأصولِ للمشاريع — REST بخدمةٍ مشتركةٍ مع الويب، **قبلَ**
+    // catch-all الوحدةِ العامّ كي لا يُظلَّل (assets/projects ليسا مساراً عامّاً هنا).
+    Route::get('projects/{id}/assets', [\App\Http\Controllers\Api\AssetProjectApiController::class, 'projectAssets'])->name('api.v1.projects.assets');
+    Route::post('projects/{id}/assets', [\App\Http\Controllers\Api\AssetProjectApiController::class, 'assign']);
+    Route::get('assets/{id}/projects', [\App\Http\Controllers\Api\AssetProjectApiController::class, 'assetProjects'])->name('api.v1.assets.projects');
+    Route::post('asset-project/{id}/end', [\App\Http\Controllers\Api\AssetProjectApiController::class, 'end']);
+
     // تسجيلُ النقاط الطرفية (Work OS · WP-J.1): عامٌّ بالرمز المسكوك لا بمفتاح API —
     // فهو **خارج** مجموعة ApiAuth أدناه (يُعرَّف بعد المجموعة بمساره الكامل).
     Route::get('{module}', [V1Controller::class, 'apiIndex']);
