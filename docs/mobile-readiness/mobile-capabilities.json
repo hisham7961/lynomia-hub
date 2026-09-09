@@ -486,9 +486,15 @@
                     "path": "/api/mobile/v1/comments",
                     "name": "mobile.comments.store",
                     "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/comments/{id}/react",
+                    "name": "mobile.comments.react",
+                    "auth": "mobile.session"
                 }
             ],
-            "count": 2
+            "count": 3
         },
         "context": {
             "endpoints": [
@@ -508,6 +514,29 @@
                     "method": "GET",
                     "path": "/api/mobile/v1/navigation",
                     "name": "mobile.navigation",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 3
+        },
+        "conversations": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/conversations",
+                    "name": "mobile.conversations.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/conversations/{id}/since",
+                    "name": "mobile.conversations.since",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/conversations/{id}/typing",
+                    "name": "mobile.conversations.typing",
                     "auth": "mobile.session"
                 }
             ],
@@ -557,6 +586,12 @@
         "dm": {
             "endpoints": [
                 {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/dm/messages/{id}/react",
+                    "name": "mobile.dm.react",
+                    "auth": "mobile.session"
+                },
+                {
                     "method": "GET",
                     "path": "/api/mobile/v1/dm/threads",
                     "name": "mobile.dm.threads",
@@ -579,9 +614,21 @@
                     "path": "/api/mobile/v1/dm/threads/{user}/send",
                     "name": "mobile.dm.send",
                     "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/dm/threads/{user}/since",
+                    "name": "mobile.dm.since",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/dm/threads/{user}/typing",
+                    "name": "mobile.dm.typing",
+                    "auth": "mobile.session"
                 }
             ],
-            "count": 4
+            "count": 7
         },
         "files": {
             "endpoints": [
@@ -780,6 +827,17 @@
             ],
             "count": 3
         },
+        "presence": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/presence",
+                    "name": "mobile.presence",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 1
+        },
         "push": {
             "endpoints": [
                 {
@@ -808,6 +866,17 @@
                 }
             ],
             "count": 4
+        },
+        "saved": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/saved",
+                    "name": "mobile.saved.index",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 1
         },
         "scanner": {
             "endpoints": [

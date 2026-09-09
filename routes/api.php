@@ -244,6 +244,25 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     Route::post('push/admin/test', [\App\Http\Controllers\Api\MobilePushController::class, 'adminTest'])->name('mobile.push.admin.test');
 
     /*
+     * ── تكافؤُ التعاون (المرحلة ٩ · §106 · إضافيّ) ──
+     *
+     * قدراتُ مركزِ التواصلِ الجديدةُ على الجوال فوق السككِ نفسِها (`CollaborationRail`/
+     * `Collaboration`/`Presence`/`Typing`/`DmService`) — لا محرّكٌ ثانٍ. **حرفيّةٌ كلُّها
+     * (`conversations`/`presence`/`saved`/لاحقاتُ since/typing/react) تُسجَّل قبل الـ
+     * catch-all `{module}` أدناه (Critic F9)** كي لا يبتلعها. العزلُ خادميٌّ في المتحكّم
+     * (guardConversation/dmReachable)؛ المركزُ داخليٌّ فالعميلُ يُطوى ٤٠٤ (له `portal/*`).
+     */
+    Route::get('conversations', [\App\Http\Controllers\Api\MobileCollabController::class, 'conversations'])->name('mobile.conversations.index');
+    Route::get('conversations/{id}/since', [\App\Http\Controllers\Api\MobileCollabController::class, 'channelSince'])->name('mobile.conversations.since');
+    Route::post('conversations/{id}/typing', [\App\Http\Controllers\Api\MobileCollabController::class, 'channelTyping'])->name('mobile.conversations.typing');
+    Route::get('dm/threads/{user}/since', [\App\Http\Controllers\Api\MobileCollabController::class, 'dmSince'])->name('mobile.dm.since');
+    Route::post('dm/threads/{user}/typing', [\App\Http\Controllers\Api\MobileCollabController::class, 'dmTyping'])->name('mobile.dm.typing');
+    Route::post('dm/messages/{id}/react', [\App\Http\Controllers\Api\MobileCollabController::class, 'dmReact'])->name('mobile.dm.react');
+    Route::post('comments/{id}/react', [\App\Http\Controllers\Api\MobileCollabController::class, 'commentReact'])->name('mobile.comments.react');
+    Route::get('presence', [\App\Http\Controllers\Api\MobileCollabController::class, 'presence'])->name('mobile.presence');
+    Route::get('saved', [\App\Http\Controllers\Api\MobileCollabController::class, 'saved'])->name('mobile.saved.index');
+
+    /*
      * ── ملفّاتٌ + ماسحٌ + موقع (Mobile Readiness · الطور F · §109) ──
      *
      * **ترتيبُ التسجيلِ عقدٌ أمنيّ (Critic F9):** كلُّ حرفيّاتِ الطور F
