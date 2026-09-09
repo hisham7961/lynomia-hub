@@ -127,9 +127,12 @@
                 </div>
             @endif
 
-            {{-- §39 الاستطلاعُ التدريجيّ — رسائلُ جديدةٌ منذ مؤشّرٍ بلا إعادةِ جلبِ الخيط --}}
+            {{-- §39 الاستطلاعُ التدريجيّ — رسائلُ جديدةٌ منذ مؤشّرٍ بلا إعادةِ جلبِ الخيط.
+                 ومؤشّرُ الكتابةِ العابر (Typing): يُلمِّح عند إدخالِ الحقل ويُعرَض في النبضة. --}}
             <div hidden data-collab-poll data-kind="dm" data-target="dmbox"
-                 data-poll-url="{{ route('dm.since', $other->id) }}" data-cursor="{{ $sinceCursor ?? '' }}"></div>
+                 data-poll-url="{{ route('dm.since', $other->id) }}" data-cursor="{{ $sinceCursor ?? '' }}"
+                 data-typing-url="{{ route('dm.typing', $other->id) }}" data-composer="#dm-body"
+                 data-typing-box="dm-typing" data-csrf="{{ csrf_token() }}"></div>
             <div class="card" id="dmbox" style="display:flex;flex-direction:column;gap:5px;min-height:320px;max-height:56vh;overflow:auto;margin-top:10px">
                 @php $lastDay = null; $lastFrom = null; @endphp
                 @forelse ($msgs as $m)
@@ -201,6 +204,10 @@
                     <div class="empty"><span class="big">✉️</span>ابدأ المحادثة — رسالتك تصل فوراً مع إشعار</div>
                 @endforelse
             </div>
+
+            {{-- مؤشّرُ الكتابةِ العابر — يُملأ حيّاً من النبضة، ويختفي عند غيابِ الإشارة --}}
+            <div class="sub" id="dm-typing" hidden aria-live="polite"
+                 style="font-size:12px;padding:2px 6px;min-height:16px"></div>
 
             <form method="POST" action="{{ route('dm.send', $other->id) }}" enctype="multipart/form-data"
                   class="card" style="display:flex;gap:8px;align-items:flex-end;margin-top:10px" id="dmform"
