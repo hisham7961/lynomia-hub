@@ -11,8 +11,8 @@
         'bitlocker' => 'تشفير BitLocker',
         'filevault' => 'تشفير FileVault',
         'updates'   => 'تحديثات النظام',
+        'wifi'      => 'شبكة Wi-Fi الشركة (اتصالُ الجهاز نفسِه)',
     ];
-    $pStates = ['active' => ['فعّالة', 'g'], 'inactive' => ['معطَّلة', 'bad']];
     $posture = is_array($posture ?? null) ? $posture : [];
 @endphp
 @if ($posture === [])
@@ -22,7 +22,9 @@
         <thead><tr><th>الفحص</th><th>الحالة كما بلّغها النظام</th></tr></thead>
         <tbody>
         @foreach ($posture as $pCheck => $pReading)
-            @php [$pLabel, $pTone] = $pStates[$pReading] ?? ['غير مُهيّأ / تعذّرت القراءة', 'wn']; @endphp
+            {{-- §11 — العقدُ الموسَّع: active/inactive/permission-denied/unavailable/unsupported/not-configured.
+                 مُنعُ القراءة (permission-denied) **ليس امتثالاً** — يُعرَض أحمرَ لا يُطمَس فعّالاً. --}}
+            @php [$pLabel, $pTone] = \App\Support\PostureContract::label((string) $pReading); @endphp
             <tr>
                 <td>{{ $pChecks[$pCheck] ?? $pCheck }}</td>
                 <td><span class="bdg {{ $pTone }}">{{ $pLabel }}</span></td>
@@ -30,5 +32,5 @@
         @endforeach
         </tbody>
     </table>
-    <div class="sub" style="margin-top:6px">قراءةٌ منعها نظامُ التشغيل تُخزَّن وتُعرَض «غير مُهيّأ» — لا تُدّعى أبداً.</div>
+    <div class="sub" style="margin-top:6px">الامتثالُ لقراءة 'active' حرفيّةٍ وحدَها؛ ومُنعُ القراءة يُعرَض صراحةً — ليس امتثالاً ولا يُدّعى.</div>
 @endif

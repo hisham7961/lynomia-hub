@@ -162,7 +162,7 @@ class WorkOsEndpointCentreTest extends TestCase
         // الشاشةُ تعرضها بصدق: «غير مُهيّأ / تعذّرت القراءة» — ولا «فعّالة» في الصفحة كلِّها
         $res = $this->actingAs($this->owner)->get(route('endpoints.show', $d->id))->assertOk();
         $res->assertSee('جدار الحماية');
-        $res->assertSee('غير مُهيّأ / تعذّرت القراءة');
+        $res->assertSee('غيرُ مُهيّأ');   // §11 — عقدُ الوضعيّة الموسَّع: not-configured يُعرَض صادقاً
         $res->assertDontSee('فعّالة');
     }
 
