@@ -214,7 +214,7 @@ class DmController extends Controller
 
         return view('dm.inbox', ['threads' => $threads, 'users' => $users, 'all' => $all,
             'open' => null, 'msgs' => collect(), 'other' => null, 'q' => $q, 'hits' => $hits,
-            'presence' => self::presence($threads->pluck('other')->all())]);
+            'presence' => self::presence($threads->pluck('other')->all()), 'dmReactions' => []]);
     }
 
     /** خيط محادثة مع مستخدم — الفتح يختم القراءة */
@@ -246,6 +246,7 @@ class DmController extends Controller
             'users' => User::whereIn('id', $ids)->pluck('name', 'id'), 'q' => '', 'hits' => collect(),
             'all' => $this->startableUsers((string) $me),
             'presence' => self::presence($ids),
+            'dmReactions' => self::dmReactionsFor($msgs->pluck('id')->all()),
         ]);
     }
 
@@ -355,6 +356,65 @@ class DmController extends Controller
         \App\Models\HubNotification::where('kind', 'dm')->where('record_id', $m->id)->delete();
 
         return back()->with('ok', 'سُحبت الرسالة — يبقى مكانُها يقول إنها حُذفت');
+    }
+
+    /**
+     * تفاعلٌ على رسالةٍ مباشرة (§21) — إيموجي واحد لكل مستخدم لكل رمز، الضغطُ ثانيةً
+     * يزيله. على **جدول `reactions` نفسِه** لا جدولَ ثانٍ (dm_message_id بدل comment_id).
+     * لطرفَي المحادثة وحدهما، ولا تفاعلَ على محذوفة. يُشعَر صاحبُ الرسالة حين يتفاعل غيرُه.
+     */
+    public function react(Request $r, string $id)
+    {
+        $m = DmMessage::findOrFail($id);
+        abort_unless(in_array(auth()->id(), [$m->from_id, $m->to_id], true), 403, 'لا شأن لك بهذه المحادثة');
+        abort_if($m->deleted_at !== null, 422, 'لا تفاعلَ على رسالةٍ محذوفة');
+
+        // العمودُ حديث: قبل الهجرة لا يُطفأ شيءٌ — رسالةٌ تقول إنّ الميزةَ تحتاج ترحيلاً
+        if (! hub_has_col('reactions', 'dm_message_id')) {
+            return back()->with('err', 'تفاعلاتُ الرسائلِ ميزةٌ جديدة تحتاج تحديث قاعدة البيانات — شغّل الترحيلات ثم أعد المحاولة.');
+        }
+
+        $emoji = hub_str($r->input('emoji'));
+        abort_unless(in_array($emoji, CommentController::REACTIONS, true), 422, 'تفاعل غير معروف');
+
+        $q = \Illuminate\Support\Facades\DB::table('reactions')
+            ->where('dm_message_id', $m->id)->where('user_id', auth()->id())->where('emoji', $emoji);
+
+        if ($q->exists()) {
+            $q->delete();
+        } else {
+            try {
+                \Illuminate\Support\Facades\DB::table('reactions')->insert([
+                    'id' => (string) Str::uuid(), 'dm_message_id' => $m->id, 'comment_id' => null,
+                    'user_id' => auth()->id(), 'emoji' => $emoji, 'created_at' => now(),
+                ]);
+            } catch (\Illuminate\Database\QueryException $e) {
+                // ضغطتان متزامنتان — القيدُ الفريد حسمها
+            }
+            // يُشعَر صاحبُ الرسالة حين يتفاعل الطرفُ الآخر (لا إشعارَ لتفاعلِ المرء بنفسِه)
+            if ($m->from_id !== auth()->id()) {
+                hub_notify($m->from_id, 'react',
+                    $emoji . ' تفاعل ' . auth()->user()->name . ' مع رسالتك: ' . Str::limit(trim((string) $m->body), 50),
+                    null, $m->id);
+            }
+        }
+
+        return back()->withFragment('dm-' . $m->id);
+    }
+
+    /** تفاعلاتُ مجموعةِ رسائلٍ مباشرة: [dm_message_id => [emoji => [أسماء]]] — نظيرُ reactionsFor */
+    public static function dmReactionsFor(array $ids): array
+    {
+        if (! $ids || ! hub_has_col('reactions', 'dm_message_id')) return [];
+
+        $rows = \Illuminate\Support\Facades\DB::table('reactions')
+            ->join('users', 'users.id', '=', 'reactions.user_id')
+            ->whereIn('dm_message_id', $ids)->get(['dm_message_id', 'emoji', 'users.name', 'reactions.user_id']);
+
+        $out = [];
+        foreach ($rows as $row) $out[$row->dm_message_id][$row->emoji][] = ['name' => $row->name, 'id' => $row->user_id];
+
+        return $out;
     }
 
     /**

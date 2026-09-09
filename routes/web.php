@@ -499,6 +499,7 @@ Route::middleware('auth')->group(function () {
     Route::get('dm', [DmController::class, 'inbox'])->name('dm.inbox');
     Route::post('dm', [DmController::class, 'start'])->name('dm.start');
     Route::post('dm/msg/{id}/edit', [DmController::class, 'edit'])->name('dm.edit');
+    Route::post('dm/msg/{id}/react', [DmController::class, 'react'])->name('dm.react');
     Route::delete('dm/msg/{id}', [DmController::class, 'destroy'])->name('dm.destroy');
     Route::get('dm/{userId}', [DmController::class, 'thread'])->name('dm.thread');
     Route::post('dm/{userId}', [DmController::class, 'send'])->name('dm.send');
