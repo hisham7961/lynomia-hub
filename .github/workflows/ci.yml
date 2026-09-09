@@ -207,6 +207,19 @@ jobs:
           sha256sum -c checksums.txt
           cat checksums.txt
 
+      # مثبِّتا MSI/PKG (§6): حالةُ التوقيع الثلاثيّة صادقةٌ (NOT_CONFIGURED)، وسكربتا
+      # البناء يتخطّيان بلطفٍ على ubuntu (لا WiX/pkgbuild) — لا تمثيلَ ولا فشلَ زائف.
+      - name: مثبِّتات — الهندسة وحالةُ التوقيع الصادقة (§6)
+        env:
+          WINDOWS_CODESIGN_PFX: ${{ secrets.WINDOWS_CODESIGN_PFX }}
+          APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+        run: |
+          sh packaging/signing-status.sh | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          # سكربتا البناء يتحقّقان من الأدوات ويخرجان 0 حيث لا تتوفّر (توثيقُ البنية)
+          sh packaging/windows/build-msi.sh dist/lynomia-agent-windows-amd64.exe "$(cat ../VERSION)" dist
+          sh packaging/macos/build-pkg.sh  dist/lynomia-agent-darwin-amd64      "$(cat ../VERSION)" dist
+
       - name: رفع الأرتيفاكتات (موسومةً unsigned-dev)
         uses: actions/upload-artifact@v4
         with:

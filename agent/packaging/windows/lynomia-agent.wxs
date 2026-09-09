@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  بيانُ WiX لمثبِّت وكيل النقاط الطرفية على Windows (مسارُ التصحيح §6).
+
+  يثبّت الثنائيّةَ الخام (lynomia-agent-windows-<arch>.exe) ويسجّلها **خدمةً**
+  (تشغيلٌ تلقائيّ). **غيرُ موقَّع** — التوقيعُ (Authenticode) خطوةٌ منفصلةٌ في
+  build-msi.sh لا تُشغَّل إلا بشهادةٍ حاضرة (NOT_CONFIGURED اليوم — C15).
+
+  المتغيّراتُ (AgentVersion/AgentExe) تُمرَّر من build-msi.sh بـ-d.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="Lynomia Endpoint Agent"
+           Language="1033"
+           Version="$(var.AgentVersion)"
+           Manufacturer="Lynomia"
+           UpgradeCode="7B4E2C10-9E3A-4F51-8C2D-1A6F3B0D9E44">
+
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"
+             Description="Lynomia Endpoint Agent (UNSIGNED DEVELOPMENT BUILD)" />
+
+    <MajorUpgrade DowngradeErrorMessage="نسخةٌ أحدثُ من الوكيل مثبَّتةٌ سلفاً." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="Lynomia Endpoint Agent">
+          <Component Id="AgentExeComponent" Guid="*">
+            <File Id="AgentExe" Source="$(var.AgentExe)" KeyPath="yes" Name="lynomia-agent.exe" />
+            <!-- الوكيلُ خدمةٌ: يعمل حلقةَ البروتوكول الموقَّعة (run). لا shell ولا أمرٌ حرّ. -->
+            <ServiceInstall Id="AgentService"
+                            Name="LynomiaEndpointAgent"
+                            DisplayName="Lynomia Endpoint Agent"
+                            Description="وكيلُ إدارةِ النقاط الطرفية — نبضٌ ووضعيّةٌ وأوامرُ قائمةٍ مغلقة."
+                            Type="ownProcess"
+                            Start="auto"
+                            ErrorControl="normal"
+                            Arguments="run" />
+            <ServiceControl Id="AgentServiceControl"
+                            Name="LynomiaEndpointAgent"
+                            Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+    </Directory>
+
+    <Feature Id="MainFeature" Title="Lynomia Endpoint Agent" Level="1">
+      <ComponentRef Id="AgentExeComponent" />
+    </Feature>
+  </Product>
+</Wix>

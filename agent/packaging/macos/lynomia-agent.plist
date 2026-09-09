@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd للوكيل على macOS (مسارُ التصحيح §6): يعمل حلقةَ البروتوكول الموقَّعة
+  (run) عند الإقلاع ويُبقيها حيّةً. لا shell ولا أمرٌ حرّ — الوكيلُ قائمةٌ مغلقة.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.lynomia.endpoint-agent</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/lynomia/lynomia-agent</string>
+        <string>run</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardErrorPath</key>
+    <string>/var/log/lynomia-endpoint-agent.log</string>
+    <key>StandardOutPath</key>
+    <string>/var/log/lynomia-endpoint-agent.log</string>
+</dict>
+</plist>
