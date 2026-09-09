@@ -144,7 +144,10 @@ func (l *agentLoop) postJSON(ctx context.Context, path string, payload map[strin
 // heartbeat — نبضةٌ واحدة بجسم عقد heartbeat (جردٌ + وضعيّةٌ صادقة).
 func (l *agentLoop) heartbeat(ctx context.Context) (*heartbeatResponse, error) {
 	var hb heartbeatResponse
-	err := l.postJSON(ctx, l.state.HeartbeatPath, inventory.HeartbeatBody(Version, security.Collect()), &hb)
+	// §10 — وضعيّةُ Wi-Fi من اتصال الجهاز نفسِه (لا مسحَ شبكة) تُرفَق بالنبضة
+	body := inventory.HeartbeatBody(Version, security.Collect())
+	body["wifi"] = network.WifiPosture()
+	err := l.postJSON(ctx, l.state.HeartbeatPath, body, &hb)
 	if err != nil {
 		return nil, err
 	}

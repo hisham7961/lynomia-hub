@@ -1,0 +1,14 @@
+#!/bin/bash
+# postinstall — تسجيلُ خدمةِ الوكيل على macOS بعد التثبيت (مسارُ التصحيح §6).
+# يُحمِّل launchd daemon فيعمل الوكيلُ (run) عند الإقلاع. لا shell حرّ — الوكيلُ
+# قائمةٌ مغلقة. (يُشغَّله المثبِّتُ pkg — لا يُشغَّل يدويّاً.)
+set -e
+
+PLIST="/Library/LaunchDaemons/com.lynomia.endpoint-agent.plist"
+
+if [ -f "$PLIST" ]; then
+	launchctl unload "$PLIST" 2>/dev/null || true
+	launchctl load -w "$PLIST"
+fi
+
+exit 0

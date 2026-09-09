@@ -9,6 +9,7 @@ package network
 
 import (
 	"net"
+	"strings"
 
 	"lynomia/agent/internal/platform"
 )
@@ -43,6 +44,26 @@ func Collect() ([]Interface, error) {
 		out = append(out, entry)
 	}
 	return out, nil
+}
+
+// WifiPosture — وضعيّةُ Wi-Fi من **اتصال الجهاز نفسِه فقط** (§10 — لا مسحَ شبكة):
+// SSID الذي يتّصل به الجهازُ (عبر واجهة المنصّة) وحالةُ قراءته الصادقة. الخادمُ
+// يقيّمه على قائمة SSID المعتمدة — والوكيلُ لا يحكم ولا يمسح.
+//
+//   - `readable`    — قُرئ SSID اتصالِ الجهاز.
+//   - `unavailable` — لم تُتِح المنصّةُ SSID (لا واجهةَ نظامٍ، أو غيرُ متّصل) —
+//     يُبلَّغ بصدقٍ ولا يُدّعى اتصالٌ معتمد.
+//
+// (تمييزُ permission-denied/unsupported متاحٌ في عقد الخادم؛ واجهةُ المنصّة
+// الحاليّة تعيد نجاحاً/فشلاً فحسب، فيُبلَّغ الفشلُ unavailable بصدق.)
+func WifiPosture() map[string]any {
+	status := "unavailable"
+	ssid := ""
+	if v, ok := platform.SSID(); ok && strings.TrimSpace(v) != "" {
+		ssid = strings.TrimSpace(v)
+		status = "readable"
+	}
+	return map[string]any{"ssid": ssid, "status": status}
 }
 
 // Summary — الحمولةُ السلكيّة لحدث network_self: الواجهاتُ المحليّة + SSID

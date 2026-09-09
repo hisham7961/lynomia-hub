@@ -157,7 +157,7 @@ class WorkOsAcceptanceEndpointTest extends TestCase
         $show = $this->actingAs($this->owner)->get(route('endpoints.show', $device->id))->assertOk();
         $show->assertSee('يتطلب MDM');
         $show->assertSee('رصدٌ فقط');
-        $show->assertSee('غير مُهيّأ / تعذّرت القراءة');   // الوضعيّةُ الصادقة على الشاشة
+        $show->assertSee('غيرُ مُهيّأ');   // §11 — الوضعيّةُ الصادقة على الشاشة (not-configured)
         $show->assertDontSee('الحجبُ مُفعَّل');
 
         /* ── (٦) دورةُ الأمر كاملة: isolate = تصعيدٌ + سبب ← claim ← نتيجةٌ موقَّعة ── */

@@ -104,32 +104,59 @@ class EndpointProtocolController extends Controller
             'agent_version' => ['nullable', 'string', 'max:60'],
             'hw' => ['nullable', 'array'],
             'posture' => ['nullable', 'array'],
+            // §10 — وضعيّةُ Wi-Fi: اتصالُ الجهاز نفسِه فقط (لا مسحَ شبكة)
+            'wifi' => ['nullable', 'array'],
+            'wifi.ssid' => ['nullable', 'string', 'max:64'],
+            'wifi.status' => ['nullable', 'string', 'max:20'],
         ]);
 
-        // **الوضعيّةُ الصادقة (C15):** ما ليس قراءةً معلومةً صريحةً يُخزَّن
-        // 'not-configured' — قراءةٌ منعها النظامُ أو ادّعاءٌ خارج القائمة لا
-        // يتحوّلان 'active' أبداً؛ 'active' لا تُكتب إلا كما أُبلغت حرفياً.
+        // **الوضعيّةُ الصادقة (C15 · §11):** العقدُ الموسَّع في `PostureContract` —
+        // active/inactive/permission-denied/unavailable/unsupported/not-configured.
+        // ما خرج عن القائمة المغلقة يهبط 'not-configured'؛ و«مُنع القارئ» يُحفَظ
+        // permission-denied (**ليس امتثالاً**) لا يُطمَس 'active' أبداً.
         $posture = null;
         if (is_array($d['posture'] ?? null)) {
             $posture = [];
             foreach ($d['posture'] as $check => $reading) {
                 if (! is_string($check) || trim($check) === '') continue;
-                $reading = is_string($reading) ? strtolower(trim($reading)) : '';
                 $posture[mb_substr(trim($check), 0, 60)] =
-                    in_array($reading, ['active', 'inactive', 'not-configured'], true) ? $reading : 'not-configured';
+                    \App\Support\PostureContract::normalize(is_string($reading) ? $reading : '');
                 if (count($posture) >= 30) break;
             }
         }
 
+        // §10 — تقييمُ وضعيّةِ Wi-Fi الشركة على اتصال الجهاز نفسِه (SSID بلّغه الوكيلُ)
+        // مقابلَ قائمة SSID المعتمدة في سياسة الجهاز. مُنع القراءة ليس امتثالاً.
+        $wifiSsidToStore = null;
+        if (is_array($d['wifi'] ?? null)) {
+            $policy = $device->policy_id ? \App\Models\EndpointPolicy::find($device->policy_id) : null;
+            $approved = $policy ? $policy->approvedSsids() : [];
+            $observedSsid = isset($d['wifi']['ssid']) ? mb_substr(trim((string) $d['wifi']['ssid']), 0, 64) : null;
+            $wifiState = \App\Support\PostureContract::evaluateWifi(
+                $observedSsid, $d['wifi']['status'] ?? null, $approved);
+
+            $posture = $posture ?? [];
+            $posture['wifi'] = $wifiState;
+            // احترازُ خصوصيّة (§13): يُخزَّن اسمُ الشبكة **فقط حين تكون معتمدة** —
+            // لا نُبقي اسمَ شبكةٍ شخصيّة (على غيرِ المعتمدة تبقى الحالةُ بلا اسم).
+            $wifiSsidToStore = $wifiState === \App\Support\PostureContract::ACTIVE ? $observedSsid : null;
+        }
+
         // saveQuietly: نبضةٌ كل دقائق لا تُغرق التدقيقَ ولا ترفع نسخةَ القفل
         // التفاؤليّ — والقصُّ عند الكاتب هنا لأن الحارسَ الصامت لا يُستدعى.
-        $device->forceFill(array_filter([
+        $fill = array_filter([
             'last_heartbeat_at' => now(),
             'hostname' => isset($d['hostname']) ? mb_substr(trim((string) $d['hostname']), 0, 120) : null,
             'agent_version' => isset($d['agent_version']) ? mb_substr((string) $d['agent_version'], 0, 30) : null,
             'hw' => $d['hw'] ?? null,
             'posture' => $posture,
-        ], fn ($v) => $v !== null))->saveQuietly();
+        ], fn ($v) => $v !== null);
+        // wifi_ssid يُكتب صراحةً حين وردت حمولةُ wifi — قد يكون null (غيرُ معتمدةٍ
+        // أو تعذّرت القراءة) كي يُمحى اسمٌ سابقٌ حين ينتقل الجهازُ عن الشبكة المعتمدة.
+        if (is_array($d['wifi'] ?? null) && hub_has_col('endpoint_devices', 'wifi_ssid')) {
+            $fill['wifi_ssid'] = $wifiSsidToStore;
+        }
+        $device->forceFill($fill)->saveQuietly();
 
         // مقاييسُ الأسطول عبر السكّة الواحدة hub_metric_put — لا مخزنَ ثانياً:
         // نبضةٌ (١) لسلسلة الحضور، وعدُّ الفحوص الفعّالة **الصادقة** للوضعيّة.

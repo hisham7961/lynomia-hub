@@ -60,3 +60,26 @@ func TestSummaryShape(t *testing.T) {
 		t.Fatalf("على linux لا قارئَ SSID — المطلوب not-configured لا %q", ssid)
 	}
 }
+
+// **وضعيّةُ Wi-Fi (§10):** اتصالُ الجهاز نفسِه فقط — مفتاحا ssid+status لا غير،
+// والحالةُ ضمن القائمة الصادقة (readable|unavailable). على linux (بلا قارئ)
+// unavailable بأمانةٍ — لا يُدّعى اتصالٌ ولا يُمسَح شيء.
+func TestWifiPostureShape(t *testing.T) {
+	w := WifiPosture()
+	if len(w) != 2 {
+		t.Fatalf("مفتاحا الوضعيّة ssid+status لا غير؛ وجدت %v", w)
+	}
+	status, ok := w["status"].(string)
+	if !ok || (status != "readable" && status != "unavailable") {
+		t.Fatalf("status خارج القائمة الصادقة: %v", w["status"])
+	}
+	if _, ok := w["ssid"].(string); !ok {
+		t.Fatalf("ssid ليست نصاً: %T", w["ssid"])
+	}
+	// linux بلا قارئ SSID: unavailable وssid فارغة — لا اختلاق
+	if runtime.GOOS == "linux" {
+		if status != "unavailable" || w["ssid"].(string) != "" {
+			t.Fatalf("على linux المطلوب unavailable وssid فارغة؛ وجدت %v", w)
+		}
+	}
+}

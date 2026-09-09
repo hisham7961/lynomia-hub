@@ -34,6 +34,34 @@ func TestCollectFromDegradesHonestly(t *testing.T) {
 	}
 }
 
+// **العقدُ الموسَّع (§11):** خطأٌ مُسمّىً يهبط لحالته الصادقة (لا يُطمَس
+// not-configured)، والقراءةُ الصريحةُ لحالةٍ موسَّعةٍ تُحفَظ كما هي. «مُنع
+// القراءة» permission-denied — **ليس امتثالاً** — لا يُخلَط بـnot-configured.
+func TestCollectFromExpandedContract(t *testing.T) {
+	cases := []struct {
+		name   string
+		reader Reader
+		want   string
+	}{
+		{"مُنع القراءة (سِمة)", func() (string, error) { return "", ErrPermissionDenied }, "permission-denied"},
+		{"غيرُ مدعوم (سِمة)", func() (string, error) { return "", ErrUnsupported }, "unsupported"},
+		{"تعذّر (سِمة)", func() (string, error) { return "", ErrUnavailable }, "unavailable"},
+		{"مُنع القراءة لا يُطمَس active", func() (string, error) { return "active", ErrPermissionDenied }, "permission-denied"},
+		{"قراءةٌ صريحة permission-denied", func() (string, error) { return "permission-denied", nil }, "permission-denied"},
+		{"قراءةٌ صريحة unavailable", func() (string, error) { return "unavailable", nil }, "unavailable"},
+		{"قراءةٌ صريحة unsupported", func() (string, error) { return "unsupported", nil }, "unsupported"},
+		{"خطأٌ عامٌّ يبقى not-configured (توافقٌ رجعيّ)", func() (string, error) { return "", errors.New("x") }, "not-configured"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := CollectFrom(map[string]Reader{"firewall": tc.reader})
+			if got["firewall"] != tc.want {
+				t.Fatalf("firewall = %q؛ المطلوب %q", got["firewall"], tc.want)
+			}
+		})
+	}
+}
+
 // الفحوصُ القانونية الأربعة تحضر دوماً — الغائبُ يُبلَّغ not-configured لا يُسكَت عنه.
 func TestCollectFromFillsCanonicalChecks(t *testing.T) {
 	got := CollectFrom(map[string]Reader{})

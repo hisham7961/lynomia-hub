@@ -30,7 +30,16 @@ class EndpointPolicy extends Model
     protected $casts = [
         'enforce' => 'boolean',
         'posture_checks' => 'array',
+        'approved_ssids' => 'array',   // SSID الشركة المعتمدة لوضعيّة Wi-Fi (§10)
     ];
+
+    /** قائمةُ SSID المعتمدة — مطبَّعةً (قصٌّ + إسقاطُ الفارغ)؛ الغيابُ ⇒ لا حكم */
+    public function approvedSsids(): array
+    {
+        $list = is_array($this->approved_ssids) ? $this->approved_ssids : [];
+
+        return array_values(array_filter(array_map(fn ($s) => trim((string) $s), $list), fn ($s) => $s !== ''));
+    }
 
     /** الأوضاعُ الخمسة — allowlist مفروضٌ في `saving` (لا DB enum · C10) */
     public const USB_MODES = ['allow', 'audit', 'readonly', 'block_storage', 'block_all'];

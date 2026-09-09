@@ -348,6 +348,20 @@ Route::middleware('auth')->group(function () {
         Route::post('endpoints/releases/{id}/delete', [\App\Http\Controllers\Web\EndpointReleaseController::class, 'destroy'])->name('endpoints.releases.delete');
     });
 
+    // ── تكاملُ MDM (Intune/Jamf) — مسارُ التصحيح §8/§9 ──
+    // إدارةُ وصلةِ التكامل: للمالك وحدَه (تكاملٌ يمسّ سياسةَ الأسطول)، والعميلُ ٤٠٤.
+    // الوصلةُ تحمل الإعدادَ لا السرَّ (السرُّ في VaultSecret مشفَّراً). كلُّ المزوّدات
+    // اليومَ **رصدٌ فقط** (جسرُ الفرض الحيّ مؤجَّل) — لا حجبَ يُزعَم (C15). **قبل**
+    // endpoints/{id} كي لا يبتلع الوسيطُ الجامح كلمةَ mdm.
+    Route::get('endpoints/mdm', [\App\Http\Controllers\Web\EndpointMdmController::class, 'index'])->name('endpoints.mdm');
+    Route::middleware('throttle:30,1')->group(function () {
+        Route::post('endpoints/mdm', [\App\Http\Controllers\Web\EndpointMdmController::class, 'store'])->name('endpoints.mdm.store');
+        Route::post('endpoints/mdm/{id}/toggle', [\App\Http\Controllers\Web\EndpointMdmController::class, 'toggle'])->name('endpoints.mdm.toggle');
+        Route::post('endpoints/mdm/{id}/health', [\App\Http\Controllers\Web\EndpointMdmController::class, 'health'])->name('endpoints.mdm.health');
+        Route::post('endpoints/mdm/{id}/sync', [\App\Http\Controllers\Web\EndpointMdmController::class, 'sync'])->name('endpoints.mdm.sync');
+        Route::post('endpoints/mdm/{id}/delete', [\App\Http\Controllers\Web\EndpointMdmController::class, 'destroy'])->name('endpoints.mdm.delete');
+    });
+
     Route::get('endpoints/{id}', [\App\Http\Controllers\Web\EndpointCentreController::class, 'show'])->name('endpoints.show');
 
     // ── عهدةُ الموظف المالية (Work OS · الطور E · WP-E.3 · §19/§28/§98) ──

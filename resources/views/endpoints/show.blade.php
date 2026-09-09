@@ -73,26 +73,40 @@
 
     <div class="card kid">
         <h3>🔌 سياسة USB</h3>
+        @php
+            $effMode = $usbEffectiveMode ?? \App\Support\MdmService::MODE_OBSERVE_ONLY;
+            $effLabel = \App\Support\MdmService::MODE_LABELS[$effMode] ?? $effMode;
+            $effTone = $effMode === \App\Support\MdmService::MODE_ENFORCE ? 'g' : 'wn';
+        @endphp
         @if ($policy)
             <table class="mini">
                 <tr><td class="sub">السياسة</td><td>{{ $policy->name }}</td></tr>
-                <tr><td class="sub">الوضع</td><td>{{ $usbModes[$policy->usb_mode] ?? $policy->usb_mode }}</td></tr>
-                <tr><td class="sub">الفرض</td>
-                    <td>
-                        @if ($policy->enforce)
-                            <span class="bdg wn">مُقِرٌّ بمتطلب MDM</span>
-                        @else
-                            <span class="bdg g">رصدٌ فقط (Audit only)</span>
-                        @endif
-                    </td></tr>
+                <tr><td class="sub">الوضع المطلوب</td><td>{{ $usbModes[$policy->usb_mode] ?? $policy->usb_mode }}</td></tr>
+                {{-- §8 — الوضعُ **الفعليّ** الصادق: تكاملُ MDM يقرّره لا رايةُ السياسة وحدَها --}}
+                <tr><td class="sub">الفرض الفعليّ</td>
+                    <td><span class="bdg {{ $effTone }}">{{ $effLabel }}</span></td></tr>
+                @if ($policy->enforce && $effMode !== \App\Support\MdmService::MODE_ENFORCE)
+                    <tr><td class="sub"></td><td class="sub">السياسةُ تطلب الفرضَ، لكنّ لا مزوّدَ MDM قادرٌ فعلاً — يبقى رصداً فقط.</td></tr>
+                @endif
             </table>
         @else
             <div class="sub">لا سياسةَ مُسنَدةً لهذا الجهاز — الوكيلُ يرصد أحداثَ USB ويبلّغها فقط.</div>
+            <div class="sub" style="margin-top:4px">الفرض الفعليّ: <span class="bdg {{ $effTone }}">{{ $effLabel }}</span></div>
         @endif
-        {{-- نصُّ الصدق الإلزاميّ (C15) — يُعرَض دائماً: لا ادّعاءَ حجبٍ بلا MDM --}}
-        <div class="flash wn" style="margin-top:8px">
-            ⚠️ يتطلب MDM / رصدٌ فقط — {{ \App\Models\EndpointPolicy::ENFORCE_NOTICE }}
-        </div>
+        {{-- تكاملُ MDM المرتبط (صادقٌ بلا سرّ) — المزوّدُ وقدرتُه الفعليّة --}}
+        @if (($mdmStatus['driver'] ?? 'null') !== 'null')
+            <div class="sub" style="margin-top:6px">
+                تكامل: {{ $mdmStatus['driver'] }}
+                @if ($mdmStatus['tenant'] ?? null)<span dir="ltr">· {{ $mdmStatus['tenant'] }}</span>@endif
+                — {{ ($mdmStatus['can_enforce'] ?? false) ? 'قادرٌ على الفرض' : 'رصدٌ فقط (جسرُ الفرض الحيّ مؤجَّل)' }}
+            </div>
+        @endif
+        {{-- نصُّ الصدق الإلزاميّ (C15) — يُعرَض دائماً ما لم يكن فرضٌ فعليٌّ حقيقيّ --}}
+        @if ($effMode !== \App\Support\MdmService::MODE_ENFORCE)
+            <div class="flash wn" style="margin-top:8px">
+                ⚠️ يتطلب MDM / رصدٌ فقط — {{ \App\Models\EndpointPolicy::ENFORCE_NOTICE }}
+            </div>
+        @endif
     </div>
 </div>
 
