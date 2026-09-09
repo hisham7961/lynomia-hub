@@ -504,6 +504,15 @@ Route::middleware('auth')->group(function () {
     Route::get('oversight', [\App\Http\Controllers\Web\OversightController::class, 'index'])->name('oversight.index');
     Route::get('oversight/{id}', [\App\Http\Controllers\Web\OversightController::class, 'show'])->name('oversight.show');
 
+    // ── مجموعاتُ الرسائل (§35) — محادثاتٌ جماعيّةٌ داخليّةٌ خاصّةٌ فوق حاويةِ المحادثة ──
+    Route::get('groups', [\App\Http\Controllers\Web\GroupController::class, 'index'])->name('groups.index');
+    Route::post('groups', [\App\Http\Controllers\Web\GroupController::class, 'store'])
+        ->middleware('throttle:30,1')->name('groups.store');
+    Route::post('groups/{id}/participants', [\App\Http\Controllers\Web\GroupController::class, 'fork'])
+        ->middleware('throttle:30,1')->name('groups.fork');
+    Route::post('groups/{id}/leave', [\App\Http\Controllers\Web\GroupController::class, 'leave'])
+        ->middleware('throttle:30,1')->name('groups.leave');
+
     // ── المراسلة الداخلية المباشرة ──
     Route::get('dm', [DmController::class, 'inbox'])->name('dm.inbox');
     Route::post('dm', [DmController::class, 'start'])->name('dm.start');

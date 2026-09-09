@@ -255,6 +255,7 @@ class ConversationController extends Controller
             'role'        => $role,
             'canPost'     => Conversation::roleCanPost($role),
             'canManage'   => Conversation::roleCanManage($role),
+            'isGroup'     => $conv->kind === 'group',
             'messages'    => $messages,
             'members'     => $members,
             'users'       => CommentController::userNames(),
@@ -529,6 +530,11 @@ class ConversationController extends Controller
     public function addMember(Request $r, string $id)
     {
         [$conv, $actorRole] = self::guardConversation($id, 'manage');
+
+        // §35 مجموعةُ الرسائل: إضافةُ عضوٍ مباشرةً تكشف تاريخَها للجديد — ممنوعة.
+        // الإضافةُ تُنشئ مجموعةً جديدةً (fork) حفظاً لجمهورِ التاريخ.
+        abort_if($conv->kind === 'group', 422,
+            'مجموعةُ الرسائل: أضِف المشاركَ عبر «مجموعةٌ جديدة» حفظاً لخصوصيّة ما مضى');
 
         $data = $r->validate([
             'user_id' => ['required', 'string'],

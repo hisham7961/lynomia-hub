@@ -31,7 +31,7 @@ class Conversation extends Model
     public const MODULE = 'conversations';
 
     /** نوعُ الحاوية — المسموحُ يُفرَض في `saving` (لا DB enum · درسُ C10) */
-    public const KINDS = ['feed', 'dm', 'channel', 'record'];
+    public const KINDS = ['feed', 'dm', 'channel', 'record', 'group'];
 
     /** الجمهور (SF-4) — داخليٌّ افتراضاً؛ العميلُ لا يرى إلا `client`/`both` */
     public const AUDIENCES = ['internal', 'client', 'both'];
@@ -115,6 +115,12 @@ class Conversation extends Model
     public function scopeChannels($q)
     {
         return $q->where('kind', 'channel');
+    }
+
+    /** مجموعاتُ الرسائل وحدَها (kind=group) — محادثاتٌ جماعيّةٌ داخليّةٌ خاصّة (§35) */
+    public function scopeGroups($q)
+    {
+        return $q->where('kind', 'group');
     }
 
     /* ────────── مساعِداتُ العضويّة (الطور C · WP-C.1) — RBAC واحد لا ثانٍ ────────── */
