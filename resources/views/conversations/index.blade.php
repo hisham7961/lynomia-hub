@@ -17,6 +17,10 @@
                     padding:10px 6px;border-top:1px solid var(--brd);text-decoration:none">
                 <span class="ava sm">#</span>
                 <b style="flex:1;min-width:0">{{ $ch->title ?: 'قناةٌ بلا اسم' }}</b>
+                @php $u = ($unread ?? [])[$ch->id] ?? 0; @endphp
+                @if ($u > 0)
+                    <span class="bdg g" title="رسائلُ غير مقروءة">{{ $u > 99 ? '99+' : $u }}</span>
+                @endif
                 @if (in_array($ch->audience, ['client', 'both'], true))
                     <span class="bdg wn" title="قناةٌ يبلغها العميلُ عبر بوابته">👥 جمهورُ العميل</span>
                 @else

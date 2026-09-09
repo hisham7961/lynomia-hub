@@ -164,7 +164,41 @@ class ConversationController extends Controller
             ->orderBy('title')->orderBy('id')
             ->get(['id', 'kind', 'title', 'audience', 'visibility', 'client_id', 'updated_at']);
 
-        return view('conversations.index', ['channels' => $channels]);
+        $unread = self::unreadCounts($channels->pluck('id')->all(), (string) $user->getKey());
+
+        return view('conversations.index', ['channels' => $channels, 'unread' => $unread]);
+    }
+
+    /**
+     * **§17 عددُ غير المقروء لكلِّ قناةٍ للعضو** — نموذجُ مؤشّرٍ (keyset) على
+     * `conversation_members.last_read_at` لا مسحُ `read_by` JSON لكلِّ رسالة: رسالةٌ
+     * حديثةٌ من غيري بعد مؤشّرِ قراءتي = غيرُ مقروءة. استعلامٌ **واحد** لكلِّ القنوات
+     * (ضمٌّ على العضويّة بعتبةٍ لكلِّ قناة) — لا N+1، محمولٌ على المحرّكين.
+     * رسائلي ليست غيرَ مقروءةٍ عليّ، والمحذوفةُ لا تُعَدّ.
+     *
+     * @return array<string,int> [conversation_id => count]
+     */
+    public static function unreadCounts(array $conversationIds, string $userId): array
+    {
+        if (! $conversationIds
+            || ! hub_has_col('comments', 'conversation_id')
+            || ! hub_has_col('conversation_members', 'last_read_at')) {
+            return [];
+        }
+
+        return \Illuminate\Support\Facades\DB::table('comments')
+            ->join('conversation_members as m', function ($j) use ($userId) {
+                $j->on('m.conversation_id', '=', 'comments.conversation_id')
+                    ->where('m.user_id', '=', $userId);
+            })
+            ->whereIn('comments.conversation_id', $conversationIds)
+            ->whereNull('comments.deleted_at')
+            ->where('comments.user_id', '!=', $userId)
+            ->where(fn ($w) => $w->whereNull('m.last_read_at')
+                ->orWhereColumn('comments.created_at', '>', 'm.last_read_at'))
+            ->groupBy('comments.conversation_id')
+            ->selectRaw('comments.conversation_id as cid, COUNT(*) as c')
+            ->pluck('c', 'cid')->map(fn ($c) => (int) $c)->all();
     }
 
     /** عرضُ قناةٍ: رسائلُها (من comments عبر الحاوية) وأعضاؤها */
@@ -178,6 +212,13 @@ class ConversationController extends Controller
 
         // إيصالُ قراءةِ صاحبِه: يمرّ عبر السكّة نفسها (read_by) لا read_at غيره
         (new CommentController)->markReadPublic($messages);
+
+        // §17 مؤشّرُ القراءةِ للعدّ غير المقروء — العضوُ يقرأ الآن، فيتقدّم `last_read_at`.
+        // صاحبُه يكتبه حين يقرأ لا القارئُ الرقابيّ (§6 · تلك عبر OversightController).
+        if (hub_has_col('conversation_members', 'last_read_at')) {
+            ConversationMember::where('conversation_id', $conv->id)
+                ->where('user_id', auth()->id())->update(['last_read_at' => now()]);
+        }
 
         $members = $conv->members()->with('user:id,name')
             ->orderByRaw("CASE role WHEN 'owner' THEN 0 WHEN 'moderator' THEN 1 WHEN 'member' THEN 2 ELSE 3 END")
