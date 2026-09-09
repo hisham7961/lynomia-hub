@@ -269,6 +269,38 @@ class ConversationController extends Controller
         return redirect()->route('conversations.show', $conv->id)->with('ok', 'أُنشئت القناة');
     }
 
+    /* ────────── تفضيلُ الإشعار لكلِّ عضوٍ (§16) ────────── */
+
+    /**
+     * **تفضيلُ إشعارِ القناةِ لعضوها** (all/mentions/muted) — كلُّ عضوٍ يضبط تفضيلَه
+     * وحده (عضويّةُ الرؤية تكفي، لا إدارة). «muted» يتزامن مع `muted_at` القائم
+     * (خطّافُ النموذج · كتمٌ واحد). غيرُ العضوِ ٤٠٤ (نظيرُ الحارس)، والعمودُ حديث:
+     * قبل الهجرة رسالةٌ تقول إنّ الميزةَ تحتاج ترحيلاً — لا خمسمئةٌ على مسارٍ حيّ.
+     */
+    public function setNotifyPref(Request $r, string $id)
+    {
+        [$conv] = self::guardConversation($id, 'v');   // أيُّ عضوٍ يضبط تفضيلَه
+
+        $data = $r->validate([
+            'pref' => ['required', 'string', Rule::in(\App\Support\Collaboration::NOTIFY_PREFS)],
+        ], [], ['pref' => 'تفضيل الإشعار']);
+
+        if (! hub_has_col('conversation_members', 'notify_pref')) {
+            return back()->with('err',
+                'ضبطُ تفضيلِ الإشعار ميزةٌ جديدة تحتاج تحديث قاعدة البيانات — شغّل الترحيلات ثم أعد المحاولة.');
+        }
+
+        $m = ConversationMember::where('conversation_id', $conv->id)
+            ->where('user_id', auth()->id())->firstOrFail();
+        $m->forceFill(['notify_pref' => $data['pref']])->save();   // الخطّافُ يزامن muted_at
+
+        return back()->with('ok', match ($data['pref']) {
+            'muted'    => 'كُتمت القناة — لا إشعارات منها',
+            'mentions' => 'إشعاراتُ الإشارة فقط',
+            default    => 'كلُّ الإشعارات',
+        });
+    }
+
     /* ────────── إدارةُ الأعضاء (owner/moderator) ────────── */
 
     /** إضافةُ عضوٍ — المشرفُ فأعلى؛ وتنصيبُ مالكٍ/مشرفٍ للمالك وحده */

@@ -479,6 +479,8 @@ Route::middleware('auth')->group(function () {
     Route::post('conversations', [ConversationController::class, 'store'])
         ->middleware('throttle:30,1')->name('conversations.store');
     Route::get('conversations/{id}', [ConversationController::class, 'show'])->name('conversations.show');
+    Route::post('conversations/{id}/notify', [ConversationController::class, 'setNotifyPref'])
+        ->middleware('throttle:60,1')->name('conversations.notify');
     Route::middleware('throttle:60,1')->group(function () {
         Route::post('conversations/{id}/members', [ConversationController::class, 'addMember'])->name('conversations.member.add');
         Route::post('conversations/{id}/members/remove', [ConversationController::class, 'removeMember'])->name('conversations.member.remove');

@@ -20,7 +20,21 @@
             · {{ $members->count() }} عضواً · دورُك: {{ $roleLabels[$role] ?? $role }}
         </div>
     </div>
-    <a class="btn ghost sm" href="{{ route('conversations.index') }}">← كل القنوات</a>
+    <div style="display:flex;gap:8px;align-items:center">
+        {{-- §16 تفضيلُ إشعارِ القناةِ لعضوها — كلُّ عضوٍ يضبط تفضيلَه وحده --}}
+        @php $myPref = optional($members->firstWhere('user_id', auth()->id()))->effectiveNotifyPref() ?? 'all'; @endphp
+        <form method="POST" action="{{ route('conversations.notify', $conv->id) }}" class="inline">
+            @csrf
+            <label class="vh" for="conv-notify">إشعارات القناة</label>
+            <select class="inp sm" id="conv-notify" name="pref" onchange="this.form.submit()" title="إشعارات القناة">
+                <option value="all" @selected($myPref === 'all')>🔔 كل الإشعارات</option>
+                <option value="mentions" @selected($myPref === 'mentions')>@ الإشارات فقط</option>
+                <option value="muted" @selected($myPref === 'muted')>🔕 مكتومة</option>
+            </select>
+            <noscript><button class="btn sm" type="submit">حفظ</button></noscript>
+        </form>
+        <a class="btn ghost sm" href="{{ route('conversations.index') }}">← كل القنوات</a>
+    </div>
 </div>
 
 @if (session('ok'))<div class="note ok">{{ session('ok') }}</div>@endif
