@@ -24,6 +24,8 @@
     @if (hub_is_owner())
         {{-- (الطور L · WP-L.2) مركزُ التنزيل — إدارتُه للمالك وحدَه --}}
         <a class="btn sm" href="{{ route('endpoints.releases') }}">📦 مركز تنزيل الوكيل</a>
+        {{-- (مسارُ التصحيح §8/§9) تكاملُ MDM — رصدٌ فقط، لا حجبَ يُزعَم --}}
+        <a class="btn sm" href="{{ route('endpoints.mdm') }}">🛡️ تكامل MDM</a>
     @endif
 </div>
 

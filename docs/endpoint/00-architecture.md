@@ -42,8 +42,8 @@
 | اتساقُ دورةِ الحياة مع الأصل | **IMPLEMENTED — §3** (نهائيّةٌ⇒تعليقٌ+إلغاءُ أوامر؛ مفقود/تالف⇒تنبيهٌ ويبقى نشطاً — عبر Custody) |
 | توقيعُ Authenticode / Developer ID / notarization | **NOT_CONFIGURED — يتطلّب شهاداتِ توقيعٍ خارجيّة** |
 | مثبّتا Windows MSI / macOS PKG | **DEFERRED → §5/§6** (أرتيفاكتاتُ تطويرٍ حالياً) |
-| فرضُ USB (حجب فعليّ) | **NOT_CONFIGURED — يتطلّب MDM (Intune/Jamf)** — اليومَ مراقبةٌ فقط |
-| تكاملُ MDM (Intune/Jamf) | **DEFERRED → §8/§9 — يتطلّب اعتماداتِ المزوّد** |
+| فرضُ USB (حجب فعليّ) | **OBSERVE_ONLY — §8** (الوضعُ الفعليُّ يقرّره `MdmService` صادقاً؛ الحجبُ الفعليّ يتطلّب مزوّداً قادراً — راجع 03) |
+| طبقةُ تكامل MDM (Intune/Jamf · config/health/mapping/sync) | **IMPLEMENTED (السيمُ) — §9**؛ الجسرُ الحيُّ **DEFERRED** خلف `canEnforce()` (اعتماداتُ المزوّد) — راجع 03 |
 | وضعيّةُ Wi-Fi للشركة | **DEFERRED → §10** (SSID مُعطَّلٌ في الوكيل — not-configured صادق) |
 | عزلُ الجهاز (`isolate`) الفعليّ | **NOT_CONFIGURED — يتطلّب MDM** — اليومَ علامةٌ فقط |
 
