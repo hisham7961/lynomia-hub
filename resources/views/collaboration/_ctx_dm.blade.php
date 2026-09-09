@@ -14,6 +14,11 @@
 <div class="cx-ctxsec">
     <div class="cx-ctxh">🔗 روابط</div>
     <a class="btn ghost sm" href="{{ route('dm.thread', $other->id) }}" style="width:100%;text-align:start;margin-bottom:6px">✉️ الصندوقُ الكامل ⤢</a>
+    {{-- §14 بدءُ مجموعةٍ من محادثة — مجموعةٌ **جديدة** تضمّ الطرفَ سلفاً، لا تُغيَّر المحادثةُ
+         الخاصّةُ ولا تُنقَل رسائلُها. يُفتَح لوحُ الإنشاءِ والطرفُ محدَّدٌ مسبقاً. --}}
+    <a class="btn ghost sm" href="{{ route('collab.center', ['new' => 'group', 'with' => $other->id]) }}"
+       style="width:100%;text-align:start">➕ إضافةُ أشخاص / بدءُ مجموعة</a>
+    <div class="sub" style="font-size:11px;margin-top:5px;line-height:1.7">تُنشئ مجموعةً جديدة — لا تُنقَل رسائلُ محادثتِكما الخاصّة.</div>
 </div>
 
 <div class="cx-ctxsec">

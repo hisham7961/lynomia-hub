@@ -50,11 +50,62 @@ class CollaborationController extends Controller
             $selected = ['type' => 'dm', 'id' => (string) $center['other']->id];
         }
 
+        // لوحاتُ الإنشاء (§9/§13/§17/§18) — تُعرَض في اللوح الأوسط حين لا خيطَ مختار،
+        // فالإنشاءُ يتمّ **داخلَ** المركز لا بمغادرته. مُنطَّقةٌ بالصلاحية.
+        $create = null;
+        $new = hub_str($r->query('new'));
+        if ($selected === null && in_array($new, ['group', 'dm', 'channel', 'pchannel'], true)) {
+            $create = $this->createPanel($user, $new, hub_str($r->query('with')));
+        }
+
         return view('collaboration.center', array_merge([
             'rail'     => $rail,
             'selected' => $selected,
+            'create'   => $create,
             'users'    => CommentController::userNames(),
         ], $center));
+    }
+
+    /**
+     * **مركزُ الانتباه (§19)** — الإشاراتُ (@) والردودُ على تعليقاتي، **من محرّكِ
+     * الإشعاراتِ القائم** (`HubNotification` بنوعِ mention/reply) لا محرّكٍ ثانٍ. يُعرَض
+     * وجهةً واضحةً داخلَ مركزِ التواصل (لا بحثٌ فقط). داخليٌّ حصراً كسائرِ المركز.
+     */
+    public function attention(Request $r)
+    {
+        $user = auth()->user();
+        abort_if(hub_is_client($user), 404);
+
+        $items = \App\Models\HubNotification::where('user_id', $user->getKey())
+            ->whereIn('kind', ['mention', 'reply'])
+            ->orderByDesc('created_at')->orderByDesc('id')
+            ->paginate(30)->withQueryString();
+
+        return view('collaboration.center', [
+            'rail'      => CollaborationRail::forUser($user),
+            'selected'  => ['type' => 'attention'],
+            'create'    => null,
+            'attention' => $items,
+            'users'     => CommentController::userNames(),
+        ]);
+    }
+
+    /**
+     * حمولةُ لوحِ الإنشاء بحسب نوعه — مرشّحون آمنون (داخليّون ضمن النطاق) للمجموعة/المحادثة،
+     * وبلا مرشّحين للقناة. `$with` يُمرَّر لِبدءِ مجموعةٍ من محادثةٍ (تُحدَّد الطرفُ سلفاً · §14).
+     */
+    private function createPanel(User $me, string $new, string $with): array
+    {
+        if (in_array($new, ['group', 'dm'], true)) {
+            $cands = DmController::reachableColleagues($me);
+            $preset = [];
+            if ($with !== '' && $cands->has($with)) $preset = [$with];   // الطرفُ المُحدَّدُ سلفاً (§14)
+
+            return ['new' => $new, 'candidates' => $cands, 'preset' => $preset,
+                'withName' => $with !== '' ? ($cands[$with]['name'] ?? '') : ''];
+        }
+
+        return ['new' => $new];   // قناة/قناة خاصّة — بلا مرشّحين
     }
 
     /** يفتح قناةً/مجموعةً في اللوح الأوسط — الحارسُ نفسُه (غيرُ العضو ٤٠٤) */
@@ -98,18 +149,28 @@ class CollaborationController extends Controller
         $tip = Comment::where('conversation_id', $conv->id)->whereNull('deleted_at')
             ->orderByDesc('created_at')->orderByDesc('id')->first(['id', 'created_at']);
 
+        // §15/§16 مرشّحو «إضافةِ أشخاصٍ» للمجموعة (فرعٌ آمن) — زملاءُ الفريقِ غيرُ الأعضاء،
+        // منطَّقون كسائرِ المنتقيات (داخليّون ضمن النطاق). للقناة لا يلزم (إضافةٌ مباشرة).
+        $addCandidates = collect();
+        if ($conv->kind === 'group') {
+            $memberIds = $members->pluck('user_id')->map('strval')->all();
+            $addCandidates = DmController::reachableColleagues(auth()->user())
+                ->reject(fn ($c, $id) => in_array((string) $id, $memberIds, true));
+        }
+
         return [
-            'conv'        => $conv,
-            'role'        => $role,
-            'canPost'     => Conversation::roleCanPost($role),
-            'canManage'   => Conversation::roleCanManage($role),
-            'isGroup'     => $conv->kind === 'group',
-            'messages'    => $messages,
-            'members'     => $members,
-            'pins'        => $pins,
-            'files'       => $files,
-            'record'      => $record,
-            'sinceCursor' => $tip ? Collaboration::encodeCursor((string) $tip->created_at, (string) $tip->id) : '',
+            'conv'          => $conv,
+            'role'          => $role,
+            'canPost'       => Conversation::roleCanPost($role),
+            'canManage'     => Conversation::roleCanManage($role),
+            'isGroup'       => $conv->kind === 'group',
+            'messages'      => $messages,
+            'members'       => $members,
+            'pins'          => $pins,
+            'files'         => $files,
+            'record'        => $record,
+            'addCandidates' => $addCandidates,
+            'sinceCursor'   => $tip ? Collaboration::encodeCursor((string) $tip->created_at, (string) $tip->id) : '',
         ];
     }
 

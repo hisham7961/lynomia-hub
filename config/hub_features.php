@@ -125,7 +125,7 @@ return [
         'workos.relationship_explorer' => ['domain' => 'work_os', 'category' => 'graph', 'title_ar' => 'مستكشف العلاقات', 'title_en' => 'Relationship Explorer', 'status' => 'ENABLED', 'web_routes' => ['graph.explore']],
         'workos.tech_workspace' => ['domain' => 'work_os', 'category' => 'graph', 'title_ar' => 'مساحة العمل التقنيّة', 'title_en' => 'Technical Workspace', 'status' => 'ENABLED'],
         'workos.project_360' => ['domain' => 'work_os', 'category' => 'delivery', 'title_ar' => 'مشروع 360', 'title_en' => 'Project 360', 'status' => 'ENABLED'],
-        'workos.global_search' => ['domain' => 'work_os', 'category' => 'search', 'title_ar' => 'بحث نظام العمل الشامل', 'title_en' => 'Work OS Global Search', 'status' => 'ENABLED', 'web_routes' => ['search.index']],
+        'workos.global_search' => ['domain' => 'work_os', 'category' => 'search', 'title_ar' => 'بحث نظام العمل الشامل', 'title_en' => 'Work OS Global Search', 'status' => 'ENABLED', 'web_routes' => ['search', 'search.mini']],
 
         /* ───────── 7D · الأصول / الجرد (Work OS · الطور F) ───────── */
         'assets.company_assets' => ['domain' => 'assets', 'category' => 'inventory', 'title_ar' => 'أصول الشركة', 'title_en' => 'Company-Owned Assets', 'status' => 'ENABLED', 'permissions' => ['assets']],

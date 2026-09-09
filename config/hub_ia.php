@@ -84,8 +84,10 @@ return [
                         'synonyms' => ['boards', 'لوحات', 'dashboards', 'ودجات']],
                 ]],
                 'messages' => ['label' => 'رسائلي', 'order' => 3, 'destinations' => [
-                    ['type' => 'personal', 'route' => 'collab.center', 'guard' => 'authed', 'importance' => 'primary',
-                        'label' => 'مركز التواصل', 'icon' => '💬', 'route_prefix' => 'collab', 'routes' => ['collab.center'],
+                    // مركزُ التواصل — بيتُه الكتالوجيُّ الواحد hub_top_links['collab'] (C6): المسارُ/التسمية/الحارس
+                    // من الكتالوج، فيرسمه الشريطُ الجانبيّ تلقائيّاً (DEFECT A) ويبقى مصدرُ الحقيقةِ واحداً.
+                    ['type' => 'center', 'center' => 'collab', 'importance' => 'primary',
+                        'route_prefix' => 'collab', 'routes' => ['collab.center', 'collab.attention'],
                         'synonyms' => ['collaboration', 'مركز التواصل', 'unified', 'الموحّد', 'workspace', 'communication hub']],
                     ['type' => 'center', 'center' => 'dm', 'importance' => 'primary', 'route_prefix' => 'dm',
                         'routes' => ['dm.inbox', 'dm.thread', 'dm.since']],

@@ -404,6 +404,11 @@ class ConversationController extends Controller
             }
         }
 
+        // من داخلِ مركزِ التواصل: تُفتَح القناةُ الجديدةُ في المركزِ نفسِه (§17)
+        if (hub_str($r->input('origin')) === 'collab') {
+            return redirect()->route('collab.center', ['c' => $conv->id])->with('ok', 'أُنشئت القناة');
+        }
+
         return redirect()->route('conversations.show', $conv->id)->with('ok', 'أُنشئت القناة');
     }
 

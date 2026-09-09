@@ -25,6 +25,55 @@
     @endif
 </div>
 
+{{-- §15/§16 إدارةُ المجموعةِ اليوميّةُ داخلَ المركز: التنبيهات · إضافةُ أشخاصٍ (فرعٌ آمن) · المغادرة.
+     لا مصطلحاتٍ تقنيّة (Fork/GroupDm) في نصّ المستخدم. القناةُ تُدار من صفحتها المعتادة. --}}
+@if (($isGroup ?? false))
+    @if (hub_has_col('conversation_members', 'notify_pref'))
+        @php $myPref = optional($members->firstWhere('user_id', auth()->id()))->notify_pref ?? 'all'; @endphp
+        <div class="cx-ctxsec">
+            <div class="cx-ctxh">🔔 التنبيهات</div>
+            <form method="POST" action="{{ route('conversations.notify', $conv->id) }}">
+                @csrf
+                <select class="inp" name="pref" onchange="this.form.submit()" aria-label="تفضيلُ تنبيهاتِ المجموعة">
+                    <option value="all" @selected($myPref === 'all')>كلُّ الرسائل</option>
+                    <option value="mentions" @selected($myPref === 'mentions')>الإشاراتُ إليّ فقط</option>
+                    <option value="muted" @selected($myPref === 'muted')>كتمُ المجموعة</option>
+                </select>
+                <noscript><button class="btn ghost xs" style="margin-top:5px">حفظ</button></noscript>
+            </form>
+        </div>
+    @endif
+
+    <div class="cx-ctxsec">
+        <div class="cx-ctxh">➕ إضافةُ أشخاص</div>
+        @if (count($addCandidates ?? []))
+            <details class="cx-addppl">
+                <summary class="btn ghost sm" style="width:100%;text-align:start">إضافةُ أشخاصٍ للمجموعة…</summary>
+                <form method="POST" action="{{ route('groups.fork', $conv->id) }}" style="margin-top:8px">
+                    @csrf
+                    <input type="hidden" name="origin" value="collab">
+                    @include('partials.participant_picker', [
+                        'candidates' => $addCandidates,
+                        'pickerId'   => 'ctx-fork',
+                        'label'      => 'من تضيف؟',
+                        'emptyHint'  => 'لا زملاءَ آخرين لإضافتهم.',
+                    ])
+                    <div class="sub" style="font-size:11px;margin-top:5px;line-height:1.7">سيتم إنشاءُ مجموعةٍ جديدةٍ بالمشاركين المضافين، ولن تظهر لهم الرسائلُ السابقة.</div>
+                    <button class="btn sm" type="submit" style="margin-top:8px">إنشاءُ مجموعةٍ موسَّعة</button>
+                </form>
+            </details>
+        @else
+            <div class="sub" style="font-size:12px">لا زملاءَ آخرين لإضافتهم.</div>
+        @endif
+    </div>
+
+    <div class="cx-ctxsec">
+        <form method="POST" action="{{ route('groups.leave', $conv->id) }}" data-confirm="مغادرةُ المجموعة؟">
+            @csrf<button class="lnk sub" type="submit" style="font-size:12.5px">↩ مغادرةُ المجموعة</button>
+        </form>
+    </div>
+@endif
+
 <div class="cx-ctxsec">
     <div class="cx-ctxh">📌 المثبّتات <span class="bdg g">{{ $pins->count() }}</span></div>
     @forelse ($pins as $p)

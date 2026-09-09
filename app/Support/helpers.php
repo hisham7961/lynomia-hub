@@ -373,6 +373,10 @@ if (! function_exists('hub_top_links')) {
         // كل رابط مُصنَّف في قسم (group): daily/analytics/centers — تستعمله hub_top_groups
         $all = [
             ['key' => 'morning',   'label' => '☀️ تشغيل اليوم',      'route' => 'morning',         'group' => 'daily',     'ok' => true],
+            // مركزُ التواصلِ الموحّد — وجهةٌ أساسيّةٌ في التنقّل العاديّ (لا بحثٌ فقط · DEFECT A).
+            // بيتُها الكتالوجيُّ الواحد: IA يشير إليها center=collab، والشريطُ يرسمها من هنا.
+            // للفريق الداخليِّ حصراً (العميلُ يستعمل البوّابةَ لا هذا الشريط) — دفاعٌ في العمق.
+            ['key' => 'collab',    'label' => '💬 مركز التواصل',     'route' => 'collab.center',   'group' => 'daily',     'ok' => ! hub_is_client($user)],
             ['key' => 'me',        'label' => '👤 بوابتي',           'route' => 'portal.me',       'group' => 'daily',     'ok' => true],
             ['key' => 'alerts',    'label' => '🔔 ينتهي قريباً',     'route' => 'alerts',          'group' => 'daily',     'ok' => true],
             ['key' => 'calendar',  'label' => '📅 التقويم',          'route' => 'calendar',        'group' => 'daily',     'ok' => true],

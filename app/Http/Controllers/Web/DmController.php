@@ -153,6 +153,24 @@ class DmController extends Controller
             ->pluck('name', 'id');
     }
 
+    /**
+     * **زملاءٌ داخليّون متاحون للاختيار** — مصدرٌ واحدٌ لمنتقي المشاركين (المجموعات
+     * والمحادثات داخلَ مركز التواصل): داخليّون (لا عملاء)، ضمن نطاقِ الشركة، غيرُ النفس،
+     * مُثرَون بالمسمّى الوظيفيّ (بيانٌ آمنٌ غيرُ حسّاس). id => ['name'=>, 'sub'=>].
+     *
+     * @return \Illuminate\Support\Collection<string,array{name:string,sub:string}>
+     */
+    public static function reachableColleagues(User $me): \Illuminate\Support\Collection
+    {
+        return User::whereNull('deleted_at')->where('status', 'نشط')
+            ->where('id', '!=', $me->getKey())->with('role')->orderBy('name')->get()
+            ->filter(fn ($u) => ! hub_is_client($u) && self::dmReachable($u, $me))
+            ->mapWithKeys(fn ($u) => [(string) $u->id => [
+                'name' => $u->name,
+                'sub'  => trim((string) ($u->job_title ?? $u->title ?? '')),
+            ]]);
+    }
+
     /** قائمة المحادثات: آخر رسالة وغير المقروء لكل طرف */
     /**
      * قائمةُ المحادثات: أحدثُ ٦٠ خيطاً **وكلُّ خيطٍ فيه غيرُ مقروء** — مضمومٌ دائماً.

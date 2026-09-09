@@ -479,6 +479,8 @@ Route::middleware('auth')->group(function () {
     //    الحرسُ في المتحكّم: guardConversation للقناة و dmReachable للمحادثة عند الاختيار،
     //    والعميلُ لا يبلغه (PortalGuard + abort_if أدناه).
     Route::get('collab', [\App\Http\Controllers\Web\CollaborationController::class, 'center'])->name('collab.center');
+    // §19 مركزُ الانتباه — الإشاراتُ والردودُ (وجهةٌ داخلَ التواصل، من محرّكِ الإشعاراتِ القائم)
+    Route::get('collab/attention', [\App\Http\Controllers\Web\CollaborationController::class, 'attention'])->name('collab.attention');
     Route::get('conversations', [ConversationController::class, 'index'])->name('conversations.index');
     Route::get('conversations/directory', [ConversationController::class, 'directory'])->name('conversations.directory');
     Route::post('conversations', [ConversationController::class, 'store'])

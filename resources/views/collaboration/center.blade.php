@@ -22,13 +22,27 @@
             @endif
         </div>
 
-        {{-- روابطُ فعلٍ سريعة — تصل الوجهاتِ القائمةَ لا تكرّرها --}}
-        <nav class="cx-quick" aria-label="روابط سريعة" style="display:flex;flex-wrap:wrap;gap:5px;padding:9px 11px;border-bottom:1px solid var(--ln)">
-            <a class="btn ghost xs" href="{{ route('conversations.directory') }}">➕ اكتشف قناة</a>
-            <a class="btn ghost xs" href="{{ route('groups.index') }}">👥 مجموعة</a>
-            <a class="btn ghost xs" href="{{ route('dm.inbox') }}">✉️ رسالة</a>
-            <a class="btn ghost xs" href="{{ route('search.messages') }}">🔎 بحث</a>
-            <a class="btn ghost xs" href="{{ route('saved.index') }}">🔖 المحفوظات</a>
+        {{-- ➕ إنشاء (§9) — فعلٌ أساسيٌّ بارز: يفتح خياراتِ الإنشاء **داخلَ** المركز
+             (لوحُ الإنشاء في المنتصف)، مُنطَّقةً بالصلاحية. قائمةٌ منسدلةٌ بلا اعتماديّة. --}}
+        <div class="cx-create">
+            <details class="cx-menu">
+                <summary class="cx-newbtn">➕ إنشاء</summary>
+                <div class="cx-menupop" role="menu" aria-label="إنشاءُ جديد">
+                    <a role="menuitem" href="{{ route('collab.center', ['new' => 'dm']) }}">✉️ رسالة جديدة</a>
+                    <a role="menuitem" href="{{ route('collab.center', ['new' => 'group']) }}">👥 مجموعة جديدة</a>
+                    <a role="menuitem" href="{{ route('collab.center', ['new' => 'channel']) }}"># قناة جديدة</a>
+                    <a role="menuitem" href="{{ route('collab.center', ['new' => 'pchannel']) }}">🔒 قناة خاصّة</a>
+                </div>
+            </details>
+        </div>
+
+        {{-- وجهاتُ التواصل الأساسيّة (§8/§19/§20/§21) — الانتباه/الاكتشاف/المحفوظات/البحث
+             وجهاتٌ واضحةٌ لا يحتاج المستخدمُ معرفةَ مسارها، ولا بحثاً عامّاً للوصولِ إليها. --}}
+        <nav class="cx-nav" aria-label="وجهات التواصل">
+            <a class="cx-navi {{ $selType === 'attention' ? 'on' : '' }}" @if ($selType === 'attention') aria-current="page" @endif href="{{ route('collab.attention') }}">🔔 الانتباه والإشارات</a>
+            <a class="cx-navi" href="{{ route('conversations.directory') }}">🧭 اكتشف القنوات</a>
+            <a class="cx-navi" href="{{ route('saved.index') }}">🔖 المحفوظات</a>
+            <a class="cx-navi" href="{{ route('search.messages') }}">🔎 بحثُ الرسائل</a>
         </nav>
 
         @php
@@ -83,9 +97,13 @@
         @endif
     </aside>
 
-    {{-- ═══════════ اللوحُ الأوسط: الخيطُ المختار ═══════════ --}}
+    {{-- ═══════════ اللوحُ الأوسط: الخيطُ المختار / الانتباه / لوحُ الإنشاء ═══════════ --}}
     <main class="cx-center" aria-label="المحادثة" style="min-width:0">
-        @if ($selType === null)
+        @if ($selType === 'attention')
+            @include('collaboration._attention')
+        @elseif (! empty($create))
+            @include('collaboration._create')
+        @elseif ($selType === null)
             @include('collaboration._empty')
         @elseif ($selType === 'dm')
             @include('collaboration._dm')
@@ -96,12 +114,16 @@
 
     {{-- ═══════════ اللوحُ اليمين: السياق (النهايةُ في RTL) ═══════════ --}}
     <aside class="card cx-ctx" aria-label="السياق" style="position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto">
-        @if ($selType === null)
-            <div class="sub" style="padding:8px 2px">اختر محادثةً لعرضِ سياقها هنا — المشاركون والمثبّتاتُ والملفّات.</div>
-        @elseif ($selType === 'dm')
+        @if ($selType === 'dm')
             @include('collaboration._ctx_dm')
-        @else
+        @elseif (in_array($selType, ['channel', 'group'], true))
             @include('collaboration._ctx_conversation')
+        @elseif ($selType === 'attention')
+            <div class="sub" style="padding:8px 2px">الانتباهُ يجمع الإشاراتِ إليك (@) والردودَ على تعليقاتك — من محرّكِ الإشعاراتِ نفسِه. افتح أيَّ عنصرٍ للانتقالِ إلى سياقه.</div>
+        @elseif (! empty($create))
+            <div class="sub" style="padding:8px 2px">تُنشئ هنا رسالةً أو مجموعةً أو قناة — كلُّه داخلَ المركز. من لا تختاره يبقى خارجَ المحادثة.</div>
+        @else
+            <div class="sub" style="padding:8px 2px">اختر محادثةً لعرضِ سياقها هنا — المشاركون والمثبّتاتُ والملفّات.</div>
         @endif
     </aside>
 </div>
@@ -109,6 +131,24 @@
 <style>
 .cx-center { min-width:0 }
 .cx-quick { display:flex; flex-wrap:wrap; gap:5px }
+/* ➕ إنشاء — زرٌّ بارزٌ وقائمةٌ منسدلة (§9) */
+.cx-create { padding:10px 11px 6px }
+.cx-menu { position:relative }
+.cx-newbtn { display:block; text-align:center; cursor:pointer; list-style:none; background:var(--p); color:#fff;
+             border-radius:9px; padding:8px 10px; font-weight:600; font-size:13.5px; user-select:none }
+.cx-newbtn::-webkit-details-marker { display:none }
+.cx-newbtn:hover { filter:brightness(1.05) }
+.cx-menupop { position:absolute; inset-inline-start:0; inset-inline-end:0; margin-top:5px; z-index:20;
+              background:var(--bg); border:1px solid var(--ln); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.12); overflow:hidden }
+.cx-menupop a { display:block; padding:9px 12px; color:inherit; text-decoration:none; font-size:13px }
+.cx-menupop a:hover { background:var(--pss) }
+/* وجهاتُ التواصل الأساسيّة */
+.cx-nav { display:flex; flex-direction:column; padding:2px 7px 8px; border-bottom:1px solid var(--ln) }
+.cx-navi { display:block; padding:7px 8px; border-radius:8px; color:inherit; text-decoration:none; font-size:13px }
+.cx-navi:hover { background:var(--pss) }
+.cx-navi.on { background:var(--pss); font-weight:600 }
+.cx-addppl summary { cursor:pointer; list-style:none }
+.cx-addppl summary::-webkit-details-marker { display:none }
 .cx-pin:hover { background:var(--pss) }
 .cx-sec { padding:6px 0 8px }
 .cx-sech { font-size:11px; color:var(--sb); padding:7px 13px 3px; letter-spacing:.02em }
