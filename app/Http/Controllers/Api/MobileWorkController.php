@@ -137,7 +137,14 @@ class MobileWorkController extends V1Controller
         $this->tagMobile($r);
         $u = auth()->user();
 
+        // حسابُ العميل: بيتُه بيتُ البوّابة (تجربةٌ مكرَّسة لا لوحةٌ داخليّةٌ بأزرارٍ
+        // مخفيّة · §12) — الحمولةُ نفسُها التي يخدمها `GET portal/home`.
+        if (hub_is_client($u)) {
+            return app(MobileClientPortalController::class)->home($r);
+        }
+
         return $this->ok([
+            'mode'          => 'internal',
             'my_work'       => $this->myWork($r, $u),
             'due'           => $this->dueSoon($u),
             'approvals'     => ['count' => $this->pendingApprovalsCount($u)],
@@ -172,6 +179,15 @@ class MobileWorkController extends V1Controller
         $cap = min(30, max(1, (int) $r->query('limit', 9)));
 
         $hits = app(\App\Http\Controllers\Web\SearchController::class)->results($q, $per, $cap);
+
+        // حسابُ العميل: النتائجُ مقصوصةٌ خادميّاً على وحدات سطحه (نظيرُ سياج
+        // mobile.portal) — البحثُ لا يكشف حتى **عنوانَ** سجلٍّ داخليٍّ ولو منح
+        // دورٌ مُساءُ الضبط وحدتَه (§23/§47).
+        if (hub_is_client(auth()->user())) {
+            $hits = array_values(array_filter($hits, fn ($h) =>
+                \App\Http\Middleware\MobilePortalGuard::clientModuleAllowed((string) $h['module'])));
+        }
+
         $out = array_map(fn ($h) => [
             'module' => (string) $h['module'],
             'id'     => (string) $h['id'],

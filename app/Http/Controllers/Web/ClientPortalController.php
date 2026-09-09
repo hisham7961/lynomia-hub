@@ -3,15 +3,8 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Client;
-use App\Models\Conversation;
-use App\Models\ConversationMember;
-use App\Models\Document;
-use App\Models\Engagement;
-use App\Models\FinDocument;
-use App\Models\Project;
+use App\Support\ClientPortalData;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\DB;
 
 /**
  * **مساحةُ العميل** (Work OS · الطور B · WP-B.2 · §13/§82–86) — شلٌّ منفصلٌ أبسطُ
@@ -22,34 +15,18 @@ use Illuminate\Support\Facades\DB;
  * وجهاتِه الست: الرئيسية، والارتباطات، والمشاريع (للقراءة)، والوثائقُ المشترَكة،
  * والفواتير، والمحادثات.
  *
- * **العزلُ سكّةٌ واحدةٌ لا ثانية:** كلُّ قراءةٍ تمرّ `hub_scope` **ثم** تُقيَّد صراحةً
- * بعملاءِ القارئ (`hub_client_ids`) — وهذا التقييدُ الصريحُ **فشلٌ مغلق**: عميلٌ
- * بلا عضويّةٍ فعّالة (`hub_client_ids === null`) لا يرى شيئاً، لا كلَّ شيء. فلا
- * نتّكل على أنّ `hub_scope` وحدَه يعزل — «بلا قيدٍ» عنده تعني «الداخليّ يرى الكلّ»،
- * وهي هنا **خطرٌ** لا راحة. الوثائقُ عبر `Document::scopeVisibleToClient`
- * (جمهور∈{client,both} ∧ عميلٌ في نطاقه)، والمحادثاتُ بالعضويّة+الجمهور.
- *
- * **لا رقمَ داخليّ:** القرّاءُ يختارون أعمدةً عميليّةً فحسب — لا `cost`/`budget`/
- * `rev_exp` للمشروع، ولا `budget`/`notes` للارتباط، ولا `url`/`staging`/`git`
- * البنيةَ التقنية. ما لا يُحمَّل لا يُسرَّب.
+ * **القرّاءُ صاروا مصدراً واحداً مشترَكاً** (`App\Support\ClientPortalData`) منذ
+ * هبوطِ تطبيق الجوال (تجربةُ العميل): السطحان — هذه الشاشاتُ الويبية وواجهةُ
+ * `/api/mobile/v1/portal/*` — يقرآن الاستعلاماتِ العميليّةَ المعزولةَ نفسَها حرفاً
+ * (فشلٌ مغلقٌ على `hub_client_ids`، أعمدةٌ عميليّةٌ بلا رقمٍ داخليّ، محادثاتٌ
+ * بالعضويّة والجمهور معاً، و`internal` محجوبٌ) — لا محرّكَ بوّابةٍ ثانٍ.
  *
  * **الداخليُّ لا يُحبَس:** مستخدمٌ داخليٌّ بلغ `/portal` (لا يمسّه `PortalGuard`)
  * يُحوَّل للوحة بلطفٍ — لا ٥٠٠ ولا فخّ.
  */
 class ClientPortalController extends Controller
 {
-    /** فواتيرُ العميل = المبيعاتُ والمقبوضاتُ فقط — لا مشترياتٌ ولا مصروفاتٌ تكشف تكلفتنا */
-    private const CLIENT_INVOICE_KINDS = ['فاتورة مبيعات', 'دفعة واردة'];
-
-    /** محادثاتُ العميل = القنواتُ والرسائلُ المباشرة ذاتُ الجمهور العميليّ */
-    private const CLIENT_CONV_KINDS = ['channel', 'dm'];
-
-    private const CLIENT_AUDIENCES = ['client', 'both'];
-
-    /**
-     * حارسُ الشلّ: الشلُّ للعميل وحدَه؛ الداخليّ يُحوَّل للوحة (لا ٥٠٠ ولا حبس).
-     * يُستدعى في صدر كل قارئ — والقرارُ بنيويٌّ (`hub_is_client`) لا نطاقيّ.
-     */
+    /** حارسُ الشلّ: الشلُّ للعميل وحدَه؛ الداخليّ يُحوَّل للوحة (لا ٥٠٠ ولا حبس). */
     private function gate(): ?RedirectResponse
     {
         if (! hub_is_client(auth()->user())) {
@@ -59,33 +36,20 @@ class ClientPortalController extends Controller
         return null;
     }
 
-    /** عملاءُ القارئ المسموحون — مصفوفةٌ فارغةٌ (لا null) فالتقييدُ صريحٌ ومغلق */
-    private function clientIds(): array
-    {
-        return hub_client_ids(auth()->user()) ?? [];
-    }
-
-    /** المعرّفاتُ التي القارئُ عضوٌ في محادثاتها — أساسُ العزل بالعضويّة */
-    private function memberConversationIds(): array
-    {
-        return ConversationMember::where('user_id', auth()->id())
-            ->orderBy('conversation_id')->pluck('conversation_id')->all();
-    }
-
     /* ────────── الرئيسية ────────── */
 
     public function home()
     {
         if ($r = $this->gate()) return $r;
-        $ids = $this->clientIds();
+        $ids = ClientPortalData::clientIds();
 
         return view('portal.client.home', [
-            'clients' => $this->clientsOf($ids),
-            'engagements' => $this->engagementRows($ids, 6),
-            'projects' => $this->projectRows($ids, 6),
-            'documents' => $this->documentRows($ids, 6),
-            'invoices' => $this->invoiceRows($ids, 6),
-            'conversations' => $this->conversationRows(4),
+            'clients' => ClientPortalData::clientsOf($ids),
+            'engagements' => ClientPortalData::engagementRows($ids, 6),
+            'projects' => ClientPortalData::projectRows($ids, 6),
+            'documents' => ClientPortalData::documentRows($ids, 6),
+            'invoices' => ClientPortalData::invoiceRows($ids, 6),
+            'conversations' => ClientPortalData::conversationRows(null, 4),
         ]);
     }
 
@@ -96,7 +60,7 @@ class ClientPortalController extends Controller
         if ($r = $this->gate()) return $r;
 
         return view('portal.client.engagements', [
-            'engagements' => $this->engagementRows($this->clientIds()),
+            'engagements' => ClientPortalData::engagementRows(ClientPortalData::clientIds()),
         ]);
     }
 
@@ -107,32 +71,21 @@ class ClientPortalController extends Controller
         if ($r = $this->gate()) return $r;
 
         return view('portal.client.projects', [
-            'projects' => $this->projectRows($this->clientIds()),
+            'projects' => ClientPortalData::projectRows(ClientPortalData::clientIds()),
         ]);
     }
 
     public function project(string $id)
     {
         if ($r = $this->gate()) return $r;
-        $ids = $this->clientIds();
-        if (! $ids) abort(404);
+        $ids = ClientPortalData::clientIds();
 
-        // أعمدةٌ عميليّةٌ فحسب — لا تكلفة/ميزانية/بنية تقنية تُحمَّل أصلاً
-        $project = hub_scope(Project::query(), 'projects')
-            ->whereIn('client_id', $ids)->whereNull('deleted_at')
-            ->select('id', 'name', 'status', 'priority', 'progress', 'start_date',
-                'launch_exp', 'launch_act', 'description', 'client_id', 'engagement_id')
-            ->findOrFail($id);
-
-        $engagement = $project->engagement_id
-            ? Engagement::whereIn('client_id', $ids)->whereKey($project->engagement_id)
-                ->value('name')
-            : null;
+        $project = ClientPortalData::projectDetail($ids, $id);
 
         return view('portal.client.project', [
             'project' => $project,
-            'clientName' => $this->clientName($project->client_id, $ids),
-            'engagementName' => $engagement,
+            'clientName' => ClientPortalData::clientName($project->client_id, $ids),
+            'engagementName' => ClientPortalData::engagementName($ids, $project->engagement_id),
         ]);
     }
 
@@ -143,7 +96,7 @@ class ClientPortalController extends Controller
         if ($r = $this->gate()) return $r;
 
         return view('portal.client.documents', [
-            'documents' => $this->documentRows($this->clientIds()),
+            'documents' => ClientPortalData::documentRows(ClientPortalData::clientIds()),
         ]);
     }
 
@@ -151,13 +104,9 @@ class ClientPortalController extends Controller
     {
         if ($r = $this->gate()) return $r;
 
-        // الجمهورُ قبل النسبة: `visibleToClient` فشلٌ مغلقٌ على المجموعة الفارغة
-        $doc = Document::visibleToClient($this->clientIds())->whereNull('deleted_at')
-            ->select('id', 'name', 'cat', 'doc_no', 'issue_date', 'expiry', 'description',
-                'audience', 'client_id')
-            ->findOrFail($id);
-
-        return view('portal.client.document', ['doc' => $doc]);
+        return view('portal.client.document', [
+            'doc' => ClientPortalData::documentDetail(ClientPortalData::clientIds(), $id),
+        ]);
     }
 
     /* ────────── الفواتير ────────── */
@@ -167,24 +116,17 @@ class ClientPortalController extends Controller
         if ($r = $this->gate()) return $r;
 
         return view('portal.client.invoices', [
-            'invoices' => $this->invoiceRows($this->clientIds()),
+            'invoices' => ClientPortalData::invoiceRows(ClientPortalData::clientIds()),
         ]);
     }
 
     public function invoice(string $id)
     {
         if ($r = $this->gate()) return $r;
-        $ids = $this->clientIds();
-        if (! $ids) abort(404);
 
-        $inv = hub_scope(FinDocument::query(), 'fin')
-            ->whereIn('client_id', $ids)->whereIn('kind', self::CLIENT_INVOICE_KINDS)
-            ->whereNull('deleted_at')
-            ->select('id', 'doc_no', 'kind', 'date', 'due', 'total', 'paid', 'currency',
-                'state', 'client_id', 'project_id')
-            ->findOrFail($id);
-
-        return view('portal.client.invoice', ['inv' => $inv]);
+        return view('portal.client.invoice', [
+            'inv' => ClientPortalData::invoiceDetail(ClientPortalData::clientIds(), $id),
+        ]);
     }
 
     /* ────────── المحادثات ────────── */
@@ -194,7 +136,7 @@ class ClientPortalController extends Controller
         if ($r = $this->gate()) return $r;
 
         return view('portal.client.conversations', [
-            'conversations' => $this->conversationRows(),
+            'conversations' => ClientPortalData::conversationRows(),
         ]);
     }
 
@@ -203,107 +145,11 @@ class ClientPortalController extends Controller
         if ($r = $this->gate()) return $r;
 
         // العضويّةُ + الجمهورُ العميليّ معاً — قناةٌ داخليّةٌ هو عضوٌ فيها تبقى ٤٠٤
-        $memberIds = $this->memberConversationIds();
-        if (! $memberIds) abort(404);
-
-        $conv = Conversation::whereIn('id', $memberIds)
-            ->whereIn('kind', self::CLIENT_CONV_KINDS)
-            ->whereIn('audience', self::CLIENT_AUDIENCES)
-            ->whereNull('archived_at')->whereNull('deleted_at')
-            ->findOrFail($id);
-
-        // الرسائلُ من `comments` عبر الحاوية — الموسومةُ داخليّاً (`internal`) محجوبة
-        $messages = $conv->messages()
-            ->where(fn ($q) => $q->whereNull('internal')->orWhere('internal', false))
-            ->with('user:id,name')
-            ->get(['id', 'conversation_id', 'body', 'user_id', 'internal', 'created_at']);
+        $conv = ClientPortalData::conversationDetail($id);
 
         return view('portal.client.conversation', [
             'conv' => $conv,
-            'messages' => $messages,
+            'messages' => ClientPortalData::conversationMessages($conv),
         ]);
-    }
-
-    /* ────────── قرّاءٌ مشترَكون — كلٌّ معزولٌ صراحةً بعملاءِ القارئ ────────── */
-
-    /** أسماءُ عملاءِ القارئ — لترويسةٍ صادقة (اسمُ العميل الذي يملكه لا كلّ CRM) */
-    private function clientsOf(array $ids)
-    {
-        if (! $ids) return collect();
-
-        return Client::whereIn('id', $ids)->whereNull('deleted_at')
-            ->orderBy('name')->orderBy('id')->get(['id', 'name']);
-    }
-
-    private function clientName(?string $clientId, array $ids): ?string
-    {
-        if (! $clientId || ! in_array((string) $clientId, array_map('strval', $ids), true)) {
-            return null;
-        }
-
-        return Client::whereKey($clientId)->value('name');
-    }
-
-    private function engagementRows(array $ids, ?int $limit = null)
-    {
-        if (! $ids) return collect();
-
-        // حقولٌ عميليّةٌ فقط — لا ميزانيةً (تكلفة) ولا ملاحظاتٍ داخلية
-        $q = hub_scope(Engagement::query(), 'engagements')
-            ->whereIn('client_id', $ids)->whereNull('deleted_at')
-            ->orderByDesc('created_at')->orderBy('id')
-            ->select('id', 'name', 'type', 'status', 'renewal', 'client_note', 'client_id');
-
-        return $limit ? $q->limit($limit)->get() : $q->get();
-    }
-
-    private function projectRows(array $ids, ?int $limit = null)
-    {
-        if (! $ids) return collect();
-
-        $q = hub_scope(Project::query(), 'projects')
-            ->whereIn('client_id', $ids)->whereNull('deleted_at')
-            ->orderByDesc('created_at')->orderBy('id')
-            ->select('id', 'name', 'status', 'priority', 'progress', 'launch_exp');
-
-        return $limit ? $q->limit($limit)->get() : $q->get();
-    }
-
-    private function documentRows(array $ids, ?int $limit = null)
-    {
-        // `visibleToClient` فشلٌ مغلقٌ على المجموعة الفارغة — لا حاجةَ لحارسٍ آخر
-        $q = Document::visibleToClient($ids)->whereNull('deleted_at')
-            ->orderByDesc('created_at')->orderBy('id')
-            ->select('id', 'name', 'cat', 'doc_no', 'issue_date', 'expiry', 'audience');
-
-        return $limit ? $q->limit($limit)->get() : $q->get();
-    }
-
-    private function invoiceRows(array $ids, ?int $limit = null)
-    {
-        if (! $ids) return collect();
-
-        $q = hub_scope(FinDocument::query(), 'fin')
-            ->whereIn('client_id', $ids)->whereIn('kind', self::CLIENT_INVOICE_KINDS)
-            ->whereNull('deleted_at')
-            ->orderByDesc('date')->orderBy('id')
-            ->select('id', 'doc_no', 'kind', 'date', 'due', 'total', 'paid', 'currency', 'state');
-
-        return $limit ? $q->limit($limit)->get() : $q->get();
-    }
-
-    private function conversationRows(?int $limit = null)
-    {
-        $memberIds = $this->memberConversationIds();
-        if (! $memberIds) return collect();
-
-        $q = Conversation::whereIn('id', $memberIds)
-            ->whereIn('kind', self::CLIENT_CONV_KINDS)
-            ->whereIn('audience', self::CLIENT_AUDIENCES)
-            ->whereNull('archived_at')->whereNull('deleted_at')
-            ->orderByDesc('updated_at')->orderBy('id')
-            ->select('id', 'kind', 'title', 'audience', 'updated_at');
-
-        return $limit ? $q->limit($limit)->get() : $q->get();
     }
 }

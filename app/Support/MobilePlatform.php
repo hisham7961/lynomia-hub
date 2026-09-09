@@ -820,6 +820,8 @@ class MobilePlatform
         'approvals' => 'api', 'home' => 'api', 'search' => 'api', 'prefs' => 'api',
         'notifications' => 'push', 'comments' => 'api', 'dm' => 'api', 'push' => 'push',
         'files' => 'field', 'scanner' => 'field', 'tracking' => 'field', 'sync' => 'api',
+        // تجربةُ العميل (§12–§18): التفعيلُ سكّةُ دخولٍ (أمن)، والبوّابةُ وإدارةُ الأعضاء سطحا API
+        'activation' => 'security', 'clients' => 'api', 'portal' => 'api',
     ];
 
     /**

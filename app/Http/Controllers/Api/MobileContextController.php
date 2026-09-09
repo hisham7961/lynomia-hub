@@ -88,7 +88,13 @@ class MobileContextController extends Controller
                 'email'    => $u->email,
                 'role'     => $u->role?->name,
                 'is_owner' => hub_is_owner($u),
+                // نمطُ الحساب من المصنِّف الصلب `users.account_type` (SF-1) — به يختار
+                // التطبيقُ غلافَه (داخليّ/عميل) **عرضاً**: الحرسُ خادميٌّ (mobile.portal)
+                'account_type' => hub_is_client($u) ? 'client' : 'internal',
             ],
+            // عضويّاتُ حساب العميل الفعّالة (منظماتُه وأدوارُه فيها) — للعرض والتنقّل؛
+            // الداخليُّ قائمةٌ فارغة. المصدرُ `client_memberships` النشِطة حصراً.
+            'memberships' => $this->clientMemberships($u),
             'context' => [
                 'companies' => $this->contextDimension('companies', MobileContext::company($r), self::BOOTSTRAP_PREVIEW),
                 'clients'   => $this->contextDimension('clients',   MobileContext::client($r),  self::BOOTSTRAP_PREVIEW),
@@ -104,10 +110,13 @@ class MobileContextController extends Controller
                 'schema'     => $sv,
             ],
             'unread_notifications' => (int) HubNotification::where('user_id', $u->id)->where('read', false)->count(),
-            'nav'                  => hub_nav($u),   // مجموعاتٌ مُنطَّقةٌ سلفاً (توافقٌ خلفيّ) — الوحدةُ بلا عرضٍ تسقط
-            // تنقّلُ IA (الطور 9): نفسُ معماريةِ الويب مُنطَّقةً — سطوحٌ ومجالاتٌ وأقسام.
-            // داخلَ البصمة عمداً (تغيّرُ ما يراه المستخدمُ لقطةٌ جديدة). لا تسريب: مُنطَّقٌ سلفاً.
-            'ia'                   => \App\Support\InformationArchitecture::make()->navigationPayload($u),
+            // حسابُ العميل: لا `hub_nav` ولا شجرةَ IA الداخلية أصلاً (نظيرُ قشرة
+            // `layouts.portal` الويبية — لا شريطَ إدارةٍ يُسلسَل ثم «يُخفى») — بل
+            // شجرةُ بوّابته الستُّ وجهاتٍ من الخادم (server-driven · §18).
+            'nav'                  => hub_is_client($u) ? [] : hub_nav($u),
+            'ia'                   => hub_is_client($u)
+                ? self::clientIa()
+                : \App\Support\InformationArchitecture::make()->navigationPayload($u),
             'schema_version'       => $sv,
         ];
 
@@ -169,7 +178,10 @@ class MobileContextController extends Controller
         return Api::etagJson($r, [
             'schema_version' => self::schemaVersion(),
             'feature_flags'  => $this->featureFlags($u),
-            'ia'             => \App\Support\InformationArchitecture::make()->navigationPayload($u),
+            // العميلُ يتلقّى شجرةَ بوّابته — لا شجرةَ الإدارة الداخلية (نظيرُ الويب)
+            'ia'             => hub_is_client($u)
+                ? self::clientIa()
+                : \App\Support\InformationArchitecture::make()->navigationPayload($u),
         ]);
     }
 
@@ -195,6 +207,68 @@ class MobileContextController extends Controller
             'mfa_enrolled'       => (bool) $u->totp_enabled,
             'restricted_company' => hub_company_ids($u) !== null,
             'restricted_client'  => hub_client_ids($u) !== null,
+            // نمطُ الحساب — علمُ عرضٍ (الغلافُ العميليّ)؛ الحرسُ في mobile.portal خادميّاً
+            'is_client'          => hub_is_client($u),
+        ];
+    }
+
+    /**
+     * عضويّاتُ حساب العميل الفعّالة — `{client_id, client_name, role}` مرتّبةً
+     * حتميّاً. للداخليّ قائمةٌ فارغة (عضويّاتُ العملاء لحسابات العملاء).
+     */
+    private function clientMemberships($u): array
+    {
+        if (! hub_is_client($u)) {
+            return [];
+        }
+
+        return \App\Models\ClientMembership::query()->active()
+            ->where('user_id', $u->id)
+            ->with('client:id,name')
+            ->orderBy('created_at')->orderBy('id')
+            ->get()
+            ->map(fn ($m) => [
+                'client_id' => (string) $m->client_id,
+                'client_name' => (string) ($m->client->name ?? ''),
+                'role' => (string) $m->role,
+            ])->values()->all();
+    }
+
+    /**
+     * شجرةُ بوّابة العميل (server-driven · §18) — الوجهاتُ الستُّ نفسُها التي تخدمها
+     * القشرةُ الويبية `layouts.portal`، بنوع `portal` ومفتاحِ وجهةٍ يقرؤه التطبيق.
+     * ثابتةٌ للجميع (التنطيقُ الأدقُّ — أيُّ صفوفٍ — في قرّاء البوّابة أنفسِهم).
+     */
+    public static function clientIa(): array
+    {
+        $dest = fn (string $key, string $label) => [
+            'label' => $label,
+            'type' => 'portal',
+            'importance' => 'primary',
+            'mobile' => 'suitable',
+            'portal' => $key,
+        ];
+
+        return [
+            'surfaces' => [],
+            'domains' => [[
+                'key' => 'portal',
+                'label' => 'مساحتك',
+                'icon' => '🤝',
+                'plane' => 'client',
+                'sections' => [[
+                    'key' => 'portal',
+                    'label' => 'بوّابة العميل',
+                    'destinations' => [
+                        $dest('home', 'الرئيسية'),
+                        $dest('engagements', 'الارتباطات'),
+                        $dest('projects', 'المشاريع'),
+                        $dest('documents', 'الوثائق المشتركة'),
+                        $dest('invoices', 'الفواتير'),
+                        $dest('conversations', 'المحادثات'),
+                    ],
+                ]],
+            ]],
         ];
     }
 
@@ -250,7 +324,12 @@ class MobileContextController extends Controller
     private function buildSchemaModules($user): array
     {
         $out = [];
+        // حسابُ العميل: المخطّطُ مقصوصٌ بنيوياً على وحدات سطحه (نظيرُ سياج
+        // mobile.portal) — دورٌ مُساءُ الضبط يمنح `servers:v` لا يُسرّب حتى
+        // **شكلَ** الوحدة الداخلية (تسمياتٍ وحقولاً) في المخطّط.
+        $isClient = hub_is_client($user);
         foreach (hub_modules() as $key => $def) {
+            if ($isClient && ! \App\Http\Middleware\MobilePortalGuard::clientModuleAllowed($key)) continue;
             if (! hub_can($user, $key, 'v')) continue;
 
             $fields = [];

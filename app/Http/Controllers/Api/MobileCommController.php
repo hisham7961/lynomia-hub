@@ -174,10 +174,40 @@ class MobileCommController extends V1Controller
         if ($record === '') $record = hub_str($r->query('record_id'));   // مرادفٌ متساهل
         if ($module === '') return Api::error(Api::VALIDATION_FAILED, 422, 'المعامل module مطلوب');
 
+        // حسابُ العميل (تطبيق العميل · §27/§39): وحدةٌ خارج سطحه — والـfeed الداخليّ
+        // خاصةً — 404 قبل أيّ حلّ (منعٌ فوق المصفوفة، نظيرُ mobile.portal)؛ والقناةُ
+        // تُشدَّد بجمهورها بعد الحلّ أدناه.
+        $isClient = hub_is_client($u);
+        if ($isClient && $module !== 'channel'
+            && ! \App\Http\Middleware\MobilePortalGuard::clientModuleAllowed($module)) {
+            return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'غير موجود');
+        }
+
         // نقطةُ التخويلِ الوحيدة — تُلقي 403/404 التي يترجمها Api::render آليّاً
         [$module, $recordId] = CommentService::guardTarget($u, $module, $record !== '' ? $record : null);
 
-        $q = Comment::where('module', $module)->whereNull('parent_id')->with('user', 'replies.user');
+        // قناةٌ لعميل: العضويّةُ وحدَها لا تكفي — الجمهورُ العميليّ شرطٌ (غرفةٌ
+        // داخليّةٌ هو عضوٌ فيها خطأً تبقى 404 · نظيرُ بوّابة الويب حرفاً)
+        if ($isClient && $module === 'channel') {
+            $clientRoom = \App\Models\Conversation::whereKey($recordId)
+                ->whereIn('kind', \App\Support\ClientPortalData::CLIENT_CONV_KINDS)
+                ->whereIn('audience', \App\Support\ClientPortalData::CLIENT_AUDIENCES)
+                ->whereNull('deleted_at')->exists();
+            if (! $clientRoom) {
+                return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'غير موجود');
+            }
+        }
+
+        $q = Comment::where('module', $module)->whereNull('parent_id');
+        // الموسومُ داخليّاً لا يُبثّ لعميلٍ أبداً — جذوراً **وردوداً** (قراءةً هنا،
+        // وكتابةً في postComment حيث تُفرض internal=false)
+        $notInternal = fn ($w) => $w->whereNull('internal')->orWhere('internal', false);
+        if ($isClient) {
+            $q->where($notInternal)
+                ->with(['user', 'replies' => fn ($rq) => $rq->where($notInternal), 'replies.user']);
+        } else {
+            $q->with('user', 'replies.user');
+        }
         if ($module === 'feed') {
             // عزلُ الشركةِ نفسُه الذي يطبّقه الويبُ على القناة — بالرِّكازِ نفسِه لا محرّكاً ثانياً
             if (hub_has_col('comments', 'company_id') && ($cids = hub_company_ids($u)) !== null) {
@@ -229,13 +259,25 @@ class MobileCommController extends V1Controller
         $reqConv = trim(hub_str($r->input('conversation_id')));
 
         // تخويلُ الكتابة — يطابق فرعَي `CommentController::store` (F2)
+        $isClient = hub_is_client($u);
         $conversationId = null;
         if (($data['module'] ?? '') === 'channel' || $reqConv !== '') {
             $convId = $reqConv !== '' ? $reqConv : $record;
             [$conv] = ConversationController::guardConversation($convId, 'post');   // الضيفُ لا يكتب (403)
+            // عميلٌ يكتب في غرفةٍ عميليّةِ الجمهور حصراً — الداخليّةُ 404 ولو كان عضواً
+            if ($isClient && (
+                ! in_array((string) $conv->kind, \App\Support\ClientPortalData::CLIENT_CONV_KINDS, true)
+                || ! in_array((string) $conv->audience, \App\Support\ClientPortalData::CLIENT_AUDIENCES, true))) {
+                return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'غير موجود');
+            }
             [$module, $recordId] = ['channel', (string) $conv->id];
             $conversationId = (string) $conv->id;
         } else {
+            // وحدةٌ خارج سطح العميل (والـfeed الداخليّ خاصةً) — 404 قبل الحلّ (§27/§39)
+            if ($isClient
+                && ! \App\Http\Middleware\MobilePortalGuard::clientModuleAllowed((string) $data['module'])) {
+                return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'غير موجود');
+            }
             [$module, $recordId] = CommentService::guardTarget($u, $data['module'], $record !== '' ? $record : null);
         }
 
@@ -252,7 +294,8 @@ class MobileCommController extends V1Controller
             $c = CommentService::create($u, $module, $recordId, $data['body'], [
                 'parent_id'       => $data['parent_id'] ?? null,
                 'att'             => $attPath,
-                'internal'        => $r->boolean('internal'),
+                // العميلُ لا يسم تعليقاً «داخلياً» أبداً — العلمُ للفريق الداخليّ وحدَه
+                'internal'        => $isClient ? false : $r->boolean('internal'),
                 'mention'         => (array) $r->input('mention', []),
                 'conversation_id' => $conversationId,
             ]);
