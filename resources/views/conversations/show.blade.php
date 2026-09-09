@@ -33,6 +33,17 @@
             </select>
             <noscript><button class="btn sm" type="submit">حفظ</button></noscript>
         </form>
+        {{-- §15 نجمةُ المفضّلة الشخصيّة --}}
+        @php $isFav = optional($members->firstWhere('user_id', auth()->id()))->isFavorite(); @endphp
+        <form method="POST" action="{{ route('conversations.favorite', $conv->id) }}" class="inline">
+            @csrf<button class="lnkbtn" type="submit" title="{{ $isFav ? 'إزالةٌ من المفضّلة' : 'إضافةٌ للمفضّلة' }}" style="font-size:16px">{{ $isFav ? '⭐' : '☆' }}</button>
+        </form>
+        {{-- §14 أرشفةُ القناةِ لمالكها --}}
+        @if ($role === 'owner')
+            <form method="POST" action="{{ route('conversations.archive', $conv->id) }}" class="inline" data-confirm="أرشفةُ القناة؟ تختفي من القوائم النشطة ويبقى تاريخُها.">
+                @csrf<button class="btn ghost sm" type="submit" title="أرشفة">🗄️</button>
+            </form>
+        @endif
         <a class="btn ghost sm" href="{{ route('conversations.index') }}">← كل القنوات</a>
     </div>
 </div>

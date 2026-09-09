@@ -40,15 +40,17 @@ class ConversationController extends Controller
      * يراها القارئ) دون تكرارِ منطق. يُرجع `[Conversation, string $role]` أو يُجهض.
      *
      * @param string $op  v=رؤية/تفاعل · post=كتابة · manage=إدارةُ الأعضاء
+     * @param bool $includeArchived  إدارةُ الأرشفة تحتاج بلوغَ المؤرشفة (إلغاءُ الأرشفة)
      * @return array{0: Conversation, 1: string}
      */
-    public static function guardConversation(string $id, string $op = 'v'): array
+    public static function guardConversation(string $id, string $op = 'v', bool $includeArchived = false): array
     {
         $user = auth()->user();
         abort_unless($user, 403);
 
-        // ١) الحاويةُ موجودةٌ وحيّة (غيرُ مؤرشفةٍ ولا محذوفةٍ ناعماً)
-        $conv = Conversation::whereNull('archived_at')->whereNull('deleted_at')->find($id);
+        // ١) الحاويةُ موجودةٌ وحيّة (غيرُ محذوفةٍ ناعماً؛ والمؤرشفةُ تُستثنى إلا لإدارتها)
+        $conv = Conversation::when(! $includeArchived, fn ($q) => $q->whereNull('archived_at'))
+            ->whereNull('deleted_at')->find($id);
 
         // ٢) عضويّةٌ فعّالة — غيرُ العضو لا يُثبت له وجودُها (٤٠٤ لا ٤٠٣)
         $role = $conv ? Conversation::roleOf((string) $conv->getKey(), (string) $user->getKey()) : null;
@@ -145,28 +147,45 @@ class ConversationController extends Controller
 
     /* ────────── الفهرسُ والعرض ────────── */
 
-    /** قنواتُ المستخدم — التي هو عضوٌ فيها، بترتيبٍ حتميّ */
+    /** قنواتُ المستخدم — التي هو عضوٌ فيها، المفضّلةُ أولاً + قسمُ الأرشيف */
     public function index()
     {
         $user = auth()->user();
 
-        // معرّفاتُ حاوياتِه (العضويّةُ أساسُ العزل) — بترتيبٍ حتميّ
-        $memberIds = ConversationMember::where('user_id', $user->getKey())
-            ->orderBy('conversation_id')->pluck('conversation_id');
+        // عضويّاتُه: المعرّفُ + الدورُ + نجمةُ المفضّلة (العضويّةُ أساسُ العزل)
+        $memberships = ConversationMember::where('user_id', $user->getKey())
+            ->get(['conversation_id', 'role', ...(hub_has_col('conversation_members', 'favorite_at') ? ['favorite_at'] : [])]);
+        $memberIds = $memberships->pluck('conversation_id');
+        $favIds = $memberships->filter(fn ($m) => $m->favorite_at ?? null)->pluck('conversation_id')->all();
+        $myRoles = $memberships->pluck('role', 'conversation_id')->all();
 
-        $channels = Conversation::channels()->active()->whereNull('deleted_at')
-            ->whereIn('id', $memberIds)
-            // دفاعُ نطاقٍ فوق العضويّة (كالحارس): المقيَّدُ لا يرى قناةَ شركةٍ خارجَ نطاقه
-            ->when(($cids = hub_company_ids($user)) !== null, fn ($q) => $q->where(
-                fn ($w) => $w->whereIn('company_id', $cids)->orWhereNull('company_id')))
-            ->when(($kids = hub_client_ids($user)) !== null, fn ($q) => $q->where(
-                fn ($w) => $w->whereIn('client_id', $kids)->orWhereNull('client_id')))
-            ->orderBy('title')->orderBy('id')
-            ->get(['id', 'kind', 'title', 'audience', 'visibility', 'client_id', 'updated_at']);
+        // دفاعُ النطاق فوق العضويّة — يُطبَّق على النشطة والمؤرشفة سواء (كالحارس)
+        $cids = hub_company_ids($user);
+        $kids = hub_client_ids($user);
+        $applyScope = function ($q) use ($cids, $kids) {
+            return $q->when($cids !== null, fn ($x) => $x->where(
+                    fn ($w) => $w->whereIn('company_id', $cids)->orWhereNull('company_id')))
+                ->when($kids !== null, fn ($x) => $x->where(
+                    fn ($w) => $w->whereIn('client_id', $kids)->orWhereNull('client_id')));
+        };
+
+        $cols = ['id', 'kind', 'title', 'audience', 'visibility', 'client_id', 'updated_at'];
+
+        $channels = $applyScope(Conversation::channels()->active()->whereNull('deleted_at')->whereIn('id', $memberIds))
+            ->orderBy('title')->orderBy('id')->get($cols)
+            // المفضّلةُ أولاً ثم بالاسم — العرضُ فقط (لا يمسّ العزل)
+            ->sortBy(fn ($c) => (in_array($c->id, $favIds, true) ? '0' : '1') . mb_strtolower((string) $c->title))
+            ->values();
+
+        $archived = $applyScope(Conversation::channels()->whereNotNull('archived_at')->whereNull('deleted_at')->whereIn('id', $memberIds))
+            ->orderBy('title')->orderBy('id')->get($cols);
 
         $unread = self::unreadCounts($channels->pluck('id')->all(), (string) $user->getKey());
 
-        return view('conversations.index', ['channels' => $channels, 'unread' => $unread]);
+        return view('conversations.index', [
+            'channels' => $channels, 'archived' => $archived, 'unread' => $unread,
+            'favIds' => $favIds, 'myRoles' => $myRoles,
+        ]);
     }
 
     /**
@@ -233,6 +252,75 @@ class ConversationController extends Controller
             'members'   => $members,
             'users'     => CommentController::userNames(),
         ]);
+    }
+
+    /* ────────── الدليلُ والانضمام (§13 · القنواتُ القابلةُ للاكتشاف) ────────── */
+
+    /** أنواعُ الظهورِ القابلةُ للاكتشافِ والانضمامِ الذاتيّ — الخاصّةُ والأعضاءُ بالدعوة فقط */
+    public const DISCOVERABLE = ['company', 'public'];
+
+    /**
+     * **دليلُ القنوات** — القنواتُ التي **يقدر** المستخدمُ اكتشافَها والانضمامَ إليها
+     * ذاتيّاً وليس عضواً فيها بعد: `kind=channel` نشطةٌ داخليّةُ الجمهور، ظهورُها
+     * `company`/`public`، وضمن نطاقِ شركته/عميله (دفاعٌ في العمق فوق الظهور). الخاصّةُ
+     * و«الأعضاء» لا تظهر (بالدعوة فقط)، والعميلُ لا يبلغ الدليلَ أصلاً (PortalGuard).
+     */
+    public function directory()
+    {
+        $user = auth()->user();
+        abort_if(hub_is_client($user), 404);
+
+        $mineIds = ConversationMember::where('user_id', $user->getKey())->pluck('conversation_id');
+
+        $channels = Conversation::channels()->active()->whereNull('deleted_at')
+            ->where('audience', 'internal')
+            ->whereIn('visibility', self::DISCOVERABLE)
+            ->whereNotIn('id', $mineIds)
+            ->when(($cids = hub_company_ids($user)) !== null, fn ($q) => $q->where(
+                fn ($w) => $w->whereIn('company_id', $cids)->orWhereNull('company_id')))
+            ->when(($kids = hub_client_ids($user)) !== null, fn ($q) => $q->where(
+                fn ($w) => $w->whereIn('client_id', $kids)->orWhereNull('client_id')))
+            ->withCount('members')
+            ->orderBy('title')->orderBy('id')
+            ->get(['id', 'title', 'visibility', 'updated_at']);
+
+        return view('conversations.directory', ['channels' => $channels]);
+    }
+
+    /**
+     * **الانضمامُ الذاتيُّ لقناةٍ قابلةٍ للاكتشاف** (§13) — يعيد فحصَ الظهورِ والنطاقِ
+     * خادميّاً (لا يثق بالدليل): داخليّةُ الجمهور، ظهورُها `company`/`public`، ضمن
+     * نطاقه، وليس عضواً بعد. يُضاف عضواً عاديّاً (`member`). الخاصّةُ/الأعضاءُ ٤٠٣.
+     */
+    public function join(string $id)
+    {
+        $user = auth()->user();
+        abort_if(hub_is_client($user), 404);
+
+        $conv = Conversation::channels()->active()->whereNull('deleted_at')->find($id);
+        // لا نُثبت وجودَ ما لا يُكتشَف: غيرُ الموجودِ/الخاصُّ/«الأعضاء» = ٤٠٤ لا ٤٠٣
+        abort_if($conv === null || $conv->audience !== 'internal'
+            || ! in_array((string) $conv->visibility, self::DISCOVERABLE, true), 404);
+
+        // نطاقُ الشركة/العميل — دفاعٌ في العمق فوق الظهور (نظيرُ الحارس)
+        if (($cids = hub_company_ids($user)) !== null && $conv->company_id !== null
+            && ! in_array((string) $conv->company_id, $cids, true)) abort(404);
+        if (($kids = hub_client_ids($user)) !== null && $conv->client_id !== null
+            && ! in_array((string) $conv->client_id, $kids, true)) abort(404);
+
+        // عضوٌ أصلاً — لا تكرارَ (نظيرُ addMember)
+        if (ConversationMember::where('conversation_id', $conv->id)->where('user_id', $user->getKey())->exists()) {
+            return redirect()->route('conversations.show', $conv->id)->with('ok', 'أنت عضوٌ فيها أصلاً');
+        }
+
+        ConversationMember::create([
+            'conversation_id' => $conv->id, 'user_id' => $user->getKey(),
+            'role' => 'member', 'source' => 'explicit', 'last_read_at' => now(),
+        ]);
+
+        hub_audit('channel.joined', 'conversations', (string) $conv->id, $conv->title);
+
+        return redirect()->route('conversations.show', $conv->id)->with('ok', 'انضممتَ إلى القناة');
     }
 
     /* ────────── إنشاءُ قناة ────────── */
@@ -340,6 +428,45 @@ class ConversationController extends Controller
             'mentions' => 'إشعاراتُ الإشارة فقط',
             default    => 'كلُّ الإشعارات',
         });
+    }
+
+    /**
+     * **نجمةُ المفضّلة الشخصيّة** (§15) — كلُّ عضوٍ ينجّم قناتَه (لا تمسّ العضويّةَ ولا
+     * غيرَه). تبديلٌ على `favorite_at` للعضو. غيرُ العضوِ ٤٠٤ (نظيرُ الحارس).
+     */
+    public function toggleFavorite(string $id)
+    {
+        [$conv] = self::guardConversation($id, 'v');
+
+        if (! hub_has_col('conversation_members', 'favorite_at')) {
+            return back()->with('err', 'المفضّلةُ ميزةٌ جديدة تحتاج تحديث قاعدة البيانات — شغّل الترحيلات ثم أعد المحاولة.');
+        }
+
+        $m = ConversationMember::where('conversation_id', $conv->id)
+            ->where('user_id', auth()->id())->firstOrFail();
+        $m->forceFill(['favorite_at' => $m->favorite_at ? null : now()])->save();
+
+        return back()->with('ok', $m->favorite_at ? '⭐ أُضيفت للمفضّلة' : 'أُزيلت من المفضّلة');
+    }
+
+    /**
+     * **أرشفةُ القناةِ وإعادتُها** (§14) — **لمالكها وحده**. القناةُ المؤرشفةُ تختفي من
+     * القوائم النشطة ولا يُكتَب فيها (حارسُ `active`/`whereNull(archived_at)`)، ويبقى
+     * تاريخُها. يبلغ المؤرشفةَ عبر `includeArchived` كي يُعيدها. أثرُ تدقيقٍ على الطرفين.
+     */
+    public function toggleArchive(string $id)
+    {
+        // نبلغ المؤرشفةَ (لإعادتها) — ثم نشترط دورَ المالك (الأرشفةُ ليست إدارةَ أعضاء)
+        [$conv, $role] = self::guardConversation($id, 'v', true);
+        abort_unless($role === 'owner', 403, 'أرشفةُ القناةِ لمالكها وحده');
+
+        $now = $conv->archived_at === null;
+        $conv->forceFill(['archived_at' => $now ? now() : null])->save();
+
+        hub_audit($now ? 'channel.archived' : 'channel.unarchived', 'conversations',
+            (string) $conv->id, $conv->title);
+
+        return back()->with('ok', $now ? '🗄️ أُرشفت القناة' : '↩ أُعيدت القناة نشطة');
     }
 
     /* ────────── إدارةُ الأعضاء (owner/moderator) ────────── */

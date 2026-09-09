@@ -476,11 +476,18 @@ Route::middleware('auth')->group(function () {
     //    (PortalGuard فوق الكل) — قناةُ جمهورِه تصله عبر portal.conversation.
     //    الحرسُ في المتحكّم: عضويّةٌ فعّالة + نطاقٌ + صلاحيةُ الوحدةِ الهدف. ──
     Route::get('conversations', [ConversationController::class, 'index'])->name('conversations.index');
+    Route::get('conversations/directory', [ConversationController::class, 'directory'])->name('conversations.directory');
     Route::post('conversations', [ConversationController::class, 'store'])
         ->middleware('throttle:30,1')->name('conversations.store');
+    Route::post('conversations/{id}/join', [ConversationController::class, 'join'])
+        ->middleware('throttle:30,1')->name('conversations.join');
     Route::get('conversations/{id}', [ConversationController::class, 'show'])->name('conversations.show');
     Route::post('conversations/{id}/notify', [ConversationController::class, 'setNotifyPref'])
         ->middleware('throttle:60,1')->name('conversations.notify');
+    Route::post('conversations/{id}/favorite', [ConversationController::class, 'toggleFavorite'])
+        ->middleware('throttle:60,1')->name('conversations.favorite');
+    Route::post('conversations/{id}/archive', [ConversationController::class, 'toggleArchive'])
+        ->middleware('throttle:60,1')->name('conversations.archive');
     Route::middleware('throttle:60,1')->group(function () {
         Route::post('conversations/{id}/members', [ConversationController::class, 'addMember'])->name('conversations.member.add');
         Route::post('conversations/{id}/members/remove', [ConversationController::class, 'removeMember'])->name('conversations.member.remove');
