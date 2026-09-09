@@ -44,6 +44,7 @@ class ConversationMember extends Model
     protected $casts = [
         'last_read_at' => 'datetime',
         'muted_at' => 'datetime',
+        'favorite_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -56,6 +57,19 @@ class ConversationMember extends Model
             }
             if ($m->source !== null && ! in_array($m->source, self::SOURCES, true)) {
                 throw new \InvalidArgumentException("مصدرُ عضويةِ محادثةٍ غيرُ صالح: {$m->source}");
+            }
+
+            // §16 تفضيلُ الإشعار: allowlist (C10)؛ و«muted» يبقى **متزامناً** مع
+            // `muted_at` القائم — كتمٌ واحدٌ يقود `scopeUnmuted`، لا اثنان.
+            if (hub_has_col('conversation_members', 'notify_pref') && $m->isDirty('notify_pref') && $m->notify_pref !== null) {
+                if (! in_array($m->notify_pref, \App\Support\Collaboration::NOTIFY_PREFS, true)) {
+                    throw new \InvalidArgumentException("تفضيلُ إشعارِ محادثةٍ غيرُ صالح: {$m->notify_pref}");
+                }
+                if ($m->notify_pref === \App\Support\Collaboration::NOTIFY_MUTED) {
+                    if ($m->muted_at === null) $m->muted_at = now();
+                } else {
+                    $m->muted_at = null;
+                }
             }
         });
     }
@@ -74,6 +88,26 @@ class ConversationMember extends Model
     public function scopeUnmuted($q)
     {
         return $q->whereNull('muted_at');
+    }
+
+    /** المفضّلة (§15) — المحاداتُ التي نجّمها العضو */
+    public function scopeFavorites($q)
+    {
+        return $q->whereNotNull('favorite_at');
+    }
+
+    /** §16 التفضيلُ الفعّال — `muted_at` يقود «muted»، وإلّا notify_pref أو `all` */
+    public function effectiveNotifyPref(): string
+    {
+        if ($this->muted_at !== null) return \App\Support\Collaboration::NOTIFY_MUTED;
+
+        return \App\Support\Collaboration::normalizeNotifyPref($this->notify_pref);
+    }
+
+    /** §15 هل نجّم العضوُ هذه المحادثة؟ */
+    public function isFavorite(): bool
+    {
+        return $this->favorite_at !== null;
     }
 
     /* ────────── مساعِداتُ الدور (الطور C · WP-C.1) ────────── */
