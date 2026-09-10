@@ -472,18 +472,22 @@ class AttendanceReportComplianceTest extends TestCase
 
         // الرئيسيّة تُرسَم بلا خطأ (حارسٌ ضدّ انهيارِ الشريط بـTypeError من الكتالوج الصوريّ)
         $ownerHtml = $this->actingAs($this->owner)->get('/')->assertOk()->getContent();
-        // المدير/المالك يرى المراكزَ الثلاثةَ روابطَ مباشرةً في «الأدوات واللوحات»
-        $this->assertStringContainsString('تقرير اليوم', $ownerHtml);
+        // المدير/المالك يرى مركزَي المحتوى والمراجعة روابطَ مباشرةً في «الأدوات واللوحات»
         $this->assertStringContainsString('مركز التقارير اليومية', $ownerHtml);
         $this->assertStringContainsString('تقارير للمراجعة', $ownerHtml);
         // روابطُ حقيقيّةٌ لا نصٌّ فقط
         $this->assertStringContainsString('href="' . route('reports.index') . '"', $ownerHtml);
-        $this->assertStringContainsString('href="' . route('reports.mine') . '"', $ownerHtml);
+        // لكنّ «تقرير اليوم» رابطٌ ذاتيٌّ للموظّف: حسابُ المالكِ بلا ملفِّ موظّفٍ نشطٍ لا
+        // يخصُّه، فيُخفى عنه بدل صفعةِ ٤٠٣ عند الضغط (العيبُ الذي بلّغ عنه المالك)
+        $this->assertStringNotContainsString('href="' . route('reports.mine') . '"', $ownerHtml,
+            '«تقرير اليوم» لا يُعرض لحسابٍ بلا ملفِّ موظّفٍ نشط');
 
-        // موظّفٌ منفِّذٌ بلا hr:v: يرى «تقرير اليوم» ولا يرى «مركز التقارير اليومية» (§80)
+        // موظّفٌ منفِّذٌ له ملفٌ نشطٌ مربوطٌ: يرى «تقرير اليوم» ولا يرى «مركز التقارير اليومية» (§80)
         [$u, $e] = $this->linkedEmployee();
         $empHtml = $this->actingAs($u)->get('/')->assertOk()->getContent();
         $this->assertStringContainsString('تقرير اليوم', $empHtml);
+        $this->assertStringContainsString('href="' . route('reports.mine') . '"', $empHtml,
+            'الموظّفُ ذو الملفِّ يرى رابطَ «تقرير اليوم» الذاتيّ');
         $this->assertStringNotContainsString('مركز التقارير اليومية', $empHtml,
             'مركزُ HR لا يظهر لموظّفٍ بلا صلاحيّة (لا تسريبَ ولا زحمة)');
 
@@ -495,5 +499,28 @@ class AttendanceReportComplianceTest extends TestCase
         $tl = collect(hub_top_links($client))->pluck('key')->all();
         $this->assertEmpty(array_intersect(['myreport', 'reportsc', 'reportsr'], $tl),
             'لا مراكزَ تقاريرَ داخليّةً في شريطِ العميل (§79)');
+    }
+
+    /* ═══════════ §66 — «تقرير اليوم» لا يصفعُ حساباً بلا ملفِّ موظّف بـ٤٠٣ ═══════════ */
+
+    public function test_mine_redirects_gracefully_for_accounts_without_an_employee_profile(): void
+    {
+        $this->seedCore();
+
+        // المالكُ (بلا ملفِّ موظّفٍ، وله hr:v): يُوجَّه لمركزِ التقارير لا يُردّ ٤٠٣ — العيبُ المُبلَّغ
+        $this->actingAs($this->owner)->get(route('reports.mine'))
+            ->assertRedirect(route('reports.index'))->assertSessionHas('err');
+
+        // محاسبٌ بلا ملفٍّ وله attend:v فقط: يُوجَّه للحضورِ الشهريّ (فصلُ النطاق §34)
+        $accRole = Role::create(['name' => 'محاسبٌ بلا ملف', 'scope' => 'all', 'flags' => [],
+            'matrix' => ['attend' => ['v' => 1]]]);
+        $acc = User::create(['name' => 'محاسب', 'email' => 'accnp@test.local', 'password' => 'Secret!2026x',
+            'role_id' => $accRole->id, 'status' => 'نشط', 'password_changed_at' => now()]);
+        $this->actingAs($acc)->get(route('reports.mine'))
+            ->assertRedirect(route('reports.monthly'))->assertSessionHas('err');
+
+        // موظّفٌ له ملفٌّ نشطٌ مربوط: يرى صفحتَه ٢٠٠ (لا يُوجَّه)
+        [$u, $e] = $this->linkedEmployee();
+        $this->actingAs($u)->get(route('reports.mine'))->assertOk();
     }
 }

@@ -213,8 +213,18 @@ class ReportsController extends Controller
     public function mine(Request $r)
     {
         $this->guardInternal();
-        $emp = \App\Support\Workday::emp(auth()->user());
-        abort_unless($emp, 403, 'لا ملفَ موظّفٍ نشطاً مربوطاً بحسابك.');
+        $u = auth()->user();
+        $emp = \App\Support\Workday::emp($u);
+        // لا ملفَ موظّفٍ نشطٍ (كالمالك/الإدارة): لا نصفعُه بـ٤٠٣ — هذه الصفحةُ لتقريرِ
+        // الموظّفِ الذاتيّ لا لحسابه. نوجّهه بلطفٍ إلى ما يخصُّه بحسب صلاحيّته (§66/§34).
+        if (! $emp) {
+            $msg = 'هذه الصفحةُ لتقريرِ العملِ اليوميِّ للموظّف، وحسابُك غيرُ مربوطٍ بملفِّ موظّفٍ نشط. '
+                . 'لمتابعةِ تقاريرِ الفريق استخدم «مركز التقارير اليومية»، وللحضورِ الشهريِّ «الحضور الشهري».';
+            if (hub_can($u, 'hr', 'v')) return redirect()->route('reports.index')->with('err', $msg);
+            if (hub_can($u, 'attend', 'v')) return redirect()->route('reports.monthly')->with('err', $msg);
+
+            return redirect()->route('dashboard')->with('err', $msg);
+        }
 
         $date = $this->validDate($r->query('date')) ?: \App\Support\BusinessDate::today();
         $c = DailyWorkCompliance::resolve($emp, $date);
