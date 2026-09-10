@@ -1,6 +1,22 @@
 {{-- بطاقة يوم العمل — تتوقع $data من Workday::mine: emp/att/entries/hours/projects/clients.
      موبايل أولاً: زرٌّ واحدٌ كبير، والسياق (وضع/مشروع) اختياريٌّ بجانبه. --}}
-@php $wAtt = $data['att'] ?? null; @endphp
+@php
+    $wAtt = $data['att'] ?? null;
+    // عدّادٌ حيٌّ لمدّة العمل منذ الحضور: تُحسَب الثواني المنقضيةُ **خادميّاً** لحظةَ العرض،
+    // ثمّ يعدُّ المتصفّحُ صعوداً منها بفارقِ ساعتِه هو — فلا حسابَ منطقةٍ زمنيّةٍ ولا انحرافَ
+    // ساعةٍ على العميل. يظهرُ ما دام حاضراً ولم ينصرف؛ عند الانصراف تحلُّ «ساعاتُ اليوم» محلَّه.
+    $wElapsed = null;
+    if ($wAtt && $wAtt->time_in && ! $wAtt->time_out) {
+        try {
+            $wDate = $wAtt->date instanceof \Illuminate\Support\Carbon
+                ? $wAtt->date->toDateString() : (string) $wAtt->date;
+            $wStart = \Illuminate\Support\Carbon::parse($wDate . ' ' . $wAtt->time_in, config('app.timezone'));
+            $wElapsed = max(0, $wStart->diffInSeconds(now(), false));
+        } catch (\Throwable $e) {
+            $wElapsed = null;
+        }
+    }
+@endphp
 <div class="card" id="myworkday">
     <h3 class="cardtitle">🕗 يومي
         @if ($wAtt?->status)<span class="bdg {{ hub_tone($wAtt->status) }}">{{ $wAtt->status }}</span>@endif
@@ -47,6 +63,11 @@
         <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">
             <div><div class="sub">حضور</div><b class="mono">{{ $wAtt->time_in }}</b>
                 @if ($wAtt->mode)<span class="sub">· {{ $wAtt->mode }}</span>@endif</div>
+            @unless (is_null($wElapsed))
+                {{-- العدّادُ الحيّ: مدّةُ العمل منذ الحضور، يعدُّ صعوداً كلَّ ثانية --}}
+                <div><div class="sub">⏱ مدّة العمل</div>
+                    <b class="mono" id="wd-live-timer" data-elapsed="{{ $wElapsed }}" title="منذ تسجيل الحضور">—</b></div>
+            @endunless
             @if ($wAtt->time_out)
                 <div><div class="sub">انصراف</div><b class="mono">{{ $wAtt->time_out }}</b></div>
                 <div><div class="sub">ساعات اليوم</div><b class="mono">{{ $wAtt->hours }}</b></div>
@@ -68,5 +89,25 @@
             <div class="sub" style="margin-top:6px">لم تكتب بندَ عملٍ بعد — بندٌ لكل مشروعٍ عملتَ عليه اليوم،
                 وساعاتُه تدخل مهمتَه تلقائياً.</div>
         @endif
+        @unless (is_null($wElapsed))
+            <script>
+            (function () {
+                var el = document.getElementById('wd-live-timer');
+                if (! el || el.dataset.ticking) return;   // لا نُكرّر المؤقّتَ على العنصر نفسِه
+                el.dataset.ticking = '1';
+                // الأساسُ من الخادم (ثوانٍ منقضية عند العرض) + فارقُ ساعةِ المتصفّحِ منذ التحميل
+                var base = Date.now();
+                var start = parseInt(el.getAttribute('data-elapsed'), 10) || 0;
+                function two(n) { return (n < 10 ? '0' : '') + n; }
+                function tick() {
+                    var s = start + Math.floor((Date.now() - base) / 1000);
+                    var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+                    el.textContent = h + ':' + two(m) + ':' + two(s % 60);
+                }
+                tick();
+                setInterval(tick, 1000);
+            })();
+            </script>
+        @endunless
     @endif
 </div>
