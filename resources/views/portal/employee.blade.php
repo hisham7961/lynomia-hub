@@ -70,6 +70,38 @@
         </div>
     @endif
 
+@elseif ($tab360 === 'reports')
+    {{-- (§21/§61) التقاريرُ اليوميّة: الحضورُ الفيزيائيّ والتقريرُ والأثرُ المحتسَب
+         يوماً بيوم — من المُحلِّلِ المركزيّ، مقيَّدةً (لا مسحٌ شامل §98). --}}
+    <div class="card kid">
+        <h3>📝 التقارير اليومية <span class="sub">— آخر أيام العمل</span></h3>
+        @if (! empty($reportHistory))
+            <div class="tblwrap"><table class="tbl">
+                <thead><tr><th>اليوم</th><th>الحضور</th><th>الوقت</th><th>التقرير</th>
+                    <th>بنود</th><th>ساعات</th><th>الحالة المحتسَبة</th><th></th></tr></thead>
+                <tbody>
+                @foreach ($reportHistory as $d)
+                    <tr>
+                        <td class="mono">{{ $d['date'] }}</td>
+                        <td>{{ $d['physical'] }}</td>
+                        <td class="mono sub">{{ $d['time_in'] ?: '—' }}@if($d['time_out']) – {{ $d['time_out'] }}@endif</td>
+                        <td><span class="bdg {{ $d['compliance']==='مقدَّم'?'ok':($d['compliance']==='غيرُ مقدَّم'?'bad':'') }}">{{ $d['compliance'] }}</span>
+                            @if ($d['late'])<span class="bdg wn">متأخّر</span>@endif</td>
+                        <td>{{ $d['report_count'] ?: '—' }}</td>
+                        <td class="mono">{{ $d['reported_hours'] ? number_format($d['reported_hours'],1) : '—' }}</td>
+                        <td><span class="bdg {{ $d['effective_key']==='present'?'ok':($d['effective_key']==='absent_due_to_missing_report'?'bad':'') }}">{{ $d['effective'] }}</span></td>
+                        <td><a class="btn ghost xs" href="{{ route('reports.day', ['emp' => $emp->id, 'date' => $d['date']]) }}">تفصيل ↗</a></td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table></div>
+            <div class="sub" style="margin-top:6px">الحضورُ الفيزيائيّ لا يُطمَس؛ «الحالة المحتسَبة» أثرُ السياسة بعد المهلة.
+                <a href="{{ route('reports.index') }}">مركز التقارير ↗</a></div>
+        @else
+            <div class="sub">لا تقاريرَ حضورٍ في المدة الأخيرة، أو لا تملك عرضَ تحديثات العمل.</div>
+        @endif
+    </div>
+
 @elseif ($tab360 === 'assets')
     {{-- العهدةُ والأجهزة: أصولٌ بيده — والسيريالُ سرٌّ تقنيٌّ يحرسه field-mode --}}
     @php $cuSerial = hub_field_mode(auth()->user(), 'assets', 'serial') !== 'hide'; @endphp

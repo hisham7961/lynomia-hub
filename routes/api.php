@@ -18,6 +18,12 @@ Route::prefix('v1')->middleware(['throttle:api', ApiAuth::class])->group(functio
     Route::get('reports/progress/{projectId}', [V1Controller::class, 'progress']);
     Route::get('reports/health', [V1Controller::class, 'health']);
 
+    // ── تقاريرُ العملِ اليوميّة (§93/§94): نفسُ المُحلِّلِ المركزيّ للويب — داخليٌّ حصراً
+    //    (العميلُ ٤٠٤)، حرفيّةُ `reports/*` قبل catch-all `{module}` كي لا يبتلعها. ──
+    Route::get('reports/my-daily', [\App\Http\Controllers\Api\ReportsApiController::class, 'myDaily'])->name('api.v1.reports.my_daily');
+    Route::get('reports/today-compliance', [\App\Http\Controllers\Api\ReportsApiController::class, 'todayCompliance'])->name('api.v1.reports.today');
+    Route::get('reports/daily', [\App\Http\Controllers\Api\ReportsApiController::class, 'teamDaily'])->name('api.v1.reports.daily');
+
     // المقاييس الزمنية: استقبالٌ آلي (n8n) وقراءةُ السلسلة — قبل {module} كي لا تبتلعها
     Route::post('metrics', [V1Controller::class, 'metricsIngest']);
     Route::get('metrics/{module}/{id}', [V1Controller::class, 'metricsShow']);
@@ -186,6 +192,11 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     // D.5 — اللوحة · D.6 — البحث · D.7 — التفضيلات (حرفيّةٌ أُحاديّةُ المقطع قبل `{module}`)
     Route::get('home', [\App\Http\Controllers\Api\MobileWorkController::class, 'home'])->name('mobile.home');
     Route::get('search', [\App\Http\Controllers\Api\MobileWorkController::class, 'search'])->name('mobile.search');
+
+    // تقريرُ العملِ اليوميّ (§93): حالُ اليوم وبنودُه للموظّف نفسِه — حرفيّةُ `work/*`
+    // قبل catch-all `{module}` كي لا يبتلعها. التقديمُ يُعادُ استعمالُ CRUD الوحدة updates.
+    Route::get('work/today', [\App\Http\Controllers\Api\MobileReportsController::class, 'today'])->name('mobile.work.today');
+    Route::get('work/daily-report', [\App\Http\Controllers\Api\MobileReportsController::class, 'today'])->name('mobile.work.daily_report');
     Route::get('prefs', [\App\Http\Controllers\Api\MobileWorkController::class, 'prefs'])->name('mobile.prefs.index');
     Route::put('prefs', [\App\Http\Controllers\Api\MobileWorkController::class, 'prefsUpdate'])->name('mobile.prefs.update');
     Route::post('prefs/pin', [\App\Http\Controllers\Api\MobileWorkController::class, 'pin'])->name('mobile.prefs.pin');

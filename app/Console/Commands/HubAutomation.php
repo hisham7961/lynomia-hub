@@ -38,6 +38,22 @@ class HubAutomation extends Command
             return 0;
         }
     }
+    /**
+     * مصالحةُ تقارير الحضور (§52): شبكةُ أمانٍ يوميّةٌ فوق الاشتقاقِ الحيّ — تُشعِر
+     * بالتقريرِ الناقصِ بعد المهلة مرّةً واحدةً (§39). معزولةُ الفشلِ كسائرِ الخطوات.
+     */
+    protected function reconcileReports(): int
+    {
+        if ($this->dry || ! \Illuminate\Support\Facades\Schema::hasTable('attendance')) return 0;
+        try {
+            // الأمرُ يطبع سطرَه المفصَّل؛ نعيد ٠/١ لعدّادِ السطرِ الملخَّص فقط
+            return \Illuminate\Support\Facades\Artisan::call('attendance:reconcile-reports') === self::SUCCESS ? 1 : 0;
+        } catch (\Throwable $e) {
+            report($e);
+            return 0;
+        }
+    }
+
     protected $description = 'توليد المستندات المتكررة وتقييم قواعد التنبيه';
 
     protected bool $dry = false;
@@ -64,10 +80,11 @@ class HubAutomation extends Command
         $p = $this->pruneNotifications();
         $k = $this->okrRefresh();
         $w = $this->workdayClose();
+        $rr = $this->reconcileReports();
         $s = $this->signalsPrune();
         $m = $this->marginSnapshot();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · تقارير: {$rr} تنبيهُ نقص · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة");
 
         if (! $this->dry) \App\Support\Health::beat('automation', (int) round((microtime(true) - $t0) * 1000));
         return self::SUCCESS;

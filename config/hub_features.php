@@ -125,6 +125,14 @@ return [
         'workos.relationship_explorer' => ['domain' => 'work_os', 'category' => 'graph', 'title_ar' => 'مستكشف العلاقات', 'title_en' => 'Relationship Explorer', 'status' => 'ENABLED', 'web_routes' => ['graph.explore']],
         'workos.tech_workspace' => ['domain' => 'work_os', 'category' => 'graph', 'title_ar' => 'مساحة العمل التقنيّة', 'title_en' => 'Technical Workspace', 'status' => 'ENABLED'],
         'workos.project_360' => ['domain' => 'work_os', 'category' => 'delivery', 'title_ar' => 'مشروع 360', 'title_en' => 'Project 360', 'status' => 'ENABLED'],
+        // (الحضور × التقرير × الامتثال · §120) قدرةٌ واحدةٌ قانونيّة: مركزُ التقارير اليوميّة
+        // ومراجعتُها — قراءةٌ/مراجعةٌ فوق WorkUpdate القائم (لا محرّكَ تقاريرَ ثانٍ)، تفصل
+        // الحضورَ الفيزيائيَّ عن الامتثالِ التقريريّ عن الأثرِ الفعّال (§6). لا مفتاحَ لكلِّ تبويب.
+        'workos.daily_reports' => ['domain' => 'work_os', 'category' => 'delivery', 'title_ar' => 'التقارير اليومية والمراجعة', 'title_en' => 'Daily Reports & Review', 'status' => 'ENABLED',
+            'permissions' => ['hr'], 'web_routes' => ['reports.index', 'reports.review', 'reports.mine'],
+            'desc_ar' => 'مركزُ التقارير اليوميّة ومراجعتُها فوق تحديثات العمل — من حضر، من كتب تقريراً، من حضر ولم يكتب، وماذا عمل كلٌّ على أيّ مشروع؛ مع فصلِ الحضور الفيزيائيّ عن الامتثال عن الأثر المحتسَب.',
+            'desc_en' => 'Daily reports center and review over WorkUpdate — who attended, who reported, who attended without reporting, and what each did on which project; physical attendance, reporting compliance and effective outcome kept separate.',
+            'introduced' => 'v2.476.0', 'docs' => 'docs/attendance-reporting/00-overview.md'],
         // (الكيان 360 · §19-27) مركزُ قيادةِ المحطة: تجميعٌ سياقيٌّ (شاغل/أصول/نقاط/جرد/مشروع) —
         // سياقيٌّ يُكتشَف من تفصيل المحطة (m.show)، لا وجهةَ GET مستقلّة (نمطُ employee_360/project_360).
         'workos.station_360' => ['domain' => 'work_os', 'category' => 'stations', 'title_ar' => 'محطّة 360', 'title_en' => 'Station 360', 'status' => 'ENABLED',

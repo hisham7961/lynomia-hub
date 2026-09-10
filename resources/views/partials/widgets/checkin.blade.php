@@ -54,6 +54,7 @@
             <div><div class="sub">بنود تقريري اليوم</div>
                 <b>{{ $data['entries'] }}</b> <span class="sub">({{ $data['hours'] }} س)</span></div>
             <span class="spacer"></span>
+            <a class="btn ghost sm" href="{{ route('reports.mine') }}">📝 تقرير اليوم</a>
             <a class="btn ghost sm" href="{{ route('m.create', 'updates') }}">＋ بند عمل</a>
             @if (! $wAtt->time_out)
                 <form method="POST" action="{{ route('workday.out') }}" class="inline"

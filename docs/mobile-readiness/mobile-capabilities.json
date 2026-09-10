@@ -950,6 +950,23 @@
                 }
             ],
             "count": 3
+        },
+        "work": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/work/daily-report",
+                    "name": "mobile.work.daily_report",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/work/today",
+                    "name": "mobile.work.today",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 2
         }
     }
 }

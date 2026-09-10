@@ -104,6 +104,13 @@ class InformationArchitecture
 
             // مجالُ الإدارة → شرطُ ظهورِ شريط الترس (layouts/app.blade.php:142)
             'admin_bar'          => fn ($u) => hub_is_owner($u) || hub_flag($u, 'users') || hub_flag($u, 'audit') || hub_secrets($u),
+
+            // مركزُ التقارير اليوميّة → ReportsController@guardTeam (HR/مالك، لا عميل §79)
+            'reports_center'     => fn ($u) => ! hub_is_client($u) && hub_can($u, 'hr', 'v'),
+            // مركزُ المراجعة → ReportReview::canReviewAny (HR/مالك/مديرُ مشروع، لا عميل)
+            'reports_review'     => fn ($u) => \App\Support\ReportReview::canReviewAny($u),
+            // تقريري اليوم → ReportsController@mine (أيُّ موظّفٍ داخليّ لنفسه)
+            'reports_mine'       => fn ($u) => $u !== null && ! hub_is_client($u),
         ];
     }
 

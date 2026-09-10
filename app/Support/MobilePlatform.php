@@ -824,6 +824,8 @@ class MobilePlatform
         'files' => 'field', 'scanner' => 'field', 'tracking' => 'field', 'sync' => 'api',
         // تجربةُ العميل (§12–§18): التفعيلُ سكّةُ دخولٍ (أمن)، والبوّابةُ وإدارةُ الأعضاء سطحا API
         'activation' => 'security', 'clients' => 'api', 'portal' => 'api',
+        // تقريرُ العملِ اليوميّ للجوال (الحضور × التقرير · §93): قراءةُ حالِ اليوم — سطحُ API
+        'work' => 'api',
     ];
 
     /**

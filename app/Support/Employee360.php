@@ -123,4 +123,36 @@ class Employee360
 
         return $events->sortByDesc('at')->values()->take($limit);
     }
+
+    /**
+     * (§21/§61) تاريخُ التقارير اليوميّة للموظّف — آخرُ N يومٍ مقيَّدةً (لا مسحٌ شامل):
+     * لكلِّ يومٍ حالةُ الحضورِ والتقريرِ والأثرِ المحتسَب من المُحلِّلِ المركزيّ (§101).
+     * محروسٌ بـ`updates:v` عند التبويب (كسائرِ تبويبات ٣٦٠)؛ القراءةُ عبرَ الموظّفِ نفسِه.
+     */
+    public function dailyReports(Employee $emp, $u, int $days = 14): array
+    {
+        if (! hub_can($u, 'updates', 'v')) return [];
+        $out = [];
+        $cursor = \App\Support\BusinessDate::now();
+        for ($i = 0; $i < max(1, min(60, $days)); $i++) {
+            $date = $cursor->copy()->subDays($i)->toDateString();
+            $c = \App\Support\DailyWorkCompliance::resolve($emp, $date);
+            // أيامٌ بلا حضورٍ ولا تقريرٍ ولا إجازةٍ تُتخطّى (لا صفوفَ فارغة)
+            if (! $c['checked_in'] && ! $c['report_submitted'] && ! $c['on_leave']) continue;
+            $out[] = [
+                'date' => $date,
+                'physical' => $c['labels']['physical'],
+                'time_in' => $c['time_in'], 'time_out' => $c['time_out'],
+                'compliance' => $c['labels']['compliance'],
+                'effective' => $c['labels']['effective'],
+                'effective_key' => $c['effective'],
+                'report_count' => $c['report_count'],
+                'reported_hours' => $c['reported_hours'],
+                'projects' => $c['projects'],
+                'late' => $c['late'],
+                'review' => $c['review'],
+            ];
+        }
+        return $out;
+    }
 }

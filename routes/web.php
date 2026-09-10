@@ -246,6 +246,17 @@ Route::middleware('auth')->group(function () {
         ->middleware('throttle:30,1')->name('workday.out');
     Route::get('workforce', [\App\Http\Controllers\Web\WorkdayController::class, 'team'])->name('workforce.team');
 
+    // ── مركزُ التقارير اليوميّة (الحضور × التقرير × الامتثال) — قراءةٌ ومراجعةٌ فوق
+    //    WorkUpdate القائم؛ الحرّاس في المتحكّم (شركةٌ/مشروعٌ/HR)، والعميلُ يُردّ ٤٠٤. ──
+    Route::get('reports/daily', [\App\Http\Controllers\Web\ReportsController::class, 'index'])->name('reports.index');
+    Route::get('reports/daily/day', [\App\Http\Controllers\Web\ReportsController::class, 'day'])->name('reports.day');
+    Route::get('reports/review', [\App\Http\Controllers\Web\ReportsController::class, 'review'])->name('reports.review');
+    Route::get('my/report', [\App\Http\Controllers\Web\ReportsController::class, 'mine'])->name('reports.mine');
+    Route::middleware('throttle:60,1')->group(function () {
+        Route::post('reports/review/{id}', [\App\Http\Controllers\Web\ReportsController::class, 'reviewAct'])->name('reports.review.act');
+        Route::post('reports/compliance/{id}/finalize', [\App\Http\Controllers\Web\ReportsController::class, 'finalize'])->name('reports.finalize');
+    });
+
     // العرض الميدانيّ للمشرف: لوحةٌ تحليلية، وجلساتُ التتبّع، وإعادةُ عرض المسار
     Route::get('field', [\App\Http\Controllers\Web\FieldController::class, 'dashboard'])->name('field.dashboard');
     Route::get('sales', [\App\Http\Controllers\Web\SalesController::class, 'dashboard'])->name('sales.dashboard');

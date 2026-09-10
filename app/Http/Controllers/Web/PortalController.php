@@ -63,6 +63,8 @@ class PortalController extends Controller
         if ($tab === 'assets') $data['custodyHist'] = $e360->custodyHistory($emp, $u);
         // الملفُّ والعمل (§17): نشاطٌ تشغيليٌّ منطَّقٌ (محطة/عهدة) — لا مسحٌ شامل
         if ($tab === 'profile') $data['empActivity'] = $e360->activity($emp, $u);
+        // التقاريرُ اليوميّة (§21/§61): تاريخُ الحضورِ والتقريرِ والأثرِ المحتسَب مقيَّداً
+        if ($tab === 'reports') $data['reportHistory'] = $e360->dailyReports($emp, $u);
         // (الطور G · WP-G.2) تبويبُ الاتصالات يُحمَّل عند فتحه — خطوطُ الموظف بـemployee_id
         if ($tab === 'telecom') $data['phones'] = $this->phonesFor($u, $emp->id);
         // (الطور M · WP-M.3) تبويبُ الأنظمة — سيرفراتُ الموظف بحافّة H.1 (servers.hr_id)
@@ -83,6 +85,9 @@ class PortalController extends Controller
     {
         return [
             'profile' => ['mod' => 'hr',       'label' => '🗂️ الملف والعمل'],
+            // (الحضور × التقرير · §21/§61) تقاريرُ الموظّف اليوميّة — حضورٌ وتقريرٌ وأثرٌ
+            // محتسَبٌ يوماً بيوم، من المُحلِّلِ المركزيّ. يحرسه `updates:v` كسائر التبويبات.
+            'reports' => ['mod' => 'updates',  'label' => '📝 التقارير اليومية'],
             'assets'  => ['mod' => 'assets',   'label' => '💻 العهدة والأجهزة'],
             'station' => ['mod' => 'stations', 'label' => '🪑 المحطة'],
             // (Work OS · الطور G · WP-G.2 · §28) سكّةُ الاتصالات وصلت: خطوطُ الموظف

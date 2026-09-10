@@ -451,6 +451,14 @@ class ModuleController extends Controller
 
         $m = $this->findScoped($class, $module, $id);
 
+        // §30: تقريرُ العملِ المقبولُ لا يعيد الموظفُ كتابتَه صامتاً — يُعيده المدير/HR
+        // للمراجعة أولاً (بأثرٍ مدقَّق). المالكُ/مسؤولُ الموارد البشرية غيرُ مقفولين.
+        if ($module === 'updates' && $m instanceof \App\Models\WorkUpdate
+            && \App\Support\ReportReview::isLockedForEditor($m, auth()->user())) {
+            return back()->withInput()->with('err',
+                'هذا التقريرُ اعتمده المدير — لا يُعدَّل بعد الاعتماد. اطلب من مديرك إعادةَ فتحِه للتنقيح.');
+        }
+
         /*
          * القفل التفاؤلي: عمود `version` كان يزيد ولا يُقارَن، والنموذج لا يبعث
          * نسخةً — فكاتبان على السجل نفسه، والثاني يدهس الأول **بلا إشارة**
