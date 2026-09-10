@@ -34,8 +34,23 @@
             <div class="sub" style="font-size:10px;margin-top:1px;{{ $mine ? 'text-align:end' : '' }}">
                 {{ $m->created_at?->format('H:i') }}
                 @if ($mine){{ $m->read_at ? ' ✓✓' : ' ✓' }}@endif
-                {{-- السحبُ لصاحب الرسالة وحده — لا يمحو أحدٌ كلام غيره --}}
+                {{-- أثرُ التحرير ظاهرٌ لطرفَي المحادثة (§22): «عُدّلت» صادقةٌ لا خُفية --}}
+                @if ($m->edited_at)<span title="عُدّلت {{ $m->edited_at?->format('Y-m-d H:i') }}">· عُدّلت</span>@endif
+                {{-- التحريرُ والسحبُ لصاحب الرسالة وحده — لا يمسّ أحدٌ كلام غيره؛ الحارسُ خادميٌّ في dm.edit/dm.destroy --}}
                 @if ($mine)
+                    {{-- §22 تعديلُ الرسالة عبر مسارِ dm.edit القائم — إفصاحٌ سطريّ لا مغادرةَ للمحادثة، كنمطِ التفاعل أدناه --}}
+                    <details class="inline">
+                        <summary class="lnkbtn" style="cursor:pointer;list-style:none" aria-label="تعديل الرسالة" title="تعديل">✏️</summary>
+                        <form method="POST" action="{{ route('dm.edit', $m->id) }}" style="margin-top:3px">
+                            @csrf
+                            <label class="vh" for="dmedit-{{ $m->id }}">نص الرسالة</label>
+                            <textarea class="inp" id="dmedit-{{ $m->id }}" name="body" rows="2" maxlength="4000"
+                                      style="min-width:220px;font-size:13px">{{ $m->body }}</textarea>
+                            <div class="crow" style="gap:6px;margin-top:3px;{{ $mine ? 'justify-content:flex-end' : '' }}">
+                                <button class="btn p xs" type="submit">حفظ التعديل</button>
+                            </div>
+                        </form>
+                    </details>
                     <form method="POST" action="{{ route('dm.destroy', $m->id) }}" class="msgdel"
                           data-confirm="سحبُ هذه الرسالة؟ يبقى مكانُها يقول إنها حُذفت.">
                         @csrf @method('DELETE')

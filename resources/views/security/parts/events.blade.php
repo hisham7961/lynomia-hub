@@ -22,7 +22,7 @@
         @endforeach
     </div>
     <div class="tblwrap"><table class="tbl">
-        <thead><tr><th>الحدث</th><th>من</th><th>ماذا</th><th>من أين</th><th>متى</th></tr></thead>
+        <thead><tr><th>الحدث</th><th>من</th><th>ماذا</th><th>من أين</th><th>متى</th><th class="vh">التفصيل</th></tr></thead>
         <tbody>
         @forelse ($events as $e)
             <tr>
@@ -32,9 +32,11 @@
                     @if (! empty($e['request_id']))<div class="sub mono ltr" style="font-size:10px" title="معرّف الطلب">{{ $e['request_id'] }}</div>@endif</td>
                 <td class="mono ltr sub">{{ $e['ip'] ?: '—' }}</td>
                 <td class="sub">{{ \Illuminate\Support\Carbon::parse($e['at'])->diffForHumans() }}</td>
+                {{-- §42.9 اكتشافٌ سياقيّ: صفُّ الحدث ← تفصيلُه القائم (security.event). لا مركزَ ثانٍ ولا بندَ شريط — الحارسُ يُعاد فحصُه في المتحكّم (مطموسٌ ومنطَّق). --}}
+                <td>@if (! empty($e['id']))<a class="btn ghost xs" href="{{ route('security.event', [$e['source'], $e['id']]) }}" title="تفصيل الحدث الأمنيّ">عرض</a>@endif</td>
             </tr>
         @empty
-            <tr><td colspan="5" class="sub" style="padding:12px;text-align:center">لا أحداث أمنية{{ $eventCode ? ' من هذا النوع' : '' }} خلال ٧ أيام.</td></tr>
+            <tr><td colspan="6" class="sub" style="padding:12px;text-align:center">لا أحداث أمنية{{ $eventCode ? ' من هذا النوع' : '' }} خلال ٧ أيام.</td></tr>
         @endforelse
         </tbody>
     </table></div>

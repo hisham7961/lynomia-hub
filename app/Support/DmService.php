@@ -107,19 +107,50 @@ class DmService
      */
     public static function threadRows(string $me): \Illuminate\Support\Collection
     {
+        // غيرُ المقروء لكلِّ خيطٍ — استعلامُ تجميعٍ واحد
         $unreadByThread = DmMessage::alive()->inCompanyScope()->where('to_id', $me)->whereNull('read_at')
             ->select('thread_key', \Illuminate\Support\Facades\DB::raw('COUNT(*) c'))
             ->groupBy('thread_key')->pluck('c', 'thread_key');
 
-        $recentKeys = DmMessage::alive()->inCompanyScope()
+        // أحدثُ ٦٠ خيطاً ووقتُ آخرِ رسالةٍ لكلٍّ — استعلامُ تجميعٍ واحد (يحمل last_at)
+        $recent = DmMessage::alive()->inCompanyScope()
             ->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
             ->select('thread_key', \Illuminate\Support\Facades\DB::raw('MAX(created_at) last_at'))
-            ->groupBy('thread_key')->orderByDesc('last_at')->limit(60)->pluck('thread_key');
-        $keys = $recentKeys->merge($unreadByThread->keys())->unique()->values();
+            ->groupBy('thread_key')->orderByDesc('last_at')->limit(60)->get();
+        $lastAt = $recent->pluck('last_at', 'thread_key');   // key => آخرُ وقت
 
-        return $keys->map(function ($key) use ($me, $unreadByThread) {
-            $last = DmMessage::alive()->inCompanyScope()->where('thread_key', $key)
-                ->orderByDesc('created_at')->orderByDesc('id')->first();
+        // خيوطُ «غيرِ المقروء» خارجَ نافذةِ الستّين تُضَمّ بوقتِ آخرِ رسالةٍ لها — استعلامٌ واحدٌ عند اللزوم
+        $missing = $unreadByThread->keys()->reject(fn ($k) => $lastAt->has($k))->values();
+        if ($missing->isNotEmpty()) {
+            DmMessage::alive()->inCompanyScope()->whereIn('thread_key', $missing->all())
+                ->select('thread_key', \Illuminate\Support\Facades\DB::raw('MAX(created_at) last_at'))
+                ->groupBy('thread_key')->get()
+                ->each(fn ($r) => $lastAt->put($r->thread_key, $r->last_at));
+        }
+        if ($lastAt->isEmpty()) return collect();
+
+        // (AUDIT-7) آخرُ رسالةٍ لكلِّ خيطٍ **دفعةً واحدة** — لا استعلامَ لكلِّ خيط. لكلِّ
+        // مفتاحٍ نجلب صفوفَ (thread_key, created_at = آخرُ وقت)، ثم نختار الأحدثَ id عند
+        // تساوي الثانية — فيُحفَظ ترتيبُ «آخرِ رسالة» الأصليّ (created_at ثم id) حرفاً،
+        // على SQLite وMySQL سواء. المجموعةُ محدودةٌ (≤ عددِ الخيوط) فالحملُ مضبوط.
+        $keys = $lastAt->keys()->all();
+        $candidates = DmMessage::alive()->inCompanyScope()
+            ->whereIn('thread_key', $keys)
+            ->where(function ($w) use ($lastAt) {
+                foreach ($lastAt as $k => $at) {
+                    $w->orWhere(fn ($q) => $q->where('thread_key', $k)->where('created_at', $at));
+                }
+            })
+            ->orderByDesc('created_at')->orderByDesc('id')->get();
+
+        // الترتيبُ تنازليّ فأوّلُ ظهورٍ لكلِّ خيطٍ هو آخرُ رسالةٍ فيه (created_at ثم id)
+        $lastByKey = [];
+        foreach ($candidates as $row) {
+            if (! isset($lastByKey[$row->thread_key])) $lastByKey[$row->thread_key] = $row;
+        }
+
+        return $lastAt->keys()->map(function ($key) use ($me, $unreadByThread, $lastByKey) {
+            $last = $lastByKey[$key] ?? null;
             if (! $last) return null;
 
             return [

@@ -32,10 +32,19 @@ class CoreSeeder extends Seeder
 
         Role::create(['name' => 'عضو فريق', 'scope' => 'proj', 'flags' => [], 'matrix' => $view]);
 
-        User::create([
-            'name' => 'غيث', 'email' => 'owner@lynomia.com', 'password' => 'ChangeMe!2026',
-            'role_id' => $owner->id, 'status' => 'نشط', 'password_changed_at' => now(),
-        ]);
+        // (AUDIT-9) بذرُ المالكِ الأوّل بلا كلمةِ مرورٍ متوقّعةٍ في المصدر — البيانةُ من التهيئة،
+        // والبذرُ متكافئٌ (idempotent): إن وُجد المالكُ لا يُعاد إنشاؤه ولا تُدهَس كلمتُه.
+        $ownerEmail = (string) config('hub.bootstrap.owner_email', 'owner@lynomia.com');
+        if (! User::where('email', $ownerEmail)->exists()) {
+            User::create([
+                'name'                => (string) config('hub.bootstrap.owner_name', 'غيث'),
+                'email'               => $ownerEmail,
+                'password'            => $this->bootstrapOwnerPassword(),
+                'role_id'             => $owner->id,
+                'status'              => 'نشط',
+                'password_changed_at' => now(),
+            ]);
+        }
 
         foreach ([['1010', 'الصندوق', 'أصول'], ['1020', 'البنك', 'أصول'], ['1200', 'الذمم المدينة', 'أصول'],
                   ['1250', 'عُهَد الموظفين', 'أصول'],   // (Work OS · الطور E) حسابُ عهدةِ الموظفين — أصلٌ (ذمّةٌ على الموظف)
@@ -58,5 +67,29 @@ class CoreSeeder extends Seeder
             DB::table('settings')->insert(['key' => $k, 'value' => json_encode($v, JSON_UNESCAPED_UNICODE),
                 'created_at' => now(), 'updated_at' => now()]);
         }
+    }
+
+    /**
+     * كلمةُ مرورِ المالكِ الأوّل — من التهيئة لا ثابتاً في المصدر (AUDIT-9):
+     *   · هُيّئت `LYNOMIA_INITIAL_ADMIN_PASSWORD` ⇒ تُستعمَل (أيّ بيئة).
+     *   · لم تُهيَّأ وفي الإنتاج ⇒ يفشل البذرُ بوضوح، فلا حسابٌ مميّزٌ بكلمةٍ متوقّعة.
+     *   · لم تُهيَّأ وخارجَ الإنتاج (محليّ/اختبار) ⇒ كلمةُ تطويرٍ حتميّةٌ لا يعتمد عليها أمنُ الإنتاج.
+     *
+     * لا تُطبَع الكلمةُ ولا تُسجَّل ولا تُعاد في مخرجٍ — تُمرَّر مباشرةً لتجزئةِ الموديل.
+     */
+    protected function bootstrapOwnerPassword(): string
+    {
+        $configured = (string) config('hub.bootstrap.owner_password', '');
+        if ($configured !== '') return $configured;
+
+        if (app()->environment('production')) {
+            throw new \RuntimeException(
+                'بذرُ مالكِ النظام في الإنتاج يتطلّب بيانةَ اعتمادٍ صريحة: عيّن '
+                . 'LYNOMIA_INITIAL_ADMIN_PASSWORD (config hub.bootstrap.owner_password) ثم أعِد '
+                . 'التشغيل. لا يُنشأ حسابٌ مميّزٌ بكلمةِ مرورٍ متوقّعة.');
+        }
+
+        // خارجَ الإنتاج فقط — بيانةُ تطويرٍ حتميّةٌ معلومةٌ للمطوّر، لا يعتمد عليها أمنُ الإنتاج
+        return 'lynomia-dev-owner';
     }
 }

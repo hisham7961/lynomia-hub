@@ -94,9 +94,10 @@ class InventoryController extends Controller
         $this->can('v');
         $session = $this->sessionScoped($id);
 
-        // الأصنافُ المجمَّدة بترتيبٍ حتميّ (الحكم ثم id) — العرضُ من اللقطة نفسِها (الحقيقةُ المجمَّدة)
+        // (AUDIT-8) الأصنافُ المجمَّدة **صفحةً محدودةً على مستوى القاعدة** لا اللقطةَ كاملةً:
+        // كانت `->get()` تحمّل كلَّ الأصناف في الذاكرة (تكبر بعددِ الأصول). الترتيبُ حتميّ (الحكم ثم id).
         $items = InventoryItem::where('session_id', $session->id)
-            ->orderBy('verdict')->orderBy('id')->get();
+            ->orderBy('verdict')->orderBy('id')->paginate(50)->withQueryString();
 
         // المسحاتُ الأحدثُ أولاً بترتيبٍ حتميّ (at ثم id)
         $scans = InventoryScan::where('session_id', $session->id)
@@ -107,11 +108,20 @@ class InventoryController extends Controller
             ->whereIn('id', $scans->pluck('by_id')->filter()->unique())
             ->pluck('name', 'id');
 
-        // خريطةُ أكواد اللقطة: لعرضِ رمزِ الأصلِ في سطرِ المسح (من اللقطة المنطَّقة وحدَها،
-        // فلا يُعرَض رمزٌ لأصلٍ خارجَ اللقطة — ومسحُ «غير معروف» لا asset_id أصلاً)
-        $itemCodes = $items->mapWithKeys(fn ($it) => [$it->asset_id => (string) data_get($it->snapshot, 'code', '')]);
+        // (AUDIT-8) العدُّ بالحكم من **تجميعِ القاعدة** لا من صفوفِ الصفحة — يمثّل الجلسةَ
+        // كاملةً مهما كانت الصفحةُ المعروضة، ولا يُحمّل صفٌّ لأجل العدّ.
+        $counts = InventoryItem::where('session_id', $session->id)
+            ->select('verdict', DB::raw('COUNT(*) c'))->groupBy('verdict')->pluck('c', 'verdict');
+        $total = (int) $counts->sum();
 
-        $counts = $items->groupBy('verdict')->map->count();
+        // خريطةُ أكواد اللقطة لصفوفِ المسح (المحدودةِ بـ200) — من عناصرِ تلك المسحات وحدَها
+        // لا من كلِّ الأصناف: فلا يعود العرضُ يحمّل اللقطةَ كاملةً لبناء الخريطة. ومن اللقطة
+        // المنطَّقة (session_id) فلا يُعرَض رمزٌ لأصلٍ خارجَها، ومسحُ «غير معروف» لا asset_id أصلاً.
+        $scanAssetIds = $scans->pluck('asset_id')->filter()->unique()->values();
+        $itemCodes = $scanAssetIds->isEmpty() ? collect()
+            : InventoryItem::where('session_id', $session->id)->whereIn('asset_id', $scanAssetIds->all())
+                ->get(['asset_id', 'snapshot'])
+                ->mapWithKeys(fn ($it) => [$it->asset_id => (string) data_get($it->snapshot, 'code', '')]);
 
         return view('inventory.show', [
             'session'   => $session,
@@ -120,6 +130,7 @@ class InventoryController extends Controller
             'names'     => $names,
             'itemCodes' => $itemCodes,
             'counts'    => $counts,
+            'total'     => $total,
         ]);
     }
 

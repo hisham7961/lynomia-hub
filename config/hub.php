@@ -15,6 +15,19 @@ return [
     'allow_destructive' => (bool) env('HUB_ALLOW_DESTRUCTIVE', false),
     // HUB_OUTBOUND=off يُطفئ كلَّ نداءٍ خارجيّ (تلجرام، بريد، ويبهوك، مراقبة، استكشاف، أودو) — لنسخة تجريبية أو تحليلٍ محليّ (v2.399)
     'outbound' => env('HUB_OUTBOUND', 'on'),
+
+    /*
+     * **بذرُ المالكِ الأوّل (AUDIT-9 · v2.474.1).** لا كلمةَ مرورٍ متوقّعةً في المصدر:
+     * `CoreSeeder` يقرأ بيانةَ الاعتماد من هنا (اصطلاحُ config لا env متناثرٌ في الكود).
+     * في الإنتاج يجب أن تُهيَّأ `LYNOMIA_INITIAL_ADMIN_PASSWORD` صراحةً وإلّا يفشل البذرُ
+     * بوضوحٍ بدلاً من إنشاء حسابٍ مميّزٍ بكلمةٍ معروفة. البريدُ والاسمُ اختياريّان.
+     */
+    'bootstrap' => [
+        'owner_email'    => env('LYNOMIA_INITIAL_ADMIN_EMAIL', 'owner@lynomia.com'),
+        'owner_name'     => env('LYNOMIA_INITIAL_ADMIN_NAME', 'غيث'),
+        'owner_password' => env('LYNOMIA_INITIAL_ADMIN_PASSWORD'),
+    ],
+
     'modules' => [
         'companies' => [
             'key' => 'companies',
