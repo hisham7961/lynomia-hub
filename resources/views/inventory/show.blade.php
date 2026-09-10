@@ -40,13 +40,14 @@
 @endif
 
 <div class="card">
-    <h3 class="cardtitle">🧮 الأصنافُ المجمَّدة ({{ $items->count() }})</h3>
+    {{-- (AUDIT-8) العدُّ الكلّيُّ من تجميعِ القاعدة ($total) لا من صفحةِ العرض — صادقٌ مهما كانت الصفحة --}}
+    <h3 class="cardtitle">🧮 الأصنافُ المجمَّدة ({{ $total }})</h3>
     @php $c = fn ($k) => (int) ($counts[$k] ?? 0); @endphp
     <div class="sub" style="margin-bottom:8px">
         موجود {{ $c('موجود') }} · مفقود {{ $c('مفقود') }} · انتقل {{ $c('انتقل') }}
         · غير متوقع {{ $c('غير متوقع') }} · معلّق {{ $c('معلّق') }}
     </div>
-    @if ($items->isEmpty())
+    @if ($total === 0)
         <div class="sub">لا أصنافَ في اللقطة.</div>
     @else
         <table class="mini">
@@ -62,6 +63,8 @@
             @endforeach
             </tbody>
         </table>
+        {{-- الترقيمُ على مستوى القاعدة (صفحةٌ ٥٠) — لا تُحمَّل اللقطةُ كاملةً في الصفحة --}}
+        {{ $items->links('partials.pagination') }}
     @endif
 </div>
 
