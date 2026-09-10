@@ -3,6 +3,7 @@
 @section('content')
 @component('partials.pagehead', ['icon' => '🎭', 'title' => 'الأدوار والصلاحيات', 'crumb' => 'النظام',
     'sub' => 'ماذا يبلغ كل دور بالأرقام — لا اسمُه ونطاقُه فقط'])
+    <a class="btn ghost sm" href="{{ route('access.index') }}">🔎 تشخيص الوصول</a>
     <a class="btn p sm" href="{{ route('roles.create') }}">＋ دور جديد</a>
 @endcomponent
 <div class="card pad0">
@@ -42,6 +43,7 @@
                 <td>{{ $r->users_count }}</td>
                 <td class="acts">
                     @unless ($r->is_owner)
+                        <a class="btn ghost xs" href="{{ route('access.role', $r) }}" title="معاينة تنقّل الدور">🔭 معاينة</a>
                         <a class="btn ghost xs" href="{{ route('roles.edit', $r) }}">تعديل</a>
                         <form class="inline" method="POST" action="{{ route('roles.clone', $r) }}">@csrf<button class="btn ghost xs">استنسخ</button></form>
                         <form class="inline" method="POST" action="{{ route('roles.destroy', $r) }}" data-confirm="حذف الدور؟">@csrf @method('DELETE')<button class="btn ghost xs dn">حذف</button></form>

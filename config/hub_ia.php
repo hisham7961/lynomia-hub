@@ -502,6 +502,9 @@ return [
                         'route_prefix' => 'users', 'routes' => ['users.index', 'users.create', 'users.edit'], 'tag' => 'ADMIN_ONLY'],
                     ['type' => 'admin', 'admin' => 'roles', 'importance' => 'primary', 'route_prefix' => 'roles',
                         'routes' => ['roles.index', 'roles.create', 'roles.edit']],
+                    // تشخيصُ الوصول — شرحُ الصلاحيّة الفعّالة (§22/§59)؛ الحارسُ owner عبر hub_admin_links['access']
+                    ['type' => 'admin', 'admin' => 'access', 'importance' => 'secondary', 'route_prefix' => 'access',
+                        'routes' => ['access.index', 'access.role']],
                 ]],
             ],
         ],

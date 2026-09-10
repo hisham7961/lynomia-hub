@@ -723,6 +723,9 @@ Route::middleware('auth')->group(function () {
     Route::put('admin/roles/{role}', [RoleController::class, 'update'])->name('roles.update');
     Route::post('admin/roles/{role}/clone', [RoleController::class, 'clone'])->name('roles.clone');
     Route::delete('admin/roles/{role}', [RoleController::class, 'destroy'])->name('roles.destroy');
+    // تشخيصُ الوصول (Permissions Reconciliation · §22/§59/§60) — مالكٌ حصراً، طبقةُ عرضٍ فوق PermissionInspector
+    Route::get('admin/access', [\App\Http\Controllers\Web\AccessController::class, 'index'])->name('access.index');
+    Route::get('admin/access/role/{role}', [\App\Http\Controllers\Web\AccessController::class, 'role'])->name('access.role');
 
     Route::get('admin/audit', [AuditController::class, 'index'])->name('audit.index');
     Route::get('admin/ops', [OpsController::class, 'index'])->name('ops.index');

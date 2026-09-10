@@ -5708,6 +5708,9 @@ if (! function_exists('hub_admin_links')) {
                 $owner, ['integrations.*', 'webhooks.*'], 'التكاملات Webhooks أودو تلجرام n8n'),
             $mk('roles', 'الأدوار', '🧑‍⚖️', 'roles.index', [], 'الإعدادات',
                 $owner, ['roles.*'], 'الأدوار والصلاحيات'),
+            // تشخيصُ الوصول — «ماذا يرى هذا الموظف ولماذا؟» فوق PermissionInspector (مالكٌ حصراً)
+            $mk('access', 'تشخيص الوصول', '🔎', 'access.index', [], 'الإعدادات',
+                $owner, ['access.*'], 'الصلاحيات الفعّالة من يرى ماذا لماذا تشخيص الوصول permissions effective'),
             $mk('users', 'المستخدمون', '👥', 'users.index', [], 'الإعدادات',
                 hub_flag($user, 'users'), ['users.*'], 'المستخدمون الحسابات'),
             $mk('prefs', 'التخصيص', '🎛️', 'prefs.edit', [], 'الإعدادات',
