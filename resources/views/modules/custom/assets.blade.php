@@ -19,7 +19,7 @@
         ['overview', '💻 النظرة'],
         ['custody', '🤲 العهدة'],
         hub_can($u, 'stations', 'v') ? ['station', '🪑 المحطة'] : null,
-        ! hub_is_client($u) ? ['projects', '🗂️ المشاريع'] : null,
+        (! hub_is_client($u) && hub_can($u, 'projects', 'v')) ? ['projects', '🗂️ المشاريع'] : null,
         ['technical', '🔧 التقنية'],
         hub_can($u, 'assets', 'v') ? ['inventory', '📦 الجرد'] : null,
         ['lifecycle', '🧮 الدورة'],
@@ -109,12 +109,12 @@
         </section>
     @endif
 
-    {{-- ═══════════ ④ المشاريع (تخصيصٌ لا عهدة · §34) ═══════════ --}}
-    @unless (hub_is_client($u))
+    {{-- ═══════════ ④ المشاريع (تخصيصٌ لا عهدة · §34) — محروسٌ خادميّاً بـprojects:v (§16) ═══════════ --}}
+    @if (! hub_is_client($u) && hub_can($u, 'projects', 'v'))
         <section id="cca-projects" data-capanel="projects" class="ccpanel {{ $asFirst === 'projects' ? 'on' : '' }}">
             @include('partials.asset_projects', ['row' => $row])
         </section>
-    @endunless
+    @endif
 
     {{-- ═══════════ ⑤ التقنية (النقطةُ الطرفيةُ الآمنة + الهويّةُ الموحّدة §35/§37) ═══════════ --}}
     <section id="cca-technical" data-capanel="technical" class="ccpanel {{ $asFirst === 'technical' ? 'on' : '' }}">

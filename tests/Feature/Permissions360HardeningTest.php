@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Models\Attendance;
 use App\Models\Company;
 use App\Models\Employee;
+use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\WorkUpdate;
 use Tests\TestCase;
 
 /**
@@ -86,5 +88,62 @@ class Permissions360HardeningTest extends TestCase
         // داخلَ النطاق: يُقبَل (إعادةُ توجيهٍ بعد الختم، لا ٤٠٤/٤٠٣)
         $this->actingAs($hr)->post(route('reports.finalize', $rowA->id), ['outcome' => 'clear'])
             ->assertRedirect();
+    }
+
+    /* ═══════════ §16 — تبويباتُ 360 محروسةٌ بصلاحيّةِ وحدتِها (لا «داخليّ» فقط) ═══════════ */
+
+    /** مستخدمٌ داخليٌّ بمصفوفةٍ محدَّدةٍ (فقط الوحداتُ المذكورةُ v=1) */
+    private function internal(string $email, array $mods): User
+    {
+        $matrix = [];
+        foreach ($mods as $m) $matrix[$m] = ['v' => 1, 'a' => 0, 'e' => 0, 'd' => 0];
+        $role = Role::create(['name' => 'دورٌ ' . $email, 'scope' => 'all', 'flags' => [], 'matrix' => $matrix]);
+
+        return User::create(['name' => 'داخليّ', 'email' => $email, 'password' => 'Secret!2026x',
+            'role_id' => $role->id, 'status' => 'نشط', 'password_changed_at' => now()]);
+    }
+
+    public function test_asset_360_projects_tab_requires_projects_view(): void
+    {
+        $this->seedCore();
+        $asset = \App\Models\Asset::create(['name' => 'حاسوبٌ محمول', 'code' => 'AST-360-1', 'status' => 'متاح']);
+
+        // يرى الأصولَ لكن لا يملكُ المشاريع: لا تبويبَ «المشاريع» على الأصل
+        $noProj = $this->internal('astnoproj@test.local', ['assets']);
+        $this->actingAs($noProj)->get(route('m.show', ['assets', $asset->id]))
+            ->assertOk()->assertDontSee('🗂️ المشاريع');
+
+        // يملكُ المشاريعَ أيضاً: التبويبُ يظهر
+        $withProj = $this->internal('astwithproj@test.local', ['assets', 'projects']);
+        $this->actingAs($withProj)->get(route('m.show', ['assets', $asset->id]))
+            ->assertOk()->assertSee('🗂️ المشاريع');
+    }
+
+    public function test_project_360_assets_and_activity_tabs_require_their_module(): void
+    {
+        $this->seedCore();
+        $project = Project::create(['name' => 'مشروعُ الاختبار', 'status' => 'نشط']);
+
+        // بنودُ عملٍ فيها عائقٌ ذو بصمةٍ مميّزة — محتوى تبويبِ «النشاط»
+        WorkUpdate::create(['project_id' => $project->id, 'created_by' => $this->owner->id,
+            'work_date' => now()->toDateString(), 'done' => 'عملٌ', 'hours' => 3,
+            'problems' => 'SENTINEL_BLOCKER_XZ', 'submitted_at' => now()]);
+
+        // يرى المشاريعَ فقط: لا تبويبَ أصولٍ ولا نشاطٍ، ولا يتسرّبُ العائقُ في الـHTML
+        $only = $this->internal('projonly@test.local', ['projects']);
+        $only->refresh();
+        $this->actingAs($only)->get(route('m.show', ['projects', $project->id]))
+            ->assertOk()
+            ->assertDontSee('🖥️ الأصول')
+            ->assertDontSee('📅 النشاط')
+            ->assertDontSee('SENTINEL_BLOCKER_XZ');
+
+        // يملكُ الأصولَ والتحديثاتِ أيضاً: التبويبان يظهران، والنشاطُ مرئيّ
+        $full = $this->internal('projfull@test.local', ['projects', 'assets', 'updates']);
+        $this->actingAs($full)->get(route('m.show', ['projects', $project->id]))
+            ->assertOk()
+            ->assertSee('🖥️ الأصول')
+            ->assertSee('📅 النشاط')
+            ->assertSee('SENTINEL_BLOCKER_XZ');
     }
 }
