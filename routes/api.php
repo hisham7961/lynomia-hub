@@ -13,7 +13,7 @@ Route::prefix('v1')->middleware(['throttle:api', ApiAuth::class])->group(functio
     Route::get('me', [V1Controller::class, 'me']);
     Route::get('modules', [V1Controller::class, 'modules']);
     // مواصفةُ OpenAPI مولَّدةٌ من سجل الوحدات — مقصورةً على ما يراه صاحبُ المفتاح (قبل {module} كي لا تبتلعها)
-    Route::get('openapi.json', [V1Controller::class, 'openapi']);
+    Route::get('openapi.json', [V1Controller::class, 'openapi'])->name('api.openapi');
 
     Route::get('reports/progress/{projectId}', [V1Controller::class, 'progress']);
     Route::get('reports/health', [V1Controller::class, 'health']);

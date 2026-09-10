@@ -79,6 +79,19 @@ class Conversation extends Model
             ->orderBy('created_at')->orderBy('id');
     }
 
+    /**
+     * (تدقيقُ الطور النهائيّ · §56) أحدثُ N رسالةٍ **جذريّة** بترتيبٍ زمنيّ صاعد — حدٌّ للعرض:
+     * قناةٌ/غرفةٌ ضخمةٌ لا تُحمَّل كاملةً في الذاكرة عند كلِّ فتح (نظيرُ حدِّ خيطِ الرسائل المباشرة).
+     * الأقدمُ يُتابَع عبرَ البحثِ والروابطِ الدائمة؛ والجديدُ عبرَ مؤشّرِ `since`. يجلب الأحدثَ
+     * تنازليّاً ثم يعكس (`reorder` يمسح ترتيبَ العلاقة الصاعد أوّلاً).
+     */
+    public function rootMessages(int $limit = 300)
+    {
+        return $this->messages()->whereNull('parent_id')->with('user', 'replies.user')
+            ->reorder()->orderByDesc('created_at')->orderByDesc('id')->limit(max(1, $limit))
+            ->get()->reverse()->values();
+    }
+
     /** أعضاءُ الحاوية المطبَّعون — دورٌ ومصدرٌ وآخرُ قراءة */
     public function members(): HasMany
     {
