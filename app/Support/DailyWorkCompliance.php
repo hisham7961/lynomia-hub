@@ -131,9 +131,70 @@ class DailyWorkCompliance
         return $out;
     }
 
+    /**
+     * الحلُّ المدَيَّ (§99 · N+1=0): موظّفون × مدىً من التواريخ (شهرٌ مثلاً) — ثلاثةُ
+     * استعلاماتٍ فقط (حضور + بنود + إجازات) لا استعلامٌ لكلِّ خليّة. يُعيد مصفوفةً
+     * مفتاحُها `employee.id → 'Y-m-d' → نتيجةُ اليوم`. أساسُ العرض الشهريّ للمحاسب.
+     *
+     * @param  array<int,string>  $dates  قائمةُ تواريخِ 'Y-m-d' مرتّبة
+     */
+    public static function resolveRange(Collection $emps, array $dates): array
+    {
+        if ($emps->isEmpty() || ! $dates) return [];
+        $from = $dates[0]; $to = $dates[count($dates) - 1];
+        $empIds = $emps->pluck('id')->all();
+        $userIds = $emps->pluck('user_id')->filter()->all();
+
+        $attByCell = Attendance::whereNull('deleted_at')->whereIn('emp_id', $empIds)
+            ->whereBetween('date', [$from, $to])->orderBy('id')->get()
+            ->groupBy(fn ($a) => $a->emp_id . '|' . self::dstr($a->date));
+
+        $repByCell = $userIds
+            ? WorkUpdate::whereNull('deleted_at')->whereIn('created_by', $userIds)
+                ->whereBetween('work_date', [$from, $to])->orderBy('submitted_at')->orderBy('id')->get()
+                ->groupBy(fn ($w) => $w->created_by . '|' . self::dstr($w->work_date))
+            : collect();
+
+        // خريطةُ الإجازاتِ المعتمدةِ (أنواعُ الخصم) المتداخلةِ مع المدى — لكلِّ موظّف
+        $leaveRows = collect();
+        if (\Illuminate\Support\Facades\Schema::hasTable('leave_requests')) {
+            $leaveRows = \App\Models\LeaveRequest::whereNull('deleted_at')->whereIn('emp_id', $empIds)
+                ->where('status', 'معتمد')->whereIn('type', config('hub.leave.deduct_types', []))
+                ->whereDate('date_from', '<=', $to)
+                ->where(fn ($q) => $q->whereDate('date_to', '>=', $from)->orWhereNull('date_to'))
+                ->get(['emp_id', 'date_from', 'date_to'])->groupBy('emp_id');
+        }
+        $onLeave = function ($empId, string $date) use ($leaveRows): bool {
+            foreach ($leaveRows->get($empId) ?? [] as $r) {
+                $f = self::dstr($r->date_from); $t = $r->date_to ? self::dstr($r->date_to) : null;
+                if ($f <= $date && ($t === null || $t >= $date)) return true;
+            }
+            return false;
+        };
+
+        $out = [];
+        foreach ($emps as $emp) {
+            foreach ($dates as $date) {
+                $out[$emp->id][$date] = self::compose(
+                    $emp, $date,
+                    collect($attByCell->get($emp->id . '|' . $date) ?? []),
+                    collect($emp->user_id ? ($repByCell->get($emp->user_id . '|' . $date) ?? []) : []),
+                    $onLeave($emp->id, $date)
+                );
+            }
+        }
+        return $out;
+    }
+
+    /** تاريخٌ نصّيّ 'Y-m-d' من قيمةٍ مقيَّدةٍ أو نص */
+    protected static function dstr($d): string
+    {
+        return (string) ($d instanceof \DateTimeInterface ? $d->format('Y-m-d') : substr((string) $d, 0, 10));
+    }
+
     /* ═══════════ التركيب — آلةُ الحالاتِ الواحدة ═══════════ */
 
-    protected static function compose(Employee $emp, string $date, Collection $atts, Collection $reports): array
+    protected static function compose(Employee $emp, string $date, Collection $atts, Collection $reports, ?bool $onLeaveOverride = null): array
     {
         $primary = $atts->last(fn ($a) => (bool) $a->time_in) ?: $atts->first();
         $checkedIn = $atts->contains(fn ($a) => (bool) $a->time_in);
@@ -144,7 +205,8 @@ class DailyWorkCompliance
 
         // الحضورُ الفيزيائيّ لا يُطمَس — والقديمُ «بلا تقرير» يُقرأ حضوراً
         $physical = self::physicalStatus($primary);
-        $onLeave = Workday::onLeave((string) $emp->id, $date);
+        // الإجازةُ: تُمرَّر محسوبةً مسبقاً في الحلِّ المدَيَّ (§99 · بلا استعلامٍ لكلِّ يوم)
+        $onLeave = $onLeaveOverride ?? Workday::onLeave((string) $emp->id, $date);
 
         // التقريرُ الصالح (§13) — بندٌ واحدٌ صالحٌ على الأقل
         $valid = $reports->filter(fn ($r) => self::isValidReportRow($r))->values();

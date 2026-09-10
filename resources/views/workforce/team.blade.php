@@ -8,6 +8,7 @@
             غيابُ التقرير حالةُ مراجعةٍ لا غياب.</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn ghost sm" href="{{ route('reports.monthly', ['month' => now()->format('Y-m')]) }}">🗓️ الحضور الشهري</a>
         <a class="btn ghost sm" href="{{ route('m.index', 'attend') }}">📋 سجل الحضور</a>
         <a class="btn ghost sm" href="{{ route('m.index', 'updates') }}">📝 تحديثات العمل</a>
         <a class="btn ghost sm" href="{{ route('m.index', 'leaves') }}">🏝️ الإجازات</a>

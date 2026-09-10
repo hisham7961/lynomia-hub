@@ -252,6 +252,10 @@ Route::middleware('auth')->group(function () {
     Route::get('reports/daily/day', [\App\Http\Controllers\Web\ReportsController::class, 'day'])->name('reports.day');
     Route::get('reports/review', [\App\Http\Controllers\Web\ReportsController::class, 'review'])->name('reports.review');
     Route::get('my/report', [\App\Http\Controllers\Web\ReportsController::class, 'mine'])->name('reports.mine');
+    // الحضورُ الشهريّ (سجلٌّ لكلِّ موظّف + تصديرٌ للمحاسب) — يكفيه attend:v أو hr:v
+    Route::get('reports/monthly', [\App\Http\Controllers\Web\ReportsController::class, 'monthly'])->name('reports.monthly');
+    Route::get('reports/monthly/employee', [\App\Http\Controllers\Web\ReportsController::class, 'monthlyEmployee'])->name('reports.monthly.employee');
+    Route::get('reports/monthly/export', [\App\Http\Controllers\Web\ReportsController::class, 'monthlyExport'])->name('reports.monthly.export');
     Route::middleware('throttle:60,1')->group(function () {
         Route::post('reports/review/{id}', [\App\Http\Controllers\Web\ReportsController::class, 'reviewAct'])->name('reports.review.act');
         Route::post('reports/compliance/{id}/finalize', [\App\Http\Controllers\Web\ReportsController::class, 'finalize'])->name('reports.finalize');

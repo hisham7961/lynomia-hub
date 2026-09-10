@@ -378,6 +378,9 @@ if (! function_exists('hub_top_links')) {
             // للفريق الداخليِّ حصراً (العميلُ يستعمل البوّابةَ لا هذا الشريط) — دفاعٌ في العمق.
             ['key' => 'collab',    'label' => '💬 مركز التواصل',     'route' => 'collab.center',   'group' => 'daily',     'ok' => ! hub_is_client($user)],
             ['key' => 'me',        'label' => '👤 بوابتي',           'route' => 'portal.me',       'group' => 'daily',     'ok' => true],
+            // تقريرُ العملِ اليوميّ للموظّف — وجهةٌ يوميّةٌ ظاهرةٌ (لا مدفونةٌ في مساحة).
+            // للفريق الداخليِّ حصراً؛ من لا ملفَ موظفٍ له يُردُّ بلطفٍ من المتحكّم لا يُخفى الرابط.
+            ['key' => 'myreport',  'label' => '📝 تقرير اليوم',       'route' => 'reports.mine',    'group' => 'daily',     'ok' => ! hub_is_client($user)],
             ['key' => 'alerts',    'label' => '🔔 ينتهي قريباً',     'route' => 'alerts',          'group' => 'daily',     'ok' => true],
             ['key' => 'calendar',  'label' => '📅 التقويم',          'route' => 'calendar',        'group' => 'daily',     'ok' => true],
             ['key' => 'feed',      'label' => '📣 قناة الفريق',      'route' => 'feed',            'group' => 'daily',     'ok' => true],
@@ -399,6 +402,12 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'custody',   'label' => '🏷️ كتالوج العهد',      'route' => 'custody.catalog', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
             ['key' => 'identity',  'label' => '📷 مركز الهوية والمسح', 'route' => 'identity.center', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
             ['key' => 'workteam',  'label' => '🕗 فريقي اليوم',        'route' => 'workforce.team',  'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
+            // مركزُ التقارير اليوميّة ومركزُ المراجعة — مراكزُ ظاهرةٌ كـ«فريقي اليوم» تماماً،
+            // لا مدفونةً في صفحةِ مساحة. الحرسُ نفسُه في المتحكّم (guardTeam/canReviewAny).
+            ['key' => 'reportsc',  'label' => '📊 مركز التقارير اليومية', 'route' => 'reports.index',  'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
+            ['key' => 'reportsr',  'label' => '📥 تقارير للمراجعة',    'route' => 'reports.review',  'group' => 'centers',   'ok' => \App\Support\ReportReview::canReviewAny($user)],
+            // الحضورُ الشهريّ للمحاسبة والاعتماد — يكفيه `attend:v` (يمنحه المالكُ للمحاسب) أو `hr:v`
+            ['key' => 'attmonth',  'label' => '🗓️ الحضور الشهري',     'route' => 'reports.monthly', 'group' => 'centers',   'ok' => hub_can($user, 'attend', 'v') || hub_can($user, 'hr', 'v')],
             ['key' => 'codehub',   'label' => '🌿 مركز الكود',        'route' => 'code.center',     'group' => 'centers',   'ok' => hub_can($user, 'code', 'v')],
             ['key' => 'assetlife', 'label' => '💼 العهدة ودورة الحياة', 'route' => 'assets.life',  'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
             ['key' => 'compb',     'label' => '⚖️ الامتثال وأثره',   'route' => 'compliance.board', 'group' => 'centers', 'ok' => hub_can($user, 'compliance', 'v')],

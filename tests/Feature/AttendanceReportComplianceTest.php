@@ -463,4 +463,37 @@ class AttendanceReportComplianceTest extends TestCase
         $this->withHeaders(['Authorization' => 'Bearer ' . $token])
             ->getJson('/api/v1/reports/daily')->assertNotFound();
     }
+
+    /* ═══════════ §121 — الاكتشافيّة: المراكزُ روابطُ ظاهرةٌ في الشريط، لا مدفونة ═══════════ */
+
+    public function test_reports_surfaces_are_discoverable_in_the_sidebar(): void
+    {
+        $this->seedCore();
+
+        // الرئيسيّة تُرسَم بلا خطأ (حارسٌ ضدّ انهيارِ الشريط بـTypeError من الكتالوج الصوريّ)
+        $ownerHtml = $this->actingAs($this->owner)->get('/')->assertOk()->getContent();
+        // المدير/المالك يرى المراكزَ الثلاثةَ روابطَ مباشرةً في «الأدوات واللوحات»
+        $this->assertStringContainsString('تقرير اليوم', $ownerHtml);
+        $this->assertStringContainsString('مركز التقارير اليومية', $ownerHtml);
+        $this->assertStringContainsString('تقارير للمراجعة', $ownerHtml);
+        // روابطُ حقيقيّةٌ لا نصٌّ فقط
+        $this->assertStringContainsString('href="' . route('reports.index') . '"', $ownerHtml);
+        $this->assertStringContainsString('href="' . route('reports.mine') . '"', $ownerHtml);
+
+        // موظّفٌ منفِّذٌ بلا hr:v: يرى «تقرير اليوم» ولا يرى «مركز التقارير اليومية» (§80)
+        [$u, $e] = $this->linkedEmployee();
+        $empHtml = $this->actingAs($u)->get('/')->assertOk()->getContent();
+        $this->assertStringContainsString('تقرير اليوم', $empHtml);
+        $this->assertStringNotContainsString('مركز التقارير اليومية', $empHtml,
+            'مركزُ HR لا يظهر لموظّفٍ بلا صلاحيّة (لا تسريبَ ولا زحمة)');
+
+        // حسابُ العميل: لا «تقرير اليوم» ولا مراكزُ تقاريرَ في شريطه
+        $role = Role::create(['name' => 'عميلُ شريط', 'scope' => 'all', 'flags' => [],
+            'matrix' => ['updates' => ['v' => 1]]]);
+        $client = User::create(['name' => 'عميل', 'email' => 'clbar@test.local', 'password' => 'Secret!2026x',
+            'role_id' => $role->id, 'status' => 'نشط', 'account_type' => 'client', 'password_changed_at' => now()]);
+        $tl = collect(hub_top_links($client))->pluck('key')->all();
+        $this->assertEmpty(array_intersect(['myreport', 'reportsc', 'reportsr'], $tl),
+            'لا مراكزَ تقاريرَ داخليّةً في شريطِ العميل (§79)');
+    }
 }
