@@ -125,6 +125,12 @@ return [
         'workos.relationship_explorer' => ['domain' => 'work_os', 'category' => 'graph', 'title_ar' => 'مستكشف العلاقات', 'title_en' => 'Relationship Explorer', 'status' => 'ENABLED', 'web_routes' => ['graph.explore']],
         'workos.tech_workspace' => ['domain' => 'work_os', 'category' => 'graph', 'title_ar' => 'مساحة العمل التقنيّة', 'title_en' => 'Technical Workspace', 'status' => 'ENABLED'],
         'workos.project_360' => ['domain' => 'work_os', 'category' => 'delivery', 'title_ar' => 'مشروع 360', 'title_en' => 'Project 360', 'status' => 'ENABLED'],
+        // (الكيان 360 · §19-27) مركزُ قيادةِ المحطة: تجميعٌ سياقيٌّ (شاغل/أصول/نقاط/جرد/مشروع) —
+        // سياقيٌّ يُكتشَف من تفصيل المحطة (m.show)، لا وجهةَ GET مستقلّة (نمطُ employee_360/project_360).
+        'workos.station_360' => ['domain' => 'work_os', 'category' => 'stations', 'title_ar' => 'محطّة 360', 'title_en' => 'Station 360', 'status' => 'ENABLED',
+            'desc_ar' => 'مركزُ قيادةِ المحطة: يُجمّع الشاغلَ وتاريخَه والأصولَ وتاريخَها والنقاطَ والجردَ وسياقَ المشروع — تجميعٌ لا محرّكٌ ثانٍ.',
+            'desc_en' => 'Station command center aggregating occupant, assets, endpoints, inventory and project context — composition, not a new engine.',
+            'introduced' => 'v2.473.0', 'docs' => 'docs/entity360/03-station360.md'],
         'workos.global_search' => ['domain' => 'work_os', 'category' => 'search', 'title_ar' => 'بحث نظام العمل الشامل', 'title_en' => 'Work OS Global Search', 'status' => 'ENABLED', 'web_routes' => ['search', 'search.mini']],
 
         /* ───────── 7D · الأصول / الجرد (Work OS · الطور F) ───────── */
@@ -137,6 +143,12 @@ return [
         'assets.reconciliation' => ['domain' => 'assets', 'category' => 'inventory', 'title_ar' => 'مطابقة الجرد', 'title_en' => 'Reconciliation', 'status' => 'ENABLED'],
         'assets.endpoint_eligibility' => ['domain' => 'assets', 'category' => 'inventory', 'title_ar' => 'أهليّة النقطة الطرفيّة', 'title_en' => 'Endpoint Eligibility', 'status' => 'ENABLED'],
         'assets.relationship' => ['domain' => 'assets', 'category' => 'graph', 'title_ar' => 'استكشاف علاقات الأصول', 'title_en' => 'Asset Relationship Exploration', 'status' => 'ENABLED'],
+        // (الكيان 360 · §28-39) مركزُ قيادةِ الأصل: تجميعٌ سياقيٌّ يفصل الحائز≠المحطة≠المشروع —
+        // سياقيٌّ يُكتشَف من تفصيل الأصل (m.show)، لا وجهةَ GET مستقلّة.
+        'assets.asset_360' => ['domain' => 'assets', 'category' => 'inventory', 'title_ar' => 'أصل 360', 'title_en' => 'Asset 360', 'status' => 'ENABLED',
+            'desc_ar' => 'مركزُ قيادةِ الأصل: عهدةٌ وتاريخُها، ومحطةٌ وتاريخُها، ومشاريعُ، ونقطةٌ طرفية، وجردٌ، ودورةُ حياة — بفصلٍ صريحٍ بين المفاهيم.',
+            'desc_en' => 'Asset command center: custody, station, projects, endpoint, inventory and lifecycle — with holder/station/project kept distinct.',
+            'introduced' => 'v2.473.0', 'docs' => 'docs/entity360/04-asset360.md'],
         // سياقيّةٌ (تُكتشَف من المشروع 360 وتفصيلِ الأصل، لا وجهةَ GET مستقلّةً — كنظائرِها
         // assets.employee_assignment/station_assignment). مساراتُ التغييرِ لها «أبوابٌ» في العرض.
         'assets.project_assignment' => ['domain' => 'assets', 'category' => 'inventory', 'title_ar' => 'تخصيص الأصل للمشروع', 'title_en' => 'Asset → Project Assignment', 'status' => 'ENABLED',

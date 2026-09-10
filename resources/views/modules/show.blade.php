@@ -92,7 +92,10 @@
              في تبويبات — فيُدار جسدُها كلُّه هناك، لا مكرَّراً أسفلَ القشرة. --}}
         @includeIf('modules.custom.' . $module)
 
-        @unless ($module === 'projects')
+        {{-- (الكيان 360) قشرةُ تبويباتٍ تملك جسدَها كلَّه: المشروعُ والمحطةُ والأصلُ 360
+             تُدير البياناتِ والملفَّ والنقاطَ والأبناءَ والخطَّ والنقاشَ في تبويباتها،
+             فلا تُكرَّر أسفلَ القشرة (نمطُ المشروع 360 · §40). --}}
+        @unless (in_array($module, ['projects', 'stations', 'assets'], true))
         <div class="card" style="--mh:{{ $look['color'] }}">
             <h3 class="cardtitle">📋 البيانات</h3>
             <dl class="detail">

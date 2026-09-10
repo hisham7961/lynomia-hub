@@ -37,13 +37,41 @@ class RelationshipProjection
     protected const TTL = 60;
 
     /**
+     * (الكيان 360 · §48) دلالةُ الحافّة: «module.col» ⟶ نوعٌ دلاليٌّ مقروء.
+     * غيرُ المُخرَّط يعود بـ`via` نفسِه — تسميةُ العرض تبقى `label` العربيّة.
+     */
+    protected const REL = [
+        'assets.holder_id'              => 'holds',
+        'assets.station_id'             => 'located_at',
+        'assets.project_id'             => 'asset_project_col',
+        'stations.current_employee_id'  => 'occupies',
+        'stations.project_id'           => 'station_project',
+        'endpoint_devices.asset_id'     => 'enrolled_as',
+        'endpoint_devices.employee_id'  => 'endpoint_user',
+        'endpoint_devices.station_id'   => 'endpoint_station',
+        'phone_numbers.employee_id'     => 'assigned_sim',
+        'phone_numbers.device_id'       => 'sim_device',
+        'phone_numbers.owner_id'        => 'sim_owner',
+        'servers.hr_id'                 => 'operates',
+    ];
+
+    /** النوعُ الدلاليّ لحافّةٍ عموديّة — معروفٌ من الخريطة أو `via` نفسُه */
+    protected static function relOf(string $via): string
+    {
+        return self::REL[$via] ?? $via;
+    }
+
+    /**
      * الإسقاطُ من جذرٍ واحد حتى `$hops` قفزات.
      * يعيد null حين لا يقرأ القارئُ الجذرَ نفسَه (وحدةً أو نطاقاً) — فالمستدعي
      * يردّ ٤٠٤ ولا يُثبت وجوداً.
      *
-     * @return array{root:string,hops:int,max_nodes:int,max_hops:int,capped:bool,nodes:array,edges:array}|null
+     * `$history`: (§54/§100) يُدرِج الحوافَّ الزمنيّةَ المُنهاةَ موسومةً `active=false`
+     * (تخصيصاتُ الأصل↔المشروع المنتهية) — الافتراضُ النشطُ فقط، بلا خلطٍ صامت.
+     *
+     * @return array{root:string,hops:int,max_nodes:int,max_hops:int,capped:bool,history:bool,nodes:array,edges:array}|null
      */
-    public static function expand(string $module, string $id, ?int $hops = null, bool $fresh = false): ?array
+    public static function expand(string $module, string $id, ?int $hops = null, bool $fresh = false, bool $history = false): ?array
     {
         if (! hub_mod($module) || $id === '') return null;
 
@@ -58,15 +86,15 @@ class RelationshipProjection
         if (! $root) return null;
 
         // المفتاحُ ببصمة القارئ الكاملة (hub_scope_key) + معاملات الإسقاط —
-        // فتغيّرُ سقفٍ أو عمقٍ مفتاحٌ آخر، وقارئان لا يتقاسمان نسخة
-        $key = hub_scope_key("graph:{$module}:{$id}:h{$hops}:n{$maxNodes}");
+        // فتغيّرُ سقفٍ أو عمقٍ أو وضعِ التاريخ مفتاحٌ آخر، وقارئان لا يتقاسمان نسخة
+        $key = hub_scope_key("graph:{$module}:{$id}:h{$hops}:n{$maxNodes}:hist" . ($history ? 1 : 0));
 
         return hub_cached($key, self::TTL, $fresh,
-            fn () => self::build($module, $root, $hops, $maxHops, $maxNodes));
+            fn () => self::build($module, $root, $hops, $maxHops, $maxNodes, $history));
     }
 
     /** البناءُ الفعليّ — توسّعٌ تدريجيٌّ بالعرض أولاً (BFS) بترتيبٍ حتميّ */
-    protected static function build(string $module, object $root, int $hops, int $maxHops, int $maxNodes): array
+    protected static function build(string $module, object $root, int $hops, int $maxHops, int $maxNodes, bool $history = false): array
     {
         $nodes = [];   // key => عقدة (ترتيبُ الاكتشاف = ترتيبُ العرض)
         $edges = [];   // "from|to|via" => حافّة (مفتاحُ الإزالة المكرَّرة حتميّ)
@@ -124,7 +152,8 @@ class RelationshipProjection
                         if ($k2 === null) continue;             // السقفُ امتلأ — الراية مرفوعة
                         $ek = "{$mkey}|{$k2}|{$m}.{$f['col']}";
                         $edges[$ek] ??= ['from' => $mkey, 'to' => $k2,
-                            'via' => $m . '.' . $f['col'], 'label' => (string) ($f['label'] ?? $f['col'])];
+                            'via' => $m . '.' . $f['col'], 'label' => (string) ($f['label'] ?? $f['col']),
+                            'kind' => 'direct', 'rel' => self::relOf($m . '.' . $f['col'])];
                         if ($hop + 1 < $hops) $queue[] = [$f['ref'], $prow, $hop + 1];
                     }
                 }
@@ -160,7 +189,8 @@ class RelationshipProjection
                     if ($k2 === null) break;                    // السقفُ امتلأ — الراية مرفوعة
                     $ek = "{$k2}|{$mkey}|{$ck}.{$cf['col']}";
                     $edges[$ek] ??= ['from' => $k2, 'to' => $mkey,
-                        'via' => $ck . '.' . $cf['col'], 'label' => (string) ($cf['label'] ?? $cf['col'])];
+                        'via' => $ck . '.' . $cf['col'], 'label' => (string) ($cf['label'] ?? $cf['col']),
+                        'kind' => 'direct', 'rel' => self::relOf($ck . '.' . $cf['col'])];
                     if ($hop + 1 < $hops) $queue[] = [$ck, $crow, $hop + 1];
                 }
 
@@ -181,18 +211,53 @@ class RelationshipProjection
                 $other   = $isAsset ? 'projects' : 'assets';
                 $col     = $isAsset ? 'asset_id' : 'project_id';
                 $ocol    = $isAsset ? 'project_id' : 'asset_id';
-                $otherIds = \App\Models\AssetProjectAssignment::active()->where($col, $row->id)
-                    ->orderByDesc('assigned_at')->orderByDesc('id')
-                    ->limit($maxNodes)->pluck($ocol)->unique()->all();
-                if ($otherIds && ($oq = hub_read($other))) {
-                    foreach ($oq->whereIn('id', $otherIds)->get() as $orow) {
+                // النشطُ فقط افتراضاً؛ ووضعُ التاريخ يُدرج المُنهاةَ أيضاً موسومةً.
+                // ترتيبُ «النشطُ أولاً» يجعل `??=` يُبقي الحافّةَ النشطةَ للزوج المكرَّر.
+                $apq = \App\Models\AssetProjectAssignment::where($col, $row->id);
+                if (! $history) $apq->whereNull('ended_at');
+                $aps = $apq->orderByRaw('ended_at is null desc')
+                    ->orderByDesc('assigned_at')->orderByDesc('id')->limit($maxNodes)->get();
+                if ($aps->isNotEmpty() && ($oq = hub_read($other))) {
+                    $orows = $oq->whereIn('id', $aps->pluck($ocol)->unique()->all())->get()->keyBy('id');
+                    foreach ($aps as $ap) {
+                        $orow = $orows[$ap->{$ocol}] ?? null;
+                        if (! $orow) continue;                  // الطرفُ الآخرُ غيرُ مقروء — لا حافّة
                         $k2 = $push($other, $orow, $hop + 1);
                         if ($k2 === null) { $capped = true; break; }
                         [$from, $to] = $isAsset ? [$mkey, $k2] : [$k2, $mkey];
                         $ek = "{$from}|{$to}|asset_project";
                         $edges[$ek] ??= ['from' => $from, 'to' => $to,
-                            'via' => 'asset_project', 'label' => 'مخصّص للمشروع'];
-                        if ($hop + 1 < $hops) $queue[] = [$other, $orow, $hop + 1];
+                            'via' => 'asset_project', 'label' => 'مخصّص للمشروع',
+                            'kind' => 'direct', 'rel' => 'allocated_to',
+                            'active' => $ap->ended_at === null,
+                            'since'  => optional($ap->assigned_at)->toDateString(),
+                            'ended'  => optional($ap->ended_at)->toDateString()];
+                        // المُنهاةُ ورقةٌ لا تُوسَّع (لا خلطَ طوبولوجيا التاريخ بالحاضر)
+                        if ($ap->ended_at === null && $hop + 1 < $hops) $queue[] = [$other, $orow, $hop + 1];
+                    }
+                }
+            }
+
+            // ── (الكيان 360 · §27/§47) حافّةٌ **مشتقّة**: المحطة→المشروع عبر أصلٍ مخصَّصٍ بها ──
+            // ليست إسناداً مباشراً: أصلٌ عند المحطة (`assets.station_id`) مخصَّصٌ لمشروعٍ نشط.
+            // الوسيطُ (الأصل) والمشروعُ كلاهما عبر `hub_read` — لا تسريبَ عبر وسيط. موسومةٌ
+            // `kind=derived` بوضوح فلا تُخلَط بإسنادٍ مباشر، وورقةٌ لا تُوسَّع (لا انفجارَ طوبولوجيا).
+            if ($hop < $hops && $m === 'stations'
+                && hub_has_col('assets', 'station_id') && hub_has_col('asset_project_assignments', 'asset_id')) {
+                $aq = hub_read('assets');
+                $assetIds = $aq ? $aq->where('station_id', $row->id)->limit($maxNodes)->pluck('id')->all() : [];
+                if ($assetIds) {
+                    $projIds = \App\Models\AssetProjectAssignment::active()
+                        ->whereIn('asset_id', $assetIds)->limit($maxNodes)->pluck('project_id')->unique()->all();
+                    if ($projIds && ($pq = hub_read('projects'))) {
+                        foreach ($pq->whereIn('id', $projIds)->get() as $prow) {
+                            $k2 = $push('projects', $prow, $hop + 1);
+                            if ($k2 === null) { $capped = true; break; }
+                            $ek = "{$mkey}|{$k2}|station_project_derived";
+                            $edges[$ek] ??= ['from' => $mkey, 'to' => $k2,
+                                'via' => 'station_project_derived', 'label' => 'مشروعٌ عبر أصلٍ بالمحطة',
+                                'kind' => 'derived', 'rel' => 'project_via_asset'];
+                        }
                     }
                 }
             }
@@ -204,6 +269,7 @@ class RelationshipProjection
             'max_hops'  => $maxHops,
             'max_nodes' => $maxNodes,
             'capped'    => $capped,
+            'history'   => $history,
             'nodes'     => array_values($nodes),
             'edges'     => array_values($edges),
         ];
