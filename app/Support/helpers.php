@@ -360,6 +360,31 @@ if (! function_exists('hub_pref')) {
     }
 }
 
+if (! function_exists('hub_has_work_profile')) {
+    /**
+     * هل للحساب ملفُّ موظّفٍ نشطٌ مربوطٌ به؟ — شرطُ «تقرير اليوم» الذاتيّ (§66).
+     *
+     * حساباتُ الإدارة/المالك لا ملفَّ موظّفٍ لها غالباً، فرابطُ «تقرير اليوم» الذاتيّ
+     * لا يخصُّها — يُخفى عنها بدل أن يُعطيها ٤٠٣ عند الضغط. والحارسُ الرمزيّ (stdClass)
+     * الذي يمرّره IA لتعدادِ المراكز ليس مستخدماً حقيقياً ⇒ يُعدُّ «له ملف» كي يبقى
+     * المركزُ قابلاً للتعداد في خريطة المعلومات لا محجوباً عنها.
+     */
+    function hub_has_work_profile($user): bool
+    {
+        if (! ($user instanceof \App\Models\User)) return true;
+
+        // مذكّرةٌ لكلِّ كائنِ مستخدمٍ في الطلب الواحد: `hub_top_links` يُستدعى عشراتِ
+        // المرّات لكلِّ مركزٍ يُفحَص (IA::catalogVisible)، فبلا مذكّرةٍ يتضاعف الاستعلامُ
+        // على الشاشة الواحدة (ميزانيّاتُ الاستعلام §99). WeakMap: نفسُ الكائن ⇐ استعلامٌ
+        // واحد، وكائناتُ الاختبارِ المختلفةُ لا تتلوّث (المفتاحُ هويّةُ الكائنِ لا معرّفُه).
+        static $memo = null;
+        $memo ??= new \WeakMap;
+        if (isset($memo[$user])) return $memo[$user];
+
+        return $memo[$user] = (\App\Support\Workday::emp($user) !== null);
+    }
+}
+
 if (! function_exists('hub_top_links')) {
     /**
      * كتالوج روابط القائمة العلوية بصلاحيات المستخدم — مصدر واحد للشريط الجانبي
@@ -379,8 +404,9 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'collab',    'label' => '💬 مركز التواصل',     'route' => 'collab.center',   'group' => 'daily',     'ok' => ! hub_is_client($user)],
             ['key' => 'me',        'label' => '👤 بوابتي',           'route' => 'portal.me',       'group' => 'daily',     'ok' => true],
             // تقريرُ العملِ اليوميّ للموظّف — وجهةٌ يوميّةٌ ظاهرةٌ (لا مدفونةٌ في مساحة).
-            // للفريق الداخليِّ حصراً؛ من لا ملفَ موظفٍ له يُردُّ بلطفٍ من المتحكّم لا يُخفى الرابط.
-            ['key' => 'myreport',  'label' => '📝 تقرير اليوم',       'route' => 'reports.mine',    'group' => 'daily',     'ok' => ! hub_is_client($user)],
+            // للفريق الداخليِّ الذي له ملفُّ موظّفٍ نشط حصراً: حسابُ الإدارة/المالك بلا ملفٍ
+            // لا يخصُّه هذا الرابطُ الذاتيّ، فيُخفى عنه بدل ٤٠٣ عند الضغط (والمتحكّم يوجّهه بلطف).
+            ['key' => 'myreport',  'label' => '📝 تقرير اليوم',       'route' => 'reports.mine',    'group' => 'daily',     'ok' => ! hub_is_client($user) && hub_has_work_profile($user)],
             ['key' => 'alerts',    'label' => '🔔 ينتهي قريباً',     'route' => 'alerts',          'group' => 'daily',     'ok' => true],
             ['key' => 'calendar',  'label' => '📅 التقويم',          'route' => 'calendar',        'group' => 'daily',     'ok' => true],
             ['key' => 'feed',      'label' => '📣 قناة الفريق',      'route' => 'feed',            'group' => 'daily',     'ok' => true],
