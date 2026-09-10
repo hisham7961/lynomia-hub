@@ -52,11 +52,18 @@ class ReportReview
         return false;
     }
 
-    /** أيقدر المستخدمُ رؤيةَ مركزِ المراجعة أصلاً؟ (بوّابةُ السطح) */
-    public static function canReviewAny(?User $actor): bool
+    /**
+     * أيقدر المستخدمُ رؤيةَ مركزِ المراجعة أصلاً؟ (بوّابةُ السطح).
+     *
+     * وسيطٌ رخوٌ لا `?User` صارم: `hub_top_links` يُستدعى أيضاً بـ«مالكٍ صوريّ»
+     * (stdClass) لاشتقاق كتالوج المراكز في IA — كسائرِ حرّاس الكتالوج التي تقبل
+     * الكائنَ الرخو (`hub_can`/`hub_flag`/`hub_is_client`). فرضُ `User` كان يُسقِط
+     * رسمَ الشريط كلَّه بـTypeError.
+     */
+    public static function canReviewAny($actor): bool
     {
         if (! $actor || hub_is_client($actor)) return false;
-        return (bool) ($actor->role?->is_owner || hub_can($actor, 'hr', 'v') || hub_can($actor, 'updates', 'e'));
+        return (bool) (($actor->role->is_owner ?? false) || hub_can($actor, 'hr', 'v') || hub_can($actor, 'updates', 'e'));
     }
 
     /* ═══════════ §30 قفلُ التحرير بعد القبول ═══════════ */

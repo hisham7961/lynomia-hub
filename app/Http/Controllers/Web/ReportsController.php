@@ -39,6 +39,25 @@ class ReportsController extends Controller
         abort_unless(hub_can(auth()->user(), 'hr', 'v'), 403);
     }
 
+    /**
+     * بوّابةُ الحضورِ الشهريّ (المحاسب §34): حضورٌ وانصرافٌ وأثرٌ محتسَبٌ للراتب — يكفيها
+     * `attend:v` (يمنحها المالكُ للمحاسب) أو `hr:v`. لا محتوى تقاريرَ هنا (فصلُ النطاق).
+     */
+    protected function guardMonthly(): void
+    {
+        $this->guardInternal();
+        abort_unless(hub_can(auth()->user(), 'attend', 'v') || hub_can(auth()->user(), 'hr', 'v'), 403);
+    }
+
+    /** موظّفو النطاق للحضور الشهريّ — عزلُ الشركة (المحاسبُ يرى شركتَه، والمالكُ الكلّ §80) */
+    protected function monthlyEmployees()
+    {
+        $q = Employee::whereNull('deleted_at')->where('status', 'نشط');
+        $cids = hub_company_ids(auth()->user());
+        if ($cids !== null) $q->whereIn('company_id', $cids);
+        return $q;
+    }
+
     /* ═══════════ §17/§18 مركزُ التقارير — نظرةُ اليوم ═══════════ */
 
     public function index(Request $r)
@@ -204,6 +223,71 @@ class ReportsController extends Controller
             ->whereDate('work_date', $date)->orderBy('submitted_at')->orderBy('id')->get();
 
         return view('reports.mine', compact('emp', 'date', 'c', 'entries'));
+    }
+
+    /* ═══════════ الحضورُ الشهريّ — سجلٌّ لكلِّ موظّفٍ + تصديرٌ للمحاسب ═══════════ */
+
+    /** شبكةُ الحضورِ الشهريّة (كلُّ الموظّفين، شهرٌ واحد) — للمحاسب/الموارد البشرية */
+    public function monthly(Request $r)
+    {
+        $this->guardMonthly();
+        $month = \App\Support\MonthlyAttendance::normMonth($r->query('month'));
+        $emps = $this->monthlyEmployees()->orderBy('name')->limit(1000)->get(['id', 'name', 'dept', 'user_id', 'company_id']);
+        $summary = \App\Support\MonthlyAttendance::summary($emps, $month);
+
+        return view('reports.monthly', [
+            'month' => $month, 'rows' => $summary['rows'],
+            'days' => count(\App\Support\MonthlyAttendance::daysOf($month)),
+            'canExport' => true,
+        ]);
+    }
+
+    /** سجلُّ موظّفٍ واحدٍ يوماً بيوم في الشهر */
+    public function monthlyEmployee(Request $r)
+    {
+        $this->guardMonthly();
+        $emp = Employee::whereNull('deleted_at')->whereKey($r->query('emp'))->firstOrFail();
+        abort_unless($this->monthlyEmployees()->whereKey($emp->id)->exists(), 404);
+        $month = \App\Support\MonthlyAttendance::normMonth($r->query('month'));
+
+        return view('reports.monthly-employee', \App\Support\MonthlyAttendance::sheet($emp, $month));
+    }
+
+    /** تصديرُ الحضور والانصراف الشهريّ CSV — للمحاسب (BOM + تحييدُ حقنِ الصيغ §82) */
+    public function monthlyExport(Request $r)
+    {
+        $this->guardMonthly();
+        $month = \App\Support\MonthlyAttendance::normMonth($r->query('month'));
+        $dates = \App\Support\MonthlyAttendance::daysOf($month);
+        $empQ = $this->monthlyEmployees();
+        if ($eid = $r->query('emp')) $empQ->whereKey($eid);   // تصديرُ موظّفٍ واحدٍ اختياريّ
+        $emps = $empQ->orderBy('name')->limit(1000)->get(['id', 'name', 'dept', 'user_id', 'company_id']);
+        $range = \App\Support\DailyWorkCompliance::resolveRange($emps, $dates);
+
+        $headers = ['الموظف', 'القسم', 'اليوم', 'الحضور', 'الانصراف', 'الساعات', 'الحالة الفعلية', 'التقرير', 'الحالة المحتسَبة'];
+        $file = 'attendance-' . $month . '.csv';
+
+        return response()->streamDownload(function () use ($emps, $dates, $range, $headers) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            $safe = fn ($v) => (is_string($v) && $v !== '' && strpbrk($v[0], "=+-@\t\r") !== false) ? "'" . $v : $v;
+            fputcsv($out, $headers, ',', '"', '');
+            foreach ($emps as $emp) {
+                foreach ($dates as $d) {
+                    $c = $range[$emp->id][$d] ?? null;
+                    if (! $c || (! $c['checked_in'] && ! $c['on_leave'] && ! $c['attendance'])) continue; // تخطّي العطلِ غيرِ المسجَّلة
+                    fputcsv($out, array_map($safe, [
+                        $emp->name, $emp->dept ?: '', $d,
+                        $c['time_in'] ?: '', $c['time_out'] ?: '',
+                        $c['hours'] ? number_format((float) $c['hours'], 2) : '',
+                        $c['on_leave'] ? 'إجازة' : ($c['checked_in'] ? ($c['labels']['physical'] ?? 'حاضر') : 'غائب'),
+                        $c['on_leave'] ? '—' : $c['labels']['compliance'],
+                        $c['labels']['effective'],
+                    ]), ',', '"', '');
+                }
+            }
+            fclose($out);
+        }, $file, ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     /* ────────── مساعدات ────────── */

@@ -174,18 +174,19 @@ return [
                 'exec' => ['label' => 'المهام والتنفيذ', 'order' => 1, 'destinations' => [
                     ['type' => 'module', 'module' => 'tasks', 'importance' => 'primary'],
                     ['type' => 'module', 'module' => 'updates', 'importance' => 'primary'],
-                    // تقاريرُ العملِ اليوميّة (§121): تقريري اليوم للموظّف، ومركزُ التقارير
-                    // والمراجعةُ للمدير/HR — فوق تحديثات العمل، لا محرّكَ تقاريرَ ثانٍ.
-                    ['type' => 'center', 'route' => 'reports.mine', 'guard' => 'reports_mine', 'importance' => 'primary',
-                        'key' => 'reports_mine', 'label' => 'تقرير اليوم',
+                    // تقاريرُ العملِ اليوميّة (§121): مراكزُ كتالوجٍ من `hub_top_links` (مصدرُ
+                    // الحقيقة الواحد للمراكز · P4)، فتظهر روابطَ مباشرةً في «الأدوات واللوحات»
+                    // كـ«فريقي اليوم» تماماً — لا مدفونةً في صفحةِ مساحة. IA يرتّب لا يَحرُس.
+                    ['type' => 'center', 'center' => 'myreport', 'importance' => 'primary',
                         'synonyms' => ['my report', 'تقريري', 'تقرير اليوم', 'daily report', 'today report']],
-                    ['type' => 'center', 'route' => 'reports.index', 'guard' => 'reports_center', 'importance' => 'primary',
-                        'key' => 'reports_center', 'label' => 'مركز التقارير اليومية',
+                    ['type' => 'center', 'center' => 'reportsc', 'importance' => 'primary',
                         'route_prefix' => 'reports', 'routes' => ['reports.index', 'reports.day'],
-                        'synonyms' => ['reports', 'التقارير', 'تقارير العمل', 'daily reports', 'compliance']],
-                    ['type' => 'center', 'route' => 'reports.review', 'guard' => 'reports_review', 'importance' => 'secondary',
-                        'key' => 'reports_review', 'label' => 'تقارير للمراجعة',
+                        'synonyms' => ['reports', 'التقارير', 'تقارير العمل', 'daily reports', 'compliance', 'الامتثال']],
+                    ['type' => 'center', 'center' => 'reportsr', 'importance' => 'secondary',
                         'synonyms' => ['review', 'المراجعة', 'reports review', 'مراجعة التقارير']],
+                    ['type' => 'center', 'center' => 'attmonth', 'importance' => 'secondary',
+                        'route_prefix' => 'reports.monthly', 'routes' => ['reports.monthly', 'reports.monthly.employee'],
+                        'synonyms' => ['monthly', 'الحضور الشهري', 'شهري', 'كشف الحضور', 'المحاسب', 'attendance sheet', 'payroll attendance']],
                     ['type' => 'module', 'module' => 'designs', 'importance' => 'primary'],
                     // issues بيتُه الأساسيّ هنا (03 لم يُدرجه صراحةً في أقسام «العمل» — أُسند لِـexec)
                     ['type' => 'module', 'module' => 'issues', 'importance' => 'primary'],

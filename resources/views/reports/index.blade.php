@@ -17,6 +17,9 @@
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
         <a class="btn ghost sm" href="{{ route('reports.review') }}">📥 تقارير للمراجعة</a>
+        @if (hub_can(auth()->user(), 'attend', 'v') || hub_can(auth()->user(), 'hr', 'v'))
+            <a class="btn ghost sm" href="{{ route('reports.monthly', ['month' => \Illuminate\Support\Str::substr($date, 0, 7)]) }}">🗓️ الحضور الشهري</a>
+        @endif
         <a class="btn ghost sm" href="{{ route('workforce.team') }}">🕗 فريقي اليوم</a>
     </div>
 </div>

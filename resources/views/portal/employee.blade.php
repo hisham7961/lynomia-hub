@@ -74,7 +74,10 @@
     {{-- (§21/§61) التقاريرُ اليوميّة: الحضورُ الفيزيائيّ والتقريرُ والأثرُ المحتسَب
          يوماً بيوم — من المُحلِّلِ المركزيّ، مقيَّدةً (لا مسحٌ شامل §98). --}}
     <div class="card kid">
-        <h3>📝 التقارير اليومية <span class="sub">— آخر أيام العمل</span></h3>
+        <h3>📝 التقارير اليومية <span class="sub">— آخر أيام العمل</span>
+            @if (hub_can(auth()->user(), 'attend', 'v') || hub_can(auth()->user(), 'hr', 'v'))
+                <a class="btn ghost xs" style="float:inline-end" href="{{ route('reports.monthly.employee', ['emp' => $emp->id, 'month' => now()->format('Y-m')]) }}">🗓️ سجل الحضور الشهري ↗</a>
+            @endif</h3>
         @if (! empty($reportHistory))
             <div class="tblwrap"><table class="tbl">
                 <thead><tr><th>اليوم</th><th>الحضور</th><th>الوقت</th><th>التقرير</th>
