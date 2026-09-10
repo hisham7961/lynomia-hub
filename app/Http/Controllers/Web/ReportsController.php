@@ -194,7 +194,10 @@ class ReportsController extends Controller
         $this->guardInternal();
         abort_unless(hub_can(auth()->user(), 'hr', 'e') || auth()->user()->role?->is_owner, 403);
         $row = Attendance::whereNull('deleted_at')->whereKey($id)->firstOrFail();
-        abort_unless(hub_company_scope(Attendance::query(), 'attend')->whereKey($row->id)->exists(), 404);
+        // تنطيقُ الدورِ الدائم (§80): كان `hub_company_scope` (فلترُ الجلسةِ للتركيز) يخلو
+        // عند غياب شركةٍ نشطةٍ فيمرّ صفُّ أيِّ شركة — فمحرّرُ HR لشركةٍ يختمُ أثرَ أخرى (IDOR).
+        // `hub_scope` عزلُ الدورِ الذي لا يُطفأ — نظيرُ day()/monthlyEmployee().
+        abort_unless(hub_scope(Attendance::query(), 'attend')->whereKey($row->id)->exists(), 404);
 
         $outcome = (string) $r->input('outcome');
         $note = trim((string) $r->input('note', ''));
