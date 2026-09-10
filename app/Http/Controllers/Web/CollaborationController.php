@@ -113,7 +113,7 @@ class CollaborationController extends Controller
     {
         [$conv, $role] = ConversationController::guardConversation($id);
 
-        $messages = $conv->messages()->whereNull('parent_id')->with('user', 'replies.user')->get();
+        $messages = $conv->rootMessages();   // §56: نافذةٌ محدودةٌ لأحدث الرسائل لا القناةُ كاملةً
         (new CommentController)->markReadPublic($messages);
 
         if (hub_has_col('conversation_members', 'last_read_at')) {

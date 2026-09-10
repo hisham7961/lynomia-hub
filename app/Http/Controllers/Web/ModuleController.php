@@ -1128,13 +1128,21 @@ class ModuleController extends Controller
         // مزامنة الأصل مع صيانته: قيد التنفيذ تضعه «صيانة»، والمكتملة تختم
         // «آخر صيانة» وتعيده «قيد الاستخدام» — كان الحقلان يدويين متناقضين
         if ($module === 'assetlog' && $m->asset_id && ($asset = \App\Models\Asset::find($m->asset_id))) {
-            if ((string) $m->status === 'قيد التنفيذ' && $asset->status !== 'صيانة') {
-                $asset->status = 'صيانة';
-                $asset->saveQuietly();
+            // (تدقيقُ الطور النهائيّ · §39/§63) تغييرُ حالةِ الأصلِ يمرّ بالمحرّكِ الواحد
+            // `Custody::transition` (تدقيقٌ + صفُّ تاريخٍ في asset_custody + مزامنةُ النقطة) لا
+            // بكتابةٍ صامتةٍ (saveQuietly) تتخطّى العهدةَ وتُسقط الأثر؛ والانتقالُ غيرُ المشروع
+            // (أصلٌ نهائيٌّ مباعٌ/مستبعد) يُتخطّى بلا إحياءٍ زائف. «آخرُ صيانة» حقلٌ حرٌّ يُختَم كما هو.
+            $to = null;
+            if ((string) $m->status === 'قيد التنفيذ') {
+                $to = 'صيانة';
             } elseif ((string) $m->status === 'مكتملة') {
-                $asset->maint = $m->date;
-                if ($asset->status === 'صيانة') $asset->status = 'قيد الاستخدام';
-                $asset->saveQuietly();
+                if ((string) $asset->maint !== (string) $m->date) { $asset->maint = $m->date; $asset->saveQuietly(); }
+                if (\App\Support\Custody::canonicalStatus($asset->status) === 'صيانة') $to = 'قيد الاستخدام';
+            }
+            if ($to !== null
+                && \App\Support\Custody::canonicalStatus($asset->status) !== \App\Support\Custody::canonicalStatus($to)
+                && \App\Support\Custody::canTransition($asset->status, $to)) {
+                \App\Support\Custody::transition($asset, $to, now()->toDateString(), 'مزامنةٌ من سجل الصيانة');
             }
         }
 

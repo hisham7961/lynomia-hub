@@ -121,7 +121,7 @@ return [
         'workos.stations' => ['domain' => 'work_os', 'category' => 'stations', 'title_ar' => 'المحطّات', 'title_en' => 'Stations', 'status' => 'ENABLED', 'permissions' => ['stations']],
         'workos.station_identity' => ['domain' => 'work_os', 'category' => 'stations', 'title_ar' => 'هويّة المحطّة (QR/باركود)', 'title_en' => 'Station Identity / QR / Barcode', 'status' => 'ENABLED'],
         'workos.station_history' => ['domain' => 'work_os', 'category' => 'stations', 'title_ar' => 'سجلّ إسناد المحطّات', 'title_en' => 'Station Assignment History', 'status' => 'ENABLED'],
-        'workos.employee_360' => ['domain' => 'work_os', 'category' => 'people', 'title_ar' => 'ملف الموظّف 360', 'title_en' => 'Employee 360', 'status' => 'ENABLED', 'permissions' => ['staff']],
+        'workos.employee_360' => ['domain' => 'work_os', 'category' => 'people', 'title_ar' => 'ملف الموظّف 360', 'title_en' => 'Employee 360', 'status' => 'ENABLED', 'permissions' => ['hr']],
         'workos.relationship_explorer' => ['domain' => 'work_os', 'category' => 'graph', 'title_ar' => 'مستكشف العلاقات', 'title_en' => 'Relationship Explorer', 'status' => 'ENABLED', 'web_routes' => ['graph.explore']],
         'workos.tech_workspace' => ['domain' => 'work_os', 'category' => 'graph', 'title_ar' => 'مساحة العمل التقنيّة', 'title_en' => 'Technical Workspace', 'status' => 'ENABLED'],
         'workos.project_360' => ['domain' => 'work_os', 'category' => 'delivery', 'title_ar' => 'مشروع 360', 'title_en' => 'Project 360', 'status' => 'ENABLED'],
@@ -158,7 +158,7 @@ return [
             'introduced' => 'v2.472.0', 'docs' => 'docs/project360/03-asset-project-assignment.md'],
 
         /* ───────── 7E · الاتصالات (Work OS · الطور G) ───────── */
-        'telecom.sim_registry' => ['domain' => 'telecom', 'category' => 'registry', 'title_ar' => 'سجلّ الشرائح (SIM)', 'title_en' => 'SIM Registry', 'status' => 'ENABLED', 'permissions' => ['sims']],
+        'telecom.sim_registry' => ['domain' => 'telecom', 'category' => 'registry', 'title_ar' => 'سجلّ الشرائح (SIM)', 'title_en' => 'SIM Registry', 'status' => 'ENABLED', 'permissions' => ['phones']],
         'telecom.phone_registry' => ['domain' => 'telecom', 'category' => 'registry', 'title_ar' => 'سجلّ الأرقام', 'title_en' => 'Phone Number Registry', 'status' => 'ENABLED'],
         'telecom.carrier_registry' => ['domain' => 'telecom', 'category' => 'registry', 'title_ar' => 'سجلّ المشغّلين', 'title_en' => 'Carrier Registry', 'status' => 'ENABLED'],
         'telecom.sim_lifecycle' => ['domain' => 'telecom', 'category' => 'registry', 'title_ar' => 'دورة حياة الشريحة', 'title_en' => 'SIM Lifecycle', 'status' => 'ENABLED'],
@@ -173,7 +173,10 @@ return [
             'desc_ar' => 'لا تكاملَ مشغّلٍ حيٍّ مُهيَّأ — لا يُدّعى ENABLED.', 'depends' => ['telecom.provisioning_adapter'], 'external_depends' => ['واجهة مشغّل الاتصالات (API + اعتمادات)'], 'provider' => 'Telecom carrier API'],
 
         /* ───────── 7F · الأمن ───────── */
-        'security.app_ip_defense' => ['domain' => 'security', 'category' => 'network', 'title_ar' => 'دفاع IP على مستوى التطبيق', 'title_en' => 'Application IP Defense', 'status' => 'ENABLED', 'derive' => 'edge',
+        // دفاعُ IP في طبقة التطبيق **نشطٌ دائماً** (لا مزوّدَ خارجيّ) — فحالتُه ثابتةٌ ENABLED
+        // ولا تُشتقّ من 'edge' (تلك لـ`security.edge_blocking` الخارجيّ وحدَه §74): اشتقاقُ
+        // edge كان يُبلغ هذا الضبطَ الحيَّ «غيرَ مُهيّأ» زوراً — إصلاحُ صدقِ السجل (تدقيقُ الطور النهائيّ).
+        'security.app_ip_defense' => ['domain' => 'security', 'category' => 'network', 'title_ar' => 'دفاع IP على مستوى التطبيق', 'title_en' => 'Application IP Defense', 'status' => 'ENABLED',
             'desc_ar' => 'الحجبُ الفعّالُ في طبقة التطبيق — نشطٌ دائماً.', 'admin_surface' => 'security.index'],
         'security.ip_allow' => ['domain' => 'security', 'category' => 'network', 'title_ar' => 'قواعد السماح (IP)', 'title_en' => 'IP Allow Rules', 'status' => 'ENABLED'],
         'security.ip_block' => ['domain' => 'security', 'category' => 'network', 'title_ar' => 'قواعد الحظر (IP)', 'title_en' => 'IP Block Rules', 'status' => 'ENABLED'],

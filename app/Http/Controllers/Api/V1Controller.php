@@ -358,6 +358,13 @@ class V1Controller extends ModuleController
         if (! $def || $module === 'users') {
             \App\Support\Api::abort(\App\Support\Api::RESOURCE_NOT_FOUND, 404, 'وحدة غير معروفة', ['kind' => 'module', 'module' => $module]);
         }
+        // عزلُ العميل خادميّاً لا بمصفوفة الدور (§14/§120.6): مجموعةُ `/api/v1` لا تمرّ
+        // بـ`PortalGuard` (وسيطُ الويب)، فيُطبَّق حجزُ العميلِ نفسُه هنا صراحةً — فحسابُ
+        // عميلٍ (ولو مُنِح دوراً) لا يبلغ إلا وحداتِه المسموحة، ٤٠٤ لغيرها (لا كشفَ وجود).
+        if (hub_is_client(auth()->user())
+            && ! in_array($module, \App\Http\Middleware\PortalGuard::MODULE_ALLOW, true)) {
+            \App\Support\Api::abort(\App\Support\Api::RESOURCE_NOT_FOUND, 404, 'وحدة غير معروفة', ['kind' => 'module', 'module' => $module]);
+        }
         if (! hub_can(auth()->user(), $module, $op)) {
             \App\Support\Api::abort(\App\Support\Api::FORBIDDEN, 403, 'لا تملك هذه الصلاحية على الوحدة', ['module' => $module, 'op' => $op]);
         }

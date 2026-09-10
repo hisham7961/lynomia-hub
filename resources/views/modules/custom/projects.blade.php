@@ -269,7 +269,7 @@
                 @foreach ($pcRoomList as [$pcAud, $pcTitle, $pcWhy, $pcColor])
                     @php
                         $pcRoom = $pcRooms[$pcAud];
-                        $pcMsgs = $pcRoom->messages()->whereNull('parent_id')->with('user', 'replies.user')->get();
+                        $pcMsgs = $pcRoom->rootMessages();   // §56: نافذةٌ محدودةٌ لأحدث رسائل الغرفة
                         $pcRole = Conversation::roleOf((string) $pcRoom->id, $pcUid);
                     @endphp
                     <div class="sub" style="margin:12px 0 -6px;font-weight:600;border-inline-start:3px solid {{ $pcColor }};padding-inline-start:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">

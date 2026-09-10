@@ -227,9 +227,8 @@ class ConversationController extends Controller
     {
         [$conv, $role] = self::guardConversation($id);
 
-        // الرسائلُ من المحرّكِ الوحيد (comments) عبر علاقةِ الحاوية — ترتيبٌ حتميّ
-        $messages = $conv->messages()->whereNull('parent_id')
-            ->with('user', 'replies.user')->get();
+        // الرسائلُ من المحرّكِ الوحيد (comments) عبر علاقةِ الحاوية — نافذةٌ محدودة (§56)
+        $messages = $conv->rootMessages();
 
         // إيصالُ قراءةِ صاحبِه: يمرّ عبر السكّة نفسها (read_by) لا read_at غيره
         (new CommentController)->markReadPublic($messages);
