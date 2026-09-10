@@ -45,12 +45,24 @@ class PortalController extends Controller
         // تبويبٌ معروفٌ لكنّ القارئَ لا يملك وحدتَه → ٤٠٣ (الحرسُ فوق الشريط)
         abort_unless(collect($tabs)->contains('key', $tab), 403, 'لا تملك عرضَ هذا التبويب');
 
-        $data = ['emp' => $emp, 'self' => false, 'tab360' => $tab, 'tabs360' => $tabs]
+        // (الكيان 360 · §6/§17) نموذجُ الموظف 360: شريطُ نظرةٍ يُجمّع العلاقاتِ المصرَّحة،
+        // وتاريخُ محطةٍ/عهدةٍ ونشاطٌ منطَّق — تكميلٌ للملفّ القائم لا محرّكٌ ثانٍ.
+        $e360 = new \App\Support\Employee360;
+
+        $data = ['emp' => $emp, 'self' => false, 'tab360' => $tab, 'tabs360' => $tabs,
+                 'ov360' => $e360->overview($emp, $u)]
             + $this->bundle($emp, $emp->user_id)
             + $this->workProfile($emp);
 
         // تبويبُ المحطة (F.1) يُحمَّل عند فتحه وحدَه — مقاعدُ الموظف بـcurrent_employee_id
-        if ($tab === 'station') $data['stations'] = $this->stationsFor($u, $emp->user_id);
+        if ($tab === 'station') {
+            $data['stations'] = $this->stationsFor($u, $emp->user_id);
+            $data['stationHist'] = $e360->stationHistory($emp, $u);   // §9 تاريخُ المحطات
+        }
+        // العهدةُ والأجهزة (§11): تاريخُ عهدةِ الأصولِ بحساب الموظف
+        if ($tab === 'assets') $data['custodyHist'] = $e360->custodyHistory($emp, $u);
+        // الملفُّ والعمل (§17): نشاطٌ تشغيليٌّ منطَّقٌ (محطة/عهدة) — لا مسحٌ شامل
+        if ($tab === 'profile') $data['empActivity'] = $e360->activity($emp, $u);
         // (الطور G · WP-G.2) تبويبُ الاتصالات يُحمَّل عند فتحه — خطوطُ الموظف بـemployee_id
         if ($tab === 'telecom') $data['phones'] = $this->phonesFor($u, $emp->id);
         // (الطور M · WP-M.3) تبويبُ الأنظمة — سيرفراتُ الموظف بحافّة H.1 (servers.hr_id)

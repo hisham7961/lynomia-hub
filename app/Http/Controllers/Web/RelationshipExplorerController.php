@@ -27,6 +27,19 @@ use Illuminate\Http\Request;
  */
 class RelationshipExplorerController extends Controller
 {
+    /**
+     * (الكيان 360 · §46) العروضُ المركّزة: وحدةُ الجذرِ ⟵ تسميةُ سياقها. **عروضٌ
+     * فوق المحرّك الواحد** لا محرّكٌ ثانٍ — الجذرُ هو التركيز، والعمقُ والمرشّحاتُ
+     * (مباشر/تاريخ) عدساتٌ فوقَه. تُفتَح من زرِّ «العلاقات» في كلِّ صفحة 360.
+     */
+    protected const FOCUS = [
+        'hr'       => '👤 سياقُ الموظف',
+        'stations' => '🪑 سياقُ المحطة',
+        'assets'   => '💻 سياقُ الأصل',
+        'projects' => '🗂️ سياقُ المشروع التقنيّ',
+        'clients'  => '🤝 سياقُ تسليم العميل',
+    ];
+
     /** الرفضُ الصلب المشترك: مَن نافذتُه نافذةُ عميلٍ لا يرى الجرافَ أصلاً */
     protected function guardInternal(): void
     {
@@ -50,8 +63,17 @@ class RelationshipExplorerController extends Controller
         [$module, $id] = $this->target($r);
 
         $hops = (int) $r->query('hops', 2);
-        $p = RelationshipProjection::expand($module, $id, $hops, (bool) $r->query('fresh'));
+        $history = (bool) $r->query('history');                  // §54: أدرِج المُنهاةَ موسومة
+        $directOnly = (bool) $r->query('direct');                // §49: أخفِ المشتقّة
+        $p = RelationshipProjection::expand($module, $id, $hops, (bool) $r->query('fresh'), $history);
         abort_if($p === null, 404);                              // جذرٌ لا يقرؤه القارئ — لا إثباتَ وجود
+
+        // مرشّحُ «المباشرِ فقط» (§47/§49): عرضٌ يُخفي الحوافَّ المشتقّة — لا يمسّ
+        // التصريحَ (المشتقّةُ مصرَّحةُ الطرفين أصلاً)، إخفاءٌ للعرض لا حجبُ أمن.
+        if ($directOnly) {
+            $p['edges'] = array_values(array_filter($p['edges'],
+                fn ($e) => ($e['kind'] ?? 'direct') !== 'derived'));
+        }
 
         // شجرةُ العرض: مجاورةٌ من الحوافّ على شجرة BFS (الأبُ = أقربُ عقدةٍ أدنى قفزة)
         // — بترتيب اكتشاف الإسقاط الحتميّ نفسِه، فلا قرعةَ عرض
@@ -64,7 +86,8 @@ class RelationshipExplorerController extends Controller
                 $nb = $byKey[$b] ?? null;
                 if (! $na || ! $nb || $nb['hop'] !== $na['hop'] + 1 || isset($seen[$b])) continue;
                 $seen[$b] = true;
-                $kids[$a][] = ['key' => $b, 'edge' => $e['label']];
+                $kids[$a][] = ['key' => $b, 'edge' => $e['label'],
+                    'kind' => $e['kind'] ?? 'direct', 'active' => $e['active'] ?? null];
             }
         }
         // أمانُ الاكتمال: الشجرةُ الدلاليّةُ تحمل الإسقاطَ **كاملاً** — عقدةٌ لم
@@ -82,14 +105,17 @@ class RelationshipExplorerController extends Controller
             ->where('module', 'graph')->orderBy('name')->orderBy('id')->get();
 
         return view('graph.explore', [
-            'p'      => $p,
-            'byKey'  => $byKey,
-            'kids'   => $kids,
-            'module' => $module,
-            'id'     => $id,
-            'hops'   => $p['hops'],
-            'views'  => $views,
-            'def'    => hub_mod($module),
+            'p'          => $p,
+            'byKey'      => $byKey,
+            'kids'       => $kids,
+            'module'     => $module,
+            'id'         => $id,
+            'hops'       => $p['hops'],
+            'views'      => $views,
+            'def'        => hub_mod($module),
+            'history'    => $history,
+            'directOnly' => $directOnly,
+            'focus'      => self::FOCUS[$module] ?? null,
         ]);
     }
 
@@ -104,7 +130,7 @@ class RelationshipExplorerController extends Controller
         [$module, $id] = $this->target($r);
 
         $hops = (int) $r->query('hops', 1);
-        $p = RelationshipProjection::expand($module, $id, $hops, (bool) $r->query('fresh'));
+        $p = RelationshipProjection::expand($module, $id, $hops, (bool) $r->query('fresh'), (bool) $r->query('history'));
         abort_if($p === null, 404);
 
         return response()->json($p);

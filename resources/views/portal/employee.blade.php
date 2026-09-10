@@ -9,13 +9,34 @@
             @if ($emp->status) · <span class="bdg {{ hub_tone($emp->status) }}">{{ $emp->status }}</span>@endif
         </div>
     </div>
-    <div style="display:flex;gap:8px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+        {{-- (§16) راسِل الموظفَ مباشرةً — يفتح خيطَ المحادثة (يُنشَأ عند اللزوم) --}}
+        @if ($emp->user_id && (string) $emp->user_id !== (string) auth()->id())
+            <a class="btn ghost sm" href="{{ route('dm.thread', $emp->user_id) }}">💬 راسِل</a>
+        @endif
+        {{-- (§56) العلاقات — إسقاطُ الموظفِ في المستكشف (داخليٌّ غيرُ معزولٍ بعملاء) --}}
+        @if (! hub_is_client(auth()->user()) && hub_client_ids() === null)
+            <a class="btn ghost sm" href="{{ route('graph.explore', ['m' => 'hr', 'id' => $emp->id]) }}">🕸️ العلاقات</a>
+        @endif
         @if (hub_can(auth()->user(), 'hr', 'e'))
             <a class="btn ghost sm" href="{{ route('m.edit', ['hr', $emp->id]) }}">✏️ تعديل الملف</a>
         @endif
         <a class="btn ghost sm" href="{{ route('m.show', ['hr', $emp->id]) }}">📄 كل الحقول</a>
     </div>
 </div>
+
+{{-- (الكيان 360 · §6) شريطُ النظرة: العلاقاتُ الحاليّةُ خطفاً — كلُّ عدٍّ خلف صلاحيّته
+     (غائبٌ = null فلا بطاقة)، ويربط تبويبَه. المالُ خلف صلاحيّة العهدة وحقلِ المبلغ (§14). --}}
+@include('partials.cc.kpis', ['items' => array_values(array_filter([
+    ['label' => 'المحطةُ الحاليّة', 'value' => $ov360['station'] ?: '—', 'tone' => $ov360['station'] ? 'ok' : 'g'],
+    $ov360['assets'] !== null ? ['label' => 'عهدةٌ بيده', 'value' => $ov360['assets'], 'hint' => 'أصولٌ بحوزته الآن'] : null,
+    $ov360['projects'] !== null ? ['label' => 'مشاريعُ نشطة', 'value' => $ov360['projects']] : null,
+    $ov360['tasks'] !== null ? ['label' => 'مهامٌّ مفتوحة', 'value' => $ov360['tasks']] : null,
+    $ov360['sim'] !== null ? ['label' => 'خطوطٌ (SIM)', 'value' => $ov360['sim']] : null,
+    $ov360['endpoints'] !== null ? ['label' => 'نقاطٌ طرفية', 'value' => $ov360['endpoints']] : null,
+    $ov360['balance'] !== null ? ['label' => 'رصيدُ العهدة', 'value' => number_format((float) $ov360['balance'], 3) . ' ' . setting('app.currency', 'د.ك'),
+        'tone' => ((float) $ov360['balance']) >= 0 ? 'g' : 'bad'] : null,
+]))])
 
 {{-- حسابُ النظام: البابُ في المدخلين معاً — «كل الحقول» و«الملف الشامل» --}}
 @include('partials.staff_account_card', ['acctRow' => $emp])
@@ -31,6 +52,23 @@
          والأمنُ فيه بطاقةٌ لا تلامس أرقامَ الأداء (spec §5.1) --}}
     @include('portal._hr', ['hr360' => true])
     @include('portal._work')
+
+    {{-- (§17) النشاطُ التشغيليّ المنطَّق: أحداثُ محطةٍ وعهدةٍ مصرَّحةٌ لكلِّ نوع، لا مسحٌ شامل --}}
+    @if (! empty($empActivity) && $empActivity->isNotEmpty())
+        <div class="card kid">
+            <h3>📅 نشاطٌ تشغيليٌّ حديث</h3>
+            <table class="mini">
+                @foreach ($empActivity as $ev)
+                    <tr>
+                        <td>{{ $ev['icon'] }} {{ $ev['text'] }}
+                            @if (! empty($ev['actor']))<div class="sub">بيد {{ $ev['actor'] }}</div>@endif</td>
+                        <td class="acts sub mono">{{ $ev['at'] ? substr((string) $ev['at'], 0, 10) : '—' }}</td>
+                    </tr>
+                @endforeach
+            </table>
+            <div class="sub" style="margin-top:6px">أحداثُ محطةٍ وعهدةٍ (لا زياراتِ صفحاتٍ ولا تخابر) — كلُّ نوعٍ خلف صلاحيّته.</div>
+        </div>
+    @endif
 
 @elseif ($tab360 === 'assets')
     {{-- العهدةُ والأجهزة: أصولٌ بيده — والسيريالُ سرٌّ تقنيٌّ يحرسه field-mode --}}
@@ -52,6 +90,22 @@
                 @endforelse
             </table>
         </div>
+        {{-- (§11) تاريخُ العهدة: استلامٌ/إعادةٌ/نقلٌ — من `asset_custody` بحساب الموظف --}}
+        @if (! empty($custodyHist) && $custodyHist->isNotEmpty())
+            <div class="card kid">
+                <h3>🕐 تاريخُ العهدة</h3>
+                <table class="mini">
+                    @foreach ($custodyHist as $ch)
+                        <tr>
+                            <td>{{ $ch->asset_name }}
+                                <div class="sub">{{ $ch->action }}@if ($ch->actor_name) · بيد {{ $ch->actor_name }}@endif</div></td>
+                            <td class="acts sub mono">{{ $ch->at ? substr((string) $ch->at, 0, 10) : '—' }}</td>
+                        </tr>
+                    @endforeach
+                </table>
+                <div class="sub" style="margin-top:6px">«العهدة» (مَن بيده) مستقلّةٌ عن «تخصيصِ المشروع» — الأخيرُ في الأصلِ نفسِه.</div>
+            </div>
+        @endif
     </div>
 
 @elseif ($tab360 === 'station')
@@ -73,6 +127,21 @@
                 @endforelse
             </table>
         </div>
+        {{-- (§9) تاريخُ المحطات: أين جلس ومتى أُخلي — من `station_assignments` --}}
+        @if (! empty($stationHist) && $stationHist->isNotEmpty())
+            <div class="card kid">
+                <h3>🕐 تاريخُ المحطات</h3>
+                <table class="mini">
+                    @foreach ($stationHist as $sh)
+                        <tr>
+                            <td>{{ $sh->station_code }}
+                                <div class="sub">{{ $sh->action === 'vacate' ? 'إخلاء' : 'إسناد' }}@if ($sh->actor_name) · بيد {{ $sh->actor_name }}@endif</div></td>
+                            <td class="acts sub mono">{{ $sh->at ? substr((string) $sh->at, 0, 10) : '—' }}</td>
+                        </tr>
+                    @endforeach
+                </table>
+            </div>
+        @endif
     </div>
 
 @elseif ($tab360 === 'telecom')

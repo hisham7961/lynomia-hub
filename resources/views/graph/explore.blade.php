@@ -18,18 +18,28 @@
         <div class="rh-id">
             <h2>🕸️ مستكشف العلاقات</h2>
             <div class="rh-meta">
+                @if (! empty($focus))<span class="bdg g">{{ $focus }}</span>@endif
                 <span class="sub">الجذر: {{ $def['label'] ?? $module }} — {{ $rootNode['label'] ?? $id }}</span>
                 <span class="sub">عُقد: {{ count($p['nodes']) }} · حوافّ: {{ count($p['edges']) }} · قفزات: {{ $p['hops'] }}</span>
+                @if (! empty($history))<span class="bdg wn">🕰️ يشمل التاريخ</span>@endif
+                @if (! empty($directOnly))<span class="bdg">مباشرٌ فقط</span>@endif
             </div>
         </div>
         <div class="spacer"></div>
         <div class="rh-acts">
-            {{-- عمقُ القفزات — يقلّمه graph.max_hops صراحةً في الخدمة --}}
+            {{-- عمقُ القفزات — يقلّمه graph.max_hops صراحةً في الخدمة (يحفظ العدسات) --}}
+            @php $lens = array_filter(['history' => $history ? 1 : null, 'direct' => $directOnly ? 1 : null]); @endphp
             @foreach (range(1, (int) $p['max_hops']) as $h)
                 <a class="btn ghost sm {{ $h === (int) $p['hops'] ? 'p' : '' }}"
-                   href="{{ route('graph.explore', ['m' => $module, 'id' => $id, 'hops' => $h]) }}">{{ $h }} قفزة</a>
+                   href="{{ route('graph.explore', ['m' => $module, 'id' => $id, 'hops' => $h] + $lens) }}">{{ $h }} قفزة</a>
             @endforeach
-            <a class="btn ghost sm" href="{{ route('graph.explore', ['m' => $module, 'id' => $id, 'hops' => $p['hops'], 'fresh' => 1]) }}">↻ تحديث</a>
+            {{-- (§54) وضعُ التاريخ: يُدرِج الحوافَّ المُنهاةَ موسومةً «تاريخيّة» --}}
+            <a class="btn ghost sm {{ $history ? 'p' : '' }}"
+               href="{{ route('graph.explore', ['m' => $module, 'id' => $id, 'hops' => $p['hops']] + array_filter(['direct' => $directOnly ? 1 : null, 'history' => $history ? null : 1])) }}">🕰️ التاريخ</a>
+            {{-- (§47/§49) مباشرٌ فقط: يُخفي الحوافَّ المشتقّة --}}
+            <a class="btn ghost sm {{ $directOnly ? 'p' : '' }}"
+               href="{{ route('graph.explore', ['m' => $module, 'id' => $id, 'hops' => $p['hops']] + array_filter(['history' => $history ? 1 : null, 'direct' => $directOnly ? null : 1])) }}">↳ مباشرٌ فقط</a>
+            <a class="btn ghost sm" href="{{ route('graph.explore', ['m' => $module, 'id' => $id, 'hops' => $p['hops'], 'fresh' => 1] + $lens) }}">↻ تحديث</a>
             <a class="btn ghost sm" href="{{ route('m.show', [$module, $id]) }}">فتح السجل</a>
         </div>
     </div>
