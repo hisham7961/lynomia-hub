@@ -15,6 +15,11 @@
 
     $u = auth()->user();
     $isCli = hub_is_client($u);
+    // فصلُ النطاق (Permissions 360 · §16): تبويباتُ 360 محروسةٌ خادميّاً بصلاحيّةِ وحدتِها لا
+    // بمجرّدِ «داخليّ» — «الأصول» بـassets:v و«النشاط» بـupdates:v — فلا يظهرُ التبويبُ ولا
+    // يُحسَبُ بيانُه (لا في الـHTML) لقارئٍ لا يملكُ الوحدةَ. الرؤيةُ مشتقّةٌ من الوصولِ الفعّال.
+    $pcSeeAssets = ! $isCli && hub_can($u, 'assets', 'v');
+    $pcSeeActivity = ! $isCli && hub_can($u, 'updates', 'v');
 
     // رؤيةُ حقلٍ لهذا القارئ: العميلُ محجوبٌ صلباً، والداخليُّ يمرّ بـfield-mode.
     $pcSee = fn (string $key) => ! $isCli && hub_field_mode($u, 'projects', $key) !== 'hide';
@@ -32,8 +37,8 @@
     $pcClient = $row->client_id ? \App\Models\Client::whereNull('deleted_at')->find($row->client_id) : null;
     $pcEng = $row->engagement_id ? \App\Models\Engagement::whereNull('deleted_at')->find($row->engagement_id) : null;
 
-    // نشاطُ آخرِ ٧ أيام — داخليٌّ (عوائقُ الفريق ليست للعميل)
-    $pcLogs = $isCli ? collect() : \Illuminate\Support\Facades\DB::table('work_updates')->whereNull('deleted_at')
+    // نشاطُ آخرِ ٧ أيام — يتطلّبُ updates:v (بنودُ العمل)، لا للعميلِ ولا لمن لا يملكُ الوحدةَ
+    $pcLogs = ! $pcSeeActivity ? collect() : \Illuminate\Support\Facades\DB::table('work_updates')->whereNull('deleted_at')
         ->where('project_id', $row->id)
         ->where('work_date', '>=', now()->subDays(7)->toDateString())
         ->orderByDesc('work_date')->orderByDesc('id')
@@ -60,11 +65,11 @@
         : array_values(array_filter([
             ['overview', '🗂️ النظرة'],
             ['delivery', '🚦 التسليم'],
-            ['assets', '🖥️ الأصول'],
+            $pcSeeAssets ? ['assets', '🖥️ الأصول'] : null,
             ['baseline', '📐 الأساس التجاري'],
             $pcExternal ? ['rooms', '💬 الغرف'] : null,
             $pcFin ? ['finance', '💰 المالية'] : null,
-            ['activity', '📅 النشاط'],
+            $pcSeeActivity ? ['activity', '📅 النشاط'] : null,
         ]));
     $pcFirst = $pcTabs[0][0];
 
@@ -198,10 +203,12 @@
             @include('partials.record_list', ['children' => $children, 'ownerId' => $row->id])
         </section>
 
-        {{-- ═══════════ الأصول (Project 360 · §19-23 · تخصيصٌ لا عهدة) ═══════════ --}}
+        {{-- ═══════════ الأصول (Project 360 · §19-23 · تخصيصٌ لا عهدة) — محروسٌ بـassets:v ═══════════ --}}
+        @if ($pcSeeAssets)
         <section id="ccp-assets" data-ccpanel="assets" class="ccpanel {{ $pcFirst === 'assets' ? 'on' : '' }}">
             @include('partials.project_assets', ['row' => $row])
         </section>
+        @endif
 
         {{-- ═══════════ ③ الأساس التجاريّ (ChangeOrder وحدَه يطوّره) ═══════════ --}}
         <section id="ccp-baseline" data-ccpanel="baseline" class="ccpanel {{ $pcFirst === 'baseline' ? 'on' : '' }}">

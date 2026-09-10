@@ -385,8 +385,10 @@ class MobileSecuritySweepTest extends TestCase
         $this->seedCore();
         $t = Task::create(['title' => 'مهمة', 'status' => 'جديدة']);
         $n = HubNotification::create([
+            // رقمٌ حسّاسٌ طويلٌ لا يصطدمُ بأرقام UUID الهيكسيّة العشوائيّة (كان «4444» يظهرُ
+            // صدفةً داخلَ notification_id فيُفشِلُ التأكيدَ زوراً — قرعةٌ لا تسريب).
             'user_id' => $this->owner->id, 'kind' => 'dm',
-            'text'    => 'محتوى‌سريّ‌جداً 4444 IBAN', 'module' => 'tasks', 'record_id' => $t->id,
+            'text'    => 'محتوى‌سريّ‌جداً 4470019902887766 IBAN', 'module' => 'tasks', 'record_id' => $t->id,
             'created_at' => now(),
         ]);
 
@@ -395,7 +397,7 @@ class MobileSecuritySweepTest extends TestCase
         $this->assertSame('رسالةٌ جديدة', $payload['title'], 'العنوانُ عامٌّ حسب النوع لا نصُّ الإشعار');
         $this->assertSame(PushService::GENERIC_BODY, $payload['body'], 'الجسمُ عامٌّ');
         $this->assertStringNotContainsString('محتوى‌سريّ', $json, 'نصُّ الإشعارِ الخام لا يبلغ الحمولة');
-        $this->assertStringNotContainsString('4444', $json, 'لا رقمَ حسّاسٍ في الحمولة');
+        $this->assertStringNotContainsString('4470019902887766', $json, 'لا رقمَ حسّاسٍ في الحمولة');
         $this->assertStringNotContainsString('IBAN', $json);
         $this->assertArrayNotHasKey('text', $payload['data'], 'لا نصَّ خامٌّ في data');
         $this->assertSame('dm', $payload['data']['category'], 'التصنيفُ آليٌّ (نوعٌ لا محتوى)');

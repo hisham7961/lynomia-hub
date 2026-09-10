@@ -30,6 +30,10 @@ class PortalController extends Controller
     public function employee(string $id)
     {
         $u = auth()->user();
+        // حدُّ حساب العميل يعلو على المصفوفة (§79): الملفُّ 360 سطحٌ داخليٌّ بحت — حسابُ
+        // عميلٍ مُساءُ الضبط (مصفوفتُه مُنِحت hr:v) لا يبلغه، ٤٠٤ لا نُثبت وجودَ ما لا يخصّه.
+        // المسارُ في PortalGuard::NAME_ALLOW «portal.*» فلا يردّه الوسيط — فالحرسُ هنا صراحةً.
+        abort_if(hub_is_client($u), 404);
         abort_unless(hub_can($u, 'hr', 'v'), 403, 'عرض ملفات الموظفين يتطلب صلاحية الموارد البشرية');
         // النطاق يسري كما في كل قارئ: ملفٌّ خارج شركتي أو مشاريعي = ٤٠٤ لا ٢٠٠
         $emp = hub_scope(Employee::query(), 'hr')->findOrFail($id);
