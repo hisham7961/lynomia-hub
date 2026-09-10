@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * تحديثات العمل — بنودُ التقرير اليومي.
@@ -27,12 +28,16 @@ class WorkUpdate extends Model
     public const MODULE = 'updates';
     public const DISPLAY = 'done';
 
-    protected $guarded = ['id', 'version', 'created_by'];
+    // حالةُ المراجعةِ وزمنُ التقديم يُضبطان من النظام/خدمة المراجعة لا من التعبئة الجماعية
+    protected $guarded = ['id', 'version', 'created_by',
+        'submitted_at', 'review_status', 'reviewed_by', 'reviewed_at', 'review_feedback'];
 
     protected $casts = [
         'progress' => 'decimal:3',
         'hours' => 'decimal:3',
         'work_date' => 'date',
+        'submitted_at' => 'datetime',
+        'reviewed_at' => 'datetime',
         'billable' => 'boolean',
         'custom' => 'array',
         'meta' => 'array',
@@ -50,6 +55,11 @@ class WorkUpdate extends Model
             // البندُ منسوبٌ لكاتبه دائماً — عليه يُبنى تقريرُ اليوم وشاشةُ الفريق
             // (created_by محروسٌ من التعبئة الجماعية، فيُسند هنا صراحةً)
             if (! $w->created_by && auth()->id()) $w->created_by = auth()->id();
+            // زمنُ التقديم (§13): يُختم مرّةً عند أوّلِ حفظٍ — التقريرُ مُقدَّمٌ بإنشائه
+            // (لا مفهومَ مسودّةٍ منفصل)، فيُقاس التأخّرُ عن المهلة منه لا من created_at
+            if ($w->submitted_at === null && Schema::hasColumn('work_updates', 'submitted_at')) {
+                $w->submitted_at = now();
+            }
         });
 
         // ساعاتُ البند تدخل «الوقت الفعلي» على مهمته **مرةً واحدة** — فمحرّكا
@@ -90,6 +100,15 @@ class WorkUpdate extends Model
         static::deleted(function (self $w) {
             if ($w->task_id && (float) $w->hours) {
                 Task::whereKey($w->task_id)->decrement('act_h', (float) $w->hours);
+            }
+        });
+
+        // **واستعادةُ المحذوف تُعيد ساعاتِه** (§72): الحذفُ الناعمُ خصمَها ولم يكن ثمّةَ
+        // خطّافُ `restored` يُقابله — فالبندُ المُستعاد كان يترك المهمةَ ناقصةَ الساعات
+        // أبداً (نظيرُ Project/Comment اللذين يهكّان restored). التماثلُ يُصان.
+        static::restored(function (self $w) {
+            if ($w->task_id && (float) $w->hours) {
+                Task::whereKey($w->task_id)->increment('act_h', (float) $w->hours);
             }
         });
     }

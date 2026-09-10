@@ -95,31 +95,42 @@ class WorkforceTest extends TestCase
             'بعد البداية والسماحية = متأخر — وسمُ مراجعةٍ لا عقوبة');
     }
 
-    public function test_missing_report_is_a_review_state_never_absence(): void
+    public function test_missing_report_never_overwrites_physical_presence(): void
     {
         $this->seedCore();
         $this->hubSetting('sec.hours_start', '23:59');
         [$u, $e] = $this->employee();
 
-        // حضر وانصرف بلا بندِ عملٍ واحد ⇒ «حاضر — بلا تقرير»
+        // حضر وانصرف بلا بندِ عمل ⇒ الحضورُ الفيزيائيُّ يبقى «حاضر» (لا يُطمَس §6)،
+        // والامتثالُ حالةٌ منفصلةٌ «بانتظار التقرير» قبلَ المهلة (لا مخالفةَ بعد §8)
         $this->actingAs($u)->post('/workday/check-in', []);
         $this->actingAs($u)->post('/workday/check-out');
-        $this->assertSame('حاضر — بلا تقرير', Workday::today($e->id)->status);
+        $this->assertSame('حاضر', Workday::today($e->id)->status, 'الحضورُ الفيزيائيُّ لا يُطمَس');
 
-        // ولو كتب بنداً قبل الانصراف لبقي حاضراً
+        $c = \App\Support\DailyWorkCompliance::resolve($e);
+        $this->assertFalse($c['report_submitted']);
+        $this->assertSame(\App\Support\DailyWorkCompliance::REPORT_PENDING, $c['state'],
+            'قبلَ المهلة: بانتظار التقرير لا «حضور بدون تقرير»');
+        $this->assertSame('present', $c['effective'], 'قبلَ المهلة لا يُحتسب غياباً — لا عقوبةَ مبكّرة');
+
+        // ولو كتب بنداً قبل الانصراف: حاضرٌ وممتثل
         [$u2, $e2] = $this->employee();
         $p = Project::create(['name' => 'مشروع اليوم']);
         $this->actingAs($u2)->post('/workday/check-in', []);
         WorkUpdate::create(['project_id' => $p->id, 'done' => 'أنجزتُ الإعداد', 'hours' => 2]);
         $this->actingAs($u2)->post('/workday/check-out');
         $this->assertSame('حاضر', Workday::today($e2->id)->status);
+        $this->assertSame(\App\Support\DailyWorkCompliance::PRESENT_REPORTED,
+            \App\Support\DailyWorkCompliance::resolve($e2)['state']);
 
-        // وبإطفاء اشتراط التقرير لا مراجعةَ أصلاً
+        // وبإطفاء اشتراط التقرير لا التزامَ أصلاً
         $this->hubSetting('work.report_required', '0');
         [$u3, $e3] = $this->employee();
         $this->actingAs($u3)->post('/workday/check-in', []);
         $this->actingAs($u3)->post('/workday/check-out');
         $this->assertSame('حاضر', Workday::today($e3->id)->status);
+        $this->assertSame(\App\Support\DailyWorkCompliance::NOT_REQUIRED,
+            \App\Support\DailyWorkCompliance::resolve($e3)['state']);
     }
 
     public function test_an_approved_leave_wins_the_final_state(): void

@@ -36,9 +36,13 @@
     $pcLogs = $isCli ? collect() : \Illuminate\Support\Facades\DB::table('work_updates')->whereNull('deleted_at')
         ->where('project_id', $row->id)
         ->where('work_date', '>=', now()->subDays(7)->toDateString())
-        ->get(['created_by', 'hours', 'problems', 'work_date']);
+        ->orderByDesc('work_date')->orderByDesc('id')
+        ->get(['id', 'created_by', 'task_id', 'done', 'hours', 'progress', 'problems', 'next', 'work_date', 'review_status', 'submitted_at']);
     $pcPeople = $pcLogs->isEmpty() ? [] : hub_ref_labels('users', $pcLogs->pluck('created_by')->filter()->unique()->values()->all());
     $pcBlockers = $pcLogs->pluck('problems')->filter(fn ($p) => trim((string) $p) !== '');
+    // (§20) الخطُّ الزمنيّ للتقارير: يوم → موظّف → بنود — من نفسِ البنود، لا محرّكَ ثانٍ
+    $pcTasks = $pcLogs->isEmpty() ? [] : hub_ref_labels('tasks', $pcLogs->pluck('task_id')->filter()->unique()->values()->all());
+    $pcByDay = $pcLogs->groupBy(fn ($l) => substr((string) $l->work_date, 0, 10));
 
     // ── الحقولُ الداخليّةُ التي تُحجب عن العميل في بطاقةِ «البيانات» (اقتصادٌ وبنية) ──
     $pcCliHide = ['budget', 'cost', 'revExp', 'url', 'staging', 'git', 'prod', 'notes'];
@@ -343,6 +347,35 @@
                         </div>
                     @endif
                     <a class="btn ghost xs" style="margin-top:8px" href="{{ route('m.index', 'updates') }}">📝 كل بنود العمل</a>
+                </div>
+
+                {{-- (§19/§20/§57) التقارير والتقدّم: يوم → موظّف → بنود — مَن عمل ماذا، على أيّ
+                     مهمّة، كم ساعة، أيّ تقدّمٍ اقترح، وما العوائق. من WorkUpdate القائم لا محرّكٌ ثانٍ. --}}
+                <div class="card">
+                    <h3 class="cardtitle">📋 التقارير والتقدّم <span class="sub">— يوماً بيوم، موظفاً موظفاً</span></h3>
+                    @foreach ($pcByDay as $day => $dayLogs)
+                        <div style="margin:10px 0">
+                            <div class="mono" style="font-weight:700">{{ $day }}</div>
+                            @foreach ($dayLogs->groupBy('created_by') as $uid => $uLogs)
+                                <div style="margin:6px 0 6px 4px;border-inline-start:2px solid var(--line,#eee);padding-inline-start:10px">
+                                    <b>{{ $pcPeople[$uid] ?? '—' }}</b>
+                                    <span class="sub">· {{ number_format((float) $uLogs->sum('hours'),1) }} ساعة · {{ $uLogs->count() }} بند</span>
+                                    @foreach ($uLogs as $l)
+                                        @php $rs = $l->review_status ?: 'pending_review'; @endphp
+                                        <div style="margin-top:4px">
+                                            ✅ {{ \Illuminate\Support\Str::limit($l->done, 140) }}
+                                            @if ($l->task_id)<span class="sub">· {{ $pcTasks[$l->task_id] ?? 'مهمّة' }}</span>@endif
+                                            @if ($l->progress !== null)<span class="bdg g">{{ (float)$l->progress }}٪</span>@endif
+                                            <span class="bdg {{ $rs==='accepted'?'ok':($rs==='needs_revision'?'wn':'') }}">{{ ['pending_review'=>'بانتظار','accepted'=>'مقبول','needs_revision'=>'تنقيح'][$rs] ?? 'بانتظار' }}</span>
+                                            @if (trim((string)$l->problems) !== '')<div class="sub" style="color:var(--bad,#c0392b)">🚧 {{ \Illuminate\Support\Str::limit($l->problems, 120) }}</div>@endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endforeach
+                        </div>
+                    @endforeach
+                    <div class="sub">التقدّمُ المقترحُ يُراجعه المدير — لا يُكتب على المهمّة قسراً (سياسة المنشأة).
+                        <a href="{{ route('reports.review') }}">مركز المراجعة ↗</a></div>
                 </div>
             @endif
             @include('partials.timeline', ['timeline' => $timeline])

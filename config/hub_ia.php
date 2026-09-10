@@ -174,6 +174,18 @@ return [
                 'exec' => ['label' => 'المهام والتنفيذ', 'order' => 1, 'destinations' => [
                     ['type' => 'module', 'module' => 'tasks', 'importance' => 'primary'],
                     ['type' => 'module', 'module' => 'updates', 'importance' => 'primary'],
+                    // تقاريرُ العملِ اليوميّة (§121): تقريري اليوم للموظّف، ومركزُ التقارير
+                    // والمراجعةُ للمدير/HR — فوق تحديثات العمل، لا محرّكَ تقاريرَ ثانٍ.
+                    ['type' => 'center', 'route' => 'reports.mine', 'guard' => 'reports_mine', 'importance' => 'primary',
+                        'key' => 'reports_mine', 'label' => 'تقرير اليوم',
+                        'synonyms' => ['my report', 'تقريري', 'تقرير اليوم', 'daily report', 'today report']],
+                    ['type' => 'center', 'route' => 'reports.index', 'guard' => 'reports_center', 'importance' => 'primary',
+                        'key' => 'reports_center', 'label' => 'مركز التقارير اليومية',
+                        'route_prefix' => 'reports', 'routes' => ['reports.index', 'reports.day'],
+                        'synonyms' => ['reports', 'التقارير', 'تقارير العمل', 'daily reports', 'compliance']],
+                    ['type' => 'center', 'route' => 'reports.review', 'guard' => 'reports_review', 'importance' => 'secondary',
+                        'key' => 'reports_review', 'label' => 'تقارير للمراجعة',
+                        'synonyms' => ['review', 'المراجعة', 'reports review', 'مراجعة التقارير']],
                     ['type' => 'module', 'module' => 'designs', 'importance' => 'primary'],
                     // issues بيتُه الأساسيّ هنا (03 لم يُدرجه صراحةً في أقسام «العمل» — أُسند لِـexec)
                     ['type' => 'module', 'module' => 'issues', 'importance' => 'primary'],

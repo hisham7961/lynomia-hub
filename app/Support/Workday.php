@@ -124,7 +124,14 @@ class Workday
 
         $row->time_out = $now->format('H:i');
         $row->hours = round(max(0, $mins) / 60, 2);
+        // الحالةُ فيزيائيّةٌ محضة — لا تُطمَس بغيابِ التقرير (§6)
         $row->status = self::evaluate($row, $user);
+        // مهلةُ التقرير تُختم عند الانصراف (§53): للعرضِ ولمرشّحِ أمرِ المصالحة (§51)
+        if (Schema::hasColumn('attendance', 'report_deadline_at')) {
+            $deadline = \App\Support\DailyWorkCompliance::computeDeadline(
+                (string) ($row->date?->toDateString() ?? $row->date), $row->time_out, true);
+            $row->report_deadline_at = $deadline;
+        }
         $row->meta = array_merge((array) $row->meta, ['checkout' => array_filter([
             'ip' => request()?->ip(), 'device' => hub_fit((string) request()?->userAgent(), 200),
         ])]);
@@ -133,16 +140,29 @@ class Workday
         hub_audit('تسجيل انصراف', 'attend', $row->id, $emp->name,
             ['after' => ['out' => $row->time_out, 'hours' => $row->hours, 'status' => $row->status]]);
 
-        $noReport = $row->status === self::NO_REPORT;
+        // رسالةُ الانصراف (§64): إن كان التقريرُ ما زال ناقصاً وواجباً، أخبِرْ بالمهلة —
+        // بلا حجبِ الانصراف، ومن المُحلِّلِ المركزيّ لا من عمودِ حالةٍ مطموس
+        $c = \App\Support\DailyWorkCompliance::resolve($emp, (string) ($row->date?->toDateString() ?? $row->date));
+        $pendingNote = '';
+        if (in_array($c['state'], [\App\Support\DailyWorkCompliance::REPORT_PENDING,
+            \App\Support\DailyWorkCompliance::PRESENT_WITHOUT_REPORT], true)) {
+            $pendingNote = '. تقريرُ اليوم لم يُقدَّم بعد'
+                . ($c['deadline_at'] ? '، ويجب تقديمُه قبل ' . $c['deadline_at']->format('H:i')
+                    . ' — بعدها يُحتسب اليومُ غيابًا لعدم تقديم التقرير' : ' — أضِف بنودَ يومك من تحديثات العمل');
+        }
 
-        return ['ok' => true, 'row' => $row,
-            'msg' => 'انصرفتَ ' . $row->time_out . ' — ' . $row->hours . ' ساعة'
-                . ($noReport ? '. تقريرُك اليومي لم يُكتب بعد — أضِف بنودَ يومك من تحديثات العمل' : '')];
+        return ['ok' => true, 'row' => $row, 'compliance' => $c,
+            'msg' => 'انصرفتَ ' . $row->time_out . ' — ' . $row->hours . ' ساعة' . $pendingNote];
     }
 
     /**
-     * الحالةُ النهائية لليوم: إجازةٌ معتمدة تغلب، ثم حضورٌ بتقريرٍ أو بدونه —
-     * وغيابُ التقرير حالةُ مراجعةٍ لا غياب (قابل للإطفاء من الإعدادات).
+     * الحالةُ الفيزيائيّة النهائية لليوم — **حضورٌ لا امتثال** (§6).
+     *
+     * إجازةٌ معتمدة تغلب، ثم متأخّر/ميدانيّ/عن بعد/حاضر. **لا يطمس هذا العمودُ
+     * غيابَ التقرير أبداً** بعد اليوم: الامتثالُ التقريريُّ والأثرُ الفعّال يُشتقّان
+     * مركزيّاً في `DailyWorkCompliance` (فيُعاد تقييمُهما لحظةَ تقديمِ التقريرِ ولو
+     * بعد الانصراف). كان هذا الموضعُ يُرجع «حاضر — بلا تقرير» فيدهس الحضورَ ولا
+     * يُعاد أبداً — جذرُ العيب (ROOT_CAUSE.md).
      */
     public static function evaluate(Attendance $row, ?User $user = null): string
     {
@@ -151,17 +171,7 @@ class Workday
         }
 
         $base = self::REMOTE_MODES[$row->mode] ?? null;
-        $current = in_array($row->status, [self::LATE], true) ? self::LATE : ($base ?: self::PRESENT);
-
-        if ((string) setting('work.report_required', '1') === '1' && $user) {
-            $has = DB::table('work_updates')->whereNull('deleted_at')
-                ->where('created_by', $user->id)
-                ->whereDate('work_date', $row->date)
-                ->exists();
-            if (! $has) return self::NO_REPORT;
-        }
-
-        return $current;
+        return in_array($row->status, [self::LATE], true) ? self::LATE : ($base ?: self::PRESENT);
     }
 
     /** أَعلى الموظفِ إجازةٌ معتمدةٌ من أنواع الغياب تشمل هذا اليوم؟ */
@@ -226,44 +236,49 @@ class Workday
             ->whereNull('deleted_at')->where('status', 'نشط')
             ->orderBy('name')->get(['id', 'name', 'dept', 'user_id']);
 
-        $att = Attendance::whereNull('deleted_at')->whereDate('date', $today)
-            ->whereIn('emp_id', $emps->pluck('id'))->get()->keyBy('emp_id');
+        // الحلُّ الجماعيُّ المركزيّ (§101 · N+1=0): استعلامان لا استعلامٌ لكلِّ صف
+        $comp = \App\Support\DailyWorkCompliance::resolveMany($emps, $today);
 
-        $logs = DB::table('work_updates')->whereNull('deleted_at')
+        // بلاغاتُ العوائق: تُقرأ مع بنودِ اليوم دفعةً واحدة (لا استعلامَ لكلِّ موظف)
+        $blockersByUser = DB::table('work_updates')->whereNull('deleted_at')
             ->whereDate('work_date', $today)
             ->whereIn('created_by', $emps->pluck('user_id')->filter())
-            ->get(['created_by', 'project_id', 'hours', 'problems'])
-            ->groupBy('created_by');
+            ->whereNotNull('problems')->where('problems', '!=', '')
+            ->get(['created_by'])->groupBy('created_by');
 
         $projects = hub_ref_labels('projects',
-            $logs->flatten(1)->pluck('project_id')->filter()->unique()->values()->all());
+            collect($comp)->pluck('projects')->flatten(1)->filter()->unique()->values()->all());
 
         $rows = [];
         $n = ['emps' => $emps->count(), 'in' => 0, 'noreport' => 0, 'leave' => 0,
-            'field' => 0, 'absent' => 0, 'late' => 0, 'none' => 0, 'hours' => 0.0, 'blockers' => 0];
+            'field' => 0, 'absent' => 0, 'late' => 0, 'none' => 0, 'hours' => 0.0, 'blockers' => 0,
+            'reported' => 0, 'pending' => 0, 'missing' => 0, 'absence_report' => 0];
 
         foreach ($emps as $e) {
-            $a = $att->get($e->id);
-            $mine = $e->user_id ? ($logs->get($e->user_id) ?? collect()) : collect();
-            $blockers = $mine->pluck('problems')->filter(fn ($p) => trim((string) $p) !== '')->count();
-            $hours = (float) $mine->sum('hours');
+            $c = $comp[$e->id];
+            $a = $c['attendance'];
+            $blockers = (int) ($blockersByUser->get($e->user_id)?->count() ?? 0);
 
-            $st = $a?->status;
-            if ($a && $a->time_in) $n['in']++;
-            if ($st === self::NO_REPORT || ($a && $a->time_in && $mine->isEmpty() && ! $a->time_out)) $n['noreport']++;
-            if ($st === self::LEAVE) $n['leave']++;
-            if (in_array($st, [self::FIELD, self::REMOTE], true)) $n['field']++;
-            if ($st === self::ABSENT) $n['absent']++;
-            if ($st === self::LATE) $n['late']++;
+            if ($c['checked_in']) $n['in']++;
+            // «تقريرٌ ناقص» = حاضرٌ بلا تقريرٍ صالح (بانتظار أو ناقص) — تتبع الإشارةَ القائمة
+            if ($c['checked_in'] && ! $c['report_submitted'] && ! $c['on_leave']) $n['noreport']++;
+            if ($c['report_submitted']) $n['reported']++;
+            if ($c['compliance'] === 'pending') $n['pending']++;
+            if ($c['state'] === \App\Support\DailyWorkCompliance::PRESENT_WITHOUT_REPORT) $n['missing']++;
+            if ($c['effective'] === 'absent_due_to_missing_report') $n['absence_report']++;
+            if ($c['on_leave']) $n['leave']++;
+            if (in_array($c['physical'], [self::FIELD, self::REMOTE], true)) $n['field']++;
+            if ($c['physical'] === self::ABSENT || (! $c['checked_in'] && $a)) $n['absent']++;
+            if ($c['physical'] === self::LATE) $n['late']++;
             if (! $a) $n['none']++;
-            $n['hours'] += $hours;
+            $n['hours'] += $c['reported_hours'];
             $n['blockers'] += $blockers;
 
             $rows[] = [
-                'emp' => $e, 'att' => $a, 'entries' => $mine->count(), 'hours' => $hours,
+                'emp' => $e, 'att' => $a, 'comp' => $c,
+                'entries' => $c['report_count'], 'hours' => $c['reported_hours'],
                 'blockers' => $blockers,
-                'projects' => $mine->pluck('project_id')->filter()->unique()
-                    ->map(fn ($pid) => $projects[$pid] ?? '—')->values()->all(),
+                'projects' => collect($c['projects'])->map(fn ($pid) => $projects[$pid] ?? '—')->values()->all(),
             ];
         }
 
