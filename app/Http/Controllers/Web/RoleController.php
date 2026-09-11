@@ -21,10 +21,13 @@ class RoleController extends Controller
         'copySec' => 'نسخ السرّ للحافظة — نصّه يصل الجهاز',
         'exp'     => 'تصدير البيانات',
         'mobile'  => 'منصّة تطبيق الهاتف — إدارةٌ وتشغيل',
+        // رقابةُ الاتصالات: بابٌ يُسنَد صراحةً لدورٍ (غيرِ المالك) لمراجعةِ خيوطِ التواصل
+        // — بديلُ التوثيقِ باسمِ الدور (Permissions 360 · 02.1/20.1)، غيرُ موروثٍ للمالكِ آليّاً.
+        'oversight' => 'رقابةُ الاتصالات — مراجعةُ خيوطِ التواصل',
     ];
 
     /** رايات يترتّب على منحها وصولٌ واسع — تُوسَم في الشاشة لا تُدسّ بين البقية */
-    public const RISKY_FLAGS = ['users', 'secrets', 'copySec', 'exp', 'audit', 'mobile'];
+    public const RISKY_FLAGS = ['users', 'secrets', 'copySec', 'exp', 'audit', 'mobile', 'oversight'];
 
     protected array $ops = ['v' => 'عرض', 'a' => 'إضافة', 'e' => 'تعديل', 'd' => 'حذف'];
 
