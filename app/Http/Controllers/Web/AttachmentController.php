@@ -263,25 +263,45 @@ class AttachmentController extends Controller
         $this->guardRecord($a->module, $a->record_id, 'v');
 
         $d = $r->validate([
-            'principal_type' => 'required|in:role,user',
-            'principal_id'   => 'required|string',
-            'effect'         => 'required|in:allow,deny',
-            'action'         => 'nullable|in:*,download,preview,view',
-            'note'           => 'nullable|string|max:300',
+            'effect'  => 'required|in:allow,deny',
+            'action'  => 'nullable|in:*,download,preview,view',
+            'note'    => 'nullable|string|max:300',
+            // **أطرافٌ متعددة** في ضبطةٍ واحدة: عدّةُ أدوارٍ و/أو عدّةُ أشخاص
+            'roles'   => 'array',
+            'roles.*' => 'string',
+            'users'   => 'array',
+            'users.*' => 'string',
+            // توافقٌ خلفيّ: طرفٌ مفرد
+            'principal_type' => 'nullable|in:role,user',
+            'principal_id'   => 'nullable|string',
         ]);
 
-        DB::table('document_access_rules')->updateOrInsert(
-            ['resource_type' => 'attachment', 'resource_id' => $a->id,
-             'principal_type' => $d['principal_type'], 'principal_id' => $d['principal_id'],
-             'action' => $d['action'] ?? '*'],
-            ['effect' => $d['effect'], 'note' => $d['note'] ?? null,
-             'created_by' => $u->id, 'updated_at' => now(), 'created_at' => now()],
-        );
-        \App\Support\DocumentPolicy::forget((string) $a->id);
-        hub_audit('ضبط وصول وثيقة', $a->module, $a->record_id, (string) $a->original_name,
-            ['after' => ['doc' => $a->id, $d['principal_type'] => $d['principal_id'], 'effect' => $d['effect']]]);
+        // اجمعِ الأطرافَ (أدوارٌ + أشخاص + المفردُ للتوافق) بلا تكرار — «type:id»
+        $principals = [];
+        foreach ((array) ($d['roles'] ?? []) as $rid) if ($rid !== '') $principals[] = 'role:' . $rid;
+        foreach ((array) ($d['users'] ?? []) as $uid) if ($uid !== '') $principals[] = 'user:' . $uid;
+        if (! empty($d['principal_type']) && ! empty($d['principal_id'])) {
+            $principals[] = $d['principal_type'] . ':' . $d['principal_id'];
+        }
+        $principals = array_values(array_unique($principals));
+        abort_if(! $principals, 422, 'اختر دوراً أو شخصاً واحداً على الأقل');
 
-        return back()->with('ok', $d['effect'] === 'deny' ? 'مُنع الوصولُ لهذه الوثيقة' : 'سُمح الوصولُ لهذه الوثيقة');
+        $action = $d['action'] ?? '*';
+        foreach ($principals as $pk) {
+            [$ptype, $pid] = explode(':', $pk, 2);
+            DB::table('document_access_rules')->updateOrInsert(
+                ['resource_type' => 'attachment', 'resource_id' => $a->id,
+                 'principal_type' => $ptype, 'principal_id' => $pid, 'action' => $action],
+                ['effect' => $d['effect'], 'note' => $d['note'] ?? null,
+                 'created_by' => $u->id, 'updated_at' => now(), 'created_at' => now()],
+            );
+        }
+        \App\Support\DocumentPolicy::forget((string) $a->id);
+        $n = count($principals);
+        hub_audit('ضبط وصول وثيقة', $a->module, $a->record_id, (string) $a->original_name,
+            ['after' => ['doc' => $a->id, 'effect' => $d['effect'], 'principals' => $n]]);
+
+        return back()->with('ok', ($d['effect'] === 'deny' ? 'مُنع' : 'سُمح') . " الوصولُ لهذه الوثيقةِ لـ{$n} طرفاً");
     }
 
     /** حذفُ قاعدةِ وصولِ وثيقة */

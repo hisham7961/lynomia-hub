@@ -177,4 +177,32 @@ class DocumentAccessPolicyTest extends TestCase
             'principal_type' => 'user', 'principal_id' => $target->id, 'effect' => 'allow',
         ])->assertForbidden();
     }
+
+    /** **أطرافٌ متعددة في ضبطةٍ واحدة**: عدّةُ أشخاصٍ ودورٍ معاً — قاعدةٌ لكلٍّ، وكلُّها تُفرَض */
+    public function test_owner_can_set_rules_for_multiple_people_and_roles_at_once(): void
+    {
+        $this->seedCore();
+        $p = Project::create(['name' => 'مشروع', 'status' => 'نشط']);
+        $a = $this->attach($p, 'صورةٌ سرية.jpg');
+        $u1 = $this->internal('p1@test.local', ['projects' => ['v' => 1]]);
+        $u2 = $this->internal('p2@test.local', ['projects' => ['v' => 1]]);
+
+        // المالكُ يسمحُ لشخصين ودورٍ في POST واحد
+        $this->actingAs($this->owner)->post(route('att.access', $a->id), [
+            'effect' => 'allow',
+            'users' => [$u1->id, $u2->id],
+            'roles' => [$u1->role_id],
+        ])->assertRedirect();
+
+        // ثلاثُ قواعدَ أُنشئت (شخصان + دور)
+        $this->assertSame(3, DB::table('document_access_rules')->where('resource_id', $a->id)->count());
+        $this->assertSame(2, DB::table('document_access_rules')->where('resource_id', $a->id)
+            ->where('principal_type', 'user')->count());
+        $this->assertSame(1, DB::table('document_access_rules')->where('resource_id', $a->id)
+            ->where('principal_type', 'role')->count());
+
+        // ولا اختيارَ طرفٍ ⇒ ٤٢٢ (لا قاعدةَ فارغة)
+        $this->actingAs($this->owner)->post(route('att.access', $a->id), ['effect' => 'deny'])
+            ->assertStatus(422);
+    }
 }
