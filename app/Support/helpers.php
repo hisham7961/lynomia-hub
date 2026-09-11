@@ -2639,11 +2639,16 @@ if (! function_exists('hub_timeline')) {
                 '#c-' . $c->id, $name($c->user_id));
         }
 
-        // ٣) المرفقات
-        foreach (\Illuminate\Support\Facades\DB::table('attachments')->whereNull('deleted_at')
-                    ->where('module', $module)->where('record_id', $recordId)
-                    ->orderByDesc('created_at')->limit($limit)
-                    ->get(['original_name', 'uploaded_by', 'created_at']) as $t) {
+        // ٣) المرفقات — والرؤيةُ تتبع قاعدةَ الوثيقة: مرفقٌ ممنوعٌ صريحاً عن القارئِ
+        // لا يُذكَر اسمُه في خطِّه الزمنيّ (وجودٌ يُكشَف). تحميلٌ دفعيٌّ للقواعدِ مرّة.
+        $tlAtts = \App\Models\Attachment::whereNull('deleted_at')
+            ->where('module', $module)->where('record_id', $recordId)
+            ->orderByDesc('created_at')->limit($limit)
+            ->get(['id', 'original_name', 'uploaded_by', 'created_at']);
+        \App\Support\DocumentPolicy::primeMemo($tlAtts->pluck('id'));
+        $tlViewer = auth()->user();
+        foreach ($tlAtts as $t) {
+            if ($tlViewer && ! \App\Support\DocumentPolicy::listable($tlViewer, $t)) continue;
             $add($t->created_at, '📎', 'مرفق',
                 \Illuminate\Support\Str::limit((string) $t->original_name, 60),
                 null, $name($t->uploaded_by));
@@ -4926,6 +4931,12 @@ if (! function_exists('hub_dossier')) {
         } catch (\Throwable $e) {
         }
 
+        // **العدُّ حَوكمةٌ، والروابطُ رؤية**: أعدادُ الاكتمالِ والنواقصِ تبقى على حقيقةِ
+        // الملفِّ مهما كانت قواعدُ الوصول (وإلا بدا الملفُّ مكتملاً لمن مُنع وثيقةً)، لكنَّ
+        // **روابطَ التنزيلِ** لا تُعرَض إلا لِما يجوزُ لهذا القارئِ رؤيتُه. تحميلٌ دفعيٌّ مرّة.
+        $docViewer = auth()->user();
+        \App\Support\DocumentPolicy::primeMemo($files->pluck('id'));
+
         $today = now()->startOfDay();
         foreach ($spec as $d) {
             $mine = $files->where('kind', $d['key']);
@@ -4950,7 +4961,11 @@ if (! function_exists('hub_dossier')) {
                 'key' => $d['key'], 'label' => $d['label'],
                 'req' => (bool) ($d['req'] ?? false), 'multi' => (bool) ($d['multi'] ?? false),
                 'expiry' => (bool) ($d['expiry'] ?? false), 'hint' => $d['hint'] ?? null,
-                'n' => $mine->count(), 'files' => $mine->values()->all(),
+                // العدُّ كاملٌ (حَوكمة)، وقائمةُ الروابطِ مُرشَّحةٌ بقاعدةِ الوثيقة (رؤية)
+                'n' => $mine->count(),
+                'files' => $mine->filter(fn ($f) => ! $docViewer
+                        || \App\Support\DocumentPolicy::listable($docViewer, $f))
+                    ->values()->all(),
                 'latest' => $latest, 'expires' => $exp, 'days' => $days,
                 'state' => $state, 'tone' => $tone,
             ];
@@ -4984,7 +4999,11 @@ if (! function_exists('hub_doc_expiry')) {
         // حارس ذاكرةٍ واسع، والحدّ الحقيقي (٢٠٠) يقع في hub_expiry بعد الترتيب.
         $rows = \App\Models\Attachment::whereNull('deleted_at')->whereNotNull('expires_at')
             ->whereBetween('expires_at', [now()->subDays(60)->toDateString(), now()->addDays(60)->toDateString()])
-            ->orderBy('expires_at')->limit(5000)->get(['module', 'record_id', 'kind', 'expires_at', 'doc_no']);
+            ->orderBy('expires_at')->limit(5000)->get(['id', 'module', 'record_id', 'kind', 'expires_at', 'doc_no']);
+
+        // **الرؤيةُ تتبع قاعدةَ الوثيقة**: وثيقةٌ ممنوعةٌ صريحاً عن القارئِ لا تظهرُ في رادارِه
+        // (اسمُها وانتهاؤها وجودٌ يُكشَف). تحميلٌ دفعيٌّ للقواعدِ مرّةً (لا N+1).
+        \App\Support\DocumentPolicy::primeMemo($rows->pluck('id'));
 
         $out = [];
         foreach ($rows->groupBy('module') as $mk => $group) {
@@ -4998,6 +5017,7 @@ if (! function_exists('hub_doc_expiry')) {
 
             foreach ($group as $a) {
                 if (! isset($ids[$a->record_id])) continue;      // خارج نطاقه
+                if ($user && ! \App\Support\DocumentPolicy::listable($user, $a)) continue;  // ممنوعةٌ صريحاً عنه
                 $d = $a->expires_at->toDateString();
                 $out[] = [
                     'module' => $mk, 'mlabel' => $md['label'],

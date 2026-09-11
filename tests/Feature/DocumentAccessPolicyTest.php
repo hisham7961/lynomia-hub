@@ -205,4 +205,142 @@ class DocumentAccessPolicyTest extends TestCase
         $this->actingAs($this->owner)->post(route('att.access', $a->id), ['effect' => 'deny'])
             ->assertStatus(422);
     }
+
+    /* ═══════════ الرؤيةُ تتبع القاعدة: لا كشفَ وجودٍ في القائمة ═══════════ */
+
+    /**
+     * **لا «رؤيةٌ غير مُفسَّرة»**: الوثيقةُ الممنوعةُ صريحاً عن المستخدمِ لا تظهرُ في قائمتِه
+     * أصلاً — لا اسمُها ولا عدُّها — لا يكفي منعُ التنزيل. (المالكُ يتجاوز فيرى الكلَّ.)
+     */
+    public function test_denied_document_is_hidden_from_the_listing(): void
+    {
+        $this->seedCore();
+        $p = Project::create(['name' => 'مشروع', 'status' => 'نشط']);
+        $ok = $this->attach($p, 'مسموحةٌ للعرض.pdf');
+        $denied = $this->attach($p, 'راتبٌ سريٌّ ممنوع.pdf');
+        $u = $this->internal('viewer@test.local', ['projects' => ['v' => 1]]);
+        $this->rule($denied, 'user', $u->id, 'deny');
+
+        $all = Attachment::whereIn('id', [$ok->id, $denied->id])->orderBy('created_at')->get();
+
+        // choke-point: الدالةُ نفسُها التي يستدعيها الجزءُ (partial) قبلَ السرد
+        $visible = \App\Support\DocumentPolicy::filterListable($u, $all);
+        $this->assertSame([$ok->id], $visible->pluck('id')->all());
+
+        // المالكُ يرى الاثنتين (يتجاوز)
+        $ownerVisible = \App\Support\DocumentPolicy::filterListable(
+            $this->owner, Attachment::whereIn('id', [$ok->id, $denied->id])->get());
+        $this->assertCount(2, $ownerVisible);
+
+        // السطحُ الفعليّ: الجزءُ المعروض لا يذكرُ اسمَ الممنوعةِ ولا يعدُّها للمستخدم
+        \Illuminate\Support\Facades\View::share('errors', new \Illuminate\Support\ViewErrorBag);
+        $this->actingAs($u);
+        $html = view('partials.attachments', [
+            'aModule' => 'projects', 'aRecordId' => $p->id,
+            'attachments' => Attachment::whereIn('id', [$ok->id, $denied->id])->orderBy('created_at')->get(),
+            'aUsers' => collect(),
+        ])->render();
+        $this->assertStringContainsString('مسموحةٌ للعرض', $html);
+        $this->assertStringNotContainsString('راتبٌ سريٌّ ممنوع', $html);
+    }
+
+    /**
+     * **رادارُ «ينتهي قريباً» يتبع القاعدة**: وثيقةٌ مؤرَّخةٌ ممنوعةٌ صريحاً عن القارئِ
+     * لا تظهرُ في رادارِه (وجودُها وانتهاؤها كشفٌ) — وتبقى للمالكِ (يتجاوز).
+     */
+    public function test_expiry_radar_hides_denied_document(): void
+    {
+        $this->seedCore();
+        $p = Project::create(['name' => 'مشروعُ الرادار', 'status' => 'نشط']);
+        $a = $this->attach($p, 'عقدٌ سريّ.pdf', 'contract');
+        $a->forceFill(['expires_at' => now()->addDays(10)])->save();
+        $u = $this->internal('radar@test.local', ['projects' => ['v' => 1]]);
+
+        // قبلَ المنع: الوثيقةُ في رادارِ المستخدم
+        $before = collect(hub_doc_expiry($u))->firstWhere('id', $p->id);
+        $this->assertNotNull($before, 'يجب أن تظهرَ الوثيقةُ المؤرَّخةُ في الرادارِ قبلَ أيِّ قاعدة');
+
+        // بعدَ المنعِ الصريح: تختفي عن المستخدمِ، وتبقى للمالك
+        $this->rule($a, 'user', $u->id, 'deny');
+        $this->assertNull(collect(hub_doc_expiry($u))->firstWhere('id', $p->id),
+            'الوثيقةُ الممنوعةُ صريحاً يجب ألّا تظهرَ في رادارِ المستخدم');
+        $this->assertNotNull(collect(hub_doc_expiry($this->owner))->firstWhere('id', $p->id),
+            'المالكُ يتجاوزُ قواعدَ الوثائق فيرى الرادارَ كاملاً');
+    }
+
+    /* ═══════════ لا التفافَ على المنع عبر مسارِ الملف ═══════════ */
+
+    /**
+     * **بوابةُ الملفِّ بالمسار (`file.show`) لا تلتفُّ على منعِ الوثيقة.** كانت تخدمُ
+     * البايتاتِ لمن يرى السجلَّ الأمَّ بلا مشاورةِ طبقةِ الوثيقة — فمن مُنع وثيقةً
+     * ثم عرف مسارَها أخذها من هنا. الآن يُفرَض القرارُ نفسُه.
+     */
+    public function test_file_show_path_cannot_bypass_document_deny(): void
+    {
+        $this->seedCore();
+        $p = Project::create(['name' => 'مشروع', 'status' => 'نشط']);
+        $a = $this->attach($p, 'كشفُ راتبٍ سريّ.pdf');
+        $u = $this->internal('pathbypass@test.local', ['projects' => ['v' => 1]]);
+
+        // نكتبُ الملفَّ حقيقةً على القرصِ الذي تقرؤه file.show (storage_path)
+        $abs = storage_path('app/' . $a->path);
+        if (! is_dir(dirname($abs))) @mkdir(dirname($abs), 0777, true);
+        file_put_contents($abs, 'REAL-BYTES');
+
+        try {
+            // قبلَ المنع: يخدمُه المسارُ (يرى السجل)
+            $this->actingAs($u)->get(route('file.show', $a->path))->assertOk();
+
+            // بعدَ المنعِ الصريح: يُرفَض بالمسارِ أيضاً (لا التفاف) — والمالكُ يتجاوز
+            $this->rule($a, 'user', $u->id, 'deny');
+            $this->actingAs($u)->get(route('file.show', $a->path))->assertForbidden();
+            $this->actingAs($this->owner)->get(route('file.show', $a->path))->assertOk();
+        } finally {
+            @unlink($abs);
+        }
+    }
+
+    /* ═══════════ ملفُّ الكيان: العدُّ حَوكمةٌ والروابطُ رؤية ═══════════ */
+
+    /**
+     * **الدوسيه**: عدُّ الاكتمالِ يبقى كاملاً (وإلا بدا الملفُّ مكتملاً لمن مُنع)، لكنَّ
+     * **رابطَ تنزيلِ** الوثيقةِ الممنوعةِ لا يُعرَض لهذا القارئ — ويبقى للمالك.
+     */
+    public function test_dossier_keeps_count_but_hides_denied_download_link(): void
+    {
+        $this->seedCore();
+        $p = Project::create(['name' => 'مشروع', 'status' => 'نشط']);
+        $a = $this->attach($p, 'عقدُ المشروعِ السريّ.pdf', 'contract');
+        $u = $this->internal('doss@test.local', ['projects' => ['v' => 1]]);
+        $this->rule($a, 'user', $u->id, 'deny');
+
+        $this->actingAs($u);
+        $row = collect(hub_dossier('projects', $p->id)['rows'])->firstWhere('key', 'contract');
+        $this->assertSame(1, $row['n'], 'العدُّ (حَوكمة) يبقى كاملاً رغمَ المنع');
+        $this->assertCount(0, $row['files'], 'رابطُ تنزيلِ الممنوعِ لا يُعرَض');
+
+        $this->actingAs($this->owner);
+        $orow = collect(hub_dossier('projects', $p->id)['rows'])->firstWhere('key', 'contract');
+        $this->assertCount(1, $orow['files'], 'المالكُ يرى الرابط (يتجاوز)');
+    }
+
+    /**
+     * **الخطُّ الزمنيّ**: اسمُ الوثيقةِ الممنوعةِ لا يظهرُ في خطِّ القارئِ الممنوع.
+     */
+    public function test_timeline_hides_denied_attachment_name(): void
+    {
+        $this->seedCore();
+        $p = Project::create(['name' => 'مشروع', 'status' => 'نشط']);
+        $a = $this->attach($p, 'وثيقةٌ سريّةٌ في الخطّ.pdf');
+        $u = $this->internal('tl@test.local', ['projects' => ['v' => 1]]);
+        $this->rule($a, 'user', $u->id, 'deny');
+
+        $this->actingAs($u);
+        $this->assertStringNotContainsString('سريّةٌ في الخطّ',
+            json_encode(hub_timeline('projects', $p->id), JSON_UNESCAPED_UNICODE));
+
+        $this->actingAs($this->owner);
+        $this->assertStringContainsString('سريّةٌ في الخطّ',
+            json_encode(hub_timeline('projects', $p->id), JSON_UNESCAPED_UNICODE));
+    }
 }
