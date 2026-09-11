@@ -1,4 +1,16 @@
 {{-- المرفقات الشاملة — يتوقع: $aModule $aRecordId $attachments $aUsers (id=>name) --}}
+@php
+    // التحكّمُ بوصولِ الوثيقةِ على مستوى المورد (Permissions 360 · وثائق · المستوى 5/6):
+    // للمالكِ أو محرِّرِ الوحدة. تُحمَّل القواعدُ والأدوارُ دفعةً واحدةً (لا N+1).
+    $aCanAcl = hub_is_owner() || hub_can(auth()->user(), $aModule, 'e');
+    $aAcl = ($aCanAcl && \Illuminate\Support\Facades\Schema::hasTable('document_access_rules'))
+        ? \Illuminate\Support\Facades\DB::table('document_access_rules')
+            ->where('resource_type', 'attachment')
+            ->whereIn('resource_id', $attachments->pluck('id'))
+            ->get()->groupBy('resource_id')
+        : collect();
+    $aRoles = $aCanAcl ? \App\Models\Role::where('is_owner', false)->orderBy('name')->get(['id', 'name']) : collect();
+@endphp
 <div class="card" id="attachments">
     <h3>📎 المرفقات <span class="bdg g">{{ $attachments->count() }}</span>
         {{-- حزمةٌ واحدةٌ بدل اثنتي عشرة ضغطة — بالأسماء الأصلية كما رُفعت --}}
@@ -54,6 +66,39 @@
                     </form>
                 @endif
             </div>
+            {{-- التحكّمُ بالوصول (المستوى 5/6): سماحٌ/منعٌ لهذه الوثيقةِ بعينها لدورٍ — للمالك/المحرِّر --}}
+            @if ($aCanAcl)
+                @php $aRows = $aAcl[$a->id] ?? collect(); @endphp
+                <details style="margin-top:4px">
+                    <summary class="sub pointer">🔒 التحكّم بالوصول @if ($aRows->count()) <span class="bdg wn">{{ $aRows->count() }} قاعدة</span>@endif</summary>
+                    <div style="padding:6px 0">
+                        @foreach ($aRows as $ar)
+                            <div class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                                <span class="bdg {{ $ar->effect === 'deny' ? 'bad' : 'ok' }}">{{ $ar->effect === 'deny' ? 'منع' : 'سماح' }}</span>
+                                {{ $ar->principal_type === 'role' ? 'دور' : 'مستخدم' }}: {{ \Illuminate\Support\Str::limit($ar->principal_id, 14) }}
+                                <form method="POST" action="{{ route('att.access.clear', [$a->id, $ar->id]) }}" class="inline">
+                                    @csrf @method('DELETE')
+                                    <button class="btn ghost xs" aria-label="إزالة قاعدة الوصول">إزالة</button>
+                                </form>
+                            </div>
+                        @endforeach
+                        <form method="POST" action="{{ route('att.access', $a->id) }}" class="crow" style="margin-top:4px">
+                            @csrf
+                            <input type="hidden" name="principal_type" value="role">
+                            <label class="vh" for="acl-role-{{ $a->id }}">الدور</label>
+                            <select class="inp" id="acl-role-{{ $a->id }}" name="principal_id" required style="max-width:180px">
+                                <option value="">— اختر دوراً —</option>
+                                @foreach ($aRoles as $role)<option value="{{ $role->id }}">{{ $role->name }}</option>@endforeach
+                            </select>
+                            <select class="inp" name="effect" style="max-width:110px">
+                                <option value="deny">منع</option>
+                                <option value="allow">سماح</option>
+                            </select>
+                            <button class="btn ghost sm" type="submit">حفظ القاعدة</button>
+                        </form>
+                    </div>
+                </details>
+            @endif
             {{-- معاينة كاملة داخل الصفحة نفسها — بلا منبثقات: الصورة تتمدد وPDF بعارضه --}}
             @if ($isImg || $isPdf)
                 <details style="margin-top:4px">

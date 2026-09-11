@@ -24,6 +24,9 @@ class HubBackup extends Command
      * تُصدَّر خاماً (أعمدتها كما هي) فتحفظ تواريخها ومحتواها حرفياً.
      */
     protected const RAW_TABLES = [
+        // قواعدُ وصولِ الوثائقِ على مستوى المورد (Permissions 360 · وثائق): حَوكمةٌ صريحةٌ
+        // لا تُشتَقُّ من شيء — تُنسخ خاماً وإلا استُعيدت المنشأةُ بلا سماحاتِ/منعِ الوثائقِ الفردية.
+        'document_access_rules',
         'journal_lines', 'payroll_lines', 'attachments',
         'contract_signers', 'contract_events', 'contract_approval_steps',
         'sign_template_versions', 'record_versions', 'record_acks',

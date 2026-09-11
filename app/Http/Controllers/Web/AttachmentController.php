@@ -145,6 +145,9 @@ class AttachmentController extends Controller
         $used = [];
         $packed = [];
         foreach ($items as $a) {
+            // طبقةُ الوثيقةِ على المورد: وثيقةٌ ممنوعةٌ صراحةً لهذا المستخدمِ لا تدخلُ الحزمةَ
+            // (فلا يلتفُّ التنزيلُ الجماعيُّ على منعٍ فرديّ · المستوى 5/6)
+            if (! \App\Support\DocumentPolicy::allows(auth()->user(), $a, 'download')) continue;
             $abs = Storage::disk($a->disk ?: 'local')->path($a->path);
             if (! is_file($abs)) continue;                      // ملفٌ مفقودٌ على القرص لا يُسقط الحزمة كلها
 
@@ -244,6 +247,55 @@ class AttachmentController extends Controller
         hub_audit('حذف مرفق', $a->module, $a->record_id, (string) $a->original_name);
 
         return back()->with('ok', 'حُذف المرفق');
+    }
+
+    /**
+     * **ضبطُ قاعدةِ وصولٍ لوثيقةٍ بعينها** (المستوى 5/6): سماحٌ/منعٌ لدورٍ أو مستخدم،
+     * مربوطٌ بمعرِّفِ المرفقِ المستقرّ (لا باسم الملف). للمالكِ أو من يملكُ تعديلَ وحدةِ السجل.
+     */
+    public function access(Request $r, string $id)
+    {
+        $a = Attachment::findOrFail($id);
+        $u = auth()->user();
+        abort_unless(hub_is_owner($u) || hub_can($u, $a->module, 'e'), 403,
+            'ضبطُ وصولِ الوثيقةِ للمالكِ أو من يملكُ تعديلَ وحدتها');
+        // النطاقُ يسري: لا تُضبط وثيقةُ سجلٍّ خارجَ صلاحيتك (٤٠٤ لا إثباتَ وجود)
+        $this->guardRecord($a->module, $a->record_id, 'v');
+
+        $d = $r->validate([
+            'principal_type' => 'required|in:role,user',
+            'principal_id'   => 'required|string',
+            'effect'         => 'required|in:allow,deny',
+            'action'         => 'nullable|in:*,download,preview,view',
+            'note'           => 'nullable|string|max:300',
+        ]);
+
+        DB::table('document_access_rules')->updateOrInsert(
+            ['resource_type' => 'attachment', 'resource_id' => $a->id,
+             'principal_type' => $d['principal_type'], 'principal_id' => $d['principal_id'],
+             'action' => $d['action'] ?? '*'],
+            ['effect' => $d['effect'], 'note' => $d['note'] ?? null,
+             'created_by' => $u->id, 'updated_at' => now(), 'created_at' => now()],
+        );
+        \App\Support\DocumentPolicy::forget((string) $a->id);
+        hub_audit('ضبط وصول وثيقة', $a->module, $a->record_id, (string) $a->original_name,
+            ['after' => ['doc' => $a->id, $d['principal_type'] => $d['principal_id'], 'effect' => $d['effect']]]);
+
+        return back()->with('ok', $d['effect'] === 'deny' ? 'مُنع الوصولُ لهذه الوثيقة' : 'سُمح الوصولُ لهذه الوثيقة');
+    }
+
+    /** حذفُ قاعدةِ وصولِ وثيقة */
+    public function accessClear(Request $r, string $id, string $ruleId)
+    {
+        $a = Attachment::findOrFail($id);
+        $u = auth()->user();
+        abort_unless(hub_is_owner($u) || hub_can($u, $a->module, 'e'), 403);
+        DB::table('document_access_rules')->where('id', $ruleId)
+            ->where('resource_type', 'attachment')->where('resource_id', $a->id)->delete();
+        \App\Support\DocumentPolicy::forget((string) $a->id);
+        hub_audit('حذف قاعدة وصول وثيقة', $a->module, $a->record_id, (string) $a->original_name);
+
+        return back()->with('ok', 'أُزيلت قاعدةُ الوصول');
     }
 
     /** مرفقات سجل — للتضمين في صفحة العرض */
