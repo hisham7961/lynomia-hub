@@ -132,6 +132,10 @@ class Employee360
     public function dailyReports(Employee $emp, $u, int $days = 14): array
     {
         if (! hub_can($u, 'updates', 'v')) return [];
+        // **بياناتُ الحضورِ خلفَ صلاحيتِها** (Permissions 360 · 09.1): التبويبُ محروسٌ بـ
+        // updates:v، لكنّ وقتَ الحضور/الانصرافِ والحضورَ الفعليَّ والتأخّرَ بياناتُ حضورٍ —
+        // تُحجَبُ عمّن لا يملكُ attend:v (تُصفَّرُ لا تُحذَفُ الصفَّ كي يبقى سجلُّ التقرير).
+        $seeAttend = hub_can($u, 'attend', 'v');
         $out = [];
         $cursor = \App\Support\BusinessDate::now();
         for ($i = 0; $i < max(1, min(60, $days)); $i++) {
@@ -141,15 +145,16 @@ class Employee360
             if (! $c['checked_in'] && ! $c['report_submitted'] && ! $c['on_leave']) continue;
             $out[] = [
                 'date' => $date,
-                'physical' => $c['labels']['physical'],
-                'time_in' => $c['time_in'], 'time_out' => $c['time_out'],
+                'physical' => $seeAttend ? $c['labels']['physical'] : null,
+                'time_in' => $seeAttend ? $c['time_in'] : null,
+                'time_out' => $seeAttend ? $c['time_out'] : null,
                 'compliance' => $c['labels']['compliance'],
                 'effective' => $c['labels']['effective'],
                 'effective_key' => $c['effective'],
                 'report_count' => $c['report_count'],
                 'reported_hours' => $c['reported_hours'],
                 'projects' => $c['projects'],
-                'late' => $c['late'],
+                'late' => $seeAttend ? $c['late'] : null,
                 'review' => $c['review'],
             ];
         }
