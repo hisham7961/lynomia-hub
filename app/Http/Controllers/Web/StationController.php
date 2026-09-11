@@ -76,6 +76,16 @@ class StationController extends Controller
             throw ValidationException::withMessages(['user_id' => 'المحطاتُ داخليّةٌ — لا تُسنَد لحساب عميل']);
         }
 
+        // **المُسنَدُ ضمنَ نطاقِ شركاتِ القارئ** (Permissions 360 · 12.5): قارئٌ معزولٌ على
+        // شركاتٍ لا يُسنِدُ مقعدَه لمستخدمٍ من شركةٍ أخرى (المحطةُ منطَّقةٌ بـscoped، والمُسنَدُ
+        // يُنطَّق كذلك). مستخدمٌ بلا شركةٍ (نطاقٌ شامل) يمرّ.
+        if (($cids = hub_company_ids()) !== null) {
+            $uco = array_map('strval', (array) ($user->companies ?? []));
+            if ($uco && ! array_intersect($uco, $cids)) {
+                throw ValidationException::withMessages(['user_id' => 'هذا المستخدمُ خارجَ نطاقِ شركاتك']);
+            }
+        }
+
         DB::transaction(function () use ($station, $user, $d) {
             // إقفالُ الصفِّ يمنع سباقَ الإسناد المتزامن (نمطُ الحركة المقفلة)
             $locked = Station::whereKey($station->id)->lockForUpdate()->firstOrFail();
