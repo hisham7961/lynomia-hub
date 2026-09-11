@@ -29,7 +29,7 @@ return [
         ['key' => 'amend', 'label' => 'ملاحق تعديل عقد التأسيس', 'multi' => true,
          'hint' => 'كل تعديلٍ لاحقٍ على العقد بملحقٍ مستقل'],
         ['key' => 'founders', 'label' => 'هويات المؤسسين والشركاء', 'req' => true, 'multi' => true,
-         'expiry' => true, 'hint' => 'هوية/جواز كل شريكٍ بنسبته'],
+         'expiry' => true, 'sec' => true, 'hint' => 'هوية/جواز كل شريكٍ بنسبته'],
         ['key' => 'tax', 'label' => 'الشهادة الضريبية', 'req' => true, 'expiry' => true,
          'hint' => 'شهادة التسجيل الضريبي / رقم المكلّف'],
         ['key' => 'vat', 'label' => 'شهادة القيمة المضافة', 'expiry' => true],
@@ -42,7 +42,7 @@ return [
         ['key' => 'signatories', 'label' => 'قرار المفوّضين بالتوقيع', 'expiry' => true,
          'hint' => 'من يُلزِم الشركة بتوقيعه وحدوده'],
         ['key' => 'lease', 'label' => 'عقد المقر / سند الملكية', 'expiry' => true],
-        ['key' => 'bank', 'label' => 'بيانات الحساب البنكي', 'hint' => 'خطاب فتح الحساب أو الآيبان الرسمي'],
+        ['key' => 'bank', 'label' => 'بيانات الحساب البنكي', 'sec' => true, 'hint' => 'خطاب فتح الحساب أو الآيبان الرسمي'],
         ['key' => 'stamp', 'label' => 'الختم والتوقيع المعتمد'],
         ['key' => 'profile', 'label' => 'الملف التعريفي للشركة', 'hint' => 'Company Profile للعروض والمناقصات'],
         ['key' => 'insurance', 'label' => 'وثائق التأمين', 'multi' => true, 'expiry' => true],
@@ -111,8 +111,8 @@ return [
     'clients' => [
         ['key' => 'cr', 'label' => 'السجل التجاري للعميل', 'expiry' => true],
         ['key' => 'tax', 'label' => 'الشهادة الضريبية', 'expiry' => true],
-        ['key' => 'auth_id', 'label' => 'هوية المفوّض بالتوقيع'],
-        ['key' => 'nda', 'label' => 'اتفاقية عدم الإفصاح', 'expiry' => true],
+        ['key' => 'auth_id', 'label' => 'هوية المفوّض بالتوقيع', 'sec' => true],
+        ['key' => 'nda', 'label' => 'اتفاقية عدم الإفصاح', 'expiry' => true, 'sec' => true],
         ['key' => 'msa', 'label' => 'الاتفاقية الإطارية', 'expiry' => true],
         ['key' => 'po', 'label' => 'أوامر الشراء', 'multi' => true],
     ],
@@ -121,7 +121,7 @@ return [
     'suppliers' => [
         ['key' => 'cr', 'label' => 'السجل التجاري', 'req' => true, 'expiry' => true],
         ['key' => 'tax', 'label' => 'الشهادة الضريبية', 'req' => true, 'expiry' => true],
-        ['key' => 'bank', 'label' => 'بيانات الحساب البنكي', 'req' => true,
+        ['key' => 'bank', 'label' => 'بيانات الحساب البنكي', 'req' => true, 'sec' => true,
          'hint' => 'مختوماً من البنك — الحوالات بلا إثبات مخاطرة'],
         ['key' => 'cert', 'label' => 'شهادات الجودة والاعتماد', 'multi' => true, 'expiry' => true],
         ['key' => 'agreement', 'label' => 'اتفاقية التوريد', 'expiry' => true],
@@ -132,14 +132,14 @@ return [
     'hr' => [
         // الصورة الشخصية: وجهُ الموظف في الدليل — كانت الوحدة بلا حقلٍ لها إطلاقاً
         ['key' => 'photo', 'label' => 'الصورة الشخصية'],
-        ['key' => 'id', 'label' => 'الهوية / الإقامة', 'req' => true, 'expiry' => true],
-        ['key' => 'passport', 'label' => 'جواز السفر', 'expiry' => true],
-        ['key' => 'contract', 'label' => 'عقد العمل', 'req' => true, 'expiry' => true],
+        ['key' => 'id', 'label' => 'الهوية / الإقامة', 'req' => true, 'expiry' => true, 'sec' => true],
+        ['key' => 'passport', 'label' => 'جواز السفر', 'expiry' => true, 'sec' => true],
+        ['key' => 'contract', 'label' => 'عقد العمل', 'req' => true, 'expiry' => true, 'sec' => true],
         ['key' => 'degree', 'label' => 'الشهادات العلمية', 'multi' => true],
         ['key' => 'cv', 'label' => 'السيرة الذاتية'],
-        ['key' => 'health', 'label' => 'الشهادة الصحية / التأمين', 'expiry' => true],
-        ['key' => 'nda', 'label' => 'إقرار السرية وعدم المنافسة'],
-        ['key' => 'bank', 'label' => 'بيانات الحساب البنكي', 'req' => true],
+        ['key' => 'health', 'label' => 'الشهادة الصحية / التأمين', 'expiry' => true, 'sec' => true],
+        ['key' => 'nda', 'label' => 'إقرار السرية وعدم المنافسة', 'sec' => true],
+        ['key' => 'bank', 'label' => 'بيانات الحساب البنكي', 'req' => true, 'sec' => true],
     ],
 
     // ── التطبيقات ──

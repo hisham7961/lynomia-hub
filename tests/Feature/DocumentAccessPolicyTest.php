@@ -343,4 +343,40 @@ class DocumentAccessPolicyTest extends TestCase
         $this->assertStringContainsString('سريّةٌ في الخطّ',
             json_encode(hub_timeline('projects', $p->id), JSON_UNESCAPED_UNICODE));
     }
+
+    /* ═══════════ تصنيفُ الحساسية (بيانةٌ لا منع) ═══════════ */
+
+    /**
+     * **أنواعٌ حسّاسةٌ مُعلَّمة**: الهويةُ/الجوازُ/العقدُ/الصحّةُ/البنكُ/السرّية في HR حسّاسة،
+     * والسيرةُ الذاتيةُ ليست. والفاحصُ (PermissionInspector) يُبرزُ التصنيفَ دون أن يمنع.
+     */
+    public function test_sensitive_kinds_are_classified_and_surfaced_in_inspector(): void
+    {
+        $this->seedCore();
+
+        // تصنيفٌ على مستوى النوع
+        $this->assertTrue(hub_doc_sensitive('hr', 'passport'));
+        $this->assertTrue(hub_doc_sensitive('hr', 'bank'));
+        $this->assertTrue(hub_doc_sensitive('companies', 'bank'));
+        $this->assertFalse(hub_doc_sensitive('hr', 'cv'));
+        $this->assertFalse(hub_doc_sensitive('projects', 'report'));
+
+        // الفاحص: نوعٌ حسّاسٌ يظهرُ في سلسلةِ التفسير دون منع
+        $p = Project::create(['name' => 'مشروع', 'status' => 'نشط']);
+        $a = $this->attach($p, 'ملف.pdf', 'report');        // غيرُ حسّاس
+        $exp = \App\Support\PermissionInspector::explainDocument($this->owner, $a, 'download');
+        $this->assertTrue($exp['allowed']);
+        $this->assertFalse($exp['sensitive']);
+
+        // وثيقةٌ من نوعٍ حسّاس (نستعمل وحدةَ hr عبر نوعِ passport على المرفق)
+        $h = Attachment::create([
+            'module' => 'hr', 'record_id' => $p->id, 'kind' => 'passport',
+            'disk' => 'local', 'path' => 'hub/t/' . \Illuminate\Support\Str::random(8) . '.pdf',
+            'original_name' => 'جواز.pdf', 'mime' => 'application/pdf', 'size' => 9,
+            'av_status' => 'clean', 'uploaded_by' => $this->owner->id,
+        ]);
+        $expH = \App\Support\PermissionInspector::explainDocument($this->owner, $h, 'download');
+        $this->assertTrue($expH['sensitive'], 'نوعُ passport حسّاسٌ ويُعلَّم في الفاحص');
+        $this->assertTrue(collect($expH['chain'])->contains(fn ($s) => $s['step'] === 'التصنيف'));
+    }
 }

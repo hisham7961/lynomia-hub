@@ -4908,6 +4908,22 @@ if (! function_exists('hub_doc_label')) {
     }
 }
 
+if (! function_exists('hub_doc_sensitive')) {
+    /**
+     * **هل نوعُ الوثيقةِ حسّاسٌ بطبيعته؟** (تصنيفٌ على مستوى النوع في `config/hub_docs.php`).
+     * الهويةُ والجوازُ والعقدُ والشهادةُ الصحيّةُ والحسابُ البنكيُّ وإقرارُ السرّية — بياناتٌ
+     * شخصيّةٌ/ماليّةٌ يُعلَّم بها كي يعرفَ المالكُ أين يضبطُ منعاً/سماحاً بدقّة. **تصنيفٌ لا
+     * حاجزٌ** في هذه النسخة (لا يُغيّر قراراً)، والحاجزُ الفارضُ يأتي بهجرةِ أدوارٍ آمنة.
+     */
+    function hub_doc_sensitive(string $module, ?string $kind): bool
+    {
+        if (! $kind) return false;
+        $d = collect(hub_doc_spec($module))->firstWhere('key', $kind);
+
+        return (bool) ($d['sec'] ?? false);
+    }
+}
+
 if (! function_exists('hub_dossier')) {
     /**
      * حال ملف سجلٍ واحد: لكل وثيقةٍ متوقّعة حالتها ونسخها وتاريخ انتهائها.
@@ -4960,6 +4976,7 @@ if (! function_exists('hub_dossier')) {
             $out['rows'][] = [
                 'key' => $d['key'], 'label' => $d['label'],
                 'req' => (bool) ($d['req'] ?? false), 'multi' => (bool) ($d['multi'] ?? false),
+                'sec' => (bool) ($d['sec'] ?? false),
                 'expiry' => (bool) ($d['expiry'] ?? false), 'hint' => $d['hint'] ?? null,
                 // العدُّ كاملٌ (حَوكمة)، وقائمةُ الروابطِ مُرشَّحةٌ بقاعدةِ الوثيقة (رؤية)
                 'n' => $mine->count(),

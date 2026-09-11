@@ -134,7 +134,15 @@ class PermissionInspector
         $doc = \App\Support\DocumentPolicy::decide($user, $a, $action);
         $add('قاعدةُ الوثيقة', $doc['allowed'], $doc['reason']);
 
-        return ['allowed' => $doc['allowed'], 'state' => $doc['state'], 'reason' => $doc['reason'], 'chain' => $chain];
+        // 3) تصنيفُ الحساسية (بيانةٌ لا منع): نوعٌ حسّاسٌ يُنبّه على ضبطِ وصولٍ صريح
+        if (hub_doc_sensitive((string) $a->module, $a->kind)) {
+            $add('التصنيف', true, 'نوعٌ حسّاسٌ ('
+                . (hub_doc_label((string) $a->module, $a->kind) ?: $a->kind)
+                . ') — بياناتٌ شخصيّة/ماليّة يُنصَح بضبطِ قاعدةِ وصولٍ صريحة');
+        }
+
+        return ['allowed' => $doc['allowed'], 'state' => $doc['state'], 'reason' => $doc['reason'],
+            'sensitive' => hub_doc_sensitive((string) $a->module, $a->kind), 'chain' => $chain];
     }
 
     /** وصفُ نطاقِ السجلّ (شركة/عميل/مشروع) — «بيانةٌ لا منع»: مسموحٌ وإن كان النطاقُ فارغاً */

@@ -57,6 +57,7 @@
                         @if ($a->downloads) · ⬇ {{ $a->downloads }}@endif
                         @php $aNote = $a->note ?: $a->field; @endphp
                         @if ($a->kind) · <span class="bdg g">{{ hub_doc_label($aModule, $a->kind) }}</span>@endif
+                        @if ($a->kind && hub_doc_sensitive($aModule, $a->kind)) <span class="bdg bad" title="نوعٌ حسّاس: بياناتٌ شخصيّة/ماليّة — يُنصَح بضبطِ وصولٍ صريح">🔴 حسّاس</span>@endif
                         @if ($a->doc_no) · رقم {{ $a->doc_no }}@endif
                         @if ($a->expires_at) · ينتهي {{ $a->expires_at->toDateString() }}@endif
                         @if ($aNote) · <span title="ملاحظة">{{ \Illuminate\Support\Str::limit($aNote, 60) }}</span>@endif
