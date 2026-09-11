@@ -565,6 +565,14 @@ class V1Controller extends ModuleController
             }
         }
 
+        // **لا تسريبَ لعمودٍ غيرِ مُعلَن** (Permissions 360 · 11.1): shape يُسقط الحقولَ
+        // المُعلَنةَ المخفيّة/السرّية، لكنّ عمودَ `meta` (يحمل تكلفةً وبياناتٍ غيرَ مُشكَّلة —
+        // يُكتَب من QuoteController/ChangeOrderController) كان يُعاد خاماً حين لا `?fields`.
+        // يُسقَط ما لم تُعلِنه الوحدةُ حقلاً باسمِه.
+        if (! in_array('meta', array_map(fn ($f) => (string) ($f['col'] ?? ''), $def['fields']), true)) {
+            unset($arr['meta']);
+        }
+
         $want = preg_split('/[،,\s]+/u', (string) $fields, -1, PREG_SPLIT_NO_EMPTY);
         if (! $want) return $arr;
 
