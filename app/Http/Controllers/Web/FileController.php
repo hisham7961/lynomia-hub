@@ -193,18 +193,27 @@ class FileController extends Controller
                     $table = (string) ($def['table'] ?? '');
                     if ($table === '' || ! Schema::hasTable($table)) continue;
 
-                    $cols = collect($def['fields'] ?? [])
-                        ->filter(fn ($f) => in_array($f['type'] ?? '', ['file', 'img'], true))
-                        ->pluck('col')->filter()->values()->all();
-                    if (! $cols) continue;
+                    $fileFields = collect($def['fields'] ?? [])
+                        ->filter(fn ($f) => in_array($f['type'] ?? '', ['file', 'img'], true)
+                            && ! empty($f['col']));
+                    if ($fileFields->isEmpty()) continue;
 
                     // الوحدة غير مرئيةٍ له: لا حاجة لاستعلامٍ أصلاً
                     if (! hub_can($u, $mk, 'v')) continue;
 
+                    // **قيدُ الحقلِ يحرسُ ملفَّه** (Permissions 360 · 05.1): حقلُ ملفٍّ
+                    // وُسم `hide` للدورِ يختفي من الجداولِ والصفحاتِ والتصديرِ — فلا يُخدَمُ
+                    // ملفُّه بالمسارِ التفافاً. نقصرُ المطابقةَ على الأعمدةِ غيرِ المخفيّةِ له.
+                    // **hub_field_mode بمفتاحِ الحقلِ لا بعمودِه** (قواعدُ الحقلِ مفتاحُها `key`).
+                    $visibleCols = $fileFields
+                        ->filter(fn ($f) => hub_field_mode($u, $mk, (string) $f['key']) !== 'hide')
+                        ->pluck('col')->values()->all();
+                    if (! $visibleCols) continue;
+
                     $q = DB::table($table)
                         ->when(Schema::hasColumn($table, 'deleted_at'), fn ($x) => $x->whereNull('deleted_at'))
-                        ->where(function ($w) use ($cols, $path) {
-                            foreach ($cols as $c) $w->orWhere($c, $path);
+                        ->where(function ($w) use ($visibleCols, $path) {
+                            foreach ($visibleCols as $c) $w->orWhere($c, $path);
                         });
 
                     if (hub_scope($q, $mk, $u)->exists()) return true;
@@ -230,12 +239,16 @@ class FileController extends Controller
                     }
                 }
 
-                // صندوق الوارد: خلف صلاحية الوثائق نفسها التي تحرس شاشته
+                // صندوق الوارد: خلف صلاحية الوثائق نفسها التي تحرس شاشته — **وبعزلِ الشركة**
+                // (Permissions 360 · 13.1): كان يُخدَمُ أيُّ مسارِ وارِدٍ لأيِّ حاملِ صلاحيةٍ ولو
+                // كان خارجَ شركاتِه؛ نُطبّق عزلَ InboxDocController::scoped نفسَه (شركتُه أو بلا شركة).
                 if (Schema::hasTable('inbox_documents')
-                    && (hub_can($u, 'inboxdocs', 'v') || hub_can($u, 'files', 'v'))
-                    && DB::table('inbox_documents')->whereNull('deleted_at')
-                        ->where('path', $path)->exists()) {
-                    return true;
+                    && (hub_can($u, 'inboxdocs', 'v') || hub_can($u, 'files', 'v'))) {
+                    $iq = DB::table('inbox_documents')->whereNull('deleted_at')->where('path', $path);
+                    if (($cids = hub_company_ids($u)) !== null) {
+                        $iq->where(fn ($w) => $w->whereIn('company_id', $cids)->orWhereNull('company_id'));
+                    }
+                    if ($iq->exists()) return true;
                 }
 
                 // مرفقات الرسائل المباشرة: لطرفَي المحادثة وحدهما. dm ليست وحدةً
