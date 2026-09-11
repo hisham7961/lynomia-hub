@@ -110,6 +110,33 @@ class PermissionInspector
         return self::verdict(true, 'ALLOWED', 'مسموحٌ عبر مصفوفةِ الدور', $module, $op, $chain);
     }
 
+    /**
+     * **يفسِّر «هل يصل المستخدمُ X الوثيقةَ Y؟»** (Permissions 360 · وثائق · المستوى 5/6).
+     * سلسلةُ السبب: رؤيةُ السجلِّ الأمِّ (وحدة+نطاق+حدُّ العميل) ← قاعدةُ الوثيقةِ الصريحة.
+     *
+     * @return array{allowed:bool, state:string, reason:string, chain:list<array{step:string, ok:bool, detail:string}>}
+     */
+    public static function explainDocument(User $user, \App\Models\Attachment $a, string $action = 'download'): array
+    {
+        $chain = [];
+        $add = function (string $step, bool $ok, string $detail) use (&$chain) {
+            $chain[] = ['step' => $step, 'ok' => $ok, 'detail' => $detail];
+        };
+
+        // 1) رؤيةُ السجلِّ الأمِّ (نفسُ حارسِ التنزيل: وحدة v + نطاق + حدُّ العميل)
+        $parent = self::explain($user, (string) $a->module, 'v');
+        $add('السجلُّ الأمُّ', $parent['allowed'], $parent['reason'] . " (سجلّ {$a->module})");
+        if (! $parent['allowed']) {
+            return ['allowed' => false, 'state' => $parent['state'], 'reason' => 'السجلُّ الأمُّ غيرُ مرئيٍّ فلا تُتاح وثيقتُه', 'chain' => $chain];
+        }
+
+        // 2) طبقةُ الوثيقةِ على المورد (المالك/قواعدُ المستخدم/الدور/الوراثة)
+        $doc = \App\Support\DocumentPolicy::decide($user, $a, $action);
+        $add('قاعدةُ الوثيقة', $doc['allowed'], $doc['reason']);
+
+        return ['allowed' => $doc['allowed'], 'state' => $doc['state'], 'reason' => $doc['reason'], 'chain' => $chain];
+    }
+
     /** وصفُ نطاقِ السجلّ (شركة/عميل/مشروع) — «بيانةٌ لا منع»: مسموحٌ وإن كان النطاقُ فارغاً */
     protected static function scopeNote(User $user, string $module): string
     {

@@ -152,6 +152,8 @@ class AttachmentService
     public static function download(Attachment $a): \Symfony\Component\HttpFoundation\BinaryFileResponse
     {
         self::guardRecord($a->module, $a->record_id, 'v');
+        // طبقةُ الوثيقةِ على مستوى المورد (المستوى 5/6): منعٌ صريحٌ لهذه الوثيقةِ ⇒ ٤٠٣
+        DocumentPolicy::authorize(auth()->user(), $a, 'download');
 
         // مرفقٌ وُسم «مصاباً» بأداةٍ خارجية يُحجب فوراً — 423 Locked: محجوز لا مفقود
         abort_if($a->av_status === 'infected', 423, 'حُجب هذا الملف — وُسم مصاباً بفحص الفيروسات');
@@ -183,6 +185,8 @@ class AttachmentService
     public static function stream(Attachment $a): \Symfony\Component\HttpFoundation\Response
     {
         self::guardRecord($a->module, $a->record_id, 'v');
+        // نفسُ طبقةِ الوثيقةِ على المعاينة (نظيرُ التنزيل): منعٌ صريحٌ ⇒ ٤٠٣ — لا معاينةَ تتجاوز
+        DocumentPolicy::authorize(auth()->user(), $a, 'preview');
 
         abort_if($a->av_status === 'infected', 423, 'حُجب هذا الملف — وُسم مصاباً بفحص الفيروسات');
         // SVG/HTML مرفوعٌ لا يُعاين حيّاً (قد يحمل سكربتاً) — يُنزَّل attachment فلا يُنفَّذ
