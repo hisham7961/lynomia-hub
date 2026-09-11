@@ -793,7 +793,8 @@ class ModuleController extends Controller
      */
     protected function exportBelt(string $module, int $count, string $unitLabel, array $def = [])
     {
-        abort_unless(hub_exporter(), 403, 'التصدير يتطلب صلاحية');
+        // تصديرُ هذه الوحدةِ الدقيق (<module>.export) أو رايةُ التصديرِ الجامعة (توافقٌ خلفيّ)
+        abort_unless(hub_can(auth()->user(), $module, 'export') || hub_exporter(), 403, 'التصدير يتطلب صلاحية');
         abort_if((string) setting('security.freeze_exports', '0') === '1', 423,
             'التصدير مجمَّدٌ الآن بمفتاح طوارئٍ أمنيّ — يُرفع من مركز الأمان');
 

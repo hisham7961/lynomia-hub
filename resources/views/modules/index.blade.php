@@ -25,7 +25,7 @@
         @if (! $trash && ($def['status'] ?? null))
             <a class="btn ghost sm" href="{{ route('m.board', $module) }}">🗂 كانبان</a>
         @endif
-        @if (! $trash && (hub_exporter()))
+        @if (! $trash && (hub_exporter() || hub_can(auth()->user(), $module, 'export')))
             <a class="btn ghost sm" href="{{ route('m.export', ['module' => $module] + request()->query()) }}">📤 CSV</a>
         @endif
         @if (! $trash && hub_can(auth()->user(), $module, 'a') && ! hub_scoped(auth()->user()))
@@ -153,7 +153,7 @@
             && ! hub_needs_approval(auth()->user(), $module, 'e');
         $bulkDelete = ! $trash && hub_can(auth()->user(), $module, 'd')
             && ! hub_needs_approval(auth()->user(), $module, 'd');
-        $bulkExport = ! $trash && hub_exporter();
+        $bulkExport = ! $trash && (hub_exporter() || hub_can(auth()->user(), $module, 'export'));
         $canBulk = $bulkStatus || $bulkDelete || $bulkExport;
         $statusOpts = $bulkStatus ? (hub_status_field($module)['options'] ?? []) : [];
         $bulkStatus = $bulkStatus && count($statusOpts) > 0;
