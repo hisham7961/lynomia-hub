@@ -4908,6 +4908,26 @@ if (! function_exists('hub_doc_label')) {
     }
 }
 
+if (! function_exists('hub_fine_perms')) {
+    /** الكتالوجُ المرجعيّ للصلاحياتِ الدقيقة (Permissions 360 · م1) — مفتاحٌ ⇒ تعريفُه */
+    function hub_fine_perms(): array
+    {
+        return (array) config('hub_permissions', []);
+    }
+}
+
+if (! function_exists('hub_fine_perms_for')) {
+    /** الصلاحياتُ الدقيقةُ المُعلَنةُ التي تنطبقُ على وحدةٍ بعينها (أو '*' لكلِّها) */
+    function hub_fine_perms_for(string $module): array
+    {
+        return array_filter(hub_fine_perms(), function ($def) use ($module) {
+            $mods = (array) ($def['modules'] ?? []);
+
+            return in_array('*', $mods, true) || in_array($module, $mods, true);
+        });
+    }
+}
+
 if (! function_exists('hub_doc_sensitive')) {
     /**
      * **هل نوعُ الوثيقةِ حسّاسٌ بطبيعته؟** (تصنيفٌ على مستوى النوع في `config/hub_docs.php`).

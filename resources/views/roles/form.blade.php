@@ -135,6 +135,25 @@
                                     aria-label="{{ $l }} — {{ $md['label'] }}" @checked(!empty($mx[$mk][$op]))></td>
                             @endforeach
                         </tr>
+                        {{-- صلاحياتٌ دقيقةٌ لهذه الوحدة (Permissions 360 · م1): تصريحاتٌ إضافيّةٌ فوق
+                             (v/a/e/d) — منفصلةٌ عن أزرارِ «الكل» فهي منحٌ مقصودٌ لا يُكنَس ضمناً. --}}
+                        @php $fineForMod = hub_fine_perms_for($mk); @endphp
+                        @if ($fineForMod)
+                            <tr class="mxrow" data-q="{{ mb_strtolower($md['label'] . ' ' . $mk) }}">
+                                <td colspan="{{ count($ops) + 1 }}" style="padding-inline-start:20px">
+                                    @foreach ($fineForMod as $fk => $fdef)
+                                        <label class="chip" title="{{ $fdef['hint'] ?? '' }}"
+                                               style="display:inline-flex;align-items:center;gap:5px;margin-inline-end:12px">
+                                            <input type="checkbox"
+                                                   name="matrix[{{ $mk }}][{{ $fk }}]" value="1"
+                                                   @checked(!empty($mx[$mk][$fk]))>
+                                            {{ ! empty($fdef['risky']) ? '🔴 ' : '' }}{{ $fdef['label'] }}
+                                            <span class="sub">— {{ $fdef['hint'] ?? '' }}</span>
+                                        </label>
+                                    @endforeach
+                                </td>
+                            </tr>
+                        @endif
                     @endforeach
                     </tbody>
                 </table></div>
