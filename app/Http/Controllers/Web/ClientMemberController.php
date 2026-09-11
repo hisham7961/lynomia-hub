@@ -24,10 +24,18 @@ use Illuminate\Http\Request;
  */
 class ClientMemberController extends Controller
 {
-    /** يحسم العميلَ الهدفَ محروساً: `clients:e` ثم النطاق وإلا ٤٠٤ */
+    /**
+     * يحسم العميلَ الهدفَ محروساً: `clients:e` أو مفتاحُ `membersManage` ثم النطاق وإلا ٤٠٤.
+     *
+     * Permissions 360 · 15.5 — إدارةُ الأعضاءِ (دعوة/دور/إلغاء) تُنشئ حساباتِ دخولٍ خارجيّةً
+     * وقد تمنحُ دورَ «مالكِ العميل»؛ إضافةٌ لا كسر: حاملُ `clients:e` يبقى يقدر (مفتاحٌ رئيس)،
+     * ويُفصَل مفتاحٌ أضيقُ (`clients:membersManage`) لمن يُدير الدخولَ دون تعديلِ بيانات العميل.
+     */
     private function manageClient(string $clientId): Client
     {
-        abort_unless(hub_can(auth()->user(), 'clients', 'e'), 403, 'إدارةُ أعضاء العميل تتطلّب صلاحيةَ تعديل العملاء');
+        $u = auth()->user();
+        abort_unless(hub_can($u, 'clients', 'e') || hub_can($u, 'clients', 'membersManage'),
+            403, 'إدارةُ أعضاء العميل تتطلّب صلاحيةَ تعديل العملاء');
 
         return hub_scope(Client::query(), 'clients')->whereNull('deleted_at')->findOrFail($clientId);
     }

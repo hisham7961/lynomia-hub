@@ -33,10 +33,17 @@ use Illuminate\Support\Str;
  */
 class InventoryController extends Controller
 {
-    /** بوّابةُ الصلاحية على وحدة الأصول (الجردُ عمليّةٌ عليها — لا وحدةَ جردٍ منفصلة) */
-    protected function can(string $op): void
+    /**
+     * بوّابةُ الصلاحية على وحدة الأصول (الجردُ عمليّةٌ عليها — لا وحدةَ جردٍ منفصلة).
+     *
+     * `$fine` (Permissions 360 · 12.4): مفتاحٌ دقيقٌ بديلٌ (`assetInventory`) يفتحُ
+     * الجردَ لأمينِ مخزنٍ لا يملكُ رايةَ `e` الجامعة. إضافةٌ لا كسر: حاملُ `e` يمرّ كما كان.
+     */
+    protected function can(string $op, ?string $fine = null): void
     {
-        abort_unless(hub_can(auth()->user(), 'assets', $op), 403, 'لا تملك صلاحيةَ الأصول');
+        $u = auth()->user();
+        $ok = hub_can($u, 'assets', $op) || ($fine !== null && hub_can($u, 'assets', $fine));
+        abort_unless($ok, 403, 'لا تملك صلاحيةَ الأصول');
     }
 
     /**
@@ -143,7 +150,7 @@ class InventoryController extends Controller
      */
     public function freeze(Request $r)
     {
-        $this->can('e');
+        $this->can('e', 'assetInventory');
 
         $session = new InventorySession();
         $session->company_id = $this->activeCompanyId();
@@ -209,7 +216,7 @@ class InventoryController extends Controller
      */
     public function scan(Request $r, string $id)
     {
-        $this->can('e');
+        $this->can('e', 'assetInventory');
         $session = $this->sessionScoped($id);
         abort_unless((string) $session->status === InventorySession::OPEN, 422, 'الجلسةُ مغلقةٌ — لا مسحَ بعد الإغلاق');
 
@@ -256,7 +263,7 @@ class InventoryController extends Controller
      */
     public function reconcile(Request $r, string $id)
     {
-        $this->can('e');
+        $this->can('e', 'assetInventory');
         if ($resp = hub_require_stepup()) return $resp;
         $session = $this->sessionScoped($id);
 
@@ -333,7 +340,7 @@ class InventoryController extends Controller
      */
     public function close(Request $r, string $id)
     {
-        $this->can('e');
+        $this->can('e', 'assetInventory');
         if ($resp = hub_require_stepup()) return $resp;
         $session = $this->sessionScoped($id);
 

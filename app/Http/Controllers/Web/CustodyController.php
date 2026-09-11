@@ -34,10 +34,18 @@ class CustodyController extends Controller
     /** أقصى ملصقاتٍ في الطلب الواحد — ورقةٌ كاملةٌ من الملصقات ولا فيضَ ذاكرة */
     public const LABEL_MAX = 60;
 
-    /** الأصلُ بنطاق القارئ وصلاحيته — بوّابةُ كل مسارٍ هنا */
-    protected function asset(string $id, string $op = 'v'): Asset
+    /**
+     * الأصلُ بنطاق القارئ وصلاحيته — بوّابةُ كل مسارٍ هنا.
+     *
+     * `$fine` (Permissions 360 · 12.4): مفتاحٌ دقيقٌ بديلٌ يفتحُ الطريقَ لمن لا يملكُ
+     * رايةَ `e` الجامعة. إضافةٌ لا كسر: حاملُ `e` يمرّ كما كان (مفتاحٌ رئيس)، ومن
+     * يملكُ المفتاحَ الدقيقَ وحدَه (أمينُ عهدةٍ مثلاً) يمرّ لهذه العمليةِ دون سواها.
+     */
+    protected function asset(string $id, string $op = 'v', ?string $fine = null): Asset
     {
-        abort_unless(hub_can(auth()->user(), 'assets', $op), 403,
+        $u = auth()->user();
+        $ok = hub_can($u, 'assets', $op) || ($fine !== null && hub_can($u, 'assets', $fine));
+        abort_unless($ok, 403,
             $op === 'v' ? 'لا تملك عرض الأصول والعهد' : 'تعديلُ العهدة يتطلب صلاحية تعديل الأصول');
 
         return Custody::scoped()->findOrFail($id);
@@ -174,7 +182,7 @@ class CustodyController extends Controller
 
     public function handover(Request $r, string $id)
     {
-        $a = $this->asset($id, 'e');
+        $a = $this->asset($id, 'e', 'custodyAssign');
 
         $d = $r->validate([
             'userId' => ['required', 'string', Rule::exists('users', 'id')->whereNull('deleted_at')],
@@ -200,7 +208,7 @@ class CustodyController extends Controller
 
     public function recover(Request $r, string $id)
     {
-        $a = $this->asset($id, 'e');
+        $a = $this->asset($id, 'e', 'custodyAssign');
         abort_if(! $a->holder_id, 422, 'هذه العهدة ليست بيد أحد أصلاً');
 
         $d = $r->validate([
@@ -227,7 +235,7 @@ class CustodyController extends Controller
      */
     public function changeStatus(Request $r, string $id)
     {
-        $a = $this->asset($id, 'e');
+        $a = $this->asset($id, 'e', 'assetStatus');
 
         $d = $r->validate([
             'status' => ['required', 'string', Rule::in(\App\Support\Custody::STATUSES)],
@@ -258,7 +266,7 @@ class CustodyController extends Controller
      */
     public function assignStation(Request $r, string $id)
     {
-        $a = $this->asset($id, 'e');
+        $a = $this->asset($id, 'e', 'assetStation');
 
         $d = $r->validate([
             'station_id' => ['nullable', 'uuid'],
@@ -293,7 +301,7 @@ class CustodyController extends Controller
 
     public function permit(Request $r, string $id)
     {
-        $a = $this->asset($id, 'e');
+        $a = $this->asset($id, 'e', 'custodyAssign');
 
         $d = $r->validate([
             'kind'   => ['required', Rule::in(Custody::PERMITS)],
@@ -360,7 +368,7 @@ class CustodyController extends Controller
     /** تسجيلُ عودة ما خرج مؤقتاً — تصريحٌ لا يُغلق يبقى سارياً أبداً */
     public function permitReturn(Request $r, string $id, string $permitId)
     {
-        $a = $this->asset($id, 'e');
+        $a = $this->asset($id, 'e', 'custodyAssign');
         $p = $this->permitOf($a, $permitId);
         abort_if($p->status !== 'ساري', 422, 'هذا التصريح مُغلقٌ سلفاً');
 
@@ -376,7 +384,7 @@ class CustodyController extends Controller
 
     public function permitCancel(string $id, string $permitId)
     {
-        $a = $this->asset($id, 'e');
+        $a = $this->asset($id, 'e', 'custodyAssign');
         $p = $this->permitOf($a, $permitId);
         abort_if($p->status !== 'ساري', 422, 'هذا التصريح مُغلقٌ سلفاً');
 

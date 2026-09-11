@@ -34,7 +34,10 @@ class EndpointEnrollController extends Controller
     {
         // العميلُ ٤٠٤ فوق كل شيء (دفاعٌ في العمق تحت PortalGuard — نمطُ StationController)
         abort_if(hub_is_client(auth()->user()), 404);
-        abort_unless(hub_is_owner() || hub_monitor(), 403, 'سكُّ رموز التسجيل للمالك أو المراقب');
+        // Permissions 360 · 14.3 — إضافةٌ لا كسر: المالكُ والمراقبُ يبقيان، ويُفتحُ
+        // السكُّ لمفتاحٍ أضيق (endpoints:enroll) دون رايةِ المراقبة الجامعة.
+        abort_unless(hub_is_owner() || hub_monitor() || hub_can(auth()->user(), 'endpoints', 'enroll'),
+            403, 'سكُّ رموز التسجيل للمالك أو المراقب');
         if ($resp = hub_require_stepup()) return $resp;
 
         // §2 — الرمزُ يُربَط بأصلٍ مؤهّلٍ مملوكٍ للشركة (لا بشركةٍ مجرّدة). الشركةُ

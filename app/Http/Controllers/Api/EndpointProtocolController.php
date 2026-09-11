@@ -428,7 +428,10 @@ class EndpointProtocolController extends Controller
     {
         // العميلُ ٤٠٤ فوق كل شيء (دفاعٌ في العمق تحت PortalGuard — نمطُ mint)
         abort_if(hub_is_client(auth()->user()), 404);
-        abort_unless(hub_is_owner() || hub_monitor(), 403, 'إصدارُ أوامر الأجهزة للمالك أو المراقب');
+        // Permissions 360 · 12.3 — إضافةٌ لا كسر: المالكُ والمراقبُ يبقيان، ويُفتحُ
+        // الأمرُ لمفتاحٍ تشغيليٍّ أضيق (endpoints:command) دون رايةِ المراقبة الجامعة.
+        abort_unless(hub_is_owner() || hub_monitor() || hub_can(auth()->user(), 'endpoints', 'command'),
+            403, 'إصدارُ أوامر الأجهزة للمالك أو المراقب');
 
         // عبرَ شركةٍ: ٤٠٤ لا تسريبَ وجود — معزولُ شركاتٍ لا يأمر غيرَ أجهزته
         $cids = hub_company_ids();

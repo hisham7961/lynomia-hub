@@ -128,10 +128,14 @@ class MobileClientMembersController extends V1Controller
 
     /* ────────── مساعِدات ────────── */
 
-    /** يحسم العميلَ الهدفَ محروساً: `clients:e` وإلا 403، ثم النطاق وإلا 404 */
+    /**
+     * يحسم العميلَ الهدفَ محروساً: `clients:e` أو `membersManage` وإلا 403، ثم النطاق وإلا 404.
+     * Permissions 360 · 15.5 — نظيرُ الويب: مفتاحٌ أضيقُ لإدارةِ الأعضاءِ دون تعديلِ بياناتِ العميل.
+     */
     private function manageClient(string $clientId): Client
     {
-        if (! hub_can(auth()->user(), 'clients', 'e')) {
+        $u = auth()->user();
+        if (! hub_can($u, 'clients', 'e') && ! hub_can($u, 'clients', 'membersManage')) {
             abort(Api::error(Api::FORBIDDEN, 403, 'إدارةُ أعضاء العميل تتطلّب صلاحيةَ تعديل العملاء'));
         }
 
