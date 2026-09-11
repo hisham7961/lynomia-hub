@@ -86,12 +86,24 @@ class Workday
 
         $status = self::REMOTE_MODES[$mode] ?? ($late ? self::LATE : self::PRESENT);
 
+        // **مشروع/عميلُ الحضورِ ضمنَ نطاقِ الموظّف** (Permissions 360 · 10.4): قيمةٌ خارجَ
+        // نطاقِه تُتجاهَل — فلا يُربَطُ حضورُه بمشروعٍ/عميلٍ لا يراه (صفٌّ ذاتيٌّ، لكنّ المرجعَ
+        // يُنطَّق كسائرِ الكتابات). النطاقُ الشاملُ يمرّ بلا تغيير.
+        $pid = $in['project_id'] ?? null;
+        if ($pid && ! hub_scope(\App\Models\Project::query(), 'projects', $user)->whereKey($pid)->exists()) {
+            $pid = null;
+        }
+        $cid = $in['client_id'] ?? null;
+        if ($cid && ! hub_scope(\App\Models\Client::query(), 'clients', $user)->whereKey($cid)->exists()) {
+            $cid = null;
+        }
+
         $row = $row ?: new Attendance(['emp_id' => $emp->id, 'date' => $now->toDateString()]);
         $row->fill([
             'time_in' => $now->format('H:i'),
             'mode' => $mode,
-            'client_id' => $in['client_id'] ?? null,
-            'project_id' => $in['project_id'] ?? null,
+            'client_id' => $cid,
+            'project_id' => $pid,
             'company_id' => $emp->company_id,
             'status' => $status,
             'meta' => array_merge((array) $row->meta, ['checkin' => array_filter([
