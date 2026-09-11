@@ -30,6 +30,7 @@
                 <td>
                     <b>{{ $d['label'] }}</b>
                     @if ($d['req'])<span class="bdg bad" title="إلزامية">إلزامية</span>@endif
+                    @if (! empty($d['sec']))<span class="bdg bad" title="نوعٌ حسّاس: بياناتٌ شخصيّة/ماليّة — يُنصَح بضبطِ وصولٍ صريح">🔴 حسّاس</span>@endif
                     @if ($d['multi'])<span class="bdg g" title="تُقبل نسخ متعددة">متعددة</span>@endif
                     @if ($d['hint'])<div class="sub">{{ $d['hint'] }}</div>@endif
                 </td>

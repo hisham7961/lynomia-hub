@@ -31,6 +31,16 @@ class FileController extends Controller
         abort_if(\App\Models\Attachment::where('path', $path)->where('av_status', 'infected')->exists(),
             423, 'حُجب هذا الملف — وُسم مصاباً بفحص الفيروسات');
 
+        // **لا التفافَ على قاعدةِ الوثيقة عبر مسارِ الملف.** طبقةُ الوصولِ للوثيقة
+        // (Permissions 360 · وثائق) تُفرَض على att.dl/att.view؛ وهذا مسارٌ بديلٌ يبثّ
+        // البايتاتِ نفسَها بالمسار. فمن مُنع وثيقةً بعينها ثم عرف مسارَها المخزَّن كان
+        // يأخذها من هنا — كسرٌ صامتٌ للمنع. إن كان المسارُ مرفقاً (أصلاً أو مصغّرةً)،
+        // يُفرَض القرارُ نفسُه: المنعُ الصريحُ ٤٠٣ هنا كما هناك. (المالكُ يتجاوز.)
+        if ($att = \App\Models\Attachment::where('path', $path)->orWhere('thumb_path', $path)->first()) {
+            \App\Support\DocumentPolicy::authorize(auth()->user(), $att,
+                $r->boolean('dl') ? 'download' : 'preview');
+        }
+
         foreach ([storage_path('app/' . $path), storage_path('app/public/' . $path)] as $abs) {
             if (is_file($abs)) {
                 /*

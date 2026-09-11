@@ -582,7 +582,8 @@ class QuoteController extends Controller
             || ($discAt > 0 && $discPct >= $discAt)
             || ($floorAt > 0 && $margin !== null && $margin < $floorAt);
 
-        if ($needs && ! hub_flag(auth()->user(), 'approve') && ! hub_is_owner()) {
+        if ($needs && ! hub_flag(auth()->user(), 'approve')
+            && ! hub_can(auth()->user(), 'quotes', 'approve') && ! hub_is_owner()) {
             // يُبلَّغ المعتمدون بطلبِ إرسالٍ يستحق نظرَهم — دون قلبِ الحالة.
             // **نطاقٌ لكلّ مستلم**: لا يُسرَّب عنوانُ العرض ومبلغُه لمعتمِدٍ معزولٍ
             // عن شركة/عميل العرض (كنمط notifyMonitors في المسار الآليّ).

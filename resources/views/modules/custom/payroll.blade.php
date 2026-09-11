@@ -56,7 +56,8 @@
                     @csrf<input type="hidden" name="do" value="generate">
                     <button class="btn">⚙️ {{ $plLines->isEmpty() ? 'توليد المسيّر' : 'إعادة التوليد' }}</button>
                 </form>
-                @if ($plLines->isNotEmpty())
+                {{-- زرُّ الاعتمادِ لحاملِ صلاحيةِ اعتمادِ الرواتبِ (أو الرايةِ الجامعة) لا لكلِّ محرِّر --}}
+                @if ($plLines->isNotEmpty() && (hub_can(auth()->user(), 'payroll', 'approve') || hub_approver()))
                     <form method="POST" action="{{ route('payroll.act', $row->id) }}" class="inline">
                         @csrf<input type="hidden" name="do" value="approve">
                         <button class="btn ghost">✅ اعتماد</button>

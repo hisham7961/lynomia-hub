@@ -57,12 +57,16 @@ class ApprovalService
      */
     public static function decide($approval, string $decision, User $approver, array $input = []): ApprovalResult
     {
-        // حارسُ المعتمِدين — قبل فتحِ المعاملة (نظيرُ رأسِ approve/reject الأصليّ)
-        if (! hub_approver()) {
+        $id = $approval instanceof Approval ? $approval->id : (string) $approval;
+
+        // حارسُ المعتمِدين — قبل فتحِ المعاملة (نظيرُ رأسِ approve/reject الأصليّ). يُقبَل
+        // إمّا برايةِ الاعتمادِ الجامعة، أو بمفتاحِ الاعتمادِ الدقيقِ لمجالِ الطلب نفسِه
+        // (payroll.approve / purchases.approve …) — فحسمُ مجالٍ لا يستلزمُ سلطةَ الكلّ.
+        $apMod = $approval instanceof Approval ? (string) $approval->mod
+            : (string) (Approval::whereKey($id)->value('mod') ?? '');
+        if (! hub_approver() && ! ($apMod !== '' && hub_can($approver, $apMod, 'approve'))) {
             return ApprovalResult::fail(self::FORBIDDEN, 403, 'الحسم للمعتمدين فقط');
         }
-
-        $id = $approval instanceof Approval ? $approval->id : (string) $approval;
 
         return DB::transaction(function () use ($id, $decision, $approver, $input) {
             // قفلُ الصفّ داخل المعاملة — معتمِدان متزامنان لا يجتازان «معلّق» معاً

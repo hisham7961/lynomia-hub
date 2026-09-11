@@ -21,10 +21,13 @@ class RoleController extends Controller
         'copySec' => 'نسخ السرّ للحافظة — نصّه يصل الجهاز',
         'exp'     => 'تصدير البيانات',
         'mobile'  => 'منصّة تطبيق الهاتف — إدارةٌ وتشغيل',
+        // رقابةُ الاتصالات: بابٌ يُسنَد صراحةً لدورٍ (غيرِ المالك) لمراجعةِ خيوطِ التواصل
+        // — بديلُ التوثيقِ باسمِ الدور (Permissions 360 · 02.1/20.1)، غيرُ موروثٍ للمالكِ آليّاً.
+        'oversight' => 'رقابةُ الاتصالات — مراجعةُ خيوطِ التواصل',
     ];
 
     /** رايات يترتّب على منحها وصولٌ واسع — تُوسَم في الشاشة لا تُدسّ بين البقية */
-    public const RISKY_FLAGS = ['users', 'secrets', 'copySec', 'exp', 'audit', 'mobile'];
+    public const RISKY_FLAGS = ['users', 'secrets', 'copySec', 'exp', 'audit', 'mobile', 'oversight'];
 
     protected array $ops = ['v' => 'عرض', 'a' => 'إضافة', 'e' => 'تعديل', 'd' => 'حذف'];
 
@@ -306,12 +309,31 @@ class RoleController extends Controller
         // في الطلب، فبلا علامةٍ صريحة لا يُفرَّق بين مصفوفةٍ مُفرَّغةٍ عمداً وقسمٍ
         // لم يُرسَل أصلاً — وكان القالب يُعيد ما أزاله المالك بيده.
         $matrixSent = $r->has('matrix') || $r->boolean('matrix_submitted');
-        $matrix = $matrixSent ? [] : (array) ($role?->matrix ?? []);
+        $prevMatrix = (array) ($role?->matrix ?? []);
+        $matrix = $matrixSent ? [] : $prevMatrix;
         if ($matrixSent) {
+            // الصلاحياتُ الدقيقةُ المُعلَنةُ في الكتالوج (Permissions 360 · م1) — تُجمَع من
+            // النموذجِ وتُحفَظ في نفسِ الصفّ، فلا يمحوها إعادةُ بناءِ المصفوفةِ صمتاً.
+            $fine = hub_fine_perms();
+            $fineKeys = array_keys($fine);
             foreach (array_keys(hub_modules()) as $mod) {
                 $row = [];
                 foreach (array_keys($this->ops) as $op) {
                     if ($r->boolean("matrix.$mod.$op")) $row[$op] = 1;
+                }
+                // مفاتيحُ الكتالوجِ المنطبقةُ على هذه الوحدة — مربّعُ اختيارٍ لكلٍّ (النموذجُ حاكم)
+                foreach ($fine as $fk => $def) {
+                    $mods = (array) ($def['modules'] ?? []);
+                    $applies = in_array('*', $mods, true) || in_array($mod, $mods, true);
+                    if ($applies && $r->boolean("matrix.$mod.$fk")) $row[$fk] = 1;
+                }
+                // **لا محوَ لمفتاحٍ مسمّى غيرِ مُعلَن**: صلاحيةٌ دقيقةٌ قديمةٌ لا يعرضها النموذجُ
+                // تُحمَل كما هي من الصفّ السابق (وإلا مُحيت صمتاً عند أيِّ حفظٍ للدور).
+                foreach ((array) ($prevMatrix[$mod] ?? []) as $k => $v) {
+                    if ($v && ! array_key_exists($k, $this->ops)
+                        && ! in_array($k, $fineKeys, true)) {
+                        $row[$k] = 1;
+                    }
                 }
                 // **الكتابة تستلزم العرض**: دورٌ يعدّل ولا يرى حالةٌ لا تُستعمل —
                 // كل قارئ يمرّ بـhub_can(...,'v') أولاً، فالإضافة بلا عرض صمتٌ محض.

@@ -1,5 +1,10 @@
 {{-- المرفقات الشاملة — يتوقع: $aModule $aRecordId $attachments $aUsers (id=>name) --}}
 @php
+    // **رؤيةُ الوثيقة تتبع القاعدة**: الوثيقةُ الممنوعةُ صراحةً عن المستخدمِ لا تُعرَض
+    // أصلاً — لا اسمَ، ولا مصغّرة، ولا عدّ. (المالكُ يتجاوز، فيرى الكلَّ.) تحميلٌ دفعيٌّ
+    // للقواعدِ ثمّ ترشيح (لا N+1). فلا «رؤيةٌ غير مُفسَّرة» في القائمة نفسِها.
+    $attachments = \App\Support\DocumentPolicy::filterListable(auth()->user(), $attachments);
+
     // التحكّمُ بوصولِ الوثيقةِ على مستوى المورد (Permissions 360 · وثائق · المستوى 5/6):
     // للمالكِ أو محرِّرِ الوحدة. تُحمَّل القواعدُ والأدوارُ دفعةً واحدةً (لا N+1).
     $aCanAcl = hub_is_owner() || hub_can(auth()->user(), $aModule, 'e');
@@ -10,6 +15,13 @@
             ->get()->groupBy('resource_id')
         : collect();
     $aRoles = $aCanAcl ? \App\Models\Role::where('is_owner', false)->orderBy('name')->get(['id', 'name']) : collect();
+    // الأشخاصُ الداخليّون (لا عملاء) — لسماحِ/منعِ أفرادٍ بأعيانهم
+    $aPeople = $aCanAcl ? \App\Models\User::where('status', 'نشط')
+        ->where(fn ($q) => $q->whereNull('account_type')->orWhere('account_type', '!=', 'client'))
+        ->orderBy('name')->limit(500)->get(['id', 'name']) : collect();
+    // خرائطُ الأسماءِ لعرضِ القواعدِ بالاسمِ لا بالمعرِّف
+    $aRoleNames = $aRoles->pluck('name', 'id');
+    $aPeopleNames = $aPeople->pluck('name', 'id');
 @endphp
 <div class="card" id="attachments">
     <h3>📎 المرفقات <span class="bdg g">{{ $attachments->count() }}</span>
@@ -45,6 +57,7 @@
                         @if ($a->downloads) · ⬇ {{ $a->downloads }}@endif
                         @php $aNote = $a->note ?: $a->field; @endphp
                         @if ($a->kind) · <span class="bdg g">{{ hub_doc_label($aModule, $a->kind) }}</span>@endif
+                        @if ($a->kind && hub_doc_sensitive($aModule, $a->kind)) <span class="bdg bad" title="نوعٌ حسّاس: بياناتٌ شخصيّة/ماليّة — يُنصَح بضبطِ وصولٍ صريح">🔴 حسّاس</span>@endif
                         @if ($a->doc_no) · رقم {{ $a->doc_no }}@endif
                         @if ($a->expires_at) · ينتهي {{ $a->expires_at->toDateString() }}@endif
                         @if ($aNote) · <span title="ملاحظة">{{ \Illuminate\Support\Str::limit($aNote, 60) }}</span>@endif
@@ -73,29 +86,43 @@
                     <summary class="sub pointer">🔒 التحكّم بالوصول @if ($aRows->count()) <span class="bdg wn">{{ $aRows->count() }} قاعدة</span>@endif</summary>
                     <div style="padding:6px 0">
                         @foreach ($aRows as $ar)
+                            @php $arName = $ar->principal_type === 'role'
+                                ? ($aRoleNames[$ar->principal_id] ?? 'دورٌ محذوف')
+                                : ($aPeopleNames[$ar->principal_id] ?? 'مستخدمٌ محذوف'); @endphp
                             <div class="sub" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                                 <span class="bdg {{ $ar->effect === 'deny' ? 'bad' : 'ok' }}">{{ $ar->effect === 'deny' ? 'منع' : 'سماح' }}</span>
-                                {{ $ar->principal_type === 'role' ? 'دور' : 'مستخدم' }}: {{ \Illuminate\Support\Str::limit($ar->principal_id, 14) }}
+                                <span>{{ $ar->principal_type === 'role' ? '👥 دور' : '👤 شخص' }}: <b>{{ $arName }}</b></span>
                                 <form method="POST" action="{{ route('att.access.clear', [$a->id, $ar->id]) }}" class="inline">
                                     @csrf @method('DELETE')
                                     <button class="btn ghost xs" aria-label="إزالة قاعدة الوصول">إزالة</button>
                                 </form>
                             </div>
                         @endforeach
-                        <form method="POST" action="{{ route('att.access', $a->id) }}" class="crow" style="margin-top:4px">
+                        {{-- ضبطةٌ واحدة: عدّةُ أدوارٍ و/أو عدّةُ أشخاص (اختر عدّةً بـCtrl/⌘ أو السحب) --}}
+                        <form method="POST" action="{{ route('att.access', $a->id) }}" style="margin-top:6px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
                             @csrf
-                            <input type="hidden" name="principal_type" value="role">
-                            <label class="vh" for="acl-role-{{ $a->id }}">الدور</label>
-                            <select class="inp" id="acl-role-{{ $a->id }}" name="principal_id" required style="max-width:180px">
-                                <option value="">— اختر دوراً —</option>
-                                @foreach ($aRoles as $role)<option value="{{ $role->id }}">{{ $role->name }}</option>@endforeach
-                            </select>
-                            <select class="inp" name="effect" style="max-width:110px">
-                                <option value="deny">منع</option>
-                                <option value="allow">سماح</option>
-                            </select>
-                            <button class="btn ghost sm" type="submit">حفظ القاعدة</button>
+                            <div>
+                                <label class="sub" for="acl-roles-{{ $a->id }}">👥 الأدوار</label>
+                                <select class="inp" id="acl-roles-{{ $a->id }}" name="roles[]" multiple size="4" style="min-width:180px">
+                                    @foreach ($aRoles as $role)<option value="{{ $role->id }}">{{ $role->name }}</option>@endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="sub" for="acl-users-{{ $a->id }}">👤 الأشخاص</label>
+                                <select class="inp" id="acl-users-{{ $a->id }}" name="users[]" multiple size="4" style="min-width:180px">
+                                    @foreach ($aPeople as $person)<option value="{{ $person->id }}">{{ $person->name }}</option>@endforeach
+                                </select>
+                            </div>
+                            <div>
+                                <label class="sub" for="acl-effect-{{ $a->id }}">القرار</label>
+                                <select class="inp" id="acl-effect-{{ $a->id }}" name="effect" style="max-width:120px">
+                                    <option value="allow">سماح</option>
+                                    <option value="deny">منع</option>
+                                </select>
+                            </div>
+                            <button class="btn ghost sm" type="submit">حفظ للمحدَّدين</button>
                         </form>
+                        <div class="sub" style="margin-top:3px">اختر أكثر من دورٍ أو شخصٍ معاً (Ctrl/⌘ أو السحب) ثمّ «حفظ للمحدَّدين».</div>
                     </div>
                 </details>
             @endif

@@ -145,8 +145,14 @@ class CodeHub
         if (! $ids) return [];
 
         $out = [];
-        foreach (Attachment::where('module', 'code')->whereIn('record_id', $ids)
-            ->orderBy('sort')->orderBy('created_at')->orderBy('id')->get() as $a) {
+        // الرؤيةُ تتبع قاعدةَ الوثيقة: أصلٌ ممنوعٌ صريحاً عن القارئِ لا يُدرَج في قائمةِ
+        // تنزيلاتِه (اسمٌ ورابطٌ وجودٌ يُكشَف). تحميلٌ دفعيٌّ للقواعدِ مرّة (لا N+1).
+        $codeAtts = Attachment::where('module', 'code')->whereIn('record_id', $ids)
+            ->orderBy('sort')->orderBy('created_at')->orderBy('id')->get();
+        \App\Support\DocumentPolicy::primeMemo($codeAtts->pluck('id'));
+        $codeViewer = auth()->user();
+        foreach ($codeAtts as $a) {
+            if ($codeViewer && ! \App\Support\DocumentPolicy::listable($codeViewer, $a)) continue;
             $out[$a->record_id][] = [
                 'name' => (string) $a->original_name,
                 'size' => (int) $a->size,

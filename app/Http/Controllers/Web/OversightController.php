@@ -53,6 +53,15 @@ class OversightController extends Controller
         $user = $user ?? auth()->user();
         if (! $user || ! $user->role) return false;
 
+        // **رايةٌ مُسنَدةٌ صراحة** (Permissions 360 · 02.1/20.1): تُمنَح/تُسحَب من محرِّرِ
+        // الأدوارِ ويُفسّرها الفاحص، بدل التوثيقِ باسمِ الدور (نمطٌ هشّ). **لا تُقرأ بـ
+        // hub_flag** لأنّه يمنحُ المالكَ كلَّ رايةٍ تلقائياً — والرقابةُ بابٌ غيرُ موروثٍ
+        // للمالكِ صراحةً (ثابتُ IA · C1): تُقرأ من رايات الدورِ الخام فلا يصيرُ المالكُ
+        // رقيباً إلا بمنحٍ صريح. الاسمُ يبقى مساراً خلفيّاً للتوافق.
+        $flags = is_array($user->role->flags) ? $user->role->flags
+            : (json_decode((string) ($user->role->flags ?? '[]'), true) ?: []);
+        if (! empty($flags['oversight'])) return true;
+
         $roleName = trim((string) setting('collab.oversight_role', ''));
         if ($roleName === '') return false;                 // لا دورَ رقابةٍ مُسنَد بعد
 
