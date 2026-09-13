@@ -141,7 +141,8 @@
              المرئيّ `aria-hidden` كي لا يُنطَق مرتين، والصفحةُ الحالية `aria-current`
              لا لونٌ وحدَه، وترتيبُ التنقّل ترتيبُ المصدر (لا `tabindex`). --}}
         @php $isOwner = hub_is_owner(); @endphp
-        @if ($isOwner || hub_flag(auth()->user(), 'users') || hub_flag(auth()->user(), 'audit') || hub_secrets())
+        {{-- Permissions 360 · 04.1: الظهورُ من الكتالوج نفسِه — رابطٌ ظاهرٌ واحدٌ يكفي (لا قائمةَ راياتٍ تنحرف) --}}
+        @if (hub_admin_bar_visible(auth()->user()))
             @php
                 $hubBarGroups = collect(hub_admin_links(auth()->user()))
                     ->filter(fn ($l) => $l['ok'])->groupBy('group');

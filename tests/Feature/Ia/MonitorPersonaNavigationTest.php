@@ -113,9 +113,10 @@ class MonitorPersonaNavigationTest extends IaTestCase
         $this->seedCore();
         $mon = $this->monitorUser();
 
-        // مجالُ الإدارةِ محجوبٌ (حارسُ admin_bar لا يشمل المراقب)
+        // Permissions 360 · 04.1 — مجالُ الإدارةِ يظهر للمراقب لأنّه يبلغ «نظرةَ التحكّم»
+        // و«التنبيهات» فعلاً (كان المجالُ محجوباً وهما مبلوغتان = انحرافُ ظهور، أُصلح)
         $domains = array_keys($this->ia()->visibleDomains($mon));
-        $this->assertNotContains('administration', $domains, 'مجالُ الإدارةِ ظهر للمراقب');
+        $this->assertContains('administration', $domains, 'مجالُ الإدارةِ يظهر لمن له وجهتا إدارةٍ حقيقيّتان');
 
         // النموذجُ المقصود: المراقبُ قد يرى مجالاً تشغيليّاً (كالموارد البشريّة) **لكن**
         // بأقسامِ المراقبةِ وحدَها (نظرةُ القوى/الأداء/القدرات — كلُّها مُصرَّحةٌ له)، ولا تُسرَّب

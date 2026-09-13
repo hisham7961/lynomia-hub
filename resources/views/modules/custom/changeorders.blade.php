@@ -15,7 +15,8 @@
             <a class="btn ghost sm" href="{{ route('m.show', ['quotes', $row->quote_id]) }}">🧾 عرضه المصدر ←</a>
         @endif
         @if ($coCanE && ! $row->trashed())
-            @if ($coStatus === 'معتمد' && ! $coApplied)
+            {{-- Permissions 360 · 05.4: الخادمُ يشترط projects:e أيضاً — فلا زرٌّ يظهر ثم يُصَدّ --}}
+            @if ($coStatus === 'معتمد' && ! $coApplied && hub_can(auth()->user(), 'projects', 'e'))
                 <form method="POST" action="{{ route('changeorders.apply', $row->id) }}"
                       data-confirm="تطبيقُ أمر التغيير على المشروع؟ تتطوّر قيمتُه التعاقدية — والعرضُ المقبول لا يُمَسّ.">
                     @csrf<button class="btn p sm">✅ تطبيقٌ على المشروع</button>

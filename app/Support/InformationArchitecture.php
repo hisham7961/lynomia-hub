@@ -103,7 +103,8 @@ class InformationArchitecture
             'odoo_project'       => fn ($u) => hub_can($u, 'projects', 'e'),
 
             // مجالُ الإدارة → شرطُ ظهورِ شريط الترس (layouts/app.blade.php:142)
-            'admin_bar'          => fn ($u) => hub_is_owner($u) || hub_flag($u, 'users') || hub_flag($u, 'audit') || hub_secrets($u),
+            // Permissions 360 · 04.1 — نفسُ حقيقةِ الشريط حرفيّاً: رابطُ إدارةٍ ظاهرٌ واحدٌ يكفي
+            'admin_bar'          => fn ($u) => hub_admin_bar_visible($u),
         ];
     }
 

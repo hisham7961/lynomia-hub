@@ -80,9 +80,13 @@ class KpiController extends Controller
             'off'     => \App\Support\KpiCentre::offTarget($rows),
             'catalog' => $this->catalog(),
             'editing' => $editing,
-            'people'  => \Illuminate\Support\Facades\DB::table('users')->whereNull('deleted_at')
-                ->where('status', '!=', 'موقوف')->orderBy('name')->orderBy('id')
-                ->limit(200)->get(['id', 'name']),
+            // Permissions 360 · 06.3 — دليلُ أسماءِ المستخدمين صلاحيةُ الموارد (hr:v) لا
+            // لوحاتِ KPI: حاملُ المجموعةِ التحليليّةِ بلا hr:v يرى الأرقامَ لا دليلَ الأسماء
+            'people'  => hub_can(auth()->user(), 'hr', 'v')
+                ? \Illuminate\Support\Facades\DB::table('users')->whereNull('deleted_at')
+                    ->where('status', '!=', 'موقوف')->orderBy('name')->orderBy('id')
+                    ->limit(200)->get(['id', 'name'])
+                : collect(),
         ]);
     }
 

@@ -253,7 +253,8 @@ class WidgetRegistry
                     ['t' => 'بوابتي',           'r' => 'portal.me',       'i' => '👤', 'c' => '#4C6FA5', 'ok' => true],
                     ['t' => 'تشغيل اليوم',      'r' => 'morning',         'i' => '☀️', 'c' => '#C08A3E', 'ok' => true],
                     ['t' => 'الرسائل',          'r' => 'dm.inbox',        'i' => '💬', 'c' => '#7C6FB0', 'ok' => true],
-                    ['t' => 'صندوق الوثائق',    'r' => 'inboxdocs.index', 'i' => '📥', 'c' => '#2FB79A', 'ok' => true],
+                    // Permissions 360 · 04.2 — البلاطةُ تتبع بوّابةَ متحكّمِها لا true ثابتة
+                    ['t' => 'صندوق الوثائق',    'r' => 'inboxdocs.index', 'i' => '📥', 'c' => '#2FB79A', 'ok' => hub_can($u, 'inboxdocs', 'v') || hub_can($u, 'files', 'v')],
                     ['t' => 'التقارير المالية', 'r' => 'reports.finance', 'i' => '📊', 'c' => '#B0568E', 'ok' => hub_can($u, 'fin', 'v')],
                 ])->filter(fn ($l) => $l['ok'])->values()->all(),
             ],

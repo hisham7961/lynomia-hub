@@ -431,7 +431,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $opsA],
             ['key' => 'delivery',  'label' => '🛤️ مسار التسليم',     'route' => 'delivery',        'group' => 'analytics', 'ok' => hub_can($user, 'feats', 'v') || hub_can($user, 'deploys', 'v') || hub_can($user, 'requests', 'v') || hub_can($user, 'designs', 'v')],
             ['key' => 'custody',   'label' => '🏷️ كتالوج العهد',      'route' => 'custody.catalog', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
-            ['key' => 'identity',  'label' => '📷 مركز الهوية والمسح', 'route' => 'identity.center', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
+            ['key' => 'identity',  'label' => '📷 مركز الهوية والمسح', 'route' => 'identity.center', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v') || hub_can($user, 'products', 'v')],
             ['key' => 'workteam',  'label' => '🕗 فريقي اليوم',        'route' => 'workforce.team',  'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
             // مركزُ التقارير اليوميّة ومركزُ المراجعة — مراكزُ ظاهرةٌ كـ«فريقي اليوم» تماماً،
             // لا مدفونةً في صفحةِ مساحة. الحرسُ نفسُه في المتحكّم (guardTeam/canReviewAny).
@@ -5763,6 +5763,32 @@ if (! function_exists('hub_range')) {
     }
 }
 
+if (! function_exists('hub_admin_bar_visible')) {
+    /**
+     * **ظهورُ شريطِ الإدارة يُشتقُّ من الكتالوج لا من قائمةِ راياتٍ مكرّرة** (Permissions 360 · 04.1).
+     * كان الشرطُ (مالك/users/audit/secrets) نسخةً يدويّةً تنحرف: حاملُ monitor/secOps يبلغ
+     * «نظرةَ التحكّم» و«التنبيهات»، وحاملُ mobile يبلغ منصّةَ الهاتف، ومن يرى الحوادثَ يبلغها —
+     * والشريطُ كلُّه محجوبٌ عنهم. الحقيقةُ الواحدة: الشريطُ يظهر لمن له **رابطٌ واحدٌ ظاهرٌ**
+     * على الأقلّ في كتالوجِ hub_admin_links (وحارسُ IA للمجالِ يستدعي هذه الدالّةَ نفسَها).
+     */
+    function hub_admin_bar_visible($user = null): bool
+    {
+        $user = $user ?? auth()->user();
+        if (! $user || hub_is_client($user)) return false;
+
+        foreach (hub_admin_links($user) as $l) {
+            // بندان لا يجعلان الموظّفَ «إداريّاً» (يبقيان داخلَ الشريط لمن ظهرَ له):
+            //  · «التخصيص» (prefs) — شخصيٌّ ok=true للجميع.
+            //  · نُسَخُ الوحداتِ العاديّة (route=m.index كالحوادث) — صاحبُها يبلغها أصلاً
+            //    من تنقّلِ الوحدات، وظهورُها هنا اختصارٌ لا سلطةُ إدارة.
+            if (($l['key'] ?? '') === 'prefs' || ($l['route'] ?? '') === 'm.index') continue;
+            if (! empty($l['ok'])) return true;
+        }
+
+        return false;
+    }
+}
+
 if (! function_exists('hub_admin_links')) {
     /**
      * كتالوجُ روابط الإدارة (WP-1.5) — المصدرُ **الواحد** الذي يُرسَم منه شريطُ
@@ -5808,7 +5834,7 @@ if (! function_exists('hub_admin_links')) {
             // لا يدلّ عليها شيءٌ صفحةٌ ميّتة. حارسُها حارسُ `ControlController::gate`
             // حرفياً (مالكٌ أو حاملُ راية المراقبة) فلا يُوعَد أحدٌ ببابٍ يُصَدّ عنه.
             $mk('control', 'نظرة التحكّم', '🎛️', 'control.index', [], 'التشغيل',
-                $owner || hub_monitor($user), ['control.*'], 'مستوى التحكّم النظرة العامة يستدعي تدخّلك'),
+                $owner || hub_monitor_group('secOps', $user), ['control.*'], 'مستوى التحكّم النظرة العامة يستدعي تدخّلك'),
             $mk('ops', 'التشغيل', '🖥️', 'ops.index', [], 'التشغيل',
                 $owner, ['ops.*'], 'مركز التشغيل الصحّة الطابور النسخ'),
             $mk('errors', 'الأخطاء', '🐞', 'errors.index', [], 'التشغيل',
@@ -5818,7 +5844,7 @@ if (! function_exists('hub_admin_links')) {
                 hub_can($user, 'incidents', 'v'), [], 'إدارة الحوادث التقنية الانقطاع'),
             // مركزُ التنبيهات: القراءةُ للمالك أو حامل المراقبة (AlertCenterController::readGate)
             $mk('alerts', 'التنبيهات', '🔔', 'alerts.center', [], 'التشغيل',
-                $owner || hub_monitor($user), ['alerts.center'], 'مركز التنبيهات قواعد التنبيه'),
+                $owner || hub_monitor_group('secOps', $user), ['alerts.center'], 'مركز التنبيهات قواعد التنبيه'),
             // مركزُ منصّة الجوال: مالكٌ أو حاملُ رايةِ الجوال (MobilePlatformController::canView)
             $mk('mobileplatform', 'منصّة تطبيق الهاتف', '📱', 'mobileplatform.index', [], 'التشغيل',
                 $owner || hub_flag($user, 'mobile'), ['mobileplatform.*'],

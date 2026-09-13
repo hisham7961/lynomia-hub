@@ -124,7 +124,8 @@ class NavOrganizationTest extends TestCase
             'assets' => $none, 'compliance' => $none, 'apps' => $none, 'projects' => $none,
             'code' => $none,
             // الحضورُ الشهريّ (attend) ومركزُ المراجعة (updates) مركزان أيضاً — يُطفآن ليفرغ القسم
-            'attend' => $none, 'updates' => $none,
+            // (وproducts كذلك — مركزُ الهويّة صار يقبلها منذ 04.4)
+            'attend' => $none, 'updates' => $none, 'products' => $none,
         ]);
 
         $labels = collect(hub_top_groups($u))->pluck('label');
@@ -146,7 +147,8 @@ class NavOrganizationTest extends TestCase
             'assets' => $none, 'compliance' => $none, 'apps' => $none, 'projects' => $none,
             'code' => $none,
             // مركزَا الحضورِ الشهريّ والمراجعة يُطفآن حتى يبقى finrep وحدَه في القسم
-            'attend' => $none, 'updates' => $none,
+            // (وproducts أيضاً — مركزُ الهويّة صار يقبلها منذ 04.4)
+            'attend' => $none, 'updates' => $none, 'products' => $none,
         ]);
 
         $g = collect(hub_top_groups($u))->firstWhere('label', 'اللوحات والمراكز');
