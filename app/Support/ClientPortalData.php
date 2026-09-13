@@ -32,6 +32,21 @@ class ClientPortalData
     /** فواتيرُ العميل = المبيعاتُ والمقبوضاتُ فقط — لا مشترياتٌ تكشف التكلفة */
     public const CLIENT_INVOICE_KINDS = ['فاتورة مبيعات', 'دفعة واردة'];
 
+    /**
+     * **أعمدةُ سطحِ العميلِ الآمنة** (Permissions 360 · 15.4/03.3) — بالعمود (col):
+     * العقدُ الموثَّقُ لبوّابةِ العميل («فواتيرُ العميل = المبيعاتُ والدفعاتُ الواردة
+     * بأعمدةٍ منسّقة») يُفرَض في **المحرّك** لا في قارئِ البوّابةِ وحدَه:
+     * `hub_visible_fields` يقصّ أعمدةَ حسابِ العميلِ على هذه القوائم أيّاً كان بابُ
+     * القراءة (m.* أو API أو مزامنةُ الجوال أو CSV)، و`hub_scope` يحصر صفوفَ
+     * الماليّةِ في CLIENT_INVOICE_KINDS. القوائمُ مرايا select في invoiceRows/
+     * projectRows/engagementRows أعلاه — تُوسَّع هنا حين يُوسَّع العقد.
+     */
+    public const CLIENT_SAFE_COLS = [
+        'fin'         => ['doc_no', 'kind', 'date', 'due', 'total', 'paid', 'currency', 'state', 'client_id', 'project_id'],
+        'projects'    => ['name', 'status', 'priority', 'progress', 'start_date', 'launch_exp', 'launch_act', 'description', 'client_id', 'engagement_id'],
+        'engagements' => ['name', 'type', 'status', 'renewal', 'client_note', 'client_id'],
+    ];
+
     /** محادثاتُ العميل = القنواتُ والرسائلُ ذاتُ الجمهور العميليّ */
     public const CLIENT_CONV_KINDS = ['channel', 'dm'];
 

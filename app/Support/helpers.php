@@ -160,6 +160,14 @@ if (! function_exists('hub_scope')) {
             $q->whereIn($kcol, $kids);
         }
 
+        // Permissions 360 · 15.4/03.3 — **حسابُ العميل على الماليّة يرى فواتيرَه حصراً**
+        // (مبيعاتٌ ودفعاتٌ واردة — عقدُ بوّابةِ العميلِ الموثَّق): التنسيقُ في المحرّكِ
+        // فيسري على كلِّ بابِ قراءة (m.* والـAPI ومزامنةُ الجوال) لا على قارئِ
+        // البوّابةِ وحدَه. الداخليّون لا يمسّهم هذا القيد.
+        if ($module === 'fin' && hub_is_client($user)) {
+            $q->whereIn('kind', \App\Support\ClientPortalData::CLIENT_INVOICE_KINDS);
+        }
+
         return $q;
     }
 }
@@ -1764,8 +1772,28 @@ if (! function_exists('hub_field_mode')) {
         $fr = $user->role?->field_rules;
         $rules = is_array($fr) ? $fr : (json_decode((string) $fr, true) ?: []);
         $mode = $rules[$module][$fieldKey] ?? '';
+        if (in_array($mode, ['ro', 'hide'], true)) return $mode;
 
-        return in_array($mode, ['ro', 'hide'], true) ? $mode : '';
+        // Permissions 360 · 07.4 — **مجموعاتُ الكتابةِ المسمّاة**: حقلٌ مذكورٌ في
+        // `writes` بكتالوجِ المفاتيحِ (hub_permissions: projTeam/projFin/projTech)
+        // يكون **قراءةً فقط** لمن لا يحمل مفتاحَه — فتتفكّك سلطةُ `e` الواحدة.
+        // ذيلُ السلسلةِ عمداً: لا يرفع حجبَ قاعدةِ دورٍ ولا حجبَ fieldsec أعلاه،
+        // وهجرةُ grant_projects_write_groups صانت حاملي `projects:e` القائمين.
+        static $writeGroups = null;
+        if ($writeGroups === null) {
+            $writeGroups = [];
+            foreach (hub_fine_perms() as $fk => $fdef) {
+                foreach ((array) ($fdef['writes'] ?? []) as $wm => $wkeys) {
+                    foreach ((array) $wkeys as $wk) $writeGroups[$wm][(string) $wk] = $fk;
+                }
+            }
+        }
+        if (isset($writeGroups[$module][$fieldKey])
+            && ! hub_can($user, $module, $writeGroups[$module][$fieldKey])) {
+            return 'ro';
+        }
+
+        return '';
     }
 }
 
@@ -1773,8 +1801,19 @@ if (! function_exists('hub_visible_fields')) {
     /** حقول الوحدة بعد إخفاء الممنوع عن دور المستخدم */
     function hub_visible_fields($user, string $module, array $def): array
     {
-        return array_values(array_filter($def['fields'],
+        $fields = array_values(array_filter($def['fields'],
             fn ($f) => hub_field_mode($user, $module, $f['key']) !== 'hide'));
+
+        // Permissions 360 · 15.4/03.3 — حسابُ العميلِ يرى أعمدةَ سطحِه المنسّقةَ حصراً
+        // (عقدُ البوّابة نفسُه) في كلِّ سطحٍ يستشير هذه الدالة: جدولُ الوحدةِ
+        // وتصديرُها وقناعُ حقولِ الجوال — لا نسختين من القرار.
+        if (hub_is_client($user) && isset(\App\Support\ClientPortalData::CLIENT_SAFE_COLS[$module])) {
+            $safe = \App\Support\ClientPortalData::CLIENT_SAFE_COLS[$module];
+            $fields = array_values(array_filter($fields,
+                fn ($f) => in_array((string) ($f['col'] ?? $f['key']), $safe, true)));
+        }
+
+        return $fields;
     }
 }
 
