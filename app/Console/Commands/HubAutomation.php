@@ -445,6 +445,10 @@ class HubAutomation extends Command
 
         $md = $module ? hub_mod($module) : null;
         foreach ($this->recipientUsers(null) as $u) {
+            // Permissions 360 · 18.1 — الرؤيةُ شرطٌ قبل النطاق: مراقبٌ لا يملك v على
+            // الوحدةِ لا يُشعَر باسمِ سجلِّها (نصُّ الإشعارِ يحمل الاسمَ — تسريبُ حقلٍ
+            // عبرَ حدِّ الصلاحيةِ لا النطاقِ فقط). المالكُ يمرّ عبر hub_can كالمعتاد.
+            if ($md && ! hub_can($u, $module, 'v')) continue;
             if ($md && $recordId && ! hub_scope(
                 DB::table($md['table'])->whereNull('deleted_at')->where('id', $recordId), $module, $u)->exists()) {
                 continue;   // السجلُّ خارج نطاق هذا المستلم — لا يُشعَر باسمه

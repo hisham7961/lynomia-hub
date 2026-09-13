@@ -2493,6 +2493,30 @@ if (! function_exists('hub_project_health')) {
     }
 }
 
+if (! function_exists('hub_project_health_for')) {
+    /**
+     * **صحّةُ المشروعِ بعينِ قارئِها** (Permissions 360 · 07.5): عاملُ «الالتزام
+     * بالميزانيّة» (نسبةُ الاستهلاكِ في note ودرجتُه) مُشتقٌّ من حقلِ الميزانيّةِ الذي
+     * قد يحجبه fieldsec/قواعدُ الدور — فمن حُجبت عنه الميزانيّةُ يُسقَط عاملُها
+     * ويُعاد تطبيعُ الدرجةِ على بقيّةِ الأوزان. الترشيحُ **عند العرض** لا في
+     * الخبيئة (health:{id} تبقى عامّةً واحدةً — لا تفرُّعَ خبيئةٍ بالمستخدم).
+     */
+    function hub_project_health_for($user, string $projectId, bool $fresh = false): array
+    {
+        $h = hub_project_health($projectId, $fresh);
+        if (! $h || hub_field_mode($user, 'projects', 'budget') !== 'hide') return $h;
+
+        $f = array_values(array_filter($h['factors'] ?? [],
+            fn ($x) => ($x['k'] ?? '') !== 'الالتزام بالميزانية'));
+        $wsum = array_sum(array_map(fn ($x) => (int) $x['w'], $f)) ?: 1;
+        $score = (int) round(array_sum(array_map(fn ($x) => $x['s'] * $x['w'], $f)) / $wsum);
+
+        return ['score' => $score, 'factors' => $f,
+                'tone' => $score >= 80 ? 'ok' : ($score >= 55 ? 'wn' : 'bad'),
+                'label' => $score >= 80 ? 'سليم' : ($score >= 55 ? 'يحتاج انتباهاً' : 'متعثر')];
+    }
+}
+
 if (! function_exists('hub_ar_norm')) {
     /**
      * تطبيع عربي للمقارنة: يجرّد التشكيل والتطويل ويوحّد صور الألف والياء والتاء المربوطة.
@@ -2862,6 +2886,28 @@ if (! function_exists('hub_notify')) {
             'read'      => false,
             'created_at' => now(),
         ]);
+    }
+}
+
+if (! function_exists('hub_notification_text')) {
+    /**
+     * **نصُّ الإشعارِ عند العرض** (Permissions 360 · 18.3): النصُّ المخزونُ خُطَّ يومَ
+     * كان المستلمُ يرى وحدتَه — إن سُحبت رؤيتُها لاحقاً بقي الاسمُ المخزونُ يتسرّب من
+     * قائمةِ الإشعارات (ويباً وجوّالاً). فحصٌ رخيصٌ بلا استعلام (`hub_can` قراءةُ
+     * مصفوفةٍ محمَّلة): وحدةٌ مسجَّلةٌ لم يعد يملك رؤيتَها ⇒ قناعٌ عامٌّ بلا اسمِ سجلّ.
+     * إشعارٌ بلا وحدةٍ (نظاميّ/شخصيّ) يمرّ كما هو، والنطاقُ الدقيقُ يبقى عند بابِ
+     * الوجهةِ نفسِها (`go`/الوحدة تصدّ ٤٠٤/٤٠٣ كالمعتاد).
+     */
+    function hub_notification_text($user, $n): string
+    {
+        $module = is_array($n) ? ($n['module'] ?? null) : ($n->module ?? null);
+        $text   = (string) (is_array($n) ? ($n['text'] ?? '') : ($n->text ?? ''));
+
+        if ($module && hub_mod((string) $module) && ! hub_can($user, (string) $module, 'v')) {
+            return '🔒 إشعارٌ عن سجلٍّ في وحدةٍ لم تعد تملك رؤيتَها';
+        }
+
+        return $text;
     }
 }
 

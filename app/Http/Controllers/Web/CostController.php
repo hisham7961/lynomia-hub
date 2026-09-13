@@ -31,6 +31,11 @@ class CostController extends Controller
     public function index(Request $r)
     {
         $this->gate();
+        // Permissions 360 · 19.1/19.2 — أرقامُ التكاليف مبنيّةٌ على أجورِ **المنشأةِ
+        // كلِّها** (hub_hourly_rates بمفتاحِ خبيئةٍ عامٍّ بلا مكوِّنِ نطاق): حسابٌ معزولٌ
+        // على شركاتٍ/عملاءَ لا يستنتج متوسّطاتِ أجورِ غيرِ شركاتِه — كنظيراتِها
+        // (services أعلاه والأداء/القدرات/القوى العاملة).
+        hub_org_analytics_guard();
 
         $one = $r->query('p');
         if ($one) {

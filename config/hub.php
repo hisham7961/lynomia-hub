@@ -9293,7 +9293,9 @@ return [
             'endpoints'     => 'CACHEABLE_INCREMENTAL',
             'assetlog'      => 'CACHEABLE_INCREMENTAL',
             'stock'         => 'CACHEABLE_INCREMENTAL',
-            'hr'            => 'CACHEABLE_INCREMENTAL',
+            // Permissions 360 · 09.3 — سجلّاتُ الأشخاصِ والرواتبِ والحضور لا تُخبَّأ
+            // على أجهزةِ الجوال: تُقرأ حيّةً فقط (جهازٌ مفقودٌ لا يحمل ملفَّ موظفين)
+            'hr'            => 'ONLINE_ONLY',
             'leaves'        => 'CACHEABLE_INCREMENTAL',
             'banks'         => 'CACHEABLE_INCREMENTAL',
             'okrs'          => 'CACHEABLE_INCREMENTAL',
@@ -9308,10 +9310,10 @@ return [
             'costc'         => 'CACHEABLE_INCREMENTAL',
             'recur'         => 'CACHEABLE_INCREMENTAL',
             'stockmv'       => 'CACHEABLE_INCREMENTAL',
-            'attend'        => 'CACHEABLE_INCREMENTAL',
-            'payroll'       => 'CACHEABLE_INCREMENTAL',
+            'attend'        => 'ONLINE_ONLY',   // 09.3 — كسجلّاتِ hr أعلاه
+            'payroll'       => 'ONLINE_ONLY',
             'recruit'       => 'CACHEABLE_INCREMENTAL',
-            'hrlog'         => 'CACHEABLE_INCREMENTAL',
+            'hrlog'         => 'ONLINE_ONLY',
             'rules'         => 'CACHEABLE_INCREMENTAL',
             'feats'         => 'CACHEABLE_INCREMENTAL',
             'designs'       => 'CACHEABLE_INCREMENTAL',

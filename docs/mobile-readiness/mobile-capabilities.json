@@ -3,7 +3,7 @@
     "_note": "بيانٌ آليّ — لا يُحرَّر يدويّاً؛ يُعاد توليدُه من المسارات فلا يصف قدرةً غيرَ مبنيّة",
     "namespace": "/api/mobile/v1",
     "mobile_api_version": "1",
-    "schema_version": "3ccb1bf26170",
+    "schema_version": "d19f975f0292",
     "openapi": {
         "live": "/api/mobile/v1/openapi.json",
         "generator": "App\\Support\\MobileOpenApi::spec()"
@@ -146,9 +146,9 @@
             "NOT_APPLICABLE"
         ],
         "coverage": {
-            "CACHEABLE_INCREMENTAL": 81,
+            "CACHEABLE_INCREMENTAL": 77,
             "CACHEABLE_READ_ONLY": 0,
-            "ONLINE_ONLY": 0,
+            "ONLINE_ONLY": 4,
             "SENSITIVE_NO_PERSIST": 3,
             "NOT_APPLICABLE": 1
         },
@@ -164,7 +164,7 @@
             "apps": "CACHEABLE_INCREMENTAL",
             "assetlog": "CACHEABLE_INCREMENTAL",
             "assets": "CACHEABLE_INCREMENTAL",
-            "attend": "CACHEABLE_INCREMENTAL",
+            "attend": "ONLINE_ONLY",
             "autos": "CACHEABLE_INCREMENTAL",
             "banks": "CACHEABLE_INCREMENTAL",
             "brands": "CACHEABLE_INCREMENTAL",
@@ -196,8 +196,8 @@
             "files": "CACHEABLE_INCREMENTAL",
             "fin": "CACHEABLE_INCREMENTAL",
             "hcps": "CACHEABLE_INCREMENTAL",
-            "hr": "CACHEABLE_INCREMENTAL",
-            "hrlog": "CACHEABLE_INCREMENTAL",
+            "hr": "ONLINE_ONLY",
+            "hrlog": "ONLINE_ONLY",
             "ideas": "CACHEABLE_INCREMENTAL",
             "incidents": "CACHEABLE_INCREMENTAL",
             "ip": "CACHEABLE_INCREMENTAL",
@@ -209,7 +209,7 @@
             "meetings": "CACHEABLE_INCREMENTAL",
             "obligations": "CACHEABLE_INCREMENTAL",
             "okrs": "CACHEABLE_INCREMENTAL",
-            "payroll": "CACHEABLE_INCREMENTAL",
+            "payroll": "ONLINE_ONLY",
             "phones": "SENSITIVE_NO_PERSIST",
             "plans": "CACHEABLE_INCREMENTAL",
             "policies": "CACHEABLE_INCREMENTAL",
