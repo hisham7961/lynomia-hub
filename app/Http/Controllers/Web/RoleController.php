@@ -110,7 +110,21 @@ class RoleController extends Controller
     public function store(Request $r)
     {
         $this->gate();
-        $role = Role::create($this->data($r));
+
+        // التحقّقُ أوّلاً: خطأُ الإدخالِ يعيد للنموذجِ محفوظَ الحقولِ قبلَ أيِّ تصعيد
+        // (وإلا ضاعت المصفوفةُ المبنيّةُ خلفَ صفحةِ التأكيد).
+        $data = $this->data($r);
+
+        // Permissions 360 · 01.6 — تصعيدُ الهويّة عند إنشاءِ دورٍ حسّاس، كنظيرِه في update():
+        // كان بالإمكان سكُّ دورٍ يحمل رايةً حسّاسةً (users/secrets/exp/audit/copySec/oversight…)
+        // في طلبٍ واحدٍ بلا تأكيدِ هوية، فيتجاوز التصعيدَ الذي يفرضه تعديلُ الدورِ نفسِه.
+        $newFlags = array_keys(array_filter((array) $r->input('flags', [])));
+        if (array_intersect($newFlags, self::RISKY_FLAGS)
+            && ($resp = hub_require_stepup(route('roles.index', absolute: false)))) {
+            return $resp;
+        }
+
+        $role = Role::create($data);
         $this->trail('إضافة دور', $role);
 
         return redirect()->route('roles.index')->with('ok', 'أُضيف الدور');
