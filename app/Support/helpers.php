@@ -1709,6 +1709,16 @@ if (! function_exists('hub_expiry_count')) {
     }
 }
 
+if (! function_exists('hub_field_sensitive')) {
+    /** أهذا الحقلُ مصنَّفٌ حسّاساً في وحدتِه؟ (كتالوج config/hub_field_sec.php — بمفتاح الحقل) */
+    function hub_field_sensitive(string $module, string $fieldKey): bool
+    {
+        $map = (array) config('hub_field_sec', []);
+
+        return in_array($fieldKey, (array) ($map[$module] ?? []), true);
+    }
+}
+
 if (! function_exists('hub_field_mode')) {
     /**
      * صلاحيات مستوى الحقل: '' كامل · 'ro' قراءة فقط · 'hide' مخفي.
@@ -1734,6 +1744,15 @@ if (! function_exists('hub_field_mode')) {
 
         $user = $user ?? auth()->user();
         if (! $user || $user->role?->is_owner) return '';
+
+        // Permissions 360 · 09.2/07.2 — الحقولُ الحسّاسةُ (راتب/هويّة/جواز/IBAN/ماليّةُ
+        // المشروع) خلفَ مفتاحِ `fieldsec` للوحدة: من لا يحمله لا يراها في أيِّ سطحٍ
+        // يستشيرُ هذه الدالة (نموذج/عرض/fill/تصدير/API). النمطُ الآمن: هجرةُ
+        // grant_fieldsec منحت المفتاحَ لكلِّ دورٍ كان يراها — فلا فقدَ فوريّاً،
+        // وقواعدُ الدورِ (ro/hide) تبقى تعمل فوقَه لحامليه.
+        if (hub_field_sensitive($module, $fieldKey) && ! hub_can($user, $module, 'fieldsec')) {
+            return 'hide';
+        }
 
         // بلا تخبئة ساكنة عمداً: الدور محمّل أصلاً والقيمة مُكاستة، والتخبئة كانت
         // تُبقي قيوداً قديمة سارية داخل العملية الواحدة (عمّال الطوابير وOctane).
