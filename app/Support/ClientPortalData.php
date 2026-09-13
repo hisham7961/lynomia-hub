@@ -168,20 +168,37 @@ class ClientPortalData
             ->orderByDesc('updated_at')->orderBy('id')
             ->select('id', 'kind', 'title', 'audience', 'updated_at');
 
-        return $limit ? $q->limit($limit)->get() : $q->get();
+        return self::scopeConvToClients($q, $userId)
+            ->when($limit, fn ($x) => $x->limit($limit))->get();
     }
 
-    /** محادثةُ عميلٍ واحدة (عضويّةٌ + جمهورٌ معاً) — وإلا 404 */
+    /** محادثةُ عميلٍ واحدة (عضويّةٌ + جمهورٌ معاً + عنوانُ عملائِه) — وإلا 404 */
     public static function conversationDetail(string $id, ?string $userId = null): Conversation
     {
         $memberIds = self::memberConversationIds($userId);
         abort_if(! $memberIds, 404);
 
-        return Conversation::whereIn('id', $memberIds)
-            ->whereIn('kind', self::CLIENT_CONV_KINDS)
-            ->whereIn('audience', self::CLIENT_AUDIENCES)
-            ->whereNull('archived_at')->whereNull('deleted_at')
-            ->findOrFail($id);
+        return self::scopeConvToClients(
+            Conversation::whereIn('id', $memberIds)
+                ->whereIn('kind', self::CLIENT_CONV_KINDS)
+                ->whereIn('audience', self::CLIENT_AUDIENCES)
+                ->whereNull('archived_at')->whereNull('deleted_at'),
+            $userId
+        )->findOrFail($id);
+    }
+
+    /**
+     * **عضويّةُ الصفِّ لا تكفي وحدَها** (Permissions 360 · 08.1): محادثةٌ معنونةٌ بعميلٍ
+     * (`client_id`) لا تُعرَض لقارئِ بوّابةٍ زالت عضويّتُه في ذلك العميل (عُلِّقت مثلاً) —
+     * صفُّ `conversation_members` يبقى بعد التعليق، فالعنوانُ يُحاكَم على `hub_client_ids`
+     * الحيّة: ضمنَ عملائِه أو محادثةٌ عامّةٌ بلا عنوان (نظيرُ عزلِ `CollaborationRail`).
+     */
+    protected static function scopeConvToClients($q, ?string $userId = null)
+    {
+        $kids = hub_client_ids($userId !== null ? User::find($userId) : null);
+
+        return $q->when($kids !== null, fn ($x) => $x->where(
+            fn ($w) => $w->whereIn('client_id', $kids)->orWhereNull('client_id')));
     }
 
     /** رسائلُ محادثةِ العميل — الموسومةُ داخليّاً (`internal`) محجوبةٌ دائماً */

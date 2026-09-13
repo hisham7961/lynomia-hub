@@ -53,7 +53,8 @@ class AssetProjectApiController extends Controller
         $this->gate();
         $project = $this->scopedProject($id);
 
-        $rows = $this->svc->activeForProject((string) $project->getKey())->map(fn ($a) => [
+        // 16.3 — القارئُ المحصورُ بشركاتٍ لا يرى أصولَ غيرِها في تخصيصاتِ المشروع
+        $rows = $this->svc->activeForProject((string) $project->getKey(), 200, auth()->user())->map(fn ($a) => [
             'assignment_id' => (string) $a->id,
             'asset_id'      => (string) $a->asset_id,
             'asset_code'    => $a->asset?->code,
@@ -71,7 +72,8 @@ class AssetProjectApiController extends Controller
         $this->gate();
         $asset = $this->scopedAsset($id);
 
-        $rows = $this->svc->activeForAsset((string) $asset->getKey())->map(fn ($a) => [
+        // 16.3 — والمقابل: لا يرى مشاريعَ غيرِ شركاتِه في تخصيصاتِ الأصل
+        $rows = $this->svc->activeForAsset((string) $asset->getKey(), 100, auth()->user())->map(fn ($a) => [
             'assignment_id' => (string) $a->id,
             'project_id'    => (string) $a->project_id,
             'project_name'  => $a->project?->name,

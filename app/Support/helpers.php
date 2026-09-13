@@ -186,12 +186,17 @@ if (! function_exists('hub_client_ids')) {
         $user = $user ?? auth()->user();
         if (! $user || $user->role?->is_owner) return null;
 
+        // Permissions 360 · 15.2 — null تعني «بلا تقييدِ عملاء» وتليق بموظّفٍ داخليٍّ عامّ،
+        // أمّا **حسابُ العميل** فقائمتُه الخاويةُ تُغلَق [] لا تُفتَح null: عميلٌ عُلِّقت
+        // عضويّاتُه كلُّها (أو لم تُمنَح بعد) لا يرى شيئاً — لا الكونَ كلَّه (fail-closed).
+        $failClosed = static fn (?array $ids): ?array => $ids === null && hub_is_client($user) ? [] : $ids;
+
         // السلوكُ القديم — القائمةُ الخام users.clients (توافقٌ رجعيّ)
-        $legacy = static function ($u): ?array {
+        $legacy = static function ($u) use ($failClosed): ?array {
             $ids = is_array($u->clients) ? $u->clients : (json_decode($u->clients ?? '[]', true) ?: []);
             $ids = array_values(array_filter(array_map('strval', $ids)));
 
-            return $ids ?: null;
+            return $failClosed($ids ?: null);
         };
 
         // الجدولُ يُفحَص مرةً ويُخبَّأ (لا يختفي بعد ظهوره)؛ قبل جاهزيّةِ القاعدة نرجع للقديم
@@ -216,7 +221,7 @@ if (! function_exists('hub_client_ids')) {
         $ids = $rows->whereNull('deleted_at')->where('status', 'active')
             ->pluck('client_id')->map('strval')->filter()->unique()->values()->all();
 
-        return $ids ?: null;
+        return $failClosed($ids ?: null);
     }
 }
 
