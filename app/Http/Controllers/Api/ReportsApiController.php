@@ -63,6 +63,10 @@ class ReportsApiController extends Controller
     {
         if (hub_is_client($r->user())) abort(404);
         abort_unless(hub_can($r->user(), 'hr', 'v'), 403);
+        // Permissions 360 · 03.1 — نطاقُ مفتاحِ API يُقيّد كصلاحيّةِ المستخدم: مفتاحٌ لا
+        // يشمل «hr:v» لا يقرأ بياناتِ الفريقِ ولو كان مالكُه يملكها (لا مفتاحَ ⇒ جلسةٌ ⇒ يمرّ).
+        $t = $r->attributes->get('api_token');
+        abort_unless(! $t || $t->allows('hr', 'v'), 403, 'نطاق هذا المفتاح لا يشمل «hr:v»');
 
         $date = $this->date($r);
         $emps = hub_company_scope(hub_scope(Employee::query(), 'hr'), 'hr')

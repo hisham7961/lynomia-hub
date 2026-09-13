@@ -30,6 +30,11 @@ class AssetProjectApiController extends Controller
         abort_unless($u, 403);
         abort_if(hub_is_client($u), 404);
         abort_unless(hub_can($u, 'assets', 'e') && hub_can($u, 'projects', 'v'), 403);
+        // Permissions 360 · 03.2 — نطاقُ مفتاحِ API يُقيّد كصلاحيّةِ المستخدم: مفتاحٌ لا يشمل
+        // «assets:e» و«projects:v» لا يربطُ أصلاً بمشروعٍ ولو ملكَ مالكُه ذلك (لا مفتاحَ ⇒ يمرّ).
+        $t = request()->attributes->get('api_token');
+        abort_unless(! $t || ($t->allows('assets', 'e') && $t->allows('projects', 'v')), 403,
+            'نطاق هذا المفتاح لا يشمل «assets:e» و«projects:v»');
     }
 
     private function scopedAsset(string $id): Asset

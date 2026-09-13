@@ -280,6 +280,13 @@ class MobileContextController extends Controller
      */
     private function contextDimension(string $module, ?string $active, int $cap): array
     {
+        // Permissions 360 · 15.3 — العميلُ لا يرى قائمةَ الشركاتِ الداخليّة: تنطيقُ الشركةِ
+        // لا يقيّد حسابَ العميل (لا `hub_company_ids` له)، فبعثُ البُعدِ خامّاً يسرّب كلَّ الشركات.
+        // بُعدُ «clients» يبقى (سجلّاتُه الخاصّة)، أمّا «companies» فبُعدٌ فارغٌ لحساب العميل.
+        if ($module === 'companies' && hub_is_client(auth()->user())) {
+            return ['restricted' => true, 'active' => null, 'count' => 0, 'has_more' => false, 'items' => []];
+        }
+
         $def   = hub_mod($module);
         $class = '\\App\\Models\\' . ($def['model'] ?? '');
         $ids   = $module === 'companies' ? hub_company_ids() : hub_client_ids();
