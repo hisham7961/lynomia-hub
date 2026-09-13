@@ -13,7 +13,7 @@ class SalesController extends Controller
 {
     public function dashboard()
     {
-        abort_unless(hub_is_owner() || hub_monitor(), 403, 'لوحةُ المبيعات للمالكين وحاملي المراقبة');
+        abort_unless(hub_is_owner() || hub_monitor_group('finAnalytics'), 403, 'لوحةُ المبيعات للمالكين وحاملي المراقبة');
         $internal = hub_field_mode(auth()->user(), 'quotes', 'cost') !== 'hide';
 
         return view('sales.dashboard', ['d' => SalesBoard::data(), 'internal' => $internal]);

@@ -17,7 +17,7 @@ class KpiController extends Controller
 {
     protected function gate(): void
     {
-        abort_unless(hub_monitor(),
+        abort_unless(hub_monitor_group('opsAnalytics'),
             403, 'باني المؤشرات للمالكين ومن يحمل صلاحية المتابعة');
     }
 

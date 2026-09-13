@@ -114,5 +114,7 @@
             </table></div>
         @endforeach
     </div>
+
+    @include('access._fineperms', ['fine' => $fine, 'flags' => $flags])
 @endif
 @endsection

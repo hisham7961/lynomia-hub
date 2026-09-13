@@ -32,7 +32,7 @@ class EndpointCentreController extends Controller
     protected function guard(): void
     {
         abort_if(hub_is_client(auth()->user()), 404);
-        abort_unless(hub_is_owner() || hub_monitor(), 403, 'مركزُ النقاط الطرفية للمالك أو المراقب');
+        abort_unless(hub_is_owner() || hub_monitor_group('secOps'), 403, 'مركزُ النقاط الطرفية للمالك أو المراقب');
     }
 
     /** الأسطول: قائمةٌ حتميّةُ الترتيب (hostname ثم id — لا قرعةَ إدراج) وبطاقاتُ حال */

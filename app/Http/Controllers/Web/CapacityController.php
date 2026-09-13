@@ -12,7 +12,7 @@ class CapacityController extends Controller
 {
     protected function gate(): void
     {
-        abort_unless(hub_monitor(),
+        abort_unless(hub_monitor_group('opsAnalytics'),
             403, 'هذه اللوحة للمالكين ومن يحمل صلاحية المتابعة');
         // كل لوحات هذا المتحكم تجمع عبر المنشأة كلها بمخبّأ عام — تُمنع عن المعزول
         hub_org_analytics_guard();

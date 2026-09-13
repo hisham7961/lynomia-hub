@@ -33,8 +33,11 @@ class AssetProjectController extends Controller
         $u = auth()->user();
         abort_unless($u, 403);
         abort_if(hub_is_client($u), 404, 'تخصيصُ الأصولِ للفريقِ الداخليّ');
-        abort_unless(hub_can($u, 'assets', 'e') && hub_can($u, 'projects', 'v'), 403,
-            'إدارةُ تخصيصِ الأصولِ تتطلّب تعديلَ الأصولِ وعرضَ المشاريع');
+        // Permissions 360 · 07.6 — إضافةٌ لا كسر: حاملُ (assets:e + projects:v) يبقى، ويُفتحُ
+        // الربطُ لمنسّقِ مشروعٍ يملكُ مفتاحَ projects:assetAssign دون رايةِ تعديلِ الأصول.
+        abort_unless((hub_can($u, 'assets', 'e') && hub_can($u, 'projects', 'v'))
+            || hub_can($u, 'projects', 'assetAssign'), 403,
+            'إدارةُ تخصيصِ الأصولِ تتطلّب تعديلَ الأصولِ وعرضَ المشاريع، أو مفتاحَ ربطِ الأصول');
     }
 
     /** أصلٌ ضمنَ نطاقِ المستخدم أو ٤٠٤ (لا كشفَ وجودٍ عبر الشركات) */

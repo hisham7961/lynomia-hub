@@ -19,7 +19,7 @@ class FieldController extends Controller
     protected function gate(): void
     {
         // مشرفٌ ميدانيّ: يرى الموارد البشرية ويملك رايةَ المراقبة — أو المالك
-        abort_unless(hub_is_owner() || (hub_can(auth()->user(), 'hr', 'v') && hub_monitor()), 403,
+        abort_unless(hub_is_owner() || (hub_can(auth()->user(), 'hr', 'v') && hub_monitor_group('opsAnalytics')), 403,
             'عرضُ المسار الميدانيّ لمشرفي الميدان');
     }
 

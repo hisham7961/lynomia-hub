@@ -861,8 +861,9 @@ Route::middleware('auth')->group(function () {
         Route::get('export', [ModuleController::class, 'export'])->name('export')->middleware('throttle:20,1');
         Route::get('create', [ModuleController::class, 'create'])->name('create');
         Route::get('import', [ImportController::class, 'form'])->name('import');
-        Route::post('import', [ImportController::class, 'map'])->name('import.map');
-        Route::post('import/run', [ImportController::class, 'run'])->name('import.run');
+        // الاستيرادُ مسارُ كتابةٍ جماعيّةٍ ثقيل — يُحدّ معدلُه كالتصدير والجماعيّ (Permissions 360 · 17.4)
+        Route::post('import', [ImportController::class, 'map'])->name('import.map')->middleware('throttle:20,1');
+        Route::post('import/run', [ImportController::class, 'run'])->name('import.run')->middleware('throttle:20,1');
         Route::post('{id}/status', [ModuleController::class, 'setStatus'])->name('status');
         // كشفُ السرّ فعلٌ حسّاس: بلا حدٍّ كانت جلسةٌ مخترقةٌ تحصد الخزنة بسرعة HTTP
         Route::post('{id}/secret/{field}', [ModuleController::class, 'revealSecret'])->name('secret')->middleware('throttle:20,1');

@@ -11,7 +11,7 @@ class CostController extends Controller
 {
     protected function gate(): void
     {
-        abort_unless(hub_monitor(),
+        abort_unless(hub_monitor_group('finAnalytics'),
             403, 'لوحة التكاليف للمالكين ومن يحمل صلاحية المتابعة');
     }
 

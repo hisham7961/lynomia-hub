@@ -24,7 +24,7 @@ class RemediationController extends Controller
 {
     protected function gate(): void
     {
-        abort_unless(hub_monitor(), 403,
+        abort_unless(hub_monitor_group('secOps'), 403,
             'أفعالُ المعالجة للمالكين ومن يحمل صلاحية المتابعة');
     }
 

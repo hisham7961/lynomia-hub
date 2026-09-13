@@ -347,7 +347,7 @@ class SecurityController extends Controller
      */
     protected function findingsReadGate(): void
     {
-        abort_unless(hub_is_owner() || hub_monitor(), 403,
+        abort_unless(hub_is_owner() || hub_monitor_group('secOps'), 403,
             'مركز النتائج الأمنية للمالك أو حامل علم المراقبة');
     }
 

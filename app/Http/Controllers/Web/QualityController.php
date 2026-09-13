@@ -103,7 +103,7 @@ class QualityController extends Controller
             return;
         }
 
-        abort_unless(hub_monitor(), 403,
+        abort_unless(hub_monitor_group('opsAnalytics'), 403,
             'مركزُ الجودة والإنجاز لمن يحمل صلاحية المتابعة أو للمالك');
         hub_org_analytics_guard();
     }
@@ -154,7 +154,7 @@ class QualityController extends Controller
             // زرُّ فعلٍ لا يُخبَّأ خلف حالةِ صلاحيةٍ قد تتغيّر قبل انتهاء المهلة.
             'actions'   => $this->cached('actions', '', fn () => $this->actionsTab(),
                 ['kpi_defs', 'objectives', 'key_results', 'tickets', 'comments', 'tasks', 'metric_points'])
-                + ['canRemediate' => hub_monitor() && hub_can(auth()->user(), 'tasks', 'a')],
+                + ['canRemediate' => hub_monitor_group('opsAnalytics') && hub_can(auth()->user(), 'tasks', 'a')],
             default     => $this->cached('overview', $range->key(), fn () => ['ov' => $this->overview($range)],
                 ['tasks', 'tickets', 'kpi_defs', 'objectives', 'key_results', 'issues',
                  'incidents', 'metric_points']),

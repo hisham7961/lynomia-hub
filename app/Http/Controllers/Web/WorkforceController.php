@@ -16,7 +16,7 @@ class WorkforceController extends Controller
     /** حارسُ لوحات المنشأة — نمطُ CapacityController حرفياً */
     protected function gate(): void
     {
-        abort_unless(hub_monitor(),
+        abort_unless(hub_monitor_group('opsAnalytics'),
             403, 'هذه اللوحة للمالكين ومن يحمل صلاحية المتابعة');
         // أرقامُها تجمع عبر كل الشركات بلا تنطيق — تُمنع عن الحساب المعزول
         hub_org_analytics_guard();

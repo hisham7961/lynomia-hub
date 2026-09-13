@@ -374,7 +374,7 @@ class SearchController extends Controller
             // حاملُ رايةِ المراقبة فقط؛ صلاحيّةُ المصفوفة وحدَها لا تجعل الأسطولَ
             // قابلاً للاستطلاع بالكتابة الحرّة. (شدٌّ للعزل لا كسرٌ: صفحاتُ الوحدة
             // القائمةُ على حالها — الفهرسُ وحدَه يضيق.)
-            if ($key === 'endpoints' && ! (hub_is_owner(auth()->user()) || hub_monitor())) continue;
+            if ($key === 'endpoints' && ! (hub_is_owner(auth()->user()) || hub_monitor_group('secOps'))) continue;
             if (! hub_can(auth()->user(), $key, 'v')) continue;
             if (! class_exists('\\App\\Models\\' . $def['model'])) continue;
             $out[$key] = $def;

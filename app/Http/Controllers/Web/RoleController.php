@@ -14,7 +14,12 @@ class RoleController extends Controller
         'users'   => 'إدارة المستخدمين',
         'audit'   => 'سجل التدقيق',
         'approve' => 'اعتماد الطلبات والموافقات',
-        'monitor' => 'اللوحات التحليلية والمراقبة',
+        'monitor' => 'اللوحات التحليلية والمراقبة (الجامعة — تمنح المجموعاتِ كلَّها)',
+        // Permissions 360 · 01.2/11.4/20.5 — تفكيكُ المراقبةِ إلى ثلاثِ مجموعاتٍ أدقّ:
+        // إضافةٌ لا كسر (monitor تبقى تمنح الكلَّ)، وكلُّ مفتاحٍ يمنح مجموعتَه وحدَها.
+        'opsAnalytics' => 'لوحاتُ الأداءِ والتشغيل (أداء/KPI/قدرات/قوى عاملة/جودة)',
+        'finAnalytics' => 'لوحاتُ الماليّةِ والتكاليف (تكاليف/مبيعات/تكلفة خدمات)',
+        'secOps'       => 'الأمنُ والنقاطُ الطرفيّةُ والتنبيهاتُ والتحكّم',
         'secrets' => 'كشف أسرار الخزنة',
         // الاسم القديم «نسخ السرّ دون كشفه» كان يَعِد بحاجزٍ لا وجود له: منفذ
         // الكشف واحد، والنصّ يصل جهاز المستخدم في الحالين — والفرق عرضٌ لا منع.
@@ -110,7 +115,21 @@ class RoleController extends Controller
     public function store(Request $r)
     {
         $this->gate();
-        $role = Role::create($this->data($r));
+
+        // التحقّقُ أوّلاً: خطأُ الإدخالِ يعيد للنموذجِ محفوظَ الحقولِ قبلَ أيِّ تصعيد
+        // (وإلا ضاعت المصفوفةُ المبنيّةُ خلفَ صفحةِ التأكيد).
+        $data = $this->data($r);
+
+        // Permissions 360 · 01.6 — تصعيدُ الهويّة عند إنشاءِ دورٍ حسّاس، كنظيرِه في update():
+        // كان بالإمكان سكُّ دورٍ يحمل رايةً حسّاسةً (users/secrets/exp/audit/copySec/oversight…)
+        // في طلبٍ واحدٍ بلا تأكيدِ هوية، فيتجاوز التصعيدَ الذي يفرضه تعديلُ الدورِ نفسِه.
+        $newFlags = array_keys(array_filter((array) $r->input('flags', [])));
+        if (array_intersect($newFlags, self::RISKY_FLAGS)
+            && ($resp = hub_require_stepup(route('roles.index', absolute: false)))) {
+            return $resp;
+        }
+
+        $role = Role::create($data);
         $this->trail('إضافة دور', $role);
 
         return redirect()->route('roles.index')->with('ok', 'أُضيف الدور');

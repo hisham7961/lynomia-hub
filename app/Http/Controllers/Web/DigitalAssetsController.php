@@ -16,7 +16,7 @@ class DigitalAssetsController extends Controller
 {
     public function index(Request $r)
     {
-        abort_unless(hub_monitor(), 403, 'مركز الأصول الرقمية للمالكين ومن يحمل صلاحية المتابعة');
+        abort_unless(hub_monitor_group('secOps'), 403, 'مركز الأصول الرقمية للمالكين ومن يحمل صلاحية المتابعة');
         hub_org_analytics_guard();
 
         return view('digital_assets', [
