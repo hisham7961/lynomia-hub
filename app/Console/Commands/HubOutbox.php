@@ -157,12 +157,22 @@ class HubOutbox extends Command
         $token = (string) setting('notify.tg_token', '');
         if ($token === '') throw new \RuntimeException('إعداد notify.tg_token فارغ — ضع توكن البوت من شاشة الإعدادات');
 
-        $chat = $msg->target ?: $this->userPref($msg->user_id, 'tg') ?: (string) setting('notify.tg_chat', '');
+        $pref = $this->userPref($msg->user_id, 'tg');
+        $chat = $msg->target ?: $pref ?: (string) setting('notify.tg_chat', '');
         if ($chat === '') throw new \RuntimeException('لا وجهة تلجرام: لا target ولا tg في تفضيلات المستخدم ولا notify.tg_chat');
+
+        // Permissions 360 · 18.4 — رسالةٌ **شخصيّةُ الوجهة** (user_id بلا target ولا
+        // تفضيلِ tg خاصّ) تسقط للقناةِ المشتركة notify.tg_chat: يصل التنبيهُ لكن
+        // **متنُها يُحجب** — نصُّها منطَّقٌ لمستلمِها وحدَه (اسمُ سجلٍّ قد لا يراه
+        // قرّاءُ القناة). الوجهةُ الشخصيّةُ والمستهدَفةُ صراحةً تستلمان النصَّ كاملاً.
+        $text = $msg->text;
+        if ($msg->user_id && ! $msg->target && ! $pref) {
+            $text = '🔔 إشعارٌ شخصيٌّ لمستلمٍ بلا وجهةِ تلجرام خاصّة — التفاصيلُ في إشعاراتِ النظام';
+        }
 
         $resp = Http::timeout(10)->asForm()->post("https://api.telegram.org/bot{$token}/sendMessage", [
             'chat_id' => $chat,
-            'text'    => $msg->text,
+            'text'    => $text,
         ]);
         if (! $resp->successful() || ! $resp->json('ok')) {
             throw new \RuntimeException('تلجرام رفض الإرسال: ' . mb_substr((string) $resp->body(), 0, 200));

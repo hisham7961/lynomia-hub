@@ -18,6 +18,14 @@ class ModuleController extends Controller
         abort_if(! $def || $module === 'users', 404);           // users لها صفحتها الإدارية الخاصة
         abort_unless(hub_can(auth()->user(), $module, $op), 403, 'لا تملك صلاحية على هذه الوحدة');
 
+        // Permissions 360 · 12.1 — أسطولُ النقاطِ الطرفيّة بوّابتُه واحدة: بابُ الوحدةِ
+        // العامُّ يشترط ما يشترطه المركزُ نفسُه (مالك/secOps)، فلا يلتفُّ `endpoints:v`
+        // في المصفوفةِ على حارسِ EndpointCentre (هجرةُ grant_secops صانت الأدوارَ القائمة).
+        if ($module === 'endpoints') {
+            abort_unless(hub_is_owner() || hub_monitor_group('secOps'), 403,
+                'أسطولُ النقاطِ الطرفيّة للمالكِ أو حاملِ مجموعةِ الأمن (secOps)');
+        }
+
         $class = '\\App\\Models\\' . $def['model'];
         abort_unless(class_exists($class), 404);
 

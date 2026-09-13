@@ -276,6 +276,8 @@ class CommentController extends Controller
     {
         $c = Comment::findOrFail($id);
         $this->guardTarget($c->module, $c->record_id);          // يرى السجل = يتفاعل
+        // 08.2 — منشورُ قناةٍ موسومٌ بشركةٍ خارجَ نطاقِ القارئ = ٤٠٤ (الخلاصةُ معزولةٌ عرضاً، وهذا يسدّ المعرّفَ المباشر)
+        \App\Support\CommentService::guardFeedComment(auth()->user(), $c);
 
         $emoji = hub_str($r->input('emoji'));
         abort_unless(in_array($emoji, self::REACTIONS, true), 422, 'تفاعل غير معروف');

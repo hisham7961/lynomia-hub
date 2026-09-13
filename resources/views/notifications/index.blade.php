@@ -21,7 +21,8 @@
         <{{ $url ? 'a' : 'div' }} class="gitem" @if($url) href="{{ hub_safe_url($url) }}" @endif
            style="padding:12px 16px;{{ $n->read ? 'opacity:.62' : '' }}">
             @unless ($n->read)<span style="width:8px;height:8px;border-radius:50%;background:var(--p);flex-shrink:0"></span>@endunless
-            <span style="flex:1;line-height:1.6">{{ $n->text }}
+            {{-- 18.3 — النصُّ يستشير صلاحيةَ اليوم لا يومِ الكتابة (قناعٌ إن سُحبت رؤيةُ الوحدة) --}}
+            <span style="flex:1;line-height:1.6">{{ hub_notification_text(auth()->user(), $n) }}
                 <span class="sub" style="display:block;font-size:11px">
                     {{ $n->created_at?->diffForHumans() }}
                     @if ($n->module && hub_mod($n->module)) · {{ hub_mod($n->module)['label'] }} @endif

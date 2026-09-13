@@ -153,6 +153,28 @@ class FlowRunner
         };
     }
 
+    /**
+     * **أهليّةُ المستلمِ المسمّى** (Permissions 360 · 18.2): معرّفٌ مكتوبٌ في تعريفِ
+     * المسارِ ليس تفويضاً — يُشعَر فقط إن كان مستخدماً قائماً يملك رؤيةَ الوحدةِ
+     * والسجلُّ ضمنَ نطاقِه (نظيرَ فرعِ «owners» عبر hub_approvers_for). وإلا `[]`
+     * فيُتخطّى الإجراءُ لهذا المستلمِ بصمت (المسارُ نفسُه يبقى يعمل لغيرِه).
+     */
+    protected static function eligibleExplicitRecipient(string $uid, string $module, Model $m): array
+    {
+        if ($uid === '') return [];
+        $u = User::whereNull('deleted_at')->find($uid);
+        if (! $u || ! hub_can($u, $module, 'v')) return [];
+
+        $md = hub_mod($module);
+        if ($md && ! hub_scope(
+            \Illuminate\Support\Facades\DB::table($md['table'])->whereNull('deleted_at')->where('id', $m->getKey()),
+            $module, $u)->exists()) {
+            return [];
+        }
+
+        return [(string) $uid];
+    }
+
     /* ── الإجراءات ── */
     protected static function act(array $a, array $def, string $module, Model $m): void
     {
@@ -162,9 +184,12 @@ class FlowRunner
             case 'notify':
                 // «owners» = المعتمِدون الذين يرون هذا السجل (نطاقٌ لكلّ مستلم) —
                 // فلا يُسرَّب اسمُ السجل عبر حدّ العزل من مسار عمل.
+                // Permissions 360 · 18.2 — والمستلمُ **المسمّى** في تعريفِ المسار يمرّ
+                // بالبوّابتين نفسِهما (رؤيةُ الوحدةِ + نطاقُ السجل) وإلا يُتخطّى: تعريفُ
+                // مسارٍ قديمٌ لا يمنح مستخدماً فَقَد صلاحيتَه نصّاً يحمل اسمَ السجل.
                 $targets = ($a['to'] ?? 'owners') === 'owners'
                     ? hub_approvers_for($module, $m->id)
-                    : [(string) $a['to']];
+                    : self::eligibleExplicitRecipient((string) $a['to'], $module, $m);
                 foreach (array_unique($targets) as $uid) {
                     if (! $uid) continue;
                     HubNotification::create([

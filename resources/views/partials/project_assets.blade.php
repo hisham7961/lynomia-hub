@@ -5,8 +5,9 @@
 @php
     use App\Support\AssetProjectService;
     $paSvc = new AssetProjectService();
-    $paActive = $paSvc->activeForProject((string) $row->id);
     $paU = auth()->user();
+    // 16.3 — القارئُ المحصورُ بشركاتٍ يرى تخصيصاتِ أصولِ شركاتِه (أو العالميّةَ بلا شركة) فقط
+    $paActive = $paSvc->activeForProject((string) $row->id, 200, $paU);
     $paCanAssign = ! hub_is_client($paU) && hub_can($paU, 'assets', 'e') && hub_can($paU, 'projects', 'v');
 
     // مرشّحو التخصيص — أصولٌ ضمنَ النطاق، بشركةٍ متوافقة، غيرُ مخصَّصةٍ نشطاً لهذا المشروع،

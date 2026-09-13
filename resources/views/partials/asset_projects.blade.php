@@ -4,9 +4,10 @@
 @php
     use App\Support\AssetProjectService;
     $apSvc = new AssetProjectService();
-    $apActive = $apSvc->activeForAsset((string) $row->id);
-    $apHistory = $apSvc->historyForAsset((string) $row->id);
     $apU = auth()->user();
+    // 16.3 — القارئُ المحصورُ بشركاتٍ يرى تخصيصاتِ مشاريعِ شركاتِه (أو العالميّةَ بلا شركة) فقط
+    $apActive = $apSvc->activeForAsset((string) $row->id, 100, $apU);
+    $apHistory = $apSvc->historyForAsset((string) $row->id, 100, $apU);
     $apCanAssign = ! hub_is_client($apU) && hub_can($apU, 'assets', 'e') && hub_can($apU, 'projects', 'v')
         && ! in_array(\App\Support\Custody::canonicalStatus($row->status), AssetProjectService::INELIGIBLE_STATUSES, true);
 

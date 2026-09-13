@@ -148,8 +148,10 @@ class IaGuardParityTest extends IaTestCase
         $this->assertTrue($ia->guard('admin_bar', $this->flaggedUser(['audit' => 1])));
         $this->assertTrue($ia->guard('admin_bar', $this->flaggedUser(['secrets' => 1])));
 
-        // monitor خارجَ الشرط: المراقبُ ليس مسؤولَ إدارةٍ، وكذا الموظفُ العاديّ
-        $this->assertFalse($ia->guard('admin_bar', $this->monitorUser()), 'المراقبُ يُعدُّ مسؤولَ إدارة (خطأ)');
+        // Permissions 360 · 04.1 — الظهورُ من الكتالوج: المراقبُ يبلغ «نظرةَ التحكّم»
+        // و«التنبيهات» فالشريطُ يظهر له بهما (كان محجوباً وهو يبلغهما = الانحرافُ المكشوف)،
+        // والموظفُ العاديُّ بلا وجهةِ إدارةٍ يبقى بلا شريط.
+        $this->assertTrue($ia->guard('admin_bar', $this->monitorUser()), 'المراقبُ له وجهتا إدارةٍ فيظهر الشريط');
         $this->assertFalse($ia->guard('admin_bar', $this->employee));
 
         // مجالُ الإدارة يظهر لمن يجتاز admin_bar فقط — تكافؤُ الرؤية

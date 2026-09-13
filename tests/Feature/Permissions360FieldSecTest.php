@@ -52,8 +52,12 @@ class Permissions360FieldSecTest extends TestCase
         $this->assertSame('hide', hub_field_mode($viewer, 'projects', 'budget'), 'الميزانيّةُ محجوبة');
         $this->assertSame('hide', hub_field_mode($viewer, 'projects', 'cost'), 'التكلفةُ محجوبة');
 
+        // 07.4 (v2.495.0) — fieldsec يمنح **الرؤية**، والكتابةُ صارت لمجموعةِ projFin:
+        // بلا مفتاحِها الحقلُ مرئيٌّ قراءةً فقط (ro لا hide)، وبها يعود قابلاً للكتابة
         $granted = $this->user('fpg@test.local', ['projects' => ['v' => 1, 'fieldsec' => 1]]);
-        $this->assertSame('', hub_field_mode($granted, 'projects', 'budget'), 'حاملُ المفتاحِ يرى الميزانيّة');
+        $this->assertSame('ro', hub_field_mode($granted, 'projects', 'budget'), 'حاملُ fieldsec يرى الميزانيّةَ (قراءةً فقط بلا projFin)');
+        $full = $this->user('fpg2@test.local', ['projects' => ['v' => 1, 'fieldsec' => 1, 'projFin' => 1]]);
+        $this->assertSame('', hub_field_mode($full, 'projects', 'budget'), 'وبمفتاحِ projFin تعود الكتابة');
     }
 
     /* ═══════════ الأسبقيّات: المالكُ يرى، وقواعدُ الدورِ تعمل فوقَ المفتاح ═══════════ */

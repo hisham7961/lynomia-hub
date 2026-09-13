@@ -72,8 +72,8 @@ class MobileFileController extends V1Controller
         // حسابُ العميل: الرفعُ على سجلات وحدات سطحه فقط (منعٌ فوق المصفوفة · §28/§47)
         $this->guardClientModule($data['module']);
 
-        // نقطةُ التخويلِ نفسُها التي يفرضها «الإتمام» — إخفاقٌ مبكّرٌ لا IDOR
-        AttachmentService::guardRecord($data['module'], $data['record_id'], 'v');
+        // نقطةُ التخويلِ نفسُها التي يفرضها «الإتمام» — إخفاقٌ مبكّرٌ لا IDOR (13.2: الإرفاقُ كتابةٌ)
+        AttachmentService::guardAttach($data['module'], $data['record_id']);
 
         // حاجزُ الامتداد على الاسم المُعلَن — قبل أن يرفع العميلُ غيغابايتاً يُرفَض
         $ext = mb_strtolower((string) pathinfo($data['filename'], PATHINFO_EXTENSION));
@@ -190,7 +190,7 @@ class MobileFileController extends V1Controller
 
             // الجوهرُ المشترك — السكّةُ نفسُها التي يسلكها الويب في `store()` بعد الوسيط
             $data = AttachmentService::validateUpload($r);
-            AttachmentService::guardRecord($data['module'], $data['record_id'], 'v');
+            AttachmentService::guardAttach($data['module'], $data['record_id']);   // 13.2 — الإرفاقُ كتابةٌ لا عرض
             $files = AttachmentService::filesFromRequest($r);
             $made = AttachmentService::attach($data['module'], $data['record_id'], $files, $data);
 
@@ -225,7 +225,7 @@ class MobileFileController extends V1Controller
         try {
             $data = AttachmentService::validateUpload($r);
             $this->guardClientModule($data['module']);   // سطحُ العميل فقط (§28/§47)
-            AttachmentService::guardRecord($data['module'], $data['record_id'], 'v');
+            AttachmentService::guardAttach($data['module'], $data['record_id']);   // 13.2 — الإرفاقُ كتابةٌ لا عرض
             $files = AttachmentService::filesFromRequest($r);
             $made = AttachmentService::attach($data['module'], $data['record_id'], $files, $data);
 

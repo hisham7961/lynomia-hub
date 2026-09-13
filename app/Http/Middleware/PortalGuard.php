@@ -90,7 +90,10 @@ class PortalGuard
         if ($request->routeIs('m.*')) {
             $module = (string) ($route->parameter('module') ?? '');
 
-            return in_array($module, self::MODULE_ALLOW, true);
+            // Permissions 360 · 02.4 — قراءةٌ فقط: القائمةُ تسمح للعميلِ **برؤية** وحداتِه
+            // السياقيّة، وكتابتُه تمرّ عبرَ مساراتِ البوّابةِ المخصَّصة لا CRUD العامّ —
+            // فطلبٌ غيرُ آمنٍ (POST/PUT/DELETE) على m.* يُردّ ٤٠٤ ولو كانت الوحدةُ مسموحة.
+            return $request->isMethodSafe() && in_array($module, self::MODULE_ALLOW, true);
         }
 
         // ٢) بقيةُ المسارات: بالاسم (تطابقٌ تامٌّ أو بادئةٌ عبر أنماط routeIs)

@@ -115,34 +115,50 @@ class AssetProjectService
 
     /* ────────── قراءاتٌ محدودةٌ حتميّة (لا N+1) ────────── */
 
-    /** تخصيصاتُ المشروعِ النشطة (مع الأصل)، محدودةٌ ومرتّبةٌ حتميّاً */
-    public function activeForProject(string $projectId, int $limit = 200)
+    /**
+     * **عزلُ القارئِ المحصورِ بشركات** (Permissions 360 · 16.3): صفوفُ التخصيصِ تُحاكَم
+     * على شركةِ **الطرفِ الآخر** (أصلِ صفِّ المشروع/مشروعِ صفِّ الأصل): ضمنَ شركاتِ
+     * القارئِ **أو بلا شركةٍ** (الأصلُ/المشروعُ «العالميّ» يبقى ظاهراً — دلالةُ منتقي
+     * التخصيصِ نفسُها، لا `hub_scope` الصارمةُ التي تُقصي null). `withTrashed` يُبقي
+     * التاريخَ متماثلاً مع ما يراه غيرُ المحصور (المحذوفُ ناعماً لا يُخفي صفَّه هنا).
+     * `null $viewer` = سلوكٌ قديمٌ بلا عزل (المستدعون الداخليّون المحسومون سلفاً).
+     */
+    protected function scopeToViewer($q, ?User $viewer, string $relation)
     {
-        return AssetProjectAssignment::active()->where('project_id', $projectId)
+        if (! $viewer || ($cids = hub_company_ids($viewer)) === null) return $q;
+
+        return $q->whereHas($relation, fn ($r) => $r->withTrashed()->where(
+            fn ($w) => $w->whereIn('company_id', $cids)->orWhereNull('company_id')));
+    }
+
+    /** تخصيصاتُ المشروعِ النشطة (مع الأصل)، محدودةٌ ومرتّبةٌ حتميّاً */
+    public function activeForProject(string $projectId, int $limit = 200, ?User $viewer = null)
+    {
+        return $this->scopeToViewer(AssetProjectAssignment::active()->where('project_id', $projectId), $viewer, 'asset')
             ->with('asset:id,name,code,type,status,holder_id,station_id')
             ->orderByDesc('assigned_at')->orderByDesc('id')->limit($limit)->get();
     }
 
     /** تاريخُ تخصيصاتِ المشروعِ (نشطٌ ومُنهًى) */
-    public function historyForProject(string $projectId, int $limit = 100)
+    public function historyForProject(string $projectId, int $limit = 100, ?User $viewer = null)
     {
-        return AssetProjectAssignment::where('project_id', $projectId)
+        return $this->scopeToViewer(AssetProjectAssignment::where('project_id', $projectId), $viewer, 'asset')
             ->with('asset:id,name,code,type')
             ->orderByDesc('assigned_at')->orderByDesc('id')->limit($limit)->get();
     }
 
     /** تخصيصاتُ الأصلِ النشطة (مع المشروع) */
-    public function activeForAsset(string $assetId, int $limit = 100)
+    public function activeForAsset(string $assetId, int $limit = 100, ?User $viewer = null)
     {
-        return AssetProjectAssignment::active()->where('asset_id', $assetId)
+        return $this->scopeToViewer(AssetProjectAssignment::active()->where('asset_id', $assetId), $viewer, 'project')
             ->with('project:id,name,status,client_id,audience')
             ->orderByDesc('assigned_at')->orderByDesc('id')->limit($limit)->get();
     }
 
     /** تاريخُ تخصيصاتِ الأصلِ (نشطٌ ومُنهًى) */
-    public function historyForAsset(string $assetId, int $limit = 100)
+    public function historyForAsset(string $assetId, int $limit = 100, ?User $viewer = null)
     {
-        return AssetProjectAssignment::where('asset_id', $assetId)
+        return $this->scopeToViewer(AssetProjectAssignment::where('asset_id', $assetId), $viewer, 'project')
             ->with('project:id,name,status')
             ->orderByDesc('assigned_at')->orderByDesc('id')->limit($limit)->get();
     }

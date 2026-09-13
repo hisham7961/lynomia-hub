@@ -28,7 +28,8 @@
     $pcFin = $pcSee('cost') && $pcSee('budget');
 
     // ── القرّاءُ القائمون، كلٌّ مرّةً واحدة (مخبّأون فلا يتكرّر عبر التبويبات) ──
-    $pcHealth = $isCli ? [] : hub_project_health($row->id);
+    // 07.5 — الصحّةُ بعينِ القارئ: من حُجبت عنه الميزانيّةُ لا يستلم عاملَها ولا نسبةَ استهلاكِها
+    $pcHealth = $isCli ? [] : hub_project_health_for($u, $row->id);
     $pcPl = $pcFin ? hub_project_pl($row->id) : null;
     $pcNext = $isCli ? [] : \App\Support\NextAction::for('projects', $row);
     $pcBaseline = ((array) $row->meta)['baseline'] ?? null;

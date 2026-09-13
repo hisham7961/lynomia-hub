@@ -204,8 +204,10 @@ class WorkOsClientMembersTest extends TestCase
         $this->stampStepUp();
         $this->post(route('clients.members.revoke', [$a->id, $m->id]))->assertRedirect();
         $this->assertSame('suspended', $m->fresh()->status, 'السحبُ يعلّق العضويّة');
-        $this->assertNull(hub_client_ids($u->fresh()),
-            'العضوُ المسحوبُ لا يرى العميلَ بعد الآن (سقط من النطاق فوراً)');
+        // Permissions 360 · 15.2 — كانت null (وهي «بلا تقييد» في hub_scope — عينُ الثغرة)؛
+        // حسابُ العميلِ المسحوبُ يُغلَق [] ففعلاً لا يرى شيئاً
+        $this->assertSame([], hub_client_ids($u->fresh()),
+            'العضوُ المسحوبُ لا يرى العميلَ بعد الآن (يُغلَق [] لا يُفتَح null)');
 
         // ودخل سلسلةَ التدقيق
         $this->assertTrue(

@@ -18,8 +18,11 @@ class DataRoomController extends Controller
 {
     protected function gate(): void
     {
-        abort_unless(hub_secrets(), 403,
-            'غرفة البيانات تتطلب صلاحية الأسرار أو المالك');
+        // Permissions 360 · 14.2 — إضافةٌ لا كسر: حاملُ secrets يبقى يدخل، ورايةُ
+        // `dataroomShare` تمنح غرفةَ البياناتِ (نشرَ روابطِ المشاركةِ الخارجيّة)
+        // وحدَها دون سلطةِ كشفِ أسرارِ الخزنة — فصلُ النشرِ عن الكشف.
+        abort_unless(hub_secrets() || hub_flag(auth()->user(), 'dataroomShare'), 403,
+            'غرفة البيانات تتطلب صلاحية الأسرار أو راية المشاركة الخارجية أو المالك');
     }
 
     /* ────────── الإدارة (داخل النظام) ────────── */

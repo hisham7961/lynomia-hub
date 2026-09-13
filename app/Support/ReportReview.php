@@ -41,8 +41,18 @@ class ReportReview
         if (! $owner && (string) $w->created_by === (string) $actor->id) return false;
         if ($owner) return true;
 
-        // مسؤولُ موارد بشرية (يرى الامتثالَ ويحكمه) — عبر التنطيق لا الاسم
-        if (hub_can($actor, 'hr', 'e')) return true;
+        // مسؤولُ موارد بشرية (يرى الامتثالَ ويحكمه) — عبر التنطيق لا الاسم.
+        // Permissions 360 · 10.2 — وضمنَ **شركاتِه**: موظّفُ صاحبِ البند (الجسرُ القانونيّ
+        // user_id) المنسوبُ لشركةٍ خارجَ قائمةِ المراجعِ ليس من رعيّتِه — يسقط لفرعِ
+        // مديرِ المشروعِ أدناه (بلا موظّفٍ أو بلا شركةٍ يبقى عامّاً — لا كسرَ للقائم).
+        if (hub_can($actor, 'hr', 'e')) {
+            $cids = hub_company_ids($actor);
+            if ($cids === null) return true;
+            $empCo = ! $w->created_by ? null
+                : Employee::whereNull('deleted_at')->where('user_id', $w->created_by)
+                    ->orderBy('id')->value('company_id');
+            if ($empCo === null || in_array((string) $empCo, $cids, true)) return true;
+        }
 
         // مديرُ المشروع: البندُ ضمن نطاقِ مشاريعه، وله تعديلُ التحديثات
         if ($w->project_id && hub_can($actor, 'updates', 'e')) {

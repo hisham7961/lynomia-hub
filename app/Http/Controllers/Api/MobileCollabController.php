@@ -241,6 +241,8 @@ class MobileCollabController extends V1Controller
         $c = Comment::find($id);
         if (! $c) return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'غير موجود');
         CommentService::guardTarget(auth()->user(), (string) $c->module, $c->record_id);
+        // 08.2 — منشورُ قناةٍ موسومٌ بشركةٍ خارجَ نطاقِ القارئ = ٤٠٤ (توازي الويب حرفاً)
+        CommentService::guardFeedComment(auth()->user(), $c);
 
         $emoji = hub_str($r->input('emoji'));
         if (! in_array($emoji, CommentController::REACTIONS, true)) {

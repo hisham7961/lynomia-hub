@@ -100,13 +100,17 @@ class Workday
 
         $row = $row ?: new Attendance(['emp_id' => $emp->id, 'date' => $now->toDateString()]);
         $row->fill([
-            'time_in' => $now->format('H:i'),
+            // **لحظةُ الضغطِ الفعليّةُ بالثانية** — لا قصَّ للدقيقة: ما ضغطه الموظّفُ هو ما يُسجَّل
+            'time_in' => $now->format('H:i:s'),
             'mode' => $mode,
             'client_id' => $cid,
             'project_id' => $pid,
             'company_id' => $emp->company_id,
             'status' => $status,
             'meta' => array_merge((array) $row->meta, ['checkin' => array_filter([
+                // ختمُ الحقيقةِ الكامل (تاريخٌ ووقتٌ ومنطقةٌ زمنيّة) — يبقى أثراً حتى لو
+                // عُدِّل time_in لاحقاً من نموذجِ الموارد: لحظةُ الضغطِ لا تُطمَس
+                'at' => $now->toIso8601String(),
                 'ip' => request()?->ip(),
                 'device' => hub_fit((string) request()?->userAgent(), 200),
                 'geo' => (setting('work.geo', '0') === '1' && ($in['geo'] ?? null)) ? $in['geo'] : null,
@@ -131,10 +135,11 @@ class Workday
         if ($row->time_out) return ['ok' => false, 'msg' => 'انصرافُك مسجَّلٌ منذ ' . $row->time_out, 'row' => $row];
 
         $now = now();
-        $mins = (strtotime($now->format('H:i')) - strtotime((string) $row->time_in)) / 60;
+        // **لحظةُ الضغطِ الفعليّةُ بالثانية** كالحضور — والفرقُ يُحسب عليها لا على دقيقةٍ مقصوصة
+        $mins = (strtotime($now->format('H:i:s')) - strtotime((string) $row->time_in)) / 60;
         if ($mins < 0) $mins += 24 * 60;                     // وردية تعبر منتصف الليل
 
-        $row->time_out = $now->format('H:i');
+        $row->time_out = $now->format('H:i:s');
         $row->hours = round(max(0, $mins) / 60, 2);
         // الحالةُ فيزيائيّةٌ محضة — لا تُطمَس بغيابِ التقرير (§6)
         $row->status = self::evaluate($row, $user);
@@ -145,6 +150,8 @@ class Workday
             $row->report_deadline_at = $deadline;
         }
         $row->meta = array_merge((array) $row->meta, ['checkout' => array_filter([
+            // ختمُ لحظةِ الانصرافِ الكامل — أثرٌ لا يُطمَس بتعديلٍ لاحقٍ للحقل
+            'at' => $now->toIso8601String(),
             'ip' => request()?->ip(), 'device' => hub_fit((string) request()?->userAgent(), 200),
         ])]);
         $row->save();

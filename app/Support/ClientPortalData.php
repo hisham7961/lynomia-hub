@@ -32,6 +32,21 @@ class ClientPortalData
     /** فواتيرُ العميل = المبيعاتُ والمقبوضاتُ فقط — لا مشترياتٌ تكشف التكلفة */
     public const CLIENT_INVOICE_KINDS = ['فاتورة مبيعات', 'دفعة واردة'];
 
+    /**
+     * **أعمدةُ سطحِ العميلِ الآمنة** (Permissions 360 · 15.4/03.3) — بالعمود (col):
+     * العقدُ الموثَّقُ لبوّابةِ العميل («فواتيرُ العميل = المبيعاتُ والدفعاتُ الواردة
+     * بأعمدةٍ منسّقة») يُفرَض في **المحرّك** لا في قارئِ البوّابةِ وحدَه:
+     * `hub_visible_fields` يقصّ أعمدةَ حسابِ العميلِ على هذه القوائم أيّاً كان بابُ
+     * القراءة (m.* أو API أو مزامنةُ الجوال أو CSV)، و`hub_scope` يحصر صفوفَ
+     * الماليّةِ في CLIENT_INVOICE_KINDS. القوائمُ مرايا select في invoiceRows/
+     * projectRows/engagementRows أعلاه — تُوسَّع هنا حين يُوسَّع العقد.
+     */
+    public const CLIENT_SAFE_COLS = [
+        'fin'         => ['doc_no', 'kind', 'date', 'due', 'total', 'paid', 'currency', 'state', 'client_id', 'project_id'],
+        'projects'    => ['name', 'status', 'priority', 'progress', 'start_date', 'launch_exp', 'launch_act', 'description', 'client_id', 'engagement_id'],
+        'engagements' => ['name', 'type', 'status', 'renewal', 'client_note', 'client_id'],
+    ];
+
     /** محادثاتُ العميل = القنواتُ والرسائلُ ذاتُ الجمهور العميليّ */
     public const CLIENT_CONV_KINDS = ['channel', 'dm'];
 
@@ -168,20 +183,37 @@ class ClientPortalData
             ->orderByDesc('updated_at')->orderBy('id')
             ->select('id', 'kind', 'title', 'audience', 'updated_at');
 
-        return $limit ? $q->limit($limit)->get() : $q->get();
+        return self::scopeConvToClients($q, $userId)
+            ->when($limit, fn ($x) => $x->limit($limit))->get();
     }
 
-    /** محادثةُ عميلٍ واحدة (عضويّةٌ + جمهورٌ معاً) — وإلا 404 */
+    /** محادثةُ عميلٍ واحدة (عضويّةٌ + جمهورٌ معاً + عنوانُ عملائِه) — وإلا 404 */
     public static function conversationDetail(string $id, ?string $userId = null): Conversation
     {
         $memberIds = self::memberConversationIds($userId);
         abort_if(! $memberIds, 404);
 
-        return Conversation::whereIn('id', $memberIds)
-            ->whereIn('kind', self::CLIENT_CONV_KINDS)
-            ->whereIn('audience', self::CLIENT_AUDIENCES)
-            ->whereNull('archived_at')->whereNull('deleted_at')
-            ->findOrFail($id);
+        return self::scopeConvToClients(
+            Conversation::whereIn('id', $memberIds)
+                ->whereIn('kind', self::CLIENT_CONV_KINDS)
+                ->whereIn('audience', self::CLIENT_AUDIENCES)
+                ->whereNull('archived_at')->whereNull('deleted_at'),
+            $userId
+        )->findOrFail($id);
+    }
+
+    /**
+     * **عضويّةُ الصفِّ لا تكفي وحدَها** (Permissions 360 · 08.1): محادثةٌ معنونةٌ بعميلٍ
+     * (`client_id`) لا تُعرَض لقارئِ بوّابةٍ زالت عضويّتُه في ذلك العميل (عُلِّقت مثلاً) —
+     * صفُّ `conversation_members` يبقى بعد التعليق، فالعنوانُ يُحاكَم على `hub_client_ids`
+     * الحيّة: ضمنَ عملائِه أو محادثةٌ عامّةٌ بلا عنوان (نظيرُ عزلِ `CollaborationRail`).
+     */
+    protected static function scopeConvToClients($q, ?string $userId = null)
+    {
+        $kids = hub_client_ids($userId !== null ? User::find($userId) : null);
+
+        return $q->when($kids !== null, fn ($x) => $x->where(
+            fn ($w) => $w->whereIn('client_id', $kids)->orWhereNull('client_id')));
     }
 
     /** رسائلُ محادثةِ العميل — الموسومةُ داخليّاً (`internal`) محجوبةٌ دائماً */

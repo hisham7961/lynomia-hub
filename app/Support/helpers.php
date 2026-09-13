@@ -160,6 +160,14 @@ if (! function_exists('hub_scope')) {
             $q->whereIn($kcol, $kids);
         }
 
+        // Permissions 360 · 15.4/03.3 — **حسابُ العميل على الماليّة يرى فواتيرَه حصراً**
+        // (مبيعاتٌ ودفعاتٌ واردة — عقدُ بوّابةِ العميلِ الموثَّق): التنسيقُ في المحرّكِ
+        // فيسري على كلِّ بابِ قراءة (m.* والـAPI ومزامنةُ الجوال) لا على قارئِ
+        // البوّابةِ وحدَه. الداخليّون لا يمسّهم هذا القيد.
+        if ($module === 'fin' && hub_is_client($user)) {
+            $q->whereIn('kind', \App\Support\ClientPortalData::CLIENT_INVOICE_KINDS);
+        }
+
         return $q;
     }
 }
@@ -186,12 +194,17 @@ if (! function_exists('hub_client_ids')) {
         $user = $user ?? auth()->user();
         if (! $user || $user->role?->is_owner) return null;
 
+        // Permissions 360 · 15.2 — null تعني «بلا تقييدِ عملاء» وتليق بموظّفٍ داخليٍّ عامّ،
+        // أمّا **حسابُ العميل** فقائمتُه الخاويةُ تُغلَق [] لا تُفتَح null: عميلٌ عُلِّقت
+        // عضويّاتُه كلُّها (أو لم تُمنَح بعد) لا يرى شيئاً — لا الكونَ كلَّه (fail-closed).
+        $failClosed = static fn (?array $ids): ?array => $ids === null && hub_is_client($user) ? [] : $ids;
+
         // السلوكُ القديم — القائمةُ الخام users.clients (توافقٌ رجعيّ)
-        $legacy = static function ($u): ?array {
+        $legacy = static function ($u) use ($failClosed): ?array {
             $ids = is_array($u->clients) ? $u->clients : (json_decode($u->clients ?? '[]', true) ?: []);
             $ids = array_values(array_filter(array_map('strval', $ids)));
 
-            return $ids ?: null;
+            return $failClosed($ids ?: null);
         };
 
         // الجدولُ يُفحَص مرةً ويُخبَّأ (لا يختفي بعد ظهوره)؛ قبل جاهزيّةِ القاعدة نرجع للقديم
@@ -216,7 +229,7 @@ if (! function_exists('hub_client_ids')) {
         $ids = $rows->whereNull('deleted_at')->where('status', 'active')
             ->pluck('client_id')->map('strval')->filter()->unique()->values()->all();
 
-        return $ids ?: null;
+        return $failClosed($ids ?: null);
     }
 }
 
@@ -431,7 +444,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $opsA],
             ['key' => 'delivery',  'label' => '🛤️ مسار التسليم',     'route' => 'delivery',        'group' => 'analytics', 'ok' => hub_can($user, 'feats', 'v') || hub_can($user, 'deploys', 'v') || hub_can($user, 'requests', 'v') || hub_can($user, 'designs', 'v')],
             ['key' => 'custody',   'label' => '🏷️ كتالوج العهد',      'route' => 'custody.catalog', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
-            ['key' => 'identity',  'label' => '📷 مركز الهوية والمسح', 'route' => 'identity.center', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
+            ['key' => 'identity',  'label' => '📷 مركز الهوية والمسح', 'route' => 'identity.center', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v') || hub_can($user, 'products', 'v')],
             ['key' => 'workteam',  'label' => '🕗 فريقي اليوم',        'route' => 'workforce.team',  'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
             // مركزُ التقارير اليوميّة ومركزُ المراجعة — مراكزُ ظاهرةٌ كـ«فريقي اليوم» تماماً،
             // لا مدفونةً في صفحةِ مساحة. الحرسُ نفسُه في المتحكّم (guardTeam/canReviewAny).
@@ -1759,8 +1772,28 @@ if (! function_exists('hub_field_mode')) {
         $fr = $user->role?->field_rules;
         $rules = is_array($fr) ? $fr : (json_decode((string) $fr, true) ?: []);
         $mode = $rules[$module][$fieldKey] ?? '';
+        if (in_array($mode, ['ro', 'hide'], true)) return $mode;
 
-        return in_array($mode, ['ro', 'hide'], true) ? $mode : '';
+        // Permissions 360 · 07.4 — **مجموعاتُ الكتابةِ المسمّاة**: حقلٌ مذكورٌ في
+        // `writes` بكتالوجِ المفاتيحِ (hub_permissions: projTeam/projFin/projTech)
+        // يكون **قراءةً فقط** لمن لا يحمل مفتاحَه — فتتفكّك سلطةُ `e` الواحدة.
+        // ذيلُ السلسلةِ عمداً: لا يرفع حجبَ قاعدةِ دورٍ ولا حجبَ fieldsec أعلاه،
+        // وهجرةُ grant_projects_write_groups صانت حاملي `projects:e` القائمين.
+        static $writeGroups = null;
+        if ($writeGroups === null) {
+            $writeGroups = [];
+            foreach (hub_fine_perms() as $fk => $fdef) {
+                foreach ((array) ($fdef['writes'] ?? []) as $wm => $wkeys) {
+                    foreach ((array) $wkeys as $wk) $writeGroups[$wm][(string) $wk] = $fk;
+                }
+            }
+        }
+        if (isset($writeGroups[$module][$fieldKey])
+            && ! hub_can($user, $module, $writeGroups[$module][$fieldKey])) {
+            return 'ro';
+        }
+
+        return '';
     }
 }
 
@@ -1768,8 +1801,19 @@ if (! function_exists('hub_visible_fields')) {
     /** حقول الوحدة بعد إخفاء الممنوع عن دور المستخدم */
     function hub_visible_fields($user, string $module, array $def): array
     {
-        return array_values(array_filter($def['fields'],
+        $fields = array_values(array_filter($def['fields'],
             fn ($f) => hub_field_mode($user, $module, $f['key']) !== 'hide'));
+
+        // Permissions 360 · 15.4/03.3 — حسابُ العميلِ يرى أعمدةَ سطحِه المنسّقةَ حصراً
+        // (عقدُ البوّابة نفسُه) في كلِّ سطحٍ يستشير هذه الدالة: جدولُ الوحدةِ
+        // وتصديرُها وقناعُ حقولِ الجوال — لا نسختين من القرار.
+        if (hub_is_client($user) && isset(\App\Support\ClientPortalData::CLIENT_SAFE_COLS[$module])) {
+            $safe = \App\Support\ClientPortalData::CLIENT_SAFE_COLS[$module];
+            $fields = array_values(array_filter($fields,
+                fn ($f) => in_array((string) ($f['col'] ?? $f['key']), $safe, true)));
+        }
+
+        return $fields;
     }
 }
 
@@ -2488,6 +2532,30 @@ if (! function_exists('hub_project_health')) {
     }
 }
 
+if (! function_exists('hub_project_health_for')) {
+    /**
+     * **صحّةُ المشروعِ بعينِ قارئِها** (Permissions 360 · 07.5): عاملُ «الالتزام
+     * بالميزانيّة» (نسبةُ الاستهلاكِ في note ودرجتُه) مُشتقٌّ من حقلِ الميزانيّةِ الذي
+     * قد يحجبه fieldsec/قواعدُ الدور — فمن حُجبت عنه الميزانيّةُ يُسقَط عاملُها
+     * ويُعاد تطبيعُ الدرجةِ على بقيّةِ الأوزان. الترشيحُ **عند العرض** لا في
+     * الخبيئة (health:{id} تبقى عامّةً واحدةً — لا تفرُّعَ خبيئةٍ بالمستخدم).
+     */
+    function hub_project_health_for($user, string $projectId, bool $fresh = false): array
+    {
+        $h = hub_project_health($projectId, $fresh);
+        if (! $h || hub_field_mode($user, 'projects', 'budget') !== 'hide') return $h;
+
+        $f = array_values(array_filter($h['factors'] ?? [],
+            fn ($x) => ($x['k'] ?? '') !== 'الالتزام بالميزانية'));
+        $wsum = array_sum(array_map(fn ($x) => (int) $x['w'], $f)) ?: 1;
+        $score = (int) round(array_sum(array_map(fn ($x) => $x['s'] * $x['w'], $f)) / $wsum);
+
+        return ['score' => $score, 'factors' => $f,
+                'tone' => $score >= 80 ? 'ok' : ($score >= 55 ? 'wn' : 'bad'),
+                'label' => $score >= 80 ? 'سليم' : ($score >= 55 ? 'يحتاج انتباهاً' : 'متعثر')];
+    }
+}
+
 if (! function_exists('hub_ar_norm')) {
     /**
      * تطبيع عربي للمقارنة: يجرّد التشكيل والتطويل ويوحّد صور الألف والياء والتاء المربوطة.
@@ -2857,6 +2925,28 @@ if (! function_exists('hub_notify')) {
             'read'      => false,
             'created_at' => now(),
         ]);
+    }
+}
+
+if (! function_exists('hub_notification_text')) {
+    /**
+     * **نصُّ الإشعارِ عند العرض** (Permissions 360 · 18.3): النصُّ المخزونُ خُطَّ يومَ
+     * كان المستلمُ يرى وحدتَه — إن سُحبت رؤيتُها لاحقاً بقي الاسمُ المخزونُ يتسرّب من
+     * قائمةِ الإشعارات (ويباً وجوّالاً). فحصٌ رخيصٌ بلا استعلام (`hub_can` قراءةُ
+     * مصفوفةٍ محمَّلة): وحدةٌ مسجَّلةٌ لم يعد يملك رؤيتَها ⇒ قناعٌ عامٌّ بلا اسمِ سجلّ.
+     * إشعارٌ بلا وحدةٍ (نظاميّ/شخصيّ) يمرّ كما هو، والنطاقُ الدقيقُ يبقى عند بابِ
+     * الوجهةِ نفسِها (`go`/الوحدة تصدّ ٤٠٤/٤٠٣ كالمعتاد).
+     */
+    function hub_notification_text($user, $n): string
+    {
+        $module = is_array($n) ? ($n['module'] ?? null) : ($n->module ?? null);
+        $text   = (string) (is_array($n) ? ($n['text'] ?? '') : ($n->text ?? ''));
+
+        if ($module && hub_mod((string) $module) && ! hub_can($user, (string) $module, 'v')) {
+            return '🔒 إشعارٌ عن سجلٍّ في وحدةٍ لم تعد تملك رؤيتَها';
+        }
+
+        return $text;
     }
 }
 
@@ -5763,6 +5853,32 @@ if (! function_exists('hub_range')) {
     }
 }
 
+if (! function_exists('hub_admin_bar_visible')) {
+    /**
+     * **ظهورُ شريطِ الإدارة يُشتقُّ من الكتالوج لا من قائمةِ راياتٍ مكرّرة** (Permissions 360 · 04.1).
+     * كان الشرطُ (مالك/users/audit/secrets) نسخةً يدويّةً تنحرف: حاملُ monitor/secOps يبلغ
+     * «نظرةَ التحكّم» و«التنبيهات»، وحاملُ mobile يبلغ منصّةَ الهاتف، ومن يرى الحوادثَ يبلغها —
+     * والشريطُ كلُّه محجوبٌ عنهم. الحقيقةُ الواحدة: الشريطُ يظهر لمن له **رابطٌ واحدٌ ظاهرٌ**
+     * على الأقلّ في كتالوجِ hub_admin_links (وحارسُ IA للمجالِ يستدعي هذه الدالّةَ نفسَها).
+     */
+    function hub_admin_bar_visible($user = null): bool
+    {
+        $user = $user ?? auth()->user();
+        if (! $user || hub_is_client($user)) return false;
+
+        foreach (hub_admin_links($user) as $l) {
+            // بندان لا يجعلان الموظّفَ «إداريّاً» (يبقيان داخلَ الشريط لمن ظهرَ له):
+            //  · «التخصيص» (prefs) — شخصيٌّ ok=true للجميع.
+            //  · نُسَخُ الوحداتِ العاديّة (route=m.index كالحوادث) — صاحبُها يبلغها أصلاً
+            //    من تنقّلِ الوحدات، وظهورُها هنا اختصارٌ لا سلطةُ إدارة.
+            if (($l['key'] ?? '') === 'prefs' || ($l['route'] ?? '') === 'm.index') continue;
+            if (! empty($l['ok'])) return true;
+        }
+
+        return false;
+    }
+}
+
 if (! function_exists('hub_admin_links')) {
     /**
      * كتالوجُ روابط الإدارة (WP-1.5) — المصدرُ **الواحد** الذي يُرسَم منه شريطُ
@@ -5808,7 +5924,7 @@ if (! function_exists('hub_admin_links')) {
             // لا يدلّ عليها شيءٌ صفحةٌ ميّتة. حارسُها حارسُ `ControlController::gate`
             // حرفياً (مالكٌ أو حاملُ راية المراقبة) فلا يُوعَد أحدٌ ببابٍ يُصَدّ عنه.
             $mk('control', 'نظرة التحكّم', '🎛️', 'control.index', [], 'التشغيل',
-                $owner || hub_monitor($user), ['control.*'], 'مستوى التحكّم النظرة العامة يستدعي تدخّلك'),
+                $owner || hub_monitor_group('secOps', $user), ['control.*'], 'مستوى التحكّم النظرة العامة يستدعي تدخّلك'),
             $mk('ops', 'التشغيل', '🖥️', 'ops.index', [], 'التشغيل',
                 $owner, ['ops.*'], 'مركز التشغيل الصحّة الطابور النسخ'),
             $mk('errors', 'الأخطاء', '🐞', 'errors.index', [], 'التشغيل',
@@ -5818,7 +5934,7 @@ if (! function_exists('hub_admin_links')) {
                 hub_can($user, 'incidents', 'v'), [], 'إدارة الحوادث التقنية الانقطاع'),
             // مركزُ التنبيهات: القراءةُ للمالك أو حامل المراقبة (AlertCenterController::readGate)
             $mk('alerts', 'التنبيهات', '🔔', 'alerts.center', [], 'التشغيل',
-                $owner || hub_monitor($user), ['alerts.center'], 'مركز التنبيهات قواعد التنبيه'),
+                $owner || hub_monitor_group('secOps', $user), ['alerts.center'], 'مركز التنبيهات قواعد التنبيه'),
             // مركزُ منصّة الجوال: مالكٌ أو حاملُ رايةِ الجوال (MobilePlatformController::canView)
             $mk('mobileplatform', 'منصّة تطبيق الهاتف', '📱', 'mobileplatform.index', [], 'التشغيل',
                 $owner || hub_flag($user, 'mobile'), ['mobileplatform.*'],

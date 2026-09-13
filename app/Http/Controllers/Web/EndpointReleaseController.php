@@ -199,7 +199,9 @@ class EndpointReleaseController extends Controller
     public function download(string $id)
     {
         // العميلُ ٤٠٤ فوق كل شيء (دفاعُ عمقٍ تحت PortalGuard) — والداخليُّ المُصادَقُ
-        // جمهورُ المركز: من يثبّت الوكيلَ على جهازه يحتاج الثنائيّةَ وتجزئتَها
+        // جمهورُ المركز: من يثبّت الوكيلَ على جهازه يحتاج الثنائيّةَ وتجزئتَها.
+        // (Permissions 360 · 12.6 — قرارٌ موثَّق: التوزيعُ الداخليُّ مقصودٌ لكلِّ موظّفٍ
+        //  مُصادَقٍ كي يثبّت وكيلَه بنفسه، وكلُّ تنزيلٍ مُقيَّدٌ في download_log أدناه.)
         abort_if(hub_is_client(auth()->user()), 404);
 
         $rel = EndpointRelease::findOrFail($id);

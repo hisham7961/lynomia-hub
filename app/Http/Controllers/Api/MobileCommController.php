@@ -471,7 +471,8 @@ class MobileCommController extends V1Controller
         return [
             'id'         => (string) $n->id,
             'kind'       => (string) $n->kind,
-            'text'       => $n->text !== null ? (string) $n->text : null,
+            // 18.3 — نظيرُ الويب: القناعُ عند العرض إن سُحبت رؤيةُ الوحدةِ بعد الكتابة
+            'text'       => $n->text !== null ? hub_notification_text(auth()->user(), $n) : null,
             'read'       => (bool) $n->read,
             'module'     => $n->module !== null ? (string) $n->module : null,
             'record_id'  => $n->record_id !== null ? (string) $n->record_id : null,

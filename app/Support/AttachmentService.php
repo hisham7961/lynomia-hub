@@ -225,6 +225,25 @@ class AttachmentService
     }
 
     /**
+     * **حارسُ الإرفاق** (Permissions 360 · 13.2): الإرفاقُ **كتابةٌ** على السجل، فلا
+     * يكفيه ظلُّ العرض — يلزم `e` (المفتاحُ الرئيس) أو المفتاحُ الدقيقُ `attach`
+     * (كتالوج hub_permissions). كان `v` يكفي بقرارٍ منتجيٍّ قديم («مشاهدٌ يُرفق
+     * مستنداً داعماً»)؛ هجرةُ grant_attach أبقته لكلِّ دورٍ قائمٍ كان يرى (لا فقدَ
+     * فوريّاً)، وصار سحبُه ممكناً من محرّرِ الأدوار لدورِ قراءةٍ بحتة. النطاقُ
+     * والوجودُ كما في `guardRecord` حرفاً (خارجَ النطاق = ٤٠٤).
+     */
+    public static function guardAttach(?string $module, ?string $recordId): void
+    {
+        $def = hub_mod((string) $module);
+        abort_unless($def && $recordId, 404);
+        $u = auth()->user();
+        abort_unless(hub_can($u, $module, 'e') || hub_can($u, $module, 'attach'), 403,
+            'الإرفاقُ يتطلّب صلاحيةَ التعديل أو مفتاحَ «إرفاق الملفات» على الوحدة');
+        $class = '\\App\\Models\\' . $def['model'];
+        hub_scope($class::query(), $module)->findOrFail($recordId);
+    }
+
+    /**
      * يُدوّن وصولاً لبياناتٍ مصنَّفة إن كان السجلُّ الأمّ يحمل حقلَ سرّيةٍ مُقيَّداً.
      * يقرأ الحقلَ من تعريف الوحدة (أيُّ حقلٍ اسمُه `secrecy`)، فلا يُخصّ وحدةً بعينها.
      */
