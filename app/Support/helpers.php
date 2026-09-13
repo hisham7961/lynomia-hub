@@ -394,6 +394,11 @@ if (! function_exists('hub_top_links')) {
     {
         $owner = (bool) $user?->role?->is_owner;
         $mon = $owner || hub_flag($user, 'monitor');
+        // Permissions 360 · 01.2/11.4/20.5/04.3 — مجموعاتُ المراقبةِ الأدقّ: رؤيةُ المركزِ
+        // في الشريطِ تطابق بوّابةَ متحكّمه (hub_monitor_group) فلا رابطٌ يظهر ثم يُصَدُّ ٤٠٣.
+        $opsA = $mon || hub_flag($user, 'opsAnalytics');
+        $finA = $mon || hub_flag($user, 'finAnalytics');
+        $secO = $mon || hub_flag($user, 'secOps');
 
         // كل رابط مُصنَّف في قسم (group): daily/analytics/centers — تستعمله hub_top_groups
         $all = [
@@ -414,16 +419,16 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'inboxdocs', 'label' => '📥 صندوق الوثائق',    'route' => 'inboxdocs.index', 'group' => 'daily',     'ok' => hub_can($user, 'inboxdocs', 'v') || hub_can($user, 'files', 'v')],
 
             ['key' => 'ceo',       'label' => '👑 لوحة CEO',         'route' => 'ceo',             'group' => 'analytics', 'ok' => $owner],
-            ['key' => 'perf',      'label' => '📈 لوحة الأداء',      'route' => 'performance',     'group' => 'analytics', 'ok' => $mon],
-            ['key' => 'sales',     'label' => '💼 لوحة المبيعات',    'route' => 'sales.dashboard', 'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'perf',      'label' => '📈 لوحة الأداء',      'route' => 'performance',     'group' => 'analytics', 'ok' => $opsA],
+            ['key' => 'sales',     'label' => '💼 لوحة المبيعات',    'route' => 'sales.dashboard', 'group' => 'analytics', 'ok' => $finA],
             ['key' => 'finrep',    'label' => '📊 التقارير المالية', 'route' => 'reports.finance', 'group' => 'analytics', 'ok' => hub_can($user, 'fin', 'v')],
-            ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'group' => 'analytics', 'ok' => $mon],
-            ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'group' => 'analytics', 'ok' => $mon],
-            ['key' => 'kpis',      'label' => '📈 مؤشرات KPI',       'route' => 'kpis.index',      'group' => 'analytics', 'ok' => $mon],
-            ['key' => 'capacity',  'label' => '📊 القدرات والموارد', 'route' => 'capacity',        'group' => 'analytics', 'ok' => $mon],
-            ['key' => 'recs',      'label' => '💡 مركز التوصيات',    'route' => 'recs',            'group' => 'analytics', 'ok' => $mon],
-            ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'group' => 'analytics', 'ok' => $mon],
-            ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'group' => 'analytics', 'ok' => $finA],
+            ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'group' => 'analytics', 'ok' => $finA],
+            ['key' => 'kpis',      'label' => '📈 مؤشرات KPI',       'route' => 'kpis.index',      'group' => 'analytics', 'ok' => $opsA],
+            ['key' => 'capacity',  'label' => '📊 القدرات والموارد', 'route' => 'capacity',        'group' => 'analytics', 'ok' => $opsA],
+            ['key' => 'recs',      'label' => '💡 مركز التوصيات',    'route' => 'recs',            'group' => 'analytics', 'ok' => $opsA],
+            ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'group' => 'analytics', 'ok' => $opsA],
+            ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $opsA],
             ['key' => 'delivery',  'label' => '🛤️ مسار التسليم',     'route' => 'delivery',        'group' => 'analytics', 'ok' => hub_can($user, 'feats', 'v') || hub_can($user, 'deploys', 'v') || hub_can($user, 'requests', 'v') || hub_can($user, 'designs', 'v')],
             ['key' => 'custody',   'label' => '🏷️ كتالوج العهد',      'route' => 'custody.catalog', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
             ['key' => 'identity',  'label' => '📷 مركز الهوية والمسح', 'route' => 'identity.center', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
@@ -438,7 +443,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'assetlife', 'label' => '💼 العهدة ودورة الحياة', 'route' => 'assets.life',  'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
             ['key' => 'compb',     'label' => '⚖️ الامتثال وأثره',   'route' => 'compliance.board', 'group' => 'centers', 'ok' => hub_can($user, 'compliance', 'v')],
             ['key' => 'appsproj',  'label' => '🔗 التطبيقات والمشاريع', 'route' => 'appsprojects', 'group' => 'centers', 'ok' => hub_can($user, 'apps', 'v') || hub_can($user, 'projects', 'v')],
-            ['key' => 'dassets',   'label' => '🔐 الأصول الرقمية',   'route' => 'digital.assets',  'group' => 'analytics', 'ok' => $mon],
+            ['key' => 'dassets',   'label' => '🔐 الأصول الرقمية',   'route' => 'digital.assets',  'group' => 'analytics', 'ok' => $secO],
             ['key' => 'pricing',   'label' => '💳 الباقات والتسعير', 'route' => 'pricing',         'group' => 'centers',   'ok' => hub_can($user, 'plans', 'v')],
             ['key' => 'mediac',    'label' => '📣 مركز الإعلام',      'route' => 'media.center',    'group' => 'centers',   'ok' => hub_can($user, 'media', 'v') || hub_can($user, 'events', 'v')],
             ['key' => 'teamdir',   'label' => '👥 دليل الفريق',       'route' => 'team',            'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
@@ -964,6 +969,22 @@ if (! function_exists('hub_monitor')) {
     function hub_monitor($user = null): bool
     {
         return hub_flag($user ?? auth()->user(), 'monitor');
+    }
+}
+
+if (! function_exists('hub_monitor_group')) {
+    /**
+     * **مجموعةُ لوحاتٍ أدقّ من رايةِ المراقبةِ الجامعة** (Permissions 360 · 01.2/11.4/20.5).
+     *
+     * إضافةٌ لا كسر: رايةُ `monitor` (والمالك) تبقى تمنح كلَّ المجموعات (مفتاحٌ رئيس)،
+     * ومفتاحُ المجموعةِ (`opsAnalytics`/`finAnalytics`/`secOps`) يمنح مجموعتَه وحدَها —
+     * فيُمنَح محاسبٌ لوحاتِ التكاليفِ دون الأداءِ والأمن. لا هجرة: حاملو monitor بلا تغيير.
+     */
+    function hub_monitor_group(string $group, $user = null): bool
+    {
+        $user = $user ?? auth()->user();
+
+        return hub_monitor($user) || hub_flag($user, $group);
     }
 }
 

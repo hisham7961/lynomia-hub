@@ -63,8 +63,8 @@ class InformationArchitecture
             'owner'              => fn ($u) => hub_is_owner($u),
             'monitor'            => fn ($u) => hub_monitor($u),
 
-            // field.* → FieldController@gate:22
-            'field'              => fn ($u) => hub_is_owner($u) || (hub_can($u, 'hr', 'v') && hub_monitor($u)),
+            // field.* → FieldController@gate:22 (Permissions 360 · مجموعةُ opsAnalytics)
+            'field'              => fn ($u) => hub_is_owner($u) || (hub_can($u, 'hr', 'v') && hub_monitor_group('opsAnalytics', $u)),
 
             // oversight.* → OversightController::isOversightOfficer:51 (نستدعي مساره ذاته — صفرُ انحراف؛ ليس موروثاً للمالك)
             'oversight'          => fn ($u) => \App\Http\Controllers\Web\OversightController::isOversightOfficer($u),
@@ -78,8 +78,8 @@ class InformationArchitecture
             // custody.wallet.* → EmployeeCustodyController@can:48 (center:89 يستدعي can('v'))
             'custody_wallet'     => fn ($u) => hub_can($u, 'custody', 'v'),
 
-            // workforce.overview → WorkforceController@gate:19
-            'workforce_overview' => fn ($u) => hub_monitor($u),
+            // workforce.overview → WorkforceController@gate:19 (Permissions 360 · مجموعةُ opsAnalytics)
+            'workforce_overview' => fn ($u) => hub_monitor_group('opsAnalytics', $u),
 
             // journey → JourneyController@show:17
             'journey'            => fn ($u) => hub_can($u, 'clients', 'v'),
@@ -94,7 +94,7 @@ class InformationArchitecture
             'boards'             => fn ($u) => $u !== null,
 
             // endpoints.* → EndpointCentreController@gate:34-35
-            'endpoints'          => fn ($u) => ! hub_is_client($u) && (hub_is_owner($u) || hub_monitor($u)),
+            'endpoints'          => fn ($u) => ! hub_is_client($u) && (hub_is_owner($u) || hub_monitor_group('secOps', $u)),
 
             // endpoints.releases.* → EndpointReleaseController@gate:40-41
             'endpoints_releases' => fn ($u) => ! hub_is_client($u) && hub_is_owner($u),

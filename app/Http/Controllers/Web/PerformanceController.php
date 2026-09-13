@@ -31,7 +31,7 @@ class PerformanceController extends Controller
 
     public function index()
     {
-        abort_unless(hub_monitor(), 403,
+        abort_unless(hub_monitor_group('opsAnalytics'), 403,
             'لوحة الأداء للمالكين وحاملي صلاحية المراقبة');
         // تجمع المنشأة كلها من الجداول الخام — كأخواتها الثلاث (القدرات
         // والتوصيات والأثر) — وكانت وحدها بلا حارس العزل، فالمحصورُ بشركةٍ

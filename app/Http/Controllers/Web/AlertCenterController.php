@@ -24,7 +24,7 @@ class AlertCenterController extends Controller
 {
     protected function readGate(): void
     {
-        abort_unless(hub_is_owner() || hub_monitor(), 403, 'مركزُ التنبيهات للمالك أو حامل علم المراقبة');
+        abort_unless(hub_is_owner() || hub_monitor_group('secOps'), 403, 'مركزُ التنبيهات للمالك أو حامل علم المراقبة');
     }
 
     protected function gate(): void

@@ -72,7 +72,7 @@ class ControlController extends Controller
 
     protected function gate(): void
     {
-        abort_unless(hub_is_owner() || hub_monitor(), 403,
+        abort_unless(hub_is_owner() || hub_monitor_group('secOps'), 403,
             'مستوى التحكّم للمالك أو حاملِ راية المراقبة');
     }
 
