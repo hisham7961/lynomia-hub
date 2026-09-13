@@ -31,7 +31,7 @@ class AccessController extends Controller
             ->get(['id', 'name', 'email', 'account_type', 'role_id', 'status']);
 
         $selected = null;
-        $matrix = $nav = $scope = null;
+        $matrix = $nav = $scope = $fine = $flags = null;
         $probe = null;
 
         $uid = hub_str($r->query('user'));
@@ -43,6 +43,8 @@ class AccessController extends Controller
             $matrix = PermissionInspector::moduleMatrix($selected);
             $nav    = PermissionInspector::navigation($selected);
             $scope  = $this->scopeSummary($selected);
+            $fine   = PermissionInspector::finePerms($selected);
+            $flags  = PermissionInspector::flags($selected);
 
             // فحصٌ نقطيّ: (وحدة، عمليّة) → سلسلةُ السبب (§59)
             $module = hub_str($r->query('module'));
@@ -58,6 +60,8 @@ class AccessController extends Controller
             'matrix'   => $matrix,
             'nav'      => $nav,
             'scope'    => $scope,
+            'fine'     => $fine,
+            'flags'    => $flags,
             'probe'    => $probe,
             'modules'  => hub_modules(),
             'ops'      => PermissionInspector::OPS,
@@ -82,6 +86,8 @@ class AccessController extends Controller
             'role'   => $role,
             'matrix' => PermissionInspector::moduleMatrix($ghost),
             'nav'    => PermissionInspector::navigation($ghost),
+            'fine'   => PermissionInspector::finePerms($ghost),
+            'flags'  => PermissionInspector::flags($ghost),
             'users'  => User::where('role_id', $role->id)->orderBy('name')->paginate(25),
         ]);
     }

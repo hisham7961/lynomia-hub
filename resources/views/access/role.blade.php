@@ -42,6 +42,8 @@
     @endforeach
 </div>
 
+@include('access._fineperms', ['fine' => $fine, 'flags' => $flags])
+
 @if ($users->count())
 <div class="card">
     <h3 style="margin:0 0 8px">👥 المستخدمون بهذا الدور ({{ $users->total() }})</h3>

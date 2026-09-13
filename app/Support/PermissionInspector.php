@@ -218,6 +218,61 @@ class PermissionInspector
     }
 
     /**
+     * **الصلاحيّاتُ الدقيقةُ الفعّالة** (Permissions 360 · م3): لكلِّ مفتاحٍ من كتالوج
+     * `hub_fine_perms` — على أيِّ وحدةٍ ينطبق، ماذا يفتح (label/hint)، وهل هو ممنوحٌ
+     * لهذا الحساب. القرارُ من `hub_can` نفسِه (المالكُ يتجاوز) — قراءةٌ لا محرّكٌ ثانٍ.
+     *
+     * @return list<array{key:string,module:string,module_label:string,label:string,hint:string,risky:bool,granted:bool}>
+     */
+    public static function finePerms(User $user): array
+    {
+        $out = [];
+        foreach (hub_fine_perms() as $key => $def) {
+            $mods = ($def['modules'] ?? []) === '*' ? array_keys(hub_modules()) : (array) ($def['modules'] ?? []);
+            foreach ($mods as $mk) {
+                $md = hub_mod($mk);
+                if (! $md) continue;
+                $out[] = [
+                    'key'          => $key,
+                    'module'       => $mk,
+                    'module_label' => $md['label'] ?? $mk,
+                    'label'        => (string) ($def['label'] ?? $key),
+                    'hint'         => (string) ($def['hint'] ?? ''),
+                    'risky'        => ! empty($def['risky']),
+                    'granted'      => hub_can($user, $mk, $key),
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * **الراياتُ وما تفتحه** (بما فيها مجموعاتُ المراقبةِ الثلاث opsAnalytics/finAnalytics/secOps):
+     * الحكمُ الفعّالُ لكلِّ راية من `hub_flag` (المالكُ يتجاوز) — إلا **رقابةَ الاتصالات**
+     * فتُحسَم بحكمِها الحقيقيّ (`isOversightOfficer` — ليست موروثةً للمالك آليّاً).
+     *
+     * @return list<array{key:string,label:string,granted:bool,risky:bool}>
+     */
+    public static function flags(User $user): array
+    {
+        $out = [];
+        foreach (\App\Http\Controllers\Web\RoleController::FLAGS as $key => $label) {
+            $granted = $key === 'oversight'
+                ? \App\Http\Controllers\Web\OversightController::isOversightOfficer($user)
+                : hub_flag($user, $key);
+            $out[] = [
+                'key'     => $key,
+                'label'   => (string) $label,
+                'granted' => (bool) $granted,
+                'risky'   => in_array($key, \App\Http\Controllers\Web\RoleController::RISKY_FLAGS, true),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * **معاينةُ التنقّلِ الفعّال** (§60): الوحداتُ المرئيّةُ مقابلَ المخفيّة، ولكلِّ مخفيّةٍ سببُها.
      * تُحسَب من المصادر الحيّة لا من قائمةٍ مخزَّنة.
      *

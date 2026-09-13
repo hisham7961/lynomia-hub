@@ -4,6 +4,24 @@
 
 الخطورة: P0=0 · P1=2 · P2=38 · P3=43
 
+## سجلُّ الإغلاق (المراحل 2–3) — 46/83 مُغلقة
+
+> الجدولُ الأصليُّ أدناه **سجلُّ التدقيقِ كما وُلد** ولا يُحرَّر؛ هذا السجلُّ يُحصي ما أُغلق
+> وأينَ (النسخةُ الحاملةُ للإصلاح والاختبارِ الذي يفشل أولاً). التفصيلُ في `FINAL_REPORT.md`.
+
+| النسخة | النتائج المُغلقة | الآليّة |
+|---|---|---|
+| ≤ v2.484.2 | 10.1 · 15.1 · 01.1 · 01.3 · 01.4 · 01.7 · 02.1 · 02.3 · 05.1 · 05.5 · 06.2 · 07.1 · 09.1 · 09.4 · 11.1 · 11.2 · 11.3 · 13.1 · 16.1 · 16.2 · 17.1 · 17.2 · 20.1 · 20.2 · 20.3 · 20.4 | تفكيكُ approve/exp إلى مفاتيحِ وحدة، رايةُ oversight، حارسُ لوحاتِ المنشأة، حجبُ الحضورِ في 360، إسقاطُ meta، تصليبُ الملفّات، بواباتُ تبويباتِ 360، حفظُ المفاتيحِ المسمّاة في المحرّر |
+| v2.484.3 | 10.4 · 12.5 | تنطيقُ المراجعِ عند الكتابة (checkin/station) — `Permissions360ScopeIdorTest` |
+| v2.485.0 | 12.3 · 12.4 · 14.3 · 15.5 | تفكيكُ assets:e (custodyAssign/assetStatus/assetStation/assetInventory) وmonitor (endpoints:command/enroll) وclients:e (membersManage) — `Permissions360FineGrainedTest` |
+| v2.485.1 | 03.1 · 03.2 · 15.3 | نطاقُ مفتاحِ API يُقيّد، وعزلُ بُعدِ الشركاتِ عن العميل — `Permissions360ApiScopeTest` |
+| v2.486.0 | 07.6 · 01.6 · 17.4 | projects:assetAssign، تصعيدُ إنشاءِ الدورِ الحسّاس، حدُّ معدّلِ الاستيراد — `Permissions360KeysHardeningTest` |
+| v2.487.0 | 01.2 · 02.2 · 11.4 · 20.5 · 04.3 · 06.1 | تفكيكُ monitor إلى opsAnalytics/finAnalytics/secOps (بوّابة+شريط+IA معاً) — `Permissions360MonitorGroupsTest` |
+| v2.488.0 | 09.2 · 07.2 | بوّابةُ fieldsec للحقولِ الحسّاسة + هجرةٌ عديمةُ الخسارة — `Permissions360FieldSecTest` |
+
+**المتبقّي (37)** — مصنَّفٌ بأسبابِه في `FINAL_REPORT.md` §المتبقّي: جراحةُ نطاقٍ سلوكيّة
+(16.3/08.2/10.2)، عملُ محرّكٍ (15.4/03.3/07.4/08.1/01.5)، تضييقٌ يحتاج قراراً (12.1/12.2/12.6/14.1/15.2/13.2/14.2/10.3/17.3/09.3/07.5)، حوكمةُ إشعارات (18.1–18.4)، تجميلُ تنقّلٍ (04.1/04.2/04.4/05.2/05.3/05.4)، ومخفَّفةٌ جزئيّاً (19.1/19.2 عبر fieldsec+finAnalytics، 02.4/03.4/06.3/07.3).
+
 | # | الخطورة | النوع | المجال | الحالة | الموضع | الدليل | الإصلاح المقترح |
 |---|---|---|---|---|---|---|---|
 | 10.1 | P1 | idor | الحضور/التقارير | ✅ CONFIRMED | app/Http/Controllers/Web/ReportsController.php:196-197 (finalize) | $row = Attendance::whereNull('deleted_at')->whereKey($id)->firstOrFail(); abort_unless(hub_company_scope(Attendance::query(),'attend')->whereKey($row->id)->exists(), 404). hub_company_scope (helpers.p | استبدل الحارس بالتنطيق الصارم كما في day()/monthlyEmployee(): abort_unless(hub_scope(Attendance::query(),'attend')->whereKey($row->id)->exists(), 404); (مع hub_company_scope فوقه ا |
