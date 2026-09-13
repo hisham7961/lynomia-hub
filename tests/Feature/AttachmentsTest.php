@@ -83,8 +83,15 @@ class AttachmentsTest extends TestCase
         $this->seedCore();
         $p = Project::create(['name' => 'مشروع', 'status' => 'قيد التنفيذ']);
 
-        // المشاهد يرفع (يملك v) ويحذف ما رفعه هو
-        $this->upload($this->viewer, $p)->assertRedirect();
+        // Permissions 360 · 13.2 — الإرفاقُ صار كتابةً مسمّاة (e أو attach): المشاهدُ
+        // القائمُ صانته هجرةُ grant_attach (يرى ⇒ يُرفق)، ونحاكي منحتَها هنا لأنّ
+        // أدوارَ الاختبارِ تُنشأ بعد الهجرات. (سلوكُ الحذفِ أدناه غيرُ متغيّر.)
+        $role = $this->viewer->role;
+        $m = $role->matrix; $m['projects']['attach'] = 1;
+        $role->update(['matrix' => $m]);
+
+        // المشاهد يرفع (يملك v + attach) ويحذف ما رفعه هو
+        $this->upload($this->viewer->fresh(), $p)->assertRedirect();
         $mine = Attachment::first();
 
         // الموظفة ترفع — والمشاهد (بلا تعديل) لا يحذف ملف غيره

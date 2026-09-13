@@ -38,11 +38,10 @@ class AttachmentController extends Controller
         // المشترك `AttachmentService` (F.2) — الويبُ والجوالُ يستدعيانه، لا نسختان.
         $data = AttachmentService::validateUpload($r);
 
-        // الإرفاق بصلاحية «عرض» قرارٌ منتجيّ مقصود ومُختبَر (AttachmentsTest):
-        // مشاهدٌ قد يُرفق مستنداً داعماً على سجلٍ يراه. الحمايةُ الحقيقية أن
-        // الملف يمرّ بحاجز الامتدادات، والتنزيل يُجبَر attachment، والمعاينة
-        // تحصر أنواعها — فلا تنفيذ. (لم نكسر سلوكاً قائماً لأجل تشدّدٍ نظريّ.)
-        AttachmentService::guardRecord($data['module'], $data['record_id'], 'v');
+        // Permissions 360 · 13.2 — الإرفاقُ كتابةٌ مسمّاة: `e` أو مفتاحُ `attach` الدقيق.
+        // (القرارُ المنتجيُّ القديم «مشاهدٌ يُرفق بصلاحية عرض» صانته هجرةُ grant_attach
+        // للأدوارِ القائمة، وصار قابلاً للسحبِ من محرّرِ الأدوار لدورِ قراءةٍ بحتة.)
+        AttachmentService::guardAttach($data['module'], $data['record_id']);
 
         // الدفعةُ بترتيب اختيارها، والمفردُ دفعةٌ من واحد — مسارٌ واحدٌ لا مساران
         // (المقطَّعُ يكون قد حُقن في `files` بوسيط ResolveChunkedUploads قبل هذا)

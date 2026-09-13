@@ -5103,6 +5103,9 @@ return [
                     'label' => 'الموظف الحامل',
                     'type' => 'ref',
                     'ref' => 'users',
+                    // Permissions 360 · 12.2 — يُختم من رمزِ التسجيلِ الموقَّع (EnrollController)
+                    // لا من نموذجِ CRUD — فلا يُعاد توجيهُ جهازٍ لموظفٍ/أصلٍ/محطةٍ بيدِ محرِّر.
+                    'locked' => true,
                 ],
                 [
                     'key' => 'assetId',
@@ -5110,6 +5113,9 @@ return [
                     'label' => 'الأصل المرتبط',
                     'type' => 'ref',
                     'ref' => 'assets',
+                    // Permissions 360 · 12.2 — يُختم من رمزِ التسجيلِ الموقَّع (EnrollController)
+                    // لا من نموذجِ CRUD — فلا يُعاد توجيهُ جهازٍ لموظفٍ/أصلٍ/محطةٍ بيدِ محرِّر.
+                    'locked' => true,
                 ],
                 [
                     'key' => 'stationId',
@@ -5117,6 +5123,9 @@ return [
                     'label' => 'المحطة',
                     'type' => 'ref',
                     'ref' => 'stations',
+                    // Permissions 360 · 12.2 — يُختم من رمزِ التسجيلِ الموقَّع (EnrollController)
+                    // لا من نموذجِ CRUD — فلا يُعاد توجيهُ جهازٍ لموظفٍ/أصلٍ/محطةٍ بيدِ محرِّر.
+                    'locked' => true,
                 ],
                 [
                     'key' => 'pubkeyFp',

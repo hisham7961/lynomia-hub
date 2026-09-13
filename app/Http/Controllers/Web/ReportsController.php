@@ -270,6 +270,13 @@ class ReportsController extends Controller
     public function monthlyExport(Request $r)
     {
         $this->guardMonthly();
+
+        // Permissions 360 · 10.3 — حزامُ التصديرِ نفسُه الذي يلبسه `ModuleController::exportBelt`
+        // (تجميدُ الطوارئ + تصعيدُ الحجمِ الكبير + بصمةُ التدقيق) دون تغييرِ سلطةِ العرض:
+        // بوّابةُ المحاسبِ (attend:v/hr:v) قرارٌ قائمٌ، والحزامُ ضوابطُ سحبِ البياناتِ فوقَه.
+        abort_if((string) setting('security.freeze_exports', '0') === '1', 423,
+            'التصدير مجمَّدٌ الآن بمفتاح طوارئٍ أمنيّ — يُرفع من مركز الأمان');
+
         $month = \App\Support\MonthlyAttendance::normMonth($r->query('month'));
         $dates = \App\Support\MonthlyAttendance::daysOf($month);
         $empQ = $this->monthlyEmployees();
@@ -277,10 +284,29 @@ class ReportsController extends Controller
         $emps = $empQ->orderBy('name')->limit(1000)->get(['id', 'name', 'dept', 'user_id', 'company_id']);
         $range = \App\Support\DailyWorkCompliance::resolveRange($emps, $dates);
 
+        // عدُّ الصفوفِ المُصدَّرةِ فعلاً (نفسُ شرطِ البثِّ أدناه) — لعتبةِ التصعيدِ وبصمةِ التدقيق
+        $rowCount = 0;
+        foreach ($emps as $emp) {
+            foreach ($dates as $d) {
+                $c = $range[$emp->id][$d] ?? null;
+                if ($c && ($c['checked_in'] || $c['on_leave'] || $c['attendance'])) $rowCount++;
+            }
+        }
+        $bigAt = (int) setting('security.export_stepup_rows', 0);
+        $isBig = $bigAt > 0 && $rowCount >= $bigAt;
+        if ($isBig && ($resp = hub_require_stepup())) return $resp;
+        hub_audit($isBig ? 'تصدير كبير' : 'تصدير', 'attend', null, $rowCount . ' يوم حضور (CSV شهري)');
+
+        // Permissions 360 · 17.3 — أعمدةُ الموظفِ تستشير نمطَ الحقل (نظيرَ CSV الوحدات):
+        // دورٌ يحجب حقلاً في hr (قواعدُ الحقولِ أو fieldsec) لا يستلمه في هذا الملفِّ أيضاً.
+        $u = auth()->user();
+        $nameHidden = hub_field_mode($u, 'hr', 'name') === 'hide';
+        $deptHidden = hub_field_mode($u, 'hr', 'dept') === 'hide';
+
         $headers = ['الموظف', 'القسم', 'اليوم', 'الحضور', 'الانصراف', 'الساعات', 'الحالة الفعلية', 'التقرير', 'الحالة المحتسَبة'];
         $file = 'attendance-' . $month . '.csv';
 
-        return response()->streamDownload(function () use ($emps, $dates, $range, $headers) {
+        return response()->streamDownload(function () use ($emps, $dates, $range, $headers, $nameHidden, $deptHidden) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
             $safe = fn ($v) => (is_string($v) && $v !== '' && strpbrk($v[0], "=+-@\t\r") !== false) ? "'" . $v : $v;
@@ -290,7 +316,7 @@ class ReportsController extends Controller
                     $c = $range[$emp->id][$d] ?? null;
                     if (! $c || (! $c['checked_in'] && ! $c['on_leave'] && ! $c['attendance'])) continue; // تخطّي العطلِ غيرِ المسجَّلة
                     fputcsv($out, array_map($safe, [
-                        $emp->name, $emp->dept ?: '', $d,
+                        $nameHidden ? '' : $emp->name, $deptHidden ? '' : ($emp->dept ?: ''), $d,
                         $c['time_in'] ?: '', $c['time_out'] ?: '',
                         $c['hours'] ? number_format((float) $c['hours'], 2) : '',
                         $c['on_leave'] ? 'إجازة' : ($c['checked_in'] ? ($c['labels']['physical'] ?? 'حاضر') : 'غائب'),
