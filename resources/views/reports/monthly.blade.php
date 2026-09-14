@@ -5,14 +5,15 @@
     $m = \Illuminate\Support\Carbon::parse($month . '-01');
     $prev = $m->copy()->subMonth()->format('Y-m');
     $next = $m->copy()->addMonth()->format('Y-m');
-    $agg = ['present'=>0,'leave'=>0,'absent'=>0,'missing'=>0,'absence_report'=>0,'hours'=>0.0,'reported'=>0];
-    foreach ($rows as $r) { foreach (['present','leave','absent','missing','absence_report','reported'] as $k) $agg[$k]+=$r['totals'][$k]; $agg['hours']+=$r['totals']['attendance_hours']; }
+    $agg = ['present'=>0,'leave'=>0,'absent'=>0,'unexcused'=>0,'missing'=>0,'absence_report'=>0,'missing_out'=>0,'hours'=>0.0,'reported'=>0];
+    foreach ($rows as $r) { foreach (['present','leave','absent','unexcused','missing','absence_report','missing_out','reported'] as $k) $agg[$k]+=($r['totals'][$k] ?? 0); $agg['hours']+=$r['totals']['attendance_hours']; }
 @endphp
 <div class="hero">
     <div>
         <h2>🗓️ الحضور الشهري <span class="sub mono">{{ $month }}</span></h2>
         <div class="sub">سجلُّ الحضور والانصراف والأثرِ المحتسَب لكلِّ موظفٍ — للمحاسبة والاعتماد.
-            العطلُ غيرُ المسجَّلة لا تُحتسب غياباً؛ الغيابُ لصفٍّ مختوم، و«غياب لعدم التقرير» بالسياسة بعد المهلة.</div>
+            العطلُ والمستقبلُ لا يُحتسبان غياباً؛ الغيابُ ليومِ عملٍ ماضٍ بلا ختمٍ وبلا إجازة (مختوماً أو بالفرق)،
+            و«غياب لعدم التقرير» بالسياسة بعد المهلة.</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <a class="btn ghost sm" href="{{ route('reports.monthly', ['month'=>$prev]) }}">‹ {{ $prev }}</a>
@@ -26,8 +27,10 @@
     <div class="stat"><span class="ico">👥</span><b>{{ number_format(count($rows)) }}</b><span>موظفاً</span></div>
     <div class="stat"><span class="ico">✅</span><b>{{ number_format($agg['present']) }}</b><span>يوم حضور</span></div>
     <div class="stat"><span class="ico">🏝️</span><b>{{ number_format($agg['leave']) }}</b><span>يوم إجازة</span></div>
-    <div class="stat"><span class="ico">❌</span><b>{{ number_format($agg['absent']) }}</b><span>يوم غياب</span></div>
+    {{-- الغياب = المختوم + المشتقُّ بالفرق (F10) — لا «صفر غياب» فوق شهرٍ بلا أختام --}}
+    <div class="stat"><span class="ico">❌</span><b>{{ number_format($agg['absent'] + $agg['unexcused']) }}</b><span>يوم غياب</span></div>
     @if ($agg['absence_report']>0)<div class="stat"><span class="ico">⛔</span><b>{{ number_format($agg['absence_report']) }}</b><span>غياب لعدم التقرير</span></div>@endif
+    @if ($agg['missing_out']>0)<div class="stat"><span class="ico">🚪</span><b>{{ number_format($agg['missing_out']) }}</b><span>انصراف مفقود (شذوذ)</span></div>@endif
     <div class="stat"><span class="ico">⏱️</span><b>{{ number_format($agg['hours'],1) }}</b><span>ساعة</span></div>
 </div>
 
@@ -36,7 +39,7 @@
     <div class="tblwrap"><table class="tbl">
         <thead><tr>
             <th>الموظف</th><th>حضور</th><th>متأخر</th><th>ميداني/عن بعد</th><th>إجازة</th>
-            <th>غياب</th><th>بلا تقرير</th><th>غياب لعدم التقرير</th><th>ساعات</th><th>أيام مقدَّم</th><th></th>
+            <th>غياب</th><th>بلا تقرير</th><th>غياب لعدم التقرير</th><th>شذوذات</th><th>ساعات</th><th>أيام مقدَّم</th><th></th>
         </tr></thead>
         <tbody>
         @forelse ($rows as $eid => $r)
@@ -47,9 +50,11 @@
                 <td class="mono">{{ $t['late'] ?: '—' }}</td>
                 <td class="mono">{{ $t['field'] ?: '—' }}</td>
                 <td class="mono">{{ $t['leave'] ?: '—' }}</td>
-                <td class="mono">@if($t['absent'])<span class="bdg bad">{{ $t['absent'] }}</span>@else — @endif</td>
+                @php $abs = $t['absent'] + ($t['unexcused'] ?? 0); @endphp
+                <td class="mono">@if($abs)<span class="bdg bad" title="مختوم {{ $t['absent'] }} + بالفرق {{ $t['unexcused'] ?? 0 }}">{{ $abs }}</span>@else — @endif</td>
                 <td class="mono">{{ $t['missing'] ?: '—' }}</td>
                 <td class="mono">@if($t['absence_report'])<span class="bdg bad">{{ $t['absence_report'] }}</span>@else — @endif</td>
+                <td class="mono">@if($t['missing_out'] ?? 0)<span class="bdg wn" title="دخولٌ بلا انصراف — الساعاتُ لا تُحتسب حتى يُصحَّح">انصراف مفقود ×{{ $t['missing_out'] }}</span>@else — @endif</td>
                 <td class="mono">{{ $t['attendance_hours'] ? number_format($t['attendance_hours'],1) : '—' }}</td>
                 <td class="mono">{{ $t['reported'] ?: '—' }}</td>
                 <td style="white-space:nowrap">
@@ -58,7 +63,7 @@
                 </td>
             </tr>
         @empty
-            <tr><td colspan="11" class="sub">لا موظفين في نطاقك لهذا الشهر.</td></tr>
+            <tr><td colspan="12" class="sub">لا موظفين في نطاقك لهذا الشهر.</td></tr>
         @endforelse
         </tbody>
     </table></div>

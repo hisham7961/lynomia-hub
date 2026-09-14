@@ -14,10 +14,40 @@ use Illuminate\Support\Facades\Schema;
  * — وكلها مسجَّلةٌ أصلاً في الوحدة نفسها وفي «المهارات والشهادات».
  *
  * وصورةُ الموظف تُرفع كوثيقةٍ من ملفه (`photo`) فتصير وجهه في الدليل.
+ *
+ * ── الدليلُ الأدنى (الجولة 1 · F4) ──
+ * موظفٌ عاديٌّ بنطاق مشاريع وبلا `hr:v` كان يرى «لا موظفين في نطاقك»: تنطيقُ
+ * `hr` يحسر على `employees.project_id` وهو NULL في كل الملفات عملياً — فلا يجد
+ * حتى مديرتَه بالبحث. والدليلُ حاجةُ **كل** زميلٍ داخليّ لا أداةُ HR وحدها،
+ * فصار له وجهان:
+ *   · **الكامل** لحامل `hr:v` — كما كان حرفياً، بتنطيقه وحقوله.
+ *   · **الأدنى** لكل زميلٍ داخليٍّ نشطٍ: الاسم/المسمّى/القسم/الشركة والمديرُ
+ *     المباشر **بالاسم** — لا هاتفَ ولا بريدَ ولا راتبَ ولا وثائقَ ولا انتهاءَ
+ *     إقامة: الحسّاسُ يبقى خلف صلاحياته، وعزلُ الشركات قائمٌ في الوجهين.
  */
 class TeamDirectory
 {
     public const TTL = 300;
+
+    /** أيُّ دليلٍ لهذا المستخدم؟ full لحامل hr:v · basic للزميل الداخليّ · null لمن سواهما */
+    public static function mode($user = null): ?string
+    {
+        $user = $user ?? auth()->user();
+        if (! $user || hub_is_client($user)) return null;
+        if (hub_can($user, 'hr', 'v')) return 'full';
+
+        return self::isColleague($user) ? 'basic' : null;
+    }
+
+    /** زميلٌ داخليّ: حسابٌ مربوطٌ بملفِّ موظفٍ مفتوحِ الخدمة (نشط/إجازة) */
+    protected static function isColleague($user): bool
+    {
+        if (! Schema::hasTable('employees')) return false;
+
+        return \App\Models\Employee::whereNull('deleted_at')
+            ->where('user_id', $user->id)
+            ->whereIn('status', Staff::OPEN)->exists();
+    }
 
     /** بطاقاتُ الفريق مجمَّعةً بالقسم — بصورةٍ وحالةِ ملفٍّ ومهارات */
     public static function cards($user = null): array
@@ -25,36 +55,26 @@ class TeamDirectory
         $user = $user ?? auth()->user();
         if (! Schema::hasTable('employees')) return [];
 
+        // بلا hr:v: الدليلُ الأدنى للزميل الداخليّ — لا شيء لمن سواه
+        if (! hub_can($user, 'hr', 'v')) {
+            return self::isColleague($user) ? self::basicCards($user) : [];
+        }
+
         $emps = hub_scope(\App\Models\Employee::query(), 'hr', $user)
             ->orderBy('name')->limit(500)->get();
         if ($emps->isEmpty()) return [];
 
         $ids = $emps->pluck('id')->all();
 
-        // الصور: أحدثُ مرفقٍ نوعُه photo لكل موظف
-        $photos = [];
-        if (Schema::hasTable('attachments')) {
-            foreach (\App\Models\Attachment::whereNull('deleted_at')->where('module', 'hr')
-                ->where('kind', 'photo')->whereIn('record_id', $ids)
-                ->orderByDesc('created_at')->get(['record_id', 'path']) as $a) {
-                $photos[$a->record_id] ??= $a->path;
-            }
-        }
+        $photos = self::photosFor($ids);
 
         $skills = Schema::hasTable('skills')
             ? DB::table('skills')->whereNull('deleted_at')->whereIn('emp_id', $ids)
                 ->get(['emp_id', 'name', 'level', 'cert', 'cert_exp'])->groupBy('emp_id')
             : collect();
 
-        // «مديره المباشر» معرّفُ **مستخدم** (‏`hr.managerId` من نوع ref→users)،
-        // وكانت الخريطةُ تُبنى بمعرّفات **الموظفين** — فالبحثُ لا يُصيب أبداً
-        // والحقلُ يظهر فارغاً مهما مُلئ. تُحلّ من `users`، ويُبقى على مرتجَعِ
-        // الموظفين احتياطاً لبياناتٍ قديمة كُتب فيها معرّفُ موظف.
-        $mgrIds = $emps->pluck('manager_id')->filter()->unique()->all();
-        $managers = ($mgrIds && Schema::hasTable('users'))
-            ? DB::table('users')->whereNull('deleted_at')->whereIn('id', $mgrIds)->pluck('name', 'id')
-            : collect();
-        $managers = $managers->union($emps->pluck('name', 'id'));
+        $managers = self::managerNames($emps);
+        $companies = self::companyNames($emps);
         // الراتب حقلٌ قد يكون محجوباً بدور القارئ — يُقرَّر مرةً لا لكل بطاقة.
         // ومثلُه انتهاءُ الإقامة والجواز: قفلُ الحقل يحجبهما في نموذج الملف،
         // وكان الدليلُ يطبعهما جهراً — فالقفلُ يُلتَفّ عليه بفتح شاشةٍ أخرى.
@@ -62,7 +82,7 @@ class TeamDirectory
         $showId = hub_field_mode($user, 'hr', 'iqamaExp') === '';
         $showPass = hub_field_mode($user, 'hr', 'passExp') === '';
 
-        return $emps->map(function ($e) use ($photos, $skills, $managers, $showSalary, $showId, $showPass) {
+        return $emps->map(function ($e) use ($photos, $skills, $managers, $companies, $showSalary, $showId, $showPass) {
             $mine = collect($skills[$e->id] ?? []);
             $certs = $mine->filter(fn ($s) => trim((string) $s->cert) !== '');
             $expiringCert = $certs->first(fn ($s) => $s->cert_exp
@@ -80,6 +100,7 @@ class TeamDirectory
                 'dept' => $e->dept ?: 'بلا قسم', 'status' => $e->status,
                 'photo' => $photos[$e->id] ?? null,
                 'manager' => $managers[$e->manager_id] ?? null,
+                'company' => $companies[$e->company_id] ?? null,
                 'hired' => $e->hired,
                 'salary' => $showSalary && $e->salary !== null ? (float) $e->salary : null,
                 'userId' => $e->user_id,
@@ -93,6 +114,81 @@ class TeamDirectory
                         || ($dossier['requiredMissing'] ?? 0) > 0 || $expiringCert !== null,
             ];
         })->groupBy('dept')->map(fn ($g) => $g->values()->all())->all();
+    }
+
+    /**
+     * الدليلُ الأدنى (F4): زملاءُ الخدمة المفتوحة بأقلِّ الحقول وأسلمِها —
+     * البطاقةُ على **الشكل نفسه** كي لا تتفرّع الشاشة، والحسّاسُ مصفَّرٌ عند
+     * المنبع (راتب/إقامة/جواز/وثائق/مهارات) لا محجوبٌ عند الطباعة.
+     */
+    protected static function basicCards($user): array
+    {
+        $q = \App\Models\Employee::whereNull('deleted_at')->whereIn('status', Staff::OPEN);
+        // عزلُ الشركات قائم — والملفُّ بلا شركةٍ عامٌّ يراه الجميع (كقائمة gaps)
+        if (($cids = hub_company_ids($user)) !== null) {
+            $q->where(fn ($w) => $w->whereIn('company_id', $cids)->orWhereNull('company_id'));
+        }
+        $emps = $q->orderBy('name')->orderBy('id')->limit(500)
+            ->get(['id', 'name', 'title', 'dept', 'status', 'company_id', 'manager_id', 'user_id']);
+        if ($emps->isEmpty()) return [];
+
+        $photos = self::photosFor($emps->pluck('id')->all());
+        $managers = self::managerNames($emps);
+        $companies = self::companyNames($emps);
+
+        return $emps->map(fn ($e) => [
+            'id' => $e->id, 'name' => $e->name, 'title' => $e->title,
+            'dept' => $e->dept ?: 'بلا قسم', 'status' => null,
+            'photo' => $photos[$e->id] ?? null,
+            'manager' => $managers[$e->manager_id] ?? null,
+            'company' => $companies[$e->company_id] ?? null,
+            'hired' => null, 'salary' => null, 'userId' => $e->user_id,
+            'skills' => [], 'skillsN' => 0, 'certsN' => 0, 'certExpiring' => null,
+            'docPct' => 100, 'docMissing' => 0, 'idDays' => null, 'passDays' => null,
+            'alert' => false,
+        ])->groupBy('dept')->map(fn ($g) => $g->values()->all())->all();
+    }
+
+    /** الصور: أحدثُ مرفقٍ نوعُه photo لكل موظف */
+    protected static function photosFor(array $ids): array
+    {
+        $photos = [];
+        if ($ids && Schema::hasTable('attachments')) {
+            foreach (\App\Models\Attachment::whereNull('deleted_at')->where('module', 'hr')
+                ->where('kind', 'photo')->whereIn('record_id', $ids)
+                ->orderByDesc('created_at')->orderByDesc('id')->get(['record_id', 'path']) as $a) {
+                $photos[$a->record_id] ??= $a->path;
+            }
+        }
+
+        return $photos;
+    }
+
+    /**
+     * «مديره المباشر» معرّفُ **مستخدم** (‏`hr.managerId` من نوع ref→users)،
+     * وكانت الخريطةُ تُبنى بمعرّفات **الموظفين** — فالبحثُ لا يُصيب أبداً
+     * والحقلُ يظهر فارغاً مهما مُلئ (أو UUID خاماً حيث يُطبع بلا حلّ). تُحلّ من
+     * `users`، ويُبقى على مرتجَعِ الموظفين احتياطاً لبياناتٍ قديمة كُتب فيها
+     * معرّفُ موظف — والمجهولُ يبقى null فلا يتسرّب UUID خامٌ إلى الشاشة أبداً.
+     */
+    protected static function managerNames($emps)
+    {
+        $mgrIds = $emps->pluck('manager_id')->filter()->unique()->all();
+        $managers = ($mgrIds && Schema::hasTable('users'))
+            ? DB::table('users')->whereNull('deleted_at')->whereIn('id', $mgrIds)->pluck('name', 'id')
+            : collect();
+
+        return $managers->union($emps->pluck('name', 'id'));
+    }
+
+    /** اسمُ الشركة لكل بطاقة — «في أي شركةٍ زميلي؟» جزءٌ من الحدّ الأدنى (F4) */
+    protected static function companyNames($emps)
+    {
+        $ids = $emps->pluck('company_id')->filter()->unique()->all();
+
+        return ($ids && Schema::hasTable('companies'))
+            ? DB::table('companies')->whereNull('deleted_at')->whereIn('id', $ids)->pluck('name_ar', 'id')
+            : collect();
     }
 
     protected static function daysTo($date): ?int
@@ -154,9 +250,12 @@ class TeamDirectory
         if ($fresh) Cache::forget($key);
 
         return Cache::remember($key, self::TTL, function () {
+            $mode = self::mode() ?? 'full';
             $cards = self::cards();
 
-            return ['depts' => $cards, 'alerts' => self::alerts($cards),
+            // تنبيهاتُ الملفات (إقامات/وثائق/رواتب الاهتمام) شأنُ HR — لا تُعرض في الأدنى
+            return ['depts' => $cards, 'mode' => $mode,
+                    'alerts' => $mode === 'full' ? self::alerts($cards) : [],
                     'n' => collect($cards)->flatten(1)->count(), 'at' => now()->toDateTimeString()];
         });
     }

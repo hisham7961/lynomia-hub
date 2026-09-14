@@ -73,7 +73,8 @@ class Project360Test extends TestCase
         if ($resp->status() === 200) {
             $resp->assertDontSee('🖥️ الأصول')->assertDontSee('أصولُ المشروع')->assertDontSee($a->name);
         } else {
-            $this->assertContains($resp->status(), [403, 404]);   // البوّابةُ قد تحجبه أصلاً
+            // v2.496 (F22): 302 = تحويلُ العميل لبوّابته — لا شاشةَ داخلية أصلاً
+            $this->assertContains($resp->status(), [302, 403, 404]);
         }
     }
 

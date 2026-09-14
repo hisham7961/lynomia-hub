@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Attachment;
 use App\Models\Client;
 use App\Models\Conversation;
 use App\Models\ConversationMember;
@@ -144,6 +145,51 @@ class ClientPortalData
             ->select('id', 'name', 'cat', 'doc_no', 'issue_date', 'expiry', 'description',
                 'audience', 'client_id')
             ->findOrFail($id);
+    }
+
+    /**
+     * **وثيقةُ تنزيلٍ واحدة** (الجولة 1 · F25) — العزلُ نفسُه حرفاً (`visibleToClient`:
+     * جمهورٌ عميليٌّ + عميلُها ضمن عملاءِ القارئ، وإلا ٤٠٤)، مع عمودَي الملفِّ
+     * (`att_id` مسارُ حقلِ الملفّ المباشر) والتصنيفِ (`secrecy`) اللذين يحتاجهما
+     * مسارُ التنزيل وحدَه — لا يُعرَضان في أي واجهة.
+     */
+    public static function documentFile(array $ids, string $id): Document
+    {
+        return Document::visibleToClient($ids)->whereNull('deleted_at')
+            ->select('id', 'name', 'att_id', 'secrecy', 'client_id')
+            ->findOrFail($id);
+    }
+
+    /**
+     * أوّلُ مرفقِ محرّكِ المرفقات على وثيقةٍ (module=files) — بترتيبٍ حتميّ
+     * (sort ثم id · قاعدة C13). null حين لا مرفق (يبقى حقلُ الملف المباشر).
+     */
+    public static function documentAttachment(string $docId): ?Attachment
+    {
+        return Attachment::where('module', 'files')->where('record_id', $docId)
+            ->whereNull('deleted_at')->orderBy('sort')->orderBy('id')->first();
+    }
+
+    /**
+     * معرّفاتُ الوثائق التي **لها ملفٌّ قابلٌ للتنزيل** من مجموعةٍ معروضة — مرفقُ
+     * محرّكِ المرفقات أو حقلُ الملفّ المباشر (`att_id`). استعلامان مجمّعان لا
+     * استعلامٌ لكلّ صفّ، كي يرسم زرُّ التنزيل في القوائم بلا N+1.
+     *
+     * @return string[] معرّفاتٌ (نصوصاً)
+     */
+    public static function documentIdsWithFiles(iterable $docIds): array
+    {
+        $ids = array_values(array_filter(array_map('strval', is_array($docIds) ? $docIds : iterator_to_array($docIds)),
+            fn ($v) => $v !== ''));
+        if (! $ids) return [];
+
+        $withAtt = Attachment::whereIn('record_id', $ids)->where('module', 'files')
+            ->whereNull('deleted_at')->orderBy('record_id')->pluck('record_id');
+        $withField = Document::whereIn('id', $ids)->whereNotNull('att_id')->where('att_id', '!=', '')
+            ->orderBy('id')->pluck('id');
+
+        return array_values(array_unique(array_map('strval',
+            array_merge($withAtt->all(), $withField->all()))));
     }
 
     public static function invoiceRows(array $ids, ?int $limit = null)

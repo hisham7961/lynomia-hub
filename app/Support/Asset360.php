@@ -21,8 +21,15 @@ class Asset360
     /** نظرةٌ خاطفة: الحائزُ/المحطةُ/المشاريعُ/النقطةُ/الجردُ — كلٌّ خلف صلاحيّته وحقلِ عرضه */
     public function overview(Asset $asset, $u): array
     {
+        /*
+         * حجبُ الاسمِ لا يقلب الحقيقة (الجولة 1 · F2): «الأصلُ مُسلَّمٌ لأحدهم»
+         * واقعةٌ تشغيليّةٌ يراها كلُّ من يرى الأصل، أمّا **اسمُ** الحائز فبياناتُ
+         * موظّفين خلف hr:v. كان غيابُ hr:v يُظهر «بلا حائز» زوراً — فقرّر تقنيٌّ
+         * أنّ الجهاز متاحٌ وهو بيد زميل (وكيل المحاكاة 7).
+         */
         $holder = ($asset->holder_id && hub_can($u, 'hr', 'v'))
             ? (hub_ref_labels('users', [$asset->holder_id])[$asset->holder_id] ?? null) : null;
+        $holderHidden = (bool) $asset->holder_id && $holder === null;
         $station = ($asset->station_id && hub_can($u, 'stations', 'v'))
             ? (hub_ref_labels('stations', [$asset->station_id])[$asset->station_id] ?? null) : null;
 
@@ -39,6 +46,7 @@ class Asset360
 
         return [
             'holder'    => $holder,       // العهدة — «مَن بيده الآن» (≠ محطة ≠ مشروع)
+            'holder_hidden' => $holderHidden, // مُسلَّمٌ والاسمُ محجوبٌ بصلاحيّات HR — لا «بلا حائز»
             'station'   => $station,      // المقعدُ الفيزيائيّ
             'projects'  => $projects,     // تخصيصاتٌ نشطة (علاقةٌ لا عهدة)
             'endpoint'  => $endpoint ? ['id' => $endpoint->id, 'hostname' => $endpoint->hostname,

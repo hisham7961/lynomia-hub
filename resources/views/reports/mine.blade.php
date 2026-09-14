@@ -2,6 +2,9 @@
 @section('title', 'تقرير اليوم')
 @section('content')
 @php
+    // الزرُّ لمن يملكه فقط (الجولة 1 · F28): كان يُعرض للجميع ثم يصفع من لا يملك
+    // `updates:a` بـ403 — زرٌّ كاذب. مكانَه رسالةٌ صادقة تدلّ على المخرج.
+    $canAdd = hub_can(auth()->user(), 'updates', 'a');
     $stateLabel = match ($c['state']) {
         'not_required' => ['غير مطلوب اليوم', ''],
         'checked_in' => ['وردية مفتوحة — يمكنك التقديم', ''],
@@ -21,7 +24,11 @@
             مشاريعك أو كعملٍ داخليّ — لا كتابةَ مرّتين.</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <a class="btn sm" href="{{ route('m.create', 'updates') }}">＋ أضف بندَ عمل</a>
+        @if ($canAdd)
+            <a class="btn sm" href="{{ route('m.create', 'updates') }}">＋ أضف بندَ عمل</a>
+        @else
+            <span class="sub">👁️ دورك للعرض فقط — اطلب صلاحيّة بنود العمل من مديرك</span>
+        @endif
     </div>
 </div>
 
@@ -35,7 +42,12 @@
 
 @if ($c['state'] === 'report_pending' || $c['state'] === 'present_without_report')
     <div class="card" style="border-inline-start:4px solid var(--wn,#e67e22)">
-        📌 {{ $c['reason'] }}. أضِف بنودَ يومك الآن — حضورُك مسجَّلٌ ولن يتغيّر.
+        @if ($canAdd)
+            📌 {{ $c['reason'] }}. أضِف بنودَ يومك الآن — حضورُك مسجَّلٌ ولن يتغيّر.
+        @else
+            {{-- لا تهويلَ على من لا يملك الفعل أصلاً — حضورُه مسجَّلٌ والنقصُ في صلاحيته لا في التزامه --}}
+            📌 حضورُك مسجَّل، ودورُك الحالي للعرض فقط فلا يمكنك إضافة بنود — اطلب صلاحيّة بنود العمل من مديرك.
+        @endif
     </div>
 @elseif ($needsRev)
     <div class="card" style="border-inline-start:4px solid var(--wn,#e67e22)">
@@ -58,12 +70,17 @@
             @if ($w->review_feedback)<div class="sub" style="border-inline-start:3px solid var(--wn,#e67e22);padding-inline-start:8px;margin-top:4px">💬 {{ $w->review_feedback }}</div>@endif
             <div style="margin-top:6px;display:flex;gap:6px">
                 <span class="sub mono">{{ $w->hours ? number_format((float)$w->hours,1).' س' : '' }}</span>
-                @if ($rs !== 'accepted')<a class="btn ghost xs" href="{{ route('m.edit', ['updates', $w->id]) }}">تعديل</a>
-                @else<span class="sub">مقبول — للتعديل اطلب من مديرك إعادةَ الفتح</span>@endif
+                {{-- زرُّ التعديل كذلك لمن يملكه (F28): بنودٌ كتبها يومَ كان دورُه يسمح تبقى للعرض --}}
+                @if ($rs !== 'accepted' && hub_can(auth()->user(), 'updates', 'e'))<a class="btn ghost xs" href="{{ route('m.edit', ['updates', $w->id]) }}">تعديل</a>
+                @elseif ($rs === 'accepted')<span class="sub">مقبول — للتعديل اطلب من مديرك إعادةَ الفتح</span>@endif
             </div>
         </div>
     @empty
-        <div class="sub">لا بنودَ بعد. <a href="{{ route('m.create', 'updates') }}">أضِف أول بند لعملك اليوم ↗</a></div>
+        @if ($canAdd)
+            <div class="sub">لا بنودَ بعد. <a href="{{ route('m.create', 'updates') }}">أضِف أول بند لعملك اليوم ↗</a></div>
+        @else
+            <div class="sub">لا بنودَ بعد — دورك للعرض فقط، فإن كان عليك تقديمُ تقريرٍ يوميّ فاطلب صلاحيّة بنود العمل من مديرك.</div>
+        @endif
     @endforelse
 </div>
 @endsection

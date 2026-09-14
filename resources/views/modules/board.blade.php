@@ -49,7 +49,10 @@
                         $who = $assigneeF ? ($assigneeNames[$row->{$assigneeF['col']}] ?? null) : null;
                         $ref = $refF ? ($refNames[$row->{$refF['col']}] ?? null) : null;
                     @endphp
-                    <div class="kcard" draggable="true" data-id="{{ $row->id }}">
+                    {{-- data-mine: بطاقةُ المسنَد إليه تُسحب ولو بلا صلاحيّة تعديلٍ عامّة —
+                         الخادمُ يحسم (الجولة 1 · F27)، والواجهةُ لا تُطفئ سحبَه صامتةً --}}
+                    <div class="kcard" draggable="true" data-id="{{ $row->id }}"
+                         data-mine="{{ $assigneeF && (string) $row->{$assigneeF['col']} === (string) auth()->id() ? 1 : 0 }}">
                         <a href="{{ route('m.show', [$module, $row->id]) }}">{{ \Illuminate\Support\Str::limit($row->{$disp} ?? $row->id, 60) }}</a>
                         @if ($ref)<div class="kref sub">{{ \Illuminate\Support\Str::limit($ref, 34) }}</div>@endif
                         @if ($prio || $due || $who)

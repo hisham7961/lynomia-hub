@@ -85,27 +85,24 @@ class WorkOsProjectCommandCentreTest extends TestCase
         $p = $this->externalProject($c);
         $cu = $this->clientUser($c);
 
-        // العميلُ يبلغ شاشةَ المشروع (projects ضمن السماحِ) — لكنه لا يرى إلا «النظرة»
-        $res = $this->actingAs($cu)->get('/m/projects/' . $p->id)->assertOk();
-        $res->assertSee($this->tab('overview'), false);
+        /*
+         * v2.496 (F22): الحجبُ صار **أشدَّ من التنقيح** — العميلُ لا يبلغ شاشةَ
+         * المشروع الداخلية أصلاً؛ تصفّحُه البشريّ يُحوَّل لبوّابته حيث صفحاتُ
+         * مشاريعِه المنسَّقة (portal.project). فلا تبويباتٍ ولا تكاليفَ ولا بنيةً
+         * تقنيّةً تُرسَل إليه في أيّ بايت — الغايةُ الأصليّةُ لهذا الاختبار محقَّقةٌ
+         * بحجبِ السطح كلِّه لا بتنقيحه.
+         */
+        $this->actingAs($cu)->get('/m/projects/' . $p->id)
+            ->assertRedirect(route('portal.home'));
 
-        // لا تبويباتٍ داخليّة (ماليةٌ · غرفٌ · تسليمٌ داخليّ · أساسٌ تجاريٌّ بأرقام · نشاطٌ داخليّ)
-        $res->assertDontSee($this->tab('finance'), false);
-        $res->assertDontSee($this->tab('rooms'), false);
-        $res->assertDontSee($this->tab('delivery'), false);
-        $res->assertDontSee($this->tab('baseline'), false);
-        $res->assertDontSee($this->tab('activity'), false);
-
-        // ولا قيمةٌ داخليّةٌ في أيِّ ركنٍ — تكلفةٌ/ميزانيّة (وcost_delta مشتقٌّ منهما) بصورتها
-        // الخام والمنسّقة معاً (`number_format` يفصلُ الآلاف: 515151 ⇒ 515,151.٠٠)
-        foreach (['515151', '515,151', '626262', '626,262', '424242', '424,242'] as $n) {
-            $res->assertDontSee($n);
+        // وصفحةُ بوّابتِه للمشروع نفسِه لا تسرّب تكلفةً/ميزانيّةً ولا بنيةً تقنيّة
+        $pr = $this->actingAs($cu)->get(route('portal.project', $p->id));
+        if ($pr->status() === 200) {
+            foreach (['515151', '515,151', '626262', '626,262', '424242', '424,242',
+                      'url-secret-9001', 'staging-secret-9002', 'git-secret-9003'] as $n) {
+                $pr->assertDontSee($n);
+            }
         }
-
-        // ولا بنيةٌ تقنيّة (روابطُ الإنتاج/الاختبار/المستودع)
-        $res->assertDontSee('url-secret-9001');
-        $res->assertDontSee('staging-secret-9002');
-        $res->assertDontSee('git-secret-9003');
     }
 
     /* ────────── ٢) المديرُ الداخليّ يرى التبويباتِ الستّ ────────── */

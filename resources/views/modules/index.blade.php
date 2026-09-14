@@ -174,16 +174,35 @@
                 <tr>
                     @if ($canBulk)<td class="bsel"><input type="checkbox" class="brow" value="{{ $row->id }}" aria-label="تحديد السجل"></td>@endif
                     @foreach ($columns as $f)
-                        <td>@include('partials._display', ['f' => $f, 'row' => $row, 'labels' => $labels, 'ctx' => 'table'])</td>
+                        <td>
+                            @if ($f['key'] === ($def['display'] ?? null))
+                                {{-- (الجولة 1 · F36) اسمُ السجل رابطٌ لصفحته — لا صيدَ لأيقونة 👁 الصغيرة وحدها --}}
+                                <a class="lx-link" hx-boost="false" href="{{ route('m.show', [$module, $row->id]) }}">@include('partials._display', ['f' => $f, 'row' => $row, 'labels' => $labels, 'ctx' => 'table'])</a>
+                            @else
+                                @include('partials._display', ['f' => $f, 'row' => $row, 'labels' => $labels, 'ctx' => 'table'])
+                            @endif
+                            @if ($module === 'fin' && $f['key'] === 'state')
+                                {{-- (الجولة 1 · F18) «متأخرة فعلاً» تُحسب من الاستحقاق والمدفوع لا من الحالة
+                                     المكتوبة — فحالة «متأخرة» لا يكتبها أحدٌ آلياً ويخفيها فلترُ الحالة --}}
+                                @php $odDays = \App\Models\FinDocument::overdueDays($row); @endphp
+                                @if ($odDays !== null)<span class="bdg bad" title="تجاوز تاريخ الاستحقاق ولم يُسدَّد">⏰ متأخرة فعلاً ({{ $odDays }} يوماً)</span>@endif
+                            @endif
+                        </td>
                     @endforeach
                     <td class="acts lx-acts">
                         <a class="lx-ib" hx-boost="false" href="{{ route('m.show', [$module, $row->id]) }}" title="عرض" aria-label="عرض السجل">👁</a>
                         @if ($trash)
-                            <form method="POST" action="{{ route('m.restore', [$module, $row->id]) }}" class="inline">@csrf<button class="lx-ib" type="submit" title="استعادة" aria-label="استعادة السجل">↩</button></form>
+                            {{-- خارج تعزيز htmx: الاستعادة داخل #tblzone كانت تُبدَّل جزئياً فتترك
+                                 ترويسةً ملتبسة («1 سجل — السلة» فوق الجدول الكامل) بلا رسالة نجاح --}}
+                            <form method="POST" action="{{ route('m.restore', [$module, $row->id]) }}" class="inline" hx-boost="false">@csrf<button class="lx-ib" type="submit" title="استعادة" aria-label="استعادة السجل">↩</button></form>
                         @else
                             @if (hub_can(auth()->user(), $module, 'e'))<a class="lx-ib" hx-boost="false" href="{{ route('m.edit', [$module, $row->id]) }}" title="تعديل" aria-label="تعديل السجل">✎</a>@endif
                             @if (hub_can(auth()->user(), $module, 'd'))
-                                <form method="POST" action="{{ route('m.destroy', [$module, $row->id]) }}" class="inline" data-confirm="نقل السجل إلى السلة؟">@csrf @method('DELETE')<button class="lx-ib dn" type="submit" title="حذف" aria-label="حذف السجل">🗑</button></form>
+                                {{-- hx-boost="false" إلزاميّة هنا (الجولة 1 · F8): داخل #tblzone المعزَّز كان
+                                     htmx يعترض الإرسال بمستمعٍ على النموذج نفسه ويطلق الحذف غيرَ عابئٍ
+                                     بـpreventDefault الذي يوقفه مسلِّحُ data-confirm — فحُذف السجل بنقرةٍ
+                                     واحدة بلا تأكيد (أثبتها وكيل المحاكاة 1 ثلاث مرات) --}}
+                                <form method="POST" action="{{ route('m.destroy', [$module, $row->id]) }}" class="inline" hx-boost="false" data-confirm="نقل السجل إلى السلة؟">@csrf @method('DELETE')<button class="lx-ib dn" type="submit" title="حذف" aria-label="حذف السجل">🗑</button></form>
                             @endif
                         @endif
                     </td>

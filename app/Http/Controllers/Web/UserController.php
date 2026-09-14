@@ -100,7 +100,8 @@ class UserController extends Controller
             'phone' => 'nullable|string|max:40',
             'job_title' => 'nullable|string|max:120',
             'role_id' => 'required|exists:roles,id',
-            'status' => 'required|in:نشط,موقوف',
+            // على الثوابت لا على نصٍّ منسوخ — قيمةٌ مكسورة كانت تعبر وتقفل صاحبها (F31)
+            'status' => ['required', Rule::in(User::STATUSES)],
             'password' => ['required', 'string', password_rules()],
             'companies' => 'nullable|array',
             'companies.*' => ['string', Rule::exists('companies', 'id')->whereNull('deleted_at')],
@@ -161,7 +162,7 @@ class UserController extends Controller
             'phone' => 'nullable|string|max:40',
             'job_title' => 'nullable|string|max:120',
             'role_id' => 'required|exists:roles,id',
-            'status' => 'required|in:نشط,موقوف',
+            'status' => ['required', Rule::in(User::STATUSES)],
             'password' => ['nullable', 'string', password_rules()],
             'companies' => 'nullable|array',
             'companies.*' => ['string', Rule::exists('companies', 'id')->whereNull('deleted_at')],
@@ -209,7 +210,7 @@ class UserController extends Controller
         else $data['password_changed_at'] = now();
 
         // آخر مالكٍ نشط لا يُوقَف: إيقافه يقفل الأدوار والإعدادات والأمان على الجميع
-        if ($data['status'] === 'موقوف' && $user->role?->is_owner && self::activeOwners() <= 1) {
+        if ($data['status'] === User::STATUS_SUSPENDED && $user->role?->is_owner && self::activeOwners() <= 1) {
             return back()->withInput()->withErrors(['status' => 'هذا آخر مالكٍ نشط — عيّن مالكاً آخر قبل إيقافه']);
         }
 
@@ -309,7 +310,7 @@ class UserController extends Controller
     {
         $ids = Role::where('is_owner', true)->pluck('id')->all();
 
-        return $ids ? User::whereNull('deleted_at')->where('status', 'نشط')->whereIn('role_id', $ids)->count() : 0;
+        return $ids ? User::whereNull('deleted_at')->where('status', User::STATUS_ACTIVE)->whereIn('role_id', $ids)->count() : 0;
     }
 
     /** كسابقتها لكن بقفلٍ صفّيّ — تُستدعى داخل معاملةٍ فتُسلسل العمليات المتزامنة */
@@ -317,7 +318,7 @@ class UserController extends Controller
     {
         $ids = Role::where('is_owner', true)->pluck('id')->all();
 
-        return $ids ? User::whereNull('deleted_at')->where('status', 'نشط')
+        return $ids ? User::whereNull('deleted_at')->where('status', User::STATUS_ACTIVE)
             ->whereIn('role_id', $ids)->lockForUpdate()->count() : 0;
     }
 }

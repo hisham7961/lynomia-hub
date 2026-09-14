@@ -216,6 +216,19 @@ class FileController extends Controller
                             foreach ($visibleCols as $c) $w->orWhere($c, $path);
                         });
 
+                    // (الجولة 1 · F21) **«سري» وعدٌ نافذٌ على الرابط الخام أيضاً**: سجلٌّ
+                    // موسومٌ «سري» في حقل `secrecy` لا يُشرَّع ملفُّه بالمسار لغير حاملِ
+                    // docsec على وحدته — إلا لمُنشئِ السجلِّ نفسِه (نظيرُ استثناءِ الرافع
+                    // في `DocumentPolicy::decide`؛ والمالكُ تجاوزَ في صدرِ mayRead).
+                    // «داخلي»/«عام» كما كانا — التضييقُ على «سري» حصراً.
+                    if (collect($def['fields'] ?? [])->firstWhere('col', 'secrecy')
+                        && ! hub_can($u, $mk, 'docsec')) {
+                        $q->where(function ($w) use ($table, $u) {
+                            $w->whereNull('secrecy')->orWhere('secrecy', '!=', 'سري');
+                            if (Schema::hasColumn($table, 'created_by')) $w->orWhere('created_by', $u->id);
+                        });
+                    }
+
                     if (hub_scope($q, $mk, $u)->exists()) return true;
                 }
 

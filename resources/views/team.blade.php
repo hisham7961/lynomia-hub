@@ -1,18 +1,28 @@
 @extends('layouts.app')
 @section('title', 'دليل الفريق')
 @section('content')
+{{-- وجها الدليل (الجولة 1 · F4): full لحامل hr:v كما كان · basic للزميل الداخليّ
+     — بطاقةٌ أدنى (اسم/مسمّى/قسم/شركة/مدير) بلا روابطَ تقود لملفّات HR ثم 403 --}}
+@php $tFull = ($t['mode'] ?? 'full') === 'full'; @endphp
 <div class="hero">
     <div>
         <nav class="crumbs" aria-label="مسار التنقل"><span>الموارد البشرية</span><span aria-hidden="true">‹</span><b>دليل الفريق</b></nav>
         <h2>👥 دليل الفريق</h2>
         <div class="sub">
-            وجوهٌ لا صفوف: مربّعٌ لكل موظف بصورته ومسمّاه ومديره ومهاراته وشهاداته —
-            و<b>حالُ ملفّه</b> وما يقترب انتهاؤه.
+            @if ($tFull)
+                وجوهٌ لا صفوف: مربّعٌ لكل موظف بصورته ومسمّاه ومديره ومهاراته وشهاداته —
+                و<b>حالُ ملفّه</b> وما يقترب انتهاؤه.
+            @else
+                زملاؤك في المنشأة: الاسمُ والمسمّى والقسمُ والشركة ومديرُه المباشر —
+                والبياناتُ الحسّاسة (هاتف/راتب/وثائق) تبقى لأصحاب صلاحيّة الموارد البشرية.
+            @endif
         </div>
     </div>
     <div class="crow" style="gap:8px">
+        <label class="vh" for="team-q">ابحث في الدليل</label>
+        <input class="inp" type="search" id="team-q" placeholder="🔎 ابحث باسمٍ أو مسمّى أو قسم…" style="max-width:230px">
         <a class="btn ghost sm" href="{{ route('team') }}?fresh=1">🔄 حدّث</a>
-        <a class="btn ghost sm" href="{{ route('m.index', 'hr') }}">جدول الموظفين ↗</a>
+        @if ($tFull)<a class="btn ghost sm" href="{{ route('m.index', 'hr') }}">جدول الموظفين ↗</a>@endif
     </div>
 </div>
 
@@ -41,7 +51,8 @@
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-top:10px">
             @foreach ($cards as $c)
-                <div style="border:1px solid var(--ln);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:6px;
+                <div class="team-card" data-q="{{ mb_strtolower(trim($c['name'] . ' ' . $c['title'] . ' ' . $c['dept'] . ' ' . ($c['manager'] ?? '') . ' ' . ($c['company'] ?? ''))) }}"
+                     style="border:1px solid var(--ln);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:6px;
                             {{ $c['alert'] ? 'border-color:var(--wn)' : '' }}">
                     <div class="crow" style="gap:9px;align-items:center">
                         @if ($c['photo'])
@@ -51,18 +62,23 @@
                             <span class="ava" style="height:44px;width:44px;font-size:17px">{{ mb_substr($c['name'], 0, 1) }}</span>
                         @endif
                         <div style="min-width:0">
-                            <a href="{{ route('m.show', ['hr', $c['id']]) }}"><b style="font-size:13px">{{ \Illuminate\Support\Str::limit($c['name'], 22) }}</b></a>
+                            {{-- في الأدنى لا رابطَ لملف HR — بابٌ سيصدّه 403 (درسُ F28) --}}
+                            @if ($tFull)
+                                <a href="{{ route('m.show', ['hr', $c['id']]) }}"><b style="font-size:13px">{{ \Illuminate\Support\Str::limit($c['name'], 22) }}</b></a>
+                            @else
+                                <b style="font-size:13px">{{ \Illuminate\Support\Str::limit($c['name'], 22) }}</b>
+                            @endif
                             <div class="sub" style="font-size:12px">{{ \Illuminate\Support\Str::limit((string) $c['title'], 24) ?: '—' }}</div>
                         </div>
                     </div>
 
                     <div class="crow" style="gap:4px;flex-wrap:wrap">
-                        <span class="bdg {{ $c['status'] === 'نشط' ? 'ok' : '' }}">{{ $c['status'] ?: '—' }}</span>
+                        @if ($tFull)<span class="bdg {{ $c['status'] === 'نشط' ? 'ok' : '' }}">{{ $c['status'] ?: '—' }}</span>@endif
                         @if ($c['docPct'] < 100)<span class="bdg {{ $c['docMissing'] ? 'bad' : 'wn' }}" title="اكتمال الملف">📂 {{ $c['docPct'] }}٪</span>@endif
                         @if ($c['skillsN'])<span class="bdg" title="مهارات">🧠 {{ $c['skillsN'] }}</span>@endif
                         @if ($c['certsN'])<span class="bdg" title="شهادات">🎓 {{ $c['certsN'] }}</span>@endif
                         @if (! $c['userId'])
-                            <span class="bdg wn" title="لا حساب في النظام">بلا حساب</span>
+                            @if ($tFull)<span class="bdg wn" title="لا حساب في النظام">بلا حساب</span>@endif
                         @elseif ($c['userId'] !== auth()->id())
                             {{-- بابٌ ثانٍ للمراسلة: الدليلُ يعرف من هو، فلا يُبحث عنه في قائمةٍ ثانية --}}
                             <a class="bdg lnk" href="{{ route('dm.thread', $c['userId']) }}"
@@ -74,6 +90,7 @@
                         <div class="sub" style="font-size:12px;line-height:1.8">{{ implode(' · ', array_slice($c['skills'], 0, 3)) }}</div>
                     @endif
                     @if ($c['manager'])<div class="sub" style="font-size:12px">مديره: {{ $c['manager'] }}</div>@endif
+                    @if ($c['company'] ?? null)<div class="sub" style="font-size:12px">🏢 {{ $c['company'] }}</div>@endif
                     @if ($c['salary'] !== null)<div class="sub" style="font-size:12px">💰 {{ number_format($c['salary'], 0) }}</div>@endif
 
                     @if ($c['idDays'] !== null && $c['idDays'] <= 60)
@@ -86,6 +103,20 @@
 @empty
     <div class="card"><div class="empty"><span class="big">👥</span>لا موظفين في نطاقك بعد</div></div>
 @endforelse
+
+{{-- بحثٌ محليّ (F4: «لا يجد حتى مديرته بالبحث») — ترشيحُ بطاقاتٍ في المتصفح بلا استعلام --}}
+<script>
+(function () {
+    var q = document.getElementById('team-q');
+    if (! q) return;
+    q.addEventListener('input', function () {
+        var t = q.value.trim().toLowerCase();
+        document.querySelectorAll('.team-card').forEach(function (c) {
+            c.style.display = (! t || (c.dataset.q || '').indexOf(t) !== -1) ? '' : 'none';
+        });
+    });
+})();
+</script>
 
 <div class="card">
     <div class="sub" style="line-height:2">

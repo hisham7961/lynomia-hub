@@ -328,8 +328,78 @@ class AlertEngine
         }
 
         $this->detectOps($health, $out);
+        $this->escalateTicketSla($out);
 
         return $out;
+    }
+
+    /**
+     * **تصعيدُ خرقِ SLA** (الجولة 1 · F33) — تذكرةٌ عاجلةٌ بقيت أسبوعين متجاوزةً
+     * موعدَ حلِّها **بلا أيّ أثر** (وكيل المحاكاة 2): الحاسبةُ القائمة `hub_sla`
+     * كانت تعرف الخرقَ ولا يسمع به أحد. هنا، مع كلِّ تقييمٍ مجدول: تذكرةٌ مفتوحةٌ
+     * تجاوزت موعدَ الحلّ يُشعَر بها مسنَدُها ومديرُه مرّةً واحدة (ختمُ
+     * `meta.sla_escalated_at` يمنع الإغراق؛ يُمسح تلقائياً إن حُلَّت وعادت فانفتحت).
+     * لا محرّكَ SLA ثانٍ — نفسُ الحاسبةِ ونفسُ قنواتِ الإشعار.
+     */
+    protected function escalateTicketSla(array &$out): void
+    {
+        if (! Schema::hasTable('tickets')) return;
+
+        try {
+            $open = \App\Models\Ticket::whereNull('deleted_at')
+                ->whereNotIn('status', ['تم الحل', 'مغلقة'])
+                ->orderBy('created_at')->orderBy('id')->limit(200)->get();
+            if ($open->isEmpty()) return;
+
+            $firsts = \App\Models\Comment::where('module', 'tickets')
+                ->whereIn('record_id', $open->pluck('id')->all())
+                ->where(fn ($q) => $q->where('internal', false)->orWhereNull('internal'))
+                ->selectRaw('record_id, MIN(created_at) as m')
+                ->groupBy('record_id')->pluck('m', 'record_id');
+
+            foreach ($open as $t) {
+                $s = hub_sla($t, $firsts[$t->id] ?? null);
+                $meta = is_array($t->meta) ? $t->meta : [];
+
+                if (! ($s['resLate'] ?? false)) {
+                    // عادت ضمن المهلة (مُدِّد الموعدُ أو أُعيد فتحُها) — يُمسح الختم ليصعَّد خرقٌ جديد
+                    if (isset($meta['sla_escalated_at']) && ! $this->dry) {
+                        unset($meta['sla_escalated_at']);
+                        $t->forceFill(['meta' => $meta])->saveQuietly();
+                    }
+                    continue;
+                }
+                if (isset($meta['sla_escalated_at'])) continue;   // صُعِّدت من قبل
+
+                $over = max(1, (int) \Illuminate\Support\Carbon::parse($s['resDue'])->diffInDays(now()));
+                $subject = \Illuminate\Support\Str::limit((string) ($t->subject ?: 'تذكرة'), 60);
+
+                if (! $this->dry) {
+                    if ($t->assignee_id) {
+                        hub_notify($t->assignee_id, 'ticket',
+                            "⏱️ تذكرتُك «{$subject}» متجاوزةٌ موعدَ الحلّ منذ {$over} " . ($over > 2 ? 'أيام' : 'يوم')
+                            . ' — عالجها أو حدّث حالتها بسببٍ مكتوب', 'tickets', $t->id);
+                        $out['notifs']++;
+
+                        // مديرُ المسنَد إليه يُخبَر — التصعيدُ معناه أن أحداً فوقه يعلم
+                        $mgrUid = \Illuminate\Support\Facades\DB::table('employees')
+                            ->whereNull('deleted_at')->where('user_id', $t->assignee_id)
+                            ->orderBy('id')->value('manager_id');
+                        if ($mgrUid && (string) $mgrUid !== (string) $t->assignee_id) {
+                            hub_notify($mgrUid, 'ticket',
+                                "📣 تصعيد SLA: تذكرة فريقك «{$subject}» متجاوزةٌ موعدَ الحلّ منذ {$over} "
+                                . ($over > 2 ? 'أيام' : 'يوم') . ' بلا حلّ', 'tickets', $t->id);
+                            $out['notifs']++;
+                        }
+                    }
+                    $meta['sla_escalated_at'] = now()->toDateTimeString();
+                    $t->forceFill(['meta' => $meta])->saveQuietly();
+                }
+                $out['fired']++;
+            }
+        } catch (\Throwable $e) {
+            report($e);   // تعثّرُ التصعيد لا يُسقط بقيّةَ التقييم
+        }
     }
 
     /** مفتاحُ عدم التكرار — بعرض عموده (١٩١) حرفياً عند الكاتب */

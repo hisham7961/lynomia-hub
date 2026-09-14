@@ -45,8 +45,13 @@
     <section id="cca-overview" data-capanel="overview" class="ccpanel {{ $asFirst === 'overview' ? 'on' : '' }}">
         @include('partials.cc.kpis', ['items' => array_values(array_filter([
             ['label' => 'الحالة', 'value' => $row->status ?: '—', 'tone' => hub_tone($row->status ?? '')],
-            ['label' => 'الحائزُ الحاليّ', 'value' => $asOv['holder'] ?: 'بلا حائز', 'tone' => $asOv['holder'] ? 'ok' : 'g',
-             'hint' => 'عهدة — مَن بيده الآن (≠ محطة ≠ مشروع)'],
+            {{-- «بلا حائز» تُقال فقط حين لا حائزَ فعلاً — الاسمُ المحجوبُ بصلاحيّات HR يُقال حجبُه لا عدمُه (الجولة 1 · F2) --}}
+            ['label' => 'الحائزُ الحاليّ',
+             'value' => $asOv['holder'] ?: (($asOv['holder_hidden'] ?? false) ? 'مُسلَّمة — الاسم محجوب' : 'بلا حائز'),
+             'tone' => $asOv['holder'] ? 'ok' : (($asOv['holder_hidden'] ?? false) ? 'wn' : 'g'),
+             'hint' => ($asOv['holder_hidden'] ?? false)
+                 ? 'الأصل بيد موظّف؛ اسمُه يتطلّب صلاحيّة عرض الموارد البشرية'
+                 : 'عهدة — مَن بيده الآن (≠ محطة ≠ مشروع)'],
             $asOv['station'] !== null ? ['label' => 'المحطة', 'value' => $asOv['station'] ?: '—', 'hint' => 'المقعدُ الفيزيائيّ'] : null,
             $asOv['projects'] !== null ? ['label' => 'مشاريعُ نشطة', 'value' => $asOv['projects'], 'hint' => 'تخصيصٌ لا عهدة'] : null,
             $asOv['endpoint'] ? ['label' => 'نقطةٌ طرفية', 'value' => \Illuminate\Support\Str::limit($asOv['endpoint']['hostname'] ?? '—', 16), 'tone' => 'g'] : null,

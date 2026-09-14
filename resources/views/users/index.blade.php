@@ -14,7 +14,7 @@
         </select>
         <select class="inp" name="status">
             <option value="">كل الحالات</option>
-            @foreach (['نشط', 'موقوف'] as $st)<option value="{{ $st }}" @selected(request('status') === $st)>{{ $st }}</option>@endforeach
+            @foreach (\App\Models\User::STATUSES as $st)<option value="{{ $st }}" @selected(request('status') === $st)>{{ $st }}</option>@endforeach
         </select>
         <select class="inp" name="twofa">
             <option value="">التحقق بخطوتين</option>
@@ -53,7 +53,8 @@
                     @elseif (count($risky))<span class="bdg wn" title="رايات واسعة: {{ implode('، ', array_map(fn ($f) => \App\Http\Controllers\Web\RoleController::FLAGS[$f] ?? $f, $risky)) }}">⚠️ {{ count($risky) }}</span>@endif
                 </td>
                 <td>
-                    <span class="bdg {{ $u->status === 'نشط' ? 'ok' : 'bad' }}">{{ $u->status }}</span>
+                    {{-- الحكمُ الموحّد isActive (F31): قيمةٌ مجهولةٌ تُعرض حمراء كما يعاملها الدخول — لا شاشةً تطمئن وباباً يصدّ --}}
+                    <span class="bdg {{ $u->isActive() ? 'ok' : 'bad' }}">{{ $u->status }}</span>
                     @if ($u->totp_enabled)<span class="bdg ok" title="تحقّق بخطوتين">🛡️</span>
                     @else<span class="bdg wn">بلا تحقّق</span>@endif
                     @if ($u->expires_at)<div class="sub">ينتهي {{ substr((string) $u->expires_at, 0, 10) }}</div>@endif

@@ -18,6 +18,19 @@ class User extends Authenticatable
     public const MODULE = 'users';
 
     /**
+     * **حالةُ الحساب ثابتةٌ لا نصٌّ حرّ** (الجولة 1 · F31) — enum التطبيق (درس C10).
+     *
+     * `users.status` كان يُكتب حرّاً ويُقرأ على غير مقياس: الدخولُ يحجب «موقوف»
+     * وحدها، وحارسُ الجلسة لا يقبل إلا «نشط» حرفاً بحرف — فقيمةٌ مكسورةُ الترميز
+     * كُتبت يوماً جعلت الحسابَ يدخل ثم يُطرد فوراً، بينما شاشاتٌ تعدّه نشطاً
+     * (`!= 'موقوف'`). القاعدة: الكتّابُ يمرّون بـ`in:` على هذه الثوابت، والقرّاءُ
+     * يحكمون بـ`isActive()` وحدها — مقياسٌ واحدٌ للجميع.
+     */
+    public const STATUS_ACTIVE = 'نشط';
+    public const STATUS_SUSPENDED = 'موقوف';
+    public const STATUSES = [self::STATUS_ACTIVE, self::STATUS_SUSPENDED];
+
+    /**
      * أعمدةٌ لا تُكتب قيمتُها في سجل التدقيق أبداً — تُستبدَل ببصمة (Auditable::auditRedact).
      * كان تجزيءُ كلمة المرور ورمزُ «تذكّرني» يُختمان في `audits.after` إلى الأبد (v2.399).
      */
@@ -44,6 +57,55 @@ class User extends Authenticatable
     protected static function booted(): void
     {
         static::created(fn (self $u) => \App\Support\Staff::linkWaitingFile($u));
+
+        // حارسُ الثوابت — يرفض حالةً خارج allowlist قبل أي كتابة (نمطُ
+        // ClientMembership نفسه). يُفحص **المتغيّرُ فقط**: صفٌّ قديمٌ بقيمةٍ
+        // مكسورة يبقى قابلاً للحفظ في أعمدةٍ أخرى (عدّادُ الدخول مثلاً)،
+        // لكن لا أحدَ يكتب حالةً جديدةً خارج الثوابت بعد اليوم.
+        static::saving(function (self $u): void {
+            if ($u->isDirty('status') && $u->status !== null
+                && ! in_array((string) $u->status, self::STATUSES, true)) {
+                throw new \InvalidArgumentException('حالةُ مستخدمٍ غيرُ صالحة: ' . $u->status);
+            }
+        });
+    }
+
+    /* ────────── الحالة: تطبيعٌ عند الكتابة وحكمٌ موحّد عند القراءة (F31) ────────── */
+
+    /**
+     * تشذيبُ الفراغات ومحارفِ الاتجاه غير المرئية (RTL/LTR marks، NBSP، ZWSP، BOM)
+     * — نسخُ «نشط» من مستندٍ أو محادثةٍ يجرّ معه محرفاً خفيّاً فيفشل الحرفيّ.
+     */
+    public static function normalizeStatus(?string $v): ?string
+    {
+        if ($v === null) return null;
+
+        $s = (string) preg_replace('/[\x{200B}-\x{200F}\x{202A}-\x{202E}\x{2060}\x{FEFF}\x{00A0}]/u', '', $v);
+
+        return trim($s);
+    }
+
+    /** التطبيعُ الدفاعيّ يقع عند المنبع — كلُّ كاتبٍ (نموذج/استيراد/سكربت) يمرّ به */
+    public function setStatusAttribute(?string $v): void
+    {
+        $this->attributes['status'] = self::normalizeStatus($v);
+    }
+
+    /**
+     * **الحكمُ الواحد**: أنشطٌ هذا الحساب؟ — به يقارن الدخولُ وحارسُ الجلسة
+     * وشاشةُ الجدول وفجواتُ التدقيق، فلا يفترق قارئان بعد اليوم.
+     * `null` يُقرأ نشطاً (سلوكُ حارس الجلسة التاريخي لصفوفِ ما قبل العمود)،
+     * وكلُّ ما سواه يُطبَّع ثم يُقارَن على الثابت — المجهولُ يفشل مغلقاً.
+     */
+    public function isActive(): bool
+    {
+        return $this->status === null || self::normalizeStatus((string) $this->status) === self::STATUS_ACTIVE;
+    }
+
+    /** موقوفٌ أو بقيمةٍ مجهولة — عكسُ `isActive` حرفياً (المجهول يفشل مغلقاً) */
+    public function isSuspended(): bool
+    {
+        return ! $this->isActive();
     }
 
     public function role(): BelongsTo

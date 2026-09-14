@@ -106,8 +106,12 @@ Route::get('.well-known/assetlinks.json',
 
 Route::middleware('guest')->group(function () {
     Route::get('login', [AuthController::class, 'show'])->name('login');
+    // (الجولة 1 · F35) خانقُ الدخول المسمّى (AppServiceProvider): ١٠ محاولاتٍ
+    // بالدقيقة لكلِّ (بريد+عنوان) لا للعنوان وحدَه — مكتبٌ خلف NAT واحدٍ كان
+    // يستنفد حصّةَ العنوان بدخولَين لكلِّ زميل. وسقفٌ ثانٍ أوسعُ على العنوان
+    // يصدّ الإغراق، وقفلُ الحساب القائم يكمل الحماية على الحساب نفسه.
     Route::post('login', [AuthController::class, 'login'])->name('login.attempt')
-        ->middleware('throttle:10,1');   // حد ١٠ محاولات بالدقيقة من نفس العنوان — يكمل قفل الحساب الموجود
+        ->middleware('throttle:login');
     Route::get('login/otp', [AuthController::class, 'otpShow'])->name('login.otp');
     Route::post('login/otp', [AuthController::class, 'otpVerify'])->name('login.otp.verify')
         ->middleware('throttle:6,1');
@@ -181,6 +185,10 @@ Route::middleware('auth')->group(function () {
     Route::post('boards/{id}/widgets', [BoardController::class, 'addWidget'])->name('boards.widget.add');
     Route::delete('boards/{id}/widgets/{widgetId}', [BoardController::class, 'removeWidget'])->name('boards.widget.remove');
     Route::get('me', [PortalController::class, 'me'])->name('portal.me');
+    // «عهدتي» — خدمةٌ ذاتيّة (الجولة 1 · F1): سطحٌ واحدٌ لسؤال «ما الذي بيدي؟»
+    Route::get('me/custody', [PortalController::class, 'myCustody'])->name('portal.custody');
+    // قرارُ طلب الإجازة بأزرارٍ صريحة (الجولة 1 · F5) — لا تحريرَ سجلٍّ خام
+    Route::post('m/leaves/{id}/decide', [\App\Http\Controllers\Web\LeaveDecisionController::class, 'decide'])->name('leaves.decide');
     Route::get('files/{path}', [FileController::class, 'show'])->name('file.show')->where('path', 'hub/.*');
 
     // ── محوّل الشركة النشطة (تصفية القوائم) ──
@@ -227,6 +235,14 @@ Route::middleware('auth')->group(function () {
         Route::get('invoices/{id}', [ClientPortalController::class, 'invoice'])->name('invoice');
         Route::get('conversations', [ClientPortalController::class, 'conversations'])->name('conversations');
         Route::get('conversations/{id}', [ClientPortalController::class, 'conversation'])->name('conversation');
+        // (الجولة 1 · F24) كتابةُ عضوِ الغرفةِ العميلِ في **غرفته** حصراً — على محرّك
+        // الرسائل القائم (comments/conversation_id)؛ الحرسُ في المتحكّم والمحرّك.
+        Route::post('conversations/{id}/messages', [ClientPortalController::class, 'conversationSend'])
+            ->middleware('throttle:30,1')->name('conversation.send');
+        // (الجولة 1 · F25) تنزيلُ ملفِّ الوثيقةِ المشارَكة — مسارٌ مصادَقٌ محكومٌ
+        // بعضويّة العميل وجمهورِ الوثيقة وسياستِها؛ لا روابطَ عامّةً ولا توقيعَ URL.
+        Route::get('documents/{id}/download', [ClientPortalController::class, 'documentDownload'])
+            ->middleware('throttle:60,1')->name('document.download');
     });
 
     // ── إدارةُ عضويّة العميل (Work OS · الطور B · WP-B.3) — داخليّةٌ فقط (مديرُ الحساب) ──

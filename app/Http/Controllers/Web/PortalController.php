@@ -26,6 +26,41 @@ class PortalController extends Controller
         ] + $this->bundle($emp, auth()->id()));
     }
 
+    /**
+     * **عهدتي** — الجوابُ الواحدُ عن «ما الذي بيدي الآن؟» (الجولة 1 · F1/F3):
+     * ما بحوزتي + حركاتُ عهدتي. خدمةٌ ذاتيّةٌ خالصة: لا `assets:v` ولا `hub_scope`
+     * — الحيازةُ نفسُها هي التفويض، والأعمدةُ آمنةٌ (لا شراء ولا ماليّة).
+     */
+    public function myCustody()
+    {
+        $uid = (string) auth()->id();
+
+        $assets = DB::table('assets')->whereNull('deleted_at')
+            ->where('holder_id', $uid)->orderBy('name')->orderBy('id')
+            ->get(['id', 'name', 'type', 'tag', 'code', 'serial', 'status', 'station_id']);
+
+        // أسماءُ المحطات عبر محلِّل المرجع (عمودُ عرضِ stations ليس name —
+        // pluck يدويّ أسقط الصفحةَ 500 على MySQL في إعادة الرحلات)
+        $stations = $assets->pluck('station_id')->filter()->unique()->all();
+        $stationNames = $stations ? hub_ref_labels('stations', $stations) : [];
+
+        // حركاتُ عهدتي: تسليمٌ إليّ واستردادٌ منّي — بترتيبٍ دلاليٍّ (التاريخ ثم id).
+        // عمودُ نوعِ الحركة اسمُه `action` (كشفته إعادةُ الرحلات على MySQL — SQLite لم تمرّ به)
+        $moves = \Illuminate\Support\Facades\Schema::hasTable('asset_custody')
+            ? DB::table('asset_custody')->whereNull('deleted_at')->where('user_id', $uid)
+                ->orderByDesc('at')->orderByDesc('id')->limit(30)
+                ->get(['id', 'asset_id', 'action', 'at', 'note'])
+            : collect();
+        $moveAssets = $moves->pluck('asset_id')->filter()->unique()->all();
+        $moveNames = $moveAssets
+            ? DB::table('assets')->whereIn('id', $moveAssets)->pluck('name', 'id')->all() : [];
+
+        return view('portal.custody', [
+            'assets' => $assets, 'stationNames' => $stationNames,
+            'moves' => $moves, 'moveNames' => $moveNames,
+        ]);
+    }
+
     /** الملف الشامل لموظف — لمن يملك عرض وحدة HR */
     public function employee(string $id)
     {
@@ -269,9 +304,20 @@ class PortalController extends Controller
                 $out['openTasks'] = $mine()->count();
             }
 
-            if ($out['may']['assets']) $out['assets'] = hub_scope(DB::table('assets')->whereNull('deleted_at'), 'assets')
-                ->where('holder_id', $userId)->orderBy('name')->orderBy('id')
-                ->limit(12)->get(['id', 'name', 'type', 'tag', 'serial', 'status']);
+            /*
+             * عهدتي **خدمةٌ ذاتيّة**: الحيازةُ نفسُها هي التفويض — كإجازاتي وحضوري.
+             * كانت خلف `assets:v` ثم `hub_scope` قبل فلترِ الحائز، فرأى حاملُ
+             * العهدةِ «لا عهدة» زوراً بينما الإشعارُ يقول «سُجّلت باسمك»
+             * (وكلاء المحاكاة 3 و7 و10). لغيري (ملفُّ موظفٍ يفتحه HR) تبقى
+             * البوّابةُ والنطاقُ كما كانا.
+             */
+            $selfCustody = $userId === (string) auth()->id();
+            if ($selfCustody || $out['may']['assets']) {
+                $cq = DB::table('assets')->whereNull('deleted_at')->where('holder_id', $userId);
+                if (! $selfCustody) $cq = hub_scope($cq, 'assets');
+                $out['assets'] = $cq->orderBy('name')->orderBy('id')
+                    ->limit(12)->get(['id', 'name', 'type', 'tag', 'serial', 'status']);
+            }
 
             /* ── الصندوق الموحد: كل ما ينتظر تصرفي ── */
 

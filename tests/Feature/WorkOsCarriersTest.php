@@ -194,7 +194,8 @@ class WorkOsCarriersTest extends TestCase
             'password' => 'Secret!2026x', 'status' => 'نشط', 'account_type' => 'client',
             'password_changed_at' => now()]);
 
-        $this->actingAs($client)->get('/m/carriers')->assertNotFound();
-        $this->actingAs($client)->get('/m/carriers/' . $carrier->id)->assertNotFound();
+        // v2.496 (F22): قشرةُ m.* تحوِّل تصفّحَ العميل لبوّابته — ردٌّ موحَّد لا يكشف وجوداً
+        $this->actingAs($client)->get('/m/carriers')->assertRedirect(route('portal.home'));
+        $this->actingAs($client)->get('/m/carriers/' . $carrier->id)->assertRedirect(route('portal.home'));
     }
 }

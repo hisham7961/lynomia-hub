@@ -192,6 +192,75 @@ class DailyWorkCompliance
         return (string) ($d instanceof \DateTimeInterface ? $d->format('Y-m-d') : substr((string) $d, 0, 10));
     }
 
+    /* ═══════════ نداءُ اليوم (الجولة ١ · F9) ═══════════ */
+
+    /**
+     * **«من غائبٌ اليوم؟» — الإجابةُ بالفرقِ لا بانتظارِ صفوفٍ لن يكتبَها أحد:**
+     * النشطون − من له ختمُ حضورٍ − من في إجازةٍ معتمدةٍ تشمل اليوم = غائبٌ بلا عذر.
+     *
+     * الفئاتُ الخمس بالأسماء: `present` (ختمَ في الوقت)، `late` (ختمَ بعد بدايةِ
+     * الدوام `sec.hours_start` + سماحيةِ `work.late_grace` — يُشتقُّ من وقتِ الختمِ
+     * نفسِه فلا يفلت صفٌّ يدويٌّ بلا وسم، والميدانيُّ/عن بعد لا يُوسَم متأخراً كما
+     * في `Workday::checkIn`)، `leave`، `absent` (بلا ختمٍ وبلا إجازة — أو صفٌّ
+     * مختومٌ «غائب»)، `noreport` (ختمَ ولم يقدّم تقريراً صالحاً والاشتراطُ قائم).
+     * العطلةُ الأسبوعية ليست غياباً: يومُ عطلةٍ يُعلَّم `weekend` وتخلو فئةُ الغياب.
+     *
+     * تقرؤه شاشةُ «فريقي اليوم» وبطاقةُ «الفريق اليوم» في لوحة CEO — مصدرٌ واحدٌ
+     * فلا تتناقض شاشتان. التنطيقُ على العاتقِ المستدعي: مرِّر موظّفين منطَّقين.
+     */
+    public static function rollCall(Collection $emps, ?string $date = null): array
+    {
+        $date = $date ?: BusinessDate::today();
+        $cells = self::resolveMany($emps, $date);
+        $weekend = MonthlyAttendance::isWeekend($date);
+
+        // بدايةُ الدوام إن وُجد مفهومُها في الإعدادات — نفسُ قراءةِ Workday::checkIn
+        $start = trim((string) setting('sec.hours_start', '08:00'));
+        $grace = max(0, (int) setting('work.late_grace', 15));
+        $startMin = null;
+        if ($start !== '' && preg_match('/^\d{1,2}:\d{2}/', $start)) {
+            [$sh, $sm] = array_map('intval', array_pad(explode(':', $start), 2, 0));
+            $startMin = $sh * 60 + $sm + $grace;
+        }
+
+        $buckets = ['present' => [], 'late' => [], 'leave' => [], 'absent' => [], 'noreport' => []];
+        $anyStamp = false;
+
+        foreach ($emps as $emp) {
+            $c = $cells[$emp->id] ?? null;
+            if (! $c) continue;
+            if ($c['attendance']) $anyStamp = true;                  // أيُّ صفٍّ (ولو «غائب» مختوماً) بيانات
+            $entry = ['id' => (string) $emp->id, 'name' => (string) $emp->name];
+
+            if ($c['on_leave']) { $buckets['leave'][] = $entry; continue; }
+
+            if ($c['checked_in']) {
+                $late = $c['physical'] === Workday::LATE;
+                if (! $late && $startMin !== null && $c['time_in'] && $c['physical'] === Workday::PRESENT) {
+                    [$h, $m] = array_map('intval', array_pad(explode(':', (string) $c['time_in']), 3, 0));
+                    $late = ($h * 60 + $m) > $startMin;
+                }
+                $buckets[$late ? 'late' : 'present'][] = $entry;
+                if ($c['report_required'] && ! $c['report_submitted']) $buckets['noreport'][] = $entry;
+                continue;
+            }
+
+            // لا ختمَ ولا إجازة (أو صفٌّ مختومٌ «غائب»): غائبٌ — في يومِ عملٍ فقط
+            if (! $weekend) $buckets['absent'][] = $entry;
+        }
+
+        // ترتيبٌ دلاليٌّ بالاسم — لا اعتمادَ على ترتيبِ إدراجٍ يقرعه المحرّكان
+        foreach ($buckets as &$b) usort($b, fn ($x, $y) => strcmp($x['name'], $y['name']));
+        unset($b);
+
+        $n = ['emps' => $emps->count(),
+            'in' => count($buckets['present']) + count($buckets['late'])];
+        foreach ($buckets as $k => $b) $n[$k] = count($b);
+
+        return ['date' => $date, 'weekend' => $weekend, 'any_stamp' => $anyStamp,
+            'buckets' => $buckets, 'n' => $n];
+    }
+
     /* ═══════════ التركيب — آلةُ الحالاتِ الواحدة ═══════════ */
 
     protected static function compose(Employee $emp, string $date, Collection $atts, Collection $reports, ?bool $onLeaveOverride = null): array

@@ -20,7 +20,15 @@
 
 <div class="cards">
     <div class="stat"><span class="ico">🟢</span><b>{{ $c['labels']['physical'] }}</b><span>الحضور الفعليّ</span></div>
-    <div class="stat"><span class="ico">🕗</span><b class="mono">{{ $c['time_in'] ?: '—' }}@if($c['time_out']) – {{ $c['time_out'] }}@endif</b><span>حضور — انصراف</span></div>
+    <div class="stat"><span class="ico">🕗</span><b class="mono">{{ $c['time_in'] ?: '—' }}@if($c['time_out']) – {{ $c['time_out'] }}@endif</b><span>حضور — انصراف
+        {{-- F11: دخولٌ بلا انصرافٍ في يومٍ ماضٍ — شارةٌ صريحةٌ ورابطُ التصحيح --}}
+        @if ($c['checked_in'] && ! $c['checked_out'] && $date < \App\Support\BusinessDate::today())
+            @if ($c['attendance'] && hub_can(auth()->user(), 'attend', 'e'))
+                <a class="bdg wn" href="{{ route('m.edit', ['attend', $c['attendance']->id]) }}" title="صحّح صفَّ الحضور — الساعاتُ لا تُختلق">انصراف مفقود ✎</a>
+            @else
+                <span class="bdg wn">انصراف مفقود</span>
+            @endif
+        @endif</span></div>
     <div class="stat"><span class="ico">📝</span><b>{{ $c['labels']['compliance'] }}</b><span>التقرير</span></div>
     <div class="stat"><span class="ico bdg {{ $effTone }}">⚖️</span><b>{{ $c['labels']['effective'] }}</b><span>الحالة المحتسَبة</span></div>
     @if ($c['deadline_at'])<div class="stat"><span class="ico">⏰</span><b class="mono">{{ $c['deadline_at']->format('Y-m-d H:i') }}</b><span>مهلة التقرير</span></div>@endif

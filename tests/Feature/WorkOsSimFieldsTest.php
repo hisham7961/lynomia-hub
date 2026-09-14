@@ -165,9 +165,10 @@ class WorkOsSimFieldsTest extends TestCase
             'password' => 'Secret!2026x', 'status' => 'نشط', 'account_type' => 'client',
             'password_changed_at' => now()]);
 
-        // الاتصالاتُ بنيةٌ داخليّة — حسابُ العميل يُردّ ٤٠٤ على القائمةِ والسجلّ (فوق المصفوفة)
-        $this->actingAs($client)->get('/m/phones')->assertNotFound();
-        $this->actingAs($client)->get('/m/phones/' . $line->id)->assertNotFound();
+        // الاتصالاتُ بنيةٌ داخليّة — v2.496 (F22): تصفّحُ العميل يُحوَّل لبوّابته
+        // (ردٌّ موحَّدٌ فوق المصفوفة لا يكشف وجودَ السجلّ)
+        $this->actingAs($client)->get('/m/phones')->assertRedirect(route('portal.home'));
+        $this->actingAs($client)->get('/m/phones/' . $line->id)->assertRedirect(route('portal.home'));
     }
 
     public function test_iccid_resolves_via_the_one_identity_engine(): void

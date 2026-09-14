@@ -240,16 +240,32 @@
         </table>
     </div>
 
-    {{-- الفريق اليوم --}}
+    {{-- الفريق اليوم — يقرأ «نداءَ اليوم» نفسَه (الجولة ١ · F9): الحاضرُ من ختم فعلاً،
+         والغائبُ بالفرق، ولا يُعلَن «مكتمل» فوق صفرِ بيانات --}}
     <div class="card kid">
-        <h3>👥 الفريق اليوم <span class="bdg g">{{ $attToday }} حاضر</span></h3>
+        <h3>👥 الفريق اليوم <span class="bdg g">{{ $teamRoll['n']['in'] }} حاضر</span>
+            @if ($teamRoll['n']['late'])<span class="bdg wn">{{ $teamRoll['n']['late'] }} متأخر</span>@endif
+            @if ($teamRoll['n']['absent'])<span class="bdg bad">{{ $teamRoll['n']['absent'] }} غائب</span>@endif
+            @if ($teamRoll['n']['noreport'])<span class="bdg wn">{{ $teamRoll['n']['noreport'] }} بلا تقرير</span>@endif
+        </h3>
         <table class="mini">
-            @forelse ($onLeave as $l)
+            @foreach ($onLeave as $l)
                 <tr><td>{{ $l->name }}<div class="sub">{{ $l->type }} · يعود {{ substr($l->to, 0, 10) }}</div></td>
                     <td class="acts"><span class="bdg wn">إجازة</span></td></tr>
-            @empty
-                <tr><td class="sub" style="padding:12px;text-align:center">لا أحد في إجازة اليوم — الفريق مكتمل 💪</td></tr>
-            @endforelse
+            @endforeach
+            @if ($teamRoll['n']['absent'])
+                <tr><td>{{ \Illuminate\Support\Str::limit(implode('، ', array_column($teamRoll['buckets']['absent'], 'name')), 60) }}
+                        <div class="sub">بلا ختمِ حضورٍ ولا إجازةٍ معتمدة</div></td>
+                    <td class="acts"><span class="bdg bad">غائب</span></td></tr>
+            @endif
+            @if ($teamRoll['weekend'] && ! $teamRoll['any_stamp'] && $onLeave->isEmpty())
+                <tr><td class="sub" style="padding:12px;text-align:center">اليوم عطلة أسبوعية</td></tr>
+            @elseif (! $teamRoll['any_stamp'] && $onLeave->isEmpty())
+                <tr><td class="sub" style="padding:12px;text-align:center">لا بيانات حضور بعد — لم يُسجَّل أيُّ ختمٍ اليوم.
+                        <a href="{{ route('workforce.team') }}">نداء اليوم ↗</a></td></tr>
+            @elseif ($onLeave->isEmpty() && ! $teamRoll['n']['absent'])
+                <tr><td class="sub" style="padding:12px;text-align:center">الجميع حاضرون — لا غيابَ ولا إجازة اليوم ✅</td></tr>
+            @endif
         </table>
     </div>
 

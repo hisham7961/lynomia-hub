@@ -150,10 +150,15 @@ class WorkOsAcceptanceClientTest extends TestCase
             ->assertSee('INV-ACC-1')->assertDontSee('INV-OTHER-9');
         $this->get(route('portal.project', $otherProject->id))->assertNotFound();
 
-        /* ── (٥) المساراتُ الداخلية ٤٠٤ للحساب المُوفَّر نفسِه (PortalGuard فوق الكل) ── */
+        /* ── (٥) المساراتُ الداخلية محجوبةٌ عن الحساب المُوفَّر نفسِه (PortalGuard فوق الكل).
+               v2.496 (F22): قشرةُ الوحدات m.* تُحوِّل التصفّحَ البشريَّ للبوّابة (ردٌّ موحَّد)،
+               والمساراتُ العميقة/الإدارية تبقى ٤٠٤ «لا كشفَ وجود» ── */
 
-        foreach (['/m/servers', '/audit', '/custody-wallet', '/endpoints', '/m/stations'] as $internal) {
-            $this->get($internal)->assertNotFound();
+        foreach (['/m/servers', '/m/stations'] as $shell) {
+            $this->get($shell)->assertRedirect(route('portal.home'));
+        }
+        foreach (['/audit', '/custody-wallet', '/endpoints'] as $deep) {
+            $this->get($deep)->assertNotFound();
         }
 
         /* ── (٦) دعوةُ زميل: مديرُ الحساب يدعو ماليّةَ العميل، تُفعِّل وترى الفاتورة ── */

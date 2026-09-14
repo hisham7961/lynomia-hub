@@ -77,6 +77,14 @@ class CeoController extends Controller
             ->get(['employees.name as name', 'leave_requests.type as type', 'leave_requests.date_to as to']);
         $attToday = DB::table('attendance')->whereNull('deleted_at')->where('date', $today)->count();
 
+        // «نداءُ اليوم» (الجولة ١ · F9): المصدرُ نفسُه الذي تقرؤه شاشةُ «فريقي اليوم» —
+        // الغائبُ بالفرق (النشطون − من ختم − من في إجازة)، فلا «0 حاضر» فوقها «مكتمل».
+        // عدُّ الصفوفِ الخام كان يحسب صفَّ «غائب» المختومَ حاضراً — البطاقةُ تقرأ النداء.
+        $teamRoll = \App\Support\DailyWorkCompliance::rollCall(
+            \App\Models\Employee::whereNull('deleted_at')->where('status', 'نشط')
+                ->orderBy('name')->get(['id', 'name', 'dept', 'user_id'])
+        );
+
         // أعلى المستحقات
         $unpaidTop = $fin()->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة'])
             ->orderByRaw('(total - COALESCE(paid, 0)) DESC')->orderByDesc('id')
@@ -102,7 +110,7 @@ class CeoController extends Controller
         $gov = \App\Support\CeoBoard::governance();
 
         return view('ceo.index', compact('kpi', 'health', 'months', 'max', 'projects',
-            'onLeave', 'attToday', 'unpaidTop', 'taskSlices', 'pipe', 'mrr', 'currency',
+            'onLeave', 'attToday', 'teamRoll', 'unpaidTop', 'taskSlices', 'pipe', 'mrr', 'currency',
             'awaiting', 'leaks', 'conc', 'risks', 'trend', 'gov'));
     }
 }

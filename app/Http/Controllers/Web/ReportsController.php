@@ -137,7 +137,18 @@ class ReportsController extends Controller
 
         $status = in_array($r->query('status'), ['accepted', 'needs_revision'], true)
             ? $r->query('status') : 'pending';
-        $q = $this->reviewableUpdates();
+
+        /*
+         * «مشاريعي فقط» (الجولة 1 · F7): مديرُ مشاريعَ بلا hr:v كان يرى طابورَ
+         * كلِّ مشاريعِ نطاقِه — ضجيجُ ما لا يخصّه فوق ما ينتظر قرارَه فعلاً
+         * (وكيل المحاكاة 4). لغير HR/المالك الافتراضيُّ «مشاريعي»، والرقعةُ
+         * الأوسع بنقرة (?scope=all).
+         */
+        $uu = auth()->user();
+        $isWide = ($uu->role?->is_owner ?? false) || hub_can($uu, 'hr', 'v');
+        $mineOnly = $r->query('scope') === 'mine' || (! $isWide && $r->query('scope') !== 'all');
+
+        $q = $this->reviewableUpdates($mineOnly);
         if ($status === 'pending') {
             $q->where(fn ($w) => $w->whereNull('review_status')->orWhere('review_status', ReportReview::PENDING));
         } else {
@@ -154,7 +165,7 @@ class ReportsController extends Controller
         $names = User::whereIn('id', $items->pluck('created_by')->filter()->unique())
             ->pluck('name', 'id');
 
-        return view('reports.review', compact('items', 'names', 'status'));
+        return view('reports.review', compact('items', 'names', 'status', 'mineOnly'));
     }
 
     /** POST — قبول / طلب تنقيح / إعادة فتح (§27/§28) */
@@ -332,13 +343,20 @@ class ReportsController extends Controller
     /* ────────── مساعدات ────────── */
 
     /** بنودٌ قابلةٌ للمراجعة لهذا المستخدم — منطَّقةٌ شركةً ومشروعاً (§77/§80) */
-    protected function reviewableUpdates()
+    protected function reviewableUpdates(bool $mineOnly = false)
     {
         $u = auth()->user();
         $q = WorkUpdate::query()->whereNull('deleted_at');
-        if ($u->role?->is_owner) return $q;
+        if ($u->role?->is_owner && ! $mineOnly) return $q;
 
-        $pids = hub_scope(Project::query(), 'projects')->pluck('id')->all();
+        // «مشاريعي» = ما أُديرُه فعلاً — لا كلُّ ما يقع في نطاق رؤيتي (F7)
+        $projQ = hub_scope(Project::query(), 'projects');
+        if ($mineOnly) $projQ->where('manager_id', (string) $u->id);
+        $pids = $projQ->pluck('id')->all();
+        if ($mineOnly) {
+            return $q->where(fn ($w) => $pids
+                ? $w->whereIn('project_id', $pids) : $w->whereRaw('1 = 0'));
+        }
         $userIds = [];
         if (hub_can($u, 'hr', 'v')) {
             $userIds = hub_company_scope(hub_scope(Employee::query(), 'hr'), 'hr')

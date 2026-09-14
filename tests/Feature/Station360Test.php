@@ -119,8 +119,10 @@ class Station360Test extends TestCase
     {
         $this->seedCore();
         $s = $this->station();
-        // البوّابةُ لا تُدرج stations في قائمة العميل → ٤٠٤ (لا كشفَ وجود)
-        $this->actingAs($this->client())->get(route('m.show', ['stations', $s->id]))->assertNotFound();
+        // v2.496 (F22): تصفّحُ العميل للقشرة الداخلية يُحوَّل لبوّابته — ردٌّ
+        // موحَّدٌ قبل حلِّ السجلّ فلا كشفَ وجودٍ، ولا محتوى داخليّاً يُرى
+        $this->actingAs($this->client())->get(route('m.show', ['stations', $s->id]))
+            ->assertRedirect(route('portal.home'));
     }
 
     public function test_count_safety_unauthorized_assets_not_counted(): void

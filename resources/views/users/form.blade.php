@@ -19,7 +19,7 @@
             </div>
             <div class="fld"><label>الحالة</label>
                 <select class="inp" name="status">
-                    @foreach (['نشط', 'موقوف'] as $st)<option @selected(old('status', $u?->status ?? 'نشط') === $st)>{{ $st }}</option>@endforeach
+                    @foreach (\App\Models\User::STATUSES as $st)<option @selected(old('status', $u?->status ?? \App\Models\User::STATUS_ACTIVE) === $st)>{{ $st }}</option>@endforeach
                 </select>
                 @error('status')<span class="ferr">{{ $message }}</span>@enderror
             </div>

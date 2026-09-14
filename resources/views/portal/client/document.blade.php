@@ -5,7 +5,13 @@
 <div class="hero">
     <div><h2>📄 {{ $doc->name }}</h2>
         <div class="sub">{{ $doc->cat ?: '' }}{{ $doc->doc_no ? ' · ' . $doc->doc_no : '' }}</div></div>
-    <a class="btn ghost sm" href="{{ route('portal.documents') }}">← كل الوثائق</a>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+        {{-- (الجولة 1 · F25) تنزيلٌ آمنٌ عبر المسار المصادَق — يُرسم فقط حين يوجد ملفٌّ فعلاً --}}
+        @if ($hasFile ?? false)
+            <a class="btn p sm" href="{{ route('portal.document.download', $doc->id) }}">⬇ تنزيل الملف</a>
+        @endif
+        <a class="btn ghost sm" href="{{ route('portal.documents') }}">← كل الوثائق</a>
+    </div>
 </div>
 
 <div class="card">

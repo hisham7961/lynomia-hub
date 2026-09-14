@@ -23,8 +23,12 @@
 <div class="cards">
     <div class="stat"><span class="ico">✅</span><b>{{ $totals['present'] }}</b><span>يوم حضور</span></div>
     <div class="stat"><span class="ico">🏝️</span><b>{{ $totals['leave'] }}</b><span>إجازة</span></div>
-    <div class="stat"><span class="ico">❌</span><b>{{ $totals['absent'] }}</b><span>غياب</span></div>
+    {{-- الغياب = المختوم + المشتقُّ بالفرق (يومُ عملٍ ماضٍ بلا ختمٍ وبلا إجازة · F10) --}}
+    <div class="stat"><span class="ico">❌</span><b>{{ $totals['absent'] + ($totals['unexcused'] ?? 0) }}</b><span>غياب</span></div>
     @if ($totals['absence_report']>0)<div class="stat"><span class="ico">⛔</span><b>{{ $totals['absence_report'] }}</b><span>غياب لعدم التقرير</span></div>@endif
+    @if (($totals['missing_out'] ?? 0) > 0)
+        <div class="stat"><span class="ico">🚪</span><b>{{ $totals['missing_out'] }}</b><span>انصراف مفقود (شذوذ)</span></div>
+    @endif
     <div class="stat"><span class="ico">⏱️</span><b>{{ number_format($totals['attendance_hours'],1) }}</b><span>ساعة</span></div>
     <div class="stat"><span class="ico">📝</span><b>{{ $totals['reported'] }}</b><span>يوم مقدَّم</span></div>
 </div>
@@ -35,19 +39,29 @@
         <tbody>
         @foreach ($days as $d)
             @php $day = \Illuminate\Support\Carbon::parse($d['date']); $dow = $wd[$day->format('D')] ?? ''; @endphp
-            <tr @class(['sub' => $d['kind']==='off'])>
+            <tr @class(['sub' => in_array($d['kind'], ['off', 'future', 'holiday'], true)])>
                 <td class="mono">{{ $d['date'] }}</td>
                 <td class="sub">{{ $dow }}</td>
                 <td class="mono">{{ $d['time_in'] ?: '—' }}</td>
-                <td class="mono">{{ $d['time_out'] ?: '—' }}</td>
+                <td class="mono">{{ $d['time_out'] ?: '—' }}
+                    {{-- F11: دخولٌ بلا انصرافٍ في يومٍ ماضٍ — شارةٌ صريحة، ورابطُ تصحيحِ HR القائم --}}
+                    @if ($d['missing_out'] ?? false)
+                        @if (($d['att_id'] ?? null) && hub_can(auth()->user(), 'attend', 'e'))
+                            <a class="bdg wn" href="{{ route('m.edit', ['attend', $d['att_id']]) }}" title="صحّح صفَّ الحضور — الساعاتُ لا تُختلق">انصراف مفقود ✎</a>
+                        @else
+                            <span class="bdg wn" title="دخولٌ بلا انصراف — الساعاتُ لا تُحتسب حتى يُصحَّح">انصراف مفقود</span>
+                        @endif
+                    @endif</td>
                 <td class="mono">{{ $d['hours'] ? number_format($d['hours'],1) : '—' }}</td>
-                <td>@if($d['kind']==='off')—@else<span class="bdg {{ $d['tone'] }}">{{ $d['label'] }}</span>@if($d['late'] ?? false)<span class="bdg wn">متأخر</span>@endif @endif</td>
+                <td>@if(in_array($d['kind'], ['off', 'future'], true))—@else<span class="bdg {{ $d['tone'] }}">{{ $d['label'] }}</span>@if($d['late'] ?? false)<span class="bdg wn">متأخر</span>@endif @endif</td>
                 <td>{{ $d['report'] ?: '—' }}</td>
                 <td>@if($d['effective_key'] ?? null)<span class="bdg {{ $d['effective_key']==='present'?'ok':($d['effective_key']==='absent_due_to_missing_report'?'bad':'') }}">{{ $d['effective'] }}</span>@else —@endif</td>
             </tr>
         @endforeach
         </tbody>
     </table></div>
-    <div class="sub" style="margin-top:8px">يومٌ بلا صفِّ حضورٍ ولا إجازةٍ = «—» (عطلة/غير مسجَّل)، لا غياب. الغيابُ لصفٍّ مختوم.</div>
+    <div class="sub" style="margin-top:8px">المستقبلُ «—» (لم يقع)، وعطلةُ الأسبوع «عطلة»، والإجازةُ المعتمدة «إجازة» —
+        و«غائب» ليومِ عملٍ ماضٍ بلا ختمٍ وبلا إجازة (مختوماً كان أو محسوباً بالفرق).
+        «انصراف مفقود» شذوذٌ ظاهرٌ: الساعاتُ لا تُختلق حتى يُصحَّح الصفُّ من الموارد البشرية.</div>
 </div>
 @endsection

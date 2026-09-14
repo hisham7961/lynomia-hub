@@ -1,4 +1,11 @@
-@if (session('ok'))<div class="flash ok">{{ session('ok') }}</div>@endif
+@if (session('ok'))<div class="flash ok">{{ session('ok') }}
+    {{-- تراجعٌ فوريّ بعد حذفٍ (الجولة 1 · F8) — رابطُ استعادةٍ لا يعتمد على فتح السلة --}}
+    @if (session('undo'))
+        <form method="post" action="{{ session('undo') }}" class="inline" hx-boost="false" style="display:inline">@csrf
+            <button type="submit" class="lnk" style="font-weight:700;text-decoration:underline">↩ تراجع</button>
+        </form>
+    @endif
+</div>@endif
 {{-- كلمةُ المرور المؤقتة تُعرض مرةً واحدة ولا تُحفظ في أي مكان يُقرأ لاحقاً --}}
 @if (session('temp_password'))
     <div class="flash wn">

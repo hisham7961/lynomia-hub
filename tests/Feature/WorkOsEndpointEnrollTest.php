@@ -328,7 +328,8 @@ class WorkOsEndpointEnrollTest extends TestCase
         $this->seedCore();
         $client = $this->clientUser();
 
-        $this->actingAs($client)->get('/m/endpoints')->assertNotFound();
+        // v2.496 (F22): قشرةُ m.* تحوِّل تصفّحَ العميل لبوّابته؛ أفعالُ الكتابة تبقى ٤٠٤
+        $this->actingAs($client)->get('/m/endpoints')->assertRedirect(route('portal.home'));
         $this->actingAs($client)->withStepup()
             ->post(route('enroll.mint'), ['companyId' => (string) Str::uuid()])->assertNotFound();
     }
