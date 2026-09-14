@@ -109,6 +109,7 @@ class ImportController extends Controller
                 foreach ($rows as $n => $line) {
                     $m = new $class;
                     $rowErr = null;
+                    $dec = \App\Support\DecisionFields::capture($module, $def, $m);
 
                     foreach ($mapping as $i => $fk) {
                         $f = $fields[$fk] ?? null;
@@ -123,6 +124,16 @@ class ImportController extends Controller
                         if ($rowErr) break;
                         $m->{$f['col']} = $val;
                     }
+
+                    /*
+                     * **حقلُ القرارِ لا يُستورَد ممّن لا يملك البتّ** (مجلس الخبراء ·
+                     * الخبير ١٤). بابُ الاستيرادِ يكتب على النموذجِ مباشرةً بلا
+                     * `ModuleController::fill()`، وخمسةُ أدوارٍ كاملةِ النطاقِ تملك
+                     * `leaves:a` بلا `hr` ولا رايةِ اعتماد — فلولا هذا السطرُ لبقي
+                     * العيبُ نفسُه مفتوحاً من ملفِّ CSV: صفٌّ حالتُه «معتمد» يخصم
+                     * رصيداً ويُعفي من الحضورِ بلا معتمِد.
+                     */
+                    \App\Support\DecisionFields::enforce($module, $m, $dec);
 
                     /*
                      * الحقول الإلزامية — **ممّا يستطيع الاستيرادُ ملأه وحده**
