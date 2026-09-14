@@ -105,6 +105,9 @@
         </form>
     </div>
 
+    {{-- (الجولة 1 · F23) حسابُ العميل لا يسكّ مفاتيحَ API: القسمُ كلُّه يُحجب عنه —
+         والخادمُ يصدّ المساراتِ نفسَها (PortalGuard + المتحكّم)، فالإخفاءُ صدقُ عرضٍ لا حماية --}}
+    @unless (hub_is_client($u))
     <div class="card kid">
         <h3>🔌 مفاتيح API</h3>
         @if (session('newtoken'))
@@ -149,6 +152,7 @@
         </form>
         <div class="sub" style="margin-top:8px">الاستخدام: ترويسة <span class="mono ltr">Authorization: Bearer &lt;المفتاح&gt;</span> — التوثيق في <span class="mono ltr">docs/API.md</span></div>
     </div>
+    @endunless
 
     <div class="card kid">
         <h3>🛡️ المصادقة الثنائية (2FA)</h3>

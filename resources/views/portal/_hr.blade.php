@@ -181,9 +181,12 @@
     </div>
     @endif
 
-    @if (! $hr360 && $may['assets'])
+    {{-- عهدتي تُعرض لصاحبها دائماً (خدمةٌ ذاتيّة — الجولة 1 · F1)، ولغيره خلف صلاحيّة الأصول --}}
+    @if (! $hr360 && ($may['assets'] || ($self ?? false)))
     <div class="card kid">
-        <h3>💻 العهدة والأجهزة</h3>
+        <h3>💻 العهدة والأجهزة
+            @if ($self ?? false)<a class="btn ghost xs msauto" href="{{ route('portal.custody') }}">عهدتي بالتفصيل ←</a>@endif
+        </h3>
         <table class="mini">
             @forelse ($assets as $a)
                 <tr>

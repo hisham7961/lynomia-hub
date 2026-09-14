@@ -51,6 +51,10 @@ class QuoteBuilderController extends Controller
             // نمطُ البند (CPQ ب): أساسيّ/اختياريّ/بديل/إضافة + مجموعةُ البدائل
             'line_mode' => ['nullable', 'in:required,optional,alternative,addon'],
             'opt_group' => ['nullable', 'string', 'max:120'],
+        ], [], [
+            // (الجولة 1 · F19) أسماءٌ عربيّة لرسائل التحقق — «discount_pct يجب أن يكون رقماً» ليست رسالة
+            'title' => 'وصف البند', 'qty' => 'الكمية', 'unit_price' => 'سعر الوحدة',
+            'discount_pct' => 'نسبة الخصم', 'tax_pct' => 'نسبة الضريبة', 'unit_cost' => 'التكلفة',
         ]);
 
         // Permissions 360 · 11.6 — التكلفةُ الداخليّةُ تتبع نمطَ حقلِ `quotes.cost`
@@ -72,6 +76,16 @@ class QuoteBuilderController extends Controller
                 if (($d['title'] ?? '') === '') $d['title'] = (string) $svc->name;
             }
         }
+
+        // (الجولة 1 · F19) **تطبيعُ الفراغ قبل الكتابة** (بعد تعبئة الكتالوج كي لا يدوسها):
+        // خانةُ خصمٍ تُركت فارغةً كانت تمرّ null إلى أعمدةِ NOT NULL
+        // (discount_pct/tax_pct/qty/unit_price) فيسقط الطلبُ بـInternal Server Error
+        // وشاشة debug. الفراغُ قيمتُه الافتراضيّة (كميّةٌ 1، وسواها 0) — والمعطوبُ
+        // رُدَّ في التحقق أعلاه برسالةٍ عربية (422 لا 500).
+        $d['qty'] = $d['qty'] ?? 1;
+        $d['unit_price'] = $d['unit_price'] ?? 0;
+        $d['discount_pct'] = $d['discount_pct'] ?? 0;
+        $d['tax_pct'] = $d['tax_pct'] ?? 0;
 
         // الاختياريُّ/البديل لا يدخل الخطَّ المُلتزَم افتراضياً؛ الأساسيُّ يدخل
         $d['included'] = ($d['line_mode'] ?? 'required') === 'required';

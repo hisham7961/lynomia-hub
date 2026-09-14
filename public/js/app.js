@@ -366,10 +366,18 @@
     else { document.documentElement.dataset.theme = 'dark'; localStorage.setItem('lyn_theme', 'dark'); }
   };
   var kb = document.querySelector('[data-kanban]');
-  if (kb && kb.dataset.can === '1') {
+  if (kb) {
     var dragging = null;
     kb.addEventListener('dragstart', function (e) {
       var c = e.target.closest('.kcard'); if (!c) return;
+      /* v2.496: كان `data-can=0` يطفئ السحبَ كلَّه صامتاً — الموظفُ يجرّ بطاقتَه
+         فتعود ولا يفهم لماذا. بطاقةُ المسنَد إليه (data-mine) تُسحب والخادمُ يحسم؛
+         وغيرُ المخوَّل يسمع السببَ بدل الصمت. */
+      if (kb.dataset.can !== '1' && c.dataset.mine !== '1') {
+        e.preventDefault();
+        Hub.toast('العرض فقط — نقلُ البطاقات هنا يحتاج صلاحيّةَ تعديل (بطاقاتُك المسندةُ إليك تُنقل)', 1);
+        return;
+      }
       dragging = c; c.classList.add('drag');
       e.dataTransfer.effectAllowed = 'move';
     });

@@ -59,7 +59,73 @@ class Quote extends Model
                     if ($q->isDirty($col)) $q->{$col} = $q->getOriginal($col);
                 }
             }
+            // (الجولة 1 · F20) **نظاما البنود يتكلّمان**: نصُّ «البنود» المتغيّر يُحلَّل هنا
+            // (فسطرٌ معطوبٌ يُرفض برسالةٍ **قبل** أي كتابة) ويُزرع بنوداً مهيكلةً في saved.
+            if ($q->isDirty('items')) {
+                $q->pendingItemLines = self::parseItemsText((string) ($q->items ?? ''));
+            }
         });
+        // (الجولة 1 · F20) بعد الحفظ: بنودُ النصّ السابقة (الموسومة meta.source=items)
+        // تُستبدل بالمُحلَّلة حديثاً — بنودُ البنّاء المهيكل لا تُمسّ — ثم يُعاد الحساب،
+        // فلا يبقى الإجماليُّ 0.00 بينما النصُّ يعدّد بنوداً مسعّرة. آمنٌ للبيانات
+        // القائمة: لا تحويلَ إلا حين **يتغيّر** النصُّ فعلاً بيد المستخدم.
+        static::saved(function (self $q) {
+            if ($q->pendingItemLines === null) return;
+            $rows = $q->pendingItemLines;
+            $q->pendingItemLines = null;
+
+            foreach (QuoteLine::where('quote_id', $q->id)->get() as $l) {
+                if ((((array) $l->meta)['source'] ?? null) === 'items') $l->delete();
+            }
+            $sort = (int) QuoteLine::where('quote_id', $q->id)->max('sort');
+            foreach ($rows as $row) {
+                QuoteLine::create($row + [
+                    'quote_id' => $q->id, 'sort' => ++$sort,
+                    'discount_pct' => 0, 'tax_pct' => 0,
+                    'meta' => ['source' => 'items'],
+                ]);
+            }
+            $q->recalc();
+        });
+    }
+
+    /**
+     * (الجولة 1 · F20) بنودُ النصّ المُعدَّة للزرع بعد الحفظ — null حين لا تحويلَ معلّقاً.
+     * خاصيّةٌ عاديّة لا سمة، فلا تلمس أعمدةَ النموذج.
+     *
+     * @var array<int, array{title: string, qty: float, unit_price: float}>|null
+     */
+    public ?array $pendingItemLines = null;
+
+    /**
+     * (الجولة 1 · F20) **تحليلُ نصّ البنود** — الصيغةُ المعلنةُ في النموذج نفسِه:
+     * «وصف | كمية | سعر» لكل سطر (العمودُ الرابع «وحدات الكرتونة» يبقى في النصّ
+     * لمستند العميل — `Items::cartons`). الكميّةُ الغائبة = 1 والسعرُ الغائب = 0،
+     * أمّا قيمةٌ **معطوبة** (كميةٌ أو سعرٌ ليسا رقماً) فتُرفض برسالةٍ تسمّي سطرَها —
+     * لا حفظَ نصٍّ ميتٍ بصمتٍ بعد اليوم.
+     *
+     * @return array<int, array{title: string, qty: float, unit_price: float}>
+     */
+    public static function parseItemsText(string $raw): array
+    {
+        $out = [];
+        $n = 0;
+        foreach (preg_split('/\r?\n/', trim($raw)) as $line) {
+            $n++;
+            $line = trim($line);
+            if ($line === '') continue;
+            $cols = array_map('trim', explode('|', $line));
+            $title = (string) ($cols[0] ?? '');
+            $bad = fn (string $what) => throw \Illuminate\Validation\ValidationException::withMessages([
+                'items' => "السطر {$n} من البنود ({$what}) — الصيغة: وصف | كمية | سعر، والكميةُ والسعرُ أرقامٌ صريحة.",
+            ]);
+            if ($title === '') $bad('بلا وصف');
+            $qty = ($cols[1] ?? '') === '' ? 1.0 : (is_numeric($cols[1]) ? (float) $cols[1] : $bad('الكمية «' . $cols[1] . '» ليست رقماً'));
+            $price = ($cols[2] ?? '') === '' ? 0.0 : (is_numeric($cols[2]) ? (float) $cols[2] : $bad('السعر «' . $cols[2] . '» ليس رقماً'));
+            $out[] = ['title' => mb_substr($title, 0, 300), 'qty' => $qty, 'unit_price' => $price];
+        }
+
+        return $out;
     }
 
     /**
@@ -95,6 +161,21 @@ class Quote extends Model
         $last = static::withTrashed()->where('doc_no', 'like', $prefix . '%')
             ->orderByDesc('doc_no')->value('doc_no');
         $n = $last ? ((int) preg_replace('/\D/', '', substr((string) $last, strlen($prefix))) + 1) : 1;
+
+        // (الجولة 1 · F20) **مصدرُ ترقيمٍ ظاهرٌ واحد**: أرقامٌ قديمة أُدخلت يدوياً بصيغة
+        // `Q-{سنة}-{تسلسل}` كانت تترك المولّدَ يفتح عدّاداً موازياً من 0001 — فيتجاور
+        // «QT-2026-0001» و«Q-2026-014» في القائمة كأنهما نظامان. الجديدُ يواصل أعلى
+        // التسلسلين بالصيغة المضبوطة وحدها (الإعدادُ quotes.doc_no_format هو المصدر)،
+        // والأرقامُ القائمة لا تُمسّ — إضافةٌ لا كسر.
+        $legacy = 'Q-' . $year . '-';
+        if ($legacy !== $prefix) {
+            $lastLegacy = static::withTrashed()->where('doc_no', 'like', $legacy . '%')
+                ->orderByDesc('doc_no')->value('doc_no');
+            if ($lastLegacy) {
+                $n = max($n, (int) preg_replace('/\D/', '', substr((string) $lastLegacy, strlen($legacy))) + 1);
+            }
+        }
+
         do {
             $candidate = str_replace(['{YEAR}', '{SEQ}'], [$year, sprintf('%04d', $n)], $fmt);
             $n++;

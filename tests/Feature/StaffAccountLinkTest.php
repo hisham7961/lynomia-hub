@@ -223,10 +223,14 @@ class StaffAccountLinkTest extends TestCase
     }
 
     /**
-     * **والعودةُ لا تُعيد الوصول تلقائياً**: إعادةُ التنشيط قرارٌ يُتَّخذ لا أثرٌ
-     * جانبيّ. من عاد يُنبَّه من يدير المستخدمين ليفتح حسابه بعد مراجعة صلاحياته.
+     * **والعودةُ تفتح الحساب بالتساوق نفسه** (الجولة 1 · F30 — عكسُ العقد القديم
+     * عمداً): كان «إشعاراً لإدارة المستخدمين ولا فتحَ»، فبقيت موظفةٌ أعادتها HR
+     * موقوفةً عن الدخول بلا تحذيرٍ يراه من أجرى الفعل. الآن: من ملك الإغلاقَ
+     * الآليّ بإغلاق الملف ملك الفتحَ بفتحه — بحارس الامتياز نفسِه، مع قيدِ
+     * تدقيقٍ وإشعارٍ للموظف وللإدارة. (الحسابُ ذو الامتياز يبقى قرارَه اليدويّ —
+     * اختبارُه في DogfoodR1WorkforceTest.)
      */
-    public function test_reactivating_does_not_silently_restore_access(): void
+    public function test_reactivating_reopens_the_account_with_audit_and_notice(): void
     {
         $this->seedCore();
         $u = User::create(['name' => 'عائد', 'email' => 'back@test.local',
@@ -237,10 +241,14 @@ class StaffAccountLinkTest extends TestCase
 
         $emp->update(['status' => 'نشط']);
 
-        $this->assertSame('موقوف', $u->fresh()->status,
-            'عاد الملفُّ فانفتح الحساب تلقائياً — إعادةُ الوصول قرارٌ لا أثرٌ جانبي');
+        $this->assertSame('نشط', $u->fresh()->status,
+            'أُعيد تفعيل الملف وبقي الحساب موقوفاً — الموظف معلّقٌ خارج النظام بلا تحذير');
         $this->assertGreaterThan(0, \App\Models\HubNotification::where('user_id', $this->owner->id)
-            ->where('text', 'LIKE', '%عاد%')->count(), 'ولا أحد أُبلغ ليفتح له الحساب');
+            ->where('text', 'LIKE', '%أُعيد تفعيل%')->count(),
+            'إدارةُ المستخدمين لم تُبلَّغ لتراجع الصلاحيات');
+        $this->assertTrue(\App\Models\AuditEntry::where('module', 'users')
+            ->where('record_id', $u->id)->where('action', 'إعادة تفعيل حساب تبعاً للملف الوظيفي')->exists(),
+            'لا أثرَ تدقيقٍ لإعادة التفعيل');
     }
 
     /* ── شاشة الفجوات ── */

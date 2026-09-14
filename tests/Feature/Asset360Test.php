@@ -109,6 +109,9 @@ class Asset360Test extends TestCase
     {
         $this->seedCore();
         $a = $this->asset();
-        $this->actingAs($this->client())->get(route('m.show', ['assets', $a->id]))->assertNotFound();
+        // v2.496: تصفّحُ العميل البشريّ للقشرة الداخلية يُحوَّل لبوّابته (F22) —
+        // ردٌّ موحَّدٌ لا يكشف وجودَ السجلّ، والمحتوى الداخليّ لا يُرى بحال
+        $this->actingAs($this->client())->get(route('m.show', ['assets', $a->id]))
+            ->assertRedirect(route('portal.home'));
     }
 }

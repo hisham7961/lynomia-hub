@@ -39,7 +39,10 @@ class AuthController extends Controller
          */
         $blocked = null;
         if ($user) {
-            if ($user->status === 'موقوف') {
+            // الحكمُ الموحّد isSuspended (F31): كان الفحص `=== 'موقوف'` حرفياً بينما
+            // حارسُ الجلسة لا يقبل إلا «نشط» — فحالةٌ مكسورةُ الترميز تدخل من هنا
+            // ثم تُطرد هناك فوراً. الآن المجهولُ يفشل مغلقاً على البابين بمقياسٍ واحد.
+            if ($user->isSuspended()) {
                 $blocked = 'الحساب موقوف — راجع مالك النظام';
             } elseif ($user->expires_at && now()->toDateString() > substr((string) $user->expires_at, 0, 10)) {
                 $blocked = 'انتهت صلاحية الحساب — راجع مالك النظام';
@@ -168,6 +171,16 @@ class AuthController extends Controller
         // sessions_log فقط (بلا ختمٍ متسلسل)، فالتحقيق في «متى ومن أين دخل»
         // لم يكن مضموناً ضد العبث كما الفشل. يُختم مع رقم صفّ الجلسة.
         hub_audit('دخول ناجح', null, null, $u->name, ['after' => ['session' => $log->id, 'via' => $via ?: ($u->totp_enabled ? '2FA' : 'كلمة مرور')]]);
+
+        // (الجولة 1 · F22) حسابُ العميل يهبط في بوّابته مباشرةً: `hub_home_url` تعرف
+        // اللوحةَ والوحداتِ الداخليةَ فقط، وكانت تُحيله إلى `/` الذي يردّه PortalGuard —
+        // حلقةُ ٤٠٤ بعد الدخول. ولا `intended` له: رابطٌ داخليٌّ مقصودٌ قبل الدخول
+        // سيُحوَّل بدوره من الحارس، فالهبوطُ الصريحُ في البوّابة أوضحُ وأقصر.
+        if (hub_is_client($u)) {
+            $r->session()->forget('url.intended');
+
+            return redirect()->route('portal.home');
+        }
 
         // شاشة البداية من تفضيل المستخدم — والرابط المقصود قبل الدخول يفوز عليها
         return redirect()->intended(hub_home_url(auth()->user()));

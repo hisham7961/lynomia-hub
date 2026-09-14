@@ -24,11 +24,45 @@
         <div class="stat"><span class="ico">⛔</span><b>{{ number_format($n['absence_report']) }}</b><span>غياب لعدم التقرير</span></div>
     @endif
     <div class="stat"><span class="ico">🏝️</span><b>{{ number_format($n['leave'] ?? 0) }}</b><span>في إجازة</span></div>
+    @if (isset($roll))
+        <div class="stat"><span class="ico">❌</span><b>{{ number_format($roll['n']['absent']) }}</b><span>غائب بلا عذر</span></div>
+    @endif
     <div class="stat"><span class="ico">⏱️</span><b>{{ number_format($n['hours'] ?? 0, 1) }}</b><span>ساعة مسجَّلة</span></div>
     @if (($n['blockers'] ?? 0) > 0)
         <div class="stat"><span class="ico">🚧</span><b>{{ number_format($n['blockers']) }}</b><span>عائقاً مُبلَّغاً</span></div>
     @endif
 </div>
+
+{{-- نداءُ اليوم (الجولة ١ · F9): «من غائبٌ اليوم؟» بالأسماء — محسوبٌ بالفرق:
+     النشطون − من له ختمُ حضورٍ − من في إجازةٍ معتمدة = غائبٌ بلا عذر --}}
+@if (isset($roll))
+<div class="card">
+    <h3 class="cardtitle">📣 نداء اليوم
+        <span class="sub">— النشطون − من ختم − من في إجازة = غائبٌ بلا عذر؛ لا انتظارَ صفوفِ «غائب»</span></h3>
+    @if ($roll['weekend'])
+        <div class="sub" style="margin-bottom:8px">اليومُ عطلةٌ أسبوعية — لا يُحتسب غيابٌ بلا عذر.</div>
+    @elseif (! $roll['any_stamp'] && ! count($roll['buckets']['leave']))
+        <div class="sub" style="margin-bottom:8px">لا بيانات حضور بعد — لم يُسجَّل أيُّ ختمٍ اليوم.</div>
+    @endif
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+        @foreach ([
+            'present' => ['✅ حاضر', 'ok'],
+            'late' => ['🕘 متأخر', 'wn'],
+            'leave' => ['🏝️ في إجازة', 'ac'],
+            'absent' => ['❌ غائب بلا عذر', 'bad'],
+            'noreport' => ['📝 حاضر بلا تقرير', 'wn'],
+        ] as $k => [$label, $tone])
+            <div style="flex:1;min-width:170px">
+                <div><span class="bdg {{ $tone }}">{{ $label }}</span> <b>{{ count($roll['buckets'][$k]) }}</b></div>
+                <div class="sub" style="margin-top:4px">
+                    @forelse ($roll['buckets'][$k] as $p){{ $p['name'] }}@if(!$loop->last) · @endif
+                    @empty — @endforelse
+                </div>
+            </div>
+        @endforeach
+    </div>
+</div>
+@endif
 
 <div class="card">
     <h3 class="cardtitle">اليوم موظفاً موظفاً <span class="sub">— الحضورُ الفيزيائيّ، التقرير، والأثرُ المحتسَب منفصلةً (§12)</span></h3>

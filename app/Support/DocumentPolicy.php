@@ -19,9 +19,11 @@ use Illuminate\Support\Facades\Schema;
  *   1) المالك ⇒ سماح.
  *   2) قاعدةُ المستخدمِ الصريحة (الأخصّ): منعٌ يعلو سماحاً.
  *   3) قاعدةُ الدورِ الصريحة: منعٌ يعلو سماحاً.
- *   4) بوّابةُ الحساسية: نوعٌ حسّاسٌ (config/hub_docs · sec) بلا قاعدةٍ صريحةٍ أعلاه يستلزمُ
+ *   4) بوّابةُ تصنيفِ السجلِّ الأمّ (الجولة 1 · F21): سجلٌّ موسومٌ «سري» في حقلِ `secrecy`
+ *      يستلزمُ (docsec) على وحدتِه — إلا لرافعِ الوثيقةِ نفسِه (والمالكُ تجاوزَ في 1).
+ *   5) بوّابةُ الحساسية: نوعٌ حسّاسٌ (config/hub_docs · sec) بلا قاعدةٍ صريحةٍ أعلاه يستلزمُ
  *      تصريحَ (docsec) للوحدة (config/hub_permissions) — وإلا مُنع.
- *   5) الافتراض ⇒ سماح (السجلُّ الأمُّ مرئيٌّ أصلاً).
+ *   6) الافتراض ⇒ سماح (السجلُّ الأمُّ مرئيٌّ أصلاً).
  *
  * فلا توسيعٌ صامتٌ: بلا قاعدةٍ صريحة، يبقى السلوكُ كما كان (وصولٌ بصلاحيةِ السجل).
  */
@@ -29,6 +31,9 @@ class DocumentPolicy
 {
     /** مذكّرةُ قواعدِ المرفقاتِ للطلبِ الواحد — منعُ N+1 عند سردِ مرفقاتٍ كثيرة */
     protected static array $memo = [];
+
+    /** مذكّرةُ تصنيفِ السجلِّ الأمّ للطلب الواحد (module|record_id ⇒ «سري»؟) */
+    protected static array $secrecyMemo = [];
 
     /** قواعدُ الوصولِ لهذا المرفق (مصفوفةٌ من صفوفٍ خام) — مخزّنةٌ للطلب */
     public static function rulesFor(string $attachmentId): array
@@ -79,8 +84,31 @@ class DocumentPolicy
     /** يُبطِل المذكّرةَ لمرفقٍ (يُستدعى بعدَ إضافةِ/حذفِ قاعدة) */
     public static function forget(?string $attachmentId = null): void
     {
-        if ($attachmentId === null) self::$memo = [];
+        if ($attachmentId === null) { self::$memo = []; self::$secrecyMemo = []; }
         else unset(self::$memo[$attachmentId]);
+    }
+
+    /**
+     * **هل السجلُّ الأمُّ موسومٌ «سري»؟** (الجولة 1 · F21) — يقرأ حقلَ `secrecy` من
+     * تعريفِ الوحدة (أيُّ وحدةٍ تحمله، لا `files` بعينها — نظيرُ `auditClassifiedAccess`)
+     * ثم قيمةَ السجلِّ الأمّ. «سري» **حصراً**: «داخلي»/«عام» لا يمسّهما هذا التضييق.
+     * مُذكَّرٌ بالسجلِّ (module|record_id) فمرفقاتُ السجلِّ الواحدِ استعلامٌ واحد.
+     */
+    public static function parentRecordSecret(Attachment $a): bool
+    {
+        $key = (string) $a->module . '|' . (string) $a->record_id;
+        if (array_key_exists($key, self::$secrecyMemo)) return self::$secrecyMemo[$key];
+
+        $def = hub_mod((string) $a->module);
+        if (! $def || ! $a->record_id
+            || ! collect($def['fields'] ?? [])->firstWhere('col', 'secrecy')) {
+            return self::$secrecyMemo[$key] = false;
+        }
+        $class = '\\App\\Models\\' . ($def['model'] ?? '');
+        if (! class_exists($class)) return self::$secrecyMemo[$key] = false;
+
+        return self::$secrecyMemo[$key] =
+            (string) ($class::whereKey($a->record_id)->value('secrecy') ?? '') === 'سري';
     }
 
     /**
@@ -144,7 +172,20 @@ class DocumentPolicy
             }
         }
 
-        // 3) بوّابةُ الحساسية (Permissions 360 · م5c): نوعٌ حسّاسٌ **بلا قاعدةٍ صريحةٍ أعلاه**
+        // 3) بوّابةُ تصنيفِ السجلِّ الأمّ (الجولة 1 · F21): «سري» كان وعداً معلَناً على
+        //    الشاشة («الاطّلاع لقسم الموارد البشريّة فقط») بلا أيّ فرضٍ — فموظفُ مبيعاتٍ
+        //    فتح مسيرَ الرواتب كاملاً. يُعامَل الآن كالنوعِ الحسّاسِ تماماً (نفسُ المحرّك،
+        //    نفسُ الأسبقيّة): يلزم docsec على وحدةِ الوثيقة — إلا لرافعِها نفسِه (يديرُ ما
+        //    رفع)، والمالكُ تجاوزَ في الصدر، والقاعدةُ الصريحةُ أعلاه تعلو كنظيرتها في
+        //    بوّابةِ النوع. «داخلي»/«عام» لا يمسّهما شيء.
+        if (self::parentRecordSecret($a)
+            && (string) $a->uploaded_by !== (string) $user->id
+            && ! hub_can($user, (string) $a->module, 'docsec')) {
+            return ['allowed' => false, 'state' => 'DENIED_SECRET_RECORD',
+                'reason' => 'سجلٌّ مصنَّفٌ «سري» يستلزمُ تصريحَ الوثائقِ الحسّاسةِ لوحدته (docsec)'];
+        }
+
+        // 4) بوّابةُ الحساسية (Permissions 360 · م5c): نوعٌ حسّاسٌ **بلا قاعدةٍ صريحةٍ أعلاه**
         //    يستلزمُ تصريحَ (docsec) للوحدة. القاعدةُ الصريحةُ (سماحُ المستخدم/الدور) تعلو هذه
         //    البوّابةَ لأنّها مرّت أعلاه؛ والمنعُ الصريحُ منعَ أصلاً. المالكُ تجاوزَ في الصدر.
         if (hub_doc_sensitive((string) $a->module, $a->kind)
@@ -153,7 +194,7 @@ class DocumentPolicy
                 'reason' => 'نوعٌ حسّاسٌ يستلزمُ تصريحَ الوثائقِ الحسّاسةِ لهذه الوحدة (docsec)'];
         }
 
-        // 4) الافتراض: السجلُّ الأمُّ مرئيٌّ (guardRecord مرّ) ⇒ سماح
+        // 5) الافتراض: السجلُّ الأمُّ مرئيٌّ (guardRecord مرّ) ⇒ سماح
         return ['allowed' => true, 'state' => 'ALLOWED_INHERITED', 'reason' => 'وراثةٌ من رؤيةِ السجلِّ الأمِّ (لا قاعدةَ وثيقةٍ صريحة)'];
     }
 

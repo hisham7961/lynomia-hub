@@ -13,9 +13,13 @@
 </div>
 
 <div class="card" style="display:flex;gap:8px;flex-wrap:wrap">
-    <a class="btn {{ $status==='pending'?'':'ghost' }} sm" href="{{ route('reports.review', ['status'=>'pending']) }}">بانتظار المراجعة</a>
-    <a class="btn {{ $status==='needs_revision'?'':'ghost' }} sm" href="{{ route('reports.review', ['status'=>'needs_revision']) }}">يحتاج تنقيحاً</a>
-    <a class="btn {{ $status==='accepted'?'':'ghost' }} sm" href="{{ route('reports.review', ['status'=>'accepted']) }}">مقبول</a>
+    <a class="btn {{ $status==='pending'?'':'ghost' }} sm" href="{{ route('reports.review', ['status'=>'pending','scope'=>request('scope')]) }}">بانتظار المراجعة</a>
+    <a class="btn {{ $status==='needs_revision'?'':'ghost' }} sm" href="{{ route('reports.review', ['status'=>'needs_revision','scope'=>request('scope')]) }}">يحتاج تنقيحاً</a>
+    <a class="btn {{ $status==='accepted'?'':'ghost' }} sm" href="{{ route('reports.review', ['status'=>'accepted','scope'=>request('scope')]) }}">مقبول</a>
+    <span style="flex:1"></span>
+    {{-- نطاق الطابور (الجولة 1 · F7): مديرُ المشروع يفتح على «مشاريعي» لا على ضجيج النطاق كلّه --}}
+    <a class="btn {{ ($mineOnly ?? false)?'':'ghost' }} sm" href="{{ route('reports.review', ['status'=>$status,'scope'=>'mine']) }}">مشاريعي</a>
+    <a class="btn {{ ($mineOnly ?? false)?'ghost':'' }} sm" href="{{ route('reports.review', ['status'=>$status,'scope'=>'all']) }}">كل نطاقي</a>
 </div>
 
 <div class="card">
@@ -36,8 +40,25 @@
                 <td class="sub">{{ \Illuminate\Support\Str::limit($w->done, 48) }}</td>
                 <td class="sub mono">{{ optional($w->submitted_at)->format('m-d H:i') }}</td>
                 <td style="white-space:nowrap">
-                    @php $emp = \App\Support\ReportReview::employeeOf($w); @endphp
-                    @if ($emp)<a class="btn ghost xs" href="{{ route('reports.day', ['emp'=>$emp->id,'date'=>optional($w->work_date)->format('Y-m-d')]) }}">مراجعة ↗</a>@endif
+                    @php
+                        $emp = \App\Support\ReportReview::employeeOf($w);
+                        $canAct = \App\Support\ReportReview::canReview(auth()->user(), $w);
+                        $isPending = $w->review_status === null || $w->review_status === \App\Support\ReportReview::PENDING;
+                    @endphp
+                    {{-- القرارُ من الطابور نفسِه (الجولة 1 · F7): مديرُ المشروع بلا hr:v كان
+                         بلا أيّ سبيلِ فعلٍ — الرابطُ الوحيدُ «مراجعة ↗» خلفَ بوّابةِ HR فيعطيه 403 --}}
+                    @if ($canAct && $isPending)
+                        <form method="post" action="{{ route('reports.review.act', $w->id) }}" style="display:inline-flex;gap:4px">
+                            @csrf
+                            <button class="btn xs" name="action" value="accept">✅ قبول</button>
+                            <button class="btn ghost xs" name="action" value="needs_revision"
+                                    onclick="var f=prompt('ما المطلوب تحسينُه؟ (يصل الموظفَ نصاً)');if(!f)return false;this.form.feedback.value=f;">✏️ تنقيح</button>
+                            <input type="hidden" name="feedback" value="">
+                        </form>
+                    @endif
+                    @if ($emp && hub_can(auth()->user(), 'hr', 'v'))
+                        <a class="btn ghost xs" href="{{ route('reports.day', ['emp'=>$emp->id,'date'=>optional($w->work_date)->format('Y-m-d')]) }}">اليوم كاملاً ↗</a>
+                    @endif
                 </td>
             </tr>
         @empty

@@ -155,6 +155,19 @@ class AttachmentService
         // طبقةُ الوثيقةِ على مستوى المورد (المستوى 5/6): منعٌ صريحٌ لهذه الوثيقةِ ⇒ ٤٠٣
         DocumentPolicy::authorize(auth()->user(), $a, 'download');
 
+        return self::serve($a);
+    }
+
+    /**
+     * **تقديمُ ملفِّ المرفق بعد التخويل** — الجزءُ الخادمُ من `download` (حاجزُ
+     * الإصابة ⇒ وجودُ الملف ⇒ عدّادٌ + سجلُّ تنزيلٍ + تدقيقُ الوصولِ المصنَّف ⇒
+     * ردُّ `attachment`). استُخرج (الجولة 1 · F25) كي تستعمله بوّابةُ العميل التي
+     * تخويلُها بعضويّةِ العميل وجمهورِ الوثيقة (`visibleToClient`) + `DocumentPolicy`
+     * لا بمصفوفةِ `hub_can` الداخلية التي يفرضها `guardRecord`. **ليس** بديلاً عن
+     * التخويل: شرطُ استدعاءٍ أن يكون المُنادي حرَس (نظيرُ `CommentService::create`).
+     */
+    public static function serve(Attachment $a): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
         // مرفقٌ وُسم «مصاباً» بأداةٍ خارجية يُحجب فوراً — 423 Locked: محجوز لا مفقود
         abort_if($a->av_status === 'infected', 423, 'حُجب هذا الملف — وُسم مصاباً بفحص الفيروسات');
 

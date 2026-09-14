@@ -21,6 +21,13 @@ use Tests\TestCase;
  *
  * والحارسُ لا يمسّ الداخليّ: المالكُ وكلُّ مستخدمٍ داخليّ يبلغ ما كان يبلغه —
  * لا انحدارَ على شاشةٍ داخلية (يحرسه هنا اختبارٌ صريح + AllScreensSmokeTest كاملاً).
+ *
+ * **تحديثُ العقد (الجولة 1 · F22):** قشرةُ الوحدات `m.*` (ومعها لوحةُ التحكّم و«بوابتي»
+ * الموظفيّة) لم تعد تُفتَح لعميلٍ بتاتاً — كانت `projects/engagements/fin` تُقرأ في
+ * القشرة الداخلية، وهو قرارٌ خاصٌّ بـ`/api/v1` لا بقشرةِ إنسان. صار **طلبُ التصفّح
+ * البشريّ** (GET HTML) على هذه السطوح يُحوَّل ٣٠٢ إلى بوّابته (لا ٤٠٤ محيّرة)، بينما
+ * يبقى طلبُ JSON/AJAX والمساراتُ العميقة/الإداريّة **٤٠٤** (لا كشفَ وجود). قراءةُ
+ * العميلِ لوحداته تبقى عبر `/api/v1` (MODULE_ALLOW) وشاشاتِ بوّابته.
  */
 class WorkOsPortalGuardTest extends TestCase
 {
@@ -61,9 +68,9 @@ class WorkOsPortalGuardTest extends TestCase
             'role' => 'viewer', 'status' => 'active', 'activated_at' => now()]);
     }
 
-    /* ────────── ١) العميل ⇐ ٤٠٤ على عيّنةٍ واسعةٍ من الوحدات الداخلية ────────── */
+    /* ────────── ١) العميل لا يبلغ قشرةَ الوحدات الداخلية (F22) ────────── */
 
-    public function test_a_client_account_gets_404_on_a_broad_sample_of_internal_modules(): void
+    public function test_a_client_account_never_reaches_internal_module_shells(): void
     {
         $this->seedCore();
         // دورٌ يمنح **كلَّ** الوحدات (v/a/e) — أقصى سوءِ ضبط: لو نجت وحدةٌ لظهرت
@@ -72,13 +79,17 @@ class WorkOsPortalGuardTest extends TestCase
         $client = $this->clientUser($all);
 
         foreach (self::INTERNAL_MODULES as $mod) {
-            // القائمة، والإنشاء، والعرضُ المباشر — الأبوابُ الثلاثةُ كلُّها مغلقة
+            // (F22) التصفّحُ البشريّ (HTML) على قشرة الوحدة يُحوَّل لبوّابته لا يُعرَض
             $this->actingAs($client)->get("/m/{$mod}")
-                ->assertNotFound("قائمةُ /m/{$mod} يجب أن تكون ٤٠٤ لحساب عميل");
+                ->assertRedirect(route('portal.home'));
             $this->actingAs($client)->get("/m/{$mod}/create")
-                ->assertNotFound("إنشاءُ /m/{$mod}/create يجب أن يكون ٤٠٤ لحساب عميل");
+                ->assertRedirect(route('portal.home'));
             $this->actingAs($client)->get("/m/{$mod}/" . Str::uuid())
-                ->assertNotFound("عرضُ /m/{$mod}/{id} يجب أن يكون ٤٠٤ لحساب عميل");
+                ->assertRedirect(route('portal.home'));
+
+            // …وطلبُ JSON على القشرة نفسِها يبقى ٤٠٤ (لا كشفَ وجودٍ لمن يجسّ برمجيّاً)
+            $this->actingAs($client)->getJson("/m/{$mod}")
+                ->assertNotFound("طلبُ JSON على /m/{$mod} يبقى ٤٠٤ لحساب عميل");
         }
     }
 
@@ -120,16 +131,21 @@ class WorkOsPortalGuardTest extends TestCase
             'المصفوفةُ تمنح servers:v فعلاً — فالمنعُ من الحارس لا من غيابِ الصلاحية');
         $this->assertTrue(hub_can($client->fresh(), 'payroll', 'v'));
 
-        // …ومع ذلك الحارسُ يردّ: ٤٠٤ فوق المصفوفة
-        $this->actingAs($client)->get('/m/servers')->assertNotFound();
-        $this->actingAs($client)->get('/m/vault')->assertNotFound();
-        $this->actingAs($client)->get('/m/payroll')->assertNotFound();
-        $this->actingAs($client)->get('/m/banks')->assertNotFound();
+        // …ومع ذلك الحارسُ يردّ فوق المصفوفة: التصفّحُ البشريّ يُحوَّل لبوّابته (F22)،
+        // فلا شريطٌ داخليٌّ ولا صفٌّ من servers/vault/payroll/banks يُعرَض له.
+        $this->actingAs($client)->get('/m/servers')->assertRedirect(route('portal.home'));
+        $this->actingAs($client)->get('/m/vault')->assertRedirect(route('portal.home'));
+        $this->actingAs($client)->get('/m/payroll')->assertRedirect(route('portal.home'));
+        $this->actingAs($client)->get('/m/banks')->assertRedirect(route('portal.home'));
+
+        // وطلبُ JSON على الوحدةِ الحسّاسةِ يبقى ٤٠٤ فوق المصفوفة — لا كشفَ وجود
+        $this->actingAs($client)->getJson('/m/servers')->assertNotFound();
+        $this->actingAs($client)->getJson('/m/vault')->assertNotFound();
     }
 
-    /* ────────── ٤) القائمةُ البيضاءُ تبلُغ (لا حجبٌ شامل) ────────── */
+    /* ────────── ٤) بوّابةُ العميل تبلُغ، والقشرةُ الداخليّةُ تُحوَّل إليها (F22) ────────── */
 
-    public function test_allowlisted_client_routes_are_reachable(): void
+    public function test_client_portal_is_reachable_and_internal_shell_redirects_to_it(): void
     {
         $this->seedCore();
         $c = Client::create(['name' => 'شركة ألف', 'stage' => 'عميل حالي']);
@@ -141,13 +157,17 @@ class WorkOsPortalGuardTest extends TestCase
         $this->activeMembership($client, $c);
         Project::create(['name' => 'مشروع العميل', 'client_id' => $c->id]);
 
-        // الوحداتُ المسموحةُ تُفتح (منطَّقةً بعميله في hub_scope) — لا ٤٠٤ شاملة
-        $this->actingAs($client)->get('/m/projects')->assertOk();
-        $this->actingAs($client)->get('/m/engagements')->assertOk();
-        $this->actingAs($client)->get('/m/fin')->assertOk();
+        // (F22) قشرةُ الوحدات الداخلية ليست مكانَ عميلٍ ولو منحته المصفوفةُ الوحدة —
+        // التصفّحُ البشريّ عليها يُحوَّل ٣٠٢ إلى بوّابته لا يُعرَض له شريطُها الداخليّ.
+        $this->actingAs($client)->get('/m/projects')->assertRedirect(route('portal.home'));
+        $this->actingAs($client)->get('/m/engagements')->assertRedirect(route('portal.home'));
+        $this->actingAs($client)->get('/m/fin')->assertRedirect(route('portal.home'));
+        // و«بوابتي» الموظفيّةُ داخليّةٌ رغم اسمها — تُحوَّل كذلك (F22)
+        $this->actingAs($client)->get('/me')->assertRedirect(route('portal.home'));
 
-        // وبوابتُه الذاتيّة تُفتح — أيُّ مستخدمٍ مُصادَقٍ يبلغ «بوابتي»
-        $this->actingAs($client)->get('/me')->assertOk();
+        // وبوّابتُه هي سطحُه: الرئيسةُ ومشاريعُه (المنطَّقةُ بعميله) تُفتحان له فعلاً
+        $this->actingAs($client)->get(route('portal.home'))->assertOk();
+        $this->actingAs($client)->get(route('portal.projects'))->assertOk();
     }
 
     /* ────────── ٥) الداخليّ لا يمسّه الحارس — لا انحدار ────────── */

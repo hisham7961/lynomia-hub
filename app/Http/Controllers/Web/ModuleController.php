@@ -58,6 +58,19 @@ class ModuleController extends Controller
         $statusCol = hub_status_col($def['key'] ?? '');
         if ($statusCol && ($st = hub_str($r->input('status'))) !== '') $q->where($statusCol, $st);
 
+        // (الجولة 1 · F18) «المتأخرةُ فعلاً» بالاستحقاق لا بالحالة المكتوبة: حالةُ
+        // «متأخرة» لا يكتبها أحدٌ آلياً، ففلترُ الحالة كان يخفي المستنداتِ المتجاوزةَ
+        // استحقاقَها فعلاً. `?overdue=1` يلتقطها من الحقيقة: due فات، ولم تُسدَّد،
+        // وليست ميتة (ملغاة/مسودة) — عرضٌ جاهزٌ تشير إليه لافتةُ الوحدة.
+        if (($def['key'] ?? '') === 'fin' && $r->boolean('overdue')) {
+            $notOverdue = array_merge((array) config('hub.fin.dead', []), ['مدفوعة']);
+            $q->whereNotNull('due')->whereDate('due', '<', now()->toDateString())
+                ->where(fn ($w) => $w->whereNull('state')->orWhereNotIn('state', $notOverdue))
+                ->whereRaw('COALESCE(paid, 0) < COALESCE(total, 0)');
+            $filters[] = ['key' => 'overdue', 'label' => 'الاستحقاق', 'val' => '1',
+                          'name' => 'متأخرة فعلاً', 'rmurl' => $r->url()];
+        }
+
         $fields = collect($def['fields']);
         foreach ((array) $r->input('f', []) as $fk => $fv) {
             if ($fv === '' || ! is_string($fv) || ! is_string($fk)) continue;
@@ -280,6 +293,9 @@ class ModuleController extends Controller
             \Illuminate\Support\Facades\Cache::forget("user:{$me}:projects");
         }
 
+        // مهمةٌ تُنشأ منجزةً (إدخالٌ رجعيّ/استيراد) تُختم كما لو انتقلت (الجولة 1 · F13):
+        // كان الختمُ على التحوّل وحدَه، فبقيت «أُنجزت: 0» في لوحات الأداء لبياناتٍ منجزةٍ فعلاً
+        $this->stampTaskCompletion($module, $m, null);
         $m->save();
         $this->notifyAssignee($def, $module, $m);
         $this->bustProgress($module, $m);
@@ -498,7 +514,17 @@ class ModuleController extends Controller
             \App\Support\FlowRunner::fire('status', $module, $m, (string) $m->{$sc});
         }
 
-        return redirect()->route('m.index', $module)->with('ok', 'حُفظت التعديلات');
+        // (الجولة 1 · F14) مستندٌ ماليّ أُعيد اشتقاقُ حالته من المدفوع الفعليّ أثناء
+        // الحفظ (إجماليٌّ تغيّر على مستندٍ مدفوع، أو «مدفوعة» زُرعت بلا مدفوع):
+        // التصحيحُ لا يقع بصمت — الرسالةُ تقول ما جرى ولماذا.
+        $okMsg = 'حُفظت التعديلات';
+        if ($m instanceof \App\Models\FinDocument && $m->stateRederived) {
+            $okMsg .= ' — وأُعيد اشتقاقُ حالة المستند من المدفوع الفعليّ: «' . $m->stateRederived['from']
+                . '» ← «' . $m->stateRederived['to'] . '» (المدفوع ' . number_format((float) $m->paid, 2)
+                . ' من إجمالي ' . number_format((float) $m->total, 2) . ')';
+        }
+
+        return redirect()->route('m.index', $module)->with('ok', $okMsg);
     }
 
     public function destroy(string $module, string $id)
@@ -511,7 +537,9 @@ class ModuleController extends Controller
         $m->delete();
         $this->bustDerivedCache($module, $m);   // حذفٌ يغيّر نسبة الإنجاز والربحية — أبطلهما
 
-        return redirect()->route('m.index', $module)->with('ok', 'نُقل السجل إلى السلة');
+        // «تراجع» بجانب رسالة النجاح (الجولة 1 · F8): النقرةُ الطائشة تُصحَّح من مكانها
+        return redirect()->route('m.index', $module)->with('ok', 'نُقل السجل إلى السلة')
+            ->with('undo', route('m.restore', [$module, $m->id]));
     }
 
     public function restore(string $module, string $id)
@@ -637,7 +665,14 @@ class ModuleController extends Controller
 
     public function setStatus(Request $r, string $module, string $id)
     {
-        [$def, $class] = $this->resolve($module, 'e');
+        // (الجولة 1 · F27) **تنطيقٌ ذاتيّ للمهام**: المسنَدُ إليه يحرّك حالةَ مهمّته
+        // وتقدّمَها ولو لم يحمل `tasks:e` العامّة — سجلّي أنا أحرّكه، كالإجازات.
+        // الواجهةُ كانت جاهزة (بطاقةُ `data-mine` تُسحب وtoast يعرض رسالةَ الخادم —
+        // v2.496) والخادمُ كان يردّ ٤٠٣ قبل أن يعرف لمن البطاقة. البوّابةُ النهائيّة
+        // بعد جلبِ السجلّ المنطَّق: البطاقةُ ليست له ⇒ ٤٠٣ برسالةٍ لا صمتَ عودة.
+        $u = auth()->user();
+        $selfScope = $module === 'tasks' && ! hub_can($u, $module, 'e');
+        [$def, $class] = $this->resolve($module, $selfScope ? 'v' : 'e');
 
         // سحبُ البطاقة تعديلُ حالةٍ كأي تعديل: التعديل الفردي يصفّ طلباً،
         // والجماعي والاستعادة يُردّان — وكان السحب وحده يكتب مباشرةً.
@@ -654,6 +689,21 @@ class ModuleController extends Controller
         abort_unless($statusCol, 404);
 
         $m = $this->findScoped($class, $module, $id);
+        if ($selfScope) {
+            $mine = (string) ($m->assignee_id ?? '');
+            abort_unless($mine !== '' && $mine === (string) $u->id, 403,
+                'تغييرُ حالة المهمة يتطلب صلاحيةَ تعديل المهام — أو أن تكون المهمةُ مسنَدةً إليك');
+        }
+
+        // (F27) تقدّمُ المهمة يُحدَّث مع حالتها في الحفظة نفسها (0–100) — اختياريّ،
+        // ويحترم قناعَ الحقل كأيّ كتابة (حقلٌ «قراءة فقط» لدوره لا يُكتب بجرّة إصبع)
+        if ($module === 'tasks' && $r->filled('progress')) {
+            abort_if(hub_field_mode($u, 'tasks', 'progress') !== '', 403,
+                'حقل نسبة الإنجاز غير قابل للكتابة بصلاحيتك');
+            $p = hub_num($r->input('progress'));
+            abort_if($p === null || $p < 0 || $p > 100, 422, 'نسبةُ الإنجاز عددٌ بين 0 و100');
+            $m->progress = $p;
+        }
 
         // جوهرُ الانتقال مشترَكٌ مع سطح الجوال (الطور D · Critic F2): الحرّاسُ نفسُها
         // (قناعُ الحقل، الخياراتُ المعرَّفة، status_via_action، requires) ثم الختمُ والحفظ.
@@ -806,6 +856,21 @@ class ModuleController extends Controller
         abort_if((string) setting('security.freeze_exports', '0') === '1', 423,
             'التصدير مجمَّدٌ الآن بمفتاح طوارئٍ أمنيّ — يُرفع من مركز الأمان');
 
+        /*
+         * (الجولة 1 · F17) **قيدُ «خارج وقت العمل» على التصدير — في الحزام الواحد**:
+         * حظرُ نقل الملفات الليليّ (WorkHours) كان بلا استثناءٍ فإقفالُ الشهر ليلاً
+         * مستحيل، وكان «تصديرُ المحدد» الجماعيّ (`m.bulk`) يفلت منه أصلاً لأن مسارَه
+         * ليس في قائمة FILE_ROUTES. هنا — البابُ الواحدُ لكل بثّ CSV — يُفرَض القيدُ
+         * على المسارين معاً، وحاملُ المفتاح الدقيق `exportNight` وحده يُستثنى ويُوسَم
+         * كلُّ استعمالٍ له في التدقيق. (استثناءُ مسار `m.export` من حظرِ الوسيط نفسِه
+         * يحتاج سطرَ إعفاءٍ في Middleware/WorkHours — خارجَ ملفّات هذه الدفعة.)
+         */
+        $night = $this->exportOutsideWorkHours();
+        if ($night && ! hub_can(auth()->user(), $module, 'exportNight')) {
+            abort(403, 'نقل الملفات ممنوع خارج وقت العمل — يعود متاحاً مع بداية الدوام،'
+                . ' أو يُمنح دورُك مفتاحَ «تصدير خارج الدوام» (exportNight) لإقفالٍ ليليٍّ مشروع');
+        }
+
         $bigAt = (int) setting('security.export_stepup_rows', 0);
         $isBig = $bigAt > 0 && $count >= $bigAt;
 
@@ -816,11 +881,32 @@ class ModuleController extends Controller
 
         if (($isBig || $iccidBulk) && ($resp = hub_require_stepup())) return $resp;
 
-        // بصمة التصدير في التدقيق — تُعرض في مركز الأمان (ICCID الجماعيّ موسومٌ بذاته)
+        // بصمة التصدير في التدقيق — تُعرض في مركز الأمان (ICCID الجماعيّ موسومٌ بذاته،
+        // واستعمالُ استثناء exportNight موسومٌ «خارج الدوام» فيُرصد كلُّ إقفالٍ ليليّ)
         $label = $iccidBulk ? 'تصدير ICCID جماعي' : ($isBig ? 'تصدير كبير' : 'تصدير');
+        if ($night) $label .= ' خارج الدوام (exportNight)';
         hub_audit($label, $module, null, $count . ' ' . $unitLabel);
 
         return null;
+    }
+
+    /**
+     * (الجولة 1 · F17) هل هذا التصديرُ واقعٌ «خارج وقت العمل» المحظورُ فيه نقلُ
+     * الملفات؟ — مرآةُ شروط `Middleware/WorkHours` حرفاً بحرف (مفتاحُ التشغيل،
+     * مفتاحُ منع الملفات، غيرُ المالكين، نافذةُ strict_from → hours_start) كي لا
+     * يفترق قرارُ الحزام عن قرارِ الوسيط.
+     */
+    protected function exportOutsideWorkHours(): bool
+    {
+        if ((string) setting('sec.hours_on', '1') !== '1') return false;
+        if ((string) setting('sec.strict_files', '1') !== '1') return false;
+        $u = auth()->user();
+        if (! $u || hub_is_owner($u)) return false;
+
+        $t = now()->format('H:i');
+
+        return $t >= (string) setting('sec.strict_from', '17:00')
+            || $t < (string) setting('sec.hours_start', '08:00');
     }
 
     /**

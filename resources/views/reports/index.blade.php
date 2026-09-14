@@ -65,7 +65,15 @@
                 <td><b>{{ $emp->name }}</b>@if ($emp->dept)<div class="sub">{{ $emp->dept }}</div>@endif</td>
                 <td>@if ($c['physical'])<span class="bdg {{ hub_tone($c['physical']) }}">{{ $c['physical'] }}</span>
                     @else<span class="bdg wn">لم يسجّل</span>@endif</td>
-                <td class="mono sub">{{ $c['time_in'] ?: '—' }}@if($c['time_out']) – {{ $c['time_out'] }}@endif</td>
+                <td class="mono sub">{{ $c['time_in'] ?: '—' }}@if($c['time_out']) – {{ $c['time_out'] }}@endif
+                    {{-- F11: دخولٌ بلا انصرافٍ في يومٍ ماضٍ — لا سقوطَ صامتاً، ورابطُ تصحيحِ HR --}}
+                    @if ($c['checked_in'] && ! $c['checked_out'] && $date < \App\Support\BusinessDate::today())
+                        @if ($c['attendance'] && hub_can(auth()->user(), 'attend', 'e'))
+                            <a class="bdg wn" href="{{ route('m.edit', ['attend', $c['attendance']->id]) }}" title="صحّح صفَّ الحضور — الساعاتُ لا تُختلق">انصراف مفقود ✎</a>
+                        @else
+                            <span class="bdg wn" title="دخولٌ بلا انصراف — الساعاتُ لا تُحتسب حتى يُصحَّح">انصراف مفقود</span>
+                        @endif
+                    @endif</td>
                 <td><span class="bdg {{ $repTone($c['compliance']) }}">{{ $c['labels']['compliance'] }}</span>
                     @if ($c['late'])<span class="bdg wn">متأخّر</span>@endif</td>
                 <td class="sub">{{ \Illuminate\Support\Str::limit(collect($c['projects'])->map(fn($p)=>$projLabels[$p]??'—')->implode(' · '), 32) ?: ($c['has_non_project'] ? 'عمل داخليّ' : '—') }}</td>

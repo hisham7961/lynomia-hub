@@ -109,6 +109,7 @@ class FinDocument extends Model
      */
     public function save(array $options = []): bool
     {
+        $this->rederivePaymentState();   // (الجولة 1 · F14) قبل الحرّاس: الحالةُ المشتقّة تُشتقّ لا تُكتب
         $reviving = $this->isReviving();
         if ($reviving || $this->isRaisingLiveMilestoneTotal()) {
             return \Illuminate\Support\Facades\DB::transaction(function () use ($options, $reviving) {
@@ -137,6 +138,93 @@ class FinDocument extends Model
     {
         return (string) $e->getCode() === '23000'
             && str_contains(mb_strtolower($e->getMessage()), 'doc_no');
+    }
+
+    /**
+     * (الجولة 1 · F14) أثرُ آخرِ إعادةِ اشتقاقٍ للحالة `['from' => …, 'to' => …]` —
+     * يقرؤه المتحكّم بعد الحفظ ليقولَ للمستخدم ما جرى بدل أن يقع التصحيحُ بصمت.
+     */
+    public ?array $stateRederived = null;
+
+    /**
+     * (الجولة 1 · F14) **الحالةُ المشتقّةُ من الدفع تُشتقّ لا تُكتب**: مستندٌ «مدفوع»
+     * عُدّل إجماليُّه 2500 → 2600 كان يبقى «مدفوعة» بصمت — والمدفوعُ الفعليّ (عمود
+     * `paid`، يحرّكه زرُّ «دفع» وحده) هو مصدرُ الحقيقة. عند أيّ حفظٍ يمسّ الإجماليَّ
+     * أو المدفوعَ أو الحالةَ وكانت الحالةُ المكتوبةُ «مدفوعة»/«مدفوعة جزئياً»، يُعاد
+     * اشتقاقُها من `paid` مقابل `total`:
+     *
+     *   · مدفوعٌ ≥ الإجمالي  ⇒ «مدفوعة»
+     *   · 0 < مدفوعٌ < الإجمالي ⇒ «مدفوعة جزئياً»
+     *   · لا مدفوعَ إطلاقاً  ⇒ تعود الحالةُ السابقةُ غيرُ الدفعيّة (أو «معتمدة») —
+     *     فزرعُ «مدفوعة» من نموذج التعديل على مستندٍ لم يُدفع (البابُ الذي لم يغطِّه
+     *     حارسُ الكانبان `status_via_action` — ARCH-03) يُصحَّح هنا أيضاً.
+     *
+     * في النموذج لا المتحكّم: أبوابُ الكتابة كثيرة (النموذج، الـAPI، تنفيذُ موافقة،
+     * استعادةُ نسخة، الجماعيّ) — والحارسُ الذي يُطبَّق في بابٍ ويُنسى في آخر ليس حارساً.
+     * الإدراجُ (`! exists`) خارجه: بياناتٌ تُستورد كما هي.
+     */
+    protected function rederivePaymentState(): void
+    {
+        if (! $this->exists) return;
+        if (! $this->isDirty('total') && ! $this->isDirty('paid') && ! $this->isDirty('state')) return;
+
+        $payStates = ['مدفوعة', 'مدفوعة جزئياً'];
+        $cur = (string) $this->state;
+        if (! in_array($cur, $payStates, true)) return;
+
+        $paid = round((float) ($this->paid ?? 0), 3);
+        $total = round((float) ($this->total ?? 0), 3);
+        $orig = (string) $this->getRawOriginal('state');
+        $derived = $paid <= 0
+            ? ($orig !== '' && ! in_array($orig, $payStates, true) ? $orig : 'معتمدة')
+            : ($paid >= $total ? 'مدفوعة' : 'مدفوعة جزئياً');
+
+        if ($derived !== $cur) {
+            $this->state = $derived;
+            $this->stateRederived = ['from' => $cur, 'to' => $derived];
+        }
+    }
+
+    /**
+     * (الجولة 1 · F18) **متأخرةٌ فعلاً؟** — أيامُ تجاوزِ الاستحقاق محسوبةً من الحقيقة
+     * (`due` فات واليومُ لم يُسدَّد) لا من حالةِ «متأخرة» المكتوبة — التي لا يكتبها
+     * أحدٌ آلياً فيخفي فلترُ الحالةِ المستنداتِ المتجاوزةَ فعلاً. يعيد عددَ الأيام،
+     * أو null لغير المتأخر (مسدَّدة/ميتة/مستقبليّة/بلا استحقاق).
+     */
+    public static function overdueDays(self $doc): ?int
+    {
+        $due = $doc->due;
+        if (! $due) return null;
+        $due = $due instanceof \Carbon\CarbonInterface
+            ? $due->copy()->startOfDay()
+            : \Illuminate\Support\Carbon::parse((string) $due)->startOfDay();
+        if (! $due->lt(now()->startOfDay())) return null;
+
+        $state = (string) ($doc->state ?? '');
+        if ($state === 'مدفوعة' || self::isDeadState($state)) return null;
+        $total = (float) ($doc->total ?? 0);
+        if ($total > 0 && (float) ($doc->paid ?? 0) >= $total) return null;
+
+        return (int) $due->diffInDays(now()->startOfDay());
+    }
+
+    /**
+     * (الجولة 1 · F18) **عمودُ «العميل / المورد» لا يبقى فارغاً والربطُ قائم**: السجلُّ
+     * يُربط بمرجع `client_id` بينما القوائمُ والتصديرُ تقرأ عمودَ `partner` النصيّ —
+     * فبدا «عمودُ العميل فارغاً في كل الصفوف» رغم أن العميل مرتبط. الفراغُ يسقط على
+     * اسمِ العميل المرتبط، والنصُّ المُدخلُ يدوياً يبقى الفائز. خبيئةٌ ساكنةٌ لكل معرّفٍ
+     * داخل الطلب الواحد كي لا يستعلم التصديرُ (٥٠٠٠ صف) عن الاسم نفسِه مرّتين.
+     */
+    protected static array $partnerNameCache = [];
+
+    public function getPartnerAttribute($v)
+    {
+        if ($v !== null && $v !== '') return $v;
+        $cid = (string) ($this->attributes['client_id'] ?? '');
+        if ($cid === '') return $v;
+
+        return self::$partnerNameCache[$cid]
+            ??= (string) (Client::withTrashed()->whereKey($cid)->value('name') ?? '');
     }
 
     /** حالةٌ ميتة؟ — التعريفُ الواحد: `config('hub.fin.dead')` (ملغاة/مسودة)؛ والفراغُ حيّ */

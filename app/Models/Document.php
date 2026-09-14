@@ -56,6 +56,14 @@ class Document extends Model
 
     protected static function booted(): void
     {
+        // رافعُ الوثيقة يُختم عند الإنشاء (الجولة 1 · F21ب) — كان العمودُ فارغاً في
+        // كلِّ السجلّات فبندُ «رافعُها يرى وثيقتَه السريّة» في hub_scope('files')
+        // ميّتٌ بلا هذا الختم (نظيرُ WorkUpdate). القديمُ يبقى فارغاً — فيحجبه
+        // «سري» عن غير حاملي docsec، وهي الجهةُ الآمنة.
+        static::creating(function (self $doc): void {
+            if (! $doc->created_by && auth()->id()) $doc->created_by = auth()->id();
+        });
+
         // حارسُ الجمهور — «enum التطبيق» البديلُ عن DB enum (C10): الفراغُ يعود إلى
         // `internal` (وثيقةٌ بلا جمهورٍ صريحٍ داخليّةٌ لا تسرّبَ للعميل)، وأيُّ قيمةٍ
         // خارج allowlist تُرفض قبل الكتابة. إضافةُ قيمةٍ مستقبلاً سطرٌ هنا لا ALTER.

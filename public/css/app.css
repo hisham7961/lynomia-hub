@@ -1043,6 +1043,12 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
 /* أزرارُ إجراءٍ أيقونيّة — خفيفةٌ تُضيء عند المرور على الصف */
 .lx-acts{opacity:.6;transition:opacity var(--t)}
 .lx-list .tbl tbody tr:hover .lx-acts{opacity:1}
+/* v2.496 (F36): اسمُ السجل في الجدول رابطٌ للعرض — لونُ النصّ نفسُه وخطٌّ عند المرور */
+.lx-link{color:inherit;text-decoration:none;font-weight:600}
+.lx-link:hover{color:var(--p);text-decoration:underline}
+/* v2.496 (F4): بطاقةُ زميلٍ في دليل الفريق (العرضُ الأدنى) */
+.team-card{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--ln);border-radius:12px;background:var(--cd)}
+.team-card .sub{font-size:12px}
 .lx-ib{display:inline-flex;align-items:center;justify-content:center;width:31px;height:31px;border-radius:9px;
   border:1px solid transparent;background:transparent;cursor:pointer;font-size:14px;color:var(--sb);transition:all var(--t);text-decoration:none}
 .lx-ib:hover{background:color-mix(in srgb,var(--p) 8%,transparent);color:var(--p)}

@@ -168,6 +168,21 @@ if (! function_exists('hub_scope')) {
             $q->whereIn('kind', \App\Support\ClientPortalData::CLIENT_INVOICE_KINDS);
         }
 
+        /*
+         * الجولة 1 · F21ب — **سجلُّ الوثيقةِ «سري» نفسُه** لا مرفقُها فقط: كانت
+         * DocumentPolicy تحجب الملفَّ والرابطَ الخام، بينما صفحةُ السجلِّ والقائمةُ
+         * تكشفان الاسمَ والرقمَ والوصفَ لأيّ حامل files:v (موظّفُ مبيعاتٍ فتح
+         * «مسير رواتب» كاملاً — وكيل المحاكاة 8، وأكّدته إعادةُ الرحلات حيّاً).
+         * الحجبُ في طبقة العزل فيسري على كلِّ بابِ قراءة (قائمة/سجل/بحث/تصدير/
+         * API/مزامنة): «سري» يُرى لحامل docsec على الوحدة أو رافعِ الوثيقة —
+         * والمالكُ لا يمرّ من هنا أصلاً (يعود قبل النطاق).
+         */
+        if ($module === 'files' && ! hub_can($user, 'files', 'docsec')) {
+            $q->where(fn ($w) => $w->where('secrecy', '!=', 'سري')
+                ->orWhereNull('secrecy')
+                ->orWhere('created_by', (string) $user->id));
+        }
+
         return $q;
     }
 }
@@ -645,12 +660,20 @@ if (! function_exists('hub_ref_options')) {
         if (! $table) return [];
 
         $disp = hub_ref_display($ref);
-        $rows = \Illuminate\Support\Facades\DB::table($table)
-            ->whereNull('deleted_at')
-            ->orderBy($disp)
-            ->limit(500)
-            ->pluck($disp, 'id')
-            ->all();
+        $q = \Illuminate\Support\Facades\DB::table($table)->whereNull('deleted_at');
+
+        /*
+         * حساباتُ العملاء ليست «أشخاصاً داخليّين» (الجولة 1 · F32): مرجعُ `users`
+         * يغذّي حقولَ المسؤول/المدير/المسنَد إليه في كلّ الوحدات، فظهرت عبير
+         * وسامي (بوّابة عملاء) خيارَين لإسناد مهمّةٍ داخليّة ومديرَ طلبِ إجازة
+         * (وكيلا المحاكاة 2 و8). تُستبعد هنا مرّةً واحدة؛ وقيمةٌ قائمةٌ محفوظةٌ
+         * (`$ensure`) تبقى تُسترجَع كي لا يَعمى نموذجُ تحريرِ سجلٍّ قديم.
+         */
+        if ($ref === 'users' && hub_has_col('users', 'account_type')) {
+            $q->where(fn ($w) => $w->whereNull('account_type')->orWhere('account_type', '!=', 'client'));
+        }
+
+        $rows = $q->orderBy($disp)->limit(500)->pluck($disp, 'id')->all();
 
         $need = array_filter(array_diff(array_map('strval', array_filter((array) $ensure)), array_map('strval', array_keys($rows))));
         if ($need) {
@@ -2472,11 +2495,15 @@ if (! function_exists('hub_project_health')) {
             $pl = hub_project_pl($projectId);
             $f = [];
 
-            // ١) الالتزام بالموعد
+            // ١) الالتزام بالموعد — منحنى صريح لا مجامل (الجولة 1 · F12): كان
+            // `100−2×أيام` يمنح مشروعاً متأخراً خمسة أيام 90/100 «سليم» (وكيلا
+            // المحاكاة 2 و4). النقطة الآن 5 لكل يوم، و8 للمشروع العاجل — فالتأخّر
+            // في عاجلٍ أفدح بحكم أولويّته المعلنة.
             $delay = $pl['delay']['days'] ?? 0;
+            $urgent = in_array(trim((string) ($p->priority ?? '')), ['عاجلة', 'عاجل'], true);
             $f[] = ['k' => 'الالتزام بالموعد', 'w' => 25,
-                    's' => $delay <= 0 ? 100 : max(0, 100 - $delay * 2),
-                    'note' => $delay > 0 ? "متأخر {$delay} يوماً" : 'ضمن الموعد'];
+                    's' => $delay <= 0 ? 100 : max(0, 100 - $delay * ($urgent ? 8 : 5)),
+                    'note' => $delay > 0 ? "متأخر {$delay} يوماً" . ($urgent ? ' — مشروع عاجل' : '') : 'ضمن الموعد'];
 
             // ٢) الالتزام بالميزانية
             $bs = 100; $bn = 'لا ميزانية معتمدة';
@@ -2525,9 +2552,23 @@ if (! function_exists('hub_project_health')) {
 
             $score = (int) round(array_sum(array_map(fn ($x) => $x['s'] * $x['w'], $f)) / 100);
 
+            /*
+             * الحالةُ التشغيليّة فوق الحساب (الجولة 1 · F12): مشروعٌ «متوقف» كان
+             * يخرج «94 · سليم» لأن التوقّف لا يولّد تأخّراً ولا تذاكرَ — والعوامل
+             * كلُّها هادئةٌ هدوءَ الموتى. المتوقّفُ لا يُقاس سليماً: سقفُ درجته 60
+             * ولقبُه يقول حالته.
+             */
+            $paused = in_array(trim((string) ($p->status ?? '')), ['متوقف', 'متوقفة', 'معلّق', 'معلق'], true);
+            if ($paused) {
+                $score = min($score, 60);
+                $f[] = ['k' => 'الحالة التشغيلية', 'w' => 0, 's' => 0,
+                        'note' => 'المشروع متوقف — الهدوء هنا توقّفٌ لا عافية'];
+            }
+
             return ['score' => $score, 'factors' => $f,
-                    'tone' => $score >= 80 ? 'ok' : ($score >= 55 ? 'wn' : 'bad'),
-                    'label' => $score >= 80 ? 'سليم' : ($score >= 55 ? 'يحتاج انتباهاً' : 'متعثر')];
+                    'tone' => $paused ? 'wn' : ($score >= 80 ? 'ok' : ($score >= 55 ? 'wn' : 'bad')),
+                    'label' => $paused ? 'متوقف — بانتظار قرار'
+                        : ($score >= 80 ? 'سليم' : ($score >= 55 ? 'يحتاج انتباهاً' : 'متعثر'))];
         });
     }
 }
@@ -2550,9 +2591,25 @@ if (! function_exists('hub_project_health_for')) {
         $wsum = array_sum(array_map(fn ($x) => (int) $x['w'], $f)) ?: 1;
         $score = (int) round(array_sum(array_map(fn ($x) => $x['s'] * $x['w'], $f)) / $wsum);
 
-        return ['score' => $score, 'factors' => $f,
-                'tone' => $score >= 80 ? 'ok' : ($score >= 55 ? 'wn' : 'bad'),
-                'label' => $score >= 80 ? 'سليم' : ($score >= 55 ? 'يحتاج انتباهاً' : 'متعثر')];
+        // الأوزانُ المعروضةُ تجمع 100 (الجولة 1 · F12): بعد إسقاط عاملٍ كانت
+        // البطاقة تعرض أوزاناً مجموعُها 80 فيَحار القارئ أين ذهب الخُمس.
+        $shown = array_map(function ($x) use ($wsum) {
+            $x['w'] = (int) $x['w'] > 0 ? (int) round($x['w'] * 100 / $wsum) : 0;
+            return $x;
+        }, $f);
+        $wshown = array_sum(array_column($shown, 'w'));
+        foreach ($shown as $i => $x) {
+            if ($x['w'] > 0) { $shown[$i]['w'] += 100 - $wshown; break; }   // فتاتُ التقريب لأول عامل
+        }
+
+        // لقبُ الأصل ونبرتُه يبقيان إن كانا حُكماً تشغيليّاً (متوقف) لا حساباً
+        $paused = ($h['label'] ?? '') === 'متوقف — بانتظار قرار';
+        if ($paused) $score = min($score, 60);
+
+        return ['score' => $score, 'factors' => $shown,
+                'tone' => $paused ? 'wn' : ($score >= 80 ? 'ok' : ($score >= 55 ? 'wn' : 'bad')),
+                'label' => $paused ? 'متوقف — بانتظار قرار'
+                    : ($score >= 80 ? 'سليم' : ($score >= 55 ? 'يحتاج انتباهاً' : 'متعثر'))];
     }
 }
 

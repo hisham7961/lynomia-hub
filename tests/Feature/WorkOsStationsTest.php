@@ -158,8 +158,10 @@ class WorkOsStationsTest extends TestCase
         $this->assertTrue(hub_can($client->fresh(), 'stations', 'v'),
             'المصفوفةُ تمنح stations:v فعلاً — فالمنعُ من الحارس لا من غيابِ الصلاحية');
 
-        $this->actingAs($client)->get('/m/stations')->assertNotFound();
-        $this->actingAs($client)->get('/m/stations/create')->assertNotFound();
-        $this->actingAs($client)->get('/m/stations/' . Str::uuid())->assertNotFound();
+        // v2.496 (F22): الحارسُ يحوِّل تصفّحَ العميل للبوّابة فوق المصفوفة —
+        // ردٌّ موحَّدٌ للقائمة والإنشاء والسجلّ (الموجودِ والمعدوم) بلا كشفِ وجود
+        $this->actingAs($client)->get('/m/stations')->assertRedirect(route('portal.home'));
+        $this->actingAs($client)->get('/m/stations/create')->assertRedirect(route('portal.home'));
+        $this->actingAs($client)->get('/m/stations/' . Str::uuid())->assertRedirect(route('portal.home'));
     }
 }

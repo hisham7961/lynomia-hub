@@ -2,6 +2,9 @@
      موبايل أولاً: زرٌّ واحدٌ كبير، والسياق (وضع/مشروع) اختياريٌّ بجانبه. --}}
 @php
     $wAtt = $data['att'] ?? null;
+    // الزرُّ لمن يملكه فقط (الجولة 1 · F28): «＋ بند عمل» كان يُعرض لمن دورُه
+    // عرضٌ فقط ثم يقوده إلى 403 — الزرُّ يُحجب ومكانَه إشارةٌ صادقةٌ موجزة.
+    $wCanAdd = hub_can(auth()->user(), 'updates', 'a');
     // عدّادٌ حيٌّ لمدّة العمل منذ الحضور: تُحسَب الثواني المنقضيةُ **خادميّاً** لحظةَ العرض،
     // ثمّ يعدُّ المتصفّحُ صعوداً منها بفارقِ ساعتِه هو — فلا حسابَ منطقةٍ زمنيّةٍ ولا انحرافَ
     // ساعةٍ على العميل. يظهرُ ما دام حاضراً ولم ينصرف؛ عند الانصراف تحلُّ «ساعاتُ اليوم» محلَّه.
@@ -76,7 +79,7 @@
                 <b>{{ $data['entries'] }}</b> <span class="sub">({{ $data['hours'] }} س)</span></div>
             <span class="spacer"></span>
             <a class="btn ghost sm" href="{{ route('reports.mine') }}">📝 تقرير اليوم</a>
-            <a class="btn ghost sm" href="{{ route('m.create', 'updates') }}">＋ بند عمل</a>
+            @if ($wCanAdd)<a class="btn ghost sm" href="{{ route('m.create', 'updates') }}">＋ بند عمل</a>@endif
             @if (! $wAtt->time_out)
                 <form method="POST" action="{{ route('workday.out') }}" class="inline"
                       data-confirm="تسجيل الانصراف الآن؟{{ $data['entries'] === 0 ? ' تقريرُك اليومي ما زال فارغاً.' : '' }}">
@@ -85,7 +88,10 @@
                 </form>
             @endif
         </div>
-        @if (! $wAtt->time_out && $data['entries'] === 0)
+        @if (! $wAtt->time_out && $data['entries'] === 0 && ! $wCanAdd)
+            {{-- لا حثَّ على فعلٍ لا يملكه (F28) — بل دلالةٌ صادقة على المخرج --}}
+            <div class="sub" style="margin-top:6px">دورك للعرض فقط — لإضافة بنود العمل اطلب صلاحيّتها من مديرك.</div>
+        @elseif (! $wAtt->time_out && $data['entries'] === 0)
             <div class="sub" style="margin-top:6px">لم تكتب بندَ عملٍ بعد — بندٌ لكل مشروعٍ عملتَ عليه اليوم،
                 وساعاتُه تدخل مهمتَه تلقائياً.</div>
         @endif

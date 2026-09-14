@@ -239,20 +239,20 @@ class WorkOsProjectRoomsTest extends TestCase
             ->assertSee('🔒 الغرفة الداخلية')->assertSee('🤝 غرفة العميل')
             ->assertSee('سرٌّ داخليٌّ محجوبٌ عن العميل');
 
-        // العميلُ يبلغ الشاشةَ الداخليّة (projects ضمن MODULE_ALLOW) لكن لا لوحةَ غرفةٍ
-        // تُعرَض له هنا ولا سرٌّ داخليّ — غرفتُه في بوابته لا في هذه الشاشة.
+        // (الجولة 1 · F22) قشرةُ الوحدة الداخلية لم تعد مكانَ عميلٍ بتاتاً: تصفّحُه
+        // البشريّ لها يُحوَّل ٣٠٢ إلى بوّابته — فلا لوحةَ غرفةٍ ولا سرٌّ داخليٌّ
+        // يُعرَض له أصلاً (الحجبُ صار على مستوى القشرة لا محتواها). غرفتُه في بوّابته.
         $cu = $this->clientUser([$a], ['projects' => ['v' => 1]]);
-        $res = $this->actingAs($cu)->get('/m/projects/' . $p->id)->assertOk();
-        $res->assertDontSee('🔒 الغرفة الداخلية');
-        $res->assertDontSee('سرٌّ داخليٌّ محجوبٌ عن العميل');
+        $this->actingAs($cu)->get('/m/projects/' . $p->id)->assertRedirect(route('portal.home'));
     }
 
     /* ────────── ٦) عزلُ العميل فوق المصفوفة: لا مرفقٌ داخليٌّ على الشاشة الداخليّة ────────── */
 
     /**
      * محقّق C1 «الحارسُ يغلب المصفوفة»: عميلٌ مُساءُ الضبط (دورُه يمنحه projects:v بالخطأ)
-     * يبلغ /m/projects/{id} — لكن المرفقاتِ والإصداراتِ والخطَّ الزمنيَّ الداخليّةَ محجوبةٌ
-     * عنه في المتحكّم (ModuleController::show) حتى لو نفذ من المصفوفة. سطحُه بوّابتُه.
+     * لا يبلغ /m/projects/{id} أصلاً — (الجولة 1 · F22) تصفّحُه البشريّ للقشرة الداخلية
+     * يُحوَّل ٣٠٢ إلى بوّابته فوق المصفوفة، فلا مرفقٌ ولا إصدارٌ ولا خطٌّ زمنيٌّ داخليّ
+     * يُعرَض له. سطحُه بوّابتُه (المرفقاتُ محكومةٌ في ModuleController::show كذلك دفاعاً في العمق).
      */
     public function test_a_misconfigured_client_never_sees_internal_attachments_on_the_internal_screen(): void
     {
@@ -272,8 +272,9 @@ class WorkOsProjectRoomsTest extends TestCase
         $this->actingAs($this->owner)->get('/m/projects/' . $p->id)->assertOk()
             ->assertSee('عقدٌ_داخليٌّ_سرّيّ');
 
-        // العميلُ يبلغ الشاشةَ (مصفوفتُه مُساءةُ الضبط) لكن لا يرى المرفقَ الداخليّ
-        $this->actingAs($cu)->get('/m/projects/' . $p->id)->assertOk()
-            ->assertDontSee('عقدٌ_داخليٌّ_سرّيّ');
+        // العميلُ (مصفوفتُه مُساءةُ الضبط) لا يبلغ الشاشةَ الداخليّةَ أصلاً — يُحوَّل لبوّابته
+        $this->actingAs($cu)->get('/m/projects/' . $p->id)->assertRedirect(route('portal.home'));
+        // وطلبُ JSON على القشرةِ نفسِها يبقى ٤٠٤ فوق المصفوفة — لا كشفَ محتوى
+        $this->actingAs($cu)->getJson('/m/projects/' . $p->id)->assertNotFound();
     }
 }

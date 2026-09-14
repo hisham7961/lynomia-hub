@@ -44,6 +44,17 @@ class NotificationLink
      */
     public static function webUrl(HubNotification $n): string
     {
+        /*
+         * إشعارُ العهدة لمن **لا يملك وحدةَ الأصول** يفتح «عهدتي» لا شاشةَ الوحدة:
+         * كان «سُجّلت باسمك عهدة» يقود حاملَها إلى m.show فيصطدم بـ404/403
+         * (الجولة 1 · وكيل 10) — الحيازةُ خدمةٌ ذاتيّةٌ سطحُها بوّابةُ الموظّف.
+         * من يملك الوحدةَ يبقى على شاشتِها الكاملة.
+         */
+        if ((string) $n->kind === 'custody'
+            && ($u = auth()->user()) && ! hub_can($u, 'assets', 'v')) {
+            return route('portal.custody');
+        }
+
         return ($n->module && $n->record_id && hub_mod((string) $n->module))
             ? route('m.show', [$n->module, $n->record_id])
             : route('notifications.index');

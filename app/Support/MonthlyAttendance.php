@@ -14,9 +14,16 @@ use Illuminate\Support\Collection;
  * اعتمده المدير/الموارد البشرية §41). منه شاشةُ «الحضور الشهريّ» ومصفوفةُ المحاسب
  * والتصديرُ — كلُّها من مصدرٍ واحد، منطَّقةٌ شركةً وصلاحيّة.
  *
- * التمييزُ الحاسمُ في السجلّ: يومٌ **بلا صفِّ حضورٍ ولا إجازةٍ** ليس «غياباً» بل «غير
- * مسجَّل/عطلة» — الغيابُ حصراً لصفٍّ مختومٍ «غائب» (يختمه كنسُ نهاية اليوم لأيّامِ
- * العملِ فقط). فلا تُحسَب العطلُ غياباً في كشفِ الراتب.
+ * التمييزُ الحاسمُ في السجلّ (الجولة ١ · F10): يومٌ بلا صفِّ حضورٍ ولا إجازةٍ يُصنَّف
+ * بطبيعتِه لا بقالبٍ واحد — **المستقبلُ** «—» (لم يقع بعد)، و**عطلةُ الأسبوع** (من
+ * إعدادِ `cost.weekend` نفسِه الذي تقرؤه `hub_workdays`) «عطلة»، و**اليومُ الجاري**
+ * «—» (لم ينتهِ)، و**يومُ العملِ الماضي** وحدَه «غائب» — محسوباً بالفرقِ لا بانتظارِ
+ * صفٍّ مختومٍ لن يكتبَه أحد. فلا تُحسَب العطلُ ولا المستقبلُ غياباً في كشفِ الراتب.
+ *
+ * عقدُ العدّادات قائمٌ (الإضافةُ لا الكسر): `absent` يبقى للصفِّ المختومِ «غائب»
+ * حصراً، و`off` مظلّةُ كلِّ يومٍ غيرِ مسجَّل كما كان — والجديدُ عدّاداتٌ منفصلة:
+ * `unexcused` (غيابٌ مشتقٌّ من الفرق)، و`missing_out` (شذوذُ «انصرافٍ مفقود» —
+ * دخولٌ بلا انصرافٍ في يومٍ ماضٍ · F11) — ظاهرةٌ لا ساقطةٌ بصمت.
  */
 class MonthlyAttendance
 {
@@ -41,6 +48,24 @@ class MonthlyAttendance
         return BusinessDate::now()->format('Y-m');
     }
 
+    /**
+     * أيامُ عطلةِ الأسبوع (ترقيمُ ISO: ٥=الجمعة ٦=السبت) — من إعدادِ `cost.weekend`
+     * نفسِه الذي تقرؤه `hub_workdays` وكنسُ نهايةِ اليوم: مصدرٌ واحدٌ للعطلة.
+     */
+    public static function weekendDays(): array
+    {
+        $off = array_filter(array_map('intval', preg_split('/[،,\s]+/u',
+            (string) setting('cost.weekend', '5,6'), -1, PREG_SPLIT_NO_EMPTY)));
+
+        return $off ?: [5, 6];
+    }
+
+    /** هل التاريخُ 'Y-m-d' يقع في عطلةِ الأسبوع؟ */
+    public static function isWeekend(string $date): bool
+    {
+        return in_array((int) date('N', strtotime($date)), self::weekendDays(), true);
+    }
+
     /* ═══════════ سجلُّ موظّفٍ واحدٍ في شهر ═══════════ */
 
     public static function sheet(Employee $emp, string $month): array
@@ -49,10 +74,10 @@ class MonthlyAttendance
         $dates = self::daysOf($month);
         $cells = DailyWorkCompliance::resolveRange(collect([$emp]), $dates)[$emp->id] ?? [];
 
-        $rows = []; $tot = self::zeroTotals();
+        $rows = []; $tot = self::zeroTotals(); $today = BusinessDate::today();
         foreach ($dates as $d) {
             $c = $cells[$d] ?? null;
-            $row = self::classify($d, $c);
+            $row = self::classify($d, $c, $today);
             self::accumulate($tot, $row, $c);
             $rows[] = $row;
         }
@@ -70,12 +95,12 @@ class MonthlyAttendance
         $dates = self::daysOf($month);
         $range = DailyWorkCompliance::resolveRange($emps, $dates);
 
-        $out = [];
+        $out = []; $today = BusinessDate::today();
         foreach ($emps as $emp) {
             $tot = self::zeroTotals();
             foreach ($dates as $d) {
                 $c = $range[$emp->id][$d] ?? null;
-                self::accumulate($tot, self::classify($d, $c), $c);
+                self::accumulate($tot, self::classify($d, $c, $today), $c);
             }
             $tot['reported_hours'] = round($tot['reported_hours'], 2);
             $tot['attendance_hours'] = round($tot['attendance_hours'], 2);
@@ -87,36 +112,50 @@ class MonthlyAttendance
     /* ────────── تصنيفُ اليوم ────────── */
 
     /**
-     * صنفُ يومٍ للعرض والعدّ. يوم بلا صفِّ حضورٍ ولا إجازة = «off» (عطلة/غير مسجَّل)
-     * لا غياب. الغيابُ حصراً لصفٍّ مختومٍ «غائب».
+     * صنفُ يومٍ للعرض والعدّ (F10). للصفوفِ الفعليّة: leave/present/absent (مختوم).
+     * ولليومِ بلا صفٍّ ولا إجازة — بطبيعتِه: **future** (مستقبلٌ · «—»)، **holiday**
+     * (عطلةُ الأسبوع · «عطلة»)، **off** (اليومُ الجاري لم ينتهِ · «—»)، **unexcused**
+     * (يومُ عملٍ ماضٍ بلا ختمٍ وبلا إجازة · «غائب» — بالفرق). ولا حالةَ محتسبةً
+     * تُعرَض لِما لم يقع (مستقبل/عطلة/اليوم الجاري).
      */
-    protected static function classify(string $date, ?array $c): array
+    protected static function classify(string $date, ?array $c, string $today): array
     {
         if (! $c) {
             return ['date' => $date, 'kind' => 'off', 'label' => '—', 'tone' => '',
-                'time_in' => null, 'time_out' => null, 'hours' => 0.0,
-                'report' => null, 'effective' => null];
+                'time_in' => null, 'time_out' => null, 'hours' => 0.0, 'missing_out' => false,
+                'att_id' => null, 'report' => null, 'effective' => null, 'effective_key' => null];
         }
         $kind = $c['on_leave'] ? 'leave'
             : ($c['checked_in'] ? 'present'
-                : ($c['attendance'] ? 'absent' : 'off'));
+                : ($c['attendance'] ? 'absent'
+                    : ($date > $today ? 'future'
+                        : (self::isWeekend($date) ? 'holiday'
+                            : ($date === $today ? 'off' : 'unexcused')))));
+
+        // مستقبلٌ/عطلةٌ/يومٌ جارٍ: لا «غائب» محتسبًا يُفترى على ما لم يقع (F10)
+        $noVerdict = in_array($kind, ['future', 'holiday', 'off'], true);
 
         return [
             'date' => $date,
             'kind' => $kind,
             'label' => match ($kind) {
-                'leave' => 'إجازة', 'absent' => 'غائب', 'off' => '—',
+                'leave' => 'إجازة', 'absent' => 'غائب', 'unexcused' => 'غائب',
+                'holiday' => 'عطلة', 'future' => '—', 'off' => '—',
                 default => $c['labels']['physical'] ?? 'حاضر',
             },
             'tone' => match ($kind) {
-                'present' => 'ok', 'leave' => 'ac', 'absent' => 'bad', default => '',
+                'present' => 'ok', 'leave' => 'ac', 'absent' => 'bad', 'unexcused' => 'bad',
+                default => '',
             },
             'time_in' => $c['time_in'], 'time_out' => $c['time_out'],
             'hours' => (float) $c['hours'],
+            // F11: دخولٌ بلا انصرافٍ في يومٍ ماضٍ — شذوذٌ يُوسَم، لا ساعاتٌ تُختلق
+            'missing_out' => $c['checked_in'] && ! $c['checked_out'] && $date < $today,
+            'att_id' => $c['attendance']?->id,
             'report' => $kind === 'present' ? $c['labels']['compliance'] : null,
             'compliance_key' => $c['compliance'] ?? null,
-            'effective' => $c['labels']['effective'] ?? null,
-            'effective_key' => $c['effective'] ?? null,
+            'effective' => $noVerdict ? null : ($c['labels']['effective'] ?? null),
+            'effective_key' => $noVerdict ? null : ($c['effective'] ?? null),
             'late' => (bool) ($c['late'] ?? false),
             'state' => $c['state'] ?? null,
         ];
@@ -126,12 +165,17 @@ class MonthlyAttendance
     {
         return ['present' => 0, 'late' => 0, 'field' => 0, 'leave' => 0, 'absent' => 0,
             'reported' => 0, 'missing' => 0, 'absence_report' => 0, 'off' => 0,
+            'future' => 0, 'holiday' => 0, 'unexcused' => 0, 'missing_out' => 0,
             'attendance_hours' => 0.0, 'reported_hours' => 0.0, 'workdays' => 0];
     }
 
     protected static function accumulate(array &$t, array $row, ?array $c): void
     {
-        $t[$row['kind']] = ($t[$row['kind']] ?? 0) + 1;   // present/leave/absent/off
+        $t[$row['kind']] = ($t[$row['kind']] ?? 0) + 1;   // present/leave/absent/off/future/holiday/unexcused
+        // المظلّةُ القديمة باقية (الإضافةُ لا الكسر): كلُّ يومٍ غيرِ مسجَّلٍ يُحصى «off»
+        // كما كان — فعقدُ «العطلُ غيرُ المسجَّلة ليست غياباً في كشف الراتب» لا يُمسّ
+        if (in_array($row['kind'], ['future', 'holiday', 'unexcused'], true)) $t['off']++;
+        if ($row['missing_out'] ?? false) $t['missing_out']++;   // F11: شذوذُ الشهرِ ظاهرٌ
         if (! $c) return;
 
         // أيامُ العملِ المسجَّلة (حضورٌ فعليّ) — تُميّز المتأخّرَ والميدانيّ

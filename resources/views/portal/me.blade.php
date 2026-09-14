@@ -24,6 +24,29 @@
     </div>
 </div>
 
+{{-- ── أوّل أسبوع (الجولة 1 · F29): دليلُ الأيام الأولى بدل «يوم هادئ» وستةِ أصفار.
+     البياناتُ من Staff::firstWeek — استعلاماتٌ خفيفةٌ لا تجري إلا داخل نافذة 14 يوماً،
+     وكلُّ رابطٍ يُعرض فقط إن كان بابُه مفتوحاً لدور صاحبه (لا رابطَ يقود إلى 403). ── --}}
+@php $fw = \App\Support\Staff::firstWeek(auth()->user(), $emp); @endphp
+@if ($fw)
+    <div class="card" style="margin-bottom:12px;border-inline-start:4px solid var(--ok,#27ae60)">
+        <h3 style="margin-bottom:4px">🌱 أوّل أسبوع؟ خطواتك الأولى هنا</h3>
+        <div class="sub" style="margin-bottom:8px">أهلاً بك — أربعُ خطواتٍ تجعل أيامك الأولى واضحة،
+            وتختفي هذه البطاقة وحدها بعد أسبوعين.</div>
+        @foreach ($fw['items'] as $it)
+            <div style="display:flex;gap:9px;align-items:center;padding:5px 0;border-bottom:1px solid var(--ln)">
+                <span style="flex:none">{{ $it['icon'] }}</span>
+                <span style="flex:1;min-width:0;{{ $it['done'] === true ? 'opacity:.55' : '' }}">{{ $it['label'] }}</span>
+                @if ($it['done'] === true)
+                    <span class="bdg ok">تمّ ✓</span>
+                @elseif ($it['url'])
+                    <a class="btn ghost xs" href="{{ $it['url'] }}">افتح ↗</a>
+                @endif
+            </div>
+        @endforeach
+    </div>
+@endif
+
 {{-- ── الصندوق الموحّد: صفٌّ واحد مرتّب بالإلحاح، لا أحد عشر جدولاً ── --}}
 <div class="card" style="margin-bottom:12px">
     <h3 style="margin-bottom:8px">📥 ينتظر تصرّفي

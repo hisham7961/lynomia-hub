@@ -19,8 +19,11 @@ use Illuminate\Support\Str;
  *   · **لا حساب يُقتسَم**: حسابٌ مربوطٌ بملفٍّ لا يُربط بثانٍ.
  *   · **الانتهاء يُغلق الباب فوراً**: إيقافُ الملف أو انتهاء خدمته أو حذفه
  *     يوقف الحساب — لا يُنتظر أن يتذكّر أحد.
- *   · **العودة لا تفتح الباب تلقائياً**: إعادةُ الوصول قرارٌ يُتَّخذ بعد مراجعة
- *     الصلاحيات، لا أثرٌ جانبيّ لتغيير حقلٍ في ملفّ.
+ *   · **والعودة تفتحه بالتساوق نفسه** (الجولة 1 · F30): من ملك أن يُغلق الحساب
+ *     بإغلاق الملف ملك أن يعيدَه بفتحه — بحارس الامتياز نفسِه (mayTouch).
+ *     كانت العودةُ «إشعاراً لإدارة المستخدمين» فقط، فبقيت موظفةٌ أعادتها HR
+ *     موقوفةً عن الدخول بلا أن يرى من أجرى الفعلَ أيَّ تحذير. الحسابُ ذو
+ *     الامتياز وحدَه يبقى قرارَه اليدويّ — كإغلاقه تماماً.
  */
 class Staff
 {
@@ -166,7 +169,7 @@ class Staff
         $u = \Illuminate\Support\Facades\DB::transaction(function () use ($emp, $email, $role, $temp) {
             $u = User::create([
                 'name' => $emp->name, 'email' => $email, 'phone' => $emp->phone,
-                'job_title' => $emp->title, 'role_id' => $role->id, 'status' => 'نشط',
+                'job_title' => $emp->title, 'role_id' => $role->id, 'status' => User::STATUS_ACTIVE,
                 'password' => $temp,
                 // بلا ختمِ تجديد: الحساب يبدأ بكلمةٍ مؤقتة يجب تبديلها عند أول دخول
                 'password_changed_at' => null,
@@ -226,7 +229,7 @@ class Staff
     {
         if (! $emp->user_id) return;
         $u = User::find($emp->user_id);
-        if (! $u || $u->status === 'موقوف') return;
+        if (! $u || $u->status === User::STATUS_SUSPENDED) return;
         if ($u->id === auth()->id()) return;
         if ($u->role?->is_owner && \App\Http\Controllers\Web\UserController::activeOwners() <= 1) return;
 
@@ -241,7 +244,7 @@ class Staff
             return;
         }
 
-        $u->forceFill(['status' => 'موقوف'])->save();
+        $u->forceFill(['status' => User::STATUS_SUSPENDED])->save();
         hub_audit('إيقاف حساب تبعاً للملف الوظيفي', 'users', $u->id, $u->name . ' — ' . $why);
 
         foreach (hub_user_admins() as $adminId) {
@@ -250,18 +253,113 @@ class Staff
         }
     }
 
-    /** عودةٌ للخدمة: تُبلَّغ إدارةُ المستخدمين ولا يُفتح الحساب تلقائياً */
+    /**
+     * عودةٌ للخدمة ⇒ **يُفتح الحساب فعلاً** — لا إشعارٌ يضيع (الجولة 1 · F30).
+     *
+     * التشخيص: `closeAccount` يوقف الحساب آلياً عند إغلاق الملف، بينما العودةُ
+     * كانت «إشعاراً لإدارة المستخدمين» وحدها — فمن أجرى إعادةَ التفعيل (HR غالباً،
+     * وليست من إدارة المستخدمين) لا يرى شيئاً، والموظفةُ «نشطة» في السجل وموقوفةٌ
+     * عن الدخول إلى أن يلتفت أحدٌ لإشعارٍ غارقٍ بين الإشعارات.
+     *
+     * التساوق: من ملك إغلاقَ الحساب بإغلاق الملف (وذلك بيد كل من يعدّل حالته)
+     * ملك فتحَه بفتحه — بالحارس نفسِه حرفياً: `mayTouch` يصدّ الحسابَ ذا الامتياز
+     * (مالك/إدارة مستخدمين) فيبقى قرارُه يدوياً بيد من يعلوه، ويُبلَّغ بصوتٍ عال.
+     * ولو كان الإيقافُ يدوياً سابقاً لعودة الملف، فإشعارُ «أُعيد التفعيل تلقائياً»
+     * يصل إدارةَ المستخدمين فتعيد الإيقاف إن كان لقرارها سببٌ باقٍ — لا صمتَ في
+     * الحالين.
+     */
     public static function announceReturn(Employee $emp): void
     {
         if (! $emp->user_id) return;
         $u = User::find($emp->user_id);
-        if (! $u || $u->status === 'نشط') return;
+        if (! $u || $u->isActive()) return;
 
+        // حسابٌ ذو امتيازٍ لا يفتحه آلياً فاعلٌ أدنى منه — نظيرُ closeAccount حرفياً
+        if (! self::mayTouch($u)) {
+            foreach (hub_user_admins() as $adminId) {
+                hub_notify($adminId, 'مستخدمون',
+                    '↩️ عاد «' . $emp->name . '» للخدمة وحسابُه ذو امتيازٍ ما زال موقوفاً — فعّله بقرارٍ ممن يملكه',
+                    'users', $u->id);
+            }
+
+            return;
+        }
+
+        $u->forceFill(['status' => User::STATUS_ACTIVE])->save();
+        hub_audit('إعادة تفعيل حساب تبعاً للملف الوظيفي', 'users', $u->id,
+            $u->name . ' — حالة الملف: ' . $emp->status);
+
+        // الموظفُ يعلم أن بابه فُتح، وإدارةُ المستخدمين تراجع الصلاحيات — لا تكتشف صدفةً
+        hub_notify($u->id, 'مستخدمون',
+            '🔓 أُعيد تفعيل حسابك مع عودة ملفك الوظيفي للخدمة — يمكنك الدخول من جديد',
+            'users', $u->id);
         foreach (hub_user_admins() as $adminId) {
             hub_notify($adminId, 'مستخدمون',
-                '↩️ عاد «' . $emp->name . '» للخدمة وحسابُه ما زال موقوفاً — راجع صلاحياته ثم فعّله',
+                '🔓 أُعيد تفعيل حساب «' . $u->name . '» تلقائياً مع عودة ملفه للخدمة — راجع صلاحياته',
                 'users', $u->id);
         }
+    }
+
+    /* ────────── أوّل أسبوع (الجولة 1 · F29) ────────── */
+
+    /**
+     * بطاقةُ «أوّل أسبوع» في بوّابتي — دليلُ الأيام الأولى بدل «يوم هادئ» وستةِ أصفار.
+     *
+     * تظهر لمن تعيينُه (`employees.hired`) أو إنشاءُ حسابه خلال آخر 14 يوماً —
+     * فالجديدُ على النظام جديدٌ ولو قدُم عهدُه بالمنشأة. ثم تختفي وحدها.
+     *
+     * القواعد: استعلاماتٌ خفيفة لا تجري إلا داخل النافذة، و**لا رابطَ ميتاً**:
+     * كلُّ رابطٍ يُعرض فقط إن كان بابُه مفتوحاً لصاحب الدور (درسُ F28 نفسه) —
+     * ودليلُ الموظف الجديد وثيقةٌ تُلتمس بعنوانها في وحدة الوثائق المتاحة له،
+     * فإن غابت غاب الرابط.
+     *
+     * @return array{since: string, items: array<int, array{icon:string,label:string,done:?bool,url:?string}>}|null
+     */
+    public static function firstWeek(?User $u, ?Employee $emp): ?array
+    {
+        if (! $u || hub_is_client($u)) return null;
+
+        $window = now()->subDays(14)->startOfDay();
+        $hiredNew = $emp && $emp->hired && $emp->hired->gte($window);
+        $accountNew = $u->created_at && $u->created_at->gte($window);
+        if (! $hiredNew && ! $accountNew) return null;
+
+        $items = [];
+
+        // ✅ سجّل حضورك — من بطاقة «يومي» في اللوحة
+        $attended = $emp && \Illuminate\Support\Facades\Schema::hasTable('attendance')
+            && \App\Models\Attendance::whereNull('deleted_at')
+                ->where('emp_id', $emp->id)->whereNotNull('time_in')->exists();
+        $items[] = ['icon' => '✅', 'label' => 'سجّل حضورك من بطاقة «يومي» في لوحة التحكم',
+            'done' => $attended, 'url' => route('dashboard') . '#myworkday'];
+
+        // 📝 أول بند عمل — الرابطُ لمن يملك الإضافة، وإلا فلا رابطَ يقود إلى 403
+        $wrote = \Illuminate\Support\Facades\Schema::hasTable('work_updates')
+            && \App\Models\WorkUpdate::whereNull('deleted_at')->where('created_by', $u->id)->exists();
+        $items[] = ['icon' => '📝', 'label' => 'اكتب أول بند عمل في تقريرك اليومي',
+            'done' => $wrote,
+            'url' => hub_can($u, 'updates', 'a') ? route('m.create', 'updates')
+                   : (hub_can($u, 'updates', 'v') ? route('reports.mine') : null)];
+
+        // 👥 دليل الفريق — بابُه مفتوحٌ لكل زميلٍ داخليٍّ نشطٍ أو لحامل hr:v (F4)
+        $mayTeam = hub_can($u, 'hr', 'v')
+            || ($emp && in_array((string) $emp->status, self::OPEN, true));
+        $items[] = ['icon' => '👥', 'label' => 'تعرّف على فريقك: من في قسمك ومن مديرك المباشر',
+            'done' => null, 'url' => $mayTeam ? route('team') : null];
+
+        // 📕 دليل الموظف الجديد — وثيقةٌ إن وُجدت في نطاقه، ولا رابطَ ميتاً إن غابت
+        if (hub_can($u, 'files', 'v') && \Illuminate\Support\Facades\Schema::hasTable('documents')) {
+            $guide = hub_scope(\App\Models\Document::query()->whereNull('deleted_at'), 'files', $u)
+                ->where('name', 'LIKE', '%دليل الموظف الجديد%')
+                ->orderBy('created_at')->orderBy('id')   // الأقدمُ هو الدليل المعتمد — ترتيبٌ حتميّ
+                ->first(['id', 'name']);
+            if ($guide) {
+                $items[] = ['icon' => '📕', 'label' => 'اقرأ «دليل الموظف الجديد»',
+                    'done' => null, 'url' => route('m.show', ['files', $guide->id])];
+            }
+        }
+
+        return ['since' => ($hiredNew ? $emp->hired : $u->created_at)->toDateString(), 'items' => $items];
     }
 
     /* ────────── شاشة الفجوات ────────── */
@@ -295,10 +393,11 @@ class Staff
             || (filled($e->email) && trim((string) $e->email) !== trim((string) $e->user->email))
         ))->values();
 
-        // خدمةٌ انتهت وحسابٌ حيّ — لا ينبغي أن يقع بعد اليوم، ويُعرض إن وقع تاريخياً
+        // خدمةٌ انتهت وحسابٌ حيّ — لا ينبغي أن يقع بعد اليوم، ويُعرض إن وقع تاريخياً.
+        // الحكمُ بـisActive الموحّد (F31): حالةٌ مجهولةٌ لا تُحسب حيّةً هنا كما لا يقبلها الدخول
         $ghosts = $emps->filter(fn ($e) => $e->user
             && ! in_array((string) $e->status, self::OPEN, true)
-            && (string) $e->user->status === 'نشط')->values();
+            && $e->user->isActive())->values();
 
         return ['noAccount' => $noAccount, 'noFile' => $noFile, 'drift' => $drift, 'ghosts' => $ghosts];
     }
