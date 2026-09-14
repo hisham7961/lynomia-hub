@@ -82,6 +82,16 @@ class ClientPortalData
 
     public const TICKET_PORTAL_CHANNEL = 'داخل التطبيق';
 
+    /**
+     * **نافذةُ كشفِ البلاغِ المكرَّر** (الجولة 3 · V3) — بالأيام. لماذا ثلاثون لا
+     * يومٌ واحد؟ لأنّ الحالةَ المشاهَدةَ كانت **ستّةَ عشرَ يوماً**: تذكرةٌ بلا ردّ
+     * أعادت صاحبتُها إرسالَها حرفاً بحرف. فنافذةٌ من ساعاتٍ تُخطئ العَرَضَ الذي
+     * وُضعت له. والشرطُ الثاني هو الحاسم: **التذكرةُ التوأمُ ما زالت مفتوحة** —
+     * فالمغلقةُ لا تحجب بلاغاً جديداً (عودةُ العطلِ بعد الحلّ بلاغٌ لا تكرار)،
+     * والمفتوحةُ المنسيّةُ لا تحجب إلى الأبد (تسقط بانقضاء النافذة).
+     */
+    public const TICKET_DUP_WINDOW_DAYS = 30;
+
     /** عملاءُ القارئ المسموحون — مصفوفةٌ فارغةٌ (لا null): التقييدُ صريحٌ ومغلق */
     public static function clientIds(?User $user = null): array
     {
@@ -371,6 +381,142 @@ class ClientPortalData
             ->with('user:id,name')
             ->orderBy('created_at')->orderBy('id')
             ->get(['id', 'module', 'record_id', 'body', 'user_id', 'internal', 'created_at']);
+    }
+
+    /**
+     * **بصمةُ البلاغ** (الجولة 3 · V3) — الموضوعُ والنصُّ والمشروعُ مُطبَّعةً عربيّاً
+     * (`hub_ar_norm`: تشكيلٌ وتطويلٌ وهمزاتٌ وتاءٌ مربوطة، مع طيِّ الفراغات). تُحسب
+     * **في PHP لا في SQL** عمداً: مقارنةُ النصوصِ في القاعدة رهينةُ الترتيبِ اللغويّ
+     * (`collation`) الذي يختلف بين SQLite وMySQL — فتخضرّ محليّاً وتسقط على CI.
+     */
+    protected static function ticketFingerprint(?string $subject, ?string $body, ?string $projectId): string
+    {
+        $norm = static fn (?string $v): string => mb_strtolower(hub_ar_norm((string) $v));
+
+        return $norm($subject) . "\n" . $norm($body) . "\n" . trim((string) $projectId);
+    }
+
+    /**
+     * **البلاغُ التوأمُ المفتوح** (الجولة 3 · V3) — كانت قناةُ البلاغ باتّجاهٍ واحد
+     * (تُفتح التذكرةُ ولا تُرَدّ)، فصاحبُها إذا طال صمتُها **أعاد إرسالَ الموضوعِ
+     * والنصِّ والمشروعِ نفسِها** فصارت تذكرتين بلا أيّ تحذير. فتكرارُ التذاكرِ
+     * المتطابقة ليس سوءَ استعمالٍ يُعاقَب — بل عَرَضٌ يُوجَّه صاحبُه فيه لتذكرتِه
+     * القائمة (حيث صار له الآن بابُ ردّ).
+     *
+     * **والعزلُ نفسُه حرفاً**: `hub_scope` + عملاءُ القارئ — فلا تُطابَق تذكرةُ
+     * عميلٍ آخرَ ولا يُكشف وجودُها بتحذيرٍ يشير إليها.
+     */
+    public static function duplicateTicket(array $ids, ?string $subject, ?string $body, ?string $projectId): ?Ticket
+    {
+        if (! $ids) return null;
+        $key = self::ticketFingerprint($subject, $body, $projectId);
+
+        $rows = hub_scope(Ticket::query(), 'tickets')
+            ->whereIn('client_id', $ids)->whereNull('deleted_at')
+            // المغلقةُ ليست توأماً: عودةُ العطلِ بعد الحلّ بلاغٌ جديد
+            ->where(fn ($w) => $w->whereNull('status')
+                ->orWhereNotIn('status', self::TICKET_DONE_STATUSES))
+            ->where('created_at', '>=', now()->subDays(self::TICKET_DUP_WINDOW_DAYS))
+            ->orderByDesc('created_at')->orderBy('id')
+            ->limit(60)
+            ->get(['id', 'subject', 'body', 'status', 'project_id', 'client_id', 'created_at']);
+
+        foreach ($rows as $t) {
+            if (self::ticketFingerprint($t->subject, $t->body,
+                $t->project_id !== null ? (string) $t->project_id : null) === $key) return $t;
+        }
+
+        return null;
+    }
+
+    /**
+     * **من يُشعَر بردِّ العميل** (الجولة 3 · V3) — الفريقُ الذي تعنيه التذكرةُ فعلاً:
+     * المُسنَدُ إليه، ومُنشئُها إن كان موظّفاً (بلاغٌ نُسخ بيد أحدهم)، ومن علّق عليها
+     * قبلاً. وحساباتُ العملاءِ تُستبعَد دائماً — هذا إشعارُ فريقٍ لا صدىً للعميل.
+     *
+     * **وفراغُ اللمسِ لا يبتلع الردّ:** التذكرةُ التي أثارت العيبَ كانت بلا مُسنَدٍ
+     * إليه وبلا تعليقٍ واحد طوالَ ستّةَ عشرَ يوماً — فلو اقتصرت القائمةُ على «من
+     * لمسها» لوقع ردُّ صاحبتِها في الفراغ مرّةً ثانية. فحين لا أحد: يُشعَر من يملك
+     * تعديلَ التذاكر فعلاً (صفُّ الدعم)، بسقفٍ لا يُغرق أحداً.
+     *
+     * @return string[]
+     */
+    public static function ticketTeamIds(Ticket $t, ?string $excludeUserId = null): array
+    {
+        $ids = [];
+        if ($t->assignee_id) $ids[] = (string) $t->assignee_id;
+        if ($t->created_by) $ids[] = (string) $t->created_by;
+        foreach (Comment::where('module', 'tickets')->where('record_id', (string) $t->id)
+            ->whereNotNull('user_id')->orderBy('user_id')->pluck('user_id')->all() as $uid) {
+            $ids[] = (string) $uid;
+        }
+
+        $ids = array_values(array_diff(array_unique($ids), [(string) $excludeUserId, '']));
+
+        $touched = $ids ? self::internalUsers()->whereIn('id', $ids)
+            ->orderBy('id')->get(['id', 'role_id', 'account_type'])
+            ->pluck('id')->map(fn ($v) => (string) $v)->all() : [];
+
+        return $touched ?: self::ticketQueueIds($excludeUserId);
+    }
+
+    /** صفُّ الدعم: من يملك تعديلَ التذاكر فعلاً — بسقفٍ وترتيبٍ حتميّ */
+    protected static function ticketQueueIds(?string $excludeUserId = null, int $cap = 20): array
+    {
+        return self::internalUsers()->with('role:id,is_owner,matrix')
+            ->orderBy('id')->get(['id', 'role_id', 'account_type'])
+            ->filter(fn (User $u) => (string) $u->id !== (string) $excludeUserId
+                && hub_can($u, 'tickets', 'e'))
+            ->take($cap)->pluck('id')->map(fn ($v) => (string) $v)->values()->all();
+    }
+
+    /** المستخدمون الداخليّون الأحياءُ النشطون — حساباتُ العملاءِ خارجَهم دائماً */
+    protected static function internalUsers()
+    {
+        return User::whereNull('deleted_at')->where('status', 'نشط')
+            ->where(fn ($w) => $w->whereNull('account_type')->orWhere('account_type', '!=', 'client'));
+    }
+
+    /**
+     * **ردُّ العميلِ يبلغ الفريق** (الجولة 3 · V3) — على السكّةِ القائمة (`hub_notify`)
+     * نظيرَ `announceTicketResolution` في الاتجاه المعاكس. موسومٌ بوحدته وسجلِّه
+     * (المستقبِلون داخليّون يملكون `tickets` فلا يُقنَّع نصُّه)، فالنقرةُ تفتح
+     * التذكرةَ نفسَها. ولا يرمي: إشعارٌ متعثّرٌ لا يُسقط ردّاً وصل.
+     */
+    public static function announceClientTicketReply(Ticket $t, User $actor, string $body): void
+    {
+        $subject = trim((string) $t->subject) ?: 'بلاغٍ بلا عنوان';
+        $text = '🎫 ردَّ العميل ' . $actor->name . ' على تذكرة «' . Str::limit($subject, 70) . '»: '
+            . Str::limit(trim($body), 90);
+
+        foreach (self::ticketTeamIds($t, (string) $actor->id) as $uid) {
+            hub_notify($uid, 'ticket', $text, 'tickets', (string) $t->id);
+        }
+    }
+
+    /* ══════════ حسابُ العميلِ الذاتيّ (الجولة 3 · V4) ══════════ */
+
+    /**
+     * **جلساتُ صاحبِ الحساب** (الجولة 3 · V4) — على **صفوفه هو حصراً** (`user_id`)،
+     * نظيرَ `MySecurityController::index` حرفاً: عتبةُ الحياةِ من الثابت الواحد
+     * `Sessions::LIVE_MIN` لا نسخةً رابعة، والجلسةُ الحاليّةُ مُعلَّمةٌ كي لا يُنهيها
+     * صاحبُها ظنّاً. ترتيبٌ حتميّ (آخرُ ظهورٍ ثمّ `id`).
+     */
+    public static function mySessions(User $u, string $currentSl = '', int $limit = 20)
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('sessions_log')) return collect();
+
+        return \Illuminate\Support\Facades\DB::table('sessions_log')
+            ->where('user_id', $u->id)
+            ->orderByDesc('last_seen_at')->orderBy('id')->limit($limit)
+            ->get(['id', 'device', 'ip', 'started_at', 'last_seen_at', 'revoked'])
+            ->map(function ($s) use ($currentSl) {
+                $s->live = ! $s->revoked && $s->last_seen_at
+                    && now()->diffInMinutes($s->last_seen_at) < \App\Support\Sessions::LIVE_MIN;
+                $s->mine = (string) $s->id === $currentSl && $currentSl !== '';
+
+                return $s;
+            });
     }
 
     /**

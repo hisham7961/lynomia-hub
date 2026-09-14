@@ -252,6 +252,21 @@ Route::middleware('auth')->group(function () {
         Route::post('tickets', [ClientPortalController::class, 'ticketStore'])
             ->middleware('throttle:20,1')->name('ticket.store');
         Route::get('tickets/{id}', [ClientPortalController::class, 'ticket'])->name('ticket');
+        // (الجولة 3 · V3) **ردُّ العميلِ على تذكرته** — كانت القناةُ باتّجاهٍ واحد منذ
+        // v2.497.0: يبلّغ ولا يُردّ عليه، فإذا طال الصمتُ أعاد البلاغَ نفسَه. الردُّ
+        // على محرّكِ التعليقات القائم، والعزلُ بفاحصِ الشاشةِ نفسِه (٤٠٤ لغيره)،
+        // و`internal` مختومٌ خادميّاً. مقنَّنُ المعدّل كبقيّة كتابات البوّابة.
+        Route::post('tickets/{id}/replies', [ClientPortalController::class, 'ticketReply'])
+            ->middleware('throttle:20,1')->name('ticket.reply');
+        // (الجولة 3 · V4) جلساتُ صاحبِ الحساب — على سكّةِ `Sessions` الواحدة وعلى
+        // صفوفه هو حصراً. شاشةُ حسابه صارت بقشرةِ بوّابته، فأفعالُها بادئتُها كذلك
+        // (مسارات `my/security` داخليّةٌ خارجَ قائمةِ PortalGuard البيضاء).
+        Route::middleware('throttle:20,1')->group(function () {
+            Route::post('account/sessions/others', [ClientPortalController::class, 'sessionsRevokeOthers'])
+                ->name('sessions.others');
+            Route::post('account/sessions/{id}/revoke', [ClientPortalController::class, 'sessionRevoke'])
+                ->name('session.revoke');
+        });
     });
 
     // ── إدارةُ عضويّة العميل (Work OS · الطور B · WP-B.3) — داخليّةٌ فقط (مديرُ الحساب) ──

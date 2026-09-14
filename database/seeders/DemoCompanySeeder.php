@@ -104,7 +104,7 @@ class DemoCompanySeeder extends Seeder
     {
         $u = $this->u[$key];
 
-        return $this->emp[$key] = Employee::create(array_merge([
+        $emp = $this->emp[$key] = Employee::create(array_merge([
             'name' => $u->name, 'user_id' => $u->id, 'email' => $u->email,
             'company_id' => $this->co[$co]->id, 'dept' => $dept, 'title' => $title,
             // المدير يُخزَّن بمعرِّف **المستخدم** (Employee::manager → belongsTo User)
@@ -114,6 +114,23 @@ class DemoCompanySeeder extends Seeder
             'contract' => 'دوام كامل', 'status' => 'نشط', 'leave_bal' => 21,
             'phone' => '+965 5' . mt_rand(100, 999) . ' ' . mt_rand(1000, 9999),
         ], $extra));
+
+        /*
+         * **عمرُ الحسابِ يوافق عمرَ التعيين** (الجولة 3): كان `User::create` يختم
+         * `created_at` بلحظةِ البذر، فيصير **كلُّ** حسابٍ في البيئة عمرُه ساعات
+         * بينما صاحبُه معيَّنٌ منذ سنتين. وبطاقةُ «أوّل أسبوع» تظهر — بحقٍّ —
+         * لمن حسابُه جديدٌ ولو قدُم عهدُه بالمنشأة (قاعدةٌ مقصودةٌ موثّقةٌ في
+         * `Staff::firstWeek`)، فكانت تظهر **للجميع**. وقد بلّغ عنها أربعةُ وكلاءَ
+         * بوصفها عطلاً في المنتج، وهي **أثرُ بذرةٍ**: المنطقُ سليمٌ والبياناتُ كاذبة.
+         * فيُختم عمرُ الحسابِ من تاريخِ التعيين — ويبقى «أوّلُ يومٍ» أوّلَ يومٍ
+         * حقّاً لمن بُذر كذلك عمداً (الموظّفةُ الجديدة).
+         */
+        if (! empty($emp->hired)) {
+            $u->forceFill(['created_at' => \Illuminate\Support\Carbon::parse($emp->hired)
+                ->setTime(8, 0)])->saveQuietly();
+        }
+
+        return $emp;
     }
 
     private function rolesAndUsers(): void

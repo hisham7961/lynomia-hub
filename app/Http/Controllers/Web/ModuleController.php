@@ -250,7 +250,7 @@ class ModuleController extends Controller
 
     public function create(Request $r, string $module)
     {
-        [$def] = $this->resolve($module, 'a');
+        [$def, $class] = $this->resolve($module, 'a');
 
         // تعبئة مسبقة من الرابط (زر ＋ داخل عمود الكانبان مثلاً يمرر الحالة):
         // تُقبل مفاتيح حقول الوحدة فقط وبقيم نصية — والتحقق الكامل يبقى عند الحفظ
@@ -258,6 +258,40 @@ class ModuleController extends Controller
         foreach ($def['fields'] ?? [] as $f) {
             $v = $r->query($f['key']);
             if (is_string($v) && $v !== '') $prefill[$f['key']] = $v;
+        }
+
+        /*
+         * **«⎘ نسخ كسجل جديد» كان يَعِد ولا يفعل** (الجولة 3): الزرُّ في صفحة
+         * السجلّ يمرّر `?from=<id>`، و`from` ليس مفتاحَ حقلٍ فتُهمله الحلقةُ أعلاه
+         * بصمت — فيُفتح نموذجٌ **فارغٌ تماماً**. أثبته وكيلان مستقلّان (مديرةُ
+         * المشاريع ومستخدمٌ محترف)، وكلاهما كان ينسخ مشروعاً بيده حقلاً حقلاً.
+         *
+         * والنسخُ يمرّ بالحرّاس القائمة لا بحارسٍ ثانٍ ينحرف:
+         *  ١) `findScoped` — قارئُ `show()` نفسُه: لا يُنسخ ما لا يُقرأ (تنطيقٌ
+         *     وصلاحيّة)، وسجلٌّ خارجَ النطاق يُردّ كما يُردّ في العرض.
+         *  ٢) **الفريدُ لا يُنسخ**: حقلٌ موسومٌ `unique` (رقمُ مستندٍ، رقمٌ تسلسليّ)
+         *     نسخُه يصنع تصادماً أو سجلّاً كاذبَ الهويّة — يُترك فارغاً ليُملأ.
+         *  ٣) **المحجوبُ لا يُسرَّب**: حقلٌ `hub_field_mode` تُخفيه أو تُقنّعه لا
+         *     يُنسَخ — فالنسخُ لا يكون بابَ كشفٍ خلفيّاً لما لا يراه الناسخ.
+         *  ٤) الطلبُ الصريحُ يغلب المنسوخ: ما جاء في الرابط يبقى فوق قيمةِ المصدر.
+         */
+        $from = (string) $r->query('from', '');
+        if ($from !== '') {
+            $src = $this->findScoped($class, $module, $from);
+            foreach ($def['fields'] ?? [] as $f) {
+                $k = $f['key'];
+                if (array_key_exists($k, $prefill)) continue;              // الرابطُ أولى
+                if (! empty($f['unique'])) continue;                       // الهويّةُ لا تُستنسخ
+                // مفرداتُ `hub_field_mode`: '' (قابلٌ للتحرير) · 'ro' · 'hide'.
+                // المخفيُّ لا يُسرَّب، والقراءةُ-فقط لا تُزرع في نموذجِ إنشاءٍ
+                // لا يملك صاحبُه كتابتَها — فلا يُملأ حقلٌ سيُرفَض عند الحفظ.
+                if (hub_field_mode(auth()->user(), $module, $k) !== '') continue;
+                $v = $src->{$f['col'] ?? $k} ?? null;
+                if ($v === null || $v === '' || is_array($v)) continue;
+                $prefill[$k] = $v instanceof \DateTimeInterface
+                    ? $v->format(($f['type'] ?? '') === 'date' ? 'Y-m-d' : 'Y-m-d H:i:s')
+                    : (string) $v;
+            }
         }
 
         return view('modules.form', [

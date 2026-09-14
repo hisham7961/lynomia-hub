@@ -307,6 +307,8 @@ class ClientPortalController extends Controller
             'priority' => ['required', 'string', Rule::in(ClientPortalData::ticketFieldOptions('priority'))],
             'project'  => ['nullable', 'string', 'max:64'],
             'client'   => ['nullable', 'string', 'max:64'],
+            // تأكيدُ صاحبِ البلاغ أنّ المتشابهَ بلاغٌ مختلفٌ فعلاً (لا يُوسَّع به أيُّ سلطة)
+            'force'    => ['nullable', 'boolean'],
         ], [], [
             'subject' => 'الموضوع', 'body' => 'الوصف', 'priority' => 'الأولوية',
             'project' => 'المشروع', 'client' => 'العميل',
@@ -315,6 +317,25 @@ class ClientPortalController extends Controller
         // مشروعُه هو أو ٤٠٤ — والعميلُ يُشتقّ منه حين يُختار
         $projectId = trim((string) ($data['project'] ?? ''));
         $project = $projectId !== '' ? ClientPortalData::projectDetail($ids, $projectId) : null;
+
+        /*
+         * **كشفُ البلاغِ المكرَّر** (الجولة 3 · V3) — العَرَضُ الذي رُصد: تذكرةٌ بلا
+         * ردٍّ ستّةَ عشرَ يوماً، فأُعيد إرسالُ الموضوعِ والنصِّ والمشروعِ نفسِها
+         * فصارت تذكرتين بلا تحذير. **يُوجَّه لا يُمنَع**: يُردّ إلى نموذجه بمدخلاته
+         * محفوظةً وتحذيرٍ يحمل رابطَ تذكرتِه القائمة (حيث صار له بابُ ردّ)، ومعه
+         * تأكيدٌ صريحٌ يمرّ به إن كان بلاغاً مختلفاً حقاً — فلا طريقَ مسدود.
+         */
+        if (! $request->boolean('force')
+            && ($twin = ClientPortalData::duplicateTicket($ids, $data['subject'], $data['body'], $project?->id))) {
+            return redirect()->route('portal.ticket.create')->withInput()
+                ->with('warn', 'لديك بلاغٌ مطابقٌ ما زال مفتوحاً — افتحه وأضِف ردَّك هناك بدل فتح تذكرةٍ ثانية.')
+                ->with('dup', [
+                    'id' => (string) $twin->id,
+                    'subject' => (string) $twin->subject,
+                    'status' => (string) $twin->status,
+                    'at' => $twin->created_at ? \Illuminate\Support\Str::of((string) $twin->created_at)->substr(0, 10)->value() : '',
+                ]);
+        }
 
         $clientId = $project?->client_id
             ? (string) $project->client_id
@@ -355,5 +376,92 @@ class ClientPortalController extends Controller
             'replies' => ClientPortalData::ticketReplies($ticket),
             'done' => in_array((string) $ticket->status, ClientPortalData::TICKET_DONE_STATUSES, true),
         ]);
+    }
+
+    /**
+     * **ردُّ العميلِ على تذكرته** (الجولة 3 · V3) — العيبُ هنا **في ميزةٍ أُضيفت في
+     * v2.497.0**: «تذاكري» هبطت بأربعة مساراتٍ لا خامسَ لها (قائمة · نموذج · إنشاء ·
+     * تفصيل)، **بلا مسارِ ردٍّ إطلاقاً**، وشاشةُ التفصيل تعرض «ردودَ الفريق» قراءةً
+     * صمّاء. فنصفُ الحلقةِ عُدَّ حلقةً كاملة: يبلّغ العميلُ ثمّ يصمت النظام، فإذا
+     * طال الصمتُ لم يبقَ بيده إلّا **إعادةُ البلاغ** — وهذا مصدرُ التذاكرِ المتطابقةِ
+     * التي رصدها وكلاءُ آخرون، لا سوءُ استعمال.
+     *
+     *  ١) **الفاحصُ الواحد**: `ticketDetail` — الاستعلامُ نفسُه الذي تقرأ به شاشتُه
+     *     (`hub_scope` + عملاؤه الفعّالون)، فتذكرةُ عميلٍ آخرَ **٤٠٤ لا ٤٠٣** (نمطُ
+     *     البوّابة: لا كشفَ وجود)، ولا فحصٌ ثانٍ ينحرف عن الأوّل مع الوقت.
+     *  ٢) **محرّكُ التعليقاتِ القائم** لا جدولَ رسائلَ ثانٍ: `comments` على
+     *     `(tickets, id)` — وهو المحرّكُ نفسُه الذي يقرأ منه ملخّصُ الحلّ ويحتسب
+     *     منه عدّادُ SLA أوّلَ ردّ.
+     *  ٣) **`internal` مختومٌ خادميّاً**: `CommentService::create` لا يُمرَّر له علمُ
+     *     الداخل، فردُّ العميلِ عامٌّ دائماً ولو حُقن `internal=1` في الطلب. والحالةُ
+     *     والمنسوبُ إليه لا يُقرآن من الطلب أصلاً — لا حقلَ لهما هنا.
+     *  ٤) ثمّ يُشعَر الفريقُ على السكّةِ القائمة، ويُبثّ الحدثُ على ناقلِ الأحداث
+     *     نفسِه (`FlowRunner::fire`) فتصله المساراتُ والويبهوكس كأيِّ حدثِ تذكرة.
+     */
+    public function ticketReply(Request $request, string $id)
+    {
+        if ($r = $this->gate()) return $r;
+        $ids = ClientPortalData::clientIds();
+
+        $ticket = ClientPortalData::ticketDetail($ids, $id);
+
+        $data = $request->validate(['body' => ['required', 'string', 'max:4000']], [], ['body' => 'ردُّك']);
+
+        $u = $request->user();
+        $c = CommentService::create($u, 'tickets', (string) $ticket->id, trim($data['body']));
+
+        /*
+         * **الصفُّ كاملاً لِما بعد التخويل**: قارئُ البوّابة يختار أعمدةً عميليّةً
+         * حصراً (لا `assignee_id` ولا `channel` — وهذا صوابُه)، لكنّ الإشعارَ يحتاج
+         * المُسنَدَ إليه وجسمُ الويبهوك يحتاج حقولَ السجلّ. فالصفُّ يُعاد تحميلُه
+         * **بعد** أن خوّل `ticketDetail` (فلا يتوسّع وصولٌ)، وإلّا صار المُسنَدُ
+         * إليه `null` صامتاً فلا يبلغه ردُّ عميله — وهو عينُ العطلِ الذي نُصلح.
+         */
+        $full = Ticket::whereKey($ticket->id)->first() ?? $ticket;
+
+        // إشعارُ الفريقِ لا يكسر ردّاً وصل (نمطُ `announceTicketResolution`)
+        try { ClientPortalData::announceClientTicketReply($full, $u, (string) $c->body); }
+        catch (\Throwable $e) { report($e); }
+
+        \App\Support\FlowRunner::fire('client_reply', 'tickets', $full);
+
+        return redirect()->route('portal.ticket', $ticket->id)
+            ->with('ok', 'وصلَ ردُّك — يراه الفريقُ الآن، وجوابُه يظهر هنا.')
+            ->withFragment('c-' . $c->id);
+    }
+
+    /* ────────── حسابُه الذاتيّ: جلساتُه (الجولة 3 · V4) ────────── */
+
+    /**
+     * **إنهاءُ جلسةٍ واحدة** — على **صفوفه هو حصراً** (`user_id` شرطُ الاستعلام،
+     * فجلسةُ غيره ٤٠٤ لا ٤٠٣: لا كشفَ وجود)، وعلى سكّةِ `Sessions` الواحدة التي
+     * تختم الأثرَ وتُدوّر «تذكّرني» — لا محرّكَ إبطالٍ ثانٍ.
+     */
+    public function sessionRevoke(Request $request, string $id)
+    {
+        if ($r = $this->gate()) return $r;
+        $u = $request->user();
+
+        $s = \Illuminate\Support\Facades\DB::table('sessions_log')
+            ->where('id', $id)->where('user_id', $u->id)->first(['id', 'ip']);
+        abort_unless($s, 404);
+
+        \App\Support\Sessions::revokeOne($u, (string) $s->id, 'إنهاء ذاتي لجلسة');
+        hub_audit('إنهاء جلستي', null, null, ($s->ip ?: 'بلا عنوان'));
+
+        return back()->with('ok', '🔌 أُنهيت الجلسة — يخرج جهازُها عند أول طلب');
+    }
+
+    /** **إنهاءُ بقيّة الجلسات** — جلستُه الحاليّةُ تبقى ويموت سواها (السكّةُ نفسُها) */
+    public function sessionsRevokeOthers(Request $request)
+    {
+        if ($r = $this->gate()) return $r;
+        $u = $request->user();
+        $mine = (string) $request->session()->get('hub.sl', '');
+
+        $n = \App\Support\Sessions::revokeAll($u, $mine !== '' ? $mine : null, 'إنهاء بقية أجهزتي');
+        hub_audit('إنهاء جلساتي الأخرى', null, null, "{$n} جلسة");
+
+        return back()->with('ok', "🔌 أُنهيت {$n} جلسة على أجهزتك الأخرى — جلستُك الحالية باقية");
     }
 }

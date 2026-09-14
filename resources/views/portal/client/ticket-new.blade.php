@@ -14,6 +14,21 @@
     <a class="btn ghost sm" href="{{ route('portal.tickets') }}">← تذاكري</a>
 </div>
 
+{{-- (الجولة 3 · V3) **تحذيرُ التكرار** — لا منعٌ أعمى: البلاغُ المطابقُ المفتوحُ
+     يُعرَض برابطه (وفيه الآن بابُ ردّ يتابع عليه)، ومن كان بلاغُه مختلفاً حقاً
+     يؤكّد ويمرّ. المدخلاتُ محفوظةٌ فلا يُعاد كتابةُ شيء. --}}
+@php $dup = session('dup'); @endphp
+@if ($dup)
+    <div class="card" style="margin-bottom:12px;border-inline-start:3px solid var(--wn,#d97706)">
+        <h3 style="margin:0 0 6px">⚠️ لديك بلاغٌ مطابقٌ مفتوح</h3>
+        <p class="sub" style="margin:0 0 8px">
+            «{{ $dup['subject'] }}»@if (!empty($dup['status'])) — الحالة: {{ $dup['status'] }}@endif
+            @if (!empty($dup['at'])) · فُتح {{ $dup['at'] }}@endif
+        </p>
+        <a class="btn p sm" href="{{ route('portal.ticket', $dup['id']) }}">افتح تذكرتَك وأضِف ردَّك هناك ←</a>
+    </div>
+@endif
+
 <div class="card">
     <form method="POST" action="{{ route('portal.ticket.store') }}">
         @csrf
@@ -63,6 +78,14 @@
                 </select>
                 @error('client')<span class="ferr">{{ $message }}</span>@enderror
             </div>
+        @endif
+
+        {{-- التأكيدُ الصريح: بديلٌ لصاحبِ البلاغ حين يكون المتشابهُ مختلفاً فعلاً --}}
+        @if ($dup)
+            <label class="fld" style="display:flex;gap:8px;align-items:center;margin-top:10px">
+                <input type="checkbox" name="force" value="1" @checked(old('force'))>
+                <span>هذا بلاغٌ مختلفٌ فعلاً — أرسِله رغم التشابه</span>
+            </label>
         @endif
 
         <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
