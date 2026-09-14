@@ -157,8 +157,12 @@ class MonthlyAttendance
             'hours' => (float) $c['hours'],
             // F11: دخولٌ بلا انصرافٍ في يومٍ ماضٍ — شذوذٌ يُوسَم، لا ساعاتٌ تُختلق
             'missing_out' => $c['checked_in'] && ! $c['checked_out'] && $date < $today,
-            // G10: صفٌّ مستحيلٌ سابقٌ للحارس (انصرافٌ قبلَ الدخول) — يُفضَح لا يُجمَّل
-            'invalid_span' => \App\Models\Attendance::hasInvalidSpan($c['time_in'], $c['time_out']),
+            // G10: صفٌّ مستحيلٌ سابقٌ للحارس (انصرافٌ قبلَ الدخول) — يُفضَح لا يُجمَّل.
+            // **والوردية الليليّةُ المُعلَنةُ ليست مستحيلة** (DB-02): «٢٢:٠٠ ← ٠٦:٠٠»
+            // برايةِ `overnight` فترةٌ صحيحةٌ تعبر منتصفَ الليل — ووسمُها «مدة غير
+            // صالحة» هنا يجعل الحارسَ والتقريرَ يقولان قولين في سؤالٍ واحد.
+            'invalid_span' => ! (bool) ($c['attendance']->overnight ?? false)
+                && \App\Models\Attendance::hasInvalidSpan($c['time_in'], $c['time_out']),
             'att_id' => $c['attendance']?->id,
             'report' => $kind === 'present' ? $c['labels']['compliance'] : null,
             'compliance_key' => $c['compliance'] ?? null,
