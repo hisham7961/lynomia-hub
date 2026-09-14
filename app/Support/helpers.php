@@ -1357,34 +1357,54 @@ if (! function_exists('hub_expiry_self_scan')) {
     function hub_expiry_self_scan(array $md, $user): array
     {
         try {
-            $emp = \Illuminate\Support\Facades\DB::table($md['table'])
-                ->whereNull('deleted_at')->where('user_id', $user->id)->first();
-            if (! $emp) return [];   // حسابُ إدارةٍ أو مالكٍ بلا ملفِّ موظّف
+            /*
+             * **كلُّ صفوفِه لا أوّلُها** (مجلس الخبراء · F4). كان `->first()` بلا
+             * `orderBy` — و`CLAUDE.md` يسمّيه **قرعة**. وأثبت التحقّقُ المستقلُّ
+             * أنّها ليست نظريّة: لمن له سجلّان أنذرَ الرادارُ **بالأبعد** وحجب
+             * **الأقرب**، بينما تراهما الموارد البشريّة. والقرعةُ تُخفي النقصَ:
+             * صفٌّ واحدٌ من اثنين يبدو نجاحاً وهو نصفُ جواب. فتُقرأ صفوفُه كلُّها،
+             * مرتّبةً بـ`id` كي لا يبقى للترتيبِ أثرٌ في ما يُعرَض.
+             */
+            $emps = \Illuminate\Support\Facades\DB::table($md['table'])
+                ->whereNull('deleted_at')->where('user_id', $user->id)
+                ->orderBy('id')->get();
+            if ($emps->isEmpty()) return [];   // حسابُ إدارةٍ أو مالكٍ بلا ملفِّ موظّف
         } catch (\Throwable $e) {
             return [];
         }
 
         $disp = hub_display_col('hr');
         $out = [];
-        foreach (hub_expiry_fields() as [$mk, $f]) {
-            if ($mk !== 'hr') continue;
-            $col = $f['col'] ?? '';
-            $raw = $col !== '' ? ($emp->{$col} ?? null) : null;
-            if (! $raw) continue;
+        foreach ($emps as $emp) {
+            foreach (hub_expiry_fields() as [$mk, $f]) {
+                if ($mk !== 'hr') continue;
+                /*
+                 * **والقناعُ يسري هنا كما يسري هناك** (مجلس الخبراء · F3). المسحُ
+                 * الرئيسيُّ يستشير `hub_field_mode` ويُعلن في تعليقِه أنّ «القناعَ
+                 * إن سرى في بابٍ وسقط في آخر فليس قناعاً بل ظنُّ ساتر» — وكان هذا
+                 * البابُ ساقطاً: قناعُ `hide` على «نهاية الخدمة» لا يمنع شيئاً عن
+                 * صاحبِه بينما يمنعه عن مديرِ العمليّات. ومن أخفت المنشأةُ عنه حقلاً
+                 * عمداً لا يُكشف له من بابٍ خلفيّ.
+                 */
+                if (hub_field_mode($user, 'hr', (string) ($f['key'] ?? '')) === 'hide') continue;
+                $col = $f['col'] ?? '';
+                $raw = $col !== '' ? ($emp->{$col} ?? null) : null;
+                if (! $raw) continue;
 
-            $d = substr((string) $raw, 0, 10);
-            try {
-                $days = (int) now()->startOfDay()
-                    ->diffInDays(\Illuminate\Support\Carbon::parse($d)->startOfDay(), false);
-            } catch (\Throwable $e) { continue; }
-            if ($days > 30 || $days < -60) continue;   // النافذةُ نفسُها التي يستعملها الرادار
+                $d = substr((string) $raw, 0, 10);
+                try {
+                    $days = (int) now()->startOfDay()
+                        ->diffInDays(\Illuminate\Support\Carbon::parse($d)->startOfDay(), false);
+                } catch (\Throwable $e) { continue; }
+                if ($days > 30 || $days < -60) continue;   // النافذةُ نفسُها التي يستعملها الرادار
 
-            $out[] = [
-                'module' => 'hr', 'mlabel' => (string) ($md['label'] ?? 'ملفات الموظفين'),
-                'flabel' => (string) ($f['label'] ?? ''), 'fkey' => (string) ($f['key'] ?? ''),
-                'id' => (string) $emp->id, 'name' => (string) ($emp->{$disp} ?? $user->name),
-                'date' => $d, 'days' => $days, 'self' => true,
-            ];
+                $out[] = [
+                    'module' => 'hr', 'mlabel' => (string) ($md['label'] ?? 'ملفات الموظفين'),
+                    'flabel' => (string) ($f['label'] ?? ''), 'fkey' => (string) ($f['key'] ?? ''),
+                    'id' => (string) $emp->id, 'name' => (string) ($emp->{$disp} ?? $user->name),
+                    'date' => $d, 'days' => $days, 'self' => true,
+                ];
+            }
         }
 
         return $out;
@@ -4359,13 +4379,20 @@ if (! function_exists('hub_recommendations')) {
         // كانا يتقاسمان مفتاحَ الدور (`r:`) فتُخبَّأ إشاراتُ عميلٍ وتُقدَّم لمستخدمِ
         // آخر: تسريبُ عزلٍ عبر الخبيئة. من له أيُّ حصرٍ يأخذ مفتاحاً خاصّاً به.
         $u = auth()->user();
-        $scopedKey = hub_scoped($u) || hub_company_ids($u) !== null || hub_client_ids($u) !== null;
         // **مبدّلُ الشركة/العميل جزءٌ من المفتاح** كما في `hub_scope_key`: بعضُ الكُتل
         // (تقاريرُ اليوم عبر `hub_company_scope`) تضيق بالمبدّل النشط، فمستخدمان يريان
         // «كلَّ الشركات» بمبدّلين مختلفين كانا يتقاسمان مفتاحاً فيُقدَّم عدُّ شركةٍ لأخرى.
         // ختمُ roles/users كما في `hub_scope_key` و`hub_expiry`: تغيّرُ صلاحيةٍ أو دورٍ
         // يُبطل الخبيئةَ فوراً لا بعد انقضاء المهلة (نافذةُ صلاحيةٍ متقادمةٍ للمستخدم غيرِ المحصور).
-        $key = 'recs:' . ($scopedKey ? 'u:' . ($u?->id ?? '0') : 'r:' . ($u?->role_id ?? '0'))
+        // **ومفتاحُ المخبأِ عقدٌ عن محتواه** (مجلس الخبراء · F2). كان المفتاحُ
+        // **بالدور** لغيرِ المحصور — وكان صحيحاً ما دام المحتوى بالدور. ثمّ صارت
+        // `hub_expiry()` تُرجع **صفَّ صاحبِ الشأن** (صفّاً بالمستخدمِ لا بالدور)،
+        // فبات وعاءُ الدورِ يحمل شأناً شخصيّاً: أثبت التحقّقُ المستقلُّ أنّ زميلاً
+        // بلا `hr:v` قرأ **اسمَ زميلِه وتاريخَ انتهاءِ إقامتِه**، ثمّ إذا أعاد بناءَ
+        // المخبأِ من منظورِه **مُحي إنذارُ صاحبِه عنه**. فالمفتاحُ بالمستخدمِ دائماً:
+        // مشاركةُ المخبأِ لا تُشترى بإفشاء. (والكلفةُ مدخلٌ لكلِّ مستخدمٍ بدل كلِّ
+        // دور — وهو ما تفعله `hub_expiry` نفسُها للمحصورين أصلاً.)
+        $key = 'recs:u:' . ($u?->id ?? '0')
             . ':' . (string) session('hub.company', '-') . ':' . (string) session('hub.client', '-')
             . hub_lens_key($projectId) . hub_data_stamp(['roles', 'users']);
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
