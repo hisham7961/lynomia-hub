@@ -1477,11 +1477,18 @@ if (! function_exists('hub_expiry_self_scan')) {
                          * وما قبلَ هذا لم يكن قراراً بل **عَرَضاً**: نموذجٌ ناقصُ
                          * عمودَين أطفأ البوّابتين صامتاً، فمرّ كلُّ شيءٍ بلا تمييز.
                          */
-                        $d = \App\Support\DocumentPolicy::decide($user, $a, 'preview');
-                        if (! $d['allowed']
-                            && ! in_array($d['state'], ['DENIED_SENSITIVE', 'DENIED_SECRET_RECORD'], true)) {
-                            continue;   // منعٌ صريحٌ أو غيابُ مستخدم — يُحترَم كما هو
+                        // **معاينةٌ أو تنزيل، كما تفعل `listable()`** (التحقّق المستقلّ):
+                        // القصرُ على `preview` وحدَها ضيّق الباب — وثيقةٌ مُنعت معاينتُها
+                        // صراحةً وسُمح تنزيلُها كانت ستختفي من رادارِ صاحبِها.
+                        $ok = false; $explicit = false;
+                        foreach (['preview', 'download'] as $act) {
+                            $d = \App\Support\DocumentPolicy::decide($user, $a, $act);
+                            if ($d['allowed']) { $ok = true; break; }
+                            if (in_array($d['state'], ['DENIED_SENSITIVE', 'DENIED_SECRET_RECORD'], true)) {
+                                $explicit = true;   // حجبٌ بالحساسيّةِ وحدَها — يُستثنى صاحبُ الشأن
+                            }
                         }
+                        if (! $ok && ! $explicit) continue;   // منعٌ صريحٌ يُحترَم كما هو
                         $out[] = [
                             'module' => 'hr', 'mlabel' => (string) ($md['label'] ?? 'ملفات الموظفين'),
                             'flabel' => hub_doc_label('hr', $a->kind) ?? 'وثيقة',

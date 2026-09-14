@@ -54,8 +54,23 @@ class PayrollRun extends Model
              * يُسوّيهما** (نوعُه مرن) — فلا الفهرسُ الفريدُ يمسك ولا الحارس.
              * سلوكٌ يختلف بالمحرّك، وهو الصنفُ الذي وُجدت بوّابةُ المحرّكين لأجله.
              */
+            $was = $m->exists ? $m->getOriginal('month_key') : null;
             $m->month_key = \App\Support\PayrollMonth::key($m->month);
             if ($m->month_key === null) return;
+
+            /*
+             * **الحارسُ يمنع إحداثَ التضارّ، لا يُجمّد ما سبقه** (التحقّق المستقلّ).
+             *
+             * قاعدةٌ مُرقّاةٌ قد تحمل مسيّرَين قديمَين لشهرٍ واحدٍ أُنشئا قبل الحارس
+             * (والهجرةُ تتخطّى الفهرسَ الفريدَ لأجلِهما عمداً). وكان كلُّ واحدٍ يرى
+             * الآخرَ فيُرفض حفظُه **ولو لم يُمسَّ الشهرُ أصلاً** — فصارا للقراءةِ
+             * فقط، **والرسالةُ تأمر «عدّل القائم» ثمّ يرفض الحارسُ ذلك التعديلَ
+             * بعينِه**، والأمرُ العلاجيُّ لا يدمج. فالمحاسبُ محاصَر.
+             *
+             * فيُفحَص التضارُّ عند **الإنشاء** أو عند **تغيّرِ الشهر** — وهما
+             * البابان اللذان يُحدِثانه. وحفظٌ لا يمسّ الشهرَ يمرّ.
+             */
+            if ($m->exists && (string) $was === (string) $m->month_key) return;
 
             $clash = static::withoutTrashed()
                 ->where('month_key', $m->month_key)
@@ -63,7 +78,9 @@ class PayrollRun extends Model
                     fn ($q) => $q->whereNull('company_id'),
                     fn ($q) => $q->where('company_id', $m->company_id))
                 ->when($m->exists, fn ($q) => $q->whereKeyNot($m->getKey()))
-                ->first(['id', 'name']);
+                // ترتيبٌ صريح: `->first()` بلا `orderBy` قرعةٌ يمنعها CLAUDE.md —
+                // وأثرُها هنا أيُّ اسمٍ يظهر في الرسالة، فليكن ثابتاً لا قرعة.
+                ->orderBy('created_at')->orderBy('id')->first(['id', 'name']);
 
             if ($clash) {
                 throw \Illuminate\Validation\ValidationException::withMessages([

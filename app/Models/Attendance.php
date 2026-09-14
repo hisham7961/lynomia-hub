@@ -112,8 +112,14 @@ class Attendance extends Model
         $in = self::secondsOfDay($timeIn);
         $out = self::secondsOfDay($timeOut);
         if ($in === null || $out === null) return null;
-        // العبورُ المُعلَنُ يضيف يوماً كاملاً للنهاية — فالفرقُ موجبٌ دائماً
-        if ($overnight && $out <= $in) $out += 86400;
+        /*
+         * **والمساواةُ صفرٌ لا عبور** (التحقّق المستقلّ). كانت `<=` تبتلع
+         * المساواةَ فيصير «٠٩:٠٠ ← ٠٩:٠٠» برايةِ الليليّةِ **أربعاً وعشرين ساعةً
+         * صامتة** — بلا سقفٍ ولا وسمٍ في الكشفِ الشهريّ، والساعاتُ تُغذّي الرواتبَ
+         * والامتثال. وهو عينُ الخطرِ الذي جُعلت الرايةُ صريحةً لأجلِه، مصروفاً في
+         * الاتّجاهِ المعاكس: نقرةٌ في غيرِ محلِّها تُحوّل يومَ صفرٍ إلى يومٍ كامل.
+         */
+        if ($overnight && $out < $in) $out += 86400;
         if ($out < $in) return null;
 
         return round(($out - $in) / 3600, 2);
@@ -139,8 +145,8 @@ class Attendance extends Model
         if ($out === null) return [$inAt, null];
 
         $outAt = $day->copy()->addSeconds($out);
-        // العبورُ المُعلَن: النهايةُ في اليومِ التالي
-        if ($overnight && $in !== null && $out <= $in) $outAt->addDay();
+        // العبورُ المُعلَن: النهايةُ في اليومِ التالي — **والمساواةُ ليست عبوراً**
+        if ($overnight && $in !== null && $out < $in) $outAt->addDay();
 
         return [$inAt, $outAt];
     }

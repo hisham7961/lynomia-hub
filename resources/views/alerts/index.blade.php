@@ -5,7 +5,7 @@
     'sub' => 'رادار تلقائي يمسح كل حقول الانتهاء والتجديد والاستحقاق في الوحدات — يتحدث كل 10 دقائق'])
     <a class="btn ghost sm" href="{{ route('alerts', ['fresh' => 1]) }}">↻ تحديث الآن</a>
 @endcomponent
-@foreach ([['🔴 متأخر — انتهى فعلاً', $late, 'bad'], ['🟠 خلال ٧ أيام', $week, 'wn'], ['🟡 خلال ٣٠ يوماً', $month, 'g']] as [$title, $set, $tone])
+@foreach ([['🔴 متأخر — انتهى فعلاً', $late, 'bad'], ['🟠 خلال ٧ أيام', $week, 'wn'], ['🟡 لاحقاً', $month, 'g']] as [$title, $set, $tone])
     @if ($set->count())
     <div class="card pad0">
         <h3 style="padding:12px 14px 0">{{ $title }} <span class="bdg {{ $tone }}">{{ $set->count() }}</span></h3>
