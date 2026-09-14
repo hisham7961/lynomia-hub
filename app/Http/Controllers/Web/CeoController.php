@@ -71,8 +71,11 @@ class CeoController extends Controller
                 ->whereNotNull('due')->where('due', '<', now()->toDateString()))->count(),
         ];
 
-        // صحة الشركة
-        $health = hub_health();
+        // صحة الشركة — **والزرُّ الذي يَعِد بالتحديثِ يُحدِّث** (مجلس الخبراء):
+        // تعرض الشاشةُ «↻ تحديث» مشيراً إلى `?fresh=1`، وتقبل `hub_health()`
+        // وسيطَ `$fresh` وتُبطل مخبأَها به — **ولم يكن الوسيطُ يصل**. اسمٌ يَعِد
+        // بسلوكٍ لا يُنفِّذه القارئ: صنفُ «سؤالٌ واحدٌ · تعريفان» نفسُه.
+        $health = hub_health(request()->boolean('fresh'));
 
         // ٦ أشهر دخل/مصروف
         $months = [];

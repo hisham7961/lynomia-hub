@@ -174,6 +174,54 @@ class CouncilExpirySelfReachTest extends TestCase
             . 'والمحرّكُ الذي يقلبها يقلب الإنذار. (CLAUDE.md يمنع هذا صراحةً.)');
     }
 
+    // ═══════════ F5 · وثائقُ ملفِّه هو ═══════════
+
+    /**
+     * **واستثناءُ صاحبِ الشأنِ كان نصفَ استثناء.** يقرأ مسحُه **أعمدةَ** ملفِّه
+     * ولا يضمّ **وثائقَه المؤرَّخة** (`hub_doc_expiry`) — فترى الموارد البشريّةُ
+     * على ملفِّه صفَّ «الهوية / الإقامة» المنتهيةَ **ولا يراه هو في أيِّ شاشة**.
+     * وهي الوثيقةُ التي عليه أن يجدّدها بنفسِه.
+     */
+    public function test_my_own_dated_document_reaches_me(): void
+    {
+        $this->seedCore();
+        // إقامةٌ بعيدةٌ خارجَ نافذةِ الرادار: فلا صفَّ عمودٍ، والصفُّ الوحيدُ المتوقَّعُ وثيقة
+        [$u, $e] = $this->member('لطيفة السالم', null, now()->addDays(200)->toDateString());
+
+        \Illuminate\Support\Facades\Storage::disk('local')->put('hub/iqama.pdf', 'x');
+        \App\Models\Attachment::create(['module' => 'hr', 'record_id' => $e->id,
+            'path' => 'hub/iqama.pdf', 'disk' => 'local', 'mime' => 'application/pdf',
+            'original_name' => 'iqama.pdf', 'uploaded_by' => $this->owner->id,
+            'kind' => 'id', 'expires_at' => now()->addDays(6)]);
+
+        $rows = collect(hub_expiry(true, $u))->where('module', 'hr');
+
+        $this->assertTrue($rows->contains(fn ($r) => str_starts_with((string) ($r['fkey'] ?? ''), 'doc:')),
+            'وثيقةُ ملفِّه المؤرَّخةُ لا تصله: المسحُ يقرأ الأعمدةَ ولا يضمّ الوثائق — '
+            . 'فتراها الموارد البشريّةُ ولا يراها صاحبُها، وهو من يجدّدها.');
+        $this->assertTrue($rows->every(fn ($r) => ($r['self'] ?? false) === true),
+            'صفٌّ بلا رايةِ `self` — فوجهتُه ستكون `m.show` التي تردّه 403');
+    }
+
+    public function test_a_colleagues_dated_document_still_does_not_reach_me(): void
+    {
+        $this->seedCore();
+        [$u] = $this->member('لطيفة السالم', null, now()->addDays(5)->toDateString());
+        $peer = \App\Models\Employee::create(['name' => 'زميلةٌ لا تخصّها', 'status' => 'نشط',
+            'iqama_exp' => now()->addDays(3)->toDateString()]);
+
+        \Illuminate\Support\Facades\Storage::disk('local')->put('hub/peer.pdf', 'x');
+        \App\Models\Attachment::create(['module' => 'hr', 'record_id' => $peer->id,
+            'path' => 'hub/peer.pdf', 'disk' => 'local', 'mime' => 'application/pdf',
+            'original_name' => 'peer.pdf', 'uploaded_by' => $this->owner->id,
+            'kind' => 'id', 'expires_at' => now()->addDays(4)]);
+
+        $ids = collect(hub_expiry(true, $u))->where('module', 'hr')->pluck('id')->all();
+
+        $this->assertNotContains($peer->id, $ids,
+            '**تسريب**: وثيقةُ زميلةٍ وصلت من لا يملك `hr:v`');
+    }
+
     // ═══════════ F3 · قناعُ الحقل ═══════════
 
     public function test_a_hidden_field_stays_hidden_even_for_its_own_subject(): void

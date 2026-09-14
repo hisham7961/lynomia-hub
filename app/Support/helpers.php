@@ -1407,6 +1407,46 @@ if (! function_exists('hub_expiry_self_scan')) {
             }
         }
 
+        /*
+         * **ووثائقُ ملفِّه معه** (مجلس الخبراء · F5). كان الاستثناءُ **نصفَ
+         * استثناء**: يقرأ أعمدةَ ملفِّه ولا يضمّ وثائقَه المؤرَّخة، فترى الموارد
+         * البشريّةُ على ملفِّه «الهوية / الإقامة» المنتهيةَ ولا يراها هو في أيِّ
+         * شاشة — **وهو من يجدّدها**.
+         *
+         * وقاعدةُ الوثيقةِ تسري كما تسري في `hub_doc_expiry`: وثيقةٌ ممنوعةٌ
+         * صراحةً عن القارئِ لا تظهر له ولو كانت على ملفِّه — القرارُ لمن قيّدها.
+         */
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('attachments')
+                && \Illuminate\Support\Facades\Schema::hasColumn('attachments', 'expires_at')) {
+                $docs = \App\Models\Attachment::whereNull('deleted_at')
+                    ->where('module', 'hr')->whereIn('record_id', $emps->pluck('id')->all())
+                    ->whereNotNull('expires_at')
+                    ->whereBetween('expires_at', [now()->subDays(60)->toDateString(),
+                                                  now()->addDays(30)->toDateString()])
+                    ->orderBy('expires_at')->orderBy('id')->limit(40)
+                    ->get(['id', 'record_id', 'kind', 'expires_at']);
+
+                if ($docs->isNotEmpty()) {
+                    \App\Support\DocumentPolicy::primeMemo($docs->pluck('id'));
+                    $names = $emps->pluck($disp, 'id');
+                    foreach ($docs as $a) {
+                        if (! \App\Support\DocumentPolicy::listable($user, $a)) continue;
+                        $out[] = [
+                            'module' => 'hr', 'mlabel' => (string) ($md['label'] ?? 'ملفات الموظفين'),
+                            'flabel' => hub_doc_label('hr', $a->kind) ?? 'وثيقة',
+                            'fkey' => 'doc:' . (string) $a->kind,
+                            'id' => (string) $a->record_id,
+                            'name' => (string) ($names[$a->record_id] ?? $user->name),
+                            'date' => $a->expires_at->toDateString(), 'doc' => true, 'self' => true,
+                            'days' => (int) now()->startOfDay()
+                                ->diffInDays($a->expires_at->copy()->startOfDay(), false),
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable $e) { /* الوثائقُ إضافةٌ — لا تُسقط مسحَ الأعمدة */ }
+
         return $out;
     }
 }
@@ -1679,9 +1719,21 @@ if (! function_exists('hub_health')) {
      */
     function hub_health(bool $fresh = false): array
     {
-        if ($fresh) \Illuminate\Support\Facades\Cache::forget('hub:health');
+        /*
+         * **والختمُ يسبق المهلة** (مجلس الخبراء). كان المفتاحُ `hub:health` **خاماً
+         * بلا ختمِ بيانات** — بخلافِ `hub_expiry` و`hub_screen` وكلِّ شاشةٍ محسوبةٍ
+         * في المنتج — فالأبعادُ مجمّدةٌ نصفَ ساعةٍ مهما تغيّرت البيانات: يُسجَّل عقدٌ
+         * فيبقى التقريرُ يقول «لا سجلّاتٍ بعد».
+         *
+         * والختمُ قراءةُ مخبأٍ لا استعلامَ قاعدة، فلا كلفةَ تُذكر.
+         */
+        $key = 'hub:health' . hub_data_stamp([
+            'contracts', 'domains', 'employees', 'fin_documents', 'incidents',
+            'issues', 'projects', 'servers', 'users', 'vault_secrets',
+        ]);
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
-        return \Illuminate\Support\Facades\Cache::remember('hub:health', 1800, function () {
+        return \Illuminate\Support\Facades\Cache::remember($key, 1800, function () {
             $db = \Illuminate\Support\Facades\DB::getFacadeRoot();
             $today = now()->toDateString();
             $soon  = now()->addDays(30)->toDateString();
