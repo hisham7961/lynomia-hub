@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\Schema;
  *   ② تدهورُ النظام            `health.<component>`              ← `Health::check`
  *   ③ خطأٌ حرجٌ غيرُ محلول      `error.critical:<hash>`           ← `error_events`
  *   ④ سلسلةُ تدقيقٍ مكسورة     `audit.chain`                     ← `audit_verifications` ثم `Audit::verifyTail`
+ *      أو متعذّرةُ الفحص       `audit.chain.unverified`          ← الحالةُ الثالثة: لم تُفحَص (V5)
  *   ⑤ مشكلةُ مجدول/طابور شديدة `health.scheduler|outbox`         ← المصدرُ ② نفسُه (لا عدّادَ ثانٍ)
  *   ⑥ نقصُ جودةٍ حرج           `quality.<module>:<rule>`         ← `DataQuality::scan`
  *   ⑦ هدفٌ حرجٌ متأخّر         `okr.<id>`                        ← `objectives`
@@ -337,6 +338,9 @@ final class AttentionQueue
      * `audit_verifications` (ناتجُ `hub:audit-verify`)، وعند غيابه يرتدّ إلى
      * `Audit::verifyTail` (نافذةٌ من آخر القيود). و«خرج بملاحظات» (warn) يُقال
      * كما هو — لا يُسمّى «مكسورة» ولا يُبتلع تحت «سليمة».
+     *
+     * وثلاثُ حالاتٍ للذيل لا حالتان: سليمةٌ تُسقط البند، ومكسورةٌ بندٌ حرج،
+     * و**متعذّرةُ الفحص** بندٌ مهمّ (`audit.chain.unverified`) — لا صمت.
      */
     protected static function audit($user, ?\Closure $health = null): array
     {
@@ -363,7 +367,20 @@ final class AttentionQueue
         }
 
         $tail = Audit::verifyTail();
-        if ($tail['ok']) return [];
+        $state = Audit::chainState($tail);
+        if ($state === 'ok') return [];
+
+        // **والتعذُّرُ يُرفَع لا يُسقَط** (الجولة ٣ · V5): كان `$tail['ok']` يعود
+        // صادقاً عند فشل الفحص فيُسقَط البندُ كلُّه — فلا يعلم المالكُ أنّ ضمانَ
+        // «لم يُعبَث بالسجل» بلا فاحصٍ يعمل. ويُقال بما هو: «تعذّر» لا «مكسورة»
+        // (لا ندّعي عبثاً لم نره)، وبمفتاحٍ مستقلٍّ كي لا يُسكِته إقرارُ بندِ الكسر.
+        if ($state === 'unknown') {
+            return [self::item('audit', 'high', 'audit.chain.unverified', '🔗',
+                'تعذّر فحصُ سلسلة التدقيق — حالتُها مجهولة',
+                (string) ($tail['why'] ?: 'لم يُنفَّذ فحصُ الذيل على هذا التنصيب.'),
+                'شغّل الفحصَ الكامل (زرُّ «افحص سلسلة التدقيق» في مركز التشغيل) واقرأ سببَ التعذّر في مركز الأخطاء باسم audit-chain.',
+                $url, 'افتح تغطية التدقيق')];
+        }
 
         return [self::item('audit', 'critical', 'audit.chain', '🔗',
             'سلسلةُ التدقيق مكسورة في ذيلها',

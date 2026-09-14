@@ -12,10 +12,13 @@
         : collect();
     $modeLabels = ['required' => 'أساسيّ', 'optional' => 'اختياريّ', 'alternative' => 'بديل', 'addon' => 'إضافة'];
     $qMeta = (array) $row->meta;
+    // (الجولة 2 · G18ب) حقيقةُ التحويل لا أثرُه في meta وحدَه: مشروعٌ مرتبطٌ بالعمود
+    // كان يبقى خفيّاً فتقول الشاشةُ «لم يُحوَّل» ومشروعُه قائم.
+    $qPrjId = $row->linkedProjectId();
 @endphp
 
 {{-- عرض ٣٦٠: سلسلةُ الأثر التجاريّ — من العميل حتى المشروع والفاتورة بنقرة --}}
-@if ($row->client_id || array_intersect_key($qMeta, array_flip(['contract_id','engagement_id','project_id','invoice_id'])))
+@if ($row->client_id || $qPrjId || array_intersect_key($qMeta, array_flip(['contract_id','engagement_id','project_id','invoice_id'])))
     <div class="card">
         <h3 class="cardtitle">🧭 سلسلةُ الأثر التجاريّ</h3>
         <div class="crow" style="flex-wrap:wrap;gap:6px">
@@ -23,7 +26,7 @@
             <span class="chip">🧾 {{ $row->doc_no }}</span>
             @if (! empty($qMeta['contract_id']))<span class="sub">›</span><a class="chip" href="{{ route('m.show', ['contracts', $qMeta['contract_id']]) }}">📜 العقد</a>@endif
             @if (! empty($qMeta['engagement_id']))<span class="sub">›</span><a class="chip" href="{{ route('m.show', ['engagements', $qMeta['engagement_id']]) }}">🤝 الارتباط</a>@endif
-            @if (! empty($qMeta['project_id']))<span class="sub">›</span><a class="chip" href="{{ route('m.show', ['projects', $qMeta['project_id']]) }}">🗂️ المشروع</a>@endif
+            @if ($qPrjId)<span class="sub">›</span><a class="chip" href="{{ route('m.show', ['projects', $qPrjId]) }}">🗂️ المشروع</a>@endif
             @if (! empty($qMeta['invoice_id']))<span class="sub">›</span><a class="chip" href="{{ route('m.show', ['fin', $qMeta['invoice_id']]) }}">🧾 الفاتورة</a>@endif
         </div>
         <div class="sub" style="margin-top:6px">مصادرُ الحقيقة موصولة — العرضُ يشير لها لا ينسخها.</div>
@@ -31,16 +34,41 @@
 @endif
 
 {{-- الفعلُ الأفضلُ التالي (محرّك NextAction) — الخطوةُ المنطقيةُ حسب حالة العرض --}}
-@php $qNext = \App\Support\NextAction::for('quotes', $row); @endphp
-@if (! empty($qNext))
+@php
+    $qNext = \App\Support\NextAction::for('quotes', $row);
+    /*
+     * (الجولة 2 · G18ب) **الخطوةُ تفعل أو لا تُعرض**: كان chip «حوّله لمشروعٍ
+     * وارتباط» رابطاً إلى الصفحة التي أنت فيها — وعدٌ يعيد التحميلَ ولا يفعل شيئاً،
+     * ويُقال معه «قُبل ولم يُحوَّل» ولو كان للعرض مشروعٌ مرتبطٌ فعلاً. تُنزع الخطوةُ
+     * الميتةُ من الشرائح، ويحلّ محلَّها الفعلُ الحقيقيُّ خلف بوّابته هو
+     * (Quote::convertGate — عينُ بوّابة المتحكّم)، أو لا شيءَ إن كان ممنوعاً:
+     * سببُ المنع مكتوبٌ في بطاقة «مسار العرض» أعلاه، فلا يتكرّر هنا.
+     */
+    $qShowUrl = route('m.show', ['quotes', $row->id]);
+    $qNext = array_values(array_filter($qNext, fn ($s) => ! (($s['url'] ?? '') === $qShowUrl
+        && str_starts_with((string) ($s['label'] ?? ''), 'حوّله لمشروع'))));
+    // مشروعٌ مرتبطٌ بالعمود وحدَه: المحرّكُ لا يعرفه فيُعرض فتحُه هنا (لا تكرارَ حين يعرفه)
+    $qOpenPrj = $qPrjId && empty($qMeta['project_id']);
+    $qActPrj = ! $qPrjId && $row->status === 'مقبول' && ! $row->trashed()
+        && $row->convertGate('project') === null;
+@endphp
+@if (! empty($qNext) || $qOpenPrj || $qActPrj)
     <div class="card">
         <h3 class="cardtitle">🎯 الخطوة التالية</h3>
         <div class="crow" style="flex-wrap:wrap;gap:8px">
+            @if ($qOpenPrj)
+                <a class="chip" href="{{ route('m.show', ['projects', $qPrjId]) }}" title="حُوِّل — تابع إقلاعَ التنفيذ.">⭐ افتح المشروعَ وابدأ الإقلاع</a>
+            @elseif ($qActPrj)
+                <form method="POST" action="{{ route('quotes.act', $row->id) }}" class="inline" data-confirm="تحويل العرض إلى مشروعٍ وارتباط؟ يُنقل النطاق ويُحفظ خطُّ الأساس التجاريّ.">@csrf
+                    <input type="hidden" name="do" value="project">
+                    <button class="chip" title="قُبل ولم يُحوَّل — التحويلُ يبدأ التسليمَ ويربط الربحية.">⭐ حوّله لمشروعٍ وارتباط</button>
+                </form>
+            @endif
             @foreach ($qNext as $step)
                 <a class="chip" href="{{ $step['url'] }}" title="{{ $step['why'] }}">{{ $step['primary'] ? '⭐ ' : '' }}{{ $step['label'] }}</a>
             @endforeach
         </div>
-        <div class="sub" style="margin-top:6px">{{ $qNext[0]['why'] }}</div>
+        @if (! empty($qNext))<div class="sub" style="margin-top:6px">{{ $qNext[0]['why'] }}</div>@endif
     </div>
 @endif
 

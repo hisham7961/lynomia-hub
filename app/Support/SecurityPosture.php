@@ -352,15 +352,38 @@ class SecurityPosture
             route('dataroom.index'));
     }
 
+    /**
+     * **وثالثةٌ بين الأخضر والأحمر: «غيرُ متحقَّق»** (الجولة ٣ · V5). كان الصفُّ
+     * ثنائيَّ اللون (`ok ? 'ok' : 'bad'`) على ناتجٍ يفشل مفتوحاً — فتعذُّرُ الفحص
+     * يُصبَغ أخضرَ ويُقرأ شهادةَ سلامة. وهو المنطقُ المكتوبُ في `checks()` نفسِها
+     * لفحصٍ يسقط: «حالتُه مجهولة لا سليمة» — معمَّماً هنا على تعذُّرٍ **داخل** الفحص.
+     */
     protected static function auditChain(): array
     {
-        if (! Schema::hasTable('audits')) return [];
-        $chain = Audit::verifyTail();
+        try {
+            if (! Schema::hasTable('audits')) return [];   // تنصيبٌ بلا سجلّ تدقيق: لا صفَّ أصلاً
+        } catch (\Throwable $e) {
+            // وتعذُّرُ السؤال عن وجود الجدول ليس جواباً بـ«لا جدول»: يُمضى إلى
+            // الفحص ليردّ حالتَه الثالثة، فيبقى الصفُّ ظاهراً بمفتاحه لا يختفي.
+        }
 
-        return self::row('audit_chain', 'سلسلة بصمات التدقيق', $chain['ok'] ? 'ok' : 'bad',
-            'كل قيدٍ مختومٌ ببصمةٍ تعتمد على ما قبله، فأي تعديلٍ مباشر على القاعدة يكسر السلسلة.',
-            $chain['broken'], $chain['ok'] ? '' : $chain['why'] . ' — شغّل `php artisan hub:audit-verify` لتحديد مدى الضرر.',
-            route('audit.index'), $chain['label']);
+        $chain = Audit::verifyTail();
+        $state = Audit::chainState($chain);
+
+        $tone = ['ok' => 'ok', 'bad' => 'bad', 'unknown' => 'wn'][$state];
+        $fix = match ($state) {
+            'bad'     => $chain['why'] . ' — شغّل `php artisan hub:audit-verify` لتحديد مدى الضرر.',
+            'unknown' => $chain['why'],
+            default   => '',
+        };
+        // وعدَدُ المكسور صفرٌ عند التعذُّر — و«٠» تحت وسمِ تحذيرٍ تُقرأ سلامة،
+        // فيُعدّ البندُ نفسُه واحداً: ضمانٌ واحدٌ بلا فاحصٍ يعمل.
+        $n = $state === 'unknown' ? 1 : (int) $chain['broken'];
+
+        return self::row('audit_chain', 'سلسلة بصمات التدقيق', $tone,
+            'كل قيدٍ مختومٌ ببصمةٍ تعتمد على ما قبله، فأي تعديلٍ مباشر على القاعدة يكسر السلسلة.'
+            . ($state === 'unknown' ? ' وفحصٌ لم يجرِ لا يقول شيئاً عن السلامة.' : ''),
+            $n, $fix, route('audit.index'), $chain['label']);
     }
 
     protected static function demoMode(): array

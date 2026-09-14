@@ -225,6 +225,11 @@ class Workday
                 foreach ($emps as $emp) {
                     if (self::today($emp->id, $date)) continue;
                     if (self::onLeave($emp->id, $date)) continue;
+                    // **والعذرُ المعتمَدُ غيرُ الخصميِّ يمنع الختمَ أيضاً** (الخاتمة · X1):
+                    // «إذن خروج» و«عمل عن بعد» معتمَدان كانا يُختمان «غائباً» في السجلِّ
+                    // الدائمِ لأنّ الكنسَ يقرأ `onLeave` (أنواعَ الخصمِ) وحدَها — فيصير
+                    // اعتمادُ الموارد البشريّةِ سبباً في إدانةٍ مكتوبةٍ لا عرضاً عابراً
+                    if (\App\Support\DailyWorkCompliance::excuseFor($emp->id, $date) !== null) continue;
                     Attendance::create([
                         'emp_id' => $emp->id, 'date' => $date, 'status' => self::ABSENT,
                         'company_id' => $emp->company_id,

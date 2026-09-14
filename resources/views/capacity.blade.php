@@ -22,6 +22,14 @@
 
 @include('partials.lens', ['lensModules' => ['tasks', 'hr', 'leaves', 'attend']])
 
+{{-- الكيانُ المختار لا يُصفّي هذه اللوحة (الجولة ٣ · V7): `hub_capacity` محرّكٌ
+     على مستوى المنشأة كلِّها، فكان يقول «٣١ موظّفاً و٥٬٢٣١ ساعةً متاحة» تحت كيانٍ
+     بلا موظّفٍ واحد بينما «فريقي اليوم» يقول ٠ من الجدول نفسِه. حتى تُصفّى فعلاً،
+     تُقال الحقيقةُ فوق الأرقام مباشرةً — لا في حاشية. --}}
+@include('partials._groupnums', [
+    'what' => 'ساعاتُ الفريق وجدولُ الأحمال أدناه',
+    'parts' => 'كلُّ أرقام هذه اللوحة (المتاح · المحجوز · المسجَّل · الاختناقات · جدول الموظفين)'])
+
 <div class="cards">
     <div class="stat"><span class="ico">🗓️</span><b>{{ $c['workDays'] }}</b><span>يوم عمل × {{ $c['hoursDay'] }} ساعات</span></div>
     <div class="stat"><span class="ico">🧮</span><b>{{ number_format($t['available'] ?? 0) }}</b><span>ساعة متاحة للفريق</span></div>

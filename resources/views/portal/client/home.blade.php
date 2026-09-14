@@ -13,12 +13,16 @@
             @endif
         </div>
     </div>
+    {{-- (الجولة 2 · G7) بابُ البلاغ في الترويسة — **حاضرٌ ولو كانت المساحةُ خاوية**:
+         في المحاكاة توقّف نظامُ العميلِ فوجد فواتيرَ ومحادثاتٍ فارغةً ولا زرَّ بلاغ. --}}
+    <a class="btn p" href="{{ route('portal.ticket.create') }}">🎫 أبلغ عن مشكلة</a>
 </div>
 
 @php
     // البوابةُ كلُّها خاويةٌ؟ رسالةٌ واحدةٌ صادقةٌ لا أصفارٌ مُلفّقة (§82)
     $anything = $engagements->isNotEmpty() || $projects->isNotEmpty()
-        || $documents->isNotEmpty() || $invoices->isNotEmpty() || $conversations->isNotEmpty();
+        || $documents->isNotEmpty() || $invoices->isNotEmpty() || $conversations->isNotEmpty()
+        || $tickets->isNotEmpty();
 @endphp
 
 @unless ($anything)
@@ -26,6 +30,8 @@
         <div style="font-size:32px">📭</div>
         <h3 style="margin:8px 0 4px">لا بيانات بعد</h3>
         <p class="sub">لم تُشارَك معك مشاريعُ أو وثائقُ أو فواتيرُ حتى الآن. سيصلك إشعارٌ حين تتوفّر.</p>
+        <p style="margin-top:10px" class="sub">وإن واجهت عطلاً الآن فلا تنتظر:
+            <a href="{{ route('portal.tickets') }}">افتح بلاغاً من «تذاكري»</a>.</p>
     </div>
 @else
     <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
@@ -79,6 +85,19 @@
                 </div>
             @empty
                 <p class="sub">لا بيانات بعد</p>
+            @endforelse
+        </div>
+
+        {{-- تذاكري (الجولة 2 · G7/G5): البلاغُ وحالتُه في مكانٍ واحد --}}
+        <div class="card">
+            <h3 style="margin-bottom:8px">🎫 تذاكرك <a class="btn ghost xs" style="float:inline-end" href="{{ route('portal.tickets') }}">الكل</a></h3>
+            @forelse ($tickets as $t)
+                <div class="inbrow" style="display:flex;justify-content:space-between;gap:8px;padding:6px 0">
+                    <a href="{{ route('portal.ticket', $t->id) }}"><b>{{ \Illuminate\Support\Str::limit($t->subject, 46) }}</b></a>
+                    <span class="bdg {{ hub_tone((string) $t->status) }}">{{ $t->status ?: '—' }}</span>
+                </div>
+            @empty
+                <p class="sub">لا بلاغاتِ لك — <a href="{{ route('portal.ticket.create') }}">أبلغ عن مشكلة</a></p>
             @endforelse
         </div>
 

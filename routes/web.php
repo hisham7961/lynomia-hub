@@ -243,6 +243,30 @@ Route::middleware('auth')->group(function () {
         // بعضويّة العميل وجمهورِ الوثيقة وسياستِها؛ لا روابطَ عامّةً ولا توقيعَ URL.
         Route::get('documents/{id}/download', [ClientPortalController::class, 'documentDownload'])
             ->middleware('throttle:60,1')->name('document.download');
+        // (الجولة 2 · G7/G5) «تذاكري» — قناةُ بلاغِ العميل ومتابعتُها: كانت البوّابةُ
+        // ستَّ وجهاتٍ بلا بابِ دعمٍ واحد، فالبلاغُ يجري هاتفيّاً خارج النظام. العزلُ
+        // كلُّه في المتحكّم/القارئ (عملاؤه + مشاريعه)، والكتابةُ مقنَّنةُ المعدّل.
+        // `tickets/new` قبل `tickets/{id}` — وإلا ابتلعها معرّفُ السجلّ.
+        Route::get('tickets', [ClientPortalController::class, 'tickets'])->name('tickets');
+        Route::get('tickets/new', [ClientPortalController::class, 'ticketCreate'])->name('ticket.create');
+        Route::post('tickets', [ClientPortalController::class, 'ticketStore'])
+            ->middleware('throttle:20,1')->name('ticket.store');
+        Route::get('tickets/{id}', [ClientPortalController::class, 'ticket'])->name('ticket');
+        // (الجولة 3 · V3) **ردُّ العميلِ على تذكرته** — كانت القناةُ باتّجاهٍ واحد منذ
+        // v2.497.0: يبلّغ ولا يُردّ عليه، فإذا طال الصمتُ أعاد البلاغَ نفسَه. الردُّ
+        // على محرّكِ التعليقات القائم، والعزلُ بفاحصِ الشاشةِ نفسِه (٤٠٤ لغيره)،
+        // و`internal` مختومٌ خادميّاً. مقنَّنُ المعدّل كبقيّة كتابات البوّابة.
+        Route::post('tickets/{id}/replies', [ClientPortalController::class, 'ticketReply'])
+            ->middleware('throttle:20,1')->name('ticket.reply');
+        // (الجولة 3 · V4) جلساتُ صاحبِ الحساب — على سكّةِ `Sessions` الواحدة وعلى
+        // صفوفه هو حصراً. شاشةُ حسابه صارت بقشرةِ بوّابته، فأفعالُها بادئتُها كذلك
+        // (مسارات `my/security` داخليّةٌ خارجَ قائمةِ PortalGuard البيضاء).
+        Route::middleware('throttle:20,1')->group(function () {
+            Route::post('account/sessions/others', [ClientPortalController::class, 'sessionsRevokeOthers'])
+                ->name('sessions.others');
+            Route::post('account/sessions/{id}/revoke', [ClientPortalController::class, 'sessionRevoke'])
+                ->name('session.revoke');
+        });
     });
 
     // ── إدارةُ عضويّة العميل (Work OS · الطور B · WP-B.3) — داخليّةٌ فقط (مديرُ الحساب) ──

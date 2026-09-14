@@ -4,8 +4,11 @@
 @php
     $m = fn ($v) => number_format((float) $v, 2);
     $c = $pl['currency'];
-    $buckets = [['ساعات الفريق', $pl['cost']['hours'], '👥'], ['السيرفرات', $pl['cost']['servers'], '🖥️'],
-                ['الأدوات والاشتراكات', $pl['cost']['tools'], '🧰'], ['الخدمات الخارجية', $pl['cost']['external'], '🌐']];
+    // تركيبُ الرقم كما يعيده `hub_project_pl` — لا قائمةَ دلاءٍ ثانيةٌ في الشاشة
+    // (عيبُ الجولة 3 · V1: «التكلفة المسجَّلة يدويّاً» كانت غائبةً عن الحساب أصلاً)
+    $icons = ['direct' => '✍️', 'hours' => '👥', 'servers' => '🖥️',
+              'tools' => '🧰', 'external' => '🌐'];
+    $buckets = $pl['cost']['components'] ?? [];
     $max = max(0.01, $pl['cost']['total']);
 @endphp
 <div class="hero">
@@ -49,20 +52,53 @@
 <div class="kids">
     <div class="card kid">
         <h3>🧮 توزيع التكلفة</h3>
+        {{-- المكوّنُ الغائبُ يُقال «لا بيان» ولا يُعرض صفراً صامتاً: الصفرُ يُقرأ
+             «لا تكلفة» وهو في الحقيقة «لا تسجيل» — والفرقُ بينهما فرقُ مشروعٍ
+             مربحٍ ومشروعٍ مجهول (عيبُ الجولة 3 · V1). --}}
         <table class="mini">
-            @foreach ($buckets as [$label, $val, $ico])
+            @foreach ($buckets as $b)
                 <tr>
-                    <td style="width:38%">{{ $ico }} {{ $label }}</td>
+                    <td style="width:38%">{{ $icons[$b['k']] ?? '•' }} {{ $b['label'] }}</td>
                     <td>
-                        <div style="background:var(--pss);border-radius:99px;height:9px;overflow:hidden">
-                            <div style="background:var(--p);height:100%;width:{{ round($val / $max * 100) }}%"></div>
-                        </div>
+                        @if ($b['has'])
+                            <div style="background:var(--pss);border-radius:99px;height:9px;overflow:hidden">
+                                <div style="background:var(--p);height:100%;width:{{ round($b['v'] / $max * 100) }}%"></div>
+                            </div>
+                        @else
+                            <span class="sub">— لا بيان مسجَّل</span>
+                        @endif
                     </td>
-                    <td class="acts"><b>{{ $m($val) }}</b>
-                        <span class="sub">{{ round($val / $max * 100) }}٪</span></td>
+                    <td class="acts">
+                        @if ($b['has'])
+                            <b>{{ $m($b['v']) }}</b><span class="sub">{{ round($b['v'] / $max * 100) }}٪</span>
+                        @else
+                            <span class="bdg wn">لا بيان</span>
+                        @endif
+                    </td>
                 </tr>
             @endforeach
+            <tr>
+                <td><b>الإجمالي</b></td><td></td>
+                <td class="acts"><b>{{ $m($pl['cost']['total']) }}</b> <span class="sub">{{ $c }}</span></td>
+            </tr>
         </table>
+
+        @if (! ($pl['cost']['known'] ?? true))
+            <div class="bdg bad" style="margin-top:8px">⚠️ لا بيانَ تكلفةٍ على هذا المشروع إطلاقاً — الصفرُ هنا جهلٌ لا ربح</div>
+        @elseif (! empty($pl['cost']['missing']))
+            <div class="sub" style="margin-top:8px">
+                ⚠️ مكوّناتٌ بلا بيان: {{ implode(' · ', $pl['cost']['missing']) }} — التكلفةُ أدناها لا أقصاها.
+            </div>
+        @endif
+
+        @if ($pl['cost']['overlap'] ?? false)
+            {{-- عَلَمُ التقاطع (كعَلَمِ اختلاط العملات): يُعلَن ولا يُطرَح — لا صفَّ
+                 مرجعيَّ خلف الحقلِ اليدويّ يُطابَق به ما تقاطع منه --}}
+            <div class="bdg wn" style="margin-top:8px">
+                ⚠️ التكلفةُ المسجَّلةُ يدويّاً تجتمع مع تكلفةٍ مشتقّة — إن كانت المسجَّلةُ تشمل العمالةَ فالعمالةُ محسوبةٌ مرّتين
+            </div>
+        @endif
+
         <div class="sub" style="margin-top:8px">
             {{ $pl['hours']['logged'] }} ساعة مسجَّلة من {{ $pl['hours']['people'] }} منفّذ ·
             متوسط أجر الساعة {{ $pl['hours']['avg_rate'] }} {{ $c }}

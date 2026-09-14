@@ -41,6 +41,52 @@ class Staff
         return (bool) ($u->role?->is_owner) || hub_flag($u, 'users');
     }
 
+    /**
+     * **من يفتح حسابَ دخولٍ لموظّف؟** (الجولة 2 · G15)
+     *
+     * كان الجوابُ «حاملُ رايةِ إدارةِ المستخدمين وحده» — وهي سلطةُ النظامِ كلِّه.
+     * فالتعيينُ الواحدُ يحتاج أربعةَ أشخاص: HR تُنشئ الملفَّ ثم تنتظر المالكَ
+     * ليفتح الحساب. القاعدةُ الآن **توسيعٌ بثلاثةِ أبوابٍ لا تضييقَ لأحد**:
+     * المالكُ، أو حاملُ الرايةِ كما كان، أو حاملُ مفتاحِ `hr:staffAccounts`
+     * المُعلَنِ في كتالوج الصلاحيات الدقيقة (يُمنح صراحةً من محرّر الأدوار).
+     *
+     * وهي المرجعُ الواحد لكلِّ بابٍ يفتح حساباً (شاشةُ الموظفين، ونموذجُ
+     * الملفّ، ومسارُ التعيين) — لا نسخةَ ثانيةً من الشرط تتفرّق صياغتُها.
+     */
+    public static function mayOpenAccounts($actor = null): bool
+    {
+        $actor = $actor ?? auth()->user();
+        if (! $actor) return false;
+
+        // hub_flag تُرجع true للمالك أصلاً — وتُذكر الملكيةُ صراحةً لتُقرأ السياسةُ كاملة
+        return hub_is_owner($actor) || hub_flag($actor, 'users') || hub_can($actor, 'hr', 'staffAccounts');
+    }
+
+    /** هل هذا الدورُ يحمل سلطةَ إدارةِ المستخدمين (أو الملكية)؟ — لحارس التصعيد */
+    protected static function roleIsPrivileged(Role $role): bool
+    {
+        if ($role->is_owner) return true;
+        $flags = is_array($role->flags) ? $role->flags : (json_decode($role->flags ?? '[]', true) ?: []);
+
+        return (bool) ($flags['users'] ?? 0);
+    }
+
+    /**
+     * **حسابٌ فُتح بكلمةٍ مؤقّتة ولم تُبدَّل بعد** (الجولة 2 · G16).
+     *
+     * الواجهةُ كانت تَعِد «سيُطلب منه تبديلُها عند أوّل دخول» ولا شيء يفرضه:
+     * دخل الموظفُ وعمل شهراً بكلمةٍ سلّمها له غيرُه بيده وبقيت في محادثةٍ ما.
+     * والحكمُ هنا على **علمٍ صريح** (`users.must_change_password`) لا على تخمينِ
+     * «`password_changed_at` فارغة»: تلك فارغةٌ كذلك لعضوِ بوّابةِ عميلٍ لم
+     * يُفعَّل ولصفوفٍ تاريخيّةٍ سبقت العمود — فلو بُني عليها الحبسُ لحُبس من
+     * لم يُخطئ وانكسر دخولٌ قائم. والعلمُ يُطفأ من تلقائه بختمِ التجديد: من
+     * بدّل كلمتَه من ملفّه (أو أعادها له إداريّ) مرّ.
+     */
+    public static function mustChangePassword($u): bool
+    {
+        return (bool) $u && (bool) ($u->must_change_password ?? false) && $u->password_changed_at === null;
+    }
+
     /** هل يجوز لهذا الفاعل المساسُ بحساب هذا المستخدم؟ */
     public static function mayTouch(User $target, $actor = null): bool
     {
@@ -66,6 +112,33 @@ class Staff
         $email = trim($email);
 
         return $email !== '' && User::onlyTrashed()->where('email', $email)->exists();
+    }
+
+    /**
+     * **ملفٌّ وظيفيٌّ آخر يملك هذا البريد؟** (الجولة 2 · G13)
+     *
+     * سكّةُ الربط كلُّها قائمةٌ على «البريد هو الهوية»: من يُضاف بأحد الطرفين
+     * يُربط بالآخر به، و«لا حساب يُقتسَم» مفروضٌ على طرفِ **الحساب** وحده.
+     * أمّا طرفُ الملفّ فكان مشاعاً: يُحفظ ملفٌّ ثانٍ ببريدِ ملفٍّ قائمٍ فيأتي
+     * «أُضيف السجل بنجاح» بلا كلمة، ويبقى ملفّان يتنازعان حساباً واحداً —
+     * أوّلُهما يظفر به (`orderBy('id')->first()`) والثاني يبقى بلا وصولٍ أبداً،
+     * ولا أحدَ يعلم لِمَ.
+     *
+     * المقارنةُ على المطبَّع: تشذيبُ الفراغات وحالةُ الأحرف (البريدُ لا يفرّق
+     * بينها عملياً، وMySQL بترتيبٍ لا حسّاسٍ للحالة أصلاً بينما SQLite حسّاسة
+     * — فالتطبيعُ هنا يُوحّد الحكمَ على المحرّكين). والمحذوفُ ناعماً لا يُحسب:
+     * ملفٌّ مُزالٌ ليس منازعاً، وكلُّ قراءات الربط ترشّحه.
+     */
+    public static function fileHoldingEmail(string $email, ?string $exceptId = null): ?Employee
+    {
+        $norm = mb_strtolower(trim($email));
+        if ($norm === '') return null;
+
+        return Employee::whereNull('deleted_at')
+            ->when($exceptId, fn ($q) => $q->where('id', '!=', $exceptId))
+            ->whereRaw('LOWER(TRIM(email)) = ?', [$norm])
+            ->orderBy('id')                       // ترتيبٌ حتميّ: أوّلُ مالكٍ للبريد يُسمّى
+            ->first(['id', 'name', 'email']);
     }
 
     /** حسابٌ حرّ بهذا البريد؟ (غير مرتبطٍ بملفٍّ آخر) */
@@ -141,11 +214,17 @@ class Staff
     public static function makeAccountResult(Employee $emp, string $roleId, $actor = null): array
     {
         $actor = $actor ?? auth()->user();
-        abort_unless(hub_flag($actor, 'users'), 403, 'فتحُ الحسابات يحتاج صلاحية إدارة المستخدمين');
+        abort_unless(self::mayOpenAccounts($actor), 403,
+            'فتحُ الحسابات يحتاج صلاحيةَ إدارةِ المستخدمين أو مفتاحَ «فتحُ حساباتِ دخولٍ للموظّفين»');
 
         $role = Role::find($roleId);
         abort_unless($role, 422, 'دورٌ غير معروف');
         abort_if($role->is_owner && ! hub_is_owner($actor), 403, 'منح دور المالك لا يكون إلا من مالك');
+        // **البابُ الجديد ليس سُلّماً** (G15): حاملُ `staffAccounts` وحدَه لا يمنح دوراً
+        // يملك إدارةَ المستخدمين — وإلا صار «فتحُ حساباتِ الموظفين» طريقاً إلى النظام
+        // كلِّه بحسابٍ يُفتح بيده. من يملك الرايةَ (أو الملكية) يبقى يمنحها كما كان.
+        abort_if(self::roleIsPrivileged($role) && ! (hub_is_owner($actor) || hub_flag($actor, 'users')), 403,
+            'منحُ دورٍ يملك إدارةَ المستخدمين لا يكون إلا ممن يملكها');
 
         $email = trim((string) $emp->email);
         if ($email === '') return ['temp' => null, 'outcome' => 'no_email', 'user' => null];
@@ -173,6 +252,9 @@ class Staff
                 'password' => $temp,
                 // بلا ختمِ تجديد: الحساب يبدأ بكلمةٍ مؤقتة يجب تبديلها عند أول دخول
                 'password_changed_at' => null,
+                // **والوعدُ يُنفَّذ** (G16): علمٌ صريحٌ يُلزم صاحبَه بالتبديل قبل أيِّ
+                // عملٍ آخر (ForcePasswordChange) — لا يُخمَّن من فراغِ ختمِ التجديد
+                'must_change_password' => true,
             ]);
             $emp->forceFill(['user_id' => $u->id])->saveQuietly();
 
@@ -341,11 +423,25 @@ class Staff
             'url' => hub_can($u, 'updates', 'a') ? route('m.create', 'updates')
                    : (hub_can($u, 'updates', 'v') ? route('reports.mine') : null)];
 
-        // 👥 دليل الفريق — بابُه مفتوحٌ لكل زميلٍ داخليٍّ نشطٍ أو لحامل hr:v (F4)
-        $mayTeam = hub_can($u, 'hr', 'v')
-            || ($emp && in_array((string) $emp->status, self::OPEN, true));
-        $items[] = ['icon' => '👥', 'label' => 'تعرّف على فريقك: من في قسمك ومن مديرك المباشر',
-            'done' => null, 'url' => $mayTeam ? route('team') : null];
+        /*
+         * 👥 دليل الفريق — **لا خطوةَ تقود إلى فراغ** (الجولة 2 · G19).
+         *
+         * كان الشرطُ تقريباً مرسوماً باليد: «حاملُ hr:v أو صاحبُ ملفٍّ مفتوح»
+         * — وهو غيرُ الشرطِ الذي تطبّقه الشاشةُ نفسُها. فحاملُ `hr:v` بنطاقِ
+         * مشاريعَ حاسرٍ يمرّ من هنا، ثم يفتح الدليلَ **فارغاً**: `cards()` تأخذ
+         * به مسارَ الدليلِ الكامل، و`hub_scope` تحسر على `employees.project_id`
+         * وهو NULL في الملفّات عملياً (عيبُ F4 نفسُه في وجهه الآخر). أوّلُ نقرةٍ
+         * للموظف الجديد في فراغ.
+         *
+         * الآن: البابُ يُسأل لصاحبه (`TeamDirectory::mode`)، ثم يُتحقَّق أنّ خلفه
+         * أحداً فعلاً باستعلامِ وجودٍ واحدٍ خفيف **بمرشّحِ الدليل نفسِه** لكلّ وجه
+         * — والخطوةُ تسقط إن كان الجواب لا. لا تضييق: من يرى زملاءه (ولو نفسَه
+         * في الدليل الكامل) يبقى يرى الخطوةَ والرابط.
+         */
+        if (self::teamDirectoryHasFaces($u)) {
+            $items[] = ['icon' => '👥', 'label' => 'تعرّف على فريقك: من في قسمك ومن مديرك المباشر',
+                'done' => null, 'url' => route('team')];
+        }
 
         // 📕 دليل الموظف الجديد — وثيقةٌ إن وُجدت في نطاقه، ولا رابطَ ميتاً إن غابت
         if (hub_can($u, 'files', 'v') && \Illuminate\Support\Facades\Schema::hasTable('documents')) {
@@ -362,6 +458,38 @@ class Staff
         return ['since' => ($hiredNew ? $emp->hired : $u->created_at)->toDateString(), 'items' => $items];
     }
 
+    /**
+     * هل خلف بابِ دليلِ الفريق **وجهٌ واحدٌ على الأقلّ** لهذا المستخدم؟ (G19)
+     *
+     * استعلامُ وجودٍ واحدٌ لا بناءَ بطاقات: الوجهُ الكاملُ يُقاس بمرشّح
+     * `TeamDirectory::cards` نفسِه (`hub_scope` على hr)، والأدنى بمرشّحِ
+     * `basicCards` (خدمةٌ مفتوحةٌ داخل عزلِ الشركات) — فلا يفترق ما نَعِد به
+     * عمّا تعرضه الشاشة.
+     */
+    protected static function teamDirectoryHasFaces(User $u): bool
+    {
+        if (TeamDirectory::mode($u) === null) return false;
+        if (! \Illuminate\Support\Facades\Schema::hasTable('employees')) return false;
+
+        /*
+         * تُحاذي `TeamDirectory::cards` حرفاً: حاملُ `hr:v` يرى نطاقَه، وإن أفرغه
+         * النطاقُ (دورٌ بنطاقِ مشاريعَ و`employees.project_id` خاوٍ) **يسقط إلى
+         * الدليلِ الأدنى** لا إلى العدم — فلا تُسقَط خطوةُ «تعرّف على فريقك» عمّن
+         * يرى زملاءه فعلاً. (كانت البوّابةُ تُحاكي المنطقَ المعطوبَ قبل إصلاحِ جذره.)
+         */
+        if (hub_can($u, 'hr', 'v')
+            && hub_scope(Employee::query()->whereNull('deleted_at'), 'hr', $u)->exists()) {
+            return true;
+        }
+
+        $q = Employee::whereNull('deleted_at')->whereIn('status', self::OPEN);
+        if (($cids = hub_company_ids($u)) !== null) {
+            $q->where(fn ($w) => $w->whereIn('company_id', $cids)->orWhereNull('company_id'));
+        }
+
+        return $q->exists();
+    }
+
     /* ────────── شاشة الفجوات ────────── */
 
     /** من بلا حساب، ومن بلا ملف، ومن اختلف اسمُه بين الطرفين */
@@ -375,9 +503,12 @@ class Staff
          * **قائمةُ الحسابات لمن يديرها وحده** (v2.321): كانت تُعيد كلَّ حسابات
          * النظام باسمها وبريدها ودورها وحالتها لمن يملك `hr:v` وحده — بلا رايةِ
          * `users` وبلا تنطيقِ شركات. وهي هنا لغرضٍ واحد: «افتح ملفاً لهذا
-         * الحساب»، وذلك فعلٌ لا يملكه إلا حاملُ الراية أصلاً.
+         * الحساب» (وتغذيةُ قائمةِ «اربط بحسابٍ قائم»)، وذلك فعلٌ لا يملكه إلا
+         * من يفتح الحسابات — فالقائمةُ تتبع البوّابةَ نفسَها لا رايةً بعينها
+         * (G15): حاملُ `hr:staffAccounts` يراها لأنّها **أداةُ** عملِه الممنوح،
+         * ومن لا يفتح حساباتٍ لا يرى حسابات.
          */
-        $noFile = hub_flag(auth()->user(), 'users')
+        $noFile = self::mayOpenAccounts()
             ? User::whereNull('deleted_at')->with('role')
                 ->when($linked, fn ($q) => $q->whereNotIn('id', $linked))
                 ->when(hub_company_ids() !== null, function ($q) {

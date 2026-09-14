@@ -46,13 +46,37 @@ class GuardsAndStampsRound6Test extends TestCase
         $c = Client::create(['name' => 'عميلُ الدوام']);
         $file = UploadedFile::fake()->create('after-hours.pdf', 4, 'application/pdf');
 
-        $res = $this->actingAs($this->employee)->post('/comments', [
-            'module' => 'clients', 'record_id' => $c->id, 'body' => 'رفعٌ ليليّ', 'att' => $file,
-        ]);
+        $payload = ['module' => 'clients', 'record_id' => $c->id, 'body' => 'رفعٌ ليليّ', 'att' => $file];
 
-        $this->assertSame(403, $res->getStatusCode(),
-            '«حظرُ نقل الملفات خارج الدوام» يحرس بابَ التنزيل ويترك بابَ الرفع مفتوحاً — '
-            . 'والتسريبُ رفعٌ إلى الخارج بقدر ما هو تنزيل');
+        /*
+         * **الضمانُ هو المنعُ لا رقمُه** (الجولة 2 · G20): كان الاختبارُ يثبّت ٤٠٣
+         * وهو *آليّةُ* المنع لا *الضمان*. ومنذ G20 صار نموذجُ المتصفّح يُردّ
+         * بتحويلةٍ تشرح وتحفظ ما كُتب — والرفعُ ممنوعٌ كما كان. فيُثبَّت هنا ما
+         * يهمّ حقاً: **لا شيءَ يُكتَب**، والإنسانُ يُخبَر بالسبب، وعميلُ الـAPI
+         * يبقى على ٤٠٣ الصريح.
+         */
+        $before = \App\Models\Comment::count();
+
+        // ١) نموذجُ المتصفّح: ممنوعٌ، لكن بشرحٍ يعود به المستخدم
+        $web = $this->actingAs($this->employee)->from('/m/clients')->post('/comments', $payload);
+        $this->assertTrue(in_array($web->getStatusCode(), [302, 403], true),
+            'رفعٌ خارج الدوام مرّ — والتسريبُ رفعٌ إلى الخارج بقدر ما هو تنزيل');
+        if ($web->getStatusCode() === 302) {
+            $this->assertStringContainsString('نقل الملفات ممنوع خارج وقت العمل',
+                (string) session('err'), 'المنعُ صامتٌ: لا يشرح للمستخدم لماذا رُدّ');
+        }
+
+        // ٢) عميلُ الـAPI/الجوال: ٤٠٣ صريحٌ لا تحويلة
+        $api = $this->actingAs($this->employee)
+            ->postJson('/comments', ['module' => 'clients', 'record_id' => $c->id,
+                'body' => 'رفعٌ ليليّ', 'att' => UploadedFile::fake()->create('n.pdf', 4, 'application/pdf')]);
+        $this->assertSame(403, $api->getStatusCode(), 'عميلُ الـAPI يستحقّ رفضاً صريحاً لا تحويلةً');
+
+        // ٣) الضمانُ نفسُه: لا تعليقَ ولا مرفقَ كُتب في الحالتين
+        $this->assertSame($before, \App\Models\Comment::count(),
+            '«حظرُ نقل الملفات خارج الدوام» يحرس بابَ التنزيل ويترك بابَ الرفع مفتوحاً');
+        $this->assertSame(0, \App\Models\Attachment::where('module', 'clients')->where('record_id', $c->id)->count(),
+            'مرفقٌ ليليٌّ استقرّ في القاعدة رغم المنع');
     }
 
     /* ── ٢) بريدٌ محجوزٌ بحسابٍ محذوف: رسالةٌ لا خمسمئة ── */

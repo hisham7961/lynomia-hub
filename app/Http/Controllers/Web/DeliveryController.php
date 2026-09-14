@@ -93,9 +93,19 @@ class DeliveryController extends Controller
         $waiting = $this->awaitingClientIds($ids);        // تذاكرُ «بانتظار العميل» المفتوحة
         $due     = $this->dueMilestones($ids, $idSet);    // معالمُ بُلغت ولم تُفوتَر (بلا ازدواج)
 
-        $health = [];   // صحةُ hub_project_health — تُحسب مرّةً لكل مشروعٍ نشط، مخبّأةٌ داخلها
-        $healthOf = function ($id) use (&$health) {
-            return $health[$id] ??= (int) (hub_project_health($id)['score'] ?? 100);
+        /*
+         * **رقمُ الصحّةِ الواحدُ من مصدرٍ واحد** (الجولة 3 · V1): اللوحةُ كانت تقرأ
+         * `hub_project_health` الخامّ بينما تقرأ صفحةُ المشروع `hub_project_health_for`
+         * (المُرشِّحَ بعينِ القارئ: من حُجبت عنه الميزانيّةُ يسقط عاملُها وتُعاد تسويةُ
+         * الأوزان). فالمشروعُ الواحدُ كان يحمل رقمين لقارئٍ واحد — 81 هنا و76 هناك.
+         * والقراءةُ الآن من الدالّة نفسِها بعينِ المستخدم نفسِه، فلا رقمَ ثانٍ.
+         * (`_for` تقرأ `hub_project_health` المخبّأةَ فلا حسابَ إضافيّ، والافتراضُ
+         * 100 لمشروعٍ لا سجلَّ له يبقى كما كان — لا مشروعَ يُصنَّف خطراً بلا بيان.)
+         */
+        $u = auth()->user();
+        $health = [];   // تُحسب مرّةً لكل مشروعٍ نشط، مخبّأةٌ داخلها
+        $healthOf = function ($id) use (&$health, $u) {
+            return $health[$id] ??= (int) (hub_project_health_for($u, (string) $id)['score'] ?? 100);
         };
 
         // ── بناءُ صفٍّ للعرض من سجلّ مشروع ──

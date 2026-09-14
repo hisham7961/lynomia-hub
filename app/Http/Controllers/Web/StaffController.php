@@ -30,7 +30,10 @@ class StaffController extends Controller
         return view('staff', Staff::gaps() + [
             'roles' => Role::when(! hub_is_owner(), fn ($q) => $q->where('is_owner', false))
                 ->orderByDesc('is_owner')->orderBy('name')->get(),
-            'mayUsers' => hub_flag(auth()->user(), 'users'),
+            // بوّابةُ فتحِ الحسابات واحدةٌ في Staff (G15): المالك، أو رايةُ إدارةِ
+            // المستخدمين كما كان، أو مفتاحُ `hr:staffAccounts` الممنوحُ صراحةً —
+            // فلا يفترق ما تعرضه الشاشةُ عمّا يقبله الرافد.
+            'mayUsers' => Staff::mayOpenAccounts(),
         ]);
     }
 

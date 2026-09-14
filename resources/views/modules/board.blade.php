@@ -6,17 +6,31 @@
     $today = now()->toDateString();
     // مفتاح حقل الحالة (قد يخالف اسم العمود) — به تُبنى رابط التعبئة المسبقة لزر ＋
     $statusKey = collect($def['fields'] ?? [])->firstWhere('col', $statusCol)['key'] ?? $statusCol;
+    /*
+     * **لا وعدَ بسحبٍ لا يقع** (الجولة 2 · G17): حقلُ الحالة في وحداتٍ كالأصول
+     * **مقفولٌ عمداً** — يُكتب عبر سكّتِه المدقَّقة وحدَها (خريطةُ الانتقالات وسجلُّ
+     * الحركة)، فكان الشريطُ يَعِد «اسحب لتغيير حالتها فوراً» ثم يُردّ الجميعُ حتى
+     * المالك (رصدها وكيلُ محاكاةِ الحادثة). الآن: الوعدُ يُقال لمن يقع له، ومن
+     * حقلُه مقفولٌ يُدَلّ على مساره الحقيقيّ بدل أن يُجرَّب ويُحبَط.
+     */
+    $statusLocked = (bool) (collect($def['fields'] ?? [])->firstWhere('col', $statusCol)['locked'] ?? false);
 @endphp
 @php $look = hub_mod_look($module); @endphp
 @component('partials.pagehead', ['icon' => $look['icon'] ?? '🗂', 'title' => 'كانبان — ' . $def['label'],
     'crumb' => $def['label'], 'crumbUrl' => route('m.index', $module),
-    'sub' => 'اسحب أي بطاقة إلى عمود آخر لتغيير حالتها فوراً',
+    'sub' => $statusLocked
+        ? 'لوحةُ متابعةٍ للعرض — حالةُ ' . $def['label'] . ' تُغيَّر من صفحة السجلّ عبر مسارها المدقَّق (يحفظ «من ← إلى» وسببَه)، لا بالسحب'
+        : (hub_can(auth()->user(), $module, 'e')
+            ? 'اسحب أي بطاقة إلى عمود آخر لتغيير حالتها فوراً'
+            : 'لوحةُ عرض — نقلُ البطاقات يحتاج صلاحيّةَ تعديل (وبطاقاتُك المسندةُ إليك تُنقل)'),
     'back' => route('m.index', $module), 'backLabel' => 'عرض القائمة'])
     @if ($canAdd)
         <a class="btn p sm" href="{{ route('m.create', $module) }}">＋ جديد</a>
     @endif
 @endcomponent
-<div class="kanban" data-kanban data-url="{{ route('m.status', [$module, '__ID__']) }}" data-can="{{ hub_can(auth()->user(), $module, 'e') ? 1 : 0 }}">
+<div class="kanban" data-kanban data-url="{{ route('m.status', [$module, '__ID__']) }}"
+     data-can="{{ ! $statusLocked && hub_can(auth()->user(), $module, 'e') ? 1 : 0 }}"
+     data-locked="{{ $statusLocked ? 1 : 0 }}">
     @foreach ($cols as $status => $items)
         @php
             // مسار المبيعات رقماً لا عدّاد بطاقات: مجموع القيم والقيمة المرجّحة

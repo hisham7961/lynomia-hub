@@ -391,12 +391,26 @@ final class Health
                         fn ($q) => $q->where('meta', 'like', '%"kind"%security%'))
                     ->count() : 0;
             $chain = Audit::verifyTail(30);
+            $chainState = Audit::chainState($chain);
             if ($lock) return self::c(self::MAINTENANCE, 'الأمن', 'قفل طوارئ مفعّل', ['lockdown' => true, 'frozen' => $frozen]);
-            if (! $chain['ok']) return self::c(self::UNAVAILABLE, 'الأمن', 'سلسلة التدقيق مكسورة — ' . $chain['why'], ['chain' => $chain]);
+            if ($chainState === 'bad') {
+                return self::c(self::UNAVAILABLE, 'الأمن', 'سلسلة التدقيق مكسورة — ' . $chain['why'],
+                    ['chain' => $chain, 'chain_state' => 'bad', 'chain_ok' => false]);
+            }
+            // **«السلسلةُ سليمة» قولٌ لا يُقال إلا بعد فحصٍ جرى** (الجولة ٣ · V5):
+            // كان `chain_ok => true` مكتوباً حرفيّاً في الصفّ، وكان `! $chain['ok']`
+            // وحدَه يفصل — فتعذُّرُ الفحص يسقط في فرع «سليمة». التعذُّرُ تدهورٌ
+            // مُعلَن: الخدمةُ تعمل وضمانُ عدم العبث بلا فاحصٍ يعمل.
+            if ($chainState === 'unknown') {
+                return self::c(self::DEGRADED, 'الأمن', 'تعذّر فحصُ سلسلة التدقيق — ' . $chain['why'],
+                    ['chain' => $chain, 'chain_state' => 'unknown', 'chain_ok' => null,
+                     'open_security_incidents' => $incidents, 'frozen' => $frozen]);
+            }
             $st = ($incidents || $frozen) ? self::DEGRADED : self::HEALTHY;
 
             return self::c($st, 'الأمن', $incidents ? "{$incidents} حادثة أمنية مفتوحة" : ($frozen ? 'مفاتيح طوارئ مفعّلة: ' . implode('، ', $frozen) : 'لا حوادث مفتوحة والسلسلة سليمة'),
-                ['open_security_incidents' => $incidents, 'frozen' => $frozen, 'chain_ok' => true]);
+                ['open_security_incidents' => $incidents, 'frozen' => $frozen,
+                 'chain_ok' => true, 'chain_state' => 'ok']);
         } catch (\Throwable $e) {
             return self::c(self::UNKNOWN, 'الأمن', 'تعذّر الفحص', []);
         }

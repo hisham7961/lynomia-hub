@@ -142,6 +142,27 @@
     for (var i = 0; i < 32; i++) o += s.charAt(Math.floor(Math.random() * s.length));
     return o;
   }
+  /* عنوانٌ مطلقٌ مُطبَّع — المقارنةُ بين `action` النسبيّ و`responseURL` المطلق
+     لا تصحّ إلا بعد أن يمرّ كلاهما على مُحلِّل المتصفّح نفسِه */
+  function absUrl(u) {
+    var a = document.createElement('a');
+    a.href = u || '';
+    return a.href;
+  }
+
+  /* كتابةُ مستندٍ عائدٍ محلَّ المستندِ الحاليّ — بديلُ التحويلةِ حين لا تحويلة.
+     `document.write` لا `innerHTML`: المستندُ العائدُ مستندٌ كامل بترويسته
+     وسكربتاته، وإحلالُ الجسدِ وحدَه يتركها غيرَ منفَّذة فتموت الصفحةُ صامتة. */
+  function writeDocument(html, url) {
+    /* شريطُ العنوان أوّلاً: `document.open()` يتبنّى عنوانَ المستندِ الحاليّ،
+       فضبطُه بعدها يأتي متأخّراً على مستندٍ كُتب بعنوانٍ قديم */
+    if (url && absUrl(url) !== location.href && window.history && history.replaceState) {
+      try { history.replaceState(null, '', url); } catch (e) {}
+    }
+    document.open();
+    document.write(html);
+    document.close();
+  }
 
   /* رفعُ ملفٍ واحدٍ **مقطَّعاً**: قطعٌ أصغرُ من سقف الطلب الواحد، بالترتيب.
      يُعيد وعداً برمزٍ يُستهلك في النموذج. onbit(bytes) للتقدّم التراكمي. */
@@ -250,6 +271,7 @@
     function send(payload) {
     var xhr = new XMLHttpRequest();
     var t0 = Date.now();
+    var sentTo = f.getAttribute('action') || location.href;   // ما أُرسل إليه فعلاً — به تُقاس التحويلة
     var box = XF.open('⬆ يُرسَل ' + picked + (picked > 1 ? ' ملفات' : ' ملف') + '…');
     box.querySelector('.xcancel').onclick = function () { xhr.abort(); };
 
@@ -262,8 +284,29 @@
     xhr.onload = function () {
       XF.close();
       if (btn) btn.disabled = false;
-      /* التحويلةُ تُتبَع تلقائياً — نمضي إلى وجهتها كما يفعل النموذج العادي */
-      if (xhr.status >= 200 && xhr.status < 400) { window.location = xhr.responseURL || location.href; return; }
+      if (xhr.status >= 200 && xhr.status < 400) {
+        /* **ليس كلُّ رفعٍ ناجحٍ ينتهي بتحويلة.** كان المُستمِعُ يفترض نمطَ
+           POST-Redirect-GET في كلِّ نموذجٍ يعترضه، فيمضي إلى `responseURL`.
+           لكنّ خطوةً وسيطةً — كمطابقةِ أعمدةِ الاستيراد — تردّ **مستندَ
+           الشاشةِ التالية** بـ200 بلا تحويلة: فيكون `responseURL` عنوانَ
+           الإرسالِ نفسَه، فيُعاد طلبُه بـGET، فيُرمى المستندُ العائدُ كلُّه
+           وتظهر الخطوةُ الأولى **بلا أيِّ رسالة**. والعلّةُ مشتركةٌ لا محلّيّة:
+           أيُّ وحدةٍ تستورد تُصاب بها.
+           فالتحويلةُ تُقاس لا تُفترَض: عنوانٌ عائدٌ يساوي عنوانَ الإرسال يعني
+           **لا تحويلة**، وحينها يُكتَب المستندُ العائدُ محلَّ الحاليّ. وما عداه
+           (تحويلةٌ فعليّة، أو متصفّحٌ لا يكشف `responseURL`) يبقى على سلوكه
+           القديم حرفاً بحرف — فمسارُ المرفقِ المنتهي بتحويلةٍ ثم رسالةِ فلاش
+           لا يمسّه هذا التغيير. */
+        var landed = xhr.responseURL || '';
+        var ctype = (xhr.getResponseHeader('Content-Type') || '').toLowerCase();
+        if (landed && absUrl(landed) === absUrl(sentTo)
+            && ctype.indexOf('text/html') > -1 && xhr.responseText) {
+          /* وإن تعذّرت الكتابةُ محلَّه لسببٍ ما فلا تُترك الصفحةُ جامدة */
+          try { writeDocument(xhr.responseText, landed); return; } catch (e) {}
+        }
+        window.location = landed || location.href;
+        return;
+      }
       if (xhr.status === 413) { Hub.toast('الملف أكبر من سقف الخادم — راجع «أقصى حجم للملف المرفوع»', 1); return; }
       /* خطأُ تحقّقٍ أو غيره: أعد الإرسال عادياً كي تظهر الرسائل في مكانها */
       f.setAttribute('data-noxhr', '1');
@@ -272,7 +315,7 @@
     xhr.onerror = function () { XF.close(); if (btn) btn.disabled = false; Hub.toast('انقطع الاتصال أثناء الرفع — أعد المحاولة', 1); };
     xhr.onabort = function () { XF.close(); if (btn) btn.disabled = false; Hub.toast('أُلغي الرفع'); };
 
-    xhr.open('POST', f.getAttribute('action') || location.href, true);
+    xhr.open('POST', sentTo, true);
     xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
     xhr.send(payload);
     }
@@ -373,6 +416,13 @@
       /* v2.496: كان `data-can=0` يطفئ السحبَ كلَّه صامتاً — الموظفُ يجرّ بطاقتَه
          فتعود ولا يفهم لماذا. بطاقةُ المسنَد إليه (data-mine) تُسحب والخادمُ يحسم؛
          وغيرُ المخوَّل يسمع السببَ بدل الصمت. */
+      /* v2.497: حقلُ حالةٍ مقفولٌ (أصولٌ مثلاً) لا يُكتب بالسحب لأحدٍ البتّة —
+         يُدَلّ صاحبُه على مساره المدقَّق بدل أن يجرّب فتعود البطاقةُ بلا تفسير */
+      if (kb.dataset.locked === '1') {
+        e.preventDefault();
+        Hub.toast('حالةُ هذا السجلّ تُغيَّر من صفحته عبر مسارها المدقَّق (يحفظ «من ← إلى» وسببَه) — لا بالسحب', 1);
+        return;
+      }
       if (kb.dataset.can !== '1' && c.dataset.mine !== '1') {
         e.preventDefault();
         Hub.toast('العرض فقط — نقلُ البطاقات هنا يحتاج صلاحيّةَ تعديل (بطاقاتُك المسندةُ إليك تُنقل)', 1);

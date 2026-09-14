@@ -170,25 +170,39 @@ class Audit
      * فحصُ الجدول كاملاً مع كل فتحةِ شاشة لا يُحتمل على جدولٍ ناضج، وفحصُ
      * الذيل يمسك ما يُعبَث به فعلاً: أحدث القيود (تغطيةً كاملةً يبقى الأمر
      * `hub:audit-verify`، وهذه الشاشة تحيل إليه عند أول كسر).
+     *
+     * **وثلاثُ حالاتٍ لا حالتان** (الجولة ٣ · V5): كان الجسمُ كلُّه مُغلَقاً
+     * بـ`catch` يردّ `ok => true` — فإن تعذّر الفحصُ لأيِّ سبب أُعلنت السلسلةُ
+     * **سليمة**، وهي آليّةُ إثباتِ عدمِ العبث التي يُتّكأ عليها ساعةَ التحقيق.
+     * والوسمُ `'تعذّر الفحص'` في الصفِّ نفسِه كان يشهد أنّ الفحصَ لم يجرِ.
+     * الآن: `state` صريحةٌ — `ok` (فُحص فسلِم) · `bad` (فُحص فانكسر) ·
+     * `unknown` (لم يُفحَص). و`ok` يبقى بولياً للعقد القائم بدلالةٍ **مُغلَقة**:
+     * صحيحٌ فقط لما تحقّقنا من سلامته، فأيُّ مستهلكٍ لم يُحدَّث يفزع ولا يطمئنّ.
+     *
+     * @return array{ok:bool, state:string, broken:int, why:string, label:string}
      */
     public static function verifyTail(int $n = 60): array
     {
-        $none = ['ok' => true, 'broken' => 0, 'why' => '', 'label' => 'لا سلسلة بعد'];
-        if (! Schema::hasTable('audits') || ! Schema::hasTable('audit_chain')) return $none;
+        $none = ['ok' => true, 'state' => 'ok', 'broken' => 0, 'why' => '', 'label' => 'لا سلسلة بعد'];
 
         try {
+            // **داخل الحارس عمداً**: `Schema::hasTable` استعلامٌ كسائرِه — وكان
+            // خارجَ `try` فيصعد استثناؤه إلى الشاشة (٥٠٠ على قاعدةٍ لا تُجيب).
+            if (! Schema::hasTable('audits') || ! Schema::hasTable('audit_chain')) return $none;
+
             $rows = AuditEntry::whereNotNull('hash')->orderByDesc('id')->limit($n)->get();
             if ($rows->isEmpty()) {
                 $unsealed = self::unsealedAfterEpoch();
 
                 return $unsealed
-                    ? ['ok' => false, 'broken' => $unsealed, 'why' => "{$unsealed} قيداً كُتب بلا بصمة", 'label' => 'بلا ختم']
+                    ? ['ok' => false, 'state' => 'bad', 'broken' => $unsealed,
+                       'why' => "{$unsealed} قيداً كُتب بلا بصمة", 'label' => 'بلا ختم']
                     : $none;
             }
 
             $head = (string) DB::table('audit_chain')->where('id', 1)->value('head');
             if ($head !== '' && $head !== $rows->first()->hash) {
-                return ['ok' => false, 'broken' => 1, 'label' => '⚠️ عبث',
+                return ['ok' => false, 'state' => 'bad', 'broken' => 1, 'label' => '⚠️ عبث',
                         'why' => 'رأس السلسلة لا يطابق آخر قيد — حُذفت قيودٌ من الذيل على الأرجح'];
             }
 
@@ -210,16 +224,44 @@ class Audit
 
             $unsealed = self::unsealedAfterEpoch();
             if ($broken || $unsealed) {
-                return ['ok' => false, 'broken' => $broken + $unsealed, 'label' => '⚠️ عبث',
+                return ['ok' => false, 'state' => 'bad', 'broken' => $broken + $unsealed, 'label' => '⚠️ عبث',
                         'why' => $broken
                             ? "{$broken} قيداً من آخر {$n} لا تطابق بصمتُه محتواه — عُدِّل مباشرةً في القاعدة"
                             : "{$unsealed} قيداً كُتب بلا بصمة بعد بدء السلسلة"];
             }
 
-            return ['ok' => true, 'broken' => 0, 'why' => '', 'label' => 'سلسلة سليمة (آخر ' . $rows->count() . ')'];
+            return ['ok' => true, 'state' => 'ok', 'broken' => 0, 'why' => '',
+                    'label' => 'سلسلة سليمة (آخر ' . $rows->count() . ')'];
         } catch (\Throwable $e) {
-            return ['ok' => true, 'broken' => 0, 'why' => '', 'label' => 'تعذّر الفحص'];
+            // **ولا يُبتلع الاستثناءُ صامتاً**: بلا أثرٍ في مركز الأخطاء يبقى
+            // «تعذّر الفحص» لغزاً لا يُشخَّص — والسببُ (عمودٌ لم يُرحَّل، محرّكٌ
+            // يرفض اللهجة، قاعدةٌ لا تُجيب) هو نصفُ العلاج. والتسجيلُ نفسُه
+            // داخل حارسٍ: إن كانت القاعدةُ هي العاطلة فلا يُسقط الشاشةَ ثانيةً.
+            try {
+                \App\Support\ErrorLog::capture('php',
+                    'audit-chain: تعذّر فحصُ ذيل السلسلة — ' . $e->getMessage(), $e->getFile(), $e->getLine());
+            } catch (\Throwable $ignored) {
+            }
+
+            return ['ok' => false, 'state' => 'unknown', 'broken' => 0, 'label' => 'تعذّر الفحص',
+                    'why' => 'تعذّر فحصُ سلسلة التدقيق ('
+                        . \Illuminate\Support\Str::limit(\App\Support\Redactor::text($e->getMessage()), 120)
+                        . ') — الحالةُ مجهولةٌ لا سليمة. التفصيلُ في مركز الأخطاء باسم audit-chain،'
+                        . ' والحكمُ القاطع بالفحص الكامل: hub:audit-verify (زرُّ «افحص سلسلة التدقيق» في مركز التشغيل).'];
         }
+    }
+
+    /**
+     * حالةُ السلسلة كلمةً واحدة من ناتج `verifyTail` — نقطةُ قراءةٍ واحدة لكلّ
+     * مستهلك. والارتدادُ للعقد القديم (`ok` وحده) مقصود: أيُّ مصفوفةٍ بُنيت قبل
+     * إضافة `state` تُقرأ كما كانت تماماً، فلا يكسر المفتاحُ الجديد قارئاً قائماً.
+     */
+    public static function chainState(array $chain): string
+    {
+        $state = (string) ($chain['state'] ?? '');
+        if (in_array($state, ['ok', 'bad', 'unknown'], true)) return $state;
+
+        return ($chain['ok'] ?? false) ? 'ok' : 'bad';
     }
 
     /**

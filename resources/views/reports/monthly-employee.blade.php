@@ -29,6 +29,9 @@
     @if (($totals['missing_out'] ?? 0) > 0)
         <div class="stat"><span class="ico">🚪</span><b>{{ $totals['missing_out'] }}</b><span>انصراف مفقود (شذوذ)</span></div>
     @endif
+    @if (($totals['invalid_span'] ?? 0) > 0)
+        <div class="stat"><span class="ico">⚠️</span><b>{{ $totals['invalid_span'] }}</b><span>مدة غير صالحة (شذوذ)</span></div>
+    @endif
     <div class="stat"><span class="ico">⏱️</span><b>{{ number_format($totals['attendance_hours'],1) }}</b><span>ساعة</span></div>
     <div class="stat"><span class="ico">📝</span><b>{{ $totals['reported'] }}</b><span>يوم مقدَّم</span></div>
 </div>
@@ -51,6 +54,14 @@
                         @else
                             <span class="bdg wn" title="دخولٌ بلا انصراف — الساعاتُ لا تُحتسب حتى يُصحَّح">انصراف مفقود</span>
                         @endif
+                    @endif
+                    {{-- G10: صفٌّ مستحيلٌ سابقٌ للحارس (الانصرافُ قبلَ الدخول) — يُفضَح لا يُعرَض «حاضراً» نظيفاً --}}
+                    @if ($d['invalid_span'] ?? false)
+                        @if (($d['att_id'] ?? null) && hub_can(auth()->user(), 'attend', 'e'))
+                            <a class="bdg bad" href="{{ route('m.edit', ['attend', $d['att_id']]) }}" title="الانصرافُ قبلَ الدخول — صحّح الوقتَين">مدة غير صالحة ✎</a>
+                        @else
+                            <span class="bdg bad" title="الانصرافُ قبلَ الدخول — لا ساعاتٍ تُحتسب">مدة غير صالحة</span>
+                        @endif
                     @endif</td>
                 <td class="mono">{{ $d['hours'] ? number_format($d['hours'],1) : '—' }}</td>
                 <td>@if(in_array($d['kind'], ['off', 'future'], true))—@else<span class="bdg {{ $d['tone'] }}">{{ $d['label'] }}</span>@if($d['late'] ?? false)<span class="bdg wn">متأخر</span>@endif @endif</td>
@@ -62,6 +73,8 @@
     </table></div>
     <div class="sub" style="margin-top:8px">المستقبلُ «—» (لم يقع)، وعطلةُ الأسبوع «عطلة»، والإجازةُ المعتمدة «إجازة» —
         و«غائب» ليومِ عملٍ ماضٍ بلا ختمٍ وبلا إجازة (مختوماً كان أو محسوباً بالفرق).
-        «انصراف مفقود» شذوذٌ ظاهرٌ: الساعاتُ لا تُختلق حتى يُصحَّح الصفُّ من الموارد البشرية.</div>
+        «انصراف مفقود» شذوذٌ ظاهرٌ: الساعاتُ لا تُختلق حتى يُصحَّح الصفُّ من الموارد البشرية —
+        ومتى صُحِّح الانصرافُ احتُسبت ساعاتُه تلقائياً (الفرقُ بين الوقتَين)، و«مدة غير صالحة» صفٌّ
+        انصرافُه قبلَ دخولِه يحتاج تصحيحاً.</div>
 </div>
 @endsection

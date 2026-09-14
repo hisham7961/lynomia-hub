@@ -17,7 +17,9 @@
             <div class="sub">الحلّ</div>
             @if ($tkSla['resPending'])
                 @if ($tkSla['resLate'])
-                    <span class="bdg bad">متجاوزة الحلّ منذ {{ $tkSla['resDue']->diffInDays(now()) }} يوماً</span>
+                    {{-- عددٌ صحيح: diffInDays تعيد كسراً عشريّاً خاماً («10.717323502569 يوماً» — الجولة 2 · G2) --}}
+                    @php $tkOver = max(1, (int) $tkSla['resDue']->diffInDays(now())); @endphp
+                    <span class="bdg bad">متجاوزة الحلّ منذ {{ $tkOver }} {{ $tkOver > 2 ? 'أيام' : 'يوم' }}</span>
                 @else
                     <span class="bdg g">الموعد {{ $tkSla['resDue']->format('Y-m-d H:i') }}</span>
                 @endif

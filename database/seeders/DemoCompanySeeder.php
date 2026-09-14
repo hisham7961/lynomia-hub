@@ -104,7 +104,7 @@ class DemoCompanySeeder extends Seeder
     {
         $u = $this->u[$key];
 
-        return $this->emp[$key] = Employee::create(array_merge([
+        $emp = $this->emp[$key] = Employee::create(array_merge([
             'name' => $u->name, 'user_id' => $u->id, 'email' => $u->email,
             'company_id' => $this->co[$co]->id, 'dept' => $dept, 'title' => $title,
             // المدير يُخزَّن بمعرِّف **المستخدم** (Employee::manager → belongsTo User)
@@ -114,6 +114,23 @@ class DemoCompanySeeder extends Seeder
             'contract' => 'دوام كامل', 'status' => 'نشط', 'leave_bal' => 21,
             'phone' => '+965 5' . mt_rand(100, 999) . ' ' . mt_rand(1000, 9999),
         ], $extra));
+
+        /*
+         * **عمرُ الحسابِ يوافق عمرَ التعيين** (الجولة 3): كان `User::create` يختم
+         * `created_at` بلحظةِ البذر، فيصير **كلُّ** حسابٍ في البيئة عمرُه ساعات
+         * بينما صاحبُه معيَّنٌ منذ سنتين. وبطاقةُ «أوّل أسبوع» تظهر — بحقٍّ —
+         * لمن حسابُه جديدٌ ولو قدُم عهدُه بالمنشأة (قاعدةٌ مقصودةٌ موثّقةٌ في
+         * `Staff::firstWeek`)، فكانت تظهر **للجميع**. وقد بلّغ عنها أربعةُ وكلاءَ
+         * بوصفها عطلاً في المنتج، وهي **أثرُ بذرةٍ**: المنطقُ سليمٌ والبياناتُ كاذبة.
+         * فيُختم عمرُ الحسابِ من تاريخِ التعيين — ويبقى «أوّلُ يومٍ» أوّلَ يومٍ
+         * حقّاً لمن بُذر كذلك عمداً (الموظّفةُ الجديدة).
+         */
+        if (! empty($emp->hired)) {
+            $u->forceFill(['created_at' => \Illuminate\Support\Carbon::parse($emp->hired)
+                ->setTime(8, 0)])->saveQuietly();
+        }
+
+        return $emp;
     }
 
     private function rolesAndUsers(): void
@@ -135,10 +152,17 @@ class DemoCompanySeeder extends Seeder
             'issues' => $vae, 'tickets' => $vae, 'clients' => $v, 'engagements' => $v, 'quotes' => $v,
         ]), []);
 
+        // الموارد البشرية: مهمّتُها المعلنة «تعيينٌ وتهيئة» لا حفظُ ملفّات (الجولة 2 · G15).
+        // كانت بلا مفتاحِ فتحِ الحسابات فتنتظر المالكَ ليفتح لكلِّ موظّفٍ حسابَه، وبلا
+        // رؤيةِ أصولٍ فلا تسلّم عهدةً في أوّل يوم، وبلا مسارِ توظيفٍ فلا تحوّل مرشّحاً
+        // إلى موظّف — ثلاثةُ أبوابٍ يحتاجها التعيينُ الواحد كانت بيد ثلاثة أشخاص.
         $rHr = $this->role('موظّفة موارد بشريّة', array_merge($daily, [
-            'hr' => $vae + ['fieldsec' => 1, 'docsec' => 1, 'export' => 1],
+            'hr' => $vae + ['fieldsec' => 1, 'docsec' => 1, 'export' => 1, 'staffAccounts' => 1],
             // docsec على وحدة الوثائق نفسِها: «سري» يُقرأ من hub_scope('files') بها (F21ب)
             'attend' => $ve, 'leaves' => $vae, 'files' => $vae + ['docsec' => 1], 'updates' => $ve,
+            'recruit' => $vae,
+            // رؤيةُ الأصولِ وإسنادُ العهدةِ وحدَه — بلا تعديلِ مواصفاتِ الأصل (custodyAssign)
+            'assets' => $v + ['custodyAssign' => 1],
         ]), []);
 
         $rAcc = $this->role('محاسب', [
@@ -147,14 +171,20 @@ class DemoCompanySeeder extends Seeder
             'fin' => $vae + ['export' => 1, 'fieldsec' => 1, 'exportNight' => 1],
             'banks' => $v + ['fieldsec' => 1, 'bankPost' => 1],
             'purchases' => $vae, 'quotes' => $v + ['fieldsec' => 1],
+            // مسيّراتُ الرواتب مهمّةٌ محاسبيّةٌ معلنة — كان يرى الحضورَ ولا يسيّر عليه راتباً
+            'payroll' => $vae + ['export' => 1],
             'attend' => $v + ['export' => 1, 'exportNight' => 1],
             'clients' => $v, 'projects' => $v, 'files' => $v, 'updates' => $vae, 'tasks' => $vae, 'leaves' => $vae,
         ], ['finAnalytics' => 1]);
 
+        // مسؤول تقنية المعلومات: كان يملك الأجهزةَ والأصولَ ولا يملك **الحادثة** —
+        // لا تذكرةً ولا مشكلةً ولا سيرفراً ولا وحدةَ إدارةِ الحوادث التقنية. فمن
+        // يرصد عطلاً يفتح تذكرةً لا يراها من يصلحها (رصده وكيلُ رحلةِ الحادثة).
         $rIt = $this->role('مسؤول تقنية المعلومات', array_merge($daily, [
             'assets' => $vae + ['custodyAssign' => 1, 'assetStatus' => 1, 'assetStation' => 1, 'assetInventory' => 1],
             'stations' => $vae, 'endpoints' => $v + ['command' => 1], 'apps' => $vae, 'dbs' => $vae, 'apis' => $vae,
             'phones' => $v, 'products' => $v,
+            'tickets' => $vae, 'issues' => $vae, 'servers' => $vae, 'incidents' => $vae,
         ]), ['secOps' => 1]);
 
         $rSales = $this->role('موظّف مبيعات', array_merge($daily, [
@@ -662,7 +692,18 @@ class DemoCompanySeeder extends Seeder
         $mkFin('دفعة واردة', 'gulf', null, 7500, 7500, 'مدفوعة', 38, 'تحويل بنكي — الخليج للتأمين');
         $mkFin('دفعة واردة', 'nakheel', null, 2500, 2500, 'مدفوعة', 33, 'شيك — النخيل');
         for ($i = 1; $i <= 8; $i++) {
-            $mkFin('مصروف', null, null, mt_rand(80, 900), mt_rand(0, 1) ? mt_rand(80, 900) : 0,
+            /*
+             * **المدفوعُ يُشتقّ من الإجماليّ لا يُقرَع بجانبه** (الجولة 3): كان
+             * السطرُ يستدعي `mt_rand` مرّتين مستقلّتين — واحدةً للإجماليّ وأخرى
+             * للمدفوع — فيخرج بالصدفة مصروفٌ مدفوعُه أكبرُ من إجماليّه
+             * (EXP-2026-013: إجماليّ 319 ومدفوع 594). وقد بلّغ عنه وكيلُ المالية
+             * بوصفه عيباً في المنتج، وهو **عيبُ بذرتي أنا**: حارسُ المنتج سليمٌ
+             * وقد أثبت الوكيلُ نفسُه أنّه يقصّ دفعةً زائدة. وبياناتٌ فاسدةٌ في
+             * بيئة التجريب أسوأُ من قلّةِ بيانات: تُنفق وقتَ من يُطاردها عيباً.
+             */
+            $expTotal = mt_rand(80, 900);
+            $expPaid  = $i % 2 === 0 ? $expTotal : 0;      // مدفوعةٌ بالكامل أو غيرُ مدفوعة
+            $mkFin('مصروف', null, null, $expTotal, $expPaid,
                 ['مدفوعة', 'معتمدة'][$i % 2], $i * 9,
                 ['اشتراك استضافة الخوادم', 'رسوم تراخيص برمجيّة', 'قرطاسيّة ومستلزمات مكتب', 'ضيافة اجتماع عميل',
                  'اشتراك إنترنت المكتب', 'وقود مهمّات ميدانيّة', 'صيانة تكييف', 'إعلانات ممولة'][$i - 1]);

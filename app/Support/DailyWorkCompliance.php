@@ -44,6 +44,107 @@ class DailyWorkCompliance
     public const POLICY_NON_COMPLIANT = 'non_compliant';
     public const POLICY_ABSENCE = 'absence_equivalent';
 
+    /**
+     * حالاتُ الطلبِ **قيدَ القرار** (الجولة ٢ · G12): لا معتمَدٌ ولا مرفوضٌ ولا ملغى —
+     * تطابق خيارات وحدة `leaves` حرفيّاً. صاحبُها ليس «غائباً بلا عذر»: قرارُه
+     * معلَّقٌ على مديرِه/الموارد البشرية، ومراسلتُه كغائبٍ ظلمٌ وبيانٌ كاذب.
+     */
+    public const PENDING_REQUEST_STATUSES = ['مقدّم', 'موافقة المدير', 'موافقة الموارد البشرية'];
+
+    /**
+     * أنواعُ الطلباتِ التي **تفسّر** غيابَ اليوم: إجازاتُ الخصم (من `hub.leave`)
+     * زائدَ «إذن خروج» و«عمل عن بعد». ما عداها (سلفة/شهادة راتب) طلبٌ إداريٌّ
+     * لا يفسّر غياباً — فلا يُخرج صاحبَه من النداء.
+     */
+    public static function excuseTypes(): array
+    {
+        return array_values(array_unique(array_merge(
+            (array) config('hub.leave.deduct_types', []), ['إذن خروج', 'عمل عن بعد'])));
+    }
+
+    /**
+     * **الأعذارُ التي ليست إجازةَ خصم** — «إذن خروج» و«عمل عن بعد» وما يُضاف بعدَهما.
+     *
+     * وهذا الفرقُ هو مَحلُّ العطل: `on_leave` يقرأ `deduct_types` وحدَها (سؤالُ
+     * **رصيدٍ ورواتب**)، فمن عذرُه من هذين النوعين لا يُعدّ في إجازةٍ — ثمّ يسقط
+     * في «غائبٌ بلا عذر» لأنّ لا فئةَ ثالثةَ له. والطلبُ **قيدَ القرار** كان أرحمَ
+     * حالاً من المعتمَد (G12 تُنصفه) — فكان الاعتمادُ عقوبة.
+     */
+    public static function nonLeaveExcuseTypes(): array
+    {
+        return array_values(array_diff(self::excuseTypes(), (array) config('hub.leave.deduct_types', [])));
+    }
+
+    /**
+     * خريطةُ الأعذارِ المعتمَدةِ غيرِ الخصميّة لمجموعةِ موظّفين — استعلامٌ واحدٌ لا N+1.
+     * تُعيد `[emp_id => نوعُ العذر]`. و`date_to` الفارغُ عذرٌ مفتوحُ النهاية.
+     */
+    public static function excusedMap(array $empIds, string $from, ?string $to = null): array
+    {
+        $to = $to ?: $from;
+        $types = self::nonLeaveExcuseTypes();
+        if (! $empIds || ! $types || ! \Illuminate\Support\Facades\Schema::hasTable('leave_requests')) return [];
+
+        $out = [];
+        $rows = \App\Models\LeaveRequest::whereNull('deleted_at')->whereIn('emp_id', $empIds)
+            ->where('status', 'معتمد')->whereIn('type', $types)
+            ->whereDate('date_from', '<=', $to)
+            ->where(fn ($q) => $q->whereDate('date_to', '>=', $from)->orWhereNull('date_to'))
+            ->orderBy('id')->get(['emp_id', 'type', 'date_from', 'date_to']);
+        foreach ($rows as $r) {
+            $out[$r->emp_id][] = ['type' => (string) $r->type,
+                'from' => self::dstr($r->date_from), 'to' => $r->date_to ? self::dstr($r->date_to) : null];
+        }
+
+        return $out;
+    }
+
+    /** نوعُ العذرِ المعتمَدِ غيرِ الخصميِّ لموظّفٍ في يومٍ بعينه — أو `null` */
+    public static function excuseFor($empId, string $date, ?array $map = null): ?string
+    {
+        $rows = $map !== null ? ($map[$empId] ?? []) : (self::excusedMap([$empId], $date)[$empId] ?? []);
+        foreach ($rows as $r) {
+            if ($r['from'] <= $date && ($r['to'] === null || $r['to'] >= $date)) return $r['type'];
+        }
+
+        return null;
+    }
+
+    /**
+     * **المسنَدُ الواحدُ لسؤالِ «من ليس على رأسِ عملِه اليومَ ولماذا؟»** تقرؤه لوحةُ
+     * المالكِ بدل استعلامِها الخاصّ (`status LIKE '%معتمد%'` بلا تصفيةِ نوعٍ أصلاً —
+     * فكان طلبُ «سلفة» أو «شهادة راتب» معتمدٌ يضع صاحبَه «في إجازةِ اليوم»).
+     *
+     * تُعيد صفوفاً `[name, type, to, kind]` حيث `kind` إمّا `leave` (إجازةُ خصم)
+     * أو `excused` (عذرٌ غيرُ خصميّ) — فيقرأ المالكُ التمييزَ ولا يفقد أحداً.
+     */
+    public static function onLeaveToday(?string $date = null, $companyId = null): Collection
+    {
+        $date = $date ?: BusinessDate::today();
+        if (! \Illuminate\Support\Facades\Schema::hasTable('leave_requests')) return collect();
+
+        $deduct = (array) config('hub.leave.deduct_types', []);
+
+        return \App\Models\LeaveRequest::query()->whereNull('leave_requests.deleted_at')
+            ->where('leave_requests.status', 'معتمد')
+            ->whereIn('leave_requests.type', self::excuseTypes())
+            ->whereDate('leave_requests.date_from', '<=', $date)
+            ->where(fn ($q) => $q->whereDate('leave_requests.date_to', '>=', $date)
+                ->orWhereNull('leave_requests.date_to'))
+            // العمودُ مؤهَّلٌ لأنّ الجدولين يحملان `company_id` — وغيرُ المؤهَّلِ
+            // يرمي «ambiguous column» على المحرّكين
+            ->join('employees', 'employees.id', '=', 'leave_requests.emp_id')
+            ->whereNull('employees.deleted_at')
+            ->when($companyId, fn ($q) => $q->where('employees.company_id', $companyId))
+            ->orderBy('employees.name')->orderBy('leave_requests.id')
+            ->get(['employees.name as name', 'leave_requests.type as type', 'leave_requests.date_to as to'])
+            ->map(function ($r) use ($deduct) {
+                $r->kind = in_array((string) $r->type, $deduct, true) ? 'leave' : 'excused';
+
+                return $r;
+            });
+    }
+
     /* ═══════════ المسنَدُ الوحيد: هل قُدِّم تقريرٌ صالح؟ (§13/§101) ═══════════ */
 
     /**
@@ -172,6 +273,9 @@ class DailyWorkCompliance
             return false;
         };
 
+        // الأعذارُ غيرُ الخصميّةِ للمجموعةِ كلِّها — استعلامٌ واحدٌ كخريطةِ الإجازات
+        $excusedMap = self::excusedMap($empIds, $from, $to);
+
         $out = [];
         foreach ($emps as $emp) {
             foreach ($dates as $date) {
@@ -179,7 +283,8 @@ class DailyWorkCompliance
                     $emp, $date,
                     collect($attByCell->get($emp->id . '|' . $date) ?? []),
                     collect($emp->user_id ? ($repByCell->get($emp->user_id . '|' . $date) ?? []) : []),
-                    $onLeave($emp->id, $date)
+                    $onLeave($emp->id, $date),
+                    $excusedMap
                 );
             }
         }
@@ -207,6 +312,15 @@ class DailyWorkCompliance
      *
      * تقرؤه شاشةُ «فريقي اليوم» وبطاقةُ «الفريق اليوم» في لوحة CEO — مصدرٌ واحدٌ
      * فلا تتناقض شاشتان. التنطيقُ على العاتقِ المستدعي: مرِّر موظّفين منطَّقين.
+     *
+     * **ولا حكمَ قبلَ أوانه** (الجولة ٢ · G12): في الرابعةِ فجراً أعلن النداءُ
+     * اثنين وثلاثين موظّفاً «غائباً بلا عذر» — والدوامُ لم يبدأ، وفيهم المالكُ
+     * والمتفرّجُ نفسُه. المعادلةُ صادقةٌ حسابيّاً وميتةٌ سياقيّاً. فقبلَ
+     * `sec.hours_start` + سماحيةِ `work.late_grace` **لا يُعلَن أحدٌ غائباً**:
+     * `not_started = true` ومن لم يختم في فئةِ `not_yet` («لم يصل بعد»). ومن له
+     * طلبٌ قيدَ القرارِ يشمل اليومَ (إذنُ خروجٍ بموافقةِ مديرٍ ينتظر الموارد مثلاً)
+     * في فئةِ `pending` («بانتظار قرار») لا في الغياب. والصفُّ المختومُ صراحةً
+     * («غائب» من كنسِ نهايةِ اليوم) حكمٌ قائمٌ لا تؤجّله الساعةُ ولا يُخفيه طلب.
      */
     public static function rollCall(Collection $emps, ?string $date = null): array
     {
@@ -223,7 +337,26 @@ class DailyWorkCompliance
             $startMin = $sh * 60 + $sm + $grace;
         }
 
-        $buckets = ['present' => [], 'late' => [], 'leave' => [], 'absent' => [], 'noreport' => []];
+        // **قبلَ بدءِ الدوام لا نداءَ غياب** (G12): اليومُ الجاريُّ وحدَه — واليومُ
+        // الماضي انقضى فحكمُه واقعٌ لا انتظار
+        $nowAt = BusinessDate::now();
+        $notStarted = $date === BusinessDate::today() && $startMin !== null
+            && ((int) $nowAt->format('H') * 60 + (int) $nowAt->format('i')) < $startMin;
+
+        // الطلباتُ قيدَ القرارِ الشاملةُ لليوم — استعلامٌ واحدٌ للمجموعة (لا N+1)
+        $pendingReq = [];
+        if ($emps->isNotEmpty() && \Illuminate\Support\Facades\Schema::hasTable('leave_requests')) {
+            $pendingReq = \App\Models\LeaveRequest::whereNull('deleted_at')
+                ->whereIn('emp_id', $emps->pluck('id')->all())
+                ->whereIn('status', self::PENDING_REQUEST_STATUSES)
+                ->whereIn('type', self::excuseTypes())
+                ->whereDate('date_from', '<=', $date)
+                ->where(fn ($q) => $q->whereDate('date_to', '>=', $date)->orWhereNull('date_to'))
+                ->orderBy('id')->pluck('emp_id')->flip()->all();
+        }
+
+        $buckets = ['present' => [], 'late' => [], 'leave' => [], 'excused' => [], 'absent' => [],
+            'noreport' => [], 'pending' => [], 'not_yet' => []];
         $anyStamp = false;
 
         foreach ($emps as $emp) {
@@ -246,7 +379,20 @@ class DailyWorkCompliance
             }
 
             // لا ختمَ ولا إجازة (أو صفٌّ مختومٌ «غائب»): غائبٌ — في يومِ عملٍ فقط
-            if (! $weekend) $buckets['absent'][] = $entry;
+            if ($weekend) continue;
+
+            // **«مأذون» قبلَ كلِّ شيء** (الخاتمة · X1): عذرٌ معتمَدٌ غيرُ خصميٍّ
+            // («إذن خروج»/«عمل عن بعد») — ليس غياباً بلا عذرٍ وليس إجازة. ويسبق
+            // حتّى الصفَّ المختومَ «غائب»: ذاك ختمُ كنسٍ آليٍّ قرأ `onLeave` وحدَها
+            // فأدان صاحبَ العذر، فلا يُقلَّد حكماً يعلو على اعتمادِ الموارد البشرية.
+            if (! empty($c['excused'])) { $buckets['excused'][] = $entry; continue; }
+
+            // الصفُّ المختومُ صراحةً حكمٌ قائم؛ وما دونَه يُؤجَّل أو يُعلَّق قبلَ أن يُدان
+            if (! $c['attendance']) {
+                if (isset($pendingReq[$emp->id])) { $buckets['pending'][] = $entry; continue; }
+                if ($notStarted) { $buckets['not_yet'][] = $entry; continue; }
+            }
+            $buckets['absent'][] = $entry;
         }
 
         // ترتيبٌ دلاليٌّ بالاسم — لا اعتمادَ على ترتيبِ إدراجٍ يقرعه المحرّكان
@@ -258,12 +404,14 @@ class DailyWorkCompliance
         foreach ($buckets as $k => $b) $n[$k] = count($b);
 
         return ['date' => $date, 'weekend' => $weekend, 'any_stamp' => $anyStamp,
+            'not_started' => $notStarted,
+            'start_at' => $start !== '' ? $start : null,
             'buckets' => $buckets, 'n' => $n];
     }
 
     /* ═══════════ التركيب — آلةُ الحالاتِ الواحدة ═══════════ */
 
-    protected static function compose(Employee $emp, string $date, Collection $atts, Collection $reports, ?bool $onLeaveOverride = null): array
+    protected static function compose(Employee $emp, string $date, Collection $atts, Collection $reports, ?bool $onLeaveOverride = null, ?array $excusedMap = null): array
     {
         $primary = $atts->last(fn ($a) => (bool) $a->time_in) ?: $atts->first();
         $checkedIn = $atts->contains(fn ($a) => (bool) $a->time_in);
@@ -276,6 +424,9 @@ class DailyWorkCompliance
         $physical = self::physicalStatus($primary);
         // الإجازةُ: تُمرَّر محسوبةً مسبقاً في الحلِّ المدَيَّ (§99 · بلا استعلامٍ لكلِّ يوم)
         $onLeave = $onLeaveOverride ?? Workday::onLeave((string) $emp->id, $date);
+        // العذرُ غيرُ الخصميّ («إذن خروج»/«عمل عن بعد») حقيقةٌ **متعامدةٌ** على
+        // الإجازة: لا يمسّ الرصيدَ ولا يُسقط تقريرَ اليوم — ويمنع وسمَ «بلا عذر»
+        $excuse = $onLeave ? null : self::excuseFor($emp->id, $date, $excusedMap);
 
         // التقريرُ الصالح (§13) — بندٌ واحدٌ صالحٌ على الأقل
         $valid = $reports->filter(fn ($r) => self::isValidReportRow($r))->values();
@@ -322,7 +473,8 @@ class DailyWorkCompliance
         if ($finalized) {
             $effective = $lockedOutcome;
         } else {
-            $effective = self::deriveEffective($state, $onLeave, $checkedIn, $reportSubmitted, $policy);
+            $effective = self::deriveEffective($state, $onLeave, $checkedIn, $reportSubmitted, $policy,
+                $excuse !== null);
         }
 
         return [
@@ -338,6 +490,8 @@ class DailyWorkCompliance
             'hours'         => $hours,
             'physical'      => $physical,                                // §6.A
             'on_leave'      => $onLeave,
+            'excused'       => $excuse !== null,                         // عذرٌ معتمَدٌ غيرُ خصميّ
+            'excuse_type'   => $excuse,
             'report_required' => $reportRequired,
             'review_required' => self::reviewRequired(),                // §85
             'report_submitted' => $reportSubmitted,                     // §6.B
@@ -397,9 +551,14 @@ class DailyWorkCompliance
      * «حضورٌ بلا تقرير» وحدَه (§7/§12).
      */
     protected static function deriveEffective(
-        string $state, bool $onLeave, bool $checkedIn, bool $reportSubmitted, string $policy
+        string $state, bool $onLeave, bool $checkedIn, bool $reportSubmitted, string $policy,
+        bool $excused = false
     ): string {
         if ($onLeave) return 'leave';
+        // **العذرُ المعتمَدُ يسبق حكمَ الغياب** (الخاتمة · X1ب): هذا العمودُ هو ما
+        // يُصدَّر وما تُبنى عليه المحاسبةُ الشهريّة، فبقاؤه «غائباً» كان يُرسل
+        // المأذونَ غائباً إلى الرواتب — وهو الضررُ الذي جاء الإصلاحُ ليمنعه.
+        if ($excused && ! $checkedIn) return 'excused';
         if (! $checkedIn) return 'absent';                             // فيزيائيّاً غائب (وإن قدّم تقريراً — §45)
 
         if ($state === self::PRESENT_WITHOUT_REPORT) {
@@ -528,7 +687,9 @@ class DailyWorkCompliance
             'absent' => 'غائب',
             'absent_due_to_missing_report' => 'غياب بسبب عدم تقديم التقرير',
             'non_compliant' => 'غيرُ ممتثل',
-            'excused' => 'معذور',
+            // مفردةٌ واحدةٌ للحالةِ الواحدة: النداءُ يقول «مأذون» فلا يقول الجدولُ
+            // «معذور» — لفظان لحالةٍ واحدةٍ عيبٌ عرفه هذا المستودعُ من قبل (v2.165)
+            'excused' => 'مأذون',
             default => $effective,
         };
         $comp = match ($compliance) {

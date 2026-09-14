@@ -58,7 +58,10 @@ class HireController extends Controller
          */
         $temp = null;
         $roleId = hub_str($r->input('role_id', ''));
-        if ($roleId !== '' && hub_flag(auth()->user(), 'users')) {
+        // والبوّابةُ واحدةٌ في Staff (الجولة 2 · G15): المالك، أو رايةُ إدارةِ المستخدمين
+        // كما كان، أو مفتاحُ `hr:staffAccounts` — فمن يُعيّن يفتح الحسابَ في الحركة
+        // نفسِها بدل أن ينتظر رابعاً. الرافدُ نفسُه يفرضها ثانيةً فلا نسخةَ تتفرّق.
+        if ($roleId !== '' && \App\Support\Staff::mayOpenAccounts()) {
             $temp = \App\Support\Staff::makeAccount($emp, $roleId);
         }
 

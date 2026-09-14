@@ -286,6 +286,21 @@ class AlertEngine
             ->values();
     }
 
+    /**
+     * **مَن يتلقّى تصعيدَ ما لا صاحبَ له** (الجولة 2 · G1): حَمَلةُ رايةِ الاعتماد
+     * (الإدارةُ التشغيليّة) ثم المالكُ احتياطاً — بسقفٍ يمنع إغراقَ منشأةٍ كبيرة.
+     * تُحمَّل مرّةً للتشغيلةِ الواحدة كنظيرتِها أعلاه.
+     */
+    protected ?array $approverIds = null;
+
+    protected function approvers(): array
+    {
+        return $this->approverIds ??= User::whereNull('deleted_at')->with('role')
+            ->orderBy('created_at')->orderBy('id')->get()
+            ->filter(fn ($u) => hub_flag($u, 'approve') || $u->role?->is_owner)
+            ->take(5)->pluck('id')->map(fn ($v) => (string) $v)->all();
+    }
+
     /* ═════════ ٢) السكّة النافذية — كلَّ ٥ دقائق ═════════ */
 
     /**
@@ -374,24 +389,56 @@ class AlertEngine
                 $over = max(1, (int) \Illuminate\Support\Carbon::parse($s['resDue'])->diffInDays(now()));
                 $subject = \Illuminate\Support\Str::limit((string) ($t->subject ?: 'تذكرة'), 60);
 
+                /*
+                 * **التذكرةُ اليتيمةُ أولى بالتصعيد لا أحقُّ بالصمت** (الجولة 2 · G1):
+                 * كان الختمُ يقع خارجَ شرطِ وجودِ المسؤول، فتذكرةٌ متجاوزةٌ **بلا
+                 * مسؤول** تُختَم بلا أن يسمع بها أحد — ثم يمنعُها ختمُها من
+                 * التصعيد حتى بعد إسنادِها (رصدها وكيلُ محاكاةِ الحادثة). فمن
+                 * يُخبَر إذن؟ مديرُ مشروعِها إن كان لها مشروع، وإلّا حَمَلةُ رايةِ
+                 * الاعتماد (الإدارةُ التشغيليّة) — ولا تُختَم إلّا إن بلغت أحداً
+                 * فعلاً، فتبقى في الطابور حتى تجد صاحباً.
+                 */
                 if (! $this->dry) {
-                    if ($t->assignee_id) {
-                        hub_notify($t->assignee_id, 'ticket',
-                            "⏱️ تذكرتُك «{$subject}» متجاوزةٌ موعدَ الحلّ منذ {$over} " . ($over > 2 ? 'أيام' : 'يوم')
-                            . ' — عالجها أو حدّث حالتها بسببٍ مكتوب', 'tickets', $t->id);
+                    $told = [];
+                    $tell = function ($uid, string $text) use (&$told, $t, &$out) {
+                        $uid = (string) ($uid ?: '');
+                        if ($uid === '' || isset($told[$uid])) return;
+                        $told[$uid] = true;
+                        hub_notify($uid, 'ticket', $text, 'tickets', $t->id);
                         $out['notifs']++;
+                    };
+                    $days = $over . ' ' . ($over > 2 ? 'أيام' : 'يوم');
+
+                    if ($t->assignee_id) {
+                        $tell($t->assignee_id, "⏱️ تذكرتُك «{$subject}» متجاوزةٌ موعدَ الحلّ منذ {$days}"
+                            . ' — عالجها أو حدّث حالتها بسببٍ مكتوب');
 
                         // مديرُ المسنَد إليه يُخبَر — التصعيدُ معناه أن أحداً فوقه يعلم
                         $mgrUid = \Illuminate\Support\Facades\DB::table('employees')
                             ->whereNull('deleted_at')->where('user_id', $t->assignee_id)
                             ->orderBy('id')->value('manager_id');
                         if ($mgrUid && (string) $mgrUid !== (string) $t->assignee_id) {
-                            hub_notify($mgrUid, 'ticket',
-                                "📣 تصعيد SLA: تذكرة فريقك «{$subject}» متجاوزةٌ موعدَ الحلّ منذ {$over} "
-                                . ($over > 2 ? 'أيام' : 'يوم') . ' بلا حلّ', 'tickets', $t->id);
-                            $out['notifs']++;
+                            $tell($mgrUid, "📣 تصعيد SLA: تذكرة فريقك «{$subject}» متجاوزةٌ موعدَ الحلّ منذ {$days} بلا حلّ");
+                        }
+                    } else {
+                        // بلا مسؤول: مديرُ المشروع أولاً، ثم الإدارةُ التشغيليّة
+                        $pmUid = $t->project_id ? \Illuminate\Support\Facades\DB::table('projects')
+                            ->whereNull('deleted_at')->where('id', $t->project_id)
+                            ->orderBy('id')->value('manager_id') : null;
+                        $tell($pmUid, "📣 تصعيد SLA: تذكرة مشروعك «{$subject}» متجاوزةٌ موعدَ الحلّ منذ {$days}"
+                            . ' و**بلا مسؤولٍ مُسنَد** — أسنِدها الآن');
+
+                        if (! $told) {
+                            foreach ($this->approvers() as $uid) {
+                                $tell($uid, "📣 تصعيد SLA: تذكرة «{$subject}» متجاوزةٌ موعدَ الحلّ منذ {$days}"
+                                    . ' وبلا مسؤولٍ مُسنَد — تحتاج صاحباً');
+                            }
                         }
                     }
+
+                    // لا ختمَ لتصعيدٍ لم يبلغ أحداً — تبقى في الطابور حتى تجد صاحباً
+                    if (! $told) continue;
+
                     $meta['sla_escalated_at'] = now()->toDateTimeString();
                     $t->forceFill(['meta' => $meta])->saveQuietly();
                 }

@@ -356,6 +356,125 @@ class Quote extends Model
         return round(($total - (float) $this->cost) / $total * 100, 1);
     }
 
+    /**
+     * **(الجولة 2 · G18ب) معرّفُ المشروع المرتبط فعلاً** — حقيقةُ التحويل لا أثرُه
+     * في `meta` وحدَه: `meta.project_id` (مسارُ التحويل بنقرة)، وإلّا عمودُ
+     * `project_id` (ربطٌ من نموذج العرض نفسِه أو من شاشة المشروع). كان القارئُ
+     * الوحيدُ `meta` فيبقى العرضُ موسوماً «لم يُحوَّل» ومشروعُه قائمٌ مرتبطٌ به —
+     * فيَعِد النظامُ بخطوةٍ أُنجزت ويُكرّر الإشارةَ على عملٍ تمّ.
+     * `withTrashed`: مشروعٌ حُذف بنعومة يبقى تحويلاً واقعاً (نمطُ حارس `toProject`).
+     */
+    public function linkedProjectId(): ?string
+    {
+        foreach ([((array) $this->meta)['project_id'] ?? null, $this->project_id] as $id) {
+            $id = (string) ($id ?? '');
+            if ($id !== '' && \App\Models\Project::withTrashed()->whereKey($id)->exists()) return $id;
+        }
+
+        return null;
+    }
+
+    /**
+     * **(الجولة 2 · G18ب) تعبئةٌ مسبقةٌ لإنشاء مشروعٍ من هذا العرض** — نمطُ
+     * `ModuleController::store` حين يحوّل عقداً لمسار التوقيع الإلكترونيّ: من لا
+     * يقدر على التحويل بنقرة (لا يملك الارتباطات مثلاً) يُنقَل لشاشةِ إنشاءٍ
+     * **مهيَّأةٍ سلفاً** بالعميل والقيمة والمسؤول — لا لفراغٍ يُعاد إدخالُه بيده.
+     * المفاتيحُ مفاتيحُ حقول وحدة المشاريع كما تقرؤها `ModuleController::create`.
+     *
+     * @return array<string, string>
+     */
+    public function projectPrefill(): array
+    {
+        return array_filter([
+            'module'    => 'projects',
+            'name'      => mb_substr((string) ($this->title ?: ('مشروع بموجب العرض ' . $this->doc_no)), 0, 290),
+            'clientId'  => (string) ($this->client_id ?? ''),
+            'managerId' => (string) ($this->pm_id ?? ''),
+            'revExp'    => (float) $this->total > 0 ? (string) (float) $this->total : '',
+            'currency'  => (string) ($this->currency ?? ''),
+            'desc'      => mb_substr(trim((string) ($this->scope ?: $this->exec_summary)), 0, 500),
+        ], fn ($v) => (string) $v !== '');
+    }
+
+    /**
+     * **(الجولة 2 · G18) بوّابةُ تحويلِ العرض — مصدرٌ واحدٌ للفعل وللعرض.**
+     *
+     * كان شرطُ **ظهور** الزرّ مكتوباً في الشاشة وشرطُ **القدرة** عليه مكتوباً في
+     * المتحكّم، فافترقا: موظّفُ المبيعات يرى «تحويل لفاتورة» فيصطدم بـ403،
+     * والمحاسبُ الذي يملك الماليةَ لا يرى الزرَّ أصلاً — فالفوترةُ من عرضٍ فائزٍ
+     * تحتاج شخصين ونقلاً يدوياً. القاعدةُ هنا واحدةٌ يقرؤها الاثنان: المتحكّمُ
+     * يردّ بها (`abort($code, $why)`) والشاشةُ تُظهر الزرَّ حين تعود `null` وتكتب
+     * سببَ المنع حين تعود بسبب — فلا يفترقان مجدداً.
+     *
+     * `$lock`: قراءةٌ قافلة داخل معاملة السكّ (نظيرُ `hasLiveMilestoneInvoice`).
+     *
+     * `key` مفتاحُ سببِ المنع — لتُسمّي الشاشةُ الحالةَ بلغتها (مثل «يُفوتَر
+     * بالدفعات») دون أن تُعيد استنتاجَ الشرط بنفسها.
+     *
+     * @return array{code:int, why:string, key:string}|null  `null` = يقدر فعلاً
+     */
+    public function convertGate(string $do, $u = null, bool $lock = false): ?array
+    {
+        if ($g = $this->convertPermGate($do, $u)) return $g;
+
+        if ($this->status !== 'مقبول') {
+            return ['code' => 422, 'why' => 'حوّل العرض بعد قبوله أولاً', 'key' => 'not_accepted'];
+        }
+
+        if ($do === 'invoice'
+            && \Illuminate\Support\Facades\Schema::hasColumn('quote_milestones', 'invoice_id')
+            && $this->hasLiveMilestoneInvoice($lock)) {
+            return ['code' => 422, 'key' => 'milestone_invoices',
+                'why' => 'للعرض فواتيرُ دفعاتٍ حيّة — لا تُسكّ فاتورةٌ كاملةٌ فوقها'
+                    . ' (أَلغِها أولاً إن كان القصدُ الفوترةَ الكاملة)'];
+        }
+
+        if ($do === 'project' && ! $this->client_id) {
+            return ['code' => 422, 'why' => 'العرضُ بلا عميلٍ — لا يُحوَّل لمشروع عميل', 'key' => 'no_client'];
+        }
+
+        return null;
+    }
+
+    /**
+     * شطرُ الصلاحيّات من بوّابة التحويل وحدَه (403) — يُنادى قبل حارسِ «حُوّل من
+     * قبل» في `toProject` كي يبقى فتحُ المشروع القائم متكرّرَ التنفيذ بعد أن تصير
+     * الحالةُ «محوّل». أمّا `convertGate` فيبدأ به ثم يزيد عليه شرطَ الحال.
+     *
+     * @return array{code:int, why:string, key:string}|null
+     */
+    public function convertPermGate(string $do, $u = null): ?array
+    {
+        $u = $u ?: auth()->user();
+
+        // العرضُ المحذوف لا يُقرأ أصلاً من نطاق المتحكّم (findOrFail ⇒ 404)
+        if ($this->trashed()) {
+            return ['code' => 404, 'why' => 'العرضُ محذوف — استعِده قبل تحويله', 'key' => 'deleted'];
+        }
+        // أفعالُ المسار كلُّها خلف صلاحية تعديل العروض (QuoteController::act)
+        if (! hub_can($u, 'quotes', 'e')) {
+            return ['code' => 403, 'key' => 'quotes_edit',
+                'why' => 'إجراءات العرض تتطلب صلاحية تعديل العروض'];
+        }
+
+        return match ($do) {
+            // الفاتورة تدخل MRR والتقارير: صلاحيةُ إنشاء المستندات المالية شرطُها
+            'invoice' => hub_can($u, 'fin', 'a') ? null
+                : ['code' => 403, 'key' => 'fin_create',
+                   'why' => 'تحويل العرض لفاتورة يتطلب صلاحية إنشاء المستندات المالية'],
+            'contract' => hub_can($u, 'contracts', 'a') ? null
+                : ['code' => 403, 'key' => 'contracts_create',
+                   'why' => 'تحويل العرض لعقد يتطلب صلاحية إنشاء العقود'],
+            'project' => ! hub_can($u, 'projects', 'a')
+                ? ['code' => 403, 'key' => 'projects_create',
+                   'why' => 'التحويل لمشروع يتطلب صلاحية إنشاء المشاريع']
+                : (hub_can($u, 'engagements', 'a') ? null
+                    : ['code' => 403, 'key' => 'engagements_create',
+                       'why' => 'التحويل يتطلب صلاحية إنشاء الارتباطات']),
+            default => ['code' => 422, 'why' => 'تحويلٌ غير معروف', 'key' => 'unknown'],
+        };
+    }
+
     public function lines(): HasMany
     {
         return $this->hasMany(QuoteLine::class, 'quote_id')->orderBy('sort')->orderBy('id');

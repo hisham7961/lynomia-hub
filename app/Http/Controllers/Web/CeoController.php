@@ -24,8 +24,29 @@ class CeoController extends Controller
     {
         abort_unless(hub_is_owner(), 403, 'لوحة CEO للمالكين فقط');
 
+        /*
+         * **الكيانُ المختار يُصفّي هذه الأرقام فعلاً** (الجولة ٣ · V7).
+         *
+         * مبدّلُ الشركة يَعِد نصّاً بأن «تصفّي القوائم عليها»، وكانت هذه اللوحةُ
+         * بلا أيّ إشارةٍ إلى الشركة النشطة: تحت كيانٍ فارغٍ تماماً تقول «٣١
+         * موظّفاً · ٨ مشاريع · صافي السنة ١٥٩٬٧٥٨» بينما «فريقي اليوم» يقول
+         * «٠ موظّفاً» من الجدول نفسِه في الدقيقة نفسِها. رقمٌ يبدو مُصفّىً وهو
+         * ليس كذلك يُفسد قراراً (توظيفٌ على ساعاتِ كيانٍ آخر).
+         *
+         * فالمرشِّحُ هنا هو `hub_company_scope` نفسُه الذي تطبّقه قوائمُ الوحدات
+         * (`ModuleController`) و«فريقي اليوم» (`WorkdayController`) — لا محرّكَ
+         * تنطيقٍ ثانٍ، ولا مساسَ بالعزل الصارم (`hub_scope`) فوقه.
+         *
+         * **وما لا يُصفّى يُصرَّح به** في الشاشة (`partials._groupnums` ووسمُ
+         * «أرقام المجموعة» على بطاقاته): صحّةُ الشركة والإيرادُ المتكرر وبطاقاتُ
+         * طبقة القرار تُحسب في محرّكاتٍ عامّةٍ خارج هذا المتحكّم — والتصريحُ
+         * صدقٌ، أمّا الصمتُ فادّعاءُ تصفيةٍ لم تقع.
+         */
+        $activeCo = \App\Support\ExecutionStats::activeCompany();
+
         // hub_fin_not_dead تُبقي «بلا حالة»: whereNotIn وحدها كانت تُسقط state=NULL صامتاً
-        $fin = fn () => hub_fin_not_dead(DB::table('fin_documents')->whereNull('deleted_at'), $this->dead);
+        $fin = fn () => hub_fin_not_dead(
+            hub_company_scope(DB::table('fin_documents')->whereNull('deleted_at'), 'fin'), $this->dead);
         $sum = fn ($kinds, $from) => (float) $fin()->whereIn('kind', $kinds)->where('date', '>=', $from)->sum('total');
         $m0 = now()->startOfMonth()->toDateString();
         $y0 = now()->startOfYear()->toDateString();
@@ -42,11 +63,12 @@ class CeoController extends Controller
             'unpaid'  => (float) $fin()->whereIn('kind', $this->income)
                             ->whereIn('state', ['مرسلة', 'مدفوعة جزئياً', 'متأخرة'])
                             ->sum(DB::raw('total - COALESCE(paid, 0)')),
-            'projects'=> hub_open_scope(DB::table('projects')->whereNull('deleted_at'))->count(),
-            'clients' => DB::table('clients')->whereNull('deleted_at')->count(),
-            'emps'    => DB::table('employees')->whereNull('deleted_at')->count(),
-            'openTasks' => hub_open_scope(DB::table('tasks')->whereNull('deleted_at'))->count(),
-            'lateTasks' => hub_open_scope(DB::table('tasks')->whereNull('deleted_at')->whereNotNull('due')->where('due', '<', now()->toDateString()))->count(),
+            'projects'=> hub_open_scope(hub_company_scope(DB::table('projects')->whereNull('deleted_at'), 'projects'))->count(),
+            'clients' => hub_company_scope(DB::table('clients')->whereNull('deleted_at'), 'clients')->count(),
+            'emps'    => hub_company_scope(DB::table('employees')->whereNull('deleted_at'), 'hr')->count(),
+            'openTasks' => hub_open_scope(hub_company_scope(DB::table('tasks')->whereNull('deleted_at'), 'tasks'))->count(),
+            'lateTasks' => hub_open_scope(hub_company_scope(DB::table('tasks')->whereNull('deleted_at'), 'tasks')
+                ->whereNotNull('due')->where('due', '<', now()->toDateString()))->count(),
         ];
 
         // صحة الشركة
@@ -64,25 +86,29 @@ class CeoController extends Controller
         $max = max(1, ...array_merge(array_column($months, 'i'), array_column($months, 'e')));
 
         // تقدم المشاريع الجارية
-        $projects = hub_open_scope(DB::table('projects')->whereNull('deleted_at'))
-            ->orderByDesc('created_at')->limit(6)->get(['id', 'name', 'status'])
+        $projects = hub_open_scope(hub_company_scope(DB::table('projects')->whereNull('deleted_at'), 'projects'))
+            ->orderByDesc('created_at')->orderByDesc('id')->limit(6)->get(['id', 'name', 'status'])
             ->map(function ($p) { $p->progress = hub_progress($p->id)['pct']; return $p; });
 
         // فريق اليوم: إجازات معتمدة تشمل اليوم + حضور اليوم
         $today = now()->toDateString();
-        $onLeave = DB::table('leave_requests')->whereNull('leave_requests.deleted_at')
-            ->where('leave_requests.status', 'LIKE', '%معتمد%')
-            ->where('leave_requests.date_from', '<=', $today)->where('leave_requests.date_to', '>=', $today)
-            ->join('employees', 'employees.id', '=', 'leave_requests.emp_id')
-            ->get(['employees.name as name', 'leave_requests.type as type', 'leave_requests.date_to as to']);
-        $attToday = DB::table('attendance')->whereNull('deleted_at')->where('date', $today)->count();
+        // **المسنَدُ الواحد** (الخاتمة · X1): كان هنا استعلامٌ ثالثٌ لـ«من في إجازةٍ
+        // اليوم» يخالف نداءَ اليومِ في ثلاثةِ مواضع — `LIKE '%معتمد%'`، و**بلا أيِّ
+        // تصفيةِ نوع** (فطلبُ «سلفة» معتمدٌ يضع صاحبَه في إجازة)، ويسقط `date_to`
+        // الفارغ. فصار الموظّفُ نفسُه «في إجازة» هنا و«غائباً بلا عذر» في النداءِ
+        // أسفلَ الصفحةِ عينِها. القراءةُ الآن من `DailyWorkCompliance` — ومعها
+        // `kind` يميّز إجازةَ الخصمِ من العذرِ المأذون، فلا يضيع أحدٌ ولا يُخلَط.
+        // والتصفيةُ بشركةِ **الموظّف** صاحبِ الطلب — هي ما يقرؤه صاحبُ القرار.
+        $onLeave = \App\Support\DailyWorkCompliance::onLeaveToday($today, $activeCo['id'] ?? null);
+        $attToday = hub_company_scope(DB::table('attendance')->whereNull('deleted_at'), 'attend')
+            ->where('date', $today)->count();
 
         // «نداءُ اليوم» (الجولة ١ · F9): المصدرُ نفسُه الذي تقرؤه شاشةُ «فريقي اليوم» —
         // الغائبُ بالفرق (النشطون − من ختم − من في إجازة)، فلا «0 حاضر» فوقها «مكتمل».
         // عدُّ الصفوفِ الخام كان يحسب صفَّ «غائب» المختومَ حاضراً — البطاقةُ تقرأ النداء.
         $teamRoll = \App\Support\DailyWorkCompliance::rollCall(
-            \App\Models\Employee::whereNull('deleted_at')->where('status', 'نشط')
-                ->orderBy('name')->get(['id', 'name', 'dept', 'user_id'])
+            hub_company_scope(\App\Models\Employee::whereNull('deleted_at')->where('status', 'نشط'), 'hr')
+                ->orderBy('name')->orderBy('id')->get(['id', 'name', 'dept', 'user_id'])
         );
 
         // أعلى المستحقات
@@ -91,8 +117,9 @@ class CeoController extends Controller
             ->limit(6)->get(['id', 'doc_no as no', 'partner', 'total', 'paid', 'due', 'state']);
 
         // توزيع المهام المفتوحة بالحالة (للدونات)
-        $taskSlices = DB::table('tasks')->whereNull('deleted_at')
-            ->select('status', DB::raw('COUNT(*) c'))->groupBy('status')->orderByDesc('c')->limit(6)->get()
+        $taskSlices = hub_company_scope(DB::table('tasks')->whereNull('deleted_at'), 'tasks')
+            ->select('status', DB::raw('COUNT(*) c'))->groupBy('status')
+            ->orderByDesc('c')->orderBy('status')->limit(6)->get()
             ->map(fn ($r) => ['label' => $r->status ?: 'بلا حالة', 'value' => (int) $r->c])->all();
 
         // مسار المبيعات والإيراد المتكرر — أرقام القرار التجاري في لوحة القيادة
@@ -111,6 +138,6 @@ class CeoController extends Controller
 
         return view('ceo.index', compact('kpi', 'health', 'months', 'max', 'projects',
             'onLeave', 'attToday', 'teamRoll', 'unpaidTop', 'taskSlices', 'pipe', 'mrr', 'currency',
-            'awaiting', 'leaks', 'conc', 'risks', 'trend', 'gov'));
+            'awaiting', 'leaks', 'conc', 'risks', 'trend', 'gov', 'activeCo'));
     }
 }

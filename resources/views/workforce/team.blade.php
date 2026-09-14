@@ -25,6 +25,9 @@
     @endif
     <div class="stat"><span class="ico">🏝️</span><b>{{ number_format($n['leave'] ?? 0) }}</b><span>في إجازة</span></div>
     @if (isset($roll))
+        @if (($roll['n']['excused'] ?? 0) > 0)
+            <div class="stat"><span class="ico">🪪</span><b>{{ number_format($roll['n']['excused']) }}</b><span>مأذون</span></div>
+        @endif
         <div class="stat"><span class="ico">❌</span><b>{{ number_format($roll['n']['absent']) }}</b><span>غائب بلا عذر</span></div>
     @endif
     <div class="stat"><span class="ico">⏱️</span><b>{{ number_format($n['hours'] ?? 0, 1) }}</b><span>ساعة مسجَّلة</span></div>
@@ -41,17 +44,32 @@
         <span class="sub">— النشطون − من ختم − من في إجازة = غائبٌ بلا عذر؛ لا انتظارَ صفوفِ «غائب»</span></h3>
     @if ($roll['weekend'])
         <div class="sub" style="margin-bottom:8px">اليومُ عطلةٌ أسبوعية — لا يُحتسب غيابٌ بلا عذر.</div>
+    @elseif ($roll['not_started'] ?? false)
+        {{-- الجولة ٢ · G12: النداءُ في الفجر كان يعلن الجميعَ غائبين قبل أن يبدأ الدوام --}}
+        <div class="sub" style="margin-bottom:8px">لم يبدأ الدوامُ بعد
+            @if (! empty($roll['start_at'])) (يبدأ {{ $roll['start_at'] }}) @endif
+            — لا يُعلَن غيابٌ قبل موعده.</div>
     @elseif (! $roll['any_stamp'] && ! count($roll['buckets']['leave']))
         <div class="sub" style="margin-bottom:8px">لا بيانات حضور بعد — لم يُسجَّل أيُّ ختمٍ اليوم.</div>
     @endif
     <div style="display:flex;gap:12px;flex-wrap:wrap">
-        @foreach ([
+        @foreach (array_filter([
             'present' => ['✅ حاضر', 'ok'],
             'late' => ['🕘 متأخر', 'wn'],
             'leave' => ['🏝️ في إجازة', 'ac'],
+            // مأذون: عذرٌ **معتمَدٌ** ليس إجازةَ خصم («إذن خروج»/«عمل عن بعد»).
+            // كان صاحبُه يسقط في «غائبٌ بلا عذر» لأنّ لا فئةَ له — فكان اعتمادُ
+            // الطلبِ يسوء بحاله: المعلَّقُ «بانتظار قرار» والمعتمَدُ «بلا عذر» (X1)
+            'excused' => ['🪪 مأذون', 'ac'],
+            // بانتظارِ قرار: طلبُ إذنٍ/إجازةٍ لم يُبتّ بعد — ليس غياباً بلا عذر (G12)
+            'pending' => ['⏳ بانتظار قرار', 'wn'],
+            // لم يختم بعدُ والدوامُ في أوّله — تظهر قبل بدء الدوام وحدَها
+            'not_yet' => ['🕗 لم يختم بعد', 'g'],
             'absent' => ['❌ غائب بلا عذر', 'bad'],
             'noreport' => ['📝 حاضر بلا تقرير', 'wn'],
-        ] as $k => [$label, $tone])
+        ], fn ($v, $k) => isset($roll['buckets'][$k])
+            && (count($roll['buckets'][$k]) || ! in_array($k, ['pending', 'not_yet', 'excused'], true)),
+            ARRAY_FILTER_USE_BOTH) as $k => [$label, $tone])
             <div style="flex:1;min-width:170px">
                 <div><span class="bdg {{ $tone }}">{{ $label }}</span> <b>{{ count($roll['buckets'][$k]) }}</b></div>
                 <div class="sub" style="margin-top:4px">
@@ -77,6 +95,8 @@
             @php $a = $r['att']; $c = $r['comp'];
                 $effTone = match ($c['effective']) {
                     'present' => 'ok', 'leave' => 'ac', 'absent_due_to_missing_report' => 'bad',
+                    // نغمةُ «مأذون» هي نغمةُ الإجازةِ نفسُها (ac) — فالعينُ تقرأ في
+                    // الجدولِ ما قرأته في النداءِ أعلاه، لا حكماً ثالثاً
                     'non_compliant' => 'wn', 'absent' => 'bad', 'excused' => 'ac', default => '' };
                 $repTone = match ($c['compliance']) {
                     'compliant' => 'ok', 'late' => 'wn', 'missing' => 'bad',

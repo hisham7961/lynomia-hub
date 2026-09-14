@@ -16,6 +16,9 @@ use Illuminate\Database\Eloquent\Model;
  */
 class FlowRunner
 {
+    /** نوعُ إشعار «فاز العرض» — وهو نفسُه ذاكرةُ عدم التكرار (لا عمودَ جديد) */
+    public const QUOTE_WON = 'quote.won';
+
     /** @param string $event created|updated|status */
     /**
      * نقطة النداء التاريخية من المتحكمات — صارت تُفوِّض للناقل.
@@ -30,6 +33,9 @@ class FlowRunner
     /** تنفيذ المسارات المطابقة — مشتركٌ في الناقل، لا يُنادى مباشرة */
     public static function run(string $event, string $module, Model $m, ?string $statusTo = null): void
     {
+        // تسليماتُ النظام المدمجة أولاً — وعدٌ لا ينتظر مساراً يكتبه المستخدم
+        self::builtins($event, $module, $m);
+
         try {
             $flows = Flow::where('enabled', true)->where('module', $module)->where('event', $event)->get();
             if ($flows->isEmpty()) return;
@@ -59,6 +65,61 @@ class FlowRunner
         } catch (\Throwable $e) {
             // المسارات لا تكسر العملية الأصلية أبداً — وعطلها يُبلَّغ كما تفعل HubAutomation
             report($e);
+        }
+    }
+
+    /**
+     * **تسليماتٌ مدمجةٌ على المحرّك نفسِه** — لا محرّكَ أحداثٍ ثانياً.
+     *
+     * آثارٌ يَعِد بها النظامُ نفسُه عبر حدود الوحدات، لا ينتظر أن يكتبها المستخدمُ
+     * مساراً: تُنفَّذ من `run` فتصل من **كل** بابٍ يُطلق الحدث (أزرارُ مسار العرض،
+     * النموذجُ العامّ، الكانبان، التغييرُ الجماعيّ، API) لا من متحكّمٍ واحدٍ يُنسى
+     * إخوتُه. وتُقرأ على **الاسم الدلاليّ** المُصرَّح في `config('hub.events')`،
+     * فمفرداتُ الحالة تبقى في السجل لا في الشيفرة. عطلُها لا يكسر العمليةَ
+     * الأصلية ولا بقيةَ المسارات — يُبلَّغ ولا يُبتلع (نمطُ `act`).
+     */
+    protected static function builtins(string $event, string $module, Model $m): void
+    {
+        try {
+            if ($module === 'quotes' && $event === 'quote.accepted') self::quoteWon($m);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    /**
+     * **(الجولة 2 · G4) فوزُ العرض يُشعر مَن سيُنفّذ.**
+     *
+     * كان القبولُ حدثاً صامتاً: مديرةُ المشروع المعيَّنة في العرض (`pm_id`) لا تعلم
+     * أنّ عليها بدءَ التسليم — لا إشعارَ ولا بندٌ في بوّابتها — فينقطع الخيطُ بين
+     * المبيعات والتنفيذ رغم أنّ كلَّ خطوةٍ تعمل وحدَها. يُشعَر مديرُ التنفيذ وصاحبُ
+     * العرض (إن اختلف)، والنصُّ يقول **ما المطلوبُ فعلُه** لا الخبرَ وحدَه.
+     *
+     * ثلاثةُ حرّاسٍ لا يُخلّ بها:
+     *  ١) **الفاعلُ لا يُشعر نفسَه** بما فعله (نمطُ `ModuleController::notifyAssignee`).
+     *  ٢) **الأهليّة** كمستلمِ المسار المسمّى: رؤيةُ الوحدة + نطاقُ السجل
+     *     (`eligibleExplicitRecipient`) — فلا يحمل الإشعارُ اسمَ العرض ومبلغَه
+     *     إلى معزولٍ عنه.
+     *  ٣) **مرّةً واحدةً لكل مستلم**: الذاكرةُ إشعارُه القائمُ نفسُه
+     *     (`kind=quote.won` على هذا السجل) — فنقرةُ قبولٍ ثانيةٌ أو حفظٌ يعيد
+     *     الحالةَ نفسَها لا يُضاعف الإشعار، وpm==owner لا يُشعَر مرّتين.
+     */
+    protected static function quoteWon(Model $q): void
+    {
+        $actor = (string) (auth()->id() ?? '');
+        $title = trim((string) ($q->title ?? ''));
+        $text = '🏆 فاز العرض ' . (string) ($q->doc_no ?? '') . ($title !== '' ? ' — ' . $title : '')
+            . ' (' . number_format((float) ($q->total ?? 0), 3) . ' ' . (string) ($q->currency ?? '') . '): '
+            . 'ابدأ التسليم — حوّله لمشروعٍ وارتباط من صفحة العرض، وراجِع جدولَ الدفعات لإصدار الدفعة المقدّمة.';
+
+        foreach ([$q->pm_id ?? null, $q->owner_id ?? null] as $uid) {
+            $uid = (string) ($uid ?? '');
+            if ($uid === '' || $uid === $actor) continue;
+            if (! self::eligibleExplicitRecipient($uid, 'quotes', $q)) continue;
+            if (HubNotification::where('user_id', $uid)->where('kind', self::QUOTE_WON)
+                ->where('module', 'quotes')->where('record_id', $q->getKey())->exists()) continue;
+
+            hub_notify($uid, self::QUOTE_WON, $text, 'quotes', (string) $q->getKey());
         }
     }
 

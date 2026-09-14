@@ -12,11 +12,35 @@ class ProfileController extends Controller
     {
         // سر مصادقة ثنائية معلّق (لم يؤكد بعد) — يبقى في الجلسة حتى التأكيد
         $pending = $r->session()->get('2fa:pending');
+        $u = auth()->user();
+
+        /*
+         * **الوجهةُ الواحدةُ بقشرتَين** (الجولة 3 · V4) — زرُّ «⚙️ حسابي» في قشرةِ
+         * البوّابة يشير إلى هذه الوجهة، وكانت تمتدّ من **تخطيطِ التطبيق الداخليّ**:
+         * فحسابُ عميلٍ يفتحها فيجد شريطاً جانبيّاً فيه «لوحة التحكم» و«مساحات العمل»
+         * و«الكيانات والعلاقات» وبحثَ النظام. العزلُ صمد (لا بيانَ شركةٍ أخرى ظهر،
+         * والروابطُ الداخليّةُ يردّها `PortalGuard` بـ٤٠٤) — فهو عيبُ **ثقةٍ وواجهة**
+         * لا ثغرةَ بيانات، وهذا وصفُه الصادق.
+         *
+         * **والعلاجُ في الوجهةِ لا بإخفاء الزرّ**: الوجهةُ واحدةٌ والمسارُ واحدٌ وكلُّ
+         * كتاباتِ الحساب (`profile.*`) كما هي — يتبدّل **القالبُ** وحدَه، فحقُّ العميلِ
+         * في إدارةِ اسمِه وكلمةِ مرورِه وتحقّقِه بخطوتين وجلساتِه يبقى عاملاً كما كان،
+         * لكن داخلَ بوّابته. (ومفاتيحُ API تبقى داخليّةً — F23 يسري في القالبين.)
+         */
+        if (hub_is_client($u)) {
+            return view('profile.portal', [
+                'u' => $u,
+                'pending2fa' => $pending,
+                'otpUri' => $pending ? \App\Support\Totp::uri($pending, $u->email, (string) setting('app.name', 'Lynomia Hub')) : null,
+                // جلساتُه هو حصراً — صفوفُ `user_id` الخاصّة به، بترتيبٍ حتميّ
+                'sessions' => \App\Support\ClientPortalData::mySessions($u, (string) $r->session()->get('hub.sl', '')),
+            ]);
+        }
 
         return view('profile', [
-            'u' => auth()->user(),
+            'u' => $u,
             'pending2fa' => $pending,
-            'otpUri' => $pending ? \App\Support\Totp::uri($pending, auth()->user()->email, (string) setting('app.name', 'Lynomia Hub')) : null,
+            'otpUri' => $pending ? \App\Support\Totp::uri($pending, $u->email, (string) setting('app.name', 'Lynomia Hub')) : null,
             'tokens' => \App\Models\ApiToken::where('user_id', auth()->id())->orderByDesc('created_at')->get(),
         ]);
     }
