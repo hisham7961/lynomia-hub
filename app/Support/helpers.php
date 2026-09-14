@@ -1329,7 +1329,7 @@ if (! function_exists('hub_expiry_self')) {
      * **ولا صلاحيّةَ تُوسَّع:** لا يفتح هذا ملفَّ زميلٍ واحد، ولا يمنح `hr:v`،
      * ولا يمسّ أيَّ وحدةٍ أخرى.
      */
-    function hub_expiry_self($user = null): array
+    function hub_expiry_self($user = null, bool $fresh = false): array
     {
         $user = $user ?? auth()->user();
         if (! $user) return [];
@@ -1344,7 +1344,17 @@ if (! function_exists('hub_expiry_self')) {
          * — **والحارسُ كان محقّاً**. والمفتاحُ بالمستخدمِ لا بالدور (الصفوفُ تخصّه
          * وحدَه)، وختمُ جدولِ الموظّفين يُبطله فورَ تجديدِ إقامةٍ لا بعد مهلة.
          */
-        $ck = 'hub:expiry:self:' . $user->id . hub_data_stamp([(string) $md['table']]);
+        /*
+         * **ختمُ ما يُقرأ كلِّه، لا جدولِ الموظّفين وحدَه** (مجلس الخبراء). صار
+         * المسحُ يقرأ **المرفقات** و**قواعدَ الوثائق**، ومفتاحُه لا يحمل ختمَهما:
+         * فقاعدةُ منعٍ صريحةٍ تُضاف والوثيقةُ باقيةٌ على الرادارِ خمسَ دقائق،
+         * و«↻ تحديث الآن» لا يُقصّرها لأنّ `$fresh` **لم يكن يصل**. وهو الصنفُ
+         * نفسُه الذي أُغلق في زرِّ `/ceo`: اسمٌ يَعِد بسلوكٍ لا يُنفِّذه القارئ.
+         */
+        $ck = 'hub:expiry:self:' . $user->id
+            . ':g' . (int) \Illuminate\Support\Facades\Cache::get('hub:expiry:gen', 0)
+            . hub_data_stamp([(string) $md['table'], 'attachments', 'document_access_rules', 'roles']);
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget($ck);
 
         return \Illuminate\Support\Facades\Cache::remember($ck, 300, function () use ($md, $user) {
             return hub_expiry_self_scan($md, $user);
@@ -1419,19 +1429,59 @@ if (! function_exists('hub_expiry_self_scan')) {
         try {
             if (\Illuminate\Support\Facades\Schema::hasTable('attachments')
                 && \Illuminate\Support\Facades\Schema::hasColumn('attachments', 'expires_at')) {
+                /*
+                 * **النموذجُ كاملاً لا منتقىً** (مجلس الخبراء). كنتُ أنتقي أربعةَ
+                 * أعمدةٍ ثمّ أُسلّم النموذجَ الناقصَ إلى `DocumentPolicy` — فتصير
+                 * `hub_doc_sensitive('', $kind)` **false** و`hub_mod('')` **null**:
+                 * **بوّابتان من خمسٍ تُطفآن صامتتين**. وأثبت التحقّقُ المستقلُّ أنّ
+                 * من يملك `hr:v` بلا `docsec` كان يرى «عقد العمل» على ملفِّه —
+                 * وهي الوثيقةُ التي تمنعها السياسةُ عنه بعينها. وكلُّ أنواعِ وثائقِ
+                 * الموارد البشريّةِ المؤرَّخةِ حسّاسة، فالميزةُ كانت تعمل **بفضلِ
+                 * الإطفاء لا رغمَه**. والانتقاءُ لم يكن يوفّر شيئاً يُذكر.
+                 *
+                 * **والنافذةُ متماثلةٌ مع `hub_doc_expiry`** (`±60`): كانت `+30`
+                 * هنا و`+60` هناك، فوثيقةٌ بعد أربعين يوماً **تراها الموارد
+                 * البشريّةُ ولا يراها صاحبُها** — وهي الشكوى نفسُها التي وُضع هذا
+                 * المسحُ لإغلاقها. والقصُّ النهائيُّ يقع في `hub_expiry` كما لها.
+                 */
                 $docs = \App\Models\Attachment::whereNull('deleted_at')
                     ->where('module', 'hr')->whereIn('record_id', $emps->pluck('id')->all())
                     ->whereNotNull('expires_at')
                     ->whereBetween('expires_at', [now()->subDays(60)->toDateString(),
-                                                  now()->addDays(30)->toDateString()])
-                    ->orderBy('expires_at')->orderBy('id')->limit(40)
-                    ->get(['id', 'record_id', 'kind', 'expires_at']);
+                                                  now()->addDays(60)->toDateString()])
+                    ->orderBy('expires_at')->orderBy('id')->limit(40)->get();
 
                 if ($docs->isNotEmpty()) {
                     \App\Support\DocumentPolicy::primeMemo($docs->pluck('id'));
                     $names = $emps->pluck($disp, 'id');
                     foreach ($docs as $a) {
-                        if (! \App\Support\DocumentPolicy::listable($user, $a)) continue;
+                        /*
+                         * **قرارٌ صريحٌ يُعلَن لا يُستدرَج** (مجلس الخبراء).
+                         *
+                         * كلُّ أنواعِ وثائقِ الموارد البشريّةِ المؤرَّخةِ موسومةٌ
+                         * `sec => true`، فبوّابةُ `docsec` تحجب عن **صاحبِ الشأنِ
+                         * نفسِه** إقامتَه وجوازَه وعقدَه. والمبدأُ الذي قام عليه
+                         * هذا المسحُ كلُّه: **«إقامتُها ليست سرّاً عنها»** —
+                         * ووثيقةُ إقامتِها كذلك، وهو من يُطالَب بتجديدها.
+                         *
+                         * فيُستثنى **صاحبُ الشأنِ وحدَه** من بوّابةِ الحساسيّة، وفي
+                         * أضيقِ حدّ:
+                         *   • سجلُّه هو (الاستعلامُ محصورٌ بـ`user_id` أصلاً)،
+                         *   • **وجودُ الوثيقةِ وتاريخُها ونوعُها** لا محتواها —
+                         *     و`att.view`/`att.dl` تبقى محكومةً بالسياسةِ كاملةً
+                         *     فتردّ 403 كما هي،
+                         *   • **والمنعُ الصريحُ يعلو** (قاعدةٌ على المستخدمِ أو
+                         *     دورِه): منشأةٌ قيّدت وثيقةً عن شخصٍ بعينِه قرارُها
+                         *     مُحترَم، ولا يُنقض باستثناءٍ عامّ.
+                         *
+                         * وما قبلَ هذا لم يكن قراراً بل **عَرَضاً**: نموذجٌ ناقصُ
+                         * عمودَين أطفأ البوّابتين صامتاً، فمرّ كلُّ شيءٍ بلا تمييز.
+                         */
+                        $d = \App\Support\DocumentPolicy::decide($user, $a, 'preview');
+                        if (! $d['allowed']
+                            && ! in_array($d['state'], ['DENIED_SENSITIVE', 'DENIED_SECRET_RECORD'], true)) {
+                            continue;   // منعٌ صريحٌ أو غيابُ مستخدم — يُحترَم كما هو
+                        }
                         $out[] = [
                             'module' => 'hr', 'mlabel' => (string) ($md['label'] ?? 'ملفات الموظفين'),
                             'flabel' => hub_doc_label('hr', $a->kind) ?? 'وثيقة',
@@ -1478,7 +1528,7 @@ if (! function_exists('hub_expiry')) {
         $user   = $user ?? auth()->user();
         // **صفوفُ صاحبِ الشأنِ تُضمّ بعد التنطيق** (PROD-05) — تُحسب خارجَ المخبأ
         // لأنّها تخصّ مستخدماً بعينِه لا دوراً، ويُمنع تكرارُ ما رآه بالنطاق أصلاً
-        $mine   = hub_expiry_self($user);
+        $mine   = hub_expiry_self($user, $fresh);
         // مقيد = نطاق مشاريع أو عزل شركات **أو عزل عملاء** — مخبأ خاص به كي لا تتسرب
         // أسماء أجنبية عبر المخبأ المشترك. كان عزلُ العميل غائباً عن هذا الشرط: مستخدمٌ
         // محصورٌ بعميلٍ (hub_client_ids) وحده كان يُرى `$scoped=false` فلا يُطبَّق
@@ -1727,9 +1777,11 @@ if (! function_exists('hub_health')) {
          *
          * والختمُ قراءةُ مخبأٍ لا استعلامَ قاعدة، فلا كلفةَ تُذكر.
          */
+        // `metric_points` مُدرَجٌ لأنّ بُعدَ «الأمن» يقرأ لقطتَه اليوميّةَ منه —
+        // كان خارجَ الختمِ فتبقى الدرجةُ قديمةً بعد لقطةٍ جديدة (مجلس الخبراء).
         $key = 'hub:health' . hub_data_stamp([
             'contracts', 'domains', 'employees', 'fin_documents', 'incidents',
-            'issues', 'projects', 'servers', 'users', 'vault_secrets',
+            'issues', 'projects', 'servers', 'users', 'vault_secrets', 'metric_points',
         ]);
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
@@ -1938,7 +1990,11 @@ if (! function_exists('hub_progress')) {
      */
     function hub_progress(string $projectId, bool $fresh = false): array
     {
-        $key = 'hub:progress:' . $projectId;
+        // **والختمُ يسبق المهلة هنا أيضاً** (مجلس الخبراء): كان المفتاحُ خاماً،
+        // فتقدّمُ المشروعِ مجمّدٌ عشرَ دقائقَ بعد إنجازِ مهمّةٍ أو بندِ خطّة —
+        // ويُقرأ داخلَ تقريرِ صحّةِ الشركة، فيُجمّد بُعداً فيه مهما جُدِّد.
+        $key = 'hub:progress:' . $projectId
+            . hub_data_stamp(['plan_items', 'tasks', 'test_cases']);
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
         return \Illuminate\Support\Facades\Cache::remember($key, 600, function () use ($projectId) {
