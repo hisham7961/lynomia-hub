@@ -49,7 +49,16 @@
         @php $pl = $d['pipeline']; @endphp
         <div style="display:flex;gap:18px;flex-wrap:wrap">
             <div><div class="sub">القيمة الخام</div><b class="mono">{{ number_format($pl['raw'] ?? 0, 3) }} {{ $pl['cur'] ?? '' }}</b></div>
-            <div><div class="sub">المرجَّح (×احتمال)</div><b class="mono">{{ number_format($pl['weighted'] ?? 0, 3) }} {{ $pl['cur'] ?? '' }}</b></div>
+            {{-- **«٠» تعني «لم يُقَس»** (مجلس الخبراء · PROD-09): طُبع «0.000» بجانب
+                 خطِّ أنابيبَ ٢٥١٬٠٠٠ لأنّ لا صفقةَ تحمل احتمالَ إغلاق — فالرقمُ
+                 غيابُ مُدخَلٍ لا تنبّؤٌ بصفر. والرقمُ الخامُ والعدُّ باقيان. --}}
+            <div><div class="sub">المرجَّح (×احتمال)</div>
+                @if ($pl['weighted_measured'] ?? true)
+                    <b class="mono">{{ number_format($pl['weighted'] ?? 0, 3) }} {{ $pl['cur'] ?? '' }}</b>
+                @else
+                    <b class="mono sub" title="لا صفقةَ تحمل احتمالَ إغلاق — أضِف «الاحتمال» لتُحسب">— لم يُقَس</b>
+                @endif
+            </div>
         </div>
         <div class="sub" style="margin-top:6px">من مراحل العملاء المفتوحة × احتمال الإغلاق — بلا محرّك تحويل عملات.</div>
     </div>

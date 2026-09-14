@@ -1658,7 +1658,8 @@ if (! function_exists('hub_health')) {
                 $inc = hub_fin_sum(config('hub.fin.income'), $m0);
                 $exp = hub_fin_sum(config('hub.fin.expense'), $m0);
                 $score = 100 - ($openN ? ($late / $openN) * 60 : 0) - ($inc - $exp < 0 ? 20 : 0);
-                $out['المالية'] = ['score' => $clamp($score), 'note' => "{$late}/{$openN} مستحق متأخر · صافي الشهر " . ($inc - $exp >= 0 ? 'موجب' : 'سالب')];
+                $out['المالية'] = ['score' => $clamp($score), 'measured' => $openN > 0,
+                    'note' => "{$late}/{$openN} مستحق متأخر · صافي الشهر " . ($inc - $exp >= 0 ? 'موجب' : 'سالب')];
             } catch (\Throwable $e) {}
 
             // المشاريع: متوسط نسبة الإنجاز للمشاريع غير المغلقة
@@ -1667,7 +1668,8 @@ if (! function_exists('hub_health')) {
                     ->where(fn ($w) => $w->whereNull('status')->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مكتمل%')->where('status', 'NOT LIKE', '%ملغ%')))
                     ->limit(30)->pluck('id');
                 $ps = collect($projects)->map(fn ($id) => hub_progress($id)['pct'])->filter(fn ($p) => $p !== null);
-                if ($ps->count()) $out['المشاريع'] = ['score' => $clamp($ps->avg()), 'note' => 'متوسط إنجاز ' . $ps->count() . ' مشروع جارٍ'];
+                if ($ps->count()) $out['المشاريع'] = ['score' => $clamp($ps->avg()), 'measured' => true,
+                    'note' => 'متوسط إنجاز ' . $ps->count() . ' مشروع جارٍ'];
             } catch (\Throwable $e) {}
 
             // الأمن: خصم للمستخدمين الخاملين >60 يوماً وللأسرار التي لم تُحدَّث >180 يوماً
@@ -1683,7 +1685,8 @@ if (! function_exists('hub_health')) {
                 // القديمة تبقى احتياطاً صادقاً قبل أول لقطة — لا درجتين متضاربتين بعدها.
                 $snap = hub_metric_latest('security', 'org', 'score');
                 $score = $snap !== null ? $snap : (100 - ($un ? ($idle / $un) * 35 : 0) - ($sn ? ($stale / $sn) * 45 : 0));
-                $out['الأمن'] = ['score' => $clamp($score), 'note' => "{$idle}/{$un} مستخدم خامل · {$stale}/{$sn} سر لم يُغيَّر منذ ٦ أشهر"];
+                $out['الأمن'] = ['score' => $clamp($score), 'measured' => ($un + $sn) > 0,
+                    'note' => "{$idle}/{$un} مستخدم خامل · {$stale}/{$sn} سر لم يُغيَّر منذ ٦ أشهر"];
             } catch (\Throwable $e) {}
 
             // الموارد البشرية: خصم لوثائق الموظفين المنتهية والقريبة من الانتهاء
@@ -1693,7 +1696,8 @@ if (! function_exists('hub_health')) {
                 $expired = $en ? (clone $emp)->where(fn ($w) => $w->where('iqama_exp', '<', $today)->orWhere('pass_exp', '<', $today))->count() : 0;
                 $soonN = $en ? (clone $emp)->where(fn ($w) => $w->whereBetween('iqama_exp', [$today, $soon])->orWhereBetween('pass_exp', [$today, $soon]))->count() : 0;
                 $score = 100 - ($en ? ($expired / $en) * 55 + ($soonN / $en) * 20 : 0);
-                $out['الموارد البشرية'] = ['score' => $clamp($score), 'note' => "{$expired} وثيقة منتهية · {$soonN} تنتهي خلال شهر (من {$en} موظف)"];
+                $out['الموارد البشرية'] = ['score' => $clamp($score), 'measured' => $en > 0,
+                    'note' => "{$expired} وثيقة منتهية · {$soonN} تنتهي خلال شهر (من {$en} موظف)"];
             } catch (\Throwable $e) {}
 
             // الامتثال: العقود والدومينات المنتهية أو القريبة
@@ -1706,7 +1710,8 @@ if (! function_exists('hub_health')) {
                 $dLate = (clone $d)->whereNotNull('expiry')->where('expiry', '<', $today)->count();
                 $tot = $cn + $dn;
                 $score = 100 - ($tot ? (($cLate + $dLate) / $tot) * 70 : 0);
-                $out['الامتثال'] = ['score' => $clamp($score), 'note' => "{$cLate} عقد و{$dLate} دومين متجاوز للنهاية (من {$tot})"];
+                $out['الامتثال'] = ['score' => $clamp($score), 'measured' => $tot > 0,
+                    'note' => "{$cLate} عقد و{$dLate} دومين متجاوز للنهاية (من {$tot})"];
             } catch (\Throwable $e) {}
 
             // البنية التحتية: سيرفرات/شهادات SSL منتهية + أعطال حرجة مفتوحة
@@ -1724,8 +1729,23 @@ if (! function_exists('hub_health')) {
                 $score = 100 - ($sn2 ? ($sLate / $sn2) * 30 : 0) - min(30, $ssl * 10)
                        - min(40, $crit * 10) - min(30, $inc * 12);
                 $out['البنية التحتية'] = ['score' => $clamp($score),
+                    // مقيسٌ إن وُجد ما يُقاس: سيرفراتٌ أو شهاداتٌ أو أعطالٌ أو حوادث
+                    'measured' => ($sn2 + $ssl + $crit + $inc) > 0,
                     'note' => "{$sLate} سيرفر منتهٍ · {$ssl} شهادة SSL منتهية · {$crit} عطل حرج مفتوح · {$inc} حادثة مفتوحة"];
             } catch (\Throwable $e) {}
+
+            /*
+             * **الدرجةُ تُمحى حيث لا قياس** (مجلس الخبراء · PROD-10).
+             *
+             * لا يكفي وسمُ `measured=false` وتركُ الدرجةِ مئةً: كلُّ قارئٍ لا
+             * يفحص الوسمَ — و`/api/v1/health` يمرّرها كما هي — سيقرأ **مئةً
+             * كاذبة**. فالقيمةُ تُصبح `null` صراحةً، والقارئُ الذي يجمع أو يقارن
+             * يحصل على فراغٍ لا على «ممتاز». **والبُعدُ يبقى في التقرير** باسمِه
+             * وسببِه، وتعود درجتُه فورَ وجودِ أوّلِ سجلّ.
+             */
+            foreach ($out as $k => $d) {
+                if (is_array($d) && ! ($d['measured'] ?? true)) $out[$k]['score'] = null;
+            }
 
             return $out;
         });
