@@ -2592,9 +2592,16 @@ if (! function_exists('hub_project_health')) {
 
             // ٣) المهام المتأخرة
             $tAll = \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')->where('project_id', $projectId)->count();
-            $tLate = \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')->where('project_id', $projectId)
-                ->whereNotNull('due')->whereDate('due', '<', today())
-                ->whereNotIn('status', ['منجزة', 'مكتملة', 'ملغاة'])->count();
+            // **السلطةُ الواحدةُ لـ«مفتوحة»** (مجلس الخبراء · A-1): كانت قائمةً
+            // حرفيّةً، و`NULL NOT IN (…)` **لا يصدُق في SQL** — فمهمّةٌ بلا حالةٍ
+            // (والعمودُ يقبل الفراغَ والنموذجُ العامُّ يعرض خياراً فارغاً) تسقط من
+            // عدّادِ المتأخّر بصمت: «٠ متأخرة من ١٢» ومهامُّ المشروعِ كلُّها فائتة.
+            // و`hub_open_scope` يعالج الفراغَ صراحةً ويوسّع القائمةَ بالحالاتِ
+            // المصرَّحِ بها في السجلّ — فالصحّةُ تقرأ ما يقرؤه بقيّةُ النظام.
+            $tLate = hub_open_scope(
+                \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')->where('project_id', $projectId)
+                    ->whereNotNull('due')->whereDate('due', '<', today())
+            )->count();
             $f[] = ['k' => 'انضباط المهام', 'w' => 20,
                     's' => $tAll ? max(0, (int) (100 - $tLate / $tAll * 200)) : 100,
                     'note' => $tAll ? "{$tLate} متأخرة من {$tAll}" : 'لا مهام مسجَّلة'];
@@ -3706,10 +3713,23 @@ if (! function_exists('hub_capacity')) {
 
         // إجازات معتمدة متقاطعة مع الفترة — «معتمد» هي قيمة السجل المعلنة
         // (كانت «معتمدة» فلا تُخصم إجازة واحدة من الطاقة أبداً)
+        //
+        // **وتصفيةُ النوعِ لازمة** (مجلس الخبراء · A-3): كان الاستعلامُ بلا أيِّ
+        // تصفيةِ نوعٍ إطلاقاً، فطلبُ «سلفة» أو «شهادة راتب» معتمدٌ **يخصم أيّامَ
+        // عملٍ من طاقةِ الموظّف** — والطلبُ الإداريُّ لا يُغيّب أحداً عن مكتبه.
+        // وهذا عينُ العيبِ الذي أُغلق في لوحةِ المالكِ بـv2.499.0 وقد نجا هنا:
+        // أُغلق المثالُ ولم يُغلق الصنف. والمصدرُ الواحد `deduct_types` هو نفسُه
+        // الذي يقرؤه `Workday::onLeave` — فالطاقةُ والحضورُ يقولان قولاً واحداً.
+        // («عمل عن بعد» و«إذن خروج» **لا** يُخصمان: صاحبُهما يعمل.)
+        //
+        // و`date_to` الفارغُ يُحتسب بـ`COALESCE` كما في حارسِ التداخل في
+        // `LeaveRequest` — صفوفٌ قديمةٌ بهذا الشكل واردةٌ ويعترف بها النموذجُ
+        // صراحةً، وكانت الطاقةُ وحدَها لا تدافع عنها.
         $leaves = \Illuminate\Support\Facades\DB::table('leave_requests')->whereNull('deleted_at')
             ->where('status', 'معتمد')->whereIn('emp_id', $empIds)
-            ->whereDate('date_from', '<=', $t->toDateString())
-            ->whereDate('date_to', '>=', $f->toDateString())
+            ->whereIn('type', (array) config('hub.leave.deduct_types', []))
+            ->whereRaw('DATE(COALESCE(date_from, date_to)) <= ?', [$t->toDateString()])
+            ->whereRaw('DATE(COALESCE(date_to, date_from)) >= ?', [$f->toDateString()])
             ->get(['emp_id', 'date_from', 'date_to']);
         $leaveDays = [];
         foreach ($leaves as $l) {
