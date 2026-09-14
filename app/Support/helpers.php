@@ -1337,6 +1337,25 @@ if (! function_exists('hub_expiry_self')) {
         $md = hub_mod('hr');
         if (! $md || empty($md['table'])) return [];
 
+        /*
+         * **مخبأٌ لازمٌ لا زينة:** شارةُ الرادارِ تُرسم في **كلِّ صفحة**، فاستعلامٌ
+         * غيرُ مخبّأٍ هنا يعني استعلاماً إضافيّاً لكلِّ طلبٍ في النظام. وقد أسقط
+         * ذلك فعلاً حارسَ عددِ الاستعلاماتِ في `SettingsSecretSweepTest` (٤٠ من ٤٠)
+         * — **والحارسُ كان محقّاً**. والمفتاحُ بالمستخدمِ لا بالدور (الصفوفُ تخصّه
+         * وحدَه)، وختمُ جدولِ الموظّفين يُبطله فورَ تجديدِ إقامةٍ لا بعد مهلة.
+         */
+        $ck = 'hub:expiry:self:' . $user->id . hub_data_stamp([(string) $md['table']]);
+
+        return \Illuminate\Support\Facades\Cache::remember($ck, 300, function () use ($md, $user) {
+            return hub_expiry_self_scan($md, $user);
+        });
+    }
+}
+
+if (! function_exists('hub_expiry_self_scan')) {
+    /** المسحُ الفعليُّ لصفوفِ صاحبِ الشأن — يُستدعى من خلفِ المخبأ */
+    function hub_expiry_self_scan(array $md, $user): array
+    {
         try {
             $emp = \Illuminate\Support\Facades\DB::table($md['table'])
                 ->whereNull('deleted_at')->where('user_id', $user->id)->first();
