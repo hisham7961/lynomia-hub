@@ -96,6 +96,36 @@ class ExecutionStats
     public const WAIT_SAMPLE_CAP = 500;
 
     /**
+     * **الكيانُ النشط في مبدّل الشريط العلوي** — قارئٌ واحدٌ لسؤالٍ واحد: «هل
+     * أنا تحت كيانٍ مختار، وما اسمُه؟» (الجولة ٣ · V7).
+     *
+     * بحرَسِ `hub_company_scope` نفسِه: اختيارٌ خارج شركات المستخدم المسموحة
+     * **يُتجاهَل** (دفاعٌ إضافيّ فوق العزل الصارم في `hub_scope`)، فلا يُعلَن
+     * اسمُ كيانٍ لا يملك القارئُ رؤيتَه. و`null` تعني «كلّ الشركات».
+     *
+     * تقرؤه اللوحاتُ لأمرين: أن تُصفّيَ فعلاً، أو أن **تُصرّح** بأنّ أرقامَها
+     * أرقامُ المجموعة (`partials._groupnums`) — وثالثةَ بينهما ليست صدقاً.
+     *
+     * @return array{id:string, name:string}|null
+     */
+    public static function activeCompany(): ?array
+    {
+        $cid = (string) session('hub.company', '');
+        if ($cid === '') return null;
+
+        $allowed = hub_company_ids();
+        if ($allowed !== null && ! in_array($cid, $allowed, true)) return null;
+
+        try {
+            $name = (string) (DB::table('companies')->where('id', $cid)->value('name_ar') ?: '');
+        } catch (\Throwable $e) {
+            $name = '';   // اسمٌ متعذّرُ القراءة لا يُلغي الحقيقة: الكيانُ مختار
+        }
+
+        return ['id' => $cid, 'name' => $name !== '' ? $name : 'الكيان المختار'];
+    }
+
+    /**
      * إسقاطُ المنشأة: عدّاداتُ التنفيذ كلُّها بتجميعٍ في القاعدة.
      * تُستدعى خلف `hub_monitor()` + `hub_org_analytics_guard()` — أرقامُها تجمع
      * عبر كل الشركات، فالحسابُ المعزول يُصَدّ في المتحكم قبل الوصول هنا.

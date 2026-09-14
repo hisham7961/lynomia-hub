@@ -294,14 +294,17 @@ class ControlController extends Controller
         }
 
         $tail = Audit::verifyTail();
+        // ثلاثُ حالاتٍ للذيل (الجولة ٣ · V5): «مكسورة» حكمٌ لا يُقال إلا على فحصٍ
+        // جرى فانكسر؛ وتعذُّرُ الفحص يُقال بنفسه تحذيراً — لا أخضرَ ولا اتّهام.
+        $state = Audit::chainState($tail);
 
         return [
             'label' => self::LABELS['audit'] . ' — نزاهةُ السلسلة', 'icon' => self::ICONS['audit'],
-            'value' => $tail['ok'] ? '—' : '⚠️ مكسورة',
+            'value' => ['ok' => '—', 'bad' => '⚠️ مكسورة', 'unknown' => '⚠️ غير متحقَّق'][$state],
             'result' => null,
             'tail_ok' => (bool) $tail['ok'],
-            'tone' => $tail['ok'] ? '' : 'bad',
-            'sub' => $tail['ok']
+            'tone' => ['ok' => '', 'bad' => 'bad', 'unknown' => 'wn'][$state],
+            'sub' => $state === 'ok'
                 ? 'لم يُشغَّل الفحصُ الكامل بعد — المعروضُ ذيلُ السلسلة: ' . $tail['label']
                 : (string) $tail['why'],
             'url' => $url,

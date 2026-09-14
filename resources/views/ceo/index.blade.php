@@ -12,10 +12,23 @@
     </div>
 </div>
 
+{{-- ═ الكيانُ المختار: ما يُصفّى يُصفّى، وما لا يُصفّى يُقال (الجولة ٣ · V7) ═
+     أرقامُ هذه اللوحة الأساسية (المالية والمشاريع والعملاء والموظفون والمهام)
+     تمرّ بـ`hub_company_scope` في المتحكّم. وهذه البطاقاتُ تُحسب في محرّكاتٍ
+     عامّةٍ لا تعرف المبدّلَ — فتُوسَم بوسمها الظاهر لا بحاشيةٍ خفيّة. --}}
+@php
+    $gnTag = $activeCo
+        ? '<span class="bdg wn" title="تُحسب على المنشأة كلِّها — لا تُصفّى على الكيان المختار">أرقام المجموعة</span>'
+        : '';
+@endphp
+@include('partials._groupnums', ['gnCo' => $activeCo,
+    'what' => 'بطاقاتُ طبقة القرار وصحّةُ الشركة والإيرادُ المتكرر',
+    'parts' => 'ينتظر قرارك · أين ينزف المال · تركّز الإيراد · المخاطر المفتوحة · تقرير صحة الشركة · الإيراد المتكرر (MRR/ARR)'])
+
 {{-- ═ طبقة القرار: قبل أي رقم — ما ينتظرني، وأين ينزف المال، وأين الخطر ═ --}}
 @if (count($awaiting) || count($gov))
 <div class="card" style="margin-bottom:12px">
-    <h3 class="cardtitle">🛎️ ينتظر قرارك</h3>
+    <h3 class="cardtitle">🛎️ ينتظر قرارك {!! $gnTag !!}</h3>
     <div class="kids">
         @foreach (array_merge($awaiting, $gov) as $a)
             <a class="card kid ceoact" href="{{ $a['url'] }}">
@@ -33,7 +46,7 @@
 
 @if (count($leaks))
 <div class="card" style="margin-bottom:12px">
-    <h3 class="cardtitle">🩸 أين ينزف المال</h3>
+    <h3 class="cardtitle">🩸 أين ينزف المال {!! $gnTag !!}</h3>
     <div class="sub" style="margin-bottom:8px">أرقامٌ بالعملة لا أعداد سجلات — لأن ما يُقاس بالمال يُقرَّر فيه.</div>
     <table class="mini">
         @foreach ($leaks as $l)
@@ -52,7 +65,7 @@
 <div class="grid2">
     @if ($conc)
     <div class="card kid">
-        <h3>🎯 تركّز الإيراد <span class="bdg {{ $conc['tone'] }}">{{ $conc['firstPct'] }}٪</span></h3>
+        <h3>🎯 تركّز الإيراد <span class="bdg {{ $conc['tone'] }}">{{ $conc['firstPct'] }}٪</span> {!! $gnTag !!}</h3>
         <div class="sub" style="margin-bottom:8px">{{ $conc['verdict'] }}</div>
         <table class="mini">
             @foreach ($conc['top'] as $c)
@@ -95,7 +108,7 @@
 
 @if (count($risks))
 <div class="card" style="margin-top:12px">
-    <h3 class="cardtitle">⚠️ مخاطر مفتوحة</h3>
+    <h3 class="cardtitle">⚠️ مخاطر مفتوحة {!! $gnTag !!}</h3>
     <table class="mini">
         @foreach ($risks as $r)
             <tr>
@@ -145,7 +158,8 @@
 @endif
 <div class="cards">
     <div class="stat"><span class="ico">📈</span><b>{{ number_format($mrr['mrr'], 0) }}</b>
-        <span>MRR — إيراد شهري متكرر{{ ($mrr['mixed'] ?? false) ? '' : ' (' . ($mrr['byCurrency'][0]['currency'] ?? setting('app.currency', 'د.ك')) . ')' }}</span></div>
+        <span>MRR — إيراد شهري متكرر{{ ($mrr['mixed'] ?? false) ? '' : ' (' . ($mrr['byCurrency'][0]['currency'] ?? setting('app.currency', 'د.ك')) . ')' }}
+            {!! $gnTag !!}</span></div>
     <div class="stat"><span class="ico">🎯</span><b>{{ number_format($pipe['pipeline'], 0) }}</b><span>مسار المبيعات المفتوح</span></div>
     <div class="stat"><span class="ico">⚖️</span><b>{{ number_format($pipe['weighted'], 0) }}</b><span>المرجّح باحتمال الإغلاق</span></div>
     @if ($pipe['winRate'] !== null)
@@ -183,7 +197,7 @@
 
 {{-- صحة الشركة --}}
 <div class="card">
-    <h3 style="margin-bottom:12px">🩺 تقرير صحة الشركة</h3>
+    <h3 style="margin-bottom:12px">🩺 تقرير صحة الشركة {!! $gnTag !!}</h3>
     @if (count($health))
         <div class="hgrid">
             @foreach ($health as $sec => $h)

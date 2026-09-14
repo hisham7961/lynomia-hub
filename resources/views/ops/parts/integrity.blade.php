@@ -33,6 +33,11 @@
                 · {{ $lastVerify->mode === 'manual' ? 'يدويّ' : 'آليّ' }}
                 · {{ number_format((int) $lastVerify->checked_rows) }} قيد
                 · <span class="mono ltr">{{ (int) $lastVerify->duration_ms }}ms</span>@if ($lastVerify->first_bad_id) · أول قيد متأثر <span class="mono ltr">#{{ $lastVerify->first_bad_id }}</span>@endif
+                {{-- ما الملاحظات؟ (الجولة ٣ · F9) — الوسمُ «سليمة بملاحظات» كان يُعرض
+                     هنا بلا تفصيل، والتفصيلُ مكتوبٌ في الصفّ نفسِه منذ v2.4xx --}}
+                @if ($lastVerify->message && $lastVerify->result !== 'ok')
+                    <div style="margin-top:4px">📝 {{ $lastVerify->message }}</div>
+                @endif
             @else
                 لم يُشغَّل الفحص الكامل بعد — يجري أسبوعياً آلياً، أو الآن بالزرّ أعلاه؛ وكلُّ تشغيلٍ يؤرَّخ.
             @endif

@@ -5,15 +5,19 @@
     'sub' => 'من فعل ماذا، بأي سجل، من أي عنوان — ومختومٌ ببصمةٍ متشابكة تكشف أي عبثٍ مباشر بالقاعدة'])
 
 <div class="cards" style="margin-bottom:12px">
-    <div class="kpi {{ $chain['ok'] ? '' : 'bad' }}">
+    {{-- ثلاثُ حالاتٍ لا حالتان (الجولة ٣ · V5): «عبث» تُهمةٌ لا تُقال إلا على فحصٍ
+         جرى فانكسر، و«سليمة» شهادةٌ لا تُقال إلا على فحصٍ جرى فسلِم — وبينهما
+         «غير متحقَّق» حين يتعذّر الفحصُ نفسُه. --}}
+    @php $chainState = \App\Support\Audit::chainState($chain); @endphp
+    <div class="kpi {{ ['ok' => '', 'bad' => 'bad', 'unknown' => 'wn'][$chainState] }}">
         <div class="lbl">🔗 سلامة السلسلة</div>
-        <div class="val" style="font-size:16px">{{ $chain['ok'] ? 'سلسلة سليمة' : '⚠️ عبث' }}</div>
-        <div class="sub">{{ $chain['ok'] ? $chain['label'] : $chain['why'] }}</div>
+        <div class="val" style="font-size:16px">{{ ['ok' => 'سلسلة سليمة', 'bad' => '⚠️ عبث', 'unknown' => '⚠️ غير متحقَّق'][$chainState] }}</div>
+        <div class="sub">{{ $chainState === 'ok' ? $chain['label'] : $chain['why'] }}</div>
     </div>
     {{-- (WP-5.5 · §1.6) آخرُ فحصٍ كامل من تاريخ audit_verifications — الصفحةُ تقرأ
          التاريخَ ولا تُشغّل الفحص: verifyTail (ذيلٌ محدود) وحده على التحميل --}}
     @php $lv = $verifs->first(); @endphp
-    <div class="kpi {{ $lv && $lv->result === 'fail' ? 'bad' : '' }}">
+    <div class="kpi {{ $lv ? (['fail' => 'bad', 'warn' => 'wn'][$lv->result] ?? '') : '' }}">
         <div class="lbl">🕰️ آخر فحص كامل للسلسلة</div>
         @if ($lv)
             <div class="val" style="font-size:16px">{{ ['ok' => '✅ سليمة', 'warn' => '⚠️ سليمة بملاحظات', 'fail' => '❌ فشل'][$lv->result] ?? $lv->result }}</div>
@@ -21,6 +25,13 @@
                 · {{ $lv->mode === 'manual' ? 'يدويّ' : 'آليّ' }}
                 · {{ number_format((int) $lv->checked_rows) }} قيد متحقق
                 · <span class="mono ltr">{{ (int) $lv->duration_ms }}ms</span>@if ($lv->first_bad_id) · أول قيد متأثر <span class="mono ltr">#{{ $lv->first_bad_id }}</span>@endif</div>
+            {{-- **حكمٌ مشروطٌ بلا تفسيرٍ أسوأُ من لا حكم** (الجولة ٣ · F9): كان
+                 «⚠️ سليمة بملاحظات» يُعرض هنا وما الملاحظاتُ إلا في صفٍّ مخزَّنٍ
+                 لا يُقرأ (جدولُ التاريخ لا يظهر إلا بفحصين فأكثر) — فيسأل
+                 المدقّقُ «ما هذه الملاحظات؟» ولا جوابَ في المنتج. --}}
+            @if ($lv->message && $lv->result !== 'ok')
+                <div class="sub" style="margin-top:4px">📝 {{ $lv->message }}</div>
+            @endif
         @else
             <div class="val" style="font-size:16px">لم يُشغَّل بعد</div>
             <div class="sub">يجري أسبوعياً آلياً، وفوراً من مركز التشغيل ⚙️ — وكلُّ تشغيلٍ يؤرَّخ هنا</div>
@@ -60,9 +71,9 @@
     </details>
 @endif
 
-@if (! $chain['ok'])
-    <div class="card" style="border-color:var(--bad);margin-bottom:12px">
-        <b>⚠️ سلسلة التدقيق مكسورة:</b> {{ $chain['why'] }}
+@if ($chainState !== 'ok')
+    <div class="card" style="border-color:var({{ $chainState === 'bad' ? '--bad' : '--wn, #E0A82E' }});margin-bottom:12px">
+        <b>{{ $chainState === 'bad' ? '⚠️ سلسلة التدقيق مكسورة:' : '⚠️ لم يُتحقَّق من سلسلة التدقيق:' }}</b> {{ $chain['why'] }}
         {{-- كان الإرشادُ سطرَ طرفيةٍ لا يملكها صاحبُ استضافةٍ مشتركة — فالفاحصُ
              الوحيدُ لهذا الضمان لا يُشغَّل أبداً. الآن زرٌّ في مركز التشغيل. --}}
         <div class="sub" style="margin-top:6px">الشاشة تفحص الذيل فقط لأن فحص الجدول كاملاً لا يُحتمل مع كل فتحة —
