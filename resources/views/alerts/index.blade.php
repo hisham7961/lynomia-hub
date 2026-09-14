@@ -27,6 +27,6 @@
     @endif
 @endforeach
 @if (! $late->count() && ! $week->count() && ! $month->count())
-    <div class="card"><div class="empty"><span class="big">😌</span>لا شيء ينتهي خلال ٣٠ يوماً — كل أصولك بأمان</div></div>
+    <div class="card"><div class="empty"><span class="big">😌</span>لا شيء ينتهي خلال ٣٠ يوماً فيما تراه صلاحيّتُك</div></div>
 @endif
 @endsection

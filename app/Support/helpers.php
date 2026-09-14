@@ -1241,6 +1241,49 @@ if (! function_exists('hub_build_children_map')) {
     }
 }
 
+if (! function_exists('hub_backup_artifacts')) {
+    /**
+     * **السلطةُ الواحدةُ على «هل ثمّة ما يُستعاد؟»** (مجلس الخبراء · ت-٣).
+     *
+     * كان لهذا السؤالِ قارئان: `SecurityPosture::backupFresh()` يسأل نبضةَ
+     * `heartbeat.backup` (**ختمَ زمن**)، و`OpsController::backupsPanel()` يعدّ
+     * **الملفّاتِ** على القرص. فقال الأوّلُ «✅ حداثةُ النسخة» بينما المجلّدُ
+     * فارغٌ تماماً — **والمهمّةُ كانت قد عملت فعلاً**، ولهذا كانت العلامةُ
+     * الخضراءُ مكتسَبةً بنبضةٍ ومكذوبةً بالقرص. ولو لم تعمل قطّ لحذّرت الشاشةُ
+     * بحقّ.
+     *
+     * والمنتجُ يعرف هذا الصنفَ ويحرسه في **الكاتب** (تعليقُ v2.312 في
+     * `HubBackup`: «فتُعطَّل قدرةُ التعافي كلها بصمت، **والمشغّل يقرأ ✓
+     * ويطمئن**») ولم يحرسه في **القارئ**. فهذه الدالّةُ هي القارئُ الواحد.
+     *
+     * @return array{count:int,bytes:int,latest:?string,at:?int}
+     */
+    function hub_backup_artifacts(): array
+    {
+        $out = ['count' => 0, 'bytes' => 0, 'latest' => null, 'at' => null];
+        try {
+            $files = array_merge(
+                glob(storage_path('app/backups/hub-*.json')) ?: [],
+                glob(storage_path('app/backups/hub-*.json.enc')) ?: []
+            );
+            foreach ($files as $f) {
+                $out['count']++;
+                $out['bytes'] += (int) @filesize($f);
+                $m = (int) @filemtime($f);
+                // الأحدثُ زمناً، والاسمُ فاصلَ تعادلٍ — لا قرعةَ بين ملفّين بلحظةٍ واحدة
+                if ($out['at'] === null || [$m, basename($f)] > [$out['at'], (string) $out['latest']]) {
+                    $out['at'] = $m;
+                    $out['latest'] = basename($f);
+                }
+            }
+        } catch (\Throwable $e) {
+            // §25: تخزينٌ متعثّر لا يُسقط الشاشة — ويُقرأ «لا أثر» وهو الأسلم
+        }
+
+        return $out;
+    }
+}
+
 if (! function_exists('hub_expiry_fields')) {
     /**
      * حقول التواريخ المصيرية عبر كل الوحدات (انتهاء/تجديد/استحقاق).
@@ -1271,11 +1314,72 @@ if (! function_exists('hub_expiry_fields')) {
     }
 }
 
+if (! function_exists('hub_expiry_self')) {
+    /**
+     * **استثناءُ صاحبِ الشأن** (مجلس الخبراء · PROD-05).
+     *
+     * الرادارُ منطَّقٌ بصلاحيّةِ الوحدة، فكان **من تنتهي إقامتُه هو الشخصَ
+     * الوحيدَ الممنوعَ من إنذارِ نفسِه**: موظّفةٌ بلا `hr:v` — ولا ينبغي أن
+     * تملكه، فملفّاتُ زملائها ليست لها — تقرأ في `/me` «٥ يوم — انتهاء
+     * الإقامة» وتقرأ في `/alerts` «😌 كل أصولك بأمان».
+     *
+     * **وإقامتُها ليست سرّاً عنها.** فتُقرأ هنا حقولُ انتهاءِ **سجلِّه هو**
+     * وحدَه — المرتبطِ بحسابِه عبر `employees.user_id`.
+     *
+     * **ولا صلاحيّةَ تُوسَّع:** لا يفتح هذا ملفَّ زميلٍ واحد، ولا يمنح `hr:v`،
+     * ولا يمسّ أيَّ وحدةٍ أخرى.
+     */
+    function hub_expiry_self($user = null): array
+    {
+        $user = $user ?? auth()->user();
+        if (! $user) return [];
+
+        $md = hub_mod('hr');
+        if (! $md || empty($md['table'])) return [];
+
+        try {
+            $emp = \Illuminate\Support\Facades\DB::table($md['table'])
+                ->whereNull('deleted_at')->where('user_id', $user->id)->first();
+            if (! $emp) return [];   // حسابُ إدارةٍ أو مالكٍ بلا ملفِّ موظّف
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $disp = hub_display_col('hr');
+        $out = [];
+        foreach (hub_expiry_fields() as [$mk, $f]) {
+            if ($mk !== 'hr') continue;
+            $col = $f['col'] ?? '';
+            $raw = $col !== '' ? ($emp->{$col} ?? null) : null;
+            if (! $raw) continue;
+
+            $d = substr((string) $raw, 0, 10);
+            try {
+                $days = (int) now()->startOfDay()
+                    ->diffInDays(\Illuminate\Support\Carbon::parse($d)->startOfDay(), false);
+            } catch (\Throwable $e) { continue; }
+            if ($days > 30 || $days < -60) continue;   // النافذةُ نفسُها التي يستعملها الرادار
+
+            $out[] = [
+                'module' => 'hr', 'mlabel' => (string) ($md['label'] ?? 'ملفات الموظفين'),
+                'flabel' => (string) ($f['label'] ?? ''), 'fkey' => (string) ($f['key'] ?? ''),
+                'id' => (string) $emp->id, 'name' => (string) ($emp->{$disp} ?? $user->name),
+                'date' => $d, 'days' => $days, 'self' => true,
+            ];
+        }
+
+        return $out;
+    }
+}
+
 if (! function_exists('hub_expiry')) {
     /** رادار الانتهاءات: كل ما ينتهي خلال 30 يوماً أو انتهى فعلاً — مخبأ، ومحدود بنطاق المستخدم */
     function hub_expiry(bool $fresh = false, $user = null): array
     {
         $user   = $user ?? auth()->user();
+        // **صفوفُ صاحبِ الشأنِ تُضمّ بعد التنطيق** (PROD-05) — تُحسب خارجَ المخبأ
+        // لأنّها تخصّ مستخدماً بعينِه لا دوراً، ويُمنع تكرارُ ما رآه بالنطاق أصلاً
+        $mine   = hub_expiry_self($user);
         // مقيد = نطاق مشاريع أو عزل شركات **أو عزل عملاء** — مخبأ خاص به كي لا تتسرب
         // أسماء أجنبية عبر المخبأ المشترك. كان عزلُ العميل غائباً عن هذا الشرط: مستخدمٌ
         // محصورٌ بعميلٍ (hub_client_ids) وحده كان يُرى `$scoped=false` فلا يُطبَّق
@@ -1295,7 +1399,7 @@ if (! function_exists('hub_expiry')) {
                 . ':g' . $gen . hub_data_stamp($tables);
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
-        return \Illuminate\Support\Facades\Cache::remember($key, $scoped ? 300 : 600, function () use ($scoped, $user) {
+        $scan = \Illuminate\Support\Facades\Cache::remember($key, $scoped ? 300 : 600, function () use ($scoped, $user) {
             $today = now()->toDateString();
             $limit = now()->addDays(30)->toDateString();
             // عتبة التنبيه لكل سجل: حقول «تنبيه قبل (يوم)» كانت تُعرض ولا تُقرأ —
@@ -1374,6 +1478,26 @@ if (! function_exists('hub_expiry')) {
             usort($items, fn ($a, $b) => $a['days'] <=> $b['days']);
             return array_slice($items, 0, 200);
         });
+
+        /*
+         * **ضمُّ صفوفِ صاحبِ الشأن** (PROD-05) بعد المسحِ المنطَّق، مع منعِ
+         * التكرار: من يملك `hr:v` رآها في المسحِ أصلاً، فلا تُعرض مرّتين.
+         * والمفتاحُ `الوحدة|السجلّ|الحقل` — لا `id` وحدَه، فللسجلِّ الواحدِ
+         * حقولُ انتهاءٍ عدّة (إقامةٌ وجوازٌ ونهايةُ خدمة).
+         */
+        if ($mine) {
+            $seen = [];
+            foreach ($scan as $r) {
+                $seen[($r['module'] ?? '') . '|' . ($r['id'] ?? '') . '|' . ($r['fkey'] ?? '')] = true;
+            }
+            foreach ($mine as $r) {
+                if (isset($seen[$r['module'] . '|' . $r['id'] . '|' . $r['fkey']])) continue;
+                $scan[] = $r;
+            }
+            usort($scan, fn ($a, $b) => $a['days'] <=> $b['days']);
+        }
+
+        return $scan;
     }
 }
 
@@ -6175,8 +6299,17 @@ if (! function_exists('hub_admin_links')) {
                 'الجوال mobile app-config الروابط العميقة الجلسات الأجهزة الدفع push OpenAPI'),
 
             // ٣) الجودة والحوكمة — قواعدُ البيانات وشكلُها ومساراتُها
+            /*
+             * **الرابطُ يقرأ شرطَ حارسِه** (مجلس الخبراء · P-16): كان هنا `$owner`
+             * وحدَه بينما `QualityController::tabGate()` يفتح التبويبَ الافتراضيَّ
+             * لـ`hub_monitor_group('opsAnalytics')` أيضاً — فكانت الشاشةُ **مفتوحةً
+             * لحاملِ الرايةِ ومخفيّةً عنه معاً**: المانحُ لا يعلم أنّه منح، وحاملُها
+             * لا يعلم أنّه يملك، وفيها زرُّ «أعد الحساب» أي فعلٌ لا قراءة.
+             * وتبويباتُ المالكِ محروسةٌ داخلَ الصفحةِ بـ`visibleTabs()` فلا يرى
+             * حاملُ الرايةِ ما ليس له. **إضافةُ رؤيةٍ لا توسيعُ صلاحيّة.**
+             */
             $mk('quality', 'الجودة', '🧹', 'quality.index', [], 'الجودة والحوكمة',
-                $owner, ['quality.*'], 'جودة البيانات التكرار'),
+                $owner || hub_monitor_group('opsAnalytics', $user), ['quality.*'], 'جودة البيانات التكرار'),
             $mk('fields', 'الحقول', '🧩', 'fields.index', [], 'الجودة والحوكمة',
                 $owner, ['fields.*'], 'باني الحقول'),
             $mk('flows', 'المسارات', '🪄', 'flows.index', [], 'الجودة والحوكمة',

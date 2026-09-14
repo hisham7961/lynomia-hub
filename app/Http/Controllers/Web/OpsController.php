@@ -188,6 +188,13 @@ class OpsController extends Controller
     {
         $out = ['files' => [], 'latest' => null, 'total' => 0, 'runs' => [], 'failed_runs' => 0];
         try {
+            /*
+             * **القارئُ نفسُه الذي يقرؤه مركزُ الأمان** (مجلس الخبراء · ت-٣):
+             * `hub_backup_artifacts()` هي السلطةُ على «هل ثمّة ما يُستعاد؟».
+             * وهذه اللوحةُ تحتاج تفصيلاً أوسعَ (اسمٌ وحجمٌ وتشفيرٌ لكلِّ ملفّ)
+             * فتبني تفصيلَها من المسارِ عينِه — **والعدُّ يبقى واحداً**، فلا
+             * يعود ممكناً أن يقول أحدُهما «صفر» ويقول الآخرُ «سليم».
+             */
             $files = [];
             foreach (array_merge(glob(storage_path('app/backups/hub-*.json')) ?: [],
                                  glob(storage_path('app/backups/hub-*.json.enc')) ?: []) as $f) {
@@ -197,6 +204,8 @@ class OpsController extends Controller
             // الأحدثُ زمنياً أولاً والاسمُ فاصلَ تعادل — لا قرعةَ ترتيبٍ بين ملفين بلحظةٍ واحدة
             usort($files, fn ($a, $b) => [$b['mtime'], $b['name']] <=> [$a['mtime'], $a['name']]);
             $out['total'] = count($files);
+            // حزامُ اتّساق: العدُّ هنا هو عدُّ السلطةِ الواحدةِ نفسِه، وإلّا عاد التناقض
+            $out['total'] = hub_backup_artifacts()['count'];
             $out['latest'] = $files[0] ?? null;
             $out['files'] = array_slice($files, 0, 10);   // «أحدث ١٠» صراحةً — والباقي على القرص
         } catch (\Throwable $e) {
