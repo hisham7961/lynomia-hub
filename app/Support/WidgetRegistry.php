@@ -148,8 +148,11 @@ class WidgetRegistry
                 'label' => '🔔 ينتهي قريباً',
                 'size'  => ['w' => 6, 'h' => 2],
                 'gate'  => fn ($u) => true,
-                'resolver' => fn ($u) => collect(hub_expiry())
-                    ->filter(fn ($i) => hub_can($u, $i['module'], 'v'))->take(5)->values(),
+                // **الترشيحُ عند السلطةِ الواحدة** (PROD-05): كان هنا ترشيحٌ ثانٍ
+                // بـ`hub_can` فوق ما يرجع من `hub_expiry()` — زائدٌ يومَ كُتب، ثمّ صار
+                // يُسقط صفَّ صاحبِ الشأنِ الذي تُرجعه السلطةُ قصداً بلا `hub_can`.
+                // والمستخدمُ يُمرَّر صراحةً الآن فلا يُعتمد على سياقٍ ضمنيّ.
+                'resolver' => fn ($u) => collect(hub_expiry(false, $u))->take(5)->values(),
             ],
 
             'apps' => [

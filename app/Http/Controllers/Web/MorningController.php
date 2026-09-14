@@ -109,7 +109,7 @@ class MorningController extends Controller
                 's' => trim(($e['mlabel'] ?? '') . ' · ' . ($e['flabel'] ?? '') . ' ' . ($e['date'] ?? '')
                        . (isset($e['days']) ? ($e['days'] < 0 ? ' (انتهى منذ ' . abs($e['days']) . ' يوماً)'
                                                               : ' (بعد ' . $e['days'] . ' يوماً)') : ''), ' ·'),
-                'u' => isset($e['module'], $e['id']) ? route('m.show', [$e['module'], $e['id']]) : null,
+                'u' => isset($e['module'], $e['id']) ? hub_expiry_url($e) : null,
                 'tone' => (($e['days'] ?? 99) < 0) ? 'bad' : 'wn']);
         $add('⏳', 'ينتهي قريباً', 'رخص ودومينات وشهادات على وشك الانتهاء', $exp, route('alerts'));
 

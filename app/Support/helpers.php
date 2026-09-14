@@ -1391,6 +1391,26 @@ if (! function_exists('hub_expiry_self_scan')) {
     }
 }
 
+if (! function_exists('hub_expiry_url')) {
+    /**
+     * **وجهةُ صفٍّ في رادارِ الانتهاءات — تعريفٌ واحدٌ يقرؤه كلُّ عارض.**
+     *
+     * كان كلُّ عارضٍ يبني `route('m.show', [module, id])` بنفسِه — خمسةُ مواضع.
+     * وما دامت صفوفُ الرادارِ كلُّها قد مرّت بـ`hub_can($u, $module, 'v')` كان
+     * ذلك صحيحاً. ثمّ دخل **صفُّ صاحبِ الشأن** (PROD-05): يُعرَض لمن لا يملك
+     * `hr:v` قصداً — فرابطٌ إلى `m.show` يردّه **403**. فتُنذِره الشاشةُ ثمّ
+     * تُغلق في وجهِه البابَ الذي دلّته عليه.
+     *
+     * وملفُّه هو مفتوحٌ له في `/me` — فهناك تذهب وجهتُه.
+     */
+    function hub_expiry_url(array $i): string
+    {
+        if (! empty($i['self'])) return route('portal.me');
+
+        return route('m.show', [$i['module'], $i['id']]);
+    }
+}
+
 if (! function_exists('hub_expiry')) {
     /** رادار الانتهاءات: كل ما ينتهي خلال 30 يوماً أو انتهى فعلاً — مخبأ، ومحدود بنطاق المستخدم */
     function hub_expiry(bool $fresh = false, $user = null): array
@@ -4458,7 +4478,7 @@ if (! function_exists('hub_recommendations')) {
                 foreach ($soon as $i) {
                     $add($i['days'] < 0 ? 'حرج' : 'مهم', '⏳', 'ينتهي قريباً: ' . $i['name'],
                         $i['mlabel'] . ' · ' . $i['flabel'] . ' — ' . ($i['days'] < 0 ? 'متأخر' : ($i['days'] === 0 ? 'اليوم' : 'خلال ' . $i['days'] . ' يوم')) . '.',
-                        route('m.show', [$i['module'], $i['id']]), 'افتح السجل',
+                        hub_expiry_url($i), 'افتح السجل',
                         // المفتاح يحمل مميّزَ الحقل/الوثيقة (fkey) فلا تتصادم إشارتا انتهاءٍ
                         // على السجل نفسِه على حالةٍ واحدة (كان module:id وحدهما يُدمجانهما).
                         'expiry:' . $i['module'] . ':' . $i['id'] . ':' . ($i['fkey'] ?? ($i['flabel'] ?? '')),

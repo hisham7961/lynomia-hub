@@ -14,7 +14,7 @@
             <tbody>
             @foreach ($set as $i)
                 <tr>
-                    <td><a href="{{ route('m.show', [$i['module'], $i['id']]) }}"><b>{{ \Illuminate\Support\Str::limit($i['name'], 40) }}</b></a></td>
+                    <td><a href="{{ hub_expiry_url($i) }}"><b>{{ \Illuminate\Support\Str::limit($i['name'], 40) }}</b></a></td>
                     <td>{{ $i['mlabel'] }}</td>
                     <td class="sub">{{ $i['flabel'] }}</td>
                     <td class="mono">{{ $i['date'] }}</td>
