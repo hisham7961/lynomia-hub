@@ -13,7 +13,10 @@ class SalesController extends Controller
 {
     public function dashboard()
     {
-        abort_unless(hub_is_owner() || hub_monitor_group('finAnalytics'), 403, 'لوحةُ المبيعات للمالكين وحاملي المراقبة');
+        // الرايةُ تُسمّى باسمِها في شاشةِ الأدوار لا بوصفٍ عامّ (الخاتمة · X5)
+        abort_unless(hub_is_owner() || hub_monitor_group('finAnalytics'), 403,
+            'لوحةُ المبيعات للمالكين ولمن يحمل راية «لوحاتُ الماليّةِ والتكاليف» '
+            . '(أو رايةَ المراقبة الشاملة) — تُمنح من شاشة الأدوار، قسم الرايات.');
         $internal = hub_field_mode(auth()->user(), 'quotes', 'cost') !== 'hide';
 
         return view('sales.dashboard', ['d' => SalesBoard::data(), 'internal' => $internal]);

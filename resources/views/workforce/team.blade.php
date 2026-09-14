@@ -95,6 +95,8 @@
             @php $a = $r['att']; $c = $r['comp'];
                 $effTone = match ($c['effective']) {
                     'present' => 'ok', 'leave' => 'ac', 'absent_due_to_missing_report' => 'bad',
+                    // نغمةُ «مأذون» هي نغمةُ الإجازةِ نفسُها (ac) — فالعينُ تقرأ في
+                    // الجدولِ ما قرأته في النداءِ أعلاه، لا حكماً ثالثاً
                     'non_compliant' => 'wn', 'absent' => 'bad', 'excused' => 'ac', default => '' };
                 $repTone = match ($c['compliance']) {
                     'compliant' => 'ok', 'late' => 'wn', 'missing' => 'bad',

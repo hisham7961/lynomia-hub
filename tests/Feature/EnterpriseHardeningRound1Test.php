@@ -147,19 +147,26 @@ class EnterpriseHardeningRound1Test extends TestCase
     /** AUTHZ-04: القوائمُ المنسدلة منطَّقة في كل موضع — نموذجُ الوحدة، مركزُ الهوية، بطاقةُ العهدة، الحقولُ المخصّصة */
     public function test_dropdowns_are_scoped_everywhere(): void
     {
-        $a = Client::create(['name' => 'عميل ألف ZZA']);
-        $b = Client::create(['name' => 'عميل باء ZZB']);
+        // **العلامةُ تحمل شرطةً عمداً** (الخاتمة): كانت «ZZA/ZZB» ثلاثةَ أحرفٍ
+        // أبجديّةٍ رقميّة، والصفحةُ تحمل رموزَ CSRF عشوائيّةً بطولِ أربعين حرفاً من
+        // المجموعةِ نفسِها — فاحتمالُ ظهورِ «ZZB» داخلَ رمزٍ عشوائيٍّ ≈ ١٠⁻⁴ لكلِّ
+        // تشغيل. وقد وقع فعلاً: سقطت الحزمةُ مرّةً واخضرّت في التشغيلِ التالي بلا
+        // تغييرٍ في الشيفرة. والشرطةُ لا ترد في رموزِ Laravel العشوائيّة إطلاقاً،
+        // **فالتأكيدُ صار أدقَّ لا أضعف**: يمنع الإنذارَ الكاذبَ ولا يخفّف الضمانَ
+        // الأمنيَّ قيدَ أنملة.
+        $a = Client::create(['name' => 'عميل ألف ZZ-OWN-CLIENT']);
+        $b = Client::create(['name' => 'عميل باء ZZ-FOREIGN-CLIENT']);
         $u = $this->userWith(['clients' => [$a->id]]);
         $html = $this->actingAs($u)->get('/m/tickets/create')->assertOk()->getContent();
-        $this->assertStringContainsString('ZZA', $html);
-        $this->assertStringNotContainsString('ZZB', $html, 'نموذجُ الإنشاء يسرّب أسماءَ عملاءَ أجانب');
+        $this->assertStringContainsString('ZZ-OWN-CLIENT', $html);
+        $this->assertStringNotContainsString('ZZ-FOREIGN-CLIENT', $html, 'نموذجُ الإنشاء يسرّب أسماءَ عملاءَ أجانب');
 
-        $ca = Company::create(['name_ar' => 'شركة ألف QQA']);
-        $cb = Company::create(['name_ar' => 'شركة باء QQB']);
+        $ca = Company::create(['name_ar' => 'شركة ألف QQ-OWN-CO']);
+        $cb = Company::create(['name_ar' => 'شركة باء QQ-FOREIGN-CO']);
         $uc = $this->userWith(['companies' => [$ca->id]]);
         $html = $this->actingAs($uc)->get('/identity')->assertOk()->getContent();
-        $this->assertStringContainsString('QQA', $html);
-        $this->assertStringNotContainsString('QQB', $html, 'مركزُ الهوية يسرّب شركاتٍ أجنبية');
+        $this->assertStringContainsString('QQ-OWN-CO', $html);
+        $this->assertStringNotContainsString('QQ-FOREIGN-CO', $html, 'مركزُ الهوية يسرّب شركاتٍ أجنبية');
 
         $up = $this->userWith([], 'proj');
         $p1 = Project::create(['name' => 'مشروعي PPA', 'manager_id' => $up->id]);

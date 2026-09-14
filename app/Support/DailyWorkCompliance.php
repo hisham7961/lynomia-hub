@@ -473,7 +473,8 @@ class DailyWorkCompliance
         if ($finalized) {
             $effective = $lockedOutcome;
         } else {
-            $effective = self::deriveEffective($state, $onLeave, $checkedIn, $reportSubmitted, $policy);
+            $effective = self::deriveEffective($state, $onLeave, $checkedIn, $reportSubmitted, $policy,
+                $excuse !== null);
         }
 
         return [
@@ -550,9 +551,14 @@ class DailyWorkCompliance
      * «حضورٌ بلا تقرير» وحدَه (§7/§12).
      */
     protected static function deriveEffective(
-        string $state, bool $onLeave, bool $checkedIn, bool $reportSubmitted, string $policy
+        string $state, bool $onLeave, bool $checkedIn, bool $reportSubmitted, string $policy,
+        bool $excused = false
     ): string {
         if ($onLeave) return 'leave';
+        // **العذرُ المعتمَدُ يسبق حكمَ الغياب** (الخاتمة · X1ب): هذا العمودُ هو ما
+        // يُصدَّر وما تُبنى عليه المحاسبةُ الشهريّة، فبقاؤه «غائباً» كان يُرسل
+        // المأذونَ غائباً إلى الرواتب — وهو الضررُ الذي جاء الإصلاحُ ليمنعه.
+        if ($excused && ! $checkedIn) return 'excused';
         if (! $checkedIn) return 'absent';                             // فيزيائيّاً غائب (وإن قدّم تقريراً — §45)
 
         if ($state === self::PRESENT_WITHOUT_REPORT) {
@@ -681,7 +687,9 @@ class DailyWorkCompliance
             'absent' => 'غائب',
             'absent_due_to_missing_report' => 'غياب بسبب عدم تقديم التقرير',
             'non_compliant' => 'غيرُ ممتثل',
-            'excused' => 'معذور',
+            // مفردةٌ واحدةٌ للحالةِ الواحدة: النداءُ يقول «مأذون» فلا يقول الجدولُ
+            // «معذور» — لفظان لحالةٍ واحدةٍ عيبٌ عرفه هذا المستودعُ من قبل (v2.165)
+            'excused' => 'مأذون',
             default => $effective,
         };
         $comp = match ($compliance) {
