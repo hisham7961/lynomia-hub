@@ -33,10 +33,22 @@ trait Searchable
             ->unique()
             ->values();
 
-        return $q->where(function (Builder $qq) use ($cols, $t) {
+        // **والعربيةُ تُطبَّع قبل المقارنة**: `LIKE` تقارن الحرفَ بالحرف، فمشروعُ
+        // «بوّابة الخليج» المخزَّنُ بالشدّةِ لا يجده من كتب «بوابة الخليج» — وهو ما
+        // يكتبه كلُّ أحد. ولا رسالةَ تُفسّر، بل «لا نتائج» على سجلٍّ قائم. يُطبَّع
+        // الطرفان بالجدولِ نفسِه الذي يقرؤه `hub_ar_norm` (مصدرٌ واحدٌ لا اثنان).
+        $norm = hub_has_arabic($term) ? hub_ar_norm(trim($term)) : null;
+        $tn = $norm !== null
+            ? '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $norm) . '%'
+            : null;
+
+        return $q->where(function (Builder $qq) use ($cols, $t, $tn) {
             foreach ($cols as $c) {
                 // اسم العمود من سجل الوحدات لا من المستخدم — والقيمة مربوطة
                 $qq->orWhereRaw("`{$c}` LIKE ? ESCAPE '!'", [$t]);
+                if ($tn !== null) {
+                    $qq->orWhereRaw(hub_ar_norm_sql("`{$c}`") . " LIKE ? ESCAPE '!'", [$tn]);
+                }
             }
         });
     }

@@ -25,6 +25,9 @@
     @endif
     <div class="stat"><span class="ico">🏝️</span><b>{{ number_format($n['leave'] ?? 0) }}</b><span>في إجازة</span></div>
     @if (isset($roll))
+        @if (($roll['n']['excused'] ?? 0) > 0)
+            <div class="stat"><span class="ico">🪪</span><b>{{ number_format($roll['n']['excused']) }}</b><span>مأذون</span></div>
+        @endif
         <div class="stat"><span class="ico">❌</span><b>{{ number_format($roll['n']['absent']) }}</b><span>غائب بلا عذر</span></div>
     @endif
     <div class="stat"><span class="ico">⏱️</span><b>{{ number_format($n['hours'] ?? 0, 1) }}</b><span>ساعة مسجَّلة</span></div>
@@ -54,6 +57,10 @@
             'present' => ['✅ حاضر', 'ok'],
             'late' => ['🕘 متأخر', 'wn'],
             'leave' => ['🏝️ في إجازة', 'ac'],
+            // مأذون: عذرٌ **معتمَدٌ** ليس إجازةَ خصم («إذن خروج»/«عمل عن بعد»).
+            // كان صاحبُه يسقط في «غائبٌ بلا عذر» لأنّ لا فئةَ له — فكان اعتمادُ
+            // الطلبِ يسوء بحاله: المعلَّقُ «بانتظار قرار» والمعتمَدُ «بلا عذر» (X1)
+            'excused' => ['🪪 مأذون', 'ac'],
             // بانتظارِ قرار: طلبُ إذنٍ/إجازةٍ لم يُبتّ بعد — ليس غياباً بلا عذر (G12)
             'pending' => ['⏳ بانتظار قرار', 'wn'],
             // لم يختم بعدُ والدوامُ في أوّله — تظهر قبل بدء الدوام وحدَها
@@ -61,7 +68,7 @@
             'absent' => ['❌ غائب بلا عذر', 'bad'],
             'noreport' => ['📝 حاضر بلا تقرير', 'wn'],
         ], fn ($v, $k) => isset($roll['buckets'][$k])
-            && (count($roll['buckets'][$k]) || ! in_array($k, ['pending', 'not_yet'], true)),
+            && (count($roll['buckets'][$k]) || ! in_array($k, ['pending', 'not_yet', 'excused'], true)),
             ARRAY_FILTER_USE_BOTH) as $k => [$label, $tone])
             <div style="flex:1;min-width:170px">
                 <div><span class="bdg {{ $tone }}">{{ $label }}</span> <b>{{ count($roll['buckets'][$k]) }}</b></div>

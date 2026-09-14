@@ -62,6 +62,89 @@ class DailyWorkCompliance
             (array) config('hub.leave.deduct_types', []), ['إذن خروج', 'عمل عن بعد'])));
     }
 
+    /**
+     * **الأعذارُ التي ليست إجازةَ خصم** — «إذن خروج» و«عمل عن بعد» وما يُضاف بعدَهما.
+     *
+     * وهذا الفرقُ هو مَحلُّ العطل: `on_leave` يقرأ `deduct_types` وحدَها (سؤالُ
+     * **رصيدٍ ورواتب**)، فمن عذرُه من هذين النوعين لا يُعدّ في إجازةٍ — ثمّ يسقط
+     * في «غائبٌ بلا عذر» لأنّ لا فئةَ ثالثةَ له. والطلبُ **قيدَ القرار** كان أرحمَ
+     * حالاً من المعتمَد (G12 تُنصفه) — فكان الاعتمادُ عقوبة.
+     */
+    public static function nonLeaveExcuseTypes(): array
+    {
+        return array_values(array_diff(self::excuseTypes(), (array) config('hub.leave.deduct_types', [])));
+    }
+
+    /**
+     * خريطةُ الأعذارِ المعتمَدةِ غيرِ الخصميّة لمجموعةِ موظّفين — استعلامٌ واحدٌ لا N+1.
+     * تُعيد `[emp_id => نوعُ العذر]`. و`date_to` الفارغُ عذرٌ مفتوحُ النهاية.
+     */
+    public static function excusedMap(array $empIds, string $from, ?string $to = null): array
+    {
+        $to = $to ?: $from;
+        $types = self::nonLeaveExcuseTypes();
+        if (! $empIds || ! $types || ! \Illuminate\Support\Facades\Schema::hasTable('leave_requests')) return [];
+
+        $out = [];
+        $rows = \App\Models\LeaveRequest::whereNull('deleted_at')->whereIn('emp_id', $empIds)
+            ->where('status', 'معتمد')->whereIn('type', $types)
+            ->whereDate('date_from', '<=', $to)
+            ->where(fn ($q) => $q->whereDate('date_to', '>=', $from)->orWhereNull('date_to'))
+            ->orderBy('id')->get(['emp_id', 'type', 'date_from', 'date_to']);
+        foreach ($rows as $r) {
+            $out[$r->emp_id][] = ['type' => (string) $r->type,
+                'from' => self::dstr($r->date_from), 'to' => $r->date_to ? self::dstr($r->date_to) : null];
+        }
+
+        return $out;
+    }
+
+    /** نوعُ العذرِ المعتمَدِ غيرِ الخصميِّ لموظّفٍ في يومٍ بعينه — أو `null` */
+    public static function excuseFor($empId, string $date, ?array $map = null): ?string
+    {
+        $rows = $map !== null ? ($map[$empId] ?? []) : (self::excusedMap([$empId], $date)[$empId] ?? []);
+        foreach ($rows as $r) {
+            if ($r['from'] <= $date && ($r['to'] === null || $r['to'] >= $date)) return $r['type'];
+        }
+
+        return null;
+    }
+
+    /**
+     * **المسنَدُ الواحدُ لسؤالِ «من ليس على رأسِ عملِه اليومَ ولماذا؟»** تقرؤه لوحةُ
+     * المالكِ بدل استعلامِها الخاصّ (`status LIKE '%معتمد%'` بلا تصفيةِ نوعٍ أصلاً —
+     * فكان طلبُ «سلفة» أو «شهادة راتب» معتمدٌ يضع صاحبَه «في إجازةِ اليوم»).
+     *
+     * تُعيد صفوفاً `[name, type, to, kind]` حيث `kind` إمّا `leave` (إجازةُ خصم)
+     * أو `excused` (عذرٌ غيرُ خصميّ) — فيقرأ المالكُ التمييزَ ولا يفقد أحداً.
+     */
+    public static function onLeaveToday(?string $date = null, $companyId = null): Collection
+    {
+        $date = $date ?: BusinessDate::today();
+        if (! \Illuminate\Support\Facades\Schema::hasTable('leave_requests')) return collect();
+
+        $deduct = (array) config('hub.leave.deduct_types', []);
+
+        return \App\Models\LeaveRequest::query()->whereNull('leave_requests.deleted_at')
+            ->where('leave_requests.status', 'معتمد')
+            ->whereIn('leave_requests.type', self::excuseTypes())
+            ->whereDate('leave_requests.date_from', '<=', $date)
+            ->where(fn ($q) => $q->whereDate('leave_requests.date_to', '>=', $date)
+                ->orWhereNull('leave_requests.date_to'))
+            // العمودُ مؤهَّلٌ لأنّ الجدولين يحملان `company_id` — وغيرُ المؤهَّلِ
+            // يرمي «ambiguous column» على المحرّكين
+            ->join('employees', 'employees.id', '=', 'leave_requests.emp_id')
+            ->whereNull('employees.deleted_at')
+            ->when($companyId, fn ($q) => $q->where('employees.company_id', $companyId))
+            ->orderBy('employees.name')->orderBy('leave_requests.id')
+            ->get(['employees.name as name', 'leave_requests.type as type', 'leave_requests.date_to as to'])
+            ->map(function ($r) use ($deduct) {
+                $r->kind = in_array((string) $r->type, $deduct, true) ? 'leave' : 'excused';
+
+                return $r;
+            });
+    }
+
     /* ═══════════ المسنَدُ الوحيد: هل قُدِّم تقريرٌ صالح؟ (§13/§101) ═══════════ */
 
     /**
@@ -190,6 +273,9 @@ class DailyWorkCompliance
             return false;
         };
 
+        // الأعذارُ غيرُ الخصميّةِ للمجموعةِ كلِّها — استعلامٌ واحدٌ كخريطةِ الإجازات
+        $excusedMap = self::excusedMap($empIds, $from, $to);
+
         $out = [];
         foreach ($emps as $emp) {
             foreach ($dates as $date) {
@@ -197,7 +283,8 @@ class DailyWorkCompliance
                     $emp, $date,
                     collect($attByCell->get($emp->id . '|' . $date) ?? []),
                     collect($emp->user_id ? ($repByCell->get($emp->user_id . '|' . $date) ?? []) : []),
-                    $onLeave($emp->id, $date)
+                    $onLeave($emp->id, $date),
+                    $excusedMap
                 );
             }
         }
@@ -268,8 +355,8 @@ class DailyWorkCompliance
                 ->orderBy('id')->pluck('emp_id')->flip()->all();
         }
 
-        $buckets = ['present' => [], 'late' => [], 'leave' => [], 'absent' => [], 'noreport' => [],
-            'pending' => [], 'not_yet' => []];
+        $buckets = ['present' => [], 'late' => [], 'leave' => [], 'excused' => [], 'absent' => [],
+            'noreport' => [], 'pending' => [], 'not_yet' => []];
         $anyStamp = false;
 
         foreach ($emps as $emp) {
@@ -293,6 +380,13 @@ class DailyWorkCompliance
 
             // لا ختمَ ولا إجازة (أو صفٌّ مختومٌ «غائب»): غائبٌ — في يومِ عملٍ فقط
             if ($weekend) continue;
+
+            // **«مأذون» قبلَ كلِّ شيء** (الخاتمة · X1): عذرٌ معتمَدٌ غيرُ خصميٍّ
+            // («إذن خروج»/«عمل عن بعد») — ليس غياباً بلا عذرٍ وليس إجازة. ويسبق
+            // حتّى الصفَّ المختومَ «غائب»: ذاك ختمُ كنسٍ آليٍّ قرأ `onLeave` وحدَها
+            // فأدان صاحبَ العذر، فلا يُقلَّد حكماً يعلو على اعتمادِ الموارد البشرية.
+            if (! empty($c['excused'])) { $buckets['excused'][] = $entry; continue; }
+
             // الصفُّ المختومُ صراحةً حكمٌ قائم؛ وما دونَه يُؤجَّل أو يُعلَّق قبلَ أن يُدان
             if (! $c['attendance']) {
                 if (isset($pendingReq[$emp->id])) { $buckets['pending'][] = $entry; continue; }
@@ -317,7 +411,7 @@ class DailyWorkCompliance
 
     /* ═══════════ التركيب — آلةُ الحالاتِ الواحدة ═══════════ */
 
-    protected static function compose(Employee $emp, string $date, Collection $atts, Collection $reports, ?bool $onLeaveOverride = null): array
+    protected static function compose(Employee $emp, string $date, Collection $atts, Collection $reports, ?bool $onLeaveOverride = null, ?array $excusedMap = null): array
     {
         $primary = $atts->last(fn ($a) => (bool) $a->time_in) ?: $atts->first();
         $checkedIn = $atts->contains(fn ($a) => (bool) $a->time_in);
@@ -330,6 +424,9 @@ class DailyWorkCompliance
         $physical = self::physicalStatus($primary);
         // الإجازةُ: تُمرَّر محسوبةً مسبقاً في الحلِّ المدَيَّ (§99 · بلا استعلامٍ لكلِّ يوم)
         $onLeave = $onLeaveOverride ?? Workday::onLeave((string) $emp->id, $date);
+        // العذرُ غيرُ الخصميّ («إذن خروج»/«عمل عن بعد») حقيقةٌ **متعامدةٌ** على
+        // الإجازة: لا يمسّ الرصيدَ ولا يُسقط تقريرَ اليوم — ويمنع وسمَ «بلا عذر»
+        $excuse = $onLeave ? null : self::excuseFor($emp->id, $date, $excusedMap);
 
         // التقريرُ الصالح (§13) — بندٌ واحدٌ صالحٌ على الأقل
         $valid = $reports->filter(fn ($r) => self::isValidReportRow($r))->values();
@@ -392,6 +489,8 @@ class DailyWorkCompliance
             'hours'         => $hours,
             'physical'      => $physical,                                // §6.A
             'on_leave'      => $onLeave,
+            'excused'       => $excuse !== null,                         // عذرٌ معتمَدٌ غيرُ خصميّ
+            'excuse_type'   => $excuse,
             'report_required' => $reportRequired,
             'review_required' => self::reviewRequired(),                // §85
             'report_submitted' => $reportSubmitted,                     // §6.B

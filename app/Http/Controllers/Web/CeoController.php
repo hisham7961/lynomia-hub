@@ -92,16 +92,14 @@ class CeoController extends Controller
 
         // فريق اليوم: إجازات معتمدة تشمل اليوم + حضور اليوم
         $today = now()->toDateString();
-        // والتصفيةُ هنا **بعمودٍ مؤهَّل** لا بـ`hub_company_scope`: الاستعلامُ
-        // مضمومٌ إلى `employees` وكلا الجدولين يحمل `company_id`، فعمودٌ غيرُ
-        // مؤهَّلٍ يرمي «ambiguous column» على المحرّكين. والدلالةُ شركةُ **الموظف**
-        // صاحبِ الإجازة — هي ما يقرؤه صاحبُ القرار تحت راية الكيان.
-        $onLeave = DB::table('leave_requests')->whereNull('leave_requests.deleted_at')
-            ->where('leave_requests.status', 'LIKE', '%معتمد%')
-            ->where('leave_requests.date_from', '<=', $today)->where('leave_requests.date_to', '>=', $today)
-            ->join('employees', 'employees.id', '=', 'leave_requests.emp_id')
-            ->when($activeCo, fn ($q) => $q->where('employees.company_id', $activeCo['id']))
-            ->get(['employees.name as name', 'leave_requests.type as type', 'leave_requests.date_to as to']);
+        // **المسنَدُ الواحد** (الخاتمة · X1): كان هنا استعلامٌ ثالثٌ لـ«من في إجازةٍ
+        // اليوم» يخالف نداءَ اليومِ في ثلاثةِ مواضع — `LIKE '%معتمد%'`، و**بلا أيِّ
+        // تصفيةِ نوع** (فطلبُ «سلفة» معتمدٌ يضع صاحبَه في إجازة)، ويسقط `date_to`
+        // الفارغ. فصار الموظّفُ نفسُه «في إجازة» هنا و«غائباً بلا عذر» في النداءِ
+        // أسفلَ الصفحةِ عينِها. القراءةُ الآن من `DailyWorkCompliance` — ومعها
+        // `kind` يميّز إجازةَ الخصمِ من العذرِ المأذون، فلا يضيع أحدٌ ولا يُخلَط.
+        // والتصفيةُ بشركةِ **الموظّف** صاحبِ الطلب — هي ما يقرؤه صاحبُ القرار.
+        $onLeave = \App\Support\DailyWorkCompliance::onLeaveToday($today, $activeCo['id'] ?? null);
         $attToday = hub_company_scope(DB::table('attendance')->whereNull('deleted_at'), 'attend')
             ->where('date', $today)->count();
 

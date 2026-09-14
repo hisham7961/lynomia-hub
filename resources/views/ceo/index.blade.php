@@ -263,9 +263,11 @@
             @if ($teamRoll['n']['noreport'])<span class="bdg wn">{{ $teamRoll['n']['noreport'] }} بلا تقرير</span>@endif
         </h3>
         <table class="mini">
+            {{-- `kind` يميّز إجازةَ الخصمِ من العذرِ المأذون (الخاتمة · X1): كلاهما
+                 «ليس على رأسِ عملِه اليوم»، وخلطُهما كان يجعل «سلفةً» معتمدةً إجازةً --}}
             @foreach ($onLeave as $l)
-                <tr><td>{{ $l->name }}<div class="sub">{{ $l->type }} · يعود {{ substr($l->to, 0, 10) }}</div></td>
-                    <td class="acts"><span class="bdg wn">إجازة</span></td></tr>
+                <tr><td>{{ $l->name }}<div class="sub">{{ $l->type }}@if ($l->to) · يعود {{ substr((string) $l->to, 0, 10) }}@endif</div></td>
+                    <td class="acts"><span class="bdg {{ $l->kind === 'leave' ? 'wn' : 'ac' }}">{{ $l->kind === 'leave' ? 'إجازة' : 'مأذون' }}</span></td></tr>
             @endforeach
             @if ($teamRoll['n']['absent'])
                 <tr><td>{{ \Illuminate\Support\Str::limit(implode('، ', array_column($teamRoll['buckets']['absent'], 'name')), 60) }}
