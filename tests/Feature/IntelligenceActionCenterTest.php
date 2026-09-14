@@ -40,8 +40,15 @@ class IntelligenceActionCenterTest extends TestCase
         $keys = collect(hub_recommendations(true)['items'])->pluck('key')->filter()->all();
         $this->assertContains('quote.unconverted:' . $q->id, $keys, 'إشارةُ العرض غير المحوَّل غائبة');
 
-        // تحويلٌ (meta.project_id) → تختفي الإشارةُ تلقائياً (حلٌّ حتميّ)
-        $q->meta = ['project_id' => (string) \Illuminate\Support\Str::uuid()];
+        /*
+         * تحويلٌ حقيقيّ → تختفي الإشارةُ تلقائياً (حلٌّ حتميّ). كان الاختبارُ يكتب
+         * **معرّفاً وهميّاً** في `meta` فيمرّ؛ ومنذ الجولة 2 (G18ب) صارت حقيقةُ
+         * التحويل تُقرأ من `Quote::linkedProjectId()` التي تتحقّق من وجودِ المشروع
+         * (والعمودِ كما meta) — فمؤشِّرٌ لمشروعٍ معدومٍ ليس تحويلاً، والإشارةُ
+         * تبقى بحقّ. التحويلُ هنا صار مشروعاً قائماً كما في الواقع.
+         */
+        $proj = \App\Models\Project::create(['name' => 'تسليمُ العرضِ العالق', 'status' => 'نشط']);
+        $q->meta = ['project_id' => (string) $proj->id];
         $q->save();
         $keys2 = collect(hub_recommendations(true)['items'])->pluck('key')->filter()->all();
         $this->assertNotContains('quote.unconverted:' . $q->id, $keys2, 'الإشارةُ لم تُحَلّ بعد التحويل');

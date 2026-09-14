@@ -44,6 +44,24 @@ class DailyWorkCompliance
     public const POLICY_NON_COMPLIANT = 'non_compliant';
     public const POLICY_ABSENCE = 'absence_equivalent';
 
+    /**
+     * حالاتُ الطلبِ **قيدَ القرار** (الجولة ٢ · G12): لا معتمَدٌ ولا مرفوضٌ ولا ملغى —
+     * تطابق خيارات وحدة `leaves` حرفيّاً. صاحبُها ليس «غائباً بلا عذر»: قرارُه
+     * معلَّقٌ على مديرِه/الموارد البشرية، ومراسلتُه كغائبٍ ظلمٌ وبيانٌ كاذب.
+     */
+    public const PENDING_REQUEST_STATUSES = ['مقدّم', 'موافقة المدير', 'موافقة الموارد البشرية'];
+
+    /**
+     * أنواعُ الطلباتِ التي **تفسّر** غيابَ اليوم: إجازاتُ الخصم (من `hub.leave`)
+     * زائدَ «إذن خروج» و«عمل عن بعد». ما عداها (سلفة/شهادة راتب) طلبٌ إداريٌّ
+     * لا يفسّر غياباً — فلا يُخرج صاحبَه من النداء.
+     */
+    public static function excuseTypes(): array
+    {
+        return array_values(array_unique(array_merge(
+            (array) config('hub.leave.deduct_types', []), ['إذن خروج', 'عمل عن بعد'])));
+    }
+
     /* ═══════════ المسنَدُ الوحيد: هل قُدِّم تقريرٌ صالح؟ (§13/§101) ═══════════ */
 
     /**
@@ -207,6 +225,15 @@ class DailyWorkCompliance
      *
      * تقرؤه شاشةُ «فريقي اليوم» وبطاقةُ «الفريق اليوم» في لوحة CEO — مصدرٌ واحدٌ
      * فلا تتناقض شاشتان. التنطيقُ على العاتقِ المستدعي: مرِّر موظّفين منطَّقين.
+     *
+     * **ولا حكمَ قبلَ أوانه** (الجولة ٢ · G12): في الرابعةِ فجراً أعلن النداءُ
+     * اثنين وثلاثين موظّفاً «غائباً بلا عذر» — والدوامُ لم يبدأ، وفيهم المالكُ
+     * والمتفرّجُ نفسُه. المعادلةُ صادقةٌ حسابيّاً وميتةٌ سياقيّاً. فقبلَ
+     * `sec.hours_start` + سماحيةِ `work.late_grace` **لا يُعلَن أحدٌ غائباً**:
+     * `not_started = true` ومن لم يختم في فئةِ `not_yet` («لم يصل بعد»). ومن له
+     * طلبٌ قيدَ القرارِ يشمل اليومَ (إذنُ خروجٍ بموافقةِ مديرٍ ينتظر الموارد مثلاً)
+     * في فئةِ `pending` («بانتظار قرار») لا في الغياب. والصفُّ المختومُ صراحةً
+     * («غائب» من كنسِ نهايةِ اليوم) حكمٌ قائمٌ لا تؤجّله الساعةُ ولا يُخفيه طلب.
      */
     public static function rollCall(Collection $emps, ?string $date = null): array
     {
@@ -223,7 +250,26 @@ class DailyWorkCompliance
             $startMin = $sh * 60 + $sm + $grace;
         }
 
-        $buckets = ['present' => [], 'late' => [], 'leave' => [], 'absent' => [], 'noreport' => []];
+        // **قبلَ بدءِ الدوام لا نداءَ غياب** (G12): اليومُ الجاريُّ وحدَه — واليومُ
+        // الماضي انقضى فحكمُه واقعٌ لا انتظار
+        $nowAt = BusinessDate::now();
+        $notStarted = $date === BusinessDate::today() && $startMin !== null
+            && ((int) $nowAt->format('H') * 60 + (int) $nowAt->format('i')) < $startMin;
+
+        // الطلباتُ قيدَ القرارِ الشاملةُ لليوم — استعلامٌ واحدٌ للمجموعة (لا N+1)
+        $pendingReq = [];
+        if ($emps->isNotEmpty() && \Illuminate\Support\Facades\Schema::hasTable('leave_requests')) {
+            $pendingReq = \App\Models\LeaveRequest::whereNull('deleted_at')
+                ->whereIn('emp_id', $emps->pluck('id')->all())
+                ->whereIn('status', self::PENDING_REQUEST_STATUSES)
+                ->whereIn('type', self::excuseTypes())
+                ->whereDate('date_from', '<=', $date)
+                ->where(fn ($q) => $q->whereDate('date_to', '>=', $date)->orWhereNull('date_to'))
+                ->orderBy('id')->pluck('emp_id')->flip()->all();
+        }
+
+        $buckets = ['present' => [], 'late' => [], 'leave' => [], 'absent' => [], 'noreport' => [],
+            'pending' => [], 'not_yet' => []];
         $anyStamp = false;
 
         foreach ($emps as $emp) {
@@ -246,7 +292,13 @@ class DailyWorkCompliance
             }
 
             // لا ختمَ ولا إجازة (أو صفٌّ مختومٌ «غائب»): غائبٌ — في يومِ عملٍ فقط
-            if (! $weekend) $buckets['absent'][] = $entry;
+            if ($weekend) continue;
+            // الصفُّ المختومُ صراحةً حكمٌ قائم؛ وما دونَه يُؤجَّل أو يُعلَّق قبلَ أن يُدان
+            if (! $c['attendance']) {
+                if (isset($pendingReq[$emp->id])) { $buckets['pending'][] = $entry; continue; }
+                if ($notStarted) { $buckets['not_yet'][] = $entry; continue; }
+            }
+            $buckets['absent'][] = $entry;
         }
 
         // ترتيبٌ دلاليٌّ بالاسم — لا اعتمادَ على ترتيبِ إدراجٍ يقرعه المحرّكان
@@ -258,6 +310,8 @@ class DailyWorkCompliance
         foreach ($buckets as $k => $b) $n[$k] = count($b);
 
         return ['date' => $date, 'weekend' => $weekend, 'any_stamp' => $anyStamp,
+            'not_started' => $notStarted,
+            'start_at' => $start !== '' ? $start : null,
             'buckets' => $buckets, 'n' => $n];
     }
 

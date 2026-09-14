@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Ticket;
 use App\Support\AttachmentService;
 use App\Support\ClientPortalData;
 use App\Support\CommentService;
@@ -10,6 +11,7 @@ use App\Support\DocumentPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 /**
  * **مساحةُ العميل** (Work OS · الطور B · WP-B.2 · §13/§82–86) — شلٌّ منفصلٌ أبسطُ
@@ -55,6 +57,8 @@ class ClientPortalController extends Controller
             'documents' => ClientPortalData::documentRows($ids, 6),
             'invoices' => ClientPortalData::invoiceRows($ids, 6),
             'conversations' => ClientPortalData::conversationRows(null, 4),
+            // (الجولة 2 · G7) بلاغاتُه وحالتُها — وبابُ البلاغِ حاضرٌ ولو كانت خاوية
+            'tickets' => ClientPortalData::ticketRows($ids, 6),
         ]);
     }
 
@@ -237,5 +241,119 @@ class ClientPortalController extends Controller
 
         return redirect()->route('portal.conversation', $conv->id)
             ->with('ok', 'أُرسلت رسالتك')->withFragment('c-' . $c->id);
+    }
+
+    /* ────────── تذاكري: قناةُ البلاغ (الجولة 2 · G7/G5) ────────── */
+
+    /**
+     * **قناةُ بلاغِ العميل** — كانت البوّابةُ ستَّ وجهاتٍ بلا بابِ دعمٍ واحد: يتوقّف
+     * نظامُ العميلِ فيبلّغ هاتفيّاً، فيدخل أصدقُ حلقةٍ في السلسلة (صوتُه بنصّه
+     * ووقته) **منسوخاً بيد موظّف**. هذه الوجهةُ تفتح الطرفين معاً: بلاغٌ يُنسب
+     * إليه ويُربط بعميله ومشروعه، وقائمةٌ يرى فيها حالةَ كلِّ تذكرةٍ وملخّصَ حلّها.
+     *
+     * **العزلُ فوق كلّ شيء** (نظيرُ سائر قرّاء البوّابة): لا يرى إلا تذاكرَ عملائه
+     * الفعّالين (`hub_client_ids` + `hub_scope`)، ولا يختار مشروعاً ليس له، ولا
+     * يُسنِد لأحد، ولا يكتب حالةً ولا ملاحظةً داخليّة — كلُّها تُختم خادميّاً.
+     */
+    public function tickets()
+    {
+        if ($r = $this->gate()) return $r;
+        $ids = ClientPortalData::clientIds();
+
+        return view('portal.client.tickets', [
+            'tickets' => ClientPortalData::ticketRows($ids),
+            // أسماءُ المشاريع للقائمة — من قارئه هو (لا استعلامَ لكلِّ صفّ)
+            'projects' => ClientPortalData::projectRows($ids),
+        ]);
+    }
+
+    public function ticketCreate()
+    {
+        if ($r = $this->gate()) return $r;
+        $ids = ClientPortalData::clientIds();
+
+        return view('portal.client.ticket-new', [
+            // مشاريعُه هو حصراً — لا كونَ المشاريع (والخادمُ يُعيد الفحص عند الحفظ)
+            'projects' => ClientPortalData::projectRows($ids),
+            'clients' => ClientPortalData::clientsOf($ids),
+            'priorities' => ClientPortalData::ticketFieldOptions('priority'),
+        ]);
+    }
+
+    /**
+     * **فتحُ تذكرةٍ من البوّابة** — الحقولُ التي يملكها العميلُ أربعةٌ لا غير
+     * (الموضوع، الوصف، الأولويّة، المشروع)، وما سواها يُختم خادميّاً:
+     *
+     *  ١) **العميلُ من عضويّاته لا من الطلب**: مشروعٌ مختارٌ ⇒ عميلُ المشروع
+     *     (وهو ضمن عملائه بحكم `projectDetail`)؛ وإلّا اختيارُه من عملائه
+     *     المتحقَّقِ منه، وإلّا أوّلُهم — فلا تُنسب تذكرةٌ لعميلٍ أجنبيّ أبداً.
+     *  ٢) **مشروعٌ ليس له ⇒ ٤٠٤** (نمطُ البوّابة: لا كشفَ وجود) — `projectDetail`
+     *     هو الفاحصُ نفسُه الذي تقرأ به شاشةُ مشاريعه، لا فحصٌ ثانٍ ينحرف.
+     *  ٣) **الحالةُ والقناةُ والمنسوبُ إليه خادميّةٌ**: «جديدة» (تذكرةٌ بلا حالةٍ
+     *     تسقط من كلِّ مصفاةٍ تشغيليّة)، وقناةُ البوّابة، والمُنشئُ هو الكاتب —
+     *     وحقولُ الداخل (إسنادٌ/ملاحظاتٌ/حالة) لا تُقرأ من الطلب إطلاقاً.
+     *  ٤) ثم يُبثّ الحدثُ على المحرّك القائم (`FlowRunner::fire('created')`) —
+     *     فيصل الويبهوكُ ومساراتُ الفريق كأيّ تذكرةٍ فُتحت داخليّاً.
+     */
+    public function ticketStore(Request $request)
+    {
+        if ($r = $this->gate()) return $r;
+        $ids = ClientPortalData::clientIds();
+        abort_if(! $ids, 404);   // عضويّةٌ فعّالةٌ شرطُ البلاغ (فشلٌ مغلق)
+
+        $data = $request->validate([
+            'subject'  => ['required', 'string', 'max:' . (hub_col_max('tickets', 'subject') ?: 300)],
+            'body'     => ['required', 'string', 'max:5000'],
+            'priority' => ['required', 'string', Rule::in(ClientPortalData::ticketFieldOptions('priority'))],
+            'project'  => ['nullable', 'string', 'max:64'],
+            'client'   => ['nullable', 'string', 'max:64'],
+        ], [], [
+            'subject' => 'الموضوع', 'body' => 'الوصف', 'priority' => 'الأولوية',
+            'project' => 'المشروع', 'client' => 'العميل',
+        ]);
+
+        // مشروعُه هو أو ٤٠٤ — والعميلُ يُشتقّ منه حين يُختار
+        $projectId = trim((string) ($data['project'] ?? ''));
+        $project = $projectId !== '' ? ClientPortalData::projectDetail($ids, $projectId) : null;
+
+        $clientId = $project?->client_id
+            ? (string) $project->client_id
+            : (in_array(trim((string) ($data['client'] ?? '')), $ids, true)
+                ? trim((string) $data['client'])
+                : (string) $ids[0]);
+
+        $u = $request->user();
+        $t = new Ticket;
+        $t->subject    = trim($data['subject']);
+        $t->body       = trim($data['body']);
+        $t->priority   = $data['priority'];
+        $t->project_id = $project?->id;
+        $t->client_id  = $clientId;
+        $t->status     = ClientPortalData::TICKET_NEW_STATUS;
+        $t->channel    = ClientPortalData::TICKET_PORTAL_CHANNEL;
+        $t->customer   = (string) $u->name;
+        $t->email      = (string) $u->email;
+        $t->created_by = (string) $u->id;
+        $t->save();
+
+        \App\Support\FlowRunner::fire('created', 'tickets', $t);
+
+        return redirect()->route('portal.ticket', $t->id)
+            ->with('ok', 'وصلَنا بلاغُك وفُتحت تذكرتُك — ستجد حالتَها وردودَ الفريق هنا.');
+    }
+
+    public function ticket(string $id)
+    {
+        if ($r = $this->gate()) return $r;
+        $ids = ClientPortalData::clientIds();
+        $ticket = ClientPortalData::ticketDetail($ids, $id);
+
+        return view('portal.client.ticket', [
+            'ticket' => $ticket,
+            'projectName' => ClientPortalData::projectName($ids, $ticket->project_id),
+            // ملخّصُ الحلّ = الردودُ العامّةُ وحدَها — الملاحظةُ الداخليّةُ لا تُعرض
+            'replies' => ClientPortalData::ticketReplies($ticket),
+            'done' => in_array((string) $ticket->status, ClientPortalData::TICKET_DONE_STATUSES, true),
+        ]);
     }
 }

@@ -29,6 +29,24 @@ class Ticket extends Model
         'archived' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        /*
+         * **الميلُ الأخير يبلغ صاحبَه** (الجولة 2 · G5): تُحلّ تذكرةُ العميل ولا
+         * يصله حرف — لا حالةٌ ولا إشعار. الختمُ هنا على **تغيّر الحالة** فحسب، في
+         * النموذج لا في متحكّمٍ بعينه، فيسري على كلِّ بابِ كتابة (نموذجُ الوحدة،
+         * والحالةُ من الكانبان، والإجراءُ الجماعيّ، وAPI) بلا محرّكٍ ثانٍ.
+         * القرارُ والنصُّ والمستقبِلون في `ClientPortalData::announceTicketResolution`
+         * (مساحةُ العميل مصدرٌ واحد)، وهو لا يرمي: إشعارٌ متعثّرٌ لا يكسر الحفظ.
+         */
+        static::updated(function (self $t): void {
+            if (! $t->wasChanged('status')) return;
+
+            try { \App\Support\ClientPortalData::announceTicketResolution($t); }
+            catch (\Throwable $e) { report($e); }
+        });
+    }
+
     public function project(): BelongsTo
     {
         return $this->belongsTo(\App\Models\Project::class, 'project_id');

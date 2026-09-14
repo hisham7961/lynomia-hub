@@ -371,16 +371,17 @@ class QuoteController extends Controller
      */
     protected function toProject(Quote $q)
     {
-        abort_unless(hub_can(auth()->user(), 'projects', 'a'), 403, 'التحويل لمشروع يتطلب صلاحية إنشاء المشاريع');
-        abort_unless(hub_can(auth()->user(), 'engagements', 'a'), 403, 'التحويل يتطلب صلاحية إنشاء الارتباطات');
+        // (الجولة 2 · G18) بوّابةٌ واحدةٌ للفعل وللعرض: الشاشةُ تُظهر الزرَّ بهذه
+        // القاعدة نفسِها (Quote::convertGate) — والصلاحيّاتُ أولاً كي يبقى فتحُ
+        // المشروع القائم متكرّرَ التنفيذ بعد أن تصير الحالةُ «محوّل».
+        if ($gate = $q->convertPermGate('project')) abort($gate['code'], $gate['why']);
         // مشروعٌ قائمٌ من هذا العرض يُفتَح مباشرةً — حتى بعد أن صار «محوّل»،
         // فالحارسُ التالي (مقبول) لا يمنع إعادةَ الفتح المتكرّرة (idempotent).
         $done = (array) $q->meta;
         if (! empty($done['project_id']) && \App\Models\Project::withTrashed()->find($done['project_id'])) {
             return redirect()->route('m.show', ['projects', $done['project_id']])->with('ok', 'حُوّل من قبل — هذا مشروعه');
         }
-        abort_unless($q->status === 'مقبول', 422, 'حوّل العرض بعد قبوله أولاً');
-        abort_unless($q->client_id, 422, 'العرضُ بلا عميلٍ — لا يُحوَّل لمشروع عميل');
+        if ($gate = $q->convertGate('project')) abort($gate['code'], $gate['why']);
 
         return DB::transaction(function () use ($q) {
             $q = Quote::whereKey($q->getKey())->lockForUpdate()->firstOrFail();
@@ -708,9 +709,8 @@ class QuoteController extends Controller
     {
         // صلاحيةُ الوحدة الهدف تُفرض هنا كما في المسار الرسمي (ContractActionsController::find):
         // إجراءُ العرض (quotes:e) لا يسكّ عقداً لمن لا يملك إنشاء العقود.
-        abort_unless(hub_can(auth()->user(), 'contracts', 'a'), 403,
-            'تحويل العرض لعقد يتطلب صلاحية إنشاء العقود');
-        abort_unless($q->status === 'مقبول', 422, 'حوّل العرض بعد قبوله أولاً');
+        // (الجولة 2 · G18) بالبوّابة نفسِها التي تُظهر الزرَّ — Quote::convertGate.
+        if ($gate = $q->convertGate('contract')) abort($gate['code'], $gate['why']);
 
         // الفحص+الإنشاء+حفظ meta داخل معاملةٍ على صفٍّ مقفول: نقرتان متزامنتان لا
         // تُنشئان عقدين. وwithTrashed: عقدٌ حُذف بنعومة يظل تحويلاً واقعاً فلا يُنشأ
@@ -753,9 +753,9 @@ class QuoteController extends Controller
     {
         // صلاحيةُ المالية تُفرض هنا كما في store لوحدة fin: الفاتورة تدخل MRR
         // والتقارير، فلا تُسكّ لمن لا يملك إنشاء المستندات المالية.
-        abort_unless(hub_can(auth()->user(), 'fin', 'a'), 403,
-            'تحويل العرض لفاتورة يتطلب صلاحية إنشاء المستندات المالية');
-        abort_unless($q->status === 'مقبول', 422, 'حوّل العرض بعد قبوله أولاً');
+        // (الجولة 2 · G18) والبوّابةُ هي **عينُها** التي تقرؤها الشاشة لتُظهر الزرَّ
+        // أو تكتب سببَ المنع (Quote::convertGate) — فلا تفترق الرؤيةُ عن القدرة.
+        if ($gate = $q->convertGate('invoice')) abort($gate['code'], $gate['why']);
 
         // نفس التصليب: معاملةٌ على صفٍّ مقفول + withTrashed — لا فاتورتان بالرقم نفسه
         // (من نقرٍ مزدوج أو من حذف الأولى بنعومة ثم إعادة التحويل).
@@ -766,9 +766,9 @@ class QuoteController extends Controller
                 return redirect()->route('m.show', ['fin', $meta['invoice_id']])->with('ok', 'حُوّل من قبل — هذه فاتورته');
             }
             // لا ازدواجَ فوترة في الاتجاه المقابل (v2.399.1): دفعةٌ مفوتَرةٌ حيّةٌ تعني أنّ
-            // جزءاً من الإيراد مُطالَبٌ به — فلا تُسكّ الكاملةُ فوقها.
-            abort_if($q->hasLiveMilestoneInvoice(), 422,
-                'للعرض فواتيرُ دفعاتٍ حيّة — لا تُسكّ فاتورةٌ كاملةٌ فوقها (أَلغِها أولاً إن كان القصدُ الفوترةَ الكاملة)');
+            // جزءاً من الإيراد مُطالَبٌ به — فلا تُسكّ الكاملةُ فوقها. تُعاد البوّابةُ
+            // نفسُها على الصفّ المقفول (قراءةٌ قافلة) فلا يفلت سكٌّ متزامن.
+            if ($gate = $q->convertGate('invoice', null, true)) abort($gate['code'], $gate['why']);
 
             $inv = FinDocument::create([
                 'doc_no'      => mb_substr('INV-' . $q->doc_no, 0, 300),   // يُقصّ إلى عرض العمود

@@ -4141,11 +4141,18 @@ if (! function_exists('hub_recommendations')) {
                         ->where('accepted_at', '<', now()->subDays(2))
                         ->when($projectId, fn ($q) => $q->where('project_id', $projectId))
                         // فاصلٌ حتميّ: عروضٌ قُبلت في الثانية نفسها لا تُقترَع بين المحرّكين
-                        ->orderByDesc('accepted_at')->orderByDesc('id')->limit(8)->get(['id', 'doc_no', 'title', 'accepted_at', 'meta']);
+                        ->orderByDesc('accepted_at')->orderByDesc('id')->limit(8)->get(['id', 'doc_no', 'title', 'accepted_at', 'meta', 'project_id']);
                     foreach ($stuck as $q) {
                         $meta = (array) (is_array($q->meta) ? $q->meta : (json_decode((string) $q->meta, true) ?: []));
-                        // حُوِّل فعلاً (مشروعٌ أو ارتباط) → لا إشارة (حلٌّ تلقائيّ عند التحويل)
-                        if (! empty($meta['project_id']) || ! empty($meta['engagement_id'])) continue;
+                        /*
+                         * **حقيقةُ التحويل من مصدرِها الواحد** (الجولة 2 · G18ب): كان
+                         * الفحصُ على `meta` وحدَه، فعرضٌ رُبط مشروعُه في **العمود**
+                         * (مسارُ التحويل القائم) يبقى موسوماً «لم يُحوَّل» والإشارةُ
+                         * تناديه أبداً — رصدها وكيلُ محاكاةِ دورةِ المشروع: مشروعٌ
+                         * وفاتورةٌ قائمان والعرضُ يقول «لم يُحوَّل». `linkedProjectId`
+                         * هي الحاكمةُ (عمودٌ أو meta، مع التحقّق من وجود المشروع).
+                         */
+                        if ($q->linkedProjectId() || ! empty($meta['engagement_id'])) continue;
                         $days = (int) \Illuminate\Support\Carbon::parse($q->accepted_at)->diffInDays(now());
                         $add($days > 7 ? 'حرج' : 'مهم', '🔗', 'عرضٌ مقبولٌ لم يُحوَّل: ' . ($q->title ?: $q->doc_no),
                             'قُبل منذ ' . $days . ' يوماً ولا مشروعَ ولا ارتباط. حوّله لتبدأ التسليمَ والتحصيل.',

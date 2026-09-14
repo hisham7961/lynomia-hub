@@ -50,6 +50,9 @@
                 <li><a class="{{ request()->routeIs('portal.project*') ? 'on' : '' }}" href="{{ route('portal.projects') }}">📁 المشاريع</a></li>
                 <li><a class="{{ request()->routeIs('portal.document*') ? 'on' : '' }}" href="{{ route('portal.documents') }}">📄 الوثائق</a></li>
                 <li><a class="{{ request()->routeIs('portal.invoice*') ? 'on' : '' }}" href="{{ route('portal.invoices') }}">🧾 الفواتير</a></li>
+                {{-- (الجولة 2 · G7) «تذاكري» — بابُ الدعم: بدونه كانت البوّابةُ ستَّ
+                     وجهاتٍ بلا قناةِ بلاغٍ، فيتوقّف نظامُ العميلِ ويبلّغ هاتفيّاً. --}}
+                <li><a class="{{ request()->routeIs('portal.ticket*') ? 'on' : '' }}" href="{{ route('portal.tickets') }}">🎫 تذاكري</a></li>
                 <li><a class="{{ request()->routeIs('portal.conversation*') ? 'on' : '' }}" href="{{ route('portal.conversations') }}">💬 المحادثات</a></li>
             </ul>
         </nav>

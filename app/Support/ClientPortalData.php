@@ -4,13 +4,17 @@ namespace App\Support;
 
 use App\Models\Attachment;
 use App\Models\Client;
+use App\Models\ClientMembership;
+use App\Models\Comment;
 use App\Models\Conversation;
 use App\Models\ConversationMember;
 use App\Models\Document;
 use App\Models\Engagement;
 use App\Models\FinDocument;
 use App\Models\Project;
+use App\Models\Ticket;
 use App\Models\User;
+use Illuminate\Support\Str;
 
 /**
  * **قرّاءُ مساحة العميل — المصدرُ الواحد** (تطبيق العميل · §13/§16):
@@ -52,6 +56,31 @@ class ClientPortalData
     public const CLIENT_CONV_KINDS = ['channel', 'dm'];
 
     public const CLIENT_AUDIENCES = ['client', 'both'];
+
+    /**
+     * **«سري» يعلو الجمهور** (الجولة 2 · G8) — تصنيفُ السرّيةِ الذي لا يبلغ بوّابةَ
+     * العميل أبداً مهما كان جمهورُه. كان الحجبُ في **مسار التنزيل وحدَه**
+     * (`ClientPortalController::documentDownload`)، فوثيقةٌ «سري» شُورِكت خطأً
+     * تُعرَض اسماً ورقماً ووصفاً في القائمة والتفصيل (ويباً وجوّالاً) ويُمنع ملفُّها
+     * فقط. ومع فتحِ سطحِ المشاركةِ الحقيقيِّ صار الخطأُ ممكناً بنقرة — فالحجبُ
+     * انتقل إلى **القارئ نفسِه** فيسري على كلِّ سطحٍ يستهلكه.
+     *
+     * وهو حجبٌ **غيرُ مشروطٍ بالمصفوفة**: حسابُ عميلٍ مُنح `files:docsec` بخطأِ ضبطٍ
+     * لا يفتح سرّاً — بوّابةُ `docsec` بابٌ داخليٌّ لا يُفتَح لطرفٍ خارجيّ.
+     */
+    public const CLIENT_BLOCKED_SECRECY = 'سري';
+
+    /** تذاكرُ العميل: الحالاتُ التي تعني «انتهت» — بها يُبلَّغ ويُقفل العدّاد */
+    public const TICKET_DONE_STATUSES = ['تم الحل', 'مغلقة'];
+
+    /**
+     * **بلاغُ العميلِ حالةً ثابتة** — حالةُ البلاغ عند وصوله وقناتُه، من ألفاظِ سجلّ
+     * الوحدة نفسِه لا من قاموسٍ ثانٍ. («تذكرةٌ بلا حالة» كانت تسقط من كلِّ مصفاةٍ
+     * تشغيليّةٍ ومن عمود الكانبان — فبلاغُ البوّابةِ يولد موسوماً «جديدة».)
+     */
+    public const TICKET_NEW_STATUS = 'جديدة';
+
+    public const TICKET_PORTAL_CHANNEL = 'داخل التطبيق';
 
     /** عملاءُ القارئ المسموحون — مصفوفةٌ فارغةٌ (لا null): التقييدُ صريحٌ ومغلق */
     public static function clientIds(?User $user = null): array
@@ -121,6 +150,15 @@ class ClientPortalData
             ->findOrFail($id);
     }
 
+    /** اسمُ مشروعٍ — ضمن عملاءِ القارئ حصراً (وإلا null: لا اسمَ لمشروعِ غيره) */
+    public static function projectName(array $ids, ?string $projectId): ?string
+    {
+        if (! $projectId || ! $ids) return null;
+
+        return Project::whereIn('client_id', $ids)->whereNull('deleted_at')
+            ->whereKey($projectId)->value('name');
+    }
+
     /** اسمُ ارتباطِ المشروع — ضمن عملاءِ القارئ حصراً */
     public static function engagementName(array $ids, ?string $engagementId): ?string
     {
@@ -129,10 +167,21 @@ class ClientPortalData
         return Engagement::whereIn('client_id', $ids)->whereKey($engagementId)->value('name');
     }
 
+    /**
+     * **الأساسُ الواحدُ لكلِّ قراءةِ وثيقةٍ عميليّة** (الجولة 2 · G8): جمهورٌ عميليٌّ +
+     * عميلُها ضمن عملاء القارئ (`visibleToClient` — فشلٌ مغلقٌ على المجموعة الفارغة)
+     * **و«سري» محجوبٌ دائماً**. كلُّ قارئٍ أدناه يمرّ من هنا، فلا يبقى بابٌ يُنسى.
+     */
+    protected static function clientDocs(array $ids)
+    {
+        return Document::visibleToClient($ids)->whereNull('deleted_at')
+            ->where(fn ($w) => $w->where('secrecy', '!=', self::CLIENT_BLOCKED_SECRECY)
+                ->orWhereNull('secrecy'));
+    }
+
     public static function documentRows(array $ids, ?int $limit = null)
     {
-        // `visibleToClient` فشلٌ مغلقٌ على المجموعة الفارغة
-        $q = Document::visibleToClient($ids)->whereNull('deleted_at')
+        $q = self::clientDocs($ids)
             ->orderByDesc('created_at')->orderBy('id')
             ->select('id', 'name', 'cat', 'doc_no', 'issue_date', 'expiry', 'audience');
 
@@ -141,7 +190,7 @@ class ClientPortalData
 
     public static function documentDetail(array $ids, string $id): Document
     {
-        return Document::visibleToClient($ids)->whereNull('deleted_at')
+        return self::clientDocs($ids)
             ->select('id', 'name', 'cat', 'doc_no', 'issue_date', 'expiry', 'description',
                 'audience', 'client_id')
             ->findOrFail($id);
@@ -155,7 +204,7 @@ class ClientPortalData
      */
     public static function documentFile(array $ids, string $id): Document
     {
-        return Document::visibleToClient($ids)->whereNull('deleted_at')
+        return self::clientDocs($ids)
             ->select('id', 'name', 'att_id', 'secrecy', 'client_id')
             ->findOrFail($id);
     }
@@ -269,5 +318,108 @@ class ClientPortalData
             ->where(fn ($q) => $q->whereNull('internal')->orWhere('internal', false))
             ->with('user:id,name')
             ->get(['id', 'conversation_id', 'body', 'user_id', 'internal', 'created_at']);
+    }
+
+    /* ══════════ تذاكرُ العميل (الجولة 2 · G7/G5) ══════════ */
+
+    /** خياراتُ حقلٍ من سجلّ الوحدة — مصدرٌ واحدٌ للأولويّات والحالات (لا انحراف) */
+    public static function ticketFieldOptions(string $key): array
+    {
+        $f = collect(hub_mod('tickets')['fields'] ?? [])->firstWhere('key', $key);
+
+        return array_values(array_filter((array) ($f['options'] ?? []), 'is_string'));
+    }
+
+    /**
+     * **تذاكرُ العميل** — أعمدةٌ عميليّةٌ حصراً: لا `notes` (ملاحظاتٌ داخليّة)، ولا
+     * `assignee_id` (من يعمل عليها شأنٌ داخليّ)، ولا `ext_id`/`meta`. والعزلُ
+     * فشلٌ مغلق: `hub_scope` + عملاءُ القارئ صراحةً — وتذكرةٌ بلا عميلٍ لا يراها أحد.
+     */
+    public static function ticketRows(array $ids, ?int $limit = null)
+    {
+        if (! $ids) return collect();
+
+        $q = hub_scope(Ticket::query(), 'tickets')
+            ->whereIn('client_id', $ids)->whereNull('deleted_at')
+            ->orderByDesc('created_at')->orderBy('id')
+            ->select('id', 'subject', 'status', 'priority', 'cat', 'project_id', 'client_id', 'created_at');
+
+        return $limit ? $q->limit($limit)->get() : $q->get();
+    }
+
+    /** تذكرةٌ واحدةٌ — خارجَ عملاءِ القارئ ٤٠٤ (نمطُ البوّابة: لا كشفَ وجود) */
+    public static function ticketDetail(array $ids, string $id): Ticket
+    {
+        abort_if(! $ids, 404);
+
+        return hub_scope(Ticket::query(), 'tickets')
+            ->whereIn('client_id', $ids)->whereNull('deleted_at')
+            ->select('id', 'subject', 'body', 'status', 'priority', 'cat', 'project_id',
+                'client_id', 'created_at', 'updated_at')
+            ->findOrFail($id);
+    }
+
+    /**
+     * **ملخّصُ الحلّ للعميل** (الجولة 2 · G5) — الردودُ **العامّة** وحدَها: علمُ
+     * `internal` على التعليق هو الفاصلُ نفسُه الذي يحتسبه عدّادُ SLA («أوّلُ ردٍّ
+     * غيرِ داخليّ»)، فما لا يُحتسب رداً على العميلِ لا يُعرَض له.
+     */
+    public static function ticketReplies(Ticket $t)
+    {
+        return Comment::where('module', 'tickets')->where('record_id', (string) $t->id)
+            ->where(fn ($q) => $q->whereNull('internal')->orWhere('internal', false))
+            ->with('user:id,name')
+            ->orderBy('created_at')->orderBy('id')
+            ->get(['id', 'module', 'record_id', 'body', 'user_id', 'internal', 'created_at']);
+    }
+
+    /**
+     * **حساباتُ العميلِ الفعّالة** — عضويّةٌ نشطةٌ (`active` وحدَها: المدعوُّ والمعلَّقُ
+     * لا يصلهما شيء) **و**حسابُ عميلٍ صلبٌ نشط. تُشتقُّ من مصدرِ الحقيقةِ نفسِه الذي
+     * يبني عليه `hub_client_ids` — لا قائمةَ مستقبلين ثانية.
+     *
+     * @return string[]
+     */
+    public static function clientAccountIds(?string $clientId): array
+    {
+        if (! $clientId) return [];
+
+        $ids = ClientMembership::where('client_id', (string) $clientId)
+            ->where('status', 'active')->orderBy('user_id')->pluck('user_id')->all();
+        if (! $ids) return [];
+
+        return User::whereIn('id', $ids)->where('account_type', 'client')
+            ->where('status', 'نشط')->orderBy('id')->pluck('id')
+            ->map(fn ($v) => (string) $v)->all();
+    }
+
+    /**
+     * **الميلُ الأخير** (الجولة 2 · G5) — تذكرةُ العميلِ تُحلّ باعتذارٍ موجَّهٍ له
+     * بالاسم، وهو لا يرى حرفاً: لا حالةً ولا ردّاً ولا إشعاراً؛ عليه أن يتّصل
+     * ثانيةً ليعلم أنّ نظامَه عاد. هنا يُغلَق الطرفُ الثاني من الحلقة:
+     *
+     *  • **نصٌّ يناسب عميلاً لا موظّفاً**: بلا مفرداتِ الداخلِ ولا اسمِ وحدةٍ ولا
+     *    رقمِ سجلّ — ما يهمّه: تذكرتُه، حالتُها، وأين يقرأ الحلّ.
+     *  • **بلا `module`/`record_id` عمداً**: إشعارٌ موسومٌ بوحدةٍ يُقنَّع نصُّه
+     *    لمن لا يملك رؤيتَها (`hub_notification_text`) — وحسابُ العميلِ لا يملك
+     *    `tickets:v` أبداً، فكان سيصله «🔒 إشعارٌ عن سجلٍّ في وحدةٍ لا تراها»:
+     *    وهو عبثُ الجولة الثانية بعينه. ووجهتُه بوّابتُه لا شاشةُ الوحدة.
+     *  • **لحساباتِ عميلِ التذكرةِ وحدَها** — عميلٌ آخرُ لا يصله شيء.
+     *
+     * يُنادى من `Ticket::booted` عند **تغيّرِ الحالة** فحسب، فيسري على كلِّ بابِ
+     * كتابة (نموذجُ الوحدة، والحالةُ من الكانبان، والإجراءُ الجماعيّ، وAPI) بلا
+     * محرّكٍ ثانٍ ولا تكرارٍ عند حفظٍ لا يمسّ الحالة.
+     */
+    public static function announceTicketResolution(Ticket $t): void
+    {
+        if (! in_array((string) $t->status, self::TICKET_DONE_STATUSES, true)) return;
+
+        $subject = trim((string) $t->subject) ?: 'بلاغُك';
+        $text = '🎫 تذكرتك «' . Str::limit($subject, 90) . '» — الحالة الآن: ' . $t->status
+            . '. تجد ملخّصَ الحلّ في «تذاكري» بمساحتك.';
+
+        foreach (self::clientAccountIds($t->client_id !== null ? (string) $t->client_id : null) as $uid) {
+            hub_notify($uid, 'ticket', $text);
+        }
     }
 }

@@ -277,7 +277,18 @@ class ReportsController extends Controller
         return view('reports.monthly-employee', \App\Support\MonthlyAttendance::sheet($emp, $month));
     }
 
-    /** تصديرُ الحضور والانصراف الشهريّ CSV — للمحاسب (BOM + تحييدُ حقنِ الصيغ §82) */
+    /**
+     * تصديرُ الحضور والانصراف الشهريّ CSV — للمحاسب (BOM + تحييدُ حقنِ الصيغ §82).
+     *
+     * **وضعان، والقديمُ كما هو** (الجولة ٢ · G11 · الإضافةُ لا الكسر):
+     *  · الافتراضيُّ `daily` — صفٌّ لكلِّ يومٍ مسجَّل، بأعمدتِه التسعةِ نفسِها حرفاً
+     *    بحرف: عقدُ ملفٍّ قائمٍ لا يُكسَر على من بنى عليه.
+     *  · `?mode=payroll` — **كشفُ الرواتب**: صفٌّ لكلِّ موظّفٍ في النطاق (لا لكلِّ
+     *    ختم)، فمن لم يُختم له يومٌ واحدٌ لا يسقط من الملفّ كما كان يسقط اثنان
+     *    وعشرون موظّفاً من اثنين وثلاثين — ومن يبني الخصوماتِ من الملفِّ كان
+     *    يخصم صفراً من الغائبين كلِّهم. بمعرّفِ الموظّفِ وأيامِه وساعاتِه
+     *    وشذوذاتِه ومجاميعِه، والراتبُ خلفَ `fieldsec` كما في كلِّ سطحٍ آخر.
+     */
     public function monthlyExport(Request $r)
     {
         $this->guardMonthly();
@@ -290,29 +301,49 @@ class ReportsController extends Controller
 
         $month = \App\Support\MonthlyAttendance::normMonth($r->query('month'));
         $dates = \App\Support\MonthlyAttendance::daysOf($month);
-        $empQ = $this->monthlyEmployees();
-        if ($eid = $r->query('emp')) $empQ->whereKey($eid);   // تصديرُ موظّفٍ واحدٍ اختياريّ
-        $emps = $empQ->orderBy('name')->limit(1000)->get(['id', 'name', 'dept', 'user_id', 'company_id']);
-        $range = \App\Support\DailyWorkCompliance::resolveRange($emps, $dates);
-
-        // عدُّ الصفوفِ المُصدَّرةِ فعلاً (نفسُ شرطِ البثِّ أدناه) — لعتبةِ التصعيدِ وبصمةِ التدقيق
-        $rowCount = 0;
-        foreach ($emps as $emp) {
-            foreach ($dates as $d) {
-                $c = $range[$emp->id][$d] ?? null;
-                if ($c && ($c['checked_in'] || $c['on_leave'] || $c['attendance'])) $rowCount++;
-            }
-        }
-        $bigAt = (int) setting('security.export_stepup_rows', 0);
-        $isBig = $bigAt > 0 && $rowCount >= $bigAt;
-        if ($isBig && ($resp = hub_require_stepup())) return $resp;
-        hub_audit($isBig ? 'تصدير كبير' : 'تصدير', 'attend', null, $rowCount . ' يوم حضور (CSV شهري)');
+        $payroll = $r->query('mode') === 'payroll';
 
         // Permissions 360 · 17.3 — أعمدةُ الموظفِ تستشير نمطَ الحقل (نظيرَ CSV الوحدات):
         // دورٌ يحجب حقلاً في hr (قواعدُ الحقولِ أو fieldsec) لا يستلمه في هذا الملفِّ أيضاً.
         $u = auth()->user();
         $nameHidden = hub_field_mode($u, 'hr', 'name') === 'hide';
         $deptHidden = hub_field_mode($u, 'hr', 'dept') === 'hide';
+        // الراتبُ حقلٌ حسّاسٌ خلفَ `fieldsec` (hub_field_sec): المحاسبُ بـ`attend:v`
+        // وحدَه يرى الأيامَ والساعاتِ ولا يرى ديناراً — ولا يُقرأ العمودُ أصلاً لمن
+        // لا يملكه، فلا يمرّ في الذاكرةِ ثم يُحجب على الورق.
+        $salaryHidden = hub_field_mode($u, 'hr', 'salary') === 'hide';
+
+        $cols = ['id', 'name', 'dept', 'user_id', 'company_id'];
+        if ($payroll && ! $salaryHidden) $cols[] = 'salary';
+
+        $empQ = $this->monthlyEmployees();
+        if ($eid = $r->query('emp')) $empQ->whereKey($eid);   // تصديرُ موظّفٍ واحدٍ اختياريّ
+        // ترتيبٌ حتميٌّ: الاسمُ ثم المعرّف — أسماءٌ متطابقةٌ كانت قرعةً بين المحرّكين
+        $emps = $empQ->orderBy('name')->orderBy('id')->limit(1000)->get($cols);
+
+        // عدُّ الصفوفِ المُصدَّرةِ فعلاً (نفسُ شرطِ البثِّ أدناه) — لعتبةِ التصعيدِ وبصمةِ التدقيق
+        $range = $payroll ? [] : \App\Support\DailyWorkCompliance::resolveRange($emps, $dates);
+        $rowCount = $emps->count();
+        if (! $payroll) {
+            $rowCount = 0;
+            foreach ($emps as $emp) {
+                foreach ($dates as $d) {
+                    $c = $range[$emp->id][$d] ?? null;
+                    if ($c && ($c['checked_in'] || $c['on_leave'] || $c['attendance'])) $rowCount++;
+                }
+            }
+        }
+        $bigAt = (int) setting('security.export_stepup_rows', 0);
+        $isBig = $bigAt > 0 && $rowCount >= $bigAt;
+        if ($isBig && ($resp = hub_require_stepup())) return $resp;
+        // بصمةُ التدقيق تسمّي ما خرج فعلاً: صفوفُ الملفِّ (وفيها الإجازةُ والغياب)
+        // لا «يومَ حضورٍ» يعدّ الإجازةَ حضوراً
+        hub_audit($isBig ? 'تصدير كبير' : 'تصدير', 'attend', null,
+            $payroll ? $rowCount . ' موظفاً (كشف رواتب شهري CSV)' : $rowCount . ' صفّاً (CSV شهري يومي)');
+
+        if ($payroll) {
+            return $this->monthlyPayrollCsv($emps, $month, $nameHidden, $deptHidden, $salaryHidden);
+        }
 
         $headers = ['الموظف', 'القسم', 'اليوم', 'الحضور', 'الانصراف', 'الساعات', 'الحالة الفعلية', 'التقرير', 'الحالة المحتسَبة'];
         $file = 'attendance-' . $month . '.csv';
@@ -335,6 +366,53 @@ class ReportsController extends Controller
                         $c['labels']['effective'],
                     ]), ',', '"', '');
                 }
+            }
+            fclose($out);
+        }, $file, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /**
+     * **كشفُ الرواتب الشهريّ** (G11): صفٌّ لكلِّ موظّفٍ في النطاق — لا لكلِّ ختم.
+     *
+     * المحاسبُ يبني الخصوماتِ من هذا الملفّ، فلا بدّ أن يحمل من لا ختمَ له أصلاً
+     * (وإلا خُصم صفرٌ من الغائبين كلِّهم)، ومعرّفاً يُطابَق به (لا اسماً عربيّاً
+     * وحدَه)، ومقامَ القسمة (أيامُ العملِ المجدولة)، وعدّادَ شذوذاتٍ يقول إن كان
+     * الرقمُ موثوقاً. المجاميعُ كلُّها من `MonthlyAttendance` — لا محرّكَ عدٍّ ثانٍ.
+     */
+    protected function monthlyPayrollCsv($emps, string $month, bool $nameHidden, bool $deptHidden, bool $salaryHidden)
+    {
+        $rows = \App\Support\MonthlyAttendance::summary($emps, $month)['rows'];
+
+        $headers = ['الموظف', 'معرّف الموظف', 'القسم', 'أيام العمل', 'أيام الحضور',
+            'غياب بلا عذر', 'غياب لعدم التقرير', 'أيام الإجازة', 'مجموع الساعات',
+            'أيام التأخّر', 'انصراف مفقود', 'شذوذات', 'الراتب الأساسي'];
+        $file = 'payroll-attendance-' . $month . '.csv';
+
+        return response()->streamDownload(function () use ($emps, $rows, $headers, $nameHidden, $deptHidden, $salaryHidden) {
+            $out = fopen('php://output', 'w');
+            fwrite($out, "\xEF\xBB\xBF");
+            $safe = fn ($v) => (is_string($v) && $v !== '' && strpbrk($v[0], "=+-@\t\r") !== false) ? "'" . $v : $v;
+            fputcsv($out, $headers, ',', '"', '');
+            foreach ($emps as $emp) {
+                $t = $rows[$emp->id]['totals'] ?? [];
+                // الشذوذُ يُجمَع ظاهراً: انصرافٌ مفقودٌ + يومٌ مستحيلٌ (مدّةٌ سالبة)
+                $anomalies = (int) ($t['missing_out'] ?? 0) + (int) ($t['invalid_span'] ?? 0);
+                fputcsv($out, array_map($safe, [
+                    $nameHidden ? '' : $emp->name,
+                    (string) $emp->id,
+                    $deptHidden ? '' : ($emp->dept ?: ''),
+                    (int) ($t['scheduled'] ?? 0),
+                    (int) ($t['workdays'] ?? 0),
+                    (int) ($t['absent'] ?? 0) + (int) ($t['unexcused'] ?? 0),
+                    (int) ($t['absence_report'] ?? 0),
+                    (int) ($t['leave'] ?? 0),
+                    number_format((float) ($t['attendance_hours'] ?? 0), 2, '.', ''),
+                    (int) ($t['late'] ?? 0),
+                    (int) ($t['missing_out'] ?? 0),
+                    $anomalies,
+                    $salaryHidden ? 'محجوب'
+                        : ($emp->salary === null ? '' : number_format((float) $emp->salary, 3, '.', '')),
+                ]), ',', '"', '');
             }
             fclose($out);
         }, $file, ['Content-Type' => 'text/csv; charset=UTF-8']);

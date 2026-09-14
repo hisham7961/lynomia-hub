@@ -75,6 +75,26 @@ class Document extends Model
                 throw new \InvalidArgumentException("جمهورُ وثيقةٍ غيرُ صالح: {$doc->audience}");
             }
         });
+
+        /*
+         * **المشاركةُ لا تتخطّى عزلَ الكاتب** (الجولة 2 · G8): مع فتحِ سطحِ المشاركة
+         * صار `client_id` حقلاً في سجلّ الوحدة — يحرسه في الويب `guardClient`
+         * (٤٢٢ برسالةٍ عربيّة) لكنّ بابَ API لا يمرّ به. فالحزامُ هنا، في النموذج،
+         * يسري على **كل** بابِ كتابة: كاتبٌ معزولٌ على عملاءَ بأعيانهم لا يفتح
+         * وثيقةً لعميلٍ خارجَ قائمته. ولا يمسّ غيرَ **فعلِ المشاركة نفسِه**
+         * (جمهورٌ عميليٌّ + عميلٌ مُغيَّر): وثيقةٌ داخليّةٌ لا تُشارَك مع أحدٍ فلا
+         * قيدَ عليها، وغيرُ المعزول (`hub_client_ids() === null`) كما كان.
+         */
+        static::saving(function (self $doc): void {
+            if (! in_array($doc->audience, self::CLIENT_AUDIENCES, true)) return;
+            if (! $doc->client_id || ! $doc->isDirty(['audience', 'client_id'])) return;
+
+            $ids = hub_client_ids();
+            if ($ids !== null && ! in_array((string) $doc->client_id, $ids, true)) {
+                throw new \InvalidArgumentException(
+                    'لا تُشارَك وثيقةٌ مع عميلٍ خارج عملاء الكاتب المسموحين');
+            }
+        });
     }
 
     /**

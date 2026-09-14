@@ -5,8 +5,8 @@
     $m = \Illuminate\Support\Carbon::parse($month . '-01');
     $prev = $m->copy()->subMonth()->format('Y-m');
     $next = $m->copy()->addMonth()->format('Y-m');
-    $agg = ['present'=>0,'leave'=>0,'absent'=>0,'unexcused'=>0,'missing'=>0,'absence_report'=>0,'missing_out'=>0,'hours'=>0.0,'reported'=>0];
-    foreach ($rows as $r) { foreach (['present','leave','absent','unexcused','missing','absence_report','missing_out','reported'] as $k) $agg[$k]+=($r['totals'][$k] ?? 0); $agg['hours']+=$r['totals']['attendance_hours']; }
+    $agg = ['present'=>0,'leave'=>0,'absent'=>0,'unexcused'=>0,'missing'=>0,'absence_report'=>0,'missing_out'=>0,'invalid_span'=>0,'hours'=>0.0,'reported'=>0];
+    foreach ($rows as $r) { foreach (['present','leave','absent','unexcused','missing','absence_report','missing_out','invalid_span','reported'] as $k) $agg[$k]+=($r['totals'][$k] ?? 0); $agg['hours']+=$r['totals']['attendance_hours']; }
 @endphp
 <div class="hero">
     <div>
@@ -19,7 +19,13 @@
         <a class="btn ghost sm" href="{{ route('reports.monthly', ['month'=>$prev]) }}">‹ {{ $prev }}</a>
         <form method="get" style="display:inline"><input type="month" name="month" value="{{ $month }}" onchange="this.form.submit()"></form>
         <a class="btn ghost sm" href="{{ route('reports.monthly', ['month'=>$next]) }}">{{ $next }} ›</a>
-        @if ($canExport)<a class="btn sm" href="{{ route('reports.monthly.export', ['month'=>$month]) }}">⬇️ تصدير CSV (للمحاسب)</a>@endif
+        @if ($canExport)
+            <a class="btn ghost sm" href="{{ route('reports.monthly.export', ['month'=>$month]) }}"
+               title="صفٌّ لكلِّ يومٍ مسجَّل — التفصيلُ اليوميّ">⬇️ تصدير CSV (يوميّ)</a>
+            {{-- G11: كشفُ الرواتب — صفٌّ لكلِّ موظّفٍ في النطاق بأيّامه وساعاته وشذوذاته --}}
+            <a class="btn sm" href="{{ route('reports.monthly.export', ['month'=>$month, 'mode'=>'payroll']) }}"
+               title="صفٌّ لكلِّ موظّف — أيامُ العملِ والحضورِ والغيابِ والإجازةِ والساعاتُ والشذوذات">⬇️ كشف الرواتب CSV</a>
+        @endif
     </div>
 </div>
 
@@ -31,6 +37,7 @@
     <div class="stat"><span class="ico">❌</span><b>{{ number_format($agg['absent'] + $agg['unexcused']) }}</b><span>يوم غياب</span></div>
     @if ($agg['absence_report']>0)<div class="stat"><span class="ico">⛔</span><b>{{ number_format($agg['absence_report']) }}</b><span>غياب لعدم التقرير</span></div>@endif
     @if ($agg['missing_out']>0)<div class="stat"><span class="ico">🚪</span><b>{{ number_format($agg['missing_out']) }}</b><span>انصراف مفقود (شذوذ)</span></div>@endif
+    @if ($agg['invalid_span']>0)<div class="stat"><span class="ico">⚠️</span><b>{{ number_format($agg['invalid_span']) }}</b><span>مدة غير صالحة (شذوذ)</span></div>@endif
     <div class="stat"><span class="ico">⏱️</span><b>{{ number_format($agg['hours'],1) }}</b><span>ساعة</span></div>
 </div>
 
@@ -54,7 +61,10 @@
                 <td class="mono">@if($abs)<span class="bdg bad" title="مختوم {{ $t['absent'] }} + بالفرق {{ $t['unexcused'] ?? 0 }}">{{ $abs }}</span>@else — @endif</td>
                 <td class="mono">{{ $t['missing'] ?: '—' }}</td>
                 <td class="mono">@if($t['absence_report'])<span class="bdg bad">{{ $t['absence_report'] }}</span>@else — @endif</td>
-                <td class="mono">@if($t['missing_out'] ?? 0)<span class="bdg wn" title="دخولٌ بلا انصراف — الساعاتُ لا تُحتسب حتى يُصحَّح">انصراف مفقود ×{{ $t['missing_out'] }}</span>@else — @endif</td>
+                <td class="mono">
+                    @if($t['missing_out'] ?? 0)<span class="bdg wn" title="دخولٌ بلا انصراف — الساعاتُ لا تُحتسب حتى يُصحَّح">انصراف مفقود ×{{ $t['missing_out'] }}</span>@endif
+                    @if($t['invalid_span'] ?? 0)<span class="bdg bad" title="الانصرافُ قبلَ الدخول — صفٌّ يحتاج تصحيحاً">مدة غير صالحة ×{{ $t['invalid_span'] }}</span>@endif
+                    @if(! ($t['missing_out'] ?? 0) && ! ($t['invalid_span'] ?? 0)) — @endif</td>
                 <td class="mono">{{ $t['attendance_hours'] ? number_format($t['attendance_hours'],1) : '—' }}</td>
                 <td class="mono">{{ $t['reported'] ?: '—' }}</td>
                 <td style="white-space:nowrap">

@@ -135,10 +135,17 @@ class DemoCompanySeeder extends Seeder
             'issues' => $vae, 'tickets' => $vae, 'clients' => $v, 'engagements' => $v, 'quotes' => $v,
         ]), []);
 
+        // الموارد البشرية: مهمّتُها المعلنة «تعيينٌ وتهيئة» لا حفظُ ملفّات (الجولة 2 · G15).
+        // كانت بلا مفتاحِ فتحِ الحسابات فتنتظر المالكَ ليفتح لكلِّ موظّفٍ حسابَه، وبلا
+        // رؤيةِ أصولٍ فلا تسلّم عهدةً في أوّل يوم، وبلا مسارِ توظيفٍ فلا تحوّل مرشّحاً
+        // إلى موظّف — ثلاثةُ أبوابٍ يحتاجها التعيينُ الواحد كانت بيد ثلاثة أشخاص.
         $rHr = $this->role('موظّفة موارد بشريّة', array_merge($daily, [
-            'hr' => $vae + ['fieldsec' => 1, 'docsec' => 1, 'export' => 1],
+            'hr' => $vae + ['fieldsec' => 1, 'docsec' => 1, 'export' => 1, 'staffAccounts' => 1],
             // docsec على وحدة الوثائق نفسِها: «سري» يُقرأ من hub_scope('files') بها (F21ب)
             'attend' => $ve, 'leaves' => $vae, 'files' => $vae + ['docsec' => 1], 'updates' => $ve,
+            'recruit' => $vae,
+            // رؤيةُ الأصولِ وإسنادُ العهدةِ وحدَه — بلا تعديلِ مواصفاتِ الأصل (custodyAssign)
+            'assets' => $v + ['custodyAssign' => 1],
         ]), []);
 
         $rAcc = $this->role('محاسب', [
@@ -147,14 +154,20 @@ class DemoCompanySeeder extends Seeder
             'fin' => $vae + ['export' => 1, 'fieldsec' => 1, 'exportNight' => 1],
             'banks' => $v + ['fieldsec' => 1, 'bankPost' => 1],
             'purchases' => $vae, 'quotes' => $v + ['fieldsec' => 1],
+            // مسيّراتُ الرواتب مهمّةٌ محاسبيّةٌ معلنة — كان يرى الحضورَ ولا يسيّر عليه راتباً
+            'payroll' => $vae + ['export' => 1],
             'attend' => $v + ['export' => 1, 'exportNight' => 1],
             'clients' => $v, 'projects' => $v, 'files' => $v, 'updates' => $vae, 'tasks' => $vae, 'leaves' => $vae,
         ], ['finAnalytics' => 1]);
 
+        // مسؤول تقنية المعلومات: كان يملك الأجهزةَ والأصولَ ولا يملك **الحادثة** —
+        // لا تذكرةً ولا مشكلةً ولا سيرفراً ولا وحدةَ إدارةِ الحوادث التقنية. فمن
+        // يرصد عطلاً يفتح تذكرةً لا يراها من يصلحها (رصده وكيلُ رحلةِ الحادثة).
         $rIt = $this->role('مسؤول تقنية المعلومات', array_merge($daily, [
             'assets' => $vae + ['custodyAssign' => 1, 'assetStatus' => 1, 'assetStation' => 1, 'assetInventory' => 1],
             'stations' => $vae, 'endpoints' => $v + ['command' => 1], 'apps' => $vae, 'dbs' => $vae, 'apis' => $vae,
             'phones' => $v, 'products' => $v,
+            'tickets' => $vae, 'issues' => $vae, 'servers' => $vae, 'incidents' => $vae,
         ]), ['secOps' => 1]);
 
         $rSales = $this->role('موظّف مبيعات', array_merge($daily, [

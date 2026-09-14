@@ -24,6 +24,11 @@ use Illuminate\Support\Collection;
  * حصراً، و`off` مظلّةُ كلِّ يومٍ غيرِ مسجَّل كما كان — والجديدُ عدّاداتٌ منفصلة:
  * `unexcused` (غيابٌ مشتقٌّ من الفرق)، و`missing_out` (شذوذُ «انصرافٍ مفقود» —
  * دخولٌ بلا انصرافٍ في يومٍ ماضٍ · F11) — ظاهرةٌ لا ساقطةٌ بصمت.
+ *
+ * وأُضيف في الجولة ٢ عدّادان لا يكسران ما قبلَهما: `invalid_span` (يومٌ مستحيلٌ —
+ * انصرافٌ قبلَ الدخول · G10: حارسُ النموذج يمنع الجديدَ منه، وهذا يفضح القديمَ
+ * بدل أن يعرضَه «حاضراً» نظيفاً)، و`scheduled` (أيامُ العملِ المجدولةُ التي وقعت
+ * فعلاً — لا عطلةَ أسبوعٍ ولا مستقبل · أساسُ كشفِ الرواتب G11).
  */
 class MonthlyAttendance
 {
@@ -123,6 +128,7 @@ class MonthlyAttendance
         if (! $c) {
             return ['date' => $date, 'kind' => 'off', 'label' => '—', 'tone' => '',
                 'time_in' => null, 'time_out' => null, 'hours' => 0.0, 'missing_out' => false,
+                'invalid_span' => false,
                 'att_id' => null, 'report' => null, 'effective' => null, 'effective_key' => null];
         }
         $kind = $c['on_leave'] ? 'leave'
@@ -151,6 +157,8 @@ class MonthlyAttendance
             'hours' => (float) $c['hours'],
             // F11: دخولٌ بلا انصرافٍ في يومٍ ماضٍ — شذوذٌ يُوسَم، لا ساعاتٌ تُختلق
             'missing_out' => $c['checked_in'] && ! $c['checked_out'] && $date < $today,
+            // G10: صفٌّ مستحيلٌ سابقٌ للحارس (انصرافٌ قبلَ الدخول) — يُفضَح لا يُجمَّل
+            'invalid_span' => \App\Models\Attendance::hasInvalidSpan($c['time_in'], $c['time_out']),
             'att_id' => $c['attendance']?->id,
             'report' => $kind === 'present' ? $c['labels']['compliance'] : null,
             'compliance_key' => $c['compliance'] ?? null,
@@ -166,6 +174,7 @@ class MonthlyAttendance
         return ['present' => 0, 'late' => 0, 'field' => 0, 'leave' => 0, 'absent' => 0,
             'reported' => 0, 'missing' => 0, 'absence_report' => 0, 'off' => 0,
             'future' => 0, 'holiday' => 0, 'unexcused' => 0, 'missing_out' => 0,
+            'invalid_span' => 0, 'scheduled' => 0,
             'attendance_hours' => 0.0, 'reported_hours' => 0.0, 'workdays' => 0];
     }
 
@@ -176,6 +185,10 @@ class MonthlyAttendance
         // كما كان — فعقدُ «العطلُ غيرُ المسجَّلة ليست غياباً في كشف الراتب» لا يُمسّ
         if (in_array($row['kind'], ['future', 'holiday', 'unexcused'], true)) $t['off']++;
         if ($row['missing_out'] ?? false) $t['missing_out']++;   // F11: شذوذُ الشهرِ ظاهرٌ
+        if ($row['invalid_span'] ?? false) $t['invalid_span']++; // G10: واليومُ المستحيلُ كذلك
+        // أيامُ العملِ المجدولةُ التي وقعت (لا عطلةَ أسبوعٍ ولا مستقبل) — مقامُ كشفِ
+        // الرواتب: به يُقاس الحضورُ والغياب، ولا يُحسَب يومٌ لم يحن بعد
+        if ($row['kind'] !== 'future' && ! self::isWeekend($row['date'])) $t['scheduled']++;
         if (! $c) return;
 
         // أيامُ العملِ المسجَّلة (حضورٌ فعليّ) — تُميّز المتأخّرَ والميدانيّ

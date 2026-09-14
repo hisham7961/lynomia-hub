@@ -31,7 +31,16 @@
 @if ($fw)
     <div class="card" style="margin-bottom:12px;border-inline-start:4px solid var(--ok,#27ae60)">
         <h3 style="margin-bottom:4px">🌱 أوّل أسبوع؟ خطواتك الأولى هنا</h3>
-        <div class="sub" style="margin-bottom:8px">أهلاً بك — أربعُ خطواتٍ تجعل أيامك الأولى واضحة،
+        {{-- **العدُّ يُحصي ما يُعرض** (الجولة 2 · G19): كان النصّ يَعِد بـ«أربعِ خطوات»
+             ثابتاً بينما البطاقةُ تعرض ثلاثاً في الحالة الغالبة (رابطُ دليلِ الموظف
+             الجديد لا يظهر إن غابت وثيقتُه، وخطوةُ الفريق تسقط إن كان الدليلُ
+             فارغاً) — فأوّلُ ما يقرؤه الموظفُ الجديد في النظام عددٌ لا يصدق. --}}
+        @php
+            $fwN = count($fw['items']);
+            $fwWord = [1 => 'خطوةٌ واحدة', 2 => 'خطوتان', 3 => 'ثلاثُ خطواتٍ',
+                       4 => 'أربعُ خطواتٍ', 5 => 'خمسُ خطواتٍ'][$fwN] ?? ($fwN . ' خطواتٍ');
+        @endphp
+        <div class="sub" style="margin-bottom:8px">أهلاً بك — {{ $fwWord }} تجعل أيامك الأولى واضحة،
             وتختفي هذه البطاقة وحدها بعد أسبوعين.</div>
         @foreach ($fw['items'] as $it)
             <div style="display:flex;gap:9px;align-items:center;padding:5px 0;border-bottom:1px solid var(--ln)">
