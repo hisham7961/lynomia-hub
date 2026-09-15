@@ -64,6 +64,9 @@
             <tr>
                 <td><b>{{ $emp->name }}</b>@if ($emp->dept)<div class="sub">{{ $emp->dept }}</div>@endif</td>
                 <td>@if ($c['physical'])<span class="bdg {{ hub_tone($c['physical']) }}">{{ $c['physical'] }}</span>
+                    {{-- ورديّةٌ عبرت منتصفَ الليل وما تزال مفتوحة — لا «لم يسجّل» (N-19) --}}
+                    @elseif (! empty($c['open_shift']))
+                        <span class="bdg ok" title="ورديّةٌ بدأت أمس وما تزال مفتوحة">🌙 على رأس العمل منذ {{ substr($c['open_shift']['time_in'], 0, 5) }} (أمس)</span>
                     @else<span class="bdg wn">لم يسجّل</span>@endif</td>
                 <td class="mono sub">{{ $c['time_in'] ?: '—' }}@if($c['time_out']) – {{ $c['time_out'] }}@endif
                     {{-- F11: دخولٌ بلا انصرافٍ في يومٍ ماضٍ — لا سقوطَ صامتاً، ورابطُ تصحيحِ HR --}}

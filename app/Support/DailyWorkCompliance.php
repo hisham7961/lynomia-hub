@@ -198,7 +198,30 @@ class DailyWorkCompliance
                 ->whereDate('work_date', $date)->orderBy('submitted_at')->orderBy('id')->get()
             : collect();
 
-        return self::compose($emp, $date, $atts, $reports);
+        return self::withOpenShift([(string) $emp->id => self::compose($emp, $date, $atts, $reports)],
+            $date)[(string) $emp->id];
+    }
+
+    /**
+     * تعبئةُ `open_shift` لخلايا يومٍ واحد — استعلامٌ واحدٌ للجماعةِ كلِّها.
+     * لا يُملأ إلّا لليومِ الجاري (السؤالُ عن «الآن»)، ولا لمن له ختمُ اليومِ أصلاً.
+     */
+    protected static function withOpenShift(array $cells, string $date): array
+    {
+        if ($date !== BusinessDate::today() || ! $cells) return $cells;
+
+        foreach (Workday::openCrossingByEmp(array_keys($cells)) as $empId => $row) {
+            $c = $cells[$empId] ?? null;
+            if (! $c || $c['checked_in'] || $c['attendance']) continue;
+
+            $cells[$empId]['open_shift'] = [
+                'date' => (string) ($row->date?->toDateString() ?? $row->date),
+                'time_in' => (string) $row->time_in,
+                'since' => substr((string) $row->time_in, 0, 5),
+            ];
+        }
+
+        return $cells;
     }
 
     /**
@@ -229,7 +252,8 @@ class DailyWorkCompliance
                 collect($emp->user_id ? ($repByUser->get($emp->user_id) ?? []) : [])
             );
         }
-        return $out;
+
+        return self::withOpenShift($out, $date);
     }
 
     /**
@@ -519,6 +543,15 @@ class DailyWorkCompliance
         return [
             'employee'      => $emp,
             'date'          => $date,
+            /*
+             * **حقلٌ إضافيٌّ لا قلبَ معنًى** (مجلسُ الخبراء · N-19): `state` جوابُ
+             * «ماذا وقع في هذا اليوم» ويبقى كما هو — عقدٌ منشور. وهذا الحقلُ جوابُ
+             * سؤالٍ آخرَ تعرضه التقارير: «أهو **الآن** على رأسِ عملِه؟». يُملأ
+             * لليومِ الجاري وحدَه ومن الجوابِ الجماعيِّ نفسِه الذي تسأله البطاقةُ
+             * وشاشةُ المدير. ويبقى مفتاحاً **موجوداً دائماً** (‏`null` حين لا ورديّة)
+             * كي لا يبتلعَه `??` في قارئٍ فيمرَّ فارغاً.
+             */
+            'open_shift'    => null,
             'attendance'    => $primary,
             'attendances'   => $atts,
             'multi'         => $atts->count() > 1,                       // §47
@@ -669,6 +702,8 @@ class DailyWorkCompliance
     {
         return [
             'date'            => $c['date'],
+            // إضافةٌ لا كسر: `state` كما هو، ومعه جوابُ «أهو الآن على رأسِ عملِه؟»
+            'open_shift'      => $c['open_shift'] ?? null,
             'checked_in'      => $c['checked_in'],
             'checked_out'     => $c['checked_out'],
             'time_in'         => $c['time_in'],
