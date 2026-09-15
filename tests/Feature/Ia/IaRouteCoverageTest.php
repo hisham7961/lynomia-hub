@@ -103,10 +103,11 @@ class IaRouteCoverageTest extends IaTestCase
         $this->seedCore();
         $ia = $this->ia();
 
-        // وحدةٌ يتيمةٌ أُسنِدت (stations) — m.index يقصد بيتها في التقنية
+        // وحدةٌ أُسنِدت (stations) — m.index يقصد بيتها في «الموارد البشرية»
+        // (انتقل البيتُ بطلبِ المالك: المحطةُ مقعدُ موظّفٍ لا أصلٌ تقنيٌّ صرف)
         $live = $ia->routeLocation('m.index', ['module' => 'stations']);
         $this->assertSame('domain', $live['scope']);
-        $this->assertSame('digital', $live['domain']);
+        $this->assertSame('hr', $live['domain']);
 
         // وحدةٌ مؤرشفةٌ (autos) — لا بيتَ تنقّل، لكنّ المسارَ يُحَلُّ إلى نطاقٍ مؤرشفٍ مصنَّف
         $dep = $ia->routeLocation('m.index', ['module' => 'autos']);

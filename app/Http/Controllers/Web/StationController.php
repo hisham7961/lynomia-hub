@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Asset;
 use App\Models\Station;
 use App\Models\StationAssignment;
 use App\Models\User;
+use App\Support\Custody;
 use App\Support\FlowRunner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -68,6 +70,8 @@ class StationController extends Controller
         $d = $r->validate([
             'user_id' => ['required', 'uuid', 'exists:users,id'],
             'note'    => ['nullable', 'string'],
+            // **عهدةُ الشاغلِ تتبعه — بخيارٍ لا إجبار** (بلاغُ المالك · §30)
+            'move_custody' => ['nullable'],
         ]);
 
         // داخليّةٌ فقط: لا يُسنَد مقعدٌ داخليٌّ لحساب عميل (يُحسَم بالتصنيف الصلب لا الاستنتاج)
@@ -109,14 +113,59 @@ class StationController extends Controller
             ['after' => ['user_id' => $user->id]]);
         $this->fire('assigned', $station);
 
-        return redirect()->route('m.show', ['stations', $station->id])
-            ->with('ok', 'أُسنِدت المحطةُ «' . $station->code . '» إلى ' . $user->name);
+        $moved = $this->moveHeldCustody($station, $user, (bool) ($d['move_custody'] ?? false));
+
+        $msg = 'أُسنِدت المحطةُ «' . $station->code . '» إلى ' . $user->name;
+        if ($moved > 0) $msg .= ' — ونُقلت ' . $moved . ' من عهدتِه إلى المقعد';
+
+        return redirect()->route('m.show', ['stations', $station->id])->with('ok', $msg);
     }
 
     /**
      * إخلاءُ المحطة — يُفرّغ الشاغلَ ويكتب حركةَ إخلاءٍ تحفظ من كان يجلس، في المعاملةِ
      * المقفلةِ نفسها. حركةُ الإخلاء تبقى أثراً بعد مغادرة الموظف.
      */
+    /**
+     * **عهدةُ الشاغلِ تتبعه إلى مقعدِه** (بلاغُ المالك: «لا تنتقل عهدُ الشخص للمحطة»).
+     *
+     * النظامُ كان يملك القطعتَين ولا يملك السلك: `assets.holder_id` و
+     * `assets.station_id` عمودان **منفصلان** ومقفلان خلفَ `Custody` المُدقَّقة،
+     * و`Custody::assignStation()` مكتوبةٌ وتعمل — ولم يكن أحدٌ يستدعيها عند
+     * إسنادِ الموظّف. فيُسنَد المقعدُ ويبقى حاسوبُه مسجَّلاً «بلا مقعد».
+     *
+     * **وبخيارٍ لا إجبار** (§30: «أصلٌ يُسنَد لموظفٍ أو لمحطةٍ أو لكليهما — لا
+     * إجبار»): هاتفٌ محمولٌ لا يُثبَّت على مكتب. والنقلُ يمرّ بـ`Custody` نفسِها
+     * فيُقيَّد في دفترِ العهدة صفّاً صفّاً — أثرٌ لا تغييرٌ صامت.
+     *
+     * والحدودُ صريحة: **عهدةُ الشاغلِ وحدَه**، وفي **نطاقِ قارئٍ** يملك تعديلَ
+     * الأصول، وما ليس على هذا المقعدِ أصلاً — وسقفٌ يمنع دفعةً هاربة.
+     */
+    protected function moveHeldCustody(Station $station, User $user, bool $requested): int
+    {
+        if (! $requested) return 0;
+        if (! hub_can(auth()->user(), 'assets', 'e')) return 0;
+
+        $held = hub_scope(Asset::query(), 'assets')
+            ->whereNull('deleted_at')
+            ->where('holder_id', $user->id)
+            ->where(fn ($q) => $q->whereNull('station_id')->orWhere('station_id', '!=', $station->id))
+            ->orderBy('id')->limit(200)->get();
+
+        $n = 0;
+        foreach ($held as $asset) {
+            Custody::assignStation($asset, (string) $station->id, now()->toDateString(),
+                'نقلٌ مع إسنادِ المقعد «' . $station->code . '»');
+            $n++;
+        }
+
+        if ($n > 0) {
+            hub_audit('نقل عهدة مع إسناد محطة', 'stations', $station->id, (string) $station->code,
+                ['after' => ['user_id' => $user->id, 'assets_moved' => $n]]);
+        }
+
+        return $n;
+    }
+
     public function vacate(Request $r, string $id)
     {
         abort_unless(hub_can(auth()->user(), 'stations', 'e'), 403, 'لا تملك تعديل المحطات');

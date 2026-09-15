@@ -283,6 +283,10 @@ return [
                     ['type' => 'module', 'module' => 'recruit', 'importance' => 'secondary'],
                 ]],
                 'workforce' => ['label' => 'القوى والأداء', 'order' => 4, 'destinations' => [
+                    // **مقعدُ الموظّف** (بلاغُ المالك): المحطةُ تُسأل من هنا كما تُسأل من
+                    // مساحةِ التقنية — بيتان لوحدةٍ واحدةٍ في الخريطة، ومدخلٌ واحدٌ في الشريط.
+                    ['type' => 'module', 'module' => 'stations', 'importance' => 'secondary',
+                     'label' => 'المحطات (مقاعد الموظفين)'],
                     ['type' => 'center', 'center' => 'workteam', 'importance' => 'secondary'],
                     ['type' => 'center', 'route' => 'workforce.overview', 'guard' => 'workforce_overview', 'importance' => 'advanced',
                         'key' => 'workforce_overview', 
@@ -335,8 +339,10 @@ return [
                         'key' => 'endpoints_releases', 
                         'label' => 'إصدارات الوكيل', 'routes' => ['endpoints.releases', 'endpoints.releases.download'],
                         'synonyms' => ['agent releases', 'إصدارات الوكيل']],
-                    // stations — يتيمٌ أُسند هنا؛ وحدةٌ عاديّة (m.index) بحارس hub_can
-                    ['type' => 'module', 'module' => 'stations', 'importance' => 'secondary', 'label' => 'الأجهزة والمحطات'],
+                    // stations انتقلت إلى مجال «الموارد البشرية» (بلاغُ المالك): المحطةُ
+                    // **مقعدُ موظّف** لا أصلٌ تقنيٌّ صرف، ومن يسأل عنها يسأل من هناك.
+                    // والجانبُ التقنيُّ للأجهزة تخدمه `endpoints` ومركزُها في هذا المجال.
+                    // (خريطةُ المعلومات تفرض **بيتاً واحداً** لكلِّ وحدة — IaFinalAuditTest.)
                 ]],
                 'accounts' => ['label' => 'الحسابات والاتصالات', 'order' => 3, 'destinations' => [
                     ['type' => 'module', 'module' => 'accounts', 'importance' => 'secondary'],
