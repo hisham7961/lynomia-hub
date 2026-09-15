@@ -2,11 +2,7 @@
 @section('title', 'مركز التقارير اليومية')
 @section('content')
 @php
-    $effTone = fn ($e) => match ($e) {
-        'present' => 'ok', 'leave' => 'ac', 'absent_due_to_missing_report' => 'bad',
-        'non_compliant' => 'wn', 'absent' => 'bad', 'excused' => 'ac', default => '' };
-    $repTone = fn ($c) => match ($c) {
-        'compliant' => 'ok', 'late' => 'wn', 'missing' => 'bad', 'pending' => 'wn', default => '' };
+    // النغمةُ من الكاتبِ (N-29) — كانت ذراعُ `default` هنا تخالف «فريقي اليوم»
     $d = \Illuminate\Support\Carbon::parse($date);
 @endphp
 <div class="hero">
@@ -63,7 +59,7 @@
             @php $emp = $c['employee']; @endphp
             <tr>
                 <td><b>{{ $emp->name }}</b>@if ($emp->dept)<div class="sub">{{ $emp->dept }}</div>@endif</td>
-                <td>@if ($c['physical'])<span class="bdg {{ hub_tone($c['physical']) }}">{{ $c['physical'] }}</span>
+                <td>@if ($c['physical'])<span class="bdg {{ $c['tones']['physical'] }}">{{ $c['physical'] }}</span>
                     {{-- ورديّةٌ عبرت منتصفَ الليل وما تزال مفتوحة — لا «لم يسجّل» (N-19) --}}
                     @elseif (! empty($c['open_shift']))
                         <span class="bdg ok" title="ورديّةٌ بدأت أمس وما تزال مفتوحة">🌙 على رأس العمل منذ {{ substr($c['open_shift']['time_in'], 0, 5) }} (أمس)</span>
@@ -77,14 +73,14 @@
                             <span class="bdg wn" title="دخولٌ بلا انصراف — الساعاتُ لا تُحتسب حتى يُصحَّح">انصراف مفقود</span>
                         @endif
                     @endif</td>
-                <td><span class="bdg {{ $repTone($c['compliance']) }}">{{ $c['labels']['compliance'] }}</span>
+                <td><span class="bdg {{ $c['tones']['compliance'] }}">{{ $c['labels']['compliance'] }}</span>
                     @if ($c['late'])<span class="bdg wn">متأخّر</span>@endif</td>
                 <td class="sub">{{ \Illuminate\Support\Str::limit(collect($c['projects'])->map(fn($p)=>$projLabels[$p]??'—')->implode(' · '), 32) ?: ($c['has_non_project'] ? 'عمل داخليّ' : '—') }}</td>
                 <td class="mono">{{ $c['reported_hours'] ? number_format($c['reported_hours'],1) : '—' }}</td>
                 <td>@if ($c['review']['needs_revision'])<span class="bdg wn">تنقيح</span>
                     @elseif ($c['review']['pending'])<span class="bdg">بانتظار</span>
                     @elseif ($c['review']['accepted'])<span class="bdg ok">مقبول</span>@else —@endif</td>
-                <td>@if ($c['verdict_pending'] ?? false)<span class="bdg" title="لم يبدأ الدوامُ بعد — لا يُعلَن حكمٌ قبل موعده">—</span>@else<span class="bdg {{ $effTone($c['effective']) }}" title="{{ $c['reason'] }}">{{ $c['labels']['effective'] }}</span>@endif</td>
+                <td>@if ($c['verdict_pending'] ?? false)<span class="bdg" title="لم يبدأ الدوامُ بعد — لا يُعلَن حكمٌ قبل موعده">—</span>@else<span class="bdg {{ $c['tones']['effective'] }}" title="{{ $c['reason'] }}">{{ $c['labels']['effective'] }}</span>@endif</td>
                 <td>@if ($emp->user_id)<a class="btn ghost xs" href="{{ route('reports.day', ['emp' => $emp->id, 'date' => $date]) }}">تفصيل ↗</a>@endif</td>
             </tr>
         @empty

@@ -100,12 +100,21 @@ class IaModuleCoverageTest extends IaTestCase
             ->firstWhere('module', 'restores')['tag'] ?? null;
         $this->assertSame('SYSTEM_ONLY', $restoresTag);
 
-        // endpoints, stations → التقنية/البنية التحتية
-        foreach (['endpoints', 'stations'] as $mk) {
-            $this->assertSame(['digital', 'infra'],
-                [$ia->primaryLocation($mk)['domain'] ?? null, $ia->primaryLocation($mk)['section'] ?? null],
-                "اليتيمُ {$mk} ليس في التقنية/البنية التحتية");
-        }
+        // endpoints → التقنية/البنية التحتية
+        $this->assertSame(['digital', 'infra'],
+            [$ia->primaryLocation('endpoints')['domain'] ?? null, $ia->primaryLocation('endpoints')['section'] ?? null],
+            'اليتيمُ endpoints ليس في التقنية/البنية التحتية');
+
+        /*
+         * **stations انتقلت إلى «الموارد البشرية» بطلبِ المالك.** المحطةُ مقعدُ
+         * موظّفٍ لا أصلٌ تقنيٌّ صرف، ومن يُسنِد المقاعدَ يسأل عنها من هناك — وكانت
+         * قبلَها بلا مدخلٍ في الشريطِ إطلاقاً (قائمةُ `hub_nav` منفصلةٌ عن السجلّ)
+         * حتى اكتشفها المالكُ صدفة. والجانبُ التقنيُّ للأجهزة تخدمه `endpoints`.
+         * وخريطةُ المعلومات تفرض **بيتاً واحداً** لكلِّ وحدة، فالانتقالُ نقلٌ لا نسخ.
+         */
+        $this->assertSame(['hr', 'workforce'],
+            [$ia->primaryLocation('stations')['domain'] ?? null, $ia->primaryLocation('stations')['section'] ?? null],
+            'المحطاتُ بيتُها الآن «الموارد البشرية ← القوى والأداء»');
 
         // autos → مؤرشفٌ بلا بيتٍ، والمسارُ m.index[autos] يبقى يعمل (صفر فقدان)
         $this->assertNull($ia->primaryLocation('autos'));

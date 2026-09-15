@@ -198,7 +198,10 @@ class MonthlyAttendance
         // أيامُ العملِ المسجَّلة (حضورٌ فعليّ) — تُميّز المتأخّرَ والميدانيّ
         if ($c['checked_in']) {
             $t['attendance_hours'] += (float) $c['hours'];
-            if (($c['physical'] ?? '') === Workday::LATE) $t['late']++;
+            // **التعريفُ الواحدُ لا الوسمُ وحدَه** (N-28): كان الصفُّ اليدويُّ
+            // «حاضر» بـ`time_in='10:30'` يُعَدُّ متأخّراً في النداءِ اليوميّ
+            // و**في الوقتِ** هنا — في الكشفِ الذي يُصدَّر.
+            if ($c['late_arrival'] ?? (($c['physical'] ?? '') === Workday::LATE)) $t['late']++;
             if (in_array($c['physical'] ?? '', [Workday::FIELD, Workday::REMOTE], true)) $t['field']++;
             $t['workdays']++;
         }

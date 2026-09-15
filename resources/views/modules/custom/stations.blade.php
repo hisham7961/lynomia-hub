@@ -122,6 +122,16 @@
                             </select></div>
                             <div class="fld fw"><label for="st-note">ملاحظة (اختياري)</label>
                                 <input class="inp" id="st-note" name="note" maxlength="500" placeholder="مثال: مقعدٌ دائمٌ في قسم الدعم"></div></div>
+                        {{-- عهدةُ الشاغلِ تتبعه إلى مقعدِه — **بخيارٍ لا إجبار** (§30):
+                             أصلٌ قد يكون بيدِ موظّفٍ وعلى محطةٍ معاً، وهاتفٌ محمولٌ
+                             لا يُثبَّت على مكتب. والنقلُ يُقيَّد في دفترِ العهدة. --}}
+                        @if (hub_can(auth()->user(), 'assets', 'e'))
+                            <label class="sub" style="display:flex;gap:7px;align-items:flex-start;margin-top:9px;cursor:pointer">
+                                <input type="checkbox" name="move_custody" value="1" checked style="margin-top:3px">
+                                <span>📦 <b>انقل عهدةَ الموظّفِ إلى هذه المحطة</b> — كلُّ أصلٍ بيدِه
+                                    يُسنَد لهذا المقعد، ويُقيَّد النقلُ في دفترِ العهدة أثراً مدقَّقاً.</span>
+                            </label>
+                        @endif
                         <button class="btn p sm" style="margin-top:10px">👤 تسجيل الإسناد</button>
                     </form>
                     @if ($row->current_employee_id)

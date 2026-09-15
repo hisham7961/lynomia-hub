@@ -2,9 +2,7 @@
 @section('title', 'تفصيل يوم — ' . $emp->name)
 @section('content')
 @php
-    $effTone = match ($c['effective']) {
-        'present' => 'ok', 'leave' => 'ac', 'absent_due_to_missing_report' => 'bad',
-        'non_compliant' => 'wn', 'absent' => 'bad', 'excused' => 'ac', default => '' };
+    $effTone = $c['tones']['effective'];   // النغمةُ من الكاتب (N-29)
     $canReview = \App\Support\ReportReview::canReviewAny(auth()->user());
     $canFinalize = hub_can(auth()->user(), 'hr', 'e') || auth()->user()->role?->is_owner;
 @endphp

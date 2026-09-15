@@ -290,12 +290,18 @@ class DailyWorkCompliance
                 ->whereDate('work_date', $date)->orderBy('submitted_at')->orderBy('id')->get()->groupBy('created_by')
             : collect();
 
+        // **خرائطُ المجموعةِ لا سؤالٌ لكلِّ موظّف** (N-20): كانت `compose` تسأل
+        // `onLeave` و`excuseFor` صفّاً صفّاً — أربعةُ استعلاماتٍ لكلِّ موظّف.
+        [$onLeave, $excusedMap] = self::batchMaps($empIds, $date, $date);
+
         $out = [];
         foreach ($emps as $emp) {
             $out[$emp->id] = self::compose(
                 $emp, $date,
                 collect($attByEmp->get($emp->id) ?? []),
-                collect($emp->user_id ? ($repByUser->get($emp->user_id) ?? []) : [])
+                collect($emp->user_id ? ($repByUser->get($emp->user_id) ?? []) : []),
+                $onLeave($emp->id, $date),
+                $excusedMap
             );
         }
 
@@ -309,6 +315,39 @@ class DailyWorkCompliance
      *
      * @param  array<int,string>  $dates  قائمةُ تواريخِ 'Y-m-d' مرتّبة
      */
+    /**
+     * **خرائطُ المجموعةِ لمدى تواريخ** (N-20) — استعلامان اثنان يخدمان كلَّ الخلايا.
+     *
+     * كانت هذه الشيفرةُ تعيش في `resolveRange` وحدَه، و`resolveMany` يسأل القاعدةَ
+     * **لكلِّ موظّف**: `Workday::onLeave` و`excuseFor`، ومعهما فحصا `hasTable`.
+     * أربعةُ استعلاماتٍ لكلِّ موظّفٍ في دالّةٍ ترويستُها تَعِد بـ«استعلامَين»
+     * (قِيست: ٦ موظّفين ⇒ ٢٨ استعلاماً · ٢٠ ⇒ ٨٣) — و`teamDaily` في الـAPI
+     * يمرّر حتى خمسَمئة. فالبانيةُ واحدةٌ الآن يستعملها الاثنان.
+     *
+     * @return array{0: \Closure, 1: array}  [دالّةُ «أفي إجازة؟»، خريطةُ الأعذار]
+     */
+    protected static function batchMaps(array $empIds, string $from, string $to): array
+    {
+        $leaveRows = collect();
+        if (\Illuminate\Support\Facades\Schema::hasTable('leave_requests')) {
+            $leaveRows = \App\Models\LeaveRequest::whereNull('deleted_at')->whereIn('emp_id', $empIds)
+                ->where('status', 'معتمد')->whereIn('type', config('hub.leave.deduct_types', []))
+                ->whereDate('date_from', '<=', $to)
+                ->where(fn ($q) => $q->whereDate('date_to', '>=', $from)->orWhereNull('date_to'))
+                ->get(['emp_id', 'date_from', 'date_to'])->groupBy('emp_id');
+        }
+
+        $onLeave = function ($empId, string $date) use ($leaveRows): bool {
+            foreach ($leaveRows->get($empId) ?? [] as $r) {
+                $f = self::dstr($r->date_from); $t = $r->date_to ? self::dstr($r->date_to) : null;
+                if ($f <= $date && ($t === null || $t >= $date)) return true;
+            }
+            return false;
+        };
+
+        return [$onLeave, self::excusedMap($empIds, $from, $to)];
+    }
+
     public static function resolveRange(Collection $emps, array $dates): array
     {
         if ($emps->isEmpty() || ! $dates) return [];
@@ -326,25 +365,8 @@ class DailyWorkCompliance
                 ->groupBy(fn ($w) => $w->created_by . '|' . self::dstr($w->work_date))
             : collect();
 
-        // خريطةُ الإجازاتِ المعتمدةِ (أنواعُ الخصم) المتداخلةِ مع المدى — لكلِّ موظّف
-        $leaveRows = collect();
-        if (\Illuminate\Support\Facades\Schema::hasTable('leave_requests')) {
-            $leaveRows = \App\Models\LeaveRequest::whereNull('deleted_at')->whereIn('emp_id', $empIds)
-                ->where('status', 'معتمد')->whereIn('type', config('hub.leave.deduct_types', []))
-                ->whereDate('date_from', '<=', $to)
-                ->where(fn ($q) => $q->whereDate('date_to', '>=', $from)->orWhereNull('date_to'))
-                ->get(['emp_id', 'date_from', 'date_to'])->groupBy('emp_id');
-        }
-        $onLeave = function ($empId, string $date) use ($leaveRows): bool {
-            foreach ($leaveRows->get($empId) ?? [] as $r) {
-                $f = self::dstr($r->date_from); $t = $r->date_to ? self::dstr($r->date_to) : null;
-                if ($f <= $date && ($t === null || $t >= $date)) return true;
-            }
-            return false;
-        };
-
-        // الأعذارُ غيرُ الخصميّةِ للمجموعةِ كلِّها — استعلامٌ واحدٌ كخريطةِ الإجازات
-        $excusedMap = self::excusedMap($empIds, $from, $to);
+        // خرائطُ المجموعةِ — البانيةُ نفسُها التي يسألها `resolveMany` (N-20)
+        [$onLeave, $excusedMap] = self::batchMaps($empIds, $from, $to);
 
         $out = [];
         foreach ($emps as $emp) {
@@ -392,6 +414,29 @@ class DailyWorkCompliance
      * في فئةِ `pending` («بانتظار قرار») لا في الغياب. والصفُّ المختومُ صراحةً
      * («غائب» من كنسِ نهايةِ اليوم) حكمٌ قائمٌ لا تؤجّله الساعةُ ولا يُخفيه طلب.
      */
+    /**
+     * **أوصلَ متأخّراً؟** (التحقّقُ الرابع عشر · N-28)
+     *
+     * سؤالٌ كان له تعريفان: `rollCall` يشتقّه من وقتِ الختمِ نفسِه «فلا يفلت صفٌّ
+     * يدويٌّ بلا وسم»، و`MonthlyAttendance` يقرأ **الوسمَ وحدَه**. فصفٌّ تُدخله
+     * المواردُ بـ`10:30` وحالتُه «حاضر» كان **متأخّراً في النداءِ اليوميّ
+     * وفي الوقتِ في الكشفِ الشهريّ** — والشهريُّ هو ما يُصدَّر.
+     *
+     * والتعريفُ هنا هو تعريفُ النداءِ حرفاً: الوسمُ المختومُ يكفي، وإن كان الصفُّ
+     * «حاضر» بلا وسمٍ فالحكمُ من وقتِ الختمِ مقارَناً بدقائقِ اليوم (لا نصّاً —
+     * فبدايةٌ قربَ منتصفِ الليل كانت تلتفّ، كما في `Workday::checkIn`).
+     */
+    public static function lateArrival(?string $physical, ?string $timeIn): bool
+    {
+        if ($physical === Workday::LATE) return true;
+        if ($physical !== Workday::PRESENT || ! $timeIn) return false;
+        $startMin = self::workdayStartMinute();
+        if ($startMin === null) return false;
+        [$h, $m] = array_map('intval', array_pad(explode(':', (string) $timeIn), 3, 0));
+
+        return ($h * 60 + $m) > $startMin;
+    }
+
     /**
      * دقيقةُ بدءِ الدوامِ + سماحيةُ التأخّر — أو `null` إن لم يُضبَط المفهوم.
      * قراءةٌ واحدةٌ يسألها النداءُ والكاتب (`sec.hours_start` + `work.late_grace`).
@@ -479,11 +524,8 @@ class DailyWorkCompliance
             }
 
             if ($c['checked_in']) {
-                $late = $c['physical'] === Workday::LATE;
-                if (! $late && $startMin !== null && $c['time_in'] && $c['physical'] === Workday::PRESENT) {
-                    [$h, $m] = array_map('intval', array_pad(explode(':', (string) $c['time_in']), 3, 0));
-                    $late = ($h * 60 + $m) > $startMin;
-                }
+                // التعريفُ الواحد (N-28) — كان يُشتقّ هنا وحدَه فاختلف عنه الشهريّ
+                $late = (bool) $c['late_arrival'];
                 $buckets[$late ? 'late' : 'present'][] = $entry;
                 if ($c['report_required'] && ! $c['report_submitted']) $buckets['noreport'][] = $entry;
                 continue;
@@ -650,6 +692,8 @@ class DailyWorkCompliance
              * دائماً** (`false`) كي لا يبتلعَه `??` فيمرَّ فارغاً.
              */
             'verdict_pending' => false,
+            // **أوصلَ متأخّراً؟** (N-28) — جوابٌ واحدٌ يسأله النداءُ والكشفُ الشهريّ
+            'late_arrival'  => self::lateArrival($physical, $timeIn),
             'attendance'    => $primary,
             'attendances'   => $atts,
             'multi'         => $atts->count() > 1,                       // §47
@@ -686,6 +730,7 @@ class DailyWorkCompliance
             'needs_review'  => $reportSubmitted && ($review['pending'] > 0 || $review['needs_revision'] > 0),
             'reason'        => self::reason($state, $effective, $deadline),
             'labels'        => self::labels($physical, $state, $effective, $compliance),
+            'tones'         => self::tones($physical, $effective, $compliance),
         ];
     }
 
@@ -804,6 +849,7 @@ class DailyWorkCompliance
             'open_shift'      => $c['open_shift'] ?? null,
             // ومعه «أحانَ وقتُ الحكمِ أصلاً؟» — فلا يقرأ عميلُ الـAPI «غائباً» في الفجر
             'verdict_pending' => (bool) ($c['verdict_pending'] ?? false),
+            'late_arrival'    => (bool) ($c['late_arrival'] ?? false),
             'checked_in'      => $c['checked_in'],
             'checked_out'     => $c['checked_out'],
             'time_in'         => $c['time_in'],
@@ -862,6 +908,41 @@ class DailyWorkCompliance
             self::ABSENT_DUE_TO_MISSING_REPORT => 'غياب بسبب عدم تقديم التقرير',
             default => '',
         };
+    }
+
+    /**
+     * **نغمةُ العرضِ من الكاتبِ لا من كلِّ شاشة** (التحقّقُ الرابع عشر · N-29).
+     *
+     * كانت ثلاثُ شاشاتٍ تُعرِّف الخريطةَ لنفسِها. وخريطةُ `effective` تطابقت
+     * صدفةً، أمّا `compliance` فاختلفت في **ذراعِ `default`**: «فريقي اليوم»
+     * تطليها `bad` و«مركز التقارير» تتركها محايدة. وقيمتان تسقطان في تلك
+     * الذراعِ معاً: `none` (كلُّ من لا حضورَ له ولا تقرير) و`reported` —
+     * وتسميةُ الثانية «مقدَّم (بلا حضور)»، أي **مُقدَّم**، فتُطلى حمراءَ في
+     * شاشةٍ ومحايدةً في أخرى.
+     *
+     * فكلُّ قيمةٍ هنا **صريحة**، ولا ذراعَ `default` تملؤها كلُّ شاشةٍ بهواها.
+     * و`none` محايدةٌ عمداً: قصّةُ ذلك اليومِ غيابٌ يرويه عمودُ «الحالة
+     * المحتسَبة» أحمرَ — ولا يُنذَر بالأمرِ نفسِه مرّتَين في صفٍّ واحد.
+     */
+    protected static function tones(?string $physical, string $effective, string $compliance): array
+    {
+        return [
+            'physical' => $physical ? hub_tone($physical) : 'wn',
+            'effective' => match ($effective) {
+                'present' => 'ok',
+                'leave', 'excused' => 'ac',
+                'absent', 'absent_due_to_missing_report' => 'bad',
+                'non_compliant' => 'wn',
+                default => '',
+            },
+            'compliance' => match ($compliance) {
+                'compliant' => 'ok',
+                'late', 'pending' => 'wn',
+                'missing' => 'bad',
+                'not_required', 'reported', 'none' => '',
+                default => '',
+            },
+        ];
     }
 
     /** بطاقاتُ عرضٍ جاهزةٌ للشاشات (نصٌّ عربيٌّ لكلِّ حقيقة) */
