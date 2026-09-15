@@ -131,7 +131,10 @@ class CouncilRetest11Test extends TestCase
     {
         $ref = new \ReflectionClass(\App\Http\Middleware\WorkHours::class);
         $exempt = (array) $ref->getConstant('NIGHT_EXEMPT');
-        $catalog = (array) (config('hub_permissions.exportNight.modules') ?? []);
+        // `'*'` اصطلاحُ الكتالوجِ لـ«كلُّ الوحدات» (N-8) — يُوسَّع هنا كما يوسّعه
+        // `RoleController` و`PermissionInspector`، فالاختبارُ يقيس ما يراه المستخدم
+        $raw = config('hub_permissions.exportNight.modules') ?? [];
+        $catalog = $raw === '*' ? array_keys(hub_modules()) : (array) $raw;
 
         foreach (['custody.label', 'custody.spec', 'custody.permit.doc'] as $name) {
             $mod = $exempt[$name] ?? null;

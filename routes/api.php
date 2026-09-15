@@ -197,6 +197,14 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     // قبل catch-all `{module}` كي لا يبتلعها. التقديمُ يُعادُ استعمالُ CRUD الوحدة updates.
     Route::get('work/today', [\App\Http\Controllers\Api\MobileReportsController::class, 'today'])->name('mobile.work.today');
     Route::get('work/daily-report', [\App\Http\Controllers\Api\MobileReportsController::class, 'today'])->name('mobile.work.daily_report');
+    /*
+     * «وثائقي» (مجلس الخبراء · N-5 · تكافؤُ السطحَين): `home` يُنذر صاحبَ الشأنِ
+     * بوثيقتِه ولم يكن في العقدِ بابٌ يفتحها — إنذارٌ بلا وجهة. التفويضُ ارتباطُ
+     * `employees.user_id` كـ«عهدتي»، والقاعدةُ `EmployeeDocuments` نفسُها التي
+     * يقرؤها الويب. حرفيّةٌ قبل الـcatch-all، كسائرِ مسارات `me/*`.
+     */
+    Route::get('me/documents', [\App\Http\Controllers\Api\MobileWorkController::class, 'myDocuments'])->name('mobile.me.documents.index');
+    Route::get('me/documents/{id}/file', [\App\Http\Controllers\Api\MobileWorkController::class, 'myDocumentFile'])->name('mobile.me.documents.file');
     Route::get('prefs', [\App\Http\Controllers\Api\MobileWorkController::class, 'prefs'])->name('mobile.prefs.index');
     Route::put('prefs', [\App\Http\Controllers\Api\MobileWorkController::class, 'prefsUpdate'])->name('mobile.prefs.update');
     Route::post('prefs/pin', [\App\Http\Controllers\Api\MobileWorkController::class, 'pin'])->name('mobile.prefs.pin');

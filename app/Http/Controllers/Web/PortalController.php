@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Attachment;
 use App\Models\Employee;
+use App\Support\AttachmentService;
+use App\Support\DocumentPolicy;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * بوابة الموظف: «بوابتي» للمستخدم الحالي، و«الملف الشامل» لمن يملك عرض HR.
@@ -23,7 +27,56 @@ class PortalController extends Controller
 
         return view('portal.me', ['emp' => $emp, 'self' => true,
             'inbox' => $inbox, 'buckets' => \App\Support\Inbox::summary($inbox),
+            // **وثائقي** (N-5): الرادارُ يسوق صاحبَ الشأنِ إلى هنا بوثيقتِه — فلتكن هنا
+            'myDocs' => $this->myDocs(),
         ] + $this->bundle($emp, auth()->id()));
+    }
+
+    /* ────────── وثائقي (مجلس الخبراء · N-5) ────────── */
+
+    /**
+     * **القاعدةُ في `EmployeeDocuments` لا هنا.** كانت مكتوبةً في هذا المتحكّمِ
+     * وحدَه، فبقي الجوالُ يُنذر بوثيقةٍ ولا يجد بابَها — **نصفُ إغلاقٍ ينتج نصفَ
+     * عيب**. فاستُخرجت إلى سلطةٍ واحدةٍ يقرؤها السطحان، ولا يفترقان غداً.
+     */
+    protected function myDocs(): array
+    {
+        return \App\Support\EmployeeDocuments::forUser(auth()->user());
+    }
+
+    /** الوثيقةُ التي أثبتُّ أنّها لي — أو ٤٠٤ (لا نُثبت وجودَ ما لا يخصّه) */
+    protected function myDoc(string $id): Attachment
+    {
+        $a = \App\Support\EmployeeDocuments::find(auth()->user(), $id);
+        abort_unless($a, 404);
+
+        return $a;
+    }
+
+    /** تنزيلُ وثيقةٍ من ملفّي — الأثرُ والحاجزُ كما في كلِّ بابٍ آخر */
+    public function docDownload(string $id)
+    {
+        $a = $this->myDoc($id);
+        abort_unless(DocumentPolicy::subjectMay(auth()->user(), $a, 'download'), 403,
+            'وصولُ هذه الوثيقةِ مقيَّدٌ بقاعدةٍ صريحة');
+
+        hub_audit('فتح وثيقةً من ملفّه', 'hr', (string) $a->record_id,
+            (string) ($a->original_name ?: $a->kind));
+
+        return AttachmentService::serve($a);
+    }
+
+    /** معاينةُ وثيقةٍ من ملفّي (نظيرُ التنزيل — نفسُ القاعدةِ ونفسُ الأثر) */
+    public function docPreview(string $id)
+    {
+        $a = $this->myDoc($id);
+        abort_unless(DocumentPolicy::subjectMay(auth()->user(), $a, 'preview'), 403,
+            'معاينةُ هذه الوثيقةِ مقيَّدةٌ بقاعدةٍ صريحة');
+
+        hub_audit('عاين وثيقةً من ملفّه', 'hr', (string) $a->record_id,
+            (string) ($a->original_name ?: $a->kind));
+
+        return AttachmentService::streamServe($a);
     }
 
     /**

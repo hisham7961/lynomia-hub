@@ -201,6 +201,19 @@ class AttachmentService
         // نفسُ طبقةِ الوثيقةِ على المعاينة (نظيرُ التنزيل): منعٌ صريحٌ ⇒ ٤٠٣ — لا معاينةَ تتجاوز
         DocumentPolicy::authorize(auth()->user(), $a, 'preview');
 
+        return self::streamServe($a);
+    }
+
+    /**
+     * **بثُّ ملفِّ المرفقِ بعد التخويل** — الجزءُ الخادمُ من `stream`، نظيرُ ما فعله
+     * `serve()` مع `download` (الجولة 1 · F25). استُخرج (N-5) كي تستعمله بوّابةُ
+     * الموظّفِ التي تخويلُها **ارتباطُ `employees.user_id`** + `DocumentPolicy`
+     * لا مصفوفةُ `hub_can` التي يفرضها `guardRecord`.
+     *
+     * **ليس** بديلاً عن التخويل: شرطُ استدعاءٍ أن يكون المُنادي حرَس.
+     */
+    public static function streamServe(Attachment $a): \Symfony\Component\HttpFoundation\Response
+    {
         abort_if($a->av_status === 'infected', 423, 'حُجب هذا الملف — وُسم مصاباً بفحص الفيروسات');
         // SVG/HTML مرفوعٌ لا يُعاين حيّاً (قد يحمل سكربتاً) — يُنزَّل attachment فلا يُنفَّذ
         abort_unless(in_array($a->mime, self::INLINE_MIMES, true), 415, 'هذا النوع يُنزَّل ولا يُعاين');

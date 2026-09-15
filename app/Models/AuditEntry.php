@@ -24,6 +24,12 @@ class AuditEntry extends Model
         self::$liveColumns = null;
     }
 
+    /** أعمدةُ الجدولِ للقرّاءِ الخارجيّين (حارسُ `hub_audit`) — نفسُ المخبأ */
+    public static function liveColumnNames(): array
+    {
+        return self::liveColumns();
+    }
+
     protected static function liveColumns(): array
     {
         if (self::$liveColumns === null) {

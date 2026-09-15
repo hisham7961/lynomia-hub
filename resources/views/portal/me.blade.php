@@ -126,6 +126,52 @@
 
 @include('portal._hr')
 
+{{-- ═══ وثائقي (مجلس الخبراء · N-5) ═══
+     رادارُ «ينتهي قريباً» يُنذر صاحبَ الشأنِ بإقامتِه ويسوقه إلى هذه الصفحة —
+     فكانت وجهةً بلا شيءٍ خلفَها. القسمُ خدمةٌ ذاتيّةٌ كـ«عهدتي»: الارتباطُ
+     بالملفِّ هو التفويض، والقاعدةُ قاعدةُ الرادارِ نفسُها فلا ينذر بما تردّه. --}}
+@if (count($myDocs ?? []))
+<div class="card pad0" id="mydocs">
+    <h3 style="padding:12px 14px 0">📄 وثائقي
+        <span class="bdg g">{{ count($myDocs) }}</span>
+        <span class="sub" style="font-weight:400">— ما على ملفّك، ومتى ينتهي</span>
+    </h3>
+    <div class="tblwrap"><table class="tbl">
+        <thead><tr><th>الوثيقة</th><th>الملف</th><th>ينتهي</th><th>الحالة</th><th></th></tr></thead>
+        <tbody>
+        @foreach ($myDocs as $d)
+            <tr>
+                <td><b>{{ $d['label'] }}</b>@if ($d['doc_no'])<span class="sub mono"> · {{ $d['doc_no'] }}</span>@endif</td>
+                <td class="sub">{{ \Illuminate\Support\Str::limit($d['name'], 36) }}</td>
+                <td class="mono">{{ $d['date'] ?? '—' }}</td>
+                <td>
+                    @if ($d['days'] === null)
+                        <span class="sub">بلا تاريخ انتهاء</span>
+                    @else
+                        <span class="bdg {{ $d['tone'] }}">{{ $d['days'] < 0
+                            ? 'انتهت منذ ' . abs($d['days']) . ' يوم'
+                            : ($d['days'] === 0 ? 'تنتهي اليوم!' : 'بعد ' . $d['days'] . ' يوم') }}</span>
+                    @endif
+                </td>
+                <td style="white-space:nowrap">
+                    @if ($d['infected'])
+                        {{-- حاجزُ الإصابةِ يُقال قبل النقر لا بعده --}}
+                        <span class="bdg bad" title="وُسم مصاباً بفحص الفيروسات">⛔ محجوب</span>
+                    @else
+                        <a class="btn ghost xs" href="{{ route('portal.doc.view', $d['id']) }}" target="_blank" rel="noopener">👁 معاينة</a>
+                        <a class="btn ghost xs" href="{{ route('portal.doc.dl', $d['id']) }}">⬇ تحميل</a>
+                    @endif
+                </td>
+            </tr>
+        @endforeach
+        </tbody>
+    </table></div>
+    <div class="sub" style="padding:8px 14px 12px">
+        هذه وثائقُ ملفِّك أنت. تجديدُها مسؤوليّتُك، ورفعُ البديلِ يمرّ بالموارد البشريّة.
+    </div>
+</div>
+@endif
+
 <style>
 .inbrow { display:flex; gap:10px; align-items:center; padding:9px 4px; border-bottom:1px solid var(--ln) }
 .inbrow:last-child { border-bottom:0 }

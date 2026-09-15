@@ -63,8 +63,30 @@ class FlowController extends Controller
             'total'    => $all->count(),
             'onCount'  => $all->where('enabled', true)->count(),
             'q'        => $q, 'only' => $only, 'group' => $group,
-            'users'    => \App\Models\User::whereNull('deleted_at')->orderBy('name')->pluck('name', 'id'),
+            'users'    => self::notifyTargets(),
         ]);
+    }
+
+    /**
+     * **وجهاتُ الإشعار — موسومةً لا مُنقّاة** (مجلس الخبراء · AUT-07).
+     *
+     * كانت تُبنى من جدولِ المستخدمين كاملاً بـ`pluck('name','id')`، فتقف
+     * **حساباتُ بوّابةِ العملاء** في القائمة بلا أيِّ تمييز — ومن يبني مساراً
+     * لا يعلم أنّ مستقبِلَه خارجُ المنشأة. وأثبتته إعادةُ الفحص.
+     *
+     * **والقرارُ وسمٌ لا حذف:** إشعارُ عميلٍ قصدٌ مشروعٌ أحياناً، فحذفُه نزعُ
+     * قدرة. يبقى الحسابُ مُختاراً ويُعلن ما هو — التصنيفُ بنيويٌّ من
+     * `users.account_type` (SF-1) لا مستنتَجٌ من العضويّات.
+     *
+     * @return \Illuminate\Support\Collection<string,string>
+     */
+    protected static function notifyTargets()
+    {
+        return \App\Models\User::whereNull('deleted_at')
+            ->orderBy('name')->orderBy('id')      // ترتيبٌ حاسمٌ بين المحرّكين
+            ->get(['id', 'name', 'account_type'])
+            ->mapWithKeys(fn ($u) => [(string) $u->id =>
+                (string) $u->name . (hub_is_client($u) ? ' — حساب عميل (بوّابة خارجيّة)' : '')]);
     }
 
     /** مجموعة التنقل التي تنتمي إليها وحدة المسار — للتجميع في الشاشة */
@@ -191,7 +213,7 @@ class FlowController extends Controller
             'flow'   => $flow,
             'module' => $flow->module,
             'def'    => $def,
-            'users'  => \App\Models\User::whereNull('deleted_at')->orderBy('name')->pluck('name', 'id'),
+            'users'  => self::notifyTargets(),
         ]);
     }
 

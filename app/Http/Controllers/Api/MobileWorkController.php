@@ -200,6 +200,53 @@ class MobileWorkController extends V1Controller
 
     // ── D.7 · التفضيلات ────────────────────────────────────────────────────
 
+    /* ────────── «وثائقي» (مجلس الخبراء · N-5 · تكافؤُ السطحَين) ────────── */
+
+    /**
+     * `GET me/documents` — وثائقُ ملفِّ المُنادي نفسِه.
+     *
+     * كان `home` يُنذره بوثيقتِه (رايةُ `self` في `attention()`) **ولا بابَ في
+     * العقدِ يفتحها** — إنذارٌ بلا وجهةٍ على الجوال، وهو عينُ ما أُغلق للويب في
+     * v2.525.0. والقاعدةُ من `EmployeeDocuments` نفسِها التي تقرؤها البوّابةُ،
+     * فلا يفترق السطحان غداً على «ما وثائقي؟».
+     *
+     * **التفويضُ ارتباطُ الملفّ** (`employees.user_id`) لا `hr:v` — ملفّاتُ
+     * الزملاءِ ليست له. ولا `path` ولا `disk` في العقد: الرابطُ يُعطى لا الموضع.
+     */
+    public function myDocuments(Request $r)
+    {
+        $this->tagMobile($r);
+
+        return $this->ok(['items' => \App\Support\EmployeeDocuments::forUser(auth()->user())]);
+    }
+
+    /**
+     * `GET me/documents/{id}/file` — بايتاتُ وثيقةٍ من ملفّي.
+     *
+     * الحدودُ حدودُ الويبِ حرفاً: ٤٠٤ لوثيقةِ زميلٍ (لا نُثبت وجودَ ما لا يخصّه)،
+     * و٤٠٣ لمنعٍ صريحٍ على وثيقتي (وجودُها مُثبَتٌ لي أصلاً)، و٤٢٣ للمُصاب،
+     * وسجلُّ تنزيلٍ وتدقيقٌ كما في كلِّ بابٍ آخر.
+     */
+    public function myDocumentFile(Request $r, string $id)
+    {
+        $this->tagMobile($r);
+        $u = auth()->user();
+
+        $a = \App\Support\EmployeeDocuments::find($u, $id);
+        if (! $a) return \App\Support\Api::error(\App\Support\Api::RESOURCE_NOT_FOUND, 404,
+            'الوثيقة غير موجودة أو ليست على ملفّك');
+
+        if (! \App\Support\DocumentPolicy::subjectMay($u, $a, 'download')) {
+            return \App\Support\Api::error(\App\Support\Api::FORBIDDEN, 403,
+                'وصولُ هذه الوثيقةِ مقيَّدٌ بقاعدةٍ صريحة');
+        }
+
+        hub_audit('فتح وثيقةً من ملفّه', 'hr', (string) $a->record_id,
+            (string) ($a->original_name ?: $a->kind), ['after' => ['source' => 'mobile']]);
+
+        return \App\Support\AttachmentService::serve($a);
+    }
+
     /**
      * `GET prefs` — تفضيلاتُ الإشعار (خريطةُ الكتم التي يقرؤها `HubNotification`
      * لِيُكتَم الدفعُ لاحقاً) + رصيفُ المثبّتات (D.7). هويّةُ المُنادي وحدَه.
