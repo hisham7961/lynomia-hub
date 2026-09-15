@@ -83,4 +83,84 @@ class NavCoverageTest extends TestCase
             $this->assertNotSame('', trim($why), "الاستثناءُ {$k} بلا سبب");
         }
     }
+
+    /**
+     * **والمراكزُ صنفٌ ثانٍ يختفي بالطريقةِ نفسِها** (بلاغُ المالك الثاني: «مركزُ
+     * الجردِ مختفٍ مثلَ المحطات»).
+     *
+     * لخريطةِ المعلومات شكلان للمركز: `['center' => 'key']` يشير إلى كتالوجِ
+     * `hub_top_links` — **مصدرُ الحقيقةِ الواحدُ للمراكز (P4)** فيظهر رابطاً
+     * مباشراً؛ و`['route' => '...']` مُعرَّفٌ داخليّاً **بلا رابطٍ في الكتالوج**،
+     * فلا يُرى إلّا بالنزولِ إلى صفحةِ المساحةِ والبحثِ في أقسامِها.
+     *
+     * فمركزٌ `primary` بلا رابطٍ = ميزةٌ مدفونة. وهذا الحارسُ يمنعها.
+     */
+    private const CENTERS_BY_DESIGN = [
+        // بيتُه الأساسيُّ «مهامّي» بوسمٍ صريحٍ في الخريطة (`primary_at`) — ظهورُه هنا ثانويّ
+        'boards.index' => 'بيتُه الأساسيُّ «مهامّي» — primary_at صريحٌ في الخريطة',
+    ];
+
+    public function test_every_primary_center_has_a_direct_sidebar_link(): void
+    {
+        $src = file_get_contents(base_path('app/Support/helpers.php'));
+        $body = substr($src, strpos($src, 'function hub_top_links'),
+            strpos($src, 'function hub_top_groups') - strpos($src, 'function hub_top_links'));
+        preg_match_all("/'key'\s*=>\s*'([^']+)'/", $body, $mk);
+        preg_match_all("/'route'\s*=>\s*'([^']+)'/", $body, $mr);
+        $topKeys = array_flip($mk[1]);
+        $topRoutes = array_flip($mr[1]);
+        $this->assertNotEmpty($topKeys, 'كتالوجُ المراكزِ غيرُ فارغ');
+
+        $buried = [];
+        foreach (config('hub_ia.domains', []) as $dk => $d) {
+            foreach (($d['sections'] ?? []) as $sk => $s) {
+                foreach (($s['destinations'] ?? []) as $dest) {
+                    if (($dest['type'] ?? '') !== 'center') continue;
+                    if (($dest['importance'] ?? '') !== 'primary') continue;
+                    if (! empty($dest['contextual'])) continue;      // يُفتح من سجلٍّ لا من قائمة
+                    $route = $dest['route'] ?? null;
+                    if (isset($dest['center']) && isset($topKeys[$dest['center']])) continue;
+                    if ($route !== null && isset($topRoutes[$route])) continue;
+                    if ($route !== null && isset(self::CENTERS_BY_DESIGN[$route])) continue;
+                    $buried[] = ($dest['label'] ?? ($dest['key'] ?? '؟')) . ' [' . ($route ?? '—') . "] @ {$dk}/{$sk}";
+                }
+            }
+        }
+
+        sort($buried);
+        $this->assertSame([], $buried,
+            "مراكزُ «أساسيّة» بلا رابطٍ مباشرٍ في الشريط — مدفونةٌ في صفحةِ مساحة:\n  - "
+            . implode("\n  - ", $buried)
+            . "\nأضِفها إلى كتالوجِ hub_top_links بحارسِ متحكّمها، أو إلى CENTERS_BY_DESIGN بسببٍ صريح.");
+    }
+
+    /** وبرهانٌ حيّ: المالكُ يرى الروابطَ في الصفحةِ فعلاً — لا في الإعدادِ وحدَه. */
+    public function test_the_owner_actually_sees_the_recovered_centers(): void
+    {
+        $this->seedCore();
+        $html = $this->actingAs($this->owner)->get('/m/tasks')->assertOk()->getContent();
+
+        foreach (['مركز الجرد' => '/inventory',
+                  'النقاط الطرفية' => '/endpoints',
+                  'لوحة المشرف الميدانيّ' => '/field',
+                  'محفظة العهدة' => '/custody-wallet'] as $label => $href) {
+            $this->assertStringContainsString($label, $html, "«{$label}» لا تظهر في الشريط");
+            $this->assertStringContainsString($href, $html, "رابطُ «{$label}» غائب");
+        }
+    }
+
+    /** ولا يُعرَض رابطٌ لمن يُصَدُّ عنه ٤٠٣ — الشريطُ يطابق بوّابةَ المتحكّم. */
+    public function test_a_user_without_the_permission_is_not_teased_with_the_link(): void
+    {
+        $this->seedCore();
+        $role = \App\Models\Role::create(['name' => 'بلا أصول', 'scope' => 'all', 'flags' => [],
+            'matrix' => ['tasks' => ['v' => 1]], 'companies' => null]);
+        $u = \App\Models\User::create(['name' => 'محدود', 'email' => 'noassets@test.local',
+            'password' => 'Secret!2026x', 'role_id' => $role->id, 'status' => 'نشط',
+            'password_changed_at' => now()]);
+
+        $html = $this->actingAs($u)->get('/m/tasks')->assertOk()->getContent();
+        $this->assertStringNotContainsString('مركز الجرد', $html,
+            'رابطٌ يظهر لمن لا يملك صلاحيةَ الأصول — ثمّ يُصَدُّ ٤٠٣');
+    }
 }

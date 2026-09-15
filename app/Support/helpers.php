@@ -459,6 +459,21 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $opsA],
             ['key' => 'delivery',  'label' => '🛤️ مسار التسليم',     'route' => 'delivery',        'group' => 'analytics', 'ok' => hub_can($user, 'feats', 'v') || hub_can($user, 'deploys', 'v') || hub_can($user, 'requests', 'v') || hub_can($user, 'designs', 'v')],
             ['key' => 'custody',   'label' => '🏷️ كتالوج العهد',      'route' => 'custody.catalog', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
+            /*
+             * **مراكزُ كانت مدفونةً في صفحاتِ المساحات** (بلاغُ المالك: «مركزُ الجردِ
+             * مختفٍ مثلَ المحطات»). لخريطةِ المعلومات شكلان للمركز: واحدٌ يشير إلى
+             * هذا الكتالوج (`center => key`) فيظهر رابطاً، وآخرُ يُعرَّف بمسارِه
+             * داخلَ الخريطةِ **بلا رابطٍ هنا** — فلا يُرى إلّا بالنزولِ إلى صفحةِ
+             * المساحةِ والبحثِ في أقسامِها. وهذه الثلاثةُ من الصنفِ الثاني.
+             *
+             * وحارسُ كلٍّ منها **حارسُ متحكّمه حرفاً** (القاعدةُ أعلاه: لا رابطٌ
+             * يظهر ثمّ يُصَدُّ ٤٠٣). ويحرسُ الصنفَ كلَّه `NavCoverageTest`.
+             */
+            ['key' => 'inventory', 'label' => '📦 مركز الجرد',       'route' => 'inventory.center', 'group' => 'centers',  'ok' => hub_can($user, 'assets', 'v')],
+            ['key' => 'endpointsc', 'label' => '💻 النقاط الطرفية',  'route' => 'endpoints.index',  'group' => 'centers',  'ok' => hub_is_owner($user) || hub_monitor_group('secOps')],
+            ['key' => 'fieldsup',  'label' => '🧭 لوحة المشرف الميدانيّ', 'route' => 'field.dashboard', 'group' => 'centers', 'ok' => hub_is_owner($user) || (hub_can($user, 'hr', 'v') && hub_monitor_group('opsAnalytics'))],
+            // ومحفظةُ العهدةِ المالية — ثانويّةٌ في الخريطةِ لكنّها بابُ عملٍ يوميٍّ للمحاسب
+            ['key' => 'custwallet', 'label' => '👛 محفظة العهدة',    'route' => 'custody.wallet.center', 'group' => 'centers', 'ok' => hub_can($user, 'custody', 'v')],
             ['key' => 'identity',  'label' => '📷 مركز الهوية والمسح', 'route' => 'identity.center', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v') || hub_can($user, 'products', 'v')],
             ['key' => 'workteam',  'label' => '🕗 فريقي اليوم',        'route' => 'workforce.team',  'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
             // مركزُ التقارير اليوميّة ومركزُ المراجعة — مراكزُ ظاهرةٌ كـ«فريقي اليوم» تماماً،
