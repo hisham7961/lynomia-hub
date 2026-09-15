@@ -19,7 +19,15 @@
 </div>
 
 <div class="cards">
-    <div class="stat"><span class="ico">🟢</span><b>{{ $c['labels']['physical'] }}</b><span>الحضور الفعليّ</span></div>
+    {{-- ورديّةٌ عبرت منتصفَ الليل وما تزال مفتوحة (التحقّقُ الثاني عشر · ع‑٥):
+         كانت هذه الصفحةُ وحدَها لا تقرأ `open_shift` فتقول «لم يسجّل» لمن هو على
+         رأسِ عملِه — وشاشةُ المدير وبطاقتُه تقولانها. --}}
+    @if (! $c['physical'] && ! empty($c['open_shift']))
+        <div class="stat"><span class="ico bdg ok">🌙</span><b>على رأس العمل</b>
+            <span>منذ {{ $c['open_shift']['since'] }} (أمس)</span></div>
+    @else
+        <div class="stat"><span class="ico">🟢</span><b>{{ $c['labels']['physical'] }}</b><span>الحضور الفعليّ</span></div>
+    @endif
     <div class="stat"><span class="ico">🕗</span><b class="mono">{{ $c['time_in'] ?: '—' }}@if($c['time_out']) – {{ $c['time_out'] }}@endif</b><span>حضور — انصراف
         {{-- F11: دخولٌ بلا انصرافٍ في يومٍ ماضٍ — شارةٌ صريحةٌ ورابطُ التصحيح --}}
         @if ($c['checked_in'] && ! $c['checked_out'] && $date < \App\Support\BusinessDate::today())
@@ -30,7 +38,12 @@
             @endif
         @endif</span></div>
     <div class="stat"><span class="ico">📝</span><b>{{ $c['labels']['compliance'] }}</b><span>التقرير</span></div>
-    <div class="stat"><span class="ico bdg {{ $effTone }}">⚖️</span><b>{{ $c['labels']['effective'] }}</b><span>الحالة المحتسَبة</span></div>
+    @if ($c['verdict_pending'] ?? false)
+        <div class="stat"><span class="ico bdg">⚖️</span><b>—</b><span>الحالة المحتسَبة
+            <span class="sub">لم يبدأ الدوامُ بعد</span></span></div>
+    @else
+        <div class="stat"><span class="ico bdg {{ $effTone }}">⚖️</span><b>{{ $c['labels']['effective'] }}</b><span>الحالة المحتسَبة</span></div>
+    @endif
     @if ($c['deadline_at'])<div class="stat"><span class="ico">⏰</span><b class="mono">{{ $c['deadline_at']->format('Y-m-d H:i') }}</b><span>مهلة التقرير</span></div>@endif
 </div>
 

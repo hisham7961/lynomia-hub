@@ -210,6 +210,25 @@ class DailyWorkCompliance
     {
         if ($date !== BusinessDate::today() || ! $cells) return $cells;
 
+        /*
+         * **الحكمُ المؤجَّل** (N-27): قبلَ بدءِ الدوام لا يُعلَن غيابٌ — بالتعريفِ
+         * الذي يسأله النداءُ نفسُه. ومن له إجازةٌ أو عذرٌ أو ختمٌ يدويٌّ فحكمُه
+         * قائمٌ لا مؤجَّل، ومن ختم فقد بدأ يومَه.
+         */
+        if (self::beforeWorkdayStart($date)) {
+            foreach ($cells as $empId => $c) {
+                /*
+                 * **شرطُ النداءِ نفسُه حرفاً** (`rollCall`): «الصفُّ المختومُ صراحةً
+                 * حكمٌ قائم؛ وما دونَه يُؤجَّل». فالتأجيلُ لمن **لا صفَّ له أصلاً**
+                 * — وصفُّ إجازةٍ أو غيابٍ مختومٍ حكمٌ لا تؤجّله الساعة. وشرطٌ أضيقُ
+                 * أو أوسعُ هنا يصنع التعريفَ الرابعَ الذي جاءت هذه الدفعةُ تمنعه.
+                 */
+                if (! $c || $c['attendance'] || $c['checked_in'] || $c['on_leave']
+                    || $c['excused'] || ($c['finalized'] ?? false)) continue;
+                $cells[$empId]['verdict_pending'] = true;
+            }
+        }
+
         foreach (Workday::openCrossingByEmp(array_keys($cells)) as $empId => $row) {
             /*
              * **شرطُ `openRow` نفسُه لا شرطٌ أضيق** (التحقّقُ الثاني عشر · ع‑٤):
@@ -226,6 +245,26 @@ class DailyWorkCompliance
                 'time_in' => (string) $row->time_in,
                 'since' => substr((string) $row->time_in, 0, 5),
             ];
+
+            /*
+             * **ومَن على رأسِ عملِه ليس غائباً** (التحقّقُ الثالث عشر · ع‑٦).
+             *
+             * كانت الشاشةُ الواحدةُ تقول قولَين في الشخصِ نفسِه: «🌙 على رأس العمل
+             * منذ ٢٢:٠٠ (أمس)» في عمودِ الحضورِ الفعليّ، و«غائب» في «الحالة
+             * المحتسَبة» — ونداؤها يعدّه حاضراً (أُصلح في v2.516). فالحقيقةُ التي
+             * تعرضها الشاشةُ أصلاً لم تكن تصل إلى الحكم.
+             *
+             * و`state` لا يُمسّ: هو جوابُ «ماذا وقع في هذا اليوم» ولم يبدأ يومُه
+             * بعد. المُصحَّحُ **الأثرُ** وحدَه، ولا يعلو على ختمِ الموارد المُدقَّق
+             * ولا على إجازةٍ أو عذرٍ (كلاهما يُخرج `effective` من «غائب» أصلاً).
+             */
+            if (! ($c['finalized'] ?? false) && ($c['effective'] ?? null) === 'absent') {
+                $cells[$empId]['effective'] = 'present';
+                $cells[$empId]['labels']['effective'] = 'حاضر';
+                $cells[$empId]['verdict_pending'] = false;
+                $cells[$empId]['reason'] = 'ورديّةٌ بدأت '
+                    . substr((string) $row->time_in, 0, 5) . ' (أمس) وما تزال مفتوحة';
+            }
         }
 
         return $cells;
@@ -353,6 +392,42 @@ class DailyWorkCompliance
      * في فئةِ `pending` («بانتظار قرار») لا في الغياب. والصفُّ المختومُ صراحةً
      * («غائب» من كنسِ نهايةِ اليوم) حكمٌ قائمٌ لا تؤجّله الساعةُ ولا يُخفيه طلب.
      */
+    /**
+     * دقيقةُ بدءِ الدوامِ + سماحيةُ التأخّر — أو `null` إن لم يُضبَط المفهوم.
+     * قراءةٌ واحدةٌ يسألها النداءُ والكاتب (`sec.hours_start` + `work.late_grace`).
+     */
+    public static function workdayStartMinute(): ?int
+    {
+        $start = trim((string) setting('sec.hours_start', '08:00'));
+        if ($start === '' || ! preg_match('/^\d{1,2}:\d{2}/', $start)) return null;
+        [$sh, $sm] = array_map('intval', array_pad(explode(':', $start), 2, 0));
+
+        return $sh * 60 + $sm + max(0, (int) setting('work.late_grace', 15));
+    }
+
+    /**
+     * **أهذا اليومُ لم يبدأ بعد؟** (G12 · F10 · N-27)
+     *
+     * سؤالٌ أجابه المنتجُ مرّتَين في **قارئَين** ولم يجبه في **الكاتب**:
+     * `rollCall` امتنع عن إعلانِ الغيابِ قبلَ الدوام (G12)، و`MonthlyAttendance`
+     * امتنع عن حكمٍ على اليومِ الجاري (F10: «لا غائبَ يُفترى على ما لم يقع») —
+     * بينما `compose()` الذي يستدعيانه معاً يقول «غائب» في الثالثةِ فجراً. فصفٌّ
+     * واحدٌ في شاشةِ «فريقي اليوم» كان يحمل «لم يبدأ الدوام» في ندائِها و«غائب»
+     * في جدولِها. التعريفُ هنا **واحدٌ** يسأله الثلاثة.
+     *
+     * واليومُ الماضي انقضى فحكمُه واقعٌ لا انتظار — الجاري وحدَه يُؤجَّل.
+     */
+    public static function beforeWorkdayStart(?string $date = null): bool
+    {
+        $date = $date ?: BusinessDate::today();
+        if ($date !== BusinessDate::today()) return false;
+        $startMin = self::workdayStartMinute();
+        if ($startMin === null) return false;
+        $now = BusinessDate::now();
+
+        return ((int) $now->format('H') * 60 + (int) $now->format('i')) < $startMin;
+    }
+
     public static function rollCall(Collection $emps, ?string $date = null): array
     {
         $date = $date ?: BusinessDate::today();
@@ -361,18 +436,11 @@ class DailyWorkCompliance
 
         // بدايةُ الدوام إن وُجد مفهومُها في الإعدادات — نفسُ قراءةِ Workday::checkIn
         $start = trim((string) setting('sec.hours_start', '08:00'));
-        $grace = max(0, (int) setting('work.late_grace', 15));
-        $startMin = null;
-        if ($start !== '' && preg_match('/^\d{1,2}:\d{2}/', $start)) {
-            [$sh, $sm] = array_map('intval', array_pad(explode(':', $start), 2, 0));
-            $startMin = $sh * 60 + $sm + $grace;
-        }
+        $startMin = self::workdayStartMinute();
 
-        // **قبلَ بدءِ الدوام لا نداءَ غياب** (G12): اليومُ الجاريُّ وحدَه — واليومُ
-        // الماضي انقضى فحكمُه واقعٌ لا انتظار
-        $nowAt = BusinessDate::now();
-        $notStarted = $date === BusinessDate::today() && $startMin !== null
-            && ((int) $nowAt->format('H') * 60 + (int) $nowAt->format('i')) < $startMin;
+        // **قبلَ بدءِ الدوام لا نداءَ غياب** (G12) — والتعريفُ صار مُسمّى يسأله
+        // الكاتبُ نفسُه لا النداءُ وحدَه (التحقّقُ الثالث عشر · N-27)
+        $notStarted = self::beforeWorkdayStart($date);
 
         // الطلباتُ قيدَ القرارِ الشاملةُ لليوم — استعلامٌ واحدٌ للمجموعة (لا N+1)
         $pendingReq = [];
@@ -575,6 +643,13 @@ class DailyWorkCompliance
              * كي لا يبتلعَه `??` في قارئٍ فيمرَّ فارغاً.
              */
             'open_shift'    => null,
+            /*
+             * **حكمٌ مؤجَّلٌ لا حكمُ غياب** (N-27): يومٌ جارٍ لم يبدأ دوامُه بعد.
+             * `effective` يبقى كما هو — عقدٌ منشورٌ لا يُقلَب — وهذه الرايةُ تقول
+             * للقارئِ إنّ الحكمَ **لم يحن**، فيعرض «—» لا «غائب». مفتاحٌ **موجودٌ
+             * دائماً** (`false`) كي لا يبتلعَه `??` فيمرَّ فارغاً.
+             */
+            'verdict_pending' => false,
             'attendance'    => $primary,
             'attendances'   => $atts,
             'multi'         => $atts->count() > 1,                       // §47
@@ -727,6 +802,8 @@ class DailyWorkCompliance
             'date'            => $c['date'],
             // إضافةٌ لا كسر: `state` كما هو، ومعه جوابُ «أهو الآن على رأسِ عملِه؟»
             'open_shift'      => $c['open_shift'] ?? null,
+            // ومعه «أحانَ وقتُ الحكمِ أصلاً؟» — فلا يقرأ عميلُ الـAPI «غائباً» في الفجر
+            'verdict_pending' => (bool) ($c['verdict_pending'] ?? false),
             'checked_in'      => $c['checked_in'],
             'checked_out'     => $c['checked_out'],
             'time_in'         => $c['time_in'],

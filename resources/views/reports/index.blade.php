@@ -84,7 +84,7 @@
                 <td>@if ($c['review']['needs_revision'])<span class="bdg wn">تنقيح</span>
                     @elseif ($c['review']['pending'])<span class="bdg">بانتظار</span>
                     @elseif ($c['review']['accepted'])<span class="bdg ok">مقبول</span>@else —@endif</td>
-                <td><span class="bdg {{ $effTone($c['effective']) }}" title="{{ $c['reason'] }}">{{ $c['labels']['effective'] }}</span></td>
+                <td>@if ($c['verdict_pending'] ?? false)<span class="bdg" title="لم يبدأ الدوامُ بعد — لا يُعلَن حكمٌ قبل موعده">—</span>@else<span class="bdg {{ $effTone($c['effective']) }}" title="{{ $c['reason'] }}">{{ $c['labels']['effective'] }}</span>@endif</td>
                 <td>@if ($emp->user_id)<a class="btn ghost xs" href="{{ route('reports.day', ['emp' => $emp->id, 'date' => $date]) }}">تفصيل ↗</a>@endif</td>
             </tr>
         @empty
