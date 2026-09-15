@@ -835,6 +835,14 @@ Route::middleware('auth')->group(function () {
 
         return back()->with('ok', 'انتهى الوضع التجريبي ومُسحت بياناته الوهمية كلها');
     })->name('demo.off');
+    /*
+     * أسعارُ الصرف (تعدّدُ العملات · v2.528.0): محرّكُ `Currency` بلا بابٍ يُدخِل
+     * السعرَ **ميزةٌ مخفيّة** — وهو الصنفُ الذي لاحقته هذه الجلسةُ كلُّها. البوّابةُ
+     * بوّابةُ الماليّة: `fin:v` يقرأ و`fin:e` يُدخِل — لا صلاحيّةَ تُخترَع لمقبضٍ واحد.
+     */
+    Route::get('admin/currency-rates', [\App\Http\Controllers\Web\CurrencyRateController::class, 'index'])->name('currency.rates');
+    Route::post('admin/currency-rates', [\App\Http\Controllers\Web\CurrencyRateController::class, 'store'])->name('currency.rates.store');
+    Route::delete('admin/currency-rates/{id}', [\App\Http\Controllers\Web\CurrencyRateController::class, 'destroy'])->name('currency.rates.destroy');
     Route::get('admin/quality', [QualityController::class, 'index'])->name('quality.index');
     Route::post('admin/quality/merge', [QualityController::class, 'merge'])->name('quality.merge');
     Route::get('admin/errors', [ErrorCenterController::class, 'index'])->name('errors.index');
