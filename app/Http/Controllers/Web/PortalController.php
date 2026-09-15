@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Attachment;
 use App\Models\Employee;
+use App\Support\AttachmentService;
+use App\Support\DocumentPolicy;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * بوابة الموظف: «بوابتي» للمستخدم الحالي، و«الملف الشامل» لمن يملك عرض HR.
@@ -23,7 +27,118 @@ class PortalController extends Controller
 
         return view('portal.me', ['emp' => $emp, 'self' => true,
             'inbox' => $inbox, 'buckets' => \App\Support\Inbox::summary($inbox),
+            // **وثائقي** (N-5): الرادارُ يسوق صاحبَ الشأنِ إلى هنا بوثيقتِه — فلتكن هنا
+            'myDocs' => $this->myDocs(),
         ] + $this->bundle($emp, auth()->id()));
+    }
+
+    /* ────────── وثائقي (مجلس الخبراء · N-5) ────────── */
+
+    /**
+     * **سجلّاتُ الموظّفِ المرتبطةُ بحسابِه** — مصدرُ الصفةِ الوحيد في هذا الباب.
+     *
+     * صفوفُه كلُّها لا أوّلُها (النموذجُ يُتيح ربطاً مزدوجاً)، مرتّبةً بـ`id` فلا
+     * يبقى للترتيبِ أثرٌ — نفسُ ما فعله `hub_expiry_self_scan` بعد أن كشفت
+     * القرعةُ أنّها تُخفي أعجلَ إقامةٍ عن صاحبِها (F4).
+     *
+     * @return array<int,string>
+     */
+    protected function myEmployeeIds(): array
+    {
+        $uid = auth()->id();
+        if (! $uid) return [];
+
+        return Employee::where('user_id', $uid)->whereNull('deleted_at')
+            ->orderBy('id')->pluck('id')->map(fn ($x) => (string) $x)->all();
+    }
+
+    /**
+     * **وثائقي** — ما على ملفّي من مستندات، بنوعِها وتاريخِ انتهائها وحالتِها.
+     *
+     * **الصفةُ هي التفويض** (على غرارِ «عهدتي»): لا `hr:v` — فملفّاتُ الزملاءِ
+     * ليست له ولا ينبغي أن تكون. والقاعدةُ التي تحكم ما يُعرَض هي
+     * `DocumentPolicy::subjectMayAny` نفسُها التي يقرؤها الرادار: **تعريفٌ واحد**،
+     * فلا يُنذره الرادارُ بوثيقةٍ تردّها البوّابةُ ولا العكس.
+     */
+    protected function myDocs()
+    {
+        $ids = $this->myEmployeeIds();
+        if (! $ids || ! Schema::hasTable('attachments')) return collect();
+
+        $u = auth()->user();
+        $rows = Attachment::whereNull('deleted_at')
+            ->where('module', 'hr')->whereIn('record_id', $ids)
+            // المؤرَّخُ أوّلاً ثمّ الأحدثُ رفعاً — و`id` حاسمٌ أخيراً فلا قرعةَ بين المحرّكين
+            ->orderByRaw('expires_at IS NULL, expires_at')
+            ->orderByDesc('created_at')->orderBy('id')
+            ->limit(60)->get();
+
+        if ($rows->isEmpty()) return collect();
+        DocumentPolicy::primeMemo($rows->pluck('id'));
+
+        $window = hub_radar_window();
+
+        return $rows->filter(fn (Attachment $a) => DocumentPolicy::subjectMayAny($u, $a))
+            ->map(function (Attachment $a) use ($window) {
+                $days = $a->expires_at
+                    ? (int) now()->startOfDay()->diffInDays($a->expires_at->copy()->startOfDay(), false)
+                    : null;
+
+                return [
+                    'id' => (string) $a->id,
+                    'kind' => (string) $a->kind,
+                    'label' => hub_doc_label('hr', $a->kind) ?? 'وثيقة',
+                    'name' => (string) $a->original_name,
+                    'doc_no' => $a->doc_no ?: null,
+                    'date' => $a->expires_at?->toDateString(),
+                    'days' => $days,
+                    'infected' => $a->av_status === 'infected',
+                    // نافذةُ الرادارِ نفسُها تحكم اللون — لا عتبةٌ ثالثةٌ في الواجهة (N-6)
+                    'tone' => $days === null ? ''
+                        : ($days < 0 ? 'bad' : ($days <= min(14, $window) ? 'wn' : '')),
+                ];
+            })->values();
+    }
+
+    /**
+     * **الوثيقةُ التي أثبتُّ أنّها لي** — أو ٤٠٤.
+     *
+     * ٤٠٤ لا ٤٠٣ عمداً: وثيقةُ زميلٍ لا يُثبَت وجودُها لمن لا تخصّه (نظيرُ
+     * `portal.employee` مع حسابِ العميل). والمنعُ الصريحُ عليها — وهو قرارُ
+     * المنشأةِ على وثيقتي أنا — يُردّ ٤٠٣ صريحاً لأنّ وجودَها مُثبَتٌ لي أصلاً.
+     */
+    protected function myDoc(string $id): Attachment
+    {
+        $a = Attachment::whereNull('deleted_at')->where('module', 'hr')->find($id);
+        abort_unless($a && in_array((string) $a->record_id, $this->myEmployeeIds(), true), 404);
+
+        return $a;
+    }
+
+    /** تنزيلُ وثيقةٍ من ملفّي — الأثرُ والحاجزُ كما في كلِّ بابٍ آخر */
+    public function docDownload(string $id)
+    {
+        $a = $this->myDoc($id);
+        abort_unless(DocumentPolicy::subjectMay(auth()->user(), $a, 'download'), 403,
+            'وصولُ هذه الوثيقةِ مقيَّدٌ بقاعدةٍ صريحة');
+
+        hub_audit('فتح وثيقةً من ملفّه', 'hr', (string) $a->record_id,
+            (string) ($a->original_name ?: $a->kind));
+
+        return AttachmentService::serve($a);
+    }
+
+    /** معاينةُ وثيقةٍ من ملفّي (نظيرُ التنزيل — نفسُ القاعدةِ ونفسُ الأثر) */
+    public function docPreview(string $id)
+    {
+        $a = $this->myDoc($id);
+        abort_unless(DocumentPolicy::subjectMay(auth()->user(), $a, 'preview'), 403,
+            'معاينةُ هذه الوثيقةِ مقيَّدةٌ بقاعدةٍ صريحة');
+
+        hub_audit('عاين وثيقةً من ملفّه', 'hr', (string) $a->record_id,
+            (string) ($a->original_name ?: $a->kind));
+
+        return AttachmentService::streamServe($a);
     }
 
     /**

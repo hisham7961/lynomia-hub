@@ -1186,6 +1186,57 @@ if (! function_exists('hub_export_blocked_now')) {
     }
 }
 
+if (! function_exists('hub_doc_belt')) {
+    /**
+     * **حزامُ المستندِ الثنائيّ — نصفُ حزامِ التصديرِ الذي يخصّ ملفاً واحداً** (N-14).
+     *
+     * `quotes.pdf` و`changeorders.pdf` يبثّان PDF فيه أسعارُ العرضِ أو قيمةُ أمرِ
+     * التغيير. وقد أُلحقا بحظرِ الليلِ في الوسيط (N-4) فصارا **مساراً ليليّاً
+     * مسمّى**، لكنّهما لا يلبسان `ModuleController::exportBelt` فيغيب عنهما:
+     *
+     *   · **مفتاحُ تجميدِ الطوارئ**: يرفعه المالكُ لحظةَ الاشتباهِ فيصدّ كلَّ CSV
+     *     — ويبقى العرضُ التجاريُّ بأسعارِه يخرج. و«الحارسُ الذي يُطبَّق في بابٍ
+     *     ويُنسى في آخر ليس حارساً بل قناعةٌ كاذبة» (من رأسِ `exportBelt` نفسِه).
+     *   · **الوسمُ الزمنيُّ في التدقيق**: «متى خرج هذا المستند؟» سؤالٌ يُجاب في
+     *     كلِّ بابٍ آخر ولا يُجاب هنا.
+     *
+     * **وما لا يفعله هذا الحزامُ قصداً — وقرارُه معلَن:** لا يشترط علم `export`.
+     * طباعةُ عرضٍ لإرسالِه إلى عميلٍ فعلٌ بيعيٌّ يوميّ لا سحبُ بياناتٍ جماعيّ،
+     * واشتراطُه ينزع اليومَ قدرةً يملكها حاملُ `quotes:v`. وهو القرارُ نفسُه
+     * المتَّخذ في `ReportsController::monthlyExport`: **الحزامُ ضوابطُ سحبِ
+     * البياناتِ فوقَ سلطةِ العرضِ القائمة، لا تغييرٌ لها.** (وحظرُ الليلِ نفسُه
+     * يبقى حيث هو — في الوسيط — فلا يُجاب سؤالٌ واحدٌ في موضعين.)
+     *
+     * يُجهض بـ٤٢٣ عند التجميد، ويعيد **أثرَ** الحدثِ ليُمرَّر إلى `hub_audit`.
+     *
+     * @return array<string,mixed> بيانات التدقيق (قد تكون فارغة)
+     */
+    function hub_doc_belt(string $module): array
+    {
+        abort_if((string) setting('security.freeze_exports', '0') === '1', 423,
+            'التصدير مجمَّدٌ الآن بمفتاح طوارئٍ أمنيّ — يُرفع من مركز الأمان');
+
+        /*
+         * **الوقتُ حقلٌ في الأثرِ لا لفظٌ في الاسم** (N-7). وضعُه في اسمِ الفعلِ
+         * يجعل فعلَ التدقيقِ **متغيّراً بالساعة** — وقد أسقط ذلك الحزمةَ عند
+         * ١٩:٥٠. وسؤالُ «متى؟» مستقلٌّ عن سؤالِ «أاستُعمل مفتاحٌ استثنائيّ؟»،
+         * فيُجاب الأوّلُ دائماً ويُسجَّل الثاني حين يقع.
+         *
+         * **والأثرُ يُكتب في عمودٍ موجود.** `hub_audit` يمرّر `$extra` إلى
+         * `AuditEntry`، وخطّافُ `creating` فيه **يُجرّد كلَّ مفتاحٍ لا عمودَ له**
+         * صامتاً (درعُ «النشر قبل الترحيل»). فمفتاحٌ مسطَّحٌ مثلِ `after_hours`
+         * لا يبلغ الجدولَ أبداً — **إصلاحٌ لا يُنفَّذ وهو مكتوب**، وهو ما وقع
+         * في N-7 حتّى كشفه إغلاقُ هذا البند. فيُوضع الأثرُ في `after` (عمودُ
+         * JSON مُعمَّد): سحبُ ملفٍّ لا «حالةَ بعدُ» له فالعمودُ شاغرٌ له.
+         */
+        $meta = hub_after_hours() ? ['after_hours' => true, 'at' => now()->format('H:i')] : [];
+        // مرورٌ ليليٌّ عبرَ بوّابةِ الوسيط لا يقع إلا لحاملِ `exportNight` على الوحدة
+        if (hub_export_night()) $meta['export_night'] = $module;
+
+        return $meta ? ['after' => $meta] : [];
+    }
+}
+
 if (! function_exists('hub_safe_url')) {
     /**
      * رابط آمن للعرض: يسمح فقط بمخططات غير قابلة للتنفيذ (http/https/mailto/tel)
@@ -1396,6 +1447,43 @@ if (! function_exists('hub_expiry_fields')) {
     }
 }
 
+if (! function_exists('hub_radar_window')) {
+    /**
+     * **نافذةُ رادارِ الانتهاءات — تعريفٌ واحدٌ يقرؤه كلُّ ماسح** (مجلس الخبراء · N-6).
+     *
+     * كانت «ينتهي قريباً» شاشةً واحدةً وشارةً واحدةً وخلفَها **رقمان**: حقولُ
+     * الوحدات `+٣٠` يوماً ووثائقُ السجلات `+٦٠`. فعلى السجلِّ الواحدِ وفي اليومِ
+     * نفسِه تُعرَض وثيقةُ الإقامةِ ويُحجَب حقلُها — والقارئُ لا يعلم من أيِّ
+     * نافذةٍ ينظر، فيقرأ «لا شيءَ قريب» وهو نصفُ جواب. وهو صنفُ العيبِ الذي
+     * يلاحقه المجلس: **لا اختبارَ يحمرّ ولا خطأَ يظهر**، والشاشةُ صادقةٌ
+     * داخليّاً وناقصةٌ من حيث لا تدري.
+     *
+     * **والافتراضُ ٦٠ — أوسعُ الرقمين — قصداً:** التوحيدُ على ٣٠ كان **سيُضيّق**
+     * تحذيراتٍ قائمةً فتختفي وثائقُ الشهرِ الثاني من رادارِ من يعتمد عليها اليوم.
+     * والتضييقُ إن أرادته المنشأةُ فبإرادتِها من الإعدادات، لا صدفةً في الشيفرة.
+     */
+    function hub_radar_window(): int
+    {
+        $n = (int) setting('radar.window_days', 60);
+
+        return max(1, min(365, $n ?: 60));
+    }
+}
+
+if (! function_exists('hub_radar_lookback')) {
+    /**
+     * الشقُّ الخلفيُّ من النافذةِ نفسِها: كم يوماً يبقى **المنتهي** على الرادار
+     * قبل أن يسقط منه. كان ٦٠ في المواضعِ الأربعةِ جميعاً — فالتوحيدُ هنا لا
+     * يغيّر سلوكاً، وإنّما يجعل الرقمَ **معرَّفاً في موضعٍ واحد** كأخيه.
+     */
+    function hub_radar_lookback(): int
+    {
+        $n = (int) setting('radar.lookback_days', 60);
+
+        return max(1, min(365, $n ?: 60));
+    }
+}
+
 if (! function_exists('hub_expiry_self')) {
     /**
      * **استثناءُ صاحبِ الشأن** (مجلس الخبراء · PROD-05).
@@ -1435,6 +1523,8 @@ if (! function_exists('hub_expiry_self')) {
          */
         $ck = 'hub:expiry:self:' . $user->id
             . ':g' . (int) \Illuminate\Support\Facades\Cache::get('hub:expiry:gen', 0)
+            // النافذةُ في المفتاحِ كما في أخيه (N-6) — مسحٌ مخبوءٌ بنافذةٍ قديمة نصفُ جواب
+            . ':w' . hub_radar_window() . '-' . hub_radar_lookback()
             . hub_data_stamp([(string) $md['table'], 'attachments', 'document_access_rules', 'roles']);
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($ck);
 
@@ -1488,7 +1578,8 @@ if (! function_exists('hub_expiry_self_scan')) {
                     $days = (int) now()->startOfDay()
                         ->diffInDays(\Illuminate\Support\Carbon::parse($d)->startOfDay(), false);
                 } catch (\Throwable $e) { continue; }
-                if ($days > 30 || $days < -60) continue;   // النافذةُ نفسُها التي يستعملها الرادار
+                // النافذةُ نفسُها التي يستعملها الرادار — من تعريفٍ واحدٍ لا من رقمٍ منسوخ (N-6)
+                if ($days > hub_radar_window() || $days < -hub_radar_lookback()) continue;
 
                 $out[] = [
                     'module' => 'hr', 'mlabel' => (string) ($md['label'] ?? 'ملفات الموظفين'),
@@ -1529,8 +1620,8 @@ if (! function_exists('hub_expiry_self_scan')) {
                 $docs = \App\Models\Attachment::whereNull('deleted_at')
                     ->where('module', 'hr')->whereIn('record_id', $emps->pluck('id')->all())
                     ->whereNotNull('expires_at')
-                    ->whereBetween('expires_at', [now()->subDays(60)->toDateString(),
-                                                  now()->addDays(60)->toDateString()])
+                    ->whereBetween('expires_at', [now()->subDays(hub_radar_lookback())->toDateString(),
+                                                  now()->addDays(hub_radar_window())->toDateString()])
                     ->orderBy('expires_at')->orderBy('id')->limit(40)->get();
 
                 if ($docs->isNotEmpty()) {
@@ -1559,18 +1650,15 @@ if (! function_exists('hub_expiry_self_scan')) {
                          * وما قبلَ هذا لم يكن قراراً بل **عَرَضاً**: نموذجٌ ناقصُ
                          * عمودَين أطفأ البوّابتين صامتاً، فمرّ كلُّ شيءٍ بلا تمييز.
                          */
-                        // **معاينةٌ أو تنزيل، كما تفعل `listable()`** (التحقّق المستقلّ):
-                        // القصرُ على `preview` وحدَها ضيّق الباب — وثيقةٌ مُنعت معاينتُها
-                        // صراحةً وسُمح تنزيلُها كانت ستختفي من رادارِ صاحبِها.
-                        $ok = false; $explicit = false;
-                        foreach (['preview', 'download'] as $act) {
-                            $d = \App\Support\DocumentPolicy::decide($user, $a, $act);
-                            if ($d['allowed']) { $ok = true; break; }
-                            if (in_array($d['state'], ['DENIED_SENSITIVE', 'DENIED_SECRET_RECORD'], true)) {
-                                $explicit = true;   // حجبٌ بالحساسيّةِ وحدَها — يُستثنى صاحبُ الشأن
-                            }
-                        }
-                        if (! $ok && ! $explicit) continue;   // منعٌ صريحٌ يُحترَم كما هو
+                        /*
+                         * **والقاعدةُ من تعريفِها الوحيد** (N-5): كان هذا المنطقُ
+                         * مكتوباً هنا بالكامل، ثمّ احتاجته بوّابةُ الموظّفِ نفسُها —
+                         * فاستُخرج إلى `DocumentPolicy::subjectMayAny` بدل أن يُنسَخ.
+                         * ونسختان لقاعدةٍ واحدةٍ تصيران تعريفَين: الرادارُ يعرض
+                         * وثيقةً والبوّابةُ تردّها، أو العكس — وكلٌّ منهما صادقٌ
+                         * داخليّاً. وذلك أصلُ ما يلاحقه هذا المجلس.
+                         */
+                        if (! \App\Support\DocumentPolicy::subjectMayAny($user, $a)) continue;
                         $out[] = [
                             'module' => 'hr', 'mlabel' => (string) ($md['label'] ?? 'ملفات الموظفين'),
                             'flabel' => hub_doc_label('hr', $a->kind) ?? 'وثيقة',
@@ -1611,7 +1699,7 @@ if (! function_exists('hub_expiry_url')) {
 }
 
 if (! function_exists('hub_expiry')) {
-    /** رادار الانتهاءات: كل ما ينتهي خلال 30 يوماً أو انتهى فعلاً — مخبأ، ومحدود بنطاق المستخدم */
+    /** رادار الانتهاءات: كل ما ينتهي خلال نافذة `hub_radar_window()` أو انتهى فعلاً — مخبأ، ومحدود بنطاق المستخدم */
     function hub_expiry(bool $fresh = false, $user = null): array
     {
         $user   = $user ?? auth()->user();
@@ -1633,17 +1721,26 @@ if (! function_exists('hub_expiry')) {
         $tables = array_values(array_unique(array_filter(array_map(
             fn ($x) => (string) (hub_mod($x[0])['table'] ?? ''), hub_expiry_fields()))));
         $tables[] = 'roles';
+        // **والنافذةُ جزءٌ من المفتاح** (N-6): صارت رقماً من الإعدادات، فتغييرُها
+        // بلا ختمٍ يُبقي المخبوءَ على النافذةِ السابقةِ حتى تنتهي المهلة — ومن
+        // وسّع رادارَه يراه كما كان ويحسب الإعدادَ لا يعمل.
         $key    = ($scoped ? 'hub:expiry:u:' . $user->id : 'hub:expiry:r:' . ($user->role_id ?? '0'))
-                . ':g' . $gen . hub_data_stamp($tables);
+                . ':g' . $gen . ':w' . hub_radar_window() . '-' . hub_radar_lookback()
+                . hub_data_stamp($tables);
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
         $scan = \Illuminate\Support\Facades\Cache::remember($key, $scoped ? 300 : 600, function () use ($scoped, $user) {
             $today = now()->toDateString();
-            $limit = now()->addDays(30)->toDateString();
+            // **نافذةٌ واحدةٌ لشاشةٍ واحدة** (N-6): كانت `30` هنا و`60` في
+            // `hub_doc_expiry` — رقمان في رادارٍ واحد. صارا `hub_radar_window()`.
+            $window = hub_radar_window();
+            $limit = now()->addDays($window)->toDateString();
             // عتبة التنبيه لكل سجل: حقول «تنبيه قبل (يوم)» كانت تُعرض ولا تُقرأ —
             // وحدةٌ لها عمود عتبة تُجلب بنافذة موسّعة ثم يُرشَّح كل سجل بعتبته هو
             $alertCols = ['domains' => 'alert', 'files' => 'alert', 'subs' => 'alerts'];
-            $wide = now()->addDays(120)->toDateString();
+            // جلبٌ موسَّعٌ للوحداتِ التي لها عمودُ عتبةٍ خاصّ — ثمّ يُرشَّح كلُّ
+            // صفٍّ بعتبتِه هو. ولا يضيقُ الجلبُ عن النافذةِ المعلنة أبداً.
+            $wide = now()->addDays(max(120, $window))->toDateString();
             $items = [];
             foreach (hub_expiry_fields() as [$mk, $f]) {
                 // **صلاحية الوحدة قبل نطاقها**: الرادار كان يُرشَّح بالنطاق وحده،
@@ -1666,7 +1763,7 @@ if (! function_exists('hub_expiry')) {
                     $q = \Illuminate\Support\Facades\DB::table($md['table'])
                         ->whereNull('deleted_at')
                         ->whereNotNull($f['col'])
-                        ->whereBetween(\Illuminate\Support\Facades\DB::raw("DATE(`{$f['col']}`)"), [now()->subDays(60)->toDateString(), $acol ? $wide : $limit]);
+                        ->whereBetween(\Illuminate\Support\Facades\DB::raw("DATE(`{$f['col']}`)"), [now()->subDays(hub_radar_lookback())->toDateString(), $acol ? $wide : $limit]);
                     if ($scoped) $q = hub_scope($q, $mk, $user);
 
                     // لا تنبيه على ما أُغلق: مهمة منجزة أو فاتورة مدفوعة أو عقد منتهٍ
@@ -1699,7 +1796,8 @@ if (! function_exists('hub_expiry')) {
                         // عتبة السجل نفسه: رقم مفرد أو قائمة «90,60,30» تؤخذ أقصاها — والفارغ = 30
                         $nums = array_filter(array_map('intval',
                             preg_split('/[\s,،]+/u', (string) ($row->_a ?? ''), -1, PREG_SPLIT_NO_EMPTY)));
-                        if ($days > ($nums ? max($nums) : 30)) continue;
+                        // عتبةٌ فارغةٌ ⇒ نافذةُ الرادارِ نفسُها، لا رقمٌ ثالثٌ مدفون
+                        if ($days > ($nums ? max($nums) : $window)) continue;
                     }
                     // `fkey` مميّزٌ ثابتٌ للحقل: سجلٌّ بحقلَي تاريخٍ (نهايةٌ وتجديد)
                     // يُنتج إشارتين تتقاسمان module+id — فبلا هذا المميّز تنهار حالتُهما
@@ -5809,7 +5907,8 @@ if (! function_exists('hub_doc_expiry')) {
         // يُستهلك بوثائق سجلاتٍ خارج نطاق القارئ فتُقصى وثائقه هو. السقف هنا
         // حارس ذاكرةٍ واسع، والحدّ الحقيقي (٢٠٠) يقع في hub_expiry بعد الترتيب.
         $rows = \App\Models\Attachment::whereNull('deleted_at')->whereNotNull('expires_at')
-            ->whereBetween('expires_at', [now()->subDays(60)->toDateString(), now()->addDays(60)->toDateString()])
+            ->whereBetween('expires_at', [now()->subDays(hub_radar_lookback())->toDateString(),
+                                          now()->addDays(hub_radar_window())->toDateString()])
             ->orderBy('expires_at')->limit(5000)->get(['id', 'module', 'record_id', 'kind', 'expires_at', 'doc_no']);
 
         // **الرؤيةُ تتبع قاعدةَ الوثيقة**: وثيقةٌ ممنوعةٌ صريحاً عن القارئِ لا تظهرُ في رادارِه

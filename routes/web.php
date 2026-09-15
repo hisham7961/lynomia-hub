@@ -187,6 +187,16 @@ Route::middleware('auth')->group(function () {
     Route::get('me', [PortalController::class, 'me'])->name('portal.me');
     // «عهدتي» — خدمةٌ ذاتيّة (الجولة 1 · F1): سطحٌ واحدٌ لسؤال «ما الذي بيدي؟»
     Route::get('me/custody', [PortalController::class, 'myCustody'])->name('portal.custody');
+    /*
+     * **«وثائقي»** — خدمةٌ ذاتيّةٌ بالتعليلِ نفسِه (مجلس الخبراء · N-5). رادارُ
+     * «ينتهي قريباً» يُنذر صاحبَ الشأنِ بإقامتِه ويسوقه إلى `/me`، و`/me` لم تكن
+     * تعرض مرفقاً واحداً — **إنذارٌ بلا وجهة**. و`att.dl`/`att.view` لا تصلحان
+     * وجهةً: حارسُهما `hub_can($u,'hr','v')` وهي صلاحيّةٌ لا يملكها الموظّفُ ولا
+     * ينبغي. فالارتباطُ بـ`employees.user_id` هو التفويض — كـ«عهدتي» تماماً —
+     * والقاعدةُ `DocumentPolicy::subjectMay` نفسُها التي يقرؤها الرادار.
+     */
+    Route::get('me/documents/{id}/dl', [PortalController::class, 'docDownload'])->name('portal.doc.dl');
+    Route::get('me/documents/{id}/view', [PortalController::class, 'docPreview'])->name('portal.doc.view');
     // قرارُ طلب الإجازة بأزرارٍ صريحة (الجولة 1 · F5) — لا تحريرَ سجلٍّ خام
     Route::post('m/leaves/{id}/decide', [\App\Http\Controllers\Web\LeaveDecisionController::class, 'decide'])->name('leaves.decide');
     Route::get('files/{path}', [FileController::class, 'show'])->name('file.show')->where('path', 'hub/.*');

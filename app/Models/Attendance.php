@@ -120,8 +120,40 @@ class Attendance extends Model
         // **اللحظتان تُشتقّان من اليومِ والوقتِ والراية** — تُكتبان دائماً كي
         // يقرأ منهما مَن يحتاج زمناً مطلقاً، و`date`/`time_in`/`time_out` تبقى
         // كما هي للعرضِ والتوافقِ الخلفيّ (الإضافةُ لا الكسر).
+        self::bootDayKeyRelease();
+
         static::saving(function (self $a) {
             [$a->in_at, $a->out_at] = self::instants($a->date, $a->time_in, $a->time_out, (bool) $a->overnight);
+
+            /*
+             * **موظّفٌ ويومٌ = صفٌّ واحد — على كلِّ الأبواب** (مجلس الخبراء · N-15).
+             *
+             * `unique_together` في سجلِّ الوحدة كان يُفرَض في `ModuleController`
+             * من `request()->input()` — أي في **بابِ النموذجِ وحدَه**؛ والاستيرادُ
+             * والـAPI والسكربتُ يحفظون بلا قواعدِ الوحدة، ولا قيدَ في القاعدة.
+             * وصفّان لليومِ نفسِه هما المُغذّي المباشرُ لعائلةِ «أيُّ صفٍّ هو
+             * الصحيح؟» التي طاردها هذا المجلسُ اثنتي عشرةَ جولة.
+             *
+             * فالمفتاحُ **مشتقٌّ** كنظيرِه في `payroll_runs.month_key`: يحمل اليومَ
+             * حين يكون الصفُّ حيّاً، ويُفرَّغ عند الحذف فلا يحجز يوماً لصفٍّ ميّت.
+             * والحارسُ هنا يسبق الفهرسَ برسالةٍ مفهومة — والفهرسُ خطُّ الدفاعِ
+             * الأخيرُ لسباقِ الكتابةِ المتزامنة.
+             */
+            $a->day_key = $a->deleted_at !== null ? null
+                : ((string) ($a->date?->toDateString() ?? $a->date) ?: null);
+
+            if ($a->day_key !== null && $a->emp_id
+                && self::hasColumnCached('day_key')) {
+                $clash = static::withoutTrashed()
+                    ->where('emp_id', $a->emp_id)->where('day_key', $a->day_key)
+                    ->when($a->exists, fn ($q) => $q->whereKeyNot($a->getKey()))
+                    ->exists();
+                if ($clash) {
+                    throw ValidationException::withMessages(['date' =>
+                        'لهذا الموظّف صفٌّ مسجَّلٌ في ' . $a->day_key . ' — موظّفٌ ويومٌ '
+                        . 'واحدٌ لا يحتمل صفَّين. عدّل الصفَّ القائمَ أو احذفه أوّلاً.']);
+                }
+            }
 
             /*
              * **مهلةُ التقريرِ يختمها كلُّ بابٍ لا بابٌ واحد** (مجلس الخبراء · N-21).
@@ -162,6 +194,33 @@ class Attendance extends Model
             && (string) $a->time_out < (string) $a->time_in;
 
         return \App\Support\DailyWorkCompliance::computeDeadline($date, $a->time_out, true, $crossed);
+    }
+
+    /**
+     * **المحذوفُ لا يحجز يومَه** (N-15): `day_key` مفتاحٌ مشتقٌّ لا بيانات، يُفرَّغ
+     * عند الحذفِ الناعم فيُعاد إدخالُ اليومِ بصفٍّ جديد — والفهرسُ الفريدُ يعدّ
+     * الفراغاتِ متمايزةً على المحرِّكَين فلا يصطدم صفّان محذوفان.
+     */
+    protected static function bootDayKeyRelease(): void
+    {
+        static::deleted(function (self $a) {
+            if (! self::hasColumnCached('day_key')) return;
+            if (method_exists($a, 'isForceDeleting') && $a->isForceDeleting()) return;
+            static::withoutEvents(fn () => static::withTrashed()
+                ->whereKey($a->getKey())->update(['day_key' => null]));
+        });
+    }
+
+    /** أعمودُ `day_key` موجودٌ؟ — فحصُ مخطَّطٍ يُحفَظ مرّةً (الهجرةُ قد لم تُطبَّق بعد) */
+    protected static function hasColumnCached(string $col): bool
+    {
+        static $memo = [];
+        if (! array_key_exists($col, $memo)) {
+            $memo[$col] = \Illuminate\Support\Facades\Schema::hasTable('attendance')
+                && \Illuminate\Support\Facades\Schema::hasColumn('attendance', $col);
+        }
+
+        return $memo[$col];
     }
 
     /** ثوانيُ اليومِ من وقتٍ نصّيّ `H:i[:s]` — أو null لِما ليس وقتاً صالحاً */

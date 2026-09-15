@@ -47,18 +47,40 @@ class ExpiryRadarRound6Test extends TestCase
             'نهاية معرضٍ ليست انتهاء رخصة — الراية false تُخرجها من الرادار');
     }
 
+    /**
+     * **العتبةُ الخاصّةُ ترجّح على النافذةِ العامّة — لا على رقمٍ بعينِه** (N-6).
+     *
+     * كان هذا الاختبارُ يثبّت `30` صراحةً بوصفها «النافذةَ الافتراضيّة»، وهي
+     * **رقمٌ ثالثٌ مدفون** بجوارِ `+٣٠` للحقولِ و`+٦٠` للوثائق. وحين وُحِّدت
+     * النافذةُ في `hub_radar_window()` احمرّ — **والاختبارُ الأحمرُ هنا ليس
+     * عيباً في الشيفرة بل عقداً قديماً ثُبِّت عرَضاً**: ما كان تحت الفحص أنّ
+     * **عتبةَ الصفِّ نفسِه تمتدّ أبعدَ من العامّة**، لا أن العامّةَ ثلاثون.
+     *
+     * فصار يُقاس **من التعريفِ نفسِه** لا من رقمٍ منسوخ — ويثبّت حافّتَيه معاً:
+     * ما دون النافذةِ يظهر، وما فوقَها لا يظهر إلا بعتبةٍ خاصّةٍ تبلغه.
+     */
     public function test_domain_alert_threshold_extends_its_radar_window(): void
     {
         $this->seedCore();
         $this->actingAs($this->owner);
-        Domain::create(['name' => 'wide-alert.com', 'expiry' => now()->addDays(45)->toDateString(), 'alert' => 60]);
-        Domain::create(['name' => 'default-window.com', 'expiry' => now()->addDays(45)->toDateString()]);
+
+        $window = hub_radar_window();
+        $beyond = $window + 20;      // خارجَ النافذةِ العامّةِ يقيناً
+
+        Domain::create(['name' => 'wide-alert.com',
+            'expiry' => now()->addDays($beyond)->toDateString(), 'alert' => $beyond + 10]);
+        Domain::create(['name' => 'default-window.com',
+            'expiry' => now()->addDays($beyond)->toDateString()]);
+        Domain::create(['name' => 'inside-window.com',
+            'expiry' => now()->addDays(max(1, $window - 5))->toDateString()]);
 
         $keys = $this->radarKeys();
         $this->assertContains('domains:wide-alert.com', $keys,
-            'دومين عتبته 60 يوماً وينتهي بعد 45 يجب أن ينبّه الآن');
+            'دومينٌ عتبتُه تبلغ تاريخَه يجب أن ينبّه الآن ولو تجاوز النافذةَ العامّة');
         $this->assertNotContains('domains:default-window.com', $keys,
-            'بلا عتبة تبقى النافذة الافتراضية 30 يوماً');
+            'بلا عتبةٍ خاصّةٍ لا يتجاوز الصفُّ النافذةَ العامّة (hub_radar_window)');
+        $this->assertContains('domains:inside-window.com', $keys,
+            'وبلا عتبةٍ خاصّةٍ يظهر ما هو **داخلَ** النافذةِ العامّة — الحافّةُ الأخرى للعقد');
     }
 
     public function test_subscription_alerts_list_is_honored(): void

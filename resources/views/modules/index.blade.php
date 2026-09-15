@@ -236,7 +236,11 @@
                 </label>
             @endif
             @if ($bulkExport)
-                <button class="btn ghost sm" type="submit" name="do" value="export">⬇ تصدير المحدد</button>
+                {{-- إنذارُ الليل (N-8): `m.bulk` محظورٌ خارجَ الدوامِ كنظيرِه المفرد،
+                     وكان الزرُّ وحدَه بلا وسمٍ — فيُضغط ويُردّ ٤٠٣ بلا سابقِ إنذار. --}}
+                <button class="btn ghost sm" type="submit" name="do" value="export"
+                    @if ($xNight) title="التصديرُ محظورٌ خارجَ ساعاتِ الدوام — يتطلّب مفتاح «تصدير خارج الدوام»" @endif
+                >⬇ تصدير المحدد @if ($xNight)🌙@endif</button>
             @endif
             @if ($bulkDelete)
                 <button class="btn ghost sm dn" type="submit" name="do" value="delete"

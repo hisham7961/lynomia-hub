@@ -66,13 +66,18 @@ class ChangeOrderController extends Controller
     public function pdf(string $id)
     {
         abort_unless(hub_can(auth()->user(), 'changeorders', 'v'), 403);
+        // حزامُ المستندِ الثنائيّ (N-14) — نظيرُ ما يلبسه بابُ عرضِ الأسعار
+        $belt = hub_doc_belt('changeorders');
         $co = hub_scope(ChangeOrder::query(), 'changeorders')->findOrFail($id);
         $html = \App\Support\ChangeOrderDoc::html($co);
         $bin = \App\Support\DocRenderer::pdf($html, 'أمر تغيير ' . $co->doc_no);
         if ($bin === null) {
+            // نسخةُ الطباعةِ تُسجَّل كما تُسجَّل الثنائيّة (N-14)
+            hub_audit('توليد مستند أمر تغيير (HTML للطباعة)', 'changeorders', $co->id, $co->doc_no, $belt);
+
             return response($html)->header('Content-Type', 'text/html; charset=utf-8');
         }
-        hub_audit('توليد مستند أمر تغيير', 'changeorders', $co->id, $co->doc_no);
+        hub_audit('توليد مستند أمر تغيير', 'changeorders', $co->id, $co->doc_no, $belt);
 
         return response($bin)->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', 'inline; filename="change-order-' . $co->doc_no . '.pdf"');

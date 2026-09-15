@@ -82,7 +82,10 @@ class CouncilNightDocumentsTest extends TestCase
 
     public function test_exportnight_is_grantable_for_every_guarded_module(): void
     {
-        $modules = (array) (config('hub_permissions.exportNight.modules') ?? []);
+        // `'*'` اصطلاحُ الكتالوجِ لـ«كلُّ الوحدات» (N-8) — يُوسَّع هنا كما يوسّعه
+        // `RoleController` و`PermissionInspector`، فالاختبارُ يقيس ما يراه المستخدم
+        $raw = config('hub_permissions.exportNight.modules') ?? [];
+        $modules = $raw === '*' ? array_keys(hub_modules()) : (array) $raw;
 
         foreach (['quotes', 'changeorders'] as $m) {
             $this->assertContains($m, $modules,

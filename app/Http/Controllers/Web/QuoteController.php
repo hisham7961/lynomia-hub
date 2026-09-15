@@ -56,15 +56,22 @@ class QuoteController extends Controller
     public function pdf(string $id)
     {
         abort_unless(hub_can(auth()->user(), 'quotes', 'v'), 403);
+        // حزامُ المستندِ الثنائيّ (N-14): تجميدُ الطوارئ + الوسمُ الزمنيّ. سلطةُ
+        // العرضِ أعلاه كما هي — لا يُشترط `export` على طباعةِ عرضٍ لعميل.
+        $belt = hub_doc_belt('quotes');
         $q = hub_scope(Quote::query(), 'quotes')->findOrFail($id);
 
         $html = \App\Support\Proposal::html($q);
         $bin = \App\Support\DocRenderer::pdf($html, 'عرض ' . $q->doc_no);
         if ($bin === null) {
-            // بلا mPDF: تُقدَّم نسخةٌ HTML قابلةٌ للطباعة من المتصفح
+            // بلا mPDF: تُقدَّم نسخةٌ HTML قابلةٌ للطباعة من المتصفح — **وتُسجَّل**
+            // (N-14): المستندُ نفسُه يخرج، فسقوطُ سطرِ التدقيقِ هنا كان يعني
+            // خروجَ الأسعارِ بلا أثرٍ كلّما غابت المكتبة.
+            hub_audit('توليد عرض (HTML للطباعة)', 'quotes', $q->id, $q->doc_no, $belt);
+
             return response($html)->header('Content-Type', 'text/html; charset=utf-8');
         }
-        hub_audit('توليد عرض PDF', 'quotes', $q->id, $q->doc_no);
+        hub_audit('توليد عرض PDF', 'quotes', $q->id, $q->doc_no, $belt);
 
         return response($bin)->header('Content-Type', 'application/pdf')
             ->header('Content-Disposition', 'inline; filename="proposal-' . $q->doc_no . '.pdf"');
