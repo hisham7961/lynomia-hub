@@ -1104,6 +1104,73 @@ if (! function_exists('hub_exporter')) {
     }
 }
 
+if (! function_exists('hub_after_hours')) {
+    /**
+     * نافذةُ «خارجِ الدوام» زمنيّاً وحدَها: بعدَ `sec.strict_from` أو قبلَ
+     * `sec.hours_start`. مقارنةُ الوقتين كانت مكتوبةً في ثلاثةِ مواضع، وهذا
+     * موضعُها الوحيد — يسألُه الوسيطُ لقاعدةِ تجديدِ الجلسة، ويسألُه
+     * `hub_export_night()` بعد أن يُضيفَ إليه مفاتيحَ التشغيلِ واستثناءَ المالك.
+     */
+    function hub_after_hours(): bool
+    {
+        $t = now()->format('H:i');
+
+        return $t >= (string) setting('sec.strict_from', '17:00')
+            || $t < (string) setting('sec.hours_start', '08:00');
+    }
+}
+
+if (! function_exists('hub_export_night')) {
+    /**
+     * هل يقعُ هذا التصديرُ في نافذةِ حظرِ نقلِ الملفاتِ خارجَ الدوام؟
+     *
+     * **تعريفٌ واحدٌ للّيل** لكلِّ بابٍ يبثُّ ملفاً. كان السؤالُ مُجاباً في موضعين:
+     * `Middleware/WorkHours::handle` لمسارات `FILE_ROUTES`، ونسخةٌ يدويّةٌ منه في
+     * `ModuleController::exportOutsideWorkHours`. وبابُ CSV الشهريِّ
+     * (`reports.monthly.export`) لم يسأله أصلاً — فكان يُسلّمُ كشفَ الرواتبِ الساعةَ
+     * الثالثةَ فجراً بينما يُردُّ تصديرُ الوحدةِ نفسِه ٤٠٣ في اللحظةِ عينها. فالجوابُ
+     * هنا وحدَه، ويستدعيه كلُّ بابٍ — فلا يفترقُ بابانِ على ساعةٍ واحدة.
+     *
+     * الشروطُ مرآةُ الوسيطِ حرفاً بحرف: مفتاحُ التشغيل، مفتاحُ منعِ الملفات،
+     * غيرُ المالكين، ونافذةُ strict_from → hours_start.
+     */
+    function hub_export_night($user = null): bool
+    {
+        if ((string) setting('sec.hours_on', '1') !== '1') return false;
+        if ((string) setting('sec.strict_files', '1') !== '1') return false;
+
+        $u = $user ?? auth()->user();
+        if (! $u || hub_is_owner($u)) return false;
+
+        return hub_after_hours();
+    }
+}
+
+if (! function_exists('hub_export_blocked_now')) {
+    /**
+     * هل يُمنع هذا المستخدمُ من التصديرِ **الآن** بحظرِ الليل؟
+     *
+     * جوابٌ واحدٌ يسألُه الحارسُ **والشاشة**: الحارسُ ليردَّ ٤٠٣، والشاشةُ لتقولَ
+     * السببَ **قبل** النقرِ لا بعده. ولولا هذا لكُتب الشرطُ في الزرِّ نسخةً ثانيةً —
+     * وهو عينُ الصنفِ الذي أُغلق هنا (N-1).
+     *
+     * @param  array|string|null  $modules  الوحدةُ (أو الوحداتُ) التي يُقبل مفتاحُ
+     *                                      `exportNight` عليها استثناءً؛ حاملُه على
+     *                                      أيٍّ منها يمرّ.
+     */
+    function hub_export_blocked_now(array|string|null $modules = null, $user = null): bool
+    {
+        if (! hub_export_night($user)) return false;
+
+        $u = $user ?? auth()->user();
+        foreach (array_filter((array) $modules, fn ($m) => is_string($m) && $m !== '') as $m) {
+            if (hub_can($u, $m, 'exportNight')) return false;
+        }
+
+        return true;
+    }
+}
+
 if (! function_exists('hub_safe_url')) {
     /**
      * رابط آمن للعرض: يسمح فقط بمخططات غير قابلة للتنفيذ (http/https/mailto/tel)

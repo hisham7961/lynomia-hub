@@ -16,7 +16,9 @@
         <a class="btn ghost sm" href="{{ route('reports.monthly', ['month'=>$month]) }}">‹ الحضور الشهري</a>
         <a class="btn ghost sm" href="{{ route('reports.monthly.employee', ['emp'=>$employee->id,'month'=>$prev]) }}">‹ {{ $prev }}</a>
         <a class="btn ghost sm" href="{{ route('reports.monthly.employee', ['emp'=>$employee->id,'month'=>$next]) }}">{{ $next }} ›</a>
-        <a class="btn sm" href="{{ route('reports.monthly.export', ['month'=>$month,'emp'=>$employee->id]) }}">⬇️ تصدير CSV</a>
+        @php $xNight = hub_export_blocked_now(['attend', 'hr']); @endphp
+        <a class="btn sm" href="{{ route('reports.monthly.export', ['month'=>$month,'emp'=>$employee->id]) }}"
+           @if ($xNight) title="{{ 'نقل الملفات ممنوع خارج وقت العمل — يعود متاحاً مع بداية الدوام' }}" @endif>@if ($xNight)🌙@endif ⬇️ تصدير CSV</a>
     </div>
 </div>
 

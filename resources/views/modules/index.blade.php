@@ -26,7 +26,10 @@
             <a class="btn ghost sm" href="{{ route('m.board', $module) }}">🗂 كانبان</a>
         @endif
         @if (! $trash && (hub_exporter() || hub_can(auth()->user(), $module, 'export')))
-            <a class="btn ghost sm" href="{{ route('m.export', ['module' => $module] + request()->query()) }}">📤 CSV</a>
+            @php $xNight = hub_export_blocked_now($module); @endphp
+            {{-- الزرُّ يبقى كما هو؛ يُضاف إليه سببُ المنعِ **قبل** النقر لا بعده --}}
+            <a class="btn ghost sm" href="{{ route('m.export', ['module' => $module] + request()->query()) }}"
+               @if ($xNight) title="{{ 'نقل الملفات ممنوع خارج وقت العمل — يعود متاحاً مع بداية الدوام' }}" @endif>📤 CSV @if ($xNight)🌙@endif</a>
         @endif
         @if (! $trash && hub_can(auth()->user(), $module, 'a') && ! hub_scoped(auth()->user()))
             <a class="btn ghost sm" href="{{ route('m.import', $module) }}">📥 استيراد</a>

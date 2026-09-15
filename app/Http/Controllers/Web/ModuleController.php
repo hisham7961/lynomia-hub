@@ -918,7 +918,7 @@ class ModuleController extends Controller
          * يحتاج سطرَ إعفاءٍ في Middleware/WorkHours — خارجَ ملفّات هذه الدفعة.)
          */
         $night = $this->exportOutsideWorkHours();
-        if ($night && ! hub_can(auth()->user(), $module, 'exportNight')) {
+        if (hub_export_blocked_now($module)) {
             abort(403, 'نقل الملفات ممنوع خارج وقت العمل — يعود متاحاً مع بداية الدوام،'
                 . ' أو يُمنح دورُك مفتاحَ «تصدير خارج الدوام» (exportNight) لإقفالٍ ليليٍّ مشروع');
         }
@@ -950,15 +950,9 @@ class ModuleController extends Controller
      */
     protected function exportOutsideWorkHours(): bool
     {
-        if ((string) setting('sec.hours_on', '1') !== '1') return false;
-        if ((string) setting('sec.strict_files', '1') !== '1') return false;
-        $u = auth()->user();
-        if (! $u || hub_is_owner($u)) return false;
-
-        $t = now()->format('H:i');
-
-        return $t >= (string) setting('sec.strict_from', '17:00')
-            || $t < (string) setting('sec.hours_start', '08:00');
+        // (مجلسُ الخبراء · التحقّقُ الثامن) النسخةُ اليدويّةُ صارت استدعاءً: التعريفُ
+        // في `hub_export_night()` وحدَه، فيسأله هذا البابُ وبابُ CSV الشهريِّ معاً.
+        return hub_export_night();
     }
 
     /**
