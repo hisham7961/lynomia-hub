@@ -271,6 +271,45 @@ class UserController extends Controller
             . '» — أبلغه ليُعيد تفعيله من ملفه الشخصي فور استعادة جهازه');
     }
 
+    /**
+     * **فكُّ قفلِ التخمينِ عن حسابٍ أُقفل بمحاولاتٍ فاشلة.**
+     *
+     * `AccountLockout::bump` يقفل الحسابَ دقائقَ معدودةً بعد تكرارِ الفشل، وهو
+     * حارسٌ صحيحٌ ضروريّ. لكنّه كان **بلا بابِ استرداد**: لا زرَّ ولا مسارَ ولا
+     * أمر — فمن أخطأ كلمتَه ثلاثاً ينتظر ساعاتٍ، والمالكُ يرى القفلَ في مركزِ
+     * الأمان (`SecurityPosture` يعدّه و`SecurityExposure` يعرضه) **ولا يملك له
+     * فعلاً**. والمنتجُ يقيس ويحكم ويعرض ثمّ يُحيل صاحبَه إلى قاعدةِ البيانات.
+     *
+     * والمبدأُ مكتوبٌ في شقيقةِ هذا الباب أعلاه: «ميزةُ أمانٍ بلا بابِ استرداد
+     * ليست أماناً بل فخّاً». وقد بُني البابُ للتحقّقِ بخطوتين ولم يُبنَ للقفل.
+     *
+     * ويُحرَس بما حُرست به شقيقتُه: رايةُ إدارةِ المستخدمين، وامتيازٌ يعلو الحسابَ
+     * الهدف، **وتأكيدُ هويّة** — لأنّ من يفكّ القفلَ مراراً يُبطل حارسَ التخمينِ
+     * نفسَه فيصير البابُ ثغرةً — وأثرُ تدقيقٍ باسمِ الفاعلِ والهدف.
+     *
+     * ولا يُصفَّر `failed_attempts` صمتاً دون القفل: العدّادُ جزءُ الحكمِ نفسِه،
+     * فتركُه يعيد القفلَ بأوّلِ خطأٍ تالٍ ويُبطل معنى الفكّ.
+     */
+    public function unlock(User $user)
+    {
+        $this->gate();
+        abort_unless(\App\Support\Staff::mayTouch($user), 403,
+            'هذا الحساب ذو امتياز — فكُّ قفله يتطلب صلاحيةً تعلوه');
+        if ($resp = hub_require_stepup(route('users.index', absolute: false))) return $resp;
+
+        if (! $user->locked_until || now()->gte($user->locked_until)) {
+            return back()->with('ok', 'الحسابُ غيرُ مقفول — لا شيءَ ليُفكّ');
+        }
+
+        $was = (string) $user->locked_until;
+        $user->forceFill(['locked_until' => null, 'failed_attempts' => 0])->save();
+        hub_audit('فكّ قفل الحساب', 'users', $user->id, $user->name,
+            ['before' => ['locked_until' => $was],
+             'after'  => ['locked_until' => null, 'by' => auth()->user()?->name]]);
+
+        return back()->with('ok', 'فُكَّ قفلُ «' . $user->name . '» — يستطيع الدخولَ الآن');
+    }
+
     public function destroy(User $user)
     {
         $this->gate();

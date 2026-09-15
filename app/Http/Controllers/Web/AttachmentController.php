@@ -296,6 +296,15 @@ class AttachmentController extends Controller
             );
         }
         \App\Support\DocumentPolicy::forget((string) $a->id);
+        /*
+         * **الكتابةُ الخامُّ لا تُطلق حدثَ Eloquent، فلا ختمَ ولا إبطال** (التحقّق
+         * المستقلّ). أُضيف ختمُ `document_access_rules` إلى مفاتيحِ الرادارِ في
+         * v2.509.0 ووُعد بأنّ «المنعَ يسري فوراً» — **ولم يكن يسري**: الجدولُ
+         * يُكتب هنا بـ`DB::table` فيبقى الختمُ جامداً والوثيقةُ على رادارِ
+         * الممنوعِ خمسَ دقائق. فالختمُ يُرفع صراحةً، ورادارُ الانتهاءاتِ يُبطَل.
+         */
+        hub_data_bump('document_access_rules');
+        hub_expiry_bust();
         $n = count($principals);
         hub_audit('ضبط وصول وثيقة', $a->module, $a->record_id, (string) $a->original_name,
             ['after' => ['doc' => $a->id, 'effect' => $d['effect'], 'principals' => $n]]);
@@ -312,6 +321,9 @@ class AttachmentController extends Controller
         DB::table('document_access_rules')->where('id', $ruleId)
             ->where('resource_type', 'attachment')->where('resource_id', $a->id)->delete();
         \App\Support\DocumentPolicy::forget((string) $a->id);
+        // ورفعُ المنعِ كوضعِه: بلا ختمٍ تبقى الوثيقةُ محجوبةً بعد السماحِ خمسَ دقائق
+        hub_data_bump('document_access_rules');
+        hub_expiry_bust();
         hub_audit('حذف قاعدة وصول وثيقة', $a->module, $a->record_id, (string) $a->original_name);
 
         return back()->with('ok', 'أُزيلت قاعدةُ الوصول');

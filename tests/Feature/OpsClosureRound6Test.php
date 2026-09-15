@@ -43,7 +43,22 @@ class OpsClosureRound6Test extends TestCase
     public function test_open_incidents_lower_infrastructure_health(): void
     {
         $this->seedCore();
+
+        /*
+         * **خطُّ أساسٍ مقيسٌ — شرطٌ أُضيف في v2.504.0 (مجلس الخبراء · PROD-10).**
+         * صار بُعدٌ بلا أيِّ بيانٍ يُعلَن «لا يُقاس» ودرجتُه `null` بدل مئةٍ كاذبة
+         * («الامتثال ١٠٠٪ من ٠» كانت أعلى درجةٍ في تقريرِ صحّةِ الشركة). وهذا
+         * الاختبارُ يحرس **أثرَ الحادثةِ على الدرجة** لا وجودَ البيانات — فيُهيَّأ
+         * سيرفرٌ ليصير للبُعدِ خطُّ أساسٍ يُقاس منه. والتأكيدان كما هما.
+         */
+        \Illuminate\Support\Facades\DB::table('servers')->insert([
+            'id' => (string) \Illuminate\Support\Str::uuid(), 'name' => 'srv-baseline',
+            'expiry' => now()->addYear()->toDateString(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
         $before = hub_health(true)['البنية التحتية']['score'];
+        $this->assertNotNull($before, 'خطُّ الأساسِ غيرُ مقيس — التهيئةُ لم تُنشئ ما يُقاس');
 
         Incident::create(['title' => 'انقطاع الخدمة', 'severity' => 'حرج', 'status' => 'مفتوح',
             'started_at' => now()->subHours(2)]);

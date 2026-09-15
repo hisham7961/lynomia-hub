@@ -786,6 +786,11 @@ class ModuleController extends Controller
         // تُزرع بلا مبلغٍ مدفوع فتُطلق invoice.paid على فاتورةٍ لم تُدفع (ARCH-03, v2.399)
         if ($why = ($def['status_via_action'][$newStatus] ?? null)) abort(422, $why);
 
+        // **قيمةُ القرارِ لا تُكتب من بابِ الحالةِ المباشر** (مجلس الخبراء · الخبير ١٤):
+        // سحبُ البطاقةِ في كانبان — ونظيرُه في الجوّال — كان يعتمد الإجازةَ ويخصم
+        // الرصيد. والحارسُ هنا لأنّ هذا **الجوهرُ المشترك** بين البابين.
+        \App\Support\DecisionFields::guardStatusWrite($module, $m, $newStatus);
+
         $prevStatus = $m->{$statusCol};
         $m->{$statusCol} = $newStatus;
         // ── Control Plane: Phase 6 (WP-6.1) ── بوّابةُ «الحالة تتطلب حقولاً» بعد الضبط
@@ -913,7 +918,7 @@ class ModuleController extends Controller
          * يحتاج سطرَ إعفاءٍ في Middleware/WorkHours — خارجَ ملفّات هذه الدفعة.)
          */
         $night = $this->exportOutsideWorkHours();
-        if ($night && ! hub_can(auth()->user(), $module, 'exportNight')) {
+        if (hub_export_blocked_now($module)) {
             abort(403, 'نقل الملفات ممنوع خارج وقت العمل — يعود متاحاً مع بداية الدوام،'
                 . ' أو يُمنح دورُك مفتاحَ «تصدير خارج الدوام» (exportNight) لإقفالٍ ليليٍّ مشروع');
         }
@@ -945,15 +950,9 @@ class ModuleController extends Controller
      */
     protected function exportOutsideWorkHours(): bool
     {
-        if ((string) setting('sec.hours_on', '1') !== '1') return false;
-        if ((string) setting('sec.strict_files', '1') !== '1') return false;
-        $u = auth()->user();
-        if (! $u || hub_is_owner($u)) return false;
-
-        $t = now()->format('H:i');
-
-        return $t >= (string) setting('sec.strict_from', '17:00')
-            || $t < (string) setting('sec.hours_start', '08:00');
+        // (مجلسُ الخبراء · التحقّقُ الثامن) النسخةُ اليدويّةُ صارت استدعاءً: التعريفُ
+        // في `hub_export_night()` وحدَه، فيسأله هذا البابُ وبابُ CSV الشهريِّ معاً.
+        return hub_export_night();
     }
 
     /**
@@ -1067,6 +1066,9 @@ class ModuleController extends Controller
                 if (! $m || (string) $m->{$statusCol} === $to) continue;
                 $m->{$statusCol} = $to;
                 try {
+                    // نفسُ حارسِ البابِ الفرديّ — **والالتفافُ بالجملة أوسعُ أثراً
+                    // من الفرد**؛ داخلَ `try` فيُنسب الرفضُ لسجلِّه ولا يقطع الدفعة
+                    \App\Support\DecisionFields::guardStatusWrite($module, $m, $to);
                     // ── Control Plane: Phase 6 (WP-6.1) ── البوّابة داخل try: رفضُها
                     // رفضُ سجلٍّ يُنسب لصاحبه (refusal) ولا يقطع الدفعة
                     $this->guardStatusRequires($def, $m);
@@ -1781,6 +1783,9 @@ class ModuleController extends Controller
      */
     protected function fill(array $def, Request $r, Model $m, ?array $only = null): void
     {
+        // حقولُ القرارِ تُلتقط قبل التعبئة لتُقارن بعدها (انظر `DecisionFields`)
+        $decision = \App\Support\DecisionFields::capture((string) ($def['key'] ?? ''), $def, $m);
+
         foreach ($def['fields'] as $f) {
             $k = $f['key']; $c = $f['col']; $t = $f['type'];
 
@@ -1846,6 +1851,15 @@ class ModuleController extends Controller
             }
             $m->custom = $custom ?: null;
         }
+
+        /*
+         * **حقلُ القرارِ يُردّ لمن لا يملك البتّ** (مجلس الخبراء · الخبير ١٤).
+         *
+         * بعد التعبئةِ لا داخلَها: السلطةُ تُقاس على السجلِّ **مكتملاً** — فـ`emp_id`
+         * و`mgr_id` هما ما يحدّد أصاحبُ الطلبِ يبتّ في طلبِ نفسِه أم مديرُه، وهما
+         * لا يُعرفان قبل أن تُملأ بقيّةُ الحقول. والحجّةُ كاملةً في `DecisionFields`.
+         */
+        \App\Support\DecisionFields::enforce((string) ($def['key'] ?? ''), $m, $decision);
 
         \App\Support\AppsProjects::inherit($def, $m);
 

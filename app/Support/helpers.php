@@ -1104,6 +1104,73 @@ if (! function_exists('hub_exporter')) {
     }
 }
 
+if (! function_exists('hub_after_hours')) {
+    /**
+     * نافذةُ «خارجِ الدوام» زمنيّاً وحدَها: بعدَ `sec.strict_from` أو قبلَ
+     * `sec.hours_start`. مقارنةُ الوقتين كانت مكتوبةً في ثلاثةِ مواضع، وهذا
+     * موضعُها الوحيد — يسألُه الوسيطُ لقاعدةِ تجديدِ الجلسة، ويسألُه
+     * `hub_export_night()` بعد أن يُضيفَ إليه مفاتيحَ التشغيلِ واستثناءَ المالك.
+     */
+    function hub_after_hours(): bool
+    {
+        $t = now()->format('H:i');
+
+        return $t >= (string) setting('sec.strict_from', '17:00')
+            || $t < (string) setting('sec.hours_start', '08:00');
+    }
+}
+
+if (! function_exists('hub_export_night')) {
+    /**
+     * هل يقعُ هذا التصديرُ في نافذةِ حظرِ نقلِ الملفاتِ خارجَ الدوام؟
+     *
+     * **تعريفٌ واحدٌ للّيل** لكلِّ بابٍ يبثُّ ملفاً. كان السؤالُ مُجاباً في موضعين:
+     * `Middleware/WorkHours::handle` لمسارات `FILE_ROUTES`، ونسخةٌ يدويّةٌ منه في
+     * `ModuleController::exportOutsideWorkHours`. وبابُ CSV الشهريِّ
+     * (`reports.monthly.export`) لم يسأله أصلاً — فكان يُسلّمُ كشفَ الرواتبِ الساعةَ
+     * الثالثةَ فجراً بينما يُردُّ تصديرُ الوحدةِ نفسِه ٤٠٣ في اللحظةِ عينها. فالجوابُ
+     * هنا وحدَه، ويستدعيه كلُّ بابٍ — فلا يفترقُ بابانِ على ساعةٍ واحدة.
+     *
+     * الشروطُ مرآةُ الوسيطِ حرفاً بحرف: مفتاحُ التشغيل، مفتاحُ منعِ الملفات،
+     * غيرُ المالكين، ونافذةُ strict_from → hours_start.
+     */
+    function hub_export_night($user = null): bool
+    {
+        if ((string) setting('sec.hours_on', '1') !== '1') return false;
+        if ((string) setting('sec.strict_files', '1') !== '1') return false;
+
+        $u = $user ?? auth()->user();
+        if (! $u || hub_is_owner($u)) return false;
+
+        return hub_after_hours();
+    }
+}
+
+if (! function_exists('hub_export_blocked_now')) {
+    /**
+     * هل يُمنع هذا المستخدمُ من التصديرِ **الآن** بحظرِ الليل؟
+     *
+     * جوابٌ واحدٌ يسألُه الحارسُ **والشاشة**: الحارسُ ليردَّ ٤٠٣، والشاشةُ لتقولَ
+     * السببَ **قبل** النقرِ لا بعده. ولولا هذا لكُتب الشرطُ في الزرِّ نسخةً ثانيةً —
+     * وهو عينُ الصنفِ الذي أُغلق هنا (N-1).
+     *
+     * @param  array|string|null  $modules  الوحدةُ (أو الوحداتُ) التي يُقبل مفتاحُ
+     *                                      `exportNight` عليها استثناءً؛ حاملُه على
+     *                                      أيٍّ منها يمرّ.
+     */
+    function hub_export_blocked_now(array|string|null $modules = null, $user = null): bool
+    {
+        if (! hub_export_night($user)) return false;
+
+        $u = $user ?? auth()->user();
+        foreach (array_filter((array) $modules, fn ($m) => is_string($m) && $m !== '') as $m) {
+            if (hub_can($u, $m, 'exportNight')) return false;
+        }
+
+        return true;
+    }
+}
+
 if (! function_exists('hub_safe_url')) {
     /**
      * رابط آمن للعرض: يسمح فقط بمخططات غير قابلة للتنفيذ (http/https/mailto/tel)
@@ -1241,6 +1308,49 @@ if (! function_exists('hub_build_children_map')) {
     }
 }
 
+if (! function_exists('hub_backup_artifacts')) {
+    /**
+     * **السلطةُ الواحدةُ على «هل ثمّة ما يُستعاد؟»** (مجلس الخبراء · ت-٣).
+     *
+     * كان لهذا السؤالِ قارئان: `SecurityPosture::backupFresh()` يسأل نبضةَ
+     * `heartbeat.backup` (**ختمَ زمن**)، و`OpsController::backupsPanel()` يعدّ
+     * **الملفّاتِ** على القرص. فقال الأوّلُ «✅ حداثةُ النسخة» بينما المجلّدُ
+     * فارغٌ تماماً — **والمهمّةُ كانت قد عملت فعلاً**، ولهذا كانت العلامةُ
+     * الخضراءُ مكتسَبةً بنبضةٍ ومكذوبةً بالقرص. ولو لم تعمل قطّ لحذّرت الشاشةُ
+     * بحقّ.
+     *
+     * والمنتجُ يعرف هذا الصنفَ ويحرسه في **الكاتب** (تعليقُ v2.312 في
+     * `HubBackup`: «فتُعطَّل قدرةُ التعافي كلها بصمت، **والمشغّل يقرأ ✓
+     * ويطمئن**») ولم يحرسه في **القارئ**. فهذه الدالّةُ هي القارئُ الواحد.
+     *
+     * @return array{count:int,bytes:int,latest:?string,at:?int}
+     */
+    function hub_backup_artifacts(): array
+    {
+        $out = ['count' => 0, 'bytes' => 0, 'latest' => null, 'at' => null];
+        try {
+            $files = array_merge(
+                glob(storage_path('app/backups/hub-*.json')) ?: [],
+                glob(storage_path('app/backups/hub-*.json.enc')) ?: []
+            );
+            foreach ($files as $f) {
+                $out['count']++;
+                $out['bytes'] += (int) @filesize($f);
+                $m = (int) @filemtime($f);
+                // الأحدثُ زمناً، والاسمُ فاصلَ تعادلٍ — لا قرعةَ بين ملفّين بلحظةٍ واحدة
+                if ($out['at'] === null || [$m, basename($f)] > [$out['at'], (string) $out['latest']]) {
+                    $out['at'] = $m;
+                    $out['latest'] = basename($f);
+                }
+            }
+        } catch (\Throwable $e) {
+            // §25: تخزينٌ متعثّر لا يُسقط الشاشة — ويُقرأ «لا أثر» وهو الأسلم
+        }
+
+        return $out;
+    }
+}
+
 if (! function_exists('hub_expiry_fields')) {
     /**
      * حقول التواريخ المصيرية عبر كل الوحدات (انتهاء/تجديد/استحقاق).
@@ -1271,11 +1381,228 @@ if (! function_exists('hub_expiry_fields')) {
     }
 }
 
+if (! function_exists('hub_expiry_self')) {
+    /**
+     * **استثناءُ صاحبِ الشأن** (مجلس الخبراء · PROD-05).
+     *
+     * الرادارُ منطَّقٌ بصلاحيّةِ الوحدة، فكان **من تنتهي إقامتُه هو الشخصَ
+     * الوحيدَ الممنوعَ من إنذارِ نفسِه**: موظّفةٌ بلا `hr:v` — ولا ينبغي أن
+     * تملكه، فملفّاتُ زملائها ليست لها — تقرأ في `/me` «٥ يوم — انتهاء
+     * الإقامة» وتقرأ في `/alerts` «😌 كل أصولك بأمان».
+     *
+     * **وإقامتُها ليست سرّاً عنها.** فتُقرأ هنا حقولُ انتهاءِ **سجلِّه هو**
+     * وحدَه — المرتبطِ بحسابِه عبر `employees.user_id`.
+     *
+     * **ولا صلاحيّةَ تُوسَّع:** لا يفتح هذا ملفَّ زميلٍ واحد، ولا يمنح `hr:v`،
+     * ولا يمسّ أيَّ وحدةٍ أخرى.
+     */
+    function hub_expiry_self($user = null, bool $fresh = false): array
+    {
+        $user = $user ?? auth()->user();
+        if (! $user) return [];
+
+        $md = hub_mod('hr');
+        if (! $md || empty($md['table'])) return [];
+
+        /*
+         * **مخبأٌ لازمٌ لا زينة:** شارةُ الرادارِ تُرسم في **كلِّ صفحة**، فاستعلامٌ
+         * غيرُ مخبّأٍ هنا يعني استعلاماً إضافيّاً لكلِّ طلبٍ في النظام. وقد أسقط
+         * ذلك فعلاً حارسَ عددِ الاستعلاماتِ في `SettingsSecretSweepTest` (٤٠ من ٤٠)
+         * — **والحارسُ كان محقّاً**. والمفتاحُ بالمستخدمِ لا بالدور (الصفوفُ تخصّه
+         * وحدَه)، وختمُ جدولِ الموظّفين يُبطله فورَ تجديدِ إقامةٍ لا بعد مهلة.
+         */
+        /*
+         * **ختمُ ما يُقرأ كلِّه، لا جدولِ الموظّفين وحدَه** (مجلس الخبراء). صار
+         * المسحُ يقرأ **المرفقات** و**قواعدَ الوثائق**، ومفتاحُه لا يحمل ختمَهما:
+         * فقاعدةُ منعٍ صريحةٍ تُضاف والوثيقةُ باقيةٌ على الرادارِ خمسَ دقائق،
+         * و«↻ تحديث الآن» لا يُقصّرها لأنّ `$fresh` **لم يكن يصل**. وهو الصنفُ
+         * نفسُه الذي أُغلق في زرِّ `/ceo`: اسمٌ يَعِد بسلوكٍ لا يُنفِّذه القارئ.
+         */
+        $ck = 'hub:expiry:self:' . $user->id
+            . ':g' . (int) \Illuminate\Support\Facades\Cache::get('hub:expiry:gen', 0)
+            . hub_data_stamp([(string) $md['table'], 'attachments', 'document_access_rules', 'roles']);
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget($ck);
+
+        return \Illuminate\Support\Facades\Cache::remember($ck, 300, function () use ($md, $user) {
+            return hub_expiry_self_scan($md, $user);
+        });
+    }
+}
+
+if (! function_exists('hub_expiry_self_scan')) {
+    /** المسحُ الفعليُّ لصفوفِ صاحبِ الشأن — يُستدعى من خلفِ المخبأ */
+    function hub_expiry_self_scan(array $md, $user): array
+    {
+        try {
+            /*
+             * **كلُّ صفوفِه لا أوّلُها** (مجلس الخبراء · F4). كان `->first()` بلا
+             * `orderBy` — و`CLAUDE.md` يسمّيه **قرعة**. وأثبت التحقّقُ المستقلُّ
+             * أنّها ليست نظريّة: لمن له سجلّان أنذرَ الرادارُ **بالأبعد** وحجب
+             * **الأقرب**، بينما تراهما الموارد البشريّة. والقرعةُ تُخفي النقصَ:
+             * صفٌّ واحدٌ من اثنين يبدو نجاحاً وهو نصفُ جواب. فتُقرأ صفوفُه كلُّها،
+             * مرتّبةً بـ`id` كي لا يبقى للترتيبِ أثرٌ في ما يُعرَض.
+             */
+            $emps = \Illuminate\Support\Facades\DB::table($md['table'])
+                ->whereNull('deleted_at')->where('user_id', $user->id)
+                ->orderBy('id')->get();
+            if ($emps->isEmpty()) return [];   // حسابُ إدارةٍ أو مالكٍ بلا ملفِّ موظّف
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $disp = hub_display_col('hr');
+        $out = [];
+        foreach ($emps as $emp) {
+            foreach (hub_expiry_fields() as [$mk, $f]) {
+                if ($mk !== 'hr') continue;
+                /*
+                 * **والقناعُ يسري هنا كما يسري هناك** (مجلس الخبراء · F3). المسحُ
+                 * الرئيسيُّ يستشير `hub_field_mode` ويُعلن في تعليقِه أنّ «القناعَ
+                 * إن سرى في بابٍ وسقط في آخر فليس قناعاً بل ظنُّ ساتر» — وكان هذا
+                 * البابُ ساقطاً: قناعُ `hide` على «نهاية الخدمة» لا يمنع شيئاً عن
+                 * صاحبِه بينما يمنعه عن مديرِ العمليّات. ومن أخفت المنشأةُ عنه حقلاً
+                 * عمداً لا يُكشف له من بابٍ خلفيّ.
+                 */
+                if (hub_field_mode($user, 'hr', (string) ($f['key'] ?? '')) === 'hide') continue;
+                $col = $f['col'] ?? '';
+                $raw = $col !== '' ? ($emp->{$col} ?? null) : null;
+                if (! $raw) continue;
+
+                $d = substr((string) $raw, 0, 10);
+                try {
+                    $days = (int) now()->startOfDay()
+                        ->diffInDays(\Illuminate\Support\Carbon::parse($d)->startOfDay(), false);
+                } catch (\Throwable $e) { continue; }
+                if ($days > 30 || $days < -60) continue;   // النافذةُ نفسُها التي يستعملها الرادار
+
+                $out[] = [
+                    'module' => 'hr', 'mlabel' => (string) ($md['label'] ?? 'ملفات الموظفين'),
+                    'flabel' => (string) ($f['label'] ?? ''), 'fkey' => (string) ($f['key'] ?? ''),
+                    'id' => (string) $emp->id, 'name' => (string) ($emp->{$disp} ?? $user->name),
+                    'date' => $d, 'days' => $days, 'self' => true,
+                ];
+            }
+        }
+
+        /*
+         * **ووثائقُ ملفِّه معه** (مجلس الخبراء · F5). كان الاستثناءُ **نصفَ
+         * استثناء**: يقرأ أعمدةَ ملفِّه ولا يضمّ وثائقَه المؤرَّخة، فترى الموارد
+         * البشريّةُ على ملفِّه «الهوية / الإقامة» المنتهيةَ ولا يراها هو في أيِّ
+         * شاشة — **وهو من يجدّدها**.
+         *
+         * وقاعدةُ الوثيقةِ تسري كما تسري في `hub_doc_expiry`: وثيقةٌ ممنوعةٌ
+         * صراحةً عن القارئِ لا تظهر له ولو كانت على ملفِّه — القرارُ لمن قيّدها.
+         */
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('attachments')
+                && \Illuminate\Support\Facades\Schema::hasColumn('attachments', 'expires_at')) {
+                /*
+                 * **النموذجُ كاملاً لا منتقىً** (مجلس الخبراء). كنتُ أنتقي أربعةَ
+                 * أعمدةٍ ثمّ أُسلّم النموذجَ الناقصَ إلى `DocumentPolicy` — فتصير
+                 * `hub_doc_sensitive('', $kind)` **false** و`hub_mod('')` **null**:
+                 * **بوّابتان من خمسٍ تُطفآن صامتتين**. وأثبت التحقّقُ المستقلُّ أنّ
+                 * من يملك `hr:v` بلا `docsec` كان يرى «عقد العمل» على ملفِّه —
+                 * وهي الوثيقةُ التي تمنعها السياسةُ عنه بعينها. وكلُّ أنواعِ وثائقِ
+                 * الموارد البشريّةِ المؤرَّخةِ حسّاسة، فالميزةُ كانت تعمل **بفضلِ
+                 * الإطفاء لا رغمَه**. والانتقاءُ لم يكن يوفّر شيئاً يُذكر.
+                 *
+                 * **والنافذةُ متماثلةٌ مع `hub_doc_expiry`** (`±60`): كانت `+30`
+                 * هنا و`+60` هناك، فوثيقةٌ بعد أربعين يوماً **تراها الموارد
+                 * البشريّةُ ولا يراها صاحبُها** — وهي الشكوى نفسُها التي وُضع هذا
+                 * المسحُ لإغلاقها. والقصُّ النهائيُّ يقع في `hub_expiry` كما لها.
+                 */
+                $docs = \App\Models\Attachment::whereNull('deleted_at')
+                    ->where('module', 'hr')->whereIn('record_id', $emps->pluck('id')->all())
+                    ->whereNotNull('expires_at')
+                    ->whereBetween('expires_at', [now()->subDays(60)->toDateString(),
+                                                  now()->addDays(60)->toDateString()])
+                    ->orderBy('expires_at')->orderBy('id')->limit(40)->get();
+
+                if ($docs->isNotEmpty()) {
+                    \App\Support\DocumentPolicy::primeMemo($docs->pluck('id'));
+                    $names = $emps->pluck($disp, 'id');
+                    foreach ($docs as $a) {
+                        /*
+                         * **قرارٌ صريحٌ يُعلَن لا يُستدرَج** (مجلس الخبراء).
+                         *
+                         * كلُّ أنواعِ وثائقِ الموارد البشريّةِ المؤرَّخةِ موسومةٌ
+                         * `sec => true`، فبوّابةُ `docsec` تحجب عن **صاحبِ الشأنِ
+                         * نفسِه** إقامتَه وجوازَه وعقدَه. والمبدأُ الذي قام عليه
+                         * هذا المسحُ كلُّه: **«إقامتُها ليست سرّاً عنها»** —
+                         * ووثيقةُ إقامتِها كذلك، وهو من يُطالَب بتجديدها.
+                         *
+                         * فيُستثنى **صاحبُ الشأنِ وحدَه** من بوّابةِ الحساسيّة، وفي
+                         * أضيقِ حدّ:
+                         *   • سجلُّه هو (الاستعلامُ محصورٌ بـ`user_id` أصلاً)،
+                         *   • **وجودُ الوثيقةِ وتاريخُها ونوعُها** لا محتواها —
+                         *     و`att.view`/`att.dl` تبقى محكومةً بالسياسةِ كاملةً
+                         *     فتردّ 403 كما هي،
+                         *   • **والمنعُ الصريحُ يعلو** (قاعدةٌ على المستخدمِ أو
+                         *     دورِه): منشأةٌ قيّدت وثيقةً عن شخصٍ بعينِه قرارُها
+                         *     مُحترَم، ولا يُنقض باستثناءٍ عامّ.
+                         *
+                         * وما قبلَ هذا لم يكن قراراً بل **عَرَضاً**: نموذجٌ ناقصُ
+                         * عمودَين أطفأ البوّابتين صامتاً، فمرّ كلُّ شيءٍ بلا تمييز.
+                         */
+                        // **معاينةٌ أو تنزيل، كما تفعل `listable()`** (التحقّق المستقلّ):
+                        // القصرُ على `preview` وحدَها ضيّق الباب — وثيقةٌ مُنعت معاينتُها
+                        // صراحةً وسُمح تنزيلُها كانت ستختفي من رادارِ صاحبِها.
+                        $ok = false; $explicit = false;
+                        foreach (['preview', 'download'] as $act) {
+                            $d = \App\Support\DocumentPolicy::decide($user, $a, $act);
+                            if ($d['allowed']) { $ok = true; break; }
+                            if (in_array($d['state'], ['DENIED_SENSITIVE', 'DENIED_SECRET_RECORD'], true)) {
+                                $explicit = true;   // حجبٌ بالحساسيّةِ وحدَها — يُستثنى صاحبُ الشأن
+                            }
+                        }
+                        if (! $ok && ! $explicit) continue;   // منعٌ صريحٌ يُحترَم كما هو
+                        $out[] = [
+                            'module' => 'hr', 'mlabel' => (string) ($md['label'] ?? 'ملفات الموظفين'),
+                            'flabel' => hub_doc_label('hr', $a->kind) ?? 'وثيقة',
+                            'fkey' => 'doc:' . (string) $a->kind,
+                            'id' => (string) $a->record_id,
+                            'name' => (string) ($names[$a->record_id] ?? $user->name),
+                            'date' => $a->expires_at->toDateString(), 'doc' => true, 'self' => true,
+                            'days' => (int) now()->startOfDay()
+                                ->diffInDays($a->expires_at->copy()->startOfDay(), false),
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable $e) { /* الوثائقُ إضافةٌ — لا تُسقط مسحَ الأعمدة */ }
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_expiry_url')) {
+    /**
+     * **وجهةُ صفٍّ في رادارِ الانتهاءات — تعريفٌ واحدٌ يقرؤه كلُّ عارض.**
+     *
+     * كان كلُّ عارضٍ يبني `route('m.show', [module, id])` بنفسِه — خمسةُ مواضع.
+     * وما دامت صفوفُ الرادارِ كلُّها قد مرّت بـ`hub_can($u, $module, 'v')` كان
+     * ذلك صحيحاً. ثمّ دخل **صفُّ صاحبِ الشأن** (PROD-05): يُعرَض لمن لا يملك
+     * `hr:v` قصداً — فرابطٌ إلى `m.show` يردّه **403**. فتُنذِره الشاشةُ ثمّ
+     * تُغلق في وجهِه البابَ الذي دلّته عليه.
+     *
+     * وملفُّه هو مفتوحٌ له في `/me` — فهناك تذهب وجهتُه.
+     */
+    function hub_expiry_url(array $i): string
+    {
+        if (! empty($i['self'])) return route('portal.me');
+
+        return route('m.show', [$i['module'], $i['id']]);
+    }
+}
+
 if (! function_exists('hub_expiry')) {
     /** رادار الانتهاءات: كل ما ينتهي خلال 30 يوماً أو انتهى فعلاً — مخبأ، ومحدود بنطاق المستخدم */
     function hub_expiry(bool $fresh = false, $user = null): array
     {
         $user   = $user ?? auth()->user();
+        // **صفوفُ صاحبِ الشأنِ تُضمّ بعد التنطيق** (PROD-05) — تُحسب خارجَ المخبأ
+        // لأنّها تخصّ مستخدماً بعينِه لا دوراً، ويُمنع تكرارُ ما رآه بالنطاق أصلاً
+        $mine   = hub_expiry_self($user, $fresh);
         // مقيد = نطاق مشاريع أو عزل شركات **أو عزل عملاء** — مخبأ خاص به كي لا تتسرب
         // أسماء أجنبية عبر المخبأ المشترك. كان عزلُ العميل غائباً عن هذا الشرط: مستخدمٌ
         // محصورٌ بعميلٍ (hub_client_ids) وحده كان يُرى `$scoped=false` فلا يُطبَّق
@@ -1295,7 +1622,7 @@ if (! function_exists('hub_expiry')) {
                 . ':g' . $gen . hub_data_stamp($tables);
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
-        return \Illuminate\Support\Facades\Cache::remember($key, $scoped ? 300 : 600, function () use ($scoped, $user) {
+        $scan = \Illuminate\Support\Facades\Cache::remember($key, $scoped ? 300 : 600, function () use ($scoped, $user) {
             $today = now()->toDateString();
             $limit = now()->addDays(30)->toDateString();
             // عتبة التنبيه لكل سجل: حقول «تنبيه قبل (يوم)» كانت تُعرض ولا تُقرأ —
@@ -1374,6 +1701,26 @@ if (! function_exists('hub_expiry')) {
             usort($items, fn ($a, $b) => $a['days'] <=> $b['days']);
             return array_slice($items, 0, 200);
         });
+
+        /*
+         * **ضمُّ صفوفِ صاحبِ الشأن** (PROD-05) بعد المسحِ المنطَّق، مع منعِ
+         * التكرار: من يملك `hr:v` رآها في المسحِ أصلاً، فلا تُعرض مرّتين.
+         * والمفتاحُ `الوحدة|السجلّ|الحقل` — لا `id` وحدَه، فللسجلِّ الواحدِ
+         * حقولُ انتهاءٍ عدّة (إقامةٌ وجوازٌ ونهايةُ خدمة).
+         */
+        if ($mine) {
+            $seen = [];
+            foreach ($scan as $r) {
+                $seen[($r['module'] ?? '') . '|' . ($r['id'] ?? '') . '|' . ($r['fkey'] ?? '')] = true;
+            }
+            foreach ($mine as $r) {
+                if (isset($seen[$r['module'] . '|' . $r['id'] . '|' . $r['fkey']])) continue;
+                $scan[] = $r;
+            }
+            usort($scan, fn ($a, $b) => $a['days'] <=> $b['days']);
+        }
+
+        return $scan;
     }
 }
 
@@ -1496,9 +1843,23 @@ if (! function_exists('hub_health')) {
      */
     function hub_health(bool $fresh = false): array
     {
-        if ($fresh) \Illuminate\Support\Facades\Cache::forget('hub:health');
+        /*
+         * **والختمُ يسبق المهلة** (مجلس الخبراء). كان المفتاحُ `hub:health` **خاماً
+         * بلا ختمِ بيانات** — بخلافِ `hub_expiry` و`hub_screen` وكلِّ شاشةٍ محسوبةٍ
+         * في المنتج — فالأبعادُ مجمّدةٌ نصفَ ساعةٍ مهما تغيّرت البيانات: يُسجَّل عقدٌ
+         * فيبقى التقريرُ يقول «لا سجلّاتٍ بعد».
+         *
+         * والختمُ قراءةُ مخبأٍ لا استعلامَ قاعدة، فلا كلفةَ تُذكر.
+         */
+        // `metric_points` مُدرَجٌ لأنّ بُعدَ «الأمن» يقرأ لقطتَه اليوميّةَ منه —
+        // كان خارجَ الختمِ فتبقى الدرجةُ قديمةً بعد لقطةٍ جديدة (مجلس الخبراء).
+        $key = 'hub:health' . hub_data_stamp([
+            'contracts', 'domains', 'employees', 'fin_documents', 'incidents',
+            'issues', 'projects', 'servers', 'users', 'vault_secrets', 'metric_points',
+        ]);
+        if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
-        return \Illuminate\Support\Facades\Cache::remember('hub:health', 1800, function () {
+        return \Illuminate\Support\Facades\Cache::remember($key, 1800, function () {
             $db = \Illuminate\Support\Facades\DB::getFacadeRoot();
             $today = now()->toDateString();
             $soon  = now()->addDays(30)->toDateString();
@@ -1515,7 +1876,8 @@ if (! function_exists('hub_health')) {
                 $inc = hub_fin_sum(config('hub.fin.income'), $m0);
                 $exp = hub_fin_sum(config('hub.fin.expense'), $m0);
                 $score = 100 - ($openN ? ($late / $openN) * 60 : 0) - ($inc - $exp < 0 ? 20 : 0);
-                $out['المالية'] = ['score' => $clamp($score), 'note' => "{$late}/{$openN} مستحق متأخر · صافي الشهر " . ($inc - $exp >= 0 ? 'موجب' : 'سالب')];
+                $out['المالية'] = ['score' => $clamp($score), 'measured' => $openN > 0,
+                    'note' => "{$late}/{$openN} مستحق متأخر · صافي الشهر " . ($inc - $exp >= 0 ? 'موجب' : 'سالب')];
             } catch (\Throwable $e) {}
 
             // المشاريع: متوسط نسبة الإنجاز للمشاريع غير المغلقة
@@ -1524,7 +1886,8 @@ if (! function_exists('hub_health')) {
                     ->where(fn ($w) => $w->whereNull('status')->orWhere(fn ($x) => $x->where('status', 'NOT LIKE', '%مكتمل%')->where('status', 'NOT LIKE', '%ملغ%')))
                     ->limit(30)->pluck('id');
                 $ps = collect($projects)->map(fn ($id) => hub_progress($id)['pct'])->filter(fn ($p) => $p !== null);
-                if ($ps->count()) $out['المشاريع'] = ['score' => $clamp($ps->avg()), 'note' => 'متوسط إنجاز ' . $ps->count() . ' مشروع جارٍ'];
+                if ($ps->count()) $out['المشاريع'] = ['score' => $clamp($ps->avg()), 'measured' => true,
+                    'note' => 'متوسط إنجاز ' . $ps->count() . ' مشروع جارٍ'];
             } catch (\Throwable $e) {}
 
             // الأمن: خصم للمستخدمين الخاملين >60 يوماً وللأسرار التي لم تُحدَّث >180 يوماً
@@ -1540,7 +1903,8 @@ if (! function_exists('hub_health')) {
                 // القديمة تبقى احتياطاً صادقاً قبل أول لقطة — لا درجتين متضاربتين بعدها.
                 $snap = hub_metric_latest('security', 'org', 'score');
                 $score = $snap !== null ? $snap : (100 - ($un ? ($idle / $un) * 35 : 0) - ($sn ? ($stale / $sn) * 45 : 0));
-                $out['الأمن'] = ['score' => $clamp($score), 'note' => "{$idle}/{$un} مستخدم خامل · {$stale}/{$sn} سر لم يُغيَّر منذ ٦ أشهر"];
+                $out['الأمن'] = ['score' => $clamp($score), 'measured' => ($un + $sn) > 0,
+                    'note' => "{$idle}/{$un} مستخدم خامل · {$stale}/{$sn} سر لم يُغيَّر منذ ٦ أشهر"];
             } catch (\Throwable $e) {}
 
             // الموارد البشرية: خصم لوثائق الموظفين المنتهية والقريبة من الانتهاء
@@ -1550,7 +1914,8 @@ if (! function_exists('hub_health')) {
                 $expired = $en ? (clone $emp)->where(fn ($w) => $w->where('iqama_exp', '<', $today)->orWhere('pass_exp', '<', $today))->count() : 0;
                 $soonN = $en ? (clone $emp)->where(fn ($w) => $w->whereBetween('iqama_exp', [$today, $soon])->orWhereBetween('pass_exp', [$today, $soon]))->count() : 0;
                 $score = 100 - ($en ? ($expired / $en) * 55 + ($soonN / $en) * 20 : 0);
-                $out['الموارد البشرية'] = ['score' => $clamp($score), 'note' => "{$expired} وثيقة منتهية · {$soonN} تنتهي خلال شهر (من {$en} موظف)"];
+                $out['الموارد البشرية'] = ['score' => $clamp($score), 'measured' => $en > 0,
+                    'note' => "{$expired} وثيقة منتهية · {$soonN} تنتهي خلال شهر (من {$en} موظف)"];
             } catch (\Throwable $e) {}
 
             // الامتثال: العقود والدومينات المنتهية أو القريبة
@@ -1563,7 +1928,8 @@ if (! function_exists('hub_health')) {
                 $dLate = (clone $d)->whereNotNull('expiry')->where('expiry', '<', $today)->count();
                 $tot = $cn + $dn;
                 $score = 100 - ($tot ? (($cLate + $dLate) / $tot) * 70 : 0);
-                $out['الامتثال'] = ['score' => $clamp($score), 'note' => "{$cLate} عقد و{$dLate} دومين متجاوز للنهاية (من {$tot})"];
+                $out['الامتثال'] = ['score' => $clamp($score), 'measured' => $tot > 0,
+                    'note' => "{$cLate} عقد و{$dLate} دومين متجاوز للنهاية (من {$tot})"];
             } catch (\Throwable $e) {}
 
             // البنية التحتية: سيرفرات/شهادات SSL منتهية + أعطال حرجة مفتوحة
@@ -1581,8 +1947,23 @@ if (! function_exists('hub_health')) {
                 $score = 100 - ($sn2 ? ($sLate / $sn2) * 30 : 0) - min(30, $ssl * 10)
                        - min(40, $crit * 10) - min(30, $inc * 12);
                 $out['البنية التحتية'] = ['score' => $clamp($score),
+                    // مقيسٌ إن وُجد ما يُقاس: سيرفراتٌ أو شهاداتٌ أو أعطالٌ أو حوادث
+                    'measured' => ($sn2 + $ssl + $crit + $inc) > 0,
                     'note' => "{$sLate} سيرفر منتهٍ · {$ssl} شهادة SSL منتهية · {$crit} عطل حرج مفتوح · {$inc} حادثة مفتوحة"];
             } catch (\Throwable $e) {}
+
+            /*
+             * **الدرجةُ تُمحى حيث لا قياس** (مجلس الخبراء · PROD-10).
+             *
+             * لا يكفي وسمُ `measured=false` وتركُ الدرجةِ مئةً: كلُّ قارئٍ لا
+             * يفحص الوسمَ — و`/api/v1/health` يمرّرها كما هي — سيقرأ **مئةً
+             * كاذبة**. فالقيمةُ تُصبح `null` صراحةً، والقارئُ الذي يجمع أو يقارن
+             * يحصل على فراغٍ لا على «ممتاز». **والبُعدُ يبقى في التقرير** باسمِه
+             * وسببِه، وتعود درجتُه فورَ وجودِ أوّلِ سجلّ.
+             */
+            foreach ($out as $k => $d) {
+                if (is_array($d) && ! ($d['measured'] ?? true)) $out[$k]['score'] = null;
+            }
 
             return $out;
         });
@@ -1683,7 +2064,11 @@ if (! function_exists('hub_progress')) {
      */
     function hub_progress(string $projectId, bool $fresh = false): array
     {
-        $key = 'hub:progress:' . $projectId;
+        // **والختمُ يسبق المهلة هنا أيضاً** (مجلس الخبراء): كان المفتاحُ خاماً،
+        // فتقدّمُ المشروعِ مجمّدٌ عشرَ دقائقَ بعد إنجازِ مهمّةٍ أو بندِ خطّة —
+        // ويُقرأ داخلَ تقريرِ صحّةِ الشركة، فيُجمّد بُعداً فيه مهما جُدِّد.
+        $key = 'hub:progress:' . $projectId
+            . hub_data_stamp(['plan_items', 'tasks', 'test_cases']);
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
 
         return \Illuminate\Support\Facades\Cache::remember($key, 600, function () use ($projectId) {
@@ -2592,9 +2977,16 @@ if (! function_exists('hub_project_health')) {
 
             // ٣) المهام المتأخرة
             $tAll = \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')->where('project_id', $projectId)->count();
-            $tLate = \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')->where('project_id', $projectId)
-                ->whereNotNull('due')->whereDate('due', '<', today())
-                ->whereNotIn('status', ['منجزة', 'مكتملة', 'ملغاة'])->count();
+            // **السلطةُ الواحدةُ لـ«مفتوحة»** (مجلس الخبراء · A-1): كانت قائمةً
+            // حرفيّةً، و`NULL NOT IN (…)` **لا يصدُق في SQL** — فمهمّةٌ بلا حالةٍ
+            // (والعمودُ يقبل الفراغَ والنموذجُ العامُّ يعرض خياراً فارغاً) تسقط من
+            // عدّادِ المتأخّر بصمت: «٠ متأخرة من ١٢» ومهامُّ المشروعِ كلُّها فائتة.
+            // و`hub_open_scope` يعالج الفراغَ صراحةً ويوسّع القائمةَ بالحالاتِ
+            // المصرَّحِ بها في السجلّ — فالصحّةُ تقرأ ما يقرؤه بقيّةُ النظام.
+            $tLate = hub_open_scope(
+                \Illuminate\Support\Facades\DB::table('tasks')->whereNull('deleted_at')->where('project_id', $projectId)
+                    ->whereNotNull('due')->whereDate('due', '<', today())
+            )->count();
             $f[] = ['k' => 'انضباط المهام', 'w' => 20,
                     's' => $tAll ? max(0, (int) (100 - $tLate / $tAll * 200)) : 100,
                     'note' => $tAll ? "{$tLate} متأخرة من {$tAll}" : 'لا مهام مسجَّلة'];
@@ -3706,10 +4098,23 @@ if (! function_exists('hub_capacity')) {
 
         // إجازات معتمدة متقاطعة مع الفترة — «معتمد» هي قيمة السجل المعلنة
         // (كانت «معتمدة» فلا تُخصم إجازة واحدة من الطاقة أبداً)
+        //
+        // **وتصفيةُ النوعِ لازمة** (مجلس الخبراء · A-3): كان الاستعلامُ بلا أيِّ
+        // تصفيةِ نوعٍ إطلاقاً، فطلبُ «سلفة» أو «شهادة راتب» معتمدٌ **يخصم أيّامَ
+        // عملٍ من طاقةِ الموظّف** — والطلبُ الإداريُّ لا يُغيّب أحداً عن مكتبه.
+        // وهذا عينُ العيبِ الذي أُغلق في لوحةِ المالكِ بـv2.499.0 وقد نجا هنا:
+        // أُغلق المثالُ ولم يُغلق الصنف. والمصدرُ الواحد `deduct_types` هو نفسُه
+        // الذي يقرؤه `Workday::onLeave` — فالطاقةُ والحضورُ يقولان قولاً واحداً.
+        // («عمل عن بعد» و«إذن خروج» **لا** يُخصمان: صاحبُهما يعمل.)
+        //
+        // و`date_to` الفارغُ يُحتسب بـ`COALESCE` كما في حارسِ التداخل في
+        // `LeaveRequest` — صفوفٌ قديمةٌ بهذا الشكل واردةٌ ويعترف بها النموذجُ
+        // صراحةً، وكانت الطاقةُ وحدَها لا تدافع عنها.
         $leaves = \Illuminate\Support\Facades\DB::table('leave_requests')->whereNull('deleted_at')
             ->where('status', 'معتمد')->whereIn('emp_id', $empIds)
-            ->whereDate('date_from', '<=', $t->toDateString())
-            ->whereDate('date_to', '>=', $f->toDateString())
+            ->whereIn('type', (array) config('hub.leave.deduct_types', []))
+            ->whereRaw('DATE(COALESCE(date_from, date_to)) <= ?', [$t->toDateString()])
+            ->whereRaw('DATE(COALESCE(date_to, date_from)) >= ?', [$f->toDateString()])
             ->get(['emp_id', 'date_from', 'date_to']);
         $leaveDays = [];
         foreach ($leaves as $l) {
@@ -4156,13 +4561,20 @@ if (! function_exists('hub_recommendations')) {
         // كانا يتقاسمان مفتاحَ الدور (`r:`) فتُخبَّأ إشاراتُ عميلٍ وتُقدَّم لمستخدمِ
         // آخر: تسريبُ عزلٍ عبر الخبيئة. من له أيُّ حصرٍ يأخذ مفتاحاً خاصّاً به.
         $u = auth()->user();
-        $scopedKey = hub_scoped($u) || hub_company_ids($u) !== null || hub_client_ids($u) !== null;
         // **مبدّلُ الشركة/العميل جزءٌ من المفتاح** كما في `hub_scope_key`: بعضُ الكُتل
         // (تقاريرُ اليوم عبر `hub_company_scope`) تضيق بالمبدّل النشط، فمستخدمان يريان
         // «كلَّ الشركات» بمبدّلين مختلفين كانا يتقاسمان مفتاحاً فيُقدَّم عدُّ شركةٍ لأخرى.
         // ختمُ roles/users كما في `hub_scope_key` و`hub_expiry`: تغيّرُ صلاحيةٍ أو دورٍ
         // يُبطل الخبيئةَ فوراً لا بعد انقضاء المهلة (نافذةُ صلاحيةٍ متقادمةٍ للمستخدم غيرِ المحصور).
-        $key = 'recs:' . ($scopedKey ? 'u:' . ($u?->id ?? '0') : 'r:' . ($u?->role_id ?? '0'))
+        // **ومفتاحُ المخبأِ عقدٌ عن محتواه** (مجلس الخبراء · F2). كان المفتاحُ
+        // **بالدور** لغيرِ المحصور — وكان صحيحاً ما دام المحتوى بالدور. ثمّ صارت
+        // `hub_expiry()` تُرجع **صفَّ صاحبِ الشأن** (صفّاً بالمستخدمِ لا بالدور)،
+        // فبات وعاءُ الدورِ يحمل شأناً شخصيّاً: أثبت التحقّقُ المستقلُّ أنّ زميلاً
+        // بلا `hr:v` قرأ **اسمَ زميلِه وتاريخَ انتهاءِ إقامتِه**، ثمّ إذا أعاد بناءَ
+        // المخبأِ من منظورِه **مُحي إنذارُ صاحبِه عنه**. فالمفتاحُ بالمستخدمِ دائماً:
+        // مشاركةُ المخبأِ لا تُشترى بإفشاء. (والكلفةُ مدخلٌ لكلِّ مستخدمٍ بدل كلِّ
+        // دور — وهو ما تفعله `hub_expiry` نفسُها للمحصورين أصلاً.)
+        $key = 'recs:u:' . ($u?->id ?? '0')
             . ':' . (string) session('hub.company', '-') . ':' . (string) session('hub.client', '-')
             . hub_lens_key($projectId) . hub_data_stamp(['roles', 'users']);
         if ($fresh) \Illuminate\Support\Facades\Cache::forget($key);
@@ -4275,7 +4687,7 @@ if (! function_exists('hub_recommendations')) {
                 foreach ($soon as $i) {
                     $add($i['days'] < 0 ? 'حرج' : 'مهم', '⏳', 'ينتهي قريباً: ' . $i['name'],
                         $i['mlabel'] . ' · ' . $i['flabel'] . ' — ' . ($i['days'] < 0 ? 'متأخر' : ($i['days'] === 0 ? 'اليوم' : 'خلال ' . $i['days'] . ' يوم')) . '.',
-                        route('m.show', [$i['module'], $i['id']]), 'افتح السجل',
+                        hub_expiry_url($i), 'افتح السجل',
                         // المفتاح يحمل مميّزَ الحقل/الوثيقة (fkey) فلا تتصادم إشارتا انتهاءٍ
                         // على السجل نفسِه على حالةٍ واحدة (كان module:id وحدهما يُدمجانهما).
                         'expiry:' . $i['module'] . ':' . $i['id'] . ':' . ($i['fkey'] ?? ($i['flabel'] ?? '')),
@@ -6155,8 +6567,17 @@ if (! function_exists('hub_admin_links')) {
                 'الجوال mobile app-config الروابط العميقة الجلسات الأجهزة الدفع push OpenAPI'),
 
             // ٣) الجودة والحوكمة — قواعدُ البيانات وشكلُها ومساراتُها
+            /*
+             * **الرابطُ يقرأ شرطَ حارسِه** (مجلس الخبراء · P-16): كان هنا `$owner`
+             * وحدَه بينما `QualityController::tabGate()` يفتح التبويبَ الافتراضيَّ
+             * لـ`hub_monitor_group('opsAnalytics')` أيضاً — فكانت الشاشةُ **مفتوحةً
+             * لحاملِ الرايةِ ومخفيّةً عنه معاً**: المانحُ لا يعلم أنّه منح، وحاملُها
+             * لا يعلم أنّه يملك، وفيها زرُّ «أعد الحساب» أي فعلٌ لا قراءة.
+             * وتبويباتُ المالكِ محروسةٌ داخلَ الصفحةِ بـ`visibleTabs()` فلا يرى
+             * حاملُ الرايةِ ما ليس له. **إضافةُ رؤيةٍ لا توسيعُ صلاحيّة.**
+             */
             $mk('quality', 'الجودة', '🧹', 'quality.index', [], 'الجودة والحوكمة',
-                $owner, ['quality.*'], 'جودة البيانات التكرار'),
+                $owner || hub_monitor_group('opsAnalytics', $user), ['quality.*'], 'جودة البيانات التكرار'),
             $mk('fields', 'الحقول', '🧩', 'fields.index', [], 'الجودة والحوكمة',
                 $owner, ['fields.*'], 'باني الحقول'),
             $mk('flows', 'المسارات', '🪄', 'flows.index', [], 'الجودة والحوكمة',

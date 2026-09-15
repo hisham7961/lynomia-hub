@@ -107,6 +107,20 @@
                 </form>
             @endif
             <br>
+            {{-- **حالةُ قفلِ التخمينِ وبابُ فكِّه** (مجلس الخبراء): كان القفلُ
+                 يُعرَض في مركزِ الأمانِ بلا أيِّ فعل، فينتظر صاحبُه ساعاتٍ أو
+                 يُحرَّر بيدٍ في القاعدة. والحالةُ تُعرَض هنا دائماً — ظاهرةً حين
+                 تكون مقفولةً، مطمئنةً حين لا تكون — فلا يبحث أحدٌ عن زرٍّ مخفيّ. --}}
+            @php $isLocked = $u->locked_until && \Illuminate\Support\Carbon::parse($u->locked_until)->gt(now()); @endphp
+            🔒 قفلُ محاولاتِ الدخول:
+            <b>{{ $isLocked ? 'مقفول حتى ' . \Illuminate\Support\Carbon::parse($u->locked_until)->format('H:i') : 'غير مقفول' }}</b>
+            @if ($isLocked && \App\Support\Staff::mayTouch($u))
+                <form method="POST" action="{{ route('users.unlock', $u) }}" class="inline"
+                      data-confirm="فكُّ قفلِ «{{ $u->name }}»؟ يعود للدخولِ بكلمته فوراً، ويُسجَّل الفكُّ باسمك.">
+                    @csrf<button class="btn ghost xs dn">🔓 فُكَّ القفل</button>
+                </form>
+            @endif
+            <br>
             🔑 آخر تجديدٍ لكلمة المرور: <b>{{ $u->password_changed_at ? \Illuminate\Support\Carbon::parse($u->password_changed_at)->diffForHumans() : 'غير معروف' }}</b><br>
             🕘 آخر دخول: <b>{{ $u->last_login_at ? \Illuminate\Support\Carbon::parse($u->last_login_at)->diffForHumans() : 'لم يدخل قط' }}</b>
             {{ $u->last_login_ip ? '· من ' . $u->last_login_ip : '' }}

@@ -24,19 +24,51 @@ class LeaveDecisionController extends Controller
     /** الحالات التي ما زالت بانتظار قرار */
     public const PENDING = ['مقدّم', 'مقدم', 'موافقة المدير', 'موافقة الموارد البشرية'];
 
-    /** صلاحيّات المستخدم تجاه طلبٍ بعينه — تُستهلك هنا وفي واجهة الأزرار */
-    public static function abilities($u, LeaveRequest $m): array
+    /**
+     * الأطرافُ الثلاثةُ تجاه طلبٍ بعينه: **صاحبُه** · **مديرُه** · **الموارد
+     * البشريّة** (ومن يعلوها: المالكُ وحاملُ رايةِ الاعتماد).
+     *
+     * استُخرجت من `abilities()` كي تكون **سلطةً واحدةً يقرؤها الجميع** — فالنموذجُ
+     * العامُّ والاستيرادُ يحتاجان الجوابَ نفسَه، وكتابةُ تعريفٍ ثانٍ لهما هي عينُ
+     * العطلِ الذي يطارده هذا المجلس: سلطةٌ مركزيّةٌ صحيحةٌ ثمّ قارئٌ يكتب تعريفَه.
+     */
+    protected static function parties($u, LeaveRequest $m): array
     {
         $uid = (string) $u->id;
         $requester = null;
         if ($m->emp_id) {
             $requester = \App\Models\Employee::whereKey($m->emp_id)->value('user_id');
         }
-        $isSelf = $requester !== null && (string) $requester === $uid;
 
-        $isMgr = ((string) $m->mgr_id === $uid)
-            || ($m->emp_id && (string) \App\Models\Employee::whereKey($m->emp_id)->value('manager_id') === $uid);
-        $isHr = hub_is_owner($u) || hub_flag($u, 'approve') || hub_can($u, 'hr', 'e');
+        return [
+            'self' => $requester !== null && (string) $requester === $uid,
+            'mgr' => ((string) $m->mgr_id === $uid)
+                || ($m->emp_id && (string) \App\Models\Employee::whereKey($m->emp_id)->value('manager_id') === $uid),
+            'hr' => hub_is_owner($u) || hub_flag($u, 'approve') || hub_can($u, 'hr', 'e'),
+        ];
+    }
+
+    /**
+     * **هل يملك هذا المستخدمُ أن يمسَّ حالةَ هذا الطلبِ أصلاً؟**
+     *
+     * سؤالُ **صلاحيّة** لا سؤالُ **تسلسل**: شرطُ `pending` («لا قرارَ فوق قرار»)
+     * يخصّ مسارَ القرارِ وحدَه، ولا يُستورد إلى الإنشاء — وإلّا لَعجزت الموارد
+     * البشريّةُ عن تسجيلِ إجازةٍ معتمدةٍ سلفاً، وذاك نزعُ قدرةٍ لا إصلاحُ عيب.
+     */
+    public static function mayDecideOn($u, LeaveRequest $m): bool
+    {
+        $p = self::parties($u, $m);
+
+        return ! $p['self'] && ($p['mgr'] || $p['hr']);
+    }
+
+    /** صلاحيّات المستخدم تجاه طلبٍ بعينه — تُستهلك هنا وفي واجهة الأزرار */
+    public static function abilities($u, LeaveRequest $m): array
+    {
+        $p = self::parties($u, $m);
+        $isSelf = $p['self'];
+        $isMgr = $p['mgr'];
+        $isHr = $p['hr'];
 
         $pending = in_array((string) $m->status, self::PENDING, true);
 

@@ -98,7 +98,7 @@
         <table class="mini">
             @forelse ($expiry as $i)
                 <tr>
-                    <td><a href="{{ route('m.show', [$i['module'], $i['id']]) }}">{{ \Illuminate\Support\Str::limit($i['name'], 34) }}</a>
+                    <td><a href="{{ hub_expiry_url($i) }}">{{ \Illuminate\Support\Str::limit($i['name'], 34) }}</a>
                         <div class="sub">{{ $i['mlabel'] }} · {{ $i['flabel'] }}</div></td>
                     <td class="acts"><span class="bdg {{ $i['days'] < 0 ? 'bad' : ($i['days'] <= 7 ? 'bad' : 'wn') }}">{{ $i['days'] < 0 ? 'متأخر ' . abs($i['days']) : $i['days'] }} يوم</span></td>
                 </tr>

@@ -36,9 +36,8 @@ class WorkHours
         if (! $u || hub_is_owner($u)) return $next($r);
         if ($r->routeIs('login', 'login.*', 'logout')) return $next($r);
 
-        $t = now()->format('H:i');
-        $strict = $t >= (string) setting('sec.strict_from', '17:00')
-               || $t < (string) setting('sec.hours_start', '08:00');
+        // نافذةُ «خارجِ الدوام» من تعريفِها الوحيد — لا نسخةَ ثانيةً هنا
+        $strict = hub_after_hours();
 
         if (! $strict) {
             session(['wh.last' => now()->timestamp]);

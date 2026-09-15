@@ -201,11 +201,21 @@
     @if (count($health))
         <div class="hgrid">
             @foreach ($health as $sec => $h)
+                {{-- **بُعدٌ بلا بياناتٍ يُعلَن «لا بيانات» لا «١٠٠٪»** (مجلس الخبراء · PROD-10):
+                     كانت «الامتثال ١٠٠٪ (من ٠)» أعلى درجةٍ في التقرير وسببُها أنّه لا
+                     توجد بياناتٌ أصلاً — و«الصفرُ من صفر» يعني «لم يُقَس» لا «ممتاز».
+                     والبُعدُ باقٍ في التقرير، ودرجتُه تعود فورَ وجودِ أوّلِ سجلّ. --}}
+                @php $ms = (bool) ($h['measured'] ?? true); @endphp
                 <div class="hitem">
                     <div class="chead"><b>{{ $sec }}</b><span class="spacer"></span>
-                        <b style="color:{{ $h['score'] >= 75 ? 'var(--ok)' : ($h['score'] >= 50 ? 'var(--wn, #E0A82E)' : 'var(--bad)') }}">{{ $h['score'] }}٪</b></div>
-                    <div class="pbar"><span style="width:{{ $h['score'] }}%;background:{{ $h['score'] >= 75 ? 'var(--ok)' : ($h['score'] >= 50 ? '#E0A82E' : 'var(--bad)') }}"></span></div>
-                    <div class="sub" style="margin-top:4px">{{ $h['note'] }}</div>
+                        @if ($ms)
+                            <b style="color:{{ $h['score'] >= 75 ? 'var(--ok)' : ($h['score'] >= 50 ? 'var(--wn, #E0A82E)' : 'var(--bad)') }}">{{ $h['score'] }}٪</b>
+                        @else
+                            <b class="sub" title="لا سجلّاتٍ في هذا البُعد — لا يُقاس بعد">—</b>
+                        @endif
+                    </div>
+                    <div class="pbar"><span style="width:{{ $ms ? $h['score'] : 0 }}%;background:{{ ! $ms ? 'var(--line, #ccc)' : ($h['score'] >= 75 ? 'var(--ok)' : ($h['score'] >= 50 ? '#E0A82E' : 'var(--bad)')) }}"></span></div>
+                    <div class="sub" style="margin-top:4px">{{ $ms ? $h['note'] : 'لا سجلّاتٍ بعد — لا يُقاس' }}</div>
                 </div>
             @endforeach
         </div>

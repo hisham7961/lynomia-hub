@@ -91,6 +91,18 @@ class OpsThresholdsTest extends TestCase
         $this->seedCore();
         $find = fn () => collect(SecurityPosture::checks())->firstWhere('key', 'backup_fresh');
 
+        /*
+         * **شرطٌ مسبقٌ أُضيف في v2.503.0 (مجلس الخبراء · ت-٣) ولا يُضعف هذا الاختبار.**
+         * صار الفحصُ يشترط **أثراً قابلاً للاستعادة** مع النبضة، لأنّه كان يقول
+         * «✅ حداثةُ النسخة» و`storage/app/backups` فارغ. وهذا الاختبارُ يحرس
+         * **نوافذَ الزمن** (٢٦/٥٠ ساعة) لا وجودَ الأثر — فيُهيَّأ الأثرُ هنا كي
+         * تبقى النوافذُ الثلاثُ مقيسةً على حدة. والتأكيداتُ الثلاثةُ كما هي.
+         */
+        $dir = storage_path('app/backups');
+        if (! is_dir($dir)) mkdir($dir, 0700, true);
+        $art = $dir . '/hub-' . now()->format('Y-m-d-Hi') . '.json';
+        file_put_contents($art, '{"ok":true}');
+
         $this->hubSetting('heartbeat.backup', now()->subHours(20)->toIso8601String());
         $this->assertSame('ok', $find()['tone'], '٢٠ ساعةً داخل النافذة اليومية');
 
@@ -99,6 +111,8 @@ class OpsThresholdsTest extends TestCase
 
         $this->hubSetting('heartbeat.backup', now()->subHours(51)->toIso8601String());
         $this->assertSame('bad', $find()['tone'], '٥١ ساعةً تتجاوز نافذة التعطل الموحّدة (٥٠س) — لا انتظار ٧٢ ساعةً القديمة');
+
+        @unlink($art);
     }
 
     /** عتبتا المعالج والذاكرة تُقرآن من الإعدادات — بمقارنةٍ ذاتيةٍ على القياس الحي نفسه */

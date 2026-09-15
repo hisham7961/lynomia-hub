@@ -5,7 +5,7 @@
     'sub' => 'رادار تلقائي يمسح كل حقول الانتهاء والتجديد والاستحقاق في الوحدات — يتحدث كل 10 دقائق'])
     <a class="btn ghost sm" href="{{ route('alerts', ['fresh' => 1]) }}">↻ تحديث الآن</a>
 @endcomponent
-@foreach ([['🔴 متأخر — انتهى فعلاً', $late, 'bad'], ['🟠 خلال ٧ أيام', $week, 'wn'], ['🟡 خلال ٣٠ يوماً', $month, 'g']] as [$title, $set, $tone])
+@foreach ([['🔴 متأخر — انتهى فعلاً', $late, 'bad'], ['🟠 خلال ٧ أيام', $week, 'wn'], ['🟡 لاحقاً', $month, 'g']] as [$title, $set, $tone])
     @if ($set->count())
     <div class="card pad0">
         <h3 style="padding:12px 14px 0">{{ $title }} <span class="bdg {{ $tone }}">{{ $set->count() }}</span></h3>
@@ -14,7 +14,7 @@
             <tbody>
             @foreach ($set as $i)
                 <tr>
-                    <td><a href="{{ route('m.show', [$i['module'], $i['id']]) }}"><b>{{ \Illuminate\Support\Str::limit($i['name'], 40) }}</b></a></td>
+                    <td><a href="{{ hub_expiry_url($i) }}"><b>{{ \Illuminate\Support\Str::limit($i['name'], 40) }}</b></a></td>
                     <td>{{ $i['mlabel'] }}</td>
                     <td class="sub">{{ $i['flabel'] }}</td>
                     <td class="mono">{{ $i['date'] }}</td>
@@ -27,6 +27,8 @@
     @endif
 @endforeach
 @if (! $late->count() && ! $week->count() && ! $month->count())
-    <div class="card"><div class="empty"><span class="big">😌</span>لا شيء ينتهي خلال ٣٠ يوماً — كل أصولك بأمان</div></div>
+    {{-- النافذةُ ليست رقماً واحداً: حقولُ الوحداتِ تُمسح إلى +٣٠ يوماً ووثائقُ صاحبِ
+         الشأنِ إلى ±٦٠ — فالجملةُ تقول «قريباً» ولا تدّعي رقماً يكذبُ نصفَ الصفحة. --}}
+    <div class="card"><div class="empty"><span class="big">😌</span>لا شيء ينتهي قريباً فيما تراه صلاحيّتُك</div></div>
 @endif
 @endsection

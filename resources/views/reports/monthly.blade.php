@@ -1,6 +1,7 @@
 @extends('layouts.app')
 @section('title', 'الحضور الشهري')
 @section('content')
+@php $xNight = hub_export_blocked_now(['attend', 'hr']); @endphp
 @php
     $m = \Illuminate\Support\Carbon::parse($month . '-01');
     $prev = $m->copy()->subMonth()->format('Y-m');
@@ -20,10 +21,10 @@
         <form method="get" style="display:inline"><input type="month" name="month" value="{{ $month }}" onchange="this.form.submit()"></form>
         <a class="btn ghost sm" href="{{ route('reports.monthly', ['month'=>$next]) }}">{{ $next }} ›</a>
         @if ($canExport)
-            <a class="btn ghost sm" href="{{ route('reports.monthly.export', ['month'=>$month]) }}"
+            <a class="btn ghost sm" @if ($xNight) title="{{ 'نقل الملفات ممنوع خارج وقت العمل — يعود متاحاً مع بداية الدوام' }}" @endif href="{{ route('reports.monthly.export', ['month'=>$month]) }}"
                title="صفٌّ لكلِّ يومٍ مسجَّل — التفصيلُ اليوميّ">⬇️ تصدير CSV (يوميّ)</a>
             {{-- G11: كشفُ الرواتب — صفٌّ لكلِّ موظّفٍ في النطاق بأيّامه وساعاته وشذوذاته --}}
-            <a class="btn sm" href="{{ route('reports.monthly.export', ['month'=>$month, 'mode'=>'payroll']) }}"
+            <a class="btn sm" @if ($xNight) title="{{ 'نقل الملفات ممنوع خارج وقت العمل — يعود متاحاً مع بداية الدوام' }}" @endif href="{{ route('reports.monthly.export', ['month'=>$month, 'mode'=>'payroll']) }}"
                title="صفٌّ لكلِّ موظّف — أيامُ العملِ والحضورِ والغيابِ والإجازةِ والساعاتُ والشذوذات">⬇️ كشف الرواتب CSV</a>
         @endif
     </div>
@@ -69,7 +70,7 @@
                 <td class="mono">{{ $t['reported'] ?: '—' }}</td>
                 <td style="white-space:nowrap">
                     <a class="btn ghost xs" href="{{ route('reports.monthly.employee', ['emp'=>$e->id,'month'=>$month]) }}">سجل ↗</a>
-                    <a class="btn ghost xs" href="{{ route('reports.monthly.export', ['month'=>$month,'emp'=>$e->id]) }}" title="تصدير هذا الموظف">⬇️</a>
+                    <a class="btn ghost xs" href="{{ route('reports.monthly.export', ['month'=>$month,'emp'=>$e->id]) }}" title="{{ $xNight ? 'نقل الملفات ممنوع خارج وقت العمل — يعود متاحاً مع بداية الدوام' : 'تصدير هذا الموظف' }}">{{ $xNight ? '🌙' : '⬇️' }}</a>
                 </td>
             </tr>
         @empty

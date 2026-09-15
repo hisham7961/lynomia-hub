@@ -408,6 +408,10 @@ class MobileWorkController extends V1Controller
             'field'  => (string) ($i['flabel'] ?? ''),
             'date'   => $i['date'] ?? null,
             'days'   => $i['days'] ?? null,
+            // **صفُّ صاحبِ الشأن** (PROD-05): يُعرَض لمن لا يملك صلاحيّةَ الوحدةِ
+            // قصداً — فوجهتُه ملفُّه هو لا سجلُّ الوحدة (الذي يردّه 403).
+            // حقلٌ مضاف، لا تغييرَ في عقدٍ قائم.
+            'self'   => (bool) ($i['self'] ?? false),
         ])->values()->all();
     }
 

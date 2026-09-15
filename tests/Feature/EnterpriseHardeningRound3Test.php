@@ -148,11 +148,26 @@ class EnterpriseHardeningRound3Test extends TestCase
         $this->assertSame('wn', $find('debug_mode')['tone']);
 
         $this->assertSame('wn', $find('backup_fresh')['tone'], 'لا نسخةَ قطّ ولا تحذير');
+
+        /*
+         * **شرطٌ مسبقٌ أُضيف في v2.503.0 (مجلس الخبراء · ت-٣) ولا يُضعف الاختبار.**
+         * صار الفحصُ يشترط **أثراً قابلاً للاستعادة** مع النبضة، لأنّه كان يقول
+         * «✅ حداثةُ النسخة» و`storage/app/backups` فارغ. وهذا الاختبارُ يحرس
+         * **أثرَ النبضةِ على النبرة** لا وجودَ الأثر — فيُهيَّأ الأثرُ هنا،
+         * والتأكيداتُ الثلاثةُ تبقى كما هي.
+         */
+        $bdir = storage_path('app/backups');
+        if (! is_dir($bdir)) mkdir($bdir, 0700, true);
+        $bart = $bdir . '/hub-' . now()->format('Y-m-d-Hi') . '.json';
+        file_put_contents($bart, '{"ok":true}');
+
         Health::beat('backup');
         $this->assertSame('ok', $find('backup_fresh')['tone']);
         Setting::updateOrCreate(['key' => 'heartbeat.backup'], ['value' => now()->subDays(4)->toIso8601String()]);
         \Illuminate\Support\Facades\Cache::forget('settings:all');
         $this->assertSame('bad', $find('backup_fresh')['tone']);
+
+        @unlink($bart);
     }
 
     /** CFG-07: HUB_OUTBOUND=off يُطفئ كلَّ نداءٍ خارجيّ */

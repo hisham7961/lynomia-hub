@@ -773,6 +773,7 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/users/{id}/restore', [UserController::class, 'restore'])->name('users.restore');
     // بابُ استردادٍ لمن ضاع جهازُ تحقّقه — وإلا فالقفلُ دائمٌ بلا مخرج
     Route::post('admin/users/{user}/twofa-off', [UserController::class, 'twofaOff'])->name('users.twofa.off');
+    Route::post('admin/users/{user}/unlock', [UserController::class, 'unlock'])->name('users.unlock');
 
     Route::get('admin/roles', [RoleController::class, 'index'])->name('roles.index');
     Route::get('admin/roles/create', [RoleController::class, 'create'])->name('roles.create');

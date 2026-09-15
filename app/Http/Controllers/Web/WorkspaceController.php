@@ -69,8 +69,11 @@ class WorkspaceController extends Controller
         $actors = \App\Models\User::whereIn('id', $activity->pluck('user_id')->filter())->pluck('name', 'id');
 
         // تنبيهات الانتهاء الخاصة بوحدات هذه المساحة — من الرادار القائم بصلاحيات المستخدم
+        // الانتماءُ للمساحةِ يُسأل عن **الإعلان** لا عن الصلاحيّة (F1): الصفوفُ
+        // رُشّحت في `hub_expiry` أصلاً، وفيها صفُّ صاحبِ الشأنِ بلا `hub_can`.
+        $wsModules = $ws['allModules'] ?? $ws['modules'];
         $expiry = collect(hub_expiry(false, $u))
-            ->filter(fn ($i) => in_array($i['module'] ?? '', $ws['modules'], true))
+            ->filter(fn ($i) => in_array($i['module'] ?? '', $wsModules, true))
             ->take(6)->values();
 
         // شارة الانتباه لكل وحدة: كم يستحق/تأخّر فيها — القُمرة تقول أين يُنظر
