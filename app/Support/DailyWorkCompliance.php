@@ -359,6 +359,13 @@ class DailyWorkCompliance
             'noreport' => [], 'pending' => [], 'not_yet' => []];
         $anyStamp = false;
 
+        // **ومن ورديّتُه عبرت منتصفَ الليل ليس غائباً** (التحقّقُ العاشر · N-13):
+        // نداءُ اليومِ كان يضعه في سلّةِ الغياب بينما بطاقتُه تعرض «انصراف».
+        // استعلامٌ واحدٌ للجماعة — الجوابُ نفسُه الذي يسأله الحارسُ والشاشة.
+        $crossing = $date === BusinessDate::today()
+            ? Workday::openCrossingByEmp($emps->pluck('id'))
+            : [];
+
         foreach ($emps as $emp) {
             $c = $cells[$emp->id] ?? null;
             if (! $c) continue;
@@ -366,6 +373,11 @@ class DailyWorkCompliance
             $entry = ['id' => (string) $emp->id, 'name' => (string) $emp->name];
 
             if ($c['on_leave']) { $buckets['leave'][] = $entry; continue; }
+
+            if (! $c['checked_in'] && ! $c['attendance'] && isset($crossing[(string) $emp->id])) {
+                $buckets['present'][] = $entry;
+                continue;
+            }
 
             if ($c['checked_in']) {
                 $late = $c['physical'] === Workday::LATE;

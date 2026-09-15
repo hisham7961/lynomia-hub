@@ -108,6 +108,9 @@
                 <td>
                     @if ($c['physical'])
                         <span class="bdg {{ hub_tone($c['physical']) }}">{{ $c['physical'] }}</span>
+                    @elseif (! empty($r['night']))
+                        {{-- ورديّةٌ عبرت منتصفَ الليل وما تزال مفتوحة — لا «لم يسجّل بعد» --}}
+                        <span class="bdg ok" title="ورديّةٌ بدأت أمس وما تزال مفتوحة">🌙 على رأس العمل منذ {{ $r['night']->time_in }} (أمس)</span>
                     @else
                         <span class="bdg wn">لم يسجّل بعد</span>
                     @endif
