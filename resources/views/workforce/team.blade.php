@@ -93,21 +93,17 @@
         <tbody>
         @forelse ($rows as $r)
             @php $a = $r['att']; $c = $r['comp'];
-                $effTone = match ($c['effective']) {
-                    'present' => 'ok', 'leave' => 'ac', 'absent_due_to_missing_report' => 'bad',
-                    // نغمةُ «مأذون» هي نغمةُ الإجازةِ نفسُها (ac) — فالعينُ تقرأ في
-                    // الجدولِ ما قرأته في النداءِ أعلاه، لا حكماً ثالثاً
-                    'non_compliant' => 'wn', 'absent' => 'bad', 'excused' => 'ac', default => '' };
-                $repTone = match ($c['compliance']) {
-                    'compliant' => 'ok', 'late' => 'wn', 'missing' => 'bad',
-                    'pending' => 'wn', 'not_required' => '', default => 'bad' };
+                // النغمةُ من الكاتبِ (N-29) — لا خريطةَ لكلِّ شاشة. و«مأذون» نغمةُ
+                // الإجازةِ نفسُها (ac) فالعينُ تقرأ في الجدولِ ما قرأته في النداء.
+                $effTone = $c['tones']['effective'];
+                $repTone = $c['tones']['compliance'];
             @endphp
             <tr>
                 <td><b>{{ $r['emp']->name }}</b>
                     @if ($r['emp']->dept)<div class="sub">{{ $r['emp']->dept }}</div>@endif</td>
                 <td>
                     @if ($c['physical'])
-                        <span class="bdg {{ hub_tone($c['physical']) }}">{{ $c['physical'] }}</span>
+                        <span class="bdg {{ $c['tones']['physical'] }}">{{ $c['physical'] }}</span>
                     @elseif (! empty($r['night']))
                         {{-- ورديّةٌ عبرت منتصفَ الليل وما تزال مفتوحة — لا «لم يسجّل بعد» --}}
                         <span class="bdg ok" title="ورديّةٌ بدأت أمس وما تزال مفتوحة">🌙 على رأس العمل منذ {{ $r['night']->time_in }} (أمس)</span>
