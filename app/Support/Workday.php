@@ -77,8 +77,14 @@ class Workday
         $row = self::today($empId, $now->toDateString());
         if ($row && $row->time_in) return $row;
 
-        $prev = self::today($empId, $now->copy()->subDay()->toDateString());
-        if (! $prev || ! $prev->time_in || $prev->time_out) return $row;
+        // **كلُّ صفوفِ الأمسِ المفتوحة**، لا صفّاً واحداً تختاره قرعة — فيطابق
+        // الجوابُ الفرديُّ الجوابَ الجماعيَّ (`openCrossingByEmp`) حرفاً بحرف
+        $prev = self::pickRow(
+            Attendance::whereNull('deleted_at')->where('emp_id', $empId)
+                ->whereDate('date', $now->copy()->subDay()->toDateString())
+                ->whereNotNull('time_in')->whereNull('time_out')->get()
+        );
+        if (! $prev) return $row;
 
         $start = $prev->in_at
             ?: \Illuminate\Support\Carbon::parse(
@@ -121,11 +127,44 @@ class Workday
         return $out;
     }
 
+    /**
+     * **اختيارُ صفِّ اليومِ بمعنًى لا بقرعة** (التحقّقُ المستقلّ الحادي عشر).
+     *
+     * كان `->orderBy('id')->first()` — و`attendance.id` هو `char(36)` **عشوائيّ**.
+     * فما إن يحمل اليومُ صفَّين (وهو مفهومٌ يعترف به المنتجُ صراحةً بحقل `multi`)
+     * حتى يتقرّر الجوابُ بقرعةِ معرّف: البطاقةُ تقول «لا ورديّة» بينما الجوابُ
+     * الجماعيُّ يقول «مفتوحة»، وضغطةٌ واحدةٌ تفتح صفّاً ثالثاً وتهجر الورديّةَ
+     * بلا انصرافٍ أبداً. **فالجوابُ الواحدُ الذي بُني عليه الإصلاحُ كلُّه كان
+     * هو نفسُه قرعة.**
+     *
+     * والقاعدةُ الآن صريحةٌ ومرتّبةٌ: **المفتوحُ قبل المُغلَق** (هو ما يمكن
+     * التصرّفُ فيه)، ثمّ **الأحدثُ دخولاً**، والمعرّفُ آخرَ فاصلٍ لا أوّلَه.
+     */
     public static function today(string $empId, ?string $date = null): ?Attendance
     {
-        return Attendance::whereNull('deleted_at')->where('emp_id', $empId)
+        $rows = Attendance::whereNull('deleted_at')->where('emp_id', $empId)
             ->whereDate('date', $date ?? now()->toDateString())
-            ->orderBy('id')->first();
+            ->get();
+
+        return self::pickRow($rows);
+    }
+
+    /** الصفُّ الأحقُّ من مجموعةِ صفوفِ يومٍ واحد — تعريفٌ واحدٌ يسأله كلُّ قارئ */
+    public static function pickRow($rows): ?Attendance
+    {
+        $rows = collect($rows);
+        if ($rows->isEmpty()) return null;
+
+        $withIn = $rows->filter(fn ($a) => (bool) $a->time_in);
+        $pool = $withIn->isNotEmpty() ? $withIn : $rows;
+
+        $open = $pool->filter(fn ($a) => $a->time_out === null);
+        $pool = $open->isNotEmpty() ? $open : $pool;
+
+        return $pool->sortBy(fn ($a) => sprintf('%s|%s|%s',
+            (string) ($a->time_in ?? ''),
+            (string) ($a->in_at?->format('Y-m-d H:i:s') ?? ''),
+            (string) $a->id))->last();
     }
 
     /* ────────── الحضور ────────── */

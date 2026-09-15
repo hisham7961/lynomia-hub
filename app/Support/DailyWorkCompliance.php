@@ -425,7 +425,14 @@ class DailyWorkCompliance
 
     protected static function compose(Employee $emp, string $date, Collection $atts, Collection $reports, ?bool $onLeaveOverride = null, ?array $excusedMap = null): array
     {
-        $primary = $atts->last(fn ($a) => (bool) $a->time_in) ?: $atts->first();
+        /*
+         * **والصفُّ الأوّلُ بمعنًى لا بقرعة** (التحقّقُ الحادي عشر): كان
+         * `$atts->last(fn …)` على مجموعةٍ مرتّبةٍ بـ`orderBy('id')` — و`id` عشوائيّ.
+         * فكانت حالةُ اليومِ تنقلب بين «حاضر» و«متأخر» بتبديلِ بادئةِ UUID وحدَها،
+         * **في الكشفِ الذي يغذّي الرواتب** — على بُعدِ سطرين من `$outRow` الذي
+         * طُهّر في v2.515. تعريفٌ واحدٌ الآن يسأله الاثنان: `Workday::pickRow()`.
+         */
+        $primary = Workday::pickRow($atts) ?: $atts->first();
         $checkedIn = $atts->contains(fn ($a) => (bool) $a->time_in);
         $timeIn = $atts->pluck('time_in')->filter()->sort()->first();
         /*

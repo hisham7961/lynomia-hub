@@ -54,11 +54,16 @@ class WorkHours
     protected const NIGHT_EXEMPT = [
         'quotes.pdf'          => 'quotes',
         'changeorders.pdf'    => 'changeorders',
-        // أوراقُ العهدةِ محروسةٌ و`custody` في كتالوجِ `exportNight` — فكان النصُّ
-        // يَعِد بمفتاحٍ لا يفتح باباً (التحقّقُ العاشر · ع‑و)
-        'custody.label'       => 'custody',
-        'custody.spec'        => 'custody',
-        'custody.permit.doc'  => 'custody',
+        /*
+         * أوراقُ العهدةِ محروسةٌ فتحتاج مفتاحاً (التحقّقُ العاشر · ع‑و) — **لكنّ
+         * `custody` ليست وحدةً في السجلّ** (‏`hub_mod('custody') = null`)، فكان
+         * المفتاحُ الذي أضفتُه في v2.515 يشير إلى وحدةٍ لا وجودَ لها: بابٌ مغلقٌ
+         * **بلا سبيلِ منحٍ أبداً** — نزعُ قدرةٍ لا إصلاح (التحقّقُ الحادي عشر · ع‑٤).
+         * والحارسُ الحقيقيُّ لهذه المسارات هو `assets` (`CustodyController::gate`).
+         */
+        'custody.label'       => 'assets',
+        'custody.spec'        => 'assets',
+        'custody.permit.doc'  => 'assets',
     ];
 
     public function handle(Request $r, Closure $next)
