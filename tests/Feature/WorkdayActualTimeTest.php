@@ -89,7 +89,11 @@ class WorkdayActualTimeTest extends TestCase
         $row->save();
 
         $fresh = Attendance::find($row->id);
-        $this->assertSame('08:00', $fresh->time_in, 'الحقلُ تعدَّل كما أرادت الموارد');
+        // المُرادُ هنا **أنّ التعديلَ نفذ** لا حرفيّةُ ما كُتب: الطابورُ يُصفِّر الخانات
+        // (v2.519) فيصير `08:00` ⇐ `08:00:00` — اللحظةُ نفسُها بصيغةٍ واحدة
+        $this->assertSame('08:00:00', $fresh->time_in, 'الحقلُ تعدَّل كما أرادت الموارد');
+        $this->assertNotSame('09:12:05', $fresh->time_in,
+            'التعديلُ اليدويُّ أزاح وقتَ الضغطِ عن العمود — وإلّا فالاختبارُ لا يقيس شيئاً');
         $this->assertStringContainsString('09:12:05', (string) ($fresh->meta['checkin']['at'] ?? ''),
             'لحظةُ الضغطِ الحقيقيّةُ باقيةٌ أثراً في meta');
     }

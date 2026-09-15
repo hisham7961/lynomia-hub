@@ -50,11 +50,136 @@ class Workday
     }
 
     /** صفُّ اليوم للموظف — أو null */
+    /**
+     * **سقفُ الورديّةِ الواحدة.** حدُّ تبنّي صفِّ الأمسِ **مدّةٌ لا ترتيبُ عقربَين**:
+     * الحدُّ الأوّلُ الذي كتبتُه («لحظةُ الضغطِ قبل وقتِ الدخول») كان يفتح نافذةً من
+     * ٠٠:٠٠ حتى وقتِ دخولِ الأمس — ثمانيَ ساعاتٍ كلَّ صباحٍ عند دوامٍ يبدأ ٠٨:٠٠ —
+     * تُغلق فيها ضغطةٌ واحدةٌ يومَ الناسي بـ٢٣٫٧٨ ساعة، مرفوعةَ رايةِ العبورِ فيسقط
+     * عنها وسمُ «مدّةٌ غير صالحة»، مملوءةَ الانصرافِ فيسقط «انصرافٌ مفقود» — **رقمٌ
+     * ملفَّقٌ يدخل كشفَ الرواتبِ بلا شذوذٍ ولا وسم**. فالسؤالُ الصحيحُ: أهذه مدّةُ
+     * ورديّةٍ أصلاً؟
+     */
+    public const MAX_SHIFT_HOURS = 16;
+
+    /**
+     * **الصفُّ المفتوحُ الآن — جوابٌ واحدٌ يسأله الحارسُ والشاشةُ معاً.**
+     *
+     * صفُّ اليومِ هو المرجعُ متى وُجد (مفتوحاً كان أو مغلقاً). فإن لم يكن، فصفُّ
+     * الأمسِ **إن كان ما يزال مفتوحاً ومدّتُه مدّةُ ورديّة** — وإلّا فلا شيء.
+     * (كانت `checkOut` تعرف صفَّ الأمسِ و`mine()` لا تعرفه، فيفتح موظّفُ الليلِ
+     * الصفحةَ ٠٣:٤٨ فلا يجد زرَّ «انصراف» أصلاً، ويُنشئ ضغطُه على «تسجيل الحضور»
+     * صفّاً ثانياً تُهجَر معه ورديّتُه — التحقّقُ المستقلّ التاسع · ع‑٢.)
+     */
+    public static function openRow(string $empId, $now = null): ?Attendance
+    {
+        $now = $now instanceof \Illuminate\Support\Carbon ? $now : now();
+
+        $row = self::today($empId, $now->toDateString());
+        if ($row && $row->time_in) return $row;
+
+        // **كلُّ صفوفِ الأمسِ المفتوحة**، لا صفّاً واحداً تختاره قرعة — فيطابق
+        // الجوابُ الفرديُّ الجوابَ الجماعيَّ (`openCrossingByEmp`) حرفاً بحرف
+        $prev = self::pickRow(
+            Attendance::whereNull('deleted_at')->where('emp_id', $empId)
+                ->whereDate('date', $now->copy()->subDay()->toDateString())
+                ->whereNotNull('time_in')->whereNull('time_out')->get()
+        );
+        if (! $prev) return $row;
+
+        $start = $prev->in_at
+            ?: \Illuminate\Support\Carbon::parse(
+                ($prev->date?->toDateString() ?? $prev->date) . ' ' . $prev->time_in);
+        $mins = $start->diffInMinutes($now, false);
+
+        return ($mins > 0 && $mins <= self::MAX_SHIFT_HOURS * 60) ? $prev : $row;
+    }
+
+    /**
+     * **من هم الآن على ورديّةٍ عبرت منتصفَ الليل؟** — نظيرُ `openRow()` للجماعة.
+     *
+     * شاشةُ المدير كانت تسأل يومَها وحدَه، فتقول «لم يسجّل بعد» عن موظّفٍ بطاقتُه
+     * تعرض «انصراف» في الدقيقةِ نفسِها (التحقّقُ المستقلّ العاشر · N-13). واستعلامٌ
+     * لكلِّ موظّفٍ كان سيكسر انضباطَ «لا N+1» الذي تحرسه هذه الشاشة، فالجوابُ
+     * **استعلامٌ واحد** وفلترةُ النافذةِ في الذاكرة — بالقاعدةِ نفسِها التي يقيس
+     * بها `openRow()`: مدّةٌ لا ترتيبُ عقربَين.
+     *
+     * @return array<string, Attendance>  معرّفُ الموظّف ⇐ صفُّ ورديّتِه المفتوحة
+     */
+    public static function openCrossingByEmp($empIds, $now = null): array
+    {
+        $ids = collect($empIds)->filter()->map(fn ($i) => (string) $i)->unique()->values();
+        if ($ids->isEmpty()) return [];
+
+        $now = $now instanceof \Illuminate\Support\Carbon ? $now : now();
+        $prev = $now->copy()->subDay()->toDateString();
+
+        $rows = Attendance::whereNull('deleted_at')->whereIn('emp_id', $ids)
+            ->whereDate('date', $prev)->whereNotNull('time_in')->whereNull('time_out')
+            ->get()
+            ->filter(function ($row) use ($now) {
+                $start = $row->in_at
+                    ?: \Illuminate\Support\Carbon::parse(
+                        ($row->date?->toDateString() ?? $row->date) . ' '
+                        . (Attendance::normTime($row->time_in) ?? '00:00:00'));
+                $mins = $start->diffInMinutes($now, false);
+
+                return $mins > 0 && $mins <= self::MAX_SHIFT_HOURS * 60;
+            });
+
+        $out = [];
+        // **بالقاعدةِ نفسِها التي يختار بها الفرديّ** — لا بترتيبِ SQL (قرعةٌ بين المحرّكين)
+        foreach ($rows->groupBy(fn ($r) => (string) $r->emp_id) as $empId => $group) {
+            if ($pick = self::pickRow($group)) $out[(string) $empId] = $pick;
+        }
+
+        return $out;
+    }
+
+    /**
+     * **اختيارُ صفِّ اليومِ بمعنًى لا بقرعة** (التحقّقُ المستقلّ الحادي عشر).
+     *
+     * كان `->orderBy('id')->first()` — و`attendance.id` هو `char(36)` **عشوائيّ**.
+     * فما إن يحمل اليومُ صفَّين (وهو مفهومٌ يعترف به المنتجُ صراحةً بحقل `multi`)
+     * حتى يتقرّر الجوابُ بقرعةِ معرّف: البطاقةُ تقول «لا ورديّة» بينما الجوابُ
+     * الجماعيُّ يقول «مفتوحة»، وضغطةٌ واحدةٌ تفتح صفّاً ثالثاً وتهجر الورديّةَ
+     * بلا انصرافٍ أبداً. **فالجوابُ الواحدُ الذي بُني عليه الإصلاحُ كلُّه كان
+     * هو نفسُه قرعة.**
+     *
+     * والقاعدةُ الآن صريحةٌ ومرتّبةٌ: **المفتوحُ قبل المُغلَق** (هو ما يمكن
+     * التصرّفُ فيه)، ثمّ **الأحدثُ دخولاً**، والمعرّفُ آخرَ فاصلٍ لا أوّلَه.
+     */
     public static function today(string $empId, ?string $date = null): ?Attendance
     {
-        return Attendance::whereNull('deleted_at')->where('emp_id', $empId)
+        $rows = Attendance::whereNull('deleted_at')->where('emp_id', $empId)
             ->whereDate('date', $date ?? now()->toDateString())
-            ->orderBy('id')->first();
+            ->get();
+
+        return self::pickRow($rows);
+    }
+
+    /** الصفُّ الأحقُّ من مجموعةِ صفوفِ يومٍ واحد — تعريفٌ واحدٌ يسأله كلُّ قارئ */
+    public static function pickRow($rows): ?Attendance
+    {
+        $rows = collect($rows);
+        if ($rows->isEmpty()) return null;
+
+        $withIn = $rows->filter(fn ($a) => (bool) $a->time_in);
+        $pool = $withIn->isNotEmpty() ? $withIn : $rows;
+
+        $open = $pool->filter(fn ($a) => $a->time_out === null);
+        $pool = $open->isNotEmpty() ? $open : $pool;
+
+        /*
+         * **مفتاحُ الترتيبِ لحظةٌ لا نصّ** (التحقّقُ الثاني عشر): `in_at` أوّلاً لأنّه
+         * لحظةٌ حقيقيّة، و`time_in` **مُصفَّراً** احتياطاً لصفوفٍ قديمةٍ كُتبت قبل
+         * التصفير — فـ`'9:00'` كانت تغلب `'23:00:00'` معجميّاً فتفوز ورديّةُ الصباحِ
+         * المنسيّةُ على ورديّةِ الليلِ المفتوحة.
+         */
+        return $pool->sortBy(fn ($a) => sprintf('%s|%s|%s',
+            (string) ($a->in_at?->format('Y-m-d H:i:s')
+                ?: (($a->date?->toDateString() ?? $a->date) . ' ' . (Attendance::normTime($a->time_in) ?? ''))),
+            (string) (Attendance::normTime($a->time_in) ?? ''),
+            (string) $a->id))->last();
     }
 
     /* ────────── الحضور ────────── */
@@ -68,12 +193,26 @@ class Workday
         $emp = self::emp($user);
         if (! $emp) return ['ok' => false, 'msg' => 'لا ملفَ موظفٍ نشطاً مربوطاً بحسابك — اطلب من الموارد البشرية ربطه من حقل «حساب النظام»'];
 
-        $row = self::today($emp->id);
+        /*
+         * **والكاتبُ يسأل ما تسأله الشاشةُ والحارس** (التحقّقُ العاشر · ع‑أ): كان
+         * `checkIn` على `today()` وحدَها، فمن له ورديّةٌ ليليّةٌ مفتوحةٌ يضغط «تسجيل
+         * الحضور» فيُفتَح صفٌّ ثانٍ، ثمّ يُغلق الانصرافُ صفَّ اليومِ وتُهجَر الورديّةُ
+         * بلا انصرافٍ أبداً — **عينُ الضررِ الذي فُتح البابُ لإغلاقِه**.
+         */
+        $now = now();
+        $row = self::openRow($emp->id, $now);
+
+        if ($row && $row->time_in && ! $row->time_out
+            && (string) ($row->date?->toDateString() ?? $row->date) !== $now->toDateString()) {
+            return ['ok' => false, 'row' => $row,
+                'msg' => 'ورديّتُك التي بدأت ' . $row->time_in . ' (أمس) ما تزال مفتوحة — '
+                    . 'سجّل انصرافَك منها أوّلاً ثمّ ابدأ يومَك'];
+        }
+
         if ($row && $row->time_in) {
             return ['ok' => false, 'msg' => 'حضورُك اليوم مسجَّلٌ منذ ' . $row->time_in, 'row' => $row];
         }
 
-        $now = now();
         $start = (string) setting('sec.hours_start', '08:00');
         $grace = max(0, (int) setting('work.late_grace', 15));
         // مقارنةٌ بدقائق اليوم لا بنصٍّ: بدايةٌ قرب منتصف الليل + سماحية كانت
@@ -139,23 +278,7 @@ class Workday
          * يومُه «انصرافٌ مفقود» بساعاتٍ فارغة — **والساعاتُ تُغذّي الرواتبَ والامتثال**.
          * فيُفتَّشُ صفُّ الأمسِ **إن كان ما يزال مفتوحاً** (حضورٌ بلا انصراف) قبل الردّ.
          */
-        $row = self::today($emp->id);
-        if (! $row || ! $row->time_in) {
-            $prev = self::today($emp->id, $now->copy()->subDay()->toDateString());
-            /*
-             * **وحدُّ التبنّي: أن تكون الساعةُ قد لفّت فعلاً.** صفُّ الأمسِ يُتبنّى
-             * فقط حين تكون لحظةُ الضغطِ **قبل** وقتِ الدخول (٠٣:٤٨ < ٢٣:٠٠) — أي
-             * ورديّةٌ عبرت منتصفَ الليل حقّاً. ومن نسي انصرافَ أمسِه ثمّ ضغط اليومَ
-             * الخامسةَ مساءً لا يُتبنّى صفُّه (١٧:٠٠ > ٠٨:٠٠)، فيبقى الردُّ «سجّل
-             * حضورَك أولاً» كما كان — وإلّا لأغلقَ إصلاحُ الليلِ يومَ الناسي بساعاتٍ
-             * ملفَّقة. (حدٌّ وُضع قبل الدفع لا بعده: هذا بالضبط شكلُ العيبِ الذي
-             * صنعه الإصلاحُ خمسَ مرّاتٍ في هذه الجولات.)
-             */
-            if ($prev && $prev->time_in && ! $prev->time_out
-                && $now->format('H:i:s') < (string) $prev->time_in) {
-                $row = $prev;
-            }
-        }
+        $row = self::openRow($emp->id, $now);
 
         if (! $row || ! $row->time_in) return ['ok' => false, 'msg' => 'لا حضورَ مسجَّلاً اليوم — سجّل حضورَك أولاً'];
         if ($row->time_out) return ['ok' => false, 'msg' => 'انصرافُك مسجَّلٌ منذ ' . $row->time_out, 'row' => $row];
@@ -179,7 +302,7 @@ class Workday
         // مهلةُ التقرير تُختم عند الانصراف (§53): للعرضِ ولمرشّحِ أمرِ المصالحة (§51)
         if (Schema::hasColumn('attendance', 'report_deadline_at')) {
             $deadline = \App\Support\DailyWorkCompliance::computeDeadline(
-                (string) ($row->date?->toDateString() ?? $row->date), $row->time_out, true);
+                (string) ($row->date?->toDateString() ?? $row->date), $row->time_out, true, $crosses);
             $row->report_deadline_at = $deadline;
         }
         $row->meta = array_merge((array) $row->meta, ['checkout' => array_filter([
@@ -252,10 +375,38 @@ class Workday
         $weekend = array_map('intval', array_filter(explode(',', (string) setting('cost.weekend', '5,6'))));
         if (in_array((int) date('N', strtotime($date)), $weekend, true)) return 0;
 
+        /*
+         * **ومن امتدّت ورديّتُه داخلَ اليومِ المكنوس ليس غائباً فيه** (التحقّقُ
+         * العاشر · ع‑ب): من بدأ ٢٣:٠٠ وانصرف التاسعةَ صباحاً كان يُختم «غائباً»
+         * في اليومِ نفسِه الذي كان فيه على رأسِ عملِه — و`effective` هو العمودُ
+         * الذي تُبنى عليه المحاسبةُ الشهريّة. استعلامٌ واحدٌ قبل الحلقة (لا
+         * استعلامَ لكلِّ موظّف).
+         */
+        $prevDay = date('Y-m-d', strtotime($date . ' -1 day'));
+
+        // (أ) من عبرت ورديّتُه وأُغلقت داخلَ اليومِ المكنوس
+        $crossers = Attendance::whereNull('deleted_at')->whereDate('date', $prevDay)
+            ->where('overnight', true)->whereDate('out_at', $date)
+            ->pluck('emp_id')->flip()->all();
+
+        /*
+         * (ب) **ومن ورديّتُه ما تزال مفتوحة** (التحقّقُ الثاني عشر · ع‑٧): الاستثناءُ
+         * السابقُ اشترط `overnight=true` و`out_at` — وكلاهما لا يُكتب إلّا عند
+         * الانصراف. فمن نسي انصرافَه من ورديّةٍ ليليّةٍ كان يُدان **غياباً في السجلِّ
+         * الدائم** الذي تُبنى عليه المحاسبةُ الشهريّة، وهو عينُ الفئةِ التي وُضع
+         * الاستثناءُ لأجلِها.
+         */
+        $openIds = Attendance::whereNull('deleted_at')->whereDate('date', $prevDay)
+            ->whereNotNull('time_in')->whereNull('time_out')->pluck('emp_id')->unique();
+        foreach (self::openCrossingByEmp($openIds, \Illuminate\Support\Carbon::parse($date . ' 00:00:01')) as $empId => $r) {
+            $crossers[$empId] = true;
+        }
+
         $n = 0;
         Employee::whereNull('deleted_at')->where('status', 'نشط')
-            ->orderBy('id')->chunkById(100, function ($emps) use ($date, &$n) {
+            ->orderBy('id')->chunkById(100, function ($emps) use ($date, $crossers, &$n) {
                 foreach ($emps as $emp) {
+                    if (isset($crossers[$emp->id])) continue;
                     if (self::today($emp->id, $date)) continue;
                     if (self::onLeave($emp->id, $date)) continue;
                     // **والعذرُ المعتمَدُ غيرُ الخصميِّ يمنع الختمَ أيضاً** (الخاتمة · X1):
@@ -306,6 +457,9 @@ class Workday
         $projects = hub_ref_labels('projects',
             collect($comp)->pluck('projects')->flatten(1)->filter()->unique()->values()->all());
 
+        // ورديّاتٌ عبرت منتصفَ الليل وما تزال مفتوحةً — الجوابُ نفسُه الذي تسأله بطاقتُه
+        $night = self::openCrossingByEmp($emps->pluck('id'), now());
+
         $rows = [];
         $n = ['emps' => $emps->count(), 'in' => 0, 'noreport' => 0, 'leave' => 0,
             'field' => 0, 'absent' => 0, 'late' => 0, 'none' => 0, 'hours' => 0.0, 'blockers' => 0,
@@ -314,9 +468,11 @@ class Workday
         foreach ($emps as $e) {
             $c = $comp[$e->id];
             $a = $c['attendance'];
+            // شرطُ `openRow` نفسُه: غيابُ **دخول** لا غيابُ صفّ (ع‑٤)
+            $nightRow = ! $c['checked_in'] ? ($night[(string) $e->id] ?? null) : null;
             $blockers = (int) ($blockersByUser->get($e->user_id)?->count() ?? 0);
 
-            if ($c['checked_in']) $n['in']++;
+            if ($c['checked_in'] || $nightRow) $n['in']++;
             // «تقريرٌ ناقص» = حاضرٌ بلا تقريرٍ صالح (بانتظار أو ناقص) — تتبع الإشارةَ القائمة
             if ($c['checked_in'] && ! $c['report_submitted'] && ! $c['on_leave']) $n['noreport']++;
             if ($c['report_submitted']) $n['reported']++;
@@ -327,12 +483,12 @@ class Workday
             if (in_array($c['physical'], [self::FIELD, self::REMOTE], true)) $n['field']++;
             if ($c['physical'] === self::ABSENT || (! $c['checked_in'] && $a)) $n['absent']++;
             if ($c['physical'] === self::LATE) $n['late']++;
-            if (! $a) $n['none']++;
+            if (! $a && ! $nightRow) $n['none']++;
             $n['hours'] += $c['reported_hours'];
             $n['blockers'] += $blockers;
 
             $rows[] = [
-                'emp' => $e, 'att' => $a, 'comp' => $c,
+                'emp' => $e, 'att' => $a, 'comp' => $c, 'night' => $nightRow,
                 'entries' => $c['report_count'], 'hours' => $c['reported_hours'],
                 'blockers' => $blockers,
                 'projects' => collect($c['projects'])->map(fn ($pid) => $projects[$pid] ?? '—')->values()->all(),
@@ -350,7 +506,8 @@ class Workday
         $emp = self::emp($user);
         if (! $emp) return null;
 
-        $row = self::today($emp->id);
+        // الشاشةُ تسأل ما يسأله الحارس — لا تعريفَ ثانياً في البطاقة
+        $row = self::openRow($emp->id);
         $entries = DB::table('work_updates')->whereNull('deleted_at')
             ->where('created_by', $user->id)->whereDate('work_date', now()->toDateString())
             ->get(['project_id', 'hours']);

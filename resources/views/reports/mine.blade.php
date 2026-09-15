@@ -15,6 +15,7 @@
         'absent' => ['لا حضور', 'bad'],
         default => [$c['state'], ''],
     };
+
     $needsRev = $c['review']['needs_revision'] > 0;
 @endphp
 <div class="hero">
@@ -33,7 +34,14 @@
 </div>
 
 <div class="cards">
-    <div class="stat"><span class="ico">🕗</span><b class="mono">{{ $c['time_in'] ?: '—' }}@if($c['time_out']) – {{ $c['time_out'] }}@endif</b><span>الحضور</span></div>
+    {{-- **ورديّتُك التي بدأت أمس ما تزال مفتوحة** (N-19): كانت هذه البطاقةُ تعرض «—»
+         بينما بطاقةُ يومِ العمل في الصفحةِ الرئيسةِ تعدّ ساعاتِك حيّاً. وموضعُ الصوابِ
+         هنا — في **الحضور** — لا في «حالة التقرير»، فهما سؤالان لا سؤال. --}}
+    @if (! empty($c['open_shift']))
+        <div class="stat"><span class="ico bdg ok">🌙</span><b class="mono">{{ substr($c['open_shift']['time_in'], 0, 5) }}</b><span>على رأس العمل منذ {{ substr($c['open_shift']['time_in'], 0, 5) }} (أمس)</span></div>
+    @else
+        <div class="stat"><span class="ico">🕗</span><b class="mono">{{ $c['time_in'] ?: '—' }}@if($c['time_out']) – {{ $c['time_out'] }}@endif</b><span>الحضور</span></div>
+    @endif
     <div class="stat"><span class="ico bdg {{ $stateLabel[1] }}">📋</span><b>{{ $stateLabel[0] }}</b><span>حالة التقرير</span></div>
     @if ($c['deadline_at'])<div class="stat"><span class="ico">⏰</span><b class="mono">{{ $c['deadline_at']->format('H:i') }}</b><span>مهلة اليوم</span></div>@endif
     <div class="stat"><span class="ico">🧾</span><b>{{ $c['report_count'] }}</b><span>بند</span></div>

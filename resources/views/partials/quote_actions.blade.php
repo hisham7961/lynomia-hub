@@ -28,7 +28,10 @@
     <h3>🧭 مسار العرض <span class="bdg {{ hub_tone($st) }}">{{ $st }}</span></h3>
     <div class="crow">
         <a class="btn ghost sm" href="{{ route('quotes.doc', $row->id) }}">🖨 المستند البسيط</a>
-        <a class="btn p sm" href="{{ route('quotes.pdf', $row->id) }}" target="_blank" rel="noopener">📄 عرض المشروع الاحترافيّ PDF</a>
+        @php $xNight = hub_export_blocked_now('quotes'); @endphp
+        {{-- السببُ قبل النقرِ لا بعده — بالجوابِ الواحدِ الذي يسألُه الحارس --}}
+        <a class="btn p sm" href="{{ route('quotes.pdf', $row->id) }}" target="_blank" rel="noopener"
+           @if ($xNight) title="{{ 'نقل الملفات ممنوع خارج وقت العمل — يعود متاحاً مع بداية الدوام' }}" @endif>📄 عرض المشروع الاحترافيّ PDF @if ($xNight)🌙@endif</a>
         @if ((int) ($row->version ?? 1) > 1)
             <a class="btn ghost sm" href="{{ route('quotes.diff', $row->id) }}">🔀 مقارنة النسخ</a>
         @endif

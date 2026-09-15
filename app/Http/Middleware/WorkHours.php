@@ -25,7 +25,46 @@ class WorkHours
     protected const FILE_ROUTES = ['file.show', 'att.dl', 'att.view', 'att.zip', 'att.store', 'm.export',
                                    'esign.pdf', 'dataroom.store', 'inboxdocs.store', 'm.import.run',
                                    // أوراقُ العهدة تُطبع وتُحفظ PDF — نقلُ ملفاتٍ بكل معنى
-                                   'custody.label', 'custody.spec', 'custody.permit.doc'];
+                                   'custody.label', 'custody.spec', 'custody.permit.doc',
+                                   /*
+                                    * **وبالتعليلِ نفسِه: مستنداتُ الأعمالِ الثنائيّة** (التحقّقُ الثامن · N-4).
+                                    * كان العرضُ التجاريُّ بأسعارِه يخرج PDF الساعةَ الثالثةَ فجراً
+                                    * (‏`application/pdf` · `Content-Disposition` · ٨٤ كيلوبايت) بينما
+                                    * يُردّ جدولُ المشتريات CSV ٤٠٣ في الدقيقةِ نفسِها.
+                                    *
+                                    * **وحُدَّ النطاقُ بعد فحصِ ما تُعيده الأبوابُ فعلاً، لا بعدِّها:**
+                                    * بلاغُ التحقّقِ سمّى خمسةَ أبواب، و**ثلاثةٌ منها شاشات** لا ملفّات —
+                                    * `quotes.doc` و`purchases.doc` و`esign.doc` تُعيد `view(...)` أي
+                                    * صفحةَ طباعةٍ بـ`text/html`. وحجبُ شاشةٍ باسمِ «حظرِ نقلِ الملفات»
+                                    * نزعُ قدرةٍ لا إصلاحٌ — وأشدُّها `esign.doc` إذ لا وحدةَ `esign`
+                                    * في السجلّ فلا مفتاحَ استثناءٍ يقابله. فالمحروسُ هنا **الثنائيّةُ
+                                    * وحدَها**.
+                                    */
+                                   'quotes.pdf', 'changeorders.pdf'];
+
+    /**
+     * **خريطةُ الاستثناء: بابٌ ← وحدتُه.** منعٌ بلا استثناءٍ يقابله نزعُ قدرة، فحاملُ
+     * مفتاحِ «تصدير خارج الدوام» (`exportNight`) على وحدةِ البابِ يمرّ كما يمرّ على
+     * `m.export`. وكان الاستثناءُ مقصوراً على مسارٍ واحدٍ يقرأ وحدتَه من مُعامِلِ
+     * المسار — فلمّا اتّسع الحظرُ اتّسع معه الاستثناء، لا الحظرُ وحدَه.
+     *
+     * (`esign` ليست وحدةً في السجلّ، فبابُها يبقى على المنعِ كما كان `esign.pdf`
+     *  من قبل — لا استثناءَ يُخترع لوحدةٍ لا وجودَ لها.)
+     */
+    protected const NIGHT_EXEMPT = [
+        'quotes.pdf'          => 'quotes',
+        'changeorders.pdf'    => 'changeorders',
+        /*
+         * أوراقُ العهدةِ محروسةٌ فتحتاج مفتاحاً (التحقّقُ العاشر · ع‑و) — **لكنّ
+         * `custody` ليست وحدةً في السجلّ** (‏`hub_mod('custody') = null`)، فكان
+         * المفتاحُ الذي أضفتُه في v2.515 يشير إلى وحدةٍ لا وجودَ لها: بابٌ مغلقٌ
+         * **بلا سبيلِ منحٍ أبداً** — نزعُ قدرةٍ لا إصلاح (التحقّقُ الحادي عشر · ع‑٤).
+         * والحارسُ الحقيقيُّ لهذه المسارات هو `assets` (`CustodyController::gate`).
+         */
+        'custody.label'       => 'assets',
+        'custody.spec'        => 'assets',
+        'custody.permit.doc'  => 'assets',
+    ];
 
     public function handle(Request $r, Closure $next)
     {
@@ -70,6 +109,9 @@ class WorkHours
              * تدقيقاً («تصدير خارج الدوام»). البقيّةُ على المنع كما كانت.
              */
             $mExp = $r->routeIs('m.export') ? (string) $r->route('module') : null;
+            foreach (self::NIGHT_EXEMPT as $routeName => $mod) {
+                if ($r->routeIs($routeName)) { $mExp = $mod; break; }
+            }
             if (! ($mExp && auth()->check() && hub_can(auth()->user(), $mExp, 'exportNight'))) {
                 /*
                  * **المنعُ لا يبتلع ما كُتب** (الجولة 2 · G20): كان أيُّ إرسالِ

@@ -108,6 +108,9 @@
                 <td>
                     @if ($c['physical'])
                         <span class="bdg {{ hub_tone($c['physical']) }}">{{ $c['physical'] }}</span>
+                    @elseif (! empty($r['night']))
+                        {{-- ورديّةٌ عبرت منتصفَ الليل وما تزال مفتوحة — لا «لم يسجّل بعد» --}}
+                        <span class="bdg ok" title="ورديّةٌ بدأت أمس وما تزال مفتوحة">🌙 على رأس العمل منذ {{ $r['night']->time_in }} (أمس)</span>
                     @else
                         <span class="bdg wn">لم يسجّل بعد</span>
                     @endif
@@ -123,7 +126,14 @@
                     @elseif ($c['review']['pending']) <span class="bdg">بانتظار</span>
                     @else —@endif
                 </td>
-                <td><span class="bdg {{ $effTone }}" title="{{ $c['reason'] }}">{{ $c['labels']['effective'] }}</span></td>
+                <td>
+                    @if ($c['verdict_pending'] ?? false)
+                        {{-- لم يبدأ الدوامُ بعد — النداءُ أعلاه يقولها، فلا يخالفه الجدول (N-27) --}}
+                        <span class="bdg" title="لم يبدأ الدوامُ بعد — لا يُعلَن حكمٌ قبل موعده">—</span>
+                    @else
+                        <span class="bdg {{ $effTone }}" title="{{ $c['reason'] }}">{{ $c['labels']['effective'] }}</span>
+                    @endif
+                </td>
                 <td>{{ $r['entries'] ?: '—' }}</td>
                 <td class="mono">{{ $r['hours'] ? number_format($r['hours'], 1) : '—' }}</td>
                 <td class="sub">{{ \Illuminate\Support\Str::limit(implode(' · ', $r['projects']), 34) ?: '—' }}</td>
