@@ -122,7 +122,46 @@ class Attendance extends Model
         // كما هي للعرضِ والتوافقِ الخلفيّ (الإضافةُ لا الكسر).
         static::saving(function (self $a) {
             [$a->in_at, $a->out_at] = self::instants($a->date, $a->time_in, $a->time_out, (bool) $a->overnight);
+
+            /*
+             * **مهلةُ التقريرِ يختمها كلُّ بابٍ لا بابٌ واحد** (مجلس الخبراء · N-21).
+             *
+             * كان `report_deadline_at` يُكتب في `Workday::checkOut` **وحدَه** — وهو
+             * بابٌ من أربعة: نموذجُ الوحدات، والاستيراد، والـAPI، وزرُّ الانصراف.
+             * وأمرُ المصالحةِ (`AttendanceReconcileReports`) يرشِّح بـ
+             * `whereNotNull('report_deadline_at')`، فكلُّ يومٍ أدخلته المواردُ يدويّاً
+             * **لا تراه شبكةُ الأمانِ أبداً**: تُكتب ساعاتُه وتُحتسب حالتُه ولا
+             * يُذكَّر أحدٌ بتقريرِه.
+             *
+             * وهو نظيرُ ما فعله المنتجُ بـ`hours` فوق: نُقل إلى الخطّافِ «كي يغطّيَ
+             * كلَّ الأبواب». فيُعطى المعاملةَ نفسَها — كاتبٌ واحدٌ يراه الجميع.
+             */
+            $a->report_deadline_at = self::derivedDeadline($a);
         });
+    }
+
+    /**
+     * مهلةُ التقريرِ المشتقّةُ من الصفّ — أو `null` لصفٍّ بلا انصراف.
+     * تُستدعى من خطّافِ الحفظِ فتغطّي كلَّ بابٍ يكتب حضوراً (N-21).
+     */
+    protected static function derivedDeadline(self $a): ?\Carbon\Carbon
+    {
+        static $has = null;
+        if ($has === null) {
+            $has = \Illuminate\Support\Facades\Schema::hasTable('attendance')
+                && \Illuminate\Support\Facades\Schema::hasColumn('attendance', 'report_deadline_at');
+        }
+        if (! $has) return null;
+        if (! $a->time_in || ! $a->time_out) return null;   // ورديّةٌ مفتوحة: لا مهلةَ بعد (§46)
+
+        $date = (string) ($a->date?->toDateString() ?? $a->date);
+        if ($date === '') return null;
+
+        // العبورُ من الصفِّ نفسِه — الرايةُ الصريحةُ ووقتٌ يسبق الدخول
+        $crossed = (bool) $a->overnight
+            && (string) $a->time_out < (string) $a->time_in;
+
+        return \App\Support\DailyWorkCompliance::computeDeadline($date, $a->time_out, true, $crossed);
     }
 
     /** ثوانيُ اليومِ من وقتٍ نصّيّ `H:i[:s]` — أو null لِما ليس وقتاً صالحاً */

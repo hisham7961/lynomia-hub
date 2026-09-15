@@ -299,12 +299,9 @@ class Workday
         $row->hours = round(max(0, $mins) / 60, 2);
         // الحالةُ فيزيائيّةٌ محضة — لا تُطمَس بغيابِ التقرير (§6)
         $row->status = self::evaluate($row, $user);
-        // مهلةُ التقرير تُختم عند الانصراف (§53): للعرضِ ولمرشّحِ أمرِ المصالحة (§51)
-        if (Schema::hasColumn('attendance', 'report_deadline_at')) {
-            $deadline = \App\Support\DailyWorkCompliance::computeDeadline(
-                (string) ($row->date?->toDateString() ?? $row->date), $row->time_out, true, $crosses);
-            $row->report_deadline_at = $deadline;
-        }
+        // مهلةُ التقرير (§53) يختمها **خطّافُ النموذج** الآن لا هذا البابُ وحدَه
+        // (N-21): كان بابٌ من أربعةٍ يكتبها، فما أدخلته المواردُ يدويّاً لا تراه
+        // شبكةُ أمانِ المصالحة أبداً. الحسابُ نفسُه — والكاتبُ واحدٌ يغطّي الجميع.
         $row->meta = array_merge((array) $row->meta, ['checkout' => array_filter([
             // ختمُ لحظةِ الانصرافِ الكامل — أثرٌ لا يُطمَس بتعديلٍ لاحقٍ للحقل
             'at' => $now->toIso8601String(),
@@ -436,7 +433,7 @@ class Workday
     protected static function teamCalc(): array
     {
         if (! hub_can(auth()->user(), 'hr', 'v') || ! Schema::hasTable('employees')) {
-            return ['rows' => [], 'n' => []];
+            return ['rows' => [], 'n' => [], 'roll' => null];
         }
 
         $today = now()->toDateString();
@@ -459,6 +456,19 @@ class Workday
 
         // ورديّاتٌ عبرت منتصفَ الليل وما تزال مفتوحةً — الجوابُ نفسُه الذي تسأله بطاقتُه
         $night = self::openCrossingByEmp($emps->pluck('id'), now());
+
+        /*
+         * **نداءُ اليومِ من اللقطةِ نفسِها** (مجلس الخبراء · N-22).
+         *
+         * كان المتحكّمُ يحسبه **حيّاً** بجوارِ جدولٍ مخبوءٍ ١٢٠ ثانية — فنافذةُ
+         * تناقضٍ ≤١٢٠ ثانية: عند تجاوزِ بدايةِ الدوامِ يقول النداءُ «غائب» ويقول
+         * الجدولُ «لم يبدأ الدوامُ بعد»، والمجموعُ يتجاوز عددَ الموظّفين. وليست
+         * البيانات هي ما يختلف (الخبيئةُ تُبطَل بتغيّرِها) بل **لحظةُ السؤال**.
+         *
+         * فصار جوابَين من سؤالٍ واحدٍ في لقطةٍ واحدة. ويُوفّر معه استعلامَ
+         * الموظّفين الذي كان المتحكّمُ يكرّره حرفاً.
+         */
+        $roll = \App\Support\DailyWorkCompliance::rollCall($emps, $today);
 
         $rows = [];
         $n = ['emps' => $emps->count(), 'in' => 0, 'noreport' => 0, 'leave' => 0,
@@ -497,7 +507,7 @@ class Workday
 
         $n['hours'] = round($n['hours'], 1);
 
-        return ['rows' => $rows, 'n' => $n, 'date' => $today];
+        return ['rows' => $rows, 'n' => $n, 'date' => $today, 'roll' => $roll];
     }
 
     /** بطاقةُ الموظف الذاتية (ودجة الرئيسية): حالُ يومي وبنودُه */

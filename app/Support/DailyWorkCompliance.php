@@ -290,12 +290,18 @@ class DailyWorkCompliance
                 ->whereDate('work_date', $date)->orderBy('submitted_at')->orderBy('id')->get()->groupBy('created_by')
             : collect();
 
+        // **خرائطُ المجموعةِ لا سؤالٌ لكلِّ موظّف** (N-20): كانت `compose` تسأل
+        // `onLeave` و`excuseFor` صفّاً صفّاً — أربعةُ استعلاماتٍ لكلِّ موظّف.
+        [$onLeave, $excusedMap] = self::batchMaps($empIds, $date, $date);
+
         $out = [];
         foreach ($emps as $emp) {
             $out[$emp->id] = self::compose(
                 $emp, $date,
                 collect($attByEmp->get($emp->id) ?? []),
-                collect($emp->user_id ? ($repByUser->get($emp->user_id) ?? []) : [])
+                collect($emp->user_id ? ($repByUser->get($emp->user_id) ?? []) : []),
+                $onLeave($emp->id, $date),
+                $excusedMap
             );
         }
 
@@ -309,6 +315,39 @@ class DailyWorkCompliance
      *
      * @param  array<int,string>  $dates  قائمةُ تواريخِ 'Y-m-d' مرتّبة
      */
+    /**
+     * **خرائطُ المجموعةِ لمدى تواريخ** (N-20) — استعلامان اثنان يخدمان كلَّ الخلايا.
+     *
+     * كانت هذه الشيفرةُ تعيش في `resolveRange` وحدَه، و`resolveMany` يسأل القاعدةَ
+     * **لكلِّ موظّف**: `Workday::onLeave` و`excuseFor`، ومعهما فحصا `hasTable`.
+     * أربعةُ استعلاماتٍ لكلِّ موظّفٍ في دالّةٍ ترويستُها تَعِد بـ«استعلامَين»
+     * (قِيست: ٦ موظّفين ⇒ ٢٨ استعلاماً · ٢٠ ⇒ ٨٣) — و`teamDaily` في الـAPI
+     * يمرّر حتى خمسَمئة. فالبانيةُ واحدةٌ الآن يستعملها الاثنان.
+     *
+     * @return array{0: \Closure, 1: array}  [دالّةُ «أفي إجازة؟»، خريطةُ الأعذار]
+     */
+    protected static function batchMaps(array $empIds, string $from, string $to): array
+    {
+        $leaveRows = collect();
+        if (\Illuminate\Support\Facades\Schema::hasTable('leave_requests')) {
+            $leaveRows = \App\Models\LeaveRequest::whereNull('deleted_at')->whereIn('emp_id', $empIds)
+                ->where('status', 'معتمد')->whereIn('type', config('hub.leave.deduct_types', []))
+                ->whereDate('date_from', '<=', $to)
+                ->where(fn ($q) => $q->whereDate('date_to', '>=', $from)->orWhereNull('date_to'))
+                ->get(['emp_id', 'date_from', 'date_to'])->groupBy('emp_id');
+        }
+
+        $onLeave = function ($empId, string $date) use ($leaveRows): bool {
+            foreach ($leaveRows->get($empId) ?? [] as $r) {
+                $f = self::dstr($r->date_from); $t = $r->date_to ? self::dstr($r->date_to) : null;
+                if ($f <= $date && ($t === null || $t >= $date)) return true;
+            }
+            return false;
+        };
+
+        return [$onLeave, self::excusedMap($empIds, $from, $to)];
+    }
+
     public static function resolveRange(Collection $emps, array $dates): array
     {
         if ($emps->isEmpty() || ! $dates) return [];
@@ -326,25 +365,8 @@ class DailyWorkCompliance
                 ->groupBy(fn ($w) => $w->created_by . '|' . self::dstr($w->work_date))
             : collect();
 
-        // خريطةُ الإجازاتِ المعتمدةِ (أنواعُ الخصم) المتداخلةِ مع المدى — لكلِّ موظّف
-        $leaveRows = collect();
-        if (\Illuminate\Support\Facades\Schema::hasTable('leave_requests')) {
-            $leaveRows = \App\Models\LeaveRequest::whereNull('deleted_at')->whereIn('emp_id', $empIds)
-                ->where('status', 'معتمد')->whereIn('type', config('hub.leave.deduct_types', []))
-                ->whereDate('date_from', '<=', $to)
-                ->where(fn ($q) => $q->whereDate('date_to', '>=', $from)->orWhereNull('date_to'))
-                ->get(['emp_id', 'date_from', 'date_to'])->groupBy('emp_id');
-        }
-        $onLeave = function ($empId, string $date) use ($leaveRows): bool {
-            foreach ($leaveRows->get($empId) ?? [] as $r) {
-                $f = self::dstr($r->date_from); $t = $r->date_to ? self::dstr($r->date_to) : null;
-                if ($f <= $date && ($t === null || $t >= $date)) return true;
-            }
-            return false;
-        };
-
-        // الأعذارُ غيرُ الخصميّةِ للمجموعةِ كلِّها — استعلامٌ واحدٌ كخريطةِ الإجازات
-        $excusedMap = self::excusedMap($empIds, $from, $to);
+        // خرائطُ المجموعةِ — البانيةُ نفسُها التي يسألها `resolveMany` (N-20)
+        [$onLeave, $excusedMap] = self::batchMaps($empIds, $from, $to);
 
         $out = [];
         foreach ($emps as $emp) {

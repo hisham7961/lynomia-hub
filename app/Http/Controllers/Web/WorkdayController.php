@@ -40,13 +40,12 @@ class WorkdayController extends Controller
         abort_unless(hub_can(auth()->user(), 'hr', 'v'), 403,
             'شاشة الفريق اليومية تتطلب صلاحية عرض الموارد البشرية');
 
-        // «نداءُ اليوم» (الجولة ١ · F9): الغائبُ بالفرقِ (النشطون − من ختم − من في
-        // إجازة) لا بانتظارِ صفوفٍ لن تُكتب — بنفسِ نطاقِ الشاشة (شركةً وصلاحية)
-        $emps = hub_company_scope(hub_scope(\App\Models\Employee::query(), 'hr'), 'hr')
-            ->whereNull('deleted_at')->where('status', 'نشط')
-            ->orderBy('name')->get(['id', 'name', 'dept', 'user_id']);
-
-        return view('workforce.team', Workday::teamToday()
-            + ['roll' => \App\Support\DailyWorkCompliance::rollCall($emps)]);
+        /*
+         * «نداءُ اليوم» (الجولة ١ · F9) صار داخلَ `teamToday()` نفسِه (N-22): كان
+         * يُحسب **حيّاً** هنا بجوارِ جدولٍ مخبوءٍ ١٢٠ ثانية، فتفتح نافذةُ تناقضٍ
+         * عند تجاوزِ بدايةِ الدوام — جوابان لسؤالٍ واحدٍ من لحظتَين مختلفتَين.
+         * ومعه سقط استعلامُ الموظّفين الذي كان يُكرَّر هنا حرفاً كما في `teamCalc`.
+         */
+        return view('workforce.team', Workday::teamToday());
     }
 }
