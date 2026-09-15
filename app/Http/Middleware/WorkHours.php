@@ -52,8 +52,13 @@ class WorkHours
      *  من قبل — لا استثناءَ يُخترع لوحدةٍ لا وجودَ لها.)
      */
     protected const NIGHT_EXEMPT = [
-        'quotes.pdf'       => 'quotes',
-        'changeorders.pdf' => 'changeorders',
+        'quotes.pdf'          => 'quotes',
+        'changeorders.pdf'    => 'changeorders',
+        // أوراقُ العهدةِ محروسةٌ و`custody` في كتالوجِ `exportNight` — فكان النصُّ
+        // يَعِد بمفتاحٍ لا يفتح باباً (التحقّقُ العاشر · ع‑و)
+        'custody.label'       => 'custody',
+        'custody.spec'        => 'custody',
+        'custody.permit.doc'  => 'custody',
     ];
 
     public function handle(Request $r, Closure $next)

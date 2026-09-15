@@ -106,12 +106,26 @@ class Workday
         $emp = self::emp($user);
         if (! $emp) return ['ok' => false, 'msg' => 'لا ملفَ موظفٍ نشطاً مربوطاً بحسابك — اطلب من الموارد البشرية ربطه من حقل «حساب النظام»'];
 
-        $row = self::today($emp->id);
+        /*
+         * **والكاتبُ يسأل ما تسأله الشاشةُ والحارس** (التحقّقُ العاشر · ع‑أ): كان
+         * `checkIn` على `today()` وحدَها، فمن له ورديّةٌ ليليّةٌ مفتوحةٌ يضغط «تسجيل
+         * الحضور» فيُفتَح صفٌّ ثانٍ، ثمّ يُغلق الانصرافُ صفَّ اليومِ وتُهجَر الورديّةُ
+         * بلا انصرافٍ أبداً — **عينُ الضررِ الذي فُتح البابُ لإغلاقِه**.
+         */
+        $now = now();
+        $row = self::openRow($emp->id, $now);
+
+        if ($row && $row->time_in && ! $row->time_out
+            && (string) ($row->date?->toDateString() ?? $row->date) !== $now->toDateString()) {
+            return ['ok' => false, 'row' => $row,
+                'msg' => 'ورديّتُك التي بدأت ' . $row->time_in . ' (أمس) ما تزال مفتوحة — '
+                    . 'سجّل انصرافَك منها أوّلاً ثمّ ابدأ يومَك'];
+        }
+
         if ($row && $row->time_in) {
             return ['ok' => false, 'msg' => 'حضورُك اليوم مسجَّلٌ منذ ' . $row->time_in, 'row' => $row];
         }
 
-        $now = now();
         $start = (string) setting('sec.hours_start', '08:00');
         $grace = max(0, (int) setting('work.late_grace', 15));
         // مقارنةٌ بدقائق اليوم لا بنصٍّ: بدايةٌ قرب منتصف الليل + سماحية كانت
@@ -274,10 +288,23 @@ class Workday
         $weekend = array_map('intval', array_filter(explode(',', (string) setting('cost.weekend', '5,6'))));
         if (in_array((int) date('N', strtotime($date)), $weekend, true)) return 0;
 
+        /*
+         * **ومن امتدّت ورديّتُه داخلَ اليومِ المكنوس ليس غائباً فيه** (التحقّقُ
+         * العاشر · ع‑ب): من بدأ ٢٣:٠٠ وانصرف التاسعةَ صباحاً كان يُختم «غائباً»
+         * في اليومِ نفسِه الذي كان فيه على رأسِ عملِه — و`effective` هو العمودُ
+         * الذي تُبنى عليه المحاسبةُ الشهريّة. استعلامٌ واحدٌ قبل الحلقة (لا
+         * استعلامَ لكلِّ موظّف).
+         */
+        $crossers = Attendance::whereNull('deleted_at')
+            ->whereDate('date', date('Y-m-d', strtotime($date . ' -1 day')))
+            ->where('overnight', true)->whereDate('out_at', $date)
+            ->pluck('emp_id')->flip()->all();
+
         $n = 0;
         Employee::whereNull('deleted_at')->where('status', 'نشط')
-            ->orderBy('id')->chunkById(100, function ($emps) use ($date, &$n) {
+            ->orderBy('id')->chunkById(100, function ($emps) use ($date, $crossers, &$n) {
                 foreach ($emps as $emp) {
+                    if (isset($crossers[$emp->id])) continue;
                     if (self::today($emp->id, $date)) continue;
                     if (self::onLeave($emp->id, $date)) continue;
                     // **والعذرُ المعتمَدُ غيرُ الخصميِّ يمنع الختمَ أيضاً** (الخاتمة · X1):

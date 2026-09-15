@@ -416,7 +416,24 @@ class DailyWorkCompliance
         $primary = $atts->last(fn ($a) => (bool) $a->time_in) ?: $atts->first();
         $checkedIn = $atts->contains(fn ($a) => (bool) $a->time_in);
         $timeIn = $atts->pluck('time_in')->filter()->sort()->first();
-        $timeOut = $atts->pluck('time_out')->filter()->sort()->last();
+        /*
+         * **الانصرافُ والعبورُ من الصفِّ الواحد** (التحقّقُ المستقلّ العاشر · ع‑د).
+         * كان `time_out` يُؤخذ **أكبرَ نصٍّ** في كلِّ صفوفِ اليوم، ورايةُ العبورِ من
+         * **صفٍّ آخر** آخرِ الترتيب — و`attendance.id` هو `char(36)` عشوائيّ، فكان
+         * `orderBy('id')` **قرعةً** تمنعها CLAUDE.md بالاسم: فارقُ أربعٍ وعشرين
+         * ساعةً في المهلةِ على البياناتِ نفسِها، بتبديلِ بادئةِ UUID وحدَها.
+         * والأسوأُ أنّ «أكبرَ نصّ» يُخطئ أصلاً في اليومِ العابر: «03:48» أصغرُ نصّاً
+         * من أيِّ انصرافٍ نهاريّ فيُهمَل وهو الأخير واقعاً.
+         *
+         * فالترتيبُ الآن **بلحظةِ الانصرافِ الحقيقيّة** (`out_at`)، والقيمتانِ من
+         * صفٍّ واحدٍ لا من صفَّين.
+         */
+        $outRow = $atts->filter(fn ($a) => $a->time_out !== null)
+            ->sortBy(fn ($a) => $a->out_at
+                ? $a->out_at->getTimestamp()
+                : strtotime(((string) ($a->date?->toDateString() ?? $a->date)) . ' ' . $a->time_out))
+            ->last();
+        $timeOut = $outRow?->time_out;
         $checkedOut = $checkedIn && $timeOut !== null;
         $hours = round((float) $atts->sum(fn ($a) => (float) $a->hours), 2);
 
@@ -450,8 +467,7 @@ class DailyWorkCompliance
         $reportRequired = ((string) setting('work.report_required', '1') === '1') && ! $onLeave;
 
         // المهلة (§9/§50) — تُشتقّ حيّاً فتستجيب لتغيّرِ الإعداد فوراً (§117)
-        // العبورُ يُقرأ من الصفِّ الحاملِ للانصراف — تعريفٌ واحدٌ يسأله المخزونُ والمشتقّ
-        $outRow = $atts->last(fn ($a) => $a->time_out !== null);
+        // العبورُ من الصفِّ الحاملِ للانصرافِ نفسِه (المُختار أعلاه بترتيبٍ دلاليّ)
         $crossed = $outRow !== null && (bool) $outRow->overnight
             && $outRow->time_in !== null && (string) $outRow->time_out < (string) $outRow->time_in;
         $deadline = self::computeDeadline($date, $timeOut, $checkedOut, $crossed);
