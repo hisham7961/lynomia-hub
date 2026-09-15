@@ -35,7 +35,7 @@
 <div class="cards">
     <div class="stat"><span class="ico" aria-hidden="true">{{ $ws['icon'] }}</span><b>{{ number_format($total) }}</b><span>سجلاً في المساحة</span></div>
     <div class="stat"><span class="ico" aria-hidden="true">🆕</span><b>{{ number_format($week) }}</b><span>أُضيف آخر ٧ أيام</span></div>
-    <div class="stat"><span class="ico" aria-hidden="true">⏳</span><b class="{{ $expiry->count() ? 'txt-bad' : '' }}">{{ $expiry->count() }}</b><span>يستحق أو ينتهي قريباً</span></div>
+    <div class="stat"><span class="ico" aria-hidden="true">⏳</span><b class="{{ $expiryN ? 'txt-bad' : '' }}">{{ $expiryN }}</b><span>يستحق أو ينتهي خلال {{ hub_radar_window() }} يوماً</span></div>
     <div class="stat"><span class="ico" aria-hidden="true">🗂</span><b>{{ count($ws['modules']) }}</b><span>وحدة نشطة</span></div>
 </div>
 
@@ -92,9 +92,12 @@
         </div>
     @endif
 
-    {{-- يستحق قريباً — من رادار الانتهاء الحقيقي --}}
+    {{-- يستحق قريباً — من رادار الانتهاء الحقيقي.
+         الشارةُ تقول **كم وقع** لا كم يسع الجدولُ (W-4)، والرابطُ يفتح الرادارَ
+         كلَّه حين يُقصّ المسرود — فلا يُقرأ سقفُ العرضِ على أنّه الواقع. --}}
     <div class="card kid">
-        <h3>⏳ يستحق أو ينتهي قريباً</h3>
+        <h3>⏳ يستحق أو ينتهي خلال {{ hub_radar_window() }} يوماً <span class="bdg">{{ $expiryN }}</span>
+            @if ($expiryN > $expiry->count())<a class="btn ghost xs msauto" href="{{ route('alerts') }}">الكل ←</a>@endif</h3>
         <table class="mini">
             @forelse ($expiry as $i)
                 <tr>
@@ -103,7 +106,7 @@
                     <td class="acts"><span class="bdg {{ $i['days'] < 0 ? 'bad' : ($i['days'] <= 7 ? 'bad' : 'wn') }}">{{ $i['days'] < 0 ? 'متأخر ' . abs($i['days']) : $i['days'] }} يوم</span></td>
                 </tr>
             @empty
-                <tr><td class="sub" style="padding:12px;text-align:center">لا استحقاقات قريبة في هذه المساحة</td></tr>
+                <tr><td class="sub" style="padding:12px;text-align:center">لا شيء يستحق أو ينتهي خلال {{ hub_radar_window() }} يوماً في هذه المساحة</td></tr>
             @endforelse
         </table>
     </div>

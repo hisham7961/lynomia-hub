@@ -69,6 +69,11 @@
             // «بوابتي» تحمل عدّاد المتأخر والمستحق اليوم — صندوقٌ لا يُعلن نفسه لا يُفتح
             $navBadges = ['alerts' => hub_expiry_count(), 'dm' => \App\Http\Controllers\Web\DmController::unreadCount(),
                           'me' => \App\Support\Inbox::count()];
+            // **وكلُّ شارةٍ تقول ماذا تعدّ** (W-3 · الطور ١٦٧). شارةُ الرادارِ تعدّ
+            // المتأخّرَ وما ينتهي خلال ٧ أيام، والبابُ الذي تفتحه يسرد النافذةَ
+            // كلَّها — فرقمان مختلفان تحت كلمتَين متطابقتَين ما لم تُقَل النافذة.
+            $navBadgeTitles = ['alerts' => 'متأخّرٌ أو ينتهي خلال ٧ أيام — والرادارُ خلف الرابط '
+                                           . hub_radar_window() . ' يوماً'];
         @endphp
         <div class="navsection">الأدوات واللوحات</div>
         @foreach (hub_top_groups(auth()->user()) as $g)
@@ -82,7 +87,7 @@
                 <summary>{{ $g['icon'] }} {{ $g['label'] }}@if ($gCount)<span class="nbdg">{{ $gCount }}</span>@endif</summary>
                 @foreach ($g['items'] as $it)
                     @php $niOn = request()->routeIs($it['route']) || request()->routeIs(\Illuminate\Support\Str::before($it['route'], '.') . '.*'); @endphp
-                    <a class="ni {{ $niOn ? 'on' : '' }}" @if ($niOn) aria-current="page" @endif href="{{ route($it['route']) }}">{{ $it['label'] }}@if (($b = (int) ($navBadges[$it['key']] ?? 0)))<span class="nbdg">{{ $b }}</span>@endif</a>
+                    <a class="ni {{ $niOn ? 'on' : '' }}" @if ($niOn) aria-current="page" @endif href="{{ route($it['route']) }}">{{ $it['label'] }}@if (($b = (int) ($navBadges[$it['key']] ?? 0)))<span class="nbdg" @if (($bt = $navBadgeTitles[$it['key']] ?? null)) title="{{ $bt }}" @endif>{{ $b }}</span>@endif</a>
                 @endforeach
             </details>
         @endforeach
