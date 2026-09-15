@@ -36,7 +36,8 @@ class HubPayrollMonths extends Command
 
         // تعبئةُ ما دخل بلا مفتاح (صفوفٌ كُتبت مباشرةً في القاعدة مثلاً)
         $filled = 0;
-        DB::table('payroll_runs')->whereNull('month_key')->select('id', 'month')
+        // المحذوفُ لا يُملأ: مفتاحُه مُفرَّغٌ عمداً كي لا يحجز شهرَه في الفهرسِ الفريد
+        DB::table('payroll_runs')->whereNull('month_key')->whereNull('deleted_at')->select('id', 'month')
             ->orderBy('id')->chunk(500, function ($rows) use (&$filled) {
                 foreach ($rows as $r) {
                     if (($k = PayrollMonth::key($r->month)) !== null) {

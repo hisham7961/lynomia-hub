@@ -27,6 +27,8 @@
     @endif
 @endforeach
 @if (! $late->count() && ! $week->count() && ! $month->count())
-    <div class="card"><div class="empty"><span class="big">😌</span>لا شيء ينتهي خلال ٣٠ يوماً فيما تراه صلاحيّتُك</div></div>
+    {{-- النافذةُ ليست رقماً واحداً: حقولُ الوحداتِ تُمسح إلى +٣٠ يوماً ووثائقُ صاحبِ
+         الشأنِ إلى ±٦٠ — فالجملةُ تقول «قريباً» ولا تدّعي رقماً يكذبُ نصفَ الصفحة. --}}
+    <div class="card"><div class="empty"><span class="big">😌</span>لا شيء ينتهي قريباً فيما تراه صلاحيّتُك</div></div>
 @endif
 @endsection
