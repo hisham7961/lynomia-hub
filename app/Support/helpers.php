@@ -3670,6 +3670,36 @@ if (! function_exists('hub_audit')) {
     function hub_audit(string $action, ?string $module = null, ?string $recordId = null,
                        ?string $name = null, array $extra = [])
     {
+        /*
+         * **حارسُ «أثرٍ لا عمودَ له»** (مجلس الخبراء · §٥٫١٣ · إعادةُ الفحص).
+         *
+         * `AuditEntry::creating` يحمل درعَ «النشر قبل الترحيل»: يحذف كلَّ مفتاحٍ
+         * لا عمودَ له كي لا يُسقط قيدُ التدقيقِ العمليةَ الحقيقيّة. والدرعُ صحيحٌ
+         * في غرضِه — **وهو في الوقتِ نفسِه مَخبأُ إصلاحٍ لا يُنفَّذ**: كتب N-7
+         * وسمَه في `after_hours`/`at` المسطَّحَين، فمرّت ثلاثُ دفعاتٍ خضراءُ على
+         * المحرّكَين ولم يبلغ الأثرُ الجدولَ قطّ.
+         *
+         * والمسحُ اللفظيُّ لا يكشف الصنفَ (جرّبتُه: **تسعةَ عشرَ موضعاً كاذباً** —
+         * لا يُميَّز الوسيطُ الخامسُ عن مصفوفةٍ في سطرٍ سابقٍ بتعبيرٍ نمطيّ).
+         * فالحارسُ **زمنُ تشغيل**: يُلقي خارجَ الإنتاج فتسقط الحزمةُ فوراً على
+         * الكاتب، ويُسجّل في الإنتاج فلا تُكسَر عمليّةٌ حقيقيّةٌ لأجلِ قيدِ تدقيق —
+         * وهو غرضُ الدرعِ الأصليُّ محفوظاً. **لا يُنقَض الدرعُ بل يُكشَف.**
+         */
+        if ($extra) {
+            $unknown = array_diff(array_keys($extra), \App\Models\AuditEntry::liveColumnNames());
+            if ($unknown) {
+                $msg = 'أثرُ تدقيقٍ بمفاتيحَ لا أعمدةَ لها فتُجرَّد صامتةً: '
+                     . implode('، ', $unknown) . ' — ضعها في `after` (عمودُ JSON مُعمَّد)'
+                     . ' أو أضِف لها عموداً بهجرة. الفعل: ' . $action;
+                if (app()->environment('production')) {
+                    \App\Support\ErrorLog::capture('php', 'hub_audit: ' . $msg, __FILE__, __LINE__);
+                    foreach ($unknown as $k) unset($extra[$k]);   // الدرعُ يعمل كما كان
+                } else {
+                    throw new \RuntimeException($msg);
+                }
+            }
+        }
+
         $companyId = (string) session('hub.company', '') ?: null;
         // بلا جلسة (API/console): المعزولُ على شركةٍ واحدة يُنسب قيدُه إليها فيراه مدقّقُها (v2.399)
         if ($companyId === null && auth()->check() && ($cids = hub_company_ids(auth()->user())) !== null && count($cids) === 1) {

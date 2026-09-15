@@ -78,11 +78,20 @@ class AssetProjectService
                 throw $e;
             }
 
+            /*
+             * **الأثرُ في عمودٍ موجود** (مجلس الخبراء · §٥٫١٤). `project_id` عمودٌ
+             * حقيقيّ، أمّا `assignment_id` و`purpose` فلا عمودَ لهما — فكان
+             * خطّافُ `AuditEntry::creating` يحذفهما قبل الإدراج **صامتاً**، ولم
+             * يُسجَّل قطُّ أيُّ تخصيصٍ ولا غرضُه منذ كُتب هذا السطر. كشفه حارسُ
+             * `hub_audit` حين صار الصنفُ مسموعاً.
+             */
             hub_audit('asset.project.assign', 'assets', (string) $asset->getKey(),
                 $project->name ?? 'مشروع', [
                     'project_id' => (string) $project->getKey(),
-                    'assignment_id' => (string) $a->getKey(),
-                    'purpose' => $purpose,
+                    'after' => [
+                        'assignment_id' => (string) $a->getKey(),
+                        'purpose' => $purpose,
+                    ],
                 ]);
 
             return $a;
@@ -104,10 +113,11 @@ class AssetProjectService
             'active_flag' => null,               // يخرج من فرادةِ النشط
         ])->save();
 
+        // نظيرُ ما فوقَه: `assignment_id` بلا عمودٍ فيُوضع في `after` (§٥٫١٤)
         hub_audit('asset.project.end', 'assets', (string) $a->asset_id, null, [
             'project_id' => (string) $a->project_id,
-            'assignment_id' => (string) $a->getKey(),
             'reason' => ($r = trim((string) $reason)) !== '' ? mb_substr($r, 0, 500) : null,
+            'after' => ['assignment_id' => (string) $a->getKey()],
         ]);
 
         return $a;

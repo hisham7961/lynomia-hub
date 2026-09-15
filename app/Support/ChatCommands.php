@@ -120,7 +120,9 @@ class ChatCommands
         ]);
 
         FlowRunner::fire('created', 'issues', $issue);
-        hub_audit('command.issue', 'issues', (string) $issue->id, $issue->title, ['via' => self::ctxLabel($context)]);
+        // `via` بلا عمودٍ — فكان سياقُ الأمرِ يُجرَّد صامتاً ولا يُعرف من أين صدر (§٥٫١٤)
+        hub_audit('command.issue', 'issues', (string) $issue->id, $issue->title,
+            ['after' => ['via' => self::ctxLabel($context)]]);
 
         // لا عمودَ issue_id على comments — فالربطُ نصٌّ يحمل مسارَ المشكلةِ ومعرّفَها
         $link = url('/m/issues/' . $issue->id);
@@ -144,7 +146,8 @@ class ChatCommands
         ]);
 
         FlowRunner::fire('created', 'tasks', $task);
-        hub_audit('command.' . $kind, 'tasks', (string) $task->id, $task->title, ['via' => self::ctxLabel($context)]);
+        hub_audit('command.' . $kind, 'tasks', (string) $task->id, $task->title,
+            ['after' => ['via' => self::ctxLabel($context)]]);
 
         // إشعارُ المسند إليه — نفسُ سكّة toTask/hub_notify، وبنفسِ نوعِ الإشعار 'assign'
         if ($assignee && $assignee !== (string) $user->getKey()) {

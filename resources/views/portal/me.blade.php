@@ -130,10 +130,10 @@
      رادارُ «ينتهي قريباً» يُنذر صاحبَ الشأنِ بإقامتِه ويسوقه إلى هذه الصفحة —
      فكانت وجهةً بلا شيءٍ خلفَها. القسمُ خدمةٌ ذاتيّةٌ كـ«عهدتي»: الارتباطُ
      بالملفِّ هو التفويض، والقاعدةُ قاعدةُ الرادارِ نفسُها فلا ينذر بما تردّه. --}}
-@if (($myDocs ?? collect())->count())
+@if (count($myDocs ?? []))
 <div class="card pad0" id="mydocs">
     <h3 style="padding:12px 14px 0">📄 وثائقي
-        <span class="bdg g">{{ $myDocs->count() }}</span>
+        <span class="bdg g">{{ count($myDocs) }}</span>
         <span class="sub" style="font-weight:400">— ما على ملفّك، ومتى ينتهي</span>
     </h3>
     <div class="tblwrap"><table class="tbl">

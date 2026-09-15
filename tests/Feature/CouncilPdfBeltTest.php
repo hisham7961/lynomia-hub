@@ -201,14 +201,22 @@ class CouncilPdfBeltTest extends TestCase
         $this->assertSame(['after_hours' => true, 'at' => '03:41'], (array) $row->after,
             'أثرُ التدقيقِ لم يصل القاعدةَ — وهو الصنفُ الذي تخفيه حزمةٌ خضراء');
 
-        // والمسطَّحُ يُجرَّد: إثباتُ الصنفِ نفسِه كي لا يُعاد ارتكابُه
-        hub_audit('فحصُ أثرٍ مسطَّح', 'quotes', 'probe-flat', 'حارسُ الصنف',
-            ['after_hours' => true, 'at' => '03:41']);
-        $flat = \Illuminate\Support\Facades\DB::table('audits')
-            ->where('record_id', 'probe-flat')->orderByDesc('id')->first();
-        $this->assertNotNull($flat);
-        $this->assertObjectNotHasProperty('after_hours', $flat,
-            'إن صار للمفتاحِ المسطَّحِ عمودٌ يوماً فليُراجَع هذا الحارسُ صراحةً — '
-            . 'لا أن يبقى يحرس بابَاً انتقل');
+        /*
+         * **والمسطَّحُ لم يعد يُجرَّد صامتاً بل يُرفَض** (v2.526.0): كان هذا الحارسُ
+         * يُثبت أنّ المفتاحَ بلا عمودٍ **يُحذف**، وهو أضعفُ ما يُثبَت — يوثّق
+         * العيبَ ولا يمنعه. فصارت `hub_audit` نفسُها ترفضه خارجَ الإنتاج، وصار
+         * هذا السطرُ يُثبت **المنعَ** لا الحذف. (والعقدُ كاملاً في
+         * `CouncilAuditExtraGuardTest`.)
+         */
+        try {
+            hub_audit('فحصُ أثرٍ مسطَّح', 'quotes', 'probe-flat', 'حارسُ الصنف',
+                ['after_hours' => true, 'at' => '03:41']);
+            $this->fail('مفتاحٌ بلا عمودٍ مرّ صامتاً — الصنفُ عاد');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('after_hours', $e->getMessage());
+        }
+        $this->assertSame(0, \Illuminate\Support\Facades\DB::table('audits')
+            ->where('record_id', 'probe-flat')->count(),
+            'رُفض الأثرُ فلا يُكتب قيدٌ ناقصٌ يُوهم أنّه كامل');
     }
 }

@@ -693,6 +693,23 @@
             ],
             "count": 1
         },
+        "me": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/me/documents",
+                    "name": "mobile.me.documents.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/me/documents/{id}/file",
+                    "name": "mobile.me.documents.file",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 2
+        },
         "meta": {
             "endpoints": [
                 {

@@ -35,82 +35,20 @@ class PortalController extends Controller
     /* ────────── وثائقي (مجلس الخبراء · N-5) ────────── */
 
     /**
-     * **سجلّاتُ الموظّفِ المرتبطةُ بحسابِه** — مصدرُ الصفةِ الوحيد في هذا الباب.
-     *
-     * صفوفُه كلُّها لا أوّلُها (النموذجُ يُتيح ربطاً مزدوجاً)، مرتّبةً بـ`id` فلا
-     * يبقى للترتيبِ أثرٌ — نفسُ ما فعله `hub_expiry_self_scan` بعد أن كشفت
-     * القرعةُ أنّها تُخفي أعجلَ إقامةٍ عن صاحبِها (F4).
-     *
-     * @return array<int,string>
+     * **القاعدةُ في `EmployeeDocuments` لا هنا.** كانت مكتوبةً في هذا المتحكّمِ
+     * وحدَه، فبقي الجوالُ يُنذر بوثيقةٍ ولا يجد بابَها — **نصفُ إغلاقٍ ينتج نصفَ
+     * عيب**. فاستُخرجت إلى سلطةٍ واحدةٍ يقرؤها السطحان، ولا يفترقان غداً.
      */
-    protected function myEmployeeIds(): array
+    protected function myDocs(): array
     {
-        $uid = auth()->id();
-        if (! $uid) return [];
-
-        return Employee::where('user_id', $uid)->whereNull('deleted_at')
-            ->orderBy('id')->pluck('id')->map(fn ($x) => (string) $x)->all();
+        return \App\Support\EmployeeDocuments::forUser(auth()->user());
     }
 
-    /**
-     * **وثائقي** — ما على ملفّي من مستندات، بنوعِها وتاريخِ انتهائها وحالتِها.
-     *
-     * **الصفةُ هي التفويض** (على غرارِ «عهدتي»): لا `hr:v` — فملفّاتُ الزملاءِ
-     * ليست له ولا ينبغي أن تكون. والقاعدةُ التي تحكم ما يُعرَض هي
-     * `DocumentPolicy::subjectMayAny` نفسُها التي يقرؤها الرادار: **تعريفٌ واحد**،
-     * فلا يُنذره الرادارُ بوثيقةٍ تردّها البوّابةُ ولا العكس.
-     */
-    protected function myDocs()
-    {
-        $ids = $this->myEmployeeIds();
-        if (! $ids || ! Schema::hasTable('attachments')) return collect();
-
-        $u = auth()->user();
-        $rows = Attachment::whereNull('deleted_at')
-            ->where('module', 'hr')->whereIn('record_id', $ids)
-            // المؤرَّخُ أوّلاً ثمّ الأحدثُ رفعاً — و`id` حاسمٌ أخيراً فلا قرعةَ بين المحرّكين
-            ->orderByRaw('expires_at IS NULL, expires_at')
-            ->orderByDesc('created_at')->orderBy('id')
-            ->limit(60)->get();
-
-        if ($rows->isEmpty()) return collect();
-        DocumentPolicy::primeMemo($rows->pluck('id'));
-
-        $window = hub_radar_window();
-
-        return $rows->filter(fn (Attachment $a) => DocumentPolicy::subjectMayAny($u, $a))
-            ->map(function (Attachment $a) use ($window) {
-                $days = $a->expires_at
-                    ? (int) now()->startOfDay()->diffInDays($a->expires_at->copy()->startOfDay(), false)
-                    : null;
-
-                return [
-                    'id' => (string) $a->id,
-                    'kind' => (string) $a->kind,
-                    'label' => hub_doc_label('hr', $a->kind) ?? 'وثيقة',
-                    'name' => (string) $a->original_name,
-                    'doc_no' => $a->doc_no ?: null,
-                    'date' => $a->expires_at?->toDateString(),
-                    'days' => $days,
-                    'infected' => $a->av_status === 'infected',
-                    // نافذةُ الرادارِ نفسُها تحكم اللون — لا عتبةٌ ثالثةٌ في الواجهة (N-6)
-                    'tone' => $days === null ? ''
-                        : ($days < 0 ? 'bad' : ($days <= min(14, $window) ? 'wn' : '')),
-                ];
-            })->values();
-    }
-
-    /**
-     * **الوثيقةُ التي أثبتُّ أنّها لي** — أو ٤٠٤.
-     *
-     * ٤٠٤ لا ٤٠٣ عمداً: وثيقةُ زميلٍ لا يُثبَت وجودُها لمن لا تخصّه (نظيرُ
-     * `portal.employee` مع حسابِ العميل). والمنعُ الصريحُ عليها — وهو قرارُ
-     * المنشأةِ على وثيقتي أنا — يُردّ ٤٠٣ صريحاً لأنّ وجودَها مُثبَتٌ لي أصلاً.
-     */
+    /** الوثيقةُ التي أثبتُّ أنّها لي — أو ٤٠٤ (لا نُثبت وجودَ ما لا يخصّه) */
     protected function myDoc(string $id): Attachment
     {
-        $a = Attachment::whereNull('deleted_at')->where('module', 'hr')->find($id);
-        abort_unless($a && in_array((string) $a->record_id, $this->myEmployeeIds(), true), 404);
+        $a = \App\Support\EmployeeDocuments::find(auth()->user(), $id);
+        abort_unless($a, 404);
 
         return $a;
     }
