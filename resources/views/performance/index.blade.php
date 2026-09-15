@@ -57,7 +57,8 @@
 
 {{-- أداء الموظفين --}}
 <div class="card pad0">
-    <div style="padding:16px 16px 0"><h3>👥 أداء الموظفين — آخر ٣٠ يوماً</h3></div>
+    {{-- اللافتةُ تقول المدى المقروءَ لا نصّاً محفوظاً (W-2) --}}
+    <div style="padding:16px 16px 0"><h3>👥 أداء الموظفين — {{ $range->label() }}</h3></div>
     <div class="tblwrap"><table class="tbl">
         <thead><tr><th>الموظف</th><th>مهام أُنجزت</th><th>الالتزام بالمواعيد</th><th>متأخرة الآن</th><th>تذاكر حُلّت</th><th>متوسط الحل</th><th>تقييم المدير</th></tr></thead>
         <tbody>

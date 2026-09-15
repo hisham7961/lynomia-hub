@@ -38,10 +38,15 @@ class PerformanceController extends Controller
         // يقرأ إيراد المنشأة كلها ورواتبها
         hub_org_analytics_guard();
 
+        // مدىً واحدٌ يُقرأ مرّةً: تحسب به الأرقامُ وتُعنون به اللافتةُ — فلا
+        // يفترقان (W-2 · الطور ١٦٧)
+        $range = $range ?? hub_range(null, '30d');
+
         return view('performance.index', [
             'company' => $this->companyKpis(),
             'okrs'    => $this->okrs(),
-            'people'  => $this->peopleKpis(),
+            'people'  => $this->peopleKpis($range),
+            'range'   => $range,
             'currency' => setting('app.currency', 'د.ك'),
         ]);
     }
@@ -112,10 +117,21 @@ class PerformanceController extends Controller
      * وظيفيّ تحكمه صلاحيةُ الحقل كأيّ حقلٍ آخر، فكان دورٌ محجوبٌ عنه في شاشة
      * الموظف يقرؤه هنا كاملاً.
      */
-    protected function peopleKpis()
+    protected function peopleKpis(?\App\Support\TimeRange $range = null)
     {
-        // نافذةٌ ثابتةٌ كما تقول ترويسةُ اللوحة «آخر ٣٠ يوماً» — لا معاملَ رابطٍ جديد
-        $range = hub_range(new \Illuminate\Http\Request(), '30d');
+        /*
+         * **الطلبُ الحيُّ لا طلبٌ فارغ** (W-1 · الطور ١٦٧): كان هنا
+         * `new \Illuminate\Http\Request()` — كائنٌ فارغٌ لا يحمل شيئاً، فلا
+         * تبلغ `?range=` هذه الشاشةَ أبداً وتبقى النافذةُ ثلاثين يوماً مهما طُلب.
+         *
+         * والقطعُ كان في الوصلةِ وحدَها: `ExecutionStats` يقبل أيَّ مدى،
+         * و`completed_at` مملوءٌ ومُفهرَس، و`hub_range(null)` تقرأ الطلبَ الجاري
+         * (‏`TimeRange::fromRequest` تفعل `$r ?? request()`). فسؤالُ «ماذا أُنجز
+         * هذا الأسبوع؟» كان **بلا جوابٍ لسطرٍ واحد**، لا لغيابِ بيانٍ ولا محرّك.
+         *
+         * والافتراضُ يبقى ثلاثين يوماً — إضافةُ مقبضٍ لا تغييرُ عادة.
+         */
+        $range = hub_range(null, '30d');
 
         // فاصلُ id بعد الاسم: أسماءٌ متساويةٌ ترتيبُها قرعةٌ تختلف بين المحرّكين
         $users = DB::table('users')->whereNull('deleted_at')->where('status', '!=', 'موقوف')
