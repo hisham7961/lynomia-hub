@@ -18,42 +18,59 @@ class MorningController extends Controller
         $u = auth()->user();
         $cards = [];
 
-        $add = function (string $ico, string $title, string $why, $rows, ?string $link = null) use (&$cards) {
+        /**
+         * **الشارةُ تعدّ المشكلةَ لا مساحةَ العرض** (W-1 · الطور ١٦٧).
+         *
+         * كلُّ بطاقةٍ تقصّ صفوفَها إلى سقفٍ للعرض، وكانت الشارةُ تعدّ **المقصوصَ**
+         * فتُقرأ ستَّ عشرةَ مهمّةً متأخّرةً «٨». والخطأُ في اتّجاهِ التهوينِ دائماً:
+         * كلّما ازدادت المتأخّراتُ ثبتت الشارةُ على سقفِها، فيعمى المؤشّرُ كلّما
+         * ازدادت الحاجةُ إليه.
+         *
+         * فصار `$n` **العددَ الحقيقيَّ** يُمرَّر صراحةً، ويبقى المسرودُ مقصوصاً
+         * كما هو و«عرض الكل ←» في مكانه — صدقٌ في العدّاد لا إغراقٌ للصفحة.
+         * ومن لم يُمرّر عدّاداً يبقى على العدِّ القديم (لا كسرَ لبطاقةٍ قائمة).
+         */
+        $add = function (string $ico, string $title, string $why, $rows, ?string $link = null, ?int $n = null) use (&$cards) {
             $rows = collect($rows);
             if ($rows->isEmpty()) return;
-            $cards[] = ['ico' => $ico, 'title' => $title, 'why' => $why, 'rows' => $rows, 'link' => $link];
+            $cards[] = ['ico' => $ico, 'title' => $title, 'why' => $why, 'rows' => $rows,
+                        'link' => $link, 'n' => max($n ?? $rows->count(), $rows->count())];
         };
 
         // ── قرارات تنتظرك ──
         if (hub_can($u, 'approvals', 'v')) {
-            $ap = hub_scope(DB::table('approvals')->whereNull('deleted_at'), 'approvals')->where('status', 'معلّق')
-                ->orderBy('due')->limit(8)->get(['id', 'title', 'due']);
+            $apQ = hub_scope(DB::table('approvals')->whereNull('deleted_at'), 'approvals')->where('status', 'معلّق');
+            $apN = (clone $apQ)->count();
+            $ap = $apQ->orderBy('due')->limit(8)->get(['id', 'title', 'due']);
             $add('✋', 'قرارات تنتظر حسمك', 'عمليات موقوفة لن تُنفَّذ قبل اعتمادك',
                 $ap->map(fn ($r) => ['t' => $r->title, 's' => $r->due ? 'الموعد ' . substr((string) $r->due, 0, 10) : '',
                                      'u' => route('m.show', ['approvals', $r->id]), 'tone' => 'wn']),
-                route('m.index', 'approvals'));
+                route('m.index', 'approvals'), $apN);
         }
 
         // ── طلبات داخلية بانتظار تقييم ──
         if (Schema::hasTable('internal_requests') && hub_can($u, 'requests', 'v')) {
-            $rq = hub_scope(DB::table('internal_requests')->whereNull('deleted_at'), 'requests')
+            $rqQ = hub_scope(DB::table('internal_requests')->whereNull('deleted_at'), 'requests')
                 ->whereIn('status', ['جديد', 'قيد التقييم', 'بانتظار الاعتماد'])
-                ->orderByDesc('created_at')->limit(6)->get(['id', 'title', 'prio_req', 'status']);
+                ;
+            $rqN = (clone $rqQ)->count();
+            $rq = $rqQ->orderByDesc('created_at')->limit(6)->get(['id', 'title', 'prio_req', 'status']);
             $add('📨', 'طلبات داخلية بلا قرار', 'طلبات فريقك واقفة عند التقييم',
                 $rq->map(fn ($r) => ['t' => $r->title, 's' => trim(($r->prio_req ?: '') . ' · ' . $r->status, ' ·'),
                                      'u' => route('m.show', ['requests', $r->id]), 'tone' => 'wn']),
-                route('m.index', 'requests'));
+                route('m.index', 'requests'), $rqN);
         }
 
         // ── حوادث تقنية مفتوحة ──
         if (Schema::hasTable('incidents') && hub_can($u, 'incidents', 'v')) {
-            $inc = hub_scope(DB::table('incidents')->whereNull('deleted_at'), 'incidents')
-                ->whereNotIn('status', ['مغلق بتقرير', 'مُستعاد'])
-                ->orderByDesc('started_at')->limit(6)->get(['id', 'title', 'severity', 'status']);
+            $incQ = hub_scope(DB::table('incidents')->whereNull('deleted_at'), 'incidents')
+                ->whereNotIn('status', ['مغلق بتقرير', 'مُستعاد']);
+            $incN = (clone $incQ)->count();
+            $inc = $incQ->orderByDesc('started_at')->limit(6)->get(['id', 'title', 'severity', 'status']);
             $add('🚨', 'حوادث تقنية مفتوحة', 'خدمات متأثرة الآن',
                 $inc->map(fn ($r) => ['t' => $r->title, 's' => trim(($r->severity ?: '') . ' · ' . $r->status, ' ·'),
                                       'u' => route('m.show', ['incidents', $r->id]), 'tone' => 'bad']),
-                route('m.index', 'incidents'));
+                route('m.index', 'incidents'), $incN);
         }
 
         // ── تذاكر تجاوزت الـ SLA ──
@@ -71,39 +88,45 @@ class MorningController extends Controller
                                  'u' => route('m.show', ['tickets', $t->id]), 'tone' => 'bad']);
                 }
             }
-            $add('⏰', 'تذاكر تجاوزت الاتفاقية', 'وعدٌ للعميل تأخر عن موعده', $late->take(8), route('support'));
+            // حدٌّ باقٍ يُقال: لا يُفحَص إلّا أوّلُ ٨٠ تذكرةٍ مفتوحة (‏`hub_sla` استعلامٌ
+            // لكلِّ تذكرة)، فالعدّادُ صادقٌ حتى هذا السقفِ لا مطلقاً.
+            $add('⏰', 'تذاكر تجاوزت الاتفاقية', 'وعدٌ للعميل تأخر عن موعده',
+                $late->take(8), route('support'), $late->count());
         }
 
         // ── مهام متأخرة ──
         // كل بندٍ في هذه الصفحة يفحص صلاحية وحدته، وهذا وحده كان يكتفي بالنطاق:
         // فمن لا يرى المهام أصلاً كان يقرأ عناوينها في ملخّص صباحه
-        $tk = hub_can($u, 'tasks', 'v')
+        $tkQ = hub_can($u, 'tasks', 'v')
             ? hub_scope(DB::table('tasks')->whereNull('deleted_at'), 'tasks')
             ->whereNotNull('due')->whereDate('due', '<', today())
             ->whereNotIn('status', ['منجزة', 'مكتملة', 'ملغاة'])
-            ->orderBy('due')->limit(8)->get(['id', 'title', 'due'])
-            : collect();
+            : null;
+        $tkN = $tkQ ? (clone $tkQ)->count() : 0;
+        $tk = $tkQ ? $tkQ->orderBy('due')->limit(8)->get(['id', 'title', 'due']) : collect();
         $add('🔥', 'مهام تجاوزت موعدها', 'التزامات مضى وقتها ولم تُغلق',
             $tk->map(fn ($r) => ['t' => $r->title, 's' => 'كان ' . substr((string) $r->due, 0, 10),
                                  'u' => route('m.show', ['tasks', $r->id]), 'tone' => 'bad']),
-            route('m.index', 'tasks'));
+            route('m.index', 'tasks'), $tkN);
 
         // ── مستحقات مالية ──
         if (hub_can($u, 'fin', 'v')) {
-            $due = hub_scope(DB::table('fin_documents')->whereNull('deleted_at'), 'fin')
+            $dueQ = hub_scope(DB::table('fin_documents')->whereNull('deleted_at'), 'fin')
                 ->whereNotNull('due')->whereDate('due', '<=', today()->addDays(7))
-                ->whereRaw('COALESCE(paid,0) < COALESCE(total,0)')
-                ->orderBy('due')->limit(8)->get(['id', 'doc_no', 'partner', 'total', 'paid', 'due']);
+                ->whereRaw('COALESCE(paid,0) < COALESCE(total,0)');
+            $dueN = (clone $dueQ)->count();
+            $due = $dueQ->orderBy('due')->limit(8)->get(['id', 'doc_no', 'partner', 'total', 'paid', 'due']);
             $add('💸', 'مستحقات خلال أسبوع', 'فواتير لم تُسدَّد بالكامل وموعدها قريب',
                 $due->map(fn ($r) => ['t' => trim(($r->doc_no ?: '') . ' — ' . ($r->partner ?: ''), ' —'),
                                       's' => 'متبقٍ ' . number_format((float) $r->total - (float) $r->paid, 2) . ' · ' . substr((string) $r->due, 0, 10),
                                       'u' => route('m.show', ['fin', $r->id]),
                                       'tone' => $r->due < today()->toDateString() ? 'bad' : 'wn']),
-                route('m.index', 'fin'));
+                route('m.index', 'fin'), $dueN);
         }
 
         // ── ينتهي قريباً ──
-        $exp = collect(hub_expiry())->take(8)
+        $expAll = collect(hub_expiry());
+        $exp = $expAll->take(8)
             ->map(fn ($e) => [
                 't' => $e['name'] ?? '—',
                 's' => trim(($e['mlabel'] ?? '') . ' · ' . ($e['flabel'] ?? '') . ' ' . ($e['date'] ?? '')
@@ -111,17 +134,19 @@ class MorningController extends Controller
                                                               : ' (بعد ' . $e['days'] . ' يوماً)') : ''), ' ·'),
                 'u' => isset($e['module'], $e['id']) ? hub_expiry_url($e) : null,
                 'tone' => (($e['days'] ?? 99) < 0) ? 'bad' : 'wn']);
-        $add('⏳', 'ينتهي قريباً', 'رخص ودومينات وشهادات على وشك الانتهاء', $exp, route('alerts'));
+        $add('⏳', 'ينتهي قريباً', 'رخص ودومينات وشهادات على وشك الانتهاء', $exp,
+            route('alerts'), $expAll->count());
 
         // ── غياب اليوم ──
         if (hub_can($u, 'leaves', 'v')) {
-            $lv = hub_scope(DB::table('leave_requests')->whereNull('deleted_at'), 'leaves')->where('status', 'معتمد')
-                ->whereDate('date_from', '<=', today())->whereDate('date_to', '>=', today())
-                ->limit(8)->get(['id', 'emp_id', 'type']);
+            $lvQ = hub_scope(DB::table('leave_requests')->whereNull('deleted_at'), 'leaves')->where('status', 'معتمد')
+                ->whereDate('date_from', '<=', today())->whereDate('date_to', '>=', today());
+            $lvN = (clone $lvQ)->count();
+            $lv = $lvQ->limit(8)->get(['id', 'emp_id', 'type']);
             $names = hub_ref_labels('hr', $lv->pluck('emp_id')->all());
             $add('🏝️', 'غائبون اليوم', 'من لن تجده على رأس العمل',
                 $lv->map(fn ($r) => ['t' => $names[$r->emp_id] ?? '—', 's' => $r->type ?: 'إجازة', 'u' => null, 'tone' => '']),
-                route('m.index', 'leaves'));
+                route('m.index', 'leaves'), $lvN);
         }
 
         // ── تشغيلي وأمني (للمالك) ──
