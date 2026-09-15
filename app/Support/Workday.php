@@ -50,6 +50,44 @@ class Workday
     }
 
     /** صفُّ اليوم للموظف — أو null */
+    /**
+     * **سقفُ الورديّةِ الواحدة.** حدُّ تبنّي صفِّ الأمسِ **مدّةٌ لا ترتيبُ عقربَين**:
+     * الحدُّ الأوّلُ الذي كتبتُه («لحظةُ الضغطِ قبل وقتِ الدخول») كان يفتح نافذةً من
+     * ٠٠:٠٠ حتى وقتِ دخولِ الأمس — ثمانيَ ساعاتٍ كلَّ صباحٍ عند دوامٍ يبدأ ٠٨:٠٠ —
+     * تُغلق فيها ضغطةٌ واحدةٌ يومَ الناسي بـ٢٣٫٧٨ ساعة، مرفوعةَ رايةِ العبورِ فيسقط
+     * عنها وسمُ «مدّةٌ غير صالحة»، مملوءةَ الانصرافِ فيسقط «انصرافٌ مفقود» — **رقمٌ
+     * ملفَّقٌ يدخل كشفَ الرواتبِ بلا شذوذٍ ولا وسم**. فالسؤالُ الصحيحُ: أهذه مدّةُ
+     * ورديّةٍ أصلاً؟
+     */
+    public const MAX_SHIFT_HOURS = 16;
+
+    /**
+     * **الصفُّ المفتوحُ الآن — جوابٌ واحدٌ يسأله الحارسُ والشاشةُ معاً.**
+     *
+     * صفُّ اليومِ هو المرجعُ متى وُجد (مفتوحاً كان أو مغلقاً). فإن لم يكن، فصفُّ
+     * الأمسِ **إن كان ما يزال مفتوحاً ومدّتُه مدّةُ ورديّة** — وإلّا فلا شيء.
+     * (كانت `checkOut` تعرف صفَّ الأمسِ و`mine()` لا تعرفه، فيفتح موظّفُ الليلِ
+     * الصفحةَ ٠٣:٤٨ فلا يجد زرَّ «انصراف» أصلاً، ويُنشئ ضغطُه على «تسجيل الحضور»
+     * صفّاً ثانياً تُهجَر معه ورديّتُه — التحقّقُ المستقلّ التاسع · ع‑٢.)
+     */
+    public static function openRow(string $empId, $now = null): ?Attendance
+    {
+        $now = $now instanceof \Illuminate\Support\Carbon ? $now : now();
+
+        $row = self::today($empId, $now->toDateString());
+        if ($row && $row->time_in) return $row;
+
+        $prev = self::today($empId, $now->copy()->subDay()->toDateString());
+        if (! $prev || ! $prev->time_in || $prev->time_out) return $row;
+
+        $start = $prev->in_at
+            ?: \Illuminate\Support\Carbon::parse(
+                ($prev->date?->toDateString() ?? $prev->date) . ' ' . $prev->time_in);
+        $mins = $start->diffInMinutes($now, false);
+
+        return ($mins > 0 && $mins <= self::MAX_SHIFT_HOURS * 60) ? $prev : $row;
+    }
+
     public static function today(string $empId, ?string $date = null): ?Attendance
     {
         return Attendance::whereNull('deleted_at')->where('emp_id', $empId)
@@ -139,23 +177,7 @@ class Workday
          * يومُه «انصرافٌ مفقود» بساعاتٍ فارغة — **والساعاتُ تُغذّي الرواتبَ والامتثال**.
          * فيُفتَّشُ صفُّ الأمسِ **إن كان ما يزال مفتوحاً** (حضورٌ بلا انصراف) قبل الردّ.
          */
-        $row = self::today($emp->id);
-        if (! $row || ! $row->time_in) {
-            $prev = self::today($emp->id, $now->copy()->subDay()->toDateString());
-            /*
-             * **وحدُّ التبنّي: أن تكون الساعةُ قد لفّت فعلاً.** صفُّ الأمسِ يُتبنّى
-             * فقط حين تكون لحظةُ الضغطِ **قبل** وقتِ الدخول (٠٣:٤٨ < ٢٣:٠٠) — أي
-             * ورديّةٌ عبرت منتصفَ الليل حقّاً. ومن نسي انصرافَ أمسِه ثمّ ضغط اليومَ
-             * الخامسةَ مساءً لا يُتبنّى صفُّه (١٧:٠٠ > ٠٨:٠٠)، فيبقى الردُّ «سجّل
-             * حضورَك أولاً» كما كان — وإلّا لأغلقَ إصلاحُ الليلِ يومَ الناسي بساعاتٍ
-             * ملفَّقة. (حدٌّ وُضع قبل الدفع لا بعده: هذا بالضبط شكلُ العيبِ الذي
-             * صنعه الإصلاحُ خمسَ مرّاتٍ في هذه الجولات.)
-             */
-            if ($prev && $prev->time_in && ! $prev->time_out
-                && $now->format('H:i:s') < (string) $prev->time_in) {
-                $row = $prev;
-            }
-        }
+        $row = self::openRow($emp->id, $now);
 
         if (! $row || ! $row->time_in) return ['ok' => false, 'msg' => 'لا حضورَ مسجَّلاً اليوم — سجّل حضورَك أولاً'];
         if ($row->time_out) return ['ok' => false, 'msg' => 'انصرافُك مسجَّلٌ منذ ' . $row->time_out, 'row' => $row];
@@ -179,7 +201,7 @@ class Workday
         // مهلةُ التقرير تُختم عند الانصراف (§53): للعرضِ ولمرشّحِ أمرِ المصالحة (§51)
         if (Schema::hasColumn('attendance', 'report_deadline_at')) {
             $deadline = \App\Support\DailyWorkCompliance::computeDeadline(
-                (string) ($row->date?->toDateString() ?? $row->date), $row->time_out, true);
+                (string) ($row->date?->toDateString() ?? $row->date), $row->time_out, true, $crosses);
             $row->report_deadline_at = $deadline;
         }
         $row->meta = array_merge((array) $row->meta, ['checkout' => array_filter([
@@ -350,7 +372,8 @@ class Workday
         $emp = self::emp($user);
         if (! $emp) return null;
 
-        $row = self::today($emp->id);
+        // الشاشةُ تسأل ما يسأله الحارس — لا تعريفَ ثانياً في البطاقة
+        $row = self::openRow($emp->id);
         $entries = DB::table('work_updates')->whereNull('deleted_at')
             ->where('created_by', $user->id)->whereDate('work_date', now()->toDateString())
             ->get(['project_id', 'hours']);

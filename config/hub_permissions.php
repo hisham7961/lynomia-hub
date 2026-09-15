@@ -56,8 +56,8 @@ return [
     // المفتاح، وحاملُه يُستثنى **للتصدير وحده** وكلُّ استعمالٍ يُوسَم في التدقيق.
     'exportNight' => [
         'label'   => 'تصدير خارج الدوام',
-        'hint'    => 'استثناءُ حاملِه من قيدِ ساعاتِ العمل لتصدير CSV وحدَه (إقفالُ الشهرِ الليليّ) — القيدُ يبقى على البقيّة، وكلُّ استعمالٍ يُقيَّد في التدقيق موسوماً «خارج الدوام».',
-        'modules' => ['hr', 'payroll', 'fin', 'purchases', 'quotes', 'attend', 'custody', 'banks', 'clients', 'suppliers', 'contracts', 'projects'],
+        'hint'    => 'استثناءُ حاملِه من قيدِ ساعاتِ العمل لسحبِ ملفِّ وحدتِه — تصديرُ CSV (إقفالُ الشهرِ الليليّ) ومستنداتُها PDF/DOC — القيدُ يبقى على البقيّة، وكلُّ استعمالٍ يُقيَّد في التدقيق موسوماً «خارج الدوام».',
+        'modules' => ['hr', 'payroll', 'fin', 'purchases', 'quotes', 'changeorders', 'attend', 'custody', 'banks', 'clients', 'suppliers', 'contracts', 'projects'],
         'group'   => 'التصدير',
         'risky'   => true,
         'implies' => ['v'],

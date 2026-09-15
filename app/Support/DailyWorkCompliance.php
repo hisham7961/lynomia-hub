@@ -450,7 +450,11 @@ class DailyWorkCompliance
         $reportRequired = ((string) setting('work.report_required', '1') === '1') && ! $onLeave;
 
         // المهلة (§9/§50) — تُشتقّ حيّاً فتستجيب لتغيّرِ الإعداد فوراً (§117)
-        $deadline = self::computeDeadline($date, $timeOut, $checkedOut);
+        // العبورُ يُقرأ من الصفِّ الحاملِ للانصراف — تعريفٌ واحدٌ يسأله المخزونُ والمشتقّ
+        $outRow = $atts->last(fn ($a) => $a->time_out !== null);
+        $crossed = $outRow !== null && (bool) $outRow->overnight
+            && $outRow->time_in !== null && (string) $outRow->time_out < (string) $outRow->time_in;
+        $deadline = self::computeDeadline($date, $timeOut, $checkedOut, $crossed);
         $now = BusinessDate::now();
         $pastDeadline = $deadline !== null && $now->gt($deadline);
         $late = $reportSubmitted && $deadline !== null && $submittedAt !== null && $submittedAt->gt($deadline);
@@ -580,14 +584,26 @@ class DailyWorkCompliance
      * فالألطفُ للموظّف (§8: لا عقوبةَ قبلَ المهلة). ورديةٌ مفتوحةٌ بلا حدٍّ نهائيّ ⇒
      * لا مهلةَ بعد (§46). عبورُ منتصفِ الليل يبقى منسوباً ليومِ العملِ الأصليّ (§50).
      */
-    public static function computeDeadline(string $date, ?string $timeOut, bool $checkedOut): ?Carbon
+    public static function computeDeadline(string $date, ?string $timeOut, bool $checkedOut,
+                                           bool $crossedMidnight = false): ?Carbon
     {
         $grace = max(0, (int) setting('work.report_grace_minutes', 120));
+        // **الحدُّ الأقصى (cutoff) يبقى على يومِ العمل** — هو «قدّم تقريرَك قبل ساعةِ كذا
+        // من يومِك»، لا من يومِ انصرافِك. أمّا مهلةُ الانصرافِ فتُبنى على لحظتِه الحقيقيّة.
         $cutoff = BusinessDate::at($date, (string) setting('work.report_cutoff_time', ''));
 
         $candidates = [];
         if ($checkedOut && $timeOut) {
-            $out = BusinessDate::at($date, $timeOut);
+            /*
+             * **الورديّةُ العابرةُ تنصرف في اليومِ التالي** (التحقّقُ المستقلّ التاسع · ع‑٣):
+             * كانت المهلةُ تُبنى من **تاريخِ الصفّ** وساعةِ الانصراف، فتقع قبلَ الانصرافِ
+             * الحقيقيِّ باثنتين وعشرين ساعة — فيُدان موظّفُ الليلِ بتأخيرِ تقريرٍ قدّمه
+             * في وقتِه، وتحت سياسةِ `absence_equivalent` يصير ذلك طريقاً إلى «غياب».
+             */
+            $outDate = $crossedMidnight
+                ? \Illuminate\Support\Carbon::parse($date)->addDay()->toDateString()
+                : $date;
+            $out = BusinessDate::at($outDate, $timeOut);
             if ($out) $candidates[] = $out->copy()->addMinutes($grace);
         }
         if ($cutoff) $candidates[] = $cutoff;

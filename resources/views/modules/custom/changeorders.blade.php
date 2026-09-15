@@ -7,7 +7,9 @@
 <div class="card">
     <h3 class="cardtitle">📋 مسارُ أمر التغيير <span class="bdg {{ hub_tone($coStatus) }}">{{ $coStatus }}</span></h3>
     <div class="crow">
-        <a class="btn p sm" href="{{ route('changeorders.pdf', $row->id) }}" target="_blank" rel="noopener">📄 مستند التغيير PDF</a>
+        @php $xNight = hub_export_blocked_now('changeorders'); @endphp
+        <a class="btn p sm" href="{{ route('changeorders.pdf', $row->id) }}" target="_blank" rel="noopener"
+           @if ($xNight) title="{{ 'نقل الملفات ممنوع خارج وقت العمل — يعود متاحاً مع بداية الدوام' }}" @endif>📄 مستند التغيير PDF @if ($xNight)🌙@endif</a>
         @if (! empty($row->project_id))
             <a class="btn ghost sm" href="{{ route('m.show', ['projects', $row->project_id]) }}">🗂️ مشروعه ←</a>
         @endif
