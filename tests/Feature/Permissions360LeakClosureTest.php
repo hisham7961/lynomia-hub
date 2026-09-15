@@ -70,7 +70,9 @@ class Permissions360LeakClosureTest extends TestCase
         // ومن يملكُ attend:v يرى الوقت
         $withAttend = $this->userWith('att@test.local', ['updates' => ['v' => 1], 'attend' => ['v' => 1]]);
         $rows2 = $e360->dailyReports($emp, $withAttend);
-        $this->assertSame('08:00', $rows2[0]['time_in'], 'حاملُ attend:v يرى الوقت');
+        // الصيغةُ **المُصفَّرة** (v2.519): الطابورُ يُكتب `HH:MM:SS` أيّاً كان المُدخَل،
+        // فلا يبقى `'9:00'` أكبرَ نصّاً من `'17:00'` في المقارناتِ التي تقرأ العمود
+        $this->assertSame('08:00:00', $rows2[0]['time_in'], 'حاملُ attend:v يرى الوقت');
     }
 
     /* ═══════════ 11.1 — API لا يُعيدُ عمودَ meta الخام ═══════════ */

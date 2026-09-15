@@ -211,8 +211,15 @@ class DailyWorkCompliance
         if ($date !== BusinessDate::today() || ! $cells) return $cells;
 
         foreach (Workday::openCrossingByEmp(array_keys($cells)) as $empId => $row) {
+            /*
+             * **شرطُ `openRow` نفسُه لا شرطٌ أضيق** (التحقّقُ الثاني عشر · ع‑٤):
+             * كان يُشترط **غيابُ صفٍّ أصلاً** (`$c['attendance']`) بينما `openRow`
+             * يشترط **غيابَ دخول** — فصفُّ يومٍ بلا `time_in` (غيابٌ مختومٌ · إجازةٌ ·
+             * استيراد) كان يُخفي ورديّةً مفتوحةً فتقول الشاشةُ «غائب» وبطاقتُه تعرض
+             * «انصراف». شرطان لسؤالٍ واحد — وهو النمطُ الذي تُطارده هذه السلسلة.
+             */
             $c = $cells[$empId] ?? null;
-            if (! $c || $c['checked_in'] || $c['attendance']) continue;
+            if (! $c || $c['checked_in']) continue;
 
             $cells[$empId]['open_shift'] = [
                 'date' => (string) ($row->date?->toDateString() ?? $row->date),
@@ -398,7 +405,7 @@ class DailyWorkCompliance
 
             if ($c['on_leave']) { $buckets['leave'][] = $entry; continue; }
 
-            if (! $c['checked_in'] && ! $c['attendance'] && isset($crossing[(string) $emp->id])) {
+            if (! $c['checked_in'] && isset($crossing[(string) $emp->id])) {
                 $buckets['present'][] = $entry;
                 continue;
             }
@@ -521,9 +528,25 @@ class DailyWorkCompliance
         $policy = self::policy();
 
         // ── القفلُ اليدويّ/الفعّالُ المُثبَّت (§41/§90): لا يُعاد كتابتُه صامتاً ──
-        $finalizedAt = $primary?->compliance_finalized_at;
-        $finalizedBy = $primary?->compliance_finalized_by;
-        $lockedOutcome = $primary ? ($primary->compliance_outcome ?: null) : null;
+        /*
+         * **الختمُ يُقرأ من الصفِّ الذي يحملُه** (التحقّقُ الثاني عشر · ع‑٢).
+         *
+         * كان يُقرأ من `$primary` — و`$primary` صار **متغيّراً بالزمن** بعد قاعدةِ
+         * «المفتوحُ قبل المُغلَق»: لحظةَ تُكمل المواردُ انصرافَ الصفِّ المختوم (من
+         * الرابطِ الذي تعرضه الشاشةُ نفسُها: «انصراف مفقود ✎») تنقلب هويّةُ الأحقّ،
+         * فيتبخّر ختمٌ إنسانيٌّ مُدقَّقٌ **بلا سجلٍّ ولا إشعار** — و«معذور» تصير
+         * «غياباً لعدم التقرير» في الكشفِ الذي يغذّي الرواتب. وهو نقضٌ صريحٌ لِما
+         * ينصّ عليه §41/§90: «قرارُ HR/مدير **لا يُعاد كتابتُه صامتاً**».
+         *
+         * فالختمُ مِلكُ صفِّه لا مِلكُ الترتيب: يُلتمَس في **كلِّ** صفوفِ اليوم،
+         * وأحدثُ ختمٍ يغلب (ترتيبٌ دلاليٌّ بلحظةِ الختمِ لا بمعرّفٍ عشوائيّ).
+         */
+        $sealed = $atts->filter(fn ($a) => $a->compliance_finalized_at !== null && ($a->compliance_outcome ?: null) !== null)
+            ->sortBy(fn ($a) => (string) $a->compliance_finalized_at)->last() ?: $primary;
+
+        $finalizedAt = $sealed?->compliance_finalized_at;
+        $finalizedBy = $sealed?->compliance_finalized_by;
+        $lockedOutcome = $sealed ? ($sealed->compliance_outcome ?: null) : null;
         $finalized = $finalizedAt !== null && $lockedOutcome !== null;
 
         // ── آلةُ الحالات ──

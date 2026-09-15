@@ -113,15 +113,23 @@ class Workday
         $now = $now instanceof \Illuminate\Support\Carbon ? $now : now();
         $prev = $now->copy()->subDay()->toDateString();
 
-        $out = [];
-        foreach (Attendance::whereNull('deleted_at')->whereIn('emp_id', $ids)
+        $rows = Attendance::whereNull('deleted_at')->whereIn('emp_id', $ids)
             ->whereDate('date', $prev)->whereNotNull('time_in')->whereNull('time_out')
-            ->orderBy('emp_id')->orderBy('time_in')->get() as $row) {
-            $start = $row->in_at
-                ?: \Illuminate\Support\Carbon::parse(
-                    ($row->date?->toDateString() ?? $row->date) . ' ' . $row->time_in);
-            $mins = $start->diffInMinutes($now, false);
-            if ($mins > 0 && $mins <= self::MAX_SHIFT_HOURS * 60) $out[(string) $row->emp_id] = $row;
+            ->get()
+            ->filter(function ($row) use ($now) {
+                $start = $row->in_at
+                    ?: \Illuminate\Support\Carbon::parse(
+                        ($row->date?->toDateString() ?? $row->date) . ' '
+                        . (Attendance::normTime($row->time_in) ?? '00:00:00'));
+                $mins = $start->diffInMinutes($now, false);
+
+                return $mins > 0 && $mins <= self::MAX_SHIFT_HOURS * 60;
+            });
+
+        $out = [];
+        // **بالقاعدةِ نفسِها التي يختار بها الفرديّ** — لا بترتيبِ SQL (قرعةٌ بين المحرّكين)
+        foreach ($rows->groupBy(fn ($r) => (string) $r->emp_id) as $empId => $group) {
+            if ($pick = self::pickRow($group)) $out[(string) $empId] = $pick;
         }
 
         return $out;
@@ -161,9 +169,16 @@ class Workday
         $open = $pool->filter(fn ($a) => $a->time_out === null);
         $pool = $open->isNotEmpty() ? $open : $pool;
 
+        /*
+         * **مفتاحُ الترتيبِ لحظةٌ لا نصّ** (التحقّقُ الثاني عشر): `in_at` أوّلاً لأنّه
+         * لحظةٌ حقيقيّة، و`time_in` **مُصفَّراً** احتياطاً لصفوفٍ قديمةٍ كُتبت قبل
+         * التصفير — فـ`'9:00'` كانت تغلب `'23:00:00'` معجميّاً فتفوز ورديّةُ الصباحِ
+         * المنسيّةُ على ورديّةِ الليلِ المفتوحة.
+         */
         return $pool->sortBy(fn ($a) => sprintf('%s|%s|%s',
-            (string) ($a->time_in ?? ''),
-            (string) ($a->in_at?->format('Y-m-d H:i:s') ?? ''),
+            (string) ($a->in_at?->format('Y-m-d H:i:s')
+                ?: (($a->date?->toDateString() ?? $a->date) . ' ' . (Attendance::normTime($a->time_in) ?? ''))),
+            (string) (Attendance::normTime($a->time_in) ?? ''),
             (string) $a->id))->last();
     }
 
@@ -367,10 +382,25 @@ class Workday
          * الذي تُبنى عليه المحاسبةُ الشهريّة. استعلامٌ واحدٌ قبل الحلقة (لا
          * استعلامَ لكلِّ موظّف).
          */
-        $crossers = Attendance::whereNull('deleted_at')
-            ->whereDate('date', date('Y-m-d', strtotime($date . ' -1 day')))
+        $prevDay = date('Y-m-d', strtotime($date . ' -1 day'));
+
+        // (أ) من عبرت ورديّتُه وأُغلقت داخلَ اليومِ المكنوس
+        $crossers = Attendance::whereNull('deleted_at')->whereDate('date', $prevDay)
             ->where('overnight', true)->whereDate('out_at', $date)
             ->pluck('emp_id')->flip()->all();
+
+        /*
+         * (ب) **ومن ورديّتُه ما تزال مفتوحة** (التحقّقُ الثاني عشر · ع‑٧): الاستثناءُ
+         * السابقُ اشترط `overnight=true` و`out_at` — وكلاهما لا يُكتب إلّا عند
+         * الانصراف. فمن نسي انصرافَه من ورديّةٍ ليليّةٍ كان يُدان **غياباً في السجلِّ
+         * الدائم** الذي تُبنى عليه المحاسبةُ الشهريّة، وهو عينُ الفئةِ التي وُضع
+         * الاستثناءُ لأجلِها.
+         */
+        $openIds = Attendance::whereNull('deleted_at')->whereDate('date', $prevDay)
+            ->whereNotNull('time_in')->whereNull('time_out')->pluck('emp_id')->unique();
+        foreach (self::openCrossingByEmp($openIds, \Illuminate\Support\Carbon::parse($date . ' 00:00:01')) as $empId => $r) {
+            $crossers[$empId] = true;
+        }
 
         $n = 0;
         Employee::whereNull('deleted_at')->where('status', 'نشط')
@@ -438,7 +468,8 @@ class Workday
         foreach ($emps as $e) {
             $c = $comp[$e->id];
             $a = $c['attendance'];
-            $nightRow = (! $c['checked_in'] && ! $a) ? ($night[(string) $e->id] ?? null) : null;
+            // شرطُ `openRow` نفسُه: غيابُ **دخول** لا غيابُ صفّ (ع‑٤)
+            $nightRow = ! $c['checked_in'] ? ($night[(string) $e->id] ?? null) : null;
             $blockers = (int) ($blockersByUser->get($e->user_id)?->count() ?? 0);
 
             if ($c['checked_in'] || $nightRow) $n['in']++;
