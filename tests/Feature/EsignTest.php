@@ -38,17 +38,17 @@ class EsignTest extends TestCase
             'contract_id' => $contract->id,
             'link_module' => 'clients', 'link_id' => $client->id,
             'vars' => ['اسم_الطرف_الثاني' => 'مطاعم الذواقة', 'اسم_شركتنا' => 'لينوميا',
-                       'المبلغ' => '1500', 'العملة' => 'د.ك'],
+                       'المبلغ' => '150015', 'العملة' => 'د.ك'],
         ])->assertSessionHas('sign_link');
 
         $req = SignRequest::first();
         $this->assertStringContainsString('مطاعم الذواقة', $req->body, 'المتغير لم يُملأ');
-        $this->assertStringContainsString('1500', $req->body);
+        $this->assertStringContainsString('150015', $req->body);
         $this->assertDatabaseHas('audits', ['action' => 'إنشاء طلب توقيع']);
 
         // ٢) العميل (بلا حساب): البوابة أولاً — كلمة سر خاطئة تُرد، والصحيحة تفتح
         auth()->logout();
-        $this->get("/sign/{$req->token}")->assertOk()->assertSee('كلمة السر')->assertDontSee('1500');
+        $this->get("/sign/{$req->token}")->assertOk()->assertSee('كلمة السر')->assertDontSee('150015');
         $this->post("/sign/{$req->token}/unlock", ['pass' => 'خطأ'])->assertSessionHas('err');
         $this->post("/sign/{$req->token}/unlock", ['pass' => 'sign1234'])->assertRedirect();
 

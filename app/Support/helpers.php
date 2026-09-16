@@ -130,6 +130,42 @@ if (! function_exists('hub_company_ids')) {
     }
 }
 
+if (! function_exists('hub_has_assignee_col')) {
+    /** أللوحدةِ عمودُ «مُسنَدٌ إليه»؟ (مخبّأٌ لكلِّ طلب — لا استعلامَ مخطّطٍ متكرّر) */
+    function hub_has_assignee_col(string $module): bool
+    {
+        static $memo = [];
+        if (array_key_exists($module, $memo)) return $memo[$module];
+
+        $table = hub_modules()[$module]['table'] ?? null;
+
+        return $memo[$module] = (bool) ($table
+            && \Illuminate\Support\Facades\Schema::hasColumn($table, 'assignee_id'));
+    }
+}
+
+if (! function_exists('hub_company_null_is_unowned')) {
+    /**
+     * **أيُعدُّ الصفُّ بلا شركةٍ «غيرَ مملوكٍ» فلا يحجبه عزلُ الشركات؟**
+     *
+     * للأشخاص: نعم. `users.company_id` عمودٌ متروكٌ سبق `users.companies`
+     * (أضافته هجرةُ add_companies_to_users **بعدَه**)، ولا سطرَ في المنتجِ
+     * يكتبه: لا حقلَ له في سجلِّ الوحدة ولا `UserController` يمسّه. فيلتقطه
+     * كشفُ المخطَّط في `hub_company_col` فيصير العزلُ `whereIn` على عمودٍ كلُّه
+     * `NULL` — **فلا يطابق أحداً**، ويُصبح المعزولُ أعمى عن البشرِ كافّة:
+     * «الموافقُ المطلوب» حقلٌ مطلوبٌ بقائمةٍ فارغة، و٧٢ حقلَ `ref→users` معه.
+     *
+     * والقاعدةُ المطبَّقةُ هنا **لا تُلغي العزل**: صفٌّ بلا شركةٍ لا يخصّ شركةً
+     * أخرى فلا يُحجب به؛ وصفٌّ يحمل شركةً مغايرةً يبقى محجوباً كما كان.
+     * وتقتصر على الأشخاص عمداً — فتوسعتُها إلى سجلّاتِ العملِ قرارُ أمنٍ آخر
+     * لا يُؤخذ بالقياس. (محاكاةُ الشهر · اليوم ٧ · M-F8)
+     */
+    function hub_company_null_is_unowned(string $module): bool
+    {
+        return $module === 'users';
+    }
+}
+
 if (! function_exists('hub_scope')) {
     /**
      * فرض النطاق الكامل على أي استعلام (Eloquent أو Query Builder):
@@ -144,12 +180,30 @@ if (! function_exists('hub_scope')) {
 
         if (hub_scoped($user)) {
             $ids = $user->visibleProjectIds();
-            if ($module === 'projects') $q->whereIn('id', $ids);
-            elseif ($col = hub_project_col($module)) $q->whereIn($col, $ids);
+            if ($module === 'projects') {
+                $q->whereIn('id', $ids);
+            } elseif ($col = hub_project_col($module)) {
+                // **الإسنادُ نفسُه سببُ وصول** (محاكاةُ الشهر · اليوم ٦ · M-F7):
+                // كان الترشيحُ بعمودِ المشروعِ وحدَه، فمهمّةٌ تُسنَد إلى محدودِ
+                // النطاقِ على مشروعٍ ليس من مشاريعه **تختفي عنه**: لا في قائمته
+                // ولا بالرابط (٤٠٤) — بينما منتقي الإسنادِ يعرض كلَّ الزملاء،
+                // والحفظُ ينجح، **ويصله إشعارُ «أُسند إليك»** فيضغطه فيُردّ.
+                // ولا يكشف هذا جديداً: الإشعارُ أفشى العنوانَ سلفاً، وإنّما
+                // يَصِل صاحبَه بما أُخبر أنّه له. وعزلُ الشركةِ والعميلِ يبقيان
+                // فوقَه (يُطبَّقان بعدَه فيضيّقان لا يوسّعان).
+                if (hub_has_assignee_col($module)) {
+                    $q->where(fn ($w) => $w->whereIn($col, $ids)
+                        ->orWhere('assignee_id', (string) $user->id));
+                } else {
+                    $q->whereIn($col, $ids);
+                }
+            }
         }
 
         if (($cids = hub_company_ids($user)) !== null && ($ccol = hub_company_col($module))) {
-            $q->whereIn($ccol, $cids);
+            hub_company_null_is_unowned($module)
+                ? $q->where(fn ($w) => $w->whereIn($ccol, $cids)->orWhereNull($ccol))
+                : $q->whereIn($ccol, $cids);
         }
 
         // عزلُ العملاء الصارم — نظيرُ عزل الشركات حرفياً: من له قائمةُ عملاء
@@ -470,8 +524,8 @@ if (! function_exists('hub_top_links')) {
              * يظهر ثمّ يُصَدُّ ٤٠٣). ويحرسُ الصنفَ كلَّه `NavCoverageTest`.
              */
             ['key' => 'inventory', 'label' => '📦 مركز الجرد',       'route' => 'inventory.center', 'group' => 'centers',  'ok' => hub_can($user, 'assets', 'v')],
-            ['key' => 'endpointsc', 'label' => '💻 النقاط الطرفية',  'route' => 'endpoints.index',  'group' => 'centers',  'ok' => hub_is_owner($user) || hub_monitor_group('secOps')],
-            ['key' => 'fieldsup',  'label' => '🧭 لوحة المشرف الميدانيّ', 'route' => 'field.dashboard', 'group' => 'centers', 'ok' => hub_is_owner($user) || (hub_can($user, 'hr', 'v') && hub_monitor_group('opsAnalytics'))],
+            ['key' => 'endpointsc', 'label' => '💻 النقاط الطرفية',  'route' => 'endpoints.index',  'group' => 'centers',  'ok' => hub_is_owner($user) || hub_monitor_group('secOps', $user)],
+            ['key' => 'fieldsup',  'label' => '🧭 لوحة المشرف الميدانيّ', 'route' => 'field.dashboard', 'group' => 'centers', 'ok' => hub_is_owner($user) || (hub_can($user, 'hr', 'v') && hub_monitor_group('opsAnalytics', $user))],
             // ومحفظةُ العهدةِ المالية — ثانويّةٌ في الخريطةِ لكنّها بابُ عملٍ يوميٍّ للمحاسب
             ['key' => 'custwallet', 'label' => '👛 محفظة العهدة',    'route' => 'custody.wallet.center', 'group' => 'centers', 'ok' => hub_can($user, 'custody', 'v')],
             ['key' => 'identity',  'label' => '📷 مركز الهوية والمسح', 'route' => 'identity.center', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v') || hub_can($user, 'products', 'v')],
@@ -917,8 +971,11 @@ if (! function_exists('hub_ref_options_scoped')) {
             $opts = array_intersect_key($opts, array_flip(array_map('strval', $user->visibleProjectIds())));
         }
         if (($cids = hub_company_ids($user)) !== null && ($ccol = hub_company_col($ref))) {
-            $allowed = \Illuminate\Support\Facades\DB::table(hub_ref_table($ref))
-                ->whereIn($ccol, $cids)->pluck('id')->map(fn ($v) => (string) $v)->all();
+            $q = \Illuminate\Support\Facades\DB::table(hub_ref_table($ref));
+            hub_company_null_is_unowned($ref)
+                ? $q->where(fn ($w) => $w->whereIn($ccol, $cids)->orWhereNull($ccol))
+                : $q->whereIn($ccol, $cids);
+            $allowed = $q->pluck('id')->map(fn ($v) => (string) $v)->all();
             $opts = array_intersect_key($opts, array_flip($allowed));
         }
         if (($kids = hub_client_ids($user)) !== null && ($kcol = hub_client_col($ref))) {
