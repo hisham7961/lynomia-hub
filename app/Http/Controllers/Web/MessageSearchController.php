@@ -75,9 +75,27 @@ class MessageSearchController extends Controller
             }
 
             $results = $rows->sortByDesc(fn ($x) => (string) $x['when'])->take(50)->values()->all();
+
+            /*
+             * **«N نتيجة» تعني ما طابق لا ما عُرض** (W-5 · الطور ١٦٧). كانت
+             * الجملةُ تقرأ `count($results)` بعد `take(50)` وفوقَها ثلاثةُ
+             * مصادرَ كلٌّ مقصوصٌ بثلاثين — فبحثٌ يطابق أربعمئةَ رسالةٍ يُقرأ
+             * «٥٠ نتيجة»، والباحثُ يظنّ أنّه رأى كلَّ ما يطابق فيتوقّف.
+             * والعدُّ ثلاثةُ استعلاماتِ `COUNT` على المصادرِ الثلاثةِ نفسِها
+             * بشروطِ تنطيقِها نفسِها — لا تقديرَ ولا استقراء.
+             */
+            $resultsN = $this->feedScope(
+                    Comment::whereNull('deleted_at')->where('module', 'feed')->where('body', 'LIKE', $like)
+                )->count()
+                + Comment::whereNull('deleted_at')->where('module', 'channel')
+                    ->whereIn('conversation_id', $memberConvIds)->where('body', 'LIKE', $like)->count()
+                + DmMessage::alive()->inCompanyScope()
+                    ->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
+                    ->where('body', 'LIKE', $like)->count();
         }
 
-        return view('search.messages', ['q' => $q, 'results' => $results]);
+        return view('search.messages', ['q' => $q, 'results' => $results,
+            'resultsN' => $resultsN ?? 0]);
     }
 
     /** نطاقُ الشركة على الخلاصة — نظيرُ `CommentController::feedCompanyFilter` حرفاً */

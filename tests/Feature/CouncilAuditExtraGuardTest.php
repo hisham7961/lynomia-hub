@@ -48,8 +48,22 @@ class CouncilAuditExtraGuardTest extends TestCase
         $row = DB::table('audits')->where('record_id', 'x2')->orderByDesc('id')->first();
         $this->assertNotNull($row, 'القيدُ لم يُكتب');
         $this->assertSame('سبب', $row->reason);
-        $this->assertSame(['after_hours' => true, 'at' => '03:41'],
-            json_decode((string) $row->after, true), 'الأثرُ لم يبلغ القاعدة');
+        /*
+         * **الترتيبُ قرعةٌ فلا يُثبَّت — تُثبَّت القيم** (CLAUDE.md · قاعدةُ JSON):
+         * عمودُ JSON في MySQL 8 يُعيد ترتيبَ مفاتيحِ الكائنِ عند التخزين (الأقصرُ
+         * أوّلاً، فـ`at` قبل `after_hours`)، بينما تحفظ SQLite وMariaDB ترتيبَ
+         * الإدراج. فـ`assertSame` على المصفوفةِ كلِّها تخضرّ محليّاً وتسقط على CI —
+         * وهو ما أسقط أربعَ دفعاتٍ متتاليةً هنا (v2.525.0 ← v2.527.0).
+         *
+         * والعقدُ لا يضعف: تُؤكَّد **كلُّ قيمةٍ بمفتاحها**، ويُؤكَّد أنّ المفاتيحَ
+         * هي هذه ولا زيادةَ — مقارنةً بمفاتيحَ **مرتَّبةٍ** فلا تعلّقَ بالترتيب.
+         */
+        $after = (array) json_decode((string) $row->after, true);
+        $this->assertSame(true, $after['after_hours'] ?? null, 'الأثرُ لم يبلغ القاعدة');
+        $this->assertSame('03:41', $after['at'] ?? null, 'الأثرُ لم يبلغ القاعدة');
+        $keys = array_keys($after);
+        sort($keys);
+        $this->assertSame(['after_hours', 'at'], $keys, 'مفاتيحُ الأثرِ ليست ما كُتب');
     }
 
     public function test_an_empty_extra_is_untouched(): void

@@ -513,6 +513,11 @@ return [
                     ['type' => 'admin', 'admin' => 'integrations', 'importance' => 'primary', 'route_prefix' => 'integrations',
                         'routes' => ['integrations.index', 'integrations.guide', 'hooks.index', 'integrations.messaging',
                             'integrations.n8n', 'integrations.odoo', 'webhooks.index', 'webhooks.log']],
+                    // أسعارُ الصرف — الإدارة ← الإعدادات (guard من hub_admin_links['curfx'] = المالك).
+                    // السعرُ إعدادٌ يحكم تحويلَ كلِّ مبلغ، فمقامُه هنا لا في المالية.
+                    ['type' => 'admin', 'admin' => 'curfx', 'importance' => 'secondary', 'route_prefix' => 'currency',
+                        'routes' => ['currency.rates'],
+                        'synonyms' => ['عملات', 'صرف', 'تحويل', 'سعر الصرف', 'currency', 'fx', 'exchange rate', 'rates']],
                     ['type' => 'admin', 'admin' => 'quoteflow', 'importance' => 'secondary', 'route_prefix' => 'quoteflow'],
                 ]],
                 'users' => ['label' => 'المستخدمون والوصول', 'order' => 5, 'destinations' => [

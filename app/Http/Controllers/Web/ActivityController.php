@@ -117,10 +117,20 @@ class ActivityController extends Controller
         $devices = $this->safe(fn () => DB::table('sessions_log')->where('user_id', $u->id)
             ->orderByDesc('started_at')->limit(8)->get(['device', 'ip', 'started_at as created_at']), collect());
         $ips = $this->safe(fn () => DB::table('user_ips')->where('user_id', $u->id)->orderByDesc('hits')->get(), collect());
+        /*
+         * **العدُّ قبل القصّ** (W-5 · الطور ١٦٧). كانت الشاشةُ تطبع
+         * `count($trail)` و`count($suspects)` — وكلاهما طولُ ما جُلب للعرضِ لا
+         * ما وقع. و«🛡️ دخول مريب (١٠)» أخطرُ صورِ هذا الصنف: مئتا محاولةٍ
+         * مريبةٍ تُقرأ «١٠» **كلّما ازداد الخطرُ ثبت الرقم**، فيُقرأ سقفُ
+         * العرضِ اطمئناناً. فالعدُّ استعلامٌ مستقلٌّ الآن والمسرودُ يبقى مقصوصاً.
+         */
         $trail = $this->safe(fn () => DB::table('page_visits')->where('user_id', $u->id)
             ->orderByDesc('at')->orderByDesc('id')->limit(120)->get(), collect());
+        $trailN = $this->safe(fn () => DB::table('page_visits')->where('user_id', $u->id)->count(), 0);
         $suspects = $this->safe(fn () => DB::table('audits')->where('user_id', $u->id)
             ->where('action', 'دخول مريب')->orderByDesc('created_at')->limit(10)->get(), collect());
+        $suspectsN = $this->safe(fn () => DB::table('audits')->where('user_id', $u->id)
+            ->where('action', 'دخول مريب')->count(), 0);
 
         // فصلُ الأمن عن الإنتاجية (WP-7.1 — spec §46): الدرجةُ الأمنية من
         // Risk::activity وحده، وساعاتُ العمل من القارئ العمليّ المصغّر أدناه —
@@ -129,7 +139,7 @@ class ActivityController extends Controller
             'from' => $since->format('Y-m-d H:i:s'), 'to' => now()->format('Y-m-d H:i:s'),
         ]));
 
-        return view('activity.show', compact('u', 'days', 'topPages', 'devices', 'ips', 'trail', 'suspects')
+        return view('activity.show', compact('u', 'days', 'topPages', 'devices', 'ips', 'trail', 'suspects', 'trailN', 'suspectsN')
             + ['risk' => Risk::activity($u, $range, $visits), 'work' => $this->workHours($visits)]);
     }
 

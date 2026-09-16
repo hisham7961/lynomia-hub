@@ -63,9 +63,23 @@ class EsignController extends Controller
             if ($rows->isNotEmpty()) $links[$label] = ['module' => $mk, 'rows' => $rows];
         }
 
-        $requests = $this->filterVisible(
-            SignRequest::orderByDesc('created_at')->limit(200)->get()
-        )->take(60)->values();
+        /*
+         * **العدُّ قبل القصّ، وعدّاداتُ الألسنةِ معه** (W-5 · الطور ١٦٧).
+         * كان العنوانُ يقول «{عدد} وثيقة» من طولِ الستّين المعروضة، وألسنةُ
+         * التصفيةِ تُحسب في القالبِ من الستّين نفسِها — فمركزٌ فيه مئةُ طلبٍ
+         * بانتظارِ التوقيع يقول «٦٠ وثيقة» ولسانُه يقول أقلَّ منها.
+         *
+         * **والرؤيةُ هنا تُرشَّح بعد الجلب** (`filterVisible` تقرأ عقدَ كلِّ
+         * طلبٍ ومرحلتَه)، فلا يُعَدُّ الصادقُ باستعلامِ `COUNT`. فالعدُّ على
+         * المرشَّحِ كلِّه، **ومصدرُه أحدثُ مئتَي طلب** — حدٌّ متبقٍّ يُقال في
+         * الشاشةِ نفسِها حين يُبلَغ، ولا يُدَّعى غيرُه.
+         */
+        $fetched   = SignRequest::orderByDesc('created_at')->limit(200)->get();
+        $visible   = $this->filterVisible($fetched)->values();
+        $requestsN = $visible->count();
+        $reqCapped = $fetched->count() >= 200;
+        $byStatus  = $visible->countBy('status');
+        $requests  = $visible->take(60)->values();
 
         // v2.121: المرحلة المعلقة الحالية لكل طلب محجوز — لشريط القرار في القائمة
         $apSteps = \Illuminate\Support\Facades\Schema::hasTable('contract_approval_steps')
@@ -88,6 +102,9 @@ class EsignController extends Controller
             // v2.117: القائمة كانت تعرض طلبات كل الشركات بلا تنطيق — تُرشَّح الآن
             // عبر نطاق العقد/الجهة المربوطة والمنشئ (وcompany_id مباشرةً يأتي في م2)
             'requests'  => $requests,
+            'requestsN' => $requestsN,
+            'reqCapped' => $reqCapped,
+            'byStatus'  => $byStatus,
             'signers'   => $signers,
             'apSteps'   => $apSteps,
             'contracts' => hub_scope(\App\Models\Contract::query(), 'contracts')

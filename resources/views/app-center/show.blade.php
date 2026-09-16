@@ -177,7 +177,7 @@
 <div class="kids">
     {{-- خط الإصدارات الزمني --}}
     <div class="card kid wide">
-        <h3>🚀 الإصدارات والتحديثات <span class="bdg g">{{ $releases->count() }}</span>
+        <h3>🚀 الإصدارات والتحديثات <span class="bdg g">{{ $releasesN }}</span>@if ($releasesN > 30)<span class="sub"> — معروضٌ منها الأحدثُ</span>@endif
             @if (hub_can(auth()->user(), 'code', 'a'))
                 <a class="btn ghost xs msauto" href="{{ route('m.create', 'code') }}">＋ إصدار جديد</a>
             @endif

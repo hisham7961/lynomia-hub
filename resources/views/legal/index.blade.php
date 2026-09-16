@@ -32,7 +32,7 @@
     </div>
 
     <div class="card kid wide">
-        <h3>⏳ يستحق التجديد <span class="bdg wn">{{ $expiring->count() }}</span></h3>
+        <h3>⏳ يستحق التجديد <span class="bdg wn">{{ $expiringN }}</span>@if ($expiringN > 12)<span class="sub"> — معروضٌ منها الأقربُ انتهاءً</span>@endif</h3>
         <table class="mini">
             @forelse ($expiring as $c)
                 <tr>
@@ -80,7 +80,7 @@
 
     {{-- v2.124: عالقة بلا توقيع أسبوعاً — من سجل أحداث الإرسال الحقيقي --}}
     <div class="card kid wide">
-        <h3>🐌 عالقة بلا توقيع أكثر من ٧ أيام <span class="bdg {{ $stuck->count() ? 'bad' : 'ok' }}">{{ $stuck->count() }}</span></h3>
+        <h3>🐌 عالقة بلا توقيع أكثر من ٧ أيام <span class="bdg {{ $stuckN ? 'bad' : 'ok' }}">{{ $stuckN }}</span>@if ($stuckN > 8)<span class="sub"> — معروضٌ منها الأقدمُ إرسالاً</span>@endif</h3>
         <table class="mini">
             @forelse ($stuck as $q)
                 <tr>
@@ -103,7 +103,7 @@
 
     {{-- v2.124: موافقات داخلية معلقة + خط التجديد --}}
     <div class="card kid">
-        <h3>🔏 موافقات معلقة <span class="bdg wn">{{ $pendingSteps->count() }}</span></h3>
+        <h3>🔏 موافقات معلقة <span class="bdg wn">{{ $pendingStepsN }}</span>@if ($pendingStepsN > 8)<span class="sub"> — معروضٌ منها الأقدمُ</span>@endif</h3>
         <table class="mini">
             @forelse ($pendingSteps as $st)
                 <tr><td>{{ \Illuminate\Support\Str::limit($st->req->title, 34) }}
@@ -116,7 +116,7 @@
         </table>
     </div>
     <div class="card kid">
-        <h3>🔄 خط التجديد <span class="bdg wn">{{ $renewals->count() }}</span></h3>
+        <h3>🔄 خط التجديد <span class="bdg wn">{{ $renewalsN }}</span>@if ($renewalsN > 8)<span class="sub"> — معروضٌ منها الأحدثُ</span>@endif</h3>
         <table class="mini">
             @forelse ($renewals as $r)
                 <tr><td><a href="{{ route('m.show', ['contracts', $r->id]) }}">{{ \Illuminate\Support\Str::limit($r->title, 34) }}</a>
@@ -130,7 +130,7 @@
 
     {{-- v2.124: التزامات متتبعة تستحق خلال شهر (وحدة الالتزامات) --}}
     <div class="card kid wide">
-        <h3>📌 التزامات تستحق خلال ٣١ يوماً <span class="bdg wn">{{ $obligations->count() }}</span>
+        <h3>📌 التزامات تستحق خلال ٣١ يوماً <span class="bdg wn">{{ $obligationsN }}</span>@if ($obligationsN > 10)<span class="sub"> — معروضٌ منها الأقربُ استحقاقاً</span>@endif
             <a class="btn ghost xs" style="float:left" href="{{ route('m.index', 'obligations') }}">كل الالتزامات</a></h3>
         <table class="mini">
             @forelse ($obligations as $o)

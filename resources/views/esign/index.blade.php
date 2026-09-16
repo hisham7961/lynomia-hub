@@ -4,8 +4,9 @@
 {{-- ═ مركز التوقيع المُعاد تصميمه (v2.311): الوثائقُ تتصدّر بطاقاتٍ بخطّ سير،
      والإنشاءُ والقوالبُ لوحتان قابلتان للطيّ — لا جدولٌ يتصدّره نموذج ═ --}}
 @php
-    $nWait = $requests->where('status', 'بانتظار التوقيع')->count();
-    $nDone = $requests->where('status', 'وُقّع')->count();
+    // عدّاداتٌ من المرشَّحِ كلِّه لا من الستّين المعروضة (W-5)
+    $nWait = (int) ($byStatus['بانتظار التوقيع'] ?? 0);
+    $nDone = (int) ($byStatus['وُقّع'] ?? 0);
     $nHold = $requests->where('status', 'بانتظار الموافقة')->count();
     $nBad  = $requests->whereIn('status', ['رُفض', 'ملغي', 'ملغى'])->count();
 @endphp
@@ -13,7 +14,7 @@
     <span class="lx-ico">✍️</span>
     <div>
         <div class="sub">مركز</div>
-        <h2>توقيع العقود الإلكتروني <span class="lx-count">{{ $requests->count() }} وثيقة</span></h2>
+        <h2>توقيع العقود الإلكتروني <span class="lx-count">{{ $requestsN }} وثيقة@if ($reqCapped) — من أحدثِ ٢٠٠ طلب@endif</span></h2>
     </div>
     <div class="spacer"></div>
     <button class="btn p sm" type="button" onclick="document.getElementById('escreate').open=true;document.getElementById('escreate').scrollIntoView({behavior:'smooth'})">➕ طلب توقيع جديد</button>
@@ -29,7 +30,7 @@
 
 {{-- ألسنةُ التصفية بالحالة — عدّاداتٌ حيّةٌ وتصفيةٌ فورية في المتصفح --}}
 <div class="esg-tabs" id="esgtabs">
-    <button class="esg-tab on" type="button" data-f="">الكل <b>{{ $requests->count() }}</b></button>
+    <button class="esg-tab on" type="button" data-f="">الكل <b>{{ $requestsN }}</b></button>
     <button class="esg-tab" type="button" data-f="بانتظار التوقيع">⏳ بانتظار التوقيع <b>{{ $nWait }}</b></button>
     <button class="esg-tab" type="button" data-f="وُقّع">✅ وُقّع <b>{{ $nDone }}</b></button>
     @if ($nHold)<button class="esg-tab" type="button" data-f="بانتظار الموافقة">🔏 بانتظار الموافقة <b>{{ $nHold }}</b></button>@endif

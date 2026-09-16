@@ -18,7 +18,7 @@
 @if ($q !== '' && mb_strlen($q) < 2)
     <div class="note wn">اكتب حرفين على الأقل.</div>
 @elseif ($q !== '')
-    <div class="sub" style="margin:10px 2px">{{ count($results) }} نتيجة لِـ«{{ $q }}»</div>
+    <div class="sub" style="margin:10px 2px">{{ $resultsN }} نتيجة لِـ«{{ $q }}»{{ $resultsN > 50 ? ' — معروضٌ منها الأحدثُ' : '' }}</div>
     @forelse ($results as $row)
         <a class="card" href="{{ $row['link'] }}" style="display:flex;gap:12px;align-items:flex-start;margin-bottom:8px;text-decoration:none;color:inherit">
             <span class="ava">{{ $row['icon'] }}</span>

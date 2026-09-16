@@ -29,11 +29,16 @@ class AppCenterController extends Controller
         // العدّادُ يُحجب كذلك: الرقمُ وحده يفضح المحجوب.
         $may = fn (string $mk) => hub_can(auth()->user(), $mk, 'v');
 
-        $releases = $may('code')
-            ? hub_scope(DB::table('code_releases')->whereNull('deleted_at'), 'code')
-                ->where('app_id', $app->id)
-                ->orderByDesc('date')->orderByDesc('created_at')
-                ->limit(30)->get()
+        // **والعدُّ منفصلٌ عن العرضِ هنا كما لجارَيه** (W-5): كان `$issuesN`
+        // و`$ticketsN` أدناه يفعلانها، و`$releases` تُطبع شارتُها من طولِ
+        // الثلاثين المعروضة — فتطبيقُ القاعدةِ في سطرٍ وإغفالُها في الذي يليه
+        // شاهدُ أنّه سهوٌ لا اصطلاح.
+        $releasesQ = $may('code')
+            ? hub_scope(DB::table('code_releases')->whereNull('deleted_at'), 'code')->where('app_id', $app->id)
+            : null;
+        $releasesN = $releasesQ ? (clone $releasesQ)->count() : 0;
+        $releases = $releasesQ
+            ? $releasesQ->orderByDesc('date')->orderByDesc('created_at')->limit(30)->get()
             : collect();
 
         // الأعطال والتذاكر المفتوحة على هذا التطبيق — «مفتوح» من التعريف الموحَّد
@@ -66,7 +71,7 @@ class AppCenterController extends Controller
         $desc = \App\Support\AppStudio::description($app);
         $ready = \App\Support\AppStudio::readiness($app, $shots);
 
-        return view('app-center.show', compact('app', 'progress', 'project', 'releases',
+        return view('app-center.show', compact('app', 'progress', 'project', 'releases', 'releasesN',
             'issues', 'issuesN', 'tickets', 'ticketsN', 'feats', 'shots', 'desc', 'ready'));
     }
 }

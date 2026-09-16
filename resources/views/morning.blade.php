@@ -19,7 +19,7 @@
     <div class="kids">
         @foreach ($cards as $c)
             <div class="card kid">
-                <h3>{{ $c['ico'] }} {{ $c['title'] }} <span class="bdg">{{ $c['rows']->count() }}</span></h3>
+                <h3>{{ $c['ico'] }} {{ $c['title'] }} <span class="bdg">{{ $c['n'] ?? $c['rows']->count() }}</span></h3>
                 <div class="sub" style="margin-bottom:8px">{{ $c['why'] }}</div>
                 <table class="mini">
                     @foreach ($c['rows'] as $r)

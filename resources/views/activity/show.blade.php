@@ -87,7 +87,7 @@
             <span class="bdg {{ $ip->hits >= 3 ? 'ok' : 'wn' }}" title="{{ $ip->hits >= 3 ? 'مكان معتاد' : 'عنوان جديد' }}">{{ $ip->ip }} × {{ $ip->hits }}</span>
         @endforeach
         @if (count($suspects))
-            <b class="sub" style="display:block;margin-top:8px;color:var(--bad)">🛡️ دخول مريب ({{ count($suspects) }}):</b>
+            <b class="sub" style="display:block;margin-top:8px;color:var(--bad)">🛡️ دخول مريب ({{ $suspectsN }}){{ $suspectsN > 10 ? ' — معروضٌ منها الأحدثُ:' : ':' }}</b>
             @foreach ($suspects as $s)<div class="sub mono">{{ $s->created_at }} — {{ $s->ip }}</div>@endforeach
         @endif
     </div>
@@ -96,9 +96,9 @@
     <div class="card kid">
         <h3>🧭 مسار التنقل داخل النظام</h3>
         @if (count($trail))
-            <div class="sub">{{ count($trail) }} زيارة مسجلة — الأثر الخام مطويّ، يُفتح عند حاجة تحقيق فقط.</div>
+            <div class="sub">{{ $trailN }} زيارة مسجلة — الأثر الخام مطويّ، يُفتح عند حاجة تحقيق فقط.</div>
             <details style="margin-top:6px">
-                <summary class="sub pointer">عرض أثر الزيارات الخام ({{ count($trail) }})</summary>
+                <summary class="sub pointer">عرض أثر الزيارات الخام ({{ $trailN }}){{ $trailN > 120 ? ' — معروضٌ منها الأحدثُ' : '' }}</summary>
                 <div style="max-height:340px;overflow:auto">
                     <table class="mini">
                         @foreach ($trail as $v)

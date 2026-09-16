@@ -1,7 +1,9 @@
 {{-- ودجة: رادار الانتهاءات --}}
 @if ($data && $data->count())
 <div class="card kid">
-    <h3>🔔 ينتهي قريباً <a class="btn ghost xs msauto" href="{{ route('alerts') }}">الكل ←</a></h3>
+    {{-- النافذةُ مقولةٌ لا مضمرة (W-3): صفوفُها تصل إلى `hub_radar_window()` يوماً،
+         وشارةُ الشريطِ إلى جانبِها تعدّ ٧ أيامٍ وحدَها — فلا تُقرأ الكلمتان سؤالاً واحداً. --}}
+    <h3>🔔 ينتهي خلال {{ hub_radar_window() }} يوماً <a class="btn ghost xs msauto" href="{{ route('alerts') }}">الكل ←</a></h3>
     <table class="mini">
         @foreach ($data as $i)
             <tr>

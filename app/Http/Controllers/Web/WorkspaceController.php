@@ -72,9 +72,24 @@ class WorkspaceController extends Controller
         // الانتماءُ للمساحةِ يُسأل عن **الإعلان** لا عن الصلاحيّة (F1): الصفوفُ
         // رُشّحت في `hub_expiry` أصلاً، وفيها صفُّ صاحبِ الشأنِ بلا `hub_can`.
         $wsModules = $ws['allModules'] ?? $ws['modules'];
-        $expiry = collect(hub_expiry(false, $u))
+        /*
+         * **العدّادُ يعدّ الواقعَ والمسرودُ يبقى مقصوصاً** (W-4 · الطور ١٦٧).
+         * كانت إحصائيّةُ «يستحق أو ينتهي» في الأعلى تقرأ `$expiry->count()`
+         * **بعد** `take(6)` — فمساحةٌ فيها عشرون انتهاءً تقول «٦»، وفوقها في
+         * القالبِ تعليقٌ يَعِد: «مجاميع محسوبة فعلاً لا نسب مزعومة». وجارتاها
+         * في الصفِّ مجموعان حقيقيّان، فالثالثةُ وحدَها كانت تقيس مساحةَ العرض.
+         *
+         * وهو صنفُ W-1 عائداً: الخطأُ في اتّجاهِ التهوينِ دائماً — كلّما ازداد
+         * الواقعُ ثبت الرقمُ على سقفِه، فيعمى المؤشّرُ كلّما ازدادت الحاجةُ إليه.
+         *
+         * **وحدٌّ متبقٍّ مكتوب:** `hub_expiry()` تقصّ عند ٢٠٠ صفٍّ (الأقربُ
+         * انتهاءً أوّلاً) قبل أن يصل الترشيحُ هنا.
+         */
+        $expAll = collect(hub_expiry(false, $u))
             ->filter(fn ($i) => in_array($i['module'] ?? '', $wsModules, true))
-            ->take(6)->values();
+            ->values();
+        $expiryN = $expAll->count();
+        $expiry  = $expAll->take(6)->values();
 
         // شارة الانتباه لكل وحدة: كم يستحق/تأخّر فيها — القُمرة تقول أين يُنظر
         // لا كم يوجد فقط. من الرادار نفسه (مخبّأ) فلا استعلامَ إضافي.
@@ -85,7 +100,7 @@ class WorkspaceController extends Controller
         $layout = InformationArchitecture::make()->workspaceLayout($u, $key);
 
         return view('workspaces.show', [
-            'ws' => $ws, 'cards' => $cards, 'activity' => $activity,
+            'ws' => $ws, 'cards' => $cards, 'activity' => $activity, 'expiryN' => $expiryN,
             'actors' => $actors, 'expiry' => $expiry, 'attention' => $attention,
             'all' => Workspaces::for($u), 'layout' => $layout,
         ]);

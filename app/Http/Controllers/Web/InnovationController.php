@@ -20,10 +20,21 @@ class InnovationController extends Controller
         // الناتج إن رُقّيت» — فوحده يُخفي كل فكرةٍ لم تُرقَّ بعد، وهي جوهر
         // الصفحة. فيُضاف الطريق عبر الخدمة: فكرةٌ تطوّر خدمةً في المشروع.
         $lens = hub_lens();
-        $ideas = hub_scope(Idea::query(), 'ideas')
+        /*
+         * **البسطُ والمقامُ كلاهما من القاعدة** (W-5 · الطور ١٦٧). كانت
+         * الجملةُ «{المقيَّمة} من {الكل} فكرة مقيَّمة» تقرأ طرفَيها من
+         * الثلاثمئةِ المحمَّلةِ للعرض — فالنسبةُ متّسقةٌ مع نفسِها وتصف
+         * **الصفحةَ لا المنشأة**. و«المقيَّمة» تعريفُها في `Idea::iceScore()`:
+         * أثرٌ وثقةٌ وسهولةٌ لا شيءَ منها فارغ — وهو شرطٌ يُكتب استعلاماً.
+         */
+        $ideasQ = fn () => hub_scope(Idea::query(), 'ideas')
             ->when($lens['id'], fn ($q) => $q->where(fn ($w) => $w->where('project_id', $lens['id'])
                 ->orWhereIn('service_id', \Illuminate\Support\Facades\DB::table('services')
-                    ->select('id')->where('project_id', $lens['id']))))
+                    ->select('id')->where('project_id', $lens['id']))));
+        $ideasN = $ideasQ()->count();
+        $scoredN = $ideasQ()->whereNotNull('impact')->whereNotNull('confidence')
+            ->whereNotNull('ease')->count();
+        $ideas = $ideasQ()
             ->orderByDesc('created_at')->limit(300)->get()
             ->map(function ($i) {
                 $i->ice = $i->iceScore();
@@ -40,7 +51,8 @@ class InnovationController extends Controller
             'contributors' => \App\Support\Innovation::contributors(),
             'pulse' => \App\Support\Innovation::pulse(),
             'atts' => \App\Support\Innovation::attachmentCounts($ideas->pluck('id')->all()),
-            'scored' => $ideas->filter(fn ($i) => $i->ice !== null)->count(),
+            'scored' => $scoredN,
+            'ideasN' => $ideasN,
             'lens' => $lens,
         ]);
     }
