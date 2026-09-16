@@ -69,7 +69,7 @@
 </div>
 
 <div class="card">
-    <h3 class="cardtitle">🖊️ المسحات ({{ $scans->count() }})</h3>
+    <h3 class="cardtitle">🖊️ المسحات ({{ $scansN }}){{ $scansN > 200 ? ' — معروضٌ منها الأحدثُ' : '' }}</h3>
     @if ($scans->isEmpty())
         <div class="sub">لا مسحاتٍ بعد.</div>
     @else

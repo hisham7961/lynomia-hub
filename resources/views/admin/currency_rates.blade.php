@@ -36,7 +36,7 @@
 @endif
 
 <div class="card pad0">
-    <h3 style="padding:12px 14px 0">📋 الأسعار المسجَّلة <span class="bdg g">{{ $rows->count() }}</span></h3>
+    <h3 style="padding:12px 14px 0">📋 الأسعار المسجَّلة <span class="bdg g">{{ $rowsN }}</span>@if ($rowsN > 300)<span class="sub"> — معروضٌ منها الأحدثُ</span>@endif</h3>
     @if ($rows->count())
     <div class="tblwrap"><table class="tbl">
         <thead><tr><th>الزوج</th><th>السعر</th><th>يسري من</th><th>المصدر</th><th>ملاحظة</th>@if ($mayEdit)<th></th>@endif</tr></thead>

@@ -107,6 +107,8 @@ class InventoryController extends Controller
             ->orderBy('verdict')->orderBy('id')->paginate(50)->withQueryString();
 
         // المسحاتُ الأحدثُ أولاً بترتيبٍ حتميّ (at ثم id)
+        // والعدُّ قبل القصّ (W-5): جلسةٌ فيها ألفُ مسحةٍ كانت تُقرأ «٢٠٠»
+        $scansN = InventoryScan::where('session_id', $session->id)->count();
         $scans = InventoryScan::where('session_id', $session->id)
             ->orderByDesc('at')->orderByDesc('id')->limit(200)->get();
 
@@ -134,6 +136,7 @@ class InventoryController extends Controller
             'session'   => $session,
             'items'     => $items,
             'scans'     => $scans,
+            'scansN'    => $scansN,
             'names'     => $names,
             'itemCodes' => $itemCodes,
             'counts'    => $counts,

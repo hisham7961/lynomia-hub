@@ -35,13 +35,17 @@ class CurrencyRateController extends Controller
         abort_unless(hub_is_owner(auth()->user()), 403,
             'أسعارُ الصرف إعدادٌ يحكم تحويلَ كلِّ مبلغ — للمالك');
 
-        $rows = DB::table('currency_rates')->whereNull('deleted_at')
+        // العدُّ قبل القصّ (W-5): الشارةُ تقول كم سعراً سُجّل لا كم يسع الجدول
+        $rowsQ = DB::table('currency_rates')->whereNull('deleted_at');
+        $rowsN = (clone $rowsQ)->count();
+        $rows = $rowsQ
             // الأحدثُ أوّلاً، و`id` حاسمٌ أخيراً فلا قرعةَ بين المحرّكين
             ->orderByDesc('as_of')->orderBy('from_cur')->orderBy('id')
             ->limit(300)->get();
 
         return view('admin.currency_rates', [
             'rows' => $rows,
+            'rowsN' => $rowsN,
             'base' => Currency::base(),
             'mayEdit' => true,   // من بلغ الشاشةَ مالكٌ، وحارسُ الكتابةِ حارسُها
             // العملاتُ المستعملةُ فعلاً في المستندات — فيُدخَل السعرُ لما يلزم

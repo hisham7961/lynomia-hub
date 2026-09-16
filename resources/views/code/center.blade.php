@@ -37,7 +37,7 @@
         <b>{{ $cadence['avg'] === null ? '—' : number_format($cadence['avg']) }}</b>
         <span>متوسط الأيام بين إصدارين</span></div>
     @unless (isset($cHide['branch']))
-        <div class="stat"><span class="ico">🌿</span><b>{{ count($branches) ?: '—' }}</b><span>فرعاً مستعملاً</span></div>
+        <div class="stat"><span class="ico">🌿</span><b>{{ $branchesN ?: '—' }}</b><span>فرعاً مستعملاً</span></div>
     @endunless
 </div>
 

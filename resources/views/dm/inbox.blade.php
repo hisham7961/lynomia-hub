@@ -88,7 +88,7 @@
     @if (($q ?? '') !== '')
         <div class="dmthread">
             <div class="card">
-                <h3>🔎 نتائج البحث عن «{{ $q }}» ({{ count($hits) }})</h3>
+                <h3>🔎 نتائج البحث عن «{{ $q }}» ({{ $hitsN }}){{ $hitsN > 60 ? ' — معروضٌ منها الأحدثُ' : '' }}</h3>
                 @forelse ($hits as $h)
                     <a class="hitrow" href="{{ route('dm.thread', $h['other']) }}">
                         <div class="crow" style="gap:7px;align-items:baseline">

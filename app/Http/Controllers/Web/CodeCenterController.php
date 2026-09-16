@@ -47,7 +47,12 @@ class CodeCenterController extends Controller
             $repo = DB::table('applications')->where('id', $appId)->value('git');
         }
 
-        $branches = collect($releases)->pluck('row.branch')->filter()->unique()->take(8)->values()->all();
+        // العدُّ قبل القصّ (W-5): الإحصائيّةُ «فرعاً مستعملاً» كانت تقرأ طولَ
+        // الثمانيةِ المعروضةِ لا عددَ الفروعِ المتمايزة. (وحدٌّ متبقٍّ مكتوب:
+        // المصدرُ `$releases` وهي مقصوصةٌ أصلاً — فالعددُ عن المعروضِ منها.)
+        $branchesAll = collect($releases)->pluck('row.branch')->filter()->unique()->values();
+        $branchesN = $branchesAll->count();
+        $branches = $branchesAll->take(8)->all();
         $tags = collect($releases)->flatMap(fn ($x) => $x['tags'])->countBy()
             ->sortDesc()->take(12)->all();
 
@@ -60,6 +65,7 @@ class CodeCenterController extends Controller
             'projId'   => $projId,
             'repo'     => $repo,
             'branches' => $branches,
+            'branchesN' => $branchesN,
             'tags'     => $tags,
         ]);
     }

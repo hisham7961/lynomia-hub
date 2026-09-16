@@ -211,12 +211,16 @@ class DmController extends Controller
          */
         $q = trim(hub_str($r->query('q')));
         $hits = collect();
+        $hitsN = 0;
         if ($q !== '') {
             $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $q) . '%';
-            $hits = DmMessage::alive()->inCompanyScope()
+            // العدُّ قبل القصّ (W-5): «٦٠ نتيجة» على بحثٍ يطابق أربعمئةً كذبةٌ
+            // في اتّجاهِ التهوين — والباحثُ يظنّ أنّه رأى كلَّ ما يطابق.
+            $hitsQ = DmMessage::alive()->inCompanyScope()
                 ->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
-                ->where('body', 'LIKE', $like)
-                ->orderByDesc('created_at')->limit(60)->get()
+                ->where('body', 'LIKE', $like);
+            $hitsN = (clone $hitsQ)->count();
+            $hits = $hitsQ->orderByDesc('created_at')->limit(60)->get()
                 ->map(fn ($m) => ['msg' => $m, 'other' => $m->from_id === $me ? $m->to_id : $m->from_id]);
         }
 
@@ -236,7 +240,7 @@ class DmController extends Controller
         $all = $this->startableUsers((string) $me);
 
         return view('dm.inbox', ['threads' => $threads, 'users' => $users, 'all' => $all,
-            'open' => null, 'msgs' => collect(), 'other' => null, 'q' => $q, 'hits' => $hits,
+            'open' => null, 'msgs' => collect(), 'other' => null, 'q' => $q, 'hits' => $hits, 'hitsN' => $hitsN,
             'presence' => self::presence($threads->pluck('other')->all()), 'dmReactions' => []]);
     }
 
@@ -270,7 +274,7 @@ class DmController extends Controller
         return view('dm.inbox', [
             'other' => $other, 'msgs' => $msgs, 'open' => $other->id,
             'threads' => $threads,
-            'users' => User::whereIn('id', $ids)->pluck('name', 'id'), 'q' => '', 'hits' => collect(),
+            'users' => User::whereIn('id', $ids)->pluck('name', 'id'), 'q' => '', 'hits' => collect(), 'hitsN' => 0,
             'all' => $this->startableUsers((string) $me),
             'presence' => self::presence($ids),
             'dmReactions' => self::dmReactionsFor($msgs->pluck('id')->all()),

@@ -37,8 +37,19 @@ class LegalController extends Controller
         $types = $base()->select('type', DB::raw('COUNT(*) c'))->groupBy('type')->orderByDesc('c')->limit(6)->get()
             ->map(fn ($r) => ['label' => $r->type ?: 'غير مصنف', 'value' => (int) $r->c])->all();
 
+        /*
+         * **العدُّ قبل القصّ** (W-5 · الطور ١٦٧). كانت الشاشةُ تطبع
+         * `$expiring->count()` في شارةِ «يستحق التجديد» — وهو طولُ ما بقي **بعد**
+         * `limit(12)`. فمنشأةٌ لها أربعون عقداً على وشك الانتهاء تقرأ «١٢»،
+         * وتبني عليه قرارَ تجديدٍ من ثُلثِ الصورة. والخطأُ في اتّجاهِ التهوينِ
+         * دائماً: كلّما ازداد الواقعُ ثبت الرقمُ على سقفِه.
+         * فالعدُّ استعلامٌ مستقلٌّ الآن، والمسرودُ يبقى مقصوصاً كما هو.
+         */
+        $expiringQ = $activeish($base())->whereNotNull('date_end')->where('date_end', '<=', $soon);
+        $expiringN = (clone $expiringQ)->count();
+
         // تنتهي قريباً (أو تجاوزت) — بأيام متبقية
-        $expiring = $activeish($base())->whereNotNull('date_end')->where('date_end', '<=', $soon)
+        $expiring = $expiringQ
             ->orderBy('date_end')->limit(12)
             ->get(['id', 'title', 'type', 'party', 'date_end as end', 'renewal', 'value', 'currency'])
             ->map(function ($c) {
@@ -47,11 +58,14 @@ class LegalController extends Controller
             });
 
         // v2.124: التزامات متتبعة تستحق (وحدة م7) بدل قصاصات النص القديمة
-        $obligations = \Illuminate\Support\Facades\Schema::hasTable('contract_obligations')
+        // والعدُّ قبل القصّ هنا كذلك (W-5)
+        $obligationsQ = \Illuminate\Support\Facades\Schema::hasTable('contract_obligations')
             ? $viaContract(hub_scope(\App\Models\ContractObligation::query(), 'obligations'))
                 ->whereNotIn('status', ['مكتمل', 'ملغي'])->whereNotNull('due')
-                ->whereDate('due', '<=', now()->addDays(31))->orderBy('due')->limit(10)->get()
-            : collect();
+                ->whereDate('due', '<=', now()->addDays(31))
+            : null;
+        $obligationsN = $obligationsQ ? (clone $obligationsQ)->count() : 0;
+        $obligations = $obligationsQ ? $obligationsQ->orderBy('due')->limit(10)->get() : collect();
 
         // v2.124: قيمة الساري بكل عملة على حدة — لا جمع عملات مختلفة في رقمٍ واحد
         $values = $activeish($base())->whereNotNull('value')->where('value', '>', 0)
@@ -59,11 +73,19 @@ class LegalController extends Controller
             ->groupBy('currency')->orderByDesc('s')->limit(5)->get();
 
         // v2.124: عالقة بلا توقيع >٧ أيام من الإرسال — بزر تذكيرٍ مباشر
-        $stuck = app(EsignController::class)->filterVisible(
+        /*
+         * **حدٌّ متبقٍّ مكتوب** (W-5): الرؤيةُ هنا تُرشَّح **بعد** الجلب
+         * (`filterVisible` تقرأ عقدَ كلِّ طلب)، فلا يُعَدُّ الصادقُ باستعلامِ
+         * `COUNT` قبلَها. فالعدُّ طولُ المرشَّحِ كلِّه — ومصدرُه خمسون طلباً
+         * أقدمَ إرسالاً، وهو سقفٌ يُقال ولا يُدَّعى غيرُه.
+         */
+        $stuckAll = app(EsignController::class)->filterVisible(
             $viaContract(\App\Models\SignRequest::where('status', 'بانتظار التوقيع'))->whereNull('cancelled_at')
                 ->whereNotNull('sent_at')->where('sent_at', '<=', now()->subDays(7))
                 ->orderBy('sent_at')->limit(50)->get()
-        )->take(8);
+        );
+        $stuckN = $stuckAll->count();
+        $stuck = $stuckAll->take(8);
 
         // v2.124: موافقات معلقة + خط التجديد (قيد التجديد ومسودات التجديد)
         $pendingSteps = \Illuminate\Support\Facades\Schema::hasTable('contract_approval_steps')
@@ -72,7 +94,11 @@ class LegalController extends Controller
                 ->when($pid, fn ($q) => $q->whereIn('request_id',
                     DB::table('sign_requests')->select('id')->where('project_id', $pid)
                         ->orWhereIn('contract_id', DB::table('contracts')->select('id')->where('project_id', $pid))))
-                ->orderBy('created_at')->orderBy('stage')->limit(20)->get()->unique('request_id')->take(8)
+                // **القصُّ للعرضِ أُخِّر إلى ما بعد الترشيح** (W-5): كان `take(8)`
+                // هنا قبل `filterVisible`، فالرقمُ المطبوعُ طولُ المعروضِ لا
+                // عددُ الموافقاتِ المعلّقةِ فعلاً. صار القصُّ آخرَ خطوة، والعدُّ
+                // يسبقه. (وحدٌّ متبقٍّ مكتوب: مصدرُه عشرون مرحلةً أقدمَ إنشاءً.)
+                ->orderBy('created_at')->orderBy('stage')->limit(20)->get()->unique('request_id')
                 ->map(function ($s) {
                     $s->req = \App\Models\SignRequest::find($s->request_id);
                     return $s;
@@ -87,9 +113,15 @@ class LegalController extends Controller
                         return $ss->filter(fn ($s) => isset($visible[$s->req->id]));
                     }))
             : collect();
-        $renewals = $base()
+        $pendingStepsN = $pendingSteps->count();
+        $pendingSteps = $pendingSteps->take(8);
+
+        // وخطُّ التجديدِ مثلُها: العدُّ استعلامٌ مستقلٌّ والمسرودُ ثمانية (W-5)
+        $renewalsQ = $base()
             ->where(fn ($q) => $q->where('status', 'قيد التجديد')
-                ->orWhere(fn ($w) => $w->where('kind', 'تجديد')->where('status', 'مسودة')))
+                ->orWhere(fn ($w) => $w->where('kind', 'تجديد')->where('status', 'مسودة')));
+        $renewalsN = (clone $renewalsQ)->count();
+        $renewals = $renewalsQ
             ->orderByDesc('created_at')->limit(8)->get(['id', 'title', 'doc_no', 'status', 'kind', 'date_end']);
 
         // v2.124: التوزيع بالمسؤول (الساري فقط) — أسماء حقيقية لا معرفات
@@ -112,7 +144,8 @@ class LegalController extends Controller
         $mixed = $curLabel['mixed'];
 
         return view('legal.index', compact('kpi', 'types', 'expiring', 'obligations', 'currency', 'mixed',
-            'values', 'stuck', 'pendingSteps', 'renewals', 'byOwner', 'dormantRules', 'obUsers', 'lens'));
+            'values', 'stuck', 'pendingSteps', 'renewals', 'byOwner', 'dormantRules', 'obUsers', 'lens',
+            'expiringN', 'obligationsN', 'stuckN', 'pendingStepsN', 'renewalsN'));
     }
 
     /** تفعيل قاعدة تنبيه عقود مبذورة معطلة — بنقرة صريحة من المستخدم لا آلياً */
