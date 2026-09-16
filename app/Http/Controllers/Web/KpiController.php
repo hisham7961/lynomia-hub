@@ -76,6 +76,10 @@ class KpiController extends Controller
         return view('kpis.index', [
             'kpis'    => hub_kpis(null, true),
             'rows'    => $rows,
+            // **المرشَّحُ ودليلُه** لما لا مالكَ له — يُعرَض ولا يُعتمَد تلقائيّاً
+            'suggest' => collect($rows)->filter(fn ($x) => ($x['owner_id'] ?? null) === null)
+                ->mapWithKeys(fn ($x) => [$x['id'] => \App\Support\Ownership::suggestForKpi(
+                    (array) ($x['formula'] ?? []))])->all(),
             'summary' => \App\Support\KpiCentre::summary($rows),
             'off'     => \App\Support\KpiCentre::offTarget($rows),
             'catalog' => $this->catalog(),
@@ -121,6 +125,86 @@ class KpiController extends Controller
         hub_audit('تعديل مؤشر KPI', null, $k->id, $k->name, ['before' => $before, 'after' => $after]);
 
         return redirect()->route('kpis.index')->with('ok', '✏️ حُدّث المؤشر «' . $k->name . '»');
+    }
+
+    /**
+     * **إسنادُ المالكِ المقترَح — نقرةٌ لا تأليف** (قرارُ المالك · بعد v2.539.0).
+     *
+     * تركُ إحدى وخمسين قائمةً منسدلةً فارغةً ليس احتراماً لقرارِ الإنسان بل
+     * **تركٌ له بلا عون**: يفتح الشاشةَ فيجد واحداً وخمسين حقلاً فارغاً وثلاثين
+     * اسماً في كلٍّ، فيغلقها — ويبقى «خارج الهدف» بلا من يُسأل عنه.
+     *
+     * فالاقتراحُ يُعرَض بدليله، وهذا البابُ يعتمده. **والقرارُ باقٍ للإنسان**:
+     * لا يقع إسنادٌ بفتحِ الشاشة، ولا يُعتمَد مرشّحٌ لم يُطلَب.
+     *
+     * ويُقبل `owner_id` صريحاً (اختارَ القارئُ غيرَ المرشَّح) — ويمرّ **بالحارسِ
+     * نفسِه**: لا يُسنَد المؤشّرُ لمن لا يبلغ الوحدةَ التي يقيسها. وإلّا أُعيد
+     * عيبُ M-A1: كُلِّف بالمساءلةِ من لا يفتح الباب.
+     */
+    public function adopt(Request $r, string $id)
+    {
+        $this->gate();
+        $k = KpiDef::findOrFail($id);
+        abort_unless(hub_has_col('kpi_defs', 'owner_id'), 422, 'عمودُ المالك غيرُ مُرحَّل');
+
+        $formula = (array) $k->formula;
+        $module  = hub_str($formula['a']['module'] ?? '');
+
+        $uid = trim(hub_str($r->input('owner_id')));
+        if ($uid === '') {
+            $s = \App\Support\Ownership::suggestForKpi($formula);
+            abort_if($s['user_id'] === null, 422, (string) $s['why']);
+            $uid = (string) $s['user_id'];
+            $why = (string) $s['why'];
+        } else {
+            $why = 'اختيارٌ صريحٌ من شاشة المؤشّرات';
+        }
+
+        $u = \App\Models\User::find($uid);
+        abort_unless($u && $u->isActive(), 422, 'المستخدَمُ غيرُ موجودٍ أو موقوف');
+        abort_unless($module === '' || hub_can($u, $module, 'v'), 422,
+            '«' . $u->name . '» لا يبلغ الوحدةَ التي يقيسها هذا المؤشّر — ولا يُسأل عمّا لا يراه');
+
+        $k->update(['owner_id' => (string) $u->id]);
+        hub_audit('إسناد مالك مؤشر', null, (string) $k->id, $k->name,
+            ['after' => ['owner' => $u->name, 'why' => $why]]);
+
+        return back()->with('ok', '👤 صار «' . $u->name . '» مالكَ «' . $k->name . '»');
+    }
+
+    /**
+     * **اعتمادُ المرشَّحين المؤكَّدين جملةً** — وما دونهم يبقى للنظر.
+     *
+     * ولا يمسّ هذا البابُ ثلاثةً: مؤشّراً **له مالكٌ** سلفاً (قرارٌ سابقٌ لا
+     * يُداس)، ومرشّحاً ثقتُه **ضعيفة** (يُعرَض ولا يُعتمَد جملةً)، ومؤشّراً
+     * **لا دليلَ** على صاحبه (الفراغُ أصدقُ من أوّلِ اسمٍ في الدليل).
+     */
+    public function adoptAll(Request $r)
+    {
+        $this->gate();
+        abort_unless(hub_has_col('kpi_defs', 'owner_id'), 422, 'عمودُ المالك غيرُ مُرحَّل');
+
+        $done = 0; $left = 0;
+        // ترتيبٌ حتميّ فلا يختلف ما يُعتمَد بين محرّكٍ ومحرّك
+        foreach (KpiDef::orderBy('sort')->orderBy('id')->get() as $k) {
+            if (trim((string) $k->owner_id) !== '') continue;        // قرارٌ سابقٌ لا يُداس
+
+            $formula = (array) $k->formula;
+            $s = \App\Support\Ownership::suggestForKpi($formula);
+            if ($s['user_id'] === null || $s['confidence'] !== 'strong') { $left++; continue; }
+
+            $u = \App\Models\User::find($s['user_id']);
+            $module = hub_str($formula['a']['module'] ?? '');
+            if (! $u || ! $u->isActive() || ($module !== '' && ! hub_can($u, $module, 'v'))) { $left++; continue; }
+
+            $k->update(['owner_id' => (string) $u->id]);
+            hub_audit('إسناد مالك مؤشر', null, (string) $k->id, $k->name,
+                ['after' => ['owner' => $u->name, 'why' => (string) $s['why'], 'bulk' => true]]);
+            $done++;
+        }
+
+        return back()->with('ok', "👥 أُسنِد {$done} مؤشّراً بمرشَّحٍ مؤكَّد"
+            . ($left ? " — وبقي {$left} للنظر: دليلُه ضعيفٌ أو لا دليلَ له" : ''));
     }
 
     /**
