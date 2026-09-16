@@ -313,7 +313,7 @@ class DogfoodR2AttendanceTest extends TestCase
 
         $this->assertStringContainsString('أحمد قاسم', $csv, 'المحاسبُ يرى الأيامَ والساعات');
         $this->assertStringContainsString('محجوب', $csv, 'والراتبُ خلفَ fieldsec — «محجوب» لا رقم');
-        $this->assertStringNotContainsString('1405', $csv, 'لا يتسرّبُ الراتبُ لمن لا يملك مفتاحَه');
+        $this->assertMaskedValueAbsent($csv, '1405', 'لا يتسرّبُ الراتبُ لمن لا يملك مفتاحَه');
     }
 
     public function test_the_existing_daily_export_contract_is_untouched(): void

@@ -23,14 +23,20 @@ class ScopeLeakAuditTest extends TestCase
 {
     /** مستخدمٌ بدورٍ مخصَّص: مصفوفةٌ وقيودُ حقولٍ كما تُعطى في الواقع */
     protected function withRole(array $matrix, array $fieldRules = [], array $companies = [],
-                                string $scope = 'all', array $flags = []): User
+                                string $scope = 'all', array $flags = [], ?string $id = null): User
     {
         $role = Role::create(['name' => 'دور مخصّص ' . Str::random(5), 'scope' => $scope,
             'flags' => $flags, 'matrix' => $matrix, 'field_rules' => $fieldRules]);
 
-        return User::create(['name' => 'مقيَّد', 'email' => Str::random(8) . '@test.local',
+        $u = new User(['name' => 'مقيَّد', 'email' => Str::random(8) . '@test.local',
             'password' => 'Secret!2026x', 'role_id' => $role->id, 'status' => 'نشط',
             'companies' => $companies ?: null, 'password_changed_at' => now()]);
+        if ($id !== null) {          // معرّفٌ مُثبَّتٌ حين يكون المعرّفُ نفسُه موضوعَ الاختبار
+            $u->id = $id;
+        }
+        $u->save();
+
+        return $u;
     }
 
     /* ── الملف الشامل للموظف: نطاق الشركة يسري كما في كل قارئ ── */
@@ -135,7 +141,7 @@ class ScopeLeakAuditTest extends TestCase
             ['services' => ['cost' => 'hide']]);
 
         $html = $this->actingAs($u)->get('/pricing')->assertOk()->getContent();
-        $this->assertStringNotContainsString('4242', $html,
+        $this->assertMaskedValueAbsent($html, '4242',
             'تكلفة الخدمة محجوبةٌ بقيود الحقول وظهرت في شاشة الباقات');
     }
 
@@ -175,9 +181,53 @@ class ScopeLeakAuditTest extends TestCase
         $u = $this->withRole(['assets' => ['v' => 1]], ['assets' => ['price' => 'hide']]);
         $html = $this->actingAs($u)->get('/assets-life')->assertOk()->getContent();
 
-        $this->assertStringNotContainsString('7,777', $html,
+        $this->assertMaskedValueAbsent($html, '7,777',
             'ثمن الأصل محجوبٌ بقيود الحقول وظهر مجموعاً في شاشة العهدة');
-        $this->assertStringNotContainsString('7777', $html);
+        $this->assertMaskedValueAbsent($html, '7777');
+    }
+
+    /**
+     * **وحارسُ الحجب يقيسُ الحقلَ لا بصمةَ الصفحة.**
+     *
+     * الوجهُ الأوّل: معرّفُ القارئِ نفسُه يحمل «7777» — وهي الحالةُ التي أسقطت
+     * `PHP 8.2 · sqlite` على دفعة v2.540.0 قرعةً (`…e09787777c2c` في `data-uid`)
+     * والحقلُ محجوبٌ كما يجب. الحارسُ الذي يسقط هنا يسقط على بصمةٍ لا على تسرّب.
+     */
+    public function test_the_masked_field_guard_ignores_an_identifier_that_carries_the_number(): void
+    {
+        $this->seedCore();
+        \App\Models\Asset::forceCreate(['id' => 'dddddddd-dddd-4ddd-bddd-dddddddddddd',
+            'name' => 'جهاز', 'price' => 7777, 'status' => 'قيد الاستخدام',
+            'holder_id' => $this->employee->id]);
+
+        $u = $this->withRole(['assets' => ['v' => 1]], ['assets' => ['price' => 'hide']],
+            id: '77777777-7777-4777-b777-777777777777');
+        $html = $this->actingAs($u)->get('/assets-life')->assertOk()->getContent();
+
+        $this->assertStringContainsString('data-uid="77777777-7777-4777-b777-777777777777"', $html,
+            'تهيئةٌ خاطئة: معرّفُ القارئ لم يُطبع في الصفحة فالحالةُ غيرُ مُعادةٍ أصلاً');
+        $this->assertMaskedValueAbsent($html, '7777',
+            'حارسُ الحجب سقط على بصمةِ الصفحة لا على الحقل المحجوب');
+    }
+
+    /**
+     * والوجهُ الثاني — وهو الأهم: طرحُ البصمات لم يُعمِ الحارس. الرقمُ نفسُه،
+     * والقارئُ نفسُه بمعرّفه الحامل لـ«7777»، لكن بلا قيدِ حجب: الحارسُ **يجب**
+     * أن يراه. لولا هذا الوجه لكان الإصلاحُ إسكاتاً لا تصحيحاً.
+     */
+    public function test_the_masked_field_guard_still_sees_the_number_when_it_is_not_masked(): void
+    {
+        $this->seedCore();
+        \App\Models\Asset::forceCreate(['id' => 'dddddddd-dddd-4ddd-bddd-dddddddddddd',
+            'name' => 'جهاز', 'price' => 7777, 'status' => 'قيد الاستخدام',
+            'holder_id' => $this->employee->id]);
+
+        $u = $this->withRole(['assets' => ['v' => 1]], [],
+            id: '77777777-7777-4777-b777-777777777777');
+        $html = $this->actingAs($u)->get('/assets-life')->assertOk()->getContent();
+
+        $this->assertStringContainsString('7,777', static::withoutOpaqueIds($html),
+            'طرحُ البصمات ابتلع الحقلَ نفسَه — فالحارسُ ما عاد يرى تسرّباً حين يقع');
     }
 
     /* ── الامتثال: الرسوم كذلك ── */
@@ -194,8 +244,8 @@ class ScopeLeakAuditTest extends TestCase
         $u = $this->withRole(['compliance' => ['v' => 1]], ['compliance' => ['fee' => 'hide']]);
         $html = $this->actingAs($u)->get('/compliance-board')->assertOk()->getContent();
 
-        $this->assertStringNotContainsString('8,888', $html, 'رسوم الامتثال محجوبةٌ وظهرت');
-        $this->assertStringNotContainsString('8888', $html);
+        $this->assertMaskedValueAbsent($html, '8,888', 'رسوم الامتثال محجوبةٌ وظهرت');
+        $this->assertMaskedValueAbsent($html, '8888');
     }
 
     /* ── التطبيقات والمشاريع: الأسماء نفسها بيانات ── */
