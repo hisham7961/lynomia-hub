@@ -83,11 +83,11 @@ class WorkOsAcceptanceClientTest extends TestCase
             'email' => 'accept.owner@client.test', 'stage' => 'عميل حالي']);
         // مديرُ المشروع (pm_id) هو المالك — فيغدو مديرَ المشروع المحوَّل ومالكَ غرفتَيه
         $quote = Quote::create(['client_id' => $client->id, 'title' => 'منصةُ القبول الرقمية',
-            'total' => 12000, 'cost' => 7000, 'currency' => 'د.ك', 'billing' => 'دفعات مراحل',
+            'total' => 1200000, 'cost' => 707070, 'currency' => 'د.ك', 'billing' => 'دفعات مراحل',
             'scope' => 'بناءُ المنصة كاملةً', 'status' => 'مقبول', 'accepted_at' => now(),
             'pm_id' => $this->owner->id]);
         QuoteLine::create(['quote_id' => $quote->id, 'title' => 'اكتشاف', 'kind' => 'مرحلة',
-            'qty' => 1, 'unit_price' => 12000]);
+            'qty' => 1, 'unit_price' => 1200000]);
 
         $this->actingAs($this->owner)->post('/quote/' . $quote->id . '/act', ['do' => 'project'])
             ->assertRedirect();
@@ -143,7 +143,15 @@ class WorkOsAcceptanceClientTest extends TestCase
             ->assertSee('منصةُ القبول الرقمية')->assertDontSee('مشروعُ الشركةِ الأخرى السرّيّ');
         $this->get(route('portal.project', $project->id))->assertOk()
             ->assertSee('منصةُ القبول الرقمية')
-            ->assertDontSee('7000');   // تكلفةُ العرض رقمٌ داخليّ
+            // **قيمةٌ من ستّ خانات** كسائرِ حرّاسِ التسريبِ في الحزمة: `assertDontSee`
+            // تقارن نصَّ الصفحةِ الخامَ بما فيه **سماتُ الوسوم**، و`<body data-uid>`
+            // يحمل UUID المستخدم. وحروفُ UUID كلُّها `[0-9a-f-]`، فسلسلةٌ من أربع
+            // خاناتٍ (7000) تصادفه قرعةً ≈٠٫٠٤٪ لكلِّ معرّف — وقد وقعت فعلاً على
+            // MariaDB بينما خضرّت SQLite في التشغيلِ نفسِه:
+            //   <body data-uid="84955405-4dfe-40a5-a01d-0a8de5f57000">
+            // وحارسُ تسريبٍ يسقط قرعةً أخطرُ من غيابه: يُعاد التشغيلُ حتّى يخضرّ،
+            // فيمرُّ التسريبُ الحقيقيُّ يوماً في الضجيج. (محاكاةُ الشهر · اليوم ٧)
+            ->assertDontSee('707070');   // تكلفةُ العرض رقمٌ داخليّ
         $this->get(route('portal.documents'))->assertOk()
             ->assertSee('تقريرُ الانطلاق المشترَك')->assertDontSee('محضرُ التسعير الداخليّ');
         $this->get(route('portal.invoices'))->assertOk()

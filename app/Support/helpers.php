@@ -144,6 +144,28 @@ if (! function_exists('hub_has_assignee_col')) {
     }
 }
 
+if (! function_exists('hub_company_null_is_unowned')) {
+    /**
+     * **أيُعدُّ الصفُّ بلا شركةٍ «غيرَ مملوكٍ» فلا يحجبه عزلُ الشركات؟**
+     *
+     * للأشخاص: نعم. `users.company_id` عمودٌ متروكٌ سبق `users.companies`
+     * (أضافته هجرةُ add_companies_to_users **بعدَه**)، ولا سطرَ في المنتجِ
+     * يكتبه: لا حقلَ له في سجلِّ الوحدة ولا `UserController` يمسّه. فيلتقطه
+     * كشفُ المخطَّط في `hub_company_col` فيصير العزلُ `whereIn` على عمودٍ كلُّه
+     * `NULL` — **فلا يطابق أحداً**، ويُصبح المعزولُ أعمى عن البشرِ كافّة:
+     * «الموافقُ المطلوب» حقلٌ مطلوبٌ بقائمةٍ فارغة، و٧٢ حقلَ `ref→users` معه.
+     *
+     * والقاعدةُ المطبَّقةُ هنا **لا تُلغي العزل**: صفٌّ بلا شركةٍ لا يخصّ شركةً
+     * أخرى فلا يُحجب به؛ وصفٌّ يحمل شركةً مغايرةً يبقى محجوباً كما كان.
+     * وتقتصر على الأشخاص عمداً — فتوسعتُها إلى سجلّاتِ العملِ قرارُ أمنٍ آخر
+     * لا يُؤخذ بالقياس. (محاكاةُ الشهر · اليوم ٧ · M-F8)
+     */
+    function hub_company_null_is_unowned(string $module): bool
+    {
+        return $module === 'users';
+    }
+}
+
 if (! function_exists('hub_scope')) {
     /**
      * فرض النطاق الكامل على أي استعلام (Eloquent أو Query Builder):
@@ -179,7 +201,9 @@ if (! function_exists('hub_scope')) {
         }
 
         if (($cids = hub_company_ids($user)) !== null && ($ccol = hub_company_col($module))) {
-            $q->whereIn($ccol, $cids);
+            hub_company_null_is_unowned($module)
+                ? $q->where(fn ($w) => $w->whereIn($ccol, $cids)->orWhereNull($ccol))
+                : $q->whereIn($ccol, $cids);
         }
 
         // عزلُ العملاء الصارم — نظيرُ عزل الشركات حرفياً: من له قائمةُ عملاء
@@ -947,8 +971,11 @@ if (! function_exists('hub_ref_options_scoped')) {
             $opts = array_intersect_key($opts, array_flip(array_map('strval', $user->visibleProjectIds())));
         }
         if (($cids = hub_company_ids($user)) !== null && ($ccol = hub_company_col($ref))) {
-            $allowed = \Illuminate\Support\Facades\DB::table(hub_ref_table($ref))
-                ->whereIn($ccol, $cids)->pluck('id')->map(fn ($v) => (string) $v)->all();
+            $q = \Illuminate\Support\Facades\DB::table(hub_ref_table($ref));
+            hub_company_null_is_unowned($ref)
+                ? $q->where(fn ($w) => $w->whereIn($ccol, $cids)->orWhereNull($ccol))
+                : $q->whereIn($ccol, $cids);
+            $allowed = $q->pluck('id')->map(fn ($v) => (string) $v)->all();
             $opts = array_intersect_key($opts, array_flip($allowed));
         }
         if (($kids = hub_client_ids($user)) !== null && ($kcol = hub_client_col($ref))) {
