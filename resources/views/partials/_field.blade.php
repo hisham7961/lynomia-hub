@@ -6,10 +6,14 @@
     // v2.128: ربطٌ برمجي — id للحقل وfor على العنوان، فالقارئ الشاشي يسمي كل حقل،
     // ونقر العنوان يركّز حقله. required الفعلية تعكس إلزامية السجل لا النجمة وحدها.
     $fid = 'f-' . $k;
-    $req = ! empty($f['required']) ? ' required aria-required=true' : '';
+    // **الإلزامُ الفعليُّ لهذا القارئ** (M-F2): حقلُ مرجعٍ قائمتُه خاويةٌ له لا
+    // يُطلَب منه — نجمةٌ فوق قائمةٍ فارغةٍ دعوةٌ إلى طريقٍ مسدود. والمتحقّقُ
+    // يقرأ الحكمَ نفسَه، فلا تفترق الشاشةُ عن الخادم.
+    $fReq = hub_field_required(is_string($module ?? null) ? $module : (string) ($def['key'] ?? ''), $f);
+    $req = $fReq ? ' required aria-required=true' : '';
 @endphp
 <div class="fld {{ $wide ? 'fw' : '' }} @error($k) haserr @enderror">
-    <label @if(! in_array($t, ['bool', 'file', 'img']) && empty($f['multi'])) for="{{ $fid }}" @endif>{{ $f['label'] }} @if(!empty($f['required']))<b class="req" aria-hidden="true">*</b>@endif</label>
+    <label @if(! in_array($t, ['bool', 'file', 'img']) && empty($f['multi'])) for="{{ $fid }}" @endif>{{ $f['label'] }} @if($fReq)<b class="req" aria-hidden="true">*</b>@endif</label>
 
     @if ($t === 'ta')
         <textarea class="inp @error($k) err @enderror" id="{{ $fid }}" name="{{ $k }}" rows="3"{!! $req !!}>{{ old($k, $raw) }}</textarea>

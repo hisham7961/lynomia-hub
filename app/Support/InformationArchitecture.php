@@ -79,7 +79,12 @@ class InformationArchitecture
             'custody_wallet'     => fn ($u) => hub_can($u, 'custody', 'v'),
 
             // workforce.overview → WorkforceController@gate:19 (Permissions 360 · مجموعةُ opsAnalytics)
-            'workforce_overview' => fn ($u) => hub_monitor_group('opsAnalytics', $u),
+            // **والرايةُ نصفُ السؤال** (M-F1 على سطحِ خريطةِ المعلومات): متحكّمُها
+            // يفرض `hub_org_analytics_guard()` فوقَ الراية — فحسابٌ معزولٌ على
+            // شركةٍ كان يجدها في البحثِ ويُردَّ عنها ٤٠٣. والشرطُ هنا شرطُ البابِ
+            // نفسُه، يحرسه `SearchAndMapOfferMatchesDestinationTest`.
+            'workforce_overview' => fn ($u) => hub_monitor_group('opsAnalytics', $u)
+                && hub_can_org_analytics($u),
 
             // journey → JourneyController@show:17
             'journey'            => fn ($u) => hub_can($u, 'clients', 'v'),

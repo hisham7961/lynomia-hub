@@ -191,12 +191,23 @@ if (! function_exists('hub_scope')) {
                 // ولا يكشف هذا جديداً: الإشعارُ أفشى العنوانَ سلفاً، وإنّما
                 // يَصِل صاحبَه بما أُخبر أنّه له. وعزلُ الشركةِ والعميلِ يبقيان
                 // فوقَه (يُطبَّقان بعدَه فيضيّقان لا يوسّعان).
-                if (hub_has_assignee_col($module)) {
-                    $q->where(fn ($w) => $w->whereIn($col, $ids)
-                        ->orWhere('assignee_id', (string) $user->id));
-                } else {
-                    $q->whereIn($col, $ids);
-                }
+                //
+                // **وما كتبتَه بيدك يبقى لك** (M-F2): صفٌّ بلا مشروعٍ أنشأتَه
+                // أنت لا يطابق `whereIn` أبداً — فلو فُتح بابُ الكتابةِ بلا
+                // مشروعٍ دون هذا لصار **يُكتَب ثمّ يُفقَد**: تقريرٌ يُحفَظ ولا
+                // يراه صاحبُه في أيِّ شاشة. وهو أسوأُ من منعِ الكتابةِ ابتداءً.
+                // والتوسيعُ أضيقُ ما يكون: **صفوفُك أنت بلا مشروعٍ فقط** —
+                // لا صفَّ غيرِك، ولا صفَّ مشروعٍ لست فيه. وعزلُ الشركةِ
+                // والعميلِ يبقيان فوقَه فيضيّقان لا يوسّعان.
+                $mine = hub_has_created_by($module)
+                    ? fn ($w) => $w->whereNull($col)->where('created_by', (string) $user->id)
+                    : null;
+
+                $q->where(function ($w) use ($col, $ids, $module, $user, $mine) {
+                    $w->whereIn($col, $ids);
+                    if (hub_has_assignee_col($module)) $w->orWhere('assignee_id', (string) $user->id);
+                    if ($mine) $w->orWhere($mine);
+                });
             }
         }
 
@@ -1760,9 +1771,126 @@ if (! function_exists('hub_expiry_url')) {
      */
     function hub_expiry_url(array $i): string
     {
-        if (! empty($i['self'])) return route('portal.me');
+        $t = hub_expiry_target($i);
 
-        return route('m.show', [$i['module'], $i['id']]);
+        return route($t['route'], $t['args']);
+    }
+}
+
+if (! function_exists('hub_has_created_by')) {
+    /** أللوحدةِ عمودُ «أنشأه»؟ — مخبّأٌ لكلِّ طلب (نظيرُ `hub_has_assignee_col`) */
+    function hub_has_created_by(string $module): bool
+    {
+        static $memo = [];
+        if (array_key_exists($module, $memo)) return $memo[$module];
+
+        $table = hub_modules()[$module]['table'] ?? null;
+
+        return $memo[$module] = $table
+            ? \Illuminate\Support\Facades\Schema::hasColumn($table, 'created_by')
+            : false;
+    }
+}
+
+if (! function_exists('hub_field_required')) {
+    /**
+     * **أهذا الحقلُ مطلوبٌ من هذا القارئِ فعلاً؟** — حكمٌ واحدٌ يقرؤه القالبُ والمتحقّق.
+     *
+     * إلزامُ حقلِ مرجعٍ **قائمتُه خاويةٌ لهذا القارئ** ليس انضباطاً بل طريقٌ
+     * مسدود: لا خيارَ يُنتقى، وكلُّ إرسالٍ يُردّ، أبداً. وقد وقع حرفيّاً في
+     * محاكاةِ الشهر (M-F2): أربعةُ موظّفين لم يُسنَدوا إلى مشروعٍ بعد وجدوا
+     * حقلَ المشروعِ مطلوباً وقائمتَه فيها خيارٌ واحدٌ هو الفراغ — **فأوّلُ واجبٍ
+     * يوميٍّ يُطلَب منهم كان أوّلَ بابٍ يُغلَق في وجوههم**، والشريطُ يدعوهم إليه.
+     *
+     * والتخفيفُ **مشروطٌ بثلاثةٍ معاً** فلا يتحوّل إلى ثغرةِ تحقّق:
+     *   ١) الحقلُ من نوع `ref` (قائمةُ اختيارٍ لا نصٌّ حرّ)،
+     *   ٢) وقائمتُه المنطَّقةُ لهذا القارئِ **خاويةٌ تماماً**،
+     *   ٣) وعمودُه في القاعدةِ **يقبل الفراغ** — فلا نستبدل ردَّ تحقّقٍ مفهوماً
+     *      بخطأِ قاعدةِ بياناتٍ غامض.
+     *
+     * فمن له مشروعٌ يبقى مسؤولاً عن ذكرِه: **الانضباطُ يبقى حيث يُمكن الوفاءُ به.**
+     */
+    function hub_field_required(string $module, array $f, $user = null): bool
+    {
+        $isRef = ($f['type'] ?? '') === 'ref' && empty($f['multi']);
+        $ref = $isRef ? (string) ($f['ref'] ?? '') : '';
+        $u = $user ?? auth()->user();
+
+        // **والإلزامُ قد يأتي من حالِ المستخدمِ لا من السجلّ** (M-F6): حسابٌ معزولٌ
+        // على شركاتٍ محدّدةٍ يفرض عليه الخادمُ ذكرَ الشركة (`guardCompany`) والسجلُّ
+        // لا يسمّيها مطلوبة — فلا نجمةَ في الصفحةِ ولا `required`، فيكتب ويضغط
+        // ويُردّ وقد ضاع ما كتب. واللافتةُ تُعلَّق **قبل** الطَّرق.
+        // (وحقلٌ مخفيٌّ أو للقراءةِ لا يُفرض: النموذجُ لا يرسله، والحارسُ يستثنيه.)
+        if ($ref === 'companies' && $u && $module !== 'companies'
+            && hub_company_ids($u) !== null
+            && hub_field_mode($u, $module, (string) $f['key']) === '') {
+            return true;
+        }
+
+        if (empty($f['required'])) return false;
+        if (! $isRef || $ref === '') return true;
+        if (! $u) return true;
+
+        // مذكّرةٌ لكلِّ (قارئ · مرجع) في الطلبِ الواحد — القالبُ والمتحقّقُ يسألان معاً
+        static $memo = [];
+        $key = ((string) ($u->id ?? '-')) . '|' . $ref;
+        if (! array_key_exists($key, $memo)) {
+            $memo[$key] = hub_ref_options_scoped($ref, null, $u);
+        }
+        if ($memo[$key] !== []) return true;
+
+        // القائمةُ خاوية: لا نُخفّف إلّا إن كان العمودُ يقبل الفراغ
+        $table = hub_modules()[$module]['table'] ?? null;
+        $col = (string) ($f['col'] ?? $f['key']);
+        if (! $table) return true;
+
+        return ! hub_column_is_nullable($table, $col);
+    }
+}
+
+if (! function_exists('hub_column_is_nullable')) {
+    /** أيقبل هذا العمودُ الفراغَ؟ — يُسأل المخطّطُ مرّةً ويُخبَّأ لكلِّ طلب */
+    function hub_column_is_nullable(string $table, string $column): bool
+    {
+        static $memo = [];
+        $key = $table . '.' . $column;
+        if (array_key_exists($key, $memo)) return $memo[$key];
+
+        try {
+            // `Schema::getColumns` هي سكّةُ Laravel 11 (وDoctrine DBAL أُسقطت فيها،
+            // فاستدعاءُ `getDoctrineColumn` يرمي دائماً ويُقرأ «غيرُ قابلٍ للفراغ»
+            // صامتاً — فشلٌ مغلقٌ يُبطل الإصلاحَ كلَّه بلا أثرٍ ظاهر).
+            $c = collect(\Illuminate\Support\Facades\Schema::getColumns($table))
+                ->firstWhere('name', $column);
+
+            return $memo[$key] = $c !== null && ($c['nullable'] ?? false) === true;
+        } catch (\Throwable) {
+            // لا سبيلَ للسؤال: **يفشل مغلقاً** — يبقى الحقلُ مطلوباً كما كان
+            return $memo[$key] = false;
+        }
+    }
+}
+
+if (! function_exists('hub_expiry_target')) {
+    /**
+     * **الوجهةُ نفسُها مُفكَّكةً** — مسارٌ ووسائط، لا عنواناً مبنيّاً.
+     *
+     * الويبُ يريدها عنواناً (`hub_expiry_url` يبنيه منها)، والجوالُ يريدها
+     * **بياناً** يضعه في عقدِه. وكانت القاعدةُ محبوسةً في بانيةِ العنوانِ
+     * وحدَها، فصدّر الجوالُ رايةَ `self` عاريةً وتُرك للتطبيقِ أن يستنتج —
+     * فبقي البندُ في سجلِّ المجلسِ «مُعلَّقاً على إصدارِ تطبيق» وهو في الخادم.
+     *
+     * والقاعدةُ واحدةٌ للسطحَين بعد اليوم: من استنتج غيرَها انحرف وحدَه.
+     *
+     * @return array{route:string, args:array<int,string>}
+     */
+    function hub_expiry_target(array $i): array
+    {
+        // صفُّ صاحبِ الشأنِ يُعرَض لمن لا يملك صلاحيّةَ الوحدةِ قصداً — فوجهتُه
+        // ملفُّه هو، لا سجلُّ الوحدةِ الذي يردّه ٤٠٣ بعد أن أنذرَته الشاشة.
+        if (! empty($i['self'])) return ['route' => 'portal.me', 'args' => []];
+
+        return ['route' => 'm.show', 'args' => [(string) $i['module'], (string) $i['id']]];
     }
 }
 
