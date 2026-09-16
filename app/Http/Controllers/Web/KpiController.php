@@ -114,7 +114,7 @@ class KpiController extends Controller
 
         $before = ['name' => $k->name, 'target' => $k->target,
                    'formula' => hub_kpi_explain((array) $k->formula)];
-        $k->update($this->attrs($d));
+        $k->update($this->attrs($d, $k));
         $after = ['name' => $k->name, 'target' => $k->target,
                   'formula' => hub_kpi_explain((array) $k->formula)];
 
@@ -185,6 +185,10 @@ class KpiController extends Controller
             // (WP-8.5) مالكٌ ودورة: «خارج الهدف» لا تصير فعلاً حتى يُعرف من يُسأل
             'owner_id' => ['nullable', 'uuid', \Illuminate\Validation\Rule::exists('users', 'id')],
             'period'   => ['nullable', 'string', 'max:20'],
+            // نسبُ الهدف: من أين جاء الرقم؟ `baseline` لا يُكتب من الشاشة —
+            // خطُّ الأساس **قياسٌ** يضبطه `hub:kpis-baseline` لا اختيارٌ يُدَّعى
+            'target_basis' => ['nullable', 'in:policy,manual'],
+            'target_note'  => ['nullable', 'string', 'max:300'],
             'a_agg'    => ['required', 'in:count,sum,avg'],
             'a_module' => ['required', 'string', 'max:60'],
             'a_col'    => ['nullable', 'string', 'max:60'],
@@ -198,7 +202,7 @@ class KpiController extends Controller
     }
 
     /** الحقول المحفوظة من مدخلاتٍ محقّقة — واحدةٌ للإضافة والتعديل فلا يفترقان */
-    protected function attrs(array $d): array
+    protected function attrs(array $d, ?KpiDef $existing = null): array
     {
         // الوحدات لا بد أن تكون مسجَّلة ومرئية — نفس حارس المقياس
         abort_unless(hub_mod($d['a_module']) && hub_can(auth()->user(), $d['a_module'], 'v'), 422);
@@ -224,12 +228,46 @@ class KpiController extends Controller
         $out = ['name' => $d['name'], 'unit' => $d['unit'] ?? null,
                 'target' => hub_num($d['target'] ?? null), 'good' => $d['good'], 'formula' => $formula];
 
+        /*
+         * **نسبُ الهدفِ يتبع الرقم** (v2.539): هدفٌ كُتب في الشاشة نسبُه ما
+         * أعلنه كاتبُه (`policy` التزامٌ · `manual` تقدير)، و«خطُّ الأساس»
+         * (`baseline`) **لا يُدَّعى من الشاشة** — هو قياسٌ يضبطه أمرُه.
+         * ورقمٌ لم يتغيّر يحتفظ بنسبه: تعديلُ اسمِ المؤشّرِ وحدَه كان يمحو
+         * أنّ هدفَه مقيسٌ فيصير رقماً صامتاً بلا سند.
+         */
+        if (hub_has_col('kpi_defs', 'target_basis')) {
+            $target = $out['target'];
+            $same = $existing !== null && $existing->target !== null && $target !== null
+                && abs((float) $existing->target - (float) $target) < 0.000001;
+
+            if ($target === null) {
+                $out['target_basis'] = null;
+                $out['target_note'] = null;
+            } elseif ($same && trim((string) $existing->target_basis) !== '') {
+                $out['target_basis'] = $existing->target_basis;
+                $out['target_note'] = ($n = trim(hub_str($d['target_note'] ?? ''))) !== ''
+                    ? mb_substr($n, 0, 300) : $existing->target_note;
+            } else {
+                $out['target_basis'] = ($d['target_basis'] ?? '') === 'policy' ? 'policy' : 'manual';
+                $out['target_note'] = ($n = trim(hub_str($d['target_note'] ?? ''))) !== ''
+                    ? mb_substr($n, 0, 300) : null;
+                if (hub_has_col('kpi_defs', 'baseline_at')) $out['baseline_at'] = null;
+            }
+        }
+
+        // **وإعدادُ النوعِ يُكمل النواقص**: نسبةٌ بلا «٪»، أو مبلغٌ بلا عملة،
+        // أو مؤشّرٌ بلا دورة — كلُّها تُملأ من نوعِ المعادلة لا تُترك «—»
+        $kindDef = \App\Support\KpiCentre::kindDefaults(
+            \App\Support\KpiCentre::kind($formula, $out['unit']));
+        if (trim((string) $out['unit']) === '' && $kindDef['unit'] !== null) $out['unit'] = $kindDef['unit'];
+
         // العمودان مضافان في هجرة الطور ٨ — يُكتبان بحارسٍ فلا تسقط الكتابة
         // على نسخةٍ لم تُرحَّل بعد (الإضافةُ لا الكسر)
         if (hub_has_col('kpi_defs', 'owner_id')) $out['owner_id'] = $d['owner_id'] ?? null;
         if (hub_has_col('kpi_defs', 'period')) {
             $out['period'] = ($p = trim(hub_str($d['period'] ?? ''))) === ''
-                ? null : mb_substr($p, 0, 20);      // القصُّ بعرض العمود الصريح عند الكاتب
+                ? $kindDef['period']                // لا «—»: دورةُ النوعِ افتراضاً
+                : mb_substr($p, 0, 20);             // القصُّ بعرض العمود الصريح عند الكاتب
         }
 
         return $out;

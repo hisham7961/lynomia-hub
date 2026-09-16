@@ -356,18 +356,21 @@ return [
                     'col' => 'budget',
                     'label' => 'الميزانية',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'cost',
                     'col' => 'cost',
                     'label' => 'التكلفة الفعلية',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'revExp',
                     'col' => 'rev_exp',
                     'label' => 'الإيراد المتوقع',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'currency',
@@ -1133,6 +1136,7 @@ return [
                     'col' => 'cost',
                     'label' => 'تكلفة التجديد',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'currency',
@@ -1298,7 +1302,7 @@ return [
                 ['key' => 'cores', 'col' => 'cores', 'label' => 'أنوية المعالج', 'type' => 'num'],
                 ['key' => 'ramGb', 'col' => 'ram_gb', 'label' => 'الذاكرة (GB)', 'type' => 'num'],
                 ['key' => 'diskGb', 'col' => 'disk_gb', 'label' => 'القرص (GB)', 'type' => 'num'],
-                ['key' => 'costMonth', 'col' => 'cost_month', 'label' => 'الكلفة الشهرية', 'type' => 'num'],
+                ['key' => 'costMonth', 'col' => 'cost_month', 'label' => 'الكلفة الشهرية', 'type' => 'num', 'money' => true,],
                 ['key' => 'backupPolicy', 'col' => 'backup_policy', 'label' => 'سياسة النسخ الاحتياطي', 'type' => 'text'],
                 ['key' => 'lastPatch', 'col' => 'last_patch', 'label' => 'آخر ترقيع أمني', 'type' => 'date'],
 
@@ -1320,6 +1324,7 @@ return [
                     'col' => 'cost',
                     'label' => 'تكلفة الدورة',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'cycle',
@@ -2837,6 +2842,7 @@ return [
                     'col' => 'amount',
                     'label' => 'القيمة',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'currency',
@@ -3209,6 +3215,7 @@ return [
                     'col' => 'amount',
                     'label' => 'القيمة',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'currency',
@@ -3643,18 +3650,21 @@ return [
                     'col' => 'amount',
                     'label' => 'المبلغ قبل الضريبة',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'tax',
                     'col' => 'tax',
                     'label' => 'الضريبة',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'total',
                     'col' => 'total',
                     'label' => 'الإجمالي',
                     'type' => 'num',
+                    'money' => true,
                     'required' => true,
                 ],
                 [
@@ -3662,6 +3672,7 @@ return [
                     'col' => 'paid',
                     'label' => 'المدفوع',
                     'type' => 'num',
+                    'money' => true,
                     // مقفول سجلّياً: المدفوع يُحرَّك عبر إجراء «دفعة» (pay) وحده —
                     // حيث يُسقَف بالمتبقي ويحرّك رصيد البنك ويولّد القيد. تحريرُه
                     // يدويّاً كان يفكّه عن البنك والدفتر (فيضٌ/سالبٌ/فكّ ربط).
@@ -3980,8 +3991,8 @@ return [
                  'hint' => 'يدخل رادار «ينتهي قريباً» — فالتجديد يُطرق بابه قبل شهرٍ لا بعد فوات.'],
                 ['key' => 'billing', 'col' => 'billing', 'label' => 'نموذج الفوترة', 'type' => 'sel',
                  'options' => ['سعر ثابت', 'بالساعة', 'عقد شهري', 'اشتراك', 'دفعات مراحل', 'تكلفة + هامش', 'حسب الاستخدام', 'عقد دعم', 'أخرى']],
-                ['key' => 'revenue', 'col' => 'revenue', 'label' => 'القيمة التعاقدية', 'type' => 'num'],
-                ['key' => 'budget', 'col' => 'budget', 'label' => 'الميزانية التقديرية للتكلفة', 'type' => 'num'],
+                ['key' => 'revenue', 'col' => 'revenue', 'label' => 'القيمة التعاقدية', 'type' => 'num', 'money' => true,],
+                ['key' => 'budget', 'col' => 'budget', 'label' => 'الميزانية التقديرية للتكلفة', 'type' => 'num', 'money' => true,],
                 ['key' => 'currency', 'col' => 'currency', 'label' => 'العملة', 'type' => 'sel',
                  'options' => ['د.ك', 'دولار', 'ريال', 'درهم', 'يورو']],
                 ['key' => 'scope', 'col' => 'scope', 'label' => 'نطاق العمل (SOW)', 'type' => 'ta'],
@@ -4393,12 +4404,14 @@ return [
                     'col' => 'price',
                     'label' => 'السعر',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'cost',
                     'col' => 'cost',
                     'label' => 'تكلفة التشغيل الشهرية',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'cycle',
@@ -4465,8 +4478,8 @@ return [
                 ['key' => 'unit', 'col' => 'unit', 'label' => 'وحدة التسعير', 'type' => 'sel',
                  'options' => ['ثابت', 'لكل مستخدم', 'لكل جهاز', 'لكل ساعة', 'لكل مشروع', 'لكل وحدة', 'حسب الاستخدام']],
                 ['key' => 'currency', 'col' => 'currency', 'label' => 'العملة', 'type' => 'text'],
-                ['key' => 'minPrice', 'col' => 'min_price', 'label' => 'أدنى سعر يُقبل', 'type' => 'num'],
-                ['key' => 'setupFee', 'col' => 'setup_fee', 'label' => 'رسوم التهيئة (مرة واحدة)', 'type' => 'num'],
+                ['key' => 'minPrice', 'col' => 'min_price', 'label' => 'أدنى سعر يُقبل', 'type' => 'num', 'money' => true,],
+                ['key' => 'setupFee', 'col' => 'setup_fee', 'label' => 'رسوم التهيئة (مرة واحدة)', 'type' => 'num', 'money' => true,],
                 ['key' => 'priceReview', 'col' => 'price_review', 'label' => 'موعد مراجعة السعر', 'type' => 'date', 'expiry' => true],
 
                 // ── ما الذي يُباع فعلاً ──
@@ -4604,6 +4617,7 @@ return [
                     'col' => 'value',
                     'label' => 'القيمة',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'currency',
@@ -5818,12 +5832,14 @@ return [
                     'col' => 'balance',
                     'label' => 'الرصيد الحالي',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'minBal',
                     'col' => 'min_bal',
                     'label' => 'حد التنبيه',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'accId',
@@ -6592,18 +6608,21 @@ return [
                     'col' => 'amount',
                     'label' => 'المبلغ قبل الضريبة',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'tax',
                     'col' => 'tax',
                     'label' => 'الضريبة',
                     'type' => 'num',
+                    'money' => true,
                 ],
                 [
                     'key' => 'total',
                     'col' => 'total',
                     'label' => 'الإجمالي',
                     'type' => 'num',
+                    'money' => true,
                     // يُحسَب خادمياً من البنود المهيكلة (recalc) — ويبقى قابلاً
                     // للإدخال اليدويّ للعروض البسيطة القائمة على النصّ الحر.
                     'hint' => 'يُحسَب تلقائياً من بنود العرض المهيكلة إن وُجدت.',
@@ -6648,10 +6667,10 @@ return [
                 ['key' => 'amId', 'col' => 'am_id', 'label' => 'مدير الحساب', 'type' => 'ref', 'ref' => 'users'],
                 ['key' => 'pmId', 'col' => 'pm_id', 'label' => 'مدير التنفيذ', 'type' => 'ref', 'ref' => 'users'],
                 ['key' => 'engagementId', 'col' => 'engagement_id', 'label' => 'الارتباط (يُملأ عند التحويل)', 'type' => 'ref', 'ref' => 'engagements'],
-                ['key' => 'discount', 'col' => 'discount', 'label' => 'خصمٌ على مستوى العرض', 'type' => 'num'],
+                ['key' => 'discount', 'col' => 'discount', 'label' => 'خصمٌ على مستوى العرض', 'type' => 'num', 'money' => true,],
                 // **التكلفة التقديرية الداخلية — تُخفى عن العميل**: حقلٌ يُقيَّد بقواعد
                 // الدور (hide) فلا يصل PDF العميل ولا عرضَه الخارجي. الهامشُ يُحسب منها.
-                ['key' => 'cost', 'col' => 'cost', 'label' => 'التكلفة التقديرية (داخليّ)', 'type' => 'num',
+                ['key' => 'cost', 'col' => 'cost', 'label' => 'التكلفة التقديرية (داخليّ)', 'type' => 'num', 'money' => true,
                  'hint' => 'داخليٌّ بحت — لا يظهر للعميل. يُحسَب منه الهامشُ المتوقّع.'],
                 // قالبٌ قابلٌ للاستنساخ: عرضٌ مُعلَّمٌ قالباً يُستنسخ عروضاً جديدة بلا إعادة إدخال
                 ['key' => 'isTemplate', 'col' => 'is_template', 'label' => 'قالبٌ قابلٌ للاستنساخ', 'type' => 'bool',
@@ -6700,10 +6719,10 @@ return [
                 ['key' => 'engagementId', 'col' => 'engagement_id', 'label' => 'الارتباط', 'type' => 'ref', 'ref' => 'engagements'],
                 ['key' => 'description', 'col' => 'description', 'label' => 'النطاق المُضاف', 'type' => 'ta'],
                 ['key' => 'reason', 'col' => 'reason', 'label' => 'سبب التغيير', 'type' => 'text'],
-                ['key' => 'valueDelta', 'col' => 'value_delta', 'label' => 'تغيّر القيمة التعاقدية (±)', 'type' => 'num',
+                ['key' => 'valueDelta', 'col' => 'value_delta', 'label' => 'تغيّر القيمة التعاقدية (±)', 'type' => 'num', 'money' => true,
                  'hint' => 'موجبٌ للزيادة وسالبٌ للنقص. يُضاف لخطّ الأساس عند التطبيق.'],
                 // التكلفةُ الداخلية تُخفى عن العميل بقواعد الدور (كحقل cost في العروض)
-                ['key' => 'costDelta', 'col' => 'cost_delta', 'label' => 'أثر التكلفة (داخليّ)', 'type' => 'num',
+                ['key' => 'costDelta', 'col' => 'cost_delta', 'label' => 'أثر التكلفة (داخليّ)', 'type' => 'num', 'money' => true,
                  'hint' => 'داخليٌّ بحت — لا يظهر للعميل.'],
                 ['key' => 'timelineDays', 'col' => 'timeline_days', 'label' => 'أثر الجدول (أيام ±)', 'type' => 'num'],
                 ['key' => 'currency', 'col' => 'currency', 'label' => 'العملة', 'type' => 'sel',
@@ -6824,6 +6843,7 @@ return [
                     'col' => 'amount',
                     'label' => 'المبلغ المعتمد',
                     'type' => 'num',
+                    'money' => true,
                     'required' => true,
                 ],
                 [
@@ -6985,6 +7005,7 @@ return [
                     'col' => 'amount',
                     'label' => 'المبلغ',
                     'type' => 'num',
+                    'money' => true,
                     'required' => true,
                 ],
                 [
@@ -7380,6 +7401,7 @@ return [
                     'col' => 'total',
                     'label' => 'الإجمالي',
                     'type' => 'num',
+                    'money' => true,
                     // مشتقٌّ من مجموع سطور المسيّر (generate/adjust يكتبانه على النموذج
                     // مباشرةً) — لا يُحرَّر من النموذج العام، وإلا بنى عليه قيدُ اليومية
                     // المُرحَّل (المقفول أبداً) رقماً مختلَقاً لا يُصحَّح بعد الترحيل.
@@ -8378,7 +8400,7 @@ return [
                 ['key' => 'due', 'col' => 'due', 'label' => 'التسليم المتوقع', 'type' => 'date'],
                 ['key' => 'items', 'col' => 'items', 'label' => 'البنود (سطر لكل بند: وصف | كمية | سعر | وحدات الكرتونة اختياري)', 'type' => 'ta',
                  'hint' => 'أضف عموداً رابعاً «وحدات الكرتونة» لأي بند لحساب كراتينه، أو اضبط تعبئة المنتج مرةً في المخزون فتُحسب تلقائياً بمطابقة الاسم.'],
-                ['key' => 'amount', 'col' => 'amount', 'label' => 'الإجمالي', 'type' => 'num'],
+                ['key' => 'amount', 'col' => 'amount', 'label' => 'الإجمالي', 'type' => 'num', 'money' => true,],
                 ['key' => 'currency', 'col' => 'currency', 'label' => 'العملة', 'type' => 'sel',
                  'options' => ['KWD', 'USD', 'EUR', 'SAR', 'AED']],
                 ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
@@ -8390,7 +8412,7 @@ return [
                  'hint' => 'اتركه فارغاً للشراء الداخلي. مع عميلٍ وراية «يُفوتر»، يُحسب مبلغُ الفوترة من الهامش.'],
                 ['key' => 'billable', 'col' => 'billable', 'label' => 'يُفوتر للعميل', 'type' => 'bool'],
                 ['key' => 'markup', 'col' => 'markup', 'label' => 'الهامش ٪', 'type' => 'num'],
-                ['key' => 'charge', 'col' => 'charge', 'label' => 'مبلغ الفوترة للعميل', 'type' => 'num',
+                ['key' => 'charge', 'col' => 'charge', 'label' => 'مبلغ الفوترة للعميل', 'type' => 'num', 'money' => true,
                  'hint' => 'يُحسب تلقائياً من الإجمالي والهامش إن تُرك فارغاً — وأدخِله يدوياً ليغلب.'],
                 ['key' => 'invoiceNo', 'col' => 'invoice_no', 'label' => 'رقم فاتورة المورد', 'type' => 'text'],
                 ['key' => 'att', 'col' => 'att_id', 'label' => 'مرفق (عرض المورد/الفاتورة)', 'type' => 'file'],
@@ -8513,7 +8535,7 @@ return [
                 ['key' => 'title', 'col' => 'title', 'label' => 'الالتزام', 'type' => 'text', 'required' => true],
                 ['key' => 'contractId', 'col' => 'contract_id', 'label' => 'العقد', 'type' => 'ref', 'ref' => 'contracts'],
                 ['key' => 'due', 'col' => 'due', 'label' => 'تاريخ الاستحقاق', 'type' => 'date', 'expiry' => true],
-                ['key' => 'amount', 'col' => 'amount', 'label' => 'المبلغ', 'type' => 'num'],
+                ['key' => 'amount', 'col' => 'amount', 'label' => 'المبلغ', 'type' => 'num', 'money' => true,],
                 ['key' => 'currency', 'col' => 'currency', 'label' => 'العملة', 'type' => 'sel',
                  'options' => ['د.ك', 'دولار', 'ريال', 'درهم', 'يورو', 'KWD']],
                 ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
@@ -8839,8 +8861,8 @@ return [
                 ['key' => 'followers', 'col' => 'followers', 'label' => 'إجمالي متابعيهم', 'type' => 'num'],
 
                 // التسعير المُقارَن: «نموذج التسعير» نصاً لا يُقارَن برقمنا
-                ['key' => 'priceFrom', 'col' => 'price_from', 'label' => 'أرخص باقة معلنة', 'type' => 'num'],
-                ['key' => 'priceTo', 'col' => 'price_to', 'label' => 'أغلى باقة معلنة', 'type' => 'num'],
+                ['key' => 'priceFrom', 'col' => 'price_from', 'label' => 'أرخص باقة معلنة', 'type' => 'num', 'money' => true,],
+                ['key' => 'priceTo', 'col' => 'price_to', 'label' => 'أغلى باقة معلنة', 'type' => 'num', 'money' => true,],
                 ['key' => 'currency', 'col' => 'currency', 'label' => 'العملة', 'type' => 'text'],
                 ['key' => 'billing', 'col' => 'billing', 'label' => 'دورة فوترتهم', 'type' => 'sel',
                  'options' => ['شهري', 'سنوي', 'مرة واحدة', 'حسب الاستخدام', 'مختلط']],
@@ -8984,7 +9006,7 @@ return [
                 ['key' => 'authorId', 'col' => 'author_id', 'label' => 'المخترع أو المؤلف', 'type' => 'ref', 'ref' => 'users'],
                 ['key' => 'projectId', 'col' => 'project_id', 'label' => 'المشروع المرتبط', 'type' => 'ref', 'ref' => 'projects'],
                 ['key' => 'descr', 'col' => 'descr', 'label' => 'الوصف ونطاق الحماية', 'type' => 'ta'],
-                ['key' => 'cost', 'col' => 'cost', 'label' => 'تكلفة التسجيل', 'type' => 'num'],
+                ['key' => 'cost', 'col' => 'cost', 'label' => 'تكلفة التسجيل', 'type' => 'num', 'money' => true,],
                 ['key' => 'currency', 'col' => 'currency', 'label' => 'العملة', 'type' => 'sel',
                  'options' => ['د.ك', 'دولار', 'ريال', 'درهم', 'يورو']],
                 ['key' => 'att', 'col' => 'att_id', 'label' => 'المستندات (شهادة التسجيل)', 'type' => 'file'],
@@ -9014,8 +9036,8 @@ return [
                 ['key' => 'brandId', 'col' => 'brand_id', 'label' => 'العلامة التجارية', 'type' => 'ref', 'ref' => 'brands'],
                 ['key' => 'ownerId', 'col' => 'owner_id', 'label' => 'المسؤول عن الحدث', 'type' => 'ref', 'ref' => 'users'],
                 ['key' => 'team', 'col' => 'team', 'label' => 'فريق المشاركة', 'type' => 'ref', 'ref' => 'users', 'multi' => true],
-                ['key' => 'budget', 'col' => 'budget', 'label' => 'الميزانية المعتمدة', 'type' => 'num'],
-                ['key' => 'actualCost', 'col' => 'actual_cost', 'label' => 'التكلفة الفعلية', 'type' => 'num'],
+                ['key' => 'budget', 'col' => 'budget', 'label' => 'الميزانية المعتمدة', 'type' => 'num', 'money' => true,],
+                ['key' => 'actualCost', 'col' => 'actual_cost', 'label' => 'التكلفة الفعلية', 'type' => 'num', 'money' => true,],
                 ['key' => 'currency', 'col' => 'currency', 'label' => 'العملة', 'type' => 'sel',
                  'options' => ['د.ك', 'دولار', 'ريال', 'درهم', 'يورو']],
                 ['key' => 'goals', 'col' => 'goals', 'label' => 'أهداف المشاركة', 'type' => 'ta'],
@@ -9041,7 +9063,7 @@ return [
             'fields' => [
                 ['key' => 'name', 'col' => 'name', 'label' => 'اسم الباقة', 'type' => 'text', 'required' => true],
                 ['key' => 'serviceId', 'col' => 'service_id', 'label' => 'الخدمة أو المنتج', 'type' => 'ref', 'ref' => 'services', 'required' => true],
-                ['key' => 'price', 'col' => 'price', 'label' => 'السعر', 'type' => 'num', 'required' => true],
+                ['key' => 'price', 'col' => 'price', 'label' => 'السعر', 'type' => 'num', 'money' => true, 'required' => true],
                 ['key' => 'currency', 'col' => 'currency', 'label' => 'العملة', 'type' => 'sel',
                  'options' => ['د.ك', 'دولار', 'ريال', 'درهم', 'يورو']],
                 ['key' => 'cycle', 'col' => 'cycle', 'label' => 'دورة الفوترة', 'type' => 'sel',
@@ -9053,9 +9075,9 @@ return [
                 ['key' => 'addons', 'col' => 'addons', 'label' => 'الإضافات المتاحة', 'type' => 'ta'],
                 ['key' => 'discounts', 'col' => 'discounts', 'label' => 'الخصومات وشروطها', 'type' => 'ta'],
                 ['key' => 'effectiveFrom', 'col' => 'effective_from', 'label' => 'تاريخ سريان السعر', 'type' => 'date'],
-                ['key' => 'prevPrice', 'col' => 'prev_price', 'label' => 'السعر السابق', 'type' => 'num'],
+                ['key' => 'prevPrice', 'col' => 'prev_price', 'label' => 'السعر السابق', 'type' => 'num', 'money' => true,],
                 ['key' => 'priceChangedAt', 'col' => 'price_changed_at', 'label' => 'تاريخ آخر تغيير للسعر', 'type' => 'date'],
-                ['key' => 'unitCost', 'col' => 'unit_cost', 'label' => 'التكلفة التقديرية لتقديم الباقة', 'type' => 'num'],
+                ['key' => 'unitCost', 'col' => 'unit_cost', 'label' => 'التكلفة التقديرية لتقديم الباقة', 'type' => 'num', 'money' => true,],
                 ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
                  'options' => ['نشطة', 'قيد الإعداد', 'متوقفة عن البيع', 'ملغاة']],
             ],

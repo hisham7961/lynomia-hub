@@ -326,6 +326,7 @@ class ModuleController extends Controller
         $m = new $class;
         $this->fill($def, $r, $m);
 
+        $this->stampAuthor($m, $module);
         $this->inheritCompany($m, $module);
         $this->inheritProject($m, $module);
         $this->inheritClient($m, $module);
@@ -1452,6 +1453,28 @@ class ModuleController extends Controller
             throw \Illuminate\Validation\ValidationException::withMessages(
                 [$pf['key'] => 'حسابك محدود النطاق — اختر مشروعاً من مشاريعك']);
         }
+    }
+
+    /**
+     * **مَن كتب هذا السجل؟** — ختمُ صاحبِه عند الإنشاء (v2.539).
+     *
+     * `hub_scope` يمنح محدودَ النطاقِ رؤيةَ **ما أنشأه هو** حين لا يحمل السجلُّ
+     * مشروعاً (M-F2): `orWhere(created_by = me)`. لكنّ العمودَ لم يكن يُكتب إلّا
+     * في نموذجين (`WorkUpdate` و`Document`) — فالفرعُ كلُّه ميّتٌ في بقيّةِ
+     * الوحدات: يكتب الموظّفُ فكرةً أو اجتماعاً بلا مشروع، فيُحفَظ الصفُّ
+     * **ويختفي عنه فوراً**. وهو أسوأُ من المنع: المنعُ يُقال، والاختفاءُ يُقرأ
+     * عطباً في النظامِ أو في الكاتب.
+     *
+     * والختمُ هنا لا في أحداثِ كلِّ نموذج: مسارٌ واحدٌ للويبِ والـAPI معاً،
+     * وبحارسِ عمودٍ فلا تسقط الكتابةُ على وحدةٍ بلا `created_by`. ومَن يختمه
+     * في `creating` (النموذجان أعلاه) يجده مختوماً فلا يُعيد.
+     */
+    protected function stampAuthor(Model $m, string $module): void
+    {
+        if (! auth()->id() || ! empty($m->created_by)) return;
+        if (! hub_has_created_by($module)) return;
+
+        $m->created_by = (string) auth()->id();
     }
 
     /**

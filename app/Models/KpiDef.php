@@ -11,5 +11,7 @@ class KpiDef extends Model
 
     protected $table = 'kpi_defs';
     protected $guarded = ['id'];
-    protected $casts = ['formula' => 'array', 'target' => 'float'];
+    protected $casts = ['formula' => 'array', 'target' => 'float',
+        // نسبُ الهدف (v2.539): متى قِيس خطُّ الأساس — تاريخٌ لا نصّ، فيُقرأ عمرُه
+        'baseline_at' => 'datetime'];
 }

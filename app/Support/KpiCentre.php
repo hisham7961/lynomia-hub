@@ -49,6 +49,129 @@ class KpiCentre
     ];
 
     /**
+     * **أنواعُ المؤشّرات** — لأنّ «إعداداً كاملاً» ليس واحداً لكلِّ مؤشّر.
+     *
+     * نسبةٌ مئويّةٌ هدفُها بين صفرٍ ومئة وتُعرض بمنزلةٍ واحدةٍ ولاحقةِ «٪»؛
+     * ومبلغٌ يُعرض بفواصلِ الآلافِ وعملةِ الأساس؛ وعدٌّ رقمٌ صحيحٌ باسمِ معدوده؛
+     * ومتوسّطٌ بمنزلتين. وخلطُها في قالبٍ واحد هو ما جعل الشاشةَ تقرأ
+     * «١٢٥٠٠٠ · الهدف ١٢٠٠٠٠» بلا عملةٍ ولا فاصلة.
+     */
+    public const KIND_PCT = 'pct';
+    public const KIND_MONEY = 'money';
+    public const KIND_AVG = 'avg';
+    public const KIND_COUNT = 'count';
+
+    public const KIND_LABEL = [
+        self::KIND_PCT   => 'نسبة مئويّة',
+        self::KIND_MONEY => 'مبلغ',
+        self::KIND_AVG   => 'متوسّط',
+        self::KIND_COUNT => 'عدّ',
+    ];
+
+    /**
+     * نوعُ المؤشّرِ من معادلته — **مشتقٌّ لا مخزَّن**: عمودٌ ثالثٌ يحمل النوعَ
+     * ينحرف عن المعادلةِ يومَ تُعدَّل المعادلةُ وحدَها، فيُعرض مبلغٌ بلاحقةِ «٪».
+     */
+    public static function kind(array $formula, ?string $unit = null): string
+    {
+        if (($formula['combine'] ?? 'none') === 'ratio_pct') return self::KIND_PCT;
+        if (trim((string) $unit) === '٪') return self::KIND_PCT;
+
+        $agg = hub_str($formula['a']['agg'] ?? 'count', 'count');
+        if ($agg === 'avg') return self::KIND_AVG;
+        if ($agg === 'count') return self::KIND_COUNT;
+
+        // `sum` على عمودٍ ماليّ ⇒ مبلغ. والماليّةُ تُعرف من وحدةِ المقياس لا من اسمِ عموده:
+        // سجلُّ الوحدات يُعلن `money` على الحقولِ المبلغيّة، وما عداها مجموعٌ عدديّ.
+        return self::isMoney($formula['a'] ?? []) ? self::KIND_MONEY : self::KIND_COUNT;
+    }
+
+    /** أهذا المقياسُ مجموعُ عمودٍ ماليّ؟ — من سجلّ الوحدة لا من تخمينِ الاسم */
+    protected static function isMoney($metric): bool
+    {
+        if (! is_array($metric)) return false;
+        $def = hub_mod(hub_str($metric['module'] ?? ''));
+        if (! $def) return false;
+
+        $ck = hub_str($metric['col'] ?? '');
+        if ($ck === '') return false;
+
+        $col = collect($def['fields'])->firstWhere('key', $ck)
+            ?: collect($def['fields'])->firstWhere('col', $ck);
+
+        return (bool) ($col['money'] ?? false);
+    }
+
+    /**
+     * **إعدادُ النوع** — الوحدةُ والدورةُ ومنازلُ العرض ومدى الهدف المقبول.
+     *
+     * دورةُ العدّ «لحظي» لا «شهري»: عدُّ المفتوحِ الآن **رصيدٌ قائم** يُقرأ
+     * لحظةَ النظر، لا تدفّقٌ يُجمَع على شهر — وتسميتُه «شهريّاً» تَعِد بجمعٍ
+     * لا يقع. والمجاميعُ والنسبُ تدفّقاتٌ فدورتُها شهريّة.
+     *
+     * @return array{unit: ?string, period: string, decimals: int, min: ?float, max: ?float}
+     */
+    public static function kindDefaults(string $kind): array
+    {
+        return match ($kind) {
+            self::KIND_PCT => ['unit' => '٪', 'period' => 'شهري', 'decimals' => 1, 'min' => 0.0, 'max' => 100.0],
+            self::KIND_MONEY => ['unit' => \App\Support\Currency::base(), 'period' => 'شهري',
+                                 'decimals' => 0, 'min' => null, 'max' => null],
+            self::KIND_AVG => ['unit' => null, 'period' => 'شهري', 'decimals' => 2, 'min' => null, 'max' => null],
+            default => ['unit' => null, 'period' => 'لحظي', 'decimals' => 0, 'min' => 0.0, 'max' => null],
+        };
+    }
+
+    /**
+     * عرضُ قيمةٍ بنوعها — رقمٌ واحدٌ بمنازلَ واحدةٍ ووحدةٍ واحدة في كلِّ شاشة.
+     * كان كلُّ سطحٍ يقصّ أصفارَه بطريقته فاختلف الرقمُ نفسُه بين بطاقةٍ وجدول.
+     */
+    public static function format($value, string $kind, ?string $unit = null): string
+    {
+        if ($value === null) return '—';
+
+        $d = self::kindDefaults($kind)['decimals'];
+        $txt = number_format((float) $value, $d);
+        if ($d > 0) $txt = rtrim(rtrim($txt, '0'), '.');      // ٨٠٫٠ ⇒ ٨٠
+
+        $u = trim((string) ($unit ?? self::kindDefaults($kind)['unit']));
+
+        return $u === '' ? $txt : ($u === '٪' ? $txt . '٪' : $txt . ' ' . $u);
+    }
+
+    /**
+     * **ما ينقص هذا المؤشّرَ ليكون مُعَدّاً** — قائمةُ نواقصَ تُقال لا حكمٌ صامت.
+     *
+     * «لا مؤشّرَ بلا إعداد» قاعدةٌ لا تُفرَض بالنيّة: شاشةٌ تعرض «—» في خانةِ
+     * الهدفِ والدورةِ والمالك تبدو عاملةً وهي لا تُحاسِب أحداً على شيء.
+     *
+     * @return array<int, string>
+     */
+    public static function missingConfig(array $row): array
+    {
+        $gaps = [];
+
+        if ($row['target'] === null) {
+            // **والنقصُ يُقال بسببه**: «بلا هدف» على وحدةٍ لم يُسجَّل فيها شيءٌ بعدُ
+            // ليس إهمالاً في الإعداد — لا شيءَ يُقاس منه خطُّ أساس. وخلطُهما
+            // يجعل القائمةَ تطلب ما لا يُمكن فعلُه، فتُهمَل كلُّها.
+            $v = $row['value'] ?? null;
+            $gaps[] = ($v === null || abs((float) $v) < 0.000001)
+                ? 'بلا هدف — ولا بياناتٍ بعدُ لقياس خطِّ أساس'
+                : 'بلا هدف — يُضبط بخطِّ أساسٍ مقيس';
+        }
+        if (trim((string) ($row['unit'] ?? '')) === '' && ($row['kind'] ?? '') !== self::KIND_COUNT) {
+            $gaps[] = 'بلا وحدة قياس';
+        }
+        if (trim((string) ($row['period'] ?? '')) === '') $gaps[] = 'بلا دورة';
+        if ($row['target'] !== null && trim((string) ($row['target_basis'] ?? '')) === '') {
+            $gaps[] = 'هدفٌ بلا نسب — لا يُعرف أمقيسٌ هو أم التزام';
+        }
+
+        return $gaps;
+    }
+
+    /**
      * الفلاترُ الميّتة في معادلة: حالةٌ مطلوبةٌ لا يعرفها سجلُّ وحدتها.
      *
      * صنفان يُرصدان معاً لأنّ أثرَهما واحد (رقمٌ كاذب):
@@ -109,6 +232,7 @@ class KpiCentre
         $hasActive = hub_has_col('kpi_defs', 'active');
         $hasOwner  = hub_has_col('kpi_defs', 'owner_id');
         $hasPeriod = hub_has_col('kpi_defs', 'period');
+        $hasBasis  = hub_has_col('kpi_defs', 'target_basis');
 
         $defs = KpiDef::when($hasActive && ! $withHidden, fn ($q) => $q->where('active', true))
             ->orderBy('sort')->orderBy('id')->get();
@@ -159,6 +283,15 @@ class KpiCentre
                 'owner_id' => $hasOwner ? $k->owner_id : null,
                 'owner' => $hasOwner && $k->owner_id ? ($ownerNames[$k->owner_id] ?? null) : null,
                 'period' => $hasPeriod ? $k->period : null,
+                // نوعُ المؤشّرِ وإعدادُه ونسبُ هدفه — بها تُعرض القيمةُ بوحدتها
+                // وتُعرف مصادرُ الهدف، وبها تُحسب «ما ينقصه ليكون مُعَدّاً»
+                'kind' => $kind = self::kind($formula, $k->unit),
+                'kind_label' => self::KIND_LABEL[$kind] ?? '',
+                'shown' => self::format($value, $kind, $k->unit),
+                'target_shown' => self::format($target, $kind, $k->unit),
+                'target_basis' => $hasBasis ? $k->target_basis : null,
+                'target_note' => $hasBasis ? $k->target_note : null,
+                'baseline_at' => $hasBasis ? $k->baseline_at : null,
                 'delta' => $delta,
                 'variance' => $variance,
                 'variance_pct' => $variancePct,
@@ -166,6 +299,11 @@ class KpiCentre
                 'health' => self::health($value, $target, $dead, (string) ($c['tone'] ?? '')),
                 'trend' => self::trend($series[$k->id][self::METRIC] ?? []),
             ];
+            // «لا مؤشّرَ بلا إعداد»: النواقصُ تُحسب بعد اكتمال الصفّ فتقرأ حقولَه كلَّها
+            $out[count($out) - 1]['missing'] = self::missingConfig($out[count($out) - 1]);
+            // **المالكُ قرارُ إنسانٍ لا حقلٌ يُملأ آليّاً** — فلا يُخلَط بنواقصِ
+            // الإعدادِ التي يسدّها أمرٌ واحد، ويُعَدّ على حدة كي لا يُغرِق القائمة
+            $out[count($out) - 1]['needs_owner'] = ($k->owner_id ?? null) === null;
         }
 
         return $out;

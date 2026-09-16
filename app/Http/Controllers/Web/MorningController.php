@@ -76,11 +76,28 @@ class MorningController extends Controller
         // ── تذاكر تجاوزت الـ SLA ──
         if (hub_can($u, 'tickets', 'v')) {
             $late = collect();
-            // نمرّر السجل الحقيقي: hub_sla يحتاج معرّفه ليجد أول رد على التذكرة
-            foreach (hub_scope(\App\Models\Ticket::query(), 'tickets')
+            $open = hub_scope(\App\Models\Ticket::query(), 'tickets')
                         ->whereNull('deleted_at')
-                        ->whereNotIn('status', ['تم الحل', 'مغلقة'])->limit(80)->get() as $t) {
-                $sla = hub_sla($t);
+                        ->whereNotIn('status', ['تم الحل', 'مغلقة'])->limit(80)->get();
+
+            /**
+             * **أوّلُ ردٍّ يُحمَّل دفعةً واحدة** — لا استعلاماً لكلِّ تذكرة.
+             *
+             * `hub_sla($t)` بلا وسيطٍ ثانٍ تسأل القاعدةَ عن أوّلِ ردٍّ **لكلِّ**
+             * تذكرة، فكلفةُ هذه الصفحةِ كانت تنمو خطّيّاً بعددِ التذاكرِ المفتوحة
+             * — وهي أوّلُ ما يفتحه كلُّ موظّفٍ كلَّ صباح، أسوأُ موضعٍ لنمطٍ يكبر.
+             * والمخرجُ موجودٌ في الدالّةِ نفسِها منذ البداية (`$firstReply` مُمرَّراً)
+             * ويستعمله `ExecutionStats` فعلاً؛ هذه الصفحةُ وحدَها لم تستعمله.
+             */
+            $firsts = $open->isEmpty() ? collect() : DB::table('comments')
+                ->where('module', 'tickets')->whereIn('record_id', $open->pluck('id'))
+                ->whereNull('deleted_at')
+                ->where(fn ($q) => $q->where('internal', false)->orWhereNull('internal'))
+                ->select('record_id', DB::raw('MIN(created_at) as at'))->groupBy('record_id')
+                ->pluck('at', 'record_id');
+
+            foreach ($open as $t) {
+                $sla = hub_sla($t, $firsts[(string) $t->id] ?? null);
                 $miss = array_filter(['أول رد' => ! empty($sla['respLate']), 'الحل' => ! empty($sla['resLate'])]);
                 if ($miss) {
                     $late->push(['t' => $t->subject,
@@ -88,8 +105,8 @@ class MorningController extends Controller
                                  'u' => route('m.show', ['tickets', $t->id]), 'tone' => 'bad']);
                 }
             }
-            // حدٌّ باقٍ يُقال: لا يُفحَص إلّا أوّلُ ٨٠ تذكرةٍ مفتوحة (‏`hub_sla` استعلامٌ
-            // لكلِّ تذكرة)، فالعدّادُ صادقٌ حتى هذا السقفِ لا مطلقاً.
+            // حدٌّ باقٍ يُقال: لا يُفحَص إلّا أوّلُ ٨٠ تذكرةٍ مفتوحة،
+            // فالعدّادُ صادقٌ حتى هذا السقفِ لا مطلقاً.
             $add('⏰', 'تذاكر تجاوزت الاتفاقية', 'وعدٌ للعميل تأخر عن موعده',
                 $late->take(8), route('support'), $late->count());
         }
