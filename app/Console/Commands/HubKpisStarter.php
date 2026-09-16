@@ -65,7 +65,9 @@ class HubKpisStarter extends Command
 
         // ── الجودة والتقنية ──
         ['🐞 المشاكل المفتوحة', 'issues', 'count', null, 'مفتوحة', 'none', null, null, null, null, 'مشكلة', 0, 'down'],
-        ['🚨 الحوادث التقنية هذا الربع', 'incidents', 'count', null, null, 'none', null, null, null, null, 'حادثة', 0, 'down'],
+        // الاسمُ كان يَعِد بربعٍ والمعادلةُ بلا نافذةٍ زمنيّةٍ أصلاً — فيُقرأ رصيدُ
+        // الحوادثِ كلِّه على أنّه حوادثُ الربع. الاسمُ يطابق ما يقيسه الآن.
+        ['🚨 الحوادث التقنية المسجَّلة', 'incidents', 'count', null, null, 'none', null, null, null, null, 'حادثة', 0, 'down'],
         ['📦 عمليات النشر الناجحة', 'deploys', 'count', null, 'ناجح', 'ratio_pct', 'deploys', 'count', null, '', '٪', 95, 'up'],
 
         // ── الموارد البشرية ──
@@ -96,7 +98,9 @@ class HubKpisStarter extends Command
         ['⭐ متوسط تقييم التطبيقات', 'apps', 'avg', 'rating', null, 'none', null, null, null, null, '/5', 4.3, 'up'],
         ['🌐 المواقع العاملة', 'websites', 'count', null, 'يعمل', 'none', null, null, null, null, 'موقع', null, 'up'],
         ['🖥️ السيرفرات العاملة', 'servers', 'count', null, 'يعمل', 'none', null, null, null, null, 'سيرفر', null, 'up'],
-        ['💸 الكلفة الشهرية للسيرفرات', 'servers', 'sum', 'cost_month', null, 'none', null, null, null, null, null, null, 'down'],
+        // العمودُ **بمفتاحه** لا باسمِ عموده: `hub_kpi_metric` يُطابق `key` وحدَه،
+        // فـ`cost_month` كان يُعيد null فيُقرأ المؤشّرُ «لا تُحسب» أبداً منذ بذره.
+        ['💸 الكلفة الشهرية للسيرفرات', 'servers', 'sum', 'costMonth', null, 'none', null, null, null, null, null, null, 'down'],
         ['📚 مقالات المعرفة المنشورة', 'kb', 'count', null, 'منشور', 'none', null, null, null, null, 'مقال', null, 'up'],
         ['📨 الطلبات الداخلية المفتوحة', 'requests', 'count', null, 'جديد', 'none', null, null, null, null, 'طلب', 0, 'down'],
         ['🎨 مهام التصميم الجاهزة', 'designs', 'count', null, 'جاهز', 'ratio_pct', 'designs', 'count', null, '', '٪', 80, 'up'],
@@ -126,6 +130,7 @@ class HubKpisStarter extends Command
         '⚖️ بنود الامتثال المحققة'    => '⚖️ بنود الامتثال الملتزمة',
         '🏭 الموردون النشطون'         => '🏭 عدد الموردين',
         '🖥️ السيرفرات النشطة'         => '🖥️ السيرفرات العاملة',
+        '🚨 الحوادث التقنية هذا الربع' => '🚨 الحوادث التقنية المسجَّلة',
     ];
 
     public function handle(): int
@@ -208,14 +213,43 @@ class HubKpisStarter extends Command
                 $formula['b'] = ['agg' => $bAgg, 'module' => $bMod, 'col' => $bCol, 'st' => $bSt ?? ''];
             }
 
-            KpiDef::create([
-                'name' => $name, 'unit' => $unit, 'target' => $target,
+            KpiDef::create($this->settings($formula, $unit, $target) + [
+                'name' => $name, 'target' => $target,
                 'good' => $good, 'formula' => $formula, 'sort' => ++$sort,
             ]);
             $n++;
         }
 
         return $n;
+    }
+
+    /**
+     * **إعدادُ المؤشّرِ بنوعه** — «لا مؤشّرَ بلا إعداد» قاعدةٌ تُفرَض عند الكاتب.
+     *
+     * الوحدةُ والدورةُ ليستا زينةً على البطاقة: بلا وحدةٍ يُقرأ ١٢٥٠٠٠ عارياً
+     * فلا يُعرف أدينارٌ هو أم تذكرة، وبلا دورةٍ لا يُعرف أرصيدٌ قائمٌ هو
+     * («كم المفتوحُ الآن») أم تدفّقٌ مجموعٌ على شهر. فيُملآن من **نوعِ المؤشّر**
+     * المشتقِّ من معادلته (`KpiCentre::kind`)، وما صرّحت به المكتبةُ يُقدَّم.
+     *
+     * والهدفُ المعلَنُ في المكتبة يُنسَب `policy` صراحةً: رقمٌ اختارته المكتبةُ
+     * لا قياسٌ من بياناتك — والتفريقُ بينهما هو كلُّ ما يجعل الهدفَ ذا معنى.
+     */
+    protected function settings(array $formula, ?string $unit, $target): array
+    {
+        $kind = \App\Support\KpiCentre::kind($formula, $unit);
+        $def  = \App\Support\KpiCentre::kindDefaults($kind);
+
+        $out = ['unit' => ($unit !== null && trim($unit) !== '') ? $unit : $def['unit']];
+
+        if (hub_has_col('kpi_defs', 'period')) $out['period'] = $def['period'];
+
+        if ($target !== null && hub_has_col('kpi_defs', 'target_basis')) {
+            $out['target_basis'] = 'policy';
+            $out['target_note'] = 'هدفٌ معلَنٌ في مكتبةِ الانطلاق — لا قياسٌ من بياناتك.'
+                . ' لخطِّ أساسٍ مقيسٍ: php artisan hub:kpis-baseline';
+        }
+
+        return $out;
     }
 
     /** الوحدة موجودة، وعمود المجموع/المتوسط رقميٌّ معلَنٌ فيها */
@@ -226,7 +260,9 @@ class HubKpisStarter extends Command
         if (! \Illuminate\Support\Facades\Schema::hasTable($def['table'])) return false;
         if ($agg === 'count') return true;
 
-        $f = collect($def['fields'])->firstWhere('col', $col) ?: collect($def['fields'])->firstWhere('key', $col);
+        // **بالمفتاح وحدَه**: `hub_kpi_metric` يُطابق `key` لا `col`، فقبولُ اسمِ
+        // العمودِ هنا كان يُجيز صفّاً لا يُحسب أبداً — «لا تُحسب» في الشاشة إلى الأبد.
+        $f = collect($def['fields'])->firstWhere('key', $col);
 
         return $f && in_array($f['type'] ?? '', ['num', 'big'], true)
             && \Illuminate\Support\Facades\Schema::hasColumn($def['table'], $f['col']);

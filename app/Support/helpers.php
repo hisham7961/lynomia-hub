@@ -3287,6 +3287,63 @@ if (! function_exists('hub_project_pl')) {
     }
 }
 
+if (! function_exists('hub_project_paused_since')) {
+    /**
+     * **منذ متى توقّف هذا المشروع؟** — من أثرِ التدقيقِ الحقيقيّ لا من عمودٍ مخترَع.
+     *
+     * لا عمودَ `paused_at` في `projects`، وإضافةُ واحدٍ تكذب على كلِّ سجلٍّ قائم
+     * (يُملأ بتاريخِ الهجرة فيبدو كلُّ متوقّفٍ متوقّفاً اليوم). والحقيقةُ مكتوبةٌ
+     * أصلاً: `Auditable` يختم كلَّ تغيّرِ حالةٍ في `audits.after`. فيُقرأ الأثرُ
+     * نزولاً حتى أوّلِ قيدٍ وضع الحالةَ على «متوقف» — وذلك تاريخُ التوقّف.
+     *
+     * **وحين لا يُعرف، يُقال إنّه لا يُعرف.** `exact=false` يعني أنّ الرقمَ حدٌّ
+     * أدنى لا قياس: إمّا لأنّ التوقّفَ أقدمُ من نافذةِ الأثر، أو لأنّ لا أثرَ
+     * أصلاً (بيانٌ سابقٌ للتدقيق) فيُؤخذ `updated_at` — آخرُ حركةٍ على السجلّ.
+     *
+     * @return array{at: ?\Illuminate\Support\Carbon, days: int, exact: bool}
+     */
+    function hub_project_paused_since(string $projectId, $updatedAt = null): array
+    {
+        $fallback = function ($exact = false) use ($updatedAt) {
+            $at = $updatedAt ? \Illuminate\Support\Carbon::parse($updatedAt) : null;
+
+            return ['at' => $at, 'days' => $at ? max(0, (int) $at->diffInDays(now())) : 0, 'exact' => $exact];
+        };
+
+        if (! \Illuminate\Support\Facades\Schema::hasTable('audits')) return $fallback();
+
+        // نافذةٌ محدودةٌ وترتيبٌ حتميّ: `id` التزايديُّ لا `created_at` (قد تتساوى بالثانية)
+        $rows = \Illuminate\Support\Facades\DB::table('audits')
+            ->where('module', 'projects')->where('record_id', $projectId)
+            ->orderByDesc('id')->limit(200)->get(['after', 'created_at']);
+
+        if ($rows->isEmpty()) return $fallback();
+
+        foreach ($rows as $r) {
+            $after = is_array($r->after) ? $r->after : (json_decode((string) $r->after, true) ?: []);
+            if (! array_key_exists('status', $after)) continue;
+            if (! hub_project_is_paused((string) $after['status'])) break;   // آخرُ تغيّرٍ أخرجه من التوقّف
+
+            $at = \Illuminate\Support\Carbon::parse($r->created_at);
+
+            return ['at' => $at, 'days' => max(0, (int) $at->diffInDays(now())), 'exact' => true];
+        }
+
+        // لا قيدَ حالةٍ في النافذة ⇒ التوقّفُ أقدمُ منها: أقدمُ ما فيها حدٌّ أدنى صادق
+        $oldest = \Illuminate\Support\Carbon::parse($rows->last()->created_at);
+
+        return ['at' => $oldest, 'days' => max(0, (int) $oldest->diffInDays(now())), 'exact' => false];
+    }
+}
+
+if (! function_exists('hub_project_is_paused')) {
+    /** الحالاتُ التي تعني «متوقف» — تعريفٌ واحدٌ يقرؤه الحسابُ والأثرُ معاً */
+    function hub_project_is_paused(?string $status): bool
+    {
+        return in_array(trim((string) $status), ['متوقف', 'متوقفة', 'معلّق', 'معلق'], true);
+    }
+}
+
 if (! function_exists('hub_project_health')) {
     /**
      * صحة المشروع: ستة عوامل من بيانات حقيقية، كل عامل ٠–١٠٠ بوزن معلن.
@@ -3415,16 +3472,70 @@ if (! function_exists('hub_project_health')) {
              * كلُّها هادئةٌ هدوءَ الموتى. المتوقّفُ لا يُقاس سليماً: سقفُ درجته 60
              * ولقبُه يقول حالته.
              */
-            $paused = in_array(trim((string) ($p->status ?? '')), ['متوقف', 'متوقفة', 'معلّق', 'معلق'], true);
+            $paused = hub_project_is_paused($p->status ?? null);
+            $cap = null;
             if ($paused) {
-                $score = min($score, 60);
+                /*
+                 * **والسقفُ الواحدُ سوّى بين حالتين لا تستويان** (محاكاةُ الشهر ·
+                 * قرارُ المالك). مشروعٌ أُوقف الأسبوعَ الماضي بقرارٍ واعٍ ومهامُّه
+                 * مغلقة **مرتَّبٌ بانتظار قرار**، و٦٠ وصفٌ عادلٌ له. ومشروعٌ أُوقف
+                 * قبل ثمانيةِ أشهرٍ وتُرك — مهامُّه فائتةٌ مفتوحة وخطرُه الحرجُ لم
+                 * يُغلق — **يتعفّن**، و٦٠ نفسُها كانت تقول عنه ما تقول عن الأوّل.
+                 * فيقف في صفِّ الترتيبِ بجانبِه ولا يُنادى أحدُهما قبل الآخر.
+                 *
+                 * فالسقفُ يهبط الآن بشيئين يُقاسان لا يُقدَّران: **طولُ السكون**
+                 * (من أثرِ التدقيق) و**ما تراكم من ديونٍ مفتوحةٍ أثناءه**. وكلُّ
+                 * حدٍّ مسقوفٌ بنفسه فلا يبتلع عاملٌ البقيّة، والأرضيّةُ ١٠ فلا
+                 * يسقط المتروكُ إلى صفرٍ يُساوي المنهار.
+                 */
+                $since = hub_project_paused_since($projectId, $p->updated_at ?? null);
+                $months = intdiv($since['days'], 30);
+
+                $dAge  = min(30, 5 * max(0, $months - 1));   // شهرُ سماحٍ ثمّ خمسٌ لكلِّ شهر
+                $dTask = min(20, 4 * $tLate);
+                $dCrit = min(15, 5 * $crit);
+                $dTkt  = min(10, 2 * $tk);
+
+                $cap = max(10, 60 - $dAge - $dTask - $dCrit - $dTkt);
+                $score = min($score, $cap);
+                $aged = $dAge > 0;                          // أطال السكونُ وحدَه؟ (للّقب أدناه)
+
+                $age = $months >= 12 ? 'منذ أكثر من سنة'
+                     : ($months >= 1 ? 'منذ ' . $months . ($months === 1 ? ' شهر' : ' أشهر')
+                     : ($since['days'] >= 1 ? 'منذ ' . $since['days'] . ' يوماً' : 'اليوم'));
+
+                $debts = [];
+                if ($tLate) $debts[] = "{$tLate} مهمّة فائتة";
+                if ($crit)  $debts[] = "{$crit} خطر حرج مفتوح";
+                if ($tk)    $debts[] = "{$tk} تذكرة مفتوحة";
+
                 $f[] = ['k' => 'الحالة التشغيلية', 'w' => 0, 's' => 0,
-                        'note' => 'المشروع متوقف — الهدوء هنا توقّفٌ لا عافية'];
+                        'note' => 'المشروع متوقف ' . $age
+                            . ($since['exact'] ? '' : ' على الأقل (لا أثرَ لتاريخِ التوقّف)')
+                            . ($debts ? ' · تراكم أثناء التوقّف: ' . implode('، ', $debts)
+                                      : ' — لا ديونَ مفتوحة، الهدوءُ هنا ترتيبٌ لا إهمال')
+                            . ' · سقفُ الدرجة ' . $cap];
             }
 
-            return ['score' => $score, 'factors' => $f,
-                    'tone' => $paused ? 'wn' : ($score >= 80 ? 'ok' : ($score >= 55 ? 'wn' : 'bad')),
-                    'label' => $paused ? 'متوقف — بانتظار قرار'
+            /*
+             * لقبُ المتوقّفِ يصف حالتَه لا سقفَه وحدَه: «بانتظار قرار» للمرتَّبِ
+             * الذي لم يهبط سقفُه، ثم «بدأ يتراكم»، ثم «متروكٌ يتعفّن» بنبرةٍ حمراء
+             * — فالقارئُ يفرزها بالعينِ قبل أن يقرأ رقماً.
+             */
+            $rot = $paused ? 60 - (int) $cap : 0;
+            /*
+             * واللقبُ يسمّي **سببَ** الهبوط لا مقدارَه وحدَه: «متروك» تصف طولَ
+             * السكون، فمشروعٌ أُوقف أمسِ وعليه خمسُ مهامَّ فائتةٍ ليس متروكاً —
+             * هو **متوقّفٌ بديونٍ مفتوحة**، وذاك نداءٌ آخرُ لفعلٍ آخر.
+             */
+            $pLabel = $rot === 0 ? 'متوقف — بانتظار قرار'
+                    : (empty($aged) ? 'متوقف — بديونٍ مفتوحة'
+                    : ($rot <= 15 ? 'متوقف — بدأ يتراكم' : 'متوقف — متروكٌ يتعفّن'));
+
+            return ['score' => $score, 'factors' => $f, 'paused' => $paused, 'cap' => $cap,
+                    'tone' => $paused ? ($rot > 15 ? 'bad' : 'wn')
+                        : ($score >= 80 ? 'ok' : ($score >= 55 ? 'wn' : 'bad')),
+                    'label' => $paused ? $pLabel
                         : ($score >= 80 ? 'سليم' : ($score >= 55 ? 'يحتاج انتباهاً' : 'متعثر'))];
         });
     }
@@ -3459,13 +3570,21 @@ if (! function_exists('hub_project_health_for')) {
             if ($x['w'] > 0) { $shown[$i]['w'] += 100 - $wshown; break; }   // فتاتُ التقريب لأول عامل
         }
 
-        // لقبُ الأصل ونبرتُه يبقيان إن كانا حُكماً تشغيليّاً (متوقف) لا حساباً
-        $paused = ($h['label'] ?? '') === 'متوقف — بانتظار قرار';
-        if ($paused) $score = min($score, 60);
+        /*
+         * لقبُ الأصل ونبرتُه يبقيان إن كانا حُكماً تشغيليّاً (متوقف) لا حساباً —
+         * **بمفتاحٍ بنيويٍّ لا بمطابقةِ نصّ**: صار للمتوقّفِ ثلاثةُ ألقاب (مرتَّب/
+         * بدأ يتراكم/متروك) فمطابقةُ واحدٍ منها كانت تُسقط السقفَ عن الاثنين
+         * الآخرَين — أي تُعيد للمتعفّنِ درجتَه الكاملة. و`?? str_starts_with`
+         * يحفظ خبيئةً كُتبت بالشكلِ السابقِ حتى تنتهي مهلتُها.
+         */
+        $paused = (bool) ($h['paused'] ?? str_starts_with((string) ($h['label'] ?? ''), 'متوقف'));
+        if ($paused) $score = min($score, (int) ($h['cap'] ?? 60));
 
         return ['score' => $score, 'factors' => $shown,
-                'tone' => $paused ? 'wn' : ($score >= 80 ? 'ok' : ($score >= 55 ? 'wn' : 'bad')),
-                'label' => $paused ? 'متوقف — بانتظار قرار'
+                'paused' => $paused, 'cap' => $h['cap'] ?? null,
+                'tone' => $paused ? ($h['tone'] ?? 'wn')
+                    : ($score >= 80 ? 'ok' : ($score >= 55 ? 'wn' : 'bad')),
+                'label' => $paused ? ($h['label'] ?? 'متوقف — بانتظار قرار')
                     : ($score >= 80 ? 'سليم' : ($score >= 55 ? 'يحتاج انتباهاً' : 'متعثر'))];
     }
 }

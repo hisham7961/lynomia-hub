@@ -111,6 +111,7 @@ class V1Controller extends ModuleController
 
             $m = new $class;
             $this->fill($def, $r, $m);
+            $this->stampAuthor($m, $module);      // كالويب: صاحبُ السجلِّ يُختم فيراه في نطاقه
             $this->inheritCompany($m, $module);   // كالويب: معزولٌ يرث شركته فلا يختفي عنه
             $this->inheritProject($m, $module);   // ومشروعَه — وإلا وُلد يتيماً لا يراه
             $this->inheritClient($m, $module);    // وعميلَه — لنفس السبب

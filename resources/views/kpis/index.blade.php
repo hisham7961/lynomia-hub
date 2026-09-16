@@ -96,6 +96,47 @@
     </div></div>
 @endif
 
+{{-- ═══ «لا مؤشّرَ بلا إعداد» ═══
+     شاشةٌ تعرض «—» في خانةِ الهدفِ والدورةِ والمالك تبدو عاملةً وهي لا تُحاسِب
+     أحداً على شيء: مؤشّرٌ بلا هدفٍ لا يُحكم عليه، وبلا مالكٍ لا يُسأل عنه أحد،
+     وبلا دورةٍ لا يُعرف أرصيدٌ قائمٌ هو أم تدفّقٌ على مدّة. فالنقصُ يُقال هنا
+     صراحةً بجانب طريقِ سدِّه، لا يُترك «—» صامتاً في جدول. --}}
+@php
+    $needCfg = collect($rows)->filter(fn ($r) => ! empty($r['missing']))->values();
+    $noOwner = collect($rows)->where('needs_owner', true)->count();
+@endphp
+@if ($needCfg->count() || $noOwner)
+    <div class="card">
+        <h3 class="cardtitle">🧩 مؤشّراتٌ ناقصةُ الإعداد <span class="bdg wn">{{ $needCfg->count() }}</span></h3>
+        @if ($noOwner)
+            {{-- المالكُ قرارُ إنسانٍ لا حقلٌ يُملأ آليّاً — فيُقال على حدة ولا يُغرق القائمة --}}
+            <div class="sub" style="margin-bottom:8px">
+                👤 <b>{{ $noOwner }}</b> مؤشّراً بلا مالك — و«خارج الهدف» لا تصير فعلاً حتى يُعرف مَن يُسأل.
+                يُسنَد من «✏️ تعديل» في كلِّ مؤشّر.
+            </div>
+        @endif
+        @if ($needCfg->count())
+        <div class="sub" style="margin-bottom:8px">
+            لضبطِ الأهدافِ الناقصةِ على <b>خطِّ أساسٍ مقيسٍ من بياناتك</b> (لا رقمٍ مخترَع):
+            <code class="mono">php artisan hub:kpis-baseline</code> — ولا يمسّ هدفاً معلَناً، ولا مؤشّراً فلترُه ميّت،
+            ولا يُثبّت صفرَ الفراغِ هدفاً.
+        </div>
+        <div class="tblwrap"><table class="tbl">
+            <thead><tr><th scope="col">المؤشّر</th><th scope="col">النوع</th><th scope="col">ما ينقصه</th></tr></thead>
+            <tbody>
+            @foreach ($needCfg as $k)
+                <tr>
+                    <td><b>{{ $k['name'] }}</b></td>
+                    <td class="sub">{{ $k['kind_label'] }}</td>
+                    <td class="sub">{{ implode(' · ', $k['missing']) }}</td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table></div>
+        @endif
+    </div>
+@endif
+
 {{-- المؤشرات: كل واحد بمعادلته وأزراره — لا بطاقةٌ صمّاء لا يُعرف مِمَّ حُسبت --}}
 @if (count($kpis))
     <div class="card pad0" style="margin-bottom:12px">
@@ -103,11 +144,12 @@
             <div class="kpirow {{ $k['active'] ? '' : 'off' }} {{ $editing?->id === $k['id'] ? 'edt' : '' }}">
                 <div class="kpival">
                     <b class="{{ $k['tone'] === 'bad' ? 'txt-bad' : '' }}">
-                        {{ $k['value'] === null ? '—' : $num($k['value']) }}{{ $k['unit'] ? ' ' . $k['unit'] : '' }}
+                        @php $xv = $rowsById[$k['id']] ?? null; @endphp
+                        {{ $xv ? $xv['shown'] : ($k['value'] === null ? '—' : $num($k['value'])) }}
                     </b>
                     @if ($k['target'] !== null)
                         <span class="bdg {{ $k['tone'] ?: 'g' }}">
-                            الهدف {{ $num($k['target']) }} {{ $k['good'] === 'up' ? '↑' : '↓' }}
+                            الهدف {{ $xv ? $xv['target_shown'] : $num($k['target']) }} {{ $k['good'] === 'up' ? '↑' : '↓' }}
                         </span>
                     @endif
                 </div>
@@ -132,11 +174,32 @@
                     @endif
                     {{-- المعادلة بالعربية: تُقرأ قبل التعديل وقبل الحذف --}}
                     <div class="sub mono" style="font-size:12px">🧮 {{ $k['explain'] }}</div>
-                    @if ($x && ($x['owner'] || $x['period']))
+                    @if ($x)
                         <div class="sub" style="font-size:12px">
-                            @if ($x['owner'])👤 {{ $x['owner'] }}@endif
-                            @if ($x['period'])@if ($x['owner']) · @endif🗓️ {{ $x['period'] }}@endif
+                            📐 {{ $x['kind_label'] }}
+                            @if ($x['owner']) · 👤 {{ $x['owner'] }}@endif
+                            @if ($x['period']) · 🗓️ {{ $x['period'] }}@endif
                         </div>
+                        {{-- **من أين جاء الهدف؟** رقمٌ صامتٌ في لوحةِ إدارةٍ يُحاسَب به
+                             أحدٌ على ما لم يلتزم به — فالنسبُ يُعرض مع الرقم لا بعده. --}}
+                        @if ($x['target'] !== null && $x['target_basis'])
+                            <div class="sub" style="font-size:12px">
+                                @if ($x['target_basis'] === 'baseline')
+                                    <span class="bdg g">📏 خطُّ أساسٍ مقيس</span>
+                                @elseif ($x['target_basis'] === 'policy')
+                                    <span class="bdg g">📜 التزامٌ معلَن</span>
+                                @else
+                                    <span class="bdg g">✍️ تقديرٌ مبدئيّ</span>
+                                @endif
+                                {{ $x['target_note'] }}
+                            </div>
+                        @endif
+                        @if ($x['missing'] || $x['needs_owner'])
+                            <div class="sub" style="font-size:12px;color:var(--wn)">
+                                🧩 ناقصُ الإعداد:
+                                {{ implode(' · ', array_merge($x['missing'], $x['needs_owner'] ? ['بلا مالك'] : [])) }}
+                            </div>
+                        @endif
                     @endif
                     @if ($x)
                         @foreach ($x['dead'] as $d)
@@ -217,7 +280,22 @@
                 </select></div>
             <div class="fld"><label for="k-period">الدورة</label>
                 <input class="inp" id="k-period" name="period" maxlength="20" placeholder="شهري / ربع سنوي / سنوي"
-                       value="{{ old('period', $editing->period ?? '') }}"></div>
+                       value="{{ old('period', $editing->period ?? '') }}">
+                <div class="sub" style="font-size:12px">تُملأ من نوع المؤشّر إن تركتَها — «لحظي» للعدّ و«شهري» للنسب والمبالغ</div></div>
+            {{-- **نسبُ الهدف**: رقمٌ بلا سندٍ يُحاسَب به فريق. و«خطُّ الأساس»
+                 لا يُختار هنا — هو قياسٌ يضبطه `php artisan hub:kpis-baseline`. --}}
+            <div class="fld"><label for="k-basis">نسبُ الهدف</label>
+                <select class="inp" id="k-basis" name="target_basis">
+                    <option value="manual" @selected(old('target_basis', $editing->target_basis ?? 'manual') !== 'policy')>تقديرٌ مبدئيّ</option>
+                    <option value="policy" @selected(old('target_basis', $editing->target_basis ?? '') === 'policy')>التزامٌ معلَن</option>
+                </select>
+                @if (($editing->target_basis ?? '') === 'baseline')
+                    <div class="sub" style="font-size:12px">الهدفُ الحاليُّ <b>خطُّ أساسٍ مقيس</b> — ولن يتغيّر نسبُه ما دام الرقمُ كما هو.</div>
+                @endif</div>
+            <div class="fld" style="flex:1 1 100%"><label for="k-tnote">سندُ الهدف (اختياري)</label>
+                <input class="inp" id="k-tnote" name="target_note" maxlength="300"
+                       placeholder="قرارُ مجلسِ الإدارة ٢٠٢٦-٠٣ · أو: متوسّطُ القطاع"
+                       value="{{ old('target_note', $editing->target_note ?? '') }}"></div>
         </div>
 
         <h4 style="margin:12px 0 6px">المقياس الأول <b class="req">*</b></h4>
