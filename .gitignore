@@ -30,3 +30,4 @@ tests/Feature/Zz*Test.php
 # نسخٌ احتياطية محلية لملف البيئة — أسرارٌ لا تُدفع
 .env.bak*
 .env.demo
+.env.month
