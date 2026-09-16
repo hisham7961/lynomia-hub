@@ -1,0 +1,72 @@
+[
+ {
+  "who": "سالم المطيري",
+  "why": "حاملُ رايةِ التشغيلِ غيرُ معزول — لوحاتُه يجب أن تبقى معروضةً ومفتوحة",
+  "falseInvite": [],
+  "lostDoor": [],
+  "deadMorning": [],
+  "morningScanned": 25,
+  "openedOk": [
+   "/performance",
+   "/capacity",
+   "/impact",
+   "/recommendations",
+   "/app-quality"
+  ]
+ },
+ {
+  "who": "منصور الرشيد",
+  "why": "شاهدٌ ثانٍ على الرايةِ نفسِها — لا حكمَ على شاهدٍ واحد",
+  "falseInvite": [],
+  "lostDoor": [],
+  "deadMorning": [],
+  "morningScanned": 9,
+  "openedOk": [
+   "/performance",
+   "/capacity",
+   "/impact",
+   "/recommendations",
+   "/app-quality"
+  ]
+ },
+ {
+  "who": "عبدالله الشمري",
+  "why": "حاملُ رايةِ الأمنِ — الأصولُ الرقميّةُ يجب أن تبقى له",
+  "falseInvite": [],
+  "lostDoor": [],
+  "deadMorning": [],
+  "morningScanned": 25,
+  "openedOk": [
+   "/digital-assets"
+  ]
+ },
+ {
+  "who": "نورة الهاجري",
+  "why": "مديرةُ مشاريعَ كخالدٍ تماماً — تُعيد فحصَ بطاقةِ الصباحِ مستقلّةً عنه",
+  "falseInvite": [],
+  "lostDoor": [],
+  "deadMorning": [],
+  "morningScanned": 23,
+  "openedOk": []
+ },
+ {
+  "who": "غيث",
+  "why": "الكتالوجُ كاملاً — الضابطُ الأعلى على «لا قدرةَ تُحذف»",
+  "falseInvite": [],
+  "lostDoor": [],
+  "deadMorning": [],
+  "morningScanned": 25,
+  "openedOk": [
+   "/performance",
+   "/costs",
+   "/service-costs",
+   "/capacity",
+   "/impact",
+   "/recommendations",
+   "/app-quality",
+   "/digital-assets",
+   "/supplier-scores",
+   "/sales"
+  ]
+ }
+]
