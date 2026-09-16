@@ -84,8 +84,16 @@ class RoleController extends Controller
         $this->gate();
         $roles = Role::withCount('users')->orderByDesc('is_owner')->orderBy('name')->get();
 
+        // **والسؤالُ المقلوب معه** (M-F12): الجدولُ أعلاه يقول «كم وحدةً يبلغ
+        // هذا الدور؟»، ولا موضعَ في المنتجِ يقول «مَن يكتب في هذه الوحدة؟».
+        // فقاست محاكاةُ الشهرِ ٦١ وحدةً من ٨٥ كاتبُها واحدٌ أو اثنان من ٣١،
+        // و٤٩ منها فارغةٌ بعد شهرٍ كامل — وما لا يُرى لا يُقرَّر فيه.
+        $coverage = collect(\App\Support\PermissionInspector::moduleCoverage())
+            ->sortBy([fn ($a, $b) => $a['writers'] <=> $b['writers'],
+                      fn ($a, $b) => $a['label'] <=> $b['label']]);
+
         return view('roles.index', ['roles' => $roles, 'reach' => $roles->mapWithKeys(
-            fn ($r) => [$r->id => self::reach($r)])]);
+            fn ($r) => [$r->id => self::reach($r)]), 'coverage' => $coverage]);
     }
 
     /**

@@ -63,4 +63,38 @@
         أسرع طريقٍ لدورٍ جديد: <b>استنسخ</b> أقرب دورٍ قائم وعدّل النسخة، أو ابدأ من <a href="{{ route('roles.create') }}">قالبٍ جاهز</a>.
     </div>
 </div>
+
+{{-- ═══════ السؤالُ المقلوب: مَن يكتب في كلِّ وحدة؟ (M-F12) ═══════ --}}
+@php
+    $thin = $coverage->where('thin', true);
+    $tot  = $coverage->first()['total'] ?? 0;
+@endphp
+<div class="card" style="margin-top:12px">
+    <h3 style="margin:0 0 4px">🔁 من يكتب في كل وحدة</h3>
+    <div class="sub" style="margin-bottom:10px">
+        الجدولُ أعلاه يسأل «كم وحدةً يبلغ هذا <b>الدور</b>؟». وهذا يسأل عكسَه:
+        «كم <b>شخصاً</b> يستطيع الكتابةَ في هذه الوحدة؟» — وهو السؤالُ الذي يفسّر
+        بقاءَ وحدةٍ فارغةً مهما طال العمل. <b>وحدةٌ لا يبلغها إلّا واحدٌ أو اثنان
+        تُوسَم «ضيّقة»</b>، وذلك ليس عطباً بالضرورة: بنيةٌ تحتيّةٌ أو سجلٌّ حسّاس
+        ضيقُه مقصود. والقرارُ لك — لكن بعد أن تراه.
+        @if ($thin->count())
+            <br><b class="wn">{{ $thin->count() }}</b> من {{ $coverage->count() }} وحدةً ضيّقةٌ الآن
+            (من أصل {{ $tot }} موظّفاً غيرَ موقوف).
+        @endif
+    </div>
+    <div class="tblwrap"><table class="tbl">
+        <thead><tr><th>الوحدة</th><th>يقرأ</th><th>يكتب</th><th>الأدوار التي تمنح الكتابة</th></tr></thead>
+        <tbody>
+        @foreach ($coverage as $mk => $c)
+            <tr>
+                <td><b>{{ $c['label'] }}</b> <span class="sub mono">{{ $mk }}</span>
+                    @if ($c['thin'])<span class="bdg wn" title="لا يبلغها إلا واحدٌ أو اثنان">ضيّقة</span>@endif</td>
+                <td class="mono">{{ $c['viewers'] }}</td>
+                <td class="mono">{{ $c['writers'] }}</td>
+                <td class="sub">{{ $c['writer_roles'] ? implode('، ', $c['writer_roles']) : '—' }}</td>
+            </tr>
+        @endforeach
+        </tbody>
+    </table></div>
+</div>
 @endsection

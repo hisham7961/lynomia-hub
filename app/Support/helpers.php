@@ -2329,8 +2329,19 @@ if (! function_exists('hub_approvers')) {
         // بينما static تعمّر عمر العملية فتخدم قائمة معتمدين قديمة
         if (app()->bound('hub.approvers')) return app('hub.approvers');
 
+        // **والرايةُ لا تكفي: لا بدّ أن يبلغ البابَ** (جولةُ الاعتماد · M-A1).
+        //
+        // كان الترشيحُ بالرايةِ وحدَها، فسُمّي معتمِداً من `approvals:v` عنده
+        // `false` — يفتح `/m/approvals` فيجد صفراً، ويفتح الطلبَ فيُردّ ٤٠٣.
+        // **فيعلَق العملُ إلى الأبد**: العمليّةُ موقوفةٌ، والطالبُ أُخبر أنّ
+        // «إشعاراً بالقرار سيصله»، ولا أحدَ يستطيع القرار. (مقيسٌ حيّاً على
+        // سالم المطيري: رايةُ approve ✅ · approvals:v ❌.)
+        //
+        // والمالكُ يبلغ كلَّ بابٍ فيمرّ دوماً — فالقائمةُ **لا تفرغ أبداً**،
+        // وطلبٌ بلا معتمِدٍ واحدٍ عملٌ ميّت.
         $ids = \App\Models\User::whereNull('deleted_at')->with('role')->get()
-            ->filter(fn ($u) => $u->role?->is_owner || hub_flag($u, 'approve'))
+            ->filter(fn ($u) => $u->role?->is_owner
+                || (hub_flag($u, 'approve') && hub_can($u, 'approvals', 'v')))
             ->pluck('id')->values()->all();
         app()->instance('hub.approvers', $ids);
 
