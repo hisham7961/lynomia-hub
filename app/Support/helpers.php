@@ -470,8 +470,8 @@ if (! function_exists('hub_top_links')) {
              * يظهر ثمّ يُصَدُّ ٤٠٣). ويحرسُ الصنفَ كلَّه `NavCoverageTest`.
              */
             ['key' => 'inventory', 'label' => '📦 مركز الجرد',       'route' => 'inventory.center', 'group' => 'centers',  'ok' => hub_can($user, 'assets', 'v')],
-            ['key' => 'endpointsc', 'label' => '💻 النقاط الطرفية',  'route' => 'endpoints.index',  'group' => 'centers',  'ok' => hub_is_owner($user) || hub_monitor_group('secOps')],
-            ['key' => 'fieldsup',  'label' => '🧭 لوحة المشرف الميدانيّ', 'route' => 'field.dashboard', 'group' => 'centers', 'ok' => hub_is_owner($user) || (hub_can($user, 'hr', 'v') && hub_monitor_group('opsAnalytics'))],
+            ['key' => 'endpointsc', 'label' => '💻 النقاط الطرفية',  'route' => 'endpoints.index',  'group' => 'centers',  'ok' => hub_is_owner($user) || hub_monitor_group('secOps', $user)],
+            ['key' => 'fieldsup',  'label' => '🧭 لوحة المشرف الميدانيّ', 'route' => 'field.dashboard', 'group' => 'centers', 'ok' => hub_is_owner($user) || (hub_can($user, 'hr', 'v') && hub_monitor_group('opsAnalytics', $user))],
             // ومحفظةُ العهدةِ المالية — ثانويّةٌ في الخريطةِ لكنّها بابُ عملٍ يوميٍّ للمحاسب
             ['key' => 'custwallet', 'label' => '👛 محفظة العهدة',    'route' => 'custody.wallet.center', 'group' => 'centers', 'ok' => hub_can($user, 'custody', 'v')],
             ['key' => 'identity',  'label' => '📷 مركز الهوية والمسح', 'route' => 'identity.center', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v') || hub_can($user, 'products', 'v')],
