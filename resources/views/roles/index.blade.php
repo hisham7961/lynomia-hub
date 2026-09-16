@@ -82,13 +82,48 @@
             (من أصل {{ $tot }} موظّفاً غيرَ موقوف).
         @endif
     </div>
+
+    {{-- **والعددُ وحدَه لا يُفرَز**: «٥٥ ضيّقة» رقمٌ صادقٌ لا يُفعَل به شيء.
+         فيُقسَم بأدلّةٍ تُفحَص إلى ثلاثِ سلالٍ — وكلُّ صنفٍ يُعرَض مع دليله كي
+         يقدر القارئُ أن **يخالف** بنظرة، لا أن يُملى عليه. --}}
+    @php
+        $tri = collect($triage ?? []);
+        $cls = ['guarded' => ['🔒 ضيقُه حارس', 'g'], 'idle' => ['💤 لا تُستعمل', 'g'],
+                'blocked' => ['🚧 معطَّلةٌ فعلاً', 'wn']];
+    @endphp
+    @if ($tri->count())
+        <div class="crow" style="gap:8px;margin-bottom:10px;flex-wrap:wrap">
+            @foreach ($cls as $k => [$lbl, $tone])
+                @php $n = $tri->where('class', $k)->count(); @endphp
+                <span class="bdg {{ $n ? $tone : '' }}">{{ $lbl }}: <b>{{ $n }}</b></span>
+            @endforeach
+        </div>
+        @php $real = $tri->where('class', 'blocked'); @endphp
+        <div class="sub" style="margin-bottom:10px">
+            @if ($real->count())
+                <b>{{ $real->count() }}</b> وحدةً فقط تُستعمل فعلاً وكتّابُها اثنان — <b>هذه وحدَها</b>
+                تستحقّ قراراً. والباقي حارسٌ بحقٍّ أو لا يُستعمل، فتوسيعُه لا يغيّر شيئاً.
+                <br>للتوسيع: <code class="mono">php artisan hub:roles-widen-core-work "اسم الدور"</code>
+            @else
+                ✅ لا وحدةَ معطَّلةً فعلاً — كلُّ ضيّقٍ هنا حارسٌ بحقٍّ أو لا يُستعمل بعد.
+            @endif
+        </div>
+    @endif
+
     <div class="tblwrap"><table class="tbl">
         <thead><tr><th>الوحدة</th><th>يقرأ</th><th>يكتب</th><th>الأدوار التي تمنح الكتابة</th></tr></thead>
         <tbody>
         @foreach ($coverage as $mk => $c)
             <tr>
                 <td><b>{{ $c['label'] }}</b> <span class="sub mono">{{ $mk }}</span>
-                    @if ($c['thin'])<span class="bdg wn" title="لا يبلغها إلا واحدٌ أو اثنان">ضيّقة</span>@endif</td>
+                    @if ($c['thin'])
+                        <span class="bdg wn" title="لا يبلغها إلا واحدٌ أو اثنان">ضيّقة</span>
+                        @php $t = ($triage ?? collect())[$mk] ?? null; @endphp
+                        @if ($t)
+                            <span class="bdg {{ $cls[$t['class']][1] ?? '' }}" title="{{ $t['why'] }}">{{ $cls[$t['class']][0] ?? '' }}</span>
+                            <div class="sub" style="font-size:12px">{{ $t['why'] }}</div>
+                        @endif
+                    @endif</td>
                 <td class="mono">{{ $c['viewers'] }}</td>
                 <td class="mono">{{ $c['writers'] }}</td>
                 <td class="sub">{{ $c['writer_roles'] ? implode('، ', $c['writer_roles']) : '—' }}</td>

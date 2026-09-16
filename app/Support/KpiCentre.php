@@ -285,6 +285,7 @@ class KpiCentre
                 'period' => $hasPeriod ? $k->period : null,
                 // نوعُ المؤشّرِ وإعدادُه ونسبُ هدفه — بها تُعرض القيمةُ بوحدتها
                 // وتُعرف مصادرُ الهدف، وبها تُحسب «ما ينقصه ليكون مُعَدّاً»
+                'formula' => $formula,          // يقرؤها مقترِحُ المالك (Ownership)
                 'kind' => $kind = self::kind($formula, $k->unit),
                 'kind_label' => self::KIND_LABEL[$kind] ?? '',
                 'shown' => self::format($value, $kind, $k->unit),

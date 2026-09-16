@@ -4,6 +4,8 @@ namespace App\Support;
 
 use App\Http\Middleware\PortalGuard;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * **مُفسِّرُ الصلاحيّة الفعّالة (PermissionInspector)** — طبقةُ قراءةٍ وتفسيرٍ لا محرّكُ توثيقٍ ثانٍ
@@ -236,6 +238,87 @@ class PermissionInspector
      * @return array<string, array{label:string, viewers:int, writers:int, total:int,
      *                             writer_roles:list<string>, thin:bool}>
      */
+    /**
+     * **ضيقُ هذه الوحدة: حارسٌ، أم خمولٌ، أم عيبٌ فعليّ؟**
+     *
+     * بطاقةُ «من يكتب في كل وحدة» تقول عدداً صادقاً ولا تقول شيئاً يُفعَل به:
+     * خمسٌ وخمسون وحدةً كاتبُها اثنان. والعددُ وحدَه **لا يُفرَز** — فيها ما
+     * ضيقُه حارسٌ مقصود، وفيها ما لا يُستعمل أصلاً، وفيها المعطَّلُ حقّاً.
+     * وخلطُ الثلاثةِ في رقمٍ واحدٍ يجعل القائمةَ تُقرأ ولا يُقرَّر بها، فيُترَك
+     * الخمسةُ والخمسون كلُّهم ويضيع المعطَّلُ الحقيقيُّ بينهم.
+     *
+     * فالفرزُ **بأدلّةٍ تُفحَص لا بذوق**، وكلُّ صنفٍ يُعرَض مع دليله كي يقدر
+     * المالكُ أن **يخالف** بنظرة — وذاك الفرقُ بين تصنيفٍ يُعين وتصنيفٍ يُملي:
+     *
+     *  · `guarded` — الوحدةُ تُعلن حقلاً سرّيّاً (`type=sec`) أو نموذجُها يُعلن
+     *    `AUDIT_SECRET`. ضيقُها **حارسٌ لا إهمال**، وتوسيعُها قرارٌ أمنيّ.
+     *  · `idle` — لا صفَّ في جدولها البتّة. توسيعُ الكتابةِ فيها **لا يغيّر
+     *    شيئاً**: لا أحدَ مُنع، لأنّ لا أحدَ حاول.
+     *  · `blocked` — فيها سجلاتٌ وكاتبُها اثنان. **هذه وحدَها** المرشَّحة.
+     *
+     * @return array{class:string, why:string, rows:int}
+     */
+    public static function narrowness(string $module): array
+    {
+        $def = hub_mod($module);
+        if (! $def) return ['class' => 'idle', 'why' => 'وحدةٌ غيرُ مسجَّلة', 'rows' => 0];
+
+        $label = (string) ($def['label'] ?? $module);
+
+        // ① حارسٌ بإعلانِ السجلِّ أو النموذج — لا بقائمةٍ مكتوبةٍ باليد
+        if ($secret = self::secretFields($module)) {
+            return ['class' => 'guarded', 'rows' => -1,
+                    'why' => '«' . $label . '» تحمل سرّاً معلَناً (' . implode('، ', $secret)
+                        . ') — ضيقُه حارسٌ لا إهمال، وتوسيعُه قرارٌ أمنيّ لا إداريّ'];
+        }
+
+        // ② خاملة: لا صفَّ فيها — ولا يُقاس ما لا جدولَ له
+        $table = (string) ($def['table'] ?? '');
+        if ($table === '' || ! Schema::hasTable($table)) {
+            return ['class' => 'idle', 'rows' => 0, 'why' => '«' . $label . '» بلا جدولٍ مُرحَّل'];
+        }
+
+        $q = DB::table($table);
+        if (Schema::hasColumn($table, 'deleted_at')) $q->whereNull('deleted_at');
+        $rows = (int) $q->count();
+
+        if ($rows === 0) {
+            return ['class' => 'idle', 'rows' => 0,
+                    'why' => '«' . $label . '» لا سجلَّ فيها — توسيعُ الكتابةِ لا يغيّر شيئاً،'
+                        . ' فلا أحدَ مُنع لأنّ لا أحدَ حاول'];
+        }
+
+        return ['class' => 'blocked', 'rows' => $rows,
+                'why' => '«' . $label . '» فيها ' . $rows . ' سجلاً وتُستعمل فعلاً،'
+                    . ' وكتّابُها اثنان — مرشَّحةٌ للتوسيع'];
+    }
+
+    /**
+     * الحقولُ السرّيّةُ التي **تُعلنها** الوحدةُ أو نموذجُها — لا قائمةٌ باليد.
+     *
+     * مصدران متّفقان: `type = 'sec'` في سجلّ الوحدات، و`AUDIT_SECRET` في النموذج
+     * (وهو ما يمنع كتابةَ القيمةِ في أثرِ التدقيق). وأيُّهما كفى.
+     *
+     * @return array<int, string>
+     */
+    protected static function secretFields(string $module): array
+    {
+        $def = hub_mod($module);
+        $out = collect($def['fields'] ?? [])->where('type', 'sec')
+            ->pluck('label')->filter()->values()->all();
+
+        $class = $def['model'] ?? null;
+        if (is_string($class) && class_exists($class) && defined($class . '::AUDIT_SECRET')) {
+            foreach ((array) constant($class . '::AUDIT_SECRET') as $col) {
+                $f = collect($def['fields'] ?? [])->firstWhere('col', $col)
+                    ?: collect($def['fields'] ?? [])->firstWhere('key', $col);
+                $out[] = (string) ($f['label'] ?? $col);
+            }
+        }
+
+        return array_values(array_unique(array_filter($out)));
+    }
+
     public static function moduleCoverage(): array
     {
         // العدُّ لمن يعمل فعلاً: الموقوفُ لا يكتب، وحسابُ العميلِ ليس من الفريق

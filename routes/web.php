@@ -499,6 +499,9 @@ Route::middleware('auth')->group(function () {
     Route::get('kpis', [\App\Http\Controllers\Web\KpiController::class, 'index'])->name('kpis.index');
     Route::post('kpis', [\App\Http\Controllers\Web\KpiController::class, 'store'])->name('kpis.store');
     Route::put('kpis/{id}', [\App\Http\Controllers\Web\KpiController::class, 'update'])->name('kpis.update');
+    // إسنادُ المالكِ المقترَح: نقرةٌ تعتمد ما عُرض بدليله — والجماعيُّ للمؤكَّدِ وحدَه
+    Route::post('kpis/adopt-all', [\App\Http\Controllers\Web\KpiController::class, 'adoptAll'])->name('kpis.adoptAll');
+    Route::post('kpis/{id}/adopt', [\App\Http\Controllers\Web\KpiController::class, 'adopt'])->name('kpis.adopt');
     Route::post('kpis/{id}/toggle', [\App\Http\Controllers\Web\KpiController::class, 'toggle'])->name('kpis.toggle');
     Route::post('kpis/{id}/move', [\App\Http\Controllers\Web\KpiController::class, 'move'])->name('kpis.move');
     Route::delete('kpis/{id}', [\App\Http\Controllers\Web\KpiController::class, 'destroy'])->name('kpis.destroy');

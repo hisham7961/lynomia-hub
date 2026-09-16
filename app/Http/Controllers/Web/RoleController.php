@@ -92,8 +92,17 @@ class RoleController extends Controller
             ->sortBy([fn ($a, $b) => $a['writers'] <=> $b['writers'],
                       fn ($a, $b) => $a['label'] <=> $b['label']]);
 
+        /*
+         * **والعددُ وحدَه لا يُفرَز** (قرارُ المالك · بعد v2.539.0): «٥٥ ضيّقة»
+         * رقمٌ صادقٌ لا يُفعَل به شيء — فيه ما ضيقُه حارسٌ مقصود، وما لا يُستعمل
+         * أصلاً، والمعطَّلُ حقّاً. فيُصنَّف كلُّ ضيّقٍ بدليله، ويبقى الحكمُ للقارئ.
+         * والتصنيفُ **للضيّقِ وحدَه** فلا يُقرأ جدولُ الوحداتِ كلِّها.
+         */
+        $triage = $coverage->filter(fn ($c) => $c['thin'])
+            ->map(fn ($c, $mk) => \App\Support\PermissionInspector::narrowness($mk));
+
         return view('roles.index', ['roles' => $roles, 'reach' => $roles->mapWithKeys(
-            fn ($r) => [$r->id => self::reach($r)]), 'coverage' => $coverage]);
+            fn ($r) => [$r->id => self::reach($r)]), 'coverage' => $coverage, 'triage' => $triage]);
     }
 
     /**

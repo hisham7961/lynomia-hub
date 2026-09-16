@@ -109,11 +109,28 @@
     <div class="card">
         <h3 class="cardtitle">🧩 مؤشّراتٌ ناقصةُ الإعداد <span class="bdg wn">{{ $needCfg->count() }}</span></h3>
         @if ($noOwner)
-            {{-- المالكُ قرارُ إنسانٍ لا حقلٌ يُملأ آليّاً — فيُقال على حدة ولا يُغرق القائمة --}}
+            {{-- **القرارُ للإنسان — والعونُ عليه واجبُ النظام.** إحدى وخمسون قائمةً
+                 منسدلةً فارغةً ليست قراراً، هي عبء: تُفتَح فتُغلَق، ويبقى «خارج
+                 الهدف» بلا من يُسأل. فيُعرَض **المرشَّحُ ودليلُه**، ويبقى الاعتمادُ
+                 نقرةً واعية — لا إسنادَ يقع بمجرّد فتحِ الشاشة. --}}
+            @php
+                $sg = collect($suggest ?? []);
+                $strong = $sg->where('confidence', 'strong')->count();
+            @endphp
             <div class="sub" style="margin-bottom:8px">
                 👤 <b>{{ $noOwner }}</b> مؤشّراً بلا مالك — و«خارج الهدف» لا تصير فعلاً حتى يُعرف مَن يُسأل.
-                يُسنَد من «✏️ تعديل» في كلِّ مؤشّر.
+                @if ($strong)
+                    <br>ومن أثرِ العملِ الحقيقيّ: <b class="ok">{{ $strong }}</b> منها له
+                    <b>مرشَّحٌ مؤكَّد</b> — يُعتمَد بنقرة.
+                @endif
             </div>
+            @if ($strong)
+                <form method="POST" action="{{ route('kpis.adoptAll') }}" style="margin-bottom:10px"
+                      data-confirm="اعتمادُ {{ $strong }} مرشَّحاً مؤكَّداً؟ لا يُمَسّ مؤشّرٌ له مالكٌ سلفاً، ولا مرشَّحٌ دليلُه ضعيف.">
+                    @csrf
+                    <button class="btn xs">👥 اعتمد المرشَّحين المؤكَّدين ({{ $strong }})</button>
+                </form>
+            @endif
         @endif
         @if ($needCfg->count())
         <div class="sub" style="margin-bottom:8px">
@@ -198,6 +215,23 @@
                             <div class="sub" style="font-size:12px;color:var(--wn)">
                                 🧩 ناقصُ الإعداد:
                                 {{ implode(' · ', array_merge($x['missing'], $x['needs_owner'] ? ['بلا مالك'] : [])) }}
+                            </div>
+                        @endif
+                        {{-- **المرشَّحُ بدليله** — والاعتمادُ نقرةٌ واعية، لا إسنادٌ يقع وحدَه --}}
+                        @php $sug = ($suggest ?? [])[$k['id']] ?? null; @endphp
+                        @if ($x['needs_owner'] && $sug)
+                            <div class="sub" style="font-size:12px">
+                                @if ($sug['user_id'])
+                                    🎯 <b>المرشَّح:</b> {{ $sug['name'] }}
+                                    <span class="bdg {{ $sug['confidence'] === 'strong' ? 'ok' : 'wn' }}">
+                                        {{ $sug['confidence'] === 'strong' ? 'دليلٌ قويّ' : 'دليلٌ ضعيف — راجِعه' }}</span>
+                                    <form method="POST" action="{{ route('kpis.adopt', $k['id']) }}" style="display:inline">
+                                        @csrf<button class="btn ghost xs">✓ اعتمد</button>
+                                    </form>
+                                    <div style="color:var(--mut,inherit)">{{ $sug['why'] }}</div>
+                                @else
+                                    🎯 <b>لا مرشَّح:</b> {{ $sug['why'] }}
+                                @endif
                             </div>
                         @endif
                     @endif
