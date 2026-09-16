@@ -260,6 +260,20 @@ class ModuleController extends Controller
             if (is_string($v) && $v !== '') $prefill[$f['key']] = $v;
         }
 
+        // **والاختيارُ من واحدٍ ليس اختياراً** (M-F6): حسابٌ معزولٌ على شركةٍ
+        // واحدةٍ يفرض عليه الخادمُ ذكرَها، فتُنتقى له سلفاً بدل أن يُسأل عمّا
+        // جوابُه محسومٌ — ولا يُكتَب شيءٌ لا يفرضه الحارسُ أصلاً. والرابطُ أولى:
+        // ما جاء في العنوانِ لا يُطمَس (السطرُ يتخطّى المفتاحَ الموجود).
+        if (($cids = hub_company_ids()) !== null && count($cids) === 1
+            && ($mk = (string) ($def['key'] ?? '')) !== 'companies') {
+            $cf = collect($def['fields'] ?? [])->first(fn ($f) => ($f['type'] ?? '') === 'ref'
+                && ($f['ref'] ?? '') === 'companies' && empty($f['multi']));
+            if ($cf && ! array_key_exists($cf['key'], $prefill)
+                && hub_field_mode(auth()->user(), $mk, (string) $cf['key']) === '') {
+                $prefill[$cf['key']] = (string) $cids[0];
+            }
+        }
+
         /*
          * **«⎘ نسخ كسجل جديد» كان يَعِد ولا يفعل** (الجولة 3): الزرُّ في صفحة
          * السجلّ يمرّر `?from=<id>`، و`from` ليس مفتاحَ حقلٍ فتُهمله الحلقةُ أعلاه
@@ -1426,6 +1440,14 @@ class ModuleController extends Controller
 
         $ids = auth()->user()->visibleProjectIds();
         $val = hub_str($r->input($pf['key']));
+
+        // **ولا يُطلَب اختيارٌ من قائمةٍ فارغة** (M-F2): محدودُ النطاقِ الذي لم
+        // يُسنَد إلى مشروعٍ بعد كان يُردّ هنا أبداً — فأوّلُ واجبٍ يوميٍّ يُطلَب
+        // منه (تقريرُ يومِه) أوّلُ بابٍ يُغلَق في وجهِه، والشريطُ يدعوه إليه.
+        // فيُقبل منه الفراغُ وحدَه، ويبقى صفُّه مرئيّاً له بـ`hub_scope`.
+        // ومن له مشروعٌ يُسأل عنه كما كان: الانضباطُ حيث يُمكن الوفاءُ به.
+        if ($ids === [] && $val === '') return;
+
         if ($val === '' || ! in_array($val, $ids, true)) {
             throw \Illuminate\Validation\ValidationException::withMessages(
                 [$pf['key'] => 'حسابك محدود النطاق — اختر مشروعاً من مشاريعك']);
@@ -1683,7 +1705,11 @@ class ModuleController extends Controller
             // حقل ممنوع على الدور لا يُتحقق منه (وإلا استحال الحفظ بحقل إلزامي مخفي)
             if (hub_field_mode(auth()->user(), (string) ($def['key'] ?? ''), $f['key']) !== '') continue;
 
-            $required = ! empty($f['required']) && ($creating || ($f['type'] ?? '') !== 'sec');
+            // **الإلزامُ يُسأل عنه لا يُقرأ خاماً** (M-F2): حقلُ مرجعٍ قائمتُه خاويةٌ
+            // لهذا القارئِ طريقٌ مسدود، و`hub_field_required` هي الحكمُ الواحدُ
+            // الذي يقرؤه القالبُ أيضاً — فلا نجمةٌ ترسمها شاشةٌ ويكذّبها متحقّق.
+            $required = hub_field_required((string) ($def['key'] ?? ''), $f)
+                && ($creating || ($f['type'] ?? '') !== 'sec');
             $r = [$required ? 'required' : 'nullable'];
             $r[] = match ($f['type']) {
                 'num', 'big' => 'numeric',

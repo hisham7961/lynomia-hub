@@ -459,6 +459,9 @@ class MobileWorkController extends V1Controller
             // قصداً — فوجهتُه ملفُّه هو لا سجلُّ الوحدة (الذي يردّه 403).
             // حقلٌ مضاف، لا تغييرَ في عقدٍ قائم.
             'self'   => (bool) ($i['self'] ?? false),
+            // **والوجهةُ محسوبةٌ في الخادم** — لا يستنتجها التطبيقُ من الراية.
+            // `hub_expiry_target` هي القاعدةُ نفسُها التي يبني بها الويبُ عنوانَه.
+            'target' => hub_expiry_target($i),
         ])->values()->all();
     }
 
