@@ -130,6 +130,20 @@ if (! function_exists('hub_company_ids')) {
     }
 }
 
+if (! function_exists('hub_has_assignee_col')) {
+    /** أللوحدةِ عمودُ «مُسنَدٌ إليه»؟ (مخبّأٌ لكلِّ طلب — لا استعلامَ مخطّطٍ متكرّر) */
+    function hub_has_assignee_col(string $module): bool
+    {
+        static $memo = [];
+        if (array_key_exists($module, $memo)) return $memo[$module];
+
+        $table = hub_modules()[$module]['table'] ?? null;
+
+        return $memo[$module] = (bool) ($table
+            && \Illuminate\Support\Facades\Schema::hasColumn($table, 'assignee_id'));
+    }
+}
+
 if (! function_exists('hub_scope')) {
     /**
      * فرض النطاق الكامل على أي استعلام (Eloquent أو Query Builder):
@@ -144,8 +158,24 @@ if (! function_exists('hub_scope')) {
 
         if (hub_scoped($user)) {
             $ids = $user->visibleProjectIds();
-            if ($module === 'projects') $q->whereIn('id', $ids);
-            elseif ($col = hub_project_col($module)) $q->whereIn($col, $ids);
+            if ($module === 'projects') {
+                $q->whereIn('id', $ids);
+            } elseif ($col = hub_project_col($module)) {
+                // **الإسنادُ نفسُه سببُ وصول** (محاكاةُ الشهر · اليوم ٦ · M-F7):
+                // كان الترشيحُ بعمودِ المشروعِ وحدَه، فمهمّةٌ تُسنَد إلى محدودِ
+                // النطاقِ على مشروعٍ ليس من مشاريعه **تختفي عنه**: لا في قائمته
+                // ولا بالرابط (٤٠٤) — بينما منتقي الإسنادِ يعرض كلَّ الزملاء،
+                // والحفظُ ينجح، **ويصله إشعارُ «أُسند إليك»** فيضغطه فيُردّ.
+                // ولا يكشف هذا جديداً: الإشعارُ أفشى العنوانَ سلفاً، وإنّما
+                // يَصِل صاحبَه بما أُخبر أنّه له. وعزلُ الشركةِ والعميلِ يبقيان
+                // فوقَه (يُطبَّقان بعدَه فيضيّقان لا يوسّعان).
+                if (hub_has_assignee_col($module)) {
+                    $q->where(fn ($w) => $w->whereIn($col, $ids)
+                        ->orWhere('assignee_id', (string) $user->id));
+                } else {
+                    $q->whereIn($col, $ids);
+                }
+            }
         }
 
         if (($cids = hub_company_ids($user)) !== null && ($ccol = hub_company_col($module))) {
