@@ -482,6 +482,17 @@ if (! function_exists('hub_top_links')) {
         $finA = $mon || hub_flag($user, 'finAnalytics');
         $secO = $mon || hub_flag($user, 'secOps');
 
+        // **والرايةُ نصفُ السؤال** (محاكاةُ الشهر · M-F1/M-F4): لوحاتُ المنشأةِ يفرض
+        // متحكّمُها `hub_org_analytics_guard()` فوقَ الراية، ولوحتا التكاليفِ تفرضان
+        // معه رافعةَ حقولِ المشاريع. فحسابٌ معزولٌ على شركةٍ يحمل الرايةَ كان يُدعى
+        // إلى عشرةِ أبوابٍ تردُّه ٤٠٣. والشرطُ هنا **هو شرطُ البابِ نفسُه** لا نظيرٌ
+        // له — يحرسه `NavOfferMatchesDestinationTest` بطرقِ كلِّ بابٍ يُعرَض فعلاً.
+        $orgA = hub_can_org_analytics($user);
+        $opsOrg = $opsA && $orgA;
+        $finOrg = $finA && $orgA;
+        $secOrg = $secO && $orgA;
+        $costOk = $finOrg && hub_can_project_finance($user);
+
         // كل رابط مُصنَّف في قسم (group): daily/analytics/centers — تستعمله hub_top_groups
         $all = [
             ['key' => 'morning',   'label' => '☀️ تشغيل اليوم',      'route' => 'morning',         'group' => 'daily',     'ok' => true],
@@ -501,16 +512,16 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'inboxdocs', 'label' => '📥 صندوق الوثائق',    'route' => 'inboxdocs.index', 'group' => 'daily',     'ok' => hub_can($user, 'inboxdocs', 'v') || hub_can($user, 'files', 'v')],
 
             ['key' => 'ceo',       'label' => '👑 لوحة CEO',         'route' => 'ceo',             'group' => 'analytics', 'ok' => $owner],
-            ['key' => 'perf',      'label' => '📈 لوحة الأداء',      'route' => 'performance',     'group' => 'analytics', 'ok' => $opsA],
+            ['key' => 'perf',      'label' => '📈 لوحة الأداء',      'route' => 'performance',     'group' => 'analytics', 'ok' => $opsOrg],
             ['key' => 'sales',     'label' => '💼 لوحة المبيعات',    'route' => 'sales.dashboard', 'group' => 'analytics', 'ok' => $finA],
             ['key' => 'finrep',    'label' => '📊 التقارير المالية', 'route' => 'reports.finance', 'group' => 'analytics', 'ok' => hub_can($user, 'fin', 'v')],
-            ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'group' => 'analytics', 'ok' => $finA],
-            ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'group' => 'analytics', 'ok' => $finA],
+            ['key' => 'costs',     'label' => '💰 التكاليف والربحية', 'route' => 'costs.index',    'group' => 'analytics', 'ok' => $costOk],
+            ['key' => 'svccosts',  'label' => '🧮 تكلفة الخدمات',    'route' => 'servicecosts',    'group' => 'analytics', 'ok' => $costOk],
             ['key' => 'kpis',      'label' => '📈 مؤشرات KPI',       'route' => 'kpis.index',      'group' => 'analytics', 'ok' => $opsA],
-            ['key' => 'capacity',  'label' => '📊 القدرات والموارد', 'route' => 'capacity',        'group' => 'analytics', 'ok' => $opsA],
-            ['key' => 'recs',      'label' => '💡 مركز التوصيات',    'route' => 'recs',            'group' => 'analytics', 'ok' => $opsA],
-            ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'group' => 'analytics', 'ok' => $opsA],
-            ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $opsA],
+            ['key' => 'capacity',  'label' => '📊 القدرات والموارد', 'route' => 'capacity',        'group' => 'analytics', 'ok' => $opsOrg],
+            ['key' => 'recs',      'label' => '💡 مركز التوصيات',    'route' => 'recs',            'group' => 'analytics', 'ok' => $opsOrg],
+            ['key' => 'impact',    'label' => '🕸️ خريطة الأثر',      'route' => 'impact',          'group' => 'analytics', 'ok' => $opsOrg],
+            ['key' => 'appq',      'label' => '🧪 جودة البرمجيات',   'route' => 'appquality',      'group' => 'analytics', 'ok' => $opsOrg],
             ['key' => 'delivery',  'label' => '🛤️ مسار التسليم',     'route' => 'delivery',        'group' => 'analytics', 'ok' => hub_can($user, 'feats', 'v') || hub_can($user, 'deploys', 'v') || hub_can($user, 'requests', 'v') || hub_can($user, 'designs', 'v')],
             ['key' => 'custody',   'label' => '🏷️ كتالوج العهد',      'route' => 'custody.catalog', 'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
             /*
@@ -540,7 +551,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'assetlife', 'label' => '💼 العهدة ودورة الحياة', 'route' => 'assets.life',  'group' => 'centers',   'ok' => hub_can($user, 'assets', 'v')],
             ['key' => 'compb',     'label' => '⚖️ الامتثال وأثره',   'route' => 'compliance.board', 'group' => 'centers', 'ok' => hub_can($user, 'compliance', 'v')],
             ['key' => 'appsproj',  'label' => '🔗 التطبيقات والمشاريع', 'route' => 'appsprojects', 'group' => 'centers', 'ok' => hub_can($user, 'apps', 'v') || hub_can($user, 'projects', 'v')],
-            ['key' => 'dassets',   'label' => '🔐 الأصول الرقمية',   'route' => 'digital.assets',  'group' => 'analytics', 'ok' => $secO],
+            ['key' => 'dassets',   'label' => '🔐 الأصول الرقمية',   'route' => 'digital.assets',  'group' => 'analytics', 'ok' => $secOrg],
             ['key' => 'pricing',   'label' => '💳 الباقات والتسعير', 'route' => 'pricing',         'group' => 'centers',   'ok' => hub_can($user, 'plans', 'v')],
             ['key' => 'mediac',    'label' => '📣 مركز الإعلام',      'route' => 'media.center',    'group' => 'centers',   'ok' => hub_can($user, 'media', 'v') || hub_can($user, 'events', 'v')],
             ['key' => 'teamdir',   'label' => '👥 دليل الفريق',       'route' => 'team',            'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
@@ -553,7 +564,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'esign',     'label' => '✍️ توقيع العقود',     'route' => 'esign.index',     'group' => 'centers',   'ok' => hub_can($user, 'contracts', 'v')],
             ['key' => 'support',   'label' => '🎫 لوحة الدعم',       'route' => 'support',         'group' => 'centers',   'ok' => hub_can($user, 'tickets', 'v')],
             ['key' => 'innov',     'label' => '💡 مركز الابتكار',    'route' => 'innovation',      'group' => 'centers',   'ok' => hub_can($user, 'ideas', 'v')],
-            ['key' => 'supscores', 'label' => '🏅 تقييم الموردين',   'route' => 'supplierscores',  'group' => 'centers',   'ok' => hub_can($user, 'suppliers', 'v')],
+            ['key' => 'supscores', 'label' => '🏅 تقييم الموردين',   'route' => 'supplierscores',  'group' => 'centers',   'ok' => hub_can($user, 'suppliers', 'v') && $orgA],
         ];
 
         return array_values(array_filter($all, fn ($l) => $l['ok']));
@@ -2463,15 +2474,64 @@ if (! function_exists('hub_org_analytics_guard')) {
      */
     function hub_org_analytics_guard(): void
     {
-        // لوحاتُ المنشأة كلّها (تكلفةٌ، قدراتٌ، صحّةُ مشاريعَ…) غيرُ منطَّقةٍ بعميل —
-        // فتُمنَع عن **كلّ حسابٍ معزول**: على شركاتٍ محددة **أو على عملاءَ محددين**.
-        // كان عزلُ العميل ثغرةً: حاملُ راية المراقبة المحصورُ بعميلٍ كان يرى أرقامَ
-        // المنشأة كلّها. (نظيرُ سدِّ تسريب الخبيئة في `hub_recommendations`.)
-        abort_if(hub_company_ids() !== null, 403, 'هذه اللوحة على مستوى المنشأة كلها — غير متاحة لحسابٍ معزول على شركات محددة');
-        abort_if(hub_client_ids() !== null, 403, 'هذه اللوحة على مستوى المنشأة كلها — غير متاحة لحسابٍ معزول على عملاء محددين');
+        $why = hub_org_analytics_block();
+        abort_if($why !== null, 403, (string) $why);
+    }
+}
+
+if (! function_exists('hub_org_analytics_block')) {
+    /**
+     * **لماذا يُمنَع هذا الحسابُ من لوحاتِ المنشأة؟** — سببٌ نصّيٌّ أو `null` إن لم يُمنَع.
+     *
+     * هذه **مصدرُ الحكمِ الواحد**: الحارسُ (`hub_org_analytics_guard`) يُجهض به،
+     * والشريطُ (`hub_top_links`) يسأله قبل أن يعرض. وكانا سؤالَين قبلَ اليوم —
+     * الشريطُ يسأل «أتملك الراية؟» والبابُ «أتملكها **ولستَ معزولاً**؟» — فعرض
+     * الشريطُ لمديرٍ عامٍّ معزولٍ على شركةٍ **عشرةَ** أبوابٍ يردُّها المنتج ٤٠٣
+     * (محاكاةُ الشهر · M-F1، مقيسةٌ حيّاً على راشد بن حمد). والسؤالُ الآن واحد.
+     *
+     * ولوحاتُ المنشأة غيرُ منطَّقةٍ بعميل، فتُمنَع عن **كلّ حسابٍ معزول**: على
+     * شركاتٍ محددة، أو على عملاءَ محددين، أو بمشاريعِ دورِه. (كان عزلُ العميل
+     * ثغرةً: حاملُ راية المراقبة المحصورُ بعميلٍ كان يرى أرقامَ المنشأة كلّها.)
+     */
+    function hub_org_analytics_block($user = null): ?string
+    {
+        if (hub_company_ids($user) !== null) return 'هذه اللوحة على مستوى المنشأة كلها — غير متاحة لحسابٍ معزول على شركات محددة';
+        if (hub_client_ids($user) !== null) return 'هذه اللوحة على مستوى المنشأة كلها — غير متاحة لحسابٍ معزول على عملاء محددين';
         // **والمعزولُ بمشاريعِ دورِه أيضاً** (Permissions 360 · 06.2): دورٌ scope=proj بلا
         // قائمةِ شركاتٍ/عملاءَ كان يجتازُ الحارسَ فيرى أرقامَ المنشأةِ كلَّها — دفاعٌ في العمق.
-        abort_if(hub_scoped(), 403, 'هذه اللوحة على مستوى المنشأة كلها — غير متاحة لحسابٍ محدود النطاق بمشاريعه');
+        if (hub_scoped($user)) return 'هذه اللوحة على مستوى المنشأة كلها — غير متاحة لحسابٍ محدود النطاق بمشاريعه';
+
+        return null;
+    }
+}
+
+if (! function_exists('hub_can_org_analytics')) {
+    /** أيجتاز هذا الحسابُ بوّابةَ لوحاتِ المنشأة؟ — وجهُ `hub_org_analytics_block` المنطقيّ */
+    function hub_can_org_analytics($user = null): bool
+    {
+        return hub_org_analytics_block($user) === null;
+    }
+}
+
+if (! function_exists('hub_can_project_finance')) {
+    /**
+     * **رافعةُ ماليّةِ المشاريع** — نظيرُ شرطِ `CostController::gate()` حرفاً.
+     *
+     * رائي وحدةِ المشاريعِ الذي حُجبت عنه حقولُ التكلفةِ والميزانيّةِ في شاشةِ
+     * المشروعِ لا يقرأ P&L ذاتَه من لوحةِ التكاليف. وحاملُ الرايةِ وحدَها (بلا
+     * `projects:v`) سلطتُه سلطةُ تحليلاتِ منشأةٍ مقصودةٌ فلا يُقاس بحقولِ وحدةٍ
+     * لا يبلغها — فيمرّ.
+     *
+     * وكان البابُ يفرضها والشريطُ لا يسأل عنها، فرأى المحاسبُ يوسفُ الحربي
+     * «💰 التكاليف» و«🧮 تكلفة الخدمات» في شريطه ورُدَّ عنهما ٤٠٣ (M-F4).
+     */
+    function hub_can_project_finance($user = null): bool
+    {
+        $u = $user ?? auth()->user();
+        if (! hub_can($u, 'projects', 'v')) return true;
+
+        return hub_field_mode($u, 'projects', 'cost') !== 'hide'
+            && hub_field_mode($u, 'projects', 'budget') !== 'hide';
     }
 }
 
@@ -6777,8 +6837,11 @@ if (! function_exists('hub_admin_links')) {
              * وتبويباتُ المالكِ محروسةٌ داخلَ الصفحةِ بـ`visibleTabs()` فلا يرى
              * حاملُ الرايةِ ما ليس له. **إضافةُ رؤيةٍ لا توسيعُ صلاحيّة.**
              */
+            // و`tabGate` يفرض `hub_org_analytics_guard()` فوقَ الراية على غير تبويبات
+            // المالك — فالحسابُ المعزولُ حاملُ الرايةِ كان يُدعى ويُصَدّ (M-F1).
             $mk('quality', 'الجودة', '🧹', 'quality.index', [], 'الجودة والحوكمة',
-                $owner || hub_monitor_group('opsAnalytics', $user), ['quality.*'], 'جودة البيانات التكرار'),
+                $owner || (hub_monitor_group('opsAnalytics', $user) && hub_can_org_analytics($user)),
+                ['quality.*'], 'جودة البيانات التكرار'),
             $mk('fields', 'الحقول', '🧩', 'fields.index', [], 'الجودة والحوكمة',
                 $owner, ['fields.*'], 'باني الحقول'),
             $mk('flows', 'المسارات', '🪄', 'flows.index', [], 'الجودة والحوكمة',

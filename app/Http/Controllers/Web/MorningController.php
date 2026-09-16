@@ -211,19 +211,30 @@ class MorningController extends Controller
         // ── مشاريع متعثرة ──
         // النطاقُ كان مفروضاً والصلاحيةُ منسيّة — فمن لا يملك وحدةَ المشاريع
         // يقرأ أسماءَها وصحّتَها في ملخّص صباحه. الحارسُ على نمط بطاقة المهام.
+        //
+        // **والبطاقةُ تقود إلى بابٍ يُفتَح لقارئها** (محاكاةُ الشهر · M-F5): شرطُ
+        // ظهورِها `projects:v`، وكلُّ روابطها كانت تقصد لوحةَ التكاليف التي تشترط
+        // رايةَ `finAnalytics` — **شرطان من عالمَين**، و٢٧ من ٣٠ موظّفاً في المحاكاة
+        // يحملون الأوّلَ دون الثاني. فحاملُ الرايةِ يبقى يُقاد إلى تحليلِ التكلفةِ
+        // كما كان، ومن لا يحملها يُقاد إلى **سجلِّ المشروعِ نفسِه** — وفيه صحّتُه
+        // التي استدعت البطاقةَ لأجلها. لا وجهةَ تُحذف؛ وجهةٌ تُصحَّح.
         $bad = collect();
         if (hub_can($u, 'projects', 'v')) {
+            $toCosts = hub_can_org_analytics($u) && hub_monitor_group('finAnalytics', $u)
+                && hub_can_project_finance($u);
             foreach (hub_scope(DB::table('projects')->whereNull('deleted_at'), 'projects')
                         ->whereNotIn('status', ['مكتمل', 'ملغى'])->limit(25)->get(['id', 'name']) as $p) {
                 $h = hub_project_health($p->id);
                 if (($h['score'] ?? 100) < 55) {
                     $bad->push(['t' => $p->name, 's' => 'صحة ' . $h['score'] . '٪ — ' . $h['label'],
-                                'u' => route('costs.index', ['p' => $p->id]), 'tone' => 'bad']);
+                                'u' => $toCosts ? route('costs.index', ['p' => $p->id])
+                                                : route('m.show', ['projects', $p->id]),
+                                'tone' => 'bad']);
                 }
             }
         }
         $add('📉', 'مشاريع متعثرة', 'صحتها دون ٥٥٪ حسب التأخير والميزانية والمهام والمخاطر',
-            $bad->take(6), route('costs.index'));
+            $bad->take(6), ($toCosts ?? false) ? route('costs.index') : route('m.index', 'projects'));
 
         return view('morning', ['cards' => $cards, 'when' => now()]);
     }
