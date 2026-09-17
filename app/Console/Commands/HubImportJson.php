@@ -68,7 +68,12 @@ class HubImportJson extends Command
             }
 
             foreach ((array) ($db['users'] ?? []) as $u) {
-                $this->upsertRow('users', (string) $u['id'], [
+                /*
+                 * نظيرُ HubBackup (F-14): ما صُدِّر يُستعاد. والغيابُ هنا يعني
+                 * الحقلَ لم يكن في نسخةٍ قديمةٍ سبقت الإصلاح — فيُترَك على
+                 * افتراضِه ولا يُدهَس بقيمةٍ مخترَعة.
+                 */
+                $row = [
                     'name' => $u['name'], 'email' => $u['email'] ?? Str::slug($u['name']) . '@example.com',
                     'phone' => $u['phone'] ?? null, 'job_title' => $u['title'] ?? null,
                     'role_id' => $u['roleId'] ?? null, 'status' => $u['status'] ?? 'نشط',
@@ -77,7 +82,19 @@ class HubImportJson extends Command
                     'allowed_ips' => $u['allowedIps'] ?? null,
                     'expires_at' => $u['expiresAt'] ?? null,
                     'created_at' => now(), 'updated_at' => now(),
-                ]);
+                ];
+                foreach ([
+                    'pwd' => 'password', 'pwdAt' => 'password_changed_at',
+                    'mustChange' => 'must_change_password',
+                    'totpOn' => 'totp_enabled', 'totpCipher' => 'totp_secret_cipher',
+                    'recovery' => 'recovery_codes', 'lockedUntil' => 'locked_until',
+                    'companyId' => 'company_id', 'accountType' => 'account_type',
+                ] as $key => $col) {
+                    if (array_key_exists($key, $u)) $row[$col] = $u[$key];
+                }
+                if (array_key_exists('clients', $u)) $row['clients'] = json_encode($u['clients'] ?? []);
+
+                $this->upsertRow('users', (string) $u['id'], $row);
             }
 
             foreach ($modules as $key => $def) {

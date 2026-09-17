@@ -27,8 +27,16 @@ class SystemMapController extends Controller
         // إلحاقُ رابطٍ آمنٍ بكلِّ وجهة: الوجهاتُ السياقيّةُ (تحتاج سجلاً/معاملاً) لا
         // تُولَّد رابطاً عامّاً فتظهر تسميةً فقط — لا رميَ ولا رابطٌ مكسور.
         $annotate = function (array &$node): void {
-            foreach ($node['sections'] ?? [] as &$s) {
-                foreach ($s['destinations'] ?? [] as &$d) {
+            /*
+             * **`??` تُبطل المرجعيّة** (المراجعةُ الشاملة · F-13): معاملُ الدمجِ يُنتج
+             * **قيمةً** لا متغيّراً، فـ`as &$s` تُربَط بنسخةٍ مؤقّتةٍ وتضيع كلُّ كتابةٍ
+             * فيها صامتةً — فكانت الخريطةُ تعرض ١٧٧ شارةً و**صفرَ روابط**.
+             * فيُهيَّأ المفتاحُ أوّلاً ثمّ يُمَرّ بالمرجعيّة على المصفوفةِ نفسِها.
+             */
+            $node['sections'] ??= [];
+            foreach ($node['sections'] as &$s) {
+                $s['destinations'] ??= [];
+                foreach ($s['destinations'] as &$d) {
                     $d['url'] = null;
                     $rn = $d['route'] ?? null;
                     if ($rn) {

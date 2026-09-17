@@ -22,7 +22,7 @@ class ModuleController extends Controller
         // العامُّ يشترط ما يشترطه المركزُ نفسُه (مالك/secOps)، فلا يلتفُّ `endpoints:v`
         // في المصفوفةِ على حارسِ EndpointCentre (هجرةُ grant_secops صانت الأدوارَ القائمة).
         if ($module === 'endpoints') {
-            abort_unless(hub_is_owner() || hub_monitor_group('secOps'), 403,
+            abort_unless(hub_fleet_ok(), 403,   // سلطةٌ واحدةٌ يشاركها /api/v1 — F-02
                 'أسطولُ النقاطِ الطرفيّة للمالكِ أو حاملِ مجموعةِ الأمن (secOps)');
         }
 

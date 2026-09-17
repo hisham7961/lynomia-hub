@@ -1118,6 +1118,26 @@ if (! function_exists('hub_monitor_group')) {
     }
 }
 
+if (! function_exists('hub_fleet_ok')) {
+    /**
+     * **سلطةٌ واحدةٌ لبابِ أسطولِ النقاطِ الطرفيّة** (المراجعةُ الشاملة · F-02).
+     *
+     * كان الشرطُ مكتوباً في `ModuleController::resolve` وحدَه، فالشاشةُ تشترط مالكاً
+     * أو `secOps` بينما `/api/v1` يكتفي بـ`endpoints:v` في المصفوفة — بابٌ يُغلَق
+     * وبابٌ يُفتَح على الأسطولِ نفسِه. والدليلُ أنّ التفاوتَ بنيويٌّ لا سهوُ سطر:
+     * كلمةُ `secOps` لم تكن ترد في **أيِّ** ملفٍّ تحت `app/Http/Controllers/Api/`.
+     *
+     * **ولهذا لم يُنسَخ الشرطُ إلى السطحِ الثاني بل أُخرج إلى هنا**: نسخُه يصنع
+     * البابَ الثالثَ يومَ يُضاف سطحٌ ثالث. من أراد الأسطولَ يسأل هذه الدالّة.
+     */
+    function hub_fleet_ok($user = null): bool
+    {
+        $user = $user ?? auth()->user();
+
+        return hub_is_owner($user) || hub_monitor_group('secOps', $user);
+    }
+}
+
 if (! function_exists('hub_approver')) {
     /** اعتماد الطلبات وأوامر الشراء */
     function hub_approver($user = null): bool
@@ -3336,11 +3356,30 @@ if (! function_exists('hub_project_paused_since')) {
     }
 }
 
+if (! function_exists('hub_paused_states')) {
+    /**
+     * **حالاتُ التوقّف — سلطةٌ واحدةٌ يقرؤها كلُّ من يسأل** (المراجعةُ الشاملة · F-05).
+     *
+     * كان المفهومُ مُعرَّفاً **مرّتين في هذا الملفّ**: حاسبُ الصحّة يعرف أربعَ قيمٍ بلا
+     * «موقوف»، وكاشفُ الركودِ يعرف ستّاً معها. وفي البياناتِ الحيّة مشروعٌ «متوقف»
+     * بميزانيّة 6,000 ومشروعٌ **«موقوف» بميزانيّة 363,000** — فالمنطقُ يمسّ الأصغرَ
+     * ويعمى عن الأكبر، والرقمُ الناتجُ صحيحٌ على **المجموعةِ الخطأ**.
+     *
+     * وسببُ العيبِ يستحقّ الحفظ: كُتب الحاسبُ من **سجلِّ الوحدات** (`config/hub.php`)
+     * وفيه سبعُ حالاتٍ ليس منها «موقوف» — بينما القاعدةُ تحوي «موقوف» و«مخطّط».
+     * فمن يكتب تعريفاً من السجلِّ وحدَه يرث عماه عمّا كُتب فعلاً.
+     */
+    function hub_paused_states(): array
+    {
+        return ['متوقف', 'متوقفة', 'موقوف', 'موقوفة', 'معلّق', 'معلق', 'مُعلّق', 'مؤجل', 'مؤجّل', 'مجمّد', 'مجمد'];
+    }
+}
+
 if (! function_exists('hub_project_is_paused')) {
-    /** الحالاتُ التي تعني «متوقف» — تعريفٌ واحدٌ يقرؤه الحسابُ والأثرُ معاً */
+    /** أمتوقّفٌ هذا المشروع؟ — تعريفٌ واحدٌ يقرؤه الحسابُ والأثرُ والكاشفُ معاً */
     function hub_project_is_paused(?string $status): bool
     {
-        return in_array(trim((string) $status), ['متوقف', 'متوقفة', 'معلّق', 'معلق'], true);
+        return in_array(trim((string) $status), hub_paused_states(), true);
     }
 }
 
@@ -5256,7 +5295,7 @@ if (! function_exists('hub_recommendations')) {
             // **لا محرّكَ صحّةٍ ثانٍ**: إشارةٌ مستقلّةٌ تُشتقّ من آخرِ أثرٍ فعليّ
             // (تدقيقُ المشروع + آخرُ تحديثِ مهمّة)، منطَّقةٌ بـhub_scope كالبقية.
             try {
-                $paused = ['متوقف', 'موقوف', 'معلّق', 'مُعلّق', 'مؤجل', 'مجمّد'];
+                $paused = hub_paused_states();   // السلطةُ نفسُها التي يسألها الحاسب — F-05
                 $projs = hub_scope(\Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at'), 'projects')
                     ->where(fn ($w) => $w->whereNull('status')
                         ->orWhere(fn ($q) => $q->whereNotIn('status', hub_closed_states())->whereNotIn('status', $paused)))
