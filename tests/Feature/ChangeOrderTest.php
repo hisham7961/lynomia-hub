@@ -105,8 +105,8 @@ class ChangeOrderTest extends TestCase
         $this->assertStringContainsString('أمرُ تغيير', $html);
         $this->assertStringContainsString('7,000', $html);
         // **لا تكلفةَ داخلية في مستند العميل**
-        $this->assertStringNotContainsString('2,500', $html);
-        $this->assertStringNotContainsString('2500', $html);
+        $this->assertMaskedValueAbsent($html, '2,500');
+        $this->assertMaskedValueAbsent($html, '2500');
 
         $res = $this->actingAs($this->owner)->get("/changeorder/{$co->id}/pdf");
         $res->assertOk();

@@ -38,6 +38,40 @@ abstract class TestCase extends BaseTestCase
         }
     }
 
+    /**
+     * **تأكيدُ غيابِ قيمةٍ محجوبةٍ عن مخرجٍ كامل — دون قرعةِ المعرّفات.**
+     *
+     * حارسُ الحجب يسأل: هل ظهر «7777» في الصفحة؟ والصفحةُ تحمل — عدا محتواها —
+     * بصماتِ الجلسة: معرّفاتُ UUID اثنتان وثلاثون خانةً ست عشريّة، فاحتمالُ أن
+     * يحوي معرّفٌ واحدٌ أربعَ خاناتٍ بعينها ≈ 1/2200، وفي الصفحة معرّفاتٌ عدّة
+     * (القارئُ في `data-uid`، والسجلّاتُ في روابطها). فالتأكيدُ قرعةٌ: يخضرّ
+     * محليّاً ويسقط على CI بلا خللٍ حقيقيّ — وهكذا سقطت دفعةُ v2.540.0 على
+     * `PHP 8.2 · sqlite` وحدَها: معرّفُ القارئ خرج `…e09787777c2c` فحوى «7777»
+     * بينما الحقلُ المحجوب مطبوعٌ صفراً كما يجب.
+     *
+     * والقرعةُ لا تُحتمل هنا خاصّةً: هذه حرّاسُ تسرّبٍ أمنيّ، وسقوطٌ كاذبٌ
+     * يُعلّم القارئَ أن يُعيد التشغيل بدل أن يقرأ — فيمرّ التسرّبُ الحقيقيّ يوماً
+     * بالعادة نفسِها. فتُطرح البصماتُ المُعتِمة قبل التأكيد: ما بقي نصُّ الصفحة
+     * لا هويّاتُها. والقيمةُ المحجوبةُ حين تتسرّب تتسرّب **نصّاً** لا داخلَ UUID،
+     * فالحارسُ لا يفقد شيئاً — يُثبت ذلك وجهُ الاختبار الثاني في
+     * `ScopeLeakAuditTest::test_the_masked_field_guard_still_sees_the_number_when_it_is_not_masked`.
+     */
+    protected function assertMaskedValueAbsent(string $haystack, string $needle, string $message = ''): void
+    {
+        $this->assertStringNotContainsString($needle, static::withoutOpaqueIds($haystack), $message);
+    }
+
+    /** طرحُ البصماتِ المُعتِمة من مخرجٍ: معرّفاتُ UUID ورمزُ CSRF — لا محتوى */
+    public static function withoutOpaqueIds(string $s): string
+    {
+        // UUID بأي حالةِ أحرف (وبلا حدودِ كلمةٍ: قد يقع داخل رابطٍ أو سمة)
+        $s = (string) preg_replace('/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i', 'OPAQUE-ID', $s);
+        // رمزُ CSRF: في الوسم `<meta name="csrf-token" content="…">` وفي حقل `_token` المخفي
+        $s = (string) preg_replace('/(name="(?:csrf-token|_token)"[^>]*?(?:content|value)=")[^"]*/i', '$1', $s);
+
+        return $s;
+    }
+
     /** ضبط إعداد نظام مع إسقاط خبيئة الإعدادات — للاختبارات */
     protected function hubSetting(string $key, string $value): void
     {

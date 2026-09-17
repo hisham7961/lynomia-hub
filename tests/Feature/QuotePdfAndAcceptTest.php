@@ -31,8 +31,8 @@ class QuotePdfAndAcceptTest extends TestCase
         $this->assertStringContainsString('العرض التجاريّ', $html);
         $this->assertStringContainsString('3,000', $html);
         // **لا تكلفةَ ولا هامشَ داخليّ في مستند العميل**
-        $this->assertStringNotContainsString('1,200', $html, 'تكلفةٌ داخلية تسرّبت لمستند العميل');
-        $this->assertStringNotContainsString('1200', $html, 'تكلفةٌ داخلية تسرّبت لمستند العميل');
+        $this->assertMaskedValueAbsent($html, '1,200', 'تكلفةٌ داخلية تسرّبت لمستند العميل');
+        $this->assertMaskedValueAbsent($html, '1200', 'تكلفةٌ داخلية تسرّبت لمستند العميل');
         $this->assertStringNotContainsString('الربحية', $html);
         $this->assertStringNotContainsString('الهامش', $html);
     }
