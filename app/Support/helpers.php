@@ -211,10 +211,35 @@ if (! function_exists('hub_scope')) {
             }
         }
 
-        if (($cids = hub_company_ids($user)) !== null && ($ccol = hub_company_col($module))) {
-            hub_company_null_is_unowned($module)
-                ? $q->where(fn ($w) => $w->whereIn($ccol, $cids)->orWhereNull($ccol))
-                : $q->whereIn($ccol, $cids);
+        /*
+         * **عزلُ الشركات — والحارسُ يفشل مغلقاً** (المراجعةُ الشاملة · F-04/F-16).
+         *
+         * كان الشرطُ `… && ($ccol = hub_company_col($module))` فيجعل **غيابَ العمود
+         * إذناً بالمرور**: ثمانِ وحداتٍ تُقرأ كاملةً لمستخدمٍ معزول. ومسحٌ آليٌّ أعطى
+         * **١٠٩ مواضعَ** بالاصطلاحِ نفسِه في المستودع — فالعيبُ اصطلاحٌ لا سطر.
+         *
+         * الآن أربعةُ أبوابٍ مُعلَنة: عمودٌ مباشر · مسارٌ إلى أبٍ يحمله · إعفاءٌ
+         * صريحٌ بسببٍ مكتوب · **وما عداها `1 = 0`**. فالصمتُ إغلاقٌ لا فتح،
+         * ويسقط `ScopeFailsClosedTest` على أوّلِ وحدةٍ لا تُعلن.
+         */
+        if (($cids = hub_company_ids($user)) !== null) {
+            if ($ccol = hub_company_col($module)) {
+                hub_company_null_is_unowned($module)
+                    ? $q->where(fn ($w) => $w->whereIn($ccol, $cids)->orWhereNull($ccol))
+                    : $q->whereIn($ccol, $cids);
+            } elseif ($via = hub_company_via($module)) {
+                // الأبُ يحمل الشركة: يُرشَّح بمفتاحِه الأجنبيّ عبر استعلامٍ فرعيٍّ
+                // محدود — لا join يضاعف الصفوفَ ولا قراءةَ جدولٍ كامل.
+                $nullOk = (bool) config("hub_tenancy.null_is_unowned.{$module}", false);
+                $q->where(function ($w) use ($via, $cids, $nullOk) {
+                    $w->whereIn($via['col'], function ($sub) use ($via, $cids) {
+                        $sub->select('id')->from($via['table'])->whereIn($via['ref'], $cids);
+                    });
+                    if ($nullOk) $w->orWhereNull($via['col']);
+                });
+            } elseif (! hub_tenancy_exempt($module)) {
+                $q->whereRaw('1 = 0');   // لم تُعلِن انتماءَها ⇒ تُغلَق، ولا تُفتَح صمتاً
+            }
         }
 
         // عزلُ العملاء الصارم — نظيرُ عزل الشركات حرفياً: من له قائمةُ عملاء
@@ -1115,6 +1140,28 @@ if (! function_exists('hub_monitor_group')) {
         $user = $user ?? auth()->user();
 
         return hub_monitor($user) || hub_flag($user, $group);
+    }
+}
+
+if (! function_exists('hub_company_via')) {
+    /**
+     * **مسارُ انتماءِ وحدةٍ بلا عمودِ شركة** (`config/hub_tenancy.php`) — أو `null`.
+     * يُعيد `['col','table','ref']`: عمودُ الأبِ في جدولِ الوحدة، وجدولُ الأب، وعمودُ
+     * الشركةِ فيه. (المراجعةُ الشاملة · F-16.)
+     */
+    function hub_company_via(string $module): ?array
+    {
+        $v = config("hub_tenancy.via.$module");
+
+        return (is_array($v) && ! empty($v['col']) && ! empty($v['table']) && ! empty($v['ref'])) ? $v : null;
+    }
+}
+
+if (! function_exists('hub_tenancy_exempt')) {
+    /** أمُعفاةٌ هذه الوحدةُ من عزلِ الشركاتِ **بسببٍ مكتوب**؟ */
+    function hub_tenancy_exempt(string $module): bool
+    {
+        return trim((string) config("hub_tenancy.exempt.$module", '')) !== '';
     }
 }
 
