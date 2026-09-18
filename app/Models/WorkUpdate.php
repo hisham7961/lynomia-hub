@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -66,7 +67,7 @@ class WorkUpdate extends Model
         // الربحية والقدرات القائمان (يقرآن tasks.act_h) يعملان بلا عدٍّ مزدوج.
         static::created(function (self $w) {
             if (! $w->task_id || ! (float) $w->hours) return;
-            Task::whereKey($w->task_id)->increment('act_h', (float) $w->hours);
+            self::shiftTaskHours($w->task_id, (float) $w->hours);
 
             // النسبةُ المقترحة: آليةً إن سمح الإعداد، وإلا اقتراحاً على meta
             // المهمة يعتمده مديرُها — لا كتابةَ تقدمٍ من طرفٍ واحد قسراً.
@@ -92,25 +93,57 @@ class WorkUpdate extends Model
             $oldTask = $w->getOriginal('task_id');
             $oldH = (float) $w->getOriginal('hours');
             if ($oldTask === $w->task_id && $oldH === (float) $w->hours) return;
-            if ($oldTask && $oldH) Task::whereKey($oldTask)->decrement('act_h', $oldH);
-            if ($w->task_id && (float) $w->hours) Task::whereKey($w->task_id)->increment('act_h', (float) $w->hours);
+            if ($oldTask && $oldH) self::shiftTaskHours($oldTask, -$oldH);
+            self::shiftTaskHours($w->task_id, (float) $w->hours);
         });
 
         // حذفُ البند يستردّ ساعاتِه من المهمة — فلا تبقى ساعاتٌ يتيمةُ المصدر
         static::deleted(function (self $w) {
-            if ($w->task_id && (float) $w->hours) {
-                Task::whereKey($w->task_id)->decrement('act_h', (float) $w->hours);
-            }
+            self::shiftTaskHours($w->task_id, -(float) $w->hours);
         });
 
         // **واستعادةُ المحذوف تُعيد ساعاتِه** (§72): الحذفُ الناعمُ خصمَها ولم يكن ثمّةَ
         // خطّافُ `restored` يُقابله — فالبندُ المُستعاد كان يترك المهمةَ ناقصةَ الساعات
         // أبداً (نظيرُ Project/Comment اللذين يهكّان restored). التماثلُ يُصان.
         static::restored(function (self $w) {
-            if ($w->task_id && (float) $w->hours) {
-                Task::whereKey($w->task_id)->increment('act_h', (float) $w->hours);
-            }
+            self::shiftTaskHours($w->task_id, (float) $w->hours);
         });
+    }
+
+    /**
+     * **نقلُ ساعاتٍ إلى «الوقت الفعلي» على مهمّة — بأمانٍ من العدم** (L2-08).
+     *
+     * `tasks.act_h` عمودٌ `decimal(16,3)` **يقبل `NULL`** وافتراضُه `NULL`،
+     * و`increment()` تولّد `SET act_h = act_h + n` — و`NULL + n = NULL` على
+     * المحرّكَين معاً. فكانت **أوّلُ** ساعةٍ تُبلَّغ على مهمّةٍ لم تُسجَّل ساعاتُها
+     * يدويّاً من قبل **تُهدَر صامتة**: لا خطأ ولا تحذير، رقمٌ يُكتب فيُبتلع.
+     * قِيس على قاعدةِ المحاكاة بعد شهرِ عملٍ كامل: ٥٨٠ بندَ تقريرٍ كلُّها بساعات،
+     * و١٢١ مهمّةً `act_h` فيها `NULL` بلا استثناء. وما انبنى على الصفر: تكلفةُ
+     * العمالةِ صفرٌ في ربحيّةِ كلِّ مشروع، و«الالتزامُ بالميزانية» يمنح ١٠٠
+     * لمشروعٍ متجاوز، وقاعدةُ «⏳ الوقتُ الفعليّ تجاوز المقدّر» ميّتةٌ بنيويّاً.
+     *
+     * `COALESCE` تُصلح الجمع، و**أرضيّةُ الصفر** تمنع الخصمَ من العدمِ أن يُنتج
+     * ساعاتٍ سالبة (بندٌ قديمٌ يُحذَف ومهمّتُه لم تمرّ بالإصلاح). و`CASE` بدل
+     * `GREATEST`/`MAX` لأنّ كلتيهما لهجةُ محرّكٍ لا تعمّ الاثنين.
+     *
+     * ولا هجرةَ ولا ردمَ بيانات: `NULL` القائمةُ تعني «لم يُسجَّل شيء» وهو صادق —
+     * وأوّلُ ساعةٍ تصلها تكتبها. والتحديثُ الجَمعيّ لا يوقظ أحداثَ النموذج،
+     * تماماً كـ`increment()` التي حلّ محلَّها، فلا تدقيقَ مضاعفاً ولا نسخةَ إصدار.
+     *
+     * @param float $delta موجبٌ للإضافة، سالبٌ للاسترداد
+     */
+    private static function shiftTaskHours(?string $taskId, float $delta): void
+    {
+        if (! $taskId || ! $delta) return;
+
+        // الفارقُ يُصاغ رقماً محكوماً بثلاثِ خاناتٍ كعمودِه (decimal(16,3))، فالتعبيرُ
+        // يبقى حرفيّاً بلا سطحِ حقن — و`DB::raw` لا تقبل ربطاً في `update` أصلاً
+        $d = number_format($delta, 3, '.', '');
+        $sum = "COALESCE(act_h, 0) + ($d)";
+
+        Task::whereKey($taskId)->update([
+            'act_h' => DB::raw("CASE WHEN $sum < 0 THEN 0 ELSE $sum END"),
+        ]);
     }
 
     public function project(): BelongsTo
