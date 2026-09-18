@@ -162,7 +162,15 @@ if (! function_exists('hub_company_null_is_unowned')) {
      */
     function hub_company_null_is_unowned(string $module): bool
     {
-        return $module === 'users';
+        // **الإعلانُ في السجلّ لا في مقارنةٍ مثبَّتة** (v2.544 · L2-05): كانت
+        // الدالّةُ `return $module === 'users'` — سطراً لا يُراجَع ولا يُعلَن،
+        // بينما فرعُ `via` في `hub_scope` يقرأ `config('hub_tenancy.null_is_unowned')`.
+        // مُعلِنان لسؤالٍ واحد، والنتيجةُ أنّ وحدةَ التذاكرِ أُظلمت كاملةً على
+        // المعزولين: ثلاثٌ وعشرون تذكرةً ولا واحدةَ تحمل شركة.
+        // و`users` تبقى كما كانت (سلوكٌ قائمٌ لا يُمسّ).
+        if ($module === 'users') return true;
+
+        return (bool) config("hub_tenancy.null_is_unowned.{$module}", false);
     }
 }
 

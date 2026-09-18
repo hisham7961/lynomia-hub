@@ -115,6 +115,30 @@ class MorningController extends Controller
                 $late->take(8), route('support'), $late->count());
         }
 
+        /*
+         * ── تذاكر جديدة بلا مسؤول ── (v2.544 · L2-06)
+         *
+         * كان أوّلُ ما يُخبر المنشأةَ عن بلاغِ عميلٍ هو «⏰ تذاكر تجاوزت
+         * الاتفاقية» — أي **بعد إخلافِ الوعد**. جولةُ التسليم أثبتته: عميلٌ فتح
+         * تذكرةً من البوّابة، فلم يُشعَر أحدٌ (صفرُ إشعارات) ولم تظهر في صباحِ
+         * أحد. فالنظامُ يقيس الإخفاقَ ولا يُعلن الالتزام.
+         *
+         * وشرطُ العرضِ هو شرطُ الباب: من يملك `tickets:v` في نطاقه لا غير.
+         */
+        if (hub_can($u, 'tickets', 'v')) {
+            $newQ = hub_scope(DB::table('tickets')->whereNull('deleted_at'), 'tickets')
+                ->whereNull('assignee_id')
+                ->whereIn('status', (array) config('hub.tickets.fresh', ['جديدة', 'جديد', 'مفتوحة']));
+            $newN = (clone $newQ)->count();
+            $new = $newQ->orderByDesc('created_at')->orderBy('id')->limit(8)
+                ->get(['id', 'subject', 'priority', 'created_at']);
+            $add('📥', 'تذاكر جديدة بلا مسؤول', 'بلاغُ عميلٍ وصل ولم يُسنَد بعد',
+                $new->map(fn ($r) => ['t' => $r->subject,
+                    's' => trim(($r->priority ? 'أولوية ' . $r->priority : '')),
+                    'u' => route('m.show', ['tickets', $r->id]), 'tone' => 'wn']),
+                route('support'), $newN);
+        }
+
         // ── مهام متأخرة ──
         // كل بندٍ في هذه الصفحة يفحص صلاحية وحدته، وهذا وحده كان يكتفي بالنطاق:
         // فمن لا يرى المهام أصلاً كان يقرأ عناوينها في ملخّص صباحه
