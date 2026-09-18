@@ -2697,6 +2697,71 @@ if (! function_exists('hub_sync_class')) {
     }
 }
 
+if (! function_exists('hub_company_from_parent')) {
+    /**
+     * **الشركةُ تُشتقُّ من السجلِّ نفسِه لا من صاحبِ الجلسةِ وحدَه** (L2-09).
+     *
+     * `ModuleController::inheritCompany` كانت تعرف مصدرَين اثنين: الشركةَ النشطةَ
+     * في الجلسة، وأولى شركاتِ المُنشئِ إن كان معزولاً. فإن لم يكن المُنشئُ معزولاً
+     * ولا له شركةٌ نشطة — وهو حالُ المالكِ والإدارةِ وأكثرِ الموظّفين — **يُحفَظ
+     * السجلُّ بلا شركةٍ أبداً**، ولو كان انتماؤه بيّناً من أبيه: مهمّةٌ على مشروعٍ
+     * تملكه شركةٌ بعينِها تُحفَظ «بلا مالك».
+     *
+     * وأثرُه لا يظهر يومَ الكتابة بل يومَ يُوظَّف أوّلُ موظّفٍ معزولٍ على شركة:
+     * الحارسُ `whereIn(company_id, …)` يُسقط كلَّ صفٍّ فارغ، فيفتح الرجلُ وحدتَه
+     * فيراها **خاوية**. قِيس على قاعدةِ المحاكاة بعد شهرِ عمل: مهامٌّ ٠ من ١٢١،
+     * وعوائقُ ٠ من ٦، وعملاءُ ٠ من ٦ — بينما المشاريعُ ١٦ من ١٦ والأصولُ ١٠٤ من
+     * ١٠٤ (أنشأها معزولون). والدليلُ الحاسم في `updates`: **١٨ من ٥٨٠** — أي
+     * الثمانيةَ عشرَ التي كتبها معزولون وحدَها.
+     *
+     * فهذه الدالّةُ تضيف المصدرَ الثالث: **أبُ السجلِّ**. لا تُستعمل إلا حين يعجز
+     * الأوّلان، ولا تكتب فوق قيمةٍ قائمة — إضافةٌ لا كسر.
+     *
+     * والعميلُ حالةٌ خاصّة: لا أبَ له، فتُستنتَج شركتُه من **مشاريعه** — وبشرطِ
+     * أن تكون واحدةً لا أكثر. فعميلٌ تخدمه شركتان من المجموعة لا يسعُه عمودٌ
+     * مفرد، فيبقى بلا انتماءٍ **مُعلَناً** (قرارُ المالك: يُشتقُّ ما لا يلتبس،
+     * ويُعلَن الملتبسُ على الشاشة بدل أن يُحسَم بقرعة).
+     *
+     * @param object|array $row السجلُّ (نموذجٌ أو مصفوفة) — يُقرأ منه project_id/client_id
+     */
+    function hub_company_from_parent(string $module, $row): ?string
+    {
+        $get = function (string $k) use ($row) {
+            $v = is_array($row) ? ($row[$k] ?? null) : ($row->{$k} ?? null);
+
+            return filled($v) ? (string) $v : null;
+        };
+        $own = function (string $table, ?string $id): ?string {
+            if (! $id) return null;
+            try {
+                $v = \Illuminate\Support\Facades\DB::table($table)->where('id', $id)->value('company_id');
+            } catch (\Throwable $e) {
+                return null;
+            }
+
+            return filled($v) ? (string) $v : null;
+        };
+
+        // العميلُ يُستنتَج من مشاريعه — وبشرطِ ألّا تلتبس
+        if ($module === 'clients') {
+            $id = $get('id');
+            if (! $id) return null;
+            try {
+                $cos = \Illuminate\Support\Facades\DB::table('projects')
+                    ->where('client_id', $id)->whereNotNull('company_id')
+                    ->distinct()->pluck('company_id')->all();
+            } catch (\Throwable $e) {
+                return null;
+            }
+
+            return count($cos) === 1 ? (string) $cos[0] : null;
+        }
+
+        return $own('projects', $get('project_id'))
+            ?? $own('clients', $get('client_id'));
+    }
+}
+
 if (! function_exists('hub_company_col')) {
     /**
      * عمود الشركة للعزل: من تعريف الوحدة، أو العمود الفعلي company_id في الجدول
