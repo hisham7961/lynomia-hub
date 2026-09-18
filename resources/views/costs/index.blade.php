@@ -13,7 +13,10 @@
     </div>
 </div>
 
-@if ($mixed ?? false)
+@if ($converted ?? false)
+    @include('partials._convertedcur', ['currency' => $currency,
+        'what' => 'الإيرادُ والربحُ والهامش أدناه'])
+@elseif ($mixed ?? false)
     @include('partials._mixedcur', ['currency' => $currency,
         'what' => 'الإيرادُ والربحُ والهامش أدناه'])
 @endif

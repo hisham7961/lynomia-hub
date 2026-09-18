@@ -5,8 +5,11 @@
     'sub' => 'مبنية مباشرة على وحدة المالية — الملغاة والمسودات مستثناة'])
     <button class="btn ghost sm" onclick="window.print()">🖨 طباعة</button>
 @endcomponent
-@if ($mixed ?? false)
-    @include('partials._mixedcur', ['currency' => $currency, 'what' => 'مستنداتك ومجاميعُ هذا التقرير'])
+@if ($converted ?? false)
+    @include('partials._convertedcur', ['currency' => $currency, 'what' => 'مجاميعُ هذا التقرير'])
+@elseif ($mixed ?? false)
+    @include('partials._mixedcur', ['currency' => $currency, 'what' => 'مستنداتك ومجاميعُ هذا التقرير',
+                                    'missing' => $curMissing ?? []])
 @endif
 <div class="cards">
     <div class="stat"><span class="ico">📈</span><b>{{ ($seesTotals ?? true) ? number_format($cards['inc'], 2) : '•••' }}</b><span>دخل هذا الشهر ({{ $currency }})</span></div>

@@ -269,8 +269,14 @@ class FeatureRegistry
         $out = [];
         foreach (self::keys() as $key) {
             $e = self::entry($key);
-            $e['status'] = $resolved[$key]['status'];
-            $e['reason'] = $resolved[$key]['reason'];
+            // **الكتالوجُ قد يسبق المخبأ**: `resolveAll` تُخبّئ للعمليّةِ الواحدة،
+            // فقدرةٌ أُضيفت إلى `config/hub_features.php` بعد أوّلِ اشتقاقٍ في
+            // العمليّة (نشرٌ وعاملُ PHP دافئ) تُقرأ في `keys()` ولا تُوجَد في
+            // المخبأ — فينفجر `Undefined array key` ويسقط **مركزُ القدرات كلُّه**.
+            // و`status()` كانت محميّةً بالضبط من هذا وهذه لم تكن. الافتراضُ نفسُه.
+            $st = $resolved[$key] ?? ['status' => FeatureStatus::DEVELOPMENT, 'reason' => 'قدرةٌ غيرُ مسجَّلة'];
+            $e['status'] = $st['status'];
+            $e['reason'] = $st['reason'];
             $e['available'] = FeatureStatus::isAvailable($e['status']);
             $e['toggleable_now'] = self::isToggleable($key);
             $out[$key] = $e;
