@@ -778,7 +778,7 @@ if (! function_exists('hub_ref_options')) {
      * لا يحوي خياره — فيُرسل الفراغ عند الحفظ **ويُمحى الرابط بصمت**. لذا تُضاف
      * القيم المختارة حالياً دائماً.
      */
-    function hub_ref_options(string $ref, $ensure = null): array
+    function hub_ref_options(string $ref, $ensure = null, ?callable $narrow = null): array
     {
         $table = hub_ref_table($ref);
         if (! $table) return [];
@@ -796,6 +796,15 @@ if (! function_exists('hub_ref_options')) {
         if ($ref === 'users' && hub_has_col('users', 'account_type')) {
             $q->where(fn ($w) => $w->whereNull('account_type')->orWhere('account_type', '!=', 'client'));
         }
+
+        /*
+         * **والتضييقُ يدخل الاستعلامَ قبل القصّ** (L2-07). الحدُّ خمسُمئةٍ مرتَّبةً
+         * أبجديّاً، فترشيحُ النتيجةِ **بعده** يعني أنّ صفوفَ صاحبِ الحسابِ قد لا
+         * تكون فيها أصلاً: على منشأةٍ فيها آلافُ المهامّ تُقصّ مهامُّه مع البقيّة
+         * لأنّ عناوينَها بعد الخمسمئة، فتصير قائمتُه **خاويةً وهي في نطاقه**.
+         * فالمُضيِّقُ يُطبَّق على الاستعلامِ نفسِه ليقع الحدُّ على المنطَّقِ وحدَه.
+         */
+        if ($narrow) $narrow($q);
 
         $rows = $q->orderBy($disp)->limit(500)->pluck($disp, 'id')->all();
 
@@ -1018,8 +1027,25 @@ if (! function_exists('hub_ref_options_scoped')) {
      */
     function hub_ref_options_scoped(string $ref, $ensure = null, $user = null): array
     {
-        $opts = hub_ref_options($ref, $ensure);
         $user = $user ?? auth()->user();
+
+        /*
+         * **ونطاقُ الوحدةِ نفسِها — لمن أُعلن تضييقُه** (L2-07 · v2.548). كانت هذه
+         * الدالّةُ تضيّق بثلاثةٍ (المشاريعُ المرئيّة · عمودُ الشركة · عمودُ العميل)
+         * ولا تسأل `hub_scope` عن الوحدةِ المرجعيّةِ ذاتها. قِيس: موظّفٌ نطاقُه
+         * **٣٢** مهمّةً يُعرَض عليه **١٢١**، وإحداها تردّ ٤٠٤ إن فُتحت وتُسمّى
+         * بعنوانِها الكاملِ في قائمته — اثنا عشرَ موضعاً و**٢٨١ صفّاً مسرَّباً**.
+         *
+         * والتضييقُ **مُعلَنٌ مرجعاً مرجعاً** في `hub_tenancy.ref_scope` بسببٍ
+         * مكتوبٍ لكلِّ مدخل، لا قاعدةً جارفة: نطاقُ وحدةِ الأفرادِ لموظّفٍ عاديٍّ
+         * صفرٌ، فتعميمُ التضييقِ يمنعه من طلبِ إجازتِه هو. والمجهولُ لا يُضيَّق.
+         */
+        $reg = (array) config("hub_tenancy.ref_scope.{$ref}", []);
+        $narrow = ($user && ! empty($reg['narrow']) && isset(hub_modules()[$ref]))
+            ? function ($q) use ($ref, $user) { hub_scope($q, $ref, $user); }
+            : null;
+
+        $opts = hub_ref_options($ref, $ensure, $narrow);
         if (! $user) return $opts;
 
         if ($ref === 'projects' && hub_scoped($user)) {
