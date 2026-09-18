@@ -57,11 +57,19 @@ class ScopeGuardRound6Test extends TestCase
     {
         $this->seedTwoCompanies();
 
+        // **بطاقةُ «قرارات تنتظر حسمك» صارت تعرض ما ينتظر هذا القارئَ بعينِه**
+        // (v2.543 · L2-02) — فالتهيئةُ تُسنِد الطلبَين إليه وتمنحه رايةَ الاعتماد،
+        // كي يبقى **العزلُ وحدَه** هو ما يُخفي «باء». موضوعُ الاختبارِ لم يتغيّر،
+        // وقوّتُه التمييزيّةُ كما هي: كلا الصفَّين ينتظرانه، ولا يرى إلا صفَّ شركته.
+        $this->employee->role->forceFill(['flags' => ['approve' => 1]])->save();
+        $this->employee->unsetRelation('role');
         DB::table('approvals')->insert([
             ['id' => (string) \Illuminate\Support\Str::uuid(), 'title' => 'موافقة ألف الصباحية', 'type' => 'تعديل',
-             'status' => 'معلّق', 'company_id' => $this->coA->id, 'created_at' => now(), 'updated_at' => now()],
+             'status' => 'معلّق', 'approver_id' => $this->employee->id,
+             'company_id' => $this->coA->id, 'created_at' => now(), 'updated_at' => now()],
             ['id' => (string) \Illuminate\Support\Str::uuid(), 'title' => 'موافقة باء الصباحية', 'type' => 'تعديل',
-             'status' => 'معلّق', 'company_id' => $this->coB->id, 'created_at' => now(), 'updated_at' => now()],
+             'status' => 'معلّق', 'approver_id' => $this->employee->id,
+             'company_id' => $this->coB->id, 'created_at' => now(), 'updated_at' => now()],
         ]);
         $this->finDoc('مستحق ألف الصباحي', $this->coA->id, ['due' => now()->toDateString()]);
         $this->finDoc('مستحق باء الصباحي', $this->coB->id, ['due' => now()->toDateString()]);

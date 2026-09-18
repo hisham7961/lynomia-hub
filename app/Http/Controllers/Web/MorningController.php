@@ -38,8 +38,12 @@ class MorningController extends Controller
         };
 
         // ── قرارات تنتظرك ──
-        if (hub_can($u, 'approvals', 'v')) {
-            $apQ = hub_scope(DB::table('approvals')->whereNull('deleted_at'), 'approvals')->where('status', 'معلّق');
+        // **«تنتظر حسمك» تعني حسمَك أنت.** كان الشرطُ `approvals:v` وحدَها، فكلُّ
+        // من يرى الموافقاتِ يُقال له إنّ عمليّاتٍ موقوفةٌ على اعتماده — ولو كانت
+        // تنتظر غيرَه، ولو لم يكن معتمِداً. `hub_approvals_awaiting` هي التعريفُ
+        // الواحدُ الذي يطابقه حارسُ الحسم (المراجعةُ الشاملة · الطبقة ٢ · L2-02).
+        if (hub_can($u, 'approvals', 'v') && hub_approver($u)) {
+            $apQ = hub_approvals_awaiting($u);
             $apN = (clone $apQ)->count();
             $ap = $apQ->orderBy('due')->limit(8)->get(['id', 'title', 'due']);
             $add('✋', 'قرارات تنتظر حسمك', 'عمليات موقوفة لن تُنفَّذ قبل اعتمادك',

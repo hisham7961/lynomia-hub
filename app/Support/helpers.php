@@ -1193,6 +1193,58 @@ if (! function_exists('hub_approver')) {
     }
 }
 
+if (! function_exists('hub_approval_waits_on')) {
+    /**
+     * **أينتظر هذا الطلبُ قرارَ هذا الشخصِ بعينِه؟** — تعريفٌ واحدٌ لا تعريفان.
+     *
+     * كانت بطاقةُ الصباحِ تقول «✋ قرارات تنتظر حسمك — عمليات موقوفة لن تُنفَّذ
+     * قبل اعتمادك» لِـ**كلِّ من يرى** الموافقات (`approvals:v` وحدَها)، بينما
+     * `ExecutionStats` تَعُدُّ «بانتظار حسمه» بـ`approver_id` أو `chain`،
+     * وحارسُ الحسمِ يشترط شيئاً ثالثاً. ثلاثةُ تعريفاتٍ لسؤالٍ واحد — فبطاقةٌ
+     * تنسب إلى قارئها مسؤوليّةً لا يملكها، وصاحبُ القرارِ لا يميّز طلبَه.
+     *
+     * فصار السؤالُ يُجاب مرّةً واحدة: **معتمِدٌ**، و**مقصودٌ بعينِه** (المعتمِدُ
+     * المُسنَد، أو ضمن السلسلة، أو المالك).
+     *
+     * @param  object  $row  صفُّ موافقةٍ فيه `approver_id` و`chain`
+     */
+    function hub_approval_waits_on($user, $row): bool
+    {
+        $user = $user ?? auth()->user();
+        if (! $user || ! hub_approver($user)) return false;
+        if (hub_is_owner($user)) return true;
+        if ((string) ($row->approver_id ?? '') === (string) $user->id) return true;
+
+        $chain = $row->chain ?? null;
+        if (is_string($chain)) return str_contains($chain, '"' . $user->id . '"');
+
+        return in_array((string) $user->id, array_map('strval', (array) $chain), true);
+    }
+}
+
+if (! function_exists('hub_approvals_awaiting')) {
+    /**
+     * **استعلامُ ما ينتظر قرارَ هذا الشخص** — منطَّقٌ ومقصودٌ به هو.
+     *
+     * تستعمله بطاقةُ الصباحِ فيصدُق عنوانُها، ويطابقه حارسُ الحسم في
+     * `ApprovalService` — فما تَعِد به الشاشةُ هو ما يسمح به الباب.
+     */
+    function hub_approvals_awaiting($user = null)
+    {
+        $user = $user ?? auth()->user();
+        $q = hub_scope(\Illuminate\Support\Facades\DB::table('approvals')->whereNull('deleted_at'), 'approvals')
+            ->whereNull('decided_at')
+            ->where(fn ($w) => $w->whereNull('status')->orWhereIn('status', ['', 'معلّق']));
+
+        if ($user && hub_is_owner($user)) return $q;
+
+        return $q->where(function ($w) use ($user) {
+            $w->where('approver_id', $user?->id)
+              ->orWhere('chain', 'LIKE', '%"' . ($user?->id ?? '-') . '"%');
+        });
+    }
+}
+
 if (! function_exists('hub_secrets')) {
     /** الاطلاع على الأسرار المخزّنة (الخزنة، غرفة البيانات) */
     function hub_secrets($user = null): bool

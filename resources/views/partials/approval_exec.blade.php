@@ -52,17 +52,41 @@
     @endif
 
     @if ($pending && $canJudge && $target)
-        <div class="crow" style="margin-top:12px">
-            <form method="POST" action="{{ route('approvals.approve', $row->id) }}"
-                  data-confirm="اعتماد العملية وتنفيذها الآن؟">
-                @csrf<button class="btn p sm" type="submit">✓ اعتماد وتنفيذ</button>
-            </form>
-            <form method="POST" action="{{ route('approvals.reject', $row->id) }}" style="display:flex;gap:6px">
-                @csrf
-                <input class="inp" name="note" placeholder="سبب الرفض (اختياري)" style="max-width:220px">
-                <button class="btn ghost sm" type="submit">✕ رفض</button>
-            </form>
-        </div>
+        @include('partials._approval_decide', ['row' => $row, 'verb' => '✓ اعتماد وتنفيذ',
+                                               'confirm' => 'اعتماد العملية وتنفيذها الآن؟'])
+    @endif
+</div>
+@else
+{{--
+    **طلبُ العمل** (شراءٌ · مصروفٌ · إجازة) — لا `mod` له ولا سجلَّ خلفه.
+
+    كانت البطاقةُ كلُّها ملفوفةً بـ`@if ($row->mod)`، فبُنيت للعمليّةِ المحميّةِ
+    وحدَها. والنتيجةُ أنّ مديراً يقرأ في صباحه «عمليات موقوفة لن تُنفَّذ قبل
+    اعتمادك» يفتح البندَ فلا يجد زرّاً — والنماذجُ الوحيدةُ في الصفحة: خروجٌ
+    وتعليقٌ وإرفاق. (المراجعةُ الشاملة · الطبقة ٢ · L2-01)
+
+    والقرارُ هنا **قرارٌ لا تنفيذ**: لا سجلَّ يُعدَّل، وإنّما يُختَم القرارُ
+    ويَبلغ صاحبَه فيرتفع الحجزُ عن العمل.
+--}}
+<div class="card">
+    <h3>✋ طلبُ عملٍ بانتظار الحسم</h3>
+    <div class="crow" style="margin-bottom:10px">
+        @if ($row->type)<span class="chip">{{ $row->type }}</span>@endif
+        @if ($row->amount !== null)
+            <span class="chip">{{ number_format((float) $row->amount, 2) }}
+                {{ $row->currency ?: setting('app.currency', 'د.ك') }}</span>
+        @endif
+        @if ($reqName)<span class="chip">طلبها: {{ $reqName }}</span>@endif
+        @if ($row->due)<span class="chip">الاستحقاق: {{ $row->due->format('Y-m-d') }}</span>@endif
+        @if ($row->decided_at)<span class="chip">حُسمت {{ $row->decided_at->diffForHumans() }}</span>@endif
+    </div>
+    @if ($row->reason)<div class="sub" style="margin-bottom:10px">{{ $row->reason }}</div>@endif
+
+    @if ($pending && $canJudge)
+        @include('partials._approval_decide', ['row' => $row, 'verb' => '✓ اعتماد',
+                                               'confirm' => 'اعتماد هذا الطلب؟'])
+    @elseif ($pending)
+        <div class="sub">ينتظر قرارَ معتمِدٍ — ولستَ منهم.</div>
     @endif
 </div>
 @endif
