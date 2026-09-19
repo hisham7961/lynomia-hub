@@ -24,6 +24,7 @@ class HubSchemaCheck extends Command
 
         if (! $gaps) {
             $this->info('✅ القاعدة تطابق ما يقرؤه الكود — لا فروقات.');
+            $this->reportDrift();
 
             return self::SUCCESS;
         }
@@ -36,6 +37,7 @@ class HubSchemaCheck extends Command
         }
 
         if (! $this->option('fix')) {
+            $this->reportDrift();
             $this->newLine();
             $this->line('لم يُغيَّر شيء. لسدّ الناقص بالإضافة وحدها:');
             $this->line('  php artisan migrate            ← الطريق الصحيح أولاً (يشغّل الهجرات)');
@@ -52,7 +54,34 @@ class HubSchemaCheck extends Command
 
         $left = SchemaGuard::gaps();
         if ($left) $this->warn('⚠️ بقي ' . count($left) . ' فرقاً يحتاج ترحيلاً.');
+        $this->reportDrift();
 
         return $left ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * **انحرافُ الحالات يُقال** — والأمرُ لا يسقط به.
+     *
+     * الفرقُ في المخطّط عطلٌ يمنع التشغيل، والانحرافُ في القيمة **بيانةٌ
+     * قائمة**: صفٌّ صحيحٌ يحمل حالةً لم تعد معلنة. فلو قلب رمزَ الخروج
+     * لأسقط بوّابةَ نشرٍ على بيانةِ عميلٍ لا على عيبِ شيفرة. يُقال ولا يُسقِط.
+     */
+    private function reportDrift(): void
+    {
+        $drift = SchemaGuard::statusDrift();
+        if (! $drift) return;
+
+        $rows = array_sum(array_column($drift, 'count'));
+        $this->newLine();
+        $this->warn('⚠️ حالاتٌ في القاعدة خارجَ سجلِّ الوحدات — '
+            . count($drift) . ' قيمةً في ' . $rows . ' صفّاً:');
+        foreach ($drift as $d) {
+            $this->line('  · ' . $d['label'] . ' (' . $d['module'] . '.' . $d['col'] . ') '
+                . '«' . $d['value'] . '» × ' . $d['count']
+                . '  ← المُعلَن: ' . \Illuminate\Support\Str::limit(implode('·', $d['options']), 70));
+        }
+        $this->newLine();
+        $this->line('الصفُّ المنحرفُ ظاهرٌ في لوحةِ كانبان تحت «⚠ غير مصنّفة»، لكنّ');
+        $this->line('مُرشِّحَ الحالةِ لا يسمّيه. صحّحه من شاشتِه، أو أعِد الخيارَ إلى السجلّ.');
     }
 }
