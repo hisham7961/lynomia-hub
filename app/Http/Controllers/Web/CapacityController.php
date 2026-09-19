@@ -92,11 +92,32 @@ class CapacityController extends Controller
         }
         $deps = $q->limit(500)->get();
 
-        $projects = hub_ref_labels('projects', $deps->pluck('project_id')->all());
-        $apps     = hub_ref_labels('apps', $deps->pluck('app_id')->all());
-        $servers  = hub_ref_labels('servers', $deps->pluck('server_id')->all());
-        $sups     = hub_ref_labels('suppliers', $deps->pluck('supplier_id')->all());
-        $emps     = hub_ref_labels('hr', $deps->pluck('emp_id')->all());
+        /*
+         * **صلاحيّةُ الوحدةِ قبل تسميةِ سجلّها** (L5-03 · v2.557) — نظيرُ ما فُرض
+         * في رادارِ الانتهاءات: «الرادارُ كان يُرشَّح بالنطاق وحدَه، فيسرد أسماءَ
+         * سجلاتٍ من وحداتٍ لا يملك المستخدمُ رؤيتَها أصلاً».
+         *
+         * وخريطةُ أثرِ الاعتماديّات تُسمّي **خمسَ وحدات**، وبوّابةُ اللوحةِ رايةُ
+         * `opsAnalytics` وحدَها — لا صلاحيّةُ أيٍّ منها. فحاملُ الرايةِ بلا
+         * `hr:v` كان يقرأ اسمَ الموظّف، وبلا `apps:v` اسمَ التطبيق… ورابطُ كلٍّ
+         * منها يردّ ٤٠٣ عند النقر.
+         *
+         * وذلك يخالف ثابتَ المنصّةِ المكتوبَ في `helpers.php:524`: «رؤيةُ المركزِ
+         * في الشريطِ تطابق بوّابةَ متحكّمه — **فلا رابطٌ يظهر ثم يُصَدُّ ٤٠٣**».
+         * ونظيرتُها `field.dashboard` تشترط `hr:v` **مع** الراية (سطر 583)، فهذه
+         * وحدَها من شذَّت.
+         *
+         * والعلاجُ لا يُفرّغ اللوحة: الأرقامُ والقدراتُ تبقى كما هي، ولا يسقط إلّا
+         * **اسمُ** سجلٍّ من وحدةٍ لا يراها القارئ.
+         */
+        $named = fn (string $ref, array $ids) => hub_can(auth()->user(), $ref, 'v')
+            ? hub_ref_labels($ref, $ids) : [];
+
+        $projects = $named('projects',  $deps->pluck('project_id')->all());
+        $apps     = $named('apps',      $deps->pluck('app_id')->all());
+        $servers  = $named('servers',   $deps->pluck('server_id')->all());
+        $sups     = $named('suppliers', $deps->pluck('supplier_id')->all());
+        $emps     = $named('hr',        $deps->pluck('emp_id')->all());
 
         $rank = ['حرجة' => 4, 'عالية' => 3, 'متوسطة' => 2, 'منخفضة' => 1];
         $nodes = [];

@@ -87,13 +87,60 @@ class Redactor
      * قاعدةُ `ErrorLog::safeMessage` بحرفها — لرسائل `QueryException` وحدها:
      * حذفُ مقطع SQL بقيمه المربوطة، وطمسُ القيم المقتبسة (Duplicate entry '…').
      * لا تُطبَّق على النصّ الحرّ: الاقتباسُ في رسالةٍ عاديةٍ ليس قيمةَ SQL.
+     *
+     * ── **المعرّفُ يبقى والقيمةُ تُطمَس** (L2-04 · v2.557) ──
+     *
+     * كانت القاعدةُ «اطمسْ كلَّ ما بين علامتَي اقتباس»، واسمُ العمودِ في رسائلِ
+     * المحرّكِ مقتبسٌ هو الآخر — فتصير `Unknown column 'act_h' in 'field list'`
+     * ⇒ `Unknown column '…' in '…'`. يقرؤها المشغّلُ في مركزِ الأخطاء فلا يعرف
+     * **أيَّ عمودٍ** ولا **أيَّ جدول**، والعطلُ البنيويُّ غيرُ قابلٍ للإصلاحِ
+     * من شاشتِه. وذلك **يناقض العقدَ المُعلَن** في `ErrorLog::safeMessage`:
+     * «نُبقي رمزَ الحالة **ووصفَ القيد/العمود**، ونحذف مقطعَ SQL ونطمس القيمَ
+     * المقتبسة».
+     *
+     * والتمييزُ الحاسم: اسمُ العمودِ والجدولِ والقيدِ **بيانُ مخطَّطٍ لا بيانُ
+     * مستخدم** — لا راتبَ فيه ولا بريداً ولا سرّاً؛ أمّا `Duplicate entry
+     * 'ahmed@…'` فقيمةٌ من صفٍّ حقيقيّ وطمسُها هو الغاية. فتُصان المعرّفاتُ في
+     * **مواضعَ بنيويّةٍ معلومةٍ وحدَها**، ويبقى كلُّ اقتباسٍ سواها مطموساً —
+     * فالتوسيعُ لا يفتح باباً لقيمةٍ في موضعٍ غيرِ محصور.
      */
     public static function sql(string $msg): string
     {
-        $msg = preg_replace('/\s*\(Connection:.*$/s', '', $msg);          // احذف SQL والقيمَ المربوطة
-        $msg = preg_replace("/'(?:[^'\\\\]|\\\\.){0,300}'/", "'…'", (string) $msg);  // اطمس القيمَ المقتبسة
+        $msg = (string) preg_replace('/\s*\(Connection:.*$/s', '', $msg);   // احذف SQL والقيمَ المربوطة
 
-        return (string) $msg;
+        // مواضعُ المعرّفِ البنيويّ — كلُّ مجموعةِ التقاطٍ فيها اسمُ مخطَّطٍ لا قيمةُ صفّ.
+        // و«Duplicate entry '…' for key '…'» تُصان مفتاحاً لا قيمةً: القيمةُ خارجَ الموضع.
+        $id = "'(?:[^'\\\\]|\\\\.){0,128}'";
+        $slots = [
+            "/\bUnknown column\s+({$id})\s+in\s+({$id})/i",
+            "/\bUnknown (?:table|database|storage engine)\s+({$id})/i",
+            "/\bTable\s+({$id})\s+(?:doesn't exist|already exists)/i",
+            "/\bColumn\s+({$id})\s+cannot be null/i",
+            "/\bField\s+({$id})\s+doesn't have a default value/i",
+            "/\bfor (?:column|key|index)\s+({$id})/i",
+        ];
+
+        $keep = [];
+        foreach ($slots as $re) {
+            $msg = (string) preg_replace_callback($re, function (array $m) use (&$keep) {
+                $whole = $m[0];
+                foreach (array_slice($m, 1) as $ident) {
+                    if ($ident === '') continue;
+                    $i = count($keep);
+                    $keep[] = $ident;
+                    // العلامةُ بلا اقتباسٍ فلا يلتقطها الطمسُ التالي
+                    $whole = str_replace($ident, "\x01{$i}\x01", $whole);
+                }
+
+                return $whole;
+            }, $msg);
+        }
+
+        $msg = (string) preg_replace("/'(?:[^'\\\\]|\\\\.){0,300}'/", "'…'", $msg);  // اطمس القيمَ المقتبسة
+
+        foreach ($keep as $i => $v) $msg = str_replace("\x01{$i}\x01", $v, $msg);
+
+        return $msg;
     }
 
     /**

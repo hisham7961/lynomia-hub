@@ -49,7 +49,8 @@
         <tbody>
         @forelse ($c['rows'] as $r)
             <tr>
-                <td><a href="{{ route('m.show', ['hr', $r['id']]) }}"><b>{{ $r['name'] }}</b></a>
+                {{-- الرابطُ لمن يفتحه وحدَه (L5-03): المحجوبُ اسمُه لا `id` له فلا رابط --}}
+                <td>@if (! empty($r['id']))<a href="{{ route('m.show', ['hr', $r['id']]) }}"><b>{{ $r['name'] }}</b></a>@else<b>{{ $r['name'] }}</b>@endif
                     @if (! $r['linked'])<div class="sub">⚠️ بلا حساب مستخدم مربوط — لا تُحتسب مهامه</div>@endif</td>
                 <td class="sub">{{ $r['dept'] ?: '—' }}</td>
                 <td class="sub">{{ $r['leaveDays'] ?: '—' }}</td>
