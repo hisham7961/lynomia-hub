@@ -1,5 +1,7 @@
 {{-- **عميل ٣٦٠°**: صحتُه بأسبابها، وأرقامُ علاقته كلِّها (ارتباطات، مشاريع،
      عقود، تذاكر، فواتير، أصولٌ نديرها له)، ودخولُ مساحته بضغطة. --}}
+@include('partials._company_ambiguous')
+
 @php
     $c360 = [
         'engagements' => \App\Models\Engagement::whereNull('deleted_at')->where('client_id', $row->id)

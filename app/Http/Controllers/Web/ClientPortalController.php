@@ -343,8 +343,22 @@ class ClientPortalController extends Controller
                 ? trim((string) $data['client'])
                 : (string) $ids[0]);
 
+        /*
+         * **الشركةُ تُعرَف عند الإنشاء لا بعده** (v2.544 · L2-05).
+         *
+         * كانت التذكرةُ تُولَد بلا `company_id`، و`hub_scope` يُسقط `NULL` —
+         * فبلاغُ العميلِ **لا يراه موظّفٌ معزولٌ بشركة** البتّة. تُشتقُّ من
+         * أوّلِ مصدرٍ يُجيب: مشروعُها، فعميلُها، فشركةُ فاتحِها. وما لم يُجب
+         * أحدٌ تبقى `NULL` — وقد أُعلنت «غيرَ مملوكةٍ فتُرى» في `hub_tenancy`،
+         * فلا تسقط في الفراغ بين الاثنين.
+         */
         $u = $request->user();
+        $companyId = $project?->company_id
+            ?: (\App\Models\Client::whereKey($clientId)->value('company_id')
+                ?: ($u->company_id ?: null));
+
         $t = new Ticket;
+        $t->company_id = $companyId ? (string) $companyId : null;
         $t->subject    = trim($data['subject']);
         $t->body       = trim($data['body']);
         $t->priority   = $data['priority'];

@@ -30,7 +30,8 @@ class LegalController extends Controller
             'active'  => $activeish($base())->count(),
             'soon'    => $activeish($base())->whereNotNull('date_end')->whereBetween('date_end', [$today, $soon])->count(),
             'overdue' => $activeish($base())->whereNotNull('date_end')->where('date_end', '<', $today)->count(),
-            'value'   => (float) $activeish($base())->sum('value'),
+            // يُملأ أدناه من محرّكِ الصرف — محوَّلاً حين يمكن وخاماً حين لا
+            'value'   => 0.0,
         ];
 
         // التوزيع بالأنواع — للدونات
@@ -68,9 +69,13 @@ class LegalController extends Controller
         $obligations = $obligationsQ ? $obligationsQ->orderBy('due')->limit(10)->get() : collect();
 
         // v2.124: قيمة الساري بكل عملة على حدة — لا جمع عملات مختلفة في رقمٍ واحد
-        $values = $activeish($base())->whereNotNull('value')->where('value', '>', 0)
+        // **المجموعةُ كاملةً للحساب، والمقصوصةُ للعرض** — الخمسُ الأُوَل تُعرض
+        // في الجدول، والبطاقةُ تُحسَب من **كلِّ** العملات وإلّا كانت لصيقةُ
+        // التحويل تصف مجموعةً والرقمُ من أخرى (v2.542)
+        $valuesAll = $activeish($base())->whereNotNull('value')->where('value', '>', 0)
             ->select('currency', DB::raw('SUM(value) s'), DB::raw('COUNT(*) c'))
-            ->groupBy('currency')->orderByDesc('s')->limit(5)->get();
+            ->groupBy('currency')->orderByDesc('s')->get();
+        $values = $valuesAll->take(5);
 
         // v2.124: عالقة بلا توقيع >٧ أيام من الإرسال — بزر تذكيرٍ مباشر
         /*
@@ -139,11 +144,21 @@ class LegalController extends Controller
         // بطاقةُ «قيمة الساري» كانت تجمع العملات وتلصق عملةَ المنشأة، وتحتها في
         // الشاشة نفسِها جدولُ `$values` يفصلها بتعليقٍ صريح — تناقضٌ داخل شاشةٍ
         // واحدة. اللصيقةُ الآن حقيقيةٌ عند التوحّد، وموسومةٌ عند الاختلاط.
-        $curLabel = hub_cur_label($values->pluck('currency'));
+        //
+        // **ومحرّكُ الصرفِ موصولٌ هنا** (v2.542): قيمةُ العقدِ الساري مبلغٌ قائمٌ
+        // لا حدثٌ مؤرَّخ، فيُحوَّل بسعرِ اليوم لا بسعرِ شهرٍ مضى. وبلا سعرٍ
+        // مسجَّلٍ تبقى اللصيقةُ والرقمُ كما كانا حرفاً بحرف.
+        $curLabel = hub_money_sum($valuesAll, 's', 'currency');
         $currency = $curLabel['cur'];
         $mixed = $curLabel['mixed'];
+        $converted = $curLabel['converted'];
+        $curMissing = $curLabel['missing'];
+        // **الرقمُ من المصدرِ الذي وُصف**: كان `SUM(value)` خاماً مستقلّاً عن
+        // اللصيقة، فبطاقةٌ تقول «محوَّل» فوق مجموعٍ لم يُحوَّل تناقضٌ في شاشة
+        $kpi['value'] = $curLabel['total'];
 
         return view('legal.index', compact('kpi', 'types', 'expiring', 'obligations', 'currency', 'mixed',
+            'converted', 'curMissing',
             'values', 'stuck', 'pendingSteps', 'renewals', 'byOwner', 'dormantRules', 'obUsers', 'lens',
             'expiringN', 'obligationsN', 'stuckN', 'pendingStepsN', 'renewalsN'));
     }

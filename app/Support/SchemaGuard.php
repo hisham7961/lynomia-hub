@@ -100,6 +100,68 @@ class SchemaGuard
     }
 
     /**
+     * **انحرافُ الحالات**: قيمةٌ في عمودِ حالةٍ خارجَ ما يعلنه سجلُّ الوحدات.
+     *
+     * أبوابُ الكتابةِ **الستّةُ** كلُّها تُقيّد بالخياراتِ المعلَنة — النموذجُ
+     * (`Rule::in`)، وسحبُ البطاقةِ في كانبان، والإجراءُ الجماعيّ، والاستيراد،
+     * وسطحا الـAPI (يُعيدان استعمالَ `rules()` و`applyStatusTransition`
+     * أنفسِهما). فالانحرافُ لا يأتي من بابٍ مفتوح، بل من:
+     *
+     *   · **بذرةٍ أو سكربتٍ** يكتب بـEloquent مباشرةً فلا يمرّ بمتحكّم،
+     *   · **عملٍ يدويٍّ** في القاعدة،
+     *   · وأشيعِها في التشغيل الحقيقيّ: **مسؤولٍ يعيد تسميةَ خيارٍ** في
+     *     `config/hub.php` — فتبقى الصفوفُ القديمةُ على الاسمِ القديم، وقد
+     *     صارت القيمةُ التي تحملها لا تُذكر في أيّ قائمة.
+     *
+     * والصفُّ المنحرفُ **لا يختفي**: لوحةُ كانبان تجمعه في عمودِ «⚠ غير مصنّفة»
+     * منذ إصلاحٍ سابق. لكنّ أحداً **لا يُخبَر أنّ الانحرافَ وقع**، ومُرشِّحُ
+     * الحالةِ في القائمة يُبنى من الخيارات المعلنة فلا يسمّي قيمتَه فلا تُنتقى.
+     * فهذا القارئُ يقولها: أيُّ وحدةٍ، وأيُّ قيمة، وكم صفّاً.
+     *
+     * والمحذوفُ ناعماً **خارجَ الحساب** — سجلٌّ في السلّة ليس حالةً قائمة.
+     * والترتيبُ صريحٌ (الوحدةُ ثمّ القيمة) فلا يقترعه المحرّك.
+     */
+    public static function statusDrift(): array
+    {
+        $out = [];
+        foreach (hub_modules() as $mk => $def) {
+            $table = (string) ($def['table'] ?? '');
+            $col = (string) (hub_status_col($mk) ?? '');
+            $options = array_values(array_filter(array_map('strval',
+                (array) (hub_status_field($mk)['options'] ?? []))));
+            if ($table === '' || $col === '' || ! $options) continue;
+            // القارئُ يمرّ على مخطّطٍ حيٍّ قد يسبق هجرةً — والغيابُ هنا يُتخطّى
+            // لأنّ `gaps()` فوقَه هي من تُبلّغ عنه، فلا يُقال العيبُ مرّتين.
+            if (! Schema::hasTable($table) || ! Schema::hasColumn($table, $col)) continue;
+
+            $q = \Illuminate\Support\Facades\DB::table($table)
+                ->whereNotNull($col)->where($col, '!=', '')
+                ->whereNotIn($col, $options);
+            if (Schema::hasColumn($table, 'deleted_at')) $q->whereNull('deleted_at');
+
+            // المعرّفُ يُلفّ بالقواعد لا يُلصَق نصّاً: `domains.ssl` عمودٌ
+            // اسمُه **كلمةٌ محجوزةٌ في MariaDB**، و`selectRaw` تُمرّره عارياً
+            // فيسقط الأمرُ كلُّه بـ1064. وSQLite لا تحجز `ssl` فتخضرّ الحزمة.
+            $rows = $q->select($col . ' as v')->selectRaw('COUNT(*) as n')
+                ->groupBy($col)->orderBy($col)->limit(50)->get();
+
+            foreach ($rows as $row) {
+                $out[] = [
+                    'module' => $mk,
+                    'label' => (string) ($def['label'] ?? $mk),
+                    'table' => $table,
+                    'col' => $col,
+                    'value' => (string) $row->v,
+                    'count' => (int) $row->n,
+                    'options' => $options,
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * سدُّ الفروقات **بالإضافة وحدها**.
      *
      * تُضاف الأعمدة الناقصة قابلةً للفراغ دائماً — فلا صفٌّ قائمٌ يُرفض، ولا

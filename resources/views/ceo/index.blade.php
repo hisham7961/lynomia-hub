@@ -67,6 +67,12 @@
     <div class="card kid">
         <h3>🎯 تركّز الإيراد <span class="bdg {{ $conc['tone'] }}">{{ $conc['firstPct'] }}٪</span> {!! $gnTag !!}</h3>
         <div class="sub" style="margin-bottom:8px">{{ $conc['verdict'] }}</div>
+        {{-- **النسبةُ على مقامٍ موحَّد**: حين تُحوَّل الفواتيرُ بأسعارِ الصرف
+             يصير «٤٠٪» رقماً لا مؤشّراً — ويُقال ذلك بدل أن يُفترَض (v2.542) --}}
+        @if ($conc['converted'] ?? false)
+            <div class="sub" style="margin-bottom:8px;color:var(--ok)">✓ محوَّلٌ إلى
+                {{ $conc['cur'] }} بأسعارِ الصرف المسجَّلة — البسطُ والمقامُ بعملةٍ واحدة.</div>
+        @endif
         <table class="mini">
             @foreach ($conc['top'] as $c)
                 <tr>
@@ -139,9 +145,13 @@
 
 {{-- مسار المبيعات والإيراد المتكرر — أرقام القرار التجاري --}}
 {{-- `hub_mrr` يحسب الاختلاط ويسلّمه للواجهة؛ وكان العرضُ يُسقط صدقَه ويطبع رقماً واحداً --}}
-@if ($mrr['mixed'] ?? false)
-    @include('partials._mixedcur', ['currency' => setting('app.currency', 'د.ك'),
+@if ($mrr['converted'] ?? false)
+    @include('partials._convertedcur', ['currency' => $mrr['currency'] ?? setting('app.currency', 'د.ك'),
         'what' => 'الإيرادُ المتكرر (MRR/ARR) أدناه'])
+@endif
+@if ($mrr['mixed'] ?? false)
+    @include('partials._mixedcur', ['currency' => $mrr['currency'] ?? setting('app.currency', 'د.ك'),
+        'what' => 'الإيرادُ المتكرر (MRR/ARR) أدناه', 'missing' => $mrr['missing'] ?? []])
     <div class="card pad0" style="margin-bottom:12px">
         <div class="tblwrap"><table class="tbl">
             <thead><tr><th>العملة</th><th>MRR</th><th>ARR</th><th>عقود</th></tr></thead>

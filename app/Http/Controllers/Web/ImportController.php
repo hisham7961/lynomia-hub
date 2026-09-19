@@ -227,8 +227,11 @@ class ImportController extends Controller
                 // **ومدى العمود** (v2.325): كان الطولُ النصّيّ وحده يُفحَص، فقيمةٌ
                 // فائضة تُقبل على SQLite وتُسقط **الدفعة كلَّها** بـ22003 على
                 // MySQL — والعطلُ في الإنتاج وحده بينما الحزمةُ خضراء.
-                if ($table && ($nm = hub_col_num_max($table, (string) $f['col'])) !== null && abs($n) > (float) $nm) {
-                    $err = '«' . $f['label'] . '»: خارج مدى العمود (أقصاه ' . $nm . ')';
+                // ومدىً لا مطلقاً (v2.550): العمودُ الصحيحُ `unsigned` أرضيّتُه صفرٌ،
+                // و`abs()` تُمرّر `-5` إليه فترفضه MySQL وتسقط الدفعةُ كلُّها.
+                if ($table && ($rg = hub_col_num_range($table, (string) $f['col'])) !== null
+                    && ($n < (float) $rg[0] || $n > (float) $rg[1])) {
+                    $err = '«' . $f['label'] . '»: خارج مدى العمود (' . $rg[0] . ' .. ' . $rg[1] . ')';
                     return null;
                 }
 

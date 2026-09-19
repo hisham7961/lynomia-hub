@@ -14,8 +14,11 @@
 
 @include('partials.lens', ['lensModules' => ['contracts', 'obligations', 'rules']])
 
-@if ($mixed ?? false)
-    @include('partials._mixedcur', ['currency' => $currency, 'what' => 'بطاقةُ «قيمة الساري»'])
+@if ($converted ?? false)
+    @include('partials._convertedcur', ['currency' => $currency, 'what' => 'بطاقةُ «قيمة الساري»'])
+@elseif ($mixed ?? false)
+    @include('partials._mixedcur', ['currency' => $currency, 'what' => 'بطاقةُ «قيمة الساري»',
+                                    'missing' => $curMissing ?? []])
 @endif
 
 <div class="cards">

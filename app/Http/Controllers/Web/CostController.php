@@ -80,14 +80,25 @@ class CostController extends Controller
         // النظام لصيقةٌ لا تحويل، فمشروعٌ فواتيرُه بالدولار ومشروعٌ بالدينار
         // يُجمعان هنا في رقمٍ واحد. يُرفع علمُ الاختلاط — من داخل المشروع الواحد
         // ومن اختلاف المشاريع معاً — وتُعنون البطاقةُ بعملتها الحقيقية عند التوحّد.
-        $label = hub_cur_label($rows->pluck('pl.currency'));
-        $mixed = $label['mixed'] || $rows->contains(fn ($x) => $x['pl']['mixed'] ?? false);
+        //
+        // **والتجميعُ يرث تحويلَ المشاريع** (v2.542): `hub_project_pl` صارت
+        // تُحوّل طرفَي الربحيّة معاً حين يُسجَّل السعر، فأرقامُ `$tot` أعلاه
+        // مجموعةٌ من أرقامٍ **بعملةِ الأساسِ نفسِها** — لا جمعَ تفّاحٍ ببرتقال.
+        // والشرطُ صريح: تُعلَن اللوحةُ محوَّلةً فقط حين يُحوَّل **كلُّ** مشروعٍ
+        // فيها، فمشروعٌ واحدٌ بزوجٍ بلا سعرٍ يُبقيها مخلوطةً كما كانت.
+        $plCurs = $rows->map(fn ($x) => $x['pl']['currency'] ?? null);
+        $anyRaw = $rows->contains(fn ($x) => ! ($x['pl']['converted'] ?? false));
+        $converted = $rows->isNotEmpty() && ! $anyRaw;
+        $label = hub_cur_label($plCurs);
+        $mixed = ! $converted
+            && ($label['mixed'] || $rows->contains(fn ($x) => $x['pl']['mixed'] ?? false));
 
         return view('costs.index', [
             'rows' => $rows->sortByDesc(fn ($x) => $x['pl']['revenue']['invoiced'])->values(),
             'tot' => $tot,
-            'currency' => $label['cur'],
+            'currency' => $converted ? \App\Support\Currency::base() : $label['cur'],
             'mixed' => $mixed,
+            'converted' => $converted,
             'rates' => hub_hourly_rates(),
         ]);
     }

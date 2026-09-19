@@ -162,7 +162,15 @@ if (! function_exists('hub_company_null_is_unowned')) {
      */
     function hub_company_null_is_unowned(string $module): bool
     {
-        return $module === 'users';
+        // **الإعلانُ في السجلّ لا في مقارنةٍ مثبَّتة** (v2.544 · L2-05): كانت
+        // الدالّةُ `return $module === 'users'` — سطراً لا يُراجَع ولا يُعلَن،
+        // بينما فرعُ `via` في `hub_scope` يقرأ `config('hub_tenancy.null_is_unowned')`.
+        // مُعلِنان لسؤالٍ واحد، والنتيجةُ أنّ وحدةَ التذاكرِ أُظلمت كاملةً على
+        // المعزولين: ثلاثٌ وعشرون تذكرةً ولا واحدةَ تحمل شركة.
+        // و`users` تبقى كما كانت (سلوكٌ قائمٌ لا يُمسّ).
+        if ($module === 'users') return true;
+
+        return (bool) config("hub_tenancy.null_is_unowned.{$module}", false);
     }
 }
 
@@ -211,10 +219,35 @@ if (! function_exists('hub_scope')) {
             }
         }
 
-        if (($cids = hub_company_ids($user)) !== null && ($ccol = hub_company_col($module))) {
-            hub_company_null_is_unowned($module)
-                ? $q->where(fn ($w) => $w->whereIn($ccol, $cids)->orWhereNull($ccol))
-                : $q->whereIn($ccol, $cids);
+        /*
+         * **عزلُ الشركات — والحارسُ يفشل مغلقاً** (المراجعةُ الشاملة · F-04/F-16).
+         *
+         * كان الشرطُ `… && ($ccol = hub_company_col($module))` فيجعل **غيابَ العمود
+         * إذناً بالمرور**: ثمانِ وحداتٍ تُقرأ كاملةً لمستخدمٍ معزول. ومسحٌ آليٌّ أعطى
+         * **١٠٩ مواضعَ** بالاصطلاحِ نفسِه في المستودع — فالعيبُ اصطلاحٌ لا سطر.
+         *
+         * الآن أربعةُ أبوابٍ مُعلَنة: عمودٌ مباشر · مسارٌ إلى أبٍ يحمله · إعفاءٌ
+         * صريحٌ بسببٍ مكتوب · **وما عداها `1 = 0`**. فالصمتُ إغلاقٌ لا فتح،
+         * ويسقط `ScopeFailsClosedTest` على أوّلِ وحدةٍ لا تُعلن.
+         */
+        if (($cids = hub_company_ids($user)) !== null) {
+            if ($ccol = hub_company_col($module)) {
+                hub_company_null_is_unowned($module)
+                    ? $q->where(fn ($w) => $w->whereIn($ccol, $cids)->orWhereNull($ccol))
+                    : $q->whereIn($ccol, $cids);
+            } elseif ($via = hub_company_via($module)) {
+                // الأبُ يحمل الشركة: يُرشَّح بمفتاحِه الأجنبيّ عبر استعلامٍ فرعيٍّ
+                // محدود — لا join يضاعف الصفوفَ ولا قراءةَ جدولٍ كامل.
+                $nullOk = (bool) config("hub_tenancy.null_is_unowned.{$module}", false);
+                $q->where(function ($w) use ($via, $cids, $nullOk) {
+                    $w->whereIn($via['col'], function ($sub) use ($via, $cids) {
+                        $sub->select('id')->from($via['table'])->whereIn($via['ref'], $cids);
+                    });
+                    if ($nullOk) $w->orWhereNull($via['col']);
+                });
+            } elseif (! hub_tenancy_exempt($module)) {
+                $q->whereRaw('1 = 0');   // لم تُعلِن انتماءَها ⇒ تُغلَق، ولا تُفتَح صمتاً
+            }
         }
 
         // عزلُ العملاء الصارم — نظيرُ عزل الشركات حرفياً: من له قائمةُ عملاء
@@ -745,7 +778,7 @@ if (! function_exists('hub_ref_options')) {
      * لا يحوي خياره — فيُرسل الفراغ عند الحفظ **ويُمحى الرابط بصمت**. لذا تُضاف
      * القيم المختارة حالياً دائماً.
      */
-    function hub_ref_options(string $ref, $ensure = null): array
+    function hub_ref_options(string $ref, $ensure = null, ?callable $narrow = null): array
     {
         $table = hub_ref_table($ref);
         if (! $table) return [];
@@ -763,6 +796,15 @@ if (! function_exists('hub_ref_options')) {
         if ($ref === 'users' && hub_has_col('users', 'account_type')) {
             $q->where(fn ($w) => $w->whereNull('account_type')->orWhere('account_type', '!=', 'client'));
         }
+
+        /*
+         * **والتضييقُ يدخل الاستعلامَ قبل القصّ** (L2-07). الحدُّ خمسُمئةٍ مرتَّبةً
+         * أبجديّاً، فترشيحُ النتيجةِ **بعده** يعني أنّ صفوفَ صاحبِ الحسابِ قد لا
+         * تكون فيها أصلاً: على منشأةٍ فيها آلافُ المهامّ تُقصّ مهامُّه مع البقيّة
+         * لأنّ عناوينَها بعد الخمسمئة، فتصير قائمتُه **خاويةً وهي في نطاقه**.
+         * فالمُضيِّقُ يُطبَّق على الاستعلامِ نفسِه ليقع الحدُّ على المنطَّقِ وحدَه.
+         */
+        if ($narrow) $narrow($q);
 
         $rows = $q->orderBy($disp)->limit(500)->pluck($disp, 'id')->all();
 
@@ -985,8 +1027,25 @@ if (! function_exists('hub_ref_options_scoped')) {
      */
     function hub_ref_options_scoped(string $ref, $ensure = null, $user = null): array
     {
-        $opts = hub_ref_options($ref, $ensure);
         $user = $user ?? auth()->user();
+
+        /*
+         * **ونطاقُ الوحدةِ نفسِها — لمن أُعلن تضييقُه** (L2-07 · v2.548). كانت هذه
+         * الدالّةُ تضيّق بثلاثةٍ (المشاريعُ المرئيّة · عمودُ الشركة · عمودُ العميل)
+         * ولا تسأل `hub_scope` عن الوحدةِ المرجعيّةِ ذاتها. قِيس: موظّفٌ نطاقُه
+         * **٣٢** مهمّةً يُعرَض عليه **١٢١**، وإحداها تردّ ٤٠٤ إن فُتحت وتُسمّى
+         * بعنوانِها الكاملِ في قائمته — اثنا عشرَ موضعاً و**٢٨١ صفّاً مسرَّباً**.
+         *
+         * والتضييقُ **مُعلَنٌ مرجعاً مرجعاً** في `hub_tenancy.ref_scope` بسببٍ
+         * مكتوبٍ لكلِّ مدخل، لا قاعدةً جارفة: نطاقُ وحدةِ الأفرادِ لموظّفٍ عاديٍّ
+         * صفرٌ، فتعميمُ التضييقِ يمنعه من طلبِ إجازتِه هو. والمجهولُ لا يُضيَّق.
+         */
+        $reg = (array) config("hub_tenancy.ref_scope.{$ref}", []);
+        $narrow = ($user && ! empty($reg['narrow']) && isset(hub_modules()[$ref]))
+            ? function ($q) use ($ref, $user) { hub_scope($q, $ref, $user); }
+            : null;
+
+        $opts = hub_ref_options($ref, $ensure, $narrow);
         if (! $user) return $opts;
 
         if ($ref === 'projects' && hub_scoped($user)) {
@@ -1118,11 +1177,105 @@ if (! function_exists('hub_monitor_group')) {
     }
 }
 
+if (! function_exists('hub_company_via')) {
+    /**
+     * **مسارُ انتماءِ وحدةٍ بلا عمودِ شركة** (`config/hub_tenancy.php`) — أو `null`.
+     * يُعيد `['col','table','ref']`: عمودُ الأبِ في جدولِ الوحدة، وجدولُ الأب، وعمودُ
+     * الشركةِ فيه. (المراجعةُ الشاملة · F-16.)
+     */
+    function hub_company_via(string $module): ?array
+    {
+        $v = config("hub_tenancy.via.$module");
+
+        return (is_array($v) && ! empty($v['col']) && ! empty($v['table']) && ! empty($v['ref'])) ? $v : null;
+    }
+}
+
+if (! function_exists('hub_tenancy_exempt')) {
+    /** أمُعفاةٌ هذه الوحدةُ من عزلِ الشركاتِ **بسببٍ مكتوب**؟ */
+    function hub_tenancy_exempt(string $module): bool
+    {
+        return trim((string) config("hub_tenancy.exempt.$module", '')) !== '';
+    }
+}
+
+if (! function_exists('hub_fleet_ok')) {
+    /**
+     * **سلطةٌ واحدةٌ لبابِ أسطولِ النقاطِ الطرفيّة** (المراجعةُ الشاملة · F-02).
+     *
+     * كان الشرطُ مكتوباً في `ModuleController::resolve` وحدَه، فالشاشةُ تشترط مالكاً
+     * أو `secOps` بينما `/api/v1` يكتفي بـ`endpoints:v` في المصفوفة — بابٌ يُغلَق
+     * وبابٌ يُفتَح على الأسطولِ نفسِه. والدليلُ أنّ التفاوتَ بنيويٌّ لا سهوُ سطر:
+     * كلمةُ `secOps` لم تكن ترد في **أيِّ** ملفٍّ تحت `app/Http/Controllers/Api/`.
+     *
+     * **ولهذا لم يُنسَخ الشرطُ إلى السطحِ الثاني بل أُخرج إلى هنا**: نسخُه يصنع
+     * البابَ الثالثَ يومَ يُضاف سطحٌ ثالث. من أراد الأسطولَ يسأل هذه الدالّة.
+     */
+    function hub_fleet_ok($user = null): bool
+    {
+        $user = $user ?? auth()->user();
+
+        return hub_is_owner($user) || hub_monitor_group('secOps', $user);
+    }
+}
+
 if (! function_exists('hub_approver')) {
     /** اعتماد الطلبات وأوامر الشراء */
     function hub_approver($user = null): bool
     {
         return hub_flag($user ?? auth()->user(), 'approve');
+    }
+}
+
+if (! function_exists('hub_approval_waits_on')) {
+    /**
+     * **أينتظر هذا الطلبُ قرارَ هذا الشخصِ بعينِه؟** — تعريفٌ واحدٌ لا تعريفان.
+     *
+     * كانت بطاقةُ الصباحِ تقول «✋ قرارات تنتظر حسمك — عمليات موقوفة لن تُنفَّذ
+     * قبل اعتمادك» لِـ**كلِّ من يرى** الموافقات (`approvals:v` وحدَها)، بينما
+     * `ExecutionStats` تَعُدُّ «بانتظار حسمه» بـ`approver_id` أو `chain`،
+     * وحارسُ الحسمِ يشترط شيئاً ثالثاً. ثلاثةُ تعريفاتٍ لسؤالٍ واحد — فبطاقةٌ
+     * تنسب إلى قارئها مسؤوليّةً لا يملكها، وصاحبُ القرارِ لا يميّز طلبَه.
+     *
+     * فصار السؤالُ يُجاب مرّةً واحدة: **معتمِدٌ**، و**مقصودٌ بعينِه** (المعتمِدُ
+     * المُسنَد، أو ضمن السلسلة، أو المالك).
+     *
+     * @param  object  $row  صفُّ موافقةٍ فيه `approver_id` و`chain`
+     */
+    function hub_approval_waits_on($user, $row): bool
+    {
+        $user = $user ?? auth()->user();
+        if (! $user || ! hub_approver($user)) return false;
+        if (hub_is_owner($user)) return true;
+        if ((string) ($row->approver_id ?? '') === (string) $user->id) return true;
+
+        $chain = $row->chain ?? null;
+        if (is_string($chain)) return str_contains($chain, '"' . $user->id . '"');
+
+        return in_array((string) $user->id, array_map('strval', (array) $chain), true);
+    }
+}
+
+if (! function_exists('hub_approvals_awaiting')) {
+    /**
+     * **استعلامُ ما ينتظر قرارَ هذا الشخص** — منطَّقٌ ومقصودٌ به هو.
+     *
+     * تستعمله بطاقةُ الصباحِ فيصدُق عنوانُها، ويطابقه حارسُ الحسم في
+     * `ApprovalService` — فما تَعِد به الشاشةُ هو ما يسمح به الباب.
+     */
+    function hub_approvals_awaiting($user = null)
+    {
+        $user = $user ?? auth()->user();
+        $q = hub_scope(\Illuminate\Support\Facades\DB::table('approvals')->whereNull('deleted_at'), 'approvals')
+            ->whereNull('decided_at')
+            ->where(fn ($w) => $w->whereNull('status')->orWhereIn('status', ['', 'معلّق']));
+
+        if ($user && hub_is_owner($user)) return $q;
+
+        return $q->where(function ($w) use ($user) {
+            $w->where('approver_id', $user?->id)
+              ->orWhere('chain', 'LIKE', '%"' . ($user?->id ?? '-') . '"%');
+        });
     }
 }
 
@@ -2570,6 +2723,71 @@ if (! function_exists('hub_sync_class')) {
     }
 }
 
+if (! function_exists('hub_company_from_parent')) {
+    /**
+     * **الشركةُ تُشتقُّ من السجلِّ نفسِه لا من صاحبِ الجلسةِ وحدَه** (L2-09).
+     *
+     * `ModuleController::inheritCompany` كانت تعرف مصدرَين اثنين: الشركةَ النشطةَ
+     * في الجلسة، وأولى شركاتِ المُنشئِ إن كان معزولاً. فإن لم يكن المُنشئُ معزولاً
+     * ولا له شركةٌ نشطة — وهو حالُ المالكِ والإدارةِ وأكثرِ الموظّفين — **يُحفَظ
+     * السجلُّ بلا شركةٍ أبداً**، ولو كان انتماؤه بيّناً من أبيه: مهمّةٌ على مشروعٍ
+     * تملكه شركةٌ بعينِها تُحفَظ «بلا مالك».
+     *
+     * وأثرُه لا يظهر يومَ الكتابة بل يومَ يُوظَّف أوّلُ موظّفٍ معزولٍ على شركة:
+     * الحارسُ `whereIn(company_id, …)` يُسقط كلَّ صفٍّ فارغ، فيفتح الرجلُ وحدتَه
+     * فيراها **خاوية**. قِيس على قاعدةِ المحاكاة بعد شهرِ عمل: مهامٌّ ٠ من ١٢١،
+     * وعوائقُ ٠ من ٦، وعملاءُ ٠ من ٦ — بينما المشاريعُ ١٦ من ١٦ والأصولُ ١٠٤ من
+     * ١٠٤ (أنشأها معزولون). والدليلُ الحاسم في `updates`: **١٨ من ٥٨٠** — أي
+     * الثمانيةَ عشرَ التي كتبها معزولون وحدَها.
+     *
+     * فهذه الدالّةُ تضيف المصدرَ الثالث: **أبُ السجلِّ**. لا تُستعمل إلا حين يعجز
+     * الأوّلان، ولا تكتب فوق قيمةٍ قائمة — إضافةٌ لا كسر.
+     *
+     * والعميلُ حالةٌ خاصّة: لا أبَ له، فتُستنتَج شركتُه من **مشاريعه** — وبشرطِ
+     * أن تكون واحدةً لا أكثر. فعميلٌ تخدمه شركتان من المجموعة لا يسعُه عمودٌ
+     * مفرد، فيبقى بلا انتماءٍ **مُعلَناً** (قرارُ المالك: يُشتقُّ ما لا يلتبس،
+     * ويُعلَن الملتبسُ على الشاشة بدل أن يُحسَم بقرعة).
+     *
+     * @param object|array $row السجلُّ (نموذجٌ أو مصفوفة) — يُقرأ منه project_id/client_id
+     */
+    function hub_company_from_parent(string $module, $row): ?string
+    {
+        $get = function (string $k) use ($row) {
+            $v = is_array($row) ? ($row[$k] ?? null) : ($row->{$k} ?? null);
+
+            return filled($v) ? (string) $v : null;
+        };
+        $own = function (string $table, ?string $id): ?string {
+            if (! $id) return null;
+            try {
+                $v = \Illuminate\Support\Facades\DB::table($table)->where('id', $id)->value('company_id');
+            } catch (\Throwable $e) {
+                return null;
+            }
+
+            return filled($v) ? (string) $v : null;
+        };
+
+        // العميلُ يُستنتَج من مشاريعه — وبشرطِ ألّا تلتبس
+        if ($module === 'clients') {
+            $id = $get('id');
+            if (! $id) return null;
+            try {
+                $cos = \Illuminate\Support\Facades\DB::table('projects')
+                    ->where('client_id', $id)->whereNotNull('company_id')
+                    ->distinct()->pluck('company_id')->all();
+            } catch (\Throwable $e) {
+                return null;
+            }
+
+            return count($cos) === 1 ? (string) $cos[0] : null;
+        }
+
+        return $own('projects', $get('project_id'))
+            ?? $own('clients', $get('client_id'));
+    }
+}
+
 if (! function_exists('hub_company_col')) {
     /**
      * عمود الشركة للعزل: من تعريف الوحدة، أو العمود الفعلي company_id في الجدول
@@ -2891,6 +3109,239 @@ if (! function_exists('hub_cur_label')) {
     }
 }
 
+if (! function_exists('hub_ym_expr')) {
+    /**
+     * **تعبيرُ «سنة-شهر» بلهجةِ المحرّك** — `2026-03` من عمودِ تاريخ.
+     *
+     * يلزم حيثما تُجمَّع المبالغُ بالعملةِ **وبالشهر** كي يُحوَّل كلُّ شهرٍ
+     * بسعرِه. والتجميعُ على التعبيرِ نفسِه يعمل على الثلاثةِ (وMySQL
+     * بـ`ONLY_FULL_GROUP_BY` كذلك).
+     *
+     * @param  \Illuminate\Database\Connection  $conn
+     */
+    function hub_ym_expr($conn, string $dateCol): string
+    {
+        return match ($conn->getDriverName()) {
+            'sqlite' => "strftime('%Y-%m', {$dateCol})",
+            'pgsql' => "to_char({$dateCol}, 'YYYY-MM')",
+            default => "DATE_FORMAT({$dateCol}, '%Y-%m')",
+        };
+    }
+}
+
+if (! function_exists('hub_ym_date')) {
+    /**
+     * **آخرُ يومٍ في شهرٍ** من `2026-03` — تاريخُ تحويلِ مجموعةِ ذلك الشهر.
+     *
+     * شهرٌ منقضٍ يثبت سعرُه فلا يتحرّك تقريرُ الربعِ الماضي، والشهرُ الجاري
+     * وحدَه يتحرّك — وذاك صوابُه لا عيبُه.
+     */
+    function hub_ym_date(?string $ym): ?string
+    {
+        $ym = trim((string) $ym);
+
+        return $ym !== ''
+            ? \Illuminate\Support\Carbon::parse($ym . '-01')->endOfMonth()->toDateString()
+            : null;
+    }
+}
+
+if (! function_exists('hub_money_rows')) {
+    /**
+     * **تطبيعُ صفوفِ شاشةٍ إلى عقدِ `Currency`** — `['amount','currency','date']`.
+     *
+     * المفتاحُ يُقرأ **حرفيّاً** لا بنقطة، فعمودٌ مستعارٌ اسمُه `pl.currency` لا
+     * يُفسَّر مساراً داخل مصفوفة. والفارغُ من العملاتِ يُنسَب لـ`$default` لا
+     * يُسقَط — «فارغ + دولار» خليطٌ وإن بدا متجانساً (انظر `hub_cur_label`).
+     *
+     * @param  iterable<mixed>  $rows
+     * @return array<int, array{amount: float, currency: string, date: ?string}>
+     */
+    function hub_money_rows(
+        iterable $rows,
+        string $amountKey = 'amount',
+        string $curKey = 'currency',
+        ?string $dateKey = null,
+        ?string $default = null
+    ): array {
+        $default = $default ?? (string) setting('app.currency', 'د.ك');
+        $val = function ($row, string $key) {
+            if (is_array($row)) return $row[$key] ?? null;
+            if (is_object($row)) return $row->{$key} ?? null;
+
+            return null;
+        };
+
+        $out = [];
+        foreach ($rows as $row) {
+            $cur = $val($row, $curKey);
+            $date = $dateKey === null ? null : $val($row, $dateKey);
+            $out[] = [
+                'amount' => (float) ($val($row, $amountKey) ?? 0),
+                'currency' => filled($cur) ? (string) $cur : $default,
+                'date' => filled($date) ? substr((string) $date, 0, 10) : null,
+            ];
+        }
+
+        return $out;
+    }
+}
+
+if (! function_exists('hub_money_base_total')) {
+    /**
+     * **مجموعٌ بعملةِ الأساسِ أو `null`** — بدائيّةُ الحسابِ لا بدائيّةُ العرض.
+     *
+     * الفرقُ عن `hub_money_sum` ليس تفصيلاً: تلك تجيب «كم المجموعُ وكيف يُقرأ؟»
+     * فتُبقي عملةً واحدةً على حالها (ألفُ دولارٍ **هو** ألفُ دولار، ولا يُوسَم
+     * محوَّلاً). وهذه تجيب سؤالاً آخر: «كم يساوي هذا بعملةِ الأساسِ **كي
+     * يُطرَح من غيرِه**؟» — فتحوّل ولو كانت العملةُ واحدة.
+     *
+     * **ولِمَ لزمت؟** لأنّ الربحَ فرقُ رقمين. إيرادُ مشروعٍ ألفُ دولار وتكلفتُه
+     * مئةُ دينار: `hub_money_sum` لا تُحوّل أيّاً منهما (كلٌّ واحدُ العملة)،
+     * فيُطبَع الربحُ ٩٠٠ — وهو جمعُ تفّاحٍ ببرتقال. وبهذه: ٣٠٠ − ١٠٠ = ٢٠٠.
+     *
+     * **و`null` ليست صفراً، هي «لا أستطيع»:** زوجٌ واحدٌ بلا سعرٍ يُبطل المجموعَ
+     * كلَّه — فيعود النداءُ إلى الرقمِ الخام، ولا يُخترَع نصفُ تحويل.
+     *
+     * @param  iterable<mixed>  $rows
+     */
+    function hub_money_base_total(
+        iterable $rows,
+        string $amountKey = 'amount',
+        string $curKey = 'currency',
+        ?string $dateKey = null,
+        ?string $default = null
+    ): ?float {
+        $total = 0.0;
+        foreach (hub_money_rows($rows, $amountKey, $curKey, $dateKey, $default) as $r) {
+            $c = \App\Support\Currency::toBase($r['amount'], $r['currency'], $r['date']);
+            if ($c === null) return null;
+            $total += $c;
+        }
+
+        return round($total, 3);
+    }
+}
+
+if (! function_exists('hub_money_sum')) {
+    /**
+     * **مجموعُ مالٍ: محوَّلٌ بعملةِ الأساس حين يمكن، ومخلوطٌ صادقٌ حين لا يمكن.**
+     *
+     * المحوِّلُ الواحدُ بين شكلِ صفوفِ الشاشات وعقدِ `Currency::sum`. كان في
+     * النظامِ محرّكُ صرفٍ كاملٌ (`App\Support\Currency`) **وشاشةُ إدخالِ أسعارٍ
+     * له — ولا شاشةَ واحدةٌ تستعمله**: ستُّ مواضعَ تجمع المالَ كانت تنادي
+     * `hub_cur_label` فترفع علمَ الاختلاط، والمالكُ يسجّل السعرَ فلا يتغيّر
+     * رقمٌ واحد. فالميزةُ مبنيّةٌ ومختبَرةٌ ومقطوعةُ السلك.
+     *
+     * **والعقدُ الحاكمُ هو عقدُ المحرّك نفسِه** (انظر `Currency`):
+     *
+     *  · بلا سعرٍ مُدخَلٍ **لا يتغيّر حرف** — اللصيقةُ تُحسَب بـ`hub_cur_label`
+     *    نفسِها، فالشاشةُ تطبع اليومَ ما طبعته أمس بالحرف.
+     *  · بسعرٍ مُدخَلٍ يُحوَّل ويُعلَن `converted` — لا يُقدَّم المحوَّلُ أصليّاً.
+     *  · وزوجٌ واحدٌ بلا سعرٍ يُبقي المجموعَ **كلَّه** مخلوطاً.
+     *
+     * **والتاريخُ ليس زينة:** `$dateKey` هو ما يجعل فاتورةَ يناير تُحوَّل بسعرِ
+     * يناير. وتركُه `null` يعني «بسعرِ اليوم» — وهو الصوابُ لِما لا تاريخَ له
+     * (قيمةُ عقدٍ ساري) والخطأُ لِما له تاريخ.
+     *
+     * @param  iterable<mixed>  $rows  صفوفٌ مصفوفاتٍ أو كائنات
+     * @return array{total: float, cur: string, mixed: bool, converted: bool, missing: array<int, string>}
+     */
+    function hub_money_sum(
+        iterable $rows,
+        string $amountKey = 'amount',
+        string $curKey = 'currency',
+        ?string $dateKey = null,
+        ?string $default = null
+    ): array {
+        $default = $default ?? (string) setting('app.currency', 'د.ك');
+
+        $shaped = hub_money_rows($rows, $amountKey, $curKey, $dateKey, $default);
+        $sum = \App\Support\Currency::sum($shaped);
+
+        // **حين لا تحويلَ فعليّاً تُحسَب اللصيقةُ بالمساعدِ القديمِ نفسِه** — لا
+        // بـ`cur` التي يشتقّها المحرّك. الفرقُ يظهر في موضعين: مجموعةٌ فارغة
+        // (المحرّكُ يُعيد عملةَ الأساس، والقديمُ يُعيد `$default` الممرَّرة)،
+        // وخليطٌ بلا سعرٍ في شاشةٍ افتراضُها ليس الأساس (ربحيّةُ مشروعٍ
+        // بالدولار). والتطابقُ الحرفيُّ هنا هو ما يجعل الوصلَ إضافةً لا كسراً.
+        if (! $sum['converted']) {
+            $l = hub_cur_label(array_column($shaped, 'currency'), $default);
+            $sum['cur'] = $l['cur'];
+            $sum['mixed'] = $l['mixed'];
+        }
+
+        return $sum;
+    }
+}
+
+if (! function_exists('hub_money_sum_q')) {
+    /**
+     * **مجموعُ مالٍ من استعلامٍ — بسعرِ شهرِ كلِّ مستندٍ لا بسعرِ اليوم.**
+     *
+     * الشاشاتُ التي تجمع بـ`SUM(total)` في SQL تطوي العملةَ والتاريخَ معاً، فلا
+     * يبقى ما يُحوَّل به. فيُجمَّع هنا **بالعملةِ وبالشهر** ثمّ تُطوى المجموعاتُ
+     * في PHP — فيُحوَّل كلُّ شهرٍ بسعرِ آخرِه، ولا يتغيّر تقريرُ الربعِ الماضي
+     * كلَّ صباح.
+     *
+     * **ومن لم يسجّل سعراً لا يدفع ثمنَ ذلك:** بلا أسعارٍ مسجَّلةٍ يُنفَّذ
+     * `SUM()` القياسيُّ الواحدُ كما كان حرفيّاً — لا `GROUP BY` ولا صفوفٌ تُجلَب.
+     *
+     * @param  \Illuminate\Database\Query\Builder|\Illuminate\Database\Eloquent\Builder  $q
+     * @return array{total: float, cur: string, mixed: bool, converted: bool, missing: array<int, string>}
+     */
+    function hub_money_sum_q(
+        $q,
+        string $amountCol = 'total',
+        string $curCol = 'currency',
+        ?string $dateCol = null,
+        ?string $default = null
+    ): array {
+        $default = $default ?? (string) setting('app.currency', 'د.ك');
+
+        // **`$amountCol` قد يكون تعبيراً لا عموداً** — «المتبقّي» في المستحقات
+        // هو `total - COALESCE(paid, 0)`. فما ليس معرّفاً بسيطاً يُمرَّر خاماً،
+        // وما هو معرّفٌ بسيطٌ يبقى مُقتبَساً كما يقتبسه البنّاء.
+        $plain = (bool) preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $amountCol);
+        $amountExpr = $plain ? $amountCol : \Illuminate\Support\Facades\DB::raw($amountCol);
+
+        // المسارُ القديمُ حرفيّاً لمن لا سعرَ عنده — ومع ذلك تبقى اللصيقةُ
+        // صادقةً: تُقرأ العملاتُ المميَّزةُ كما كانت الشاشاتُ تقرؤها
+        if (! \App\Support\Currency::enabled()) {
+            $total = (float) (clone $q)->sum($amountExpr);
+            $l = hub_cur_label((clone $q)->distinct()->pluck($curCol), $default);
+
+            return ['total' => round($total, 3), 'cur' => $l['cur'], 'mixed' => $l['mixed'],
+                    'converted' => false, 'missing' => []];
+        }
+
+        $conn = $q->getConnection();
+        $DB = \Illuminate\Support\Facades\DB::class;
+
+        if ($dateCol === null) {
+            $rows = (clone $q)->select($curCol, $DB::raw("SUM({$amountCol}) as hub_amt"))
+                ->groupBy($curCol)->get();
+
+            return hub_money_sum($rows, 'hub_amt', $curCol, null, $default);
+        }
+
+        $ym = hub_ym_expr($conn, $dateCol);
+
+        $rows = (clone $q)->select($curCol, $DB::raw("{$ym} as hub_ym"), $DB::raw("SUM({$amountCol}) as hub_amt"))
+            ->groupBy($curCol)->groupBy($DB::raw($ym))->get();
+
+        $shaped = [];
+        foreach ($rows as $r) {
+            $shaped[] = [
+                'amount' => (float) $r->hub_amt,
+                'currency' => $r->{$curCol} ?? null,
+                'date' => hub_ym_date($r->hub_ym ?? null),
+            ];
+        }
+
+        return hub_money_sum($shaped, 'amount', 'currency', 'date', $default);
+    }
+}
+
 if (! function_exists('hub_mrr')) {
     /**
      * الإيراد الشهري المتكرر (MRR) من العقود السارية — أثمن رقمٍ تجاري لم يكن
@@ -2917,7 +3368,10 @@ if (! function_exists('hub_mrr')) {
             // `Undefined array key` ينتظر أوّلَ قاعدةٍ بلا عقدٍ سارٍ.
             $empty = ['mrr' => 0.0, 'arr' => 0.0, 'contracts' => 0, 'byService' => [],
                       'byCurrency' => [], 'mixed' => false, 'unmapped' => 0, 'oneTime' => 0.0,
-                      'oneTimeByCurrency' => [], 'oneTimeMixed' => false];
+                      'oneTimeByCurrency' => [], 'oneTimeMixed' => false,
+                      // مفاتيحُ التحويلِ في العودةِ المبكرةِ كذلك — العرضُ يقرؤها بلا شرط
+                      'converted' => false, 'currency' => (string) setting('app.currency', 'د.ك'),
+                      'missing' => [], 'oneTimeConverted' => false];
 
             $q = hub_read('contracts');
             if (! $q) return $empty;
@@ -2981,19 +3435,34 @@ if (! function_exists('hub_mrr')) {
             unset($oc);
             usort($otCur, fn ($a, $b) => $b['total'] <=> $a['total']);
 
+            /*
+             * **والمحرّكُ موصولٌ بالإيرادِ المتكرّرِ كذلك** (v2.542): قيمةُ العقد
+             * السارية مبلغٌ قائمٌ لا حدثٌ مؤرَّخ، فبسعرِ اليوم. وبسعرٍ مسجَّلٍ
+             * يصير MRR رقماً واحداً بعملةِ الأساسِ بدل تفصيلٍ لا يُجمَع —
+             * وARR تبعُه. والتفصيلُ بالعملة **يبقى** مهما كان (لا حذف).
+             */
+            $mrrM = hub_money_sum($byCur, 'mrr', 'currency', null, $default);
+            $otM = hub_money_sum($otCur, 'total', 'currency', null, $default);
+            $mrrOut = $mrrM['converted'] ? $mrrM['total'] : round($mrr, 2);
+            $otOut = $otM['converted'] ? $otM['total'] : round($oneTime, 2);
+
             return [
-                'mrr' => round($mrr, 2),
-                'arr' => round($mrr * 12, 2),
+                'mrr' => $mrrOut,
+                'arr' => round($mrrOut * 12, 2),
                 'contracts' => $contracts->count(),
                 'byService' => $byService,
                 'byCurrency' => $byCur,
                 // الرقم الموحّد أعلاه أمينٌ فقط بعملةٍ واحدة — mixed يخبر الواجهة
-                // أن تعرض التفصيل لا رقماً واحداً كاذباً
-                'mixed' => count($byCur) > 1,
+                // أن تعرض التفصيل لا رقماً واحداً كاذباً. ويسقط العلمُ حين يُحوَّل.
+                'mixed' => $mrrM['mixed'],
+                'converted' => $mrrM['converted'],
+                'currency' => $mrrM['cur'],
+                'missing' => $mrrM['missing'],
                 'unmapped' => $unmapped,
-                'oneTime' => round($oneTime, 2),
+                'oneTime' => $otOut,
                 'oneTimeByCurrency' => $otCur,
-                'oneTimeMixed' => count($otCur) > 1,
+                'oneTimeMixed' => $otM['mixed'],
+                'oneTimeConverted' => $otM['converted'],
             ];
         });
     }
@@ -3151,18 +3620,20 @@ if (! function_exists('hub_project_pl')) {
             $oneOff = fn ($amount, $cycle) => (string) $cycle === 'مرة واحدة' ? (float) $amount : 0.0;
 
             $servers = \Illuminate\Support\Facades\DB::table('servers')
-                ->whereNull('deleted_at')->where('project_id', $projectId)->get(['cost', 'cycle']);
-            $serverCost = 0.0;
-            foreach ($servers as $s) $serverCost += $norm($s->cost, $s->cycle) * $months + $oneOff($s->cost, $s->cycle);
+                ->whereNull('deleted_at')->where('project_id', $projectId)->get(['cost', 'cycle', 'currency']);
+            // **كلُّ مكوّنٍ يحتفظ بعملتِه حتّى لحظةِ الطيّ** (v2.542): الطيُّ
+            // الفوريُّ في `float` واحدٍ يُتلف العملةَ فلا يبقى ما يُحوَّل به
+            $serverRows = $servers->map(fn ($s) => ['amount' => $norm($s->cost, $s->cycle) * $months + $oneOff($s->cost, $s->cycle),
+                                                    'currency' => $s->currency, 'date' => null])->all();
 
             // ── ٣) الأدوات والاشتراكات ──
             // الملغى/المنتهي لا يُحمَّل على كامل عمر المشروع — كما hub_service_costs
             $subs = \Illuminate\Support\Facades\DB::table('subscriptions')
                 ->whereNull('deleted_at')->where('project_id', $projectId)
                 ->where(fn ($w) => $w->whereNull('status')->orWhereNotIn('status', ['ملغي', 'منتهي']))
-                ->get(['amount', 'cycle']);
-            $toolCost = 0.0;
-            foreach ($subs as $s) $toolCost += $norm($s->amount, $s->cycle) * $months + $oneOff($s->amount, $s->cycle);
+                ->get(['amount', 'cycle', 'currency']);
+            $toolRows = $subs->map(fn ($s) => ['amount' => $norm($s->amount, $s->cycle) * $months + $oneOff($s->amount, $s->cycle),
+                                               'currency' => $s->currency, 'date' => null])->all();
 
             // ── ٤) الخدمات الخارجية: مشتريات + مصروفات مالية مرتبطة بالمشروع ──
             // المصروف بتعريفه المعتمد config('hub.fin.expense') لا نوع «مصروف» وحده،
@@ -3174,14 +3645,22 @@ if (! function_exists('hub_project_pl')) {
             // فبلا استثنائه يُحتسب المبلغُ مرّتين: من صفّ الشراء ومن فاتورته. والحالاتُ
             // الميتة (مسودة/ملغى/مرتجع) ليست تكلفةً كسائر التقارير. `whereNull('meta->bill_id')`
             // تعمل على المحرّكين (json_extract يُعيد NULL حين لا مفتاح).
-            $purch = (float) \Illuminate\Support\Facades\DB::table('purchases')
+            $conn = \Illuminate\Support\Facades\DB::connection();
+            $ymP = hub_ym_expr($conn, 'date');
+            $shapeYm = fn ($rows) => collect($rows)->map(fn ($r) => ['amount' => (float) $r->t,
+                'currency' => $r->currency, 'date' => hub_ym_date($r->ym)])->all();
+
+            $purchRows = $shapeYm(\Illuminate\Support\Facades\DB::table('purchases')
                 ->whereNull('deleted_at')->where('project_id', $projectId)
                 ->whereNull('meta->bill_id')
                 ->whereNotIn('status', (array) config('hub.purchases.dead', ['مسودة', 'ملغى', 'مرتجع']))
-                ->sum('amount');
-            $expense = (float) $finDoc()
-                ->whereIn('kind', (array) config('hub.fin.expense', ['مصروف']))->sum('total');
-            $externalCost = $purch + $expense;
+                ->select('currency', $DB::raw("{$ymP} as ym"), $DB::raw('COALESCE(SUM(amount),0) as t'))
+                ->groupBy('currency')->groupBy($DB::raw($ymP))->get());
+            $expenseRows = $shapeYm($finDoc()
+                ->whereIn('kind', (array) config('hub.fin.expense', ['مصروف']))
+                ->select('currency', $DB::raw("{$ymP} as ym"), $DB::raw('COALESCE(SUM(total),0) as t'))
+                ->groupBy('currency')->groupBy($DB::raw($ymP))->get());
+            $externalRows = array_merge($purchRows, $expenseRows);
 
             // ── ٥) التكلفةُ المسجَّلةُ يدويّاً على المشروع (`projects.cost`) ──
             // لا استعلامَ جديد: الصفُّ مقروءٌ أصلاً أعلاه. و`null` ليست كـ`0`:
@@ -3196,29 +3675,101 @@ if (! function_exists('hub_project_pl')) {
             // COALESCE(paid,0) داخل الجمع: فاتورة لم يُدفع منها شيء paid=NULL
             // كانت تُفسد المجموع لا تُصفَّر.
             $incKinds = (array) config('hub.fin.income', ['فاتورة مبيعات', 'دفعة واردة']);
-            $inv = $finDoc()->whereIn('kind', $incKinds)
-                ->selectRaw('COALESCE(SUM(total),0) t, COALESCE(SUM(COALESCE(paid,0)),0) p, COUNT(*) n')->first();
 
-            // **صدقُ العملة داخل المشروع الواحد**: `fin_documents.currency` حقلٌ
-            // مكشوفٌ بستّة خيارات، فمشروعٌ واحدٌ قد تحمل فواتيرُه عملتين — والربحُ
-            // والهامشُ يُبنيان على هذا الإيراد. لا محرّكَ تحويلٍ في النظام، فيُفصَّل
-            // بالعملة ويُرفع علمُ الاختلاط بدل رقمٍ واحدٍ يبدو دقيقاً.
-            $incByCur = $finDoc()->whereIn('kind', $incKinds)
-                ->selectRaw('currency, COALESCE(SUM(total),0) t, COUNT(*) n')
-                ->groupBy('currency')->get();
-            $plLabel = hub_cur_label($incByCur->pluck('currency'), (string) ($p->currency ?: setting('app.currency', 'د.ك')));
-            $byCurrency = $incByCur
-                ->map(fn ($r) => ['currency' => filled($r->currency) ? (string) $r->currency : $plLabel['cur'],
+            /*
+             * **صدقُ العملة داخل المشروع الواحد**: `fin_documents.currency` حقلٌ
+             * مكشوفٌ بستّة خيارات، فمشروعٌ واحدٌ قد تحمل فواتيرُه عملتين — والربحُ
+             * والهامشُ يُبنيان على هذا الإيراد. فيُفصَّل بالعملةِ **وبالشهر**:
+             * الفصلُ بالعملةِ لصدقِ اللصيقة، وبالشهرِ كي يُحوَّل كلُّ شهرٍ بسعرِه.
+             *
+             * واستعلامٌ واحدٌ يُغني عن ثلاثة: المفوترُ والمحصَّلُ والعدد.
+             */
+            $incRows = $finDoc()->whereIn('kind', $incKinds)
+                ->select('currency', $DB::raw("{$ymP} as ym"),
+                    $DB::raw('COALESCE(SUM(total),0) as t'),
+                    $DB::raw('COALESCE(SUM(COALESCE(paid,0)),0) as p'),
+                    $DB::raw('COUNT(*) as n'))
+                ->groupBy('currency')->groupBy($DB::raw($ymP))->get();
+
+            // «دفعة واردة» محصَّلة بطبيعتها: total هو المبلغ الواصل وإن لم يُملأ paid
+            $payRows = $shapeYm($finDoc()->where('kind', 'دفعة واردة')->whereNull('paid')
+                ->select('currency', $DB::raw("{$ymP} as ym"), $DB::raw('COALESCE(SUM(total),0) as t'))
+                ->groupBy('currency')->groupBy($DB::raw($ymP))->get());
+
+            $defCur = (string) ($p->currency ?: setting('app.currency', 'د.ك'));
+            $revRows = $incRows->map(fn ($r) => ['amount' => (float) $r->t,
+                'currency' => $r->currency, 'date' => hub_ym_date($r->ym)])->all();
+            $paidRows = $incRows->map(fn ($r) => ['amount' => (float) $r->p,
+                'currency' => $r->currency, 'date' => hub_ym_date($r->ym)])->all();
+            /*
+             * **مكوّنٌ بلا بيانٍ لا يُفبرَك له صفّ — والصفرُ لا يُخالط.**
+             *
+             * مشروعٌ عملتُه المُعلَنةُ درهمٌ ولا تكلفةَ مسجَّلةً فيه ولا فاتورة:
+             * صفٌّ بمبلغِ صفرٍ يحمل الدرهمَ كان يُخالطه بعملةِ نظامٍ أخرى **بلا
+             * مالٍ أصلاً**، فتُطبع شارةُ اختلاطٍ حمراءُ على مشروعٍ فارغ. وعلمُ
+             * اختلاطٍ كاذبٌ ليس زينةً: يُعلّم القارئَ تجاهلَ التحذيرات.
+             *
+             * و`$directRec` هي التمييزُ القائمُ نفسُه بين «سُجِّل صفراً» و«لم
+             * يُسجَّل» — المستعمَلُ في `has` أدناه.
+             */
+            $directRows = $directRec ? [['amount' => $directCost, 'currency' => $p->currency, 'date' => null]] : [];
+            // أسعارُ الساعةِ إعدادٌ بعملةِ النظام — لا عمودَ عملةٍ خلفها
+            $hourRows = $hoursTotal > 0
+                ? [['amount' => $hoursCost, 'currency' => (string) setting('app.currency', 'د.ك'), 'date' => null]]
+                : [];
+            $costRows = array_merge($directRows, $hourRows, $serverRows, $toolRows, $externalRows);
+
+            /*
+             * **الربحُ فرقُ رقمين، فإمّا يُحوَّل الطرفان وإمّا لا يُحوَّل شيء**
+             * (v2.542 · F-15).
+             *
+             * إيرادُ مشروعٍ ألفُ دولارٍ وتكلفتُه مئةُ دينار: تحويلُ الإيرادِ
+             * وحدَه يطبع ربحاً أسوأَ من الحقيقةِ ثلاثَ مرّات — **ورقمٌ يبدو
+             * دقيقاً وهو خطأٌ أسوأُ من رقمٍ موسومٍ «مخلوط»**. فالشرطُ ثلاثيّ:
+             * سعرٌ مسجَّلٌ أصلاً، وعملةٌ واحدةٌ على الأقلّ تخالف الأساس (وإلّا
+             * فلا تحويلَ حدث)، **وكلُّ** زوجٍ في الطرفين له سعرٌ في تاريخه.
+             *
+             * وتخلّفُ أيِّ شرطٍ يُعيد كلَّ رقمٍ إلى خامِه — لا نصفَ تحويل.
+             */
+            $curSet = array_unique(array_map(fn ($r) => filled($r['currency'] ?? null)
+                ? (string) $r['currency'] : $defCur, array_merge($costRows, $revRows)));
+            $foreign = (bool) array_diff($curSet, [\App\Support\Currency::base()]);
+            $revBase = $foreign ? hub_money_base_total($revRows, 'amount', 'currency', 'date', $defCur) : null;
+            $costBase = $foreign ? hub_money_base_total($costRows, 'amount', 'currency', 'date', $defCur) : null;
+            $plConv = \App\Support\Currency::enabled() && $foreign
+                && $revBase !== null && $costBase !== null;
+
+            /** يطوي مكوّناً: محوَّلاً بعملةِ الأساسِ حين حُوِّل الطرفان، وخاماً عداه */
+            $fold = function (array $rows) use ($plConv, $defCur): float {
+                if ($plConv) return (float) (hub_money_base_total($rows, 'amount', 'currency', 'date', $defCur) ?? 0.0);
+
+                return (float) array_sum(array_column($rows, 'amount'));
+            };
+
+            $directCost  = $fold($directRows);
+            $hoursCost   = $fold($hourRows);
+            $serverCost  = $fold($serverRows);
+            $toolCost    = $fold($toolRows);
+            $externalCost = $fold($externalRows);
+            $revenue     = $fold($revRows);
+            $collected   = $fold($paidRows) + $fold($payRows);
+
+            // اللصيقةُ: محوَّلةٌ بعملةِ الأساس، أو المساعدُ القديمُ حرفاً بحرف.
+            // **والاختلاطُ يُقاس على الطرفين** — مشروعٌ إيرادُه بعملةٍ وتكلفتُه
+            // بأخرى مخلوطٌ وإن اتّحدت فواتيرُه، وكان العلمُ يُقرأ من الإيرادِ وحدَه.
+            $plLabel = $plConv
+                ? ['cur' => \App\Support\Currency::base(), 'mixed' => false]
+                : hub_cur_label(array_column(array_merge($revRows, $costRows), 'currency'), $defCur);
+
+            $byCurrency = collect($incRows)
+                ->map(fn ($r) => ['currency' => filled($r->currency) ? (string) $r->currency : $defCur,
                                   'revenue' => round((float) $r->t, 2), 'docs' => (int) $r->n])
                 ->groupBy('currency')
                 ->map(fn ($g, $c) => ['currency' => $c, 'revenue' => round($g->sum('revenue'), 2),
                                       'docs' => (int) $g->sum('docs')])
                 ->sortByDesc('revenue')->values()->all();
-            // «دفعة واردة» محصَّلة بطبيعتها: total هو المبلغ الواصل وإن لم يُملأ paid
-            $payExtra = (float) $finDoc()->where('kind', 'دفعة واردة')->whereNull('paid')->sum('total');
+            $invN = (int) $incRows->sum('n');
 
-            $revenue   = (float) ($inv->t ?? 0);
-            $collected = (float) ($inv->p ?? 0) + $payExtra;
             // الجمعُ الخماسيُّ بقاعدته المعلَنة أعلاه — المسجَّلةُ يدويّاً مصدرٌ
             // خامسٌ مستقلٌّ لا بديلٌ عن المشتقّات (عيبُ الجولة 3 · V1)
             $totalCost = $directCost + $hoursCost + $serverCost + $toolCost + $externalCost;
@@ -3261,10 +3812,12 @@ if (! function_exists('hub_project_pl')) {
                 // الاختلاط مع رفع `mixed` — لا عنونةُ كلِّ شيءٍ بعملة النظام زوراً
                 'currency' => $plLabel['cur'],
                 'mixed'    => $plLabel['mixed'],
+                // **المحوَّلُ يُعلَن لا يُقدَّم أصليّاً** (v2.542)
+                'converted' => $plConv,
                 'byCurrency' => $byCurrency,
                 'months'   => $months, 'days' => $days,
                 'revenue'  => ['invoiced' => round($revenue, 2), 'collected' => round($collected, 2),
-                               'docs' => (int) ($inv->n ?? 0),
+                               'docs' => $invN,
                                'uncollected' => round($revenue - $collected, 2)],
                 // المفاتيحُ القديمةُ باقيةٌ كما هي (الإضافةُ لا الكسر)، و«direct»
                 // و«known»/«components»/«missing»/«overlap» تُضاف بجانبها
@@ -3336,11 +3889,30 @@ if (! function_exists('hub_project_paused_since')) {
     }
 }
 
+if (! function_exists('hub_paused_states')) {
+    /**
+     * **حالاتُ التوقّف — سلطةٌ واحدةٌ يقرؤها كلُّ من يسأل** (المراجعةُ الشاملة · F-05).
+     *
+     * كان المفهومُ مُعرَّفاً **مرّتين في هذا الملفّ**: حاسبُ الصحّة يعرف أربعَ قيمٍ بلا
+     * «موقوف»، وكاشفُ الركودِ يعرف ستّاً معها. وفي البياناتِ الحيّة مشروعٌ «متوقف»
+     * بميزانيّة 6,000 ومشروعٌ **«موقوف» بميزانيّة 363,000** — فالمنطقُ يمسّ الأصغرَ
+     * ويعمى عن الأكبر، والرقمُ الناتجُ صحيحٌ على **المجموعةِ الخطأ**.
+     *
+     * وسببُ العيبِ يستحقّ الحفظ: كُتب الحاسبُ من **سجلِّ الوحدات** (`config/hub.php`)
+     * وفيه سبعُ حالاتٍ ليس منها «موقوف» — بينما القاعدةُ تحوي «موقوف» و«مخطّط».
+     * فمن يكتب تعريفاً من السجلِّ وحدَه يرث عماه عمّا كُتب فعلاً.
+     */
+    function hub_paused_states(): array
+    {
+        return ['متوقف', 'متوقفة', 'موقوف', 'موقوفة', 'معلّق', 'معلق', 'مُعلّق', 'مؤجل', 'مؤجّل', 'مجمّد', 'مجمد'];
+    }
+}
+
 if (! function_exists('hub_project_is_paused')) {
-    /** الحالاتُ التي تعني «متوقف» — تعريفٌ واحدٌ يقرؤه الحسابُ والأثرُ معاً */
+    /** أمتوقّفٌ هذا المشروع؟ — تعريفٌ واحدٌ يقرؤه الحسابُ والأثرُ والكاشفُ معاً */
     function hub_project_is_paused(?string $status): bool
     {
-        return in_array(trim((string) $status), ['متوقف', 'متوقفة', 'معلّق', 'معلق'], true);
+        return in_array(trim((string) $status), hub_paused_states(), true);
     }
 }
 
@@ -4308,28 +4880,90 @@ if (! function_exists('hub_col_widths')) {
 }
 
 if (! function_exists('hub_col_num_max')) {
-    /** أقصى قيمةٍ مطلقةٍ يسعها عمودٌ عشريّ — نصّاً دقيقاً (لا float يُقرِّب فيتسرّب الفيض) */
+    /** أقصى قيمةٍ يسعها عمودٌ عدديّ — نصّاً دقيقاً (لا float يُقرِّب فيتسرّب الفيض) */
     function hub_col_num_max(string $table, string $col): ?string
     {
         return hub_col_nums()[$table][$col] ?? null;
     }
 }
 
-if (! function_exists('hub_col_nums')) {
+if (! function_exists('hub_col_num_range')) {
     /**
-     * خريطةُ حدود الأعمدة العشرية (`decimal(M, D)`) من **مصدر الهجرات**.
+     * **مدى** العمودِ العدديّ — [أدنى، أقصى] نصّاً، أو `null` لعمودٍ غيرِ عدديّ.
      *
-     * كحدّ الطول النصّيّ (`hub_col_widths`): SQLite لا يفرض دقّةَ decimal فتمرّ
-     * القيمةُ الفائضة في الاختبار، ثم يرفضها MySQL في الإنتاج بـ22003 (خطأ ٥٠٠،
-     * ورسالتُه تُسرّب القيمة إلى مركز الأخطاء). الحدُّ من العمود يرفضها برسالةٍ
-     * للمستخدم قبل القاعدة. أقصى مطلق = 10^(M−D) − 10^(−D).
+     * والمدى لا السقفُ وحدَه (v2.550): الأعمدةُ الصحيحةُ في هذا المستودع
+     * **٨٣ من ٨٧ تصريحاً `unsigned`** — مداها ٠..N لا ‏±N. فسقفٌ متناظرٌ
+     * (`between:-255,255`) يقبل `-5` في عمودِ `unsignedTinyInteger` وترفضه
+     * MySQL بـ22003 كما ترفض ٩٩٩٩ تماماً. والعشريُّ يبقى متناظراً كما كان.
      */
+    function hub_col_num_range(string $table, string $col): ?array
+    {
+        $m = hub_col_num_meta()[$table][$col] ?? null;
+
+        return $m ? [$m['min'], $m['max']] : null;
+    }
+}
+
+if (! function_exists('hub_col_is_int')) {
+    /** أعمودٌ **صحيحٌ** هو؟ (يميّز `integer` بأنواعه من `decimal`) */
+    function hub_col_is_int(string $table, string $col): bool
+    {
+        return (bool) (hub_col_num_meta()[$table][$col]['int'] ?? false);
+    }
+}
+
+if (! function_exists('hub_col_nums')) {
+    /** خريطةُ **أقصى** الأعمدةِ العدديّة — إسقاطٌ من `hub_col_num_meta()` */
     function hub_col_nums(): array
+    {
+        static $max = null;
+        if ($max !== null) return $max;
+
+        $max = [];
+        foreach (hub_col_num_meta() as $table => $cols) {
+            foreach ($cols as $col => $m) $max[$table][$col] = $m['max'];
+        }
+
+        return $max;
+    }
+}
+
+if (! function_exists('hub_col_num_meta')) {
+    /**
+     * حدودُ الأعمدةِ العدديّة من **مصدر الهجرات** — العشريّةِ والصحيحةِ معاً.
+     *
+     * كحدّ الطول النصّيّ (`hub_col_widths`): SQLite لا تفرض دقّةَ decimal ولا
+     * مدى الصحيح فتمرّ القيمةُ الفائضة في الاختبار، ثم يرفضها MySQL في الإنتاج
+     * بـ22003 (خطأ ٥٠٠، ورسالتُه تُسرّب القيمة إلى مركز الأخطاء). الحدُّ من
+     * العمود يرفضها برسالةٍ للمستخدم قبل القاعدة.
+     *
+     * · العشريّ `decimal(M, D)`: أقصى مطلق = 10^(M−D) − 10^(−D)، والمدى متناظر.
+     * · الصحيح: مدى نوعِه في MySQL — و`unsigned` أرضيّتُه صفرٌ لا سالب. وكان
+     *   الصحيحُ **لا يُقرأ أصلاً** حتى v2.550، فحقلُ `num` على عمودٍ صحيحٍ
+     *   ينال `numeric` عارياً: «٩٩٩٩» في خانةِ درجةِ الأداء (`unsignedTinyInteger`)
+     *   تمرّ التحقّقَ وتبتلعها SQLite وترفضها MySQL. تسعةَ عشرَ حقلاً كذلك.
+     */
+    function hub_col_num_meta(): array
     {
         static $map = null;
         if ($map !== null) return $map;
 
-        $map = \Illuminate\Support\Facades\Cache::remember('hub:colnums:' . config('hub.version'), 86400, function () {
+        $map = \Illuminate\Support\Facades\Cache::remember('hub:colmeta:' . config('hub.version'), 86400, function () {
+            // مدى كلِّ نوعٍ صحيحٍ في MySQL — نصّاً: `bigInteger` يتجاوز مدى int في PHP
+            $ints = [
+                'tinyInteger' => ['-128', '127'],
+                'unsignedTinyInteger' => ['0', '255'],
+                'smallInteger' => ['-32768', '32767'],
+                'unsignedSmallInteger' => ['0', '65535'],
+                'mediumInteger' => ['-8388608', '8388607'],
+                'unsignedMediumInteger' => ['0', '16777215'],
+                'integer' => ['-2147483648', '2147483647'],
+                'unsignedInteger' => ['0', '4294967295'],
+                'bigInteger' => ['-9223372036854775808', '9223372036854775807'],
+                'unsignedBigInteger' => ['0', '18446744073709551615'],
+            ];
+            $alt = implode('|', array_keys($ints));
+
             $out = [];
             foreach (glob(database_path('migrations/*.php')) ?: [] as $file) {
                 $src = (string) @file_get_contents($file);
@@ -4342,8 +4976,14 @@ if (! function_exists('hub_col_nums')) {
                         // لا يُمثَّل تماماً في double فيتسرّب فيضٌ يرفضه MySQL بـ22003.
                         $intDigits = max(0, (int) $c[2] - (int) $c[3]);
                         $dec = (int) $c[3];
-                        $out[$b[1]][$c[1]] = (str_repeat('9', $intDigits) ?: '0')
+                        $m = (str_repeat('9', $intDigits) ?: '0')
                             . ($dec > 0 ? '.' . str_repeat('9', $dec) : '');
+                        $out[$b[1]][$c[1]] = ['min' => '-' . $m, 'max' => $m, 'int' => false];
+                    }
+                    // والصحيحُ بأنواعه — مداه من تصريحِ نوعِه لا من دقّةٍ مكتوبة
+                    preg_match_all("/->($alt)\\(\\s*'([a-z0-9_]+)'/", $b[2], $icols, PREG_SET_ORDER);
+                    foreach ($icols as $c) {
+                        $out[$b[1]][$c[2]] = ['min' => $ints[$c[1]][0], 'max' => $ints[$c[1]][1], 'int' => true];
                     }
                 }
             }
@@ -5256,7 +5896,7 @@ if (! function_exists('hub_recommendations')) {
             // **لا محرّكَ صحّةٍ ثانٍ**: إشارةٌ مستقلّةٌ تُشتقّ من آخرِ أثرٍ فعليّ
             // (تدقيقُ المشروع + آخرُ تحديثِ مهمّة)، منطَّقةٌ بـhub_scope كالبقية.
             try {
-                $paused = ['متوقف', 'موقوف', 'معلّق', 'مُعلّق', 'مؤجل', 'مجمّد'];
+                $paused = hub_paused_states();   // السلطةُ نفسُها التي يسألها الحاسب — F-05
                 $projs = hub_scope(\Illuminate\Support\Facades\DB::table('projects')->whereNull('deleted_at'), 'projects')
                     ->where(fn ($w) => $w->whereNull('status')
                         ->orWhere(fn ($q) => $q->whereNotIn('status', hub_closed_states())->whereNotIn('status', $paused)))

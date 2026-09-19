@@ -274,5 +274,20 @@ return [
         'platform.monitor_analytics' => ['domain' => 'platform', 'category' => 'observability', 'title_ar' => 'المراقبة والتحليلات', 'title_en' => 'Monitor / Analytics', 'status' => 'ENABLED', 'admin_surface' => 'control.index'],
         'platform.feature_registry' => ['domain' => 'platform', 'category' => 'governance', 'title_ar' => 'سجلّ القدرات', 'title_en' => 'Feature Registry', 'status' => 'ENABLED',
             'desc_ar' => 'هذا المركز — مصدرُ حقيقةِ القدرات الواحد.', 'admin_surface' => 'features.index', 'web_routes' => ['features.index', 'features.show'], 'introduced' => 'v2.470.0', 'docs' => 'docs/features/00-overview.md'],
+
+        // **محرّكُ الصرف** — بُني في v2.528.0 بشاشةِ إدخالٍ محروسةٍ واختباراتٍ
+        // كاملة، **ولم يُسجَّل هنا ولم تُنادِه شاشةٌ واحدة**. فالمالكُ لا يجد
+        // القدرةَ في مركزِ القدرات ولا يرى أثراً لها في الأرقام — ميزةٌ مبنيّةٌ
+        // مقطوعةُ السلك. وُصلت في v2.542.0 وسُجِّلت هنا معها.
+        'platform.currency_engine' => ['domain' => 'platform', 'category' => 'governance',
+            'title_ar' => 'محرّك أسعار الصرف', 'title_en' => 'Currency Exchange Engine', 'status' => 'ENABLED',
+            'desc_ar' => 'سعرٌ مؤرَّخٌ لكلِّ زوجِ عملات، وتحويلُ المجاميع لعملةِ الأساس. '
+                . 'بلا سعرٍ مُدخَلٍ لا يتغيّر رقم؛ وبسعرٍ يُحوَّل ويُعلَن أنّه محوَّل. '
+                . 'موصولٌ بلوحةِ المبيعات وتركّزِ العملاء وربحيّةِ المشاريع ولوحةِ التكاليف '
+                . 'والمركزِ القانونيِّ والتقريرِ الماليِّ والإيرادِ المتكرّر.',
+            'admin_surface' => 'currency.rates',
+            'web_routes' => ['currency.rates', 'currency.rates.store', 'currency.rates.destroy'],
+            'introduced' => 'v2.528.0', 'docs' => 'docs/ultimate-platform-review/03-design-currency-wiring.md',
+            'limitations' => 'لا يُشتقُّ سعرٌ عبر عملةٍ ثالثة، ومستندٌ أقدمُ من أوّلِ سعرٍ مسجَّلٍ لا يُحوَّل.'],
     ],
 ];

@@ -25,7 +25,9 @@
 
 {{-- `hub_project_pl` يحسب `mixed` و`byCurrency` — وكانت الشاشةُ تقرأ `currency`
      وحدها فتعرض إيراداً وتكلفةً وربحاً بلصيقةٍ واحدة فوق صفوفٍ بعملتين --}}
-@if ($pl['mixed'] ?? false)
+@if ($pl['converted'] ?? false)
+    @include('partials._convertedcur', ['currency' => $c, 'what' => 'أرقامُ الإيراد والتكلفة والربح هنا'])
+@elseif ($pl['mixed'] ?? false)
     @include('partials._mixedcur', ['currency' => $c, 'what' => 'أرقامُ الإيراد والتكلفة والربح هنا'])
     @if ($pl['byCurrency'] ?? [])
         <div class="card"><div class="sub">تفصيلُ الإيراد بالعملة:

@@ -64,7 +64,12 @@ class ApprovalService
         // (payroll.approve / purchases.approve …) — فحسمُ مجالٍ لا يستلزمُ سلطةَ الكلّ.
         $apMod = $approval instanceof Approval ? (string) $approval->mod
             : (string) (Approval::whereKey($id)->value('mod') ?? '');
-        if (! hub_approver() && ! ($apMod !== '' && hub_can($approver, $apMod, 'approve'))) {
+        // **الرايةُ على الهويّةِ التي يُنسَب إليها القرار.** كانت `hub_approver()` بلا
+        // وسيطٍ فتقرأ **صاحبَ الجلسة**، بينما الحسمُ يُختَم بـ`$approver` الممرَّر.
+        // ومع تطابقِهما في الويبِ والجوال لا يظهر الفرق — ويظهر أوّلَ ما يُنادى
+        // المحرّكُ من أمرٍ أو مهمّةٍ مجدولةٍ بهويّةٍ صريحة: تُفحَص رايةُ واحدٍ
+        // ويُنسَب القرارُ لآخر (المراجعةُ الشاملة · الطبقة ٢).
+        if (! hub_approver($approver) && ! ($apMod !== '' && hub_can($approver, $apMod, 'approve'))) {
             return ApprovalResult::fail(self::FORBIDDEN, 403, 'الحسم للمعتمدين فقط');
         }
 
@@ -92,23 +97,39 @@ class ApprovalService
                 }
             }
 
-            // (٣) لا حسمٌ مزدوج — الفيصلُ `decided_at` قبل عمود الحالة (لا يُنقض بقلبِ نصّ)
-            if (! ($ap->mod && $ap->decided_at === null
-                && in_array($ap->status, [null, '', 'معلّق'], true))) {
-                // **الرسالةُ تصف الحالَ لا تخترعه** (محاكاةُ الشهر · اليوم ٧ · M-F9):
-                // هذا الشرطُ يجمع ثلاثَ حالاتٍ في ردٍّ واحد، وأشهرُها عمليّاً
-                // **طلبُ عملٍ بلا `mod`** (شراءٌ/مصروفٌ/إجازة) — لم يُحسم قطّ
-                // و`decided_at` فيه `NULL`، فيُقال له «حُسم من قبل» وهو كذبٌ
-                // صريحٌ يُرسل الموافقَ يفتّش عن قرارٍ لا وجودَ له. الرمزُ يبقى
-                // كما هو (لا يُمسّ عقدُ الـAPI)، وإنّما يصدُق النصّ.
-                $never = $ap->decided_at === null
-                    && in_array($ap->status, [null, '', 'معلّق'], true);
+            /*
+             * (٢·ب) **طلبُ عملٍ بلا `mod`** (شراءٌ · مصروفٌ · إجازة) — صار يُحسَم
+             * (المراجعةُ الشاملة · الطبقة ٢ · L2-01).
+             *
+             * كان يُردُّ بـ«لا مسارَ حسمٍ له في المنتج بعد» — وهو صدقٌ **محبوسٌ خلف
+             * زرٍّ لم يُرسَم**: بطاقةُ الصباحِ تقول للمدير «عمليات موقوفة لن تُنفَّذ
+             * قبل اعتمادك» وتربط البند، فيفتحه ولا يجد ما يحسم به. وفي بياناتِ
+             * المحاكاة كان **كلُّ** ما ينتظر قراراً من هذا الصنف.
+             *
+             * **ولا سجلَّ خلفَه يُنطَّق به** كما تُنطَّق العمليّةُ المحميّة (٢)، فيلزمه
+             * حارسان بديلان:
+             *   · نطاقُ وحدتِه نفسِها عبر `hub_scope('approvals')` — يفشل مغلقاً
+             *     كما قرّرت دفعةُ العزل (v2.542)، فلا يُحسم طلبُ شركةٍ أخرى.
+             *   · **ومن يُنتظَر قرارُه فعلاً**: `approver_id` أو `chain` — وهو
+             *     **التعريفُ نفسُه** الذي تَعُدُّ به `ExecutionStats` «بانتظار حسمه».
+             *     فما تُعلنه الشاشةُ وما يسمح به الحارسُ شيءٌ واحد، لا شيئان.
+             */
+            if (! $ap->mod) {
+                $inScope = hub_scope(
+                    DB::table('approvals')->whereNull('deleted_at')->where('id', $ap->id),
+                    'approvals')->exists();
+                if (! $inScope) {
+                    return ApprovalResult::fail(self::FORBIDDEN, 403, 'هذا الطلب خارج نطاقك');
+                }
+                if (! hub_approval_waits_on($approver, $ap)) {
+                    return ApprovalResult::fail(self::FORBIDDEN, 403,
+                        'هذا الطلب ينتظر قرارَ معتمِدٍ آخر — ولستَ في سلسلته');
+                }
+            }
 
-                return ApprovalResult::fail(self::ALREADY_DECIDED, 422,
-                    $never && ! $ap->mod
-                        ? 'هذا طلبُ عملٍ (لا عمليّةٌ محميّةٌ على سجلّ) — ولا مسارَ حسمٍ له في المنتج بعد. '
-                          . 'لم يُحسم، ولم يتغيّر شيء.'
-                        : 'حُسم هذا الطلب من قبل');
+            // (٣) لا حسمٌ مزدوج — الفيصلُ `decided_at` قبل عمود الحالة (لا يُنقض بقلبِ نصّ)
+            if (! ($ap->decided_at === null && in_array($ap->status, [null, '', 'معلّق'], true))) {
+                return ApprovalResult::fail(self::ALREADY_DECIDED, 422, 'حُسم هذا الطلب من قبل');
             }
 
             // ── الرفض ──
@@ -122,6 +143,20 @@ class ApprovalService
             }
 
             // ── الاعتماد ──
+            /*
+             * **اعتمادُ طلبِ العمل: قرارٌ لا تنفيذ.** لا سجلَّ يُعدَّل ولا حمولةَ
+             * تُعاد — القيمةُ في أنّ القرارَ **وقع** وخُتم وبَلغ صاحبَه، فيرتفع
+             * الحجزُ عن الصرفِ أو الشراءِ أو الإجازة. والتنفيذُ الماليُّ يبقى حيث
+             * هو: في وحدتِه بمستنده.
+             */
+            if (! $ap->mod) {
+                $ap->forceFill(['status' => 'معتمد', 'decided_by' => $approver->id,
+                                'decided_at' => now()])->save();
+                self::tellRequester($ap, $approver, 'اعتُمد طلبك: ' . $ap->title);
+
+                return ApprovalResult::ok(self::APPROVED, $ap, false, 'اعتُمد الطلب وأُبلغ الطالب');
+            }
+
             $def = hub_mod($ap->mod);
             if (! ($def && $ap->record_id)) {
                 return ApprovalResult::fail(self::NOT_EXECUTABLE, 422, 'طلب غير قابل للتنفيذ');

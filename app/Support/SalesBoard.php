@@ -102,14 +102,25 @@ class SalesBoard
         return $out;
     }
 
-    /** أعلى المسؤولين بقيمة المقبول وعدده (بالعملة الغالبة) */
+    /**
+     * أعلى المسؤولين بقيمة المقبول وعدده.
+     *
+     * **والمجموعُ يمرّ بمحرّكِ الصرف** (v2.542): بائعٌ له صفقةٌ بالدولارِ وأخرى
+     * بالدينار كان يُجمَع له رقمٌ لا يُمثّل شيئاً ثمّ يُوسَم «مخلوط» — ويُرتَّب
+     * به بين زملائه. فإن سجّل المالكُ سعرَ الزوجِ صار الرقمُ محوَّلاً بعملةِ
+     * الأساسِ ومُعلَناً `converted`، **وصحَّ الترتيبُ تبعاً له**. وبلا سعرٍ
+     * يبقى الخامُ ويبقى العلمُ كما كانا حرفاً بحرف.
+     *
+     * والتاريخُ `accepted_at` لا اليوم: صفقةُ يناير بسعرِ يناير.
+     */
     protected static function byOwner($accepted): array
     {
         $g = $accepted->groupBy('owner_id')->map(function ($rows) {
-            $cur = hub_cur_label($rows->pluck('currency'));
+            $m = hub_money_sum($rows, 'total', 'currency', 'accepted_at');
 
-            return ['count' => $rows->count(), 'value' => round($rows->sum(fn ($r) => (float) $r->total), 3),
-                    'cur' => $cur['cur'], 'mixed' => $cur['mixed']];
+            return ['count' => $rows->count(), 'value' => $m['total'],
+                    'cur' => $m['cur'], 'mixed' => $m['mixed'],
+                    'converted' => $m['converted'], 'missing' => $m['missing']];
         })->sortByDesc('value')->take(10);
         $names = hub_ref_labels('users', $g->keys()->filter()->values()->all());
 

@@ -38,8 +38,12 @@ class MorningController extends Controller
         };
 
         // ── قرارات تنتظرك ──
-        if (hub_can($u, 'approvals', 'v')) {
-            $apQ = hub_scope(DB::table('approvals')->whereNull('deleted_at'), 'approvals')->where('status', 'معلّق');
+        // **«تنتظر حسمك» تعني حسمَك أنت.** كان الشرطُ `approvals:v` وحدَها، فكلُّ
+        // من يرى الموافقاتِ يُقال له إنّ عمليّاتٍ موقوفةٌ على اعتماده — ولو كانت
+        // تنتظر غيرَه، ولو لم يكن معتمِداً. `hub_approvals_awaiting` هي التعريفُ
+        // الواحدُ الذي يطابقه حارسُ الحسم (المراجعةُ الشاملة · الطبقة ٢ · L2-02).
+        if (hub_can($u, 'approvals', 'v') && hub_approver($u)) {
+            $apQ = hub_approvals_awaiting($u);
             $apN = (clone $apQ)->count();
             $ap = $apQ->orderBy('due')->limit(8)->get(['id', 'title', 'due']);
             $add('✋', 'قرارات تنتظر حسمك', 'عمليات موقوفة لن تُنفَّذ قبل اعتمادك',
@@ -109,6 +113,30 @@ class MorningController extends Controller
             // فالعدّادُ صادقٌ حتى هذا السقفِ لا مطلقاً.
             $add('⏰', 'تذاكر تجاوزت الاتفاقية', 'وعدٌ للعميل تأخر عن موعده',
                 $late->take(8), route('support'), $late->count());
+        }
+
+        /*
+         * ── تذاكر جديدة بلا مسؤول ── (v2.544 · L2-06)
+         *
+         * كان أوّلُ ما يُخبر المنشأةَ عن بلاغِ عميلٍ هو «⏰ تذاكر تجاوزت
+         * الاتفاقية» — أي **بعد إخلافِ الوعد**. جولةُ التسليم أثبتته: عميلٌ فتح
+         * تذكرةً من البوّابة، فلم يُشعَر أحدٌ (صفرُ إشعارات) ولم تظهر في صباحِ
+         * أحد. فالنظامُ يقيس الإخفاقَ ولا يُعلن الالتزام.
+         *
+         * وشرطُ العرضِ هو شرطُ الباب: من يملك `tickets:v` في نطاقه لا غير.
+         */
+        if (hub_can($u, 'tickets', 'v')) {
+            $newQ = hub_scope(DB::table('tickets')->whereNull('deleted_at'), 'tickets')
+                ->whereNull('assignee_id')
+                ->whereIn('status', (array) config('hub.tickets.fresh', ['جديدة', 'جديد', 'مفتوحة']));
+            $newN = (clone $newQ)->count();
+            $new = $newQ->orderByDesc('created_at')->orderBy('id')->limit(8)
+                ->get(['id', 'subject', 'priority', 'created_at']);
+            $add('📥', 'تذاكر جديدة بلا مسؤول', 'بلاغُ عميلٍ وصل ولم يُسنَد بعد',
+                $new->map(fn ($r) => ['t' => $r->subject,
+                    's' => trim(($r->priority ? 'أولوية ' . $r->priority : '')),
+                    'u' => route('m.show', ['tickets', $r->id]), 'tone' => 'wn']),
+                route('support'), $newN);
         }
 
         // ── مهام متأخرة ──

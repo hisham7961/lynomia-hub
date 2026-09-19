@@ -366,6 +366,13 @@ class V1Controller extends ModuleController
             && ! in_array($module, \App\Http\Middleware\PortalGuard::MODULE_ALLOW, true)) {
             \App\Support\Api::abort(\App\Support\Api::RESOURCE_NOT_FOUND, 404, 'وحدة غير معروفة', ['kind' => 'module', 'module' => $module]);
         }
+        // أسطولُ النقاطِ الطرفيّة: **السلطةُ نفسُها التي تسألها الشاشة** (F-02) — لا نسخةٌ
+        // ثانيةٌ من الشرط، فالنسخُ هو ما ولّد التفاوتَ أوّلَ مرّة.
+        if ($module === 'endpoints' && ! hub_fleet_ok(auth()->user())) {
+            \App\Support\Api::abort(\App\Support\Api::FORBIDDEN, 403,
+                'أسطولُ النقاطِ الطرفيّة للمالكِ أو حاملِ مجموعةِ الأمن (secOps)',
+                ['module' => $module, 'op' => $op]);
+        }
         if (! hub_can(auth()->user(), $module, $op)) {
             \App\Support\Api::abort(\App\Support\Api::FORBIDDEN, 403, 'لا تملك هذه الصلاحية على الوحدة', ['module' => $module, 'op' => $op]);
         }

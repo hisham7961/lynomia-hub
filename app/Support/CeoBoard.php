@@ -94,13 +94,17 @@ class CeoBoard
             // «مرسلة/مدفوعة جزئياً/متأخرة» (هنّ بالضبط ما ليس مسدَّداً/ملغىً/مسودة)
             // مع اشتراطِ المتبقّي الموجب، فالمجموعُ لا يتغيّر ويُصبح تعريفاً واحداً.
             $agedQ = hub_fin_outstanding(clone $fin, 60);
-            // استنساخٌ قبل التجميع: `sum()` ينفّذ الاستعلام، ونريد العملات أيضاً
-            $aged = (float) (clone $agedQ)->sum(DB::raw('total - COALESCE(paid, 0)'));
+            // **المتبقّي يمرّ بمحرّكِ الصرف** (v2.542): المبلغُ `total - paid`
+            // تعبيرٌ لا عمود، والتجميعُ بالعملةِ وبشهرِ الاستحقاق يجعل فاتورةَ
+            // يناير تُحوَّل بسعرِ يناير. وبلا سعرٍ مسجَّلٍ يُنفَّذ المجموعُ
+            // القياسيُّ نفسُه ولا تُجلَب صفوف.
+            $agedM = hub_money_sum_q(clone $agedQ, 'total - COALESCE(paid, 0)', 'currency', 'due', $cur);
+            $aged = $agedM['total'];
             if ($aged > 0) $out[] = ['icon' => '⏳', 'amount' => $aged,
                 'label' => 'مستحقات متأخرة فوق ٦٠ يوماً',
                 'why' => 'كلما طال التقادم قلّت فرصة التحصيل — هذا أقرب ما يكون إلى خسارة مؤجّلة.',
                 'url' => route('m.index', 'fin'), 'tone' => 'bad']
-                + self::curLabel((clone $agedQ)->distinct()->pluck('currency'), $cur);
+                + self::money($agedM);
         }
 
         // مشاريع تجاوزت ميزانيتها: الفرق هو النزف نفسه
@@ -109,12 +113,16 @@ class CeoBoard
                 ->whereNotNull('budget')->where('budget', '>', 0)
                 ->whereColumn('cost', '>', 'budget')
                 ->get(['name', 'budget', 'cost', 'currency']);
-            $gap = $over->sum(fn ($p) => (float) $p->cost - (float) $p->budget);
-            if ($over->count()) $out[] = ['icon' => '📉', 'amount' => $gap,
+            // الفجوةُ مبلغٌ مشتقٌّ (تكلفة − ميزانية) فتُشكَّل صفوفاً بعملاتها ثمّ
+            // تُجمَع بالمحرّك. ولا تاريخَ للمشروعِ يصلح سعراً، فبسعرِ اليوم.
+            $gapRows = $over->map(fn ($p) => ['amount' => (float) $p->cost - (float) $p->budget,
+                                              'currency' => $p->currency])->all();
+            $gapM = hub_money_sum($gapRows, 'amount', 'currency', null, $cur);
+            if ($over->count()) $out[] = ['icon' => '📉', 'amount' => $gapM['total'],
                 'label' => $over->count() . ' مشروع تجاوز ميزانيته',
                 'why' => 'أكبرها: ' . ($over->sortByDesc(fn ($p) => $p->cost - $p->budget)->first()->name ?? '—'),
                 'url' => route('m.index', 'projects'), 'tone' => 'bad']
-                + self::curLabel($over->pluck('currency'), $cur);
+                + self::money($gapM);
         }
 
         // اشتراكات تتجدد تلقائياً خلال شهر: تُدفع بصمت ما لم تُراجَع قبل موعدها
@@ -122,13 +130,14 @@ class CeoBoard
             $subs = hub_open_scope($sb)
                 ->whereNotNull('renew')
                 ->whereBetween('renew', [now()->toDateString(), now()->addDays(30)->toDateString()])
-                ->get(['service', 'amount', 'auto_renew', 'currency']);
+                ->get(['service', 'amount', 'auto_renew', 'currency', 'renew']);
             $auto = $subs->where('auto_renew', 1);
-            if ($auto->count()) $out[] = ['icon' => '🔁', 'amount' => (float) $auto->sum('amount'),
+            $autoM = hub_money_sum($auto, 'amount', 'currency', 'renew', $cur);
+            if ($auto->count()) $out[] = ['icon' => '🔁', 'amount' => $autoM['total'],
                 'label' => $auto->count() . ' اشتراك يتجدد تلقائياً خلال شهر',
                 'why' => 'التجديد التلقائي يُدفع بلا قرار — راجع الحاجة قبل أن يُخصم.',
                 'url' => route('m.index', 'subs'), 'tone' => 'wn']
-                + self::curLabel($auto->pluck('currency'), $cur);
+                + self::money($autoM);
         }
 
         return $out;
@@ -151,6 +160,18 @@ class CeoBoard
     }
 
     /**
+     * لصيقةُ بطاقةٍ من جوابِ محرّكِ الصرف — `converted` تُنقَل كما هي كي
+     * **تُعلَن** في الشاشة: المحوَّلُ لا يُقدَّم أصليّاً (v2.542).
+     *
+     * @param  array{cur: string, mixed: bool, converted: bool, missing: array<int, string>}  $m
+     */
+    protected static function money(array $m): array
+    {
+        return ['cur' => $m['cur'], 'mixed' => $m['mixed'],
+                'converted' => $m['converted'], 'missing' => $m['missing']];
+    }
+
+    /**
      * التركّز: الخطر الذي يبدو نجاحاً.
      * عميلٌ واحد نصفُ إيرادك ليس «عميلاً كبيراً» — هو نصفُ شركتك في يد غيرك.
      */
@@ -165,25 +186,47 @@ class CeoBoard
 
         $income = (array) config('hub.fin.income', []);
         $dead = (array) config('hub.fin.dead', []);
-        $rows = $fin->whereIn('kind', $income ?: ['فاتورة مبيعات'])
+        $base = $fin->whereIn('kind', $income ?: ['فاتورة مبيعات'])
             // NOT IN تُسقط NULL صامتةً — ومستندٌ بلا حالة مستندٌ قائم
             ->where(fn ($w) => $w->whereNull('state')->orWhereNotIn('state', $dead ?: ['ملغاة']))
             ->where('date', '>=', now()->subMonths(12)->toDateString())
-            ->whereNotNull('client_id')
-            ->select('client_id', 'currency', DB::raw('SUM(total) as t'))
-            ->groupBy('client_id', 'currency')->orderByDesc('t')->get();
+            ->whereNotNull('client_id');
 
-        // **الحكمُ لا يُبنى على مقامٍ مخلوط**: نسبةُ «عميلٌ واحد ٤٠٪ من إيرادك»
-        // مشتقّةٌ من قسمةِ مجموعٍ على مجموع — فإن اختلفت عملاتُ الصفوف فالنسبةُ
-        // نفسُها مُخترَعة، والحكمُ القاطع فوقها («أزمة سيولة») أخطرُ من الرقم.
-        $label = self::curLabel($rows->pluck('currency'), (string) setting('app.currency', 'د.ك'));
+        // التجميعُ بالعميلِ **وبالعملةِ وبالشهر**: الشهرُ لازمٌ كي تُحوَّل فاتورةُ
+        // يناير بسعرِ يناير لا بسعرِ اليوم (v2.542)
+        $ym = hub_ym_expr($base->getConnection(), 'date');
+        $rows = (clone $base)
+            ->select('client_id', 'currency', DB::raw("{$ym} as ym"), DB::raw('SUM(total) as t'))
+            ->groupBy('client_id', 'currency')->groupBy(DB::raw($ym))->get();
 
-        // الصفوفُ مجمّعةٌ بالعميل والعملة — تُطوى على العميل لحساب التركّز
+        /*
+         * **الحكمُ لا يُبنى على مقامٍ مخلوط**: نسبةُ «عميلٌ واحد ٤٠٪ من إيرادك»
+         * مشتقّةٌ من قسمةِ مجموعٍ على مجموع — فإن اختلفت عملاتُ الصفوف فالنسبةُ
+         * نفسُها مُخترَعة، والحكمُ القاطع فوقها («أزمة سيولة») أخطرُ من الرقم.
+         *
+         * **ومحرّكُ الصرفِ موصولٌ هنا** (v2.542): بسعرٍ مسجَّلٍ يُوحَّد البسطُ
+         * والمقامُ بعملةِ الأساسِ معاً — فتصير النسبةُ رقماً لا مؤشّراً، ويُرفع
+         * الاعتذارُ من الحكم. وبلا سعرٍ يبقى كلُّ شيءٍ كما كان حرفاً بحرف.
+         *
+         * **والبسطُ والمقامُ من مصدرٍ واحد:** لا يُحوَّل مجموعُ عميلٍ ويُترَك
+         * المجموعُ الكلّيُّ خاماً — تلك نسبةٌ أسوأُ من المخلوطة.
+         */
+        $shape = fn ($g) => $g->map(fn ($r) => ['amount' => (float) $r->t,
+            'currency' => $r->currency, 'date' => hub_ym_date($r->ym)])->all();
+        $all = hub_money_sum($shape($rows), 'amount', 'currency', 'date',
+            (string) setting('app.currency', 'د.ك'));
+        $label = ['cur' => $all['cur'], 'mixed' => $all['mixed']];
+
+        // الصفوفُ مجمّعةٌ بالعميلِ والعملةِ والشهر — تُطوى على العميل لحساب
+        // التركّز، بالأساسِ حين حُوِّل المجموعُ الكلّيّ وبالخامِ حين لم يُحوَّل
         $rows = $rows->groupBy('client_id')->map(fn ($g, $cid) => (object) [
-            'client_id' => $cid, 't' => (float) $g->sum('t'),
+            'client_id' => $cid,
+            't' => $all['converted']
+                ? (float) (hub_money_base_total($shape($g), 'amount', 'currency', 'date') ?? $g->sum('t'))
+                : (float) $g->sum('t'),
         ])->sortByDesc('t')->values();
 
-        $total = (float) $rows->sum('t');
+        $total = $all['converted'] ? (float) $all['total'] : (float) $rows->sum('t');
         if ($total <= 0 || $rows->count() < 2) return [];
 
         $cq = hub_read('clients');
@@ -200,6 +243,7 @@ class CeoBoard
         return ['top' => $top, 'total' => $total, 'n' => $rows->count(),
             'firstPct' => $first, 'top3Pct' => $top3,
             'cur' => $label['cur'], 'mixed' => $label['mixed'],
+            'converted' => $all['converted'], 'missing' => $all['missing'],
             'tone' => $label['mixed'] ? 'wn' : ($first >= 40 ? 'bad' : ($first >= 25 ? 'wn' : 'ok')),
             // مع الاختلاط يُكتم الحكمُ القاطع ويُستبدَل بما هو صحيحٌ فعلاً: النسبةُ
             // مؤشّرٌ لا رقم، والسبيلُ إلى رقمٍ صادقٍ توحيدُ عملة الفوترة.
