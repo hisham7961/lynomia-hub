@@ -308,6 +308,8 @@ Route::middleware('auth')->group(function () {
     Route::get('reports/monthly/export', [\App\Http\Controllers\Web\ReportsController::class, 'monthlyExport'])->name('reports.monthly.export');
     Route::middleware('throttle:60,1')->group(function () {
         Route::post('reports/review/{id}', [\App\Http\Controllers\Web\ReportsController::class, 'reviewAct'])->name('reports.review.act');
+        // «حوّله إلى بلاغ» — المعوّقُ المبلَّغُ يصير التزاماً بمالكٍ وموعد (v2.558)
+        Route::post('reports/blocker/{id}/to-issue', [\App\Http\Controllers\Web\ReportsController::class, 'blockerToIssue'])->name('reports.blocker.issue');
         Route::post('reports/compliance/{id}/finalize', [\App\Http\Controllers\Web\ReportsController::class, 'finalize'])->name('reports.finalize');
     });
 

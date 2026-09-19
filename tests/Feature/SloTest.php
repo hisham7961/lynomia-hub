@@ -55,7 +55,17 @@ class SloTest extends TestCase
         foreach (array_chunk($rows, 100) as $chunk) DB::table('metric_points')->insert($chunk);
     }
 
-    /** بلا مفاتيحَ لا بطاقةَ ولا رقم — ومفتاحُ هدفٍ بلا نافذةٍ لا يُشعل شيئاً ولا يطبع 99.9 */
+    /**
+     * بلا مفاتيحَ لا بطاقةَ ولا رقم — ومفتاحُ هدفٍ بلا نافذةٍ لا يُشعل شيئاً ولا
+     * يطبع الرقمَ المضبوط.
+     *
+     * **والقيمةُ `99.937` لا `99.9` عمداً** (v2.558): الإبرةُ القصيرةُ في صفحةٍ
+     * كاملةٍ قرعةٌ — و`/admin/ops` يطبع **حجومَ أدلّةٍ حيّة**، فـ`storage/logs`
+     * بلغ في هذا المستودعِ `99.9 MB` فصار التأكيدُ يسقط على قياسِ قرصٍ لا على
+     * تسريبِ إعداد. وهو صنفُ العيبِ نفسُه الذي أسقط v2.540.0 على المعرّفات —
+     * ومصدرُ الضجيجِ هنا عدّادٌ يتحرّك لا UUID. فتُختار قيمةٌ من ستِّ خاناتٍ لا
+     * يطبعها عدّادٌ آخر، ويبقى المعنى: الرقمُ المضبوطُ لا يتسرّب للشاشة.
+     */
     public function test_without_keys_the_card_is_entirely_off(): void
     {
         $this->seedCore();
@@ -64,10 +74,10 @@ class SloTest extends TestCase
         $this->assertStringNotContainsString('أهداف مستوى الخدمة', $html, 'البطاقة مطفأة كلياً بلا مفاتيح');
 
         // هدفُ توافرٍ وحدَه بلا نافذة = غيرُ مفعَّل — والرقمُ المضبوط لا يتسرّب للشاشة
-        $this->hubSetting('slo.availability_pct', '99.9');
+        $this->hubSetting('slo.availability_pct', '99.937');
         $html = $this->actingAs($this->owner)->get('/admin/ops')->assertOk()->getContent();
         $this->assertStringNotContainsString('أهداف مستوى الخدمة', $html, 'هدفٌ بلا نافذةٍ لا يُشعل البطاقة');
-        $this->assertStringNotContainsString('99.9', $html, 'لا يُطبع 99.9 مُختلَقاً أبداً');
+        $this->assertStringNotContainsString('99.937', $html, 'لا يُطبع الهدفُ المضبوطُ مُختلَقاً أبداً');
     }
 
     /** بضبطٍ وبياناتٍ كافية: SLI والامتثال والميزانية المستهلكة والمتبقية — من العدّ الفعلي */
