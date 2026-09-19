@@ -1,0 +1,152 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# بوّابةُ نماذج LiteLLM — مشروعُ Lynomia Hub · المرحلة ١٫٥
+#
+#   ⚠️  ملفٌّ للمراجعةِ لم يُشغَّل بعد. التشغيلُ بموافقةٍ صريحةٍ ثانية.
+#
+#   الطلب:  docker compose -p litellm -f deploy/litellm/docker-compose.yml ...
+#   (الأمرُ يحتاج root — المستخدمُ lynomia ليس في sudoers ولا في مجموعة docker)
+#
+#   🚫 **لا يمسّ هذا الملفُّ مشروعَ lynomia-backend بأيِّ صورة**: أسماءُ مشروعٍ
+#      وشبكةٍ وحاوياتٍ ومجلّداتٍ **مختلفةٌ كلُّها**، ولا `external:` لأيِّ مورد.
+# ─────────────────────────────────────────────────────────────────────────────
+name: litellm                       # اسمُ المشروعِ صريحٌ — لا يُشتقّ من المجلّد
+
+services:
+
+  # ═══ قاعدةُ البيانات — خاصّةٌ بالبوّابةِ وحدَها ═══
+  postgres:
+    # مثبَّتٌ **بالوسمِ والبصمةِ معاً**: الوسمُ يُقرأ، والبصمةُ تَحكم.
+    # والبصمةُ أدناه **بصمةُ فهرسٍ (OCI index)** لا بصمةُ منصّةٍ بعينِها — قِيس
+    # ذلك: `Content-Type: application/vnd.oci.image.index.v1+json`. فهي تصلح
+    # لكلِّ معمارية، ويختار Docker منها `linux/amd64` على هذا الخادم
+    # (`sha256:7a396fd2…`). ولو ثُبِّتت بصمةُ المنصّةِ لتعطّل الملفُّ على غيرها.
+    # (وقِيس أنّ `16-alpine` المتحرّكَ يشير الآن إلى بصمةٍ أخرى — فالتثبيتُ
+    #  ليس احتياطاً نظريّاً: الوسمُ تحرّك فعلاً بين سحبٍ وآخر.)
+    image: postgres:16.14-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+    container_name: litellm-postgres
+
+    # ❗ **لا `ports:` إطلاقاً** — القاعدةُ لا تُنشَر على المضيفِ البتّة.
+    #    تُبلَغ بالاسمِ `litellm-postgres` داخلَ الشبكةِ الخاصّةِ وحدَها.
+
+    restart: unless-stopped
+
+    # كلمةُ المرورِ وحدَها هنا — ولا يرى هذا الحاوي مفتاحَ الإدارةِ ولا الملح
+    env_file:
+      - /etc/litellm/postgres.env
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: litellm
+      PGDATA: /var/lib/postgresql/data/pgdata
+      # ❗ **لا `POSTGRES_INITDB_ARGS` هنا** — وقد كان فيها `--auth-host` و
+      #    `--auth-local`، فحُذفا بعد قراءةِ `docker-entrypoint.sh` من الصورةِ
+      #    نفسِها:
+      #      • `pg_setup_hba_conf()` يُلحق `host all all all scram-sha-256`
+      #        تلقائيّاً (يشتقّ الأسلوبَ من `password_encryption`) — فـ
+      #        `--auth-host` تكرارٌ لا يضيف شيئاً؛
+      #      • و`--auth-local=scram-sha-256` **يكسر الصيانة**: تعليقُ السطر
+      #        ٣٥٧ في نقطةِ الدخولِ يقول صراحةً إنّ `PGPASSWORD` تصير لازمةً
+      #        لكلِّ `psql` محليّ حينها — أي كلمةُ المرورِ في بيئةِ كلِّ أمرِ
+      #        نسخٍ واستعادة، وهو ما نتجنّبه.
+      #    والمكسبُ الأمنيُّ صفر: الفاعلُ الوحيدُ على المقبسِ المحلّيِّ هو root
+      #    داخلَ الحاوية، وهو يقرأ كلمةَ المرورِ أصلاً.
+
+    command:
+      - postgres
+      - "-c"
+      - "shared_buffers=64MB"        # مناسبٌ لسقفِ 256 ميغا
+      - "-c"
+      - "max_connections=20"         # البوّابةُ لا تحتاج أكثر
+      - "-c"
+      - "listen_addresses=*"         # داخلَ الشبكةِ الخاصّةِ فقط — لا منفذَ منشور
+
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+    # `-h 127.0.0.1` **ليست زينة**: نقطةُ الدخولِ تُقلع خادماً مؤقّتاً أثناء
+    # التهيئةِ بـ`-c listen_addresses=''` (سطر ٢٩٧) — أي على المقبسِ وحدَه.
+    # ففحصٌ عبر المقبسِ يخضرُّ والقاعدةُ لم تجهز بعد، ويسمح لـ`depends_on` أن
+    # يُقلع البوّابةَ على قاعدةٍ نصفِ مهيّأة. والفحصُ عبر TCP يستحيل نجاحُه قبل
+    # أن يستمع الخادمُ الحقيقيّ. و`pg_isready` **مقيسٌ موجوداً** في الصورة:
+    # `usr/local/bin/pg_isready`.
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "litellm", "-d", "litellm", "-h", "127.0.0.1", "-q"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    mem_limit: 256m
+    memswap_limit: 256m              # يساوي الحدَّ — فلا محاولةَ تبديلٍ (ولا swap أصلاً)
+    cpus: 0.25
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    networks: [net]
+
+  # ═══ البوّابة — منشورةٌ على loopback وحدَه ═══
+  litellm:
+    # بصمةُ فهرسٍ أيضاً (amd64 + arm64)؛ منصّةُ هذا الخادم `sha256:266180fb…`
+    image: ghcr.io/berriai/litellm:v1.101.0@sha256:d295634e09c648dcdb72c4cc2dd226f5fb87823a73e88cbbed6f205e4deb044b
+    container_name: litellm-gateway
+
+    restart: unless-stopped
+
+    depends_on:
+      postgres:
+        condition: service_healthy   # لا تُقلع البوّابةُ قبل أن تجيبَ القاعدة
+
+    env_file:
+      - /etc/litellm/litellm.env     # MASTER_KEY · SALT_KEY · DATABASE_URL
+
+    # ❗ **الربطُ على المضيفِ `127.0.0.1` حرفيّاً** — لا `0.0.0.0`، ولا
+    #    `4000:4000` المجرّدةُ التي تنشر على كلِّ الواجهات.
+    ports:
+      - "127.0.0.1:4000:4000"
+
+    volumes:
+      - ./config/litellm-config.yaml:/app/config.yaml:ro
+
+    # `--port 4000` **صريحةٌ عمداً**: نقطةُ الدخولِ `docker/prod_entrypoint.sh`
+    # تنتهي بـ`exec litellm "$@"`، و`command` هنا يستبدل `CMD` الأصليَّ
+    # (`["--port","4000"]`). والافتراضُ في الـCLI هو 4000 أيضاً
+    # (`proxy_cli.py:661`) فلا ينكسر شيءٌ بحذفِها — لكنّ ربطَ المنفذِ المنشورِ
+    # بافتراضٍ غيرِ موثَّقٍ في الوثائق ليس تثبيتاً.
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+
+    # ❗ **لا `curl` ولا `wget` ولا `nc` في هذه الصورة** — قِيس ذلك بسردِ
+    #    محتوياتِ الطبقاتِ الاثنتينِ والعشرين كلِّها (٢٨٬١٧٩ مُدخلاً): لا شيءَ
+    #    منها موجود. فالفحصُ الذي كان يجرّب `curl` أوّلاً كان يفشل دائماً ثمّ
+    #    يسقط إلى البديل — تعقيدٌ بلا فائدة.
+    #    و`python3` **مقيسٌ موجوداً** في موضعين (`/usr/bin/python3` و
+    #    `/app/.venv/bin/python3`، كلاهما 3.13) و`urllib` في مكتبتِه القياسيّة
+    #    (`usr/lib/python3.13/urllib/request.py`). فالمسارُ المطلقُ يتجنّب
+    #    بيئةَ التطبيقِ الافتراضيّةَ ولا يعتمد على `PATH`، وصيغةُ `CMD` لا
+    #    تحتاج صدفةً أصلاً.
+    healthcheck:
+      test: ["CMD", "/usr/bin/python3", "-c", "import sys,urllib.request;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness',timeout=5).status==200 else 1)"]
+      interval: 20s
+      timeout: 10s
+      retries: 6
+      start_period: 90s              # الإقلاعُ الأوّلُ يطبّق هجراتِ القاعدة
+
+    mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 1.0
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    networks: [net]
+
+# ═══ الشبكةُ والمجلّد — بأسماءٍ صريحةٍ لا تتقاطع مع أيِّ مشروعٍ آخر ═══
+networks:
+  net:
+    name: litellm_net                # ≠ lynomia-backend_default
+    driver: bridge
+
+volumes:
+  pgdata:
+    name: litellm_pgdata             # ≠ أيِّ مجلّدٍ قائم
