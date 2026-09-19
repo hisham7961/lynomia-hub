@@ -4880,28 +4880,90 @@ if (! function_exists('hub_col_widths')) {
 }
 
 if (! function_exists('hub_col_num_max')) {
-    /** أقصى قيمةٍ مطلقةٍ يسعها عمودٌ عشريّ — نصّاً دقيقاً (لا float يُقرِّب فيتسرّب الفيض) */
+    /** أقصى قيمةٍ يسعها عمودٌ عدديّ — نصّاً دقيقاً (لا float يُقرِّب فيتسرّب الفيض) */
     function hub_col_num_max(string $table, string $col): ?string
     {
         return hub_col_nums()[$table][$col] ?? null;
     }
 }
 
-if (! function_exists('hub_col_nums')) {
+if (! function_exists('hub_col_num_range')) {
     /**
-     * خريطةُ حدود الأعمدة العشرية (`decimal(M, D)`) من **مصدر الهجرات**.
+     * **مدى** العمودِ العدديّ — [أدنى، أقصى] نصّاً، أو `null` لعمودٍ غيرِ عدديّ.
      *
-     * كحدّ الطول النصّيّ (`hub_col_widths`): SQLite لا يفرض دقّةَ decimal فتمرّ
-     * القيمةُ الفائضة في الاختبار، ثم يرفضها MySQL في الإنتاج بـ22003 (خطأ ٥٠٠،
-     * ورسالتُه تُسرّب القيمة إلى مركز الأخطاء). الحدُّ من العمود يرفضها برسالةٍ
-     * للمستخدم قبل القاعدة. أقصى مطلق = 10^(M−D) − 10^(−D).
+     * والمدى لا السقفُ وحدَه (v2.550): الأعمدةُ الصحيحةُ في هذا المستودع
+     * **٨٣ من ٨٧ تصريحاً `unsigned`** — مداها ٠..N لا ‏±N. فسقفٌ متناظرٌ
+     * (`between:-255,255`) يقبل `-5` في عمودِ `unsignedTinyInteger` وترفضه
+     * MySQL بـ22003 كما ترفض ٩٩٩٩ تماماً. والعشريُّ يبقى متناظراً كما كان.
      */
+    function hub_col_num_range(string $table, string $col): ?array
+    {
+        $m = hub_col_num_meta()[$table][$col] ?? null;
+
+        return $m ? [$m['min'], $m['max']] : null;
+    }
+}
+
+if (! function_exists('hub_col_is_int')) {
+    /** أعمودٌ **صحيحٌ** هو؟ (يميّز `integer` بأنواعه من `decimal`) */
+    function hub_col_is_int(string $table, string $col): bool
+    {
+        return (bool) (hub_col_num_meta()[$table][$col]['int'] ?? false);
+    }
+}
+
+if (! function_exists('hub_col_nums')) {
+    /** خريطةُ **أقصى** الأعمدةِ العدديّة — إسقاطٌ من `hub_col_num_meta()` */
     function hub_col_nums(): array
+    {
+        static $max = null;
+        if ($max !== null) return $max;
+
+        $max = [];
+        foreach (hub_col_num_meta() as $table => $cols) {
+            foreach ($cols as $col => $m) $max[$table][$col] = $m['max'];
+        }
+
+        return $max;
+    }
+}
+
+if (! function_exists('hub_col_num_meta')) {
+    /**
+     * حدودُ الأعمدةِ العدديّة من **مصدر الهجرات** — العشريّةِ والصحيحةِ معاً.
+     *
+     * كحدّ الطول النصّيّ (`hub_col_widths`): SQLite لا تفرض دقّةَ decimal ولا
+     * مدى الصحيح فتمرّ القيمةُ الفائضة في الاختبار، ثم يرفضها MySQL في الإنتاج
+     * بـ22003 (خطأ ٥٠٠، ورسالتُه تُسرّب القيمة إلى مركز الأخطاء). الحدُّ من
+     * العمود يرفضها برسالةٍ للمستخدم قبل القاعدة.
+     *
+     * · العشريّ `decimal(M, D)`: أقصى مطلق = 10^(M−D) − 10^(−D)، والمدى متناظر.
+     * · الصحيح: مدى نوعِه في MySQL — و`unsigned` أرضيّتُه صفرٌ لا سالب. وكان
+     *   الصحيحُ **لا يُقرأ أصلاً** حتى v2.550، فحقلُ `num` على عمودٍ صحيحٍ
+     *   ينال `numeric` عارياً: «٩٩٩٩» في خانةِ درجةِ الأداء (`unsignedTinyInteger`)
+     *   تمرّ التحقّقَ وتبتلعها SQLite وترفضها MySQL. تسعةَ عشرَ حقلاً كذلك.
+     */
+    function hub_col_num_meta(): array
     {
         static $map = null;
         if ($map !== null) return $map;
 
-        $map = \Illuminate\Support\Facades\Cache::remember('hub:colnums:' . config('hub.version'), 86400, function () {
+        $map = \Illuminate\Support\Facades\Cache::remember('hub:colmeta:' . config('hub.version'), 86400, function () {
+            // مدى كلِّ نوعٍ صحيحٍ في MySQL — نصّاً: `bigInteger` يتجاوز مدى int في PHP
+            $ints = [
+                'tinyInteger' => ['-128', '127'],
+                'unsignedTinyInteger' => ['0', '255'],
+                'smallInteger' => ['-32768', '32767'],
+                'unsignedSmallInteger' => ['0', '65535'],
+                'mediumInteger' => ['-8388608', '8388607'],
+                'unsignedMediumInteger' => ['0', '16777215'],
+                'integer' => ['-2147483648', '2147483647'],
+                'unsignedInteger' => ['0', '4294967295'],
+                'bigInteger' => ['-9223372036854775808', '9223372036854775807'],
+                'unsignedBigInteger' => ['0', '18446744073709551615'],
+            ];
+            $alt = implode('|', array_keys($ints));
+
             $out = [];
             foreach (glob(database_path('migrations/*.php')) ?: [] as $file) {
                 $src = (string) @file_get_contents($file);
@@ -4914,8 +4976,14 @@ if (! function_exists('hub_col_nums')) {
                         // لا يُمثَّل تماماً في double فيتسرّب فيضٌ يرفضه MySQL بـ22003.
                         $intDigits = max(0, (int) $c[2] - (int) $c[3]);
                         $dec = (int) $c[3];
-                        $out[$b[1]][$c[1]] = (str_repeat('9', $intDigits) ?: '0')
+                        $m = (str_repeat('9', $intDigits) ?: '0')
                             . ($dec > 0 ? '.' . str_repeat('9', $dec) : '');
+                        $out[$b[1]][$c[1]] = ['min' => '-' . $m, 'max' => $m, 'int' => false];
+                    }
+                    // والصحيحُ بأنواعه — مداه من تصريحِ نوعِه لا من دقّةٍ مكتوبة
+                    preg_match_all("/->($alt)\\(\\s*'([a-z0-9_]+)'/", $b[2], $icols, PREG_SET_ORDER);
+                    foreach ($icols as $c) {
+                        $out[$b[1]][$c[2]] = ['min' => $ints[$c[1]][0], 'max' => $ints[$c[1]][1], 'int' => true];
                     }
                 }
             }

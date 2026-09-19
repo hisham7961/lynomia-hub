@@ -1780,12 +1780,15 @@ class ModuleController extends Controller
                 && ($w = hub_col_max($def['table'] ?? '', $f['col'] ?? $f['key']))) {
                 $r[] = 'max:' . $w;
             }
-            // سقفُ العدد من **دقّة العمود العشريّ**: كان num/big يُتحقّق كـ`numeric`
+            // **مدى العدد من العمود نفسه**: كان num/big يُتحقّق كـ`numeric`
             // بلا حدّ، فقيمةٌ تفوق decimal(M,D) تمرّ على SQLite ثم يرفضها MySQL بـ22003
             // (٥٠٠ ورسالةٌ تُسرّب القيمة). الحدُّ يرفضها للمستخدم قبل القاعدة.
+            // ومدىً لا سقفاً متناظراً (v2.550): العمودُ الصحيحُ لم يكن يُقرأ أصلاً،
+            // و٨٣ من ٨٧ تصريحاً منه `unsigned` — أرضيّتُه صفرٌ، فـ`-5` في
+            // `unsignedTinyInteger` يرفضه MySQL بالخطأ نفسِه الذي يرفض به ٩٩٩٩.
             if (in_array($f['type'], ['num', 'big'], true)
-                && ($nm = hub_col_num_max($def['table'] ?? '', $f['col'] ?? $f['key'])) !== null) {
-                $r[] = 'between:-' . $nm . ',' . $nm;   // $nm نصٌّ دقيقٌ من دقّة العمود (لا float)
+                && ($rg = hub_col_num_range($def['table'] ?? '', $f['col'] ?? $f['key'])) !== null) {
+                $r[] = 'between:' . $rg[0] . ',' . $rg[1];   // نصٌّ دقيقٌ من تصريحِ العمود (لا float)
             }
             // وقائمةُ الخيارات تُلزِم: شاشةُ الحالة تفرضها منذ v2.x والنموذج لا
             if (($f['type'] ?? '') === 'sel' && ! empty($f['options'])) {
