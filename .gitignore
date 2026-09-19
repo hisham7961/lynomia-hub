@@ -31,3 +31,7 @@ tests/Feature/Zz*Test.php
 .env.bak*
 .env.demo
 .env.month
+
+# أسرارُ تشغيل بوّابة LiteLLM — لا تدخل المستودعَ أبداً
+deploy/litellm/*.env
+deploy/litellm/.env*
