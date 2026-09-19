@@ -30,8 +30,10 @@ echo "### القرص";        df -h / /var/lib/docker 2>/dev/null | sort -u
 echo "### الذاكرة";      free -m
 echo "### الحاويات (سردٌ فقط — لا لمس)"
 docker ps -a --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
-echo "### المنفذان 4000 و5432 — يجب أن يكونا خاليين"
-ss -ltnp | grep -E ':(4000|5432)\b' || echo "✅ لا مستمعَ على أيٍّ منهما"
+echo "### المنفذُ 4000 — يجب أن يكون خالياً"
+ss -ltnp | grep ':4000\b' || echo "✅ لا مستمعَ على 4000"
+echo "### 5432 — سردٌ للعلمِ لا حاجزٌ (اقرأ الملاحظةَ أدناه)"
+ss -ltnp | grep ':5432\b' || echo "(لا مستمع)"
 echo "### مجلّدات/شبكاتُ مشروعِنا — يجب ألّا توجد بعد"
 docker volume ls  | grep -E 'litellm' || echo "✅ لا مجلّد"
 docker network ls | grep -E 'litellm' || echo "✅ لا شبكة"
@@ -45,7 +47,14 @@ git rev-parse --short HEAD; git rev-parse --abbrev-ref HEAD; cat VERSION
 git status --porcelain | head       # يُتوقَّع: نظيفٌ أو تغييراتٌ تعرفها
 ```
 
-> **حاجز ①:** إن كان أحدُ المنفذين مشغولاً — **قف**. لا تُغيّر شيئاً.
+> **حاجز ①:** **المنفذُ 4000 وحدَه حاجز.** إن كان مشغولاً — **قف**.
+>
+> **أمّا 5432 على المضيفِ فليس حاجزاً، ولو كان مشغولاً.** قاعدتُنا **لا تنشر
+> منفذاً على المضيفِ إطلاقاً** (لا مفتاح `ports:` فيها)، فهي تستمع داخلَ فضائها
+> الشبكيِّ الخاصِّ وحدَه، وتُبلَغ بالاسم `litellm-postgres:5432` على
+> `litellm_net`. فوجودُ PostgreSQL نظاميٍّ على `127.0.0.1:5432` **لا يتعارض
+> ولا يُمَسّ**. (وهذا بالضبط ما اشتُري بقرارِ «لا `ports` للقاعدة».)
+> — *تصحيحُ نصٍّ سابقٍ في هذا الكرّاس جعل 5432 حاجزاً؛ وكان خطأً.*
 
 ---
 
@@ -83,8 +92,8 @@ install -o root -g root -m 0644 /home/lynomia/litellm-stage/config/litellm-confi
 sha256sum /opt/litellm/docker-compose.yml /opt/litellm/config/litellm-config.yaml  # يطابق أعلاه
 
 install -d -o root -g root -m 0700 /etc/litellm
-install -d -o lynomia -g lynomia -m 0700 /home/lynomia/litellm-backups
-ls -ld /etc/litellm /opt/litellm /home/lynomia/litellm-backups
+install -d -o root -g root -m 0700 /var/backups/litellm
+ls -ld /etc/litellm /opt/litellm /var/backups/litellm
 ```
 
 ---
@@ -236,6 +245,9 @@ done
 echo "### الربطُ على المضيف"
 docker port litellm-gateway                      # المتوقَّع: 4000/tcp -> 127.0.0.1:4000
 
+echo "### أقُتِلت لنفادِ الذاكرة؟ (الخادمُ بلا swap — فالتجاوزُ قتلٌ لا إبطاء)"
+docker inspect litellm-gateway --format 'OOMKilled={{.State.OOMKilled}} ExitCode={{.State.ExitCode}} Restarts={{.RestartCount}}'
+
 echo "### الحدودُ والسياساتُ الفعليّة"
 docker inspect litellm-gateway --format \
   'Memory={{.HostConfig.Memory}} Swap={{.HostConfig.MemorySwap}} NanoCpus={{.HostConfig.NanoCpus}} Restart={{.HostConfig.RestartPolicy.Name}} Log={{.HostConfig.LogConfig.Type}} {{.HostConfig.LogConfig.Config}}'
@@ -301,7 +313,7 @@ set -euo pipefail
 set -o pipefail            # ❗ لولاها لكتب gzip ملفاً صالحاً فارغاً عند فشلِ pg_dump
 umask 077
 CS="docker compose -f /opt/litellm/docker-compose.yml"
-B="/home/lynomia/litellm-backups/litellm-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
+B="/var/backups/litellm/litellm-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
 
 $CS exec -T postgres pg_dump -U litellm -d litellm --clean --if-exists | gzip > "$B"
 echo "حالةُ الخروج: $?"
@@ -332,7 +344,7 @@ CS="docker compose -f /opt/litellm/docker-compose.yml"
 {
 echo "=== ① الحاويات والصحّة ==="
 docker inspect litellm-postgres litellm-gateway --format \
- '{{.Name}} | state={{.State.Status}} | health={{if .State.Health}}{{.State.Health.Status}}{{else}}لا فحص{{end}} | restart={{.HostConfig.RestartPolicy.Name}}'
+ '{{.Name}} | state={{.State.Status}} | health={{if .State.Health}}{{.State.Health.Status}}{{else}}لا فحص{{end}} | restart={{.HostConfig.RestartPolicy.Name}} | OOMKilled={{.State.OOMKilled}} | RestartCount={{.RestartCount}}'
 
 echo "=== ② الصورةُ والبصمةُ الفعليّة ==="
 for c in litellm-postgres litellm-gateway; do
@@ -386,7 +398,7 @@ docker compose -f /opt/litellm/docker-compose.yml logs --tail=120 litellm 2>&1 \
 | `/opt/litellm/` + ملفّان | مجلّدٌ جديد · `0755 root:root` |
 | `/etc/litellm/` + ملفّا بيئة | مجلّدٌ جديد · `0700` والملفّان `0600 root:root` |
 | `/home/lynomia/litellm-stage/` | مجلّدُ مرحلةٍ مؤقّت (يجوز حذفُه بعد المطابقة) |
-| `/home/lynomia/litellm-backups/` + نسخةٌ واحدة | مجلّدٌ جديد · `0700` |
+| `/var/backups/litellm/` + نسخةٌ واحدة | مجلّدٌ جديد · `0700 root:root` |
 | صورتان | ≈ ١٫٤ غيغا |
 | حاويتان · شبكة `litellm_net` · مجلّد `litellm_pgdata` | جديدةٌ كلُّها |
 | مراجعُ تتبّعِ git في مستودع Hub | `fetch` فقط — **لا `HEAD` ولا شجرةُ عمل** |

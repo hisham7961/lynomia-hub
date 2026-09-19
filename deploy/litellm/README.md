@@ -199,7 +199,7 @@ docker image inspect ghcr.io/berriai/litellm:v1.101.0 --format '{{index .RepoDig
 |---|---|---|
 | `/etc/litellm/` | `0700 root:root` | `compose` يعمل كـroot فيقرأ؛ وغيرُ root لا يمرّ خلالَ المجلّدِ أصلاً |
 | `/etc/litellm/*.env` | `0600 root:root` | قفلٌ ثانٍ لو اتّسعت صلاحيّةُ المجلّدِ يوماً |
-| `/home/lynomia/litellm-backups/` | `0700` · و`umask 077` قبلَ كلِّ نسخة | النسخةُ تحوي الجداولَ المشفّرةَ كما هي؛ ولا تولد `0644` لحظةً ثمّ تُضيَّق |
+| `/var/backups/litellm/` | `0700 root:root` · و`umask 077` قبلَ كلِّ نسخة | النسخةُ تحوي الجداولَ المشفّرةَ كما هي — فلا يقرؤها `lynomia`؛ ولا تولد `0644` لحظةً ثمّ تُضيَّق |
 | `deploy/litellm/config/litellm-config.yaml` | كما في المستودع | لا سرَّ فيه، ويُركَّب `:ro` |
 
 **ولا توسيعَ لصلاحيّاتِ المضيف** في أيِّ خطوة: لا `chmod` على مجلّدٍ قائم، ولا
@@ -291,7 +291,7 @@ docker inspect litellm-gateway litellm-postgres \
 | # | الأمر | root؟ |
 |---|---|---|
 | أ‑١ | `mkdir -p /etc/litellm && chmod 0700 /etc/litellm && chown root:root /etc/litellm` | **نعم** |
-| أ‑٢ | `mkdir -p /home/lynomia/litellm-backups && chmod 0700 /home/lynomia/litellm-backups` | **نعم** |
+| أ‑٢ | `install -d -o root -g root -m 0700 /var/backups/litellm` | **نعم** |
 
 ### المرحلةُ ب — الأسرار (تُولَّد ولا تُطبَع)
 
@@ -415,7 +415,7 @@ docker port litellm-postgres        # المتوقَّع: لا مخرجات إط
 ```bash
 umask 077
 set -o pipefail                      # ❗ لولاها لنجح `gzip` على فشلِ `pg_dump`
-B="/home/lynomia/litellm-backups/litellm-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
+B="/var/backups/litellm/litellm-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
 docker compose -p litellm -f /opt/litellm/docker-compose.yml exec -T postgres \
   pg_dump -U litellm -d litellm --clean --if-exists | gzip > "$B"
 echo "خرج بالحالة: $?"               # ≠ 0 ⇒ النسخةُ ساقطةٌ فاحذفها وأعد
