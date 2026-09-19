@@ -24,6 +24,8 @@ class Issue extends Model
 
     protected $casts = [
         'found' => 'date',
+        // موعدُ المعالجة (v2.558) — نظيرُ `found` و`closed` فيُعامَل معاملتَهما
+        'due' => 'date',
         'closed' => 'date',
         'custom' => 'array',
         'meta' => 'array',

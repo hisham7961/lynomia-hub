@@ -74,7 +74,20 @@
                     {{ ['pending_review'=>'بانتظار المراجعة','accepted'=>'مقبول','needs_revision'=>'يحتاج تنقيحاً'][$rs] ?? 'بانتظار' }}</span>
             </div>
             <div style="margin-top:6px">✅ {{ $w->done }}</div>
-            @if ($w->problems)<div class="sub" style="color:var(--bad,#c0392b)">🚧 {{ $w->problems }}</div>@endif
+            @if ($w->problems)
+                <div class="sub" style="color:var(--bad,#c0392b)">🚧 {{ $w->problems }}</div>
+                {{-- **المعوّقُ يصير التزاماً** (v2.558): مالكٌ وموعدٌ وحالةٌ تُغلَق.
+                     والزرُّ لمن يكتب البلاغاتِ وحدَه؛ والمُحوَّلُ سلفاً يُعرَض لا يُكرَّر. --}}
+                @php $wIssue = data_get($w->meta, 'issue_id'); @endphp
+                @if ($wIssue)
+                    <div class="sub">🔗 <a href="{{ route('m.show', ['issues', $wIssue]) }}">حُوّل إلى بلاغ — افتحه</a></div>
+                @elseif (hub_can(auth()->user(), 'issues', 'a'))
+                    <form method="POST" action="{{ route('reports.blocker.issue', $w->id) }}" style="margin-top:4px">
+                        @csrf
+                        <button class="btn ghost xs" type="submit">🚩 حوّله إلى بلاغ</button>
+                    </form>
+                @endif
+            @endif
             @if ($w->review_feedback)<div class="sub" style="border-inline-start:3px solid var(--wn,#e67e22);padding-inline-start:8px;margin-top:4px">💬 {{ $w->review_feedback }}</div>@endif
             <div style="margin-top:6px;display:flex;gap:6px">
                 <span class="sub mono">{{ $w->hours ? number_format((float)$w->hours,1).' س' : '' }}</span>

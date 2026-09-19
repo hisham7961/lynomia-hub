@@ -308,6 +308,8 @@ Route::middleware('auth')->group(function () {
     Route::get('reports/monthly/export', [\App\Http\Controllers\Web\ReportsController::class, 'monthlyExport'])->name('reports.monthly.export');
     Route::middleware('throttle:60,1')->group(function () {
         Route::post('reports/review/{id}', [\App\Http\Controllers\Web\ReportsController::class, 'reviewAct'])->name('reports.review.act');
+        // «حوّله إلى بلاغ» — المعوّقُ المبلَّغُ يصير التزاماً بمالكٍ وموعد (v2.558)
+        Route::post('reports/blocker/{id}/to-issue', [\App\Http\Controllers\Web\ReportsController::class, 'blockerToIssue'])->name('reports.blocker.issue');
         Route::post('reports/compliance/{id}/finalize', [\App\Http\Controllers\Web\ReportsController::class, 'finalize'])->name('reports.finalize');
     });
 
@@ -885,6 +887,17 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/integrations/hooks/{id}/toggle', [\App\Http\Controllers\Web\InboundHookController::class, 'toggle'])->name('hooks.toggle');
     Route::delete('admin/integrations/hooks/{id}', [\App\Http\Controllers\Web\InboundHookController::class, 'destroy'])->name('hooks.destroy');
     // n8n — ربطُ مثيلٍ منفصلٍ يعمل على الخادم (Docker) بالنظام
+    /* ── مركزُ الذكاء الاصطناعيّ (v2.559 · المرحلة ١) ─────────────────────
+     * الحارسُ في المتحكّم (`AiCenterController::gate`) هو حارسُ الرابطِ في
+     * الشريطِ نفسُه — ثابتُ المنصّة: رؤيةُ الرابطِ تطابق بوّابةَ متحكّمِه.
+     */
+    Route::get('admin/ai', [\App\Http\Controllers\Web\AiCenterController::class, 'index'])->name('ai.index');
+    Route::post('admin/ai', [\App\Http\Controllers\Web\AiCenterController::class, 'save'])->name('ai.save');
+    Route::post('admin/ai/forget-key', [\App\Http\Controllers\Web\AiCenterController::class, 'forgetKey'])->name('ai.forget');
+    // الفحصُ يخرج إلى الشبكة، فيُخنَق كنظائرِه (فاحصُ أودو ‎10,1)
+    Route::post('admin/ai/test', [\App\Http\Controllers\Web\AiCenterController::class, 'test'])
+        ->name('ai.test')->middleware('throttle:10,1');
+
     Route::get('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'index'])->name('integrations.n8n');
     Route::post('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'save'])->name('integrations.n8n.save');
     Route::get('admin/security', [SecurityController::class, 'index'])->name('security.index');

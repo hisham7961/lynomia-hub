@@ -168,6 +168,99 @@ class ReportsController extends Controller
         return view('reports.review', compact('items', 'names', 'status', 'mineOnly'));
     }
 
+    /**
+     * **POST — «حوّله إلى بلاغ»: المعوّقُ يصير التزاماً** (قرارُ المالك · v2.558).
+     *
+     * القياسُ على شهرِ المحاكاة: **٤٧٣ تقريرَ عملٍ يذكر معوّقاً، مقابل ٦ بلاغاتٍ
+     * متتبَّعةٍ في القاعدة كلِّها**. وبطاقةُ «حواجبُ مبلَّغة» كانت موعظةً لا
+     * مقبِضاً — نصُّها «راجع المعوّقات مع الفريق» وفعلُها «افتح المشروع». فلا
+     * مالكَ ولا موعدَ ولا حالةَ تُغلَق.
+     *
+     * **والتحويلُ يمرّ بالحرّاس القائمةِ لا بحارسٍ ثانٍ ينحرف:**
+     *  ١) لا يُحوَّل ما لا يُقرأ: التقريرُ يُجلب بـ`hub_scope` على وحدتِه.
+     *  ٢) ولا يكتب من لا يكتب: `issues:a` شرطٌ صريح.
+     *  ٣) **ولا يُنشأ مرّتين**: مفتاحُ البلاغِ يُختَم في `meta.issue_id` على
+     *     التقرير، فالنقرةُ الثانيةُ تفتح البلاغَ القائمَ ولا تُنشئ ثانياً —
+     *     ولو ضغطه اثنان معاً.
+     *  ٤) والمالكُ الافتراضيُّ مديرُ المشروع؛ فإن لم يكن فكاتبُ التقرير — ولا
+     *     يُترك البلاغُ بلا صاحبٍ فيعود إلى ما هربنا منه.
+     */
+    public function blockerToIssue(Request $r, string $id)
+    {
+        $this->guardInternal();
+        abort_unless(hub_can(auth()->user(), 'issues', 'a'), 403,
+            'إنشاء البلاغات يحتاج صلاحية الإضافة على وحدة البلاغات');
+
+        // لا يُحوَّل ما لا يُقرأ — تنطيقُ وحدةِ التقارير نفسُه
+        $w = hub_scope(\Illuminate\Support\Facades\DB::table('work_updates')
+                ->whereNull('deleted_at'), 'updates')
+            ->where('id', $id)->first();
+        abort_if(! $w, 404, 'التقرير غير موجود أو خارج نطاقك');
+
+        $text = trim((string) ($w->problems ?? ''));
+        abort_if($text === '', 422, 'هذا التقرير لا يذكر معوّقاً');
+
+        // ولا يُنشأ مرّتين: البلاغُ المختومُ سابقاً يُفتَح ولا يُستنسخ
+        $meta = is_array($w->meta) ? $w->meta : (json_decode((string) ($w->meta ?? '[]'), true) ?: []);
+        $prev = (string) ($meta['issue_id'] ?? '');
+        if ($prev !== '' && \Illuminate\Support\Facades\DB::table('issues')
+                ->whereNull('deleted_at')->where('id', $prev)->exists()) {
+            return redirect()->route('m.show', ['issues', $prev])
+                ->with('ok', 'هذا المعوّق مُحوَّلٌ سلفاً — هذا بلاغُه');
+        }
+
+        $days = max(1, (int) setting('issues.blocker_due_days', 7));
+        $mgr  = $w->project_id
+            ? \Illuminate\Support\Facades\DB::table('projects')->where('id', $w->project_id)->value('manager_id')
+            : null;
+
+        /*
+         * **يُنشأ بالموديلِ لا بـ`DB::table`** — وهو فرقٌ ليس أسلوبيّاً.
+         * `Issue` يحمل `Auditable` و`HasVersions`، والإدراجُ الخامُ لا يمرّ
+         * بالموديلِ فيُسقطهما معاً بصمت: **لا أثرَ تدقيقٍ** يقول مَن حوّل هذا
+         * المعوّقَ إلى التزام، و**لا لقطةَ في `record_versions`** — وهي عينُها
+         * ما يُستَرجَع به سجلٌّ حُذف حذفاً قاسياً. والبلاغُ التزامٌ مُسائَلٌ
+         * عنه، فأولى السجلّاتِ بأثرٍ لا أقلُّها.
+         *
+         * (وقِيس ما ليس عيباً كذلك: `version` له افتراضُ قاعدةٍ = ١ فلا يبقى
+         * عدماً في الإدراجِ الخام — فلا يُدَّعى عليه ما ليس فيه.)
+         */
+        $issue = new \App\Models\Issue();
+        // العنوانُ سطرُ المعوّقِ نفسُه مقصوصاً على عرضِ عمودِه — لا نصٌّ مخترَع
+        $issue->title = hub_fit('معوّق: ' . $text, (int) (hub_col_num_max('issues', 'title') ?: 190)) ?: 'معوّق مبلَّغ';
+        $issue->kind = 'مشكلة';
+        $issue->project_id = $w->project_id;
+        $issue->company_id = $w->company_id ?? null;
+        $issue->severity = 'متوسطة';
+        $issue->priority = 'متوسطة';
+        $issue->status = 'مفتوحة';
+        $issue->assignee_id = $mgr ?: ($w->created_by ?? null);
+        $issue->found = $w->work_date ?? now()->toDateString();
+        $issue->due = now()->addDays($days)->toDateString();
+        // النصُّ كاملاً في «السبب» — العنوانُ يُقصّ والأصلُ لا يضيع
+        $issue->cause = $text;
+        $issue->meta = ['from_update' => (string) $w->id];
+        /*
+         * **والمُنشئُ يُختَم هنا صراحةً** — `created_by` في `$guarded`، ولا
+         * يختمه إلّا `ModuleController::stampAuthor` على مسارِ النموذج، وهذا
+         * مسارٌ آخر. وليس الأثرَ وحدَه ما يضيع لو تُرك: `hub_scope` يمنح محدودَ
+         * النطاقِ رؤيةَ **ما أنشأه هو** بـ`orWhere('created_by', me)` — فبلاغٌ
+         * بلا مُنشئٍ يختفي عن محوّلِه نفسِه لحظةَ إنشائِه.
+         */
+        $issue->created_by = (string) auth()->id();
+        $issue->save();
+        $issueId = (string) $issue->id;
+
+        // الختمُ على التقرير: به تُمنَع الازدواجيّةُ ويُعرَف مصيرُ المعوّق
+        $meta['issue_id'] = $issueId;
+        \Illuminate\Support\Facades\DB::table('work_updates')->where('id', $w->id)
+            ->update(['meta' => json_encode($meta, JSON_UNESCAPED_UNICODE), 'updated_at' => now()]);
+
+        return redirect()->route('m.show', ['issues', $issueId])
+            ->with('ok', 'حُوّل المعوّق إلى بلاغ — مالكُه ' . ($mgr ? 'مديرُ المشروع' : 'كاتبُ التقرير')
+                . ' وموعدُه بعد ' . $days . ' يوماً');
+    }
+
     /** POST — قبول / طلب تنقيح / إعادة فتح (§27/§28) */
     public function reviewAct(Request $r, string $id)
     {

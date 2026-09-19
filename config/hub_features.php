@@ -29,6 +29,23 @@ return [
     /* ═══════════════════════ القدرات ═══════════════════════ */
     'features' => [
 
+        /* ───────── 7Z · الذكاء الاصطناعي (v2.559 · المرحلة ١) ───────── */
+        // حالتُها **مشتقّةٌ لا مُعلَنة**: تُقرأ من الإعدادِ الفعليّ عبر derive،
+        // فلا تقول الشاشةُ «تعمل» لبوّابةٍ لم تُضبَط بعد.
+        'ai.gateway' => ['domain' => 'platform', 'category' => 'integration',
+            'title_ar' => 'بوّابة نماذج الذكاء الاصطناعي (LiteLLM)', 'title_en' => 'AI Model Gateway (LiteLLM)',
+            'desc_ar' => 'طبقةُ اتّصالٍ واحدةٌ بالنماذج، تعمل على خادمِ Hub نفسِه مربوطةً داخليّاً بلا كشفٍ للإنترنت.',
+            'desc_en' => 'Single model-access layer, co-located and loopback-bound.',
+            'status' => 'NOT_CONFIGURED', 'derive' => 'ai.gateway',
+            'account_types' => ['internal'], 'admin_surface' => 'ai.index', 'web_routes' => ['ai.index'],
+            'introduced' => 'v2.559.0', 'docs' => 'docs/ai-hub/01-architecture.md'],
+        'ai.assistant' => ['domain' => 'platform', 'category' => 'assistant',
+            'title_ar' => 'مساعد Hub — «اسأل Hub»', 'title_en' => 'Hub Assistant',
+            'desc_ar' => 'محادثةٌ تقرأ بياناتِ العملِ بصلاحيّةِ صاحبِها. **لم تُنفَّذ بعد** — المرحلةُ الثالثة.',
+            'desc_en' => 'Permission-scoped assistant. Not implemented yet — phase 3.',
+            'status' => 'DEVELOPMENT', 'account_types' => ['internal'],
+            'introduced' => 'v2.559.0', 'docs' => 'docs/ai-hub/02-phases.md'],
+
         /* ───────── 7A · التعاون (v2.464–v2.469 · مُتحقَّق) ───────── */
         'collab.center' => ['domain' => 'collaboration', 'category' => 'center',
             'title_ar' => 'مركز التواصل الموحّد', 'title_en' => 'Unified Collaboration Center',

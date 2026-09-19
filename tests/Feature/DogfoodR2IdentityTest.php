@@ -105,7 +105,13 @@ class DogfoodR2IdentityTest extends TestCase
         $this->assertArrayHasKey('staffAccounts', $cat,
             'مفتاح staffAccounts غير معلَن في كتالوج hub_permissions — فلا موضعَ لمنحه في محرّر الأدوار');
         $this->assertContains('hr', (array) $cat['staffAccounts']['modules']);
-        $this->assertStringNotContainsString('.', 'staffAccounts');
+        // **حُذف هنا تأكيدٌ فارغ** (v2.558): كان
+        // `assertStringNotContainsString('.', 'staffAccounts')` — طرفاه حرفيّان،
+        // فهو صادقٌ أبداً مهما كان الكتالوج، ولا يفشل على أيِّ انحدار. ولم
+        // يُستبدَل بحارسِ «مفتاحٌ بلا نقطة» لأنّ الدعوى لم تثبت: المفتاحُ يدخل
+        // اسمَ الحقلِ بين قوسين (`matrix[{$mk}][{$fk}]` في roles/form.blade.php)
+        // فالنقطةُ فيه لا تكسر شيئاً. والتأكيدانِ أعلاه يقومان بالعملِ الحقيقيّ:
+        // المفتاحُ مُعلَنٌ، وعلى وحدةِ `hr`. **وما لم يُقَس لا يُحرَس.**
     }
 
     public function test_g15_hr_holding_the_key_opens_an_employee_account_without_the_users_flag(): void

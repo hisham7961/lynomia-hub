@@ -82,7 +82,20 @@
             </div>
             <div style="margin-top:6px">✅ {{ $w->done }}</div>
             @if ($w->doing)<div class="sub">🔧 جارٍ: {{ $w->doing }}</div>@endif
-            @if ($w->problems)<div class="sub" style="color:var(--bad,#c0392b)">🚧 عوائق: {{ $w->problems }}</div>@endif
+            @if ($w->problems)
+                <div class="sub" style="color:var(--bad,#c0392b)">🚧 عوائق: {{ $w->problems }}</div>
+                {{-- **المعوّقُ يصير التزاماً** (v2.558): مالكٌ وموعدٌ وحالةٌ تُغلَق.
+                     والزرُّ لمن يكتب البلاغاتِ وحدَه؛ والمُحوَّلُ سلفاً يُعرَض لا يُكرَّر. --}}
+                @php $wIssue = data_get($w->meta, 'issue_id'); @endphp
+                @if ($wIssue)
+                    <div class="sub">🔗 <a href="{{ route('m.show', ['issues', $wIssue]) }}">حُوّل إلى بلاغ — افتحه</a></div>
+                @elseif (hub_can(auth()->user(), 'issues', 'a'))
+                    <form method="POST" action="{{ route('reports.blocker.issue', $w->id) }}" style="margin-top:4px">
+                        @csrf
+                        <button class="btn ghost xs" type="submit">🚩 حوّله إلى بلاغ</button>
+                    </form>
+                @endif
+            @endif
             @if ($w->next)<div class="sub">➡️ التالي: {{ $w->next }}</div>@endif
             @if ($w->progress !== null && $w->task)
                 <div class="sub">📈 تقدّمٌ مقترح: {{ (float)$w->progress }}٪ (المهمّة الآن {{ (float)($w->task->progress ?? 0) }}٪)</div>@endif
