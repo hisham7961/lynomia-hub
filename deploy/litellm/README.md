@@ -320,13 +320,40 @@ grep '^LITELLM_SALT_KEY=' /etc/litellm/litellm.env   # يُنسَخ إلى خز�
 
 | # | الأمر | root؟ |
 |---|---|---|
-| ج‑١ | `cd /home/lynomia/public_html/hub-lynomia-com` | لا |
-| ج‑٢ | `git fetch origin && git log --oneline HEAD..origin/<الفرع>` — معاينة | لا |
-| ج‑٣ | دمجُ الفرعِ ليصلَ ملفُّ compose (**بلا `reset` ولا `clean` ولا `checkout` مدمّر**) | لا |
-| ج‑٤ | `docker compose -p litellm -f deploy/litellm/docker-compose.yml config -q` — تحقّقٌ نحويٌّ **بلا تشغيل** | **نعم** |
-| ج‑٥ | `docker compose -p litellm -f deploy/litellm/docker-compose.yml pull` | **نعم** |
+| ج‑١ | كـ`lynomia`: `cd /home/lynomia/public_html/hub-lynomia-com && git fetch origin <الفرع>` | لا |
+| ج‑٢ | كـ`lynomia`: `git show origin/<الفرع>:deploy/litellm/…` ← إلى `/home/lynomia/litellm-stage/` | لا |
+| ج‑٣ | كـroot: `install -o root -g root -m 0644` من المرحلةِ إلى `/opt/litellm/` | **نعم** |
+| ج‑٤ | `docker compose -f /opt/litellm/docker-compose.yml config -q` — تحقّقٌ نحويٌّ **بلا تشغيل ولا طباعةِ بيئة** | **نعم** |
+| ج‑٥ | `docker compose -f /opt/litellm/docker-compose.yml pull` | **نعم** |
 | ج‑٦ | `docker image inspect … --format '{{index .RepoDigests 0}}'` — مطابقةُ البصمة | **نعم** |
-| ج‑٧ | `docker compose -p litellm -f deploy/litellm/docker-compose.yml up -d` | **نعم** |
+| ج‑٧ | `up -d postgres` ← انتظارُ الصحّة ← ثمّ `up -d litellm` | **نعم** |
+
+### لماذا `/opt/litellm/` لا شجرةُ عملِ Hub؟
+
+ثلاثةُ أسبابٍ مقيسة:
+
+1. **فرعُ الإنتاج `claude/arfaah-uzt2d9` لا يحوي ملفَّ compose أصلاً** (فيه
+   `preflight.sh` وحدَه). فجلبُه يستلزم دمجَ فرعٍ كامل — وهو **خلطُ ترقيةِ Hub
+   بتثبيتِ LiteLLM في عمليّةِ نشرٍ واحدة**، وقد استُبعد صراحةً.
+2. **نشرُ Hub يصير خطراً على مِكدَسٍ يعمل**: أيُّ «Pull or Deploy» من Webuzo قد
+   يغيّر ملفَّ compose تحتَ حاوياتٍ قائمة.
+3. `/opt/litellm/` **خارجَ `public_html`** بملكيّةِ root — فلا يبلغه خادمُ الوِب
+   ولا يملكه `lynomia`.
+
+**ومصدرُ الحقيقةِ يبقى المستودع.** والنقلُ بـ`git fetch` ثمّ `git show`:
+**كلاهما لا يغيّر `HEAD` ولا شجرةَ العمل** — لا `checkout`، ولا `merge`، ولا
+`reset`، ولا `clean`. و`fetch` يُنفَّذ كـ`lynomia` لا كـroot، لئلّا تولد كائناتُ
+git بملكيّةِ root في مستودعٍ يملكه `lynomia`.
+
+**وبصمتا الملفّين للمطابقةِ بعد النقل** (‏`sha256sum`):
+
+| الملف | البصمة |
+|---|---|
+| `docker-compose.yml` | `8f1743ff5b751b8790ec43e46fdcc0a9b15f9f43e90c87e58f9cd9da7846d9fe` |
+| `config/litellm-config.yaml` | `8f1a366583089f1c326c377afb60836dbead06a745159d6d7064ee586a670ba6` |
+
+> **ولا تصادمَ مع `deploy/n8n` القائم** (مقيس): هو يستعمل `n8n_data` و
+> `n8n_db_data` والمنفذَ 5678؛ ونحن `litellm_pgdata` و`litellm_net` و4000.
 
 ---
 
@@ -334,7 +361,7 @@ grep '^LITELLM_SALT_KEY=' /etc/litellm/litellm.env   # يُنسَخ إلى خز�
 
 | المستوى | الأمر | النجاح |
 |---|---|---|
-| **L1** | `docker compose -p litellm -f deploy/litellm/docker-compose.yml ps` | حاويتان `(healthy)` |
+| **L1** | `docker compose -p litellm -f /opt/litellm/docker-compose.yml ps` | حاويتان `(healthy)` |
 | **L1ب** | `docker inspect … NanoCpus/Memory` (§٧) | الحدودُ مطبَّقةٌ لا أصفار |
 | **L2** | `curl -fsS http://127.0.0.1:4000/health/liveliness` | ٢٠٠ (وعلى **المضيفِ** `curl` موجود) |
 | **L2ب** | `curl -fsS http://127.0.0.1:4000/health/readiness` | يذكر حالةَ القاعدة |
@@ -367,7 +394,7 @@ AI ENABLED. **ولا يُربَط مزوّدٌ في المرحلة ١٫٥.**
 ss -ltnp | grep ':4000'
 
 # ② لا منفذَ منشوراً للقاعدةِ من مشروعِنا
-docker compose -p litellm -f deploy/litellm/docker-compose.yml ps --format '{{.Service}} {{.Ports}}'
+docker compose -p litellm -f /opt/litellm/docker-compose.yml ps --format '{{.Service}} {{.Ports}}'
 docker port litellm-postgres        # المتوقَّع: لا مخرجات إطلاقاً
 
 # ③ ومن خارجِ الخادم (من جهازك):
@@ -389,7 +416,7 @@ docker port litellm-postgres        # المتوقَّع: لا مخرجات إط
 umask 077
 set -o pipefail                      # ❗ لولاها لنجح `gzip` على فشلِ `pg_dump`
 B="/home/lynomia/litellm-backups/litellm-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
-docker compose -p litellm -f deploy/litellm/docker-compose.yml exec -T postgres \
+docker compose -p litellm -f /opt/litellm/docker-compose.yml exec -T postgres \
   pg_dump -U litellm -d litellm --clean --if-exists | gzip > "$B"
 echo "خرج بالحالة: $?"               # ≠ 0 ⇒ النسخةُ ساقطةٌ فاحذفها وأعد
 ```
@@ -415,7 +442,7 @@ gunzip -c "$B" | tail -2 | grep -q 'PostgreSQL database dump complete' \
 ### ١٢‑ج · اختبارُ الاستعادة — بلا مساسٍ بالحيّ
 
 ```bash
-CS="docker compose -p litellm -f deploy/litellm/docker-compose.yml"
+CS="docker compose -p litellm -f /opt/litellm/docker-compose.yml"
 $CS exec -T postgres psql -U litellm -d postgres -c 'CREATE DATABASE restore_test;'
 gunzip -c "$B" | $CS exec -T postgres psql -U litellm -d restore_test -v ON_ERROR_STOP=1
 $CS exec -T postgres psql -U litellm -d restore_test -c '\dt'   # جداولٌ ⇒ النسخةُ سليمة
@@ -428,7 +455,7 @@ $CS exec -T postgres psql -U litellm -d postgres -c 'DROP DATABASE restore_test;
 ### ١٢‑د · الاستعادةُ الحقيقيّة
 
 ```bash
-gunzip -c "$B" | docker compose -p litellm -f deploy/litellm/docker-compose.yml \
+gunzip -c "$B" | docker compose -p litellm -f /opt/litellm/docker-compose.yml \
   exec -T postgres psql -U litellm -d litellm -v ON_ERROR_STOP=1
 ```
 (التفريغُ أُخذ بـ`--clean --if-exists` فيُسقط الجداولَ القديمةَ قبل إعادتِها.)
@@ -458,7 +485,7 @@ gunzip -c "$B" | docker compose -p litellm -f deploy/litellm/docker-compose.yml 
 **لا تفقد بياناتٍ. جرّبها أوّلاً دائماً.**
 
 ```bash
-CS="docker compose -p litellm -f deploy/litellm/docker-compose.yml"
+CS="docker compose -p litellm -f /opt/litellm/docker-compose.yml"
 $CS logs --tail=200 litellm          # اقرأ قبل أن تتصرّف
 $CS logs --tail=200 postgres
 $CS restart litellm                  # إعادةُ تشغيلٍ لخدمةٍ واحدة
@@ -480,7 +507,7 @@ $CS down                             # ❗ بلا `-v`: يزيل الحاويا�
 # ① نسخةٌ احتياطيّةٌ أوّلاً — شرطٌ لا نصيحة (§١٢) ✔ تحقّق من العتباتِ الأربع
 # ② بصمةُ فهرسِ الإصدارِ الهدف (تُستعلَم كما في §٢)
 # ③ تُكتب في docker-compose.yml مكانَ البصمةِ الحاليّة، ثمّ:
-CS="docker compose -p litellm -f deploy/litellm/docker-compose.yml"
+CS="docker compose -p litellm -f /opt/litellm/docker-compose.yml"
 $CS pull && $CS up -d
 # ④ ثمّ L1 → L2 → L3
 ```
@@ -515,7 +542,7 @@ $CS pull && $CS up -d
 > **وإن كان قد أُدخِل اعتمادُ مزوّدٍ واحد، فالشرطُ الثالثُ يصير حاجزاً مطلقاً.**
 
 ```bash
-CS="docker compose -p litellm -f deploy/litellm/docker-compose.yml"
+CS="docker compose -p litellm -f /opt/litellm/docker-compose.yml"
 $CS down -v                          # ⛔ يحذف litellm_pgdata نهائيّاً
 docker volume rm litellm_pgdata      # (إن بقي)
 docker image rm ghcr.io/berriai/litellm:v1.101.0 postgres:16.14-alpine
