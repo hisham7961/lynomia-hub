@@ -680,7 +680,7 @@ return [
                 'default'     => '1',
                 'depends'     => 'work_hours',
                 'effect' => 'مفعَّلاً: من انصرف بلا تقريرٍ يُذكَّر بإشعارٍ داخليٍّ واحدٍ (لا تكرار — إشعارٌ لكلِّ موظفٍ/يومٍ/نوع §39) قبل المهلة، وبعدها يُشعَر بالمخالفة ويُشعَر مديرُه. إطفاؤه يُبقي الرصدَ في الشاشات بلا إشعارات.',
-                'where'  => 'Console/AttendanceReconcile ← hub:automation + workday.out',
+                'where'  => 'Console/Commands/AttendanceReconcileReports ← hub:automation + workday.out',
                 'risk'   => 'إطفاؤه يُصمِت التذكيرَ فيتفاجأ الموظفُ بالمخالفة — أبقِه مفعَّلاً ما لم تُدِر التذكيرَ بقناةٍ أخرى.',
             ],
             'work.review_required' => [
