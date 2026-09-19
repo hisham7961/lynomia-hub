@@ -113,6 +113,70 @@ class ConnectionProbe
     }
 
     /**
+     * **فاحصُ بوّابةِ LiteLLM** (المرحلة ١) — على خادمِ Hub نفسِه، لا تُكشَف.
+     *
+     * والنداءُ على `/v1/models` عمداً لا على `/health/liveliness`: الأوّلُ
+     * **مزدوجُ الإفادة** كفاحصِ أودو حرفاً بحرف — يقول إنّ الخدمةَ حيّة
+     * **وإنّ مفتاحَ الإدارةِ مقبول**. أمّا فحصُ الحياةِ فيمرّ بلا مصادقة،
+     * فيقول «سليم» لبوّابةٍ ترفض مفتاحَنا — وهو أسوأُ من لا فحص.
+     *
+     * و`401/403` تُفرَّق عن غيرِها في الرسالة: البوّابةُ حيّةٌ والمفتاحُ خطأ —
+     * وهذا تشخيصٌ مختلفٌ تماماً عن «الخدمةُ لا تجيب»، وعلاجُه مختلف.
+     */
+    public static function litellm(): array
+    {
+        if (! \App\Support\AiGateway::configured()) {
+            return self::row(null, null, null,
+                \App\Support\AiGateway::whyNotReady() ?? 'البوّابةُ غيرُ مهيّأة');
+        }
+
+        $target = \App\Support\AiGateway::url('/v1/models');
+        // بوّابةُ الخروجِ الضيّقة — تسمح بـloopback الحرفيِّ لهذا الهدفِ وحدَه،
+        // وتردُّ ما سواه إلى `hub_outbound_ok` كاملاً (انظر AiGateway::outboundGate)
+        $gate = \App\Support\AiGateway::outboundGate($target);
+        if (! $gate['ok']) return self::row(null, null, null, $gate['why']);
+
+        $to = \App\Support\AiGateway::timeouts();
+
+        $t0 = microtime(true);
+        try {
+            $res = Http::withOptions([
+                'allow_redirects' => false,
+                'curl'            => hub_resolve_pin($target, $gate['ip']),
+            ])
+                ->connectTimeout($to['connect'])->timeout(min($to['read'], self::READ_TIMEOUT))
+                ->withHeaders([
+                    'User-Agent'    => 'LynomiaHub-Probe/1.0',
+                    'Authorization' => 'Bearer ' . \App\Support\AiGateway::key(),
+                ])
+                ->get($target);
+        } catch (\Throwable $e) {
+            return self::row(false, null, self::since($t0), $e->getMessage());
+        }
+
+        $code = $res->status();
+        $up = $code >= 200 && $code < 300;
+
+        // عددُ النماذجِ المُعلَنةِ في البوّابة — خبرٌ صادقٌ لا تقدير؛ و«صفر»
+        // حالةٌ مشروعةٌ تُقال: بوّابةٌ تعمل ولم يُربَط بها مزوّدٌ بعد.
+        $count = null;
+        if ($up) {
+            $data = $res->json('data');
+            if (is_array($data)) $count = count($data);
+        }
+
+        $why = $up ? null : ('ردَّت البوّابةُ HTTP ' . $code
+            . (in_array($code, [401, 403], true)
+                ? ' — البوّابةُ حيّةٌ ومفتاحُ الإدارةِ مرفوض'
+                : ''));
+
+        return self::row($up, $code, self::since($t0), $why,
+            $up ? ('البوّابةُ تجيب والمفتاحُ مقبول'
+                 . ($count === null ? '' : ' · نماذجُ مُعلَنة: ' . $count)) : null,
+            ['models' => $count]);
+    }
+
+    /**
      * سطرٌ واحدٌ للمشغّل من النتيجة — تُستهلكه الشاشاتُ الثلاث بحرفه فلا تفترق
      * رسائلُها. والزمنُ فيه دائماً: فحصٌ ينجح في تسع ثوانٍ خبرٌ لا يقلّ عن الفشل.
      */

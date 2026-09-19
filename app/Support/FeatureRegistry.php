@@ -203,6 +203,39 @@ class FeatureRegistry
                 : ['status' => FeatureStatus::NOT_CONFIGURED, 'reason' => 'لا مزوّدَ MDM مُهيَّأً — النظامُ يرصد USB ولا يحجب'];
         }
 
+        // بوّابةُ النماذج (LiteLLM): الصدقُ من الإعدادِ **والفحصِ** معاً.
+        // **سلَّمٌ من أربعِ درجاتٍ لا درجتان** (تصحيحُ المالك · ١): وجودُ عنوانٍ
+        // ومفتاحٍ يعني «مهيّأٌ ولم يُختبر» لا «يعمل»؛ ونجاحُ الفحصِ يعني أنّ
+        // البوّابةَ تردّ وتقبل المفتاح، **ولا يعني** أنّ نموذجاً ولّد إجابة.
+        // و`ENABLED` محجوزةٌ للمرحلةِ الثانية حين يُولَّد فعلاً.
+        if ($derive === 'ai.gateway') {
+            $configured = (bool) rescue(fn () => \App\Support\AiGateway::configured(), false, false);
+            if (! $configured) {
+                return ['status' => FeatureStatus::NOT_CONFIGURED,
+                        'reason' => 'لا عنوانَ بوّابةٍ ومفتاحَ إدارةٍ محفوظَين'];
+            }
+
+            $probed = (bool) rescue(fn () => \App\Support\AiGateway::probePassed(), false, false);
+            if (! $probed) {
+                return ['status' => FeatureStatus::NOT_CONFIGURED,
+                        'reason' => 'الإعدادُ مكتملٌ **ولم يُختبر الاتصالُ بعد** — لا دليلَ أنّ البوّابةَ تردّ'];
+            }
+
+            $on = (bool) rescue(fn () => \App\Support\AiGateway::enabled(), false, false);
+            if (! $on) {
+                return ['status' => FeatureStatus::DISABLED,
+                        'reason' => 'الفحصُ ناجحٌ والتكاملُ مطفأٌ من الإعدادات'];
+            }
+
+            $gen = (bool) rescue(fn () => \App\Support\AiGateway::generationVerified(), false, false);
+
+            return $gen
+                ? ['status' => FeatureStatus::ENABLED,
+                   'reason' => 'الفحصُ ناجحٌ وتوليدٌ فعليٌّ تحقّق']
+                : ['status' => FeatureStatus::READY,
+                   'reason' => 'الفحصُ ناجحٌ — **ولم يُختبر توليدُ إجابةٍ من نموذجٍ بعد** (المرحلة ٢)'];
+        }
+
         // حجبُ الحافّة (IP): طبقةُ التطبيقِ نشطةٌ دائماً؛ الحافّةُ تحتاج مزوّداً
         if ($derive === 'edge') {
             $edge = rescue(fn () => (string) (EdgeDefense::status()['edge']['state'] ?? 'not_configured'), 'not_configured', false);

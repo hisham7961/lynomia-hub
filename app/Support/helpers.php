@@ -7833,6 +7833,11 @@ if (! function_exists('hub_admin_links')) {
                 $owner, ['features.*'], 'القدرات المزايا capabilities features flags سجل القدرات جاهزة مؤجلة'),
             $mk('integrations', 'التكاملات', '🔌', 'integrations.index', [], 'الإعدادات',
                 $owner, ['integrations.*', 'webhooks.*'], 'التكاملات Webhooks أودو تلجرام n8n'),
+            // مركزُ الذكاء الاصطناعيّ (v2.559): حارسُه حارسُ صفحتِه حرفاً بحرف
+            // (`AiCenterController::gate`) — فلا رابطٌ يظهر ثمّ يُصَدُّ ٤٠٣.
+            $mk('ai', 'الذكاء الاصطناعي', '🤖', 'ai.index', [], 'الإعدادات',
+                $owner || hub_flag($user, 'aiAdmin'), ['ai.*'],
+                'الذكاء الاصطناعي النماذج البوابة LiteLLM المزودون مساعد'),
             $mk('roles', 'الأدوار', '🧑‍⚖️', 'roles.index', [], 'الإعدادات',
                 $owner, ['roles.*'], 'الأدوار والصلاحيات'),
             // تشخيصُ الوصول — «ماذا يرى هذا الموظف ولماذا؟» فوق PermissionInspector (مالكٌ حصراً)

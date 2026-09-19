@@ -510,6 +510,11 @@ return [
                     ['type' => 'admin', 'admin' => 'features', 'importance' => 'primary', 'route_prefix' => 'features',
                         'routes' => ['features.index', 'features.show'],
                         'synonyms' => ['features', 'capabilities', 'القدرات', 'المزايا', 'feature registry', 'flags', 'سجل القدرات']],
+                    // مركزُ الذكاء الاصطناعيّ (v2.559 · المرحلة ١) — بيتُه الإعداداتُ
+                    // والتكاملات: بوّابةُ نماذجَ تُضبَط، لا وحدةَ عملٍ تُدار.
+                    ['type' => 'admin', 'admin' => 'ai', 'importance' => 'primary', 'route_prefix' => 'ai',
+                        'routes' => ['ai.index'],
+                        'synonyms' => ['ai', 'الذكاء الاصطناعي', 'litellm', 'نماذج', 'مساعد', 'gpt', 'llm', 'بوابة النماذج']],
                     ['type' => 'admin', 'admin' => 'integrations', 'importance' => 'primary', 'route_prefix' => 'integrations',
                         'routes' => ['integrations.index', 'integrations.guide', 'hooks.index', 'integrations.messaging',
                             'integrations.n8n', 'integrations.odoo', 'webhooks.index', 'webhooks.log']],
