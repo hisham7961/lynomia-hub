@@ -5,10 +5,9 @@
 # لماذا سكربتٌ لا ادّعاء: بيئةُ التطوير التي كُتب فيها هذا الدمجُ **معزولةٌ عن
 # خادمِك** ولا تصل إليه، فلا يصحّ أن يُقال «Docker متاح» أو «systemd يعمل» دون
 # تشغيلٍ على الخادمِ نفسِه. وVPS لا يعني بالضرورة صلاحيّةَ root ولا إمكانَ
-# Docker: خوادمُ cPanel كثيراً ما تكون على CloudLinux + CageFS، **وcPanel لا
-# تدعم رسميّاً تنصيبَ Docker على خادمِ cPanel نفسِه** (تعارضٌ معروفٌ مع إدارتها
-# للحاويات والشبكة) — فالمسارُ الأسلمُ على خادمِ cPanel غالباً systemd + بيئةُ
-# Python معزولة، لا Docker. وهذا الفحصُ يحسم أيَّهما.
+# Docker: لوحاتُ التحكّم (Webuzo · cPanel · غيرُهما) تختلف في دعمِها لتشغيلِ
+# Docker على الخادمِ نفسِه، وبعضُها على CloudLinux + CageFS يحجب الرؤية.
+# **ولا يُفترَض شيءٌ عن لوحتِك من اسمِها** — هذا الفحصُ يحسم بالدليل.
 #
 # التشغيل (على خادمِ Hub، عبر SSH):
 #     bash deploy/litellm/preflight.sh
@@ -32,15 +31,20 @@ elif sudo -n true 2>/dev/null; then ok 'sudo بلا كلمةِ مرور'
 elif command -v sudo >/dev/null 2>&1; then warn 'sudo موجودٌ ويطلب كلمةَ مرور — أعِد التشغيلَ بـ sudo'
 else no 'لا root ولا sudo — التنصيبُ كخدمةِ نظامٍ متعذّر'; fi
 
-hdr '٢) نظامُ التشغيلِ والإدارة'
+hdr '٢) نظامُ التشغيلِ ولوحةُ الإدارة'
 [ -r /etc/os-release ] && . /etc/os-release && printf '  التوزيعة: %s %s\n' "${NAME:-?}" "${VERSION_ID:-}"
-if [ -e /usr/local/cpanel/version ]; then ok "cPanel: $(cat /usr/local/cpanel/version 2>/dev/null)"; else printf '  cPanel: غيرُ مثبَّت\n'; fi
+# اللوحاتُ المعروفة — وغيابُ واحدةٍ ليس عطلاً، بل خبرٌ عن أيُّها يُدير
+if [ -e /usr/local/cpanel/version ]; then ok "cPanel: $(cat /usr/local/cpanel/version 2>/dev/null)"
+elif [ -d /usr/local/webuzo ]; then ok "Webuzo: $(cat /usr/local/webuzo/version 2>/dev/null || echo 'مثبَّت')"
+elif [ -d /usr/local/cwpsrv ]; then ok 'CWP مثبَّت'
+elif [ -d /usr/local/psa ]; then ok 'Plesk مثبَّت'
+else printf '  لا لوحةَ تحكّمٍ معروفةً — إدارةٌ مباشرة\n'; fi
 if [ -e /etc/cloudlinux-release ] || grep -qi cloudlinux /etc/os-release 2>/dev/null; then
     warn 'CloudLinux — CageFS قد يحجب رؤيةَ العمليّات والمسارات لمستخدمي cPanel'
     command -v cagefsctl >/dev/null 2>&1 && printf '    cagefsctl موجود\n'
 fi
 
-hdr '٣) systemd (المسارُ المرجَّح على خادمِ cPanel)'
+hdr '٣) systemd'
 if [ -d /run/systemd/system ]; then
     ok "systemd يعمل — $(systemctl --version 2>/dev/null | head -1)"
     if systemctl list-units --type=service >/dev/null 2>&1; then ok 'يمكن الاستعلامُ عن الوحدات'
@@ -56,7 +60,7 @@ if command -v docker >/dev/null 2>&1; then
         || warn 'docker compose (v2) غيرُ متاح'
 else
     no 'Docker غيرُ مثبَّت'
-    [ -e /usr/local/cpanel/version ] && warn 'وعلى خادمِ cPanel: تنصيبُه غيرُ مدعومٍ رسميّاً — رجّح systemd'
+    [ -e /usr/local/cpanel/version ] && warn 'وعلى cPanel تحديداً: تنصيبُه غيرُ مدعومٍ رسميّاً'
 fi
 
 hdr '٥) Python (يلزم LiteLLM ≥ 3.8؛ والموصى 3.11+)'
@@ -104,7 +108,7 @@ else warn 'curl غيرُ موجود'; fi
 hdr '═══ الخلاصة ═══'
 printf '  انسخ كلَّ ما سبق. القراءة:\n'
 printf '   • root/sudo + Docker يعمل            ⇒ وضعُ compose (deploy/litellm/docker-compose.yml)\n'
-printf '   • root/sudo + systemd بلا Docker     ⇒ وضعُ systemd + venv (الأرجحُ على cPanel)\n'
+printf '   • root/sudo + systemd بلا Docker     ⇒ وضعُ systemd + venv\n'
 printf '   • لا root ولا systemd                ⇒ لا بوّابةَ على هذا الخادم — بوّابةٌ مُدارةٌ أو خادمٌ ثانٍ\n'
 printf '\n  ولا شيءَ مِن هذا يُعطّل المرحلةَ الأولى: Hub يكلّم البوّابةَ عبر HTTP\n'
 printf '  أيّاً كان مقرُّها، والمركزُ يقول بصراحة «البوّابةُ غيرُ مهيّأة» حتّى تُهيَّأ.\n'
