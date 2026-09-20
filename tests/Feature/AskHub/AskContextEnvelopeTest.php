@@ -255,7 +255,10 @@ class AskContextEnvelopeTest extends TestCase
     public function test_الميزانيّةُ_من_السياسةِ_لا_رقمانِ_يفترقان(): void
     {
         $this->assertSame(AskPolicy::MAX_CONTEXT_CHARS, AskContext::MAX_CONTEXT_CHARS);
-        $this->assertSame(AskPolicy::MAX_TOOL_CALLS, AskContext::MAX_RESULTS);
+        // **سعةُ الوعاءِ على السقفِ الصلبِ لا على المضبوط** — فرفعُ الإعدادِ
+        // لا يُسقط نتيجةً نُفِّذت فعلاً وقُرئت صفوفُها
+        $this->assertSame(AskPolicy::HARD_TOOL_CALLS, AskContext::MAX_RESULTS);
+        $this->assertGreaterThanOrEqual(AskPolicy::maxToolCalls(), AskContext::MAX_RESULTS);
         $this->assertSame(AskPolicy::MAX_ROWS_PER_TOOL, AskContext::MAX_ROWS_PER_RESULT);
     }
 

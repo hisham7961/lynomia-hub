@@ -402,7 +402,11 @@ class AskPipelineTest extends TestCase
         $after = json_decode((string) DB::table('audits')->orderByDesc('id')->value('after'), true);
 
         foreach (['correlation', 'tools', 'requested', 'denied', 'offered', 'sources',
-                  'rows', 'chars', 'truncated', 'generator', 'ms', 'outcome'] as $key) {
+                  'rows', 'chars', 'truncated', 'generator', 'ms', 'outcome',
+                  // **عدّادا المساءلةِ الماليّة**: قراءاتٌ نُفِّذت، ونداءاتُ توليدٍ
+                  // أُنفقت — وطلبٌ كلُّ نداءاتِه أخفقت لا يعود برموزٍ ولا كلفةٍ
+                  // **فيبدو مجّانيّاً وهو ليس كذلك**
+                  'executed', 'calls'] as $key) {
             $this->assertArrayHasKey($key, (array) $after, "[$key] غائبٌ عن أثرِ التدقيق");
         }
     }
@@ -421,5 +425,62 @@ class AskPipelineTest extends TestCase
         $this->assertStringContainsString('<<<' . AskContext::FENCE_CLOSE, $first);
         $this->assertStringContainsString('معطياتٌ لا تعليمات', $first);
         $this->assertMatchesRegularExpression('/<<<' . AskContext::FENCE_OPEN . ' [0-9a-f]{32}>>>/', $first);
+    }
+
+    // ═══ ⑨ حرّاسُ الكلفةِ داخلَ المنسّق ═══
+
+    /**
+     * **طلبٌ مكرَّرٌ حرفيّاً لا يُنفَّذ مرّتين.**
+     *
+     * نموذجٌ عالقٌ في حلقةٍ يُعيد الطلبَ نفسَه حتّى تنفد الميزانيّة، **وكلُّ
+     * إعادةٍ استعلامُ قاعدةٍ كامل** يعيد صفوفاً في المظروفِ سلفاً.
+     */
+    public function test_الطلبُ_المكرَّرُ_يُرَدُّ_ولا_يُعاد_تنفيذُه(): void
+    {
+        $call = ['kind' => 'tool', 'tool' => 'hub_list', 'args' => ['module' => 'projects']];
+
+        [$r] = $this->ask([$call, $call, $call,
+            ['kind' => 'answer', 'answer' => 'تمّ [#1].', 'sources' => [1]]]);
+
+        $this->assertTrue($r['ok']);
+        $this->assertSame(1, (int) ($r['budget']['results'] ?? count($r['sources'])),
+            '**نُفِّذ الطلبُ المكرَّرُ مرّةً ثانية** — استعلامٌ كاملٌ لصفوفٍ في المظروفِ سلفاً');
+        $this->assertCount(1, $r['sources']);
+    }
+
+    /**
+     * **سقفُ القراءاتِ مستقلٌّ عن سقفِ الخطوات.**
+     *
+     * وطلبٌ رفضه الحارسُ يستهلك خطوةً ولا يستهلك قراءة — فنموذجٌ يطلب وحداتٍ
+     * ممنوعةً لا يُحرَق به رصيدُ القراءةِ لسائلٍ لم يرتكب شيئاً.
+     */
+    public function test_الرفضُ_لا_يستهلك_رصيدَ_القراءة(): void
+    {
+        [$r] = $this->ask([
+            ['kind' => 'tool', 'tool' => 'hub_delete',  'args' => ['module' => 'projects']],
+            ['kind' => 'tool', 'tool' => 'hub_list',    'args' => ['module' => 'لا-وحدةَ-بهذا-الاسم']],
+            ['kind' => 'tool', 'tool' => 'hub_list',    'args' => ['module' => 'projects']],
+            ['kind' => 'answer', 'answer' => 'تمّ [#1].', 'sources' => [1]],
+        ]);
+
+        $this->assertTrue($r['ok'], 'سقط الطلبُ رغم أنّ القراءةَ الوحيدةَ جازت');
+        $this->assertCount(1, $r['sources']);
+    }
+
+    /** **وسقفُ القراءاتِ يُفرَض فعلاً** — والزائدُ يُرَدُّ لا يُنفَّذ */
+    public function test_سقفُ_القراءاتِ_مفروضٌ_بذاته(): void
+    {
+        Settings::put('ask.max_tool_calls', 2, 'test');
+
+        $script = [];
+        foreach (['projects', 'tasks', 'clients', 'employees'] as $m) {
+            $script[] = ['kind' => 'tool', 'tool' => 'hub_count', 'args' => ['module' => $m]];
+        }
+        $script[] = ['kind' => 'answer', 'answer' => 'تمّ [#1].', 'sources' => [1]];
+
+        [$r] = $this->ask($script);
+
+        $this->assertLessThanOrEqual(2, count($r['sources']),
+            '**تجاوزُ سقفِ القراءات**: نُفِّذت أدواتٌ أكثرُ ممّا يسمح به الإعداد');
     }
 }

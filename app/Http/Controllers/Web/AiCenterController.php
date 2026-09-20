@@ -43,6 +43,8 @@ class AiCenterController extends Controller
 
         return view('ai.center', [
             'snap'     => \App\Support\AiOverview::snapshot(),
+            // **مسارُ القبولِ كاملاً** — ثماني درجاتٍ تُقرأ حالتُها من النظامِ لا تُؤشَّر
+            'path'     => \App\Support\AiOverview::acceptancePath(),
             'sections' => \App\Support\AiAccess::sections(),
             'section'  => 'overview',
             'manage'   => \App\Support\AiAccess::canManage(),

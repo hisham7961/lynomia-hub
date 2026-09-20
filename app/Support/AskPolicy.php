@@ -36,7 +36,13 @@ final class AskPolicy
     /** مفتاحُ القدرةِ في سجلِّ القدرات */
     public const CAPABILITY = 'ai.assistant';
 
-    /** الغرضُ الافتراضيُّ — **يُطلَب بالاسمِ لا بنموذجٍ بعينِه** (الثابت ٥) */
+    /**
+     * **الغرضُ الافتراضيُّ — والافتراضيُّ وحدَه.**
+     *
+     * الغرضُ الفعليُّ يُقرأ من `ask.profile` حيّاً (`profileKey()`)، وهذا ما
+     * يجعل تبديلَ النموذجِ أو المزوّدِ **تغييرَ إعدادٍ من مركزِ الذكاء لا
+     * تعديلَ شيفرة**. والثابتُ يبقى قيمةً ابتدائيّةً ومرجعاً للاختبارات.
+     */
     public const PROFILE = 'general';
 
     /**
@@ -50,6 +56,34 @@ final class AskPolicy
     public const MAX_CONTEXT_CHARS  = 24000;
     public const MAX_TOOL_CALLS     = 6;
     public const MAX_ROWS_PER_TOOL  = 25;
+
+    /** سقفُ رموزِ المخرَجِ الافتراضيُّ للخطوةِ الواحدة */
+    public const MAX_OUTPUT_TOKENS = 700;
+
+    /**
+     * ── **السقوفُ الصلبةُ — ما لا يرفعه إعداد** ──
+     *
+     * كلُّ سقفٍ أدناه له مفتاحُ إعدادٍ يُخفضه، **ولا مفتاحَ يرفعه فوق هذا**.
+     * ولمَ سقفانِ لا واحد؟ لأنّ مفتاحَ الإعدادِ يُضبَط من شاشةٍ، ومن يملك
+     * الشاشةَ يملك أن يكتب `999999` سهواً — **فيصير حارسُ الكلفةِ بابَ
+     * إنفاقٍ بدل أن يكون سدَّه**. فالإعدادُ يضبط داخلَ المدى، والمدى في
+     * الشيفرةِ حيث لا يبلغه خطأُ إدخال.
+     */
+    public const HARD_OUTPUT_TOKENS = 2000;
+    public const HARD_MODEL_STEPS   = 10;
+    public const HARD_TOOL_CALLS    = 10;
+
+    /**
+     * **أقصى عددِ نداءاتِ توليدٍ في الطلبِ الواحد — بالإعاداتِ والاحتياطِ معاً.**
+     *
+     * وهذا هو **الحاجزُ الصلبُ للكلفة**، لا سقفُ الخطوات. لأنّ الخطوةَ الواحدةَ
+     * قد تُعيد المحاولةَ مرّتين ثمّ تحتاط مرّتين — أي **خمسةَ نداءاتٍ لخطوةٍ
+     * واحدة**. فسقفُ ستِّ خطواتٍ بلا هذا الحاجزِ يعني ثلاثين نداءً ممكناً
+     * للسؤالِ الواحد. وسقفُ الكلفةِ التقديريُّ (`ask.cost_ceiling`) حارسٌ
+     * ثانٍ اختياريٌّ فوقَه، **لا بديلٌ عنه**: التقديرُ يحتاج خريطةَ أسعار،
+     * وهذا العددُ لا يحتاج شيئاً.
+     */
+    public const MAX_GENERATION_CALLS = 12;
 
     /** حدُّ المعدّل — كما `ai.test` وأخواتِها */
     public const THROTTLE = '20,1';
@@ -112,7 +146,7 @@ final class AskPolicy
             return (string) (AiGateway::whyNotReady() ?? 'بوّابةُ النماذجِ غيرُ جاهزة');
         }
         if (self::profile() === null) {
-            return 'لا غرضَ «' . self::PROFILE . '» بسلسلةٍ جاهزة — اربط نموذجاً بغرضٍ من قسمِ التوجيه';
+            return 'لا غرضَ «' . self::profileKey() . '» بسلسلةٍ جاهزة — اربط نموذجاً بغرضٍ من قسمِ التوجيه';
         }
         if (! hub_capability(self::CAPABILITY)) {
             return 'مساعدُ Hub مُطفأٌ من سجلِّ القدرات';
@@ -136,11 +170,75 @@ final class AskPolicy
     public static function profile(): ?\App\Models\AiProfile
     {
         $p = \App\Models\AiProfile::query()
-            ->where('key', self::PROFILE)->where('enabled', true)->first();
+            ->where('key', self::profileKey())->where('enabled', true)->first();
 
         if ($p === null) return null;
 
         return AiProfiles::chain($p)->isEmpty() ? null : $p;
+    }
+
+    // ── ما يُضبَط من الإعداداتِ لا من الشيفرة ──────────────────────────
+
+    /**
+     * **مفتاحُ غرضِ التوجيهِ كما ضبطه المالك** — أو الافتراضيّ.
+     *
+     * وقيمةٌ فارغةٌ لا تعني «بلا غرض» بل **«لم يُضبَط»**، فتعود إلى
+     * الافتراضيّ بدل أن تُطفئ الميزةَ بصمت.
+     */
+    public static function profileKey(): string
+    {
+        $k = trim((string) setting('ask.profile', 'general'));
+
+        return $k === '' ? self::PROFILE : $k;
+    }
+
+    /** سقفُ رموزِ المخرَجِ الفعليُّ — بين ١ والسقفِ الصلب */
+    public static function maxOutputTokens(): int
+    {
+        return self::clamp(setting('ask.max_output_tokens', 700),
+            self::MAX_OUTPUT_TOKENS, self::HARD_OUTPUT_TOKENS);
+    }
+
+    /** سقفُ خطواتِ النموذجِ الفعليّ */
+    public static function maxModelSteps(): int
+    {
+        return self::clamp(setting('ask.max_model_steps', 6),
+            self::MAX_TOOL_CALLS, self::HARD_MODEL_STEPS);
+    }
+
+    /** سقفُ تنفيذاتِ الأدواتِ الفعليّ — **مستقلٌّ عن الخطوات** */
+    public static function maxToolCalls(): int
+    {
+        return self::clamp(setting('ask.max_tool_calls', 6),
+            self::MAX_TOOL_CALLS, self::HARD_TOOL_CALLS);
+    }
+
+    /** سقفُ الكلفةِ المقدَّرةِ للطلب — `0.0` يعني ألّا سقفَ تقديريّ */
+    public static function costCeiling(): float
+    {
+        return max(0.0, (float) setting('ask.cost_ceiling', 0));
+    }
+
+    /**
+     * **قيمةٌ داخلَ مدىً** — والخارجُ عن المدى يُقصّ إليه لا يُقبَل.
+     *
+     * ── **ولمَ يُكتَب المفتاحُ والافتراضيُّ حرفيّاً في كلِّ نداء؟** ──
+     *
+     * كانا يُمرَّران وسيطين إلى هذه الدالّة، **فسقط حارسان** في أوّلِ بوّابةٍ
+     * كاملة: `SettingsCenterTest` يمسح `app/` على النمطِ
+     * `setting('<مفتاح>'` ليُثبِت أنّ كلَّ مدخلٍ في الشاشةِ **له قارئٌ حقيقيّ**،
+     * و`SettingsModelTest` يقارن الافتراضيَّ المُعلَنَ في الكتالوجِ **بالوسيطِ
+     * الثاني الحرفيّ**. ومفتاحٌ يصل متغيّراً لا يراه المسحُ، فيبدو المدخلُ
+     * ميّتاً وهو حيّ — **والشاشةُ تَعِد بأثرٍ لا دليلَ عليه**.
+     *
+     * والتكرارُ بين الحرفيِّ والثابتِ مقصودٌ إذاً، **ويحرسه اختبارٌ** يُقارن
+     * الاثنين بالكتالوج فلا ينحرفان صامتين.
+     */
+    private static function clamp(mixed $v, int $default, int $hard): int
+    {
+        $n = is_numeric($v) ? (int) $v : $default;
+
+        return max(1, min($hard, $n));
     }
 
     // ── حدودُ المدخل ────────────────────────────────────────────────────

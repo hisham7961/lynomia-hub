@@ -362,13 +362,27 @@ class AskAdversarialSweepTest extends TestCase
             AskFailures::NO_ACCESSIBLE_DATA,
         ];
 
-        // هذه لا تُبلَغ إلّا من مولِّدٍ حيٍّ خلفَ بوّابةٍ حقيقيّة — ولا توليدَ بعد
-        $deferred = [
+        /*
+         * **ولا رمزَ مؤجَّلٌ بعد اليوم.**
+         *
+         * كانت خمسةُ رموزٍ تُعَدّ «لا تُبلَغ إلّا من مولِّدٍ حيّ»، فأُجِّلت.
+         * والمولِّدُ الحيُّ بُني في دفعةِ جاهزيّةِ الإنتاج، وكلُّها تُقاس الآن
+         * **بلقطاتٍ مطابقةٍ لعقدِ البوّابةِ** في `LiteLlmAskGeneratorTest` —
+         * بلا نداءٍ حقيقيٍّ ولا دينار. فمن كان يُقاس بالوعدِ صار يُقاس بالدليل.
+         */
+        $live = [
             AskFailures::GATEWAY_FAILURE, AskFailures::PROVIDER_FAILURE,
-            AskFailures::TIMEOUT, AskFailures::RATE_LIMITED,
+            AskFailures::TIMEOUT, AskFailures::RATE_LIMITED, AskFailures::CONTENT_FILTERED,
         ];
 
-        $this->assertSame([], array_diff(AskFailures::CODES, $covered, $deferred),
-            'رمزُ إخفاقٍ لا هو مُختبَرٌ ولا هو مؤجَّلٌ بسبب');
+        $this->assertSame([], array_diff(AskFailures::CODES, $covered, $live),
+            'رمزُ إخفاقٍ لا هو مُختبَرٌ هنا ولا في حزمةِ المولِّدِ الحيّ');
+
+        // وبرهانٌ أنّ الخمسةَ مُغطّاةٌ فعلاً لا مُعلَنةٌ تغطيةً
+        $liveSuite = (string) file_get_contents(__DIR__ . '/LiteLlmAskGeneratorTest.php');
+        foreach ($live as $code) {
+            $this->assertStringContainsString('AskFailures::' . $code, $liveSuite,
+                "[{$code}] نُقل من «مؤجَّل» إلى «مُغطّى» بلا اختبارٍ يقابله");
+        }
     }
 }
