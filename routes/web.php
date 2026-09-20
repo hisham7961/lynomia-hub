@@ -980,6 +980,16 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/ai/models/{model}/probe', [\App\Http\Controllers\Web\AiModelController::class, 'probe'])
         ->name('ai.models.probe')->middleware('throttle:10,1');
 
+    // ═══ دورةُ الحياةِ — بابُ الخروجِ الذي لم يكن ═══
+    // الإزالةُ تمسّ الطرفَين (البوّابةَ ثمّ السجلّ)، ففيها تصعيدٌ وخنقٌ كنظائرِها.
+    Route::post('admin/ai/models/{model}/unlink', [\App\Http\Controllers\Web\AiModelController::class, 'unlink'])
+        ->name('ai.models.unlink')->middleware('throttle:20,1');
+    Route::delete('admin/ai/models/{model}', [\App\Http\Controllers\Web\AiModelController::class, 'destroy'])
+        ->name('ai.models.destroy')->middleware('throttle:20,1');
+    // والمصالحةُ قراءةٌ محضة — تكشف الافتراقَ ولا تُصلحه من نفسِها
+    Route::get('admin/ai/providers/{provider}/models/reconcile', [\App\Http\Controllers\Web\AiModelController::class, 'reconcile'])
+        ->name('ai.models.reconcile')->middleware('throttle:30,1');
+
     /* ── الأغراضُ وسلاسلُ التوجيه (المرحلة ٢ · W7 · §٨ · §٩) ─────────────
      * الحارسُ نفسُه، و**التصعيدُ على كلِّ كتابة**. ولا نداءَ شبكةٍ في أيٍّ من
      * هذه المسارات: سياسةٌ تُقرَأ وتُرتَّب، فلا خنقَ لخروجٍ لا يقع.

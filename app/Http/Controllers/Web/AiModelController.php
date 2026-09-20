@@ -344,6 +344,74 @@ class AiModelController extends Controller
         return back()->with('ok', 'المستوى ' . $level . ' — ' . \App\Support\ConnectionProbe::line($res));
     }
 
+    // ── ⑤ دورةُ الحياةِ — بابُ الخروجِ الذي لم يكن ─────────────────────
+
+    /**
+     * **فكُّ ارتباطِ النموذجِ من كلِّ غرض** — خطوةٌ قابلةٌ للتراجع.
+     *
+     * ولا تُدمَج بالإزالةِ في زرٍّ واحد: الأولى يُتراجَع عنها بإعادةِ الربط،
+     * والثانيةُ لا.
+     */
+    public function unlink(AiModel $model)
+    {
+        $this->gate();
+        if ($resp = hub_require_stepup()) return $resp;
+
+        $res = \App\Support\AiModelLifecycle::unlink($model);
+
+        return back()->with('ok', $res['detached'] > 0
+            ? 'فُكَّ ارتباطُ النموذجِ من ' . $res['detached'] . ' غرضاً — وصار قابلاً للإزالة'
+            : 'النموذجُ غيرُ مربوطٍ بغرضٍ أصلاً');
+    }
+
+    /**
+     * **إزالةُ نموذج** — البوّابةُ أوّلاً ثمّ السجلّ، أو لا شيء.
+     *
+     * والموانعُ تُقرأ قبل أيِّ نداء، فتعود للمديرِ **بأسمائِها** لا برسالةِ
+     * «تعذّر» — ومعها المسارُ الذي يفكّها.
+     */
+    public function destroy(AiModel $model)
+    {
+        $this->gate();
+        if ($resp = hub_require_stepup()) return $resp;
+
+        $provider = $model->provider;
+        $res = \App\Support\AiModelLifecycle::remove($model);
+
+        if (! $res['ok']) {
+            return back()->withErrors(['destroy' => (string) $res['error']]);
+        }
+
+        $note = match ((string) $res['gateway']) {
+            'deleted' => 'أُزيل النموذجُ من Hub وأُلغي نشرُه عند البوّابة',
+            'absent'  => 'أُزيل النموذجُ من Hub — ولم يكن له نشرٌ عند البوّابة',
+            default   => 'أُزيل النموذج',
+        };
+
+        return $provider === null
+            ? back()->with('ok', $note)
+            : redirect()->route('ai.models.index', $provider)->with('ok', $note);
+    }
+
+    /**
+     * **المصالحة** — أين يفترق Hub عن البوّابة؟
+     *
+     * قراءةٌ محضةٌ بكلفةِ صفر: تكشف الافتراقَ في الاتّجاهَين **ولا تُصلحه من
+     * نفسِها**. فالإصلاحُ قرارُ إنسانٍ يراه قبل أن يتّخذه.
+     */
+    public function reconcile(AiProvider $provider)
+    {
+        \App\Support\AiAccess::gateView();
+
+        return view('ai.models-reconcile', [
+            'sections' => \App\Support\AiAccess::sections(),
+            'section'  => 'models',
+            'manage'   => \App\Support\AiAccess::canManage(),
+            'provider' => $provider,
+            'report'   => \App\Support\AiModelLifecycle::reconcile($provider),
+        ]);
+    }
+
     /** مجموعاتُ الحقائقِ المعروضة — تُقرأ في القالبِ بلا تعداد */
     public static function factGroups(): array
     {

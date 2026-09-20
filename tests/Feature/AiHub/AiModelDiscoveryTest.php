@@ -465,6 +465,99 @@ class AiModelDiscoveryTest extends TestCase
         $this->assertSame(AiModelSources::CATALOG, (string) $m->pricing_source);
     }
 
+    // ═══ ⑥٫٥ دلالاتُ الإتاحة — «معروفٌ» ليس «متاحاً لحسابِك» ═══
+
+    /**
+     * **جذعُ العائلةِ يُميَّز عن النموذج.**
+     *
+     * ── **العيبُ الذي وُلد منه هذا الحارس** ──
+     *
+     * عرض الكتالوجُ مُدخَلاً يبدو معرّفَ نموذجٍ كاملاً، فتبنّاه المالكُ بضغطة.
+     * وحين بلغ الطلبُ المزوّدَ ردّ **٤٠٤: لا نموذجَ بهذا الاسم**. والسببُ أنّ
+     * ذلك المُدخَلَ **مفتاحُ تسعيرٍ لعائلة** لا معرّفُ نموذج: الإصدارُ المثبَّتُ
+     * نفسُه يُجرّد المعرّفاتِ الحقيقيّةَ إليه بحذفِ ثلاثةِ مقاطعَ من آخرِها.
+     */
+    public function test_جذعُ_العائلةِ_يُميَّز_عن_معرّفٍ_كامل(): void
+    {
+        // جذعٌ — بلا مقاطعِ الحساب
+        $this->assertTrue(AiModelSources::isFamilyStem('ft:some-base-2024-07-18'));
+
+        // معرّفاتٌ كاملةٌ — تحمل مقاطعَ الحساب
+        $this->assertFalse(AiModelSources::isFamilyStem('ft:some-base-2024-07-18:org:suffix:job123'));
+        // **ومقطعٌ فارغٌ في الوسطِ لا يجعله جذعاً** — وهي الحالةُ التي يُخطئ
+        // فيها تعبيرُ المصدرِ نفسُه، فلم يُنسَخ حرفاً
+        $this->assertFalse(AiModelSources::isFamilyStem('ft:some-base-2024-07-18:org::job123'));
+
+        // ومعرّفٌ عاديٌّ لا علاقةَ له بالعائلات
+        $this->assertFalse(AiModelSources::isFamilyStem('fam/plain-model'));
+    }
+
+    /** **ودلالةُ الإتاحةِ تُحمَل مع المرشَّحِ لا تُستنتَج في الشاشة** */
+    public function test_كلُّ_مرشَّحٍ_يحمل_دلالةَ_إتاحتِه(): void
+    {
+        $p = $this->provider();
+
+        $this->registry = [[
+            'model_name'     => 'hub-registered',
+            'litellm_params' => ['model' => 'fam/registered', 'litellm_credential_name' => $p->credential_name],
+            'model_info'     => ['mode' => 'chat'],
+        ]];
+        $this->costMap = [
+            'fam/plain'          => $this->catalogEntry(),
+            'ft:some-base-2024'  => $this->catalogEntry(),
+        ];
+
+        $by = collect(AiModelSources::discover($p)['candidates'])->keyBy('upstream_model');
+
+        $this->assertSame(AiModelSources::AVAIL_REGISTERED, $by['fam/registered']['availability']);
+        $this->assertSame(AiModelSources::AVAIL_CATALOG,    $by['fam/plain']['availability']);
+        $this->assertSame(AiModelSources::AVAIL_ACCOUNT,    $by['ft:some-base-2024']['availability'],
+            '**ادّعاءُ إتاحة**: جذعُ عائلةٍ عُرض كأنّه نموذجٌ متاحٌ لحسابِك');
+    }
+
+    /** **ومُدخَلُ الكتالوجِ لا يُقدَّم إثباتَ وصولٍ أبداً** */
+    public function test_مُدخَلُ_الكتالوجِ_ليس_إثباتَ_وصول(): void
+    {
+        $p = $this->provider();
+        $this->costMap = ['fam/plain' => $this->catalogEntry()];
+
+        $c = AiModelSources::discover($p)['candidates'][0];
+
+        $this->assertNotSame(AiModelSources::AVAIL_REGISTERED, $c['availability'],
+            '**ترقيةٌ بالصمت**: مُدخَلُ كتالوجٍ عُدَّ نشراً مُسجَّلاً');
+    }
+
+    /**
+     * **والجذعُ لا يُتبنّى بضغطة** — ولو اختاره المتصفّحُ صراحةً.
+     *
+     * فالحارسُ في الخدمةِ لا في الشاشةِ وحدَها: إخفاءُ مربّعِ الاختيارِ يمنع
+     * الزلّةَ، ولا يمنع طلباً مصنوعاً بيد.
+     */
+    public function test_جذعُ_العائلةِ_لا_يُتبنّى_ولا_يُسجَّل_عند_البوّابة(): void
+    {
+        $p = $this->provider();
+        $this->costMap = ['ft:some-base-2024' => $this->catalogEntry()];
+
+        $res = AiModels::adopt($p, [AiModelSources::CATALOG . '|ft:some-base-2024']);
+
+        $this->assertFalse($res['ok'], '**تُبنّي جذعُ عائلة**: صفٌّ يبدو سليماً ويردّ المزوّدُ ٤٠٤');
+        $this->assertSame([], $this->created,
+            '**سُجّل جذعٌ عند البوّابة**: تهيئةٌ حيّةٌ لا تُنادى أبداً');
+        $this->assertStringContainsString('جذع', (string) $res['error']);
+    }
+
+    /** **والمعرّفُ الكاملُ من العائلةِ نفسِها يُتبنّى بلا حَرَج** */
+    public function test_معرّفٌ_كاملٌ_من_العائلةِ_يُتبنّى(): void
+    {
+        $p = $this->provider();
+        $this->costMap = ['ft:some-base-2024:org::job123' => $this->catalogEntry()];
+
+        $res = AiModels::adopt($p, [AiModelSources::CATALOG . '|ft:some-base-2024:org::job123']);
+
+        $this->assertTrue($res['ok'], (string) $res['error']);
+        $this->assertSame('ft:some-base-2024:org::job123', $this->created[0]['litellm_params']['model']);
+    }
+
     // ═══ ⑦ لا تبعيّةَ لمزوّدٍ بعينِه ═══
 
     /**

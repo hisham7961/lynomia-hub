@@ -129,7 +129,7 @@
         <table class="tbl">
             <thead><tr>
                 <th></th><th>المعرّفُ عند المزوّد</th><th>الوضع</th>
-                <th>القدرات</th><th>السياق</th><th>المصدر</th><th>الحال</th>
+                <th>القدرات</th><th>السياق</th><th>الإتاحة</th><th>الحال</th>
             </tr></thead>
             <tbody>
             @foreach ($candidates as $c)
@@ -141,6 +141,8 @@
                     <td>
                         @if ($c['already_imported'])
                             <span class="mut">—</span>
+                        @elseif (! \App\Support\AiModelSources::adoptableInOneClick($c['availability'] ?? ''))
+                            <span class="mut" title="جذعُ عائلةٍ — يلزمه معرّفُك الكامل">✋</span>
                         @else
                             <input type="checkbox" name="picks[]"
                                    value="{{ $c['source'] }}|{{ $c['upstream_model'] }}">
@@ -158,7 +160,17 @@
                     <td>{{ is_numeric(is_array($ctx) ? ($ctx['v'] ?? null) : $ctx)
                             ? number_format((float) (is_array($ctx) ? $ctx['v'] : $ctx))
                             : 'غيرُ معروف' }}</td>
-                    <td><span class="mono ltr">{{ $c['source'] }}</span></td>
+                    <td>
+                        @php($av = (string) ($c['availability'] ?? ''))
+                        @if ($av === \App\Support\AiModelSources::AVAIL_REGISTERED)
+                            <span class="bdg ok" title="منشورٌ عند البوّابةِ بمرجعِ اعتمادِك">مُسجَّل</span>
+                        @elseif ($av === \App\Support\AiModelSources::AVAIL_ACCOUNT)
+                            <span class="bdg wn" title="جذعُ عائلةٍ — معرّفُك الحقيقيُّ يحمل لاحقةَ حسابِك">جذعُ عائلة</span>
+                        @else
+                            <span class="bdg" title="يعرفه الكتالوجُ — ولا يُثبِت أنّ حسابَك يبلغه">كتالوج</span>
+                        @endif
+                        <span class="mut mono ltr">{{ $c['source'] }}</span>
+                    </td>
                     <td>
                         @if ($c['already_imported'])<span class="bdg ok">في Hub</span>@endif
                         @if ($c['deprecated_on'])<span class="bdg wn">يُطوى {{ $c['deprecated_on'] }}</span>@endif
@@ -168,6 +180,15 @@
             </tbody>
         </table>
 
+        <div class="sub mut">
+            <b>والإتاحةُ ثلاثُ درجاتٍ لا واحدة:</b>
+            <b>مُسجَّل</b> = منشورٌ عند البوّابةِ بمرجعِ اعتمادِك ·
+            <b>كتالوج</b> = تعرفه البوّابةُ و<b>لا يُثبِت أنّ حسابَك يبلغه</b> ·
+            <b>جذعُ عائلة</b> = مفتاحُ تسعيرٍ لا معرّفَ نموذج، والحقيقيُّ يحمل لاحقةَ حسابِك
+            فلا يُتبنّى بضغطة — أكمِله من «➕ تسجيلُ نموذجٍ يدويّاً» في
+            <a href="{{ route('ai.models.index', $provider) }}">شاشةِ النماذج</a>.
+            <b>ولا شيءَ منها إثباتُ وصول</b> — الإثباتُ فاحصُ B وحدَه.
+        </div>
         <div class="sub mut">
             الاسمُ الداخليُّ في Hub <b>يُولَّد تلقائيّاً</b> من معرّفِ المزوّد — وتستطيع تغييرَه لاحقاً في التهيئة.
             <b>والتبنّي لا يُفعِّل</b>: النموذجُ يولد مُعطَّلاً حتّى تُفعّلَه صراحةً.
