@@ -139,12 +139,16 @@ final class AiOverview
                 'لا اعتمادَ في خزنةِ البوّابة — فلا طلبَ يصل المزوّد', 'ai.providers.index');
         }
 
-        // نموذجٌ وُسم متعطّلاً — أُزيل من المنبع
-        foreach (AiModel::query()->where('health', 'UNAVAILABLE')
-                     ->orderBy('litellm_model_name')->get() as $m) {
-            $add('warn', 'نموذجٌ أُزيل من المنبع: ' . $m->litellm_model_name,
-                'وُسم `UNAVAILABLE` بعد إخفاقِ توجيهٍ — راجِع تسجيلَه عند البوّابة',
-                'ai.models.all');
+        // نموذجٌ لا يُوجَّه إليه — أُزيل من المنبعِ أو لا تُعلنه البوّابة
+        foreach (AiModel::query()->whereIn('health', AiProfiles::UNROUTABLE)
+                     ->orderBy('litellm_model_name')->orderBy('id')->get() as $m) {
+            $orphan = mb_strtoupper((string) $m->health) === 'ORPHANED';
+            $add('warn', ($orphan ? 'نموذجٌ لا تُعلنه البوّابة: ' : 'نموذجٌ أُزيل من المنبع: ')
+                . $m->litellm_model_name,
+                $orphan
+                    ? 'وُسم يتيماً في آخرِ تصالحٍ — **واستعادةٌ جزئيّةٌ أشهرُ أسبابِه**'
+                    : 'وُسم `UNAVAILABLE` بعد إخفاقِ توجيهٍ — راجِع تسجيلَه عند البوّابة',
+                'ai.diagnostics');
         }
 
         // غرضٌ مُفعَّلٌ بسلسلةٍ فارغة — طلبٌ لا يُوجَّه إلى أحد

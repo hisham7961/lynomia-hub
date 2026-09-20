@@ -69,6 +69,15 @@ final class AiProfiles
     /** **ثلاثةُ نماذجَ لا أكثر** — الحارسُ ① مطبَّقاً على طولِ السلسلة */
     public const MAX_LINKS = AiRouting::MAX_DEPTH + 1;
 
+    /**
+     * **حالاتُ صحّةٍ لا يُوجَّه إليها طلبٌ بحال** (W9 · §١٧).
+     *
+     * `UNAVAILABLE` أثبت التوجيهُ نفسُه أنّه أُزيل من المنبع (٤٠٤).
+     * و`ORPHANED` لا تُعلنه البوّابةُ أصلاً — فاسمٌ تجهله البوّابةُ لا يُرسَل
+     * إليه طلبٌ، **والفرقُ بينهما مصدرُ العلمِ لا نتيجتُه**.
+     */
+    public const UNROUTABLE = ['UNAVAILABLE', 'ORPHANED'];
+
     // ── البذر ──────────────────────────────────────────────────────────
 
     /**
@@ -269,7 +278,7 @@ final class AiProfiles
             ->map(static fn (AiProfileModel $l) => $l->model)
             ->filter(static function (?AiModel $m) use ($profile) {
                 if ($m === null || ! $m->enabled) return false;
-                if (mb_strtoupper((string) $m->health) === 'UNAVAILABLE') return false;
+                if (in_array(mb_strtoupper((string) $m->health), self::UNROUTABLE, true)) return false;
 
                 $p = $m->provider;
                 if ($p === null || ! $p->enabled) return false;
@@ -294,6 +303,7 @@ final class AiProfiles
                 ! $l->enabled                                             => 'الحلقةُ مُعطَّلةٌ في هذه السلسلة',
                 ! $m->enabled                                             => 'النموذجُ مُعطَّل',
                 mb_strtoupper((string) $m->health) === 'UNAVAILABLE'      => 'النموذجُ أُزيل من المنبع ووُسم متعطّلاً',
+                mb_strtoupper((string) $m->health) === 'ORPHANED'          => 'لا تُعلن البوّابةُ هذا النموذجَ — وُسم يتيماً في آخرِ تصالح',
                 $m->provider === null || ! $m->provider->enabled          => 'مزوّدُ النموذجِ مُعطَّل',
                 (string) ($m->provider->credential_state ?? '') === 'missing' => 'اعتمادُ المزوّدِ لم يستقرَّ بعد',
                 ! self::eligibility($profile, $m)['ok']                   => (string) self::eligibility($profile, $m)['why'],

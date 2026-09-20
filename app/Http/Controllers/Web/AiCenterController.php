@@ -137,7 +137,35 @@ class AiCenterController extends Controller
             'chain'    => \App\Support\AiDiagnostics::chain(),
             'probes'   => \App\Support\AiDiagnostics::recentProbes(),
             'manage'   => \App\Support\AiAccess::canManage(),
+            'recon'    => session('ai.recon'),
         ]);
+    }
+
+    /**
+     * **تصالحُ الحالةِ مع البوّابة** (§١٧ · R3) — معاينةٌ ثمّ كتابةٌ بقرار.
+     *
+     * والمعاينةُ **قراءةٌ محضةٌ مجّانيّة** فلا تصعيدَ عليها؛ أمّا الكتابةُ
+     * فتُغيّر ما يُوجَّه إليه الطلبُ، وهي من صنفِ ما يُحرَس بالهويّةِ الطازجة.
+     *
+     * **ولا يُستورَد نموذجٌ ولا يُحذَف صفّ** — الوسمُ عكوسٌ والحذفُ ليس كذلك.
+     */
+    public function reconcile(Request $r)
+    {
+        $apply = $r->boolean('apply');
+
+        $apply ? $this->gate() : \App\Support\AiAccess::gateView();
+        if ($apply && ($resp = hub_require_stepup())) return $resp;
+
+        $res = \App\Support\AiReconcile::run($apply);
+
+        if (! $res['ok']) {
+            return back()->withErrors(['recon' => (string) $res['error']]);
+        }
+
+        return back()->with('ai.recon', $res)->with('ok', $res['applied']
+            ? 'تمّ التصالح — ووُسم ' . $res['counts']['orphaned'] . ' يتيماً، ورُفع الوسمُ عن '
+                . $res['counts']['restored']
+            : 'معاينةُ تصالحٍ — **ولم يُكتَب شيء**');
     }
 
     /**

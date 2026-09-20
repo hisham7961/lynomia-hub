@@ -903,6 +903,9 @@ Route::middleware('auth')->group(function () {
         ->name('ai.usage');
     Route::get('admin/ai/diagnostics', [\App\Http\Controllers\Web\AiCenterController::class, 'diagnostics'])
         ->name('ai.diagnostics');
+    // تصالحُ الحالةِ مع البوّابة (W9 · §١٧) — يخرج إلى الشبكةِ فيُخنَق كنظائرِه
+    Route::post('admin/ai/reconcile', [\App\Http\Controllers\Web\AiCenterController::class, 'reconcile'])
+        ->name('ai.reconcile')->middleware('throttle:10,1');
     Route::get('admin/ai/models', [\App\Http\Controllers\Web\AiModelController::class, 'all'])
         ->name('ai.models.all');
     Route::post('admin/ai', [\App\Http\Controllers\Web\AiCenterController::class, 'save'])->name('ai.save');

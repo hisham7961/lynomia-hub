@@ -48,6 +48,66 @@
     @endforeach
 </div>
 
+{{-- ═══ التصالحُ مع البوّابة (W9 · §١٧) ═══
+     قاعدتان مستقلّتان تفترقان، والاستعادةُ الجزئيّةُ أوضحُ أبوابِ الافتراق:
+     نماذجُ في سلسلةِ توجيهٍ لا وجودَ لها عند البوّابة. --}}
+<div class="card">
+    <h3>التصالحُ مع البوّابة</h3>
+    <div class="sub mut">
+        نموذجٌ في Hub بلا نظيرٍ عند البوّابةِ يُوسَم <b>يتيماً</b> ويُستبعَد من
+        التوجيهِ تلقائيّاً. <b>والتعافي آليٌّ كالوسم</b>: ما عاد يظهر يُرفَع عنه
+        الوسمُ في التصالحِ التالي. <b>ولا يُستورَد نموذجٌ ولا يُحذَف صفّ.</b>
+    </div>
+
+    <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px">
+        <form method="POST" action="{{ route('ai.reconcile') }}">@csrf
+            <button class="btn sm">🔍 معاينة <span class="mut">(لا تكتب)</span></button>
+        </form>
+        @if ($manage ?? true)
+            <form method="POST" action="{{ route('ai.reconcile') }}">@csrf
+                <input type="hidden" name="apply" value="1">
+                <button class="btn sm">✍️ صالِح واكتب الوسم</button>
+            </form>
+        @endif
+    </div>
+
+    @if (! empty($recon))
+        <div class="sub" style="margin-top:10px">
+            <span class="bdg {{ $recon['applied'] ? 'ok' : 'wn' }}">
+                {{ $recon['applied'] ? 'كُتب الوسم' : 'معاينةٌ — لم يُكتَب شيء' }}
+            </span>
+            <span class="mut mono ltr">{{ $recon['checked_at'] }}</span>
+        </div>
+        @if (! empty($recon['error']))
+            <div class="sub"><b>{!! e($recon['error']) !!}</b></div>
+        @endif
+
+        <div class="cards">
+            <div class="stat"><span class="ico bdg">🗂️</span>
+                <b>{{ $recon['counts']['hub_models'] }} عندنا · {{ $recon['counts']['live_models'] }} تُعلنها البوّابة</b>
+                <span>والمرجعُ ما تُعلنه هي لا ما نظنّه نحن.</span></div>
+            <div class="stat"><span class="ico bdg {{ $recon['counts']['orphaned'] ? 'wn' : 'ok' }}">👻</span>
+                <b>{{ $recon['counts']['orphaned'] }} يتيماً</b>
+                <span>لا نظيرَ لها عند البوّابة — تُستبعَد من التوجيه.</span></div>
+            <div class="stat"><span class="ico bdg ok">↩️</span>
+                <b>{{ $recon['counts']['restored'] }} عاد</b>
+                <span>ظهر ثانيةً فرُفع عنه الوسم.</span></div>
+            <div class="stat"><span class="ico bdg {{ $recon['counts']['unregistered'] ? 'wn' : '' }}">➕</span>
+                <b>{{ $recon['counts']['unregistered'] }} غيرُ مُسجَّلٍ عندنا</b>
+                <span>باعتمادِنا عند البوّابةِ ولا صفَّ له — <b>يُبلَّغ ولا يُستورَد</b>.</span></div>
+        </div>
+
+        @foreach ([['orphaned', 'يتيمٌ'], ['restored', 'عاد'],
+                   ['unregistered', 'غيرُ مُسجَّلٍ عندنا'], ['credential_gone', 'اعتمادٌ بلا أثرٍ في الخزنة']] as $pair)
+            @continue (empty($recon[$pair[0]]))
+            <div class="sub mut">
+                <b>{{ $pair[1] }}:</b>
+                @foreach ($recon[$pair[0]] as $n)<span class="mono ltr">{{ $n }}</span>@if(! $loop->last) · @endif @endforeach
+            </div>
+        @endforeach
+    @endif
+</div>
+
 {{-- ═══ آخرُ الفحوص — بعد المُطهِّرِ عند مصدرِها ═══ --}}
 <div class="card">
     <h3>آخرُ الفحوص <span class="mut">({{ count($probes) }})</span></h3>
