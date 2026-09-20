@@ -25,6 +25,7 @@
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
         <a class="btn sm" href="{{ route('ai.providers.index') }}">🔌 المزوّدون</a>
+        <a class="btn sm" href="{{ route('ai.profiles.index') }}">🎯 الأغراضُ والتوجيه</a>
         <form method="POST" action="{{ route('ai.models.discover', $provider) }}">@csrf
             <button class="btn sm">🔎 اكتشاف</button>
         </form>

@@ -946,6 +946,25 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/ai/models/{model}/probe', [\App\Http\Controllers\Web\AiModelController::class, 'probe'])
         ->name('ai.models.probe')->middleware('throttle:10,1');
 
+    /* ── الأغراضُ وسلاسلُ التوجيه (المرحلة ٢ · W7 · §٨ · §٩) ─────────────
+     * الحارسُ نفسُه، و**التصعيدُ على كلِّ كتابة**. ولا نداءَ شبكةٍ في أيٍّ من
+     * هذه المسارات: سياسةٌ تُقرَأ وتُرتَّب، فلا خنقَ لخروجٍ لا يقع.
+     */
+    Route::get('admin/ai/profiles', [\App\Http\Controllers\Web\AiProfileController::class, 'index'])
+        ->name('ai.profiles.index');
+    Route::post('admin/ai/profiles/seed', [\App\Http\Controllers\Web\AiProfileController::class, 'seed'])
+        ->name('ai.profiles.seed');
+    Route::post('admin/ai/profiles/{profile}/attach', [\App\Http\Controllers\Web\AiProfileController::class, 'attach'])
+        ->name('ai.profiles.attach');
+    Route::post('admin/ai/profiles/{profile}/reorder', [\App\Http\Controllers\Web\AiProfileController::class, 'reorder'])
+        ->name('ai.profiles.reorder');
+    Route::post('admin/ai/profiles/{profile}/toggle', [\App\Http\Controllers\Web\AiProfileController::class, 'toggle'])
+        ->name('ai.profiles.toggle');
+    Route::post('admin/ai/chain/{link}/toggle', [\App\Http\Controllers\Web\AiProfileController::class, 'linkToggle'])
+        ->name('ai.profiles.link.toggle');
+    Route::delete('admin/ai/chain/{link}', [\App\Http\Controllers\Web\AiProfileController::class, 'detach'])
+        ->name('ai.profiles.detach');
+
     Route::get('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'index'])->name('integrations.n8n');
     Route::post('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'save'])->name('integrations.n8n.save');
     Route::get('admin/security', [SecurityController::class, 'index'])->name('security.index');

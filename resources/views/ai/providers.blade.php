@@ -13,7 +13,10 @@
         <h2>🔌 مزوّدو الذكاء الاصطناعي</h2>
         <div class="sub">يُضاف المزوّدُ ويُضبَط اعتمادُه <b>من هنا</b> — والسرُّ يعبر إلى البوّابةِ ولا يستقرّ في Hub.</div>
     </div>
-    <div><a class="btn sm" href="{{ route('ai.index') }}">⚙️ إعدادُ البوّابة</a></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <a class="btn sm" href="{{ route('ai.index') }}">⚙️ إعدادُ البوّابة</a>
+        <a class="btn sm" href="{{ route('ai.profiles.index') }}">🎯 الأغراضُ والتوجيه</a>
+    </div>
 </div>
 
 @if (! $configured)
