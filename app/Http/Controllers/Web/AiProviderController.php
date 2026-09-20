@@ -38,10 +38,31 @@ class AiProviderController extends Controller
         \App\Support\AiAccess::gateManage();
     }
 
-    /** **القراءةُ تُفتَح لحاملِ `aiView`** — والكتابةُ تبقى خلف الإدارة (W8) */
-    public function index()
+    /**
+     * **القراءةُ تُفتَح لحاملِ `aiView`** — والكتابةُ تبقى خلف الإدارة (W8).
+     *
+     * **والقائمةُ تُتصفَّح ولا تُسكَب.** حين كان الكتالوجُ خمسةً كان عرضُ نموذجِ
+     * كلِّ واحدٍ مفتوحاً معقولاً؛ وصار مئةً وستّةً وعشرين، فعرضُها جميعاً
+     * ليس «تغطيةً كاملة» بل **شاشةٌ لا تُستعمَل**. فبحثٌ وتصفيةٌ وسقفٌ معلَن،
+     * ثمّ **نموذجُ مزوّدٍ واحدٍ عند اختيارِه** — لا مئةٌ وستّةٌ وعشرون نموذجاً
+     * في صفحةٍ واحدة.
+     */
+    public function index(Request $r)
     {
         \App\Support\AiAccess::gateView();
+
+        $catalog = AiCatalog::all();
+
+        // الاختيارُ يُصادَق على الكتالوجِ نفسِه — فلا مفتاحٌ من العنوانِ يبني نموذجاً.
+        $pick     = (string) $r->query('add', '');
+        $selected = ($pick !== '' && isset($catalog[$pick])) ? $pick : null;
+
+        $filters = [
+            'q'         => (string) $r->query('q', ''),
+            'status'    => (string) $r->query('status', ''),
+            'auth'      => (string) $r->query('auth', ''),
+            'discovery' => (string) $r->query('discovery', ''),
+        ];
 
         return view('ai.providers', [
             'sections'  => \App\Support\AiAccess::sections(),
@@ -49,11 +70,36 @@ class AiProviderController extends Controller
             'manage'    => \App\Support\AiAccess::canManage(),
             // **حالةُ الاعتمادِ للمدير وحدَه** (§١٠): القارئُ يرى «يعمل» لا «لماذا لا»
             'showState' => \App\Support\AiAccess::showsCredentialState(),
-            'providers' => AiProvider::query()->orderBy('catalog_key')->orderBy('label')->get(),
-            'catalog'   => AiCatalog::all(),
+            'providers' => AiProvider::query()->orderBy('catalog_key')->orderBy('label')->orderBy('id')->get(),
+            'catalog'   => $catalog,
             'configured' => AiGateway::configured(),
             'whyNot'    => AiGateway::whyNotReady(),
+
+            // ── تصفّحُ المزوّدين (إغلاقُ التغطية) ──
+            'filters'   => $filters,
+            'browse'    => \App\Support\AiProviderCoverage::browse($filters),
+            'facets'    => \App\Support\AiProviderCoverage::facets(),
+            'coverage'  => \App\Support\AiProviderCoverage::summary(),
+            'selected'  => $selected,
         ]);
+    }
+
+    /**
+     * **تحديثُ قائمةِ المزوّدين من البوّابة** — سحبٌ بطلبٍ لا خلفيّةٌ تستنزف.
+     *
+     * قراءةٌ محضةٌ بكلفةِ صفر (`GET /model/settings`)، **ولا تُبدِّل اعتماداً
+     * ولا نموذجاً**. وهي وراء حارسِ الإدارةِ لا القراءة: تغييرُ ما يراه
+     * الجميعُ في الشاشةِ فعلُ إدارة.
+     */
+    public function refresh()
+    {
+        $this->gate();
+
+        $res = \App\Support\AiProviderRegistry::refresh();
+
+        return back()->with($res['ok'] ? 'ok' : 'warn', $res['ok']
+            ? "حُدِّثت قائمةُ المزوّدين من البوّابة — {$res['count']} مزوّداً."
+            : 'تعذّرت قراءةُ قائمةِ المزوّدين من البوّابة — والقائمةُ المعروضةُ هي آخرُ ما نعرفه.');
     }
 
     /** إضافةُ مزوّدٍ وإنشاءُ اعتمادِه — الخطوةُ الوحيدةُ التي يعبرها سرٌّ أوّلَ مرّة */

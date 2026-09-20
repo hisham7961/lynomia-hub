@@ -47,6 +47,42 @@ final class AiProviders
     public const SHAPE = ['ok', 'provider', 'error'];
 
     /**
+     * **حارسُ النهايةِ الصادرة** — يُغلق SSRF عبر البوّابة، لا عبر Hub.
+     *
+     * **ولماذا هنا لا في الشاشة؟** لأنّ العنوانَ الذي يُكتَب في حقلِ نهايةٍ
+     * **لا يتّصل به Hub**: يُخزَّن في الاعتمادِ ثمّ يتّصل به **مُحرّكُ البوّابةِ
+     * نفسُه** عند أوّلِ طلبِ توليد. فحارسُ الصادرِ في مسارِ نداءاتِنا لا يراه
+     * أبداً، وقواعدُ `url` تقبل `http://169.254.169.254` وهي «رابطٌ صالح».
+     *
+     * فبلا هذا الحارسِ يصير حقلُ إعدادٍ في شاشةِ إدارةٍ **بابَ قراءةٍ لشبكةٍ
+     * داخليّةٍ من داخلِها**: عنوانُ بياناتِ سحابةٍ أو خدمةٌ خلفَ الجدار، يقرؤها
+     * المُحرّكُ ويُعيد ما قرأ في ردِّ نموذج.
+     *
+     * **والفحصُ من المخطَّطِ لا من اسمِ الحقل:** كلُّ حقلٍ نوعُه `url` أو في
+     * قواعدِه `url` — فعائلةٌ جديدةٌ تُضاف غداً تُحرَس بلا سطرٍ هنا.
+     *
+     * ويُستدعى **قبل أيِّ نداء**: الرفضُ لا يُرسِل شيئاً إلى البوّابة.
+     */
+    private static function endpointGuard(string $catalogKey, array $input): ?string
+    {
+        foreach (AiCatalog::fields($catalogKey) as $f) {
+            $isEndpoint = ($f['type'] ?? null) === 'url'
+                || in_array('url', (array) ($f['rules'] ?? []), true);
+            if (! $isEndpoint) continue;
+
+            $value = trim((string) ($input[$f['key']] ?? ''));
+            if ($value === '') continue;   // الفارغُ يُحكَم عليه بالإلزامِ لا بالحارس
+
+            $gate = hub_outbound_ok($value);
+            if (! ($gate['ok'] ?? false)) {
+                return 'نهايةٌ مرفوضة في «' . (string) $f['label'] . '»: ' . (string) ($gate['why'] ?? 'غيرُ مسموحة');
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * **اسمُ الاعتماد عند البوّابة** — مشتقٌّ لا مُدخَل.
      *
      * تركُه للمستخدم يفتح بابَ تصادمٍ بين مزوّدَين ويسرّب تسميةً داخليّةً إلى
@@ -71,6 +107,7 @@ final class AiProviders
         }
 
         if ($why = self::missingRequired($catalogKey, $input)) return self::fail($why);
+        if ($why = self::endpointGuard($catalogKey, $input)) return self::fail($why);
 
         $split = AiCatalog::split($catalogKey, $input);
         if ($split['credential'] === []) {
@@ -118,6 +155,7 @@ final class AiProviders
     {
         $key = (string) $provider->catalog_key;
         if (! AiCatalog::exists($key)) return self::fail('مزوّدٌ غيرُ معروفٍ في الكتالوج');
+        if ($why = self::endpointGuard($key, $input)) return self::fail($why);
 
         $split = AiCatalog::split($key, $input);
         if ($split['credential'] === []) {

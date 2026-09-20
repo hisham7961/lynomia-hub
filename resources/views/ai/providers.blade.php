@@ -142,74 +142,175 @@
     @endforelse
 </div>
 
-{{-- ═══ إضافةُ مزوّد — النموذجُ يُبنى من الكتالوج لا من حقولٍ مكتوبةٍ لمزوّدٍ بعينِه ═══ --}}
+{{-- ═══ إضافةُ مزوّد — تصفّحٌ ثمّ نموذجٌ واحد (إغلاقُ التغطية) ═══
+
+     **ولماذا لا تُعرَض النماذجُ كلُّها كما كانت؟** لأنّها صارت مئةً وستّةً
+     وعشرين. وعرضُ مئةٍ وستّةٍ وعشرين نموذجَ إعدادٍ في صفحةٍ ليس تغطيةً بل
+     **منعاً للاختيار**. فبحثٌ وتصفيةٌ وقائمةٌ مختصرة، ثمّ نموذجُ **المختارِ
+     وحدَه** — والعددُ الكلّيُّ معلنٌ فلا يظنّ القارئُ أنّ المعروضَ كلُّ ما هناك. --}}
 @if ($manage ?? true)
 <div class="card">
-    <h3>إضافةُ مزوّد</h3>
+    <h3>إضافةُ مزوّد
+        <span class="mut">({{ $coverage['configurable'] }} مزوّداً قابلاً للإعداد)</span>
+    </h3>
 
-    @foreach ($catalog as $key => $def)
-        <details>
-            <summary>
-                <b>{{ $def['label'] }}</b>
-                <span class="mut mono ltr">{{ $def['label_en'] ?? $key }}</span>
-                @if (($def['discovery'] ?? '') === 'manual')
-                    <span class="bdg wn" title="{{ $def['discovery_note'] ?? '' }}">النماذجُ تُضاف يدويّاً</span>
-                @endif
-            </summary>
+    <div class="sub mut">
+        مقروءون من بوّابةِ LiteLLM
+        @if ($coverage['litellm_version'])<span class="mono ltr">v{{ $coverage['litellm_version'] }}</span>@endif
+        —
+        @if (($coverage['source'] ?? '') === 'gateway')
+            <span class="bdg ok">قائمةٌ حيّةٌ من البوّابة</span>
+        @else
+            <span class="bdg">لقطةٌ محفوظة</span>
+        @endif
+        <form method="POST" action="{{ route('ai.providers.refresh') }}" style="display:inline">@csrf
+            <button class="btn sm">🔄 حدِّث القائمةَ من البوّابة</button>
+        </form>
+        <small class="mut">قراءةٌ بكلفةِ صفر — لا تُبدّل اعتماداً ولا نموذجاً.</small>
+    </div>
 
-            <form method="POST" action="{{ route('ai.providers.store') }}" class="grid" autocomplete="off">@csrf
-                <input type="hidden" name="catalog_key" value="{{ $key }}">
+    {{-- ── البحثُ والتصفية ── --}}
+    <form method="GET" action="{{ route('ai.providers.index') }}" class="grid">
+        <label><span>ابحث</span>
+            <input type="text" name="q" value="{{ $filters['q'] }}" class="ltr"
+                   placeholder="اسمُ المزوّد أو اسمُه عند البوّابة">
+            <small class="mut">حرفان فأكثر.</small></label>
 
-                <label>
-                    <span>الاسم المعروض</span>
-                    <input type="text" name="label" maxlength="191" placeholder="{{ $def['label'] }}">
-                    <small class="mut">اتركه فارغاً ليُستعمل اسمُ المزوّد.</small>
-                </label>
-
-                @foreach ($def['fields'] as $f)
-                    @php($type = $f['type'] ?? 'text')
-                    <label>
-                        <span>{{ $f['label'] }}@if(! empty($f['required']))<b class="req">*</b>@endif</span>
-
-                        @if ($type === 'select')
-                            <select name="f[{{ $f['key'] }}]">
-                                @foreach ((array) ($f['options'] ?? []) as $ov => $ol)
-                                    <option value="{{ $ov }}" @selected(($f['default'] ?? null) === $ov)>{{ $ol }}</option>
-                                @endforeach
-                            </select>
-                        @elseif ($type === 'bool')
-                            <input type="checkbox" name="f[{{ $f['key'] }}]" value="1" @checked(! empty($f['default']))>
-                        @elseif ($type === 'password')
-                            {{-- **لا `value` ولا `old()` على حقلِ سرٍّ** — فلا يعود السرُّ إلى HTML --}}
-                            <input type="password" name="f[{{ $f['key'] }}]" class="ltr"
-                                   autocomplete="new-password" placeholder="{{ $f['placeholder'] ?? '' }}">
-                        @else
-                            <input type="{{ $type === 'number' ? 'number' : 'text' }}" name="f[{{ $f['key'] }}]"
-                                   class="ltr" value="{{ old('f.' . $f['key'], $f['default'] ?? '') }}"
-                                   placeholder="{{ $f['placeholder'] ?? '' }}">
-                        @endif
-
-                        @if (! empty($f['hint']))<small class="mut">{{ $f['hint'] }}</small>@endif
-                        <small class="mut">
-                            {{ ($f['sends_to'] ?? '') === 'credential' ? '↗️ يُرسَل إلى خزنةِ البوّابة' : '🗄️ يُحفَظ في Hub (غيرُ سرّيّ)' }}
-                        </small>
-                    </label>
+        <label><span>الحالة</span>
+            <select name="status">
+                <option value="">الكلّ</option>
+                @foreach ($facets['status'] as $v => $l)
+                    <option value="{{ $v }}" @selected($filters['status'] === $v)>{{ $l }}</option>
                 @endforeach
+            </select></label>
 
-                @if (! empty($def['docs_url']))
-                    <div class="sub mut" style="grid-column:1/-1">
-                        <a href="{{ $def['docs_url'] }}" target="_blank" rel="noopener">وثائقُ المزوّد ↗</a>
-                    </div>
-                @endif
+        <label><span>شكلُ المصادقة</span>
+            <select name="auth">
+                <option value="">الكلّ</option>
+                @foreach ($facets['auth'] as $v => $l)
+                    <option value="{{ $v }}" @selected($filters['auth'] === $v)>{{ $l }}</option>
+                @endforeach
+            </select></label>
 
-                <div style="grid-column:1/-1">
-                    <button class="btn" @disabled(! $configured)>➕ أضِف المزوّدَ وأنشئ اعتمادَه</button>
-                    <span class="mut">يُطلَب تأكيدُ هويّتِك قبل الحفظ.</span>
+        <label><span>اكتشافُ النماذج</span>
+            <select name="discovery">
+                <option value="">الكلّ</option>
+                @foreach ($facets['discovery'] as $v => $l)
+                    <option value="{{ $v }}" @selected($filters['discovery'] === $v)>{{ $l }}</option>
+                @endforeach
+            </select></label>
+
+        <div style="grid-column:1/-1">
+            <button class="btn sm">🔎 صفِّ</button>
+            <a class="btn sm" href="{{ route('ai.providers.index') }}">مسحُ التصفية</a>
+        </div>
+    </form>
+
+    {{-- ── القائمةُ المختصرة ── --}}
+    <div class="sub mut">
+        ظهر <b>{{ $browse['shown'] }}</b> من <b>{{ $browse['total'] }}</b> مطابقاً.
+        @if ($browse['truncated'])
+            <span class="bdg wn">القائمةُ مقصوصة — ضيِّق البحثَ لترى الباقي</span>
+        @endif
+    </div>
+
+    @forelse ($browse['rows'] as $row)
+        <div class="row" style="align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding:8px 0">
+            <div style="flex:1;min-width:220px">
+                <b>{{ $row['label'] }}</b>
+                <span class="mut mono ltr">{{ $row['slug'] }}</span>
+                @if ($row['curated'])<span class="bdg ok" title="وصفٌ مكتوبٌ بعنايةٍ لا مشتقّ">موصوفٌ بعناية</span>@endif
+                <div class="sub">
+                    <span class="bdg">{{ $row['auth_label'] }}</span>
+                    @if ($row['discovery'] === 'manual')
+                        <span class="bdg wn">النماذجُ تُضاف يدويّاً</span>
+                    @elseif ($row['discovery'] === 'live')
+                        <span class="bdg ok">اكتشافٌ حيّ</span>
+                    @else
+                        <span class="bdg">قائمةُ نماذجَ معروفة</span>
+                    @endif
+                    <span class="mut">{{ $row['fields'] }} حقلاً</span>
                 </div>
-            </form>
-        </details>
-    @endforeach
+            </div>
+            <a class="btn sm" href="{{ route('ai.providers.index', array_filter($filters) + ['add' => $row['key']]) }}#add">
+                {{ $selected === $row['key'] ? '▼ مفتوح' : '⚙️ إعداد' }}
+            </a>
+        </div>
+    @empty
+        <div class="empty">
+            <b>لا مزوّدَ يطابق التصفية.</b>
+            <div class="sub">جرّب نصّاً أقصرَ أو امسح التصفية.</div>
+        </div>
+    @endforelse
 </div>
+
+{{-- ── نموذجُ المزوّدِ المختارِ وحدَه ── --}}
+@if ($selected)
+    @php($def = $catalog[$selected])
+    <div class="card" id="add">
+        <h3>إعدادُ {{ $def['label'] }}
+            <span class="mut mono ltr">{{ $def['litellm_key'] }}</span>
+        </h3>
+
+        <div class="sub mut">
+            شكلُ المصادقة: <b>{{ $def['auth'] }}</b> ·
+            اكتشافُ النماذج: <b>{{ $def['discovery'] }}</b>
+            @if (! empty($def['discovery_note']))<br>{{ $def['discovery_note'] }}@endif
+        </div>
+
+        <form method="POST" action="{{ route('ai.providers.store') }}" class="grid" autocomplete="off">@csrf
+            <input type="hidden" name="catalog_key" value="{{ $selected }}">
+
+            <label>
+                <span>الاسم المعروض</span>
+                <input type="text" name="label" maxlength="191" placeholder="{{ $def['label'] }}">
+                <small class="mut">اتركه فارغاً ليُستعمل اسمُ المزوّد.</small>
+            </label>
+
+            @foreach ($def['fields'] as $f)
+                @php($type = $f['type'] ?? 'text')
+                <label>
+                    <span>{{ $f['label'] }}@if(! empty($f['required']))<b class="req">*</b>@endif</span>
+
+                    @if ($type === 'select')
+                        <select name="f[{{ $f['key'] }}]">
+                            @foreach ((array) ($f['options'] ?? []) as $ov => $ol)
+                                <option value="{{ $ov }}" @selected(($f['default'] ?? null) === $ov)>{{ $ol }}</option>
+                            @endforeach
+                        </select>
+                    @elseif ($type === 'bool')
+                        <input type="checkbox" name="f[{{ $f['key'] }}]" value="1" @checked(! empty($f['default']))>
+                    @elseif ($type === 'password')
+                        {{-- **لا `value` ولا `old()` على حقلِ سرٍّ** — فلا يعود السرُّ إلى HTML --}}
+                        <input type="password" name="f[{{ $f['key'] }}]" class="ltr"
+                               autocomplete="new-password" placeholder="{{ $f['placeholder'] ?? '' }}">
+                    @else
+                        <input type="{{ $type === 'number' ? 'number' : 'text' }}" name="f[{{ $f['key'] }}]"
+                               class="ltr" value="{{ old('f.' . $f['key'], $f['default'] ?? '') }}"
+                               placeholder="{{ $f['placeholder'] ?? '' }}">
+                    @endif
+
+                    @if (! empty($f['hint']))<small class="mut">{{ $f['hint'] }}</small>@endif
+                    <small class="mut">
+                        {{ ($f['sends_to'] ?? '') === 'credential' ? '↗️ يُرسَل إلى خزنةِ البوّابة' : '🗄️ يُحفَظ في Hub (غيرُ سرّيّ)' }}
+                        @if (! empty($f['secret'])) · <b>سرٌّ يعبر ولا يستقرّ</b>@endif
+                    </small>
+                </label>
+            @endforeach
+
+            @if (! empty($def['docs_url']))
+                <div class="sub mut" style="grid-column:1/-1">
+                    <a href="{{ $def['docs_url'] }}" target="_blank" rel="noopener">وثائقُ المزوّد ↗</a>
+                </div>
+            @endif
+
+            <div style="grid-column:1/-1">
+                <button class="btn" @disabled(! $configured)>➕ أضِف المزوّدَ وأنشئ اعتمادَه</button>
+                <span class="mut">يُطلَب تأكيدُ هويّتِك قبل الحفظ.</span>
+            </div>
+        </form>
+    </div>
+@endif
 @endif
 
 @endsection

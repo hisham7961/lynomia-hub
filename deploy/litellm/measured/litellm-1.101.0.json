@@ -1,0 +1,5676 @@
+{
+ "chat_capable": 127,
+ "json_registry_count": 28,
+ "litellm_version": "1.101.0",
+ "live_discovery_count": 25,
+ "provider_count": 155,
+ "providers": {
+  "a2a": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "A2A",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "a2a",
+   "env_config": [
+    "A2A_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "a2a_agent": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "A2A_AGENT",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": null,
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "ai21": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "AI21",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.ai21.com/studio/v1",
+   "dir": "ai21",
+   "env_config": [
+    "AI21_API_BASE"
+   ],
+   "env_direct_config": [
+    "AI21_API_BASE"
+   ],
+   "env_direct_secret": [
+    "AI21_API_KEY"
+   ],
+   "env_secret": [
+    "AI21_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "ai21_chat": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "AI21_CHAT",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "ai21",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "aiml": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "AIML",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "aiml",
+   "env_config": [
+    "AIML_API_BASE"
+   ],
+   "env_direct_config": [
+    "AIML_API_BASE"
+   ],
+   "env_direct_secret": [
+    "AIMLAPI_KEY",
+    "AIML_API_KEY"
+   ],
+   "env_secret": [
+    "AIMLAPI_KEY",
+    "AIML_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "image_generation"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "aiohttp_openai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "AIOHTTP_OPENAI",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "aiohttp_openai",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "amazon_nova": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "AMAZON_NOVA",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "amazon_nova",
+   "env_config": [
+    "AMAZON_NOVA_API_BASE"
+   ],
+   "env_direct_config": [
+    "AMAZON_NOVA_API_BASE"
+   ],
+   "env_direct_secret": [
+    "AMAZON_NOVA_API_KEY"
+   ],
+   "env_secret": [
+    "AMAZON_NOVA_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "anthropic": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "ANTHROPIC",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "anthropic",
+   "env_config": [
+    "ANTHROPIC_API_BASE",
+    "ANTHROPIC_AWS_API_BASE",
+    "ANTHROPIC_AWS_BASE_URL",
+    "ANTHROPIC_AWS_WORKSPACE_ID",
+    "ANTHROPIC_BASE_URL",
+    "ANTHROPIC_MESSAGES_MAX_DETACHED_STREAM_DRAINS",
+    "ANTHROPIC_MESSAGES_STREAM_RELAY_QUEUE_MAXSIZE",
+    "ANTHROPIC_TOKEN_COUNTING_BETA_VERSION",
+    "ANTHROPIC_WORKSPACE_ID",
+    "LITELLM_REASONING_AUTO_SUMMARY"
+   ],
+   "env_direct_config": [
+    "ANTHROPIC_API_BASE",
+    "ANTHROPIC_BASE_URL",
+    "LITELLM_REASONING_AUTO_SUMMARY"
+   ],
+   "env_direct_secret": [
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN"
+   ],
+   "env_secret": [
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "ANTHROPIC_AWS_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "anthropic_messages",
+    "files",
+    "skills_api",
+    "text_completion"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "anthropic_text": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "ANTHROPIC_TEXT",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "anthropic",
+   "env_config": [
+    "ANTHROPIC_API_BASE",
+    "ANTHROPIC_BASE_URL",
+    "LITELLM_REASONING_AUTO_SUMMARY"
+   ],
+   "env_direct_config": [
+    "ANTHROPIC_API_BASE",
+    "ANTHROPIC_BASE_URL",
+    "LITELLM_REASONING_AUTO_SUMMARY"
+   ],
+   "env_direct_secret": [
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN"
+   ],
+   "env_secret": [
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "apertis": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "APERTIS",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": "https://api.stima.tech/v1",
+   "dir": null,
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "STIMA_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "STIMA_API_KEY",
+   "json_base_url": "https://api.stima.tech/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "assemblyai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "ASSEMBLYAI",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://llm-gateway.assemblyai.com/v1",
+   "dir": null,
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "ASSEMBLYAI_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "ASSEMBLYAI_API_KEY",
+   "json_base_url": "https://llm-gateway.assemblyai.com/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "auto_router": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "AUTO_ROUTER",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": null,
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "aws_polly": {
+   "aws_base": true,
+   "chat_config": false,
+   "const": "AWS_POLLY",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "aws_polly",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "text_to_speech"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "aws_access_key_id",
+    "aws_external_id",
+    "aws_profile_name",
+    "aws_region_name",
+    "aws_role_name",
+    "aws_secret_access_key",
+    "aws_session_name",
+    "aws_session_token",
+    "aws_sts_endpoint",
+    "aws_web_identity_token"
+   ],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "azure": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "AZURE",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "azure",
+   "env_config": [
+    "AZURE_AI_API_BASE",
+    "AZURE_AI_API_VERSION",
+    "AZURE_API_BASE",
+    "AZURE_API_TYPE",
+    "AZURE_API_VERSION",
+    "AZURE_AUTHORITY_HOST",
+    "AZURE_CERTIFICATE_PATH",
+    "AZURE_CLIENT_ID",
+    "AZURE_COMPUTER_USE_INPUT_COST_PER_1K_TOKENS",
+    "AZURE_COMPUTER_USE_OUTPUT_COST_PER_1K_TOKENS",
+    "AZURE_CREDENTIAL",
+    "AZURE_DEFAULT_RESPONSES_API_VERSION",
+    "AZURE_DOCUMENT_INTELLIGENCE_API_VERSION",
+    "AZURE_DOCUMENT_INTELLIGENCE_DEFAULT_DPI",
+    "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT",
+    "AZURE_FEDERATED_TOKEN_FILE",
+    "AZURE_FILE_SEARCH_COST_PER_GB_PER_DAY",
+    "AZURE_KEY_VAULT_URI",
+    "AZURE_OPERATION_POLLING_TIMEOUT",
+    "AZURE_SCOPE",
+    "AZURE_SENTINEL_AUDIT_STREAM_NAME",
+    "AZURE_SENTINEL_AUTHORITY_HOST",
+    "AZURE_SENTINEL_CLIENT_ID",
+    "AZURE_SENTINEL_DCR_IMMUTABLE_ID",
+    "AZURE_SENTINEL_ENDPOINT",
+    "AZURE_SENTINEL_STREAM_NAME",
+    "AZURE_SENTINEL_TENANT_ID",
+    "AZURE_SPEECH_API_BASE",
+    "AZURE_STORAGE_ACCOUNT_NAME",
+    "AZURE_STORAGE_CLIENT_ID",
+    "AZURE_STORAGE_ENDPOINT_SUFFIX",
+    "AZURE_STORAGE_FILE_SYSTEM",
+    "AZURE_STORAGE_TENANT_ID",
+    "AZURE_TENANT_ID",
+    "AZURE_USERNAME",
+    "AZURE_VECTOR_STORE_COST_PER_GB_PER_DAY"
+   ],
+   "env_direct_config": [
+    "AZURE_API_BASE",
+    "AZURE_API_VERSION",
+    "AZURE_AUTHORITY_HOST",
+    "AZURE_CLIENT_ID",
+    "AZURE_SCOPE",
+    "AZURE_SPEECH_API_BASE",
+    "AZURE_TENANT_ID",
+    "AZURE_USERNAME"
+   ],
+   "env_direct_secret": [
+    "AZURE_AD_TOKEN",
+    "AZURE_API_KEY",
+    "AZURE_CLIENT_SECRET",
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_PASSWORD",
+    "AZURE_SPEECH_API_KEY"
+   ],
+   "env_secret": [
+    "AZURE_AD_TOKEN",
+    "AZURE_AI_API_KEY",
+    "AZURE_API_KEY",
+    "AZURE_CERTIFICATE_PASSWORD",
+    "AZURE_CLIENT_SECRET",
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_PASSWORD",
+    "AZURE_SENTINEL_CLIENT_SECRET",
+    "AZURE_SPEECH_API_KEY",
+    "AZURE_STORAGE_ACCOUNT_KEY",
+    "AZURE_STORAGE_CLIENT_SECRET"
+   ],
+   "excluded_from_listing": true,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "audio_transcription",
+    "chat",
+    "container",
+    "image_edit",
+    "image_generation",
+    "passthrough",
+    "realtime_http",
+    "responses_api",
+    "text_to_speech",
+    "vector_stores",
+    "video"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "azure_ad_token",
+    "azure_ad_token_provider",
+    "azure_password",
+    "azure_scope",
+    "azure_username"
+   ],
+   "reads_api_version": [
+    "AZURE_AI_API_VERSION",
+    "AZURE_API_VERSION",
+    "AZURE_DEFAULT_RESPONSES_API_VERSION",
+    "AZURE_DOCUMENT_INTELLIGENCE_API_VERSION"
+   ],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "azure_ai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "AZURE_AI",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "azure_ai",
+   "env_config": [
+    "AZURE_AI_API_BASE",
+    "AZURE_AI_API_VERSION",
+    "AZURE_API_BASE",
+    "AZURE_API_VERSION",
+    "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"
+   ],
+   "env_direct_config": [
+    "AZURE_AI_API_BASE",
+    "AZURE_AI_API_VERSION",
+    "AZURE_API_BASE",
+    "AZURE_API_VERSION",
+    "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"
+   ],
+   "env_direct_secret": [
+    "AZURE_AI_API_KEY"
+   ],
+   "env_secret": [
+    "AZURE_AI_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "anthropic_messages",
+    "image_edit",
+    "image_generation",
+    "ocr",
+    "rerank",
+    "text_completion",
+    "vector_stores"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [
+    "azure_search_service_name",
+    "azure_search_vector_field"
+   ],
+   "reads_api_version": [
+    "AZURE_AI_API_VERSION",
+    "AZURE_API_VERSION"
+   ],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "azure_text": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "AZURE_TEXT",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "azure",
+   "env_config": [
+    "AZURE_API_BASE",
+    "AZURE_API_VERSION",
+    "AZURE_AUTHORITY_HOST",
+    "AZURE_CLIENT_ID",
+    "AZURE_SCOPE",
+    "AZURE_SPEECH_API_BASE",
+    "AZURE_TENANT_ID",
+    "AZURE_USERNAME"
+   ],
+   "env_direct_config": [
+    "AZURE_API_BASE",
+    "AZURE_API_VERSION",
+    "AZURE_AUTHORITY_HOST",
+    "AZURE_CLIENT_ID",
+    "AZURE_SCOPE",
+    "AZURE_SPEECH_API_BASE",
+    "AZURE_TENANT_ID",
+    "AZURE_USERNAME"
+   ],
+   "env_direct_secret": [
+    "AZURE_AD_TOKEN",
+    "AZURE_API_KEY",
+    "AZURE_CLIENT_SECRET",
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_PASSWORD",
+    "AZURE_SPEECH_API_KEY"
+   ],
+   "env_secret": [
+    "AZURE_AD_TOKEN",
+    "AZURE_API_KEY",
+    "AZURE_CLIENT_SECRET",
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_PASSWORD",
+    "AZURE_SPEECH_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "container"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "azure_ad_token",
+    "azure_ad_token_provider",
+    "azure_password",
+    "azure_scope",
+    "azure_username"
+   ],
+   "reads_api_version": [
+    "AZURE_API_VERSION"
+   ],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "baseten": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "BASETEN",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://inference.baseten.co/v1",
+   "dir": "baseten",
+   "env_config": [
+    "BASETEN_API_BASE"
+   ],
+   "env_direct_config": [
+    "BASETEN_API_BASE"
+   ],
+   "env_direct_secret": [
+    "BASETEN_API_KEY"
+   ],
+   "env_secret": [
+    "BASETEN_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "bedrock": {
+   "aws_base": true,
+   "chat_config": true,
+   "const": "BEDROCK",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "bedrock",
+   "env_config": [
+    "AGENTCORE_GATEWAY_URL",
+    "AGENTCORE_MCP_PROTOCOL_VERSION",
+    "AGENTCORE_SEARCH_TOOL_NAME",
+    "ANTHROPIC_AWS_API_BASE",
+    "ANTHROPIC_AWS_BASE_URL",
+    "ANTHROPIC_AWS_WORKSPACE_ID",
+    "ANTHROPIC_WORKSPACE_ID",
+    "AWS_BATCH_ROLE_ARN",
+    "AWS_BEARER_TOKEN_BEDROCK",
+    "AWS_BEDROCK_RUNTIME_ENDPOINT",
+    "AWS_DEFAULT_REGION",
+    "AWS_REGION",
+    "AWS_REGION_NAME",
+    "AWS_ROLE_ARN",
+    "AWS_S3_BUCKET_NAME",
+    "AWS_S3_ENCRYPTION_KEY_ID",
+    "AWS_S3_OUTPUT_BUCKET_NAME",
+    "AWS_WEB_IDENTITY_TOKEN_FILE",
+    "BEDROCK_API_BASE",
+    "BEDROCK_MANTLE_API_BASE",
+    "BEDROCK_MANTLE_REGION",
+    "BEDROCK_MAX_POLICY_SIZE",
+    "BEDROCK_MIN_THINKING_BUDGET_TOKENS"
+   ],
+   "env_direct_config": [
+    "AGENTCORE_GATEWAY_URL",
+    "AGENTCORE_MCP_PROTOCOL_VERSION",
+    "AGENTCORE_SEARCH_TOOL_NAME",
+    "ANTHROPIC_AWS_API_BASE",
+    "ANTHROPIC_AWS_BASE_URL",
+    "ANTHROPIC_AWS_WORKSPACE_ID",
+    "ANTHROPIC_WORKSPACE_ID",
+    "AWS_BATCH_ROLE_ARN",
+    "AWS_BEARER_TOKEN_BEDROCK",
+    "AWS_BEDROCK_RUNTIME_ENDPOINT",
+    "AWS_DEFAULT_REGION",
+    "AWS_REGION",
+    "AWS_REGION_NAME",
+    "AWS_ROLE_ARN",
+    "AWS_S3_BUCKET_NAME",
+    "AWS_S3_ENCRYPTION_KEY_ID",
+    "AWS_S3_OUTPUT_BUCKET_NAME",
+    "AWS_WEB_IDENTITY_TOKEN_FILE",
+    "BEDROCK_MANTLE_API_BASE"
+   ],
+   "env_direct_secret": [
+    "ANTHROPIC_AWS_API_KEY"
+   ],
+   "env_secret": [
+    "ANTHROPIC_AWS_API_KEY",
+    "BEDROCK_MANTLE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "anthropic_messages",
+    "batches",
+    "files",
+    "image_edit",
+    "passthrough",
+    "text_completion",
+    "vector_store",
+    "vector_stores"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "bedrock_tags"
+   ],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "bedrock_mantle": {
+   "aws_base": true,
+   "chat_config": true,
+   "const": "BEDROCK_MANTLE",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "bedrock_mantle",
+   "env_config": [
+    "AWS_BEARER_TOKEN_BEDROCK",
+    "AWS_REGION",
+    "AWS_REGION_NAME",
+    "BEDROCK_MANTLE_API_BASE",
+    "BEDROCK_MANTLE_REGION"
+   ],
+   "env_direct_config": [
+    "AWS_BEARER_TOKEN_BEDROCK",
+    "AWS_REGION",
+    "AWS_REGION_NAME",
+    "BEDROCK_MANTLE_API_BASE",
+    "BEDROCK_MANTLE_REGION"
+   ],
+   "env_direct_secret": [
+    "BEDROCK_MANTLE_API_KEY"
+   ],
+   "env_secret": [
+    "BEDROCK_MANTLE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "passthrough",
+    "responses_api"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "black_forest_labs": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "BLACK_FOREST_LABS",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "black_forest_labs",
+   "env_config": [
+    "BFL_API_BASE"
+   ],
+   "env_direct_config": [
+    "BFL_API_BASE"
+   ],
+   "env_direct_secret": [
+    "BFL_API_KEY",
+    "BLACK_FOREST_LABS_API_KEY"
+   ],
+   "env_secret": [
+    "BFL_API_KEY",
+    "BLACK_FOREST_LABS_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "image_edit",
+    "image_generation"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "bytez": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "BYTEZ",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "bytez",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "BYTEZ_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "cerebras": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "CEREBRAS",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.cerebras.ai/v1",
+   "dir": "cerebras",
+   "env_config": [
+    "CEREBRAS_API_BASE"
+   ],
+   "env_direct_config": [
+    "CEREBRAS_API_BASE"
+   ],
+   "env_direct_secret": [
+    "CEREBRAS_API_KEY"
+   ],
+   "env_secret": [
+    "CEREBRAS_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "charity_engine": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "CHARITY_ENGINE",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.charityengine.services/remotejobs/v2/inference",
+   "dir": null,
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "CHARITY_ENGINE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "CHARITY_ENGINE_API_KEY",
+   "json_base_url": "https://api.charityengine.services/remotejobs/v2/inference",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "chatgpt": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "CHATGPT",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "chatgpt",
+   "env_config": [
+    "ALACRITTY_SOCKET",
+    "CHATGPT_API_BASE",
+    "CHATGPT_AUTH_FILE",
+    "CHATGPT_DEFAULT_INSTRUCTIONS",
+    "CHATGPT_ORIGINATOR",
+    "CHATGPT_TOKEN_DIR",
+    "CHATGPT_USER_AGENT",
+    "CHATGPT_USER_AGENT_SUFFIX",
+    "GNOME_TERMINAL_SCREEN",
+    "ITERM_PROFILE",
+    "ITERM_PROFILE_NAME",
+    "ITERM_SESSION_ID",
+    "KITTY_WINDOW_ID",
+    "KONSOLE_VERSION",
+    "OPENAI_CHATGPT_API_BASE",
+    "TERM",
+    "TERM_PROGRAM",
+    "TERM_PROGRAM_VERSION",
+    "TERM_SESSION_ID",
+    "VTE_VERSION",
+    "WEZTERM_VERSION",
+    "WT_SESSION"
+   ],
+   "env_direct_config": [
+    "ALACRITTY_SOCKET",
+    "CHATGPT_API_BASE",
+    "CHATGPT_AUTH_FILE",
+    "CHATGPT_DEFAULT_INSTRUCTIONS",
+    "CHATGPT_ORIGINATOR",
+    "CHATGPT_TOKEN_DIR",
+    "CHATGPT_USER_AGENT",
+    "CHATGPT_USER_AGENT_SUFFIX",
+    "GNOME_TERMINAL_SCREEN",
+    "ITERM_PROFILE",
+    "ITERM_PROFILE_NAME",
+    "ITERM_SESSION_ID",
+    "KITTY_WINDOW_ID",
+    "KONSOLE_VERSION",
+    "OPENAI_CHATGPT_API_BASE",
+    "TERM",
+    "TERM_PROGRAM",
+    "TERM_PROGRAM_VERSION",
+    "TERM_SESSION_ID",
+    "VTE_VERSION",
+    "WEZTERM_VERSION",
+    "WT_SESSION"
+   ],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "responses_api"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "chutes": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "CHUTES",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": "https://llm.chutes.ai/v1/",
+   "dir": null,
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "CHUTES_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "CHUTES_API_KEY",
+   "json_base_url": "https://llm.chutes.ai/v1/",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "clarifai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "CLARIFAI",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "clarifai",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [
+    "CLARIFAI_API_KEY"
+   ],
+   "env_secret": [
+    "CLARIFAI_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "text_completion"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "cloudflare": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "CLOUDFLARE",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "cloudflare",
+   "env_config": [
+    "CLOUDFLARE_ACCOUNT_ID",
+    "CLOUDFLARE_API_BASE"
+   ],
+   "env_direct_config": [
+    "CLOUDFLARE_ACCOUNT_ID"
+   ],
+   "env_direct_secret": [],
+   "env_secret": [
+    "CLOUDFLARE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "codestral": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "CODESTRAL",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://codestral.mistral.ai/v1",
+   "dir": "codestral",
+   "env_config": [
+    "CODESTRAL_API_BASE"
+   ],
+   "env_direct_config": [
+    "CODESTRAL_API_BASE"
+   ],
+   "env_direct_secret": [
+    "CODESTRAL_API_KEY"
+   ],
+   "env_secret": [
+    "CODESTRAL_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "cognition": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "COGNITION",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.cognition.ai/v1",
+   "dir": null,
+   "env_config": [
+    "COGNITION_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "COGNITION_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "COGNITION_API_KEY",
+   "json_base_url": "https://api.cognition.ai/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "cohere": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "COHERE",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "cohere",
+   "env_config": [
+    "COHERE_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [
+    "COHERE_API_KEY",
+    "CO_API_KEY"
+   ],
+   "env_secret": [
+    "COHERE_API_KEY",
+    "CO_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "embedding",
+    "ocr",
+    "rerank"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "cohere_chat": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "COHERE_CHAT",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "cohere",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [
+    "COHERE_API_KEY",
+    "CO_API_KEY"
+   ],
+   "env_secret": [
+    "COHERE_API_KEY",
+    "CO_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "embedding",
+    "rerank"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "cometapi": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "COMETAPI",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "cometapi",
+   "env_config": [
+    "COMETAPI_API_BASE",
+    "COMETAPI_BASE_URL"
+   ],
+   "env_direct_config": [
+    "COMETAPI_API_BASE",
+    "COMETAPI_BASE_URL"
+   ],
+   "env_direct_secret": [
+    "COMETAPI_API_KEY",
+    "COMETAPI_KEY"
+   ],
+   "env_secret": [
+    "COMETAPI_API_KEY",
+    "COMETAPI_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding",
+    "image_generation"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "compactifai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "COMPACTIFAI",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "compactifai",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [
+    "COMPACTIFAI_API_KEY"
+   ],
+   "env_secret": [
+    "COMPACTIFAI_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "cursor": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "CURSOR",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": null,
+   "env_config": [
+    "CURSOR_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "custom": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "CUSTOM",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": null,
+   "env_config": [
+    "CUSTOM_TIKTOKEN_CACHE_DIR"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "custom_openai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "CUSTOM_OPENAI",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "openai",
+   "env_config": [
+    "OPENAI_API_BASE",
+    "OPENAI_BASE_URL",
+    "OPENAI_IDENTITY_PROVIDER_ID",
+    "OPENAI_IDENTITY_TOKEN_FILE",
+    "OPENAI_ORGANIZATION",
+    "OPENAI_SERVICE_ACCOUNT_ID"
+   ],
+   "env_direct_config": [
+    "OPENAI_API_BASE",
+    "OPENAI_BASE_URL",
+    "OPENAI_IDENTITY_PROVIDER_ID",
+    "OPENAI_IDENTITY_TOKEN_FILE",
+    "OPENAI_ORGANIZATION",
+    "OPENAI_SERVICE_ACCOUNT_ID"
+   ],
+   "env_direct_secret": [
+    "OPENAI_API_KEY"
+   ],
+   "env_secret": [
+    "OPENAI_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "custom_llm_provider"
+   ],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "darkbloom": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "DARKBLOOM",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.darkbloom.dev/v1",
+   "dir": null,
+   "env_config": [
+    "DARKBLOOM_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "DARKBLOOM_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "DARKBLOOM_API_KEY",
+   "json_base_url": "https://api.darkbloom.dev/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "dashscope": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "DASHSCOPE",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": null,
+   "dir": "dashscope",
+   "env_config": [
+    "DASHSCOPE_API_BASE",
+    "DASHSCOPE_API_BASE_IMAGE",
+    "DASHSCOPE_API_BASE_RERANK",
+    "QWENCLOUD_API_BASE",
+    "QWENCLOUD_API_BASE_IMAGE",
+    "QWENCLOUD_API_BASE_RERANK",
+    "QWEN_AI_PLATFORM_API_BASE",
+    "QWEN_AI_PLATFORM_API_BASE_IMAGE",
+    "QWEN_AI_PLATFORM_API_BASE_RERANK"
+   ],
+   "env_direct_config": [
+    "DASHSCOPE_API_BASE",
+    "DASHSCOPE_API_BASE_IMAGE",
+    "DASHSCOPE_API_BASE_RERANK",
+    "QWENCLOUD_API_BASE",
+    "QWENCLOUD_API_BASE_IMAGE",
+    "QWENCLOUD_API_BASE_RERANK",
+    "QWEN_AI_PLATFORM_API_BASE",
+    "QWEN_AI_PLATFORM_API_BASE_IMAGE",
+    "QWEN_AI_PLATFORM_API_BASE_RERANK"
+   ],
+   "env_direct_secret": [
+    "DASHSCOPE_API_KEY",
+    "QWENCLOUD_API_KEY",
+    "QWEN_AI_PLATFORM_API_KEY"
+   ],
+   "env_secret": [
+    "DASHSCOPE_API_KEY",
+    "QWENCLOUD_API_KEY",
+    "QWEN_AI_PLATFORM_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding",
+    "image_generation",
+    "rerank"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "databricks": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "DATABRICKS",
+   "declared_openai_compatible": false,
+   "declared_openai_like": true,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "databricks",
+   "env_config": [
+    "DATABRICKS_API_BASE",
+    "DATABRICKS_CLIENT_ID",
+    "DATABRICKS_USER_AGENT",
+    "LITELLM_USER_AGENT"
+   ],
+   "env_direct_config": [
+    "DATABRICKS_API_BASE",
+    "DATABRICKS_CLIENT_ID",
+    "DATABRICKS_USER_AGENT",
+    "LITELLM_USER_AGENT"
+   ],
+   "env_direct_secret": [
+    "DATABRICKS_API_KEY",
+    "DATABRICKS_CLIENT_SECRET"
+   ],
+   "env_secret": [
+    "DATABRICKS_API_KEY",
+    "DATABRICKS_CLIENT_SECRET"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "responses_api"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "datarobot": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "DATAROBOT",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "datarobot",
+   "env_config": [
+    "DATAROBOT_ENDPOINT"
+   ],
+   "env_direct_config": [
+    "DATAROBOT_ENDPOINT"
+   ],
+   "env_direct_secret": [
+    "DATAROBOT_API_TOKEN"
+   ],
+   "env_secret": [
+    "DATAROBOT_API_TOKEN"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "deepgram": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "DEEPGRAM",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "deepgram",
+   "env_config": [
+    "DEEPGRAM_API_BASE"
+   ],
+   "env_direct_config": [
+    "DEEPGRAM_API_BASE"
+   ],
+   "env_direct_secret": [
+    "DEEPGRAM_API_KEY"
+   ],
+   "env_secret": [
+    "DEEPGRAM_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "audio_transcription"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "deepinfra": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "DEEPINFRA",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "deepinfra",
+   "env_config": [
+    "DEEPINFRA_API_BASE"
+   ],
+   "env_direct_config": [
+    "DEEPINFRA_API_BASE"
+   ],
+   "env_direct_secret": [
+    "DEEPINFRA_API_KEY"
+   ],
+   "env_secret": [
+    "DEEPINFRA_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "rerank"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "deepseek": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "DEEPSEEK",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.deepseek.com/beta",
+   "dir": "deepseek",
+   "env_config": [
+    "DEEPSEEK_ANTHROPIC_API_BASE",
+    "DEEPSEEK_API_BASE"
+   ],
+   "env_direct_config": [
+    "DEEPSEEK_ANTHROPIC_API_BASE",
+    "DEEPSEEK_API_BASE"
+   ],
+   "env_direct_secret": [
+    "DEEPSEEK_API_KEY"
+   ],
+   "env_secret": [
+    "DEEPSEEK_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "anthropic_messages"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "docker_model_runner": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "DOCKER_MODEL_RUNNER",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "docker_model_runner",
+   "env_config": [
+    "DOCKER_MODEL_RUNNER_API_BASE"
+   ],
+   "env_direct_config": [
+    "DOCKER_MODEL_RUNNER_API_BASE"
+   ],
+   "env_direct_secret": [
+    "DOCKER_MODEL_RUNNER_API_KEY"
+   ],
+   "env_secret": [
+    "DOCKER_MODEL_RUNNER_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "dotprompt": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "DOTPROMPT",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": null,
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "elevenlabs": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "ELEVENLABS",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "elevenlabs",
+   "env_config": [
+    "ELEVENLABS_API_BASE"
+   ],
+   "env_direct_config": [
+    "ELEVENLABS_API_BASE"
+   ],
+   "env_direct_secret": [
+    "ELEVENLABS_API_KEY"
+   ],
+   "env_secret": [
+    "ELEVENLABS_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "audio_transcription",
+    "text_to_speech"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "empower": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "EMPOWER",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://app.empower.dev/api/v1",
+   "dir": "empower",
+   "env_config": [
+    "EMPOWER_API_BASE"
+   ],
+   "env_direct_config": [
+    "EMPOWER_API_BASE"
+   ],
+   "env_direct_secret": [
+    "EMPOWER_API_KEY"
+   ],
+   "env_secret": [
+    "EMPOWER_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "fal_ai": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "FAL_AI",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "fal_ai",
+   "env_config": [
+    "FAL_AI_API_BASE"
+   ],
+   "env_direct_config": [
+    "FAL_AI_API_BASE"
+   ],
+   "env_direct_secret": [
+    "FAL_AI_API_KEY"
+   ],
+   "env_secret": [
+    "FAL_AI_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "image_generation"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "featherless_ai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "FEATHERLESS_AI",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": null,
+   "dir": "featherless_ai",
+   "env_config": [
+    "FEATHERLESS_AI_API_BASE",
+    "FEATHERLESS_API_BASE"
+   ],
+   "env_direct_config": [
+    "FEATHERLESS_AI_API_BASE",
+    "FEATHERLESS_API_BASE"
+   ],
+   "env_direct_secret": [
+    "FEATHERLESS_AI_API_KEY",
+    "FEATHERLESS_API_KEY"
+   ],
+   "env_secret": [
+    "FEATHERLESS_AI_API_KEY",
+    "FEATHERLESS_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "fireworks_ai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "FIREWORKS_AI",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": null,
+   "dir": "fireworks_ai",
+   "env_config": [
+    "FIREWORKS_ACCOUNT_ID",
+    "FIREWORKS_AI_16_B",
+    "FIREWORKS_AI_176_B_MOE",
+    "FIREWORKS_AI_4_B",
+    "FIREWORKS_AI_56_B_MOE",
+    "FIREWORKS_AI_80_B",
+    "FIREWORKS_AI_API_BASE",
+    "FIREWORKS_API_BASE"
+   ],
+   "env_direct_config": [
+    "FIREWORKS_ACCOUNT_ID",
+    "FIREWORKS_API_BASE"
+   ],
+   "env_direct_secret": [
+    "FIREWORKSAI_API_KEY",
+    "FIREWORKS_AI_API_KEY",
+    "FIREWORKS_AI_TOKEN",
+    "FIREWORKS_API_KEY"
+   ],
+   "env_secret": [
+    "FIREWORKSAI_API_KEY",
+    "FIREWORKS_AI_API_KEY",
+    "FIREWORKS_AI_TOKEN",
+    "FIREWORKS_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "rerank",
+    "text_completion"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "friendliai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "FRIENDLIAI",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.friendli.ai/serverless/v1",
+   "dir": "friendliai",
+   "env_config": [
+    "FRIENDLI_API_BASE"
+   ],
+   "env_direct_config": [
+    "FRIENDLI_API_BASE"
+   ],
+   "env_direct_secret": [
+    "FRIENDLIAI_API_KEY",
+    "FRIENDLI_TOKEN"
+   ],
+   "env_secret": [
+    "FRIENDLIAI_API_KEY",
+    "FRIENDLI_TOKEN"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "galadriel": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "GALADRIEL",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.galadriel.com/v1",
+   "dir": "galadriel",
+   "env_config": [
+    "GALADRIEL_API_BASE"
+   ],
+   "env_direct_config": [
+    "GALADRIEL_API_BASE"
+   ],
+   "env_direct_secret": [
+    "GALADRIEL_API_KEY"
+   ],
+   "env_secret": [
+    "GALADRIEL_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "gdc": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "GDC",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "gdc",
+   "env_config": [
+    "GDC_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "GDC_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "gdc_token_caching"
+   ],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "gemini": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "GEMINI",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "gemini",
+   "env_config": [
+    "GEMINI_API_BASE"
+   ],
+   "env_direct_config": [
+    "GEMINI_API_BASE"
+   ],
+   "env_direct_secret": [
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY"
+   ],
+   "env_secret": [
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "audio_transcription",
+    "files",
+    "google_genai_generate_content",
+    "image_edit",
+    "image_generation",
+    "realtime",
+    "text_completion",
+    "vector_stores",
+    "video"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": true
+  },
+  "gigachat": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "GIGACHAT",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://gigachat.devices.sberbank.ru/api/v1",
+   "dir": "gigachat",
+   "env_config": [
+    "GIGACHAT_API_BASE",
+    "GIGACHAT_AUTH_URL",
+    "GIGACHAT_SCOPE"
+   ],
+   "env_direct_config": [
+    "GIGACHAT_API_BASE",
+    "GIGACHAT_AUTH_URL",
+    "GIGACHAT_SCOPE"
+   ],
+   "env_direct_secret": [
+    "GIGACHAT_ACCESS_TOKEN",
+    "GIGACHAT_API_KEY",
+    "GIGACHAT_CREDENTIALS"
+   ],
+   "env_secret": [
+    "GIGACHAT_ACCESS_TOKEN",
+    "GIGACHAT_API_KEY",
+    "GIGACHAT_CREDENTIALS"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "embedding",
+    "passthrough"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "github": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "GITHUB",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://models.inference.ai.azure.com",
+   "dir": "github",
+   "env_config": [
+    "GITHUB_API_BASE",
+    "GITHUB_COPILOT_ACCESS_TOKEN_FILE",
+    "GITHUB_COPILOT_ACCESS_TOKEN_URL",
+    "GITHUB_COPILOT_API_BASE",
+    "GITHUB_COPILOT_API_KEY_FILE",
+    "GITHUB_COPILOT_API_KEY_URL",
+    "GITHUB_COPILOT_CLIENT_ID",
+    "GITHUB_COPILOT_DEVICE_CODE_URL",
+    "GITHUB_COPILOT_TOKEN_DIR"
+   ],
+   "env_direct_config": [
+    "GITHUB_API_BASE"
+   ],
+   "env_direct_secret": [
+    "GITHUB_API_KEY"
+   ],
+   "env_secret": [
+    "GITHUB_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "github_copilot": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "GITHUB_COPILOT",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "github_copilot",
+   "env_config": [
+    "GITHUB_COPILOT_ACCESS_TOKEN_FILE",
+    "GITHUB_COPILOT_ACCESS_TOKEN_URL",
+    "GITHUB_COPILOT_API_BASE",
+    "GITHUB_COPILOT_API_KEY_FILE",
+    "GITHUB_COPILOT_API_KEY_URL",
+    "GITHUB_COPILOT_CLIENT_ID",
+    "GITHUB_COPILOT_DEVICE_CODE_URL",
+    "GITHUB_COPILOT_TOKEN_DIR"
+   ],
+   "env_direct_config": [
+    "GITHUB_COPILOT_ACCESS_TOKEN_FILE",
+    "GITHUB_COPILOT_ACCESS_TOKEN_URL",
+    "GITHUB_COPILOT_API_BASE",
+    "GITHUB_COPILOT_API_KEY_FILE",
+    "GITHUB_COPILOT_API_KEY_URL",
+    "GITHUB_COPILOT_CLIENT_ID",
+    "GITHUB_COPILOT_DEVICE_CODE_URL",
+    "GITHUB_COPILOT_TOKEN_DIR"
+   ],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "anthropic_messages",
+    "embedding",
+    "responses_api"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "gradient_ai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "GRADIENT_AI",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "gradient_ai",
+   "env_config": [
+    "GRADIENT_AI_AGENT_ENDPOINT"
+   ],
+   "env_direct_config": [
+    "GRADIENT_AI_AGENT_ENDPOINT"
+   ],
+   "env_direct_secret": [
+    "GRADIENT_AI_API_KEY"
+   ],
+   "env_secret": [
+    "GRADIENT_AI_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "groq": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "GROQ",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "groq",
+   "env_config": [
+    "GROQ_API_BASE"
+   ],
+   "env_direct_config": [
+    "GROQ_API_BASE"
+   ],
+   "env_direct_secret": [
+    "GROQ_API_KEY"
+   ],
+   "env_secret": [
+    "GROQ_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "helicone": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "HELICONE",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://ai-gateway.helicone.ai/",
+   "dir": null,
+   "env_config": [
+    "HELICONE_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "HELICONE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "HELICONE_API_KEY",
+   "json_base_url": "https://ai-gateway.helicone.ai/",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "heroku": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "HEROKU",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "heroku",
+   "env_config": [
+    "HEROKU_API_BASE"
+   ],
+   "env_direct_config": [
+    "HEROKU_API_BASE"
+   ],
+   "env_direct_secret": [
+    "HEROKU_API_KEY"
+   ],
+   "env_secret": [
+    "HEROKU_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "hosted_vllm": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "HOSTED_VLLM",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": null,
+   "dir": "hosted_vllm",
+   "env_config": [
+    "HOSTED_VLLM_API_BASE"
+   ],
+   "env_direct_config": [
+    "HOSTED_VLLM_API_BASE"
+   ],
+   "env_direct_secret": [
+    "HOSTED_VLLM_API_KEY"
+   ],
+   "env_secret": [
+    "HOSTED_VLLM_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "audio_transcription",
+    "embedding",
+    "passthrough",
+    "rerank",
+    "responses_api",
+    "text_completion",
+    "video"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "huggingface": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "HUGGINGFACE",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "huggingface",
+   "env_config": [
+    "HF_API_BASE",
+    "HUGGINGFACE_API_BASE"
+   ],
+   "env_direct_config": [
+    "HF_API_BASE",
+    "HUGGINGFACE_API_BASE"
+   ],
+   "env_direct_secret": [
+    "HUGGINGFACE_API_KEY"
+   ],
+   "env_secret": [
+    "HUGGINGFACE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "rerank"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "humanloop": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "HUMANLOOP",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": null,
+   "env_config": [
+    "HUMANLOOP_PROMPT_CACHE_TTL_SECONDS"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "HUMANLOOP_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "hyperbolic": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "HYPERBOLIC",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": null,
+   "dir": "hyperbolic",
+   "env_config": [
+    "HYPERBOLIC_API_BASE"
+   ],
+   "env_direct_config": [
+    "HYPERBOLIC_API_BASE"
+   ],
+   "env_direct_secret": [
+    "HYPERBOLIC_API_KEY"
+   ],
+   "env_secret": [
+    "HYPERBOLIC_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "inception": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "INCEPTION",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "inception",
+   "env_config": [
+    "INCEPTION_API_BASE"
+   ],
+   "env_direct_config": [
+    "INCEPTION_API_BASE"
+   ],
+   "env_direct_secret": [
+    "INCEPTION_API_KEY"
+   ],
+   "env_secret": [
+    "INCEPTION_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "infinity": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "INFINITY",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "infinity",
+   "env_config": [
+    "INFINITY_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [
+    "INFINITY_API_KEY"
+   ],
+   "env_secret": [
+    "INFINITY_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding",
+    "rerank"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "jina_ai": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "JINA_AI",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "jina_ai",
+   "env_config": [
+    "JINA_AI_API_BASE"
+   ],
+   "env_direct_config": [
+    "JINA_AI_API_BASE"
+   ],
+   "env_direct_secret": [
+    "JINA_AI_API_KEY",
+    "JINA_AI_TOKEN",
+    "JINA_API_KEY"
+   ],
+   "env_secret": [
+    "JINA_AI_API_KEY",
+    "JINA_AI_TOKEN",
+    "JINA_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding",
+    "rerank"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "lambda_ai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "LAMBDA_AI",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": null,
+   "dir": "lambda_ai",
+   "env_config": [
+    "LAMBDA_API_BASE"
+   ],
+   "env_direct_config": [
+    "LAMBDA_API_BASE"
+   ],
+   "env_direct_secret": [
+    "LAMBDA_API_KEY"
+   ],
+   "env_secret": [
+    "LAMBDA_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "langflow": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "LANGFLOW",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "langflow",
+   "env_config": [
+    "LANGFLOW_API_BASE"
+   ],
+   "env_direct_config": [
+    "LANGFLOW_API_BASE"
+   ],
+   "env_direct_secret": [
+    "LANGFLOW_API_KEY"
+   ],
+   "env_secret": [
+    "LANGFLOW_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "langfuse": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "LANGFUSE",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": null,
+   "env_config": [
+    "LANGFUSE_DEBUG",
+    "LANGFUSE_FLUSH_INTERVAL",
+    "LANGFUSE_HOST",
+    "LANGFUSE_OTEL_HOST",
+    "LANGFUSE_RELEASE",
+    "LANGFUSE_TRACING_ENVIRONMENT"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "LANGFUSE_PUBLIC_KEY",
+    "LANGFUSE_SECRET_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "langgraph": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "LANGGRAPH",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "http://localhost:2024",
+   "dir": "langgraph",
+   "env_config": [
+    "LANGGRAPH_API_BASE"
+   ],
+   "env_direct_config": [
+    "LANGGRAPH_API_BASE"
+   ],
+   "env_direct_secret": [
+    "LANGGRAPH_API_KEY"
+   ],
+   "env_secret": [
+    "LANGGRAPH_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "lemonade": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "LEMONADE",
+   "declared_openai_compatible": false,
+   "declared_openai_like": true,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "lemonade",
+   "env_config": [
+    "LEMONADE_API_BASE"
+   ],
+   "env_direct_config": [
+    "LEMONADE_API_BASE"
+   ],
+   "env_direct_secret": [
+    "LEMONADE_API_KEY"
+   ],
+   "env_secret": [
+    "LEMONADE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "text_completion"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "libertai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "LIBERTAI",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.libertai.io/v1",
+   "dir": null,
+   "env_config": [
+    "LIBERTAI_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "LIBERTAI_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "LIBERTAI_API_KEY",
+   "json_base_url": "https://api.libertai.io/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "litellm_agent": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "LITELLM_AGENT",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": null,
+   "env_config": [
+    "LITELLM_AGENT_HEALTH_CHECK_GATHER_TIMEOUT",
+    "LITELLM_AGENT_HEALTH_CHECK_TIMEOUT"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "litellm_proxy": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "LITELLM_PROXY",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "litellm_proxy",
+   "env_config": [
+    "LITELLM_PROXY_API_BASE"
+   ],
+   "env_direct_config": [
+    "LITELLM_PROXY_API_BASE"
+   ],
+   "env_direct_secret": [
+    "LITELLM_PROXY_API_KEY"
+   ],
+   "env_secret": [
+    "LITELLM_PROXY_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "image_edit",
+    "image_generation",
+    "responses_api",
+    "text_completion"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "llamafile": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "LLAMAFILE",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": null,
+   "dir": "llamafile",
+   "env_config": [
+    "LLAMAFILE_API_BASE"
+   ],
+   "env_direct_config": [
+    "LLAMAFILE_API_BASE"
+   ],
+   "env_direct_secret": [
+    "LLAMAFILE_API_KEY"
+   ],
+   "env_secret": [
+    "LLAMAFILE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "lm_studio": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "LM_STUDIO",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "lm_studio",
+   "env_config": [
+    "LM_STUDIO_API_BASE"
+   ],
+   "env_direct_config": [
+    "LM_STUDIO_API_BASE"
+   ],
+   "env_direct_secret": [
+    "LM_STUDIO_API_KEY"
+   ],
+   "env_secret": [
+    "LM_STUDIO_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "manus": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "MANUS",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.manus.im",
+   "dir": "manus",
+   "env_config": [
+    "MANUS_API_BASE"
+   ],
+   "env_direct_config": [
+    "MANUS_API_BASE"
+   ],
+   "env_direct_secret": [
+    "MANUS_API_KEY"
+   ],
+   "env_secret": [
+    "MANUS_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "files",
+    "responses_api"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "maritalk": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "MARITALK",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": null,
+   "env_config": [
+    "MARITALK_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "MARITALK_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "meta": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "META",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.meta.ai/v1",
+   "dir": null,
+   "env_config": [
+    "META_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "META_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "META_API_KEY",
+   "json_base_url": "https://api.meta.ai/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "meta_llama": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "LLAMA",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": "https://api.llama.com/compat/v1",
+   "dir": "meta_llama",
+   "env_config": [
+    "LLAMA_API_BASE"
+   ],
+   "env_direct_config": [
+    "LLAMA_API_BASE"
+   ],
+   "env_direct_secret": [
+    "LLAMA_API_KEY"
+   ],
+   "env_secret": [
+    "LLAMA_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "milvus": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "MILVUS",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "milvus",
+   "env_config": [
+    "MILVUS_API_BASE"
+   ],
+   "env_direct_config": [
+    "MILVUS_API_BASE"
+   ],
+   "env_direct_secret": [
+    "MILVUS_API_KEY"
+   ],
+   "env_secret": [
+    "MILVUS_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "vector_stores"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "milvus_db_name",
+    "milvus_partition_names",
+    "milvus_text_field"
+   ],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "minimax": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "MINIMAX",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "minimax",
+   "env_config": [
+    "MINIMAX_API_BASE"
+   ],
+   "env_direct_config": [
+    "MINIMAX_API_BASE"
+   ],
+   "env_direct_secret": [
+    "MINIMAX_API_KEY"
+   ],
+   "env_secret": [
+    "MINIMAX_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "anthropic_messages",
+    "text_to_speech"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "mistral": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "MISTRAL",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "mistral",
+   "env_config": [
+    "MISTRAL_API_BASE",
+    "MISTRAL_AZURE_API_BASE"
+   ],
+   "env_direct_config": [
+    "MISTRAL_AZURE_API_BASE"
+   ],
+   "env_direct_secret": [
+    "MISTRAL_API_KEY",
+    "MISTRAL_AZURE_API_KEY"
+   ],
+   "env_secret": [
+    "MISTRAL_API_KEY",
+    "MISTRAL_AZURE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "audio_transcription",
+    "ocr"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "modelscope": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "MODELSCOPE",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": null,
+   "dir": "modelscope",
+   "env_config": [
+    "MODELSCOPE_API_BASE"
+   ],
+   "env_direct_config": [
+    "MODELSCOPE_API_BASE"
+   ],
+   "env_direct_secret": [
+    "MODELSCOPE_API_KEY"
+   ],
+   "env_secret": [
+    "MODELSCOPE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "image_generation"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "mongodb": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "MONGODB",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "mongodb",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [
+    "MONGODB_SIDECAR_API_KEY"
+   ],
+   "env_secret": [
+    "MONGODB_SIDECAR_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "vector_stores"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "mongodb_connection_string"
+   ],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "moonshot": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "MOONSHOT",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": null,
+   "dir": "moonshot",
+   "env_config": [
+    "MOONSHOT_API_BASE"
+   ],
+   "env_direct_config": [
+    "MOONSHOT_API_BASE"
+   ],
+   "env_direct_secret": [
+    "MOONSHOT_API_KEY"
+   ],
+   "env_secret": [
+    "MOONSHOT_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "morph": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "MORPH",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "morph",
+   "env_config": [
+    "MORPH_API_BASE"
+   ],
+   "env_direct_config": [
+    "MORPH_API_BASE"
+   ],
+   "env_direct_secret": [
+    "MORPH_API_KEY"
+   ],
+   "env_secret": [
+    "MORPH_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "nano-gpt": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "NANOGPT",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": "https://nano-gpt.com/api/v1",
+   "dir": "openai_like",
+   "env_config": [
+    "OPENAI_LIKE_API_BASE"
+   ],
+   "env_direct_config": [
+    "OPENAI_LIKE_API_BASE"
+   ],
+   "env_direct_secret": [
+    "OPENAI_LIKE_API_KEY"
+   ],
+   "env_secret": [
+    "NANOGPT_API_KEY",
+    "OPENAI_LIKE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "NANOGPT_API_KEY",
+   "json_base_url": "https://nano-gpt.com/api/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "nebius": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "NEBIUS",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": "https://api.studio.nebius.ai/v1",
+   "dir": "nebius",
+   "env_config": [
+    "NEBIUS_API_BASE"
+   ],
+   "env_direct_config": [
+    "NEBIUS_API_BASE"
+   ],
+   "env_direct_secret": [
+    "NEBIUS_API_KEY"
+   ],
+   "env_secret": [
+    "NEBIUS_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "neosantara": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "NEOSANTARA",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.neosantara.xyz/v1",
+   "dir": null,
+   "env_config": [
+    "NEOSANTARA_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "NEOSANTARA_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "NEOSANTARA_API_KEY",
+   "json_base_url": "https://api.neosantara.xyz/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "nlp_cloud": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "NLP_CLOUD",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "nlp_cloud",
+   "env_config": [
+    "NLP_CLOUD_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "NLP_CLOUD_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "novita": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "NOVITA",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.novita.ai/v3/openai",
+   "dir": "novita",
+   "env_config": [
+    "NOVITA_API_BASE"
+   ],
+   "env_direct_config": [
+    "NOVITA_API_BASE"
+   ],
+   "env_direct_secret": [
+    "NOVITA_API_KEY"
+   ],
+   "env_secret": [
+    "NOVITA_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "nscale": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "NSCALE",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "nscale",
+   "env_config": [
+    "NSCALE_API_BASE"
+   ],
+   "env_direct_config": [
+    "NSCALE_API_BASE"
+   ],
+   "env_direct_secret": [
+    "NSCALE_API_KEY"
+   ],
+   "env_secret": [
+    "NSCALE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "nvidia_nim": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "NVIDIA_NIM",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://integrate.api.nvidia.com/v1",
+   "dir": "nvidia_nim",
+   "env_config": [
+    "NVIDIA_NIM_API_BASE"
+   ],
+   "env_direct_config": [
+    "NVIDIA_NIM_API_BASE"
+   ],
+   "env_direct_secret": [
+    "NVIDIA_NIM_API_KEY"
+   ],
+   "env_secret": [
+    "NVIDIA_NIM_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "rerank"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "nvidia_riva": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "NVIDIA_RIVA",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "nvidia_riva",
+   "env_config": [
+    "NVIDIA_RIVA_API_BASE"
+   ],
+   "env_direct_config": [
+    "NVIDIA_RIVA_API_BASE"
+   ],
+   "env_direct_secret": [
+    "NVIDIA_NIM_API_KEY",
+    "NVIDIA_RIVA_API_KEY"
+   ],
+   "env_secret": [
+    "NVIDIA_NIM_API_KEY",
+    "NVIDIA_RIVA_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "audio_transcription"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "oci": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "OCI",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "oci",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "oci_compartment_id",
+    "oci_endpoint_id",
+    "oci_fingerprint",
+    "oci_key",
+    "oci_key_file",
+    "oci_region",
+    "oci_serving_mode",
+    "oci_signer",
+    "oci_tenancy",
+    "oci_user"
+   ],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "ollama": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "OLLAMA",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "http://localhost:11434",
+   "dir": "ollama",
+   "env_config": [
+    "OLLAMA_API_BASE"
+   ],
+   "env_direct_config": [
+    "OLLAMA_API_BASE"
+   ],
+   "env_direct_secret": [
+    "OLLAMA_API_KEY"
+   ],
+   "env_secret": [
+    "OLLAMA_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "text_completion"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "ollama_chat": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "OLLAMA_CHAT",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "ollama",
+   "env_config": [
+    "OLLAMA_API_BASE"
+   ],
+   "env_direct_config": [
+    "OLLAMA_API_BASE"
+   ],
+   "env_direct_secret": [
+    "OLLAMA_API_KEY"
+   ],
+   "env_secret": [
+    "OLLAMA_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "text_completion"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "oobabooga": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "OOBABOOGA",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "oobabooga",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "openai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "OPENAI",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "openai",
+   "env_config": [
+    "OPENAI_API_BASE",
+    "OPENAI_BASE_URL",
+    "OPENAI_CHATGPT_API_BASE",
+    "OPENAI_FILE_SEARCH_COST_PER_1K_CALLS",
+    "OPENAI_IDENTITY_PROVIDER_ID",
+    "OPENAI_IDENTITY_TOKEN_FILE",
+    "OPENAI_LIKE_API_BASE",
+    "OPENAI_ORGANIZATION",
+    "OPENAI_PROJECT",
+    "OPENAI_SERVICE_ACCOUNT_ID"
+   ],
+   "env_direct_config": [
+    "OPENAI_API_BASE",
+    "OPENAI_BASE_URL",
+    "OPENAI_IDENTITY_PROVIDER_ID",
+    "OPENAI_IDENTITY_TOKEN_FILE",
+    "OPENAI_ORGANIZATION",
+    "OPENAI_SERVICE_ACCOUNT_ID"
+   ],
+   "env_direct_secret": [
+    "OPENAI_API_KEY"
+   ],
+   "env_secret": [
+    "OPENAI_API_KEY",
+    "OPENAI_LIKE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "audio_transcription",
+    "chat",
+    "container",
+    "evals_api",
+    "image_edit",
+    "image_generation",
+    "image_variation",
+    "realtime_http",
+    "responses_api",
+    "text_completion",
+    "vector_store_files",
+    "vector_stores",
+    "video"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "openai_like": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "OPENAI_LIKE",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "openai_like",
+   "env_config": [
+    "OPENAI_LIKE_API_BASE"
+   ],
+   "env_direct_config": [
+    "OPENAI_LIKE_API_BASE"
+   ],
+   "env_direct_secret": [
+    "OPENAI_LIKE_API_KEY"
+   ],
+   "env_secret": [
+    "OPENAI_LIKE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "openrouter": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "OPENROUTER",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "openrouter",
+   "env_config": [
+    "OPENROUTER_API_BASE",
+    "OR_APP_NAME",
+    "OR_SITE_URL"
+   ],
+   "env_direct_config": [
+    "OPENROUTER_API_BASE",
+    "OR_APP_NAME",
+    "OR_SITE_URL"
+   ],
+   "env_direct_secret": [
+    "OPENROUTER_API_KEY",
+    "OR_API_KEY"
+   ],
+   "env_secret": [
+    "OPENROUTER_API_KEY",
+    "OR_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding",
+    "image_edit",
+    "image_generation",
+    "responses_api"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "ovhcloud": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "OVHCLOUD",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "ovhcloud",
+   "env_config": [
+    "OVHCLOUD_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [
+    "OVHCLOUD_API_KEY"
+   ],
+   "env_secret": [
+    "OVHCLOUD_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "audio_transcription",
+    "embedding"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "parasail": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "PARASAIL",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.parasail.io/v1",
+   "dir": null,
+   "env_config": [
+    "PARASAIL_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "PARASAIL_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "PARASAIL_API_KEY",
+   "json_base_url": "https://api.parasail.io/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "perplexity": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "PERPLEXITY",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "perplexity",
+   "env_config": [
+    "PERPLEXITY_API_BASE"
+   ],
+   "env_direct_config": [
+    "PERPLEXITY_API_BASE"
+   ],
+   "env_direct_secret": [
+    "PERPLEXITYAI_API_KEY",
+    "PERPLEXITY_API_KEY"
+   ],
+   "env_secret": [
+    "PERPLEXITYAI_API_KEY",
+    "PERPLEXITY_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding",
+    "responses_api"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "petals": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "PETALS",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "petals",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "pg_vector": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "PG_VECTOR",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "pg_vector",
+   "env_config": [
+    "PG_VECTOR_API_BASE"
+   ],
+   "env_direct_config": [
+    "PG_VECTOR_API_BASE"
+   ],
+   "env_direct_secret": [
+    "PG_VECTOR_API_KEY"
+   ],
+   "env_secret": [
+    "PG_VECTOR_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "vector_stores"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "pinstripes": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "PINSTRIPES",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://pinstripes.io/v1",
+   "dir": null,
+   "env_config": [
+    "PINSTRIPES_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "PINSTRIPES_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "PINSTRIPES_API_KEY",
+   "json_base_url": "https://pinstripes.io/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "poe": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "POE",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": "https://api.poe.com/v1",
+   "dir": null,
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "POE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "POE_API_KEY",
+   "json_base_url": "https://api.poe.com/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "predibase": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "PREDIBASE",
+   "declared_openai_compatible": false,
+   "declared_openai_like": true,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "predibase",
+   "env_config": [
+    "PREDIBASE_API_BASE",
+    "PREDIBASE_TENANT_ID"
+   ],
+   "env_direct_config": [
+    "PREDIBASE_API_BASE"
+   ],
+   "env_direct_secret": [],
+   "env_secret": [
+    "PREDIBASE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "predibase_tenant_id"
+   ],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "publicai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "PUBLICAI",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": "https://api.publicai.co/v1",
+   "dir": null,
+   "env_config": [
+    "PUBLICAI_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "PUBLICAI_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "PUBLICAI_API_KEY",
+   "json_base_url": "https://api.publicai.co/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "qwen_ai_platform": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "QWEN_AI_PLATFORM",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": null,
+   "dir": null,
+   "env_config": [
+    "QWEN_AI_PLATFORM_API_BASE",
+    "QWEN_AI_PLATFORM_API_BASE_IMAGE",
+    "QWEN_AI_PLATFORM_API_BASE_RERANK"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "QWEN_AI_PLATFORM_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding",
+    "image_generation",
+    "rerank"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "qwencloud": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "QWENCLOUD",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": null,
+   "dir": null,
+   "env_config": [
+    "QWENCLOUD_API_BASE",
+    "QWENCLOUD_API_BASE_IMAGE",
+    "QWENCLOUD_API_BASE_RERANK"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "QWENCLOUD_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding",
+    "image_generation",
+    "rerank"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "ragflow": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "RAGFLOW",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "ragflow",
+   "env_config": [
+    "RAGFLOW_API_BASE"
+   ],
+   "env_direct_config": [
+    "RAGFLOW_API_BASE"
+   ],
+   "env_direct_secret": [
+    "RAGFLOW_API_KEY"
+   ],
+   "env_secret": [
+    "RAGFLOW_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "vector_stores"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "recraft": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "RECRAFT",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "recraft",
+   "env_config": [
+    "RECRAFT_API_BASE"
+   ],
+   "env_direct_config": [
+    "RECRAFT_API_BASE"
+   ],
+   "env_direct_secret": [
+    "RECRAFT_API_KEY"
+   ],
+   "env_secret": [
+    "RECRAFT_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "image_edit",
+    "image_generation"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "reducto": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "REDUCTO",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "reducto",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [
+    "REDUCTO_API_KEY"
+   ],
+   "env_secret": [
+    "REDUCTO_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "ocr"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "replicate": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "REPLICATE",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "replicate",
+   "env_config": [
+    "REPLICATE_API_BASE",
+    "REPLICATE_MODEL_NAME_WITH_ID_LENGTH",
+    "REPLICATE_POLLING_DELAY_SECONDS"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "REPLICATE_API_KEY",
+    "REPLICATE_API_TOKEN"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "runwayml": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "RUNWAYML",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "runwayml",
+   "env_config": [
+    "RUNWAYML_API_BASE",
+    "RUNWAYML_DEFAULT_API_VERSION",
+    "RUNWAYML_POLLING_TIMEOUT"
+   ],
+   "env_direct_config": [
+    "RUNWAYML_API_BASE"
+   ],
+   "env_direct_secret": [
+    "RUNWAYML_API_KEY",
+    "RUNWAYML_API_SECRET"
+   ],
+   "env_secret": [
+    "RUNWAYML_API_KEY",
+    "RUNWAYML_API_SECRET"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "image_generation",
+    "text_to_speech",
+    "video"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "runwayml_voice"
+   ],
+   "reads_api_version": [
+    "RUNWAYML_DEFAULT_API_VERSION"
+   ],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "s3_vectors": {
+   "aws_base": true,
+   "chat_config": false,
+   "const": "S3_VECTORS",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "s3_vectors",
+   "env_config": [
+    "S3_VECTORS_DEFAULT_DIMENSION",
+    "S3_VECTORS_DEFAULT_DISTANCE_METRIC"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "vector_stores"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "sagemaker": {
+   "aws_base": true,
+   "chat_config": true,
+   "const": "SAGEMAKER",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "sagemaker",
+   "env_config": [
+    "AWS_REGION",
+    "AWS_REGION_NAME"
+   ],
+   "env_direct_config": [
+    "AWS_REGION",
+    "AWS_REGION_NAME"
+   ],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "sagemaker_base_url"
+   ],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "sagemaker_chat": {
+   "aws_base": true,
+   "chat_config": true,
+   "const": "SAGEMAKER_CHAT",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "sagemaker",
+   "env_config": [
+    "AWS_REGION",
+    "AWS_REGION_NAME"
+   ],
+   "env_direct_config": [
+    "AWS_REGION",
+    "AWS_REGION_NAME"
+   ],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "sagemaker_base_url"
+   ],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "sagemaker_nova": {
+   "aws_base": true,
+   "chat_config": true,
+   "const": "SAGEMAKER_NOVA",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "sagemaker",
+   "env_config": [
+    "AWS_REGION",
+    "AWS_REGION_NAME"
+   ],
+   "env_direct_config": [
+    "AWS_REGION",
+    "AWS_REGION_NAME"
+   ],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "sagemaker_base_url"
+   ],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "sambanova": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "SAMBANOVA",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.sambanova.ai/v1",
+   "dir": "sambanova",
+   "env_config": [
+    "SAMBANOVA_API_BASE"
+   ],
+   "env_direct_config": [
+    "SAMBANOVA_API_BASE"
+   ],
+   "env_direct_secret": [
+    "SAMBANOVA_API_KEY"
+   ],
+   "env_secret": [
+    "SAMBANOVA_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "sap": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "SAP_GENERATIVE_AI_HUB",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "sap",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "scaleway": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "SCALEWAY",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.scaleway.ai/v1",
+   "dir": "scaleway",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [
+    "SCW_SECRET_KEY"
+   ],
+   "env_secret": [
+    "SCW_SECRET_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "SCW_SECRET_KEY",
+   "json_base_url": "https://api.scaleway.ai/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [
+    "audio_transcription"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "scx-ai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "SCX_AI",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.scx.ai/v1",
+   "dir": "openai_like",
+   "env_config": [
+    "OPENAI_LIKE_API_BASE",
+    "SCX_API_BASE"
+   ],
+   "env_direct_config": [
+    "OPENAI_LIKE_API_BASE"
+   ],
+   "env_direct_secret": [
+    "OPENAI_LIKE_API_KEY"
+   ],
+   "env_secret": [
+    "OPENAI_LIKE_API_KEY",
+    "SCX_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "SCX_API_KEY",
+   "json_base_url": "https://api.scx.ai/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "snowflake": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "SNOWFLAKE",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "snowflake",
+   "env_config": [
+    "SNOWFLAKE_ACCOUNT_ID"
+   ],
+   "env_direct_config": [
+    "SNOWFLAKE_ACCOUNT_ID"
+   ],
+   "env_direct_secret": [
+    "SNOWFLAKE_JWT"
+   ],
+   "env_secret": [
+    "SNOWFLAKE_JWT"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "soniox": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "SONIOX",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.soniox.com",
+   "dir": "soniox",
+   "env_config": [
+    "SONIOX_API_BASE"
+   ],
+   "env_direct_config": [
+    "SONIOX_API_BASE"
+   ],
+   "env_direct_secret": [
+    "SONIOX_API_KEY"
+   ],
+   "env_secret": [
+    "SONIOX_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "audio_transcription"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "stability": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "STABILITY",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "stability",
+   "env_config": [
+    "STABILITY_API_BASE"
+   ],
+   "env_direct_config": [
+    "STABILITY_API_BASE"
+   ],
+   "env_direct_secret": [
+    "STABILITY_API_KEY"
+   ],
+   "env_secret": [
+    "STABILITY_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "image_edit",
+    "image_generation"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "synthetic": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "SYNTHETIC",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": "https://api.synthetic.new/openai/v1",
+   "dir": null,
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "SYNTHETIC_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "SYNTHETIC_API_KEY",
+   "json_base_url": "https://api.synthetic.new/openai/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "tencent": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "TENCENT",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://tokenhub-intl.tencentcloudmaas.com/v1",
+   "dir": "tencent",
+   "env_config": [
+    "TENCENT_ANTHROPIC_API_BASE",
+    "TENCENT_API_BASE"
+   ],
+   "env_direct_config": [
+    "TENCENT_ANTHROPIC_API_BASE",
+    "TENCENT_API_BASE"
+   ],
+   "env_direct_secret": [
+    "TENCENT_API_KEY"
+   ],
+   "env_secret": [
+    "TENCENT_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "anthropic_messages"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "tensormesh": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "TENSORMESH",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": "https://serverless.tensormesh.ai/v1",
+   "dir": null,
+   "env_config": [
+    "TENSORMESH_SERVERLESS_BASE_URL"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "TENSORMESH_INFERENCE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "TENSORMESH_INFERENCE_API_KEY",
+   "json_base_url": "https://serverless.tensormesh.ai/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "text-completion-codestral": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "TEXT_COMPLETION_CODESTRAL",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "codestral",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "text-completion-inception": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "TEXT_COMPLETION_INCEPTION",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "inception",
+   "env_config": [
+    "INCEPTION_API_BASE"
+   ],
+   "env_direct_config": [
+    "INCEPTION_API_BASE"
+   ],
+   "env_direct_secret": [
+    "INCEPTION_API_KEY"
+   ],
+   "env_secret": [
+    "INCEPTION_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "text_completion"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "text-completion-openai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "TEXT_COMPLETION_OPENAI",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "openai",
+   "env_config": [
+    "OPENAI_API_BASE",
+    "OPENAI_BASE_URL",
+    "OPENAI_IDENTITY_PROVIDER_ID",
+    "OPENAI_IDENTITY_TOKEN_FILE",
+    "OPENAI_ORGANIZATION",
+    "OPENAI_SERVICE_ACCOUNT_ID"
+   ],
+   "env_direct_config": [
+    "OPENAI_API_BASE",
+    "OPENAI_BASE_URL",
+    "OPENAI_IDENTITY_PROVIDER_ID",
+    "OPENAI_IDENTITY_TOKEN_FILE",
+    "OPENAI_ORGANIZATION",
+    "OPENAI_SERVICE_ACCOUNT_ID"
+   ],
+   "env_direct_secret": [
+    "OPENAI_API_KEY"
+   ],
+   "env_secret": [
+    "OPENAI_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "together_ai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "TOGETHER_AI",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": "https://api.together.ai/v1",
+   "dir": "together_ai",
+   "env_config": [
+    "TOGETHER_AI_110_B",
+    "TOGETHER_AI_21_B",
+    "TOGETHER_AI_41_B",
+    "TOGETHER_AI_4_B",
+    "TOGETHER_AI_80_B",
+    "TOGETHER_AI_8_B",
+    "TOGETHER_AI_API_BASE",
+    "TOGETHER_AI_EMBEDDING_150_M",
+    "TOGETHER_AI_EMBEDDING_350_M"
+   ],
+   "env_direct_config": [
+    "TOGETHER_AI_API_BASE"
+   ],
+   "env_direct_secret": [
+    "TOGETHERAI_API_KEY",
+    "TOGETHER_AI_API_KEY",
+    "TOGETHER_AI_TOKEN",
+    "TOGETHER_API_KEY"
+   ],
+   "env_secret": [
+    "TOGETHERAI_API_KEY",
+    "TOGETHER_AI_API_KEY",
+    "TOGETHER_AI_TOKEN",
+    "TOGETHER_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "text_completion"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "topaz": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "TOPAZ",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "topaz",
+   "env_config": [
+    "TOPAZ_API_BASE"
+   ],
+   "env_direct_config": [
+    "TOPAZ_API_BASE"
+   ],
+   "env_direct_secret": [
+    "TOPAZ_API_KEY"
+   ],
+   "env_secret": [
+    "TOPAZ_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "image_variation",
+    "text_completion"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "triton": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "TRITON",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "triton",
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "v0": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "V0",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": null,
+   "dir": "v0",
+   "env_config": [
+    "V0_API_BASE"
+   ],
+   "env_direct_config": [
+    "V0_API_BASE"
+   ],
+   "env_direct_secret": [
+    "V0_API_KEY"
+   ],
+   "env_secret": [
+    "V0_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "valkey": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "VALKEY",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "valkey",
+   "env_config": [
+    "VALKEY_HOST",
+    "VALKEY_PORT"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "VALKEY_PASSWORD"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "vector_stores"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "vercel_ai_gateway": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "VERCEL_AI_GATEWAY",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "vercel_ai_gateway",
+   "env_config": [
+    "VERCEL_AI_GATEWAY_API_BASE"
+   ],
+   "env_direct_config": [
+    "VERCEL_AI_GATEWAY_API_BASE"
+   ],
+   "env_direct_secret": [
+    "VERCEL_AI_GATEWAY_API_KEY",
+    "VERCEL_OIDC_TOKEN"
+   ],
+   "env_secret": [
+    "VERCEL_AI_GATEWAY_API_KEY",
+    "VERCEL_OIDC_TOKEN"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "embedding"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "vertex_ai": {
+   "aws_base": true,
+   "chat_config": true,
+   "const": "VERTEX_AI",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "vertex_ai",
+   "env_config": [
+    "GCS_BUCKET_NAME",
+    "GCS_PATH_SERVICE_ACCOUNT",
+    "VERTEXAI_API_BASE",
+    "VERTEXAI_LOCATION",
+    "VERTEXAI_PROJECT",
+    "VERTEX_LOCATION"
+   ],
+   "env_direct_config": [
+    "GCS_BUCKET_NAME",
+    "GCS_PATH_SERVICE_ACCOUNT",
+    "VERTEXAI_LOCATION",
+    "VERTEXAI_PROJECT",
+    "VERTEX_LOCATION"
+   ],
+   "env_direct_secret": [
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "VERTEXAI_CREDENTIALS"
+   ],
+   "env_secret": [
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "VERTEXAI_CREDENTIALS"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "anthropic_messages",
+    "audio_transcription",
+    "files",
+    "google_genai_generate_content",
+    "image_edit",
+    "image_generation",
+    "ocr",
+    "rerank",
+    "text_completion",
+    "text_to_speech",
+    "vector_stores",
+    "video"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "vertex_ai_credentials",
+    "vertex_ai_location",
+    "vertex_ai_project",
+    "vertex_collection_id",
+    "vertex_count_tokens_location",
+    "vertex_credentials",
+    "vertex_engine_id",
+    "vertex_location",
+    "vertex_project",
+    "vertex_voice_dict"
+   ],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": true
+  },
+  "vertex_ai_beta": {
+   "aws_base": true,
+   "chat_config": true,
+   "const": "VERTEX_AI_BETA",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "vertex_ai",
+   "env_config": [
+    "GCS_BUCKET_NAME",
+    "GCS_PATH_SERVICE_ACCOUNT",
+    "VERTEXAI_LOCATION",
+    "VERTEXAI_PROJECT",
+    "VERTEX_LOCATION"
+   ],
+   "env_direct_config": [
+    "GCS_BUCKET_NAME",
+    "GCS_PATH_SERVICE_ACCOUNT",
+    "VERTEXAI_LOCATION",
+    "VERTEXAI_PROJECT",
+    "VERTEX_LOCATION"
+   ],
+   "env_direct_secret": [
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "VERTEXAI_CREDENTIALS"
+   ],
+   "env_secret": [
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "VERTEXAI_CREDENTIALS"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "vertex_ai_credentials",
+    "vertex_ai_location",
+    "vertex_ai_project",
+    "vertex_collection_id",
+    "vertex_count_tokens_location",
+    "vertex_credentials",
+    "vertex_engine_id",
+    "vertex_location",
+    "vertex_project",
+    "vertex_voice_dict"
+   ],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": true
+  },
+  "vllm": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "VLLM",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "vllm",
+   "env_config": [
+    "VLLM_API_BASE"
+   ],
+   "env_direct_config": [
+    "VLLM_API_BASE"
+   ],
+   "env_direct_secret": [],
+   "env_secret": [],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "passthrough",
+    "text_completion"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "volcengine": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "VOLCENGINE",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://ark.cn-beijing.volces.com/api/v3",
+   "dir": "volcengine",
+   "env_config": [
+    "ARK_API_BASE",
+    "VOLCENGINE_API_BASE"
+   ],
+   "env_direct_config": [
+    "ARK_API_BASE",
+    "VOLCENGINE_API_BASE"
+   ],
+   "env_direct_secret": [
+    "ARK_API_KEY",
+    "VOLCENGINE_API_KEY"
+   ],
+   "env_secret": [
+    "ARK_API_KEY",
+    "VOLCENGINE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding",
+    "responses_api"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "voyage": {
+   "aws_base": false,
+   "chat_config": false,
+   "const": "VOYAGE",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "voyage",
+   "env_config": [
+    "VOYAGE_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [
+    "VOYAGE_AI_API_KEY",
+    "VOYAGE_AI_TOKEN",
+    "VOYAGE_API_KEY"
+   ],
+   "env_secret": [
+    "VOYAGE_AI_API_KEY",
+    "VOYAGE_AI_TOKEN",
+    "VOYAGE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "embedding",
+    "rerank"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "wandb": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "WANDB",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": true,
+   "default_api_base": "https://api.inference.wandb.ai/v1",
+   "dir": "wandb",
+   "env_config": [
+    "WANDB_API_BASE",
+    "WANDB_HOST",
+    "WANDB_PROJECT_ID"
+   ],
+   "env_direct_config": [
+    "WANDB_API_BASE"
+   ],
+   "env_direct_secret": [
+    "WANDB_API_KEY"
+   ],
+   "env_secret": [
+    "WANDB_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "watsonx": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "WATSONX",
+   "declared_openai_compatible": false,
+   "declared_openai_like": true,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "watsonx",
+   "env_config": [
+    "HOSTED_VLLM_API_BASE",
+    "PROJECT_ID",
+    "REGION",
+    "SPACE_ID",
+    "WATSONX_API_BASE",
+    "WATSONX_DEPLOYMENT_SPACE_ID",
+    "WATSONX_IAM_URL",
+    "WATSONX_PROJECT_ID",
+    "WATSONX_REGION",
+    "WATSONX_SPACE_ID",
+    "WATSONX_URL",
+    "WML_URL",
+    "WX_PROJECT_ID",
+    "WX_REGION",
+    "WX_SPACE_ID",
+    "WX_URL"
+   ],
+   "env_direct_config": [
+    "HOSTED_VLLM_API_BASE",
+    "PROJECT_ID",
+    "REGION",
+    "SPACE_ID",
+    "WATSONX_API_BASE",
+    "WATSONX_DEPLOYMENT_SPACE_ID",
+    "WATSONX_IAM_URL",
+    "WATSONX_PROJECT_ID",
+    "WATSONX_REGION",
+    "WATSONX_SPACE_ID",
+    "WATSONX_URL",
+    "WML_URL",
+    "WX_PROJECT_ID",
+    "WX_REGION",
+    "WX_SPACE_ID",
+    "WX_URL"
+   ],
+   "env_direct_secret": [
+    "HOSTED_VLLM_API_KEY",
+    "WATSONX_APIKEY",
+    "WATSONX_API_KEY",
+    "WATSONX_TOKEN",
+    "WATSONX_ZENAPIKEY",
+    "WX_API_KEY"
+   ],
+   "env_secret": [
+    "HOSTED_VLLM_API_KEY",
+    "WATSONX_APIKEY",
+    "WATSONX_API_KEY",
+    "WATSONX_TOKEN",
+    "WATSONX_ZENAPIKEY",
+    "WX_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "audio_transcription",
+    "embedding",
+    "passthrough",
+    "rerank"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "watsonx_project"
+   ],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "watsonx_text": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "WATSONX_TEXT",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "watsonx",
+   "env_config": [
+    "HOSTED_VLLM_API_BASE",
+    "PROJECT_ID",
+    "REGION",
+    "SPACE_ID",
+    "WATSONX_API_BASE",
+    "WATSONX_DEPLOYMENT_SPACE_ID",
+    "WATSONX_IAM_URL",
+    "WATSONX_PROJECT_ID",
+    "WATSONX_REGION",
+    "WATSONX_SPACE_ID",
+    "WATSONX_URL",
+    "WML_URL",
+    "WX_PROJECT_ID",
+    "WX_REGION",
+    "WX_SPACE_ID",
+    "WX_URL"
+   ],
+   "env_direct_config": [
+    "HOSTED_VLLM_API_BASE",
+    "PROJECT_ID",
+    "REGION",
+    "SPACE_ID",
+    "WATSONX_API_BASE",
+    "WATSONX_DEPLOYMENT_SPACE_ID",
+    "WATSONX_IAM_URL",
+    "WATSONX_PROJECT_ID",
+    "WATSONX_REGION",
+    "WATSONX_SPACE_ID",
+    "WATSONX_URL",
+    "WML_URL",
+    "WX_PROJECT_ID",
+    "WX_REGION",
+    "WX_SPACE_ID",
+    "WX_URL"
+   ],
+   "env_direct_secret": [
+    "HOSTED_VLLM_API_KEY",
+    "WATSONX_APIKEY",
+    "WATSONX_API_KEY",
+    "WATSONX_TOKEN",
+    "WATSONX_ZENAPIKEY",
+    "WX_API_KEY"
+   ],
+   "env_secret": [
+    "HOSTED_VLLM_API_KEY",
+    "WATSONX_APIKEY",
+    "WATSONX_API_KEY",
+    "WATSONX_TOKEN",
+    "WATSONX_ZENAPIKEY",
+    "WX_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [
+    "watsonx_project"
+   ],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "xai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "XAI",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "xai",
+   "env_config": [
+    "XAI_API_BASE",
+    "XAI_OAUTH_API_BASE",
+    "XAI_OAUTH_AUTH_FILE",
+    "XAI_OAUTH_TOKEN_DIR"
+   ],
+   "env_direct_config": [
+    "XAI_API_BASE",
+    "XAI_OAUTH_API_BASE",
+    "XAI_OAUTH_AUTH_FILE",
+    "XAI_OAUTH_TOKEN_DIR"
+   ],
+   "env_direct_secret": [
+    "XAI_API_KEY"
+   ],
+   "env_secret": [
+    "XAI_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": true,
+   "modalities": [
+    "responses_api",
+    "text_completion"
+   ],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  },
+  "xiaomi_mimo": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "XIAOMI_MIMO",
+   "declared_openai_compatible": false,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": "https://api.xiaomimimo.com/v1",
+   "dir": null,
+   "env_config": [],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "XIAOMI_MIMO_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": "XIAOMI_MIMO_API_KEY",
+   "json_base_url": "https://api.xiaomimimo.com/v1",
+   "json_registry": true,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "xinference": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "XINFERENCE",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "xinference",
+   "env_config": [
+    "XINFERENCE_API_BASE"
+   ],
+   "env_direct_config": [],
+   "env_direct_secret": [],
+   "env_secret": [
+    "XINFERENCE_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [
+    "image_generation"
+   ],
+   "openai_compatible_chain": false,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": false,
+   "vertex_base": false
+  },
+  "zai": {
+   "aws_base": false,
+   "chat_config": true,
+   "const": "ZAI",
+   "declared_openai_compatible": true,
+   "declared_openai_like": false,
+   "declared_text_completion": false,
+   "default_api_base": null,
+   "dir": "zai",
+   "env_config": [
+    "ZAI_API_BASE"
+   ],
+   "env_direct_config": [
+    "ZAI_API_BASE"
+   ],
+   "env_direct_secret": [
+    "ZAI_API_KEY"
+   ],
+   "env_secret": [
+    "ZAI_API_KEY"
+   ],
+   "excluded_from_listing": false,
+   "json_api_key_env": null,
+   "json_base_url": null,
+   "json_registry": false,
+   "live_discovery": false,
+   "modalities": [],
+   "openai_compatible_chain": true,
+   "param_keys": [],
+   "reads_api_version": [],
+   "static_models": true,
+   "vertex_base": false
+  }
+ }
+}

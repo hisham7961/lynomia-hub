@@ -923,6 +923,9 @@ Route::middleware('auth')->group(function () {
         ->name('ai.providers.index');
     Route::post('admin/ai/providers', [\App\Http\Controllers\Web\AiProviderController::class, 'store'])
         ->name('ai.providers.store')->middleware('throttle:20,1');
+    // تحديثُ قائمةِ المزوّدين من البوّابة — مسارٌ ساكنٌ قبل المساراتِ ذاتِ المعرّف
+    Route::post('admin/ai/providers/refresh', [\App\Http\Controllers\Web\AiProviderController::class, 'refresh'])
+        ->name('ai.providers.refresh')->middleware('throttle:10,1');
     Route::post('admin/ai/providers/{provider}/rotate', [\App\Http\Controllers\Web\AiProviderController::class, 'rotate'])
         ->name('ai.providers.rotate')->middleware('throttle:20,1');
     Route::post('admin/ai/providers/{provider}/revoke', [\App\Http\Controllers\Web\AiProviderController::class, 'revoke'])

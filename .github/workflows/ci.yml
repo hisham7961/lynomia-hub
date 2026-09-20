@@ -74,6 +74,15 @@ jobs:
           php artisan hub:openapi --out=/tmp/openapi.json -q
           php -r '$a=json_decode(file_get_contents("docs/openapi.json"),true);$b=json_decode(file_get_contents("/tmp/openapi.json"),true);unset($a["info"]["version"],$b["info"]["version"],$a["info"]["x-hub-version"],$b["info"]["x-hub-version"]);if($a!==$b){fwrite(STDERR,"✗ docs/openapi.json منحرفٌ عن السجلّ — شغّل: php artisan hub:openapi --out=docs/openapi.json\n");exit(1);}echo "✅ OpenAPI مطابق\n";'
 
+      - name: خريطةُ المزوّدين ومصفوفةُ التغطيةِ لا تنحرفان عن القياس
+        # `config/ai_providers.php` و`docs/ai-hub/21-coverage-matrix.md` **مولَّدان**:
+        # الأولُ من قياسِ مصدرِ LiteLLM، والثاني من الأوّل. وتحريرُ أيٍّ منهما بيدٍ
+        # يُنتج شاشةً تصف حالةً انقضت — وهذا ما تُسقطه هذه البوّابة.
+        run: |
+          export DB_CONNECTION=sqlite DB_DATABASE=/tmp/ci.sqlite CACHE_STORE=array CACHE_DRIVER=array SESSION_DRIVER=array
+          php artisan hub:ai-provider-map --check
+          php artisan hub:ai-coverage --check
+
       - name: انتظار MySQL
         if: matrix.engine == 'mysql'
         run: |

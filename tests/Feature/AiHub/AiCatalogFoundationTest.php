@@ -62,14 +62,44 @@ class AiCatalogFoundationTest extends TestCase
         }
     }
 
+    /**
+     * **لا يُدّعى اكتشافٌ حيٌّ بلا دليلٍ مقيس.**
+     *
+     * كان هذا الاختبارُ يمنع `live` على الإطلاق، لأنّ W0 لم يُثبِت الحيَّ لأيِّ
+     * مزوّد — وكان ذلك صحيحاً بدليلِه يومَها. ثمّ جاء قياسُ المصدرِ
+     * (`deploy/litellm/tools/measure_providers.py`) فأثبت أيُّ صنفِ إعدادٍ
+     * ينفّذ `get_models()` وأيُّه لا.
+     *
+     * **فالشرطُ لم يُخفَّف بل صار أدقّ:** المنعُ المطلقُ حلّ محلَّه **ربطُ كلِّ
+     * ادّعاءٍ بصفٍّ مقيس**. ومَن ادّعى `live` بلا سطرٍ في القياس يسقط هنا —
+     * وهو ما لم يكن الاختبارُ الأوّلُ يميّزه أصلاً.
+     */
     public function test_لا_مرجعَ_يدّعي_اكتشافاً_حيّاً_لم_يُثبَت(): void
     {
-        // ‏W0 أثبت السقوطَ إلى الخريطةِ الساكنة، ولم يُثبَت الحيُّ لأيِّ مزوّد.
-        // فالوضعُ مدعومٌ في العقدِ ولا يدّعيه تعريف.
-        foreach (AiCatalog::keys() as $k) {
-            $this->assertNotSame('live', AiCatalog::discovery($k),
-                "[$k] يدّعي اكتشافاً حيّاً لم يُثبَت في W0");
+        $measured = $this->measurement()['providers'] ?? [];
+
+        foreach (AiCatalog::all() as $k => $entry) {
+            if (($entry['discovery'] ?? null) !== 'live') continue;
+
+            $slug = (string) ($entry['litellm_key'] ?? '');
+            $this->assertArrayHasKey($slug, $measured,
+                "[$k] يدّعي اكتشافاً حيّاً ولا صفَّ له في القياس");
+            $this->assertTrue((bool) ($measured[$slug]['live_discovery'] ?? false),
+                "[$k] يدّعي اكتشافاً حيّاً والقياسُ يقول خلافَه");
         }
+    }
+
+    /** ملفُّ القياسِ المرافقُ للإصدارِ المثبَّت */
+    private function measurement(): array
+    {
+        $files = glob(base_path('deploy/litellm/measured/*.json')) ?: [];
+        sort($files);
+        $this->assertNotSame([], $files, 'لا ملفَّ قياسٍ في deploy/litellm/measured');
+
+        $raw = json_decode((string) file_get_contents((string) end($files)), true);
+        $this->assertIsArray($raw, 'ملفُّ القياسِ غيرُ صالح');
+
+        return $raw;
     }
 
     // ═══ ② Azure — الحالةُ المركّبة ═══
@@ -295,25 +325,92 @@ class AiCatalogFoundationTest extends TestCase
 
     // ═══ ⑧ الحارسُ المعماريّ ═══
 
+    /**
+     * **لا طبقةَ نقلٍ لمزوّدٍ داخلَ Hub** — حارسُ العقدِ الأثقل، بمسحينِ لا مسح.
+     *
+     * كان المسحُ واحداً: كلُّ مفاتيحِ الكتالوجِ في `app/` كلِّه. وكان يكفي حين
+     * كان الكتالوجُ خمسةَ أسماءٍ مميّزة. ثمّ صار السجلُّ يشتقُّ مئةً وستّةً
+     * وعشرين اسماً من البوّابة، وفيها كلماتٌ إنجليزيّةٌ عاديّة — فصار المسحُ
+     * الواحدُ يُبلِّغ عن مئتي موضعٍ بريءٍ في وحداتِ الرواتبِ والمخزون، **ويصير
+     * حارساً يُتجاهَل**. وحارسٌ يُتجاهَل أسوأُ من لا حارس.
+     *
+     * فانقسم إلى مسحينِ لكلٍّ حجّتُه:
+     *
+     *  ① **المسحُ الواسع** — الأسماءُ المكتوبةُ بيدٍ في `config/ai_catalog.php`
+     *     على `app/` كلِّه. وهي مميّزةٌ لا تلتبس بكلمةٍ عامّة، فالمسحُ هنا
+     *     **كما كان في W1 حرفاً بحرف** — لم يُخفَّف.
+     *
+     *  ② **المسحُ العميق** — **كلُّ** الأسماءِ (مفاتيحُ Hub وأسماءُ البوّابة
+     *     معاً) على سطحِ الذكاءِ وحدَه. وهناك لا عذرَ لاسمِ مزوّدٍ البتّة:
+     *     هذه هي الملفّاتُ التي لو تسرّب إليها اسمٌ لصار Hub طبقةَ نقل.
+     *
+     * والاستثناءُ الوحيدُ **اسمُ متغيّرٍ في PHP** (`$meta`): متغيّرٌ محلّيٌّ
+     * ليس إشارةً إلى مزوّد، وإقحامُه يُفسد المسحَ العميقَ بضجيجٍ من جنسِ ما
+     * أفسد المسحَ الواحد.
+     */
     public function test_لا_طبقةَ_نقلٍ_لمزوّدٍ_داخلَ_Hub(): void
     {
-        $hits = [];
+        // ── ① المكتوبُ بيدٍ على app/ كلِّه ──
+        $wide = [];
         $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(app_path()));
         foreach ($it as $file) {
             if (! $file->isFile() || $file->getExtension() !== 'php') continue;
             $src = file_get_contents($file->getPathname());
-            foreach (AiCatalog::keys() as $k) {
-                $needle = str_replace('_', '', $k);
-                if (preg_match('/\b' . preg_quote($k, '/') . '\b/i', $src)
-                    || preg_match('/\b' . preg_quote($needle, '/') . '\b/i', $src)) {
-                    $hits[] = str_replace(app_path() . '/', '', $file->getPathname()) . " → $k";
+            foreach (AiCatalog::curatedKeys() as $k) {
+                foreach ([$k, str_replace('_', '', $k)] as $needle) {
+                    if (preg_match('/\b' . preg_quote($needle, '/') . '\b/i', $src)) {
+                        $wide[] = str_replace(app_path() . '/', '', $file->getPathname()) . " → $k";
+                    }
                 }
             }
         }
 
-        $this->assertSame([], $hits,
-            "اسمُ مزوّدٍ تسرّب إلى app/ — والعقدُ أنّ Hub مستوى تحكّمٍ لا طبقةَ نقل:\n"
-            . implode("\n", $hits));
+        $this->assertSame([], array_values(array_unique($wide)),
+            "اسمُ مزوّدٍ مكتوبٍ بيدٍ تسرّب إلى app/ — والعقدُ أنّ Hub مستوى تحكّمٍ لا طبقةَ نقل:\n"
+            . implode("\n", array_unique($wide)));
+
+        // ── ② كلُّ الأسماءِ على سطحِ الذكاء ──
+        $names = [];
+        foreach (AiCatalog::all() as $k => $entry) {
+            $names[$k] = true;
+            if (isset($entry['litellm_key'])) $names[(string) $entry['litellm_key']] = true;
+        }
+        $this->assertGreaterThan(100, count($names),
+            'السجلُّ لم يشتقَّ المزوّدين — فالمسحُ العميقُ يمسح فراغاً');
+
+        $deep = [];
+        foreach ($this->aiSurfaceFiles() as $path) {
+            $src = file_get_contents($path);
+            foreach (array_keys($names) as $k) {
+                foreach ([$k, str_replace('_', '', (string) $k)] as $needle) {
+                    // `(?<![$\w])` يستثني اسمَ متغيّرٍ في PHP وحدَه — لا أكثر.
+                    if (preg_match('/(?<![$\w])' . preg_quote($needle, '/') . '\b/i', $src)) {
+                        $deep[] = basename($path) . " → $k";
+                    }
+                }
+            }
+        }
+
+        $this->assertSame([], array_values(array_unique($deep)),
+            "اسمُ مزوّدٍ تسرّب إلى سطحِ الذكاء — وهناك لا عذرَ له:\n"
+            . implode("\n", array_unique($deep)));
+    }
+
+    /** ملفّاتُ سطحِ الذكاءِ — حيث لا عذرَ لاسمِ مزوّد @return list<string> */
+    private function aiSurfaceFiles(): array
+    {
+        $files = array_merge(
+            glob(app_path('Support/Ai*.php')) ?: [],
+            glob(app_path('Support/Ask*.php')) ?: [],
+            glob(app_path('Support/LiteLlm*.php')) ?: [],
+            glob(app_path('Http/Controllers/Web/Ai*.php')) ?: [],
+            glob(app_path('Console/Commands/HubAi*.php')) ?: [],
+        );
+        sort($files);
+
+        $this->assertGreaterThan(20, count($files), 'سطحُ الذكاءِ لم يُعثَر عليه — المسحُ يمسح فراغاً');
+
+        return $files;
     }
 
     public function test_الكتالوجُ_لا_ينسخ_معرفةَ_النماذج(): void
