@@ -22,8 +22,12 @@ use Tests\TestCase;
  *
  * > **بعد هذه الدفعةِ لا يبقى تعديلُ شيفرةٍ واحدٌ لتشغيلِ «اسأل Hub» الحقيقيّ.**
  *
- * فكلُّ درجةٍ في السلّمِ `A → B → Discovery → Import → Enable → C → D → Ask`
+ * فكلُّ درجةٍ في السلّمِ
+ * `A → Credential → Discovery → Import → B → Enable → C → D → Ask`
  * **لها وجهةٌ تُنقَر**، وحالتُها **تُقرأ من النظامِ لا تُؤشَّر يدويّاً**.
+ *
+ * **وموضعُ B صُحِّح بالمصدر** لا بالذوق: فحصُ الاعتمادِ عند البوّابةِ يختبر
+ * (اعتماداً × نموذجاً)، فلا يُطلَب من المالكِ أن يُجريَه قبل أن يملكَ نموذجاً.
  */
 class AskAcceptancePathTest extends TestCase
 {
@@ -75,12 +79,31 @@ class AskAcceptancePathTest extends TestCase
 
     // ═══ ① السلّمُ نفسُه ═══
 
-    public function test_السلّمُ_ثمانِ_درجاتٍ_بالمفاتيحِ_المتّفَقِ_عليها(): void
+    public function test_السلّمُ_تسعُ_درجاتٍ_بالمفاتيحِ_المتّفَقِ_عليها(): void
     {
         $keys = array_column(AiOverview::acceptancePath(), 'key');
 
-        $this->assertSame(['A', 'B', 'Discovery', 'Import', 'Enable', 'C', 'D', 'Ask'], $keys,
+        $this->assertSame(
+            ['A', 'Credential', 'Discovery', 'Import', 'B', 'Enable', 'C', 'D', 'Ask'], $keys,
             'انحرف مسارُ القبولِ عمّا اتُّفق عليه');
+    }
+
+    /**
+     * **وB لا يسبق النموذجَ** — حارسٌ على الترتيبِ نفسِه لا على عدِّ الدرجات.
+     *
+     * سقطت أوّلُ جلسةِ قبولٍ حقيقيّةٍ على هذا بالضبط: سلّمٌ يضع B ثانياً،
+     * فيفحص المالكُ اعتماداً بلا نموذجٍ فتردّ البوّابةُ ٥٠٠ داخليّاً.
+     */
+    public function test_درجةُ_B_تقع_بعد_الاستيرادِ_لا_قبلَه(): void
+    {
+        $keys = array_column(AiOverview::acceptancePath(), 'key');
+
+        $this->assertGreaterThan(array_search('Import', $keys, true),
+            array_search('B', $keys, true),
+            '**ترتيبٌ يُوقع في الخطأ**: B يُطلَب قبل أن يوجدَ نموذجٌ يُفحَص به');
+        $this->assertGreaterThan(array_search('Credential', $keys, true),
+            array_search('Discovery', $keys, true),
+            'الاكتشافُ لا يسبق إدخالَ الاعتماد');
     }
 
     /** **وكلُّ درجةٍ وجهةٌ تُنقَر** — فلا طرفيّةَ بين خطوتين */

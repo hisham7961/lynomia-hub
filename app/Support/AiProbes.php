@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Http;
  * | | يُثبِت | الكلفة | إقرار |
  * |---|---|---|---|
  * | **A** | البوّابةُ حيّةٌ وتقبل مفتاحَ الإدارة | **صفر** | لا |
- * | **B** | **المزوّدُ يقبل مفتاحَنا** | **يُنفق** | **نعم** |
+ * | **B** | **المزوّدُ يقبل مفتاحَنا على نموذجٍ بعينِه** | **يُنفق** | **نعم** |
  * | **C** | النموذجُ مُسجَّلٌ وقابلٌ للبلوغ | **صفر** | لا |
  * | **D** | النموذجُ **يُولّد فعلاً** | يُنفق | **نعم** |
  * | **E** | قدرةٌ بعينها تعمل | أعلى | **نعم** |
@@ -112,25 +112,62 @@ final class AiProbes extends ConnectionProbe
      * والوضعُ يُمرَّر ولا يُستنتَج: الاستنتاجُ قد يقع على وضعٍ أغلى بكثير
      * (توليدُ صورةٍ بدل إكمالِ نصّ).
      */
-    public static function b(AiProvider $provider, string $mode, bool $costAcknowledged = false): array
+    public static function b(AiModel $model, string $mode, bool $costAcknowledged = false): array
     {
         if (! $costAcknowledged) {
             return self::row(null, null, null,
                 'فحصُ الاعتمادِ يُنفق رصيداً — يلزم إقرارٌ صريحٌ بالكلفة قبل تنفيذِه');
         }
+
+        $provider = $model->provider;
+        if ($provider === null) {
+            return self::row(null, null, null, 'النموذجُ بلا مزوّد');
+        }
         if ((string) $provider->credential_state === 'missing') {
             return self::row(null, null, null, 'لا اعتمادَ لهذا المزوّد — اضبطه أوّلاً');
         }
 
+        /*
+         * **ولا يُرسَل اسمُ Hub الداخليُّ مكانَ اسمِ المزوّد.**
+         *
+         * `litellm_model_name` اسمٌ نُسمّي به النموذجَ عندنا (`hub-general`)،
+         * و`upstream_model` اسمُه عند المزوّد (`gpt-4o-mini`). والمزوّدُ لا
+         * يعرف أسماءَنا: إرسالُ الأوّلِ يُنتج فشلاً **يبدو مفتاحاً خاطئاً وهو
+         * خطأُ تسمية** — فيُطارَد اعتمادٌ سليمٌ يوماً كاملاً.
+         *
+         * فالنقصُ يُقال بصراحةٍ ولا يُسَدّ بتخمين.
+         */
+        $upstream = trim((string) $model->upstream_model);
+        if ($upstream === '') {
+            return self::row(null, null, null,
+                'لا اسمَ النموذجِ عند المزوّد لهذا السجلّ — والفحصُ يختبر '
+                . '(اعتماداً × نموذجاً) لا اعتماداً وحدَه. اضبط الاسمَ ثمّ أعِد الفحص');
+        }
+
         $t0  = microtime(true);
-        $res = LiteLlmAdmin::testConnection(
-            ['litellm_credential_name' => (string) $provider->credential_name],
-            $mode, true);
+        $res = LiteLlmAdmin::testConnection([
+            'model'                   => $upstream,
+            'litellm_credential_name' => (string) $provider->credential_name,
+        ], $mode, true);
+
+        /*
+         * **ونجاحٌ مدفوعٌ يترك أثراً.**
+         *
+         * كانت حالةُ الاعتمادِ تبقى `configured` مهما نجح B — فالفحصُ يُنفق
+         * ثمّ **لا يُذكَر أنّه جرى**، فيُعاد غداً بلا داعٍ ويُنفَق مرّتين،
+         * وسلّمُ القبولِ لا يتقدّم درجةً واحدة.
+         *
+         * **والفشلُ لا يُنزل الحالةَ**: قد يكون اسمَ نموذجٍ خاطئاً لا مفتاحاً،
+         * وإنزالُها يُرسل المالكَ يُدوّر اعتماداً سليماً.
+         */
+        if ($res['ok']) {
+            $provider->forceFill(['credential_state' => AiCatalog::secretState(true, true)])->save();
+        }
 
         return self::row($res['ok'], $res['code'], self::since($t0),
             $res['ok'] ? null : (string) $res['error'],
-            $res['ok'] ? 'المزوّدُ قبل اعتمادَنا' : null,
-            ['mode' => $mode]);
+            $res['ok'] ? 'المزوّدُ قبل اعتمادَنا على هذا النموذج' : null,
+            ['mode' => $mode, 'model' => $upstream]);
     }
 
     // ═══ D — توليدٌ أدنى (يُنفق) ═══

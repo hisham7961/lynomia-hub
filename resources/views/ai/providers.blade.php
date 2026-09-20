@@ -34,7 +34,14 @@
 
     @forelse ($providers as $p)
         @php($def = $catalog[$p->catalog_key] ?? null)
+        @php($logo = \App\Support\AiProviderRegistry::logoSvg($p->catalog_key))
+        @php($mk = \App\Support\AiProviderRegistry::mark((string) ($def['litellm_key'] ?? $p->catalog_key)))
         <div class="row" style="align-items:flex-start;gap:12px;flex-wrap:wrap;border-top:1px solid var(--line);padding:12px 0">
+            @if ($logo !== null)
+                <span class="pvlogo pvsvg" aria-hidden="true">{!! $logo !!}</span>
+            @else
+                <span class="pvlogo" style="--pv-h:{{ $mk['hue'] }}" aria-hidden="true">{{ $mk['initials'] }}</span>
+            @endif
             <div style="flex:1;min-width:240px">
                 <b>{{ $p->label }}</b>
                 <span class="mut mono ltr">{{ $def['label_en'] ?? $p->catalog_key }}</span>
@@ -88,15 +95,36 @@
                 @endif
             </div>
 
-            {{-- ═══ المستوى B — فحصُ قبولِ المزوّدِ لاعتمادِنا (يُنفق) ═══ --}}
+            {{-- ═══ المستوى B — فحصُ قبولِ المزوّدِ لاعتمادِنا (يُنفق) ═══
+
+                 **والفحصُ يجري على (اعتمادٍ × نموذج) لا على اعتمادٍ وحدَه.** لا
+                 مسارَ في البوّابةِ يختبر اعتماداً مجرّداً، ومسارُ الفحصِ يلزمه
+                 اسمُ النموذجِ عند المزوّد. فالنموذجُ **يُختار من قائمةٍ مسجّلة**
+                 ولا يُكتَب يداً ولا يُستنتَج من اسمِ Hub الداخليّ. --}}
             @if (($manage ?? true) && $p->credential_state !== 'missing')
+                @php($bModels = $p->models->filter(static fn ($m) => trim((string) $m->upstream_model) !== ''))
                 <details style="width:100%">
                     <summary class="mut">🧪 فحصُ الاعتماد (B)</summary>
                     <div class="sub mut">
                         <b>يُنفق رصيداً.</b> فحصُ الاتصالِ بالبوّابة (A) مجّانيٌّ ولا يُثبِت أنّ
                         <b>المزوّدَ</b> يقبل مفتاحَنا — وهذا ما يُثبِته B، ولا سبيلَ مجّانيَّ إليه.
+                        <b>ويلزمه نموذجٌ مسجَّل</b>: البوّابةُ تختبر (اعتماداً × نموذجاً).
                     </div>
+                    @if ($bModels->isEmpty())
+                        <div class="sub mut">
+                            لا نموذجَ مسجَّلاً لهذا المزوّدِ بعدُ — و<b>B يلزمه نموذج</b>.
+                            اكتشِفِ النماذجَ أو سجّل واحداً يدويّاً من
+                            <a href="{{ route('ai.models.index', $p) }}">شاشةِ النماذج</a>، ثمّ عُد إلى هنا.
+                        </div>
+                    @else
                     <form method="POST" action="{{ route('ai.providers.probe', $p) }}" class="grid">@csrf
+                        <label><span>النموذج<b class="req">*</b></span>
+                            <select name="model_id" required>
+                                @foreach ($bModels as $m)
+                                    <option value="{{ $m->id }}">{{ $m->display_name ?: $m->litellm_model_name }} — {{ $m->upstream_model }}</option>
+                                @endforeach
+                            </select>
+                            <small class="mut">يُرسَل <b>اسمُ النموذجِ عند المزوّد</b> لا اسمُه في Hub.</small></label>
                         <label><span>الوضع</span>
                             <select name="mode">
                                 <option value="chat">محادثة</option>
@@ -108,6 +136,7 @@
                         </label>
                         <div style="grid-column:1/-1"><button class="btn sm">💸 افحص الاعتماد</button></div>
                     </form>
+                    @endif
                 </details>
             @endif
 
@@ -220,8 +249,25 @@
         @forelse ($browse['rows'] as $row)
             <a class="pvcard {{ $selected === $row['key'] ? 'pvon' : '' }}"
                href="{{ route('ai.providers.index', array_filter($filters) + ['add' => $row['key']]) }}#add">
-                <span class="pvlogo" style="--pv-h:{{ $row['mark']['hue'] }}"
-                      aria-hidden="true">{{ $row['mark']['initials'] }}</span>
+                {{--
+                    **الشعارُ الحقيقيُّ أوّلاً، والحرفانِ احتياطاً لا أصلاً.**
+
+                    ويُدرَج متنُ الـSVG ولا يُوضَع في `<img>`: أحدَ عشرَ شعاراً
+                    في المجموعةِ **أحاديُّ اللونِ بـ`currentColor`**، وفي
+                    `<img>` تكون الصورةُ مستنداً منفصلاً لا يرث لونَ الصفحة
+                    فيُرسَم أسودَ على خلفيّةٍ داكنة — أي **يختفي**.
+
+                    و`{!! !!}` هنا على متنٍ **مُثبَّتٍ في المستودعِ** اسمُه من
+                    خريطةٍ مولَّدةٍ لا من مُدخَل، ومرّ بحارسِ
+                    `AiProviderRegistry::safeSvg()`، وتمسحه حزمةُ الاختبارِ
+                    ملفّاً ملفّاً. ولا مُدخَلَ مستخدِمٍ يبلغ هذا الموضعَ بحال.
+                --}}
+                @if ($row['logo'] !== null)
+                    <span class="pvlogo pvsvg" aria-hidden="true">{!! $row['logo'] !!}</span>
+                @else
+                    <span class="pvlogo" style="--pv-h:{{ $row['mark']['hue'] }}"
+                          aria-hidden="true">{{ $row['mark']['initials'] }}</span>
+                @endif
 
                 <span class="pvbody">
                     <span class="pvname">{{ $row['label'] }}</span>
@@ -252,10 +298,19 @@
 {{-- ── نموذجُ المزوّدِ المختارِ وحدَه ── --}}
 @if ($selected)
     @php($def = $catalog[$selected])
+    @php($selLogo = \App\Support\AiProviderRegistry::logoSvg($selected))
+    @php($selMark = \App\Support\AiProviderRegistry::mark((string) $def['litellm_key']))
     <div class="card" id="add">
-        <h3>إعدادُ {{ $def['label'] }}
-            <span class="mut mono ltr">{{ $def['litellm_key'] }}</span>
-        </h3>
+        <div class="row" style="gap:10px;align-items:center">
+            @if ($selLogo !== null)
+                <span class="pvlogo pvsvg" aria-hidden="true">{!! $selLogo !!}</span>
+            @else
+                <span class="pvlogo" style="--pv-h:{{ $selMark['hue'] }}" aria-hidden="true">{{ $selMark['initials'] }}</span>
+            @endif
+            <h3 style="margin:0">إعدادُ {{ $def['label'] }}
+                <span class="mut mono ltr">{{ $def['litellm_key'] }}</span>
+            </h3>
+        </div>
 
         <div class="sub mut">
             شكلُ المصادقة: <b>{{ $def['auth'] }}</b> ·
@@ -332,6 +387,8 @@
         display:flex;align-items:center;justify-content:center;
         font:600 13px/1 system-ui,sans-serif;letter-spacing:.5px;direction:ltr;
         color:#fff;background:hsl(var(--pv-h) 52% 42%)}
+.pvsvg{background:transparent;color:var(--tx)}
+.pvsvg svg{width:26px;height:26px;display:block}
 .pvbody{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
 .pvname{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pvslug{font-size:11px;opacity:.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

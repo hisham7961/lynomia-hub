@@ -83,6 +83,9 @@ final class AiOverview
         return [
             'providers'          => AiProvider::query()->count(),
             'providers_enabled'  => AiProvider::query()->where('enabled', true)->count(),
+            // **اعتمادٌ مُدخَلٌ** ≠ **اعتمادٌ مقبول**: الأوّلُ درجةُ السلّمِ قبل B،
+            // والثاني ما يكتبه B نفسُه بعد أن يقبلَه المزوّدُ على نموذجٍ مسجَّل
+            'providers_credentialed' => AiProvider::query()->where('credential_state', '!=', 'missing')->count(),
             'providers_verified' => AiProvider::query()->where('credential_state', 'verified')->count(),
             'models'             => AiModel::query()->count(),
             'models_enabled'     => AiModel::query()->where('enabled', true)->count(),
@@ -244,12 +247,19 @@ final class AiOverview
     }
 
     /**
-     * **مسارُ قبولِ الإنتاجِ مرئيّاً** — ثماني درجاتٍ كلٌّ منها **حالةٌ مقروءة**
+     * **مسارُ قبولِ الإنتاجِ مرئيّاً** — تسعُ درجاتٍ كلٌّ منها **حالةٌ مقروءة**
      * لا مربّعٌ يُؤشَّر يدويّاً.
      *
      * ولمَ يُعرَض السلّمُ كلُّه والخطوةُ التاليةُ واحدة؟ لأنّ الخطوةَ الواحدةَ
      * تقول **ما الآن** ولا تقول **كم بقي**. ومالكٌ يوشك أن يُدخل اعتماداً
      * مدفوعاً يستحقّ أن يرى الطريقَ كاملاً قبل أن يخطو.
+     *
+     * **وترتيبُ الدرجاتِ صُحِّح بالمصدر.** كان السلّمُ يضع B قبلَ الاكتشافِ
+     * والاستيراد، فيُرسَل المالكُ ليفحصَ اعتماداً **بلا نموذج** — وفحصُ
+     * الاعتمادِ عند البوّابةِ يختبر **(اعتماداً × نموذجاً)**: لا مسارَ فيها
+     * يختبر اعتماداً مجرّداً، ومسارُ الفحصِ يقرأ اسمَ النموذجِ قراءةً لا
+     * تحتمل غيابَه فينكسر داخليّاً. فصارت درجةُ «الاعتماد» أوّلاً (إدخالُه
+     * وحده)، ثمّ الاكتشافُ والاستيراد، ثمّ B إثباتاً.
      *
      * @return list<array{key:string, title:string, done:bool, route:?string}>
      */
@@ -260,12 +270,14 @@ final class AiOverview
         return [
             ['key' => 'A', 'title' => 'البوّابةُ مهيّأةٌ والاتصالُ مُختبَر',
              'done' => AiGateway::probePassed(), 'route' => 'ai.settings'],
-            ['key' => 'B', 'title' => 'اعتمادُ مزوّدٍ مُدخَلٌ ومقبول',
-             'done' => $c['providers_verified'] > 0, 'route' => 'ai.providers.index'],
+            ['key' => 'Credential', 'title' => 'اعتمادُ مزوّدٍ مُدخَلٌ في خزنةِ البوّابة',
+             'done' => $c['providers_credentialed'] > 0, 'route' => 'ai.providers.index'],
             ['key' => 'Discovery', 'title' => 'نماذجُ المزوّدِ مُكتشَفة',
              'done' => $c['models'] > 0, 'route' => 'ai.providers.index'],
             ['key' => 'Import', 'title' => 'نماذجُ مُستورَدةٌ إلى سجلِّ Hub',
              'done' => $c['models'] > 0, 'route' => 'ai.models.all'],
+            ['key' => 'B', 'title' => 'المزوّدُ قبِل اعتمادَنا على نموذجٍ مسجَّل (يُنفق بإقرارِك)',
+             'done' => $c['providers_verified'] > 0, 'route' => 'ai.providers.index'],
             ['key' => 'Enable', 'title' => 'نموذجٌ مُفعَّلٌ ومربوطٌ بغرض',
              'done' => $c['profiles_ready'] > 0, 'route' => 'ai.profiles.index'],
             ['key' => 'C', 'title' => 'النموذجُ مُعلَنٌ عند البوّابةِ (فحصٌ بكلفةِ صفر)',

@@ -82,6 +82,8 @@ jobs:
           export DB_CONNECTION=sqlite DB_DATABASE=/tmp/ci.sqlite CACHE_STORE=array CACHE_DRIVER=array SESSION_DRIVER=array
           php artisan hub:ai-provider-map --check
           php artisan hub:ai-coverage --check
+          # وخريطةُ الشعارات: تشير إلى ملفٍّ زال، أو ملفٌّ يُنشَر ولا يُعرَض
+          php artisan hub:ai-logos --check
 
       - name: انتظار MySQL
         if: matrix.engine == 'mysql'
