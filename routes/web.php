@@ -898,6 +898,24 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/ai/test', [\App\Http\Controllers\Web\AiCenterController::class, 'test'])
         ->name('ai.test')->middleware('throttle:10,1');
 
+    /* ── مزوّدو الذكاء — دورةُ حياةِ الاعتماد (المرحلة ٢ · W4) ────────────
+     * الحارسُ نفسُه (`AiProviderController::gate`)، و**كلُّ كتابةٍ خلف تصعيدِ
+     * الهويّة** كما تنصّ خطّةُ W4 — لا إدخالُ السرِّ وحدَه.
+     * والكتابةُ تخرج إلى البوّابة، فتُخنَق كنظائرِها.
+     */
+    Route::get('admin/ai/providers', [\App\Http\Controllers\Web\AiProviderController::class, 'index'])
+        ->name('ai.providers.index');
+    Route::post('admin/ai/providers', [\App\Http\Controllers\Web\AiProviderController::class, 'store'])
+        ->name('ai.providers.store')->middleware('throttle:20,1');
+    Route::post('admin/ai/providers/{provider}/rotate', [\App\Http\Controllers\Web\AiProviderController::class, 'rotate'])
+        ->name('ai.providers.rotate')->middleware('throttle:20,1');
+    Route::post('admin/ai/providers/{provider}/revoke', [\App\Http\Controllers\Web\AiProviderController::class, 'revoke'])
+        ->name('ai.providers.revoke')->middleware('throttle:20,1');
+    Route::post('admin/ai/providers/{provider}/toggle', [\App\Http\Controllers\Web\AiProviderController::class, 'toggle'])
+        ->name('ai.providers.toggle');
+    Route::delete('admin/ai/providers/{provider}', [\App\Http\Controllers\Web\AiProviderController::class, 'destroy'])
+        ->name('ai.providers.destroy')->middleware('throttle:20,1');
+
     Route::get('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'index'])->name('integrations.n8n');
     Route::post('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'save'])->name('integrations.n8n.save');
     Route::get('admin/security', [SecurityController::class, 'index'])->name('security.index');

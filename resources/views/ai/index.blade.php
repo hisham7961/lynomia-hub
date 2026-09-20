@@ -8,6 +8,8 @@
         <div class="sub">بوّابةُ النماذج على خادمِ Hub نفسِه — مربوطةً داخليّاً بلا كشفٍ للإنترنت.</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
+        {{-- شاشةٌ بلا رابطٍ ميزةٌ مخفيّة — ورابطُها بابُ متحكّمِها نفسُه --}}
+        <a class="btn sm" href="{{ route('ai.providers.index') }}">🔌 المزوّدون والاعتمادات</a>
         @if ($configured)
             <form method="POST" action="{{ route('ai.test') }}">@csrf
                 <button class="btn sm">🔌 اختبار الاتصال</button>
