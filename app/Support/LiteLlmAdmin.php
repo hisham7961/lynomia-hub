@@ -86,6 +86,26 @@ final class LiteLlmAdmin
         return self::call('GET', '/spend/logs?limit=' . max(1, min(100, $limit)));
     }
 
+    /**
+     * **هويّةُ المزوّدين المدعومين في هذا الإصدار** — قراءةٌ محضةٌ بكلفةِ صفر.
+     *
+     * وصفُ المسارِ في شيفرةِ البوّابةِ حرفيّاً: *«Returns provider name,
+     * description, and required parameters for each provider»*، وجسمُه يدور
+     * على `litellm.provider_list` — أي على تعدادِ المزوّدين كلِّه.
+     *
+     * **فقائمةُ المزوّدين تُقرأ من البوّابةِ ولا تُنسَخ إلى Hub.** واللقطةُ في
+     * `config/ai_providers.php` احتياطٌ حين تكون البوّابةُ غيرَ مُعدَّةٍ أو
+     * ساقطة، لا مصدرُ حقيقةٍ ينافسها.
+     *
+     * **وحقولُ كلِّ مزوّدٍ في هذا الردِّ فارغةٌ لأكثرِ المزوّدين** — أثبته
+     * قياسُ المصدر (`docs/ai-hub/20-provider-discovery.md` §٤٫٢). فيُؤخَذ منه
+     * **الاسمُ** ويُترَك ما عداه.
+     */
+    public static function providerSettings(): array
+    {
+        return self::call('GET', '/model/settings');
+    }
+
     /** سردُ الاعتمادات — **البوّابةُ تُقنِّع القيمَ بنفسِها** (W0 · C2) */
     public static function credentials(): array
     {

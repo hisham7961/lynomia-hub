@@ -41,8 +41,20 @@ final class AiCatalog
 
     public const FIELD_TYPES = ['text', 'password', 'select', 'number', 'url', 'bool'];
 
-    /** أساليبُ المصادقةِ المعروفةُ للكتالوج — وصفيّةٌ لا سلوكيّة */
+    /**
+     * أساليبُ المصادقةِ المعروفةُ للكتالوج — وصفيّةٌ لا سلوكيّة.
+     *
+     * **وهذه المفرداتُ الخمسُ أصليّةٌ تبقى** (W1)، ويُضاف إليها وقتَ التحقّقِ
+     * ما تُعلنه `AiAuthSchemas` من عائلاتٍ مولَّدة — فالمداخلُ المكتوبةُ بيدٍ
+     * والمداخلُ المشتقّةُ من عائلةٍ تمرّان بمُصادِقٍ واحدٍ لا باثنين.
+     */
     public const AUTH_MODES = ['api_key', 'api_key_endpoint', 'bearer_token', 'cloud_iam', 'none'];
+
+    /** @return list<string> كلُّ ما يُقبَل في `auth`: الخمسُ الأصليّةُ + العائلات */
+    public static function authModes(): array
+    {
+        return array_values(array_unique(array_merge(self::AUTH_MODES, AiAuthSchemas::names())));
+    }
 
     /** **قائمةٌ صارمةٌ لخصائصِ الحقل** — ما ليس فيها خطأٌ مطبعيٌّ لا ميزة */
     public const FIELD_PROPS = [
@@ -50,9 +62,16 @@ final class AiCatalog
         'rules', 'options', 'hint', 'placeholder', 'default', 'show_if',
     ];
 
+    /**
+     * خصائصُ المزوّد. **والتسعُ الأولى أصليّةٌ من W1**؛ والأربعُ الأخيرةُ
+     * أُضيفت مع التغطيةِ الكاملةِ ليحمل المدخلُ **أصلَه وحالتَه**: أمن كتالوجٍ
+     * مكتوبٍ بيدٍ هو أم مشتقٌّ من عائلة، وأيُّ وسائطَ يخدم، وإن كان غيرَ قابلٍ
+     * للإعدادِ فلماذا. وبلا هذه الأربعِ تصير المصفوفةُ ادّعاءً لا بياناً.
+     */
     public const PROVIDER_PROPS = [
         'label', 'label_en', 'icon', 'litellm_key', 'auth',
         'discovery', 'discovery_note', 'docs_url', 'fields',
+        'source', 'status', 'status_reason', 'modalities',
     ];
 
     public const PROVIDER_REQUIRED = ['label', 'litellm_key', 'auth', 'discovery', 'fields'];
@@ -60,12 +79,29 @@ final class AiCatalog
 
     // ── القراءة ────────────────────────────────────────────────────────
 
-    /** @return array<string,array> */
+    /**
+     * **الكتالوجُ كلُّه: المكتوبُ بيدٍ فوق المشتقِّ من السجلّ.**
+     *
+     * المشتقُّ يغطّي كلَّ ما تدعمه البوّابةُ (`AiProviderRegistry`)، والمكتوبُ
+     * بيدٍ يعلو عليه حيث كُتب — بعنوانِه وتلميحاتِه ووضعِ اكتشافِه. فلا يُفقَد
+     * ما صِيغ بعناية، ولا يبقى المزوّدون الباقون خارجَ الشاشة.
+     *
+     * @return array<string,array>
+     */
     public static function all(): array
     {
-        $raw = config('ai_catalog', []);
+        $curated = config('ai_catalog', []);
+        $curated = is_array($curated) ? $curated : [];
 
-        return is_array($raw) ? $raw : [];
+        return array_replace(AiProviderRegistry::catalog(), $curated);
+    }
+
+    /** المكتوبُ بيدٍ وحدَه — يقرؤه حارسُ «لا اسمَ مزوّدٍ في app/» @return list<string> */
+    public static function curatedKeys(): array
+    {
+        $curated = config('ai_catalog', []);
+
+        return is_array($curated) ? array_keys($curated) : [];
     }
 
     /** @return list<string> */
@@ -226,7 +262,7 @@ final class AiCatalog
             if (isset($p['discovery']) && ! in_array($p['discovery'], self::DISCOVERY_MODES, true)) {
                 $errors[] = "$at أسلوبُ اكتشافٍ غيرُ معروف `{$p['discovery']}`";
             }
-            if (isset($p['auth']) && ! in_array($p['auth'], self::AUTH_MODES, true)) {
+            if (isset($p['auth']) && ! in_array($p['auth'], self::authModes(), true)) {
                 $errors[] = "$at أسلوبُ مصادقةٍ غيرُ معروف `{$p['auth']}`";
             }
 
