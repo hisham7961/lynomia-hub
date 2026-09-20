@@ -72,6 +72,29 @@
                 </form>
             </div>
 
+            {{-- ═══ المستوى B — فحصُ قبولِ المزوّدِ لاعتمادِنا (يُنفق) ═══ --}}
+            @if ($p->credential_state !== 'missing')
+                <details style="width:100%">
+                    <summary class="mut">🧪 فحصُ الاعتماد (B)</summary>
+                    <div class="sub mut">
+                        <b>يُنفق رصيداً.</b> فحصُ الاتصالِ بالبوّابة (A) مجّانيٌّ ولا يُثبِت أنّ
+                        <b>المزوّدَ</b> يقبل مفتاحَنا — وهذا ما يُثبِته B، ولا سبيلَ مجّانيَّ إليه.
+                    </div>
+                    <form method="POST" action="{{ route('ai.providers.probe', $p) }}" class="grid">@csrf
+                        <label><span>الوضع</span>
+                            <select name="mode">
+                                <option value="chat">محادثة</option>
+                                <option value="embedding">تضمين</option>
+                            </select>
+                            <small class="mut">يُمرَّر صراحةً — والاستنتاجُ قد يقع على وضعٍ أغلى.</small></label>
+                        <label style="grid-column:1/-1">
+                            <input type="checkbox" name="ack" value="1"> <b>أُقِرُّ بأنّ هذا الفحصَ يُنفق رصيداً</b>
+                        </label>
+                        <div style="grid-column:1/-1"><button class="btn sm">💸 افحص الاعتماد</button></div>
+                    </form>
+                </details>
+            @endif
+
             {{-- ═══ تدويرُ السرّ — الاسمُ نفسُه والقيمُ جديدة ═══ --}}
             @if ($def)
                 <details style="width:100%">

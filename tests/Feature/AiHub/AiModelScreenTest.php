@@ -189,6 +189,64 @@ class AiModelScreenTest extends TestCase
             '**تسريب**: سرُّ المزوّدِ ظهر في صفحةِ النماذج');
     }
 
+    // ═══ الفواحص من الشاشة (W6) ═══
+
+    /** **C مجّانيٌّ** فيمرّ بلا إقرارِ كلفة */
+    public function test_المستوى_C_يمرّ_بلا_إقرار(): void
+    {
+        $p = $this->seedProvider();
+        $this->announce($p);
+        AiModels::import($p, ['hub-alpha']);
+        $m = AiModel::firstOrFail();
+
+        $this->actingAs($this->owner)->stepped()
+            ->post(route('ai.models.probe', $m), ['level' => 'C'])
+            ->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame('CONNECTED', (string) $m->fresh()->health);
+    }
+
+    /** **وD وE يُرَدّان بلا إقرارٍ صريح — ولا يُرسَل طلبُ توليدٍ واحد** */
+    public function test_المدفوعةُ_تُرَدّ_من_الشاشةِ_بلا_إقرار(): void
+    {
+        $p = $this->seedProvider();
+        $this->announce($p);
+        AiModels::import($p, ['hub-alpha']);
+        $m = AiModel::firstOrFail();
+
+        foreach ([['level' => 'D'], ['level' => 'E', 'capability' => 'tools']] as $payload) {
+            $this->actingAs($this->owner)->stepped()
+                ->post(route('ai.models.probe', $m), $payload)
+                ->assertRedirect()->assertSessionHasErrors('ack');
+        }
+
+        Http::assertNotSent(fn ($req) => str_contains($req->url(), '/chat/completions'));
+    }
+
+    /** وفحصُ الاعتمادِ B كذلك — والوضعُ إلزاميّ */
+    public function test_فحصُ_الاعتمادِ_يُرَدّ_بلا_إقرار(): void
+    {
+        $p = $this->seedProvider();
+
+        $this->actingAs($this->owner)->stepped()
+            ->post(route('ai.providers.probe', $p), ['mode' => 'chat'])
+            ->assertRedirect()->assertSessionHasErrors('ack');
+
+        Http::assertNotSent(fn ($req) => str_contains($req->url(), '/health/test_connection'));
+    }
+
+    /** والشاشةُ تُعلن أيَّ الفحوصِ يُنفق — فلا يُضغَط زرٌّ مُكلِفٌ بلا علم */
+    public function test_الشاشةُ_تُعلن_الفحوصَ_المدفوعة(): void
+    {
+        $p = $this->seedProvider();
+        $this->announce($p);
+        AiModels::import($p, ['hub-alpha']);
+
+        $this->actingAs($this->owner)->get(route('ai.models.index', $p))->assertOk()
+            ->assertSee('يُنفقان رصيداً', false)
+            ->assertSee('أُقِرُّ بأنّ هذا الفحصَ يُنفق رصيداً', false);
+    }
+
     /** والشاشةُ تقول صراحةً حين لا اكتشافَ آليَّ للمزوّد — بدل أن تتظاهر به */
     public function test_الشاشةُ_تُعلن_غيابَ_الاكتشافِ_الآليّ(): void
     {

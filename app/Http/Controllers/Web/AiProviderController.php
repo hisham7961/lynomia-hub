@@ -135,6 +135,32 @@ class AiProviderController extends Controller
             : back()->withErrors(['enabled' => (string) $res['error']]);
     }
 
+    /**
+     * **المستوى B — فحصُ الاعتماد** (المرحلة ٢ · W6): يُثبِت أنّ **المزوّدَ**
+     * يقبل مفتاحَنا، لا أنّ البوّابةَ حيّة (ذاك المستوى A وهو مجّانيّ).
+     *
+     * **ويُنفق رصيداً** — أغلق W0 الفجوةَ G3 بعكسِ ما افترضته الخطّةُ أوّلاً.
+     * فلا يُنفَّذ إلّا بإقرارٍ صريحٍ من الشاشة، والوضعُ يُمرَّر ولا يُستنتَج.
+     */
+    public function probe(Request $r, AiProvider $provider)
+    {
+        $this->gate();
+        if ($resp = hub_require_stepup()) return $resp;
+
+        $d = $r->validate([
+            'mode' => ['required', 'string', 'in:chat,embedding'],
+            'ack'  => ['accepted'],
+        ], ['ack.accepted' => 'يلزم إقرارٌ صريحٌ بأنّ هذا الفحصَ يُنفق رصيداً'],
+           ['mode' => 'وضع الفحص']);
+
+        $res = \App\Support\AiProbes::b($provider, (string) $d['mode'], true);
+
+        hub_audit('فحص اعتماد مزوّد (B)', AiProvider::MODULE, (string) $provider->id,
+            (string) $provider->label, ['after' => ['up' => $res['up'], 'ms' => $res['ms'], 'mode' => $d['mode']]]);
+
+        return back()->with('ok', \App\Support\ConnectionProbe::line($res));
+    }
+
     // ── الداخل ─────────────────────────────────────────────────────────
 
     /**

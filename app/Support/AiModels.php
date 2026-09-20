@@ -314,6 +314,30 @@ final class AiModels
         return ['ok' => true, 'models' => [$model], 'error' => null];
     }
 
+    /**
+     * **يُوسَم `verified` — ولا يكتبه إلّا فحصُ قدرةٍ ناجح** (المستوى E · W6).
+     *
+     * وهو أعلى رتبةً من `litellm`، فلا يدهسه تحديثٌ من الخريطة. ولا يُكتب
+     * **إلّا عند النجاح**: فشلُ الطلبِ قد يكون مهلةً أو حدَّ معدّلٍ أو عطلاً
+     * عابراً، فجعلُه «لا يدعم» يُغلق باباً مفتوحاً بدليلٍ لا يخصّ القدرة.
+     *
+     * @return array{ok: bool, models: list<AiModel>, error: ?string}
+     */
+    public static function recordVerified(AiModel $model, string $capability): array
+    {
+        $caps = (array) $model->capabilities;
+        if (! array_key_exists($capability, $caps)) return self::fail('قدرةٌ غيرُ معروفة');
+
+        $caps[$capability] = ['v' => true, 'src' => 'verified', 'at' => now()->toIso8601String()];
+        $model->forceFill(['capabilities' => $caps, 'updated_by' => auth()->id()])->save();
+
+        self::trace('إثبات قدرة نموذج باختبار', $model->provider, [
+            'model' => $model->litellm_model_name, 'capability' => $capability,
+        ]);
+
+        return ['ok' => true, 'models' => [$model], 'error' => null];
+    }
+
     // ── الداخل ─────────────────────────────────────────────────────────
 
     /**

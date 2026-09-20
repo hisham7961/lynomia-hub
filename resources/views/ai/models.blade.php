@@ -158,6 +158,53 @@
                 </form>
             </details>
 
+            {{-- ═══ الفواحص C · D · E — والمدفوعةُ تُعلَن ولا تُخفى ═══ --}}
+            <details style="width:100%">
+                <summary class="mut">🧪 الفحوص</summary>
+                <div class="sub mut">
+                    <b>C</b> مجّانيّ · <b>D</b> و<b>E</b> <b>يُنفقان رصيداً</b> ولا يُنفَّذان إلّا بإقرارٍ صريح.
+                    والمستوى <b>A</b> في زرِّ «اختبار الاتصال» بمركزِ الذكاء.
+                </div>
+                @if ($m->last_probe_at)
+                    <div class="sub">
+                        <span class="bdg {{ $m->health === 'CONNECTED' ? 'ok' : ($m->health === 'FAILED' ? 'wn' : '') }}">{{ $m->health }}</span>
+                        <span class="mut">{{ $m->last_probe_at }}{{ $m->last_latency_ms ? ' · ' . $m->last_latency_ms . ' مللي' : '' }}</span>
+                        @if ($m->last_error)<span class="mut">{{ $m->last_error }}</span>@endif
+                    </div>
+                @endif
+
+                <form method="POST" action="{{ route('ai.models.probe', $m) }}" class="grid">@csrf
+                    <input type="hidden" name="level" value="C">
+                    <div style="grid-column:1/-1"><button class="btn sm">🧪 C — مُسجَّلٌ وقابلٌ للبلوغ <span class="mut">(كلفةٌ صفر)</span></button></div>
+                </form>
+
+                <form method="POST" action="{{ route('ai.models.probe', $m) }}" class="grid">@csrf
+                    <input type="hidden" name="level" value="D">
+                    <label style="grid-column:1/-1">
+                        <input type="checkbox" name="ack" value="1">
+                        <b>أُقِرُّ بأنّ هذا الفحصَ يُنفق رصيداً</b> — توليدٌ أدنى بسقفِ
+                        {{ \App\Support\AiProbes::MAX_OUTPUT_TOKENS }} رمزاً.
+                    </label>
+                    <div style="grid-column:1/-1"><button class="btn sm">💸 D — توليدٌ أدنى</button></div>
+                </form>
+
+                <form method="POST" action="{{ route('ai.models.probe', $m) }}" class="grid">@csrf
+                    <input type="hidden" name="level" value="E">
+                    <label><span>القدرة</span>
+                        <select name="capability">
+                            @foreach (\App\Support\AiProbes::PROBABLE as $cap)
+                                <option value="{{ $cap }}">{{ $cap }}</option>
+                            @endforeach
+                        </select></label>
+                    <label style="grid-column:1/-1">
+                        <input type="checkbox" name="ack" value="1">
+                        <b>أُقِرُّ بالكلفة</b> — والناجحُ وحدَه يكتب <span class="mono ltr">verified</span>،
+                        والفاشلُ <b>لا يُثبِت النفي</b>.
+                    </label>
+                    <div style="grid-column:1/-1"><button class="btn sm">💸 E — إثباتُ قدرة</button></div>
+                </form>
+            </details>
+
             <details style="width:100%">
                 <summary class="mut">✋ تجاوزٌ يدويٌّ لحقيقة</summary>
                 <div class="sub mut">يُوسَم <span class="mono ltr">hub_override</span> ويعلو كلَّ تحديثٍ من البوّابة.</div>

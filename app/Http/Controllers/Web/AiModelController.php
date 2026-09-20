@@ -168,6 +168,43 @@ class AiModelController extends Controller
             : back()->withErrors(['key' => (string) $res['error']]);
     }
 
+    /**
+     * **المستويات C · D · E على نموذج** (المرحلة ٢ · W6).
+     *
+     * ‏C مجّانيٌّ فيمرّ بلا إقرار؛ وD وE **يُنفقان** فلا يُنفَّذان إلّا بإقرارٍ
+     * صريحٍ من الشاشة. والمستوى A في زرِّ «اختبار الاتصال» بمركزِ الذكاء — فلا
+     * يُبنى مرّتين.
+     */
+    public function probe(Request $r, AiModel $model)
+    {
+        $this->gate();
+        if ($resp = hub_require_stepup()) return $resp;
+
+        $level = mb_strtoupper((string) $r->input('level', ''));
+        if (! in_array($level, ['C', 'D', 'E'], true)) {
+            return back()->withErrors(['level' => 'مستوى فحصٍ غيرُ معروف — C أو D أو E']);
+        }
+
+        if (\App\Support\AiProbes::isPaid($level) && ! $r->boolean('ack')) {
+            return back()->withErrors(['ack' => 'هذا الفحصُ يُنفق رصيداً — أقِرَّ بالكلفةِ صراحةً قبل تنفيذِه']);
+        }
+
+        $res = match ($level) {
+            'C' => \App\Support\AiProbes::c($model),
+            'D' => \App\Support\AiProbes::d($model, true),
+            'E' => \App\Support\AiProbes::e($model, (string) $r->input('capability', ''), true),
+        };
+
+        $model->forceFill([
+            'health'          => $res['up'] === true ? 'CONNECTED' : ($res['up'] === false ? 'FAILED' : 'UNKNOWN'),
+            'last_probe_at'   => now(),
+            'last_latency_ms' => $res['ms'],
+            'last_error'      => $res['error'],       // مرّ بـ`Redactor` في `row()`
+        ])->save();
+
+        return back()->with('ok', 'المستوى ' . $level . ' — ' . \App\Support\ConnectionProbe::line($res));
+    }
+
     /** مجموعاتُ الحقائقِ المعروضة — تُقرأ في القالبِ بلا تعداد */
     public static function factGroups(): array
     {

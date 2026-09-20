@@ -938,6 +938,14 @@ Route::middleware('auth')->group(function () {
     Route::post('admin/ai/models/{model}/override', [\App\Http\Controllers\Web\AiModelController::class, 'override'])
         ->name('ai.models.override');
 
+    /* ── الفواحصُ الخمسة (المرحلة ٢ · W6) — والمستوى A في `ai.test` فلا يُبنى مرّتين.
+     * والمدفوعةُ (B · D · E) لا تُنفَّذ إلّا بإقرارٍ صريحٍ بالكلفة.
+     */
+    Route::post('admin/ai/providers/{provider}/probe', [\App\Http\Controllers\Web\AiProviderController::class, 'probe'])
+        ->name('ai.providers.probe')->middleware('throttle:10,1');
+    Route::post('admin/ai/models/{model}/probe', [\App\Http\Controllers\Web\AiModelController::class, 'probe'])
+        ->name('ai.models.probe')->middleware('throttle:10,1');
+
     Route::get('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'index'])->name('integrations.n8n');
     Route::post('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'save'])->name('integrations.n8n.save');
     Route::get('admin/security', [SecurityController::class, 'index'])->name('security.index');
