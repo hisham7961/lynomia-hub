@@ -69,7 +69,9 @@ class AiCredentialProbeContractTest extends TestCase
             $url = $req->url();
 
             if (str_contains($url, '/health/test_connection')) {
-                $this->lastTest = (array) $req->data();
+                // **المتنُ الخامُّ هو الحقيقة**: خرائطُ الحمولةِ كائناتٌ في
+                // الشيفرة، و`data()` تُعيدها كما بُنيت لا كما تُرسَل
+                $this->lastTest = (array) json_decode((string) $req->body(), true);
                 $params = (array) ($this->lastTest['litellm_params'] ?? []);
 
                 // `proxy/health_check.py:774` — قوسانِ لا `.get()`

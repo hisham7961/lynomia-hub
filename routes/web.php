@@ -955,6 +955,14 @@ Route::middleware('auth')->group(function () {
         ->name('ai.models.import')->middleware('throttle:20,1');
     Route::post('admin/ai/providers/{provider}/models/register', [\App\Http\Controllers\Web\AiModelController::class, 'register'])
         ->name('ai.models.register')->middleware('throttle:20,1');
+
+    // ═══ الاكتشافُ الموحَّد — شاشةُ الاختيارِ بلا كتابةِ معرّف ═══
+    // قراءةٌ محضةٌ بكلفةِ صفر: سجلُّ البوّابةِ وكتالوجُها، ولا طلبَ يبلغ مزوّداً.
+    Route::get('admin/ai/providers/{provider}/models/browse', [\App\Http\Controllers\Web\AiModelController::class, 'browse'])
+        ->name('ai.models.browse')->middleware('throttle:30,1');
+    // والتبنّي كتابةٌ عند البوّابةِ — فيُخنَق كنظائرِه ويمرّ بالتصعيد
+    Route::post('admin/ai/providers/{provider}/models/adopt', [\App\Http\Controllers\Web\AiModelController::class, 'adopt'])
+        ->name('ai.models.adopt')->middleware('throttle:20,1');
     Route::post('admin/ai/providers/{provider}/models/refresh', [\App\Http\Controllers\Web\AiModelController::class, 'refresh'])
         ->name('ai.models.refresh')->middleware('throttle:20,1');
     Route::post('admin/ai/models/{model}/configure', [\App\Http\Controllers\Web\AiModelController::class, 'configure'])

@@ -99,7 +99,7 @@ class AiProviderLifecycleTest extends TestCase
 
         Http::assertSent(function ($req) {
             if (! str_contains($req->url(), '/credentials')) return false;
-            $values = $req->data()['credential_values'] ?? [];
+            $values = $this->sentBody($req)['credential_values'] ?? [];
 
             // وجهةُ الحقلِ من المخطَّط: المفتاحُ والعنوانُ إلى الاعتماد
             $this->assertArrayHasKey('api_key', $values, 'المفتاحُ لم يصل البوّابة');

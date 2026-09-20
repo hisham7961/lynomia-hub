@@ -74,6 +74,10 @@
             </div>
 
             <div style="display:flex;gap:6px;flex-wrap:wrap">
+                {{-- **الاكتشافُ أوّلاً**: الرحلةُ الطبيعيّةُ تبدأ هنا لا بكتابةِ معرّف --}}
+                @if ($p->credential_state !== 'missing')
+                    <a class="btn sm" href="{{ route('ai.models.browse', $p) }}">🔍 اكتشافُ النماذج</a>
+                @endif
                 <a class="btn sm" href="{{ route('ai.models.index', $p) }}">🧠 النماذج</a>
                 {{-- **شرطُ العرضِ = شرطُ الباب** (W8): زرٌّ يُعرَض ثمّ يُصَدُّ ٤٠٣
                      أسوأُ من غيابِه — يَعِد بقدرةٍ لا يملكها صاحبُه. --}}
@@ -113,7 +117,8 @@
                     @if ($bModels->isEmpty())
                         <div class="sub mut">
                             لا نموذجَ مسجَّلاً لهذا المزوّدِ بعدُ — و<b>B يلزمه نموذج</b>.
-                            اكتشِفِ النماذجَ أو سجّل واحداً يدويّاً من
+                            ابدأ بـ<a href="{{ route('ai.models.browse', $p) }}"><b>🔍 اكتشافِ النماذج</b></a>
+                            واختر ما تحتاجه، أو سجّل واحداً يدويّاً من
                             <a href="{{ route('ai.models.index', $p) }}">شاشةِ النماذج</a>، ثمّ عُد إلى هنا.
                         </div>
                     @else

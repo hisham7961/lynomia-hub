@@ -152,7 +152,7 @@ class AiProviderCoverageTest extends TestCase
         // والنهايةُ **ليست سرّاً** فتبقى مقروءةً في الاعتمادِ عند البوّابة
         $sent = false;
         Http::assertSent(function ($request) use (&$sent) {
-            $body = (array) $request->data();
+            $body = $this->sentBody($request);
             if (($body['credential_values']['api_key'] ?? null) === self::PLANTED) $sent = true;
 
             return true;

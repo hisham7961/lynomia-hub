@@ -106,6 +106,31 @@ final class LiteLlmAdmin
         return self::call('GET', '/model/settings');
     }
 
+    /**
+     * **كتالوجُ البوّابةِ عن السوق** — `GET /public/litellm_model_cost_map`.
+     *
+     * يُعيد ما تعرفه الحزمةُ المثبّتةُ عن النماذجِ **كلِّها**: معرّفَ النموذجِ
+     * عند مزوّدِه، ومزوّدَه، ووضعَه، وحدودَه، وتسعيرَه، وما يدعمه من قدرات.
+     *
+     * **وثلاثُ حقائقَ عنه تُقال قبل استعمالِه:**
+     *
+     *  ① **قراءةٌ محضةٌ بكلفةِ صفر.** المسارُ يُعيد قاموساً محمولاً في الحزمةِ
+     *     نفسِها (`litellm.model_cost`) — لا يخرج منه طلبٌ إلى مزوّد، ولا
+     *     يُولَّد حرفٌ واحد، ولا يُمَسُّ اعتماد.
+     *
+     *  ② **معرفةٌ عن السوقِ لا إعلانٌ من حسابِك.** وجودُ نموذجٍ هنا **لا
+     *     يعني** أنّ اعتمادَك يبلغه: قد يكون محجوباً عن حسابِك أو مطويّاً.
+     *     فمصدرُ كلِّ مرشَّحٍ يُعرَض، ولا يُقدَّم هذا مقامَ إثباتٍ — والإثباتُ
+     *     فاحصٌ يُنفق بإقرار.
+     *
+     *  ③ **ضخمٌ فيُحَدّ.** آلافُ المُدخَلات، فالمستهلِكُ يُرشّح ويَسقُف ولا
+     *     يعرض ما وصل كما وصل.
+     */
+    public static function modelCostMap(): array
+    {
+        return self::call('GET', '/public/litellm_model_cost_map');
+    }
+
     /** سردُ الاعتمادات — **البوّابةُ تُقنِّع القيمَ بنفسِها** (W0 · C2) */
     public static function credentials(): array
     {
@@ -136,8 +161,8 @@ final class LiteLlmAdmin
 
         return self::call('POST', '/credentials', [
             'credential_name'   => $name,
-            'credential_values' => $values,
-            'credential_info'   => $info,
+            'credential_values' => self::obj($values),
+            'credential_info'   => self::obj($info),
         ]);
     }
 
@@ -150,8 +175,8 @@ final class LiteLlmAdmin
 
         return self::call('PATCH', '/credentials/' . rawurlencode($name), [
             'credential_name'   => $name,
-            'credential_values' => $values,
-            'credential_info'   => $info,
+            'credential_values' => self::obj($values),
+            'credential_info'   => self::obj($info),
         ]);
     }
 
@@ -171,11 +196,11 @@ final class LiteLlmAdmin
     {
         return self::call('POST', '/model/new', [
             'model_name'     => $modelName,
-            'litellm_params' => array_merge($extraParams, [
+            'litellm_params' => self::obj(array_merge($extraParams, [
                 'model'                   => $upstream,
                 'litellm_credential_name' => $credentialName,
-            ]),
-            'model_info'     => $modelInfo,
+            ])),
+            'model_info'     => self::obj($modelInfo),
         ]);
     }
 
@@ -245,9 +270,38 @@ final class LiteLlmAdmin
         }
 
         return self::call('POST', '/health/test_connection', [
-            'litellm_params' => $litellmParams,
+            'litellm_params' => self::obj($litellmParams),
             'mode'           => $mode,
         ]);
+    }
+
+    /**
+     * **خريطةٌ حرّةٌ تخرج كائناً — ولو كانت فارغة.**
+     *
+     * ── **العطلُ الذي فرض هذا المُحوِّل** ──
+     *
+     * سجّل المالكُ نموذجاً في أوّلِ قبولِ إنتاجٍ حقيقيّ، فعادت `422`:
+     * حقلُ الوصفِ خرج `[]` والعقدُ يطلب كائناً.
+     *
+     * **والسببُ لغةٌ لا بوّابة.** في PHP `[]` قائمةٌ وخريطةٌ في آنٍ واحد —
+     * لا تمييزَ بينهما. وفي JSON التمييزُ حاسم: `[]` مصفوفةٌ و`{}` كائن.
+     * فخريطةٌ وصفيّةٌ تُركت فارغةً تصير **مصفوفةً** عند الترميز، ونموذجُ
+     * الجسمِ عند البوّابةِ يرفضها بنوعِها لا بمحتواها.
+     *
+     * **ولا يُصلَح الحقلُ الذي سقط وحدَه.** قياسُ نماذجِ الجسمِ في الإصدارِ
+     * المثبَّتِ أثبت أنّ ثلاثَ حمولاتٍ تحمل الخللَ نفسَه، ونجَت اثنتان منها
+     * في الإنتاج **بالمصادفة** لا بالتصميم: مُستدعياهما يمرّران وصفاً غيرَ
+     * فارغ. فمتى مرّ أحدُهما خريطةً فارغةً سقط كما سقط الثالث.
+     *
+     * فالقاعدةُ تُفرَض في طبقةِ النقل: **كلُّ خريطةٍ حرّةٍ تعبر هذا المُحوِّل**،
+     * وهو محايدٌ للمزوّدِ تماماً — لا يعرف مزوّداً ولا حقلاً بعينِه.
+     *
+     * والتحويلُ يُبقي المفاتيحَ كما هي؛ ومفتاحٌ عدديٌّ يصير نصّاً — وهو ما
+     * يطلبه كائنُ JSON أصلاً.
+     */
+    private static function obj(array $map): \stdClass
+    {
+        return (object) $map;
     }
 
     // ── المحرّك ────────────────────────────────────────────────────────
@@ -307,6 +361,9 @@ final class LiteLlmAdmin
             $code === 401 || $code === 403 => 'البوّابةُ حيّةٌ ومفتاحُ الإدارةِ مرفوض',
             $code === 404                  => 'المورِدُ غيرُ موجودٍ عند البوّابة',
             $code === 400                  => 'طلبٌ مرفوضُ الشكل',
+            // **ولا تُخلَط بالأربعمئة**: ٤٢٢ تعني أنّ الجسمَ وصل وقُرئ ثمّ
+            // رُفض **حقلٌ بنوعِه** — فالمديرُ يبحث في الأنواعِ لا في المسار
+            $code === 422                  => 'رُفض شكلُ الطلبِ عند البوّابة — حقلٌ بنوعٍ غيرِ متوقَّع',
             $code >= 500                   => 'عطلٌ داخليٌّ في البوّابة',
             default                        => '',
         };

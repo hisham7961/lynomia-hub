@@ -67,7 +67,7 @@ final class AiModelFacts
      * **ولا تُشتقّ منها إلّا القدراتُ المذكورةُ هنا.** `tools` و`vision` وأخواتُها
      * تبقى على أعلامِها أو `unknown`، فالوضعُ لا يقول عنها شيئاً.
      */
-    private const MODE_MAP = [
+    public const MODE_MAP = [
         'chat'                => 'chat',
         'completion'          => 'text',
         'embedding'           => 'embeddings',
