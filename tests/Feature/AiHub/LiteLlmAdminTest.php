@@ -118,7 +118,7 @@ class LiteLlmAdminTest extends TestCase
         $this->assertTrue($r['ok']);
 
         Http::assertSent(function ($req) {
-            $d = $req->data();
+            $d = $this->sentBody($req);
             $this->assertSame('azure-prod', $d['credential_name']);
             $this->assertSame(self::PLANTED, $d['credential_values']['api_key'],
                 'السرُّ لم يصل البوّابةَ — والعميلُ ناقلٌ لا مُرشِّح');
@@ -140,7 +140,7 @@ class LiteLlmAdminTest extends TestCase
         LiteLlmAdmin::createModel('hub-general', 'azure/deploy-x', 'azure-prod');
 
         Http::assertSent(function ($req) {
-            $p = $req->data()['litellm_params'];
+            $p = $this->sentBody($req)['litellm_params'];
             $this->assertSame('azure-prod', $p['litellm_credential_name']);
             $this->assertSame('azure/deploy-x', $p['model']);
             $this->assertArrayNotHasKey('api_key', $p, 'مفتاحٌ في معاملاتِ النموذج — والمرجعُ يُغني عنه');
@@ -173,7 +173,7 @@ class LiteLlmAdminTest extends TestCase
         $this->assertTrue(LiteLlmAdmin::testConnection(['model' => 'x'], 'chat', true)['ok']);
 
         Http::assertSent(function ($req) {
-            $this->assertSame('chat', $req->data()['mode'],
+            $this->assertSame('chat', $this->sentBody($req)['mode'],
                 'الوضعُ لم يُمرَّر — والاستنتاجُ الآليُّ قد يقع على وضعٍ أغلى');
             return true;
         });

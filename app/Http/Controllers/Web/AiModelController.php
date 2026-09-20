@@ -118,6 +118,79 @@ class AiModelController extends Controller
                 : 'اكتُشف ' . count($r['candidates']) . ' نموذجاً — راجِعها ثمّ اختر. **ولم يُفعَّل شيء.**');
     }
 
+    /**
+     * **شاشةُ الاكتشافِ الموحَّدة** — ولا يُكتَب معرّفُ نموذجٍ بيدٍ بعدَها.
+     *
+     * قراءةٌ محضةٌ بكلفةِ صفر: سجلُّ البوّابةِ وكتالوجُها. **ولا طلبَ يبلغ
+     * مزوّداً**، فلا إقرارَ كلفةٍ يُطلَب هنا.
+     */
+    public function browse(Request $r, AiProvider $provider)
+    {
+        \App\Support\AiAccess::gateView();
+
+        $found = \App\Support\AiModelSources::discover($provider);
+
+        // ترشيحٌ على قائمةٍ بيضاءَ لا على مُدخَلٍ حرّ
+        $mode = (string) $r->query('mode', '');
+        if (! in_array($mode, \App\Support\AiModelSources::MODES, true)) $mode = '';
+
+        $q = mb_substr(trim((string) $r->query('q', '')), 0, 80);
+
+        $candidates = $found['candidates'];
+        if ($mode !== '') {
+            $candidates = array_values(array_filter($candidates,
+                static fn (array $c) => ($c['mode'] ?? null) === $mode));
+        }
+        if ($q !== '') {
+            $candidates = array_values(array_filter($candidates,
+                static fn (array $c) => mb_stripos((string) $c['upstream_model'], $q) !== false));
+        }
+
+        return view('ai.models-browse', [
+            'sections'   => \App\Support\AiAccess::sections(),
+            'section'    => 'models',
+            'manage'     => \App\Support\AiAccess::canManage(),
+            'provider'   => $provider,
+            'found'      => $found,
+            'candidates' => $candidates,
+            'modes'      => \App\Support\AiModelSources::MODES,
+            'mode'       => $mode,
+            'q'          => $q,
+            // **الحكمُ على النتيجةِ لا على تصنيفٍ مُعلَن** — والتصنيفُ يُخطئ في الاتّجاهَين
+            'yielded'    => \App\Support\AiModelSources::yieldedCandidates($found),
+            'bothRead'   => \App\Support\AiModelSources::bothSourcesRead($found),
+        ]);
+    }
+
+    /**
+     * **التبنّي** — اختيارٌ واحدٌ أو عدّةٌ، بضغطةٍ واحدةٍ وبلا اختراعِ اسم.
+     *
+     * والاسمُ الداخليُّ يُولَّد حتميّاً (`AiModels::mintAlias`)، ويبقى قابلاً
+     * للتعديلِ في التهيئة. **ولا كلفةَ في التبنّي**: تسجيلُ إعدادٍ عند
+     * البوّابةِ لا طلبُ توليد.
+     */
+    public function adopt(Request $r, AiProvider $provider)
+    {
+        $this->gate();
+        if ($resp = hub_require_stepup()) return $resp;
+
+        $picks = array_values(array_filter((array) $r->input('picks', []),
+            static fn ($p) => is_string($p) && trim($p) !== ''));
+
+        $res = AiModels::adopt($provider, $picks);
+
+        if (! $res['ok']) {
+            return back()->withErrors(['picks' => (string) $res['error']]);
+        }
+
+        $note = 'تُبنّي ' . count($res['models']) . ' نموذجاً — **مُعطَّلةً** حتّى تُفعّلها';
+        if ($res['skipped'] !== []) {
+            $note .= ' · وتُخطّي ' . count($res['skipped']) . ' (مستورَدٌ سلفاً أو تعذّر تسجيلُه)';
+        }
+
+        return redirect()->route('ai.models.index', $provider)->with('ok', $note);
+    }
+
     /** **② الاختيار** — استيرادُ المُنتقى مُعطَّلاً */
     public function import(Request $r, AiProvider $provider)
     {

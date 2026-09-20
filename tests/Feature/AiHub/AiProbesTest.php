@@ -67,7 +67,8 @@ class AiProbesTest extends TestCase
                  * الإنتاجُ يردّ ٥٠٠. البوّابةُ تقرأ `litellm_params['model']`
                  * قراءةً لا تحتمل الغياب، فغيابُه عطلٌ داخليٌّ لا فحصٌ فاشل.
                  */
-                if (! array_key_exists('model', (array) (($req->data()['litellm_params'] ?? [])))) {
+                $sent = (array) json_decode((string) $req->body(), true);
+                if (! array_key_exists('model', (array) ($sent['litellm_params'] ?? []))) {
                     return Http::response(
                         ['detail' => ['error' => "Failed to test connection: 'model'"]], 500);
                 }
@@ -196,10 +197,16 @@ class AiProbesTest extends TestCase
         $r = AiProbes::b($m, 'chat', true);
 
         $this->assertTrue($r['up'], (string) $r['error']);
-        Http::assertSent(fn ($req) => str_contains($req->url(), '/health/test_connection')
-            && ($req->data()['mode'] ?? null) === 'chat'
-            // **والنموذجُ جزءٌ من الحمولةِ لا زينةٌ فيها** — بغيرِه عطلٌ داخليّ
-            && (($req->data()['litellm_params'] ?? [])['model'] ?? null) === 'fake/upstream-a');
+        // **والقراءةُ من المتنِ الخامِّ**: خرائطُ الحمولةِ كائناتٌ في الشيفرة،
+        // و`data()` تُعيدها كما بُنيت لا كما تُرسَل — فالمتنُ هو الحقيقة
+        Http::assertSent(function ($req) {
+            if (! str_contains($req->url(), '/health/test_connection')) return false;
+            $b = (array) json_decode((string) $req->body(), true);
+
+            return ($b['mode'] ?? null) === 'chat'
+                // **والنموذجُ جزءٌ من الحمولةِ لا زينةٌ فيها** — بغيرِه عطلٌ داخليّ
+                && (($b['litellm_params'] ?? [])['model'] ?? null) === 'fake/upstream-a';
+        });
     }
 
     // ═══ ③ السقفُ مفروضٌ لا مُستقبَل ═══

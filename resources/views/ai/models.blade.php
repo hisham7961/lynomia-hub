@@ -87,7 +87,14 @@
 @if ($manage ?? true)
 <div class="card">
     <details>
-        <summary><b>➕ تسجيلُ نموذجٍ يدويّاً</b> <span class="mut">باسمِه عند المزوّد</span></summary>
+        <summary><b>➕ تسجيلُ نموذجٍ يدويّاً</b>
+            <span class="mut">متقدّم — والمسارُ الطبيعيُّ هو 🔍 اكتشافُ النماذج</span></summary>
+        <div class="sub mut">
+            <b>لا تحتاج هذا في الأغلب.</b> اضغط
+            <a href="{{ route('ai.models.browse', $provider) }}">🔍 اكتشافَ النماذج</a>
+            واختر من قائمةٍ حقيقيّة. وهذا البابُ لمزوّدٍ لا تعرف البوّابةُ نماذجَه،
+            أو لنموذجٍ لم يبلغ الكتالوجَ بعد.
+        </div>
         <form method="POST" action="{{ route('ai.models.register', $provider) }}" class="grid">@csrf
             <label>
                 <span>الاسم في Hub<b class="req">*</b></span>

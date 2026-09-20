@@ -125,6 +125,8 @@ final class AiModels
                 'provider_id'        => $provider->id,
                 'litellm_model_name' => $name,
                 'upstream_model'     => $c['upstream_model'],
+                // **نشرٌ قائمٌ عند البوّابةِ** — وهو أعلى المصادرِ رتبةً
+                'discovery_source'   => AiModelSources::GATEWAY,
                 'display_name'       => $name,              // يُعاد تسميتُه في التهيئة
                 'enabled'            => false,              // **الاكتشافُ لا يُفعِّل**
                 'capabilities'       => $c['capabilities'],
@@ -232,7 +234,154 @@ final class AiModels
         // ويُقرأ ما تقوله البوّابةُ عنه — **لا ما نظنّه نحن**
         $import = self::import($provider, [$hubName]);
 
+        // **ويُوسَم بمصدرِه**: ادّعاءُ إنسانٍ لا نشرٌ مُكتشَفٌ ولا كتالوجٌ مقروء
+        foreach (($import['models'] ?? []) as $m) {
+            $m->forceFill(['discovery_source' => AiModelSources::MANUAL])->save();
+        }
+
         return $import['ok'] ? $import : ['ok' => true, 'models' => [], 'error' => null];
+    }
+
+    // ── ③٫٥ التبنّي — اختيارٌ من كتالوجِ البوّابةِ بلا كتابةِ معرّف ──────
+
+    /**
+     * **اسمٌ داخليٌّ يُولَّد ولا يُخترَع.**
+     *
+     * كان المديرُ يُطالَب باسمَين لكلِّ نموذج: معرّفِه عند المزوّد، **واسمٍ
+     * يخترعه له في Hub**. والثاني لا قيمةَ قرارٍ فيه في الأغلب — مجرّدُ
+     * عَقَبةٍ أمام من يريد نموذجاً يعمل.
+     *
+     * فيُشتَقّ من المصدرِ نفسِه: `hub-{مفتاحُ المزوّد}-{المعرّفُ مُطبَّعاً}`.
+     *
+     * **وثلاثُ خصالٍ يحرسها التوليد:**
+     *
+     *  ① **حتميٌّ**: المُدخَلُ نفسُه يعطي الاسمَ نفسَه في كلِّ مرّة، فإعادةُ
+     *     الاستيرادِ لا تُنتج صفّاً ثانياً لنموذجٍ واحد.
+     *  ② **مطابقٌ للقيد**: حروفٌ وأرقامٌ و`. _ -` فقط — وهو القيدُ نفسُه
+     *     المفروضُ على التسجيلِ اليدويّ، فلا مسارانِ بقاعدتَين.
+     *  ③ **فريدٌ بلا قرعة**: عند التصادمِ يُضاف بصمةٌ قصيرةٌ من المعرّفِ
+     *     الكاملِ لا رقمٌ تسلسليٌّ يختلف باختلافِ ترتيبِ الاستيراد.
+     */
+    public static function mintAlias(AiProvider $provider, string $upstream): string
+    {
+        $upstream = trim($upstream);
+        if ($upstream === '') return '';
+
+        // بعضُ المعرّفاتِ تحمل مفتاحَ مزوّدِها سابقةً — فلا يُكرَّر في الاسم
+        $tail = mb_strtolower($upstream);
+        $key  = mb_strtolower(trim((string) $provider->catalog_key));
+        if ($key !== '' && str_starts_with($tail, $key . '/')) {
+            $tail = mb_substr($tail, mb_strlen($key) + 1);
+        }
+
+        $slug = preg_replace('/[^a-z0-9._-]+/u', '-', $tail) ?? '';
+        $slug = trim(preg_replace('/-{2,}/', '-', $slug) ?? '', '-._');
+
+        $base = trim('hub-' . preg_replace('/[^a-z0-9._-]+/u', '-', $key) . '-' . $slug, '-._');
+        if ($base === '' || $slug === '') $base = 'hub-' . substr(sha1($upstream), 0, 12);
+
+        $base = mb_substr($base, 0, 160);
+
+        if (! AiModel::query()->where('litellm_model_name', $base)->exists()) return $base;
+
+        // **بصمةُ المعرّفِ الكامل** — حتميّةٌ ولا تتعلّق بترتيبِ الاستيراد
+        return mb_substr($base, 0, 160) . '-' . substr(sha1($upstream), 0, 8);
+    }
+
+    /**
+     * **تبنّي نماذجَ مُختارةٍ من الاكتشاف** — بضغطةٍ واحدةٍ وبلا كتابةِ معرّف.
+     *
+     * والمُدخَلُ **اختياراتٌ** لا نصٌّ حرّ: كلُّ اختيارٍ `مصدر|معرّف`، ويُطابَق
+     * على مرشَّحي الاكتشافِ الحقيقيّين. فما لم يُكتشَف لا يُتبنّى — ولا يعبر
+     * معرّفٌ من المتصفّحِ إلى البوّابةِ بلا أن يمرَّ على قائمةِ ما اكتُشف.
+     *
+     * **والمُسجَّلُ عند البوّابةِ سلفاً لا يُسجَّل ثانيةً**: مرشَّحُ السجلِّ
+     * يُستورَد كما كان، ومرشَّحُ الكتالوجِ يُسجَّل أوّلاً ثمّ يُستورَد.
+     *
+     * @param  list<string>  $picks
+     * @return array{ok: bool, models: list<AiModel>, skipped: list<string>, error: ?string}
+     */
+    public static function adopt(AiProvider $provider, array $picks): array
+    {
+        if ($picks === []) {
+            return ['ok' => false, 'models' => [], 'skipped' => [], 'error' => 'لم يُختَر نموذجٌ — التبنّي بلا اختيارٍ يُرَدّ'];
+        }
+        if ((string) $provider->credential_state === 'missing') {
+            return ['ok' => false, 'models' => [], 'skipped' => [], 'error' => 'لا اعتمادَ لهذا المزوّد — اضبطه قبل تبنّي نموذج'];
+        }
+
+        $found = AiModelSources::discover($provider);
+        if (! $found['ok']) {
+            return ['ok' => false, 'models' => [], 'skipped' => [], 'error' => (string) $found['error']];
+        }
+
+        $byPick = [];
+        foreach ($found['candidates'] as $c) {
+            $byPick[$c['source'] . '|' . $c['upstream_model']] = $c;
+        }
+
+        $models  = [];
+        $skipped = [];
+        $fromRegistry = [];
+
+        foreach (array_values(array_unique(array_map('strval', $picks))) as $pick) {
+            $c = $byPick[$pick] ?? null;
+            if ($c === null || $c['already_imported']) { $skipped[] = $pick; continue; }
+
+            if ($c['source'] === AiModelSources::GATEWAY) {
+                $fromRegistry[] = (string) $c['litellm_model_name'];
+                continue;
+            }
+
+            $alias = self::mintAlias($provider, (string) $c['upstream_model']);
+            if ($alias === '') { $skipped[] = $pick; continue; }
+
+            // **البوّابةُ أوّلاً** — فلا صفٌّ في Hub يدّعي نشراً لم يقع
+            $res = LiteLlmAdmin::createModel($alias, (string) $c['upstream_model'],
+                (string) $provider->credential_name);
+            if (! $res['ok']) { $skipped[] = $pick; continue; }
+
+            $models[] = AiModel::create([
+                'provider_id'        => $provider->id,
+                'litellm_model_name' => $alias,
+                'upstream_model'     => (string) $c['upstream_model'],
+                'discovery_source'   => AiModelSources::CATALOG,
+                'display_name'       => (string) $c['display_name'],
+                'enabled'            => false,          // **التبنّي لا يُفعِّل**
+                'capabilities'       => (array) $c['capabilities'],
+                'limits'             => (array) $c['limits'],
+                'params'             => (array) $c['params'],
+                'pricing'            => (array) $c['pricing'],
+                'pricing_source'     => AiModelSources::CATALOG,
+                'pricing_updated_at' => now(),
+                'health'             => 'UNKNOWN',
+                'created_by'         => auth()->id(),
+                'updated_by'         => auth()->id(),
+            ]);
+        }
+
+        // ما كان مُسجَّلاً عند البوّابةِ يمرّ بمسارِ الاستيرادِ القائمِ نفسِه
+        if ($fromRegistry !== []) {
+            $imported = self::import($provider, $fromRegistry);
+            if ($imported['ok']) {
+                foreach ($imported['models'] as $m) $models[] = $m;
+            } else {
+                $skipped = array_merge($skipped, $fromRegistry);
+            }
+        }
+
+        if ($models === []) {
+            return ['ok' => false, 'models' => [], 'skipped' => $skipped,
+                    'error' => 'لا نموذجَ جديدٌ يُتبنّى — المُختارُ مستورَدٌ سلفاً أو تعذّر تسجيلُه'];
+        }
+
+        self::trace('تبنّي نماذج ذكاء', $provider, [
+            'adopted' => array_map(static fn (AiModel $m) => $m->litellm_model_name, $models),
+            'skipped' => $skipped,
+            'enabled' => false,
+        ]);
+
+        return ['ok' => true, 'models' => $models, 'skipped' => $skipped, 'error' => null];
     }
 
     // ── ④ التهيئةُ والاختيار — قرارُ إنسان ──────────────────────────────

@@ -1,0 +1,85 @@
+{
+  "_": "مولَّدٌ بقياسِ نماذجِ جسمِ litellm==1.101.0 المثبَّتة — لا يُحرَّر يداً",
+  "litellm_version": "1.101.0",
+  "routes": {
+    "POST /model/new": {
+      "body_model": "Deployment",
+      "required": [
+        "litellm_params",
+        "model_info",
+        "model_name"
+      ],
+      "extra": "allow",
+      "object_fields": [
+        "litellm_params",
+        "model_info"
+      ]
+    },
+    "POST /credentials": {
+      "body_model": "CreateCredentialItem",
+      "required": [
+        "credential_info",
+        "credential_name"
+      ],
+      "extra": "ignore",
+      "object_fields": [
+        "credential_info",
+        "credential_values"
+      ]
+    },
+    "PATCH /credentials/{name}": {
+      "body_model": "CredentialItem",
+      "required": [
+        "credential_info",
+        "credential_name",
+        "credential_values"
+      ],
+      "extra": "ignore",
+      "object_fields": [
+        "credential_info",
+        "credential_values"
+      ]
+    },
+    "POST /model/delete": {
+      "body_model": "ModelInfoDelete",
+      "required": [
+        "id"
+      ],
+      "extra": "ignore",
+      "object_fields": []
+    },
+    "POST /model/block": {
+      "body_model": "BlockModelRequest",
+      "required": [
+        "model_id"
+      ],
+      "extra": "ignore",
+      "object_fields": []
+    },
+    "POST /model/unblock": {
+      "body_model": "BlockModelRequest",
+      "required": [
+        "model_id"
+      ],
+      "extra": "ignore",
+      "object_fields": []
+    }
+  },
+  "measured_verdicts": {
+    "model_new.model_info_EMPTY_ARRAY": "REJECTED:model_type",
+    "model_new.model_info_EMPTY_OBJECT": "ACCEPTED",
+    "model_new.model_info_OMITTED": "ACCEPTED",
+    "model_new.litellm_params_EMPTY_ARRAY": "REJECTED:model_type",
+    "model_new.litellm_params_NO_MODEL": "REJECTED:missing",
+    "credentials.credential_info_EMPTY_ARRAY": "REJECTED:dict_type",
+    "credentials.credential_info_EMPTY_OBJECT": "ACCEPTED",
+    "credentials_patch.credential_info_EMPTY_ARRAY": "REJECTED:dict_type",
+    "credentials_patch.credential_info_EMPTY_OBJECT": "ACCEPTED"
+  },
+  "litellm_params_only_required_field": [
+    "model"
+  ],
+  "model_info_required_field": [
+    "id"
+  ]
+}

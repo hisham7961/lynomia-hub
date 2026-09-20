@@ -56,6 +56,25 @@ abstract class TestCase extends BaseTestCase
      * فالحارسُ لا يفقد شيئاً — يُثبت ذلك وجهُ الاختبار الثاني في
      * `ScopeLeakAuditTest::test_the_masked_field_guard_still_sees_the_number_when_it_is_not_masked`.
      */
+    /**
+     * **جسمُ الطلبِ كما يُرسَل لا كما بُنيَ.**
+     *
+     * ── **المصيدةُ التي يُغلقها هذا المُساعِد** ──
+     *
+     * حمولاتُ البوّابةِ تحمل **خرائطَ حرّةً** تُبنى كائناتٍ في الشيفرة، لأنّ
+     * العقدَ يرفض `[]` ويقبل `{}` — وفي PHP لا فرقَ بينهما. و`$req->data()`
+     * تُعيد ما **بُنيَ** (فيه `stdClass`) لا ما **يُرسَل** (نصُّ JSON):
+     * فيسقط `$req->data()['litellm_params']['model']` بـ«لا يمكن استعمالُ
+     * كائنٍ مصفوفةً»، أو — وهو الأسوأ — **يمرّ تأكيدٌ على شكلٍ غيرِ الذي
+     * يبلغ الشبكةَ**.
+     *
+     * فالتأكيدُ يقع على **المتنِ الخامِّ** دائماً: هو وحدَه ما تراه البوّابة.
+     */
+    protected function sentBody(mixed $request): array
+    {
+        return (array) json_decode((string) $request->body(), true);
+    }
+
     protected function assertMaskedValueAbsent(string $haystack, string $needle, string $message = ''): void
     {
         $this->assertStringNotContainsString($needle, static::withoutOpaqueIds($haystack), $message);
