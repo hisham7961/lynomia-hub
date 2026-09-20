@@ -177,24 +177,32 @@ final class AiProviderCoverage
         return $reason;
     }
 
-    /** سقفُ نتائجِ التصفّح — شاشةٌ تُقرأ لا قائمةٌ تُغرِق */
+    /**
+     * سقفٌ اختياريٌّ للتصفّح — **ولا يُطبَّق افتراضاً**.
+     *
+     * كان سقفاً افتراضيّاً بأربعةٍ وعشرين، وكان خطأً: الشاشةُ تقول «ظهر ٢٤ من
+     * ١٢٦ — ضيِّق البحث» لمن لا يعرف ما يبحث عنه أصلاً. **وتصفّحُ ما هو متاحٌ
+     * نصفُ الغرضِ من التغطيةِ الكاملة**؛ فالقطعُ يُخفي المعروضَ ولا يُنظّمه.
+     * والتنظيمُ موضعُه العرضُ (شبكةٌ تُمسح بالعين) لا العدد.
+     */
     public const BROWSE_LIMIT = 24;
 
     /** أقلُّ طولٍ لنصِّ البحث — حرفٌ واحدٌ يُعيد كلَّ شيءٍ فلا يُصفّي */
     public const MIN_QUERY = 2;
 
     /**
-     * **تصفّحُ المزوّدين القابلين للإعداد** — بحثٌ وتصفيةٌ وسقف.
+     * **تصفّحُ المزوّدين القابلين للإعداد** — بحثٌ وتصفيةٌ، **وبلا قطعٍ افتراضيّ**.
      *
-     * **ولماذا سقفٌ أصلاً؟** لأنّ عرضَ مئةٍ وستّةٍ وعشرين نموذجَ إعدادٍ في
-     * صفحةٍ واحدةٍ ليس «تغطيةً كاملة» بل **إغراقٌ يمنع الاختيار**: مَن يبحث
-     * عن مزوّدٍ بعينِه يمرّ على مئةٍ وخمسةٍ وعشرين لا تعنيه. فالقائمةُ تُصفّى
-     * ثمّ تُقَصّ، **والعددُ الكلّيُّ يُعلَن** كي لا يظنّ القارئُ أنّ ما رآه كلُّ ما هناك.
+     * الإغراقُ الذي يُخشى ليس عددَ البطاقاتِ بل عددَ **النماذج**: مئةٌ وستّةٌ
+     * وعشرون نموذجَ إعدادٍ مفتوحةً معاً هي ما يمنع الاختيار. وقد فُصل الأمران:
+     * البطاقاتُ تُعرَض كلُّها ليُمسَح المتاحُ بالعين، **والنموذجُ واحدٌ عند
+     * الاختيار**. فالتصفيةُ أداةُ تضييقٍ لمن يعرف ما يريد، لا شرطاً لرؤيةِ ما هو متاح.
      *
      * @param  array{q?:string,status?:string,auth?:string,discovery?:string}  $filters
+     * @param  int|null  $limit  سقفٌ اختياريّ؛ `null` = الكلّ
      * @return array{rows:list<array>,total:int,shown:int,truncated:bool}
      */
-    public static function browse(array $filters = [], int $limit = self::BROWSE_LIMIT): array
+    public static function browse(array $filters = [], ?int $limit = null): array
     {
         $q         = trim((string) ($filters['q'] ?? ''));
         $status    = (string) ($filters['status'] ?? '');
@@ -230,6 +238,7 @@ final class AiProviderCoverage
                 'status'     => $state,
                 'curated'    => ($entry['source'] ?? null) !== 'measured' && ($entry['source'] ?? null) !== 'default',
                 'fields'     => count($entry['fields'] ?? []),
+                'mark'       => AiProviderRegistry::mark($slug),
             ];
         }
 
@@ -240,10 +249,16 @@ final class AiProviderCoverage
 
         $total = count($rows);
 
+        if ($limit === null) {
+            return ['rows' => $rows, 'total' => $total, 'shown' => $total, 'truncated' => false];
+        }
+
+        $limit = max(1, $limit);
+
         return [
-            'rows'      => array_slice($rows, 0, max(1, $limit)),
+            'rows'      => array_slice($rows, 0, $limit),
             'total'     => $total,
-            'shown'     => min($total, max(1, $limit)),
+            'shown'     => min($total, $limit),
             'truncated' => $total > $limit,
         ];
     }

@@ -67,6 +67,10 @@ return [
             'sections' => [
                 'daily' => ['label' => 'يومي', 'order' => 1, 'destinations' => [
                     ['type' => 'center', 'center' => 'morning', 'importance' => 'primary'],
+                    // اسأل Hub (المرحلة ٣) — بيتُه «مهامّي» لا «الإعدادات»: يسأل
+                    // الموظّفُ عن عملِه بصلاحيّتِه، ولا يضبط بوّابةً ولا مزوّداً.
+                    ['type' => 'center', 'center' => 'ask', 'importance' => 'primary',
+                        'synonyms' => ['ask', 'اسأل', 'مساعد', 'سؤال', 'assistant', 'اسأل hub', 'بياناتي']],
                     ['type' => 'center', 'center' => 'alerts', 'importance' => 'primary'],
                     ['type' => 'center', 'center' => 'calendar', 'importance' => 'primary'],
                 ]],

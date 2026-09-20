@@ -378,10 +378,22 @@ class AiCatalogFoundationTest extends TestCase
         $this->assertGreaterThan(100, count($names),
             'السجلُّ لم يشتقَّ المزوّدين — فالمسحُ العميقُ يمسح فراغاً');
 
+        // **الكلمةُ العاديّةُ ليست إشارةَ مزوّد.** في المئةِ والستّةِ والعشرين
+        // أسماءٌ هي كلماتٌ إنجليزيّةٌ شائعة، تستعملها المنصّةُ كلُّها مفاتيحَ
+        // ردٍّ وأسماءَ حقول. فمسحُها في سطحِ الذكاءِ يُبلّغ عن البريءِ ويُفقِد
+        // الحارسَ معناه.
+        //
+        // **والاستثناءُ يُقاس لا يُنتقى:** اسمٌ يظهر في `app/` **خارجَ سطحِ
+        // الذكاء** فالمنصّةُ تستعمله كلمةً عاديّةً أصلاً. وما لا يظهر إلّا في
+        // سطحِ الذكاءِ يبقى ممسوحاً — فلو كان اسمٌ اسمَ مزوّدٍ خالصاً لما ظهر
+        // في وحدةِ رواتبَ ولا مخزون، ولَسقط هنا كما يجب.
+        $ordinary = $this->ordinaryWords(array_keys($names));
+
         $deep = [];
         foreach ($this->aiSurfaceFiles() as $path) {
             $src = file_get_contents($path);
             foreach (array_keys($names) as $k) {
+                if (isset($ordinary[$k])) continue;
                 foreach ([$k, str_replace('_', '', (string) $k)] as $needle) {
                     // `(?<![$\w])` يستثني اسمَ متغيّرٍ في PHP وحدَه — لا أكثر.
                     if (preg_match('/(?<![$\w])' . preg_quote($needle, '/') . '\b/i', $src)) {
@@ -394,6 +406,39 @@ class AiCatalogFoundationTest extends TestCase
         $this->assertSame([], array_values(array_unique($deep)),
             "اسمُ مزوّدٍ تسرّب إلى سطحِ الذكاء — وهناك لا عذرَ له:\n"
             . implode("\n", array_unique($deep)));
+    }
+
+    /**
+     * **أسماءٌ تستعملها المنصّةُ خارجَ سطحِ الذكاءِ ككلماتٍ عاديّة.**
+     *
+     * تُقاس بمسحِ `app/` كلِّه عدا سطحِ الذكاء: ما ظهر هناك كلمةٌ من لغةِ
+     * الشيفرةِ لا إشارةُ مزوّد. والقياسُ يحفظ للحارسِ قوّتَه: اسمٌ لا يظهر
+     * إلّا في سطحِ الذكاءِ يبقى ممسوحاً.
+     *
+     * @param  list<string>  $names
+     * @return array<string,bool>
+     */
+    private function ordinaryWords(array $names): array
+    {
+        $surface = array_flip($this->aiSurfaceFiles());
+        $out     = [];
+
+        $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(app_path()));
+        foreach ($it as $file) {
+            if (! $file->isFile() || $file->getExtension() !== 'php') continue;
+            $path = $file->getPathname();
+            if (isset($surface[$path])) continue;
+
+            $src = file_get_contents($path);
+            foreach ($names as $k) {
+                if (isset($out[$k])) continue;
+                if (preg_match('/(?<![$\\w])' . preg_quote((string) $k, '/') . '\\b/i', $src)) {
+                    $out[$k] = true;
+                }
+            }
+        }
+
+        return $out;
     }
 
     /** ملفّاتُ سطحِ الذكاءِ — حيث لا عذرَ لاسمِ مزوّد @return list<string> */

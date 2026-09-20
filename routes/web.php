@@ -320,6 +320,13 @@ Route::middleware('auth')->group(function () {
     Route::get('field/route/{id}', [\App\Http\Controllers\Web\FieldController::class, 'route'])->name('field.route');
 
     Route::get('morning', [MorningController::class, 'index'])->name('morning');
+
+    // ── اسأل Hub (المرحلة ٣ · P3-W6) ──
+    // بابُها `AskPolicy::gate()` في المتحكّم — وهو شرطُ ظهورِ رابطِها حرفاً بحرف.
+    // و`throttle` من `AskPolicy::THROTTLE` فلا رقمانِ يفترقان بين سياسةٍ ومسار.
+    Route::get('ask', [\App\Http\Controllers\Web\AskController::class, 'index'])->name('ask.index');
+    Route::post('ask', [\App\Http\Controllers\Web\AskController::class, 'run'])
+        ->name('ask.run')->middleware('throttle:' . \App\Support\AskPolicy::THROTTLE);
     Route::get('calendar', [\App\Http\Controllers\Web\CalendarController::class, 'index'])->name('calendar');
     Route::get('costs', [CostController::class, 'index'])->name('costs.index');
     Route::get('service-costs', [CostController::class, 'services'])->name('servicecosts');
