@@ -236,6 +236,40 @@ class FeatureRegistry
                    'reason' => 'الفحصُ ناجحٌ — **ولم يُختبر توليدُ إجابةٍ من نموذجٍ بعد** (المرحلة ٢)'];
         }
 
+        /*
+         * **مساعدُ Hub (المرحلة ٣)** — الحالةُ تُشتقّ من الواقعِ لا تُعلَن.
+         *
+         * والمساعدُ يحتاج شيئين معاً: **بوّابةً تردّ** (وإلّا فلا توليد)،
+         * **وغرضاً بسلسلةٍ صالحة** (وإلّا فالطلبُ لا يُوجَّه إلى أحد). وغرضٌ
+         * موجودٌ بسلسلةٍ فارغةٍ **لا يُعَدّ جاهزاً** — درسُ W8 نفسُه.
+         *
+         * و`ENABLED` محجوزةٌ لِما بعدَ توليدٍ فعليٍّ تحقّق (`ai.generation_ok`)
+         * — فـ«جاهز» ليست «جرَّبنا فأجاب».
+         */
+        if ($derive === 'ai.assistant') {
+            $gwOn = (bool) rescue(fn () => \App\Support\AiGateway::enabled()
+                && \App\Support\AiGateway::probePassed(), false, false);
+
+            if (! $gwOn) {
+                return ['status' => FeatureStatus::NOT_CONFIGURED,
+                        'reason' => 'بوّابةُ النماذجِ غيرُ جاهزةٍ — لا مساعدَ قبلها'];
+            }
+
+            $profile = rescue(fn () => \App\Support\AskPolicy::profile(), null, false);
+            if ($profile === null) {
+                return ['status' => FeatureStatus::NOT_CONFIGURED,
+                        'reason' => 'لا غرضَ توجيهٍ بسلسلةٍ صالحة — **وغرضٌ بسلسلةٍ فارغةٍ لا يُجيب طلباً**'];
+            }
+
+            $gen = (bool) rescue(fn () => \App\Support\AiGateway::generationVerified(), false, false);
+
+            return $gen
+                ? ['status' => FeatureStatus::ENABLED,
+                   'reason' => 'البوّابةُ جاهزةٌ والغرضُ مُهيَّأٌ وتوليدٌ فعليٌّ تحقّق']
+                : ['status' => FeatureStatus::READY,
+                   'reason' => 'البوّابةُ جاهزةٌ والغرضُ مُهيَّأ — **ولم يُختبر توليدُ إجابةٍ بعد**'];
+        }
+
         // حجبُ الحافّة (IP): طبقةُ التطبيقِ نشطةٌ دائماً؛ الحافّةُ تحتاج مزوّداً
         if ($derive === 'edge') {
             $edge = rescue(fn () => (string) (EdgeDefense::status()['edge']['state'] ?? 'not_configured'), 'not_configured', false);

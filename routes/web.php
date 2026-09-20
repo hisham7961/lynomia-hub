@@ -892,11 +892,94 @@ Route::middleware('auth')->group(function () {
      * الشريطِ نفسُه — ثابتُ المنصّة: رؤيةُ الرابطِ تطابق بوّابةَ متحكّمِه.
      */
     Route::get('admin/ai', [\App\Http\Controllers\Web\AiCenterController::class, 'index'])->name('ai.index');
+    /* ── الأقسامُ السبعةُ (المرحلة ٢ · W8 · §١١) ──────────────────────────
+     * `ai.index` صارت **نظرةً** — تجيب «أيعمل؟ وما الخطوةُ التالية؟». وشاشةُ
+     * المرحلةِ الأولى انتقلت إلى `ai.settings` بوصفِها قسمَ الإعدادات، **وثلاثةُ
+     * مساراتِ الكتابةِ بعناوينِها كما هي** فلا عقدَ يُكسَر.
+     */
+    Route::get('admin/ai/settings', [\App\Http\Controllers\Web\AiCenterController::class, 'settings'])
+        ->name('ai.settings');
+    Route::get('admin/ai/usage', [\App\Http\Controllers\Web\AiCenterController::class, 'usage'])
+        ->name('ai.usage');
+    Route::get('admin/ai/diagnostics', [\App\Http\Controllers\Web\AiCenterController::class, 'diagnostics'])
+        ->name('ai.diagnostics');
+    // تصالحُ الحالةِ مع البوّابة (W9 · §١٧) — يخرج إلى الشبكةِ فيُخنَق كنظائرِه
+    Route::post('admin/ai/reconcile', [\App\Http\Controllers\Web\AiCenterController::class, 'reconcile'])
+        ->name('ai.reconcile')->middleware('throttle:10,1');
+    Route::get('admin/ai/models', [\App\Http\Controllers\Web\AiModelController::class, 'all'])
+        ->name('ai.models.all');
     Route::post('admin/ai', [\App\Http\Controllers\Web\AiCenterController::class, 'save'])->name('ai.save');
     Route::post('admin/ai/forget-key', [\App\Http\Controllers\Web\AiCenterController::class, 'forgetKey'])->name('ai.forget');
     // الفحصُ يخرج إلى الشبكة، فيُخنَق كنظائرِه (فاحصُ أودو ‎10,1)
     Route::post('admin/ai/test', [\App\Http\Controllers\Web\AiCenterController::class, 'test'])
         ->name('ai.test')->middleware('throttle:10,1');
+
+    /* ── مزوّدو الذكاء — دورةُ حياةِ الاعتماد (المرحلة ٢ · W4) ────────────
+     * الحارسُ نفسُه (`AiProviderController::gate`)، و**كلُّ كتابةٍ خلف تصعيدِ
+     * الهويّة** كما تنصّ خطّةُ W4 — لا إدخالُ السرِّ وحدَه.
+     * والكتابةُ تخرج إلى البوّابة، فتُخنَق كنظائرِها.
+     */
+    Route::get('admin/ai/providers', [\App\Http\Controllers\Web\AiProviderController::class, 'index'])
+        ->name('ai.providers.index');
+    Route::post('admin/ai/providers', [\App\Http\Controllers\Web\AiProviderController::class, 'store'])
+        ->name('ai.providers.store')->middleware('throttle:20,1');
+    Route::post('admin/ai/providers/{provider}/rotate', [\App\Http\Controllers\Web\AiProviderController::class, 'rotate'])
+        ->name('ai.providers.rotate')->middleware('throttle:20,1');
+    Route::post('admin/ai/providers/{provider}/revoke', [\App\Http\Controllers\Web\AiProviderController::class, 'revoke'])
+        ->name('ai.providers.revoke')->middleware('throttle:20,1');
+    Route::post('admin/ai/providers/{provider}/toggle', [\App\Http\Controllers\Web\AiProviderController::class, 'toggle'])
+        ->name('ai.providers.toggle');
+    Route::delete('admin/ai/providers/{provider}', [\App\Http\Controllers\Web\AiProviderController::class, 'destroy'])
+        ->name('ai.providers.destroy')->middleware('throttle:20,1');
+
+    /* ── سجلُّ النماذجِ والاكتشاف (المرحلة ٢ · W5) ────────────────────────
+     * الحارسُ نفسُه، و**الكتابةُ خلف تصعيدِ الهويّة**؛ أمّا الاكتشافُ فقراءةٌ
+     * محضةٌ لا تكتب صفّاً فلا تصعيدَ عليها. والنداءاتُ تخرج إلى البوّابةِ
+     * فتُخنَق كنظائرِها.
+     */
+    Route::get('admin/ai/providers/{provider}/models', [\App\Http\Controllers\Web\AiModelController::class, 'index'])
+        ->name('ai.models.index');
+    Route::post('admin/ai/providers/{provider}/models/discover', [\App\Http\Controllers\Web\AiModelController::class, 'discover'])
+        ->name('ai.models.discover')->middleware('throttle:20,1');
+    Route::post('admin/ai/providers/{provider}/models/import', [\App\Http\Controllers\Web\AiModelController::class, 'import'])
+        ->name('ai.models.import')->middleware('throttle:20,1');
+    Route::post('admin/ai/providers/{provider}/models/register', [\App\Http\Controllers\Web\AiModelController::class, 'register'])
+        ->name('ai.models.register')->middleware('throttle:20,1');
+    Route::post('admin/ai/providers/{provider}/models/refresh', [\App\Http\Controllers\Web\AiModelController::class, 'refresh'])
+        ->name('ai.models.refresh')->middleware('throttle:20,1');
+    Route::post('admin/ai/models/{model}/configure', [\App\Http\Controllers\Web\AiModelController::class, 'configure'])
+        ->name('ai.models.configure');
+    Route::post('admin/ai/models/{model}/toggle', [\App\Http\Controllers\Web\AiModelController::class, 'toggle'])
+        ->name('ai.models.toggle');
+    Route::post('admin/ai/models/{model}/override', [\App\Http\Controllers\Web\AiModelController::class, 'override'])
+        ->name('ai.models.override');
+
+    /* ── الفواحصُ الخمسة (المرحلة ٢ · W6) — والمستوى A في `ai.test` فلا يُبنى مرّتين.
+     * والمدفوعةُ (B · D · E) لا تُنفَّذ إلّا بإقرارٍ صريحٍ بالكلفة.
+     */
+    Route::post('admin/ai/providers/{provider}/probe', [\App\Http\Controllers\Web\AiProviderController::class, 'probe'])
+        ->name('ai.providers.probe')->middleware('throttle:10,1');
+    Route::post('admin/ai/models/{model}/probe', [\App\Http\Controllers\Web\AiModelController::class, 'probe'])
+        ->name('ai.models.probe')->middleware('throttle:10,1');
+
+    /* ── الأغراضُ وسلاسلُ التوجيه (المرحلة ٢ · W7 · §٨ · §٩) ─────────────
+     * الحارسُ نفسُه، و**التصعيدُ على كلِّ كتابة**. ولا نداءَ شبكةٍ في أيٍّ من
+     * هذه المسارات: سياسةٌ تُقرَأ وتُرتَّب، فلا خنقَ لخروجٍ لا يقع.
+     */
+    Route::get('admin/ai/profiles', [\App\Http\Controllers\Web\AiProfileController::class, 'index'])
+        ->name('ai.profiles.index');
+    Route::post('admin/ai/profiles/seed', [\App\Http\Controllers\Web\AiProfileController::class, 'seed'])
+        ->name('ai.profiles.seed');
+    Route::post('admin/ai/profiles/{profile}/attach', [\App\Http\Controllers\Web\AiProfileController::class, 'attach'])
+        ->name('ai.profiles.attach');
+    Route::post('admin/ai/profiles/{profile}/reorder', [\App\Http\Controllers\Web\AiProfileController::class, 'reorder'])
+        ->name('ai.profiles.reorder');
+    Route::post('admin/ai/profiles/{profile}/toggle', [\App\Http\Controllers\Web\AiProfileController::class, 'toggle'])
+        ->name('ai.profiles.toggle');
+    Route::post('admin/ai/chain/{link}/toggle', [\App\Http\Controllers\Web\AiProfileController::class, 'linkToggle'])
+        ->name('ai.profiles.link.toggle');
+    Route::delete('admin/ai/chain/{link}', [\App\Http\Controllers\Web\AiProfileController::class, 'detach'])
+        ->name('ai.profiles.detach');
 
     Route::get('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'index'])->name('integrations.n8n');
     Route::post('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'save'])->name('integrations.n8n.save');

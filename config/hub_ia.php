@@ -512,9 +512,16 @@ return [
                         'synonyms' => ['features', 'capabilities', 'القدرات', 'المزايا', 'feature registry', 'flags', 'سجل القدرات']],
                     // مركزُ الذكاء الاصطناعيّ (v2.559 · المرحلة ١) — بيتُه الإعداداتُ
                     // والتكاملات: بوّابةُ نماذجَ تُضبَط، لا وحدةَ عملٍ تُدار.
+                    // **والأقسامُ السبعةُ مساراتُ الوجهةِ الواحدة** (W8 · §١١): لا وجهةٌ
+                    // لكلِّ قسمٍ — فسبعُ بطاقاتٍ في خريطةِ النظامِ تُشتّت، والمركزُ
+                    // واحدٌ يُدخَل من «نظرة». وبقيّةُ المسارات تُعلَن هنا كي
+                    // تعرفها الفتاتُ والبحثُ ولوحةُ الأوامر، فلا صفحةٌ يتيمة.
                     ['type' => 'admin', 'admin' => 'ai', 'importance' => 'primary', 'route_prefix' => 'ai',
-                        'routes' => ['ai.index'],
-                        'synonyms' => ['ai', 'الذكاء الاصطناعي', 'litellm', 'نماذج', 'مساعد', 'gpt', 'llm', 'بوابة النماذج']],
+                        'routes' => ['ai.index', 'ai.settings', 'ai.usage', 'ai.diagnostics',
+                            'ai.providers.index', 'ai.models.all', 'ai.models.index', 'ai.profiles.index'],
+                        'synonyms' => ['ai', 'الذكاء الاصطناعي', 'litellm', 'نماذج', 'مساعد', 'gpt', 'llm',
+                            'بوابة النماذج', 'مزودون', 'اعتمادات', 'توجيه', 'أغراض', 'ملفات سياسة',
+                            'احتياط', 'استهلاك', 'تكلفة الذكاء', 'تشخيص', 'قدرات النماذج']],
                     ['type' => 'admin', 'admin' => 'integrations', 'importance' => 'primary', 'route_prefix' => 'integrations',
                         'routes' => ['integrations.index', 'integrations.guide', 'hooks.index', 'integrations.messaging',
                             'integrations.n8n', 'integrations.odoo', 'webhooks.index', 'webhooks.log']],
