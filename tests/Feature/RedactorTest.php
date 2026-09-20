@@ -71,6 +71,42 @@ class RedactorTest extends TestCase
         $this->assertStringContainsString('page=2', $out, 'معاملٌ بريء طُمس — الطمسُ بالمفتاح لا بالجملة');
     }
 
+    /**
+     * مفتاحُ مزوّدٍ عارٍ في نصٍّ حرّ — `sk-…` و`AIza…`.
+     *
+     * الفجوةُ ثبتت باختبارٍ ساقطٍ أوّلاً: بوّابةُ الذكاء تُعيد جسمَ خطأٍ ورسالةَ
+     * استثناءٍ فيهما المفتاحُ الذي أُرسل، فتمرّ من `Redactor::text` كما هي —
+     * فلا `Bearer` يسبقها ولا `مفتاح=قيمة` يحويها ولا `lyn_` شكلُها. وكلُّ
+     * مسارِ خطأِ مزوّدٍ في الطور ٢ يصبّ هنا، فالثقبُ في المُطهِّر لا في عميله.
+     */
+    public function test_bare_provider_api_key_is_redacted_in_free_text(): void
+    {
+        $openai = 'sk-PLANTED9f3c7b1e55aa4477d2e6';
+        $anthropic = 'sk-ant-api03-PLANTEDxyzQwErTy0123456789';
+        $router = 'sk-or-v1-0123456789abcdef0123456789abcdef';
+        $google = 'AIzaSyD-PLANTED1234567890abcdefghij';
+
+        $out = Redactor::text("upstream 401: incorrect api key provided: {$openai}"
+            . " ثم {$anthropic} ثم {$router} ثم {$google} — والمسارُ /v1/chat/completions");
+
+        foreach (['openai' => $openai, 'anthropic' => $anthropic, 'openrouter' => $router, 'google' => $google] as $why => $k) {
+            $this->assertStringNotContainsString($k, $out, "مفتاحُ مزوّدٍ عارٍ نجا من الطمس ({$why})");
+        }
+        $this->assertStringContainsString('/v1/chat/completions', $out,
+            'مسارٌ بريء طُمس — الطمسُ بشكلِ المفتاح لا بالجملة');
+        $this->assertSame($out, Redactor::text($out), 'طمسُ المفتاحِ العاري ليس ثابتاً');
+    }
+
+    /** ولا يلتهم النصَّ البريء: `task-`/`disk-` ليست `sk-`، والقصيرُ ليس مفتاحاً */
+    public function test_bare_key_pattern_spares_innocent_words(): void
+    {
+        foreach (['/m/tasks-overview-and-more-pages', 'disk-usage-report-generator-x',
+                  'sk-short', 'ask-for-approval-on-this-record'] as $innocent) {
+            $this->assertSame($innocent, Redactor::text($innocent),
+                "نصٌّ بريء طُمس بنمطِ المفتاح العاري: {$innocent}");
+        }
+    }
+
     /** PEM مبتور (بلا END — أثرٌ مقصوص) يُطمَس جسمُه أيضاً */
     public function test_truncated_pem_block_is_still_redacted(): void
     {

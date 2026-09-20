@@ -207,6 +207,68 @@ class BackupRestoreTest extends TestCase
         }
     }
 
+    /**
+     * سكّةُ الذكاء (الطور ٢ · W2) — جولةٌ كاملةٌ لا تغطيةٌ بالاسم.
+     *
+     * أضاف W2 أربعةَ جداولَ خارجَ سجل الوحدات، فسقط حارسُ التغطية
+     * (`EnterpriseHardeningRound1Test::test_backup_covers_every_table_…`) إثباتاً
+     * أوّليّاً: جداولُ قرارٍ بشريٍّ خارجَ النسخة وغيرُ مُعلَنةٍ عابرة. والأخطرُ في
+     * فقدِها أنّ `credential_name` مرجعُ الاعتمادِ في LiteLLM: يبقى الاعتمادُ حيّاً
+     * في البوّابة ولا يبقى في Hub ما يعرف اسمَه — فلا يُستأنَف إلا بإدخالِ كلِّ
+     * سرٍّ من جديد. فالجولةُ هنا تثبت عودةَ الصفوف بقيمها لا حضورَ الأسماء.
+     */
+    public function test_ai_catalog_tables_round_trip_through_backup_and_restore(): void
+    {
+        $this->seedCore();
+        $mk = fn () => (string) Str::uuid();
+        $providerId = $mk();
+        $modelId = $mk();
+        $profileId = $mk();
+
+        $seed = [
+            'ai_providers'      => [['id' => $providerId, 'catalog_key' => 'openai', 'label' => 'مزوّدُ الجولة',
+                                     'enabled' => 1, 'credential_name' => 'cred-roundtrip-77',
+                                     'credential_state' => 'present', 'health' => 'UNKNOWN'], 'credential_name'],
+            'ai_models'         => [['id' => $modelId, 'provider_id' => $providerId,
+                                     'litellm_model_name' => 'hub-roundtrip-model',
+                                     'upstream_model' => 'upstream-roundtrip', 'display_name' => 'نموذجُ الجولة',
+                                     'enabled' => 1, 'priority' => 7], 'litellm_model_name'],
+            'ai_profiles'       => [['id' => $profileId, 'key' => 'roundtrip', 'label' => 'ملفُّ الجولة',
+                                     'required_capability' => 'chat', 'enabled' => 1], 'key'],
+            'ai_profile_models' => [['id' => $mk(), 'profile_id' => $profileId, 'model_id' => $modelId,
+                                     'rank' => 3, 'enabled' => 1], 'rank'],
+        ];
+
+        foreach ($seed as $t => [$row, $marker]) {
+            DB::table($t)->insert($row + ['created_at' => now(), 'updated_at' => now()]);
+        }
+
+        $this->artisan('hub:backup')->assertExitCode(0);
+
+        $dump = json_decode(file_get_contents($this->latestBackup()), true);
+        foreach ($seed as $t => [$row, $marker]) {
+            $this->assertTrue(collect($dump['_tables'][$t] ?? [])->contains('id', $row['id']),
+                "جدولُ الذكاء «{$t}» غائبٌ عن النسخة — استعادةٌ تُطفئ الذكاءَ بصمت");
+        }
+
+        // ولا سرَّ في النسخة: الاسمُ مرجعٌ والسرُّ في البوّابة وحدَها
+        $providerRow = collect($dump['_tables']['ai_providers'])->firstWhere('id', $providerId);
+        foreach (array_keys((array) $providerRow) as $col) {
+            $this->assertStringNotContainsString('api_key', (string) $col,
+                'عمودُ سرٍّ في صفِّ المزوّد المنسوخ — العقدُ أن Hub لا يحمل سرّاً');
+        }
+
+        foreach (array_keys($seed) as $t) DB::table($t)->delete();
+        $this->artisan('hub:import', ['file' => $this->latestBackup()])->assertExitCode(0);
+
+        foreach ($seed as $t => [$row, $marker]) {
+            $back = DB::table($t)->where('id', $row['id'])->first();
+            $this->assertNotNull($back, "صفُّ «{$t}» لم يعُد بالاستعادة — الجولةُ مبتورة");
+            $this->assertSame((string) $row[$marker], (string) $back->{$marker},
+                "علامةُ «{$t}.{$marker}» انحرفت في الجولة");
+        }
+    }
+
     /** (٥) الإعدادات المستعادة تسري فوراً لا بعد انتهاء الخبيئة */
     public function test_restore_busts_the_settings_cache(): void
     {
