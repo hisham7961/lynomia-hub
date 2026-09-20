@@ -39,12 +39,14 @@ return [
             'status' => 'NOT_CONFIGURED', 'derive' => 'ai.gateway',
             'account_types' => ['internal'], 'admin_surface' => 'ai.index', 'web_routes' => ['ai.index'],
             'introduced' => 'v2.559.0', 'docs' => 'docs/ai-hub/01-architecture.md'],
+        // **بُنيت في المرحلة ٣** — والحالةُ تُشتقّ من الواقعِ لا تُعلَن:
+        // بوّابةٌ جاهزةٌ + غرضٌ بسلسلةٍ صالحة ⇒ READY، وما دونها NOT_CONFIGURED.
         'ai.assistant' => ['domain' => 'platform', 'category' => 'assistant',
             'title_ar' => 'مساعد Hub — «اسأل Hub»', 'title_en' => 'Hub Assistant',
-            'desc_ar' => 'محادثةٌ تقرأ بياناتِ العملِ بصلاحيّةِ صاحبِها. **لم تُنفَّذ بعد** — المرحلةُ الثالثة.',
-            'desc_en' => 'Permission-scoped assistant. Not implemented yet — phase 3.',
-            'status' => 'DEVELOPMENT', 'account_types' => ['internal'],
-            'introduced' => 'v2.559.0', 'docs' => 'docs/ai-hub/02-phases.md'],
+            'desc_ar' => 'سؤالٌ يُجاب من بياناتِ Hub **بصلاحيّةِ السائلِ نفسِه** — قراءةٌ فقط، عبر أدواتٍ محكومةٍ لا اتصالٍ حرٍّ بالقاعدة.',
+            'desc_en' => 'Answers from Hub data under the asker own permissions — read-only, via governed tools.',
+            'status' => 'READY', 'derive' => 'ai.assistant', 'account_types' => ['internal'],
+            'introduced' => 'v2.569.0', 'docs' => 'docs/ai-hub/19-phase3-discovery.md'],
 
         /* ───────── 7A · التعاون (v2.464–v2.469 · مُتحقَّق) ───────── */
         'collab.center' => ['domain' => 'collaboration', 'category' => 'center',
