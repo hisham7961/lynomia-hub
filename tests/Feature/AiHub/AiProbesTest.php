@@ -59,7 +59,21 @@ class AiProbesTest extends TestCase
             }
             if (str_contains($url, '/model/info'))  return Http::response(['data' => $this->entries], 200);
             if (str_contains($url, '/v1/models'))   return Http::response(['data' => $this->entries], 200);
-            if (str_contains($url, '/health/test_connection')) return Http::response(['status' => 'ok'], 200);
+            if (str_contains($url, '/health/test_connection')) {
+                /*
+                 * **والمحاكاةُ تُطابق العقدَ لا تُجامله.**
+                 *
+                 * كانت تردّ ٢٠٠ على أيِّ حمولةٍ — فمرّت الحزمةُ خضراءَ بينما
+                 * الإنتاجُ يردّ ٥٠٠. البوّابةُ تقرأ `litellm_params['model']`
+                 * قراءةً لا تحتمل الغياب، فغيابُه عطلٌ داخليٌّ لا فحصٌ فاشل.
+                 */
+                if (! array_key_exists('model', (array) (($req->data()['litellm_params'] ?? [])))) {
+                    return Http::response(
+                        ['detail' => ['error' => "Failed to test connection: 'model'"]], 500);
+                }
+
+                return Http::response(['status' => 'ok'], 200);
+            }
 
             return Http::response(['credential_name' => 'ok'], 200);
         }]);
@@ -89,7 +103,7 @@ class AiProbesTest extends TestCase
         $rows = [
             AiProbes::a(),
             AiProbes::c($m),
-            AiProbes::b($m->provider, 'chat'),          // بلا إقرار
+            AiProbes::b($m, 'chat'),                    // بلا إقرار
             AiProbes::d($m),                            // بلا إقرار
             AiProbes::e($m, 'tools'),                   // بلا إقرار
         ];
@@ -168,7 +182,7 @@ class AiProbesTest extends TestCase
     {
         $m = $this->seedModel();
 
-        $r = AiProbes::b($m->provider, 'chat');
+        $r = AiProbes::b($m, 'chat');
 
         $this->assertNull($r['up']);
         Http::assertNotSent(fn ($req) => str_contains($req->url(), '/health/test_connection'));
@@ -179,11 +193,13 @@ class AiProbesTest extends TestCase
     {
         $m = $this->seedModel();
 
-        $r = AiProbes::b($m->provider, 'chat', true);
+        $r = AiProbes::b($m, 'chat', true);
 
         $this->assertTrue($r['up'], (string) $r['error']);
         Http::assertSent(fn ($req) => str_contains($req->url(), '/health/test_connection')
-            && ($req->data()['mode'] ?? null) === 'chat');
+            && ($req->data()['mode'] ?? null) === 'chat'
+            // **والنموذجُ جزءٌ من الحمولةِ لا زينةٌ فيها** — بغيرِه عطلٌ داخليّ
+            && (($req->data()['litellm_params'] ?? [])['model'] ?? null) === 'fake/upstream-a');
     }
 
     // ═══ ③ السقفُ مفروضٌ لا مُستقبَل ═══

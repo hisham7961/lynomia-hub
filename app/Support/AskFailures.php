@@ -59,11 +59,23 @@ final class AskFailures
     /** السؤالُ نفسُه فارغٌ أو أطولُ من المسموح — خطأُ طلبٍ لا خطأُ خدمة */
     public const MALFORMED_QUESTION = 'MALFORMED_QUESTION';
 
+    /**
+     * **حُجب المحتوى بمرشِّحِ سياسةٍ عند المزوّد** — وهذه **نتيجةٌ لا عطل**.
+     *
+     * وأُضيف الرمزُ حين قُرئ عقدُ البوّابةِ الحقيقيّ: `ContentPolicyViolationError`
+     * يعود `400` مثلَ الطلبِ الفاسد، و`finish_reason` قد يعود `content_filter`
+     * على ردٍّ **ناجحٍ** بـ`200`. وبلا رمزٍ له كان يُقال للمستخدمِ «وصل ردٌّ غيرُ
+     * مفهومٍ من النموذج» — وهو كذبٌ يُرسله يُطارد عطلاً لا وجودَ له، بينما
+     * الصوابُ أن يُعيد صياغةَ سؤالِه.
+     */
+    public const CONTENT_FILTERED = 'CONTENT_FILTERED';
+
     public const CODES = [
         self::UNAUTHORIZED, self::UNAVAILABLE, self::GATEWAY_FAILURE, self::PROVIDER_FAILURE,
         self::MODEL_FAILURE, self::TIMEOUT, self::RATE_LIMITED, self::CONTEXT_LIMIT,
         self::MALFORMED_TOOL_REQUEST, self::UNSAFE_TOOL_ARGUMENTS, self::NO_ACCESSIBLE_DATA,
         self::PARTIAL_RESULT, self::FORGED_SOURCE, self::TOOL_BUDGET, self::MALFORMED_QUESTION,
+        self::CONTENT_FILTERED,
     ];
 
     /**
@@ -91,6 +103,7 @@ final class AskFailures
         self::FORGED_SOURCE          => 'أحال الجوابُ إلى مصدرٍ لم يُقرأ — فحُجب.',
         self::TOOL_BUDGET            => 'بلغ السؤالُ حدَّ خطواتِ القراءةِ المسموحة.',
         self::MALFORMED_QUESTION     => 'السؤالُ فارغٌ أو أطولُ من المسموح.',
+        self::CONTENT_FILTERED       => 'حجب المزوّدُ الردَّ بمرشِّحِ محتوى. أعِد صياغةَ السؤال.',
     ];
 
     public static function message(string $code): string

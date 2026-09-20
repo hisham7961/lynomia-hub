@@ -70,7 +70,11 @@ class AiProviderController extends Controller
             'manage'    => \App\Support\AiAccess::canManage(),
             // **حالةُ الاعتمادِ للمدير وحدَه** (§١٠): القارئُ يرى «يعمل» لا «لماذا لا»
             'showState' => \App\Support\AiAccess::showsCredentialState(),
-            'providers' => AiProvider::query()->orderBy('catalog_key')->orderBy('label')->orderBy('id')->get(),
+            // **والنماذجُ تُجلَب معها** — فنموذجُ الفحصِ B يُختار من قائمةٍ
+            // مسجَّلةٍ لا يُكتَب يداً، والترتيبُ يُطلَب صراحةً وينتهي بـ`id`
+            'providers' => AiProvider::query()->with(['models' => static fn ($q) => $q
+                    ->orderByDesc('priority')->orderBy('litellm_model_name')->orderBy('id')])
+                ->orderBy('catalog_key')->orderBy('label')->orderBy('id')->get(),
             'catalog'   => $catalog,
             'configured' => AiGateway::configured(),
             'whyNot'    => AiGateway::whyNotReady(),
@@ -187,11 +191,22 @@ class AiProviderController extends Controller
     }
 
     /**
-     * **المستوى B — فحصُ الاعتماد** (المرحلة ٢ · W6): يُثبِت أنّ **المزوّدَ**
-     * يقبل مفتاحَنا، لا أنّ البوّابةَ حيّة (ذاك المستوى A وهو مجّانيّ).
+     * **المستوى B — فحصُ الاعتماد على نموذجٍ بعينِه** (المرحلة ٢ · W6 · مُصحَّح).
      *
-     * **ويُنفق رصيداً** — أغلق W0 الفجوةَ G3 بعكسِ ما افترضته الخطّةُ أوّلاً.
-     * فلا يُنفَّذ إلّا بإقرارٍ صريحٍ من الشاشة، والوضعُ يُمرَّر ولا يُستنتَج.
+     * يُثبِت أنّ **المزوّدَ يقبل مفتاحَنا**، لا أنّ البوّابةَ حيّة (ذاك A وهو
+     * مجّانيّ). **ويُنفق رصيداً**، فلا يُنفَّذ إلّا بإقرارٍ صريح.
+     *
+     * ── **ولمَ صار يلزمه نموذج؟** ──
+     *
+     * كان يُرسَل باسمِ الاعتمادِ وحدَه، فردّت البوّابةُ `500` ومتنُه `'model'`.
+     * وقراءةُ مصدرِ الإصدارِ المثبَّتِ حسمت السبب: `proxy/health_check.py:774`
+     * يقرأ `litellm_params["model"]` **بقوسين لا بـ`.get()`**. فالمسارُ
+     * **يختبر (اعتماداً × نموذجاً)** ولا يعرف اختبارَ اعتمادٍ وحدَه — ولا
+     * يوجد في البوّابةِ مسارٌ آخرُ يفعل ذلك (مسارُ `/credentials` إنشاءٌ
+     * وسردٌ وحذفٌ لا فحص).
+     *
+     * فصار النموذجُ **مُختاراً من قائمةِ نماذجِ هذا المزوّدِ نفسِه** — لا
+     * مكتوباً بيدٍ ولا مُخمَّناً — ومزوّدٌ بلا نموذجٍ لا يُعرَض له الزرُّ أصلاً.
      */
     public function probe(Request $r, AiProvider $provider)
     {
@@ -199,15 +214,27 @@ class AiProviderController extends Controller
         if ($resp = hub_require_stepup()) return $resp;
 
         $d = $r->validate([
-            'mode' => ['required', 'string', 'in:chat,embedding'],
-            'ack'  => ['accepted'],
-        ], ['ack.accepted' => 'يلزم إقرارٌ صريحٌ بأنّ هذا الفحصَ يُنفق رصيداً'],
-           ['mode' => 'وضع الفحص']);
+            'mode'     => ['required', 'string', 'in:chat,embedding'],
+            'model_id' => ['required', 'string'],
+            'ack'      => ['accepted'],
+        ], ['ack.accepted' => 'يلزم إقرارٌ صريحٌ بأنّ هذا الفحصَ يُنفق رصيداً',
+            'model_id.required' => 'اختر نموذجاً — فحصُ الاعتمادِ يجري على (اعتمادٍ × نموذج)'],
+           ['mode' => 'وضع الفحص', 'model_id' => 'النموذج']);
 
-        $res = \App\Support\AiProbes::b($provider, (string) $d['mode'], true);
+        // **والنموذجُ من هذا المزوّدِ وحدَه** — ولا يُفحَص اعتمادُ مزوّدٍ بنموذجِ غيرِه
+        $model = \App\Models\AiModel::query()
+            ->where('provider_id', $provider->id)
+            ->whereKey((string) $d['model_id'])->first();
+
+        if ($model === null) {
+            return back()->withErrors(['model_id' => 'النموذجُ ليس من هذا المزوّد']);
+        }
+
+        $res = \App\Support\AiProbes::b($model, (string) $d['mode'], true);
 
         hub_audit('فحص اعتماد مزوّد (B)', AiProvider::MODULE, (string) $provider->id,
-            (string) $provider->label, ['after' => ['up' => $res['up'], 'ms' => $res['ms'], 'mode' => $d['mode']]]);
+            (string) $provider->label, ['after' => ['up' => $res['up'], 'ms' => $res['ms'],
+                'mode' => $d['mode'], 'model' => (string) $model->litellm_model_name]]);
 
         return back()->with('ok', \App\Support\ConnectionProbe::line($res));
     }

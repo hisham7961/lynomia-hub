@@ -126,7 +126,27 @@ final class AiRouting
 
         if ($code === 401 || $code === 403) return 'auth';
         if ($code === 404)                  return 'model_gone';
-        if ($code === 429)                  return 'rate_limited';
+
+        /*
+         * **‏٤٢٩ ليست دائماً حدَّ معدّل** — كشفه قراءةُ عقدِ الإصدارِ المثبَّت.
+         *
+         * `proxy/_types.py:3855` يفرض الرمزَ صراحةً على رسالتين:
+         * «‏No healthy deployment available» و«‏No deployments available». أي
+         * أنّ **نفادَ النماذجِ الصالحةِ — وهو انقطاعُ خدمةٍ — يُعاد بالرمزِ
+         * الذي يعني «أبطئ»**.
+         *
+         * والفرقُ في القرارِ لا في التسميةِ وحدَها: `rate_limited` يُعيد
+         * المحاولةَ **بالمهلةِ المُعلَنةِ** انتظاراً لحدٍّ ينقضي، وهنا لا حدَّ
+         * ينقضي أصلاً — فالصوابُ تراجعٌ أُسّيٌّ ثمّ احتياطٌ إلى نموذجٍ آخر.
+         * ولأنّ الطلبَ **لم يبلغ مزوّداً** فلا رمزَ أُنفق في إعادتِه.
+         */
+        if ($code === 429) {
+            return str_contains($body, 'no healthy deployment')
+                || str_contains($body, 'no deployments available')
+                ? 'transient'
+                : 'rate_limited';
+        }
+
         if (in_array($code, [500, 502, 503, 504], true)) return 'transient';
 
         if ($code === 400) {

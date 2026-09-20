@@ -239,6 +239,9 @@ final class AiProviderCoverage
                 'curated'    => ($entry['source'] ?? null) !== 'measured' && ($entry['source'] ?? null) !== 'default',
                 'fields'     => count($entry['fields'] ?? []),
                 'mark'       => AiProviderRegistry::mark($slug),
+                // **الشعارُ الحقيقيُّ إن وُجد** — و`null` تعني «لا شعارَ له»
+                // لا «تعذّر التحميل»، فالبطاقةُ تسقط إلى العلامةِ الحرفيّة
+                'logo'       => AiProviderRegistry::logoSvg($key),
             ];
         }
 

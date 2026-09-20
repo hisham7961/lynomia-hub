@@ -93,6 +93,7 @@ class AiProfileScreenTest extends TestCase
             ['post',   route('ai.profiles.attach', $g),           ['model_id' => $m->id]],
             ['post',   route('ai.profiles.reorder', $g),          ['order' => [$link->id]]],
             ['post',   route('ai.profiles.toggle', $g),           ['enabled' => 0]],
+            ['post',   route('ai.profiles.ask', $g),              []],
             ['post',   route('ai.profiles.link.toggle', $link),   ['enabled' => 0]],
             ['delete', route('ai.profiles.detach', $link),        []],
         ];

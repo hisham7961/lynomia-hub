@@ -59,6 +59,8 @@ class AiProfileController extends Controller
             'depth'  => AiRouting::MAX_DEPTH,
             'cool'   => [AiRouting::COOLDOWN_AFTER, AiRouting::COOLDOWN_MINUTES],
             'seeded' => $profiles->count(),
+            // **أيُّ غرضٍ يخدم «اسأل Hub» الآن؟** — يُعرَض حيث يُتَّخذ القرار
+            'askProfile' => \App\Support\AskPolicy::profileKey(),
         ]);
     }
 
@@ -131,6 +133,35 @@ class AiProfileController extends Controller
 
         return back()->with('ok', $r->boolean('enabled')
             ? 'فُعِّل الغرض' : 'عُطِّل الغرضُ — وسلسلتُه لا تُستعمَل حتّى يُفعَّل');
+    }
+
+    /**
+     * **يجعل هذا الغرضَ غرضَ «اسأل Hub»** — من الشاشةِ لا من الشيفرة.
+     *
+     * ── **ولمَ زرٌّ هنا وللمفتاحِ صفحتُه في مركزِ الإعدادات؟** ──
+     *
+     * لأنّ القرارَ يُتَّخذ **وأنت تنظر إلى السلاسل**: أيُّها جاهزٌ وأيُّها
+     * فارغٌ وأيُّها أغلى. وإرسالُ المالكِ إلى شاشةٍ أخرى ليكتب مفتاحاً نصّيّاً
+     * **يجعله يكتب اسمَ غرضٍ لا يراه** — ومفتاحٌ يُكتَب بالحروفِ يُخطَأ فيه،
+     * والخطأُ يُطفئ المساعدَ برسالةٍ تبدو عطلاً.
+     *
+     * **ولا يُقبَل غرضٌ بسلسلةٍ فارغة**: ضبطُه يُطفئ المساعدَ فوراً، والشاشةُ
+     * تمنع ما تعرف أنّه يكسر.
+     */
+    public function askProfile(AiProfile $profile)
+    {
+        $this->gate();
+        if ($resp = hub_require_stepup()) return $resp;
+
+        if (! $profile->enabled || AiProfiles::chain($profile)->isEmpty()) {
+            return back()->withErrors(['ask' => 'غرضٌ بسلسلةٍ فارغةٍ أو معطَّلٍ لا يصلح لِـ«اسأل Hub» — اربط نموذجاً أوّلاً']);
+        }
+
+        \App\Support\Settings::batch('ai', function () use ($profile) {
+            \App\Support\Settings::put('ask.profile', (string) $profile->key, 'ai');
+        }, ['name' => 'ask.profile — غرضُ مساعدِ «اسأل Hub»']);
+
+        return back()->with('ok', 'صار «' . $profile->label . '» غرضَ مساعدِ «اسأل Hub»');
     }
 
     public function linkToggle(Request $r, AiProfileModel $link)

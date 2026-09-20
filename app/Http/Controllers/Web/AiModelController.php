@@ -225,11 +225,16 @@ class AiModelController extends Controller
     }
 
     /**
-     * **المستويات C · D · E على نموذج** (المرحلة ٢ · W6).
+     * **المستويات B · C · D · E على نموذج** (المرحلة ٢ · W6 — وB أُضيف لاحقاً).
      *
-     * ‏C مجّانيٌّ فيمرّ بلا إقرار؛ وD وE **يُنفقان** فلا يُنفَّذان إلّا بإقرارٍ
+     * ‏C مجّانيٌّ فيمرّ بلا إقرار؛ وB وD وE **تُنفق** فلا تُنفَّذ إلّا بإقرارٍ
      * صريحٍ من الشاشة. والمستوى A في زرِّ «اختبار الاتصال» بمركزِ الذكاء — فلا
      * يُبنى مرّتين.
+     *
+     * **ولماذا B على صفِّ النموذجِ لا على بطاقةِ المزوّدِ وحدَها؟** لأنّ فحصَ
+     * الاعتمادِ عند البوّابةِ يختبر **(اعتماداً × نموذجاً)**: لا مسارَ فيها
+     * يختبر اعتماداً مجرّداً. فالمكانُ الطبيعيُّ لإطلاقِه هو الصفُّ الذي يحمل
+     * اسمَ النموذجِ عند المزوّد.
      */
     public function probe(Request $r, AiModel $model)
     {
@@ -237,15 +242,20 @@ class AiModelController extends Controller
         if ($resp = hub_require_stepup()) return $resp;
 
         $level = mb_strtoupper((string) $r->input('level', ''));
-        if (! in_array($level, ['C', 'D', 'E'], true)) {
-            return back()->withErrors(['level' => 'مستوى فحصٍ غيرُ معروف — C أو D أو E']);
+        if (! in_array($level, ['B', 'C', 'D', 'E'], true)) {
+            return back()->withErrors(['level' => 'مستوى فحصٍ غيرُ معروف — B أو C أو D أو E']);
         }
 
         if (\App\Support\AiProbes::isPaid($level) && ! $r->boolean('ack')) {
             return back()->withErrors(['ack' => 'هذا الفحصُ يُنفق رصيداً — أقِرَّ بالكلفةِ صراحةً قبل تنفيذِه']);
         }
 
+        // **والوضعُ يُمرَّر صراحةً** — والاستنتاجُ قد يقع على وضعٍ أغلى
+        $mode = (string) $r->input('mode', 'chat');
+        if (! in_array($mode, ['chat', 'embedding'], true)) $mode = 'chat';
+
         $res = match ($level) {
+            'B' => \App\Support\AiProbes::b($model, $mode, true),
             'C' => \App\Support\AiProbes::c($model),
             'D' => \App\Support\AiProbes::d($model, true),
             'E' => \App\Support\AiProbes::e($model, (string) $r->input('capability', ''), true),

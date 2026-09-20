@@ -60,6 +60,30 @@
     </div>
 @endif
 
+{{--
+    ═══ مسارُ قبولِ الإنتاج — ثماني درجاتٍ **حالتُها مقروءةٌ لا مُؤشَّرة** ═══
+
+    والخطوةُ التاليةُ أعلاه تقول «ما الآن»، وهذا يقول **«كم بقي»**. ومالكٌ
+    يوشك أن يُدخل اعتماداً مدفوعاً يستحقّ أن يرى الطريقَ كاملاً قبل أن يخطو.
+--}}
+<div class="card">
+    <h3>مسارُ التشغيلِ الحقيقيّ <span class="mut">(من الواجهةِ وحدَها — بلا طرفيّةٍ ولا شيفرة)</span></h3>
+    <div class="row" style="flex-wrap:wrap;gap:8px;margin-top:8px">
+        @foreach ($path as $stepRow)
+            <div class="row" style="gap:6px;align-items:center;border:1px solid var(--line);
+                        border-radius:8px;padding:6px 10px">
+                <span class="bdg {{ $stepRow['done'] ? 'ok' : 'wn' }}">{{ $stepRow['done'] ? '✓' : '•' }}</span>
+                <span class="mono ltr mut">{{ $stepRow['key'] }}</span>
+                @if ($stepRow['route'] && ! $stepRow['done'])
+                    <a href="{{ route($stepRow['route']) }}">{{ $stepRow['title'] }}</a>
+                @else
+                    <span>{{ $stepRow['title'] }}</span>
+                @endif
+            </div>
+        @endforeach
+    </div>
+</div>
+
 {{-- ═══ يحتاج انتباهاً — مرتَّباً بالشدّةِ لا بالزمن ═══ --}}
 <div class="card">
     <h3>يحتاج انتباهاً <span class="mut">({{ count($snap['attention']) }})</span></h3>

@@ -86,6 +86,21 @@ final class AskAudit
             'generator'   => isset($shape['generator']) ? (string) $shape['generator'] : null,
             'tokens'      => isset($shape['tokens']) ? (int) $shape['tokens'] : null,
             'cost'        => isset($shape['cost']) ? (float) $shape['cost'] : null,
+            /*
+             * ── زيدت مع المولِّدِ الإنتاجيّ: **عدّادا المساءلةِ الماليّة** ──
+             *
+             * `executed` عددُ قراءاتِ القاعدةِ التي **سُمح بها ونُفِّذت** — وهو
+             * غيرُ `requested` وغيرُ `denied`، وبه يُقرأ أثرُ الطلبِ على
+             * البيانات. و`calls` عددُ نداءاتِ التوليدِ **بالإعاداتِ والاحتياطِ
+             * معاً** — وهو ما يُنفق فعلاً.
+             *
+             * ولمَ `calls` وقد سُجّل `tokens`؟ لأنّ عددَ الرموزِ **لا يعود من
+             * نداءٍ أخفق**، فطلبٌ استهلك خمسةَ نداءاتٍ فاشلةٍ يُسجَّل بلا رموزٍ
+             * ولا كلفة — **فيبدو مجّانيّاً وهو ليس كذلك**. وعدُّ النداءاتِ
+             * يُسجَّل في كلِّ حال.
+             */
+            'executed'    => (int) ($shape['executed'] ?? 0),
+            'calls'       => isset($shape['calls']) ? (int) $shape['calls'] : null,
             'outcome'   => (string) ($shape['outcome'] ?? 'ok'),
             'why'       => isset($shape['why']) ? mb_substr((string) $shape['why'], 0, 180) : null,
         ];

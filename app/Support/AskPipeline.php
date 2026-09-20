@@ -108,8 +108,22 @@ final class AskPipeline
         $answer    = null;
         $cited     = [];
         $usage     = [];
+        $executed  = 0;
+        $seen      = [];
+        $truncatedAnswer = false;
 
-        for ($step = 0; $step < AskPolicy::MAX_TOOL_CALLS; $step++) {
+        /*
+         * ── **سقفانِ مستقلّان: خطواتُ النموذجِ وتنفيذاتُ الأدوات** ──
+         *
+         * خطوةٌ رفضها الحارسُ تستهلك **نداءَ توليدٍ** ولا تستهلك **قراءةَ
+         * قاعدة**. وعدُّهما عدّاً واحداً يجعل نموذجاً يطلب ستَّ وحداتٍ ممنوعةٍ
+         * يستنفد ميزانيّةَ القراءةِ **بلا قراءةٍ واحدة** — فيُحرَم السائلُ
+         * جوابَه بعقوبةِ خطأٍ لم يرتكبه.
+         */
+        $maxSteps = AskPolicy::maxModelSteps();
+        $maxTools = AskPolicy::maxToolCalls();
+
+        for ($step = 0; $step < $maxSteps; $step++) {
             $envelope = $ctx->render();
 
             // **فشلٌ مُغلَقٌ لا مفتوح**: مظروفٌ لم يجتَز فحصَه لا يُرسَل
@@ -133,6 +147,9 @@ final class AskPipeline
             if ($kind === 'answer') {
                 $answer = is_string($out['answer'] ?? null) ? $out['answer'] : null;
                 $cited  = array_values(array_filter((array) ($out['sources'] ?? []), 'is_int'));
+                // **جوابٌ بلغ سقفَ رموزِ المخرَجِ مبتورٌ** — ويُعلَن جزئيّاً كما
+                // يُعلَن قصُّ السياق، فلا يُقرأ الناقصُ تامّاً
+                $truncatedAnswer = (bool) ($out['partial'] ?? false);
                 break;
             }
 
@@ -147,6 +164,24 @@ final class AskPipeline
             $requested[] = $tool;
 
             $why = self::authorize($tool, $args, $u);
+
+            /*
+             * **وطلبٌ مكرَّرٌ حرفيّاً لا يُنفَّذ مرّتين.**
+             *
+             * نموذجٌ عالقٌ في حلقةٍ يُعيد الطلبَ نفسَه حتّى تنفد الميزانيّة،
+             * **وكلُّ إعادةٍ استعلامُ قاعدةٍ كامل** يعيد الصفوفَ التي في
+             * المظروفِ أصلاً. فالرفضُ هنا يوفّر القراءةَ ويقول للنموذجِ
+             * صراحةً إنّ النتيجةَ عنده — وهو أنفعُ من تكرارٍ صامت.
+             */
+            $print = $tool . '|' . json_encode($args, JSON_UNESCAPED_UNICODE);
+            if ($why === null && isset($seen[$print])) {
+                $why = 'طلبٌ مكرَّرٌ حرفيّاً — نتيجتُه في المظروفِ سلفاً';
+            }
+
+            if ($why === null && $executed >= $maxTools) {
+                $why = 'بلغ الطلبُ سقفَ قراءاتِ القاعدةِ المسموحة';
+            }
+
             if ($why !== null) {
                 $denied[] = $tool;
                 $ctx->trust('rejected_step_' . $step, ['tool' => $tool, 'why' => $why]);
@@ -154,6 +189,8 @@ final class AskPipeline
                 continue;
             }
 
+            $seen[$print] = true;
+            $executed++;
             $result = AskTools::run($tool, $args, $u);
             $added  = $ctx->addResult($result);
 
@@ -164,7 +201,7 @@ final class AskPipeline
         if ($answer === null) {
             return self::fail(AskFailures::TOOL_BUDGET, $correlation, $started, $gen,
                 ['requested' => $requested, 'denied' => $denied, 'usage' => $usage,
-                 'ctx' => $ctx]);
+                 'executed' => $executed, 'ctx' => $ctx]);
         }
 
         $answer = trim(Redactor::text($answer));
@@ -182,7 +219,7 @@ final class AskPipeline
         }
 
         $budget  = $ctx->budget();
-        $partial = (bool) $budget['truncated'];
+        $partial = (bool) $budget['truncated'] || $truncatedAnswer;
 
         AskAudit::asked([
             'correlation' => $correlation,
@@ -196,6 +233,8 @@ final class AskPipeline
             'rows'        => (int) $budget['rows'],
             'chars'       => (int) $budget['chars'],
             'truncated'   => $partial,
+            'executed'    => $executed,
+            'calls'       => isset($usage['calls']) ? (int) $usage['calls'] : null,
             'profile'     => (string) $profile->key,
             'model'       => isset($usage['model']) ? (string) $usage['model'] : null,
             'generator'   => $gen->label(),
@@ -271,6 +310,8 @@ final class AskPipeline
             'rows'        => (int) ($budget['rows'] ?? 0),
             'chars'       => (int) ($budget['chars'] ?? 0),
             'truncated'   => (bool) ($budget['truncated'] ?? false),
+            'executed'    => (int) ($extra['executed'] ?? 0),
+            'calls'       => isset($extra['usage']['calls']) ? (int) $extra['usage']['calls'] : null,
             'generator'   => $gen->label(),
             'failure'     => $code,
             'ms'          => (int) round((microtime(true) - $started) * 1000),

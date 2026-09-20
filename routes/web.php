@@ -986,6 +986,12 @@ Route::middleware('auth')->group(function () {
         ->name('ai.profiles.reorder');
     Route::post('admin/ai/profiles/{profile}/toggle', [\App\Http\Controllers\Web\AiProfileController::class, 'toggle'])
         ->name('ai.profiles.toggle');
+    /*
+     * **اختيارُ غرضِ «اسأل Hub» من الشاشةِ لا من الشيفرة** (جاهزيّةُ الإنتاج).
+     * ويسبق مسارَ `{link}` ترتيباً لأنّه مسارٌ ثابتٌ تحت `profiles/`.
+     */
+    Route::post('admin/ai/profiles/{profile}/ask', [\App\Http\Controllers\Web\AiProfileController::class, 'askProfile'])
+        ->name('ai.profiles.ask')->middleware('throttle:20,1');
     Route::post('admin/ai/chain/{link}/toggle', [\App\Http\Controllers\Web\AiProfileController::class, 'linkToggle'])
         ->name('ai.profiles.link.toggle');
     Route::delete('admin/ai/chain/{link}', [\App\Http\Controllers\Web\AiProfileController::class, 'detach'])

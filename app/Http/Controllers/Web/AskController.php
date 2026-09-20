@@ -86,13 +86,17 @@ class AskController extends Controller
             // العددَ وحدَه يكفي للطمأنة قبل أوّلِ سؤال.
             'modules'  => count(AskTools::catalog()),
             'tools'    => AskTools::TOOLS,
+            // **الحدودُ كما تُفرَض الآن لا كما كُتبت يوماً** — فالمضبوطُ من
+            // الإعداداتِ يُغيّر السلوكَ، وشاشةٌ تعرض الثابتَ تَعِد بما لا يقع
             'limits'   => [
                 'question' => AskPolicy::MAX_QUESTION_CHARS,
-                'steps'    => AskPolicy::MAX_TOOL_CALLS,
+                'steps'    => AskPolicy::maxToolCalls(),
                 'rows'     => AskPolicy::MAX_ROWS_PER_TOOL,
             ],
             'result'   => null,
             'asked'    => null,
+            // **من يملك الإصلاحَ يُعطى الطريقَ إليه** — ولا يُعرَض لغيرِه بابٌ مغلق
+            'canFix'   => \App\Support\AiAccess::canManage(),
             'failures' => AskFailures::MESSAGES,
         ];
     }

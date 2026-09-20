@@ -101,12 +101,28 @@
                 @if ($p->required_capability)
                     <span class="bdg wn">يشترط: {{ $p->required_capability }}</span>
                 @endif
+                @if ($p->key === ($askProfile ?? ''))
+                    <span class="bdg ok">غرضُ «اسأل Hub»</span>
+                @endif
             </h3>
             @if ($manage ?? true)
-            <form method="POST" action="{{ route('ai.profiles.toggle', $p) }}">@csrf
-                <input type="hidden" name="enabled" value="{{ $p->enabled ? 0 : 1 }}">
-                <button class="btn sm">{{ $p->enabled ? '⏸ تعطيل' : '▶ تفعيل' }}</button>
-            </form>
+            <div class="row" style="gap:6px">
+                {{--
+                    **اختيارُ غرضِ المساعدِ من هنا** — وهو القرارُ الذي كان
+                    يحتاج تحريرَ ملفٍّ ودفعة. ولا يُعرَض الزرُّ لغرضٍ سلسلتُه
+                    فارغةٌ أو معطَّل: ضبطُه يُطفئ المساعدَ فوراً، **والشاشةُ لا
+                    تعرض زرّاً تعرف أنّه يكسر**.
+                --}}
+                @if ($p->key !== ($askProfile ?? '') && $p->enabled && $r['chain']->isNotEmpty())
+                <form method="POST" action="{{ route('ai.profiles.ask', $p) }}">@csrf
+                    <button class="btn sm">🤖 اجعله غرضَ «اسأل Hub»</button>
+                </form>
+                @endif
+                <form method="POST" action="{{ route('ai.profiles.toggle', $p) }}">@csrf
+                    <input type="hidden" name="enabled" value="{{ $p->enabled ? 0 : 1 }}">
+                    <button class="btn sm">{{ $p->enabled ? '⏸ تعطيل' : '▶ تفعيل' }}</button>
+                </form>
+            </div>
             @endif
         </div>
 

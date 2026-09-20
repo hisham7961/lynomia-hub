@@ -242,9 +242,15 @@ class AiModelScreenTest extends TestCase
         $this->announce($p);
         AiModels::import($p, ['hub-alpha']);
 
-        $this->actingAs($this->owner)->get(route('ai.models.index', $p))->assertOk()
-            ->assertSee('يُنفقان رصيداً', false)
-            ->assertSee('أُقِرُّ بأنّ هذا الفحصَ يُنفق رصيداً', false);
+        $html = (string) $this->actingAs($this->owner)->get(route('ai.models.index', $p))
+            ->assertOk()
+            ->assertSee('تُنفق رصيداً', false)
+            ->assertSee('أُقِرُّ بأنّ هذا الفحصَ يُنفق رصيداً', false)
+            ->getContent();
+
+        // **وB على صفِّ النموذجِ** — فهي تختبر (اعتماداً × نموذجاً) لا اعتماداً وحدَه
+        $this->assertStringContainsString('value="B"', $html,
+            '**فحصُ الاعتمادِ بلا مكانٍ يُطلَق منه**: B غائبٌ عن صفِّ النموذجِ الذي يحمل اسمَه عند المزوّد');
     }
 
     /** والشاشةُ تقول صراحةً حين لا اكتشافَ آليَّ للمزوّد — بدل أن تتظاهر به */

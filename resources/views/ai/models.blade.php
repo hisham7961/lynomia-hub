@@ -167,11 +167,11 @@
                 </form>
             </details>
 
-            {{-- ═══ الفواحص C · D · E — والمدفوعةُ تُعلَن ولا تُخفى ═══ --}}
+            {{-- ═══ الفواحص B · C · D · E — والمدفوعةُ تُعلَن ولا تُخفى ═══ --}}
             <details style="width:100%">
                 <summary class="mut">🧪 الفحوص</summary>
                 <div class="sub mut">
-                    <b>C</b> مجّانيّ · <b>D</b> و<b>E</b> <b>يُنفقان رصيداً</b> ولا يُنفَّذان إلّا بإقرارٍ صريح.
+                    <b>C</b> مجّانيّ · <b>B</b> و<b>D</b> و<b>E</b> <b>تُنفق رصيداً</b> ولا تُنفَّذ إلّا بإقرارٍ صريح.
                     والمستوى <b>A</b> في زرِّ «اختبار الاتصال» بمركزِ الذكاء.
                 </div>
                 @if ($m->last_probe_at)
@@ -179,6 +179,30 @@
                         <span class="bdg {{ $m->health === 'CONNECTED' ? 'ok' : ($m->health === 'FAILED' ? 'wn' : '') }}">{{ $m->health }}</span>
                         <span class="mut">{{ $m->last_probe_at }}{{ $m->last_latency_ms ? ' · ' . $m->last_latency_ms . ' مللي' : '' }}</span>
                         @if ($m->last_error)<span class="mut">{{ $m->last_error }}</span>@endif
+                    </div>
+                @endif
+
+                {{-- **B على صفِّ النموذجِ** — فالبوّابةُ تختبر (اعتماداً × نموذجاً)
+                     ولا مسارَ فيها يختبر اعتماداً مجرّداً، والاسمُ المُرسَل هو
+                     اسمُ النموذجِ **عند المزوّد** لا اسمُه في Hub. --}}
+                @if (trim((string) $m->upstream_model) !== '')
+                <form method="POST" action="{{ route('ai.models.probe', $m) }}" class="grid">@csrf
+                    <input type="hidden" name="level" value="B">
+                    <label><span>الوضع</span>
+                        <select name="mode">
+                            <option value="chat">محادثة</option>
+                            <option value="embedding">تضمين</option>
+                        </select></label>
+                    <label style="grid-column:1/-1">
+                        <input type="checkbox" name="ack" value="1">
+                        <b>أُقِرُّ بأنّ هذا الفحصَ يُنفق رصيداً</b> — يُختبر قبولُ المزوّدِ
+                        لاعتمادِنا على <span class="mono ltr">{{ $m->upstream_model }}</span>.
+                    </label>
+                    <div style="grid-column:1/-1"><button class="btn sm">💸 B — قبولُ المزوّدِ لاعتمادِنا</button></div>
+                </form>
+                @else
+                    <div class="sub mut">
+                        لا اسمَ لهذا النموذجِ عند المزوّد — و<b>B</b> يلزمه ذلك الاسمُ لا اسمَ Hub.
                     </div>
                 @endif
 
