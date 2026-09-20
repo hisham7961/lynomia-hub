@@ -892,6 +892,19 @@ Route::middleware('auth')->group(function () {
      * الشريطِ نفسُه — ثابتُ المنصّة: رؤيةُ الرابطِ تطابق بوّابةَ متحكّمِه.
      */
     Route::get('admin/ai', [\App\Http\Controllers\Web\AiCenterController::class, 'index'])->name('ai.index');
+    /* ── الأقسامُ السبعةُ (المرحلة ٢ · W8 · §١١) ──────────────────────────
+     * `ai.index` صارت **نظرةً** — تجيب «أيعمل؟ وما الخطوةُ التالية؟». وشاشةُ
+     * المرحلةِ الأولى انتقلت إلى `ai.settings` بوصفِها قسمَ الإعدادات، **وثلاثةُ
+     * مساراتِ الكتابةِ بعناوينِها كما هي** فلا عقدَ يُكسَر.
+     */
+    Route::get('admin/ai/settings', [\App\Http\Controllers\Web\AiCenterController::class, 'settings'])
+        ->name('ai.settings');
+    Route::get('admin/ai/usage', [\App\Http\Controllers\Web\AiCenterController::class, 'usage'])
+        ->name('ai.usage');
+    Route::get('admin/ai/diagnostics', [\App\Http\Controllers\Web\AiCenterController::class, 'diagnostics'])
+        ->name('ai.diagnostics');
+    Route::get('admin/ai/models', [\App\Http\Controllers\Web\AiModelController::class, 'all'])
+        ->name('ai.models.all');
     Route::post('admin/ai', [\App\Http\Controllers\Web\AiCenterController::class, 'save'])->name('ai.save');
     Route::post('admin/ai/forget-key', [\App\Http\Controllers\Web\AiCenterController::class, 'forgetKey'])->name('ai.forget');
     // الفحصُ يخرج إلى الشبكة، فيُخنَق كنظائرِه (فاحصُ أودو ‎10,1)

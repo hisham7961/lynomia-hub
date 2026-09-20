@@ -56,6 +56,36 @@ final class LiteLlmAdmin
         return self::call('GET', '/model/deprecations');
     }
 
+    /*
+     * ── **الإنفاق — قراءةٌ من مصدرِ الحقيقةِ الواحد** (§١٣ · W8) ─────────
+     *
+     * البوّابةُ تملك `LiteLLM_SpendLogs` و`DailyUserSpend` وأخواتِها. **فلا
+     * جدولَ استهلاكٍ في Hub**: جدولٌ ثانٍ يفترق عن الأصلِ خلال أسابيعَ ثمّ
+     * يُصدَّق أحدُهما عشوائيّاً.
+     *
+     * والمسارانِ أدناه من الإحدى والثلاثين التي أثبتها W0 [C] — **لا يُخترَع
+     * مسارٌ لم يُرَ**. وكلُّها `GET` قراءةٌ محضة؛ و`POST /global/spend/reset`
+     * تدميريّةٌ فلا تُلمَس.
+     */
+
+    /** الإنفاقُ مُجمَّعاً بالنموذج — **تكلفةٌ تقديريّةٌ من خريطةِ الأسعار** */
+    public static function spendByModel(): array
+    {
+        return self::call('GET', '/global/spend/models');
+    }
+
+    /** نشاطُ الطلباتِ بالنموذج — عددٌ ورموزٌ عبر الزمن */
+    public static function activityByModel(): array
+    {
+        return self::call('GET', '/global/activity/model');
+    }
+
+    /** سردُ الدُّفعاتِ الأخيرة — للتشخيصِ لا للفوترة */
+    public static function spendLogs(int $limit = 25): array
+    {
+        return self::call('GET', '/spend/logs?limit=' . max(1, min(100, $limit)));
+    }
+
     /** سردُ الاعتمادات — **البوّابةُ تُقنِّع القيمَ بنفسِها** (W0 · C2) */
     public static function credentials(): array
     {

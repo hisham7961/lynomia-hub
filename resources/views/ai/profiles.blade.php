@@ -19,12 +19,16 @@
         </div>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <a class="btn sm" href="{{ route('ai.providers.index') }}">🔌 المزوّدون</a>
+        {{-- **شرطُ العرضِ = شرطُ الباب** (W8) --}}
+        @if ($manage ?? true)
         <form method="POST" action="{{ route('ai.profiles.seed') }}">@csrf
             <button class="btn sm">🌱 زرعُ الأغراضِ الناقصة</button>
         </form>
+        @endif
     </div>
 </div>
+
+@include('ai._sections')
 
 {{-- ═══ الحرّاسُ الأربعةُ ضدّ انفجارِ الكلفة ═══ --}}
 <div class="cards">
@@ -98,10 +102,12 @@
                     <span class="bdg wn">يشترط: {{ $p->required_capability }}</span>
                 @endif
             </h3>
+            @if ($manage ?? true)
             <form method="POST" action="{{ route('ai.profiles.toggle', $p) }}">@csrf
                 <input type="hidden" name="enabled" value="{{ $p->enabled ? 0 : 1 }}">
                 <button class="btn sm">{{ $p->enabled ? '⏸ تعطيل' : '▶ تفعيل' }}</button>
             </form>
+            @endif
         </div>
 
         @if ($p->description)<div class="sub mut">{{ $p->description }}</div>@endif
@@ -128,7 +134,7 @@
                         <span class="bdg wn">خارجَ السلسلةِ الآن</span>
                     @endif
 
-                    @if ($i > 0)
+                    @if (($manage ?? true) && $i > 0)
                         <form method="POST" action="{{ route('ai.profiles.reorder', $p) }}">@csrf
                             @foreach ($r['links'] as $j => $l)
                                 @php($k = $j === $i ? $i - 1 : ($j === $i - 1 ? $i : $j))
@@ -138,6 +144,7 @@
                         </form>
                     @endif
 
+                    @if ($manage ?? true)
                     <form method="POST" action="{{ route('ai.profiles.link.toggle', $link) }}">@csrf
                         <input type="hidden" name="enabled" value="{{ $link->enabled ? 0 : 1 }}">
                         <button class="btn sm">{{ $link->enabled ? '⏸' : '▶' }}</button>
@@ -147,6 +154,7 @@
                         @csrf @method('DELETE')
                         <button class="btn sm danger">إخراج</button>
                     </form>
+                    @endif
                 </div>
             @endforeach
         @endif
@@ -162,7 +170,7 @@
         @endif
 
         {{-- الضمُّ — ومعه سببُ من لا يصلح، فلا يُبحَث عن عطلٍ لا وجودَ له --}}
-        @if ($r['offer'] !== [])
+        @if (($manage ?? true) && $r['offer'] !== [])
             <form method="POST" action="{{ route('ai.profiles.attach', $p) }}"
                   class="row" style="margin-top:10px;gap:6px;flex-wrap:wrap">@csrf
                 <select name="model_id" style="flex:1;min-width:240px">

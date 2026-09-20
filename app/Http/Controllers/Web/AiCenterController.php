@@ -19,16 +19,44 @@ use Illuminate\Http\Request;
 class AiCenterController extends Controller
 {
     /**
-     * حارسُ المركز — **وهو حارسُ الرابطِ في الشريطِ حرفاً بحرف**
-     * (`hub_admin_links['ai']['ok']`)، فلا رابطٌ يظهر ثمّ يُصَدُّ ٤٠٣.
+     * حارسُ الكتابة — **مُفوَّضٌ إلى `AiAccess` لا منسوخٌ** (W8).
+     *
+     * كان خمسةُ متحكّماتٍ تكتب هذا الشرطَ نسخاً. والنسخُ يعمل اليوم ويفترق
+     * غداً: يُضاف علمٌ في أربعةٍ ويُنسى في الخامس.
      */
     protected function gate(): void
     {
-        abort_unless(hub_is_owner() || hub_flag(auth()->user(), 'aiAdmin'), 403,
-            'مركزُ الذكاء الاصطناعيّ يحتاج صلاحيّةَ إدارتِه');
+        \App\Support\AiAccess::gateManage();
     }
 
+    /**
+     * **نظرةٌ — القسمُ الأوّلُ من السبعة** (W8 · §١١).
+     *
+     * تجيب عن سؤالٍ واحد: **أيعمل؟ وإن لم يعمل فما الخطوةُ التالية؟** ولذلك
+     * ليست لوحةَ أرقامٍ بل سلّمُ جاهزيّةٍ وطابورُ انتباهٍ وخطوةٌ واحدةٌ تالية.
+     *
+     * **وبابُها القراءةُ** — فحاملُ `aiView` يراها ولا يكتب فيها شيئاً.
+     */
     public function index()
+    {
+        \App\Support\AiAccess::gateView();
+
+        return view('ai.center', [
+            'snap'     => \App\Support\AiOverview::snapshot(),
+            'sections' => \App\Support\AiAccess::sections(),
+            'section'  => 'overview',
+            'manage'   => \App\Support\AiAccess::canManage(),
+        ]);
+    }
+
+    /**
+     * **الإعداداتُ — شاشةُ المرحلةِ الأولى بموضعِها الجديد** (W8 · §١١).
+     *
+     * الخطّةُ تسمّيها «شاشةُ المرحلة ١ الحاليّة»، فهي تُنقَل ولا تُكتَب ثانيةً.
+     * **ومساراتُ الكتابةِ الثلاثةُ بعناوينِها كما هي** (`ai.save` · `ai.test` ·
+     * `ai.forget`) فلا عقدَ يُكسَر.
+     */
+    public function settings()
     {
         $this->gate();
 
@@ -51,6 +79,64 @@ class AiCenterController extends Controller
             // الفحصُ **لا يُطلَق مع فتحِ الصفحة**: صفحةٌ تتّصل بالشبكة عند كلِّ
             // عرضٍ تصير بطيئةً ومزعجةً لخدمةٍ متوقّفة. الفحصُ بزرٍّ صريح.
             'probe'      => session('ai.probe'),
+            'sections'   => \App\Support\AiAccess::sections(),
+            'section'    => 'settings',
+        ]);
+    }
+
+    /**
+     * **الاستهلاك — ولا جدولَ استهلاكٍ في Hub** (§١٣).
+     *
+     * البوّابةُ تملك `LiteLLM_SpendLogs` وأخواتِها، فبناءُ جدولِ قياسٍ هنا
+     * **تكرارٌ يفترق عن الأصلِ خلال أسابيع** ثمّ يُصدَّق أحدُهما عشوائيّاً.
+     * فالشاشةُ تقرأ من المصدرِ وتعرض، **ولا تخزّن رقماً واحداً**.
+     *
+     * **والتكلفةُ مقدَّرةٌ ويُقال ذلك** — من خريطةِ أسعارٍ لا من فاتورةِ
+     * مزوّد. وإخفاءُ هذا الحدِّ يجعل الشاشةَ تكذب.
+     *
+     * **والقراءةُ بزرٍّ لا مع فتحِ الصفحة**: صفحةٌ تتّصل بالبوّابةِ عند كلِّ
+     * عرضٍ تصير بطيئةً ومزعجةً لخدمةٍ متوقّفة — قاعدةُ المرحلةِ الأولى نفسُها.
+     */
+    public function usage(Request $r)
+    {
+        \App\Support\AiAccess::gateCost();
+
+        $pull   = $r->boolean('pull');
+        $spend  = $pull ? \App\Support\LiteLlmAdmin::spendByModel()   : null;
+        $active = $pull ? \App\Support\LiteLlmAdmin::activityByModel() : null;
+
+        return view('ai.usage', [
+            'sections'   => \App\Support\AiAccess::sections(),
+            'section'    => 'usage',
+            'configured' => AiGateway::configured(),
+            'whyNot'     => AiGateway::whyNotReady(),
+            'pulled'     => $pull,
+            'spend'      => $spend,
+            'activity'   => $active,
+            'attribution' => \App\Support\AiUsage::ATTRIBUTION,
+        ]);
+    }
+
+    /**
+     * **التشخيص — لماذا فشل، بلا سرّ** (§١١).
+     *
+     * وشجرةُ القرارِ تقول **أين انقطع الخيط** بدل أن تعرض رسالةَ خطأٍ خاماً:
+     * البوّابةُ؟ الاعتمادُ؟ النموذجُ؟ الشبكة؟ ورسالةٌ خامٌ بلا موضعٍ تجعل
+     * المديرَ يُصلح ما ليس معطوباً.
+     *
+     * **وكلُّ نصٍّ معروضٍ مرّ بـ`Redactor` عند مصدرِه** — `ConnectionProbe::row()`
+     * هي نقطةُ الاختناقِ الوحيدةُ التي تصنع حقلَ الخطأ.
+     */
+    public function diagnostics()
+    {
+        \App\Support\AiAccess::gateView();
+
+        return view('ai.diagnostics', [
+            'sections' => \App\Support\AiAccess::sections(),
+            'section'  => 'diagnostics',
+            'chain'    => \App\Support\AiDiagnostics::chain(),
+            'probes'   => \App\Support\AiDiagnostics::recentProbes(),
+            'manage'   => \App\Support\AiAccess::canManage(),
         ]);
     }
 

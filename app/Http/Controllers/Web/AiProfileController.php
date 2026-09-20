@@ -28,13 +28,13 @@ class AiProfileController extends Controller
     /** حارسُ المركز — نسخةُ `AiCenterController::gate` نفسُها */
     protected function gate(): void
     {
-        abort_unless(hub_is_owner() || hub_flag(auth()->user(), 'aiAdmin'), 403,
-            'مركزُ الذكاء الاصطناعيّ يحتاج صلاحيّةَ إدارتِه');
+        \App\Support\AiAccess::gateManage();
     }
 
+    /** **القراءةُ تُفتَح لحاملِ `aiView`** — والكتابةُ تبقى خلف الإدارة (W8) */
     public function index()
     {
-        $this->gate();
+        \App\Support\AiAccess::gateView();
 
         $profiles = AiProfiles::all();
         $rows     = [];
@@ -51,6 +51,9 @@ class AiProfileController extends Controller
         }
 
         return view('ai.profiles', [
+            'sections' => \App\Support\AiAccess::sections(),
+            'section'  => 'routing',
+            'manage'   => \App\Support\AiAccess::canManage(),
             'rows'   => $rows,
             'table'  => AiRouting::TABLE,
             'depth'  => AiRouting::MAX_DEPTH,

@@ -19,6 +19,8 @@
     </div>
 </div>
 
+@include('ai._sections')
+
 @if (! $configured)
     <div class="cards">
         <div class="stat"><span class="ico bdg wn">⚙️</span><b>البوّابةُ غيرُ مهيّأة</b>
@@ -37,8 +39,13 @@
                 <b>{{ $p->label }}</b>
                 <span class="mut mono ltr">{{ $def['label_en'] ?? $p->catalog_key }}</span>
                 <div class="sub">
-                    {{-- **حالةٌ لا قيمة** — واسمُ الاعتمادِ مرجعٌ لا سرّ --}}
-                    @if ($p->credential_state === 'verified')
+                    {{-- **حالةٌ لا قيمة** — واسمُ الاعتمادِ مرجعٌ لا سرّ.
+                         **وهي للمدير وحدَه** (§١٠ · W8): القارئُ يرى أنّ المزوّدَ
+                         يعمل أو لا يعمل، ولا يرى **لماذا** — فحالةُ الاعتمادِ
+                         خريطةُ من يملك المفاتيحَ وأين الثغرة. --}}
+                    @if (! ($showState ?? true))
+                        {{-- لا شيءَ يُعرَض للقارئ --}}
+                    @elseif ($p->credential_state === 'verified')
                         <span class="bdg ok">✅ اعتمادٌ مُتحقَّق</span>
                     @elseif ($p->credential_state === 'configured')
                         <span class="bdg">🔑 اعتمادٌ مضبوطٌ ولم يُختبر</span>
@@ -46,7 +53,9 @@
                         <span class="bdg wn">⚠️ لا اعتماد</span>
                     @endif
                     <span class="bdg {{ $p->enabled ? 'ok' : '' }}">{{ $p->enabled ? 'مُشغَّل' : 'مُطفأ' }}</span>
-                    <span class="mut mono ltr" title="مرجعُ الاعتمادِ في خزنةِ البوّابة — لا سرّ">{{ $p->credential_name }}</span>
+                    @if ($showState ?? true)
+                        <span class="mut mono ltr" title="مرجعُ الاعتمادِ في خزنةِ البوّابة — لا سرّ">{{ $p->credential_name }}</span>
+                    @endif
                 </div>
                 @if (($p->config ?? []) !== [])
                     <div class="sub mut">
@@ -59,6 +68,9 @@
 
             <div style="display:flex;gap:6px;flex-wrap:wrap">
                 <a class="btn sm" href="{{ route('ai.models.index', $p) }}">🧠 النماذج</a>
+                {{-- **شرطُ العرضِ = شرطُ الباب** (W8): زرٌّ يُعرَض ثمّ يُصَدُّ ٤٠٣
+                     أسوأُ من غيابِه — يَعِد بقدرةٍ لا يملكها صاحبُه. --}}
+                @if ($manage ?? true)
                 <form method="POST" action="{{ route('ai.providers.toggle', $p) }}">@csrf
                     <input type="hidden" name="enabled" value="{{ $p->enabled ? 0 : 1 }}">
                     <button class="btn sm">{{ $p->enabled ? '⏸️ إطفاء' : '▶️ تشغيل' }}</button>
@@ -73,10 +85,11 @@
                       onsubmit="return confirm('يُبطَل الاعتمادُ ثمّ يُحذَف المزوّد. أتتابع؟')">@csrf @method('DELETE')
                     <button class="btn sm danger">🗑️ حذف</button>
                 </form>
+                @endif
             </div>
 
             {{-- ═══ المستوى B — فحصُ قبولِ المزوّدِ لاعتمادِنا (يُنفق) ═══ --}}
-            @if ($p->credential_state !== 'missing')
+            @if (($manage ?? true) && $p->credential_state !== 'missing')
                 <details style="width:100%">
                     <summary class="mut">🧪 فحصُ الاعتماد (B)</summary>
                     <div class="sub mut">
@@ -99,7 +112,7 @@
             @endif
 
             {{-- ═══ تدويرُ السرّ — الاسمُ نفسُه والقيمُ جديدة ═══ --}}
-            @if ($def)
+            @if (($manage ?? true) && $def)
                 <details style="width:100%">
                     <summary class="mut">🔄 تدويرُ الاعتماد</summary>
                     <form method="POST" action="{{ route('ai.providers.rotate', $p) }}" class="grid" autocomplete="off">@csrf
@@ -130,6 +143,7 @@
 </div>
 
 {{-- ═══ إضافةُ مزوّد — النموذجُ يُبنى من الكتالوج لا من حقولٍ مكتوبةٍ لمزوّدٍ بعينِه ═══ --}}
+@if ($manage ?? true)
 <div class="card">
     <h3>إضافةُ مزوّد</h3>
 
@@ -196,5 +210,6 @@
         </details>
     @endforeach
 </div>
+@endif
 
 @endsection

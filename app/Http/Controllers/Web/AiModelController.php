@@ -28,21 +28,77 @@ class AiModelController extends Controller
     /** حارسُ المركز — نسخةُ `AiCenterController::gate` نفسُها */
     protected function gate(): void
     {
-        abort_unless(hub_is_owner() || hub_flag(auth()->user(), 'aiAdmin'), 403,
-            'مركزُ الذكاء الاصطناعيّ يحتاج صلاحيّةَ إدارتِه');
+        \App\Support\AiAccess::gateManage();
     }
 
+    /** **القراءةُ تُفتَح لحاملِ `aiView`** — والكتابةُ تبقى خلف الإدارة (W8) */
     public function index(AiProvider $provider)
     {
-        $this->gate();
+        \App\Support\AiAccess::gateView();
 
         return view('ai.models', [
+            'sections'  => \App\Support\AiAccess::sections(),
+            'section'   => 'models',
+            'manage'    => \App\Support\AiAccess::canManage(),
             'provider'   => $provider,
             'models'     => $provider->models()->orderByDesc('priority')->orderBy('display_name')->get(),
             'candidates' => (array) session('ai.candidates.' . $provider->id, []),
             'unowned'    => (int) session('ai.unowned.' . $provider->id, 0),
             'discovery'  => \App\Support\AiCatalog::discovery((string) $provider->catalog_key),
             'note'       => \App\Support\AiCatalog::provider((string) $provider->catalog_key)['discovery_note'] ?? null,
+        ]);
+    }
+
+    /**
+     * **جدولُ النماذجِ عبر المزوّدين** — القسمُ الثالثُ من السبعة (W8 · §١١).
+     *
+     * وشاشةُ المزوّدِ الواحدِ تخدم **الدورةَ** (اكتشافٌ ← اختيارٌ ← تهيئة)،
+     * وهذه تخدم **السؤالَ العرضيّ**: «أيُّ نموذجٍ عندي يقرأ صورةً؟ وبأيِّ
+     * كلفة؟» — ولا يُجاب عنه بفتحِ خمسِ شاشاتٍ وجمعِها بالعين.
+     *
+     * **والترشيحُ يمرّ بقائمةٍ بيضاءَ لا بمُدخلٍ حرّ**: القدرةُ من
+     * `AiModelFacts::CAPABILITIES` والحالةُ من ثلاثٍ معلومة.
+     */
+    public function all(Request $r)
+    {
+        \App\Support\AiAccess::gateView();
+
+        $cap    = (string) $r->query('cap', '');
+        $state  = (string) $r->query('state', '');
+        $prov   = (string) $r->query('provider', '');
+
+        if (! in_array($cap, AiModelFacts::CAPABILITIES, true))   $cap = '';
+        if (! in_array($state, ['enabled', 'disabled', 'gone'], true)) $state = '';
+
+        $q = AiModel::query()->with('provider');
+        if ($prov !== '') $q->where('provider_id', $prov);
+        if ($state === 'enabled')  $q->where('enabled', true);
+        if ($state === 'disabled') $q->where('enabled', false);
+        if ($state === 'gone')     $q->where('health', 'UNAVAILABLE');
+
+        // **الترتيبُ يُطلَب صراحةً وينتهي بـ`id`** — فصفّان متساويا الأولويّةِ
+        // والاسمِ لا يتبادلان مواضعَهما بين محرّكٍ ومحرّك
+        $models = $q->orderByDesc('priority')->orderBy('litellm_model_name')->orderBy('id')->get();
+
+        // الترشيحُ بالقدرةِ **بعد الجلب**: الحقيقةُ في عمودِ JSON ولهجةُ
+        // استعلامِه تفترق بين المحرّكَين، والعددُ هنا عشراتٌ لا آلاف
+        if ($cap !== '') {
+            $models = $models->filter(static function (AiModel $m) use ($cap) {
+                $fact = ((array) $m->capabilities)[$cap] ?? null;
+                return \App\Support\Tri::allowsExecution(is_array($fact) ? ($fact['v'] ?? null) : $fact);
+            })->values();
+        }
+
+        return view('ai.models-all', [
+            'sections'     => \App\Support\AiAccess::sections(),
+            'section'      => 'models',
+            'manage'       => \App\Support\AiAccess::canManage(),
+            'models'       => $models,
+            'providers'    => AiProvider::query()->orderBy('label')->orderBy('id')->get(),
+            'capabilities' => AiModelFacts::CAPABILITIES,
+            'cap'          => $cap,
+            'state'        => $state,
+            'provider'     => $prov,
         ]);
     }
 

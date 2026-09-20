@@ -35,15 +35,20 @@ class AiProviderController extends Controller
     /** حارسُ المركز — نسخةُ `AiCenterController::gate` نفسُها، فلا بابانِ لغرفةٍ واحدة */
     protected function gate(): void
     {
-        abort_unless(hub_is_owner() || hub_flag(auth()->user(), 'aiAdmin'), 403,
-            'مركزُ الذكاء الاصطناعيّ يحتاج صلاحيّةَ إدارتِه');
+        \App\Support\AiAccess::gateManage();
     }
 
+    /** **القراءةُ تُفتَح لحاملِ `aiView`** — والكتابةُ تبقى خلف الإدارة (W8) */
     public function index()
     {
-        $this->gate();
+        \App\Support\AiAccess::gateView();
 
         return view('ai.providers', [
+            'sections'  => \App\Support\AiAccess::sections(),
+            'section'   => 'providers',
+            'manage'    => \App\Support\AiAccess::canManage(),
+            // **حالةُ الاعتمادِ للمدير وحدَه** (§١٠): القارئُ يرى «يعمل» لا «لماذا لا»
+            'showState' => \App\Support\AiAccess::showsCredentialState(),
             'providers' => AiProvider::query()->orderBy('catalog_key')->orderBy('label')->get(),
             'catalog'   => AiCatalog::all(),
             'configured' => AiGateway::configured(),

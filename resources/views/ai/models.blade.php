@@ -24,16 +24,20 @@
         </div>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <a class="btn sm" href="{{ route('ai.providers.index') }}">🔌 المزوّدون</a>
-        <a class="btn sm" href="{{ route('ai.profiles.index') }}">🎯 الأغراضُ والتوجيه</a>
+        <a class="btn sm" href="{{ route('ai.models.all') }}">🧠 كلُّ النماذج</a>
+        {{-- **شرطُ العرضِ = شرطُ الباب** (W8) --}}
+        @if ($manage ?? true)
         <form method="POST" action="{{ route('ai.models.discover', $provider) }}">@csrf
             <button class="btn sm">🔎 اكتشاف</button>
         </form>
         <form method="POST" action="{{ route('ai.models.refresh', $provider) }}">@csrf
             <button class="btn sm">🔄 تحديثُ المعرفة</button>
         </form>
+        @endif
     </div>
 </div>
+
+@include('ai._sections')
 
 @if ($discovery !== 'live')
     <div class="cards">
@@ -44,7 +48,7 @@
 @endif
 
 {{-- ═══ ② المراجعة — ما نعرفه وما نجهله قبل الاختيار ═══ --}}
-@if ($candidates !== [])
+@if (($manage ?? true) && $candidates !== [])
 <div class="card">
     <h3>مرشَّحون للاستيراد <span class="mut">({{ count($candidates) }})</span></h3>
     @if ($unowned > 0)
@@ -80,6 +84,7 @@
 @endif
 
 {{-- ═══ التسجيلُ اليدويّ ═══ --}}
+@if ($manage ?? true)
 <div class="card">
     <details>
         <summary><b>➕ تسجيلُ نموذجٍ يدويّاً</b> <span class="mut">باسمِه عند المزوّد</span></summary>
@@ -99,6 +104,7 @@
         </form>
     </details>
 </div>
+@endif
 
 {{-- ═══ ③④ السجلُّ — الاختيارُ والتهيئة ═══ --}}
 <div class="card">
@@ -134,6 +140,8 @@
                 </div>
             </div>
 
+            {{-- **شرطُ العرضِ = شرطُ الباب** (W8): ما يُصَدُّ ٤٠٣ لا يُعرَض زرّاً --}}
+            @if ($manage ?? true)
             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">
                 <form method="POST" action="{{ route('ai.models.toggle', $m) }}">@csrf
                     <input type="hidden" name="enabled" value="{{ $m->enabled ? 0 : 1 }}">
@@ -224,6 +232,7 @@
                     <div style="grid-column:1/-1"><button class="btn sm">✋ سجّل التجاوز</button></div>
                 </form>
             </details>
+            @endif
         </div>
     @empty
         <div class="empty">

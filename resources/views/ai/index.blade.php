@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'مركز الذكاء الاصطناعي')
+@section('title', 'إعدادات بوّابة الذكاء الاصطناعي')
 @section('content')
 
 <div class="hero">
@@ -8,8 +8,6 @@
         <div class="sub">بوّابةُ النماذج على خادمِ Hub نفسِه — مربوطةً داخليّاً بلا كشفٍ للإنترنت.</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-        {{-- شاشةٌ بلا رابطٍ ميزةٌ مخفيّة — ورابطُها بابُ متحكّمِها نفسُه --}}
-        <a class="btn sm" href="{{ route('ai.providers.index') }}">🔌 المزوّدون والاعتمادات</a>
         @if ($configured)
             <form method="POST" action="{{ route('ai.test') }}">@csrf
                 <button class="btn sm">🔌 اختبار الاتصال</button>
@@ -17,6 +15,8 @@
         @endif
     </div>
 </div>
+
+@include('ai._sections')
 
 {{-- ═══ حالةُ التشغيل — **أربعُ درجاتٍ لا درجتان** ═══
      وجودُ عنوانٍ ومفتاحٍ يعني «مهيّأٌ ولم يُختبر» لا «يعمل». ونجاحُ الفحصِ يعني

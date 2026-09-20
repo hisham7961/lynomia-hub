@@ -90,11 +90,22 @@ class AiCenterFoundationTest extends TestCase
         // ② ويُقرأ صحيحاً عند الخادم
         $this->assertSame($secret, AiGateway::key(), 'المفتاحُ لا يُفكّ عند القراءة');
 
-        // ③ ولا يظهر في صفحةِ المركزِ أبداً — القناعُ وحدَه
-        $html = $this->actingAs($u)->get('/admin/ai')->assertOk()->getContent();
+        /*
+         * ③ ولا يظهر في صفحةِ الإعداداتِ أبداً — القناعُ وحدَه.
+         *
+         * **والنموذجُ انتقل إلى `/admin/ai/settings`** (W8): `/admin/ai` صارت
+         * «نظرة»، قسمَ المركزِ الأوّل. والحارسُ ينتقل مع ما يحرسه، **ولا
+         * يضعف**: يُضاف إليه أنّ «نظرة» نفسَها لا تحمل شيئاً من السرّ.
+         */
+        $html = $this->actingAs($u)->get('/admin/ai/settings')->assertOk()->getContent();
         $this->assertStringNotContainsString($secret, $html, 'المفتاحُ سُرّب إلى الصفحة');
         $this->assertStringNotContainsString('TESTKEY', $html, 'جزءٌ من المفتاحِ سُرّب');
         $this->assertStringContainsString('aa63', $html, 'القناعُ لا يعرض آخرَ أربعِ خانات');
+
+        // ④ **و«نظرة» لا تحمل سرّاً ولا قناعَه** — حارسٌ زِيدَ لا نُقِص
+        $overview = $this->actingAs($u)->get('/admin/ai')->assertOk()->getContent();
+        $this->assertStringNotContainsString($secret, $overview, 'المفتاحُ سُرّب إلى صفحةِ النظرة');
+        $this->assertStringNotContainsString('TESTKEY', $overview, 'جزءٌ من المفتاحِ سُرّب إلى صفحةِ النظرة');
     }
 
     /** الفارغُ يُبقي المحفوظ — وإلّا محا كلُّ حفظٍ لحقلٍ آخرَ المفتاحَ */
@@ -350,7 +361,8 @@ class AiCenterFoundationTest extends TestCase
 
         $this->assertNull(session('_old_input.key'), 'المفتاحُ فُلِش في المدخلاتِ المعادة');
 
-        $html = $this->actingAs($u)->get('/admin/ai')->assertOk()->getContent();
+        // النموذجُ في قسمِ الإعدادات — والحارسُ عندَه (W8)
+        $html = $this->actingAs($u)->get('/admin/ai/settings')->assertOk()->getContent();
         $this->assertStringNotContainsString($secret, $html, 'المفتاحُ المرفوضُ عاد إلى HTML');
         $this->assertStringNotContainsString('FLASHLEAK', $html);
     }
