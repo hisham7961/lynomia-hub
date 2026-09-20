@@ -27,8 +27,14 @@
         <a class="btn sm" href="{{ route('ai.models.all') }}">🧠 كلُّ النماذج</a>
         {{-- **شرطُ العرضِ = شرطُ الباب** (W8) --}}
         @if ($manage ?? true)
+        {{-- **بابُ الإضافةِ الحقيقيُّ أوّلاً.** كان مدفوناً في قسمٍ مطويّ بينما
+             الزرُّ البارزُ يقرأ سجلَّ البوّابةِ وحدَه — وكلُّ ما فيه مستورَدٌ
+             سلفاً فيُعرَض **مُعطَّلاً**. فبدا النظامُ يرفض إضافةَ نموذجٍ ثانٍ،
+             وهو إنّما يُخفي الباب. --}}
+        <a class="btn sm" href="{{ route('ai.models.browse', $provider) }}">🔍 اكتشافُ النماذجِ وإضافتُها</a>
+        <a class="btn sm" href="{{ route('ai.models.reconcile', $provider) }}">🔁 المطابقةُ مع البوّابة</a>
         <form method="POST" action="{{ route('ai.models.discover', $provider) }}">@csrf
-            <button class="btn sm">🔎 اكتشاف</button>
+            <button class="btn sm">🔎 سجلُّ البوّابة</button>
         </form>
         <form method="POST" action="{{ route('ai.models.refresh', $provider) }}">@csrf
             <button class="btn sm">🔄 تحديثُ المعرفة</button>
@@ -147,14 +153,54 @@
                 </div>
             </div>
 
+            {{-- ═══ الحالُ والمصدرُ والتحقّق — تُقال ولا تُخمَّن ═══ --}}
+            <div class="sub">
+                <span class="mono ltr" title="معرّفُ النموذجِ عند المزوّد">{{ $m->upstream_model }}</span>
+                @if ($m->discovery_source)
+                    <span class="bdg" title="من أين عرفناه">{{ $m->discovery_source }}</span>
+                @endif
+                <span class="bdg {{ $m->health === 'CONNECTED' ? 'ok' : ($m->health === 'FAILED' ? 'wn' : '') }}">
+                    {{ $m->health === 'CONNECTED' ? 'مُتحقَّق' : ($m->health === 'FAILED' ? 'فشل آخرُ فحص' : 'لم يُفحَص') }}
+                </span>
+                @if ($m->last_error)<span class="mut">{{ $m->last_error }}</span>@endif
+            </div>
+
             {{-- **شرطُ العرضِ = شرطُ الباب** (W8): ما يُصَدُّ ٤٠٣ لا يُعرَض زرّاً --}}
             @if ($manage ?? true)
+            @php($deps = \App\Support\AiModelLifecycle::dependencies($m))
             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">
                 <form method="POST" action="{{ route('ai.models.toggle', $m) }}">@csrf
                     <input type="hidden" name="enabled" value="{{ $m->enabled ? 0 : 1 }}">
                     <button class="btn sm">{{ $m->enabled ? '⏸️ تعطيل' : '▶️ تفعيل' }}</button>
                 </form>
+
+                {{-- **الإزالةُ تُعرَض دائماً** — وما يمنعها يُقال بالاسمِ لا يُخفى الزرّ.
+                     فزرٌّ غائبٌ يُقرَأ «لا يمكن أبداً»، والحقيقةُ «ليس قبل أن تفكّ كذا». --}}
+                @if ($deps['removable'])
+                    <form method="POST" action="{{ route('ai.models.destroy', $m) }}"
+                          onsubmit="return confirm('يُلغى نشرُ النموذجِ عند البوّابةِ ثمّ يُزال من Hub. أتتابع؟')">
+                        @csrf @method('DELETE')
+                        <button class="btn sm danger">🗑️ إزالة</button>
+                    </form>
+                @else
+                    <form method="POST" action="{{ route('ai.models.unlink', $m) }}">@csrf
+                        <button class="btn sm">🔓 فكُّ الارتباط</button>
+                    </form>
+                @endif
             </div>
+
+            @if (! $deps['removable'])
+                <div class="sub mut" style="width:100%">
+                    <b>ما يمنع الإزالة:</b>
+                    @foreach ($deps['blocking'] as $b)
+                        <div>• {!! e(str_replace('**', '', (string) $b['label'])) !!} —
+                            <span class="mut">{{ $b['hint'] }}</span></div>
+                    @endforeach
+                </div>
+            @endif
+            @foreach ($deps['notes'] as $n)
+                <div class="sub mut" style="width:100%">ℹ️ {{ $n }}</div>
+            @endforeach
 
             <details style="width:100%">
                 <summary class="mut">⚙️ تهيئة</summary>

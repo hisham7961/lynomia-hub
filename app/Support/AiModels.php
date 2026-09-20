@@ -328,6 +328,22 @@ final class AiModels
             $c = $byPick[$pick] ?? null;
             if ($c === null || $c['already_imported']) { $skipped[] = $pick; continue; }
 
+            /*
+             * **وجذعُ العائلةِ لا يُتبنّى بضغطة.**
+             *
+             * معرّفٌ كهذا يُعلنه الكتالوجُ **مفتاحَ تسعيرٍ لعائلة**، لا نموذجاً
+             * يُنادى: الحقيقيُّ يحمل بعده مقاطعَ حسابِك. فتبنّيه بضغطةٍ يُنتج
+             * صفّاً يبدو سليماً حتّى يبلغ المزوّدَ فيردّ «لا نموذجَ بهذا
+             * الاسم» — وهو ما وقع فعلاً في القبول.
+             *
+             * فيُرَدُّ هنا، ويُوجَّه المديرُ إلى إكمالِ معرّفِه من بابِ
+             * التسجيلِ اليدويّ — حيث المعرّفُ الكاملُ يُقبَل بلا حَرَج.
+             */
+            if (! AiModelSources::adoptableInOneClick((string) ($c['availability'] ?? ''))) {
+                $skipped[] = $pick;
+                continue;
+            }
+
             if ($c['source'] === AiModelSources::GATEWAY) {
                 $fromRegistry[] = (string) $c['litellm_model_name'];
                 continue;
@@ -372,7 +388,8 @@ final class AiModels
 
         if ($models === []) {
             return ['ok' => false, 'models' => [], 'skipped' => $skipped,
-                    'error' => 'لا نموذجَ جديدٌ يُتبنّى — المُختارُ مستورَدٌ سلفاً أو تعذّر تسجيلُه'];
+                    'error' => 'لا نموذجَ جديدٌ يُتبنّى — المُختارُ مستورَدٌ سلفاً، أو هو '
+                               . '**جذعُ عائلةٍ** يلزمه معرّفُك الكامل، أو تعذّر تسجيلُه'];
         }
 
         self::trace('تبنّي نماذج ذكاء', $provider, [

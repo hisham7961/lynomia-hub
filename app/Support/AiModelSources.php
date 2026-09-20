@@ -52,6 +52,86 @@ final class AiModelSources
     /** المصادرُ **مرتَّبةً**: الأوّلُ يغلب الثاني عند التكرار */
     public const SOURCES = [self::GATEWAY, self::CATALOG, self::MANUAL];
 
+    // ═══ دلالاتُ الإتاحة — «معروفٌ في الكتالوج» ليس «متاحٌ لحسابِك» ═══
+
+    /** **مُسجَّلٌ عند البوّابةِ بمرجعِ اعتمادِنا** — أقوى ما نملك بلا إنفاق */
+    public const AVAIL_REGISTERED = 'gateway_registered';
+
+    /** **يعرفه كتالوجُ البوّابة** — ولا يُثبِت أنّ حسابَك يبلغه */
+    public const AVAIL_CATALOG = 'catalog_known';
+
+    /**
+     * **معرّفُ عائلةٍ لا معرّفُ نموذج** — الحقيقيُّ يحمل لاحقةَ حسابِك.
+     *
+     * وهذه أخطرُ الثلاث: يبدو معرّفاً كاملاً وهو **جذعٌ** لا يُنادى.
+     */
+    public const AVAIL_ACCOUNT = 'account_specific';
+
+    public const AVAILABILITY = [self::AVAIL_REGISTERED, self::AVAIL_CATALOG, self::AVAIL_ACCOUNT];
+
+    /**
+     * **بادئاتُ العائلاتِ التي يُجرَّد معرّفُها إلى جذع.**
+     *
+     * ── **لماذا هذه القائمةُ ليست ترقيعاً لمزوّدٍ بعينه؟** ──
+     *
+     * لأنّها **مقروءةٌ من منطقِ الحزمةِ المثبّتةِ نفسِها**: `utils.py` يحمل
+     * دالّةً تُجرّد المعرّفَ الكاملَ إلى جذعِه بحذفِ **ثلاثةِ مقاطعَ** من آخرِه
+     * (`(:[^:]+){3}$`)، وتُستدعى حين يحمل المعرّفُ هذه البادئة. فالجذعُ —
+     * وهو ما يحمله الكتالوجُ — **مفتاحُ تسعيرٍ لا معرّفُ نموذجٍ يُنادى**.
+     *
+     * فالقاعدةُ عامّةٌ في صياغتِها: *معرّفٌ يعرف الإصدارُ المثبَّتُ أنّه جذعٌ
+     * لعائلةٍ، ولا يحمل مقاطعَ الحسابِ بعدُ* — ولا اسمَ مزوّدٍ فيها.
+     * وإن أضاف الإصدارُ عائلةً أخرى، تُمَدُّ من المصدرِ نفسِه لا من الذاكرة.
+     */
+    public const STEM_MARKERS = ['ft:'];
+
+    /**
+     * **أهذا المعرّفُ جذعُ عائلةٍ لا نموذجاً يُنادى؟**
+     *
+     * الجذعُ يحمل البادئةَ **ولا يحمل بعدها إلّا مقطعاً واحداً** — وهو اسمُ
+     * الأساس. والمعرّفُ الحقيقيُّ يزيد عليه مقاطعَ حسابِك.
+     *
+     * ── **ولمَ لا يُنسَخ تعبيرُ المصدرِ حرفاً؟** ──
+     *
+     * لأنّ **القياسَ كشف فيه ثغرة**: تعبيرُه يطلب ثلاثةَ مقاطعَ غيرَ فارغةٍ
+     * في الآخر، فمعرّفٌ حقيقيٌّ أحدُ مقاطعِه فارغٌ **لا يُجرَّده المصدرُ
+     * نفسُه** — ولو نسخناه لَعَدَدْنا معرّفاً كاملاً جذعاً ومنعنا تبنّيَه.
+     *
+     * فالمعيارُ هنا **أبسطُ وأمتن**: وجودُ مقاطعَ بعد الأساسِ من عدمِه. وهو
+     * يوافق المصدرَ في كلِّ حالةٍ يعمل فيها، ويصيب حيث يُخطئ.
+     */
+    public static function isFamilyStem(string $upstream): bool
+    {
+        $id = trim($upstream);
+        if ($id === '') return false;
+
+        foreach (self::STEM_MARKERS as $marker) {
+            $at = mb_strpos($id, $marker);
+            if ($at === false) continue;
+
+            // ما بعد البادئة: مقطعٌ واحدٌ ⇒ جذع · أكثرُ ⇒ معرّفٌ يحمل حسابَه
+            $tail = mb_substr($id, $at + mb_strlen($marker));
+
+            return $tail !== '' && ! str_contains($tail, ':');
+        }
+
+        return false;
+    }
+
+    /** دلالةُ إتاحةِ مرشَّحٍ — من مصدرِه وشكلِ معرّفِه، لا من ظنّ */
+    public static function availabilityOf(string $source, string $upstream): string
+    {
+        if ($source === self::GATEWAY) return self::AVAIL_REGISTERED;
+
+        return self::isFamilyStem($upstream) ? self::AVAIL_ACCOUNT : self::AVAIL_CATALOG;
+    }
+
+    /** **أيُتبنّى بضغطة؟** — الجذعُ لا، فمعرّفُه ليس معرّفَ نموذج */
+    public static function adoptableInOneClick(string $availability): bool
+    {
+        return $availability !== self::AVAIL_ACCOUNT;
+    }
+
     /**
      * **سقفُ ما يُعرَض** — قائمةٌ بلا حدٍّ تُعطِّل الشاشةَ ولا تُفيد أحداً.
      *
@@ -180,6 +260,7 @@ final class AiModelSources
                 'litellm_model_name' => (string) $c['litellm_model_name'],
                 'display_name'       => (string) $c['litellm_model_name'],
                 'source'             => self::GATEWAY,
+                'availability'       => self::AVAIL_REGISTERED,
                 'already_imported'   => (bool) $c['already_imported'],
                 'mode'               => null,
                 'capabilities'       => (array) $c['capabilities'],
@@ -240,6 +321,7 @@ final class AiModelSources
                 'litellm_model_name' => null,           // يُولَّد عند الاستيراد
                 'display_name'       => $upstream,
                 'source'             => self::CATALOG,
+                'availability'       => self::availabilityOf(self::CATALOG, $upstream),
                 'already_imported'   => $known->has($upstream),
                 'mode'               => self::cleanMode($entry['mode'] ?? null),
                 'capabilities'       => AiModelFacts::capabilities($info),
