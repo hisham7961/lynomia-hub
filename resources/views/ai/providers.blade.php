@@ -55,6 +55,7 @@
             </div>
 
             <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <a class="btn sm" href="{{ route('ai.models.index', $p) }}">🧠 النماذج</a>
                 <form method="POST" action="{{ route('ai.providers.toggle', $p) }}">@csrf
                     <input type="hidden" name="enabled" value="{{ $p->enabled ? 0 : 1 }}">
                     <button class="btn sm">{{ $p->enabled ? '⏸️ إطفاء' : '▶️ تشغيل' }}</button>

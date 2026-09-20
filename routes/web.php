@@ -916,6 +916,28 @@ Route::middleware('auth')->group(function () {
     Route::delete('admin/ai/providers/{provider}', [\App\Http\Controllers\Web\AiProviderController::class, 'destroy'])
         ->name('ai.providers.destroy')->middleware('throttle:20,1');
 
+    /* ── سجلُّ النماذجِ والاكتشاف (المرحلة ٢ · W5) ────────────────────────
+     * الحارسُ نفسُه، و**الكتابةُ خلف تصعيدِ الهويّة**؛ أمّا الاكتشافُ فقراءةٌ
+     * محضةٌ لا تكتب صفّاً فلا تصعيدَ عليها. والنداءاتُ تخرج إلى البوّابةِ
+     * فتُخنَق كنظائرِها.
+     */
+    Route::get('admin/ai/providers/{provider}/models', [\App\Http\Controllers\Web\AiModelController::class, 'index'])
+        ->name('ai.models.index');
+    Route::post('admin/ai/providers/{provider}/models/discover', [\App\Http\Controllers\Web\AiModelController::class, 'discover'])
+        ->name('ai.models.discover')->middleware('throttle:20,1');
+    Route::post('admin/ai/providers/{provider}/models/import', [\App\Http\Controllers\Web\AiModelController::class, 'import'])
+        ->name('ai.models.import')->middleware('throttle:20,1');
+    Route::post('admin/ai/providers/{provider}/models/register', [\App\Http\Controllers\Web\AiModelController::class, 'register'])
+        ->name('ai.models.register')->middleware('throttle:20,1');
+    Route::post('admin/ai/providers/{provider}/models/refresh', [\App\Http\Controllers\Web\AiModelController::class, 'refresh'])
+        ->name('ai.models.refresh')->middleware('throttle:20,1');
+    Route::post('admin/ai/models/{model}/configure', [\App\Http\Controllers\Web\AiModelController::class, 'configure'])
+        ->name('ai.models.configure');
+    Route::post('admin/ai/models/{model}/toggle', [\App\Http\Controllers\Web\AiModelController::class, 'toggle'])
+        ->name('ai.models.toggle');
+    Route::post('admin/ai/models/{model}/override', [\App\Http\Controllers\Web\AiModelController::class, 'override'])
+        ->name('ai.models.override');
+
     Route::get('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'index'])->name('integrations.n8n');
     Route::post('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'save'])->name('integrations.n8n.save');
     Route::get('admin/security', [SecurityController::class, 'index'])->name('security.index');
