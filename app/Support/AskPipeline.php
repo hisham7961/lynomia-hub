@@ -1,0 +1,307 @@
+<?php
+
+namespace App\Support;
+
+use App\Contracts\AskGenerator;
+use Illuminate\Support\Str;
+
+/**
+ * **منسّقُ «اسأل Hub»** — من السؤالِ إلى الجوابِ، بحارسٍ عند كلِّ خطوة. (P3-W5)
+ *
+ * المسارُ كاملاً:
+ *
+ * ```
+ * المستخدِم → الباب → كتالوجُ أدواتِه → السياق → التوجيه → طلبُ قراءة
+ *   → إعادةُ تحقّقٍ في الخادم → تنفيذ → مظروفٌ غيرُ موثوق → توليد
+ *   → جوابٌ مُصادَق → تدقيق
+ * ```
+ *
+ * ── **الثابتُ الحاكم: النموذجُ لا يملك سلطةَ تنفيذ** ──
+ *
+ * ما يعود من المولِّدِ **طلبٌ غيرُ موثوقٍ بالكامل**، ولو كان المولِّدُ قد
+ * أطاع حقناً إطاعةً تامّة. ولذلك **حارسان مستقلّان لا واحد**:
+ *
+ *  ① **تصفيةُ الكتالوج** — النموذجُ لا يرى إلّا ما يملكه صاحبُ الجلسة، فلا
+ *     يعرف أنّ ما لا يملكه موجودٌ أصلاً. وهذا يقتل «حقنَ الأداة» عند منبعِه.
+ *
+ *  ② **تصريحُ التنفيذ** — وهو الحارسُ الذي يُعوَّل عليه. **يُعاد بناءُ
+ *     الكتالوجِ عند كلِّ تنفيذٍ من الصفر**، ويُعاد التحقّقُ من المستخدمِ
+ *     والنطاقِ والوحدةِ والعمليّةِ والوسائطِ والمعرّفاتِ والحدودِ والحقول.
+ *
+ * **ولماذا حارسانِ والأوّلُ كافٍ ظاهراً؟** لأنّ الأوّلَ يُبنى **مرّةً** في
+ * أوّلِ الطلب، وقد تُسحَب صلاحيّةُ المستخدمِ بعد ذلك بلحظة. فكتالوجٌ بُني
+ * قبل السحبِ يبقى في ذاكرةِ الطلبِ يَعِد بما لم يعد مملوكاً — وهذا
+ * ‏TOCTOU حرفيّاً. والحارسُ الثاني يقرأ الصلاحيّةَ **وقتَ التنفيذِ** فيسقط
+ * الطلبُ ولو مرّ بالأوّل.
+ *
+ * ── **حدُّ القراءةِ فقط** ──
+ *
+ * هذه المرحلةُ **تقرأ ولا تكتب**. لا إنشاءَ ولا تعديلَ ولا حذفَ ولا اعتمادَ
+ * ولا إرسالَ ولا تشغيلَ مسارٍ ولا تغييرَ إعدادٍ أو صلاحيّةٍ أو تكامل. والحدُّ
+ * مفروضٌ **بالبنيةِ لا بالنيّة**: الأدواتُ الخمسُ قارئةٌ كلُّها، وأيُّ اسمٍ
+ * خارجَها يُرَدّ قبل أن يُنظَر في وسائطِه.
+ *
+ * ── **ولا تفكيرَ يُخزَّن** ──
+ *
+ * لا يُحفَظ سؤالٌ ولا جوابٌ ولا سلسلةُ تفكيرٍ في التدقيق: سجلُّ التدقيقِ
+ * يُقرأ بصلاحيّاتٍ **غيرِ صلاحيّةِ السائل**، فتخزينُ «كم راتبُ فلان؟» فيه
+ * يفتح التسريبَ الذي أغلقه المسارُ كلُّه.
+ */
+final class AskPipeline
+{
+    /** شكلُ الجوابِ الموحَّد — لا شكلَ يُخترَع في متحكّمٍ ولا قالب */
+    public const SHAPE = ['ok', 'answer', 'sources', 'failure', 'message',
+                          'partial', 'budget', 'meta'];
+
+    /** **الأدواتُ الكاتبةُ: لا شيء.** ثابتٌ يُقرأ ويُختبَر لا تعليقٌ يُنسى */
+    public const WRITE_TOOLS = [];
+
+    /**
+     * **يُجيب عن سؤالٍ واحد** — أو يقول لماذا لا، بتصنيفٍ لا برسالةٍ عامّة.
+     *
+     * @return array{ok:bool, answer:?string, sources:list<array>, failure:?string,
+     *               message:?string, partial:bool, budget:array, meta:array}
+     */
+    public static function ask(string $question, mixed $user = null, ?AskGenerator $generator = null): array
+    {
+        $started     = microtime(true);
+        $correlation = (string) Str::uuid();
+        $u           = $user ?? auth()->user();
+        $gen         = $generator ?? app(AskGenerator::class);
+
+        // ── البابُ: صلاحيّةٌ لا توافر ──
+        if ($u === null || ! AskPolicy::canAsk($u)) {
+            AskAudit::denied(AskFailures::UNAUTHORIZED, ['correlation' => $correlation,
+                'failure' => AskFailures::UNAUTHORIZED, 'generator' => $gen->label()]);
+
+            return self::fail(AskFailures::UNAUTHORIZED, $correlation, $started, $gen);
+        }
+
+        $q = AskPolicy::sanitizeQuestion($question);
+        if ($q === null) {
+            return self::fail(AskFailures::MALFORMED_QUESTION, $correlation, $started, $gen);
+        }
+
+        // ── التوافرُ: مفصولٌ عن الصلاحيّةِ عمداً (العيبُ الذي أُغلق سابقاً) ──
+        if (! AskPolicy::ready($u)) {
+            return self::fail(AskFailures::UNAVAILABLE, $correlation, $started, $gen);
+        }
+
+        $profile = AskPolicy::profile();
+        if ($profile === null) {
+            return self::fail(AskFailures::UNAVAILABLE, $correlation, $started, $gen);
+        }
+
+        // ── الكتالوج: الحارسُ الأوّل — النموذجُ لا يرى ما لا يملكه صاحبُ الجلسة ──
+        $catalog = AskTools::catalog($u);
+
+        $ctx = AskContext::open();
+        $ctx->trust('limits', $ctx->budget());
+        $ctx->trust('modules_offered', array_keys($catalog));
+        $ctx->trust('tools_offered', AskTools::TOOLS);
+        $ctx->trust('read_only', true);
+        $ctx->trust('scope', 'كلُّ قراءةٍ مُنطَّقةٌ بصلاحيّةِ صاحبِ الجلسةِ وشركتِه');
+
+        $history   = [];
+        $requested = [];
+        $denied    = [];
+        $answer    = null;
+        $cited     = [];
+        $usage     = [];
+
+        for ($step = 0; $step < AskPolicy::MAX_TOOL_CALLS; $step++) {
+            $envelope = $ctx->render();
+
+            // **فشلٌ مُغلَقٌ لا مفتوح**: مظروفٌ لم يجتَز فحصَه لا يُرسَل
+            if (! $ctx->verify($envelope)) {
+                return self::fail(AskFailures::CONTEXT_LIMIT, $correlation, $started, $gen,
+                    ['requested' => $requested, 'denied' => $denied]);
+            }
+
+            $out = $gen->step($envelope, $catalog, $history);
+            $usage = is_array($out['usage'] ?? null) ? $out['usage'] : $usage;
+            $kind  = (string) ($out['kind'] ?? 'error');
+
+            if ($kind === 'error') {
+                $code = (string) ($out['code'] ?? AskFailures::MODEL_FAILURE);
+
+                return self::fail(AskFailures::known($code) ? $code : AskFailures::MODEL_FAILURE,
+                    $correlation, $started, $gen,
+                    ['requested' => $requested, 'denied' => $denied, 'usage' => $usage]);
+            }
+
+            if ($kind === 'answer') {
+                $answer = is_string($out['answer'] ?? null) ? $out['answer'] : null;
+                $cited  = array_values(array_filter((array) ($out['sources'] ?? []), 'is_int'));
+                break;
+            }
+
+            if ($kind !== 'tool') {
+                return self::fail(AskFailures::MODEL_FAILURE, $correlation, $started, $gen,
+                    ['requested' => $requested, 'denied' => $denied, 'usage' => $usage]);
+            }
+
+            // ── الحارسُ الثاني: التصريحُ عند التنفيذِ، مستقلٌّ عن الكتالوج ──
+            $tool = is_string($out['tool'] ?? null) ? $out['tool'] : '';
+            $args = is_array($out['args'] ?? null) ? $out['args'] : [];
+            $requested[] = $tool;
+
+            $why = self::authorize($tool, $args, $u);
+            if ($why !== null) {
+                $denied[] = $tool;
+                $ctx->trust('rejected_step_' . $step, ['tool' => $tool, 'why' => $why]);
+                $history[] = ['tool' => $tool, 'ok' => false, 'why' => $why];
+                continue;
+            }
+
+            $result = AskTools::run($tool, $args, $u);
+            $added  = $ctx->addResult($result);
+
+            $history[] = ['tool' => $tool, 'ok' => (bool) ($result['ok'] ?? false),
+                          'rows' => $added['rows'], 'source' => $added['source']];
+        }
+
+        if ($answer === null) {
+            return self::fail(AskFailures::TOOL_BUDGET, $correlation, $started, $gen,
+                ['requested' => $requested, 'denied' => $denied, 'usage' => $usage,
+                 'ctx' => $ctx]);
+        }
+
+        $answer = trim(Redactor::text($answer));
+        if ($answer === '') {
+            return self::fail(AskFailures::MODEL_FAILURE, $correlation, $started, $gen,
+                ['requested' => $requested, 'denied' => $denied, 'usage' => $usage, 'ctx' => $ctx]);
+        }
+
+        // ── المراجعُ تُصادَق على ما قرأه الخادمُ لا على ما قاله النموذج ──
+        foreach ($cited as $n) {
+            if (! $ctx->isKnownSource((int) $n)) {
+                return self::fail(AskFailures::FORGED_SOURCE, $correlation, $started, $gen,
+                    ['requested' => $requested, 'denied' => $denied, 'usage' => $usage, 'ctx' => $ctx]);
+            }
+        }
+
+        $budget  = $ctx->budget();
+        $partial = (bool) $budget['truncated'];
+
+        AskAudit::asked([
+            'correlation' => $correlation,
+            'tools'       => $requested,
+            'requested'   => $requested,
+            'denied'      => $denied,
+            'offered'     => count($catalog),
+            'modules'     => array_values(array_filter(array_map(
+                static fn (array $s) => $s['module'], $ctx->sources()))),
+            'sources'     => count($ctx->sources()),
+            'rows'        => (int) $budget['rows'],
+            'chars'       => (int) $budget['chars'],
+            'truncated'   => $partial,
+            'profile'     => (string) $profile->key,
+            'model'       => isset($usage['model']) ? (string) $usage['model'] : null,
+            'generator'   => $gen->label(),
+            'tokens'      => isset($usage['tokens']) ? (int) $usage['tokens'] : null,
+            'cost'        => isset($usage['cost']) ? (float) $usage['cost'] : null,
+            'depth'       => count($requested),
+            'ms'          => (int) round((microtime(true) - $started) * 1000),
+            'outcome'     => $partial ? 'partial' : 'ok',
+        ]);
+
+        return [
+            'ok'      => true,
+            'answer'  => $answer,
+            'sources' => $ctx->sources(),
+            'failure' => $partial ? AskFailures::PARTIAL_RESULT : null,
+            'message' => $partial ? AskFailures::message(AskFailures::PARTIAL_RESULT) : null,
+            'partial' => $partial,
+            'budget'  => $budget,
+            'meta'    => self::requestMeta($correlation, $started, $gen, (string) $profile->key, $usage),
+        ];
+    }
+
+    /**
+     * **تصريحُ التنفيذ** — الحارسُ الثاني، ويُعاد بناؤه من الصفرِ كلَّ مرّة.
+     *
+     * يعود `null` إن جاز التنفيذُ، وإلّا **سببٌ لا يكشف ما لا يملكه الطالب**:
+     * «غيرُ متاحة» لا «موجودةٌ وممنوعة». فالتفريقُ بينهما يرسم للمهاجمِ خريطةَ
+     * ما عند غيرِه.
+     */
+    public static function authorize(string $tool, array $args, mixed $user): ?string
+    {
+        if ($user === null || ! AskPolicy::canAsk($user)) return 'لا صلاحيّةَ لاستعمالِ المساعد';
+        if (! in_array($tool, AskTools::TOOLS, true)) return 'أداةٌ غيرُ معروفة';
+        if (in_array($tool, self::WRITE_TOOLS, true)) return 'الكتابةُ خارجَ نطاقِ هذه المرحلة';
+
+        // **الكتالوجُ يُبنى الآن لا من ذاكرةِ أوّلِ الطلب** — وهذا ما يُغلق TOCTOU
+        $catalog = AskTools::catalog($user);
+
+        $module = $args['module'] ?? null;
+        if ($module !== null) {
+            if (! is_string($module) || ! isset($catalog[$module])) return 'وحدةٌ غيرُ متاحةٍ لك';
+        }
+
+        // **الشكلُ يُفحَص قبل القيمة.** وسيطٌ يصل مصفوفةً حيث يُنتظَر عددٌ كان
+        // يُحوَّل إلى نصٍّ فيرفع تحذيراً — أي أنّ **حمولةً فاسدةً تُسقط الحارسَ
+        // نفسَه** بدل أن يردَّها. فيُفحَص النوعُ أوّلاً ويُرَدُّ ما ليس قياسيّاً.
+        foreach (['id', 'limit', 'page'] as $numeric) {
+            if (! array_key_exists($numeric, $args)) continue;
+
+            $v = $args[$numeric];
+            if (is_int($v)) continue;
+            if (! is_string($v) || ! ctype_digit($v)) return 'وسيطٌ عدديٌّ غيرُ صالح';
+        }
+
+        if (isset($args['filters']) && ! is_array($args['filters'])) return 'شكلُ تصفيةٍ غيرُ صالح';
+
+        return null;
+    }
+
+    // ── الداخل ────────────────────────────────────────────────────────
+
+    private static function fail(string $code, string $correlation, float $started,
+                                 AskGenerator $gen, array $extra = []): array
+    {
+        $ctx    = $extra['ctx'] ?? null;
+        $budget = $ctx instanceof AskContext ? $ctx->budget() : [];
+
+        AskAudit::asked([
+            'correlation' => $correlation,
+            'tools'       => (array) ($extra['requested'] ?? []),
+            'requested'   => (array) ($extra['requested'] ?? []),
+            'denied'      => (array) ($extra['denied'] ?? []),
+            'rows'        => (int) ($budget['rows'] ?? 0),
+            'chars'       => (int) ($budget['chars'] ?? 0),
+            'truncated'   => (bool) ($budget['truncated'] ?? false),
+            'generator'   => $gen->label(),
+            'failure'     => $code,
+            'ms'          => (int) round((microtime(true) - $started) * 1000),
+            'outcome'     => 'failed',
+            'why'         => $code,
+        ]);
+
+        return [
+            'ok'      => false,
+            'answer'  => null,
+            'sources' => $ctx instanceof AskContext ? $ctx->sources() : [],
+            'failure' => $code,
+            'message' => AskFailures::message($code),
+            'partial' => false,
+            'budget'  => $budget,
+            'meta'    => self::requestMeta($correlation, $started, $gen, null,
+                (array) ($extra['usage'] ?? [])),
+        ];
+    }
+
+    private static function requestMeta(string $correlation, float $started, AskGenerator $gen,
+                                 ?string $profile, array $usage): array
+    {
+        return [
+            'correlation' => $correlation,
+            'ms'          => (int) round((microtime(true) - $started) * 1000),
+            'generator'   => $gen->label(),
+            'live'        => $gen->isLive(),
+            'profile'     => $profile,
+            // **لا تفكيرَ ولا سياقَ خامٌّ هنا** — ما يُعرَض للمستخدمِ لا يحمل إلّا ما يخصّه
+            'usage'       => array_intersect_key($usage, array_flip(['model', 'tokens', 'cost'])),
+        ];
+    }
+}

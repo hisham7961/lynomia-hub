@@ -303,17 +303,54 @@ class AiProviderCoverageTest extends TestCase
             'password_changed_at' => now()]);
     }
 
-    public function test_الشاشةُ_لا_تسكب_كلَّ_النماذجِ_دفعةً_واحدة(): void
+    /**
+     * **البطاقاتُ كلُّها، والنموذجُ واحد** — وهما شرطانِ لا واحد.
+     *
+     * أوّلُ تنفيذٍ خلط بينهما فقصَّ **البطاقاتِ** عند أربعٍ وعشرين وقال «ضيِّق
+     * البحثَ لترى الباقي». وكان ذلك عطلاً لا احترازاً: مَن يتصفّح لا يعرف ما
+     * يبحث عنه بعد، فالقطعُ يُخفي عنه المتاحَ بدل أن ينظّمه له. والإغراقُ
+     * الحقيقيُّ عددُ **النماذجِ** المفتوحةِ معاً لا عددُ البطاقات.
+     */
+    public function test_الشاشةُ_تعرض_كلَّ_المزوّدين_ونموذجاً_واحداً(): void
     {
-        $html = $this->actingAs($this->admin())->get(route('ai.providers.index'))
+        $html = (string) $this->actingAs($this->admin())->get(route('ai.providers.index'))
             ->assertOk()->getContent();
 
-        $forms = substr_count((string) $html, 'name="catalog_key"');
-
+        // ① نموذجٌ واحدٌ على الأكثر — لا مئةٌ وستّةٌ وعشرون
+        $forms = substr_count($html, 'name="catalog_key"');
         $this->assertLessThanOrEqual(1, $forms,
             "الشاشةُ تعرض {$forms} نموذجَ إعدادٍ دفعةً واحدة — وهذا إغراقٌ لا تغطية");
-        $this->assertStringContainsString('name="q"', (string) $html, 'لا حقلَ بحثٍ في الشاشة');
-        $this->assertStringContainsString('name="auth"', (string) $html, 'لا تصفيةَ بشكلِ المصادقة');
+
+        // ② وكلُّ مزوّدٍ قابلٍ للإعدادِ له بطاقةٌ — بلا قطعٍ ولا «ضيِّق البحث»
+        $cards = substr_count($html, 'class="pvcard');
+        $this->assertSame(count(AiCatalog::all()), $cards,
+            "ظهر {$cards} بطاقةً من " . count(AiCatalog::all()) . ' — والقطعُ يُخفي المتاحَ لا ينظّمه');
+
+        foreach (array_keys(AiCatalog::all()) as $key) {
+            $this->assertStringContainsString('add=' . rawurlencode($key), $html,
+                "[$key] غائبٌ عن الشبكة");
+        }
+
+        $this->assertStringContainsString('name="q"', $html, 'لا حقلَ بحثٍ في الشاشة');
+        $this->assertStringContainsString('name="auth"', $html, 'لا تصفيةَ بشكلِ المصادقة');
+    }
+
+    public function test_لكلِّ_مزوّدٍ_علامةٌ_ثابتةٌ_مشتقّةٌ_من_اسمِه(): void
+    {
+        $a = AiProviderRegistry::mark('some_provider');
+        $b = AiProviderRegistry::mark('some_provider');
+        $c = AiProviderRegistry::mark('other_provider');
+
+        $this->assertSame($a, $b, 'العلامةُ تتبدّل بين نداءين — فلونُ المزوّدِ يقفز بين صفحتين');
+        $this->assertNotSame($a['hue'], $c['hue'], 'مزوّدانِ مختلفانِ بلونٍ واحد');
+        $this->assertSame('SP', $a['initials']);
+        $this->assertSame('OP', $c['initials']);
+        $this->assertGreaterThanOrEqual(0, $a['hue']);
+        $this->assertLessThan(360, $a['hue']);
+
+        // ومزوّدٌ لم يُقَس قطُّ يأخذ علامتَه كغيرِه — لا مربّعٌ فارغ
+        $new = AiProviderRegistry::mark('a_provider_from_the_future');
+        $this->assertNotSame('', $new['initials']);
     }
 
     public function test_اختيارُ_مزوّدٍ_يفتح_نموذجَه_وحدَه(): void

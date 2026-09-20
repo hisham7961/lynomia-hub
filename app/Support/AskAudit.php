@@ -76,6 +76,16 @@ final class AskAudit
             'model'     => isset($shape['model']) ? (string) $shape['model'] : null,
             'depth'     => (int) ($shape['depth'] ?? 0),
             'ms'        => isset($shape['ms']) ? (int) $shape['ms'] : null,
+            // ── زيدت مع المنسّق (P3-W5/W6): يكفي للتحقيقِ ولا يحمل سرّاً ──
+            'correlation' => isset($shape['correlation']) ? (string) $shape['correlation'] : null,
+            'offered'     => (int) ($shape['offered'] ?? 0),
+            'requested'   => $list($shape['requested'] ?? []),
+            'denied'      => $list($shape['denied'] ?? []),
+            'sources'     => (int) ($shape['sources'] ?? 0),
+            'failure'     => isset($shape['failure']) ? (string) $shape['failure'] : null,
+            'generator'   => isset($shape['generator']) ? (string) $shape['generator'] : null,
+            'tokens'      => isset($shape['tokens']) ? (int) $shape['tokens'] : null,
+            'cost'        => isset($shape['cost']) ? (float) $shape['cost'] : null,
             'outcome'   => (string) ($shape['outcome'] ?? 'ok'),
             'why'       => isset($shape['why']) ? mb_substr((string) $shape['why'], 0, 180) : null,
         ];

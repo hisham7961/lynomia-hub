@@ -206,42 +206,47 @@
         </div>
     </form>
 
-    {{-- ── القائمةُ المختصرة ── --}}
+    {{-- ── الشبكة: كلُّ المطابقين، بلا قطع ── --}}
     <div class="sub mut">
-        ظهر <b>{{ $browse['shown'] }}</b> من <b>{{ $browse['total'] }}</b> مطابقاً.
-        @if ($browse['truncated'])
-            <span class="bdg wn">القائمةُ مقصوصة — ضيِّق البحثَ لترى الباقي</span>
+        <b>{{ $browse['total'] }}</b>
+        @if ($browse['total'] === $coverage['configurable'])
+            مزوّداً — وهم كلُّ ما تدعمه البوّابةُ ويقبل الإعدادَ من هنا.
+        @else
+            مزوّداً يطابق التصفية من أصل {{ $coverage['configurable'] }}.
         @endif
     </div>
 
-    @forelse ($browse['rows'] as $row)
-        <div class="row" style="align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding:8px 0">
-            <div style="flex:1;min-width:220px">
-                <b>{{ $row['label'] }}</b>
-                <span class="mut mono ltr">{{ $row['slug'] }}</span>
-                @if ($row['curated'])<span class="bdg ok" title="وصفٌ مكتوبٌ بعنايةٍ لا مشتقّ">موصوفٌ بعناية</span>@endif
-                <div class="sub">
-                    <span class="bdg">{{ $row['auth_label'] }}</span>
-                    @if ($row['discovery'] === 'manual')
-                        <span class="bdg wn">النماذجُ تُضاف يدويّاً</span>
-                    @elseif ($row['discovery'] === 'live')
-                        <span class="bdg ok">اكتشافٌ حيّ</span>
-                    @else
-                        <span class="bdg">قائمةُ نماذجَ معروفة</span>
-                    @endif
-                    <span class="mut">{{ $row['fields'] }} حقلاً</span>
-                </div>
-            </div>
-            <a class="btn sm" href="{{ route('ai.providers.index', array_filter($filters) + ['add' => $row['key']]) }}#add">
-                {{ $selected === $row['key'] ? '▼ مفتوح' : '⚙️ إعداد' }}
+    <div class="pvgrid">
+        @forelse ($browse['rows'] as $row)
+            <a class="pvcard {{ $selected === $row['key'] ? 'pvon' : '' }}"
+               href="{{ route('ai.providers.index', array_filter($filters) + ['add' => $row['key']]) }}#add">
+                <span class="pvlogo" style="--pv-h:{{ $row['mark']['hue'] }}"
+                      aria-hidden="true">{{ $row['mark']['initials'] }}</span>
+
+                <span class="pvbody">
+                    <span class="pvname">{{ $row['label'] }}</span>
+                    <span class="pvslug mono ltr">{{ $row['slug'] }}</span>
+
+                    <span class="pvmeta">
+                        <span class="bdg">{{ $row['auth_label'] }}</span>
+                        @if ($row['discovery'] === 'live')
+                            <span class="bdg ok">اكتشافٌ حيّ</span>
+                        @elseif ($row['discovery'] === 'catalog')
+                            <span class="bdg">نماذجُ معروفة</span>
+                        @else
+                            <span class="bdg wn">نماذجُ يدويّة</span>
+                        @endif
+                        @if ($row['curated'])<span class="bdg ok">موصوفٌ بعناية</span>@endif
+                    </span>
+                </span>
             </a>
-        </div>
-    @empty
-        <div class="empty">
-            <b>لا مزوّدَ يطابق التصفية.</b>
-            <div class="sub">جرّب نصّاً أقصرَ أو امسح التصفية.</div>
-        </div>
-    @endforelse
+        @empty
+            <div class="empty">
+                <b>لا مزوّدَ يطابق التصفية.</b>
+                <div class="sub">جرّب نصّاً أقصرَ أو امسح التصفية.</div>
+            </div>
+        @endforelse
+    </div>
 </div>
 
 {{-- ── نموذجُ المزوّدِ المختارِ وحدَه ── --}}
@@ -312,5 +317,27 @@
     </div>
 @endif
 @endif
+
+{{-- أنماطُ شبكةِ المزوّدين — تُعرَّف هنا لا في الورقة: شاشةٌ واحدةٌ تستعملها،
+     وحارسُ المفردات يقبل التعريفَ في القالبِ كما يقبله في الورقة. --}}
+<style>
+.pvgrid{display:grid;gap:10px;margin-top:10px;
+        grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+.pvcard{display:flex;gap:10px;align-items:flex-start;padding:10px;
+        border:1px solid var(--line);border-radius:10px;background:var(--cd);
+        color:inherit;text-decoration:none;transition:border-color .15s,transform .15s}
+.pvcard:hover{border-color:var(--p);transform:translateY(-1px)}
+.pvon{border-color:var(--p);box-shadow:0 0 0 1px var(--p) inset}
+.pvlogo{--pv-h:210;flex:0 0 38px;width:38px;height:38px;border-radius:9px;
+        display:flex;align-items:center;justify-content:center;
+        font:600 13px/1 system-ui,sans-serif;letter-spacing:.5px;direction:ltr;
+        color:#fff;background:hsl(var(--pv-h) 52% 42%)}
+.pvbody{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.pvname{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pvslug{font-size:11px;opacity:.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pvmeta{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}
+.pvmeta .bdg{font-size:10px;padding:1px 6px}
+@media (max-width:480px){.pvgrid{grid-template-columns:1fr}}
+</style>
 
 @endsection

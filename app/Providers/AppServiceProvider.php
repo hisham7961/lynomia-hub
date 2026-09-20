@@ -12,7 +12,20 @@ use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
-    public function register(): void {}
+    public function register(): void
+    {
+        /*
+         * **منفذُ التوليدِ يبدأ فارغاً** (المرحلة ٣ · P3-W5).
+         *
+         * التوليدُ الحقيقيُّ **يُنفق مالاً**، وقرارُ الإنفاقِ ليس قرارَ شيفرة.
+         * فما دام لم يُدخَل اعتمادُ مزوّدٍ ولم يُقَرّ بالتكلفة، يبقى المنفذُ
+         * موصولاً بمولِّدٍ يعود بخطأٍ **مصنَّفٍ صريح** لا بجوابٍ مُختلَق.
+         *
+         * والربطُ الحقيقيُّ سطرٌ واحدٌ هنا حين يقرّر المالك — والمنسّقُ كلُّه
+         * لا يتغيّر، لأنّه لا يعرف من وراءَ المنفذ أصلاً.
+         */
+        $this->app->bind(\App\Contracts\AskGenerator::class, \App\Support\NullAskGenerator::class);
+    }
 
     public function boot(): void
     {
