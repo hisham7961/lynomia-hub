@@ -138,6 +138,7 @@ final class LiteLlmAskGenerator implements AskGenerator
             'ceiling'    => AskPolicy::costCeiling(),
             'in_tokens'  => (int) ceil(mb_strlen($envelope) / AskContext::CHARS_PER_TOKEN),
             'out_tokens' => AskPolicy::maxOutputTokens(),
+            'feature'    => AiPurposes::ASK,
         ])->governBy($this->gov === [] ? null : AiGovernance::gateFor($this->gov));
 
         /*

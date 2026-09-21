@@ -171,6 +171,23 @@ final class AskPolicy
             return (string) (AiGateway::whyNotReady() ?? 'بوّابةُ النماذجِ غيرُ جاهزة');
         }
         if (self::profile() === null) {
+            /*
+             * **والسببُ يُسمّى إن كان الملاءمةَ لا الفراغ** (المرحلة ٥ · W2):
+             * سلسلةٌ مملوءةٌ بنماذجَ لا تُصدر طلباتِ أدواتٍ تبدو «فارغة»
+             * — فيُرسَل المديرُ يربط نموذجاً وهو مربوطٌ سلفاً.
+             */
+            $p = \App\Models\AiProfile::query()
+                ->where('key', self::profileKey())->where('enabled', true)->first();
+
+            $unfit = $p === null ? [] : array_values(array_filter(
+                AiProfiles::excluded($p, AiPurposes::ASK),
+                static fn (array $x) => str_contains((string) $x['why'], 'ينقص النموذجَ')));
+
+            if ($unfit !== []) {
+                return 'نماذجُ غرضِ «' . self::profileKey() . '» لا تُلائم المساعدَ — '
+                       . (string) $unfit[0]['why'];
+            }
+
             return 'لا غرضَ «' . self::profileKey() . '» بسلسلةٍ جاهزة — اربط نموذجاً بغرضٍ من قسمِ التوجيه';
         }
         if (! hub_capability(self::CAPABILITY)) {
@@ -199,7 +216,14 @@ final class AskPolicy
 
         if ($p === null) return null;
 
-        return AiProfiles::chain($p)->isEmpty() ? null : $p;
+        /*
+         * **وسلسلةٌ صالحةٌ لهذه الميزةِ بعينِها** (المرحلة ٥ · W2).
+         *
+         * غرضٌ سلسلتُه نماذجُ تُولّد ولا تُصدر طلباتِ أدواتٍ **لا يُجيب سؤالاً
+         * في هذا المسار**: مسارُ المساعدِ كلُّه دورةُ أدوات. فالفحصُ هنا
+         * بحاجةِ الميزةِ لا بحاجةِ الغرضِ وحدَها.
+         */
+        return AiProfiles::chain($p, AiPurposes::ASK)->isEmpty() ? null : $p;
     }
 
     // ── ما يُضبَط من الإعداداتِ لا من الشيفرة ──────────────────────────

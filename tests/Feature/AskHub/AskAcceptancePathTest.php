@@ -67,7 +67,11 @@ class AskAcceptancePathTest extends TestCase
             'provider_id' => $provider->id, 'litellm_model_name' => 'hub-general',
             'upstream_model' => 'fake/hub-general', 'display_name' => 'نموذجٌ وهميّ',
             'enabled' => true, 'health' => 'UNKNOWN',
-            'capabilities' => ['chat' => ['v' => true, 'src' => 'litellm']],
+            'capabilities' => [
+                // **و`tools` معلَنةٌ لأنّ مسارَ المساعدِ كلَّه دورةُ أدوات** (المرحلة ٥ · W2)
+                'chat'  => ['v' => true, 'src' => 'litellm'],
+                'tools' => ['v' => true, 'src' => 'litellm'],
+            ],
             'limits' => [], 'params' => [], 'pricing' => [],
         ]);
 

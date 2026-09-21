@@ -85,7 +85,11 @@ class AskScreenTest extends TestCase
             'provider_id' => $provider->id, 'litellm_model_name' => 'fake-chat',
             'upstream_model' => 'fake/fake-chat', 'display_name' => 'نموذجٌ وهميّ',
             'enabled' => true, 'health' => 'UNKNOWN',
-            'capabilities' => ['chat' => ['v' => true, 'src' => 'litellm']],
+            'capabilities' => [
+                // **و`tools` معلَنةٌ لأنّ مسارَ المساعدِ كلَّه دورةُ أدوات** (المرحلة ٥ · W2)
+                'chat'  => ['v' => true, 'src' => 'litellm'],
+                'tools' => ['v' => true, 'src' => 'litellm'],
+            ],
             'limits' => ['context_window' => ['v' => 32000, 'src' => 'litellm']],
             'params' => [],
             'pricing' => ['input_per_1k' => ['v' => 0.001, 'src' => 'litellm'],

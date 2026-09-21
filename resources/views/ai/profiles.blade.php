@@ -103,6 +103,8 @@
                 @endif
                 @if ($p->key === ($askProfile ?? ''))
                     <span class="bdg ok">غرضُ «اسأل Hub»</span>
+                    {{-- **وما يشترطه المساعدُ يُقال هنا لا في وثيقة** (المرحلة ٥ · W6) --}}
+                    <span class="bdg">يلزمه: {{ implode(' + ', $askNeeds ?? []) }}</span>
                 @endif
             </h3>
             @if ($manage ?? true)
@@ -150,6 +152,24 @@
                         <span class="bdg wn">خارجَ السلسلةِ الآن</span>
                     @endif
 
+                    {{--
+                        **الملاءمةُ للمساعدِ — بوّابةٌ سادسةٌ تُقال باسمِها.**
+
+                        «مُلائم» قدراتٌ مُعلَنةٌ تكفي · «مُثبَتٌ عملاً» إعلانٌ
+                        غائبٌ ودورةُ أداةٍ في دفترِنا تُثبِته · «غيرُ مُلائم»
+                        ينقصه ما لا يُستغنى عنه — **والقدرةُ الناقصةُ تُسمّى**.
+                    --}}
+                    @php($f = ($r['fit'] ?? [])[(string) $link->model_id] ?? null)
+                    @if ($f !== null)
+                        <span class="bdg {{ $f['ok'] ? 'ok' : 'wn' }}"
+                              title="{{ $f['why'] ?? 'قدراتُ هذا النموذجِ تكفي غرضَ المساعد' }}">
+                            {{ ($fitTags ?? [])[$f['state']] ?? $f['state'] }}
+                            @if ($f['missing'] !== [])
+                                <span class="mono ltr">{{ implode('·', $f['missing']) }}</span>
+                            @endif
+                        </span>
+                    @endif
+
                     @if (($manage ?? true) && $i > 0)
                         <form method="POST" action="{{ route('ai.profiles.reorder', $p) }}">@csrf
                             @foreach ($r['links'] as $j => $l)
@@ -173,6 +193,20 @@
                     @endif
                 </div>
             @endforeach
+        @endif
+
+        {{--
+            **وسببُ عدمِ الملاءمةِ كاملاً تحت السلسلة** — فالوسمُ قصيرٌ والسببُ
+            جملةٌ تُقرَأ، ولا يُترَك في `title` وحدَه لا يراه أحدٌ على هاتف.
+        --}}
+        @php($unfit = array_filter($r['fit'] ?? [], fn ($x) => ! $x['ok']))
+        @if ($unfit !== [])
+            <div class="sub mut" style="margin-top:8px">
+                <b>لا يُلائم «اسأل Hub»:</b>
+                @foreach ($unfit as $why)
+                    <div>· {{ $why['why'] }}</div>
+                @endforeach
+            </div>
         @endif
 
         {{-- **ولا حلقةَ تُخفى بلا سبب** --}}

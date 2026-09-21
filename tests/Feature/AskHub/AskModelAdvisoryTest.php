@@ -367,7 +367,9 @@ class AskModelAdvisoryTest extends TestCase
             'provider_id' => $provider->id, 'litellm_model_name' => 'hub-general',
             'upstream_model' => 'fake/hub-general', 'display_name' => 'hub-general',
             'enabled' => true, 'health' => 'UNKNOWN',
-            'capabilities' => ['chat' => ['v' => true, 'src' => 'litellm']] + $capabilities,
+            'capabilities' => ['chat' => ['v' => true, 'src' => 'litellm']] + $capabilities
+                              // **و`tools` معلَنةٌ ما لم يقلها الاختبارُ نفسُه** (المرحلة ٥ · W2)
+                              + ['tools' => ['v' => true, 'src' => 'litellm']],
             'limits'  => ['context_window' => ['v' => 32000, 'src' => 'litellm']],
             'params'  => $params,
             'pricing' => ['input_per_1k' => ['v' => 0.001, 'src' => 'litellm'],
