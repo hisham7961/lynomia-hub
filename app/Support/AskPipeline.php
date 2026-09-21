@@ -414,7 +414,16 @@ final class AskPipeline
             'live'        => $gen->isLive(),
             'profile'     => $profile,
             // **لا تفكيرَ ولا سياقَ خامٌّ هنا** — ما يُعرَض للمستخدمِ لا يحمل إلّا ما يخصّه
-            'usage'       => array_intersect_key($usage, array_flip(['model', 'tokens', 'cost'])),
+            'usage'       => array_intersect_key($usage,
+                array_flip(['model', 'tokens', 'cost', 'reasoning'])),
+            /*
+             * **وعددُ النداءاتِ المدفوعةِ يُعرَض ولو أخفق الطلب.**
+             *
+             * كان يُحسَب في المولِّدِ ويُسجَّل في الأثر، **ثمّ يُصفّى هنا**
+             * فلا يراه من يُشخّص من الشاشة: طلبٌ أنفق نداءين وأخفق يبدو
+             * كأنّه لم يُنفق شيئاً. وهو **عددٌ لا يحمل سرّاً**.
+             */
+            'calls'       => (int) ($usage['calls'] ?? 0),
         ];
     }
 }
