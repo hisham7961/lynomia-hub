@@ -269,6 +269,78 @@ class BackupRestoreTest extends TestCase
         }
     }
 
+    /**
+     * **وجداولُ الحوكمةِ الأربعةُ تجول كما تجول جداولُ الكتالوج** (المرحلة ٤).
+     *
+     * ── **ولمَ لا تكفي بوّابةُ التغطية؟** ──
+     *
+     * تلك تُثبت أنّ **الاسمَ** في قائمةِ النسخة، لا أنّ **الصفوفَ تعود**.
+     * و`ai_budget_periods` تحمل قيداً فريداً مركّباً `(budget_id, period_key)`،
+     * و`ai_usage_events` تحمل أعمدةً عدديّةً تقبل العدم — وكلاهما ينكسر بصمت.
+     *
+     * **والعطبُ إن وقع مالٌ لا سجلّات**: منشأةٌ تُستعاد **بعدّاداتِ ميزانيّةٍ
+     * صفراً**، فكلُّ سقفٍ مفروضٍ يعود مفتوحاً وإنفاقُ الشهرِ يختفي من الدفاتر.
+     */
+    public function test_ai_governance_tables_round_trip_through_backup_and_restore(): void
+    {
+        $this->seedCore();
+        $mk = fn () => (string) Str::uuid();
+        $budgetId = $mk();
+        $policyId = $mk();
+        $eventId  = $mk();
+
+        $seed = [
+            'ai_policies'       => [['id' => $policyId, 'key' => 'rt-policy', 'label' => 'سياسةُ الجولة',
+                                     'effect' => 'deny', 'scope_type' => 'global', 'priority' => 42,
+                                     'enabled' => 1], 'priority'],
+            'ai_budgets'        => [['id' => $budgetId, 'key' => 'rt-budget', 'label' => 'ميزانيّةُ الجولة',
+                                     'scope_type' => 'global', 'period' => 'monthly',
+                                     'limit_micro' => 12_345_678, 'limit_requests' => 900,
+                                     'currency' => 'USD', 'enforce' => 1, 'enabled' => 1], 'limit_micro'],
+            // **العدّادُ هو المال** — وقيدُه الفريدُ مركّبٌ فيُختبَر بعودتِه
+            'ai_budget_periods' => [['id' => $mk(), 'budget_id' => $budgetId, 'period_key' => '2026-09',
+                                     'reserved_micro' => 250_000, 'spent_micro' => 7_654_321,
+                                     'requests' => 118, 'tokens' => 44_556,
+                                     'unknown_cost_events' => 9, 'opened_at' => now()], 'spent_micro'],
+            // **والمجهولُ يعود مجهولاً لا صفراً** — `cost_micro` عدمٌ مقصود
+            'ai_usage_events'   => [['id' => $eventId, 'request_id' => $mk(), 'attempt' => 2,
+                                     'relation' => 'retry', 'purpose' => 'ask', 'feature' => 'ask',
+                                     'model_name' => 'hub-roundtrip-model', 'status' => 'failed',
+                                     'failure' => 'PROVIDER_FAILURE', 'total_tokens' => 321,
+                                     'cost_micro' => null, 'cost_source' => 'unknown',
+                                     'currency' => 'USD', 'budget_id' => $budgetId,
+                                     'period_key' => '2026-09', 'latency_ms' => 1234], 'total_tokens'],
+        ];
+
+        foreach ($seed as $t => [$row, $marker]) {
+            DB::table($t)->insert($row + ['created_at' => now(), 'updated_at' => now()]);
+        }
+
+        $this->artisan('hub:backup')->assertExitCode(0);
+
+        $dump = json_decode(file_get_contents($this->latestBackup()), true);
+        foreach ($seed as $t => [$row, $marker]) {
+            $this->assertTrue(collect($dump['_tables'][$t] ?? [])->contains('id', $row['id']),
+                "جدولُ الحوكمة «{$t}» غائبٌ عن النسخة — استعادةٌ تفتح كلَّ سقفٍ مفروضٍ بصمت");
+        }
+
+        foreach (array_keys($seed) as $t) DB::table($t)->delete();
+        $this->artisan('hub:import', ['file' => $this->latestBackup()])->assertExitCode(0);
+
+        foreach ($seed as $t => [$row, $marker]) {
+            $back = DB::table($t)->where('id', $row['id'])->first();
+            $this->assertNotNull($back, "صفُّ «{$t}» لم يعُد بالاستعادة — الجولةُ مبتورة");
+            $this->assertSame((string) $row[$marker], (string) $back->{$marker},
+                "علامةُ «{$t}.{$marker}» انحرفت في الجولة");
+        }
+
+        // **والمجهولُ لم يصر صفراً في الجولة** — وهو ثابتُ المرحلة ٤ (I-3)
+        $event = DB::table('ai_usage_events')->where('id', $eventId)->first();
+        $this->assertNull($event->cost_micro,
+            'كلفةٌ مجهولةٌ عادت صفراً بعد الاستعادة — فالسقفُ يُبطَل في صمت');
+        $this->assertSame('unknown', (string) $event->cost_source);
+    }
+
     /** (٥) الإعدادات المستعادة تسري فوراً لا بعد انتهاء الخبيئة */
     public function test_restore_busts_the_settings_cache(): void
     {

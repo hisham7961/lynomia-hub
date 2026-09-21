@@ -358,9 +358,43 @@ class AskAdversarialSweepTest extends TestCase
             AskFailures::UNAUTHORIZED, AskFailures::UNAVAILABLE, AskFailures::MODEL_FAILURE,
             AskFailures::TOOL_BUDGET, AskFailures::FORGED_SOURCE, AskFailures::PARTIAL_RESULT,
             AskFailures::MALFORMED_QUESTION, AskFailures::CONTEXT_LIMIT,
-            AskFailures::MALFORMED_TOOL_REQUEST, AskFailures::UNSAFE_TOOL_ARGUMENTS,
-            AskFailures::NO_ACCESSIBLE_DATA,
+            AskFailures::MALFORMED_TOOL_REQUEST,
         ];
+
+        /*
+         * ── **سلّةٌ رابعةٌ: مُعلَنٌ بلا مُنتِج** (تدقيقُ ما قبل المرحلة ٥) ──
+         *
+         * رمزانِ في `AskFailures::CODES` **لا يُصدِرهما سطرٌ واحدٌ في `app/`**،
+         * وكانا مُدرَجَين في سلّةِ «مُغطّى هنا» بلا اختبارٍ واحدٍ يقابلهما —
+         * **إعلانُ تغطيةٍ بلا مقابل**، وهو ما بُني هذا الحارسُ كلُّه لمنعِه.
+         *
+         *  · `UNSAFE_TOOL_ARGUMENTS` — رفضُ الحارسِ لوسائطِ أداةٍ **لا يُسقط
+         *    الطلب**: يُسجَّل في المظروفِ `rejected_step_N` ويمضي النموذجُ
+         *    ليجيب بما يملك. فالرفضُ حدثٌ داخلَ الطلبِ لا تصنيفٌ له.
+         *  · `NO_ACCESSIBLE_DATA` — «لا بياناتٍ في نطاقِك» **جوابٌ يقوله
+         *    النموذجُ نصّاً**، وحارسا `FORGED_SOURCE` و`UNSOURCED_NUMBER` هما
+         *    ما يمنع الاختلاقَ مكانَه.
+         *
+         * **وتغييرُ ذلك قرارُ منتجٍ لا إصلاحُ تدقيق** — فيُوثَّق الحالُ ويُحرَس:
+         * من يُوصِّل مُنتِجاً لأحدِهما غداً يُسقط هذا الصفَّ حتّى يكتب اختبارَه.
+         */
+        $declaredOnly = [AskFailures::UNSAFE_TOOL_ARGUMENTS, AskFailures::NO_ACCESSIBLE_DATA];
+
+        // **والمسحُ على `app/` كلِّها** — فمُنتِجٌ يُوصَّل في أيِّ طبقةٍ يُكشَف.
+        // و`AskFailures` نفسُها لا تُطابِق: تكتب رموزَها `self::` لا `AskFailures::`.
+        $app = '';
+        $walk = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator(base_path('app'), \FilesystemIterator::SKIP_DOTS));
+        foreach ($walk as $f) {
+            if ($f->isFile() && $f->getExtension() === 'php') $app .= (string) file_get_contents($f->getPathname());
+        }
+        $this->assertStringContainsString('AskFailures::UNAUTHORIZED', $app,
+            'مسحُ الشيفرةِ عاد فارغاً — الحارسُ كان سيمرّ فراغاً لا حراسة');
+
+        foreach ($declaredOnly as $code) {
+            $this->assertStringNotContainsString('AskFailures::' . $code, $app,
+                "[{$code}] صار له مُنتِجٌ في الشيفرة — فانقله إلى سلّةٍ مُختبَرةٍ واكتب اختبارَه");
+        }
 
         /*
          * **ولا رمزَ مؤجَّلٌ بعد اليوم.**
@@ -393,8 +427,23 @@ class AskAdversarialSweepTest extends TestCase
             AskFailures::UNSOURCED_NUMBER,
         ];
 
-        $this->assertSame([], array_diff(AskFailures::CODES, $covered, $live, $governed),
+        $this->assertSame([], array_diff(AskFailures::CODES, $covered, $live, $governed, $declaredOnly),
             'رمزُ إخفاقٍ لا هو مُختبَرٌ هنا ولا في حزمةِ المولِّدِ الحيّ ولا في حزمةِ الحوكمة');
+
+        /*
+         * **وسلّةُ «مُغطّى» تُطالَب بالدليلِ كأختَيها.** كانت الوحيدةَ التي
+         * تُصدَّق على كلمتِها، فتسلّل إليها رمزانِ بلا مُنتِجٍ ولا اختبار.
+         */
+        $askSuite = '';
+        foreach ((array) glob(__DIR__ . '/*.php') as $f) {
+            if (! str_ends_with($f, 'AskAdversarialSweepTest.php')) $askSuite .= (string) file_get_contents($f);
+        }
+        foreach ((array) glob(__DIR__ . '/../AiHub/*.php') as $f) $askSuite .= (string) file_get_contents($f);
+
+        foreach ($covered as $code) {
+            $this->assertStringContainsString('AskFailures::' . $code, $askSuite,
+                "[{$code}] مُعلَنٌ «مُغطّى» بلا اختبارٍ يقابله في حزمةِ «اسأل Hub» ولا في حزمةِ الذكاء");
+        }
 
         // وبرهانُ الحوكمةِ من ملفّاتِها — لا إعلانَ تغطيةٍ بلا مقابل
         $govSuite = '';

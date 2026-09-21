@@ -124,18 +124,60 @@ class AiSecuritySweepTest extends TestCase
         ];
     }
 
+    /**
+     * **كلُّ جدولِ ذكاءٍ في المخطَّطِ — لا قائمةً تُكتَب بيد.**
+     *
+     * وقائمةُ الأربعةِ المكتوبةُ بيدٍ تخلّفت عن المرحلة ٤: أُضيفت أربعةُ جداولٍ
+     * (السياساتُ والميزانيّاتُ وعدّاداتُ الفترةِ وسجلُّ الاستهلاك) **ولم
+     * يمسسها هذا المسحُ**. والاشتقاقُ من المخطَّطِ يجعل جدولاً يُضاف غداً
+     * داخلَ الحارسِ فوراً.
+     *
+     * @return list<string>
+     */
+    private static function aiTables(): array
+    {
+        // **والاسمُ قد يعود مسبوقاً بالمخطَّطِ على بعضِ المحرّكات** (`hub_test.ai_models`)
+        $bare = static function (string $t): string {
+            $at = strrpos($t, '.');
+
+            return $at === false ? $t : substr($t, $at + 1);
+        };
+
+        $names = collect(\Illuminate\Support\Facades\Schema::getTableListing())
+            ->map(fn ($t) => $bare((string) $t))
+            ->filter(fn (string $t) => str_starts_with($t, 'ai_'))
+            ->unique()->sort()->values()->all();
+
+        \PHPUnit\Framework\Assert::assertGreaterThanOrEqual(8, count($names),
+            'جداولُ الذكاءِ أقلُّ من ثمانية — فالمسحُ يقرأ مخطَّطاً ناقصاً');
+
+        return $names;
+    }
+
     // ═══ ① لا يظهر في صفحة ═══
 
     public function test_لا_سرَّ_في_صفحةٍ_من_صفحاتِ_المركز(): void
     {
         [$p, $m] = $this->world();
 
-        $pages = [
-            route('ai.index'), route('ai.settings'), route('ai.usage'),
-            route('ai.diagnostics'), route('ai.providers.index'),
-            route('ai.models.all'), route('ai.models.index', $p),
-            route('ai.profiles.index'),
-        ];
+        /*
+         * ── **القائمةُ تُشتَقّ من شريطِ الأقسامِ لا تُكتَب بيد** ──
+         *
+         * وقائمةٌ مكتوبةٌ بيدٍ تتخلّف عن المركزِ بصمت: أُضيف قسما الحوكمةِ في
+         * المرحلة ٤ **ولم يُزَرْهما هذا المسحُ ولا مرّة**. فشاشتان تعرضان
+         * صفوفَ سياساتٍ وميزانيّاتٍ بقيتا خارجَ حارسِ التسريبِ كلَّه.
+         *
+         * و`AiAccess::sections()` **هي** مصدرُ حقيقةِ التنقّلِ الواحد — فقسمٌ
+         * يُضاف غداً يدخل هذا المسحَ في اللحظةِ نفسِها، بلا أن يتذكّره أحد.
+         */
+        $pages = array_map(fn ($sec) => route($sec['route']),
+            array_filter(\App\Support\AiAccess::sections($this->owner), fn ($sec) => $sec['ok']));
+
+        // **والمسارُ ذو المُعامل خارجَ الشريط** — فيُضاف صراحةً
+        $pages[] = route('ai.models.index', $p);
+
+        $this->assertGreaterThanOrEqual(9, count($pages),
+            'شريطُ الأقسامِ انكمش — فالمسحُ يغطّي أقلَّ ممّا يعرض المركز');
 
         foreach ($pages as $uri) {
             $html = $this->actingAs($this->owner)->get($uri)->assertOk()->getContent();
@@ -159,7 +201,7 @@ class AiSecuritySweepTest extends TestCase
     {
         $this->world();
 
-        foreach (['ai_providers', 'ai_models', 'ai_profiles', 'ai_profile_models'] as $table) {
+        foreach (self::aiTables() as $table) {
             foreach (DB::table($table)->get() as $row) {
                 $blob = json_encode((array) $row, JSON_UNESCAPED_UNICODE);
 
