@@ -39,14 +39,38 @@ class AiProfileController extends Controller
         $profiles = AiProfiles::all();
         $rows     = [];
 
+        $askKey = \App\Support\AskPolicy::profileKey();
+
         foreach ($profiles as $p) {
+            $links = AiProfileModel::query()->with(['model.provider'])
+                ->where('profile_id', $p->id)->orderBy('rank')->get();
+
+            /*
+             * **ولماذا هذا النموذجُ صالحٌ للمساعدِ أو غيرُ صالح؟** (المرحلة ٥ · W6)
+             *
+             * البوّاباتُ ستٌّ — قدرةٌ وتوافرٌ وصحّةٌ وسياسةٌ وميزانيّةٌ وملاءمة —
+             * و«خارجَ السلسلة» وحدَها تخلطها كلَّها في جملةٍ واحدة. فالمديرُ
+             * يقرأ «خارجَ السلسلة» فيذهب يُراجع الاعتمادَ بينما النقصُ قدرةٌ
+             * لا يُصلحها اعتماد. **والملاءمةُ تُقال باسمِ القدرةِ الناقصة.**
+             *
+             * وتُحسَب لغرضِ المساعدِ وحدَه: غيرُه لا يُدير دورةَ أدوات.
+             */
+            $fit = [];
+            if ((string) $p->key === $askKey) {
+                foreach ($links as $l) {
+                    if ($l->model === null) continue;
+                    $fit[(string) $l->model_id] = \App\Support\AiPurposes::suitability(
+                        $l->model, \App\Support\AiPurposes::ASK);
+                }
+            }
+
             $rows[] = [
                 'profile'  => $p,
-                'links'    => AiProfileModel::query()->with(['model.provider'])
-                    ->where('profile_id', $p->id)->orderBy('rank')->get(),
+                'links'    => $links,
                 'chain'    => AiProfiles::chain($p),
                 'excluded' => AiProfiles::excluded($p),
                 'offer'    => $this->offer($p),
+                'fit'      => $fit,
             ];
         }
 
@@ -60,7 +84,10 @@ class AiProfileController extends Controller
             'cool'   => [AiRouting::COOLDOWN_AFTER, AiRouting::COOLDOWN_MINUTES],
             'seeded' => $profiles->count(),
             // **أيُّ غرضٍ يخدم «اسأل Hub» الآن؟** — يُعرَض حيث يُتَّخذ القرار
-            'askProfile' => \App\Support\AskPolicy::profileKey(),
+            'askProfile' => $askKey,
+            // مفرداتُ وسمِ الملاءمةِ — تُقرَأ في الشاشةِ ولا تُكتَب فيها
+            'fitTags'    => \App\Support\AiPurposes::TAG,
+            'askNeeds'   => \App\Support\AiPurposes::needs(\App\Support\AiPurposes::ASK),
         ]);
     }
 

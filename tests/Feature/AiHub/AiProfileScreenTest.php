@@ -198,6 +198,53 @@ class AiProfileScreenTest extends TestCase
             ->assertSee('طلبٌ بلا سلسلةٍ لا يُوجَّه إلى أحد', false);
     }
 
+    // ═══ الملاءمةُ للمساعدِ تُقرَأ من الشاشة (المرحلة ٥ · W6) ═══
+
+    /**
+     * **شاشةُ التوجيهِ تقول لماذا يصلح النموذجُ للمساعدِ أو لا يصلح.**
+     *
+     * و«خارجَ السلسلةِ الآن» وحدَها تخلط ستَّ بوّاباتٍ في جملةٍ واحدة: قدرةٌ
+     * وتوافرٌ وصحّةٌ وسياسةٌ وميزانيّةٌ وملاءمة. فالمديرُ يقرؤها ويذهب يُراجع
+     * الاعتمادَ بينما النقصُ **قدرةٌ لا يُصلحها اعتماد** — ويعود بعد نصفِ
+     * ساعةٍ إلى العطلِ نفسِه.
+     */
+    public function test_شاشةُ_التوجيهِ_تُسمّي_القدرةَ_الناقصةَ_للمساعد(): void
+    {
+        $ask = $this->profile(\App\Support\AskPolicy::profileKey());
+        AiProfiles::attach($ask, $this->model($this->provider(), 'chat-only', ['chat' => true]));
+
+        $this->actingAs($this->owner)->get(route('ai.profiles.index'))->assertOk()
+            ->assertSee('يلزمه: chat + tools', false)
+            ->assertSee(\App\Support\AiPurposes::TAG[\App\Support\AiPurposes::UNFIT], false)
+            ->assertSee('لا يُلائم «اسأل Hub»', false)
+            ->assertSee('ينقص النموذجَ لهذا الغرض', false);
+    }
+
+    /** **ونموذجٌ مُلائمٌ يُوسَم مُلائماً** — فالوسمُ خبرٌ لا إنذارٌ دائم */
+    public function test_النموذجُ_المُلائمُ_يُوسَم_ولا_يُنذَر_عنه(): void
+    {
+        $ask = $this->profile(\App\Support\AskPolicy::profileKey());
+        AiProfiles::attach($ask, $this->model($this->provider(), 'chat-and-tools',
+            ['chat' => true, 'tools' => true]));
+
+        $this->actingAs($this->owner)->get(route('ai.profiles.index'))->assertOk()
+            ->assertSee(\App\Support\AiPurposes::TAG[\App\Support\AiPurposes::FIT], false)
+            ->assertDontSee('لا يُلائم «اسأل Hub»', false);
+    }
+
+    /** **وغرضٌ غيرُ غرضِ المساعدِ لا يُوسَم بملاءمةٍ لا تعنيه** */
+    public function test_غرضٌ_آخرُ_لا_يحمل_وسمَ_ملاءمةِ_المساعد(): void
+    {
+        $coding = $this->profile('coding');
+        AiProfiles::attach($coding, $this->model($this->provider(), 'coder', ['chat' => true]));
+
+        $html = (string) $this->actingAs($this->owner)
+            ->get(route('ai.profiles.index'))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('ينقص النموذجَ لهذا الغرض', $html,
+            '**غرضٌ لا يُدير دورةَ أدواتٍ وُسم بحاجةِ المساعد**');
+    }
+
     public function test_لا_سرَّ_في_صفحةِ_الأغراض(): void
     {
         $g = $this->profile('general');

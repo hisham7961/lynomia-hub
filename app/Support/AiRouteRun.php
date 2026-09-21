@@ -73,12 +73,20 @@ final class AiRouteRun
     /**
      * **تبدأ الرحلةُ من أوّلِ نموذجٍ صالحٍ لا من أوّلِ نموذجٍ مكتوب.**
      *
-     * @param  array{ceiling?: float, in_tokens?: int, out_tokens?: int}  $opts
+     * ── **و«صالحٌ» تشمل الملاءمةَ للغرض** (المرحلة ٥ · W2) ──
+     *
+     * `AskPolicy::profile()` يفحص الملاءمةَ قبل أن يُسلّم الغرضَ، لكنّ فحصاً
+     * عند البابِ وحدَه **ليس حارساً**: هذا الصنفُ يُبقي السلسلةَ كلَّها في
+     * يدِه ويقفز فيها عند كلِّ إخفاق، فنموذجٌ غيرُ مُلائمٍ في الموضعِ الثاني
+     * يُوصَل إليه بالاحتياطِ بعد أن مرّ الأوّلُ بالفحص. **فالسلسلةُ نفسُها
+     * تُبنى مُصفّاةً** — ومَن لم يُمرّر `feature` يحصل على السلوكِ القديمِ حرفاً.
+     *
+     * @param  array{ceiling?: float, in_tokens?: int, out_tokens?: int, feature?: string}  $opts
      */
     public static function for(AiProfile $profile, array $opts = []): self
     {
         $run = new self(
-            AiProfiles::chain($profile)->all(),
+            AiProfiles::chain($profile, (string) ($opts['feature'] ?? ''))->all(),
             $profile,
             (float) ($opts['ceiling'] ?? 0.0),
             (int) ($opts['in_tokens'] ?? 0),

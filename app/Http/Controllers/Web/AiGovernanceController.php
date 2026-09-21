@@ -296,8 +296,20 @@ class AiGovernanceController extends Controller
              * **ولا محتوى فيها**: سببُ انتهاءٍ وأرقامٌ واسمُ أداةٍ من مفرداتٍ
              * مغلقة، وكلُّها منطَّقةٌ بـ`hub_company_ids` كبقيّةِ الصفوف.
              */
+            /*
+             * **والترتيبُ يُطلَب صراحةً حتّى في جدولِ عرض** (المرحلة ٥ · W5).
+             *
+             * `created_at` بدقّةِ الثانية، و`id` **معرّفٌ عشوائيٌّ لا تزايديّ**
+             * — فمحاولاتُ الطلبِ الواحدِ تقع في الثانيةِ نفسِها ويُرتّبها
+             * المحرّكُ كما اتّفق. فيقرأ المشخّصُ `fallback` فوق `initial`
+             * **ويستنتج أنّ الاحتياطَ سبق الأساسيّ**.
+             *
+             * فالتقسيمُ بـ`request_id` يجمع محاولاتِ الطلبِ الواحدِ متجاورةً،
+             * و`attempt` يرتّبها داخلَه بترتيبِ وقوعِها.
+             */
             'turns'      => (clone $base())
-                ->orderByDesc('created_at')->orderByDesc('id')->limit(25)
+                ->orderByDesc('created_at')->orderBy('request_id')->orderBy('attempt')
+                ->orderBy('id')->limit(25)
                 ->get(['correlation', 'attempt', 'relation', 'status', 'failure',
                        'finish_reason', 'model_name', 'input_tokens', 'output_tokens',
                        'reasoning_tokens', 'max_output_tokens', 'tool_requested',

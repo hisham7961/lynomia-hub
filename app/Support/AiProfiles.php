@@ -269,14 +269,19 @@ final class AiProfiles
      *
      * @return \Illuminate\Support\Collection<int, AiModel>
      */
-    public static function chain(AiProfile $profile)
+    /**
+     * @param  string  $feature  **ميزةُ Hub الطالبة** — تُصفّي بحاجاتِها فوقَ
+     *   اشتراطِ الغرض (المرحلة ٥ · W2). وفراغُها يُبقي السلوكَ كما كان
+     *   حرفاً، **فالإضافةُ لا تكسر مُنادياً قائماً**.
+     */
+    public static function chain(AiProfile $profile, string $feature = '')
     {
         if (! $profile->enabled) return collect();
 
         return self::links($profile)
             ->filter(static fn (AiProfileModel $l) => (bool) $l->enabled)
             ->map(static fn (AiProfileModel $l) => $l->model)
-            ->filter(static function (?AiModel $m) use ($profile) {
+            ->filter(static function (?AiModel $m) use ($profile, $feature) {
                 if ($m === null || ! $m->enabled) return false;
                 if (in_array(mb_strtoupper((string) $m->health), self::UNROUTABLE, true)) return false;
 
@@ -284,13 +289,28 @@ final class AiProfiles
                 if ($p === null || ! $p->enabled) return false;
                 if ((string) $p->credential_state === 'missing') return false;
 
-                return self::eligibility($profile, $m)['ok'];
+                if (! self::eligibility($profile, $m)['ok']) return false;
+
+                /*
+                 * **وملاءمةُ الغرضِ بوّابةٌ سادسةٌ مستقلّة** (المرحلة ٥ · W2).
+                 *
+                 * اشتراطُ الغرضِ (`required_capability`) قدرةٌ **واحدة**، وميزةٌ
+                 * قد تحتاج أكثر: «اسأل Hub» دورةُ أدواتٍ كاملة، فيلزمه
+                 * `chat` **و**`tools` معاً. وكان `general` يشترط `chat`
+                 * وحدَها — فنموذجٌ لا يُصدر طلباتِ أدواتٍ يجلس شرعيّاً على
+                 * رأسِ سلسلةِ المساعد.
+                 */
+                return $feature === '' || AiPurposes::suitability($m, $feature)['ok'];
             })
             ->values();
     }
 
-    /** ما أُخرج من السلسلةِ ولماذا — فالشاشةُ تقول السببَ بدل أن تُخفيَ الحلقة */
-    public static function excluded(AiProfile $profile): array
+    /**
+     * ما أُخرج من السلسلةِ ولماذا — فالشاشةُ تقول السببَ بدل أن تُخفيَ الحلقة.
+     *
+     * @param  string  $feature  ميزةُ Hub — لتُقال حاجتُها غيرُ الملبّاة أيضاً
+     */
+    public static function excluded(AiProfile $profile, string $feature = ''): array
     {
         $out = [];
 
@@ -307,6 +327,9 @@ final class AiProfiles
                 $m->provider === null || ! $m->provider->enabled          => 'مزوّدُ النموذجِ مُعطَّل',
                 (string) ($m->provider->credential_state ?? '') === 'missing' => 'اعتمادُ المزوّدِ لم يستقرَّ بعد',
                 ! self::eligibility($profile, $m)['ok']                   => (string) self::eligibility($profile, $m)['why'],
+                // **وملاءمةُ الغرضِ آخرُ ما يُفحَص** — فسببُ المنعِ الأسبقُ أدقُّ تشخيصاً
+                $feature !== '' && ! AiPurposes::suitability($m, $feature)['ok']
+                    => (string) AiPurposes::suitability($m, $feature)['why'],
                 default                                                   => null,
             };
 
