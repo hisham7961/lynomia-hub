@@ -271,14 +271,22 @@ class AskAdversarialSweepTest extends TestCase
 
     public function test_إحالةٌ_في_نصِّ_الجوابِ_لا_تصنع_مصدراً(): void
     {
+        // **وقراءةٌ حقيقيّةٌ تسبق الجواب** (`21b7633f`): جوابٌ نهائيٌّ بلا
+        // قراءةٍ صار يسقط بـ`NO_SERVER_READ`، والمقصودُ هنا غيرُ ذلك.
         [$r] = $this->ask([
+            ['kind' => 'tool', 'tool' => 'hub_list', 'args' => ['module' => 'projects']],
             ['kind' => 'answer', 'answer' => 'حسب المصدرِ المذكورِ في وحدةِ الرواتب…', 'sources' => []],
         ]);
 
-        // نصُّ الجوابِ يذكر مصدراً، لكنّ **قائمةَ المصادرِ من الخادمِ فارغة**
+        /*
+         * نصُّ الجوابِ يذكر «وحدةَ الرواتب»، **والقراءةُ الوحيدةُ التي وقعت
+         * كانت المشاريع**. فالمصادرُ تعكس ما قرأه الخادمُ لا ما قاله النصّ.
+         */
         $this->assertTrue($r['ok']);
-        $this->assertSame([], $r['sources'],
+        $this->assertCount(1, $r['sources'],
             'نصٌّ في الجوابِ خلق مصدراً — والمصادرُ تُبنى من القراءةِ لا من الكلام');
+        $this->assertSame('projects', (string) ($r['sources'][0]['module'] ?? ''),
+            '**مصدرٌ لوحدةٍ لم تُقرَأ** — خلقه ذكرُها في النصّ');
     }
 
     public function test_مرجعٌ_برقمٍ_غيرِ_مقروءٍ_يُسقِط_الجواب(): void
@@ -358,7 +366,7 @@ class AskAdversarialSweepTest extends TestCase
             AskFailures::UNAUTHORIZED, AskFailures::UNAVAILABLE, AskFailures::MODEL_FAILURE,
             AskFailures::TOOL_BUDGET, AskFailures::FORGED_SOURCE, AskFailures::PARTIAL_RESULT,
             AskFailures::MALFORMED_QUESTION, AskFailures::CONTEXT_LIMIT,
-            AskFailures::MALFORMED_TOOL_REQUEST,
+            AskFailures::MALFORMED_TOOL_REQUEST, AskFailures::NO_SERVER_READ,
         ];
 
         /*
