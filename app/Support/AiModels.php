@@ -121,7 +121,8 @@ final class AiModels
             if ($c === null)            { $skipped[] = $name; continue; }
             if ($c['already_imported']) { $skipped[] = $name; continue; }
 
-            $models[] = AiModel::create([
+            // **يُنشَأ أو يُستعاد** — ولا يصطدم بصفٍّ مُزالٍ يقبض على الاسم
+            $row = self::put($provider, $name, (string) $c['upstream_model'], [
                 'provider_id'        => $provider->id,
                 'litellm_model_name' => $name,
                 'upstream_model'     => $c['upstream_model'],
@@ -139,6 +140,9 @@ final class AiModels
                 'created_by'         => auth()->id(),
                 'updated_by'         => auth()->id(),
             ]);
+
+            if ($row === null) { $skipped[] = $name; continue; }
+            $models[] = $row;
         }
 
         if ($models === []) {
@@ -217,8 +221,16 @@ final class AiModels
         if ((string) $provider->credential_state === 'missing') {
             return self::fail('لا اعتمادَ لهذا المزوّد — اضبط الاعتمادَ قبل تسجيلِ نموذج');
         }
-        if (AiModel::query()->where('litellm_model_name', $hubName)->exists()) {
-            return self::fail('الاسمُ مستعمَلٌ في Hub — اختر اسماً آخر');
+        /*
+         * **والمسحُ يشمل المحذوفَ** — فالفهرسُ الفريدُ يشمله، وفحصٌ أعمى عنه
+         * يُمرِّر الاسمَ ثمّ يسقط الإدراجُ بخرقِ قيدٍ بعد أن يكون النشرُ قد وقع.
+         */
+        $held = AiModel::withTrashed()->where('litellm_model_name', $hubName)->first();
+
+        if ($held !== null && ! self::reclaimable($held, $provider, $upstream)) {
+            return self::fail($held->trashed()
+                ? 'الاسمُ محجوزٌ لنموذجٍ مُزالٍ يختلف معرّفُه أو مزوّدُه — اختر اسماً آخر'
+                : 'الاسمُ مستعمَلٌ في Hub — اختر اسماً آخر');
         }
 
         $res = LiteLlmAdmin::createModel($hubName, $upstream, (string) $provider->credential_name);
@@ -282,7 +294,29 @@ final class AiModels
 
         $base = mb_substr($base, 0, 160);
 
-        if (! AiModel::query()->where('litellm_model_name', $base)->exists()) return $base;
+        /*
+         * ── **والمحذوفُ يُرى هنا — وإلّا صادم الفهرسَ الفريد** ──
+         * (قبولُ الإنتاج · عطبُ ما بعد الحذف)
+         *
+         * الحذفُ **ناعم**، وعمودُ الاسمِ **فريدٌ في الجدولِ كلِّه** — فالصفُّ
+         * المحذوفُ يحتفظ باسمِه في الفهرس. وكان المسحُ يجري بنطاقِ الحذفِ
+         * الناعمِ فلا يراه، فيُعيد الاسمَ نفسَه ويسقط الإدراجُ بخرقِ قيد:
+         * **٥٠٠ في الشاشةِ ونشرٌ يتيمٌ عند البوّابة** — لأنّ النشرَ يقع قبل
+         * الإدراج.
+         *
+         * **والتصادمُ مع نفسِه ليس تصادماً:** صفٌّ محذوفٌ لهذا المزوّدِ
+         * بالمعرّفِ نفسِه هو **النموذجُ عينُه**، فيبقى له اسمُه ويُستعاد
+         * (`reclaim`). وبغيرِ هذا الاستثناءِ يُولَد للنموذجِ الواحدِ اسمٌ
+         * جديدٌ في كلِّ حذفٍ وتبنٍّ — فتضيع الحتميّةُ التي بُني عليها المولِّد.
+         */
+        $clash = AiModel::withTrashed()->where('litellm_model_name', $base)->first();
+
+        if ($clash === null) return $base;
+
+        if ((string) $clash->provider_id === (string) $provider->id
+            && (string) $clash->upstream_model === $upstream) {
+            return $base;
+        }
 
         // **بصمةُ المعرّفِ الكامل** — حتميّةٌ ولا تتعلّق بترتيبِ الاستيراد
         return mb_substr($base, 0, 160) . '-' . substr(sha1($upstream), 0, 8);
@@ -357,7 +391,7 @@ final class AiModels
                 (string) $provider->credential_name);
             if (! $res['ok']) { $skipped[] = $pick; continue; }
 
-            $models[] = AiModel::create([
+            $row = self::put($provider, $alias, (string) $c['upstream_model'], [
                 'provider_id'        => $provider->id,
                 'litellm_model_name' => $alias,
                 'upstream_model'     => (string) $c['upstream_model'],
@@ -374,6 +408,9 @@ final class AiModels
                 'created_by'         => auth()->id(),
                 'updated_by'         => auth()->id(),
             ]);
+
+            if ($row === null) { $skipped[] = $pick; continue; }
+            $models[] = $row;
         }
 
         // ما كان مُسجَّلاً عند البوّابةِ يمرّ بمسارِ الاستيرادِ القائمِ نفسِه
@@ -522,6 +559,63 @@ final class AiModels
         }
 
         return $out;
+    }
+
+    // ═══ استرجاعُ صفٍّ مُزالٍ — بدل التصادمِ بفهرسٍ فريد ═══
+
+    /**
+     * **أهذا الصفُّ المُزالُ هو النموذجُ نفسُه؟**
+     *
+     * اسمُ النموذجِ في Hub **فريدٌ في الجدولِ كلِّه**، والحذفُ **ناعم**. فصفٌّ
+     * مُزالٌ يبقى قابضاً على اسمِه في الفهرس. والسؤالُ الصحيحُ ليس «أالاسمُ
+     * حرٌّ؟» بل **«أصاحبُ الاسمِ هو من نُعيده؟»** — والجوابُ بمفتاحِ الهويّةِ
+     * الحقيقيّ: **(المزوّدُ، معرّفُ المنبع)**، لا بالاسمِ المولَّدِ عنهما.
+     *
+     * فإن كان هو: يُستعاد ويُحدَّث. وإن كان غيرَه: الاسمُ محجوزٌ فعلاً.
+     */
+    private static function reclaimable(?AiModel $held, AiProvider $provider, string $upstream): bool
+    {
+        return $held !== null
+            && $held->trashed()
+            && (string) $held->provider_id === (string) $provider->id
+            && (string) $held->upstream_model === trim($upstream);
+    }
+
+    /**
+     * **يُنشئ صفَّ النموذجِ أو يستعيده** — ولا يصطدم بفهرسٍ فريدٍ أبداً.
+     *
+     * ── **العطبُ الذي وُلدت منه هذه الدالّة** ──
+     *
+     * حُذف النموذجُ المسجَّلُ الوحيدُ من الشاشة، ثمّ أُريد تبنّي نموذج. وكلُّ
+     * مسارات الإنشاءِ الثلاثةِ (تبنٍّ · استيرادٌ · تسجيلٌ يدويّ) كانت تُنادي
+     * `AiModel::create` مباشرةً وتفحص الاسمَ **بنطاقِ الحذفِ الناعم** — فلا
+     * ترى الصفَّ المُزالَ الذي يقبض على الاسمِ في الفهرس. والنتيجةُ:
+     *
+     *  · **٥٠٠ في الشاشة** بخرقِ `ai_models.litellm_model_name` الفريد،
+     *  · **ونشرٌ يتيمٌ عند البوّابة** — لأنّ `createModel` يسبق الإدراج،
+     *  · ومديرٌ يظنّ أنّ النظامَ «لم يعد يقبل نماذج».
+     *
+     * **والاستعادةُ أصدقُ من اسمٍ جديد:** النموذجُ هو هو — مزوّدُه ومعرّفُه
+     * لم يتغيّرا — فإعطاؤه اسماً ثانياً يُنتج تاريخَين لشيءٍ واحد، ويكسر
+     * حتميّةَ المولِّدِ التي تمنع الصفوفَ المكرّرة.
+     *
+     * @param  array<string,mixed>  $attrs  الحقولُ كما تُكتَب في الإنشاء
+     */
+    private static function put(AiProvider $provider, string $alias, string $upstream, array $attrs): ?AiModel
+    {
+        $held = AiModel::withTrashed()->where('litellm_model_name', $alias)->first();
+
+        if ($held === null) return AiModel::create($attrs);
+
+        // اسمٌ يقبض عليه صفٌّ **حيٌّ** أو صفٌّ مُزالٍ لنموذجٍ آخر — لا يُمَسّ
+        if (! self::reclaimable($held, $provider, $upstream)) return null;
+
+        $held->restore();
+
+        // **والحقائقُ تُحدَّث بما جاء الآن** — والاستعادةُ لا تُفعِّل شيئاً
+        $held->forceFill($attrs + ['enabled' => false])->save();
+
+        return $held->fresh();
     }
 
     /** أثرٌ صريحٌ عند الكاتب — الجدولُ بلا `Auditable` (قرارُ المالك · B) */
