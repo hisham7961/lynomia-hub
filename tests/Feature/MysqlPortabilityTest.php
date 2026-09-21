@@ -274,4 +274,79 @@ class MysqlPortabilityTest extends TestCase
         $this->assertGreaterThanOrEqual(4, count($rows),
             'مصفوفةُ CI أقصرُ ممّا يلزم — المحرّكان والإصداران معاً أربعةُ صفوفٍ على الأقلّ');
     }
+
+    /**
+     * **لا عمودَ زمنيٍّ يُكتَب فوقه بلا أن يطلبه أحد** (البند #2 · DI-05/06).
+     *
+     * ── **البندُ كما كُتب، والقياسُ كما جاء** ──
+     *
+     * السجلُّ يقول: عشرون عمودَ `timestamp` بلا `nullable` ولا افتراض، «يسقط
+     * تنصيبٌ جديدٌ على `explicit_defaults_for_timestamp=OFF`». **والعشرون
+     * صحيحة** — لكنّ الآليّةَ المخوفةَ لم تقع على المحرّكِ المقيس:
+     *
+     * | ما خافه البند | القياس |
+     * |---|---|
+     * | `ON UPDATE CURRENT_TIMESTAMP` ضمنيّاً | **٠** عموداً غيرَ `updated_at` |
+     * | افتراضٌ صفريٌّ `0000-00-00` | **٠** |
+     * | `NOT NULL` بلا افتراض | **٢٠** — صرامةٌ يملؤها التطبيقُ دائماً |
+     *
+     * ── **فلماذا حارسٌ إذن؟** ──
+     *
+     * لأنّ الفرقَ **ليس في الهجرةِ بل في إعدادِ الخادم**: المتغيّرُ
+     * `explicit_defaults_for_timestamp` يُضبَط في `my.cnf` لا في المستودع.
+     * فنفسُ الهجرةِ تُنتج مخطَّطاً سليماً على خادمٍ ومخطَّطاً يكتب فوقَ
+     * أعمدتِه على آخر. **وتحريرُ خمسةٍ وثلاثين موضعاً في الهجرات لا يمسُّ
+     * ذلك بحرف.**
+     *
+     * وهذا الحارسُ يسأل **المخطَّطَ المُنشأَ فعلاً** لا نصَّ الهجرة: فإن
+     * أُنشئ على خادمٍ بإعدادٍ آخرَ ظهرت الأعمدةُ هنا فوراً. وهو يعمل على
+     * المحرّكَين في CI، أي على `mysql:8.0` و`mariadb:10.11` معاً.
+     *
+     * **والعمودُ الذي يُكتَب فوقه بلا طلبٍ أخبثُ من عمودٍ يسقط إدراجُه:**
+     * السقوطُ يُرى، والكتابةُ فوقَ `started_at` أو `first_seen_at` **تُفسِد
+     * التاريخَ صامتةً** — فيصير «أوّلُ رصدٍ» هو آخرَ تحديث.
+     */
+    public function test_لا_عمودَ_زمنيٍّ_يُكتَب_فوقه_ضمنيّاً(): void
+    {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            $this->markTestSkipped('سلوكُ الأعمدةِ الزمنيّةِ الضمنيُّ خاصّيّةُ MySQL/MariaDB');
+        }
+
+        $schema = DB::connection()->getDatabaseName();
+
+        /*
+         * **و`updated_at` وحدَها مستثناةٌ بحقّ** — الكتابةُ فوقها عند كلِّ
+         * تحديثٍ هي معناها، وLaravel يتولّاها من التطبيقِ أصلاً.
+         */
+        $overwritten = DB::select(
+            "SELECT CONCAT(TABLE_NAME, '.', COLUMN_NAME) AS col
+               FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = ? AND DATA_TYPE = 'timestamp'
+                AND EXTRA LIKE '%on update%' AND COLUMN_NAME <> 'updated_at'
+              ORDER BY TABLE_NAME, COLUMN_NAME",
+            [$schema]
+        );
+
+        $this->assertSame([], array_map(fn ($r) => $r->col, $overwritten),
+            "أعمدةٌ زمنيّةٌ تُكتَب فوقها عند كلِّ تحديثٍ بلا أن يطلب ذلك أحد.\n"
+            . 'المحرّكُ رقّاها ضمنيّاً لأنّ `explicit_defaults_for_timestamp=0` — '
+            . 'صرّح بـ`nullable()` أو `useCurrent()` في هجرةِ كلٍّ منها.');
+
+        /*
+         * **والتاريخُ الصفريُّ ليس تاريخاً.** عمودٌ افتراضُه `0000-00-00`
+         * يمرّ في القاعدةِ ويسقط عند قراءتِه في PHP — أو أسوأُ: يُقرَأ
+         * «١ يناير سنةَ صفر» فيُفسد كلَّ فرزٍ ومدىً زمنيّ.
+         */
+        $zeroDated = DB::select(
+            "SELECT CONCAT(TABLE_NAME, '.', COLUMN_NAME) AS col
+               FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = ? AND DATA_TYPE = 'timestamp'
+                AND COLUMN_DEFAULT LIKE '0000%'
+              ORDER BY TABLE_NAME, COLUMN_NAME",
+            [$schema]
+        );
+
+        $this->assertSame([], array_map(fn ($r) => $r->col, $zeroDated),
+            'أعمدةٌ زمنيّةٌ افتراضُها تاريخٌ صفريّ — تمرّ في القاعدةِ وتُفسد كلَّ فرزٍ ومدى');
+    }
 }

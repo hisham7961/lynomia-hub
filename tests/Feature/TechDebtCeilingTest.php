@@ -73,6 +73,29 @@ class TechDebtCeilingTest extends TestCase
      */
     private const AUDIT_ACTIONS = 231;
 
+    /**
+     * **سقفُ الأعمدةِ الزمنيّةِ غيرِ المُصرَّحة** — قِيست ٣٥ موضعاً على v2.589.0.
+     *
+     * البند #2 (DI-05/06): `$t->timestamp('x')` بلا `nullable()` ولا
+     * `useCurrent()` ولا `default()` **يترك القرارَ للمحرّك**. وما يقرّره
+     * المحرّكُ يختلف بإعدادِ الخادم لا بالهجرة: على
+     * `explicit_defaults_for_timestamp=0` يُرقّي العمودَ الأوّلَ إلى
+     * `DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` — **فيُكتَب
+     * فوقَه عند كلِّ تحديثٍ بلا أن يطلب ذلك أحد**.
+     *
+     * ── **وهذا السقفُ نصفُ الحارس** ──
+     *
+     * النصفُ الآخرُ `MysqlPortabilityTest::test_لا_عمودَ_زمنيٍّ_يُكتَب_فوقه_ضمنيّاً`
+     * يسأل **المخطَّطَ المُنشأَ فعلاً** على المحرّكَين، فيكشف الترقيةَ أينما
+     * وقعت. وهذا يمنع **إضافةَ** موضعٍ جديدٍ يعتمد على إعدادِ خادم.
+     *
+     * **ولا تُحرَّر الخمسةُ والثلاثون رجعيّاً:** تعديلُ هجرةٍ منشورةٍ لا
+     * يمسُّ قاعدةً مهاجَرةً أصلاً — يمسُّ التنصيبَ الجديدَ وحدَه، فيُنتج
+     * مخطَّطَين مختلفَين لنسخةٍ واحدة. والإغلاقُ الصحيحُ هجرةٌ جديدةٌ
+     * تُصرّح، وهي قرارُ مالكٍ لأنّها تمسُّ عشرين عموداً في الإنتاج.
+     */
+    private const UNDECLARED_TIMESTAMPS = 35;
+
     // ═══════════════════════════════════════════════════════════════════
 
     /** **الملفُّ الأضخمُ لا يزداد ضخامةً** */
@@ -165,6 +188,29 @@ class TechDebtCeilingTest extends TestCase
             . 'اخفض `AUDIT_ACTIONS` إلى الرقمِ الجديد كي يبقى السقفُ حارساً.');
     }
 
+    /**
+     * **لا عمودَ زمنيٍّ جديدٍ يترك قرارَه للمحرّك.**
+     *
+     * وما يقرّره المحرّكُ **ليس مكتوباً في المستودع**: هو `my.cnf` على خادمٍ
+     * لا يراه أحدٌ من هنا. فالتصريحُ ليس تزيّناً — هو نقلُ القرارِ من إعدادٍ
+     * غائبٍ إلى سطرٍ مقروء.
+     */
+    public function test_سقفُ_الأعمدةِ_الزمنيّةِ_غيرِ_المُصرَّحةِ_لا_يُتجاوَز(): void
+    {
+        $sites = $this->undeclaredTimestampSites();
+        $n     = count($sites);
+
+        $this->assertLessThanOrEqual(self::UNDECLARED_TIMESTAMPS, $n,
+            "**أعمدةٌ زمنيّةٌ بلا تصريحٍ صارت {$n}** والسقفُ " . self::UNDECLARED_TIMESTAMPS . ".\n"
+            . "الجديدُ على الأرجح في:\n  · " . implode("\n  · ", array_slice($sites, -4)) . "\n"
+            . 'صرّح بـ`nullable()` لعمودٍ قد يغيب، أو `useCurrent()` لعمودٍ زمنُه لحظةُ الإنشاء — '
+            . '**ولا تترك القرارَ لإعدادِ خادمٍ لا يراه المستودع**.');
+
+        $this->assertGreaterThan(self::UNDECLARED_TIMESTAMPS - 8, $n,
+            "**المواضعُ صارت {$n} — أي أقلَّ من السقفِ بكثير.**\n"
+            . 'اخفض `UNDECLARED_TIMESTAMPS` إلى الرقمِ الجديد كي يبقى السقفُ حارساً.');
+    }
+
     // ── أدواتُ المسح ──────────────────────────────────────────────────
 
     /**
@@ -234,6 +280,32 @@ class TechDebtCeilingTest extends TestCase
 
         $out = array_keys($seen);
         sort($out);   // ترتيبٌ حتميٌّ — فعيّنةُ رسالةِ الإخفاقِ لا تتبدّل بين تشغيلين
+
+        return $out;
+    }
+
+    /**
+     * **مواضعُ `->timestamp('…')` التي لا تُصرّح بسلوكِ العمود.**
+     *
+     * ويُقرَأ السطرُ وحدَه عمداً: سلسلةُ `Blueprint` تُكتَب في سطرٍ واحدٍ في
+     * هذا المستودعِ كلِّه — و**نافذةٌ أوسعُ تلتقط `nullable()` عمودٍ مجاور**
+     * فتُخفي الموضعَ المقصود. (وهي القرعةُ المعكوسةُ لِما صحّح `::first()`:
+     * هناك النافذةُ أصدق، وهنا السطر.)
+     *
+     * @return list<string>
+     */
+    private function undeclaredTimestampSites(): array
+    {
+        $out = [];
+
+        foreach ($this->phpFiles(base_path('database/migrations')) as $file) {
+            foreach (file($file, FILE_IGNORE_NEW_LINES) as $i => $line) {
+                if (! str_contains($line, '->timestamp(')) continue;
+                if (preg_match('/nullable\(|useCurrent|default\(/', $line)) continue;
+
+                $out[] = str_replace(base_path() . '/', '', $file) . ':' . ($i + 1);
+            }
+        }
 
         return $out;
     }
