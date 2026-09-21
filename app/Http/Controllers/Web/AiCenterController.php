@@ -116,6 +116,15 @@ class AiCenterController extends Controller
             'spend'      => $spend,
             'activity'   => $active,
             'attribution' => \App\Support\AiUsage::ATTRIBUTION,
+            /*
+             * **وسجلُّ Hub يُقرأ مع فتحِ الصفحةِ بلا زرّ** (المرحلة ٤) — ولا
+             * تناقضَ مع قاعدةِ «القراءةُ بزرّ»: تلك قاعدةُ **نداءِ الشبكة**،
+             * وهذا استعلامٌ محلّيٌّ مفهرَسٌ لا يتّصل بأحد. فلا بطءَ ولا تعليقَ
+             * لخدمةٍ متوقّفة.
+             */
+            'ledger'     => \App\Http\Controllers\Web\AiGovernanceController::usageSummary(
+                (int) $r->integer('days', 30) ?: 30),
+            'days'       => max(1, min(365, (int) $r->integer('days', 30) ?: 30)),
         ]);
     }
 

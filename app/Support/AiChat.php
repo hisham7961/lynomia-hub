@@ -65,6 +65,17 @@ final class AiChat
     public const MARK_TIMEOUT   = ['litellm.timeout'];
     public const MARK_POLICY    = ['contentpolicyviolation'];
 
+    /**
+     * **دلالاتُ نفادِ الرصيد** — نصُّ المزوّدِ الأصليُّ كما يصل.
+     *
+     * والدليلُ أنّه يصل: `exception_mapping_utils.py` يبني الرسالةَ
+     * `"RateLimitError: {provider} - {message}"` — **فالمتنُ الأصليُّ ينجو
+     * حرفيّاً**. والدلالاتُ عامّةٌ على المال لا على مزوّدٍ بعينِه.
+     */
+    public const MARK_CREDITS = ['no credits', 'credit balance', 'insufficient_quota',
+                                 'insufficient credit', 'exceeded your current quota',
+                                 'billing', 'add credits', 'payment required'];
+
     /** بادئةُ كلِّ استثناءٍ تولّده LiteLLM — ودلالتُها أنّ العطلَ **خلفَ** البوّابة */
     public const MARK_BEYOND_GATEWAY = 'litellm.';
 
@@ -184,11 +195,24 @@ final class AiChat
         // ① المهلةُ أوّلاً — رمزُها ٤٠٨ وقد تصل بمتنِها على رمزٍ آخر
         if ($status === 408 || self::has($b, self::MARK_TIMEOUT)) return AskFailures::TIMEOUT;
 
-        // ② حدُّ المعدّلِ — **إلّا حين يكون ٤٢٩ قناعاً لانقطاعِ خدمة**
+        // ⓪ **الدفعُ المطلوبُ رمزٌ صريحٌ للمال** — ولا لبسَ فيه
+        if ($status === 402) return AskFailures::PROVIDER_CREDITS;
+
+        /*
+         * ② **‏٤٢٩ ثلاثةُ معانٍ لا معنىً واحد** — ويفرّقها المتنُ لا الرمز:
+         *
+         *  · «لا نشرَ صالحاً» ⇒ انقطاعُ خدمةٍ خلفَ البوّابة.
+         *  · «لا رصيدَ / فوترة» ⇒ **مالٌ نفد، ولا ينقضي بانتظار**.
+         *  · وما عداهما ⇒ حدُّ معدّلٍ حقيقيٌّ ينقضي بمهلتِه.
+         *
+         * **والترتيبُ مقصود:** «لا نشرَ صالحاً» أوّلاً لأنّها جملةُ البوّابةِ
+         * نفسِها ولا تحمل مالاً، ثمّ الرصيدُ، ثمّ الافتراضُ الأوسع.
+         */
         if ($status === 429) {
-            return self::has($b, self::MARK_NO_DEPLOY)
-                ? AskFailures::PROVIDER_FAILURE
-                : AskFailures::RATE_LIMITED;
+            if (self::has($b, self::MARK_NO_DEPLOY))  return AskFailures::PROVIDER_FAILURE;
+            if (self::has($b, self::MARK_CREDITS))    return AskFailures::PROVIDER_CREDITS;
+
+            return AskFailures::RATE_LIMITED;
         }
 
         // ③ تجاوزُ السياقِ يصل ٤٠٠ — فالمتنُ هو ما يفرّقه عن طلبٍ فاسدِ الشكل

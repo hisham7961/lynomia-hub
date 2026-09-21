@@ -57,6 +57,9 @@ final class AiRouteRun
     /** كم مرشَّحاً تخطّاه المسحُ الأخيرُ لتهدئةِ مزوّدِه — ليُقال السببُ لا «لا شيء» */
     private int $skippedCooling = 0;
 
+    /** حاكمُ السياسةِ المحقون — `null` يعني «بلا حوكمةٍ مُركَّبة» */
+    private ?\Closure $gate = null;
+
     private function __construct(
         array $chain,
         private readonly ?AiProfile $profile,
@@ -292,6 +295,15 @@ final class AiRouteRun
             ? $this->contextWindow($this->chain[$this->index] ?? null)
             : null;
 
+        /*
+         * **ومزوّدُ القفزةِ الحالية يُمسَك قبل المسح** — فشرطُ `other_provider`
+         * يُقاس عليه. والرصيدُ رصيدُ حسابٍ عند مزوّدٍ بعينِه: كلُّ نموذجٍ على
+         * اعتمادِه يسقط سقوطَه، **فقفزةٌ إليه إنفاقُ نداءٍ على بابٍ مغلقٍ سلفاً**.
+         */
+        $currentProvider = $decision['conditional'] === 'other_provider'
+            ? (string) ($this->chain[$this->index]->provider_id ?? '')
+            : null;
+
         for ($i = $this->index + 1; $i < count($this->chain); $i++) {
             $m = $this->chain[$i];
 
@@ -307,10 +319,42 @@ final class AiRouteRun
                 if ($ctx === null || $currentCtx === null || $ctx <= $currentCtx) continue;
             }
 
+            if ($currentProvider !== null && (string) $m->provider_id === $currentProvider) continue;
+
+            /*
+             * **والحوكمةُ تُعاد عند كلِّ قفزة** (المرحلة ٤ · P4-W5).
+             *
+             * السماحُ بالنموذجِ «أ» ليس سماحاً بالنموذجِ «ب». فلو قُرئت
+             * السياسةُ مرّةً عند فتحِ الرحلةِ وحدَها لصار **الاحتياطُ بابَ
+             * التفافٍ عليها**: يُمنَع نموذجٌ غالٍ في السياسة، ثمّ يُبلَغ
+             * بإسقاطِ الأرخصِ منه قصداً أو صدفة.
+             */
+            if (! $this->governed($m)) continue;
+
             return $i;
         }
 
         return null;
+    }
+
+    /**
+     * **أتسمح الحوكمةُ بهذا النموذجِ الآن؟** — والافتراضُ «نعم» بلا حاكمٍ مُركَّب.
+     *
+     * `AiRouteRun` محرّكُ قرارٍ خالصٌ يُستعمَل في اختباراتٍ بلا مستخدمٍ ولا
+     * سياق، **فحقنُ الحاكمِ اختياريٌّ عمداً**: من لم يحقنه يحصل على السلوكِ
+     * القديمِ حرفاً، ومن حقنه تُعاد سياستُه عند كلِّ قفزة.
+     */
+    private function governed(AiModel $m): bool
+    {
+        return $this->gate === null || (bool) ($this->gate)($m);
+    }
+
+    /** يُحقَن من `AiGovernance` — لا يُبنى هنا فلا يعرف هذا الصنفُ مستخدماً */
+    public function governBy(?\Closure $gate): self
+    {
+        $this->gate = $gate;
+
+        return $this;
     }
 
     /** نافذةُ السياقِ **المُثبَتةُ** — ومجهولةُ المصدرِ ليست رقماً يُقاس عليه */

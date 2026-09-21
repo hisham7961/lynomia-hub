@@ -25,6 +25,10 @@ class AiRoutingTest extends TestCase
         'budget_exceeded'        => ['retry' => 0, 'fallback' => false],
         'content_policy'         => ['retry' => 0, 'fallback' => false],
         'rate_limited'           => ['retry' => 1, 'fallback' => true],
+        // (المرحلة ٤ · P4-W8) رصيدٌ نفد: لا إعادةَ، واحتياطٌ **إلى مزوّدٍ آخرَ وحدَه**
+        'provider_credits'       => ['retry' => 0, 'fallback' => true],
+        // (المرحلة ٤ · P4-W5) منعُ السياسةِ قرارٌ لا عطل — والاحتياطُ التفافٌ عليه
+        'policy_denied'          => ['retry' => 0, 'fallback' => false],
         'transient'              => ['retry' => 2, 'fallback' => true],
         'model_gone'             => ['retry' => 0, 'fallback' => true],
         'provider_cooldown'      => ['retry' => 0, 'fallback' => true],

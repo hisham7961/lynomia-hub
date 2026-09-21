@@ -70,19 +70,28 @@ class AiCenterSectionsTest extends TestCase
         ]);
     }
 
-    /** الأقسامُ السبعةُ بمساراتِها — يُقرأ من مصدرِ الحقيقةِ الواحد */
+    /**
+     * **الأقسامُ التسعةُ بمساراتِها وترتيبِها** — مكتوبةً باليدِ لا مقروءةً من المصدر.
+     *
+     * فاختبارٌ يقرأ `sections()` ويؤكّد أنّها تساوي نفسَها لا يُثبت شيئاً.
+     * **والنسخةُ الثانيةُ هنا هي الشاهد**، وأيُّ انحرافٍ بينهما يُسقط الحزمة.
+     *
+     * وسبعةٌ صارت تسعةً في المرحلة ٤ (السياساتُ والميزانيّات) — **إضافةٌ
+     * مُعلَنةٌ في الحارسِ لا تمريرٌ بتوسيعِ عدّاد**.
+     */
     private static function routes(): array
     {
         return ['ai.index', 'ai.providers.index', 'ai.models.all',
-                'ai.profiles.index', 'ai.usage', 'ai.settings', 'ai.diagnostics'];
+                'ai.profiles.index', 'ai.policies.index', 'ai.budgets.index',
+                'ai.usage', 'ai.settings', 'ai.diagnostics'];
     }
 
     // ═══ ① الرايةُ الجديدةُ: يقرأ ولا يكتب ═══
 
-    public function test_الأقسامُ_سبعةٌ_ولا_ثامنَ(): void
+    public function test_الأقسامُ_تسعةٌ_ولا_عاشرَ(): void
     {
-        $this->assertCount(7, AiAccess::sections($this->owner),
-            '**عددُ الأقسامِ انحرف عن §١١** — سبعةٌ لا أكثرَ ولا أقلّ');
+        $this->assertCount(9, AiAccess::sections($this->owner),
+            '**عددُ الأقسامِ انحرف** — تسعةٌ لا أكثرَ ولا أقلّ');
         $this->assertSame(self::routes(),
             array_column(AiAccess::sections($this->owner), 'route'));
     }
@@ -352,9 +361,20 @@ class AiCenterSectionsTest extends TestCase
 
     public function test_شاشةُ_الاستهلاكِ_تقول_إنّ_التكلفةَ_تقديريّة(): void
     {
+        /*
+         * **الوعدُ تغيّر في المرحلة ٤ ولم يَضعُف.**
+         *
+         * كانت الشاشةُ تقول «التكلفةُ تقديريّةٌ لا مفوترة» و«لا جدولَ استهلاكٍ
+         * في Hub» — وكلاهما صارا **ناقصَين لا كاذبَين**: صار في Hub سجلُّ
+         * حوكمةٍ (لا نسخةٌ من الفاتورة)، وصارت الكلفةُ **أربعَ درجاتٍ** لا
+         * درجةً واحدة. فالحارسُ يُطالب بالوعدِ الأدقّ: أن تقول الشاشةُ
+         * **من أين جاء كلُّ رقم**، و**أنّ المجهولَ ليس صفراً**.
+         */
         $this->actingAs($this->owner)->get(route('ai.usage'))->assertOk()
-            ->assertSee('تقديريّةٌ لا مفوترة', false)
-            ->assertSee('لا جدولَ استهلاكٍ في Hub', false);
+            ->assertSee('كلُّ رقمٍ يقول من أين جاء', false)
+            ->assertSee('المجهولُ ليس صفراً', false)
+            ->assertSee(\App\Support\AiCost::REPORTED, false)
+            ->assertSee(\App\Support\AiCost::UNKNOWN, false);
     }
 
     /** **ولا تتّصل بالبوّابةِ مع فتحِ الصفحة** */

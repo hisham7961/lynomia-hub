@@ -46,8 +46,17 @@ class AiProbesTest extends TestCase
         Settings::put('ai.gateway_url', 'http://127.0.0.1:4000', 'test');
         Settings::put('ai.gateway_key', 'sk-admin-test-key-000111222333', 'test');
 
-        $this->completion = ['choices' => [['message' => ['content' => 'ok']]],
-                             'usage' => ['prompt_tokens' => 7, 'completion_tokens' => 2, 'total_tokens' => 9]];
+        /*
+         * **لقطةٌ مطابقةٌ للعقدِ المقيس** (تصحيحُ قبولِ الإنتاج · D/E).
+         *
+         * كانت `['choices' => [['message' => ['content' => 'ok']]]]` — **أسهلَ
+         * من الواقعِ وأفقرَ منه معاً**: تُسقط `object` و`id` و`created`
+         * و`finish_reason` و`role` (وكلُّها **مضمونةُ الحضور** في العقد)،
+         * وتضمن في المقابل نصّاً ظاهراً **لا يضمنه العقدُ أبداً**
+         * (`content: str | None`). فكانت الحزمةُ خضراءَ والإنتاجُ يسقط.
+         */
+        $this->completion = self::completionFixture('ok', 'stop',
+            ['prompt_tokens' => 7, 'completion_tokens' => 2, 'total_tokens' => 9]);
 
         Http::fake(['*' => function ($req) {
             $url = $req->url();
@@ -237,11 +246,36 @@ class AiProbesTest extends TestCase
 
     // ═══ ④ لا مخرجَ يُخزَّن ═══
 
+    /**
+     * **مُنشئُ لقطةٍ واحدٌ** — فلا تنحرف لقطةٌ عن أختِها في ملفٍّ واحد.
+     *
+     * ويحمل ما يضمنه `ModelResponse` حضورَه: الهويّةُ والمعرّفُ والزمنُ وخيارٌ
+     * بسببِ انتهاءٍ ودورٍ — **ويحرسه `AiProbeEvidenceTest`** فلا يعود النقصُ.
+     */
+    private static function completionFixture(?string $content, string $finish = 'stop',
+                                              ?array $usage = null, array $extraMessage = []): array
+    {
+        $body = [
+            'id'      => 'chatcmpl-' . str_repeat('b', 24),
+            'object'  => 'chat.completion',
+            'created' => 1758400000,
+            'model'   => 'hub-general',
+            'choices' => [[
+                'index'         => 0,
+                'finish_reason' => $finish,
+                'message'       => ['role' => 'assistant', 'content' => $content] + $extraMessage,
+            ]],
+        ];
+        if ($usage !== null) $body['usage'] = $usage;
+
+        return $body;
+    }
+
     public function test_لا_مخرجَ_يُخزَّن_بل_طولٌ_وبصمةٌ_وعيّنة(): void
     {
         $m = $this->seedModel();
         $long = str_repeat('نصٌّ طويلٌ من النموذج ', 40);
-        $this->completion = ['choices' => [['message' => ['content' => $long]]]];
+        $this->completion = self::completionFixture($long);
 
         $r = AiProbes::d($m, true);
 
@@ -303,10 +337,11 @@ class AiProbesTest extends TestCase
         $m = $this->seedModel();
         $this->assertSame('unknown', $m->capabilities['tools']['src'], 'تهيئةٌ خاطئة');
 
-        $this->completion = ['choices' => [['message' => [
-            'content' => '', 'tool_calls' => [['id' => 'c1', 'type' => 'function',
-                'function' => ['name' => 'ping', 'arguments' => '{}']]],
-        ]]]];
+        // **و`content` هنا `null` لا `''`** — فالعقدُ يجعلها كذلك في ردِّ أداةٍ خالص
+        $this->completion = self::completionFixture(null, 'tool_calls',
+            ['prompt_tokens' => 20, 'completion_tokens' => 6, 'total_tokens' => 26],
+            ['tool_calls' => [['id' => 'c1', 'type' => 'function',
+                               'function' => ['name' => 'ping', 'arguments' => '{}']]]]);
 
         $r = AiProbes::e($m, 'tools', true);
 
@@ -341,11 +376,12 @@ class AiProbesTest extends TestCase
     public function test_E_لا_يُصدّق_ردّاً_ناجحاً_خالياً_من_الدليل(): void
     {
         $m = $this->seedModel();
-        $this->completion = ['choices' => [['message' => ['content' => 'ok']]]];   // بلا tool_calls
+        $this->completion = self::completionFixture('ok');   // بلا tool_calls
 
         $r = AiProbes::e($m, 'tools', true);
 
-        $this->assertFalse($r['up'], '٢٠٠ بلا استدعاءِ أداةٍ عُدَّت إثباتاً للأدوات');
+        // **«لم يُثبَت» ≠ «فشل»** — البنيةُ سليمةٌ والبوّابةُ أجابت، والدليلُ وحدَه ناقص
+        $this->assertNull($r['up'], '٢٠٠ بلا استدعاءِ أداةٍ عُدَّت إثباتاً للأدوات');
         $m->refresh();
         $this->assertSame('unknown', $m->capabilities['tools']['src']);
     }

@@ -85,7 +85,25 @@ final class LiteLlmAskGenerator implements AskGenerator
 
     private ?string $lastFailure = null;
 
+    /** سياقُ الحوكمةِ لهذا الطلب — يُسلَّم من المنسّقِ قبل أوّلِ خطوة */
+    private array $gov = [];
+
+    /** المحاولةُ السابقةُ في هذا الطلب — لِتُعرَف علاقةُ ما بعدَها بها */
+    private ?string $lastEventId = null;
+
+    /** عدّادُ المحاولاتِ في الطلبِ المنطقيِّ الواحد — لا في الخطوة */
+    private int $attempts = 0;
+
+    /** طولُ مظروفِ الخطوةِ الحاليّةِ بالحروف — لتقديرِ رموزِ المدخلِ عند الحجز */
+    private int $envelopeChars = 0;
+
     public function __construct(private ?AiProfile $profile = null) {}
+
+    /** **سياقُ الحوكمةِ يُستقبَل ولا يُبنى هنا** — فهذا الصنفُ لا يعرف مستخدماً */
+    public function govern(array $ctx): void
+    {
+        $this->gov = $ctx;
+    }
 
     // ── العقد ──────────────────────────────────────────────────────────
 
@@ -101,7 +119,7 @@ final class LiteLlmAskGenerator implements AskGenerator
             'ceiling'    => AskPolicy::costCeiling(),
             'in_tokens'  => (int) ceil(mb_strlen($envelope) / AskContext::CHARS_PER_TOKEN),
             'out_tokens' => AskPolicy::maxOutputTokens(),
-        ]);
+        ])->governBy($this->gov === [] ? null : AiGovernance::gateFor($this->gov));
 
         /*
          * **رحلةٌ مُغلَقةٌ عند فتحِها ليست «إعداداً ناقصاً».**
@@ -128,6 +146,8 @@ final class LiteLlmAskGenerator implements AskGenerator
              ['role' => 'user',   'content' => $envelope]],
             $this->pairs,
         );
+
+        $this->envelopeChars = mb_strlen($envelope);
 
         return $this->generate($messages, AskTools::schema($tools));
     }
@@ -172,6 +192,25 @@ final class LiteLlmAskGenerator implements AskGenerator
                 return $this->error($this->lastFailure ?? AskFailures::PROVIDER_FAILURE);
             }
 
+            $outCap = $this->outputCap();
+
+            /*
+             * ── **الحوكمةُ تسبق كلَّ نداءٍ — لا الطلبَ وحدَه** (المرحلة ٤) ──
+             *
+             * السياسةُ والميزانيّةُ تُقرآن **عند كلِّ محاولةٍ**: إعادةً كانت أم
+             * احتياطاً. فطلبٌ يمرّ بثلاثِ محاولاتٍ يُحجَز له ثلاثَ مرّاتٍ
+             * ويُلتزَم ثلاثاً — **لأنّ ثلاثاً أُنفقت فعلاً**. وحجزٌ واحدٌ في
+             * أوّلِ الطلبِ كان سيجعل الإعادةَ والاحتياطَ **مجّانيَّين في
+             * دفاترِنا** ومدفوعَين عند المزوّد.
+             */
+            $this->attempts++;
+            $admit = $this->admit($model, $outCap);
+
+            if (! $admit['ok']) {
+                return $this->error($this->lastFailure = (string) $admit['code']);
+            }
+
+            $t0 = microtime(true);
             $this->calls++;
             $res = AiChat::complete([
                 'model'       => (string) $model->litellm_model_name,
@@ -179,17 +218,31 @@ final class LiteLlmAskGenerator implements AskGenerator
                 'tools'       => $toolDefs,
                 'tool_choice' => 'auto',
                 'temperature' => 0,
-                'max_tokens'  => AskPolicy::maxOutputTokens(),
-            ], AskPolicy::maxOutputTokens());
+                'max_tokens'  => $outCap,
+            ], $outCap);
 
+            $ms = (int) ($res['ms'] ?? round((microtime(true) - $t0) * 1000));
             $this->lastUsage = $res['usage'] ?: $this->lastUsage;
 
             if ($res['ok']) {
+                if ($admit['event'] !== null) {
+                    AiGovernance::settleOk($admit['event'], $admit['holds'],
+                        (array) $res['usage'], (array) ($model->pricing ?? []), $ms, $res['status']);
+                    $this->lastEventId = (string) $admit['event']->id;
+                }
+
                 // **النجاحُ يمسح تهدئةَ المزوّدِ ولا يُغلق الرحلة** — فالخطوةُ
                 // التاليةُ تبدأ من النموذجِ الذي نجح لا من رأسِ السلسلة
                 AiRouting::noteSuccess((string) $model->provider_id);
 
                 return $this->read((array) $res['data']);
+            }
+
+            if ($admit['event'] !== null) {
+                AiGovernance::settleFailed($admit['event'], $admit['holds'],
+                    (string) $res['failure'], (string) $res['cause'], $res['status'], $ms,
+                    (array) $res['usage'], (array) ($model->pricing ?? []));
+                $this->lastEventId = (string) $admit['event']->id;
             }
 
             $this->lastFailure = $stepFailure = (string) $res['failure'];
@@ -232,6 +285,44 @@ final class LiteLlmAskGenerator implements AskGenerator
                 return $this->error($this->lastFailure);
             }
         }
+    }
+
+    /**
+     * **قبولُ محاولةٍ واحدة** — أو رفضُها بتصنيفٍ يُقال للمستخدم.
+     *
+     * **وبلا سياقِ حوكمةٍ يمرّ كما كان** — فالمولِّدُ يُستعمَل في اختباراتِ
+     * عقدٍ بلا مستخدمٍ ولا قاعدة، وإسقاطُها هناك كان سيُخفي العقدَ خلف تهيئة.
+     */
+    private function admit(\App\Models\AiModel $model, int $outCap): array
+    {
+        if ($this->gov === []) {
+            return ['ok' => true, 'code' => null, 'holds' => [], 'event' => null];
+        }
+
+        $inTokens = (int) ceil($this->envelopeChars / AskContext::CHARS_PER_TOKEN);
+        $est      = AiCost::estimate((array) ($model->pricing ?? []), $inTokens, $outCap);
+
+        return AiGovernance::admit($this->gov, $model, $est, $inTokens + $outCap, [
+            'attempt'   => $this->attempts,
+            'relation'  => $this->attempts === 1 ? 'initial'
+                : ($this->run?->depth() > 0 ? 'fallback' : 'retry'),
+            'parent_id' => $this->lastEventId,
+        ]);
+    }
+
+    /**
+     * **سقفُ المخرَجِ بعد تضييقِ السياسة** — والأشدُّ يفوز.
+     *
+     * فسياسةٌ تقول «لا تتجاوز ٢٠٠ رمزاً لهذا الغرض» تُضيّق سقفَ الإعدادات،
+     * **ولا ترفعه أبداً**: `min` لا `max`. وسياسةٌ تطلب أكثرَ ممّا أقرّته
+     * الإعداداتُ لا تُعطى شيئاً — فالتضييقُ اتّجاهٌ واحد.
+     */
+    private function outputCap(): int
+    {
+        $cap = AskPolicy::maxOutputTokens();
+        $lim = (int) ($this->gov['limits']['max_output_tokens'] ?? 0);
+
+        return $lim > 0 ? max(1, min($cap, $lim)) : $cap;
     }
 
     /**
