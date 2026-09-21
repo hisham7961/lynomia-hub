@@ -272,7 +272,7 @@ class AskAdversarialSweepTest extends TestCase
     public function test_إحالةٌ_في_نصِّ_الجوابِ_لا_تصنع_مصدراً(): void
     {
         [$r] = $this->ask([
-            ['kind' => 'answer', 'answer' => 'حسب المصدر رقم ٧ في وحدةِ الرواتب…', 'sources' => []],
+            ['kind' => 'answer', 'answer' => 'حسب المصدرِ المذكورِ في وحدةِ الرواتب…', 'sources' => []],
         ]);
 
         // نصُّ الجوابِ يذكر مصدراً، لكنّ **قائمةَ المصادرِ من الخادمِ فارغة**
@@ -387,6 +387,10 @@ class AskAdversarialSweepTest extends TestCase
             AskFailures::PROVIDER_CREDITS, AskFailures::MODEL_UNAVAILABLE,
             AskFailures::POLICY_DENIED, AskFailures::BUDGET_EXCEEDED,
             AskFailures::QUOTA_EXCEEDED,
+            // (قبولُ إنتاجٍ · «كم مشروعاً») تفصيلُ `MODEL_FAILURE` — يُقاس في حزمةِ العقد
+            AskFailures::MALFORMED_MODEL_RESPONSE, AskFailures::MODEL_NO_OUTPUT,
+            AskFailures::MODEL_REASONED_ONLY, AskFailures::TOOL_PROTOCOL_ERROR,
+            AskFailures::UNSOURCED_NUMBER,
         ];
 
         $this->assertSame([], array_diff(AskFailures::CODES, $covered, $live, $governed),
@@ -394,8 +398,9 @@ class AskAdversarialSweepTest extends TestCase
 
         // وبرهانُ الحوكمةِ من ملفّاتِها — لا إعلانَ تغطيةٍ بلا مقابل
         $govSuite = '';
-        foreach (['AiFailureTaxonomyTest', 'AiGovernanceTest', 'AiBudgetConcurrencyTest'] as $f) {
-            $path = __DIR__ . '/../AiHub/' . $f . '.php';
+        foreach (['../AiHub/AiFailureTaxonomyTest', '../AiHub/AiGovernanceTest',
+                  '../AiHub/AiBudgetConcurrencyTest', 'AskResponseContractTest'] as $f) {
+            $path = __DIR__ . '/' . $f . '.php';
             if (is_file($path)) $govSuite .= (string) file_get_contents($path);
         }
         foreach ($governed as $code) {

@@ -166,7 +166,9 @@ class AskScreenTest extends TestCase
         $u = $this->asker();
         $this->ready();
         $this->bind([['kind' => 'answer',
-                      'answer' => '<img src=x onerror=alert(1)><script>steal()</script>',
+                      // **بلا رقمٍ في الحمولة**: حارسُ «رقمٌ بلا قراءة» يحجب الجوابَ قبل العرض،
+                      // فيُقاس الهروبُ على صفحةٍ لا جوابَ فيها — والمقصودُ هنا الهروبُ لا الحجب
+                      'answer' => '<img src=x onerror=alert(document.domain)><script>steal()</script>',
                       'sources' => []]]);
 
         $html = (string) $this->actingAs($u)
