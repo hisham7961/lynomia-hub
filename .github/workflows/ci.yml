@@ -1,9 +1,15 @@
-# ═══ حزمةُ الاختبارات على المحرّكين معاً ═══
+# ═══ حزمةُ الاختبارات على المحرّكاتِ الثلاثة ═══
 #
 # SQLite متساهلة حيث تكون MySQL صارمة: عمودٌ غائب، ونصٌّ أطول من عرض عموده،
 # وعددٌ خارج مداه، ولهجةُ استعلامٍ خاصة. وكلُّ صنفٍ من هذه أطفأ شاشةً على
 # الخادم بينما الحزمةُ خضراء على SQLite. فتُشغَّل الاختبارات نفسها على
 # **المحرّك الذي يعمل عليه النظام فعلاً** — ليقع ما يقع هنا لا عند صاحب النظام.
+#
+# **وMariaDB أُضيف صفّاً رابعاً** (البند #32): الخادمُ عليه، وكانت البوّابةُ
+# تمتحن MySQL 8 وحدَها — فبقي محرّكُ الإنتاجِ ممتحَناً بذاكرةِ من يتذكّر
+# تشغيلَ الأمرِ محلّيّاً. وليسا واحداً باسمَين: افتراضُ
+# `explicit_defaults_for_timestamp` يختلف، ودلالةُ `ORDER BY` عند تساوي
+# القيمِ تختلف — وهي القرعةُ التي يحذّر منها CLAUDE.md نصّاً.
 #
 # ولا شيء كان يفرض خضرة الحزمة قبل هذا الملف: خطّاف pre-push يفرض رفع النسخة
 # وحدها، فكل «أخضر» كان يعتمد على أن يتذكّر أحدُهم تشغيل الأمر.
@@ -21,23 +27,13 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
-      fail-fast: false          # نتيجةُ المحرّكين معاً تُقرأ في جولةٍ واحدة
+      fail-fast: false          # نتيجةُ المحرّكاتِ كلِّها تُقرأ في جولةٍ واحدة
       matrix:
         include:
-          - { php: '8.2', engine: sqlite, config: phpunit.xml }
-          - { php: '8.4', engine: sqlite, config: phpunit.xml }
-          - { php: '8.4', engine: mysql,  config: phpunit.mysql.xml }
-
-    services:
-      mysql:
-        image: mysql:8.0
-        env:
-          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
-          MYSQL_DATABASE: hub_test
-        ports: ['3306:3306']
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1"
-          --health-interval=5s --health-timeout=5s --health-retries=20
+          - { php: '8.2', engine: sqlite,  config: phpunit.xml,       image: '' }
+          - { php: '8.4', engine: sqlite,  config: phpunit.xml,       image: '' }
+          - { php: '8.4', engine: mysql,   config: phpunit.mysql.xml, image: 'mysql:8.0' }
+          - { php: '8.4', engine: mariadb, config: phpunit.mysql.xml, image: 'mariadb:10.11' }
 
     steps:
       - uses: actions/checkout@v4
@@ -85,18 +81,44 @@ jobs:
           # وخريطةُ الشعارات: تشير إلى ملفٍّ زال، أو ملفٌّ يُنشَر ولا يُعرَض
           php artisan hub:ai-logos --check
 
-      - name: انتظار MySQL
-        if: matrix.engine == 'mysql'
+      # ═══ محرّكُ القاعدة يُشغَّل مشروطاً لا عبر `services` ═══
+      #
+      # كتلةُ `services` تُقلِع لكلِّ صفٍّ من المصفوفةِ بلا شرط، **ولا تقبل
+      # صورةً فارغة** — فلا يمكن أن تختلف الصورةُ من صفٍّ لآخر. وبها كان
+      # صفّا sqlite يُقلِعان قاعدةً لا يمسّانها، وكان **محرّكٌ واحدٌ فقط**
+      # ممكناً في المصفوفة كلِّها.
+      #
+      # و`docker run` يقبل الشرطَ والصورةَ معاً — وبه صار MariaDB صفّاً
+      # رابعاً. **ولماذا هو تحديداً؟** لأنّ الخادمَ يعمل عليه، وCI كان يمتحن
+      # MySQL 8 وحدَها: فرقٌ في `explicit_defaults_for_timestamp` ولهجةٍ
+      # ودلالةِ ترتيبٍ **يقع على الخادمِ ولا تراه بوّابةٌ خضراء**.
+      - name: تشغيلُ محرّكِ القاعدة (${{ matrix.image }})
+        if: matrix.engine != 'sqlite'
         run: |
-          for i in $(seq 1 30); do
-            mysqladmin ping -h 127.0.0.1 -P 3306 -uroot --silent && exit 0
+          docker run -d --name hub-db -p 3306:3306 \
+            -e MYSQL_ALLOW_EMPTY_PASSWORD=yes \
+            -e MARIADB_ALLOW_EMPTY_ROOT_PASSWORD=yes \
+            -e MYSQL_DATABASE=hub_test \
+            -e MARIADB_DATABASE=hub_test \
+            ${{ matrix.image }}
+
+      - name: انتظار المحرّك
+        # **الاستعدادُ استعلامٌ لا نبضة:** `mysqladmin ping` يُجاب بنجاحٍ حتّى
+        # أثناء تهيئةِ الصورة، فتبدأ الهجراتُ على قاعدةٍ لم تُنشأ بعد. والسؤالُ
+        # عن `hub_test` نفسِها هو الذي يقطع هذه المسابقة.
+        if: matrix.engine != 'sqlite'
+        run: |
+          for i in $(seq 1 60); do
+            mysql -h 127.0.0.1 -P 3306 -uroot -e 'use hub_test' 2>/dev/null && exit 0
             sleep 2
           done
-          echo "لم تجهز MySQL"; exit 1
+          echo "✗ لم يجهز المحرّك ${{ matrix.image }}"
+          docker logs hub-db 2>&1 | tail -40
+          exit 1
 
-      - name: الهجرات وفحص المخطّط على MySQL
+      - name: الهجرات وفحص المخطّط على محرّك الخادم
         # الهجراتُ كلُّها على قاعدةٍ حقيقية ثم hub:schema-check: عمودٌ في السجلّ بلا هجرة يسقط هنا لا على الخادم
-        if: matrix.engine == 'mysql'
+        if: matrix.engine != 'sqlite'
         run: |
           cp .env.example .env && php artisan key:generate --ansi -q
           DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_PORT=3306 DB_DATABASE=hub_test DB_USERNAME=root DB_PASSWORD= php artisan migrate --force -q

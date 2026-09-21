@@ -74,14 +74,36 @@ class InnovationController extends Controller
         if ($cid === '' || ($allowed !== null && ! in_array($cid, $allowed, true))) {
             $cid = $allowed[0] ?? null;
         }
-        $project = Project::create([
-            'name' => \Illuminate\Support\Str::limit((string) $idea->title, 120, ''),
-            'status' => 'تخطيط',
-            'company_id' => $cid ?: null,
-            'description' => trim("من مركز الابتكار.\n\nالمشكلة: " . (string) $idea->problem . "\n\nالفكرة: " . (string) $idea->idea),
-        ]);
+        /*
+         * **معاملةٌ على الفكرةِ مقفولةً — كتابتان واقعةٌ واحدة** (البند #3 · DI-07).
+         *
+         * الإنشاءُ والربطُ كانا كتابتَين مكشوفتَين، وفيهما عطلان:
+         *
+         *  · **سقوطُ الربطِ يترك مشروعاً يتيماً** — لا فكرةَ تشير إليه، ويظهر
+         *    في كانبان المشاريعِ كعملٍ حقيقيّ، والفكرةُ تبقى قابلةً للترقية
+         *    فيُولَد له توأم.
+         *  · **والفحصُ خارجَ القفلِ قرعة** — نقرتان متزامنتان (أو نقرةٌ
+         *    وإعادةُ إرسال) تمرّان معاً على `abort_if` فارغ، فيُنشأ مشروعان
+         *    ويُهمَل أوّلُهما حين يكتب الثاني `project_id` فوقَه.
+         *
+         * والفحصُ فوقُ يبقى كما هو: ردٌّ ٤٢٢ سريعٌ بلا قفلٍ في الحالةِ الشائعة.
+         * **وهذا هنا هو الفاصلُ لا ذاك.**
+         */
+        $project = \Illuminate\Support\Facades\DB::transaction(function () use ($id, $cid) {
+            $idea = hub_scope(Idea::query(), 'ideas')->whereKey($id)->lockForUpdate()->firstOrFail();
+            abort_if($idea->project_id, 422, 'رُقّيت هذه الفكرة لمشروع من قبل');
 
-        $idea->update(['project_id' => $project->id, 'status' => 'قيد التنفيذ']);
+            $project = Project::create([
+                'name' => \Illuminate\Support\Str::limit((string) $idea->title, 120, ''),
+                'status' => 'تخطيط',
+                'company_id' => $cid ?: null,
+                'description' => trim("من مركز الابتكار.\n\nالمشكلة: " . (string) $idea->problem . "\n\nالفكرة: " . (string) $idea->idea),
+            ]);
+
+            $idea->update(['project_id' => $project->id, 'status' => 'قيد التنفيذ']);
+
+            return $project;
+        });
 
         return redirect()->route('m.show', ['projects', $project->id])
             ->with('ok', '🚀 رُقّيت الفكرة إلى مشروع — أكمل تخطيطه من هنا');
