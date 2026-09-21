@@ -79,9 +79,11 @@ final class AiLedger
      * **ولا يُحوَّل مجهولٌ إلى صفر:** `cost_micro` تبقى `null` و`cost_source`
      * تقول `unknown`، فتقرأ الشاشةُ «—» لا «٠٫٠٠».
      */
-    public static function succeed(AiUsageEvent $e, array $settled, int $ms, ?int $httpStatus = 200): AiUsageEvent
+    public static function succeed(AiUsageEvent $e, array $settled, int $ms,
+                                   ?int $httpStatus = 200, array $diag = []): AiUsageEvent
     {
         $t = (array) ($settled['tokens'] ?? []);
+        self::diagnose($e, $diag);
 
         $e->forceFill([
             'status'        => 'ok',
@@ -110,9 +112,11 @@ final class AiLedger
      * اعتماد) — **والسجلُّ يقول ما يعرف ولا يُخمّن**.
      */
     public static function fail(AiUsageEvent $e, ?string $failure, ?string $cause,
-                                ?int $httpStatus, int $ms, array $settled = []): AiUsageEvent
+                                ?int $httpStatus, int $ms, array $settled = [],
+                                array $diag = []): AiUsageEvent
     {
         $t = (array) ($settled['tokens'] ?? []);
+        self::diagnose($e, $diag);
 
         $e->forceFill([
             'status'        => 'failed',
@@ -141,6 +145,29 @@ final class AiLedger
         ])->save();
 
         return $e;
+    }
+
+    /**
+     * **تليمتري الدورةِ — تصنيفٌ وأرقامٌ لا محتوى** (قبولُ الإنتاج `92dbd557`).
+     *
+     * وثلاثُ محاولاتٍ مدفوعةٍ مضت خُمِّن سببُها بدل أن يُقرأ، لأنّ ما يلزم
+     * التشخيصَ لم يكن يُسجَّل: سببُ الانتهاء، ورموزُ التفكير، والسقفُ
+     * المُرسَل، واسمُ الأداةِ المطلوبة.
+     *
+     * **ولا وسائطَ أداةٍ ولا نصَّ**: الاسمُ من مفرداتٍ مغلقةٍ خمسٍ لا غير.
+     */
+    private static function diagnose(AiUsageEvent $e, array $diag): void
+    {
+        if ($diag === []) return;
+
+        $tool = (string) ($diag['tool'] ?? '');
+
+        $e->forceFill(array_filter([
+            'finish_reason'     => self::clip($diag['finish'] ?? null, 40),
+            'reasoning_tokens'  => isset($diag['reasoning']) ? max(0, (int) $diag['reasoning']) : null,
+            'max_output_tokens' => isset($diag['max_output']) ? max(0, (int) $diag['max_output']) : null,
+            'tool_requested'    => in_array($tool, \App\Support\AskTools::TOOLS, true) ? $tool : null,
+        ], static fn ($v) => $v !== null));
     }
 
     /**

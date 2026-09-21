@@ -76,6 +76,7 @@ class AskController extends Controller
     {
         $ready   = AskPolicy::ready();
         $profile = AskPolicy::profile();
+        $canFix  = \App\Support\AiAccess::canManage();
 
         return [
             'ready'    => $ready,
@@ -99,7 +100,15 @@ class AskController extends Controller
             'result'   => null,
             'asked'    => null,
             // **من يملك الإصلاحَ يُعطى الطريقَ إليه** — ولا يُعرَض لغيرِه بابٌ مغلق
-            'canFix'   => \App\Support\AiAccess::canManage(),
+            'canFix'   => $canFix,
+            /*
+             * **أيصلح النموذجُ لسؤالٍ قصير؟** — من التهيئةِ لا من نداء.
+             *
+             * ولمن يملك التبديلَ وحدَه: اسمُ النموذجِ وقدراتُه تفصيلُ بنيةٍ لا
+             * يخصّ السائل، **وعرضُه للجميعِ يوسّع سطحَ المعرفةِ بلا فائدةٍ له**.
+             */
+            'advisory' => ($canFix && $profile !== null)
+                ? \App\Support\AskModelAdvisory::read($profile) : null,
             'failures' => AskFailures::MESSAGES,
         ];
     }

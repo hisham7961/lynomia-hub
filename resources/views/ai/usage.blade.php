@@ -135,6 +135,47 @@
 </div>
 @endif
 
+@if (($ledger['turns'] ?? []) !== [])
+<div class="card">
+    <h3>آخرُ الدورات — لكلِّ نداءٍ صفٌّ يُقرأ</h3>
+    <div class="sub mut">
+        <b>دورةٌ لا تُقرأ بعد وقوعِها تُخمَّن:</b> سببُ الانتهاءِ والسقفُ
+        المُرسَلُ ورموزُ التفكيرِ هي ما يفرّق «بلغ الجوابُ سقفَه» من «أنفق
+        النموذجُ السقفَ كلَّه تفكيراً» — <b>ولا نصَّ سؤالٍ ولا جوابٍ ولا
+        وسائطَ أداةٍ هنا</b>.
+    </div>
+    <table class="tbl">
+        <thead><tr>
+            <th>الطلب</th><th>المحاولة</th><th>الحالة</th><th>الانتهاء</th>
+            <th>الأداة</th><th>مدخل</th><th>مخرَج</th><th>تفكير</th>
+            <th>السقف</th><th>ms</th>
+        </tr></thead>
+        <tbody>
+        @foreach ($ledger['turns'] as $t)
+            <tr>
+                <td><span class="mono ltr">{{ $t['correlation'] }}</span></td>
+                <td>{{ $t['attempt'] }}<span class="mut"> · {{ $t['relation'] }}</span></td>
+                <td>
+                    {{ $t['status'] }}
+                    @if ($t['failure'])<br><span class="mono ltr mut">{{ $t['failure'] }}</span>@endif
+                </td>
+                <td><span class="mono ltr">{{ $t['finish'] ?? '—' }}</span></td>
+                <td><span class="mono ltr">{{ $t['tool'] ?? '—' }}</span></td>
+                <td>{{ $t['in']  ?? '—' }}</td>
+                <td>{{ $t['out'] ?? '—' }}</td>
+                {{-- **رموزُ تفكيرٍ تلتهم السقفَ تُوسَم** — فهي سببٌ لا رقمٌ عابر --}}
+                <td class="{{ ($t['reasoning'] ?? 0) > 0 && $t['cap'] && $t['reasoning'] >= $t['cap'] * 0.8 ? 'wn' : '' }}">
+                    {{ $t['reasoning'] ?? '—' }}
+                </td>
+                <td>{{ $t['cap'] ?? '—' }}</td>
+                <td>{{ $t['ms'] }}</td>
+            </tr>
+        @endforeach
+        </tbody>
+    </table>
+</div>
+@endif
+
 <div class="cards">
     <div class="stat"><span class="ico bdg">🗄️</span>
         <b>حدُّ الملكيّةِ صريح</b>

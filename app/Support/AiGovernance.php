@@ -203,10 +203,11 @@ final class AiGovernance
 
     /** **إغلاقُ محاولةٍ ناجحة** — كلفةٌ موسومةٌ بمصدرِها في السجلِّ والعدّاد معاً */
     public static function settleOk(AiUsageEvent $e, array $holds, array $usage,
-                                    array $pricing, int $ms, ?int $status = 200): array
+                                    array $pricing, int $ms, ?int $status = 200,
+                                    array $diag = []): array
     {
         $settled = AiCost::settle($usage, $pricing);
-        AiLedger::succeed($e, $settled, $ms, $status);
+        AiLedger::succeed($e, $settled, $ms, $status, $diag);
 
         $tokens = (int) (($settled['tokens']['total'] ?? null)
             ?? ((int) ($settled['tokens']['in'] ?? 0) + (int) ($settled['tokens']['out'] ?? 0)));
@@ -225,12 +226,13 @@ final class AiGovernance
      */
     public static function settleFailed(AiUsageEvent $e, array $holds, ?string $failure,
                                         ?string $cause, ?int $status, int $ms,
-                                        array $usage = [], array $pricing = []): array
+                                        array $usage = [], array $pricing = [],
+                                        array $diag = []): array
     {
         $settled = $usage === [] ? ['micro' => null, 'source' => AiCost::UNKNOWN, 'tokens' => []]
             : AiCost::settle($usage, $pricing);
 
-        AiLedger::fail($e, $failure, $cause, $status, $ms, $settled);
+        AiLedger::fail($e, $failure, $cause, $status, $ms, $settled, $diag);
         AiBudgets::commit($holds, $settled['micro'],
             (int) ($settled['tokens']['total'] ?? 0));
 

@@ -108,7 +108,7 @@ final class AskPipeline
         $verdict = AiPolicy::evaluate($gov);
         if (! $verdict['allowed']) {
             return self::fail((string) ($verdict['code'] ?? AskFailures::POLICY_DENIED),
-                $correlation, $started, $gen);
+                $correlation, $started, $gen, ['profile' => (string) $profile->key]);
         }
 
         // **والسقوفُ تُحمَل في السياقِ لا تُعاد قراءتُها** — فقراءةٌ ثانيةٌ في
@@ -166,7 +166,8 @@ final class AskPipeline
                  * «ضيقَ سياق» كانت تُخفي محاولةَ حقنٍ خلف رسالةِ سعة.
                  */
                 return self::fail(AskFailures::CONTEXT_INTEGRITY, $correlation, $started, $gen,
-                    ['requested' => $requested, 'denied' => $denied, 'ctx' => $ctx]);
+                    ['requested' => $requested, 'denied' => $denied, 'ctx' => $ctx,
+                     'profile' => (string) $profile->key]);
             }
 
             $out = $gen->step($envelope, $catalog, $history);
@@ -186,6 +187,7 @@ final class AskPipeline
                 return self::fail(AskFailures::known($code) ? $code : AskFailures::MODEL_FAILURE,
                     $correlation, $started, $gen,
                     ['requested' => $requested, 'denied' => $denied, 'usage' => $usage,
+                     'profile' => (string) $profile->key,
                      'executed' => $executed, 'ctx' => $ctx]);
             }
 
@@ -201,6 +203,7 @@ final class AskPipeline
             if ($kind !== 'tool') {
                 return self::fail(AskFailures::MODEL_FAILURE, $correlation, $started, $gen,
                     ['requested' => $requested, 'denied' => $denied, 'usage' => $usage,
+                     'profile' => (string) $profile->key,
                      'executed' => $executed, 'ctx' => $ctx]);
             }
 
@@ -247,20 +250,23 @@ final class AskPipeline
         if ($answer === null) {
             return self::fail(AskFailures::TOOL_BUDGET, $correlation, $started, $gen,
                 ['requested' => $requested, 'denied' => $denied, 'usage' => $usage,
+                     'profile' => (string) $profile->key,
                  'executed' => $executed, 'ctx' => $ctx]);
         }
 
         $answer = trim(Redactor::text($answer));
         if ($answer === '') {
             return self::fail(AskFailures::MODEL_FAILURE, $correlation, $started, $gen,
-                ['requested' => $requested, 'denied' => $denied, 'usage' => $usage, 'ctx' => $ctx]);
+                ['requested' => $requested, 'denied' => $denied, 'usage' => $usage,
+                     'profile' => (string) $profile->key, 'ctx' => $ctx]);
         }
 
         // ── المراجعُ تُصادَق على ما قرأه الخادمُ لا على ما قاله النموذج ──
         foreach ($cited as $n) {
             if (! $ctx->isKnownSource((int) $n)) {
                 return self::fail(AskFailures::FORGED_SOURCE, $correlation, $started, $gen,
-                    ['requested' => $requested, 'denied' => $denied, 'usage' => $usage, 'ctx' => $ctx]);
+                    ['requested' => $requested, 'denied' => $denied, 'usage' => $usage,
+                     'profile' => (string) $profile->key, 'ctx' => $ctx]);
             }
         }
 
@@ -286,6 +292,7 @@ final class AskPipeline
         if ($executed === 0 && preg_match('/[0-9\x{0660}-\x{0669}\x{06F0}-\x{06F9}]/u', $answer)) {
             return self::fail(AskFailures::UNSOURCED_NUMBER, $correlation, $started, $gen,
                 ['requested' => $requested, 'denied' => $denied, 'usage' => $usage,
+                     'profile' => (string) $profile->key,
                  'executed' => $executed, 'ctx' => $ctx]);
         }
 
@@ -312,6 +319,7 @@ final class AskPipeline
             'generator'   => $gen->label(),
             'tokens'      => isset($usage['tokens']) ? (int) $usage['tokens'] : null,
             'cost'        => isset($usage['cost']) ? (float) $usage['cost'] : null,
+            'reasoning_tokens' => isset($usage['reasoning']) ? (int) $usage['reasoning'] : null,
             'depth'       => count($requested),
             'ms'          => (int) round((microtime(true) - $started) * 1000),
             'outcome'     => $partial ? 'partial' : 'ok',
@@ -384,6 +392,21 @@ final class AskPipeline
             'truncated'   => (bool) ($budget['truncated'] ?? false),
             'executed'    => (int) ($extra['executed'] ?? 0),
             'calls'       => isset($extra['usage']['calls']) ? (int) $extra['usage']['calls'] : null,
+            /*
+             * ── **والصفُّ الذي يُحقَّق فيه كان أفقرَ من صفِّ النجاح** ──
+             * (قبولُ الإنتاج · `92dbd557`)
+             *
+             * أثرُ النجاحِ يحمل الغرضَ والنموذجَ والرموزَ والكلفة، **وأثرُ
+             * الإخفاقِ لا يحمل منها شيئاً** — وهو وحدَه ما يُفتَح للتحقيق.
+             * فمعرّفُ الطلبِ يُعطي «أخفق» ولا يقول **بأيِّ نموذجٍ ولا كم
+             * أنفق**، فيُخمَّن ما كان يُقرأ.
+             */
+            'profile'     => isset($extra['profile']) ? (string) $extra['profile'] : null,
+            'model'       => isset($extra['usage']['model']) ? (string) $extra['usage']['model'] : null,
+            'tokens'      => isset($extra['usage']['tokens']) ? (int) $extra['usage']['tokens'] : null,
+            'cost'        => isset($extra['usage']['cost']) ? (float) $extra['usage']['cost'] : null,
+            'reasoning_tokens' => isset($extra['usage']['reasoning'])
+                ? (int) $extra['usage']['reasoning'] : null,
             'generator'   => $gen->label(),
             'failure'     => $code,
             'ms'          => (int) round((microtime(true) - $started) * 1000),
