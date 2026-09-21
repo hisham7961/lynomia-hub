@@ -160,8 +160,13 @@ final class AskPipeline
 
             // **فشلٌ مُغلَقٌ لا مفتوح**: مظروفٌ لم يجتَز فحصَه لا يُرسَل
             if (! $ctx->verify($envelope)) {
-                return self::fail(AskFailures::CONTEXT_LIMIT, $correlation, $started, $gen,
-                    ['requested' => $requested, 'denied' => $denied]);
+                /*
+                 * **فشلُ السياجِ حالةُ أمنٍ لا حالةُ سعة** — ورقمٌ سرّيٌّ ظهر
+                 * ثالثةً يعني أنّ بياناتٍ حملته إلى داخلِ الحمولة. وتسميتُها
+                 * «ضيقَ سياق» كانت تُخفي محاولةَ حقنٍ خلف رسالةِ سعة.
+                 */
+                return self::fail(AskFailures::CONTEXT_INTEGRITY, $correlation, $started, $gen,
+                    ['requested' => $requested, 'denied' => $denied, 'ctx' => $ctx]);
             }
 
             $out = $gen->step($envelope, $catalog, $history);
@@ -171,9 +176,17 @@ final class AskPipeline
             if ($kind === 'error') {
                 $code = (string) ($out['code'] ?? AskFailures::MODEL_FAILURE);
 
+                /*
+                 * **ودليلُ السياقِ يُسجَّل مع الإخفاقِ لا مع النجاحِ وحدَه.**
+                 *
+                 * كان إخفاقُ النموذجِ يُسجَّل بـ`chars = 0` و`rows = 0` مهما
+                 * قُرئ قبلَه — **فالصفُّ الذي يدّعي ضيقَ السياقِ لا يحمل عنه
+                 * رقماً واحداً**، ولا يُشخَّص بعدَه شيء.
+                 */
                 return self::fail(AskFailures::known($code) ? $code : AskFailures::MODEL_FAILURE,
                     $correlation, $started, $gen,
-                    ['requested' => $requested, 'denied' => $denied, 'usage' => $usage]);
+                    ['requested' => $requested, 'denied' => $denied, 'usage' => $usage,
+                     'executed' => $executed, 'ctx' => $ctx]);
             }
 
             if ($kind === 'answer') {
@@ -187,7 +200,8 @@ final class AskPipeline
 
             if ($kind !== 'tool') {
                 return self::fail(AskFailures::MODEL_FAILURE, $correlation, $started, $gen,
-                    ['requested' => $requested, 'denied' => $denied, 'usage' => $usage]);
+                    ['requested' => $requested, 'denied' => $denied, 'usage' => $usage,
+                     'executed' => $executed, 'ctx' => $ctx]);
             }
 
             // ── الحارسُ الثاني: التصريحُ عند التنفيذِ، مستقلٌّ عن الكتالوج ──

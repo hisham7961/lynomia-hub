@@ -149,7 +149,10 @@ final class AskTools
         };
 
         return [
-            $fn('hub_modules', 'يسرد الوحداتِ المتاحةَ لصاحبِ الجلسةِ وحقولَ كلٍّ منها. ابدأ بها إن لم تعرف أين تبحث.', []),
+            $fn('hub_modules', 'فهرسُ الوحداتِ المتاحةِ لصاحبِ الجلسة (مفتاحٌ وعنوان). '
+                . 'ومع `module` يعيد حقولَ تلك الوحدةِ وحدَها. '
+                . 'ولعدِّ صفوفِ وحدةٍ لا تحتج إليه: نادِ `hub_count` بمفتاحِ الوحدةِ مباشرةً.',
+                ['module' => ['type' => 'string', 'description' => 'مفتاحُ وحدةٍ لطلبِ حقولِها وحدَها']]),
             $fn('hub_search', 'بحثٌ نصّيٌّ عبر الوحداتِ المتاحة. حرفان على الأقلّ.',
                 ['q' => ['type' => 'string', 'minLength' => self::MIN_SEARCH_CHARS]], ['q']),
             $fn('hub_list', 'يعيد صفوفَ وحدةٍ داخلَ نطاقِ صاحبِ الجلسة. السقفُ '
@@ -157,7 +160,8 @@ final class AskTools
                 ['module' => $moduleArg, 'filters' => $filters], ['module']),
             $fn('hub_record', 'يعيد سجلّاً واحداً بمعرّفِه — إن كان داخلَ نطاقِ صاحبِ الجلسة.',
                 ['module' => $moduleArg, 'id' => ['type' => 'string']], ['module', 'id']),
-            $fn('hub_count', 'يعيد عدَّ الصفوفِ داخلَ النطاقِ بلا تسليمِ صفٍّ واحد.',
+            $fn('hub_count', 'يعيد عدَّ الصفوفِ داخلَ النطاقِ بلا تسليمِ صفٍّ واحد. '
+                . '**استعملها لكلِّ سؤالِ «كم»** — ولا تجلب صفوفاً لتعدَّها بنفسِك.',
                 ['module' => $moduleArg, 'filters' => $filters], ['module']),
         ];
     }
@@ -185,7 +189,7 @@ final class AskTools
         }
 
         return match ($tool) {
-            'hub_modules' => self::toolModules($u),
+            'hub_modules' => self::toolModules($u, $args),
             'hub_search'  => self::toolSearch($u, $args),
             'hub_list'    => self::toolList($u, $args),
             'hub_record'  => self::toolRecord($u, $args),
@@ -196,15 +200,51 @@ final class AskTools
     // ── الأدوات ────────────────────────────────────────────────────────
 
     /** **ما الذي يمكن سؤالي عنه؟** — أسماءٌ ووسومٌ، **ولا صفَّ بيانات** */
-    private static function toolModules(mixed $u): array
+    /**
+     * **فهرسُ الوحدات — كاملاً ومُقتضَباً معاً** (إصلاحُ قبولِ الإنتاج `71b0059e`).
+     *
+     * ── **العطبُ الذي كان** ──
+     *
+     * كان الفهرسُ يحمل **أسماءَ حقولِ كلِّ وحدة**: ألفٌ وأربعُمئةٍ وسبعةٌ
+     * وأربعون اسمَ حقلٍ عبر خمسٍ وثمانين وحدة — **تسعةَ عشرَ ألفَ حرفٍ** من
+     * أربعةٍ وعشرين ألفاً هي ميزانيّةُ السياقِ كلُّها. ثمّ يقصّه وعاءُ السياقِ
+     * إلى **خمسةٍ وعشرين صفّاً** بحدِّ صفوفِ **البيانات**، فيصل النموذجَ
+     * خمسٌ وعشرون وحدةً أبجديّاً — و`projects` التاسعةُ والخمسون.
+     *
+     * **فالسائلُ يسأل عن المشاريعِ ودليلُه لا يذكرها.**
+     *
+     * ── **والعلاجُ بنيويٌّ لا سقفٌ أكبر** ──
+     *
+     *  · الفهرسُ **مفتاحٌ وعنوانٌ فقط** — فيسع الخمسَ والثمانين في أقلَّ من
+     *    ربعِ الميزانيّة، وهو نفسُه ما تُعلنه مفرداتُ `enum` فلا يكشف جديداً.
+     *  · **والحقولُ تُطلَب لوحدةٍ بعينِها** — من يريد أن يُرشِّح يسأل عن حقولِ
+     *    وحدتِه وحدَها، ولا يُحمَّل الجميعُ ثمنَ حاجةِ واحد.
+     *  · وهو **فهرسٌ لا بيانات**، فلا يُقصّ بحدِّ صفوفِ البيانات.
+     */
+    private static function toolModules(mixed $u, array $args = []): array
     {
-        $rows = [];
-        foreach (self::catalog($u) as $key => $meta) {
-            $rows[] = ['module' => $key, 'label' => $meta['label'],
-                       'fields' => implode(',', $meta['fields'])];
+        $catalog = self::catalog($u);
+        $one     = trim((string) ($args['module'] ?? ''));
+
+        // **حقولُ وحدةٍ بعينِها** — والوحدةُ تُتحقَّق من الكتالوجِ لا من قولِ النموذج
+        if ($one !== '') {
+            if (! isset($catalog[$one])) {
+                return self::fail('hub_modules', 'وحدةٌ غيرُ متاحةٍ لصاحبِ الجلسة');
+            }
+
+            return self::ok('hub_modules', $one, [[
+                'module' => $one,
+                'label'  => $catalog[$one]['label'],
+                'fields' => implode(',', $catalog[$one]['fields']),
+            ]], false, true);
         }
 
-        return self::ok('hub_modules', null, $rows);
+        $rows = [];
+        foreach ($catalog as $key => $meta) {
+            $rows[] = ['module' => $key, 'label' => $meta['label']];
+        }
+
+        return self::ok('hub_modules', null, $rows, false, true);
     }
 
     /**
@@ -434,15 +474,24 @@ final class AskTools
         return class_exists($class) ? $class : null;
     }
 
-    private static function ok(string $tool, ?string $module, array $rows, bool $truncated = false): array
+    /**
+     * @param  bool  $directory  **أفهرسٌ هذا أم صفوفُ بيانات؟**
+     *   الفهرسُ أسماءُ وحداتٍ وعناوينُها — **لا معرّفَ ولا قيمةَ سجلٍّ فيه**،
+     *   وهو نفسُه ما تُعلنه مفرداتُ `enum` في وصفِ الأدوات. فقصُّه بحدِّ صفوفِ
+     *   **البيانات** يُخفي عن النموذجِ وحداتٍ يملكها صاحبُ الجلسةِ فعلاً.
+     */
+    private static function ok(string $tool, ?string $module, array $rows,
+                               bool $truncated = false, bool $directory = false): array
     {
         return ['ok' => true, 'tool' => $tool, 'module' => $module, 'rows' => $rows,
-                'count' => null, 'error' => null, 'truncated' => $truncated];
+                'count' => null, 'error' => null, 'truncated' => $truncated,
+                'directory' => $directory];
     }
 
     private static function fail(string $tool, string $why): array
     {
         return ['ok' => false, 'tool' => $tool, 'module' => null, 'rows' => [],
-                'count' => null, 'error' => $why, 'truncated' => false];
+                'count' => null, 'error' => $why, 'truncated' => false,
+                'directory' => false];
     }
 }

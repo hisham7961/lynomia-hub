@@ -432,14 +432,16 @@ final class LiteLlmAskGenerator implements AskGenerator
          * تماماً**. وثلاثُ حالاتٍ مشروعةٍ تنتهي إلى نصٍّ فارغ، **وعلاجُ كلٍّ
          * منها مختلف**، فجمعُها في «ردٍّ غيرِ مفهوم» يمنع التشخيصَ كلَّه:
          *
-         *  · **قُطع بسقفِ المخرَج** ⇒ حدُّ سياق: ضيِّق السؤالَ أو ارفع السقف.
+         *  · **قُطع بسقفِ المخرَج** ⇒ `OUTPUT_LIMIT`: سقفُ **ما يكتب** نفد،
+         *    ولا علاقةَ لطولِ السؤالِ به. وكان يُقال «حدَّ سياق» فيُرسَل صاحبُ
+         *    السؤالِ القصيرِ يضيّق ما لا يحتاج تضييقاً (قبولُ الإنتاج `71b0059e`).
          *  · **أنفقه في التفكير** ⇒ نموذجٌ تفكيريٌّ بسقفٍ ضيّق.
          *  · **إكمالٌ فارغٌ حقّاً** ⇒ خبرٌ عن النموذجِ لا عن فهمِنا.
          *
          * **ولا يُجعَل شيءٌ من هذا نجاحاً** — كلُّها إخفاقٌ، لكنّه إخفاقٌ باسمِه.
          */
         if ($text === '') {
-            if ($finish === 'length')  return $this->error(AskFailures::CONTEXT_LIMIT);
+            if ($finish === 'length')  return $this->error(AskFailures::OUTPUT_LIMIT);
             if ($think !== '')         return $this->error(AskFailures::MODEL_REASONED_ONLY);
 
             return $this->error(AskFailures::MODEL_NO_OUTPUT);

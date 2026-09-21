@@ -86,8 +86,32 @@ final class AskFailures
     /** بلغت الحصّةُ سقفَها — عددُ طلباتٍ أو رموزٍ لا مال */
     public const QUOTA_EXCEEDED = 'QUOTA_EXCEEDED';
 
-    /** السياقُ بلغ سقفَه قبل أن يكتملَ الجواب */
+    /**
+     * **سياقُ المدخلِ تجاوز سعةَ النموذج** — ويعود من البوّابةِ بـ٤٠٠ بمتنٍ يُسمّيه.
+     *
+     * **ومعناه ضاق بعد أن كان مظلّةً لثلاثةِ أسبابٍ مختلفة** (إصلاحُ قبولِ
+     * الإنتاج `71b0059e`): كان يُقال أيضاً عن بلوغِ سقفِ **المخرَج** وعن
+     * فشلِ **سلامةِ المظروف**، وعلاجُ كلٍّ منها مختلف. فمن قيل له «ضيِّق
+     * سؤالَك» وسؤالُه ثلاثُ كلمات، أُرسل يُصلح ما ليس معطوباً.
+     */
     public const CONTEXT_LIMIT = 'CONTEXT_LIMIT';
+
+    /**
+     * **سقفُ المخرَجِ نفد قبل أن يكتب النموذجُ حرفاً** — `finish_reason = length`.
+     *
+     * وهو **سقفُ ما يكتب لا سعةُ ما يقرأ**. وسؤالٌ من ثلاثِ كلماتٍ يبلغه حين
+     * يكون السقفُ ضيّقاً أو النموذجُ مُسهِباً — **ولا علاقةَ لطولِ السؤالِ به**.
+     */
+    public const OUTPUT_LIMIT = 'OUTPUT_LIMIT';
+
+    /**
+     * **مظروفُ السياقِ لم يجتَز فحصَ سلامتِه** — وهذه حالةُ **أمنٍ** لا سعة.
+     *
+     * فحصُ `AskContext::verify` يعدّ السياجين والرقمَ السرّيّ: ظهورُه ثالثةً
+     * يعني أنّ **بياناتٍ حملت الرقمَ إلى داخلِ الحمولة** — أي محاولةَ كسرِ
+     * السياج. وتسميتُها «ضيقَ سياق» كانت تُخفي محاولةَ حقنٍ خلف رسالةِ سعة.
+     */
+    public const CONTEXT_INTEGRITY = 'CONTEXT_INTEGRITY';
 
     /** طلبُ أداةٍ لا يُطابق العقد: اسمٌ مجهولٌ أو شكلٌ فاسد */
     public const MALFORMED_TOOL_REQUEST = 'MALFORMED_TOOL_REQUEST';
@@ -137,6 +161,7 @@ final class AskFailures
     public const CODES = [
         self::UNAUTHORIZED, self::UNAVAILABLE, self::GATEWAY_FAILURE, self::PROVIDER_FAILURE,
         self::MODEL_FAILURE, self::TIMEOUT, self::RATE_LIMITED, self::CONTEXT_LIMIT,
+        self::OUTPUT_LIMIT, self::CONTEXT_INTEGRITY,
         self::PROVIDER_CREDITS, self::MODEL_UNAVAILABLE,
         self::MALFORMED_MODEL_RESPONSE, self::MODEL_NO_OUTPUT, self::MODEL_REASONED_ONLY,
         self::TOOL_PROTOCOL_ERROR, self::UNSOURCED_NUMBER,
@@ -174,6 +199,9 @@ final class AskFailures
         self::BUDGET_EXCEEDED        => 'بلغت ميزانيّةُ الذكاءِ سقفَها لهذه الفترة.',
         self::QUOTA_EXCEEDED         => 'بلغت حصّةُ الاستعمالِ سقفَها لهذه الفترة.',
         self::CONTEXT_LIMIT          => 'السؤالُ يحتاج بياناتٍ أكثرَ ممّا يتّسع له السياق. ضيِّق السؤالَ.',
+        // **ولا يُقال «ضيِّق سؤالَك» لمن سؤالُه ثلاثُ كلمات** — العطبُ في سقفِ الكتابةِ لا في السؤال
+        self::OUTPUT_LIMIT           => 'بلغ الجوابُ سقفَ طولِه قبل أن يكتمل — والسؤالُ سليم. أعِد المحاولةَ أو ارفع سقفَ المخرَجِ من الإعدادات.',
+        self::CONTEXT_INTEGRITY      => 'تعذّر تجهيزُ سياقٍ موثوقٍ لهذا الطلب — ولم يُرسَل شيءٌ إلى النموذج.',
         self::MALFORMED_TOOL_REQUEST => 'طلبُ قراءةٍ غيرُ صالحٍ — لم يُنفَّذ.',
         self::UNSAFE_TOOL_ARGUMENTS  => 'طلبُ قراءةٍ برفضٍ من الحارس — لم يُنفَّذ.',
         self::NO_ACCESSIBLE_DATA     => 'لا بياناتٍ ضمنَ نطاقِك تجيب عن هذا السؤال.',

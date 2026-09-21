@@ -178,11 +178,25 @@ final class AskContext
         $dropped  = 0;
         $why      = null;
 
+        /*
+         * ── **فهرسٌ لا صفوفُ بيانات** (إصلاحُ قبولِ الإنتاج `71b0059e`) ──
+         *
+         * حدُّ الصفوفِ وُضع لسجلّاتِ **أعمال**: كلُّ صفٍّ منها معرّفٌ وقيمٌ،
+         * وخمسةٌ وعشرون منها سياقٌ معقول. **والفهرسُ ليس من هذا الصنف**: هو
+         * أسماءُ وحداتٍ وعناوينُها، ولا معرّفَ فيه ولا قيمةَ سجلّ — وهو نفسُه
+         * ما تُعلنه مفرداتُ `enum` في وصفِ الأدواتِ في كلِّ خطوة.
+         *
+         * **وقصُّه كان يُخفي عن النموذجِ وحداتٍ يملكها صاحبُ الجلسةِ فعلاً**،
+         * فيبحث عمّا لا يعرف وجودَه ويستنفد خطواتِه ثمّ يُخفق. وسقفُ المحارفِ
+         * يبقى مفروضاً عليه كما على غيرِه — فالحارسُ الصلبُ لم يُمَسّ.
+         */
+        $directory = (bool) ($result['directory'] ?? false);
+
         foreach ($incoming as $row) {
-            if (count($kept) >= self::MAX_ROWS_PER_RESULT) {
+            if (! $directory && count($kept) >= self::MAX_ROWS_PER_RESULT) {
                 $dropped++; $why = $why ?? 'سقفُ صفوفِ الأداة'; continue;
             }
-            if ($this->rows + count($kept) >= self::MAX_ROWS_TOTAL) {
+            if (! $directory && $this->rows + count($kept) >= self::MAX_ROWS_TOTAL) {
                 $dropped++; $why = $why ?? 'سقفُ صفوفِ الطلب'; continue;
             }
 
