@@ -32,11 +32,24 @@ use Illuminate\Support\Facades\DB;
  */
 class AiGovernanceController extends Controller
 {
-    /** الكتابةُ خلف الإدارةِ والتصعيدِ معاً — كما كلُّ كتابةٍ في المركز */
-    protected function gateWrite(): void
+    /**
+     * **الكتابةُ خلف الإدارةِ والتصعيدِ معاً** — كما كلُّ كتابةٍ في المركز.
+     *
+     * ── **ولمَ يُعاد الردُّ ولا يُبتَلَع؟** ──
+     *
+     * `hub_require_stepup()` **تُعيد** ردَّ التحويلِ (أو ٤٢٨ للـAPI) ولا
+     * تُلقي ولا تُجهِض. فنداؤها عارياً كان يُسقط ردَّها في الفراغ **وتمضي
+     * الكتابةُ بجلسةٍ باردة** — فيُنشأ صفُّ «اسمح» أو تُطفأ ميزانيّةٌ مفروضةٌ
+     * بلا هويّةٍ طازجة، وهو بعينِه التهديدُ المُسمّى في نموذجِ تهديدِ المرحلة ٤
+     * («رفعُ سقفٍ ليلاً وإعادتُه صباحاً») والمُعلَنُ أنّ هذا الحارسَ يمنعه.
+     *
+     * **والمنعُ يُعاد إلى المُستدعي ليُعيده** — فلا حارسَ يُفرَض بنيّةِ مُستدعٍ.
+     */
+    protected function gateWrite(): ?\Symfony\Component\HttpFoundation\Response
     {
         AiAccess::gateManage();
-        hub_require_stepup();
+
+        return hub_require_stepup();
     }
 
     // ═══ السياسات ═══
@@ -59,7 +72,7 @@ class AiGovernanceController extends Controller
 
     public function storePolicy(Request $r)
     {
-        $this->gateWrite();
+        if ($resp = $this->gateWrite()) return $resp;
 
         $data = $r->validate([
             'key'                   => ['required', 'string', 'max:80', 'regex:/^[a-z0-9._-]+$/',
@@ -96,7 +109,7 @@ class AiGovernanceController extends Controller
 
     public function togglePolicy(AiPolicyRule $policy)
     {
-        $this->gateWrite();
+        if ($resp = $this->gateWrite()) return $resp;
         $policy->update(['enabled' => ! $policy->enabled]);
 
         return back()->with('ok', $policy->enabled ? 'فُعِّلت السياسة.' : 'عُطِّلت السياسة.');
@@ -104,7 +117,7 @@ class AiGovernanceController extends Controller
 
     public function destroyPolicy(AiPolicyRule $policy)
     {
-        $this->gateWrite();
+        if ($resp = $this->gateWrite()) return $resp;
         $label = (string) $policy->label;
         $policy->delete();
 
@@ -131,7 +144,7 @@ class AiGovernanceController extends Controller
 
     public function storeBudget(Request $r)
     {
-        $this->gateWrite();
+        if ($resp = $this->gateWrite()) return $resp;
 
         $data = $r->validate([
             'key'            => ['required', 'string', 'max:80', 'regex:/^[a-z0-9._-]+$/',
@@ -182,7 +195,7 @@ class AiGovernanceController extends Controller
 
     public function toggleBudget(AiBudget $budget)
     {
-        $this->gateWrite();
+        if ($resp = $this->gateWrite()) return $resp;
         $budget->update(['enabled' => ! $budget->enabled]);
 
         return back()->with('ok', $budget->enabled ? 'فُعِّلت الميزانيّة.' : 'عُطِّلت الميزانيّة.');
@@ -190,7 +203,7 @@ class AiGovernanceController extends Controller
 
     public function destroyBudget(AiBudget $budget)
     {
-        $this->gateWrite();
+        if ($resp = $this->gateWrite()) return $resp;
         $label = (string) $budget->label;
         $budget->delete();
 

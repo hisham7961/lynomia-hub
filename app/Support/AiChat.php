@@ -54,7 +54,7 @@ final class AiChat
 
     /** الشكلُ الموحَّدُ للردّ — لا شكلَ يُخترَع في مُستدعٍ */
     public const SHAPE = ['ok', 'status', 'failure', 'cause', 'data',
-                          'error', 'retry_after', 'usage', 'ms'];
+                          'error', 'retry_after', 'usage', 'ms', 'sent'];
 
     /** ما يُحتفَظ به من متنِ الخطأِ — بعد الطمسِ وللتصنيفِ لا للعرض */
     public const MAX_ERROR_CHARS = 300;
@@ -82,10 +82,22 @@ final class AiChat
     /**
      * **نداءٌ واحدٌ غيرُ مُبثوث** — ويعود بشكلٍ واحدٍ نجح أم أخفق.
      *
+     * ── **و`sent` تقول: أغادر الطلبُ الخادمَ أصلاً؟** (تدقيقُ ما قبل المرحلة ٥) ──
+     *
+     * وهذه الطبقةُ **وحدَها** تعرف الجواب، فلا يُستنتَج في مُستدعٍ: رفضانِ
+     * يقعان **قبل فتحِ أيِّ مقبس** — بوّابةٌ غيرُ جاهزةٍ ووجهةٌ يرفضها حارسُ
+     * الصادر — **لا يبلغان أحداً ولا يكلّفان فلساً**، فحاملُهما `sent = false`
+     * ويُفرَج عن حجزِ ميزانيّتِه ولا يُحسَب على حصّة.
+     *
+     * **وما عداهما `true`**، ومنه انقطاعُ النقلِ قصداً: مهلةٌ انقضت تعني أنّ
+     * الطلبَ ربّما وصل وعُولج، **فالإفراجُ عنه يكذب**. و`cause = bad_request`
+     * لا تكفي للتفريق — فردُّ ٤٠٠ من البوّابةِ سببُه `bad_request` أيضاً وقد
+     * وقع وأُنفق.
+     *
      * @param  array  $body              حمولةُ الطلبِ كما بُنيت أعلى
      * @param  int    $maxOutputTokens   **السقفُ المُقرّ** — يُفرَض هنا لا يُقترَح
      * @return array{ok:bool, status:?int, failure:?string, cause:?string, data:?array,
-     *               error:?string, retry_after:?int, usage:array, ms:int}
+     *               error:?string, retry_after:?int, usage:array, ms:int, sent:bool}
      */
     public static function complete(array $body, int $maxOutputTokens): array
     {
@@ -93,14 +105,14 @@ final class AiChat
 
         if (! AiGateway::enabled()) {
             return self::fail(AskFailures::UNAVAILABLE, 'bad_request', null,
-                AiGateway::whyNotReady() ?? 'بوّابةُ النماذجِ غيرُ جاهزة', $t0);
+                AiGateway::whyNotReady() ?? 'بوّابةُ النماذجِ غيرُ جاهزة', $t0, false);
         }
 
         $url  = AiGateway::url(self::PATH);
         $gate = AiGateway::outboundGate($url);
         if (! ($gate['ok'] ?? false)) {
             return self::fail(AskFailures::GATEWAY_FAILURE, 'bad_request', null,
-                (string) ($gate['why'] ?? 'وجهةٌ مرفوضة'), $t0);
+                (string) ($gate['why'] ?? 'وجهةٌ مرفوضة'), $t0, false);
         }
 
         // ② السقفُ يُعاد فرضُه بعد الدمج · ③ البثُّ مُطفأٌ قسراً
@@ -153,6 +165,7 @@ final class AiChat
                 'retry_after' => null,
                 'usage'       => self::usage($json, $res->header('x-litellm-response-cost')),
                 'ms'          => $ms,
+                'sent'        => true,
             ];
         }
 
@@ -172,6 +185,7 @@ final class AiChat
             'retry_after' => is_numeric($after) ? max(1, (int) $after) : null,
             'usage'       => [],
             'ms'          => $ms,
+            'sent'        => true,
         ];
     }
 
@@ -271,8 +285,13 @@ final class AiChat
         return str_contains($w, 'timed out') || str_contains($w, 'timeout');
     }
 
+    /**
+     * @param  bool  $sent  **أغادر الطلبُ الخادمَ؟** — والافتراضُ `true` هو
+     *   الجانبُ المُحافظ: ما قد يكون وصل يُحاسَب، وما ثبت أنّه لم يُرسَل وحدَه
+     *   يُفرَج عنه.
+     */
     private static function fail(string $failure, string $cause, ?int $status,
-                                 string $error, float $t0): array
+                                 string $error, float $t0, bool $sent = true): array
     {
         return [
             'ok'          => false,
@@ -284,6 +303,7 @@ final class AiChat
             'retry_after' => null,
             'usage'       => [],
             'ms'          => (int) round((microtime(true) - $t0) * 1000),
+            'sent'        => $sent,
         ];
     }
 }

@@ -239,9 +239,29 @@ final class LiteLlmAskGenerator implements AskGenerator
             }
 
             if ($admit['event'] !== null) {
-                AiGovernance::settleFailed($admit['event'], $admit['holds'],
-                    (string) $res['failure'], (string) $res['cause'], $res['status'], $ms,
-                    (array) $res['usage'], (array) ($model->pricing ?? []));
+                /*
+                 * ── **ما لم يغادر الخادمَ لا يُحاسَب** (تدقيقُ ما قبل المرحلة ٥) ──
+                 *
+                 * `AiChat` وحدَها تعرف أَفُتح مقبسٌ أم رُدّ الطلبُ قبلَه:
+                 * بوّابةٌ مطفأةٌ أو وجهةٌ يرفضها حارسُ الصادرِ **لا تبلغ أحداً
+                 * ولا تكلّف فلساً**. وكان يُلتزَم بها كما يُلتزَم بنداءٍ وقع،
+                 * فيُحسَب الطلبُ على الحصّةِ ويُعَدّ حدثاً «مجهولَ الكلفة»
+                 * وكلفتُه صفرٌ مُثبَتة. **وميزانيّةٌ بحدِّ ثلاثةِ طلباتٍ تُستنزَف
+                 * بثلاثةِ أخطاءِ تهيئة**، ثمّ يُصَدّ السائلُ الرابعُ عن عطلٍ
+                 * ليس عطلَه.
+                 *
+                 * **وانقطاعُ النقلِ يبقى التزاماً** — مهلةٌ انقضت تعني أنّ
+                 * الطلبَ ربّما وصل وعُولج، فالإفراجُ عنه يكذب (العقدُ §٥).
+                 */
+                if (($res['sent'] ?? true) === false) {
+                    AiGovernance::abandon($admit['event'], $admit['holds'],
+                        (string) $res['failure']);
+                } else {
+                    AiGovernance::settleFailed($admit['event'], $admit['holds'],
+                        (string) $res['failure'], (string) $res['cause'], $res['status'], $ms,
+                        (array) $res['usage'], (array) ($model->pricing ?? []));
+                }
+
                 $this->lastEventId = (string) $admit['event']->id;
             }
 
