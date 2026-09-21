@@ -35,4 +35,7 @@ final class NullAskGenerator implements AskGenerator
     {
         return 'null';
     }
+
+    /** **لا توليدَ فلا كلفة** — فلا ميزانيّةَ تُحجَز ولا صفَّ يُكتَب */
+    public function govern(array $ctx): void {}
 }

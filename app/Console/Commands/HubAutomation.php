@@ -592,6 +592,34 @@ class HubAutomation extends Command
                     $n += $gone; $per['error_occurrences'] += $gone;
                 } while ($gone >= 5000);
             }
+            /*
+             * ── **حجوزاتُ الذكاءِ المعلَّقة** (المرحلة ٤ · P4-W4) ──
+             *
+             * **وهذا ليس مقصَّ عمرٍ بل إنقاذُ ميزانيّة.** مسارٌ مات بين الحجزِ
+             * والالتزامِ يترك مالاً محجوزاً **إلى الأبد**، فتُخنَق ميزانيّةٌ
+             * سليمةٌ بإنفاقٍ لم يقع قطّ. والصفُّ لا يُحذَف بل يُوسَم `expired`
+             * — فسجلُّ «ماتَ هنا» أنفعُ للتشخيصِ من صمت.
+             */
+            if (\Illuminate\Support\Facades\Schema::hasTable('ai_usage_events')) {
+                $per['ai_reservations_expired'] = \App\Support\AiLedger::expireStale();
+
+                /*
+                 * **ومقصُّ عمرِ السجلّ** — بأرضيّةٍ صلبةٍ ثلاثين يوماً.
+                 *
+                 * والعدّاداتُ في `ai_budget_periods` **لا تُقصّ**: مُجمَّعةٌ
+                 * صغيرةٌ صفّاً لكلِّ فترة، وقصُّها يمحو تاريخَ الإنفاقِ الذي
+                 * بُنيت لتحفظه. **وحذفُ المفصَّلِ لا يعني حذفَ المجمَّل.**
+                 */
+                $uKeep = max(30, (int) setting('retention.ai_usage_days', 400));
+                $per['ai_usage_events'] = 0;
+                do {
+                    $gone = DB::table('ai_usage_events')
+                        ->where('created_at', '<', now()->subDays($uKeep)->toDateTimeString())
+                        ->limit(5000)->delete();
+                    $n += $gone; $per['ai_usage_events'] += $gone;
+                } while ($gone >= 5000);
+            }
+
             if (\Illuminate\Support\Facades\Schema::hasTable('page_visits')) {
                 // ── Control Plane: Phase 7 (WP-7.4) ── الزياراتُ وحدَها كانت بثابتِ
                 // ٩٠ في الشيفرة بينما إخوتُها بمفاتيحَ معلَنة — retention.visits_days

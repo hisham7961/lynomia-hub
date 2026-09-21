@@ -1015,6 +1015,30 @@ Route::middleware('auth')->group(function () {
     Route::delete('admin/ai/chain/{link}', [\App\Http\Controllers\Web\AiProfileController::class, 'detach'])
         ->name('ai.profiles.detach');
 
+    /* ── الحوكمة: السياساتُ والميزانيّات (المرحلة ٤ · P4-W7) ─────────────
+     *
+     * **والواجهةُ ليست طبقةَ الفرض.** المنعُ يقع في `AiPolicy`/`AiBudgets`
+     * قبل أن تُبنى صفحةٌ واحدة، فمن نادى المسارَ مباشرةً يصطدم بالحارسِ نفسِه.
+     * وكلُّ كتابةٍ هنا **قرارُ حوكمةٍ يُدقَّق** — ففيها تصعيدٌ وخنقٌ كنظائرِها.
+     */
+    Route::get('admin/ai/policies', [\App\Http\Controllers\Web\AiGovernanceController::class, 'policies'])
+        ->name('ai.policies.index');
+    Route::post('admin/ai/policies', [\App\Http\Controllers\Web\AiGovernanceController::class, 'storePolicy'])
+        ->name('ai.policies.store')->middleware('throttle:20,1');
+    Route::post('admin/ai/policies/{policy}/toggle', [\App\Http\Controllers\Web\AiGovernanceController::class, 'togglePolicy'])
+        ->name('ai.policies.toggle')->middleware('throttle:20,1');
+    Route::delete('admin/ai/policies/{policy}', [\App\Http\Controllers\Web\AiGovernanceController::class, 'destroyPolicy'])
+        ->name('ai.policies.destroy')->middleware('throttle:20,1');
+
+    Route::get('admin/ai/budgets', [\App\Http\Controllers\Web\AiGovernanceController::class, 'budgets'])
+        ->name('ai.budgets.index');
+    Route::post('admin/ai/budgets', [\App\Http\Controllers\Web\AiGovernanceController::class, 'storeBudget'])
+        ->name('ai.budgets.store')->middleware('throttle:20,1');
+    Route::post('admin/ai/budgets/{budget}/toggle', [\App\Http\Controllers\Web\AiGovernanceController::class, 'toggleBudget'])
+        ->name('ai.budgets.toggle')->middleware('throttle:20,1');
+    Route::delete('admin/ai/budgets/{budget}', [\App\Http\Controllers\Web\AiGovernanceController::class, 'destroyBudget'])
+        ->name('ai.budgets.destroy')->middleware('throttle:20,1');
+
     Route::get('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'index'])->name('integrations.n8n');
     Route::post('admin/integrations/n8n', [\App\Http\Controllers\Web\N8nController::class, 'save'])->name('integrations.n8n.save');
     Route::get('admin/security', [SecurityController::class, 'index'])->name('security.index');

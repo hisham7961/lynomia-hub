@@ -92,8 +92,40 @@ final class AskPipeline
             return self::fail(AskFailures::UNAVAILABLE, $correlation, $started, $gen);
         }
 
+        /*
+         * ── **الحوكمة: السياقُ يُبنى هنا و`hub_allowed` تُرفَع هنا** (المرحلة ٤) ──
+         *
+         * **والرفعُ بعد `canAsk` مباشرةً لا قبلَها** — فالرايةُ اسمُها ما تعنيه:
+         * «مرّ تخويلُ Hub». ورفعُها في أوّلِ الدالّةِ بلا فحصٍ كان سيجعل
+         * `AiPolicy` تثق بما لم يُتحقَّق منه، **فتصير طبقةُ التضييقِ بابَ دخول**.
+         *
+         * والسياسةُ تُقرأ **للغرضِ قبل النموذج**: منعٌ على مستوى الغرضِ يوفّر
+         * بناءَ الكتالوجِ والسياقِ كلِّه.
+         */
+        $gov = AiGovernance::context($u, (string) $profile->key, 'ask', $correlation);
+        $gov['hub_allowed'] = true;
+
+        $verdict = AiPolicy::evaluate($gov);
+        if (! $verdict['allowed']) {
+            return self::fail((string) ($verdict['code'] ?? AskFailures::POLICY_DENIED),
+                $correlation, $started, $gen);
+        }
+
+        // **والسقوفُ تُحمَل في السياقِ لا تُعاد قراءتُها** — فقراءةٌ ثانيةٌ في
+        // المولِّدِ قد تقع بعد تعديلِ السياسةِ بلحظة، فيُولَّد بسقفٍ غيرِ الذي
+        // أُذن به. والسياقُ لقطةٌ واحدةٌ للطلبِ كلِّه.
+        $gov['limits'] = (array) $verdict['limits'];
+        $gov['tools']  = (bool) $verdict['tools'];
+
+        // **والمولِّدُ يُسلَّم السياقَ قبل أوّلِ خطوة** — فلا نداءَ خارجَ الحوكمة
+        $gen->govern($gov);
+
         // ── الكتالوج: الحارسُ الأوّل — النموذجُ لا يرى ما لا يملكه صاحبُ الجلسة ──
-        $catalog = AskTools::catalog($u);
+        //
+        // **والسياسةُ تضيّق فوقَه ولا توسّع**: `allow_tools = false` تُفرغ
+        // الكتالوجَ فلا يرى النموذجُ أداةً أصلاً — وهذا أقوى من رفضِ التنفيذِ
+        // لاحقاً لأنّه **لا يُغري بطلبِ ما لا يُنفَّذ** فتُهدَر خطوةُ توليد.
+        $catalog = $verdict['tools'] ? AskTools::catalog($u) : [];
 
         $ctx = AskContext::open();
         $ctx->trust('limits', $ctx->budget());

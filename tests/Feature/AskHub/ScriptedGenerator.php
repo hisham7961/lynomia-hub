@@ -60,6 +60,14 @@ final class ScriptedGenerator implements AskGenerator
         return 'scripted';
     }
 
+    /** المزروعُ لا يبلغ مزوّداً فلا يُنفق — **وسياقُ الحوكمةِ يُحفَظ للتأكيدِ عليه** */
+    public array $governedWith = [];
+
+    public function govern(array $ctx): void
+    {
+        $this->governedWith = $ctx;
+    }
+
     /** كلُّ ما رآه النموذجُ من نصٍّ — للبحثِ عمّا يجب ألّا يكون فيه */
     public function everythingSeen(): string
     {

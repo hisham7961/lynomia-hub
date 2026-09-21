@@ -375,8 +375,33 @@ class AskAdversarialSweepTest extends TestCase
             AskFailures::TIMEOUT, AskFailures::RATE_LIMITED, AskFailures::CONTENT_FILTERED,
         ];
 
-        $this->assertSame([], array_diff(AskFailures::CODES, $covered, $live),
-            'رمزُ إخفاقٍ لا هو مُختبَرٌ هنا ولا في حزمةِ المولِّدِ الحيّ');
+        /*
+         * **وسلّةٌ ثالثةٌ للحوكمة** (المرحلة ٤).
+         *
+         * رموزُ المرحلةِ الرابعةِ لا يبلغها مسحٌ عدائيٌّ على الأدواتِ ولا
+         * مولِّدٌ حيّ: منعُ سياسةٍ وتجاوزُ ميزانيّةٍ وحصّةٍ ونفادُ رصيدٍ
+         * **قراراتُ حوكمةٍ تُقاس في حزمتِها**. والحارسُ يبقى حارساً: يُطالَب
+         * بدليلٍ في ملفٍّ بعينِه لا بوعدٍ في قائمة.
+         */
+        $governed = [
+            AskFailures::PROVIDER_CREDITS, AskFailures::MODEL_UNAVAILABLE,
+            AskFailures::POLICY_DENIED, AskFailures::BUDGET_EXCEEDED,
+            AskFailures::QUOTA_EXCEEDED,
+        ];
+
+        $this->assertSame([], array_diff(AskFailures::CODES, $covered, $live, $governed),
+            'رمزُ إخفاقٍ لا هو مُختبَرٌ هنا ولا في حزمةِ المولِّدِ الحيّ ولا في حزمةِ الحوكمة');
+
+        // وبرهانُ الحوكمةِ من ملفّاتِها — لا إعلانَ تغطيةٍ بلا مقابل
+        $govSuite = '';
+        foreach (['AiFailureTaxonomyTest', 'AiGovernanceTest', 'AiBudgetConcurrencyTest'] as $f) {
+            $path = __DIR__ . '/../AiHub/' . $f . '.php';
+            if (is_file($path)) $govSuite .= (string) file_get_contents($path);
+        }
+        foreach ($governed as $code) {
+            $this->assertStringContainsString('AskFailures::' . $code, $govSuite,
+                "[{$code}] رمزُ حوكمةٍ بلا اختبارٍ يقابله في حزمةِ الحوكمة");
+        }
 
         // وبرهانٌ أنّ الخمسةَ مُغطّاةٌ فعلاً لا مُعلَنةٌ تغطيةً
         $liveSuite = (string) file_get_contents(__DIR__ . '/LiteLlmAskGeneratorTest.php');

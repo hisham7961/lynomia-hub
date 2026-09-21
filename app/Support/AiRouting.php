@@ -31,8 +31,8 @@ final class AiRouting
     /** أسبابُ الإخفاقِ المعروفة — مفتاحُ الصفِّ في الجدول */
     public const CAUSES = [
         'auth', 'bad_request', 'context_overflow', 'unsupported_capability',
-        'budget_exceeded', 'content_policy', 'rate_limited', 'transient',
-        'model_gone', 'provider_cooldown', 'stream_interrupted',
+        'budget_exceeded', 'content_policy', 'rate_limited', 'provider_credits',
+        'policy_denied', 'transient', 'model_gone', 'provider_cooldown', 'stream_interrupted',
     ];
 
     /**
@@ -70,6 +70,30 @@ final class AiRouting
             'retry' => 1, 'fallback' => true, 'use_retry_after' => true,
             'why'   => 'عابرٌ ومُحدَّدُ المدّة — مرّةٌ بالمهلةِ المُعلَنة ثمّ احتياط',
         ],
+        /*
+         * **رصيدُ الحسابِ نفد — لا إعادةَ، واحتياطٌ إلى مزوّدٍ آخرَ وحدَه.**
+         *
+         * وهذا الصفُّ وُلد من قبولِ إنتاجٍ حقيقيّ: الطلبُ بلغ المزوّدَ وعاد
+         * `429` بنصِّ «لا رصيدَ متبقٍّ»، فقُرئ حدَّ معدّلٍ فانتُظرت مهلتُه
+         * وأُعيد النداءُ ثمّ احتيط إلى نموذجٍ ثانٍ **على الاعتمادِ الميّتِ
+         * نفسِه**. ثلاثةُ نداءاتٍ ضائعةٍ عن مالٍ لا يعود بانتظار.
+         *
+         * **والشرطُ `other_provider` هو لبُّ الصفّ:** الرصيدُ رصيدُ حسابٍ عند
+         * مزوّدٍ بعينِه، فكلُّ نموذجٍ على اعتمادِه يسقط سقوطَه. والاحتياطُ إلى
+         * مزوّدٍ آخرَ — إن وُجد — هو الاحتياطُ الوحيدُ الذي يُنتج شيئاً.
+         */
+        'provider_credits' => [
+            'retry' => 0, 'fallback' => true, 'conditional' => 'other_provider',
+            'why'   => 'نفد رصيدُ الحساب — لا يُصلحه انتظارٌ ولا نموذجٌ آخرُ على الاعتمادِ نفسِه',
+        ],
+        /**
+         * منعته سياسةُ الحوكمة — **قرارٌ لا عطل**، فلا إعادةَ ولا احتياط.
+         * والاحتياطُ هنا **التفافٌ على السياسة** لا إنقاذٌ من عطل.
+         */
+        'policy_denied' => [
+            'retry' => 0, 'fallback' => false,
+            'why'   => 'السياسةُ منعت — والاحتياطُ التفافٌ عليها لا إنقاذٌ من عطل',
+        ],
         'transient' => [
             'retry' => 2, 'fallback' => true, 'backoff' => 'exponential',
             'why'   => 'عابر — حتّى مرّتين بتراجعٍ أُسّيّ ثمّ احتياط',
@@ -103,7 +127,7 @@ final class AiRouting
      * منّا. وعدُّ هذه على المزوّدِ يُهدّئ مزوّداً سليماً لعشرِ دقائقَ بسببِ ثلاثةِ
      * طلباتٍ مشوّهةٍ كتبناها نحن.
      */
-    public const FAULTS = ['auth', 'rate_limited', 'transient', 'model_gone'];
+    public const FAULTS = ['auth', 'rate_limited', 'provider_credits', 'transient', 'model_gone'];
 
     // ── التصنيف ────────────────────────────────────────────────────────
 
@@ -140,12 +164,28 @@ final class AiRouting
          * ينقضي أصلاً — فالصوابُ تراجعٌ أُسّيٌّ ثمّ احتياطٌ إلى نموذجٍ آخر.
          * ولأنّ الطلبَ **لم يبلغ مزوّداً** فلا رمزَ أُنفق في إعادتِه.
          */
+        /*
+         * **ورصيدٌ نفد ليس حدَّ معدّلٍ أيضاً** (المرحلة ٤ · P4-W8).
+         *
+         * فـ٤٢٩ صارت ثلاثةَ معانٍ: انقطاعُ خدمةٍ خلفَ البوّابة، ومالٌ نفد،
+         * وحدُّ معدّلٍ حقيقيّ. والفرقُ في القرارِ كلِّه لا في التسمية:
+         * الأوّلُ يُعاد ويُحتاط، والثاني **لا يُعاد ولا يُحتاط إلّا إلى مزوّدٍ
+         * آخر**، والثالثُ ينتظر مهلتَه المُعلَنة.
+         *
+         * **والتصنيفُ مركزُه `AiChat::classify`** لا يُنسَخ هنا: نسختان من
+         * دلالاتِ المتنِ تفترقان بعد شهرٍ فيُقرَأ الردُّ الواحدُ صنفين.
+         */
         if ($code === 429) {
-            return str_contains($body, 'no healthy deployment')
-                || str_contains($body, 'no deployments available')
-                ? 'transient'
+            if (str_contains($body, 'no healthy deployment')
+                || str_contains($body, 'no deployments available')) return 'transient';
+
+            return AiChat::classify(429, $body) === AskFailures::PROVIDER_CREDITS
+                ? 'provider_credits'
                 : 'rate_limited';
         }
+
+        // **الدفعُ المطلوبُ رمزٌ صريحٌ للمال** — ولا يحتمل قراءةً ثانية
+        if ($code === 402) return 'provider_credits';
 
         if (in_array($code, [500, 502, 503, 504], true)) return 'transient';
 

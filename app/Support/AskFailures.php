@@ -35,6 +35,28 @@ final class AskFailures
     public const TIMEOUT      = 'TIMEOUT';
     public const RATE_LIMITED = 'RATE_LIMITED';
 
+    /**
+     * **نفد رصيدُ الحسابِ عند المزوّد** — والفرقُ عن `RATE_LIMITED` عمليٌّ لا لفظيّ.
+     *
+     * كلاهما يعود `429`، **وقرارُهما متضادّ**: حدُّ المعدّلِ ينقضي بمهلةٍ
+     * مُعلَنةٍ فيصحُّ الانتظارُ والإعادة، ونفادُ الرصيد **لا ينقضي بشيء** —
+     * فالإعادةُ نداءٌ ضائعٌ والانتظارُ كذبٌ على من ينتظر. والاحتياطُ إلى
+     * نموذجٍ آخرَ على **الاعتمادِ نفسِه** يصطدم بالرصيدِ نفسِه.
+     */
+    public const PROVIDER_CREDITS = 'PROVIDER_CREDITS';
+
+    /** النموذجُ بعينِه غيرُ صالحٍ الآن — مُعطَّلٌ أو مُزالٌ أو مُستبعَد */
+    public const MODEL_UNAVAILABLE = 'MODEL_UNAVAILABLE';
+
+    /** منعته سياسةُ الحوكمةِ — **والصلاحيّةُ قائمةٌ** فلا يُقال «لا صلاحيّةَ لك» */
+    public const POLICY_DENIED = 'POLICY_DENIED';
+
+    /** بلغت الميزانيّةُ سقفَها في هذه الفترة — مالٌ لا صلاحيّة */
+    public const BUDGET_EXCEEDED = 'BUDGET_EXCEEDED';
+
+    /** بلغت الحصّةُ سقفَها — عددُ طلباتٍ أو رموزٍ لا مال */
+    public const QUOTA_EXCEEDED = 'QUOTA_EXCEEDED';
+
     /** السياقُ بلغ سقفَه قبل أن يكتملَ الجواب */
     public const CONTEXT_LIMIT = 'CONTEXT_LIMIT';
 
@@ -73,6 +95,8 @@ final class AskFailures
     public const CODES = [
         self::UNAUTHORIZED, self::UNAVAILABLE, self::GATEWAY_FAILURE, self::PROVIDER_FAILURE,
         self::MODEL_FAILURE, self::TIMEOUT, self::RATE_LIMITED, self::CONTEXT_LIMIT,
+        self::PROVIDER_CREDITS, self::MODEL_UNAVAILABLE,
+        self::POLICY_DENIED, self::BUDGET_EXCEEDED, self::QUOTA_EXCEEDED,
         self::MALFORMED_TOOL_REQUEST, self::UNSAFE_TOOL_ARGUMENTS, self::NO_ACCESSIBLE_DATA,
         self::PARTIAL_RESULT, self::FORGED_SOURCE, self::TOOL_BUDGET, self::MALFORMED_QUESTION,
         self::CONTENT_FILTERED,
@@ -95,6 +119,11 @@ final class AskFailures
         self::MODEL_FAILURE          => 'وصل ردٌّ غيرُ مفهومٍ من النموذج — ولم يُعرَض شيءٌ منه.',
         self::TIMEOUT                => 'انقضت المهلةُ قبل اكتمالِ الجواب.',
         self::RATE_LIMITED           => 'تجاوزتَ حدَّ الطلبات. انتظر قليلاً ثمّ أعِد السؤال.',
+        self::PROVIDER_CREDITS       => 'نفد رصيدُ الحسابِ عند المزوّد — ولا يُصلحه الانتظار. راجِع الإدارةَ لشحنِ الرصيد.',
+        self::MODEL_UNAVAILABLE      => 'النموذجُ المختارُ غيرُ صالحٍ الآن. جرّب غرضاً آخرَ للتوجيه.',
+        self::POLICY_DENIED          => 'منعت سياسةُ الذكاءِ هذه العمليّة. راجِع الإدارةَ لتعديلِ السياسة.',
+        self::BUDGET_EXCEEDED        => 'بلغت ميزانيّةُ الذكاءِ سقفَها لهذه الفترة.',
+        self::QUOTA_EXCEEDED         => 'بلغت حصّةُ الاستعمالِ سقفَها لهذه الفترة.',
         self::CONTEXT_LIMIT          => 'السؤالُ يحتاج بياناتٍ أكثرَ ممّا يتّسع له السياق. ضيِّق السؤالَ.',
         self::MALFORMED_TOOL_REQUEST => 'طلبُ قراءةٍ غيرُ صالحٍ — لم يُنفَّذ.',
         self::UNSAFE_TOOL_ARGUMENTS  => 'طلبُ قراءةٍ برفضٍ من الحارس — لم يُنفَّذ.',
