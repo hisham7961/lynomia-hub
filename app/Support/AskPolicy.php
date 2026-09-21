@@ -73,6 +73,31 @@ final class AskPolicy
     public const HARD_MODEL_STEPS   = 10;
     public const HARD_TOOL_CALLS    = 10;
 
+    /*
+     * ── **وأرضيّاتٌ صلبةٌ أيضاً — ما لا يخفضه إعداد** (قبولُ الإنتاج · `OUTPUT_LIMIT`) ──
+     *
+     * **وسقفٌ بلا أرضيّةٍ ليس حارساً بل بابُ تعطيل.** كان المدى `[1, hard]`،
+     * فقيمةٌ تُكتَب سهواً في الشاشةِ — `16` أو `0` أو سالب — تُقبَل صامتة،
+     * فيُرسَل `max_tokens` ضئيلاً **ويموت كلُّ سؤالٍ بـ`OUTPUT_LIMIT`
+     * والتهيئةُ تبدو سليمة**.
+     *
+     * والأرقامُ مشتقّةٌ لا مُختارة:
+     *
+     *  · **`MIN_OUTPUT_TOKENS = 256`** — أصغرُ سقفٍ تكتمل عنده دورةُ سؤالٍ
+     *    واحدة: طلبُ أداةٍ بوسائطِه (`{"module":"projects"}` ≈ ٤٠ رمزاً) ثمّ
+     *    جوابٌ عربيٌّ قصيرٌ باستشهادِه (≈ ٦٠). والباقي هامشٌ لنموذجٍ يكتب
+     *    مقدّمةً قبل جوابِه. **وهو أكبرُ من سقفِ الفاحصِ D بستّةَ عشرَ ضعفاً**،
+     *    فلا يرث المنتجُ ميزانيّةَ فحصٍ غرضُها إثباتُ توليدٍ أدنى بأرخصِ ثمن.
+     *  · **`MIN_MODEL_STEPS = 2`** — خطوةُ أداةٍ وخطوةُ جواب. وبخطوةٍ واحدةٍ
+     *    يطلب النموذجُ القراءةَ **ولا يبقى له نداءٌ يقول فيه ما قرأ**.
+     *  · **`MIN_TOOL_CALLS = 1`** — قراءةٌ واحدةٌ على الأقلّ، وإلّا فلا مساعد.
+     *
+     * **ولا تُرفَع الأرضيّةُ فوق الافتراضيّ**: هي حدُّ ما يعمل، لا ما نُفضّل.
+     */
+    public const MIN_OUTPUT_TOKENS = 256;
+    public const MIN_MODEL_STEPS   = 2;
+    public const MIN_TOOL_CALLS    = 1;
+
     /**
      * **أقصى عددِ نداءاتِ توليدٍ في الطلبِ الواحد — بالإعاداتِ والاحتياطِ معاً.**
      *
@@ -196,21 +221,21 @@ final class AskPolicy
     public static function maxOutputTokens(): int
     {
         return self::clamp(setting('ask.max_output_tokens', 700),
-            self::MAX_OUTPUT_TOKENS, self::HARD_OUTPUT_TOKENS);
+            self::MAX_OUTPUT_TOKENS, self::MIN_OUTPUT_TOKENS, self::HARD_OUTPUT_TOKENS);
     }
 
     /** سقفُ خطواتِ النموذجِ الفعليّ */
     public static function maxModelSteps(): int
     {
         return self::clamp(setting('ask.max_model_steps', 6),
-            self::MAX_TOOL_CALLS, self::HARD_MODEL_STEPS);
+            self::MAX_TOOL_CALLS, self::MIN_MODEL_STEPS, self::HARD_MODEL_STEPS);
     }
 
     /** سقفُ تنفيذاتِ الأدواتِ الفعليّ — **مستقلٌّ عن الخطوات** */
     public static function maxToolCalls(): int
     {
         return self::clamp(setting('ask.max_tool_calls', 6),
-            self::MAX_TOOL_CALLS, self::HARD_TOOL_CALLS);
+            self::MAX_TOOL_CALLS, self::MIN_TOOL_CALLS, self::HARD_TOOL_CALLS);
     }
 
     /** سقفُ الكلفةِ المقدَّرةِ للطلب — `0.0` يعني ألّا سقفَ تقديريّ */
@@ -234,11 +259,15 @@ final class AskPolicy
      * والتكرارُ بين الحرفيِّ والثابتِ مقصودٌ إذاً، **ويحرسه اختبارٌ** يُقارن
      * الاثنين بالكتالوج فلا ينحرفان صامتين.
      */
-    private static function clamp(mixed $v, int $default, int $hard): int
+    /**
+     * @param  int  $min  **الأرضيّةُ الصلبة** — وكانت `1` فصار الإعدادُ يُعطّل
+     *   المنتجَ بدل أن يضبطه (قبولُ الإنتاج · `OUTPUT_LIMIT`).
+     */
+    private static function clamp(mixed $v, int $default, int $min, int $hard): int
     {
         $n = is_numeric($v) ? (int) $v : $default;
 
-        return max(1, min($hard, $n));
+        return max($min, min($hard, $n));
     }
 
     // ── حدودُ المدخل ────────────────────────────────────────────────────

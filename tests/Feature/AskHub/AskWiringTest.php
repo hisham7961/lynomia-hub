@@ -246,10 +246,22 @@ class AskWiringTest extends TestCase
         $this->assertSame(0.0, AskPolicy::costCeiling());
     }
 
-    public function test_الإعدادُ_يخفض_السقفَ_ولا_يرفعه_فوقَ_الصلب(): void
+    /**
+     * **الإعدادُ يضبط داخلَ المدى — ولا يخرج من طرفيه.**
+     *
+     * وكان هذا الصفُّ يُثبِت أنّ `120` تمرّ كما هي، **وكان ذلك عيباً لا
+     * ميزة**: المدى كان `[1, 2000]` فتُقبَل قيمةٌ تقتل كلَّ سؤالٍ
+     * بـ`OUTPUT_LIMIT` والتهيئةُ تبدو سليمة (قبولُ إنتاجٍ حقيقيّ). فصار
+     * المدى `[256, 2000]`، وما دون الأرضيّةِ يُرفَع إليها.
+     */
+    public function test_الإعدادُ_يضبط_داخلَ_المدى_ولا_يخرج_من_طرفيه(): void
     {
         Settings::put('ask.max_output_tokens', 120, 'test');
-        $this->assertSame(120, AskPolicy::maxOutputTokens());
+        $this->assertSame(AskPolicy::MIN_OUTPUT_TOKENS, AskPolicy::maxOutputTokens(),
+            'قيمةٌ تحت الأرضيّةِ مرّت — وهي تقتل كلَّ سؤالٍ في الإنتاج');
+
+        Settings::put('ask.max_output_tokens', 900, 'test');
+        $this->assertSame(900, AskPolicy::maxOutputTokens(), 'قيمةٌ داخلَ المدى لم تُحترَم');
 
         Settings::put('ask.max_output_tokens', 999999, 'test');
         $this->assertSame(AskPolicy::HARD_OUTPUT_TOKENS, AskPolicy::maxOutputTokens(),

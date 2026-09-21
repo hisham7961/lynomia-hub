@@ -53,7 +53,9 @@
                       @disabled(! $ready)>{{ old('q', $asked) }}</textarea>
             <small class="mut" id="askhelp">
                 حتّى {{ $limits['question'] }} حرفاً · يقرأ المساعدُ حتّى
-                {{ $limits['steps'] }} خطواتِ قراءةٍ و{{ $limits['rows'] }} صفّاً لكلِّ خطوة.
+                {{ $limits['steps'] }} خطواتِ قراءةٍ و{{ $limits['rows'] }} صفّاً لكلِّ خطوة{{ '' }}
+                {{-- **وسقفُ المخرَجِ يُعرَض** — رسالةُ `OUTPUT_LIMIT` تُحيل إليه --}}
+                · وسقفُ الجوابِ {{ $limits['output'] }} رمزاً لكلِّ خطوة.
             </small>
         </label>
 

@@ -92,6 +92,9 @@ class AskController extends Controller
                 'question' => AskPolicy::MAX_QUESTION_CHARS,
                 'steps'    => AskPolicy::maxToolCalls(),
                 'rows'     => AskPolicy::MAX_ROWS_PER_TOOL,
+                // **والسقفُ الذي يُنتج `OUTPUT_LIMIT` يُعرَض** — فرسالةُ الإخفاقِ
+                // تُحيل إليه، وقارئُها كان لا يرى كم هو الآن
+                'output'   => AskPolicy::maxOutputTokens(),
             ],
             'result'   => null,
             'asked'    => null,

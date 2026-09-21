@@ -261,6 +261,14 @@ final class AiChat
             'prompt'     => isset($u['prompt_tokens']) ? (int) $u['prompt_tokens'] : null,
             'completion' => isset($u['completion_tokens']) ? (int) $u['completion_tokens'] : null,
             'tokens'     => isset($u['total_tokens']) ? (int) $u['total_tokens'] : null,
+            /*
+             * **ورموزُ التفكيرِ تُقرأ ولا تُبتلَع** — العقدُ المقيسُ يضعها في
+             * `usage.completion_tokens_details.reasoning_tokens`. وهي **رموزُ
+             * مخرَجٍ تُدفَع** ولا يراها المستخدمُ نصّاً، فإغفالُها يجعل طلباً
+             * أنفق ألفاً يبدو وكأنّه أنفق عشرة.
+             */
+            'reasoning'  => isset($u['completion_tokens_details']['reasoning_tokens'])
+                ? (int) $u['completion_tokens_details']['reasoning_tokens'] : null,
         ];
         if ($cost !== null) $out['cost'] = $cost;
 
