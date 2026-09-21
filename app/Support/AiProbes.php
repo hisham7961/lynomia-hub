@@ -489,7 +489,8 @@ final class AiProbes extends ConnectionProbe
             'fp'            => $text === '' ? null : Redactor::fingerprint($text),
             'sample'        => mb_substr(Redactor::text($text), 0, self::SAMPLE_CHARS),
             'tool_calls'    => count($calls),
-            'reasoning'     => $think !== '' || ($rTok !== null && $rTok > 0),
+            // **التعريفُ الواحدُ في `AiChat`** — ولا نسختان تفترقان بعد شهر
+            'reasoning'     => AiChat::reasoned($json),
             'usage'         => array_intersect_key($usage,
                 array_flip(['prompt_tokens', 'completion_tokens', 'total_tokens'])),
             // **واسمُ النموذجِ في الردِّ يُعلَن ولا يُبتلَع**: بوّابةٌ وجّهت الطلبَ

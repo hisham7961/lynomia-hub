@@ -229,7 +229,8 @@ final class LiteLlmAskGenerator implements AskGenerator
             if ($res['ok']) {
                 if ($admit['event'] !== null) {
                     AiGovernance::settleOk($admit['event'], $admit['holds'],
-                        (array) $res['usage'], (array) ($model->pricing ?? []), $ms, $res['status']);
+                        (array) $res['usage'], (array) ($model->pricing ?? []), $ms, $res['status'],
+                        AiChat::shape((array) $res['data']) + ['max_output' => $outCap]);
                     $this->lastEventId = (string) $admit['event']->id;
                 }
 
@@ -261,7 +262,8 @@ final class LiteLlmAskGenerator implements AskGenerator
                 } else {
                     AiGovernance::settleFailed($admit['event'], $admit['holds'],
                         (string) $res['failure'], (string) $res['cause'], $res['status'], $ms,
-                        (array) $res['usage'], (array) ($model->pricing ?? []));
+                        (array) $res['usage'], (array) ($model->pricing ?? []),
+                        AiChat::shape((array) ($res['data'] ?? [])) + ['max_output' => $outCap]);
                 }
 
                 $this->lastEventId = (string) $admit['event']->id;
@@ -374,8 +376,9 @@ final class LiteLlmAskGenerator implements AskGenerator
         $finish  = (string) ($choice['finish_reason'] ?? '');
         $calls   = is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [];
         $text    = is_string($message['content'] ?? null) ? trim($message['content']) : '';
-        $think   = is_string($message['reasoning_content'] ?? null)
-            ? trim($message['reasoning_content']) : '';
+        // **تعريفٌ واحدٌ للتفكيرِ يقرؤه الفاحصُ والمنتجُ معاً** (`92dbd557`):
+        // المتنُ **أو** رموزُ `usage` — وأكثرُ النماذجِ لا تُعيد المتنَ أصلاً
+        $think   = AiChat::reasoned($json);
 
         if ($message === [] || ! in_array($finish, AiProbes::FINISH_REASONS, true)) {
             return $this->error(AskFailures::MALFORMED_MODEL_RESPONSE);
@@ -455,7 +458,7 @@ final class LiteLlmAskGenerator implements AskGenerator
              * **واستنفادُ التفكيرِ بنموذجٍ غيرِ تفكيريٍّ أو بميزانيّةٍ أوسعَ
              * كثيراً** — ولا يُعرَف أيُّهما بلا تفريق.
              */
-            if ($think !== '')         return $this->error(AskFailures::MODEL_REASONED_ONLY);
+            if ($think)                return $this->error(AskFailures::MODEL_REASONED_ONLY);
             if ($finish === 'length')  return $this->error(AskFailures::OUTPUT_LIMIT);
 
             return $this->error(AskFailures::MODEL_NO_OUTPUT);

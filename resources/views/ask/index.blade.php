@@ -59,6 +59,29 @@
             </small>
         </label>
 
+        {{-- ── **والسقفُ وحدَه لا يكفي: من يتقاسمه معه؟** (قبولُ الإنتاج · `92dbd557`) ──
+
+             سؤالٌ أخفق بـ`OUTPUT_LIMIT` وسقفُه سبعُمئةٍ معروضةٌ فوق. وسبعُمئةٍ
+             تكفي جملةً عربيّةً عشرَ مرّات — **فالسقفُ لم يكن صغيراً، بل كان
+             مقسوماً**: نموذجٌ يُفكّر يُنفق منه قبل أن يكتب حرفاً يُرى.
+
+             ويُعرَض **لمن يملك التبديلَ وحدَه** — فاسمُ النموذجِ وقدراتُه
+             تفصيلُ بنيةٍ لا يخصّ السائل. --}}
+        @if ($advisory ?? null)
+            <div style="grid-column:1/-1">
+                <small class="mut">
+                    <span class="bdg {{ \App\Support\AskModelAdvisory::warns($advisory) ? 'wn' : 'ok' }}">
+                        {{ $advisory['code'] === \App\Support\AskModelAdvisory::SHARES_CAP ? '🧠 يُفكّر'
+                           : ($advisory['code'] === \App\Support\AskModelAdvisory::FIT ? '✓ لا يُفكّر' : '؟ غيرُ معلوم') }}
+                    </span>
+                    {{ $advisory['say'] }}
+                    @if (\App\Support\AskModelAdvisory::warns($advisory))
+                        <a href="{{ route('ai.profiles.index') }}">بدّل نموذجَ الغرضِ من التوجيهِ والأغراض ←</a>
+                    @endif
+                </small>
+            </div>
+        @endif
+
         <div style="grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <button class="btn" @disabled(! $ready) data-ask-submit>💬 اسأل</button>
             <span class="mut askwait" hidden aria-live="polite">⏳ يقرأ ويجيب…</span>
@@ -123,6 +146,15 @@
                 <b>تعذّر الجواب</b>
                 <span>{{ $result['message'] }}</span>
                 <span class="mut mono ltr">{{ $result['failure'] }}</span>
+
+                {{-- **وحيث تُقرَأ الرسالةُ يُقال السبب.** رسالةُ «بلغ الجوابُ
+                     سقفَ طولِه» تُرسل قارئَها إلى رفعِ السقفِ — وقد يكون
+                     السقفُ سليماً والمُتقاسِمُ هو العلّة. --}}
+                @if (($advisory ?? null) && \App\Support\AskModelAdvisory::warns($advisory)
+                     && in_array($result['failure'], ['OUTPUT_LIMIT', 'MODEL_REASONED_ONLY'], true))
+                    <span class="mut">{{ $advisory['say'] }}</span>
+                    <span><a class="btn sm" href="{{ route('ai.profiles.index') }}">راجِع سلسلةَ الغرض ←</a></span>
+                @endif
             </div>
         </div>
     @endif

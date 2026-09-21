@@ -275,6 +275,70 @@ final class AiChat
         return array_filter($out, static fn ($v) => $v !== null);
     }
 
+    /**
+     * **أفكّر النموذجُ في هذا الردّ؟ — تعريفٌ واحدٌ للمنصّةِ كلِّها.**
+     *
+     * ── **ولمَ دليلان لا واحد؟** ──
+     *
+     * العقدُ المقيسُ يجعل `reasoning_content` **حقلاً اختياريّاً يُحذَف حين
+     * لا يُستعمَل**، وأكثرُ النماذجِ التفكيريّةِ **لا تُعيد متنَ تفكيرِها
+     * أصلاً**: تُبلِغ عددَ رموزِه في `usage.completion_tokens_details` وتُخفي
+     * ما فكّرت فيه. فمن يقرأ المتنَ وحدَه يرى نموذجاً أنفق سقفَه كلَّه
+     * تفكيراً **ويظنّه لم يفكّر**.
+     *
+     * **وكان التعريفُ مزدوجاً في المستودع**: `AiProbes::verdict` تقرأ
+     * الدليلين، و`LiteLlmAskGenerator::read` تقرأ المتنَ وحدَه — فالفاحصُ
+     * أدقُّ من مسارِ الإنتاج (قبولُ الإنتاج `92dbd557`). فصار التعريفُ هنا،
+     * في الطبقةِ التي تقرأ العقدَ أصلاً، ويقرؤه الاثنان.
+     */
+    public static function reasoned(array $json): bool
+    {
+        $choice  = (array) ((($json['choices'] ?? [])[0] ?? []) ?: []);
+        $message = (array) (($choice['message'] ?? []) ?: []);
+
+        if (is_string($message['reasoning_content'] ?? null)
+            && trim($message['reasoning_content']) !== '') {
+            return true;
+        }
+
+        return self::reasoningTokens($json) > 0;
+    }
+
+    /** **عددُ رموزِ التفكيرِ كما أبلغه العقد** — صفرٌ حين لا يُبلَّغ */
+    public static function reasoningTokens(array $json): int
+    {
+        $u = is_array($json['usage'] ?? null) ? $json['usage'] : [];
+        $n = $u['completion_tokens_details']['reasoning_tokens'] ?? null;
+
+        return is_numeric($n) ? max(0, (int) $n) : 0;
+    }
+
+    /**
+     * **شكلُ الردِّ للتشخيصِ — أرقامٌ وتصنيفٌ لا محتوى.**
+     *
+     * وهذه هي البياناتُ التي احتجناها في ثلاثِ محاولاتِ قبولٍ مدفوعةٍ ولم
+     * نجدها، فخُمِّن السببُ بدل أن يُقرأ. **ولا نصَّ فيها ولا وسائطَ أداة**:
+     * سببُ انتهاءٍ، وعددُ نداءاتِ أدوات، واسمُ أوّلِها من مفرداتٍ مغلقة.
+     *
+     * @return array{finish: ?string, calls: int, tool: ?string, reasoning: int}
+     */
+    public static function shape(array $json): array
+    {
+        $choice  = (array) ((($json['choices'] ?? [])[0] ?? []) ?: []);
+        $message = (array) (($choice['message'] ?? []) ?: []);
+        $calls   = is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [];
+        $name    = (string) ((($calls[0] ?? [])['function'] ?? [])['name'] ?? '');
+
+        return [
+            'finish'    => is_string($choice['finish_reason'] ?? null)
+                ? $choice['finish_reason'] : null,
+            'calls'     => count($calls),
+            // **الاسمُ من مفرداتٍ مغلقةٍ فقط** — وما ليس منها لا يُسجَّل
+            'tool'      => in_array($name, AskTools::TOOLS, true) ? $name : null,
+            'reasoning' => self::reasoningTokens($json),
+        ];
+    }
+
     // ── الداخل ────────────────────────────────────────────────────────
 
     private static function has(string $haystack, array $needles): bool

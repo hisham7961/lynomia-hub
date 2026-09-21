@@ -285,6 +285,39 @@ class AiGovernanceController extends Controller
             'by_source'  => $bySource,
             'by_model'   => $byModel,
             'by_failure' => $byFailure,
+            /*
+             * ── **آخرُ الدوراتِ مقروءةً** (قبولُ الإنتاج `92dbd557`) ──
+             *
+             * ثلاثُ محاولاتٍ مدفوعةٍ مضت خُمِّن سببُها بدل أن يُقرأ، لأنّ ما
+             * يلزم التشخيصَ لم يكن مُسجَّلاً ولا معروضاً. **والشاشةُ هي
+             * الطريقُ الوحيدُ لصاحبِ الخادمِ إلى صفِّه** — بلا طرفيّةٍ ولا
+             * استعلام.
+             *
+             * **ولا محتوى فيها**: سببُ انتهاءٍ وأرقامٌ واسمُ أداةٍ من مفرداتٍ
+             * مغلقة، وكلُّها منطَّقةٌ بـ`hub_company_ids` كبقيّةِ الصفوف.
+             */
+            'turns'      => (clone $base())
+                ->orderByDesc('created_at')->orderByDesc('id')->limit(25)
+                ->get(['correlation', 'attempt', 'relation', 'status', 'failure',
+                       'finish_reason', 'model_name', 'input_tokens', 'output_tokens',
+                       'reasoning_tokens', 'max_output_tokens', 'tool_requested',
+                       'latency_ms', 'created_at'])
+                ->map(fn ($r) => [
+                    'correlation' => mb_substr((string) $r->correlation, 0, 8),
+                    'attempt'     => (int) $r->attempt,
+                    'relation'    => (string) $r->relation,
+                    'status'      => (string) $r->status,
+                    'failure'     => $r->failure === null ? null : (string) $r->failure,
+                    'finish'      => $r->finish_reason === null ? null : (string) $r->finish_reason,
+                    'model'       => (string) ($r->model_name ?? '—'),
+                    'in'          => $r->input_tokens === null ? null : (int) $r->input_tokens,
+                    'out'         => $r->output_tokens === null ? null : (int) $r->output_tokens,
+                    'reasoning'   => $r->reasoning_tokens === null ? null : (int) $r->reasoning_tokens,
+                    'cap'         => $r->max_output_tokens === null ? null : (int) $r->max_output_tokens,
+                    'tool'        => $r->tool_requested === null ? null : (string) $r->tool_requested,
+                    'ms'          => (int) $r->latency_ms,
+                    'at'          => $r->created_at,
+                ])->all(),
         ];
     }
 }
