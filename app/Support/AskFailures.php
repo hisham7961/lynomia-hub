@@ -32,6 +32,35 @@ final class AskFailures
     /** النموذجُ أجاب بما لا يُفهَم — لا عطلَ شبكةٍ بل ردٌّ فاسد */
     public const MODEL_FAILURE = 'MODEL_FAILURE';
 
+    /*
+     * ── **تفصيلُ `MODEL_FAILURE` بعد قبولِ إنتاجٍ حقيقيّ** ──
+     *
+     * كان رمزاً واحداً يبتلع **أربعَ حالاتٍ علاجُ كلٍّ منها مختلفٌ تماماً**،
+     * فيقرأ المشغّلُ «ردٌّ غيرُ مفهوم» عن ردٍّ **مفهومٍ تماماً** ولا يُشخَّص منه
+     * شيء. والرمزُ الجامعُ يبقى لما لا يُصنَّف، والأربعةُ تخرج منه بأسمائِها.
+     */
+
+    /** **٢٠٠ بجسمٍ ليس إكمالَ محادثةٍ أصلاً** — عيبُ طرفٍ آخرَ لا عيبُ فهمِنا */
+    public const MALFORMED_MODEL_RESPONSE = 'MALFORMED_MODEL_RESPONSE';
+
+    /** **بنيةٌ سليمةٌ ولا مخرَجَ البتّة** — `content: null` بلا أداةٍ ولا تفكير */
+    public const MODEL_NO_OUTPUT = 'MODEL_NO_OUTPUT';
+
+    /** **أنفق النموذجُ مخرَجَه في التفكيرِ ولم يُخرج جواباً** */
+    public const MODEL_REASONED_ONLY = 'MODEL_REASONED_ONLY';
+
+    /** **سببُ الانتهاءِ يُناقض الرسالة** — «أدوات» بلا نداءِ أداة */
+    public const TOOL_PROTOCOL_ERROR = 'TOOL_PROTOCOL_ERROR';
+
+    /**
+     * **رقمٌ في الجوابِ ولم تُنفَّذ قراءةٌ واحدة.**
+     *
+     * والسؤالُ «كم مشروعاً لدينا؟» لا يُجاب من معرفةِ نموذج: العددُ يأتي من
+     * Hub عبر أداةٍ مصرَّحٍ بها بنطاقِ صاحبِ الجلسة. **وجوابٌ واثقٌ بعددٍ
+     * مخترَعٍ أسوأُ من لا جواب** — لأنّه يُصدَّق ويُبنى عليه قرار.
+     */
+    public const UNSOURCED_NUMBER = 'UNSOURCED_NUMBER';
+
     public const TIMEOUT      = 'TIMEOUT';
     public const RATE_LIMITED = 'RATE_LIMITED';
 
@@ -96,6 +125,8 @@ final class AskFailures
         self::UNAUTHORIZED, self::UNAVAILABLE, self::GATEWAY_FAILURE, self::PROVIDER_FAILURE,
         self::MODEL_FAILURE, self::TIMEOUT, self::RATE_LIMITED, self::CONTEXT_LIMIT,
         self::PROVIDER_CREDITS, self::MODEL_UNAVAILABLE,
+        self::MALFORMED_MODEL_RESPONSE, self::MODEL_NO_OUTPUT, self::MODEL_REASONED_ONLY,
+        self::TOOL_PROTOCOL_ERROR, self::UNSOURCED_NUMBER,
         self::POLICY_DENIED, self::BUDGET_EXCEEDED, self::QUOTA_EXCEEDED,
         self::MALFORMED_TOOL_REQUEST, self::UNSAFE_TOOL_ARGUMENTS, self::NO_ACCESSIBLE_DATA,
         self::PARTIAL_RESULT, self::FORGED_SOURCE, self::TOOL_BUDGET, self::MALFORMED_QUESTION,
@@ -117,6 +148,11 @@ final class AskFailures
         self::GATEWAY_FAILURE        => 'تعذّر الوصولُ إلى بوّابةِ الذكاء. أعِد المحاولةَ بعد قليل.',
         self::PROVIDER_FAILURE       => 'المزوّدُ لم يستجب. جرّب مرّةً أخرى أو اختر غرضاً آخرَ للتوجيه.',
         self::MODEL_FAILURE          => 'وصل ردٌّ غيرُ مفهومٍ من النموذج — ولم يُعرَض شيءٌ منه.',
+        self::MALFORMED_MODEL_RESPONSE => 'وصل ردٌّ لا يُطابق عقدَ البوّابة — ولم يُعرَض شيءٌ منه.',
+        self::MODEL_NO_OUTPUT        => 'أجاب النموذجُ بلا مخرَجٍ البتّة. أعِد السؤالَ أو جرّب غرضاً آخرَ للتوجيه.',
+        self::MODEL_REASONED_ONLY    => 'أنفق النموذجُ مخرَجَه في التفكيرِ ولم يُخرج جواباً. ارفع سقفَ رموزِ المخرَجِ أو ضيِّق السؤال.',
+        self::TOOL_PROTOCOL_ERROR    => 'ردُّ النموذجِ يُناقض نفسَه في طلبِ القراءة — لم يُنفَّذ شيء.',
+        self::UNSOURCED_NUMBER       => 'ذكر الجوابُ رقماً بلا قراءةٍ من Hub — فحُجب. الأرقامُ تُقرَأ ولا تُخمَّن.',
         self::TIMEOUT                => 'انقضت المهلةُ قبل اكتمالِ الجواب.',
         self::RATE_LIMITED           => 'تجاوزتَ حدَّ الطلبات. انتظر قليلاً ثمّ أعِد السؤال.',
         self::PROVIDER_CREDITS       => 'نفد رصيدُ الحسابِ عند المزوّد — ولا يُصلحه الانتظار. راجِع الإدارةَ لشحنِ الرصيد.',

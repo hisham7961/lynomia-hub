@@ -332,14 +332,45 @@ final class LiteLlmAskGenerator implements AskGenerator
      */
     private function read(array $json): array
     {
-        $choice  = (array) (($json['choices'][0] ?? []) ?: []);
+        /*
+         * ── **البنيةُ تُفحَص أوّلاً — ولا تساهُلَ فيها** ──
+         *
+         * العقدُ المقيسُ يضمن `object = "chat.completion"` و`choices` غيرَ
+         * الفارغةِ و`finish_reason` من تعدادٍ معروف. فغيابُ أيٍّ منها **ليس
+         * نقصَ دليلٍ بل جسمٌ آخرُ تماماً** — ويُقال باسمِه لا بـ«ردٍّ غيرِ مفهوم».
+         *
+         * وهذا هو الحدُّ الذي يمنع «٢٠٠ = ردٌّ صالح»: التساهلُ لم يُفتَح، بل
+         * **نُقل الشرطُ من النصِّ الظاهرِ إلى ما يضمنه العقدُ فعلاً**.
+         */
+        $choices = $json['choices'] ?? null;
+        if (($json['object'] ?? null) !== AiProbes::OBJECT || ! is_array($choices) || $choices === []) {
+            return $this->error(AskFailures::MALFORMED_MODEL_RESPONSE);
+        }
+
+        $choice  = (array) (($choices[0] ?? []) ?: []);
         $message = (array) (($choice['message'] ?? []) ?: []);
         $finish  = (string) ($choice['finish_reason'] ?? '');
         $calls   = is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [];
         $text    = is_string($message['content'] ?? null) ? trim($message['content']) : '';
+        $think   = is_string($message['reasoning_content'] ?? null)
+            ? trim($message['reasoning_content']) : '';
+
+        if ($message === [] || ! in_array($finish, AiProbes::FINISH_REASONS, true)) {
+            return $this->error(AskFailures::MALFORMED_MODEL_RESPONSE);
+        }
 
         // **حجبُ المحتوى نتيجةٌ لا عطل** — وله رمزُه فلا يُقال «ردٌّ غيرُ مفهوم»
         if ($finish === 'content_filter') return $this->error(AskFailures::CONTENT_FILTERED);
+
+        /*
+         * **وسببُ انتهاءٍ يقول «أدوات» بلا نداءِ أداةٍ تناقضٌ في الردِّ نفسِه.**
+         *
+         * وهو خللُ بروتوكولٍ لا عطلُ نموذج: لا شيءَ يُنفَّذ، ولا يُقال للمشغّلِ
+         * «ردٌّ غيرُ مفهوم» عن ردٍّ **مفهومٍ ومتناقض**.
+         */
+        if ($calls === [] && in_array($finish, ['tool_calls', 'function_call'], true)) {
+            return $this->error(AskFailures::TOOL_PROTOCOL_ERROR);
+        }
 
         if ($calls !== []) {
             /*
@@ -372,7 +403,27 @@ final class LiteLlmAskGenerator implements AskGenerator
                     'usage' => $this->usage()];
         }
 
-        if ($text === '') return $this->error(AskFailures::MODEL_FAILURE);
+        /*
+         * ── **وهنا كان العيبُ الذي أسقط أوّلَ سؤالٍ حقيقيّ** ──
+         *
+         * كان السطرُ: `if ($text === '') return error(MODEL_FAILURE);`
+         *
+         * والعقدُ المقيسُ يقول `content: str | None` — فـ`null` **ردٌّ مشروعٌ
+         * تماماً**. وثلاثُ حالاتٍ مشروعةٍ تنتهي إلى نصٍّ فارغ، **وعلاجُ كلٍّ
+         * منها مختلف**، فجمعُها في «ردٍّ غيرِ مفهوم» يمنع التشخيصَ كلَّه:
+         *
+         *  · **قُطع بسقفِ المخرَج** ⇒ حدُّ سياق: ضيِّق السؤالَ أو ارفع السقف.
+         *  · **أنفقه في التفكير** ⇒ نموذجٌ تفكيريٌّ بسقفٍ ضيّق.
+         *  · **إكمالٌ فارغٌ حقّاً** ⇒ خبرٌ عن النموذجِ لا عن فهمِنا.
+         *
+         * **ولا يُجعَل شيءٌ من هذا نجاحاً** — كلُّها إخفاقٌ، لكنّه إخفاقٌ باسمِه.
+         */
+        if ($text === '') {
+            if ($finish === 'length')  return $this->error(AskFailures::CONTEXT_LIMIT);
+            if ($think !== '')         return $this->error(AskFailures::MODEL_REASONED_ONLY);
+
+            return $this->error(AskFailures::MODEL_NO_OUTPUT);
+        }
 
         return [
             'kind'    => 'answer',

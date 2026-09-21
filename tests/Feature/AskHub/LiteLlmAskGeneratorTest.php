@@ -280,11 +280,12 @@ class LiteLlmAskGeneratorTest extends TestCase
             'حجبُ المحتوى ظهر «ردّاً غيرَ مفهوم» — فيُطارَد عطلٌ لا وجودَ له');
     }
 
+    /** **صار له اسمُه** بعد قبولِ الإنتاج: «لا مخرَجَ» لا «غيرُ مفهوم» */
     public function test_ردٌّ_بلا_نصٍّ_ولا_نداءٍ_عطلُ_نموذج(): void
     {
         $this->script([[LiteLlmFixtures::answer(''), 200]]);
 
-        $this->assertSame(AskFailures::MODEL_FAILURE, $this->ask()['failure']);
+        $this->assertSame(AskFailures::MODEL_NO_OUTPUT, $this->ask()['failure']);
     }
 
     /** **مرجعٌ مُختلَقٌ يُسقط الجوابَ كلَّه** — والحارسُ يعمل على المسارِ الحيّ */
