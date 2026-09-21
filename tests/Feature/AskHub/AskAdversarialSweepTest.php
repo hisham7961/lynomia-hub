@@ -425,6 +425,8 @@ class AskAdversarialSweepTest extends TestCase
             AskFailures::MALFORMED_MODEL_RESPONSE, AskFailures::MODEL_NO_OUTPUT,
             AskFailures::MODEL_REASONED_ONLY, AskFailures::TOOL_PROTOCOL_ERROR,
             AskFailures::UNSOURCED_NUMBER,
+            // (قبولُ إنتاجٍ · `71b0059e`) فصلُ ما كان تحت مظلّةِ `CONTEXT_LIMIT`
+            AskFailures::OUTPUT_LIMIT, AskFailures::CONTEXT_INTEGRITY,
         ];
 
         $this->assertSame([], array_diff(AskFailures::CODES, $covered, $live, $governed, $declaredOnly),
@@ -448,7 +450,8 @@ class AskAdversarialSweepTest extends TestCase
         // وبرهانُ الحوكمةِ من ملفّاتِها — لا إعلانَ تغطيةٍ بلا مقابل
         $govSuite = '';
         foreach (['../AiHub/AiFailureTaxonomyTest', '../AiHub/AiGovernanceTest',
-                  '../AiHub/AiBudgetConcurrencyTest', 'AskResponseContractTest'] as $f) {
+                  '../AiHub/AiBudgetConcurrencyTest', 'AskResponseContractTest',
+                  'AskCountPathTest'] as $f) {
             $path = __DIR__ . '/' . $f . '.php';
             if (is_file($path)) $govSuite .= (string) file_get_contents($path);
         }

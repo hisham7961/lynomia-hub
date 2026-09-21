@@ -175,8 +175,15 @@ class AskResponseContractTest extends TestCase
             '**`content: null` ليس «ردّاً غيرَ مفهوم»** — العقدُ يجعله مشروعاً');
     }
 
-    /** **وقطعُ سقفِ المخرَجِ قبل أن يخرج حرفٌ سببٌ آخرُ تماماً** */
-    public function test_قطعُ_السقفِ_قبل_أيِّ_حرفٍ_يُصنَّف_حدَّ_سياقٍ_لا_عطلَ_نموذج(): void
+    /**
+     * **وقطعُ سقفِ المخرَجِ قبل أن يخرج حرفٌ سببٌ آخرُ تماماً** — وقد كان
+     * يُسمّى هنا «حدَّ سياق» حتّى صحّحه قبولُ الإنتاج `71b0059e`.
+     *
+     * `finish_reason = length` سقفُ **ما يكتب** النموذجُ لا سعةُ **ما يقرأ**.
+     * وسؤالٌ من ثلاثِ كلماتٍ يبلغه، فقولُ «ضيِّق سؤالَك» عنه يُرسل صاحبَه
+     * يُصلح ما ليس معطوباً بينما العطبُ في سقفِ المخرَجِ أو إسهابِ النموذج.
+     */
+    public function test_قطعُ_السقفِ_قبل_أيِّ_حرفٍ_يُصنَّف_سقفَ_مخرَجٍ_لا_حدَّ_سياق(): void
     {
         $body = LiteLlmFixtures::answer('x', LiteLlmFixtures::usage());
         $body['choices'][0]['message']['content'] = null;
@@ -185,8 +192,11 @@ class AskResponseContractTest extends TestCase
 
         $r = $this->ask();
 
-        $this->assertSame(AskFailures::CONTEXT_LIMIT, $r['failure'],
-            'قُطع بسقفِنا — والعلاجُ تضييقُ السؤالِ لا مطاردةُ عطل');
+        $this->assertSame(AskFailures::OUTPUT_LIMIT, $r['failure'],
+            'سقفُ المخرَجِ ما زال يُقال «حدَّ سياق» — فيُطارَد عطلٌ في السؤالِ لا وجودَ له');
+        $this->assertStringNotContainsString('ضيِّق السؤال',
+            (string) AskFailures::message((string) $r['failure']),
+            'الرسالةُ ما زالت تطلب تضييقَ سؤالٍ سليم');
     }
 
     /** **ونموذجٌ أنفق مخرَجَه في التفكيرِ له رمزُه** — فلا يُطارَد عطلٌ لا وجودَ له */
