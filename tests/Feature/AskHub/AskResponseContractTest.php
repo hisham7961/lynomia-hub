@@ -298,7 +298,13 @@ class AskResponseContractTest extends TestCase
     /** **وجوابٌ بلا رقمٍ ولا أداةٍ يمرّ** — فالحارسُ على الأرقامِ لا على الكلام */
     public function test_جوابٌ_بلا_رقمٍ_لا_يمسّه_حارسُ_التخمين(): void
     {
-        $this->script([[LiteLlmFixtures::answer('لا أجد ما يجيب في نطاقِك.', LiteLlmFixtures::usage())]]);
+        // **وقراءةٌ حقيقيّةٌ تسبق الجواب** (`21b7633f`): جوابٌ نهائيٌّ بلا
+        // قراءةٍ صار يسقط بـ`NO_SERVER_READ`، والمقصودُ هنا غيرُ ذلك.
+        $this->script([
+            [LiteLlmFixtures::toolCall([['id' => 'c1', 'name' => 'hub_list',
+                                        'args' => ['module' => 'projects']]])],
+            [LiteLlmFixtures::answer('لا أجد ما يجيب في نطاقِك.', LiteLlmFixtures::usage())],
+        ]);
 
         $this->assertTrue($this->ask()['ok']);
     }
@@ -314,7 +320,9 @@ class AskResponseContractTest extends TestCase
 
         $r = $this->ask();
 
-        $this->assertTrue($r['ok'], 'المنسّقُ يرفض الأداةَ ويُكمل — ولا ينهار');
+        // **ولا انهيار**: الأداةُ تُرَدّ، والطلبُ يُصنَّف «بلا قراءة» لا يسقط
+        $this->assertFalse($r['ok']);
+        $this->assertSame(AskFailures::NO_SERVER_READ, $r['failure']);
         $this->assertSame([], $r['sources'], 'أداةٌ مجهولةٌ نُفِّذت');
     }
 

@@ -191,11 +191,16 @@ class LiteLlmAskGeneratorTest extends TestCase
         $second = $this->sent[1]['messages'];
         $roles  = array_column($second, 'role');
 
-        $this->assertSame(['system', 'user', 'assistant', 'tool'], $roles,
+        /*
+         * **ورسالتا `user` لا واحدة** (`21b7633f`): الأولى سؤالُ المستخدمِ
+         * والثانيةُ المظروف. وكان التسلسلُ أربعةً لأنّ السؤالَ **لم يكن
+         * يُرسَل أصلاً** — فحرَس هذا الصفُّ العطبَ بوصفِه عقداً.
+         */
+        $this->assertSame(['system', 'user', 'user', 'assistant', 'tool'], $roles,
             '**تسلسلٌ فاسد** — ومزوّدٌ صارمٌ يردّه ٤٠٠');
 
-        $assistant = $second[2];
-        $tool      = $second[3];
+        $assistant = $second[3];
+        $tool      = $second[4];
 
         $this->assertSame('call_abc123', $assistant['tool_calls'][0]['id']);
         $this->assertSame('call_abc123', $tool['tool_call_id'],
@@ -218,7 +223,7 @@ class LiteLlmAskGeneratorTest extends TestCase
 
         $this->ask();
 
-        $toolMsg = $this->sent[1]['messages'][3]['content'];
+        $toolMsg = $this->sent[1]['messages'][4]['content'];   // +١: السؤالُ رسالةٌ مستقلّة
 
         $this->assertStringNotContainsString('771234', $toolMsg,
             '**صفٌّ تكرّر خارجَ المظروف** — نسخةٌ ثانيةٌ بلا سياجٍ ولا ترقيم');
@@ -238,7 +243,7 @@ class LiteLlmAskGeneratorTest extends TestCase
 
         $this->ask();
 
-        $assistant = $this->sent[1]['messages'][2];
+        $assistant = $this->sent[1]['messages'][3];   // +١: السؤالُ رسالةٌ مستقلّة
 
         $this->assertCount(1, $assistant['tool_calls'],
             '**تسلسلٌ فاسد**: نداءان مُسجَّلان ونتيجةٌ واحدةٌ مُرسَلة');
@@ -258,9 +263,18 @@ class LiteLlmAskGeneratorTest extends TestCase
         $this->assertSame(AskFailures::MALFORMED_TOOL_REQUEST, $r['failure']);
     }
 
+    /**
+     * **ويسبقه قراءةٌ حقيقيّة** (`21b7633f`): جوابٌ نهائيٌّ بلا قراءةٍ صار
+     * يسقط بـ`NO_SERVER_READ` قبل أن يُنظَر في بتره — فالقياسُ هنا للبترِ
+     * وحدَه، فيُعطى الطلبُ قراءتَه.
+     */
     public function test_جوابٌ_بلغ_سقفَ_الرموزِ_يُعلَن_جزئيّاً(): void
     {
-        $this->script([[LiteLlmFixtures::truncated('الجوابُ بدأ ثمّ'), 200]]);
+        $this->script([
+            [LiteLlmFixtures::toolCall([['id' => 'c1', 'name' => 'hub_list',
+                                        'args' => ['module' => 'projects']]]), 200],
+            [LiteLlmFixtures::truncated('الجوابُ بدأ ثمّ'), 200],
+        ]);
 
         $r = $this->ask();
 

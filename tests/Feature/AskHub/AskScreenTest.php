@@ -165,7 +165,11 @@ class AskScreenTest extends TestCase
     {
         $u = $this->asker();
         $this->ready();
-        $this->bind([['kind' => 'answer',
+        $this->bind([
+                     // **وقراءةٌ تسبق الجواب** (`21b7633f`): جوابٌ بلا قراءةٍ
+                     // يُحجَب بـ`NO_SERVER_READ` فتُقاس صفحةٌ بلا جواب
+                     ['kind' => 'tool', 'tool' => 'hub_list', 'args' => ['module' => 'projects']],
+                     ['kind' => 'answer',
                       // **بلا رقمٍ في الحمولة**: حارسُ «رقمٌ بلا قراءة» يحجب الجوابَ قبل العرض،
                       // فيُقاس الهروبُ على صفحةٍ لا جوابَ فيها — والمقصودُ هنا الهروبُ لا الحجب
                       'answer' => '<img src=x onerror=alert(document.domain)><script>steal()</script>',

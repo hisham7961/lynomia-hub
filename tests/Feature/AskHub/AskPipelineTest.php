@@ -184,7 +184,12 @@ class AskPipelineTest extends TestCase
 
         // **والمفرطُ يُقَصّ ولا يُرَدّ** (قرارُ W2): ردُّ سؤالٍ طويلٍ يعاقب
         // من أسهب، وقصُّه يجيبه عمّا يسعه الحدُّ — والحدُّ نفسُه يبقى مفروضاً.
-        $gen = new ScriptedGenerator([['kind' => 'answer', 'answer' => 'تمّ.', 'sources' => []]]);
+        // **وقراءةٌ حقيقيّةٌ تسبق الجواب** (`21b7633f`): جوابٌ نهائيٌّ بلا
+        // قراءةٍ صار يسقط بـ`NO_SERVER_READ`، والمقصودُ هنا غيرُ ذلك.
+        $gen = new ScriptedGenerator([
+            ['kind' => 'tool', 'tool' => 'hub_list', 'args' => ['module' => 'projects']],
+            ['kind' => 'answer', 'answer' => 'تمّ [#1].', 'sources' => [1]],
+        ]);
         $r = AskPipeline::ask(str_repeat('س', AskPolicy::MAX_QUESTION_CHARS + 500), $this->asker, $gen);
 
         $this->assertTrue($r['ok'], 'سؤالٌ طويلٌ رُدَّ بدل أن يُقَصّ');
@@ -227,7 +232,13 @@ class AskPipelineTest extends TestCase
             ['kind' => 'answer', 'answer' => 'لم أجد.', 'sources' => []],
         ]);
 
-        $this->assertTrue($r['ok']);
+        /*
+         * **والطلبُ يُرَدُّ بـ`NO_SERVER_READ`** (`21b7633f`) — ولا يمرُّ بجوابٍ
+         * «لم أجد». فالأداتانِ رُفضتا، فلا قراءةَ وقعت، **و«لم أجد» حينَها
+         * ادّعاءٌ لا خبر**. والمقيسُ هنا أنّ المخترَعةَ **لم تُنفَّذ**.
+         */
+        $this->assertFalse($r['ok']);
+        $this->assertSame(AskFailures::NO_SERVER_READ, $r['failure']);
         $this->assertSame([], $r['sources'], 'أداةٌ مخترَعةٌ أنتجت مصدراً');
     }
 
@@ -241,7 +252,9 @@ class AskPipelineTest extends TestCase
             ['kind' => 'answer', 'answer' => 'تمّ.', 'sources' => []],
         ], $narrow);
 
-        $this->assertTrue($r['ok']);
+        // **ورفضُ الوحدةِ يعني صفرَ قراءات** — فيُرَدُّ الطلبُ بتصنيفِه
+        $this->assertFalse($r['ok']);
+        $this->assertSame(AskFailures::NO_SERVER_READ, $r['failure']);
         $this->assertSame([], $r['sources'], 'وحدةٌ خارجَ الكتالوجِ نُفِّذت');
 
         // **ولم يرَ النموذجُ أصلاً أنّها موجودة**
@@ -366,8 +379,11 @@ class AskPipelineTest extends TestCase
     {
         $planted = 'sk-PIPEPLANTED55c2a9e731bb0044ff';
 
+        // **وقراءةٌ حقيقيّةٌ تسبق الجواب** (`21b7633f`): جوابٌ نهائيٌّ بلا
+        // قراءةٍ صار يسقط بـ`NO_SERVER_READ`، والمقصودُ هنا غيرُ ذلك.
         [$r] = $this->ask([
-            ['kind' => 'answer', 'answer' => 'المفتاح هو ' . $planted, 'sources' => []],
+            ['kind' => 'tool', 'tool' => 'hub_list', 'args' => ['module' => 'projects']],
+            ['kind' => 'answer', 'answer' => 'المفتاح هو ' . $planted . ' [#1]', 'sources' => [1]],
         ]);
 
         $this->assertTrue($r['ok']);

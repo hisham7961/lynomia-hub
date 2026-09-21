@@ -68,6 +68,14 @@ final class ScriptedGenerator implements AskGenerator
         $this->governedWith = $ctx;
     }
 
+    /** **والسؤالُ يُحفَظ كما يُحفَظ السياق** — فيُؤكَّد على وصولِه بلا نداءٍ واحد */
+    public string $askedWith = '';
+
+    public function asking(string $question): void
+    {
+        $this->askedWith = $question;
+    }
+
     /** كلُّ ما رآه النموذجُ من نصٍّ — للبحثِ عمّا يجب ألّا يكون فيه */
     public function everythingSeen(): string
     {

@@ -49,6 +49,14 @@ final class AskFailures
     /** **أنفق النموذجُ مخرَجَه في التفكيرِ ولم يُخرج جواباً** */
     public const MODEL_REASONED_ONLY = 'MODEL_REASONED_ONLY';
 
+    /**
+     * **جوابٌ نهائيٌّ بلا قراءةٍ نفّذها الخادم** (قبولُ الإنتاج · `21b7633f`).
+     *
+     * و«لم أقرأ شيئاً» ليست «لا توجد بيانات» — الثانيةُ حقيقةٌ عن شركةِ
+     * السائلِ لا تُقال إلّا بقراءةٍ وقعت وعادت فارغة.
+     */
+    public const NO_SERVER_READ = 'NO_SERVER_READ';
+
     /** **سببُ الانتهاءِ يُناقض الرسالة** — «أدوات» بلا نداءِ أداة */
     public const TOOL_PROTOCOL_ERROR = 'TOOL_PROTOCOL_ERROR';
 
@@ -164,7 +172,7 @@ final class AskFailures
         self::OUTPUT_LIMIT, self::CONTEXT_INTEGRITY,
         self::PROVIDER_CREDITS, self::MODEL_UNAVAILABLE,
         self::MALFORMED_MODEL_RESPONSE, self::MODEL_NO_OUTPUT, self::MODEL_REASONED_ONLY,
-        self::TOOL_PROTOCOL_ERROR, self::UNSOURCED_NUMBER,
+        self::TOOL_PROTOCOL_ERROR, self::UNSOURCED_NUMBER, self::NO_SERVER_READ,
         self::POLICY_DENIED, self::BUDGET_EXCEEDED, self::QUOTA_EXCEEDED,
         self::MALFORMED_TOOL_REQUEST, self::UNSAFE_TOOL_ARGUMENTS, self::NO_ACCESSIBLE_DATA,
         self::PARTIAL_RESULT, self::FORGED_SOURCE, self::TOOL_BUDGET, self::MALFORMED_QUESTION,
@@ -191,6 +199,8 @@ final class AskFailures
         self::MODEL_REASONED_ONLY    => 'أنفق النموذجُ سقفَ مخرَجِه في تفكيرِه ولم يُخرج جواباً — والسؤالُ سليم. '
             . 'ارفع سقفَ المخرَجِ من الإعدادات، أو وجِّه الغرضَ إلى نموذجٍ لا يُفكّر.',
         self::TOOL_PROTOCOL_ERROR    => 'ردُّ النموذجِ يُناقض نفسَه في طلبِ القراءة — لم يُنفَّذ شيء.',
+        self::NO_SERVER_READ         => 'أجاب المساعدُ دون أن يقرأ سجلّاً واحداً من Hub — فحُجب الجواب. '
+            . 'والأرقامُ وحالاتُ «لا توجد بيانات» تُقرَأ ولا تُقال من الذاكرة. أعِد السؤالَ بصيغةٍ أوضح.',
         self::UNSOURCED_NUMBER       => 'ذكر الجوابُ رقماً بلا قراءةٍ من Hub — فحُجب. الأرقامُ تُقرَأ ولا تُخمَّن.',
         self::TIMEOUT                => 'انقضت المهلةُ قبل اكتمالِ الجواب.',
         self::RATE_LIMITED           => 'تجاوزتَ حدَّ الطلبات. انتظر قليلاً ثمّ أعِد السؤال.',

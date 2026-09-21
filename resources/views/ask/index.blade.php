@@ -67,16 +67,16 @@
 
              ويُعرَض **لمن يملك التبديلَ وحدَه** — فاسمُ النموذجِ وقدراتُه
              تفصيلُ بنيةٍ لا يخصّ السائل. --}}
+        {{-- **وسمٌ لا فقرة** (`21b7633f`): كانت الجملةُ الكاملةُ تُطبَع هنا
+             فتُزاحم مربّعَ السؤالِ وتُقرأ عطلاً. فصارت **وسماً** يحمل تفصيلَه
+             في `title`، وموضعُ الشرحِ الكاملِ لوحةُ الإخفاقِ ومركزُ الذكاء. --}}
         @if ($advisory ?? null)
             <div style="grid-column:1/-1">
                 <small class="mut">
-                    <span class="bdg {{ \App\Support\AskModelAdvisory::warns($advisory) ? 'wn' : 'ok' }}">
-                        {{ $advisory['code'] === \App\Support\AskModelAdvisory::SHARES_CAP ? '🧠 يُفكّر'
-                           : ($advisory['code'] === \App\Support\AskModelAdvisory::FIT ? '✓ لا يُفكّر' : '؟ غيرُ معلوم') }}
-                    </span>
-                    {{ $advisory['say'] }}
+                    <span class="bdg {{ \App\Support\AskModelAdvisory::warns($advisory) ? 'wn' : 'ok' }}"
+                          title="{{ $advisory['say'] }}">{{ \App\Support\AskModelAdvisory::TAG[$advisory['code']] }}</span>
                     @if (\App\Support\AskModelAdvisory::warns($advisory))
-                        <a href="{{ route('ai.profiles.index') }}">بدّل نموذجَ الغرضِ من التوجيهِ والأغراض ←</a>
+                        <a href="{{ route('ai.profiles.index') }}">راجِع سلسلةَ الغرض ←</a>
                     @endif
                 </small>
             </div>
