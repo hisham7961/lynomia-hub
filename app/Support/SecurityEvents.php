@@ -41,7 +41,9 @@ final class SecurityEvents
         'PASSKEY_REMOVED'         => ['حذف مفتاح مرور', 'notice', ['حذف مفتاح مرور']],
         'PASSKEY_FAILURE'         => ['فشل تحقّق مفتاح مرور', 'warning', ['فشل تحقّق مفتاح مرور']],
         'STEP_UP_SUCCESS'         => ['تصعيد مصادقة ناجح', 'info', ['تصعيد مصادقة ناجح', 'تصعيد مصادقة بمفتاح مرور']],
-        'STEP_UP_FAILURE'         => ['فشل تصعيد المصادقة', 'warning', ['فشل تصعيد المصادقة']],
+        // الفعلُ من `StepUp::AUDIT_FAILURE` لا نصّاً مكرّراً: كانت صياغتُه في الجوال
+        // تختلف بحركةٍ واحدةٍ فلا يطابقها `whereIn` — فلا يصير الفشلُ حدثاً أمنيّاً.
+        'STEP_UP_FAILURE'         => [\App\Support\StepUp::AUDIT_FAILURE, 'warning', [\App\Support\StepUp::AUDIT_FAILURE]],
         'ROLE_CHANGED'            => ['تغيير دور', 'high', ['@module:roles']],
         'PERMISSION_CHANGED'      => ['تغيير صلاحيات مستخدم', 'high', ['@module:users:تعديل', 'استعادة مستخدم', 'إيقاف حساب تبعاً للملف الوظيفي']],
         'USER_CREATED'            => ['إنشاء حساب', 'notice', ['@module:users:إضافة', 'إنشاء حساب لموظف جديد', 'إنشاء ملف وظيفي مع حساب']],
