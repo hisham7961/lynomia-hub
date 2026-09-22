@@ -19,6 +19,16 @@ use Illuminate\Support\Facades\Schema;
  */
 class FileController extends Controller
 {
+    /**
+     * **فعلُ التدقيقِ لتنزيلِ ملفِّ حقلٍ في وحدة** (البند #16 · AUD-11).
+     *
+     * سكّةُ `download_log` مفتاحُها `attachment_id` **غيرُ قابلٍ للعدم**،
+     * وملفُّ حقلِ الوحدةِ لا صفَّ مرفقٍ له. فأثرُه ينتمي إلى **سجلِّه** لا
+     * إلى مرفقٍ لا وجودَ له — ومفتاحُ `(module, record_id)` في سجلِّ التدقيق
+     * هو موضعُه الطبيعيّ، **بلا هجرةٍ تمسُّ مخطَّطَ الإنتاج**.
+     */
+    public const AUDIT_DOWNLOAD = 'تنزيل ملف حقل';
+
     public function show(\Illuminate\Http\Request $r, string $path)
     {
         // داخل hub/ فقط وبلا صعود مسارات
@@ -76,6 +86,17 @@ class FileController extends Controller
                  * وإلا من **السجل وحقله** («مشروع أطلس — شعار المشروع.png»).
                  */
                 if (! $inline) {
+                    /*
+                     * **الأثرُ على التنزيلِ وحدَه** (البند #16 · AUD-11).
+                     *
+                     * صفحةُ سجلٍّ فيها خمسُ صورٍ تُصدِر خمسَ طلباتِ معاينة.
+                     * فوسمُ كلِّ واحدةٍ «تنزيلاً» يُغرِق السجلَّ بضجيجٍ يُخفي
+                     * التنزيلَ الحقيقيّ — **وسجلٌّ لا يُقرَأ ليس أثراً**.
+                     * و`DocumentPolicy` أعلاه يفرّق بينهما أصلاً، فالأثرُ يتبع
+                     * تفرقتَه القائمةَ ولا يخترع أخرى.
+                     */
+                    $this->trail($path, $att ?? null);
+
                     return response()->download($abs, $this->downloadName($path), [
                         'X-Robots-Tag' => 'noindex',
                         'X-Content-Type-Options' => 'nosniff',
@@ -91,6 +112,99 @@ class FileController extends Controller
         }
 
         abort(404);
+    }
+
+    /**
+     * **أثرُ التنزيل — مصرفان لا واحد، كلٌّ لموضوعِه** (البند #16 · AUD-11).
+     *
+     * ── **الفجوةُ التي أُغلقت** ──
+     *
+     * سكّةُ `download_log` مستعمَلةٌ في خمسةِ مواضعَ ولم تكن هنا. وهذا البابُ
+     * — كما يقول توثيقُ الصنفِ أعلاه — **يبثّ البايتاتِ نفسَها بالمسار**،
+     * ولذلك يفرض عليه `DocumentPolicy` القرارَ نفسَه. **فكان الإذنُ موحَّداً
+     * بين البابَين والأثرُ ليس كذلك**: من نزّل وثيقةً من شاشةِ المرفقات يُرى،
+     * ومن نزّلها بمسارِها لا يُرى.
+     *
+     * ── **ولماذا مصرفان؟** ──
+     *
+     * `download_log.attachment_id` عمودٌ **غيرُ قابلٍ للعدم**. فملفُّ حقلِ
+     * وحدةٍ لا صفَّ مرفقٍ له لا مكانَ له فيه إلّا بتغييرِ مخطَّطٍ يمسُّ
+     * الإنتاج. وسجلُّ التدقيقِ يحمل الواقعةَ بمفتاحِها الطبيعيِّ
+     * `(module, record_id)` بلا ذلك — **فالمصرفُ يتبع الموضوعَ لا العكس**.
+     *
+     * ── **ولا يُسقِط فشلُ الأثرِ تنزيلاً مشروعاً** ──
+     *
+     * القارئُ طلب ملفّاً وحُرس وأُذِن له. فلو سقط قيدُ الأثرِ — عمودٌ ضاق أو
+     * اتّصالٌ انقطع — **فالصوابُ أن يصل الملفُّ ويُبلَّغ العطل**، لا أن يُمنع
+     * القارئُ من حقٍّ ثبت له. وهذا هو الميزانُ نفسُه الذي يزنه `hub_audit`
+     * في الإنتاج: لا تُكسَر عمليّةٌ حقيقيّةٌ لأجلِ قيدِ تدقيق.
+     */
+    protected function trail(string $path, ?\App\Models\Attachment $att): void
+    {
+        try {
+            if ($att && ! $att->trashed()) {
+                DB::table('download_log')->insert([
+                    'attachment_id' => $att->id,
+                    'user_id'       => auth()->id(),
+                    'ip'            => request()->ip(),
+                    'device'        => substr((string) request()->userAgent(), 0, 200),
+                    'created_at'    => now(),
+                ]);
+
+                return;                       // مرفقٌ: سكّتُه هي سكّةُ بابِ المرفقات نفسُها
+            }
+
+            if ($at = $this->locate($path)) {
+                hub_audit(self::AUDIT_DOWNLOAD, $at['module'], $at['id'], $at['label']);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    /**
+     * **أينَ يقيم هذا الملف؟** — الوحدةُ والسجلُّ والحقلُ، أو `null` لملفٍّ
+     * لا سجلَّ لوحدةٍ يشير إليه.
+     *
+     * والمسحُ هو مسحُ `downloadName` نفسُه — استُخرج كي لا يُمشى على ثلاثين
+     * وحدةً مرّتين في الطلبِ الواحد. **ولا يُنادى إلّا في مسارِ التنزيل**:
+     * المعاينةُ مسارٌ ساخنٌ (صورُ الصفحة) لا يحتمل استعلاماً لكلِّ وحدة.
+     *
+     * @return array{module: string, id: string, label: string}|null
+     */
+    protected function locate(string $path): ?array
+    {
+        foreach (hub_modules() as $mk => $def) {
+            $table = (string) ($def['table'] ?? '');
+            if ($table === '' || ! Schema::hasTable($table)) continue;
+
+            $cols = collect($def['fields'] ?? [])
+                ->filter(fn ($f) => in_array($f['type'] ?? '', ['file', 'img'], true) && ! empty($f['col']))
+                ->mapWithKeys(fn ($f) => [(string) $f['col'] => (string) ($f['label'] ?? $f['col'])])->all();
+            if (! $cols) continue;
+
+            // **ترتيبٌ حتميٌّ ولو بدا الصفُّ واحداً** — سجلّان قد يشيران إلى
+            // الملفِّ نفسِه (نسخٌ أو استيراد)، و`first()` بلا ترتيبٍ **قرعةٌ**
+            // تُعطي أثراً مختلفاً بين المحرّكَين لنفسِ التنزيل.
+            $row = DB::table($table)->where(function ($w) use ($cols, $path) {
+                foreach (array_keys($cols) as $c) $w->orWhere($c, $path);
+            })->orderBy('id')->first();
+            if (! $row) continue;
+
+            // أيُّ عمودٍ منها يحمل هذا الملف؟ (السجل قد يحمل ملفين)
+            $col = collect(array_keys($cols))->first(fn ($c) => ($row->{$c} ?? null) === $path);
+            if (! $col) continue;
+
+            $disp = (string) ($row->{hub_display_col($mk)} ?? '');
+
+            return [
+                'module' => $mk,
+                'id'     => (string) ($row->id ?? ''),
+                'label'  => trim($disp !== '' ? "{$disp} — {$cols[$col]}" : $cols[$col]),
+            ];
+        }
+
+        return null;
     }
 
     /**

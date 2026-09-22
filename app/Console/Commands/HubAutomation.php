@@ -234,8 +234,10 @@ class HubAutomation extends Command
             // بالسلسلة لا بالنوع: hub:set يخزّن العدد 1 فيُقرأ int و`=== '1'` تفشل —
             // كان التفعيلُ من الأمر الموثَّق نفسِه لا يعمل
             if ((string) setting('contracts.auto_expire') === '1') {
-                $due = \App\Models\Contract::where('status', 'ساري')
-                    ->whereNotNull('date_end')->whereDate('date_end', '<', today())->limit(200)->get();
+                // مدىً لا دالّة: `DATE(date_end)` تُلغي `contracts_date_end_index`
+                // (قِيس بـEXPLAIN: `type: ALL · key: NULL` ⟵ `type: range`)
+                $due = \App\Models\Contract::where('status', 'ساري')->whereNotNull('date_end');
+                $due = \App\Support\DayRange::before($due, 'date_end', today())->limit(200)->get();
                 foreach ($due as $c) {
                     if (! $this->dry) {
                         $c->status = 'منتهي';
@@ -258,7 +260,7 @@ class HubAutomation extends Command
                 ->max('notice');
             $renewable = \App\Models\Contract::where('status', 'ساري')->where('renewal', 'تلقائي')
                 ->whereNotNull('notice')->where('notice', '>', 0)->whereNotNull('date_end')
-                ->whereDate('date_end', '<=', today()->addDays(max(1, $maxNotice)))
+                ->tap(fn ($q) => \App\Support\DayRange::upto($q, 'date_end', today()->addDays(max(1, $maxNotice))))
                 ->orderBy('date_end')->orderBy('id')->limit(200)->get()
                 ->filter(fn ($c) => \Illuminate\Support\Carbon::parse($c->date_end)
                     ->lte(today()->addDays((int) $c->notice)));
@@ -333,7 +335,7 @@ class HubAutomation extends Command
         $due = RecurringDoc::whereNull('deleted_at')
             ->where('status', 'مفعّل')
             ->whereNotNull('next')
-            ->whereDate('next', '<=', today())
+            ->tap(fn ($q) => \App\Support\DayRange::upto($q, 'next', today()))
             ->get();
 
         foreach ($due as $rec) {

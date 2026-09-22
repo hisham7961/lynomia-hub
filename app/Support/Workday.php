@@ -446,7 +446,7 @@ class Workday
 
         // بلاغاتُ العوائق: تُقرأ مع بنودِ اليوم دفعةً واحدة (لا استعلامَ لكلِّ موظف)
         $blockersByUser = DB::table('work_updates')->whereNull('deleted_at')
-            ->whereDate('work_date', $today)
+            ->tap(fn ($q) => \App\Support\DayRange::on($q, 'work_date', $today))
             ->whereIn('created_by', $emps->pluck('user_id')->filter())
             ->whereNotNull('problems')->where('problems', '!=', '')
             ->get(['created_by'])->groupBy('created_by');
