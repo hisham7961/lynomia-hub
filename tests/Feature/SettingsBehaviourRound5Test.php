@@ -208,4 +208,75 @@ class SettingsBehaviourRound5Test extends TestCase
 
         return $id;
     }
+
+    /* ═══════════ ٧ · esign.pass_min (البند #24) ═══════════ */
+
+    /**
+     * **الحدُّ الأدنى لكلمةِ سرِّ التوقيع يُقرأ من الإعداد** (#24 · §٥).
+     *
+     * ── **والافتراضُ بقي أربعةً عمداً** ──
+     *
+     * كان ثابتاً عند أربعةٍ «لعقدٍ قائمٍ مع المُرسِلين والقوالب»، وقِيس فلم
+     * يوجد **تكامل**: لا قالبَ يحمل كلمةَ سرّ، ولا مسارَ API يُنشئ طلباً،
+     * والفتحُ يقارن التجزئةَ لا الطول.
+     *
+     * **ثمّ جُرِّب رفعُ الافتراضِ إلى ثمانية فسقط ٢٨ اختبارَ توقيعٍ على
+     * المحرّكَين** — ستّةٌ وعشرون موضعاً في الحزمةِ يكتب كلمةً من أربعة.
+     * والحزمةُ مقياسُ عُرفٍ لا بياناتٍ مخترَعة: من اعتاد الأربعةَ شهوراً
+     * يصطدم بجدارٍ لم يطلبه. **فالرافعةُ تُتاح والسياسةُ تُترَك لصاحبها** —
+     * وهذا ما يجعل #24 قراراً بنقرةٍ بدل أن يبقى ثابتاً في الشيفرة.
+     */
+    public function test_حدُّ_كلمةِ_سرِّ_التوقيع_يُقرأ_من_الإعداد(): void
+    {
+        $this->seedCore();
+
+        // الافتراضُ (٤) = سلوكُ ما قبل v2.596.0 حرفاً — لا شيءَ يُكسَر بالترقية
+        $this->actingAs($this->owner)
+            ->post('/esign', ['title' => 'وثيقةٌ بالافتراض', 'free_body' => 'نصّ', 'pass' => 'ab12'])
+            ->assertSessionHasNoErrors();
+
+        // والرافعةُ تعمل: ثمانيةٌ تردّ كلمةَ الأربعة
+        $this->hubSetting('esign.pass_min', '8');
+        $this->actingAs($this->owner)
+            ->post('/esign', ['title' => 'وثيقةٌ قصيرةُ السرّ', 'free_body' => 'نصّ', 'pass' => 'ab12'])
+            ->assertSessionHasErrors('pass');
+
+        // وثمانيةُ أحرفٍ تمرّ تحت الحدِّ المرفوع
+        $this->actingAs($this->owner)
+            ->post('/esign', ['title' => 'وثيقةٌ بكلمةٍ وافية', 'free_body' => 'نصّ', 'pass' => 'ab12cd34'])
+            ->assertSessionHasNoErrors();
+    }
+
+    /** **وأرضيّةُ أربعةٍ صلبةٌ** — إعدادٌ أصغرُ لا يفتح البابَ لكلمةٍ من حرفَين */
+    public function test_أرضيّةُ_حدِّ_كلمةِ_سرِّ_التوقيع_أربعة(): void
+    {
+        $this->seedCore();
+        $this->hubSetting('esign.pass_min', '1');
+
+        $this->actingAs($this->owner)
+            ->post('/esign', ['title' => 'وثيقةٌ بحرفين', 'free_body' => 'نصّ', 'pass' => 'ab'])
+            ->assertSessionHasErrors('pass');
+    }
+
+    /**
+     * **ورفعُ الحدِّ لا يكسر طلباً قائماً** — وهذا ما كان يخافه البند.
+     *
+     * التحقّقُ عند الفتح `Hash::check` لا ينظر في الطول، فوثيقةٌ أُرسلت
+     * بكلمةٍ من أربعةِ أحرفٍ تبقى قابلةً للفتحِ بعد رفعِ الحدِّ إلى ثمانية.
+     */
+    public function test_رفعُ_الحدّ_لا_يكسر_وثيقةً_قائمة(): void
+    {
+        $this->seedCore();
+        $this->actingAs($this->owner)
+            ->post('/esign', ['title' => 'وثيقةٌ سابقة', 'free_body' => 'نصّ', 'pass' => 'ab12'])
+            ->assertSessionHasNoErrors();
+
+        $req = \App\Models\SignRequest::query()->orderByDesc('created_at')->orderByDesc('id')->first();
+        $this->assertNotNull($req, 'لم تُنشأ الوثيقةُ أصلاً — التهيئةُ لم تصحّ');
+
+        // رُفع الحدُّ بعد الإرسال — والكلمةُ القديمةُ ما زالت تفتح
+        $this->hubSetting('esign.pass_min', '8');
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('ab12', (string) $req->fresh()->pass),
+            'رفعُ الحدِّ أبطل كلمةَ وثيقةٍ أُرسلت قبله — وذاك ما كان البندُ يخافه');
+    }
 }

@@ -311,7 +311,18 @@ class EsignController extends Controller
             'title' => 'required|string|max:200',
             'template_id' => 'nullable|exists:sign_templates,id',
             'free_body' => 'nullable|string|max:200000',
-            'pass' => 'nullable|string|min:4|max:80',   // يبقى ٤ (عقدٌ قائم مع المُرسِلين والقوالب) — انظر TECH_DEBT #24
+            // **الحدُّ من الإعداد لا من ثابت** (#24 · §٥ — v2.596.0).
+            //
+            // كان ٤ «لعقدٍ قائمٍ مع المُرسِلين والقوالب»، وقِيس فلم يوجد **تكامل**:
+            // `sign_templates` بلا عمودِ `pass`، ولا مسارَ API يُنشئ طلبَ توقيع،
+            // والتحقّقُ عند الفتح `Hash::check` لا ينظر في الطول.
+            //
+            // **لكنّ الافتراضَ بقي ٤، ورفعُه قرارُ مالكٍ لا قرارُ ترقية.** جُرِّب
+            // الرفعُ إلى ٨ فسقط **ثمانيةٌ وعشرون** اختبارَ توقيعٍ على المحرّكَين:
+            // ستّةٌ وعشرون موضعاً في الحزمةِ يكتب كلمةً من أربعةِ أحرف. والحزمةُ
+            // هنا مقياسُ عُرفٍ لا مجرّدُ بيانات — فمن اعتاد الأربعةَ شهوراً يصطدم
+            // بجدارٍ لم يطلبه. فالرافعةُ تُتاح، والسياسةُ تُترَك لصاحبها.
+            'pass' => 'nullable|string|min:' . max(4, (int) setting('esign.pass_min', 4)) . '|max:80',
             'contract_id' => 'nullable|string',
             'link_module' => 'nullable|string|max:40', 'link_id' => 'nullable|string|max:64',
             'permit' => 'nullable|string|max:64',       // تصريحُ عهدةٍ جاء منه الطلب

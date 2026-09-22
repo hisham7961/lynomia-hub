@@ -88,8 +88,11 @@ class DailyWorkCompliance
         $out = [];
         $rows = \App\Models\LeaveRequest::whereNull('deleted_at')->whereIn('emp_id', $empIds)
             ->where('status', 'معتمد')->whereIn('type', $types)
-            ->whereDate('date_from', '<=', $to)
-            ->where(fn ($q) => $q->whereDate('date_to', '>=', $from)->orWhereNull('date_to'))
+            // **مدىً لا دالّةً على العمود** (#33/§٥): الفهرسُ المركّبُ
+            // `leave_requests_emp_dates_idx` أُضيف في هذه الدفعة، وقِيس بـ`EXPLAIN`
+            // أنّ المدى يُنصّف الصفوفَ المفحوصةَ فوق ما يكسبه الفهرسُ وحدَه.
+            ->tap(fn ($q) => \App\Support\DayRange::upto($q, 'date_from', $to))
+            ->where(fn ($q) => \App\Support\DayRange::since($q, 'date_to', $from)->orWhereNull('date_to'))
             ->orderBy('id')->get(['emp_id', 'type', 'date_from', 'date_to']);
         foreach ($rows as $r) {
             $out[$r->emp_id][] = ['type' => (string) $r->type,
@@ -128,8 +131,11 @@ class DailyWorkCompliance
         return \App\Models\LeaveRequest::query()->whereNull('leave_requests.deleted_at')
             ->where('leave_requests.status', 'معتمد')
             ->whereIn('leave_requests.type', self::excuseTypes())
-            ->whereDate('leave_requests.date_from', '<=', $date)
-            ->where(fn ($q) => $q->whereDate('leave_requests.date_to', '>=', $date)
+            // **مدىً لا دالّةً على العمود** (#33/§٥): الفهرسُ المركّبُ
+            // `leave_requests_emp_dates_idx` أُضيف في هذه الدفعة، وقِيس بـ`EXPLAIN`
+            // أنّ المدى يُنصّف الصفوفَ المفحوصةَ فوق ما يكسبه الفهرسُ وحدَه.
+            ->tap(fn ($q) => \App\Support\DayRange::upto($q, 'leave_requests.date_from', $date))
+            ->where(fn ($q) => \App\Support\DayRange::since($q, 'leave_requests.date_to', $date)
                 ->orWhereNull('leave_requests.date_to'))
             // العمودُ مؤهَّلٌ لأنّ الجدولين يحملان `company_id` — وغيرُ المؤهَّلِ
             // يرمي «ambiguous column» على المحرّكين
@@ -332,8 +338,11 @@ class DailyWorkCompliance
         if (\Illuminate\Support\Facades\Schema::hasTable('leave_requests')) {
             $leaveRows = \App\Models\LeaveRequest::whereNull('deleted_at')->whereIn('emp_id', $empIds)
                 ->where('status', 'معتمد')->whereIn('type', config('hub.leave.deduct_types', []))
-                ->whereDate('date_from', '<=', $to)
-                ->where(fn ($q) => $q->whereDate('date_to', '>=', $from)->orWhereNull('date_to'))
+                // **مدىً لا دالّةً على العمود** (#33/§٥): الفهرسُ المركّبُ
+                // `leave_requests_emp_dates_idx` أُضيف في هذه الدفعة، وقِيس بـ`EXPLAIN`
+                // أنّ المدى يُنصّف الصفوفَ المفحوصةَ فوق ما يكسبه الفهرسُ وحدَه.
+                ->tap(fn ($q) => \App\Support\DayRange::upto($q, 'date_from', $to))
+                ->where(fn ($q) => \App\Support\DayRange::since($q, 'date_to', $from)->orWhereNull('date_to'))
                 ->get(['emp_id', 'date_from', 'date_to'])->groupBy('emp_id');
         }
 
@@ -494,8 +503,9 @@ class DailyWorkCompliance
                 ->whereIn('emp_id', $emps->pluck('id')->all())
                 ->whereIn('status', self::PENDING_REQUEST_STATUSES)
                 ->whereIn('type', self::excuseTypes())
-                ->whereDate('date_from', '<=', $date)
-                ->where(fn ($q) => $q->whereDate('date_to', '>=', $date)->orWhereNull('date_to'))
+                // مدىً لا دالّةً على العمود — الفهرسُ المركّبُ أُضيف في هذه الدفعة (#33/§٥)
+                ->tap(fn ($q) => \App\Support\DayRange::upto($q, 'date_from', $date))
+                ->where(fn ($q) => \App\Support\DayRange::since($q, 'date_to', $date)->orWhereNull('date_to'))
                 ->orderBy('id')->pluck('emp_id')->flip()->all();
         }
 
