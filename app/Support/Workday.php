@@ -354,8 +354,11 @@ class Workday
         return LeaveRequest::whereNull('deleted_at')->where('emp_id', $empId)
             ->where('status', 'معتمد')
             ->whereIn('type', config('hub.leave.deduct_types', []))
-            ->whereDate('date_from', '<=', $date)
-            ->where(fn ($q) => $q->whereDate('date_to', '>=', $date)->orWhereNull('date_to'))
+            // **مدىً لا دالّةً على العمود** (#33/§٥): الفهرسُ المركّبُ
+            // `leave_requests_emp_dates_idx` أُضيف في هذه الدفعة، وقِيس بـ`EXPLAIN`
+            // أنّ المدى يُنصّف الصفوفَ المفحوصةَ فوق ما يكسبه الفهرسُ وحدَه.
+            ->tap(fn ($q) => \App\Support\DayRange::upto($q, 'date_from', $date))
+            ->where(fn ($q) => \App\Support\DayRange::since($q, 'date_to', $date)->orWhereNull('date_to'))
             ->exists();
     }
 
@@ -446,7 +449,7 @@ class Workday
 
         // بلاغاتُ العوائق: تُقرأ مع بنودِ اليوم دفعةً واحدة (لا استعلامَ لكلِّ موظف)
         $blockersByUser = DB::table('work_updates')->whereNull('deleted_at')
-            ->whereDate('work_date', $today)
+            ->tap(fn ($q) => \App\Support\DayRange::on($q, 'work_date', $today))
             ->whereIn('created_by', $emps->pluck('user_id')->filter())
             ->whereNotNull('problems')->where('problems', '!=', '')
             ->get(['created_by'])->groupBy('created_by');

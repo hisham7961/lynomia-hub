@@ -155,6 +155,10 @@ class Quote extends Model
     public static function nextDocNo(): string
     {
         $fmt = (string) setting('quotes.doc_no_format', 'QT-{YEAR}-{SEQ}');
+        // **قالبٌ بلا `{SEQ}` كان يُعلّق الحفظَ أبداً** (#٣٥أ · §٤ط): المرشَّحُ
+        // ثابتٌ لا يتزايد، والحلقةُ أدناه تستعلم القاعدةَ في كلِّ لفّة. والتسلسلُ
+        // يُلحَق هنا فيبقى صدرُ القالبِ المضبوطِ كما كُتب والرقمُ فريداً.
+        if (! str_contains($fmt, '{SEQ}')) $fmt .= '-{SEQ}';
         $year = now()->format('Y');
         $prefix = str_replace(['{YEAR}', '{SEQ}'], [$year, ''], $fmt);
         $prefix = rtrim($prefix, '-');

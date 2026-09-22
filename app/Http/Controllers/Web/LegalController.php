@@ -168,8 +168,21 @@ class LegalController extends Controller
     {
         abort_unless(hub_can(auth()->user(), 'contracts', 'e'), 403);
         $rule = \App\Models\AlertRule::whereNull('deleted_at')->where('mod', 'contracts')->findOrFail($id);
-        $rule->forceFill(['status' => 'مفعّلة'])->save();
-        hub_audit('تفعيل قاعدة تنبيه عقود', 'contracts', null, $rule->name);
+
+        /*
+         * **التغييرُ وأثرُه واقعةٌ واحدة** (البند #3 · DI-07).
+         *
+         * قاعدةُ التنبيهِ ضابطٌ تشغيليّ: **من فعّلها ومتى سؤالُ تدقيقٍ لا
+         * فضول**. وبلا معاملةٍ كان سقوطُ قيدِ التدقيقِ يُبقي القاعدةَ مفعّلةً
+         * بلا أثر — فيقول السجلُّ غيرَ ما تقوله القاعدة، **ولا يكشفه
+         * `hub:audit-verify`** لأنّ سلسلةَ البصماتِ تكشف العبثَ لا الغياب.
+         *
+         * وهذا هو ما يفعله المستودعُ في سبعةَ عشرَ موضعاً آخر — الشذوذُ كان هنا.
+         */
+        \Illuminate\Support\Facades\DB::transaction(function () use ($rule) {
+            $rule->forceFill(['status' => 'مفعّلة'])->save();
+            hub_audit('تفعيل قاعدة تنبيه عقود', 'contracts', null, $rule->name);
+        });
 
         return back()->with('ok', 'فُعّلت «' . $rule->name . '» — تعمل مع أتمتة الصباح اليومية');
     }

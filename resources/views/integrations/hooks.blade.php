@@ -13,6 +13,19 @@
     <a class="btn ghost sm" href="{{ route('integrations.index') }}">↪ مركز التكاملات</a>
 </div>
 
+{{-- #20 · رافعةُ اشتراطِ الختمِ الزمنيّ: تُقرأ الحالةُ قبل الإشعال --}}
+@if ($requireTs)
+    <div class="flash wn" style="position:static;margin-bottom:12px">⏱ اشتراطُ ترويسة
+        <span class="mono ltr">X-Hub-Timestamp</span> <b>مشتعل</b> — كلُّ طلبٍ يصل نقطةً موقّعةً بلا ختمٍ زمنيٍّ يُرَدُّ بـ401.</div>
+@elseif ($tsSummary['hooks_break'])
+    <div class="flash" style="position:static;margin-bottom:12px">⏱ <b>{{ $tsSummary['hooks_break'] }}</b>
+        من {{ $tsSummary['hooks'] }} نقطةً وصلها طلبٌ <b>بلا</b> ترويسة <span class="mono ltr">X-Hub-Timestamp</span>
+        خلال {{ \App\Support\HardeningReadiness::QUIET_DAYS }} يوماً — وهؤلاء وحدَهم مَن يتوقّف لو أُشعل
+        <span class="mono ltr">security.inbound_require_timestamp</span>.
+        @if ($tsSummary['hooks_unknown'])<br>و<b>{{ $tsSummary['hooks_unknown'] }}</b> لم يصلها طلبٌ بعدُ —
+        فحالتُها <b>مجهولةٌ لا جاهزة</b>، ولا تُخمَّن.@endif</div>
+@endif
+
 {{-- ═ إنشاء نقطة ═ --}}
 <div class="card">
     <h3>➕ نقطةُ استقبالٍ جديدة</h3>
@@ -33,6 +46,11 @@
             <h3 style="margin:0">{{ $h->name }}
                 <span class="bdg {{ $h->enabled ? 'ok' : 'wn' }}">{{ $h->enabled ? 'يعمل' : 'موقوف' }}</span>
                 @if ($h->event)<span class="bdg mono ltr">{{ $h->event }}</span>@endif
+            @php $tsRow = $ts[$h->id] ?? null; @endphp
+            @if ($tsRow)
+                <span class="bdg {{ ['يتوقّف' => 'wn', 'جاهزة' => 'ok'][$tsRow['state']] ?? '' }}"
+                      title="@if ($tsRow['state'] === 'يتوقّف')آخرُ طلبٍ بلا ختمٍ زمنيّ: {{ $tsRow['without'] }}@elseif ($tsRow['state'] === 'جاهزة')لا طلبَ بلا ختمٍ زمنيٍّ منذ {{ \App\Support\HardeningReadiness::QUIET_DAYS }} يوماً@else لم يصلها طلبٌ يُرصَد بعد@endif">⏱ {{ $tsRow['state'] }}</span>
+            @endif
             </h3>
             <span class="spacer"></span>
             <span class="sub">الطلبات: <b>{{ number_format($h->hits) }}</b>
@@ -95,7 +113,10 @@
   -H 'Content-Type: application/json' \
   -d '{"name":"عميل جديد","value":100}'</div>
         <b>٣)</b> إن كانت موقّعةً: أضف ترويسة <span class="mono ltr">X-Hub-Signature: sha256=&lt;hmac&gt;</span> على الجسم الخام بالسرّ.<br>
-        <b>٤)</b> الرد <span class="mono ltr">{"ok":true,...}</span> يعني القبول — ويظهر الاستقبال في سجلّ النقطة.
+        <b>٤)</b> الرد <span class="mono ltr">{"ok":true,...}</span> يعني القبول — ويظهر الاستقبال في سجلّ النقطة.<br>
+        <b>٥)</b> <b>وأضِف ترويسةَ الختم الزمنيّ</b> <span class="mono ltr">X-Hub-Timestamp: &lt;unix&gt;</span> ووقّع
+        <span class="mono ltr">"ts.body"</span> بدل الجسم وحدَه — فالطلبُ الملتقَط لا يُعاد بعد خمسِ دقائق.
+        وهي اختياريّةٌ اليوم، والشارةُ على كلِّ نقطةٍ أعلاه تقول أيُّها تبنّتها.
     </div>
 </div>
 @endsection

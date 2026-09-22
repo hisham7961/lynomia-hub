@@ -123,6 +123,10 @@ class Contract extends Model
     public static function nextDocNo(): string
     {
         $format = (string) (setting('contracts.doc_no_format') ?: 'CTR-{YEAR}-{SEQ}');
+        // **قالبٌ بلا `{SEQ}` كان يُعلّق الحفظَ أبداً** (#٣٥أ · §٤ط): المرشَّحُ
+        // ثابتٌ لا يتزايد، والحلقةُ أدناه تستعلم القاعدةَ في كلِّ لفّة. والتسلسلُ
+        // يُلحَق هنا فيبقى صدرُ القالبِ المضبوطِ كما كُتب والرقمُ فريداً.
+        if (! str_contains($format, '{SEQ}')) $format .= '-{SEQ}';
         $year = now()->format('Y');
         // آخر تسلسل للسنة الحالية من الأرقام المولدة بالصيغة نفسها
         $prefix = str_replace(['{YEAR}', '{SEQ}'], [$year, ''], $format);

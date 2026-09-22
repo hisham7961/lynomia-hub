@@ -46,7 +46,7 @@ class StepUpController extends Controller
 
         if (! StepUp::verify($u, hub_str($r->input('answer')))) {
             RateLimiter::hit($key, 60);
-            hub_audit('فشل تصعيد المصادقة', null, null, $u->name);
+            hub_audit(StepUp::AUDIT_FAILURE, null, null, $u->name);
 
             return back()->with('err', StepUp::method($u) === 'totp'
                 ? 'الرمز غير صحيح أو انتهى'

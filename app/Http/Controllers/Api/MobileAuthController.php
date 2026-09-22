@@ -443,7 +443,7 @@ class MobileAuthController extends Controller
 
         // ── F11: فحصُ الاعتماد المجرّدُ من الحالة (لا session()) — السكّةُ نفسُها لا فرعٌ ثانٍ ──
         if (! StepUp::checkCredential($user, hub_str($data['credential']))) {
-            hub_audit('فشلُ تصعيد المصادقة', null, null, $user->name,
+            hub_audit(StepUp::AUDIT_FAILURE, null, null, $user->name,
                 ['user_id' => $user->id, 'after' => ['purpose' => $data['purpose'], 'method' => $method]]);
 
             return Api::error(Api::STEP_UP_REQUIRED, 428,

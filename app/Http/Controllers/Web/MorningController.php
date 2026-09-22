@@ -205,7 +205,11 @@ class MorningController extends Controller
         // ── غياب اليوم ──
         if (hub_can($u, 'leaves', 'v')) {
             $lvQ = hub_scope(DB::table('leave_requests')->whereNull('deleted_at'), 'leaves')->where('status', 'معتمد')
-                ->whereDate('date_from', '<=', today())->whereDate('date_to', '>=', today());
+                // مدىً لا دالّةً على العمود (#33/§٥). **ولا `orWhereNull` هنا عمداً**:
+                // هذا القارئُ يعدّ من لهم تاريخُ عودةٍ معلوم، والمفتوحُ بلا نهايةٍ
+                // كان خارجَه قبلَ التحويلِ وبعدَه — التحويلُ لا يغيّر صفّاً.
+                ->tap(fn ($q) => \App\Support\DayRange::upto($q, 'date_from', today()))
+                ->tap(fn ($q) => \App\Support\DayRange::since($q, 'date_to', today()));
             $lvN = (clone $lvQ)->count();
             $lv = $lvQ->limit(8)->get(['id', 'emp_id', 'type']);
             $names = hub_ref_labels('hr', $lv->pluck('emp_id')->all());

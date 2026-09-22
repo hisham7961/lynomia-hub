@@ -234,8 +234,10 @@ class HubAutomation extends Command
             // بالسلسلة لا بالنوع: hub:set يخزّن العدد 1 فيُقرأ int و`=== '1'` تفشل —
             // كان التفعيلُ من الأمر الموثَّق نفسِه لا يعمل
             if ((string) setting('contracts.auto_expire') === '1') {
-                $due = \App\Models\Contract::where('status', 'ساري')
-                    ->whereNotNull('date_end')->whereDate('date_end', '<', today())->limit(200)->get();
+                // مدىً لا دالّة: `DATE(date_end)` تُلغي `contracts_date_end_index`
+                // (قِيس بـEXPLAIN: `type: ALL · key: NULL` ⟵ `type: range`)
+                $due = \App\Models\Contract::where('status', 'ساري')->whereNotNull('date_end');
+                $due = \App\Support\DayRange::before($due, 'date_end', today())->limit(200)->get();
                 foreach ($due as $c) {
                     if (! $this->dry) {
                         $c->status = 'منتهي';
@@ -258,7 +260,7 @@ class HubAutomation extends Command
                 ->max('notice');
             $renewable = \App\Models\Contract::where('status', 'ساري')->where('renewal', 'تلقائي')
                 ->whereNotNull('notice')->where('notice', '>', 0)->whereNotNull('date_end')
-                ->whereDate('date_end', '<=', today()->addDays(max(1, $maxNotice)))
+                ->tap(fn ($q) => \App\Support\DayRange::upto($q, 'date_end', today()->addDays(max(1, $maxNotice))))
                 ->orderBy('date_end')->orderBy('id')->limit(200)->get()
                 ->filter(fn ($c) => \Illuminate\Support\Carbon::parse($c->date_end)
                     ->lte(today()->addDays((int) $c->notice)));
@@ -333,7 +335,7 @@ class HubAutomation extends Command
         $due = RecurringDoc::whereNull('deleted_at')
             ->where('status', 'مفعّل')
             ->whereNotNull('next')
-            ->whereDate('next', '<=', today())
+            ->tap(fn ($q) => \App\Support\DayRange::upto($q, 'next', today()))
             ->get();
 
         foreach ($due as $rec) {
@@ -345,29 +347,61 @@ class HubAutomation extends Command
             while ($rec->next && Carbon::parse($rec->next)->lte(today()) && $guard++ < 24) {
                 $onDate = substr((string) $rec->next, 0, 10);
 
+                // NoOverflow: مرساةُ ٣١ يناير كانت تقفز فبراير (addMonths يفيض
+                // إلى ٣ مارس) وتنجرف للأبد — نفس صنف عيب التقارير المُصلَح
+                $after = Carbon::parse($rec->next)->addMonthsNoOverflow($months)->toDateString();
+
                 if ($rec->auto_post) {
                     $doc = null;
+
                     if (! $this->dry) {
-                        $doc = FinDocument::create([
-                            'doc_no'     => FinDocument::nextRecurringNo(),   // متسلسلٌ فريدٌ لا عشوائيٌّ يتصادم
-                            'kind'       => $rec->kind ?: 'مصروف',
-                            'partner'    => $rec->partner,
-                            'date'       => $onDate,
-                            'due'        => $onDate,
-                            'amount'     => $rec->amount,
-                            'tax'        => 0,
-                            'total'      => $rec->amount,
-                            'currency'   => $rec->currency,
-                            'project_id' => $rec->project_id,
-                            'company_id' => $rec->company_id,
-                            // الأبعاد كاملة: كانت تضيع عند التوليد (البند يُحشر نصاً في الوصف)
-                            // فتعمى تقارير البنود ومراكز التكلفة عن كل المولَّد آلياً
-                            'cc_id'      => $rec->cc_id,
-                            'cat'        => $rec->cat,
-                            'method'     => $rec->method,
-                            'description'=> 'وُلّد تلقائياً من المتكرر: ' . $rec->name,
-                        ]);
+                        /*
+                         * **المستندُ وتقديمُ المؤشّرِ واقعةٌ واحدة** (البند #6 · F-12).
+                         *
+                         * حفظُ `next` مع كلِّ دورةٍ — لا بعد الحلقةِ كلِّها — إصلاحٌ
+                         * سابقٌ صحيحٌ **يرتّب الكتابتَين ولا يجعلهما واحدة**: بينهما
+                         * نافذةٌ يسقط فيها الحفظُ بعد أن التزم المستند، فيبقى مستندٌ
+                         * ومؤشّرٌ لم يتقدّم — **فيُولَّد له توأمٌ في صباحِ الغد**.
+                         *
+                         * وهذا الأمرُ يعمل **كلَّ صباحٍ بلا من يراه**، و`catch` أدناه
+                         * يمنع متكرّراً واحداً من إيقافِ البقيّة — فالعطلُ يُبلَّغ
+                         * ويمضي، **ويظهر أثرُه بعد أسابيعَ فاتورةً مكرّرةً في دفترٍ
+                         * ماليّ**. فالمعاملةُ هنا ليست تشدّداً: هي الفرقُ بين «سقطت
+                         * الدورةُ فتُعاد غداً نظيفةً» و«سقطت فخلّفت أثراً».
+                         *
+                         * والإشعارُ خارجَها عمداً: **سقوطُ إشعارٍ لا ينقض واقعةً ماليّة.**
+                         */
+                        $doc = DB::transaction(function () use ($rec, $onDate, $after) {
+                            $created = FinDocument::create([
+                                'doc_no'     => FinDocument::nextRecurringNo(),   // متسلسلٌ فريدٌ لا عشوائيٌّ يتصادم
+                                'kind'       => $rec->kind ?: 'مصروف',
+                                'partner'    => $rec->partner,
+                                'date'       => $onDate,
+                                'due'        => $onDate,
+                                'amount'     => $rec->amount,
+                                'tax'        => 0,
+                                'total'      => $rec->amount,
+                                'currency'   => $rec->currency,
+                                'project_id' => $rec->project_id,
+                                'company_id' => $rec->company_id,
+                                // الأبعاد كاملة: كانت تضيع عند التوليد (البند يُحشر نصاً في الوصف)
+                                // فتعمى تقارير البنود ومراكز التكلفة عن كل المولَّد آلياً
+                                'cc_id'      => $rec->cc_id,
+                                'cat'        => $rec->cat,
+                                'method'     => $rec->method,
+                                'description'=> 'وُلّد تلقائياً من المتكرر: ' . $rec->name,
+                            ]);
+
+                            $rec->next = $after;
+                            $rec->saveQuietly();
+
+                            return $created;
+                        });
+                    } else {
+                        // المعاينةُ تُقدّم المؤشّرَ في الذاكرةِ وحدَها كي تنتهيَ الحلقة
+                        $rec->next = $after;
                     }
+
                     $docs++;
                     $this->notifyMonitors('recur',
                         "توليد تلقائي: {$rec->name} — " . number_format((float) $rec->amount, 2) . ' ' . ($rec->currency ?: ''),
@@ -377,17 +411,11 @@ class HubAutomation extends Command
                     $this->notifyMonitors('recur-manual',
                         "مستحق ({$onDate}): {$rec->name} — أنشئ المستند يدوياً",
                         'recur', $rec->id);
+
+                    // تذكيرٌ بلا مستند: **كتابةٌ واحدةٌ** فلا معاملةَ لها
+                    $rec->next = $after;
+                    if (! $this->dry) $rec->saveQuietly();
                 }
-
-                // NoOverflow: مرساةُ ٣١ يناير كانت تقفز فبراير (addMonths يفيض
-                // إلى ٣ مارس) وتنجرف للأبد — نفس صنف عيب التقارير المُصلَح
-                $rec->next = Carbon::parse($rec->next)->addMonthsNoOverflow($months)->toDateString();
-
-                // **حفظُ next مع كل دورة لا بعد الحلقة كلها**: كانت الفواتير
-                // تُلتزم فوراً وnext يُحفظ مرةً واحدة في النهاية — فعطلٌ في الدورة
-                // الرابعة يترك الثلاث المُنشأة بمؤشّرٍ قديم فتُعاد. الآن كل دورةٍ
-                // تُقدّم المؤشّر فورَ إنشائها فلا إعادةَ توليد.
-                if (! $this->dry) $rec->saveQuietly();
             }
           } catch (\Throwable $e) {
               // متكرّرٌ واحدٌ لا يوقف البقية، وعطلُه يُبلَّغ لا يُبتلع

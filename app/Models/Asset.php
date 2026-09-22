@@ -93,6 +93,11 @@ class Asset extends Model
     {
         $format = (string) (setting('assets.code_format')
             ?: config('hub_assets.code_format', 'LYN-{CAT}-{YEAR}-{SEQ}'));
+        // **قالبٌ بلا `{SEQ}` كان يُعلّق الحفظَ أبداً** (#٣٥أ · الجولةُ الثانية):
+        // المرشَّحُ ثابتٌ لا يتزايد، والحلقةُ أدناه تستعلم القاعدةَ في كلِّ لفّة —
+        // فلا هي تخرج ولا هي تصمت. والتسلسلُ يُلحَق هنا فيبقى صدرُ القالبِ
+        // المضبوطِ كما كُتب، ويبقى الكودُ فريداً كما يفرض العمود.
+        if (! str_contains($format, '{SEQ}')) $format .= '-{SEQ}';
         $cat = \App\Support\Custody::catCode($type);
         $year = now()->format('Y');
 
