@@ -18,7 +18,20 @@
     ['label' => 'خطرة (خاملة أو بلا انتهاء)', 'value' => $summary['risky'],
      'tone' => $summary['risky'] ? 'bad' : 'ok', 'hint' => 'خمولٌ يتجاوز ' . $unusedDays . ' يوماً، أو بلا تاريخ انتهاء'],
     ['label' => 'مُبطَلة', 'value' => $summary['revoked'], 'tone' => $summary['revoked'] ? 'wn' : ''],
+    ['label' => $require2fa ? 'متوقّفةٌ الآن (بلا ثنائيّة)' : 'تتوقّف لو أُشترطت الثنائيّة',
+     'value' => $hardening['tokens_break'], 'tone' => $hardening['tokens_break'] ? 'wn' : 'ok',
+     'hint' => 'مفاتيحُ سارية صاحبُها لم يُفعّل المصادقة الثنائية'],
 ]])
+
+{{-- #14 · رافعةُ اشتراطِ الثنائيّة: القائمةُ تُقرأ قبل الإشعال لا بعده --}}
+@if ($require2fa)
+    <div class="flash wn" style="position:static;margin-bottom:12px">🔐 اشتراطُ المصادقة الثنائية على مفاتيح API <b>مشتعل</b> —
+        كلُّ مفتاحٍ صاحبُه بلا ثنائيّةٍ يُرَدُّ الآن بـ403. العمودُ أدناه يسمّيهم، والإطفاءُ من مركز الإعدادات يُعيد كلَّ شيءٍ لحظتَه.</div>
+@elseif ($hardening['tokens_break'])
+    <div class="flash" style="position:static;margin-bottom:12px">🔐 <b>{{ $hardening['tokens_break'] }}</b>
+        من {{ $hardening['tokens'] }} مفتاحاً سارياً صاحبُه بلا مصادقةٍ ثنائية — وهؤلاء وحدَهم مَن يتوقّف لو أُشعل
+        <span class="mono ltr">security.api_require_2fa</span>. فعّل ثنائيّاتِهم أوّلاً، ثمّ أشعِل المفتاح.</div>
+@endif
 
 <div class="card">
     <h3 style="margin:0 0 8px">🧾 المفاتيح <span class="sub">(بترتيبٍ ثابتٍ عبر الصفحات — والفرزُ من رؤوس الجدول)</span></h3>

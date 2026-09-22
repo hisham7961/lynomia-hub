@@ -11,6 +11,7 @@
             @include('partials.cc.th', ['col' => 'expires', 'label' => 'ينتهي', 'default' => 'created'])
             @include('partials.cc.th', ['col' => 'used', 'label' => 'آخر استعمال', 'default' => 'created'])
             <th scope="col">آخر عنوان</th>
+            <th scope="col">الثنائيّة</th>
             <th scope="col">الامتياز</th>
             <th scope="col">الحالة</th>
             <th scope="col" class="acts"></th>
@@ -30,6 +31,8 @@
                 <td class="sub">{{ $tok->expires_at ? \Illuminate\Support\Carbon::parse($tok->expires_at)->diffForHumans() : 'لا ينتهي' }}</td>
                 <td class="sub">{{ $tok->last_used_at ? \Illuminate\Support\Carbon::parse($tok->last_used_at)->diffForHumans() : 'لم يُستعمل قط' }}</td>
                 <td>@if ($tok->last_ip)<bdi class="mono ltr">{{ $tok->last_ip }}</bdi>@else<span class="sub">—</span>@endif</td>
+                <td>@if ($tok->owner2fa)<span class="bdg ok" title="صاحبُه فعّل المصادقة الثنائية">مفعّلة</span>
+                    @else<span class="bdg wn" title="يتوقّف لو أُشترطت الثنائيّة على مفاتيح API">بلا ثنائيّة</span>@endif</td>
                 <td>@if ($tok->privileged)<span class="bdg {{ $tok->full ? 'bad' : 'wn' }}" title="صاحبُه مالكٌ أو حاملُ رايةٍ خطرة">مميَّز</span>
                     @else<span class="sub">عاديّ</span>@endif</td>
                 <td><span class="bdg {{ $tokTone }}">{{ $tokLabel }}</span>
@@ -44,7 +47,7 @@
                 </td>
             </tr>
         @empty
-            @include('partials.empty', ['colspan' => 10, 'icon' => '🔑',
+            @include('partials.empty', ['colspan' => 11, 'icon' => '🔑',
                      'text' => 'لا مفاتيح API بعد — تُسكّ من الملف الشخصي لكل مستخدم'])
         @endforelse
         </tbody>

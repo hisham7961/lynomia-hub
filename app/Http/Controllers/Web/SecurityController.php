@@ -932,7 +932,7 @@ class SecurityController extends Controller
                 DB::raw(hub_has_col('api_tokens', 'last_ip') ? 'api_tokens.last_ip' : 'NULL as last_ip'),
                 DB::raw($hasCols ? 'api_tokens.revoked_at' : 'NULL as revoked_at'),
                 DB::raw($hasCols ? 'api_tokens.revoked_by' : 'NULL as revoked_by'),
-                'users.name as uname', 'users.role_id as urole'])
+                'users.name as uname', 'users.role_id as urole', 'users.totp_enabled'])
             ->withQueryString();
 
         // امتيازُ صاحب الرمز دفعةً واحدة — لا استعلامَ لكل صفّ
@@ -941,6 +941,8 @@ class SecurityController extends Controller
             $t->privileged = in_array((string) $t->urole, $privRoles, true);
             $t->full = \App\Support\ApiTokens::fullScope($t->scopes);
             $t->status = \App\Support\ApiTokens::classify($t);
+            // #14: صاحبٌ بلا ثنائيّةٍ = رمزٌ يتوقّف لحظةَ إشعالِ الاشتراط
+            $t->owner2fa = (bool) $t->totp_enabled;
 
             return $t;
         });
@@ -950,6 +952,9 @@ class SecurityController extends Controller
             'summary' => \App\Support\ApiTokens::summary(),
             'unusedDays' => \App\Support\ApiTokens::unusedDays(),
             'frozen' => (string) setting('security.freeze_tokens', '0') === '1',
+            // #14: «مَن يتوقّف لو أُشعل الاشتراط» — قائمةٌ تُقرأ قبل القرار لا بعده
+            'hardening' => \App\Support\HardeningReadiness::summary(),
+            'require2fa' => (string) setting('security.api_require_2fa', '0') === '1',
         ]);
     }
 

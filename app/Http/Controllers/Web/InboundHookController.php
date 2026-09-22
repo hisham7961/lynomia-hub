@@ -28,6 +28,30 @@ class InboundHookController extends Controller
 
     /* ───────── الوجه العام: الاستقبال ───────── */
 
+    /**
+     * **رصدُ الختمِ الزمنيّ — كتابةٌ واحدةٌ بالدقيقةِ كحدٍّ أقصى.**
+     *
+     * والعمودُ المكتوبُ واحدٌ لا اثنان: الطلبُ إمّا حمل الترويسةَ أو افتقدها،
+     * فيُؤرَّخ الوجهُ الذي وقع وحدَه. وغيابُ العمودِ (تنصيبٌ لم يُرحَّل بعد)
+     * يُتخطّى بصمت — الرصدُ إضافةٌ لا شرطٌ لعملِ النقطة.
+     */
+    protected function observeTimestamp(\App\Models\InboundHook $hook, bool $present): void
+    {
+        $col = $present ? 'ts_seen_at' : 'ts_missing_at';
+        if (! hub_has_col('inbound_hooks', $col)) return;
+
+        try {
+            $last = $hook->{$col};
+            if ($last && \Illuminate\Support\Carbon::parse($last)->gt(now()->subMinute())) return;
+            // كتابةٌ مباشرةٌ لا حفظُ نموذج — نظيرُ سطرِ `hits` أسفلَه حرفاً: فحفظُ
+            // النموذجِ يلمس `updated_at` ويُمرّ عمودَ السرِّ على cast التشفير بلا داعٍ
+            \Illuminate\Support\Facades\DB::table('inbound_hooks')->where('id', $hook->id)->update([$col => now()]);
+            $hook->{$col} = now();   // فلا يُكرَّر الرصدُ في الطلبِ نفسِه
+        } catch (\Throwable $e) {
+            report($e);   // الرصدُ لا يُسقط استقبالاً
+        }
+    }
+
     public function receive(Request $r, string $token)
     {
         $hook = InboundHook::where('token', $token)->where('enabled', true)->first();
@@ -36,10 +60,29 @@ class InboundHookController extends Controller
 
         $raw = (string) $r->getContent();
 
+        /*
+         * **رصدُ تبنّي الختمِ الزمنيّ — قبل أيِّ فرض** (#20 · §٥ · v2.597.0).
+         *
+         * كلفةُ البند المعلَنة «المُرسِلونَ القدامى يُرفَضون»، ولا يُقرَّر على
+         * كلام. فيُسجَّل لكلِّ نقطةٍ آخرُ طلبٍ **حمل** الترويسةَ وآخرُ طلبٍ
+         * **افتقدها** — فيقرأ المالكُ بعد أسبوعين مَن يتوقّف بالاسم
+         * (`HardeningReadiness::inboundHooks()`).
+         *
+         * **والكتابةُ مخنوقةٌ بالدقيقة** كنمطِ `ApiAuth::last_used_at`: رصدٌ
+         * لا يضيف كتابةً لكلِّ طلبٍ على سطحٍ عامّ.
+         */
+        $this->observeTimestamp($hook, trim((string) $r->header('X-Hub-Timestamp', '')) !== '');
+
         // توقيعُ HMAC حين يكون للنقطة سرّ: X-Hub-Signature: sha256=<hmac>
         if (filled($hook->secret)) {
             $sent = (string) $r->header('X-Hub-Signature', '');
             $ts = trim((string) $r->header('X-Hub-Timestamp', ''));
+
+            // **والفرضُ رافعةٌ مطفأةٌ افتراضياً**: بلا إشعالها يبقى المُرسِلُ
+            // القديمُ يعمل حرفاً كما كان — لا شيءَ يُكسَر بالترقية.
+            if ($ts === '' && (string) setting('security.inbound_require_timestamp', '0') === '1') {
+                abort(401, 'هذه النقطةُ تتطلب ترويسةَ X-Hub-Timestamp');
+            }
             // (v2.399) ربطُ التوقيع بالزمن حين يرسل المصدرُ X-Hub-Timestamp: يُوقَّع "ts.body" ويُرفض
             // ما تجاوز خمسَ دقائق — فالطلبُ الملتقَط لا يُعاد بعد نافذته. وبلا الترويسة يبقى
             // التوقيعُ على الجسم كما كان (توافقٌ مع المُرسِلين القائمين).
@@ -104,7 +147,12 @@ class InboundHookController extends Controller
             ->whereIn('hook_id', $hooks->pluck('id'))
             ->orderByDesc('id')->limit(40)->get()->groupBy('hook_id');
 
-        return view('integrations.hooks', compact('hooks', 'events'));
+        // #20: حالةُ تبنّي الختمِ الزمنيّ لكلِّ نقطة — «مَن يتوقّف» قبل أيِّ إشعال
+        $ts = collect(\App\Support\HardeningReadiness::inboundHooks())->keyBy('id');
+        $tsSummary = \App\Support\HardeningReadiness::summary();
+        $requireTs = (string) setting('security.inbound_require_timestamp', '0') === '1';
+
+        return view('integrations.hooks', compact('hooks', 'events', 'ts', 'tsSummary', 'requireTs'));
     }
 
     public function store(Request $r)
