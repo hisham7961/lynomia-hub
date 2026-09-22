@@ -84,6 +84,11 @@ class Station extends Model
     public static function nextCode(): string
     {
         $format = (string) (setting('stations.code_format') ?: 'ST-{YEAR}-{SEQ}');
+        // **قالبٌ بلا `{SEQ}` كان يُعلّق الحفظَ أبداً** (#٣٥أ · الجولةُ الثانية):
+        // المرشَّحُ ثابتٌ لا يتزايد، والحلقةُ أدناه تستعلم القاعدةَ في كلِّ لفّة —
+        // فلا هي تخرج ولا هي تصمت. والتسلسلُ يُلحَق هنا فيبقى صدرُ القالبِ
+        // المضبوطِ كما كُتب، ويبقى الكودُ فريداً كما يفرض العمود.
+        if (! str_contains($format, '{SEQ}')) $format .= '-{SEQ}';
         $year = now()->format('Y');
 
         $prefix = str_replace(['{YEAR}', '{SEQ}'], [$year, ''], $format);
