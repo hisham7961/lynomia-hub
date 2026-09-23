@@ -215,6 +215,7 @@ class AiCenterController extends Controller
 
         // العنوانُ يمرّ ببوّابةِ الخروج قبل أن يُحفَظ — فلا يُخزَّن هدفٌ لا
         // يُسمَح بطلبِه أصلاً، ولا يُكتشَف المنعُ بعد الحفظ عند أوّلِ فحص.
+        // (SSRF-1: بوّابةُ الخروج ترفض منافذَ البنيةِ الحسّاسة على loopback — فلا يُخزَّن هدفُ مسح.)
         if ($url !== '') {
             $probe = AiGateway::baseUrl() === $url ? $url . '/v1/models' : null;
             $gate = $probe !== null
@@ -309,8 +310,13 @@ class AiCenterController extends Controller
         $host = parse_url($url, PHP_URL_HOST);
         $scheme = mb_strtolower((string) parse_url($url, PHP_URL_SCHEME));
 
+        // **SSRF-1: استثناءُ الـloopback لا يشمل منافذَ البنيةِ الحسّاسة.** توجيهُ البوّابةِ
+        // إلى 127.0.0.1:6379 (Redis) أو :5432 (Postgres) كان يجعل «افحص الاتصال» عرّافَ
+        // خدماتٍ داخليّة. فمنفذُ البوّابةِ الحقيقيُّ (~4000) يمرّ، والمنافذُ الحسّاسة تُرفَض.
+        $port = parse_url($url, PHP_URL_PORT);
         if (is_string($host) && in_array($host, ['127.0.0.1', '::1', '[::1]'], true)
-            && in_array($scheme, ['http', 'https'], true)) {
+            && in_array($scheme, ['http', 'https'], true)
+            && ! in_array((int) $port, \App\Support\AiGateway::SENSITIVE_LOOPBACK_PORTS, true)) {
             return ['ok' => true, 'why' => '', 'ip' => null];
         }
 

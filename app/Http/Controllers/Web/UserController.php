@@ -233,6 +233,9 @@ class UserController extends Controller
         // كلمةِ ضحيّته يبقى داخلاً حتى يخرج بنفسه. الطرحُ نفسُه الذي يفعله تغييرُ الكلمة الذاتيّ.
         if (! empty($data['password'])) {
             \App\Support\Sessions::revokeAll($user, null);
+            // AUTH-1: وجلساتُ الجوال أيضاً — بلا هذا كان التدقيقُ يُدوّن sessions_revoked=true
+            // بينما رمزُ تحديثِ الجوال يبقى حيّاً يُدوَّر، فيبقى المقتحمُ داخلاً رغم إعادة الضبط.
+            \App\Support\MobileSessionService::revokeAllForUser($user, 'إعادةُ تعيين كلمة المرور');
             hub_audit('إعادة تعيين كلمة مرور', 'users', $user->id, $user->name, ['after' => ['by' => auth()->user()?->name, 'sessions_revoked' => true]]);
             hub_notify($user->id, 'security', 'أُعيد ضبطُ كلمة مرورك بواسطة ' . (auth()->user()?->name ?? 'الإدارة') . ' وأُنهيت جلساتُك القديمة — إن لم تطلب ذلك راجع مدير النظام فوراً', 'users', $user->id);
         }

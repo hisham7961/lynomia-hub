@@ -13,6 +13,14 @@ class MonitorController extends Controller
         abort_unless(isset(Uptime::TARGETS[$module]), 404, 'هذه الوحدة غير قابلة للمراقبة');
         abort_unless(hub_can(auth()->user(), $module, 'e'), 403, 'الفحص الحيّ يتطلب صلاحية تعديل الوحدة');
 
+        // **SSRF-2: مع تفعيلِ `monitor.allow_private` (يُبطِل حظرَ العناوين الداخليّة
+        // عالميّاً في hub_outbound_ok)، يصير «افحص الآن» مِجَسّاً داخليّاً بانعكاسِ رمزٍ
+        // وزمنٍ لكلِّ محرِّرِ وحدة servers/websites. فيُحصَر — عند تفعيلِ العلَم — بالمالك.**
+        if (setting('monitor.allow_private')) {
+            abort_unless(hub_is_owner(auth()->user()), 403,
+                'الفحصُ الحيُّ مع السماح بالعناوين الداخليّة للمالك وحدَه');
+        }
+
         $def = hub_mod($module);
         $class = '\\App\\Models\\' . $def['model'];
         $row = hub_scope($class::query(), $module)->findOrFail($id);

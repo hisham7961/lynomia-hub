@@ -57,8 +57,18 @@ class MobileSessionAuth
         // **حراسُ الحساب الخمسة يسريان على الجوال كما على API/الويب** (ApiAuth:43-63) —
         // البوّابةُ الخامسةُ التي تفرضها، فلا تسريبَ لحسابٍ موقوفٍ/منتهٍ/مقفولٍ/محصورٍ عبر الجوال
         $user = $session->user()->whereNull('deleted_at')->first();
-        if (! $user || $user->status === 'موقوف' || ($user->locked_until && now()->lt($user->locked_until))) {
+        // AUTH-3: الحكمُ الموحّد `isSuspended()` لا مقارنةُ حالةٍ حرفيّة — بابٌ موازٍ لا ينقض F31
+        if (! $user || $user->isSuspended() || ($user->locked_until && now()->lt($user->locked_until))) {
             return Api::error(Api::ACCOUNT_RESTRICTED, 403, 'الحساب موقوف أو مقفل', ['reason' => 'account_suspended_or_locked']);
+        }
+        // **AUTH-1: تغييرُ كلمة المرور يُبطل الجلسة** (CWE-613): جلسةٌ سُكّت قبل آخرِ
+        // تغييرٍ لكلمة المرور لا يُوثَق بها — نظيرُ `Sessions::revokeAll` على قناة الويب،
+        // لكن هنا حتميّاً على مصدرِ الجلسة لا على جدولٍ منفصل، فيُمسَك كلُّ مسارِ تغيير.
+        if ($user->password_changed_at && $session->created_at
+            && $session->created_at->lt($user->password_changed_at)) {
+            SecurityRadar::record($request, 'وصول مرفوض', 'جلسةُ جوالٍ أقدمُ من تغييرِ كلمة المرور');
+
+            return Api::error(Api::SESSION_REVOKED, 401, 'تغيّرت كلمةُ المرور — سجّل الدخول من جديد');
         }
         if ($user->expires_at && now()->toDateString() > substr((string) $user->expires_at, 0, 10)) {
             return Api::error(Api::ACCOUNT_RESTRICTED, 403, 'انتهت صلاحية هذا الحساب', ['reason' => 'account_expired']);
