@@ -35,3 +35,5 @@ tests/Feature/Zz*Test.php
 # أسرارُ تشغيل بوّابة LiteLLM — لا تدخل المستودعَ أبداً
 deploy/litellm/*.env
 deploy/litellm/.env*
+.env.*test
+.env.uitest

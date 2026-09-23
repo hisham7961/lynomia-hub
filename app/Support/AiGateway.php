@@ -29,6 +29,19 @@ namespace App\Support;
  */
 class AiGateway
 {
+    /**
+     * **SSRF-1: منافذُ البنيةِ الحسّاسة على loopback لا تُقبَل بوّابةً.** استثناءُ
+     * `127.0.0.1` ضروريٌّ لبوّابةِ LiteLLM (المنفذُ ~4000)، لكنّه كان يشمل أيَّ منفذٍ —
+     * فيُوجَّه إلى قاعدةِ بياناتٍ أو مخزنٍ داخليٍّ ويصير «افحص الاتصال» عرّافَ خدمات.
+     * قواعدُ البيانات والمخازنُ والوكلاءُ الإداريّون مرفوضون؛ منافذُ التطبيقِ/الوكيلِ تُقبَل.
+     */
+    public const SENSITIVE_LOOPBACK_PORTS = [
+        22, 23, 25, 111, 135, 139, 445,          // إدارة/نقلُ ملفّات
+        1433, 1521, 3306, 5432, 27017, 6379,     // قواعدُ بيانات + Redis
+        9200, 9300, 11211, 5672, 15672, 2379,    // بحثٌ · تخزينٌ مؤقّت · طوابير · etcd
+        2375, 2376, 8500, 8200,                  // Docker · Consul · Vault
+    ];
+
     /** عنوانُ البوّابة كما ضُبط — بلا شرطةٍ أخيرة، أو نصٌّ فارغٌ إن لم يُضبط */
     public static function baseUrl(): string
     {
@@ -214,7 +227,11 @@ class AiGateway
 
         $literalLoopback = in_array($host, ['127.0.0.1', '::1', '[::1]'], true);
 
-        if ($sameDestination && $literalLoopback && in_array($scheme, ['http', 'https'], true)) {
+        // **SSRF-1: استثناءُ الـloopback لا يشمل منافذَ البنيةِ الحسّاسة.** توجيهُ البوّابةِ
+        // إلى 127.0.0.1:6379 (Redis) أو :5432 (Postgres) وأمثالِها كان يجعل «افحص الاتصال»
+        // عرّافَ خدماتٍ داخليّة. فحتّى مع التطابقِ (sameDestination) يُرفَض المنفذُ الحسّاس.
+        if ($sameDestination && $literalLoopback && in_array($scheme, ['http', 'https'], true)
+            && ! in_array($port, self::SENSITIVE_LOOPBACK_PORTS, true)) {
             // `ip = null` عمداً: لا تثبيتَ عنوانٍ حيث لا تحليلَ اسمٍ أصلاً
             return ['ok' => true, 'why' => '', 'ip' => null];
         }

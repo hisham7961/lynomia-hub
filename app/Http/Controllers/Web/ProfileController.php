@@ -261,6 +261,9 @@ class ProfileController extends Controller
         // وجلساتُ الأجهزة الأخرى الحيّة تُوسم منتهية فيطردها SessionSentry مع طلبها
         // التالي، ويُدوَّر «تذكّرني» — بالسكّة الواحدة (Sessions::revokeAll).
         \App\Support\Sessions::revokeAll($u, (string) $r->session()->get('hub.sl', '') ?: null);
+        // AUTH-1: وقناةُ الجوال أيضاً — Sessions::revokeAll يمسّ جدولَ الويب وحدَه، ولا يلمس
+        // mobile_sessions. فبلا هذا يبقى رمزُ تحديثِ الجوال يُدوَّر بعد تغيير الكلمة (CWE-613).
+        \App\Support\MobileSessionService::revokeAllForUser($u, 'تغييرُ كلمة المرور');
 
         // تدوير معرّف الجلسة الحالية بعد تغيير كلمة المرور
         $r->session()->regenerate();

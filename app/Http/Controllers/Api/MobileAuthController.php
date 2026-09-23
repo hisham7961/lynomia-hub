@@ -267,10 +267,27 @@ class MobileAuthController extends Controller
 
             return Api::error(Api::SESSION_REVOKED, 401, 'الحساب لم يعد موجوداً — سجّل الدخول من جديد');
         }
+        // **AUTH-1: لا تجديدَ لعائلةٍ نشأت قبل آخرِ تغييرٍ لكلمة المرور** (CWE-613): التدويرُ
+        // يسكّ صفّاً جديداً بطابعِ الآنَ في العائلةِ نفسِها، فلا يُقاس زمنُ الجلسةِ الحاليّة بل
+        // **مولدُ العائلة** (أقدمُ صفٍّ فيها = زمنُ الدخول الأصليّ). فيُبطَل رمزُ التحديثِ إلى
+        // ما لا نهايةٍ بعد تغيير الكلمة، لا يُمدَّد. نظيرُ حارسِ `MobileSessionAuth` على المصدر.
+        $familyOrigin = MobileSession::where('family_id', $session->family_id)->min('created_at');
+        if ($user->password_changed_at && $familyOrigin
+            && \Illuminate\Support\Carbon::parse($familyOrigin)->lt($user->password_changed_at)) {
+            MobileSessionService::revokeFamily((string) $session->family_id, 'تغييرُ كلمة المرور');
+
+            return Api::error(Api::SESSION_REVOKED, 401, 'تغيّرت كلمةُ المرور — سجّل الدخول من جديد');
+        }
         if ($restricted = $this->accountGate($user, $r)) {
             MobileSessionService::revokeSession($session, 'حسابٌ محجوبٌ عند التحديث');
 
             return $restricted;
+        }
+        // AUTH-2: ولا تمديدَ وصولٍ لحسابٍ صارت عليه سياسةٌ إلزاميّةٌ غيرُ مُستوفاة
+        if ($blocked = $this->policyBlock($user)) {
+            MobileSessionService::revokeSession($session, 'سياسةٌ إلزاميّةٌ غيرُ مستوفاة عند التحديث');
+
+            return $blocked;
         }
 
         return $this->ok($this->sessionPayload($session, $res['access'], $res['refresh']));
@@ -562,7 +579,7 @@ class MobileAuthController extends Controller
      */
     private function accountGate(User $user, Request $r)
     {
-        if ($user->status === 'موقوف') {
+        if ($user->isSuspended()) {   // AUTH-3: الحكمُ الموحّد لا مقارنةُ حالةٍ حرفيّة
             return Api::error(Api::ACCOUNT_RESTRICTED, 403, 'الحساب موقوف — راجع مالك النظام',
                 ['reason' => 'account_suspended']);
         }
@@ -644,8 +661,35 @@ class MobileAuthController extends Controller
      * `finishLogin`/`Devices::bindOnLogin`/`session()`. الرمزان يُعادان **مرّةً**
      * هنا ولا يُخزَّنان صريحَين ولا يُدقَّقان.
      */
+    /**
+     * **AUTH-2: سياستا الدخولِ الإلزاميّتان تسريان على جلسةِ الجوال أيضاً** («لا دخولَ
+     * موازٍ أضعف»). الحارسان `ForcePasswordChange` و`Require2faForPrivileged` وسيطان على
+     * الويب ويستثنيان `api/*` عمداً (لسطحِ التكامل مصادقتُه) — لكنّ دخولَ الجوال دخولٌ
+     * تفاعليٌّ لا رمزُ آلة، فيُفرَض عليه ما يُفرَض على الويب: كلمةُ مرورٍ مؤقّتةٌ تُبدَّل
+     * أولاً، وحسابٌ حسّاسٌ بلا 2FA يُفعّلها حين تشترطها المنشأة. الردُّ 428 بالغلافِ
+     * الموحَّدِ والـpolicy نفسِها، فيوجّه التطبيقُ المستخدمَ لإتمامِ السياسةِ لا يُمنَح جلسةً.
+     */
+    private function policyBlock(User $user)
+    {
+        if (\App\Support\Staff::mustChangePassword($user)) {
+            return Api::error(Api::STEP_UP_REQUIRED, 428,
+                'دخلتَ بكلمةِ مرورٍ مؤقّتة — بدّلها قبل أيِّ عملٍ آخر',
+                ['policy' => 'must_change_password']);
+        }
+        if ((string) setting('auth.2fa_required_priv', '0') === '1'
+            && ! $user->totp_enabled && \App\Support\Risk::privileged($user)) {
+            return Api::error(Api::STEP_UP_REQUIRED, 428,
+                'حسابُك صاحبُ صلاحياتٍ حسّاسة — فعّل التحقّقَ بخطوتين للمتابعة (سياسةُ المنشأة)',
+                ['policy' => 'auth.2fa_required_priv']);
+        }
+
+        return null;
+    }
+
     private function issueSession(User $user, MobileInstallation $installation, array $data, Request $r)
     {
+        if ($blocked = $this->policyBlock($user)) return $blocked;
+
         [$session, $access, $refresh] = MobileSessionService::mint(
             $user, $installation, $r->ip(), $data['app_version'] ?? null, $data['platform'] ?? null
         );

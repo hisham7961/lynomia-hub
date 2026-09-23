@@ -559,6 +559,18 @@ class V1Controller extends ModuleController
         foreach ($def['fields'] as $f) {
             $hidden = hub_field_mode($u, $module, $f['key']) === 'hide';
             $secret = ($f['type'] ?? '') === 'sec' && (! $canSec || ! $inAllowed);
+            // **SEC-1: حقلٌ يعلن `stepup` (كـPUK) لا يُكشَف عبر مسارِ القراءة دون تصعيدٍ طازج.**
+            // الويب يفرض التصعيدَ في `ModuleController::revealSecret` حتّى للمالك؛ وسطحُ التكامل
+            // (رمزُ API) لا يملك آليّةَ تصعيدٍ تفاعليّةً أصلاً — فيُسقَط الحقلُ. وسطحُ الجوال يُكشَف
+            // فقط بمنحةِ تصعيدٍ ساريةٍ للغرض (mobileStepUpFresh)، وإلا أُسقِط. لا يُقرأ عمّن يقدر
+            // على نسخِ الأسرار وحده كما كان — بل يُقرأ التصعيدُ المُعلَنُ على الحقل نفسِه.
+            $needStepup = ! empty($f['stepup']) || (string) setting('security.stepup_secrets', '0') === '1';
+            if (! $secret && $needStepup && ($f['type'] ?? '') === 'sec') {
+                $ms = request()->attributes->get('mobile_session');
+                $fresh = $ms instanceof \App\Models\MobileSession
+                    && \App\Support\MobileSessionService::mobileStepUpFresh($ms, 'reveal:' . $module . ':' . $f['key']);
+                if (! $fresh) $secret = true;
+            }
             if ($hidden || $secret) { unset($arr[$f['col']]); continue; }
             // **حقلُ التاريخ يوماً لا لحظةً** (v2.399): كان يُسلسَل `2026-01-05` طابعَ UTC
             // `2026-01-04T21:00:00Z` (المنطقة +٣) فتُعيده جولةُ القراءة/الكتابة يوماً إلى الوراء.

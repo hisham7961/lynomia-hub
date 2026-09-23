@@ -182,7 +182,7 @@ class PasskeyController extends Controller
         if (! $u) return response()->json(['ok' => false, 'error' => 'الحساب غير موجود'], 422);
 
         // نفسُ حراس الدخول: موقوف / قفل طوارئ / حساب مقفل
-        if ($u->status === 'موقوف') return response()->json(['ok' => false, 'error' => 'الحساب موقوف'], 403);
+        if ($u->isSuspended()) return response()->json(['ok' => false, 'error' => 'الحساب موقوف'], 403);   // AUTH-3
         if (setting('security.lockdown') && ! hub_is_owner($u)) {
             return response()->json(['ok' => false, 'error' => 'النظام في قفل طوارئ'], 403);
         }

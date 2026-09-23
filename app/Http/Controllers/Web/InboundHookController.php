@@ -93,6 +93,13 @@ class InboundHookController extends Controller
                 $calc = 'sha256=' . hash_hmac('sha256', $raw, (string) $hook->secret);
             }
             abort_unless($sent !== '' && hash_equals($calc, $sent), 401, 'توقيعٌ غير صالح');
+
+            // **WEBHOOK-1/2: مفتاحُ منعِ الإعادةِ يُشتقّ خادميّاً من التوقيعِ لا من ترويسةِ
+            // العميل.** كانت الإعادةُ تُمنَع فقط إن أرسل المصدرُ `X-Hub-Event-Id` (يتحكّم به
+            // المُعيدُ فيغيّره) وفقط إن أُشعلت رافعةُ الطابع الزمنيّ. الآن التوقيعُ نفسُه (مربوطٌ
+            // بالزمن حين يُرسَل الطابع) هو مفتاحُ التفرّد: طلبٌ مُعادٌ حرفاً = توقيعٌ مطابق =
+            // مرفوضٌ دائماً، ولا يُزوَّر توقيعٌ جديدٌ بلا السرّ. fail-closed لا fail-open.
+            $replayKey = 'sig:' . hash('sha256', $sent);
         }
 
         /*
@@ -104,6 +111,9 @@ class InboundHookController extends Controller
          */
         $eventId = hub_fit(hub_str($r->header('X-Hub-Event-Id')), 190);
         $eventId = $eventId === '' ? null : $eventId;
+        // WEBHOOK-1/2: النقطةُ الموقَّعة تُبطِل التكرارَ بمفتاحِ التوقيع الخادميّ (مشتقٌّ
+        // أعلاه) لا بترويسةِ العميل — فلا تعتمد الحمايةُ على ما يتحكّم به المُعيد.
+        if (isset($replayKey)) $eventId = $replayKey;
 
         // (WP-1.3) الحمولةُ تُخزَّن **مطموسةً**: مفاتيحُ الأسرار (password/api_key/…) بالعمق
         // في JSON، وأنماطُ الرموز (Bearer/JWT/PEM/…) في النص — بعد التحقق من التوقيع

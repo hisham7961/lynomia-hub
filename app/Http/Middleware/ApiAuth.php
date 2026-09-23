@@ -41,7 +41,7 @@ class ApiAuth
         }
 
         $user = $token->user()->whereNull('deleted_at')->first();
-        if (! $user || $user->status === 'موقوف' || ($user->locked_until && now()->lt($user->locked_until))) {
+        if (! $user || $user->isSuspended() || ($user->locked_until && now()->lt($user->locked_until))) {   // AUTH-3
             return Api::error(Api::ACCOUNT_RESTRICTED, 403, 'الحساب موقوف أو مقفل', ['reason' => 'account_suspended_or_locked']);
         }
 
