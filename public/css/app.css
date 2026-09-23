@@ -356,6 +356,11 @@ input[type=checkbox],input[type=radio]{accent-color:var(--p)}
 .matrixwrap{overflow:auto;max-height:62vh;border:1px solid var(--ln);border-radius:12px}
 .matrix .c{text-align:center}
 .matrix input{accent-color:var(--p);width:15px;height:15px}
+/* صفُّ الصلاحيّات الدقيقة (v2.599): مطويٌّ افتراضاً ويُفتح بزرّ «⚙️ دقيقة» —
+   يُميَّز عن صفِّ الوحدة بخلفيّةٍ خافتةٍ وخطٍّ جانبيّ، فلا يُقرأ سطراً منها. */
+.matrix .finerow>td{background:color-mix(in srgb,var(--p) 3%,transparent);
+    border-inline-start:2px solid color-mix(in srgb,var(--p) 30%,transparent);padding-block:7px}
+.matrix .finerow .chip{font-size:12px}
 
 /* ═ الدخول ═  (v2.125: خلفية .loginbg هنا كانت ميتة — تطغى عليها طبقة v2.95 المتأخرة، فحُذفت) */
 .loginbg{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
