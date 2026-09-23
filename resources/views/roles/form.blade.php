@@ -102,6 +102,8 @@
                 <button type="button" class="btn ghost sm" data-col="{{ $op }}">كل «{{ $lbl }}»</button>
             @endforeach
             <button type="button" class="btn ghost sm" data-col="none">✕ امسح الكل</button>
+            {{-- دورٌ جديدٌ كلُّ مجموعاتِه مطويّة: بلا هذا الزرّ يفتحها المالكُ تسعَ مرّاتٍ بيده --}}
+            <button type="button" class="btn ghost sm" id="mxopen" data-open="0">⤢ افتح الكل</button>
         </div>
         <div class="sub" style="margin-bottom:8px">
             تأشير «إضافة» أو «تعديل» أو «حذف» يُفعّل «عرض» تلقائياً عند الحفظ — دورٌ يكتب ولا يرى لا يعمل.
@@ -115,19 +117,39 @@
                     <span class="sub">({{ count($g['items']) }})</span>
                     <span class="bdg {{ $gSet ? 'ok' : '' }}" data-gcount="{{ $gLabel }}">{{ $gSet }} مُفعَّلة</span>
                 </summary>
-                <div class="crow" style="gap:6px;flex-wrap:wrap;margin:8px 0">
-                    <button type="button" class="btn ghost xs" data-grp="{{ $gLabel }}" data-set="v">عرض للكل</button>
-                    <button type="button" class="btn ghost xs" data-grp="{{ $gLabel }}" data-set="vae">عرض وإضافة وتعديل</button>
-                    <button type="button" class="btn ghost xs" data-grp="{{ $gLabel }}" data-set="vaed">كل شيء</button>
+                {{-- **اسمٌ يقول الحقيقة**: هذه الأزرار **تُسند** لا تُضيف — فـ«عرض للكل»
+                     كان يجرّد وحداتِ المجموعةِ من الإضافةِ والتعديلِ والحذف ويتركها عرضاً،
+                     واسمُه يعد بالمنح. صار الاسمُ «اضبط الكلَّ على»، ويسبق السحبَ تأكيدٌ يعدّ ما يُزال. --}}
+                <div class="crow" style="gap:6px;flex-wrap:wrap;margin:8px 0;align-items:center">
+                    <span class="sub">اضبط الكلَّ على:</span>
+                    <button type="button" class="btn ghost xs" data-grp="{{ $gLabel }}" data-set="v">عرضٌ فقط</button>
+                    <button type="button" class="btn ghost xs" data-grp="{{ $gLabel }}" data-set="vae">عرض + إضافة + تعديل</button>
+                    <button type="button" class="btn ghost xs" data-grp="{{ $gLabel }}" data-set="vaed">كلُّ شيء</button>
                     <button type="button" class="btn ghost xs" data-grp="{{ $gLabel }}" data-set="">لا شيء</button>
                 </div>
                 <div class="tblwrap"><table class="tbl matrix">
                     <thead><tr><th>الوحدة</th>@foreach ($ops as $l)<th>{{ $l }}</th>@endforeach</tr></thead>
                     <tbody>
                     @foreach ($g['items'] as $mk => $md)
-                        <tr class="mxrow" data-q="{{ mb_strtolower($md['label'] . ' ' . $mk) }}">
+                        @php
+                            $fineForMod = hub_fine_perms_for($mk);
+                            // **البحثُ كان أعمى عن ٢٠٣ صلاحيّةٍ دقيقة**: `data-q` اسمُ الوحدةِ ومفتاحُها
+                            // وحدَهما، فمن يبحث «تصدير» لا يجد الوحداتِ التي فيها صلاحيّةُ تصدير.
+                            $fineQ = collect($fineForMod)->map(fn ($d, $fk) => ($d['label'] ?? '') . ' ' . $fk)->implode(' ');
+                            $modQ  = mb_strtolower(trim($md['label'] . ' ' . $mk . ' ' . $fineQ));
+                            // ما ضُبط منها فعلاً — يُفتح صفُّها وحدَه، فالمضبوطُ لا يُخفى
+                            $fineSet = collect($fineForMod)->filter(fn ($d, $fk) => ! empty($mx[$mk][$fk]))->count();
+                        @endphp
+                        <tr class="mxrow" data-q="{{ $modQ }}">
                             <td>{{ $md['label'] }}
                                 <button type="button" class="btn ghost xs" data-row-toggle aria-label="تبديل كل صلاحيات {{ $md['label'] }}">الكل</button>
+                                @if ($fineForMod)
+                                    <button type="button" class="btn ghost xs" data-fine="{{ $mk }}"
+                                            aria-expanded="{{ $fineSet ? 'true' : 'false' }}"
+                                            aria-label="صلاحيات دقيقة لـ{{ $md['label'] }}">⚙️ دقيقة
+                                        <b>{{ count($fineForMod) }}</b>@if ($fineSet)<span class="bdg ok" style="margin-inline-start:4px">{{ $fineSet }}</span>@endif
+                                    </button>
+                                @endif
                             </td>
                             @foreach ($ops as $op => $l)
                                 <td class="c"><input type="checkbox" class="mxbox" data-op="{{ $op }}"
@@ -136,21 +158,27 @@
                             @endforeach
                         </tr>
                         {{-- صلاحياتٌ دقيقةٌ لهذه الوحدة (Permissions 360 · م1): تصريحاتٌ إضافيّةٌ فوق
-                             (v/a/e/d) — منفصلةٌ عن أزرارِ «الكل» فهي منحٌ مقصودٌ لا يُكنَس ضمناً. --}}
-                        @php $fineForMod = hub_fine_perms_for($mk); @endphp
+                             (v/a/e/d) — منفصلةٌ عن أزرارِ «الكل» فهي منحٌ مقصودٌ لا يُكنَس ضمناً.
+
+                             **ومطويّةٌ افتراضاً**: ٢٠٣ منها عبر ٨٤ وحدة، كلُّ واحدةٍ كانت تطبع شرحَها
+                             كاملاً **مرّتين** (تلميحاً ونصّاً) — فتغرق مربّعاتُ (v/a/e/d) الأربعةُ في
+                             جدارِ نصّ. الشرحُ الآن تلميحٌ وحده، والصفُّ يُفتح بزرّ «⚙️ دقيقة»،
+                             وما ضُبط منه يُفتح تلقائياً فلا يُخفى منحٌ قائم. --}}
                         @if ($fineForMod)
-                            <tr class="mxrow" data-q="{{ mb_strtolower($md['label'] . ' ' . $mk) }}">
+                            <tr class="mxrow finerow" data-for="{{ $mk }}" data-open="{{ $fineSet ? 1 : 0 }}"
+                                data-q="{{ $modQ }}" data-qf="{{ mb_strtolower($fineQ) }}"
+                                @style(['display:none' => ! $fineSet])>
                                 <td colspan="{{ count($ops) + 1 }}" style="padding-inline-start:20px">
                                     @foreach ($fineForMod as $fk => $fdef)
                                         <label class="chip" title="{{ $fdef['hint'] ?? '' }}"
-                                               style="display:inline-flex;align-items:center;gap:5px;margin-inline-end:12px">
+                                               style="display:inline-flex;align-items:center;gap:5px;margin-inline-end:12px;margin-bottom:4px">
                                             <input type="checkbox"
                                                    name="matrix[{{ $mk }}][{{ $fk }}]" value="1"
                                                    @checked(!empty($mx[$mk][$fk]))>
                                             {{ ! empty($fdef['risky']) ? '🔴 ' : '' }}{{ $fdef['label'] }}
-                                            <span class="sub">— {{ $fdef['hint'] ?? '' }}</span>
                                         </label>
                                     @endforeach
+                                    <div class="sub" style="margin-top:4px;font-size:11px">مرِّر على أيِّ صلاحيّةٍ لقراءة شرحها.</div>
                                 </td>
                             </tr>
                         @endif
@@ -291,21 +319,50 @@
             });
             recount(); e.preventDefault();
         }
+        // **صلاحيّاتٌ دقيقةٌ: طيٌّ وفتح** — الزرُّ يقلب الصفَّ، والبحثُ يحترم قلبَه
+        if (t.dataset && t.dataset.fine) {
+            var fr = form.querySelector('.finerow[data-for="' + t.dataset.fine + '"]');
+            if (fr) {
+                fr.dataset.open = fr.dataset.open === '1' ? '0' : '1';
+                t.setAttribute('aria-expanded', fr.dataset.open === '1' ? 'true' : 'false');
+                applyFine(fr);
+            }
+            e.preventDefault(); return;
+        }
+
         if (t.dataset && t.dataset.grp !== undefined && t.dataset.set !== undefined) {
-            var set = t.dataset.set;
-            t.closest('.mxgrp').querySelectorAll('.mxrow').forEach(function (r) {
-                r.querySelectorAll('.mxbox').forEach(function (b) {
-                    b.checked = set.indexOf(b.dataset.op) > -1;
-                });
+            var set = t.dataset.set,
+                boxes = t.closest('.mxgrp').querySelectorAll('.mxbox'),
+                lose = 0;
+            // **هذه الأزرار تُسند لا تُضيف**: «عرضٌ فقط» على مجموعةٍ ممتلئةٍ يسحب
+            // الإضافةَ والتعديلَ والحذف. فيُعَدُّ ما سيُزال ويُقال قبل وقوعه.
+            Array.prototype.forEach.call(boxes, function (b) {
+                if (b.checked && set.indexOf(b.dataset.op) === -1) lose++;
+            });
+            if (lose && ! confirm('سيُزال ' + lose + ' تأشيراً قائماً من هذه المجموعة. متابعة؟')) {
+                e.preventDefault(); return;
+            }
+            Array.prototype.forEach.call(boxes, function (b) {
+                b.checked = set.indexOf(b.dataset.op) > -1;
             });
             recount(); e.preventDefault();
         }
     });
 
+    // صفُّ الدقيقة يظهر إن طابق بحثُه **و**كان مفتوحاً — أو إن طابق البحثُ اسمَ
+    // صلاحيّةٍ دقيقةٍ فيه بعينها، فيُكشَف ولو كان مطويّاً (وإلّا فالبحثُ يجد ولا يُري).
+    function applyFine(fr) {
+        var t = (q.value || '').trim().toLowerCase(),
+            ok = ! t || (fr.dataset.q || '').indexOf(t) > -1,
+            hit = !! t && (fr.dataset.qf || '').indexOf(t) > -1;
+        fr.style.display = (ok && (fr.dataset.open === '1' || hit)) ? '' : 'none';
+    }
+
     function filter(input, sel, hideEmptyGroups) {
         var t = (input.value || '').trim().toLowerCase(), shown = 0;
         document.querySelectorAll(sel).forEach(function (row) {
             var ok = ! t || row.dataset.q.indexOf(t) > -1;
+            if (row.classList.contains('finerow')) { applyFine(row); return; }
             row.style.display = ok ? '' : 'none';
             if (ok) shown++;
         });
@@ -320,6 +377,16 @@
         }
     }
     q.addEventListener('input', function () { filter(q, '.mxrow', true); });
+
+    // **دورٌ جديدٌ كلُّ مجموعاتِه مطويّة** — بلا هذا الزرّ يُفتَح تسعُ مرّاتٍ باليد
+    var openAll = document.getElementById('mxopen');
+    if (openAll) openAll.addEventListener('click', function () {
+        var on = openAll.dataset.open !== '1';
+        document.querySelectorAll('.mxgrp').forEach(function (g) { g.open = on; });
+        openAll.dataset.open = on ? '1' : '0';
+        openAll.textContent = on ? '⤡ اطوِ الكل' : '⤢ افتح الكل';
+    });
+
     recount();
 
     // مُنتقي قيود الحقول: يبني صفّاً واحداً لكل قيدٍ يُضبط — فلا يحمل الطلب
