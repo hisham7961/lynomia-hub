@@ -629,7 +629,7 @@ class HubAutomation extends Command
              * — فسجلُّ «ماتَ هنا» أنفعُ للتشخيصِ من صمت.
              */
             if (\Illuminate\Support\Facades\Schema::hasTable('ai_usage_events')) {
-                $per['ai_reservations_expired'] = \App\Support\AiLedger::expireStale();
+                $per['ai_reservations_expired'] = \App\Support\Ai\Governance\AiLedger::expireStale();
 
                 /*
                  * **ومقصُّ عمرِ السجلّ** — بأرضيّةٍ صلبةٍ ثلاثين يوماً.

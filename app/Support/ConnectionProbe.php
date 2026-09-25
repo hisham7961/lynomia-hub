@@ -125,18 +125,18 @@ class ConnectionProbe
      */
     public static function litellm(): array
     {
-        if (! \App\Support\AiGateway::configured()) {
+        if (! \App\Support\Ai\Gateway\AiGateway::configured()) {
             return self::row(null, null, null,
-                \App\Support\AiGateway::whyNotReady() ?? 'البوّابةُ غيرُ مهيّأة');
+                \App\Support\Ai\Gateway\AiGateway::whyNotReady() ?? 'البوّابةُ غيرُ مهيّأة');
         }
 
-        $target = \App\Support\AiGateway::url('/v1/models');
+        $target = \App\Support\Ai\Gateway\AiGateway::url('/v1/models');
         // بوّابةُ الخروجِ الضيّقة — تسمح بـloopback الحرفيِّ لهذا الهدفِ وحدَه،
         // وتردُّ ما سواه إلى `hub_outbound_ok` كاملاً (انظر AiGateway::outboundGate)
-        $gate = \App\Support\AiGateway::outboundGate($target);
+        $gate = \App\Support\Ai\Gateway\AiGateway::outboundGate($target);
         if (! $gate['ok']) return self::row(null, null, null, $gate['why']);
 
-        $to = \App\Support\AiGateway::timeouts();
+        $to = \App\Support\Ai\Gateway\AiGateway::timeouts();
 
         $t0 = microtime(true);
         try {
@@ -147,7 +147,7 @@ class ConnectionProbe
                 ->connectTimeout($to['connect'])->timeout(min($to['read'], self::READ_TIMEOUT))
                 ->withHeaders([
                     'User-Agent'    => 'LynomiaHub-Probe/1.0',
-                    'Authorization' => 'Bearer ' . \App\Support\AiGateway::key(),
+                    'Authorization' => 'Bearer ' . \App\Support\Ai\Gateway\AiGateway::key(),
                 ])
                 ->get($target);
         } catch (\Throwable $e) {

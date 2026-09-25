@@ -209,25 +209,25 @@ class FeatureRegistry
         // البوّابةَ تردّ وتقبل المفتاح، **ولا يعني** أنّ نموذجاً ولّد إجابة.
         // و`ENABLED` محجوزةٌ للمرحلةِ الثانية حين يُولَّد فعلاً.
         if ($derive === 'ai.gateway') {
-            $configured = (bool) rescue(fn () => \App\Support\AiGateway::configured(), false, false);
+            $configured = (bool) rescue(fn () => \App\Support\Ai\Gateway\AiGateway::configured(), false, false);
             if (! $configured) {
                 return ['status' => FeatureStatus::NOT_CONFIGURED,
                         'reason' => 'لا عنوانَ بوّابةٍ ومفتاحَ إدارةٍ محفوظَين'];
             }
 
-            $probed = (bool) rescue(fn () => \App\Support\AiGateway::probePassed(), false, false);
+            $probed = (bool) rescue(fn () => \App\Support\Ai\Gateway\AiGateway::probePassed(), false, false);
             if (! $probed) {
                 return ['status' => FeatureStatus::NOT_CONFIGURED,
                         'reason' => 'الإعدادُ مكتملٌ **ولم يُختبر الاتصالُ بعد** — لا دليلَ أنّ البوّابةَ تردّ'];
             }
 
-            $on = (bool) rescue(fn () => \App\Support\AiGateway::enabled(), false, false);
+            $on = (bool) rescue(fn () => \App\Support\Ai\Gateway\AiGateway::enabled(), false, false);
             if (! $on) {
                 return ['status' => FeatureStatus::DISABLED,
                         'reason' => 'الفحصُ ناجحٌ والتكاملُ مطفأٌ من الإعدادات'];
             }
 
-            $gen = (bool) rescue(fn () => \App\Support\AiGateway::generationVerified(), false, false);
+            $gen = (bool) rescue(fn () => \App\Support\Ai\Gateway\AiGateway::generationVerified(), false, false);
 
             return $gen
                 ? ['status' => FeatureStatus::ENABLED,
@@ -247,21 +247,21 @@ class FeatureRegistry
          * — فـ«جاهز» ليست «جرَّبنا فأجاب».
          */
         if ($derive === 'ai.assistant') {
-            $gwOn = (bool) rescue(fn () => \App\Support\AiGateway::enabled()
-                && \App\Support\AiGateway::probePassed(), false, false);
+            $gwOn = (bool) rescue(fn () => \App\Support\Ai\Gateway\AiGateway::enabled()
+                && \App\Support\Ai\Gateway\AiGateway::probePassed(), false, false);
 
             if (! $gwOn) {
                 return ['status' => FeatureStatus::NOT_CONFIGURED,
                         'reason' => 'بوّابةُ النماذجِ غيرُ جاهزةٍ — لا مساعدَ قبلها'];
             }
 
-            $profile = rescue(fn () => \App\Support\AskPolicy::profile(), null, false);
+            $profile = rescue(fn () => \App\Support\Ai\Ask\AskPolicy::profile(), null, false);
             if ($profile === null) {
                 return ['status' => FeatureStatus::NOT_CONFIGURED,
                         'reason' => 'لا غرضَ توجيهٍ بسلسلةٍ صالحة — **وغرضٌ بسلسلةٍ فارغةٍ لا يُجيب طلباً**'];
             }
 
-            $gen = (bool) rescue(fn () => \App\Support\AiGateway::generationVerified(), false, false);
+            $gen = (bool) rescue(fn () => \App\Support\Ai\Gateway\AiGateway::generationVerified(), false, false);
 
             return $gen
                 ? ['status' => FeatureStatus::ENABLED,

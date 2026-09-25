@@ -3,10 +3,10 @@
 namespace Tests\Feature\AiHub;
 
 use App\Models\AiModel;
-use App\Support\AiOverview;
-use App\Support\AiProbes;
-use App\Support\AiProviders;
-use App\Support\LiteLlmAdmin;
+use App\Support\Ai\Center\AiOverview;
+use App\Support\Ai\Catalog\AiProbes;
+use App\Support\Ai\Catalog\AiProviders;
+use App\Support\Ai\Gateway\LiteLlmAdmin;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;

@@ -11,14 +11,14 @@ use App\Models\Project;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
-use App\Support\AiGateway;
-use App\Support\AiProfiles;
-use App\Support\AiPurposes;
-use App\Support\AiRouteRun;
-use App\Support\AskFailures;
-use App\Support\AskPipeline;
-use App\Support\AskPolicy;
-use App\Support\AskTools;
+use App\Support\Ai\Gateway\AiGateway;
+use App\Support\Ai\Routing\AiProfiles;
+use App\Support\Ai\Routing\AiPurposes;
+use App\Support\Ai\Routing\AiRouteRun;
+use App\Support\Ai\Ask\AskFailures;
+use App\Support\Ai\Ask\AskPipeline;
+use App\Support\Ai\Ask\AskPolicy;
+use App\Support\Ai\Ask\AskTools;
 use App\Support\FeatureRegistry;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -247,8 +247,8 @@ class AskAdversarialPhase5Test extends TestCase
     /** **واسمُ الأداةِ المُسجَّلُ يُصفّى بالمفرداتِ المغلقة — فلا يُحقَن اسمٌ مخترَع** */
     public function test_اسمُ_أداةٍ_مخترَعٌ_لا_يدخل_الدفترَ_دليلاً(): void
     {
-        $e = \App\Support\AiLedger::succeed(
-            \App\Support\AiLedger::open([
+        $e = \App\Support\Ai\Governance\AiLedger::succeed(
+            \App\Support\Ai\Governance\AiLedger::open([
                 'request_id' => (string) Str::uuid(), 'feature' => 'ask',
             ]),
             ['tokens' => ['in' => 10, 'out' => 5]], 40, 200,

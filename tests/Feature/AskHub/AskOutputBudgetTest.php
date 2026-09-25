@@ -6,14 +6,14 @@ use App\Models\Company;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\AiGateway;
-use App\Support\AiProbes;
-use App\Support\AiProfiles;
-use App\Support\AskFailures;
-use App\Support\AskPipeline;
-use App\Support\AskPolicy;
+use App\Support\Ai\Gateway\AiGateway;
+use App\Support\Ai\Catalog\AiProbes;
+use App\Support\Ai\Routing\AiProfiles;
+use App\Support\Ai\Ask\AskFailures;
+use App\Support\Ai\Ask\AskPipeline;
+use App\Support\Ai\Ask\AskPolicy;
 use App\Support\FeatureRegistry;
-use App\Support\LiteLlmAskGenerator;
+use App\Support\Ai\Ask\LiteLlmAskGenerator;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -195,7 +195,7 @@ class AskOutputBudgetTest extends TestCase
         $json = LiteLlmFixtures::answer('جوابٌ [#1].', LiteLlmFixtures::usage());
         $json['usage']['completion_tokens_details'] = ['reasoning_tokens' => 512];
 
-        $u = \App\Support\AiChat::usage($json);
+        $u = \App\Support\Ai\Gateway\AiChat::usage($json);
 
         $this->assertSame(512, (int) ($u['reasoning'] ?? 0),
             'رموزُ التفكيرِ لا تُقرأ — فتُنفَق ولا تُرى في الاستهلاك');

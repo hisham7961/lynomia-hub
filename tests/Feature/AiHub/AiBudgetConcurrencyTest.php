@@ -7,12 +7,12 @@ use App\Models\AiModel;
 use App\Models\AiPolicyRule;
 use App\Models\AiProvider;
 use App\Models\AiUsageEvent;
-use App\Support\AiBudgets;
-use App\Support\AiGovernance;
-use App\Support\AiPolicy;
-use App\Support\AiProviders;
-use App\Support\AiRouteRun;
-use App\Support\AskFailures;
+use App\Support\Ai\Governance\AiBudgets;
+use App\Support\Ai\Governance\AiGovernance;
+use App\Support\Ai\Governance\AiPolicy;
+use App\Support\Ai\Catalog\AiProviders;
+use App\Support\Ai\Routing\AiRouteRun;
+use App\Support\Ai\Ask\AskFailures;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -310,8 +310,8 @@ class AiBudgetConcurrencyTest extends TestCase
         $a = AiGovernance::admit($this->ctx(), $m, 300_000, 100);
         $a['event']->forceFill(['started_at' => now()->subHours(3)])->save();
 
-        $this->assertSame(1, \App\Support\AiLedger::expireStale());
-        $this->assertSame(0, \App\Support\AiLedger::expireStale(),
+        $this->assertSame(1, \App\Support\Ai\Governance\AiLedger::expireStale());
+        $this->assertSame(0, \App\Support\Ai\Governance\AiLedger::expireStale(),
             'صفٌّ انتهى مرّةً لا يُلتقَط ثانيةً');
 
         $this->assertSame(0, AiBudgets::status($b->fresh())['reserved_micro']);

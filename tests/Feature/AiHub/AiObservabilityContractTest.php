@@ -3,9 +3,9 @@
 namespace Tests\Feature\AiHub;
 
 use App\Models\AiUsageEvent;
-use App\Support\AiCost;
-use App\Support\AiLedger;
-use App\Support\AskAudit;
+use App\Support\Ai\Governance\AiCost;
+use App\Support\Ai\Governance\AiLedger;
+use App\Support\Ai\Ask\AskAudit;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -296,7 +296,7 @@ class AiObservabilityContractTest extends TestCase
         $e = AiLedger::succeed($this->open(), ['tokens' => ['in' => 10, 'out' => 5]], 40,
             200, ['tool' => 'hub_count']);
 
-        $this->assertContains((string) $e->tool_requested, \App\Support\AskTools::TOOLS);
+        $this->assertContains((string) $e->tool_requested, \App\Support\Ai\Ask\AskTools::TOOLS);
     }
 
     /** **والعملةُ مُعلَنةٌ لا مفترَضةٌ** — فرقمٌ بلا عملةٍ لا يُجمَع */

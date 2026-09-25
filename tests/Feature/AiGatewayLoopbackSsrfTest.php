@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Role;
 use App\Models\User;
-use App\Support\AiGateway;
+use App\Support\Ai\Gateway\AiGateway;
 use App\Support\Settings;
 use Tests\TestCase;
 

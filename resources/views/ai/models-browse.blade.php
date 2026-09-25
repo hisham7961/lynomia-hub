@@ -57,7 +57,7 @@
     </div>
     @if ($found['truncated'])
         <div class="sub mut">
-            ✂️ <b>القائمةُ أطولُ ممّا عُرض</b> — عُرض أوّلُ {{ \App\Support\AiModelSources::MAX_CANDIDATES }} مرشَّحاً.
+            ✂️ <b>القائمةُ أطولُ ممّا عُرض</b> — عُرض أوّلُ {{ \App\Support\Ai\Catalog\AiModelSources::MAX_CANDIDATES }} مرشَّحاً.
             استعمل الترشيحَ للوصولِ إلى ما تريد.
         </div>
     @endif
@@ -141,7 +141,7 @@
                     <td>
                         @if ($c['already_imported'])
                             <span class="mut">—</span>
-                        @elseif (! \App\Support\AiModelSources::adoptableInOneClick($c['availability'] ?? ''))
+                        @elseif (! \App\Support\Ai\Catalog\AiModelSources::adoptableInOneClick($c['availability'] ?? ''))
                             <span class="mut" title="جذعُ عائلةٍ — يلزمه معرّفُك الكامل">✋</span>
                         @else
                             <input type="checkbox" name="picks[]"
@@ -162,9 +162,9 @@
                             : 'غيرُ معروف' }}</td>
                     <td>
                         @php($av = (string) ($c['availability'] ?? ''))
-                        @if ($av === \App\Support\AiModelSources::AVAIL_REGISTERED)
+                        @if ($av === \App\Support\Ai\Catalog\AiModelSources::AVAIL_REGISTERED)
                             <span class="bdg ok" title="منشورٌ عند البوّابةِ بمرجعِ اعتمادِك">مُسجَّل</span>
-                        @elseif ($av === \App\Support\AiModelSources::AVAIL_ACCOUNT)
+                        @elseif ($av === \App\Support\Ai\Catalog\AiModelSources::AVAIL_ACCOUNT)
                             <span class="bdg wn" title="جذعُ عائلةٍ — معرّفُك الحقيقيُّ يحمل لاحقةَ حسابِك">جذعُ عائلة</span>
                         @else
                             <span class="bdg" title="يعرفه الكتالوجُ — ولا يُثبِت أنّ حسابَك يبلغه">كتالوج</span>

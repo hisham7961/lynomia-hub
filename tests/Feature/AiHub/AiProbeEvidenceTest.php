@@ -4,8 +4,8 @@ namespace Tests\Feature\AiHub;
 
 use App\Models\AiModel;
 use App\Models\AiProvider;
-use App\Support\AiProbes;
-use App\Support\AiProviders;
+use App\Support\Ai\Catalog\AiProbes;
+use App\Support\Ai\Catalog\AiProviders;
 use App\Support\ConnectionProbe;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;

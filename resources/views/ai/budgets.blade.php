@@ -7,7 +7,7 @@
      ميزانيّةٌ تُفحَص **بعد** الإنفاقِ ليست ميزانيّة. ولذلك يُحجَز التقديرُ قبل
      النداء، ويُلتزَم بالفعليِّ بعدَه، ويُفرَج عمّا لم يقع. --}}
 
-@php($fmt = fn ($micro) => $micro === null ? '—' : number_format($micro / \App\Support\AiCost::SCALE, 4))
+@php($fmt = fn ($micro) => $micro === null ? '—' : number_format($micro / \App\Support\Ai\Governance\AiCost::SCALE, 4))
 
 <div class="hero">
     <div>
@@ -31,7 +31,7 @@
         <span>ميزانيّةٌ بلا فرضٍ تقيس ولا تمنع — <b>مسارُ هجرةٍ آمنٌ</b> قبل أن يُقطَع عملٌ برقمٍ خُمِّن.</span></div>
     <div class="stat"><span class="ico bdg">⏳</span><b>الحجزُ ينقضي</b>
         <span>مسارٌ مات بين الحجزِ والالتزامِ يُفرَج عنه بعد
-        {{ \App\Support\AiBudgets::RESERVATION_TTL_MIN }} دقيقة — <b>فلا تُخنَق ميزانيّةٌ بمالٍ لم يُنفَق</b>.</span></div>
+        {{ \App\Support\Ai\Governance\AiBudgets::RESERVATION_TTL_MIN }} دقيقة — <b>فلا تُخنَق ميزانيّةٌ بمالٍ لم يُنفَق</b>.</span></div>
 </div>
 
 @if ($budgets->isEmpty())
@@ -126,7 +126,7 @@
                 <input name="label" required maxlength="191" placeholder="السقفُ الشهريُّ العامّ"></label>
             <label style="min-width:130px">النطاق
                 <select name="scope_type">
-                    @foreach (\App\Support\AiBudgets::SCOPES as $sc)
+                    @foreach (\App\Support\Ai\Governance\AiBudgets::SCOPES as $sc)
                         <option value="{{ $sc }}">{{ $sc }}</option>
                     @endforeach
                 </select></label>
@@ -134,13 +134,13 @@
                 <input name="scope_id" class="mono ltr" placeholder="يُترَك فارغاً مع «global»"></label>
             <label style="min-width:120px">الفترة
                 <select name="period">
-                    @foreach (\App\Support\AiBudgets::PERIODS as $pr)
+                    @foreach (\App\Support\Ai\Governance\AiBudgets::PERIODS as $pr)
                         <option value="{{ $pr }}" @selected($pr === 'monthly')>{{ $pr }}</option>
                     @endforeach
                 </select></label>
         </div>
         <div class="row" style="gap:10px;flex-wrap:wrap;align-items:flex-start;margin-top:8px">
-            <label style="min-width:160px">سقفُ المال ({{ \App\Support\AiCost::CURRENCY }})
+            <label style="min-width:160px">سقفُ المال ({{ \App\Support\Ai\Governance\AiCost::CURRENCY }})
                 <input name="limit_amount" type="number" step="0.0001" min="0" placeholder="بلا سقفِ مال"></label>
             <label style="min-width:150px">سقفُ الطلبات
                 <input name="limit_requests" type="number" min="1" placeholder="بلا سقفِ عدد"></label>

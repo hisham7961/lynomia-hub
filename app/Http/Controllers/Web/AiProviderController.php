@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\AiProvider;
-use App\Support\AiCatalog;
-use App\Support\AiGateway;
-use App\Support\AiProviders;
+use App\Support\Ai\Catalog\AiCatalog;
+use App\Support\Ai\Gateway\AiGateway;
+use App\Support\Ai\Catalog\AiProviders;
 use Illuminate\Http\Request;
 
 /**
@@ -35,7 +35,7 @@ class AiProviderController extends Controller
     /** حارسُ المركز — نسخةُ `AiCenterController::gate` نفسُها، فلا بابانِ لغرفةٍ واحدة */
     protected function gate(): void
     {
-        \App\Support\AiAccess::gateManage();
+        \App\Support\Ai\Center\AiAccess::gateManage();
     }
 
     /**
@@ -49,7 +49,7 @@ class AiProviderController extends Controller
      */
     public function index(Request $r)
     {
-        \App\Support\AiAccess::gateView();
+        \App\Support\Ai\Center\AiAccess::gateView();
 
         $catalog = AiCatalog::all();
 
@@ -65,11 +65,11 @@ class AiProviderController extends Controller
         ];
 
         return view('ai.providers', [
-            'sections'  => \App\Support\AiAccess::sections(),
+            'sections'  => \App\Support\Ai\Center\AiAccess::sections(),
             'section'   => 'providers',
-            'manage'    => \App\Support\AiAccess::canManage(),
+            'manage'    => \App\Support\Ai\Center\AiAccess::canManage(),
             // **حالةُ الاعتمادِ للمدير وحدَه** (§١٠): القارئُ يرى «يعمل» لا «لماذا لا»
-            'showState' => \App\Support\AiAccess::showsCredentialState(),
+            'showState' => \App\Support\Ai\Center\AiAccess::showsCredentialState(),
             // **والنماذجُ تُجلَب معها** — فنموذجُ الفحصِ B يُختار من قائمةٍ
             // مسجَّلةٍ لا يُكتَب يداً، والترتيبُ يُطلَب صراحةً وينتهي بـ`id`
             'providers' => AiProvider::query()->with(['models' => static fn ($q) => $q
@@ -81,9 +81,9 @@ class AiProviderController extends Controller
 
             // ── تصفّحُ المزوّدين (إغلاقُ التغطية) ──
             'filters'   => $filters,
-            'browse'    => \App\Support\AiProviderCoverage::browse($filters),
-            'facets'    => \App\Support\AiProviderCoverage::facets(),
-            'coverage'  => \App\Support\AiProviderCoverage::summary(),
+            'browse'    => \App\Support\Ai\Catalog\AiProviderCoverage::browse($filters),
+            'facets'    => \App\Support\Ai\Catalog\AiProviderCoverage::facets(),
+            'coverage'  => \App\Support\Ai\Catalog\AiProviderCoverage::summary(),
             'selected'  => $selected,
         ]);
     }
@@ -99,7 +99,7 @@ class AiProviderController extends Controller
     {
         $this->gate();
 
-        $res = \App\Support\AiProviderRegistry::refresh();
+        $res = \App\Support\Ai\Catalog\AiProviderRegistry::refresh();
 
         return back()->with($res['ok'] ? 'ok' : 'warn', $res['ok']
             ? "حُدِّثت قائمةُ المزوّدين من البوّابة — {$res['count']} مزوّداً."
@@ -230,7 +230,7 @@ class AiProviderController extends Controller
             return back()->withErrors(['model_id' => 'النموذجُ ليس من هذا المزوّد']);
         }
 
-        $res = \App\Support\AiProbes::b($model, (string) $d['mode'], true);
+        $res = \App\Support\Ai\Catalog\AiProbes::b($model, (string) $d['mode'], true);
 
         hub_audit('فحص اعتماد مزوّد (B)', AiProvider::MODULE, (string) $provider->id,
             (string) $provider->label, ['after' => ['up' => $res['up'], 'ms' => $res['ms'],

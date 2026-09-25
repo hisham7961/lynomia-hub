@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Support\AiAuthSchemas;
-use App\Support\AiProviderCoverage;
-use App\Support\AiProviderRegistry;
+use App\Support\Ai\Catalog\AiAuthSchemas;
+use App\Support\Ai\Catalog\AiProviderCoverage;
+use App\Support\Ai\Catalog\AiProviderRegistry;
 use Illuminate\Console\Command;
 
 /**

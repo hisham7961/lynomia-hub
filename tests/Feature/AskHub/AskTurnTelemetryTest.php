@@ -7,15 +7,15 @@ use App\Models\Company;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\AiChat;
-use App\Support\AiGateway;
-use App\Support\AiProfiles;
-use App\Support\AskFailures;
-use App\Support\AskPipeline;
-use App\Support\AskPolicy;
-use App\Support\AskTools;
+use App\Support\Ai\Gateway\AiChat;
+use App\Support\Ai\Gateway\AiGateway;
+use App\Support\Ai\Routing\AiProfiles;
+use App\Support\Ai\Ask\AskFailures;
+use App\Support\Ai\Ask\AskPipeline;
+use App\Support\Ai\Ask\AskPolicy;
+use App\Support\Ai\Ask\AskTools;
 use App\Support\FeatureRegistry;
-use App\Support\LiteLlmAskGenerator;
+use App\Support\Ai\Ask\LiteLlmAskGenerator;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -223,7 +223,7 @@ class AskTurnTelemetryTest extends TestCase
         $this->assertFalse($r['ok']);
 
         $rows = \Illuminate\Support\Facades\DB::table('audits')
-            ->where('action', \App\Support\AskAudit::ACTION_ASKED)
+            ->where('action', \App\Support\Ai\Ask\AskAudit::ACTION_ASKED)
             ->orderBy('id')->get();
 
         $this->assertNotEmpty($rows, 'إخفاقٌ بلا أثرٍ البتّة');
@@ -254,8 +254,8 @@ class AskTurnTelemetryTest extends TestCase
         $this->askWith([[$bad, 200]]);
 
         $blob = (string) json_encode(\Illuminate\Support\Facades\DB::table('audits')
-            ->whereIn('action', [\App\Support\AskAudit::ACTION_ASKED,
-                                 \App\Support\AskAudit::ACTION_DENIED])->get(),
+            ->whereIn('action', [\App\Support\Ai\Ask\AskAudit::ACTION_ASKED,
+                                 \App\Support\Ai\Ask\AskAudit::ACTION_DENIED])->get(),
             JSON_UNESCAPED_UNICODE);
 
         $this->assertStringContainsString('reasoning_tokens', $blob);

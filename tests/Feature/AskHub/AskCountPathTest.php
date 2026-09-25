@@ -6,13 +6,13 @@ use App\Models\Company;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\AiGateway;
-use App\Support\AiProfiles;
-use App\Support\AskContext;
-use App\Support\AskFailures;
-use App\Support\AskPipeline;
-use App\Support\AskPolicy;
-use App\Support\AskTools;
+use App\Support\Ai\Gateway\AiGateway;
+use App\Support\Ai\Routing\AiProfiles;
+use App\Support\Ai\Ask\AskContext;
+use App\Support\Ai\Ask\AskFailures;
+use App\Support\Ai\Ask\AskPipeline;
+use App\Support\Ai\Ask\AskPolicy;
+use App\Support\Ai\Ask\AskTools;
 use App\Support\FeatureRegistry;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -359,7 +359,7 @@ class AskCountPathTest extends TestCase
             return Http::response($s[0], $s[1] ?? 200);
         });
 
-        return AskPipeline::ask($q, $this->asker, new \App\Support\LiteLlmAskGenerator());
+        return AskPipeline::ask($q, $this->asker, new \App\Support\Ai\Ask\LiteLlmAskGenerator());
     }
 
     private function scopedUser(string $email, array $companies, ?array $modules = null): User

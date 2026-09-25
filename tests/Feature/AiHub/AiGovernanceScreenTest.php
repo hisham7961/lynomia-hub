@@ -5,8 +5,8 @@ namespace Tests\Feature\AiHub;
 use App\Models\AiBudget;
 use App\Models\AiPolicyRule;
 use App\Models\AiUsageEvent;
-use App\Support\AiCost;
-use App\Support\AiPolicy;
+use App\Support\Ai\Governance\AiCost;
+use App\Support\Ai\Governance\AiPolicy;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -47,7 +47,7 @@ class AiGovernanceScreenTest extends TestCase
 
     public function test_قسما_الحوكمةِ_مُعلَنانِ_في_شريطِ_الأقسام(): void
     {
-        $keys = array_column(\App\Support\AiAccess::sections($this->owner), 'key');
+        $keys = array_column(\App\Support\Ai\Center\AiAccess::sections($this->owner), 'key');
 
         $this->assertContains('policies', $keys);
         $this->assertContains('budgets', $keys);
@@ -56,7 +56,7 @@ class AiGovernanceScreenTest extends TestCase
     /** **كلُّ قسمٍ يُعرَض يُفتَح** — وقسمٌ يُعرَض ولا يُفتَح عيبٌ يُكشَف آليّاً */
     public function test_كلُّ_قسمٍ_مُعلَنٍ_للمالكِ_يُفتَح(): void
     {
-        foreach (\App\Support\AiAccess::sections($this->owner) as $s) {
+        foreach (\App\Support\Ai\Center\AiAccess::sections($this->owner) as $s) {
             if (! $s['ok']) continue;
 
             $this->actingAs($this->owner)->get(route($s['route']))

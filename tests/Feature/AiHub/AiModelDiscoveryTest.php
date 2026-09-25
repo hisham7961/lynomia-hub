@@ -4,9 +4,9 @@ namespace Tests\Feature\AiHub;
 
 use App\Models\AiModel;
 use App\Models\AiProvider;
-use App\Support\AiModels;
-use App\Support\AiModelSources;
-use App\Support\AiProviders;
+use App\Support\Ai\Catalog\AiModels;
+use App\Support\Ai\Catalog\AiModelSources;
+use App\Support\Ai\Catalog\AiProviders;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -442,7 +442,7 @@ class AiModelDiscoveryTest extends TestCase
 
         // القدراتُ المشتقّةُ من **الوضعِ** حصريّةٌ عمداً: مُدخَلٌ وضعُه محادثةٌ
         // ليس نموذجَ تضمينٍ حقّاً. فالحارسُ على قدراتِ **الأعلام** وحدَها.
-        $modeDerived = \App\Support\AiModelFacts::MODE_MAP;
+        $modeDerived = \App\Support\Ai\Catalog\AiModelFacts::MODE_MAP;
 
         foreach ((array) $c['capabilities'] as $k => $fact) {
             if (in_array($k, $modeDerived, true)) continue;

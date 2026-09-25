@@ -326,7 +326,7 @@ Route::middleware('auth')->group(function () {
     // و`throttle` من `AskPolicy::THROTTLE` فلا رقمانِ يفترقان بين سياسةٍ ومسار.
     Route::get('ask', [\App\Http\Controllers\Web\AskController::class, 'index'])->name('ask.index');
     Route::post('ask', [\App\Http\Controllers\Web\AskController::class, 'run'])
-        ->name('ask.run')->middleware('throttle:' . \App\Support\AskPolicy::THROTTLE);
+        ->name('ask.run')->middleware('throttle:' . \App\Support\Ai\Ask\AskPolicy::THROTTLE);
     Route::get('calendar', [\App\Http\Controllers\Web\CalendarController::class, 'index'])->name('calendar');
     Route::get('costs', [CostController::class, 'index'])->name('costs.index');
     Route::get('service-costs', [CostController::class, 'services'])->name('servicecosts');

@@ -56,7 +56,7 @@
                     @if ($r->notes)<div class="sub mut">{{ $r->notes }}</div>@endif
                 </td>
                 <td>
-                    @if ($r->effect === \App\Support\AiPolicy::DENY)
+                    @if ($r->effect === \App\Support\Ai\Governance\AiPolicy::DENY)
                         <span class="bdg danger">منع</span>
                     @else
                         <span class="bdg ok">سماح</span>
@@ -122,7 +122,7 @@
                 </select></label>
             <label style="min-width:120px">النطاق
                 <select name="scope_type">
-                    @foreach (\App\Support\AiPolicy::SCOPES as $sc)
+                    @foreach (\App\Support\Ai\Governance\AiPolicy::SCOPES as $sc)
                         <option value="{{ $sc }}">{{ $sc }}</option>
                     @endforeach
                 </select></label>

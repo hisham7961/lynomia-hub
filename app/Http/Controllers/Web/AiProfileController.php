@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\AiModel;
 use App\Models\AiProfile;
 use App\Models\AiProfileModel;
-use App\Support\AiProfiles;
-use App\Support\AiRouting;
+use App\Support\Ai\Routing\AiProfiles;
+use App\Support\Ai\Routing\AiRouting;
 use Illuminate\Http\Request;
 
 /**
@@ -28,18 +28,18 @@ class AiProfileController extends Controller
     /** حارسُ المركز — نسخةُ `AiCenterController::gate` نفسُها */
     protected function gate(): void
     {
-        \App\Support\AiAccess::gateManage();
+        \App\Support\Ai\Center\AiAccess::gateManage();
     }
 
     /** **القراءةُ تُفتَح لحاملِ `aiView`** — والكتابةُ تبقى خلف الإدارة (W8) */
     public function index()
     {
-        \App\Support\AiAccess::gateView();
+        \App\Support\Ai\Center\AiAccess::gateView();
 
         $profiles = AiProfiles::all();
         $rows     = [];
 
-        $askKey = \App\Support\AskPolicy::profileKey();
+        $askKey = \App\Support\Ai\Ask\AskPolicy::profileKey();
 
         foreach ($profiles as $p) {
             $links = AiProfileModel::query()->with(['model.provider'])
@@ -59,8 +59,8 @@ class AiProfileController extends Controller
             if ((string) $p->key === $askKey) {
                 foreach ($links as $l) {
                     if ($l->model === null) continue;
-                    $fit[(string) $l->model_id] = \App\Support\AiPurposes::suitability(
-                        $l->model, \App\Support\AiPurposes::ASK);
+                    $fit[(string) $l->model_id] = \App\Support\Ai\Routing\AiPurposes::suitability(
+                        $l->model, \App\Support\Ai\Routing\AiPurposes::ASK);
                 }
             }
 
@@ -75,9 +75,9 @@ class AiProfileController extends Controller
         }
 
         return view('ai.profiles', [
-            'sections' => \App\Support\AiAccess::sections(),
+            'sections' => \App\Support\Ai\Center\AiAccess::sections(),
             'section'  => 'routing',
-            'manage'   => \App\Support\AiAccess::canManage(),
+            'manage'   => \App\Support\Ai\Center\AiAccess::canManage(),
             'rows'   => $rows,
             'table'  => AiRouting::TABLE,
             'depth'  => AiRouting::MAX_DEPTH,
@@ -86,8 +86,8 @@ class AiProfileController extends Controller
             // **أيُّ غرضٍ يخدم «اسأل Hub» الآن؟** — يُعرَض حيث يُتَّخذ القرار
             'askProfile' => $askKey,
             // مفرداتُ وسمِ الملاءمةِ — تُقرَأ في الشاشةِ ولا تُكتَب فيها
-            'fitTags'    => \App\Support\AiPurposes::TAG,
-            'askNeeds'   => \App\Support\AiPurposes::needs(\App\Support\AiPurposes::ASK),
+            'fitTags'    => \App\Support\Ai\Routing\AiPurposes::TAG,
+            'askNeeds'   => \App\Support\Ai\Routing\AiPurposes::needs(\App\Support\Ai\Routing\AiPurposes::ASK),
         ]);
     }
 

@@ -2,9 +2,9 @@
 
 namespace Tests\Feature\AskHub;
 
-use App\Support\AiChat;
-use App\Support\AiRouting;
-use App\Support\AskFailures;
+use App\Support\Ai\Gateway\AiChat;
+use App\Support\Ai\Routing\AiRouting;
+use App\Support\Ai\Ask\AskFailures;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;

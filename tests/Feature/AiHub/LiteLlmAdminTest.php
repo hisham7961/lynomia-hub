@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\AiHub;
 
-use App\Support\AiGateway;
-use App\Support\LiteLlmAdmin;
+use App\Support\Ai\Gateway\AiGateway;
+use App\Support\Ai\Gateway\LiteLlmAdmin;
 use App\Support\Settings;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -240,8 +240,8 @@ class LiteLlmAdminTest extends TestCase
 
     public function test_العميلُ_لا_يعرف_اسمَ_مزوّد(): void
     {
-        $src = \Tests\Support\Source::read(\App\Support\LiteLlmAdmin::class);
-        foreach (\App\Support\AiCatalog::keys() as $k) {
+        $src = \Tests\Support\Source::read(\App\Support\Ai\Gateway\LiteLlmAdmin::class);
+        foreach (\App\Support\Ai\Catalog\AiCatalog::keys() as $k) {
             $this->assertDoesNotMatchRegularExpression(
                 '/\b' . preg_quote($k, '/') . '\b/i', $src,
                 "اسمُ مزوّدٍ `$k` في عميلِ الإدارة — والعقدُ عامٌّ لا خاصّ"

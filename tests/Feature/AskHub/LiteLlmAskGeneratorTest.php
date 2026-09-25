@@ -9,13 +9,13 @@ use App\Models\Company;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\AiGateway;
-use App\Support\AiProfiles;
-use App\Support\AskFailures;
-use App\Support\AskPipeline;
-use App\Support\AskPolicy;
+use App\Support\Ai\Gateway\AiGateway;
+use App\Support\Ai\Routing\AiProfiles;
+use App\Support\Ai\Ask\AskFailures;
+use App\Support\Ai\Ask\AskPipeline;
+use App\Support\Ai\Ask\AskPolicy;
 use App\Support\FeatureRegistry;
-use App\Support\LiteLlmAskGenerator;
+use App\Support\Ai\Ask\LiteLlmAskGenerator;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -359,8 +359,8 @@ class LiteLlmAskGeneratorTest extends TestCase
             AiProfile::query()->where('key', AskPolicy::PROFILE)->firstOrFail()
         )->first()->provider_id;
 
-        for ($i = 0; $i < \App\Support\AiRouting::COOLDOWN_AFTER; $i++) {
-            \App\Support\AiRouting::noteFailure((string) $provider);
+        for ($i = 0; $i < \App\Support\Ai\Routing\AiRouting::COOLDOWN_AFTER; $i++) {
+            \App\Support\Ai\Routing\AiRouting::noteFailure((string) $provider);
         }
 
         $this->script([[LiteLlmFixtures::answer('لن يُستدعى.'), 200]]);

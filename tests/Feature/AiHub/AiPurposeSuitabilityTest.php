@@ -6,10 +6,10 @@ use App\Models\AiModel;
 use App\Models\AiProfile;
 use App\Models\AiProvider;
 use App\Models\AiUsageEvent;
-use App\Support\AiProfiles;
-use App\Support\AiPurposes;
-use App\Support\AiRouteRun;
-use App\Support\AskPolicy;
+use App\Support\Ai\Routing\AiProfiles;
+use App\Support\Ai\Routing\AiPurposes;
+use App\Support\Ai\Routing\AiRouteRun;
+use App\Support\Ai\Ask\AskPolicy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -121,9 +121,9 @@ class AiPurposeSuitabilityTest extends TestCase
         \App\Support\Settings::put('ai.gateway_key', 'sk-admin-test-key-000111222333', 'test');
         \App\Support\Settings::put('ai.enabled', '1', 'test');
         \App\Support\Settings::put('ai.probe_ok', '1', 'test');
-        \App\Support\Settings::put('ai.probe_fp', \App\Support\AiGateway::fingerprint(), 'test');
+        \App\Support\Settings::put('ai.probe_fp', \App\Support\Ai\Gateway\AiGateway::fingerprint(), 'test');
         \App\Support\Settings::put('ai.generation_ok', '1', 'test');
-        \App\Support\Settings::put('ai.generation_fp', \App\Support\AiGateway::fingerprint(), 'test');
+        \App\Support\Settings::put('ai.generation_fp', \App\Support\Ai\Gateway\AiGateway::fingerprint(), 'test');
         \App\Support\FeatureRegistry::flush();
 
         $modules = array_keys((array) config('hub.modules'));
@@ -437,7 +437,7 @@ class AiPurposeSuitabilityTest extends TestCase
      */
     public function test_طبقةُ_الملاءمةِ_بلا_اسمِ_مزوّدٍ_ولا_نموذج(): void
     {
-        $src = (string) \Tests\Support\Source::read(\App\Support\AiPurposes::class);
+        $src = (string) \Tests\Support\Source::read(\App\Support\Ai\Routing\AiPurposes::class);
 
         foreach (['openai', 'anthropic', 'gpt-', 'claude-', 'gemini', 'azure', 'mistral'] as $needle) {
             $this->assertStringNotContainsStringIgnoringCase($needle, $src,
@@ -445,7 +445,7 @@ class AiPurposeSuitabilityTest extends TestCase
         }
 
         foreach (AiPurposes::needs(AiPurposes::ASK) as $cap) {
-            $this->assertContains($cap, \App\Support\AiModelFacts::CAPABILITIES,
+            $this->assertContains($cap, \App\Support\Ai\Catalog\AiModelFacts::CAPABILITIES,
                 'حاجةٌ خارجَ مفرداتِ القدراتِ المعروفة: ' . $cap);
         }
     }

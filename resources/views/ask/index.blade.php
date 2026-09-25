@@ -73,9 +73,9 @@
         @if ($advisory ?? null)
             <div style="grid-column:1/-1">
                 <small class="mut">
-                    <span class="bdg {{ \App\Support\AskModelAdvisory::warns($advisory) ? 'wn' : 'ok' }}"
-                          title="{{ $advisory['say'] }}">{{ \App\Support\AskModelAdvisory::TAG[$advisory['code']] }}</span>
-                    @if (\App\Support\AskModelAdvisory::warns($advisory))
+                    <span class="bdg {{ \App\Support\Ai\Ask\AskModelAdvisory::warns($advisory) ? 'wn' : 'ok' }}"
+                          title="{{ $advisory['say'] }}">{{ \App\Support\Ai\Ask\AskModelAdvisory::TAG[$advisory['code']] }}</span>
+                    @if (\App\Support\Ai\Ask\AskModelAdvisory::warns($advisory))
                         <a href="{{ route('ai.profiles.index') }}">راجِع سلسلةَ الغرض ←</a>
                     @endif
                 </small>
@@ -150,7 +150,7 @@
                 {{-- **وحيث تُقرَأ الرسالةُ يُقال السبب.** رسالةُ «بلغ الجوابُ
                      سقفَ طولِه» تُرسل قارئَها إلى رفعِ السقفِ — وقد يكون
                      السقفُ سليماً والمُتقاسِمُ هو العلّة. --}}
-                @if (($advisory ?? null) && \App\Support\AskModelAdvisory::warns($advisory)
+                @if (($advisory ?? null) && \App\Support\Ai\Ask\AskModelAdvisory::warns($advisory)
                      && in_array($result['failure'], ['OUTPUT_LIMIT', 'MODEL_REASONED_ONLY'], true))
                     <span class="mut">{{ $advisory['say'] }}</span>
                     <span><a class="btn sm" href="{{ route('ai.profiles.index') }}">راجِع سلسلةَ الغرض ←</a></span>

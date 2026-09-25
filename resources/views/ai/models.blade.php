@@ -167,7 +167,7 @@
 
             {{-- **شرطُ العرضِ = شرطُ الباب** (W8): ما يُصَدُّ ٤٠٣ لا يُعرَض زرّاً --}}
             @if ($manage ?? true)
-            @php($deps = \App\Support\AiModelLifecycle::dependencies($m))
+            @php($deps = \App\Support\Ai\Catalog\AiModelLifecycle::dependencies($m))
             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start">
                 <form method="POST" action="{{ route('ai.models.toggle', $m) }}">@csrf
                     <input type="hidden" name="enabled" value="{{ $m->enabled ? 0 : 1 }}">
@@ -269,7 +269,7 @@
                     <label style="grid-column:1/-1">
                         <input type="checkbox" name="ack" value="1">
                         <b>أُقِرُّ بأنّ هذا الفحصَ يُنفق رصيداً</b> — توليدٌ أدنى بسقفِ
-                        {{ \App\Support\AiProbes::MAX_OUTPUT_TOKENS }} رمزاً.
+                        {{ \App\Support\Ai\Catalog\AiProbes::MAX_OUTPUT_TOKENS }} رمزاً.
                     </label>
                     <div style="grid-column:1/-1"><button class="btn sm">💸 D — توليدٌ أدنى</button></div>
                 </form>
@@ -278,7 +278,7 @@
                     <input type="hidden" name="level" value="E">
                     <label><span>القدرة</span>
                         <select name="capability">
-                            @foreach (\App\Support\AiProbes::PROBABLE as $cap)
+                            @foreach (\App\Support\Ai\Catalog\AiProbes::PROBABLE as $cap)
                                 <option value="{{ $cap }}">{{ $cap }}</option>
                             @endforeach
                         </select></label>

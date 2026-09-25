@@ -25,7 +25,7 @@ return [
     'source' => [
         'litellm_version' => '1.101.0',
         'generator'       => 'deploy/litellm/tools/measure_providers.py',
-        'classifier'      => 'App\\Support\\AiProviderRegistry::classify',
+        'classifier'      => 'App\\Support\\Ai\\Catalog\\AiProviderRegistry::classify',
         'providers'       => 155,
     ],
 

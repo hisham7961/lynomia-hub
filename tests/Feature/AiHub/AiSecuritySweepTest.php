@@ -6,10 +6,10 @@ use App\Models\AiModel;
 use App\Models\AiProfile;
 use App\Models\AiProvider;
 use App\Models\AuditEntry;
-use App\Support\AiProfiles;
-use App\Support\AiProviders;
-use App\Support\AiReconcile;
-use App\Support\AiRouteRun;
+use App\Support\Ai\Routing\AiProfiles;
+use App\Support\Ai\Catalog\AiProviders;
+use App\Support\Ai\Center\AiReconcile;
+use App\Support\Ai\Routing\AiRouteRun;
 use App\Support\Redactor;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -171,7 +171,7 @@ class AiSecuritySweepTest extends TestCase
          * يُضاف غداً يدخل هذا المسحَ في اللحظةِ نفسِها، بلا أن يتذكّره أحد.
          */
         $pages = array_map(fn ($sec) => route($sec['route']),
-            array_filter(\App\Support\AiAccess::sections($this->owner), fn ($sec) => $sec['ok']));
+            array_filter(\App\Support\Ai\Center\AiAccess::sections($this->owner), fn ($sec) => $sec['ok']));
 
         // **والمسارُ ذو المُعامل خارجَ الشريط** — فيُضاف صراحةً
         $pages[] = route('ai.models.index', $p);

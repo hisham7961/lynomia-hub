@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\AskFailures;
-use App\Support\AskPipeline;
-use App\Support\AskPolicy;
-use App\Support\AskTools;
+use App\Support\Ai\Ask\AskFailures;
+use App\Support\Ai\Ask\AskPipeline;
+use App\Support\Ai\Ask\AskPolicy;
+use App\Support\Ai\Ask\AskTools;
 use Illuminate\Http\Request;
 
 /**
@@ -76,7 +76,7 @@ class AskController extends Controller
     {
         $ready   = AskPolicy::ready();
         $profile = AskPolicy::profile();
-        $canFix  = \App\Support\AiAccess::canManage();
+        $canFix  = \App\Support\Ai\Center\AiAccess::canManage();
 
         return [
             'ready'    => $ready,
@@ -108,7 +108,7 @@ class AskController extends Controller
              * يخصّ السائل، **وعرضُه للجميعِ يوسّع سطحَ المعرفةِ بلا فائدةٍ له**.
              */
             'advisory' => ($canFix && $profile !== null)
-                ? \App\Support\AskModelAdvisory::read($profile) : null,
+                ? \App\Support\Ai\Ask\AskModelAdvisory::read($profile) : null,
             'failures' => AskFailures::MESSAGES,
         ];
     }

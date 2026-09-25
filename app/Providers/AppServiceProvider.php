@@ -32,8 +32,8 @@ class AppServiceProvider extends ServiceProvider
          */
         $this->app->bind(\App\Contracts\AskGenerator::class, static function ($app) {
             return $app->runningUnitTests()
-                ? new \App\Support\NullAskGenerator()
-                : \App\Support\AskGeneratorFactory::make();
+                ? new \App\Support\Ai\Ask\NullAskGenerator()
+                : \App\Support\Ai\Ask\AskGeneratorFactory::make();
         });
     }
 

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\AiHub;
 
-use App\Support\AiCatalog;
+use App\Support\Ai\Catalog\AiCatalog;
 use PHPUnit\Framework\Attributes\DataProvider;
 use App\Support\Tri;
 use Tests\TestCase;

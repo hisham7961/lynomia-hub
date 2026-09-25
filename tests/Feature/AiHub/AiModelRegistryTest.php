@@ -4,9 +4,9 @@ namespace Tests\Feature\AiHub;
 
 use App\Models\AiModel;
 use App\Models\AiProvider;
-use App\Support\AiModelFacts;
-use App\Support\AiModels;
-use App\Support\AiProviders;
+use App\Support\Ai\Catalog\AiModelFacts;
+use App\Support\Ai\Catalog\AiModels;
+use App\Support\Ai\Catalog\AiProviders;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -427,8 +427,8 @@ class AiModelRegistryTest extends TestCase
     /** ولا اسمَ نموذجٍ مُعدَّدٍ في الشيفرة — الأسماءُ تأتي من البوّابةِ أو من المدير */
     public function test_لا_قائمةَ_أسماءِ_نماذجَ_في_الشيفرة(): void
     {
-        $src = \Tests\Support\Source::read(\App\Support\AiModelFacts::class)
-            . \Tests\Support\Source::read(\App\Support\AiModels::class);
+        $src = \Tests\Support\Source::read(\App\Support\Ai\Catalog\AiModelFacts::class)
+            . \Tests\Support\Source::read(\App\Support\Ai\Catalog\AiModels::class);
 
         // أسماءُ النماذجِ تحمل رقمَ إصدارٍ أو نقطةً بين كلمتَين — نمطٌ لا يظهر في مفاتيحِ العقد
         $this->assertSame(0, preg_match_all('/[\'"][a-z]+-[0-9]+(\.[0-9]+)?[a-z-]*[\'"]/i', $src),

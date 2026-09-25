@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Support\AiReleaseCheck;
+use App\Support\Ai\Center\AiReleaseCheck;
 use Illuminate\Console\Command;
 
 /**

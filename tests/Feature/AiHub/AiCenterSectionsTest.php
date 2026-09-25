@@ -7,9 +7,9 @@ use App\Models\AiProfile;
 use App\Models\AiProvider;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\AiAccess;
-use App\Support\AiProfiles;
-use App\Support\AiUsage;
+use App\Support\Ai\Center\AiAccess;
+use App\Support\Ai\Routing\AiProfiles;
+use App\Support\Ai\Gateway\AiUsage;
 use App\Support\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -291,7 +291,7 @@ class AiCenterSectionsTest extends TestCase
         ]);
         AiProfiles::seed();   // أغراضٌ مُفعَّلةٌ بسلاسلَ فارغة ⇒ تحذيرات
 
-        $rows = \App\Support\AiOverview::attention();
+        $rows = \App\Support\Ai\Center\AiOverview::attention();
         $this->assertNotSame([], $rows);
 
         $seenWarn = false;
@@ -311,13 +311,13 @@ class AiCenterSectionsTest extends TestCase
     public function test_الغرضُ_الجاهزُ_ما_سلسلتُه_صالحة(): void
     {
         AiProfiles::seed();
-        $this->assertSame(0, \App\Support\AiOverview::counts()['profiles_ready'],
+        $this->assertSame(0, \App\Support\Ai\Center\AiOverview::counts()['profiles_ready'],
             '**غرضٌ بسلسلةٍ فارغةٍ عُدَّ جاهزاً** — والشاشةُ تطمئنّ حيث تُنذر');
 
         $g = AiProfile::query()->where('key', 'general')->firstOrFail();
         AiProfiles::attach($g, $this->model($this->provider()));
 
-        $this->assertSame(1, \App\Support\AiOverview::counts()['profiles_ready']);
+        $this->assertSame(1, \App\Support\Ai\Center\AiOverview::counts()['profiles_ready']);
     }
 
     // ═══ التشخيص ═══
@@ -335,7 +335,7 @@ class AiCenterSectionsTest extends TestCase
         Settings::put('ai.probe_ok', false, 'test');   // مُهيَّأةٌ ولم تُثبِت أنّها تردّ
         $this->provider();   // مزوّدٌ موجودٌ — ولا يُقرَأ ما دامت البوّابةُ مقطوعة
 
-        $chain  = \App\Support\AiDiagnostics::chain();
+        $chain  = \App\Support\Ai\Center\AiDiagnostics::chain();
         $halted = false;
 
         foreach ($chain as $link) {
@@ -373,8 +373,8 @@ class AiCenterSectionsTest extends TestCase
         $this->actingAs($this->owner)->get(route('ai.usage'))->assertOk()
             ->assertSee('كلُّ رقمٍ يقول من أين جاء', false)
             ->assertSee('المجهولُ ليس صفراً', false)
-            ->assertSee(\App\Support\AiCost::REPORTED, false)
-            ->assertSee(\App\Support\AiCost::UNKNOWN, false);
+            ->assertSee(\App\Support\Ai\Governance\AiCost::REPORTED, false)
+            ->assertSee(\App\Support\Ai\Governance\AiCost::UNKNOWN, false);
     }
 
     /** **ولا تتّصل بالبوّابةِ مع فتحِ الصفحة** */

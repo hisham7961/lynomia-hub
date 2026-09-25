@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\AiModel;
 use App\Models\AiProvider;
-use App\Support\AiModelFacts;
-use App\Support\AiModels;
+use App\Support\Ai\Catalog\AiModelFacts;
+use App\Support\Ai\Catalog\AiModels;
 use Illuminate\Http\Request;
 
 /**
@@ -28,24 +28,24 @@ class AiModelController extends Controller
     /** حارسُ المركز — نسخةُ `AiCenterController::gate` نفسُها */
     protected function gate(): void
     {
-        \App\Support\AiAccess::gateManage();
+        \App\Support\Ai\Center\AiAccess::gateManage();
     }
 
     /** **القراءةُ تُفتَح لحاملِ `aiView`** — والكتابةُ تبقى خلف الإدارة (W8) */
     public function index(AiProvider $provider)
     {
-        \App\Support\AiAccess::gateView();
+        \App\Support\Ai\Center\AiAccess::gateView();
 
         return view('ai.models', [
-            'sections'  => \App\Support\AiAccess::sections(),
+            'sections'  => \App\Support\Ai\Center\AiAccess::sections(),
             'section'   => 'models',
-            'manage'    => \App\Support\AiAccess::canManage(),
+            'manage'    => \App\Support\Ai\Center\AiAccess::canManage(),
             'provider'   => $provider,
             'models'     => $provider->models()->orderByDesc('priority')->orderBy('display_name')->get(),
             'candidates' => (array) session('ai.candidates.' . $provider->id, []),
             'unowned'    => (int) session('ai.unowned.' . $provider->id, 0),
-            'discovery'  => \App\Support\AiCatalog::discovery((string) $provider->catalog_key),
-            'note'       => \App\Support\AiCatalog::provider((string) $provider->catalog_key)['discovery_note'] ?? null,
+            'discovery'  => \App\Support\Ai\Catalog\AiCatalog::discovery((string) $provider->catalog_key),
+            'note'       => \App\Support\Ai\Catalog\AiCatalog::provider((string) $provider->catalog_key)['discovery_note'] ?? null,
         ]);
     }
 
@@ -61,7 +61,7 @@ class AiModelController extends Controller
      */
     public function all(Request $r)
     {
-        \App\Support\AiAccess::gateView();
+        \App\Support\Ai\Center\AiAccess::gateView();
 
         $cap    = (string) $r->query('cap', '');
         $state  = (string) $r->query('state', '');
@@ -90,9 +90,9 @@ class AiModelController extends Controller
         }
 
         return view('ai.models-all', [
-            'sections'     => \App\Support\AiAccess::sections(),
+            'sections'     => \App\Support\Ai\Center\AiAccess::sections(),
             'section'      => 'models',
-            'manage'       => \App\Support\AiAccess::canManage(),
+            'manage'       => \App\Support\Ai\Center\AiAccess::canManage(),
             'models'       => $models,
             'providers'    => AiProvider::query()->orderBy('label')->orderBy('id')->get(),
             'capabilities' => AiModelFacts::CAPABILITIES,
@@ -134,13 +134,13 @@ class AiModelController extends Controller
      */
     public function browse(Request $r, AiProvider $provider)
     {
-        \App\Support\AiAccess::gateView();
+        \App\Support\Ai\Center\AiAccess::gateView();
 
-        $found = \App\Support\AiModelSources::discover($provider);
+        $found = \App\Support\Ai\Catalog\AiModelSources::discover($provider);
 
         // ترشيحٌ على قائمةٍ بيضاءَ لا على مُدخَلٍ حرّ
         $mode = (string) $r->query('mode', '');
-        if (! in_array($mode, \App\Support\AiModelSources::MODES, true)) $mode = '';
+        if (! in_array($mode, \App\Support\Ai\Catalog\AiModelSources::MODES, true)) $mode = '';
 
         $q = mb_substr(trim((string) $r->query('q', '')), 0, 80);
 
@@ -155,18 +155,18 @@ class AiModelController extends Controller
         }
 
         return view('ai.models-browse', [
-            'sections'   => \App\Support\AiAccess::sections(),
+            'sections'   => \App\Support\Ai\Center\AiAccess::sections(),
             'section'    => 'models',
-            'manage'     => \App\Support\AiAccess::canManage(),
+            'manage'     => \App\Support\Ai\Center\AiAccess::canManage(),
             'provider'   => $provider,
             'found'      => $found,
             'candidates' => $candidates,
-            'modes'      => \App\Support\AiModelSources::MODES,
+            'modes'      => \App\Support\Ai\Catalog\AiModelSources::MODES,
             'mode'       => $mode,
             'q'          => $q,
             // **الحكمُ على النتيجةِ لا على تصنيفٍ مُعلَن** — والتصنيفُ يُخطئ في الاتّجاهَين
-            'yielded'    => \App\Support\AiModelSources::yieldedCandidates($found),
-            'bothRead'   => \App\Support\AiModelSources::bothSourcesRead($found),
+            'yielded'    => \App\Support\Ai\Catalog\AiModelSources::yieldedCandidates($found),
+            'bothRead'   => \App\Support\Ai\Catalog\AiModelSources::bothSourcesRead($found),
         ]);
     }
 
@@ -327,7 +327,7 @@ class AiModelController extends Controller
             return back()->withErrors(['level' => 'مستوى فحصٍ غيرُ معروف — B أو C أو D أو E']);
         }
 
-        if (\App\Support\AiProbes::isPaid($level) && ! $r->boolean('ack')) {
+        if (\App\Support\Ai\Catalog\AiProbes::isPaid($level) && ! $r->boolean('ack')) {
             return back()->withErrors(['ack' => 'هذا الفحصُ يُنفق رصيداً — أقِرَّ بالكلفةِ صراحةً قبل تنفيذِه']);
         }
 
@@ -336,10 +336,10 @@ class AiModelController extends Controller
         if (! in_array($mode, ['chat', 'embedding'], true)) $mode = 'chat';
 
         $res = match ($level) {
-            'B' => \App\Support\AiProbes::b($model, $mode, true),
-            'C' => \App\Support\AiProbes::c($model),
-            'D' => \App\Support\AiProbes::d($model, true),
-            'E' => \App\Support\AiProbes::e($model, (string) $r->input('capability', ''), true),
+            'B' => \App\Support\Ai\Catalog\AiProbes::b($model, $mode, true),
+            'C' => \App\Support\Ai\Catalog\AiProbes::c($model),
+            'D' => \App\Support\Ai\Catalog\AiProbes::d($model, true),
+            'E' => \App\Support\Ai\Catalog\AiProbes::e($model, (string) $r->input('capability', ''), true),
         };
 
         $model->forceFill([
@@ -365,7 +365,7 @@ class AiModelController extends Controller
         $this->gate();
         if ($resp = hub_require_stepup()) return $resp;
 
-        $res = \App\Support\AiModelLifecycle::unlink($model);
+        $res = \App\Support\Ai\Catalog\AiModelLifecycle::unlink($model);
 
         return back()->with('ok', $res['detached'] > 0
             ? 'فُكَّ ارتباطُ النموذجِ من ' . $res['detached'] . ' غرضاً — وصار قابلاً للإزالة'
@@ -384,7 +384,7 @@ class AiModelController extends Controller
         if ($resp = hub_require_stepup()) return $resp;
 
         $provider = $model->provider;
-        $res = \App\Support\AiModelLifecycle::remove($model);
+        $res = \App\Support\Ai\Catalog\AiModelLifecycle::remove($model);
 
         if (! $res['ok']) {
             return back()->withErrors(['destroy' => (string) $res['error']]);
@@ -409,14 +409,14 @@ class AiModelController extends Controller
      */
     public function reconcile(AiProvider $provider)
     {
-        \App\Support\AiAccess::gateView();
+        \App\Support\Ai\Center\AiAccess::gateView();
 
         return view('ai.models-reconcile', [
-            'sections' => \App\Support\AiAccess::sections(),
+            'sections' => \App\Support\Ai\Center\AiAccess::sections(),
             'section'  => 'models',
-            'manage'   => \App\Support\AiAccess::canManage(),
+            'manage'   => \App\Support\Ai\Center\AiAccess::canManage(),
             'provider' => $provider,
-            'report'   => \App\Support\AiModelLifecycle::reconcile($provider),
+            'report'   => \App\Support\Ai\Catalog\AiModelLifecycle::reconcile($provider),
         ]);
     }
 

@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\AiUsageEvent;
 use App\Providers\AppServiceProvider;
-use App\Support\AiGateway;
-use App\Support\AiLedger;
-use App\Support\AskPolicy;
+use App\Support\Ai\Gateway\AiGateway;
+use App\Support\Ai\Governance\AiLedger;
+use App\Support\Ai\Ask\AskPolicy;
 use Tests\TestCase;
 
 /**
