@@ -141,7 +141,7 @@ class EsignDocumentIntegrityTest extends TestCase
     /** ومسارُ العميل نفسه يمرّر الوسم — لا الدالة وحدها */
     public function test_client_pdf_route_passes_the_client_flag(): void
     {
-        $src = file_get_contents(app_path('Http/Controllers/Web/EsignController.php'));
+        $src = \Tests\Support\Source::read(\App\Http\Controllers\Web\EsignController::class);
         $this->assertMatchesRegularExpression(
             '/function clientPdf.*?docHtml\(\$req,\s*evidence:\s*false\)/s', $src,
             'clientPdf يستدعي docHtml بلا وسم عميل — فيُسرّب الأثر رغم إصلاح الدالة');

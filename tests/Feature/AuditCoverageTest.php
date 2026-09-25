@@ -84,7 +84,7 @@ class AuditCoverageTest extends TestCase
 
         // حفظُ التحقيق مدقَّق (WP-5.3)؛ وحذفُه بلا قيدٍ — ثغرةٌ مفتوحة تُقال بصدق
         $this->assertSame('closed', $gaps['saved_view_store']['state']);
-        $prefSrc = (string) file_get_contents(app_path('Http/Controllers/Web/PrefController.php'));
+        $prefSrc = (string) \Tests\Support\Source::read(\App\Http\Controllers\Web\PrefController::class);
         $expected = str_contains($prefSrc, "'حذف تحقيق تدقيق'") ? 'closed' : 'open';
         $this->assertSame($expected, $gaps['saved_view_destroy']['state'],
             'حالُ ثغرة حذف التحقيق لا يطابق المصدر — التقرير يفترض لا يفحص');

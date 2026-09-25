@@ -121,7 +121,7 @@ class TechDebtCeilingTest extends TestCase
     /** **الملفُّ الأضخمُ لا يزداد ضخامةً** */
     public function test_سقفُ_ملفِّ_المساعدات_لا_يُتجاوَز(): void
     {
-        $path  = app_path('Support/helpers.php');
+        $path  = \Tests\Support\Source::helpersPath();
         $lines = count(file($path, FILE_IGNORE_NEW_LINES));
 
         $this->assertLessThanOrEqual(self::HELPERS_LINES, $lines,

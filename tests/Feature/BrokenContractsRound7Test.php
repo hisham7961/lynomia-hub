@@ -134,7 +134,7 @@ class BrokenContractsRound7Test extends TestCase
 
     public function test_the_two_public_verify_routes_do_not_share_one_bucket(): void
     {
-        $src = (string) file_get_contents(base_path('app/Http/Controllers/Web/EsignController.php'));
+        $src = (string) \Tests\Support\Source::read(\App\Http\Controllers\Web\EsignController::class);
 
         $this->assertStringNotContainsString("'verify:' . \$r->ip()", $src,
             'مسارا التحقّق العلنيّ يتقاسمان دلوَ تحديد المعدل نفسَه بسقفين '

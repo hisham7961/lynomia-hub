@@ -162,7 +162,7 @@ class DiffAuditConfirmedRound7Test extends TestCase
             'حارسُ سلامة');
 
         // المفتاحُ نفسُه لا يخدم قارئين مختلفَي النطاق
-        $src = (string) file_get_contents(base_path('app/Support/DigitalAssets.php'));
+        $src = (string) \Tests\Support\Source::read(\App\Support\DigitalAssets::class);
         $this->assertStringNotContainsString("Cache::remember('da:all'", $src,
             'مفتاحُ خبيئةٍ عامٌّ واحد يخدم كلَّ القرّاء — فأوّلُ من يسخّنه يفرض '
             . 'رؤيتَه على من لا يرى ما رأى، ويُلغى تنطيقُ صحّة الخزنة كلُّه');

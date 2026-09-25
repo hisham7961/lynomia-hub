@@ -97,7 +97,7 @@ class SearchDmLeakTest extends TestCase
 
     public function test_search_ordering_is_deterministic(): void
     {
-        $src = file_get_contents(app_path('Http/Controllers/Web/SearchController.php'));
+        $src = \Tests\Support\Source::read(\App\Http\Controllers\Web\SearchController::class);
         $this->assertMatchesRegularExpression(
             "/orderByDesc\('created_at'\)->orderByDesc\('id'\)/",
             $src, 'ترتيب نتائج البحث بلا فاصل id — قرعة بين المحرّكين');

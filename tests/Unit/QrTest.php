@@ -103,8 +103,8 @@ class QrTest extends TestCase
     {
         // بلا التعليقات: ذكرُ المكتبة في التوثيق تاريخٌ لا اعتماد — الحارس على الكود الحيّ
         $strip = fn (string $s) => preg_replace(['/\/\*.*?\*\//s', '~//[^\n]*~'], ' ', $s);
-        $src = $strip(file_get_contents(__DIR__ . '/../../app/Support/Qr.php'))
-            . $strip(file_get_contents(__DIR__ . '/../../app/Support/QrEncoder.php'));
+        $src = $strip(\Tests\Support\Source::read(\App\Support\Qr::class))
+            . $strip(\Tests\Support\Source::read(\App\Support\QrEncoder::class));
         $this->assertStringNotContainsString('BaconQrCode', $src,
             'مسار الرمز يعتمد مكتبة composer — يختفي على استضافةٍ بلا vendor حديث');
     }

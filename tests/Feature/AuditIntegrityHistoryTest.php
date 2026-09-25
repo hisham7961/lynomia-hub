@@ -190,7 +190,7 @@ class AuditIntegrityHistoryTest extends TestCase
         $this->assertContains('audit.retention_policy', $known);
 
         // ق٦: لا كودَ تقليمٍ — كنّاسُ الأتمتة لا يقرأ المفتاحَ ولا يمسّ جدول audits
-        $automation = (string) file_get_contents(app_path('Console/Commands/HubAutomation.php'));
+        $automation = (string) \Tests\Support\Source::read(\App\Console\Commands\HubAutomation::class);
         $this->assertStringNotContainsString("setting('audit.retention_days'", $automation,
             'كنّاسُ الأتمتة صار يقرأ مفتاح الاحتفاظ — ق٦ تنصّ: وصفٌ لا مقصّ');
         $this->assertStringNotContainsString("DB::table('audits')->where", $automation,

@@ -81,8 +81,8 @@ class AuditVocabularyTest extends TestCase
          * (ويبٌ وجوال) ولا يقرأ كاتبُ أحدِهما الآخر. **فالثابتُ هو ما يمنع،
          * والنصُّ هو ما انحرف.**
          */
-        foreach (['Web/StepUpController.php', 'Api/MobileAuthController.php'] as $rel) {
-            $src = (string) file_get_contents(app_path('Http/Controllers/' . $rel));
+        foreach ([\App\Http\Controllers\Web\StepUpController::class, \App\Http\Controllers\Api\MobileAuthController::class] as $rel) {
+            $src = \Tests\Support\Source::read($rel);
 
             /*
              * **والمنعُ على صياغةِ التصعيدِ وحدَها** — لا على كلِّ فعلِ فشل:

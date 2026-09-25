@@ -101,10 +101,10 @@ class AuditRemediationMediumTest extends TestCase
         // (WP-5.3) صار الفرزُ خلف رؤوس cc/th عموداً واتجاهاً متغيّرين — والفاصلُ
         // باقٍ بعده حرفياً؛ وسلوكُه محروسٌ حيّاً في
         // AuditInvestigationTest::test_pagination_is_stable_with_equal_timestamps
-        $audit = (string) file_get_contents(app_path('Http/Controllers/Web/AuditController.php'));
+        $audit = (string) \Tests\Support\Source::read(\App\Http\Controllers\Web\AuditController::class);
         $this->assertStringContainsString("->orderBy(\$sort, \$dir)->orderBy('audits.id', \$dir)", $audit);
 
-        $api = (string) file_get_contents(app_path('Http/Controllers/Api/V1Controller.php'));
+        $api = (string) \Tests\Support\Source::read(\App\Http\Controllers\Api\V1Controller::class);
         $this->assertStringContainsString("orderByDesc('created_at')->orderByDesc('id')", $api);
     }
 }

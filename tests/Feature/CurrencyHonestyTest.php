@@ -65,7 +65,7 @@ class CurrencyHonestyTest extends TestCase
      */
     public function test_payroll_employee_query_is_scoped(): void
     {
-        $src = file_get_contents(app_path('Http/Controllers/Web/PayrollController.php'));
+        $src = \Tests\Support\Source::read(\App\Http\Controllers\Web\PayrollController::class);
         $this->assertMatchesRegularExpression("/hub_scope\(\s*Employee::query\(\).*?,\s*'hr'/su", $src,
             'استعلام موظفي الرواتب خام بلا hub_scope — تشغيلةٌ بلا شركة تسحب كل الشركات');
 

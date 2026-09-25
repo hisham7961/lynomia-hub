@@ -102,9 +102,11 @@ class NavCoverageTest extends TestCase
 
     public function test_every_primary_center_has_a_direct_sidebar_link(): void
     {
-        $src = file_get_contents(base_path('app/Support/helpers.php'));
-        $body = substr($src, strpos($src, 'function hub_top_links'),
-            strpos($src, 'function hub_top_groups') - strpos($src, 'function hub_top_links'));
+        // جسمُ الدالّةِ بالانعكاس (أوّلُ سطرٍ وآخرُه) لا بالبحثِ عن اسمِ الدالّةِ التي تليها —
+        // فلا يرتبط الحارسُ بترتيبِ الدوالّ في ملفِّها ولا بملفِّها (REORG_PLAN §R1)
+        $fn = new \ReflectionFunction('hub_top_links');
+        $body = implode('', array_slice(file((string) $fn->getFileName()),
+            $fn->getStartLine() - 1, $fn->getEndLine() - $fn->getStartLine() + 1));
         preg_match_all("/'key'\s*=>\s*'([^']+)'/", $body, $mk);
         preg_match_all("/'route'\s*=>\s*'([^']+)'/", $body, $mr);
         $topKeys = array_flip($mk[1]);

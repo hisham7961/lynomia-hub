@@ -437,7 +437,7 @@ class AiPurposeSuitabilityTest extends TestCase
      */
     public function test_طبقةُ_الملاءمةِ_بلا_اسمِ_مزوّدٍ_ولا_نموذج(): void
     {
-        $src = (string) file_get_contents(app_path('Support/AiPurposes.php'));
+        $src = (string) \Tests\Support\Source::read(\App\Support\AiPurposes::class);
 
         foreach (['openai', 'anthropic', 'gpt-', 'claude-', 'gemini', 'azure', 'mistral'] as $needle) {
             $this->assertStringNotContainsStringIgnoringCase($needle, $src,

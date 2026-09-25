@@ -80,7 +80,7 @@ class ShellOnlyGuidanceRound7Test extends TestCase
     /** ٤) والفاحصُ مجدوَلٌ: ضمانٌ لا يفحصه شيءٌ دوريّاً ليس ضماناً */
     public function test_the_audit_verifier_is_scheduled(): void
     {
-        $src = (string) file_get_contents(base_path('routes/console.php'));
+        $src = (string) \Tests\Support\Source::routes('console');
         $this->assertStringContainsString('hub:audit-verify', $src,
             'سلسلةُ التدقيق بلا فاحصٍ دوريّ — العبثُ يبقى غيرَ مكتشَفٍ إلى أن '
             . 'يخطر لأحدٍ أن يسأل، وهو ما لا يقع');

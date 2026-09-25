@@ -26,7 +26,7 @@ class DeployWithoutMigrateTest extends TestCase
     /** كل نداءٍ عالميّ يقرأ عموداً حديثاً يفحص وجوده أولاً */
     public function test_the_sidebar_badge_never_hard_depends_on_a_fresh_column(): void
     {
-        $src = file_get_contents(app_path('Http/Controllers/Web/DmController.php'));
+        $src = \Tests\Support\Source::read(\App\Http\Controllers\Web\DmController::class);
         preg_match('/function unreadCount.*?\n    \}/s', $src, $m);
 
         $this->assertNotEmpty($m, 'لم يُعثر على unreadCount');

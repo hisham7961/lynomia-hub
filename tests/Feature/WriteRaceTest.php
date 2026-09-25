@@ -102,7 +102,7 @@ class WriteRaceTest extends TestCase
     /** والإدراج يُتجاهَل عند التزاحم لا يُرمى — يُقرأ من المصدر */
     public function test_the_snapshot_writer_ignores_a_conflicting_insert(): void
     {
-        $src = file_get_contents(app_path('Traits/HasVersions.php'));
+        $src = \Tests\Support\Source::read(\App\Traits\HasVersions::class);
 
         $this->assertStringContainsString('insertOrIgnore', $src,
             'اللقطة تُدرَج بلا تحصينٍ من التزاحم — فخرقُ التفرّد يصير خطأ ٥٠٠ على الحافظ');
@@ -112,7 +112,7 @@ class WriteRaceTest extends TestCase
 
     public function test_the_inbox_stamp_covers_every_table_it_reads(): void
     {
-        $src = file_get_contents(app_path('Support/Inbox.php'));
+        $src = \Tests\Support\Source::read(\App\Support\Inbox::class);
         preg_match_all("/DB::table\('([a-z_]+)'\)/", $src, $m);
         $read = array_values(array_unique($m[1] ?? []));
 

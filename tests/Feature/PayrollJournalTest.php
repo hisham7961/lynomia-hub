@@ -92,12 +92,12 @@ class PayrollJournalTest extends TestCase
      */
     public function test_autojournal_is_transaction_wrapped(): void
     {
-        $svc = file_get_contents(app_path('Support/JournalPostingService.php'));
+        $svc = \Tests\Support\Source::read(\App\Support\JournalPostingService::class);
         $this->assertMatchesRegularExpression('/postBalanced.*?DB::transaction/su', $svc,
             'خدمةُ الترحيل تبني القيدَ وسطريه بلا معاملة — فشلُ السطر الثاني يترك قيداً أعرج');
 
         foreach (['FinController', 'PayrollController'] as $c) {
-            $src = file_get_contents(app_path("Http/Controllers/Web/{$c}.php"));
+            $src = \Tests\Support\Source::read("App\\Http\\Controllers\\Web\\{$c}");
             $this->assertMatchesRegularExpression('/autoJournal.*?postBalanced/su', $src,
                 "{$c}::autoJournal لم يعد يفوّض إلى خدمة الترحيل المشترَكة — نسخةٌ ثالثةٌ محتملة");
         }

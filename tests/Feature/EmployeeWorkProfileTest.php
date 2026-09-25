@@ -188,10 +188,12 @@ class EmployeeWorkProfileTest extends TestCase
     {
         // القارئُ واحد (نقدُ الخطّة #١): لا صنفَ عدّادٍ ثانٍ باسمٍ آخر،
         // ولا حسابَ أداءٍ محليٌّ في المتحكّمين — كلاهما يستهلك ExecutionStats.
-        $this->assertFileDoesNotExist(app_path('Support/WorkforceStats.php'));
-        foreach (['Http/Controllers/Web/PerformanceController.php',
-                  'Http/Controllers/Web/PortalController.php'] as $rel) {
-            $src = file_get_contents(app_path($rel));
+        // بالهويّة لا بالمسار: تأكيدُ غيابِ ملفٍّ بمسارٍ مكتوب ينجح فارغاً بعد أيِّ نقل
+        $this->assertFalse(class_exists('App\\Support\\WorkforceStats'), 'صنفُ عدّادٍ ثانٍ ظهر');
+        $this->assertSame([], \Tests\Support\Source::files('', 'WorkforceStats.php', 0), 'ملفُّ عدّادٍ ثانٍ ظهر في مكانٍ ما تحت app/');
+        foreach ([\App\Http\Controllers\Web\PerformanceController::class,
+                  \App\Http\Controllers\Web\PortalController::class] as $rel) {
+            $src = \Tests\Support\Source::read($rel);
             $this->assertStringContainsString('ExecutionStats', $src, $rel . ' يقرأ من القارئ الواحد');
             $this->assertStringNotContainsString('completed_at', $src,
                 $rel . ' يحسب الإنجاز بنفسه بدل أن يقرأه');
@@ -350,7 +352,7 @@ class EmployeeWorkProfileTest extends TestCase
 
         // وفحصُ المصدر: قارئُ التنفيذ لا يعرف جدولَ الزيارات أصلاً
         $this->assertStringNotContainsString('page_visits',
-            file_get_contents(app_path('Support/ExecutionStats.php')));
+            \Tests\Support\Source::read(\App\Support\ExecutionStats::class));
     }
 
     /* ════════ ٥) كلفةُ القراءة ════════ */

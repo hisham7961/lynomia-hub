@@ -151,7 +151,7 @@ class EvidenceAndBypassTest extends TestCase
     /** ولا يُفرَّغ سجلٌّ بمئات المُخاطَبين في ضغطةٍ واحدة بلا حدّ */
     public function test_the_reminder_fan_out_is_capped(): void
     {
-        $src = file_get_contents(app_path('Http/Controllers/Web/AckController.php'));
+        $src = \Tests\Support\Source::read(\App\Http\Controllers\Web\AckController::class);
 
         $this->assertMatchesRegularExpression('/REMIND_CAP|->take\(|array_slice/', $src,
             'التذكير يُفرِّغ على كل مُخاطَبٍ بلا سقف — ضغطةٌ واحدة تكتب مئات الإشعارات');

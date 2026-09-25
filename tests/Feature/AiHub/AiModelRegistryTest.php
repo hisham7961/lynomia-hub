@@ -427,8 +427,8 @@ class AiModelRegistryTest extends TestCase
     /** ولا اسمَ نموذجٍ مُعدَّدٍ في الشيفرة — الأسماءُ تأتي من البوّابةِ أو من المدير */
     public function test_لا_قائمةَ_أسماءِ_نماذجَ_في_الشيفرة(): void
     {
-        $src = file_get_contents(app_path('Support/AiModelFacts.php'))
-            . file_get_contents(app_path('Support/AiModels.php'));
+        $src = \Tests\Support\Source::read(\App\Support\AiModelFacts::class)
+            . \Tests\Support\Source::read(\App\Support\AiModels::class);
 
         // أسماءُ النماذجِ تحمل رقمَ إصدارٍ أو نقطةً بين كلمتَين — نمطٌ لا يظهر في مفاتيحِ العقد
         $this->assertSame(0, preg_match_all('/[\'"][a-z]+-[0-9]+(\.[0-9]+)?[a-z-]*[\'"]/i', $src),

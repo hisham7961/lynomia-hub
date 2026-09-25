@@ -93,7 +93,7 @@ class RegistryTruthRound7Test extends TestCase
         // على **الاستيراد**: لا يجوز أن يرفض صفّاً بحقلٍ لا يستطيع ملأه أصلاً.
         $this->assertNotEmpty($offenders, 'لا حقلَ من هذا الصنف — الاختبارُ يحرس فراغاً');
 
-        $src = (string) file_get_contents(base_path('app/Http/Controllers/Web/ImportController.php'));
+        $src = (string) \Tests\Support\Source::read(\App\Http\Controllers\Web\ImportController::class);
         $this->assertStringContainsString('importable', $src,
             'الاستيرادُ يفرض `required` على حقولٍ لا يستوردها أصلاً (‏`locked` '
             . 'و`sec` و`file`) — فوحداتٌ كاملة يُرفض فيها ١٠٠٪ من الصفوف بحقلٍ '

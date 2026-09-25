@@ -70,8 +70,8 @@ class OutboundSsrfCallTimeRound5Test extends TestCase
     /** حارسا Uptime/التسليم يمنعان إعادة التوجيه (allow_redirects=false) — إثباتُ المصدر */
     public function test_outbound_paths_do_not_follow_redirects(): void
     {
-        foreach (['Support/Odoo.php', 'Support/WebhookDispatcher.php', 'Support/Uptime.php'] as $f) {
-            $src = file_get_contents(app_path($f));
+        foreach ([\App\Support\Odoo::class, \App\Support\WebhookDispatcher::class, \App\Support\Uptime::class] as $f) {
+            $src = \Tests\Support\Source::read($f);
             $this->assertMatchesRegularExpression("/'allow_redirects'\\s*=>\\s*false/", $src,
                 "{$f}: مسارٌ صادرٌ يتّبع إعادة التوجيه — وجهةٌ تردّ 302 نحو الداخل تلتفّ حول الحارس");
         }

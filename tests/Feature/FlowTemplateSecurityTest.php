@@ -108,7 +108,7 @@ class FlowTemplateSecurityTest extends TestCase
     /** أعطال الإجراءات تُبلَّغ ولا يرتفع العدّاد إلا بنجاحٍ فعلي — حارس مصدر */
     public function test_action_failures_are_reported_not_swallowed(): void
     {
-        $src = file_get_contents(app_path('Support/FlowRunner.php'));
+        $src = \Tests\Support\Source::read(\App\Support\FlowRunner::class);
         $this->assertStringContainsString('report($e)', $src,
             'أعطال إجراءات المسارات تُبتلع بلا أي تسجيل — مسارٌ مكسور لا يكتشفه أحد');
         $this->assertMatchesRegularExpression('/if\s*\(\s*\$ok/u', $src,

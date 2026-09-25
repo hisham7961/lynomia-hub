@@ -331,8 +331,8 @@ class WorkforceOverviewTest extends TestCase
 
         // **spec §5.5 حرفياً:** لا قراءةَ لجدول الزيارات في مصدر القارئ أو الشاشة
         // أو المتحكم إطلاقاً — فلا يمكن أصلاً أن يُرتَّب موظفٌ بعدد زياراته
-        foreach ([app_path('Support/ExecutionStats.php'),
-                  app_path('Http/Controllers/Web/WorkforceController.php'),
+        foreach ([\Tests\Support\Source::path(\App\Support\ExecutionStats::class),
+                  \Tests\Support\Source::path(\App\Http\Controllers\Web\WorkforceController::class),
                   resource_path('views/workforce/overview.blade.php')] as $src) {
             $this->assertStringNotContainsString('page_visits', file_get_contents($src),
                 basename($src) . ' لا يقرأ الزيارات');

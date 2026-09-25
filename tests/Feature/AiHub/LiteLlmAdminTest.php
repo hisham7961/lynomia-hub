@@ -240,7 +240,7 @@ class LiteLlmAdminTest extends TestCase
 
     public function test_العميلُ_لا_يعرف_اسمَ_مزوّد(): void
     {
-        $src = file_get_contents(app_path('Support/LiteLlmAdmin.php'));
+        $src = \Tests\Support\Source::read(\App\Support\LiteLlmAdmin::class);
         foreach (\App\Support\AiCatalog::keys() as $k) {
             $this->assertDoesNotMatchRegularExpression(
                 '/\b' . preg_quote($k, '/') . '\b/i', $src,
