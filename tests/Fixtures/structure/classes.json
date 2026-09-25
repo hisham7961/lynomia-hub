@@ -399,6 +399,7 @@
     "App\\Support\\Ai\\Governance\\AiGovernance",
     "App\\Support\\Ai\\Governance\\AiLedger",
     "App\\Support\\Ai\\Governance\\AiPolicy",
+    "App\\Support\\Ai\\GovernedCompletion",
     "App\\Support\\Ai\\Routing\\AiProfiles",
     "App\\Support\\Ai\\Routing\\AiPurposes",
     "App\\Support\\Ai\\Routing\\AiRouteRun",

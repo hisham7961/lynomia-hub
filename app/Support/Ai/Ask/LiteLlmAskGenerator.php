@@ -4,13 +4,10 @@ namespace App\Support\Ai\Ask;
 
 use App\Contracts\AskGenerator;
 use App\Models\AiProfile;
+use App\Support\Ai\GovernedCompletion;
 use App\Support\Ai\Catalog\AiProbes;
 use App\Support\Ai\Gateway\AiChat;
-use App\Support\Ai\Governance\AiCost;
-use App\Support\Ai\Governance\AiGovernance;
 use App\Support\Ai\Routing\AiPurposes;
-use App\Support\Ai\Routing\AiRouteRun;
-use App\Support\Ai\Routing\AiRouting;
 
 /**
  * **المولِّدُ الإنتاجيّ** — يصل «اسأل Hub» ببوّابةِ النماذجِ الحقيقيّة.
@@ -47,8 +44,8 @@ use App\Support\Ai\Routing\AiRouting;
  */
 final class LiteLlmAskGenerator implements AskGenerator
 {
-    /** أطولُ انتظارٍ يُقبَل داخلَ طلبٍ متزامن — وما فوقَه يُحوَّل قراراً لا نوماً */
-    public const MAX_SYNC_DELAY = 2;
+    /** أطولُ انتظارٍ يُقبَل داخلَ طلبٍ متزامن — يسكن الآن في `GovernedCompletion` */
+    public const MAX_SYNC_DELAY = GovernedCompletion::MAX_SYNC_DELAY;
 
     /** نمطُ استخراجِ المراجعِ من نصِّ الجواب — `[#3]` */
     public const CITE_PATTERN = '/\[#(\d{1,3})\]/u';
@@ -82,10 +79,11 @@ final class LiteLlmAskGenerator implements AskGenerator
         الإيجاز: جوابُك للمستخدمِ لا لنفسِك. لا تسرد خطواتِك ولا الأدواتِ التي ناديتَها ولا الوحداتِ المتاحة، ولا تشرح كيف وصلتَ إلى الجواب. وسؤالُ «كم» جوابُه **جملةٌ واحدة**: العددُ ومرجعُه.
         TXT;
 
-    /** أقصى نداءٍ للتوليدِ في هذا الطلبِ — يُعدُّ هنا لا في المنسّق */
-    private int $calls = 0;
-
-    private ?AiRouteRun $run = null;
+    /**
+     * **النداءُ المحكومُ لهذا الطلب** — يُفتح عند أوّلِ خطوةٍ ويبقى للطلبِ كلِّه،
+     * فسقفُ النداءاتِ وعمقُ الاحتياطِ والحوكمةُ تُحسب على السؤالِ لا على الخطوة.
+     */
+    private ?GovernedCompletion $gc = null;
 
     /** الحوارُ الحقيقيُّ مع البوّابة — أزواجُ `assistant`/`tool` لا غير */
     private array $pairs = [];
@@ -93,18 +91,8 @@ final class LiteLlmAskGenerator implements AskGenerator
     /** طلبُ الأداةِ المعلَّقُ الذي لم تصل نتيجتُه بعد */
     private ?array $pending = null;
 
-    private array $lastUsage = [];
-
-    private ?string $lastFailure = null;
-
     /** سياقُ الحوكمةِ لهذا الطلب — يُسلَّم من المنسّقِ قبل أوّلِ خطوة */
     private array $gov = [];
-
-    /** المحاولةُ السابقةُ في هذا الطلب — لِتُعرَف علاقةُ ما بعدَها بها */
-    private ?string $lastEventId = null;
-
-    /** عدّادُ المحاولاتِ في الطلبِ المنطقيِّ الواحد — لا في الخطوة */
-    private int $attempts = 0;
 
     /** طولُ مظروفِ الخطوةِ الحاليّةِ بالحروف — لتقديرِ رموزِ المدخلِ عند الحجز */
     private int $envelopeChars = 0;
@@ -141,12 +129,13 @@ final class LiteLlmAskGenerator implements AskGenerator
         // **رحلةٌ واحدةٌ للطلبِ كلِّه** — فسقفُ الكلفةِ وعمقُ الاحتياطِ يُحسبان
         // على السؤالِ لا على الخطوة. ولو فُتحت رحلةٌ لكلِّ خطوةٍ لَعاد كلُّ
         // خطوةٍ إلى أوّلِ نموذجٍ في السلسلةِ **فأُنفق فشلُه مرّةً بعد مرّة**.
-        $this->run ??= AiRouteRun::for($profile, [
+        $this->gc ??= GovernedCompletion::open($profile, $this->gov, [
             'ceiling'    => AskPolicy::costCeiling(),
             'in_tokens'  => (int) ceil(mb_strlen($envelope) / AskContext::CHARS_PER_TOKEN),
-            'out_tokens' => AskPolicy::maxOutputTokens(),
+            'max_output' => AskPolicy::maxOutputTokens(),
+            'max_calls'  => AskPolicy::MAX_GENERATION_CALLS,
             'feature'    => AiPurposes::ASK,
-        ])->governBy($this->gov === [] ? null : AiGovernance::gateFor($this->gov));
+        ]);
 
         /*
          * **رحلةٌ مُغلَقةٌ عند فتحِها ليست «إعداداً ناقصاً».**
@@ -161,8 +150,8 @@ final class LiteLlmAskGenerator implements AskGenerator
          * بينما العطلُ عند مزوّدٍ يتعافى بعد دقائق. **وهذا صنفُ الخلطِ الذي
          * بُني `AskFailures` كلُّه لمنعِه**، فالصوابُ `PROVIDER_FAILURE`.
          */
-        if ($this->run->closed()) {
-            return $this->error($this->lastFailure ?? AskFailures::PROVIDER_FAILURE);
+        if ($this->gc->closed()) {
+            return $this->error($this->gc->lastFailure() ?? AskFailures::PROVIDER_FAILURE);
         }
 
         // نتيجةُ الأداةِ المعلَّقةِ تُقفَل الآن — فالتسلسلُ `assistant`→`tool` تامّ
@@ -205,186 +194,25 @@ final class LiteLlmAskGenerator implements AskGenerator
     /** أثرُ الرحلةِ للتدقيقِ — بلا سرٍّ ولا متنِ ردّ */
     public function trail(): array
     {
-        return $this->run?->trail() ?? [];
+        return $this->gc?->trail() ?? [];
     }
 
     // ── التوليد ────────────────────────────────────────────────────────
 
     /**
-     * **نداءٌ واحدٌ وما يليه من قرارٍ** — وحلقةُ الإخفاقِ محدودةٌ بحاجزين:
-     * سقفُ النداءاتِ وإغلاقُ الرحلة.
+     * **نداءٌ محكومٌ واحدٌ ثمّ قراءةُ ردِّه** — والحلقةُ كلُّها (السقف · الحوكمة ·
+     * الإعادة · الاحتياط · منعُ النوم) في `GovernedCompletion`، لا هنا.
      */
     private function generate(array $messages, array $toolDefs): array
     {
-        // سببُ آخرِ إخفاقٍ **في هذه الخطوةِ وحدَها** — لا في الطلبِ كلِّه.
-        // ونُفرِّق: إخفاقٌ عابرٌ في خطوةٍ سابقةٍ ثمّ نجاحٌ ليس سببَ توقّفِ هذه
-        // الخطوة، **وذكرُه هنا يُرسل المشرفَ يطارد عطلاً انتهى**.
-        $stepFailure = null;
+        $res = $this->gc->call([
+            'messages'    => $messages,
+            'tools'       => $toolDefs,
+            'tool_choice' => 'auto',
+            'temperature' => 0,
+        ], $this->envelopeChars);
 
-        while (true) {
-            // ① الحاجزُ الصلب — يُفحَص **قبل** النداءِ لا بعدَه
-            if ($this->calls >= AskPolicy::MAX_GENERATION_CALLS) {
-                return $this->error($stepFailure ?? AskFailures::TOOL_BUDGET);
-            }
-
-            $model = $this->run?->model();
-            if ($model === null) {
-                return $this->error($this->lastFailure ?? AskFailures::PROVIDER_FAILURE);
-            }
-
-            $outCap = $this->outputCap();
-
-            /*
-             * ── **الحوكمةُ تسبق كلَّ نداءٍ — لا الطلبَ وحدَه** (المرحلة ٤) ──
-             *
-             * السياسةُ والميزانيّةُ تُقرآن **عند كلِّ محاولةٍ**: إعادةً كانت أم
-             * احتياطاً. فطلبٌ يمرّ بثلاثِ محاولاتٍ يُحجَز له ثلاثَ مرّاتٍ
-             * ويُلتزَم ثلاثاً — **لأنّ ثلاثاً أُنفقت فعلاً**. وحجزٌ واحدٌ في
-             * أوّلِ الطلبِ كان سيجعل الإعادةَ والاحتياطَ **مجّانيَّين في
-             * دفاترِنا** ومدفوعَين عند المزوّد.
-             */
-            $this->attempts++;
-            $admit = $this->admit($model, $outCap);
-
-            if (! $admit['ok']) {
-                return $this->error($this->lastFailure = (string) $admit['code']);
-            }
-
-            $t0 = microtime(true);
-            $this->calls++;
-            $res = AiChat::complete([
-                'model'       => (string) $model->litellm_model_name,
-                'messages'    => $messages,
-                'tools'       => $toolDefs,
-                'tool_choice' => 'auto',
-                'temperature' => 0,
-                'max_tokens'  => $outCap,
-            ], $outCap);
-
-            $ms = (int) ($res['ms'] ?? round((microtime(true) - $t0) * 1000));
-            $this->lastUsage = $res['usage'] ?: $this->lastUsage;
-
-            if ($res['ok']) {
-                if ($admit['event'] !== null) {
-                    AiGovernance::settleOk($admit['event'], $admit['holds'],
-                        (array) $res['usage'], (array) ($model->pricing ?? []), $ms, $res['status'],
-                        AiChat::shape((array) $res['data']) + ['max_output' => $outCap]);
-                    $this->lastEventId = (string) $admit['event']->id;
-                }
-
-                // **النجاحُ يمسح تهدئةَ المزوّدِ ولا يُغلق الرحلة** — فالخطوةُ
-                // التاليةُ تبدأ من النموذجِ الذي نجح لا من رأسِ السلسلة
-                AiRouting::noteSuccess((string) $model->provider_id);
-
-                return $this->read((array) $res['data']);
-            }
-
-            if ($admit['event'] !== null) {
-                /*
-                 * ── **ما لم يغادر الخادمَ لا يُحاسَب** (تدقيقُ ما قبل المرحلة ٥) ──
-                 *
-                 * `AiChat` وحدَها تعرف أَفُتح مقبسٌ أم رُدّ الطلبُ قبلَه:
-                 * بوّابةٌ مطفأةٌ أو وجهةٌ يرفضها حارسُ الصادرِ **لا تبلغ أحداً
-                 * ولا تكلّف فلساً**. وكان يُلتزَم بها كما يُلتزَم بنداءٍ وقع،
-                 * فيُحسَب الطلبُ على الحصّةِ ويُعَدّ حدثاً «مجهولَ الكلفة»
-                 * وكلفتُه صفرٌ مُثبَتة. **وميزانيّةٌ بحدِّ ثلاثةِ طلباتٍ تُستنزَف
-                 * بثلاثةِ أخطاءِ تهيئة**، ثمّ يُصَدّ السائلُ الرابعُ عن عطلٍ
-                 * ليس عطلَه.
-                 *
-                 * **وانقطاعُ النقلِ يبقى التزاماً** — مهلةٌ انقضت تعني أنّ
-                 * الطلبَ ربّما وصل وعُولج، فالإفراجُ عنه يكذب (العقدُ §٥).
-                 */
-                if (($res['sent'] ?? true) === false) {
-                    AiGovernance::abandon($admit['event'], $admit['holds'],
-                        (string) $res['failure']);
-                } else {
-                    AiGovernance::settleFailed($admit['event'], $admit['holds'],
-                        (string) $res['failure'], (string) $res['cause'], $res['status'], $ms,
-                        (array) $res['usage'], (array) ($model->pricing ?? []),
-                        AiChat::shape((array) ($res['data'] ?? [])) + ['max_output' => $outCap]);
-                }
-
-                $this->lastEventId = (string) $admit['event']->id;
-            }
-
-            $this->lastFailure = $stepFailure = (string) $res['failure'];
-
-            $decision = $this->run->fail([
-                'code'        => $res['status'],
-                'body'        => (string) $res['error'],
-                'retry_after' => $res['retry_after'],
-            ]);
-
-            // ④ ولا نومَ طويلٌ في مسارٍ متزامن
-            if ($decision['action'] === 'retry') {
-                $delay = (int) ($decision['delay'] ?? 0);
-
-                if ($delay > self::MAX_SYNC_DELAY) {
-                    /*
-                     * **مهلةٌ أطولُ من أن تُنتظَر — فيُستأنَف القرارُ بلا انتظار.**
-                     *
-                     * ويُحسَب على المزوّدِ إخفاقٌ ثانٍ، **وهذا مقصودٌ لا سهو**:
-                     * مزوّدٌ طلب أن نصبر عليه نصفَ دقيقةٍ أخبرَنا صراحةً أنّه
-                     * لن يخدمنا الآن. فتعجيلُ تهدئتِه (ثلاثُ إخفاقاتٍ ⇒ عشرُ
-                     * دقائق) يجعل الطلباتِ التاليةَ **تتخطّاه بلا مهلةٍ تُهدَر**
-                     * بدل أن تصطفّ على بابٍ مغلق.
-                     */
-                    $decision = $this->run->fail([
-                        'code' => $res['status'], 'body' => (string) $res['error'],
-                    ]);
-
-                    // وإعادةٌ ثانيةٌ تُطلَب رغم ذلك تُعامَل توقّفاً — فلا حلقةَ
-                    // تدور بلا نداءٍ يُحسَب عليها
-                    if ($decision['action'] === 'retry') {
-                        return $this->error($this->lastFailure);
-                    }
-                } elseif ($delay > 0) {
-                    usleep($delay * 1_000_000);
-                }
-            }
-
-            if (in_array($decision['action'], ['stop', 'done'], true)) {
-                return $this->error($this->lastFailure);
-            }
-        }
-    }
-
-    /**
-     * **قبولُ محاولةٍ واحدة** — أو رفضُها بتصنيفٍ يُقال للمستخدم.
-     *
-     * **وبلا سياقِ حوكمةٍ يمرّ كما كان** — فالمولِّدُ يُستعمَل في اختباراتِ
-     * عقدٍ بلا مستخدمٍ ولا قاعدة، وإسقاطُها هناك كان سيُخفي العقدَ خلف تهيئة.
-     */
-    private function admit(\App\Models\AiModel $model, int $outCap): array
-    {
-        if ($this->gov === []) {
-            return ['ok' => true, 'code' => null, 'holds' => [], 'event' => null];
-        }
-
-        $inTokens = (int) ceil($this->envelopeChars / AskContext::CHARS_PER_TOKEN);
-        $est      = AiCost::estimate((array) ($model->pricing ?? []), $inTokens, $outCap);
-
-        return AiGovernance::admit($this->gov, $model, $est, $inTokens + $outCap, [
-            'attempt'   => $this->attempts,
-            'relation'  => $this->attempts === 1 ? 'initial'
-                : ($this->run?->depth() > 0 ? 'fallback' : 'retry'),
-            'parent_id' => $this->lastEventId,
-        ]);
-    }
-
-    /**
-     * **سقفُ المخرَجِ بعد تضييقِ السياسة** — والأشدُّ يفوز.
-     *
-     * فسياسةٌ تقول «لا تتجاوز ٢٠٠ رمزاً لهذا الغرض» تُضيّق سقفَ الإعدادات،
-     * **ولا ترفعه أبداً**: `min` لا `max`. وسياسةٌ تطلب أكثرَ ممّا أقرّته
-     * الإعداداتُ لا تُعطى شيئاً — فالتضييقُ اتّجاهٌ واحد.
-     */
-    private function outputCap(): int
-    {
-        $cap = AskPolicy::maxOutputTokens();
-        $lim = (int) ($this->gov['limits']['max_output_tokens'] ?? 0);
-
-        return $lim > 0 ? max(1, min($cap, $lim)) : $cap;
+        return $res['ok'] ? $this->read($res['data']) : $this->error($res['code']);
     }
 
     /**
@@ -458,7 +286,7 @@ final class LiteLlmAskGenerator implements AskGenerator
             }
 
             $this->pending = [
-                'id'   => $rawId === '' ? 'call_' . ($this->calls) : $rawId,
+                'id'   => $rawId === '' ? 'call_' . $this->gc->calls() : $rawId,
                 'name' => $name,
             ];
 
@@ -571,9 +399,7 @@ final class LiteLlmAskGenerator implements AskGenerator
 
     private function usage(): array
     {
-        // **`array_merge` لا `+`** — وعاملُ الجمعِ يُبقي مفاتيحَ الطرفِ الأيسرِ
-        // فيُسقط عدَّ النداءاتِ صامتاً لو حمل الاستهلاكُ يوماً مفتاحاً بالاسمِ نفسِه
-        return array_merge($this->lastUsage, ['calls' => $this->calls]);
+        return $this->gc?->usage() ?? ['calls' => 0];
     }
 
     private function error(?string $code): array

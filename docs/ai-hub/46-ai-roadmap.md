@@ -26,7 +26,13 @@
   `DailyWorkCompliance` · `ReportReview` · `AlertEngine`. **الذكاءُ يُغني هذه ولا يستبدلها**
   (`docs/INTELLIGENCE_MAP.md`: «لا محرّكَ ثانياً»).
 
-## ٢) الخطوةُ صفر — `GovernedCompletion` (شرطٌ لكلِّ ما بعدها)
+## ٢) الخطوةُ صفر — `GovernedCompletion` (شرطٌ لكلِّ ما بعدها) — ✅ v2.600.5
+
+**المُنفَّذ:** `App\Support\Ai\GovernedCompletion` — `authorize()` (سياقٌ + سياسةٌ للغرض) ·
+`open()` (رحلةٌ واحدةٌ للطلب) · `call()` (الحلقةُ كاملةً) — و`LiteLlmAskGenerator` مبنيٌّ عليه
+بلا تغيير سلوك: **حزمةُ `AskHub/` (242 اختباراً) خضراءُ بلا سطرٍ واحدٍ معدَّلٍ فيها**. والحارسُ
+`GovernedCompletionTest::test_لا_نداءَ_للبوّابةِ_إلّا_عبر_النداءِ_المحكوم` يُسقط الحزمةَ
+إن نادت ميزةٌ `AiChat::complete` من خارجه.
 
 منطقُ الحوكمة والتوجيه والاستدعاء محبوسٌ اليوم داخل `LiteLlmAskGenerator`
 (`generate` :210 · `admit` :351). يُستخرج إلى خدمةٍ واحدة:
