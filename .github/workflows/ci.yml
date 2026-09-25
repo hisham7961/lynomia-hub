@@ -25,6 +25,7 @@ jobs:
   suite:
     name: PHP ${{ matrix.php }} · ${{ matrix.engine }}
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.probe == true }}
 
     strategy:
       fail-fast: false          # نتيجةُ المحرّكاتِ كلِّها تُقرأ في جولةٍ واحدة
@@ -34,6 +35,11 @@ jobs:
           - { php: '8.4', engine: sqlite,  config: phpunit.xml,       image: '' }
           - { php: '8.4', engine: mysql,   config: phpunit.mysql.xml, image: 'mysql:8.0' }
           - { php: '8.4', engine: mariadb, config: phpunit.mysql.xml, image: 'mariadb:10.11' }
+          # **صفُّ قياسٍ لا بوّابة** (docs/ai-hub/46-ai-roadmap.md §6.2): ترقيةُ الإنتاج إلى
+          # MariaDB 11.8 LTS (نوعُ VECTOR الأصيل) قرارٌ مؤجَّل — وهذا الصفُّ يقيس توافقَ
+          # الحزمةِ معها **قبل** القرار، فيُعرَف ما سينكسر على CI لا على الخادم. سقوطُه
+          # لا يحجب الدفعة (probe)؛ ويصير بوّابةً حين تُقرَّر الترقية.
+          - { php: '8.4', engine: mariadb, config: phpunit.mysql.xml, image: 'mariadb:11.8', probe: true }
 
     steps:
       - uses: actions/checkout@v4
