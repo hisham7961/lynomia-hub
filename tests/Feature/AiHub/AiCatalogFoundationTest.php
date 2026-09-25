@@ -444,12 +444,15 @@ class AiCatalogFoundationTest extends TestCase
     /** ملفّاتُ سطحِ الذكاءِ — حيث لا عذرَ لاسمِ مزوّد @return list<string> */
     private function aiSurfaceFiles(): array
     {
+        // مسحٌ متكرّرٌ بحدٍّ أدنى لكلِّ نمط (REORG_PLAN §R1): نقلُ الأصنافِ إلى نطاقها
+        // (`Support/Ai/…`) لا يُفرغ الحارسَ — وضياعُ نمطٍ كاملٍ يُسقطه لا يُقصّره صامتاً
+        $S = \Tests\Support\Source::class;
         $files = array_merge(
-            glob(app_path('Support/Ai*.php')) ?: [],
-            glob(app_path('Support/Ask*.php')) ?: [],
-            glob(app_path('Support/LiteLlm*.php')) ?: [],
-            glob(app_path('Http/Controllers/Web/Ai*.php')) ?: [],
-            glob(app_path('Console/Commands/HubAi*.php')) ?: [],
+            $S::files('Support', 'Ai*.php', 27),
+            $S::files('Support', 'Ask*.php', 9),
+            $S::files('Support', 'LiteLlm*.php', 2),
+            $S::files('Http/Controllers', 'Ai*.php', 5),
+            $S::files('Console/Commands', 'HubAi*.php', 6),
         );
         sort($files);
 

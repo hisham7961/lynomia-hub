@@ -71,7 +71,7 @@ class Wave2CleanupTest extends TestCase
     /** المعاملة والتنظيف الحتمي — حارس مصدر */
     public function test_import_runs_inside_a_transaction_with_final_cleanup(): void
     {
-        $src = file_get_contents(app_path('Http/Controllers/Web/ImportController.php'));
+        $src = \Tests\Support\Source::read(\App\Http\Controllers\Web\ImportController::class);
         $this->assertStringContainsString('DB::transaction', $src,
             'الاستيراد صفاً صفاً بلا معاملة — عطلٌ في المنتصف يترك استيراداً جزئياً والإعادة تكرر');
         $this->assertStringContainsString('} finally {', $src,

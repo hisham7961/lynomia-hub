@@ -83,7 +83,7 @@ class CheapTailsRound8Test extends TestCase
             'لا فهرسَ على `page_visits.at` — التشذيبُ والقراءةُ مسحٌ كامل للجدول');
 
         // التشذيبُ لم يعد في وسيط التتبّع (لا حذفَ في مسار المستخدم)
-        $mw = (string) file_get_contents(app_path('Http/Middleware/TrackVisits.php'));
+        $mw = (string) \Tests\Support\Source::read(\App\Http\Middleware\TrackVisits::class);
         $this->assertStringNotContainsString('->delete()', $mw,
             'وسيطُ التتبّع ما زال يشذّب داخل طلب المستخدم — حذفٌ في أثناء تحميل صفحة');
     }

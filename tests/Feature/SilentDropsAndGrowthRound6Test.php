@@ -97,7 +97,7 @@ class SilentDropsAndGrowthRound6Test extends TestCase
 
     public function test_the_live_check_route_is_rate_limited(): void
     {
-        $src = file_get_contents(base_path('routes/web.php'));
+        $src = \Tests\Support\Source::routes('web');
         $this->assertMatchesRegularExpression(
             "/monitor\/\{module\}\/\{id\}\/check'[^;]*throttle:/s", $src,
             'الفحصُ الحيّ بلا حدِّ معدّل — كلُّ ضغطةٍ تحجز عاملاً ثوانيَ طويلة بلا سقف');

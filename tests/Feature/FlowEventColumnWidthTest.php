@@ -54,7 +54,7 @@ class FlowEventColumnWidthTest extends TestCase
     public function test_the_flows_starter_writes_only_what_fits(): void
     {
         $declared = (int) $this->declaredWidth('flows', 'event');
-        $src = (string) file_get_contents(base_path('app/Console/Commands/HubFlowsStarter.php'));
+        $src = (string) \Tests\Support\Source::read(\App\Console\Commands\HubFlowsStarter::class);
 
         preg_match_all("/'([a-z_]+\.[a-z_.]+)'/", $src, $m);
         $tooLong = array_values(array_unique(array_filter($m[1], fn ($n) => strlen($n) > $declared)));

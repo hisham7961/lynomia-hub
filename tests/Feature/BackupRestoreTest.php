@@ -371,7 +371,7 @@ class BackupRestoreTest extends TestCase
         $this->assertSame('600', substr(sprintf('%o', fileperms($file)), -3),
             'ملف النسخة (القاعدة كلها بهواتف المستخدمين وأسرار الخزنة) مقروء لكل حسابات الخادم');
 
-        $src = file_get_contents(app_path('Console/Commands/HubBackup.php'));
+        $src = \Tests\Support\Source::read(\App\Console\Commands\HubBackup::class);
         $this->assertStringContainsString('chunkById', $src,
             'chunk على created_at بلا فاصل — صفوف تفلت من النسخة عند تساوي الطوابع');
     }

@@ -123,14 +123,14 @@ class ApprovalIntegrityTest extends TestCase
     {
         // المنطقُ انتقل إلى السكّة المشتركة `ApprovalService` (Mobile Readiness · الطور D ·
         // Critic F2) كي يستدعيه الويبُ والجوالُ معاً بلا نسخٍ — والقفلُ والمعاملةُ معه.
-        $src = file_get_contents(app_path('Support/ApprovalService.php'));
+        $src = \Tests\Support\Source::read(\App\Support\ApprovalService::class);
         $this->assertStringContainsString('lockForUpdate', $src,
             'الحسم بلا قفل — معتمِدان متزامنان يجتازان فحص «معلّق» معاً');
         $this->assertStringContainsString('DB::transaction', $src,
             'الحسم بلا معاملة — سباق اعتماد/رفض ينفّذ ويكتب «مرفوض»');
 
         // والمتحكّمُ لا يزال بابَ الويب: يفوّض للخدمة (لا معالجَ ويبٍ يُستدعى من الجوال)
-        $ctrl = file_get_contents(app_path('Http/Controllers/Web/ApprovalDecisionController.php'));
+        $ctrl = \Tests\Support\Source::read(\App\Http\Controllers\Web\ApprovalDecisionController::class);
         $this->assertStringContainsString('ApprovalService::decide', $ctrl,
             'متحكّمُ الويب يجب أن يفوّض الحسمَ للخدمة المشتركة (F2)');
     }

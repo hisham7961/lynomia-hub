@@ -250,7 +250,7 @@ class WorkOsGlobalSearchTest extends TestCase
 
     public function test_work_os_search_branches_order_deterministically(): void
     {
-        $src = file_get_contents(app_path('Http/Controllers/Web/SearchController.php'));
+        $src = \Tests\Support\Source::read(\App\Http\Controllers\Web\SearchController::class);
         $this->assertMatchesRegularExpression(
             "/orderBy\('title'\)->orderBy\('id'\)/", $src,
             'فرعُ القنوات بلا فاصل id — «أيُّ ثلاثٍ تظهر» قرعةٌ بين المحرّكين');

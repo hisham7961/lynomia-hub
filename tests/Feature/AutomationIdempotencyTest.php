@@ -79,7 +79,7 @@ class AutomationIdempotencyTest extends TestCase
 
         // حارس مصدر: الكود يستعمل whereDate لا نافذة datetime
         // (WP-6.3) جوهرُ alertRules استُخرج إلى App\Support\AlertEngine — الحارسُ يتبعه
-        $src = file_get_contents(app_path('Support/AlertEngine.php'));
+        $src = \Tests\Support\Source::read(\App\Support\AlertEngine::class);
         $this->assertStringContainsString("whereDate('created_at'", $src,
             'دلو منع التكرار يقارن بالطابع الزمني لا باليوم — انزياح الكرون يُعيد الإطلاق');
     }
@@ -87,7 +87,7 @@ class AutomationIdempotencyTest extends TestCase
     /** (١) الأوامر المجدولة تحمل حماية التزامن — حارس مصدر */
     public function test_scheduled_commands_have_overlap_protection(): void
     {
-        $src = file_get_contents(base_path('routes/console.php'));
+        $src = \Tests\Support\Source::routes('console');
         $this->assertStringContainsString('withoutOverlapping', $src,
             'الأوامر المجدولة بلا withoutOverlapping — تشغيلان متزامنان يولّدان مكرّراً');
     }

@@ -39,7 +39,7 @@ class SecurityActivitySplitTest extends TestCase
         $this->seedCore();
 
         // فحصُ المصدر: لوحةُ الأداء (المتحكّم والعرض) لا تمسّ Risk ولا زيارات الصفحات
-        $ctrl = file_get_contents(app_path('Http/Controllers/Web/PerformanceController.php'));
+        $ctrl = \Tests\Support\Source::read(\App\Http\Controllers\Web\PerformanceController::class);
         $view = file_get_contents(resource_path('views/performance/index.blade.php'));
         foreach (['Risk::', 'riskProfile', 'page_visits', 'نسبة الشك', 'مخاطر النشاط'] as $needle) {
             $this->assertStringNotContainsString($needle, $ctrl, 'متحكّم الأداء يقرأ الأمن: ' . $needle);
@@ -142,7 +142,7 @@ class SecurityActivitySplitTest extends TestCase
         $this->assertArrayHasKey('parts', $r);
 
         // ولا ثابتَ ٠٨–١٦ باقياً في متحكّم النشاط
-        $src = file_get_contents(app_path('Http/Controllers/Web/ActivityController.php'));
+        $src = \Tests\Support\Source::read(\App\Http\Controllers\Web\ActivityController::class);
         $this->assertDoesNotMatchRegularExpression('/h\s*>=\s*8\s*&&\s*\$h\s*<\s*16/', $src,
             'حدود الدوام ما زالت صلبة ٠٨–١٦ في المتحكّم');
     }

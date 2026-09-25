@@ -25,9 +25,9 @@ use Tests\TestCase;
 class CheckThenWriteRaceRound5Test extends TestCase
 {
     /** جسمُ دالةٍ بعينها: من تصريحها إلى تصريح الدالة التالية */
-    protected function methodSrc(string $relPath, string $marker): string
+    protected function methodSrc(string $class, string $marker): string
     {
-        $src = file_get_contents(app_path($relPath));
+        $src = \Tests\Support\Source::read($class);
         $start = strpos($src, $marker);
         $this->assertNotFalse($start, "لم يُعثَر على {$marker}");
         $after = substr($src, (int) $start + strlen($marker));
@@ -75,7 +75,7 @@ class CheckThenWriteRaceRound5Test extends TestCase
     /** (٢) تجديد العقد يُنشَأ داخل معاملةٍ على صفٍّ مقفول */
     public function test_contract_renewal_spawn_is_row_locked(): void
     {
-        $body = $this->methodSrc('Http/Controllers/Web/ContractActionsController.php', 'function spawnRenewal(');
+        $body = $this->methodSrc(\App\Http\Controllers\Web\ContractActionsController::class, 'function spawnRenewal(');
         $this->assertStringContainsString('lockForUpdate', $body,
             'spawnRenewal بلا قفلٍ صفّيّ — زرٌّ+أتمتةٌ متزامنان يُنشئان مسودتَي تجديد');
         $this->assertStringContainsString('DB::transaction', $body);
@@ -84,7 +84,7 @@ class CheckThenWriteRaceRound5Test extends TestCase
     /** (٣) اعتماد مرحلة التوقيع داخل معاملةٍ على صفٍّ مقفول */
     public function test_esign_stage_approve_is_row_locked(): void
     {
-        $body = $this->methodSrc('Http/Controllers/Web/EsignController.php', 'public function approve(Request');
+        $body = $this->methodSrc(\App\Http\Controllers\Web\EsignController::class, 'public function approve(Request');
         $this->assertStringContainsString('lockForUpdate', $body,
             'اعتماد مرحلة التوقيع بلا قفل — تسليمٌ/حدثٌ مزدوج على المرحلة الأخيرة');
         $this->assertStringContainsString('DB::transaction', $body);

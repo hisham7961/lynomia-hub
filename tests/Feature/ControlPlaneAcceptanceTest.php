@@ -470,7 +470,7 @@ class ControlPlaneAcceptanceTest extends TestCase
         $incidentId = (string) Str::uuid();
 
         // موضعٌ حقيقيٌّ في الشيفرة — ملفٌّ داخل جذر المشروع (الحارسُ يرفض ما خرج عنه)
-        $file = app_path('Support/Health.php');
+        $file = \Tests\Support\Source::path(\App\Support\Health::class);
 
         Task::create(['id' => $taskId, 'title' => 'إصلاحُ العطل الحرج', 'status' => 'جديدة']);
         DB::table('incidents')->insert([
@@ -540,7 +540,7 @@ class ControlPlaneAcceptanceTest extends TestCase
         $this->assertNotSame([], $snippet, 'لا مقتطفَ شيفرةٍ حول السطر');
         $this->assertTrue(collect($snippet)->contains(fn ($l) => $l['hot'] && $l['n'] === 60),
             'السطرُ الحارّ غيرُ مُعلَّم');
-        $this->assertSame('app/Support/Health.php', $show->viewData('relPath'),
+        $this->assertSame(str_replace(base_path() . '/', '', $file), $show->viewData('relPath'),
             'المسارُ يُعرض مطلقاً لا نسبيّاً للجذر');
         $this->ans(self::Q_ERRORS[4], $snippet, 'لا موضعَ في الشيفرة');
 

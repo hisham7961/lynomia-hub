@@ -202,9 +202,9 @@ class WorkOsCustodyPostingTest extends TestCase
 
     public function test_all_three_rails_post_through_the_one_shared_service(): void
     {
-        $fin = (string) file_get_contents(app_path('Http/Controllers/Web/FinController.php'));
-        $pay = (string) file_get_contents(app_path('Http/Controllers/Web/PayrollController.php'));
-        $cust = (string) file_get_contents(app_path('Support/CustodyPostingService.php'));
+        $fin = (string) \Tests\Support\Source::read(\App\Http\Controllers\Web\FinController::class);
+        $pay = (string) \Tests\Support\Source::read(\App\Http\Controllers\Web\PayrollController::class);
+        $cust = (string) \Tests\Support\Source::read(\App\Support\CustodyPostingService::class);
 
         foreach (['FinController' => $fin, 'PayrollController' => $pay, 'CustodyPostingService' => $cust] as $n => $src) {
             $this->assertStringContainsString('postBalanced', $src,

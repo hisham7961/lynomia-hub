@@ -33,7 +33,7 @@ class FinalAuditStockLeaveTest extends TestCase
     /** (#13) استلامُ الشراء يقفل صفَّ الصنف قبل قراءة‑وكتابة رصيده */
     public function test_purchase_receive_locks_the_stock_item_row(): void
     {
-        $src = file_get_contents(app_path('Http/Controllers/Web/PurchaseController.php'));
+        $src = \Tests\Support\Source::read(\App\Http\Controllers\Web\PurchaseController::class);
         $recv = substr($src, strpos($src, 'protected function receive'),
             strpos($src, 'protected function returnStock') - strpos($src, 'protected function receive'));
 
