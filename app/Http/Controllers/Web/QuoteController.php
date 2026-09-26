@@ -622,26 +622,8 @@ class QuoteController extends Controller
      */
     protected function archiveProposal(Quote $q, string $tag): void
     {
-        try {
-            $html = \App\Support\Documents\Proposal::html($q->fresh());
-            $pdf = \App\Support\Documents\DocRenderer::pdf($html, 'عرض ' . $q->doc_no);
-            [$blob, $mime, $ext] = $pdf
-                ? [$pdf, 'application/pdf', 'pdf']
-                : [$html, 'text/html', 'html'];
-            $path = 'hub/att/quote-' . $q->doc_no . '-v' . (int) $q->version . '-' . uniqid() . '.' . $ext;
-            \Illuminate\Support\Facades\Storage::disk('local')->put($path, $blob);
-            \App\Models\Attachment::create([
-                'module' => 'quotes', 'record_id' => $q->id,
-                'field' => 'عرض مؤرشَف — ' . $tag . ' (نسخة ' . (int) $q->version . ')',
-                'disk' => 'local', 'path' => $path,
-                'original_name' => 'proposal-' . $q->doc_no . '-v' . (int) $q->version . '.' . $ext,
-                'mime' => $mime, 'size' => strlen($blob),
-                'checksum' => hash('sha256', $blob),
-                'uploaded_by' => auth()->id(),
-            ]);
-        } catch (\Throwable $e) {
-            report($e);   // الأرشفةُ إضافةٌ — فشلُها لا يُفشل الإرسال
-        }
+        // المنطقُ في محرّك القبول (أرشيفٌ واحدٌ لبابَي الإرسال والقبول)
+        \App\Support\Finance\QuoteAcceptance::archive($q, $tag, auth()->id());
     }
 
     /**
@@ -695,15 +677,18 @@ class QuoteController extends Controller
         // فقط» لا يقلبها من الأزرار (hub_field_mode توثّق setStatus كأحد مستهلكيها).
         abort_if(hub_field_mode(auth()->user(), 'quotes', 'status') !== '', 403,
             'حقل الحالة مقفولٌ لدورك (قراءة فقط) — لا يُغيَّر من أزرار المسار');
-        $q->status = $status;
-        if ($status === 'مقبول' && ! $q->accepted_at) {
-            $q->accepted_at = now();
-            $q->accepted_by = auth()->user()?->name;
-        }
-        $q->save();
 
-        // أرشفةُ النسخة المقبولة — الوثيقةُ التي وافق عليها العميلُ تُجمَّد كما هي
-        if ($status === 'مقبول') $this->archiveProposal($q, 'مقبول');
+        // **القبولُ بمحرّكه الواحد** (TECH_DEBT #29): القفلُ + المعاملةُ + أرشفةُ النسخة المقبولة
+        // + سجلُّ «كيف قُبل» + إشعارُ المعتمدين + تدقيقٌ واحد — كالتوقيع الإلكترونيّ حرفاً،
+        // ومتكرّرٌ بلا أثر (ولا يُعاد عرضٌ «محوّل» إلى «مقبول»).
+        if ($status === 'مقبول') {
+            return \App\Support\Finance\QuoteAcceptance::byUser($q, auth()->user())
+                ? back()->with('ok', $msg)
+                : back()->with('ok', 'العرضُ مقبولٌ من قبل — لا أثرَ مكرّر');
+        }
+
+        $q->status = $status;
+        $q->save();
 
         // **إطلاقُ الأحداث الدلالية**: كان setStatus يتجاوز FlowRunner فلا تُطلَق
         // quote.accepted/rejected المعلَنة — الآن تُطلق فتعمل حِزمُ الاستجابة والتنبيهات.

@@ -155,18 +155,11 @@ final class EsignFinalizer
             } elseif ($req->link_module === 'decisions') {
                 hub_audit('توثيق قرار بتوقيع إلكتروني', 'decisions', $req->link_id, $req->title . ' — ' . $signer);
             } elseif ($req->link_module === 'quotes') {
-                // **قبولُ العميل للعرض بتوقيعٍ إلكترونيّ**: يقلب العرضَ «مقبول»
-                // (فيُطلق quote.accepted) بأدلّةٍ كاملة — لا محرك قبولٍ ثانٍ.
+                // **قبولُ العميل للعرض بتوقيعٍ إلكترونيّ** بمحرّك القبول الواحد (TECH_DEBT #29):
+                // قفلُ الحالة على مُصدِر الطلب + أرشفةُ النسخة المقبولة + meta (الظرف ورمزُ
+                // التحقق والموقّع، وaccept_sign كما كان) + إشعارٌ + تدقيقٌ — كزرّ الويب حرفاً.
                 $q = \App\Models\Quote::find($req->link_id);
-                if ($q && ! in_array($q->status, ['مقبول', 'محوّل'], true)) {
-                    $q->forceFill([
-                        'status' => 'مقبول', 'accepted_at' => now(), 'accepted_by' => $signer,
-                        'meta' => array_merge((array) $q->meta, ['accept_sign' => $req->verify_code]),
-                    ])->save();
-                    \App\Support\Platform\FlowRunner::fire('status', 'quotes', $q, 'مقبول');
-                    \App\Support\Documents\Esign\EsignFinalizer::notifyOwners('🎉 قَبِل العميلُ العرضَ «' . ($q->title ?: $q->doc_no) . '» بتوقيعٍ إلكترونيّ [' . $req->verify_code . ']');
-                    hub_audit('قبول عرض بتوقيع إلكتروني', 'quotes', $q->id, $q->doc_no . ' — ' . $signer);
-                }
+                if ($q) \App\Support\Finance\QuoteAcceptance::bySignature($q, $req, $signer);
             }
         } catch (\Throwable $e) {
             report($e);   // إكمال السير إضافة — فشله لا يُفشل التوقيع نفسه المحفوظ فعلاً
