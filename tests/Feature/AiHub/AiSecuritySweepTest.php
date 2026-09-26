@@ -143,7 +143,14 @@ class AiSecuritySweepTest extends TestCase
             return $at === false ? $t : substr($t, $at + 1);
         };
 
+        // **ومخطّطُنا وحدَه** — MySQL/MariaDB تُعيد جداولَ **كلِّ** القواعد التي يراها
+        // الاتصال، فيتسرّب جدولُ قاعدةٍ مجاورةٍ على الخادم نفسِه (قاعدةُ worktree آخر)
+        // ثمّ يُقرأ هنا فلا يوجد. النمطُ نفسُه في EnterpriseHardeningRound1Test.
+        $schema = \Illuminate\Support\Facades\DB::connection()->getDatabaseName();
         $names = collect(\Illuminate\Support\Facades\Schema::getTableListing())
+            ->map(fn ($t) => (string) $t)
+            ->filter(fn (string $t) => ! str_contains($t, '.')
+                || in_array(substr($t, 0, strrpos($t, '.')), ['main', $schema], true))
             ->map(fn ($t) => $bare((string) $t))
             ->filter(fn (string $t) => str_starts_with($t, 'ai_'))
             ->unique()->sort()->values()->all();
