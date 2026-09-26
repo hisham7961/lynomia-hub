@@ -14,7 +14,7 @@ use Illuminate\Console\Command;
  */
 class HubBrain extends Command
 {
-    protected $signature = 'hub:brain {--dry : عدُّ ما سيُضمَّن دون نداءٍ ولا كتابة} {--setup : إنشاءُ جدول المتّجهات في قاعدة العقل المضبوطة}';
+    protected $signature = 'hub:brain {--dry : عدُّ ما سيُضمَّن دون نداءٍ ولا كتابة} {--setup : إنشاءُ جدول المتّجهات في قاعدة العقل المضبوطة} {--purge-main : مع --setup: محوُ المتّجهات القديمة من القاعدة الرئيسة}';
     protected $description = 'العقلُ الثاني — جولةُ فهرسةٍ دلاليّةٍ للمعرفة والمحاضر والقرارات';
 
     public function handle(): int
@@ -23,6 +23,16 @@ class HubBrain extends Command
             $conn = PhpVectorStore::connection();
             $made = PhpVectorStore::ensureTable($conn);
             $this->info(($made ? 'أُنشئ' : 'موجودٌ أصلاً') . ' جدولُ المتّجهات في «' . ($conn ?? 'القاعدة الرئيسة') . '»');
+            // الانتقالُ إلى قاعدةٍ مستقلّة لا ينقل المتّجهاتِ القديمة ولا يمحوها — يُقال، والمحوُ بطلبٍ صريح
+            if ($conn !== null && \Illuminate\Support\Facades\Schema::hasTable('ai_embeddings')) {
+                $left = \Illuminate\Support\Facades\DB::table('ai_embeddings')->count();
+                if ($left > 0 && $this->option('purge-main')) {
+                    \Illuminate\Support\Facades\DB::table('ai_embeddings')->delete();
+                    $this->info("مُحي {$left} مقطعاً قديماً من القاعدة الرئيسة");
+                } elseif ($left > 0) {
+                    $this->warn("في القاعدة الرئيسة {$left} مقطعاً قديماً لا يُستعمل بعد الآن — لا تُنقل (تُعاد الفهرسةُ في المستقلّة)؛ امحها بـ --purge-main");
+                }
+            }
 
             return self::SUCCESS;
         }

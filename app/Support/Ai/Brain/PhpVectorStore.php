@@ -32,9 +32,30 @@ final class PhpVectorStore implements VectorStore
         return DB::connection(self::connection());
     }
 
+    /**
+     * **الجدولُ حاضرٌ على الاتّصال المضبوط؟** — وقاعدةٌ مستقلّةٌ لا تُبلَغ (متوقّفة · تُرقّى · اعتمادٌ خاطئ)
+     * تعني «العقلُ غيرُ جاهز» لا انهياراً: فالقاعدةُ الاختياريّةُ لا تُسقط «اسأل Hub» ولا جولةَ الأتمتة.
+     */
     public static function hasTable(): bool
     {
-        return Schema::connection(self::connection())->hasTable('ai_embeddings');
+        try {
+            return Schema::connection(self::connection())->hasTable('ai_embeddings');
+        } catch (\Throwable $e) {
+            report($e);
+
+            return false;
+        }
+    }
+
+    /** قاعدةُ SQLite مستقلّةٌ ملفُّها غائب؟ يُنشأ (فارغاً) — كي يعمل `hub:brain --setup` على تنصيبٍ جديد */
+    public static function touchSqlite(?string $connection): void
+    {
+        if ($connection === null) return;
+        $cfg = (array) config('database.connections.' . $connection, []);
+        $path = (string) ($cfg['database'] ?? '');
+        if (($cfg['driver'] ?? '') !== 'sqlite' || $path === '' || $path === ':memory:' || is_file($path)) return;
+        @mkdir(dirname($path), 0755, true);
+        @touch($path);
     }
 
     /**
@@ -43,6 +64,7 @@ final class PhpVectorStore implements VectorStore
      */
     public static function ensureTable(?string $connection = null): bool
     {
+        self::touchSqlite($connection);
         $schema = Schema::connection($connection);
         if ($schema->hasTable('ai_embeddings')) return false;
         $schema->create('ai_embeddings', function (Blueprint $t) {

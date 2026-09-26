@@ -385,4 +385,40 @@ class DevAssistantTest extends TestCase
         $this->assertNull($r['commits']['source']);
         $this->assertStringContainsString('غيرُ موجود', (string) $r['commits']['why']);
     }
+
+    public function test_التزاماتٌ_كثيرةٌ_تُقصّ_الأقدمُ_ويُقال(): void
+    {
+        $commits = [];
+        for ($i = 1; $i <= 150; $i++) {
+            $commits[] = ['sha' => sprintf('%040x', $i), 'commit' => ['message' => sprintf('QWXZMARK%03d ', $i) . str_repeat('نصٌّ عربيٌّ طويلٌ في رسالة الالتزام ', 3)]];
+        }
+        $this->ghReply = ['status' => 200, 'body' => ['total_commits' => 150, 'commits' => $commits]];
+        $rel = $this->releases();
+        $this->replies = [['reply' => ['- سطر']]];
+
+        $r = DraftAssistant::draft($this->member(), 'notes', 'code', $rel);
+
+        $this->assertTrue($r['clipped'], 'القصُّ يُقال');
+        $this->assertLessThan(150, $r['commits']['sent']);
+        $this->assertStringContainsString('QWXZMARK150', $this->sentText(), 'الأحدثُ محفوظ');
+        $this->assertStringNotContainsString('QWXZMARK001', $this->sentText(), 'والأقدمُ هو المقصوص');
+    }
+
+    public function test_السابقُ_للمقارنة_من_المستودع_نفسِه_ولا_مقارنةَ_بلا_تاريخ(): void
+    {
+        $pid = $this->row('projects', ['name' => 'مشروع', 'company_id' => $this->alpha->id]);
+        $this->row('code_releases', ['ver' => '0.9', 'project_id' => $pid, 'date' => '2031-01-01', 'repo' => 'https://github.com/acme/hub', 'commit' => 'aaaaaaa']);
+        $this->row('code_releases', ['ver' => 'web', 'project_id' => $pid, 'date' => '2031-01-20', 'repo' => 'https://github.com/acme/other', 'commit' => 'ccccccc']);
+        $rel = $this->row('code_releases', ['ver' => '1.0', 'project_id' => $pid, 'date' => '2031-02-01', 'repo' => 'https://github.com/acme/hub', 'commit' => 'bbbbbbb']);
+        $this->replies = [['reply' => ['- سطر']]];
+
+        DraftAssistant::draft($this->member(), 'notes', 'code', $rel);
+        $this->assertSame('https://api.github.com/repos/acme/hub/compare/aaaaaaa...bbbbbbb', $this->gh[0]->url(), 'لا مقارنةَ بمستودعٍ آخر');
+
+        $this->gh = [];
+        $noDate = $this->row('code_releases', ['ver' => '1.1', 'project_id' => $pid, 'repo' => 'https://github.com/acme/hub', 'commit' => 'ddddddd']);
+        $r = DraftAssistant::draft($this->member(), 'notes', 'code', $noDate);
+        $this->assertSame([], $this->gh);
+        $this->assertStringContainsString('تاريخ', (string) $r['commits']['why']);
+    }
 }

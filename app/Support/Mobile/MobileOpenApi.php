@@ -350,7 +350,8 @@ class MobileOpenApi
                 'ok' => $env($obj([
                     'schema_version' => $str,
                     'feature_flags' => $obj(['can_approve' => $bool, 'can_monitor' => $bool, 'can_secrets' => $bool,
-                        'mfa_enrolled' => $bool, 'restricted_company' => $bool, 'restricted_client' => $bool]),
+                        'mfa_enrolled' => $bool, 'restricted_company' => $bool, 'restricted_client' => $bool,
+                        'is_client' => $bool, 'can_ask' => $bool]),
                     'ia' => $obj(['surfaces' => ['type' => 'array'], 'domains' => ['type' => 'array']]),
                 ])), 'errors' => []],
 

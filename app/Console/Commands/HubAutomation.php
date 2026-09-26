@@ -139,8 +139,10 @@ class HubAutomation extends Command
     /** العقلُ الثاني (المرحلة ٤): جولةُ فهرسةٍ إن كان مفعَّلاً — ومعزولُ الفشل كسائر الخطوات */
     protected function brainIndex(): int
     {
-        if (! \App\Support\Ai\Brain\Brain::ready()) return 0;
         try {
+            // الجاهزيّةُ داخلَ الحارس: قاعدةُ العقل المستقلّة المتوقّفة لا تُسقط الجولةَ قبل نبضها
+            if (! \App\Support\Ai\Brain\Brain::ready()) return 0;
+
             return (int) \App\Support\Ai\Brain\Brain::index($this->dry)['embedded'];
         } catch (\Throwable $e) {
             report($e);

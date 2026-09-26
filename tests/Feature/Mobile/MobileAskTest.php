@@ -211,4 +211,15 @@ class MobileAskTest extends TestCase
         $caps = \App\Support\Mobile\MobileOpenApi::capabilities();
         $this->assertSame(5, $caps['areas']['ask']['count']);
     }
+
+    public function test_علمُ_can_ask_في_الإقلاع_يتبع_الصلاحيّةَ_والبوّابة(): void
+    {
+        $u = $this->asker();
+        $this->assertFalse($this->getJson('/api/mobile/v1/bootstrap', $this->auth($u))->assertOk()->json('data.feature_flags.can_ask'),
+            'بوّابةٌ غيرُ جاهزة ⇒ لا مدخل');
+        $this->ready();
+        $this->assertTrue($this->getJson('/api/mobile/v1/bootstrap', $this->auth($u))->assertOk()->json('data.feature_flags.can_ask'));
+        $noFlag = $this->asker(false);
+        $this->assertFalse($this->getJson('/api/mobile/v1/bootstrap', $this->auth($noFlag))->assertOk()->json('data.feature_flags.can_ask'));
+    }
 }

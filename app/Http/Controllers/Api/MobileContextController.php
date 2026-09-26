@@ -209,6 +209,8 @@ class MobileContextController extends Controller
             'restricted_client'  => hub_client_ids($u) !== null,
             // نمطُ الحساب — علمُ عرضٍ (الغلافُ العميليّ)؛ الحرسُ في mobile.portal خادميّاً
             'is_client'          => hub_is_client($u),
+            // «اسأل Hub» متاحٌ الآن لهذا المستخدم (الصلاحيّةُ والبوّابةُ معاً) — علمُ عرض، والحرسُ في المسار
+            'can_ask'            => ! hub_is_client($u) && \App\Support\Ai\Ask\AskPolicy::ready($u),
         ];
     }
 

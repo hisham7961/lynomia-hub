@@ -66,7 +66,11 @@ final class Brain
     /** لماذا لا يعمل؟ — `null` إن كان جاهزاً */
     public static function whyNot(): ?string
     {
-        if (! self::enabled()) return 'العقلُ الثاني مطفأ (brain.enabled) — تفعيلُه قرارُ المالك لأنّ نصوصَ السجلّات تغادر إلى مزوّد التضمين';
+        if ((string) setting('brain.enabled', '0') !== '1') return 'العقلُ الثاني مطفأ (brain.enabled) — تفعيلُه قرارُ المالك لأنّ نصوصَ السجلّات تغادر إلى مزوّد التضمين';
+        if (! PhpVectorStore::hasTable()) {
+            return 'جدولُ المتّجهات غائبٌ أو قاعدتُه لا تُبلَغ في «' . (PhpVectorStore::connection() ?? 'القاعدة الرئيسة')
+                . '» — شغّل php artisan hub:brain --setup أو تحقّق من الاتّصال';
+        }
         if (! AiGateway::enabled()) return (string) (AiGateway::whyNotReady() ?? 'بوّابةُ النماذجِ غيرُ مهيّأة');
         if (! AiGateway::probePassed()) return 'لم يُفحَص الاتصالُ بالبوّابةِ على الإعدادِ الحاليّ';
         if (self::profile() === null) return 'غرضُ «' . self::profileKey() . '» بلا نموذجِ تضمينٍ صالح';

@@ -155,21 +155,31 @@ final class DraftAssistant
         $src = self::sourceText($module, $row);
         $parts = [$src];
         if ($kind === 'notes') {
-            $prevId = null;
-            $parts[] = self::releaseContext($u, $id, $row, $prevId);
+            $parts[] = self::releaseContext($u, $id, $row);
             $log = trim((string) $input);
             if ($log !== '') {
                 $parts[] = "سجلُّ الالتزامات كما ألصقه المستخدم:\n" . mb_substr($log, 0, (int) $def['input']['max']);
                 $out['commits'] = ['source' => 'paste', 'why' => null];
             } else {
-                $out['commits'] = self::githubCommits($u, $row, $prevId);
-                if ($out['commits']['lines'] ?? []) {
-                    $parts[] = 'سجلُّ الالتزامات من GitHub (' . $out['commits']['total'] . "):\n" . implode("\n", $out['commits']['lines']);
+                $out['commits'] = self::githubCommits($u, $id, $row);
+                if ($lines = $out['commits']['lines'] ?? []) {
+                    // **الأحدثُ أوّلاً في الحفظ** — مسقوفٌ كاللصق، والقصُّ يُقال (العدُّ المُرسَل من الكلّ)
+                    $kept = [];
+                    $len = 0;
+                    foreach (array_reverse($lines) as $ln) {
+                        if ($len + mb_strlen($ln) + 1 > (int) $def['input']['max']) break;
+                        $kept[] = $ln;
+                        $len += mb_strlen($ln) + 1;
+                    }
+                    $kept = array_reverse($kept);
+                    $out['commits']['sent'] = count($kept);
+                    if (count($kept) < (int) $out['commits']['total']) $out['clipped'] = true;
+                    $parts[] = 'سجلُّ الالتزامات من GitHub (آخرُ ' . count($kept) . ' من ' . $out['commits']['total'] . "):\n" . implode("\n", $kept);
                 }
                 unset($out['commits']['lines']);
             }
         }
-        $out['clipped'] = mb_strlen($src) > self::SOURCE_MAX_TOTAL || ($rec['clipped'] ?? []) !== [];
+        $out['clipped'] = $out['clipped'] || mb_strlen($src) > self::SOURCE_MAX_TOTAL || ($rec['clipped'] ?? []) !== [];
 
         $res = AuditorAi::ask($gc, self::system($kind, $def, $allowed, $u, $target), $parts,
             $target === null ? 'reply' : 'items', self::SOURCE_MAX_TOTAL);
@@ -335,15 +345,36 @@ final class DraftAssistant
      *
      * @return array{source: ?string, why: ?string, total?: int, lines?: list<string>}
      */
-    private static function githubCommits(User $u, array $row, ?string $prevId): array
+    private static function githubCommits(User $u, string $id, array $row): array
     {
         $repo = (string) ($row['repo'] ?? '');
         $head = (string) ($row['commit'] ?? '');
-        if (\App\Support\Ai\Dev\ReleaseCommits::repo($repo) === null) return ['source' => null, 'why' => null];
-        if ($prevId === null || ! in_array('commit', (array) (AskTools::catalog($u)['code']['fields'] ?? []), true)) {
-            return ['source' => null, 'why' => 'لا إصدارَ سابقٌ ظاهرٌ بالتزامٍ للمقارنة — ألصق السجلَّ يدويّاً'];
+        $parsed = \App\Support\Ai\Dev\ReleaseCommits::repo($repo);
+        if ($parsed === null) return ['source' => null, 'why' => null];
+        $fields = (array) (AskTools::catalog($u)['code']['fields'] ?? []);
+        $cur = \App\Models\CodeRelease::query()->whereKey($id)->first(['id', 'project_id', 'app_id', 'date']);
+        if ($cur === null || ! in_array('commit', $fields, true) || ! in_array('date', $fields, true) || $cur->date === null) {
+            return ['source' => null, 'why' => 'لا تاريخَ ظاهرٌ للإصدار أو لا التزامَ ظاهرٌ — ألصق السجلَّ يدويّاً'];
         }
-        $base = (string) \App\Models\CodeRelease::query()->whereKey($prevId)->value('commit');
+        // **السابقُ للمقارنة: المستودعُ نفسُه** — الإصدارُ الأحدثُ قبل هذا في المشروع (والتطبيقِ إن كان) بالتزامٍ،
+        // ممّا يراه السائل، ورابطُ مستودعه يشير إلى المالك/المستودع نفسِه
+        $base = null;
+        \App\Models\CodeRelease::query()->where('project_id', $cur->project_id)->whereKeyNot($id)
+            ->when($cur->app_id, fn ($q) => $q->where('app_id', $cur->app_id))
+            ->whereNotNull('commit')->where('commit', '!=', '')->whereNotNull('date')
+            ->whereDate('date', '<=', $cur->date->toDateString())
+            ->orderByDesc('date')->orderByDesc('id')->select(['id', 'repo', 'commit'])
+            ->chunk(200, function ($cands) use ($u, $parsed, &$base) {
+                $seen = array_flip(AskTools::visibleIds($u, 'code', $cands->pluck('id')->map(fn ($x) => (string) $x)->all()));
+                foreach ($cands as $c) {
+                    if (isset($seen[(string) $c->id]) && \App\Support\Ai\Dev\ReleaseCommits::repo($c->repo) === $parsed) {
+                        $base = (string) $c->commit;
+
+                        return false;
+                    }
+                }
+            });
+        if ($base === null) return ['source' => null, 'why' => 'لا إصدارَ سابقٌ ظاهرٌ للمستودع نفسِه بالتزام — ألصق السجلَّ يدويّاً'];
         $r = \App\Support\Ai\Dev\ReleaseCommits::between($repo, $base, $head);
 
         return $r['ok'] ? ['source' => 'github', 'why' => null, 'total' => $r['total'], 'lines' => $r['lines']]

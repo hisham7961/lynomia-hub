@@ -387,4 +387,37 @@ class BrainTest extends TestCase
             @unlink($file);
         }
     }
+
+    public function test_قاعدةُ_العقل_المستقلّة_المتوقّفة_لا_تُسقط_اسأل_ولا_الأتمتة(): void
+    {
+        config(['database.connections.brain_dead' => ['driver' => 'sqlite', 'database' => '/nonexistent-dir-qwxz/brain.sqlite', 'prefix' => ''],
+                'database.brain_connection' => 'brain_dead']);
+
+        $this->assertFalse(Brain::ready());
+        $this->assertStringContainsString('hub:brain --setup', (string) Brain::whyNot());
+        $names = array_map(fn ($t) => $t['function']['name'], AskTools::schema(AskTools::catalog($this->owner)));
+        $this->assertNotContains('hub_semantic', $names, 'الأداةُ لا تُعلَن — ولا انهيار');
+        $this->artisan('hub:automation')->assertSuccessful();
+    }
+
+    public function test_الإعدادُ_ينشئ_ملفَّ_SQLite_ويقول_ما_بقي_في_الرئيسة_ويمحوه_بطلب(): void
+    {
+        $file = storage_path('framework/testing/brain-new-' . Str::random(8) . '/b.sqlite');
+        $this->decision('قرارٌ في الرئيسة');
+        Brain::index();
+        $this->assertGreaterThan(0, DB::table('ai_embeddings')->count());
+        try {
+            config(['database.connections.brain_new' => ['driver' => 'sqlite', 'database' => $file, 'prefix' => ''],
+                    'database.brain_connection' => 'brain_new']);
+            $this->artisan('hub:brain', ['--setup' => true])->expectsOutputToContain('--purge-main')->assertSuccessful();
+            $this->assertFileExists($file);
+            $this->assertGreaterThan(0, DB::table('ai_embeddings')->count(), 'لا محوَ بلا طلب');
+            $this->artisan('hub:brain', ['--setup' => true, '--purge-main' => true])->assertSuccessful();
+            $this->assertSame(0, DB::table('ai_embeddings')->count());
+        } finally {
+            DB::purge('brain_new');
+            @unlink($file);
+            @rmdir(dirname($file));
+        }
+    }
 }
