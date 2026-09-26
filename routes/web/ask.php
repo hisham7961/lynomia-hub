@@ -22,6 +22,9 @@ use Illuminate\Support\Facades\Route;
     // تقدّمُ القراءة (SSE) — الحرّاسُ نفسُها والخنقُ نفسُه؛ والجوابُ لا يُبثّ قبل مصادقة مراجعه
     Route::post('ask/stream', [\App\Http\Controllers\Web\AskController::class, 'stream'])
         ->name('ask.stream')->middleware('throttle:' . \App\Support\Ai\Ask\AskPolicy::THROTTLE);
+    // المساعدُ التنفيذيّ (المرحلة ٣): مسودةٌ من سجلٍّ يراه السائل — لا كتابةَ ولا إرسال
+    Route::post('assist/draft', [\App\Http\Controllers\Web\AssistController::class, 'draft'])
+        ->name('assist.draft')->middleware('throttle:' . \App\Support\Ai\Ask\AskPolicy::THROTTLE);
     // ذاكرةُ المحادثة (المرحلة ٢): المحوُ لصاحب الخيط وحدَه — والعرضُ على `ask?thread=` نفسِه
     Route::post('ask/forget', [\App\Http\Controllers\Web\AskController::class, 'forget'])
         ->name('ask.forget')->middleware('throttle:30,1');

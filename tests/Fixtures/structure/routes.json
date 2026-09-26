@@ -2629,6 +2629,17 @@
     },
     {
         "methods": "POST",
+        "uri": "assist/draft",
+        "name": "assist.draft",
+        "action": "App\\Http\\Controllers\\Web\\AssistController@draft",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:20,1"
+        ]
+    },
+    {
+        "methods": "POST",
         "uri": "ask/forget",
         "name": "ask.forget",
         "action": "App\\Http\\Controllers\\Web\\AskController@forget",
