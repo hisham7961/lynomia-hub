@@ -628,6 +628,72 @@
         ]
     },
     {
+        "methods": "POST",
+        "uri": "api/mobile/v1/ask",
+        "name": "mobile.ask.run",
+        "action": "App\\Http\\Controllers\\Api\\MobileAskController@ask",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:20,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/ask/threads",
+        "name": "mobile.ask.threads.index",
+        "action": "App\\Http\\Controllers\\Api\\MobileAskController@threads",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "DELETE",
+        "uri": "api/mobile/v1/ask/threads",
+        "name": "mobile.ask.threads.destroy_all",
+        "action": "App\\Http\\Controllers\\Api\\MobileAskController@destroyAll",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/ask/threads/{id}",
+        "name": "mobile.ask.threads.show",
+        "action": "App\\Http\\Controllers\\Api\\MobileAskController@show",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "DELETE",
+        "uri": "api/mobile/v1/ask/threads/{id}",
+        "name": "mobile.ask.threads.destroy",
+        "action": "App\\Http\\Controllers\\Api\\MobileAskController@destroy",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
         "methods": "GET|HEAD",
         "uri": "api/mobile/v1/work/today",
         "name": "mobile.work.today",
@@ -2544,6 +2610,17 @@
         "uri": "ask",
         "name": "ask.run",
         "action": "App\\Http\\Controllers\\Web\\AskController@run",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:20,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "ask/stream",
+        "name": "ask.stream",
+        "action": "App\\Http\\Controllers\\Web\\AskController@stream",
         "middleware": [
             "web",
             "auth",

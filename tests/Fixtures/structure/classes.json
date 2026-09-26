@@ -40,6 +40,7 @@
     "App\\Http\\Controllers\\Api\\EndpointEnrollController",
     "App\\Http\\Controllers\\Api\\EndpointProtocolController",
     "App\\Http\\Controllers\\Api\\MobileActivationController",
+    "App\\Http\\Controllers\\Api\\MobileAskController",
     "App\\Http\\Controllers\\Api\\MobileAuthController",
     "App\\Http\\Controllers\\Api\\MobileClientMembersController",
     "App\\Http\\Controllers\\Api\\MobileClientPortalController",

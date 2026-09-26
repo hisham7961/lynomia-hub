@@ -68,8 +68,12 @@ final class AskPipeline
     /**
      * @param  list<string>  $earlier  **أسئلةُ** الخيط السابقة لصاحبه (`AskMemory::earlierQuestions`) — لا أجوبتُها:
      *   فالبياناتُ تُقرأ من جديد بالأدوات المُنطَّقة ولا يعود إلى النموذج ما قُرئ بصلاحيّاتِ أمس.
+     * @param  (\Closure(array{stage:string, step?:int, tool?:string, label?:?string, rows?:int}): void)|null  $progress
+     *   **تقدّمُ القراءة لا نصُّ الجواب** (المرحلة ٢): يُبلَّغ بكلِّ خطوةِ تفكيرٍ وكلِّ قراءةٍ مُنطَّقةٍ تمّت
+     *   (أداتُها ووسمُ وحدتها وعددُ صفوفها) — والجوابُ لا يُبثّ قبل مصادقة مراجعه، فلا يرى السائلُ نصّاً قد يُحجب.
      */
-    public static function ask(string $question, mixed $user = null, ?AskGenerator $generator = null, array $earlier = []): array
+    public static function ask(string $question, mixed $user = null, ?AskGenerator $generator = null, array $earlier = [],
+                               ?\Closure $progress = null): array
     {
         $started     = microtime(true);
         $correlation = (string) Str::uuid();
@@ -172,6 +176,7 @@ final class AskPipeline
         $maxTools = AskPolicy::maxToolCalls();
 
         for ($step = 0; $step < $maxSteps; $step++) {
+            if ($progress) $progress(['stage' => 'think', 'step' => $step + 1]);
             $envelope = $ctx->render();
 
             // **فشلٌ مُغلَقٌ لا مفتوح**: مظروفٌ لم يجتَز فحصَه لا يُرسَل
@@ -258,6 +263,11 @@ final class AskPipeline
             $executed++;
             $result = AskTools::run($tool, $args, $u);
             $added  = $ctx->addResult($result);
+            if ($progress) {
+                $mod = is_string($result['module'] ?? null) ? hub_mod((string) $result['module']) : null;
+                $progress(['stage' => 'read', 'tool' => $tool, 'rows' => (int) $added['rows'],
+                    'label' => is_array($mod) ? (string) ($mod['label'] ?? '') : null]);
+            }
 
             $history[] = ['tool' => $tool, 'ok' => (bool) ($result['ok'] ?? false),
                           'rows' => $added['rows'], 'source' => $added['source']];

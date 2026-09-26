@@ -385,6 +385,41 @@
             ],
             "count": 4
         },
+        "ask": {
+            "endpoints": [
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/ask",
+                    "name": "mobile.ask.run",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "DELETE",
+                    "path": "/api/mobile/v1/ask/threads",
+                    "name": "mobile.ask.threads.destroy_all",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/ask/threads",
+                    "name": "mobile.ask.threads.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "DELETE",
+                    "path": "/api/mobile/v1/ask/threads/{id}",
+                    "name": "mobile.ask.threads.destroy",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/ask/threads/{id}",
+                    "name": "mobile.ask.threads.show",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 5
+        },
         "auth": {
             "endpoints": [
                 {

@@ -60,6 +60,45 @@ class AskController extends Controller
     {
         $this->gate();
 
+        return view('ask.index', $this->answer($r));
+    }
+
+    /**
+     * **السؤالُ نفسُه مع تقدّم القراءة** (المرحلة ٢ · «تدفّقُ الجواب» بصيغته الصادقة): أحداثُ SSE بكلِّ
+     * خطوةِ تفكيرٍ وكلِّ قراءةٍ مُنطَّقةٍ تمّت (وحدتُها وعددُ صفوفها) — **ولا حرفَ من الجواب قبل مصادقة
+     * مراجعه**: الحدثُ الأخيرُ (`done`) يحمل الصفحةَ نفسَها التي يعيدها `run`. والمسارُ ذاتُ الحرّاس
+     * (`answer()` واحدٌ للمسارين)، وبلا JavaScript يبقى النموذجُ العاديّ.
+     */
+    public function stream(Request $r)
+    {
+        $this->gate();
+        // خيطُ غيرِه ٤٠٤ **قبل** فتح البثّ — فلا يُرسَل رأسُ 200 لطلبٍ مرفوض
+        if ($r->filled('thread')) abort_if(AskMemory::open($r->user(), (string) $r->input('thread')) === null, 404);
+
+        return response()->stream(function () use ($r) {
+            $send = function (string $event, array $data): void {
+                echo 'event: ' . $event . "\n" . 'data: ' . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
+                if (ob_get_level() > 0) @ob_flush();
+                flush();
+            };
+            $data = $this->answer($r, function (array $p) use ($send) {
+                $send('progress', ['text' => match ($p['stage']) {
+                    'think' => 'يفكّر… (الخطوة ' . (int) ($p['step'] ?? 1) . ')',
+                    'read' => 'قرأ ' . ($p['label'] ? '«' . $p['label'] . '»' : 'بياناتٍ مُنطَّقة') . ' — ' . (int) ($p['rows'] ?? 0) . ' صفّاً',
+                    default => 'يعمل…',
+                }]);
+            });
+            $send('done', ['html' => view('ask.index', $data)->render()]);
+        }, 200, [
+            'Content-Type' => 'text/event-stream; charset=UTF-8',
+            'Cache-Control' => 'no-cache, no-store',
+            'X-Accel-Buffering' => 'no',   // nginx: لا يُخزَّن البثُّ مؤقّتاً
+        ]);
+    }
+
+    /** بابٌ واحدٌ للسؤال — للعرض العاديّ وللبثّ: الخيط (لصاحبه)، والمتابعة، والحفظ @return array<string,mixed> */
+    private function answer(Request $r, ?\Closure $progress = null): array
+    {
         $thread = null;
         if ($r->filled('thread')) {
             $thread = AskMemory::open($r->user(), (string) $r->input('thread'));
@@ -68,7 +107,7 @@ class AskController extends Controller
         }
 
         $question = (string) $r->input('q', '');
-        $result   = AskPipeline::ask($question, $r->user(), null, AskMemory::earlierQuestions($thread));
+        $result   = AskPipeline::ask($question, $r->user(), null, AskMemory::earlierQuestions($thread), $progress);
         // يُحفظ دورٌ فقط إن كانت الذاكرةُ مفعَّلةً والسؤالُ غيرَ فارغ — وهو وحدَه ما يُسقَط من التاريخ المعروض
         $saved    = AskMemory::enabled() && AskPolicy::sanitizeQuestion($question) !== null;
         $thread   = AskMemory::record($r->user(), $thread, $question, $result) ?? $thread;
@@ -76,11 +115,11 @@ class AskController extends Controller
         // **`array_merge` لا `+`**: عاملُ الجمعِ يُبقي مفاتيحَ الطرفِ الأيسر،
         // و`screen()` يحمل `result => null` — فكان الجوابُ يُبنى ثمّ يُطمَس
         // بفراغٍ قبل العرض، والصفحةُ تعود كأن شيئاً لم يكن.
-        return view('ask.index', array_merge($this->screen($thread, $saved), [
+        return array_merge($this->screen($thread, $saved), [
             'result' => $result,
             // **السؤالُ يُعاد عرضُه للمستخدمِ نفسِه** — لا يُخزَّن ولا يُدقَّق
             'asked'  => AskPolicy::sanitizeQuestion($question),
-        ]));
+        ]);
     }
 
     /** محوُ خيطٍ واحدٍ أو كلِّ خيوط صاحب الجلسة — لا يمسّ خيطَ غيره أبداً */

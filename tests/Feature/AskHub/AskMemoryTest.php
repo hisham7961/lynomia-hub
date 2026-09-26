@@ -286,6 +286,46 @@ class AskMemoryTest extends TestCase
         $this->actingAs($u->fresh())->get(route('ask.index', ['thread' => $t->id]))->assertForbidden();
     }
 
+    // ═══ ⑥ تقدّمُ القراءة (SSE) — والجوابُ لا يُبثّ قبل مصادقته ═══
+
+    public function test_البثُّ_يُبلّغ_بالقراءات_ولا_يُظهر_الجوابَ_قبل_حدث_الختام(): void
+    {
+        $u = $this->asker();
+        $this->ready();
+        $this->bindAnswer('الجوابُ المُصادَق QWXZ-STREAM');
+
+        $res = $this->actingAs($u)->post(route('ask.stream'), ['q' => 'ما مشاريعي؟']);
+        $res->assertOk();
+        $this->assertStringStartsWith('text/event-stream', (string) $res->headers->get('Content-Type'));
+        $body = $res->streamedContent();
+
+        $label = (string) hub_mod('projects')['label'];
+        $this->assertStringContainsString('event: progress', $body);
+        $this->assertStringContainsString($label, $body, 'القراءةُ المُنطَّقةُ تُبلَّغ بوحدتها');
+        $before = strstr($body, 'event: done', true);
+        $this->assertNotFalse($before, 'لا حدثَ ختام');
+        $this->assertStringNotContainsString('QWXZ-STREAM', $before, 'لا حرفَ من الجواب قبل مصادقة مراجعه');
+        $this->assertStringContainsString('QWXZ-STREAM', substr($body, strlen($before)), 'الختامُ يحمل الصفحةَ بالجواب');
+        $this->assertSame(1, AskTurn::query()->count(), 'البثُّ يحفظ كالعرض العاديّ');
+    }
+
+    public function test_البثُّ_بحرّاس_السؤال_نفسِها(): void
+    {
+        $alice = $this->asker();
+        $bob = $this->asker();
+        $this->ready();
+        $t = AskMemory::record($alice, null, 'سؤالُ أليس', ['ok' => true, 'answer' => 'سرّ', 'sources' => []]);
+        $this->bindAnswer('x');
+
+        $this->actingAs($bob)->post(route('ask.stream'), ['q' => 'تسلّل', 'thread' => $t->id])->assertNotFound();
+        $this->assertSame(1, AskTurn::query()->count(), 'لم يُفتح بثٌّ ولم يُحفظ شيء');
+
+        $role = $bob->role;
+        $role->flags = [];
+        $role->save();
+        $this->actingAs($bob->fresh())->post(route('ask.stream'), ['q' => 'سؤال'])->assertForbidden();
+    }
+
     // ═══ ⑤ الاحتفاظُ والمحوُ والإطفاء ═══
 
     public function test_المحوُ_لصاحبه_ومقصُّ_العمر_يمحو_الخامدَ_وحدَه(): void
@@ -316,7 +356,7 @@ class AskMemoryTest extends TestCase
         Settings::put('ask.memory', '0', 'test');
         $this->bindAnswer('جواب');
 
-        $this->actingAs($u)->post(route('ask.run'), ['q' => 'سؤالٌ بلا ذاكرة'])->assertOk()->assertDontSee('محادثاتُك');
+        $this->actingAs($u)->post(route('ask.run'), ['q' => 'سؤالٌ بلا ذاكرة'])->assertOk()->assertDontSee('data-ask-threads', false);
         $this->assertSame(0, AskThread::query()->count());
         $this->assertSame(0, AskTurn::query()->count());
     }

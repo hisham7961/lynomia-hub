@@ -19,6 +19,9 @@ use Illuminate\Support\Facades\Route;
     Route::get('ask', [\App\Http\Controllers\Web\AskController::class, 'index'])->name('ask.index');
     Route::post('ask', [\App\Http\Controllers\Web\AskController::class, 'run'])
         ->name('ask.run')->middleware('throttle:' . \App\Support\Ai\Ask\AskPolicy::THROTTLE);
+    // تقدّمُ القراءة (SSE) — الحرّاسُ نفسُها والخنقُ نفسُه؛ والجوابُ لا يُبثّ قبل مصادقة مراجعه
+    Route::post('ask/stream', [\App\Http\Controllers\Web\AskController::class, 'stream'])
+        ->name('ask.stream')->middleware('throttle:' . \App\Support\Ai\Ask\AskPolicy::THROTTLE);
     // ذاكرةُ المحادثة (المرحلة ٢): المحوُ لصاحب الخيط وحدَه — والعرضُ على `ask?thread=` نفسِه
     Route::post('ask/forget', [\App\Http\Controllers\Web\AskController::class, 'forget'])
         ->name('ask.forget')->middleware('throttle:30,1');

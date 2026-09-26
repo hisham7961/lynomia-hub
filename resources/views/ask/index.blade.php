@@ -235,13 +235,54 @@
 </style>
 
 <script>
-/* حالةُ الانتظار: الضغطةُ الواحدةُ تكفي — وزرٌّ يُضغَط مرّتين يُنفق خطوتين. */
-document.getElementById('askform')?.addEventListener('submit', function () {
-    var b = this.querySelector('[data-ask-submit]');
-    var w = this.querySelector('.askwait');
-    if (b) { b.disabled = true; }
-    if (w) { w.hidden = false; }
-});
+/* حالةُ الانتظار: الضغطةُ الواحدةُ تكفي — وزرٌّ يُضغَط مرّتين يُنفق خطوتين.
+   **وتقدّمُ القراءة** (المرحلة ٢): يُرسَل السؤالُ إلى ask/stream فتصل أسطرُ «يفكّر… · قرأ «المشاريع» — ١٢ صفّاً»
+   أثناءَ العمل، والجوابُ **بعد مصادقة مراجعه** صفحةً كاملة. وأيُّ تعذّرٍ (متصفّحٌ قديم · انقطاع) يعود
+   إلى الإرسالِ العاديّ — فالميزةُ تحسينٌ لا شرط. */
+(function () {
+    var form = document.getElementById('askform');
+    if (!form) return;
+    var streamUrl = @json(route('ask.stream'));
+    var plain = false;
+    form.addEventListener('submit', function (e) {
+        var b = form.querySelector('[data-ask-submit]');
+        var w = form.querySelector('.askwait');
+        if (b) { b.disabled = true; }
+        if (w) { w.hidden = false; }
+        if (plain || !window.fetch || !window.TextDecoder || !window.ReadableStream) return;
+        e.preventDefault();
+        var started = false;
+        // لا يُعاد الإرسالُ إلّا إن لم يبدأ البثُّ أصلاً — فسؤالٌ بدأ العملُ عليه لا يُنفَق مرّتين
+        var fallback = function () {
+            if (!started) { plain = true; form.submit(); return; }
+            if (w) { w.textContent = '⚠️ انقطع الاتّصالُ قبل الجواب — افتح «محادثاتُك» أو أعِد تحميلَ الصفحة'; }
+        };
+        fetch(streamUrl, { method: 'POST', body: new FormData(form), credentials: 'same-origin',
+                           headers: { 'Accept': 'text/event-stream' } })
+            .then(function (res) {
+                if (!res.ok || !res.body) { fallback(); return; }
+                var reader = res.body.getReader(), dec = new TextDecoder(), buf = '', done = false;
+                var pump = function () {
+                    return reader.read().then(function (chunk) {
+                        if (chunk.done) { if (!done) fallback(); return; }
+                        started = true;
+                        buf += dec.decode(chunk.value, { stream: true });
+                        var parts = buf.split('\n\n'); buf = parts.pop();
+                        parts.forEach(function (block) {
+                            var ev = (block.match(/^event: (.*)$/m) || [])[1], data = (block.match(/^data: (.*)$/m) || [])[1];
+                            if (!ev || !data) return;
+                            try { data = JSON.parse(data); } catch (x) { return; }
+                            if (ev === 'progress' && w) { w.textContent = '⏳ ' + data.text; }
+                            if (ev === 'done' && data.html) { done = true; document.open(); document.write(data.html); document.close(); }
+                        });
+                        return pump();
+                    });
+                };
+                return pump();
+            })
+            .catch(fallback);
+    });
+})();
 </script>
 
 @endsection

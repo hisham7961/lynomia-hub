@@ -193,6 +193,15 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     Route::get('home', [\App\Http\Controllers\Api\MobileWorkController::class, 'home'])->name('mobile.home');
     Route::get('search', [\App\Http\Controllers\Api\MobileWorkController::class, 'search'])->name('mobile.search');
 
+    // «اسأل Hub» (خارطةُ الذكاء · المرحلة ٢) — حرفيّةُ `ask*` قبل الـcatch-all؛ السؤالُ بخنقِ المساعد نفسِه،
+    // والخيوطُ لصاحبها وحدَه (AskMemory) — غيرُه ٤٠٤
+    Route::post('ask', [\App\Http\Controllers\Api\MobileAskController::class, 'ask'])
+        ->middleware('throttle:' . \App\Support\Ai\Ask\AskPolicy::THROTTLE)->name('mobile.ask.run');
+    Route::get('ask/threads', [\App\Http\Controllers\Api\MobileAskController::class, 'threads'])->name('mobile.ask.threads.index');
+    Route::delete('ask/threads', [\App\Http\Controllers\Api\MobileAskController::class, 'destroyAll'])->name('mobile.ask.threads.destroy_all');
+    Route::get('ask/threads/{id}', [\App\Http\Controllers\Api\MobileAskController::class, 'show'])->name('mobile.ask.threads.show');
+    Route::delete('ask/threads/{id}', [\App\Http\Controllers\Api\MobileAskController::class, 'destroy'])->name('mobile.ask.threads.destroy');
+
     // تقريرُ العملِ اليوميّ (§93): حالُ اليوم وبنودُه للموظّف نفسِه — حرفيّةُ `work/*`
     // قبل catch-all `{module}` كي لا يبتلعها. التقديمُ يُعادُ استعمالُ CRUD الوحدة updates.
     Route::get('work/today', [\App\Http\Controllers\Api\MobileReportsController::class, 'today'])->name('mobile.work.today');
