@@ -88,7 +88,7 @@ class CommentController extends Controller
             // السقفُ الفعليّ لا رقمٌ مكتوبٌ بيدٍ هنا: كان ٥٠٠ م.ب ثابتةً في هذا
 // المسار وحده، فتغييرُ الإعداد لا يمسّه — ومرفقُ التعليق يمرّ من
 // البوابة نفسها التي تمرّ منها بقيّة المرفقات.
-            'att'       => ['nullable', 'file', 'max:' . hub_upload_cap()['kb']],
+            'att'       => ['nullable', 'file', 'max:' . hub_upload_cap()['kb'], \App\Support\Security\UploadPolicy::rule()],   // FS-04
             'mention'   => ['nullable', 'array'],
             'internal'  => ['nullable', 'boolean'],
         ]);

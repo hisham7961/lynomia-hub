@@ -76,8 +76,7 @@ class MobileFileController extends V1Controller
         AttachmentService::guardAttach($data['module'], $data['record_id']);
 
         // حاجزُ الامتداد على الاسم المُعلَن — قبل أن يرفع العميلُ غيغابايتاً يُرفَض
-        $ext = mb_strtolower((string) pathinfo($data['filename'], PATHINFO_EXTENSION));
-        if (in_array($ext, AttachmentService::BLOCKED, true)) {
+        if (\App\Support\Security\UploadPolicy::blocked($data['filename'])) {
             return Api::error(Api::VALIDATION_FAILED, 422,
                 'هذا النوع من الملفات غير مسموح: ' . Str::limit($data['filename'], 40));
         }

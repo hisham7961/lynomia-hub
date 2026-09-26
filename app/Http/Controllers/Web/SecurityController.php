@@ -555,18 +555,24 @@ class SecurityController extends Controller
         $cat = (string) $r->query('cat', 'owners');
         if (! isset(\App\Support\Security\IdentityRisk::CATEGORIES[$cat])) $cat = 'owners';
 
-        // نتائجُ الإقرار الحيّة لهؤلاء المستخدمين — نفسُ سكّة security_findings (ق٤)
+        $rows = $this->paginateArray($review['cats'][$cat], $r);
+
+        // نتائجُ الإقرار الحيّة لهؤلاء المستخدمين — نفسُ سكّة security_findings (ق٤).
+        // (CP-49-B) مقصورةٌ على **المعروضين في هذه الصفحة**: كانت تُجلب لكلِّ المستخدمين
+        // — ومنهم مَن هو خارجَ نطاق القارئ — ثمّ يُترك للقالب أن ينتقي.
+        $shown = collect($rows->items())->pluck('id')->filter()->map(fn ($v) => (string) $v)->values()->all();
         $findings = collect();
-        if (Schema::hasTable('security_findings')) {
+        if ($shown && Schema::hasTable('security_findings')) {
             $findings = DB::table('security_findings')
                 ->where('code', 'twofa_priv')->where('entity_type', 'user')
+                ->whereIn('entity_id', $shown)
                 ->orderBy('entity_id')->orderBy('id')
                 ->get(['id', 'entity_id', 'status'])->keyBy('entity_id');
         }
 
         return view('security.privileged', [
             'cats' => $review['cats'], 'cat' => $cat,
-            'rows' => $this->paginateArray($review['cats'][$cat], $r),
+            'rows' => $rows,
             'findings' => $findings,
             'emailMode' => $this->emailMode(), 'isOwner' => hub_is_owner(),
         ]);

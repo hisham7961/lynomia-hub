@@ -189,4 +189,40 @@ class PrivilegedReviewTest extends TestCase
         $this->actingAs($this->owner)->get('/admin/security/privileged?cat=risky')
             ->assertOk()->assertSee('priv-a@corp.example')->assertSee('مميز أجنبي');
     }
+    /**
+     * CP-49-B (TECH_DEBT #34): نتائجُ twofa_priv تُقرأ **للمعروضين فقط** — لا لكلِّ المستخدمين.
+     * كان `privileged()` يجلب نتائجَ الجميع (ومنهم مستخدمو شركاتٍ خارجَ نطاق المراقب)
+     * ثمّ يترك للقالب أن ينتقي؛ قراءةٌ خارجَ النطاق وإن لم تُطبع.
+     */
+    public function test_findings_are_read_only_for_the_displayed_rows(): void
+    {
+        $this->seedCore();
+        $co = (string) Str::uuid();
+        $other = (string) Str::uuid();
+        DB::table('companies')->insert([
+            ['id' => $co, 'name_ar' => 'شركة المراقب', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => $other, 'name_ar' => 'شركة أخرى', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        $mine = $this->makeUser(['name' => 'مميز شركتي', 'companies' => [$co], 'totp_enabled' => 0], ['secrets' => 1]);
+        $foreign = $this->makeUser(['name' => 'مميز أجنبي', 'companies' => [$other], 'totp_enabled' => 0], ['secrets' => 1]);
+
+        // المالكُ يسوّي النتائج (يكتب twofa_priv للاثنين)
+        $this->actingAs($this->owner)->get('/admin/security/privileged?cat=no_mfa')->assertOk();
+        $this->assertSame(1, DB::table('security_findings')->where('code', 'twofa_priv')
+            ->where('entity_id', $foreign->id)->count(), 'تمهيد: نتيجةُ الأجنبيّ لم تُكتب');
+
+        $monitor = $this->monitorUser([$co]);
+        foreach (array_keys(IdentityRisk::CATEGORIES) as $cat) {
+            $resp = $this->actingAs($monitor)->get('/admin/security/privileged?cat=' . $cat)->assertOk();
+            $shown = collect($resp->viewData('rows')->items())->pluck('id')->map(fn ($v) => (string) $v)->all();
+            $read = $resp->viewData('findings')->keys()->map(fn ($v) => (string) $v)->all();
+            $this->assertSame([], array_values(array_diff($read, $shown)),
+                "فئة {$cat}: قُرئت نتائجُ مستخدمين غيرِ معروضين — خارجَ النطاق");
+            $this->assertNotContains((string) $foreign->id, $read, "فئة {$cat}: قُرئت نتيجةُ مستخدمٍ أجنبيّ");
+        }
+
+        // والمعروضُ ما زال يجد نتيجتَه (لا يُفقَد الإقرار)
+        $resp = $this->actingAs($monitor)->get('/admin/security/privileged?cat=no_mfa');
+        $this->assertTrue($resp->viewData('findings')->has((string) $mine->id), 'فُقدت نتيجةُ المستخدم المعروض');
+    }
 }

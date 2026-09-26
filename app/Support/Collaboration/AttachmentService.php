@@ -36,11 +36,10 @@ use App\Support\Documents\DocumentPolicy;
 class AttachmentService
 {
     /**
-     * امتداداتٌ تُرفض مهما كان الإعداد — موحَّدةٌ على **الأشدّ** (نظيرُ حقولِ الوحدات).
-     * (نُقلت من `AttachmentController` لتصير مصدرَ الحقيقةِ الواحد لكلا السطحَين.)
+     * امتداداتٌ تُرفض مهما كان الإعداد — **مرآةٌ** لـ`UploadPolicy::BLOCKED` (FS-04):
+     * القائمةُ الواحدةُ لكلِّ مسارات الرفع هناك، والثابتُ هنا باقٍ للتوافق فقط.
      */
-    public const BLOCKED = ['php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'phar', 'cgi', 'pl', 'sh', 'htaccess',
-        'html', 'htm', 'xhtml', 'svg', 'svgz', 'js', 'mjs'];
+    public const BLOCKED = \App\Support\Security\UploadPolicy::BLOCKED;
 
     /** أقصى ملفاتٍ في رفعةٍ واحدة — لقطاتُ متجرٍ لثلاث منصّاتٍ لا تتجاوزها */
     public const BATCH_MAX = 20;
@@ -113,8 +112,7 @@ class AttachmentService
 
         $made = [];
         foreach ($files as $f) {
-            $ext = mb_strtolower((string) $f->getClientOriginalExtension());
-            abort_if(in_array($ext, self::BLOCKED, true), 422,
+            abort_if(\App\Support\Security\UploadPolicy::blocked($f), 422,
                 'هذا النوع من الملفات غير مسموح: ' . Str::limit((string) $f->getClientOriginalName(), 40));
 
             $path = $f->store('hub/att', 'local');

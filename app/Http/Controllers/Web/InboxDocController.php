@@ -67,7 +67,7 @@ class InboxDocController extends Controller
     {
         $this->gate('a');
         $d = $r->validate([
-            'file' => ['required', 'file', 'max:' . hub_upload_cap()['kb']],
+            'file' => ['required', 'file', 'max:' . hub_upload_cap()['kb'], \App\Support\Security\UploadPolicy::rule()],   // FS-04
             'note' => ['nullable', 'string', 'max:390'],
         ], [], ['file' => 'الملف', 'note' => 'الملاحظة']);
 

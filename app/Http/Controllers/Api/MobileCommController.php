@@ -250,7 +250,7 @@ class MobileCommController extends V1Controller
             'record_id' => ['nullable', 'string'],
             'parent_id' => ['nullable', 'exists:comments,id'],
             'body'      => ['required', 'string', 'max:4000'],
-            'att'       => ['nullable', 'file', 'max:' . hub_upload_cap()['kb']],
+            'att'       => ['nullable', 'file', 'max:' . hub_upload_cap()['kb'], \App\Support\Security\UploadPolicy::rule()],   // FS-04
             'mention'   => ['nullable', 'array'],
             'internal'  => ['nullable', 'boolean'],
         ], [], ['body' => 'نص التعليق', 'att' => 'المرفق']);
@@ -400,7 +400,7 @@ class MobileCommController extends V1Controller
         $r->merge(['body' => trim(hub_str($r->input('body')))]);   // مسافاتٌ بيضٌ ليست رسالة
         $data = $r->validate([
             'body' => ['required', 'string', 'max:4000'],
-            'att'  => ['nullable', 'file', 'max:' . hub_upload_cap()['kb']],
+            'att'  => ['nullable', 'file', 'max:' . hub_upload_cap()['kb'], \App\Support\Security\UploadPolicy::rule()],   // FS-04
         ], [], ['body' => 'نص الرسالة', 'att' => 'المرفق']);
 
         $gate = $this->idempotentBegin($r);

@@ -42,13 +42,9 @@ final class ModuleValidation
                 // امتداداتُ التنفيذ والترميز محظورة: SVG/HTML تحمل سكربتاً يعمل
                 // بأصل التطبيق إن فُتحت، وPHP قنبلةٌ إن لمسها الخادم يوماً.
                 // البوابة تخدم الغريب تنزيلاً قسرياً — وهذا حزامُ الأمان الثاني.
+                // (FS-04) القائمةُ من `UploadPolicy` الواحدة — وهي الأشدّ (كانت هنا نسخةٌ أقصر).
                 $r = [$r[0], 'file', 'max:' . hub_upload_cap()['kb'],
-                    function ($attr, $file, $fail) {
-                        $ext = strtolower((string) $file->getClientOriginalExtension());
-                        if (in_array($ext, ['php', 'phtml', 'phar', 'html', 'htm', 'xhtml', 'svg', 'svgz', 'js', 'mjs'], true)) {
-                            $fail('هذا النوع من الملفات لا يُرفع — قد يحمل شيفرةً تنفيذية. حوّله إلى PDF أو صورة.');
-                        }
-                    }];
+                    \App\Support\Security\UploadPolicy::rule()];
             }
 
             // سقفُ الطول من **عرض العمود نفسه**: كان الحقل النصّي يُتحقّق منه

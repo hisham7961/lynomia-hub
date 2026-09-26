@@ -431,6 +431,15 @@ class V1Controller extends ModuleController
                         ->header('X-Idempotent-Replay', 'true');
                 }
 
+                // (ERR-09) تنفيذٌ اكتمل لكنّ تخزينَ ردّه في الجدول فشل: الردُّ في المخزن
+                // الاحتياطيّ — يُعاد كما هو، ولا يُعدّ الحجزُ «يتيماً» فيُنفَّذ مرّةً ثانية
+                $fallback = $this->idempotentFallbackGet($tokenId, $ikey);
+                if ($fallback && hash_equals((string) ($fallback['fp'] ?? ''), $fp)) {
+                    return response($fallback['response'], $fallback['code'])
+                        ->header('Content-Type', 'application/json')
+                        ->header('X-Idempotent-Replay', 'true');
+                }
+
                 // حجز يتيم من محاولة ماتت قبل الإتمام: بعد دقيقة يجوز الاستيلاء عليه
                 if (\Illuminate\Support\Carbon::parse($row->created_at)->lt(now()->subMinute())) {
                     \Illuminate\Support\Facades\DB::table('idempotency_keys')
@@ -443,7 +452,12 @@ class V1Controller extends ModuleController
             }
         }
 
-        return true;    // التنظيف انزلق تحتنا مرتين — لا نعطّل العميل
+        // (ERR-09) تعذّر الحجزُ مرّتين ولا صفَّ يُفسّره: إمّا مخزنٌ معطوب وإمّا تنظيفٌ انزلق
+        // تحتنا مرّتين. كان يمضي **بلا حجز** («لا نعطّل العميل») — فتحٌ عند العطل يسمح
+        // بتنفيذٍ مكرّر. الآن يُغلَق: رفضٌ صريحٌ قابلٌ للإعادة، والطلبُ لم يُنفَّذ.
+        return \App\Support\Platform\Api::error(\App\Support\Platform\Api::SERVICE_UNAVAILABLE, 503,
+            'تعذّر حجزُ مفتاح idempotency الآن فلم يُنفَّذ الطلب — أعد المحاولة بالمفتاح نفسِه بعد لحظات',
+            null, [], ['Retry-After' => '5']);
     }
 
     /** إتمام الحجز: يُملأ الرد المخزن تحت المفتاح (مع تنظيف ما جاوز يومين) */
@@ -459,8 +473,42 @@ class V1Controller extends ModuleController
             \Illuminate\Support\Facades\DB::table('idempotency_keys')
                 ->where('created_at', '<', now()->subDays(2))->delete();
         } catch (\Throwable $e) {
-            // فشل التخزين لا يكسر الرد — لكنه يُبلَّغ (v2.399): إعادةُ تنفيذٍ محتملة لا تبقى بلا أثر
+            // فشل التخزين لا يكسر الرد (التنفيذُ تمّ ولا رجعةَ فيه) — ويُبلَّغ (v2.399).
+            // (ERR-09) والإبلاغُ وحده لا يمنع تنفيذاً ثانياً: الحجزُ بلا ردٍّ يُعدّ «يتيماً» بعد
+            // دقيقة فيُستولى عليه. فيُحفظ الردُّ في مخزنٍ احتياطيّ (الكاش) يقرؤه idempotentBegin
+            // قبل أيّ استيلاء — فتصير إعادةُ المحاولة إعادةَ ردٍّ لا تنفيذاً.
             report($e);
+            $this->idempotentFallbackPut($tokenId, $ikey, $this->fingerprintOf($r), $resp);
+        }
+    }
+
+    /** مفتاحُ المخزن الاحتياطيّ لردِّ idempotency (ERR-09) — مجزّأٌ فلا يحمل المفتاحَ خاماً */
+    protected function idempotentFallbackKey(string $tokenId, string $ikey): string
+    {
+        return 'idem:fallback:' . hash('sha256', $tokenId . "\0" . $ikey);
+    }
+
+    /** حفظُ الردّ احتياطياً حين يفشل جدولُ idempotency_keys — بعمر تنظيف الجدول نفسِه (يومان) */
+    protected function idempotentFallbackPut(string $tokenId, string $ikey, string $fp, $resp): void
+    {
+        try {
+            \Illuminate\Support\Facades\Cache::put($this->idempotentFallbackKey($tokenId, $ikey), [
+                'fp' => $fp, 'code' => $resp->getStatusCode(), 'response' => $resp->getContent(),
+            ], now()->addDays(2));
+        } catch (\Throwable $e) {
+            report($e);   // المخزنان معطوبان معاً: يبقى الأثرُ في السجلّ على الأقلّ
+        }
+    }
+
+    /** قراءةُ الردّ الاحتياطيّ — null إن لم يوجد أو تعذّرت القراءة */
+    protected function idempotentFallbackGet(string $tokenId, string $ikey): ?array
+    {
+        try {
+            $v = \Illuminate\Support\Facades\Cache::get($this->idempotentFallbackKey($tokenId, $ikey));
+
+            return is_array($v) && isset($v['code'], $v['response']) ? $v : null;
+        } catch (\Throwable $e) {
+            return null;
         }
     }
 

@@ -63,7 +63,7 @@ class DataRoomController extends Controller
             // حدُّ النظام نفسُه لا رقمٌ مكتوبٌ بيد: كان ٥٠ م.ب صامتاً بينما بقية
             // مسارات الرفع تتبع «files.max_kb» — فغرفةُ البيانات مخزنُ ملفاتٍ
             // كغيرها، ومن رفع هويةً بصريةً هنا يستحق السقفَ ذاته.
-            'file'     => ['required', 'file', 'max:' . hub_upload_cap()['kb']],
+            'file'     => ['required', 'file', 'max:' . hub_upload_cap()['kb'], \App\Support\Security\UploadPolicy::rule()],   // FS-04
             'password' => ['nullable', 'string', 'min:8', 'max:100'],   // سطحٌ عامّ: ٤ أحرف تُخمَّن (v2.399)
             'days'     => ['nullable', 'integer', 'min:1', 'max:365'],
             'no_download' => ['nullable'],
