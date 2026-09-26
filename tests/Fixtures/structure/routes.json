@@ -1581,6 +1581,16 @@
         ]
     },
     {
+        "methods": "POST",
+        "uri": "csp-report",
+        "name": "csp.report",
+        "action": "App\\Http\\Controllers\\Web\\CspReportController@store",
+        "middleware": [
+            "web",
+            "throttle:30,1"
+        ]
+    },
+    {
         "methods": "GET|HEAD",
         "uri": "manifest.webmanifest",
         "name": "pwa.manifest",
@@ -1667,6 +1677,50 @@
             "web",
             "guest",
             "throttle:6,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "password/forgot",
+        "name": "password.request",
+        "action": "App\\Http\\Controllers\\Web\\PasswordResetController@request",
+        "middleware": [
+            "web",
+            "guest",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "password/forgot",
+        "name": "password.email",
+        "action": "App\\Http\\Controllers\\Web\\PasswordResetController@email",
+        "middleware": [
+            "web",
+            "guest",
+            "throttle:password-reset"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "password/reset/{token}",
+        "name": "password.reset",
+        "action": "App\\Http\\Controllers\\Web\\PasswordResetController@show",
+        "middleware": [
+            "web",
+            "guest",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "password/reset",
+        "name": "password.update",
+        "action": "App\\Http\\Controllers\\Web\\PasswordResetController@update",
+        "middleware": [
+            "web",
+            "guest",
+            "throttle:10,1"
         ]
     },
     {
