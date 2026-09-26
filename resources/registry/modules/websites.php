@@ -1,0 +1,187 @@
+<?php
+
+/** سجلُّ الوحدات — «websites» (docs/REORG_PLAN.md §R4) — يُحمَّل بترتيبه من قائمة config/hub.php */
+
+return [
+    'key' => 'websites',
+    'table' => 'websites',
+    'model' => 'Website',
+    'label' => 'المواقع',
+    'display' => 'name',
+    'status' => 'status',
+    'columns' => [
+        'name',
+        'url',
+        'projectId',
+        'type',
+        'status',
+    ],
+    'fields' => [
+        ['key' => 'domainId', 'col' => 'domain_id', 'label' => 'الدومين', 'type' => 'ref', 'ref' => 'domains'],
+        ['key' => 'serverId', 'col' => 'server_id', 'label' => 'السيرفر المستضيف', 'type' => 'ref', 'ref' => 'servers'],
+        [
+            'key' => 'name',
+            'col' => 'name',
+            'label' => 'اسم الموقع',
+            'type' => 'text',
+            'required' => true,
+        ],
+        [
+            'key' => 'url',
+            'col' => 'url',
+            'label' => 'رابط الموقع',
+            'type' => 'url',
+            'required' => true,
+        ],
+        [
+            'key' => 'projectId',
+            'col' => 'project_id',
+            'label' => 'المشروع',
+            'type' => 'ref',
+            'ref' => 'projects',
+        ],
+        [
+            'key' => 'type',
+            'col' => 'type',
+            'label' => 'نوع الموقع',
+            'type' => 'sel',
+            'options' => [
+                'موقع تعريفي',
+                'متجر',
+                'لوحة إدارة',
+                'مدونة',
+                'API',
+                'أخرى',
+            ],
+        ],
+        [
+            'key' => 'status',
+            'col' => 'status',
+            'label' => 'الحالة',
+            'type' => 'sel',
+            'options' => [
+                'يعمل',
+                'قيد التطوير',
+                'صيانة',
+                'متوقف',
+            ],
+        ],
+        [
+            'key' => 'tech',
+            'col' => 'tech',
+            'label' => 'التقنية المستخدمة',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'cms',
+            'col' => 'cms',
+            'label' => 'نظام إدارة المحتوى',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'devId',
+            'col' => 'dev_id',
+            'label' => 'المطور المسؤول',
+            'type' => 'ref',
+            'ref' => 'users',
+        ],
+        [
+            'key' => 'adminUrl',
+            'col' => 'admin_url',
+            'label' => 'لوحة التحكم',
+            'type' => 'url',
+        ],
+        [
+            'key' => 'staging',
+            'col' => 'staging',
+            'label' => 'بيئة الاختبار',
+            'type' => 'url',
+        ],
+        [
+            'key' => 'host',
+            'col' => 'host',
+            'label' => 'الاستضافة',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'cloudflare',
+            'col' => 'cloudflare',
+            'label' => 'Cloudflare',
+            'type' => 'bool',
+        ],
+        [
+            'key' => 'git',
+            'col' => 'git',
+            'label' => 'Git Repository',
+            'type' => 'url',
+        ],
+        [
+            'key' => 'prod',
+            'col' => 'prod',
+            'label' => 'بيئة الإنتاج',
+            'type' => 'url',
+        ],
+        [
+            'key' => 'dbName',
+            'col' => 'db_name',
+            'label' => 'قاعدة البيانات',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'gsc',
+            'col' => 'gsc',
+            'label' => 'Google Search Console',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'ga',
+            'col' => 'ga',
+            'label' => 'Google Analytics',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'pixels',
+            'col' => 'pixels',
+            'label' => 'Pixels (Meta / TikTok)',
+            'type' => 'text',
+        ],
+
+        // ── التحليلات: كانت خانة GA تُملأ فلا يصل زائرٌ واحد ──
+        ['key' => 'ga4Id', 'col' => 'ga4_id', 'label' => 'معرّف GA4 (G-XXXXXXX)', 'type' => 'text'],
+        ['key' => 'gtmId', 'col' => 'gtm_id', 'label' => 'معرّف GTM (GTM-XXXXX)', 'type' => 'text'],
+        ['key' => 'sitemap', 'col' => 'sitemap', 'label' => 'رابط خريطة الموقع', 'type' => 'url'],
+
+        // ── المراقبة الحيّة والصحة التقنية ──
+        ['key' => 'monitorOn', 'col' => 'monitor_on', 'label' => 'فعّل المراقبة الحيّة', 'type' => 'bool'],
+        ['key' => 'monitorUrl', 'col' => 'monitor_url', 'label' => 'رابط الفحص (يُترك فارغاً = رابط الموقع)', 'type' => 'url'],
+        ['key' => 'cfZone', 'col' => 'cf_zone', 'label' => 'منطقة Cloudflare', 'type' => 'text'],
+        ['key' => 'sslExpiry', 'col' => 'ssl_expiry', 'label' => 'انتهاء شهادة SSL', 'type' => 'date', 'expiry' => true],
+        ['key' => 'lighthouse', 'col' => 'lighthouse', 'label' => 'درجة الأداء (Lighthouse)', 'type' => 'num'],
+        ['key' => 'lastAudit', 'col' => 'last_audit', 'label' => 'آخر تدقيق تقني/SEO', 'type' => 'date'],
+        [
+            'key' => 'supEmail',
+            'col' => 'sup_email',
+            'label' => 'بريد الدعم',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'lastUp',
+            'col' => 'last_up',
+            'label' => 'آخر تحديث',
+            'type' => 'date',
+        ],
+        [
+            'key' => 'notes',
+            'col' => 'notes',
+            'label' => 'ملاحظات تقنية',
+            'type' => 'ta',
+        ],
+    ],
+    'search' => [
+        'name',
+        'tech',
+        'cms',
+        'host',
+        'db_name',
+    ],
+];

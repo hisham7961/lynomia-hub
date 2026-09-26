@@ -1,0 +1,41 @@
+<?php
+
+/** سجلُّ الوحدات — «visits» (docs/REORG_PLAN.md §R4) — يُحمَّل بترتيبه من قائمة config/hub.php */
+
+return [
+    'key' => 'visits',
+    'table' => 'visits',
+    'model' => 'Visit',
+    'label' => 'الزيارات',
+    'display' => 'name',
+    'status' => 'status',
+    'columns' => ['name', 'hcpId', 'empId', 'kind', 'plannedDate', 'status'],
+    'fields' => [
+        ['key' => 'name', 'col' => 'name', 'label' => 'عنوان الزيارة', 'type' => 'text',
+         'hint' => 'يُولَّد من الطبيب والتاريخ إن تُرك فارغاً.'],
+        ['key' => 'hcpId', 'col' => 'hcp_id', 'label' => 'مقدم الرعاية', 'type' => 'ref', 'ref' => 'hcps', 'required' => true],
+        ['key' => 'facilityId', 'col' => 'facility_id', 'label' => 'المنشأة', 'type' => 'ref', 'ref' => 'facilities'],
+        ['key' => 'cycleId', 'col' => 'cycle_id', 'label' => 'الدورة/الحملة', 'type' => 'ref', 'ref' => 'cycles'],
+        ['key' => 'empId', 'col' => 'emp_id', 'label' => 'المندوب', 'type' => 'ref', 'ref' => 'hr'],
+        ['key' => 'kind', 'col' => 'kind', 'label' => 'النوع', 'type' => 'sel',
+         'options' => ['مخططة', 'طارئة', 'فائتة']],
+        ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
+         'options' => ['مخطط', 'تمت', 'فائتة', 'ملغاة']],
+        ['key' => 'plannedDate', 'col' => 'planned_date', 'label' => 'تاريخ التخطيط', 'type' => 'date'],
+        ['key' => 'visitAt', 'col' => 'visit_at', 'label' => 'لحظة التنفيذ', 'type' => 'dt'],
+        ['key' => 'objective', 'col' => 'objective', 'label' => 'هدف الزيارة', 'type' => 'ta'],
+        ['key' => 'discussion', 'col' => 'discussion', 'label' => 'ما دار في الزيارة', 'type' => 'ta'],
+        ['key' => 'outcome', 'col' => 'outcome', 'label' => 'النتيجة', 'type' => 'ta'],
+        ['key' => 'nextAction', 'col' => 'next_action', 'label' => 'الخطوة التالية', 'type' => 'ta'],
+        ['key' => 'productIds', 'col' => 'product_ids', 'label' => 'منتجات عُرِضت', 'type' => 'ref', 'ref' => 'products', 'multi' => true],
+        ['key' => 'samples', 'col' => 'samples', 'label' => 'عيّنات صُرِفت', 'type' => 'ta',
+         'hint' => 'المنتج والكمية — تُخصَم من المخزون بحركةٍ منفصلة عند اعتمادها.'],
+        ['key' => 'geo', 'col' => 'geo', 'label' => 'الموقع لحظة التنفيذ', 'type' => 'text',
+         'hint' => 'يُلتقط بموافقتك لحظةَ التنفيذ فقط — لا تتبّعَ بعدها.'],
+        ['key' => 'clientId', 'col' => 'client_id', 'label' => 'العميل', 'type' => 'ref', 'ref' => 'clients'],
+        ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات', 'type' => 'ta'],
+        ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
+        ['key' => 'tags', 'col' => 'tags', 'label' => 'وسوم', 'type' => 'tags'],
+    ],
+    'search' => ['name', 'objective', 'discussion', 'outcome', 'notes'],
+];

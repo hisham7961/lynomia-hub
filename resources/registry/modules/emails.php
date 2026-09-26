@@ -1,0 +1,127 @@
+<?php
+
+/** سجلُّ الوحدات — «emails» (docs/REORG_PLAN.md §R4) — يُحمَّل بترتيبه من قائمة config/hub.php */
+
+return [
+    'key' => 'emails',
+    'table' => 'email_accounts',
+    'model' => 'EmailAccount',
+    'label' => 'البريد الإلكتروني',
+    'display' => 'address',
+    'status' => 'status',
+    'columns' => [
+        'address',
+        'type',
+        'projectId',
+        'twoFA',
+        'status',
+    ],
+    'fields' => [
+        ['key' => 'domainId', 'col' => 'domain_id', 'label' => 'الدومين التابع له', 'type' => 'ref', 'ref' => 'domains'],
+        ['key' => 'vaultId', 'col' => 'vault_id', 'label' => 'سرّ الدخول (من الخزنة)', 'type' => 'ref', 'ref' => 'vault'],
+        [
+            'key' => 'address',
+            'col' => 'address',
+            'label' => 'عنوان البريد',
+            'type' => 'text',
+            'required' => true,
+        ],
+        [
+            'key' => 'type',
+            'col' => 'type',
+            'label' => 'نوع البريد',
+            'type' => 'sel',
+            'options' => [
+                'إدارة',
+                'دعم',
+                'مبيعات',
+                'تطبيقات',
+                'مطور',
+                'حسابات',
+                'إعلانات',
+                'شحن',
+                'عام',
+            ],
+        ],
+        [
+            'key' => 'companyId',
+            'col' => 'company_id',
+            'label' => 'الشركة',
+            'type' => 'ref',
+            'ref' => 'companies',
+        ],
+        [
+            'key' => 'projectId',
+            'col' => 'project_id',
+            'label' => 'المشروع',
+            'type' => 'ref',
+            'ref' => 'projects',
+        ],
+        [
+            'key' => 'ownerId',
+            'col' => 'owner_id',
+            'label' => 'المستخدم المسؤول',
+            'type' => 'ref',
+            'ref' => 'users',
+        ],
+        [
+            'key' => 'provider',
+            'col' => 'provider',
+            'label' => 'مزود البريد',
+            'type' => 'sel',
+            'options' => [
+                'Google Workspace',
+                'Gmail',
+                'Outlook',
+                'Zoho',
+                'بريد الدومين',
+                'أخرى',
+            ],
+        ],
+        [
+            'key' => 'recovery',
+            'col' => 'recovery',
+            'label' => 'البريد الاحتياطي',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'recPhone',
+            'col' => 'rec_phone',
+            'label' => 'رقم الاسترداد',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'twoFA',
+            'col' => 'two_f_a',
+            'label' => 'تحقق ثنائي',
+            'type' => 'bool',
+        ],
+        [
+            'key' => 'created',
+            'col' => 'created',
+            'label' => 'تاريخ الإنشاء',
+            'type' => 'date',
+        ],
+        [
+            'key' => 'status',
+            'col' => 'status',
+            'label' => 'الحالة',
+            'type' => 'sel',
+            'options' => [
+                'نشط',
+                'موقوف',
+            ],
+        ],
+        [
+            'key' => 'notes',
+            'col' => 'notes',
+            'label' => 'ملاحظات',
+            'type' => 'ta',
+        ],
+    ],
+    'search' => [
+        'address',
+        'recovery',
+        'rec_phone',
+    ],
+];

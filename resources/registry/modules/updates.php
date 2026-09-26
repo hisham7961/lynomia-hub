@@ -1,0 +1,120 @@
+<?php
+
+/** سجلُّ الوحدات — «updates» (docs/REORG_PLAN.md §R4) — يُحمَّل بترتيبه من قائمة config/hub.php */
+
+return [
+    'key' => 'updates',
+    'table' => 'work_updates',
+    'model' => 'WorkUpdate',
+    'label' => 'تحديثات العمل',
+    'display' => 'done',
+    'status' => null,
+    'columns' => [
+        'workDate',
+        'projectId',
+        'done',
+        'progress',
+        'hours',
+    ],
+    'fields' => [
+        [
+            'key' => 'workDate',
+            'col' => 'work_date',
+            'label' => 'يوم العمل',
+            'type' => 'date',
+            'hint' => 'يُملأ باليوم الحالي إن تُرك فارغاً — بنودُ اليوم الواحد هي تقريرُه اليومي.',
+        ],
+        [
+            'key' => 'projectId',
+            'col' => 'project_id',
+            'label' => 'المشروع',
+            'type' => 'ref',
+            'required' => true,
+            'ref' => 'projects',
+        ],
+        [
+            'key' => 'taskId',
+            'col' => 'task_id',
+            'label' => 'المهمة',
+            'type' => 'ref',
+            'ref' => 'tasks',
+            'hint' => 'اربط البندَ بمهمته فتُضاف ساعاتُه إلى وقتها الفعلي وتصل نسبتُه المقترحة لمديره.',
+        ],
+        [
+            'key' => 'clientId',
+            'col' => 'client_id',
+            'label' => 'العميل',
+            'type' => 'ref',
+            'ref' => 'clients',
+        ],
+        [
+            'key' => 'done',
+            'col' => 'done',
+            'label' => 'ما الذي تم إنجازه؟',
+            'type' => 'ta',
+            'required' => true,
+        ],
+        [
+            'key' => 'doing',
+            'col' => 'doing',
+            'label' => 'ما الذي يتم العمل عليه؟',
+            'type' => 'ta',
+        ],
+        [
+            'key' => 'problems',
+            'col' => 'problems',
+            'label' => 'ما المشكلات الموجودة؟',
+            'type' => 'ta',
+        ],
+        [
+            'key' => 'needs',
+            'col' => 'needs',
+            'label' => 'ما المطلوب من الإدارة؟',
+            'type' => 'ta',
+        ],
+        [
+            'key' => 'next',
+            'col' => 'next',
+            'label' => 'الخطوة التالية',
+            'type' => 'ta',
+        ],
+        [
+            'key' => 'progress',
+            'col' => 'progress',
+            'label' => 'نسبة الإنجاز %',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'hours',
+            'col' => 'hours',
+            'label' => 'الوقت المستغرق (س)',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'billable',
+            'col' => 'billable',
+            'label' => 'ساعاتٌ تُفوتر',
+            'type' => 'bool',
+            'hint' => 'لبنود مشاريع العملاء بنموذج «بالساعة» — تُجمع في ربحية الارتباط.',
+        ],
+        [
+            'key' => 'links',
+            'col' => 'links',
+            'label' => 'روابط الاختبار',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'att',
+            'col' => 'att_id',
+            'label' => 'مرفق / صورة',
+            'type' => 'file',
+        ],
+    ],
+    'search' => [
+        'done',
+        'doing',
+        'problems',
+        'needs',
+        'next',
+    ],
+];

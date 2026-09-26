@@ -1,0 +1,42 @@
+<?php
+
+/** سجلُّ الوحدات — «requests» (docs/REORG_PLAN.md §R4) — يُحمَّل بترتيبه من قائمة config/hub.php */
+
+return [
+    'key' => 'requests',
+    'table' => 'internal_requests',
+    'model' => 'InternalRequest',
+    'label' => 'الطلبات الواردة',
+    'display' => 'title',
+    'status' => 'status',
+    'columns' => ['title', 'reqType', 'requesterId', 'prioFinal', 'needBy', 'status'],
+    'fields' => [
+        ['key' => 'title', 'col' => 'title', 'label' => 'عنوان الطلب', 'type' => 'text', 'required' => true],
+        ['key' => 'reqType', 'col' => 'req_type', 'label' => 'نوع الطلب', 'type' => 'sel',
+         'options' => ['ميزة جديدة', 'تعديل نظام', 'شراء', 'توظيف', 'حملة تسويقية', 'خدمة تقنية', 'صلاحية', 'تقرير', 'أخرى']],
+        ['key' => 'requesterId', 'col' => 'requester_id', 'label' => 'مقدّم الطلب', 'type' => 'ref', 'ref' => 'users'],
+        ['key' => 'dept', 'col' => 'dept', 'label' => 'القسم الطالب', 'type' => 'text'],
+        ['key' => 'description', 'col' => 'description', 'label' => 'وصف الطلب بالتفصيل', 'type' => 'ta', 'required' => true],
+        ['key' => 'justification', 'col' => 'justification', 'label' => 'المبرر وأثر عدم التنفيذ', 'type' => 'ta'],
+        ['key' => 'prioReq', 'col' => 'prio_req', 'label' => 'الأولوية المقترحة من مقدّم الطلب', 'type' => 'sel',
+         'options' => ['عاجل', 'عالية', 'متوسطة', 'منخفضة']],
+        ['key' => 'prioFinal', 'col' => 'prio_final', 'label' => 'الأولوية المعتمدة', 'type' => 'sel',
+         'options' => ['عاجل', 'عالية', 'متوسطة', 'منخفضة']],
+        ['key' => 'estCost', 'col' => 'est_cost', 'label' => 'التكلفة التقديرية (د.ك)', 'type' => 'num'],
+        ['key' => 'estDays', 'col' => 'est_days', 'label' => 'الجهد التقديري (أيام عمل)', 'type' => 'num'],
+        ['key' => 'reviewerId', 'col' => 'reviewer_id', 'label' => 'المقيّم', 'type' => 'ref', 'ref' => 'users'],
+        ['key' => 'reviewNotes', 'col' => 'review_notes', 'label' => 'ملاحظات التقييم', 'type' => 'ta'],
+        ['key' => 'decision', 'col' => 'decision', 'label' => 'القرار', 'type' => 'sel',
+         'options' => ['مقبول', 'مؤجل', 'مرفوض']],
+        ['key' => 'rejectReason', 'col' => 'reject_reason', 'label' => 'سبب الرفض أو التأجيل', 'type' => 'ta'],
+        ['key' => 'projectId', 'col' => 'project_id', 'label' => 'المشروع الناتج عن الطلب', 'type' => 'ref', 'ref' => 'projects'],
+        ['key' => 'taskId', 'col' => 'task_id', 'label' => 'المهمة الناتجة عن الطلب', 'type' => 'ref', 'ref' => 'tasks'],
+        ['key' => 'reqDate', 'col' => 'req_date', 'label' => 'تاريخ الطلب', 'type' => 'date'],
+        ['key' => 'needBy', 'col' => 'need_by', 'label' => 'موعد الحاجة', 'type' => 'date'],
+        ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
+         'options' => ['جديد', 'قيد التقييم', 'بانتظار الاعتماد', 'معتمد', 'قيد التنفيذ', 'منفَّذ', 'مرفوض']],
+        ['key' => 'att', 'col' => 'att_id', 'label' => 'مرفق (نموذج الطلب / عرض سعر)', 'type' => 'file'],
+        ['key' => 'tags', 'col' => 'tags', 'label' => 'وسوم', 'type' => 'tags'],
+    ],
+    'search' => ['title', 'description', 'justification', 'dept'],
+];

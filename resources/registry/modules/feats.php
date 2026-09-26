@@ -1,0 +1,120 @@
+<?php
+
+/** سجلُّ الوحدات — «feats» (docs/REORG_PLAN.md §R4) — يُحمَّل بترتيبه من قائمة config/hub.php */
+
+return [
+    'key' => 'feats',
+    'table' => 'plan_items',
+    'model' => 'PlanItem',
+    'label' => 'خطة العمل والمزايا',
+    'display' => 'title',
+    'status' => 'status',
+    'columns' => [
+        'title',
+        'type',
+        'projectId',
+        'status',
+        'test',
+        'progress',
+    ],
+    'fields' => [
+        [
+            'key' => 'title',
+            'col' => 'title',
+            'label' => 'العنصر / الميزة',
+            'type' => 'text',
+            'required' => true,
+        ],
+        [
+            'key' => 'type',
+            'col' => 'type',
+            'label' => 'النوع',
+            'type' => 'sel',
+            'options' => [
+                'مرحلة',
+                'ميزة',
+                'شاشة',
+                'API',
+                'تكامل',
+                'أخرى',
+            ],
+        ],
+        [
+            'key' => 'projectId',
+            'col' => 'project_id',
+            'label' => 'المشروع',
+            'type' => 'ref',
+            'required' => true,
+            'ref' => 'projects',
+        ],
+        [
+            'key' => 'assigneeId',
+            'col' => 'assignee_id',
+            'label' => 'المسؤول',
+            'type' => 'ref',
+            'ref' => 'users',
+        ],
+        [
+            'key' => 'requestId',
+            'col' => 'request_id',
+            'label' => 'الطلب الأصلي (خيط التتبع)',
+            'type' => 'ref',
+            'ref' => 'requests',
+        ],
+        [
+            'key' => 'start',
+            'col' => 'date_start',
+            'label' => 'البداية',
+            'type' => 'date',
+        ],
+        [
+            'key' => 'due',
+            'col' => 'due',
+            'label' => 'الاستحقاق',
+            'type' => 'date',
+        ],
+        [
+            'key' => 'weight',
+            'col' => 'weight',
+            'label' => 'الوزن (تأثيره على النسبة)',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'status',
+            'col' => 'status',
+            'label' => 'الحالة',
+            'type' => 'sel',
+            'options' => ['مقترحة', 'مخططة', 'قيد التطوير', 'قيد الاختبار', 'منشورة', 'ملغاة'],
+        ],
+        [
+            'key' => 'progress',
+            'col' => 'progress',
+            'label' => 'الإنجاز % (للعناصر بلا فروع)',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'test',
+            'col' => 'test',
+            'label' => 'حالة الاختبار',
+            'type' => 'sel',
+            'options' => ['لم يُختبر', 'قيد الاختبار', 'ناجح', 'فشل'],
+        ],
+        [
+            'key' => 'testNote',
+            'col' => 'test_note',
+            'label' => 'ملاحظة الاختبار',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'desc',
+            'col' => 'description',
+            'label' => 'الوصف',
+            'type' => 'ta',
+        ],
+    ],
+    'search' => [
+        'title',
+        'test_note',
+        'description',
+    ],
+];

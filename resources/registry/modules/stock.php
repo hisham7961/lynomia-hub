@@ -1,0 +1,146 @@
+<?php
+
+/** سجلُّ الوحدات — «stock» (docs/REORG_PLAN.md §R4) — يُحمَّل بترتيبه من قائمة config/hub.php */
+
+return [
+    'key' => 'stock',
+    'table' => 'stock_items',
+    'model' => 'StockItem',
+    'label' => 'المخزون',
+    'display' => 'name',
+    'status' => 'status',
+    'columns' => [
+        'name',
+        'sku',
+        'wh',
+        'qty',
+        'cartonQty',
+        'reorder',
+        'expiry',
+        'status',
+    ],
+    'fields' => [
+        [
+            'key' => 'name',
+            'col' => 'name',
+            'label' => 'المنتج',
+            'type' => 'text',
+            'required' => true,
+        ],
+        [
+            'key' => 'sku',
+            'col' => 'sku',
+            'label' => 'SKU',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'barcode',
+            'col' => 'barcode',
+            'label' => 'الباركود',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'wh',
+            'col' => 'wh',
+            'label' => 'المستودع',
+            'type' => 'sel',
+            'options' => [
+                'الرئيسي',
+                'الفرع',
+                'مستودع خارجي',
+                'بضاعة بالطريق',
+            ],
+        ],
+        [
+            'key' => 'qty',
+            'col' => 'qty',
+            'label' => 'الكمية',
+            'type' => 'num',
+            'required' => true,
+            'min' => 0,   // الكميةُ لا تُسلَّب من نموذج التعديل العامّ — الحركاتُ من دفتر المخزون (v2.399)
+        ],
+        [
+            'key' => 'reorder',
+            'col' => 'reorder',
+            'label' => 'حد إعادة الطلب',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'unit',
+            'col' => 'unit',
+            'label' => 'الوحدة',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'cartonQty',
+            'col' => 'carton_qty',
+            'label' => 'وحدات الكرتونة',
+            'type' => 'num',
+            'hint' => 'كم وحدة في الكرتونة الواحدة؟ يُحسب منها عدد الكراتين على الفواتير والاستلام والحركات. اتركه فارغاً لمنتج لا يأتي بكراتين.',
+        ],
+        [
+            'key' => 'batch',
+            'col' => 'batch',
+            'label' => 'رقم الدفعة',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'prod',
+            'col' => 'prod',
+            'label' => 'تاريخ الإنتاج',
+            'type' => 'date',
+        ],
+        [
+            'key' => 'expiry',
+            'col' => 'expiry',
+            'label' => 'تاريخ الانتهاء',
+            'type' => 'date',
+            'expiry' => true,
+        ],
+        [
+            'key' => 'cost',
+            'col' => 'cost',
+            'label' => 'التكلفة',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'price',
+            'col' => 'price',
+            'label' => 'سعر البيع',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'companyId',
+            'col' => 'company_id',
+            'label' => 'الشركة',
+            'type' => 'ref',
+            'ref' => 'companies',
+        ],
+        [
+            'key' => 'status',
+            'col' => 'status',
+            'label' => 'الحالة',
+            'type' => 'sel',
+            'options' => [
+                'متاح',
+                'منخفض',
+                'نفد',
+                'تالف',
+                'محجوز',
+            ],
+        ],
+        [
+            'key' => 'notes',
+            'col' => 'notes',
+            'label' => 'ملاحظات',
+            'type' => 'ta',
+        ],
+    ],
+    'search' => [
+        'name',
+        'sku',
+        'barcode',
+        'unit',
+        'batch',
+    ],
+];

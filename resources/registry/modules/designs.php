@@ -1,0 +1,118 @@
+<?php
+
+/** سجلُّ الوحدات — «designs» (docs/REORG_PLAN.md §R4) — يُحمَّل بترتيبه من قائمة config/hub.php */
+
+return [
+    'key' => 'designs',
+    'table' => 'design_tasks',
+    'model' => 'DesignTask',
+    'label' => 'التصاميم',
+    'display' => 'title',
+    'status' => 'status',
+    'columns' => [
+        'art',
+        'title',
+        'projectId',
+        'assigneeId',
+        'type',
+        'status',
+        'due',
+    ],
+    'fields' => [
+        [
+            'key' => 'title',
+            'col' => 'title',
+            'label' => 'عنوان مهمة التصميم',
+            'type' => 'text',
+            'required' => true,
+        ],
+        [
+            'key' => 'projectId',
+            'col' => 'project_id',
+            'label' => 'المشروع',
+            'type' => 'ref',
+            'required' => true,
+            'ref' => 'projects',
+        ],
+        [
+            'key' => 'assigneeId',
+            'col' => 'assignee_id',
+            'label' => 'المصمم المكلّف',
+            'type' => 'ref',
+            'ref' => 'users',
+        ],
+        [
+            'key' => 'type',
+            'col' => 'type',
+            'label' => 'نوع التصميم',
+            'type' => 'sel',
+            'options' => [
+                'بوست سوشال',
+                'ستوري',
+                'شعار',
+                'بنر إعلاني',
+                'غلاف',
+                'واجهة UI',
+                'هوية',
+                'مطبوعات',
+                'موشن / فيديو',
+                'أخرى',
+            ],
+        ],
+        [
+            'key' => 'status',
+            'col' => 'status',
+            'label' => 'الحالة',
+            'type' => 'sel',
+            'options' => [
+                'طلبات جديدة',
+                'قيد التصميم',
+                'بانتظار مراجعة',
+                'تعديلات',
+                'جاهز',
+                'ملغي',
+            ],
+        ],
+        [
+            'key' => 'priority',
+            'col' => 'priority',
+            'label' => 'الأولوية',
+            'type' => 'sel',
+            'options' => ['عاجلة', 'عالية', 'متوسطة', 'منخفضة'],
+        ],
+        [
+            'key' => 'due',
+            'col' => 'due',
+            'label' => 'الموعد النهائي',
+            'type' => 'date',
+        ],
+        [
+            'key' => 'brief',
+            'col' => 'brief',
+            'label' => 'التوجيه الإبداعي (Brief)',
+            'type' => 'ta',
+        ],
+        [
+            'key' => 'refLink',
+            'col' => 'ref_link',
+            'label' => 'رابط مرجعي / ملهم',
+            'type' => 'url',
+        ],
+        [
+            'key' => 'art',
+            'col' => 'art_id',
+            'label' => 'صورة التصميم (ارفعها عند الجاهزية)',
+            'type' => 'img',
+        ],
+        [
+            'key' => 'notes',
+            'col' => 'notes',
+            'label' => 'ملاحظات',
+            'type' => 'ta',
+        ],
+    ],
+    'search' => [
+        'title',
+        'brief',
+    ],
+];
