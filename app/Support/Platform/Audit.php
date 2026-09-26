@@ -200,26 +200,46 @@ class Audit
                     : $none;
             }
 
+            // **ترتيبُ السلسلة ترتيبُ الالتزام لا ترتيبُ `id` (AUD-07).** القيدُ المكتوبُ
+            // داخل معاملة عملٍ يُختم بعد التزامها، فقد يسبقه في السلسلة قيدٌ أحدثُ
+            // منه `id`. فالنافذةُ تُمشى **بالروابط من الرأس** — الأحدثُ `id` بدايةُ
+            // بحثٍ لا ترتيب — وما لم يكن فيها يُجلب بفهرس `hash`.
             $head = (string) DB::table('audit_chain')->where('id', 1)->value('head');
-            if ($head !== '' && $head !== $rows->first()->hash) {
+            $byHash = $rows->keyBy('hash');
+            $fetch = function (string $h) use (&$byHash) {
+                if (! $byHash->has($h)) {
+                    $found = AuditEntry::where('hash', $h)->orderBy('id')->first();
+                    if (! $found) return null;
+                    $byHash->put($h, $found);
+                }
+
+                return $byHash->get($h);
+            };
+
+            if ($head !== '' && ! $fetch($head)) {
                 return ['ok' => false, 'state' => 'bad', 'broken' => 1, 'label' => '⚠️ عبث',
                         'why' => 'رأس السلسلة لا يطابق آخر قيد — حُذفت قيودٌ من الذيل على الأرجح'];
             }
 
             // **والوصلُ بين القيود، لا بصمةُ كلٍّ وحدها.** حذفُ قيدٍ من المنتصف
             // يُبقي الرأسَ مطابقاً وبصمةَ كلِّ قيدٍ باقٍ صحيحة — فكان يُبلَّغ
-            // «سلسلة سليمة»، وهذا بالضبط ما تُصان السلسلةُ من أجله. الصفوفُ
-            // مرتَّبةٌ تنازلياً، فـ`prev_hash` كلِّ قيدٍ لا بدّ أن يساوي `hash`
-            // تاليه في المصفوفة (وآخرُ عنصرٍ في النافذة سابقُه خارجها فيُتخطّى).
-            $rows = $rows->values();
-            $broken = 0;
-            foreach ($rows as $i => $row) {
-                $p = (string) $row->prev_hash;
-                $match = hash('sha256', $p . '|' . $row->canonical()) === $row->hash
-                      || hash('sha256', $p . '|' . $row->canonical('v2raw')) === $row->hash
-                      || hash('sha256', $p . '|' . $row->canonical('v1')) === $row->hash;
+            // «سلسلة سليمة»، وهذا بالضبط ما تُصان السلسلةُ من أجله. المشيُ من
+            // الرأس على `prev_hash`: سابقٌ لا قيدَ يحمله (غير البداية) = انقطاع.
+            $genesis = str_repeat('0', 64);
+            // بلا رأسٍ مخزَّن (هجرةٌ لم تُطبَّق): البدايةُ أحدثُ قيدٍ مختوم — `$rows` مرتّبةٌ بـid تنازلياً
+            $cur = $fetch($head !== '' ? $head : (string) $rows[0]->hash);
+            $broken = 0; $walked = 0;
+            while ($cur && $walked < $n) {
+                $walked++;
+                $p = (string) $cur->prev_hash;
+                $match = hash('sha256', $p . '|' . $cur->canonical()) === $cur->hash
+                      || hash('sha256', $p . '|' . $cur->canonical('v2raw')) === $cur->hash
+                      || hash('sha256', $p . '|' . $cur->canonical('v1')) === $cur->hash;
                 if (! $match) $broken++;
-                elseif ($i + 1 < $rows->count() && $p !== (string) $rows[$i + 1]->hash) $broken++;
+                if ($p === $genesis || $walked >= $n) break;
+                $next = $fetch($p);
+                if (! $next) { $broken++; break; }
+                $cur = $next;
             }
 
             $unsealed = self::unsealedAfterEpoch();
@@ -231,7 +251,7 @@ class Audit
             }
 
             return ['ok' => true, 'state' => 'ok', 'broken' => 0, 'why' => '',
-                    'label' => 'سلسلة سليمة (آخر ' . $rows->count() . ')'];
+                    'label' => 'سلسلة سليمة (آخر ' . $walked . ')'];
         } catch (\Throwable $e) {
             // **ولا يُبتلع الاستثناءُ صامتاً**: بلا أثرٍ في مركز الأخطاء يبقى
             // «تعذّر الفحص» لغزاً لا يُشخَّص — والسببُ (عمودٌ لم يُرحَّل، محرّكٌ
