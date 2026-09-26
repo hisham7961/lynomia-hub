@@ -47,7 +47,8 @@ class OperationalSearchTest extends TestCase
     // لا استجوابٌ تشغيليّ، وحرّاسُ error_events/email بلا مساس (التأكيدان أعلاه يقيسانهما).
     // +١ لكلِّ محرّك (v2.477.1): فحصُ «تقرير اليوم» ملفَّ الموظّفِ عبر hub_has_work_profile
     // استعلامٌ واحدٌ مذكَّرٌ للطلب كلِّه (WeakMap) — ثابتٌ لا يتضاعف مع المطابقات
-    private const PLAIN_BUDGET = ['sqlite' => 97, 'mysql' => 96, 'mariadb' => 96];
+    // v2.616.0: ٩٧ ⇐ ٩٥ على SQLite — خريطةُ الأعمدة المخبوءة (SchemaCache) أغنت عن فحص جدولٍ وقراءةِ إعداداتٍ مكرّرة
+    private const PLAIN_BUDGET = ['sqlite' => 95, 'mysql' => 96, 'mariadb' => 96];
 
     private const RID = '0198f0c2-77aa-4a11-9a1e-5f4d2b7c1e33';
     private const IP = '203.0.113.9';

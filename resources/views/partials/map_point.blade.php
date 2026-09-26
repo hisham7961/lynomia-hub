@@ -13,7 +13,7 @@
     <a class="chip" target="_blank" rel="noopener" href="{{ \App\Support\Platform\Maps::pointUrl($mpLat, $mpLng) }}">{{ $label }}</a>
 @elseif ($mpMode === 'self')
     @php $mpId = 'mp' . \Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(10)); @endphp
-    <div id="{{ $mpId }}" class="lyn-map-point" data-map-mode="self" style="height:220px;width:100%;border-radius:var(--r);overflow:hidden;margin-top:6px"></div>
+    <div id="{{ $mpId }}" class="lyn-map-point" data-map-mode="self"></div>
     <link rel="stylesheet" href="{{ asset('vendor/leaflet/1.9.4/leaflet.min.css') }}">
     <script src="{{ asset('vendor/leaflet/1.9.4/leaflet.min.js') }}"></script>
     <script nonce="{{ \App\Support\Security\ContentSecurity::nonce() }}">
