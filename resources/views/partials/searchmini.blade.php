@@ -18,6 +18,9 @@
         </a>
     @endforeach
     <a class="gitem all" role="option" href="{{ route('search', ['q' => $q]) }}">كل النتائج ←</a>
+@elseif (! empty($partial))
+    {{-- البحثُ السريعُ بلغ ميزانيّتَه قبل أن يمرّ على كلِّ شيء — فلا «لا نتائج» كاذبة --}}
+    <a class="gitem all" role="option" href="{{ route('search', ['q' => $q]) }}" data-search-partial>⏱️ لم يكتمل البحثُ السريع — ابحث في كل شيء ←</a>
 @elseif (! count($dests) && ! count($acts) && mb_strlen($q) >= 2)
     <div class="gitem sub">لا نتائج لـ«{{ $q }}»</div>
 @endif
