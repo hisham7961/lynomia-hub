@@ -36,6 +36,14 @@ class DevAssistantTest extends TestCase
 
     private Company $alpha;
 
+    /** طلباتُ GitHub المُلتقطة، وردُّه @var list<\Illuminate\Http\Client\Request> */
+    private array $gh = [];
+
+    private array $ghReply = ['status' => 200, 'body' => ['total_commits' => 2, 'commits' => [
+        ['sha' => 'a1b2c3d4e5f6', 'commit' => ['message' => "QWXZ-GH-ONE add invoice export\n\nbody"]],
+        ['sha' => 'b2c3d4e5f6a7', 'commit' => ['message' => 'QWXZ-GH-TWO fix receipt printing']],
+    ]]];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -61,6 +69,11 @@ class DevAssistantTest extends TestCase
         foreach (['general', 'coding'] as $p) AiProfiles::attach(AiProfile::query()->where('key', $p)->firstOrFail(), $model);
 
         Http::fake(function ($req) {
+            if (str_starts_with($req->url(), 'https://api.github.com/')) {
+                $this->gh[] = $req;
+
+                return Http::response($this->ghReply['body'], $this->ghReply['status']);
+            }
             $this->sent[] = json_decode((string) $req->body(), true);
             $reply = $this->replies[0] ?? ['items' => []];
 
@@ -305,5 +318,71 @@ class DevAssistantTest extends TestCase
         $this->assertStringNotContainsString('2031-01-07', $sent, 'تاريخٌ محجوبٌ لا يظهر');
         $this->assertStringNotContainsString('2031-02-01', $sent);
         $this->assertStringContainsString('QWXZ-FIX', $sent, 'والمشاكلُ التي يرى حقولَها باقية');
+    }
+
+    // ═══ التزاماتُ الإصدار من GitHub ═══
+
+    public function test_رابطُ_المستودع_لا_يوجّه_الطلبَ_إلى_غير_GitHub(): void
+    {
+        $ok = \App\Support\Ai\Dev\ReleaseCommits::repo('https://github.com/acme/hub.git');
+        $this->assertSame(['acme', 'hub'], $ok);
+        foreach (['https://github.com.evil.test/acme/hub', 'http://127.0.0.1/acme/hub', 'https://gitlab.com/acme/hub',
+                  'https://github.com/acme/hub/../../x', 'https://github.com/acme', 'https://user@github.com/acme/hub',
+                  'https://github.com/acme/hub?x=1', 'https://github.com/../hub'] as $bad) {
+            $this->assertNull(\App\Support\Ai\Dev\ReleaseCommits::repo($bad), $bad);
+        }
+        foreach (['', '..', 'a..b', '-x', 'a b', 'a?b', 'a#b'] as $bad) $this->assertNull(\App\Support\Ai\Dev\ReleaseCommits::ref($bad), $bad);
+    }
+
+    private function releases(array $cur = [], array $prev = []): string
+    {
+        $pid = $this->row('projects', ['name' => 'مشروع', 'company_id' => $this->alpha->id]);
+        $this->row('code_releases', $prev + ['ver' => '1.0.0', 'project_id' => $pid, 'date' => '2031-01-07',
+            'repo' => 'https://github.com/acme/hub', 'commit' => 'aaaaaaa']);
+
+        return $this->row('code_releases', $cur + ['ver' => '1.1.0', 'project_id' => $pid, 'date' => '2031-02-01',
+            'repo' => 'https://github.com/acme/hub', 'commit' => 'bbbbbbb']);
+    }
+
+    public function test_بلا_لصقٍ_تُجلب_الالتزاماتُ_من_GitHub_بالرمز_وتصل_النموذج(): void
+    {
+        Settings::put('dev.github_token', 'ghp_QWXZtoken123456', 'test');
+        $rel = $this->releases();
+        $this->replies = [['reply' => ['- تصدير']]];
+
+        $r = DraftAssistant::draft($this->member(), 'notes', 'code', $rel);
+
+        $this->assertTrue($r['ok'], (string) $r['message']);
+        $this->assertSame('github', $r['commits']['source']);
+        $this->assertCount(1, $this->gh);
+        $this->assertSame('https://api.github.com/repos/acme/hub/compare/aaaaaaa...bbbbbbb', $this->gh[0]->url());
+        $this->assertSame('Bearer ghp_QWXZtoken123456', $this->gh[0]->header('Authorization')[0]);
+        $this->assertStringContainsString('QWXZ-GH-ONE', $this->sentText());
+        $this->assertStringNotContainsString('ghp_QWXZtoken', $this->sentText(), 'الرمزُ لا يصل النموذج');
+
+        // واللصقُ يسبق الجلب
+        $this->gh = [];
+        DraftAssistant::draft($this->member(), 'notes', 'code', $rel, 'c1 pasted');
+        $this->assertSame([], $this->gh);
+    }
+
+    public function test_حقلُ_الالتزام_المحجوب_لا_يُجلب_به_والإخفاقُ_يُقال(): void
+    {
+        $rel = $this->releases();
+        $this->replies = [['reply' => ['- سطر']]];
+        $role = Role::create(['name' => 'بلا التزام ' . Str::random(4), 'scope' => 'all', 'flags' => [AskPolicy::FLAG => 1],
+            'matrix' => collect(array_keys(config('hub.modules')))->mapWithKeys(fn ($m) => [$m => ['v' => 1, 'a' => 1, 'e' => 1, 'd' => 0]])->all(),
+            'field_rules' => ['code' => ['commit' => 'hide']]]);
+        $u = User::create(['name' => 'م', 'email' => Str::random(9) . '@dev.local', 'password' => 'Secret!2026x',
+            'role_id' => $role->id, 'status' => 'نشط', 'password_changed_at' => now(), 'companies' => [$this->alpha->id]]);
+
+        $this->assertTrue(DraftAssistant::draft($u, 'notes', 'code', $rel)['ok']);
+        $this->assertSame([], $this->gh, 'التزامٌ محجوبٌ لا يُستعمل');
+
+        $this->ghReply = ['status' => 404, 'body' => ['message' => 'Not Found']];
+        $r = DraftAssistant::draft($this->member(), 'notes', 'code', $rel);
+        $this->assertTrue($r['ok'], 'الإخفاقُ لا يُسقط المسودة');
+        $this->assertNull($r['commits']['source']);
+        $this->assertStringContainsString('غيرُ موجود', (string) $r['commits']['why']);
     }
 }

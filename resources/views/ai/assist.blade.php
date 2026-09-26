@@ -27,6 +27,11 @@
         <div class="askanswer" id="assist-reply">{{ $result['text'] }}</div>
         <button class="btn sm" type="button"
                 onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('assist-reply').innerText); this.textContent = '✓ نُسخ'">📋 انسخ</button>
+        @if (($result['commits']['source'] ?? null) === 'github')
+            <div class="sub" data-assist-commits>🔗 الالتزاماتُ جُلبت من GitHub ({{ $result['commits']['total'] ?? 0 }})</div>
+        @elseif (! empty($result['commits']['why']))
+            <div class="sub mut" data-assist-commits>ℹ️ لم تُجلب الالتزامات: {{ $result['commits']['why'] }}</div>
+        @endif
         @if (($result['kind'] ?? '') === 'notes')
             <span class="mut">ثمّ الصقها في حقل «الملاحظات» في الإصدار بعد مراجعتها — لا يُحفَظ شيءٌ من هنا.</span>
         @else

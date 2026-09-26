@@ -57,7 +57,7 @@ final class DraftAssistant
         'notes' => [
             'label' => 'ملاحظاتُ الإصدار', 'icon' => '📝', 'source' => 'code', 'target' => null,
             'fields' => [], 'carry' => [], 'many' => false,
-            'input' => ['name' => 'log', 'label' => 'سجلُّ الالتزامات (اختياريّ) — ألصق ناتجَ git log --oneline للنطاق', 'max' => 8000],
+            'input' => ['name' => 'log', 'label' => 'سجلُّ الالتزامات (اختياريّ) — ألصق ناتجَ git log --oneline، أو اتركه فارغاً ليُجلَب من GitHub إن كان للإصدار مستودعٌ والتزام', 'max' => 8000],
         ],
     ];
 
@@ -124,7 +124,7 @@ final class DraftAssistant
     public static function draft(User $u, string $kind, string $module, string $id, ?string $input = null): array
     {
         $out = ['ok' => false, 'code' => null, 'message' => '', 'kind' => $kind, 'drafts' => [], 'text' => null,
-            'dropped' => [], 'clipped' => false, 'source' => ['module' => $module, 'id' => $id]];
+            'dropped' => [], 'clipped' => false, 'commits' => null, 'source' => ['module' => $module, 'id' => $id]];
         $def = self::kindsFor($u, $module)[$kind] ?? null;
         if ($def === null) return ['code' => AskFailures::UNAUTHORIZED, 'message' => 'هذا النوعُ غيرُ متاحٍ لك على هذا السجلّ'] + $out;
 
@@ -147,9 +147,19 @@ final class DraftAssistant
         $src = self::sourceText($module, $row);
         $parts = [$src];
         if ($kind === 'notes') {
-            $parts[] = self::releaseContext($u, $id, $row);
+            $prevId = null;
+            $parts[] = self::releaseContext($u, $id, $row, $prevId);
             $log = trim((string) $input);
-            if ($log !== '') $parts[] = "سجلُّ الالتزامات كما ألصقه المستخدم:\n" . mb_substr($log, 0, (int) $def['input']['max']);
+            if ($log !== '') {
+                $parts[] = "سجلُّ الالتزامات كما ألصقه المستخدم:\n" . mb_substr($log, 0, (int) $def['input']['max']);
+                $out['commits'] = ['source' => 'paste', 'why' => null];
+            } else {
+                $out['commits'] = self::githubCommits($u, $row, $prevId);
+                if ($out['commits']['lines'] ?? []) {
+                    $parts[] = 'سجلُّ الالتزامات من GitHub (' . $out['commits']['total'] . "):\n" . implode("\n", $out['commits']['lines']);
+                }
+                unset($out['commits']['lines']);
+            }
         }
         $out['clipped'] = mb_strlen($src) > self::SOURCE_MAX_TOTAL || ($rec['clipped'] ?? []) !== [];
 
@@ -260,7 +270,7 @@ final class DraftAssistant
      * ورؤيةُ حقل العرض). **ولا ترشيحَ بحقلٍ محجوبٍ عن السائل** — كما يرفضه `hub_list`: القسمُ الذي يحتاج
      * حالةً أو مشروعاً لا يراهما يُقال غيرَ متاح، والنافذةُ لا تُبنى بتاريخٍ لا يراه (فالترشيحُ نفسُه كان يُفشيه).
      */
-    private static function releaseContext(User $u, string $id, array $row): string
+    private static function releaseContext(User $u, string $id, array $row, ?string &$prevId = null): string
     {
         $pid = (string) ($row['projectId'] ?? '');
         if (! Str::isUuid($pid)) return 'لا مشروعَ ظاهرٌ لهذا الإصدار — فلا مهامَّ ولا مشاكلَ مرفقة.';
@@ -276,10 +286,10 @@ final class DraftAssistant
             \App\Models\CodeRelease::query()->where('project_id', $pid)->whereKeyNot($id)->whereNotNull('date')
                 ->when($date, fn ($q) => $q->whereDate('date', '<', $date))
                 ->orderByDesc('date')->orderByDesc('id')->select(['id', 'date'])
-                ->chunk(200, function ($cands) use ($u, &$prev) {
+                ->chunk(200, function ($cands) use ($u, &$prev, &$prevId) {
                     $seen = array_flip(AskTools::visibleIds($u, 'code', $cands->pluck('id')->map(fn ($x) => (string) $x)->all()));
                     foreach ($cands as $c) {
-                        if (isset($seen[(string) $c->id])) { $prev = $c->date?->toDateString(); return false; }
+                        if (isset($seen[(string) $c->id])) { $prev = $c->date?->toDateString(); $prevId = (string) $c->id; return false; }
                     }
                 });
         }
@@ -303,6 +313,27 @@ final class DraftAssistant
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * **التزاماتُ الإصدار من GitHub — من حقولٍ يراها السائل وحدَها**: المستودعُ والالتزامُ من صفّه المُسقَط (المحجوبُ
+     * غائبٌ عنه أصلاً)، والتزامُ السابقِ فقط إن رأى السابقَ (`$prevId` من `visibleIds`) وحقلَ الالتزام.
+     *
+     * @return array{source: ?string, why: ?string, total?: int, lines?: list<string>}
+     */
+    private static function githubCommits(User $u, array $row, ?string $prevId): array
+    {
+        $repo = (string) ($row['repo'] ?? '');
+        $head = (string) ($row['commit'] ?? '');
+        if (\App\Support\Ai\Dev\ReleaseCommits::repo($repo) === null) return ['source' => null, 'why' => null];
+        if ($prevId === null || ! in_array('commit', (array) (AskTools::catalog($u)['code']['fields'] ?? []), true)) {
+            return ['source' => null, 'why' => 'لا إصدارَ سابقٌ ظاهرٌ بالتزامٍ للمقارنة — ألصق السجلَّ يدويّاً'];
+        }
+        $base = (string) \App\Models\CodeRelease::query()->whereKey($prevId)->value('commit');
+        $r = \App\Support\Ai\Dev\ReleaseCommits::between($repo, $base, $head);
+
+        return $r['ok'] ? ['source' => 'github', 'why' => null, 'total' => $r['total'], 'lines' => $r['lines']]
+                        : ['source' => null, 'why' => $r['why']];
     }
 
     private static function sourceText(string $module, array $row): string

@@ -418,6 +418,7 @@
     "App\\Support\\Ai\\Center\\AiReconcile",
     "App\\Support\\Ai\\Center\\AiReleaseCheck",
     "App\\Support\\Ai\\Dev\\ErrorTriage",
+    "App\\Support\\Ai\\Dev\\ReleaseCommits",
     "App\\Support\\Ai\\Gateway\\AiChat",
     "App\\Support\\Ai\\Gateway\\AiGateway",
     "App\\Support\\Ai\\Gateway\\AiUsage",
