@@ -1,7 +1,7 @@
 {{-- صفحةُ الارتباط: الربحيةُ من مصادرها، ومشاريعُه وعقودُه، وموعدُ تجديده —
      لا رقمَ ربحٍ يُكتب باليد. تتوقع $row (الارتباط). --}}
 @php
-    $egPl = \App\Support\Engagements::pl($row);
+    $egPl = \App\Support\Finance\Engagements::pl($row);
     $egProjects = \App\Models\Project::whereNull('deleted_at')->where('engagement_id', $row->id)
         ->orderBy('name')->get(['id', 'name', 'status', 'progress']);
     $egContracts = \App\Models\Contract::whereNull('deleted_at')

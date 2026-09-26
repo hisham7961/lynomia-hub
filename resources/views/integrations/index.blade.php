@@ -13,9 +13,9 @@
 <div class="kids">
     @foreach ($installed as $i)
         <div class="card kid" style="border-inline-start:4px solid {{ $i['ready'] ? 'var(--ok, #27ae60)' : 'var(--wn, #e67e22)' }}">
-            @php $hk = $i['health'] ?? \App\Support\Integrations::UNKNOWN; @endphp
+            @php $hk = $i['health'] ?? \App\Support\Ops\Integrations::UNKNOWN; @endphp
             <h3>{{ $i['icon'] }} {{ $i['name'] }}
-                <span class="bdg {{ \App\Support\Integrations::HEALTH_TONE[$hk] ?? 'g' }}" title="{{ $hk }}">{{ \App\Support\Integrations::HEALTH_LABELS[$hk] ?? $hk }}</span>
+                <span class="bdg {{ \App\Support\Ops\Integrations::HEALTH_TONE[$hk] ?? 'g' }}" title="{{ $hk }}">{{ \App\Support\Ops\Integrations::HEALTH_LABELS[$hk] ?? $hk }}</span>
                 <span class="bdg g">{{ ['out' => '⬅ يرسل', 'in' => '➡ يستقبل', 'both' => '⬌ الاتجاهان'][$i['dir']] }}</span>
             </h3>
             <div class="sub" style="margin-bottom:8px">{{ $i['desc'] }}</div>

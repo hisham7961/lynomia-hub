@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\MobileContext;
 use App\Models\HubNotification;
-use App\Support\Api;
+use App\Support\Platform\Api;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -116,7 +116,7 @@ class MobileContextController extends Controller
             'nav'                  => hub_is_client($u) ? [] : hub_nav($u),
             'ia'                   => hub_is_client($u)
                 ? self::clientIa()
-                : \App\Support\InformationArchitecture::make()->navigationPayload($u),
+                : \App\Support\Platform\InformationArchitecture::make()->navigationPayload($u),
             'schema_version'       => $sv,
         ];
 
@@ -181,7 +181,7 @@ class MobileContextController extends Controller
             // العميلُ يتلقّى شجرةَ بوّابته — لا شجرةَ الإدارة الداخلية (نظيرُ الويب)
             'ia'             => hub_is_client($u)
                 ? self::clientIa()
-                : \App\Support\InformationArchitecture::make()->navigationPayload($u),
+                : \App\Support\Platform\InformationArchitecture::make()->navigationPayload($u),
         ]);
     }
 

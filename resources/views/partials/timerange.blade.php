@@ -1,4 +1,4 @@
-{{-- كبسولات المدى الزمنيّ الموحّد (WP-1.1) — يتوقع: $range (App\Support\TimeRange).
+{{-- كبسولات المدى الزمنيّ الموحّد (WP-1.1) — يتوقع: $range (App\Support\Platform\TimeRange).
      الروابط تحفظ باقي معاملات الرابط (عدسة/مرشِّحات) وتُسقط الترقيم — تغييرُ المدى صفحةٌ أولى. --}}
 @php
     $range = $range ?? hub_range();
@@ -11,7 +11,7 @@
     $trTo = $range->preset === 'custom' ? ($trDays ? $range->to->copy()->subDay() : $range->to)->format('Y-m-d') : '';
 @endphp
 <div class="toolbar" style="gap:6px">
-    @foreach (\App\Support\TimeRange::PRESETS as $trKey => $trDef)
+    @foreach (\App\Support\Platform\TimeRange::PRESETS as $trKey => $trDef)
         <a class="btn sm {{ $range->preset === $trKey ? 'p' : 'ghost' }}"
            href="{{ $trUrl . '?' . http_build_query($trQs + ['range' => $trKey]) }}">{{ $trDef[1] }}</a>
     @endforeach

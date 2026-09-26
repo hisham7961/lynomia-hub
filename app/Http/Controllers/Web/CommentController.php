@@ -8,8 +8,8 @@ use App\Models\Conversation;
 use App\Models\HubNotification;
 use App\Models\Task;
 use App\Models\User;
-use App\Support\ChatCommands;
-use App\Support\CommentService;
+use App\Support\Collaboration\ChatCommands;
+use App\Support\Collaboration\CommentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -277,7 +277,7 @@ class CommentController extends Controller
         $c = Comment::findOrFail($id);
         $this->guardTarget($c->module, $c->record_id);          // يرى السجل = يتفاعل
         // 08.2 — منشورُ قناةٍ موسومٌ بشركةٍ خارجَ نطاقِ القارئ = ٤٠٤ (الخلاصةُ معزولةٌ عرضاً، وهذا يسدّ المعرّفَ المباشر)
-        \App\Support\CommentService::guardFeedComment(auth()->user(), $c);
+        \App\Support\Collaboration\CommentService::guardFeedComment(auth()->user(), $c);
 
         $emoji = hub_str($r->input('emoji'));
         abort_unless(in_array($emoji, self::REACTIONS, true), 422, 'تفاعل غير معروف');

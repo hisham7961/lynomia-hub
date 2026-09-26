@@ -7,7 +7,7 @@ use App\Models\Employee;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\WorkUpdate;
-use App\Support\ActionCenter;
+use App\Support\Insights\ActionCenter;
 use App\Support\Ai\Auditor\Auditor;
 use App\Support\Ai\Auditor\AuditorAccuracy;
 use Illuminate\Support\Facades\DB;

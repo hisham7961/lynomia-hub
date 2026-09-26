@@ -1,6 +1,6 @@
 {{-- بطاقة «مبيعات القنوات» من أودو — للمشاريع. يتوقع: $row --}}
 @php
-    $chCli = \App\Support\Odoo::forRow($row);
+    $chCli = \App\Support\Ops\Odoo::forRow($row);
     $chList = (array) (((array) $row->meta)['odoo']['channels'] ?? []);
     $chMayE = hub_can(auth()->user(), 'projects', 'e');
     // كل قناة تُجلب على حدة: فشلُ واحدةٍ لا يقتل الباقيات

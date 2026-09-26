@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Role;
 use App\Models\User;
-use App\Support\PermissionInspector;
+use App\Support\Security\PermissionInspector;
 use Tests\TestCase;
 
 /**

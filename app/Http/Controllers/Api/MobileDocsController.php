@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Support\MobileOpenApi;
+use App\Support\Mobile\MobileOpenApi;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -20,7 +20,7 @@ class MobileDocsController extends Controller
     public function openapi(): JsonResponse
     {
         return response()->json(MobileOpenApi::spec(), 200, [
-            'X-API-Version' => \App\Support\Api::VERSION,
+            'X-API-Version' => \App\Support\Platform\Api::VERSION,
             'Cache-Control' => 'public, max-age=300',
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }

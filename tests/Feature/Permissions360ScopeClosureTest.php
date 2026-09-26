@@ -14,9 +14,9 @@ use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\WorkUpdate;
-use App\Support\AssetProjectService;
-use App\Support\ClientPortalData;
-use App\Support\ReportReview;
+use App\Support\Assets\AssetProjectService;
+use App\Support\Collaboration\ClientPortalData;
+use App\Support\Workforce\ReportReview;
 use Tests\TestCase;
 
 /**

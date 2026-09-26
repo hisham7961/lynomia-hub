@@ -10,7 +10,7 @@ use App\Models\User;
 use App\Support\Ai\Center\AiAccess;
 use App\Support\Ai\Routing\AiProfiles;
 use App\Support\Ai\Gateway\AiUsage;
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;

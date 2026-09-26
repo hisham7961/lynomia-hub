@@ -2,7 +2,7 @@
 @section('title', 'مركز الجودة والإنجاز')
 @section('content')
 @php
-    use App\Support\Severity;
+    use App\Support\Platform\Severity;
     $qcNum = fn ($v, int $d = 0) => $v === null ? '—' : number_format((float) $v, $d);
     $qcPct = fn ($v) => $v === null ? '—' : $v . '٪';
     /* (§49 · §25 — لا طريقَ مسدود) التبويباتُ غيرُ «البيانات» تُقرأ لحاملِ راية
@@ -311,7 +311,7 @@
                            <th scope="col">العدد</th><th scope="col">عيّنة</th><th scope="col" class="acts">افتح</th></tr></thead>
                 <tbody>
                 @foreach ($checks as $c)
-                    @php $dqLvl = $c['sev'] ?? \App\Support\DataQuality::severity($c); @endphp
+                    @php $dqLvl = $c['sev'] ?? \App\Support\Insights\DataQuality::severity($c); @endphp
                     <tr>
                         <td><span class="bdg {{ Severity::tone($dqLvl) }}">{{ Severity::label($dqLvl) }}</span></td>
                         <td><a href="{{ route('m.index', $c['module']) }}">{{ hub_mod($c['module'])['label'] ?? $c['module'] }}</a>
@@ -520,7 +520,7 @@
 {{-- ═══════════ ④ تبويبُ المؤشّرات (WP-8.5 · §6.9) ═══════════ --}}
 @if ($tab === 'kpi')
     @php
-        $H = \App\Support\KpiCentre::HEALTH;
+        $H = \App\Support\Insights\KpiCentre::HEALTH;
         $hTone = ['on' => 'ok', 'warn' => 'wn', 'off' => 'bad', 'dead' => 'wn', 'nodata' => 'g', 'notarget' => 'g'];
     @endphp
     @include('partials.cc.kpis', ['items' => [

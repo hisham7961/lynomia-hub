@@ -11,7 +11,7 @@ use App\Models\Role;
 use App\Models\Task;
 use App\Models\Ticket;
 use App\Models\User;
-use App\Support\ExecutionStats;
+use App\Support\Workforce\ExecutionStats;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -38,9 +38,9 @@ use Tests\TestCase;
 class EmployeeWorkProfileTest extends TestCase
 {
     /** نافذةُ الثلاثين يوماً التي يقرؤها لوحُ الأداء وبطاقةُ الموظف */
-    protected function range(): \App\Support\TimeRange
+    protected function range(): \App\Support\Platform\TimeRange
     {
-        return \App\Support\TimeRange::fromRequest(new Request(['range' => '30d']));
+        return \App\Support\Platform\TimeRange::fromRequest(new Request(['range' => '30d']));
     }
 
     /**
@@ -352,7 +352,7 @@ class EmployeeWorkProfileTest extends TestCase
 
         // وفحصُ المصدر: قارئُ التنفيذ لا يعرف جدولَ الزيارات أصلاً
         $this->assertStringNotContainsString('page_visits',
-            \Tests\Support\Source::read(\App\Support\ExecutionStats::class));
+            \Tests\Support\Source::read(\App\Support\Workforce\ExecutionStats::class));
     }
 
     /* ════════ ٥) كلفةُ القراءة ════════ */

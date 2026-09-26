@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Support\AlertEngine;
-use App\Support\Health;
+use App\Support\Ops\AlertEngine;
+use App\Support\Ops\Health;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Schema;
 

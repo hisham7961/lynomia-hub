@@ -90,7 +90,7 @@ class AuditEntry extends Model
                 // فشل استثنائي (قاعدة تحت ضغط مثلاً): الكتابة تمضي بلا بصمة كي لا يتعطل
                 // العمل — لكن لا صمت بعد اليوم: يُسجَّل هنا، وhub:audit-verify يفشل صراحةً
                 // على أي سجل بلا بصمة كُتب بعد بدء السلسلة (حقبة audit_chain.started_at)
-                \App\Support\ErrorLog::capture('php',
+                \App\Support\Ops\ErrorLog::capture('php',
                     'audit-chain: فشل ختم سجل تدقيق (' . $m->action . '/' . $m->module . ') — ' . $e->getMessage(),
                     __FILE__, __LINE__);
             }

@@ -71,17 +71,17 @@ class KpiController extends Controller
 
         // صفوفُ المركز (WP-8.5): القيمةُ من `hub_kpi_value` كما كانت، ومعها
         // المالكُ والدورةُ والانحرافُ والاتّجاهُ والحالةُ الصحّية — قراءةٌ واحدة
-        $rows = \App\Support\KpiCentre::rows(auth()->user());
+        $rows = \App\Support\Insights\KpiCentre::rows(auth()->user());
 
         return view('kpis.index', [
             'kpis'    => hub_kpis(null, true),
             'rows'    => $rows,
             // **المرشَّحُ ودليلُه** لما لا مالكَ له — يُعرَض ولا يُعتمَد تلقائيّاً
             'suggest' => collect($rows)->filter(fn ($x) => ($x['owner_id'] ?? null) === null)
-                ->mapWithKeys(fn ($x) => [$x['id'] => \App\Support\Ownership::suggestForKpi(
+                ->mapWithKeys(fn ($x) => [$x['id'] => \App\Support\Insights\Ownership::suggestForKpi(
                     (array) ($x['formula'] ?? []))])->all(),
-            'summary' => \App\Support\KpiCentre::summary($rows),
-            'off'     => \App\Support\KpiCentre::offTarget($rows),
+            'summary' => \App\Support\Insights\KpiCentre::summary($rows),
+            'off'     => \App\Support\Insights\KpiCentre::offTarget($rows),
             'catalog' => $this->catalog(),
             'editing' => $editing,
             // Permissions 360 · 06.3 — دليلُ أسماءِ المستخدمين صلاحيةُ الموارد (hr:v) لا
@@ -152,7 +152,7 @@ class KpiController extends Controller
 
         $uid = trim(hub_str($r->input('owner_id')));
         if ($uid === '') {
-            $s = \App\Support\Ownership::suggestForKpi($formula);
+            $s = \App\Support\Insights\Ownership::suggestForKpi($formula);
             abort_if($s['user_id'] === null, 422, (string) $s['why']);
             $uid = (string) $s['user_id'];
             $why = (string) $s['why'];
@@ -190,7 +190,7 @@ class KpiController extends Controller
             if (trim((string) $k->owner_id) !== '') continue;        // قرارٌ سابقٌ لا يُداس
 
             $formula = (array) $k->formula;
-            $s = \App\Support\Ownership::suggestForKpi($formula);
+            $s = \App\Support\Insights\Ownership::suggestForKpi($formula);
             if ($s['user_id'] === null || $s['confidence'] !== 'strong') { $left++; continue; }
 
             $u = \App\Models\User::find($s['user_id']);
@@ -341,8 +341,8 @@ class KpiController extends Controller
 
         // **وإعدادُ النوعِ يُكمل النواقص**: نسبةٌ بلا «٪»، أو مبلغٌ بلا عملة،
         // أو مؤشّرٌ بلا دورة — كلُّها تُملأ من نوعِ المعادلة لا تُترك «—»
-        $kindDef = \App\Support\KpiCentre::kindDefaults(
-            \App\Support\KpiCentre::kind($formula, $out['unit']));
+        $kindDef = \App\Support\Insights\KpiCentre::kindDefaults(
+            \App\Support\Insights\KpiCentre::kind($formula, $out['unit']));
         if (trim((string) $out['unit']) === '' && $kindDef['unit'] !== null) $out['unit'] = $kindDef['unit'];
 
         // العمودان مضافان في هجرة الطور ٨ — يُكتبان بحارسٍ فلا تسقط الكتابة

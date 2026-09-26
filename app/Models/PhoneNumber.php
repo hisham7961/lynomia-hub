@@ -52,11 +52,11 @@ class PhoneNumber extends Model
         // وحده. **لا لوكَبٌ ثانٍ** — `Identity::attach` هو المحرّكُ الوحيد للهوية.
         static::saved(function (self $p) {
             if ($p->iccid) {
-                \App\Support\Identity::attach('phones', $p->id, 'iccid', $p->iccid,
+                \App\Support\Security\Identity::attach('phones', $p->id, 'iccid', $p->iccid,
                     ['is_primary' => true, 'verified' => true]);
             }
             if ($p->msisdn) {
-                \App\Support\Identity::attach('phones', $p->id, 'msisdn', $p->msisdn);
+                \App\Support\Security\Identity::attach('phones', $p->id, 'msisdn', $p->msisdn);
             }
         });
     }

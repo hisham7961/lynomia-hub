@@ -2,7 +2,7 @@
 
 namespace App\Support\Ai\Ask;
 
-use App\Support\Redactor;
+use App\Support\Platform\Redactor;
 
 /**
  * **مظروفُ البياناتِ غيرِ الموثوقة وميزانيّةُ السياق** (المرحلة ٣ · P3-W4).

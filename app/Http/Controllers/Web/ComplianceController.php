@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\Compliance;
+use App\Support\Insights\Compliance;
 
 /**
  * لوحة الامتثال — الالتزام وأثره لا جدولُ تواريخ.

@@ -40,7 +40,7 @@ class Permissions360ScopeIdorTest extends TestCase
         $u = $this->user('p4a@test.local', ['updates' => ['v' => 1]], scope: 'proj');
         $emp = Employee::create(['name' => 'موظف', 'status' => 'نشط', 'user_id' => $u->id]);
 
-        $res = \App\Support\Workday::checkIn($u, ['project_id' => $out->id, 'mode' => 'مكتب']);
+        $res = \App\Support\Workforce\Workday::checkIn($u, ['project_id' => $out->id, 'mode' => 'مكتب']);
         $this->assertTrue($res['ok'] ?? false, 'الحضورُ سُجِّل');
         $this->assertNull(Attendance::where('emp_id', $emp->id)->first()->project_id,
             'مشروعٌ خارجَ النطاقِ لم يُربَط بالحضور');
@@ -53,7 +53,7 @@ class Permissions360ScopeIdorTest extends TestCase
         $u = $this->user('p4b@test.local', ['updates' => ['v' => 1]]);   // scope=all
         $emp = Employee::create(['name' => 'موظف٢', 'status' => 'نشط', 'user_id' => $u->id]);
 
-        \App\Support\Workday::checkIn($u, ['project_id' => $p->id, 'mode' => 'مكتب']);
+        \App\Support\Workforce\Workday::checkIn($u, ['project_id' => $p->id, 'mode' => 'مكتب']);
         $this->assertSame($p->id, Attendance::where('emp_id', $emp->id)->first()->project_id,
             'المشروعُ ضمنَ نطاقِ الشامل يبقى مربوطاً');
     }

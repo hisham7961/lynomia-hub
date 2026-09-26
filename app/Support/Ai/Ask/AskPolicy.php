@@ -5,7 +5,7 @@ namespace App\Support\Ai\Ask;
 use App\Support\Ai\Gateway\AiGateway;
 use App\Support\Ai\Routing\AiProfiles;
 use App\Support\Ai\Routing\AiPurposes;
-use App\Support\Redactor;
+use App\Support\Platform\Redactor;
 
 /**
  * **بابُ «اسأل Hub» وحدودُه** (المرحلة ٣ · P3-W2).

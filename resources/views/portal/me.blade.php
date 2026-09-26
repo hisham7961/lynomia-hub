@@ -27,7 +27,7 @@
 {{-- ── أوّل أسبوع (الجولة 1 · F29): دليلُ الأيام الأولى بدل «يوم هادئ» وستةِ أصفار.
      البياناتُ من Staff::firstWeek — استعلاماتٌ خفيفةٌ لا تجري إلا داخل نافذة 14 يوماً،
      وكلُّ رابطٍ يُعرض فقط إن كان بابُه مفتوحاً لدور صاحبه (لا رابطَ يقود إلى 403). ── --}}
-@php $fw = \App\Support\Staff::firstWeek(auth()->user(), $emp); @endphp
+@php $fw = \App\Support\Workforce\Staff::firstWeek(auth()->user(), $emp); @endphp
 @if ($fw)
     <div class="card" style="margin-bottom:12px;border-inline-start:4px solid var(--ok,#27ae60)">
         <h3 style="margin-bottom:4px">🌱 أوّل أسبوع؟ خطواتك الأولى هنا</h3>
@@ -83,7 +83,7 @@
 
     @forelse ($shown as $it)
         @if ($lastBucket !== $it['bucket'])
-            @php $lastBucket = $it['bucket']; $bk = \App\Support\Inbox::BUCKETS[$it['bucket']]; @endphp
+            @php $lastBucket = $it['bucket']; $bk = \App\Support\Collaboration\Inbox::BUCKETS[$it['bucket']]; @endphp
             <div class="sub" style="margin:12px 0 4px;font-weight:600">{{ $bk['icon'] }} {{ $bk['label'] }}</div>
         @endif
         <div class="inbrow">

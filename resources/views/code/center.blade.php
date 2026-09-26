@@ -125,7 +125,7 @@
 
                     @unless (isset($cHide['notes']))
                         @if (trim($rel['notes']) !== '')
-                            <div class="relnotes">{!! \App\Support\CodeHub::notesHtml($rel['notes']) !!}</div>
+                            <div class="relnotes">{!! \App\Support\Apps\CodeHub::notesHtml($rel['notes']) !!}</div>
                         @else
                             <div class="sub" style="margin-top:8px">لا سجلَّ تغييراتٍ لهذا الإصدار — وما لم يُكتب لا يُتذكَّر.</div>
                         @endif

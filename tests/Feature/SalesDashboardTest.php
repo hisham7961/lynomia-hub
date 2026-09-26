@@ -6,7 +6,7 @@ use App\Models\Client;
 use App\Models\Quote;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\SalesBoard;
+use App\Support\Finance\SalesBoard;
 use Tests\TestCase;
 
 /**

@@ -47,9 +47,9 @@ class ModuleController extends Controller
         // فالنقص يُفتح لا يُقرأ. والمفتاح يُطابَق على قائمة الفحوص المشتقّة من
         // السجل، فمفتاحٌ مُلفَّق لا يبني قيداً ولا يوسّع القائمة.
         if ($qc = hub_str($r->input('qc'))) {
-            $rule = \App\Support\DataQuality::rules($def['key'] ?? '')[$qc] ?? null;
+            $rule = \App\Support\Insights\DataQuality::rules($def['key'] ?? '')[$qc] ?? null;
             if ($rule) {
-                $q = \App\Support\DataQuality::apply($q, (string) ($def['key'] ?? ''), (string) $qc);
+                $q = \App\Support\Insights\DataQuality::apply($q, (string) ($def['key'] ?? ''), (string) $qc);
                 $filters[] = ['key' => 'qc', 'label' => 'فحص جودة', 'val' => $qc, 'name' => $rule['label']];
             }
         }
@@ -389,7 +389,7 @@ class ModuleController extends Controller
         $m->save();
         $this->notifyAssignee($def, $module, $m);
         $this->bustProgress($module, $m);
-        \App\Support\FlowRunner::fire('created', $module, $m);
+        \App\Support\Platform\FlowRunner::fire('created', $module, $m);
 
         /*
          * **موظفٌ جديد بحسابٍ جديد**: الربط بحسابٍ قائم يقع تلقائياً في نموذج
@@ -406,7 +406,7 @@ class ModuleController extends Controller
                     . ' — لم يُنشأ حسابٌ جديد ولا كلمةُ مرورٍ مؤقتة.');
             }
 
-            $res = \App\Support\Staff::makeAccountResult($m, hub_str($r->input('_account_role')));
+            $res = \App\Support\Workforce\Staff::makeAccountResult($m, hub_str($r->input('_account_role')));
             if ($res['temp'] !== null) {
                 return $to('ok', 'أُضيف الموظف وأُنشئ حسابه')
                     ->with('temp_password', $res['temp'])
@@ -429,7 +429,7 @@ class ModuleController extends Controller
             // v2.117: حفظٌ حقيقي لا saveQuietly — الانقلاب يُدقَّق ويُصدَر وتلتقطه المسارات
             $m->status = 'قيد التوقيع';
             $m->save();
-            \App\Support\FlowRunner::fire('status', $module, $m, 'قيد التوقيع');
+            \App\Support\Platform\FlowRunner::fire('status', $module, $m, 'قيد التوقيع');
 
             return redirect()->route('esign.index', [
                 'contract' => $m->id,
@@ -539,7 +539,7 @@ class ModuleController extends Controller
         // **حزمةُ استجابة**: كشفُ سرٍّ من الخزنة حدثٌ دلاليّ (vault.revealed) —
         // تعمل عليه التدفقات. يُطلق بالوحدة الفعلية فلا يُصدر إلا لـvault
         // (config('hub.events') لا يعرّف الحدثَ لغيرها)، وفشلُه لا يُفشل الكشف.
-        try { \App\Support\FlowRunner::fire('revealed', $module, $row); } catch (\Throwable $e) { report($e); }
+        try { \App\Support\Platform\FlowRunner::fire('revealed', $module, $row); } catch (\Throwable $e) { report($e); }
 
         return response()->json(['v' => (string) ($row->{$f['col']} ?? '')]);
     }
@@ -568,7 +568,7 @@ class ModuleController extends Controller
         // §30: تقريرُ العملِ المقبولُ لا يعيد الموظفُ كتابتَه صامتاً — يُعيده المدير/HR
         // للمراجعة أولاً (بأثرٍ مدقَّق). المالكُ/مسؤولُ الموارد البشرية غيرُ مقفولين.
         if ($module === 'updates' && $m instanceof \App\Models\WorkUpdate
-            && \App\Support\ReportReview::isLockedForEditor($m, auth()->user())) {
+            && \App\Support\Workforce\ReportReview::isLockedForEditor($m, auth()->user())) {
             return back()->withInput()->with('err',
                 'هذا التقريرُ اعتمده المدير — لا يُعدَّل بعد الاعتماد. اطلب من مديرك إعادةَ فتحِه للتنقيح.');
         }
@@ -599,9 +599,9 @@ class ModuleController extends Controller
         $m->save();
         $this->notifyAssignee($def, $module, $m, $prevAssignee);
         $this->bustProgress($module, $m);
-        \App\Support\FlowRunner::fire('updated', $module, $m);
+        \App\Support\Platform\FlowRunner::fire('updated', $module, $m);
         if ($sc && (string) $m->{$sc} !== (string) $prevStatus) {
-            \App\Support\FlowRunner::fire('status', $module, $m, (string) $m->{$sc});
+            \App\Support\Platform\FlowRunner::fire('status', $module, $m, (string) $m->{$sc});
         }
 
         // (الجولة 1 · F14) مستندٌ ماليّ أُعيد اشتقاقُ حالته من المدفوع الفعليّ أثناء
@@ -659,8 +659,8 @@ class ModuleController extends Controller
          * حالةُ الملفِّ للعمل — لا مسارَ إعادةِ تفعيلٍ ثانٍ.
          */
         if ($m instanceof \App\Models\Employee
-            && in_array((string) $m->status, \App\Support\Staff::OPEN, true)) {
-            \App\Support\Staff::announceReturn($m);
+            && in_array((string) $m->status, \App\Support\Workforce\Staff::OPEN, true)) {
+            \App\Support\Workforce\Staff::announceReturn($m);
         }
     }
 
@@ -845,7 +845,7 @@ class ModuleController extends Controller
         // **قيمةُ القرارِ لا تُكتب من بابِ الحالةِ المباشر** (مجلس الخبراء · الخبير ١٤):
         // سحبُ البطاقةِ في كانبان — ونظيرُه في الجوّال — كان يعتمد الإجازةَ ويخصم
         // الرصيد. والحارسُ هنا لأنّ هذا **الجوهرُ المشترك** بين البابين.
-        \App\Support\DecisionFields::guardStatusWrite($module, $m, $newStatus);
+        \App\Support\Platform\DecisionFields::guardStatusWrite($module, $m, $newStatus);
 
         $prevStatus = $m->{$statusCol};
         $m->{$statusCol} = $newStatus;
@@ -857,7 +857,7 @@ class ModuleController extends Controller
 
         $changed = (string) $m->{$statusCol} !== (string) $prevStatus;
         if ($changed) {
-            \App\Support\FlowRunner::fire('status', $module, $m, (string) $m->{$statusCol});
+            \App\Support\Platform\FlowRunner::fire('status', $module, $m, (string) $m->{$statusCol});
         }
 
         return ['changed' => $changed, 'from' => $prevStatus, 'to' => (string) $m->{$statusCol}];
@@ -1144,7 +1144,7 @@ class ModuleController extends Controller
                 try {
                     // نفسُ حارسِ البابِ الفرديّ — **والالتفافُ بالجملة أوسعُ أثراً
                     // من الفرد**؛ داخلَ `try` فيُنسب الرفضُ لسجلِّه ولا يقطع الدفعة
-                    \App\Support\DecisionFields::guardStatusWrite($module, $m, $to);
+                    \App\Support\Platform\DecisionFields::guardStatusWrite($module, $m, $to);
                     // ── Control Plane: Phase 6 (WP-6.1) ── البوّابة داخل try: رفضُها
                     // رفضُ سجلٍّ يُنسب لصاحبه (refusal) ولا يقطع الدفعة
                     $this->guardStatusRequires($def, $m);
@@ -1154,7 +1154,7 @@ class ModuleController extends Controller
                     continue;
                 }
                 $this->bustProgress($module, $m);
-                \App\Support\FlowRunner::fire('status', $module, $m, $to);
+                \App\Support\Platform\FlowRunner::fire('status', $module, $m, $to);
                 $n++;
             }
 
@@ -1207,7 +1207,7 @@ class ModuleController extends Controller
             $why = $e->getMessage();
         } else {
             // بالرسالة الآمنة (v2.399): الخامُ يحمل قيمَ الأعمدة والاستعلامَ — ويُدفع إشعاراً للمالكين
-            \App\Support\ErrorLog::capture('bulk', \App\Support\ErrorLog::safeMessage($e), $e->getFile(), $e->getLine());
+            \App\Support\Ops\ErrorLog::capture('bulk', \App\Support\Ops\ErrorLog::safeMessage($e), $e->getFile(), $e->getLine());
             $why = 'عطلٌ غير متوقع — سُجّل في مركز الأخطاء';
         }
 
@@ -1288,7 +1288,7 @@ class ModuleController extends Controller
      */
     protected function queueApproval(array $def, string $module, string $op, Model $m, Request $r)
     {
-        \App\Support\ApprovalService::submit($def, $module, $op, $m, $r);
+        \App\Support\Platform\ApprovalService::submit($def, $module, $op, $m, $r);
 
         return redirect()->route('m.index', $module)
             ->with('ok', 'هذه العملية محمية — أُرسل طلب الموافقة للمعتمدين وسيصلك إشعار بالقرار');
@@ -1345,7 +1345,7 @@ class ModuleController extends Controller
 
         // الحقول المقيسة (متابعون، إعجابات، تحميلات، تقييم) تُسجَّل نقطةً في
         // السلسلة الزمنية مع كل حفظ — الحقل وحده يدهس ما قبله فلا يبقى نمو
-        \App\Support\Metrics::capture($module, $m);
+        \App\Support\Ops\Metrics::capture($module, $m);
 
         // سياسةٌ أو مقالٌ إلزامي تغيّرت نسخته: الإقرارات القديمة تسقط ويُعاد
         // الإعلان. بلا هذا يبقى الجميع «مُقِرّين» بنسخةٍ ماتت — امتثالٌ كاذب.
@@ -1365,12 +1365,12 @@ class ModuleController extends Controller
                 $to = 'صيانة';
             } elseif ((string) $m->status === 'مكتملة') {
                 if ((string) $asset->maint !== (string) $m->date) { $asset->maint = $m->date; $asset->saveQuietly(); }
-                if (\App\Support\Custody::canonicalStatus($asset->status) === 'صيانة') $to = 'قيد الاستخدام';
+                if (\App\Support\Assets\Custody::canonicalStatus($asset->status) === 'صيانة') $to = 'قيد الاستخدام';
             }
             if ($to !== null
-                && \App\Support\Custody::canonicalStatus($asset->status) !== \App\Support\Custody::canonicalStatus($to)
-                && \App\Support\Custody::canTransition($asset->status, $to)) {
-                \App\Support\Custody::transition($asset, $to, now()->toDateString(), 'مزامنةٌ من سجل الصيانة');
+                && \App\Support\Assets\Custody::canonicalStatus($asset->status) !== \App\Support\Assets\Custody::canonicalStatus($to)
+                && \App\Support\Assets\Custody::canTransition($asset->status, $to)) {
+                \App\Support\Assets\Custody::transition($asset, $to, now()->toDateString(), 'مزامنةٌ من سجل الصيانة');
             }
         }
 
@@ -1908,7 +1908,7 @@ class ModuleController extends Controller
     protected function fill(array $def, Request $r, Model $m, ?array $only = null): void
     {
         // حقولُ القرارِ تُلتقط قبل التعبئة لتُقارن بعدها (انظر `DecisionFields`)
-        $decision = \App\Support\DecisionFields::capture((string) ($def['key'] ?? ''), $def, $m);
+        $decision = \App\Support\Platform\DecisionFields::capture((string) ($def['key'] ?? ''), $def, $m);
 
         foreach ($def['fields'] as $f) {
             $k = $f['key']; $c = $f['col']; $t = $f['type'];
@@ -1983,9 +1983,9 @@ class ModuleController extends Controller
          * و`mgr_id` هما ما يحدّد أصاحبُ الطلبِ يبتّ في طلبِ نفسِه أم مديرُه، وهما
          * لا يُعرفان قبل أن تُملأ بقيّةُ الحقول. والحجّةُ كاملةً في `DecisionFields`.
          */
-        \App\Support\DecisionFields::enforce((string) ($def['key'] ?? ''), $m, $decision);
+        \App\Support\Platform\DecisionFields::enforce((string) ($def['key'] ?? ''), $m, $decision);
 
-        \App\Support\AppsProjects::inherit($def, $m);
+        \App\Support\Apps\AppsProjects::inherit($def, $m);
 
         // ── Control Plane: Phase 6 (WP-6.1) ── بوّابةُ «الحالة تتطلب حقولاً» على
         // حالة النموذج **بعد** التعبئة — تغطّي التحديث (ويب وAPI وPATCH) والإنشاء

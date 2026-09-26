@@ -20,7 +20,7 @@
                 <td>
                     <b>{{ $ses->uname ?? '—' }}</b>
                     @if ($emailMode !== 'hide' && $ses->uemail)
-                        <div class="sub">{{ $emailMode === 'mask' ? \App\Support\SecurityFindings::maskPII($ses->uemail) : $ses->uemail }}</div>
+                        <div class="sub">{{ $emailMode === 'mask' ? \App\Support\Security\SecurityFindings::maskPII($ses->uemail) : $ses->uemail }}</div>
                     @endif
                 </td>
                 <td class="sub" title="{{ $ses->device }}">{{ $ses->browser ?: '—' }}</td>

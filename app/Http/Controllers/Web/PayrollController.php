@@ -192,7 +192,7 @@ class PayrollController extends Controller
      */
     protected function autoJournal(PayrollRun $run): void
     {
-        $svc = new \App\Support\JournalPostingService();
+        $svc = new \App\Support\Finance\JournalPostingService();
         if (! $svc->enabled()) return;
         try {
             $map = $svc->accountsMap();

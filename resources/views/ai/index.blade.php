@@ -66,7 +66,7 @@
 @if (! empty($probe))
     <div class="card">
         <h3 class="cardtitle">نتيجةُ آخرِ فحص</h3>
-        <div class="sub">{{ \App\Support\ConnectionProbe::line($probe) }}</div>
+        <div class="sub">{{ \App\Support\Ops\ConnectionProbe::line($probe) }}</div>
         @if (($probe['detail']['models'] ?? null) !== null)
             <div class="sub" style="margin-top:4px">نماذجُ مُعلَنةٌ في البوّابة:
                 <b>{{ $probe['detail']['models'] }}</b>

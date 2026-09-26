@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\ErrorEvent;
-use App\Support\ErrorLog;
+use App\Support\Ops\ErrorLog;
 use Illuminate\Http\Request;
 
 /** مركز الأخطاء والسجلات — تجميع وتتبع ومعالجة */
@@ -21,12 +21,12 @@ class ErrorCenterController extends Controller
         $q = ErrorEvent::query();
         // (WP-3.3) المرشِّح يقبل مفتاح IssueState الإنجليزي أو تسميته العربية —
         // والمخزَّن هو التسمية، فالصفوفُ الموروثة تُطابَق بلا إعادة كتابة
-        if ($st = $r->query('st')) $q->where('status', \App\Support\IssueState::MAP[$st] ?? $st);
+        if ($st = $r->query('st')) $q->where('status', \App\Support\Platform\IssueState::MAP[$st] ?? $st);
         if ($k = $r->query('k')) $q->where('kind', $k);
         // الصنفُ والشدّة (v2.399) — بحارس العمود كي لا تسقط الشاشة قبل الهجرة
         $taxonomy = hub_has_col('error_events', 'category');
-        if ($taxonomy && ($cat = hub_str($r->query('cat'))) !== '' && in_array($cat, \App\Support\ErrorTaxonomy::CATEGORIES, true)) $q->where('category', $cat);
-        if ($taxonomy && ($sev = hub_str($r->query('sev'))) !== '' && in_array($sev, \App\Support\ErrorTaxonomy::SEVERITIES, true)) $q->where('severity', $sev);
+        if ($taxonomy && ($cat = hub_str($r->query('cat'))) !== '' && in_array($cat, \App\Support\Ops\ErrorTaxonomy::CATEGORIES, true)) $q->where('category', $cat);
+        if ($taxonomy && ($sev = hub_str($r->query('sev'))) !== '' && in_array($sev, \App\Support\Ops\ErrorTaxonomy::SEVERITIES, true)) $q->where('severity', $sev);
         if ($term = trim(hub_str($r->query('q', '')))) {
             $q->where(fn ($w) => $w->where('message', 'LIKE', "%{$term}%")
                 ->orWhere('file', 'LIKE', "%{$term}%")->orWhere('url', 'LIKE', "%{$term}%"));
@@ -44,9 +44,9 @@ class ErrorCenterController extends Controller
         // ورسمُ الزمن من عيّنات الوقوع (لا من last_seen الذي ينسب العاصفةَ
         // لساعةٍ واحدة)، ودوناتُ الصنف والشدّة — والمدى بكبسولات TimeRange.
         $range = hub_range($r, '24h');
-        $stats = \App\Support\ErrorStats::cards();
-        $chart = \App\Support\ErrorStats::overTime($range);
-        $donuts = \App\Support\ErrorStats::donuts();
+        $stats = \App\Support\Ops\ErrorStats::cards();
+        $chart = \App\Support\Ops\ErrorStats::overTime($range);
+        $donuts = \App\Support\Ops\ErrorStats::donuts();
 
         $rows = $q->paginate(25)->withQueryString();
         // الأسماءُ بـwhereIn على المعروض فقط — لا جلبَ لجدول المستخدمين كلِّه
@@ -191,7 +191,7 @@ class ErrorCenterController extends Controller
             'due' => $data['due_at'] ?? null,
             // الوصفُ يمرّ بالمُطهِّر الواحد: الرسالةُ مطموسةٌ عند الالتقاط، لكنّ
             // المهمةَ يقرؤها من لا يملك فتحَ مركز الأخطاء — فلا تسريبَ عبرها
-            'description' => \App\Support\Redactor::text(
+            'description' => \App\Support\Platform\Redactor::text(
                 "خطأ من مركز الأخطاء.\n\nالنوع: {$e->kind}\nالتكرار: {$e->count}\n"
                 . ($rel ? "الموضع: {$rel}:{$e->line}\n" : '')
                 . ($e->url ? "الرابط: {$e->url}\n" : '')
@@ -231,9 +231,9 @@ class ErrorCenterController extends Controller
     {
         $this->gate();
         $to = (string) $r->input('to');
-        $r->merge(['to' => \App\Support\IssueState::MAP[$to] ?? $to]);
+        $r->merge(['to' => \App\Support\Platform\IssueState::MAP[$to] ?? $to]);
         $data = $r->validate([
-            'to' => ['required', \Illuminate\Validation\Rule::in(array_values(\App\Support\IssueState::MAP))],
+            'to' => ['required', \Illuminate\Validation\Rule::in(array_values(\App\Support\Platform\IssueState::MAP))],
             'reason' => ['required_if:to,متجاهَل', 'nullable', 'string', 'max:300'],
             'mute_days' => ['nullable', 'integer', 'min:1', 'max:90'],
         ], ['reason.required_if' => 'التجاهل يشترط سبباً — إخفاء عطل بلا تعليل نسيان لا قرار']);
@@ -250,7 +250,7 @@ class ErrorCenterController extends Controller
                            'resolved_release' => mb_substr((string) config('hub.version'), 0, 20)];
             }
             if ($to === 'متجاهَل' && hub_has_col('error_events', 'ignored_reason')) {
-                $patch += ['ignored_reason' => mb_substr(\App\Support\Redactor::text((string) $data['reason']), 0, 300),
+                $patch += ['ignored_reason' => mb_substr(\App\Support\Platform\Redactor::text((string) $data['reason']), 0, 300),
                            'ignored_by' => auth()->id()];
             }
         }
@@ -262,8 +262,8 @@ class ErrorCenterController extends Controller
         // الأثر (§31): انتقالُ الحالة قيدٌ، والإهمالُ قيدٌ باسمه، والكتمُ قيدٌ ثالث
         if ($to !== $old) {
             hub_audit($to === 'متجاهَل' ? 'تجاهل خطأ' : 'تغيير حالة خطأ', 'errors', $e->id,
-                'من «' . \App\Support\IssueState::label($old) . '» إلى «' . \App\Support\IssueState::label($to) . '»'
-                . ($to === 'متجاهَل' ? ' — السبب: ' . mb_substr(\App\Support\Redactor::text((string) $data['reason']), 0, 150) : ''));
+                'من «' . \App\Support\Platform\IssueState::label($old) . '» إلى «' . \App\Support\Platform\IssueState::label($to) . '»'
+                . ($to === 'متجاهَل' ? ' — السبب: ' . mb_substr(\App\Support\Platform\Redactor::text((string) $data['reason']), 0, 150) : ''));
         }
         if (! empty($data['mute_days']) && hub_has_col('error_events', 'muted_until')) {
             hub_audit('كتم تنبيه خطأ', 'errors', $e->id,
@@ -351,7 +351,7 @@ class ErrorCenterController extends Controller
                 if ($term !== '' && mb_stripos($e['text'], $term) === false) continue;
 
                 // المُطهِّرُ الواحد على كلِّ ما يُعرض، وحجبُ IP عن غير المالك
-                $text = \App\Support\Redactor::text($e['text']);
+                $text = \App\Support\Platform\Redactor::text($e['text']);
                 if (! hub_is_owner()) $text = (string) preg_replace('/\b\d{1,3}(\.\d{1,3}){3}\b/', '‹ip›', $text);
                 $entries[] = ['at' => $e['at'], 'level' => $e['level'], 'text' => $text, 'more' => $e['more']];
             }

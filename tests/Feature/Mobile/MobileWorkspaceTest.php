@@ -8,7 +8,7 @@ use App\Models\HubNotification;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
-use App\Support\PrefService;
+use App\Support\Platform\PrefService;
 use Tests\TestCase;
 
 /**

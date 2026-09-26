@@ -5,7 +5,7 @@ namespace App\Support\Ai\Center;
 use App\Models\AiModel;
 use App\Models\AiProvider;
 use App\Support\Ai\Gateway\LiteLlmAdmin;
-use App\Support\Redactor;
+use App\Support\Platform\Redactor;
 
 /**
  * **تصالحُ الحالةِ بين Hub والبوّابة** (المرحلة ٢ · W9 · §١٧ · R3).

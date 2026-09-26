@@ -13,7 +13,7 @@ use App\Support\Ai\Governance\AiPolicy;
 use App\Support\Ai\Catalog\AiProviders;
 use App\Support\Ai\Routing\AiRouteRun;
 use App\Support\Ai\Ask\AskFailures;
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;

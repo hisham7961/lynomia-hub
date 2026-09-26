@@ -10,7 +10,7 @@ use App\Support\Ai\Ask\AskGeneratorFactory;
 use App\Support\Ai\Ask\AskPolicy;
 use App\Support\Ai\Gateway\AiGateway;
 use App\Support\Ai\Routing\AiProfiles;
-use App\Support\FeatureRegistry;
+use App\Support\Platform\FeatureRegistry;
 
 /**
  * **نظرةٌ تقول أينَ الخلل — لا لوحةَ أرقامٍ تُزيّن** (المرحلة ٢ · W8 · §١١).

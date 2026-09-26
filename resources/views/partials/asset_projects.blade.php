@@ -2,14 +2,14 @@
      تخصيصاتُ هذا الأصلِ للمشاريع (تشغيليّةٌ لا عهدة): نشطٌ + تاريخ + تخصيصٌ/إنهاء.
      داخليٌّ حصراً (العميلُ لا يبلغ تفصيلَ الأصل). لغةٌ صريحة: «مخصّص للمشروع» لا «عهدة». --}}
 @php
-    use App\Support\AssetProjectService;
+    use App\Support\Assets\AssetProjectService;
     $apSvc = new AssetProjectService();
     $apU = auth()->user();
     // 16.3 — القارئُ المحصورُ بشركاتٍ يرى تخصيصاتِ مشاريعِ شركاتِه (أو العالميّةَ بلا شركة) فقط
     $apActive = $apSvc->activeForAsset((string) $row->id, 100, $apU);
     $apHistory = $apSvc->historyForAsset((string) $row->id, 100, $apU);
     $apCanAssign = ! hub_is_client($apU) && hub_can($apU, 'assets', 'e') && hub_can($apU, 'projects', 'v')
-        && ! in_array(\App\Support\Custody::canonicalStatus($row->status), AssetProjectService::INELIGIBLE_STATUSES, true);
+        && ! in_array(\App\Support\Assets\Custody::canonicalStatus($row->status), AssetProjectService::INELIGIBLE_STATUSES, true);
 
     $apCandidates = [];
     if ($apCanAssign) {

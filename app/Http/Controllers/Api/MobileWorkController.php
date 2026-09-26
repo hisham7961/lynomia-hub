@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Approval;
-use App\Support\Api;
-use App\Support\ApprovalResult;
-use App\Support\ApprovalService;
+use App\Support\Platform\Api;
+use App\Support\Platform\ApprovalResult;
+use App\Support\Platform\ApprovalService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
  * D.4/D.5/D.6/D.7.
  *
  * **مبنيٌّ بالكامل — سكك مشتركة لا محرّكٌ ثانٍ:**
- *  • **الاعتمادات (D.4):** `App\Support\ApprovalService::decide($id, 'approve'|'reject',
+ *  • **الاعتمادات (D.4):** `App\Support\Platform\ApprovalService::decide($id, 'approve'|'reject',
  *    auth()->user())` — المنطقُ نفسُه الذي يستدعيه الويبُ (Critic F2)، يعيد
  *    `ApprovalResult` فيترجمه هذا السطحُ إلى `Api::*` (اعتمادٌ/رفضٌ ⇒ `ok`، تقادمٌ ⇒
  *    `VERSION_CONFLICT`، ممنوعٌ ⇒ `FORBIDDEN`، محسومٌ سلفاً ⇒ `BUSINESS_RULE_VIOLATION`).
@@ -24,7 +24,7 @@ use Illuminate\Http\Request;
  *    استعلاماتِ `hub_scope` القائمة — قوائمُ قصيرةٌ وعدّادات، لا منطقَ أعمالٍ جديد.
  *  • **البحث (D.6):** `app(App\Http\Controllers\Web\SearchController::class)->results($q)`
  *    — المحرّكُ المُنطَّق نفسُه (Critic F2)، كلُّ نتيجةٍ `{module, id}` = وجهةُ رابطٍ عميق.
- *  • **التفضيلات (D.7):** `App\Support\PrefService` (خريطةُ الكتم التي يقرؤها HubNotification،
+ *  • **التفضيلات (D.7):** `App\Support\Platform\PrefService` (خريطةُ الكتم التي يقرؤها HubNotification،
  *    والمثبّتات) — الجوهرُ المنزوعُ من `PrefController` (Critic F2)، هويّةُ المُنادي وحدَه.
  *
  * كلُّ ردٍّ بغلاف `Api::*` (`data`/`error` + `code` + `request_id`)؛ الهويّةُ من الجلسة
@@ -217,7 +217,7 @@ class MobileWorkController extends V1Controller
     {
         $this->tagMobile($r);
 
-        return $this->ok(['items' => \App\Support\EmployeeDocuments::forUser(auth()->user())]);
+        return $this->ok(['items' => \App\Support\Workforce\EmployeeDocuments::forUser(auth()->user())]);
     }
 
     /**
@@ -232,19 +232,19 @@ class MobileWorkController extends V1Controller
         $this->tagMobile($r);
         $u = auth()->user();
 
-        $a = \App\Support\EmployeeDocuments::find($u, $id);
-        if (! $a) return \App\Support\Api::error(\App\Support\Api::RESOURCE_NOT_FOUND, 404,
+        $a = \App\Support\Workforce\EmployeeDocuments::find($u, $id);
+        if (! $a) return \App\Support\Platform\Api::error(\App\Support\Platform\Api::RESOURCE_NOT_FOUND, 404,
             'الوثيقة غير موجودة أو ليست على ملفّك');
 
-        if (! \App\Support\DocumentPolicy::subjectMay($u, $a, 'download')) {
-            return \App\Support\Api::error(\App\Support\Api::FORBIDDEN, 403,
+        if (! \App\Support\Documents\DocumentPolicy::subjectMay($u, $a, 'download')) {
+            return \App\Support\Platform\Api::error(\App\Support\Platform\Api::FORBIDDEN, 403,
                 'وصولُ هذه الوثيقةِ مقيَّدٌ بقاعدةٍ صريحة');
         }
 
         hub_audit('فتح وثيقةً من ملفّه', 'hr', (string) $a->record_id,
             (string) ($a->original_name ?: $a->kind), ['after' => ['source' => 'mobile']]);
 
-        return \App\Support\AttachmentService::serve($a);
+        return \App\Support\Collaboration\AttachmentService::serve($a);
     }
 
     /**
@@ -259,13 +259,13 @@ class MobileWorkController extends V1Controller
         $this->tagMobile($r);
         $u = auth()->user();
 
-        $muted = \App\Support\PrefService::mute($u);
+        $muted = \App\Support\Platform\PrefService::mute($u);
         $muteable = [];
         foreach (\App\Models\HubNotification::MUTEABLE as $k => $label) {
             $muteable[] = ['key' => $k, 'label' => $label, 'muted' => in_array($k, $muted, true)];
         }
 
-        $pinnedTokens = array_map(fn ($p) => (string) $p['token'], \App\Support\PrefService::pins($u));
+        $pinnedTokens = array_map(fn ($p) => (string) $p['token'], \App\Support\Platform\PrefService::pins($u));
         $targets = [];
         foreach (hub_pin_targets($u) as $t) {
             $targets[] = $this->pinEntry($t, in_array((string) $t['token'], $pinnedTokens, true));
@@ -276,7 +276,7 @@ class MobileWorkController extends V1Controller
             'pins'   => [
                 'pinned'  => array_values(array_filter($targets, fn ($e) => $e['pinned'])),
                 'targets' => $targets,
-                'max'     => \App\Support\PrefService::PIN_MAX,
+                'max'     => \App\Support\Platform\PrefService::PIN_MAX,
             ],
         ]);
     }
@@ -290,7 +290,7 @@ class MobileWorkController extends V1Controller
     public function prefsUpdate(Request $r)
     {
         $this->tagMobile($r);
-        $applied = \App\Support\PrefService::setMute(auth()->user(), (array) $r->input('mute', []));
+        $applied = \App\Support\Platform\PrefService::setMute(auth()->user(), (array) $r->input('mute', []));
 
         return $this->ok(['notify' => ['mute' => $applied]]);
     }
@@ -316,7 +316,7 @@ class MobileWorkController extends V1Controller
         if ($gate instanceof \Symfony\Component\HttpFoundation\Response) return $gate;
 
         try {
-            $res  = \App\Support\PrefService::togglePin(auth()->user(), $token);
+            $res  = \App\Support\Platform\PrefService::togglePin(auth()->user(), $token);
             $resp = $this->renderPin($res, $token);
             // يُثبَّت الردُّ تحت المفتاح فقط حين يُبدَّل فعلاً — فلا يمنع خطأٌ عابرٌ
             // (وجهةٌ غيرُ صالحةٍ/سقفٌ) إعادةَ المحاولة الصحيحة بالمفتاح نفسِه.
@@ -414,7 +414,7 @@ class MobileWorkController extends V1Controller
     /** «تقترب مواعيدها»: ودجةُ `due` القائمة (مهامُ نطاقي القريبةُ الاستحقاق) ⇒ `{module,id}` */
     private function dueSoon($u): array
     {
-        $box = \App\Support\WidgetRegistry::resolve('due', $u);
+        $box = \App\Support\Platform\WidgetRegistry::resolve('due', $u);
         if (! is_array($box) || empty($box['rows'])) return [];
 
         $disp = $box['disp'] ?? null;
@@ -444,7 +444,7 @@ class MobileWorkController extends V1Controller
     /** «ينتهي قريباً»: ودجةُ `expiry` القائمة (محروسةٌ بالوحدة والحقل) ⇒ عناصرُ `{module,id}` */
     private function attention($u): array
     {
-        $items = \App\Support\WidgetRegistry::resolve('expiry', $u);
+        $items = \App\Support\Platform\WidgetRegistry::resolve('expiry', $u);
         if (! $items) return [];
 
         return collect($items)->map(fn ($i) => [
@@ -471,7 +471,7 @@ class MobileWorkController extends V1Controller
      */
     private function recentActivity($u): array
     {
-        $rows = \App\Support\WidgetRegistry::resolve('audits', $u);
+        $rows = \App\Support\Platform\WidgetRegistry::resolve('audits', $u);
         if (! $rows) return [];
 
         return collect($rows)->map(fn ($a) => [

@@ -31,16 +31,16 @@ class ProfileController extends Controller
             return view('profile.portal', [
                 'u' => $u,
                 'pending2fa' => $pending,
-                'otpUri' => $pending ? \App\Support\Totp::uri($pending, $u->email, (string) setting('app.name', 'Lynomia Hub')) : null,
+                'otpUri' => $pending ? \App\Support\Security\Totp::uri($pending, $u->email, (string) setting('app.name', 'Lynomia Hub')) : null,
                 // جلساتُه هو حصراً — صفوفُ `user_id` الخاصّة به، بترتيبٍ حتميّ
-                'sessions' => \App\Support\ClientPortalData::mySessions($u, (string) $r->session()->get('hub.sl', '')),
+                'sessions' => \App\Support\Collaboration\ClientPortalData::mySessions($u, (string) $r->session()->get('hub.sl', '')),
             ]);
         }
 
         return view('profile', [
             'u' => $u,
             'pending2fa' => $pending,
-            'otpUri' => $pending ? \App\Support\Totp::uri($pending, $u->email, (string) setting('app.name', 'Lynomia Hub')) : null,
+            'otpUri' => $pending ? \App\Support\Security\Totp::uri($pending, $u->email, (string) setting('app.name', 'Lynomia Hub')) : null,
             'tokens' => \App\Models\ApiToken::where('user_id', auth()->id())->orderByDesc('created_at')->get(),
         ]);
     }
@@ -159,7 +159,7 @@ class ProfileController extends Controller
     /** بدء تفعيل المصادقة الثنائية: توليد سر وعرضه للمستخدم */
     public function twofaStart(Request $r)
     {
-        $r->session()->put('2fa:pending', \App\Support\Totp::secret());
+        $r->session()->put('2fa:pending', \App\Support\Security\Totp::secret());
 
         return redirect()->route('profile.edit')->with('ok', 'أدخل السر في تطبيق المصادقة ثم أكّد بالرمز');
     }
@@ -169,7 +169,7 @@ class ProfileController extends Controller
     {
         $secret = (string) $r->session()->get('2fa:pending');
         abort_unless($secret !== '', 422);
-        if (! \App\Support\Totp::verifyOnce($secret, hub_str($r->input('code')), '2fa-confirm:' . auth()->id())) {
+        if (! \App\Support\Security\Totp::verifyOnce($secret, hub_str($r->input('code')), '2fa-confirm:' . auth()->id())) {
             return back()->withErrors(['code' => 'الرمز غير صحيح — تأكد من إدخال السر في التطبيق وأن ساعة الجوال مضبوطة']);
         }
 
@@ -189,7 +189,7 @@ class ProfileController extends Controller
     {
         $u = auth()->user();
         abort_unless($u->totp_enabled, 422);
-        if (! \App\Support\Totp::verifyOnce((string) $u->totp_secret_cipher, hub_str($r->input('code')), '2fa-disable:' . $u->id)) {
+        if (! \App\Support\Security\Totp::verifyOnce((string) $u->totp_secret_cipher, hub_str($r->input('code')), '2fa-disable:' . $u->id)) {
             return back()->withErrors(['code' => 'الرمز غير صحيح']);
         }
 
@@ -260,10 +260,10 @@ class ProfileController extends Controller
 
         // وجلساتُ الأجهزة الأخرى الحيّة تُوسم منتهية فيطردها SessionSentry مع طلبها
         // التالي، ويُدوَّر «تذكّرني» — بالسكّة الواحدة (Sessions::revokeAll).
-        \App\Support\Sessions::revokeAll($u, (string) $r->session()->get('hub.sl', '') ?: null);
+        \App\Support\Security\Sessions::revokeAll($u, (string) $r->session()->get('hub.sl', '') ?: null);
         // AUTH-1: وقناةُ الجوال أيضاً — Sessions::revokeAll يمسّ جدولَ الويب وحدَه، ولا يلمس
         // mobile_sessions. فبلا هذا يبقى رمزُ تحديثِ الجوال يُدوَّر بعد تغيير الكلمة (CWE-613).
-        \App\Support\MobileSessionService::revokeAllForUser($u, 'تغييرُ كلمة المرور');
+        \App\Support\Mobile\MobileSessionService::revokeAllForUser($u, 'تغييرُ كلمة المرور');
 
         // تدوير معرّف الجلسة الحالية بعد تغيير كلمة المرور
         $r->session()->regenerate();

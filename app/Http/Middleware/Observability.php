@@ -2,8 +2,8 @@
 
 namespace App\Http\Middleware;
 
-use App\Support\ErrorLog;
-use App\Support\Series;
+use App\Support\Ops\ErrorLog;
+use App\Support\Ops\Series;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

@@ -11,9 +11,9 @@ use App\Support\Ai\Gateway\AiGateway;
 use App\Support\Ai\Gateway\LiteLlmAdmin;
 use App\Support\Ai\Governance\AiCost;
 use App\Support\Ai\Governance\AiGovernance;
-use App\Support\ConnectionProbe;
-use App\Support\Redactor;
-use App\Support\Settings;
+use App\Support\Ops\ConnectionProbe;
+use App\Support\Platform\Redactor;
+use App\Support\Platform\Settings;
 
 /**
  * **الفواحصُ الخمسة A–E** (المرحلة ٢ · W6).

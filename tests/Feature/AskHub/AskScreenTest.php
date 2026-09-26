@@ -14,7 +14,7 @@ use App\Support\Ai\Gateway\AiGateway;
 use App\Support\Ai\Routing\AiProfiles;
 use App\Support\Ai\Ask\AskContext;
 use App\Support\Ai\Ask\AskPolicy;
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -72,7 +72,7 @@ class AskScreenTest extends TestCase
         // الصوابُ في الإنتاج (طلبٌ واحدٌ لا يُعيد اشتقاقَ مئةِ قدرة)، لكنّه
         // **يعبر بين أصنافِ الاختبارِ في العمليّةِ الواحدة**: صنفٌ سابقٌ حسم
         // «ai.assistant» وبوّابتُه غيرُ مهيّأة، فتبقى مُطفأةً هنا مهما ضبطنا.
-        \App\Support\FeatureRegistry::flush();
+        \App\Support\Platform\FeatureRegistry::flush();
 
         AiProfiles::seed();
 

@@ -10,7 +10,7 @@
 @endcomponent
 
 @php
-    $H = \App\Support\Health::class;
+    $H = \App\Support\Ops\Health::class;
     $hdrBad = collect($health['components'])->filter(fn ($c) => $c['status'] !== $H::HEALTHY);
     $hdrDown = $hdrBad->contains(fn ($c) => $c['status'] === $H::UNAVAILABLE);
     // «منذ متى» من السلسلة وحدها — بلا سلسلةٍ بعدُ لا مدّةَ مُختلَقة، وحالةٌ لم

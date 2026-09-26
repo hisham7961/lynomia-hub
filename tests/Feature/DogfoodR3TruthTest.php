@@ -8,10 +8,10 @@ use App\Models\Employee;
 use App\Models\FinDocument;
 use App\Models\Project;
 use App\Models\Task;
-use App\Support\AttentionQueue;
-use App\Support\Audit;
-use App\Support\Health;
-use App\Support\SecurityPosture;
+use App\Support\Insights\AttentionQueue;
+use App\Support\Platform\Audit;
+use App\Support\Ops\Health;
+use App\Support\Security\SecurityPosture;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

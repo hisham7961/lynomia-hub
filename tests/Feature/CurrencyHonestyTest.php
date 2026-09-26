@@ -11,7 +11,7 @@ use App\Models\PayrollRun;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\CeoBoard;
+use App\Support\Insights\CeoBoard;
 use Tests\TestCase;
 
 /**

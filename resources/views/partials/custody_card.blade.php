@@ -4,13 +4,13 @@
      ومواصفاتُها الداخلية، وتصاريحُ خروجها، وسجلُّ من حملها قبل. --}}
 @php
     $cuCan   = hub_can(auth()->user(), 'assets', 'e');
-    $cuCat   = \App\Support\Custody::cat($row->type);
-    $cuSpecT = \App\Support\Custody::specTemplate($row->type);
+    $cuCat   = \App\Support\Assets\Custody::cat($row->type);
+    $cuSpecT = \App\Support\Assets\Custody::specTemplate($row->type);
     $cuSpecs = (array) ($row->specs ?? []);
-    $cuHist  = \App\Support\Custody::history($row->id, 12);
+    $cuHist  = \App\Support\Assets\Custody::history($row->id, 12);
     $cuHolder = $row->holder_id ? (hub_ref_labels('users', [$row->holder_id])[$row->holder_id] ?? 'حسابٌ محذوف') : null;
     $cuOpen  = collect($cuHist)->where('status', 'ساري')->values();
-    $cuQr    = \App\Support\Qr::svg(route('m.show', ['assets', $row->id]), 96);
+    $cuQr    = \App\Support\Documents\Qr::svg(route('m.show', ['assets', $row->id]), 96);
     $cuToday = now()->toDateString();
 @endphp
 
@@ -117,11 +117,11 @@
 {{-- ── الحالة والمقعد: قيمتان مقفلتان تُكتبان عبر Custody وحدَها (الطور F · WP-F.2 · C11) ── --}}
 @php
     $cuStatus  = (string) ($row->status ?? '');
-    $cuCanon   = \App\Support\Custody::canonicalStatus($cuStatus);
+    $cuCanon   = \App\Support\Assets\Custody::canonicalStatus($cuStatus);
     // الحالاتُ المشروعةُ بعد الحالة الحالية فقط — لا قائمةٌ كاملةٌ تُغري بقفزةٍ ممنوعة
     $cuTargets = $cuCanon === null
-        ? \App\Support\Custody::ENTRY_STATES
-        : (\App\Support\Custody::TRANSITIONS[$cuCanon] ?? []);
+        ? \App\Support\Assets\Custody::ENTRY_STATES
+        : (\App\Support\Assets\Custody::TRANSITIONS[$cuCanon] ?? []);
     $cuStation = $row->station_id ? (hub_ref_labels('stations', [$row->station_id])[$row->station_id] ?? '—') : null;
 @endphp
 <div class="card">
@@ -217,7 +217,7 @@
         </form>
     @else
         <dl class="detail">
-            @forelse (\App\Support\Custody::specRows($row) as $sr)
+            @forelse (\App\Support\Assets\Custody::specRows($row) as $sr)
                 <div class="drow"><dt>{{ $sr['label'] }}</dt>
                     <dd @if ($sr['ltr']) dir="ltr" @endif>{{ $sr['val'] }}</dd></div>
             @empty
@@ -274,7 +274,7 @@
                 <div class="fld">
                     <label for="pm-kind">نوع التصريح</label>
                     <select class="inp" id="pm-kind" name="kind" required>
-                        @foreach (\App\Support\Custody::PERMITS as $k)
+                        @foreach (\App\Support\Assets\Custody::PERMITS as $k)
                             <option value="{{ $k }}">{{ $k }}</option>
                         @endforeach
                     </select>
@@ -308,7 +308,7 @@
             <button class="btn p sm" style="margin-top:10px">📄 إصدار التصريح</button>
         </form>
         <div class="sub" style="margin-top:10px">
-            @foreach (\App\Support\Custody::PERMIT_HINTS as $k => $why)
+            @foreach (\App\Support\Assets\Custody::PERMIT_HINTS as $k => $why)
                 <div>• <b>{{ $k }}:</b> {{ $why }}</div>
             @endforeach
         </div>

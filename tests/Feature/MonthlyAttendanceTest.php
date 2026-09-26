@@ -8,7 +8,7 @@ use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\MonthlyAttendance;
+use App\Support\Workforce\MonthlyAttendance;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
 

@@ -106,7 +106,7 @@
                             </td>
                             <td>@if ($b['fails'] > 0)<span class="bdg {{ $b['fails'] >= 3 ? 'bad' : 'wn' }}">{{ $b['fails'] }}{{ $b['fails_capped'] ? '+' : '' }}</span>@else <span class="sub">٠</span>@endif</td>
                             <td class="sub" style="white-space:nowrap">@if ($next){{ $next->diffForHumans() }}@else — @endif</td>
-                            <td class="acts"><span class="bdg {{ ($b['status'] ?? '') === \App\Support\Health::UNAVAILABLE ? 'bad' : ($b['late'] ? 'wn' : 'ok') }}">{{ ($b['status'] ?? '') === \App\Support\Health::UNKNOWN ? '— لم تنبض' : ($b['late'] ? '⚠️ متأخرة' : '✓ تعمل') }}</span></td>
+                            <td class="acts"><span class="bdg {{ ($b['status'] ?? '') === \App\Support\Ops\Health::UNAVAILABLE ? 'bad' : ($b['late'] ? 'wn' : 'ok') }}">{{ ($b['status'] ?? '') === \App\Support\Ops\Health::UNKNOWN ? '— لم تنبض' : ($b['late'] ? '⚠️ متأخرة' : '✓ تعمل') }}</span></td>
                         </tr>
                     @endforeach
                     </tbody>

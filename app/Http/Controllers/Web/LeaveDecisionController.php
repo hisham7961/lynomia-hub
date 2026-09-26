@@ -131,7 +131,7 @@ class LeaveDecisionController extends Controller
                 'leaves', $m->id);
         }
 
-        \App\Support\FlowRunner::fire('status', 'leaves', $m, $new);
+        \App\Support\Platform\FlowRunner::fire('status', 'leaves', $m, $new);
 
         return back()->with('ok', $new === 'مرفوض' ? 'رُفض الطلب وأُخطر صاحبُه بالسبب'
             : ($new === 'معتمد' ? 'اعتُمد الطلب — خُصم من الرصيد إن كان غياباً' : 'سُجّلت موافقتُك — بقي اعتمادُ الموارد البشرية'));

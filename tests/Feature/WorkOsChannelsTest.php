@@ -9,7 +9,7 @@ use App\Models\Conversation;
 use App\Models\ConversationMember;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\HubEvents;
+use App\Support\Platform\HubEvents;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 

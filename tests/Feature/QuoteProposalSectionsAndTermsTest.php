@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Client;
 use App\Models\Quote;
 use App\Models\QuoteLine;
-use App\Support\Proposal;
+use App\Support\Documents\Proposal;
 use Tests\TestCase;
 
 /**

@@ -30,8 +30,8 @@ class QuoteController extends Controller
         $client = $q->client_id ? Client::find($q->client_id) : null;
 
         // إثراء البنود بحساب الكراتين (تعبئة المنتجات) بعزل شركة المستند
-        $items = \App\Support\Items::cartons(
-            \App\Support\Items::parse((string) $q->items), $q->company_id);
+        $items = \App\Support\Assets\Items::cartons(
+            \App\Support\Assets\Items::parse((string) $q->items), $q->company_id);
 
         // **قفلُ الحقل يسري على الورقة كما على الشاشة** (v2.323): ما حُجب في
         // القائمة كان يُطبع هنا كاملاً — والمستندُ يُرسَل للعميل ويُطبَع ويُؤرشَف.
@@ -43,8 +43,8 @@ class QuoteController extends Controller
             'items' => $items,
             'hideTotal' => $hide('total'),
             'hideItems' => $hide('items'),
-            'showCartons' => \App\Support\Items::anyCartons($items),
-            'totalCartons' => \App\Support\Items::totalCartons($items),
+            'showCartons' => \App\Support\Assets\Items::anyCartons($items),
+            'totalCartons' => \App\Support\Assets\Items::totalCartons($items),
             'logo' => setting('app.logo'),
         ]);
     }
@@ -61,8 +61,8 @@ class QuoteController extends Controller
         $belt = hub_doc_belt('quotes');
         $q = hub_scope(Quote::query(), 'quotes')->findOrFail($id);
 
-        $html = \App\Support\Proposal::html($q);
-        $bin = \App\Support\DocRenderer::pdf($html, 'عرض ' . $q->doc_no);
+        $html = \App\Support\Documents\Proposal::html($q);
+        $bin = \App\Support\Documents\DocRenderer::pdf($html, 'عرض ' . $q->doc_no);
         if ($bin === null) {
             // بلا mPDF: تُقدَّم نسخةٌ HTML قابلةٌ للطباعة من المتصفح — **وتُسجَّل**
             // (N-14): المستندُ نفسُه يخرج، فسقوطُ سطرِ التدقيقِ هنا كان يعني
@@ -464,7 +464,7 @@ class QuoteController extends Controller
             $q->engagement_id = $engagementId;
             $q->status = 'محوّل';
             $q->save();
-            \App\Support\FlowRunner::fire('status', 'quotes', $q, 'محوّل');
+            \App\Support\Platform\FlowRunner::fire('status', 'quotes', $q, 'محوّل');
             hub_audit('تحويل عرض إلى مشروع', 'quotes', $q->id, $q->doc_no . ' → ' . $name);
 
             // (٥) توفيرُ مساحةِ العميل الآليّ (Work OS · الطور B · WP-B.4 · §63/§98 · C8):
@@ -479,7 +479,7 @@ class QuoteController extends Controller
             // أعلاه (قبولٌ مكرَّرٌ يعود قبل الوصولِ هنا)، فقبولان لا يُطلقانه مرّتين، ويرتدّ
             // مع ارتدادِ المعاملة. الخامُّ `provisioned` يشتقّ project.provisioned
             // المُصرَّحَ في config('hub.events.projects').
-            \App\Support\FlowRunner::fire('provisioned', 'projects', $project);
+            \App\Support\Platform\FlowRunner::fire('provisioned', 'projects', $project);
 
             return redirect()->route('m.show', ['projects', $project->id])
                 ->with('ok', '🚀 أُنشئ المشروع والارتباط من العرض — نُقل النطاق وحُفظ خطُّ الأساس التجاريّ، وأُنشئت مساحةُ العميل');
@@ -563,7 +563,7 @@ class QuoteController extends Controller
         ]);
 
         // الحدثُ يُطلَق مرّةً — بعد خلقِ العضويّةِ فعلاً، تحت القفلِ نفسِه.
-        \App\Support\FlowRunner::fire('workspace_created', 'clients', $client);
+        \App\Support\Platform\FlowRunner::fire('workspace_created', 'clients', $client);
 
         hub_audit('توفيرُ مساحةِ عميلٍ آليّاً عند قبولِ عرض', 'clients', $client->id, $client->name, [
             'after' => ['membership_id' => $membership->id, 'user_id' => $user->id, 'role' => 'owner',
@@ -623,8 +623,8 @@ class QuoteController extends Controller
     protected function archiveProposal(Quote $q, string $tag): void
     {
         try {
-            $html = \App\Support\Proposal::html($q->fresh());
-            $pdf = \App\Support\DocRenderer::pdf($html, 'عرض ' . $q->doc_no);
+            $html = \App\Support\Documents\Proposal::html($q->fresh());
+            $pdf = \App\Support\Documents\DocRenderer::pdf($html, 'عرض ' . $q->doc_no);
             [$blob, $mime, $ext] = $pdf
                 ? [$pdf, 'application/pdf', 'pdf']
                 : [$html, 'text/html', 'html'];
@@ -707,7 +707,7 @@ class QuoteController extends Controller
 
         // **إطلاقُ الأحداث الدلالية**: كان setStatus يتجاوز FlowRunner فلا تُطلَق
         // quote.accepted/rejected المعلَنة — الآن تُطلق فتعمل حِزمُ الاستجابة والتنبيهات.
-        \App\Support\FlowRunner::fire('status', 'quotes', $q, $status);
+        \App\Support\Platform\FlowRunner::fire('status', 'quotes', $q, $status);
 
         return back()->with('ok', $msg);
     }

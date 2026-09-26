@@ -6,7 +6,7 @@ use App\Models\AiFinding;
 use App\Models\SignalState;
 use App\Models\User;
 use App\Models\WorkUpdate;
-use App\Support\ReportReview;
+use App\Support\Workforce\ReportReview;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;

@@ -79,7 +79,7 @@
             @foreach ($chain as $row)
                 <tr>
                     <td class="mono sub">{{ $row['e']->created_at }}</td>
-                    <td>{{ \App\Support\Evidence::label($row['e']->event) }}</td>
+                    <td>{{ \App\Support\Documents\Evidence::label($row['e']->event) }}</td>
                     <td class="mono ltr sub">{{ ($client ?? false) ? '—' : ($row['e']->ip ?: '—') }}</td>
                     <td class="mono ltr sub" style="font-size:9.5px">{{ substr($row['hash'], 0, 16) }}…</td>
                 </tr>

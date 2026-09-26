@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\WorkUpdate;
-use App\Support\DailyWorkCompliance;
-use App\Support\Workday;
+use App\Support\Workforce\DailyWorkCompliance;
+use App\Support\Workforce\Workday;
 use Illuminate\Http\Request;
 
 /**
@@ -54,6 +54,6 @@ class MobileReportsController extends Controller
         if ($d !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) {
             try { return \Illuminate\Support\Carbon::parse($d)->toDateString(); } catch (\Throwable $e) {}
         }
-        return \App\Support\BusinessDate::today();
+        return \App\Support\Platform\BusinessDate::today();
     }
 }

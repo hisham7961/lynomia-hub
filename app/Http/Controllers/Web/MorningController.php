@@ -208,8 +208,8 @@ class MorningController extends Controller
                 // مدىً لا دالّةً على العمود (#33/§٥). **ولا `orWhereNull` هنا عمداً**:
                 // هذا القارئُ يعدّ من لهم تاريخُ عودةٍ معلوم، والمفتوحُ بلا نهايةٍ
                 // كان خارجَه قبلَ التحويلِ وبعدَه — التحويلُ لا يغيّر صفّاً.
-                ->tap(fn ($q) => \App\Support\DayRange::upto($q, 'date_from', today()))
-                ->tap(fn ($q) => \App\Support\DayRange::since($q, 'date_to', today()));
+                ->tap(fn ($q) => \App\Support\Platform\DayRange::upto($q, 'date_from', today()))
+                ->tap(fn ($q) => \App\Support\Platform\DayRange::since($q, 'date_to', today()));
             $lvN = (clone $lvQ)->count();
             $lv = $lvQ->limit(8)->get(['id', 'emp_id', 'type']);
             $names = hub_ref_labels('hr', $lv->pluck('emp_id')->all());
@@ -232,7 +232,7 @@ class MorningController extends Controller
             // الأخطاء الجديدة بأسمائها لا بعددها: «٣ أخطاء بانتظار المعالجة» لا تقول
             // شيئاً — الرسالة والموضع والتكرار هي ما يُبنى عليه قرار.
             // (WP-3.4) من القارئ الواحد ErrorStats — كانت نسخةً من خمسٍ متباعدة.
-            $newErrs = \App\Support\ErrorStats::topNew(4);
+            $newErrs = \App\Support\Ops\ErrorStats::topNew(4);
             foreach ($newErrs as $er) {
                 $where = $er->file ? str_replace(base_path() . '/', '', $er->file) . ($er->line ? ':' . $er->line : '') : '';
                 $ops->push([

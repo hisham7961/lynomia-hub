@@ -8,7 +8,7 @@ use App\Support\Ai\Catalog\AiModelLifecycle;
 use App\Support\Ai\Catalog\AiModels;
 use App\Support\Ai\Catalog\AiModelSources;
 use App\Support\Ai\Catalog\AiProviders;
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;

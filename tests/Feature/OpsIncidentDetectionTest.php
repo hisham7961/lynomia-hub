@@ -3,9 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Incident;
-use App\Support\AlertEngine;
-use App\Support\Health;
-use App\Support\HubEvents;
+use App\Support\Ops\AlertEngine;
+use App\Support\Ops\Health;
+use App\Support\Platform\HubEvents;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

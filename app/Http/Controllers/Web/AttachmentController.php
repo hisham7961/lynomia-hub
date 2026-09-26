@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Attachment;
-use App\Support\AttachmentService;
+use App\Support\Collaboration\AttachmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -146,7 +146,7 @@ class AttachmentController extends Controller
         foreach ($items as $a) {
             // طبقةُ الوثيقةِ على المورد: وثيقةٌ ممنوعةٌ صراحةً لهذا المستخدمِ لا تدخلُ الحزمةَ
             // (فلا يلتفُّ التنزيلُ الجماعيُّ على منعٍ فرديّ · المستوى 5/6)
-            if (! \App\Support\DocumentPolicy::allows(auth()->user(), $a, 'download')) continue;
+            if (! \App\Support\Documents\DocumentPolicy::allows(auth()->user(), $a, 'download')) continue;
             $abs = Storage::disk($a->disk ?: 'local')->path($a->path);
             if (! is_file($abs)) continue;                      // ملفٌ مفقودٌ على القرص لا يُسقط الحزمة كلها
 
@@ -295,7 +295,7 @@ class AttachmentController extends Controller
                  'created_by' => $u->id, 'updated_at' => now(), 'created_at' => now()],
             );
         }
-        \App\Support\DocumentPolicy::forget((string) $a->id);
+        \App\Support\Documents\DocumentPolicy::forget((string) $a->id);
         /*
          * **الكتابةُ الخامُّ لا تُطلق حدثَ Eloquent، فلا ختمَ ولا إبطال** (التحقّق
          * المستقلّ). أُضيف ختمُ `document_access_rules` إلى مفاتيحِ الرادارِ في
@@ -320,7 +320,7 @@ class AttachmentController extends Controller
         abort_unless(hub_is_owner($u) || hub_can($u, $a->module, 'e'), 403);
         DB::table('document_access_rules')->where('id', $ruleId)
             ->where('resource_type', 'attachment')->where('resource_id', $a->id)->delete();
-        \App\Support\DocumentPolicy::forget((string) $a->id);
+        \App\Support\Documents\DocumentPolicy::forget((string) $a->id);
         // ورفعُ المنعِ كوضعِه: بلا ختمٍ تبقى الوثيقةُ محجوبةً بعد السماحِ خمسَ دقائق
         hub_data_bump('document_access_rules');
         hub_expiry_bust();

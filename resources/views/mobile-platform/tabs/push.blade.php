@@ -2,8 +2,8 @@
      الرموزِ الحيّة، تفصيلُ التسليم (لماذا فشل)، سجلٌّ مُرشَّحٌ مُصفَّح، واختبارُ دفعٍ
      آمنٌ إلى جهازِ المُختبِرِ وحدَه عبر المزوّدِ القائم (لا تجاوزَ ضبط). قيمٌ حقيقيّةٌ فقط. --}}
 @php
-    $tone = fn ($s) => \App\Support\MobilePlatform::TONE[$s] ?? 'g';
-    $lbl  = fn ($s) => \App\Support\MobilePlatform::LABEL[$s] ?? $s;
+    $tone = fn ($s) => \App\Support\Mobile\MobilePlatform::TONE[$s] ?? 'g';
+    $lbl  = fn ($s) => \App\Support\Mobile\MobilePlatform::LABEL[$s] ?? $s;
     $base = fn (array $q = []) => route('mobileplatform.index', array_merge(['tab' => 'push'], $q));
     $dt = fn ($v) => $v ? \Illuminate\Support\Carbon::parse($v)->format('m-d H:i') : '—';
 @endphp

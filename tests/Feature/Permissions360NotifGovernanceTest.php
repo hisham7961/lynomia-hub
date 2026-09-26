@@ -65,7 +65,7 @@ class Permissions360NotifGovernanceTest extends TestCase
         $p = Project::create(['name' => 'مشروعُ المسار', 'status' => 'نشط']);
         $def = hub_mod('projects');
 
-        $act = new \ReflectionMethod(\App\Support\FlowRunner::class, 'act');
+        $act = new \ReflectionMethod(\App\Support\Platform\FlowRunner::class, 'act');
         $fire = fn (string $uid) => $act->invoke(null,
             ['type' => 'notify', 'to' => $uid, 'text' => 'حدثٌ في مشروعُ المسار'], $def, 'projects', $p);
 

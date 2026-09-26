@@ -71,7 +71,7 @@ class GroupController extends Controller
         // رسالةُ افتتاحٍ اختياريّة عبر مسار القنوات نفسِه (المحرّكُ الوحيد)
         $body = trim(hub_str($r->input('body')));
         if ($body !== '') {
-            \App\Support\CommentService::create($me, 'channel', (string) $conv->id, $body, ['conversation_id' => (string) $conv->id]);
+            \App\Support\Collaboration\CommentService::create($me, 'channel', (string) $conv->id, $body, ['conversation_id' => (string) $conv->id]);
         }
 
         // من داخلِ مركزِ التواصل: يُفتَح الخيطُ الجديدُ في المركزِ نفسِه (لا مغادرة · §13)

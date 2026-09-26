@@ -10,8 +10,8 @@ use App\Models\Quote;
 use App\Models\Role;
 use App\Models\SignalState;
 use App\Models\User;
-use App\Support\ActionCenter;
-use App\Support\NextAction;
+use App\Support\Insights\ActionCenter;
+use App\Support\Insights\NextAction;
 use Tests\TestCase;
 
 /**

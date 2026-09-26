@@ -48,7 +48,7 @@
 
             {{-- التحقّق: الرمز و QR للموقَّعة (نسخةٌ ورقيةٌ قابلةٌ للتحقّق) --}}
             @if ($q->status === 'وُقّع' && ! empty($q->verify_code))
-                @php $qr = \App\Support\Qr::svg(route('sign.verify') . '?code=' . $q->verify_code, 84); @endphp
+                @php $qr = \App\Support\Documents\Qr::svg(route('sign.verify') . '?code=' . $q->verify_code, 84); @endphp
                 <div style="display:flex;gap:10px;align-items:center;margin-top:8px">
                     @if ($qr)<div style="background:#fff;padding:4px;border-radius:8px;border:1px solid var(--ln)">{!! $qr !!}</div>@endif
                     <div class="sub" style="line-height:1.8">

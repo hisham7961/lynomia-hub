@@ -66,7 +66,7 @@
                     @else<span class="bdg wn">لم يسجّل</span>@endif</td>
                 <td class="mono sub">{{ $c['time_in'] ?: '—' }}@if($c['time_out']) – {{ $c['time_out'] }}@endif
                     {{-- F11: دخولٌ بلا انصرافٍ في يومٍ ماضٍ — لا سقوطَ صامتاً، ورابطُ تصحيحِ HR --}}
-                    @if ($c['checked_in'] && ! $c['checked_out'] && $date < \App\Support\BusinessDate::today())
+                    @if ($c['checked_in'] && ! $c['checked_out'] && $date < \App\Support\Platform\BusinessDate::today())
                         @if ($c['attendance'] && hub_can(auth()->user(), 'attend', 'e'))
                             <a class="bdg wn" href="{{ route('m.edit', ['attend', $c['attendance']->id]) }}" title="صحّح صفَّ الحضور — الساعاتُ لا تُختلق">انصراف مفقود ✎</a>
                         @else

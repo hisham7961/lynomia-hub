@@ -7,8 +7,8 @@ use App\Models\PushDelivery;
 use App\Models\PushToken;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\MobilePlatform;
-use App\Support\PushService;
+use App\Support\Mobile\MobilePlatform;
+use App\Support\Mobile\PushService;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 

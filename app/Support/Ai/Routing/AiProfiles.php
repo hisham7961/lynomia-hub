@@ -5,8 +5,8 @@ namespace App\Support\Ai\Routing;
 use App\Models\AiModel;
 use App\Models\AiProfile;
 use App\Models\AiProfileModel;
-use App\Support\Redactor;
-use App\Support\Tri;
+use App\Support\Platform\Redactor;
+use App\Support\Platform\Tri;
 
 /**
  * **ملفّاتُ السياسة وسلاسلُها** (المرحلة ٢ · W7 · §٩).

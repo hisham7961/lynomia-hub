@@ -8,7 +8,7 @@ use App\Models\AssetProjectAssignment;
 use App\Models\Project;
 use App\Models\Station;
 use App\Models\User;
-use App\Support\AssetProjectService;
+use App\Support\Assets\AssetProjectService;
 use Tests\TestCase;
 
 /**

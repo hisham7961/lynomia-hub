@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ApiToken;
 use App\Models\InboundHook;
-use App\Support\HardeningReadiness;
+use App\Support\Security\HardeningReadiness;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;

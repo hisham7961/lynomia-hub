@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\OdooConnection;
-use App\Support\Odoo;
+use App\Support\Ops\Odoo;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\FakesOdoo;

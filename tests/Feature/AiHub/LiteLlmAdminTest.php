@@ -4,7 +4,7 @@ namespace Tests\Feature\AiHub;
 
 use App\Support\Ai\Gateway\AiGateway;
 use App\Support\Ai\Gateway\LiteLlmAdmin;
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Tests\TestCase;

@@ -4,16 +4,16 @@
      `Custody`/`AssetProjectService` فقط. الأصولُ داخليّة (لا عميل — البوّابةُ تردّه ٤٠٤). --}}
 @php
     $u = auth()->user();
-    $as360 = new \App\Support\Asset360;
+    $as360 = new \App\Support\Assets\Asset360;
     $asOv = $as360->overview($row, $u);
     $asStationHist = $as360->stationHistory($row, $u);
     $asLife = $as360->lifecycle($row, $u);
     $asCur = setting('app.currency', 'د.ك');
 
     // الهويّةُ الموحّدة (باركود + طراز + معرّفات)
-    $aiIds = \App\Support\Identity::of('assets', $row->id);
+    $aiIds = \App\Support\Security\Identity::of('assets', $row->id);
     $aiProduct = $row->product_id ? \App\Models\Product::find($row->product_id) : null;
-    $aiBar = \App\Support\Barcode::svg((string) $row->code, 38);
+    $aiBar = \App\Support\Documents\Barcode::svg((string) $row->code, 38);
 
     $asTabs = array_values(array_filter([
         ['overview', '💻 النظرة'],
@@ -149,7 +149,7 @@
                     <div class="crow" style="margin-top:8px">
                         @foreach ($aiIds as $rid)
                             @continue($rid->kind === 'serial' && hub_masked('assets', 'serial'))
-                            <span class="chip" title="{{ $rid->source ?: '' }}">{{ \App\Support\Identity::KINDS[$rid->kind] ?? $rid->kind }}
+                            <span class="chip" title="{{ $rid->source ?: '' }}">{{ \App\Support\Security\Identity::KINDS[$rid->kind] ?? $rid->kind }}
                                 <b class="mono ltr">{{ \Illuminate\Support\Str::limit($rid->value, 24) }}</b></span>
                         @endforeach
                     </div>

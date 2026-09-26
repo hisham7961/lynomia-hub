@@ -49,9 +49,9 @@
         @php [$epStLabel, $epStTone] = $epStatusMap[$dev->status] ?? [$dev->status, 'wn']; @endphp
         <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0">
             <a href="{{ route('endpoints.show', $dev->id) }}"><b>{{ $dev->hostname ?? '—' }}</b></a>
-            <span class="chip">{{ \App\Support\Endpoint::label($dev->os) }}</span>
+            <span class="chip">{{ \App\Support\Endpoint\Endpoint::label($dev->os) }}</span>
             <span class="bdg {{ $epStTone }}">{{ $epStLabel }}</span>
-            @unless (\App\Support\Endpoint::isSupported($dev->os))<span class="bdg wn">نظامٌ قديم</span>@endunless
+            @unless (\App\Support\Endpoint\Endpoint::isSupported($dev->os))<span class="bdg wn">نظامٌ قديم</span>@endunless
             <span class="sub">آخر نبضة: {{ $dev->last_heartbeat_at?->format('Y-m-d H:i') ?? 'لم ينبض' }}</span>
             @if ($epTech && $dev->pubkey_fp)
                 <span class="sub mono ltr">بصمة: {{ \Illuminate\Support\Str::limit((string) $dev->pubkey_fp, 16) }}</span>

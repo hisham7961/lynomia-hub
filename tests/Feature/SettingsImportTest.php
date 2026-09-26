@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;

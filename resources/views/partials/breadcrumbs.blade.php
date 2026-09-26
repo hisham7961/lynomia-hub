@@ -4,7 +4,7 @@
      تسمياتِ الموقع لا بياناتٍ)، ولا يُعرَض للزائر أو حين لا مسارَ ذا دلالة. --}}
 @auth
     @php
-        $iaTrail = \App\Support\InformationArchitecture::make()->breadcrumbs(request(), auth()->user());
+        $iaTrail = \App\Support\Platform\InformationArchitecture::make()->breadcrumbs(request(), auth()->user());
         // طيُّ التكرارِ المتتالي (قسمٌ = وجهة مثلاً) كي لا يتكرّر الاسمُ مرّتين
         $iaCrumbs = [];
         $prev = null;

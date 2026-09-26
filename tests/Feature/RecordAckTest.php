@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Asset;
 use App\Models\Decision;
 use App\Models\Meeting;
-use App\Support\Acks;
+use App\Support\Collaboration\Acks;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -97,7 +97,7 @@ class RecordAckTest extends TestCase
             'status' => 'لم يبدأ', 'date' => now()->toDateString()]);
 
         $this->actingAs($this->employee);
-        $item = collect(\App\Support\Inbox::items($this->employee))->firstWhere('kind', 'ack');
+        $item = collect(\App\Support\Collaboration\Inbox::items($this->employee))->firstWhere('kind', 'ack');
 
         $this->assertNotNull($item, 'قرارٌ ينتظر إقراري ولم يصل صندوقي');
         $this->assertSame('اعتماد الميزانية', $item['title']);

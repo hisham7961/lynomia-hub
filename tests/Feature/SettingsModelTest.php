@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\Web\SettingController;
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

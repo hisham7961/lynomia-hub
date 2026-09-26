@@ -2,15 +2,15 @@
 
 namespace App\Http\Controllers\Web;
 
-use App\Support\ApprovalResult;
-use App\Support\ApprovalService;
+use App\Support\Platform\ApprovalResult;
+use App\Support\Platform\ApprovalService;
 use Illuminate\Http\Request;
 
 /**
  * حسم الموافقات المُلزِمة: الاعتماد يُنفّذ العملية المؤجلة (تعديل بالحمولة المخزنة أو حذف)،
  * والرفض يوقفها — وفي الحالين يُشعَر طالب التنفيذ.
  *
- * **المنطقُ في `App\Support\ApprovalService` (Mobile Readiness · الطور D · Critic F2):**
+ * **المنطقُ في `App\Support\Platform\ApprovalService` (Mobile Readiness · الطور D · Critic F2):**
  * المعاملةُ وقفلُ الصفّ وحارسُ التقادم وإعادةُ الحمولة وإشعارُ الطالب صارت في خدمةٍ
  * مشتركةٍ يستدعيها الويبُ والجوالُ معاً — فلا يُنسخ منطقُ الأعمال ولا يُستدعى معالجُ
  * الويب (الذي يعيد 302) من الجوال. وهذا المتحكّم يترجم نتيجةَ الخدمة (`ApprovalResult`)

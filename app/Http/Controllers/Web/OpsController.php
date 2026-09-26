@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\Series;
-use App\Support\SysMonitor;
+use App\Support\Ops\Series;
+use App\Support\Ops\SysMonitor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -77,8 +77,8 @@ class OpsController extends Controller
         // **نموذجُ الصحّة الواحد** (v2.399): الحالةُ لكل مكوّنٍ حرج بخمس درجات — هي نفسُها
         // التي يقرؤها /healthz، فلا يقول المركزُ «سليم» وتقول المراقبةُ غيرَه. النبضاتُ
         // تُشتقّ منه (المتغيّر نفسُه للقالب) بمدّة آخر تشغيلٍ ونتيجته لا الموعدِ وحده.
-        $health = \App\Support\Health::check();
-        $deps = \App\Support\Health::dependencies();
+        $health = \App\Support\Ops\Health::check();
+        $deps = \App\Support\Ops\Health::dependencies();
         $beats = [];
         foreach (($health['components']['scheduler']['data']['jobs'] ?? []) as $k => $j) {
             $beats[] = ['key' => $k, 'label' => $j['label'], 'at' => $j['at'], 'late' => $j['late'],
@@ -93,7 +93,7 @@ class OpsController extends Controller
         // من خمسٍ متباعدة)، ملفوفةٌ (§25: جدولٌ ساقط يعرض «غير متاح» لا أصفاراً
         // كاذبة) ومخبّأةٌ ٦٠ ثانية: أرقامُ أسبوعٍ كاملٍ لا تتغيّر بين ضغطتين
         $errsW = hub_screen('ops.errs', 60,
-            fn () => rescue(fn () => \App\Support\ErrorStats::opsSummary(), null, false), [], true);
+            fn () => rescue(fn () => \App\Support\Ops\ErrorStats::opsSummary(), null, false), [], true);
 
         // (WP-2.7 · §3.14) الترحيلات بعدّادٍ واحدٍ متّفق (hub_pending_migrations) —
         // النسخةُ الخاصة القديمة (pendingMigrations) حُذفت فلا يقول المركزُ قولاً
@@ -154,7 +154,7 @@ class OpsController extends Controller
      */
     protected function headerSince(array $health): array
     {
-        $rank = (float) \App\Support\Health::rank($health['status']);
+        $rank = (float) \App\Support\Ops\Health::rank($health['status']);
 
         return hub_screen('ops.hdr:' . (int) $rank, 60, function () use ($rank) {
             $out = ['since' => null, 'tracked' => false];
@@ -670,8 +670,8 @@ class OpsController extends Controller
         $on = ! (bool) setting('maintenance.on', false);
         // (WP-9.2) على الكاتب الواحد — والفعلُ الأمنيّ يُمرَّر للدفعة فيبقى قيداً واحداً.
         // والإنهاءُ يكتب فراغاً ولا يحذف الصفَّ (كما كان): `setting()` تقرأ الفراغَ غياباً.
-        \App\Support\Settings::batch('ops', function () use ($on) {
-            \App\Support\Settings::put('maintenance.on', $on ? '1' : '', 'ops',
+        \App\Support\Platform\Settings::batch('ops', function () use ($on) {
+            \App\Support\Platform\Settings::put('maintenance.on', $on ? '1' : '', 'ops',
                 $on ? 'تفعيل وضع الصيانة من مركز التشغيل' : 'إنهاء وضع الصيانة من مركز التشغيل');
         }, ['action' => $on ? 'تفعيل وضع الصيانة' : 'إنهاء وضع الصيانة',
             'module' => null, 'name' => 'من مركز التشغيل']);
@@ -728,7 +728,7 @@ class OpsController extends Controller
             Cache::forget('hub.pending_migrations');   // شارة التحذير تختفي فوراً
 
             // وفروقاتُ ما بعد الترحيل تُقال: عمودٌ يقرؤه الكود ولم تُنشئه هجرة
-            $gaps = \App\Support\SchemaGuard::gaps();
+            $gaps = \App\Support\Ops\SchemaGuard::gaps();
 
             hub_data_bump('migrations');   // ختمُ لوحة الترحيلات (WP-2.7) — العدّادُ الجديد يظهر فوراً
 
@@ -759,20 +759,20 @@ class OpsController extends Controller
     {
         $probe = (string) $r->query('probe', '');
         if ($probe === 'live') {
-            return response()->json(['status' => 'ok', 'probe' => 'live'] + \App\Support\Health::live());
+            return response()->json(['status' => 'ok', 'probe' => 'live'] + \App\Support\Ops\Health::live());
         }
 
-        $full = $probe === 'ready' ? \App\Support\Health::ready() : \App\Support\Health::check();
-        $pub = \App\Support\Health::publicView($full);
+        $full = $probe === 'ready' ? \App\Support\Ops\Health::ready() : \App\Support\Ops\Health::check();
+        $pub = \App\Support\Ops\Health::publicView($full);
         $c = $full['components'];
-        $legacy = fn (string $k) => in_array($c[$k]['status'] ?? \App\Support\Health::UNKNOWN,
-            [\App\Support\Health::HEALTHY, \App\Support\Health::DEGRADED, \App\Support\Health::MAINTENANCE], true) ? 'ok' : 'fail';
+        $legacy = fn (string $k) => in_array($c[$k]['status'] ?? \App\Support\Ops\Health::UNKNOWN,
+            [\App\Support\Ops\Health::HEALTHY, \App\Support\Ops\Health::DEGRADED, \App\Support\Ops\Health::MAINTENANCE], true) ? 'ok' : 'fail';
         $checks = ['db' => $legacy('db'), 'cache' => $legacy('cache'), 'storage' => $legacy('storage')];
         // **رمزُ HTTP من الجاهزية وحدها**: ٥٠٣ حين لا يُخدَم طلبٌ صحيح (قاعدة/خبيئة/تخزين/إعداد).
         // أمّا المجدولاتُ والطوابيرُ والتكاملات فتُقال «متدهورة» في `health`/`components` —
         // مراقبةُ Uptime تُنبّه على «الموقع لا يخدم» لا على «cron لم يُضبط بعد»، وذاك شأنُ مركز التشغيل.
-        $readiness = \App\Support\Health::readinessOf($full);
-        $down = $readiness === \App\Support\Health::UNAVAILABLE;
+        $readiness = \App\Support\Ops\Health::readinessOf($full);
+        $down = $readiness === \App\Support\Ops\Health::UNAVAILABLE;
 
         return response()->json([
             // `status` بدلالته القديمة حرفياً (ok ما لم يفشل فحصٌ من الثلاثة) — العقدُ القديم لا يتبدّل؛
@@ -800,7 +800,7 @@ class OpsController extends Controller
     {
         $this->gate();
 
-        return response()->json(\App\Support\Health::check() + ['dependencies' => \App\Support\Health::dependencies()],
+        return response()->json(\App\Support\Ops\Health::check() + ['dependencies' => \App\Support\Ops\Health::dependencies()],
             200, [], JSON_UNESCAPED_UNICODE);
     }
 
@@ -888,7 +888,7 @@ class OpsController extends Controller
      */
     public static function dependencyCards(array $health): array
     {
-        $H = \App\Support\Health::class;
+        $H = \App\Support\Ops\Health::class;
         $cards = [];
 
         // البنية من مكوّنات الصحّة — المكوّن outbox هو «الطابور» بلسان الاعتماديات
@@ -908,16 +908,16 @@ class OpsController extends Controller
 
         // التكاملات المضبوطة فعلاً — من السجل الواحد لا من قائمةٍ ثانية
         try {
-            $dirs = [\App\Support\Integrations::IN => 'وارد', \App\Support\Integrations::OUT => 'صادر',
-                     \App\Support\Integrations::BOTH => 'الاتجاهان'];
-            foreach (\App\Support\Integrations::installed() as $key => $i) {
-                if (($i['health'] ?? '') === \App\Support\Integrations::CONFIGURATION_REQUIRED) continue;
+            $dirs = [\App\Support\Ops\Integrations::IN => 'وارد', \App\Support\Ops\Integrations::OUT => 'صادر',
+                     \App\Support\Ops\Integrations::BOTH => 'الاتجاهان'];
+            foreach (\App\Support\Ops\Integrations::installed() as $key => $i) {
+                if (($i['health'] ?? '') === \App\Support\Ops\Integrations::CONFIGURATION_REQUIRED) continue;
                 $cards[] = [
                     'id' => 'dep-' . $key, 'icon' => $i['icon'], 'name' => $i['name'],
                     'type' => 'تكامل ' . ($dirs[$i['dir']] ?? $i['dir']),
-                    'health' => \App\Support\Integrations::HEALTH_LABELS[$i['health']] ?? $i['health'],
-                    'tone' => \App\Support\Integrations::HEALTH_TONE[$i['health']] ?? 'g',
-                    'ms' => \App\Support\Integrations::lastMs($key),
+                    'health' => \App\Support\Ops\Integrations::HEALTH_LABELS[$i['health']] ?? $i['health'],
+                    'tone' => \App\Support\Ops\Integrations::HEALTH_TONE[$i['health']] ?? 'g',
+                    'ms' => \App\Support\Ops\Integrations::lastMs($key),
                     'ok_at' => $i['last_ok_at'], 'fail_at' => $i['last_fail_at'],
                     'error' => $i['last_error'], 'why' => $i['state'] ?? '',
                 ];
@@ -934,14 +934,14 @@ class OpsController extends Controller
                 $fail = DB::table('outbox')->where('channel', 'mail')->where('state', 'failed')->max('created_at');
                 $err = $fail ? DB::table('outbox')->where('channel', 'mail')->where('state', 'failed')
                     ->orderByDesc('created_at')->orderByDesc('id')->value('error') : null;
-                $j = \App\Support\Integrations::judge($ok ? (string) $ok : null, $fail ? (string) $fail : null);
+                $j = \App\Support\Ops\Integrations::judge($ok ? (string) $ok : null, $fail ? (string) $fail : null);
                 $cards[] = [
                     'id' => 'dep-mail', 'icon' => '📧', 'name' => 'البريد الصادر (' . $mailer . ')',
                     'type' => 'صادر',
-                    'health' => \App\Support\Integrations::HEALTH_LABELS[$j] ?? $j,
-                    'tone' => \App\Support\Integrations::HEALTH_TONE[$j] ?? 'g',
+                    'health' => \App\Support\Ops\Integrations::HEALTH_LABELS[$j] ?? $j,
+                    'tone' => \App\Support\Ops\Integrations::HEALTH_TONE[$j] ?? 'g',
                     'ms' => null, 'ok_at' => $ok, 'fail_at' => $fail,
-                    'error' => $err ? mb_substr(\App\Support\Redactor::text((string) $err), 0, 180) : null,
+                    'error' => $err ? mb_substr(\App\Support\Platform\Redactor::text((string) $err), 0, 180) : null,
                     'why' => 'مُرسِلٌ حقيقيّ — يغادر الخادمَ فعلاً',
                 ];
             }
@@ -1021,7 +1021,7 @@ class OpsController extends Controller
 
         // الوجهةُ لا تُكتب في التدقيق إلا مقنَّعة — القيدُ يُقرأ بصلاحية «تدقيق» أوسعَ من «مالك»
         hub_audit('إعادة إرسال رسالة صادرة', null, null,
-            'قناة ' . $msg->channel . ' · نوع ' . $msg->kind . ' · الوجهة ' . \App\Support\Integrations::maskDestination($msg->target));
+            'قناة ' . $msg->channel . ' · نوع ' . $msg->kind . ' · الوجهة ' . \App\Support\Ops\Integrations::maskDestination($msg->target));
 
         $reset = ['state' => 'queued', 'error' => null];
         if (hub_has_col('outbox', 'attempts')) $reset += ['attempts' => 0, 'next_at' => null];
@@ -1030,7 +1030,7 @@ class OpsController extends Controller
         try {
             \Illuminate\Support\Facades\Artisan::call('hub:outbox', ['--only' => $msg->id]);
         } catch (\Throwable $e) {
-            return redirect()->route('ops.index')->with('err', 'تعذّر تشغيل العامل: ' . mb_substr(\App\Support\Redactor::text($e->getMessage()), 0, 200));
+            return redirect()->route('ops.index')->with('err', 'تعذّر تشغيل العامل: ' . mb_substr(\App\Support\Platform\Redactor::text($e->getMessage()), 0, 200));
         }
 
         $fresh = $msg->fresh();

@@ -236,7 +236,7 @@ class AiProviderController extends Controller
             (string) $provider->label, ['after' => ['up' => $res['up'], 'ms' => $res['ms'],
                 'mode' => $d['mode'], 'model' => (string) $model->litellm_model_name]]);
 
-        return back()->with('ok', \App\Support\ConnectionProbe::line($res));
+        return back()->with('ok', \App\Support\Ops\ConnectionProbe::line($res));
     }
 
     // ── الداخل ─────────────────────────────────────────────────────────

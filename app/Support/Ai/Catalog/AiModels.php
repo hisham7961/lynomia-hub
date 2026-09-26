@@ -5,8 +5,8 @@ namespace App\Support\Ai\Catalog;
 use App\Models\AiModel;
 use App\Models\AiProvider;
 use App\Support\Ai\Gateway\LiteLlmAdmin;
-use App\Support\Redactor;
-use App\Support\Tri;
+use App\Support\Platform\Redactor;
+use App\Support\Platform\Tri;
 
 /**
  * **سجلُّ النماذجِ والاكتشاف** (المرحلة ٢ · W5).

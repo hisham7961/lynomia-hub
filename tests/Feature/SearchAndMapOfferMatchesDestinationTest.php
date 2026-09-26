@@ -64,7 +64,7 @@ class SearchAndMapOfferMatchesDestinationTest extends TestCase
     /** كلُّ وجهةٍ يعرضها البحثُ لهذه الشخصيّة، مطروقةً — ويُعاد ما رُدَّ ٤٠٣ */
     private function refusedSearchOffers(User $u): array
     {
-        $ia = app(\App\Support\InformationArchitecture::class);
+        $ia = app(\App\Support\Platform\InformationArchitecture::class);
         $seen = $refused = [];
         $this->knocked = 0;
 

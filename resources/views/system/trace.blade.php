@@ -32,8 +32,8 @@
             @forelse ($rows as $row)
                 <tr>
                     <td><bdi class="mono ltr">{{ $row['at'] }}</bdi></td>
-                    <td><span class="bdg g">{{ \App\Support\Correlation::KINDS[$row['kind']] ?? $row['kind'] }}</span></td>
-                    <td><span class="bdg {{ \App\Support\Severity::tone($row['severity']) }}">{{ \App\Support\Severity::label($row['severity']) }}</span></td>
+                    <td><span class="bdg g">{{ \App\Support\Ops\Correlation::KINDS[$row['kind']] ?? $row['kind'] }}</span></td>
+                    <td><span class="bdg {{ \App\Support\Platform\Severity::tone($row['severity']) }}">{{ \App\Support\Platform\Severity::label($row['severity']) }}</span></td>
                     <td>
                         @if (! empty($row['url']))<a href="{{ $row['url'] }}"><b>{{ $row['title'] }}</b></a>@else<b>{{ $row['title'] }}</b>@endif
                         @if (! empty($row['why']))<div class="sub">{{ $row['why'] }}</div>@endif
@@ -48,7 +48,7 @@
         </table>
     </div>
     @if ($rows)
-        <div class="sub" style="margin-top:8px">يُعرض حتى {{ \App\Support\Correlation::LIMIT }} صفٍّ من كل مصدر — الأقدمُ أولاً.</div>
+        <div class="sub" style="margin-top:8px">يُعرض حتى {{ \App\Support\Ops\Correlation::LIMIT }} صفٍّ من كل مصدر — الأقدمُ أولاً.</div>
     @endif
 </div>
 @endsection

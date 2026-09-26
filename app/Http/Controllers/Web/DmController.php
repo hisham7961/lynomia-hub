@@ -8,7 +8,7 @@ use App\Models\ConversationMember;
 use App\Models\DmMessage;
 use App\Models\HubNotification;
 use App\Models\User;
-use App\Support\DmService;
+use App\Support\Collaboration\DmService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -42,7 +42,7 @@ class DmController extends Controller
             $c = \Illuminate\Support\Carbon::parse($at);
             // الحالةُ الخشنة (§presence) فوق «متصل» الثنائيّ — للتواصل لا للمراقبة
             $out[$uid] = ['online' => $c->gt(now()->subMinutes(5)), 'at' => $c,
-                'state' => \App\Support\Presence::state($c)];
+                'state' => \App\Support\Collaboration\Presence::state($c)];
         }
 
         return $out;
@@ -278,7 +278,7 @@ class DmController extends Controller
             'all' => $this->startableUsers((string) $me),
             'presence' => self::presence($ids),
             'dmReactions' => self::dmReactionsFor($msgs->pluck('id')->all()),
-            'sinceCursor' => $tip ? \App\Support\Collaboration::encodeCursor((string) $tip->created_at, (string) $tip->id) : '',
+            'sinceCursor' => $tip ? \App\Support\Collaboration\Collaboration::encodeCursor((string) $tip->created_at, (string) $tip->id) : '',
         ]);
     }
 
@@ -404,7 +404,7 @@ class DmController extends Controller
 
         $me = (string) auth()->id();
         $key = DmMessage::threadKey($me, (string) $other->id);
-        $cursor = \App\Support\Collaboration::decodeCursor($r->query('cursor'));
+        $cursor = \App\Support\Collaboration\Collaboration::decodeCursor($r->query('cursor'));
 
         $q = DmMessage::where('thread_key', $key)->inCompanyScope();
         if ($cursor !== null) {
@@ -422,7 +422,7 @@ class DmController extends Controller
         }
 
         $events = $rows->map(fn (DmMessage $m) => [
-            'type'       => $m->deleted_at !== null ? \App\Support\Collaboration::EV_MESSAGE_DELETED : \App\Support\Collaboration::EV_MESSAGE_CREATED,
+            'type'       => $m->deleted_at !== null ? \App\Support\Collaboration\Collaboration::EV_MESSAGE_DELETED : \App\Support\Collaboration\Collaboration::EV_MESSAGE_CREATED,
             'id'         => (string) $m->id,
             'mine'       => $m->from_id === $me,
             'body'       => $m->deleted_at !== null ? null : (string) $m->body,
@@ -433,12 +433,12 @@ class DmController extends Controller
 
         $last = $rows->last();
         $next = $last
-            ? \App\Support\Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
+            ? \App\Support\Collaboration\Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
             : (string) $r->query('cursor', '');
 
         // §typing الطرفُ الآخرُ يكتب الآن؟ (عابرٌ لا يُدقَّق) — الاسمُ إن كان في النافذة.
         // بوّابةُ القدرة: إن أُطفئ «مؤشّر الكتابة» لا إشارةَ (فشلٌ آمن).
-        $typing = (hub_capability('collab.typing') && in_array((string) $other->id, \App\Support\Typing::current($key, $me), true))
+        $typing = (hub_capability('collab.typing') && in_array((string) $other->id, \App\Support\Collaboration\Typing::current($key, $me), true))
             ? [$other->name] : [];
 
         return response()->json(['events' => $events, 'cursor' => $next, 'typing' => $typing]);
@@ -453,7 +453,7 @@ class DmController extends Controller
         abort_if($other->id === auth()->id(), 404);
         abort_unless(self::dmReachable($other), 404);
 
-        \App\Support\Typing::ping(DmMessage::threadKey((string) auth()->id(), (string) $other->id), (string) auth()->id());
+        \App\Support\Collaboration\Typing::ping(DmMessage::threadKey((string) auth()->id(), (string) $other->id), (string) auth()->id());
 
         return response()->noContent();
     }

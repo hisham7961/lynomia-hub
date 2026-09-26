@@ -2,14 +2,14 @@
 
 namespace App\Models;
 
-use App\Support\EndpointPrivacy;
+use App\Support\Endpoint\EndpointPrivacy;
 use App\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * **حدثُ نقطةٍ طرفية** (Work OS · الطور J · WP-J.2 · §43) — لقطةٌ يبلّغها وكيلُ
- * جهازٍ عبر المسار الموقَّع (عقدُ التوقيع في docblock ‏`App\Support\Es256`).
+ * جهازٍ عبر المسار الموقَّع (عقدُ التوقيع في docblock ‏`App\Support\Security\Es256`).
  *
  * `kind` و`severity` قائمتا سماحٍ تُفرَضان هنا (لا DB enum — درسُ C10)؛
  * والملخّصُ **يُنقَّح ويُقصّ عند الكاتب** (محارفُ التحكّم تُنزَع، ٤٠٠ محرفاً)؛

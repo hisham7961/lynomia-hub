@@ -70,7 +70,7 @@ class CouncilPayrollMonthTest extends TestCase
     #[\PHPUnit\Framework\Attributes\DataProvider('monthForms')]
     public function test_the_month_normalizer_reads_what_accountants_write(string $raw, ?string $want): void
     {
-        $this->assertSame($want, \App\Support\PayrollMonth::key($raw),
+        $this->assertSame($want, \App\Support\Workforce\PayrollMonth::key($raw),
             'المطبِّعُ أخطأ في «' . $raw . '» — وكلُّ صيغةٍ يُخطئها تفتح بابَ التكرار');
     }
 

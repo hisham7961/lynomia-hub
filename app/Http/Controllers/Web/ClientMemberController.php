@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientMembership;
-use App\Support\ClientMembers;
+use App\Support\Collaboration\ClientMembers;
 use Illuminate\Http\Request;
 
 /**
@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
  *
  * ── لا RBAC ثانٍ: الصلاحيةُ = `hub_can('clients','e')` للمدير + بياناتُ
  * `client_memberships` لما يملكه العميل.
- * ── **الجوهرُ صار مصدراً واحداً مشترَكاً** (`App\Support\ClientMembers`) منذ هبوطِ
+ * ── **الجوهرُ صار مصدراً واحداً مشترَكاً** (`App\Support\Collaboration\ClientMembers`) منذ هبوطِ
  * تطبيق الجوال: السطحان (هذه اللوحةُ و`/api/mobile/v1/clients/{client}/members`)
  * يستدعيان منطقَ الدعوة/الدور/السحب نفسَه حرفاً — لا سكّةَ تفعيلٍ ولا عضويّةٍ ثانية.
  * ── لا سكّةَ عزلٍ ثانية: `PortalGuard` يردّ حسابَ العميل عن هذه المسارات (٤٠٤)،

@@ -3,7 +3,7 @@
 namespace Tests\Unit;
 
 use App\Models\ApiToken;
-use App\Support\Totp;
+use App\Support\Security\Totp;
 use PHPUnit\Framework\TestCase;
 
 class SupportTest extends TestCase

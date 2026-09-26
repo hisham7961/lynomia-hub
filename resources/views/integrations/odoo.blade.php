@@ -22,7 +22,7 @@
                 <th>آخر اختبار ناجح</th><th>المشاريع</th><th></th>
             </tr></thead>
             <tbody>
-                @php $dflt = \App\Support\Odoo::for(null); @endphp
+                @php $dflt = \App\Support\Ops\Odoo::for(null); @endphp
                 <tr>
                     <td><b>الافتراضي</b></td>
                     <td class="mono ltr">{{ $dflt->host() ?: '—' }}</td>

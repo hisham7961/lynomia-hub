@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\HubNotification;
-use App\Support\Api;
-use App\Support\ClientPortalData;
+use App\Support\Platform\Api;
+use App\Support\Collaboration\ClientPortalData;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

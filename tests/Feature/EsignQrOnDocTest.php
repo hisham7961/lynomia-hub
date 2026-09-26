@@ -128,7 +128,7 @@ class EsignQrOnDocTest extends TestCase
             'signed_at' => now(), 'signed_ip' => '1.2.3.4',
         ]);
 
-        $html = \App\Support\DocRenderer::docHtml($req->fresh());
+        $html = \App\Support\Documents\DocRenderer::docHtml($req->fresh());
         $this->assertStringContainsString('data:image/svg+xml;base64,', $html,
             'وثيقةُ PDF الموقّعة بلا رمز QR — كان على الويب فقط لا على المستند المنزَّل');
         $this->assertStringContainsString($req->verify_code, $html);   // النصُّ يبقى للتحقّق اليدوي
@@ -145,7 +145,7 @@ class EsignQrOnDocTest extends TestCase
         ]);
 
         $this->assertStringNotContainsString('data:image/svg+xml;base64,',
-            \App\Support\DocRenderer::docHtml($req->fresh()));
+            \App\Support\Documents\DocRenderer::docHtml($req->fresh()));
     }
 
     /** لا يُفتَح إلا الموقّع: المسودة أو الرمز الخاطئ → ٤٠٤ (لا يكشف غير الموقّع) */

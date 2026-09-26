@@ -92,7 +92,7 @@ class PayrollJournalTest extends TestCase
      */
     public function test_autojournal_is_transaction_wrapped(): void
     {
-        $svc = \Tests\Support\Source::read(\App\Support\JournalPostingService::class);
+        $svc = \Tests\Support\Source::read(\App\Support\Finance\JournalPostingService::class);
         $this->assertMatchesRegularExpression('/postBalanced.*?DB::transaction/su', $svc,
             'خدمةُ الترحيل تبني القيدَ وسطريه بلا معاملة — فشلُ السطر الثاني يترك قيداً أعرج');
 

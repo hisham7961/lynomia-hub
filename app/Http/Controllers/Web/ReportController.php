@@ -71,7 +71,7 @@ class ReportController extends Controller
          * وحدَه، وترتيبٌ وقصٌّ في SQL.
          */
         $fold = function ($q, string $key, ?int $limit, bool $withCount) {
-            if (! \App\Support\Currency::enabled()) {
+            if (! \App\Support\Finance\Currency::enabled()) {
                 $sel = array_filter([$key, $withCount ? DB::raw('COUNT(*) c') : null,
                                      DB::raw('SUM(total) s')]);
 

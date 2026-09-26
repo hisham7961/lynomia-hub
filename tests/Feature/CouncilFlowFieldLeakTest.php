@@ -39,7 +39,7 @@ class CouncilFlowFieldLeakTest extends TestCase
 
     private function resolve(string $tpl, Employee $e): string
     {
-        $ref = new \ReflectionMethod(\App\Support\FlowRunner::class, 'tpl');
+        $ref = new \ReflectionMethod(\App\Support\Platform\FlowRunner::class, 'tpl');
         $ref->setAccessible(true);
 
         return $ref->invoke(null, $tpl, hub_mod('hr'), 'hr', $e);

@@ -17,7 +17,7 @@ use App\Support\Ai\Ask\AskFailures;
 use App\Support\Ai\Ask\AskPipeline;
 use App\Support\Ai\Ask\AskPolicy;
 use App\Support\Ai\Ask\AskTools;
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -96,7 +96,7 @@ class AskAdversarialSweepTest extends TestCase
         // الصوابُ في الإنتاج (طلبٌ واحدٌ لا يُعيد اشتقاقَ مئةِ قدرة)، لكنّه
         // **يعبر بين أصنافِ الاختبارِ في العمليّةِ الواحدة**: صنفٌ سابقٌ حسم
         // «ai.assistant» وبوّابتُه غيرُ مهيّأة، فتبقى مُطفأةً هنا مهما ضبطنا.
-        \App\Support\FeatureRegistry::flush();
+        \App\Support\Platform\FeatureRegistry::flush();
 
         AiProfiles::seed();
         $p = AiProvider::create(['catalog_key' => 'openai', 'label' => 'وهميّ', 'enabled' => true,

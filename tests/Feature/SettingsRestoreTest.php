@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Support\SecurityEvents;
-use App\Support\Settings;
+use App\Support\Security\SecurityEvents;
+use App\Support\Platform\Settings;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

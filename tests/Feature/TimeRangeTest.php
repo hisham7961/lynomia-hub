@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\TimeRange;
+use App\Support\Platform\TimeRange;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;

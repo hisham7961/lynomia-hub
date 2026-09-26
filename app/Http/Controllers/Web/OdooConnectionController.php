@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\OdooConnection;
-use App\Support\Odoo;
+use App\Support\Ops\Odoo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
@@ -56,7 +56,7 @@ class OdooConnectionController extends Controller
         return view('integrations.odoo', [
             'rows' => $rows, 'uses' => $uses, 'linked' => $linked,
             'defaultReady' => Odoo::configured(),
-            'odooMods' => \App\Support\Integrations::odooModules(),
+            'odooMods' => \App\Support\Ops\Integrations::odooModules(),
         ]);
     }
 
@@ -124,17 +124,17 @@ class OdooConnectionController extends Controller
         $this->gate();
         $c = OdooConnection::findOrFail($id);
 
-        $res = \App\Support\ConnectionProbe::odoo($c);
+        $res = \App\Support\Ops\ConnectionProbe::odoo($c);
         if ($res['up'] !== true) {
             // الفشل لا يمسّ آخر نجاحٍ مسجَّل — التاريخ يبقى صادقاً
             return back()->withErrors(['conn' => 'اختبار «' . $c->name . '» — '
-                . \App\Support\ConnectionProbe::line($res)]);
+                . \App\Support\Ops\ConnectionProbe::line($res)]);
         }
 
         $c->forceFill(['last_ok_at' => now(),
             'last_version' => hub_str($res['detail']['version'] ?? '')])->save();
 
-        return back()->with('ok', '«' . $c->name . '» — ' . \App\Support\ConnectionProbe::line($res));
+        return back()->with('ok', '«' . $c->name . '» — ' . \App\Support\Ops\ConnectionProbe::line($res));
     }
 
     public function destroy(string $id): RedirectResponse
@@ -175,12 +175,12 @@ class OdooConnectionController extends Controller
 
         // (WP-9.2) على الكاتب الواحد — والإبطالُ عنده (كاشُ أودو نفسُه يتدوّر
         // ببصمة الاعتماد في مفتاحه، فلا نسفَ يدويّاً له)
-        \App\Support\Settings::batch('odoo', function () use ($d) {
-            \App\Support\Settings::put('odoo.url', $d['url'], 'odoo');
-            \App\Support\Settings::put('odoo.db', $d['db'], 'odoo');
-            \App\Support\Settings::put('odoo.user', $d['username'], 'odoo');
+        \App\Support\Platform\Settings::batch('odoo', function () use ($d) {
+            \App\Support\Platform\Settings::put('odoo.url', $d['url'], 'odoo');
+            \App\Support\Platform\Settings::put('odoo.db', $d['db'], 'odoo');
+            \App\Support\Platform\Settings::put('odoo.user', $d['username'], 'odoo');
             // مفتاحٌ فارغ يُبقي المخزون — والمكتوب يُشفَّر عند الكاتب كما من شاشة الإعدادات
-            if (filled($d['key'] ?? null)) \App\Support\Settings::put('odoo.key', $d['key'], 'odoo');
+            if (filled($d['key'] ?? null)) \App\Support\Platform\Settings::put('odoo.key', $d['key'], 'odoo');
         }, ['name' => 'odoo.* — من مركز التكاملات']);
 
         return back()->with('ok', 'حُفظ الاتصال الافتراضي — اختبره الآن');

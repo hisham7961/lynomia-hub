@@ -8,9 +8,9 @@ use App\Models\Project;
 use App\Models\Role;
 use App\Models\Station;
 use App\Models\User;
-use App\Support\Asset360;
-use App\Support\AssetProjectService;
-use App\Support\Custody;
+use App\Support\Assets\Asset360;
+use App\Support\Assets\AssetProjectService;
+use App\Support\Assets\Custody;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 

@@ -27,7 +27,7 @@ class MySecurityController extends Controller
             ->map(function ($s) use ($mine) {
                 // (WP-4.4) عتبةُ الحياة من الثابت الواحد Sessions::LIVE_MIN — لا نسخةً رابعة
                 $s->live = ! $s->revoked && $s->last_seen_at
-                    && now()->diffInMinutes($s->last_seen_at) < \App\Support\Sessions::LIVE_MIN;
+                    && now()->diffInMinutes($s->last_seen_at) < \App\Support\Security\Sessions::LIVE_MIN;
                 $s->mine = $s->id === $mine;
 
                 return $s;
@@ -38,7 +38,7 @@ class MySecurityController extends Controller
             : collect();
 
         // خطرُ جلستك الحالية — مفسَّراً بعوامله لا رقماً أعمى
-        $risk = \App\Support\Risk::session($u);
+        $risk = \App\Support\Security\Risk::session($u);
 
         // مفاتيحُ المرور المسجَّلة (Passkeys) — إن كانت الميزةُ مفعَّلة
         $passkeys = ((string) setting('auth.passkeys_on', '1') === '1'
@@ -56,7 +56,7 @@ class MySecurityController extends Controller
         $s = DB::table('sessions_log')->where('id', $id)->where('user_id', $u->id)->first(['id', 'ip']);
         abort_unless($s, 404);
 
-        \App\Support\Sessions::revokeOne($u, $id, 'إنهاء ذاتي لجلسة');
+        \App\Support\Security\Sessions::revokeOne($u, $id, 'إنهاء ذاتي لجلسة');
         hub_audit('إنهاء جلستي', null, null, ($s->ip ?: 'بلا عنوان'));
 
         return back()->with('ok', '🔌 أُنهيت الجلسة — يخرج جهازُها عند أول طلب');
@@ -67,7 +67,7 @@ class MySecurityController extends Controller
     {
         $u = auth()->user();
         $mine = (string) session('hub.sl', '');
-        $n = \App\Support\Sessions::revokeAll($u, $mine !== '' ? $mine : null, 'إنهاء بقية أجهزتي');
+        $n = \App\Support\Security\Sessions::revokeAll($u, $mine !== '' ? $mine : null, 'إنهاء بقية أجهزتي');
         hub_audit('إنهاء جلساتي الأخرى', null, null, "{$n} جلسة");
 
         return back()->with('ok', "🔌 أُنهيت {$n} جلسة على أجهزتك الأخرى — جلستُك الحالية باقية");
@@ -89,7 +89,7 @@ class MySecurityController extends Controller
         // إبطالُ الجهاز يبطل جلساتِه دفعةً — بختم الأثر الموحَّد نفسِه (WP-4.4)
         DB::table('sessions_log')->where('user_id', $u->id)
             ->where('device_id', $dev->id)->where('revoked', false)
-            ->update(\App\Support\Sessions::revocationStamp('إبطال جهاز'));
+            ->update(\App\Support\Security\Sessions::revocationStamp('إبطال جهاز'));
         $u->forceFill(['remember_token' => Str::random(60)])->saveQuietly();
         $dev->update(['trust' => 'مبطَل']);
         $dev->delete();

@@ -67,9 +67,9 @@ class AppCenterController extends Controller
             : collect();
 
         // ما يراه المستخدمُ في المتجر: لقطاتُه ووصفُه وما ينقص قبل النشر
-        $shots = \App\Support\AppStudio::shots($app);
-        $desc = \App\Support\AppStudio::description($app);
-        $ready = \App\Support\AppStudio::readiness($app, $shots);
+        $shots = \App\Support\Apps\AppStudio::shots($app);
+        $desc = \App\Support\Apps\AppStudio::description($app);
+        $ready = \App\Support\Apps\AppStudio::readiness($app, $shots);
 
         return view('app-center.show', compact('app', 'progress', 'project', 'releases', 'releasesN',
             'issues', 'issuesN', 'tickets', 'ticketsN', 'feats', 'shots', 'desc', 'ready'));

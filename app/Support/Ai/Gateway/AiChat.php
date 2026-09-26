@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Http;
 use App\Support\Ai\Ask\AskFailures;
 use App\Support\Ai\Ask\AskTools;
 use App\Support\Ai\Routing\AiRouting;
-use App\Support\Redactor;
+use App\Support\Platform\Redactor;
 
 /**
  * **طبقةُ نقلِ التوليدِ الواحدة** — `POST /v1/chat/completions`. (المرحلة ٣ · جاهزيّةُ الإنتاج)

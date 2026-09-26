@@ -55,7 +55,7 @@ class PayrollRun extends Model
              * سلوكٌ يختلف بالمحرّك، وهو الصنفُ الذي وُجدت بوّابةُ المحرّكين لأجله.
              */
             $was = $m->exists ? $m->getOriginal('month_key') : null;
-            $m->month_key = \App\Support\PayrollMonth::key($m->month);
+            $m->month_key = \App\Support\Workforce\PayrollMonth::key($m->month);
             if ($m->month_key === null) return;
 
             /*

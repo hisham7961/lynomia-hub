@@ -166,9 +166,9 @@ class DataRoomController extends Controller
             $stamp = setting('app.name', 'Lynomia') . ' · ' . $r->ip() . ' · ' . now()->format('Y-m-d H:i');
             try {
                 $bytes = (string) $link->mime === 'application/pdf'
-                    ? \App\Support\Watermark::pdf($abs, $stamp)
-                    : \App\Support\Watermark::image($abs, $stamp, (string) $link->mime);
-            } catch (\App\Support\UnsupportedPdfException $e) {
+                    ? \App\Support\Documents\Watermark::pdf($abs, $stamp)
+                    : \App\Support\Documents\Watermark::image($abs, $stamp, (string) $link->mime);
+            } catch (\App\Support\Documents\UnsupportedPdfException $e) {
                 // سببٌ مسمّى لا ٥٠٠ (v2.399): الملفُ بضغطٍ حديث لا يُوسم على هذا الخادم — يبقى مغلقاً
                 abort(415, 'هذا الملف بصيغة PDF مضغوطة (1.5+) لا تُوسم على هذا الخادم — اطلب من مُرسِل الرابط نسخةً قابلة للتنزيل أو ملفاً بصيغة PDF 1.4');
             } catch (\Throwable $e) {

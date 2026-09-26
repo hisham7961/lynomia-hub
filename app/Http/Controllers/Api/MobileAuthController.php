@@ -7,13 +7,13 @@ use App\Models\MobileInstallation;
 use App\Models\MobileSession;
 use App\Models\MobileStepupGrant;
 use App\Models\User;
-use App\Support\AccountLockout;
-use App\Support\Api;
-use App\Support\LoginSentry;
-use App\Support\MobileSessionService;
-use App\Support\SecurityRadar;
-use App\Support\StepUp;
-use App\Support\Totp;
+use App\Support\Security\AccountLockout;
+use App\Support\Platform\Api;
+use App\Support\Security\LoginSentry;
+use App\Support\Mobile\MobileSessionService;
+use App\Support\Security\SecurityRadar;
+use App\Support\Security\StepUp;
+use App\Support\Security\Totp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -671,13 +671,13 @@ class MobileAuthController extends Controller
      */
     private function policyBlock(User $user)
     {
-        if (\App\Support\Staff::mustChangePassword($user)) {
+        if (\App\Support\Workforce\Staff::mustChangePassword($user)) {
             return Api::error(Api::STEP_UP_REQUIRED, 428,
                 'دخلتَ بكلمةِ مرورٍ مؤقّتة — بدّلها قبل أيِّ عملٍ آخر',
                 ['policy' => 'must_change_password']);
         }
         if ((string) setting('auth.2fa_required_priv', '0') === '1'
-            && ! $user->totp_enabled && \App\Support\Risk::privileged($user)) {
+            && ! $user->totp_enabled && \App\Support\Security\Risk::privileged($user)) {
             return Api::error(Api::STEP_UP_REQUIRED, 428,
                 'حسابُك صاحبُ صلاحياتٍ حسّاسة — فعّل التحقّقَ بخطوتين للمتابعة (سياسةُ المنشأة)',
                 ['policy' => 'auth.2fa_required_priv']);

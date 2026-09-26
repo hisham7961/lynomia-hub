@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\Workday;
+use App\Support\Workforce\Workday;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 

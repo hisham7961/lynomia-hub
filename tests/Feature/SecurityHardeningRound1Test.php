@@ -192,7 +192,7 @@ class SecurityHardeningRound1Test extends TestCase
             'password_changed_at' => now()]);
         $emp->update(['user_id' => $scoped->id]);
 
-        $mine = \App\Support\Workday::mine($scoped);
+        $mine = \App\Support\Workforce\Workday::mine($scoped);
         $names = collect($mine['projects'] ?? [])->values()->all();
         $this->assertNotContains('مشروع سرّي جداً', $names,
             'قائمةُ مشاريع بطاقة اليوم سرّبت مشروعاً خارج نطاق المستخدم');

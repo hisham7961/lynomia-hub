@@ -7,20 +7,20 @@ use App\Models\KeyResult;
 use App\Models\KpiDef;
 use App\Models\Objective;
 use App\Models\Task;
-use App\Support\ApiTokens;
-use App\Support\Audit;
-use App\Support\Correlation;
-use App\Support\DataQuality;
-use App\Support\ErrorStats;
-use App\Support\ExecutionStats;
-use App\Support\Health;
-use App\Support\Integrations;
-use App\Support\KpiCentre;
-use App\Support\Remediation;
-use App\Support\SecurityFindings;
-use App\Support\SecurityPosture;
-use App\Support\Series;
-use App\Support\Settings;
+use App\Support\Security\ApiTokens;
+use App\Support\Platform\Audit;
+use App\Support\Ops\Correlation;
+use App\Support\Insights\DataQuality;
+use App\Support\Ops\ErrorStats;
+use App\Support\Workforce\ExecutionStats;
+use App\Support\Ops\Health;
+use App\Support\Ops\Integrations;
+use App\Support\Insights\KpiCentre;
+use App\Support\Ops\Remediation;
+use App\Support\Security\SecurityFindings;
+use App\Support\Security\SecurityPosture;
+use App\Support\Ops\Series;
+use App\Support\Platform\Settings;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -470,7 +470,7 @@ class ControlPlaneAcceptanceTest extends TestCase
         $incidentId = (string) Str::uuid();
 
         // موضعٌ حقيقيٌّ في الشيفرة — ملفٌّ داخل جذر المشروع (الحارسُ يرفض ما خرج عنه)
-        $file = \Tests\Support\Source::path(\App\Support\Health::class);
+        $file = \Tests\Support\Source::path(\App\Support\Ops\Health::class);
 
         Task::create(['id' => $taskId, 'title' => 'إصلاحُ العطل الحرج', 'status' => 'جديدة']);
         DB::table('incidents')->insert([

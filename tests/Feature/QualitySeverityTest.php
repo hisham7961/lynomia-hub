@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Client;
-use App\Support\DataQuality;
-use App\Support\Severity;
+use App\Support\Insights\DataQuality;
+use App\Support\Platform\Severity;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;

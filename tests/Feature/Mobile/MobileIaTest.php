@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Mobile;
 
-use App\Support\InformationArchitecture;
+use App\Support\Platform\InformationArchitecture;
 use Tests\TestCase;
 
 /**

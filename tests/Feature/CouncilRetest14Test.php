@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\DailyWorkCompliance;
-use App\Support\MonthlyAttendance;
+use App\Support\Workforce\DailyWorkCompliance;
+use App\Support\Workforce\MonthlyAttendance;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -47,8 +47,8 @@ class CouncilRetest14Test extends TestCase
         $e = $this->member('late14@test.local');
 
         // الدوامُ ٠٨:٠٠ وسماحيةُ ١٥ دقيقة ⇒ ٠٨:١٥ حدُّ التأخّر
-        \App\Support\Settings::put('sec.hours_start', '08:00', 'test');
-        \App\Support\Settings::put('work.late_grace', '15', 'test');
+        \App\Support\Platform\Settings::put('sec.hours_start', '08:00', 'test');
+        \App\Support\Platform\Settings::put('work.late_grace', '15', 'test');
 
         Carbon::setTestNow(Carbon::parse('2026-09-20 12:00:00', config('app.timezone')));
 
@@ -96,8 +96,8 @@ class CouncilRetest14Test extends TestCase
     {
         $this->seedCore();
         $e = $this->member('range14-' . md5($timeIn . $status) . '@test.local');
-        \App\Support\Settings::put('sec.hours_start', '08:00', 'test');
-        \App\Support\Settings::put('work.late_grace', '15', 'test');
+        \App\Support\Platform\Settings::put('sec.hours_start', '08:00', 'test');
+        \App\Support\Platform\Settings::put('work.late_grace', '15', 'test');
 
         Carbon::setTestNow(Carbon::parse('2026-09-20 12:00:00', config('app.timezone')));
         DB::table('attendance')->insert([

@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\IdentityLookup;
 use App\Support\Discovery\Engine;
-use App\Support\MailSettings;
-use App\Support\Tracking;
+use App\Support\Platform\MailSettings;
+use App\Support\Workforce\Tracking;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -244,7 +244,7 @@ class SettingsBehaviourRound3Test extends TestCase
     /** إجابةُ مزوّدين مخبوءةٌ بعمرٍ بالأيّام — تُعيد الرقمَ المُطبَّع */
     protected function lookupRow(string $gtin, int $ageDays): string
     {
-        $norm = \App\Support\Identity::norm('gtin', $gtin);
+        $norm = \App\Support\Security\Identity::norm('gtin', $gtin);
         IdentityLookup::create([
             'norm' => $norm, 'status' => 'found',
             'result' => ['name' => 'صنفٌ مخبوء'], 'providers' => ['اختبار'],

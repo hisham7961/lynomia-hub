@@ -114,7 +114,7 @@ class EsignController extends Controller
             'preContract' => request('contract'),
             'preTitle'    => request('title'),
             'preLink'     => request('link'),
-            'registry'    => \App\Support\ContractVars::flat(),
+            'registry'    => \App\Support\Documents\ContractVars::flat(),
         ]);
     }
 
@@ -133,7 +133,7 @@ class EsignController extends Controller
         if (! \Illuminate\Support\Facades\Schema::hasTable('asset_custody')) return;
 
         $p = \App\Models\AssetCustody::where('asset_id', $linkId)
-            ->whereIn('action', \App\Support\Custody::PERMITS)->find($permitId);
+            ->whereIn('action', \App\Support\Assets\Custody::PERMITS)->find($permitId);
         if (! $p) return;
 
         $p->sign_id = $req->id;
@@ -203,7 +203,7 @@ class EsignController extends Controller
             'tpl' => $tpl,
             'versions' => \App\Models\SignTemplateVersion::where('template_id', $id)
                 ->orderByDesc('version')->limit(20)->get(),
-            'registry' => \App\Support\ContractVars::registry(),
+            'registry' => \App\Support\Documents\ContractVars::registry(),
         ]);
     }
 
@@ -282,13 +282,13 @@ class EsignController extends Controller
             ? SignTemplate::findOrFail($d['template_id'])->body
             : (string) ($d['free_body'] ?? '');
         $vals = array_merge(
-            \App\Support\ContractVars::resolve($contractId, $linkModule, $linkId),
+            \App\Support\Documents\ContractVars::resolve($contractId, $linkModule, $linkId),
             array_filter((array) ($d['vars'] ?? []), fn ($v) => is_string($v) && trim($v) !== '')
         );
 
         return view('esign._preview', [
-            'body' => \App\Support\ContractVars::apply($body, $vals),
-            'missing' => \App\Support\ContractVars::missing($body, $vals),
+            'body' => \App\Support\Documents\ContractVars::apply($body, $vals),
+            'missing' => \App\Support\Documents\ContractVars::missing($body, $vals),
         ]);
     }
 
@@ -376,13 +376,13 @@ class EsignController extends Controller
             // v2.119: الحل التلقائي من السجلات المربوطة أولاً وقيم المستخدم تعلوه،
             // الإلزامي الفارغ يمنع الإنشاء، والاختياري الفارغ يُعلَّم ⟦ظاهراً⟧
             $vals = array_merge(
-                \App\Support\ContractVars::resolve($contractId, $linkModule, $linkId),
+                \App\Support\Documents\ContractVars::resolve($contractId, $linkModule, $linkId),
                 array_filter((array) ($d['vars'] ?? []), fn ($v) => is_string($v) && trim($v) !== '')
             );
-            if ($missing = \App\Support\ContractVars::missing($tpl->body, $vals)) {
+            if ($missing = \App\Support\Documents\ContractVars::missing($tpl->body, $vals)) {
                 return back()->with('err', 'متغيرات إلزامية لم تُملأ: ' . implode('، ', $missing))->withInput();
             }
-            $body = \App\Support\ContractVars::apply($tpl->body, $vals);
+            $body = \App\Support\Documents\ContractVars::apply($tpl->body, $vals);
         } else {
             $body = trim((string) ($d['free_body'] ?? ''));
             if ($body === '') {
@@ -421,9 +421,9 @@ class EsignController extends Controller
         // ولا يُسلَّم ولا ينقلب العقد حتى تكتمل المراحل بالترتيب. بلا قواعد = صفر أثر
         $hold = null;
         if ($contractId && ($hc = \App\Models\Contract::find($contractId))
-            && \App\Support\ContractApprovals::spawn($req, $hc)) {
+            && \App\Support\Documents\ContractApprovals::spawn($req, $hc)) {
             $req->forceFill(['status' => 'بانتظار الموافقة'])->saveQuietly();
-            $hold = \App\Support\ContractApprovals::pending($req);
+            $hold = \App\Support\Documents\ContractApprovals::pending($req);
         }
 
         if ($signersIn) {
@@ -488,7 +488,7 @@ class EsignController extends Controller
         if (! $c || (string) $c->status === $to) return;
         $c->status = $to;
         $c->save();
-        \App\Support\FlowRunner::fire('status', 'contracts', $c, $to);
+        \App\Support\Platform\FlowRunner::fire('status', 'contracts', $c, $to);
     }
 
     /** نطاق الطلب (شركة/مشروع) يُشتق من عقده أولاً ثم من جهته المربوطة */
@@ -632,13 +632,13 @@ class EsignController extends Controller
         $this->guardRequest($req);
         abort_if($req->status !== 'وُقّع', 410, 'الشهادة تصدر للوثائق الموقعة فقط');
 
-        [$chain, $head] = \App\Support\Evidence::chain($req);
+        [$chain, $head] = \App\Support\Documents\Evidence::chain($req);
 
         return view('esign.certificate', [
             'req' => $req, 'chain' => $chain, 'head' => $head,
-            'verdict' => \App\Support\Evidence::verify($req),
+            'verdict' => \App\Support\Documents\Evidence::verify($req),
             'signers' => \App\Models\ContractSigner::where('request_id', $req->id)->orderBy('order')->get(),
-            'qr' => \App\Support\Qr::svg(route('sign.verify') . '?code=' . $req->verify_code, 132),
+            'qr' => \App\Support\Documents\Qr::svg(route('sign.verify') . '?code=' . $req->verify_code, 132),
         ]);
     }
 
@@ -649,13 +649,13 @@ class EsignController extends Controller
         abort_unless(session("sign.ok.{$token}"), 403);
         abort_if($req->status !== 'وُقّع', 410, 'الشهادة تصدر للوثائق الموقعة فقط');
 
-        [$chain, $head] = \App\Support\Evidence::chain($req);
+        [$chain, $head] = \App\Support\Documents\Evidence::chain($req);
 
         return view('esign.certificate', [
             'req' => $req, 'chain' => $chain, 'head' => $head, 'client' => true,
-            'verdict' => \App\Support\Evidence::verify($req),
+            'verdict' => \App\Support\Documents\Evidence::verify($req),
             'signers' => \App\Models\ContractSigner::where('request_id', $req->id)->orderBy('order')->get(),
-            'qr' => \App\Support\Qr::svg(route('sign.verify') . '?code=' . $req->verify_code, 132),
+            'qr' => \App\Support\Documents\Qr::svg(route('sign.verify') . '?code=' . $req->verify_code, 132),
         ]);
     }
 
@@ -666,7 +666,7 @@ class EsignController extends Controller
         $req = SignRequest::findOrFail($id);
         $this->guardRequest($req);
 
-        $bin = \App\Support\DocRenderer::pdf(\App\Support\DocRenderer::docHtml($req), $req->title);
+        $bin = \App\Support\Documents\DocRenderer::pdf(\App\Support\Documents\DocRenderer::docHtml($req), $req->title);
         if (! $bin) {
             return redirect()->route('esign.doc', $req->id)
                 ->with('err', 'محرك PDF غير متاح — اطبع من هذه الصفحة (Ctrl+P)');
@@ -686,7 +686,7 @@ class EsignController extends Controller
 
         // نسخةُ العميل بلا أثرٍ حسّاس: الموقّعُ الآخر ومستلمُ النسخة يريان الوثيقة
         // والتوقيع لا عنوانَ شبكة غيرهم ولا رقمَ هويته — نفس ما تفرضه doc.blade.php
-        $bin = \App\Support\DocRenderer::pdf(\App\Support\DocRenderer::docHtml($req, evidence: false), $req->title);
+        $bin = \App\Support\Documents\DocRenderer::pdf(\App\Support\Documents\DocRenderer::docHtml($req, evidence: false), $req->title);
         if (! $bin) return redirect()->route('sign.doc', $token);
         \App\Models\ContractEvent::log('downloaded', $req, ['signer_id' => $signer?->id]);
 
@@ -705,12 +705,12 @@ class EsignController extends Controller
     {
         try {
             if (\Illuminate\Support\Facades\Schema::hasColumn('sign_requests', 'evidence_hash')) {
-                [, $head] = \App\Support\Evidence::chain($req);
+                [, $head] = \App\Support\Documents\Evidence::chain($req);
                 $req->forceFill(['evidence_hash' => $head])->saveQuietly();
             }
 
             if ($req->contract_id
-                && ($pdf = \App\Support\DocRenderer::pdf(\App\Support\DocRenderer::docHtml($req), $req->title))) {
+                && ($pdf = \App\Support\Documents\DocRenderer::pdf(\App\Support\Documents\DocRenderer::docHtml($req), $req->title))) {
                 $path = 'hub/att/signed-' . $req->verify_code . '.pdf';
                 \Illuminate\Support\Facades\Storage::disk('local')->put($path, $pdf);
                 \App\Models\Attachment::create([
@@ -813,7 +813,7 @@ class EsignController extends Controller
         $proposalHtml = null;
         if ($req->link_module === 'quotes' && $req->link_id) {
             $quote = \App\Models\Quote::find($req->link_id);   // سطحٌ عامّ: الرمزُ هو التخويل
-            if ($quote) $proposalHtml = \App\Support\Proposal::html($quote, true);
+            if ($quote) $proposalHtml = \App\Support\Documents\Proposal::html($quote, true);
         }
 
         // v2.122: تمرير الرمز الحالي للنموذج — رمز الموقّع المستقل لا رمز الطلب،
@@ -980,9 +980,9 @@ class EsignController extends Controller
         return \Illuminate\Support\Facades\DB::transaction(function () use ($req, $d) {
             $req = SignRequest::whereKey($req->id)->lockForUpdate()->firstOrFail();
             abort_if($req->status !== 'بانتظار الموافقة' || $req->cancelled_at, 410, 'لا مرحلة معلقة لهذا الطلب');
-            $step = \App\Support\ContractApprovals::pending($req);
+            $step = \App\Support\Documents\ContractApprovals::pending($req);
             abort_unless($step, 410, 'لا مرحلة معلقة لهذا الطلب');
-            abort_unless(\App\Support\ContractApprovals::canDecide(auth()->user(), $step), 403,
+            abort_unless(\App\Support\Documents\ContractApprovals::canDecide(auth()->user(), $step), 403,
                 'قرار هذه المرحلة ليس لك');
 
             $step->forceFill(['status' => 'موافق', 'decided_by' => auth()->id(),
@@ -991,7 +991,7 @@ class EsignController extends Controller
                 $req->title . ' — مرحلة ' . $step->stage . ' (' . ($step->label ?: $step->kind) . ')');
 
             // مرحلة تالية؟ يُخطَر صاحب قرارها ويبقى الطلب محجوزاً
-            if ($next = \App\Support\ContractApprovals::pending($req)) {
+            if ($next = \App\Support\Documents\ContractApprovals::pending($req)) {
                 $this->notifyStage($next, $req);
 
                 return back()->with('ok', 'اعتُمدت المرحلة — التالي: ' . ($next->label ?: $next->kind));
@@ -1000,7 +1000,7 @@ class EsignController extends Controller
             // اكتملت السلسلة: الطلب يتحرر ويُسلَّم الآن، والحدث الدلالي ينطلق
             $this->deliver($req);
             if ($req->contract_id && ($c = \App\Models\Contract::find($req->contract_id))) {
-                \App\Support\FlowRunner::fire('approved', 'contracts', $c);
+                \App\Support\Platform\FlowRunner::fire('approved', 'contracts', $c);
             }
             $this->notifyOwners('✅ اكتملت موافقات «' . $req->title . '» وأُرسل للموقّعين');
 
@@ -1015,9 +1015,9 @@ class EsignController extends Controller
         $req = SignRequest::findOrFail($id);
         $this->guardRequest($req);
         abort_if($req->status !== 'بانتظار الموافقة' || $req->cancelled_at, 410, 'لا مرحلة معلقة لهذا الطلب');
-        $step = \App\Support\ContractApprovals::pending($req);
+        $step = \App\Support\Documents\ContractApprovals::pending($req);
         abort_unless($step, 410, 'لا مرحلة معلقة لهذا الطلب');
-        abort_unless(\App\Support\ContractApprovals::canDecide(auth()->user(), $step), 403,
+        abort_unless(\App\Support\Documents\ContractApprovals::canDecide(auth()->user(), $step), 403,
             'قرار هذه المرحلة ليس لك');
 
         $note = mb_substr(trim(hub_str($r->input('note'))), 0, 400);
@@ -1032,7 +1032,7 @@ class EsignController extends Controller
         \App\Models\ContractEvent::log('voided', $req, ['meta' => json_encode(
             ['reason' => 'رُفضت الموافقة الداخلية — ' . $note], JSON_UNESCAPED_UNICODE)]);
         if ($req->contract_id && ($c = \App\Models\Contract::find($req->contract_id))) {
-            \App\Support\FlowRunner::fire('approval_rejected', 'contracts', $c);
+            \App\Support\Platform\FlowRunner::fire('approval_rejected', 'contracts', $c);
         }
         hub_audit('رفض مرحلة موافقة عقد', 'contracts', $req->contract_id,
             $req->title . ' — مرحلة ' . $step->stage . ': ' . $note);
@@ -1098,13 +1098,13 @@ class EsignController extends Controller
             'code' => $code, 'found' => $found, 'throttled' => false,
             // **الرأسُ يُعاد حسابُه لا يُعرض وحدَه**: قيمةٌ مخزَّنةٌ تَعِد بإثباتٍ
             // ولا فاحصَ خلفها تُسكِت السؤالَ الذي كان سيكشف العبث
-            'verdict' => $found ? \App\Support\Evidence::verify($found) : ['checked' => false, 'ok' => true],
+            'verdict' => $found ? \App\Support\Documents\Evidence::verify($found) : ['checked' => false, 'ok' => true],
             // v2.122: الموقّعون وأزمانهم (أسماء فقط — لا بريد ولا IP علناً) + QR للنسخ الورقية
             'signers' => $found
                 ? \App\Models\ContractSigner::where('request_id', $found->id)
                     ->where('role', 'موقّع')->where('status', 'وُقّع')->orderBy('order')->get()
                 : collect(),
-            'qr' => $found ? \App\Support\Qr::svg(route('sign.verify') . '?code=' . $found->verify_code, 120) : null,
+            'qr' => $found ? \App\Support\Documents\Qr::svg(route('sign.verify') . '?code=' . $found->verify_code, 120) : null,
         ]);
     }
 
@@ -1398,7 +1398,7 @@ class EsignController extends Controller
                         'status' => 'مقبول', 'accepted_at' => now(), 'accepted_by' => $signer,
                         'meta' => array_merge((array) $q->meta, ['accept_sign' => $req->verify_code]),
                     ])->save();
-                    \App\Support\FlowRunner::fire('status', 'quotes', $q, 'مقبول');
+                    \App\Support\Platform\FlowRunner::fire('status', 'quotes', $q, 'مقبول');
                     $this->notifyOwners('🎉 قَبِل العميلُ العرضَ «' . ($q->title ?: $q->doc_no) . '» بتوقيعٍ إلكترونيّ [' . $req->verify_code . ']');
                     hub_audit('قبول عرض بتوقيع إلكتروني', 'quotes', $q->id, $q->doc_no . ' — ' . $signer);
                 }
@@ -1428,7 +1428,7 @@ class EsignController extends Controller
         $seeded = (array) (setting('esign.tpl_seeded') ?: []);
         $have = SignTemplate::pluck('name')->all();
         $changed = false;
-        foreach (\App\Support\ContractTemplates::library() as $i => $tpl) {
+        foreach (\App\Support\Documents\ContractTemplates::library() as $i => $tpl) {
             if (! in_array($tpl['name'], $seeded, true)) {
                 if (! in_array($tpl['name'], $have, true)) SignTemplate::create($tpl + ['sort' => $i]);
                 $seeded[] = $tpl['name'];

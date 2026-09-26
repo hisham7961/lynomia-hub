@@ -32,8 +32,8 @@ class PurchaseController extends Controller
 
         // إثراء البنود بحساب الكراتين (تعبئة المنتجات) بعزل شركة المستند —
         // فيعرف المُستلِم كم كرتونة يتوقّع من كل صنف
-        $items = \App\Support\Items::cartons(
-            \App\Support\Items::parse((string) $p->items), $p->company_id);
+        $items = \App\Support\Assets\Items::cartons(
+            \App\Support\Assets\Items::parse((string) $p->items), $p->company_id);
 
         // قفل الحقل يسري على مستند الطباعة كما على صفحة العرض (modules/show:90):
         // دورٌ محجوبٌ عليه «الإجمالي» أو «البنود» لا يراهما عبر مسار الطباعة.
@@ -43,8 +43,8 @@ class PurchaseController extends Controller
             'p' => $p,
             'supplier' => $p->supplier_id ? Supplier::find($p->supplier_id) : null,
             'items' => $items,
-            'showCartons' => \App\Support\Items::anyCartons($items),
-            'totalCartons' => \App\Support\Items::totalCartons($items),
+            'showCartons' => \App\Support\Assets\Items::anyCartons($items),
+            'totalCartons' => \App\Support\Assets\Items::totalCartons($items),
             'logo' => setting('app.logo'),
             'hideAmount' => hub_field_mode($u, 'purchases', 'amount') === 'hide',
             'hideItems'  => hub_field_mode($u, 'purchases', 'items') === 'hide',
@@ -133,7 +133,7 @@ class PurchaseController extends Controller
                 return [$made, $skipped];
             }
 
-            $lines = \App\Support\Items::parse((string) $p->items);
+            $lines = \App\Support\Assets\Items::parse((string) $p->items);
             $supplierName = $p->supplier_id ? (Supplier::find($p->supplier_id)?->name ?? '') : '';
             $moveIds = [];
             foreach ($lines as $line) {

@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\Web\RoleController;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\PermissionInspector as PI;
+use App\Support\Security\PermissionInspector as PI;
 use Tests\TestCase;
 
 /**

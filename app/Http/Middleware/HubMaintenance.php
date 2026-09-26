@@ -43,7 +43,7 @@ class HubMaintenance
              * للمالك. الرسالةُ تقول ذلك صراحةً بدل أن تُترك للاستنتاج.
              */
             if ($request->expectsJson() || $request->is('api/*')) {
-                return \App\Support\Api::error(\App\Support\Api::LOCKDOWN, 503,
+                return \App\Support\Platform\Api::error(\App\Support\Platform\Api::LOCKDOWN, 503,
                     'قفلُ طوارئ — سطحُ API معلَّقٌ بالكامل. يرفعه مالكُ النظام من المتصفح.');
             }
 
@@ -64,7 +64,7 @@ class HubMaintenance
             if ($request->expectsJson() || $request->is('api/*')) {
                 if ($request->isMethodSafe()) return $next($request);
 
-                return \App\Support\Api::error(\App\Support\Api::MAINTENANCE, 503,
+                return \App\Support\Platform\Api::error(\App\Support\Platform\Api::MAINTENANCE, 503,
                     'النظام في وضع الصيانة — الكتابة متوقفة مؤقتاً', null, [], ['Retry-After' => '300']);
             }
 

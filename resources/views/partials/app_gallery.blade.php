@@ -8,7 +8,7 @@
     // الرؤيةُ تتبع قاعدةَ الوثيقة: لقطةٌ ممنوعةٌ صريحاً عن القارئِ لا تُعرَض ولا تُعدّ
     // في المعرض. (جاهزيّةُ المتجر `$ready` تُحسَب في المتحكِّم من اللقطاتِ كاملةً، فلا
     // يُشوّهها منعُ فردٍ — العرضُ رؤيةٌ، والجاهزيّةُ حَوكمة.)
-    $shots = \App\Support\DocumentPolicy::filterListable(auth()->user(), $shots);
+    $shots = \App\Support\Documents\DocumentPolicy::filterListable(auth()->user(), $shots);
     $gCan = hub_can(auth()->user(), 'apps', 'e');
     $gN = $shots->count();
 @endphp
@@ -79,7 +79,7 @@
         </div>
     @else
         <div class="sub" style="padding:10px 0 14px">
-            لا لقطات بعد — والمتاجرُ تشترط {{ $ready['shotsNeeded'] ?? \App\Support\AppStudio::SHOTS_APPLE }} على الأقل، وهي ما يقرّر عليه المستخدمُ
+            لا لقطات بعد — والمتاجرُ تشترط {{ $ready['shotsNeeded'] ?? \App\Support\Apps\AppStudio::SHOTS_APPLE }} على الأقل، وهي ما يقرّر عليه المستخدمُ
             التحميل قبل أن يقرأ سطراً. ارفعها كلَّها دفعةً واحدة من الحقل أدناه.
         </div>
     @endif
@@ -89,7 +89,7 @@
             @csrf
             <input type="hidden" name="module" value="apps">
             <input type="hidden" name="record_id" value="{{ $app->id }}">
-            <input type="hidden" name="kind" value="{{ \App\Support\AppStudio::SHOT_KIND }}">
+            <input type="hidden" name="kind" value="{{ \App\Support\Apps\AppStudio::SHOT_KIND }}">
             <label class="vh" for="shot-files">اختر لقطات (عدة صور معاً)</label>
             {{-- أنواعٌ مسمّاةٌ لا `image/*`: القبولُ الصريح يُرشّح نافذةَ الاختيار
                  على ما تقبله المتاجر فعلاً، ولا يُغري برفع HEIC لا يُعرَض. --}}

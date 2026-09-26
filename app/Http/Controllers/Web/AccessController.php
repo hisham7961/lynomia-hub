@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\PermissionInspector;
+use App\Support\Security\PermissionInspector;
 use Illuminate\Http\Request;
 
 /**

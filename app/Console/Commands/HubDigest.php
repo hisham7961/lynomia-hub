@@ -115,7 +115,7 @@ class HubDigest extends Command
                 'text' => hub_fit($text, hub_col_max('outbox', 'text') ?? 790), 'state' => 'queued', 'created_at' => now()]);
         }
 
-        \App\Support\Health::beat('digest', (int) round((microtime(true) - $t0) * 1000));
+        \App\Support\Ops\Health::beat('digest', (int) round((microtime(true) - $t0) * 1000));
 
         $this->info('أُرسل التقرير إلى ' . $owners->count() . ' مالك');
 

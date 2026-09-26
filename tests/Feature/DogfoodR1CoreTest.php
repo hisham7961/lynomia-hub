@@ -11,7 +11,7 @@ use App\Models\Role;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Models\WorkUpdate;
-use App\Support\AlertEngine;
+use App\Support\Ops\AlertEngine;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -88,12 +88,12 @@ class DogfoodR1CoreTest extends TestCase
             'holder_id' => $holder->id]);
 
         $tech = $this->user('tech-nohr@test.local', ['assets' => ['v' => 1]]);   // بلا hr:v
-        $ov = (new \App\Support\Asset360)->overview($asset, $tech);
+        $ov = (new \App\Support\Assets\Asset360)->overview($asset, $tech);
         $this->assertNull($ov['holder'], 'الاسم محجوب بلا hr:v');
         $this->assertTrue($ov['holder_hidden'], 'الحقيقة تبقى: الأصل مُسلَّم والاسم محجوب — لا «بلا حائز»');
 
         $hr = $this->user('hr-view@test.local', ['assets' => ['v' => 1], 'hr' => ['v' => 1]]);
-        $ov2 = (new \App\Support\Asset360)->overview($asset, $hr);
+        $ov2 = (new \App\Support\Assets\Asset360)->overview($asset, $hr);
         $this->assertNotNull($ov2['holder']);
         $this->assertFalse($ov2['holder_hidden']);
     }
@@ -156,7 +156,7 @@ class DogfoodR1CoreTest extends TestCase
         $this->actingAs($pm);
         $this->get(route('reports.review'))->assertOk();   // «مشاريعي» افتراضاً — لا 403
         $this->post(route('reports.review.act', $w->id), ['action' => 'accept'])->assertRedirect();
-        $this->assertSame(\App\Support\ReportReview::ACCEPTED, (string) $w->fresh()->review_status,
+        $this->assertSame(\App\Support\Workforce\ReportReview::ACCEPTED, (string) $w->fresh()->review_status,
             'القرار متاح من الطابور نفسه بلا المرور ببوّابة hr:v');
     }
 

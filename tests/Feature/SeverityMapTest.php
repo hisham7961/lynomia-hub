@@ -2,13 +2,13 @@
 
 namespace Tests\Feature;
 
-use App\Support\ActionCenter;
-use App\Support\ErrorTaxonomy;
-use App\Support\Health;
-use App\Support\IssueState;
-use App\Support\OpStatus;
-use App\Support\SecurityEvents;
-use App\Support\Severity;
+use App\Support\Insights\ActionCenter;
+use App\Support\Ops\ErrorTaxonomy;
+use App\Support\Ops\Health;
+use App\Support\Platform\IssueState;
+use App\Support\Ops\OpStatus;
+use App\Support\Security\SecurityEvents;
+use App\Support\Platform\Severity;
 use Tests\TestCase;
 
 /**

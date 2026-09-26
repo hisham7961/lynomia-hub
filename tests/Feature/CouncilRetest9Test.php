@@ -6,7 +6,7 @@ use App\Models\Attendance;
 use App\Models\Employee;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\Workday;
+use App\Support\Workforce\Workday;
 use Carbon\Carbon;
 use Tests\TestCase;
 

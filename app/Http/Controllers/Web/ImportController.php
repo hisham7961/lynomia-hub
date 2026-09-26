@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\Sheet;
+use App\Support\Platform\Sheet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -109,7 +109,7 @@ class ImportController extends Controller
                 foreach ($rows as $n => $line) {
                     $m = new $class;
                     $rowErr = null;
-                    $dec = \App\Support\DecisionFields::capture($module, $def, $m);
+                    $dec = \App\Support\Platform\DecisionFields::capture($module, $def, $m);
 
                     foreach ($mapping as $i => $fk) {
                         $f = $fields[$fk] ?? null;
@@ -133,7 +133,7 @@ class ImportController extends Controller
                      * العيبُ نفسُه مفتوحاً من ملفِّ CSV: صفٌّ حالتُه «معتمد» يخصم
                      * رصيداً ويُعفي من الحضورِ بلا معتمِد.
                      */
-                    \App\Support\DecisionFields::enforce($module, $m, $dec);
+                    \App\Support\Platform\DecisionFields::enforce($module, $m, $dec);
 
                     /*
                      * الحقول الإلزامية — **ممّا يستطيع الاستيرادُ ملأه وحده**

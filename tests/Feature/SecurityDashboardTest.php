@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\ApiToken;
 use App\Models\SessionLog;
-use App\Support\SecurityFindings;
-use App\Support\SecurityPosture;
+use App\Support\Security\SecurityFindings;
+use App\Support\Security\SecurityPosture;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -84,20 +84,20 @@ class SecurityDashboardTest extends TestCase
         $this->assertSame(SecurityFindings::openCountBySeverity('high'), (int) $cards['findings_high']['value']);
 
         $this->assertSame(count(SecurityPosture::privilegedNoMfaIds()), (int) $cards['priv_no_mfa']['value']);
-        $this->assertSame(\App\Support\SecurityExposure::summary()['high'], (int) $cards['exposed']['value']);
+        $this->assertSame(\App\Support\Security\SecurityExposure::summary()['high'], (int) $cards['exposed']['value']);
 
         $live = (int) DB::table('sessions_log')->where('revoked', false)
-            ->where('last_seen_at', '>=', now()->subMinutes(\App\Support\Sessions::LIVE_MIN))->count();
+            ->where('last_seen_at', '>=', now()->subMinutes(\App\Support\Security\Sessions::LIVE_MIN))->count();
         $this->assertSame($live, (int) $cards['live_sessions']['value']);
         $this->assertGreaterThanOrEqual(1, $live);
 
         $failed = (int) DB::table('audits')
-            ->whereIn('action', \App\Support\SecurityEvents::actions('AUTH_FAILURE'))
+            ->whereIn('action', \App\Support\Security\SecurityEvents::actions('AUTH_FAILURE'))
             ->where('created_at', '>=', now()->subDays(7))->count();
         $this->assertSame($failed, (int) $cards['failed7']['value']);
         $this->assertSame(3, $failed);
 
-        $radar = \App\Support\SecurityRadar::summary();
+        $radar = \App\Support\Security\SecurityRadar::summary();
         $this->assertSame($radar['total'], (int) $cards['denied7']['value']);
         $this->assertSame($radar['ips'], (int) $cards['denied_ips']['value']);
 
@@ -174,7 +174,7 @@ class SecurityDashboardTest extends TestCase
         ]);
 
         DB::enableQueryLog();
-        $counts = \App\Support\SecurityEvents::counts(7);
+        $counts = \App\Support\Security\SecurityEvents::counts(7);
         $log = DB::getQueryLog();
         DB::disableQueryLog();
 

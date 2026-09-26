@@ -79,7 +79,7 @@ class ExternalInputHardeningTest extends TestCase
         $src = \Tests\Support\Source::read(\App\Console\Commands\HubOutbox::class);
         $this->assertMatchesRegularExpression('#Redactor::text\(\s*\$e->getMessage\(\)#u', $src,
             'رمز البوت في مسار الطلب يتسرّب إلى outbox.error المعروض عند فشل اتصال — لا تفويض للمُطهِّر');
-        $rules = \Tests\Support\Source::read(\App\Support\Redactor::class);
+        $rules = \Tests\Support\Source::read(\App\Support\Platform\Redactor::class);
         $this->assertMatchesRegularExpression('#/bot\[0-9\]#u', $rules,
             'قاعدة /bot<id>:<token> غابت عن Redactor — رمز البوت يتسرّب من كل الكتّاب المفوِّضين');
     }

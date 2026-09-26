@@ -35,7 +35,7 @@
     @endif
     <div class="card">
         @php $vdoc = ($req->status === 'وُقّع' && $req->verify_code)
-            ? \App\Support\Qr::svg(route('sign.verify.doc', $req->verify_code), 96) : null; @endphp
+            ? \App\Support\Documents\Qr::svg(route('sign.verify.doc', $req->verify_code), 96) : null; @endphp
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;border-bottom:2px solid var(--ln);padding-bottom:10px;margin-bottom:14px">
             <h2>{{ $req->title }}</h2>
             <div style="text-align:left">

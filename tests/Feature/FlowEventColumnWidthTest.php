@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\HubEvents;
+use App\Support\Platform\HubEvents;
 use Tests\TestCase;
 
 /**

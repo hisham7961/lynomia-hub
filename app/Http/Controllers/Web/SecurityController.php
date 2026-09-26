@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\SecurityPosture;
-use App\Support\SecurityRadar;
+use App\Support\Security\SecurityPosture;
+use App\Support\Security\SecurityRadar;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -15,7 +15,7 @@ class SecurityController extends Controller
      * بعد هذه المدة تُعدّ الجلسة منتهيةً لا نشطة — (WP-4.4) الثابتُ الواحد في
      * `Sessions::LIVE_MIN` بدل أربع نسخٍ متباعدة؛ الاسمُ المحليّ يبقى للتوافق.
      */
-    protected const LIVE_MIN = \App\Support\Sessions::LIVE_MIN;
+    protected const LIVE_MIN = \App\Support\Security\Sessions::LIVE_MIN;
 
     protected function gate(): void
     {
@@ -28,13 +28,13 @@ class SecurityController extends Controller
 
         // السجلُّ الأمنيّ الموحَّد (v2.399): تصنيفٌ قانونيّ فوق التدقيق ورادار المنع — يُصفّى بالكود
         $eventCode = hub_str($r->query('ev'));
-        if ($eventCode !== '' && ! isset(\App\Support\SecurityEvents::CODES[$eventCode])) $eventCode = '';
+        if ($eventCode !== '' && ! isset(\App\Support\Security\SecurityEvents::CODES[$eventCode])) $eventCode = '';
 
         $users = DB::table('users')->whereNull('deleted_at');
 
         // (WP-4.3) صيغُ فشل الدخول من مفردات SecurityEvents الواحدة — لا قائمةً حرفيةً
         // مكرّرة: صيغةُ QuoteFlow التاريخية كانت تسقط من كل عدٍّ يكتب «دخول فاشل» بيده
-        $authFail = \App\Support\SecurityEvents::actions('AUTH_FAILURE');
+        $authFail = \App\Support\Security\SecurityEvents::actions('AUTH_FAILURE');
 
         // (WP-4.5) معرّفاتُ الأسرار البائتة من المصدر الواحد — البطاقةُ والجدولُ
         // المصغّر يقرآن القائمةَ نفسَها فلا ينحرف أحدُهما عن الآخر
@@ -44,8 +44,8 @@ class SecurityController extends Controller
         // طلبٍ وتُمرَّر: كانت اللوحةُ تنادي counts/summary/intel/staleParts مرّتين
         // ومرّاتٍ فتتجاوز ميزانيّتَها — والرقمُ الواحد من مصدره الواحد لا يتبدّل
         // بين نداءين في الطلب نفسه.
-        $eventCounts = \App\Support\SecurityEvents::counts(7);
-        $apiParts = \App\Support\ApiTokens::staleParts();
+        $eventCounts = \App\Support\Security\SecurityEvents::counts(7);
+        $apiParts = \App\Support\Security\ApiTokens::staleParts();
         $radarSummary = SecurityRadar::summary();
 
         $kpi = [
@@ -101,7 +101,7 @@ class SecurityController extends Controller
                     'targets' => (int) $t->fail_targets])
                 ->values();
         } catch (\Throwable $e) {
-            \App\Support\ErrorLog::capture('php', 'security: تعذّر تجميع العناوين الطارقة — ' . $e->getMessage(),
+            \App\Support\Ops\ErrorLog::capture('php', 'security: تعذّر تجميع العناوين الطارقة — ' . $e->getMessage(),
                 $e->getFile(), $e->getLine());
             $knocking = collect();
         }
@@ -148,8 +148,8 @@ class SecurityController extends Controller
         $summary = SecurityPosture::summary($posture);
 
         // **خريطةُ الانكشاف**: من يطاله اختراقُ حسابٍ واحد — بعلاقاتٍ فعلية
-        $exposure = \App\Support\SecurityExposure::map();
-        $exposureSummary = \App\Support\SecurityExposure::summary($exposure);
+        $exposure = \App\Support\Security\SecurityExposure::map();
+        $exposureSummary = \App\Support\Security\SecurityExposure::summary($exposure);
 
         return view('security.index', [
             'kpi' => $kpi, 'sessions' => $sessions, 'failed' => $failed, 'knocking' => $knocking,
@@ -169,7 +169,7 @@ class SecurityController extends Controller
             // — الملخّصُ والذكاءُ والعدّاداتُ هي المحسوبةُ أعلاه مرّةً واحدة
             'radar' => $radarSummary, 'denials' => SecurityRadar::recent(),
             'threats' => SecurityRadar::threats(intel: $intel7),
-            'events' => \App\Support\SecurityEvents::recent(7, 40, $eventCode ?: null),
+            'events' => \App\Support\Security\SecurityEvents::recent(7, 40, $eventCode ?: null),
             'eventCounts' => $eventCounts,
             'eventCode' => $eventCode,
         ]);
@@ -185,14 +185,14 @@ class SecurityController extends Controller
         array $kpi, int $staleSecrets, array $apiParts, array $radar): array
     {
         // النتائجُ المفتوحة بعدّةٍ مجمَّعةٍ واحدة — لا عدَّ لكل شدّةٍ على حدة
-        $openBySev = \App\Support\SecurityFindings::openCounts();
+        $openBySev = \App\Support\Security\SecurityFindings::openCounts();
         $findCrit = (int) ($openBySev['critical'] ?? 0);
         $findHigh = (int) ($openBySev['high'] ?? 0);
         // «المميّزون بلا MFA» رقمُ فحص الوضعية المحسوب لتوّه — والنداءُ المباشر
         // احتياطٌ لصفّ العطل البديل وحدَه (فحصٌ ساقط لا يحمل مفتاحَه)
         $byKey = array_column($posture, null, 'key');
         $privNoMfa = (int) ($byKey['twofa_priv']['n'] ?? count(SecurityPosture::privilegedNoMfaIds()));
-        $tokens = \App\Support\ApiTokens::summary($apiParts);
+        $tokens = \App\Support\Security\ApiTokens::summary($apiParts);
 
         return [
             ['key' => 'score', 'label' => 'درجة الوضعية', 'value' => $summary['score'] . '٪',
@@ -213,7 +213,7 @@ class SecurityController extends Controller
              'hint' => 'من خريطة الانكشاف — خارج نطاق «سليم»'],
             ['key' => 'live_sessions', 'label' => 'جلسات نشطة الآن', 'value' => $kpi['live'],
              'url' => route('security.sessions'),
-             'hint' => 'آخر ظهورٍ خلال ' . \App\Support\Sessions::LIVE_MIN . ' دقيقة'],
+             'hint' => 'آخر ظهورٍ خلال ' . \App\Support\Security\Sessions::LIVE_MIN . ' دقيقة'],
             ['key' => 'failed7', 'label' => 'دخول فاشل (٧ أيام)', 'value' => $kpi['failed7'],
              'tone' => $kpi['failed7'] ? 'wn' : 'ok',
              'url' => route('security.index', ['ev' => 'AUTH_FAILURE']) . '#secevents'],
@@ -257,9 +257,9 @@ class SecurityController extends Controller
         // إعداداتٍ ثانياً بجانبه — فالفعلُ يُمرَّر إلى الدفعة لا يُكتب مرّتين.
         // ورفعُ التجميد **حذفُ صفّ**: افتراضيُّ هذا المفتاح «مطفأ» فالحذفُ عودةٌ
         // إليه لا انقلابُ حالة — وهو غيرُ استعادةِ افتراضيٍّ مُعلَن (critic #7).
-        \App\Support\Settings::batch('security', function () use ($on, $setKey, $label) {
-            $on ? \App\Support\Settings::put($setKey, '1', 'security', "تجميد {$label} من مركز الأمان")
-                : \App\Support\Settings::forget($setKey, 'security', "رفع تجميد {$label} من مركز الأمان");
+        \App\Support\Platform\Settings::batch('security', function () use ($on, $setKey, $label) {
+            $on ? \App\Support\Platform\Settings::put($setKey, '1', 'security', "تجميد {$label} من مركز الأمان")
+                : \App\Support\Platform\Settings::forget($setKey, 'security', "رفع تجميد {$label} من مركز الأمان");
         }, ['action' => $on ? "تجميد {$label} (طوارئ)" : "رفع تجميد {$label}",
             'module' => null, 'name' => auth()->user()->name]);
 
@@ -281,10 +281,10 @@ class SecurityController extends Controller
 
         $u = \App\Models\User::withTrashed()->find($s->user_id);
         if ($u) {
-            \App\Support\Sessions::revokeOne($u, $id, 'إنهاء إداري من مركز الأمان');
+            \App\Support\Security\Sessions::revokeOne($u, $id, 'إنهاء إداري من مركز الأمان');
         } else {
             // صاحبُ الجلسة زال من الجدول — يُوسَم الصفُّ بالختم نفسِه بلا تدوير
-            DB::table('sessions_log')->where('id', $id)->update(\App\Support\Sessions::revocationStamp('إنهاء إداري من مركز الأمان'));
+            DB::table('sessions_log')->where('id', $id)->update(\App\Support\Security\Sessions::revocationStamp('إنهاء إداري من مركز الأمان'));
         }
 
         $name = DB::table('users')->where('id', $s->user_id)->value('name');
@@ -306,13 +306,13 @@ class SecurityController extends Controller
         $u = \App\Models\User::withTrashed()->find($userId);
         abort_unless($u, 404);
 
-        $n = \App\Support\Sessions::revokeAll($u, null, 'إنهاء إداري لكل الجلسات');
+        $n = \App\Support\Security\Sessions::revokeAll($u, null, 'إنهاء إداري لكل الجلسات');
 
         hub_audit('إنهاء جلسات مستخدم', null, null, $u->name . " — {$n} جلسة");
 
         // **حزمةُ استجابة**: إنهاءُ جلسات مستخدمٍ حدثٌ أمنيّ دلاليّ — تعمل عليه
         // التدفقاتُ (تنبيهٌ للمالكين، تليجرام…) كأي حدث. فشلُ الإطلاق لا يُفشل الفعل.
-        try { \App\Support\FlowRunner::fire('sessions_revoked', 'users', $u); } catch (\Throwable $e) { report($e); }
+        try { \App\Support\Platform\FlowRunner::fire('sessions_revoked', 'users', $u); } catch (\Throwable $e) { report($e); }
 
         return back()->with('ok', "🔌 أُنهيت {$n} جلسة لـ«{$u->name}» على كل الأجهزة");
     }
@@ -331,7 +331,7 @@ class SecurityController extends Controller
         abort_unless($u, 404);
 
         $keep = (string) session('hub.sl', '');
-        $n = \App\Support\Sessions::revokeAll($u, $keep !== '' ? $keep : null, 'إنهاء الجلسات الأخرى (إدارة)');
+        $n = \App\Support\Security\Sessions::revokeAll($u, $keep !== '' ? $keep : null, 'إنهاء الجلسات الأخرى (إدارة)');
 
         hub_audit('إنهاء جلسات مستخدم', null, null, $u->name . " — {$n} جلسة (عدا جلسة المنفّذ)");
 
@@ -358,7 +358,7 @@ class SecurityController extends Controller
      */
     protected function findingsQuery()
     {
-        return \App\Support\SecurityFindings::scopeCompanies(
+        return \App\Support\Security\SecurityFindings::scopeCompanies(
             DB::table('security_findings'), hub_company_ids());
     }
 
@@ -370,13 +370,13 @@ class SecurityController extends Controller
     protected function maskFinding(object $f): object
     {
         $ev = json_decode((string) $f->evidence, true);
-        $ev = is_array($ev) ? \App\Support\Redactor::arr($ev) : [];
+        $ev = is_array($ev) ? \App\Support\Platform\Redactor::arr($ev) : [];
         if (! hub_is_owner()) {
             foreach (['title', 'description', 'remediation'] as $c) {
-                $f->{$c} = \App\Support\SecurityFindings::maskPII((string) ($f->{$c} ?? ''));
+                $f->{$c} = \App\Support\Security\SecurityFindings::maskPII((string) ($f->{$c} ?? ''));
             }
             array_walk_recursive($ev, function (&$v) {
-                if (is_string($v)) $v = \App\Support\SecurityFindings::maskPII($v);
+                if (is_string($v)) $v = \App\Support\Security\SecurityFindings::maskPII($v);
             });
         }
         $f->evidence = json_encode($ev, JSON_UNESCAPED_UNICODE);
@@ -390,9 +390,9 @@ class SecurityController extends Controller
         $this->findingsReadGate();
 
         $st = hub_str($r->query('st'));
-        if (! isset(\App\Support\SecurityFindings::STATUSES[$st])) $st = '';
+        if (! isset(\App\Support\Security\SecurityFindings::STATUSES[$st])) $st = '';
         $sev = hub_str($r->query('sev'));
-        if (! in_array($sev, \App\Support\Severity::LEVELS, true)) $sev = '';
+        if (! in_array($sev, \App\Support\Platform\Severity::LEVELS, true)) $sev = '';
 
         $q = $this->findingsQuery();
         if ($st !== '') $q->where('status', $st);
@@ -510,7 +510,7 @@ class SecurityController extends Controller
     {
         $this->findingsReadGate();
 
-        $rows = \App\Support\IdentityRisk::map(hub_company_ids());
+        $rows = \App\Support\Security\IdentityRisk::map(hub_company_ids());
 
         // فرزٌ من رؤوس cc/th — والافتراضُ الأعلى خطراً أولاً بفاصل تعادلٍ حاسم (id)
         $sort = in_array($r->query('sort'), ['score', 'name', 'login', 'failed'], true)
@@ -527,7 +527,7 @@ class SecurityController extends Controller
             return ($dir * ($k($a) <=> $k($b))) ?: ($a['id'] <=> $b['id']);
         });
 
-        $bands = \App\Support\Risk::bands();
+        $bands = \App\Support\Security\Risk::bands();
         $kpi = [
             'total' => count($rows),
             'high'  => count(array_filter($rows, fn ($x) => $x['score'] >= $bands['high'])),
@@ -548,12 +548,12 @@ class SecurityController extends Controller
 
         // ذيلُ WP-4.3: نتائجُ الكيان (مستخدم) تُسوّى هنا حيث تُولد مُعدّاتُها —
         // كتابةُ رصدٍ فقط (المالكُ وحدَه يشغّلها)، ولا امتيازَ يُسحب تلقائياً أبداً
-        if (hub_is_owner()) \App\Support\IdentityRisk::reconcileUserFindings();
+        if (hub_is_owner()) \App\Support\Security\IdentityRisk::reconcileUserFindings();
 
-        $review = \App\Support\IdentityRisk::review(hub_company_ids());
+        $review = \App\Support\Security\IdentityRisk::review(hub_company_ids());
 
         $cat = (string) $r->query('cat', 'owners');
-        if (! isset(\App\Support\IdentityRisk::CATEGORIES[$cat])) $cat = 'owners';
+        if (! isset(\App\Support\Security\IdentityRisk::CATEGORIES[$cat])) $cat = 'owners';
 
         // نتائجُ الإقرار الحيّة لهؤلاء المستخدمين — نفسُ سكّة security_findings (ق٤)
         $findings = collect();
@@ -615,7 +615,7 @@ class SecurityController extends Controller
         $fip = hub_str($r->query('ip'));
         $state = in_array($r->query('state'), ['live', 'revoked'], true) ? (string) $r->query('state') : '';
 
-        $liveSince = now()->subMinutes(\App\Support\Sessions::LIVE_MIN);
+        $liveSince = now()->subMinutes(\App\Support\Security\Sessions::LIVE_MIN);
         $vis = $this->visibleUserIds();
 
         $base = function () use ($range, $uid, $fip, $vis) {
@@ -637,15 +637,15 @@ class SecurityController extends Controller
             ->withQueryString();
 
         // الألفةُ دفعةً واحدة لعناوين الصفحة — لا حلقةَ استعلامٍ لكل صفّ
-        $familiar = \App\Support\Devices::familiarMap($rows->getCollection()->pluck('user_id')->all());
+        $familiar = \App\Support\Security\Devices::familiarMap($rows->getCollection()->pluck('user_id')->all());
         $mine = (string) session('hub.sl', '');
         $rows->getCollection()->transform(function ($s) use ($liveSince, $familiar, $mine) {
             $s->live = ! $s->revoked && $s->last_seen_at && (string) $s->last_seen_at >= $liveSince->toDateTimeString();
             $s->mine = $mine !== '' && (string) $s->id === $mine;
-            [$s->browser] = \App\Support\Devices::describe((string) ($s->user_agent ?: $s->device));
+            [$s->browser] = \App\Support\Security\Devices::describe((string) ($s->user_agent ?: $s->device));
             $s->age = \Illuminate\Support\Carbon::parse($s->started_at)
                 ->diffForHumans($s->last_seen_at ? \Illuminate\Support\Carbon::parse($s->last_seen_at) : now(), true);
-            $s->unusual = $s->ip && ! \App\Support\Devices::isFamiliar($familiar, (string) $s->user_id, (string) $s->ip);
+            $s->unusual = $s->ip && ! \App\Support\Security\Devices::isFamiliar($familiar, (string) $s->user_id, (string) $s->ip);
 
             return $s;
         });
@@ -694,12 +694,12 @@ class SecurityController extends Controller
             ->limit(1000)
             ->get(['user_devices.*', 'users.name as uname', 'users.email as uemail']);
 
-        $familiar = \App\Support\Devices::familiarMap($all->pluck('user_id')->all());
+        $familiar = \App\Support\Security\Devices::familiarMap($all->pluck('user_id')->all());
         $all->transform(function ($d) use ($familiar) {
             $d->revokedState = $d->deleted_at !== null || $d->trust === 'مبطَل';
             // مريب: معلّقٌ (غيرُ مراجَع) آخرُ عنوانه غيرُ مألوفٍ لصاحبه — من الذاكرة القائمة
             $d->suspicious = ! $d->revokedState && $d->trust === 'معلّق'
-                && $d->last_ip && ! \App\Support\Devices::isFamiliar($familiar, (string) $d->user_id, (string) $d->last_ip);
+                && $d->last_ip && ! \App\Support\Security\Devices::isFamiliar($familiar, (string) $d->user_id, (string) $d->last_ip);
 
             return $d;
         });
@@ -795,7 +795,7 @@ class SecurityController extends Controller
         if ($masked) {
             // بريدُ محاولة الدخول يسكن عمودَ name — يُطمس لغير المالك (critic #9)
             $trail->transform(function ($a) {
-                $a->name = \App\Support\SecurityFindings::maskPII((string) $a->name);
+                $a->name = \App\Support\Security\SecurityFindings::maskPII((string) $a->name);
 
                 return $a;
             });
@@ -834,7 +834,7 @@ class SecurityController extends Controller
     {
         $this->findingsReadGate();
 
-        $e = \App\Support\SecurityEvents::find($source, $id);
+        $e = \App\Support\Security\SecurityEvents::find($source, $id);
         abort_unless($e !== null, 404);
 
         // التنطيق (critic #9): المحصورُ بشركاتٍ يرى أحداثَ مستخدمي شركاته فقط —
@@ -848,7 +848,7 @@ class SecurityController extends Controller
             // (محاولةُ الدخول تكتب بريدَها في name) — فيمرّ كلُّ نصٍّ حرٍّ بالقناع
             foreach (['name', 'path', 'detail', 'email'] as $k) {
                 if (isset($e[$k]) && $e[$k] !== null && $e[$k] !== '') {
-                    $e[$k] = \App\Support\SecurityFindings::maskPII((string) $e[$k]);
+                    $e[$k] = \App\Support\Security\SecurityFindings::maskPII((string) $e[$k]);
                 }
             }
         }
@@ -914,7 +914,7 @@ class SecurityController extends Controller
 
         // ذيلُ WP-4.5 (critic #24): نتائجُ الكيانات تُسوّى حيث تُولد مُعدّاتُها —
         // نمطُ security.privileged نفسُه (رصدٌ وإغلاقٌ آليّ، لا فعلٌ على الرموز)
-        \App\Support\SecurityFindings::reconcileEntityFindings();
+        \App\Support\Security\SecurityFindings::reconcileEntityFindings();
 
         // فرزٌ من رؤوس cc/th بترتيبٍ حتميّ (فاصلُ التعادل id) — الافتراضُ الأحدثُ سكّاً
         $sorts = ['created' => 'api_tokens.created_at', 'used' => 'api_tokens.last_used_at',
@@ -936,11 +936,11 @@ class SecurityController extends Controller
             ->withQueryString();
 
         // امتيازُ صاحب الرمز دفعةً واحدة — لا استعلامَ لكل صفّ
-        $privRoles = array_map('strval', \App\Support\ApiTokens::privilegedRoleIds());
+        $privRoles = array_map('strval', \App\Support\Security\ApiTokens::privilegedRoleIds());
         $rows->getCollection()->transform(function ($t) use ($privRoles) {
             $t->privileged = in_array((string) $t->urole, $privRoles, true);
-            $t->full = \App\Support\ApiTokens::fullScope($t->scopes);
-            $t->status = \App\Support\ApiTokens::classify($t);
+            $t->full = \App\Support\Security\ApiTokens::fullScope($t->scopes);
+            $t->status = \App\Support\Security\ApiTokens::classify($t);
             // #14: صاحبٌ بلا ثنائيّةٍ = رمزٌ يتوقّف لحظةَ إشعالِ الاشتراط
             $t->owner2fa = (bool) $t->totp_enabled;
 
@@ -949,11 +949,11 @@ class SecurityController extends Controller
 
         return view('security.tokens', [
             'rows' => $rows, 'sort' => $sort, 'dir' => $dir,
-            'summary' => \App\Support\ApiTokens::summary(),
-            'unusedDays' => \App\Support\ApiTokens::unusedDays(),
+            'summary' => \App\Support\Security\ApiTokens::summary(),
+            'unusedDays' => \App\Support\Security\ApiTokens::unusedDays(),
             'frozen' => (string) setting('security.freeze_tokens', '0') === '1',
             // #14: «مَن يتوقّف لو أُشعل الاشتراط» — قائمةٌ تُقرأ قبل القرار لا بعده
-            'hardening' => \App\Support\HardeningReadiness::summary(),
+            'hardening' => \App\Support\Security\HardeningReadiness::summary(),
             'require2fa' => (string) setting('security.api_require_2fa', '0') === '1',
         ]);
     }
@@ -996,7 +996,7 @@ class SecurityController extends Controller
         $this->gate();
 
         // ذيلُ WP-4.5: نتائجُ الأسرار البائتة تُسوّى حيث تُولد مُعدّاتُها
-        \App\Support\SecurityFindings::reconcileEntityFindings();
+        \App\Support\Security\SecurityFindings::reconcileEntityFindings();
 
         $hasRot = hub_has_col('vault_secrets', 'rotated_at');
         $staleIds = array_map('strval', SecurityPosture::vaultStaleIds());
@@ -1024,7 +1024,7 @@ class SecurityController extends Controller
         // SECRET_REVEALED الواحدة — فهرسُ audits.record_id يقود الاستعلام
         $ids = $rows->getCollection()->pluck('id')->map(fn ($v) => (string) $v)->all();
         $usage = $ids ? DB::table('audits')->where('module', 'vault')
-            ->whereIn('action', \App\Support\SecurityEvents::actions('SECRET_REVEALED'))
+            ->whereIn('action', \App\Support\Security\SecurityEvents::actions('SECRET_REVEALED'))
             ->whereIn('record_id', $ids)
             ->groupBy('record_id')->orderBy('record_id')
             ->selectRaw('record_id, COUNT(*) as n')->pluck('n', 'record_id') : collect();
@@ -1053,9 +1053,9 @@ class SecurityController extends Controller
         $on = ! setting('security.lockdown', false);
 
         // (WP-9.2) على الكاتب الواحد — والفعلُ الأمنيّ يُمرَّر للدفعة فيبقى قيداً واحداً
-        \App\Support\Settings::batch('security', function () use ($on) {
-            $on ? \App\Support\Settings::put('security.lockdown', '1', 'security', 'قفل الطوارئ من مركز الأمان')
-                : \App\Support\Settings::forget('security.lockdown', 'security', 'رفع قفل الطوارئ من مركز الأمان');
+        \App\Support\Platform\Settings::batch('security', function () use ($on) {
+            $on ? \App\Support\Platform\Settings::put('security.lockdown', '1', 'security', 'قفل الطوارئ من مركز الأمان')
+                : \App\Support\Platform\Settings::forget('security.lockdown', 'security', 'رفع قفل الطوارئ من مركز الأمان');
         }, ['action' => $on ? 'تفعيل قفل الطوارئ' : 'رفع قفل الطوارئ',
             'module' => null, 'name' => auth()->user()->name]);
 
@@ -1102,7 +1102,7 @@ class SecurityController extends Controller
             ->orderByDesc('created_at')->orderByDesc('id')->paginate(25);
 
         return view('security.blocks', [
-            'rows' => $rows, 'kpi' => $kpi, 'edge' => \App\Support\EdgeDefense::status(),
+            'rows' => $rows, 'kpi' => $kpi, 'edge' => \App\Support\Security\EdgeDefense::status(),
             'prefill' => preg_match('/^[0-9A-Fa-f:.\/]{3,64}$/', (string) $r->query('ip')) === 1
                 ? (string) $r->query('ip') : '',
         ]);
@@ -1223,7 +1223,7 @@ class SecurityController extends Controller
             'ip' => $ip, 'mode' => $data['mode'], 'origin' => 'manual',
             'reason' => $data['reason'] ?? null, 'expires_at' => $expires,
             'by_id' => auth()->id(),
-            'request_id' => mb_substr((string) \App\Support\Api::requestId(), 0, 64) ?: null,
+            'request_id' => mb_substr((string) \App\Support\Platform\Api::requestId(), 0, 64) ?: null,
         ]);
 
         $verb = $data['mode'] === 'block' ? 'حظر' : 'سماح';
@@ -1232,7 +1232,7 @@ class SecurityController extends Controller
             ['category' => 'SECURITY_POLICY_CHANGED', 'severity' => 'high']);
 
         // الحافّةُ أفضلُ جهدٍ صادق: غيرُ المُهيّأة لا تُنادى، والإخفاقُ لا يُدّعى نجاحاً
-        $edge = $data['mode'] === 'block' && \App\Support\EdgeDefense::push($rule);
+        $edge = $data['mode'] === 'block' && \App\Support\Security\EdgeDefense::push($rule);
 
         return back()->with('ok', "⛔ أُضيفت قاعدةُ {$verb} للعنوان {$ip} ("
             . $this->ruleTermLabel($expires) . ') — حظرُ التطبيق ساري المفعول فوراً'

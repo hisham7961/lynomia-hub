@@ -3,7 +3,7 @@
 namespace Tests\Feature\UltimateReview;
 
 use App\Models\Project;
-use App\Support\SchemaGuard;
+use App\Support\Ops\SchemaGuard;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;

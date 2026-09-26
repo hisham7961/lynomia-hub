@@ -20,7 +20,7 @@
 @elseif ($tsSummary['hooks_break'])
     <div class="flash" style="position:static;margin-bottom:12px">⏱ <b>{{ $tsSummary['hooks_break'] }}</b>
         من {{ $tsSummary['hooks'] }} نقطةً وصلها طلبٌ <b>بلا</b> ترويسة <span class="mono ltr">X-Hub-Timestamp</span>
-        خلال {{ \App\Support\HardeningReadiness::QUIET_DAYS }} يوماً — وهؤلاء وحدَهم مَن يتوقّف لو أُشعل
+        خلال {{ \App\Support\Security\HardeningReadiness::QUIET_DAYS }} يوماً — وهؤلاء وحدَهم مَن يتوقّف لو أُشعل
         <span class="mono ltr">security.inbound_require_timestamp</span>.
         @if ($tsSummary['hooks_unknown'])<br>و<b>{{ $tsSummary['hooks_unknown'] }}</b> لم يصلها طلبٌ بعدُ —
         فحالتُها <b>مجهولةٌ لا جاهزة</b>، ولا تُخمَّن.@endif</div>
@@ -49,7 +49,7 @@
             @php $tsRow = $ts[$h->id] ?? null; @endphp
             @if ($tsRow)
                 <span class="bdg {{ ['يتوقّف' => 'wn', 'جاهزة' => 'ok'][$tsRow['state']] ?? '' }}"
-                      title="@if ($tsRow['state'] === 'يتوقّف')آخرُ طلبٍ بلا ختمٍ زمنيّ: {{ $tsRow['without'] }}@elseif ($tsRow['state'] === 'جاهزة')لا طلبَ بلا ختمٍ زمنيٍّ منذ {{ \App\Support\HardeningReadiness::QUIET_DAYS }} يوماً@else لم يصلها طلبٌ يُرصَد بعد@endif">⏱ {{ $tsRow['state'] }}</span>
+                      title="@if ($tsRow['state'] === 'يتوقّف')آخرُ طلبٍ بلا ختمٍ زمنيّ: {{ $tsRow['without'] }}@elseif ($tsRow['state'] === 'جاهزة')لا طلبَ بلا ختمٍ زمنيٍّ منذ {{ \App\Support\Security\HardeningReadiness::QUIET_DAYS }} يوماً@else لم يصلها طلبٌ يُرصَد بعد@endif">⏱ {{ $tsRow['state'] }}</span>
             @endif
             </h3>
             <span class="spacer"></span>

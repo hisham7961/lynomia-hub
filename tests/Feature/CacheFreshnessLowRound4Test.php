@@ -7,10 +7,10 @@ use App\Models\Employee;
 use App\Models\MediaItem;
 use App\Models\PricingPlan;
 use App\Models\Service;
-use App\Support\Inbox;
-use App\Support\MediaCenter;
-use App\Support\Pricing;
-use App\Support\TeamDirectory;
+use App\Support\Collaboration\Inbox;
+use App\Support\Insights\MediaCenter;
+use App\Support\Finance\Pricing;
+use App\Support\Workforce\TeamDirectory;
 use Tests\TestCase;
 
 /**

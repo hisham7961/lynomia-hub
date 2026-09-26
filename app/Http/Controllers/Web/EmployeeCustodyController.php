@@ -8,7 +8,7 @@ use App\Models\BankAccount;
 use App\Models\Employee;
 use App\Models\EmployeeCustodyMove;
 use App\Models\PayrollLine;
-use App\Support\CustodyPostingService;
+use App\Support\Assets\CustodyPostingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -254,7 +254,7 @@ class EmployeeCustodyController extends Controller
 
         // الطرفُ المقابلُ لكلِّ ساقٍ حسابُ العهدة نفسُه (مالٌ لا يغادر المنشأة) —
         // فيصفو القيدُ داخل حساب العهدة بلا مساسِ نقدٍ أو مصروف.
-        $custody = (new \App\Support\JournalPostingService())->accountsMap()['custody'] ?? null;
+        $custody = (new \App\Support\Finance\JournalPostingService())->accountsMap()['custody'] ?? null;
 
         DB::transaction(function () use ($from, $to, $d, $tid, $r, $custody) {
             $this->svc()->record([

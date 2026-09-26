@@ -9,7 +9,7 @@ use App\Models\EndpointEvent;
 use App\Models\EndpointPolicy;
 use App\Models\EndpointRelease;
 use App\Models\EnrollmentToken;
-use App\Support\Es256;
+use App\Support\Security\Es256;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;

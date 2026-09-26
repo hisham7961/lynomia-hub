@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\AlertRule;
 use App\Models\IpRule;
-use App\Support\AlertEngine;
-use App\Support\HubEvents;
+use App\Support\Ops\AlertEngine;
+use App\Support\Platform\HubEvents;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;

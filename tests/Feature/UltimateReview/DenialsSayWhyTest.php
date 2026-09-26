@@ -97,11 +97,11 @@ class DenialsSayWhyTest extends TestCase
      */
     public function test_a_credential_shaped_reason_is_masked_before_storage(): void
     {
-        $masked = \App\Support\Redactor::text('رُفض — Bearer abcdef0123456789XYZ');
+        $masked = \App\Support\Platform\Redactor::text('رُفض — Bearer abcdef0123456789XYZ');
         $this->assertStringNotContainsString('abcdef0123456789XYZ', $masked,
             'رمزُ حاملٍ في سببِ المنعِ يُخزَّن بنصّه — بيانُ اعتمادٍ في متناول قارئ الرادار');
 
-        $plain = \App\Support\Redactor::text('لا تملك صلاحية على هذه الوحدة');
+        $plain = \App\Support\Platform\Redactor::text('لا تملك صلاحية على هذه الوحدة');
         $this->assertSame('لا تملك صلاحية على هذه الوحدة', $plain,
             'المطهِّرُ يُتلف سبباً بريئاً — فيضيع ما أُضيف من أجله');
     }

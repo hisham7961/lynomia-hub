@@ -47,7 +47,7 @@ class CapacityController extends Controller
         $this->gate();
 
         return view('recommendations', [
-            'ac'   => \App\Support\ActionCenter::feed((bool) request()->query('fresh'), hub_lens()['id']),
+            'ac'   => \App\Support\Insights\ActionCenter::feed((bool) request()->query('fresh'), hub_lens()['id']),
             'lens' => hub_lens(),
         ]);
     }
@@ -64,7 +64,7 @@ class CapacityController extends Controller
         }
         // العدسةُ النشطة (مُحقَّقةُ النطاق في hub_lens: تعود null لمشروعٍ خارج نطاقه)
         // تُمرَّر ليُطابِق الحارسُ الصفَّ الذي رآه المستخدم تحت `?p=PID`.
-        $ok = \App\Support\ActionCenter::disposition($skey, $do, hub_str($r->input('until')) ?: null, hub_str($r->input('note')) ?: null, hub_lens()['id']);
+        $ok = \App\Support\Insights\ActionCenter::disposition($skey, $do, hub_str($r->input('until')) ?: null, hub_str($r->input('note')) ?: null, hub_lens()['id']);
 
         return back()->with($ok ? 'ok' : 'err',
             $ok ? '✔️ سُجّل تصرّفُك على الإشارة' : 'تعذّر — الإشارةُ ليست في صفّك أو زالت');

@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Role;
 use App\Models\User;
-use App\Support\Risk;
-use App\Support\StepUp;
+use App\Support\Security\Risk;
+use App\Support\Security\StepUp;
 use Tests\TestCase;
 
 /**

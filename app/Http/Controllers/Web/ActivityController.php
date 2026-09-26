@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Support\Risk;
-use App\Support\TimeRange;
+use App\Support\Security\Risk;
+use App\Support\Platform\TimeRange;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 

@@ -24,7 +24,7 @@
         @foreach ($posture as $pCheck => $pReading)
             {{-- §11 — العقدُ الموسَّع: active/inactive/permission-denied/unavailable/unsupported/not-configured.
                  مُنعُ القراءة (permission-denied) **ليس امتثالاً** — يُعرَض أحمرَ لا يُطمَس فعّالاً. --}}
-            @php [$pLabel, $pTone] = \App\Support\PostureContract::label((string) $pReading); @endphp
+            @php [$pLabel, $pTone] = \App\Support\Security\PostureContract::label((string) $pReading); @endphp
             <tr>
                 <td>{{ $pChecks[$pCheck] ?? $pCheck }}</td>
                 <td><span class="bdg {{ $pTone }}">{{ $pLabel }}</span></td>

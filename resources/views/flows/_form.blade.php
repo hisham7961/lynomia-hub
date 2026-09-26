@@ -33,7 +33,7 @@
                 <option value="created" @selected($curEvent === 'created')>عند إنشاء سجل</option>
                 <option value="updated" @selected($curEvent === 'updated')>عند تعديل سجل</option>
                 <option value="status" @selected($curEvent === 'status')>عند تحول الحالة إلى…</option>
-                @php $sem = \App\Support\HubEvents::namesFor($def['key'] ?? ''); @endphp
+                @php $sem = \App\Support\Platform\HubEvents::namesFor($def['key'] ?? ''); @endphp
                 @if (count($sem))
                     {{-- أحداث الأعمال: تُغني عن مطابقة نص الحالة يدوياً --}}
                     <optgroup label="أحداث الأعمال">

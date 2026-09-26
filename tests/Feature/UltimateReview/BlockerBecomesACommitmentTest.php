@@ -78,7 +78,7 @@ class BlockerBecomesACommitmentTest extends TestCase
     {
         $this->seedCore();
         [$wid] = $this->blocker('معوّقٌ آخر');
-        \App\Support\Settings::put('issues.blocker_due_days', '3', 'test');
+        \App\Support\Platform\Settings::put('issues.blocker_due_days', '3', 'test');
 
         $u = $this->actor(['updates' => ['v' => 1], 'issues' => ['v' => 1, 'a' => 1]]);
         $this->actingAs($u)->post("/reports/blocker/{$wid}/to-issue");

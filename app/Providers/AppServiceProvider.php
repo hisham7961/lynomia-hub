@@ -46,7 +46,7 @@ class AppServiceProvider extends ServiceProvider
          */
         // تُستثنى الحزمةُ نفسها: أداةُ الاختبار تُعيد بناء قاعدةٍ مؤقتة بحقّ،
         // ولا بياناتٍ فيها تُفقد. والاختبارُ الذي يفحص الحاجز يستدعيه صراحةً.
-        if (! $this->app->runningUnitTests()) \App\Support\SchemaGuard::shield();
+        if (! $this->app->runningUnitTests()) \App\Support\Ops\SchemaGuard::shield();
 
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
@@ -61,7 +61,7 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // بريد SMTP من حقول مركز المراسلة — تغلب .env إن مُلئت، محصّنة مثلها
-        \App\Support\MailSettings::apply();
+        \App\Support\Platform\MailSettings::apply();
 
         /*
          * حدُّ معدّل API: ١٢٠ بالدقيقة لكل مفتاح — **وسقفٌ للعنوان لا يُفلَت منه**.

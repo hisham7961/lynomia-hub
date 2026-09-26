@@ -3,7 +3,7 @@
 @section('content')
 @php
     $effTone = $c['tones']['effective'];   // النغمةُ من الكاتب (N-29)
-    $canReview = \App\Support\ReportReview::canReviewAny(auth()->user());
+    $canReview = \App\Support\Workforce\ReportReview::canReviewAny(auth()->user());
     $canFinalize = hub_can(auth()->user(), 'hr', 'e') || auth()->user()->role?->is_owner;
 @endphp
 <div class="hero">
@@ -28,7 +28,7 @@
     @endif
     <div class="stat"><span class="ico">🕗</span><b class="mono">{{ $c['time_in'] ?: '—' }}@if($c['time_out']) – {{ $c['time_out'] }}@endif</b><span>حضور — انصراف
         {{-- F11: دخولٌ بلا انصرافٍ في يومٍ ماضٍ — شارةٌ صريحةٌ ورابطُ التصحيح --}}
-        @if ($c['checked_in'] && ! $c['checked_out'] && $date < \App\Support\BusinessDate::today())
+        @if ($c['checked_in'] && ! $c['checked_out'] && $date < \App\Support\Platform\BusinessDate::today())
             @if ($c['attendance'] && hub_can(auth()->user(), 'attend', 'e'))
                 <a class="bdg wn" href="{{ route('m.edit', ['attend', $c['attendance']->id]) }}" title="صحّح صفَّ الحضور — الساعاتُ لا تُختلق">انصراف مفقود ✎</a>
             @else
@@ -101,7 +101,7 @@
                 <div class="sub">📈 تقدّمٌ مقترح: {{ (float)$w->progress }}٪ (المهمّة الآن {{ (float)($w->task->progress ?? 0) }}٪)</div>@endif
             @if ($w->review_feedback)<div class="sub" style="border-inline-start:3px solid var(--wn,#e67e22);padding-inline-start:8px;margin-top:4px">💬 ملاحظة المراجع: {{ $w->review_feedback }}</div>@endif
 
-            @if ($canReview && \App\Support\ReportReview::canReview(auth()->user(), $w))
+            @if ($canReview && \App\Support\Workforce\ReportReview::canReview(auth()->user(), $w))
                 {{-- ═══ المدقّق (§٣.٤ · A3): ملاحظتُه للمراجع وحدَه، ومسودتُه تُعبّأ ولا تُرسَل —
                      الموظّفُ لا يرى إلّا ما حرّره المراجعُ وأرسله بـ«طلب تنقيح» (قرارُ المالك §٣.٦) ═══ --}}
                 @php $notes = $auditNotes[(string) $w->id] ?? []; $draftNote = collect($notes)->pluck('note')->filter()->first(); @endphp

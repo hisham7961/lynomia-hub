@@ -6,7 +6,7 @@ use App\Contracts\AskGenerator;
 use Illuminate\Support\Str;
 use App\Support\Ai\Governance\AiGovernance;
 use App\Support\Ai\Governance\AiPolicy;
-use App\Support\Redactor;
+use App\Support\Platform\Redactor;
 
 /**
  * **منسّقُ «اسأل Hub»** — من السؤالِ إلى الجوابِ، بحارسٍ عند كلِّ خطوة. (P3-W5)

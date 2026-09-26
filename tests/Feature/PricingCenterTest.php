@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\Pricing;
+use App\Support\Finance\Pricing;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

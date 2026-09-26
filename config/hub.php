@@ -4919,7 +4919,7 @@ return [
                     'col' => 'status',
                     'label' => 'الحالة',
                     'type' => 'sel',
-                    'options' => \App\Support\Custody::STATUSES,
+                    'options' => \App\Support\Assets\Custody::STATUSES,
                     'locked' => true,
                 ],
                 [
@@ -5143,7 +5143,7 @@ return [
                     'type' => 'sel',
                     // المدعومُ رسميّاً من المصدرِ الواحد (§1): Windows/macOS — لا يُنشأ
                     // سجلٌّ جديدٌ بنظامٍ غيرِ مدعوم؛ والصفوفُ القديمة (linux) تبقى تُعرَض.
-                    'options' => \App\Support\Endpoint::SUPPORTED,
+                    'options' => \App\Support\Endpoint\Endpoint::SUPPORTED,
                     'locked' => true,
                 ],
                 // (لا حقلَ `agentVersion` في السجل عمداً: قيمةٌ آليّةٌ يبلّغها
@@ -9441,7 +9441,7 @@ return [
      * (NOT_CONFIGURED) لا مُختلَقة.
      */
     'mobile' => [
-        'api_version' => '1',   // = App\Support\Api::VERSION
+        'api_version' => '1',   // = App\Support\Platform\Api::VERSION
         'version_gate' => [
             // فارغٌ = لا حدَّ = لا حجب. يُقرأ الحيُّ من setting('mobile.min_version_ios') ...
             'ios'          => ['min' => '', 'latest' => ''],
@@ -9487,7 +9487,7 @@ return [
         // التوقيع (SHA-256). تُخدَم /.well-known/apple-app-site-association و/.well-known/
         // assetlinks.json صادقةً **تربط صفرَ تطبيق** حتى تُضبط (spec §Deep links: «documented,
         // not fabricated»). القيمُ الحيّةُ تغلب عبر setting('mobile.dl_*'). المسارُ `/m/*` هو
-        // ترميزُ الرابطِ العميق القانونيّ {module,id,action} (App\Support\NotificationLink).
+        // ترميزُ الرابطِ العميق القانونيّ {module,id,action} (App\Support\Collaboration\NotificationLink).
         'deep_links' => [
             'serve'   => true,                 // هل تُخدَم /.well-known/* (تبقى صادقةً NOT_CONFIGURED دون معرّفات)
             'host'    => '',                   // النطاقُ المُصرَّح — فارغٌ ⇒ config('app.url')

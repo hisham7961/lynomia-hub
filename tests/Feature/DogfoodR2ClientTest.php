@@ -289,16 +289,16 @@ class DogfoodR2ClientTest extends TestCase
     /** ما تختمه البوّابةُ خادميّاً من ألفاظِ السجلّ نفسِه — لا قاموسَ ثانٍ ينحرف */
     public function test_g7_portal_stamps_match_the_ticket_registry_options(): void
     {
-        $this->assertContains(\App\Support\ClientPortalData::TICKET_NEW_STATUS,
-            \App\Support\ClientPortalData::ticketFieldOptions('status'),
+        $this->assertContains(\App\Support\Collaboration\ClientPortalData::TICKET_NEW_STATUS,
+            \App\Support\Collaboration\ClientPortalData::ticketFieldOptions('status'),
             'حالةُ البلاغِ المختومةُ من خيارات السجلّ');
-        $this->assertContains(\App\Support\ClientPortalData::TICKET_PORTAL_CHANNEL,
-            \App\Support\ClientPortalData::ticketFieldOptions('channel'),
+        $this->assertContains(\App\Support\Collaboration\ClientPortalData::TICKET_PORTAL_CHANNEL,
+            \App\Support\Collaboration\ClientPortalData::ticketFieldOptions('channel'),
             'قناةُ البلاغِ المختومةُ من خيارات السجلّ');
-        foreach (\App\Support\ClientPortalData::TICKET_DONE_STATUSES as $s) {
-            $this->assertContains($s, \App\Support\ClientPortalData::ticketFieldOptions('status'));
+        foreach (\App\Support\Collaboration\ClientPortalData::TICKET_DONE_STATUSES as $s) {
+            $this->assertContains($s, \App\Support\Collaboration\ClientPortalData::ticketFieldOptions('status'));
         }
-        $this->assertNotEmpty(\App\Support\ClientPortalData::ticketFieldOptions('priority'));
+        $this->assertNotEmpty(\App\Support\Collaboration\ClientPortalData::ticketFieldOptions('priority'));
     }
 
     public function test_g7_client_cannot_open_a_ticket_on_a_project_that_is_not_hers(): void

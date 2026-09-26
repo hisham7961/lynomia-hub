@@ -3,7 +3,7 @@
 namespace App\Support\Discovery;
 
 use App\Models\IdentityLookup;
-use App\Support\Identity;
+use App\Support\Security\Identity;
 use Illuminate\Support\Facades\Http;
 
 /**

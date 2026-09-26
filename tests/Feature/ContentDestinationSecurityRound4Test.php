@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\MediaItem;
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
-use App\Support\WebhookDispatcher;
+use App\Support\Ops\WebhookDispatcher;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 

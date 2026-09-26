@@ -6,12 +6,12 @@
      تبقى في `StationController` المقفل. المحطاتُ داخليّةٌ (لا عميل — البوّابةُ تردّه ٤٠٤). --}}
 @php
     $u = auth()->user();
-    $st360 = new \App\Support\Station360;
+    $st360 = new \App\Support\Assets\Station360;
     $stCan = hub_can($u, 'stations', 'e');
     $stHolder = $row->current_employee_id
         ? (hub_ref_labels('users', [$row->current_employee_id])[$row->current_employee_id] ?? 'حسابٌ محذوف')
         : null;
-    $stQr = $row->code ? \App\Support\Qr::svg(route('stations.code', $row->code), 96) : '';
+    $stQr = $row->code ? \App\Support\Documents\Qr::svg(route('stations.code', $row->code), 96) : '';
 
     $stOv = $st360->overview($row, $u);
     $stAssets = $st360->currentAssets($row, $u);

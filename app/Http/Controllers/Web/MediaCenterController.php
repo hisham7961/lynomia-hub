@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\MediaCenter;
+use App\Support\Insights\MediaCenter;
 use Illuminate\Http\Request;
 
 /** مركز الإعلام والفعاليات — الظهورُ أثرٌ لا أرشيف */

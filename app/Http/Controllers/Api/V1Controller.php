@@ -59,8 +59,8 @@ class V1Controller extends ModuleController
 
         $trash = false; $filters = [];
         $q = $this->buildQuery($r, $def, $class, $trash, $filters);
-        $applied = \App\Support\Api::timeFilters($r, $q);
-        [$col, $dir, $sortKey] = \App\Support\Api::sort($r, $def, $module);
+        $applied = \App\Support\Platform\Api::timeFilters($r, $q);
+        [$col, $dir, $sortKey] = \App\Support\Platform\Api::sort($r, $def, $module);
 
         // فاصلُ id: عمودُ الفرز قد تتساوى قيمُه (الطابع بدقّة الثانية) فتتقلب الصفحات بين الطلبات
         $per = min(100, max(1, (int) $r->query('per', 25)));
@@ -72,7 +72,7 @@ class V1Controller extends ModuleController
         $fields = hub_str($r->query('fields')) ?: null;
         $this->auditApiSecretRead($def, count($page->items()));
 
-        return \App\Support\Api::list($page,
+        return \App\Support\Platform\Api::list($page,
             collect($page->items())->map(fn ($row) => $this->shape($def, $row, $fields)),
             ['sort' => $sortKey ?? 'created_at', 'dir' => $dir, 'trash' => $trash,
              'filters' => array_filter(['q' => hub_str($r->query('q')) ?: null,
@@ -118,7 +118,7 @@ class V1Controller extends ModuleController
             $m->save();
             $this->notifyAssignee($def, $module, $m);
             $this->bustProgress($module, $m);
-            \App\Support\FlowRunner::fire('created', $module, $m);
+            \App\Support\Platform\FlowRunner::fire('created', $module, $m);
 
             $resp = $this->one($def, $m->fresh(), null, 201);
             $this->idempotentFinish($r, $resp);
@@ -137,7 +137,7 @@ class V1Controller extends ModuleController
         [$def, $class] = $this->resolveApi($module, 'e');
         $this->aliasColumns($r, $def);
         if (hub_needs_approval(auth()->user(), $module, 'e')) {
-            return \App\Support\Api::error(\App\Support\Api::APPROVAL_REQUIRED, 409,
+            return \App\Support\Platform\Api::error(\App\Support\Platform\Api::APPROVAL_REQUIRED, 409,
                 'هذه العملية محمية بالموافقات — نفّذها من الواجهة ليُصفّ الطلب');
         }
         $r->validate($this->rules($def, false), [], $this->attrs($def));
@@ -146,16 +146,16 @@ class V1Controller extends ModuleController
 
         $m = $this->findScoped($class, $module, $id);
         // القفلُ التفاؤليّ للـAPI: `If-Match: "n"` أو `_version` — تخالفٌ = 409 VERSION_CONFLICT
-        \App\Support\Api::assertVersion($r, $m);
+        \App\Support\Platform\Api::assertVersion($r, $m);
         $prev = ($af = $this->assigneeField($def)) ? $m->{$af['col']} : null;
         $prevStatus = ($sc = hub_status_col($module)) ? $m->{$sc} : null;
         $this->fill($def, $r, $m);
         $m->save();
         $this->notifyAssignee($def, $module, $m, $prev);
         $this->bustProgress($module, $m);
-        \App\Support\FlowRunner::fire('updated', $module, $m);
+        \App\Support\Platform\FlowRunner::fire('updated', $module, $m);
         if ($sc && (string) $m->{$sc} !== (string) $prevStatus) {
-            \App\Support\FlowRunner::fire('status', $module, $m, (string) $m->{$sc});
+            \App\Support\Platform\FlowRunner::fire('status', $module, $m, (string) $m->{$sc});
         }
 
         return $this->one($def, $m->fresh());
@@ -173,7 +173,7 @@ class V1Controller extends ModuleController
         [$def, $class] = $this->resolveApi($module, 'e');
         $this->aliasColumns($r, $def);
         if (hub_needs_approval(auth()->user(), $module, 'e')) {
-            return \App\Support\Api::error(\App\Support\Api::APPROVAL_REQUIRED, 409,
+            return \App\Support\Platform\Api::error(\App\Support\Platform\Api::APPROVAL_REQUIRED, 409,
                 'هذه العملية محمية بالموافقات — نفّذها من الواجهة ليُصفّ الطلب');
         }
 
@@ -194,16 +194,16 @@ class V1Controller extends ModuleController
         if ($cf && in_array($cf['key'], $keys, true)) $this->guardCompany($r, $module);
 
         $m = $this->findScoped($class, $module, $id);
-        \App\Support\Api::assertVersion($r, $m);
+        \App\Support\Platform\Api::assertVersion($r, $m);
         $prev = ($af = $this->assigneeField($def)) ? $m->{$af['col']} : null;
         $prevStatus = ($sc = hub_status_col($module)) ? $m->{$sc} : null;
         $this->fill($def, $r, $m, $hasCustom ? array_merge($keys, ['custom']) : $keys);
         $m->save();
         $this->notifyAssignee($def, $module, $m, $prev);
         $this->bustProgress($module, $m);
-        \App\Support\FlowRunner::fire('updated', $module, $m);
+        \App\Support\Platform\FlowRunner::fire('updated', $module, $m);
         if ($sc && (string) $m->{$sc} !== (string) $prevStatus) {
-            \App\Support\FlowRunner::fire('status', $module, $m, (string) $m->{$sc});
+            \App\Support\Platform\FlowRunner::fire('status', $module, $m, (string) $m->{$sc});
         }
 
         return $this->one($def, $m->fresh());
@@ -214,12 +214,12 @@ class V1Controller extends ModuleController
     {
         [$def, $class] = $this->resolveApi($module, 'd');
         if (hub_needs_approval(auth()->user(), $module, 'd')) {
-            return \App\Support\Api::error(\App\Support\Api::APPROVAL_REQUIRED, 409,
+            return \App\Support\Platform\Api::error(\App\Support\Platform\Api::APPROVAL_REQUIRED, 409,
                 'هذه العملية محمية بالموافقات — نفّذها من الواجهة ليُصفّ الطلب');
         }
         $this->findScoped($class, $module, $id)->delete();
 
-        return response()->json(['deleted' => true, 'request_id' => \App\Support\Api::requestId()]);
+        return response()->json(['deleted' => true, 'request_id' => \App\Support\Platform\Api::requestId()]);
     }
 
     /** GET /api/v1/reports/progress/{projectId} */
@@ -357,30 +357,30 @@ class V1Controller extends ModuleController
     {
         $def = hub_mod($module);
         if (! $def || $module === 'users') {
-            \App\Support\Api::abort(\App\Support\Api::RESOURCE_NOT_FOUND, 404, 'وحدة غير معروفة', ['kind' => 'module', 'module' => $module]);
+            \App\Support\Platform\Api::abort(\App\Support\Platform\Api::RESOURCE_NOT_FOUND, 404, 'وحدة غير معروفة', ['kind' => 'module', 'module' => $module]);
         }
         // عزلُ العميل خادميّاً لا بمصفوفة الدور (§14/§120.6): مجموعةُ `/api/v1` لا تمرّ
         // بـ`PortalGuard` (وسيطُ الويب)، فيُطبَّق حجزُ العميلِ نفسُه هنا صراحةً — فحسابُ
         // عميلٍ (ولو مُنِح دوراً) لا يبلغ إلا وحداتِه المسموحة، ٤٠٤ لغيرها (لا كشفَ وجود).
         if (hub_is_client(auth()->user())
             && ! in_array($module, \App\Http\Middleware\PortalGuard::MODULE_ALLOW, true)) {
-            \App\Support\Api::abort(\App\Support\Api::RESOURCE_NOT_FOUND, 404, 'وحدة غير معروفة', ['kind' => 'module', 'module' => $module]);
+            \App\Support\Platform\Api::abort(\App\Support\Platform\Api::RESOURCE_NOT_FOUND, 404, 'وحدة غير معروفة', ['kind' => 'module', 'module' => $module]);
         }
         // أسطولُ النقاطِ الطرفيّة: **السلطةُ نفسُها التي تسألها الشاشة** (F-02) — لا نسخةٌ
         // ثانيةٌ من الشرط، فالنسخُ هو ما ولّد التفاوتَ أوّلَ مرّة.
         if ($module === 'endpoints' && ! hub_fleet_ok(auth()->user())) {
-            \App\Support\Api::abort(\App\Support\Api::FORBIDDEN, 403,
+            \App\Support\Platform\Api::abort(\App\Support\Platform\Api::FORBIDDEN, 403,
                 'أسطولُ النقاطِ الطرفيّة للمالكِ أو حاملِ مجموعةِ الأمن (secOps)',
                 ['module' => $module, 'op' => $op]);
         }
         if (! hub_can(auth()->user(), $module, $op)) {
-            \App\Support\Api::abort(\App\Support\Api::FORBIDDEN, 403, 'لا تملك هذه الصلاحية على الوحدة', ['module' => $module, 'op' => $op]);
+            \App\Support\Platform\Api::abort(\App\Support\Platform\Api::FORBIDDEN, 403, 'لا تملك هذه الصلاحية على الوحدة', ['module' => $module, 'op' => $op]);
         }
 
         // نطاقات المفتاح: مفتاح مقيد لا يتجاوز قيده حتى لو كان صاحبه يستطيع
         $token = request()->attributes->get('api_token');
         if ($token && ! $token->allows($module, $op)) {
-            \App\Support\Api::abort(\App\Support\Api::INSUFFICIENT_SCOPE, 403,
+            \App\Support\Platform\Api::abort(\App\Support\Platform\Api::INSUFFICIENT_SCOPE, 403,
                 'نطاق هذا المفتاح لا يشمل «' . $module . ':' . $op . '» — أنشئ مفتاحاً بنطاق أوسع أو عدّل النطاقات',
                 ['module' => $module, 'op' => $op, 'scopes' => (string) $token->scopes]);
         }
@@ -421,7 +421,7 @@ class V1Controller extends ModuleController
                 // مفتاحٌ أُعيد بطلبٍ مختلف (مسار/جسم): لا نعيد ردَّ الأول (بيانات وحدةٍ
                 // أخرى) ولا نُسقط الثاني بصمت — نرفض صراحةً كي يتبيّن العميلُ خطأه.
                 if (($row->fingerprint ?? null) !== null && ! hash_equals((string) $row->fingerprint, $fp)) {
-                    return \App\Support\Api::error(\App\Support\Api::IDEMPOTENCY_KEY_REUSED, 422,
+                    return \App\Support\Platform\Api::error(\App\Support\Platform\Api::IDEMPOTENCY_KEY_REUSED, 422,
                         'مفتاح idempotency أُعيد بطلبٍ مختلف — استعمل مفتاحاً جديداً لكل طلب');
                 }
 
@@ -438,7 +438,7 @@ class V1Controller extends ModuleController
                     continue;
                 }
 
-                return \App\Support\Api::error(\App\Support\Api::IDEMPOTENCY_IN_PROGRESS, 409,
+                return \App\Support\Platform\Api::error(\App\Support\Platform\Api::IDEMPOTENCY_IN_PROGRESS, 409,
                     'الطلب نفسه قيد المعالجة الآن — أعد المحاولة بعد لحظات', null, [], ['Retry-After' => '5']);
             }
         }
@@ -485,7 +485,7 @@ class V1Controller extends ModuleController
         // و`mobile_session->id` لسطح الجوال (كلُّ جلسةٍ مالكٌ مستقلٌّ — لا إعادةَ ردٍّ
         // عبر المستخدمين). لا NULL لطلبٍ مُصادَق — فلا حجزٌ صامتٌ متجاوَزٌ في الجوال.
         $ikey  = trim((string) $r->header('Idempotency-Key'));
-        $owner = \App\Support\Idempotency::owner($r);
+        $owner = \App\Support\Platform\Idempotency::owner($r);
         if ($ikey === '' || mb_strlen($ikey) > 120 || ! $owner) return [null, null];
 
         return [$owner, $ikey];
@@ -568,7 +568,7 @@ class V1Controller extends ModuleController
             if (! $secret && $needStepup && ($f['type'] ?? '') === 'sec') {
                 $ms = request()->attributes->get('mobile_session');
                 $fresh = $ms instanceof \App\Models\MobileSession
-                    && \App\Support\MobileSessionService::mobileStepUpFresh($ms, 'reveal:' . $module . ':' . $f['key']);
+                    && \App\Support\Mobile\MobileSessionService::mobileStepUpFresh($ms, 'reveal:' . $module . ':' . $f['key']);
                 if (! $fresh) $secret = true;
             }
             if ($hidden || $secret) { unset($arr[$f['col']]); continue; }
@@ -621,7 +621,7 @@ class V1Controller extends ModuleController
      */
     public function identityResolve(string $q)
     {
-        $hit = \App\Support\Identity::resolve($q);
+        $hit = \App\Support\Security\Identity::resolve($q);
         if ($hit['type'] !== 'none') {
             $module = ['asset' => 'assets', 'product' => 'products', 'stock' => 'stock'][$hit['type']];
             abort_unless($this->tokenAllows($module, 'v'), 403, "نطاق هذا المفتاح لا يشمل «{$module}:v»");
@@ -644,7 +644,7 @@ class V1Controller extends ModuleController
     {
         $resp = response()->json([
             'data' => $this->shape($def, $row, $fields),
-            'request_id' => \App\Support\Api::requestId(),
+            'request_id' => \App\Support\Platform\Api::requestId(),
         ], $status);
         if (isset($row->version)) $resp->header('ETag', '"' . (int) $row->version . '"');
 
@@ -665,7 +665,7 @@ class V1Controller extends ModuleController
             $mods[] = $key;
         }
 
-        return response()->json(\App\Support\OpenApi::spec($mods, $u), 200, [],
+        return response()->json(\App\Support\Platform\OpenApi::spec($mods, $u), 200, [],
             JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
@@ -677,7 +677,7 @@ class V1Controller extends ModuleController
      */
     protected function fieldEmp(): \App\Models\Employee
     {
-        $emp = \App\Support\Workday::emp(auth()->user());
+        $emp = \App\Support\Workforce\Workday::emp(auth()->user());
         abort_unless($emp, 403, 'لا ملفَ موظفٍ نشطاً مربوطاً بحسابك');
         abort_if(empty($emp->field_role) || $emp->field_role === '—', 403,
             'التتبّع الميدانيّ لأصحاب الدور الميدانيّ — يُضبط من ملف الموظف');
@@ -691,7 +691,7 @@ class V1Controller extends ModuleController
         $emp = $this->fieldEmp();
         abort_unless($r->boolean('consent'), 422, 'التتبّع يتطلب موافقةً صريحة (consent=true)');
 
-        $s = \App\Support\Tracking::start($emp, [
+        $s = \App\Support\Workforce\Tracking::start($emp, [
             'user_id' => auth()->id(),
             'field_day' => $r->input('field_day'),
             'device' => $r->header('X-Device', $r->userAgent()),
@@ -710,10 +710,10 @@ class V1Controller extends ModuleController
 
         $points = $r->input('points', []);
         abort_if(! is_array($points), 422, 'points يجب أن تكون مصفوفة');
-        abort_if(count($points) > \App\Support\Tracking::BATCH_MAX, 422,
-            'الدفعةُ تتجاوز الحدّ (' . \App\Support\Tracking::BATCH_MAX . ' نقطة)');
+        abort_if(count($points) > \App\Support\Workforce\Tracking::BATCH_MAX, 422,
+            'الدفعةُ تتجاوز الحدّ (' . \App\Support\Workforce\Tracking::BATCH_MAX . ' نقطة)');
 
-        $res = \App\Support\Tracking::ingest($s, $points);
+        $res = \App\Support\Workforce\Tracking::ingest($s, $points);
 
         return response()->json($res + ['session' => $s->id]);
     }
@@ -725,7 +725,7 @@ class V1Controller extends ModuleController
         $s = \App\Models\TrackSession::where('id', $session)->where('emp_id', $emp->id)->first();
         abort_unless($s, 404);
 
-        \App\Support\Tracking::end($s);
+        \App\Support\Workforce\Tracking::end($s);
         hub_audit('إنهاء جلسة تتبّع ميدانيّ', 'tracks', $s->id, $emp->name . " — {$s->point_count} نقطة");
 
         return response()->json([

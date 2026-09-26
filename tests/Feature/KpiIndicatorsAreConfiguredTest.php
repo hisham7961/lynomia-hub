@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\KpiDef;
-use App\Support\KpiCentre;
+use App\Support\Insights\KpiCentre;
 use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
@@ -68,7 +68,7 @@ class KpiIndicatorsAreConfiguredTest extends TestCase
                 $this->assertSame('٪', $k->unit, "«{$k->name}» نسبةٌ ووحدتُها ليست ٪");
             }
             if ($kind === KpiCentre::KIND_MONEY) {
-                $this->assertSame(\App\Support\Currency::base(), $k->unit,
+                $this->assertSame(\App\Support\Finance\Currency::base(), $k->unit,
                     "«{$k->name}» مبلغٌ ووحدتُه ليست عملةَ الأساس");
             }
         }

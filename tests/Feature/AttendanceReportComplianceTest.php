@@ -10,7 +10,7 @@ use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\WorkUpdate;
-use App\Support\Workday;
+use App\Support\Workforce\Workday;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -79,9 +79,9 @@ class AttendanceReportComplianceTest extends TestCase
         $this->assertSame(Workday::PRESENT, $row->status, 'الحضورُ الفيزيائيّ محفوظ: حاضر');
 
         // الامتثالُ التقريريّ يُقرّ بالتقرير — من المُحلِّل المركزيّ (§101)
-        $c = \App\Support\DailyWorkCompliance::resolve($e);
+        $c = \App\Support\Workforce\DailyWorkCompliance::resolve($e);
         $this->assertTrue($c['report_submitted'], 'has_report = true');
-        $this->assertSame(\App\Support\DailyWorkCompliance::PRESENT_REPORTED, $c['state']);
+        $this->assertSame(\App\Support\Workforce\DailyWorkCompliance::PRESENT_REPORTED, $c['state']);
         $this->assertSame('present', $c['effective'], 'الأثرُ الفعّال: حاضر/ممتثل');
     }
 
@@ -117,15 +117,15 @@ class AttendanceReportComplianceTest extends TestCase
         // قبل المهلة: الآن 08:30 والانصراف لم يقع — وردية مفتوحة/بانتظار
         Carbon::setTestNow(Carbon::parse($date . ' 08:30:00', config('app.timezone')));
         $this->attendance($e, $date, '08:00', null);   // بلا انصراف بعد
-        $c = \App\Support\DailyWorkCompliance::resolve($e, $date);
-        $this->assertSame(\App\Support\DailyWorkCompliance::CHECKED_IN, $c['state']);
+        $c = \App\Support\Workforce\DailyWorkCompliance::resolve($e, $date);
+        $this->assertSame(\App\Support\Workforce\DailyWorkCompliance::CHECKED_IN, $c['state']);
         $this->assertSame('present', $c['effective'], 'وردية مفتوحة — لا مخالفة (§106)');
 
         // انصرف 09:00، والآن 18:00 (بعد المهلة grace=0) ⇒ حضورٌ بلا تقرير + غياب محتسَب
         Carbon::setTestNow(Carbon::parse($date . ' 18:00:00', config('app.timezone')));
         Attendance::where('emp_id', $e->id)->update(['time_out' => '09:00']);
-        $c = \App\Support\DailyWorkCompliance::resolve($e, $date);
-        $this->assertSame(\App\Support\DailyWorkCompliance::PRESENT_WITHOUT_REPORT, $c['state']);
+        $c = \App\Support\Workforce\DailyWorkCompliance::resolve($e, $date);
+        $this->assertSame(\App\Support\Workforce\DailyWorkCompliance::PRESENT_WITHOUT_REPORT, $c['state']);
         $this->assertSame('absent_due_to_missing_report', $c['effective']);
         $this->assertSame(Workday::PRESENT, $c['physical'], 'الحضورُ الفيزيائيُّ لا يُطمَس (§7)');
         $this->assertNotNull($c['time_in'], 'ختمُ الحضورِ باقٍ');
@@ -144,8 +144,8 @@ class AttendanceReportComplianceTest extends TestCase
         $this->attendance($e, $date, '08:00', '09:00');
         $this->report($u, $date);   // قُدِّم 18:00 — بعد مهلة 09:00
 
-        $c = \App\Support\DailyWorkCompliance::resolve($e, $date);
-        $this->assertSame(\App\Support\DailyWorkCompliance::LATE_REPORT, $c['state']);
+        $c = \App\Support\Workforce\DailyWorkCompliance::resolve($e, $date);
+        $this->assertSame(\App\Support\Workforce\DailyWorkCompliance::LATE_REPORT, $c['state']);
         $this->assertTrue($c['late'], 'التأخّرُ محفوظ');
         $this->assertTrue($c['needs_review'], 'يحتاج مراجعة (§40)');
     }
@@ -165,8 +165,8 @@ class AttendanceReportComplianceTest extends TestCase
             'date_from' => $date, 'date_to' => $date, 'days' => 1, 'status' => 'معتمد']);
         $this->attendance($e, $date, '08:00', '09:00');
 
-        $c = \App\Support\DailyWorkCompliance::resolve($e, $date);
-        $this->assertSame(\App\Support\DailyWorkCompliance::NOT_REQUIRED, $c['state']);
+        $c = \App\Support\Workforce\DailyWorkCompliance::resolve($e, $date);
+        $this->assertSame(\App\Support\Workforce\DailyWorkCompliance::NOT_REQUIRED, $c['state']);
         $this->assertSame('leave', $c['effective']);
         $this->assertFalse($c['report_required']);
     }
@@ -182,8 +182,8 @@ class AttendanceReportComplianceTest extends TestCase
         Carbon::setTestNow(Carbon::parse($date . ' 18:00:00', config('app.timezone')));
         $this->attendance($e, $date, '08:00', null);   // بلا انصراف
 
-        $c = \App\Support\DailyWorkCompliance::resolve($e, $date);
-        $this->assertSame(\App\Support\DailyWorkCompliance::CHECKED_IN, $c['state']);
+        $c = \App\Support\Workforce\DailyWorkCompliance::resolve($e, $date);
+        $this->assertSame(\App\Support\Workforce\DailyWorkCompliance::CHECKED_IN, $c['state']);
         $this->assertNotSame('absent_due_to_missing_report', $c['effective']);
     }
 
@@ -198,9 +198,9 @@ class AttendanceReportComplianceTest extends TestCase
         $this->report($u, $date);                       // تقريرٌ أولاً
         $this->attendance($e, $date, '08:00', '16:00'); // ثم الانصراف
 
-        $c = \App\Support\DailyWorkCompliance::resolve($e, $date);
+        $c = \App\Support\Workforce\DailyWorkCompliance::resolve($e, $date);
         $this->assertTrue($c['report_submitted']);
-        $this->assertSame(\App\Support\DailyWorkCompliance::PRESENT_REPORTED, $c['state']);
+        $this->assertSame(\App\Support\Workforce\DailyWorkCompliance::PRESENT_REPORTED, $c['state']);
     }
 
     /* ═══════════ §110 — يومٌ متعدّدُ المشاريع: ممتثل، بلا عدٍّ مزدوج ═══════════ */
@@ -217,7 +217,7 @@ class AttendanceReportComplianceTest extends TestCase
         $this->report($u, $date, $pa, 'عملُ أ');
         $this->report($u, $date, $pb, 'عملُ ب');
 
-        $c = \App\Support\DailyWorkCompliance::resolve($e, $date);
+        $c = \App\Support\Workforce\DailyWorkCompliance::resolve($e, $date);
         $this->assertTrue($c['report_submitted']);
         $this->assertSame(2, $c['report_count']);
         $this->assertEqualsCanonicalizing([$pa->id, $pb->id], $c['projects']);
@@ -235,10 +235,10 @@ class AttendanceReportComplianceTest extends TestCase
         $this->attendance($e, $date, '08:00', '16:00');
         $this->report($u, $date, null, 'عملٌ إداريٌّ داخليّ');   // project_id = null
 
-        $c = \App\Support\DailyWorkCompliance::resolve($e, $date);
+        $c = \App\Support\Workforce\DailyWorkCompliance::resolve($e, $date);
         $this->assertTrue($c['report_submitted'], 'عملٌ داخليٌّ يُرضي الاشتراط (§16)');
         $this->assertTrue($c['has_non_project']);
-        $this->assertSame(\App\Support\DailyWorkCompliance::PRESENT_REPORTED, $c['state']);
+        $this->assertSame(\App\Support\Workforce\DailyWorkCompliance::PRESENT_REPORTED, $c['state']);
     }
 
     /* ═══════════ §13/§24 — نائبٌ فارغٌ لا يُرضي اشتراطاً ═══════════ */
@@ -252,7 +252,7 @@ class AttendanceReportComplianceTest extends TestCase
         $this->attendance($e, $date, '08:00', '16:00');
         $this->report($u, $date, null, '-');   // نائبٌ رمزيّ
 
-        $c = \App\Support\DailyWorkCompliance::resolve($e, $date);
+        $c = \App\Support\Workforce\DailyWorkCompliance::resolve($e, $date);
         $this->assertFalse($c['report_submitted'], 'الشرطةُ ليست تقريراً (§24)');
     }
 
@@ -292,13 +292,13 @@ class AttendanceReportComplianceTest extends TestCase
 
         // سماحيةٌ واسعة: 10:00 < 09:00+180 = 12:00 ⇒ بانتظار
         $this->hubSetting('work.report_grace_minutes', '180');
-        $this->assertSame(\App\Support\DailyWorkCompliance::REPORT_PENDING,
-            \App\Support\DailyWorkCompliance::resolve($e, $date)['state']);
+        $this->assertSame(\App\Support\Workforce\DailyWorkCompliance::REPORT_PENDING,
+            \App\Support\Workforce\DailyWorkCompliance::resolve($e, $date)['state']);
 
         // تضييقُها فوراً: 10:00 > 09:00+0 ⇒ حضورٌ بلا تقرير
         $this->hubSetting('work.report_grace_minutes', '0');
-        $this->assertSame(\App\Support\DailyWorkCompliance::PRESENT_WITHOUT_REPORT,
-            \App\Support\DailyWorkCompliance::resolve($e, $date)['state']);
+        $this->assertSame(\App\Support\Workforce\DailyWorkCompliance::PRESENT_WITHOUT_REPORT,
+            \App\Support\Workforce\DailyWorkCompliance::resolve($e, $date)['state']);
     }
 
     /* ═══════════ §72 — استعادةُ بندٍ محذوفٍ تُعيد ساعاتِه للمهمة ═══════════ */
@@ -329,7 +329,7 @@ class AttendanceReportComplianceTest extends TestCase
         $w = $this->report($u, $date, $p, 'مسودةٌ أوّليّة');
 
         // المدير يطلب تنقيحاً
-        \App\Support\ReportReview::needsRevision($w->fresh(), $this->owner, 'فصّل ما أنجزت');
+        \App\Support\Workforce\ReportReview::needsRevision($w->fresh(), $this->owner, 'فصّل ما أنجزت');
         $this->assertSame('needs_revision', $w->fresh()->review_status);
         // إشعارُ الموظف
         $this->assertTrue(\App\Models\HubNotification::where('user_id', $u->id)
@@ -341,7 +341,7 @@ class AttendanceReportComplianceTest extends TestCase
         $this->assertStringContainsString('أنجزتُ', (string) $w->fresh()->done);
 
         // المدير يقبل — لا يمسّ الساعات (§73)
-        \App\Support\ReportReview::accept($w->fresh(), $this->owner);
+        \App\Support\Workforce\ReportReview::accept($w->fresh(), $this->owner);
         $this->assertSame('accepted', $w->fresh()->review_status);
 
         // §30: بعد القبول، الموظفُ لا يعدّل صامتاً
@@ -364,9 +364,9 @@ class AttendanceReportComplianceTest extends TestCase
         $p = Project::create(['name' => 'مشروع']);
         $w = $this->report($u, now()->toDateString(), $p);
 
-        $this->assertFalse(\App\Support\ReportReview::canReview($other, $w->fresh()));
+        $this->assertFalse(\App\Support\Workforce\ReportReview::canReview($other, $w->fresh()));
         // ولا صاحبُ التقريرِ يراجع نفسَه (فصلُ التنفيذ عن الحكم §76)
-        $this->assertFalse(\App\Support\ReportReview::canReview($u, $w->fresh()));
+        $this->assertFalse(\App\Support\Workforce\ReportReview::canReview($u, $w->fresh()));
         // المسارُ يردّ 403
         $this->actingAs($other)->post(route('reports.review.act', $w->id), ['action' => 'accept'])
             ->assertForbidden();
@@ -386,7 +386,7 @@ class AttendanceReportComplianceTest extends TestCase
             $this->actingAs($client)->get(route($r))->assertNotFound();
         }
         // ولا الواجهةُ: my-daily تُردّ 404 للعميل
-        $this->assertFalse(\App\Support\ReportReview::canReviewAny($client));
+        $this->assertFalse(\App\Support\Workforce\ReportReview::canReviewAny($client));
     }
 
     /* ═══════════ §115 — لا تسرّب تقارير/حضور عبرَ الشركات ═══════════ */
@@ -424,7 +424,7 @@ class AttendanceReportComplianceTest extends TestCase
         Carbon::setTestNow(Carbon::parse($date . ' 12:00:00', config('app.timezone')));
         $this->report($u, $date, null, 'عملٌ عن بعدٍ بلا تسجيلِ حضور');   // تقريرٌ بلا صفِّ حضور
 
-        $c = \App\Support\DailyWorkCompliance::resolve($e, $date);
+        $c = \App\Support\Workforce\DailyWorkCompliance::resolve($e, $date);
         $this->assertFalse($c['checked_in'], 'لا حضورَ مفتَرى (§45)');
         $this->assertTrue($c['report_submitted'], 'التقريرُ حقيقةٌ منفصلة');
         $this->assertNull($c['physical']);
@@ -446,7 +446,7 @@ class AttendanceReportComplianceTest extends TestCase
         $res = $this->withHeaders(['Authorization' => 'Bearer ' . $token])
             ->getJson('/api/v1/reports/my-daily?date=' . $date)->assertOk();
         $res->assertJsonPath('compliance.report_submitted', true);
-        $res->assertJsonPath('compliance.state', \App\Support\DailyWorkCompliance::PRESENT_REPORTED);
+        $res->assertJsonPath('compliance.state', \App\Support\Workforce\DailyWorkCompliance::PRESENT_REPORTED);
     }
 
     public function test_api_v1_reports_deny_client_account(): void

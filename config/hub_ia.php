@@ -7,7 +7,7 @@
  * من `hub_admin_links`. لا جدولَ ولا نموذجَ ولا حقلَ ولا صلاحيةَ تُنسخ هنا.
  *
  * ⚠️ لا يمنحُ IA صلاحيةً قطّ (Critic C1). كلُّ وجهةٍ **تُصرّح كيف تُحرَس**، وخدمة
- * `App\Support\InformationArchitecture` تفوّض الرؤيةَ لنفس المُسنِد القائم:
+ * `App\Support\Platform\InformationArchitecture` تفوّض الرؤيةَ لنفس المُسنِد القائم:
  *   · type=module            → hub_can($u, module, 'v')
  *   · type=center (كتالوج)   → مفتاحُ `center` فقط؛ الرابط/التسمية/الحارس من
  *                              hub_top_links[$key] (C6 — لا نُعيد ذكر route/label)

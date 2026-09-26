@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
-use App\Support\Ownership;
+use App\Support\Insights\Ownership;
 use Tests\TestCase;
 
 /**

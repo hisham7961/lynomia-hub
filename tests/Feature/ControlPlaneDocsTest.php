@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;

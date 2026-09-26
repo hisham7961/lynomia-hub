@@ -116,7 +116,7 @@ class ContractApprovalsTest extends TestCase
         $this->seedCore();
         $this->seedRules();
         $captured = [];
-        \App\Support\HubEvents::listen(function ($event) use (&$captured) { $captured[] = $event; });
+        \App\Support\Platform\HubEvents::listen(function ($event) use (&$captured) { $captured[] = $event; });
         [$req, $c] = $this->makeHeld();
 
         $this->actingAs($this->employee)->post("/esign/{$req->id}/approve");
@@ -144,7 +144,7 @@ class ContractApprovalsTest extends TestCase
         $this->seedCore();
         $this->seedRules();
         $captured = [];
-        \App\Support\HubEvents::listen(function ($event) use (&$captured) { $captured[] = $event; });
+        \App\Support\Platform\HubEvents::listen(function ($event) use (&$captured) { $captured[] = $event; });
         [$req, $c] = $this->makeHeld();
 
         // بلا سبب → يُرد بإرشاد

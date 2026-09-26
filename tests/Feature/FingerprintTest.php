@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\ErrorEvent;
-use App\Support\ErrorLog;
-use App\Support\ErrorTaxonomy;
+use App\Support\Ops\ErrorLog;
+use App\Support\Ops\ErrorTaxonomy;
 use Tests\TestCase;
 
 /**

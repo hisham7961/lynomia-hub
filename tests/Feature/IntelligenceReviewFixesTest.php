@@ -8,7 +8,7 @@ use App\Models\FinDocument;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\ActionCenter;
+use App\Support\Insights\ActionCenter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;

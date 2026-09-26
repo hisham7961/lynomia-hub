@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\ErrorEvent;
-use App\Support\ErrorLog;
+use App\Support\Ops\ErrorLog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;

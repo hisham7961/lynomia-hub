@@ -195,7 +195,7 @@ class MessagingCenterTest extends TestCase
 
         // وتُطبَّق على البريد الحي غالبةً .env
         config(['mail.default' => 'log']);
-        \App\Support\MailSettings::apply();
+        \App\Support\Platform\MailSettings::apply();
         $this->assertSame('smtp', config('mail.default'));
         $this->assertSame('smtp.zoho.com', config('mail.mailers.smtp.host'));
         $this->assertSame('app-pass-1', config('mail.mailers.smtp.password'));
@@ -239,7 +239,7 @@ class MessagingCenterTest extends TestCase
         $this->seedCore();
         config(['mail.default' => 'log', 'mail.mailers.smtp.host' => 'env-host']);
 
-        \App\Support\MailSettings::apply();
+        \App\Support\Platform\MailSettings::apply();
 
         $this->assertSame('log', config('mail.default'));
         $this->assertSame('env-host', config('mail.mailers.smtp.host'));

@@ -263,7 +263,7 @@ if (! function_exists('hub_scope')) {
         // فيسري على كلِّ بابِ قراءة (m.* والـAPI ومزامنةُ الجوال) لا على قارئِ
         // البوّابةِ وحدَه. الداخليّون لا يمسّهم هذا القيد.
         if ($module === 'fin' && hub_is_client($user)) {
-            $q->whereIn('kind', \App\Support\ClientPortalData::CLIENT_INVOICE_KINDS);
+            $q->whereIn('kind', \App\Support\Collaboration\ClientPortalData::CLIENT_INVOICE_KINDS);
         }
 
         /*
@@ -434,9 +434,9 @@ if (! function_exists('hub_capability')) {
      */
     function hub_capability(string $key): bool
     {
-        if (! in_array($key, \App\Support\FeatureRegistry::keys(), true)) return true;
+        if (! in_array($key, \App\Support\Platform\FeatureRegistry::keys(), true)) return true;
 
-        return \App\Support\FeatureRegistry::available($key);
+        return \App\Support\Platform\FeatureRegistry::available($key);
     }
 }
 
@@ -507,7 +507,7 @@ if (! function_exists('hub_has_work_profile')) {
         $memo ??= new \WeakMap;
         if (isset($memo[$user])) return $memo[$user];
 
-        return $memo[$user] = (\App\Support\Workday::emp($user) !== null);
+        return $memo[$user] = (\App\Support\Workforce\Workday::emp($user) !== null);
     }
 }
 
@@ -595,7 +595,7 @@ if (! function_exists('hub_top_links')) {
             // مركزُ التقارير اليوميّة ومركزُ المراجعة — مراكزُ ظاهرةٌ كـ«فريقي اليوم» تماماً،
             // لا مدفونةً في صفحةِ مساحة. الحرسُ نفسُه في المتحكّم (guardTeam/canReviewAny).
             ['key' => 'reportsc',  'label' => '📊 مركز التقارير اليومية', 'route' => 'reports.index',  'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
-            ['key' => 'reportsr',  'label' => '📥 تقارير للمراجعة',    'route' => 'reports.review',  'group' => 'centers',   'ok' => \App\Support\ReportReview::canReviewAny($user)],
+            ['key' => 'reportsr',  'label' => '📥 تقارير للمراجعة',    'route' => 'reports.review',  'group' => 'centers',   'ok' => \App\Support\Workforce\ReportReview::canReviewAny($user)],
             // الحضورُ الشهريّ للمحاسبة والاعتماد — يكفيه `attend:v` (يمنحه المالكُ للمحاسب) أو `hr:v`
             ['key' => 'attmonth',  'label' => '🗓️ الحضور الشهري',     'route' => 'reports.monthly', 'group' => 'centers',   'ok' => hub_can($user, 'attend', 'v') || hub_can($user, 'hr', 'v')],
             ['key' => 'codehub',   'label' => '🌿 مركز الكود',        'route' => 'code.center',     'group' => 'centers',   'ok' => hub_can($user, 'code', 'v')],
@@ -909,7 +909,7 @@ if (! function_exists('hub_open_incident')) {
             ];
             // (WP-1.4) ربطُ الحادثة بالطلب الذي فجّرها — `system.trace` يجمع الأثرَ بالمعرّف
             if (hub_has_col('incidents', 'request_id')) {
-                $row['request_id'] = mb_substr((string) \App\Support\Api::requestId(), 0, 40) ?: null;
+                $row['request_id'] = mb_substr((string) \App\Support\Platform\Api::requestId(), 0, 40) ?: null;
             }
             // ── Control Plane: Phase 6 (WP-6.1) ──
             // عمودُ `kind` مرآةُ meta.kind (عرضُه ٢٠ — mb_substr عند الكاتب) يُغني
@@ -928,11 +928,11 @@ if (! function_exists('hub_open_incident')) {
             $m = \App\Models\Incident::create($row);
             // (WP-6.3) البثُّ على الناقل الواحد — فتعمل المساراتُ المبذورة
             // («🚨 حادث حرج») والويبهوكس على الحوادث الآليّة كما اليدويّة تماماً
-            \App\Support\FlowRunner::fire('created', 'incidents', $m);
+            \App\Support\Platform\FlowRunner::fire('created', 'incidents', $m);
 
             return $m;
         } catch (\Throwable $e) {
-            \App\Support\ErrorLog::capture('php', 'hub_open_incident: ' . $e->getMessage(), __FILE__, __LINE__);
+            \App\Support\Ops\ErrorLog::capture('php', 'hub_open_incident: ' . $e->getMessage(), __FILE__, __LINE__);
 
             return null;
         }
@@ -943,7 +943,7 @@ if (! function_exists('hub_stepup_ok')) {
     /** هل تصعيدُ المصادقة ساري المفعول الآن؟ (نافذةٌ قصيرة بعد إعادة التحقّق) */
     function hub_stepup_ok(): bool
     {
-        return \App\Support\StepUp::fresh();
+        return \App\Support\Security\StepUp::fresh();
     }
 }
 
@@ -956,7 +956,7 @@ if (! function_exists('hub_require_stepup')) {
      */
     function hub_require_stepup(?string $next = null)
     {
-        if (\App\Support\StepUp::fresh()) return null;
+        if (\App\Support\Security\StepUp::fresh()) return null;
 
         // وجهةُ العودة بعد التأكيد: `stepup.verify` يُعيد التوجيه بـGET، فلا يصحّ أن
         // تكون الوجهةُ مسارَ الفعل نفسِه إن كان POST/PUT/DELETE (ترحيلٌ، تصعيدٌ…) —
@@ -979,7 +979,7 @@ if (! function_exists('hub_require_stepup')) {
 
         if (request()->expectsJson() || request()->is('api/*')) {
             // الغلافُ الموحَّد: المفاتيحُ القديمة (error/stepup/url) كما هي + code + request_id
-            return \App\Support\Api::error(\App\Support\Api::STEP_UP_REQUIRED, 428,
+            return \App\Support\Platform\Api::error(\App\Support\Platform\Api::STEP_UP_REQUIRED, 428,
                 'يتطلب تأكيدَ الهوية', null, ['stepup' => true, 'url' => $url]);
         }
 
@@ -997,7 +997,7 @@ if (! function_exists('hub_schedule_failed')) {
     function hub_schedule_failed(string $command, string $category = 'QUEUE', string $severity = 'ERROR'): void
     {
         $job = str_replace(['hub:', 'metrics-snapshot', 'quality-snapshot', 'uptime-check', 'audit-verify'], ['', 'metrics', 'quality', 'uptime', 'audit'], $command);
-        \App\Support\ErrorLog::capture('php', 'فشل مهمة مجدولة: ' . $command . ' — راجع مركز التشغيل وكتيّبات التشغيل',
+        \App\Support\Ops\ErrorLog::capture('php', 'فشل مهمة مجدولة: ' . $command . ' — راجع مركز التشغيل وكتيّبات التشغيل',
             'routes/console.php', null, null, ['category' => $category, 'severity' => $severity]);
         try {
             \App\Models\Setting::updateOrCreate(['key' => 'heartbeat.' . $job . '.meta'],
@@ -1864,7 +1864,7 @@ if (! function_exists('hub_expiry_self_scan')) {
                     ->orderBy('expires_at')->orderBy('id')->limit(40)->get();
 
                 if ($docs->isNotEmpty()) {
-                    \App\Support\DocumentPolicy::primeMemo($docs->pluck('id'));
+                    \App\Support\Documents\DocumentPolicy::primeMemo($docs->pluck('id'));
                     $names = $emps->pluck($disp, 'id');
                     foreach ($docs as $a) {
                         /*
@@ -1897,7 +1897,7 @@ if (! function_exists('hub_expiry_self_scan')) {
                          * وثيقةً والبوّابةُ تردّها، أو العكس — وكلٌّ منهما صادقٌ
                          * داخليّاً. وذلك أصلُ ما يلاحقه هذا المجلس.
                          */
-                        if (! \App\Support\DocumentPolicy::subjectMayAny($user, $a)) continue;
+                        if (! \App\Support\Documents\DocumentPolicy::subjectMayAny($user, $a)) continue;
                         $out[] = [
                             'module' => 'hr', 'mlabel' => (string) ($md['label'] ?? 'ملفات الموظفين'),
                             'flabel' => hub_doc_label('hr', $a->kind) ?? 'وثيقة',
@@ -2708,8 +2708,8 @@ if (! function_exists('hub_visible_fields')) {
         // Permissions 360 · 15.4/03.3 — حسابُ العميلِ يرى أعمدةَ سطحِه المنسّقةَ حصراً
         // (عقدُ البوّابة نفسُه) في كلِّ سطحٍ يستشير هذه الدالة: جدولُ الوحدةِ
         // وتصديرُها وقناعُ حقولِ الجوال — لا نسختين من القرار.
-        if (hub_is_client($user) && isset(\App\Support\ClientPortalData::CLIENT_SAFE_COLS[$module])) {
-            $safe = \App\Support\ClientPortalData::CLIENT_SAFE_COLS[$module];
+        if (hub_is_client($user) && isset(\App\Support\Collaboration\ClientPortalData::CLIENT_SAFE_COLS[$module])) {
+            $safe = \App\Support\Collaboration\ClientPortalData::CLIENT_SAFE_COLS[$module];
             $fields = array_values(array_filter($fields,
                 fn ($f) => in_array((string) ($f['col'] ?? $f['key']), $safe, true)));
         }
@@ -3234,7 +3234,7 @@ if (! function_exists('hub_money_base_total')) {
     ): ?float {
         $total = 0.0;
         foreach (hub_money_rows($rows, $amountKey, $curKey, $dateKey, $default) as $r) {
-            $c = \App\Support\Currency::toBase($r['amount'], $r['currency'], $r['date']);
+            $c = \App\Support\Finance\Currency::toBase($r['amount'], $r['currency'], $r['date']);
             if ($c === null) return null;
             $total += $c;
         }
@@ -3248,7 +3248,7 @@ if (! function_exists('hub_money_sum')) {
      * **مجموعُ مالٍ: محوَّلٌ بعملةِ الأساس حين يمكن، ومخلوطٌ صادقٌ حين لا يمكن.**
      *
      * المحوِّلُ الواحدُ بين شكلِ صفوفِ الشاشات وعقدِ `Currency::sum`. كان في
-     * النظامِ محرّكُ صرفٍ كاملٌ (`App\Support\Currency`) **وشاشةُ إدخالِ أسعارٍ
+     * النظامِ محرّكُ صرفٍ كاملٌ (`App\Support\Finance\Currency`) **وشاشةُ إدخالِ أسعارٍ
      * له — ولا شاشةَ واحدةٌ تستعمله**: ستُّ مواضعَ تجمع المالَ كانت تنادي
      * `hub_cur_label` فترفع علمَ الاختلاط، والمالكُ يسجّل السعرَ فلا يتغيّر
      * رقمٌ واحد. فالميزةُ مبنيّةٌ ومختبَرةٌ ومقطوعةُ السلك.
@@ -3277,7 +3277,7 @@ if (! function_exists('hub_money_sum')) {
         $default = $default ?? (string) setting('app.currency', 'د.ك');
 
         $shaped = hub_money_rows($rows, $amountKey, $curKey, $dateKey, $default);
-        $sum = \App\Support\Currency::sum($shaped);
+        $sum = \App\Support\Finance\Currency::sum($shaped);
 
         // **حين لا تحويلَ فعليّاً تُحسَب اللصيقةُ بالمساعدِ القديمِ نفسِه** — لا
         // بـ`cur` التي يشتقّها المحرّك. الفرقُ يظهر في موضعين: مجموعةٌ فارغة
@@ -3326,7 +3326,7 @@ if (! function_exists('hub_money_sum_q')) {
 
         // المسارُ القديمُ حرفيّاً لمن لا سعرَ عنده — ومع ذلك تبقى اللصيقةُ
         // صادقةً: تُقرأ العملاتُ المميَّزةُ كما كانت الشاشاتُ تقرؤها
-        if (! \App\Support\Currency::enabled()) {
+        if (! \App\Support\Finance\Currency::enabled()) {
             $total = (float) (clone $q)->sum($amountExpr);
             $l = hub_cur_label((clone $q)->distinct()->pluck($curCol), $default);
 
@@ -3507,7 +3507,7 @@ if (! function_exists('hub_stock_sync')) {
 
         $item->status = $new;
         $item->saveQuietly();
-        \App\Support\FlowRunner::fire('status', 'stock', $item, $new);
+        \App\Support\Platform\FlowRunner::fire('status', 'stock', $item, $new);
     }
 }
 
@@ -3753,10 +3753,10 @@ if (! function_exists('hub_project_pl')) {
              */
             $curSet = array_unique(array_map(fn ($r) => filled($r['currency'] ?? null)
                 ? (string) $r['currency'] : $defCur, array_merge($costRows, $revRows)));
-            $foreign = (bool) array_diff($curSet, [\App\Support\Currency::base()]);
+            $foreign = (bool) array_diff($curSet, [\App\Support\Finance\Currency::base()]);
             $revBase = $foreign ? hub_money_base_total($revRows, 'amount', 'currency', 'date', $defCur) : null;
             $costBase = $foreign ? hub_money_base_total($costRows, 'amount', 'currency', 'date', $defCur) : null;
-            $plConv = \App\Support\Currency::enabled() && $foreign
+            $plConv = \App\Support\Finance\Currency::enabled() && $foreign
                 && $revBase !== null && $costBase !== null;
 
             /** يطوي مكوّناً: محوَّلاً بعملةِ الأساسِ حين حُوِّل الطرفان، وخاماً عداه */
@@ -3778,7 +3778,7 @@ if (! function_exists('hub_project_pl')) {
             // **والاختلاطُ يُقاس على الطرفين** — مشروعٌ إيرادُه بعملةٍ وتكلفتُه
             // بأخرى مخلوطٌ وإن اتّحدت فواتيرُه، وكان العلمُ يُقرأ من الإيرادِ وحدَه.
             $plLabel = $plConv
-                ? ['cur' => \App\Support\Currency::base(), 'mixed' => false]
+                ? ['cur' => \App\Support\Finance\Currency::base(), 'mixed' => false]
                 : hub_cur_label(array_column(array_merge($revRows, $costRows), 'currency'), $defCur);
 
             $byCurrency = collect($incRows)
@@ -4435,10 +4435,10 @@ if (! function_exists('hub_timeline')) {
             ->where('module', $module)->where('record_id', $recordId)
             ->orderByDesc('created_at')->limit($limit)
             ->get(['id', 'original_name', 'uploaded_by', 'created_at']);
-        \App\Support\DocumentPolicy::primeMemo($tlAtts->pluck('id'));
+        \App\Support\Documents\DocumentPolicy::primeMemo($tlAtts->pluck('id'));
         $tlViewer = auth()->user();
         foreach ($tlAtts as $t) {
-            if ($tlViewer && ! \App\Support\DocumentPolicy::listable($tlViewer, $t)) continue;
+            if ($tlViewer && ! \App\Support\Documents\DocumentPolicy::listable($tlViewer, $t)) continue;
             $add($t->created_at, '📎', 'مرفق',
                 \Illuminate\Support\Str::limit((string) $t->original_name, 60),
                 null, $name($t->uploaded_by));
@@ -4516,7 +4516,7 @@ if (! function_exists('hub_timeline')) {
                     $add($at($l->created_at), '🔗', 'دليل: ' . ($kindLbl[$l->kind] ?? $l->kind),
                         $blind
                             ? 'سجلٌّ خارج صلاحيتك — أُخفي ملخّصُه'
-                            : \Illuminate\Support\Str::limit(\App\Support\Redactor::text((string) $l->summary), 160),
+                            : \Illuminate\Support\Str::limit(\App\Support\Platform\Redactor::text((string) $l->summary), 160),
                         (! $blind && $lm !== '' && $l->record_id) ? route('m.show', [$lm, $l->record_id]) : null,
                         $name($l->by));
                 }
@@ -4534,7 +4534,7 @@ if (! function_exists('hub_timeline')) {
                         array_keys($me['evidence']), array_values($me['evidence'])));
                 }
                 $add($at($me['at'] ?? null), '🤖', 'قيد آليّ',
-                    \Illuminate\Support\Str::limit(\App\Support\Redactor::text($txt), 160));
+                    \Illuminate\Support\Str::limit(\App\Support\Platform\Redactor::text($txt), 160));
             }
 
             // ٣) النشرُ المرتبط بعمود المرجع القائم
@@ -4659,7 +4659,7 @@ if (! function_exists('hub_audit')) {
                      . implode('، ', $unknown) . ' — ضعها في `after` (عمودُ JSON مُعمَّد)'
                      . ' أو أضِف لها عموداً بهجرة. الفعل: ' . $action;
                 if (app()->environment('production')) {
-                    \App\Support\ErrorLog::capture('php', 'hub_audit: ' . $msg, __FILE__, __LINE__);
+                    \App\Support\Ops\ErrorLog::capture('php', 'hub_audit: ' . $msg, __FILE__, __LINE__);
                     foreach ($unknown as $k) unset($extra[$k]);   // الدرعُ يعمل كما كان
                 } else {
                     throw new \RuntimeException($msg);
@@ -4693,7 +4693,7 @@ if (! function_exists('hub_audit')) {
             // hub_fit لا substr: القصُّ بالبايتات يقطع الحرف العربي نصفين
             'device'    => hub_fit((string) request()->userAgent(), 200),
             'ip'        => request()->ip(),
-            'request_id' => \App\Support\Api::requestId(),
+            'request_id' => \App\Support\Platform\Api::requestId(),
             'created_at' => now(),
             // (WP-5.2) أعمدةُ التطبيع — خارج البصمة؛ و$extra يغلبها لمن صرّح بفئته
         ] + hub_audit_norm($action, $module, $extra['before'] ?? null, $extra['after'] ?? null, $name));
@@ -5955,7 +5955,7 @@ if (! function_exists('hub_recommendations')) {
 
             // ٨) عهدةٌ متأخرةُ الاسترداد — من منتِج القائم `Custody::overdue` (منطَّقٌ سلفاً)
             try {
-                foreach (\App\Support\Custody::overdue(8) as $c) {
+                foreach (\App\Support\Assets\Custody::overdue(8) as $c) {
                     $add(($c['late'] ?? 0) > 14 ? 'حرج' : 'مهم', '📦', 'عهدةٌ متأخرةُ الاسترداد: ' . $c['asset'],
                         'تصريحُ «' . $c['action'] . '» استحقّ رجوعُه ' . $c['due'] . ' — متأخرٌ ' . $c['late'] . ' يوماً. تابع الاسترداد.',
                         route('m.show', ['assets', $c['assetId']]), 'افتح الأصل',
@@ -6011,7 +6011,7 @@ if (! function_exists('hub_recommendations')) {
             try {
                 if (! $projectId && hub_can(auth()->user(), 'hr', 'v')
                     && \Illuminate\Support\Facades\Schema::hasTable('attendance')) {
-                    $team = \App\Support\Workday::teamToday();
+                    $team = \App\Support\Workforce\Workday::teamToday();
                     $missing = (int) ($team['n']['noreport'] ?? 0);
                     if ($missing > 0) {
                         $add($missing >= 5 ? 'مهم' : 'اطّلاع', '📝', $missing . ' تقريرٌ يوميٌّ ناقصٌ اليوم',
@@ -6959,7 +6959,7 @@ if (! function_exists('hub_dossier')) {
         // الملفِّ مهما كانت قواعدُ الوصول (وإلا بدا الملفُّ مكتملاً لمن مُنع وثيقةً)، لكنَّ
         // **روابطَ التنزيلِ** لا تُعرَض إلا لِما يجوزُ لهذا القارئِ رؤيتُه. تحميلٌ دفعيٌّ مرّة.
         $docViewer = auth()->user();
-        \App\Support\DocumentPolicy::primeMemo($files->pluck('id'));
+        \App\Support\Documents\DocumentPolicy::primeMemo($files->pluck('id'));
 
         $today = now()->startOfDay();
         foreach ($spec as $d) {
@@ -6989,7 +6989,7 @@ if (! function_exists('hub_dossier')) {
                 // العدُّ كاملٌ (حَوكمة)، وقائمةُ الروابطِ مُرشَّحةٌ بقاعدةِ الوثيقة (رؤية)
                 'n' => $mine->count(),
                 'files' => $mine->filter(fn ($f) => ! $docViewer
-                        || \App\Support\DocumentPolicy::listable($docViewer, $f))
+                        || \App\Support\Documents\DocumentPolicy::listable($docViewer, $f))
                     ->values()->all(),
                 'latest' => $latest, 'expires' => $exp, 'days' => $days,
                 'state' => $state, 'tone' => $tone,
@@ -7029,7 +7029,7 @@ if (! function_exists('hub_doc_expiry')) {
 
         // **الرؤيةُ تتبع قاعدةَ الوثيقة**: وثيقةٌ ممنوعةٌ صريحاً عن القارئِ لا تظهرُ في رادارِه
         // (اسمُها وانتهاؤها وجودٌ يُكشَف). تحميلٌ دفعيٌّ للقواعدِ مرّةً (لا N+1).
-        \App\Support\DocumentPolicy::primeMemo($rows->pluck('id'));
+        \App\Support\Documents\DocumentPolicy::primeMemo($rows->pluck('id'));
 
         $out = [];
         foreach ($rows->groupBy('module') as $mk => $group) {
@@ -7043,7 +7043,7 @@ if (! function_exists('hub_doc_expiry')) {
 
             foreach ($group as $a) {
                 if (! isset($ids[$a->record_id])) continue;      // خارج نطاقه
-                if ($user && ! \App\Support\DocumentPolicy::listable($user, $a)) continue;  // ممنوعةٌ صريحاً عنه
+                if ($user && ! \App\Support\Documents\DocumentPolicy::listable($user, $a)) continue;  // ممنوعةٌ صريحاً عنه
                 $d = $a->expires_at->toDateString();
                 $out[] = [
                     'module' => $mk, 'mlabel' => $md['label'],
@@ -7703,9 +7703,9 @@ if (! function_exists('hub_range')) {
      * (from/to وحدهما، created_from/created_to/updated_since، days/d العدديّان)
      * تُقرأ كما هي بلا إعادة تسمية. العرضُ في `partials/timerange.blade.php`.
      */
-    function hub_range(?\Illuminate\Http\Request $r = null, string $default = '7d'): \App\Support\TimeRange
+    function hub_range(?\Illuminate\Http\Request $r = null, string $default = '7d'): \App\Support\Platform\TimeRange
     {
-        return \App\Support\TimeRange::fromRequest($r, $default);
+        return \App\Support\Platform\TimeRange::fromRequest($r, $default);
     }
 }
 
@@ -7938,8 +7938,8 @@ if (! function_exists('hub_audit_class')) {
     function hub_audit_class(string $action, ?string $module = null, $before = null, $after = null, ?string $name = null): array
     {
         // ١) الأفعال الأمنية — الكودُ القانونيّ هو الفئة والشدّةُ من تصنيفه
-        if ($code = \App\Support\SecurityEvents::codeFor($action, $module, $after, $name)) {
-            return ['category' => $code, 'severity' => \App\Support\SecurityEvents::CODES[$code][1] ?? 'info'];
+        if ($code = \App\Support\Security\SecurityEvents::codeFor($action, $module, $after, $name)) {
+            return ['category' => $code, 'severity' => \App\Support\Security\SecurityEvents::CODES[$code][1] ?? 'info'];
         }
 
         // ٢) الاستعادة من الفرق: «تعديل» أعاد deleted_at إلى null = استعادةُ محذوف
@@ -7989,7 +7989,7 @@ if (! function_exists('hub_audit_norm')) {
         $c = hub_audit_class($action, $module, $before, $after, $name);
 
         // مصدرُ الطلب للوسم لا للتخويل (الطور ١): web|api|console|hook
-        $src = \App\Support\Api::requestSource();
+        $src = \App\Support\Platform\Api::requestSource();
 
         // المآل من صيغة الفعل نفسِها — الفاشلُ يُكتب فعلاً فاشلاً لا ناجحاً بملحق
         $outcome = 'success';
@@ -8034,7 +8034,7 @@ if (! function_exists('hub_ia')) {
     /**
      * سجلُّ الهندسة المعلوماتية — `config/hub_ia.php` (المصدرُ الواحد لتنظيم
      * الوجهات في مجالاتٍ وأقسام). يشيرُ لمفاتيح hub.php/hub_top_links/hub_admin_links
-     * ولا يكرّرها. الرؤيةُ والحلُّ عبر خدمةِ `App\Support\InformationArchitecture`.
+     * ولا يكرّرها. الرؤيةُ والحلُّ عبر خدمةِ `App\Support\Platform\InformationArchitecture`.
      */
     function hub_ia(): array
     {

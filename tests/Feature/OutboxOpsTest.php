@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditEntry;
 use App\Models\OutboxMessage;
-use App\Support\Integrations;
+use App\Support\Ops\Integrations;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\TestCase;

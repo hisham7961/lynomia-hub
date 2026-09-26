@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\Series;
+use App\Support\Ops\Series;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

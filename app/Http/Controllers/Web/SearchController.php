@@ -172,10 +172,10 @@ class SearchController extends Controller
                 $out[] = ['t' => $t, 'u' => $url];
             };
             $push('🏠 لوحة التحكم', 'dashboard');
-            foreach (\App\Support\Workspaces::for($u) as $key => $ws) {
+            foreach (\App\Support\Platform\Workspaces::for($u) as $key => $ws) {
                 $push($ws['icon'] . ' مساحة ' . $ws['label'], 'workspace', [$key]);
             }
-            foreach (\App\Support\InformationArchitecture::make()->catalogDestinations($u) as $d) {
+            foreach (\App\Support\Platform\InformationArchitecture::make()->catalogDestinations($u) as $d) {
                 if (! empty($d['route'])) $push($d['label'], $d['route'], $d['args'] ?? []);
             }
 
@@ -187,7 +187,7 @@ class SearchController extends Controller
         // `find` الإداريّةُ القديمةُ محفوظةٌ داخلَ الخدمة). **حارسُ كلِّ وجهةٍ حارسُها هي**.
         // لا تمسُّ operational()/workOs()/ترتيبَ الدمجِ/الإزالةَ بالرابط (C3).
         $iaHits = [];
-        foreach (\App\Support\InformationArchitecture::make()->searchDestinations($u, $q) as $d) {
+        foreach (\App\Support\Platform\InformationArchitecture::make()->searchDestinations($u, $q) as $d) {
             if (empty($d['route'])) continue;   // وجهةٌ سياقيّةٌ بلا رابطٍ عامّ — لا تُقترح هنا
             try {
                 $url = route($d['route'], $d['args'] ?? []);
@@ -200,7 +200,7 @@ class SearchController extends Controller
         // صفحاتُ المساحات المركزيّة (/w/{key}) — ليست وجهةَ IA (المساحةُ مجالٌ)، تبقى
         // قابلةً للإيجاد بالاسم كما كانت (صفر فقدان)
         $wsHits = [];
-        foreach (\App\Support\Workspaces::for($u) as $key => $ws) {
+        foreach (\App\Support\Platform\Workspaces::for($u) as $key => $ws) {
             if (mb_stripos('مساحة ' . $ws['label'], $q) !== false) {
                 $wsHits[] = ['t' => $ws['icon'] . ' مساحة ' . $ws['label'], 'u' => route('workspace', $key)];
             }
@@ -272,7 +272,7 @@ class SearchController extends Controller
         // ٤) مفتاحُ إعداد — من كتالوج الإعدادات نفسِه (`Settings::entry`)، فلا
         //    يُوعَد بمفتاحٍ لا تعرفه الشاشة. والقراءةُ من config بلا استعلام.
         if ($owner && str_contains($q, '.') && preg_match('/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/i', $q)
-            && ($entry = \App\Support\Settings::entry($q)) !== null) {
+            && ($entry = \App\Support\Platform\Settings::entry($q)) !== null) {
             $out[] = ['t' => '⚙️ الإعداد ' . ($entry['label'] ?? $q) . ' — ' . $ltr($q),
                       'u' => route('settings.edit') . '#' . $q];
         }

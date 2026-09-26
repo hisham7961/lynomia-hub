@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Support\Risk;
+use App\Support\Security\Risk;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -35,7 +35,7 @@ class Require2faForPrivileged
         // الآن يُردّ 428 بالغلاف الموحَّد ورابطِ التفعيل، ولا يمرّ.
         if ($request->is('api/*')) return $next($request);
         if ($request->expectsJson()) {
-            return \App\Support\Api::error(\App\Support\Api::STEP_UP_REQUIRED, 428,
+            return \App\Support\Platform\Api::error(\App\Support\Platform\Api::STEP_UP_REQUIRED, 428,
                 'حسابُك صاحبُ صلاحياتٍ حسّاسة — فعّل التحقّقَ بخطوتين للمتابعة (سياسةُ المنشأة)',
                 ['policy' => 'auth.2fa_required_priv'], ['stepup' => true, 'url' => route('profile.edit')]);
         }

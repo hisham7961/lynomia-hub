@@ -10,7 +10,7 @@ use App\Support\Ai\Gateway\AiGateway;
 use App\Support\Ai\GovernedCompletion;
 use App\Support\Ai\Routing\AiProfiles;
 use App\Support\Ai\Routing\AiPurposes;
-use App\Support\Redactor;
+use App\Support\Platform\Redactor;
 
 /**
  * **كواشفُ الذكاءِ في المدقّق — البابُ الواحدُ إلى النموذج** (§٣.١ · A2).

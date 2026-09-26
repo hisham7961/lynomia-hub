@@ -430,7 +430,7 @@ class HubBackup extends Command
         $this->info('✓ ' . basename($file) . ' — ' . number_format($total) . ' سجل، ' .
                     number_format(filesize($file) / 1024, 1) . ' KB (محفوظ آخر ' . $keep . ' نسخة)');
 
-        \App\Support\Health::beat('backup', (int) round((microtime(true) - $t0) * 1000), 'ok', basename($file) . ' · ' . number_format($total) . ' سجل');
+        \App\Support\Ops\Health::beat('backup', (int) round((microtime(true) - $t0) * 1000), 'ok', basename($file) . ' · ' . number_format($total) . ' سجل');
         return self::SUCCESS;
     }
 }

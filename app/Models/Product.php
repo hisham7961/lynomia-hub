@@ -44,10 +44,10 @@ class Product extends Model
         });
         // الباركود الأساسي يدخل سجل الهوية تلقائياً — فالمحلّل يجده بلا خطوة يدوية
         static::saved(function (self $p) {
-            if ($p->code) \App\Support\Identity::attach('products', $p->id, 'lyn', $p->code,
+            if ($p->code) \App\Support\Security\Identity::attach('products', $p->id, 'lyn', $p->code,
                 ['is_primary' => true, 'verified' => true, 'source' => 'توليد']);
-            if ($p->barcode) \App\Support\Identity::attach('products', $p->id, 'gtin', $p->barcode);
-            if ($p->mpn) \App\Support\Identity::attach('products', $p->id, 'mpn', $p->mpn);
+            if ($p->barcode) \App\Support\Security\Identity::attach('products', $p->id, 'gtin', $p->barcode);
+            if ($p->mpn) \App\Support\Security\Identity::attach('products', $p->id, 'mpn', $p->mpn);
         });
     }
 

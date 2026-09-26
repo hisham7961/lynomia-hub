@@ -70,7 +70,7 @@ class CouncilPortalDocumentsTest extends TestCase
             'principal_type' => 'user', 'principal_id' => $u->id,
             'effect' => 'deny', 'action' => '*', 'created_at' => now(),
         ]);
-        \App\Support\DocumentPolicy::forget((string) $a->id);
+        \App\Support\Documents\DocumentPolicy::forget((string) $a->id);
     }
 
     // ═══════════ ١ · الوجهةُ صار خلفَها شيء ═══════════

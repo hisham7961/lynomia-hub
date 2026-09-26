@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\RelationshipProjection;
+use App\Support\Insights\RelationshipProjection;
 use Illuminate\Http\Request;
 
 /**

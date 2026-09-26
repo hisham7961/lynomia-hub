@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Support\Staff;
+use App\Support\Workforce\Staff;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -38,7 +38,7 @@ class ForcePasswordChange
         // سطحُ API له مصادقتُه (ApiAuth) ولا يُعترض هنا — كما في حارس التحقّق بخطوتين
         if ($request->is('api/*')) return $next($request);
         if ($request->expectsJson()) {
-            return \App\Support\Api::error(\App\Support\Api::STEP_UP_REQUIRED, 428,
+            return \App\Support\Platform\Api::error(\App\Support\Platform\Api::STEP_UP_REQUIRED, 428,
                 'دخلتَ بكلمةِ مرورٍ مؤقّتة — بدّلها قبل أيِّ عملٍ آخر',
                 ['policy' => 'must_change_password'], ['stepup' => true, 'url' => route('profile.edit')]);
         }

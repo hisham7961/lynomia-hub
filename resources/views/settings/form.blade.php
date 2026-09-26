@@ -68,14 +68,14 @@
      لا تخصّ مفتاحاً بعينه بل ما لا يصحّ **وحدَه** — خادمُ بريدٍ بلا مستخدم،
      ورابطُ أودو بلا قاعدة، وبدايةُ دوامٍ بعد الوضع الصارم. ومعها القارئُ الذي
      يجعلها قاعدةً لا رأياً. --}}
-@php $depErrors = collect(\App\Support\Settings::DEPENDS)->keys()->filter(fn ($g) => $errors->has($g)); @endphp
+@php $depErrors = collect(\App\Support\Platform\Settings::DEPENDS)->keys()->filter(fn ($g) => $errors->has($g)); @endphp
 @if ($depErrors->isNotEmpty())
     <div class="card" style="border-color:var(--bad);margin-bottom:12px">
         <h3>⛔ لم يُحفظ شيء — مجموعةٌ لا تصحّ نصفَ مضبوطة</h3>
         <ul style="margin:6px 0 0;padding-inline-start:18px;line-height:2">
             @foreach ($depErrors as $g)
                 <li>{{ $errors->first($g) }}
-                    <div class="sub mono ltr" style="font-size:11px">{{ \App\Support\Settings::DEPENDS[$g]['why'] }}</div></li>
+                    <div class="sub mono ltr" style="font-size:11px">{{ \App\Support\Platform\Settings::DEPENDS[$g]['why'] }}</div></li>
             @endforeach
         </ul>
     </div>
@@ -179,7 +179,7 @@
                         @if (empty($meta['readonly']) && ($fact['stored'] ?? null) !== null)
                             <button class="btn ghost xs" type="submit" form="rstk{{ $gi }}_{{ $input }}"
                                     style="margin-inline-start:auto"
-                                    data-confirm="استعادةُ «{{ $meta['label'] ?? $key }}» إلى افتراضيّه؟@if (\App\Support\Settings::isHighRisk($key)) مفتاحٌ عالي الخطورة — سيُطلَب تأكيدُ هويتك.@endif">↺ افتراضيّه</button>
+                                    data-confirm="استعادةُ «{{ $meta['label'] ?? $key }}» إلى افتراضيّه؟@if (\App\Support\Platform\Settings::isHighRisk($key)) مفتاحٌ عالي الخطورة — سيُطلَب تأكيدُ هويتك.@endif">↺ افتراضيّه</button>
                         @endif
                     </div>
 

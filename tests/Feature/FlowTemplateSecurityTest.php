@@ -6,7 +6,7 @@ use App\Models\Flow;
 use App\Models\HubNotification;
 use App\Models\Task;
 use App\Models\VaultSecret;
-use App\Support\FlowRunner;
+use App\Support\Platform\FlowRunner;
 use Tests\TestCase;
 
 /**
@@ -108,7 +108,7 @@ class FlowTemplateSecurityTest extends TestCase
     /** أعطال الإجراءات تُبلَّغ ولا يرتفع العدّاد إلا بنجاحٍ فعلي — حارس مصدر */
     public function test_action_failures_are_reported_not_swallowed(): void
     {
-        $src = \Tests\Support\Source::read(\App\Support\FlowRunner::class);
+        $src = \Tests\Support\Source::read(\App\Support\Platform\FlowRunner::class);
         $this->assertStringContainsString('report($e)', $src,
             'أعطال إجراءات المسارات تُبتلع بلا أي تسجيل — مسارٌ مكسور لا يكتشفه أحد');
         $this->assertMatchesRegularExpression('/if\s*\(\s*\$ok/u', $src,

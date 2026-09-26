@@ -1,5 +1,5 @@
 {{-- الإقرار الموثَّق على السجل — يتوقع: $module $row. لا يظهر لوحدةٍ غير مسجَّلة --}}
-@php $ack = \App\Support\Acks::state($module, $row); @endphp
+@php $ack = \App\Support\Collaboration\Acks::state($module, $row); @endphp
 @if ($ack && ($ack['total'] || $ack['extra']))
     @php
         $me = collect($ack['people'])->firstWhere('id', (string) auth()->id());

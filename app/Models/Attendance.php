@@ -193,7 +193,7 @@ class Attendance extends Model
         $crossed = (bool) $a->overnight
             && (string) $a->time_out < (string) $a->time_in;
 
-        return \App\Support\DailyWorkCompliance::computeDeadline($date, $a->time_out, true, $crossed);
+        return \App\Support\Workforce\DailyWorkCompliance::computeDeadline($date, $a->time_out, true, $crossed);
     }
 
     /**

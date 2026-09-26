@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Comment;
-use App\Support\CommentService;
+use App\Support\Collaboration\CommentService;
 use Tests\TestCase;
 
 /**

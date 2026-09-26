@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Client;
 use App\Models\ErrorEvent;
 use App\Models\Quote;
-use App\Support\ErrorLog;
+use App\Support\Ops\ErrorLog;
 use Tests\TestCase;
 
 class OpsQualityTest extends TestCase

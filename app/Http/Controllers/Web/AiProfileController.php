@@ -184,8 +184,8 @@ class AiProfileController extends Controller
             return back()->withErrors(['ask' => 'غرضٌ بسلسلةٍ فارغةٍ أو معطَّلٍ لا يصلح لِـ«اسأل Hub» — اربط نموذجاً أوّلاً']);
         }
 
-        \App\Support\Settings::batch('ai', function () use ($profile) {
-            \App\Support\Settings::put('ask.profile', (string) $profile->key, 'ai');
+        \App\Support\Platform\Settings::batch('ai', function () use ($profile) {
+            \App\Support\Platform\Settings::put('ask.profile', (string) $profile->key, 'ai');
         }, ['name' => 'ask.profile — غرضُ مساعدِ «اسأل Hub»']);
 
         return back()->with('ok', 'صار «' . $profile->label . '» غرضَ مساعدِ «اسأل Hub»');

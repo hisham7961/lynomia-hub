@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Support\Risk;
-use App\Support\TimeRange;
+use App\Support\Security\Risk;
+use App\Support\Platform\TimeRange;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

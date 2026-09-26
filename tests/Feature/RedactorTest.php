@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Support\ErrorLog;
-use App\Support\Redactor;
-use App\Support\SecurityRadar;
+use App\Support\Ops\ErrorLog;
+use App\Support\Platform\Redactor;
+use App\Support\Security\SecurityRadar;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;

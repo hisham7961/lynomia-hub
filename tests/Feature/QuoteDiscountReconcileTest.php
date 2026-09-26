@@ -53,7 +53,7 @@ class QuoteDiscountReconcileTest extends TestCase
         $q->recalc();
         $q->refresh();
 
-        $html = \App\Support\Proposal::html($q, true);
+        $html = \App\Support\Documents\Proposal::html($q, true);
         // الصافيُّ المعروضُ قبل الخصم = ١٠٠٠ (لا ٨٠٠ المخزَّن) كي يتصالح المستند
         $this->assertStringContainsString(number_format(1000, 3), $html);
         $this->assertStringContainsString(number_format(200, 3), $html);   // الخصم

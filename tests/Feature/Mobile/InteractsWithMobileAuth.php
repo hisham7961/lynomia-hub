@@ -3,7 +3,7 @@
 namespace Tests\Feature\Mobile;
 
 use App\Models\User;
-use App\Support\Totp;
+use App\Support\Security\Totp;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 

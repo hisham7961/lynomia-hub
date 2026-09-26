@@ -7,7 +7,7 @@ use App\Models\AiPolicyRule;
 use App\Models\AiUsageEvent;
 use App\Support\Ai\Governance\AiCost;
 use App\Support\Ai\Governance\AiPolicy;
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;

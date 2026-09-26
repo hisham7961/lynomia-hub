@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\MobileSession;
 use App\Models\PushToken;
-use App\Support\Api;
-use App\Support\PushService;
+use App\Support\Platform\Api;
+use App\Support\Mobile\PushService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -13,7 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * **تسجيلُ دفعِ الجوال + إدارتُه** — Mobile Readiness · الطور E · E.5/E.7.
- * مبنيٌّ على `App\Support\PushService` — لا محرّكٌ ثانٍ:
+ * مبنيٌّ على `App\Support\Mobile\PushService` — لا محرّكٌ ثانٍ:
  *
  *  • **التسجيل (E.5 · `POST push/register`):** `PushService::register(...)` — إزالةُ
  *    التكرار على `(provider, token)` **مع إعادةِ التوجيه/الإبطالِ عند تصادمِ مالكَين**

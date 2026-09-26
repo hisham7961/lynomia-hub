@@ -10,7 +10,7 @@ use App\Models\JournalLine;
 use App\Models\LedgerAccount;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\CustodyPostingService;
+use App\Support\Assets\CustodyPostingService;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 

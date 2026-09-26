@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Ticket;
-use App\Support\AttachmentService;
-use App\Support\ClientPortalData;
-use App\Support\CommentService;
-use App\Support\DocumentPolicy;
+use App\Support\Collaboration\AttachmentService;
+use App\Support\Collaboration\ClientPortalData;
+use App\Support\Collaboration\CommentService;
+use App\Support\Documents\DocumentPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -22,7 +22,7 @@ use Illuminate\Validation\Rule;
  * وجهاتِه الست: الرئيسية، والارتباطات، والمشاريع (للقراءة)، والوثائقُ المشترَكة،
  * والفواتير، والمحادثات.
  *
- * **القرّاءُ صاروا مصدراً واحداً مشترَكاً** (`App\Support\ClientPortalData`) منذ
+ * **القرّاءُ صاروا مصدراً واحداً مشترَكاً** (`App\Support\Collaboration\ClientPortalData`) منذ
  * هبوطِ تطبيق الجوال (تجربةُ العميل): السطحان — هذه الشاشاتُ الويبية وواجهةُ
  * `/api/mobile/v1/portal/*` — يقرآن الاستعلاماتِ العميليّةَ المعزولةَ نفسَها حرفاً
  * (فشلٌ مغلقٌ على `hub_client_ids`، أعمدةٌ عميليّةٌ بلا رقمٍ داخليّ، محادثاتٌ
@@ -371,7 +371,7 @@ class ClientPortalController extends Controller
         $t->created_by = (string) $u->id;
         $t->save();
 
-        \App\Support\FlowRunner::fire('created', 'tickets', $t);
+        \App\Support\Platform\FlowRunner::fire('created', 'tickets', $t);
 
         return redirect()->route('portal.ticket', $t->id)
             ->with('ok', 'وصلَنا بلاغُك وفُتحت تذكرتُك — ستجد حالتَها وردودَ الفريق هنا.');
@@ -437,7 +437,7 @@ class ClientPortalController extends Controller
         try { ClientPortalData::announceClientTicketReply($full, $u, (string) $c->body); }
         catch (\Throwable $e) { report($e); }
 
-        \App\Support\FlowRunner::fire('client_reply', 'tickets', $full);
+        \App\Support\Platform\FlowRunner::fire('client_reply', 'tickets', $full);
 
         return redirect()->route('portal.ticket', $ticket->id)
             ->with('ok', 'وصلَ ردُّك — يراه الفريقُ الآن، وجوابُه يظهر هنا.')
@@ -460,7 +460,7 @@ class ClientPortalController extends Controller
             ->where('id', $id)->where('user_id', $u->id)->first(['id', 'ip']);
         abort_unless($s, 404);
 
-        \App\Support\Sessions::revokeOne($u, (string) $s->id, 'إنهاء ذاتي لجلسة');
+        \App\Support\Security\Sessions::revokeOne($u, (string) $s->id, 'إنهاء ذاتي لجلسة');
         hub_audit('إنهاء جلستي', null, null, ($s->ip ?: 'بلا عنوان'));
 
         return back()->with('ok', '🔌 أُنهيت الجلسة — يخرج جهازُها عند أول طلب');
@@ -473,7 +473,7 @@ class ClientPortalController extends Controller
         $u = $request->user();
         $mine = (string) $request->session()->get('hub.sl', '');
 
-        $n = \App\Support\Sessions::revokeAll($u, $mine !== '' ? $mine : null, 'إنهاء بقية أجهزتي');
+        $n = \App\Support\Security\Sessions::revokeAll($u, $mine !== '' ? $mine : null, 'إنهاء بقية أجهزتي');
         hub_audit('إنهاء جلساتي الأخرى', null, null, "{$n} جلسة");
 
         return back()->with('ok', "🔌 أُنهيت {$n} جلسة على أجهزتك الأخرى — جلستُك الحالية باقية");

@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AccountActivation;
 use App\Models\ClientMembership;
 use App\Models\User;
-use App\Support\Api;
+use App\Support\Platform\Api;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -151,7 +151,7 @@ class MobileActivationController extends Controller
 
         // حدثٌ دلاليّ + أثرُ تدقيق — السكّةُ نفسُها (source=mobile عبر الوسم أعلاه)
         try {
-            \App\Support\FlowRunner::fire('account_activated', 'users', $user);
+            \App\Support\Platform\FlowRunner::fire('account_activated', 'users', $user);
         } catch (\Throwable $e) {
             report($e);
         }

@@ -119,7 +119,7 @@ class AuthController extends Controller
             return back()->withErrors(['code' => "الحساب مقفل مؤقتاً بعد محاولات فاشلة — أعد المحاولة بعد {$m} دقيقة"]);
         }
 
-        if (! \App\Support\Totp::verifyOnce((string) $u->totp_secret_cipher, hub_str($r->input('code')), 'login:' . $u->id)) {
+        if (! \App\Support\Security\Totp::verifyOnce((string) $u->totp_secret_cipher, hub_str($r->input('code')), 'login:' . $u->id)) {
             $this->bumpFailedAttempts($u);
             // فشلُ الرمز الثاني حدثٌ أمنيّ يستحق أثراً كفشل كلمة المرور — كان
             // يزيد العدّاد بصمتٍ فلا يظهر «كلمةٌ صحيحةٌ ورمزٌ يُخمَّن» في التدقيق
@@ -146,11 +146,11 @@ class AuthController extends Controller
 
         // هوية الجهاز: كوكي ثابتٌ يُربط بصفٍّ «معلّق» عند أول ظهور — إشارةٌ
         // لحارس الدخول ولخطر الجلسة، لا سلاحُ حجب. يُلحق الكوكي على الاستجابة.
-        $newDevice = ! \App\Support\Devices::isKnown($u, $r);
-        $device = \App\Support\Devices::bindOnLogin($u, $r);
+        $newDevice = ! \App\Support\Security\Devices::isKnown($u, $r);
+        $device = \App\Support\Security\Devices::bindOnLogin($u, $r);
 
         // حارس الدخول: يتعلم العناوين المعتادة ويرصد الغريب وخارج الدوام
-        \App\Support\LoginSentry::inspect($u, (string) $r->ip(), $newDevice);
+        \App\Support\Security\LoginSentry::inspect($u, (string) $r->ip(), $newDevice);
 
         // معرّف صفّ الجلسة يُحفَظ في الجلسة نفسها: بغيره لا نبضةَ حضورٍ ولا
         // إنهاءَ عن بُعد — وهو ما جعل عمود revoked ميتاً منذ الهجرة الأولى
@@ -205,13 +205,13 @@ class AuthController extends Controller
     /**
      * زيادةُ عدّاد المحاولات الفاشلة **ذرّيّاً** ثم قفلُ الحساب عند السقف.
      *
-     * كان المنطقُ هنا حرفيّاً؛ استُخرج إلى `App\Support\AccountLockout::bump` كي
+     * كان المنطقُ هنا حرفيّاً؛ استُخرج إلى `App\Support\Security\AccountLockout::bump` كي
      * يتقاسمه الويبُ وسطحُ الجوال الأصيل (Mobile Readiness · الطور B) — محرّكُ قفلٍ
      * **واحد** لا موازٍ أضعف (spec §Auth · Critic F4). هذه الدالةُ تبقى (يعتمدها
      * `CheckThenWriteRound8Test` بالانعكاس) وتفوّض إلى المحرّك المشترك بسلوكٍ مطابق.
      */
     protected function bumpFailedAttempts(User $u): void
     {
-        \App\Support\AccountLockout::bump($u);
+        \App\Support\Security\AccountLockout::bump($u);
     }
 }

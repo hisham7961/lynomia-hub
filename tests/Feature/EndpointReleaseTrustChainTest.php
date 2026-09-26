@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Company;
 use App\Models\EndpointDevice;
 use App\Models\EndpointRelease;
-use App\Support\Es256;
+use App\Support\Security\Es256;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;

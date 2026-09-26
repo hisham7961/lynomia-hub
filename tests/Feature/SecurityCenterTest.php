@@ -95,7 +95,7 @@ class SecurityCenterTest extends TestCase
         $this->seedCore();
         $this->hubSetting('monitor.allow_private', '1');            // حارس SSRF مُبطَل
 
-        $checks = collect(\App\Support\SecurityPosture::checks());
+        $checks = collect(\App\Support\Security\SecurityPosture::checks());
         $this->assertGreaterThanOrEqual(10, $checks->count(), 'فحوصٌ حقيقية لا أرقامٌ عارية');
 
         $ssrf = $checks->firstWhere('key', 'ssrf');
@@ -105,19 +105,19 @@ class SecurityCenterTest extends TestCase
         // كلمة سرّ QuoteFlow الافتراضية مكتوبةٌ في شيفرةٍ عامة
         $this->assertSame('bad', $checks->firstWhere('key', 'qf_pass')['tone']);
         $this->hubSetting('quoteflow.pass', 'enc:' . \Illuminate\Support\Facades\Crypt::encryptString('KwT!9912xz'));
-        $this->assertSame('ok', collect(\App\Support\SecurityPosture::checks())->firstWhere('key', 'qf_pass')['tone']);
+        $this->assertSame('ok', collect(\App\Support\Security\SecurityPosture::checks())->firstWhere('key', 'qf_pass')['tone']);
     }
 
     public function test_posture_flags_privileged_accounts_without_two_factor(): void
     {
         $this->seedCore();
 
-        $c = collect(\App\Support\SecurityPosture::checks())->firstWhere('key', 'twofa_priv');
+        $c = collect(\App\Support\Security\SecurityPosture::checks())->firstWhere('key', 'twofa_priv');
         $this->assertSame('bad', $c['tone'], 'مالكٌ بلا تحقّقٍ بخطوتين خطرٌ يُسمّى');
         $this->assertGreaterThanOrEqual(1, $c['n']);
 
         User::whereKey($this->owner->id)->update(['totp_enabled' => 1]);
-        $this->assertSame('ok', collect(\App\Support\SecurityPosture::checks())->firstWhere('key', 'twofa_priv')['tone']);
+        $this->assertSame('ok', collect(\App\Support\Security\SecurityPosture::checks())->firstWhere('key', 'twofa_priv')['tone']);
     }
 
     public function test_posture_flags_stale_api_tokens_and_open_share_links(): void
@@ -131,7 +131,7 @@ class SecurityCenterTest extends TestCase
             'expires_at' => null, 'revoked' => false, 'views' => 0,
             'created_by' => $this->owner->id, 'created_at' => now()]);
 
-        $checks = collect(\App\Support\SecurityPosture::checks());
+        $checks = collect(\App\Support\Security\SecurityPosture::checks());
         $this->assertContains($checks->firstWhere('key', 'api_stale')['tone'], ['wn', 'bad']);
         $this->assertContains($checks->firstWhere('key', 'share_open')['tone'], ['wn', 'bad'],
             'رابطٌ عامٌّ بلا انتهاء يبقى مفتوحاً للأبد ولا أحد يراه');

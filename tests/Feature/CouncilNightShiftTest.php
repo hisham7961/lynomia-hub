@@ -96,7 +96,7 @@ class CouncilNightShiftTest extends TestCase
         $row = Attendance::where('emp_id', $e->id)->firstOrFail();
         $this->assertTrue((bool) $row->overnight, 'تهيئةٌ خاطئة: الرايةُ لم تُحفظ');
 
-        $sheet = \App\Support\MonthlyAttendance::sheet($e->fresh(), '2026-06');
+        $sheet = \App\Support\Workforce\MonthlyAttendance::sheet($e->fresh(), '2026-06');
         $day = collect($sheet['days'] ?? $sheet)->firstWhere('date', '2026-06-17');
         $this->assertNotNull($day, 'اليومُ غائبٌ عن الكشفِ الشهريّ');
 

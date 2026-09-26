@@ -87,7 +87,7 @@ class CouncilUnmeasuredTest extends TestCase
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        $pl = \App\Support\SalesBoard::data()['pipeline'] ?? [];
+        $pl = \App\Support\Finance\SalesBoard::data()['pipeline'] ?? [];
         $this->assertSame(251000.0, (float) ($pl['raw'] ?? 0),
             'الرقمُ الخامُ اختفى — والمطلوبُ توضيحُ المرجَّحِ لا إخفاءُ الخام');
         $this->assertFalse((bool) ($pl['weighted_measured'] ?? true),
@@ -105,7 +105,7 @@ class CouncilUnmeasuredTest extends TestCase
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        $pl = \App\Support\SalesBoard::data()['pipeline'] ?? [];
+        $pl = \App\Support\Finance\SalesBoard::data()['pipeline'] ?? [];
         $this->assertTrue((bool) ($pl['weighted_measured'] ?? false),
             'صفقةٌ باحتمالٍ أُعلنت غيرَ مقيسة — الحارسُ أطفأ مقياساً صحيحاً');
         $this->assertSame(40000.0, (float) ($pl['weighted'] ?? 0),

@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'سجلّ القدرات')
 @section('content')
-@php use App\Support\FeatureStatus; @endphp
+@php use App\Support\Platform\FeatureStatus; @endphp
 
 <div class="hero">
     <div>

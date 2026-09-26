@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AlertRule;
 use App\Models\HubNotification;
-use App\Support\AlertEngine;
+use App\Support\Ops\AlertEngine;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -12,7 +12,7 @@ use Tests\TestCase;
 /**
  * **استخراجُ محرّك التنبيه بلا تغيير سلوك** (WP-6.3).
  *
- * جوهرُ `HubAutomation::alertRules` انتقل إلى `App\Support\AlertEngine::daily`
+ * جوهرُ `HubAutomation::alertRules` انتقل إلى `App\Support\Ops\AlertEngine::daily`
  * حرفياً — والاختباراتُ القائمة الخمسة (AlertEscalationTest ·
  * AutomationReachAndScopeTest · NotifyAndRulesRound6Test · NotifyBoundsRound8Test
  * · ScopeGuardRound6Test) تحرس السلوكَ الدقيق (تنطيقٌ لكل مستلم، ترقيمٌ بمؤشّر

@@ -51,7 +51,7 @@ class SilentDropsAndGrowthRound6Test extends TestCase
             return;
         }
 
-        $m = \App\Support\SysMonitor::memory();
+        $m = \App\Support\Ops\SysMonitor::memory();
         $this->assertTrue((bool) ($m['ok'] ?? false),
             'قراءةُ الذاكرة نجحت والبطاقة تُعلن الفشل — عامل الاتحاد لا يدهس المفتاح القائم');
         $this->assertGreaterThan(0, (int) ($m['total'] ?? 0));

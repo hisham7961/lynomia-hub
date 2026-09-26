@@ -10,7 +10,7 @@ use App\Models\Project;
 use App\Models\Quote;
 use App\Models\QuoteLine;
 use App\Models\User;
-use App\Support\HubEvents;
+use App\Support\Platform\HubEvents;
 use Tests\TestCase;
 
 /**

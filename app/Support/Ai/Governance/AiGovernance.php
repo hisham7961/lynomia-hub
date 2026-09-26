@@ -6,7 +6,7 @@ use App\Models\AiModel;
 use App\Models\AiUsageEvent;
 use Illuminate\Support\Str;
 use App\Support\Ai\Ask\AskFailures;
-use App\Support\Redactor;
+use App\Support\Platform\Redactor;
 
 /**
  * **بابُ الحوكمةِ الواحد** (المرحلة ٤ · P4-W5) — حيث تلتقي الطبقاتُ الثلاث.

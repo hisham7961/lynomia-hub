@@ -132,7 +132,7 @@ class UserController extends Controller
          */
         $msg = 'أُضيف المستخدم';
         if ($r->boolean('_make_employee') && hub_can(auth()->user(), 'hr', 'a')
-            && \App\Support\Staff::makeFile($u)) {
+            && \App\Support\Workforce\Staff::makeFile($u)) {
             $msg = 'أُضيف المستخدم وأُنشئ ملفُّه الوظيفي';
         } elseif ($u->employee()->exists()) {
             $msg = 'أُضيف المستخدم ورُبط بملفّه الوظيفي';
@@ -232,10 +232,10 @@ class UserController extends Controller
         // كانت الجلساتُ الحيّة وكعكةُ «تذكّرني» تبقى صالحةً بعدها — فمهاجمٌ أُعيد ضبطُ
         // كلمةِ ضحيّته يبقى داخلاً حتى يخرج بنفسه. الطرحُ نفسُه الذي يفعله تغييرُ الكلمة الذاتيّ.
         if (! empty($data['password'])) {
-            \App\Support\Sessions::revokeAll($user, null);
+            \App\Support\Security\Sessions::revokeAll($user, null);
             // AUTH-1: وجلساتُ الجوال أيضاً — بلا هذا كان التدقيقُ يُدوّن sessions_revoked=true
             // بينما رمزُ تحديثِ الجوال يبقى حيّاً يُدوَّر، فيبقى المقتحمُ داخلاً رغم إعادة الضبط.
-            \App\Support\MobileSessionService::revokeAllForUser($user, 'إعادةُ تعيين كلمة المرور');
+            \App\Support\Mobile\MobileSessionService::revokeAllForUser($user, 'إعادةُ تعيين كلمة المرور');
             hub_audit('إعادة تعيين كلمة مرور', 'users', $user->id, $user->name, ['after' => ['by' => auth()->user()?->name, 'sessions_revoked' => true]]);
             hub_notify($user->id, 'security', 'أُعيد ضبطُ كلمة مرورك بواسطة ' . (auth()->user()?->name ?? 'الإدارة') . ' وأُنهيت جلساتُك القديمة — إن لم تطلب ذلك راجع مدير النظام فوراً', 'users', $user->id);
         }
@@ -261,7 +261,7 @@ class UserController extends Controller
         $this->gate();
         abort_if($user->id === auth()->id(), 422,
             'أطفئه من ملفك الشخصي برمزٍ صحيح — هذا البابُ لمن فقد جهازه');
-        abort_unless(\App\Support\Staff::mayTouch($user), 403,
+        abort_unless(\App\Support\Workforce\Staff::mayTouch($user), 403,
             'هذا الحساب ذو امتياز — فكُّ تحقّقه يتطلب صلاحيةً تعلوه');
         // إطفاءُ تحقّق غيرِك بابٌ لاختطاف حساب — يتطلب تأكيدَ هويتك أولاً
         if ($resp = hub_require_stepup(route('users.index', absolute: false))) return $resp;
@@ -296,7 +296,7 @@ class UserController extends Controller
     public function unlock(User $user)
     {
         $this->gate();
-        abort_unless(\App\Support\Staff::mayTouch($user), 403,
+        abort_unless(\App\Support\Workforce\Staff::mayTouch($user), 403,
             'هذا الحساب ذو امتياز — فكُّ قفله يتطلب صلاحيةً تعلوه');
         if ($resp = hub_require_stepup(route('users.index', absolute: false))) return $resp;
 

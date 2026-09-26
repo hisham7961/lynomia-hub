@@ -22,7 +22,7 @@ class WebhookDelivery extends Model
     protected static function booted(): void
     {
         static::creating(function (self $m) {
-            if ($m->request_id === null && hub_has_col('webhook_deliveries', 'request_id')) $m->request_id = \App\Support\Api::requestId();
+            if ($m->request_id === null && hub_has_col('webhook_deliveries', 'request_id')) $m->request_id = \App\Support\Platform\Api::requestId();
         });
     }
 }

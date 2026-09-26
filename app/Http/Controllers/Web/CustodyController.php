@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetCustody;
-use App\Support\Custody;
-use App\Support\Qr;
+use App\Support\Assets\Custody;
+use App\Support\Documents\Qr;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -238,14 +238,14 @@ class CustodyController extends Controller
         $a = $this->asset($id, 'e', 'assetStatus');
 
         $d = $r->validate([
-            'status' => ['required', 'string', Rule::in(\App\Support\Custody::STATUSES)],
+            'status' => ['required', 'string', Rule::in(\App\Support\Assets\Custody::STATUSES)],
             'at'     => 'required|date',
             'note'   => 'nullable|string|max:500',
         ], [], ['status' => 'الحالة', 'at' => 'التاريخ', 'note' => 'ملاحظة']);
 
         $from = (string) $a->status;
         try {
-            \App\Support\Custody::transition($a, $d['status'], substr($d['at'], 0, 10), $d['note'] ?? null);
+            \App\Support\Assets\Custody::transition($a, $d['status'], substr($d['at'], 0, 10), $d['note'] ?? null);
         } catch (\InvalidArgumentException $e) {
             abort(422, $e->getMessage());
         }
@@ -287,7 +287,7 @@ class CustodyController extends Controller
         }
 
         $was = $a->station_id;
-        \App\Support\Custody::assignStation($a, $stationId, substr($d['at'], 0, 10), $d['note'] ?? null);
+        \App\Support\Assets\Custody::assignStation($a, $stationId, substr($d['at'], 0, 10), $d['note'] ?? null);
 
         hub_audit($stationId ? 'إسناد أصل لمحطة' : 'إخلاء أصل من محطة', 'assets', $a->id, (string) $a->name,
             ['before' => ['المحطة' => $was ?: '—'], 'after' => ['المحطة' => $stationId ?: '—']]);

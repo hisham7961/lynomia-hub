@@ -33,8 +33,8 @@
             <label class="vh" for="sev">تصفية بالشدّة</label>
             <select class="inp" id="sev" name="sev" onchange="this.form.submit()">
                 <option value="">كل الشدّات</option>
-                @foreach (\App\Support\Severity::LEVELS as $acLv)
-                    <option value="{{ $acLv }}" @selected($sev === $acLv)>{{ \App\Support\Severity::LABELS[$acLv] }}</option>
+                @foreach (\App\Support\Platform\Severity::LEVELS as $acLv)
+                    <option value="{{ $acLv }}" @selected($sev === $acLv)>{{ \App\Support\Platform\Severity::LABELS[$acLv] }}</option>
                 @endforeach
             </select>
         </form>
@@ -54,7 +54,7 @@
             @forelse ($rows as $ai)
                 <tr>
                     <td>
-                        <span class="bdg {{ \App\Support\Severity::tone($ai->severity) }}">{{ \App\Support\Severity::label($ai->severity) }}</span>
+                        <span class="bdg {{ \App\Support\Platform\Severity::tone($ai->severity) }}">{{ \App\Support\Platform\Severity::label($ai->severity) }}</span>
                         @if ((int) $ai->count > 1)<span class="bdg g" title="مرات الرصد">×{{ (int) $ai->count }}</span>@endif
                     </td>
                     <td>

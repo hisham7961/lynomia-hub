@@ -9,7 +9,7 @@ use App\Models\Employee;
 use App\Models\HubNotification;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\TeamDirectory;
+use App\Support\Workforce\TeamDirectory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -84,7 +84,7 @@ class DogfoodR1WorkforceTest extends TestCase
         Attendance::create(['emp_id' => $emp->id, 'date' => now()->toDateString(), 'time_in' => '08:00']);
 
         $this->actingAs($u);
-        $html = view('partials.widgets.checkin', ['data' => \App\Support\Workday::mine($u)])->render();
+        $html = view('partials.widgets.checkin', ['data' => \App\Support\Workforce\Workday::mine($u)])->render();
         $this->assertStringNotContainsString('＋ بند عمل', $html,
             'زرُّ إضافة بندٍ ظهر في بطاقة «يومي» لمن لا يملك updates:a');
 
@@ -92,7 +92,7 @@ class DogfoodR1WorkforceTest extends TestCase
         $emp2 = $this->fileFor($this->employee);
         Attendance::create(['emp_id' => $emp2->id, 'date' => now()->toDateString(), 'time_in' => '08:00']);
         $this->actingAs($this->employee);
-        $html2 = view('partials.widgets.checkin', ['data' => \App\Support\Workday::mine($this->employee)])->render();
+        $html2 = view('partials.widgets.checkin', ['data' => \App\Support\Workforce\Workday::mine($this->employee)])->render();
         $this->assertStringContainsString('＋ بند عمل', $html2);
     }
 

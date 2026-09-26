@@ -89,7 +89,7 @@
         <select class="inp" id="fst" name="st" onchange="this.form.submit()">
             <option value="">كل الحالات</option>
             {{-- (WP-3.3) الحالاتُ الخمس من خريطة IssueState (الطور ١) — القيمةُ هي التسمية المخزَّنة فتُطابَق الصفوفُ الموروثة كما هي --}}
-            @foreach (\App\Support\IssueState::MAP as $s)<option @selected($st === $s)>{{ $s }}</option>@endforeach
+            @foreach (\App\Support\Platform\IssueState::MAP as $s)<option @selected($st === $s)>{{ $s }}</option>@endforeach
         </select>
         <label class="vh" for="fk">تصفية بالنوع</label>
         <select class="inp" id="fk" name="k" onchange="this.form.submit()">
@@ -100,12 +100,12 @@
             <label class="vh" for="fcat">تصفية بالصنف</label>
             <select class="inp" id="fcat" name="cat" onchange="this.form.submit()">
                 <option value="">كل الأصناف</option>
-                @foreach (\App\Support\ErrorTaxonomy::CATEGORIES as $c)<option value="{{ $c }}" @selected($cat === $c)>{{ \App\Support\ErrorTaxonomy::LABELS[$c] ?? $c }}</option>@endforeach
+                @foreach (\App\Support\Ops\ErrorTaxonomy::CATEGORIES as $c)<option value="{{ $c }}" @selected($cat === $c)>{{ \App\Support\Ops\ErrorTaxonomy::LABELS[$c] ?? $c }}</option>@endforeach
             </select>
             <label class="vh" for="fsev">تصفية بالشدّة</label>
             <select class="inp" id="fsev" name="sev" onchange="this.form.submit()">
                 <option value="">كل الشدّات</option>
-                @foreach (\App\Support\ErrorTaxonomy::SEVERITIES as $sv)<option value="{{ $sv }}" @selected($sev === $sv)>{{ \App\Support\ErrorTaxonomy::LABELS[$sv] ?? $sv }}@if (isset($bySeverity[$sv])) ({{ $bySeverity[$sv] }})@endif</option>@endforeach
+                @foreach (\App\Support\Ops\ErrorTaxonomy::SEVERITIES as $sv)<option value="{{ $sv }}" @selected($sev === $sv)>{{ \App\Support\Ops\ErrorTaxonomy::LABELS[$sv] ?? $sv }}@if (isset($bySeverity[$sv])) ({{ $bySeverity[$sv] }})@endif</option>@endforeach
             </select>
         @endif
         <label class="vh" for="fsort">الترتيب</label>
@@ -129,8 +129,8 @@
                     {{-- الرسالة كاملةً (كانت تُبتر عند ٩٠ حرفاً فيضيع معناها) والموضع صريح --}}
                     @if ($taxonomy && $e->severity)
                         @php $sevTone = in_array($e->severity, ['CRITICAL', 'HIGH'], true) ? 'bad' : ($e->severity === 'ERROR' ? 'wn' : 'g'); @endphp
-                        <span class="bdg {{ $sevTone }}" title="الشدّة">{{ \App\Support\ErrorTaxonomy::LABELS[$e->severity] ?? $e->severity }}</span>
-                        <span class="bdg g" title="الصنف">{{ \App\Support\ErrorTaxonomy::LABELS[$e->category] ?? $e->category }}</span>
+                        <span class="bdg {{ $sevTone }}" title="الشدّة">{{ \App\Support\Ops\ErrorTaxonomy::LABELS[$e->severity] ?? $e->severity }}</span>
+                        <span class="bdg g" title="الصنف">{{ \App\Support\Ops\ErrorTaxonomy::LABELS[$e->category] ?? $e->category }}</span>
                         @if ((int) $e->users > 1)<span class="bdg g" title="مستخدمون متأثرون">👥 {{ $e->users }}</span>@endif
                     @endif
                     <a href="{{ route('errors.show', $e->id) }}"><b>{{ \Illuminate\Support\Str::limit($e->message, 200) }}</b></a>
@@ -147,7 +147,7 @@
                 <td><b>{{ $e->count }}</b></td>
                 <td class="sub">{{ $e->last_seen->diffForHumans() }}</td>
                 {{-- (WP-3.3) العرضُ عبر خريطة IssueState: الموروثُ العربيّ يمرّ كما هو والمفتاحُ يُترجم --}}
-                @php $stLbl = \App\Support\IssueState::label($e->status); @endphp
+                @php $stLbl = \App\Support\Platform\IssueState::label($e->status); @endphp
                 <td><span class="bdg {{ $stLbl === 'محلول' ? 'ok' : ($stLbl === 'جديد' ? 'bad' : ($stLbl === 'متجاهَل' ? 'g' : 'wn')) }}">{{ $stLbl }}</span></td>
                 <td class="acts">
                     <a class="btn ghost xs" href="{{ route('errors.show', $e->id) }}">🔍 تفاصيل</a>

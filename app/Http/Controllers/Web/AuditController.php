@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\Audit;
-use App\Support\SecurityEvents;
-use App\Support\TimeRange;
+use App\Support\Platform\Audit;
+use App\Support\Security\SecurityEvents;
+use App\Support\Platform\TimeRange;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -145,8 +145,8 @@ class AuditController extends Controller
         $rawB = $a->getAttributes()['before'] ?? null;
         $rawA = $a->getAttributes()['after'] ?? null;
         $diff = array_map(fn ($d) => [
-            'from' => \App\Support\Redactor::text($d['from']),
-            'to'   => \App\Support\Redactor::text($d['to']),
+            'from' => \App\Support\Platform\Redactor::text($d['from']),
+            'to'   => \App\Support\Platform\Redactor::text($d['to']),
         ] + $d, Audit::diff($a->module, $rawB, $rawA));
 
         // التصنيف: المخزّنُ للجديد (WP-5.2)، ومُترجِمُ القراءة للصفوف الأقدم
@@ -189,7 +189,7 @@ class AuditController extends Controller
                     ->map(function ($e) use (&$taskIds) {
                         $meta = json_decode((string) ($e->meta ?? ''), true) ?: [];
                         if (! empty($meta['task_id'])) $taskIds[] = (string) $meta['task_id'];
-                        $e->message = \App\Support\Redactor::text((string) $e->message);
+                        $e->message = \App\Support\Platform\Redactor::text((string) $e->message);
 
                         return $e;
                     });

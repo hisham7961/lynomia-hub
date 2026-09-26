@@ -41,9 +41,9 @@
                 <td class="sub mono">{{ optional($w->submitted_at)->format('m-d H:i') }}</td>
                 <td style="white-space:nowrap">
                     @php
-                        $emp = \App\Support\ReportReview::employeeOf($w);
-                        $canAct = \App\Support\ReportReview::canReview(auth()->user(), $w);
-                        $isPending = $w->review_status === null || $w->review_status === \App\Support\ReportReview::PENDING;
+                        $emp = \App\Support\Workforce\ReportReview::employeeOf($w);
+                        $canAct = \App\Support\Workforce\ReportReview::canReview(auth()->user(), $w);
+                        $isPending = $w->review_status === null || $w->review_status === \App\Support\Workforce\ReportReview::PENDING;
                     @endphp
                     {{-- القرارُ من الطابور نفسِه (الجولة 1 · F7): مديرُ المشروع بلا hr:v كان
                          بلا أيّ سبيلِ فعلٍ — الرابطُ الوحيدُ «مراجعة ↗» خلفَ بوّابةِ HR فيعطيه 403 --}}

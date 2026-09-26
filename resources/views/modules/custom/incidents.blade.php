@@ -4,7 +4,7 @@
      ترسم بطاقةَ الإقرار في هذه الصفحة، لا من عمودٍ ثانٍ يتخلّف عنها. --}}
 @php
     $ihLead = $row->lead_id ? (hub_ref_labels('users', [$row->lead_id])[$row->lead_id] ?? 'مستخدم محذوف') : null;
-    $ihAck = \App\Support\Acks::state('incidents', $row);
+    $ihAck = \App\Support\Collaboration\Acks::state('incidents', $row);
     $ihAckAt = $ihAck ? (collect($ihAck['people'])->firstWhere('acked', true)['at'] ?? null) : null;
 
     /*

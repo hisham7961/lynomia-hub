@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Client;
 use App\Models\FinDocument;
 use App\Models\MetricPoint;
-use App\Support\Sheet;
+use App\Support\Platform\Sheet;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 

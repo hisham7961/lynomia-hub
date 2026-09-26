@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Middleware\MobileContext;
-use App\Support\Api;
-use App\Support\ApprovalService;
-use App\Support\MobileSessionService;
-use App\Support\StepUp;
+use App\Support\Platform\Api;
+use App\Support\Platform\ApprovalService;
+use App\Support\Mobile\MobileSessionService;
+use App\Support\Security\StepUp;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,7 +19,7 @@ use Illuminate\Http\Request;
  * البيضاء — لا mass-assignment)، و`findScoped` (`hub_scope`)، و`assertVersion`
  * (If-Match ⇒ VERSION_CONFLICT)، و`one`/`shape` (ETag)، و**آلةَ الـIdempotency**
  * (`idempotentBegin/Finish/Release`) المفتوحةَ على **مالكِ الجوال** لا NULL:
- * `ikeyOf` الموروثة تقرأ `App\Support\Idempotency::owner` فتعيد `mobile_session->id`
+ * `ikeyOf` الموروثة تقرأ `App\Support\Platform\Idempotency::owner` فتعيد `mobile_session->id`
  * لطلب الجوال (Critic F1) — فإعادةُ المحاولة تُحجَز لمرّة، ولا يُعاد ردُّ مستخدمٍ لآخر.
  *
  * **العقودُ الملتزَمة:**

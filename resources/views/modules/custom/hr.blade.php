@@ -1,8 +1,8 @@
 {{-- أفكار هذا الموظف — الاقتراح إسهامٌ يُذكر في ملفه لا سطرٌ في قائمةٍ عامة --}}
 @php
     $ideaUser = $row->user_id ?? null;
-    $myIdeas = $ideaUser ? \App\Support\Innovation::byPerson($ideaUser) : [];
-    $myScore = $ideaUser ? collect(\App\Support\Innovation::contributors(999))->firstWhere('id', $ideaUser) : null;
+    $myIdeas = $ideaUser ? \App\Support\Insights\Innovation::byPerson($ideaUser) : [];
+    $myScore = $ideaUser ? collect(\App\Support\Insights\Innovation::contributors(999))->firstWhere('id', $ideaUser) : null;
 @endphp
 @if ($ideaUser && hub_can(auth()->user(), 'ideas', 'v'))
     <div class="card">

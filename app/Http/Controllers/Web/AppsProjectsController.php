@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\AppsProjects;
+use App\Support\Apps\AppsProjects;
 
 /**
  * التطبيقات والمشاريع: علاقةٌ واحدة محسومة.

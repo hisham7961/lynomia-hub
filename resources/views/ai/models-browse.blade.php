@@ -134,7 +134,7 @@
             <tbody>
             @foreach ($candidates as $c)
                 @php($caps = collect((array) $c['capabilities'])
-                        ->filter(fn ($f) => \App\Support\Tri::allowsExecution(is_array($f) ? ($f['v'] ?? null) : $f))
+                        ->filter(fn ($f) => \App\Support\Platform\Tri::allowsExecution(is_array($f) ? ($f['v'] ?? null) : $f))
                         ->keys()->all())
                 @php($ctx = ((array) $c['limits'])['max_input_tokens'] ?? null)
                 <tr>

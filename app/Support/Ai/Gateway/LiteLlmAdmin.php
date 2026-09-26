@@ -3,7 +3,7 @@
 namespace App\Support\Ai\Gateway;
 
 use Illuminate\Support\Facades\Http;
-use App\Support\Redactor;
+use App\Support\Platform\Redactor;
 
 /**
  * **عميلُ واجهةِ إدارةِ LiteLLM** (المرحلة ٢ · W3).

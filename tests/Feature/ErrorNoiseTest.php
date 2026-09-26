@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\ErrorEvent;
 use App\Models\HubNotification;
-use App\Support\ErrorLog;
-use App\Support\ErrorStats;
-use App\Support\Health;
+use App\Support\Ops\ErrorLog;
+use App\Support\Ops\ErrorStats;
+use App\Support\Ops\Health;
 use Tests\TestCase;
 
 /**

@@ -22,7 +22,7 @@
             ->orderByDesc('date')->limit(10)->get()
         : collect();
     $wsUsers = \App\Models\User::whereIn('id', $wsObs->pluck('owner_id')->merge($wsSteps->pluck('approver_id'))->filter()->unique())->pluck('name', 'id');
-    $cwNext = \App\Support\NextAction::for('contracts', $row);
+    $cwNext = \App\Support\Insights\NextAction::for('contracts', $row);
 @endphp
 @if (! empty($cwNext))
     {{-- الفعلُ الأفضلُ التالي (محرّك NextAction): تجديدٌ وشيكٌ أو تذكيرُ توقيع --}}

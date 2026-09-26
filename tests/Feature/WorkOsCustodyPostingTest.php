@@ -7,8 +7,8 @@ use App\Models\EmployeeCustodyMove;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\LedgerAccount;
-use App\Support\CustodyPostingService;
-use App\Support\HubEvents;
+use App\Support\Assets\CustodyPostingService;
+use App\Support\Platform\HubEvents;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -204,7 +204,7 @@ class WorkOsCustodyPostingTest extends TestCase
     {
         $fin = (string) \Tests\Support\Source::read(\App\Http\Controllers\Web\FinController::class);
         $pay = (string) \Tests\Support\Source::read(\App\Http\Controllers\Web\PayrollController::class);
-        $cust = (string) \Tests\Support\Source::read(\App\Support\CustodyPostingService::class);
+        $cust = (string) \Tests\Support\Source::read(\App\Support\Assets\CustodyPostingService::class);
 
         foreach (['FinController' => $fin, 'PayrollController' => $pay, 'CustodyPostingService' => $cust] as $n => $src) {
             $this->assertStringContainsString('postBalanced', $src,

@@ -49,7 +49,7 @@ class OrderingDeterminismRound6Test extends TestCase
                 'created_at' => $at]);
         }
 
-        [$rows] = \App\Support\Evidence::chain($req->fresh());
+        [$rows] = \App\Support\Documents\Evidence::chain($req->fresh());
         $order = collect($rows)->pluck('e.event')->all();
 
         $this->assertSame(['created', 'sent', 'signed'], $order,
@@ -74,9 +74,9 @@ class OrderingDeterminismRound6Test extends TestCase
         }
 
         $this->actingAs($this->owner);
-        $first = collect(\App\Support\WidgetRegistry::resolve('due', $this->owner)['rows'])
+        $first = collect(\App\Support\Platform\WidgetRegistry::resolve('due', $this->owner)['rows'])
             ->pluck('title')->all();
-        $again = collect(\App\Support\WidgetRegistry::resolve('due', $this->owner)['rows'])
+        $again = collect(\App\Support\Platform\WidgetRegistry::resolve('due', $this->owner)['rows'])
             ->pluck('title')->all();
 
         $this->assertSame($first, $again, 'ودجةٌ تُرجع ستّاً مختلفة في كل استدعاء');
@@ -98,7 +98,7 @@ class OrderingDeterminismRound6Test extends TestCase
         }
 
         $this->actingAs($this->owner);
-        $rows = collect(\App\Support\WidgetRegistry::resolve('audits', $this->owner));
+        $rows = collect(\App\Support\Platform\WidgetRegistry::resolve('audits', $this->owner));
 
         $this->assertCount(10, $rows);
         $this->assertSame('إجراء 13', $rows->first()->action ?? null,
@@ -117,9 +117,9 @@ class OrderingDeterminismRound6Test extends TestCase
         }
 
         $this->actingAs($this->owner);
-        $a = collect(\App\Support\WidgetRegistry::resolve('donut', $this->owner))->pluck('label')->all();
+        $a = collect(\App\Support\Platform\WidgetRegistry::resolve('donut', $this->owner))->pluck('label')->all();
         \Illuminate\Support\Facades\Cache::flush();
-        $b = collect(\App\Support\WidgetRegistry::resolve('donut', $this->owner))->pluck('label')->all();
+        $b = collect(\App\Support\Platform\WidgetRegistry::resolve('donut', $this->owner))->pluck('label')->all();
 
         $this->assertSame($a, $b, 'سبعُ حالاتٍ بالعدد نفسِه والستُّ المعروضة تتبدّل');
         // ترتيبُ الحروف بالنقطة الرمزية: ز(0632) قبل ه(0647) قبل و(0648)
@@ -195,7 +195,7 @@ class OrderingDeterminismRound6Test extends TestCase
             'hash' => hash('sha256', 'once'), 'kind' => 'خطأ', 'message' => 'مرةٌ واحدة',
             'count' => 1, 'first_seen' => $at, 'last_seen' => $at]);
 
-        $errs = collect(\App\Support\SysMonitor::pulse())->sum('errs');
+        $errs = collect(\App\Support\Ops\SysMonitor::pulse())->sum('errs');
         $this->assertSame(51, $errs,
             'النبضُ يعدّ بصماتِ الأخطاء لا تكراراتها — عطلٌ وقع خمسين مرة يُرسم شرطةً '
             . 'واحدة بجوار عطلٍ وقع مرة، فلا تُقرأ العاصفةُ عاصفةً');

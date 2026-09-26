@@ -3,10 +3,10 @@
      مُختبِرٌ دلاليّ، وقائمةُ فحصِ الإطلاق. قراءةٌ صرفة، قيمٌ حقيقيّة، وحالاتٌ صادقة. --}}
 @php
     use Illuminate\Support\Str;
-    $tone = fn ($s) => \App\Support\MobilePlatform::TONE[$s] ?? 'g';
-    $lbl  = fn ($s) => \App\Support\MobilePlatform::LABEL[$s] ?? $s;
-    $R = \App\Support\MobilePlatform::READY;
-    $NC = \App\Support\MobilePlatform::NOT_CONFIGURED;
+    $tone = fn ($s) => \App\Support\Mobile\MobilePlatform::TONE[$s] ?? 'g';
+    $lbl  = fn ($s) => \App\Support\Mobile\MobilePlatform::LABEL[$s] ?? $s;
+    $R = \App\Support\Mobile\MobilePlatform::READY;
+    $NC = \App\Support\Mobile\MobilePlatform::NOT_CONFIGURED;
     $set = fn ($anchor) => route('settings.edit') . '#' . $anchor;
     $yn = fn ($b) => $b ? '<span class="bdg ok">نعم</span>' : '<span class="bdg g">لا</span>';
 @endphp
@@ -38,7 +38,7 @@
 {{-- ═══ معاينةُ app-config الحيّة + فعّاليّةُ بوّابةِ التحديث (§21/§23) ═══ --}}
 <div class="card kid wide">
     <h3>📲 معاينةُ app-config الحيّة</h3>
-    <p class="sub">ما يتلقّاه العميلُ فعلاً من نقطةِ <span class="mono">GET /{{ \App\Support\MobileOpenApi::PREFIX }}/app-config</span> —
+    <p class="sub">ما يتلقّاه العميلُ فعلاً من نقطةِ <span class="mono">GET /{{ \App\Support\Mobile\MobileOpenApi::PREFIX }}/app-config</span> —
         النقطةُ نفسُها لا نسخةٌ ثانية. أدخِل إصدارَ عميلٍ مُفترَضاً لترى هل تُلزمه البوّابةُ بالتحديث.</p>
     <form method="GET" class="toolbar" style="gap:6px;margin-bottom:10px;flex-wrap:wrap">
         <input type="hidden" name="tab" value="config">

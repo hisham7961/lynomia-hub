@@ -145,7 +145,7 @@ class FinController extends Controller
         $total = (float) ($doc->total ?? 0);
 
         if ($doc->state !== $prev) {
-            \App\Support\FlowRunner::fire('status', 'fin', $doc, $doc->state);
+            \App\Support\Platform\FlowRunner::fire('status', 'fin', $doc, $doc->state);
         }
         hub_audit('دفعة', 'fin', $doc->id,
             ($doc->doc_no ?: $doc->id) . ' — ' . number_format($amount, 2) . ' ' . ($doc->currency ?: '')
@@ -213,7 +213,7 @@ class FinController extends Controller
         });
 
         if ($doc->state !== $prev) {
-            \App\Support\FlowRunner::fire('status', 'fin', $doc, $doc->state);
+            \App\Support\Platform\FlowRunner::fire('status', 'fin', $doc, $doc->state);
         }
         hub_audit('عكس دفعة', 'fin', $doc->id,
             ($doc->doc_no ?: $doc->id) . ' — ' . number_format($amount, 2) . ' ' . ($doc->currency ?: '')
@@ -238,7 +238,7 @@ class FinController extends Controller
      */
     protected function autoJournal(FinDocument $doc, float $amount, bool $reverse = false): void
     {
-        $svc = new \App\Support\JournalPostingService();
+        $svc = new \App\Support\Finance\JournalPostingService();
         if (! $svc->enabled()) return;
 
         try {

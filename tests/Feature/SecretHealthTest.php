@@ -83,13 +83,13 @@ class SecretHealthTest extends TestCase
             'version' => 1, 'archived' => 0,
             'created_at' => now()->subDays(300), 'updated_at' => now()->subDays(300), 'rotated_at' => now()->subDay()]);
 
-        $ids = array_map('strval', \App\Support\SecurityPosture::vaultStaleIds());
+        $ids = array_map('strval', \App\Support\Security\SecurityPosture::vaultStaleIds());
         $this->assertContains($stale, $ids, 'تعديلُ الملاحظة أخفى سرّاً بائتاً عن فحص التدوير');
         $this->assertNotContains($fresh, $ids, 'سرٌّ دُوّر أمسِ ليس بائتاً');
 
         // والعتبةُ من الإعداد الواحد security.secret_stale_days
         $this->hubSetting('security.secret_stale_days', '400');
-        $this->assertSame([], \App\Support\SecurityPosture::vaultStaleIds(),
+        $this->assertSame([], \App\Support\Security\SecurityPosture::vaultStaleIds(),
             'العتبةُ لا تُقرأ من security.secret_stale_days');
     }
 

@@ -6,9 +6,9 @@ use App\Models\Conversation;
 use App\Models\ConversationMember;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\FeatureRegistry;
-use App\Support\FeatureStatus;
-use App\Support\Settings;
+use App\Support\Platform\FeatureRegistry;
+use App\Support\Platform\FeatureStatus;
+use App\Support\Platform\Settings;
 use Tests\TestCase;
 
 /**

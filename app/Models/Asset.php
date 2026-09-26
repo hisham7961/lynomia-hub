@@ -52,10 +52,10 @@ class Asset extends Model
         // هويّاتُ الأصل تدخل سجل الهوية الموحّد تلقائياً — فيجدها المحلّل
         // بالمسح، وتعديلُ سيريالٍ من أي مسار (CRUD/API/استيراد) يلحق وحده
         static::saved(function (self $a) {
-            if ($a->code) \App\Support\Identity::attach('assets', $a->id, 'lyn', $a->code,
+            if ($a->code) \App\Support\Security\Identity::attach('assets', $a->id, 'lyn', $a->code,
                 ['is_primary' => true, 'verified' => true, 'source' => 'توليد']);
-            if ($a->serial) \App\Support\Identity::attach('assets', $a->id, 'serial', $a->serial);
-            if ($a->tag) \App\Support\Identity::attach('assets', $a->id, 'tag', $a->tag);
+            if ($a->serial) \App\Support\Security\Identity::attach('assets', $a->id, 'serial', $a->serial);
+            if ($a->tag) \App\Support\Security\Identity::attach('assets', $a->id, 'tag', $a->tag);
         });
     }
 
@@ -98,7 +98,7 @@ class Asset extends Model
         // فلا هي تخرج ولا هي تصمت. والتسلسلُ يُلحَق هنا فيبقى صدرُ القالبِ
         // المضبوطِ كما كُتب، ويبقى الكودُ فريداً كما يفرض العمود.
         if (! str_contains($format, '{SEQ}')) $format .= '-{SEQ}';
-        $cat = \App\Support\Custody::catCode($type);
+        $cat = \App\Support\Assets\Custody::catCode($type);
         $year = now()->format('Y');
 
         $prefix = str_replace(['{CAT}', '{YEAR}', '{SEQ}'], [$cat, $year, ''], $format);
@@ -141,7 +141,7 @@ class Asset extends Model
     {
         if (! $this->company_id) return 'الأصلُ بلا شركة';
         if (! $this->isCompanyManaged()) return 'الأصلُ شخصيٌّ (BYOD) — لا يُدار للشركة';
-        $status = \App\Support\Custody::canonicalStatus($this->status);
+        $status = \App\Support\Assets\Custody::canonicalStatus($this->status);
         if ($status !== null && in_array($status, self::ENDPOINT_INELIGIBLE_STATUSES, true)) {
             return 'حالةُ الأصلِ غيرُ مؤهّلة: ' . $status;
         }

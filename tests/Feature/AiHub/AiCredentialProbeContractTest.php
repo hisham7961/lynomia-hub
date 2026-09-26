@@ -7,7 +7,7 @@ use App\Support\Ai\Center\AiOverview;
 use App\Support\Ai\Catalog\AiProbes;
 use App\Support\Ai\Catalog\AiProviders;
 use App\Support\Ai\Gateway\LiteLlmAdmin;
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;

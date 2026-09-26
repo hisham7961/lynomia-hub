@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Support\DataQuality;
-use App\Support\ExecutionStats;
+use App\Support\Insights\DataQuality;
+use App\Support\Workforce\ExecutionStats;
 use Illuminate\Console\Command;
 
 /**
@@ -35,7 +35,7 @@ class HubQualitySnapshot extends Command
         // لكل مؤشّرٍ نشط. بلا سلسلةٍ لا اتّجاهَ لمؤشّر، و«٤٥٪» وحدها لا تقول
         // أصاعدةٌ هي أم هابطة. تُكتب هنا لا في أمرٍ مجدولٍ ثانٍ يُنسى تسجيلُه
         // في `Health::JOBS` فلا يراه `/healthz`.
-        $kpis = \App\Support\KpiCentre::snapshot($this->option('date'));
+        $kpis = \App\Support\Insights\KpiCentre::snapshot($this->option('date'));
 
         $this->info("درجة الجودة {$t['score']}٪ · {$t['defects']} نقصاً في {$t['checks']} فحصاً · "
             . "{$t['clean']} وحدة نظيفة من {$t['modules']}");
@@ -46,7 +46,7 @@ class HubQualitySnapshot extends Command
                 . " · {$x['overdue']} متأخّرة · {$x['blocked']} متوقّفة");
         }
 
-        \App\Support\Health::beat('quality', (int) round((microtime(true) - $t0) * 1000));
+        \App\Support\Ops\Health::beat('quality', (int) round((microtime(true) - $t0) * 1000));
         return self::SUCCESS;
     }
 }

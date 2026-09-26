@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\ExecutionStats;
+use App\Support\Workforce\ExecutionStats;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -100,7 +100,7 @@ class PerformanceController extends Controller
      */
     protected function okrs(): array
     {
-        return \App\Support\OkrCentre::board(auth()->user());
+        return \App\Support\Insights\OkrCentre::board(auth()->user());
     }
 
     /**
@@ -117,7 +117,7 @@ class PerformanceController extends Controller
      * وظيفيّ تحكمه صلاحيةُ الحقل كأيّ حقلٍ آخر، فكان دورٌ محجوبٌ عنه في شاشة
      * الموظف يقرؤه هنا كاملاً.
      */
-    protected function peopleKpis(?\App\Support\TimeRange $range = null)
+    protected function peopleKpis(?\App\Support\Platform\TimeRange $range = null)
     {
         /*
          * **الطلبُ الحيُّ لا طلبٌ فارغ** (W-1 · الطور ١٦٧): كان هنا

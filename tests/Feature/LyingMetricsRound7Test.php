@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Models\FinDocument;
 use App\Models\Project;
 use App\Models\StockItem;
-use App\Support\DataQuality;
-use App\Support\Delivery;
+use App\Support\Insights\DataQuality;
+use App\Support\Apps\Delivery;
 use Tests\TestCase;
 
 /**

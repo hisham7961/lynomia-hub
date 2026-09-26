@@ -7,9 +7,9 @@ use App\Models\Comment;
 use App\Models\Conversation;
 use App\Models\ConversationMember;
 use App\Models\User;
-use App\Support\Collaboration;
-use App\Support\CollaborationRail;
-use App\Support\DmService;
+use App\Support\Collaboration\Collaboration;
+use App\Support\Collaboration\CollaborationRail;
+use App\Support\Collaboration\DmService;
 use Illuminate\Http\Request;
 
 /**

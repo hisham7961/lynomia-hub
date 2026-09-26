@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Support\FeatureRegistry;
-use App\Support\InformationArchitecture;
+use App\Support\Platform\FeatureRegistry;
+use App\Support\Platform\InformationArchitecture;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 

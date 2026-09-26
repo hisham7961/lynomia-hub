@@ -51,10 +51,10 @@
     ['label' => 'تذاكر مفتوحة', 'value' => $x['open_tickets'], 'tone' => 'g',
      'url' => $wfMod('tickets', 'support')],
     ['label' => 'خرق SLA في النافذة', 'value' => $wfSla['n'], 'tone' => $wfSla['n'] ? 'bad' : 'ok',
-     'sub' => 'من ' . $wfSla['of'] . ' تذكرة في النافذة' . ($wfSla['capped'] ? ' (عيّنة بسقف ' . \App\Support\ExecutionStats::SLA_SAMPLE_CAP . ')' : ''),
+     'sub' => 'من ' . $wfSla['of'] . ' تذكرة في النافذة' . ($wfSla['capped'] ? ' (عيّنة بسقف ' . \App\Support\Workforce\ExecutionStats::SLA_SAMPLE_CAP . ')' : ''),
      'url' => $wfMod('tickets', 'support')],
     ['label' => 'مشاريع في خطر', 'value' => $wfRisk['n'], 'tone' => $wfRisk['n'] ? 'bad' : 'ok',
-     'sub' => 'صحةٌ دون ٥٥ من ' . $wfRisk['of'] . ' مشروعٍ مفتوح' . ($wfRisk['capped'] ? ' (بسقف ' . \App\Support\ExecutionStats::HEALTH_SAMPLE_CAP . ')' : ''),
+     'sub' => 'صحةٌ دون ٥٥ من ' . $wfRisk['of'] . ' مشروعٍ مفتوح' . ($wfRisk['capped'] ? ' (بسقف ' . \App\Support\Workforce\ExecutionStats::HEALTH_SAMPLE_CAP . ')' : ''),
      'url' => $wfMod('projects', 'm.index', 'projects')],
     ['label' => 'اعتمادات معلّقة', 'value' => $x['pending_approvals'], 'tone' => $x['pending_approvals'] ? 'wn' : 'ok',
      'url' => $wfMod('approvals', 'm.index', 'approvals')],
@@ -106,7 +106,7 @@
     <div class="cards">
         <div class="stat"><span class="ico">🔥</span><b class="{{ count($wfL['over']) ? 'txt-bad' : '' }}">{{ count($wfL['over']) }}</b><span>فوق الطاقة (حمل > ١٠٠٪)</span></div>
         <div class="stat"><span class="ico">🌤️</span><b>{{ count($wfL['idle']) }}</b><span>بلا تكليفٍ مفتوح</span></div>
-        <div class="stat"><span class="ico">⏰</span><b class="{{ count($wfL['heavy_overdue']) ? 'txt-bad' : '' }}">{{ count($wfL['heavy_overdue']) }}</b><span>تأخّرٌ كثيف ({{ \App\Support\ExecutionStats::HEAVY_OVERDUE_MIN }}+ مهامَّ فائتة)</span></div>
+        <div class="stat"><span class="ico">⏰</span><b class="{{ count($wfL['heavy_overdue']) ? 'txt-bad' : '' }}">{{ count($wfL['heavy_overdue']) }}</b><span>تأخّرٌ كثيف ({{ \App\Support\Workforce\ExecutionStats::HEAVY_OVERDUE_MIN }}+ مهامَّ فائتة)</span></div>
         <div class="stat"><span class="ico">📏</span><b>{{ $wfL['spread'] ? $wfL['spread']['gap'] . '٪' : '—' }}</b><span>تشتّت التوزيع (أعلى حملٍ − أدناه)</span></div>
     </div>
 
@@ -163,7 +163,7 @@
         <div class="stat"><span class="ico">🗳️</span><b class="{{ $bnW['approvals']['pending'] ? 'txt-bad' : '' }}">{{ $bnW['approvals']['pending'] }}</b>
             <span>اعتمادات تنتظر الحسم{{ $bnW['approvals']['oldest_days'] !== null ? ' — أقدمُها منذ ' . $bnW['approvals']['oldest_days'] . ' يوماً' : '' }}</span></div>
         <div class="stat"><span class="ico">⏱️</span><b>{{ $bnH($bnW['approvals']['avg_h']) }}</b>
-            <span>متوسط انتظار الاعتماد ({{ $bnW['approvals']['decided_n'] }} حُسم في النافذة{{ $bnW['approvals']['capped'] ? ' — عيّنة بسقف ' . \App\Support\ExecutionStats::WAIT_SAMPLE_CAP : '' }})</span></div>
+            <span>متوسط انتظار الاعتماد ({{ $bnW['approvals']['decided_n'] }} حُسم في النافذة{{ $bnW['approvals']['capped'] ? ' — عيّنة بسقف ' . \App\Support\Workforce\ExecutionStats::WAIT_SAMPLE_CAP : '' }})</span></div>
         <div class="stat"><span class="ico">📮</span><b>{{ $bnW['tickets_waiting']['n'] }}</b>
             <span>تذاكر «بانتظار العميل»{{ $bnW['tickets_waiting']['oldest_days'] !== null ? ' — أقدمُها بلا تحديث منذ ' . $bnW['tickets_waiting']['oldest_days'] . ' يوماً' : '' }}</span></div>
         <div class="stat"><span class="ico">⏸️</span><b>{{ $bnW['tasks_paused']['n'] }}</b>
@@ -171,7 +171,7 @@
         <div class="stat"><span class="ico">🕸️</span><b class="{{ $bnS['n'] ? 'txt-bad' : '' }}">{{ $bnS['n'] }}</b>
             <span>مهام راكدة (مفتوحة بلا مساسٍ منذ {{ $bnS['threshold_days'] }}+ أيام)</span></div>
         <div class="stat"><span class="ico">🔁</span><b class="{{ $bnR['n'] ? 'txt-bad' : '' }}">{{ $bnR['total'] }}</b>
-            <span>مرات إعادة فتح تذاكر (على {{ $bnR['n'] }} تذكرة{{ $bnR['capped'] ? ' — عيّنة بسقف ' . \App\Support\ExecutionStats::REOPEN_SAMPLE_CAP : '' }})</span></div>
+            <span>مرات إعادة فتح تذاكر (على {{ $bnR['n'] }} تذكرة{{ $bnR['capped'] ? ' — عيّنة بسقف ' . \App\Support\Workforce\ExecutionStats::REOPEN_SAMPLE_CAP : '' }})</span></div>
     </div>
 
     <div class="crow" style="flex-wrap:wrap;gap:16px;align-items:flex-start;margin-top:10px">
@@ -197,7 +197,7 @@
 
 <div class="card pad0" style="margin-top:12px">
     <div style="padding:14px 14px 0">
-        <h3 style="margin:0">⏳ مكوث الحالات <span class="sub">من قيود التدقيق في النافذة ({{ $bn['dwell']['sample'] }} قيدَ تغييرِ حالة{{ $bn['dwell']['capped'] ? ' — عيّنة بسقف ' . \App\Support\ExecutionStats::DWELL_SAMPLE_CAP . ' لكل وحدة' : '' }}) — الحالةُ المنتهية لا يُعدّ لها مكوثٌ مفتوح</span></h3>
+        <h3 style="margin:0">⏳ مكوث الحالات <span class="sub">من قيود التدقيق في النافذة ({{ $bn['dwell']['sample'] }} قيدَ تغييرِ حالة{{ $bn['dwell']['capped'] ? ' — عيّنة بسقف ' . \App\Support\Workforce\ExecutionStats::DWELL_SAMPLE_CAP . ' لكل وحدة' : '' }}) — الحالةُ المنتهية لا يُعدّ لها مكوثٌ مفتوح</span></h3>
     </div>
     <div class="tblwrap">
     <table class="tbl">

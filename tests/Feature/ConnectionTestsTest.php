@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\OdooConnection;
-use App\Support\ConnectionProbe;
+use App\Support\Ops\ConnectionProbe;
 use Tests\Concerns\FakesOdoo;
 use Tests\TestCase;
 

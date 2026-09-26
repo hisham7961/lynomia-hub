@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
-use App\Support\Odoo;
-use App\Support\WebhookDispatcher;
+use App\Support\Ops\Odoo;
+use App\Support\Ops\WebhookDispatcher;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -70,7 +70,7 @@ class OutboundSsrfCallTimeRound5Test extends TestCase
     /** حارسا Uptime/التسليم يمنعان إعادة التوجيه (allow_redirects=false) — إثباتُ المصدر */
     public function test_outbound_paths_do_not_follow_redirects(): void
     {
-        foreach ([\App\Support\Odoo::class, \App\Support\WebhookDispatcher::class, \App\Support\Uptime::class] as $f) {
+        foreach ([\App\Support\Ops\Odoo::class, \App\Support\Ops\WebhookDispatcher::class, \App\Support\Ops\Uptime::class] as $f) {
             $src = \Tests\Support\Source::read($f);
             $this->assertMatchesRegularExpression("/'allow_redirects'\\s*=>\\s*false/", $src,
                 "{$f}: مسارٌ صادرٌ يتّبع إعادة التوجيه — وجهةٌ تردّ 302 نحو الداخل تلتفّ حول الحارس");

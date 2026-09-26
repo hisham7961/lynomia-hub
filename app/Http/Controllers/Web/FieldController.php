@@ -96,7 +96,7 @@ class FieldController extends Controller
             // جلسةٌ حيّةٌ لم تُبسَّط بعد — تُعرض نقاطُها المتاحة (مبسَّطةً لحظياً)
             $pts = TrackPoint::where('session_id', $s->id)->orderBy('captured_at')
                 ->get(['lat', 'lng'])->map(fn ($p) => [(float) $p->lat, (float) $p->lng])->all();
-            $line = \App\Support\Tracking::simplify($pts, 0.00005);
+            $line = \App\Support\Workforce\Tracking::simplify($pts, 0.00005);
         }
         $rawCount = hub_is_owner() ? TrackPoint::where('session_id', $s->id)->count() : null;
 

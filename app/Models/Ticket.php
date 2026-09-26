@@ -42,7 +42,7 @@ class Ticket extends Model
         static::updated(function (self $t): void {
             if (! $t->wasChanged('status')) return;
 
-            try { \App\Support\ClientPortalData::announceTicketResolution($t); }
+            try { \App\Support\Collaboration\ClientPortalData::announceTicketResolution($t); }
             catch (\Throwable $e) { report($e); }
         });
     }

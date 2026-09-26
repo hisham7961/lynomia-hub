@@ -1,5 +1,5 @@
 {{-- الباقات والتسعير: بطاقاتٌ لا صفوف — كل خدمةٍ بوجهها وباقاتها وهامشها وموقعها من السوق --}}
-@php $pr = \App\Support\Pricing::all((bool) request()->query('fresh')); @endphp
+@php $pr = \App\Support\Finance\Pricing::all((bool) request()->query('fresh')); @endphp
 
 @if (count($pr['insights']))
     <div class="card" style="margin-bottom:12px">

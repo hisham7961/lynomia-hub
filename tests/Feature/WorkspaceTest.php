@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Contract;
-use App\Support\Workspaces;
+use App\Support\Platform\Workspaces;
 use Tests\TestCase;
 
 /** CTO م2 (v2.134): مساحات العمل — صفحات مركزية بأرقام منطّقة وصلاحيات صارمة */

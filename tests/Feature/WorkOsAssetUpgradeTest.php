@@ -6,7 +6,7 @@ use App\Models\Asset;
 use App\Models\AssetCustody;
 use App\Models\Company;
 use App\Models\Station;
-use App\Support\Custody;
+use App\Support\Assets\Custody;
 use Tests\TestCase;
 
 /**

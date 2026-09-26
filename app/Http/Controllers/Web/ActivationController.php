@@ -137,7 +137,7 @@ class ActivationController extends Controller
 
         // حدثٌ دلاليّ (يُطلق التدفّقاتِ كأيّ حدث) + أثرُ تدقيقٍ للتفعيل
         try {
-            \App\Support\FlowRunner::fire('account_activated', 'users', $user);
+            \App\Support\Platform\FlowRunner::fire('account_activated', 'users', $user);
         } catch (\Throwable $e) {
             report($e);
         }

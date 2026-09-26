@@ -148,7 +148,7 @@
                         <button class="btn ghost xs dn" data-confirm="إلغاء الطلب وإبطال كل روابطه؟" title="إلغاء الطلب">🚫</button></form>
                 @endif
                 @if ($q->status === 'بانتظار الموافقة' && ($ap = ($apSteps[$q->id] ?? null))
-                     && \App\Support\ContractApprovals::canDecide(auth()->user(), $ap))
+                     && \App\Support\Documents\ContractApprovals::canDecide(auth()->user(), $ap))
                     <details class="inline"><summary class="btn ghost xs">🔏 قرار المرحلة</summary>
                         <form method="POST" action="{{ route('esign.approve', $q->id) }}"
                               style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">@csrf

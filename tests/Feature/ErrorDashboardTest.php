@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ErrorEvent;
 use App\Models\User;
-use App\Support\TimeRange;
+use App\Support\Platform\TimeRange;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -83,8 +83,8 @@ class ErrorDashboardTest extends TestCase
             'last_seen' => now()->subHours(3), 'message' => 'عطل قديم خارج نافذة الساعة']);
 
         // ١) Health::errors — النافذةُ ساعة، غيرُ المحلول فقط، والأعداد حرفية
-        $errs = \App\Support\Health::check()['components']['errors'];
-        $this->assertSame(\App\Support\Health::UNAVAILABLE, $errs['status'], 'حرجٌ خلال ساعة = غير متاح');
+        $errs = \App\Support\Ops\Health::check()['components']['errors'];
+        $this->assertSame(\App\Support\Ops\Health::UNAVAILABLE, $errs['status'], 'حرجٌ خلال ساعة = غير متاح');
         $this->assertSame(1, (int) $errs['data']['critical_1h']);
         $this->assertSame(1, (int) $errs['data']['high_1h']);
         $this->assertSame(47244, (int) $errs['data']['hits_1h'], 'مجموع تكرارات غير المحلول خلال ساعة');
@@ -120,7 +120,7 @@ class ErrorDashboardTest extends TestCase
         $this->assertStringContainsString('data-card="critical">2<', $html,
             'بطاقة «حرجة» = المفتوح + المتجاهَل، بلا المحلول — دلالة Health::errors نفسها');
 
-        $data = \App\Support\Health::check()['components']['errors']['data'];
+        $data = \App\Support\Ops\Health::check()['components']['errors']['data'];
         $this->assertSame(2, (int) $data['critical_1h'], 'والصحّة تعدّ العددَ نفسه');
     }
 
@@ -139,7 +139,7 @@ class ErrorDashboardTest extends TestCase
         }
 
         $range = TimeRange::fromRequest(Request::create('/admin/errors', 'GET', ['range' => '24h']));
-        $chart = \App\Support\ErrorStats::overTime($range);
+        $chart = \App\Support\Ops\ErrorStats::overTime($range);
 
         $this->assertTrue($chart['ok']);
         $this->assertSame('hour', $chart['unit']);

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\Severity;
+use App\Support\Platform\Severity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -50,8 +50,8 @@ class AlertCenterController extends Controller
         // غيرُ المالك (monitor) يقرأ مطموسَ البريد — العناوينُ تُعرض <bdi> كما في مركز الأمن
         if (! hub_is_owner()) {
             $rows->getCollection()->transform(function ($i) {
-                $i->title = \App\Support\SecurityFindings::maskPII((string) $i->title);
-                $i->subject = $i->subject !== null ? \App\Support\SecurityFindings::maskPII((string) $i->subject) : null;
+                $i->title = \App\Support\Security\SecurityFindings::maskPII((string) $i->title);
+                $i->subject = $i->subject !== null ? \App\Support\Security\SecurityFindings::maskPII((string) $i->subject) : null;
 
                 return $i;
             });

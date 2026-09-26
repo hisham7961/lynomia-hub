@@ -2,7 +2,7 @@
 
 namespace App\Support\Ai\Ask;
 
-use App\Support\Redactor;
+use App\Support\Platform\Redactor;
 
 /**
  * **أثرُ «اسأل Hub» — ما يُسجَّل وما لا يُسجَّل** (المرحلة ٣ · P3-W2).

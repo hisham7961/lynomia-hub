@@ -33,12 +33,12 @@ class BrokenRailsTest extends TestCase
 
         $this->actingAs($this->owner);
         $this->assertContains('مقالٌ إلزامي',
-            collect(\App\Support\Inbox::items($this->owner))->pluck('title')->all());
+            collect(\App\Support\Collaboration\Inbox::items($this->owner))->pluck('title')->all());
 
         hub_ack_do('kb', $id);
 
         $this->assertNotContains('مقالٌ إلزامي',
-            collect(\App\Support\Inbox::items($this->owner))->pluck('title')->all(),
+            collect(\App\Support\Collaboration\Inbox::items($this->owner))->pluck('title')->all(),
             'أقرَّ المستخدم بالقراءة وبقي البند في صندوقه — بلا فعلٍ يُزيله أبداً');
     }
 
@@ -57,7 +57,7 @@ class BrokenRailsTest extends TestCase
         $st = hub_ack_state('kb', $id);
         $this->assertSame(100, (int) ($st['pct'] ?? 0));
         $this->assertNotContains('دليل السلامة',
-            collect(\App\Support\Inbox::items($this->owner))->pluck('title')->all());
+            collect(\App\Support\Collaboration\Inbox::items($this->owner))->pluck('title')->all());
     }
 
     /** ونسخةٌ جديدة تُعيد الطلب — الإقرار مرتبطٌ بنصٍّ بعينه */
@@ -74,7 +74,7 @@ class BrokenRailsTest extends TestCase
         DB::table('kb_articles')->where('id', $id)->update(['ver' => '2']);
 
         $this->assertContains('سياسة الاستخدام',
-            collect(\App\Support\Inbox::items($this->owner))->pluck('title')->all(),
+            collect(\App\Support\Collaboration\Inbox::items($this->owner))->pluck('title')->all(),
             'نصٌّ تغيّر وبقي إقرار النسخة القديمة يُغطّيه');
     }
 
@@ -89,7 +89,7 @@ class BrokenRailsTest extends TestCase
         }
 
         $this->actingAs($this->owner);
-        $titles = collect(\App\Support\Inbox::items($this->owner))->pluck('title')->all();
+        $titles = collect(\App\Support\Collaboration\Inbox::items($this->owner))->pluck('title')->all();
 
         $this->assertContains('مقالٌ منشور', $titles);
         $this->assertNotContains('مقالٌ مسودة', $titles, 'مسودةٌ تُطالِب كل الفريق بقراءتها');
@@ -106,7 +106,7 @@ class BrokenRailsTest extends TestCase
 
         $this->actingAs($this->owner);
         $this->assertNotContains('سياسةٌ مسودة',
-            collect(\App\Support\Inbox::items($this->owner))->pluck('title')->all());
+            collect(\App\Support\Collaboration\Inbox::items($this->owner))->pluck('title')->all());
     }
 
     /* ── حالةُ الوثائق ── */

@@ -6,7 +6,7 @@ use App\Models\AiFinding;
 use App\Models\Company;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\ActionCenter;
+use App\Support\Insights\ActionCenter;
 use App\Support\Ai\Auditor\Auditor;
 use App\Support\Ai\Auditor\AuditorIdentity;
 use App\Support\Ai\Auditor\AuditorSignals;
@@ -335,10 +335,10 @@ class AuditorTest extends TestCase
         $visible = ActionCenter::signals(true)['visible'];
 
         $this->assertNotNull(collect($visible)->firstWhere('key', $f->signalKey()));
-        $control = \App\Support\AttentionQueue::forControl($visible);
+        $control = \App\Support\Insights\AttentionQueue::forControl($visible);
         $this->assertSame([], array_values(array_filter(array_map(fn ($s) => $s['key'] ?? '', $control),
             fn ($k) => str_starts_with((string) $k, 'audit:'))), 'حكمٌ على عملِ فريقٍ ليس حالةَ نظام');
-        $this->assertNotContains(AuditorSignals::TYPE, \App\Support\AttentionQueue::TYPES);
+        $this->assertNotContains(AuditorSignals::TYPE, \App\Support\Insights\AttentionQueue::TYPES);
     }
 
     // ═══ ⑥ حدودُ الرؤية — بمستخدمين معزولين ═══

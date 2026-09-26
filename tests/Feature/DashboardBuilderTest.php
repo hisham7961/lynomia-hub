@@ -187,7 +187,7 @@ class DashboardBuilderTest extends TestCase
         $this->actingAs($this->owner)->post("/boards/{$b->id}/widgets", ['widget_key' => 'donut']);
 
         $w = $b->widgets()->first();
-        $size = \App\Support\WidgetRegistry::get('donut')['size'];
+        $size = \App\Support\Platform\WidgetRegistry::get('donut')['size'];
         $this->assertSame($size['w'], (int) $w->w);
         $this->assertSame($size['h'], (int) $w->h);
     }

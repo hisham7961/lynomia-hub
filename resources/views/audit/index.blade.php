@@ -8,7 +8,7 @@
     {{-- ثلاثُ حالاتٍ لا حالتان (الجولة ٣ · V5): «عبث» تُهمةٌ لا تُقال إلا على فحصٍ
          جرى فانكسر، و«سليمة» شهادةٌ لا تُقال إلا على فحصٍ جرى فسلِم — وبينهما
          «غير متحقَّق» حين يتعذّر الفحصُ نفسُه. --}}
-    @php $chainState = \App\Support\Audit::chainState($chain); @endphp
+    @php $chainState = \App\Support\Platform\Audit::chainState($chain); @endphp
     <div class="kpi {{ ['ok' => '', 'bad' => 'bad', 'unknown' => 'wn'][$chainState] }}">
         <div class="lbl">🔗 سلامة السلسلة</div>
         <div class="val" style="font-size:16px">{{ ['ok' => 'سلسلة سليمة', 'bad' => '⚠️ عبث', 'unknown' => '⚠️ غير متحقَّق'][$chainState] }}</div>
@@ -211,7 +211,7 @@
         <tbody>
         @forelse ($rows as $a)
             @php
-                $diff = \App\Support\Audit::diff($a->module, $a->before ?? null, $a->after ?? null);
+                $diff = \App\Support\Platform\Audit::diff($a->module, $a->before ?? null, $a->after ?? null);
                 // التصنيف: المخزّنُ للجديد، ومُترجِمُ القراءة (WP-5.2) للصفوف الأقدم من التطبيع
                 $ac = ($a->severity ?? null)
                     ? ['category' => $a->category, 'severity' => $a->severity]

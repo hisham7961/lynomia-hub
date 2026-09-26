@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Attendance;
 use App\Models\Employee;
-use App\Support\DailyWorkCompliance;
+use App\Support\Workforce\DailyWorkCompliance;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -36,7 +36,7 @@ class AttendanceReconcileReports extends Command
         $notify = ((string) setting('work.report_reminder', '1') === '1') && $policy !== DailyWorkCompliance::POLICY_WARNING;
 
         $lookback = max(1, (int) $this->option('days'));
-        $since = \App\Support\BusinessDate::now()->subDays($lookback)->toDateString();
+        $since = \App\Support\Platform\BusinessDate::now()->subDays($lookback)->toDateString();
         $nowTs = now()->toDateTimeString();
 
         // المرشّحون فقط (§51): حضورٌ فات موعدُ تقريرِه ولم يُقفَل — نافذةٌ خلفيّةٌ محدودة

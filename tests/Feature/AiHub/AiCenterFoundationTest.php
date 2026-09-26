@@ -5,8 +5,8 @@ namespace Tests\Feature\AiHub;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\Ai\Gateway\AiGateway;
-use App\Support\ConnectionProbe;
-use App\Support\Settings;
+use App\Support\Ops\ConnectionProbe;
+use App\Support\Platform\Settings;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -25,7 +25,7 @@ class AiCenterFoundationTest extends TestCase
     {
         $this->actingAs($u)->post('/stepup', ['answer' => 'Secret!2026x', 'next' => '/'])
             ->assertRedirect();
-        $this->assertTrue(\App\Support\StepUp::fresh(), 'لم تُختَم نافذةُ التصعيد');
+        $this->assertTrue(\App\Support\Security\StepUp::fresh(), 'لم تُختَم نافذةُ التصعيد');
     }
 
     /** يختم نجاحَ فحصٍ على البصمةِ الحاليّة — بلا بوّابةٍ حيّةٍ في الاختبار */
@@ -240,14 +240,14 @@ class AiCenterFoundationTest extends TestCase
         // صحيحٌ في الإنتاج (طلبٌ واحدٌ = حلٌّ واحد)، فيُفرَغ هنا بين الدرجاتِ
         // كي يُقاس الاشتقاقُ لا المخبوء.
         $st = function () {
-            \App\Support\FeatureRegistry::flush();
+            \App\Support\Platform\FeatureRegistry::flush();
 
-            return \App\Support\FeatureRegistry::status('ai.gateway')['status'];
+            return \App\Support\Platform\FeatureRegistry::status('ai.gateway')['status'];
         };
         $why = function () {
-            \App\Support\FeatureRegistry::flush();
+            \App\Support\Platform\FeatureRegistry::flush();
 
-            return \App\Support\FeatureRegistry::status('ai.gateway')['reason'];
+            return \App\Support\Platform\FeatureRegistry::status('ai.gateway')['reason'];
         };
 
         // ① لا إعدادَ

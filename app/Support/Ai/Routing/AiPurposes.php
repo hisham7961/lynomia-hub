@@ -4,7 +4,7 @@ namespace App\Support\Ai\Routing;
 
 use App\Models\AiModel;
 use App\Models\AiUsageEvent;
-use App\Support\Tri;
+use App\Support\Platform\Tri;
 
 /**
  * **ما تحتاجه ميزةُ Hub من النموذجِ فعلاً** — لا ما يكفي لتوليدِ نصّ.

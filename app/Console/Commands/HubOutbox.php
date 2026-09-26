@@ -54,7 +54,7 @@ class HubOutbox extends Command
             $this->info('لا رسائل بانتظار الإرسال');
             if ($only !== '') return self::SUCCESS;
             $this->webhooks();
-            \App\Support\Health::beat('outbox', (int) round((microtime(true) - $t0) * 1000));
+            \App\Support\Ops\Health::beat('outbox', (int) round((microtime(true) - $t0) * 1000));
             return self::SUCCESS;
         }
 
@@ -78,7 +78,7 @@ class HubOutbox extends Command
                 // الفعّال برسالة الخطأ — أي «…/bot<TOKEN>/sendMessage» — فيتسرّب
                 // الرمز إلى outbox.error المعروض وإلى اللوج. يُطمَس قبل التخزين.
                 // (WP-1.3) تفويضٌ للمُطهِّر الواحد — قاعدةُ /bot… بحرفها وأخواتُها
-                $emsg = \App\Support\Redactor::text($e->getMessage());
+                $emsg = \App\Support\Platform\Redactor::text($e->getMessage());
                 // **إعادةٌ آليةٌ محدودة** (v2.399): كان الفشلُ الأولُ نهائياً (dead letter) ولو كان
                 // انقطاعَ SMTP لحظةً. ثلاثُ محاولاتٍ بتباعدٍ (٥ → ٣٠ → ١٢٠ دقيقة) ثم failed حقّاً.
                 $attempts = $retryCols ? (int) $msg->attempts + 1 : 1;
@@ -102,7 +102,7 @@ class HubOutbox extends Command
         $this->webhooks();
 
         // النبضةُ بمدّتها ونتيجتها: فشلٌ في الدفعة يُقال في مركز التشغيل لا في سطر طرفيةٍ لا يقرؤه أحد
-        \App\Support\Health::beat('outbox', (int) round((microtime(true) - $t0) * 1000),
+        \App\Support\Ops\Health::beat('outbox', (int) round((microtime(true) - $t0) * 1000),
             $failed ? 'partial' : 'ok', $failed ? "فشل {$failed} من " . ($sent + $failed) : null);
         return self::SUCCESS;
     }
@@ -147,7 +147,7 @@ class HubOutbox extends Command
             // منع الإرسال المزدوج لو تداخل تشغيلان — نفس نمط outbox
             if (! \App\Models\WebhookDelivery::where('id', $d->id)->where('state', 'queued')
                     ->update(['state' => 'sending', 'claimed_at' => now()])) continue;
-            \App\Support\WebhookDispatcher::send($d) ? $ok++ : $fail++;
+            \App\Support\Ops\WebhookDispatcher::send($d) ? $ok++ : $fail++;
         }
         $this->info("Webhooks — نجح: {$ok} · فشل/أُعيد جدولته: {$fail}");
     }

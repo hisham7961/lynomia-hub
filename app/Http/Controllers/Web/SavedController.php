@@ -7,8 +7,8 @@ use App\Models\Comment;
 use App\Models\DmMessage;
 use App\Models\SavedMessage;
 use App\Models\User;
-use App\Support\Collaboration;
-use App\Support\CommentService;
+use App\Support\Collaboration\Collaboration;
+use App\Support\Collaboration\CommentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -119,7 +119,7 @@ class SavedController extends Controller
                 'available' => $m->deleted_at === null,
                 'title'     => $m->deleted_at === null ? Str::limit(trim((string) $m->body), 90) : 'حُذفت رسالة',
                 'author'    => optional(User::find($m->from_id))->name,
-                'link'      => \App\Support\MessageLink::dm($m, (string) $me->id),
+                'link'      => \App\Support\Collaboration\MessageLink::dm($m, (string) $me->id),
             ]);
         } catch (\Throwable $e) {
             return $base;   // لم يعد يُرى — يبقى صفُّ المحفوظةِ كي يُزيلها صاحبُها

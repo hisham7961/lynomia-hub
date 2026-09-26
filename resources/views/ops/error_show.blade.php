@@ -15,7 +15,7 @@
         <h2>🐞 {{ $kindLabel }}</h2>
         <div class="sub">
             <span class="bdg {{ $kindTone }}">{{ $kindLabel }}</span>
-            @php $stLbl = \App\Support\IssueState::label($e->status); @endphp
+            @php $stLbl = \App\Support\Platform\IssueState::label($e->status); @endphp
             <span class="bdg {{ $stLbl === 'محلول' ? 'ok' : ($stLbl === 'جديد' ? 'bad' : ($stLbl === 'متجاهَل' ? 'g' : 'wn')) }}">{{ $stLbl }}</span>
             تكرّر <b>{{ number_format($e->count) }}</b> مرة ·
             أول ظهور {{ $e->first_seen?->diffForHumans() }} · آخر ظهور {{ $e->last_seen?->diffForHumans() }}
@@ -44,8 +44,8 @@
             <td class="mono ltr">{{ $e->request_id ?: '—' }}</td></tr>
         @if (isset($e->category))
         <tr><td class="sub">الصنف والشدّة</td>
-            <td>{{ \App\Support\ErrorTaxonomy::LABELS[$e->category] ?? ($e->category ?: '—') }} ·
-                <b>{{ \App\Support\ErrorTaxonomy::LABELS[$e->severity] ?? ($e->severity ?: '—') }}</b>
+            <td>{{ \App\Support\Ops\ErrorTaxonomy::LABELS[$e->category] ?? ($e->category ?: '—') }} ·
+                <b>{{ \App\Support\Ops\ErrorTaxonomy::LABELS[$e->severity] ?? ($e->severity ?: '—') }}</b>
                 <span class="sub">({{ $e->category ?: '—' }} / {{ $e->severity ?: '—' }})</span></td></tr>
         <tr><td class="sub">الإصدار والبيئة</td>
             <td class="mono ltr">{{ $e->release ?: '—' }} · {{ $e->env ?: '—' }}</td></tr>
@@ -167,7 +167,7 @@
             <div class="tblwrap"><table class="mini">
                 @foreach ($reqAudits as $a)
                     <tr><td class="sub" style="width:150px">{{ \Illuminate\Support\Carbon::parse($a->created_at)->format('Y-m-d H:i:s') }}</td>
-                        <td>{{ $a->action }}@if ($a->name) — {{ \App\Support\Redactor::text($a->name) }}@endif
+                        <td>{{ $a->action }}@if ($a->name) — {{ \App\Support\Platform\Redactor::text($a->name) }}@endif
                             @if ($a->user_id) <span class="sub">· {{ $users[$a->user_id] ?? 'مستخدم محذوف' }}</span>@endif</td></tr>
                 @endforeach
             </table></div>
@@ -180,8 +180,8 @@
     <h3 class="cardtitle">🛠️ ما العمل؟</h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         {{-- (WP-3.3) الحالاتُ الخمس من خريطة IssueState — «متجاهَل» له نموذجُه لأنه يشترط سبباً --}}
-        @foreach (($lifecycle ? array_values(\App\Support\IssueState::MAP) : ['قيد المعالجة', 'محلول', 'جديد']) as $to)
-            @continue($to === \App\Support\IssueState::label($e->status) || $to === 'متجاهَل')
+        @foreach (($lifecycle ? array_values(\App\Support\Platform\IssueState::MAP) : ['قيد المعالجة', 'محلول', 'جديد']) as $to)
+            @continue($to === \App\Support\Platform\IssueState::label($e->status) || $to === 'متجاهَل')
             <form class="inline" method="POST" action="{{ route('errors.status', $e->id) }}">
                 @csrf<input type="hidden" name="to" value="{{ $to }}">
                 <button class="btn ghost sm">علّمه «{{ $to }}»</button>
@@ -197,7 +197,7 @@
         @endif
     </div>
 
-    @if ($lifecycle && \App\Support\IssueState::label($e->status) !== 'متجاهَل')
+    @if ($lifecycle && \App\Support\Platform\IssueState::label($e->status) !== 'متجاهَل')
         {{-- التجاهل قرارٌ مسبَّب: بلا سببٍ يُرفض ٤٢٢ --}}
         <form method="POST" action="{{ route('errors.status', $e->id) }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
             @csrf<input type="hidden" name="to" value="متجاهَل">
@@ -213,7 +213,7 @@
     @if ($lifecycle)
         {{-- كتمُ إشعارات هذه البصمة مؤقتاً (يُحترم في الإشعار — حزمة 3.5) --}}
         <form method="POST" action="{{ route('errors.status', $e->id) }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px">
-            @csrf<input type="hidden" name="to" value="{{ \App\Support\IssueState::label($e->status) }}">
+            @csrf<input type="hidden" name="to" value="{{ \App\Support\Platform\IssueState::label($e->status) }}">
             <label class="vh" for="mtd">مدة الكتم</label>
             <select class="inp" id="mtd" name="mute_days" style="max-width:160px">
                 <option value="1">كتم يوماً</option><option value="7" selected>كتم أسبوعاً</option><option value="30">كتم شهراً</option>

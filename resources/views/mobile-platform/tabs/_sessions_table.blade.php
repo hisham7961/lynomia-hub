@@ -3,7 +3,7 @@
 <table class="mini">
     <tr><th>المستخدم</th><th>المنصّة</th><th>الإصدار</th><th>آخر استعمال</th><th>IP</th><th>الحالة</th><th></th></tr>
     @forelse ($rows as $s)
-        @php $st = \App\Support\MobilePlatform::sessionStatus($s); @endphp
+        @php $st = \App\Support\Mobile\MobilePlatform::sessionStatus($s); @endphp
         <tr>
             <td>{{ $s->user?->name ?? '—' }}</td>
             <td>{{ $s->platform ?: '—' }}</td>

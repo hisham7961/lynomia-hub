@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Models\Client;
 use App\Models\ClientMembership;
 use App\Models\MobileSession;
-use App\Support\Api;
-use App\Support\ClientMembers;
-use App\Support\MobileSessionService;
-use App\Support\StepUp;
+use App\Support\Platform\Api;
+use App\Support\Collaboration\ClientMembers;
+use App\Support\Mobile\MobileSessionService;
+use App\Support\Security\StepUp;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,7 +16,7 @@ use Illuminate\Http\Request;
  * **إدارةُ أعضاء العميل على الجوال** (تطبيق العميل · §15) — لوحةُ مديرِ الحساب
  * **الداخليّ** (نظيرُ `ClientMemberController` الويبيّ) على سطح
  * `/api/mobile/v1/clients/{client}/members`: تعدادٌ ودعوةٌ ودورٌ وسحب، عبر
- * **الجوهر المشترك الواحد** (`App\Support\ClientMembers`) — لا سكّةَ عضويّةٍ
+ * **الجوهر المشترك الواحد** (`App\Support\Collaboration\ClientMembers`) — لا سكّةَ عضويّةٍ
  * ولا تفعيلٍ ثانية.
  *
  * الحراسة: `hub_can('clients','e')` + `hub_scope` (عميلٌ خارج نطاق المدير 404)،

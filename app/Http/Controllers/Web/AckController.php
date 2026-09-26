@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\Acks;
+use App\Support\Collaboration\Acks;
 use Illuminate\Http\Request;
 
 /**

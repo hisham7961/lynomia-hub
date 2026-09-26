@@ -33,7 +33,7 @@
          'tone' => 'g', 'sub' => $work['tickets_open'] === null ? null : $work['tickets_open'] . ' مفتوحةٌ الآن'],
         ['label' => 'متوسط الحل', 'value' => $wRes['avg_h'] === null ? '—' : $wRes['avg_h'] . ' س',
          'tone' => 'g',
-         'sub' => $wRes['of'] ? 'من ' . $wRes['of'] . ' تذكرة' . ($wRes['capped'] ? ' (عيّنة بسقف ' . \App\Support\ExecutionStats::PEOPLE_SAMPLE_CAP . ')' : '')
+         'sub' => $wRes['of'] ? 'من ' . $wRes['of'] . ' تذكرة' . ($wRes['capped'] ? ' (عيّنة بسقف ' . \App\Support\Workforce\ExecutionStats::PEOPLE_SAMPLE_CAP . ')' : '')
                 : 'لا تذاكرَ حُلّت في النافذة',
          'hint' => 'من ختم حلّ التذكرة إن وُجد، وإلا من آخر تعديلٍ عليها'],
         ['label' => 'مشاريع', 'value' => $wDash($work['projects_open']), 'tone' => 'g',

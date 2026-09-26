@@ -8,9 +8,9 @@ use App\Models\Conversation;
 use App\Models\ConversationMember;
 use App\Models\Project;
 use App\Models\User;
-use App\Support\ChatCommands;
-use App\Support\Collaboration;
-use App\Support\FlowRunner;
+use App\Support\Collaboration\ChatCommands;
+use App\Support\Collaboration\Collaboration;
+use App\Support\Platform\FlowRunner;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -416,7 +416,7 @@ class ConversationController extends Controller
     /**
      * **رسائلُ القناةِ الجديدةُ منذ مؤشّر** (§39) — استطلاعٌ تدريجيٌّ بمؤشّر `since`
      * (keyset على `(created_at, id)`) لا إعادةُ جلبِ الخيطِ كلِّه في كلِّ نبضة. عقدُ
-     * الأحداثِ من `App\Support\Collaboration` — نفسُه سواءٌ وصله استطلاعاً أو بثّاً
+     * الأحداثِ من `App\Support\Collaboration\Collaboration` — نفسُه سواءٌ وصله استطلاعاً أو بثّاً
      * مستقبلاً (بلا كسرِ عقد العميل · §38). العزلُ خادميّ: `guardConversation` أولاً.
      *
      * مؤشّرٌ غائب/فاسد ⇒ من الذيل (أحدثُ ٥٠) — تمهيدٌ آمن. يُرجِع أحداثاً + مؤشّراً جديداً.
@@ -457,7 +457,7 @@ class ConversationController extends Controller
         // §typing مؤشّرُ الكتابةِ العابر — أسماءُ الأعضاءِ الكاتبين الآن (عدا القارئ).
         // بوّابةُ القدرة: إن أُطفئ «مؤشّر الكتابة» لا تُبثّ إشارةٌ (فشلٌ آمنٌ لا تسريب).
         $typing = hub_capability('collab.typing')
-            ? User::whereIn('id', \App\Support\Typing::current((string) $conv->id, (string) auth()->id()))->pluck('name')->all()
+            ? User::whereIn('id', \App\Support\Collaboration\Typing::current((string) $conv->id, (string) auth()->id()))->pluck('name')->all()
             : [];
 
         return response()->json(['events' => $events, 'cursor' => $next, 'typing' => $typing]);
@@ -469,7 +469,7 @@ class ConversationController extends Controller
         // بوّابةُ القدرة: «مؤشّر الكتابة» اختياريّة — إن أُطفئت يفشل المسارُ بأمان (٤٠٤)
         abort_unless(hub_capability('collab.typing'), 404);
         [$conv] = self::guardConversation($id, 'v');
-        \App\Support\Typing::ping((string) $conv->id, (string) auth()->id());
+        \App\Support\Collaboration\Typing::ping((string) $conv->id, (string) auth()->id());
 
         return response()->noContent();
     }
@@ -487,7 +487,7 @@ class ConversationController extends Controller
         [$conv] = self::guardConversation($id, 'v');   // أيُّ عضوٍ يضبط تفضيلَه
 
         $data = $r->validate([
-            'pref' => ['required', 'string', Rule::in(\App\Support\Collaboration::NOTIFY_PREFS)],
+            'pref' => ['required', 'string', Rule::in(\App\Support\Collaboration\Collaboration::NOTIFY_PREFS)],
         ], [], ['pref' => 'تفضيل الإشعار']);
 
         if (! hub_has_col('conversation_members', 'notify_pref')) {

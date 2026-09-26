@@ -6,12 +6,12 @@ use App\Models\Company;
 use App\Models\EndpointDevice;
 use App\Models\EndpointRelease;
 use App\Models\EnrollmentToken;
-use App\Support\Endpoint;
+use App\Support\Endpoint\Endpoint;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * **تصحيحُ أنظمةِ التشغيل المدعومة** (§1) — المصدرُ الواحد `App\Support\Endpoint`:
+ * **تصحيحُ أنظمةِ التشغيل المدعومة** (§1) — المصدرُ الواحد `App\Support\Endpoint\Endpoint`:
  * المدعومُ رسميّاً Windows/macOS فقط. تسجيلُ Linux **الجديد** يُرَدّ خادميّاً،
  * والصفوفُ القديمة تُصان وتُصنَّف «غير مدعومة». القائمةُ لا تتكرّر ولا تتباعد.
  */

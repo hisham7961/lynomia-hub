@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Comment;
 use App\Models\Conversation;
 use App\Models\ConversationMember;
-use App\Support\HubEvents;
+use App\Support\Platform\HubEvents;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\Inbox;
+use App\Support\Collaboration\Inbox;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;

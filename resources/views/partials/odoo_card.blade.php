@@ -2,7 +2,7 @@
      الحلُّ لكل سجل: forRow يقرأ اختيارَ الخادم من meta['odoo']['conn'] —
      الشركات والعملاء بلا اختيارٍ يبقون على الافتراضي بشفافية --}}
 @php
-    $ocli = \App\Support\Odoo::forRow($row);
+    $ocli = \App\Support\Ops\Odoo::forRow($row);
     $odooOk = $ocli->ready();
     $meta = (array) $row->meta;
     $opid = (int) ($meta['odoo_partner_id'] ?? 0);

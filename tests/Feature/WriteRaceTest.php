@@ -51,7 +51,7 @@ class WriteRaceTest extends TestCase
         $this->assertSame($headBefore, DB::table('audit_chain')->where('id', 1)->value('head'),
             'تقدّم الرأس ولم يُكتب قيدٌ يحمله — والسلسلة تقول «عبث» إلى الأبد');
 
-        $v = \App\Support\Audit::verifyTail();
+        $v = \App\Support\Platform\Audit::verifyTail();
         $this->assertTrue($v['ok'], 'إنذارُ تلاعبٍ كاذب: ' . ($v['why'] ?: $v['label']));
     }
 
@@ -72,7 +72,7 @@ class WriteRaceTest extends TestCase
 
         hub_audit('الثالث', 'hr', null, 'ج');
 
-        $v = \App\Support\Audit::verifyTail();
+        $v = \App\Support\Platform\Audit::verifyTail();
         $this->assertTrue($v['ok'], 'السلسلة انكسرت بعد سقوط قيدٍ وسطيّ: ' . ($v['why'] ?: $v['label']));
     }
 
@@ -112,11 +112,11 @@ class WriteRaceTest extends TestCase
 
     public function test_the_inbox_stamp_covers_every_table_it_reads(): void
     {
-        $src = \Tests\Support\Source::read(\App\Support\Inbox::class);
+        $src = \Tests\Support\Source::read(\App\Support\Collaboration\Inbox::class);
         preg_match_all("/DB::table\('([a-z_]+)'\)/", $src, $m);
         $read = array_values(array_unique($m[1] ?? []));
 
-        $missing = array_values(array_diff($read, \App\Support\Inbox::TABLES));
+        $missing = array_values(array_diff($read, \App\Support\Collaboration\Inbox::TABLES));
 
         $this->assertSame([], $missing,
             'جداولُ يقرؤها الصندوق ولا يختمها — تغيّرها لا يُبطل خبيئته فيبقى المُنجَز معروضاً: '
@@ -139,12 +139,12 @@ class WriteRaceTest extends TestCase
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        $before = collect(\App\Support\Inbox::items($this->owner))->pluck('title')->implode(' ');
+        $before = collect(\App\Support\Collaboration\Inbox::items($this->owner))->pluck('title')->implode(' ');
         $this->assertStringContainsString('اسمٌ خاطئ', $before, 'لم يظهر الطلب أصلاً');
 
         $emp->update(['name' => 'الاسم الصحيح']);
 
-        $after = collect(\App\Support\Inbox::items($this->owner))->pluck('title')->implode(' ');
+        $after = collect(\App\Support\Collaboration\Inbox::items($this->owner))->pluck('title')->implode(' ');
         $this->assertStringContainsString('الاسم الصحيح', $after,
             'صُحّح الاسم وبقي الصندوق يعرض الخطأ — ختمُه لا يشمل جدول الموظفين');
     }

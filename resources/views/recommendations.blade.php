@@ -2,7 +2,7 @@
 @section('title', 'مركز التوصيات')
 @section('content')
 @php
-    use App\Support\AttentionQueue;
+    use App\Support\Insights\AttentionQueue;
     $c = $ac['counts'];
     $tone = ['حرج' => 'bad', 'مهم' => 'wn', 'اطّلاع' => ''];
     $stateLabel = ['ack' => 'مُقَرّة', 'open' => '', 'snoozed' => 'مؤجّلة', 'dismissed' => 'مرفوضة'];

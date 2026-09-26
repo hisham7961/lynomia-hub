@@ -85,7 +85,7 @@ class AiModelController extends Controller
         if ($cap !== '') {
             $models = $models->filter(static function (AiModel $m) use ($cap) {
                 $fact = ((array) $m->capabilities)[$cap] ?? null;
-                return \App\Support\Tri::allowsExecution(is_array($fact) ? ($fact['v'] ?? null) : $fact);
+                return \App\Support\Platform\Tri::allowsExecution(is_array($fact) ? ($fact['v'] ?? null) : $fact);
             })->values();
         }
 
@@ -295,7 +295,7 @@ class AiModelController extends Controller
         ], [], ['group' => 'المجموعة', 'key' => 'الحقيقة', 'value' => 'القيمة']);
 
         $value = $d['value'] ?? null;
-        if ($d['group'] === 'capabilities' || $d['group'] === 'params') $value = \App\Support\Tri::of($value);
+        if ($d['group'] === 'capabilities' || $d['group'] === 'params') $value = \App\Support\Platform\Tri::of($value);
         elseif (is_numeric($value)) $value = $value + 0;
 
         $res = AiModels::override($model, (string) $d['group'], (string) $d['key'], $value);
@@ -349,7 +349,7 @@ class AiModelController extends Controller
             'last_error'      => $res['error'],       // مرّ بـ`Redactor` في `row()`
         ])->save();
 
-        return back()->with('ok', 'المستوى ' . $level . ' — ' . \App\Support\ConnectionProbe::line($res));
+        return back()->with('ok', 'المستوى ' . $level . ' — ' . \App\Support\Ops\ConnectionProbe::line($res));
     }
 
     // ── ⑤ دورةُ الحياةِ — بابُ الخروجِ الذي لم يكن ─────────────────────

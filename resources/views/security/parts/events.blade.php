@@ -6,7 +6,7 @@
             <label class="vh" for="ev">تصفية بالحدث</label>
             <select class="inp" id="ev" name="ev" onchange="this.form.submit()">
                 <option value="">كل الأحداث ({{ array_sum($eventCounts) }})</option>
-                @foreach (\App\Support\SecurityEvents::CODES as $code => [$label, $sev])
+                @foreach (\App\Support\Security\SecurityEvents::CODES as $code => [$label, $sev])
                     <option value="{{ $code }}" @selected($eventCode === $code)>{{ $label }} · {{ $code }}@if (isset($eventCounts[$code])) ({{ $eventCounts[$code] }})@endif</option>
                 @endforeach
             </select>
@@ -17,8 +17,8 @@
     </div>
     <div class="crow" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">
         @foreach (array_slice($eventCounts, 0, 8, true) as $code => $n)
-            @php [$lbl, $sev] = \App\Support\SecurityEvents::CODES[$code]; @endphp
-            <a class="bdg {{ \App\Support\SecurityEvents::SEVERITY_TONE[$sev] }}" href="{{ route('security.index', ['ev' => $code]) }}#secevents" title="{{ $code }}">{{ $lbl }} {{ $n }}</a>
+            @php [$lbl, $sev] = \App\Support\Security\SecurityEvents::CODES[$code]; @endphp
+            <a class="bdg {{ \App\Support\Security\SecurityEvents::SEVERITY_TONE[$sev] }}" href="{{ route('security.index', ['ev' => $code]) }}#secevents" title="{{ $code }}">{{ $lbl }} {{ $n }}</a>
         @endforeach
     </div>
     <div class="tblwrap"><table class="tbl">

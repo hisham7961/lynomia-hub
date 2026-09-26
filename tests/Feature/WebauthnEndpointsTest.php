@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\WebauthnCredential;
-use App\Support\StepUp;
-use App\Support\Webauthn;
+use App\Support\Security\StepUp;
+use App\Support\Security\Webauthn;
 use Tests\TestCase;
 
 /**

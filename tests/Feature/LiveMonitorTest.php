@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Server;
 use App\Models\Website;
-use App\Support\Uptime;
+use App\Support\Ops\Uptime;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 

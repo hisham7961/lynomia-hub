@@ -2,7 +2,7 @@
      مُصفَّحاً، وتبنّي الإصدارات الحقيقيّ. يُعيد استعمالَ سجلِّ التدقيق وSecurityEvents —
      لا مخزنَ ثانٍ، لا سرّ. قيمٌ حقيقيّةٌ فقط (صادقٌ فارغٌ قبل الإطلاق). --}}
 @php
-    use App\Support\MobilePlatform;
+    use App\Support\Mobile\MobilePlatform;
     $dt = fn ($v) => $v ? \Illuminate\Support\Carbon::parse($v)->format('m-d H:i') : '—';
     $sevTone = fn ($s) => ['high' => 'bad', 'warning' => 'wn', 'notice' => 'i', 'info' => 'g'][$s] ?? 'g';
     $outTone = fn ($o) => ['success' => 'ok', 'failed' => 'bad', 'denied' => 'wn'][$o] ?? 'g';

@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Dashboard;
-use App\Support\WidgetRegistry;
+use App\Support\Platform\WidgetRegistry;
 use Illuminate\Http\Request;
 
 /**
@@ -127,7 +127,7 @@ class DashboardController extends Controller
          * الصندوقُ الموحّد — وهو يجمع الإجازاتِ والاعتماداتِ والتواقيعَ وغيرَها.
          */
         try {
-            if ($n = \App\Support\Inbox::count($user)) {
+            if ($n = \App\Support\Collaboration\Inbox::count($user)) {
                 return "بانتظار تصرّفك {$n} " . ($n > 2 ? 'بنود' : 'بند')
                     . ' في «بوابتي» — افتح الصندوق الموحّد.';
             }

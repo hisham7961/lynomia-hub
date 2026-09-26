@@ -4,7 +4,7 @@ namespace App\Support\Ai\Routing;
 
 use App\Models\AiModel;
 use App\Models\AiProfile;
-use App\Support\Redactor;
+use App\Support\Platform\Redactor;
 
 /**
  * **رحلةُ طلبٍ واحدةٍ عبر سلسلةِ غرض** (المرحلة ٢ · W7 · §٨).

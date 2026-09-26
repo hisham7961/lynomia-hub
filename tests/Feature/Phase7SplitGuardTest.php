@@ -118,7 +118,7 @@ class Phase7SplitGuardTest extends TestCase
 
         // والمصدرُ نفسُه: لا العرضُ ولا القارئُ يمسّان جدولَ الزيارات
         foreach ([resource_path('views/portal/_work.blade.php'),
-                  \Tests\Support\Source::path(\App\Support\ExecutionStats::class)] as $src) {
+                  \Tests\Support\Source::path(\App\Support\Workforce\ExecutionStats::class)] as $src) {
             $this->assertStringNotContainsString('page_visits', file_get_contents($src),
                 basename($src) . ' يقرأ الزيارات');
         }

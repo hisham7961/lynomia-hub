@@ -6,7 +6,7 @@ use App\Models\Company;
 use App\Models\Contract;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\Workspaces;
+use App\Support\Platform\Workspaces;
 use Tests\TestCase;
 
 /**

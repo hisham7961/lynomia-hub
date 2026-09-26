@@ -43,15 +43,15 @@
             <label class="vh" for="st">تصفية بالحالة</label>
             <select class="inp" id="st" name="st" onchange="this.form.submit()">
                 <option value="">كل الحالات</option>
-                @foreach (\App\Support\SecurityFindings::STATUSES as $sfK => $sfL)
+                @foreach (\App\Support\Security\SecurityFindings::STATUSES as $sfK => $sfL)
                     <option value="{{ $sfK }}" @selected($st === $sfK)>{{ $sfL }}</option>
                 @endforeach
             </select>
             <label class="vh" for="sev">تصفية بالشدّة</label>
             <select class="inp" id="sev" name="sev" onchange="this.form.submit()">
                 <option value="">كل الشدّات</option>
-                @foreach (\App\Support\Severity::LEVELS as $sfLv)
-                    <option value="{{ $sfLv }}" @selected($sev === $sfLv)>{{ \App\Support\Severity::LABELS[$sfLv] }}</option>
+                @foreach (\App\Support\Platform\Severity::LEVELS as $sfLv)
+                    <option value="{{ $sfLv }}" @selected($sev === $sfLv)>{{ \App\Support\Platform\Severity::LABELS[$sfLv] }}</option>
                 @endforeach
             </select>
         </form>
@@ -63,7 +63,7 @@
         foreach ($rows as $sfF) {
             $sfEv = json_decode((string) $sfF->evidence, true) ?: [];
             $sfActs = '<span class="bdg ' . (['open' => 'bad', 'acknowledged' => 'wn', 'resolved' => 'ok', 'ignored' => 'g'][$sfF->status] ?? 'g') . '">'
-                . e(\App\Support\SecurityFindings::STATUSES[$sfF->status] ?? $sfF->status) . '</span>';
+                . e(\App\Support\Security\SecurityFindings::STATUSES[$sfF->status] ?? $sfF->status) . '</span>';
             if (! empty($isOwner)) $sfActs .= ' ' . view('security.parts.finding_actions', ['f' => $sfF])->render();
             $sfRows[] = [
                 'sev' => $sfF->severity, 'title' => $sfF->title, 'why' => $sfF->description,

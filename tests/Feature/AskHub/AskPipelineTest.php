@@ -17,7 +17,7 @@ use App\Support\Ai\Gateway\AiGateway;
 use App\Support\Ai\Routing\AiProfiles;
 use App\Support\Ai\Ask\AskTools;
 use App\Support\Ai\Ask\NullAskGenerator;
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -94,7 +94,7 @@ class AskPipelineTest extends TestCase
         // الصوابُ في الإنتاج (طلبٌ واحدٌ لا يُعيد اشتقاقَ مئةِ قدرة)، لكنّه
         // **يعبر بين أصنافِ الاختبارِ في العمليّةِ الواحدة**: صنفٌ سابقٌ حسم
         // «ai.assistant» وبوّابتُه غيرُ مهيّأة، فتبقى مُطفأةً هنا مهما ضبطنا.
-        \App\Support\FeatureRegistry::flush();
+        \App\Support\Platform\FeatureRegistry::flush();
 
         AiProfiles::seed();
 

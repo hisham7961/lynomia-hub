@@ -17,7 +17,7 @@
             ->whereNotIn('state', ['مدفوعة', 'ملغاة', 'مسودة'])->count(),
         'assets' => \App\Models\Asset::whereNull('deleted_at')->where('client_id', $row->id)->count(),
     ];
-    $cHealth = \App\Support\Engagements::health($row);
+    $cHealth = \App\Support\Finance\Engagements::health($row);
 @endphp
 <div class="card">
     <h3 class="cardtitle">🧭 العميل ٣٦٠°

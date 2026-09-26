@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
-use App\Support\WebhookDispatcher;
+use App\Support\Ops\WebhookDispatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;

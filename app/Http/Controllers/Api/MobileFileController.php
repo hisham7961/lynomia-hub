@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Middleware\ResolveChunkedUploads;
 use App\Models\Attachment;
-use App\Support\Api;
-use App\Support\AttachmentService;
-use App\Support\ChunkedUpload;
+use App\Support\Platform\Api;
+use App\Support\Collaboration\AttachmentService;
+use App\Support\Collaboration\ChunkedUpload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -28,11 +28,11 @@ use Symfony\Component\HttpFoundation\Response;
  *    الجوال (`Idempotency::owner` ⇒ `mobile_session->id` · Critic F1) — لدفعةِ النقاط
  *    (F.4) وإتمامِ الرفع (F.1) كي لا تُضاعف إعادةُ المحاولة نقاطاً أو مرفقاً.
  *
- * **جوهرُ الملفّات (F.1/F.2):** يُعاد استعمالُ `App\Support\AttachmentService` — لا
+ * **جوهرُ الملفّات (F.1/F.2):** يُعاد استعمالُ `App\Support\Collaboration\AttachmentService` — لا
  * نسخةَ منطقٍ ثانية (Critic F2): `validateUpload` + `guardRecord(...,'v')` +
  * `filesFromRequest` + `attach` (قائمةُ الكتابة البيضاء + البصمةُ sha256 + القرصُ
  * الخاصّ `local` — لا base64 ولا رابطٌ عامّ) + `download`/`stream` (حاجزُ الإصابة +
- * سجلُّ الوصول + التدقيق). **الرفعُ المقطَّعُ يُعاد استعمالُ `App\Support\ChunkedUpload`**
+ * سجلُّ الوصول + التدقيق). **الرفعُ المقطَّعُ يُعاد استعمالُ `App\Support\Collaboration\ChunkedUpload`**
  * (لا جدولَ جديد — القرارُ موثَّق): `append` للقطعة و`claim` للتجميع، وعلامةُ
  * `ResolveChunkedUploads::FLAG` تُرفع في «الإتمام» كي يرفع `hub_upload_cap` سقفَ
  * الطلب الواحد عن الملفّ المجمَّع.

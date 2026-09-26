@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\WebauthnCredential;
-use App\Support\StepUp;
-use App\Support\Webauthn;
+use App\Support\Security\StepUp;
+use App\Support\Security\Webauthn;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -194,7 +194,7 @@ class PasskeyController extends Controller
             return response()->json(['ok' => false, 'error' => 'انتهت صلاحية الحساب'], 403);
         }
         if ($u->allowed_ips && ! ip_allowed((string) $r->ip(), (string) $u->allowed_ips)) {
-            \App\Support\SecurityRadar::record($r, 'وصول مرفوض', 'مفتاح مرور من عنوان خارج القائمة');
+            \App\Support\Security\SecurityRadar::record($r, 'وصول مرفوض', 'مفتاح مرور من عنوان خارج القائمة');
             return response()->json(['ok' => false, 'error' => 'الدخول من هذا العنوان غير مسموح لهذا الحساب'], 403);
         }
 

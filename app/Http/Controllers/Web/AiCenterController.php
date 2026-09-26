@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Support\Ai\Gateway\AiGateway;
-use App\Support\ConnectionProbe;
-use App\Support\Settings;
+use App\Support\Ops\ConnectionProbe;
+use App\Support\Platform\Settings;
 use Illuminate\Http\Request;
 
 /**

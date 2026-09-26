@@ -10,7 +10,7 @@ use App\Support\Ai\Auditor\Detectors\MeetingCommitments;
 use App\Support\Ai\Auditor\Detectors\RepeatedBlocker;
 use App\Support\Ai\Auditor\Detectors\ReportQuality;
 use App\Support\Ai\Auditor\Detectors\SemanticBlocker;
-use App\Support\Redactor;
+use App\Support\Platform\Redactor;
 use Illuminate\Support\Facades\Schema;
 
 /**

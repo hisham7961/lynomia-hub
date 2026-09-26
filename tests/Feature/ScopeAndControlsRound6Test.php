@@ -66,13 +66,13 @@ class ScopeAndControlsRound6Test extends TestCase
 
         $this->actingAs($u);
 
-        $pulse = \App\Support\Innovation::pulse();
+        $pulse = \App\Support\Insights\Innovation::pulse();
         $this->assertSame(1, $pulse['n'],
             'نبضُ الابتكار يعدّ أفكاراً خارج نطاق القارئ — القائمةُ منطَّقة والنبضُ فوقها ليس كذلك');
         $this->assertSame(0, $pulse['scored'], 'النبضُ يقيس أفكاراً لا يراها');
         $this->assertSame(1, $pulse['people']);
 
-        $names = collect(\App\Support\Innovation::contributors())->pluck('id')->all();
+        $names = collect(\App\Support\Insights\Innovation::contributors())->pluck('id')->all();
         $this->assertSame([$u->id], $names,
             'لوحةُ المساهمين تكشف مقترِحاً من مشروعٍ خارج النطاق');
 
@@ -96,7 +96,7 @@ class ScopeAndControlsRound6Test extends TestCase
             ['hr' => ['iqamaExp' => 'hide', 'passExp' => 'hide']]));
 
         // البطاقاتُ مجمَّعةٌ بالقسم — تُسطَّح قبل البحث
-        $arr = json_decode(json_encode(\App\Support\TeamDirectory::cards($u), JSON_UNESCAPED_UNICODE), true);
+        $arr = json_decode(json_encode(\App\Support\Workforce\TeamDirectory::cards($u), JSON_UNESCAPED_UNICODE), true);
         $card = collect($arr)->flatten(1)->firstWhere('name', 'موظفُ الإقامة');
         $this->assertNotNull($card, 'البطاقةُ غائبة — الاختبارُ يمرّ فراغاً لا حراسة');
 
@@ -122,7 +122,7 @@ class ScopeAndControlsRound6Test extends TestCase
         $old = Employee::create(['name' => 'مديرٌ قديم', 'status' => 'نشط']);
         Employee::create(['name' => 'مرؤوسٌ قديم', 'status' => 'نشط', 'manager_id' => $old->id]);
 
-        $arr = json_decode(json_encode(\App\Support\TeamDirectory::cards($this->owner), JSON_UNESCAPED_UNICODE), true);
+        $arr = json_decode(json_encode(\App\Support\Workforce\TeamDirectory::cards($this->owner), JSON_UNESCAPED_UNICODE), true);
         $cards = collect($arr)->flatten(1);
         $card = $cards->firstWhere('name', 'مرؤوس');
         $this->assertNotNull($card, 'البطاقةُ غائبة — الاختبارُ يمرّ فراغاً لا حراسة');
@@ -137,13 +137,13 @@ class ScopeAndControlsRound6Test extends TestCase
 
     public function test_totp_never_verifies_against_an_empty_secret(): void
     {
-        $this->assertFalse(\App\Support\Totp::verify('', \App\Support\Totp::code('')),
+        $this->assertFalse(\App\Support\Security\Totp::verify('', \App\Support\Security\Totp::code('')),
             'Totp::verify تفشل مفتوحةً على سرٍّ فارغ — رمزٌ يحسبه أيُّ أحد يفتح الحساب');
-        $this->assertFalse(\App\Support\Totp::verify('', '000000'));
+        $this->assertFalse(\App\Support\Security\Totp::verify('', '000000'));
 
         // والسرُّ الحقيقيّ يبقى يعمل
-        $secret = \App\Support\Totp::secret();
-        $this->assertTrue(\App\Support\Totp::verify($secret, \App\Support\Totp::code($secret)),
+        $secret = \App\Support\Security\Totp::secret();
+        $this->assertTrue(\App\Support\Security\Totp::verify($secret, \App\Support\Security\Totp::code($secret)),
             'الحارسُ كسر التحقق السليم');
     }
 

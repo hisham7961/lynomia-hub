@@ -10,8 +10,8 @@ use App\Support\Ai\Center\AiOverview;
 use App\Support\Ai\Routing\AiProfiles;
 use App\Support\Ai\Ask\AskGeneratorFactory;
 use App\Support\Ai\Ask\AskPolicy;
-use App\Support\FeatureRegistry;
-use App\Support\Settings;
+use App\Support\Platform\FeatureRegistry;
+use App\Support\Platform\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

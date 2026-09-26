@@ -110,7 +110,7 @@ class RoleController extends Controller
         // هذا الدور؟»، ولا موضعَ في المنتجِ يقول «مَن يكتب في هذه الوحدة؟».
         // فقاست محاكاةُ الشهرِ ٦١ وحدةً من ٨٥ كاتبُها واحدٌ أو اثنان من ٣١،
         // و٤٩ منها فارغةٌ بعد شهرٍ كامل — وما لا يُرى لا يُقرَّر فيه.
-        $coverage = collect(\App\Support\PermissionInspector::moduleCoverage())
+        $coverage = collect(\App\Support\Security\PermissionInspector::moduleCoverage())
             ->sortBy([fn ($a, $b) => $a['writers'] <=> $b['writers'],
                       fn ($a, $b) => $a['label'] <=> $b['label']]);
 
@@ -121,7 +121,7 @@ class RoleController extends Controller
          * والتصنيفُ **للضيّقِ وحدَه** فلا يُقرأ جدولُ الوحداتِ كلِّها.
          */
         $triage = $coverage->filter(fn ($c) => $c['thin'])
-            ->map(fn ($c, $mk) => \App\Support\PermissionInspector::narrowness($mk));
+            ->map(fn ($c, $mk) => \App\Support\Security\PermissionInspector::narrowness($mk));
 
         return view('roles.index', ['roles' => $roles, 'reach' => $roles->mapWithKeys(
             fn ($r) => [$r->id => self::reach($r)]), 'coverage' => $coverage, 'triage' => $triage]);

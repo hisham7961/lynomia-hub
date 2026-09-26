@@ -151,18 +151,18 @@ class DiffAuditConfirmedRound7Test extends TestCase
         Cache::flush();
 
         $this->actingAs($this->owner);
-        $ownerView = \App\Support\DigitalAssets::all(true);
+        $ownerView = \App\Support\Assets\DigitalAssets::all(true);
 
         $this->actingAs($isolated);
-        $isoView = \App\Support\DigitalAssets::all();
+        $isoView = \App\Support\Assets\DigitalAssets::all();
 
         $this->assertNotSame(
-            \App\Support\DigitalAssets::class . '|' . json_encode($ownerView['at']),
-            \App\Support\DigitalAssets::class . '|null',
+            \App\Support\Assets\DigitalAssets::class . '|' . json_encode($ownerView['at']),
+            \App\Support\Assets\DigitalAssets::class . '|null',
             'حارسُ سلامة');
 
         // المفتاحُ نفسُه لا يخدم قارئين مختلفَي النطاق
-        $src = (string) \Tests\Support\Source::read(\App\Support\DigitalAssets::class);
+        $src = (string) \Tests\Support\Source::read(\App\Support\Assets\DigitalAssets::class);
         $this->assertStringNotContainsString("Cache::remember('da:all'", $src,
             'مفتاحُ خبيئةٍ عامٌّ واحد يخدم كلَّ القرّاء — فأوّلُ من يسخّنه يفرض '
             . 'رؤيتَه على من لا يرى ما رأى، ويُلغى تنطيقُ صحّة الخزنة كلُّه');

@@ -46,7 +46,7 @@ class MorningOpsTest extends TestCase
     public function test_owner_only_operational_alerts(): void
     {
         $this->seedCore();
-        \App\Support\ErrorLog::capture('php', 'خطأ للاختبار', '/x.php', 1);
+        \App\Support\Ops\ErrorLog::capture('php', 'خطأ للاختبار', '/x.php', 1);
 
         $this->actingAs($this->owner)->get('/morning')->assertOk()->assertSee('تنبيهات تشغيلية وأمنية');
         $this->actingAs($this->employee)->get('/morning')->assertOk()->assertDontSee('تنبيهات تشغيلية وأمنية');

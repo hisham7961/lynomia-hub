@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\KeyResult;
 use App\Models\Objective;
-use App\Support\OkrCentre;
+use App\Support\Insights\OkrCentre;
 use Tests\TestCase;
 
 /**

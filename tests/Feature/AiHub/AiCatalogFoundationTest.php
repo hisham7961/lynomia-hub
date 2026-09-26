@@ -4,7 +4,7 @@ namespace Tests\Feature\AiHub;
 
 use App\Support\Ai\Catalog\AiCatalog;
 use PHPUnit\Framework\Attributes\DataProvider;
-use App\Support\Tri;
+use App\Support\Platform\Tri;
 use Tests\TestCase;
 
 /**

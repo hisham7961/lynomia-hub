@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Meeting;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\Inbox;
+use App\Support\Collaboration\Inbox;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

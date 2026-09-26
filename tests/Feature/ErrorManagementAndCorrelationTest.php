@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Client;
 use App\Models\ErrorEvent;
-use App\Support\ErrorLog;
-use App\Support\ErrorTaxonomy;
+use App\Support\Ops\ErrorLog;
+use App\Support\Ops\ErrorTaxonomy;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
@@ -123,7 +123,7 @@ class ErrorManagementAndCorrelationTest extends TestCase
         $this->assertSame($rid, DB::table('notifications_hub')->where('user_id', $this->employee->id)->value('request_id'), 'الإشعار');
 
         // والسلسلةُ التدقيقية سليمة: request_id ليس من الأعمدة المختومة فلا يمسّها
-        $this->assertTrue(\App\Support\Audit::verifyTail()['ok']);
+        $this->assertTrue(\App\Support\Platform\Audit::verifyTail()['ok']);
 
         // (WP-1.4) والمنعُ والحادثةُ يحملان معرّفَ طلبِهما كذلك — الأثرُ يكتمل عبر الطبقات السبع
         $deny = $this->actingAs($this->employee)->get('/admin/errors');

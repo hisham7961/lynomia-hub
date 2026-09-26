@@ -69,7 +69,7 @@ class FileController extends Controller
          */
         if ($att = \App\Models\Attachment::withTrashed()
             ->where(fn ($w) => $w->where('path', $path)->orWhere('thumb_path', $path))->first()) {
-            \App\Support\DocumentPolicy::authorize(auth()->user(), $att,
+            \App\Support\Documents\DocumentPolicy::authorize(auth()->user(), $att,
                 $r->boolean('dl') ? 'download' : 'preview');
         }
 

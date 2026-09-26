@@ -8,8 +8,8 @@ use App\Models\Employee;
 use App\Models\Project;
 use App\Models\User;
 use App\Models\WorkUpdate;
-use App\Support\DailyWorkCompliance;
-use App\Support\ReportReview;
+use App\Support\Workforce\DailyWorkCompliance;
+use App\Support\Workforce\ReportReview;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -63,7 +63,7 @@ class ReportsController extends Controller
     public function index(Request $r)
     {
         $this->guardTeam();
-        $date = $this->validDate($r->query('date')) ?: \App\Support\BusinessDate::today();
+        $date = $this->validDate($r->query('date')) ?: \App\Support\Platform\BusinessDate::today();
 
         $emps = hub_company_scope(hub_scope(Employee::query(), 'hr'), 'hr')
             ->whereNull('deleted_at')->where('status', 'نشط');
@@ -115,7 +115,7 @@ class ReportsController extends Controller
         abort_unless(hub_company_scope(hub_scope(Employee::query(), 'hr'), 'hr')
             ->whereKey($emp->id)->exists(), 404);
 
-        $date = $this->validDate($r->query('date')) ?: \App\Support\BusinessDate::today();
+        $date = $this->validDate($r->query('date')) ?: \App\Support\Platform\BusinessDate::today();
         $c = DailyWorkCompliance::resolve($emp, $date);
 
         // بنودُ اليوم — مع المشروع والمهمّة (§68 · بلا N+1)
@@ -331,7 +331,7 @@ class ReportsController extends Controller
     {
         $this->guardInternal();
         $u = auth()->user();
-        $emp = \App\Support\Workday::emp($u);
+        $emp = \App\Support\Workforce\Workday::emp($u);
         // لا ملفَ موظّفٍ نشطٍ (كالمالك/الإدارة): لا نصفعُه بـ٤٠٣ — هذه الصفحةُ لتقريرِ
         // الموظّفِ الذاتيّ لا لحسابه. نوجّهه بلطفٍ إلى ما يخصُّه بحسب صلاحيّته (§66/§34).
         if (! $emp) {
@@ -343,7 +343,7 @@ class ReportsController extends Controller
             return redirect()->route('dashboard')->with('err', $msg);
         }
 
-        $date = $this->validDate($r->query('date')) ?: \App\Support\BusinessDate::today();
+        $date = $this->validDate($r->query('date')) ?: \App\Support\Platform\BusinessDate::today();
         $c = DailyWorkCompliance::resolve($emp, $date);
         $entries = WorkUpdate::with(['project:id,name', 'task:id,title'])
             ->whereNull('deleted_at')->where('created_by', auth()->id())
@@ -358,13 +358,13 @@ class ReportsController extends Controller
     public function monthly(Request $r)
     {
         $this->guardMonthly();
-        $month = \App\Support\MonthlyAttendance::normMonth($r->query('month'));
+        $month = \App\Support\Workforce\MonthlyAttendance::normMonth($r->query('month'));
         $emps = $this->monthlyEmployees()->orderBy('name')->limit(1000)->get(['id', 'name', 'dept', 'user_id', 'company_id']);
-        $summary = \App\Support\MonthlyAttendance::summary($emps, $month);
+        $summary = \App\Support\Workforce\MonthlyAttendance::summary($emps, $month);
 
         return view('reports.monthly', [
             'month' => $month, 'rows' => $summary['rows'],
-            'days' => count(\App\Support\MonthlyAttendance::daysOf($month)),
+            'days' => count(\App\Support\Workforce\MonthlyAttendance::daysOf($month)),
             'canExport' => true,
         ]);
     }
@@ -375,9 +375,9 @@ class ReportsController extends Controller
         $this->guardMonthly();
         $emp = Employee::whereNull('deleted_at')->whereKey($r->query('emp'))->firstOrFail();
         abort_unless($this->monthlyEmployees()->whereKey($emp->id)->exists(), 404);
-        $month = \App\Support\MonthlyAttendance::normMonth($r->query('month'));
+        $month = \App\Support\Workforce\MonthlyAttendance::normMonth($r->query('month'));
 
-        return view('reports.monthly-employee', \App\Support\MonthlyAttendance::sheet($emp, $month));
+        return view('reports.monthly-employee', \App\Support\Workforce\MonthlyAttendance::sheet($emp, $month));
     }
 
     /**
@@ -417,8 +417,8 @@ class ReportsController extends Controller
                 . ' أو يُمنح دورُك مفتاحَ «تصدير خارج الدوام» (exportNight) لإقفالٍ ليليٍّ مشروع');
         }
 
-        $month = \App\Support\MonthlyAttendance::normMonth($r->query('month'));
-        $dates = \App\Support\MonthlyAttendance::daysOf($month);
+        $month = \App\Support\Workforce\MonthlyAttendance::normMonth($r->query('month'));
+        $dates = \App\Support\Workforce\MonthlyAttendance::daysOf($month);
         $payroll = $r->query('mode') === 'payroll';
 
         // Permissions 360 · 17.3 — أعمدةُ الموظفِ تستشير نمطَ الحقل (نظيرَ CSV الوحدات):
@@ -440,7 +440,7 @@ class ReportsController extends Controller
         $emps = $empQ->orderBy('name')->orderBy('id')->limit(1000)->get($cols);
 
         // عدُّ الصفوفِ المُصدَّرةِ فعلاً (نفسُ شرطِ البثِّ أدناه) — لعتبةِ التصعيدِ وبصمةِ التدقيق
-        $range = $payroll ? [] : \App\Support\DailyWorkCompliance::resolveRange($emps, $dates);
+        $range = $payroll ? [] : \App\Support\Workforce\DailyWorkCompliance::resolveRange($emps, $dates);
         $rowCount = $emps->count();
         if (! $payroll) {
             $rowCount = 0;
@@ -510,7 +510,7 @@ class ReportsController extends Controller
      */
     protected function monthlyPayrollCsv($emps, string $month, bool $nameHidden, bool $deptHidden, bool $salaryHidden)
     {
-        $rows = \App\Support\MonthlyAttendance::summary($emps, $month)['rows'];
+        $rows = \App\Support\Workforce\MonthlyAttendance::summary($emps, $month)['rows'];
 
         $headers = ['الموظف', 'معرّف الموظف', 'القسم', 'أيام العمل', 'أيام الحضور',
             'غياب بلا عذر', 'غياب لعدم التقرير', 'أيام الإجازة', 'مجموع الساعات',

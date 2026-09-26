@@ -98,7 +98,7 @@
 
         <div class="sub" style="margin-top:10px;line-height:2">
             🛡️ التحقق بخطوتين: <b>{{ $u->totp_enabled ? 'مفعَّل' : 'غير مفعَّل' }}</b> — يفعّله صاحب الحساب من ملفه الشخصي.
-            @if ($u->totp_enabled && $u->id !== auth()->id() && \App\Support\Staff::mayTouch($u))
+            @if ($u->totp_enabled && $u->id !== auth()->id() && \App\Support\Workforce\Staff::mayTouch($u))
                 {{-- بابُ استرداد: إطفاؤه من ملفه الشخصي يشترط رمزاً من الجهاز
                      المفقود نفسِه، فمن ضاع هاتفُه كان مقفولاً خارج النظام أبداً --}}
                 <form method="POST" action="{{ route('users.twofa.off', $u) }}" class="inline"
@@ -114,7 +114,7 @@
             @php $isLocked = $u->locked_until && \Illuminate\Support\Carbon::parse($u->locked_until)->gt(now()); @endphp
             🔒 قفلُ محاولاتِ الدخول:
             <b>{{ $isLocked ? 'مقفول حتى ' . \Illuminate\Support\Carbon::parse($u->locked_until)->format('H:i') : 'غير مقفول' }}</b>
-            @if ($isLocked && \App\Support\Staff::mayTouch($u))
+            @if ($isLocked && \App\Support\Workforce\Staff::mayTouch($u))
                 <form method="POST" action="{{ route('users.unlock', $u) }}" class="inline"
                       data-confirm="فكُّ قفلِ «{{ $u->name }}»؟ يعود للدخولِ بكلمته فوراً، ويُسجَّل الفكُّ باسمك.">
                     @csrf<button class="btn ghost xs dn">🔓 فُكَّ القفل</button>

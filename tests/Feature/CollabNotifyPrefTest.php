@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Conversation;
 use App\Models\ConversationMember;
 use App\Models\HubNotification;
-use App\Support\CommentService;
+use App\Support\Collaboration\CommentService;
 use Tests\TestCase;
 
 /**

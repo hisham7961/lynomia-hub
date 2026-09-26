@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\SalesBoard;
+use App\Support\Finance\SalesBoard;
 
 /**
  * لوحةُ المبيعات وتحليلاتُ العروض (CPQ د) — للمالكين ولحاملي المراقبة، بنمطِ

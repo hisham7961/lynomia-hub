@@ -41,7 +41,7 @@ class OdooReadPathGuardTest extends TestCase
 
     public function test_every_odoo_setting_read_lives_in_the_connection_factory(): void
     {
-        $allowed = [\Tests\Support\Source::path(\App\Support\Odoo::class)];
+        $allowed = [\Tests\Support\Source::path(\App\Support\Ops\Odoo::class)];
         $bad = [];
         foreach ($this->files([app_path(), resource_path('views')]) as $f) {
             if (in_array($f, $allowed, true)) continue;
@@ -57,7 +57,7 @@ class OdooReadPathGuardTest extends TestCase
 
     public function test_jsonrpc_calls_exist_only_in_the_client(): void
     {
-        $allowed = [\Tests\Support\Source::path(\App\Support\Odoo::class)];
+        $allowed = [\Tests\Support\Source::path(\App\Support\Ops\Odoo::class)];
         $bad = [];
         foreach ($this->files([app_path()]) as $f) {
             if (in_array($f, $allowed, true)) continue;
@@ -85,7 +85,7 @@ class OdooReadPathGuardTest extends TestCase
      */
     public function test_odoo_client_never_calls_write_methods(): void
     {
-        $src = $this->src(\Tests\Support\Source::path(\App\Support\Odoo::class));
+        $src = $this->src(\Tests\Support\Source::path(\App\Support\Ops\Odoo::class));
 
         preg_match_all("/->call\(\s*'[^']+'\s*,\s*'([^']+)'/", $src, $m);
         $this->assertNotEmpty($m[1], 'لا نداءات في العميل — تغيّر شكلُه فحدّث الحارس');

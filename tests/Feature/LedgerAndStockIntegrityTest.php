@@ -11,7 +11,7 @@ use App\Models\Purchase;
 use App\Models\Station;
 use App\Models\StockItem;
 use App\Models\StockMove;
-use App\Support\Custody;
+use App\Support\Assets\Custody;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

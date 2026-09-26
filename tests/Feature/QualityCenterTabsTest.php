@@ -9,11 +9,11 @@ use App\Models\Objective;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
-use App\Support\CeoBoard;
-use App\Support\DataQuality;
-use App\Support\ExecutionStats;
-use App\Support\KpiCentre;
-use App\Support\TimeRange;
+use App\Support\Insights\CeoBoard;
+use App\Support\Insights\DataQuality;
+use App\Support\Workforce\ExecutionStats;
+use App\Support\Insights\KpiCentre;
+use App\Support\Platform\TimeRange;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
 

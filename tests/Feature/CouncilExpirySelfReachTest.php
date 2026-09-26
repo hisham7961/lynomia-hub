@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\Workspaces;
+use App\Support\Platform\Workspaces;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Tests\TestCase;

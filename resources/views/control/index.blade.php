@@ -6,7 +6,7 @@
      وتحتها صفُّ «يستدعي تدخّلك». لا تفصيلَ يُكرَّر هنا، ولا رقمَ يُحسب هنا —
      وكلُّ ما لا يقيسه محرّكُه يُكتب «—» لا صفراً. --}}
 @php
-    use App\Support\AttentionQueue;
+    use App\Support\Insights\AttentionQueue;
     $ccOrder = ['security', 'operations', 'errors', 'audit', 'quality', 'execution'];
     $ccShown = collect($ccOrder)->map(fn ($k) => $cards[$k] ?? null)
         ->filter(fn ($c) => $c && ! empty($c['visible']))->values();

@@ -9,7 +9,7 @@
         fn () => rescue(fn () => \App\Http\Controllers\Web\OpsController::dependencyCards($health), [], false),
         [], true);
     $depCards = $depW['data'];
-    $upTargets = rescue(fn () => \App\Support\Uptime::enabled(), [], false);
+    $upTargets = rescue(fn () => \App\Support\Ops\Uptime::enabled(), [], false);
     $upRange = hub_range(request(), '30d');
 @endphp
 
@@ -44,7 +44,7 @@
         @include('partials.empty', ['text' => 'لا أهدافَ مراقبةً بعد — فعِّل «المراقبة الحيّة» على سيرفر أو موقع من بطاقته، وسيبدأ القياس من الآن', 'icon' => '📡'])
     @else
         @foreach ($upTargets as [$upMk, $upRow])
-            @php $upH = \App\Support\Uptime::history($upMk, (string) $upRow->id, $upRange); @endphp
+            @php $upH = \App\Support\Ops\Uptime::history($upMk, (string) $upRow->id, $upRange); @endphp
             <div style="margin-bottom:10px">
                 <b>{{ $upRow->name ?? $upRow->id }}</b>
                 @if ($upH['live'] === true)<span class="bdg ok">يعمل الآن</span>

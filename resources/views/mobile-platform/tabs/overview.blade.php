@@ -1,10 +1,10 @@
 {{-- نظرةٌ عامّة (spec §7/§56): مؤشّراتٌ حقيقيّة + حالةُ التهيئة الصادقة (تكشف ما يحتاج
      ضبطاً) + بطاقةُ الجاهزية. قيمٌ حقيقيّةٌ فقط — لا بيانات وهميّة. --}}
 @php
-    $tone = fn ($s) => \App\Support\MobilePlatform::TONE[$s] ?? 'g';
-    $lbl  = fn ($s) => \App\Support\MobilePlatform::LABEL[$s] ?? $s;
-    $R = \App\Support\MobilePlatform::READY;
-    $NC = \App\Support\MobilePlatform::NOT_CONFIGURED;
+    $tone = fn ($s) => \App\Support\Mobile\MobilePlatform::TONE[$s] ?? 'g';
+    $lbl  = fn ($s) => \App\Support\Mobile\MobilePlatform::LABEL[$s] ?? $s;
+    $R = \App\Support\Mobile\MobilePlatform::READY;
+    $NC = \App\Support\Mobile\MobilePlatform::NOT_CONFIGURED;
 @endphp
 
 @include('partials.cc.kpis', ['items' => [

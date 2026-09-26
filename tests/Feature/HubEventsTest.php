@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Contract;
 use App\Models\FinDocument;
 use App\Models\Task;
-use App\Support\HubEvents;
+use App\Support\Platform\HubEvents;
 use Tests\TestCase;
 
 /**
@@ -174,7 +174,7 @@ class HubEventsTest extends TestCase
         ]);
 
         $t = Task::create(['title' => 'مهمة', 'status' => 'منجزة']);
-        \App\Support\FlowRunner::fire('status', 'tasks', $t, 'منجزة');
+        \App\Support\Platform\FlowRunner::fire('status', 'tasks', $t, 'منجزة');
 
         $this->assertSame(1, (int) $flow->fresh()->runs, 'المسار الدلالي لم يُنفَّذ');
     }
@@ -209,7 +209,7 @@ class HubEventsTest extends TestCase
         $seen = []; $this->record($seen);
 
         $t = Task::create(['title' => 'مهمة', 'status' => 'مكتملة']);
-        \App\Support\FlowRunner::fire('status', 'tasks', $t, 'مكتملة');
+        \App\Support\Platform\FlowRunner::fire('status', 'tasks', $t, 'مكتملة');
 
         $this->assertContains('status', $seen);
         $this->assertContains('task.completed', $seen);

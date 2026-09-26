@@ -8,10 +8,10 @@ use App\Http\Controllers\Web\DmController;
 use App\Models\Comment;
 use App\Models\HubNotification;
 use App\Models\User;
-use App\Support\Api;
-use App\Support\CommentService;
-use App\Support\DmService;
-use App\Support\NotificationLink;
+use App\Support\Platform\Api;
+use App\Support\Collaboration\CommentService;
+use App\Support\Collaboration\DmService;
+use App\Support\Collaboration\NotificationLink;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -190,8 +190,8 @@ class MobileCommController extends V1Controller
         // داخليّةٌ هو عضوٌ فيها خطأً تبقى 404 · نظيرُ بوّابة الويب حرفاً)
         if ($isClient && $module === 'channel') {
             $clientRoom = \App\Models\Conversation::whereKey($recordId)
-                ->whereIn('kind', \App\Support\ClientPortalData::CLIENT_CONV_KINDS)
-                ->whereIn('audience', \App\Support\ClientPortalData::CLIENT_AUDIENCES)
+                ->whereIn('kind', \App\Support\Collaboration\ClientPortalData::CLIENT_CONV_KINDS)
+                ->whereIn('audience', \App\Support\Collaboration\ClientPortalData::CLIENT_AUDIENCES)
                 ->whereNull('deleted_at')->exists();
             if (! $clientRoom) {
                 return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'غير موجود');
@@ -266,8 +266,8 @@ class MobileCommController extends V1Controller
             [$conv] = ConversationController::guardConversation($convId, 'post');   // الضيفُ لا يكتب (403)
             // عميلٌ يكتب في غرفةٍ عميليّةِ الجمهور حصراً — الداخليّةُ 404 ولو كان عضواً
             if ($isClient && (
-                ! in_array((string) $conv->kind, \App\Support\ClientPortalData::CLIENT_CONV_KINDS, true)
-                || ! in_array((string) $conv->audience, \App\Support\ClientPortalData::CLIENT_AUDIENCES, true))) {
+                ! in_array((string) $conv->kind, \App\Support\Collaboration\ClientPortalData::CLIENT_CONV_KINDS, true)
+                || ! in_array((string) $conv->audience, \App\Support\Collaboration\ClientPortalData::CLIENT_AUDIENCES, true))) {
                 return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'غير موجود');
             }
             [$module, $recordId] = ['channel', (string) $conv->id];

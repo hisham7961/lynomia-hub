@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Support\PayrollMonth;
+use App\Support\Workforce\PayrollMonth;
 use Illuminate\Console\Command;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;

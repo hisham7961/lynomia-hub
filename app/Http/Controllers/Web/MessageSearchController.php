@@ -7,7 +7,7 @@ use App\Models\Comment;
 use App\Models\ConversationMember;
 use App\Models\DmMessage;
 use App\Models\User;
-use App\Support\MessageLink;
+use App\Support\Collaboration\MessageLink;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 

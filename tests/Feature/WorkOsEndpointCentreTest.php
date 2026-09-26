@@ -8,7 +8,7 @@ use App\Models\EndpointDevice;
 use App\Models\EndpointPolicy;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\Es256;
+use App\Support\Security\Es256;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -19,7 +19,7 @@ use Tests\TestCase;
  *
  * يمتدّ سوابقَه المعلنة:
  *  • `WorkOsEndpointProtocolTest` — عتادُ التسجيل والتوقيع الحقيقيّ (عقدُ
- *    docblock ‏`App\Support\Es256`) لبذر أجهزةٍ عبر المسار الكامل.
+ *    docblock ‏`App\Support\Security\Es256`) لبذر أجهزةٍ عبر المسار الكامل.
  *  • `ClientOperationsTest` — عزلُ حساب العميل: ٤٠٤ على كل سطحٍ داخليّ.
  *  • `WorkOsEmployee360TabsTest` — التبويبُ محروسٌ خادمياً وfield-mode لا إخفاءُ عرض.
  *  • `SecurityEventsTest` — التصنيفُ القانونيّ فوق ما يُكتب فعلاً (لا مخزنَ ثانياً).
@@ -256,7 +256,7 @@ class WorkOsEndpointCentreTest extends TestCase
             'قيدُ العتبة تكرّر داخل النافذة — عاد الضجيج');
 
         // السجلُّ الأمنيُّ الموحَّد يصنّفه بالكود القانونيّ — قارئٌ واحد لا مخزنٌ ثانٍ
-        $recent = \App\Support\SecurityEvents::recent(7, 60, 'ENDPOINT_USB_SURGE');
+        $recent = \App\Support\Security\SecurityEvents::recent(7, 60, 'ENDPOINT_USB_SURGE');
         $this->assertCount(1, $recent);
         $this->assertSame('ENDPOINT_USB_SURGE', $recent->first()['code']);
 

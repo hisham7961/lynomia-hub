@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * **والأسرارُ مبصومةٌ لا مخزَّنة:** `before`/`after` لمفتاحٍ حسّاس بصمةُ
  * `Redactor::fingerprint` (‏`sha256:…`) — فتاريخُ التغيير يقول «تبدّلت» ولا
- * يقول «إلى ماذا». الكاتبُ الوحيد `App\Support\Settings::put`.
+ * يقول «إلى ماذا». الكاتبُ الوحيد `App\Support\Platform\Settings::put`.
  *
  * الأعمدةُ النصّية بعرضٍ صريح وكتلة `Schema::create` حرفيةٌ لا حلقة — فيراها
  * `hub_col_widths()` وحرّاسُ العرض. ويُعلَن الجدولُ في `HubBackup::RAW_TABLES`.

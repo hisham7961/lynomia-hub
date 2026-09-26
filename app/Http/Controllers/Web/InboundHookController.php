@@ -120,7 +120,7 @@ class InboundHookController extends Controller
         // على الخام كما هو، فالطمسُ لا يمسّ HMAC.
         $row = [
             'hook_id'    => $hook->id,
-            'payload'    => mb_strcut(\App\Support\Redactor::json($raw), 0, self::MAX_BYTES),
+            'payload'    => mb_strcut(\App\Support\Platform\Redactor::json($raw), 0, self::MAX_BYTES),
             'ip'         => $r->ip(),
             'status'     => 200,
             'created_at' => now(),
@@ -128,7 +128,7 @@ class InboundHookController extends Controller
         if (Schema::hasColumn('inbound_hook_events', 'event_id')) $row['event_id'] = $eventId;
         // (WP-1.4) ربطُ الحدث الوارد بطلبه — يظهر في صفحة `system.trace` بمعرّفه
         if (Schema::hasColumn('inbound_hook_events', 'request_id')) {
-            $row['request_id'] = mb_substr((string) \App\Support\Api::requestId(), 0, 40) ?: null;
+            $row['request_id'] = mb_substr((string) \App\Support\Platform\Api::requestId(), 0, 40) ?: null;
         }
 
         $fresh = $eventId === null
@@ -158,8 +158,8 @@ class InboundHookController extends Controller
             ->orderByDesc('id')->limit(40)->get()->groupBy('hook_id');
 
         // #20: حالةُ تبنّي الختمِ الزمنيّ لكلِّ نقطة — «مَن يتوقّف» قبل أيِّ إشعال
-        $ts = collect(\App\Support\HardeningReadiness::inboundHooks())->keyBy('id');
-        $tsSummary = \App\Support\HardeningReadiness::summary();
+        $ts = collect(\App\Support\Security\HardeningReadiness::inboundHooks())->keyBy('id');
+        $tsSummary = \App\Support\Security\HardeningReadiness::summary();
         $requireTs = (string) setting('security.inbound_require_timestamp', '0') === '1';
 
         return view('integrations.hooks', compact('hooks', 'events', 'ts', 'tsSummary', 'requireTs'));

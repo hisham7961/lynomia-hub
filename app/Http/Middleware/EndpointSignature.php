@@ -3,8 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Models\EndpointDevice;
-use App\Support\Api;
-use App\Support\Es256;
+use App\Support\Platform\Api;
+use App\Support\Security\Es256;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * **وسيطُ توقيع النقاط الطرفية** — Work OS · الطور J · WP-J.1 · §43.
  *
- * يفرض **عقدَ التوقيع** المكتوبَ مرةً واحدةً في docblock ‏`App\Support\Es256`
+ * يفرض **عقدَ التوقيع** المكتوبَ مرةً واحدةً في docblock ‏`App\Support\Security\Es256`
  * (وكيلُ الطور K يعكسه حرفياً) على كل مسارِ جهازٍ (heartbeat/أحداث/أوامر —
  * تُوصَل في WP-J.2) — **قبل أيّ منطقِ معالج**:
  *
@@ -77,7 +77,7 @@ class EndpointSignature
             return $this->deny($request, 'جهازٌ غيرُ معروف');
         }
         if ($device->status !== 'active') {
-            \App\Support\SecurityRadar::record($request, 'وصول مرفوض', 'جهازٌ طرفيّ غيرُ نشط: ' . $device->status);
+            \App\Support\Security\SecurityRadar::record($request, 'وصول مرفوض', 'جهازٌ طرفيّ غيرُ نشط: ' . $device->status);
 
             return Api::error(Api::ACCOUNT_RESTRICTED, 403,
                 'هذا الجهاز ' . $device->status . ' — راجع مركزَ النقاط الطرفية');
@@ -101,7 +101,7 @@ class EndpointSignature
             report($e);
         }
         if (! $valid) {
-            \App\Support\SecurityRadar::record($request, 'وصول مرفوض', 'توقيعُ جهازٍ طرفيّ لا يصحّ');
+            \App\Support\Security\SecurityRadar::record($request, 'وصول مرفوض', 'توقيعُ جهازٍ طرفيّ لا يصحّ');
 
             return $this->deny($request, 'التوقيعُ غير صحيح');
         }
@@ -111,7 +111,7 @@ class EndpointSignature
             'device_id' => $device->id, 'nonce' => $nonce, 'created_at' => now(),
         ]);
         if (! $fresh) {
-            \App\Support\SecurityRadar::record($request, 'وصول مرفوض', 'إعادةُ طلبِ جهازٍ طرفيّ (nonce معاد)');
+            \App\Support\Security\SecurityRadar::record($request, 'وصول مرفوض', 'إعادةُ طلبِ جهازٍ طرفيّ (nonce معاد)');
 
             return Api::error(Api::CONFLICT, 409, 'طلبٌ مُعادٌ بحذافيره — كلُّ طلبٍ بـnonce جديد');
         }
@@ -134,7 +134,7 @@ class EndpointSignature
     /** ردُّ 401 موحَّد — سببٌ للسجل لا تشريحٌ يفيد طارقاً */
     protected function deny(Request $request, string $why): Response
     {
-        \App\Support\SecurityRadar::record($request, 'وصول مرفوض', 'نقاطٌ طرفية: ' . $why);
+        \App\Support\Security\SecurityRadar::record($request, 'وصول مرفوض', 'نقاطٌ طرفية: ' . $why);
 
         return Api::error(Api::UNAUTHENTICATED, 401, 'توقيعُ الجهاز مطلوبٌ وصحيح — راجع عقدَ Es256');
     }

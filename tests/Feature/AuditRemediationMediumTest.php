@@ -86,7 +86,7 @@ class AuditRemediationMediumTest extends TestCase
 
         $this->assertSame('none', setting('mail.encryption'), '«none» ابتُلعت فراغاً');
 
-        \App\Support\MailSettings::apply();
+        \App\Support\Platform\MailSettings::apply();
         $this->assertNull(config('mail.mailers.smtp.encryption'),
             'بلا تشفير عادت TLS قسراً — خادم المنفذ 25 سيفشل');
 

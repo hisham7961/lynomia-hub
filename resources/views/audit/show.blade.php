@@ -54,7 +54,7 @@
             <td>@if ($modDef && $a->record_id)<a href="{{ route('m.show', [$a->module, $a->record_id]) }}"><b>{{ $a->name ?: 'سجل' }}</b></a>
                 @else <b>{{ $a->name ?: '—' }}</b>@endif</td></tr>
         @if ($a->reason)
-            <tr><td class="sub">السبب</td><td>💬 {{ \App\Support\Redactor::text($a->reason) }}</td></tr>
+            <tr><td class="sub">السبب</td><td>💬 {{ \App\Support\Platform\Redactor::text($a->reason) }}</td></tr>
         @endif
     </table>
 
@@ -130,12 +130,12 @@
 <div class="card">
     <h3 class="cardtitle">🛡️ الدلالة الأمنية</h3>
     @if ($secCode)
-        @php [$secLabel, $secSev] = \App\Support\SecurityEvents::CODES[$secCode]; @endphp
+        @php [$secLabel, $secSev] = \App\Support\Security\SecurityEvents::CODES[$secCode]; @endphp
         <table class="mini">
             <tr><td class="sub" style="width:130px">الحدث</td>
                 <td>{{ $secLabel }} <span class="sub mono ltr">({{ $secCode }})</span></td></tr>
             <tr><td class="sub">الشدّة</td>
-                <td><span class="bdg {{ \App\Support\SecurityEvents::SEVERITY_TONE[$secSev] ?? 'g' }}">{{ ['info' => 'معلومة', 'notice' => 'ملحوظ', 'warning' => 'تحذير', 'high' => 'خطِر'][$secSev] ?? $secSev }}</span></td></tr>
+                <td><span class="bdg {{ \App\Support\Security\SecurityEvents::SEVERITY_TONE[$secSev] ?? 'g' }}">{{ ['info' => 'معلومة', 'notice' => 'ملحوظ', 'warning' => 'تحذير', 'high' => 'خطِر'][$secSev] ?? $secSev }}</span></td></tr>
         </table>
     @else
         <div class="sub">ليس حدثاً أمنياً مصنَّفاً في كتالوج الأحداث القانونية — قيدُ عملٍ اعتيادي.</div>
@@ -186,7 +186,7 @@
             @foreach ($relErrors as $e)
                 <tr><td class="sub" style="width:130px">خطأ</td>
                     <td><a href="{{ route('errors.show', $e->id) }}"><b>{{ \Illuminate\Support\Str::limit($e->message, 90) }}</b></a>
-                        <span class="sub">· {{ \App\Support\IssueState::label($e->status) }}</span></td></tr>
+                        <span class="sub">· {{ \App\Support\Platform\IssueState::label($e->status) }}</span></td></tr>
             @endforeach
             @foreach ($relIncidents as $i)
                 <tr><td class="sub" style="width:130px">حادثة</td>

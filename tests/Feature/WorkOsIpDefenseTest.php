@@ -319,7 +319,7 @@ class WorkOsIpDefenseTest extends TestCase
         // محوّلٌ معلَنٌ بمرجعِ سرٍّ مكسور (لا سجلَّ خزنةٍ يقابله) — يتدهور صادقاً
         $this->hubSetting('security.edge_adapter', 'cloudflare');
         $this->hubSetting('security.edge_cloudflare_secret_ref', (string) Str::uuid());
-        $this->assertFalse(\App\Support\EdgeDefense::configured(),
+        $this->assertFalse(\App\Support\Security\EdgeDefense::configured(),
             'مرجعُ VaultSecret مكسورٌ وما زال المحوّل يدّعي التهيئة');
         $again = $this->actingAs($this->owner)->get(route('security.blocks'));
         $again->assertSee('غير مُهيّأ');

@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditEntry;
 use App\Models\Task;
-use App\Support\WidgetRegistry;
+use App\Support\Platform\WidgetRegistry;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;

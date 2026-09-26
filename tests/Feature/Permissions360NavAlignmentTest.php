@@ -50,7 +50,7 @@ class Permissions360NavAlignmentTest extends TestCase
         $this->assertFalse(hub_admin_bar_visible($emp), 'من لا رابطَ له لا شريطَ له');
 
         // وحارسُ IA للمجالِ هو الدالّةُ نفسُها (لا انحراف)
-        $ia = \App\Support\InformationArchitecture::make();
+        $ia = \App\Support\Platform\InformationArchitecture::make();
         $this->assertSame(hub_admin_bar_visible($sec), $ia->guard('admin_bar', $sec));
         $this->assertSame(hub_admin_bar_visible($emp), $ia->guard('admin_bar', $emp));
     }
@@ -62,13 +62,13 @@ class Permissions360NavAlignmentTest extends TestCase
         $this->seedCore();
 
         // 04.2 — بلا inboxdocs/files لا بلاطة؛ وبأحدِهما تظهر
-        $reg = \App\Support\WidgetRegistry::resolve('links', $this->owner);
+        $reg = \App\Support\Platform\WidgetRegistry::resolve('links', $this->owner);
         $this->assertNotNull($reg);
         $none = $this->user('tile0@test.local', ['updates' => ['v' => 1]]);
-        $tiles = collect(\App\Support\WidgetRegistry::resolve('links', $none))->pluck('r');
+        $tiles = collect(\App\Support\Platform\WidgetRegistry::resolve('links', $none))->pluck('r');
         $this->assertNotContains('inboxdocs.index', $tiles, 'بلا صلاحيّةٍ لا بلاطةَ صندوقِ وثائق');
         $files = $this->user('tile1@test.local', ['files' => ['v' => 1]]);
-        $tiles2 = collect(\App\Support\WidgetRegistry::resolve('links', $files))->pluck('r');
+        $tiles2 = collect(\App\Support\Platform\WidgetRegistry::resolve('links', $files))->pluck('r');
         $this->assertContains('inboxdocs.index', $tiles2, 'حاملُ files:v يرى البلاطة');
 
         // 04.4 — حاملُ products:v وحدَها يرى مركزَ الهويّة (المتحكّمُ يقبله)

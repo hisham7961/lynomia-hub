@@ -2,7 +2,7 @@
 
 namespace App\Support\Ai\Catalog;
 
-use App\Support\Tri;
+use App\Support\Platform\Tri;
 
 /**
  * **تطبيعُ معرفةِ البوّابةِ إلى حقائقَ موسومةِ المصدر** (المرحلة ٢ · W5).

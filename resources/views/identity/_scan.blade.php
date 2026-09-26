@@ -51,7 +51,7 @@
             <div class="fg" style="margin-top:6px">
                 <div class="fld"><label for="r-qty">عدد القطع</label>
                     <input class="inp" id="r-qty" name="qty" type="number" min="1"
-                           max="{{ \App\Support\Identity::BULK_MAX }}" value="1"></div>
+                           max="{{ \App\Support\Security\Identity::BULK_MAX }}" value="1"></div>
                 <div class="fld fw"><label for="r-serials">السيريالات (سطرٌ لكل قطعة — اختياري)</label>
                     <textarea class="inp mono ltr" id="r-serials" name="serials_raw" rows="2"
                               placeholder="CZJ12345&#10;CZJ12346"></textarea>

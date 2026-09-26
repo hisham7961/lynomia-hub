@@ -5,7 +5,7 @@ namespace App\Support\Ai\Catalog;
 use App\Models\AiProvider;
 use Illuminate\Support\Str;
 use App\Support\Ai\Gateway\LiteLlmAdmin;
-use App\Support\Redactor;
+use App\Support\Platform\Redactor;
 
 /**
  * **دورةُ حياةِ اعتمادِ المزوّد** (المرحلة ٢ · W4).

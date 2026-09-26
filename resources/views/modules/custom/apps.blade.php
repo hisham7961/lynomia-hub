@@ -5,9 +5,9 @@
      لقطاتٍ يُرى قبل أي قراءة، وأولُ سطرين من وصف المتجر، وبابٌ إلى المركز حيث
      السلايدر الكامل والترتيب والجاهزية. --}}
 @php
-    $aShots = \App\Support\AppStudio::shots($row);
-    $aDesc = \App\Support\AppStudio::description($row);
-    $aReady = \App\Support\AppStudio::readiness($row, $aShots);
+    $aShots = \App\Support\Apps\AppStudio::shots($row);
+    $aDesc = \App\Support\Apps\AppStudio::description($row);
+    $aReady = \App\Support\Apps\AppStudio::readiness($row, $aShots);
 @endphp
 <div class="card">
     <h3 class="cardtitle">📱 واجهة المتجر

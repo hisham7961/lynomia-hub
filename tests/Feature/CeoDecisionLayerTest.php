@@ -6,7 +6,7 @@ use App\Models\Client;
 use App\Models\Decision;
 use App\Models\FinDocument;
 use App\Models\Project;
-use App\Support\CeoBoard;
+use App\Support\Insights\CeoBoard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;

@@ -31,7 +31,7 @@
     // 07.5 — الصحّةُ بعينِ القارئ: من حُجبت عنه الميزانيّةُ لا يستلم عاملَها ولا نسبةَ استهلاكِها
     $pcHealth = $isCli ? [] : hub_project_health_for($u, $row->id);
     $pcPl = $pcFin ? hub_project_pl($row->id) : null;
-    $pcNext = $isCli ? [] : \App\Support\NextAction::for('projects', $row);
+    $pcNext = $isCli ? [] : \App\Support\Insights\NextAction::for('projects', $row);
     $pcBaseline = ((array) $row->meta)['baseline'] ?? null;
     $pcExternal = $row->isExternal();
 

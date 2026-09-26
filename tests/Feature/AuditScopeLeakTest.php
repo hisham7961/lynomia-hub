@@ -7,7 +7,7 @@ use App\Models\Conversation;
 use App\Models\ConversationMember;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\StepUp;
+use App\Support\Security\StepUp;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;

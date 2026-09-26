@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ContractApprovalStep;
 use App\Models\SignRequest;
-use App\Support\DocRenderer;
+use App\Support\Documents\DocRenderer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;

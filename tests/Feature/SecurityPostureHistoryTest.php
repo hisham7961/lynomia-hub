@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\Health;
+use App\Support\Ops\Health;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -46,7 +46,7 @@ class SecurityPostureHistoryTest extends TestCase
         $this->assertCount(2, $series, 'لقطتان بيومين لم تُنتجا نقطتين');
 
         // توحيدُ الدرجة: المكتوبُ هو درجةُ SecurityPosture::summary لا معادلةً ثانية
-        $expected = (float) \App\Support\SecurityPosture::summary()['score'];
+        $expected = (float) \App\Support\Security\SecurityPosture::summary()['score'];
         $this->assertSame($expected, (float) end($series)['value']);
 
         // وكلُّ مقاييس اللقطة الثمانية كُتبت

@@ -146,7 +146,7 @@
                         <span class="sub">{{ $f->kind }}</span>
                         {{-- (WP-2.6) المعاينةُ عبر المقنِّع الواحد: كان النصُّ يُطبع كاملاً
                              ومنه رسائلُ sign_otp — رمزُ توقيعٍ سارٍ معروضاً لكل فاتح شاشة --}}
-                        <div class="sub">{{ \App\Support\Integrations::outboxPreview($f->kind, $f->text) }}</div>
+                        <div class="sub">{{ \App\Support\Ops\Integrations::outboxPreview($f->kind, $f->text) }}</div>
                         <div class="ferr">{{ $f->error }}</div></td>
                     <td class="acts sub">{{ \Illuminate\Support\Carbon::parse($f->created_at)->diffForHumans() }}</td>
                 </tr>

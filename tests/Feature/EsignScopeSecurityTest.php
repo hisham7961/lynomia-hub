@@ -171,7 +171,7 @@ class EsignScopeSecurityTest extends TestCase
     {
         $this->seedCore();
         $captured = [];
-        \App\Support\HubEvents::listen(function ($event) use (&$captured) {
+        \App\Support\Platform\HubEvents::listen(function ($event) use (&$captured) {
             $captured[] = $event;
         });
 

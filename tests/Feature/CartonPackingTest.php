@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Quote;
 use App\Models\StockItem;
-use App\Support\Items;
+use App\Support\Assets\Items;
 use Tests\TestCase;
 
 /**

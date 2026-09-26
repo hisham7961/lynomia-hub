@@ -56,7 +56,7 @@ class User extends Authenticatable
     /** حسابٌ جديد يجد ملفَّه الوظيفي الذي ينتظره — البريد هو الهوية */
     protected static function booted(): void
     {
-        static::created(fn (self $u) => \App\Support\Staff::linkWaitingFile($u));
+        static::created(fn (self $u) => \App\Support\Workforce\Staff::linkWaitingFile($u));
 
         // حارسُ الثوابت — يرفض حالةً خارج allowlist قبل أي كتابة (نمطُ
         // ClientMembership نفسه). يُفحص **المتغيّرُ فقط**: صفٌّ قديمٌ بقيمةٍ

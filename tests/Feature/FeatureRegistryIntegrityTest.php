@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Support\FeatureRegistry;
-use App\Support\FeatureStatus;
-use App\Support\Settings;
+use App\Support\Platform\FeatureRegistry;
+use App\Support\Platform\FeatureStatus;
+use App\Support\Platform\Settings;
 use Tests\TestCase;
 
 /**

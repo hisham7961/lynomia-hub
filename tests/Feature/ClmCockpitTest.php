@@ -49,7 +49,7 @@ class ClmCockpitTest extends TestCase
     {
         $this->seedCore();
         $captured = [];
-        \App\Support\HubEvents::listen(function ($event) use (&$captured) { $captured[] = $event; });
+        \App\Support\Platform\HubEvents::listen(function ($event) use (&$captured) { $captured[] = $event; });
         $c = Contract::create(['title' => 'متجاوز نهايته', 'type' => 'عقد عميل', 'status' => 'ساري',
             'date_end' => now()->subDays(3)->toDateString()]);
 

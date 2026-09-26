@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\Odoo;
+use App\Support\Ops\Odoo;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;

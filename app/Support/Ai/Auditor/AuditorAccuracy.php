@@ -4,7 +4,7 @@ namespace App\Support\Ai\Auditor;
 
 use App\Models\AiFinding;
 use App\Models\User;
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;

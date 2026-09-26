@@ -117,14 +117,14 @@ class AiPurposeSuitabilityTest extends TestCase
      */
     private function opensTheDoor(): void
     {
-        \App\Support\Settings::put('ai.gateway_url', 'http://127.0.0.1:4000', 'test');
-        \App\Support\Settings::put('ai.gateway_key', 'sk-admin-test-key-000111222333', 'test');
-        \App\Support\Settings::put('ai.enabled', '1', 'test');
-        \App\Support\Settings::put('ai.probe_ok', '1', 'test');
-        \App\Support\Settings::put('ai.probe_fp', \App\Support\Ai\Gateway\AiGateway::fingerprint(), 'test');
-        \App\Support\Settings::put('ai.generation_ok', '1', 'test');
-        \App\Support\Settings::put('ai.generation_fp', \App\Support\Ai\Gateway\AiGateway::fingerprint(), 'test');
-        \App\Support\FeatureRegistry::flush();
+        \App\Support\Platform\Settings::put('ai.gateway_url', 'http://127.0.0.1:4000', 'test');
+        \App\Support\Platform\Settings::put('ai.gateway_key', 'sk-admin-test-key-000111222333', 'test');
+        \App\Support\Platform\Settings::put('ai.enabled', '1', 'test');
+        \App\Support\Platform\Settings::put('ai.probe_ok', '1', 'test');
+        \App\Support\Platform\Settings::put('ai.probe_fp', \App\Support\Ai\Gateway\AiGateway::fingerprint(), 'test');
+        \App\Support\Platform\Settings::put('ai.generation_ok', '1', 'test');
+        \App\Support\Platform\Settings::put('ai.generation_fp', \App\Support\Ai\Gateway\AiGateway::fingerprint(), 'test');
+        \App\Support\Platform\FeatureRegistry::flush();
 
         $modules = array_keys((array) config('hub.modules'));
         $matrix  = collect($modules)->mapWithKeys(fn ($m) => [$m => ['v' => 1, 'a' => 0, 'e' => 0, 'd' => 0]])->all();

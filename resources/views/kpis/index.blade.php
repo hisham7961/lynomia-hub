@@ -26,7 +26,7 @@
      «على الهدف» — فالنظامُ يهنّئ نفسَه على قياسٍ لم يقع. --}}
 @php
     $healthTone = ['on' => 'ok', 'warn' => 'wn', 'off' => 'bad', 'dead' => 'wn', 'nodata' => 'g', 'notarget' => 'g'];
-    $H = \App\Support\KpiCentre::HEALTH;
+    $H = \App\Support\Insights\KpiCentre::HEALTH;
     $rowsById = collect($rows)->keyBy('id');
     $canRemediate = hub_monitor() && hub_can(auth()->user(), 'tasks', 'a');
 @endphp

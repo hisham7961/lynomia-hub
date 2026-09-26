@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Role;
 use App\Models\Server;
 use App\Models\User;
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Tests\TestCase;
 
 /**

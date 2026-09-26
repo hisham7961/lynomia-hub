@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\SecurityRadar;
+use App\Support\Security\SecurityRadar;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

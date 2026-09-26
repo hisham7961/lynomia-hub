@@ -177,7 +177,7 @@ class HubKpisStarter extends Command
             $f = (array) $k->formula;
             // الوحدةُ نفسُها **والفلترُ ميّت**: وإلا فهو مؤشّرُ صاحبِ النظام لا بذرتُنا
             if (hub_str($f['a']['module'] ?? '') !== $mod) continue;
-            if (! \App\Support\KpiCentre::deadFilters($f)) continue;
+            if (! \App\Support\Insights\KpiCentre::deadFilters($f)) continue;
 
             $formula = ['a' => ['agg' => $agg, 'module' => $mod, 'col' => $col, 'st' => $st ?? ''],
                         'combine' => $combine];
@@ -236,8 +236,8 @@ class HubKpisStarter extends Command
      */
     protected function settings(array $formula, ?string $unit, $target): array
     {
-        $kind = \App\Support\KpiCentre::kind($formula, $unit);
-        $def  = \App\Support\KpiCentre::kindDefaults($kind);
+        $kind = \App\Support\Insights\KpiCentre::kind($formula, $unit);
+        $def  = \App\Support\Insights\KpiCentre::kindDefaults($kind);
 
         $out = ['unit' => ($unit !== null && trim($unit) !== '') ? $unit : $def['unit']];
 

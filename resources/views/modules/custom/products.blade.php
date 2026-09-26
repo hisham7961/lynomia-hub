@@ -1,13 +1,13 @@
 {{-- بطاقةُ هوية المنتج: الكودُ الدائم برمزيه، والمعرفاتُ كلُّها، والقطعُ المملوكة،
      ومصدرُ كل حقلٍ إن جاء من الاستكشاف — وتسجيلُ قطعٍ جديدةٍ من هنا مباشرةً. --}}
 @php
-    $pIds = \App\Support\Identity::of('products', $row->id);
+    $pIds = \App\Support\Security\Identity::of('products', $row->id);
     $pAssets = \App\Models\Asset::where('product_id', $row->id)
         ->orderBy('code')->orderBy('id')->get(['id', 'code', 'name', 'serial', 'status', 'holder_id']);
     $pHolders = hub_ref_labels('users', $pAssets->pluck('holder_id')->filter()->unique()->values()->all());
     $pDisc = data_get($row->meta, 'discovery');
-    $pBar = \App\Support\Barcode::svg((string) $row->code, 40);
-    $pQr = \App\Support\Qr::svg(route('products.code', $row->code), 150);
+    $pBar = \App\Support\Documents\Barcode::svg((string) $row->code, 40);
+    $pQr = \App\Support\Documents\Qr::svg(route('products.code', $row->code), 150);
     $pCanReg = hub_can(auth()->user(), 'assets', 'a');
     $pCanMerge = hub_can(auth()->user(), 'products', 'd');
 @endphp
@@ -40,7 +40,7 @@
             <tbody>
             @foreach ($pIds as $rid)
                 <tr>
-                    <td>{{ \App\Support\Identity::KINDS[$rid->kind] ?? $rid->kind }}</td>
+                    <td>{{ \App\Support\Security\Identity::KINDS[$rid->kind] ?? $rid->kind }}</td>
                     <td class="mono ltr">{{ $rid->value }}</td>
                     <td class="sub">{{ $rid->source ?: '—' }}</td>
                     <td>@if ($rid->is_primary)<span class="bdg ok">أساسي</span>@endif

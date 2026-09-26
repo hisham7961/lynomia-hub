@@ -6,7 +6,7 @@ use App\Models\Attachment;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\ChunkedUpload;
+use App\Support\Collaboration\ChunkedUpload;
 use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 

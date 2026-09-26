@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetProjectAssignment;
 use App\Models\Project;
-use App\Support\AssetProjectService;
+use App\Support\Assets\AssetProjectService;
 use Illuminate\Http\Request;
 
 /**

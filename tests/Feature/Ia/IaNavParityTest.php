@@ -4,7 +4,7 @@ namespace Tests\Feature\Ia;
 
 use App\Models\Role;
 use App\Models\User;
-use App\Support\Workspaces;
+use App\Support\Platform\Workspaces;
 
 /**
  * **IA الطور 3 — مطابقةُ المحوّلات (Adapters Parity)**: يُثبت أنّ IA مصدرُ الحقيقة
