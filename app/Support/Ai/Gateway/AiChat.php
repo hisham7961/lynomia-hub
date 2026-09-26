@@ -56,6 +56,9 @@ final class AiChat
 {
     public const PATH = '/v1/chat/completions';
 
+    /** مسارُ التضمين في البوّابة (العقدُ القياسيّ نفسُه) — للعقل الثاني (`App\Support\Ai\Brain`) */
+    public const EMBED_PATH = '/v1/embeddings';
+
     /** الشكلُ الموحَّدُ للردّ — لا شكلَ يُخترَع في مُستدعٍ */
     public const SHAPE = ['ok', 'status', 'failure', 'cause', 'data',
                           'error', 'retry_after', 'usage', 'ms', 'sent'];
@@ -125,6 +128,37 @@ final class AiChat
             max(1, $maxOutputTokens)));
         $payload['stream'] = false;
 
+        return self::post($url, $gate, $payload, $t0);
+    }
+
+    /**
+     * **تضمينُ نصوص** — البابُ نفسُه (بوّابةٌ مفعّلة · حارسُ الخروج · المهلات · الطمس · التصنيف)
+     * على مسار التضمين. لا يُنادى إلّا من `GovernedCompletion::embed` (الحوكمةُ والسجلّ هناك).
+     *
+     * @param  array{model: string, input: list<string>}  $body
+     */
+    public static function embed(array $body): array
+    {
+        $t0 = microtime(true);
+
+        if (! AiGateway::enabled()) {
+            return self::fail(AskFailures::UNAVAILABLE, 'bad_request', null,
+                AiGateway::whyNotReady() ?? 'بوّابةُ النماذجِ غيرُ جاهزة', $t0, false);
+        }
+
+        $url  = AiGateway::url(self::EMBED_PATH);
+        $gate = AiGateway::outboundGate($url);
+        if (! ($gate['ok'] ?? false)) {
+            return self::fail(AskFailures::GATEWAY_FAILURE, 'bad_request', null,
+                (string) ($gate['why'] ?? 'وجهةٌ مرفوضة'), $t0, false);
+        }
+
+        return self::post($url, $gate, ['model' => (string) $body['model'], 'input' => array_values((array) $body['input'])], $t0);
+    }
+
+    /** الإرسالُ وتصنيفُ الردّ — مشتركٌ بين المحادثة والتضمين */
+    private static function post(string $url, array $gate, array $payload, float $t0): array
+    {
         $to = AiGateway::timeouts();
 
         try {

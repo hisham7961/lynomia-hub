@@ -243,14 +243,17 @@
     var form = document.getElementById('askform');
     if (!form) return;
     var streamUrl = @json(route('ask.stream'));
-    var plain = false;
+    // `inflight` محلّيٌّ عمداً: حارسُ الإرسال المزدوج العامّ يفكّ الزرَّ بعد ٢٠ ثانية، والبثُّ لا يغادر الصفحة
+    var plain = false, inflight = false;
     form.addEventListener('submit', function (e) {
+        if (inflight) { e.preventDefault(); return; }
         var b = form.querySelector('[data-ask-submit]');
         var w = form.querySelector('.askwait');
         if (b) { b.disabled = true; }
         if (w) { w.hidden = false; }
         if (plain || !window.fetch || !window.TextDecoder || !window.ReadableStream) return;
         e.preventDefault();
+        inflight = true;
         var started = false;
         // لا يُعاد الإرسالُ إلّا إن لم يبدأ البثُّ أصلاً — فسؤالٌ بدأ العملُ عليه لا يُنفَق مرّتين
         var fallback = function () {
@@ -260,7 +263,9 @@
         fetch(streamUrl, { method: 'POST', body: new FormData(form), credentials: 'same-origin',
                            headers: { 'Accept': 'text/event-stream' } })
             .then(function (res) {
-                if (!res.ok || !res.body) { fallback(); return; }
+                // تحويلٌ (جلسةٌ منتهية · ساعاتُ العمل · تغييرُ كلمة المرور) ⇒ إلى حيث أراد الخادم، لا «انقطاع»
+                if (res.redirected) { location.assign(res.url); return; }
+                if (!res.ok || !res.body || !/text\/event-stream/.test(res.headers.get('Content-Type') || '')) { fallback(); return; }
                 var reader = res.body.getReader(), dec = new TextDecoder(), buf = '', done = false;
                 var pump = function () {
                     return reader.read().then(function (chunk) {
@@ -272,7 +277,8 @@
                             var ev = (block.match(/^event: (.*)$/m) || [])[1], data = (block.match(/^data: (.*)$/m) || [])[1];
                             if (!ev || !data) return;
                             try { data = JSON.parse(data); } catch (x) { return; }
-                            if (ev === 'progress' && w) { w.textContent = '⏳ ' + data.text; }
+                            if (ev === 'progress') { if (w) w.textContent = '⏳ ' + data.text; if (b) b.disabled = true; }
+                            if (ev === 'error') { done = true; inflight = false; if (b) b.disabled = false; if (w) w.textContent = '⚠️ ' + (data.text || ''); }
                             if (ev === 'done' && data.html) { done = true; document.open(); document.write(data.html); document.close(); }
                         });
                         return pump();

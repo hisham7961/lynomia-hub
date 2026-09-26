@@ -43,6 +43,9 @@
             <a class="btn sm" href="{{ $d['url'] }}">📝 افتح النموذجَ معبّأً وراجِع قبل الحفظ</a>
         </div>
     @endforeach
+    @if ($result['clipped'] ?? false)
+        <div class="sub mut" data-assist-clipped>✂️ المصدرُ أطولُ ممّا يُرسَل إلى المساعد — بُنيت المسودةُ على أوّله، فراجِع ما بعده بنفسك.</div>
+    @endif
     @if ($result['dropped'])
         <div class="sub mut">أُسقط من المقترح ما لا يحقّ للمساعد تعبئتُه أو ما لم يجتز التحقّق: {{ implode('، ', $result['dropped']) }}</div>
     @endif

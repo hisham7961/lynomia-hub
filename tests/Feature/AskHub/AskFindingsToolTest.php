@@ -179,7 +179,9 @@ class AskFindingsToolTest extends TestCase
     {
         $names = array_map(fn ($t) => $t['function']['name'], AskTools::schema(AskTools::catalog($this->employee)));
         $this->assertContains('hub_findings', $names);
-        $this->assertSame(AskTools::TOOLS, $names, 'كلُّ أداةٍ مُعلَنةٍ منفَّذة، وكلُّ منفَّذةٍ مُعلَنة');
+        // كلُّ مُعلَنةٍ منفَّذة؛ والبحثُ بالمعنى وحدَه يُعلَن حين يعمل العقلُ الثاني
+        $expected = \App\Support\Ai\Brain\Brain::ready() ? AskTools::TOOLS : array_values(array_diff(AskTools::TOOLS, ['hub_semantic']));
+        $this->assertSame($expected, $names, 'كلُّ أداةٍ مُعلَنةٍ منفَّذة، وكلُّ منفَّذةٍ مُعلَنة');
         $this->assertSame([], AskTools::WRITE_TOOLS);
         $this->assertNull(AskPipeline::authorize('hub_findings', [], $this->employee));
     }

@@ -119,6 +119,23 @@ final class GovernedCompletion
      */
     public function call(array $payload, int $inputChars): array
     {
+        return $this->loop($payload, $inputChars, false);
+    }
+
+    /**
+     * **تضمينُ نصوصٍ بالحوكمة نفسِها** (العقلُ الثاني · المرحلة ٤) — الحلقةُ ذاتُها: سقفُ النداءات،
+     * والقبولُ والحجزُ والتسويةُ لكلِّ محاولة، والرحلةُ عبر سلسلة الغرض. والمخرَجُ متّجهاتٌ لا رموز.
+     *
+     * @param  list<string>  $texts
+     * @return array{ok: true, data: array}|array{ok: false, code: string}
+     */
+    public function embed(array $texts, int $inputChars): array
+    {
+        return $this->loop(['input' => array_values($texts)], $inputChars, true);
+    }
+
+    private function loop(array $payload, int $inputChars, bool $embed): array
+    {
         // سببُ آخرِ إخفاقٍ **في هذا النداءِ المنطقيِّ وحدَه** — لا في الطلبِ كلِّه.
         $stepFailure = null;
 
@@ -133,7 +150,8 @@ final class GovernedCompletion
                 return $this->fail($this->lastFailure ?? AskFailures::PROVIDER_FAILURE);
             }
 
-            $outCap = $this->outputCap();
+            // التضمينُ لا مخرَجَ رمزيَّ له — يُقدَّر بمدخله وحدَه
+            $outCap = $embed ? 1 : $this->outputCap();
 
             // ② الحوكمةُ تسبق كلَّ محاولة — إعادةً كانت أم احتياطاً
             $this->attempts++;
@@ -146,10 +164,12 @@ final class GovernedCompletion
             $t0 = microtime(true);
             $this->calls++;
             // ترتيبُ المفاتيحِ كما كان حرفيّاً: `model` أوّلاً و`max_tokens` آخراً
-            $res = AiChat::complete(
-                ['model' => (string) $model->litellm_model_name] + $payload + ['max_tokens' => $outCap],
-                $outCap,
-            );
+            $res = $embed
+                ? AiChat::embed(['model' => (string) $model->litellm_model_name] + $payload)
+                : AiChat::complete(
+                    ['model' => (string) $model->litellm_model_name] + $payload + ['max_tokens' => $outCap],
+                    $outCap,
+                );
 
             $ms = (int) ($res['ms'] ?? round((microtime(true) - $t0) * 1000));
             $this->lastUsage = $res['usage'] ?: $this->lastUsage;

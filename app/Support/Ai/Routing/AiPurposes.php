@@ -56,6 +56,9 @@ final class AiPurposes
     /** مفتاحُ المساعد التنفيذيّ («مسودةٌ ثمّ تأكيد» · `App\Support\Ai\Assist\DraftAssistant`) */
     public const ASSIST = 'assist';
 
+    /** مفتاحُ العقل الثاني (التضمينُ للفهرسة وللبحث · `App\Support\Ai\Brain\Brain`) */
+    public const BRAIN = 'brain';
+
     /**
      * **ما تحتاجه كلُّ ميزةٍ من قدرات** — صلبٌ لا يُضبَط من شاشة.
      *
@@ -77,6 +80,8 @@ final class AiPurposes
         self::AUDIT => ['chat'],
         // **والمساعدُ التنفيذيُّ كذلك** — الخادمُ قرأ المصدرَ بعين السائل، والنموذجُ يقترح حقولاً فقط
         self::ASSIST => ['chat'],
+        // **والعقلُ الثاني يحتاج التضمينَ وحدَه** — لا محادثةَ ولا أدوات
+        self::BRAIN => ['embeddings'],
     ];
 
     /** حالاتُ الملاءمة — ثلاثٌ لا اثنتان */

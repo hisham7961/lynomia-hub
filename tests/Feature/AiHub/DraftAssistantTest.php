@@ -164,6 +164,41 @@ class DraftAssistantTest extends TestCase
         $this->assertSame(0, DB::table('decisions')->count());
     }
 
+    public function test_المحضرُ_الطويلُ_يبلغ_النموذجَ_كاملاً_وما_جاوز_السقفَ_يُقال(): void
+    {
+        $u = $this->asker();
+        $mid = (string) Str::uuid();
+        // قرارٌ في آخر محضرٍ أطولَ من ٣٠٠ حرف — سقفُ أداة المحادثة كان يُسقطه صامتاً
+        $notes = str_repeat('نقاشٌ مطوّلٌ حول الجدول الزمنيّ والميزانيّة. ', 20) . 'اتُّفق على QWXZ-LATE-DECISION';
+        DB::table('meetings')->insert(['id' => $mid, 'title' => 'اجتماعٌ طويل', 'notes' => $notes,
+            'company_id' => $this->alpha->id, 'created_at' => now(), 'updated_at' => now()]);
+        $this->replies = [['items' => [['title' => 'قرار']]]];
+
+        $r = DraftAssistant::draft($u, 'decisions', 'meetings', $mid);
+        $this->assertTrue($r['ok'], (string) $r['message']);
+        $this->assertGreaterThan(300, mb_strlen($notes));
+        $this->assertStringContainsString('QWXZ-LATE-DECISION', $this->sentText(), 'آخرُ المحضر يصل النموذج');
+        $this->assertFalse($r['clipped']);
+
+        DB::table('meetings')->where('id', $mid)->update(['notes' => str_repeat('س', DraftAssistant::SOURCE_MAX_VALUE + 50)]);
+        $r = DraftAssistant::draft($u, 'decisions', 'meetings', $mid);
+        $this->assertTrue($r['clipped'], 'ما جاوز السقفَ يُعلَن لا يُخفى');
+    }
+
+    public function test_مهمّةٌ_من_صفحة_مشروع_تحمل_المشروعَ_نفسَه(): void
+    {
+        $u = $this->asker();
+        $pid = (string) Str::uuid();
+        DB::table('projects')->insert(['id' => $pid, 'name' => 'مشروعُ المصدر', 'company_id' => $this->alpha->id,
+            'created_at' => now(), 'updated_at' => now()]);
+        $this->replies = [['items' => [['title' => 'مهمّةٌ للمشروع', 'projectId' => (string) Str::uuid()]]]];
+
+        $r = DraftAssistant::draft($u, 'task', 'projects', $pid);
+
+        $this->assertTrue($r['ok'], (string) $r['message']);
+        $this->assertSame($pid, $r['drafts'][0]['fields']['projectId'], 'المصدرُ هو المشروع');
+    }
+
     public function test_مسودةُ_الردّ_نصٌّ_ينسخه_صاحبُه_ولا_يُرسَل_شيء(): void
     {
         $u = $this->asker();

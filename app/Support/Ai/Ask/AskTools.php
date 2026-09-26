@@ -39,7 +39,7 @@ final class AskTools
      * والسادسةُ (`hub_findings` · المرحلة ٢ في `docs/ai-hub/46-ai-roadmap.md`) تقرأ نتائجَ المدقّق
      * **عبر `AuditorSignals` نفسِه** — بشروطه الخمسة لكلِّ مشاهد، فلا قاعدةَ رؤيةٍ ثانية.
      */
-    public const TOOLS = ['hub_modules', 'hub_search', 'hub_list', 'hub_record', 'hub_count', 'hub_findings'];
+    public const TOOLS = ['hub_modules', 'hub_search', 'hub_list', 'hub_record', 'hub_count', 'hub_findings', 'hub_semantic'];
 
     /**
      * **الأدواتُ الكاتبة: فارغةٌ بقرارِ مالكٍ محسوم.**
@@ -184,6 +184,11 @@ final class AskTools
                 . '(تقاريرُ منسوخة · عائقٌ متكرّر · ساعاتٌ بلا تقدّم · قرارٌ بلا مهمّة…) مع سجلِّه. '
                 . 'ومع `module` تقتصر على ما موضوعُه تلك الوحدة. **رصدٌ آليٌّ يُتحقَّق منه لا حكم.**',
                 ['module' => $moduleArg]),
+            // **العقلُ الثاني يُعلَن حين يعمل فقط** — أداةٌ تُعلَن ولا تعمل تُنفق خطوةَ نموذجٍ على لا شيء
+            ...(\App\Support\Ai\Brain\Brain::ready() ? [$fn('hub_semantic', 'بحثٌ **بالمعنى** في المعرفة والمحاضر والقرارات والمشاريع '
+                . 'والمهامّ والمشاكل والتذاكر — لسؤالٍ لا تعرف كلماتِه الحرفيّة («ما قرّرناه بشأن المورّدين؟»). '
+                . 'يعيد سجلّاتٍ يراها صاحبُ الجلسة مرتّبةً بالقرب؛ اقرأ تفاصيلَها بـhub_record.',
+                ['q' => ['type' => 'string', 'minLength' => self::MIN_SEARCH_CHARS]], ['q'])] : []),
         ];
     }
 
@@ -198,7 +203,8 @@ final class AskTools
      * @return array{ok: bool, tool: string, module: ?string, rows: list<array<string,mixed>>,
      *               count: ?int, error: ?string, truncated: bool}
      */
-    public static function run(string $tool, array $args, mixed $user = null): array
+    public static function run(string $tool, array $args, mixed $user = null,
+                               int $maxValue = self::MAX_VALUE_CHARS): array
     {
         $u = $user ?? auth()->user();
 
@@ -213,9 +219,12 @@ final class AskTools
             'hub_modules' => self::toolModules($u, $args),
             'hub_search'  => self::toolSearch($u, $args),
             'hub_list'    => self::toolList($u, $args),
-            'hub_record'  => self::toolRecord($u, $args),
+            // **وسقفُ القيمة من الخادم لا من الوسائط**: المساعدُ التنفيذيّ يقرأ المحضرَ كاملاً
+            // (مسودةُ القرارات من أوّل ٣٠٠ حرفٍ تُسقط ما بعدها صامتةً)، والنموذجُ لا يختاره
+            'hub_record'  => self::toolRecord($u, $args, max(self::MAX_VALUE_CHARS, $maxValue)),
             'hub_count'   => self::toolCount($u, $args),
             'hub_findings' => self::toolFindings($u, $args),
+            'hub_semantic' => self::toolSemantic($u, $args),
         };
     }
 
@@ -331,7 +340,7 @@ final class AskTools
     }
 
     /** **صفٌّ واحدٌ بمعرّفِه** — و٤٠٤ خارجَ النطاقِ كما في الشاشةِ سواءً بسواء */
-    private static function toolRecord(mixed $u, array $args): array
+    private static function toolRecord(mixed $u, array $args, int $max = self::MAX_VALUE_CHARS): array
     {
         [$module, $def, $err] = self::resolveModule($u, $args);
         if ($err !== null) return self::fail('hub_record', $err);
@@ -349,7 +358,7 @@ final class AskTools
         }
 
         return self::ok('hub_record', $module,
-            self::project(collect([$row]), self::fieldMap($u, $module, $def)));
+            self::project(collect([$row]), self::fieldMap($u, $module, $def), $max));
     }
 
     /** **عدٌّ داخلَ النطاق** — ولا صفَّ يُسلَّم، فالعددُ وحدَه جوابُ سؤالٍ كثير */
@@ -391,6 +400,23 @@ final class AskTools
      * عميل) — ثمّ يُسقَط ما رفضه مديرٌ أو أجّله كما في الملخّص. فالموظّفُ لا يقرأ هنا حكمَ الآلة على
      * عمله (قرارُ المالك §٣.٦)، والمسودةُ ورابطُها لا يُسلَّمان (للمدير في شاشته).
      */
+    /** **العقلُ الثاني** — أقربُ السجلّات بالمعنى، محكومةً بنطاق السائل وحقوله (`Brain::search`) */
+    private static function toolSemantic(mixed $u, array $args): array
+    {
+        $q = trim((string) ($args['q'] ?? ''));
+        if (mb_strlen($q) < self::MIN_SEARCH_CHARS) return self::fail('hub_semantic', 'نصُّ البحثِ أقصرُ من حرفين');
+        if (! $u instanceof \App\Models\User || ! \App\Support\Ai\Brain\Brain::ready()) {
+            return self::fail('hub_semantic', 'البحثُ بالمعنى غيرُ مفعّل — استعمل hub_search');
+        }
+        $res = \App\Support\Ai\Brain\Brain::search($u, $q, min(8, self::MAX_ROWS));
+        if (! $res['ok']) return self::fail('hub_semantic', 'تعذّر البحثُ بالمعنى الآن — استعمل hub_search');
+
+        $rows = array_map(fn ($h) => ['id' => $h['id'], 'module' => $h['module'], 'label' => $h['label'],
+            'title' => $h['title'], 'score' => (string) $h['score']], $res['hits']);
+
+        return self::ok('hub_semantic', null, $rows, (bool) $res['partial']);
+    }
+
     private static function toolFindings(mixed $u, array $args): array
     {
         $module = null;
@@ -447,6 +473,50 @@ final class AskTools
         $q = self::scopedQuery($u, $module);
 
         return $q !== null && $q->whereKey($ids)->count() === count($ids);
+    }
+
+    /**
+     * **أيُّ هذه السجلّات في نطاقه الآن؟** — الاستعلامُ المُنطَّقُ نفسُه (للعقل الثاني: الحكمُ وقتَ الاستعلام
+     * على مرشَّحي البحث الدلاليّ قبل أن يبلغوا النموذج). وحدةٌ خارج كتالوجه ⇒ لا شيء.
+     *
+     * @param  list<string>  $ids
+     * @return list<string>
+     */
+    public static function visibleIds(mixed $u, string $module, array $ids): array
+    {
+        if ($ids === [] || ! isset(self::catalog($u)[$module])) return [];
+        $q = self::scopedQuery($u, $module);
+        if ($q === null) return [];
+
+        return $q->whereKey(array_values(array_unique(array_map('strval', $ids))))
+            ->orderBy('id')->pluck('id')->map(fn ($x) => (string) $x)->all();
+    }
+
+    /**
+     * عناوينُ سجلّاتٍ **يراها** — بحقل العرض إن لم يُحجب عنه، وإلّا وسمُ الوحدة. منقّحةٌ مقصوصة.
+     *
+     * @param  list<string>  $ids
+     * @return array<string, string>
+     */
+    public static function titles(mixed $u, string $module, array $ids): array
+    {
+        $def = (array) hub_mod($module);
+        $label = (string) ($def['label'] ?? $module);
+        $display = (string) ($def['display'] ?? '');
+        $fields = self::catalog($u)[$module]['fields'] ?? [];
+        $col = null;
+        foreach ((array) ($def['fields'] ?? []) as $f) {
+            if (($f['key'] ?? '') === $display && in_array($display, $fields, true)) $col = (string) ($f['col'] ?? $display);
+        }
+        $out = [];
+        $q = self::scopedQuery($u, $module);
+        if ($q === null || $ids === []) return $out;
+        foreach ($q->whereKey($ids)->orderBy('id')->get() as $row) {
+            $t = $col !== null ? trim((string) ($row->{$col} ?? '')) : '';
+            $out[(string) $row->id] = self::clip(Redactor::text($t !== '' ? $t : $label));
+        }
+
+        return $out;
     }
 
     /**
@@ -529,7 +599,10 @@ final class AskTools
         $class = self::modelOf($module);
         if ($class === null) return null;
 
-        return hub_client_scope(hub_scope($class::query(), $module, $u), $module);
+        // **وعدسةُ الجوال فوق النطاق** (`X-Lynomia-Company`/`X-Lynomia-Client`) كما في البحث: تضييقٌ
+        // لا توسيع، ولا أثرَ لها على الويب ولا في الطرفيّة (سماتُ الطلب غائبة)
+        return \App\Http\Middleware\MobileContext::apply(
+            hub_client_scope(hub_scope($class::query(), $module, $u), $module), $module);
     }
 
     /** `field => column` للحقولِ **المرئيّةِ لهذا المستخدم** وحدَها */
@@ -587,7 +660,7 @@ final class AskTools
     }
 
     /** يُسقِط الصفوفَ على الحقولِ المرئيّةِ **ويطمس ويقصّ** */
-    private static function project($rows, array $fields): array
+    private static function project($rows, array $fields, int $max = self::MAX_VALUE_CHARS): array
     {
         $out = [];
         foreach ($rows as $row) {
@@ -598,7 +671,7 @@ final class AskTools
                     $v = $v === null ? null : json_encode($v, JSON_UNESCAPED_UNICODE);
                 }
                 if ($v === null) continue;
-                $r[$key] = self::clip(Redactor::text((string) $v));
+                $r[$key] = self::clip(Redactor::text((string) $v), $max);
             }
             $out[] = $r;
         }
@@ -606,9 +679,9 @@ final class AskTools
         return $out;
     }
 
-    private static function clip(string $v): string
+    private static function clip(string $v, int $max = self::MAX_VALUE_CHARS): string
     {
-        return Str::limit($v, self::MAX_VALUE_CHARS, '…');
+        return Str::limit($v, $max, '…');
     }
 
     /** صنفُ الموديلِ إن وُجد — ووحدةٌ بلا موديلٍ لا أداةَ لها */

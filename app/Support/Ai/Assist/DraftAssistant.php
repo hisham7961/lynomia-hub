@@ -37,7 +37,8 @@ final class DraftAssistant
             'label' => 'مهمّةٌ من هذا السجلّ', 'icon' => '✅', 'source' => '*', 'target' => 'tasks',
             'fields' => ['title' => 'text', 'desc' => 'ta', 'priority' => 'sel', 'due' => 'date', 'estH' => 'num'],
             // حقلُ الهدف ⇐ حقلُ المصدر (أو معرّفُ المصدر نفسِه `@id`) — بلا نموذج
-            'carry' => ['projectId' => 'projectId', 'ticketId' => '@id:tickets', 'decisionId' => '@id:decisions'],
+            // والمشروعُ من عمود المصدر، **أو هو المصدرُ نفسُه** حين تُقترح المهمّةُ من صفحة مشروع
+            'carry' => ['projectId' => ['projectId', '@id:projects'], 'ticketId' => '@id:tickets', 'decisionId' => '@id:decisions'],
             'many' => false,
         ],
         'decisions' => [
@@ -55,6 +56,12 @@ final class DraftAssistant
     /** سقفُ مخرجات النداء — مقترحٌ لا مقالة */
     public const MAX_OUTPUT = 900;
 
+    /** أطولُ حقلٍ من المصدر يبلغ النموذج — المحضرُ كاملاً لا أوّلُ ٣٠٠ حرفٍ منه */
+    public const SOURCE_MAX_VALUE = 4000;
+
+    /** سقفُ نصِّ المصدر كلِّه داخل السياج */
+    public const SOURCE_MAX_TOTAL = 12000;
+
     /** أطولُ قيمةٍ تُحمَل في رابط التعبئة — والتحقّقُ الكاملُ عند الحفظ */
     public const MAX_VALUE = 1200;
 
@@ -65,7 +72,7 @@ final class DraftAssistant
 
     public static function profileKey(): string
     {
-        $k = trim((string) setting('assist.profile', AskPolicy::PROFILE));
+        $k = trim((string) setting('assist.profile', 'general'));
 
         return $k === '' ? AskPolicy::PROFILE : $k;
     }
@@ -106,12 +113,12 @@ final class DraftAssistant
     public static function draft(User $u, string $kind, string $module, string $id): array
     {
         $out = ['ok' => false, 'code' => null, 'message' => '', 'kind' => $kind, 'drafts' => [], 'text' => null,
-            'dropped' => [], 'source' => ['module' => $module, 'id' => $id]];
+            'dropped' => [], 'clipped' => false, 'source' => ['module' => $module, 'id' => $id]];
         $def = self::kindsFor($u, $module)[$kind] ?? null;
         if ($def === null) return ['code' => AskFailures::UNAUTHORIZED, 'message' => 'هذا النوعُ غيرُ متاحٍ لك على هذا السجلّ'] + $out;
 
         // ① المصدرُ بعين السائل — الحارسُ الذي يحرس الشاشة
-        $rec = AskTools::run('hub_record', ['module' => $module, 'id' => $id], $u);
+        $rec = AskTools::run('hub_record', ['module' => $module, 'id' => $id], $u, self::SOURCE_MAX_VALUE);
         if (! $rec['ok'] || $rec['rows'] === []) return ['code' => 'NOT_FOUND', 'message' => 'لا سجلَّ بهذا المعرّفِ في نطاقك'] + $out;
         $row = $rec['rows'][0];
 
@@ -122,11 +129,16 @@ final class DraftAssistant
         $auth = GovernedCompletion::authorize($u, self::profile(), AiPurposes::ASSIST, 'assist:' . Str::uuid());
         if (! $auth['ok']) return ['code' => (string) $auth['code'], 'message' => AskFailures::message((string) $auth['code'])] + $out;
         $gc = GovernedCompletion::open(self::profile(), $auth['gov'], [
-            'feature' => AiPurposes::ASSIST, 'max_calls' => 1, 'max_output' => self::MAX_OUTPUT, 'in_tokens' => 1500,
+            'feature' => AiPurposes::ASSIST, 'max_calls' => 1, 'max_output' => self::MAX_OUTPUT, 'in_tokens' => 4000,
         ]);
 
-        $res = AuditorAi::ask($gc, self::system($kind, $def, $allowed, $u, $target), [self::sourceText($module, $row)],
-            $target === null ? 'reply' : 'items', 6000);
+        // **والقصُّ يُقال لا يُخفى**: حقلٌ بلغ سقفَه أو نصٌّ جاوز السياج ⇒ المسودةُ بُنيت على بعض المصدر
+        $src = self::sourceText($module, $row);
+        $out['clipped'] = mb_strlen($src) > self::SOURCE_MAX_TOTAL
+            || collect($row)->contains(fn ($v) => is_string($v) && mb_strlen($v) > self::SOURCE_MAX_VALUE);
+
+        $res = AuditorAi::ask($gc, self::system($kind, $def, $allowed, $u, $target), [$src],
+            $target === null ? 'reply' : 'items', self::SOURCE_MAX_TOTAL);
         if (! $res['ok']) {
             return ['code' => (string) $res['code'], 'message' => AskFailures::message((string) $res['code'])] + $out;
         }
@@ -210,14 +222,17 @@ final class DraftAssistant
     {
         $out = [];
         $fields = collect((array) (hub_mod($target)['fields'] ?? []))->keyBy('key');
-        foreach ($map as $to => $from) {
+        foreach ($map as $to => $froms) {
             if (! $fields->has($to) || hub_field_mode($u, $target, $to) !== '') continue;
-            if (str_starts_with($from, '@id:')) {
-                if (substr($from, 4) === $module) $out[$to] = $id;
-                continue;
+            // مصادرُ بالترتيب — أوّلُ ما يُعطي قيمةً يكفي
+            foreach ((array) $froms as $from) {
+                if (str_starts_with($from, '@id:')) {
+                    if (substr($from, 4) === $module) { $out[$to] = $id; break; }
+                    continue;
+                }
+                $v = $row[$from] ?? null;
+                if (is_string($v) && Str::isUuid($v)) { $out[$to] = $v; break; }
             }
-            $v = $row[$from] ?? null;
-            if (is_string($v) && Str::isUuid($v)) $out[$to] = $v;
         }
 
         return $out;

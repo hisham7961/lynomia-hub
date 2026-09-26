@@ -76,19 +76,30 @@ class AskController extends Controller
         if ($r->filled('thread')) abort_if(AskMemory::open($r->user(), (string) $r->input('thread')) === null, 404);
 
         return response()->stream(function () use ($r) {
+            // **يُكمل وإن أُغلق التبويب**: النداءُ دُفع ثمنُه، فالتدقيقُ ودورُ الخيط يُكتبان ولو غاب المتلقّي
+            ignore_user_abort(true);
             $send = function (string $event, array $data): void {
+                if (connection_aborted()) return;
                 echo 'event: ' . $event . "\n" . 'data: ' . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
                 if (ob_get_level() > 0) @ob_flush();
                 flush();
             };
-            $data = $this->answer($r, function (array $p) use ($send) {
-                $send('progress', ['text' => match ($p['stage']) {
-                    'think' => 'يفكّر… (الخطوة ' . (int) ($p['step'] ?? 1) . ')',
-                    'read' => 'قرأ ' . ($p['label'] ? '«' . $p['label'] . '»' : 'بياناتٍ مُنطَّقة') . ' — ' . (int) ($p['rows'] ?? 0) . ' صفّاً',
-                    default => 'يعمل…',
-                }]);
-            });
-            $send('done', ['html' => view('ask.index', $data)->render()]);
+            // **والخطأُ بعد رأس 200 حدثٌ يُقال** — لا صفحةُ ٥٠٠ داخل بثٍّ بدأ فيقرؤها المتصفّحُ «انقطاعاً»
+            try {
+                $data = $this->answer($r, function (array $p) use ($send) {
+                    $send('progress', ['stage' => $p['stage'], 'text' => match ($p['stage']) {
+                        'think' => 'يفكّر… (الخطوة ' . (int) ($p['step'] ?? 1) . ')',
+                        'read' => 'قرأ ' . ($p['label'] ? '«' . $p['label'] . '»' : 'بياناتٍ مُنطَّقة') . ' — ' . (int) ($p['rows'] ?? 0) . ' صفّاً',
+                        default => 'يعمل…',
+                    }]);
+                });
+                $send('done', ['html' => view('ask.index', $data)->render()]);
+            } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e) {
+                $send('error', ['text' => $e->getStatusCode() === 404 ? 'لم تعُد هذه المحادثةُ موجودة' : 'تعذّر إكمالُ الطلب']);
+            } catch (\Throwable $e) {
+                report($e);
+                $send('error', ['text' => 'تعذّر إكمالُ الجواب بسبب خطأٍ في الخادم — حاول مجدّداً']);
+            }
         }, 200, [
             'Content-Type' => 'text/event-stream; charset=UTF-8',
             'Cache-Control' => 'no-cache, no-store',

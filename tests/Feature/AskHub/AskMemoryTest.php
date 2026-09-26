@@ -301,12 +301,33 @@ class AskMemoryTest extends TestCase
 
         $label = (string) hub_mod('projects')['label'];
         $this->assertStringContainsString('event: progress', $body);
-        $this->assertStringContainsString($label, $body, 'القراءةُ المُنطَّقةُ تُبلَّغ بوحدتها');
         $before = strstr($body, 'event: done', true);
         $this->assertNotFalse($before, 'لا حدثَ ختام');
+        // **قبل الختام** لا في الجسد كلِّه — فصفحةُ الختام تطبع وسمَ المصدر أصلاً فتُخفي غيابَ حدث القراءة
+        $this->assertStringContainsString('"stage":"read"', $before, 'حدثُ القراءة يُبثّ أثناء العمل');
+        $this->assertStringContainsString($label, $before, 'القراءةُ المُنطَّقةُ تُبلَّغ بوحدتها قبل الختام');
         $this->assertStringNotContainsString('QWXZ-STREAM', $before, 'لا حرفَ من الجواب قبل مصادقة مراجعه');
         $this->assertStringContainsString('QWXZ-STREAM', substr($body, strlen($before)), 'الختامُ يحمل الصفحةَ بالجواب');
         $this->assertSame(1, AskTurn::query()->count(), 'البثُّ يحفظ كالعرض العاديّ');
+    }
+
+    public function test_خطأُ_الخادم_بعد_بدء_البثّ_حدثٌ_يُقال_لا_انقطاع(): void
+    {
+        $u = $this->asker();
+        $this->ready();
+        $this->app->instance(AskGenerator::class, new class implements AskGenerator {
+            public function step(string $envelope, array $tools, array $history): array { throw new \RuntimeException('QWXZ-INTERNAL-DETAIL'); }
+            public function asking(string $question): void {}
+            public function isLive(): bool { return false; }
+            public function label(): string { return 'عطِب'; }
+            public function govern(array $ctx): void {}
+        });
+
+        $body = $this->actingAs($u)->post(route('ask.stream'), ['q' => 'ما مشاريعي؟'])->assertOk()->streamedContent();
+
+        $this->assertStringContainsString('event: error', $body);
+        $this->assertStringNotContainsString('event: done', $body);
+        $this->assertStringNotContainsString('QWXZ-INTERNAL-DETAIL', $body, 'تفصيلُ الاستثناء لا يبلغ المتصفّح');
     }
 
     public function test_البثُّ_بحرّاس_السؤال_نفسِها(): void

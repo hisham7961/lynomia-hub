@@ -108,6 +108,25 @@ class MobileAskTest extends TestCase
         return $this->bearer($this->mobileLogin($u)['access_token']);
     }
 
+    public function test_عدسةُ_الشركة_في_الجوال_تضيّق_قراءاتِ_المساعد(): void
+    {
+        $other = Company::create(['name_ar' => 'شركةٌ ثانية']);
+        Project::create(['name' => 'مشروعُ الثانية QWXZ-OTHER-CO', 'company_id' => $other->id]);
+        $u = $this->asker();
+        $u->companies = [$this->company->id, $other->id];
+        $u->save();
+        $this->actingAs($u);
+
+        $all = \App\Support\Ai\Ask\AskTools::run('hub_list', ['module' => 'projects'], $u);
+        $this->assertCount(2, $all['rows'], 'بلا عدسةٍ: كلُّ ما في نطاقه');
+
+        // ما يضعه `MobileContext` بعد التحقّق من الترويسة
+        request()->attributes->set('mobile_company', $this->company->id);
+        $narrow = \App\Support\Ai\Ask\AskTools::run('hub_list', ['module' => 'projects'], $u);
+        $this->assertCount(1, $narrow['rows'], 'الجوابُ يطابق الشركةَ المعروضة في التطبيق');
+        $this->assertStringNotContainsString('QWXZ-OTHER-CO', json_encode($narrow, JSON_UNESCAPED_UNICODE));
+    }
+
     public function test_السؤالُ_والمتابعةُ_والخيوطُ_لصاحبها(): void
     {
         $u = $this->asker();
