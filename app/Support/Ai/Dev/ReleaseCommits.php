@@ -20,7 +20,7 @@ final class ReleaseCommits
 
     public static function enabled(): bool
     {
-        return (string) setting('dev.github_commits', '1') === '1';
+        return (string) setting('dev.github_commits', '0') === '1';
     }
 
     /** `[owner, repo]` من رابط github.com — أو `null` */

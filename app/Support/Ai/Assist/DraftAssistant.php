@@ -63,7 +63,7 @@ final class DraftAssistant
         'notes' => [
             'label' => 'ملاحظاتُ الإصدار', 'icon' => '📝', 'source' => 'code', 'target' => null,
             'fields' => [], 'carry' => [], 'many' => false,
-            'input' => ['name' => 'log', 'label' => 'سجلُّ الالتزامات (اختياريّ) — ألصق ناتجَ git log --oneline، أو اتركه فارغاً ليُجلَب من GitHub إن كان للإصدار مستودعٌ والتزام', 'max' => 8000],
+            'input' => ['name' => 'log', 'label' => 'سجلُّ التغييرات (اختياريّ) — ألصقه هنا، أو اتركه فارغاً ليُقرأ من الملفّ المرفق بالإصدار', 'max' => 8000],
         ],
     ];
 
@@ -160,6 +160,11 @@ final class DraftAssistant
             if ($log !== '') {
                 $parts[] = "سجلُّ الالتزامات كما ألصقه المستخدم:\n" . mb_substr($log, 0, (int) $def['input']['max']);
                 $out['commits'] = ['source' => 'paste', 'why' => null];
+            } elseif (($file = self::releaseFile($u, $id)) !== null) {
+                // **ملفٌّ مرفقٌ بالإصدار** (سجلُّ التغييرات يُرفع مع التحديث) — لا ربطَ بمستودع
+                $parts[] = "سجلُّ التغييرات من الملفّ المرفق بالإصدار:\n" . $file['text'];
+                $out['commits'] = ['source' => 'file', 'why' => null, 'name' => $file['name']];
+                if ($file['clipped']) $out['clipped'] = true;
             } else {
                 $out['commits'] = self::githubCommits($u, $id, $row);
                 if ($lines = $out['commits']['lines'] ?? []) {
@@ -345,6 +350,34 @@ final class DraftAssistant
      *
      * @return array{source: ?string, why: ?string, total?: int, lines?: list<string>}
      */
+    /** امتداداتُ ملفّ سجلّ التغييرات المقبولة — نصٌّ فقط */
+    public const RELEASE_FILE_EXT = ['txt', 'md', 'markdown', 'log', 'text', 'csv', 'json', 'yml', 'yaml'];
+
+    /**
+     * **ملفُّ الإصدار المرفق** — إن كان حقلُ الملفّ ظاهراً للسائل، والملفُّ نصّاً مرفوعاً بالنظام (القرصُ الخاصّ،
+     * تحت `hub/`، بلا `..`)، وحجمُه معقول. يُقرأ أوّلُه حتى سقف اللصق نفسِه، والقصُّ يُقال.
+     *
+     * @return ?array{text: string, name: string, clipped: bool}
+     */
+    private static function releaseFile(User $u, string $id): ?array
+    {
+        if (! in_array('file', (array) (AskTools::catalog($u)['code']['fields'] ?? []), true)) return null;
+        $rel = \App\Models\CodeRelease::query()->find($id);
+        $path = (string) ($rel?->file_id ?? '');
+        if ($path === '' || ! str_starts_with($path, 'hub/') || str_contains($path, '..')) return null;
+        $meta = is_array($rel->meta) ? $rel->meta : (json_decode((string) $rel->meta, true) ?: []);
+        $name = (string) ($meta['files']['file_id']['name'] ?? '') ?: basename($path);   // الاسمُ الأصليّ (stampFileName)
+        $ext = mb_strtolower(pathinfo($name, PATHINFO_EXTENSION) ?: pathinfo($path, PATHINFO_EXTENSION));
+        if (! in_array($ext, self::RELEASE_FILE_EXT, true)) return null;
+        $disk = \Illuminate\Support\Facades\Storage::disk('local');
+        if (! $disk->exists($path) || $disk->size($path) > 512 * 1024) return null;
+        $text = trim((string) $disk->get($path));
+        if ($text === '' || ! mb_check_encoding($text, 'UTF-8')) return null;
+        $max = (int) self::KINDS['notes']['input']['max'];
+
+        return ['text' => mb_substr($text, 0, $max), 'name' => $name, 'clipped' => mb_strlen($text) > $max];
+    }
+
     private static function githubCommits(User $u, string $id, array $row): array
     {
         $repo = (string) ($row['repo'] ?? '');
@@ -352,7 +385,7 @@ final class DraftAssistant
         $parsed = \App\Support\Ai\Dev\ReleaseCommits::repo($repo);
         if ($parsed === null) return ['source' => null, 'why' => null];
         $fields = (array) (AskTools::catalog($u)['code']['fields'] ?? []);
-        $cur = \App\Models\CodeRelease::query()->whereKey($id)->first(['id', 'project_id', 'app_id', 'date']);
+        $cur = \App\Models\CodeRelease::query()->find($id, ['id', 'project_id', 'app_id', 'date']);
         if ($cur === null || ! in_array('commit', $fields, true) || ! in_array('date', $fields, true) || $cur->date === null) {
             return ['source' => null, 'why' => 'لا تاريخَ ظاهرٌ للإصدار أو لا التزامَ ظاهرٌ — ألصق السجلَّ يدويّاً'];
         }

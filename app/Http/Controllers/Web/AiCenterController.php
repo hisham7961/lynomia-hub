@@ -48,7 +48,20 @@ class AiCenterController extends Controller
             'sections' => \App\Support\Ai\Center\AiAccess::sections(),
             'section'  => 'overview',
             'manage'   => \App\Support\Ai\Center\AiAccess::canManage(),
+            'quick'    => \App\Support\Ai\Center\AiAccess::canManage() ? \App\Support\Ai\Center\AiQuickSetup::plan() : null,
         ]);
+    }
+
+    /** **الإعدادُ السريع** — الفارغُ وحدَه، وكلُّ ضمٍّ عبر `AiProfiles::attach` بحرّاسه وأثره */
+    public function quickSetup(Request $r)
+    {
+        $this->gate();
+        $data = $r->validate(['usd' => ['required', 'integer', 'min:0', 'max:1000000'], 'brain' => ['nullable', 'boolean']]);
+        $res = \App\Support\Ai\Center\AiQuickSetup::apply((int) $data['usd'], (bool) ($data['brain'] ?? false));
+
+        return redirect()->route('ai.index')->with('ok', '✅ الإعدادُ السريع: ' . $res['attached'] . ' ضمّاً'
+            . ($res['budget'] ? ' · ميزانيّةٌ شهريّةٌ أُنشئت' : '')
+            . ($res['brain'] ? ' · البحثُ بالمعنى مفعَّل (الفهرسةُ في جولة الأتمتة التالية)' : ''));
     }
 
     /**

@@ -27,7 +27,9 @@
         <div class="askanswer" id="assist-reply">{{ $result['text'] }}</div>
         <button class="btn sm" type="button"
                 onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('assist-reply').innerText); this.textContent = '✓ نُسخ'">📋 انسخ</button>
-        @if (($result['commits']['source'] ?? null) === 'github')
+        @if (($result['commits']['source'] ?? null) === 'file')
+            <div class="sub" data-assist-commits>📎 سجلُّ التغييرات قُرئ من الملفّ المرفق: {{ $result['commits']['name'] ?? '' }}</div>
+        @elseif (($result['commits']['source'] ?? null) === 'github')
             <div class="sub" data-assist-commits>🔗 الالتزاماتُ جُلبت من GitHub — أُرسل {{ $result['commits']['sent'] ?? 0 }} من {{ $result['commits']['total'] ?? 0 }}</div>
         @elseif (! empty($result['commits']['why']))
             <div class="sub mut" data-assist-commits>ℹ️ لم تُجلب الالتزامات: {{ $result['commits']['why'] }}</div>

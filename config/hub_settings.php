@@ -1397,8 +1397,8 @@ return [
             'dev.github_commits' => [
                 'label'  => 'جلبُ التزامات الإصدار من GitHub',
                 'type'   => 'onoff',
-                'def'    => 'مفعَّل',
-                'default'     => '1',
+                'def'    => 'مطفأ',
+                'default'     => '0',
                 'doc'         => 'في «ملاحظات الإصدار»: إن تُرك حقلُ السجلّ فارغاً وكان للإصدار وللإصدار السابق التزامٌ ومستودعٌ على github.com، تُجلب الالتزاماتُ بينهما.',
                 'effect' => 'قراءةٌ فقط من api.github.com (المضيفُ ثابت — حقلُ المستودع لا يوجّه الطلبَ إلى غيره). ويُرسَل إلى GitHub اسمُ المستودع والالتزامان لا غير.',
                 'where'  => 'Support/Ai/Dev/ReleaseCommits ← DraftAssistant (notes)',

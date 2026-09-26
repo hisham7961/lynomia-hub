@@ -6025,6 +6025,16 @@
         ]
     },
     {
+        "methods": "POST",
+        "uri": "admin/ai/quick-setup",
+        "name": "ai.quick_setup",
+        "action": "App\\Http\\Controllers\\Web\\AiCenterController@quickSetup",
+        "middleware": [
+            "web",
+            "auth"
+        ]
+    },
+    {
         "methods": "GET|HEAD",
         "uri": "admin/ai/models",
         "name": "ai.models.all",

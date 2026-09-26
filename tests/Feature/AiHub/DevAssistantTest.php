@@ -336,6 +336,7 @@ class DevAssistantTest extends TestCase
 
     private function releases(array $cur = [], array $prev = []): string
     {
+        Settings::put('dev.github_commits', '1', 'test');   // مطفأٌ افتراضاً — هذه اختباراتُه
         $pid = $this->row('projects', ['name' => 'مشروع', 'company_id' => $this->alpha->id]);
         $this->row('code_releases', $prev + ['ver' => '1.0.0', 'project_id' => $pid, 'date' => '2031-01-07',
             'repo' => 'https://github.com/acme/hub', 'commit' => 'aaaaaaa']);
@@ -406,6 +407,7 @@ class DevAssistantTest extends TestCase
 
     public function test_السابقُ_للمقارنة_من_المستودع_نفسِه_ولا_مقارنةَ_بلا_تاريخ(): void
     {
+        Settings::put('dev.github_commits', '1', 'test');
         $pid = $this->row('projects', ['name' => 'مشروع', 'company_id' => $this->alpha->id]);
         $this->row('code_releases', ['ver' => '0.9', 'project_id' => $pid, 'date' => '2031-01-01', 'repo' => 'https://github.com/acme/hub', 'commit' => 'aaaaaaa']);
         $this->row('code_releases', ['ver' => 'web', 'project_id' => $pid, 'date' => '2031-01-20', 'repo' => 'https://github.com/acme/other', 'commit' => 'ccccccc']);
@@ -420,5 +422,53 @@ class DevAssistantTest extends TestCase
         $r = DraftAssistant::draft($this->member(), 'notes', 'code', $noDate);
         $this->assertSame([], $this->gh);
         $this->assertStringContainsString('تاريخ', (string) $r['commits']['why']);
+    }
+
+    // ═══ سجلُّ التغييرات من الملفّ المرفق بالإصدار (بلا GitHub) ═══
+
+    private function releaseWithFile(string $name, string $content, ?string $path = null): string
+    {
+        $path ??= 'hub/' . Str::random(20) . '.txt';
+        if (! str_contains($path, '..')) \Illuminate\Support\Facades\Storage::disk('local')->put($path, $content);
+        $pid = $this->row('projects', ['name' => 'مشروع', 'company_id' => $this->alpha->id]);
+
+        return $this->row('code_releases', ['ver' => '2.0', 'project_id' => $pid, 'date' => '2031-05-01',
+            'repo' => 'https://github.com/acme/hub', 'commit' => 'eeeeeee', 'file_id' => $path,
+            'meta' => json_encode(['files' => ['file_id' => ['name' => $name]]])]);
+    }
+
+    public function test_الملفُّ_المرفقُ_بالإصدار_يُقرأ_ولا_يُنادى_GitHub_افتراضاً(): void
+    {
+        $rel = $this->releaseWithFile('CHANGELOG.md', "## 2.0\n- QWXZ-FROM-FILE إضافةُ تصدير الفواتير");
+        $this->replies = [['reply' => ['- سطر']]];
+
+        $r = DraftAssistant::draft($this->member(), 'notes', 'code', $rel);
+
+        $this->assertTrue($r['ok'], (string) $r['message']);
+        $this->assertSame('file', $r['commits']['source']);
+        $this->assertSame('CHANGELOG.md', $r['commits']['name']);
+        $this->assertStringContainsString('QWXZ-FROM-FILE', $this->sentText());
+        $this->assertSame([], $this->gh, 'لا ربطَ بـGitHub');
+    }
+
+    public function test_الملفُّ_لا_يُقرأ_بحقلٍ_محجوبٍ_ولا_خارج_hub_ولا_غير_نصّ(): void
+    {
+        $this->replies = [['reply' => ['- سطر']]];
+        // مسارٌ يهرب من مجلّد الرفع
+        $esc = $this->releaseWithFile('notes.txt', '', '../../.env');
+        $this->assertNull(DraftAssistant::draft($this->member(), 'notes', 'code', $esc)['commits']['source']);
+        // امتدادٌ غيرُ نصّيّ
+        $bin = $this->releaseWithFile('build.zip', 'QWXZ-ZIP', 'hub/' . Str::random(12) . '.zip');
+        DraftAssistant::draft($this->member(), 'notes', 'code', $bin);
+        $this->assertStringNotContainsString('QWXZ-ZIP', $this->sentText());
+        // حقلُ الملفّ محجوبٌ عن السائل
+        $rel = $this->releaseWithFile('CHANGELOG.md', 'QWXZ-HIDDEN-FILE');
+        $role = Role::create(['name' => 'بلا ملفّ ' . Str::random(4), 'scope' => 'all', 'flags' => [AskPolicy::FLAG => 1],
+            'matrix' => collect(array_keys(config('hub.modules')))->mapWithKeys(fn ($m) => [$m => ['v' => 1, 'a' => 1, 'e' => 1, 'd' => 0]])->all(),
+            'field_rules' => ['code' => ['file' => 'hide']]]);
+        $u = User::create(['name' => 'م', 'email' => Str::random(9) . '@dev.local', 'password' => 'Secret!2026x',
+            'role_id' => $role->id, 'status' => 'نشط', 'password_changed_at' => now(), 'companies' => [$this->alpha->id]]);
+        DraftAssistant::draft($u, 'notes', 'code', $rel);
+        $this->assertStringNotContainsString('QWXZ-HIDDEN-FILE', $this->sentText());
     }
 }
