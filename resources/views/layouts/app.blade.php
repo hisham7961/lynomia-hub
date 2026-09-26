@@ -9,7 +9,7 @@
      لا يصطدم بسقف الطلب الواحد، و`kb` سقفُ النظام النهائي. بالكيلوبايت. --}}
 @php $upc = hub_upload_cap(); @endphp
 <meta name="hub-upload" content="{{ $upc['kb'] }},{{ $upc['chunkAt'] }},{{ $upc['appKb'] }}">
-<script>(function(){var t=localStorage.getItem('lyn_theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.dataset.theme='dark'})()</script>
+<script nonce="{{ \App\Support\Security\ContentSecurity::nonce() }}">(function(){var t=localStorage.getItem('lyn_theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.dataset.theme='dark'})()</script>
 <title>@yield('title', 'لوحة التحكم') — {{ setting('app.name', config('app.name')) }}</title>
 <link href="{{ asset('css/fonts.css') }}?v={{ config('hub.version') }}" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ config('hub.version') }}">

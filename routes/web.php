@@ -35,6 +35,18 @@ Route::get('healthz', [OpsController::class, 'health'])->name('healthz')->middle
         \App\Http\Middleware\Require2faForPrivileged::class, \App\Http\Middleware\ResolveChunkedUploads::class,
         \App\Http\Middleware\DownloadPing::class, \App\Http\Middleware\AccessRadar::class]);
 
+// ── تقاريرُ CSP (بند الدَّين #12 · FE-03): وجهةُ `report-uri` لسياسة السكربتات ──
+// عامّةٌ بالضرورة (المتصفّحُ يرسلها بلا رمز CSRF — مستثناةٌ في bootstrap/app.php)، ومجرَّدةٌ
+// من وسطاء الجلسة/الصيانة/البوّابة كي لا يُحوَّل التقريرُ أو يُحسَب زيارة. حصانتُها في
+// متحكّمها: صفحاتُنا وحدها، وسقفٌ يوميٌّ عامّ، وحدُّ معدّلٍ هنا لكل عنوان.
+Route::post('csp-report', [\App\Http\Controllers\Web\CspReportController::class, 'store'])->name('csp.report')
+    ->middleware('throttle:30,1')
+    ->withoutMiddleware([\App\Http\Middleware\HubMaintenance::class, \App\Http\Middleware\WorkHours::class,
+        \App\Http\Middleware\SessionSentry::class, \App\Http\Middleware\TrackVisits::class,
+        \App\Http\Middleware\Require2faForPrivileged::class, \App\Http\Middleware\ForcePasswordChange::class,
+        \App\Http\Middleware\PortalGuard::class, \App\Http\Middleware\ResolveChunkedUploads::class,
+        \App\Http\Middleware\DownloadPing::class, \App\Http\Middleware\AccessRadar::class]);
+
 // ── PWA: بيان وأيقونة وصفحة بلا اتصال (عامة) ──
 Route::get('manifest.webmanifest', [PwaController::class, 'manifest'])->name('pwa.manifest');
 Route::get('pwa-icon.svg', [PwaController::class, 'icon'])->name('pwa.icon');

@@ -77,7 +77,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         // الويبهوك الوارد سطحٌ آليّ لا نموذج له: يُصادَق بالرمز في الرابط + توقيع
         // HMAC، فلا CSRF عليه (المُرسِل خدمةٌ خارجية لا متصفّح يحمل الرمز).
-        $middleware->validateCsrfTokens(except: ['hook/*']);
+        // وتقاريرُ CSP يرسلها المتصفّحُ آلياً بلا رمز (بند الدَّين #12) — متحكّمُها لا يكتب إلا بلاغاً محدوداً.
+        $middleware->validateCsrfTokens(except: ['hook/*', 'csp-report']);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // كل استثناء يُجمَّع في مركز الأخطاء (بلا كسر المعالجة الأصلية)
