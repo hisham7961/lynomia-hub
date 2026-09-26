@@ -514,6 +514,7 @@
     "App\\Support\\Ops\\Remediation",
     "App\\Support\\Ops\\SchemaGuard",
     "App\\Support\\Ops\\Series",
+    "App\\Support\\Ops\\SnapshotIsolation",
     "App\\Support\\Ops\\SysMonitor",
     "App\\Support\\Ops\\Uptime",
     "App\\Support\\Ops\\WebhookDispatcher",

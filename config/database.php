@@ -27,6 +27,10 @@ return [
 
     'migrations' => ['table' => 'migrations', 'update_date_on_publish' => true],
 
+    // MariaDB ≥ 11: إبقاءُ `innodb_snapshot_isolation` الافتراضيّ الجديد (true) أو دلالةِ 10.11 التي
+    // بُنيت عليها حرّاسُ التزامن (false · الافتراض) — App\Support\Ops\SnapshotIsolation
+    'snapshot_isolation' => (bool) env('DB_SNAPSHOT_ISOLATION', false),
+
     'redis' => [
         'client' => env('REDIS_CLIENT', 'phpredis'),
         'options' => ['cluster' => 'redis', 'prefix' => env('REDIS_PREFIX', 'lynomia_')],

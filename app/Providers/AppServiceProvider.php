@@ -48,6 +48,12 @@ class AppServiceProvider extends ServiceProvider
         // ولا بياناتٍ فيها تُفقد. والاختبارُ الذي يفحص الحاجز يستدعيه صراحةً.
         if (! $this->app->runningUnitTests()) \App\Support\Ops\SchemaGuard::shield();
 
+        // دلالةُ القراءة القافلة التي بُنيت عليها حرّاسُ التزامن — على MariaDB 11 أيضاً
+        // (قبل أوّل استعلام: `setting()` أدناه أوّلُ من يفتح الاتّصال)
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Database\Events\ConnectionEstablished::class,
+            fn ($e) => \App\Support\Ops\SnapshotIsolation::apply($e->connection));
+        foreach (\Illuminate\Support\Facades\DB::getConnections() as $c) \App\Support\Ops\SnapshotIsolation::apply($c);
+
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
         }

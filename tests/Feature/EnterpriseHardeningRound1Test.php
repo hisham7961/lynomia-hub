@@ -169,12 +169,14 @@ class EnterpriseHardeningRound1Test extends TestCase
         $this->assertStringNotContainsString('QQ-FOREIGN-CO', $html, 'مركزُ الهوية يسرّب شركاتٍ أجنبية');
 
         $up = $this->userWith([], 'proj');
-        $p1 = Project::create(['name' => 'مشروعي PPA', 'manager_id' => $up->id]);
-        Project::create(['name' => 'مشروع سري PPB', 'manager_id' => $this->owner->id]);
+        // والوسمُ بشرطةٍ للسبب نفسِه أعلاه: «PPB» وقع فعلاً داخلَ اسمِ مستخدمٍ عشوائيّ («uPPBw»)
+        // في القائمة المنسدلة فسقطت الحزمة (v2.603.8) — والشرطةُ لا ترد في الأسماءِ العشوائيّة
+        $p1 = Project::create(['name' => 'مشروعي PP-OWN-PROJ', 'manager_id' => $up->id]);
+        Project::create(['name' => 'مشروع سري PP-FOREIGN-PROJ', 'manager_id' => $this->owner->id]);
         $asset = Asset::create(['name' => 'لابتوب', 'project_id' => $p1->id]);
         $html = $this->actingAs($up)->get('/m/assets/' . $asset->id)->assertOk()->getContent();
-        $this->assertStringContainsString('PPA', $html);
-        $this->assertStringNotContainsString('PPB', $html, 'بطاقةُ العهدة تسرّب مشاريعَ خارج النطاق');
+        $this->assertStringContainsString('PP-OWN-PROJ', $html);
+        $this->assertStringNotContainsString('PP-FOREIGN-PROJ', $html, 'بطاقةُ العهدة تسرّب مشاريعَ خارج النطاق');
 
         Client::create(['name' => 'عميل ألف', 'company_id' => $ca->id]);
         Client::create(['name' => 'عميل باء CFB', 'company_id' => $cb->id]);
