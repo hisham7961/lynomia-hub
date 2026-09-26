@@ -70,6 +70,18 @@ Route::middleware('guest')->group(function () {
     Route::get('login/otp', [AuthController::class, 'otpShow'])->name('login.otp');
     Route::post('login/otp', [AuthController::class, 'otpVerify'])->name('login.otp.verify')
         ->middleware('throttle:6,1');
+
+    // استعادةُ كلمة المرور ذاتيّاً (بندُ الدَّين #15 · AUTH-09) — طلبُ رابطٍ بالبريد ثم
+    // نموذجُ كلمةٍ جديدة. ردٌّ واحدٌ وُجد البريدُ أم لم يوجد، ورموزٌ مجزّأةٌ منتهية،
+    // وخانقٌ مسمّى على البريد والعنوان. رايتُها auth.pw_reset_on.
+    Route::get('password/forgot', [\App\Http\Controllers\Web\PasswordResetController::class, 'request'])
+        ->name('password.request')->middleware('throttle:30,1');
+    Route::post('password/forgot', [\App\Http\Controllers\Web\PasswordResetController::class, 'email'])
+        ->name('password.email')->middleware('throttle:password-reset');
+    Route::get('password/reset/{token}', [\App\Http\Controllers\Web\PasswordResetController::class, 'show'])
+        ->name('password.reset')->middleware('throttle:30,1');
+    Route::post('password/reset', [\App\Http\Controllers\Web\PasswordResetController::class, 'update'])
+        ->name('password.update')->middleware('throttle:10,1');
 });
 
 // التوقيع الإلكتروني — الجهة العامة: العميل بلا حساب، برابط خاص وكلمة سر

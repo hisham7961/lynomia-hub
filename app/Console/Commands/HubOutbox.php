@@ -45,7 +45,7 @@ class HubOutbox extends Command
             ->whereIn('channel', ['tg', 'mail'])
             ->when($only !== '', fn ($q) => $q->where('id', $only))
             ->when($retryCols, fn ($q) => $q->where(fn ($w) => $w->whereNull('next_at')->orWhere('next_at', '<=', now())))
-            ->orderByRaw("CASE WHEN kind IN ('sign_otp', 'otp', 'test') THEN 0 ELSE 1 END")
+            ->orderByRaw("CASE WHEN kind IN ('sign_otp', 'otp', 'password_reset', 'test') THEN 0 ELSE 1 END")
             ->orderBy('created_at')->orderBy('id')
             ->limit($only !== '' ? 1 : (int) $this->option('limit'))
             ->get();

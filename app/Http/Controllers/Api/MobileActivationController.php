@@ -92,7 +92,9 @@ class MobileActivationController extends Controller
         // الكلمةُ **قبل** حرق الرمز: كلمةٌ ضعيفةٌ لا تُهدر رمزاً صالحاً (422 حقلية)
         $data = $r->validate([
             'otp' => ['required', 'string'],
-            'password' => ['required', 'confirmed', password_rules()],
+            // وسجلُّ الكلمات السابقة (بندُ الدَّين #15) — نظيرُ set الويبيّ حرفاً
+            'password' => ['required', 'confirmed', password_rules(),
+                \App\Support\Security\PasswordHistory::rule($act->user)],
         ], [], ['otp' => 'رمز التحقق', 'password' => 'كلمة المرور']);
 
         $input = preg_replace('/\D/', '', hub_str($data['otp']));

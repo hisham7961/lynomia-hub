@@ -108,6 +108,18 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        // (بندُ الدَّين #15 · AUTH-09) الاستعادةُ الذاتيّة: سقفٌ على البريد نفسِه (وُجد أم لم
+        // يوجد — فالسقفُ لا يصير أوراكلَ تعداد) يمنع إغراقَ صندوقِ ضحيّةٍ بالروابط،
+        // وسقفٌ على العنوان يصدّ المسحَ على قوائم بريد. والوسيطُ يقع قبل المتحكّم.
+        RateLimiter::for('password-reset', function ($request) {
+            $email = mb_strtolower(trim((string) $request->input('email')));
+
+            return [
+                Limit::perHour(5)->by('pwreset:' . sha1($email)),
+                Limit::perMinute(5)->by('pwreset-ip:' . $request->ip()),
+            ];
+        });
+
         /**
          * ختمُ تغيّر الجداول: كل كتابةٍ ترفع عدّاد جدولها، ومفاتيح الشاشات
          * المحسوبة تحمل الختم — فتُبطَل خبيئتُها لحظةَ تتغيّر بياناتها لا بعد

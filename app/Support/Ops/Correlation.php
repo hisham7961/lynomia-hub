@@ -115,7 +115,10 @@ final class Correlation
                 $rows[] = ['at' => (string) $o->created_at, 'kind' => 'outbox',
                     'severity' => ($o->state ?? '') === 'failed' ? 'high' : 'info',
                     'title' => 'رسالة صادرة (' . $o->channel . ') — ' . $o->state,
-                    'why' => mb_substr(Redactor::text((string) $o->text), 0, 160),
+                    // النوعُ السرّيُّ (رمزُ تحقّق/رابطُ استعادة) يُحجب كلّه كما في شاشة المراسلة
+                    'why' => in_array((string) ($o->kind ?? ''), \App\Support\Ops\Integrations::SECRET_OUTBOX_KINDS, true)
+                        ? \App\Support\Ops\Integrations::outboxPreview((string) $o->kind, null)
+                        : mb_substr(Redactor::text((string) $o->text), 0, 160),
                     'url' => route('integrations.messaging'), 'meta' => []];
             }
         }

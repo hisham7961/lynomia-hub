@@ -242,7 +242,8 @@ class ProfileController extends Controller
     {
         $r->validate([
             'current'  => ['required', 'current_password'],
-            'password' => ['required', 'confirmed', password_rules()],
+            // وسجلُّ الكلمات السابقة (بندُ الدَّين #15): لا عودةَ إلى إحدى آخر N — ومنها الحاليّة
+            'password' => ['required', 'confirmed', password_rules(), \App\Support\Security\PasswordHistory::rule($r->user())],
         ], [
             'current.current_password' => 'كلمة المرور الحالية غير صحيحة',
             'password.confirmed'       => 'تأكيد كلمة المرور غير مطابق',

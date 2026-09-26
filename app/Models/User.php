@@ -68,6 +68,14 @@ class User extends Authenticatable
                 throw new \InvalidArgumentException('حالةُ مستخدمٍ غيرُ صالحة: ' . $u->status);
             }
         });
+
+        // سجلُّ كلمات المرور (بندُ الدَّين #15 · AUTH-08): كلُّ كتابةٍ على `password`
+        // — من أيِّ مسار — تُدوَّن تجزيئاً هنا لا في كلِّ متحكّمٍ على حدة، فلا مسارَ ينساه.
+        static::saved(function (self $u): void {
+            if ($u->wasRecentlyCreated ? filled($u->getAttributes()['password'] ?? null) : $u->wasChanged('password')) {
+                \App\Support\Security\PasswordHistory::record($u);
+            }
+        });
     }
 
     /* ────────── الحالة: تطبيعٌ عند الكتابة وحكمٌ موحّد عند القراءة (F31) ────────── */
@@ -106,6 +114,15 @@ class User extends Authenticatable
     public function isSuspended(): bool
     {
         return ! $this->isActive();
+    }
+
+    /**
+     * رابطُ الاستعادة يسلك صندوقَ الصادر (قناةُ البريد) لا إشعارَ الإطار — المسارُ
+     * الصادرُ الوحيد (بندُ الدَّين #15 · AUTH-09 · PasswordResetController::deliver).
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        \App\Http\Controllers\Web\PasswordResetController::deliver($this, (string) $token);
     }
 
     public function role(): BelongsTo

@@ -114,13 +114,20 @@ class Integrations
     }
 
     /**
+     * أنواعُ رسائلِ الصادر التي يحمل نصُّها **سرّاً سارياً** فلا يُعرض على أيِّ شاشة:
+     * رموزُ التحقّق، ورابطُ استعادة كلمة المرور (بندُ الدَّين #15) — رابطٌ ساري
+     * المفعول على شاشةِ تشغيلٍ هو الاستيلاءُ على الحساب بنقرة.
+     */
+    public const SECRET_OUTBOX_KINDS = ['sign_otp', 'otp', 'password_reset'];
+
+    /**
      * (WP-2.6) معاينةُ نصِّ رسالةٍ صادرةٍ للعرض التشخيصيّ: أنواعُ رموز التحقّق
      * (`sign_otp`/`otp`) تُحجب كلياً — رمزٌ ساري المفعول معروضٌ على شاشةٍ هو
      * تجاوزُ قناة التحقّق نفسِها — وسائرُ الأنواع تمرّ بالمُطهِّر الواحد ثم تُقصّ.
      */
     public static function outboxPreview(?string $kind, ?string $text, int $limit = 70): string
     {
-        if (in_array((string) $kind, ['sign_otp', 'otp'], true)) {
+        if (in_array((string) $kind, self::SECRET_OUTBOX_KINDS, true)) {
             return 'محتوى محجوب — رسالة رمز تحقّق لا يُعرض نصُّها';
         }
 

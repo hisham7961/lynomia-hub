@@ -103,7 +103,9 @@ class ActivationController extends Controller
         }
 
         // كلمةُ السرّ النهائيةُ تحترم password_rules() — لا كلمةَ ضعيفة (§12)
-        $data = $r->validate(['password' => ['required', 'confirmed', password_rules()]]);
+        // وسجلُّ الكلمات السابقة (بندُ الدَّين #15) — لإعادةِ تفعيلِ حسابٍ سبق أن وضع صاحبُه كلمتَه
+        $data = $r->validate(['password' => ['required', 'confirmed', password_rules(),
+            \App\Support\Security\PasswordHistory::rule($act->user)]]);
 
         // ذرّيّاً: قفلُ الصفّ + حارسُ «لم يُستهلَك بعد» — فقبولان متزامنان لا يفعّلان مرّتين
         $user = DB::transaction(function () use ($act, $data, $r) {
