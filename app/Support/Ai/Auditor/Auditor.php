@@ -6,7 +6,10 @@ use App\Models\AiFinding;
 use App\Support\Ai\Auditor\Detectors\CopiedReport;
 use App\Support\Ai\Auditor\Detectors\DecisionWithoutTask;
 use App\Support\Ai\Auditor\Detectors\HoursWithoutProgress;
+use App\Support\Ai\Auditor\Detectors\MeetingCommitments;
 use App\Support\Ai\Auditor\Detectors\RepeatedBlocker;
+use App\Support\Ai\Auditor\Detectors\ReportQuality;
+use App\Support\Ai\Auditor\Detectors\SemanticBlocker;
 use App\Support\Redactor;
 use Illuminate\Support\Facades\Schema;
 
@@ -35,7 +38,19 @@ final class Auditor
             new RepeatedBlocker(),
             new HoursWithoutProgress(),
             new DecisionWithoutTask(),
+            // كواشفُ الذكاء (A2) — تعمل فقط حين `AuditorAi::whyNot() === null`
+            new ReportQuality(),
+            new SemanticBlocker(),
+            new MeetingCommitments(),
         ];
+    }
+
+    private static ?string $runId = null;
+
+    /** معرّفُ الجولةِ الجارية — تُفتح به جلسةُ الذكاءِ الواحدة وسقفُ نداءاتها */
+    public static function runId(): string
+    {
+        return self::$runId ??= (string) \Illuminate\Support\Str::uuid();
     }
 
     /** المفتاحُ العامّ للمدقّق — يُطفئه كلَّه دون أن يمسح نتيجة */
@@ -53,9 +68,11 @@ final class Auditor
         return null;
     }
 
-    /** هويّةُ الشرط ⇒ مفتاحٌ ثابت */
+    /** هويّةُ الشرط ⇒ مفتاحٌ ثابت (ونتيجةٌ أُعيدت من الحفظ تحمل مفتاحَها كما هو) */
     public static function dedupKey(array $f): string
     {
+        if (isset($f['dedup_key']) && is_string($f['dedup_key']) && strlen($f['dedup_key']) === 40) return $f['dedup_key'];
+
         return sha1(json_encode($f['identity'] ?? [$f['subject_module'], $f['subject_id']], JSON_UNESCAPED_UNICODE));
     }
 
@@ -63,7 +80,7 @@ final class Auditor
      * **جولةٌ واحدة.** لكلِّ كاشف: رصدٌ ⇒ حفظٌ أو تحديث ⇒ حلُّ ما زال شرطُه.
      * والمعاينةُ (`$dry`) تحسب الأعدادَ نفسَها — جديدٌ وزائل — **ولا تكتب**.
      *
-     * @return array<string, array{found: int, opened: int, resolved: int, error: ?string}>
+     * @return array<string, array{found: int, opened: int, resolved: int, error: ?string, skipped: ?string}>
      */
     public static function run(bool $dry = false): array
     {
@@ -71,10 +88,27 @@ final class Auditor
         if (! self::enabled() || ! Schema::hasTable('ai_findings')) return $stats;
 
         $auditor = AuditorIdentity::user();
+        self::$runId = (string) \Illuminate\Support\Str::uuid();
+        AuditorAi::reset();
+        $aiWhyNot = AuditorAi::whyNot();
 
         foreach (self::detectors() as $d) {
             $key = $d->key();
-            $stats[$key] = ['found' => 0, 'opened' => 0, 'resolved' => 0, 'error' => null];
+            $stats[$key] = ['found' => 0, 'opened' => 0, 'resolved' => 0, 'error' => null, 'skipped' => null, 'incomplete' => null];
+
+            // **كاشفٌ مطفأٌ لكثرة الرفض لا يُسأل ولا يحلّ** — ونتائجُه تُخفى معه (AuditorSignals)
+            if (AuditorAccuracy::isDisabled($key)) {
+                $stats[$key]['skipped'] = 'مطفأ — راجع دقّتَه في مركز الذكاء ← المدقّق';
+
+                continue;
+            }
+            // **كاشفُ ذكاءٍ غيرُ جاهزٍ لا يُسأل ولا يحلّ شيئاً** — «مطفأ» ليس «زال الشرط»؛
+            // **ولا يُسأل في المعاينة**: المعاينةُ لا تكتب، ونداءٌ مدفوعٌ تُرمى نتيجتُه يُدفَع ثانيةً غداً
+            if ($d->source() === 'ai' && ($aiWhyNot !== null || $dry)) {
+                $stats[$key]['skipped'] = $aiWhyNot ?? 'المعاينةُ لا تسأل النموذج — نداءاتُه مدفوعة';
+
+                continue;
+            }
 
             // **العزلُ لكلِّ كاشفٍ بكامل دورته** — الرصدُ والحفظُ والحلّ: سباقُ مفتاحٍ فريدٍ
             // أو خطأُ حفظٍ في كاشفٍ لا يُسقط الكواشفَ التي بعده
@@ -89,11 +123,15 @@ final class Auditor
                     if (self::store($d, $f, $dk, $dry)) $stats[$key]['opened']++;
                 }
 
-                if (! $d->complete()) continue;   // تغطيةٌ ناقصة ⇒ لا حلَّ لما لم يُنظَر فيه
+                // تغطيةٌ ناقصة ⇒ لا حلَّ إلّا لما أُعيد فحصُه فعلاً ووُجد سليماً
+                $complete = $d->complete();
+                $cleared = $complete ? [] : array_flip($d instanceof AiDetector ? $d->cleared() : []);
+                if (! $complete) $stats[$key]['incomplete'] = $d instanceof AiDetector ? ($d->stopReason() ?? 'بنودٌ لم يُحكَم عليها') : 'ناقصة';
 
                 $stale = AiFinding::query()->where('detector', $key)->where('status', 'open')
                     ->orderBy('id')->get(['id', 'dedup_key'])
-                    ->filter(fn ($row) => ! isset($seen[$row->dedup_key]));
+                    ->filter(fn ($row) => ! isset($seen[$row->dedup_key])
+                        && ($complete || isset($cleared[$row->dedup_key])));
                 $stats[$key]['resolved'] = $stale->count();
                 if (! $dry && $stale->isNotEmpty()) {
                     AiFinding::query()->whereIn('id', $stale->pluck('id')->all())
@@ -105,7 +143,12 @@ final class Auditor
             }
         }
 
-        if (! $dry) hub_data_bump('ai_findings');
+        AuditorAi::reset();
+        self::$runId = null;
+        if (! $dry) {
+            hub_data_bump('ai_findings');
+            try { AuditorAccuracy::review(); } catch (\Throwable $e) { report($e); }
+        }
 
         return $stats;
     }
@@ -131,7 +174,9 @@ final class Auditor
             // **الملخّصُ يمرّ بالمنقّح** — نصُّ التقرير قد يحمل سرّاً لصقه صاحبُه
             'summary' => mb_substr(Redactor::text((string) $f['summary']), 0, 600),
             'suggestion' => isset($f['suggestion']) ? mb_substr(Redactor::text((string) $f['suggestion']), 0, 600) : null,
-            'fingerprint' => hash('sha256', json_encode($f['input'] ?? $f['evidence'], JSON_UNESCAPED_UNICODE)),
+            'fingerprint' => $f['fingerprint'] ?? hash('sha256', json_encode($f['input'] ?? $f['evidence'], JSON_UNESCAPED_UNICODE)),
+            // مسودةُ النموذج تمرّ بالمنقّح كالملخّص — تُعرَض رابطاً وتُعبّأ في نموذج
+            'draft' => isset($f['draft']) ? self::redactDraft((array) $f['draft']) : null,
             'status' => 'open',
             'last_seen_at' => $now,
             'resolved_at' => null,
@@ -148,6 +193,15 @@ final class Auditor
         $row->fill($attrs)->save();
 
         return $opening;
+    }
+
+    private static function redactDraft(array $d): array
+    {
+        array_walk_recursive($d, function (&$v) {
+            if (is_string($v)) $v = mb_substr(Redactor::text($v), 0, 300);
+        });
+
+        return $d;
     }
 
     /** بصمةُ النتيجة المحفوظة لشرطٍ — ليقرّر الكاشفُ الذكيُّ ألّا يدفع لتحليلٍ مكرَّر */

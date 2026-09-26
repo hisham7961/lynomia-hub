@@ -63,7 +63,7 @@ final class AuditorSignals
     {
         if (! $u || hub_is_client($u) || ! Auditor::enabled() || ! Schema::hasTable('ai_findings')) return [];
 
-        $key = 'auditor:sig:' . $u->id . ':' . ($projectId ?? '-')
+        $key = 'auditor:sig:' . $u->id . ':' . ($projectId ?? '-') . ':' . md5(implode(',', AuditorAccuracy::disabled()))
             . hub_data_stamp(['ai_findings', 'roles', 'users', 'work_updates', 'tasks', 'decisions', 'meetings']);
 
         return hub_cached($key, self::TTL, $fresh, fn () => self::compute($u, $projectId));
@@ -90,7 +90,7 @@ final class AuditorSignals
 
             foreach (self::filter($u, $rows, $projectId) as $f) {
                 if (count($out) >= self::MAX) break;
-                $out[] = self::signal($f, $labels);
+                $out[] = self::signal($f, $labels, $u);
             }
             if ($rows->count() < self::PAGE) break;
         }
@@ -107,6 +107,8 @@ final class AuditorSignals
     {
         $q = AiFinding::query()->where('status', 'open')
             ->orderByDesc('detected_at')->orderBy('id')->limit(self::PAGE);
+        // كاشفٌ أُطفئ (لكثرة الرفض أو بيد المالك) تُخفى نتائجُه معه — وتعود إن أُعيد
+        if (($off = AuditorAccuracy::disabled()) !== []) $q->whereNotIn('detector', $off);
         if (($cids = hub_company_ids($u)) !== null) {
             $q->where(fn ($w) => $w->whereIn('company_id', $cids)->orWhereNull('company_id'));
         }
@@ -143,8 +145,16 @@ final class AuditorSignals
         return $out;
     }
 
-    private static function signal(AiFinding $f, array $labels): array
+    private static function signal(AiFinding $f, array $labels, User $u): array
     {
+        // **مسودةٌ ثمّ تأكيد** (§٣.٤): نتيجةٌ تحمل مسودةً تفتح نموذجَ الإنشاءِ القائمَ معبّأً —
+        // لمن يملك الإضافةَ في وحدتها وحدَه؛ والحفظُ فعلُه هو بصلاحيّاته وموافقاته
+        $draft = (array) ($f->draft ?? []);
+        $draftUrl = null;
+        if (($draft['module'] ?? null) && hub_mod((string) $draft['module']) && hub_can($u, (string) $draft['module'], 'a')) {
+            $draftUrl = route('m.create', ['module' => $draft['module']]) . '?' . http_build_query((array) ($draft['fields'] ?? []));
+        }
+
         return [
             'key' => $f->signalKey(),
             'sev' => self::SEV[$f->severity] ?? 'اطّلاع',
@@ -155,8 +165,8 @@ final class AuditorSignals
                 . ($f->suggestion ? ' — ' . $f->suggestion : ''),
             'module' => $f->subject_module,
             'record_id' => $f->subject_id,
-            'url' => route('m.show', [$f->subject_module, $f->subject_id]),
-            'action' => 'افتح',
+            'url' => $draftUrl ?? route('m.show', [$f->subject_module, $f->subject_id]),
+            'action' => $draftUrl ? 'سجّله قراراً' : 'افتح',
             'type' => self::TYPE,
         ];
     }

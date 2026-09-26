@@ -224,6 +224,12 @@ final class GovernedCompletion
         return array_merge($this->lastUsage, ['calls' => $this->calls]);
     }
 
+    /** صفُّ سجلِّ الاستهلاكِ لآخرِ محاولة — لربطِ ما بُني عليها بكلفتها */
+    public function lastEventId(): ?string
+    {
+        return $this->lastEventId;
+    }
+
     public function calls(): int
     {
         return $this->calls;

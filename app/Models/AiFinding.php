@@ -20,6 +20,7 @@ class AiFinding extends Model
     protected $casts = [
         'evidence' => 'array',
         'fields' => 'array',
+        'draft' => 'array',
         'detected_at' => 'datetime',
         'last_seen_at' => 'datetime',
         'resolved_at' => 'datetime',

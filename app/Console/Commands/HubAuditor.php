@@ -28,6 +28,11 @@ class HubAuditor extends Command
 
         $failed = 0;
         foreach (Auditor::run($dry) as $key => $s) {
+            if (($s['skipped'] ?? null) !== null) {
+                $this->line("… {$key}: لم يُسأل — {$s['skipped']}");
+
+                continue;
+            }
             if ($s['error'] !== null) {
                 $failed++;
                 $this->error("✗ {$key}: فشل ({$s['error']}) — نتائجُه القائمة لم تُمسّ");
@@ -35,6 +40,8 @@ class HubAuditor extends Command
                 continue;
             }
             $this->info("✓ {$key}: رُصد {$s['found']} · جديدٌ {$s['opened']} · زال شرطُه {$s['resolved']}");
+            // جولةٌ ناقصةٌ تُقال — لا تبدو «لا شيء» (سقفٌ أو ميزانيّةٌ أو سياسةٌ أو بوّابة)
+            if (($s['incomplete'] ?? null) !== null) $this->warn("  ⚠ {$key}: الجولةُ ناقصة ({$s['incomplete']}) — لم يُحَلّ إلّا ما أُعيد فحصُه");
         }
 
         return $failed === 0 ? self::SUCCESS : self::FAILURE;
