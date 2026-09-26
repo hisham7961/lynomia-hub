@@ -361,4 +361,30 @@ class BrainTest extends TestCase
         $this->assertSame(40, DB::table('ai_embeddings')->where('module', 'decisions')->distinct()->count('record_id'),
             'كلُّ جولةٍ تتقدّم — لا تُعيد الأوّلين');
     }
+
+    public function test_قاعدةٌ_مستقلّةٌ_للعقل_لا_تمسّ_القاعدةَ_الرئيسة(): void
+    {
+        $file = storage_path('framework/testing/brain-' . Str::random(8) . '.sqlite');
+        @mkdir(dirname($file), 0777, true);
+        touch($file);
+        try {
+            config(['database.connections.brain_t' => ['driver' => 'sqlite', 'database' => $file, 'prefix' => '', 'foreign_key_constraints' => true],
+                    'database.brain_connection' => 'brain_t']);
+            $this->assertFalse(Brain::ready(), 'بلا جدولٍ في القاعدة المستقلّة لا يعمل');
+            $this->artisan('hub:brain', ['--setup' => true])->assertSuccessful();
+            $this->assertTrue(Brain::ready());
+
+            $d = $this->decision('اعتمادُ المورّد الثاني');
+            Brain::index();
+
+            $this->assertSame(0, DB::table('ai_embeddings')->count(), 'القاعدةُ الرئيسة لم تُمسّ');
+            $this->assertGreaterThan(0, DB::connection('brain_t')->table('ai_embeddings')->where('record_id', $d)->count());
+            $this->assertContains($d, array_column(Brain::search($this->owner, 'مورّد')['hits'], 'id'), 'البحثُ يعمل من القاعدة المستقلّة');
+            $this->assertNotContains($d, array_column(Brain::search($this->user([$this->beta->id]), 'مورّد')['hits'], 'id'),
+                'والحكمُ بالنطاق من القاعدة الرئيسة كما كان');
+        } finally {
+            DB::purge('brain_t');
+            @unlink($file);
+        }
+    }
 }

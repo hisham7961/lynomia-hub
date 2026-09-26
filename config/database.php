@@ -17,6 +17,23 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
             'options' => [PDO::ATTR_PERSISTENT => false],
         ],
+        // اتّصالُ العقل الثاني المستقلّ — لا يُستعمل إلّا حين BRAIN_DB_CONNECTION=brain.
+        // SQLite ملفٌّ واحدٌ بلا خادم (BRAIN_DB_DRIVER=sqlite)، أو MariaDB/MySQL منفصل (الافتراض).
+        'brain' => [
+            'driver' => env('BRAIN_DB_DRIVER', 'mysql'),
+            'url' => env('BRAIN_DB_URL'),
+            'host' => env('BRAIN_DB_HOST', '127.0.0.1'),
+            'port' => env('BRAIN_DB_PORT', '3306'),
+            'database' => env('BRAIN_DB_DATABASE', env('BRAIN_DB_DRIVER', 'mysql') === 'sqlite' ? database_path('brain.sqlite') : 'lynomia_brain'),
+            'username' => env('BRAIN_DB_USERNAME', 'root'),
+            'password' => env('BRAIN_DB_PASSWORD', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+            'engine' => null,
+            'foreign_key_constraints' => true,
+        ],
         'sqlite' => [
             'driver' => 'sqlite',
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
@@ -26,6 +43,11 @@ return [
     ],
 
     'migrations' => ['table' => 'migrations', 'update_date_on_publish' => true],
+
+    // **قاعدةُ العقل الثاني المستقلّة** (اختياريّة): متّجهاتُ البحث بالمعنى في قاعدةٍ وحدَها فلا تمسّ القاعدةَ
+    // الرئيسة أبداً — ويُرقّى محرّكُها وحدَه متى شئت. فارغٌ = الجدولُ في القاعدة الرئيسة (الافتراض).
+    // التفعيل: BRAIN_DB_CONNECTION=brain ثمّ `php artisan hub:brain --setup` (يُنشئ الجدولَ هناك).
+    'brain_connection' => env('BRAIN_DB_CONNECTION') ?: null,
 
     // MariaDB ≥ 11: إبقاءُ `innodb_snapshot_isolation` الافتراضيّ الجديد (true) أو دلالةِ 10.11 التي
     // بُنيت عليها حرّاسُ التزامن (false · الافتراض) — App\Support\Ops\SnapshotIsolation

@@ -46,7 +46,7 @@ final class Brain
 
     public static function enabled(): bool
     {
-        return (string) setting('brain.enabled', '0') === '1' && Schema::hasTable('ai_embeddings');
+        return (string) setting('brain.enabled', '0') === '1' && PhpVectorStore::hasTable();
     }
 
     public static function profileKey(): string
@@ -192,7 +192,7 @@ final class Brain
 
             // سجلّاتٌ حُذفت: مقاطعُها تُمحى
             if (! $dry) {
-                $gone = DB::table('ai_embeddings')->where('module', $module)->distinct()->orderBy('record_id')->pluck('record_id')
+                $gone = $store->recordIds($module)
                     ->diff($class::query()->pluck('id')->map(fn ($x) => (string) $x));
                 foreach ($gone as $rid) $stats['removed'] += $store->forget($module, (string) $rid);
             }
@@ -289,7 +289,7 @@ final class Brain
             if (! isset($best[$key]) || $h['score'] > $best[$key]['score']) $best[$key] = $h;
         }
         // مقاطعُ من فضاء نموذجٍ آخر (تبديلٌ لم تكتمل إعادةُ فهرسته، أو احتياطيٌّ خدم) لا تُقارَن — فالتغطيةُ ناقصةٌ وتُعلَن
-        $stale = $served !== '' && DB::table('ai_embeddings')->whereIn('module', $modules)->where('model', '!=', $served)->exists();
+        $stale = $served !== '' && self::store()->hasOtherModel($modules, $served);
         uasort($best, fn ($a, $b) => $b['score'] <=> $a['score'] ?: strcmp($a['record_id'], $b['record_id']));
         $best = array_slice(array_values($best), 0, $k);
 

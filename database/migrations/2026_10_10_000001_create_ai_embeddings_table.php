@@ -1,8 +1,6 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * **متّجهاتُ العقل الثاني** (المرحلة ٤ · `docs/ai-hub/46-ai-roadmap.md` §٦ · خيارُ «أ»).
@@ -17,23 +15,8 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('ai_embeddings')) return;
-
-        Schema::create('ai_embeddings', function (Blueprint $t) {
-            $t->id();
-            $t->string('module', 40);
-            $t->uuid('record_id');
-            $t->string('field', 60);
-            $t->unsignedSmallInteger('chunk')->default(0);
-            $t->uuid('company_id')->nullable();
-            $t->char('hash', 40);                        // sha1(النموذج|النصّ) — لا يُعاد تضمينُ ما لم يتغيّر
-            $t->string('model', 191);
-            $t->unsignedSmallInteger('dim');
-            $t->binary('vector');
-            $t->timestamps();
-            $t->unique(['module', 'record_id', 'field', 'chunk']);
-            $t->index(['module', 'company_id']);
-        });
+        // المخطّطُ في مصدرٍ واحد (`PhpVectorStore::ensureTable`) — وقاعدةُ العقل المستقلّة تُنشأ بـ`hub:brain --setup`
+        \App\Support\Ai\Brain\PhpVectorStore::ensureTable();
     }
 
     public function down(): void

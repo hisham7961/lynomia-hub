@@ -17,6 +17,12 @@ interface VectorStore
     /** يُحدّث شركةَ مقاطع سجلٍّ نُقل — بلا إعادة تضمين (النصُّ لم يتغيّر) */
     public function retag(string $module, string $recordId, ?string $companyId): int;
 
+    /** معرّفاتُ السجلّات المفهرسة لوحدة @return \Illuminate\Support\Collection<int, string> */
+    public function recordIds(string $module);
+
+    /** مقاطعُ من فضاء نموذجٍ آخر في هذه الوحدات؟ @param list<string> $modules */
+    public function hasOtherModel(array $modules, string $model): bool;
+
     /** يمحو مقاطعَ سجلٍّ (كلَّها، أو ما عدا المفاتيحَ الحيّة "field#chunk") */
     public function forget(string $module, string $recordId, ?array $keep = null): int;
 
