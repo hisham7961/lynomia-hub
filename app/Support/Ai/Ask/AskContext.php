@@ -223,6 +223,12 @@ final class AskContext
             'label'    => $this->moduleLabel($result['module'] ?? null),
             'rows'     => count($kept),
             'ids'      => $this->ids($kept),
+            // **ونتيجةٌ عابرةٌ للوحدات** (البحث · ملاحظاتُ المدقّق) تحمل وحدةَ كلِّ صفّ: `module:id` —
+            // فتُعاد مصادقةُ الجواب المحفوظ على كلِّ سجلٍّ في وحدته (`AskMemory`) لا تُحجَب جملةً
+            'refs'     => ($result['module'] === null || $tool === 'hub_findings') ? $this->refs($kept) : [],
+            // وملاحظاتُ المدقّق بمفاتيحها — فيُعاد الجوابُ المحفوظُ إلى حارس المدقّق نفسِه لا إلى موضوعها وحدَه
+            'findings' => $tool === 'hub_findings' ? array_values(array_filter(array_map(
+                fn ($r) => is_array($r) && is_string($r['key'] ?? null) ? $r['key'] : null, $kept))) : [],
             'scope'    => 'مُنطَّقٌ بصلاحيّةِ صاحبِ الجلسة',
             'complete' => $dropped === 0 && ! ($result['truncated'] ?? false),
         ];
@@ -381,6 +387,20 @@ final class AskContext
         }
 
         return array_slice($ids, 0, self::MAX_ROWS_PER_RESULT);
+    }
+
+    /** `module:id` لكلِّ صفٍّ يحمل الاثنين — **من البياناتِ لا من النموذج** */
+    private function refs(array $rows): array
+    {
+        $out = [];
+        foreach ($rows as $r) {
+            if (! is_array($r)) continue;
+            $m = $r['module'] ?? null;
+            $id = $r['id'] ?? null;
+            if (is_string($m) && $m !== '' && (is_string($id) || is_int($id)) && (string) $id !== '') $out[] = $m . ':' . $id;
+        }
+
+        return array_slice($out, 0, self::MAX_ROWS_PER_RESULT);
     }
 
     private function moduleLabel(mixed $module): ?string

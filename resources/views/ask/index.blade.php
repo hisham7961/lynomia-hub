@@ -42,9 +42,67 @@
     </div>
 @endif
 
+{{-- ── ذاكرةُ المحادثة (المرحلة ٢ · AskMemory) — خيوطُك وحدَك، ولا يقرؤها غيرُك ولا المالك ── --}}
+@if ($memory)
+    <div class="card" data-ask-threads>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:space-between">
+            <h3 style="margin:0">محادثاتُك</h3>
+            <span style="display:flex;gap:6px;flex-wrap:wrap">
+                @if ($thread)<a class="btn sm" href="{{ route('ask.index') }}">➕ محادثةٌ جديدة</a>@endif
+                @if ($threads->isNotEmpty())
+                    <form method="POST" action="{{ route('ask.forget') }}" onsubmit="return confirm('تُمحى كلُّ محادثاتك نهائيّاً — متابعة؟')">@csrf
+                        <button class="btn sm">🗑️ امحُ كلَّ محادثاتي</button>
+                    </form>
+                @endif
+            </span>
+        </div>
+        <div class="sub">
+            تُحفظ مشفّرةً لك وحدَك وتُمحى بعد {{ $memoryDays }} يوماً بلا نشاط. والجوابُ المحفوظُ يُعرَض فقط
+            <b>ما دامت صلاحيّتُك تشمل ما بُني عليه</b> — وسؤالُ المتابعةِ يُرسل أسئلتَك السابقةَ لا أجوبتَها،
+            فيقرأ المساعدُ البياناتِ من جديد.
+        </div>
+        @forelse ($threads as $t)
+            <div>
+                <a href="{{ route('ask.index', ['thread' => $t->id]) }}" @if ($thread && $thread->id === $t->id) aria-current="page" @endif>
+                    {{ $thread && $thread->id === $t->id ? '▸ ' : '' }}{{ $t->title }}
+                </a>
+                <span class="mut">· {{ $t->last_at?->diffForHumans() }}</span>
+            </div>
+        @empty
+            <div class="mut">لا محادثاتٍ محفوظةٌ بعد — سؤالُك الأوّلُ يبدأ واحدة.</div>
+        @endforelse
+    </div>
+
+    @if ($thread)
+        <div class="card" data-ask-history>
+            <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+                <h3 style="margin:0">{{ $thread->title }}</h3>
+                <form method="POST" action="{{ route('ask.forget') }}" onsubmit="return confirm('تُمحى هذه المحادثة نهائيّاً — متابعة؟')">@csrf
+                    <input type="hidden" name="thread" value="{{ $thread->id }}">
+                    <button class="btn sm">🗑️ امحُ هذه المحادثة</button>
+                </form>
+            </div>
+            @foreach ($turns as $turn)
+                <div style="margin-top:10px">
+                    <div><b>سألتَ:</b> {{ $turn['question'] }}</div>
+                    @if ($turn['answer'] !== null)
+                        <div class="askanswer">{{ $turn['answer'] }}</div>
+                    @elseif ($turn['hidden'])
+                        <div class="sub" data-ask-hidden><span class="bdg wn">أُخفي الجواب</span>
+                            صلاحيّتُك لم تعد تشمل بعضَ ما بُني عليه — اسأل من جديد فيجيبك المساعدُ بما تراه الآن.</div>
+                    @else
+                        <div class="sub"><span class="bdg wn">لم يُجَب</span> {{ $failures[$turn['failure']] ?? 'تعذّر الجواب' }}</div>
+                    @endif
+                </div>
+            @endforeach
+        </div>
+    @endif
+@endif
+
 {{-- ── السؤال ── --}}
 <div class="card">
     <form method="POST" action="{{ route('ask.run') }}" class="grid" id="askform">@csrf
+        @if ($memory && $thread)<input type="hidden" name="thread" value="{{ $thread->id }}">@endif
         <label style="grid-column:1/-1">
             <span>سؤالُك</span>
             <textarea name="q" rows="3" maxlength="{{ $limits['question'] }}"

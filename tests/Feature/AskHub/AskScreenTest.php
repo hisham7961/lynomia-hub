@@ -257,13 +257,32 @@ class AskScreenTest extends TestCase
         $this->actingAs($u)->post(route('ask.run'), ['q' => 'سؤال'])->assertForbidden();
     }
 
-    // ═══ ⑥ لا محادثةً محفوظة — قرارٌ يُختبَر لا يُدَّعى ═══
+    // ═══ ⑥ المحادثةُ المحفوظةُ لا توجد إلّا بشروطها — قرارٌ يُختبَر لا يُدَّعى ═══
 
-    public function test_لا_جدولَ_محادثاتٍ_في_هذه_المرحلة(): void
+    /**
+     * كان هذا الاختبارُ يمنع أيَّ جدولِ محادثات (المرحلة ٣): الحفظُ يُنشئ مخزناً يُقرأ بصلاحيّاتٍ
+     * غيرِ صلاحيّةِ سائله. والمرحلةُ ٢ من خارطة الذكاء أدخلته **بشروطه** (`AskMemory` · v2.605.0) —
+     * فصار الحارسُ يمنع ظهورَه **بلا تلك الشروط**: جدولاه وحدَهما، مشفَّرٌ نصُّه، خارجَ التدقيق والنسخ،
+     * وله مفتاحُ إطفاء. والمِلكيّةُ وإعادةُ التحقّق مُمتحنتان في `AskMemoryTest`.
+     */
+    public function test_مخزنُ_المحادثات_لا_يوجد_إلّا_بشروطه(): void
     {
-        foreach (['ask_conversations', 'ask_messages', 'ask_threads', 'ask_history'] as $t) {
+        foreach (['ask_conversations', 'ask_messages', 'ask_history'] as $t) {
             $this->assertFalse(\Illuminate\Support\Facades\Schema::hasTable($t),
-                "[$t] ظهر مخزنٌ للمحادثات — وحفظُ الأسئلةِ يُنشئ التسريبَ الذي أُغلق");
+                "[$t] مخزنُ محادثاتٍ ثانٍ خارجَ AskMemory — بلا شروطها");
         }
+
+        foreach ([\App\Models\AskThread::class => ['title'], \App\Models\AskTurn::class => ['question', 'answer']] as $model => $texts) {
+            $m = new $model();
+            foreach ($texts as $col) {
+                $this->assertSame('encrypted', $m->getCasts()[$col] ?? null, "{$model}::{$col} غيرُ مشفَّر");
+            }
+            $this->assertNotContains(\App\Traits\Auditable::class, class_uses_recursive($model),
+                "{$model} يدخل التدقيق — والتدقيقُ يقول مَن سأل لا ماذا");
+            $this->assertContains($m->getTable(), \App\Console\Commands\HubBackup::EPHEMERAL,
+                "{$model}: النسخُ يُبقي ما محاه صاحبُه");
+        }
+
+        $this->assertNotNull(\App\Support\Platform\Settings::entry('ask.memory'), 'لا مفتاحَ إطفاءٍ للذاكرة في مركز الإعدادات');
     }
 }

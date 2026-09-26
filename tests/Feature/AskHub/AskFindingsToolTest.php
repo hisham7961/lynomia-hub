@@ -73,8 +73,9 @@ class AskFindingsToolTest extends TestCase
         $this->assertSame('updates', $row['module']);
         $this->assertNotSame('', $row['detector']);
         $this->assertStringNotContainsString('🔎', $row['finding']);
-        $this->assertSame(['id', 'module', 'detector', 'severity', 'finding', 'context'], array_keys($row),
-            'لا مسودةَ ولا رابطَ ولا مفتاحَ إشارةٍ في ما يصل النموذج');
+        $this->assertSame(['id', 'module', 'detector', 'severity', 'finding', 'context', 'key'], array_keys($row),
+            'لا مسودةَ ولا رابطَ في ما يصل النموذج — والمفتاحُ هويّةٌ لإعادة المصادقة لا بيانات');
+        $this->assertSame($f->signalKey(), $row['key']);
     }
 
     public function test_صاحبُ_التقرير_لا_يقرأ_حكمَ_المدقّقِ_على_عمله_ولو_سأل_المساعد(): void
@@ -85,6 +86,58 @@ class AskFindingsToolTest extends TestCase
 
         $this->assertTrue($r['ok']);
         $this->assertSame([], $r['rows'], 'قرارُ المالك §٣.٦: يصل الموظّفَ ما اعتمده مديرُه لا الحكمُ الخام');
+    }
+
+    /**
+     * **شرطُ «ليس عملَه» على موضوعٍ غيرِ تقرير** — تقريرُ الموظّف يحجبه عنه شرطُ المراجعة أيضاً،
+     * فاختبارُ التقرير وحدَه لا يمتحن الشرطَ الثالث. قرارٌ منفّذُه صاحبُ الجلسة يمتحنه وحدَه:
+     * المراجعُ يرى الملاحظة وصاحبُ القرار لا.
+     */
+    public function test_منفّذُ_القرار_لا_يقرأ_ملاحظةَ_المدقّقِ_على_قراره_والمراجعُ_يقرؤها(): void
+    {
+        DB::table('decisions')->insert(['id' => (string) Str::uuid(), 'title' => 'اعتمادُ مورّدٍ ثانٍ للخوادم',
+            'status' => 'قيد التنفيذ', 'company_id' => $this->alpha->id, 'exec_id' => $this->author->id,
+            'created_at' => now()->subDays(10), 'updated_at' => now()]);
+        Auditor::run();
+        $this->assertSame(1, AiFinding::query()->where('detector', 'decision_without_task')->count());
+
+        $this->assertCount(1, AskTools::run('hub_findings', ['module' => 'decisions'], $this->employee)['rows'],
+            'المراجعُ يراها — فالخلوُّ عند صاحبها ليس من البوّابة');
+        $this->assertSame([], AskTools::run('hub_findings', ['module' => 'decisions'], $this->author)['rows'],
+            'منفّذُ القرار لا يقرأ حكمَ المدقّق على عمله');
+    }
+
+    /** **الجوابُ المحفوظُ المبنيُّ على ملاحظة** يُعاد إلى حارس المدقّق نفسِه — لا إلى موضوعها وحدَه */
+    public function test_جوابٌ_محفوظٌ_على_ملاحظةٍ_يُخفى_حين_تُرفَض_أو_يغيب_شاهدُها(): void
+    {
+        $f = $this->finding();
+        $save = function () {
+            $ctx = \App\Support\Ai\Ask\AskContext::open();
+            $ctx->addResult(AskTools::run('hub_findings', [], $this->employee));
+
+            return \App\Support\Ai\Ask\AskMemory::record($this->employee, null, 'ماذا رصد المدقّق؟',
+                ['ok' => true, 'answer' => 'عائقٌ متكرّر', 'sources' => $ctx->sources()]);
+        };
+
+        $t = $save();
+        $this->assertFalse(\App\Support\Ai\Ask\AskMemory::turns($this->employee, $t)[0]['hidden']);
+
+        // رفضها المالك ⇒ لا تُعرَض في أيِّ مكان — ولا في الذاكرة
+        $this->actingAs($this->owner);
+        ActionCenter::disposition($f->signalKey(), 'dismiss', null, 'ليس عائقاً');
+        $this->assertTrue(\App\Support\Ai\Ask\AskMemory::turns($this->employee, $t)[0]['hidden'], 'ملاحظةٌ مرفوضة');
+
+        // وشاهدٌ غاب (غيرُ الموضوع) ⇒ كذلك
+        ActionCenter::disposition($f->signalKey(), 'reopen', null, null);
+        $t2 = $save();
+        $this->assertFalse(\App\Support\Ai\Ask\AskMemory::turns($this->employee, $t2)[0]['hidden']);
+        $others = collect((array) $f->evidence)->pluck('id')->reject(fn ($id) => $id === $f->subject_id)->values()->all();
+        $this->assertNotEmpty($others);
+        DB::table('work_updates')->whereIn('id', $others)->update(['company_id' => Company::create(['name_ar' => 'باء'])->id]);
+        \Illuminate\Support\Facades\Cache::flush();
+        $u = User::query()->find($this->employee->id);
+        $u->forceFill(['companies' => [$this->alpha->id]])->save();
+        $this->assertTrue(\App\Support\Ai\Ask\AskMemory::turns($u->fresh(), $t2)[0]['hidden'], 'شاهدٌ خرج من النطاق');
     }
 
     public function test_حسابُ_العميل_ومن_لا_يملك_المساعد_لا_يقرآن_شيئاً(): void

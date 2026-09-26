@@ -414,12 +414,98 @@ final class AskTools
                 'severity' => (string) ($sig['sev'] ?? ''),
                 'finding'  => self::clip(Redactor::text((string) preg_replace('/^🔎\s*/u', '', (string) ($sig['title'] ?? '')))),
                 'context'  => self::clip(Redactor::text((string) ($sig['why'] ?? ''))),
+                // هويّةُ الملاحظة — لتُعاد مصادقةُ الجواب المحفوظ عليها بعينها (`AskMemory`)
+                'key'      => (string) ($sig['key'] ?? ''),
             ];
         }
 
-        $truncated = count($rows) > self::MAX_ROWS;
+        // **والقصُّ صادق:** `visibleTo` يقف عند `AuditorSignals::MAX` قبل إسقاطِ المرفوض والترشيحِ
+        // بالوحدة — فبلوغُه يعني أنّ ما بعده لم يُقرأ، ولا يُقال «كاملٌ» عمّا لم يُقرأ
+        $truncated = count($rows) > self::MAX_ROWS || count($all) >= \App\Support\Ai\Auditor\AuditorSignals::MAX;
 
         return self::ok('hub_findings', $module, array_slice($rows, 0, self::MAX_ROWS), $truncated);
+    }
+
+    /**
+     * **أما زالت هذه السجلّاتُ كلُّها في نطاقه، وهذه الحقولُ كلُّها مرئيّةً له — الآن؟**
+     *
+     * لذاكرةِ المحادثة (`AskMemory`): جوابٌ حُفظ بصلاحيّاتِ أمس لا يُعرَض بصلاحيّاتِ اليوم ما لم
+     * تجتز مصادرُه **الحارسَ نفسَه** الذي قرأها — الكتالوجُ ثمّ الاستعلامُ المُنطَّق. فلا قاعدةَ رؤيةٍ ثانية.
+     *
+     * @param  list<string|int>  $ids
+     * @param  list<string>  $fields
+     */
+    public static function stillVisible(mixed $u, string $module, array $ids, array $fields = []): bool
+    {
+        $catalog = self::catalog($u);
+        if (! isset($catalog[$module])) return false;
+        if (array_diff($fields, $catalog[$module]['fields']) !== []) return false;
+
+        $ids = array_values(array_unique(array_map('strval', $ids)));
+        if ($ids === []) return true;
+
+        $q = self::scopedQuery($u, $module);
+
+        return $q !== null && $q->whereKey($ids)->count() === count($ids);
+    }
+
+    /**
+     * **ملاحظاتُ المدقّق الحيّةُ لهذا المشاهد الآن** — المفاتيحُ التي كان `hub_findings` سيُسلّمها:
+     * `visibleTo` بشروطه الخمسة ناقصاً ما رفضه مديرٌ أو أجّله. لإعادة مصادقة جوابٍ محفوظ (`AskMemory`).
+     *
+     * @return array<string, true>
+     */
+    public static function liveFindingKeys(mixed $u): array
+    {
+        if (! $u instanceof \App\Models\User) return [];
+        $all = \App\Support\Ai\Auditor\AuditorSignals::visibleTo($u);
+        $keys = array_values(array_filter(array_column($all, 'key')));
+        $hide = \App\Support\Ai\Auditor\AuditorSignals::hiddenKeys($keys);
+        $out = [];
+        foreach ($keys as $k) if (! isset($hide[$k])) $out[$k] = true;
+
+        return $out;
+    }
+
+    /**
+     * **شكلُ نطاقِ الصفوف لهذا المستخدم الآن** — مدخلاتُ `hub_scope` + `hub_client_scope` كما هي:
+     * المشاريعُ المرئيّة (إن كان محدودَ النطاق) والشركاتُ وعدسةُ العميل. `null` = بلا تقييد.
+     * لجوابٍ محفوظٍ بلا معرّفاتٍ يُعاد فحصُها (عدٌّ · قائمةٌ فارغة): يُعرَض فقط ما دام النطاقُ يشمل ما كان.
+     *
+     * @return array{p: ?list<string>, c: ?list<string>, k: ?string}
+     */
+    public static function scopeShape(mixed $u): array
+    {
+        $sorted = static function (?array $ids): ?array {
+            if ($ids === null) return null;
+            $ids = array_values(array_unique(array_map('strval', $ids)));
+            sort($ids);
+
+            return $ids;
+        };
+        $kid = (string) session('hub.client', '');
+
+        return [
+            'p' => hub_scoped($u) ? $sorted((array) $u->visibleProjectIds()) : null,
+            'c' => $sorted(hub_company_ids($u)),
+            'k' => $kid === '' ? null : $kid,
+        ];
+    }
+
+    /** هل يشمل النطاقُ الآن كلَّ ما شمله حينها؟ (توسيعٌ يُبقي الجواب، وأيُّ تضييقٍ يُخفيه) */
+    public static function scopeCovers(array $then, mixed $u): bool
+    {
+        $now = self::scopeShape($u);
+        foreach (['p', 'c'] as $k) {
+            $a = $then[$k] ?? null;
+            $b = $now[$k];
+            if ($b === null) continue;                 // بلا تقييدٍ الآن ⇒ يشمل كلَّ شيء
+            if ($a === null) return false;             // كان بلا تقييدٍ وصار مقيَّداً ⇒ ضاق
+            if (array_diff((array) $a, $b) !== []) return false;
+        }
+        $a = $then['k'] ?? null;
+
+        return $now['k'] === null || $now['k'] === $a;  // عدسةُ عميلٍ الآن لم تكن أو غيرُها ⇒ ضاق
     }
 
     private static function resolveModule(mixed $u, array $args): array

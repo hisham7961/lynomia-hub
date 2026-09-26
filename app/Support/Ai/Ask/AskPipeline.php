@@ -65,7 +65,11 @@ final class AskPipeline
      * @return array{ok:bool, answer:?string, sources:list<array>, failure:?string,
      *               message:?string, partial:bool, budget:array, meta:array}
      */
-    public static function ask(string $question, mixed $user = null, ?AskGenerator $generator = null): array
+    /**
+     * @param  list<string>  $earlier  **أسئلةُ** الخيط السابقة لصاحبه (`AskMemory::earlierQuestions`) — لا أجوبتُها:
+     *   فالبياناتُ تُقرأ من جديد بالأدوات المُنطَّقة ولا يعود إلى النموذج ما قُرئ بصلاحيّاتِ أمس.
+     */
+    public static function ask(string $question, mixed $user = null, ?AskGenerator $generator = null, array $earlier = []): array
     {
         $started     = microtime(true);
         $correlation = (string) Str::uuid();
@@ -130,7 +134,7 @@ final class AskPipeline
          * مرجعانِ اثنان في الملفّ كلِّه: إسنادٌ وفحصُ فراغ. فيصل النموذجَ
          * مظروفُ بياناتٍ بلا سؤال، فيجيب بالحقيقة: «لم يرد سؤالٌ محدّد».
          */
-        $gen->asking($q);
+        $gen->asking(self::withEarlier($q, $earlier));
 
         // ── الكتالوج: الحارسُ الأوّل — النموذجُ لا يرى ما لا يملكه صاحبُ الجلسة ──
         //
@@ -409,6 +413,26 @@ final class AskPipeline
     }
 
     // ── الداخل ────────────────────────────────────────────────────────
+
+    /**
+     * سؤالُ المتابعة بسياقه: أسئلةُ صاحبه السابقة أوّلاً (مطهَّرةً ومقصوصة) ثمّ السؤالُ الحاليّ.
+     * نصُّ المستخدم نفسِه في موضعه نفسِه (رسالةُ المستخدم) — فلا يرتفع إلى ثقةٍ لا يستحقّها.
+     *
+     * @param  list<string>  $earlier
+     */
+    private static function withEarlier(string $q, array $earlier): string
+    {
+        $prior = [];
+        foreach (array_slice($earlier, -AskMemory::EARLIER) as $e) {
+            $e = AskPolicy::sanitizeQuestion((string) $e);
+            if ($e !== null) $prior[] = '«' . Str::limit($e, AskMemory::EARLIER_CHARS, '…') . '»';
+        }
+        if ($prior === []) return $q;
+
+        return 'أسئلتي السابقةُ في هذه المحادثة (للسياق فقط — اقرأ بياناتِها من جديد بالأدوات): '
+            . implode(' · ', $prior) . "
+سؤالي الآن: " . $q;
+    }
 
     private static function fail(string $code, string $correlation, float $started,
                                  AskGenerator $gen, array $extra = []): array

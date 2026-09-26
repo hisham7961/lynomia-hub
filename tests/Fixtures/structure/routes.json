@@ -2551,6 +2551,17 @@
         ]
     },
     {
+        "methods": "POST",
+        "uri": "ask/forget",
+        "name": "ask.forget",
+        "action": "App\\Http\\Controllers\\Web\\AskController@forget",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:30,1"
+        ]
+    },
+    {
         "methods": "GET|HEAD",
         "uri": "calendar",
         "name": "calendar",

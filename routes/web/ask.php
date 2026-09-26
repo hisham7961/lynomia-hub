@@ -19,6 +19,9 @@ use Illuminate\Support\Facades\Route;
     Route::get('ask', [\App\Http\Controllers\Web\AskController::class, 'index'])->name('ask.index');
     Route::post('ask', [\App\Http\Controllers\Web\AskController::class, 'run'])
         ->name('ask.run')->middleware('throttle:' . \App\Support\Ai\Ask\AskPolicy::THROTTLE);
+    // ذاكرةُ المحادثة (المرحلة ٢): المحوُ لصاحب الخيط وحدَه — والعرضُ على `ask?thread=` نفسِه
+    Route::post('ask/forget', [\App\Http\Controllers\Web\AskController::class, 'forget'])
+        ->name('ask.forget')->middleware('throttle:30,1');
     Route::get('calendar', [\App\Http\Controllers\Web\CalendarController::class, 'index'])->name('calendar');
     Route::get('costs', [CostController::class, 'index'])->name('costs.index');
     Route::get('service-costs', [CostController::class, 'services'])->name('servicecosts');

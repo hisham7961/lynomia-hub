@@ -672,6 +672,10 @@ class HubAutomation extends Command
                 } while ($gone >= 5000);
             }
 
+            // **ذاكرةُ «اسأل Hub»** (المرحلة ٢): خيوطٌ بلا نشاطٍ منذ ask.memory_days تُمحى بأدوارها
+            $per['ask_threads'] = \App\Support\Ai\Ask\AskMemory::prune();
+            $n += $per['ask_threads'];
+
             if (\Illuminate\Support\Facades\Schema::hasTable('page_visits')) {
                 // ── Control Plane: Phase 7 (WP-7.4) ── الزياراتُ وحدَها كانت بثابتِ
                 // ٩٠ في الشيفرة بينما إخوتُها بمفاتيحَ معلَنة — retention.visits_days
