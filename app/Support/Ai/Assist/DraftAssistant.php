@@ -51,6 +51,12 @@ final class DraftAssistant
             'label' => 'مسودةُ ردٍّ على التذكرة', 'icon' => '✉️', 'source' => 'tickets', 'target' => null,
             'fields' => [], 'carry' => [], 'many' => false,
         ],
+        // **تصنيفُ التذكرة وأولويّتُها** — على السجلّ نفسِه: يفتح نموذجَ *التعديل* باقتراحٍ مُسمّى (`?suggest=1`)
+        // لحقلَي اختيارٍ فقط؛ والحفظُ فعلُ المحرِّر بقواعد التحديث. (الإسنادُ مرجعٌ — لا يقترحه النموذج)
+        'triage' => [
+            'label' => 'صنّف التذكرة ورتّب أولويّتَها', 'icon' => '🏷️', 'source' => 'tickets', 'target' => 'tickets', 'mode' => 'edit',
+            'fields' => ['cat' => 'sel', 'priority' => 'sel'], 'carry' => [], 'many' => false,
+        ],
         // (المرحلة ٥ · مساعدُ التطوير) ملاحظاتُ إصدارٍ من الالتزامات: النظامُ لا يخزّن الالتزامات، فالسجلُّ
         // **يُلصَق** (`git log --oneline` للنطاق)، ويُضاف ما يراه السائلُ من مهامَّ أُنجزت ومشاكلَ حُلّت في
         // مشروع الإصدار منذ الإصدار السابق. والناتجُ نصٌّ يُنسخ إلى حقل الملاحظات — لا يُكتب شيء.
@@ -108,7 +114,9 @@ final class DraftAssistant
         $out = [];
         foreach (self::KINDS as $k => $def) {
             if ($def['source'] !== '*' && $def['source'] !== $module) continue;
-            if ($def['target'] !== null && ($def['target'] === $module || ! hub_can($u, $def['target'], 'a'))) continue;
+            if (($def['mode'] ?? 'create') === 'edit') {
+                if ($def['target'] !== $module || ! hub_can($u, $module, 'e')) continue;
+            } elseif ($def['target'] !== null && ($def['target'] === $module || ! hub_can($u, $def['target'], 'a'))) continue;
             $out[$k] = $def;
         }
 
@@ -189,6 +197,12 @@ final class DraftAssistant
                 $clean = isset($allowed[$k]) ? self::value($allowed[$k], $v) : null;
                 if ($clean === null) { $dropped[] = (string) $k; continue; }
                 $fields[$k] = $clean;
+            }
+            if (($def['mode'] ?? 'create') === 'edit') {
+                if ($fields === []) continue;
+                $out['drafts'][] = ['fields' => $fields,
+                    'url' => route('m.edit', ['module' => $target, 'id' => $id]) . '?' . http_build_query(['suggest' => '1'] + $fields)];
+                continue;
             }
             if (($fields['title'] ?? '') === '') continue;   // بلا عنوانٍ ليس مقترحاً
             $fields = $fields + $carry;
@@ -369,6 +383,11 @@ final class DraftAssistant
                 'text' => 'عنوانٌ قصير', 'ta' => 'وصفٌ', 'date' => 'تاريخ YYYY-MM-DD ولا يسبق ' . $today,
                 'num' => 'عددُ ساعاتٍ تقديريّ', 'sel' => 'واحدٌ من: ' . implode(' | ', $f['options']), default => 'نصّ',
             } . ')';
+        }
+        if ($kind === 'triage') {
+            return 'أنت مساعدُ دعمٍ فنّيٍّ في نظام أعمالٍ عربيّ. صنّف التذكرةَ التي بين السياجين: الحقولُ المسموحةُ وحدَها: '
+                . implode('، ', $spec) . '. اختر من الخيارات المذكورة حرفيّاً، واترك الحقلَ الذي لا يدلّ عليه النصّ. '
+                . 'أعِد {"items": [{…}]} بعنصرٍ واحد.';
         }
         $what = $def['many'] ? 'القراراتِ التي اتُّخذت فعلاً في المحضر (لا النقاشَ ولا الاقتراحات)' : 'مهمّةً واحدةً تنفيذيّةً يقتضيها السجلّ';
 

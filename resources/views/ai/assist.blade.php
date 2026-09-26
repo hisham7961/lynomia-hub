@@ -41,7 +41,7 @@
 @else
     @foreach ($result['drafts'] as $i => $d)
         <div class="card" data-assist-draft>
-            <h3>{{ count($result['drafts']) > 1 ? 'مقترح ' . ($i + 1) . ': ' : '' }}{{ $d['fields']['title'] ?? '' }}</h3>
+            <h3>{{ count($result['drafts']) > 1 ? 'مقترح ' . ($i + 1) . ': ' : '' }}{{ $d['fields']['title'] ?? $def['label'] }}</h3>
             @php $tdef = collect((array) (hub_mod($def['target'])['fields'] ?? []))->keyBy('key'); @endphp
             <dl class="detail">
                 @foreach ($d['fields'] as $k => $v)

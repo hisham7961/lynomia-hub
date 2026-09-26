@@ -405,7 +405,7 @@ class ModuleController extends Controller
         return response()->json(['v' => (string) ($row->{$f['col']} ?? '')]);
     }
 
-    public function edit(string $module, string $id)
+    public function edit(Request $r, string $module, string $id)
     {
         [$def, $class] = $this->resolve($module, 'e');
         $row = $this->findScoped($class, $module, $id);
@@ -413,7 +413,32 @@ class ModuleController extends Controller
         return view('modules.form', [
             'module' => $module, 'def' => $def, 'row' => $row,
             'refOptions' => $this->refOptions($def, $row),
+            'suggest' => $this->editSuggestions($r, $module, $def, $row),
         ]);
+    }
+
+    /**
+     * **اقتراحٌ على نموذج التعديل** (`?suggest=1&حقل=قيمة` — من المساعد مثلاً): يُعرَض في الحقل مع شريطٍ يسمّيه،
+     * **ولا يُحفظ شيءٌ إلّا بزرّ الحفظ** (بقواعد التحديث وموافقاته كما هي). وضيّقٌ عمداً: حقولُ الاختيار وحدَها،
+     * وقيمةٌ من خياراتها، وحقلٌ قابلٌ للكتابة عند المحرِّر — فالرابطُ لا يملأ نصّاً ولا مرجعاً ولا محجوباً.
+     *
+     * @return array<string, string>
+     */
+    private function editSuggestions(Request $r, string $module, array $def, $row): array
+    {
+        if ($r->query('suggest') !== '1') return [];
+        $out = [];
+        foreach ($def['fields'] ?? [] as $f) {
+            $k = (string) ($f['key'] ?? '');
+            $v = $r->query($k);
+            if (($f['type'] ?? '') !== 'sel' || ! is_string($v) || ! empty($f['multi'])) continue;
+            if (! in_array($v, array_map('strval', (array) ($f['options'] ?? [])), true)) continue;
+            if (hub_field_mode(auth()->user(), $module, $k) !== '') continue;
+            if ((string) ($row->{$f['col'] ?? $k} ?? '') === $v) continue;   // لا تغييرَ فلا اقتراح
+            $out[$k] = $v;
+        }
+
+        return $out;
     }
 
     public function update(Request $r, string $module, string $id)

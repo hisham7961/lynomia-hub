@@ -238,7 +238,7 @@ class DraftAssistantTest extends TestCase
     {
         $tid = $this->ticket();
         $noTasks = $this->asker(['tasks' => ['v' => 1, 'a' => 0, 'e' => 0, 'd' => 0]]);
-        $this->assertSame(['reply'], array_keys(DraftAssistant::kindsFor($noTasks, 'tickets')), 'لا «مهمّة» لمن لا يضيف مهامّ');
+        $this->assertSame(['reply', 'triage'], array_keys(DraftAssistant::kindsFor($noTasks, 'tickets')), 'لا «مهمّة» لمن لا يضيف مهامّ');
         $this->assertSame([], DraftAssistant::kindsFor($noTasks, 'projects'), 'ولا شيءَ على وحدةٍ لا نوعَ فيها يملكه');
         $this->assertSame(['task'], array_keys(DraftAssistant::kindsFor($this->asker(), 'projects')), 'المهمّةُ من أيِّ سجلٍّ يراه');
 
@@ -253,5 +253,48 @@ class DraftAssistantTest extends TestCase
 
         Settings::put('assist.enabled', '0', 'test');
         $this->assertSame([], DraftAssistant::kindsFor($this->asker(), 'tickets'), 'المفتاحُ يطفئه');
+    }
+
+    // ═══ تصنيفُ التذكرة — اقتراحٌ على نموذج التعديل ═══
+
+    public function test_تصنيفُ_التذكرة_يفتح_التعديلَ_باقتراحٍ_مسمّى_ولا_يحفظ(): void
+    {
+        $u = $this->asker();
+        $tid = $this->ticket(['cat' => 'استفسار عام', 'priority' => 'منخفضة']);
+        $this->replies = [['items' => [['cat' => 'عطل تقني', 'priority' => 'أعلى شيء', 'status' => 'مغلقة', 'assigneeId' => (string) Str::uuid()]]]];
+
+        $this->assertArrayHasKey('triage', DraftAssistant::kindsFor($u, 'tickets'));
+        $r = DraftAssistant::draft($u, 'triage', 'tickets', $tid);
+
+        $this->assertTrue($r['ok'], (string) $r['message']);
+        $this->assertSame(['cat' => 'عطل تقني'], $r['drafts'][0]['fields'], 'خيارٌ خارج قائمته وحقلٌ غيرُ مطلوبٍ يُسقطان');
+        $this->assertEqualsCanonicalizing(['priority', 'status', 'assigneeId'], $r['dropped']);
+        $this->assertStringStartsWith(route('m.edit', ['module' => 'tickets', 'id' => $tid]) . '?suggest=1', $r['drafts'][0]['url']);
+
+        $html = $this->actingAs($u)->get($r['drafts'][0]['url'])->assertOk()->getContent();
+        $this->assertStringContainsString('data-edit-suggest', $html);
+        $this->assertMatchesRegularExpression('/<option[^>]*value="عطل تقني"[^>]*selected/u', $html);
+        $this->assertSame('استفسار عام', DB::table('tickets')->where('id', $tid)->value('cat'), 'لم يُحفظ شيء');
+    }
+
+    public function test_اقتراحُ_التعديل_ضيّق_اختيارٌ_صالحٌ_لحقلٍ_قابلٍ_للكتابة_وبالعلَم_وحدَه(): void
+    {
+        $u = $this->asker([], ['tickets' => ['priority' => 'ro']]);
+        $tid = $this->ticket(['cat' => 'استفسار عام', 'priority' => 'منخفضة']);
+        $url = route('m.edit', ['module' => 'tickets', 'id' => $tid]);
+
+        $html = $this->actingAs($u)->get($url . '?cat=' . urlencode('شكوى'))->assertOk()->getContent();
+        $this->assertStringNotContainsString('data-edit-suggest', $html, 'بلا suggest=1 لا اقتراح');
+
+        $q = http_build_query(['suggest' => '1', 'cat' => 'ليس خياراً', 'priority' => 'عاجلة', 'subject' => 'QWXZ-INJECTED-SUBJECT']);
+        $html = $this->actingAs($u)->get($url . '?' . $q)->assertOk()->getContent();
+        $this->assertStringNotContainsString('data-edit-suggest', $html, 'خيارٌ باطلٌ وحقلٌ للقراءة ونصٌّ — لا شيءَ منها');
+        $this->assertStringNotContainsString('QWXZ-INJECTED-SUBJECT', $html);
+    }
+
+    public function test_التصنيفُ_لمن_يملك_التعديلَ_وحدَه(): void
+    {
+        $u = $this->asker(['tickets' => ['v' => 1, 'a' => 1, 'e' => 0, 'd' => 0]]);
+        $this->assertArrayNotHasKey('triage', DraftAssistant::kindsFor($u, 'tickets'));
     }
 }
