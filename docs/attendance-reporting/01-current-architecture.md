@@ -12,7 +12,7 @@
 | الحضور | `attendance` · module `attend` | الحالةُ الفيزيائيّة، `time_in/out`، `date`، `emp_id` |
 | بنودُ التقرير | `work_updates` · module `updates` | «هل قُدِّم تقريرٌ صالحٌ لتاريخ العمل؟» |
 | جسرُ الهويّة | `Employee.user_id ↔ User.id` | ربطُ صفِّ الحضور بكاتبِ التقرير |
-| يومُ العمل | `App\Support\Workday` | تسجيلُ الحضور/الانصراف والحالةُ الفيزيائيّة والكنس |
+| يومُ العمل | `App\Support\Workforce\Workday` | تسجيلُ الحضور/الانصراف والحالةُ الفيزيائيّة والكنس |
 | الإشعارات | `notifications_hub` · `HubNotification` | تذكيرُ التقريرِ الناقص (نوع واحد، مرّةً) |
 | المجدول | `hub:automation` @ `06:00` | شبكةُ أمانٍ يوميّة فوق الاشتقاق الحيّ |
 
@@ -46,9 +46,9 @@
 يمنع ربطَ حسابٍ ذي امتيازٍ أو حسابٍ مأخوذ (`Employee.php:51-58`)، والربطُ بالبريد
 آليٌّ عند الإنشاء (`Employee.php:61`).
 
-## ٤) محرّكُ يوم العمل — `App\Support\Workday`
+## ٤) محرّكُ يوم العمل — `App\Support\Workforce\Workday`
 
-منطقُ الحضور كلُّه في مكانٍ واحد (`app/Support/Workday.php`):
+منطقُ الحضور كلُّه في مكانٍ واحد (`app/Support/Workforce/Workday.php`):
 
 - **الجسر**: `Workday::emp(?User)` يجلب الملفَّ النشطَ من `user_id`
   (`Workday.php:44-50`)؛ `today($empId, $date)` صفُّ اليوم بترتيبٍ حتميّ

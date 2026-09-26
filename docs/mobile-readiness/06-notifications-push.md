@@ -27,7 +27,7 @@
   لأنّه لا يحمل تخويلاً (الاستعلامُ منطَّقٌ بـ`user_id` أصلاً): مؤشّرٌ مُختلَقٌ يزيح النافذةَ داخلَ
   إشعاراتي وحدَها لا غير.
 - كلُّ عنصرٍ يحمل وجهتَه القانونيّة `{module,id,action}` من `NotificationLink::target($n)`
-  (`app/Support/NotificationLink.php:28`) — لا رابطَ ويبٍ صلبٌ ولا اسمَ شاشة (راجع
+  (`app/Support/Collaboration/NotificationLink.php:28`) — لا رابطَ ويبٍ صلبٌ ولا اسمَ شاشة (راجع
   `08-versioning-deep-links.md`).
 - الحذفُ الصلبُ للنموذج يعني لا شواهدَ حذف؛ يُزامَن العميلُ بالمؤشّر ويُسقِط من خبيئته ما لم يعد يرد.
 
@@ -47,7 +47,7 @@ static::created(function (self $n) {
   الستّة (`AlertEngine`/`FlowRunner`/`LoginSentry`/`EsignController`/`HubDigest`/`HubAutomation`)
   التي تتجاوز `hub_notify` — بلا لمسِ أيٍّ منها.
 - **بعد الالتزام لا سطريّاً:** `scheduleFanout` يجدوله عبر `DB::afterCommit`
-  (`app/Support/PushService.php:126-135`)، فاستثناءُ مزوّدٍ لا يقع **داخلَ** المعاملة المحيطة
+  (`app/Support/Mobile/PushService.php:126-135`)، فاستثناءُ مزوّدٍ لا يقع **داخلَ** المعاملة المحيطة
   (اعتماد/استيعابُ مقاييس/مسار) فيُرجِعَ الإشعارَ الملتزَم (spec §Push: «failed push must not
   lose internal notification»). واستثناءُ التفريعِ نفسِه ملتقَطٌ (`report($e)`) — الإشعارُ الداخليُّ نجا.
 - **الأنواعُ المكتومة لا تُدفَع بلا حارسٍ زائد:** hook الكتمِ يُلغي `creating` بـ`return false`
@@ -60,7 +60,7 @@ static::created(function (self $n) {
 
 ## 3) خدمةُ الدفع والمزوّدون
 
-`App\Support\PushService` (`app/Support/PushService.php`) هي التجريد؛ خلفَها واجهةٌ ومنفّذان:
+`App\Support\Mobile\PushService` (`app/Support/Mobile/PushService.php`) هي التجريد؛ خلفَها واجهةٌ ومنفّذان:
 
 | المكوّن | الملف | الدور |
 |---|---|---|
@@ -107,7 +107,7 @@ static::created(function (self $n) {
 
 ## 5) خصوصيّةُ الدفع — الحمولةُ آمنةٌ بالبناء
 
-`PushService::payloadFor($n)` (`app/Support/PushService.php:202`) يبني:
+`PushService::payloadFor($n)` (`app/Support/Mobile/PushService.php:202`) يبني:
 
 ```json
 {

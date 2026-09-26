@@ -21,8 +21,8 @@
 | الملف | الأسطر | الدور |
 |---|---|---|
 | `config/ai_catalog.php` | ٢٩٦ | **وصفُ المزوّدين** — خمسةُ مراجع |
-| `app/Support/AiCatalog.php` | ٣٨٤ | **المحرّكُ والمُصادِق** — بلا اسمِ مزوّدٍ واحد |
-| `app/Support/Tri.php` | ٨٤ | الحقيقةُ الثلاثيّة |
+| `app/Support/Ai/Catalog/AiCatalog.php` | ٣٨٤ | **المحرّكُ والمُصادِق** — بلا اسمِ مزوّدٍ واحد |
+| `app/Support/Platform/Tri.php` | ٨٤ | الحقيقةُ الثلاثيّة |
 | `tests/Feature/AiHub/AiCatalogFoundationTest.php` | ٣٢٩ | ٣٣ اختباراً |
 | `VERSION` · `README.md` · `docs/openapi.json` | — | رفعُ النسخةِ ومدخلُ السجلِّ ومواصفةٌ مُولَّدة |
 

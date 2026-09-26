@@ -19,7 +19,7 @@
 | صحّةُ التسليم | `hub_project_health($id)` | ٦ عوامل موزونة |
 | ربحيّةُ المشروع (P&L) | `hub_project_pl($id,$fresh)` (`helpers.php:2193`) | إيراد/تكلفة/ربح/هامش/ميزانية — لا دفترَ ثانٍ |
 | خطُّ الأساس التجاريّ | `$project->meta['baseline']` | من عرضٍ مقبول |
-| الخطوة التالية | `App\Support\NextAction::for('projects',$row)` | — |
+| الخطوة التالية | `App\Support\Insights\NextAction::for('projects',$row)` | — |
 | الخطُّ الزمنيّ | `hub_timeline('projects',$id)` (`helpers.php:2555`) | تدقيق+تعليقات+مرفقات+نسخ |
 | الغرفتان | `ConversationController::ensureProjectRooms($project)` (`ConversationController.php:108-148`) | idempotent · `['internal','client']` |
 | المستكشف | رابطٌ قائمٌ في ترويسة العرض `graph.explore?m=projects&id=…` (`modules/show.blade.php:47`، محجوبٌ عن العميل) | `RelationshipProjection::expand` |
@@ -40,7 +40,7 @@
 
 ## 5) محرّكُ العلاقات (نقطةُ التوسعة)
 
-- `RelationshipProjection` (`app/Support/RelationshipProjection.php`) **مدفوعٌ بالإعداد**: لا قائمةَ حوافٍّ ثابتة —
+- `RelationshipProjection` (`app/Support/Insights/RelationshipProjection.php`) **مدفوعٌ بالإعداد**: لا قائمةَ حوافٍّ ثابتة —
   الحوافُّ حقولُ `type=ref` في `config/hub.php`، والعكسيّةُ من `hub_children` (`helpers.php:1107-1149`). كلُّ عقدةٍ
   تمرّ بـ`hub_read` (تفويضٌ تلقائيّ — لا رافدٌ ثانٍ). الجذرُ من `?m=&id=` (`RelationshipExplorerController::target`).
 - **تعليمُ الحافّةِ الجديدة (§40):** توسعةٌ صغيرةٌ موجّهةٌ في `neighbors` لتُضيف جيرانَ «التخصيصِ النشط»

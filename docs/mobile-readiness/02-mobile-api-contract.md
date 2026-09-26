@@ -42,7 +42,7 @@ Authorization: Bearer <access_token>
 **قاعدةٌ حاكمة:** لا هويّةٌ/دورٌ/ملكيّةٌ/`user_id` يرسلها العميلُ تُصدَّق — الهويّةُ من
 الجلسة المُطابَقة وحدَها. الترويسةُ لا تُوسِّع صلاحيةً قط.
 
-## 3. غلافُ الاستجابة (`app/Support/Api.php`)
+## 3. غلافُ الاستجابة (`app/Support/Platform/Api.php`)
 
 **نجاحٌ (كائن):**
 ```json
@@ -214,4 +214,4 @@ PUT /api/mobile/v1/tasks/{id}    If-Match: "3"      (والسجلُّ version=5)
 ---
 
 **التحقّق:** جدولُ المسارات مطابقٌ لـ`route:list --path=api/mobile` (٥٨). الغلافُ
-والأكوادُ من `app/Support/Api.php`. لا مسارٌ هنا غيرُ مُسجَّلٍ في `routes/api.php`.
+والأكوادُ من `app/Support/Platform/Api.php`. لا مسارٌ هنا غيرُ مُسجَّلٍ في `routes/api.php`.

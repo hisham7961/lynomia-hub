@@ -65,8 +65,8 @@
 `NavOfferMatchesDestinationTest` بطرقِ كلِّ بابٍ يُعرَض فعلاً.
 
 **الأدلّة:**
-`docs/month-simulation/screenshots/employee-11/day01-sidebar-offers-performance.png`
-`docs/month-simulation/screenshots/employee-11/day01-click-gives-403.png`
+`docs/archive/month-simulation/screenshots/employee-11/day01-sidebar-offers-performance.png`
+`docs/archive/month-simulation/screenshots/employee-11/day01-click-gives-403.png`
 
 ---
 

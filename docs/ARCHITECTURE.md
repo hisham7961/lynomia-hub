@@ -4,16 +4,44 @@
 > الثابت: **سكّتان** لا ثالثَ لهما — سجلُّ الوحدات `config/hub.php` (يُولّد الشاشات والـAPI
 > والتحقق والتنطيق من تعريفٍ واحد)، والمفتاحُ متعدّدُ الأشكال `(module, record_id)` الذي تعلّق
 > عليه كلُّ الخدمات المشتركة (تدقيق، مرفقات، تعليقات، نسخ، إشعارات، أحداث).
+>
+> **حُدِّثت في v2.603.6** بعد إعادة التنظيم (`docs/REORG_PLAN.md`): الأصنافُ في نطاقاتها، والسجلُّ
+> والمساراتُ مقسومةٌ ملفّاتٍ، والمتحكّمان الأكبران يفوّضان إلى خدمات — **والسلوكُ لم يتغيّر**.
+
+## ٠) خريطةُ المجلّدات
+
+| المجلّد | ما فيه |
+|---|---|
+| `config/hub.php` + `resources/registry/modules/*.php` | سجلُّ الوحدات: ملفٌّ لكلِّ وحدة (٨٥)، تُحمَّل **بقائمةٍ صريحةٍ مرتّبة** في `config/hub.php` — الترتيبُ دلاليّ (القوائم والتنقّل). خارجَ `config/` عمداً لأنّ Laravel يحمّل كلَّ ما تحته مفتاحاً |
+| `routes/web.php` + `routes/web/*.php` | مساراتُ الويب: الملفُّ الأمّ يُضمِّن ١٤ ملفّاً بالنطاق (`workspace` · `workforce` · `ask` · `assets` · `identity` · `collaboration` · `insights` · `odoo` · `profile` · `admin` · `ai-center` · `admin-platform` · `modules` · `control-plane`) **كلٌّ في موضعه** من مجموعة `auth` — فالترتيبُ الذي يحكم المطابقةَ محفوظ |
+| `app/Http/Controllers/{Web,Api}` | المتحكّمات: رقيقةٌ حيث أمكن، والمنطقُ المشترك في `app/Support` |
+| `app/Support/<النطاق>/` | المنطقُ بالنطاق — لا صنفَ مسطّحاً تحت `app/Support` (الجدول التالي) |
+| `app/Support/helpers.php` | قلبُ الأمن بدوالّه العامّة (`hub_can` · `hub_scope` · `hub_field_mode` · `hub_audit` …) وأغلفةٌ من سطرٍ لمحرّكاتٍ صارت أصنافاً |
+| `tools/` | أدواتُ النقل الآليّ التي بُنيت بها إعادةُ التنظيم (`move-classes` · `extract-helpers` · `extract-methods`) |
+| `tests/Fixtures/structure/` | لقطاتُ البنية (المسارات · السجلّ · الأصناف · الدوالّ) — `php artisan hub:structure-snapshot --write` بعد تغييرٍ مقصود |
+
+| النطاق (`App\Support\…`) | ما يملكه |
+|---|---|
+| `Ai` | مركزُ الذكاء: `Gateway` (LiteLLM) · `Governance` (السياسة والميزانية والدفتر) · `Routing` (الأغراض والملفّات) · `Catalog` · `Center` · `Ask` (اسأل المنصّة) · `Auditor` (المدقّق) · `GovernedCompletion` (البابُ الوحيد لنداء النموذج) |
+| `Platform` | السكّةُ المشتركة: `Api` · `OpenApi` · `Audit` · `Settings` · `HubEvents` · `FlowRunner` · `Redactor` · `TimeRange` · `Severity` · `InformationArchitecture` · `StructureSnapshot` · و`Modules\*` (منطقُ محرّك الوحدات) |
+| `Security` | المصادقةُ والجلسات والأجهزة وWebAuthn وTOTP والتصعيد والوضعُ الأمنيّ ونتائجُه |
+| `Ops` | الصحّةُ والمراقبة والأخطاء والتنبيه والويبهوك والتكاملات وOdoo وتصنيفُ الحالة |
+| `Insights` | مركزُ الفعل والتوصيات والمؤشّرات والـOKR وجودةُ البيانات والربحيّة ورادارُ الانتهاء |
+| `Workforce` | يومُ العمل والحضور والتقارير اليومية ومراجعتُها وإحصاءاتُ التنفيذ وملفُّ الموظّف |
+| `Documents` | العروضُ والعقود وقوالبُها والتصييرُ PDF والباركود/QR والعلامةُ المائيّة، و`Esign\EsignFinalizer` (إتمامُ التوقيع) |
+| `Collaboration` | المحادثاتُ والرسائلُ المباشرة والتعليقاتُ والمرفقات والحضورُ والكتابة وبوّابةُ العميل |
+| `Assets` · `Finance` · `Apps` | الأصولُ والعهد · القيودُ والتسعير والعملة · استوديو التطبيقات والتسليم |
+| `Mobile` · `Push` · `Endpoint` · `Mdm` · `Discovery` | سطحُ الجوال (`/api/mobile/v1`) · مزوّدو الدفع · الأجهزةُ المُدارة · مزوّدو MDM · مزوّدو الباركود |
 
 ## ١) الطبقات
 
 | الطبقة | أين | ما تملكه |
 |---|---|---|
-| سجلّ الوحدات | `config/hub.php` (٨٢ وحدة) + `config/hub_settings.php` | الحقول وأنواعُها، المراجع، الحالات، الأعمدة، أعمدةُ العزل (`company_id`/`client_id`/`project_id`)، مفاتيحُ الإعدادات وشروحُها |
-| محرّك الوحدات | `app/Http/Controllers/Web/ModuleController.php` | القائمة/النموذج/الحفظ/الحذف/الاستعادة/التصدير/الدفعات/اللوحات لكل وحدة، بحرّاسٍ واحدة: `hub_can` + `hub_scope` + `hub_field_mode` + `guardCompany` + `guardClient` |
-| واجهة API | `app/Http/Controllers/Api/V1Controller.php` (يرث المحرّك) + `app/Support/Api.php` + `app/Support/OpenApi.php` | عقدُ الأخطاء الموحَّد (رموزٌ ثابتة + `request_id`)، الفرزُ بقائمةٍ بيضاء، المرشِّحاتُ الزمنية، `PATCH`، `If-Match`/`_version`، Idempotency-Key، مواصفةُ OpenAPI 3.1 المولَّدة من السجلّ (`/api/v1/openapi.json`, `hub:openapi`) |
+| سجلّ الوحدات | `config/hub.php` (٨٥ وحدة، كلٌّ في ملفّها تحت `resources/registry/modules/`) + `config/hub_settings.php` | الحقول وأنواعُها، المراجع، الحالات، الأعمدة، أعمدةُ العزل (`company_id`/`client_id`/`project_id`)، مفاتيحُ الإعدادات وشروحُها |
+| محرّك الوحدات | `app/Http/Controllers/Web/ModuleController.php` — يفوّض البحثَ والتصفية والتصديرَ والتحقّقَ وحرّاسَ التنطيق وإبطالَ المشتقّ إلى `app/Support/Platform/Modules/*` | القائمة/النموذج/الحفظ/الحذف/الاستعادة/التصدير/الدفعات/اللوحات لكل وحدة، بحرّاسٍ واحدة: `hub_can` + `hub_scope` + `hub_field_mode` + `guardCompany` + `guardClient` |
+| واجهة API | `app/Http/Controllers/Api/V1Controller.php` (يرث المحرّك) + `app/Support/Platform/Api.php` + `app/Support/Platform/OpenApi.php` | عقدُ الأخطاء الموحَّد (رموزٌ ثابتة + `request_id`)، الفرزُ بقائمةٍ بيضاء، المرشِّحاتُ الزمنية، `PATCH`، `If-Match`/`_version`، Idempotency-Key، مواصفةُ OpenAPI 3.1 المولَّدة من السجلّ (`/api/v1/openapi.json`, `hub:openapi`) |
 | الدوالُّ المشتركة | `app/Support/helpers.php` | `hub_can`، `hub_scope`، `hub_company_scope`، `hub_field_mode`، `hub_ref_options_scoped`، `hub_guard_scope_input`، `hub_audit`، `hub_notify`، `hub_require_stepup` / `hub_require_credential_stepup`، `hub_outbound_ok` (حاجز SSRF/DNS)، `hub_security_incident`، `hub_schedule_failed`، `setting()` |
-| الخدماتُ المشتركة | `app/Support/*` | `Audit` (سلسلة SHA-256 مختومة)، `ErrorLog` + `ErrorTaxonomy`، `Health`، `SecurityEvents`، `Sessions`، `StepUp`، `Totp`، `Webauthn`، `Devices`، `Risk`، `HubEvents` → `WebhookDispatcher` / `FlowRunner`، `Integrations` (سجلّ التكاملات وصحّتها)، `Odoo`، `Discovery\Engine`، `SysMonitor`، `Uptime`، `SchemaGuard` |
+| الخدماتُ المشتركة | `app/Support/<النطاق>/*` (§٠) | `Audit` (سلسلة SHA-256 مختومة)، `ErrorLog` + `ErrorTaxonomy`، `Health`، `SecurityEvents`، `Sessions`، `StepUp`، `Totp`، `Webauthn`، `Devices`، `Risk`، `HubEvents` → `WebhookDispatcher` / `FlowRunner`، `Integrations` (سجلّ التكاملات وصحّتها)، `Odoo`، `Discovery\Engine`، `SysMonitor`، `Uptime`، `SchemaGuard` |
 | الوسطاء | `app/Http/Middleware/*` | `SecurityHeaders` → `Observability` (X-Request-Id + سياقُ السجل) → `HubMaintenance` → `SessionSentry` → `WorkHours` → `TrackVisits` → `Require2faForPrivileged` → `AccessRadar`؛ وللـAPI: `ApiAuth` (رموز `lyn_`، نطاقات، IP، انتهاء، عدّاداتُ الاستخدام) |
 | العملُ الخلفيّ | `routes/console.php` + `app/Console/Commands/*` | بلا عامل طوابير (`QUEUE_CONNECTION=sync`): كلُّ عملٍ مؤجَّل يمرّ بجداول (`outbox`، `webhook_deliveries`) ويُصرَف بأوامرَ مجدولة بنبضاتٍ (`heartbeat.<job>`) وخطّافِ فشلٍ (`onFailure` → مركز الأخطاء + حادثة عند فشل فحص السلسلة) |
 | الواجهة | `resources/views/*` (Blade, RTL, HTMX) | شاشاتُ الوحدات المولَّدة (`modules/*`)، مراكزُ الإدارة (`ops/`, `security/`, `integrations/`, `settings/`, `errors/`)، صفحاتُ الأخطاء العربية (`errors/<code>.blade.php`) |
@@ -35,9 +63,9 @@ Exception → bootstrap/app.php → Api::render (api/*) | صفحةُ خطأ عر
 
 ## ٣) طبقةُ البيانات
 
-- **جداولُ الوحدات** (٨٢): كلٌّ بأعمدةٍ من سجلّها؛ الحذفُ ناعم؛ `company_id`/`client_id`/`project_id` حيث يُعزَل.
+- **جداولُ الوحدات** (٨٥): كلٌّ بأعمدةٍ من سجلّها؛ الحذفُ ناعم؛ `company_id`/`client_id`/`project_id` حيث يُعزَل.
 - **جداولُ المنصّة**: `audits` + `audit_chain` (سلسلةٌ مختومة، `request_id` للربط)، `record_versions`، `attachments`، `comments`، `notifications_hub`، `outbox`، `webhook_deliveries`، `inbound_hook_events`، `error_events` (تصنيفٌ + شدّة + بصمةٌ + إصدار)، `sessions_log`، `access_denials`، `api_tokens` + `api_usage`، `metric_points`، `settings`، `idempotency_keys`، `record_identifiers` + `identity_lookups`.
-- **الهجرات**: إضافيةٌ فقط (١٧٢ ملفاً)، محروسةٌ بـ`hasTable/hasColumn`؛ `hub:schema-check` يقارن السجلَّ بالقاعدة.
+- **الهجرات**: إضافيةٌ فقط (٢٦٣ ملفاً)، محروسةٌ بـ`hasTable/hasColumn`؛ `hub:schema-check` يقارن السجلَّ بالقاعدة.
 - **النسخُ الاحتياطي**: `hub:backup` ينسخ جداولَ الوحدات + `RAW_TABLES` (الأتمتة والاعتماد والتوقيع والسلاسل) — وكلُّ جدولٍ إمّا منسوخٌ أو مُعلَنٌ في `HubBackup::EPHEMERAL` (يحرسه اختبارٌ).
 
 ## ٤) نموذجُ الأمان
@@ -66,7 +94,7 @@ Exception → bootstrap/app.php → Api::render (api/*) | صفحةُ خطأ عر
 | `hub:digest` | أسبوعياً | `heartbeat.digest` | كذلك |
 | `hub:audit-verify` | أسبوعياً | `heartbeat.audit` | كذلك + **حادثةٌ أمنية** |
 
-نموذجُ الصحّة (`App\Support\Health`): `live` (العملية حيّة) / `ready` (db, cache, storage, migrations, config)
+نموذجُ الصحّة (`App\Support\Ops\Health`): `live` (العملية حيّة) / `ready` (db, cache, storage, migrations, config)
 / `check` (الكامل: + المجدولات + التكاملات + الأمن) — بحالاتٍ خمس (`HEALTHY, DEGRADED, UNAVAILABLE, MAINTENANCE, UNKNOWN`)
 تُعرض في مركز التشغيل وتُقرأ من `/healthz?probe=live|ready`.
 
@@ -75,7 +103,7 @@ Exception → bootstrap/app.php → Api::render (api/*) | صفحةُ خطأ عر
 
 ## ٦) التكاملات
 
-- **Odoo** (`App\Support\Odoo`): XML-RPC بقاطعِ دارةٍ ونبضةِ صحّة (`Integrations::pulse`).
+- **Odoo** (`App\Support\Ops\Odoo`): XML-RPC بقاطعِ دارةٍ ونبضةِ صحّة (`Integrations::pulse`).
 - **الويبهوك** الصادر/الوارد (`webhooks`, `inbound_hooks`): توقيعُ HMAC، `event_id` لمنع التكرار، دورةُ حياةٍ مدوَّنة.
 - **المراسلة**: بريد/تلجرام عبر `outbox` (لا إرسالَ مباشرٌ من الطلب إلا زرُّ الاختبار).
 - **الاستكشاف** (`Discovery\Engine`): مزوّدو الباركود (UPCitemdb, OpenFoodFacts, OpenLibrary) بكاشٍ ٣٠ يوماً **للحاسم فقط**.
@@ -93,7 +121,9 @@ Exception → bootstrap/app.php → Api::render (api/*) | صفحةُ خطأ عر
 
 | تريد… | السكّة |
 |---|---|
-| وحدةً جديدة | مدخلٌ في `config/hub.php` + هجرةٌ إضافية — لا Controller ولا View |
+| وحدةً جديدة | ملفٌّ في `resources/registry/modules/<key>.php` + سطرٌ في موضعه من قائمة `config/hub.php` + هجرةٌ إضافية — لا Controller ولا View |
+| نداءً لنموذج ذكاء | `GovernedCompletion::authorize()` ثم `open()` ثم `call()` — لا `AiChat::complete` مباشرةً (يحرسه `GovernedCompletionTest`) |
+| مساراتٍ لنطاقٍ قائم | ملفُّ نطاقه تحت `routes/web/` — وملفٌّ جديد يُضمَّن في موضعه من `routes/web.php` |
 | مسارَ قراءةٍ مخصّصاً | `hub_scope` + `hub_can` + `hub_field_mode` قبل الاستعلام، و`hub_ref_options_scoped` للقوائم |
 | مسارَ كتابةٍ مخصّصاً (خارج المحرّك) | `hub_guard_scope_input($data, [...])` + `Auditable` أو `hub_audit` |
 | فعلاً أمنيّاً | `hub_audit` بفعلٍ يعرفه `SecurityEvents::CODES` (أو أضِف رمزاً هناك) |
@@ -110,6 +140,7 @@ Exception → bootstrap/app.php → Api::render (api/*) | صفحةُ خطأ عر
 3. **كلُّ عيبٍ أمنيّ اختبارٌ يفشل أولاً** ثم يُصلَح.
 4. **الترتيبُ صريح** (`orderBy(...)->orderBy('id')`) — لا قرعةَ صفوف.
 5. **لا سرَّ في السجلّات**: `AUDIT_SECRET`، بصماتٌ للقيم المشفَّرة، لا تتبّعَ مكدّسٍ للمستخدم.
+6. **البنيةُ لا تتغيّر صامتةً**: لقطاتُ المسارات والسجلّ والأصناف والدوالّ (`StructureSnapshotTest`) تُسقط أيَّ فقدٍ أو إضافةٍ بلا لقطة.
 
 ## مستوى التحكّم المؤسسي (Control Plane) — الطور الأول (v2.401)
 
@@ -117,12 +148,12 @@ Exception → bootstrap/app.php → Api::render (api/*) | صفحةُ خطأ عر
 
 | العمود | الواجهة | الملف |
 |---|---|---|
-| المدى الزمنيّ الموحّد | `TimeRange::fromRequest()` / `->prev()` / `->apply($q,$col)` + `hub_range()` + `partials/timerange` | `app/Support/TimeRange.php` |
-| خرائطُ الشدّة والحالة | `Severity::normalize/label/tone/rank` · `OpStatus::fromHealth` · `IssueState::MAP` — خرائطُ عرضٍ فوق المفردات القائمة، لا تحويلَ مخزَّن | `app/Support/Severity.php` وأخواها |
-| المُطهِّر الواحد | `Redactor::text/arr/fingerprint/sql/json` — تُفوَّض إليه السبعُ القائمة (ErrorLog، Health::safe، Integrations::pulse، HubOutbox، WebhookDispatcher، SecurityRadar، InboundHook) | `app/Support/Redactor.php` |
-| الترابط | `X-Request-Id` وحدَه (`Api::requestId/requestSource/requestIdIsExternal`)؛ قارئ `Correlation::forRequestId` وصفحة `system/trace/{rid}` (مالك أو علم `audit` منطَّقاً) | `app/Support/Correlation.php` |
+| المدى الزمنيّ الموحّد | `TimeRange::fromRequest()` / `->prev()` / `->apply($q,$col)` + `hub_range()` + `partials/timerange` | `app/Support/Platform/TimeRange.php` |
+| خرائطُ الشدّة والحالة | `Severity::normalize/label/tone/rank` · `OpStatus::fromHealth` · `IssueState::MAP` — خرائطُ عرضٍ فوق المفردات القائمة، لا تحويلَ مخزَّن | `app/Support/Platform/Severity.php` · `Platform/IssueState.php` · `Ops/OpStatus.php` |
+| المُطهِّر الواحد | `Redactor::text/arr/fingerprint/sql/json` — تُفوَّض إليه السبعُ القائمة (ErrorLog، Health::safe، Integrations::pulse، HubOutbox، WebhookDispatcher، SecurityRadar، InboundHook) | `app/Support/Platform/Redactor.php` |
+| الترابط | `X-Request-Id` وحدَه (`Api::requestId/requestSource/requestIdIsExternal`)؛ قارئ `Correlation::forRequestId` وصفحة `system/trace/{rid}` (مالك أو علم `audit` منطَّقاً) | `app/Support/Ops/Correlation.php` |
 | عُدّةُ مركز التحكّم | `partials/cc/{kpis,trend,findings,freshness,tabs,th}` + `hub_admin_links()` + `hub_screen(..., stamped:)` | `resources/views/partials/cc/` |
-| أوّليّاتُ القياس | `hub_metric_bucket` · `hub_window_pair` · `hub_compare` (pct=null عند أساسٍ صفريّ) · `Series::percentiles/mergeHist` — و`metric_points` يبقى مخزنَ التاريخ الوحيد | `app/Support/Series.php` |
+| أوّليّاتُ القياس | `hub_metric_bucket` · `hub_window_pair` · `hub_compare` (pct=null عند أساسٍ صفريّ) · `Series::percentiles/mergeHist` — و`metric_points` يبقى مخزنَ التاريخ الوحيد | `app/Support/Ops/Series.php` |
 
 وحاجزٌ أمنيّ أُغلق قبل البناء: التصدير الجَماعيّ يمرّ بحزام `export()` نفسِه (تجميد/تصعيد/أثر)، وتقليمُ الاحتفاظ لا يحذف أدلّةً غيرَ محلولة عاليةَ الشدّة ويكتب أثرَ ما حذف. التقريران الكاملان: `docs/control-plane/DISCOVERY.md` (تصنيفُ ١٥٢ بنداً بالأدلة) و`PLAN.md` (٤١ حزمةَ عملٍ للأطوار ١–١٠ + ٤٠ تفنيداً).
 
@@ -149,3 +180,16 @@ Exception → bootstrap/app.php → Api::render (api/*) | صفحةُ خطأ عر
 
 وثلاثةُ مجدولاتٍ جديدة بنبضاتها في `Health::JOBS`: `hub:ops-snapshot` (كل ٥ د) ·
 `hub:alerts-evaluate` (كل ٥ د) · `hub:security-snapshot` (يومياً).
+
+## مركزُ الذكاء والمدقّق (v2.559 → v2.603)
+
+> **الوثائق:** `docs/ai-hub/01-architecture.md` (البنية) · `docs/ai-hub/46-ai-roadmap.md` (الخطّةُ وقراراتُ المالك).
+
+- **البوّابة:** LiteLLM خلف `Ai\Gateway`؛ وكلُّ نداءِ نموذجٍ يمرّ بـ`GovernedCompletion` — تفويضٌ (`AiGovernance`:
+  السياسة والميزانية بحجزٍ مسبق) ثم دفترُ استهلاك (`ai_usage_events`) لكلِّ نداء، وسقفُ نداءاتٍ ومخرجاتٍ للجلسة.
+- **اسأل المنصّة** (`Ai\Ask`): قراءةٌ فقط بخمس أدوات، كلٌّ منها يمرّ بـ`hub_scope` + `hub_can` + `hub_field_mode`؛
+  `WRITE_TOOLS = []`.
+- **المدقّق** (`Ai\Auditor`): هويّةُ خدمةٍ في الذاكرة لا تُحفظ، وكواشفُ قواعد (نسخُ التقرير · العائقُ المتكرّر ·
+  ساعاتٌ بلا تقدّم · قرارٌ بلا مهمّة) وكواشفُ ذكاءٍ **مطفأةٌ افتراضاً** (`auditor.ai`). النتائجُ في `ai_findings` بمفتاحٍ
+  ثابتٍ للشرط، و**يُعاد تنطيقُها لكلِّ مشاهد** قبل أن تظهر في مركز الفعل (`AuditorSignals`). لا يكتب سجلاتِ أعمال،
+  والموظّفُ لا يرى حكمَه — يرى ملاحظةَ مديره فقط. وكاشفٌ يرفضه المديرون كثيراً يُطفئ نفسَه (`AuditorAccuracy`).

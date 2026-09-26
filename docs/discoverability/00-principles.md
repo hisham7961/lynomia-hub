@@ -30,6 +30,6 @@
 
 ## لا محرّكَ ثانٍ (إضافةٌ لا كسر)
 
-كلُّ ما في هذا الطور فوق المصادرِ القائمة: `config/hub_ia.php` + `App\Support\InformationArchitecture`
+كلُّ ما في هذا الطور فوق المصادرِ القائمة: `config/hub_ia.php` + `App\Support\Platform\InformationArchitecture`
 (الهندسةُ المعلوماتية)، و`hub_top_links`/`hub_admin_links` (كتالوجُ الشريط)، و`FeatureRegistry`
 (سجلُّ القدرات · مصدرُ تدقيق). لا جدولَ قوائمَ ولا سجلَّ واجهةٍ ثانياً.

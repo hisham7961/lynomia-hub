@@ -27,7 +27,7 @@ HTTP 422
 حاسم: `[]` مصفوفةٌ و`{}` كائن.
 
 ```php
-// قبل — app/Support/LiteLlmAdmin.php::createModel()
+// قبل — app/Support/Ai/Gateway/LiteLlmAdmin.php::createModel()
 'model_info' => $modelInfo,       // $modelInfo = []  ⇒  "model_info":[]
 ```
 

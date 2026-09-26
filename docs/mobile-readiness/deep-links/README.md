@@ -6,7 +6,7 @@
 
 ## 1) الرابطُ العميقُ القانونيّ — `{module, id, action}`
 
-المصدرُ الواحدُ للوجهة هو `App\Support\NotificationLink::target()` — **لا اسمَ شاشةِ جوالٍ صلب
+المصدرُ الواحدُ للوجهة هو `App\Support\Collaboration\NotificationLink::target()` — **لا اسمَ شاشةِ جوالٍ صلب
 ولا رابطَ ويبٍ صلب**. الشكل:
 
 ```json

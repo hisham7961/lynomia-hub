@@ -123,7 +123,7 @@
 
 ## المخرَجات
 
-`docs/expert-council/` — من `00-methodology` إلى `19-capability-preservation`،
+`docs/archive/expert-council/` — من `00-methodology` إلى `19-capability-preservation`،
 ومعها `FINDINGS` و`PRODUCT_GAPS` و`FUTURE_OPPORTUNITIES` و`FINAL_COUNCIL_REPORT`.
 
 ## الحكم — عبارةٌ واحدةٌ حرفيّةٌ لا ثالثَ لها

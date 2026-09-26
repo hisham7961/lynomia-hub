@@ -36,10 +36,10 @@
 | `config/hub_settings.php` | ٢،٣،٤،٥،٧ | إضافةٌ في نهاية المجموعة المعنيّة أو في `internal`؛ الدمجُ يأخذ الاثنين. لا تحرير مدخلٍ قائم. |
 | `config/hub.php` | ٥،٦،٨ | حقولُ `incidents`/`rules` وأحداثُ `events` — طورٌ واحدٌ في المرّة؛ بعد الدمج يُعاد توليد `docs/openapi.json`. |
 | `app/Support/helpers.php` | **الطور ١ فقط** | كلُّ الدوالّ المشتركة تُولد في الطور ١؛ الأطوارُ اللاحقة تستهلك ولا تحرّر (تفادياً لتعارضٍ في ملفٍ من ٥١٠٠ سطر). |
-| `app/Support/Health.php` | ٢،٤،٦ | حزمةٌ واحدة لكل طورٍ تملك `JOBS`/`check()`؛ تُدمج قبل غيرها. |
+| `app/Support/Ops/Health.php` | ٢،٤،٦ | حزمةٌ واحدة لكل طورٍ تملك `JOBS`/`check()`؛ تُدمج قبل غيرها. |
 | `app/Http/Middleware/Observability.php` | ١ ثم ٢ | الطور ١ يُنهي عملَه قبل أن يبدأ الطور ٢ عليه. |
 | `app/Console/Commands/HubAutomation.php` (كتلةُ الاحتفاظ) | ٣،٧ | تسلسل: ٣ ثم ٧. |
-| `app/Support/ErrorLog.php` | ١ (توصيل Redactor) ثم ٣ (occurrences) | تسلسل. |
+| `app/Support/Ops/ErrorLog.php` | ١ (توصيل Redactor) ثم ٣ (occurrences) | تسلسل. |
 | `resources/views/layouts/app.blade.php` (شريط الإدارة) | ١٠ فقط | الأطوارُ ١–٩ لا تلمس الشريط؛ روابطُها تُسجَّل في `hub_admin_links()` (الطور ١) ويرسمها الطور ١٠. |
 | `public/css/app.css` | ١ فقط | إضافةُ `--info/--infobg` و`.bdg.i` و`.cc-*` مرّةً واحدة. |
 | `README.md` + `VERSION` | كلُّ دفعة | آخرُ commit في كلّ worktree قبل الدفع: rebase ثم رفعُ النسخة (لا تُعدَّل داخل عملٍ متوازٍ). |
@@ -68,14 +68,14 @@
 ### أ) القائمُ الذي يُعاد استعماله كما هو (لا تُكرَّر)
 | السكّة | الواجهة | الملف |
 |---|---|---|
-| معرّفُ الطلب | `Api::requestId(): ?string` + ترويسة `X-Request-Id` + `Log::withContext` | `app/Support/Api.php:80` · `app/Http/Middleware/Observability.php:18-41` |
+| معرّفُ الطلب | `Api::requestId(): ?string` + ترويسة `X-Request-Id` + `Log::withContext` | `app/Support/Platform/Api.php:80` · `app/Http/Middleware/Observability.php:18-41` |
 | السلاسلُ الزمنية | `hub_metric_put(module, record_id, metric, value, at, source, meta)` · `hub_metric_series` · `hub_metric_latest` (null = «لا قياس») · `hub_metric_spark` | `helpers.php:4208-4290` · جدول `metric_points` (فريدٌ على module+record_id+metric+at) |
 | نبضاتُ المجدولات | `Health::beat(job, ms, result, note)` + `Health::JOBS` + `hub_schedule_failed()` | `Health.php:48-57,363` · `helpers.php:639` |
 | خبيئةُ الشاشات | `hub_screen(prefix, ttl, fn, tables)` (بصمةُ النطاق + ختمُ الجداول + `?fresh=1`) · `hub_cached` · `hub_scope_key` | `helpers.php:2563-2890` |
 | الحرّاس | `hub_can` · `hub_scope` · `hub_company_scope` · `hub_client_ids` · `hub_field_mode` · `hub_is_owner` · `hub_flag` · `hub_monitor` · `hub_org_analytics_guard` · `hub_require_stepup` / `_ops` / `_credential` | `helpers.php` |
 | الأثر | `Auditable` (إضافة/تعديل/حذف مختومة) · `hub_audit(action, module, record_id, name, extra)` · `SecurityEvents::CODES/codeFor/actions` | `app/Traits/Auditable.php` · `helpers.php:2500` · `SecurityEvents.php:27-105` |
 | الإقرار/التأجيل | `ActionCenter::disposition(skey, ack|snooze|dismiss|reopen, until, note)` فوق `signal_states` (مفتاحٌ فريد، مدقَّق، «الحرج لا يُهمَل») | `ActionCenter.php:151-200` |
-| الإقرار على سجلّ | `Acks::record()` + `config/hub_acks.php` + `record_acks` + `partials/acks.blade.php` (مُدمَجٌ سلفاً في `modules/show`) | `app/Support/Acks.php:115` |
+| الإقرار على سجلّ | `Acks::record()` + `config/hub_acks.php` + `record_acks` + `partials/acks.blade.php` (مُدمَجٌ سلفاً في `modules/show`) | `app/Support/Collaboration/Acks.php:115` |
 | العروضُ المحفوظة | `saved_views` + `PrefController::storeView/defaultView/destroyView` + `SavedView::url()` | `PrefController.php:170-225` |
 | الخطُّ الزمنيّ للسجل | `hub_timeline(module, record_id, limit)` + `partials/timeline.blade.php` | `helpers.php:2378-2470` |
 | مكوّناتُ العرض | `partials/pagehead` · `partials/empty` · `partials/pagination(_simple)` · `partials/flash` · `partials/chart_donut` · أصنافُ `.card/.cards/.stat/.kpi/.tbl/.tblwrap/.bdg(ok|wn|bad|g)` | `resources/views/partials/*` · `public/css/app.css` |
@@ -84,7 +84,7 @@
 
 ### ب) الجديدُ في الطور ١ (ستةُ أعمدةٍ يقوم عليها كلُّ ما بعدها)
 
-**١. `App\Support\TimeRange`** — مدىً زمنيٌّ واحد للمنصّة كلّها
+**١. `App\Support\Platform\TimeRange`** — مدىً زمنيٌّ واحد للمنصّة كلّها
 ```php
 TimeRange::fromRequest(?Request $r = null, string $default = '7d'): self
   // ?range=1h|6h|24h|7d|30d|90d|custom  (+ ?from=&to= للمخصّص، ويقبل التاريخ والوقت)
@@ -99,7 +99,7 @@ hub_range(?Request $r = null, string $default = '7d'): TimeRange   // غلافٌ
 ```
 المنطقةُ الزمنية: `config('app.timezone')` = Asia/Kuwait (كما يفعل `hub_metric_put`). عرضٌ: `partials/timerange.blade.php`.
 
-**٢. `App\Support\Severity` + `OpStatus` + `IssueState`** — طبقةُ خرائط، لا مفرداتٍ سادسة
+**٢. `App\Support\Platform\Severity` + `OpStatus` + `IssueState`** — طبقةُ خرائط، لا مفرداتٍ سادسة
 ```php
 Severity::LEVELS  = ['info','low','medium','high','critical'];
 Severity::LABELS  = ['معلوماتي','منخفض','متوسط','مرتفع','حرج'];
@@ -118,7 +118,7 @@ IssueState::MAP = ['new'=>'جديد','investigating'=>'قيد التحقيق','i
 ```
 > قاعدة: **لا تحويلَ مدمِّرٍ لقيمةٍ مخزَّنة**؛ الخرائطُ للعرض والتصفية والعدّ.
 
-**٣. `App\Support\Redactor`** — مُطهِّرٌ واحد تُفوَّض إليه السبعُ القائمة
+**٣. `App\Support\Platform\Redactor`** — مُطهِّرٌ واحد تُفوَّض إليه السبعُ القائمة
 ```php
 Redactor::text(?string $s): string       // مسارات /hook|sign|verify|s|w/{رمز} (القاعدةُ القائمة)
                                          // + ?token=/?key=/?password=/?api_key= في سلسلة الاستعلام
@@ -136,7 +136,7 @@ Redactor::fingerprint(string $v): string // 'sha256:'+16hex — نفسُ صيغ�
 Api::requestId(): ?string                       // كما هو — المصدرُ الوحيد
 Api::requestSource(): string                    // جديد: web|api|console|hook  (للوسم لا للتخويل)
 Api::requestIdIsExternal(): bool                // جديد: العميلُ أرسله ⇒ لا يُفترَض تفرّده
-App\Support\Correlation::forRequestId(string $rid, $viewer): array
+App\Support\Ops\Correlation::forRequestId(string $rid, $viewer): array
    // يجمع من: audits · error_events · outbox · webhook_deliveries · notifications_hub
    //          · access_denials · incidents   (كلٌّ بحارسِه ونطاقِه)
    // يعيد صفوفاً موحَّدة: ['at','kind','severity','title','why','url','meta']
@@ -162,8 +162,8 @@ hub_metric_bucket(Carbon|string $at, int $minutes = 5): Carbon    // تقريب�
 hub_window_pair(int $hours): array   // ['cur'=>[from,to], 'prev'=>[from,to]]  (spec §36)
 hub_compare(float $cur, ?float $prev, int $minN = 0): array
    // ['cur','prev','delta','pct'|null,'n_ok'] — pct = null حين الأساس صفر (دلالةُ WidgetRegistry:126)
-App\Support\Series::percentiles(array $hist, array $p = [50,95,99]): array  // من مدرَّجٍ لوغاريتميّ
-App\Support\Series::mergeHist(array $a, array $b): array
+App\Support\Ops\Series::percentiles(array $hist, array $p = [50,95,99]): array  // من مدرَّجٍ لوغاريتميّ
+App\Support\Ops\Series::mergeHist(array $a, array $b): array
 ```
 قاعدةُ التخزين (spec §15): **`metric_points` هي المخزن**؛ لا جدولَ سلاسلَ ثانياً. الاستثناءُ الوحيدُ المسموح: `http_metric_buckets` (الطور ٢) لأنّ شكلَ `metric_points` (`record_id` uuid + قيمةٌ واحدة) لا يسع بُعدَ المسار ولا (count/sum/max/hist) في حاويةٍ واحدة.
 
@@ -175,9 +175,9 @@ App\Support\Series::mergeHist(array $a, array $b): array
 
 ### WP-1.1 — TimeRange + المكوّن
 - **spec:** GLOBAL TIME RANGE · §12.2 · §36.
-- **يُبنى:** `app/Support/TimeRange.php` (جديد) + `hub_range()` في `helpers.php` + `resources/views/partials/timerange.blade.php`.
+- **يُبنى:** `app/Support/Platform/TimeRange.php` (جديد) + `hub_range()` في `helpers.php` + `resources/views/partials/timerange.blade.php`.
   يقبل معاملاتِ اليوم كما هي: `from`/`to` (شاشةُ التدقيق `AuditController.php:46-47`، القدرات `CapacityController.php:27`)، و`created_from/created_to/updated_since` (`Api::timeFilters`)، و`d`/`days` (السوشال/API metrics). **لا يُعاد تسميةُ معاملٍ قائم** لأن `saved_views.query` يخزّن سلسلةَ الاستعلام حرفياً.
-- **ملفّات:** إنشاء `app/Support/TimeRange.php`، `resources/views/partials/timerange.blade.php`؛ تعديل `app/Support/helpers.php` (دالّةٌ واحدة).
+- **ملفّات:** إنشاء `app/Support/Platform/TimeRange.php`، `resources/views/partials/timerange.blade.php`؛ تعديل `app/Support/helpers.php` (دالّةٌ واحدة).
 - **هجرة/فهارس:** لا شيء.
 - **إعدادات:** لا شيء.
 - **مسارات:** لا شيء.
@@ -186,21 +186,21 @@ App\Support\Series::mergeHist(array $a, array $b): array
 
 ### WP-1.2 — Severity / OpStatus / IssueState
 - **spec:** GLOBAL SEVERITY MODEL · GLOBAL STATUS MODEL · §12.1.
-- **يُبنى:** `app/Support/Severity.php`، `app/Support/OpStatus.php`، `app/Support/IssueState.php` (خرائطُ عرض) — تُغذّى من `ErrorTaxonomy::SEVERITIES/LABELS`، `SecurityEvents::SEVERITY_TONE`، `Health::LABELS/TONE`، خيارات `config/hub.php` للحوادث والمشاكل، `ActionCenter::RANK`.
+- **يُبنى:** `app/Support/Platform/Severity.php`، `app/Support/Ops/OpStatus.php`، `app/Support/Platform/IssueState.php` (خرائطُ عرض) — تُغذّى من `ErrorTaxonomy::SEVERITIES/LABELS`، `SecurityEvents::SEVERITY_TONE`، `Health::LABELS/TONE`، خيارات `config/hub.php` للحوادث والمشاكل، `ActionCenter::RANK`.
 - **ملفّات:** ثلاثةُ أصنافٍ جديدة + `public/css/app.css` (توكن `--info` و`.bdg.i`) — **هذا هو التعديلُ الوحيد على CSS في كل الخطّة**.
 - **اختبارات:** `tests/Feature/SeverityMapTest.php` — كلُّ قيمةٍ حرفيّة موجودة في المستودع (تُجمَع من الثوابت لا تُكتب يدوياً) تُطبَّع إلى واحدةٍ من الخمس؛ المجهولُ ⇒ `info` بلا استثناء؛ `OpStatus` لا يغيّر ثوابت `Health` (اختبارُ عقد `/healthz` يبقى أخضر).
 - **القبول:** §42.2 · §44.1 · §47 (ترتيبٌ واحدٌ للشدّة عبر المراكز).
 
 ### WP-1.3 — Redactor + توصيلُ السبعة
 - **spec:** GLOBAL DIAGNOSTIC REDACTION ENGINE · §4.10 · §20 · §23.2.
-- **يُبنى:** `app/Support/Redactor.php` (جديد) ثم تفويضُ: `ErrorLog::redact/safeMessage`، `Health::safe`، `Integrations::pulse`، `HubOutbox` (نصُّ الخطأ)، `WebhookDispatcher.php:137`، `SecurityRadar::record` (path/detail — اليومَ تُخزَّن رموزُ الروابط العامة المخمَّنة بنصّها)، `InboundHookController::receive` (payload).
-- **ملفّات:** إنشاء `Redactor.php`؛ تعديل `app/Support/ErrorLog.php`, `Health.php`, `Integrations.php`, `app/Console/Commands/HubOutbox.php`, `app/Support/WebhookDispatcher.php`, `app/Support/SecurityRadar.php`, `app/Http/Controllers/Web/InboundHookController.php`.
+- **يُبنى:** `app/Support/Platform/Redactor.php` (جديد) ثم تفويضُ: `ErrorLog::redact/safeMessage`، `Health::safe`، `Integrations::pulse`، `HubOutbox` (نصُّ الخطأ)، `WebhookDispatcher.php:137`، `SecurityRadar::record` (path/detail — اليومَ تُخزَّن رموزُ الروابط العامة المخمَّنة بنصّها)، `InboundHookController::receive` (payload).
+- **ملفّات:** إنشاء `Redactor.php`؛ تعديل `app/Support/Ops/ErrorLog.php`, `Health.php`, `Integrations.php`, `app/Console/Commands/HubOutbox.php`, `app/Support/Ops/WebhookDispatcher.php`, `app/Support/Security/SecurityRadar.php`, `app/Http/Controllers/Web/InboundHookController.php`.
 - **اختبارات (تفشل أولاً — ثبت بالتنفيذ أنها تمرّ اليوم بالنصّ الصريح):** `tests/Feature/RedactorTest.php` — كلُّ مفتاحٍ من قائمة spec في مصفوفةٍ متداخلة؛ Bearer/JWT/PEM/lyn_*/`?token=`؛ ثباتُ الطمس (idempotent)؛ والاختباراتُ القائمة تبقى خضراء (`EnterpriseHardeningRound3Test::test_public_tokens_are_redacted_from_error_log`, `ErrorLeakAndNumericBoundRound5Test`, `SilentControlsRound6Test`, `SecretsNeverInAuditRound7Test`).
 - **القبول:** §41/١٠ · §42 (لا سرَّ في تشخيص) · §44 (تتبّعٌ آمن).
 
 ### WP-1.4 — الترابط: أعمدةٌ + قارئ + صفحةُ `system.trace`
 - **spec:** GLOBAL CORRELATION ENGINE · REQUEST CORRELATION VIEW · §42.10 · §45.
-- **يُبنى:** توسيعُ `Observability` (وسمُ المصدر والخارجيّ فقط — لا معرّفَ جديد)، `App\Support\Correlation` (جديد)، `app/Http/Controllers/Web/SystemTraceController.php` (جديد)، `resources/views/system/trace.blade.php` (جديد يستعمل `partials/cc/*` و`<bdi class="mono ltr">`).
+- **يُبنى:** توسيعُ `Observability` (وسمُ المصدر والخارجيّ فقط — لا معرّفَ جديد)، `App\Support\Ops\Correlation` (جديد)، `app/Http/Controllers/Web/SystemTraceController.php` (جديد)، `resources/views/system/trace.blade.php` (جديد يستعمل `partials/cc/*` و`<bdi class="mono ltr">`).
   الكتّاب: `SecurityRadar::record`, `InboundHookController::receive`, `hub_security_incident` يكتبون `request_id`.
 - **هجرة (إضافية، محروسة):** `2026_09_1x_p1_correlation_ids.php`
   - `access_denials.request_id` string(40) nullable + index
@@ -223,7 +223,7 @@ App\Support\Series::mergeHist(array $a, array $b): array
 
 ### WP-1.6 — أوّليّاتُ القياس والمقارنة
 - **spec:** §15، §36، §37.
-- **يُبنى:** `hub_metric_bucket`، `hub_window_pair`، `hub_compare` في `helpers.php`؛ `app/Support/Series.php` (percentiles/mergeHist)؛ وإعادةُ توجيه `WidgetRegistry.php:120-131` و`CeoBoard.php:263-271` إلى `hub_compare` (حذفُ نسختين متباعدتين).
+- **يُبنى:** `hub_metric_bucket`، `hub_window_pair`، `hub_compare` في `helpers.php`؛ `app/Support/Ops/Series.php` (percentiles/mergeHist)؛ وإعادةُ توجيه `WidgetRegistry.php:120-131` و`CeoBoard.php:263-271` إلى `hub_compare` (حذفُ نسختين متباعدتين).
 - **اختبارات:** `tests/Feature/MetricPrimitivesTest.php` — الحاويةُ تُقرِّب لأسفل بدقّة ٥ دقائق عبر حدود الساعة؛ `pct === null` حين الأساس صفر؛ percentiles على توزيعٍ اصطناعيّ ضمن حدّ خطأ الحاوية المعلَن؛ لوحاتُ `WidgetRegistry`/`CeoBoard` تعطي نفسَ الأرقام بعد التوحيد (انحدار).
 - **القبول:** §43 (مقارنةُ نافذتين) · §26 (لا نسبةٍ مخترَعة).
 
@@ -241,7 +241,7 @@ App\Support\Series::mergeHist(array $a, array $b): array
 - **spec:** §3.17 · §3.2.
 - **يُبنى:** مفاتيحُ في `config/hub_settings.php` بمجموعة «🚧 التشغيل والمراقبة» بقيمٍ افتراضيةٍ **مساويةٍ لثوابت اليوم**، وقراءتُها عبر `setting()` داخل `rescue()` (كما `Observability.php:44`) في: `SysMonitor::cpu` (60/90)، `SysMonitor::memory` (75/90)، `Health::storage` (85/97)، `Health::db` (500ms)، `Health::outbox` (20/60 دقيقة)، `ops/index.blade.php:61` (نسخةُ ٨٥ المضمّنة)، و`SecurityPosture::backupFresh` (30/72h) الذي **يُوحَّد على** `Health::JOBS['backup']` (26/50h).
 - **مفاتيح:** `ops.cpu_warn=60`, `ops.cpu_crit=90`, `ops.mem_warn=75`, `ops.mem_crit=90`, `ops.disk_warn=85`, `ops.disk_crit=97`, `ops.db_ms_warn=500`, `ops.queue_age_warn=20`, `ops.queue_age_crit=60`, `ops.http_p95_ms=1000`, `ops.scheduler_late_factor=1` (معامِلٌ على `Health::JOBS`).
-- **ملفّات:** `config/hub_settings.php` · `app/Support/SysMonitor.php` · `app/Support/Health.php` · `app/Support/SecurityPosture.php` · `resources/views/ops/index.blade.php`.
+- **ملفّات:** `config/hub_settings.php` · `app/Support/Ops/SysMonitor.php` · `app/Support/Ops/Health.php` · `app/Support/Security/SecurityPosture.php` · `resources/views/ops/index.blade.php`.
 - **اختبارات:** `OpsThresholdsTest` — ضبطُ `ops.disk_warn=50` يحوّل ٦٠٪ إلى DEGRADED؛ الافتراضياتُ تعيد سلوكَ اليوم حرفياً (انحدار على `HealthModelTest`)؛ `/healthz` يجيب حين تتعذّر قراءةُ الإعدادات (قاعدةٌ ساقطة).
 - **القبول:** §43 «هل CPU/RAM/القرص بخير؟» · §48 «ما أثرُ تغييره؟».
 
@@ -262,7 +262,7 @@ App\Support\Series::mergeHist(array $a, array $b): array
   - **تاريخُ التشغيل:** يُضاف في `Health::beat()` نفسِها سطرٌ `hub_metric_put('ops', $job, 'run', $ms, now(), 'auto', ['result'=>…,'note'=>…])` — فتاريخُ كل مجدولٍ يوجد بلا جدولٍ جديد؛ ويُضاف توقيتُ `$ms` للأوامر الستّة التي تنبض بلا مدّة (`HubBackup`, `HubUptimeCheck`, `HubQualitySnapshot`, `HubMetricsSnapshot`, `HubDigest`, وخطّافُ `hub:audit-verify` في `routes/console.php`).
   - **كشفُ الإصدار (§3.15):** مقارنةُ `config('hub.version')` بـ`setting('ops.last_version')`؛ عند الاختلاف يُنشأ صفٌّ واحد في `deployments` (وحدة `deploys`) بـ`ver/env/deployed_at/migrations/meta.auto=true` — عبر `Deployment::create` (فيَجري `Auditable` وختمُ البيانات)، **بلا اختراع commit ولا بيانات GitHub**.
 - **مجدول:** `Schedule::command('hub:ops-snapshot')->everyFiveMinutes()->withoutOverlapping(20)->onFailure(fn () => hub_schedule_failed('hub:ops-snapshot','QUEUE','ERROR'))` + `Health::JOBS['ops'] = ['لقطةُ التشغيل (كل ٥ دقائق)', 5, 15, 60]`.
-- **ملفّات:** أمرٌ جديد · `routes/console.php` · `app/Support/Health.php` (JOBS + beat) · ٦ أوامرَ لإضافة `$ms` · `resources/views/ops/index.blade.php` (جدولُ المجدولات: آخرُ نجاح، آخرُ فشل، فشلٌ متتالٍ، الموعدُ المتوقّع، اتّجاهُ المدّة).
+- **ملفّات:** أمرٌ جديد · `routes/console.php` · `app/Support/Ops/Health.php` (JOBS + beat) · ٦ أوامرَ لإضافة `$ms` · `resources/views/ops/index.blade.php` (جدولُ المجدولات: آخرُ نجاح، آخرُ فشل، فشلٌ متتالٍ، الموعدُ المتوقّع، اتّجاهُ المدّة).
 - **مفاتيح:** `ops.last_version` (internal).
 - **اختبارات:** `OpsSnapshotTest` — التشغيلُ مرّتين في الدقيقة نفسها **يُحدِّث** ولا يكرّر (المفتاحُ الفريد)؛ `Health::JOBS` يشمل الأمرَ الجديد و`schedule:list` يُظهره؛ نبضةٌ فاشلة تُنتج صفَّ تاريخٍ بنتيجة fail؛ تغييرُ `config('hub.version')` يُنشئ صفَّ نشرٍ واحداً (وتشغيلٌ ثانٍ لا يُنشئ ثانياً)؛ ميزانيةُ استعلاماتٍ للأمر.
 - **القبول:** §43 «هل المجدول يعمل؟» · §3.1 «منذ متى؟».
@@ -340,7 +340,7 @@ App\Support\Series::mergeHist(array $a, array $b): array
 - **spec:** §4.1 · §4.4 · §4.8 · §4.7 · §12.
 - **يُبنى:** `ops/errors.blade.php`: عشرُ بطاقات (مفتوحة، حرجة، جديدةُ اليوم، وقوعاتُ ٢٤س من `error_occurrences`، انحدارات، مستخدمون متأثّرون، PHP/API/JS/بطيء) + رسمُ «الأخطاء عبر الزمن» من العيّنات (لا من `last_seen` كما تفعل `SysMonitor::pulse` فتنسب عدّاً كاملاً لساعةٍ واحدة) + `chart_donut` للفئات والشدّة + `partials/timerange`.
   `ops/error_show.blade.php`: جدولُ العيّنات (وقت · request_id ⇐ رابط `system.trace` · مستخدم · مسار · مدّة)، آخرُ المتأثّرين (`whereIn` على المعرّفات المعروضة فقط — لا `User::pluck` للجدول كلِّه كما اليوم في `:63,:112`)، خطُّ الإصدار (أول ظهور/الحل/الانحدار)، **فتاتٌ آمنة** (زياراتُ `page_visits` للمستخدم قبل الوقوع + قيودُ `audits` بنفس `request_id` — كلاهما مفهرس، ولا التقاطَ جديد)، وربطُ الحادثة/المهمّة.
-  **قارئٌ واحد** `App\Support\ErrorStats` يستهلكه المركزُ و`OpsController.php:84-93` و`MorningController.php:140` و`Health::errors` (خمسُ نسخٍ اليوم).
+  **قارئٌ واحد** `App\Support\Ops\ErrorStats` يستهلكه المركزُ و`OpsController.php:84-93` و`MorningController.php:140` و`Health::errors` (خمسُ نسخٍ اليوم).
 - **اختبارات:** `ErrorDashboardTest` — بطاقةُ «حرجة» تطابق دلالةَ `Health::errors`؛ خطأٌ بعدّ ٥٠ موزّعٍ على ٥ ساعات يرسم ٥ أعمدة؛ الفتاتُ لا تُظهر زياراتِ مستخدمٍ آخر؛ عددُ الاستعلامات لا ينمو مع عدد المستخدمين.
 - **القبول:** §44 كامل.
 
@@ -367,7 +367,7 @@ App\Support\Series::mergeHist(array $a, array $b): array
 - **spec:** §2.3 · §34 · §31 · §42.2.
 - **جدولٌ جديد:** `security_findings` — `id` uuid، `code` string(60)، `entity_type` string(40) null، `entity_id` uuid null، `severity` string(12) (مفرداتُ `Severity`)، `title` string(200)، `description` text، `evidence` json، `remediation` text، `owner_id` uuid null، `status` string(20) (`open|acknowledged|resolved|ignored`)، `first_seen_at`، `last_seen_at`، `acknowledged_at/by`، `resolved_at`، `company_id` uuid null، `request_id` string(40) null، timestamps.
   **فهارس:** فريدٌ `(code, entity_type, entity_id)` · `(status, severity)` · `(last_seen_at)`. **الإعلان:** `HubBackup::RAW_TABLES` (حالةُ حَوكمةٍ لا تليمتري).
-- **يُبنى:** `App\Support\SecurityFindings::reconcile()` — يمشي على `SecurityPosture::checks()` (الرموزُ هي `key` نفسُها: lockdown, twofa_priv, pw_stale, idle, vault_stale, api_stale, share_open, audit_chain, debug_mode, owners, default_pw, backup_fresh…) وعلى النتائج **لكل كيان** (`SecurityExposure::map` للمستخدمين، `SecurityPosture::apiStale` لكل رمز، `vaultRotation` لكل سرّ، `twofaPrivileged` للمميّزين) ⇒ upsert يحفظ `first_seen_at` ويُحدِّث `last_seen_at`، ويُغلق تلقائياً (`resolved`) ما اختفى شرطُه.
+- **يُبنى:** `App\Support\Security\SecurityFindings::reconcile()` — يمشي على `SecurityPosture::checks()` (الرموزُ هي `key` نفسُها: lockdown, twofa_priv, pw_stale, idle, vault_stale, api_stale, share_open, audit_chain, debug_mode, owners, default_pw, backup_fresh…) وعلى النتائج **لكل كيان** (`SecurityExposure::map` للمستخدمين، `SecurityPosture::apiStale` لكل رمز، `vaultRotation` لكل سرّ، `twofaPrivileged` للمميّزين) ⇒ upsert يحفظ `first_seen_at` ويُحدِّث `last_seen_at`، ويُغلق تلقائياً (`resolved`) ما اختفى شرطُه.
   الشدّةُ من نبرة الفحص عبر `Severity::normalize` (bad⇒high/critical حسب الرمز، wn⇒medium). التوصية = حقلُ `fix` + `url` القائمان في `SecurityPosture::row` (لا نصَّ يُخترَع).
   **قرار ق٤:** الإقرارُ يعيش في هذا الجدول؛ ولا يُسجَّل نفسُ الشرط إشارةً في `signal_states` (منعاً لإقرارين).
 - **مسارات:** `GET admin/security/findings` (`security.findings`)، `GET admin/security/findings/{id}` (`security.finding`)، `POST .../ack`، `POST .../resolve` — الحارس: قراءةٌ `hub_is_owner() || hub_monitor()` (ق١) مع تنطيقِ الكيانات، والفعلُ `hub_is_owner()` + `hub_audit('إقرار نتيجة أمنية' / 'إغلاق نتيجة أمنية')`.
@@ -385,7 +385,7 @@ App\Support\Series::mergeHist(array $a, array $b): array
 
 ### WP-4.3 — مركزُ خطر الهويّة + مراجعةُ الامتيازات
 - **spec:** §2.4 · §2.5 · §42.3–42.5.
-- **يُبنى:** `App\Support\IdentityRisk` (**لا** `Support\Identity` — الاسمُ مأخوذٌ لمحلِّل هوية المنتج، ولا مسارات `identity.*`) يحسب لكل مستخدمٍ بـ**٦ استعلامات تجميعية** (`GROUP BY user_id`) على `sessions_log`, `user_devices`, `user_ips`, `access_denials`, `audits`, `webauthn_credentials` — كلُّها مفهرسةٌ على `user_id` (`COMMAND_VERIFIED`) — ثم يركّب العوامل من `Risk::privileged`, `RoleController::RISKY_FLAGS`, `Risk::bands` (منخفض/متوسط/عالٍ/حرج من `risk.band_*`), وفشلِ الدخول عبر `SecurityEvents::actions('AUTH_FAILURE'|'MFA_FAILURE')` (مفردةٌ واحدة بدل ثلاثِ قوائمَ حرفية متباعدة اليوم).
+- **يُبنى:** `App\Support\Security\IdentityRisk` (**لا** `Support\Identity` — الاسمُ مأخوذٌ لمحلِّل هوية المنتج، ولا مسارات `identity.*`) يحسب لكل مستخدمٍ بـ**٦ استعلامات تجميعية** (`GROUP BY user_id`) على `sessions_log`, `user_devices`, `user_ips`, `access_denials`, `audits`, `webauthn_credentials` — كلُّها مفهرسةٌ على `user_id` (`COMMAND_VERIFIED`) — ثم يركّب العوامل من `Risk::privileged`, `RoleController::RISKY_FLAGS`, `Risk::bands` (منخفض/متوسط/عالٍ/حرج من `risk.band_*`), وفشلِ الدخول عبر `SecurityEvents::actions('AUTH_FAILURE'|'MFA_FAILURE')` (مفردةٌ واحدة بدل ثلاثِ قوائمَ حرفية متباعدة اليوم).
   مراجعةُ الامتيازات: مالكون، أدوارٌ خطرة، نطاق `all`، وصولُ شركاتٍ واسع (`users.companies` فارغة)، خاملون ٣٠/٦٠/٩٠ (بمفاتيحَ لا بثابتٍ مكرَّرٍ في ٥ مواضع)، بلا MFA، أدوارٌ تغيّرت مؤخّراً (`audits` على `roles`/`users` + `RoleController::trail`)، وامتيازاتٌ غيرُ مستعملة (مصفوفةُ الدور مقابل `audits(user_id, module)` في ٩٠ يوماً — الفهرسُ الجديد من WP-1.4).
   الأفعال: فتحُ المستخدم/الدور، إنهاءُ الجلسات، تعطيلُ الحساب، **إقرار/مراجعةٌ لاحقاً** عبر `security_findings` (نفسُ سكّة الإقرار).
 - **مفاتيح:** `security.idle_days_1=30`, `security.idle_days_2=60`, `security.idle_days_3=90`, `security.secret_stale_days=180`, `security.token_unused_days=90` (تُقرأ في `SecurityPosture` و`SecurityController` بدل الثوابت المكرَّرة).
@@ -407,7 +407,7 @@ App\Support\Series::mergeHist(array $a, array $b): array
 
 ### WP-4.5 — مركزُ رموز API + صحّةُ الأسرار + لوحةُ القيادة الأمنية
 - **spec:** §2.9 · §2.10 · §2.1 · §18.
-- **يُبنى:** جدولُ رموزٍ للمالك (اسم/مالك/نطاقات/إنشاء/انتهاء/آخر استعمال/آخر IP/عمر/امتياز/حالة) بتصنيفٍ **واحد** `App\Support\ApiTokens::classify()` يستهلكه `SecurityPosture::apiStale` أيضاً (منعاً لعتبتين). أفعال: إبطال/تعطيل بـstep-up ومدقَّقة — **لا تدويرَ لرمز غيرك** (ق٧).
+- **يُبنى:** جدولُ رموزٍ للمالك (اسم/مالك/نطاقات/إنشاء/انتهاء/آخر استعمال/آخر IP/عمر/امتياز/حالة) بتصنيفٍ **واحد** `App\Support\Security\ApiTokens::classify()` يستهلكه `SecurityPosture::apiStale` أيضاً (منعاً لعتبتين). أفعال: إبطال/تعطيل بـstep-up ومدقَّقة — **لا تدويرَ لرمز غيرك** (ق٧).
   صحّةُ الأسرار من `vault_secrets` (عنوان/نوع/مالك/آخر تدوير/عمر/استعمال من قيود «عرض حساس» عبر فهرس `audits(module,record_id)`/خطر) — **بلا قيمةٍ ولا بصمة**.
   لوحةُ القيادة (§2.1): ١٥ بطاقة عبر `cc/kpis` تُجمَّع من `SecurityPosture::summary` + `SecurityExposure::summary` + `SecurityRadar::summary` + `SecurityFindings` (حرج/مرتفع) + `Integrations::api()` — **وتُستبدَل** `SecurityEvents::counts()` (تُحمِّل ٢٠٠٠–٦٠٠٠ صفّاً وتصنّفها في PHP عند كل تحميل) بعدّاتٍ SQL على `whereIn(action, SecurityEvents::actions(code))` مستفيدةً من الفهرس الجديد `audits(action, created_at)`.
 - **هجرة:** `api_tokens.last_ip` string(60) (يُكتب في `ApiAuth` بنفس خنق الدقيقة القائم لـ`last_used_at`) · `api_tokens.revoked_at`, `revoked_by` (لعرض «مُبطَل» بدل الحذف الصلب؛ `ApiAuth` يرفض المُبطَل) · `vault_secrets.rotated_at` (يُختم في `VaultSecret::booted` حين يتغيّر `secret_cipher` فقط — لا عند تعديل ملاحظة).
@@ -466,7 +466,7 @@ App\Support\Series::mergeHist(array $a, array $b): array
 - **جدولٌ جديد:** `audit_verifications` — `id`، `mode` (auto|manual)، `initiated_by` uuid null، `request_id`، `started_at`، `finished_at`، `duration_ms`، `result` (ok|warn|fail)، `checked_rows`، `weak_rows`، `unsealed_rows`، `mismatch_rows`، `blank_rows`، `first_bad_id` bigint null، `message` string(500). **فهرس:** `(started_at)`. **الإعلان:** `HubBackup::RAW_TABLES` (دليلُ نزاهةٍ لا تليمتري — ولهذا لا يُدفَع إلى `metric_points` الذي يُقلَّم بعد ٣٦٥ يوماً).
   الكاتب: `HubAuditVerify::handle` (يملك العدّادات سلفاً) + زرُّ `ops.verifyaudit`. القرّاء: بطاقةٌ في `audit.index` و`ops/index`، ويبقى `Audit::verifyTail` وحده على تحميل الصفحة (**لا فحصَ كامل أبداً في طلب**).
 - **محلّلُ التغطية (للمالك):** `GET admin/audit/coverage` (`audit.coverage`) — يقارن `hub_modules()` × وجودَ `Auditable` (٨٢/٨٢ اليوم) × كتالوجَ `SecurityEvents::CODES` × مواضعَ `hub_audit` الفعلية، ويُصنّف: مغطّى / مغطّى جزئياً (الاستعادةُ تُكتب «تعديل») / **يحتاج مراجعة** حيث لا يُثبَت إلا بالمسح النصّي — بلا يقينٍ مزيَّف (spec: "No fake certainty"). ويُظهر الثغراتِ المعروفة: تغييرُ حالة الخطأ و`toTask` (يُغلقان في WP-3.3) وCRUD العروضِ المحفوظة.
-- **الاحتفاظ (§1.8):** مفاتيحُ وصفٍ فقط — `audit.retention_days=0` (=للأبد) و`audit.retention_policy` نصّ، تُعرَض للقراءة في الشاشة؛ **لا كودَ تقليم** (ق٦)، مع تحديثِ النصوص الثلاثة التي تَعِد بـ«للأبد» (`hub_settings.php`, `HubAutomation`, `docs/SECURITY_PLATFORM_MAP.md`) كي لا تتناقض.
+- **الاحتفاظ (§1.8):** مفاتيحُ وصفٍ فقط — `audit.retention_days=0` (=للأبد) و`audit.retention_policy` نصّ، تُعرَض للقراءة في الشاشة؛ **لا كودَ تقليم** (ق٦)، مع تحديثِ النصوص الثلاثة التي تَعِد بـ«للأبد» (`hub_settings.php`, `HubAutomation`, `docs/archive/SECURITY_PLATFORM_MAP.md`) كي لا تتناقض.
 - **اختبارات:** `AuditIntegrityHistoryTest` (كلُّ تشغيلٍ آليّ/يدويّ يكتب صفّاً بالعدّادات و`first_bad_id`؛ فتحُ الصفحة لا يُنشئ صفّاً ولا يشغّل فحصاً كاملاً — اختبارُ عدد استعلامات) · `AuditCoverageTest` (للمالك فقط؛ يعلن «يحتاج مراجعة» حيث لا إثباتَ؛ يرصد فعلاً غيرَ مغطّى) · `SettingsCenterTest` يبقى أخضر بالمفاتيح الجديدة.
 - **القبول:** §45 «هل السلسلة سليمة؟ وهل ثمّة عملياتٌ مهمّة بلا تدقيق؟».
 
@@ -505,7 +505,7 @@ App\Support\Series::mergeHist(array $a, array $b): array
 - **هجرة:** توسيعُ `alert_rules` بأعمدةٍ nullable: `severity` string(12)، `domain` string(24) (`module|security|system|error|quality|execution`)، `source` string(80) (مثل `security.failed_logins`, `errors.critical_count`, `health.scheduler`)، `window_min` uint، `cooldown_min` uint، `auto_incident` bool؛ وحقولُها في سجلّ `config/hub.php` («rules») كي تتبعها الشاشةُ والـAPI.
   **جدولٌ جديد:** `alert_instances` — `id`، `rule_id` null، `dedup_key` string(191) **فريد**، `domain`، `module`، `record_id` null، `subject` string(120) null (IP/مستخدم للنوافذ)، `severity`، `title` string(300)، `status` (`triggered|acknowledged|resolved`)، `first_at`، `last_at`، `count`، `acknowledged_by/at`، `resolved_at`، `incident_id` null، `company_id` null، `request_id`. **فهارس:** فريدُ `dedup_key` · `(status, severity, last_at)` · `(incident_id)`. **الإعلان:** `HubBackup::RAW_TABLES`.
   السبب: ذاكرةُ التكرار اليوم هي `notifications_hub.kind='rule:<id>'` وهي **تُقلَّم بعد ٩٠/٣٦٥ يوماً** ⇒ التكرارُ والتصعيدُ يفقدان ذاكرتَهما صامتين.
-- **يُبنى:** استخراجُ `HubAutomation::alertRules` (٣٨٥–٥٦٩) إلى `App\Support\AlertEngine` بلا تغيير سلوك (نطاقٌ لكل مستلِم، ترقيمٌ بمؤشّر المعرّف، تصعيد) — يستدعيه الأمرُ اليوميّ **و** أمرٌ جديد `hub:alerts-evaluate` كلَّ ٥ دقائق للقواعد ذات النافذة، ومصادرُه: `audits(action, created_at)` (فشلُ الدخول)، `access_denials(ip, created_at)`، `Health::check()` (§3.9)، `error_events`، `SecurityFindings`.
+- **يُبنى:** استخراجُ `HubAutomation::alertRules` (٣٨٥–٥٦٩) إلى `App\Support\Ops\AlertEngine` بلا تغيير سلوك (نطاقٌ لكل مستلِم، ترقيمٌ بمؤشّر المعرّف، تصعيد) — يستدعيه الأمرُ اليوميّ **و** أمرٌ جديد `hub:alerts-evaluate` كلَّ ٥ دقائق للقواعد ذات النافذة، ومصادرُه: `audits(action, created_at)` (فشلُ الدخول)، `access_denials(ip, created_at)`، `Health::check()` (§3.9)، `error_events`، `SecurityFindings`.
   **كشفُ الحوادث التشغيلية (§3.9):** تعميمُ `hub_security_incident` إلى `hub_open_incident(title, severity, kind, fingerprint, meta, dedupHours)` — التكرارُ **ببصمة** لا بنصّ العنوان، والحاليّ يبقى غلافاً متوافقاً. البصمات: `ops:db_unavailable`, `ops:disk_critical`, `ops:scheduler_dead:<job>`, `ops:outbox_backlog`, `ops:dep_failed:<key>`, `ops:error_spike`. وعند الشفاء يُضاف قيدُ «تعافت الخدمة» ولا يُغلق تلقائياً بصمت.
   **الإطلاق:** كلُّ حادثةٍ آليّة تمرّ بـ`HubEvents`/`Incident::create` فتعمل المساراتُ المبذورة («🚨 حادث حرج») — اليومَ `hub_security_incident` يتجاوزها.
   **حالةُ التنبيه (§9.3):** `triggered → acknowledged → resolved` (الحلُّ آليٌّ حين يزول الشرطُ في التقييم التالي)؛ والمفتوحُ يُقرأ إشارةً في `ActionCenter` (ق٣).
@@ -583,13 +583,13 @@ App\Support\Series::mergeHist(array $a, array $b): array
 
 ### WP-8.3 — إدارةُ التكرار (دمجٌ آمنٌ ومدقَّق)
 - **spec:** §6.4 · §31 · §23.5.
-- **يُبنى:** رفعُ `QualityController::merge` إلى شكل `Identity::merge` (`app/Support/Identity.php:257-284`): معاينةٌ (نفسُ حلقة المراجع بـ`count()` بدل `update()`)، سببُ التشابه والحقلُ المطابق، مقارنةٌ جنباً إلى جنب، عددُ المراجع لكل مرشَّح، **قيدُ تدقيقٍ صريح** («دمج عملاء» بالمنقول و`request_id`) — اليومَ لا `hub_audit` إطلاقاً — و`meta.merged_into/merged_at`، وحذفٌ ناعمٌ فقط، وتحقّقٌ من أنّ المعرّفاتِ الممرَّرة تنتمي فعلاً لمجموعةِ تكرارٍ مكتشَفة (اليومَ قائمةٌ حرّة تُحلّ بـ`findOrFail` غيرِ منطَّق)، وتخبئةُ كشف التكرار بـ`hub_screen` (٥٠٬٠٠٠ صفٍّ في الذاكرة عند كل فتح).
+- **يُبنى:** رفعُ `QualityController::merge` إلى شكل `Identity::merge` (`app/Support/Security/Identity.php:257-284`): معاينةٌ (نفسُ حلقة المراجع بـ`count()` بدل `update()`)، سببُ التشابه والحقلُ المطابق، مقارنةٌ جنباً إلى جنب، عددُ المراجع لكل مرشَّح، **قيدُ تدقيقٍ صريح** («دمج عملاء» بالمنقول و`request_id`) — اليومَ لا `hub_audit` إطلاقاً — و`meta.merged_into/merged_at`، وحذفٌ ناعمٌ فقط، وتحقّقٌ من أنّ المعرّفاتِ الممرَّرة تنتمي فعلاً لمجموعةِ تكرارٍ مكتشَفة (اليومَ قائمةٌ حرّة تُحلّ بـ`findOrFail` غيرِ منطَّق)، وتخبئةُ كشف التكرار بـ`hub_screen` (٥٠٬٠٠٠ صفٍّ في الذاكرة عند كل فتح).
 - **اختبارات:** `DuplicateMergeTest` — المعاينةُ لا تكتب؛ التنفيذُ يكتب قيدَ دمجٍ واحداً؛ **سجلٌّ ثالثٌ غيرُ ذي صلة لا يُمَسّ** (فجوةُ §23.5 اليوم)؛ لا حذفَ صلب؛ معرّفٌ من خارج المجموعة يُرفض.
 - **القبول:** §47 · §31.
 
 ### WP-8.4 — تحليلاتُ التنفيذ (مهامّ/مشاريع/تذاكر) + اتّجاهُها
 - **spec:** §6.5 · §6.6 · §6.7 · §6.8 · §6.12.
-- **يُبنى:** قارئٌ واحد `App\Support\ExecutionStats` بتجميعاتٍ منطَّقة: مخطّط/منجَز/مفتوح/متأخّر/متوقّف (`متوقفة`)/الإنجاز٪/الالتزام٪/الإنتاجية؛ وجدولُ مشاريعَ بتجميعٍ **بالجملة** (لا `hub_project_health` لكل صفٍّ = ٧ استعلاماتٍ لكلٍّ) مع عمودِ معوّقاتٍ من تجميع `work_updates.problems` القائم؛ وتدفّقُ المهامّ (أُنشئت/أُنجزت/أُعيد فتحُها/متأخّرة/زمنُ الدورة/الإنتاجية) بشكل `Delivery::leadTime` (وسيطٌ + وسمُ عيّنة)؛ وجودةُ التذاكر (فُتحت/حُلّت/SLA٪/متوسّطُ الاستجابة والحل/أُعيد فتحُها) مع تصحيحِ عيبٍ قائم: `SupportController` يعدّ «المفتوحة» من صفحةٍ محدودة بـ٦٠ صفّاً.
+- **يُبنى:** قارئٌ واحد `App\Support\Workforce\ExecutionStats` بتجميعاتٍ منطَّقة: مخطّط/منجَز/مفتوح/متأخّر/متوقّف (`متوقفة`)/الإنجاز٪/الالتزام٪/الإنتاجية؛ وجدولُ مشاريعَ بتجميعٍ **بالجملة** (لا `hub_project_health` لكل صفٍّ = ٧ استعلاماتٍ لكلٍّ) مع عمودِ معوّقاتٍ من تجميع `work_updates.problems` القائم؛ وتدفّقُ المهامّ (أُنشئت/أُنجزت/أُعيد فتحُها/متأخّرة/زمنُ الدورة/الإنتاجية) بشكل `Delivery::leadTime` (وسيطٌ + وسمُ عيّنة)؛ وجودةُ التذاكر (فُتحت/حُلّت/SLA٪/متوسّطُ الاستجابة والحل/أُعيد فتحُها) مع تصحيحِ عيبٍ قائم: `SupportController` يعدّ «المفتوحة» من صفحةٍ محدودة بـ٦٠ صفّاً.
 - **هجرة:** `tasks.completed_at` (nullable، مفهرس) يُختم عند دخول حالةٍ مغلقة ويُمسح عند إعادة الفتح (مرآةُ منطق `meta.resolved_at` للتذاكر في `ModuleController:974-984`) + `meta.reopened`؛ **وفهرسُ `tasks(due)`** (غائبٌ اليوم رغم أنّ كلَّ استعلام تأخّرٍ يرشّح به).
   السبب: نسبةُ الالتزام تُحسب اليومَ من `updated_at` («وقتُ الإغلاق التقريبي») فأيُّ تعديلٍ لاحق يُفسدها.
 - **لقطةُ التنفيذ (§6.12):** ضمن `hub:quality-snapshot` القائم: `('execution','org','completion_pct'|'ontime_pct'|'overdue'|'open_issues')` (+ لكل مشروعٍ إن لزم، على نمط `marginSnapshot`).
@@ -618,7 +618,7 @@ App\Support\Series::mergeHist(array $a, array $b): array
 ### WP-9.1 — نموذجُ المعلومات + القيمةُ السارية والمصدر
 - **spec:** §7.1 · §7.3 · §7.4 · §7.2.
 - **يُبنى:** حقولٌ **إضافية** لكل مدخلٍ في الكتالوج: `default` (قيمةٌ آليّة لا نثر)، `sensitive` (bool)، `validation` (تُنقَل من `SettingController::CHECKS` فتصير مصدراً واحداً)، `depends` (مجموعة)، `scope`، `restart`، `env_key`، `owner_route`، `doc`. و`internal` يصير مصفوفةً `{why, owner_route}` مع قبولِ الصيغة النصّية القديمة.
-  `App\Support\Settings::effective(string $key): array{stored, default, effective, source, sensitive}` — يقرأ الأرضياتِ الحقيقية من الشيفرة (`hub_upload_cap` هو النموذجُ العامل: يقول **من** فرض الحدّ)، ويصنّف المصدرَ: default (لا صفّ) · database (صفٌّ موجود) · environment (`env_key` وقيمةٌ خالية — **بلا إظهار قيمةِ البيئة**) · dedicated module (`internal.owner_route`).
+  `App\Support\Platform\Settings::effective(string $key): array{stored, default, effective, source, sensitive}` — يقرأ الأرضياتِ الحقيقية من الشيفرة (`hub_upload_cap` هو النموذجُ العامل: يقول **من** فرض الحدّ)، ويصنّف المصدرَ: default (لا صفّ) · database (صفٌّ موجود) · environment (`env_key` وقيمةٌ خالية — **بلا إظهار قيمةِ البيئة**) · dedicated module (`internal.owner_route`).
   **مشتقّاتُ الاتّساق:** `SettingController::SECRETS` تُشتقّ من `sensitive` — فيغلق عيبٌ قائم: `hub:set n8n.key` يخزّن نصّاً صريحاً بينما شاشةُ التكامل تشفّره.
   لوحةُ §7.2: إجمالي المفاتيح · المُغيَّر عن الافتراضي (وجودُ صفّ، بعد استثناء ٧ مفاتيحَ يبذرها `CoreSeeder` بقيمها الافتراضية) · عاليةُ الخطورة · أسرارٌ مضبوطة · تكاملاتٌ ناقصةُ الإعداد (`Integrations::installed()` = `CONFIGURATION_REQUIRED`) · راياتٌ نشطة.
 - **اختبارات:** `SettingsModelTest` — كلُّ مدخلٍ معروضٍ له `default` آليّ؛ `default` يطابق القيمةَ الحرفية في نداء `setting('k', <lit>)` (مسحٌ ساكن بنمط `SettingsCenterTest::liveKeys`)؛ المصدرُ يُصنَّف صحيحاً للأربعة؛ لا قيمةَ بيئةٍ في HTML؛ `hub:set` يشفّر كلَّ مفتاحٍ `sensitive` (يفشل اليوم على `n8n.key`).
@@ -626,7 +626,7 @@ App\Support\Series::mergeHist(array $a, array $b): array
 
 ### WP-9.2 — كاتبٌ واحد + تاريخُ الإعداد + آخرُ تعديل
 - **spec:** §7.5 · §7.6 · §31.
-- **يُبنى:** `App\Support\Settings::put(string $key, $value, string $source, ?string $reason = null)` — نقطةُ الكتابة **الوحيدة**: تحقّق (من الكتالوج) → تشفيرٌ للحسّاس → كتابة → `Cache::forget('settings:all')` (منسوخٌ اليومَ في ١٥ موضعاً) → `hub_audit('تعديل إعدادات النظام')` بـ«قبل/بعد» ببصمةٍ للأسرار → صفٌّ في `setting_changes`.
+- **يُبنى:** `App\Support\Platform\Settings::put(string $key, $value, string $source, ?string $reason = null)` — نقطةُ الكتابة **الوحيدة**: تحقّق (من الكتالوج) → تشفيرٌ للحسّاس → كتابة → `Cache::forget('settings:all')` (منسوخٌ اليومَ في ١٥ موضعاً) → `hub_audit('تعديل إعدادات النظام')` بـ«قبل/بعد» ببصمةٍ للأسرار → صفٌّ في `setting_changes`.
   تُعاد إليه: `SettingController::put`، `MessagingController::mail/telegram`، `N8nController::save`، `OdooConnectionController::defaults`، `SecurityController::freeze/lockdown`، `OpsController::toggleMaintenance`، `HubSet` (بلا أثرٍ اليوم)، `HubImportJson` (بلا تحقّقٍ ولا أثر)، ومسارُ الاستيراد الجديد. (`Health::beat` و`Integrations::pulse` **يبقيان** خارجَه: حالةٌ تشغيلية لا إعداد.)
   **جدولٌ جديد (ق٨):** `setting_changes` — `id`، `key` string(120)، `before` json، `after` json (الأسرارُ مبصومة)، `user_id` uuid null، `source` string(20) (`screen|messaging|odoo|n8n|security|ops|cli|import|restore|demo`)، `request_id`، `audit_id` bigint null، `created_at`. **فهارس:** `(key, created_at)`، `(created_at)`. **الإعلان:** `HubBackup::RAW_TABLES`. البديلُ المرفوض: مسحُ `audits` — القيدُ واحدٌ لدفعةٍ كاملة (المفاتيحُ في `after._keys`)، والاسمُ مقصوصٌ إلى ٣٠٠ حرف، و`record_id` من نوع uuid فلا يسع المفتاح.
 - **اختبارات:** `SettingsHistoryTest` — كتابةٌ من كلِّ مسارٍ من العشرة تُنتج صفَّ تاريخٍ وقيدَ تدقيق؛ الأسرارُ مبصومةٌ في الاثنين؛ «آخر تعديل (من/متى)» يظهر لكل مفتاح؛ `hub:set` صار يُدقَّق.
@@ -669,7 +669,7 @@ App\Support\Series::mergeHist(array $a, array $b): array
 
 ### WP-10.2 — قائمةُ «يحتاج انتباهك» + التوصيات
 - **spec:** §33 · §34.
-- **يُبنى:** `App\Support\AttentionQueue::items($user)` — منتِجٌ **ثانٍ** يُدمج في `ActionCenter::feed()` القائم (فتُعاد استعمالُ سكّة الإقرار/التأجيل في `signal_states` بلا مخزنٍ ثالث)، بمصادرَ سبعة فقط وبلا ضجيج: نتيجةٌ أمنية حرجة (`security_findings`) · تدهورُ النظام (`Health` غيرُ سليم) · خطأٌ حرجٌ غيرُ محلول · سلسلةُ تدقيقٍ مكسورة · مشكلةُ مجدول/طابور شديدة · مشكلةُ جودة بيانات حرجة (WP-8.2) · هدفٌ حرجٌ متأخّر. مفاتيحُ ثابتة: `health.<component>`, `audit.chain`, `error.critical:<hash>`, `sec.finding:<code>[:<entity>]`, `quality.<module>:<rule>`, `okr.<id>`, `alert:<dedup_key>`.
+- **يُبنى:** `App\Support\Insights\AttentionQueue::items($user)` — منتِجٌ **ثانٍ** يُدمج في `ActionCenter::feed()` القائم (فتُعاد استعمالُ سكّة الإقرار/التأجيل في `signal_states` بلا مخزنٍ ثالث)، بمصادرَ سبعة فقط وبلا ضجيج: نتيجةٌ أمنية حرجة (`security_findings`) · تدهورُ النظام (`Health` غيرُ سليم) · خطأٌ حرجٌ غيرُ محلول · سلسلةُ تدقيقٍ مكسورة · مشكلةُ مجدول/طابور شديدة · مشكلةُ جودة بيانات حرجة (WP-8.2) · هدفٌ حرجٌ متأخّر. مفاتيحُ ثابتة: `health.<component>`, `audit.chain`, `error.critical:<hash>`, `sec.finding:<code>[:<entity>]`, `quality.<module>:<rule>`, `okr.<id>`, `alert:<dedup_key>`.
   الشكلُ الموحَّد = شكلُ `hub_recommendations` (`sev, ico, title, why, url, action, key, module, record_id`) مضافاً إليه `type` و`detected` و`owner`؛ والشدّةُ عبر `Severity`. والتوصيةُ (§34) حتميّةٌ من `fix/url` في `SecurityPosture::row` ومن خريطةِ توصياتٍ صغيرة لمكوّنات `Health` (اليومَ تحمل `why` بلا `fix/url`).
   **تحذيرُ تسمية:** كلمةُ «انتباه» مستعملةٌ سلفاً لعدّاد انتهاءِ الصلاحيات في `Workspaces::attentionByModule` (شارةُ الشريط الجانبي) ⇒ إمّا اسمٌ مميّز أو دمجُ ذلك العدّاد صراحةً.
 - **مسارات:** يُعرض في `control.index` وفي `/recommendations` القائم (`recs`) — بلا مسارِ إقرارٍ جديد (`recs.act` قائم).
@@ -800,7 +800,7 @@ App\Support\Series::mergeHist(array $a, array $b): array
 **٣) `hub_screen_stamped` (WP-1.5) مدخلُ تخبئةٍ ثانٍ.**
 `hub_screen` ثلاثةُ أسطر (`helpers.php:2883-2887`) تلفّ `hub_cached(hub_scope_key + hub_data_stamp)`. دالّةٌ توأمٌ بجانبها تعني قارئين يجب أن يبقيا متطابقَين. **الإصلاح:** مُعامل رابع `bool $stamped = false` على `hub_screen` نفسِها (أو إعادةُ `['at'=>…, 'data'=>…]` خلف رايةٍ) — لا دالّة ثانية. `COMMAND_VERIFIED`
 
-**٤) `App\Support\Settings::put()` (WP-9.2) يُعيد كتابةَ `SettingController::put()`.**
+**٤) `App\Support\Platform\Settings::put()` (WP-9.2) يُعيد كتابةَ `SettingController::put()`.**
 `SettingController.php:189-201` يفعل اليومَ: قراءةَ القديم، الكتابة، رصدَ التغيّر، وبصمةَ `sha256:` للأسرار — أي جوهرَ الكاتب الموحّد. بناءُ `Settings::put` **بجانبه** يترك نسختين لمنطق الفرق. **الإصلاح:** انقُل جسمَ `SettingController::put` إلى `Settings::put` واجعل المتحكّمَ يفوّض إليه في الدفعة نفسِها؛ ولا تترك المسارَين قائمين بين حزمتين. `STATICALLY_REVIEWED`
 
 **٥) أربعةُ أسطحِ إقرارٍ حيّة بعد الخطّة.**
@@ -905,7 +905,7 @@ WP-4.1: «يمشي على `SecurityPosture::apiStale` لكل رمز، `vaultRota
 `incident_links.summary` (٣٠٠) و`alert_instances.title` (٣٠٠) يُغذَّيان من `audits.name` (٣٠٠ أصلاً) ورسائلِ الأخطاء و`Health::c()['why']`. MySQL الصارمة ترمي حيث تبتر SQLite — وهو صنفُ العطل الذي أنشئ له `ColumnFitsItsWriterTest`. **الإصلاح:** `mb_substr` عند الكاتب لا عند القارئ، وأضِف الزوجَ إلى `ColumnFitsItsWriterTest` في الحزمة نفسِها.
 
 **٣٧) إقرارُ الحادثة عبر `record_acks` لا يعمل للحوادث التي تهمّ.**
-`Acks::targets()` يُعيد `[]` حين يكون عمودُ `who` فارغاً (`app/Support/Acks.php:38-44`)، و`incidents.lead_id` **nullable** (`2026_01_20_000001:24`) — والحوادثُ التي يفتحها `hub_security_incident` آلياً بلا قائد. فـ«أُقرّت» في ترويسة §8.1 يستحيل بلوغُها في الحالة الوحيدة التي تحتاجها. وزيادةً: `Acks::record` يختم `ver` (`:126`) و`reack` تُبطل الإقرارَ عند تغيّر النسخة ⇒ كلُّ تحريرٍ أثناء الاستجابة يُعيد طلبَ الإقرار. **الإصلاح:** إمّا فرضُ `lead_id` قبل الإقرار (وتعبئتُه آلياً بمالكٍ افتراضيّ عند الفتح الآليّ)، أو عمودا `acknowledged_at/by` كما فعلت ق٨ حين رفضت حشرَ تاريخ الإعدادات في `audits`. `COMMAND_VERIFIED`
+`Acks::targets()` يُعيد `[]` حين يكون عمودُ `who` فارغاً (`app/Support/Collaboration/Acks.php:38-44`)، و`incidents.lead_id` **nullable** (`2026_01_20_000001:24`) — والحوادثُ التي يفتحها `hub_security_incident` آلياً بلا قائد. فـ«أُقرّت» في ترويسة §8.1 يستحيل بلوغُها في الحالة الوحيدة التي تحتاجها. وزيادةً: `Acks::record` يختم `ver` (`:126`) و`reack` تُبطل الإقرارَ عند تغيّر النسخة ⇒ كلُّ تحريرٍ أثناء الاستجابة يُعيد طلبَ الإقرار. **الإصلاح:** إمّا فرضُ `lead_id` قبل الإقرار (وتعبئتُه آلياً بمالكٍ افتراضيّ عند الفتح الآليّ)، أو عمودا `acknowledged_at/by` كما فعلت ق٨ حين رفضت حشرَ تاريخ الإعدادات في `audits`. `COMMAND_VERIFIED`
 
 **٣٨) `hub:ops-snapshot` كلَّ ٥ دقائق فوق `Health::check()` مخالفٌ لـ§16.**
 `Health::check()` قيس بـ**٥٥ استعلاماً بلا كاش** (RUNTIME_VERIFIED في تقرير الاكتشاف)، و`SysMonitor::diskConsumers/tableConsumers` مسحُ ملفاتٍ وجداول. ٢٨٨ تشغيلاً/يوم ⇒ ~١٧ ألف استعلامٍ يومياً + مسوحُ قرصٍ على استضافةٍ مشتركة. §16: «Do not perform expensive full scans every minute». **الإصلاح:** لقطةُ الـ٥ دقائق تقتصر على `cpu_pct/mem_pct/disk_pct/db_ms` + `rank` من `Health::ready()` (لا `check()` الكامل)؛ ويُنقل `tableConsumers`/`diskConsumers` إلى لقطةٍ يومية — وهو ما تلمّح إليه الخطّة («ويومياً») دون أن تُخرج `Health::check` من المسار كلَّ ٥ دقائق.
@@ -922,7 +922,7 @@ WP-4.1: «يمشي على `SecurityPosture::apiStale` لكل رمز، `vaultRota
 - **الأعمدةُ الجديدة على `audits` آمنة:** `AuditEntry::SEALED` (`app/Models/AuditEntry.php:92-93`) ثابتٌ صريح، و`liveColumns()` (`:27-38`) تُجرّد المجهولَ قبل الإدراج، و`forgetColumnCache()` موجودةٌ للاختبارات ⇒ ق٢ صحيحة.
 - **`SecurityEvents::CODES` يحوي `API_CREDENTIAL_REVOKED`** بالفعل (`SecurityEvents.php:57` ⇒ «إبطال مفتاح API») فلا يلزم رمزٌ جديد لـWP-4.5.
 - **`deployments` جاهزٌ لـ§3.15:** `ver(80)`, `env(40)`, `deployed_at`, `migrations(40)`, `incident_id` (`2026_01_20_…create_deployments`) — لا هجرةَ لازمة.
-- **`Sessions::revokeAll(User, ?string $exceptSessionId)`** بالتوقيع الذي تفترضه WP-4.4 (`app/Support/Sessions.php:22`).
+- **`Sessions::revokeAll(User, ?string $exceptSessionId)`** بالتوقيع الذي تفترضه WP-4.4 (`app/Support/Security/Sessions.php:22`).
 - **`incidents.lead_id` قائم** فبنيةُ `config/hub_acks.php` صالحةٌ تقنياً (لكن انظر البند ٣٧).
 - **لا بنيةَ خارجية ولا هجرةَ مدمّرة ولا كسرَ مسارٍ/عقدِ API في أيّ حزمة** (§22/§24/§27) — القاعدةُ محفوظةٌ في §٠.٣ ومطبَّقةٌ في كل مصفوفة الحزم.
 

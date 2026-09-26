@@ -61,9 +61,9 @@
 
 ## 2) الكودُ `APP_UPDATE_REQUIRED` (426)
 
-مُضافٌ في `Api::CODES` من دون كسرٍ (Critic F14): `app/Support/Api.php:56` (الثابت)، والرسالةُ
+مُضافٌ في `Api::CODES` من دون كسرٍ (Critic F14): `app/Support/Platform/Api.php:56` (الثابت)، والرسالةُ
 العربيّة `:89`، والربطُ `426 => APP_UPDATE_REQUIRED` (`:179`). قيمةُ enum إضافيّةٌ — توافقيّةٌ لا
-كاسرة، تظهر في مواصفة الجوال (`app/Support/MobileOpenApi.php:739,782`). **بوّابةُ الإصدار اليوم
+كاسرة، تظهر في مواصفة الجوال (`app/Support/Mobile/MobileOpenApi.php:739,782`). **بوّابةُ الإصدار اليوم
 إشارةُ عرضٍ** (`update_required` في `app-config`/`health`) لا حاجزٌ يردّ 426 على كلِّ نقطة؛ الكودُ
 محجوزٌ للحظرِ الصريح متى قرّر فريقُ التطبيق فرضَه، فلا يُختلَق حجبٌ لم يُطلَب.
 
@@ -71,7 +71,7 @@
 
 ## 3) الرابطُ العميقُ القانونيّ — `{module, id, action}`
 
-المصدرُ الواحدُ للوجهة `App\Support\NotificationLink::target()` (`app/Support/NotificationLink.php:28`)
+المصدرُ الواحدُ للوجهة `App\Support\Collaboration\NotificationLink::target()` (`app/Support/Collaboration/NotificationLink.php:28`)
 — **لا اسمَ شاشةِ جوالٍ صلب ولا رابطَ ويبٍ صلب**:
 
 ```json
@@ -91,7 +91,7 @@
 | `GET notifications` (`routes/api.php:186`) | `notifications[].target` |
 | `GET search` (`routes/api.php:169`) | كلُّ نتيجةٍ `{module, id}` (نظيرُ محرّك البحث — النتيجةُ هي الوجهة) |
 | `GET home` (`routes/api.php:168`) | عناصرُ لوحة العمل `{module, id}` |
-| حمولةُ الدفع | `data.{module,id,action}` (`PushService::payloadFor` · `app/Support/PushService.php:213-217`) |
+| حمولةُ الدفع | `data.{module,id,action}` (`PushService::payloadFor` · `app/Support/Mobile/PushService.php:213-217`) |
 
 ---
 

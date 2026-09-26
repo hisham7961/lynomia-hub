@@ -7,18 +7,18 @@
 ## المبدأ الحاكم: تكرارُ الخلفيّة = صفر
 
 المركزُ **طبقةُ عرضٍ للقراءة** لا مخزنٌ ولا مزوّدٌ ولا سجلٌّ ثانٍ. كلُّ قراءةٍ تمرّ عبر
-`App\Support\MobilePlatform` التي **تفوّض** للأنظمة القائمة:
+`App\Support\Mobile\MobilePlatform` التي **تفوّض** للأنظمة القائمة:
 
 | القدرة | المصدرُ القائم (لا بديلَ له) |
 |---|---|
-| الدفع | `App\Support\PushService` + `push_tokens` + `push_deliveries` |
-| الجلسات/الأجهزة | `App\Support\MobileSessionService` + `mobile_sessions` + `mobile_installations` |
-| الـAPI/القدرات/المزامنة | `App\Support\MobileOpenApi::capabilities()` (مُشتقٌّ من المسارات الحيّة) |
+| الدفع | `App\Support\Mobile\PushService` + `push_tokens` + `push_deliveries` |
+| الجلسات/الأجهزة | `App\Support\Mobile\MobileSessionService` + `mobile_sessions` + `mobile_installations` |
+| الـAPI/القدرات/المزامنة | `App\Support\Mobile\MobileOpenApi::capabilities()` (مُشتقٌّ من المسارات الحيّة) |
 | app-config/بوّابة الإصدار | `Api\MobileAuthController@appConfig` (النقطةُ الحيّة نفسُها) |
-| الروابط العميقة | `Web\MobileWellKnownController` + `App\Support\NotificationLink` |
-| الأمن/الأحداث | جدولُ `audits` (source=mobile) + `App\Support\SecurityEvents` |
-| الملفات/الفيروسات | `attachments.av_status` + `App\Support\AttachmentService` |
-| الماسح | `App\Support\Identity` |
+| الروابط العميقة | `Web\MobileWellKnownController` + `App\Support\Collaboration\NotificationLink` |
+| الأمن/الأحداث | جدولُ `audits` (source=mobile) + `App\Support\Security\SecurityEvents` |
+| الملفات/الفيروسات | `attachments.av_status` + `App\Support\Collaboration\AttachmentService` |
+| الماسح | `App\Support\Security\Identity` |
 | التتبّع | `track_sessions` (تجميعٌ فقط — لا `track_points`) |
 | الصحّة | نمطُ `Health::c` |
 
@@ -26,7 +26,7 @@
 
 ## المكوّنات
 
-- **`App\Support\MobilePlatform`** — خدمةُ القراءةِ المُجمِّعة (كلُّ الدوالِّ ثابتة، بلا حالة).
+- **`App\Support\Mobile\MobilePlatform`** — خدمةُ القراءةِ المُجمِّعة (كلُّ الدوالِّ ثابتة، بلا حالة).
 - **`Web\MobilePlatformController`** — متحكّمٌ واحدٌ بتبويباتٍ (`?tab=`)، **الحرسُ فيه** (لا إخفاءُ تنقّل).
 - **`resources/views/mobile-platform/`** — `index` + `tabs/*` بأصنافِ CSS القائمة (لا CSS جديد، لا إعادةَ تصميم).
 - **المسارات** — `admin/mobile-platform` (اسمُ `mobileplatform.*`)، مع مسارَي POST مخنوقَين (إبطالُ جلسة، اختبارُ دفع).

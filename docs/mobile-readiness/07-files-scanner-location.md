@@ -1,7 +1,7 @@
 # الملفّاتُ والماسحُ والموقع — Files / Scanner / Location (Mobile Readiness · الطور F · §109)
 
-> **الجوهرُ المشترك لا نسخةٌ ثانية:** رفعُ الملفّات يعيد استعمال `App\Support\AttachmentService`
-> (قائمةٌ بيضاء + بصمةُ sha256 + القرصُ الخاصُّ `local`) و`App\Support\ChunkedUpload` للتقطيع
+> **الجوهرُ المشترك لا نسخةٌ ثانية:** رفعُ الملفّات يعيد استعمال `App\Support\Collaboration\AttachmentService`
+> (قائمةٌ بيضاء + بصمةُ sha256 + القرصُ الخاصُّ `local`) و`App\Support\Collaboration\ChunkedUpload` للتقطيع
 > (لا جدولَ جديد). **لا base64، لا رابطٌ عامّ** — كلُّ بايتٍ خلفَ بوّابةِ التخويل نفسِها، والمصابُ
 > يُحجَب. الماسحُ يعيد استعمال المحلّلِ الموحّد، والموقعُ يعيد استعمال سكّةِ التتبّع بموافقةٍ صريحة.
 > كلُّ ما يلي **مبنيٌّ ومُختبَرٌ على المحرّكَين**.
@@ -51,7 +51,7 @@
 
 ## 2) الجوهرُ المشترك — `AttachmentService` (قائمةٌ بيضاء + بصمة + قرصٌ خاصّ)
 
-`app/Support/AttachmentService.php` هو المصدرُ الواحد لكلا السطحَين (الويب والجوال) — لا نسخةَ ثانية:
+`app/Support/Collaboration/AttachmentService.php` هو المصدرُ الواحد لكلا السطحَين (الويب والجوال) — لا نسخةَ ثانية:
 
 - **حاجزُ الامتداد** `BLOCKED` (`AttachmentService.php:41-42`): `php php3..php8 phtml phar cgi pl sh
   htaccess html htm xhtml svg svgz js mjs` — رفضٌ ٤٢٢. (SVG/HTML قد تحمل سكربتات.)
@@ -120,7 +120,7 @@
 ## 6) الـIdempotency على الأثر القابلِ لإعادة المحاولة
 
 مالكُ الـIdempotency على الجوال هو الجلسة (`Idempotency::owner` ⇒ `mobile_session->id` ·
-`app/Support/Idempotency.php:40-47`) — فلا يعود ردُّ مستخدمٍ لآخر. يُحجَز على: **إتمامُ الرفع**
+`app/Support/Platform/Idempotency.php:40-47`) — فلا يعود ردُّ مستخدمٍ لآخر. يُحجَز على: **إتمامُ الرفع**
 (`uploadComplete`)، **الرفعُ المفرد** (`attach`)، و**دفعةُ نقاط التتبّع** (`trackingPoints`). يُحجَز
 قبل أيِّ أثرٍ (رفعِ المرفق/الإرفاق) فإعادةُ المحاولة بالمفتاح نفسِه تعيد الردَّ المخزَّن ولا تكرّر أثراً.
 

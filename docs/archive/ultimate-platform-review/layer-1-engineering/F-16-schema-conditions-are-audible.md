@@ -83,7 +83,7 @@ tasks.client_id  ← app/Http/Controllers/Web/CommentController.php:254
 
 فالكلفةُ عاليةٌ والمكسبُ — في قاعدةٍ مُرحَّلةٍ — صفر. **والحارسُ يقطع الصمتَ
 الذي يجعل القلبَ ضروريّاً**، بكلفةِ اختبارٍ واحد. ومن أراد القلبَ بعده وجده
-مقيساً: القائمةُ الكاملةُ محفوظةٌ في `docs/ultimate-platform-review/layer-1-engineering/`.
+مقيساً: القائمةُ الكاملةُ محفوظةٌ في `docs/archive/ultimate-platform-review/layer-1-engineering/`.
 
 ## وقائمةُ الاستشرافِ محروسةٌ هي أيضاً
 

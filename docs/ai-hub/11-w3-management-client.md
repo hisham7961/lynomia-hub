@@ -14,9 +14,9 @@
 
 | الملف | السطور | ماذا |
 |---|---:|---|
-| `app/Support/LiteLlmAdmin.php` | ٢٥٤ | العميل — ١٥ نداءً عبر محرّكٍ واحد |
+| `app/Support/Ai/Gateway/LiteLlmAdmin.php` | ٢٥٤ | العميل — ١٥ نداءً عبر محرّكٍ واحد |
 | `tests/Feature/AiHub/LiteLlmAdminTest.php` | ٢٥١ | ١٨ اختباراً |
-| `app/Support/Redactor.php` | +٢ نمط | سدُّ ثقبِ المفتاح العاري |
+| `app/Support/Platform/Redactor.php` | +٢ نمط | سدُّ ثقبِ المفتاح العاري |
 | `tests/Feature/RedactorTest.php` | +٢ اختبار | إثباتُ الثقبِ ثمّ سدِّه |
 | `app/Console/Commands/HubBackup.php` | +٤ جداول | تغطيةُ جداولِ W2 |
 | `tests/Feature/BackupRestoreTest.php` | +١ اختبار | جولةُ نسخٍ واستعادةٍ كاملة |
@@ -32,7 +32,7 @@
 
 كلُّ هدفٍ يمرّ بـ`AiGateway::outboundGate()` ذي الشروطِ الخمسة، ثمّ
 `requestOptions()` التي تضبط `allow_redirects => false`
-(`app/Support/AiGateway.php:231`) — فردُّ `302` من البوّابةِ لا يقود الطلبَ إلى
+(`app/Support/Ai/Gateway/AiGateway.php:231`) — فردُّ `302` من البوّابةِ لا يقود الطلبَ إلى
 هدفٍ لم يمرّ بالحارس. يحرسه `test_كلُّ_نداءٍ_لا_يتّبع_تحويلاً`.
 
 ### ③ الكلفةُ تُعلَن ولا تُخفى

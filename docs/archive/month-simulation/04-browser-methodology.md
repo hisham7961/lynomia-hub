@@ -29,7 +29,7 @@
 | `session(persona)` | دخولٌ **من شاشةِ الدخول** بالبريد وكلمةِ المرور، ثمّ حفظُ الجلسةِ لإعادةِ الاستعمال |
 | `settle(page)` | **شرطٌ لا خيار**: `networkidle` + مهلة — قبل كلِّ لقطةٍ وكلِّ قراءةِ نصّ |
 | `visit(page, uri)` | الحالةُ والعنوانُ والنصُّ المرئيُّ كما يقرؤه إنسان |
-| `shot(page, …)` | دليلٌ مصوَّرٌ إلى `docs/month-simulation/screenshots/<persona>/` |
+| `shot(page, …)` | دليلٌ مصوَّرٌ إلى `docs/archive/month-simulation/screenshots/<persona>/` |
 | `submitForm(page, sel, values)` | يُرسل النموذجَ **كاملاً** من الصفحةِ المرسومة |
 
 ### لماذا `submitForm` تُعبّئ فوقَ المعروضِ لا تبني حمولةً

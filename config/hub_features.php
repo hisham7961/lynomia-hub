@@ -306,7 +306,7 @@ return [
                 . 'والمركزِ القانونيِّ والتقريرِ الماليِّ والإيرادِ المتكرّر.',
             'admin_surface' => 'currency.rates',
             'web_routes' => ['currency.rates', 'currency.rates.store', 'currency.rates.destroy'],
-            'introduced' => 'v2.528.0', 'docs' => 'docs/ultimate-platform-review/03-design-currency-wiring.md',
+            'introduced' => 'v2.528.0', 'docs' => 'docs/archive/ultimate-platform-review/03-design-currency-wiring.md',
             'limitations' => 'لا يُشتقُّ سعرٌ عبر عملةٍ ثالثة، ومستندٌ أقدمُ من أوّلِ سعرٍ مسجَّلٍ لا يُحوَّل.'],
     ],
 ];

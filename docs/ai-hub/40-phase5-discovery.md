@@ -86,7 +86,7 @@
 | تغطيةُ النسخِ الاحتياطيّ | ثمانيةُ جداولِ ذكاءٍ في `HubBackup::RAW_TABLES` | `HubBackup.php:161-173` · `EnterpriseHardeningRound1Test` | — | — | **DONE** |
 | جولةُ استعادةٍ مُثبَتة | `BackupRestoreTest` عامٌّ للمنصّة | `tests/Feature/BackupRestoreTest.php` | استعادةٌ **خاصّةٌ بجداولِ الذكاء** + سيناريوهاتُ فقدانِ طرفٍ واحد | **W10** | **PARTIAL** |
 | دليلُ تشغيلٍ للذكاء | سطرٌ واحدٌ في `RUNBOOKS.md:126` عن `LITELLM_SALT_KEY` | `docs/RUNBOOKS.md` | runbook تشغيليٌّ كامل | **W11** | **MISSING** |
-| إجراءُ نشرٍ وتراجُع | `docs/deployment/v2.555-to-v2.559-plan.md` (خطّةُ دفعةٍ واحدة) | — | إجراءٌ عامٌّ للذكاء | **W11** | **MISSING** |
+| إجراءُ نشرٍ وتراجُع | `docs/archive/deployment/v2.555-to-v2.559-plan.md` (خطّةُ دفعةٍ واحدة) | — | إجراءٌ عامٌّ للذكاء | **W11** | **MISSING** |
 | بوّابةُ إطلاقٍ آليّة | `hub:schema-check` · `hub:openapi` · `hub:ai-provider-map --check` | `app/Console/Commands/` | **أمرٌ واحدٌ يجمعها ويحكم PASS/WARN/FAIL** | **W12** | **MISSING** |
 
 ### ما أضافته المراحلُ ٢–٤ ويغطّي متطلَّباتٍ قديمة — **SUPERSEDED**

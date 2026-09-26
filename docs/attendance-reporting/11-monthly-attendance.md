@@ -10,10 +10,10 @@
 
 ## المعمار — تركيبٌ لا محرّكٌ ثانٍ (§122)
 
-- **`App\Support\DailyWorkCompliance::resolveRange(Collection $emps, array $dates)`** — حلٌّ مدَيٌّ
+- **`App\Support\Workforce\DailyWorkCompliance::resolveRange(Collection $emps, array $dates)`** — حلٌّ مدَيٌّ
   N+1=0 (§99): ثلاثةُ استعلاماتٍ فقط (حضورٌ + بنودٌ + إجازاتٌ للمدى)، ثمّ يُركَّب كلُّ (موظّف×يوم)
   بـ`compose` مع تمرير الإجازةِ محسوبةً مسبقاً (لا استعلامَ لكلِّ خليّة). يُعيد `empId → 'Y-m-d' → نتيجة`.
-- **`App\Support\MonthlyAttendance`** — نموذجُ قراءة: `sheet(emp, 'Y-m')` (يومٌ بيوم + مجاميع)،
+- **`App\Support\Workforce\MonthlyAttendance`** — نموذجُ قراءة: `sheet(emp, 'Y-m')` (يومٌ بيوم + مجاميع)،
   `summary(emps, 'Y-m')` (مجاميعُ كلِّ موظّف). العدُّ **صادق**:
   - يومٌ **بلا صفِّ حضورٍ ولا إجازة** = «off» (عطلة/غير مسجَّل)، **لا غياب**.
   - الغيابُ حصراً لصفٍّ مختوم «غائب» (يختمه كنسُ نهاية اليوم لأيّامِ العملِ فقط).

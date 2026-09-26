@@ -38,7 +38,7 @@
 
 ## المخرجات
 
-`docs/final-audit/` — خمسَ عشرةَ وثيقة: `00-scope` … `11-release-checklist` +
+`docs/archive/final-audit/` — خمسَ عشرةَ وثيقة: `00-scope` … `11-release-checklist` +
 `FINDINGS.md` + `RELEASE_MATRIX.md` + `FINAL_REPORT.md`.
 
 ## التصنيف

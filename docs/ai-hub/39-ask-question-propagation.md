@@ -19,7 +19,7 @@ if ($q === null) { … }
 // ← ولا سطرَ ثالثٌ يذكر $q
 ```
 
-`grep -c '\$q\b' app/Support/AskPipeline.php` ⟵ **`2`**: إسنادٌ وفحصُ فراغ.
+`grep -c '\$q\b' app/Support/Ai/Ask/AskPipeline.php` ⟵ **`2`**: إسنادٌ وفحصُ فراغ.
 **والسؤالُ لا يُمرَّر إلى أحد.**
 
 و`AskContext::render()` يبني المظروفَ من `notice` · `trusted` · `sources` ·

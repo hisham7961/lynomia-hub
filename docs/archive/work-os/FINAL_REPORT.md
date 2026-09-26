@@ -113,9 +113,9 @@
 
 ## DOCS
 
-- `docs/work-os/INVENTORY.md` — جردُ الاستكشاف كما سُلِّم (٣٤٦ سطرَ تتبّعٍ بوسوم STATICALLY_REVIEWED/COMMAND_VERIFIED/RUNTIME_VERIFIED).
-- `docs/work-os/PLAN.md` — خطةُ الأطوار A–M كما سُلِّمت (رِكائزُ SF-1..SF-5، حِزمُ WP، نقدُ المحقّق C1–C15 المُلزِم).
-- `docs/work-os/FINAL_REPORT.md` — هذا التقرير (§103).
+- `docs/archive/work-os/INVENTORY.md` — جردُ الاستكشاف كما سُلِّم (٣٤٦ سطرَ تتبّعٍ بوسوم STATICALLY_REVIEWED/COMMAND_VERIFIED/RUNTIME_VERIFIED).
+- `docs/archive/work-os/PLAN.md` — خطةُ الأطوار A–M كما سُلِّمت (رِكائزُ SF-1..SF-5، حِزمُ WP، نقدُ المحقّق C1–C15 المُلزِم).
+- `docs/archive/work-os/FINAL_REPORT.md` — هذا التقرير (§103).
 - `docs/openapi.json` — مولَّدٌ لا محرَّر (`php artisan hub:openapi`)، مُتحقَّقٌ منه **بلا انحرافٍ** على هذه الشجرة (179 مساراً/172 مخطّطاً)، وبوّابةُ CI تُسقط أيَّ انحراف.
 - `CLAUDE.md` — دروسُ المحرّكين المُدوَّنة أثناء الأطوار (قرعةُ مفاتيح JSON، الترتيبُ الحتميّ).
 - توثيقُ العقود في مواضعها: عقدُ التوقيع في docblock ‏`Es256`، عقدُ البيان في `agent/internal/update`، وتعليقاتُ routes/config تشرح كلَّ سكّة.

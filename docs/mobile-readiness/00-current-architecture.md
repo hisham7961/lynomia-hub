@@ -3,7 +3,7 @@
 > Mobile Readiness · الطور H · H.1. وثيقةٌ **مبنيّةٌ على الشجرة الحقيقيّة** (head
 > `v2.427.0`) — كلُّ ادّعاءٍ يحمل `file:line` أو مساراً. لا توصيات: ما هنا **مُنفَّذٌ
 > ومُختبَرٌ** على المحرّكين (SQLite + MySQL). المنهجُ نفسُه الذي في
-> `docs/work-os/FINAL_REPORT.md`.
+> `docs/archive/work-os/FINAL_REPORT.md`.
 
 ## 1. المبدأ: نواةٌ واحدةٌ، ثلاثةُ عملاء (Web · Mobile · Integrations)
 
@@ -28,7 +28,7 @@
 | **Mobile** (جديد) | `/api/mobile/v1/*` (`routes/api.php:102-280`) | زوجُ رمزَين: وصولٌ قصيرٌ + تحديثٌ متجدّد | `MobileSessionAuth` (`app/Http/Middleware/MobileSessionAuth.php`) |
 
 `/api/v1` و`ApiToken` و`ApiAuth` و`docs/openapi.json` **لم تُمَسّ**: `git status`
-يُظهر `docs/openapi.json` و`app/Support/OpenApi.php` و`V1Controller.php` و`Api.php`
+يُظهر `docs/openapi.json` و`app/Support/Platform/OpenApi.php` و`V1Controller.php` و`Api.php`
 و`ApiAuth.php` **نظيفةً كلَّها** — n8n والتكاملاتُ تعمل بلا هجرة.
 
 ## 2. جلسةُ الجوال ≠ ApiToken — مفهومان منفصلان
@@ -52,7 +52,7 @@
 الفروقُ الجوهريّةُ عن `ApiToken`:
 
 - **قصيرُ العمر:** رمزُ الوصول `setting('mobile.access_ttl_min', 15)` دقيقة
-  (`MobileSessionService::accessTtlAt` — `app/Support/MobileSessionService.php:37`)؛
+  (`MobileSessionService::accessTtlAt` — `app/Support/Mobile/MobileSessionService.php:37`)؛
   التحديثُ `setting('mobile.refresh_ttl_days', 30)` يوماً (`:43`).
 - **مربوطٌ بتنصيبٍ وعائلة:** كلُّ تسجيلِ دخولٍ عائلةٌ جديدة (`family_id` · `:74`).
 - **تدويرٌ لمرّةٍ واحدة + كشفُ إعادة:** `MobileSessionService::rotate` (`:101`) — انظر
@@ -117,7 +117,7 @@ Critic F6a). والأنواعُ المكتومة لا تبلغ `created` أصل�
 
 ### 4b. مالكُ الـIdempotency عبر السطوح (Critic F1)
 
-`Idempotency::owner($r)` (`app/Support/Idempotency.php:40`) سكّةٌ مشتركة: `api_token->id`
+`Idempotency::owner($r)` (`app/Support/Platform/Idempotency.php:40`) سكّةٌ مشتركة: `api_token->id`
 لسطح التكامل (byte-identical لـ`/api/v1`)، و`mobile_session->id` لسطح الجوال — فكلُّ
 جلسةٍ مالكٌ مستقلٌّ، **ولا يُعاد ردُّ مستخدمٍ لآخر**. `V1Controller::ikeyOf` (`:466`)
 يقرؤها، فآلةُ الـIdempotency الموروثةُ تعمل للجوال دون أن تُصبح `[null,null]` (العيبُ
@@ -136,7 +136,7 @@ Critic F6a). والأنواعُ المكتومة لا تبلغ `created` أصل�
 
 كلُّ ردٍّ بغلاف `Api::*`: نجاحٌ `{data, request_id}` (+ `meta` للقوائم)، وخطأٌ
 `{error, code, details, request_id}` بكودٍ آليٍّ (العربيةُ لا تُحلَّل من العميل)،
-و`X-API-Version: 1` على كل ردّ. الأكوادُ من `Api::CODES` (`app/Support/Api.php:62`)
+و`X-API-Version: 1` على كل ردّ. الأكوادُ من `Api::CODES` (`app/Support/Platform/Api.php:62`)
 تُضاف إليها **أربعةٌ للجوال فقط** (`Api.php:53-56`): `MFA_REQUIRED`,
 `REFRESH_TOKEN_INVALID`, `SESSION_REVOKED`, `APP_UPDATE_REQUIRED` — إضافةٌ لا تُعيد
 تسميةَ كودٍ ولا تحذف (لا تكسر n8n). التفصيلُ الكاملُ في `02-mobile-api-contract.md`.
@@ -144,7 +144,7 @@ Critic F6a). والأنواعُ المكتومة لا تبلغ `created` أصل�
 ## 7. التوثيقُ الحيّ (OpenAPI)
 
 مواصفةُ الجوال **مولَّدةٌ من المسارات الحيّة** لا مكتوبةٌ باليد:
-`App\Support\MobileOpenApi::spec()` يُرشِّح `RouteFacade::getRoutes()` على
+`App\Support\Mobile\MobileOpenApi::spec()` يُرشِّح `RouteFacade::getRoutes()` على
 `api/mobile/v1`، فلا يوثّق مساراً غيرَ موجودٍ ولا يُسقط مساراً حقيقيّاً. تُخدَم عبر
 `GET /api/mobile/v1/openapi.json` (`MobileDocsController@openapi` · `routes/api.php:120`،
 **عامّةٌ** في المجموعة قبل catch-all). وثيقةٌ **منفصلةٌ تماماً**: العنوانُ «Lynomia

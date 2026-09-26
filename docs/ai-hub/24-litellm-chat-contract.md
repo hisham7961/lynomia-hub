@@ -191,9 +191,9 @@ guardrail_intervened · eos · finish_reason_unspecified · malformed_function_c
 
 | البند | الموضع |
 |---|---|
-| بناءُ الطلبِ وتحليلُ الردِّ والترويسات | `app/Support/AiChat.php` |
+| بناءُ الطلبِ وتحليلُ الردِّ والترويسات | `app/Support/Ai/Gateway/AiChat.php` |
 | خريطةُ الرمزِ والمتنِ إلى `AskFailures` | `AiChat::classify()` |
-| تسلسلُ `assistant`→`tool` بـ`tool_call_id` | `app/Support/LiteLlmAskGenerator.php` |
+| تسلسلُ `assistant`→`tool` بـ`tool_call_id` | `app/Support/Ai/Ask/LiteLlmAskGenerator.php` |
 | لقطاتُ ردٍّ مطابقةٌ للعقد | `tests/Feature/AskHub/LiteLlmFixtures.php` |
 
 **ولا طلبَ حقيقيٌّ في هذه الدفعة.** كلُّ ما سبق مُختبَرٌ بـ`Http::fake()`

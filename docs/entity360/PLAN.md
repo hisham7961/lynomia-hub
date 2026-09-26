@@ -6,9 +6,9 @@
 
 ثلاثةُ أصنافٍ خفيفةٍ **للقراءة فقط** تُجمّع المصادرَ المرجعيّة (كلُّ استعلامٍ مقيَّدٌ ومنطَّق، بلا N+1):
 
-- `App\Support\Employee360` — `overview($emp,$u)` (عدّاداتٌ ورؤوسُ علاقاتٍ منطَّقة) · `stationHistory` · `custodyHistory` · `activity`.
-- `App\Support\Station360` — `overview` · `currentAssets` · `assetHistory` (من `asset_custody.station_id`) · `inventoryStatus` (عبر الأصول) · `projectContext` (مباشرٌ + مشتقٌّ موسوم).
-- `App\Support\Asset360` — `overview` · `custodyHistory` · `stationHistory` · `inventoryStatus` · `lifecycle`.
+- `App\Support\Workforce\Employee360` — `overview($emp,$u)` (عدّاداتٌ ورؤوسُ علاقاتٍ منطَّقة) · `stationHistory` · `custodyHistory` · `activity`.
+- `App\Support\Assets\Station360` — `overview` · `currentAssets` · `assetHistory` (من `asset_custody.station_id`) · `inventoryStatus` (عبر الأصول) · `projectContext` (مباشرٌ + مشتقٌّ موسوم).
+- `App\Support\Assets\Asset360` — `overview` · `custodyHistory` · `stationHistory` · `inventoryStatus` · `lifecycle`.
 
 كلُّها تُعيد بنياتٍ بسيطةً (arrays/collections مقيَّدة)، وتطبّق `hub_scope`/`hub_can`/`hub_field_mode`. **الكتابةُ تبقى في محرّكاتها** (`Custody`, `AssetProjectService`, `StationController`, `EmployeeCustodyController`).
 

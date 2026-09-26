@@ -24,7 +24,7 @@
 - **منتِجاتُ إشاراتٍ قائمة** (قواعد لا ذكاء): `hub_recommendations` · `ActionCenter` ·
   `Inbox` · `AttentionQueue` · `NextAction` · `DataQuality` · `Compliance` ·
   `DailyWorkCompliance` · `ReportReview` · `AlertEngine`. **الذكاءُ يُغني هذه ولا يستبدلها**
-  (`docs/INTELLIGENCE_MAP.md`: «لا محرّكَ ثانياً»).
+  (`docs/archive/INTELLIGENCE_MAP.md`: «لا محرّكَ ثانياً»).
 
 ## ٢) الخطوةُ صفر — `GovernedCompletion` (شرطٌ لكلِّ ما بعدها) — ✅ v2.600.5
 

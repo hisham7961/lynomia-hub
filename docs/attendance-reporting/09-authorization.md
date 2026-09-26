@@ -30,7 +30,7 @@
 ## الطبقةُ الثانية — من يراجع (§32/§33/§76/§77)
 
 المراجعةُ **تنطيقٌ لا اسمُ دور**. القارئان في `ReportReview`
-(`app/Support/ReportReview.php`):
+(`app/Support/Workforce/ReportReview.php`):
 
 ### `canReview(User $actor, WorkUpdate $w)` — أيراجع هذا البندَ بعينه؟ (`:35-53`)
 
@@ -87,7 +87,7 @@
 
 الوجهاتُ الثلاثُ في مسار `work → exec` (`config/hub_ia.php:179-188`)، وحرّاسُها في
 `InformationArchitecture::guards()` تعكس منطقَ المنافذ تماماً
-(`app/Support/InformationArchitecture.php`):
+(`app/Support/Platform/InformationArchitecture.php`):
 
 | الحارس | الشرط | السطر |
 |---|---|---|

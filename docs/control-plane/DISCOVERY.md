@@ -52,7 +52,7 @@
 | السكّة | الشيفرة | ما تعطيه |
 |---|---|---|
 | ارتباطُ الطلب `X-Request-Id` | `Observability.php:18-41` (توليد/قبولُ معرّفِ العميل بنمط `^[A-Za-z0-9][A-Za-z0-9._:-]{7,63}$` + `Log::withContext` + ترويسةُ الردّ)، `Api::requestId()` `Api.php:80-95` | معرّفٌ واحدٌ للطلب يُكتب تلقائياً في `audits` (`Auditable.php:104`, `helpers.php:2525`)، `outbox`, `webhook_deliveries`, `notifications_hub`, `error_events` |
-| التدقيق المختوم | `Auditable` (`app/Traits/Auditable.php:12-107`)، `AuditEntry` (سلسلةُ SHA-256، `:52-160`)، `Audit::diff` (`app/Support/Audit.php:31-79`)، `Audit::verifyTail` (`:88-145`)، `hub:audit-verify` | إضافة/تعديل/حذف مختومةٌ لكل الوحدات الـ82 + فرقٌ مقنَّعٌ بالصلاحيات + تحقّقُ ذيلٍ لكل تحميلِ صفحة |
+| التدقيق المختوم | `Auditable` (`app/Traits/Auditable.php:12-107`)، `AuditEntry` (سلسلةُ SHA-256، `:52-160`)، `Audit::diff` (`app/Support/Platform/Audit.php:31-79`)، `Audit::verifyTail` (`:88-145`)، `hub:audit-verify` | إضافة/تعديل/حذف مختومةٌ لكل الوحدات الـ82 + فرقٌ مقنَّعٌ بالصلاحيات + تحقّقُ ذيلٍ لكل تحميلِ صفحة |
 | تصنيفُ الأحداث الأمنية | `SecurityEvents::CODES` (36 رمزاً) `SecurityEvents.php:27-105`، `recent()/counts()` `:119-172` | خريطةُ ~60 نصّاً عربياً → رمز + شدّة، وسجلٌّ موحّد فوق `audits`+`access_denials` بلا جدولٍ جديد |
 | تصنيفُ الأخطاء | `ErrorTaxonomy` (`:15-113` تصنيف/شدّة/بصمة)، `ErrorLog::capture/bump/tell` (`:32-206`) | بصمةٌ ودمجٌ وتنبيهٌ بسقفِ عاصفة (8/15د) وإعادةُ فتحٍ عند العودة |
 | الصحّة | `Health::check/JOBS/beat/watchdog` (`Health.php:25-430`) + `/healthz` + `ops.health` | 12 مكوِّناً بخمس حالات + نبضاتٌ + كلبُ حراسةٍ يومي |

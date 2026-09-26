@@ -16,8 +16,8 @@
 
 | الملف | ماذا |
 |---|---|
-| `app/Support/AiModelFacts.php` | المُطبِّعُ الخالص — حقائقُ موسومةُ المصدر |
-| `app/Support/AiModels.php` | الكاتبُ الواحد — اكتشافٌ/استيرادٌ/تحديثٌ/تسجيلٌ/تهيئة |
+| `app/Support/Ai/Catalog/AiModelFacts.php` | المُطبِّعُ الخالص — حقائقُ موسومةُ المصدر |
+| `app/Support/Ai/Catalog/AiModels.php` | الكاتبُ الواحد — اكتشافٌ/استيرادٌ/تحديثٌ/تسجيلٌ/تهيئة |
 | `app/Http/Controllers/Web/AiModelController.php` | الشاشةُ بخطواتِها الأربع |
 | `resources/views/ai/models.blade.php` | المراجعةُ تُظهر ما نجهله كما تُظهر ما نعرفه |
 | `routes/web.php` | ثمانيةُ مسارات |

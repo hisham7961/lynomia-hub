@@ -60,7 +60,7 @@
 | النقطةُ الطرفية | `endpoint_devices.asset_id` | `Asset::activeEndpoint()` · الأهليّة `endpointEligible()` |
 | الجرد | `inventory_items.asset_id` / `inventory_scans.asset_id` (لا عمودَ محطة) | مشتقٌّ: آخرُ مسحٍ `InventoryScan where asset_id order at desc` |
 | الدورة | `buy_date/warranty/maint/life/disposal/price` + `AssetMaintenance` | إهلاكٌ خطّيّ (قائمٌ في العرض) |
-| الكتابة | `App\Support\Custody` (`move`/`permit`/`transition`/`assignStation`) + `AssetProjectService` | `holder_id/station_id/status` **مقفولة** — قراءةٌ فقط في 360 |
+| الكتابة | `App\Support\Assets\Custody` (`move`/`permit`/`transition`/`assignStation`) + `AssetProjectService` | `holder_id/station_id/status` **مقفولة** — قراءةٌ فقط في 360 |
 
 **الفصلُ الثلاثيّ (§30):** الحائز (holder_id/custody) ≠ المحطة (station_id) ≠ تخصيصُ المشروع (asset_project_assignments) — ثلاثةُ مفاهيمَ لا تُخلَط.
 
@@ -68,7 +68,7 @@
 
 ## ٤) الرسم (RelationshipProjection) — محرّكٌ **واحد**
 
-- `App\Support\RelationshipProjection::expand($module,$id,$hops,$fresh): ?array`. الشكل: `{root,hops,max_hops,max_nodes,capped,nodes,edges}`.
+- `App\Support\Insights\RelationshipProjection::expand($module,$id,$hops,$fresh): ?array`. الشكل: `{root,hops,max_hops,max_nodes,capped,nodes,edges}`.
 - عقدة: `{key,module,id,label,hop,counts}` · حافّة: `{from,to,via,label}` **فقط اليوم** — لا `kind`/`direct`/`derived`/`active`.
 - الحدود: `graph.max_hops`(٣)/`graph.max_nodes`(١٢٠). التصريحُ للعقدة عبر `hub_read` (طرفان مقروءان ⇒ حافّة). `capped` صريح.
 - الحوافّ من: (أ) حقولُ `ref` أماماً، (ب) `hub_children` عكساً، (ج) كتلةُ `asset_project` (`::active()` فقط، `via='asset_project'`).

@@ -7,7 +7,7 @@
 
 ## المسارُ الدقيق (مُثبَتٌ من الكود)
 
-`Workday::evaluate()` (`app/Support/Workday.php:147-165`) هو محرّكُ تصنيفِ اليوم:
+`Workday::evaluate()` (`app/Support/Workforce/Workday.php:147-165`) هو محرّكُ تصنيفِ اليوم:
 
 ```php
 if ((string) setting('work.report_required', '1') === '1' && $user) {

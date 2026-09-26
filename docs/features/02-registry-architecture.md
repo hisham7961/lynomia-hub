@@ -8,8 +8,8 @@
 | المكوّن | الدور |
 |---|---|
 | `config/hub_features.php` | **الكتالوجُ الكوديّ** — المجالاتُ + كلُّ قدرةٍ بحقولها البنيويّة (بلا closures) |
-| `App\Support\FeatureStatus` | **نموذجُ الحالة** — الحالاتُ التسع + التسمياتُ + قواعدُ الانتقال |
-| `App\Support\FeatureRegistry` | **المحرّك** — يقرأ الكتالوج، يشتقُّ الحالة، يحلّ الاعتماديّات، يبدّل عبر `Settings` |
+| `App\Support\Platform\FeatureStatus` | **نموذجُ الحالة** — الحالاتُ التسع + التسمياتُ + قواعدُ الانتقال |
+| `App\Support\Platform\FeatureRegistry` | **المحرّك** — يقرأ الكتالوج، يشتقُّ الحالة، يحلّ الاعتماديّات، يبدّل عبر `Settings` |
 | `hub_capability($key)` | **بوّابةُ التوافر** المركزيّة — مستقلّةٌ عن `hub_can` |
 | `feature.*` في `config/hub_settings.php` | مفاتيحُ رايةِ التبديلِ للقدرات الاختياريّة — يملكها `features.index` |
 
