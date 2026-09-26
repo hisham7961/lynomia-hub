@@ -34,8 +34,12 @@ use App\Support\Platform\Redactor;
  */
 final class AskTools
 {
-    /** الأدواتُ الخمسُ — **قراءةٌ محضةٌ كلُّها، ولا سادسةَ تكتب** */
-    public const TOOLS = ['hub_modules', 'hub_search', 'hub_list', 'hub_record', 'hub_count'];
+    /**
+     * الأدواتُ — **قراءةٌ محضةٌ كلُّها، ولا أداةَ تكتب.** الخمسُ الأولى على سجلِّ الوحدات،
+     * والسادسةُ (`hub_findings` · المرحلة ٢ في `docs/ai-hub/46-ai-roadmap.md`) تقرأ نتائجَ المدقّق
+     * **عبر `AuditorSignals` نفسِه** — بشروطه الخمسة لكلِّ مشاهد، فلا قاعدةَ رؤيةٍ ثانية.
+     */
+    public const TOOLS = ['hub_modules', 'hub_search', 'hub_list', 'hub_record', 'hub_count', 'hub_findings'];
 
     /**
      * **الأدواتُ الكاتبة: فارغةٌ بقرارِ مالكٍ محسوم.**
@@ -176,6 +180,10 @@ final class AskTools
             $fn('hub_count', 'يعيد عدَّ الصفوفِ داخلَ النطاقِ بلا تسليمِ صفٍّ واحد. '
                 . '**استعملها لكلِّ سؤالِ «كم»** — ولا تجلب صفوفاً لتعدَّها بنفسِك.',
                 ['module' => $moduleArg, 'filters' => $filters], ['module']),
+            $fn('hub_findings', 'ملاحظاتُ «المدقّق» المفتوحةُ التي يراها صاحبُ الجلسة: ما رصده على عملِ الفريق '
+                . '(تقاريرُ منسوخة · عائقٌ متكرّر · ساعاتٌ بلا تقدّم · قرارٌ بلا مهمّة…) مع سجلِّه. '
+                . 'ومع `module` تقتصر على ما موضوعُه تلك الوحدة. **رصدٌ آليٌّ يُتحقَّق منه لا حكم.**',
+                ['module' => $moduleArg]),
         ];
     }
 
@@ -207,6 +215,7 @@ final class AskTools
             'hub_list'    => self::toolList($u, $args),
             'hub_record'  => self::toolRecord($u, $args),
             'hub_count'   => self::toolCount($u, $args),
+            'hub_findings' => self::toolFindings($u, $args),
         };
     }
 
@@ -374,6 +383,45 @@ final class AskTools
      *
      * @return array{0: string, 1: array, 2: ?string}
      */
+    /**
+     * **ملاحظاتُ المدقّق كما يراها هذا المشاهدُ في مركز الفعل — لا أكثر.**
+     *
+     * لا استعلامَ على `ai_findings` هنا: القراءةُ كلُّها عبر `AuditorSignals::visibleTo` — الشروطُ
+     * الخمسة (سجلّاتُ الشاهد مرئيّة · لا حقلَ محجوب · **ليس عملَه هو** · بوّابةُ الموضوع · لا حسابَ
+     * عميل) — ثمّ يُسقَط ما رفضه مديرٌ أو أجّله كما في الملخّص. فالموظّفُ لا يقرأ هنا حكمَ الآلة على
+     * عمله (قرارُ المالك §٣.٦)، والمسودةُ ورابطُها لا يُسلَّمان (للمدير في شاشته).
+     */
+    private static function toolFindings(mixed $u, array $args): array
+    {
+        $module = null;
+        if (trim((string) ($args['module'] ?? '')) !== '') {
+            [$module, , $err] = self::resolveModule($u, $args);
+            if ($err !== null) return self::fail('hub_findings', $err);
+        }
+        if (! $u instanceof \App\Models\User) return self::fail('hub_findings', 'لا صلاحيّةَ لاستعمالِ المساعد');
+
+        $all = \App\Support\Ai\Auditor\AuditorSignals::visibleTo($u);
+        $hide = \App\Support\Ai\Auditor\AuditorSignals::hiddenKeys(array_values(array_filter(array_column($all, 'key'))));
+
+        $rows = [];
+        foreach ($all as $sig) {
+            if (isset($hide[$sig['key'] ?? ''])) continue;
+            if ($module !== null && ($sig['module'] ?? null) !== $module) continue;
+            $rows[] = [
+                'id'       => (string) ($sig['record_id'] ?? ''),
+                'module'   => (string) ($sig['module'] ?? ''),
+                'detector' => self::clip(Redactor::text((string) ($sig['label'] ?? ''))),
+                'severity' => (string) ($sig['sev'] ?? ''),
+                'finding'  => self::clip(Redactor::text((string) preg_replace('/^🔎\s*/u', '', (string) ($sig['title'] ?? '')))),
+                'context'  => self::clip(Redactor::text((string) ($sig['why'] ?? ''))),
+            ];
+        }
+
+        $truncated = count($rows) > self::MAX_ROWS;
+
+        return self::ok('hub_findings', $module, array_slice($rows, 0, self::MAX_ROWS), $truncated);
+    }
+
     private static function resolveModule(mixed $u, array $args): array
     {
         $module = trim((string) ($args['module'] ?? ''));
