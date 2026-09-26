@@ -61,6 +61,14 @@ class ModuleController extends Controller
         [$def, $class] = $this->resolve($module, 'v');
         $def['key'] = $module;
 
+        // «إلغاء» في نموذج التعديل يعود إلى هنا بـ`_unlock=<id>`: يُحرَّر قفلُ تحريرِك (وحدَه)
+        // ثم تُعاد القائمةُ بعنوانٍ نظيف — فلا يبقى المعاملُ في روابطِ الترقيم والعروض.
+        if (is_string($ul = $r->query('_unlock')) && $ul !== '') {
+            $this->releaseEditLock($module, $ul);
+
+            return redirect()->route('m.index', $module);
+        }
+
         // عروض المستخدم المحفوظة لهذه الوحدة — استعلام واحد يخدم التحويل والقائمة معاً
         $views = \App\Models\SavedView::where('user_id', auth()->id())
             ->where('module', $module)->orderByDesc('is_default')->orderBy('name')->get();
@@ -112,6 +120,14 @@ class ModuleController extends Controller
     public function create(Request $r, string $module)
     {
         [$def, $class] = $this->resolve($module, 'a');
+
+        // **تبعيّاتُ الوحدة** (`depends_on` · DI-11): وحدةٌ تتبع وحدةً معطَّلةً أو محجوبةً
+        // عنك لا يُفتح لها نموذجٌ مكسورٌ بقائمةٍ فارغة — رسالةٌ تسمّي الناقصَ بدلاً منه.
+        if ($missing = \App\Support\Platform\Modules\ModuleDependencies::missing(auth()->user(), $module)) {
+            return redirect()->route('m.index', $module)->with('err',
+                'لا يمكن إضافةُ سجلٍّ في «' . $def['label'] . '» الآن: تعتمد هذه الوحدةُ على «'
+                . implode('» و«', $missing) . '» وهي غيرُ مفعّلةٍ أو لا تملك صلاحيّةَ عرضها. راجع مسؤولَ النظام.');
+        }
 
         // تعبئة مسبقة من الرابط (زر ＋ داخل عمود الكانبان مثلاً يمرر الحالة):
         // تُقبل مفاتيح حقول الوحدة فقط وبقيم نصية — والتحقق الكامل يبقى عند الحفظ
@@ -410,11 +426,33 @@ class ModuleController extends Controller
         [$def, $class] = $this->resolve($module, 'e');
         $row = $this->findScoped($class, $module, $id);
 
+        // **قفلُ التحريرِ اللّيّن** (DI-09): فتحُ النموذجِ يأخذ القفلَ أو يجدّده؛ وإن كان
+        // غيرُك يحرّره الآن فشريطُ تنبيهٍ لا منع — `_version` في update() يصون التعديل.
+        // وعطلُ القفلِ لا يُطفئ نموذجَ التعديل: تنبيهٌ مفقودٌ أهونُ من شاشةٍ مكسورة.
+        $editLock = null;
+        try {
+            $other = \App\Models\RecordLock::acquire($module, (string) $row->id, auth()->user());
+            $editLock = $other?->warningFor(auth()->user());
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         return view('modules.form', [
             'module' => $module, 'def' => $def, 'row' => $row,
             'refOptions' => $this->refOptions($def, $row),
             'suggest' => $this->editSuggestions($r, $module, $def, $row),
+            'editLock' => $editLock,
         ]);
+    }
+
+    /** يُحرِّر قفلَ تحريرِ المستخدمِ الحاليّ على السجلّ (قفلُه وحدَه) — وعطلُه لا يُفشل الطلب */
+    protected function releaseEditLock(string $module, string $id): void
+    {
+        try {
+            \App\Models\RecordLock::release($module, $id, auth()->user());
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**
@@ -471,6 +509,7 @@ class ModuleController extends Controller
                 'عدّل شخصٌ آخر هذا السجل بينما كنت تحرّره — افتحه من جديد وراجع تغييرك قبل الحفظ.']);
         }
 
+        $this->releaseEditLock($module, (string) $m->id);   // انتهت جلسةُ التحرير: حُفظ أو أُرسل للموافقة
         if (hub_needs_approval(auth()->user(), $module, 'e')) {
             return $this->queueApproval($def, $module, 'e', $m, $r);
         }
@@ -507,6 +546,7 @@ class ModuleController extends Controller
     {
         [$def, $class] = $this->resolve($module, 'd');
         $m = $this->findScoped($class, $module, $id);
+        $this->releaseEditLock($module, (string) $m->id);
         if (hub_needs_approval(auth()->user(), $module, 'd')) {
             return $this->queueApproval($def, $module, 'd', $m, request());
         }

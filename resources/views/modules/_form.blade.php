@@ -131,7 +131,8 @@
             @if ($hx)
                 <button class="btn ghost" type="button" onclick="Hub.closeModal()">إلغاء</button>
             @else
-                <a class="btn ghost" href="{{ route('m.index', $module) }}">إلغاء</a>
+                {{-- الإلغاءُ في التعديل يُحرِّر قفلَ تحريرك (DI-09) --}}
+                <a class="btn ghost" href="{{ $updating ? route('m.index', [$module, '_unlock' => $row->id]) : route('m.index', $module) }}">إلغاء</a>
             @endif
         </div>
     </form>

@@ -441,7 +441,7 @@ if (! function_exists('hub_capability')) {
 }
 
 if (! function_exists('hub_nav')) {
-    /** مجموعات التنقل الجانبي — تُخفى الوحدات التي لا يملك المستخدم عرضها */
+    /** مجموعات التنقل الجانبي — تُخفى الوحدات التي لا يملك المستخدم عرضها أو نقصت تبعيّاتُها (`depends_on`) */
     /**
      * مجموعات التنقل بعد الصلاحيات **وتخصيص المستخدم**: وحدة مخفية تسقط،
      * وتسمية بديلة تُطبق، وترتيب المجموعات يتبع اختياره — كله عرضٌ فقط:
@@ -458,7 +458,7 @@ if (! function_exists('hub_nav')) {
             $items = [];
             foreach ($g['items'] as $k) {
                 if (! hub_mod($k) || ! hub_can($user, $k, 'v')) continue;
-                if (in_array($k, $hidden, true)) continue;
+                if (in_array($k, $hidden, true) || ! \App\Support\Platform\Modules\ModuleDependencies::met($user, $k)) continue;
                 $alias = trim((string) ($names[$k] ?? ''));
                 $items[] = ['key' => $k, 'label' => $alias !== '' ? $alias : hub_mod($k)['label']];
             }

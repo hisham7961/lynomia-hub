@@ -10,6 +10,12 @@
         <h2>{{ $updating ? '✏️ تعديل سجل' : (! empty($dup) ? '⎘ نسخ سجل' : '＋ سجل جديد') }}</h2>
     </div>
 </div>
+@if (! empty($editLock) && $updating)
+    {{-- قفلُ التحريرِ اللّيّن (DI-09): تنبيهٌ لا منع — `_version` يصون التعديلَ عند الحفظ --}}
+    <div class="card" data-edit-lock role="status" style="border-inline-start:4px solid var(--wn, #d98a00)">
+        <b>✋ {{ $editLock }}</b>
+    </div>
+@endif
 @if (! empty($suggest) && $updating)
     @php $sfields = collect($def['fields'] ?? [])->keyBy('key'); @endphp
     <div class="card" data-edit-suggest style="border-inline-start:4px solid var(--acc, #2a7ae2)">
