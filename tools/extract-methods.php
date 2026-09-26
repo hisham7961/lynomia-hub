@@ -13,8 +13,12 @@
  *
  * **شرطُ الانغلاق:** كلُّ `$this->x(` في طريقةٍ منقولة يجب أن يكون `x` منقولاً أيضاً — وإلّا توقّفت
  * الأداةُ ولم تكتب شيئاً. فالطرائقُ المنقولةُ لا تعتمد على حالةِ المتحكّم، وتصير ساكنةً بلا تغيير سلوك.
- * **والتعدّدُ الشكليّ محفوظ؟** يُتحقَّق يدويّاً قبل التشغيل أنّ لا صنفاً وارثاً يعيد تعريفَ طريقةٍ منقولة
- * (وإلّا صار نداءُ `self::` يتجاوز إعادةَ التعريف).
+ * **والتعدّدُ الشكليّ محفوظٌ آليّاً:** يُمسح كلُّ ورثةِ المتحكّم تحت `app/` — فإن أعاد وارثٌ تعريفَ طريقةٍ
+ * تناديها طريقةٌ منقولةٌ أخرى (`$this->x()` صار `\Service::x()` فيتجاوز إعادةَ التعريف) توقّفت الأداة.
+ * (وإعادةُ تعريفِ طريقةٍ منقولةٍ لا يناديها منقولٌ آخر سليمة: المفوِّضُ باقٍ و`parent::` يصله.)
+ * **ولا حالةَ صنفٍ ضمنيّة:** `self::class` · `static::class` · `new self/static` · `self::$prop` ·
+ * `instanceof self` في النصّ المنقول تُوقف الأداة (معناها يتغيّر في الخدمة)؛ وثابتٌ غيرُ منقولٍ تقرؤه
+ * طريقةٌ منقولة يجب أن يكون **عامّاً** (الخدمةُ تقرؤه من الخارج) و`static::CONST` لا يعيد وارثٌ تعريفَه.
  *
  * لكلِّ طريقة: نصُّها وتوثيقُها حرفيّاً إلى الخدمة (`public static`)، و`$this->x(` ⇒ `\Service::x(`،
  * و`self::CONST` المنقول ⇒ `\Service::CONST`؛ وفي المتحكّم مفوِّضٌ بالتوقيعِ والظهورِ نفسَيهما.
@@ -35,6 +39,64 @@ $rc = new ReflectionClass($cls);
 $path = $rc->getFileName();
 $lines = file($path);
 $src = implode('', $lines);
+
+// ورثةُ المتحكّم تحت app/ — لا تُفترض قائمتُهم يدويّاً
+$heirs = [];
+foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root . '/app', FilesystemIterator::SKIP_DOTS)) as $f) {
+    if (! str_ends_with((string) $f, '.php')) continue;
+    $code = (string) file_get_contents((string) $f);
+    if (! preg_match('/^namespace\s+([^;]+);/m', $code, $nsm) || ! preg_match('/^(?:final\s+|abstract\s+)?class\s+(\w+)/m', $code, $cm)) continue;
+    $fq = $nsm[1] . '\\' . $cm[1];
+    if (class_exists($fq) && is_subclass_of($fq, $cls)) $heirs[] = $fq;
+}
+sort($heirs);
+
+/**
+ * `self::K`/`static::K` في نصٍّ منقول ⇒ `\Service::K` إن انتقل الثابت، وإلّا `\Controller::K` بشرط أن
+ * يكون عامّاً ولا يعيد وارثٌ تعريفَه تحت `static::`. و`parent::` أيّاً كان يوقف الأداة (لا أبَ للخدمة).
+ */
+function rewriteSelf(string $text, string $who, array $constOwner, string $cls, array $heirs): string
+{
+    if (preg_match('/\bparent::|\b(?:self|static)::(?:class\b|\$)|\bnew\s+(?:self|static)\b|\binstanceof\s+(?:self|static)\b/', $text, $bad)) {
+        fwrite(STDERR, "✗ {$who} تستعمل «{$bad[0]}» — معناها يتغيّر في الخدمة\n"); exit(1);
+    }
+
+    return preg_replace_callback('/\b(self|static)::([A-Za-z_]\w*)\b(?!\s*\()/', function ($x) use ($constOwner, $cls, $heirs, $who) {
+        [$all, $kw, $k] = $x;
+        if (isset($constOwner[$k])) return '\\' . $constOwner[$k] . '::' . $k;
+        if (! (new ReflectionClass($cls))->hasConstant($k)) { fwrite(STDERR, "✗ {$who}: «{$all}» ليس ثابتاً في المتحكّم\n"); exit(1); }
+        if (! (new ReflectionClassConstant($cls, $k))->isPublic()) {
+            fwrite(STDERR, "✗ {$who} تقرأ «{$all}» غيرَ العامّ — انقله مع الطريقة (consts) أو أبقِها\n"); exit(1);
+        }
+        if ($kw === 'static') {
+            foreach ($heirs as $h) {
+                if ((new ReflectionClassConstant($h, $k))->class === $h) { fwrite(STDERR, "✗ {$who}: {$h} يعيد تعريفَ {$k} و«static::» يربط متأخّراً\n"); exit(1); }
+            }
+        }
+
+        return '\\' . $cls . '::' . $k;
+    }, $text);
+}
+
+/** وسائطُ التوقيع بأسمائها — والمتغيّرُ العدد (`T_ELLIPSIS` لا نصُّ «...» الذي قد يكون قيمةً افتراضيّة) مبسوط */
+function argList(string $params): string
+{
+    $args = [];
+    $variadic = false;
+    foreach (PhpToken::tokenize('<?php function x(' . $params . '){}') as $t) {
+        if ($t->id === T_VARIABLE) $args[] = $t->text;
+        if ($t->id === T_ELLIPSIS) $variadic = true;
+    }
+    $list = implode(', ', $args);
+
+    return $variadic ? (string) preg_replace('/(\$\w+)$/', '...$1', $list) : $list;
+}
+
+// كلُّ خدمةٍ هدف: اسمُ صنفٍ صحيحٌ تحت App\ وملفُّها غيرُ موجود — يُفحص **قبل أيّ كتابة** فلا نصفَ نقل
+foreach (array_unique([...array_keys($plan['targets']), ...array_values($plan['consts'] ?? [])]) as $svc) {
+    if (! preg_match('/^App(\\\\[A-Z]\w*)+$/', $svc)) { fwrite(STDERR, "✗ اسمُ خدمةٍ غيرُ صالح: {$svc}\n"); exit(1); }
+    if (is_file($root . '/app/' . str_replace('\\', '/', substr($svc, 4)) . '.php')) { fwrite(STDERR, "✗ موجود: {$svc}\n"); exit(1); }
+}
 
 $owner = [];   // method => service fqcn
 foreach ($plan['targets'] as $svc => $methods) {
@@ -76,11 +138,18 @@ foreach ($owner as $name => $svc) {
         if (! isset($owner[$c])) { fwrite(STDERR, "✗ {$name} تنادي \$this->{$c} غيرَ المنقولة — العنقودُ غيرُ منغلق\n"); exit(1); }
     }
     if (preg_match('/\$this(?!->\w+\s*\()/', $text)) { fwrite(STDERR, "✗ {$name} تستعمل \$this لغير نداء طريقة\n"); exit(1); }
+    // وارثٌ يعيد تعريفَ طريقةٍ تناديها هذه الطريقة ⇒ النداءُ الساكنُ يتجاوزه
+    foreach (array_unique($calls[1]) as $c) {
+        if ($c === $name) continue;
+        foreach ($heirs as $h) {
+            if ((new ReflectionMethod($h, $c))->class === $h) {
+                fwrite(STDERR, "✗ {$name} تنادي {$c} و{$h} يعيد تعريفَها — النقلُ يتجاوز إعادةَ التعريف\n"); exit(1);
+            }
+        }
+    }
 
     $body = preg_replace_callback('/\$this->(\w+)\s*\(/', fn ($x) => '\\' . $owner[$x[1]] . '::' . $x[1] . '(', $text);
-    $body = preg_replace_callback('/\b(self|static)::([A-Z][A-Z0-9_]*)\b/', function ($x) use ($constOwner, $cls) {
-        return isset($constOwner[$x[2]]) ? '\\' . $constOwner[$x[2]] . '::' . $x[2] : '\\' . $cls . '::' . $x[2];
-    }, $body);
+    $body = rewriteSelf($body, $name, $constOwner, $cls, $heirs);
     if (preg_match('/\b(self|static|parent)::\w+\s*\(/', $body)) { fwrite(STDERR, "✗ {$name} تنادي self/static/parent::طريقة\n"); exit(1); }
     $body = preg_replace('/^(\s*)(?:public|protected|private)\s+function\s+/m', '$1public static function ', $body, 1);
     $services[$svc]['methods'][] = $doc . $body;
@@ -96,12 +165,7 @@ foreach ($owner as $name => $svc) {
     }
     $params = $sig[1];
     $ret = isset($sig[2]) ? rtrim($sig[2]) : '';
-    $args = [];
-    foreach (PhpToken::tokenize('<?php function x(' . $params . '){}') as $t) {
-        if ($t->id === T_VARIABLE) $args[] = $t->text;
-    }
-    $argList = implode(', ', $args);
-    if (str_contains($params, '...')) $argList = preg_replace('/(\$\w+)$/', '...$1', $argList);
+    $argList = argList($params);
     $vis = $m->isPublic() ? 'public' : ($m->isProtected() ? 'protected' : 'private');
     $void = trim(ltrim($ret, ':')) === 'void';
     $short = substr($svc, strrpos($svc, '\\') + 1);
@@ -122,6 +186,11 @@ foreach ($constOwner as $const => $svc) {
     $k = $startLine;
     while (! preg_match('/;\s*(\/\/.*)?$/', rtrim($lines[$k]))) $k++;
     $constText = implode('', array_slice($lines, $startLine, $k - $startLine + 1));
+    // نصُّ الثابت يمرّ بما تمرّ به الطرائق: self:: يُعاد حلُّه، والأسماءُ المستوردةُ تُستورد في الخدمة
+    $constText = rewriteSelf($constText, $const, $constOwner, $cls, $heirs);
+    foreach ($imports as $alias => $fq) {
+        if (preg_match('/(?<![\\\\\w$])' . preg_quote($alias, '/') . '(?!\w)/', $constText)) $services[$svc]['uses'][$fq] = true;
+    }
     $services[$svc]['consts'][] = preg_replace('/^(\s*)(?:(?:public|protected|private)\s+)?const/', '$1public const', $constText, 1);
     $edits[] = [$startLine, $k, "    {$vis} const {$const} = \\{$svc}::{$const};   // انتقل (docs/REORG_PLAN.md §R6)\n"];
 }

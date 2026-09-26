@@ -7,7 +7,9 @@ use Illuminate\Http\Request;
 
 /**
  * طرائقُ نُقلت من `ModuleController` بلا تغيير (docs/REORG_PLAN.md §R6) — والمتحكّمُ يفوّض
- * إليها بالتوقيعِ والظهورِ نفسَيهما، فالورثةُ (`V1Controller` · `ApprovalDecisionController` · `MobileWorkController`) لا يتغيّرون.
+ * إليها بالتوقيعِ والظهورِ نفسَيهما، فالورثةُ العشرة (`V1Controller` ومتحكّماتُ الجوال الثمانية تحته · `ApprovalDecisionController`)
+ * لا يتغيّرون؛ وإعادةُ `MobileResourceController` تعريفَ `buildQuery` نافذةٌ كما كانت — لا طريقةَ منقولةً
+ * أخرى تناديها، والمفوِّضُ يصله `parent::buildQuery`.
  */
 final class ModuleTenancy
 {

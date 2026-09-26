@@ -13,7 +13,7 @@
 |---|---|
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | خريطةُ المعمارية: المجلّدات والنطاقات، الطبقات، مسارُ الطلب، الأمن، العملُ الخلفيّ، **وأين تضيف ماذا** |
 | [`../CLAUDE.md`](../CLAUDE.md) | اصطلاحاتُ العمل: رفعُ النسخة، المحرّكان، ترتيبُ الصفوف، الإضافةُ لا الكسر |
-| [`TECH_DEBT.md`](TECH_DEBT.md) | سجلُّ الدَّين التقنيّ بأدلّته وسقوفه (`TechDebtCeilingTest` · `TechDebtTruthTest` تقرؤه) |
+| [`TECH_DEBT.md`](TECH_DEBT.md) | سجلُّ الدَّين التقنيّ بأدلّته (`TechDebtTruthTest` · `ControlPlaneDocsTest` تقرآنه؛ وسقوفُه مفروضةٌ شيفرةً في `TechDebtCeilingTest`) |
 | [`REORG_PLAN.md`](REORG_PLAN.md) | خطّةُ إعادة التنظيم R0–R7 وما نُفّذ منها وما لم يُنفَّذ وسببُه |
 | [`architecture-decisions.md`](architecture-decisions.md) | سجلُّ القرارات المعمارية (المشكلة · الخيارات · المختار · السبب) |
 

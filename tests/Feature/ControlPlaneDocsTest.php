@@ -191,7 +191,11 @@ class ControlPlaneDocsTest extends TestCase
         }
     }
 
-    /** حلُّ اسمِ صنفٍ مجرّد عبر فضاءات أسماء المستودع */
+    /**
+     * حلُّ اسمِ صنفٍ مجرّد عبر فضاءات أسماء المستودع — ومعها **كلُّ نطاقٍ تحت `app/Support`**
+     * مكتشَفاً من المجلّدات (R2 نقل الأصنافَ المسطّحة إلى نطاقاتها: `Health` صار `Ops\Health`).
+     * والاسمُ الذي يطابق صنفين يُرفض لا يُحزَر — فلا يمرّ عضوٌ لأنّه وُجد في الصنفِ الخطأ.
+     */
     private function resolve(string $short): ?string
     {
         if (class_exists($short)) return $short;
@@ -199,6 +203,27 @@ class ControlPlaneDocsTest extends TestCase
             if (class_exists($ns . $short)) return $ns . $short;
         }
 
-        return null;
+        $hits = [];
+        foreach ($this->supportNamespaces() as $ns) {
+            if (class_exists($ns . $short)) $hits[] = $ns . $short;
+        }
+
+        return count($hits) === 1 ? $hits[0] : null;
+    }
+
+    /** @return string[] فضاءاتُ `App\Support\<النطاق>\…` كلُّها، مرتّبة */
+    private function supportNamespaces(): array
+    {
+        $out = [];
+        $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(app_path('Support'),
+            \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::SELF_FIRST);
+        foreach ($it as $f) {
+            if (! $f->isDir()) continue;
+            $rel = substr($f->getPathname(), strlen(app_path('Support')) + 1);
+            $out[] = 'App\\Support\\' . str_replace('/', '\\', $rel) . '\\';
+        }
+        sort($out);
+
+        return $out;
     }
 }

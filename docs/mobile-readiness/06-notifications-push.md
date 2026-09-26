@@ -39,7 +39,7 @@
 
 ```php
 static::created(function (self $n) {
-    \App\Support\PushService::scheduleFanout($n);
+    \App\Support\Mobile\PushService::scheduleFanout($n);
 });
 ```
 

@@ -116,10 +116,11 @@ foreach ($plan as $fn => $target) {
 
     // الوسائطُ بأسمائها وبترتيبها — والمتغيّرةُ العدد تُمرَّر مبسوطة
     $args = [];
+    $variadic = false;   // بالرمز (T_ELLIPSIS) لا بنصّ «...» — قيمةٌ افتراضيّةٌ '...' ليست بسطاً
     foreach (PhpToken::tokenize('<?php function x(' . $params . '){}') as $i => $t) {
         if ($t->id === T_VARIABLE) $args[] = $t->text;
+        if ($t->id === T_ELLIPSIS) $variadic = true;
     }
-    $variadic = str_contains($params, '...');
     $argList = implode(', ', $args);
     if ($variadic) $argList = preg_replace('/(\$\w+)$/', '...$1', $argList);
 
