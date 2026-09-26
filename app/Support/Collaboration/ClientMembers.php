@@ -98,7 +98,7 @@ class ClientMembers
     public static function upsertMembership(string $clientId, string $userId, string $role, User $inviter): ClientMembership
     {
         $m = ClientMembership::withTrashed()
-            ->where('client_id', $clientId)->where('user_id', $userId)->first();
+            ->where('client_id', $clientId)->where('user_id', $userId)->orderBy('id')->first();
 
         if ($m) {
             if ($m->trashed()) {

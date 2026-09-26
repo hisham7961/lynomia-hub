@@ -600,7 +600,7 @@ class ConversationController extends Controller
         ], [], ['user_id' => 'المستخدم', 'role' => 'الدور']);
 
         $m = ConversationMember::where('conversation_id', $conv->id)
-            ->where('user_id', $data['user_id'])->first();
+            ->where('user_id', $data['user_id'])->orderBy('id')->first();
         abort_unless($m, 404, 'العضوُ غيرُ موجودٍ في القناة');
 
         $newRole = $data['role'];
@@ -636,7 +636,7 @@ class ConversationController extends Controller
         $data = $r->validate(['user_id' => ['required', 'string']], [], ['user_id' => 'المستخدم']);
 
         $m = ConversationMember::where('conversation_id', $conv->id)
-            ->where('user_id', $data['user_id'])->first();
+            ->where('user_id', $data['user_id'])->orderBy('id')->first();
         abort_unless($m, 404, 'العضوُ غيرُ موجودٍ في القناة');
 
         // المشرفُ لا يزيل مالكاً/مشرفاً آخر — الإزالةُ لمن دونه رتبةً (المالكُ يزيل الكلّ)

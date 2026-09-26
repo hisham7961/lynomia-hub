@@ -175,7 +175,7 @@ class PasskeyController extends Controller
         abort_if($challenge === '', 422, 'انتهت الجلسة — أعد المحاولة');
 
         $d = $r->validate(['id' => 'required|string|max:512']);
-        $cred = WebauthnCredential::where('credential_id', $d['id'])->first();
+        $cred = WebauthnCredential::where('credential_id', $d['id'])->orderBy('id')->first();
         if (! $cred) return response()->json(['ok' => false, 'error' => 'مفتاحٌ غير معروف'], 422);
 
         $u = User::find($cred->user_id);
@@ -232,7 +232,7 @@ class PasskeyController extends Controller
             'signature' => 'required|string',
         ]);
 
-        $cred = WebauthnCredential::where('credential_id', $d['id'])->where('user_id', $userId)->first();
+        $cred = WebauthnCredential::where('credential_id', $d['id'])->where('user_id', $userId)->orderBy('id')->first();
         if (! $cred) return response()->json(['ok' => false, 'error' => 'مفتاحٌ غير معروف لهذا الحساب'], 422);
 
         try {

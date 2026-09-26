@@ -569,7 +569,7 @@ class AlertEngine
         // عرضُ العمود ٣٠٠ — القصُّ عند الكاتب (critic #36): SQLite تبتر صامتةً وMySQL ترمي
         $title = mb_substr((string) $f['title'], 0, 300);
 
-        $row = DB::table('alert_instances')->where('dedup_key', $key)->first();
+        $row = DB::table('alert_instances')->where('dedup_key', $key)->orderBy('id')->first();
         $isNew = ! $row;
         $reopened = $row && $row->status === 'resolved';
 

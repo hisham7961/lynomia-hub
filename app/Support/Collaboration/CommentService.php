@@ -289,7 +289,7 @@ class CommentService
         if (! $convId) return false;
 
         $m = \App\Models\ConversationMember::where('conversation_id', $convId)
-            ->where('user_id', $uid)->first();
+            ->where('user_id', $uid)->orderBy('id')->first();
         if (! $m) return false;
 
         $pref = $m->effectiveNotifyPref();

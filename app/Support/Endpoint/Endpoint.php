@@ -83,7 +83,7 @@ final class Endpoint
         $status = \App\Support\Assets\Custody::canonicalStatus($asset->status);
         if ($status === null || ! in_array($status, self::ASSET_TERMINAL_STATUSES, true)) return;
 
-        $device = \App\Models\EndpointDevice::where('asset_id', $asset->id)->where('status', 'active')->first();
+        $device = \App\Models\EndpointDevice::where('asset_id', $asset->id)->where('status', 'active')->orderBy('id')->first();
         if ($device === null) return;
 
         $device->forceFill(['status' => 'suspended'])->saveQuietly();   // ناعمٌ — لا حدثَ يُعاد كتابتُه

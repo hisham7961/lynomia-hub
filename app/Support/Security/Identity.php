@@ -231,7 +231,7 @@ class Identity
 
         $norm = self::norm('gtin', (string) ($data['barcode'] ?? ''));
         if ($norm !== '') {
-            $hit = RecordIdentifier::where('module', 'products')->where('norm', $norm)->first();
+            $hit = RecordIdentifier::where('module', 'products')->where('norm', $norm)->orderBy('created_at')->orderBy('id')->first();
             if ($hit) $out->push(['why' => 'الباركود نفسه', 'id' => $hit->record_id]);
         }
 

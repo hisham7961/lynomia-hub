@@ -31,7 +31,7 @@ class HubRolesWidenCoreWork extends Command
         $touched = 0;
 
         foreach ((array) $this->argument('role') as $name) {
-            $role = Role::where('name', $name)->first();
+            $role = Role::where('name', $name)->orderBy('created_at')->orderBy('id')->first();
             if (! $role) { $this->error("لا دورَ باسم «{$name}»"); continue; }
             if ($role->is_owner) { $this->warn("«{$name}» دورُ مالكٍ — يتجاوز أصلاً، لا شيءَ يُمنَح"); continue; }
 

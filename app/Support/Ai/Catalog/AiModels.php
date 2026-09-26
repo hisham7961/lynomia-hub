@@ -228,7 +228,7 @@ final class AiModels
          * **والمسحُ يشمل المحذوفَ** — فالفهرسُ الفريدُ يشمله، وفحصٌ أعمى عنه
          * يُمرِّر الاسمَ ثمّ يسقط الإدراجُ بخرقِ قيدٍ بعد أن يكون النشرُ قد وقع.
          */
-        $held = AiModel::withTrashed()->where('litellm_model_name', $hubName)->first();
+        $held = AiModel::withTrashed()->where('litellm_model_name', $hubName)->orderBy('id')->first();
 
         if ($held !== null && ! self::reclaimable($held, $provider, $upstream)) {
             return self::fail($held->trashed()
@@ -312,7 +312,7 @@ final class AiModels
          * (`reclaim`). وبغيرِ هذا الاستثناءِ يُولَد للنموذجِ الواحدِ اسمٌ
          * جديدٌ في كلِّ حذفٍ وتبنٍّ — فتضيع الحتميّةُ التي بُني عليها المولِّد.
          */
-        $clash = AiModel::withTrashed()->where('litellm_model_name', $base)->first();
+        $clash = AiModel::withTrashed()->where('litellm_model_name', $base)->orderBy('id')->first();
 
         if ($clash === null) return $base;
 
@@ -606,7 +606,7 @@ final class AiModels
      */
     private static function put(AiProvider $provider, string $alias, string $upstream, array $attrs): ?AiModel
     {
-        $held = AiModel::withTrashed()->where('litellm_model_name', $alias)->first();
+        $held = AiModel::withTrashed()->where('litellm_model_name', $alias)->orderBy('id')->first();
 
         if ($held === null) return AiModel::create($attrs);
 

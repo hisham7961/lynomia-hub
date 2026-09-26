@@ -415,7 +415,7 @@ class V1Controller extends ModuleController
                 return true;
             } catch (\Illuminate\Database\QueryException $e) {
                 $row = \Illuminate\Support\Facades\DB::table('idempotency_keys')
-                    ->where('token_id', $tokenId)->where('ikey', $ikey)->first();
+                    ->where('token_id', $tokenId)->where('ikey', $ikey)->orderBy('id')->first();
                 if (! $row) continue;                             // حُذف تحتنا (تنظيف) — أعد المحاولة
 
                 // مفتاحٌ أُعيد بطلبٍ مختلف (مسار/جسم): لا نعيد ردَّ الأول (بيانات وحدةٍ

@@ -1025,7 +1025,7 @@ class EsignController extends Controller
             RateLimiter::hit($key, 60);
             // v2.117: الموقعة فقط — الرد على رموز المسودات كان يكشف وجودها وعناوينها
             // لمن يجرب الرموز (الغرض أصالة نسخةٍ بيدك، والمسودة لا نسخة معتمدة لها)
-            $found = SignRequest::where('verify_code', $code)->where('status', 'وُقّع')->first();
+            $found = SignRequest::where('verify_code', $code)->where('status', 'وُقّع')->orderBy('id')->first();
         }
 
         return view('sign.verify', [
@@ -1057,7 +1057,7 @@ class EsignController extends Controller
         abort_if(RateLimiter::tooManyAttempts($key, 20), 429, 'محاولاتٌ كثيرة — انتظر دقيقة ثم أعد المسح');
         RateLimiter::hit($key, 60);
 
-        $req = SignRequest::where('verify_code', $code)->where('status', 'وُقّع')->first();
+        $req = SignRequest::where('verify_code', $code)->where('status', 'وُقّع')->orderBy('id')->first();
         abort_if(! $req, 404, 'لا وثيقة موقّعة بهذا الرمز');
 
         // لا نكتب في سجل الأدلة القانوني (append-only) على فتحٍ عامٍّ مجهول — كان

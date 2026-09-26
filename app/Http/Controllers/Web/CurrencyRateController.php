@@ -74,7 +74,7 @@ class CurrencyRateController extends Controller
         $key = ['from_cur' => trim($d['from_cur']), 'to_cur' => trim($d['to_cur']), 'as_of' => $asOf];
 
         // **تصحيحُ السعرِ تحديثٌ لا صفٌّ ثانٍ يتنازعه** (القيدُ الفريدُ يحرسه)
-        $exists = DB::table('currency_rates')->where($key)->whereNull('deleted_at')->first();
+        $exists = DB::table('currency_rates')->where($key)->whereNull('deleted_at')->orderBy('id')->first();
         if ($exists) {
             DB::table('currency_rates')->where('id', $exists->id)->update([
                 'rate' => $d['rate'], 'note' => $d['note'] ?? null,

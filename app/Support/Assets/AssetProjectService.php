@@ -72,7 +72,7 @@ class AssetProjectService
                 // نعيد قراءةَ النشطِ ونُعيده (idempotent) بدل إفشالِ الطلب.
                 if ((string) $e->getCode() === '23000') {
                     $row = AssetProjectAssignment::where('asset_id', $asset->getKey())
-                        ->where('project_id', $project->getKey())->whereNull('ended_at')->first();
+                        ->where('project_id', $project->getKey())->whereNull('ended_at')->orderBy('id')->first();
                     if ($row) return $row;
                 }
                 throw $e;

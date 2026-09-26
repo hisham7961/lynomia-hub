@@ -35,7 +35,7 @@ class SavedController extends Controller
 
         $existing = SavedMessage::where('user_id', $me->id)
             ->where('target_type', $data['target_type'])
-            ->where('target_id', $data['target_id'])->first();
+            ->where('target_id', $data['target_id'])->orderBy('id')->first();
 
         if ($existing) {
             $existing->delete();

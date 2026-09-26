@@ -30,7 +30,7 @@ class HubDigest extends Command
             }
         }
         $owner = User::whereNull('deleted_at')->where('status', 'نشط')
-            ->whereHas('role', fn ($q) => $q->where('is_owner', true))->first();
+            ->whereHas('role', fn ($q) => $q->where('is_owner', true))->orderBy('created_at')->orderBy('id')->first();
         if (! $owner) {
             $this->warn('لا مالك نشط — لا تقرير');
             return self::SUCCESS;

@@ -124,7 +124,7 @@ final class AiBudgets
              * سبقه بميلي‑ثانية.
              */
             $row = AiBudgetPeriod::query()
-                ->where('budget_id', (string) $b->id)->where('period_key', $key)->first();
+                ->where('budget_id', (string) $b->id)->where('period_key', $key)->orderBy('id')->first();
 
             if ($row === null) throw $e;
 

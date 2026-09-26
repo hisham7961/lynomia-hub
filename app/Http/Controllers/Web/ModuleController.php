@@ -1064,7 +1064,7 @@ class ModuleController extends Controller
     {
         $u = auth()->user();
         if (! $u || hub_is_owner($u) || ! method_exists($row, 'versions')) return null;
-        $v = $row->versions()->where('version', $version)->first();
+        $v = $row->versions()->where('version', $version)->orderBy('id')->first();
         if (! $v) return null;
         $snap = (array) $v->snapshot;
         $checks = [

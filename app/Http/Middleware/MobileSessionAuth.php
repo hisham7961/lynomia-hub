@@ -40,7 +40,7 @@ class MobileSessionAuth
         }
 
         // مطابقةُ التجزئة (نمطُ ApiAuth:25) — sha256 hex حصراً، لا نصَّ صريحاً في القاعدة
-        $session = MobileSession::where('access_hash', hash('sha256', $plain))->first();
+        $session = MobileSession::where('access_hash', hash('sha256', $plain))->orderBy('id')->first();
         if (! $session || ! $session->access_expires_at || now()->gt($session->access_expires_at)) {
             SecurityRadar::record($request, 'وصول مرفوض', $session ? 'رمزُ وصولِ جوالٍ منتهٍ' : 'رمزُ وصولِ جوالٍ غير صالح');
 
@@ -56,7 +56,7 @@ class MobileSessionAuth
 
         // **حراسُ الحساب الخمسة يسريان على الجوال كما على API/الويب** (ApiAuth:43-63) —
         // البوّابةُ الخامسةُ التي تفرضها، فلا تسريبَ لحسابٍ موقوفٍ/منتهٍ/مقفولٍ/محصورٍ عبر الجوال
-        $user = $session->user()->whereNull('deleted_at')->first();
+        $user = $session->user()->whereNull('deleted_at')->orderBy('id')->first();
         // AUTH-3: الحكمُ الموحّد `isSuspended()` لا مقارنةُ حالةٍ حرفيّة — بابٌ موازٍ لا ينقض F31
         if (! $user || $user->isSuspended() || ($user->locked_until && now()->lt($user->locked_until))) {
             return Api::error(Api::ACCOUNT_RESTRICTED, 403, 'الحساب موقوف أو مقفل', ['reason' => 'account_suspended_or_locked']);

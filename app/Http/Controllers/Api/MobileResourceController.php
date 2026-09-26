@@ -500,7 +500,7 @@ class MobileResourceController extends V1Controller
 
         try {
             $row = \Illuminate\Support\Facades\DB::table('idempotency_keys')
-                ->where('token_id', $tokenId)->where('ikey', $ikey)->first();
+                ->where('token_id', $tokenId)->where('ikey', $ikey)->orderBy('id')->first();
         } catch (\Throwable $e) {
             return null;   // خطأُ قراءةٍ عابر: يمرّ للمسار العاديّ (idempotentBegin يحسمه)
         }

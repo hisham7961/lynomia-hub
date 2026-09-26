@@ -71,7 +71,7 @@ trait HasVersions
      */
     public function restoreVersion(int $version, $user = null): bool
     {
-        $v = $this->versions()->where('version', $version)->first();
+        $v = $this->versions()->where('version', $version)->orderBy('id')->first();
         if (! $v) return false;
 
         $data = collect($v->snapshot)->except(['id', 'version', 'created_at', 'updated_at', 'deleted_at']);

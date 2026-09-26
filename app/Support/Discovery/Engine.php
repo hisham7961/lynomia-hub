@@ -52,7 +52,7 @@ class Engine
 
         // ── الكاش: إجابةٌ حديثة تُعاد كما هي — والعدّاد يشهد كم وفّرت ──
         $days = max(1, (int) setting('identity.cache_days', 30));
-        $hit = IdentityLookup::where('norm', $norm)->first();
+        $hit = IdentityLookup::where('norm', $norm)->orderBy('id')->first();
         if ($hit && $hit->checked_at && $hit->checked_at->gt(now()->subDays($days))) {
             $hit->increment('hits');
 

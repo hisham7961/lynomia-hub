@@ -40,7 +40,7 @@ class ApiAuth
                 'هذا المفتاح مقيد بعناوين IP محددة وعنوانك ليس منها', ['reason' => 'token_ip_allowlist']);
         }
 
-        $user = $token->user()->whereNull('deleted_at')->first();
+        $user = $token->user()->whereNull('deleted_at')->orderBy('id')->first();
         if (! $user || $user->isSuspended() || ($user->locked_until && now()->lt($user->locked_until))) {   // AUTH-3
             return Api::error(Api::ACCOUNT_RESTRICTED, 403, 'الحساب موقوف أو مقفل', ['reason' => 'account_suspended_or_locked']);
         }

@@ -51,7 +51,7 @@ class Devices
         $hash = hash('sha256', $raw);
 
         $dev = UserDevice::withTrashed()
-            ->where('user_id', $user->id)->where('cookie_hash', $hash)->first();
+            ->where('user_id', $user->id)->where('cookie_hash', $hash)->orderBy('id')->first();
 
         [$label, $platform] = self::describe((string) $r->userAgent());
 

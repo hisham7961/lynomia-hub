@@ -68,7 +68,7 @@ class FileController extends Controller
          * بعينها — وسقط بفارقِ مُنشئِ استعلامٍ على بُعدِ ستّةِ أسطر.)
          */
         if ($att = \App\Models\Attachment::withTrashed()
-            ->where(fn ($w) => $w->where('path', $path)->orWhere('thumb_path', $path))->first()) {
+            ->where(fn ($w) => $w->where('path', $path)->orWhere('thumb_path', $path))->orderBy('created_at')->orderBy('id')->first()) {
             \App\Support\Documents\DocumentPolicy::authorize(auth()->user(), $att,
                 $r->boolean('dl') ? 'download' : 'preview');
         }
@@ -257,7 +257,7 @@ class FileController extends Controller
 
             $row = DB::table($table)->where(function ($w) use ($cols, $path) {
                 foreach (array_keys($cols) as $c) $w->orWhere($c, $path);
-            })->first();
+            })->orderBy('id')->first();
             if (! $row) continue;
 
             // أيُّ عمودٍ منها يحمل هذا الملف؟ (السجل قد يحمل ملفين)
