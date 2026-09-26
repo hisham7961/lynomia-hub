@@ -77,21 +77,22 @@ class AiCenterSectionsTest extends TestCase
      * **والنسخةُ الثانيةُ هنا هي الشاهد**، وأيُّ انحرافٍ بينهما يُسقط الحزمة.
      *
      * وسبعةٌ صارت تسعةً في المرحلة ٤ (السياساتُ والميزانيّات) — **إضافةٌ
-     * مُعلَنةٌ في الحارسِ لا تمريرٌ بتوسيعِ عدّاد**.
+     * مُعلَنةٌ في الحارسِ لا تمريرٌ بتوسيعِ عدّاد**. وتسعةٌ صارت عشرةً بالمدقّق
+     * (v2.603.0 · دقّةُ كواشفه — أعدادٌ لا محتوى، لقارئِ المركز).
      */
     private static function routes(): array
     {
         return ['ai.index', 'ai.providers.index', 'ai.models.all',
                 'ai.profiles.index', 'ai.policies.index', 'ai.budgets.index',
-                'ai.usage', 'ai.settings', 'ai.diagnostics'];
+                'ai.usage', 'ai.settings', 'ai.diagnostics', 'ai.auditor'];
     }
 
     // ═══ ① الرايةُ الجديدةُ: يقرأ ولا يكتب ═══
 
-    public function test_الأقسامُ_تسعةٌ_ولا_عاشرَ(): void
+    public function test_الأقسامُ_عشرةٌ_ولا_حاديَ_عشر(): void
     {
-        $this->assertCount(9, AiAccess::sections($this->owner),
-            '**عددُ الأقسامِ انحرف** — تسعةٌ لا أكثرَ ولا أقلّ');
+        $this->assertCount(10, AiAccess::sections($this->owner),
+            '**عددُ الأقسامِ انحرف** — عشرةٌ لا أكثرَ ولا أقلّ');
         $this->assertSame(self::routes(),
             array_column(AiAccess::sections($this->owner), 'route'));
     }
@@ -101,7 +102,7 @@ class AiCenterSectionsTest extends TestCase
         $u = $this->actor(['aiView' => 1]);
 
         foreach (['ai.index', 'ai.providers.index', 'ai.models.all',
-                  'ai.profiles.index', 'ai.diagnostics'] as $r) {
+                  'ai.profiles.index', 'ai.diagnostics', 'ai.auditor'] as $r) {
             $this->actingAs($u)->get(route($r))->assertOk();
         }
     }

@@ -125,7 +125,10 @@ class ReportsController extends Controller
                 ->whereDate('work_date', $date)->orderBy('submitted_at')->orderBy('id')->get()
             : collect();
 
-        return view('reports.day', compact('emp', 'date', 'c', 'entries'));
+        // ملاحظاتُ المدقّق على بنود اليوم — لمن يراجعها وحدَه، بالشروطِ الخمسةِ نفسِها (§٣.٤)
+        $auditNotes = \App\Support\Ai\Auditor\AuditorSignals::notesFor(auth()->user(), $entries);
+
+        return view('reports.day', compact('emp', 'date', 'c', 'entries', 'auditNotes'));
     }
 
     /* ═══════════ §31 مركزُ المراجعة — طابورُ التقارير ═══════════ */
@@ -270,6 +273,13 @@ class ReportsController extends Controller
 
         $action = (string) $r->input('action');
         $feedback = trim((string) $r->input('feedback', ''));
+
+        // **مسودةُ المدقّق لا تركب القبول** (قرارُ المالك §٣.٦): «قبول» بنصِّ مسودةٍ مفتوحةٍ حرفيّاً
+        // لا يرسلها إلى الموظّف — المسودةُ تصله بـ«طلب تنقيح» وحده، بعد أن يختارها المراجعُ عمداً
+        if ($action === 'accept' && $feedback !== ''
+            && in_array($feedback, \App\Support\Ai\Auditor\AuditorSignals::draftNotes($w), true)) {
+            $feedback = '';
+        }
 
         match ($action) {
             'accept' => ReportReview::accept($w, auth()->user(), $feedback ?: null),

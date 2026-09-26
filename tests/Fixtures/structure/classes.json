@@ -60,6 +60,7 @@
     "App\\Http\\Controllers\\Web\\AckController",
     "App\\Http\\Controllers\\Web\\ActivationController",
     "App\\Http\\Controllers\\Web\\ActivityController",
+    "App\\Http\\Controllers\\Web\\AiAuditorController",
     "App\\Http\\Controllers\\Web\\AiCenterController",
     "App\\Http\\Controllers\\Web\\AiGovernanceController",
     "App\\Http\\Controllers\\Web\\AiModelController",

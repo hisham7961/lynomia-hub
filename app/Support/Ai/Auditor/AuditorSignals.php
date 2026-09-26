@@ -3,6 +3,7 @@
 namespace App\Support\Ai\Auditor;
 
 use App\Models\AiFinding;
+use App\Models\SignalState;
 use App\Models\User;
 use App\Models\WorkUpdate;
 use App\Support\ReportReview;
@@ -67,6 +68,85 @@ final class AuditorSignals
             . hub_data_stamp(['ai_findings', 'roles', 'users', 'work_updates', 'tasks', 'decisions', 'meetings']);
 
         return hub_cached($key, self::TTL, $fresh, fn () => self::compute($u, $projectId));
+    }
+
+    /**
+     * **ملاحظاتُ المدقّق على تقاريرَ بعينها — لشاشةِ المراجعة** (§٣.٤ · A3).
+     *
+     * لكلِّ تقريرٍ: ما يراه هذا المراجعُ من نتائجَ مفتوحةٍ موضوعُها التقرير (بالشروطِ الخمسةِ
+     * نفسِها)، ومسودةُ ملاحظةٍ للموظّف إن كانت. **والمسودةُ لا تصل الموظّفَ بذاتها** — تُعبّأ في
+     * حقلِ ملاحظةِ المراجعة، والمراجعُ يحرّرها ويرسلها بـ«طلب تنقيح» أو يتركها.
+     *
+     * @param  iterable<\App\Models\WorkUpdate>  $reports
+     * @return array<string, list<array{summary: string, label: string, ai: bool, note: ?string}>>
+     */
+    public static function notesFor(User $u, iterable $reports): array
+    {
+        if (hub_is_client($u) || ! Auditor::enabled() || ! Schema::hasTable('ai_findings')) return [];
+        $ids = [];
+        foreach ($reports as $w) $ids[] = (string) $w->id;
+        if ($ids === []) return [];
+
+        $q = AiFinding::query()->where('status', 'open')->where('subject_module', 'updates')
+            ->whereIn('subject_id', $ids)->orderBy('detected_at')->orderBy('id');
+        if (($off = AuditorAccuracy::disabled()) !== []) $q->whereNotIn('detector', $off);
+
+        $labels = [];
+        foreach (Auditor::detectors() as $d) $labels[$d->key()] = $d->label();
+
+        $rows = self::filter($u, $q->get(), null);
+        $hide = self::hiddenKeys(array_map(fn ($f) => $f->signalKey(), $rows));
+
+        $out = [];
+        foreach ($rows as $f) {
+            if (isset($hide[$f->signalKey()])) continue;   // رفضها مديرٌ أو أجّلها ⇒ لا تعود من هنا
+            $out[$f->subject_id][] = [
+                'summary' => $f->summary,
+                'label' => $labels[$f->detector] ?? $f->detector,
+                'ai' => $f->source === 'ai',
+                'note' => is_string($f->draft['note'] ?? null) ? $f->draft['note'] : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /** مسوداتُ الملاحظة المفتوحة على تقريرٍ — لحارسِ «القبول» (لا عرضَ هنا) @return list<string> */
+    public static function draftNotes(WorkUpdate $w): array
+    {
+        if (! Schema::hasTable('ai_findings')) return [];
+
+        return AiFinding::query()->where('subject_module', 'updates')->where('subject_id', (string) $w->id)
+            ->where('status', 'open')->orderBy('id')->get()
+            ->map(fn ($f) => is_string($f->draft['note'] ?? null) ? trim($f->draft['note']) : null)
+            ->filter()->values()->all();
+    }
+
+    /**
+     * **ما يخفيه تصرّفُ المديرين** — رفضٌ أو تأجيلٌ لم ينقضِ. تقرؤه كلُّ قراءةٍ غيرِ صفِّ مركز الفعل
+     * (صفحةُ المراجعة، الملخّص) فلا يعود ما أُخفي هناك من بابٍ آخر.
+     *
+     * @param  list<string>  $keys
+     * @return array<string, true>
+     */
+    public static function hiddenKeys(array $keys): array
+    {
+        if ($keys === [] || ! Schema::hasTable('signal_states')) return [];
+        $out = [];
+        foreach (SignalState::query()->whereIn('skey', $keys)->get() as $st) {
+            if ($st->hidesNow()) $out[$st->skey] = true;
+        }
+
+        return $out;
+    }
+
+    /** إشاراتُ المدقّق **الظاهرةُ** لمشاهد — بعد إسقاطِ المرفوضِ والمؤجَّل (للملخّص الأسبوعيّ) */
+    public static function openFor(User $u): array
+    {
+        $all = self::visibleTo($u, null, true);
+        $hide = self::hiddenKeys(array_values(array_filter(array_column($all, 'key'))));
+
+        return array_values(array_filter($all, fn ($s) => ! isset($hide[$s['key'] ?? ''])));
     }
 
     /** هل يرى هذا المشاهدُ هذه النتيجةَ بعينها؟ (للاختبار ولأيِّ بابِ قراءةٍ آخر) */
@@ -168,6 +248,9 @@ final class AuditorSignals
             'url' => $draftUrl ?? route('m.show', [$f->subject_module, $f->subject_id]),
             'action' => $draftUrl ? 'سجّله قراراً' : 'افتح',
             'type' => self::TYPE,
+            // إضافةٌ متوافقة: الكاشفُ واسمُه — لمن يجمع الإشاراتِ به (الملخّصُ الأسبوعيّ)
+            'detector' => $f->detector,
+            'label' => $labels[$f->detector] ?? $f->detector,
         ];
     }
 

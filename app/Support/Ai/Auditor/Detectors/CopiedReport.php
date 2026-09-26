@@ -71,6 +71,9 @@ final class CopiedReport implements Detector
                         'summary' => 'تقريرُ ' . $day . ' يكرّر «ما تمّ إنجازه» من تقرير '
                             . $prevDay . ' حرفيّاً: «' . Text::clip($r->done) . '».',
                         'suggestion' => 'اطلب من صاحبِ التقرير وصفَ ما أُنجز فعلاً في هذا اليوم.',
+                        // مسودةُ ملاحظةٍ للموظّف — لا تصله إلّا إن حرّرها المديرُ وأرسلها (§٣.٤ · §٣.٦)
+                        'draft' => ['note' => 'تقريرُك ليوم ' . $day . ' يكرّر ما كتبتَه ليوم ' . $prevDay
+                            . ' حرفيّاً — صِف ما أنجزتَه فعلاً في هذا اليوم.'],
                         'input' => [(string) $prev->id, (string) $r->id, $n],
                         'identity' => [(string) $r->id],
                     ];

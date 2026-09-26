@@ -102,6 +102,24 @@
             @if ($w->review_feedback)<div class="sub" style="border-inline-start:3px solid var(--wn,#e67e22);padding-inline-start:8px;margin-top:4px">💬 ملاحظة المراجع: {{ $w->review_feedback }}</div>@endif
 
             @if ($canReview && \App\Support\ReportReview::canReview(auth()->user(), $w))
+                {{-- ═══ المدقّق (§٣.٤ · A3): ملاحظتُه للمراجع وحدَه، ومسودتُه تُعبّأ ولا تُرسَل —
+                     الموظّفُ لا يرى إلّا ما حرّره المراجعُ وأرسله بـ«طلب تنقيح» (قرارُ المالك §٣.٦) ═══ --}}
+                @php $notes = $auditNotes[(string) $w->id] ?? []; $draftNote = collect($notes)->pluck('note')->filter()->first(); @endphp
+                @foreach ($notes as $n)
+                    <div class="sub" style="border-inline-start:3px solid var(--acc,#2c7be5);padding-inline-start:8px;margin-top:6px" data-auditor-note>
+                        🔎 <b>المدقّق · {{ $n['label'] }}</b>@if ($n['ai']) <span class="bdg">بالذكاء — تحقّق</span>@endif — {{ $n['summary'] }}
+                    </div>
+                @endforeach
+                {{-- **المسودةُ اقتراحٌ لا قيمة:** لا تُعبّأ في الحقل — فحقلُ الملاحظة يُرسَل مع «قبول» أيضاً، ومسودةٌ
+                     معبّأةٌ كانت ستصل الموظّفَ حين يرفض المراجعُ حكمَ المدقّق ويقبل التقرير. زرٌّ ينسخها إلى الحقل
+                     بقرار المراجع، ثمّ يحرّرها ويرسلها بـ«طلب تنقيح». --}}
+                @if ($draftNote)
+                    <div class="sub" style="margin-top:4px" data-auditor-draft>
+                        ✍️ مسودةٌ مقترحة: «<span data-draft-text>{{ $draftNote }}</span>»
+                        <button type="button" class="btn ghost xs"
+                            onclick="var f=this.closest('.card').querySelector('input[name=feedback]');f.value=this.parentNode.querySelector('[data-draft-text]').textContent;f.focus()">استعمل المسودة</button>
+                    </div>
+                @endif
                 <form method="post" action="{{ route('reports.review.act', $w->id) }}" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center">
                     @csrf
                     <input type="text" name="feedback" class="in" placeholder="ملاحظة (لطلب التنقيح)" style="flex:1;min-width:160px">

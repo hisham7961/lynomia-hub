@@ -100,6 +100,8 @@ final class HoursWithoutProgress implements Detector
                     . Reports::day($rows[0]) . ' — والإنجازُ المُبلَّغ ثابتٌ عند '
                     . rtrim(rtrim(number_format(max($measured), 1, '.', ''), '0'), '.') . '٪.',
                 'suggestion' => 'اسأل عن العائق أو أعِد تقديرَ المهمّة أو قسِّمها.',
+                'draft' => ['note' => 'مضت عدّةُ أيّامٍ على المهمّة «' . mb_substr((string) $task->title, 0, 60)
+                    . '» والإنجازُ ثابت — ما الذي يعيقها؟ اذكر العائقَ أو تقديراً جديداً للمدّة لنعالجه معاً.'],
                 'input' => [array_map(fn ($r) => [$r->id, $r->hours, $r->progress], $rows), $task->progress, $task->status],
             ];
         }

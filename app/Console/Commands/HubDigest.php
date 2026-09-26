@@ -53,6 +53,24 @@ class HubDigest extends Command
             $lines[] = 'لا توصيات حرجة الآن — أو أن البيانات غير مكتملة بعد.';
         }
 
+        // المدقّق (A4): ما ينتظر المالكَ من إشاراته — بعينِ المالك (مُعادُ التنطيق)، والسطرُ يُحذف عند الصفر
+        try {
+            // الظاهرةُ وحدَها — ما رفضه المديرون أو أجّلوه لا يُعَدّ «مفتوحاً» هنا كما لا يُعَدّ في مركز الفعل
+            $aud = \App\Support\Ai\Auditor\AuditorSignals::openFor($owner);
+            if ($aud !== []) {
+                $by = [];
+                foreach ($aud as $s) {
+                    $label = (string) ($s['label'] ?? 'أخرى');
+                    $by[$label] = ($by[$label] ?? 0) + 1;
+                }
+                arsort($by);
+                $lines[] = '🔎 المدقّق: ' . count($aud) . (count($aud) >= \App\Support\Ai\Auditor\AuditorSignals::MAX ? '+' : '') . ' إشارةٌ مفتوحة — '
+                    . implode(' · ', array_map(fn ($k, $n) => "{$k} ×{$n}", array_keys($by), $by)) . '.';
+            }
+        } catch (\Throwable $e) {
+            report($e);   // إثراء — لا يُسقط التقرير
+        }
+
         // v2.124: نبض العقود — أرقام حقيقية فقط، والسطر يُحذف كله عند الصفر
         try {
             $active = \App\Models\Contract::where('status', 'ساري')->count();

@@ -5883,6 +5883,27 @@
         ]
     },
     {
+        "methods": "GET|HEAD",
+        "uri": "admin/ai/auditor",
+        "name": "ai.auditor",
+        "action": "App\\Http\\Controllers\\Web\\AiAuditorController@index",
+        "middleware": [
+            "web",
+            "auth"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "admin/ai/auditor/{key}/toggle",
+        "name": "ai.auditor.toggle",
+        "action": "App\\Http\\Controllers\\Web\\AiAuditorController@toggle",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:30,1"
+        ]
+    },
+    {
         "methods": "POST",
         "uri": "admin/ai/reconcile",
         "name": "ai.reconcile",

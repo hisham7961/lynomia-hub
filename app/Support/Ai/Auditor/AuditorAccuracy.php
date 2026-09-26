@@ -5,6 +5,7 @@ namespace App\Support\Ai\Auditor;
 use App\Models\AiFinding;
 use App\Models\User;
 use App\Support\Settings;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -27,6 +28,9 @@ final class AuditorAccuracy
 
     public const MAX_DISMISS_RATE = 0.6;
 
+    /** أقلُّ عددِ رافضين مختلفين قبل الإطفاء الآليّ */
+    public const MIN_ACTORS = 2;
+
     /** @return list<string> مفاتيحُ الكواشف المطفأة */
     public static function disabled(): array
     {
@@ -47,38 +51,71 @@ final class AuditorAccuracy
         $list = $off ? array_values(array_unique([...$list, $key])) : array_values(array_diff($list, [$key]));
         sort($list);
         Settings::put('auditor.disabled', implode(',', $list), $source, $reason);
+
+        // **إعادةُ التشغيل تبدأ عدّاً جديداً** — وإلّا أطفأته الجولةُ التالية بالرفضِ القديمِ نفسِه
+        // ولم يستطع المالكُ نقضَ الإطفاءِ الآليّ ستّين يوماً
+        if (! $off) {
+            $map = self::reenabled();
+            $map[$key] = now()->toIso8601String();
+            ksort($map);
+            Settings::put('auditor.reenabled', json_encode($map, JSON_UNESCAPED_SLASHES), $source, $reason);
+        }
+    }
+
+    /** متى أُعيد تشغيلُ كلِّ كاشفٍ آخرَ مرّة @return array<string, string> */
+    public static function reenabled(): array
+    {
+        $v = json_decode((string) setting('auditor.reenabled', ''), true);
+
+        return is_array($v) ? array_filter($v, 'is_string') : [];
     }
 
     /**
      * **لوحةُ الدقّة** — أعدادٌ لا محتوى: لا ملخّصَ نتيجةٍ ولا اسمَ موظّف.
      *
+     * بلا مشاهدٍ ⇒ على المنشأة كلِّها (للإطفاء الآليّ — العتبةُ عامّة). وبمشاهدٍ له قائمةُ شركاتٍ ⇒
+     * أعدادُ شركاته وحدَها (نشاطُ غيرِه ليس له — نمطُ شاشةِ الحوكمة).
+     *
      * @return list<array{key: string, label: string, source: string, disabled: bool, open: int,
-     *                    resolved: int, ack: int, snoozed: int, dismissed: int, rate: ?float}>
+     *                    resolved: int, ack: int, snoozed: int, dismissed: int, actors: int, rate: ?float}>
      */
-    public static function stats(): array
+    public static function stats(?User $viewer = null): array
     {
-        $since = now()->subDays(self::WINDOW_DAYS);
+        $floor = now()->subDays(self::WINDOW_DAYS);
+        $cids = $viewer !== null ? hub_company_ids($viewer) : null;
         $has = Schema::hasTable('ai_findings');
-        $out = [];
+        $reenabled = self::reenabled();
 
+        // التصرّفاتُ مرّةً واحدة — والبادئةُ تُطابَق في PHP: «_» في LIKE حرفٌ بديلٌ لا شرطةٌ سفليّة
+        $states = collect();
+        if (Schema::hasTable('signal_states')) {
+            $q = DB::table('signal_states')->where('skey', 'like', 'audit:%')->where('at', '>=', $floor);
+            if ($cids !== null) $q->whereIn('company_id', $cids);
+            $states = $q->orderBy('id')->get(['skey', 'state', 'by', 'at']);
+        }
+
+        $out = [];
         foreach (Auditor::detectors() as $d) {
             $key = $d->key();
+            // بعد إعادة التشغيل: ما وقع **بعدها** حصراً — التصرّفُ في لحظتها نفسِها سابقٌ لها
+            $reset = isset($reenabled[$key]) && Carbon::parse($reenabled[$key])->gt($floor) ? Carbon::parse($reenabled[$key]) : null;
             $row = ['key' => $key, 'label' => $d->label(), 'source' => $d->source(),
                     'disabled' => self::isDisabled($key), 'open' => 0, 'resolved' => 0,
-                    'ack' => 0, 'snoozed' => 0, 'dismissed' => 0, 'rate' => null];
+                    'ack' => 0, 'snoozed' => 0, 'dismissed' => 0, 'actors' => 0, 'rate' => null];
             if ($has) {
-                $row['open'] = AiFinding::query()->where('detector', $key)->where('status', 'open')->count();
-                $row['resolved'] = AiFinding::query()->where('detector', $key)->where('status', 'resolved')
-                    ->where('resolved_at', '>=', $since)->count();
+                $open = AiFinding::query()->where('detector', $key)->where('status', 'open');
+                $resolved = AiFinding::query()->where('detector', $key)->where('status', 'resolved')->where('resolved_at', '>=', $floor);
+                if ($cids !== null) {
+                    $open->whereIn('company_id', $cids);
+                    $resolved->whereIn('company_id', $cids);
+                }
+                $row['open'] = $open->count();
+                $row['resolved'] = $resolved->count();
             }
-            if (Schema::hasTable('signal_states')) {
-                $states = DB::table('signal_states')->where('skey', 'like', 'audit:' . $key . ':%')
-                    ->where('at', '>=', $since)
-                    ->selectRaw('state, count(*) as n')->groupBy('state')->pluck('n', 'state');
-                $row['ack'] = (int) ($states['ack'] ?? 0);
-                $row['snoozed'] = (int) ($states['snoozed'] ?? 0);
-                $row['dismissed'] = (int) ($states['dismissed'] ?? 0);
-            }
+            $mine = $states->filter(fn ($st) => str_starts_with((string) $st->skey, 'audit:' . $key . ':')
+                && ($reset === null || Carbon::parse($st->at)->gt($reset)));
+            foreach (['ack', 'snoozed', 'dismissed'] as $state) $row[$state] = $mine->where('state', $state)->count();
+            $row['actors'] = $mine->where('state', 'dismissed')->pluck('by')->filter()->unique()->count();
             $total = $row['ack'] + $row['snoozed'] + $row['dismissed'];
             $row['rate'] = $total > 0 ? round($row['dismissed'] / $total, 3) : null;
             $out[] = $row;
@@ -99,6 +136,8 @@ final class AuditorAccuracy
             if ($s['disabled']) continue;
             $total = $s['ack'] + $s['snoozed'] + $s['dismissed'];
             if ($total < self::MIN_DISPOSITIONS || ($s['rate'] ?? 0) < self::MAX_DISMISS_RATE) continue;
+            // **ولا يُطفئه رأيُ شخصٍ واحد** — الرفضُ من اثنين مختلفين على الأقلّ
+            if ($s['actors'] < self::MIN_ACTORS) continue;
 
             $off[] = $s['key'];
             if ($dry) continue;

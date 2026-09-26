@@ -126,6 +126,8 @@ final class AiAccess
             ['key' => 'usage',       'label' => 'الاستهلاك', 'icon' => '💰', 'route' => 'ai.usage',            'ok' => $cost],
             ['key' => 'settings',    'label' => 'الإعدادات', 'icon' => '⚙️', 'route' => 'ai.settings',         'ok' => $manage],
             ['key' => 'diagnostics', 'label' => 'التشخيص',   'icon' => '🩺', 'route' => 'ai.diagnostics',      'ok' => $view],
+            // المدقّق (A4): دقّةُ كواشفه — أعدادٌ لا محتوى، فلقارئِ المركز
+            ['key' => 'auditor',     'label' => 'المدقّق',   'icon' => '🔎', 'route' => 'ai.auditor',          'ok' => $view],
         ];
     }
 }
