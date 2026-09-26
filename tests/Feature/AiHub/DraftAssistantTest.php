@@ -183,6 +183,12 @@ class DraftAssistantTest extends TestCase
         DB::table('meetings')->where('id', $mid)->update(['notes' => str_repeat('س', DraftAssistant::SOURCE_MAX_VALUE + 50)]);
         $r = DraftAssistant::draft($u, 'decisions', 'meetings', $mid);
         $this->assertTrue($r['clipped'], 'ما جاوز السقفَ يُعلَن لا يُخفى');
+
+        // والقصُّ على فراغٍ (يُقلَّم فيخفي طولُه القصَّ) يُعلَن كذلك
+        DB::table('meetings')->where('id', $mid)->update(['notes' => str_repeat('س', DraftAssistant::SOURCE_MAX_VALUE - 1) . ' ' . str_repeat('QWXZ-TAIL ', 30)]);
+        $r = DraftAssistant::draft($u, 'decisions', 'meetings', $mid);
+        $this->assertStringNotContainsString('QWXZ-TAIL', json_encode(end($this->sent), JSON_UNESCAPED_UNICODE));
+        $this->assertTrue($r['clipped'], 'القصُّ على فراغٍ يُعلَن');
     }
 
     public function test_مهمّةٌ_من_صفحة_مشروع_تحمل_المشروعَ_نفسَه(): void

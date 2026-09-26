@@ -62,6 +62,9 @@ final class AskTools
     /** أطولُ قيمةِ حقلٍ تُسلَّم — نصٌّ طويلٌ يُغرِق السياقَ ويُنفق */
     public const MAX_VALUE_CHARS = 300;
 
+    /** @var array<string, true> حقولُ آخر `project` التي قُصّت */
+    private static array $clipped = [];
+
     /** **الحدُّ الأدنى للبحثِ** — حرفٌ واحدٌ يُعيد الجدولَ كلَّه فعليّاً */
     public const MIN_SEARCH_CHARS = 2;
 
@@ -357,8 +360,12 @@ final class AskTools
             return self::fail('hub_record', 'لا سجلَّ بهذا المعرّفِ في نطاقِك');
         }
 
-        return self::ok('hub_record', $module,
+        self::$clipped = [];
+        $res = self::ok('hub_record', $module,
             self::project(collect([$row]), self::fieldMap($u, $module, $def), $max));
+
+        // **الحقولُ التي قُصّت** — تُقال عند القصّ نفسِه لا بطول الناتج (القصُّ على فراغٍ يُقلّم ويُخفي نفسَه)
+        return $res + ['clipped' => array_keys(self::$clipped)];
     }
 
     /** **عدٌّ داخلَ النطاق** — ولا صفَّ يُسلَّم، فالعددُ وحدَه جوابُ سؤالٍ كثير */
@@ -671,7 +678,9 @@ final class AskTools
                     $v = $v === null ? null : json_encode($v, JSON_UNESCAPED_UNICODE);
                 }
                 if ($v === null) continue;
-                $r[$key] = self::clip(Redactor::text((string) $v), $max);
+                $raw = Redactor::text((string) $v);
+                $r[$key] = self::clip($raw, $max);
+                if ($r[$key] !== $raw) self::$clipped[$key] = true;
             }
             $out[] = $r;
         }

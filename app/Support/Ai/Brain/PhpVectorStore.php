@@ -14,6 +14,9 @@ final class PhpVectorStore implements VectorStore
 
     private const PAGE = 1000;
 
+    /** حجمُ دفعة الحكم (استعلامُ نطاقٍ واحدٌ لكلِّ وحدةٍ في الدفعة) */
+    private const JUDGE = 200;
+
     public static function pack(array $v): string
     {
         return pack('g*', ...array_map('floatval', $v));
@@ -42,11 +45,18 @@ final class PhpVectorStore implements VectorStore
     {
         $out = [];
         foreach (DB::table('ai_embeddings')->where('module', $module)->where('record_id', $recordId)
-            ->orderBy('id')->get(['field', 'chunk', 'hash']) as $r) {
-            $out[$r->field . '#' . $r->chunk] = (string) $r->hash;
+            ->orderBy('id')->get(['field', 'chunk', 'hash', 'company_id']) as $r) {
+            $out[$r->field . '#' . $r->chunk] = ['hash' => (string) $r->hash,
+                'company_id' => $r->company_id !== null ? (string) $r->company_id : null];
         }
 
         return $out;
+    }
+
+    public function retag(string $module, string $recordId, ?string $companyId): int
+    {
+        return DB::table('ai_embeddings')->where('module', $module)->where('record_id', $recordId)
+            ->update(['company_id' => $companyId, 'updated_at' => now()]);
     }
 
     public function forget(string $module, string $recordId, ?array $keep = null): int
@@ -61,17 +71,18 @@ final class PhpVectorStore implements VectorStore
         return $n;
     }
 
-    public function nearest(array $vector, array $modules, ?array $companies, int $limit): array
+    public function nearest(array $vector, array $modules, ?array $companies, string $model, int $limit, callable $accept): array
     {
         $q = self::norm($vector);
-        if ($q === [] || $modules === []) return ['hits' => [], 'scanned' => 0, 'partial' => false];
+        if ($q === [] || $modules === [] || $model === '') return ['hits' => [], 'scanned' => 0, 'partial' => false];
 
-        $heap = [];
+        // ① كلُّ مرشَّحٍ يُقاس (المسحُ بالقوّة هو الكلفةُ أصلاً) — ولا قصَّ قبل الحكم
+        $all = [];
         $scanned = 0;
         $partial = false;
         $lastId = 0;
         while (true) {
-            $page = DB::table('ai_embeddings')->whereIn('module', $modules)->where('dim', count($q))
+            $page = DB::table('ai_embeddings')->whereIn('module', $modules)->where('dim', count($q))->where('model', $model)
                 ->when($companies !== null, fn ($w) => $w->where(fn ($x) => $x->whereIn('company_id', $companies)->orWhereNull('company_id')))
                 ->where('id', '>', $lastId)->orderBy('id')->limit(self::PAGE)
                 ->get(['id', 'module', 'record_id', 'field', 'vector']);
@@ -81,21 +92,27 @@ final class PhpVectorStore implements VectorStore
                 $v = self::unpack((string) $r->vector);
                 $s = 0.0;
                 foreach ($q as $i => $x) $s += $x * ($v[$i] ?? 0.0);
-                $heap[] = ['module' => (string) $r->module, 'record_id' => (string) $r->record_id,
+                $all[] = ['module' => (string) $r->module, 'record_id' => (string) $r->record_id,
                     'field' => (string) $r->field, 'score' => $s];
                 if (++$scanned >= self::MAX_SCAN) { $partial = true; break 2; }
             }
-            if (count($heap) > $limit * 4) {
-                usort($heap, fn ($a, $b) => $b['score'] <=> $a['score']);
-                $heap = array_slice($heap, 0, $limit);
-            }
         }
-        usort($heap, fn ($a, $b) => $b['score'] <=> $a['score'] ?: strcmp($a['record_id'], $b['record_id']));
+        usort($all, fn ($a, $b) => $b['score'] <=> $a['score'] ?: strcmp($a['record_id'], $b['record_id']) ?: strcmp($a['field'], $b['field']));
 
-        return ['hits' => array_slice($heap, 0, $limit), 'scanned' => $scanned, 'partial' => $partial];
+        // ② الحكمُ دفعاتٍ بترتيب القرب حتى يجتمع المطلوب من سجلّاتٍ مقبولة
+        $hits = [];
+        $records = [];
+        foreach (array_chunk($all, self::JUDGE) as $batch) {
+            foreach ($accept($batch) as $h) {
+                $hits[] = $h;
+                $records[$h['module'] . ':' . $h['record_id']] = true;
+            }
+            if (count($records) >= $limit) break;
+        }
+
+        return ['hits' => $hits, 'scanned' => $scanned, 'partial' => $partial];
     }
 
-    /** متّجهٌ بطولِ الوحدة — فالضربُ النقطيُّ جيبُ تمام (المخزَّنُ مُطبَّعٌ عند الكتابة) @return list<float> */
     public static function norm(array $v): array
     {
         $n = sqrt(array_sum(array_map(fn ($x) => (float) $x * (float) $x, $v)));

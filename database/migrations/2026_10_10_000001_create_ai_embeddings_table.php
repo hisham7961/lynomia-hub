@@ -27,7 +27,7 @@ return new class extends Migration
             $t->unsignedSmallInteger('chunk')->default(0);
             $t->uuid('company_id')->nullable();
             $t->char('hash', 40);                        // sha1(النموذج|النصّ) — لا يُعاد تضمينُ ما لم يتغيّر
-            $t->string('model', 120);
+            $t->string('model', 191);
             $t->unsignedSmallInteger('dim');
             $t->binary('vector');
             $t->timestamps();

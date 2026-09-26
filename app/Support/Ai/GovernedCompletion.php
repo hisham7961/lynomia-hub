@@ -185,7 +185,8 @@ final class GovernedCompletion
                 // النجاحُ يمسح تهدئةَ المزوّدِ ولا يُغلق الرحلة
                 AiRouting::noteSuccess((string) $model->provider_id);
 
-                return ['ok' => true, 'data' => (array) $res['data']];
+                // **والنموذجُ الذي خدم فعلاً** — قد يكون احتياطيّاً؛ والتضمينُ يحتاجه (فضاءُ المتّجهات لكلِّ نموذج)
+                return ['ok' => true, 'data' => (array) $res['data'], 'model' => (string) $model->litellm_model_name];
             }
 
             if ($admit['event'] !== null) {

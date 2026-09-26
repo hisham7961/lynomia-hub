@@ -151,8 +151,7 @@ final class DraftAssistant
             $log = trim((string) $input);
             if ($log !== '') $parts[] = "سجلُّ الالتزامات كما ألصقه المستخدم:\n" . mb_substr($log, 0, (int) $def['input']['max']);
         }
-        $out['clipped'] = mb_strlen($src) > self::SOURCE_MAX_TOTAL
-            || collect($row)->contains(fn ($v) => is_string($v) && mb_strlen($v) > self::SOURCE_MAX_VALUE);
+        $out['clipped'] = mb_strlen($src) > self::SOURCE_MAX_TOTAL || ($rec['clipped'] ?? []) !== [];
 
         $res = AuditorAi::ask($gc, self::system($kind, $def, $allowed, $u, $target), $parts,
             $target === null ? 'reply' : 'items', self::SOURCE_MAX_TOTAL);

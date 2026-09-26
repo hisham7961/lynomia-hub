@@ -244,9 +244,10 @@
     if (!form) return;
     var streamUrl = @json(route('ask.stream'));
     // `inflight` محلّيٌّ عمداً: حارسُ الإرسال المزدوج العامّ يفكّ الزرَّ بعد ٢٠ ثانية، والبثُّ لا يغادر الصفحة
-    var plain = false, inflight = false;
+    var plain = false, inflight = false, dead = false;
     form.addEventListener('submit', function (e) {
-        if (inflight) { e.preventDefault(); return; }
+        // بثٌّ انقطع بعد أن بدأ: لا يُعاد السؤالُ صامتاً (قد يكون دُفع ثمنُه) — والزرُّ الحيُّ يُعيد تحميل الصفحة
+        if (inflight) { e.preventDefault(); if (dead) location.reload(); return; }
         var b = form.querySelector('[data-ask-submit]');
         var w = form.querySelector('.askwait');
         if (b) { b.disabled = true; }
@@ -258,7 +259,8 @@
         // لا يُعاد الإرسالُ إلّا إن لم يبدأ البثُّ أصلاً — فسؤالٌ بدأ العملُ عليه لا يُنفَق مرّتين
         var fallback = function () {
             if (!started) { plain = true; form.submit(); return; }
-            if (w) { w.textContent = '⚠️ انقطع الاتّصالُ قبل الجواب — افتح «محادثاتُك» أو أعِد تحميلَ الصفحة'; }
+            dead = true;
+            if (w) { w.textContent = '⚠️ انقطع الاتّصالُ قبل الجواب — افتح «محادثاتُك» أو أعِد تحميلَ الصفحة (الزرُّ يعيد التحميل)'; }
         };
         fetch(streamUrl, { method: 'POST', body: new FormData(form), credentials: 'same-origin',
                            headers: { 'Accept': 'text/event-stream' } })

@@ -120,11 +120,14 @@ final class Brain
             $res = $gc->embed($texts, array_sum(array_map('mb_strlen', $texts)));
             if (! $res['ok']) return (string) $res['code'];
             $vecs = (array) ($res['data']['data'] ?? []);
+            // **الموسومُ بالنموذج الذي خدم فعلاً** — احتياطيٌّ خدم؟ تُوسَم متّجهاتُه باسمه وبصمتِه، فلا تُقارَن
+            // بمتّجهات الأساسيّ، وتُعاد بالأساسيّ في الجولة التالية (بصمتُه لا تطابق)
+            $served = (string) ($res['model'] ?? '');
             $rows = [];
             foreach ($pending as $i => $p) {
                 $v = $vecs[$i]['embedding'] ?? null;
-                if (! is_array($v) || $v === []) continue;
-                $rows[] = ['vector' => $v] + $p['row'];
+                if (! is_array($v) || $v === [] || $served === '') continue;
+                $rows[] = ['vector' => $v, 'hash' => sha1($served . '|' . $p['text']), 'model' => $served] + $p['row'];
             }
             $store->upsert($rows);
             $stats['embedded'] += count($rows);
@@ -146,6 +149,8 @@ final class Brain
             foreach ($class::query()->orderBy('id')->lazyById(200) as $rec) {
                 $stats['records']++;
                 $have = $store->hashes($module, (string) $rec->id);
+                $cid = $ccol ? ($rec->{$ccol} ?: null) : null;
+                $cid = $cid !== null ? (string) $cid : null;
                 $live = [];
                 foreach ($cols as $key => $col) {
                     $text = trim((string) ($rec->{$col} ?? ''));
@@ -154,15 +159,21 @@ final class Brain
                         $k = $key . '#' . $n;
                         $live[] = $k;
                         $hash = sha1($model . '|' . $chunk);
-                        if (($have[$k] ?? null) === $hash) { $stats['skipped']++; continue; }
+                        if (($have[$k]['hash'] ?? null) === $hash) { $stats['skipped']++; continue; }
                         if ($budget-- <= 0) { $stats['stopped'] = 'بلغت الجولةُ سقفَها (brain.max_per_run) — تُكمل الجولةُ التالية'; break 4; }
                         $pending[] = ['text' => $chunk, 'row' => ['module' => $module, 'record_id' => (string) $rec->id,
-                            'field' => $key, 'chunk' => $n, 'company_id' => $ccol ? ($rec->{$ccol} ?: null) : null,
-                            'hash' => $hash, 'model' => $model]];
+                            'field' => $key, 'chunk' => $n, 'company_id' => $cid]];
                         if (count($pending) >= self::BATCH && ($stop = $flush()) !== null) { $stats['stopped'] = $stop; break 4; }
                     }
                 }
-                if (! $dry && count($live) < count($have)) $stats['removed'] += $store->forget($module, (string) $rec->id, $live);
+                if (! $dry) {
+                    // **كلُّ مفتاحٍ لم يعُد حيّاً يُمحى** — لا حين ينقص العددُ فقط (حقلٌ قصُر وآخرُ طال بالعدد نفسِه)
+                    if (array_diff(array_keys($have), $live) !== []) $stats['removed'] += $store->forget($module, (string) $rec->id, $live);
+                    // **ونُقل إلى شركةٍ أخرى بالنصّ نفسِه؟** تُحدَّث شركتُه بلا تضمين — وإلّا اختفى عن شركته الجديدة
+                    foreach ($have as $h) {
+                        if ($h['company_id'] !== $cid) { $store->retag($module, (string) $rec->id, $cid); break; }
+                    }
+                }
             }
 
             // سجلّاتٌ حُذفت: مقاطعُها تُمحى
@@ -195,7 +206,10 @@ final class Brain
 
     private static function modelName(): string
     {
-        return (string) (AiProfiles::chain(self::profile(), AiPurposes::BRAIN)->first()?->litellm_model_name ?? '');
+        // رأسُ السلسلة المرتّبة (مجموعةٌ لا استعلام) — ما تبدأ به الفهرسةُ وتُقاس عليه البصمات
+        $chain = AiProfiles::chain(self::profile(), AiPurposes::BRAIN)->values();
+
+        return $chain->isEmpty() ? '' : (string) $chain[0]->litellm_model_name;
     }
 
     // ══════════════════ البحث ══════════════════
@@ -221,24 +235,33 @@ final class Brain
         $res = $gc->embed([$q], mb_strlen($q));
         $vec = $res['ok'] ? ($res['data']['data'][0]['embedding'] ?? null) : null;
         if (! is_array($vec)) return ['code' => (string) ($res['code'] ?? AskFailures::MODEL_NO_OUTPUT)] + $out;
+        $served = (string) ($res['model'] ?? '');
 
-        $near = self::store()->nearest($vec, $modules, hub_company_ids($u), max(40, $k * 6));
-
-        // ── الحكمُ وقتَ الاستعلام: النطاقُ المُنطَّق + حقلُ المقطع مرئيّ ──
-        $byModule = [];
-        foreach ($near['hits'] as $h) {
-            if (! in_array($h['field'], $catalog[$h['module']]['fields'] ?? [], true)) continue;
-            $byModule[$h['module']][] = $h;
-        }
-        $best = [];
-        foreach ($byModule as $m => $hits) {
-            $ok = array_flip(AskTools::visibleIds($u, $m, array_column($hits, 'record_id')));
-            foreach ($hits as $h) {
-                if (! isset($ok[$h['record_id']])) continue;
-                $key = $m . ':' . $h['record_id'];
-                if (! isset($best[$key]) || $h['score'] > $best[$key]['score']) $best[$key] = $h;
+        // ── الحكمُ وقتَ الاستعلام **أثناء المسح**: حقلُ المقطع مرئيّ + النطاقُ المُنطَّق — دفعةً دفعةً بترتيب القرب،
+        //    فلا يزاحم ما لا يراه القارئُ ما يراه (ولا يصير غيابُ سجلِّه دليلاً على ما حوله) ──
+        $accept = function (array $batch) use ($u, $catalog): array {
+            $byModule = [];
+            foreach ($batch as $h) {
+                if (! in_array($h['field'], $catalog[$h['module']]['fields'] ?? [], true)) continue;
+                $byModule[$h['module']][] = $h;
             }
+            $ok = [];
+            foreach ($byModule as $m => $hits) {
+                $seen = array_flip(AskTools::visibleIds($u, $m, array_column($hits, 'record_id')));
+                foreach ($hits as $h) if (isset($seen[$h['record_id']])) $ok[] = $h;
+            }
+
+            return $ok;
+        };
+        $near = self::store()->nearest($vec, $modules, hub_company_ids($u), $served, $k, $accept);
+
+        $best = [];
+        foreach ($near['hits'] as $h) {
+            $key = $h['module'] . ':' . $h['record_id'];
+            if (! isset($best[$key]) || $h['score'] > $best[$key]['score']) $best[$key] = $h;
         }
+        // مقاطعُ من فضاء نموذجٍ آخر (تبديلٌ لم تكتمل إعادةُ فهرسته، أو احتياطيٌّ خدم) لا تُقارَن — فالتغطيةُ ناقصةٌ وتُعلَن
+        $stale = $served !== '' && DB::table('ai_embeddings')->whereIn('module', $modules)->where('model', '!=', $served)->exists();
         uasort($best, fn ($a, $b) => $b['score'] <=> $a['score'] ?: strcmp($a['record_id'], $b['record_id']));
         $best = array_slice(array_values($best), 0, $k);
 
@@ -252,6 +275,6 @@ final class Brain
                 'score' => round($h['score'], 4)];
         }
 
-        return ['ok' => true, 'partial' => $near['partial']] + $out;
+        return ['ok' => true, 'partial' => $near['partial'] || $stale] + $out;
     }
 }

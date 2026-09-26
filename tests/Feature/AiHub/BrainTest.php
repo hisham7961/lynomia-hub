@@ -38,6 +38,9 @@ class BrainTest extends TestCase
 
     private Company $alpha;
 
+    /** نماذجُ «معطّلة» يردّ عليها المزوّدُ الوهميّ بـ503 @var list<string> */
+    private array $down = [];
+
     private Company $beta;
 
     protected function setUp(): void
@@ -75,6 +78,7 @@ class BrainTest extends TestCase
         Http::fake(function ($req) {
             $body = json_decode((string) $req->body(), true);
             $this->sent[] = $body;
+            if (in_array($body['model'] ?? '', $this->down, true)) return Http::response(['error' => 'ServiceUnavailable'], 503);
             $data = [];
             foreach ((array) ($body['input'] ?? []) as $i => $text) $data[] = ['index' => $i, 'embedding' => self::vec((string) $text)];
 
@@ -235,5 +239,107 @@ class BrainTest extends TestCase
         $this->assertNotContains('hub_semantic', array_map(fn ($t) => $t['function']['name'], AskTools::schema(AskTools::catalog($u))),
             'مطفأٌ ⇒ لا يُعلَن');
         $this->assertSame('BRAIN_OFF', Brain::search($u, 'المورّد')['code']);
+    }
+
+    // ═══ من المراجعة العدائيّة (v2.609.1) ═══
+
+    public function test_ما_لا_يراه_القارئُ_لا_يزاحم_ما_يراه(): void
+    {
+        $mineP = (string) Str::uuid();
+        $otherP = (string) Str::uuid();
+        foreach ([$mineP => 'مشروعي', $otherP => 'مشروعٌ ليس لي'] as $id => $n) {
+            DB::table('projects')->insert(['id' => $id, 'name' => $n, 'company_id' => $this->alpha->id, 'created_at' => now(), 'updated_at' => now()]);
+        }
+        $mine = $this->decision('مورّد إطلاق طابعة', ['project_id' => $mineP]);
+        $u = $this->user([$this->alpha->id]);
+        $role = $u->role;
+        $role->scope = 'proj';
+        $role->save();
+        DB::table('projects')->where('id', $mineP)->update(['manager_id' => $u->id]);
+        $u = $u->fresh();
+        // خمسون قراراً أقربُ إلى السؤال في مشروعٍ لا يراه — كانت تملأ النافذةَ قبل الحكم فيختفي قرارُه
+        $others = [];
+        for ($i = 0; $i < 50; $i++) $others[] = $this->decision('مورّد مورّد ' . $i, ['project_id' => $otherP]);
+        Brain::index();
+
+        $r = Brain::search($u, 'مورّد');
+        $this->assertTrue($r['ok']);
+        $ids = array_column($r['hits'], 'id');
+        $this->assertContains($mine, $ids, 'سجلُّه لا يُزاحَم بما لا يراه');
+        $this->assertSame([], array_values(array_intersect($others, $ids)), 'ولا يظهر ما ليس له');
+    }
+
+    public function test_مقاطعُ_الحقل_المحجوب_لا_تحجز_مكانَ_ما_يُرى(): void
+    {
+        $mine = $this->decision('مورّد طابعة');
+        for ($i = 0; $i < 60; $i++) $this->decision('قرار ' . $i, ['notes' => 'مورّد']);
+        Brain::index();
+
+        $r = Brain::search($this->user([$this->alpha->id], ['decisions' => ['notes' => 'hide']]), 'مورّد');
+        $this->assertContains($mine, array_column($r['hits'], 'id'));
+    }
+
+    public function test_مقطعٌ_زال_يُمحى_ولو_بقي_العددُ_نفسُه(): void
+    {
+        $d = $this->decision('قرار', ['notes' => str_repeat('طابعة ', 100) . "\n" . str_repeat('خادم ', 100)]);
+        Brain::index();
+        $this->assertSame(2, DB::table('ai_embeddings')->where('record_id', $d)->where('field', 'notes')->count());
+
+        // الملاحظاتُ قصُرت إلى مقطعٍ والسببُ طال بمقطع — العددُ ثلاثةٌ قبلُ وبعد
+        DB::table('decisions')->where('id', $d)->update(['notes' => 'قصير', 'reason' => 'سبب']);
+        Brain::index();
+
+        $keys = DB::table('ai_embeddings')->where('record_id', $d)->orderBy('field')->orderBy('chunk')->get(['field', 'chunk'])
+            ->map(fn ($r) => $r->field . '#' . $r->chunk)->all();
+        $this->assertSame(['notes#0', 'reason#0', 'title#0'], $keys);
+        // والنصُّ المحذوفُ لا يُطابَق: أقربُ مقاطع السجلّ إلى «خادم» ليس مقطعاً عنه
+        $hit = collect(Brain::search($this->owner, 'خادم خادم')['hits'])->firstWhere('id', $d);
+        $this->assertTrue($hit === null || $hit['score'] < 0.5, 'مقطعُ «خادم» الزائلُ ما زال يُطابَق');
+    }
+
+    public function test_سجلٌّ_نُقل_إلى_شركةٍ_أخرى_يتبعه_فهرسُه_بلا_تضمين(): void
+    {
+        $id = (string) Str::uuid();
+        DB::table('kb_articles')->insert(['id' => $id, 'title' => 'مورّد', 'company_id' => $this->alpha->id, 'created_at' => now(), 'updated_at' => now()]);
+        Brain::index();
+        $calls = $this->embedCalls();
+
+        DB::table('kb_articles')->where('id', $id)->update(['company_id' => $this->beta->id]);
+        Brain::index();
+
+        $this->assertSame([(string) $this->beta->id], DB::table('ai_embeddings')->where('record_id', $id)->distinct()->pluck('company_id')->map(fn ($x) => (string) $x)->all());
+        $this->assertSame($calls, $this->embedCalls(), 'النصُّ لم يتغيّر ⇒ لا تضمين');
+        $this->assertContains($id, array_column(Brain::search($this->user([$this->beta->id]), 'مورّد')['hits'], 'id'), 'شركتُه الجديدةُ تجده');
+    }
+
+    public function test_متّجهاتُ_النموذج_الاحتياطيّ_توسَم_باسمه_ولا_تُقارَن_بغيره(): void
+    {
+        $p2 = AiProvider::create(['catalog_key' => 'openai', 'label' => 'مزوّدٌ ثانٍ', 'enabled' => true,
+            'credential_name' => 'hub-emb2-' . substr(sha1((string) microtime(true)), 0, 10), 'credential_state' => 'configured']);
+        $b = AiModel::create(['provider_id' => $p2->id, 'litellm_model_name' => 'hub-embed-b', 'upstream_model' => 'fake/hub-embed-b',
+            'display_name' => 'b', 'enabled' => true, 'health' => 'UNKNOWN', 'capabilities' => ['embeddings' => ['v' => true, 'src' => 'litellm']],
+            'limits' => [], 'params' => [], 'pricing' => ['input_per_1k' => ['v' => 0.0001, 'src' => 'litellm'],
+            'output_per_1k' => ['v' => 0, 'src' => 'litellm'], 'currency' => 'USD', 'unit' => 'per_1k_tokens']]);
+        AiProfiles::attach(AiProfile::query()->where('key', 'embedding')->firstOrFail(), $b);
+        $d = $this->decision('اعتماد مورّد');
+
+        $this->down = ['hub-embed'];
+        Brain::index();
+        $this->assertSame(['hub-embed-b'], DB::table('ai_embeddings')->where('record_id', $d)->pluck('model')->all(), 'موسومٌ بمن خدم فعلاً');
+
+        // الأساسيُّ عاد: السؤالُ يُضمَّن به، فلا يُقارَن بمتّجهات «ب» — والتغطيةُ الناقصةُ تُعلَن
+        $this->down = ['hub-embed-b'];
+        \Illuminate\Support\Facades\Cache::flush();
+        $r = Brain::search($this->owner, 'مورّد');
+        $this->assertTrue($r['ok'], (string) $r['code']);
+        $this->assertSame([], $r['hits'], 'لا مقارنةَ بين فضاءين');
+        $this->assertTrue($r['partial']);
+
+        // والجولةُ التالية تُعيد تضمينَه بالأساسيّ (بصمتُه لا تطابق)
+        Brain::index();
+        $this->assertSame(['hub-embed'], DB::table('ai_embeddings')->where('record_id', $d)->pluck('model')->all());
+        $r = Brain::search($this->owner, 'مورّد');
+        $this->assertSame([$d], array_column($r['hits'], 'id'));
+        $this->assertFalse($r['partial']);
     }
 }
