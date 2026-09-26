@@ -32,167 +32,28 @@ class ModuleController extends Controller
         return [$def, $class];
     }
 
-    /** استعلام القائمة الموحّد (بحث + حالة + فلاتر مراجع) — يخدم الفهرس والتصدير والكانبان */
+    /** مفوِّضٌ — المنطقُ في `ModuleQuery::buildQuery` (docs/REORG_PLAN.md §R6) */
     protected function buildQuery(Request $r, array $def, string $class, bool &$trash = false, array &$filters = []): \Illuminate\Database\Eloquent\Builder
     {
-        $trash = $r->boolean('trash') && hub_can(auth()->user(), $def['key'] ?? '', 'd');
-        $q = $trash ? $class::onlyTrashed() : $class::query();
-        $q = hub_scope($q, $def['key'] ?? '');          // نطاق المشاريع للحسابات المحدودة
-        $q = hub_company_scope($q, $def['key'] ?? '');  // الشركة النشطة من الشريط العلوي
-        $q = hub_client_scope($q, $def['key'] ?? '');   // مساحة عمل العميل من الشريط العلوي
-
-        if ($term = hub_str($r->input('q'))) $q->search($term);
-
-        // فحص جودة (`?qc=`): يفتح **نفس** السجلات التي عدّها مركز الجودة —
-        // فالنقص يُفتح لا يُقرأ. والمفتاح يُطابَق على قائمة الفحوص المشتقّة من
-        // السجل، فمفتاحٌ مُلفَّق لا يبني قيداً ولا يوسّع القائمة.
-        if ($qc = hub_str($r->input('qc'))) {
-            $rule = \App\Support\Insights\DataQuality::rules($def['key'] ?? '')[$qc] ?? null;
-            if ($rule) {
-                $q = \App\Support\Insights\DataQuality::apply($q, (string) ($def['key'] ?? ''), (string) $qc);
-                $filters[] = ['key' => 'qc', 'label' => 'فحص جودة', 'val' => $qc, 'name' => $rule['label']];
-            }
-        }
-
-        // العمود الفيزيائي لا المفتاح — في الوثائق المفتاح docStatus والعمود doc_status
-        $statusCol = hub_status_col($def['key'] ?? '');
-        if ($statusCol && ($st = hub_str($r->input('status'))) !== '') $q->where($statusCol, $st);
-
-        // (الجولة 1 · F18) «المتأخرةُ فعلاً» بالاستحقاق لا بالحالة المكتوبة: حالةُ
-        // «متأخرة» لا يكتبها أحدٌ آلياً، ففلترُ الحالة كان يخفي المستنداتِ المتجاوزةَ
-        // استحقاقَها فعلاً. `?overdue=1` يلتقطها من الحقيقة: due فات، ولم تُسدَّد،
-        // وليست ميتة (ملغاة/مسودة) — عرضٌ جاهزٌ تشير إليه لافتةُ الوحدة.
-        if (($def['key'] ?? '') === 'fin' && $r->boolean('overdue')) {
-            $notOverdue = array_merge((array) config('hub.fin.dead', []), ['مدفوعة']);
-            $q->whereNotNull('due')->whereDate('due', '<', now()->toDateString())
-                ->where(fn ($w) => $w->whereNull('state')->orWhereNotIn('state', $notOverdue))
-                ->whereRaw('COALESCE(paid, 0) < COALESCE(total, 0)');
-            $filters[] = ['key' => 'overdue', 'label' => 'الاستحقاق', 'val' => '1',
-                          'name' => 'متأخرة فعلاً', 'rmurl' => $r->url()];
-        }
-
-        $fields = collect($def['fields']);
-        foreach ((array) $r->input('f', []) as $fk => $fv) {
-            if ($fv === '' || ! is_string($fv) || ! is_string($fk)) continue;
-
-            $f = $fields->firstWhere('key', $fk);
-            // حقلٌ محجوبٌ عن هذا المستخدم لا يُرشَّح به: الترشيح ثم رؤية النتائج
-            // كاشفٌ لقيمته بالاستدلال — نفس حارس الفلاتر المتقدمة (applyAdvancedFilters).
-            if ($f && hub_field_mode(auth()->user(), (string) ($def['key'] ?? ''), $fk) === 'hide') continue;
-            if ($f && ($f['type'] ?? '') === 'ref') {
-                // المتعدد احتواءٌ في مصفوفة، والمفرد مساواة
-                empty($f['multi'])
-                    ? $q->where($f['col'], $fv)
-                    : $q->whereJsonContains($f['col'], $fv);
-                $filters[] = ['key' => $fk, 'label' => $f['label'], 'val' => $fv,
-                              'name' => $this->chipLabel((string) $f['ref'], $fv)];
-                continue;
-            }
-
-            // أعمدة الربط الضمنية — قائمة بيضاء بعمودين لا غير. بلا هذا الحصر يصير
-            // «عرض الكل» ترشيحاً على أي عمود يُسمّيه الرابط، وهو كاشفٌ للقيم بالاستدلال.
-            $implicit = ['company_id' => 'companies', 'project_id' => 'projects'];
-            if (isset($implicit[$fk]) && ($tbl = $def['table'] ?? null)
-                && \Illuminate\Support\Facades\Schema::hasColumn($tbl, $fk)) {
-                $q->where($fk, $fv);
-                $filters[] = ['key' => $fk, 'label' => hub_mod($implicit[$fk])['label'] ?? $fk,
-                              'val' => $fv,
-                              'name' => $this->chipLabel((string) $implicit[$fk], $fv)];
-            }
-        }
-
-        $this->applyAdvancedFilters($r, $def, $fields, $q, $filters);
-
-        return $q;
+        return \App\Support\Platform\Modules\ModuleQuery::buildQuery($r, $def, $class, $trash, $filters);
     }
 
-    /**
-     * اسمُ شريحة الترشيح **داخل النطاق وحده** (v2.399): `?f[clientId]=<uuid>` كان يُترجم أيَّ
-     * معرّفٍ إلى اسمه — عرّافاً لأسماء عملاء وشركات خارج العزل. خارجُ النطاق يبقى معرّفاً عارياً.
-     */
+    /** مفوِّضٌ — المنطقُ في `ModuleQuery::chipLabel` (docs/REORG_PLAN.md §R6) */
     protected function chipLabel(string $ref, string $id): string
     {
-        return (string) (hub_ref_options_scoped($ref, $id)[$id] ?? $id);
+        return \App\Support\Platform\Modules\ModuleQuery::chipLabel($ref, $id);
     }
 
     /** عوامل الفلاتر المتقدمة المسموحة لكل نوع حقل — ما خرج عنها يُتجاهل بصمت */
-    public const FL_OPS = [
-        'text' => ['has', 'eq', 'neq', 'empty', 'nempty'],
-        'ta' => ['has', 'eq', 'neq', 'empty', 'nempty'],
-        'url' => ['has', 'empty', 'nempty'],
-        'sel' => ['eq', 'neq', 'empty', 'nempty'],
-        'num' => ['eq', 'neq', 'gt', 'lt', 'empty', 'nempty'],
-        'big' => ['eq', 'neq', 'gt', 'lt', 'empty', 'nempty'],
-        'date' => ['eq', 'before', 'after', 'empty', 'nempty'],
-        'dt' => ['eq', 'before', 'after', 'empty', 'nempty'],
-        'bool' => ['eq'],
-    ];
+    public const FL_OPS = \App\Support\Platform\Modules\ModuleQuery::FL_OPS;   // انتقل (docs/REORG_PLAN.md §R6)
 
     /** تسميات العوامل للرقائق والواجهة */
-    public const FL_LABELS = [
-        'has' => 'يحوي', 'eq' => '=', 'neq' => '≠', 'gt' => '>', 'lt' => '<',
-        'before' => 'قبل', 'after' => 'بعد', 'empty' => 'فارغ', 'nempty' => 'غير فارغ',
-    ];
+    public const FL_LABELS = \App\Support\Platform\Modules\ModuleQuery::FL_LABELS;   // انتقل (docs/REORG_PLAN.md §R6)
 
-    /**
-     * باني الفلاتر المتقدم (v2.116): شروط مركبة fl[i][f|o|v] بمنطق «و».
-     * كل شرط يُصادَق ضد تعريف الوحدة: الحقل موجود، ونوعه قابل للترشيح (لا أسرار
-     * ولا ملفات — الترشيح على عمود سرّي كاشفٌ للقيم بالاستدلال)، وحقول الصلاحية
-     * المخفية عن المستخدم لا تُرشَّح، والعامل من القائمة البيضاء لنوعه. ما فشل
-     * بصادقةٍ يُتجاهل بصمت فلا يكسر رابطاً محفوظاً قديماً.
-     */
+    /** مفوِّضٌ — المنطقُ في `ModuleQuery::applyAdvancedFilters` (docs/REORG_PLAN.md §R6) */
     protected function applyAdvancedFilters(Request $r, array $def, $fields, $q, array &$filters): void
     {
-        foreach (array_slice((array) $r->input('fl', []), 0, 10, true) as $i => $cond) {
-            if (! is_array($cond)) continue;
-            $fk = (string) ($cond['f'] ?? '');
-            $op = (string) ($cond['o'] ?? '');
-            $fv = $cond['v'] ?? '';
-            if (! is_string($fv)) continue;
-
-            $f = $fields->firstWhere('key', $fk);
-            if (! $f) continue;
-            $t = $f['type'] ?? 'text';
-            if (! isset(self::FL_OPS[$t]) || ! in_array($op, self::FL_OPS[$t], true)) continue;
-            if (hub_field_mode(auth()->user(), $def['key'] ?? '', $fk) === 'hide') continue;
-
-            $needsVal = ! in_array($op, ['empty', 'nempty'], true);
-            if ($needsVal && $fv === '') continue;
-            if (in_array($t, ['sel'], true) && $needsVal && ! in_array($fv, $f['options'] ?? [], true)) continue;
-            if (in_array($t, ['num', 'big'], true) && $needsVal && ! is_numeric($fv)) continue;
-
-            $col = $f['col'];
-            match ($op) {
-                'has' => $q->where($col, 'like', '%' . str_replace(['%', '_'], ['\\%', '\\_'], $fv) . '%'),
-                'eq' => $t === 'bool'
-                    ? $q->where($col, (bool) ((int) $fv))
-                    : $q->where($col, in_array($t, ['num', 'big'], true) ? $fv + 0 : $fv),
-                'neq' => $q->where($col, '!=', in_array($t, ['num', 'big'], true) ? $fv + 0 : $fv),
-                'gt' => $q->where($col, '>', $fv + 0),
-                'lt' => $q->where($col, '<', $fv + 0),
-                'before' => $q->whereDate($col, '<', $fv),
-                'after' => $q->whereDate($col, '>', $fv),
-                // «فارغ» على رقمٍ أو تاريخ = NULL وحده: مقارنةُ '' تُصنّف الصفرَ
-                // فارغاً على MySQL (يحوّل '' إلى 0) وتُعيد غيرَه على SQLite —
-                // انقسامٌ صامت بين المحرّكين ونتيجةٌ خاطئة في الإنتاج
-                'empty' => in_array($t, ['num', 'big', 'date', 'dt'], true)
-                    ? $q->whereNull($col)
-                    : $q->where(fn ($w) => $w->whereNull($col)->orWhere($col, '')),
-                'nempty' => in_array($t, ['num', 'big', 'date', 'dt'], true)
-                    ? $q->whereNotNull($col)
-                    : $q->whereNotNull($col)->where($col, '!=', ''),
-            };
-
-            // رقاقة الشرط مع رابط إزالته وحده — بقية الشروط والمعايير تبقى
-            $qs = $r->query();
-            unset($qs['fl'][$i], $qs['page']);
-            $filters[] = [
-                'key' => "fl:$i", 'label' => $f['label'],
-                'val' => $fv, 'op' => self::FL_LABELS[$op],
-                'name' => $needsVal ? ($t === 'bool' ? ((int) $fv ? 'نعم' : 'لا') : $fv) : '',
-                'rmurl' => $r->url() . ($qs ? '?' . http_build_query($qs) : ''),
-            ];
-        }
+        \App\Support\Platform\Modules\ModuleQuery::applyAdvancedFilters($r, $def, $fields, $q, $filters);
     }
 
     public function index(Request $r, string $module)
@@ -940,147 +801,28 @@ class ModuleController extends Controller
         return $this->streamCsv($module, $def, $rows, $rows->count() >= 5000);
     }
 
-    /**
-     * حزامُ أمان التصدير — بابٌ **واحد** لكل مسار يبثّ CSV (تصدير القائمة
-     * و«تصدير المحدد» الجماعي). كان الحزامُ على `export()` وحده بينما
-     * `bulk(do=export)` يبثّ بلا تجميدٍ ولا عتبةٍ ولا وسم — والحارسُ الذي
-     * يُطبَّق في بابٍ ويُنسى في آخر ليس حارساً بل قناعةٌ كاذبة:
-     *
-     *   · **صلاحيةُ المصدِّر** (٤٠٣) — علم `exp`.
-     *   · **مفتاحُ طوارئٍ مفصول** (٤٢٣): تجميدُ التصدير يصدّ سحبَ البيانات
-     *     الجماعيّ لحظةَ الاشتباه — حتى للمالك، فالتجميدُ يُرفع من مركز
-     *     الأمان لا بتصدير. (مطفأٌ افتراضاً فلا يمسّ العملَ العاديّ.)
-     *   · **تصديرٌ كبير** = نقلُ بياناتٍ جماعيّ: فوق العتبة
-     *     (security.export_stepup_rows، مطفأةٌ افتراضاً بـ0) يتطلب تأكيدَ
-     *     الهوية، ويُوسَم الحدثُ «تصدير كبير» في التدقيق ليُرصد في مركز الأمن.
-     *
-     * يعيد استجابةَ التصعيد إن لزمت، وإلا `null` بعد كتابة بصمة التدقيق —
-     * فلا بايتَ CSV قبل اجتياز الحزام كلِّه.
-     */
+    /** مفوِّضٌ — المنطقُ في `ModuleExport::exportBelt` (docs/REORG_PLAN.md §R6) */
     protected function exportBelt(string $module, int $count, string $unitLabel, array $def = [])
     {
-        // تصديرُ هذه الوحدةِ الدقيق (<module>.export) أو رايةُ التصديرِ الجامعة (توافقٌ خلفيّ)
-        abort_unless(hub_can(auth()->user(), $module, 'export') || hub_exporter(), 403, 'التصدير يتطلب صلاحية');
-        abort_if((string) setting('security.freeze_exports', '0') === '1', 423,
-            'التصدير مجمَّدٌ الآن بمفتاح طوارئٍ أمنيّ — يُرفع من مركز الأمان');
-
-        /*
-         * (الجولة 1 · F17) **قيدُ «خارج وقت العمل» على التصدير — في الحزام الواحد**:
-         * حظرُ نقل الملفات الليليّ (WorkHours) كان بلا استثناءٍ فإقفالُ الشهر ليلاً
-         * مستحيل، وكان «تصديرُ المحدد» الجماعيّ (`m.bulk`) يفلت منه أصلاً لأن مسارَه
-         * ليس في قائمة FILE_ROUTES. هنا — البابُ الواحدُ لكل بثّ CSV — يُفرَض القيدُ
-         * على المسارين معاً، وحاملُ المفتاح الدقيق `exportNight` وحده يُستثنى ويُوسَم
-         * كلُّ استعمالٍ له في التدقيق. (استثناءُ مسار `m.export` من حظرِ الوسيط نفسِه
-         * يحتاج سطرَ إعفاءٍ في Middleware/WorkHours — خارجَ ملفّات هذه الدفعة.)
-         */
-        $night = $this->exportOutsideWorkHours();
-        if (hub_export_blocked_now($module)) {
-            abort(403, 'نقل الملفات ممنوع خارج وقت العمل — يعود متاحاً مع بداية الدوام،'
-                . ' أو يُمنح دورُك مفتاحَ «تصدير خارج الدوام» (exportNight) لإقفالٍ ليليٍّ مشروع');
-        }
-
-        $bigAt = (int) setting('security.export_stepup_rows', 0);
-        $isBig = $bigAt > 0 && $count >= $bigAt;
-
-        // (Work OS · الطور G · §22) تصديرُ ICCID الجماعيّ = سحبُ هويّاتِ شرائحَ خام —
-        // خطرُ انتحالِ/استبدالِ SIM — فيتطلب تأكيدَ الهوية بمعزلٍ عن عتبةِ الحجم
-        // العامّة، ومنطَّقاً بالعمود لا شاملاً (تصديرٌ بلا عمود ICCID لا يُعطَّل).
-        $iccidBulk = $module === 'phones' && $count > 0 && $this->exportColumnsInclude($def, 'iccid');
-
-        if (($isBig || $iccidBulk) && ($resp = hub_require_stepup())) return $resp;
-
-        // بصمة التصدير في التدقيق — تُعرض في مركز الأمان (ICCID الجماعيّ موسومٌ بذاته،
-        // واستعمالُ استثناء exportNight موسومٌ «خارج الدوام» فيُرصد كلُّ إقفالٍ ليليّ)
-        $label = $iccidBulk ? 'تصدير ICCID جماعي' : ($isBig ? 'تصدير كبير' : 'تصدير');
-        /*
-         * **الوسمُ الزمنيُّ مستقلٌّ عن الاستثناء** (مجلس الخبراء · N-7).
-         *
-         * كان «خارج الدوام» يُكتب **حين يُستعمل استثناءُ `exportNight`** وحدَه —
-         * والمالكُ مستثنًى بالتصميم فلا استثناءَ يُوسَم. فكشفُ الرواتبِ سُحب
-         * الثالثةَ وإحدى وأربعين فجراً وسُجّل «تصدير» عارياً (`audits#3505`).
-         * والسؤالان مختلفان: «أاستُعمل مفتاحٌ استثنائيّ؟» و«متى سُحب الملفّ؟».
-         * فالثاني يُجاب دائماً — ومن يراجع التدقيقَ يرى الساعةَ لا يستنتجها.
-         */
-        if ($night) $label .= ' خارج الدوام (exportNight)';
-        hub_audit($label, $module, null, $count . ' ' . $unitLabel,
-            // **الوسمُ الزمنيُّ في الأثرِ لا في الاسم** (N-7): «متى سُحب الملفّ؟» سؤالٌ
-            // مستقلٌّ عن «أاستُعمل مفتاحٌ استثنائيّ؟» — والمالكُ مستثنًى بالتصميم فلا
-            // يُوسَم سحبُه فجراً أبداً. ووضعُه في **الاسم** يجعل فعلَ التدقيق متغيّراً
-            // بالساعة (أسقطت الحزمةُ ذلك عند ١٩:٥٠) — فالحقيقةُ حقلٌ لا لفظ.
-            // // **والأثرُ يُكتب في عمودٍ موجود** (N-14 · ما كشفه إغلاقُه): `hub_audit`
-            // يمرّر `$extra` إلى `AuditEntry`، و`creating` **يُجرّد كلَّ مفتاحٍ لا
-            // عمودَ له** صامتاً (درعُ «النشر قبل الترحيل»). فمفتاحا `after_hours`
-            // و`at` المسطَّحان لم يصلا الجدولَ قطّ — **إصلاحٌ لا يُنفَّذ وهو مكتوب**.
-            // فيُوضعان في `after` (عمودُ JSON مُعمَّد): للتصديرِ لا «حالةَ بعدُ»
-            // فالعمودُ شاغرٌ له، وهو الاصطلاحُ نفسُه في سائرِ المواضع.
-            hub_after_hours() ? ['after' => ['after_hours' => true, 'at' => now()->format('H:i')]] : []);
-
-        return null;
+        return \App\Support\Platform\Modules\ModuleExport::exportBelt($module, $count, $unitLabel, $def);
     }
 
-    /**
-     * (الجولة 1 · F17) هل هذا التصديرُ واقعٌ «خارج وقت العمل» المحظورُ فيه نقلُ
-     * الملفات؟ — مرآةُ شروط `Middleware/WorkHours` حرفاً بحرف (مفتاحُ التشغيل،
-     * مفتاحُ منع الملفات، غيرُ المالكين، نافذةُ strict_from → hours_start) كي لا
-     * يفترق قرارُ الحزام عن قرارِ الوسيط.
-     */
+    /** مفوِّضٌ — المنطقُ في `ModuleExport::exportOutsideWorkHours` (docs/REORG_PLAN.md §R6) */
     protected function exportOutsideWorkHours(): bool
     {
-        // (مجلسُ الخبراء · التحقّقُ الثامن) النسخةُ اليدويّةُ صارت استدعاءً: التعريفُ
-        // في `hub_export_night()` وحدَه، فيسأله هذا البابُ وبابُ CSV الشهريِّ معاً.
-        return hub_export_night();
+        return \App\Support\Platform\Modules\ModuleExport::exportOutsideWorkHours();
     }
 
-    /**
-     * هل يشمل التصديرُ عموداً بعينه؟ — يعيد بناءَ مجموعةِ أعمدة التصدير كما تفعل
-     * `columnsAndLabels` (أعمدةُ المستخدم المخصّصةُ مقاطَعةً بالمرئي لدوره، أو
-     * الافتراضيّة)، فحزامُ ICCID يُشعَل فقط حين يكون العمودُ فعلاً في المُخرَج
-     * (لا محجوباً بـfield-mode، ولا خارجَ تفضيل الأعمدة).
-     */
+    /** مفوِّضٌ — المنطقُ في `ModuleExport::exportColumnsInclude` (docs/REORG_PLAN.md §R6) */
     protected function exportColumnsInclude(array $def, string $key): bool
     {
-        if (empty($def)) return false;
-        $fields = collect(hub_visible_fields(auth()->user(), (string) ($def['key'] ?? ''), $def));
-        if (! $fields->contains('key', $key)) return false;             // محجوبٌ عن الدور → ليس في المُخرَج
-        $userCols = array_values(array_intersect(
-            (array) hub_pref('cols.' . ($def['key'] ?? ''), []), $fields->pluck('key')->all()));
-        $keys = $userCols ?: ($def['columns'] ?? $fields->take(4)->pluck('key')->all());
-
-        return in_array($key, $keys, true);
+        return \App\Support\Platform\Modules\ModuleExport::exportColumnsInclude($def, $key);
     }
 
-    /** بث CSV بترويسة BOM (يقرأ Excel العربية) — تستعمله «تصدير القائمة» و«تصدير المحدد» */
+    /** مفوِّضٌ — المنطقُ في `ModuleExport::streamCsv` (docs/REORG_PLAN.md §R6) */
     protected function streamCsv(string $module, array $def, $rows, bool $truncated = false)
     {
-        [$columns, $labels] = $this->columnsAndLabels($def, $rows->all());
-
-        return response()->streamDownload(function () use ($rows, $columns, $labels, $truncated) {
-            $out = fopen('php://output', 'w');
-            fwrite($out, "\xEF\xBB\xBF");
-            // معامل escape الفارغ صراحةً: سلوك RFC 4180 كما يقرأ Excel، ويُسكت
-            // تحذير PHP 8.4 «$escape الافتراضي سيتغير» المتكرر مع كل سطر
-            fputcsv($out, array_column($columns, 'label'), ',', '"', '');
-            foreach ($rows as $row) {
-                $line = [];
-                foreach ($columns as $f) {
-                    $v = $row->{$f['col']} ?? '';
-                    if ($f['type'] === 'ref' && empty($f['multi'])) $v = $labels[$f['key']][$v] ?? $v;
-                    elseif ($f['type'] === 'sec') $v = '••••';
-                    elseif (is_array($v)) $v = implode('، ', $v);
-                    elseif (is_string($v) && str_starts_with($v, '[')) { $d = json_decode($v, true); if (is_array($d)) $v = implode('، ', array_map(fn ($x) => is_scalar($x) ? $x : '', $d)); }
-                    // تحييد حقن الصيغ: قيمة تبدأ بـ= + - @ أو تبويب تُنفَّذ صيغةً
-                    // في Excel على جهاز المصدِّر (=HYPERLINK تسريب، =cmd تنفيذ) —
-                    // فاصلة عليا بادئة تجعلها نصاً بريئاً كما تفعل جداول Google
-                    if (is_string($v) && $v !== '' && strpbrk($v[0], "=+-@\t\r") !== false) $v = "'" . $v;
-                    $line[] = $v;
-                }
-                fputcsv($out, $line, ',', '"', '');
-            }
-            if ($truncated) {
-                fputcsv($out, ['⚠ قُصّ التصدير عند ٥٠٠٠ صف — ضيّق الفلاتر وصدّر على دفعات'], ',', '"', '');
-            }
-            fclose($out);
-        }, $module . '-' . now()->format('Y-m-d') . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        return \App\Support\Platform\Modules\ModuleExport::streamCsv($module, $def, $rows, $truncated);
     }
 
     /**
@@ -1314,104 +1056,16 @@ class ModuleController extends Controller
         return $did;
     }
 
-    /**
-     * إبطالُ الكاش المشتقّ (نسبة الإنجاز + ربحية المشروع + أجور الساعة) — يُشارَك
-     * بين الحفظ **والحذف والاستعادة**: حذفُ مهمةٍ أو مستندٍ ماليّ يغيّر الحساب كما
-     * الحفظُ، وكانا لا يُبطلانه فيبقى progress/pl قديماً حتى انتهاء عمر الكاش.
-     */
+    /** مفوِّضٌ — المنطقُ في `ModuleCache::bustDerivedCache` (docs/REORG_PLAN.md §R6) */
     protected function bustDerivedCache(string $module, Model $m): void
     {
-        if (in_array($module, ['tasks', 'feats'], true) && ($pid = $m->project_id ?? null)) {
-            \Illuminate\Support\Facades\Cache::forget('hub:progress:' . $pid);
-        }
-
-        // ربحية المشروع: أي مدخل من مدخلاتها يُبطل حسابها المخبأ فوراً
-        if (in_array($module, ['tasks', 'fin', 'servers', 'subs', 'purchases', 'projects'], true)) {
-            $pid = $module === 'projects' ? $m->id : ($m->project_id ?? null);
-            if ($pid) \Illuminate\Support\Facades\Cache::forget('pl:' . $pid);
-        }
-
-        // أجور الساعة مشتقة من رواتب الملفات الوظيفية — تعديلها يُبطل الجدول كله
-        if ($module === 'hr') \Illuminate\Support\Facades\Cache::forget('cost:rates');
+        \App\Support\Platform\Modules\ModuleCache::bustDerivedCache($module, $m);
     }
 
-    /** نسف كاش نسبة الإنجاز عند تغيّر مهمة أو بند خطة + ختم وقت حل التذاكر (SLA) */
+    /** مفوِّضٌ — المنطقُ في `ModuleCache::bustProgress` (docs/REORG_PLAN.md §R6) */
     protected function bustProgress(string $module, Model $m): void
     {
-        $this->bustDerivedCache($module, $m);
-
-        // حالة الصنف تُشتق من كميته وحدّه فور أي حفظ — نفد/منخفض/متاح
-        if ($module === 'stock' && $m instanceof \App\Models\StockItem) hub_stock_sync($m);
-
-        // الحقول المقيسة (متابعون، إعجابات، تحميلات، تقييم) تُسجَّل نقطةً في
-        // السلسلة الزمنية مع كل حفظ — الحقل وحده يدهس ما قبله فلا يبقى نمو
-        \App\Support\Ops\Metrics::capture($module, $m);
-
-        // سياسةٌ أو مقالٌ إلزامي تغيّرت نسخته: الإقرارات القديمة تسقط ويُعاد
-        // الإعلان. بلا هذا يبقى الجميع «مُقِرّين» بنسخةٍ ماتت — امتثالٌ كاذب.
-        // دورة الإقرار (إسقاط عند تحديث النسخة + إعادة الإعلان) انتقلت إلى
-        // النموذج نفسه — Policy::booted و KbArticle::booted — فتعمل أياً كان
-        // مصدر التغيير لا من هذا المسار وحده.
-
-        // مزامنة الأصل مع صيانته: قيد التنفيذ تضعه «صيانة»، والمكتملة تختم
-        // «آخر صيانة» وتعيده «قيد الاستخدام» — كان الحقلان يدويين متناقضين
-        if ($module === 'assetlog' && $m->asset_id && ($asset = \App\Models\Asset::find($m->asset_id))) {
-            // (تدقيقُ الطور النهائيّ · §39/§63) تغييرُ حالةِ الأصلِ يمرّ بالمحرّكِ الواحد
-            // `Custody::transition` (تدقيقٌ + صفُّ تاريخٍ في asset_custody + مزامنةُ النقطة) لا
-            // بكتابةٍ صامتةٍ (saveQuietly) تتخطّى العهدةَ وتُسقط الأثر؛ والانتقالُ غيرُ المشروع
-            // (أصلٌ نهائيٌّ مباعٌ/مستبعد) يُتخطّى بلا إحياءٍ زائف. «آخرُ صيانة» حقلٌ حرٌّ يُختَم كما هو.
-            $to = null;
-            if ((string) $m->status === 'قيد التنفيذ') {
-                $to = 'صيانة';
-            } elseif ((string) $m->status === 'مكتملة') {
-                if ((string) $asset->maint !== (string) $m->date) { $asset->maint = $m->date; $asset->saveQuietly(); }
-                if (\App\Support\Assets\Custody::canonicalStatus($asset->status) === 'صيانة') $to = 'قيد الاستخدام';
-            }
-            if ($to !== null
-                && \App\Support\Assets\Custody::canonicalStatus($asset->status) !== \App\Support\Assets\Custody::canonicalStatus($to)
-                && \App\Support\Assets\Custody::canTransition($asset->status, $to)) {
-                \App\Support\Assets\Custody::transition($asset, $to, now()->toDateString(), 'مزامنةٌ من سجل الصيانة');
-            }
-        }
-
-        // إخلاء العهدة عند المغادرة: منتهية خدمته وبعهدته أصول ⟵ مهمة استرداد
-        // واحدة (لا تتكرر) تسمّي الأصول — كانت العهدة تُنسى مع المغادر
-        if ($module === 'hr' && (string) $m->status === 'منتهية خدمته' && $m->user_id) {
-            $held = \App\Models\Asset::whereNull('deleted_at')
-                ->where('holder_id', $m->user_id)->get(['id', 'name']);
-            if ($held->isNotEmpty()) {
-                $title = 'استرداد عهدة: ' . $m->name;
-                $exists = \App\Models\Task::whereNull('deleted_at')->where('title', $title)
-                    ->whereNotIn('status', ['منجزة', 'مكتملة', 'ملغاة'])->exists();
-                if (! $exists) {
-                    \App\Models\Task::create([
-                        'title' => $title, 'status' => 'جديدة', 'priority' => 'عالية',
-                        'company_id' => $m->company_id,
-                        'description' => "الموظف منتهية خدمته وبعهدته:\n- "
-                            . $held->pluck('name')->implode("\n- ")
-                            . "\n\nاسترد الأصول ووثّق التسليم بإقرارٍ موقّع ثم حوّل حالتها إلى «متاح».",
-                    ]);
-                }
-            }
-        }
-
-        if ($module === 'tickets') {
-            $meta = (array) ($m->meta ?? []);
-            $closed = in_array((string) $m->status, ['تم الحل', 'مغلقة'], true);
-            if ($closed && empty($meta['resolved_at'])) {
-                $meta['resolved_at'] = now()->toIso8601String();
-                $m->meta = $meta;
-                $m->saveQuietly();
-            } elseif (! $closed && ! empty($meta['resolved_at'])) {
-                unset($meta['resolved_at']);          // أُعيد فتحها
-                // ── Control Plane: Phase 7 (WP-7.4) ── الارتدادُ كان يُمحى بصمت:
-                // عدّادٌ تراكميّ على meta يقرؤه قارئُ الاختناقات
-                // (ExecutionStats::bottlenecks) — لا عمودَ ولا جدولَ جديد.
-                $meta['reopened'] = (int) ($meta['reopened'] ?? 0) + 1;
-                $m->meta = $meta ?: null;
-                $m->saveQuietly();
-            }
-        }
+        \App\Support\Platform\Modules\ModuleCache::bustProgress($module, $m);
     }
 
     /** حقل المسؤول (assigneeId → users) إن وُجد في الوحدة */
@@ -1469,85 +1123,22 @@ class ModuleController extends Controller
         return hub_scope($q, $module)->findOrFail($id);
     }
 
-    /**
-     * للحسابات المحدودة: يجب ربط السجل بأحد مشاريع المستخدم عند الإضافة أو التعديل.
-     * يرمي ValidationException — تتحول redirect في الويب و422 JSON في الـ API.
-     */
+    /** مفوِّضٌ — المنطقُ في `ModuleTenancy::guardProject` (docs/REORG_PLAN.md §R6) */
     protected function guardProject(Request $r, string $module): void
     {
-        if (! hub_scoped(auth()->user())) return;
-        if ($module === 'projects') return;                      // تُضبط عضويته تلقائياً في store
-        $pf = hub_project_field($module);
-        if (! $pf) return;
-
-        $ids = auth()->user()->visibleProjectIds();
-        $val = hub_str($r->input($pf['key']));
-
-        // **ولا يُطلَب اختيارٌ من قائمةٍ فارغة** (M-F2): محدودُ النطاقِ الذي لم
-        // يُسنَد إلى مشروعٍ بعد كان يُردّ هنا أبداً — فأوّلُ واجبٍ يوميٍّ يُطلَب
-        // منه (تقريرُ يومِه) أوّلُ بابٍ يُغلَق في وجهِه، والشريطُ يدعوه إليه.
-        // فيُقبل منه الفراغُ وحدَه، ويبقى صفُّه مرئيّاً له بـ`hub_scope`.
-        // ومن له مشروعٌ يُسأل عنه كما كان: الانضباطُ حيث يُمكن الوفاءُ به.
-        if ($ids === [] && $val === '') return;
-
-        if ($val === '' || ! in_array($val, $ids, true)) {
-            throw \Illuminate\Validation\ValidationException::withMessages(
-                [$pf['key'] => 'حسابك محدود النطاق — اختر مشروعاً من مشاريعك']);
-        }
+        \App\Support\Platform\Modules\ModuleTenancy::guardProject($r, $module);
     }
 
-    /**
-     * **مَن كتب هذا السجل؟** — ختمُ صاحبِه عند الإنشاء (v2.539).
-     *
-     * `hub_scope` يمنح محدودَ النطاقِ رؤيةَ **ما أنشأه هو** حين لا يحمل السجلُّ
-     * مشروعاً (M-F2): `orWhere(created_by = me)`. لكنّ العمودَ لم يكن يُكتب إلّا
-     * في نموذجين (`WorkUpdate` و`Document`) — فالفرعُ كلُّه ميّتٌ في بقيّةِ
-     * الوحدات: يكتب الموظّفُ فكرةً أو اجتماعاً بلا مشروع، فيُحفَظ الصفُّ
-     * **ويختفي عنه فوراً**. وهو أسوأُ من المنع: المنعُ يُقال، والاختفاءُ يُقرأ
-     * عطباً في النظامِ أو في الكاتب.
-     *
-     * والختمُ هنا لا في أحداثِ كلِّ نموذج: مسارٌ واحدٌ للويبِ والـAPI معاً،
-     * وبحارسِ عمودٍ فلا تسقط الكتابةُ على وحدةٍ بلا `created_by`. ومَن يختمه
-     * في `creating` (النموذجان أعلاه) يجده مختوماً فلا يُعيد.
-     */
+    /** مفوِّضٌ — المنطقُ في `ModuleTenancy::stampAuthor` (docs/REORG_PLAN.md §R6) */
     protected function stampAuthor(Model $m, string $module): void
     {
-        if (! auth()->id() || ! empty($m->created_by)) return;
-        if (! hub_has_created_by($module)) return;
-
-        $m->created_by = (string) auth()->id();
+        \App\Support\Platform\Modules\ModuleTenancy::stampAuthor($m, $module);
     }
 
-    /**
-     * وراثة الشركة النشطة لسجلٍ جديد في وحدةٍ لها عمود شركة بلا حقلٍ في نموذجها
-     * (الخدمات، قواعد التنبيه، المهام...) — وإلا وُلِد بلا شركة فاختفى فوراً من
-     * القائمة المفلترة بالشركة (whereIn يُقصي NULL). الويب يرث الشركة النشطة من
-     * الشريط، والـAPI (بلا جلسة) يرث أولى شركات المستخدم المسموحة إن كان معزولاً.
-     * يُستدعى من store وapiStore كليهما — فالمسارُ الآليّ لا يختلف عن اليدويّ.
-     */
+    /** مفوِّضٌ — المنطقُ في `ModuleTenancy::inheritCompany` (docs/REORG_PLAN.md §R6) */
     protected function inheritCompany(Model $m, string $module): void
     {
-        if ($module === 'companies' || ! ($ccol = hub_company_col($module)) || ! empty($m->{$ccol})) return;
-        $cid = (string) session('hub.company', '');
-        $allowed = hub_company_ids();
-        if ($cid !== '' && ($allowed === null || in_array($cid, $allowed, true))) {
-            $m->{$ccol} = $cid;
-        } elseif ($allowed !== null && ! empty($allowed)) {
-            // معزولٌ بلا شركة نشطة (وكلُّ نداءات API كذلك): يُنسب لأولى شركاته
-            // المسموحة بدل أن يُحفَظ بلا شركة فيختفي من قوائمه فوراً
-            $m->{$ccol} = $allowed[0];
-        } elseif ($derived = hub_company_from_parent($module, $m)) {
-            /*
-             * **والمصدرُ الثالث: أبُ السجلِّ** (L2-09). المصدرانِ أعلاه يصفان
-             * **صاحبَ الجلسة** لا السجلَّ: فمن ليس معزولاً ولا له شركةٌ نشطة —
-             * المالكُ والإدارةُ وأكثرُ الموظّفين — كان يُنشئ مهمّةً على مشروعٍ
-             * تملكه شركةٌ بعينِها فتُحفَظ **بلا مالك**. ولا يظهر الأثرُ يومَها
-             * بل يومَ يُوظَّف أوّلُ معزول: الحارسُ يُسقط كلَّ صفٍّ فارغ فيرى
-             * وحدتَه خاوية. قِيس بعد شهرِ عمل: مهامٌّ ٠ من ١٢١ وعوائقُ ٠ من ٦،
-             * و`updates` ١٨ من ٥٨٠ — أي ما كتبه معزولون وحدَهم.
-             */
-            $m->{$ccol} = $derived;
-        }
+        \App\Support\Platform\Modules\ModuleTenancy::inheritCompany($m, $module);
     }
 
     /**
@@ -1558,185 +1149,46 @@ class ModuleController extends Controller
      * ولا يظهر في قائمته — سجلٌّ يتيمٌ على منشئه نفسه، بلا كلمةٍ تقول لماذا.
      * يرثُ أولَ مشاريعه المرئية، بنفس منطق وراثة الشركة أعلاه.
      */
-    /**
-     * ونظيرُها للعميل: من يعمل في مساحة عملِ عميلٍ يُنسب سجلُّه الجديد إليه
-     * تلقائياً، والمعزولُ على عملاء (بلا مساحةٍ نشطة أو عبر API) يُنسب لأولهم —
-     * فلا يُخلق سجلٌّ في مساحة عميلٍ ثم يختفي من قوائمها فوراً.
-     */
+    /** مفوِّضٌ — المنطقُ في `ModuleTenancy::inheritClient` (docs/REORG_PLAN.md §R6) */
     protected function inheritClient(Model $m, string $module): void
     {
-        if ($module === 'clients' || ! ($kcol = hub_client_col($module)) || ! empty($m->{$kcol})) return;
-        $kid = (string) session('hub.client', '');
-        $allowed = hub_client_ids();
-        if ($kid !== '' && ($allowed === null || in_array($kid, $allowed, true))) {
-            $m->{$kcol} = $kid;
-        } elseif ($allowed !== null && ! empty($allowed)) {
-            $m->{$kcol} = $allowed[0];
-        }
+        \App\Support\Platform\Modules\ModuleTenancy::inheritClient($m, $module);
     }
 
-    /**
-     * **مشاركةُ وثيقةٍ مع عميل** (Work OS · الطور B · WP-B.5) — مسارُ الكتابةِ الوحيدُ
-     * الذي يجعل مستخدماً داخليّاً يعلّم وثيقةً «يراها العميل». حصريٌّ لوحدة `files`،
-     * وفوقَه بالفعل سياجان: `PortalGuard` (لا يبلغ حسابُ عميلٍ `/m/files` أصلاً)
-     * و`resolve()` (`hub_can`). فالكاتبُ هنا داخليٌّ لا محالة.
-     *
-     * يحترم `hub_field_mode`: دورٌ حُجب عنه `audience`/`clientId` (ro/hide) لا يكتبهما
-     * ولو حُقنا في الطلب. والغيابُ ليس تغييراً — طلبٌ لا يحمل المفتاح يُبقي القائم.
-     * القيمُ تُتحقَّق هنا وفي حارس النموذج (allowlist · C10)؛ و`client_id` يُقصر على
-     * عملاءِ الكاتب إن كان معزولاً (نظيرُ `guardClient` لوحدةٍ بلا حقل ref→clients).
-     */
+    /** مفوِّضٌ — المنطقُ في `ModuleTenancy::applyDocumentAudience` (docs/REORG_PLAN.md §R6) */
     protected function applyDocumentAudience(Request $r, string $module, Model $m): void
     {
-        if ($module !== 'files') return;
-        $u = auth()->user();
-
-        if ($r->has('audience') && hub_field_mode($u, $module, 'audience') === '') {
-            $val = hub_str($r->input('audience'));
-            if (in_array($val, \App\Models\Document::AUDIENCES, true)) {
-                $m->audience = $val;
-            }
-        }
-
-        if ($r->has('clientId') && hub_field_mode($u, $module, 'clientId') === '') {
-            $val = hub_str($r->input('clientId'));
-            if ($val === '') {
-                $m->client_id = null;
-            } else {
-                $ids = hub_client_ids($u);
-                if ($ids !== null && ! in_array($val, $ids, true)) {
-                    throw \Illuminate\Validation\ValidationException::withMessages(
-                        ['clientId' => 'حسابك معزول على عملاء محددين — اختر عميلاً من عملائك']);
-                }
-                $m->client_id = $val;
-            }
-        }
+        \App\Support\Platform\Modules\ModuleTenancy::applyDocumentAudience($r, $module, $m);
     }
 
+    /** مفوِّضٌ — المنطقُ في `ModuleTenancy::inheritProject` (docs/REORG_PLAN.md §R6) */
     protected function inheritProject(Model $m, string $module): void
     {
-        if ($module === 'projects' || ! hub_scoped(auth()->user())) return;
-        if (! ($pcol = hub_project_col($module)) || ! empty($m->{$pcol})) return;
-
-        $ids = auth()->user()->visibleProjectIds();
-        if ($ids) $m->{$pcol} = $ids[0];
+        \App\Support\Platform\Modules\ModuleTenancy::inheritProject($m, $module);
     }
 
-    /**
-     * ونظيرُها للعميل (v2.399): كان المعزولُ على عملاء يكتب `clientId` لعميلٍ أجنبيّ
-     * (‏`exists` وحدها) فيُنسب سجلُّه لمساحة عميلٍ آخر ويختفي عنه — التماثلُ الذي
-     * صُلِّح للشركات ولم يُعكَس للعملاء.
-     */
+    /** مفوِّضٌ — المنطقُ في `ModuleTenancy::guardClient` (docs/REORG_PLAN.md §R6) */
     protected function guardClient(Request $r, string $module): void
     {
-        $ids = hub_client_ids();
-        if ($ids === null || $module === 'clients') return;
-        $kf = collect(hub_mod($module)['fields'] ?? [])
-            ->first(fn ($f) => ($f['type'] ?? '') === 'ref' && ($f['ref'] ?? '') === 'clients' && empty($f['multi']));
-        if (! $kf) return;
-        if (hub_field_mode(auth()->user(), $module, $kf['key']) !== '') return;
-
-        $val = hub_str($r->input($kf['key']));
-        if ($val === '') return;   // الفراغُ يرثه inheritClient — لا حبسَ للحفظ
-        if (! in_array($val, $ids, true)) {
-            throw \Illuminate\Validation\ValidationException::withMessages(
-                [$kf['key'] => 'حسابك معزول على عملاء محددين — اختر عميلاً من عملائك']);
-        }
+        \App\Support\Platform\Modules\ModuleTenancy::guardClient($r, $module);
     }
 
-    /** العزل الصارم: من له شركات مسموحة يربط السجل بإحداها فقط عند الإضافة أو التعديل */
+    /** مفوِّضٌ — المنطقُ في `ModuleTenancy::guardCompany` (docs/REORG_PLAN.md §R6) */
     protected function guardCompany(Request $r, string $module): void
     {
-        $ids = hub_company_ids();
-        if ($ids === null || $module === 'companies') return;
-        $cf = collect(hub_mod($module)['fields'] ?? [])
-            ->first(fn ($f) => ($f['type'] ?? '') === 'ref' && ($f['ref'] ?? '') === 'companies' && empty($f['multi']));
-        if (! $cf) return;
-        // حقل الشركة مخفيّ أو للقراءة لدور المستخدم: النموذج لا يرسله وfill لا يكتبه،
-        // فالقيمة القائمة تبقى وhub_scope يفرض العزل قراءةً — لا تحبس الحفظ عبثاً.
-        if (hub_field_mode(auth()->user(), $module, $cf['key']) !== '') return;
-
-        $val = hub_str($r->input($cf['key']));
-        if ($val === '' || ! in_array($val, $ids, true)) {
-            throw \Illuminate\Validation\ValidationException::withMessages(
-                [$cf['key'] => 'حسابك معزول على شركات محددة — اختر شركة من شركاتك']);
-        }
+        \App\Support\Platform\Modules\ModuleTenancy::guardCompany($r, $module);
     }
 
-    /**
-     * **طلبُ حسابٍ مع موظفٍ جديد: شروطُه تُفحص قبل الحفظ لا بعده.**
-     *
-     * البريد اختياريّ في نموذج الموظف، وفتحُ الحساب يحتاجه (البريدُ هوية
-     * الدخول). فمن يضع علامة «🔑 افتح له حساب» بلا بريد كان يُحفظ موظفُه
-     * ويُبتلع طلبُ حسابه **صامتاً** ويُقال له «أُضيف السجل بنجاح» — فيظنّ أنّ
-     * للرجل حساباً ولا يكتشف خلافَ ذلك إلا حين لا يستطيع الدخول.
-     *
-     * والفحصُ قبل الحفظ لا بعده: **إمّا الطرفان معاً وإمّا لا شيء وسببٌ مكتوب**
-     * — لا موظفٌ محفوظٌ ونصفُ طلبٍ ساقط.
-     *
-     * ويُتخطّى الفحصُ لمن لا يملك إدارة المستخدمين: الخيارُ لا يُعرض له أصلاً،
-     * وإرسالُه مفتعلاً يُردّ في `Staff::makeAccount` بـ403 — ولا يُحرم من حفظ
-     * ملفٍّ وظيفيّ هو مسموحٌ له أصلاً.
-     */
+    /** مفوِّضٌ — المنطقُ في `ModuleTenancy::guardAccountRequest` (docs/REORG_PLAN.md §R6) */
     protected function guardAccountRequest(Request $r, string $module): void
     {
-        if ($module !== 'hr' || ! $r->boolean('_make_account')) return;
-        if (! hub_flag(auth()->user(), 'users')) return;
-
-        $err = [];
-        if (blank($r->input('email'))) {
-            $err['email'] = 'فتحُ حسابٍ يحتاج بريداً إلكترونياً — البريد هو هوية الدخول.'
-                . ' أضِف البريد، أو أزِل خيار «افتح له حساب نظام» وافتحه لاحقاً من شاشة المستخدمين.';
-        }
-
-        $roleId = hub_str($r->input('_account_role'));
-        if ($roleId === '' || ! \App\Models\Role::find($roleId)) {
-            $err['_account_role'] = 'اختر دورَ الحساب — الدور يحدّد ما يراه صاحبه وما يفعله.';
-        }
-
-        if ($err) throw \Illuminate\Validation\ValidationException::withMessages($err);
+        \App\Support\Platform\Modules\ModuleTenancy::guardAccountRequest($r, $module);
     }
 
-    /** أعمدة الجدول (من تعريف الوحدة) + أسماء العرض للمراجع الظاهرة في الصفحة */
+    /** مفوِّضٌ — المنطقُ في `ModuleExport::columnsAndLabels` (docs/REORG_PLAN.md §R6) */
     protected function columnsAndLabels(array $def, array $rows, bool $all = false): array
     {
-        // صلاحيات مستوى الحقل: المخفي عن دور المستخدم لا يظهر في جدول ولا صفحة ولا تصدير
-        $fields = collect(hub_visible_fields(auth()->user(), (string) ($def['key'] ?? ''), $def));
-        // أعمدة المستخدم المخصصة تتقدم على أعمدة السجل — وتُقاطَع مع المرئي لدوره
-        $userCols = $all ? [] : array_values(array_intersect(
-            (array) hub_pref('cols.' . ($def['key'] ?? ''), []), $fields->pluck('key')->all()));
-        $keys   = $all ? $fields->pluck('key')->all()
-            : ($userCols ?: ($def['columns'] ?? $fields->take(4)->pluck('key')->all()));
-        $cols   = $fields->whereIn('key', $keys)->values()->all();
-
-        $labels = [];
-        foreach ($fields->where('type', 'ref') as $f) {
-            if (! $all && ! in_array($f['key'], $keys, true)) continue;
-            $ids = [];
-            foreach ($rows as $row) {
-                $v = $row->{$f['col']} ?? null;
-                if (! $v) continue;
-                if (! empty($f['multi'])) {
-                    $arr = is_array($v) ? $v : (json_decode($v, true) ?: []);
-                    $ids = array_merge($ids, $arr);
-                } else {
-                    $ids[] = $v;
-                }
-            }
-            // (الطور H · WP-H.1 · §37) حافّةُ بنيةٍ مُعلَنة (`edge` في السجل): الاسمُ
-            // لا يُحَلُّ إلا لقارئٍ يملك وحدةَ الطرف الآخر — «الحافّةُ لمن يملك
-            // طرفَيها». القناعُ «—» لا المعرِّفُ الخام: الاسمُ وحده تسريبٌ (نمطُ
-            // AuditScopeLeakTest) والمعرِّفُ إفشاءُ وجودٍ — ترشيحٌ خادميٌّ هنا
-            // (يسري على الصفحة والجدول والتصدير معاً) لا إخفاءُ JS.
-            if (! empty($f['edge']) && ! hub_can(auth()->user(), (string) $f['ref'], 'v')) {
-                $labels[$f['key']] = array_fill_keys(
-                    array_values(array_unique(array_map('strval', array_filter($ids)))), '—');
-                continue;
-            }
-            $labels[$f['key']] = hub_ref_labels($f['ref'], $ids);
-        }
-
-        return [$cols, $labels];
+        return \App\Support\Platform\Modules\ModuleExport::columnsAndLabels($def, $rows, $all);
     }
 
     /** خيارات حالة الوحدة (إن وُجد عمود حالة) */
@@ -1772,131 +1224,16 @@ class ModuleController extends Controller
         return $out;
     }
 
-    /** قواعد التحقق من تعريف الوحدة — الحقول السرية مطلوبة عند الإنشاء فقط (التعديل الفارغ يُبقي القديم) */
+    /** مفوِّضٌ — المنطقُ في `ModuleValidation::rules` (docs/REORG_PLAN.md §R6) */
     protected function rules(array $def, bool $creating = true): array
     {
-        $rules = [];
-        foreach ($def['fields'] as $f) {
-            // حقل ممنوع على الدور لا يُتحقق منه (وإلا استحال الحفظ بحقل إلزامي مخفي)
-            if (hub_field_mode(auth()->user(), (string) ($def['key'] ?? ''), $f['key']) !== '') continue;
-
-            // **الإلزامُ يُسأل عنه لا يُقرأ خاماً** (M-F2): حقلُ مرجعٍ قائمتُه خاويةٌ
-            // لهذا القارئِ طريقٌ مسدود، و`hub_field_required` هي الحكمُ الواحدُ
-            // الذي يقرؤه القالبُ أيضاً — فلا نجمةٌ ترسمها شاشةٌ ويكذّبها متحقّق.
-            $required = hub_field_required((string) ($def['key'] ?? ''), $f)
-                && ($creating || ($f['type'] ?? '') !== 'sec');
-            $r = [$required ? 'required' : 'nullable'];
-            $r[] = match ($f['type']) {
-                'num', 'big' => 'numeric',
-                'date', 'dt' => 'date',
-                'file', 'img' => 'file',
-                // كانت تسقط للنص: صندوق المتصفح يمر بـ«1» صدفةً، لكن الـ API
-                // بقيمة منطقية true يُرفض برسالة «يجب أن يكون نصاً».
-                'bool' => 'boolean',
-                default => 'string',
-            };
-            if ($f['type'] === 'ref' && ($t = hub_ref_table($f['ref']))) {
-                $r = empty($f['multi'])
-                    ? [$r[0], "exists:$t,id"]
-                    : [$r[0], 'array'];
-            }
-            if (in_array($f['type'], ['file', 'img'], true)) {
-                // امتداداتُ التنفيذ والترميز محظورة: SVG/HTML تحمل سكربتاً يعمل
-                // بأصل التطبيق إن فُتحت، وPHP قنبلةٌ إن لمسها الخادم يوماً.
-                // البوابة تخدم الغريب تنزيلاً قسرياً — وهذا حزامُ الأمان الثاني.
-                $r = [$r[0], 'file', 'max:' . hub_upload_cap()['kb'],
-                    function ($attr, $file, $fail) {
-                        $ext = strtolower((string) $file->getClientOriginalExtension());
-                        if (in_array($ext, ['php', 'phtml', 'phar', 'html', 'htm', 'xhtml', 'svg', 'svgz', 'js', 'mjs'], true)) {
-                            $fail('هذا النوع من الملفات لا يُرفع — قد يحمل شيفرةً تنفيذية. حوّله إلى PDF أو صورة.');
-                        }
-                    }];
-            }
-
-            // سقفُ الطول من **عرض العمود نفسه**: كان الحقل النصّي يُتحقّق منه
-            // كـ`string` بلا حدّ، وSQLite لا يفرض طول varchar فتمرّ الحزمة،
-            // ثم يرفض MySQL القيمة في الإنتاج بـ22001. الرفضُ برسالةٍ للمستخدم
-            // خيرٌ من خمسمئةٍ بعد أن يكون السجل قد كُتب.
-            if (in_array($f['type'], ['text', 'sel', 'url', 'sec'], true)
-                && ($w = hub_col_max($def['table'] ?? '', $f['col'] ?? $f['key']))) {
-                $r[] = 'max:' . $w;
-            }
-            // **مدى العدد من العمود نفسه**: كان num/big يُتحقّق كـ`numeric`
-            // بلا حدّ، فقيمةٌ تفوق decimal(M,D) تمرّ على SQLite ثم يرفضها MySQL بـ22003
-            // (٥٠٠ ورسالةٌ تُسرّب القيمة). الحدُّ يرفضها للمستخدم قبل القاعدة.
-            // ومدىً لا سقفاً متناظراً (v2.550): العمودُ الصحيحُ لم يكن يُقرأ أصلاً،
-            // و٨٣ من ٨٧ تصريحاً منه `unsigned` — أرضيّتُه صفرٌ، فـ`-5` في
-            // `unsignedTinyInteger` يرفضه MySQL بالخطأ نفسِه الذي يرفض به ٩٩٩٩.
-            if (in_array($f['type'], ['num', 'big'], true)
-                && ($rg = hub_col_num_range($def['table'] ?? '', $f['col'] ?? $f['key'])) !== null) {
-                $r[] = 'between:' . $rg[0] . ',' . $rg[1];   // نصٌّ دقيقٌ من تصريحِ العمود (لا float)
-            }
-            // وقائمةُ الخيارات تُلزِم: شاشةُ الحالة تفرضها منذ v2.x والنموذج لا
-            if (($f['type'] ?? '') === 'sel' && ! empty($f['options'])) {
-                $r[] = \Illuminate\Validation\Rule::in($f['options']);
-            }
-            // **قيودٌ يعلنها السجلّ** (v2.399) — لا شيفرةَ لكل وحدة:
-            //  · `ta` بسقف عمود TEXT (كان بلا حدّ فيمرّ على SQLite ويرفضه MySQL بعد الكتابة)
-            //  · `min` للأعداد (كمّيةُ المخزون لا تكون سالبة من نموذج التعديل العامّ)
-            //  · `format: time` لحقول الوقت النصّية (كان «صباحاً 9» يُحسب ٤٩٦٧٦١ ساعة)
-            //  · `unique` لعمودٍ متفرّد (رقمُ العرض) — بالرسالة لا بفهرسٍ يسقط على بياناتٍ قائمة
-            if ($f['type'] === 'ta') $r[] = 'max:' . (hub_col_max($def['table'] ?? '', $f['col'] ?? $f['key']) ?: 65535);
-            if (isset($f['min']) && in_array($f['type'], ['num', 'big'], true)) $r[] = 'min:' . $f['min'];
-            if (($f['format'] ?? '') === 'time') $r[] = 'regex:/^([01]?\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/';
-            if (! empty($f['unique']) && ! empty($def['table'])) {
-                $uq = \Illuminate\Validation\Rule::unique($def['table'], $f['col'] ?? $f['key'])->ignore(request()->route('id'));
-                if (hub_has_col($def['table'], 'deleted_at')) $uq->whereNull('deleted_at');
-                $r[] = $uq;
-            }
-
-            $rules[$f['key']] = $r;
-        }
-
-        // **تفرّدٌ مركّب** (v2.399): `unique_together` في تعريف الوحدة — موظفٌ ويومٌ في الحضور
-        // مثلاً: صفّان بالمفاتيح نفسِها كانا يُقبلان ولا ترى الخدمةُ الذاتية إلا الأول.
-        foreach ((array) ($def['unique_together'] ?? []) as $combo) {
-            $combo = array_values((array) $combo);
-            $first = $combo[0] ?? null;
-            if (! $first || ! isset($rules[$first]) || empty($def['table'])) continue;
-            $rules[$first][] = function ($attr, $value, $fail) use ($def, $combo) {
-                $q = \Illuminate\Support\Facades\DB::table($def['table']);
-                foreach ($combo as $k) {
-                    $f = collect($def['fields'])->firstWhere('key', $k);
-                    $v = request()->input($k);
-                    if (! $f || $v === null || $v === '' || is_array($v)) return;
-                    ($f['type'] ?? '') === 'date'
-                        ? $q->whereDate($f['col'] ?? $k, substr((string) $v, 0, 10))
-                        : $q->where($f['col'] ?? $k, $v);
-                }
-                if ($id = request()->route('id')) $q->where('id', '!=', $id);
-                if (hub_has_col($def['table'], 'deleted_at')) $q->whereNull('deleted_at');
-                if ($q->exists()) $fail('يوجد سجلٌّ بهذه القيم نفسِها — لا يُكرَّر');
-            };
-        }
-
-        // الحقول المخصصة (باني الحقول)
-        foreach (hub_custom_fields($def['key'] ?? null) as $cf) {
-            $r = [! empty($cf['required']) ? 'required' : 'nullable'];
-            $r[] = match ($cf['type'] ?? 'text') {
-                'num'  => 'numeric',
-                'date' => 'date',
-                default => 'string',
-            };
-            if (($cf['type'] ?? '') === 'ref' && ($t = hub_ref_table($cf['ref'] ?? ''))) $r[] = "exists:$t,id";
-            $rules['custom.' . $cf['key']] = $r;
-        }
-
-        return $rules;
+        return \App\Support\Platform\Modules\ModuleValidation::rules($def, $creating);
     }
 
-    /** تسميات الحقول العربية لرسائل التحقق (:attribute) — تشمل الحقول المخصصة */
+    /** مفوِّضٌ — المنطقُ في `ModuleValidation::attrs` (docs/REORG_PLAN.md §R6) */
     protected function attrs(array $def): array
     {
-        $out = [];
-        foreach ($def['fields'] as $f) $out[$f['key']] = $f['label'];
-        foreach (hub_custom_fields($def['key'] ?? null) as $cf) $out['custom.' . $cf['key']] = $cf['label'];
-
-        return $out;
+        return \App\Support\Platform\Modules\ModuleValidation::attrs($def);
     }
 
     /** تعبئة الموديل من الطلب حسب نوع كل حقل */

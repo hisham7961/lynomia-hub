@@ -19,8 +19,6 @@
 
 @include('ai._sections')
 
-@if (session('ok'))<div class="alert ok">{{ session('ok') }}</div>@endif
-
 <div class="card">
     <h3>الحالة</h3>
     <div class="sub">

@@ -1,12 +1,12 @@
 {
-    "_generator": "App\\Support\\MobileOpenApi::capabilities() — مُشتقٌّ من المسارات الحيّة (php artisan tinker / اختبار الانحراف)",
+    "_generator": "App\\Support\\Mobile\\MobileOpenApi::capabilities() — مُشتقٌّ من المسارات الحيّة (php artisan tinker / اختبار الانحراف)",
     "_note": "بيانٌ آليّ — لا يُحرَّر يدويّاً؛ يُعاد توليدُه من المسارات فلا يصف قدرةً غيرَ مبنيّة",
     "namespace": "/api/mobile/v1",
     "mobile_api_version": "1",
     "schema_version": "8e9f8dd5bb93",
     "openapi": {
         "live": "/api/mobile/v1/openapi.json",
-        "generator": "App\\Support\\MobileOpenApi::spec()"
+        "generator": "App\\Support\\Mobile\\MobileOpenApi::spec()"
     },
     "auth": {
         "type": "first_party_session",
@@ -45,7 +45,7 @@
         "biometrics": "جانبُ التطبيق فقط — الخادمُ لا يستقبل قوالبَ حيويّة قط"
     },
     "error_codes": {
-        "contract": "App\\Support\\Api::CODES (موحَّدٌ مع /api/v1 — لا يُعاد تسميةُ كودٍ قائم)",
+        "contract": "App\\Support\\Platform\\Api::CODES (موحَّدٌ مع /api/v1 — لا يُعاد تسميةُ كودٍ قائم)",
         "reused": [
             "UNAUTHENTICATED",
             "ACCOUNT_RESTRICTED",
@@ -114,7 +114,7 @@
             "id": "string (UUID)",
             "action": "show"
         },
-        "source_of_truth": "App\\Support\\NotificationLink::target() — نفسُها التي تصدرها notifications/{id}/target والبحثُ واللوحة",
+        "source_of_truth": "App\\Support\\Collaboration\\NotificationLink::target() — نفسُها التي تصدرها notifications/{id}/target والبحثُ واللوحة",
         "null_semantics": "target=null ⇒ لا وجهةَ سجلٍّ (يعود التطبيقُ لقائمة الإشعارات) — نظيرُ الويب",
         "no_hardcoded_screens": true,
         "universal_link_encoding": {
