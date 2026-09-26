@@ -96,7 +96,7 @@ class ImportController extends Controller
         // خارج الحلقة لا داخلها: فحص العمود استعلام information_schema ثابت
         // النتيجة، وكان يُنفَّذ لكل صف؛ وحلّ المراجع يُخبّأ فاسم الشركة المتكرر
         // في آلاف الصفوف لا يُستعلم إلا مرة
-        $hasCompany = \Illuminate\Support\Facades\Schema::hasColumn($def['table'], 'company_id');
+        $hasCompany = \App\Support\Platform\SchemaCache::hasColumn($def['table'], 'company_id');
         $allowed = hub_company_ids();
         $this->refCache = [];
 

@@ -66,10 +66,10 @@ final class Ownership
         $table = (string) ($def['table'] ?? '');
         if ($table !== '' && Schema::hasTable($table)) {
             foreach (self::ASSIGN_COLS as $col) {
-                if (! Schema::hasColumn($table, $col)) continue;
+                if (! \App\Support\Platform\SchemaCache::hasColumn($table, $col)) continue;
 
                 $q = DB::table($table)->whereNotNull($col)->where($col, '!=', '');
-                if (Schema::hasColumn($table, 'deleted_at')) $q->whereNull('deleted_at');
+                if (\App\Support\Platform\SchemaCache::hasColumn($table, 'deleted_at')) $q->whereNull('deleted_at');
 
                 foreach ($q->selectRaw("{$col} as uid, count(*) as n")->groupBy($col)->get() as $r) {
                     $score[(string) $r->uid]['holds'] = (int) $r->n;

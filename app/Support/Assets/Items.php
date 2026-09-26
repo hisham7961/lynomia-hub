@@ -3,7 +3,6 @@
 namespace App\Support\Assets;
 
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /** محلل بنود المستندات المشترك (عروض الأسعار وأوامر الشراء): «وصف | كمية | سعر | وحدات الكرتونة؟» لكل سطر */
 class Items
@@ -109,13 +108,13 @@ class Items
     /** اسم المنتج (lowercase) → carton_qty، من جدول المخزون بعزل الشركة إن وُجدت */
     protected static function stockCartonMap(?string $companyId): array
     {
-        if (! Schema::hasTable('stock_items') || ! Schema::hasColumn('stock_items', 'carton_qty')) {
+        if (! \App\Support\Platform\SchemaCache::hasColumn('stock_items', 'carton_qty')) {
             return [];
         }
         $q = DB::table('stock_items')->whereNull('deleted_at')
             ->whereNotNull('carton_qty')->where('carton_qty', '>', 0)
             ->whereNotNull('name')->where('name', '!=', '');
-        if ($companyId !== null && $companyId !== '' && Schema::hasColumn('stock_items', 'company_id')) {
+        if ($companyId !== null && $companyId !== '' && \App\Support\Platform\SchemaCache::hasColumn('stock_items', 'company_id')) {
             // يشمل الصنف بلا شركة (مشترك) + صنف الشركة النشطة — لا يفضح صنف شركةٍ أخرى
             $q->where(fn ($w) => $w->where('company_id', $companyId)->orWhereNull('company_id'));
         }

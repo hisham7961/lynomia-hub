@@ -5,7 +5,6 @@ namespace App\Support\Ai\Auditor\Detectors;
 use App\Models\User;
 use App\Support\Ai\Auditor\Detector;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * **قرارٌ بلا مهمّةٍ تنفّذه:** قرارٌ مفتوحٌ منذ أسبوعٍ فأكثر — أو تجاوز موعدَه — ولا مهمّةَ
@@ -47,7 +46,7 @@ final class DecisionWithoutTask implements Detector
     public function detect(User $auditor): array
     {
         $this->complete = true;
-        if (! Schema::hasColumn('tasks', 'decision_id')) return [];
+        if (! \App\Support\Platform\SchemaCache::hasColumn('tasks', 'decision_id')) return [];
 
         $today = now()->toDateString();
         $cutoff = now()->subDays(self::MIN_AGE_DAYS);

@@ -227,7 +227,7 @@ class WidgetRegistry
                     // درعُ النشر-قبل-الترحيل: إن غاب العمود بعدُ لا نفلتر به فينفجر —
                     // بل نتحفّظ فنقصرها على نشاط المستخدم نفسه (لا تسريبَ ولا انهيار).
                     if (($cids = hub_company_ids($u)) !== null) {
-                        if (Schema::hasColumn('audits', 'company_id')) {
+                        if (\App\Support\Platform\SchemaCache::hasColumn('audits', 'company_id')) {
                             $q->whereIn('audits.company_id', $cids);
                         } else {
                             $q->where('audits.user_id', $u->id);

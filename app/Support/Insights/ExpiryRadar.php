@@ -82,7 +82,7 @@ final class ExpiryRadar
                 $disp = hub_display_col($mk);
                 $acol = $alertCols[$mk] ?? null;
                 try {
-                    if ($acol && ! \Illuminate\Support\Facades\Schema::hasColumn($md['table'], $acol)) $acol = null;
+                    if ($acol && ! \App\Support\Platform\SchemaCache::hasColumn($md['table'], $acol)) $acol = null;
                     $q = \Illuminate\Support\Facades\DB::table($md['table'])
                         ->whereNull('deleted_at')
                         ->whereNotNull($f['col'])
@@ -96,13 +96,13 @@ final class ExpiryRadar
                     // مسار (حالةُ شهادة الدومين مثلاً) — الإقصاءُ بها يُسقط من
                     // الرادار أشدَّ السجلات حاجةً إليه
                     if (empty($md['expiryIgnoresStatus'])
-                        && ($sc = hub_status_col($mk)) && \Illuminate\Support\Facades\Schema::hasColumn($md['table'], $sc)) {
+                        && ($sc = hub_status_col($mk)) && \App\Support\Platform\SchemaCache::hasColumn($md['table'], $sc)) {
                         $q->where(fn ($w) => $w->whereNull($sc)->orWhereNotIn($sc, hub_closed_states()));
                     }
 
                     // مستند مالي سُدّد بالكامل لا يستحق تنبيه استحقاق ولو لم تُحدَّث حالته:
                     // السداد المسجَّل هو الحقيقة، لا التسمية.
-                    if ($mk === 'fin' && \Illuminate\Support\Facades\Schema::hasColumn($md['table'], 'paid')) {
+                    if ($mk === 'fin' && \App\Support\Platform\SchemaCache::hasColumn($md['table'], 'paid')) {
                         $q->whereRaw('COALESCE(paid,0) < COALESCE(total,0)');
                     }
 
@@ -225,8 +225,7 @@ final class ExpiryRadar
          * صراحةً عن القارئِ لا تظهر له ولو كانت على ملفِّه — القرارُ لمن قيّدها.
          */
         try {
-            if (\Illuminate\Support\Facades\Schema::hasTable('attachments')
-                && \Illuminate\Support\Facades\Schema::hasColumn('attachments', 'expires_at')) {
+            if (\App\Support\Platform\SchemaCache::hasColumn('attachments', 'expires_at')) {
                 /*
                  * **النموذجُ كاملاً لا منتقىً** (مجلس الخبراء). كنتُ أنتقي أربعةَ
                  * أعمدةٍ ثمّ أُسلّم النموذجَ الناقصَ إلى `DocumentPolicy` — فتصير

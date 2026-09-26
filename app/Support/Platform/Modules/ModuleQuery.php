@@ -90,7 +90,7 @@ final class ModuleQuery
             // «عرض الكل» ترشيحاً على أي عمود يُسمّيه الرابط، وهو كاشفٌ للقيم بالاستدلال.
             $implicit = ['company_id' => 'companies', 'project_id' => 'projects'];
             if (isset($implicit[$fk]) && ($tbl = $def['table'] ?? null)
-                && \Illuminate\Support\Facades\Schema::hasColumn($tbl, $fk)) {
+                && \App\Support\Platform\SchemaCache::hasColumn($tbl, $fk)) {
                 $q->where($fk, $fv);
                 $filters[] = ['key' => $fk, 'label' => hub_mod($implicit[$fk])['label'] ?? $fk,
                               'val' => $fv,

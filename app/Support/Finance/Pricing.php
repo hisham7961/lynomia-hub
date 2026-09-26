@@ -32,7 +32,7 @@ class Pricing
                    'competitors' => 'competitors', 'applications' => 'apps'][$t] ?? null;
         if ($module) return hub_read($module);
 
-        return DB::table($t)->when(Schema::hasColumn($t, 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'));
+        return DB::table($t)->when(\App\Support\Platform\SchemaCache::hasColumn($t, 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'));
     }
 
     /** التكلفة والهامش حقولٌ قد تُحجب — والباقة تُعرض بلاهما لا بهما مكشوفَين */

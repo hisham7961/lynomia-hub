@@ -156,7 +156,7 @@ class Acks
             if (! $md || ! Schema::hasTable($md['table']) || ! hub_can($user, $module, 'v')) continue;
 
             $col = $def['who']['col'];
-            if (! Schema::hasColumn($md['table'], $col)) continue;
+            if (! \App\Support\Platform\SchemaCache::hasColumn($md['table'], $col)) continue;
 
             $q = hub_scope(DB::table($md['table'])->whereNull('deleted_at'), $module, $user);
             $q = $def['who']['type'] === 'one'

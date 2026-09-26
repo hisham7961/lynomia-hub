@@ -5,7 +5,6 @@ namespace App\Support\Insights;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * مركز الإعلام والفعاليات — الظهورُ أثرٌ لا أرشيف.
@@ -31,7 +30,7 @@ class MediaCenter
         $module = ['media_items' => 'media', 'events' => 'events'][$t] ?? null;
         if ($module) return hub_read($module);
 
-        return DB::table($t)->when(Schema::hasColumn($t, 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'));
+        return DB::table($t)->when(\App\Support\Platform\SchemaCache::hasColumn($t, 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'));
     }
 
     /** خطّ الزمن: وصولٌ وعددُ ظهوراتٍ لكل شهر — النموّ يُرى لا يُخمَّن */

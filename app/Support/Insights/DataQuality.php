@@ -303,7 +303,7 @@ class DataQuality
                 if ($table === '' || ! Schema::hasTable($table)) continue;
 
                 $base = fn () => DB::table($table)
-                    ->when(Schema::hasColumn($table, 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'));
+                    ->when(\App\Support\Platform\SchemaCache::hasColumn($table, 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'));
 
                 $total = (int) $base()->count();
                 if (! $total) continue;                   // وحدةٌ فارغة: لا نقص فيها

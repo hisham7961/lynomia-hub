@@ -78,15 +78,15 @@ class AuditController extends Controller
             'actions' => \Illuminate\Support\Facades\Cache::remember('audit:actions', 300, fn () => DB::table('audits')->distinct()->orderBy('action')->limit(40)->pluck('action')),
             'roles'   => DB::table('roles')->orderBy('name')->orderBy('id')->pluck('name', 'id'),
             'companies' => DB::table('companies')
-                ->when(Schema::hasColumn('companies', 'deleted_at'), fn ($w) => $w->whereNull('deleted_at'))
+                ->when(\App\Support\Platform\SchemaCache::hasColumn('companies', 'deleted_at'), fn ($w) => $w->whereNull('deleted_at'))
                 ->when($cids !== null, fn ($w) => $w->whereIn('id', $cids))
                 ->orderBy('name_ar')->orderBy('id')->pluck('name_ar', 'id'),
             'projects' => DB::table('projects')
-                ->when(Schema::hasColumn('projects', 'deleted_at'), fn ($w) => $w->whereNull('deleted_at'))
+                ->when(\App\Support\Platform\SchemaCache::hasColumn('projects', 'deleted_at'), fn ($w) => $w->whereNull('deleted_at'))
                 ->when(hub_scoped($u), fn ($w) => $w->whereIn('id', $u->visibleProjectIds()))
                 ->orderBy('name')->orderBy('id')->pluck('name', 'id'),
             'clients' => DB::table('clients')
-                ->when(Schema::hasColumn('clients', 'deleted_at'), fn ($w) => $w->whereNull('deleted_at'))
+                ->when(\App\Support\Platform\SchemaCache::hasColumn('clients', 'deleted_at'), fn ($w) => $w->whereNull('deleted_at'))
                 ->when($kids !== null, fn ($w) => $w->whereIn('id', $kids))
                 ->orderBy('name')->orderBy('id')->pluck('name', 'id'),
             'categories' => $this->categories(),

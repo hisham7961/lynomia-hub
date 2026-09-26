@@ -1368,7 +1368,7 @@ class ModuleController extends Controller
     protected function stampFileName(Model $m, array $def, string $col, $file): void
     {
         $table = (string) ($def['table'] ?? '');
-        if ($table === '' || ! \Illuminate\Support\Facades\Schema::hasColumn($table, 'meta')) return;
+        if ($table === '' || ! \App\Support\Platform\SchemaCache::hasColumn($table, 'meta')) return;
 
         $meta = $m->meta;
         $arr = is_array($meta) ? $meta : (json_decode((string) $meta, true) ?: []);

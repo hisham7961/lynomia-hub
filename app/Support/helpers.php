@@ -105,7 +105,7 @@ if (! function_exists('hub_project_col')) {
 
         $table = hub_mod($module)['table'] ?? null;
         try {
-            $has = $table && \Illuminate\Support\Facades\Schema::hasColumn($table, 'project_id');
+            $has = $table && \App\Support\Platform\SchemaCache::hasColumn($table, 'project_id');
         } catch (\Throwable $e) {
             $has = false;
         }
@@ -140,7 +140,7 @@ if (! function_exists('hub_has_assignee_col')) {
         $table = hub_modules()[$module]['table'] ?? null;
 
         return $memo[$module] = (bool) ($table
-            && \Illuminate\Support\Facades\Schema::hasColumn($table, 'assignee_id'));
+            && \App\Support\Platform\SchemaCache::hasColumn($table, 'assignee_id'));
     }
 }
 
@@ -367,7 +367,7 @@ if (! function_exists('hub_client_col')) {
 
         $table = hub_mod($module)['table'] ?? null;
         try {
-            $has = $table && \Illuminate\Support\Facades\Schema::hasColumn($table, 'client_id');
+            $has = $table && \App\Support\Platform\SchemaCache::hasColumn($table, 'client_id');
         } catch (\Throwable $e) {
             $has = false;
         }
@@ -1318,11 +1318,8 @@ if (! function_exists('hub_has_col')) {
      */
     function hub_has_col(string $table, string $col): bool
     {
-        return (bool) \Illuminate\Support\Facades\Cache::remember(
-            'hub:hascol:' . $table . '.' . $col, 300,
-            fn () => \Illuminate\Support\Facades\Schema::hasTable($table)
-                  && \Illuminate\Support\Facades\Schema::hasColumn($table, $col)
-        );
+        // خريطةُ أعمدةٍ لكلِّ جدولٍ لا مفتاحٌ لكلِّ عمود، وتُفرَّغ مع أيِّ DDL أو هجرة (PERF-05)
+        return \App\Support\Platform\SchemaCache::hasColumn($table, $col);
     }
 }
 
@@ -1811,7 +1808,7 @@ if (! function_exists('hub_has_created_by')) {
         $table = hub_modules()[$module]['table'] ?? null;
 
         return $memo[$module] = $table
-            ? \Illuminate\Support\Facades\Schema::hasColumn($table, 'created_by')
+            ? \App\Support\Platform\SchemaCache::hasColumn($table, 'created_by')
             : false;
     }
 }
@@ -2428,7 +2425,7 @@ if (! function_exists('hub_company_col')) {
 
         $table = hub_mod($module)['table'] ?? null;
         try {
-            $has = $table && \Illuminate\Support\Facades\Schema::hasColumn($table, 'company_id');
+            $has = $table && \App\Support\Platform\SchemaCache::hasColumn($table, 'company_id');
         } catch (\Throwable $e) {
             $has = false;
         }
@@ -3860,7 +3857,7 @@ if (! function_exists('hub_read')) {
         if (! hub_can($user, $module, 'v')) return null;
 
         $q = \Illuminate\Support\Facades\DB::table($table);
-        if (\Illuminate\Support\Facades\Schema::hasColumn($table, 'deleted_at')) $q->whereNull('deleted_at');
+        if (\App\Support\Platform\SchemaCache::hasColumn($table, 'deleted_at')) $q->whereNull('deleted_at');
 
         return hub_scope($q, $module, $user);
     }
@@ -4389,7 +4386,7 @@ if (! function_exists('hub_kpi_metric')) {
         if (($st = trim(hub_str($m['st'] ?? ''))) !== '' && ($skey = $def['status'] ?? null)) {
             $sfield = collect($def['fields'])->firstWhere('key', $skey);
             $scol = $sfield['col'] ?? $skey;
-            if (\Illuminate\Support\Facades\Schema::hasColumn($def['table'], $scol)) $q->where($scol, $st);
+            if (\App\Support\Platform\SchemaCache::hasColumn($def['table'], $scol)) $q->where($scol, $st);
         }
 
         if ($agg === 'count') return (float) $q->count();
@@ -4484,7 +4481,7 @@ if (! function_exists('hub_kpis')) {
     {
         if (! \Illuminate\Support\Facades\Schema::hasTable('kpi_defs')) return [];
         $user = $user ?? auth()->user();
-        $hasActive = \Illuminate\Support\Facades\Schema::hasColumn('kpi_defs', 'active');
+        $hasActive = \App\Support\Platform\SchemaCache::hasColumn('kpi_defs', 'active');
 
         return \App\Models\KpiDef::when($hasActive && ! $withHidden, fn ($q) => $q->where('active', true))
             ->orderBy('sort')->orderBy('created_at')->get()->map(function ($k) use ($user, $hasActive) {
@@ -5007,7 +5004,7 @@ if (! function_exists('hub_doc_expiry')) {
     {
         $user = $user ?? auth()->user();
         if (! \Illuminate\Support\Facades\Schema::hasTable('attachments')) return [];
-        if (! \Illuminate\Support\Facades\Schema::hasColumn('attachments', 'expires_at')) return [];
+        if (! \App\Support\Platform\SchemaCache::hasColumn('attachments', 'expires_at')) return [];
 
         // القصّ يقع **بعد** الترشيح بالنطاق لا قبله: سقفٌ من ٣٠٠ صفٍّ كان
         // يُستهلك بوثائق سجلاتٍ خارج نطاق القارئ فتُقصى وثائقه هو. السقف هنا
@@ -5602,7 +5599,7 @@ if (! function_exists('hub_lens_path')) {
         if (! $t || ! \Illuminate\Support\Facades\Schema::hasTable($t)) {
             return $memo[$module] = ['mode' => 'none'];
         }
-        if (\Illuminate\Support\Facades\Schema::hasColumn($t, 'project_id')) {
+        if (\App\Support\Platform\SchemaCache::hasColumn($t, 'project_id')) {
             return $memo[$module] = ['mode' => 'direct', 'col' => 'project_id'];
         }
 
@@ -5610,9 +5607,8 @@ if (! function_exists('hub_lens_path')) {
         foreach (['app_id' => 'applications', 'emp_id' => 'employees', 'client_id' => 'clients',
                   'contract_id' => 'contracts', 'asset_id' => 'assets', 'objective_id' => 'objectives',
                   'social_id' => 'social_accounts', 'policy_id' => 'policies'] as $c => $tt) {
-            if (\Illuminate\Support\Facades\Schema::hasColumn($t, $c)
-                && \Illuminate\Support\Facades\Schema::hasTable($tt)
-                && \Illuminate\Support\Facades\Schema::hasColumn($tt, 'project_id')) {
+            if (\App\Support\Platform\SchemaCache::hasColumn($t, $c)
+                && \App\Support\Platform\SchemaCache::hasColumn($tt, 'project_id')) {
                 return $memo[$module] = ['mode' => 'via', 'col' => $c, 'table' => $tt];
             }
         }

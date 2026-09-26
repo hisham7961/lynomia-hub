@@ -272,7 +272,7 @@ final class AuditorSignals
 
             foreach (array_chunk(array_keys($ids), 500) as $chunk) {
                 $q = DB::table($table)->whereIn('id', $chunk);
-                if (Schema::hasColumn($table, 'deleted_at')) $q->whereNull('deleted_at');
+                if (\App\Support\Platform\SchemaCache::hasColumn($table, 'deleted_at')) $q->whereNull('deleted_at');
                 foreach (hub_scope($q, $module, $u)->pluck('id') as $id) $out[$module][(string) $id] = true;
             }
         }
@@ -334,7 +334,7 @@ final class AuditorSignals
         $out = [];
         foreach ($rows->groupBy('subject_module') as $module => $group) {
             $table = hub_modules()[$module]['table'] ?? null;
-            if ($table === null || ! Schema::hasColumn($table, 'project_id')) continue;
+            if ($table === null || ! \App\Support\Platform\SchemaCache::hasColumn($table, 'project_id')) continue;
             foreach (DB::table($table)->whereIn('id', $group->pluck('subject_id')->unique()->values()->all())
                 ->get(['id', 'project_id']) as $r) {
                 $out[$module . ':' . $r->id] = $r->project_id !== null ? (string) $r->project_id : null;

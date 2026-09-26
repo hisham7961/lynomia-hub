@@ -156,7 +156,7 @@ class Uptime
             $def = hub_mod($mk);
             if (! $def) continue;
             try {
-                if (! \Illuminate\Support\Facades\Schema::hasColumn($def['table'], $onCol)) continue;
+                if (! \App\Support\Platform\SchemaCache::hasColumn($def['table'], $onCol)) continue;
                 $class = '\\App\\Models\\' . $def['model'];
                 foreach ($class::whereNull('deleted_at')->where($onCol, true)->get() as $row) {
                     if (self::urlOf($mk, $row)) $out[] = [$mk, $row];

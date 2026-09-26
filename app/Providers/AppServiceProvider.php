@@ -54,6 +54,9 @@ class AppServiceProvider extends ServiceProvider
             fn ($e) => \App\Support\Ops\SnapshotIsolation::apply($e->connection));
         foreach (\Illuminate\Support\Facades\DB::getConnections() as $c) \App\Support\Ops\SnapshotIsolation::apply($c);
 
+        // خريطةُ الأعمدة المخبوءة تُفرَّغ مع كلِّ DDL ومع نهاية الهجرات (PERF-05) — لا تكذب بعد migrate
+        \App\Support\Platform\SchemaCache::register();
+
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
         }

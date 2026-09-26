@@ -74,7 +74,7 @@ final class Correlation
                     fn ($m) => hub_can($viewer, $m, 'v')));
                 $q->where(fn ($w) => $w->whereNull('audits.module')->orWhereIn('audits.module', $visible));
                 if (($cids = hub_company_ids($viewer)) !== null) {
-                    if (Schema::hasColumn('audits', 'company_id')) $q->whereIn('audits.company_id', $cids);
+                    if (\App\Support\Platform\SchemaCache::hasColumn('audits', 'company_id')) $q->whereIn('audits.company_id', $cids);
                     else $q->where('audits.user_id', $viewer->id);   // درعُ ما قبل الترحيل — تحفّظٌ لا انهيار
                 }
             }

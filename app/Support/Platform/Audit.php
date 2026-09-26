@@ -63,7 +63,7 @@ class Audit
         //    يبقى لصاحبه وحده. (درعُ النشر-قبل-الترحيل: إن غاب العمودُ بعدُ
         //    نتحفّظ على نشاط المستخدم نفسِه — لا تسريبَ ولا انهيار.)
         if (($cids = hub_company_ids($user)) !== null) {
-            if (Schema::hasColumn('audits', 'company_id')) {
+            if (\App\Support\Platform\SchemaCache::hasColumn('audits', 'company_id')) {
                 $uid = $user->id;
                 $q->where(fn ($w) => $w->whereIn('audits.company_id', $cids)
                     ->orWhere(fn ($y) => $y->whereNull('audits.company_id')
@@ -313,7 +313,7 @@ class Audit
 
     protected static function unsealedAfterEpoch(): int
     {
-        if (! Schema::hasColumn('audit_chain', 'started_at')) return 0;
+        if (! \App\Support\Platform\SchemaCache::hasColumn('audit_chain', 'started_at')) return 0;
         $epoch = DB::table('audit_chain')->where('id', 1)->value('started_at');
 
         return $epoch ? AuditEntry::whereNull('hash')->where('created_at', '>=', $epoch)->count() : 0;

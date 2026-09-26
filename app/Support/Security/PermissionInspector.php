@@ -279,7 +279,7 @@ class PermissionInspector
         }
 
         $q = DB::table($table);
-        if (Schema::hasColumn($table, 'deleted_at')) $q->whereNull('deleted_at');
+        if (\App\Support\Platform\SchemaCache::hasColumn($table, 'deleted_at')) $q->whereNull('deleted_at');
         $rows = (int) $q->count();
 
         if ($rows === 0) {

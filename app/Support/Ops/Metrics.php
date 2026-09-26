@@ -78,11 +78,11 @@ class Metrics
             $def = hub_mod($module);
             if (! $def || ! Schema::hasTable($def['table'])) continue;
 
-            $cols = array_values(array_filter($map, fn ($c) => Schema::hasColumn($def['table'], $c)));
+            $cols = array_values(array_filter($map, fn ($c) => \App\Support\Platform\SchemaCache::hasColumn($def['table'], $c)));
             if (! $cols) continue;
 
             $q = DB::table($def['table']);
-            if (Schema::hasColumn($def['table'], 'deleted_at')) $q->whereNull('deleted_at');
+            if (\App\Support\Platform\SchemaCache::hasColumn($def['table'], 'deleted_at')) $q->whereNull('deleted_at');
 
             $n = 0;
             foreach ($q->get(array_merge(['id'], $cols)) as $row) {

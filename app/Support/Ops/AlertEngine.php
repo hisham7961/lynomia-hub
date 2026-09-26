@@ -108,7 +108,7 @@ class AlertEngine
             // الحقل: مفتاح من تعريف الوحدة أو اسم عمود مباشر
             $fdef = collect($md['fields'])->firstWhere('key', $rule->field);
             $col = $fdef['col']
-                ?? (Schema::hasColumn($md['table'], (string) $rule->field) ? $rule->field : null);
+                ?? (\App\Support\Platform\SchemaCache::hasColumn($md['table'], (string) $rule->field) ? $rule->field : null);
             if (! $col) { $this->line("تخطٍ: {$rule->name} — حقل غير معروف"); continue; }
             // نوعُ الحقل يحسم دلالة «فارغ»: على العدديّ والتاريخيّ = NULL وحده،
             // فمقارنةُ '' على عمودٍ رقميّ تُطابق الصفرَ على MySQL (يحوّل '' إلى 0)
@@ -120,7 +120,7 @@ class AlertEngine
             // مقارنة عمود بعمود: القيمة اسم حقلٍ من الوحدة نفسها (قائمة بيضاء من سجلها)
             // — بها يحيا «حد إعادة الطلب» لكل صنف و«حد التنبيه» لكل صندوق
             $vcol = fn () => collect($md['fields'])->firstWhere('key', $v)['col']
-                ?? (Schema::hasColumn($md['table'], $v) ? $v : null);
+                ?? (\App\Support\Platform\SchemaCache::hasColumn($md['table'], $v) ? $v : null);
             match ($rule->op) {
                 'أكبر من'               => $q->where($col, '>', (float) $v),
                 'أصغر من'               => $q->where($col, '<', (float) $v),
@@ -321,7 +321,7 @@ class AlertEngine
 
         $health ??= Health::check();
 
-        $rules = Schema::hasColumn('alert_rules', 'source')
+        $rules = \App\Support\Platform\SchemaCache::hasColumn('alert_rules', 'source')
             ? AlertRule::whereNull('deleted_at')->where('status', 'مفعّلة')
                 ->whereNotNull('source')->where('source', '!=', '')
                 ->orderBy('created_at')->orderBy('id')->get()

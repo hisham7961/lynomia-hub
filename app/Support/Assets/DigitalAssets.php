@@ -31,14 +31,14 @@ class DigitalAssets
     protected static function has(string $table, string ...$cols): bool
     {
         if (! Schema::hasTable($table)) return false;
-        foreach ($cols as $c) if (! Schema::hasColumn($table, $c)) return false;
+        foreach ($cols as $c) if (! \App\Support\Platform\SchemaCache::hasColumn($table, $c)) return false;
 
         return true;
     }
 
     protected static function live(string $table)
     {
-        return DB::table($table)->when(Schema::hasColumn($table, 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'));
+        return DB::table($table)->when(\App\Support\Platform\SchemaCache::hasColumn($table, 'deleted_at'), fn ($q) => $q->whereNull('deleted_at'));
     }
 
     // ───────────────────── ١) الملكية والمغادرة ─────────────────────

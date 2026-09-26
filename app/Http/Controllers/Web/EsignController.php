@@ -25,7 +25,7 @@ class EsignController extends Controller
     {
         abort_unless(hub_can(auth()->user(), 'contracts', $op), 403, 'التوقيع الإلكتروني يتبع صلاحية العقود');
         // كودٌ نُشر قبل هجرته: رسالة صريحة بدل QueryException «عمود مفقود» غامضة
-        abort_unless(\Illuminate\Support\Facades\Schema::hasColumn('sign_requests', 'verify_code'),
+        abort_unless(\App\Support\Platform\SchemaCache::hasColumn('sign_requests', 'verify_code'),
             503, 'قاعدة البيانات بحاجة لتحديث — شغّل الترحيلات من مركز التشغيل ⚙️ ثم عد');
     }
 

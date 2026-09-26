@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\InboundHook;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -125,9 +124,9 @@ class InboundHookController extends Controller
             'status'     => 200,
             'created_at' => now(),
         ];
-        if (Schema::hasColumn('inbound_hook_events', 'event_id')) $row['event_id'] = $eventId;
+        if (\App\Support\Platform\SchemaCache::hasColumn('inbound_hook_events', 'event_id')) $row['event_id'] = $eventId;
         // (WP-1.4) ربطُ الحدث الوارد بطلبه — يظهر في صفحة `system.trace` بمعرّفه
-        if (Schema::hasColumn('inbound_hook_events', 'request_id')) {
+        if (\App\Support\Platform\SchemaCache::hasColumn('inbound_hook_events', 'request_id')) {
             $row['request_id'] = mb_substr((string) \App\Support\Platform\Api::requestId(), 0, 40) ?: null;
         }
 

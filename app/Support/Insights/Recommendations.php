@@ -455,8 +455,7 @@ final class Recommendations
             // ثم تُغلَق بـ`whereNotIn` (أعمدةٌ مقابلَ قيمٍ مربوطة — واحدةٌ على المحرّكين)،
             // فلا يُنفِق مستبعَدٌ شيئاً من الميزانيّة. وفحصُ PHP بعد الجلب يبقى حزاماً.
             try {
-                if (\Illuminate\Support\Facades\Schema::hasTable('quote_milestones')
-                    && \Illuminate\Support\Facades\Schema::hasColumn('quote_milestones', 'reached_at')
+                if (\App\Support\Platform\SchemaCache::hasColumn('quote_milestones', 'reached_at')
                     && hub_can(auth()->user(), 'quotes', 'v')) {
                     $dead = (array) config('hub.fin.dead', []);
                     $qSub = hub_scope(\App\Models\Quote::query(), 'quotes')

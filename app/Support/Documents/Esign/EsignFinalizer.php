@@ -181,7 +181,7 @@ final class EsignFinalizer
     public static function archiveSignedCopy(SignRequest $req): void
     {
         try {
-            if (\Illuminate\Support\Facades\Schema::hasColumn('sign_requests', 'evidence_hash')) {
+            if (\App\Support\Platform\SchemaCache::hasColumn('sign_requests', 'evidence_hash')) {
                 [, $head] = \App\Support\Documents\Evidence::chain($req);
                 $req->forceFill(['evidence_hash' => $head])->saveQuietly();
             }
