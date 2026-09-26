@@ -342,4 +342,23 @@ class BrainTest extends TestCase
         $this->assertSame([$d], array_column($r['hits'], 'id'));
         $this->assertFalse($r['partial']);
     }
+
+    public function test_تعطّلُ_الأساسيّ_لا_يُجيع_الفهرسة(): void
+    {
+        $p2 = AiProvider::create(['catalog_key' => 'openai', 'label' => 'مزوّدٌ ثانٍ', 'enabled' => true,
+            'credential_name' => 'hub-emb3-' . substr(sha1((string) microtime(true)), 0, 10), 'credential_state' => 'configured']);
+        $b = AiModel::create(['provider_id' => $p2->id, 'litellm_model_name' => 'hub-embed-b', 'upstream_model' => 'fake/hub-embed-b',
+            'display_name' => 'b', 'enabled' => true, 'health' => 'UNKNOWN', 'capabilities' => ['embeddings' => ['v' => true, 'src' => 'litellm']],
+            'limits' => [], 'params' => [], 'pricing' => ['input_per_1k' => ['v' => 0.0001, 'src' => 'litellm'],
+            'output_per_1k' => ['v' => 0, 'src' => 'litellm'], 'currency' => 'USD', 'unit' => 'per_1k_tokens']]);
+        AiProfiles::attach(AiProfile::query()->where('key', 'embedding')->firstOrFail(), $b);
+        for ($i = 0; $i < 40; $i++) $this->decision('قرار ' . $i);
+        Settings::put('brain.max_per_run', '16', 'test');
+        $this->down = ['hub-embed'];
+
+        for ($run = 0; $run < 3; $run++) Brain::index();
+
+        $this->assertSame(40, DB::table('ai_embeddings')->where('module', 'decisions')->distinct()->count('record_id'),
+            'كلُّ جولةٍ تتقدّم — لا تُعيد الأوّلين');
+    }
 }

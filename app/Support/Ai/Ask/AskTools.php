@@ -674,6 +674,11 @@ final class AskTools
             $r = [];
             foreach ($fields as $key => $col) {
                 $v = $row->{$col} ?? null;
+                // التاريخُ بتوقيت التطبيق كما تعرضه الشاشة — لا نصُّ JSON مقتبسٌ بتوقيتٍ عالميٍّ يُزيحه يوماً
+                if ($v instanceof \DateTimeInterface) {
+                    $c = \Illuminate\Support\Carbon::instance($v);
+                    $v = $c->format('H:i:s') === '00:00:00' ? $c->toDateString() : $c->toDateTimeString();
+                }
                 if ($v === null || is_array($v) || is_object($v)) {
                     $v = $v === null ? null : json_encode($v, JSON_UNESCAPED_UNICODE);
                 }

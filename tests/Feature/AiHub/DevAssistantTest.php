@@ -143,7 +143,7 @@ class DevAssistantTest extends TestCase
         $this->assertTrue($r['ok'], (string) $r['message']);
         $this->assertStringNotContainsString('QWXZ-TASK-UNSEEN', $this->sentText());
         $this->assertStringContainsString('QWXZ-ISSUE-SEEN', $this->sentText());
-        $this->assertStringContainsString('مهامُّ أُنجزت (0)', $this->sentText());
+        $this->assertStringContainsString('مهامُّ أُنجزت: غيرُ متاحٍ لك', $this->sentText());
     }
 
     public function test_بطاقةُ_الإصدار_تحمل_حقلَ_السجلّ_والمسارُ_يمرّره(): void
@@ -233,5 +233,77 @@ class DevAssistantTest extends TestCase
         Settings::put('dev.enabled', '0', 'test');
         $this->actingAs($this->owner)->get(route('errors.show', $e->id))->assertOk()->assertDontSee('data-dev-explain-form', false);
         $this->actingAs($this->owner)->post(route('errors.explain', $e->id))->assertForbidden();
+    }
+
+    // ═══ من المراجعة العدائيّة (v2.609.2) ═══
+
+    public function test_مسارٌ_مزروعٌ_عبر_jslog_لا_يُرسل_أسرارَ_المشروع_إلى_النموذج(): void
+    {
+        $dir = base_path('bootstrap/cache');
+        $probe = $dir . '/devprobe_cfg.php';
+        file_put_contents($probe, "<?php\nreturn [\n  'key' => 'base64:QWXZAPPKEY123456',\n  'password' => 'QWXZ-DBPASS-9876',\n];\n");
+        try {
+            // عضوٌ عاديٌّ يزرع الملفَّ والسطر
+            $this->actingAs($this->member())->postJson(route('jslog'), ['message' => 'boom', 'source' => $probe, 'line' => 3])->assertSuccessful();
+            $e = ErrorEvent::query()->where('kind', 'js')->orderByDesc('last_seen')->orderByDesc('id')->firstOrFail();
+            $this->assertSame($probe, $e->file);
+            $this->replies = [['items' => [['title' => 't', 'cause' => 'c', 'fix' => 'f']]]];
+
+            $this->actingAs($this->owner)->post(route('errors.explain', $e->id))->assertOk();
+            $this->assertStringNotContainsString('QWXZAPPKEY', $this->sentText());
+            $this->assertStringNotContainsString('QWXZ-DBPASS', $this->sentText());
+
+            // ولا تعرضه شاشةُ المالك نفسُها — ولو كان الخطأُ php
+            $e->forceFill(['kind' => 'php'])->save();
+            $this->actingAs($this->owner)->get(route('errors.show', $e->id))->assertOk()->assertDontSee('QWXZ-DBPASS');
+            ErrorTriage::explain($this->owner, $e->fresh());
+            $this->assertStringNotContainsString('QWXZ-DBPASS', $this->sentText(), 'ولا للنموذج');
+        } finally {
+            @unlink($probe);
+        }
+    }
+
+    public function test_رابطُ_المشكلة_المعبّأ_يبقى_تحت_حدِّ_سطر_الطلب(): void
+    {
+        $long = str_repeat('سببٌ مطوّلٌ للخطأ ', 120);
+        $this->replies = [['items' => [['title' => str_repeat('عنوان ', 40), 'cause' => $long, 'fix' => $long]]]];
+
+        $r = ErrorTriage::explain($this->owner, $this->error());
+        $this->assertLessThan(7000, strlen($r['draft']['url']));
+        $this->assertGreaterThan(1000, mb_strlen($r['explain']['cause']), 'الشرحُ المعروضُ لا يُقصّ بقصِّ الرابط');
+    }
+
+    public function test_ملاحظاتُ_الإصدار_لا_تُرشّح_بحقلٍ_محجوب_ولا_تتجاوز_تاريخَ_الإصدار_ولا_تعدّ_المخاطر(): void
+    {
+        $pid = $this->row('projects', ['name' => 'مشروع', 'company_id' => $this->alpha->id]);
+        $this->row('code_releases', ['ver' => '1.0.0', 'project_id' => $pid, 'date' => '2031-01-07']);
+        $rel = $this->row('code_releases', ['ver' => '1.1.0', 'project_id' => $pid, 'date' => '2031-02-01']);
+        $this->row('code_releases', ['ver' => '1.2.0', 'project_id' => $pid, 'date' => '2031-03-01']);   // لاحقٌ لا سابق
+        $this->row('tasks', ['title' => 'QWXZ-IN', 'status' => 'مكتملة', 'project_id' => $pid, 'updated_at' => '2031-01-15 10:00:00']);
+        $this->row('tasks', ['title' => 'QWXZ-AFTER', 'status' => 'مكتملة', 'project_id' => $pid, 'updated_at' => '2031-02-15 10:00:00']);
+        $this->row('issues', ['title' => 'QWXZ-RISK', 'kind' => 'خطر', 'status' => 'مغلقة', 'project_id' => $pid, 'updated_at' => '2031-01-15 10:00:00']);
+        $this->row('issues', ['title' => 'QWXZ-FIX', 'kind' => 'مشكلة', 'status' => 'محلولة', 'project_id' => $pid, 'updated_at' => '2031-01-15 10:00:00']);
+        $this->replies = [['reply' => ['- سطر']]];
+
+        $this->assertTrue(DraftAssistant::draft($this->member(), 'notes', 'code', $rel)['ok']);
+        $sent = $this->sentText();
+        $this->assertStringContainsString('بعد 2031-01-07 حتى 2031-02-01', $sent, 'النافذةُ من السابق إلى تاريخ الإصدار نفسِه');
+        $this->assertStringContainsString('QWXZ-IN', $sent);
+        $this->assertStringContainsString('QWXZ-FIX', $sent);
+        foreach (['QWXZ-AFTER', 'QWXZ-RISK'] as $no) $this->assertStringNotContainsString($no, $sent, $no);
+
+        // حالةُ المهامّ وتاريخُ الإصدار محجوبان ⇒ لا ترشيحَ بهما ولا إفشاء
+        $this->sent = [];
+        $role = Role::create(['name' => 'محجوب ' . Str::random(4), 'scope' => 'all', 'flags' => [AskPolicy::FLAG => 1],
+            'matrix' => collect(array_keys(config('hub.modules')))->mapWithKeys(fn ($m) => [$m => ['v' => 1, 'a' => 1, 'e' => 1, 'd' => 0]])->all(),
+            'field_rules' => ['tasks' => ['status' => 'hide'], 'code' => ['date' => 'hide']]]);
+        $u = User::create(['name' => 'محجوب', 'email' => Str::random(9) . '@dev.local', 'password' => 'Secret!2026x',
+            'role_id' => $role->id, 'status' => 'نشط', 'password_changed_at' => now(), 'companies' => [$this->alpha->id]]);
+        $this->assertTrue(DraftAssistant::draft($u, 'notes', 'code', $rel)['ok']);
+        $sent = $this->sentText();
+        $this->assertStringNotContainsString('QWXZ-IN', $sent, 'حالةٌ محجوبةٌ لا تُرشِّح');
+        $this->assertStringNotContainsString('2031-01-07', $sent, 'تاريخٌ محجوبٌ لا يظهر');
+        $this->assertStringNotContainsString('2031-02-01', $sent);
+        $this->assertStringContainsString('QWXZ-FIX', $sent, 'والمشاكلُ التي يرى حقولَها باقية');
     }
 }

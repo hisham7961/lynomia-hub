@@ -257,28 +257,43 @@ final class DraftAssistant
     /**
      * **ما أُنجز في مشروع الإصدار منذ الإصدار السابق — بعين السائل.** المرشَّحون من استعلامٍ بالمشروع
      * والحالة والنافذة، ثمّ **كلُّهم يمرّون بالحارس المُنطَّق** (`AskTools::visibleIds`/`titles`: النطاقُ
-     * ورؤيةُ حقل العرض). والنافذةُ من تاريخ أحدث إصدارٍ سابقٍ **يراه** في المشروع نفسِه.
+     * ورؤيةُ حقل العرض). **ولا ترشيحَ بحقلٍ محجوبٍ عن السائل** — كما يرفضه `hub_list`: القسمُ الذي يحتاج
+     * حالةً أو مشروعاً لا يراهما يُقال غيرَ متاح، والنافذةُ لا تُبنى بتاريخٍ لا يراه (فالترشيحُ نفسُه كان يُفشيه).
      */
     private static function releaseContext(User $u, string $id, array $row): string
     {
         $pid = (string) ($row['projectId'] ?? '');
         if (! Str::isUuid($pid)) return 'لا مشروعَ ظاهرٌ لهذا الإصدار — فلا مهامَّ ولا مشاكلَ مرفقة.';
-        $date = (string) ($row['date'] ?? '');
-        $date = preg_match('/^\d{4}-\d{2}-\d{2}/', $date) ? substr($date, 0, 10) : null;
+        $sees = fn (string $m, string ...$keys) => array_diff($keys, (array) (AskTools::catalog($u)[$m]['fields'] ?? [])) === [];
 
+        // التاريخُ من الموديل لا من الصفّ المُسقَط (قيمةُ Carbon تُرمَّز نصّاً مقتبساً بتوقيتٍ آخر)
+        $date = null;
         $prev = null;
-        $cands = \App\Models\CodeRelease::query()->where('project_id', $pid)->whereKeyNot($id)->whereNotNull('date')
-            ->when($date, fn ($q) => $q->whereDate('date', '<', $date))->orderBy('id')->limit(500)->get(['id', 'date']);
-        $seen = array_flip(AskTools::visibleIds($u, 'code', $cands->pluck('id')->map(fn ($x) => (string) $x)->all()));
-        foreach ($cands as $c) {
-            $d = $c->date?->toDateString();
-            if (isset($seen[(string) $c->id]) && $d !== null && ($prev === null || $d > $prev)) $prev = $d;
+        if ($sees('code', 'date')) {
+            $date = \App\Models\CodeRelease::query()->whereKey($id)->value('date');
+            $date = $date ? \Illuminate\Support\Carbon::parse($date)->toDateString() : null;
+            // أحدثُ إصدارٍ سابقٍ **يراه** — بترتيب التاريخ لا بالمعرّف، دفعاتٍ حتى أوّلِ مرئيّ
+            \App\Models\CodeRelease::query()->where('project_id', $pid)->whereKeyNot($id)->whereNotNull('date')
+                ->when($date, fn ($q) => $q->whereDate('date', '<', $date))
+                ->orderByDesc('date')->orderByDesc('id')->select(['id', 'date'])
+                ->chunk(200, function ($cands) use ($u, &$prev) {
+                    $seen = array_flip(AskTools::visibleIds($u, 'code', $cands->pluck('id')->map(fn ($x) => (string) $x)->all()));
+                    foreach ($cands as $c) {
+                        if (isset($seen[(string) $c->id])) { $prev = $c->date?->toDateString(); return false; }
+                    }
+                });
         }
 
         $lines = ['نافذةُ الإصدار: ' . ($prev ? 'بعد ' . $prev : 'منذ بداية المشروع') . ($date ? ' حتى ' . $date : '')];
-        foreach ([['tasks', \App\Models\Task::class, ['مكتملة', 'منجزة'], 'مهامُّ أُنجزت'],
-                  ['issues', \App\Models\Issue::class, ['محلولة', 'مغلقة'], 'مشاكلُ حُلّت']] as [$m, $class, $done, $title]) {
-            $ids = $class::query()->where('project_id', $pid)->whereIn('status', $done)
+        foreach ([['tasks', \App\Models\Task::class, ['مكتملة', 'منجزة'], 'مهامُّ أُنجزت', null],
+                  // «المشاكل والمخاطر» وحدةٌ واحدة — والخطرُ المُغلق ليس إصلاحاً في إصدار
+                  ['issues', \App\Models\Issue::class, ['محلولة', 'مغلقة'], 'مشاكلُ حُلّت',
+                   fn ($q) => $q->where(fn ($w) => $w->where('kind', 'مشكلة')->orWhereNull('kind'))]] as [$m, $class, $done, $title, $extra]) {
+            if (! $sees($m, 'status', 'projectId') || ($m === 'issues' && ! $sees($m, 'kind'))) {
+                $lines[] = $title . ': غيرُ متاحٍ لك (حقولُ الحالة أو المشروع محجوبة)';
+                continue;
+            }
+            $ids = $class::query()->where('project_id', $pid)->whereIn('status', $done)->when($extra, $extra)
                 ->when($prev, fn ($q) => $q->where('updated_at', '>', $prev . ' 23:59:59'))
                 ->when($date, fn ($q) => $q->where('updated_at', '<=', $date . ' 23:59:59'))
                 ->orderBy('id')->limit(500)->pluck('id')->map(fn ($x) => (string) $x)->all();

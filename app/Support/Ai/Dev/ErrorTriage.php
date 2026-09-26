@@ -33,6 +33,9 @@ final class ErrorTriage
 {
     public const MAX_OUTPUT = 1200;
 
+    /** أطولُ «سبب» أو «إصلاح» في رابط التعبئة */
+    public const URL_TA = 450;
+
     /** ما يجوز للنموذج اقتراحُه في «مشكلة» */
     public const FIELDS = ['title' => 'text', 'cause' => 'ta', 'fix' => 'ta', 'severity' => 'sel', 'priority' => 'sel'];
 
@@ -106,7 +109,10 @@ final class ErrorTriage
             }
             if (($fields['title'] ?? '') === '') $fields['title'] = Str::limit('🐞 ' . preg_replace('/\s+/u', ' ', (string) $e->message), 180, '…');
             $fields += self::server($u, $e);
-            $out['draft'] = ['fields' => $fields, 'url' => route('m.create', ['module' => 'issues']) . '?' . http_build_query($fields)];
+            // الرابطُ سطرُ طلبٍ لا جسد: حقلا النصِّ الطويل يُقصّان فيه (حرفٌ عربيٌّ ستّةُ بايتات) كي لا يُرفض بـ414
+            $url = $fields;
+            foreach (['cause', 'fix'] as $k) if (isset($url[$k])) $url[$k] = Str::limit($url[$k], self::URL_TA, '…');
+            $out['draft'] = ['fields' => $fields, 'url' => route('m.create', ['module' => 'issues']) . '?' . http_build_query($url)];
         }
 
         return ['ok' => true] + $out;
@@ -138,7 +144,7 @@ final class ErrorTriage
         $parts = ["النوع: {$e->kind}\nالتكرار: {$e->count}\nالموضع: {$rel}" . ($e->line ? ':' . $e->line : '')
             . "\nالرابط: " . ($e->method ? $e->method . ' ' : '') . $url . "\nالرسالة:\n" . $e->message];
 
-        $real = ErrorSnippet::realPath($e);
+        $real = ErrorSnippet::realPath($e, forModel: true);
         if ($real !== null && $e->line) {
             $code = array_map(fn ($s) => str_pad((string) $s['n'], 5) . ($s['hot'] ? '▶ ' : '  ') . $s['code'],
                 ErrorSnippet::around($real, (int) $e->line, 12, 8));

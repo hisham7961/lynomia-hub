@@ -136,6 +136,11 @@ final class Brain
             return null;
         };
 
+        // متّجهاتٌ من نموذجٍ احتياطيٍّ في السلسلة **سارية** (لا يُعاد الأوّلون كلَّ جولةٍ فيجوع من بعدهم)؛
+        // وتُرقّى إلى الأساسيّ **بعد** أن يُفهرَس الجديدُ، بما بقي من سقف الجولة
+        $chainNames = self::chainNames();
+        $upgrade = [];
+
         foreach (self::SOURCES as $module => $keys) {
             $def = hub_mod($module);
             // السجلُّ يسمّي الموديلَ قصيراً (`Decision`) — كما يحلّه `AskTools`
@@ -160,6 +165,15 @@ final class Brain
                         $live[] = $k;
                         $hash = sha1($model . '|' . $chunk);
                         if (($have[$k]['hash'] ?? null) === $hash) { $stats['skipped']++; continue; }
+                        $stored = $have[$k]['hash'] ?? null;
+                        if ($stored !== null && in_array($stored, array_map(fn ($n) => sha1($n . '|' . $chunk), $chainNames), true)) {
+                            $stats['skipped']++;
+                            if (count($upgrade) < self::maxPerRun()) {
+                                $upgrade[] = ['text' => $chunk, 'row' => ['module' => $module, 'record_id' => (string) $rec->id,
+                                    'field' => $key, 'chunk' => $n, 'company_id' => $cid]];
+                            }
+                            continue;
+                        }
                         if ($budget-- <= 0) { $stats['stopped'] = 'بلغت الجولةُ سقفَها (brain.max_per_run) — تُكمل الجولةُ التالية'; break 4; }
                         $pending[] = ['text' => $chunk, 'row' => ['module' => $module, 'record_id' => (string) $rec->id,
                             'field' => $key, 'chunk' => $n, 'company_id' => $cid]];
@@ -185,6 +199,14 @@ final class Brain
         }
         if ($stats['stopped'] === null && ($stop = $flush()) !== null) $stats['stopped'] = $stop;
 
+        // الترقيةُ إلى الأساسيّ — بما بقي من السقف، بعد الجديد
+        foreach ($upgrade as $p) {
+            if ($stats['stopped'] !== null || $budget-- <= 0) break;
+            $pending[] = $p;
+            if (count($pending) >= self::BATCH && ($stop = $flush()) !== null) $stats['stopped'] = $stop;
+        }
+        if ($stats['stopped'] === null && ($stop = $flush()) !== null) $stats['stopped'] = $stop;
+
         return $stats;
     }
 
@@ -202,6 +224,12 @@ final class Brain
         if ($text !== '') $out[] = $text;
 
         return array_slice($out, 0, 20);
+    }
+
+    /** @return list<string> أسماءُ نماذج السلسلة بترتيبها */
+    private static function chainNames(): array
+    {
+        return AiProfiles::chain(self::profile(), AiPurposes::BRAIN)->map(fn ($m) => (string) $m->litellm_model_name)->values()->all();
     }
 
     private static function modelName(): string
