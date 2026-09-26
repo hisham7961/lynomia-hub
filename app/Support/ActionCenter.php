@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\SignalState;
+use App\Support\Ai\Auditor\AuditorSignals;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -139,6 +140,14 @@ class ActionCenter
         // ── Control Plane: Phase 10 (WP-10.2) ──
         try {
             foreach (AttentionQueue::items(null, $fresh, $health) as $it) $items[] = $it;
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        // ③ نتائجُ المدقّق (docs/ai-hub/46-ai-roadmap.md §٣) — منتِجٌ ثالثٌ لا محرّك:
+        // مُعادةُ التنطيق للمشاهد، والتصرّفُ بها في signal_states نفسِها بلا مخزنٍ رابع
+        try {
+            foreach (AuditorSignals::visibleTo(auth()->user(), $projectId, $fresh) as $it) $items[] = $it;
         } catch (\Throwable $e) {
             report($e);
         }

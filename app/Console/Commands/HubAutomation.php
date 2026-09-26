@@ -83,8 +83,9 @@ class HubAutomation extends Command
         $rr = $this->reconcileReports();
         $s = $this->signalsPrune();
         $m = $this->marginSnapshot();
+        $au = $this->auditorRun();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · تقارير: {$rr} تنبيهُ نقص · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · تقارير: {$rr} تنبيهُ نقص · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة · المدقّق: {$au['opened']} نتيجةٌ جديدة، {$au['resolved']} زال شرطُها");
 
         if (! $this->dry) \App\Support\Health::beat('automation', (int) round((microtime(true) - $t0) * 1000));
         return self::SUCCESS;
@@ -125,6 +126,29 @@ class HubAutomation extends Command
 
             return 0;
         }
+    }
+
+    /**
+     * **المدقّق** (docs/ai-hub/46-ai-roadmap.md §٣) — خطوةٌ في الدورة اليوميّة لا أمرُ
+     * جدولةٍ منفصل («لا أمرَ جدولةٍ لكلِّ مسح» — INTELLIGENCE_MAP). ومعزولُ الفشل كسائر
+     * الخطوات: كاشفٌ يرمي لا يُسقط ما بعده، ولا يحلّ نتائجَه القائمة.
+     *
+     * @return array{opened: int, resolved: int}
+     */
+    protected function auditorRun(): array
+    {
+        try {
+            $stats = \App\Support\Ai\Auditor\Auditor::run($this->dry);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return ['opened' => 0, 'resolved' => 0];
+        }
+
+        return [
+            'opened' => array_sum(array_column($stats, 'opened')),
+            'resolved' => $this->dry ? 0 : array_sum(array_column($stats, 'resolved')),
+        ];
     }
 
     /**

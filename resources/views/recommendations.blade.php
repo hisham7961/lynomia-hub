@@ -50,7 +50,7 @@
                 <b>{{ $it['title'] }}</b>
                 <span class="bdg {{ $tone[$it['sev']] }}">{{ $it['sev'] }}</span>
                 @if (! empty($it['type']))
-                    <span class="bdg g">{{ AttentionQueue::TYPE_LABELS[$it['type']] ?? $it['type'] }}</span>
+                    <span class="bdg g">{{ AttentionQueue::TYPE_LABELS[$it['type']] ?? (\App\Support\Ai\Auditor\AuditorSignals::TYPE_LABEL[$it['type']] ?? $it['type']) }}</span>
                 @endif
                 @if (($it['state'] ?? 'open') === 'ack')<span class="bdg">✔️ مُقَرّة</span>@endif
                 <div class="sub" style="margin-top:3px">{{ $it['why'] }}</div>
