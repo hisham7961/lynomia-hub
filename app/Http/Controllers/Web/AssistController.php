@@ -20,11 +20,12 @@ class AssistController extends Controller
             'kind' => ['required', 'string', 'in:' . implode(',', array_keys(DraftAssistant::KINDS))],
             'module' => ['required', 'string', 'max:60'],
             'id' => ['required', 'string', 'max:64'],
+            'log' => ['nullable', 'string', 'max:8000'],
         ]);
         abort_unless(hub_mod($data['module']) !== null, 404);
 
         return view('ai.assist', [
-            'result' => DraftAssistant::draft($u, $data['kind'], $data['module'], $data['id']),
+            'result' => DraftAssistant::draft($u, $data['kind'], $data['module'], $data['id'], $data['log'] ?? null),
             'def' => DraftAssistant::KINDS[$data['kind']],
         ]);
     }

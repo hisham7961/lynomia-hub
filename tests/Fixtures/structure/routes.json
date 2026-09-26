@@ -5681,6 +5681,17 @@
     },
     {
         "methods": "POST",
+        "uri": "admin/errors/{id}/explain",
+        "name": "errors.explain",
+        "action": "App\\Http\\Controllers\\Web\\DevAssistController@explain",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:20,1"
+        ]
+    },
+    {
+        "methods": "POST",
         "uri": "jslog",
         "name": "jslog",
         "action": "App\\Http\\Controllers\\Web\\ErrorCenterController@jslog",

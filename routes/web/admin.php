@@ -97,6 +97,9 @@ use Illuminate\Support\Facades\Route;
     Route::get('admin/errors/{id}', [ErrorCenterController::class, 'show'])->name('errors.show')->whereUuid('id');
     Route::post('admin/errors/{id}/status', [ErrorCenterController::class, 'status'])->name('errors.status');
     Route::post('admin/errors/{id}/task', [ErrorCenterController::class, 'toTask'])->name('errors.task');
+    // (المرحلة ٥ · مساعدُ التطوير) شرحٌ واقتراحُ إصلاحٍ ونموذجُ «مشكلة» معبّأ — لا يكتب شيئاً
+    Route::post('admin/errors/{id}/explain', [\App\Http\Controllers\Web\DevAssistController::class, 'explain'])
+        ->name('errors.explain')->whereUuid('id')->middleware('throttle:' . \App\Support\Ai\Ask\AskPolicy::THROTTLE);
     Route::post('jslog', [ErrorCenterController::class, 'jslog'])->name('jslog')->middleware('throttle:20,1');
     Route::get('admin/integrations', [\App\Http\Controllers\Web\IntegrationController::class, 'index'])->name('integrations.index');
     Route::get('admin/integrations/guide', [\App\Http\Controllers\Web\IntegrationController::class, 'guide'])->name('integrations.guide');

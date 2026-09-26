@@ -10,6 +10,10 @@
                 <input type="hidden" name="kind" value="{{ $k }}">
                 <input type="hidden" name="module" value="{{ $aModule }}">
                 <input type="hidden" name="id" value="{{ $aRecordId }}">
+                @if (! empty($d['input']))
+                    <label class="sub" style="display:block;margin-top:6px">{{ $d['input']['label'] }}
+                        <textarea name="{{ $d['input']['name'] }}" rows="4" maxlength="{{ $d['input']['max'] }}" class="ltr mono" style="width:100%"></textarea></label>
+                @endif
                 <button class="btn sm">{{ $d['icon'] }} {{ $d['label'] }}</button>
             </form>
         @endforeach

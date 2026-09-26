@@ -51,7 +51,18 @@ final class DraftAssistant
             'label' => 'مسودةُ ردٍّ على التذكرة', 'icon' => '✉️', 'source' => 'tickets', 'target' => null,
             'fields' => [], 'carry' => [], 'many' => false,
         ],
+        // (المرحلة ٥ · مساعدُ التطوير) ملاحظاتُ إصدارٍ من الالتزامات: النظامُ لا يخزّن الالتزامات، فالسجلُّ
+        // **يُلصَق** (`git log --oneline` للنطاق)، ويُضاف ما يراه السائلُ من مهامَّ أُنجزت ومشاكلَ حُلّت في
+        // مشروع الإصدار منذ الإصدار السابق. والناتجُ نصٌّ يُنسخ إلى حقل الملاحظات — لا يُكتب شيء.
+        'notes' => [
+            'label' => 'ملاحظاتُ الإصدار', 'icon' => '📝', 'source' => 'code', 'target' => null,
+            'fields' => [], 'carry' => [], 'many' => false,
+            'input' => ['name' => 'log', 'label' => 'سجلُّ الالتزامات (اختياريّ) — ألصق ناتجَ git log --oneline للنطاق', 'max' => 8000],
+        ],
     ];
+
+    /** أقصى ما يُذكر من مهامِّ الإصدار ومشاكله — عناوينُ لا سجلّات */
+    public const RELEASE_ITEMS = 40;
 
     /** سقفُ مخرجات النداء — مقترحٌ لا مقالة */
     public const MAX_OUTPUT = 900;
@@ -110,7 +121,7 @@ final class DraftAssistant
      * @return array{ok: bool, code: ?string, message: string, kind: string, drafts: list<array{fields: array<string,string>, url: ?string}>,
      *               text: ?string, dropped: list<string>, source: array{module: string, id: string}}
      */
-    public static function draft(User $u, string $kind, string $module, string $id): array
+    public static function draft(User $u, string $kind, string $module, string $id, ?string $input = null): array
     {
         $out = ['ok' => false, 'code' => null, 'message' => '', 'kind' => $kind, 'drafts' => [], 'text' => null,
             'dropped' => [], 'clipped' => false, 'source' => ['module' => $module, 'id' => $id]];
@@ -134,10 +145,16 @@ final class DraftAssistant
 
         // **والقصُّ يُقال لا يُخفى**: حقلٌ بلغ سقفَه أو نصٌّ جاوز السياج ⇒ المسودةُ بُنيت على بعض المصدر
         $src = self::sourceText($module, $row);
+        $parts = [$src];
+        if ($kind === 'notes') {
+            $parts[] = self::releaseContext($u, $id, $row);
+            $log = trim((string) $input);
+            if ($log !== '') $parts[] = "سجلُّ الالتزامات كما ألصقه المستخدم:\n" . mb_substr($log, 0, (int) $def['input']['max']);
+        }
         $out['clipped'] = mb_strlen($src) > self::SOURCE_MAX_TOTAL
             || collect($row)->contains(fn ($v) => is_string($v) && mb_strlen($v) > self::SOURCE_MAX_VALUE);
 
-        $res = AuditorAi::ask($gc, self::system($kind, $def, $allowed, $u, $target), [$src],
+        $res = AuditorAi::ask($gc, self::system($kind, $def, $allowed, $u, $target), $parts,
             $target === null ? 'reply' : 'items', self::SOURCE_MAX_TOTAL);
         if (! $res['ok']) {
             return ['code' => (string) $res['code'], 'message' => AskFailures::message((string) $res['code'])] + $out;
@@ -181,7 +198,7 @@ final class DraftAssistant
      * @param  array<string,string>  $wanted
      * @return array<string, array{type:string, options: list<string>}>
      */
-    private static function proposable(User $u, string $target, array $wanted): array
+    public static function proposable(User $u, string $target, array $wanted): array
     {
         $out = [];
         foreach ((array) (hub_mod($target)['fields'] ?? []) as $f) {
@@ -196,7 +213,7 @@ final class DraftAssistant
     }
 
     /** قيمةٌ من النموذج بعد التحقّق من نوعها — أو `null` (تُسقَط وتُعلَن) */
-    private static function value(array $spec, mixed $v): ?string
+    public static function value(array $spec, mixed $v): ?string
     {
         if (! is_scalar($v)) return null;
         $s = trim(Redactor::text((string) $v));
@@ -238,6 +255,42 @@ final class DraftAssistant
         return $out;
     }
 
+    /**
+     * **ما أُنجز في مشروع الإصدار منذ الإصدار السابق — بعين السائل.** المرشَّحون من استعلامٍ بالمشروع
+     * والحالة والنافذة، ثمّ **كلُّهم يمرّون بالحارس المُنطَّق** (`AskTools::visibleIds`/`titles`: النطاقُ
+     * ورؤيةُ حقل العرض). والنافذةُ من تاريخ أحدث إصدارٍ سابقٍ **يراه** في المشروع نفسِه.
+     */
+    private static function releaseContext(User $u, string $id, array $row): string
+    {
+        $pid = (string) ($row['projectId'] ?? '');
+        if (! Str::isUuid($pid)) return 'لا مشروعَ ظاهرٌ لهذا الإصدار — فلا مهامَّ ولا مشاكلَ مرفقة.';
+        $date = (string) ($row['date'] ?? '');
+        $date = preg_match('/^\d{4}-\d{2}-\d{2}/', $date) ? substr($date, 0, 10) : null;
+
+        $prev = null;
+        $cands = \App\Models\CodeRelease::query()->where('project_id', $pid)->whereKeyNot($id)->whereNotNull('date')
+            ->when($date, fn ($q) => $q->whereDate('date', '<', $date))->orderBy('id')->limit(500)->get(['id', 'date']);
+        $seen = array_flip(AskTools::visibleIds($u, 'code', $cands->pluck('id')->map(fn ($x) => (string) $x)->all()));
+        foreach ($cands as $c) {
+            $d = $c->date?->toDateString();
+            if (isset($seen[(string) $c->id]) && $d !== null && ($prev === null || $d > $prev)) $prev = $d;
+        }
+
+        $lines = ['نافذةُ الإصدار: ' . ($prev ? 'بعد ' . $prev : 'منذ بداية المشروع') . ($date ? ' حتى ' . $date : '')];
+        foreach ([['tasks', \App\Models\Task::class, ['مكتملة', 'منجزة'], 'مهامُّ أُنجزت'],
+                  ['issues', \App\Models\Issue::class, ['محلولة', 'مغلقة'], 'مشاكلُ حُلّت']] as [$m, $class, $done, $title]) {
+            $ids = $class::query()->where('project_id', $pid)->whereIn('status', $done)
+                ->when($prev, fn ($q) => $q->where('updated_at', '>', $prev . ' 23:59:59'))
+                ->when($date, fn ($q) => $q->where('updated_at', '<=', $date . ' 23:59:59'))
+                ->orderBy('id')->limit(500)->pluck('id')->map(fn ($x) => (string) $x)->all();
+            $names = array_slice(AskTools::titles($u, $m, AskTools::visibleIds($u, $m, $ids)), 0, self::RELEASE_ITEMS);
+            $lines[] = $title . ' (' . count($names) . '):';
+            foreach ($names as $n) $lines[] = '- ' . $n;
+        }
+
+        return implode("\n", $lines);
+    }
+
     private static function sourceText(string $module, array $row): string
     {
         $label = (string) (hub_mod($module)['label'] ?? $module);
@@ -253,6 +306,13 @@ final class DraftAssistant
     private static function system(string $kind, array $def, array $allowed, User $u, ?string $target): string
     {
         $today = now()->toDateString();
+        if ($kind === 'notes') {
+            return 'أنت مساعدُ تطويرٍ في نظام أعمالٍ عربيّ. اكتب مسودةَ ملاحظاتِ إصدارٍ موجزةً بالعربيّة لمستخدمي النظام، '
+                . 'مجمّعةً تحت: ✨ جديد · 🛠️ تحسينات · 🐞 إصلاحات (أسقِط العنوانَ الفارغ)، سطراً لكلِّ بند يبدأ بـ«- ». '
+                . 'من الالتزامات والمهامِّ والمشاكل التي بين السياجين **وحدَها** — لا تخترع ميزةً ولا رقماً، '
+                . 'واترك الالتزاماتِ الداخليّةَ البحتة (تنسيق · اختبارات · دمج) خارجها. '
+                . 'أعِد {"reply": ["سطر", "سطر"]}.';
+        }
         if ($target === null) {
             return "أنت مساعدٌ في نظام أعمالٍ عربيّ. اكتب مسودةَ ردٍّ مهذّبٍ وموجزٍ بالعربيّة على تذكرة العميل التي بين السياجين، "
                 . "بلا وعودٍ بمواعيدَ أو أسعارٍ أو التزاماتٍ غيرِ مذكورةٍ في التذكرة، وبلا اختلاقِ حقائق. "

@@ -23,11 +23,15 @@
     </div>
 @elseif ($result['text'] !== null)
     <div class="card" data-assist-reply>
-        <h3>مسودةُ الردّ</h3>
+        <h3>{{ ($result['kind'] ?? '') === 'notes' ? 'مسودةُ ملاحظاتِ الإصدار' : 'مسودةُ الردّ' }}</h3>
         <div class="askanswer" id="assist-reply">{{ $result['text'] }}</div>
         <button class="btn sm" type="button"
                 onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('assist-reply').innerText); this.textContent = '✓ نُسخ'">📋 انسخ</button>
-        <span class="mut">ثمّ الصقها في تعليقٍ على التذكرة بعد مراجعتها — لا يُرسَل شيءٌ من هنا.</span>
+        @if (($result['kind'] ?? '') === 'notes')
+            <span class="mut">ثمّ الصقها في حقل «الملاحظات» في الإصدار بعد مراجعتها — لا يُحفَظ شيءٌ من هنا.</span>
+        @else
+            <span class="mut">ثمّ الصقها في تعليقٍ على التذكرة بعد مراجعتها — لا يُرسَل شيءٌ من هنا.</span>
+        @endif
     </div>
 @else
     @foreach ($result['drafts'] as $i => $d)

@@ -59,6 +59,9 @@ final class AiPurposes
     /** مفتاحُ العقل الثاني (التضمينُ للفهرسة وللبحث · `App\Support\Ai\Brain\Brain`) */
     public const BRAIN = 'brain';
 
+    /** مفتاحُ مساعد التطوير (فرزُ الخطأ · `App\Support\Ai\Dev\ErrorTriage`) */
+    public const DEV = 'dev';
+
     /**
      * **ما تحتاجه كلُّ ميزةٍ من قدرات** — صلبٌ لا يُضبَط من شاشة.
      *
@@ -82,6 +85,8 @@ final class AiPurposes
         self::ASSIST => ['chat'],
         // **والعقلُ الثاني يحتاج التضمينَ وحدَه** — لا محادثةَ ولا أدوات
         self::BRAIN => ['embeddings'],
+        // **ومساعدُ التطوير يحتاج التوليدَ وحدَه** — الخادمُ جمع الخطأَ ومقتطفَه، والنموذجُ يشرح ويقترح
+        self::DEV => ['chat'],
     ];
 
     /** حالاتُ الملاءمة — ثلاثٌ لا اثنتان */

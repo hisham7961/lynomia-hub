@@ -30,6 +30,14 @@
     <pre class="mono ltr" style="background:var(--cd);border:1px solid var(--brd);border-radius:10px;padding:12px;overflow:auto;direction:ltr;text-align:left;white-space:pre-wrap;font-size:12.5px">{{ $e->message }}</pre>
 </div>
 
+{{-- (المرحلة ٥) مساعدُ التطوير — يظهر حين يكون جاهزاً فقط، والنقرُ لا يكتب شيئاً --}}
+@if (\App\Support\Ai\Dev\ErrorTriage::ready(auth()->user()))
+    <form method="POST" action="{{ route('errors.explain', $e->id) }}" class="inline" data-dev-explain-form>@csrf
+        <button class="btn sm">🧑‍💻 اشرح هذا الخطأ واقترح إصلاحاً</button>
+        <span class="sub">نداءٌ محكومٌ للذكاء — المقتطفُ والرسالةُ منقّحان، ولا يُحفظ شيء.</span>
+    </form>
+@endif
+
 {{-- أين: الموضع والمقتطف --}}
 <div class="card">
     <h3 class="cardtitle">📍 أين وقع؟</h3>

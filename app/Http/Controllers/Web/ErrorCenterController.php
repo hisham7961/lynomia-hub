@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\ErrorEvent;
 use App\Support\Ops\ErrorLog;
+use App\Support\Ops\ErrorSnippet;
 use Illuminate\Http\Request;
 
 /** مركز الأخطاء والسجلات — تجميع وتتبع ومعالجة */
@@ -72,32 +73,14 @@ class ErrorCenterController extends Controller
         $this->gate();
         $e = ErrorEvent::findOrFail($id);
 
-        // مقتطف الشيفرة حول السطر — «أين» بالضبط لا مجرد اسم ملف.
-        // **ومن داخل جذر المشروع حصراً** (v2.318): `error_events.file` صفٌّ
-        // يزرعه أيُّ مستخدمٍ مسجَّل بإحداث خطأ، وقراءتُه كما هو تعني قراءةَ أيّ
-        // ملفٍ على القرص (‏`.env`، مفاتيح، `/etc/passwd`) وطباعتَه على الشاشة.
+        // مقتطف الشيفرة حول السطر — «أين» بالضبط لا مجرد اسم ملف. **ومن داخل جذر المشروع حصراً**
+        // (v2.318): الحارسُ في `ErrorSnippet` — واحدٌ لهذه الشاشة ولمساعد التطوير
         $snippet = [];
-        $path = (string) $e->file;
-        $real = $path !== '' ? @realpath($path) : false;
-        $root = @realpath(base_path()) ?: base_path();
-        $inRoot = $real !== false && str_starts_with($real, rtrim($root, '/') . '/')
-            && ! str_starts_with($real, rtrim($root, '/') . '/.env');
-
-        if ($inRoot && $e->line && is_file($real) && is_readable($real)) {
+        $real = ErrorSnippet::realPath($e);
+        if ($real !== null && $e->line) {
             $e = clone $e;
             $e->file = $real;
-        }
-        if ($inRoot && $e->line && is_file($e->file) && is_readable($e->file)) {
-            try {
-                $lines = @file($e->file, FILE_IGNORE_NEW_LINES);
-                if ($lines !== false) {
-                    $from = max(0, $e->line - 6);
-                    $to = min(count($lines) - 1, $e->line + 4);
-                    for ($i = $from; $i <= $to; $i++) {
-                        $snippet[] = ['n' => $i + 1, 'code' => $lines[$i], 'hot' => ($i + 1) === (int) $e->line];
-                    }
-                }
-            } catch (\Throwable $ex) {}
+            $snippet = ErrorSnippet::around($real, (int) $e->line);
         }
 
         // أخطاء شقيقة: نفس الملف أو نفس الرابط — يكشف العطل الجذري لا عرضه
