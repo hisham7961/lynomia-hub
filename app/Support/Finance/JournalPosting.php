@@ -107,7 +107,7 @@ final class JournalPosting
         $ten = (int) ($m[2] !== '' ? $m[2] : '0') * 10000 + (int) str_pad(substr($m[3] ?? '', 0, 4), 4, '0');
         $mills = intdiv($ten + 5, 10);
 
-        return ($m[1] ?? '') === '-' ? -$mills : $mills;
+        return $m[1] === '-' ? -$mills : $mills;
     }
 
     /** ملّيماتٌ ⟵ نصٌّ للعرض (للرسائل وحدها — لا يُحسب عليه) */
@@ -293,8 +293,11 @@ final class JournalPosting
 
     private static function existing(array $src, bool $lock): ?JournalEntry
     {
-        $q = JournalEntry::withTrashed()->where($src)->orderBy('id');
+        $q = JournalEntry::query();
+        $q->withTrashed();
+        $q->where($src)->orderBy('id');
+        if ($lock) $q->lockForUpdate();
 
-        return ($lock ? $q->lockForUpdate() : $q)->first();
+        return $q->first();
     }
 }
