@@ -926,9 +926,21 @@
                     "path": "/api/mobile/v1/saved",
                     "name": "mobile.saved.index",
                     "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/saved",
+                    "name": "mobile.saved.store",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "DELETE",
+                    "path": "/api/mobile/v1/saved/{id}",
+                    "name": "mobile.saved.destroy",
+                    "auth": "mobile.session"
                 }
             ],
-            "count": 1
+            "count": 3
         },
         "scanner": {
             "endpoints": [

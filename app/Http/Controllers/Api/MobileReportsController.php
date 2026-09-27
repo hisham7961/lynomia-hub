@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\WorkUpdate;
+use App\Support\Platform\Api;
 use App\Support\Workforce\DailyWorkCompliance;
 use App\Support\Workforce\Workday;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
@@ -22,8 +24,7 @@ class MobileReportsController extends Controller
     {
         if (hub_is_client($r->user())) abort(404);
         $emp = Workday::emp($r->user());
-        if (! $emp) return response()->json(['error' => 'no_employee_profile',
-            'message' => 'لا ملفَ موظّفٍ نشطاً مربوطاً بحسابك'], 422);
+        if (! $emp) return self::noEmployeeProfile();
 
         $date = $this->date($r);
         $c = DailyWorkCompliance::resolve($emp, $date);
@@ -32,7 +33,7 @@ class MobileReportsController extends Controller
             ->get(['id', 'project_id', 'task_id', 'done', 'hours', 'progress', 'problems',
                 'submitted_at', 'review_status', 'review_feedback']);
 
-        return response()->json([
+        $payload = [
             'compliance' => DailyWorkCompliance::apiShape($c),
             'entries' => $entries->map(fn ($w) => [
                 'id' => $w->id, 'project_id' => $w->project_id, 'task_id' => $w->task_id,
@@ -45,7 +46,28 @@ class MobileReportsController extends Controller
             ])->values(),
             'submit_hint' => ['method' => 'POST', 'path' => '/api/mobile/v1/updates',
                 'note' => 'تقديمُ التقرير = إنشاءُ بندِ عملٍ للوحدة updates (لا مسارَ مكرّر)'],
-        ]);
+        ];
+
+        // (إضافيّ · طلب الجوال #5) المفاتيحُ العلويّةُ القديمةُ باقيةٌ كما هي (عقدٌ قائم)، ويُضاف
+        // الغلافُ الموحَّد بجانبها: `data` (الحمولةُ نفسُها) + `request_id` — فينتقل العميلُ إليه
+        // دون كسرِ من يقرأ الشكلَ القديم.
+        return response()->json($payload + ['data' => $payload, 'request_id' => Api::requestId()]);
+    }
+
+    /**
+     * خطأُ «لا ملفَ موظّف» (422): الشكلُ القديمُ `{error:'no_employee_profile', message}` باقٍ
+     * حرفاً، ويُضاف فوقه غلافُ `Api::error` (طلب الجوال #5 · إضافيّ): `code` آليٌّ من السجلّ
+     * (`BUSINESS_RULE_VIOLATION`) و`details.reason = no_employee_profile` و`request_id`،
+     * وترويستا `X-Error-Code`/`X-Request-Id`. (`Api::error` يضع الرسالةَ العربيّةَ في `error`،
+     * فيُعاد `error` إلى رمزه الخامِ القديم — التفرّعُ على `code`/`reason` لا على النصّ.)
+     */
+    public static function noEmployeeProfile(): JsonResponse
+    {
+        $resp = Api::error(Api::BUSINESS_RULE_VIOLATION, 422, 'لا ملفَ موظّفٍ نشطاً مربوطاً بحسابك',
+            ['reason' => 'no_employee_profile']);
+        $resp->setData(['error' => 'no_employee_profile'] + $resp->getData(true));
+
+        return $resp;
     }
 
     protected function date(Request $r): string

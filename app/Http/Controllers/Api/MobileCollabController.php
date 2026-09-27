@@ -100,6 +100,9 @@ class MobileCollabController extends V1Controller
                 ->orWhere(fn ($x) => $x->where('created_at', $t)->where('id', '>', $cid)));
         }
         $rows = $q->orderBy('created_at')->orderBy('id')->limit(50)->get();
+        // (إضافيّ · طلب الجوال #6) تفاعلاتُ الدفعةِ باستعلامٍ واحد — لا N+1
+        $reactions = CommentController::reactionsFor($rows);
+        $meId = (string) auth()->id();
 
         $events = $rows->map(fn (Comment $c) => [
             'type'       => Collaboration::EV_MESSAGE_CREATED,
@@ -110,6 +113,7 @@ class MobileCollabController extends V1Controller
             'body'       => (string) $c->body,
             'edited'     => $c->edited_at !== null,
             'created_at' => optional($c->created_at)->toIso8601String(),
+            'reactions'  => MobileCommController::reactionList($reactions[$c->id] ?? [], $meId),
         ])->all();
 
         $last = $rows->last();
@@ -166,6 +170,9 @@ class MobileCollabController extends V1Controller
             DmMessage::whereIn('id', $incoming)->update(['read_at' => now()]);
         }
 
+        // (إضافيّ · طلب الجوال #6) تفاعلاتُ الدفعةِ باستعلامٍ واحد — لا N+1
+        $reactions = DmController::dmReactionsFor($rows->pluck('id')->map('strval')->all());
+
         $events = $rows->map(fn (DmMessage $m) => [
             'type'       => $m->deleted_at !== null ? Collaboration::EV_MESSAGE_DELETED : Collaboration::EV_MESSAGE_CREATED,
             'id'         => (string) $m->id,
@@ -174,6 +181,8 @@ class MobileCollabController extends V1Controller
             'deleted'    => $m->deleted_at !== null,
             'edited'     => $m->edited_at !== null,
             'created_at' => optional($m->created_at)->toIso8601String(),
+            'reactions'  => $m->deleted_at !== null ? []
+                : MobileCommController::reactionList($reactions[(string) $m->id] ?? [], (string) $me->id),
         ])->all();
 
         $last = $rows->last();
@@ -308,7 +317,86 @@ class MobileCollabController extends V1Controller
         return $this->ok(['saved' => $rows]);
     }
 
+    /**
+     * `POST saved` — احفظ رسالةً أراها الآن (طلب الجوال #7 · إضافيّ). حرسُ الرؤيةِ نفسُه
+     * الذي يطبّقه `SavedController::toggle` في الويب (تعليق: `guardTarget` · DM: طرفٌ فيها)
+     * **مضافاً إليه** حارسُ منشورِ القناةِ الموسومِ بشركة (`guardFeedComment` — نظيرُ
+     * `commentReact`). **حفظٌ لا تبديل:** إعادةُ الطلبِ (شبكةٌ متقطّعة) تعيد المحفوظةَ
+     * القائمةَ (`created=false`، 200) لا تُزيلها — الإزالةُ صريحةٌ بـ`DELETE saved/{id}`.
+     * ما لا أراه (أو لا وجودَ له) ٤٠٤ موحَّد — لا كشفَ وجود.
+     */
+    public function saveStore(Request $r): Response
+    {
+        $this->tagMobile($r);
+        if ($deny = $this->denyClient()) return $deny;
+        $me = auth()->user();
+
+        $type = hub_str($r->input('target_type'));
+        $tid = hub_str($r->input('target_id'));
+        $note = trim(hub_str($r->input('note')));
+        if (! in_array($type, Collaboration::SAVED_TYPES, true) || $tid === '' || mb_strlen($tid) > 64) {
+            return Api::error(Api::VALIDATION_FAILED, 422, 'نوعُ الهدفِ ومعرّفُه مطلوبان',
+                ['target_type' => Collaboration::SAVED_TYPES]);
+        }
+        if (mb_strlen($note) > 500) return Api::error(Api::VALIDATION_FAILED, 422, 'الملاحظةُ أطولُ من ٥٠٠ حرف');
+
+        if (! $this->savedTargetVisible($me, $type, $tid)) {
+            return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'لا رسالةَ بهذا المعرّف');
+        }
+
+        $existing = SavedMessage::where('user_id', $me->id)->where('target_type', $type)
+            ->where('target_id', $tid)->orderBy('id')->first();
+        $created = false;
+        if (! $existing) {
+            try {
+                $existing = SavedMessage::create(['user_id' => $me->id, 'target_type' => $type,
+                    'target_id' => $tid, 'note' => $note !== '' ? $note : null]);
+                $created = true;
+            } catch (\Illuminate\Database\QueryException $e) {
+                // طلبان متزامنان — القيدُ الفريدُ حسمها؛ نعيد الصفَّ الفائز
+                $existing = SavedMessage::where('user_id', $me->id)->where('target_type', $type)
+                    ->where('target_id', $tid)->orderBy('id')->firstOrFail();
+            }
+        }
+
+        return response()->json(['data' => ['saved' => $this->savedShape($me, $existing), 'created' => $created],
+            'request_id' => Api::requestId()], $created ? 201 : 200);
+    }
+
+    /** `DELETE saved/{id}` — إزالةُ محفوظتي (لصاحبها وحده · غيرُها ٤٠٤ — لا IDOR) */
+    public function saveDestroy(Request $r, string $id): Response
+    {
+        $this->tagMobile($r);
+        if ($deny = $this->denyClient()) return $deny;
+
+        $s = SavedMessage::where('user_id', auth()->id())->whereKey($id)->first();
+        if (! $s) return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'لا محفوظةَ بهذا المعرّف');
+        $s->delete();
+
+        return $this->ok(['id' => (string) $id, 'deleted' => true]);
+    }
+
     /* ────────── مساعِداتٌ داخلية ────────── */
+
+    /** هل الهدفُ مرئيٌّ لي الآن؟ (حرسُ الحفظ — لا يُحفظ مرجعٌ لما لا يُرى) */
+    private function savedTargetVisible(User $me, string $type, string $id): bool
+    {
+        try {
+            if ($type === 'comment') {
+                $c = Comment::find($id);
+                if (! $c) return false;
+                CommentService::guardTarget($me, (string) $c->module, $c->record_id);   // يُجهض إن خفي
+                CommentService::guardFeedComment($me, $c);
+
+                return true;
+            }
+            $m = DmMessage::find($id);
+
+            return $m && in_array((string) $me->id, [(string) $m->from_id, (string) $m->to_id], true);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface|\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return false;
+        }
+    }
 
     /** بدّلُ تفاعلٍ (toggle) بمفتاحِ الصفِّ + الرمزِ — يعيد true إن أصبح مُفعّلاً */
     private function toggleReaction(array $key, string $emoji): bool
@@ -336,23 +424,36 @@ class MobileCollabController extends V1Controller
         $base = ['id' => (string) $s->id, 'type' => (string) $s->target_type,
             'available' => false, 'title' => null, 'author' => null,
             'note' => $s->note !== null ? (string) $s->note : null,
-            'saved_at' => optional($s->created_at)->toIso8601String()];
+            'saved_at' => optional($s->created_at)->toIso8601String(),
+            // (إضافيّ · طلب الجوال #7) وجهةٌ قانونيّة — **حين `available=true` وحدَه**، وإلّا null
+            'target' => null];
 
         try {
             if ($s->target_type === 'comment') {
                 $c = Comment::find($s->target_id);
                 if (! $c) return $base;
                 CommentService::guardTarget($me, (string) $c->module, $c->record_id);   // يُجهض إن خفي
+                CommentService::guardFeedComment($me, $c);   // منشورُ شركةٍ خارجَ نطاقي = غيرُ متاح
 
                 return array_merge($base, ['available' => true,
-                    'title' => Str::limit(trim((string) $c->body), 90), 'author' => optional($c->user)->name]);
+                    'title' => Str::limit(trim((string) $c->body), 90), 'author' => optional($c->user)->name,
+                    'target' => [
+                        'kind'       => 'comment',
+                        'module'     => (string) $c->module,
+                        'record_id'  => $c->record_id !== null && $c->module !== 'feed' ? (string) $c->record_id : null,
+                        'comment_id' => (string) $c->id,
+                        'parent_id'  => $c->parent_id !== null ? (string) $c->parent_id : null,
+                    ]]);
             }
             $m = DmMessage::find($s->target_id);
             if (! $m || ! in_array((string) $me->id, [(string) $m->from_id, (string) $m->to_id], true)) return $base;
+            $alive = $m->deleted_at === null;
+            $otherId = (string) $m->from_id === (string) $me->id ? (string) $m->to_id : (string) $m->from_id;
 
-            return array_merge($base, ['available' => $m->deleted_at === null,
-                'title' => $m->deleted_at === null ? Str::limit(trim((string) $m->body), 90) : 'حُذفت رسالة',
-                'author' => optional(User::find($m->from_id))->name]);
+            return array_merge($base, ['available' => $alive,
+                'title' => $alive ? Str::limit(trim((string) $m->body), 90) : 'حُذفت رسالة',
+                'author' => optional(User::find($m->from_id))->name,
+                'target' => $alive ? ['kind' => 'dm', 'user_id' => $otherId, 'message_id' => (string) $m->id] : null]);
         } catch (\Throwable $e) {
             return $base;   // لم يعد يُرى — يبقى الصفُّ كي يُزيله صاحبُه، بلا كشفٍ
         }

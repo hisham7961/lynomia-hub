@@ -78,7 +78,7 @@ return [
         'collab.mentions' => ['domain' => 'collaboration', 'category' => 'messaging', 'title_ar' => 'الإشارات (Mentions)', 'title_en' => 'Mentions', 'status' => 'ENABLED',
             'desc_ar' => 'إشاراتٌ مُنطَّقةٌ بالمصرَّح لهم — لا تمنح وصولاً.', 'introduced' => 'v2.456.0'],
         'collab.saved' => ['domain' => 'collaboration', 'category' => 'messaging', 'title_ar' => 'المحفوظات', 'title_en' => 'Saved for Later', 'status' => 'ENABLED',
-            'desc_ar' => 'محفوظاتٌ تُعادُ تخويلاً عند كلِّ فتح.', 'web_routes' => ['saved.index'], 'api_routes' => ['mobile.saved.index'], 'mobile_backend' => 'ready', 'introduced' => 'v2.456.0'],
+            'desc_ar' => 'محفوظاتٌ تُعادُ تخويلاً عند كلِّ فتح.', 'web_routes' => ['saved.index'], 'api_routes' => ['mobile.saved.index', 'mobile.saved.store', 'mobile.saved.destroy'], 'mobile_backend' => 'ready', 'introduced' => 'v2.456.0'],
         'collab.pins' => ['domain' => 'collaboration', 'category' => 'messaging', 'title_ar' => 'التثبيت (Pins)', 'title_en' => 'Pins', 'status' => 'ENABLED', 'introduced' => 'v2.456.0'],
         'collab.search' => ['domain' => 'collaboration', 'category' => 'messaging', 'title_ar' => 'بحث الرسائل', 'title_en' => 'Message Search', 'status' => 'ENABLED',
             'desc_ar' => 'بحثٌ منطَّقٌ بالعضويّة — لا يُرجِع قناةً لست فيها.', 'web_routes' => ['search.messages'], 'introduced' => 'v2.456.0'],
