@@ -1730,37 +1730,118 @@ return [
             'owner_route' => 'security.index',
         ],
         // ── Mobile Readiness · الطور B (SF-1/SF-5 · §109) — مفاتيحُ تشغيلِ جلساتِ
-        // الجوال: تُضبط من القاعدة عند الحاجة ولها افتراضيّاتٌ آمنة (شاشةُ إدارةٍ
-        // مخصَّصةٌ تأتي في طورٍ لاحق). لا سرَّ فيها. يقرؤها سطحُ مصادقةِ الجوال. ──
+        // الجوال: تُضبط من القاعدة عند الحاجة ولها افتراضيّاتٌ آمنة. لا سرَّ فيها.
+        // يقرؤها سطحُ مصادقةِ الجوال. (مفاتيحُ الإصدار/المتجر/الروابط/الدفع أدناه
+        // تُحرَّر من مركز منصّة الجوال — `owner_route` يحيل إليه.) ──
         'mobile.access_ttl_min' => 'مهلةُ رمز وصولِ الجوال بالدقائق قبل انتهائه (يُجدَّد برمز التحديث). افتراضياً ١٥. يقرؤها MobileSessionService.',
         'mobile.refresh_ttl_days' => 'مهلةُ رمز تحديثِ الجوال بالأيام (يُدوَّر لمرّةٍ واحدة عند كل استعمال). افتراضياً ٣٠. يقرؤها MobileSessionService.',
         'mobile.mfa_challenge_min' => 'كم دقيقةً يبقى تحدّي التحقق بخطوتين على الجوال صالحاً بين تسجيل الدخول وإدخال الرمز. افتراضياً ٥. يقرؤها MobileAuthController.',
-        'mobile.support_url' => 'رابطُ الدعم المعروض في app-config للتطبيق (قبل الدخول، بلا سرّ). فارغٌ افتراضاً. يقرؤه MobileAuthController.',
+        'mobile.support_url' => [
+            'why'          => 'رابطُ الدعم المعروض في app-config للتطبيق (قبل الدخول، بلا سرّ). فارغٌ افتراضاً. يقرؤه MobileAuthController.',
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'config'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال',
+        ],
         // ── Mobile Readiness · الطور H (H.3) — معرّفا الروابط العميقة (Universal/App
         // Links): فارغان افتراضاً ⇒ well-known يُخدَم NOT_CONFIGURED صدقاً (لا يربط أيَّ
         // تطبيق) حتى تُضبط معرّفاتٌ حقيقيّة. لا سرَّ فيهما (معرّفٌ علنيّ + بصمةُ شهادة).
-        'mobile.dl_apple_team_id' => 'معرّفُ فريق Apple (Team ID) لربط Universal Links في apple-app-site-association. فارغٌ افتراضاً = غير مُهيّأ (لا يربط تطبيقاً). يقرؤه MobileWellKnownController.',
-        'mobile.dl_apple_bundle_id' => 'مُعرّفُ حزمة iOS (bundle id مثل com.example.app) لربط Universal Links مع Team ID. فارغٌ افتراضاً = غير مُهيّأ. يقرؤه MobileWellKnownController ومركزُ منصّة الجوال.',
-        'mobile.dl_android_package' => 'اسمُ حزمة Android (package name) لربط App Links مع بصمة التوقيع. فارغٌ افتراضاً = غير مُهيّأ. يقرؤه MobileWellKnownController ومركزُ منصّة الجوال.',
-        'mobile.dl_android_fingerprints' => 'بصماتُ شهادةِ توقيع Android (sha256، مفصولةٌ بفاصلة) لربط App Links في assetlinks.json. فارغٌ افتراضاً = غير مُهيّأ. يقرؤه MobileWellKnownController.',
+        'mobile.dl_apple_team_id' => [
+            'why'          => 'معرّفُ فريق Apple (Team ID) لربط Universal Links في apple-app-site-association. فارغٌ افتراضاً = غير مُهيّأ (لا يربط تطبيقاً). يقرؤه MobileWellKnownController.',
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'config'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال',
+        ],
+        'mobile.dl_apple_bundle_id' => [
+            'why'          => 'مُعرّفُ حزمة iOS (bundle id مثل com.example.app) لربط Universal Links مع Team ID. فارغٌ افتراضاً = غير مُهيّأ. يقرؤه MobileWellKnownController ومركزُ منصّة الجوال.',
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'config'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال',
+        ],
+        'mobile.dl_android_package' => [
+            'why'          => 'اسمُ حزمة Android (package name) لربط App Links مع بصمة التوقيع. فارغٌ افتراضاً = غير مُهيّأ. يقرؤه MobileWellKnownController ومركزُ منصّة الجوال.',
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'config'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال',
+        ],
+        'mobile.dl_android_fingerprints' => [
+            'why'          => 'بصماتُ شهادةِ توقيع Android (sha256، مفصولةٌ بفاصلة) لربط App Links في assetlinks.json. فارغٌ افتراضاً = غير مُهيّأ. يقرؤه MobileWellKnownController.',
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'config'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال',
+        ],
         // ── Mobile Readiness · الطور C (SF-5 · C.3) — بوّابةُ إصدارِ التطبيق وروابطُ
         // المتجر: تُقرأ في app-config/health (قبل الدخول، بلا سرّ). افتراضُها **فارغٌ
         // عمداً ⇒ لا حجبَ لنسخ التطوير** حتى يُضبط حدٌّ صراحةً (spec §Version gate).
-        // شاشةُ إدارةٍ مخصَّصةٌ تأتي في طورٍ لاحق؛ افتراضاتُها الشحنيّةُ في config/hub.php.mobile. ──
-        'mobile.min_version_ios' => 'الحدُّ الأدنى لإصدار تطبيق iOS المقبول (semver مثل 1.2.0). فارغٌ افتراضاً = لا حجب. أقلُّ منه ⇒ update_required في app-config/health. يقرؤه MobileAuthController.',
-        'mobile.latest_version_ios' => 'أحدثُ إصدارِ تطبيق iOS المنشور (للعرض في app-config — تلميحُ تحديثٍ اختياريّ). فارغٌ افتراضاً. يقرؤه MobileAuthController.',
-        'mobile.min_version_android' => 'الحدُّ الأدنى لإصدار تطبيق Android المقبول (semver). فارغٌ افتراضاً = لا حجب. أقلُّ منه ⇒ update_required. يقرؤه MobileAuthController.',
-        'mobile.latest_version_android' => 'أحدثُ إصدارِ تطبيق Android المنشور (للعرض). فارغٌ افتراضاً. يقرؤه MobileAuthController.',
-        'mobile.force_update' => 'حين يكون ١: التحديثُ إلزاميٌّ لا اختياريٌّ حين يكون إصدارُ العميل دون الحدِّ الأدنى (force_update في app-config) — يوجّه التطبيقُ لبوّابة التحديث الحاجزة. صفرٌ (الافتراض) = تلميحٌ لا حجب. يقرؤه MobileAuthController.',
-        'mobile.store_url_ios' => 'رابطُ App Store لتطبيق iOS (يُعرض في app-config لتوجيه التحديث). فارغٌ افتراضاً ⇒ null صادقة (NOT_CONFIGURED، لا يُختلَق). يقرؤه MobileAuthController.',
-        'mobile.store_url_android' => 'رابطُ Google Play لتطبيق Android. فارغٌ افتراضاً ⇒ null صادقة (NOT_CONFIGURED). يقرؤه MobileAuthController.',
+        // تُحرَّر من مركز منصّة الجوال (تبويب «التطبيق والإطلاق»)؛ افتراضاتُها الشحنيّةُ في config/hub.php.mobile. ──
+        'mobile.min_version_ios' => [
+            'why'          => 'الحدُّ الأدنى لإصدار تطبيق iOS المقبول (semver مثل 1.2.0). فارغٌ افتراضاً = لا حجب. أقلُّ منه ⇒ update_required في app-config/health. يقرؤه MobileAuthController.',
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'config'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال',
+        ],
+        'mobile.latest_version_ios' => [
+            'why'          => 'أحدثُ إصدارِ تطبيق iOS المنشور (للعرض في app-config — تلميحُ تحديثٍ اختياريّ). فارغٌ افتراضاً. يقرؤه MobileAuthController.',
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'config'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال',
+        ],
+        'mobile.min_version_android' => [
+            'why'          => 'الحدُّ الأدنى لإصدار تطبيق Android المقبول (semver). فارغٌ افتراضاً = لا حجب. أقلُّ منه ⇒ update_required. يقرؤه MobileAuthController.',
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'config'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال',
+        ],
+        'mobile.latest_version_android' => [
+            'why'          => 'أحدثُ إصدارِ تطبيق Android المنشور (للعرض). فارغٌ افتراضاً. يقرؤه MobileAuthController.',
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'config'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال',
+        ],
+        'mobile.force_update' => [
+            'why'          => 'حين يكون ١: التحديثُ إلزاميٌّ لا اختياريٌّ حين يكون إصدارُ العميل دون الحدِّ الأدنى (force_update في app-config) — يوجّه التطبيقُ لبوّابة التحديث الحاجزة. صفرٌ (الافتراض) = تلميحٌ لا حجب. يقرؤه MobileAuthController.',
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'config'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال',
+        ],
+        'mobile.store_url_ios' => [
+            'why'          => 'رابطُ App Store لتطبيق iOS (يُعرض في app-config لتوجيه التحديث). فارغٌ افتراضاً ⇒ null صادقة (NOT_CONFIGURED، لا يُختلَق). يقرؤه MobileAuthController.',
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'config'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال',
+        ],
+        'mobile.store_url_android' => [
+            'why'          => 'رابطُ Google Play لتطبيق Android. فارغٌ افتراضاً ⇒ null صادقة (NOT_CONFIGURED). يقرؤه MobileAuthController.',
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'config'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال',
+        ],
         // ── Mobile Readiness · الطور E (E.6/E.7 · spec §Push) — سائقُ دفعِ الجوال
         // واعتماداتُه: **إعدادٌ خارجيٌّ يُقرأ الحيُّ لا يُختلَق**. فارغٌ افتراضاً ⇒
         // `NullPushProvider` ⇒ NOT_CONFIGURED صدقاً (لا نجاحٌ مُزيَّف). تقرؤها
         // `PushService`، وحالتُها الصادقةُ (بلا سرّ) تُعرَض عبر `push/admin/status`. ──
-        'mobile.push_driver' => 'سائقُ دفعِ الجوال: فارغٌ (الافتراض) ⇒ NullPushProvider ⇒ NOT_CONFIGURED صدقاً (لا نجاحٌ مُزيَّف)، أو «fcm» لتفعيل Firebase Cloud Messaging (يحتاج project_id + رمز الوصول). يقرؤه PushService.',
-        'mobile.push_fcm_project_id' => 'معرّفُ مشروع Firebase لدفع FCM — إعدادٌ خارجيٌّ (لا سرّ، يُعرَض حضورُه لا قيمتُه). فارغٌ افتراضاً ⇒ الدفعُ غيرُ مهيّأ (NOT_CONFIGURED). يقرؤه PushService.',
+        'mobile.push_driver' => [
+            'why'          => 'سائقُ دفعِ الجوال: فارغٌ (الافتراض) ⇒ NullPushProvider ⇒ NOT_CONFIGURED صدقاً (لا نجاحٌ مُزيَّف)، أو «fcm» لتفعيل Firebase Cloud Messaging (يحتاج project_id + رمز الوصول). يقرؤه PushService.',
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'push'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال',
+        ],
+        'mobile.push_fcm_project_id' => [
+            'why'          => 'معرّفُ مشروع Firebase لدفع FCM — إعدادٌ خارجيٌّ (لا سرّ، يُعرَض حضورُه لا قيمتُه). فارغٌ افتراضاً ⇒ الدفعُ غيرُ مهيّأ (NOT_CONFIGURED). يقرؤه PushService.',
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'push'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال',
+        ],
+        'mobile.push_fcm_service_account' => [
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'push'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال (كتابةٌ فقط)',
+            'why'       => 'ملفُّ حساب خدمة Firebase (JSON: client_email/private_key/project_id) — **سرٌّ**: يُخزَّن مشفَّراً ولا يُعرَض قط. منه يسكّ PushService رمزَ OAuth (JWT موقَّعٌ RS256) ويخبّئه حتى قبيل انتهائه — فلا يسقط الدفعُ بانتهاء رمزٍ ثابت. رمزُ الوصول الثابت أدناه احتياطٌ للتوافق.',
+            'sensitive' => true,
+        ],
         'mobile.push_fcm_access_token' => [
+            'owner_route'  => 'mobileplatform.index',
+            'owner_params' => ['tab' => 'push'],
+            'owner_label'  => 'يُحرَّر في مركز منصّة الجوال (كتابةٌ فقط)',
             'why'       => 'رمزُ وصولِ حساب خدمة Firebase لإرسال FCM — **سرٌّ**: يُخزَّن مشفَّراً ولا يُعرَض قط (يُعرَض حضورُه فقط في push/admin/status). فارغٌ افتراضاً ⇒ NOT_CONFIGURED (لا يُختلَق نجاحٌ). يقرؤه PushService.',
             'sensitive' => true,
         ],

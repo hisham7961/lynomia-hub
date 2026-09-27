@@ -510,6 +510,9 @@ class MobileCommController extends V1Controller
             'pinned'      => (bool) $c->pinned,
             'resolved'    => $c->resolved_at !== null,
             'has_attachment' => ! empty($c->att),
+            // (إضافيّ · طلب الجوال #2) مقبضُ تنزيلِ المرفق {id,name,size,mime,download} — للداخليّ
+            'attachment'  => ! empty($c->att) && ! hub_is_client($me)
+                ? \App\Support\Mobile\MessageAttachment::shape($c->att, (string) $c->id, 'mobile.comments.attachment') : null,
             'reactions'   => $this->reactionSummary($reactions[$c->id] ?? [], $me),
             'created_at'  => optional($c->created_at)->toIso8601String(),
         ];
@@ -554,6 +557,9 @@ class MobileCommController extends V1Controller
             'body'           => $deleted ? null : (string) $m->body,
             'deleted'        => $deleted,
             'has_attachment' => ! $deleted && ! empty($m->att),
+            // (إضافيّ · طلب الجوال #2) مقبضُ تنزيلِ المرفق {id,name,size,mime,download}
+            'attachment'     => ! $deleted && ! empty($m->att)
+                ? \App\Support\Mobile\MessageAttachment::shape($m->att, (string) $m->id, 'mobile.dm.attachment') : null,
             'read'           => $m->read_at !== null,
             'created_at'     => optional($m->created_at)->toIso8601String(),
             // (إضافيّ · طلب الجوال #6) ملخّصُ التفاعلات نظيرُ commentShape؛ المحذوفةُ بلا تفاعلات

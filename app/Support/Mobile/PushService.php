@@ -64,6 +64,9 @@ class PushService
         'test'               => 'إشعارٌ تجريبيّ',
     ];
 
+    /** قناةُ إشعاراتِ Android الافتراضيّة (يُنشئها التطبيقُ بالمعرّف نفسِه) */
+    public const ANDROID_CHANNEL = 'lynomia_default';
+
     /** العنوانُ الافتراضيُّ لنوعٍ غيرِ مُخرَّط — عامٌّ لا يُسرّب */
     public const KIND_TITLE_DEFAULT = 'إشعارٌ جديد';
 
@@ -105,15 +108,22 @@ class PushService
             'requested'        => $driver !== '' ? $driver : null,   // ما طُلب في الإعدادات
             'has_project_id'   => trim((string) $creds['project_id']) !== '',     // حضورٌ لا قيمة
             'has_access_token' => trim((string) $creds['access_token']) !== '',   // حضورٌ لا قيمة — لا يُعرَض المفتاحُ قط
+            // حسابُ الخدمة (سكُّ OAuth خادميّاً) — حضورٌ صالحٌ لا قيمة
+            'has_service_account' => ! empty($creds['service_account']),
         ];
     }
 
     /** اعتماداتُ FCM من الإعدادات — **إعدادٌ خارجيٌّ لا يُختلَق** (لا تُسجَّل قط) */
     private static function fcmCreds(): array
     {
+        // حسابُ الخدمة (مشفَّرٌ في الإعدادات) — صالحٌ أو لا شيء؛ ومعرّفُ المشروع منه إن لم يُضبط صراحةً
+        $sa = \App\Support\Push\FcmServiceAccount::parse((string) setting('mobile.push_fcm_service_account', ''));
+        $project = trim((string) setting('mobile.push_fcm_project_id', config('hub.mobile.push.fcm.project_id', '')));
+
         return [
-            'project_id'   => (string) setting('mobile.push_fcm_project_id', config('hub.mobile.push.fcm.project_id', '')),
-            'access_token' => (string) setting('mobile.push_fcm_access_token', ''),
+            'project_id'      => $project !== '' ? $project : (string) ($sa['project_id'] ?? ''),
+            'service_account' => $sa,
+            'access_token'    => (string) setting('mobile.push_fcm_access_token', ''),
         ];
     }
 
@@ -222,6 +232,9 @@ class PushService
             'body'     => self::GENERIC_BODY,
             'category' => $base,
             'data'     => $data,
+            // (إضافيّ) شارةُ iOS (apns.aps.badge) وقناةُ Android — يبنيهما المزوّد
+            'badge'    => (int) $data['unread'],
+            'android_channel' => self::ANDROID_CHANNEL,
         ];
     }
 

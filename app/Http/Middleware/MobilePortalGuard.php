@@ -66,7 +66,15 @@ class MobilePortalGuard
         'mobile.search',
         'mobile.notifications.*',
         'mobile.comments.*',
-        'mobile.files.*',
+        // الملفّاتُ بأسمائها لا بالبادئة: رفعٌ/تنزيلٌ على وحداتِه المسموحة. أمّا قائمةُ مرفقاتِ
+        // السجلّ وحذفُ المرفق (`mobile.files.index|destroy` · المرحلة ٣) فمحجوبان — الويبُ يُخفي
+        // مرفقاتِ الشاشةِ الداخليّةِ عن العميل ولا يبلغ حذفَها (نظيرُ PortalGuard حرفاً).
+        'mobile.files.upload_session',
+        'mobile.files.upload_chunk',
+        'mobile.files.upload_complete',
+        'mobile.files.attach',
+        'mobile.files.download',
+        'mobile.files.stream',
         'mobile.push.register',
         'mobile.push.unregister',
         'mobile.portal.*',

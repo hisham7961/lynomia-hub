@@ -129,7 +129,21 @@ static::created(function (self $n) {
 - **الجسمُ ثابتٌ عامّ** (`GENERIC_BODY` · `:41`) — «افتح التطبيق للاطّلاع على التفاصيل».
 - **الوجهةُ القانونيّة** `{module,id,action}` من `NotificationLink::target` — لا رابطَ ويبٍ ولا اسمَ شاشة.
 - **عددُ غير المقروء** لصاحب الإشعار وحدَه (`unreadFor` · `:303`).
-- على FCM تُرسَل `notification.{title,body}` + `data` (نصوصٌ) فقط (`FcmPushProvider.php:53-63`) — لا سرَّ في الحمولة.
+- على FCM تُرسَل `notification.{title,body}` + `data` (نصوصٌ) فقط — لا سرَّ في الحمولة.
+- **(إضافيّ · خطّةُ التطبيق 2.3)** يُضاف إلى رسالة FCM: `apns.payload.aps.badge` = عددُ غير المقروء
+  (شارةُ iOS دون فتح التطبيق)، و`android.notification.channel_id` = `lynomia_default`
+  (`PushService::ANDROID_CHANNEL` — ينشئ التطبيقُ القناةَ بالمعرّف نفسِه). قاعدةُ الجسمِ العامّ باقية.
+
+### اعتمادُ FCM — حسابُ خدمةٍ يسكّ رمزَ OAuth خادميّاً
+
+رمزُ الوصول الثابت (`mobile.push_fcm_access_token`) يعيش ساعةً ثم يسقط الدفعُ صامتاً. المفضَّلُ الآن
+**ملفُّ حساب الخدمة** (`mobile.push_fcm_service_account` — سرٌّ مشفَّرٌ للكتابة فقط يُضبط من مركز منصّة
+الجوال ← الدفع؛ يُتحقَّق من `client_email`/`private_key`/`project_id`). منه يسكّ
+`App\Support\Push\FcmServiceAccount` رمزاً: JWT موقَّعٌ RS256 (`openssl_sign`) بنطاق
+`https://www.googleapis.com/auth/firebase.messaging`، يُبادَل في `https://oauth2.googleapis.com/token`
+(منحةُ jwt-bearer، عبر حارس الصادر `hub_outbound_ok` — والنقطةُ ثابتةٌ لا تُقرأ من الملفّ)، ويُخبَّأ
+مشفَّراً حتى ما قبل انتهائه بخمس دقائق. الرمزُ الثابتُ يبقى احتياطاً للتوافق. تعذّرُ السكّ بلا احتياط ⇒
+تسليمٌ `failed` بصنف `auth_failed` (صادقٌ لا نجاحٌ مُزيَّف)، ولا يُسجَّل ملفٌّ ولا رمزٌ ولا ردُّ مزوّد.
 
 ---
 

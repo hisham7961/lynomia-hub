@@ -20,8 +20,13 @@ namespace App\Support\Push;
  */
 class FcmPushProvider implements PushProvider
 {
+    /** صنفُ الخطأ حين يتعذّر سكُّ رمزِ OAuth من حساب الخدمة (ولا رمزَ احتياطيّ) */
+    public const ERR_AUTH = 'auth_failed';
+
     /**
-     * @param array $creds ['project_id'=>?, 'access_token'=>?] — إعدادٌ خارجيٌّ (لا يُختلَق)
+     * @param array $creds ['project_id'=>?, 'service_account'=>?array, 'access_token'=>?] — إعدادٌ خارجيٌّ
+     *        (لا يُختلَق). حسابُ الخدمة يُسكّ منه رمزُ OAuth خادميّاً (`FcmServiceAccount`)؛ والرمزُ
+     *        الثابتُ احتياطٌ للتوافق مع الضبط القديم.
      */
     public function __construct(private array $creds = [])
     {
@@ -32,11 +37,24 @@ class FcmPushProvider implements PushProvider
         return 'fcm';
     }
 
-    /** مُهيّأٌ = مشروعٌ + رمزُ وصولٍ حاضران (لا نُرسِل بلا اعتمادٍ صالح) */
+    /** مُهيّأٌ = مشروعٌ + (حسابُ خدمةٍ صالح أو رمزُ وصولٍ) — لا نُرسِل بلا اعتماد */
     public function isConfigured(): bool
     {
         return trim((string) ($this->creds['project_id'] ?? '')) !== ''
-            && trim((string) ($this->creds['access_token'] ?? '')) !== '';
+            && (! empty($this->creds['service_account'])
+                || trim((string) ($this->creds['access_token'] ?? '')) !== '');
+    }
+
+    /** رمزُ الوصول لهذا الإرسال: مسكوكٌ من حساب الخدمة، وإلا الثابتُ الاحتياطيّ — أو null */
+    private function bearer(): ?string
+    {
+        if (! empty($this->creds['service_account'])) {
+            $t = FcmServiceAccount::accessToken((array) $this->creds['service_account']);
+            if ($t !== null) return $t;
+        }
+        $static = trim((string) ($this->creds['access_token'] ?? ''));
+
+        return $static !== '' ? $static : null;
     }
 
     public function send(string $token, string $platform, array $payload): PushSendResult
@@ -46,9 +64,16 @@ class FcmPushProvider implements PushProvider
             return PushSendResult::notConfigured();
         }
 
+        // مُهيّأٌ لكنّ السكَّ تعذّر (ولا احتياط): فشلٌ صادقٌ بصنفٍ تقنيّ — لا نداءَ بلا اعتماد
+        $bearer = $this->bearer();
+        if ($bearer === null) {
+            return PushSendResult::failed(self::ERR_AUTH);
+        }
+
         try {
             $project = trim((string) $this->creds['project_id']);
-            $res = \Illuminate\Support\Facades\Http::withToken((string) $this->creds['access_token'])
+            $unread = (int) ($payload['data']['unread'] ?? 0);
+            $res = \Illuminate\Support\Facades\Http::withToken($bearer)
                 ->timeout(8)
                 ->post("https://fcm.googleapis.com/v1/projects/{$project}/messages:send", [
                     'message' => [
@@ -60,6 +85,10 @@ class FcmPushProvider implements PushProvider
                         ],
                         // البياناتُ نصوصٌ لدى FCM — الرابطُ العميقُ والعدّاد لا أكثر
                         'data' => array_map('strval', (array) ($payload['data'] ?? [])),
+                        // (إضافيّ) شارةُ iOS = عددُ غير المقروء، وقناةُ Android الافتراضيّة
+                        'apns' => ['payload' => ['aps' => ['badge' => $unread]]],
+                        'android' => ['notification' => ['channel_id' => (string) ($payload['android_channel']
+                            ?? \App\Support\Mobile\PushService::ANDROID_CHANNEL)]],
                     ],
                 ]);
 

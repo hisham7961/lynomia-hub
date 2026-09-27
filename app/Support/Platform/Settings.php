@@ -41,7 +41,7 @@ class Settings
      * أيّها جاء، فسؤالُ «من غيّره؟» يسبقه «من أين؟». عرضُ العمود ٢٠ حرفاً.
      */
     public const WRITERS = ['screen', 'messaging', 'odoo', 'n8n', 'security',
-                            'ops', 'cli', 'import', 'restore', 'demo', 'features'];
+                            'ops', 'cli', 'import', 'restore', 'demo', 'features', 'mobile'];
 
     /**
      * كم قيدَ تدقيقٍ يُمسح ارتداداً حين لا صفَّ تاريخٍ للمفتاح. الجدولُ حديث،
@@ -147,8 +147,12 @@ class Settings
                    // (WP-9.4) مفتاحٌ داخليٌّ **قابلٌ للنقل** بين التنصيبات: سياسةُ
                    // احتفاظٍ أو عتبةُ تشغيلٍ لا حالةٌ. الافتراضيُّ لا — فالإغفال
                    // يمنع التصدير ولا يفتحه.
-                   'exportable' => (bool) ($meta['exportable'] ?? false)]
-                : ['why' => (string) $meta, 'owner_route' => '', 'sensitive' => false, 'exportable' => false];
+                   'exportable' => (bool) ($meta['exportable'] ?? false),
+                   // (إضافيّ) وسائطُ مسارِ الشاشة المالكة (تبويبٌ بعينه) ونصُّ رابطها
+                   'owner_params' => (array) ($meta['owner_params'] ?? []),
+                   'owner_label' => (string) ($meta['owner_label'] ?? '')]
+                : ['why' => (string) $meta, 'owner_route' => '', 'sensitive' => false, 'exportable' => false,
+                   'owner_params' => [], 'owner_label' => ''];
         }
 
         return $out;

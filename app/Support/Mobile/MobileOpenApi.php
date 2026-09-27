@@ -577,7 +577,9 @@ class MobileOpenApi
                 'ok' => $env($ref('Record')), 'errors' => ['403', '404', '409', '422', '428']],
             'mobile.resource.destroy' => ['tag' => 'crud', 'summary' => 'نقلٌ للسلة؛ محميٌّ ⇒ يُصفُّ طلباً (202)',
                 'ok' => $env($obj(['deleted' => $bool])), 'errors' => ['403', '404', '409', '428']],
-        ];
+        ]
+            // أفعالُ الميدان والموظّف (المرحلة ٣) — وصفاتُها في صنفِها المستقلّ
+            + MobileOpenApiFieldOps::opMeta($ref, $env, $obj);
     }
 
     // ══════════════════════════ مخطّطاتٌ ومعاملاتٌ وردودُ أخطاء ══════════════════════════
@@ -590,7 +592,7 @@ class MobileOpenApi
         $i = ['type' => 'integer'];
         $dt = ['type' => 'string', 'format' => 'date-time', 'nullable' => true];
 
-        return [
+        return MobileOpenApiFieldOps::schemas() + [
             'Error' => ['type' => 'object', 'required' => ['error', 'code', 'message'], 'properties' => [
                 'error' => ['type' => 'string', 'description' => 'الرسالة (مفتاح التوافق القديم)'],
                 'code' => ['type' => 'string', 'enum' => array_keys(Api::CODES)],
@@ -705,6 +707,7 @@ class MobileOpenApi
                 'id' => $s, 'parent_id' => $sN, 'user' => ['$ref' => '#/components/schemas/UserRef'],
                 'body' => $s, 'mentions' => ['type' => 'array', 'items' => $s], 'internal' => $b, 'pinned' => $b,
                 'resolved' => $b, 'has_attachment' => $b,
+                'attachment' => ['$ref' => '#/components/schemas/MessageAttachment'],
                 'reactions' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => ['emoji' => $s, 'count' => $i, 'mine' => $b]]],
                 'created_at' => $dt, 'replies' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true]],
             ]],
@@ -715,7 +718,8 @@ class MobileOpenApi
             ]],
             'DmMessage' => ['type' => 'object', 'properties' => [
                 'id' => $s, 'from_id' => $s, 'to_id' => $s, 'mine' => $b, 'body' => $sN, 'deleted' => $b,
-                'has_attachment' => $b, 'read' => $b, 'created_at' => $dt,
+                'has_attachment' => $b, 'attachment' => ['$ref' => '#/components/schemas/MessageAttachment'],
+                'read' => $b, 'created_at' => $dt,
                 'reactions' => ['$ref' => '#/components/schemas/Reactions'],
             ]],
             'Reactions' => ['type' => 'array', 'description' => 'ملخّصُ التفاعلات — مرتّبٌ بقائمةِ الرموزِ الثابتة؛ فارغٌ للمحذوفة',
@@ -867,7 +871,7 @@ class MobileOpenApi
             'tracking' => 'التتبّع الميدانيّ (بموافقة)',
             'sync' => 'المزامنة التزايُدية',
             'health' => 'الصحّة',
-        ];
+        ] + MobileOpenApiFieldOps::TAGS;
         $out = [];
         foreach ($t as $name => $desc) $out[] = ['name' => $name, 'description' => $desc];
 
@@ -943,7 +947,13 @@ class MobileOpenApi
         return [
             'push_fcm' => [
                 'status' => \App\Support\Mobile\PushService::status()['configured'] ? 'CONFIGURED' : 'NOT_CONFIGURED',
-                'configured_via' => ['setting: mobile.push_driver=fcm', 'setting: mobile.push_fcm_project_id', 'setting: mobile.push_fcm_access_token'],
+                'configured_via' => ['setting: mobile.push_driver=fcm', 'setting: mobile.push_fcm_project_id',
+                    'setting: mobile.push_fcm_service_account (مفضَّل — رمزُ OAuth يُسكّ خادميّاً ويُجدَّد)',
+                    'setting: mobile.push_fcm_access_token (احتياطٌ ينتهي خلال ساعة)'],
+                // عقدُ الحمولة الذي يستقبله التطبيق (إضافيّ): الشارةُ والقناة
+                'payload' => ['data' => ['notification_id', 'category', 'unread', 'module', 'id', 'action'],
+                    'apns.payload.aps.badge' => 'عددُ غير المقروء', 'android.notification.channel_id' => \App\Support\Mobile\PushService::ANDROID_CHANNEL,
+                    'body' => 'عامٌّ ثابت (لا نصَّ الإشعار الخام)'],
                 'behavior_when_absent' => 'NullPushProvider — التسليمُ not_configured، لا نجاحٌ مُزيَّف، والإشعارُ الداخليُّ لا يُفقَد',
                 'no_secret_exposed' => true,
             ],
@@ -1054,7 +1064,8 @@ class MobileOpenApi
             'idempotency' => [
                 'header' => 'Idempotency-Key',
                 'owner' => 'mobile_session id (Critic F1 — لا يُعاد ردُّ مستخدمٍ لآخر)',
-                'applies_to' => ['create', 'approval decide', 'comment post', 'dm send', 'file complete', 'file attach', 'action run', 'tracking points', 'pin toggle', 'protected-write submit'],
+                'applies_to' => ['create', 'approval decide', 'comment post', 'dm send', 'file complete', 'file attach', 'action run', 'tracking points', 'pin toggle', 'protected-write submit',
+                    'attendance check-in/out', 'leave decide', 'custody handover/recover', 'inventory freeze/scan/reconcile/close'],
             ],
             'context_headers' => self::contextHeadersDoc(),
             'deep_link' => self::deepLinkDoc(),
@@ -1105,6 +1116,7 @@ class MobileOpenApi
             'mobile.resource.update' => 'crud', 'mobile.resource.patch' => 'crud', 'mobile.resource.destroy' => 'crud',
         ];
         if (isset($map[$name])) return $map[$name];
+        if (isset(MobileOpenApiFieldOps::AREAS[$name])) return MobileOpenApiFieldOps::AREAS[$name];
         // مسارٌ جديدٌ بلا تصنيفٍ صريح — يسقط لمجالٍ مُشتقٍّ من أوّلِ مقطعٍ بعد البادئة (صادقٌ لا مُختلَق)
         $rest = trim(substr($uri, strlen(self::PREFIX)), '/');
         $seg = explode('/', $rest)[0] ?? 'other';

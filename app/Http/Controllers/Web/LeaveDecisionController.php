@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\LeaveRequest;
+use App\Support\Workforce\LeaveDecision;
 use Illuminate\Http\Request;
 
 /**
@@ -21,119 +22,48 @@ use Illuminate\Http\Request;
  */
 class LeaveDecisionController extends Controller
 {
-    /** الحالات التي ما زالت بانتظار قرار */
-    public const PENDING = ['مقدّم', 'مقدم', 'موافقة المدير', 'موافقة الموارد البشرية'];
+    /** الحالات التي ما زالت بانتظار قرار — مصدرُها السلطةُ الواحدة `LeaveDecision` */
+    public const PENDING = LeaveDecision::PENDING;
 
     /**
-     * الأطرافُ الثلاثةُ تجاه طلبٍ بعينه: **صاحبُه** · **مديرُه** · **الموارد
-     * البشريّة** (ومن يعلوها: المالكُ وحاملُ رايةِ الاعتماد).
-     *
-     * استُخرجت من `abilities()` كي تكون **سلطةً واحدةً يقرؤها الجميع** — فالنموذجُ
-     * العامُّ والاستيرادُ يحتاجان الجوابَ نفسَه، وكتابةُ تعريفٍ ثانٍ لهما هي عينُ
-     * العطلِ الذي يطارده هذا المجلس: سلطةٌ مركزيّةٌ صحيحةٌ ثمّ قارئٌ يكتب تعريفَه.
-     */
-    protected static function parties($u, LeaveRequest $m): array
-    {
-        $uid = (string) $u->id;
-        $requester = null;
-        if ($m->emp_id) {
-            $requester = \App\Models\Employee::whereKey($m->emp_id)->value('user_id');
-        }
-
-        return [
-            'self' => $requester !== null && (string) $requester === $uid,
-            'mgr' => ((string) $m->mgr_id === $uid)
-                || ($m->emp_id && (string) \App\Models\Employee::whereKey($m->emp_id)->value('manager_id') === $uid),
-            'hr' => hub_is_owner($u) || hub_flag($u, 'approve') || hub_can($u, 'hr', 'e'),
-        ];
-    }
-
-    /**
-     * **هل يملك هذا المستخدمُ أن يمسَّ حالةَ هذا الطلبِ أصلاً؟**
-     *
-     * سؤالُ **صلاحيّة** لا سؤالُ **تسلسل**: شرطُ `pending` («لا قرارَ فوق قرار»)
-     * يخصّ مسارَ القرارِ وحدَه، ولا يُستورد إلى الإنشاء — وإلّا لَعجزت الموارد
-     * البشريّةُ عن تسجيلِ إجازةٍ معتمدةٍ سلفاً، وذاك نزعُ قدرةٍ لا إصلاحُ عيب.
+     * **هل يملك هذا المستخدمُ أن يمسَّ حالةَ هذا الطلبِ أصلاً؟** — تفويضٌ للسلطة الواحدة
+     * (`LeaveDecision::mayDecideOn`) يبقى هنا بتوقيعه كي لا يتغيّر مستهلكوه (`DecisionFields`).
      */
     public static function mayDecideOn($u, LeaveRequest $m): bool
     {
-        $p = self::parties($u, $m);
-
-        return ! $p['self'] && ($p['mgr'] || $p['hr']);
+        return LeaveDecision::mayDecideOn($u, $m);
     }
 
     /** صلاحيّات المستخدم تجاه طلبٍ بعينه — تُستهلك هنا وفي واجهة الأزرار */
     public static function abilities($u, LeaveRequest $m): array
     {
-        $p = self::parties($u, $m);
-        $isSelf = $p['self'];
-        $isMgr = $p['mgr'];
-        $isHr = $p['hr'];
-
-        $pending = in_array((string) $m->status, self::PENDING, true);
-
-        return [
-            'pending' => $pending,
-            'self' => $isSelf,
-            // المديرُ يوصي ما دام الطلبُ عند مرحلته؛ وHR يحسم من أيّ حالةٍ معلّقة
-            'mgr_approve' => $pending && ! $isSelf && $isMgr
-                && in_array((string) $m->status, ['مقدّم', 'مقدم'], true),
-            'final_approve' => $pending && ! $isSelf && $isHr,
-            'reject' => $pending && ! $isSelf && ($isMgr || $isHr),
-        ];
+        return LeaveDecision::abilities($u, $m);
     }
 
+    /**
+     * بابُ الويب: التحقّقُ وشكلُ الردّ (تحويلٌ برسالة) هنا، والسلسلةُ نفسُها في
+     * `LeaveDecision::decide` — يسلكها الجوالُ حرفاً (`MobileLeavesController`).
+     */
     public function decide(Request $r, string $id)
     {
         $u = auth()->user();
-        abort_unless(hub_can($u, 'leaves', 'v'), 403, 'لا تملك عرض الإجازات');
-
-        /** @var LeaveRequest $m */
-        $m = hub_scope(LeaveRequest::query()->whereNull('deleted_at'), 'leaves')->findOrFail($id);
+        $m = LeaveDecision::findScoped($u, $id);
 
         $d = $r->validate([
             'decision' => 'required|in:approve,reject',
             'note' => 'nullable|string|max:500',
         ], [], ['decision' => 'القرار', 'note' => 'السبب']);
 
-        $ab = self::abilities($u, $m);
-        abort_unless($ab['pending'], 422, 'هذا الطلب محسومٌ أصلاً — لا قرارَ فوق قرار');
-        abort_if($ab['self'], 403, 'لا يُقرَّر في طلبِ النفس — يقرّر مديرُك أو الموارد البشرية');
+        $res = LeaveDecision::decide($u, $m, $d['decision'], $d['note'] ?? null);
 
-        if ($d['decision'] === 'reject') {
-            abort_unless($ab['reject'], 403, 'قرارُ هذا الطلب لمدير الموظّف أو الموارد البشرية');
-            if (blank($d['note'] ?? null)) {
-                return back()->withErrors(['note' => 'سببُ الرفض مطلوب — يقرؤه صاحبُ الطلب'])->withInput();
+        if (! $res['ok']) {
+            // سببُ الرفضِ الناقص خطأُ حقلٍ في النموذج (كما كان) — والباقي رفضٌ صريح
+            if ($res['reason'] === LeaveDecision::R_REASON) {
+                return back()->withErrors(['note' => $res['msg']])->withInput();
             }
-            $new = 'مرفوض';
-        } elseif ($ab['final_approve']) {
-            $new = 'معتمد';
-        } elseif ($ab['mgr_approve']) {
-            $new = 'موافقة المدير';
-        } else {
-            abort(403, 'قرارُ هذا الطلب لمدير الموظّف أو الموارد البشرية');
+            abort($res['http'], $res['msg']);
         }
 
-        $was = (string) $m->status;
-        $m->status = $new;
-        if (filled($d['note'] ?? null)) $m->note = $d['note'];
-        $m->save();   // خصمُ الرصيد/استعادتُه في نموذج LeaveRequest نفسه
-
-        hub_audit('قرار إجازة', 'leaves', $m->id, (string) ($m->type ?: 'طلب'),
-            ['before' => ['الحالة' => $was], 'after' => ['الحالة' => $new, 'ملاحظة' => $d['note'] ?? '—']]);
-
-        // صاحبُ الطلب يُخبَر بالقرار — لا يكتشفه صدفةً من الجدول
-        if ($m->emp_id && ($ruid = \App\Models\Employee::whereKey($m->emp_id)->value('user_id'))) {
-            hub_notify($ruid, 'leave',
-                ($new === 'مرفوض' ? '❌ رُفض طلبك: ' : ($new === 'معتمد' ? '✅ اعتُمد طلبك: ' : '👍 وافق مديرُك على طلبك: '))
-                . ($m->type ?: 'إجازة')
-                . ($d['note'] ?? null ? ' — ' . \Illuminate\Support\Str::limit($d['note'], 120) : ''),
-                'leaves', $m->id);
-        }
-
-        \App\Support\Platform\FlowRunner::fire('status', 'leaves', $m, $new);
-
-        return back()->with('ok', $new === 'مرفوض' ? 'رُفض الطلب وأُخطر صاحبُه بالسبب'
-            : ($new === 'معتمد' ? 'اعتُمد الطلب — خُصم من الرصيد إن كان غياباً' : 'سُجّلت موافقتُك — بقي اعتمادُ الموارد البشرية'));
+        return back()->with('ok', $res['msg']);
     }
 }
