@@ -178,7 +178,8 @@ class PasswordResetController extends Controller
     {
         $app = (string) setting('app.name', config('app.name'));
         $ttl = (int) config('auth.passwords.users.expire', 60);
-        $url = route('password.reset', ['token' => $token, 'email' => $user->email]);
+        // من العنوان المضبوط لا من ترويسة Host للطلب المجهول (تسميمُ رابط الاستعادة)
+        $url = \App\Support\Platform\PublicUrl::route('password.reset', ['token' => $token, 'email' => $user->email]);
 
         OutboxMessage::create([
             'kind' => 'password_reset', 'channel' => 'mail', 'target' => $user->email,

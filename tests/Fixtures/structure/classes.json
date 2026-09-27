@@ -562,6 +562,7 @@
     "App\\Support\\Platform\\Modules\\ModuleValidation",
     "App\\Support\\Platform\\OpenApi",
     "App\\Support\\Platform\\PrefService",
+    "App\\Support\\Platform\\PublicUrl",
     "App\\Support\\Platform\\RecordTimeline",
     "App\\Support\\Platform\\Redactor",
     "App\\Support\\Platform\\SchemaCache",

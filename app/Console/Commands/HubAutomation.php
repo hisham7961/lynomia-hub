@@ -65,6 +65,15 @@ class HubAutomation extends Command
         $this->dry = (bool) $this->option('dry');
         if ($this->dry) $this->warn('وضع المعاينة — لن يُكتب شيء');
 
+        // استدراكُ ختمِ تدقيقٍ ضاع بعد الالتزام (AUD-07) — أوّلاً، معزولاً كسائر الخطوات
+        if (! $this->dry) {
+            try {
+                \App\Models\AuditEntry::sealPending();
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
         $g = $this->recurring();
         // عزلُ الفشل كسائر الخطوات (v2.399): قاعدةٌ واحدة ترمي كانت تُسقط التذكيرات والعقود والنبضة
         try {

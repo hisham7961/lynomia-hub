@@ -228,9 +228,10 @@ class Audit
             $genesis = str_repeat('0', 64);
             // بلا رأسٍ مخزَّن (هجرةٌ لم تُطبَّق): البدايةُ أحدثُ قيدٍ مختوم — `$rows` مرتّبةٌ بـid تنازلياً
             $cur = $fetch($head !== '' ? $head : (string) $rows[0]->hash);
-            $broken = 0; $walked = 0;
+            $broken = 0; $walked = 0; $visited = [];
             while ($cur && $walked < $n) {
                 $walked++;
+                $visited[(string) $cur->getKey()] = true;
                 $p = (string) $cur->prev_hash;
                 $match = hash('sha256', $p . '|' . $cur->canonical()) === $cur->hash
                       || hash('sha256', $p . '|' . $cur->canonical('v2raw')) === $cur->hash
@@ -240,6 +241,15 @@ class Audit
                 $next = $fetch($p);
                 if (! $next) { $broken++; break; }
                 $cur = $next;
+            }
+
+            // **ولا يتيمَ في النافذة:** قيدٌ مختومٌ أحدثُ من أقدمِ ما مُشي ولم يبلغه المشيُ من الرأس = صفٌّ
+            // مُدرَجٌ خارج السلسلة (مزوَّر) — كان الفحصُ القديمُ بالـid يكشفه، والمشيُ بالروابط وحدَه يغفله
+            $oldest = $visited ? min(array_map('intval', array_keys($visited))) : null;
+            if ($oldest !== null) {
+                foreach ($rows as $r) {
+                    if ($r->id > $oldest && ! isset($visited[(string) $r->getKey()])) $broken++;
+                }
             }
 
             $unsealed = self::unsealedAfterEpoch();
@@ -316,7 +326,9 @@ class Audit
         if (! \App\Support\Platform\SchemaCache::hasColumn('audit_chain', 'started_at')) return 0;
         $epoch = DB::table('audit_chain')->where('id', 1)->value('started_at');
 
-        return $epoch ? AuditEntry::whereNull('hash')->where('created_at', '>=', $epoch)->count() : 0;
+        // الأحدثُ من مهلة الختم المؤجَّل «قيدَ الختم» لا «عبث» (AUD-07)
+        return $epoch ? AuditEntry::whereNull('hash')->where('created_at', '>=', $epoch)
+            ->where(fn ($q) => AuditEntry::outsideSealGrace($q))->count() : 0;
     }
 
     // ── عرض القيم ──

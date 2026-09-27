@@ -58,7 +58,7 @@ class Redactor
         '~\bsk-[A-Za-z0-9_\-]{16,}~' => 'sk-' . self::MASK,
         '~\bAIza[A-Za-z0-9_\-]{16,}~' => 'AIza' . self::MASK,
         '~(password|passwd|pwd|pass|access_token|refresh_token|client_secret|api_key|apikey|secret|token|key|signature|authorization)=([^&;\s"\']+)~i' => '$1=' . self::MASK,
-        '~/(hook|sign|verify|s|w)/[^/?\s&]{8,}~i' => '/$1/{رمز}',
+        '~/(hook|sign|verify|s|w|reset|activate)/[^/?\s&]{8,}~i' => '/$1/{رمز}',
     ];
 
     /** المفاتيحُ السرّية مجموعةً (spec + Audit::MASKED + AUDIT_SECRET من النماذج) — تُبنى مرة */

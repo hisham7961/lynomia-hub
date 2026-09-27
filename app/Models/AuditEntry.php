@@ -133,6 +133,50 @@ class AuditEntry extends Model
         }
     }
 
+    /** مهلةُ الختم المؤجَّل: قيدٌ بلا بصمةٍ أحدثُ منها «قيدَ الختم» لا «عبث» */
+    public const SEAL_GRACE_SECONDS = 120;
+
+    /**
+     * خارجَ مهلة الختم: أقدمُ من المهلة **أو في المستقبل** — فالتاريخُ المستقبليُّ لا يختبئ في المهلة
+     * (قيدٌ بلا بصمةٍ بتاريخٍ قادمٍ عبثٌ لا ختمٌ جارٍ).
+     */
+    public static function outsideSealGrace($q)
+    {
+        return $q->where('created_at', '<', now()->subSeconds(self::SEAL_GRACE_SECONDS))->orWhere('created_at', '>', now());
+    }
+
+    /** أقصى عمرٍ لقيدٍ يُستدرَك ختمُه — ما هو أقدمُ يبقى إنذاراً صريحاً لا يُختم آليّاً */
+    public const SEAL_RECOVER_HOURS = 24;
+
+    /**
+     * **استدراكُ ختمٍ ضاع بعد الالتزام** — عمليّةٌ ماتت بين الالتزام ونداء الختم (نفادُ ذاكرة · مهلةٌ · قتلُ عامل)،
+     * أو نداءٌ سابقٌ بعد الالتزام رمى فلم يبلغ نداءَ الختم. يُختم القيدُ الملتزمُ بلا بصمةٍ **بعد حقبة السلسلة وفي
+     * آخر ٢٤ ساعة وأقدمَ من مهلة الختم** (فلا يسابق ختماً جارياً)، بترتيب `id`، بالقفل القصير نفسِه، ويُسجَّل كلُّ
+     * استدراكٍ في مركز الأخطاء — فلا يمرّ صامتاً. وما هو أقدمُ من ٢٤ ساعة يبقى إنذاراً لـ`hub:audit-verify`:
+     * الاستدراكُ للحادث القريب، لا لتبييض صفوفٍ مجهولةِ المصدر.
+     */
+    public static function sealPending(): int
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('audit_chain') || ! \App\Support\Platform\SchemaCache::hasColumn('audit_chain', 'started_at')) return 0;
+        $epoch = \Illuminate\Support\Facades\DB::table('audit_chain')->where('id', 1)->value('started_at');
+        if (! $epoch) return 0;
+        $from = max((string) $epoch, now()->subHours(self::SEAL_RECOVER_HOURS)->toDateTimeString());
+
+        $sealed = 0;
+        self::query()->whereNull('hash')->where('created_at', '>=', $from)
+            ->where('created_at', '<=', now()->subSeconds(self::SEAL_GRACE_SECONDS))
+            ->orderBy('id')->limit(1000)->get()
+            ->each(function (self $row) use (&$sealed) {
+                self::sealCommitted($row);
+                if ($row->hash !== null) $sealed++;
+            });
+        if ($sealed > 0) {
+            \App\Support\Ops\ErrorLog::capture('php', "audit-chain: استُدرك ختمُ {$sealed} قيداً التزم بلا بصمة (ختمٌ مؤجَّلٌ لم يقع)", __FILE__, __LINE__);
+        }
+
+        return $sealed;
+    }
+
     protected static function booted(): void
     {
         static::creating(function (self $m) {

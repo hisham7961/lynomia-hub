@@ -61,17 +61,26 @@ class CspReportController extends Controller
 
         $doc = $pick('document-uri', 'documentURL');
         $docHost = strtolower((string) parse_url($doc, PHP_URL_HOST));
-        if ($docHost === '' || $docHost !== strtolower($r->getHost())) return;   // صفحاتُنا وحدها
+        // صفحاتُنا وحدها — بالعنوان المضبوط لا بترويسة Host التي يتحكّم فيها المُرسِل
+        $ours = strtolower((string) parse_url((string) config('app.url'), PHP_URL_HOST));
+        if ($docHost === '' || ($ours !== '' ? $docHost !== $ours : $docHost !== strtolower($r->getHost()))) return;
 
-        $key = 'cspreport:' . now()->toDateString();
-        $n = (int) Cache::get($key, 0);
-        if ($n >= ContentSecurity::REPORT_DAILY_CAP) return;
-        Cache::put($key, $n + 1, now()->endOfDay());
+        // سقفان: يوميٌّ عامّ، ويوميٌّ لكلِّ عنوان — فلا يستنفد مُرسِلٌ مجهولٌ واحدٌ حصّةَ اليوم كلَّها
+        $day = now()->toDateString();
+        $ipKey = 'cspreport:' . $day . ':' . sha1((string) $r->ip());
+        foreach ([['cspreport:' . $day, ContentSecurity::REPORT_DAILY_CAP], [$ipKey, ContentSecurity::REPORT_IP_DAILY_CAP]] as [$key, $cap]) {
+            Cache::add($key, 0, now()->endOfDay());
+            if ((int) Cache::get($key, 0) >= $cap) return;
+        }
+        Cache::increment('cspreport:' . $day);
+        Cache::increment($ipKey);
 
         $directive = mb_substr(preg_replace('/[^a-z\-]/', '', strtolower($pick('effective-directive', 'effectiveDirective', 'violated-directive'))), 0, 40);
         $disposition = $pick('disposition') === 'enforce' ? 'مفروضة' : 'تقرير';
         $blocked = self::shortUri($pick('blocked-uri', 'blockedURL'));
-        $docPath = (string) (parse_url($doc, PHP_URL_PATH) ?: '/');
+        // المسارُ مطبَّعاً (رموزُ التوقيع والاستعادة والتفعيل ⇐ {tok}) — لا يُخزَّن رمزٌ صالحٌ في مركز الأخطاء
+        $docPath = ErrorLog::maskPath(ltrim((string) (parse_url($doc, PHP_URL_PATH) ?: '/'), '/'));
+        $docPath = '/' . $docPath;
         $source = self::shortUri($pick('source-file', 'sourceFile'));
         $line = (int) $pick('line-number', 'lineNumber');
 
@@ -90,6 +99,8 @@ class CspReportController extends Controller
         if (! is_array($p)) return '';
         $out = isset($p['host']) ? (($p['scheme'] ?? 'https') . '://' . $p['host']) : '';
 
-        return mb_substr($out . ($p['path'] ?? ''), 0, 200);
+        $path = isset($p['path']) ? '/' . ErrorLog::maskPath(ltrim((string) $p['path'], '/')) : '';
+
+        return mb_substr($out . $path, 0, 200);
     }
 }

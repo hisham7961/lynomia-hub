@@ -44,7 +44,9 @@ class HubAuditVerify extends Command
             ? DB::table('audit_chain')->where('id', 1)->value('started_at') : null;
 
         $unsealed = AuditEntry::whereNull('hash')->count();
-        $suspect = $epoch ? AuditEntry::whereNull('hash')->where('created_at', '>=', $epoch)->count() : 0;
+        // الأحدثُ من مهلة الختم المؤجَّل «قيدَ الختم» لا «عبث» (AUD-07)؛ واستدراكُه في hub:automation
+        $suspect = $epoch ? AuditEntry::whereNull('hash')->where('created_at', '>=', $epoch)
+            ->where(fn ($q) => AuditEntry::outsideSealGrace($q))->count() : 0;
         $legacyRows = $unsealed - $suspect;
 
         // فهرس خفيف: ثلاث قيم قصيرة لكل سجل — المشي بلا تحميل المحتوى

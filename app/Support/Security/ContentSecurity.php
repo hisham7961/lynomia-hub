@@ -29,6 +29,9 @@ final class ContentSecurity
     /** سقفُ التقارير المخزَّنة في اليوم كلّه — نقطةٌ عامّةٌ لا تملأ الجدولَ بلا حدّ */
     public const REPORT_DAILY_CAP = 500;
 
+    /** وسقفٌ يوميٌّ لكلِّ عنوان — مُرسِلٌ مجهولٌ واحدٌ لا يستنفد حصّةَ اليوم */
+    public const REPORT_IP_DAILY_CAP = 25;
+
     /** أقصى جسمٍ مقبول لتقريرٍ واحد (بايت) — التقريرُ الحقيقيّ بضعُ مئات */
     public const REPORT_MAX_BYTES = 16384;
 

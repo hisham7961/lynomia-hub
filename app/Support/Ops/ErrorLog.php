@@ -257,10 +257,19 @@ class ErrorLog
      */
     public static function routePattern($req): string
     {
+        return self::maskPath((string) $req->path());
+    }
+
+    /** المطبِّعُ نفسُه على مسارٍ نصّيّ (تقاريرُ CSP تحمل مساراتٍ من المتصفّح لا طلباً) */
+    public static function maskPath(string $path): string
+    {
+        // والمقطعُ الطويلُ غيرُ المقروء (٢٤ محرفاً فأكثر: رمزُ استعادةٍ أو تفعيلٍ أو توقيع) ⇐ {رمز} — فلا يُخزَّن رمزٌ
+        // صالحٌ في جداول القياس ولا في مركز الأخطاء، ولا يولّد كلُّ رابطٍ دلواً خاصّاً به
         return (string) preg_replace([
             '/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i',
             '/\/\d+(?=\/|$)/',
-        ], ['{id}', '/{n}'], (string) $req->path());
+            '/(?<=\/)[A-Za-z0-9_\-]{24,}(?=\/|$)/',
+        ], ['{id}', '/{n}', '{tok}'], $path);
     }
 
     /**

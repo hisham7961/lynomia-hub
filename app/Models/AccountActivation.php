@@ -89,7 +89,7 @@ class AccountActivation extends Model
         ]);
 
         $app = (string) setting('app.name', config('app.name'));
-        $url = route('activate.show', $token);
+        $url = \App\Support\Platform\PublicUrl::route('activate.show', $token);
         // نصٌّ يحمل الرابطَ والرمزَ فقط — **لا كلمةَ سرٍّ** (لا وجودَ لها أصلاً بعدُ)
         OutboxMessage::create([
             'kind' => 'account_activation', 'channel' => 'mail', 'target' => $user->email,
