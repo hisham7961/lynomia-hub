@@ -40,7 +40,7 @@ class PerformanceController extends Controller
 
         // مدىً واحدٌ يُقرأ مرّةً: تحسب به الأرقامُ وتُعنون به اللافتةُ — فلا
         // يفترقان (W-2 · الطور ١٦٧)
-        $range = $range ?? hub_range(null, '30d');
+        $range = hub_range(null, '30d');
 
         return view('performance.index', [
             'company' => $this->companyKpis(),
