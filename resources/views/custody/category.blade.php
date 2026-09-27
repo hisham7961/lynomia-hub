@@ -26,6 +26,8 @@
     </div>
 </header>
 
+@include('custody._insight')
+
 <div class="card">
     <form method="GET" class="fg" style="margin-bottom:4px">
         <div class="fld">

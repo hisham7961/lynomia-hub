@@ -94,8 +94,9 @@ class HubAutomation extends Command
         $m = $this->marginSnapshot();
         $au = $this->auditorRun();
         $br = $this->brainIndex();
+        $ci = $this->custodyInsights();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · تقارير: {$rr} تنبيهُ نقص · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة · المدقّق: {$au['opened']} نتيجةٌ جديدة، {$au['resolved']} زال شرطُها · العقلُ الثاني: {$br} مقطعاً مُضمَّناً");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · تقارير: {$rr} تنبيهُ نقص · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة · المدقّق: {$au['opened']} نتيجةٌ جديدة، {$au['resolved']} زال شرطُها · العقلُ الثاني: {$br} مقطعاً مُضمَّناً · تحليلُ العهد: {$ci} صنفاً");
 
         if (! $this->dry) \App\Support\Ops\Health::beat('automation', (int) round((microtime(true) - $t0) * 1000));
         return self::SUCCESS;
@@ -153,6 +154,20 @@ class HubAutomation extends Command
             if (! \App\Support\Ai\Brain\Brain::ready()) return 0;
 
             return (int) \App\Support\Ai\Brain\Brain::index($this->dry)['embedded'];
+        } catch (\Throwable $e) {
+            report($e);
+
+            return 0;
+        }
+    }
+
+    /** تحليلُ الذكاء لأصناف العهد (`custody.ai_insights`): ما تغيّرت حقائقُه فقط — ومعزولُ الفشل */
+    protected function custodyInsights(): int
+    {
+        try {
+            if (! \App\Support\Assets\CustodyInsights::enabled()) return 0;
+
+            return (int) \App\Support\Assets\CustodyInsights::run(null, $this->dry)['generated'];
         } catch (\Throwable $e) {
             report($e);
 
