@@ -4,6 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>تصريح {{ $p->action }} — {{ $p->permit_no }}</title>
 <meta name="robots" content="noindex, nofollow">
+<script src="{{ asset('js/actions.js') }}?v={{ config('hub.version') }}" defer></script>
 <link href="{{ asset('css/fonts.css') }}?v={{ config('hub.version') }}" rel="stylesheet">
 {{-- تصريحُ نقل/خروج عهدة (A5): ورقةٌ مرقّمةٌ تُبرَز عند البوابة. كان خروجُ
      الجهاز حدثاً شفهياً — «أخذوه للصيانة» بلا رقمٍ ولا موعدِ عودةٍ ولا توقيع. --}}
@@ -67,7 +68,7 @@ th{text-align:right;color:#5d706c;font-weight:700;width:34%;background:#f5f9f8}
                 'title' => 'تصريح ' . $p->action . ' عهدة ' . $p->permit_no . ' — ' . \Illuminate\Support\Str::limit($a->name, 60),
             ]) }}">✍️ أرسله للتوقيع الإلكتروني</a>
     @endif
-    <button class="btn" onclick="window.print()">🖨 طباعة / حفظ PDF</button>
+    <button class="btn" data-print>🖨 طباعة / حفظ PDF</button>
 </div>
 
 <div class="page">

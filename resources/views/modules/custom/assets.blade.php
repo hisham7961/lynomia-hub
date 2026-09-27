@@ -225,7 +225,7 @@
     </section>
 </div>
 
-<script>
+<script @cspNonce>
     (function () {
         document.querySelectorAll('[data-cc-as]').forEach(function (box) {
             var tabs = box.querySelectorAll('[data-castab]');

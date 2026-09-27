@@ -42,9 +42,8 @@
         {{-- (F15) معاينةُ المبلغ المفسَّر قبل الحفظ: «2,50.00» كانت تُفسَّر 250.00 وتُسجَّل بصمت --}}
         <form method="POST" action="{{ route('fin.act', $row->id) }}" hx-boost="false"
               style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"
-              onsubmit="var a=parseFloat(this.amount.value);
-                        if(!isFinite(a)||a<=0){alert('المبلغ غير مقروء — اكتبه رقماً عشرياً صريحاً بلا فواصل آلاف (مثل 2500.000)');return false}
-                        return confirm('تأكيد الدفعة: سيُسجَّل مبلغ ' + a.toFixed(3) + ' {{ $finCur }} — هل هذا ما قصدت؟')">
+              data-amount-invalid="المبلغ غير مقروء — اكتبه رقماً عشرياً صريحاً بلا فواصل آلاف (مثل 2500.000)"
+              data-amount-confirm="تأكيد الدفعة: سيُسجَّل مبلغ {amount} {{ $finCur }} — هل هذا ما قصدت؟">
             @csrf
             <input type="hidden" name="do" value="pay">
             <label style="display:block">
@@ -90,9 +89,8 @@
         </div>
         <form method="POST" action="{{ route('fin.act', $row->id) }}" hx-boost="false"
               style="display:flex;gap:8px;flex-wrap:wrap;align-items:end"
-              onsubmit="var a=parseFloat(this.amount.value);
-                        if(!isFinite(a)||a<=0){alert('مبلغ العكس غير مقروء — اكتبه رقماً عشرياً صريحاً');return false}
-                        return confirm('عكس دفعة بمبلغ ' + a.toFixed(3) + ' {{ $finCur }} — يعيد المبلغَ ويحرّك الرصيدَ عكسياً. متابعة؟')">
+              data-amount-invalid="مبلغ العكس غير مقروء — اكتبه رقماً عشرياً صريحاً"
+              data-amount-confirm="عكس دفعة بمبلغ {amount} {{ $finCur }} — يعيد المبلغَ ويحرّك الرصيدَ عكسياً. متابعة؟">
             @csrf
             <input type="hidden" name="do" value="reverse">
             <label style="display:block">

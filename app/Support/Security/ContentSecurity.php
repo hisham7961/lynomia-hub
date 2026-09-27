@@ -6,21 +6,27 @@ namespace App\Support\Security;
  * **سياسةُ السكربتات في CSP** (بند الدَّين #12 · FE-03) — مصدرٌ واحدٌ للوضع والـnonce والسياسة.
  *
  * كانت CSP بلا `script-src` أصلاً لأنّ حصرَها يكسر الواجهة (نصوصٌ مضمَّنة ومعالجاتُ
- * أحداثٍ في السمات). والطريقُ المعتمد: **Report-Only أوّلاً** — تُعلَن السياسةُ
- * ولا تُفرض، فيُبلغ المتصفّحُ عن كلِّ ما كانت ستحجبه، ويُجمَع ذلك في مركز الأخطاء
- * جرداً لما بقي قبل الفرض. ثمّ `enforce` حين يصمت السجلّ مدّةً كافية.
+ * أحداثٍ في السمات). مرّت بمرحلة **Report-Only** جرداً لما بقي، ثمّ نُظِّفت الواجهةُ كلُّها
+ * فصار الافتراضيُّ **`enforce`** (v2.617):
  *
- * السياسةُ **تطابق كيف يحمّل النظامُ سكربتاته فعلاً**:
- *  · كلُّ ملفّات السكربت من أصلنا (`js/app.js` · `js/htmx.min.js` · Leaflet المضمَّن محلياً
- *    · مكتبةُ الرسم) ⇐ `'self'`، ولا CDN واحد.
- *  · النصوصُ المضمَّنة في القوالب العامّة تحمل `nonce` هذا الطلب ⇐ `'nonce-…'`؛ وما لم
- *    يُوسَم بعدُ يظهر في التقارير فيُوسَم تدريجياً.
- *  · معالجاتُ الأحداث في السمات (onclick/onchange/onsubmit — نحو ٩٠ موضعاً) مسموحةٌ في
- *    هذه المرحلة بـ`script-src-attr 'unsafe-inline'` صراحةً — نقلُها إلى مستمِعاتٍ في
- *    `app.js` خطوةٌ لاحقة، وحذفُ هذا الاستثناء بعدها.
+ *  · كلُّ ملفّات السكربت من أصلنا (`js/app.js` · `js/actions.js` · `js/htmx.min.js` ·
+ *    Leaflet المضمَّن محلياً · مكتبةُ الرسم) ⇐ `'self'`، ولا CDN واحد.
+ *  · كلُّ `<script>` مضمَّنٍ في القوالب يحمل `@cspNonce` (nonce هذا الطلب) ⇐ `'nonce-…'`.
+ *  · **لا معالجاتِ أحداثٍ في السمات ولا روابطَ `javascript:` ولا `hx-on`** ⇐
+ *    `script-src-attr 'none'`. الأفعالُ مُعلَنةٌ بسمات data-* ومستمِعاتُها المفوَّضة في
+ *    `public/js/actions.js`. وحارسةُ `CspInlineHandlersGuardTest` تمسح القوالبَ كلَّها
+ *    فتُسقط الحزمةَ عند أوّل عودةٍ لأيٍّ منها — فلا يرجع الدَّينُ بصمت.
+ *  · `'strict-dynamic'` **غيرُ مستعمَلة عمداً**: تُسقط `'self'` في المتصفّحات الحديثة
+ *    فتستلزم nonce على كلِّ `<script src>` أيضاً — ولا مكسبَ لنا منها (لا مُحمِّلَ سكربتاتٍ ديناميّ).
  *
- * ما تكسبه السياسةُ مفروضةً اليوم: `<script src>` من أصلٍ أجنبيّ و`<script>` محقونٌ بلا
- * nonce يُحجبان — وهما صورتا الحقن الأشيع.
+ * **مفتاحُ المالك باقٍ** (`security.csp_script` في الإعدادات): `enforce` (الافتراضي) ·
+ * `report` يعيدها Report-Only فيُبلغ ولا يحجب (لتشخيص عطلٍ في الإنتاج دون كسر) · `off`
+ * يُسقطها. والتقاريرُ في الوضعين الأوّلين تصل مركزَ الأخطاء عبر `/csp-report`.
+ *
+ * **استثناءٌ مُسمّى واحد:** تطبيقُ QuoteFlow الجانبيّ ملفُّ HTML مُضمَّنٌ كما هو (للمالك وحده
+ * خلف كلمة سرٍّ ثانية) يبني أزرارَه بمعالجاتٍ في السمات — يطلب `allowLegacyInline()` فتُخفَّف
+ * السياسةُ **لتلك الاستجابة وحدها** إلى `'self' 'unsafe-inline'` مع عنوان مكتبة PDF التي يحمّلها بعينه
+ * (ويبقى كلُّ أصلٍ أجنبيٍّ آخر محجوباً).
  */
 final class ContentSecurity
 {
@@ -36,14 +42,14 @@ final class ContentSecurity
     public const REPORT_MAX_BYTES = 16384;
 
     /**
-     * الوضعُ الساري: `off` · `report` (الافتراضي) · `enforce`. قيمةٌ مجهولة تسقط إلى
-     * `report` — فلا يُفرض شيءٌ بخطأ كتابة. وتعذُّرُ القراءة (قاعدةٌ ساقطة) يسقط إليه كذلك
-     * كي لا يصير ترويسةُ أمانٍ سببَ ٥٠٠ على `healthz`.
+     * الوضعُ الساري: `enforce` (الافتراضي منذ v2.617) · `report` · `off`. قيمةٌ مجهولة تسقط
+     * إلى `report` — فخطأُ كتابةٍ لا يُطفئ الحمايةَ ولا يكسر الواجهة. وتعذُّرُ القراءة
+     * (قاعدةٌ ساقطة) يسقط إليه كذلك كي لا يصير ترويسةُ أمانٍ سببَ ٥٠٠ على `healthz`.
      */
     public static function mode(): string
     {
         try {
-            $m = strtolower(trim((string) setting('security.csp_script', 'report')));
+            $m = strtolower(trim((string) setting('security.csp_script', 'enforce')));
         } catch (\Throwable $e) {
             return 'report';
         }
@@ -67,10 +73,27 @@ final class ContentSecurity
         return $n;
     }
 
+    /**
+     * استجابةٌ بعينها تطلب السياسةَ المخفَّفة (QuoteFlow وحده اليوم) — تُعلَّم على الطلب
+     * فتقرؤها الوسيطةُ حين تكتب الترويسة. لا مفتاحَ عامّاً ولا إعداد: استدعاءٌ صريحٌ في متحكّمه.
+     */
+    public static function allowLegacyInline(array $scriptUrls = []): void
+    {
+        // مصادرُ خارجيّةٌ بعينها (عنوانٌ كاملٌ https لا نطاقٌ مفتوح) — ما يحمّله الملفُّ المضمَّن فعلاً
+        $urls = array_values(array_filter($scriptUrls,
+            fn ($u) => is_string($u) && preg_match('#^https://[A-Za-z0-9.\-]+/[A-Za-z0-9._~/\-]+$#', $u)));
+        request()->attributes->set('csp_legacy_inline', $urls);
+    }
+
     /** نصُّ السياسة (بلا وجهة التقرير) — واحدٌ في الوضعين فما يُقاس هو ما يُفرض */
     public static function scriptPolicy(): string
     {
-        return "script-src 'self' 'nonce-" . self::nonce() . "'; script-src-attr 'unsafe-inline'";
+        $legacy = request()->attributes->get('csp_legacy_inline');
+        if (is_array($legacy)) {
+            return trim("script-src 'self' 'unsafe-inline' " . implode(' ', $legacy)) . "; script-src-attr 'unsafe-inline'";
+        }
+
+        return "script-src 'self' 'nonce-" . self::nonce() . "'; script-src-attr 'none'";
     }
 
     /** السياسةُ مع وجهة التقرير — `report-uri` نسبيّةٌ لأصلنا */

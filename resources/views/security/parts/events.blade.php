@@ -4,7 +4,7 @@
         <h3 style="margin:0">🧾 السجل الأمني الموحّد <span class="sub">(٧ أيام)</span></h3>
         <form method="GET" class="crow" style="gap:6px">
             <label class="vh" for="ev">تصفية بالحدث</label>
-            <select class="inp" id="ev" name="ev" onchange="this.form.submit()">
+            <select class="inp" id="ev" name="ev" data-submit-on-change>
                 <option value="">كل الأحداث ({{ array_sum($eventCounts) }})</option>
                 @foreach (\App\Support\Security\SecurityEvents::CODES as $code => [$label, $sev])
                     <option value="{{ $code }}" @selected($eventCode === $code)>{{ $label }} · {{ $code }}@if (isset($eventCounts[$code])) ({{ $eventCounts[$code] }})@endif</option>

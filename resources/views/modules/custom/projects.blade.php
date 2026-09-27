@@ -419,7 +419,7 @@
     @endif
 @endunless
 
-<script>
+<script @cspNonce>
     // تبديلُ التبويبات بلا إعادةِ تحميل — كلُّ اللوحاتِ في DOM، نُظهر النشطةَ وحدَها.
     (function () {
         document.querySelectorAll('[data-cc-proj]').forEach(function (box) {

@@ -106,7 +106,7 @@
 
 <div class="modal" id="pvmodal" hidden>
     <div class="modalbox" style="max-width:760px">
-        <button class="mclose" type="button" onclick="document.getElementById('pvmodal').hidden=true" aria-label="إغلاق">✕</button>
+        <button class="mclose" type="button" data-hide-target="#pvmodal" aria-label="إغلاق">✕</button>
         <div id="pvbody"></div>
     </div>
 </div>

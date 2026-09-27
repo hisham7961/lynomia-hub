@@ -92,7 +92,7 @@
 <div class="card">
     <form method="GET" action="{{ route('ai.models.browse', $provider) }}" class="grid">
         <label><span>الوضع</span>
-            <select name="mode" onchange="this.form.submit()">
+            <select name="mode" data-submit-on-change>
                 <option value="">كلُّ الأوضاع</option>
                 @foreach ($modes as $m)
                     <option value="{{ $m }}" @selected($mode === $m)>{{ $m }}</option>
@@ -121,9 +121,9 @@
         <div class="sub">
             {{-- تبديلٌ ضمنَ هذا النموذجِ وحدَه — بلا صنفٍ وسيطٍ ولا دالّةٍ عامّة --}}
             <button class="btn sm" type="button"
-                    onclick="this.closest('form').querySelectorAll('input[name=&quot;picks[]&quot;]').forEach(c=>c.checked=true)">☑️ اختر الكلّ</button>
+                    data-check-all="picks[]" data-check-state="1">☑️ اختر الكلّ</button>
             <button class="btn sm" type="button"
-                    onclick="this.closest('form').querySelectorAll('input[name=&quot;picks[]&quot;]').forEach(c=>c.checked=false)">☐ امسح الاختيار</button>
+                    data-check-all="picks[]" data-check-state="0">☐ امسح الاختيار</button>
         </div>
 
         <table class="tbl">

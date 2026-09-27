@@ -14,13 +14,15 @@ use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 /**
- * **سياسةُ السكربتات في CSP** (بند الدَّين #12 · FE-03) — تقريرٌ أوّلاً ثمّ فرض.
+ * **سياسةُ السكربتات في CSP** (بند الدَّين #12 · FE-03) — مفروضةٌ افتراضياً منذ v2.617.
  *
- *  · `report` (الافتراضي): ترويسة Report-Only تحمل `script-src` بـnonce الطلب، والسياسةُ
- *    المفروضة كما كانت حرفياً — لا يُحجب شيءٌ على أيّ صفحة.
- *  · `enforce`: السياسةُ نفسُها داخل Content-Security-Policy، ولا Report-Only.
+ *  · `enforce` (الافتراضي): `script-src 'self' 'nonce-…'; script-src-attr 'none'` داخل
+ *    Content-Security-Policy، ولا Report-Only — لا معالجاتِ سماتٍ ولا نصوصَ بلا nonce.
+ *  · `report`: السياسةُ نفسُها في Report-Only، والمفروضةُ كما كانت حرفياً — لا يُحجب شيء.
  *  · `off`: لا `script-src` في أيّ ترويسة.
- *  · والـnonce الذي تطبعه القوالبُ هو الذي تكتبه الترويسة.
+ *  · والـnonce الذي تطبعه القوالبُ (`@cspNonce`) هو الذي تكتبه الترويسة، وكلُّ سكربتٍ مضمَّنٍ
+ *    في صفحاتٍ حقيقيّةٍ يحمله.
+ *  · واستثناءٌ مسمّى واحد (`allowLegacyInline` — QuoteFlow) لا يتسرّب إلى طلبٍ آخر.
  *  · ومستقبِلُ التقارير عامٌّ بلا CSRF، يقبل صفحاتِنا وحدها، ويسجّل بلا إشعار.
  */
 class CspScriptPolicyTest extends TestCase
@@ -40,16 +42,32 @@ class CspScriptPolicyTest extends TestCase
         return (new SecurityHeaders())->handle($req, fn () => $resp);
     }
 
-    public function test_default_is_report_only_and_the_enforced_policy_is_unchanged(): void
+    public function test_default_is_enforce_with_no_inline_attribute_handlers(): void
     {
         $this->mode(null);
+        $this->assertSame('enforce', ContentSecurity::mode());
+        $out = $this->pass(Request::create('http://localhost/dashboard', 'GET'));
+
+        $csp = (string) $out->headers->get('Content-Security-Policy');
+        $this->assertStringStartsWith("base-uri 'self'; object-src 'none'; frame-ancestors 'self'", $csp);
+        $this->assertStringContainsString("script-src 'self' 'nonce-", $csp);
+        $this->assertStringContainsString("script-src-attr 'none'", $csp);
+        $this->assertStringNotContainsString('unsafe-inline', $csp, 'السياسةُ الصارمة ما زالت تسمح بالنصوص المضمَّنة');
+        $this->assertStringNotContainsString('unsafe-eval', $csp);
+        $this->assertStringContainsString('report-uri /csp-report', $csp);
+        $this->assertNull($out->headers->get('Content-Security-Policy-Report-Only'));
+    }
+
+    public function test_report_keeps_the_enforced_policy_unchanged_and_reports_the_strict_one(): void
+    {
+        $this->mode('report');
         $out = $this->pass(Request::create('http://localhost/dashboard', 'GET'));
 
         $this->assertSame("base-uri 'self'; object-src 'none'; frame-ancestors 'self'",
-            $out->headers->get('Content-Security-Policy'), 'الوضعُ الافتراضيّ غيّر السياسةَ المفروضة');
+            $out->headers->get('Content-Security-Policy'), 'وضعُ التقرير غيّر السياسةَ المفروضة');
         $ro = (string) $out->headers->get('Content-Security-Policy-Report-Only');
         $this->assertStringContainsString("script-src 'self' 'nonce-", $ro);
-        $this->assertStringContainsString("script-src-attr 'unsafe-inline'", $ro);
+        $this->assertStringContainsString("script-src-attr 'none'", $ro);
         $this->assertStringContainsString('report-uri /csp-report', $ro);
     }
 
@@ -63,6 +81,24 @@ class CspScriptPolicyTest extends TestCase
         $this->assertStringContainsString("script-src 'self' 'nonce-", $csp);
         $this->assertStringContainsString('report-uri /csp-report', $csp);
         $this->assertNull($out->headers->get('Content-Security-Policy-Report-Only'));
+    }
+
+    public function test_the_named_legacy_exception_is_per_request_only(): void
+    {
+        $this->mode('enforce');
+        $req = Request::create('http://localhost/quoteflow', 'GET');
+        app()->instance('request', $req);
+        ContentSecurity::allowLegacyInline(['https://cdn.example/lib/x.min.js', "https://evil.example/ 'unsafe-eval'", '*']);
+        $out = (new SecurityHeaders())->handle($req, fn () => new Response('<html>qf</html>'));
+        $csp = (string) $out->headers->get('Content-Security-Policy');
+        $this->assertStringContainsString("script-src 'self' 'unsafe-inline' https://cdn.example/lib/x.min.js; script-src-attr 'unsafe-inline'", $csp);
+        $this->assertStringNotContainsString('unsafe-eval', $csp, 'مصدرٌ مُمرَّرٌ حقن كلمةً مفتاحيّة');
+        $this->assertStringNotContainsString('evil.example', $csp);
+        $this->assertStringNotContainsString('nonce-', $csp, 'nonce مع unsafe-inline يُبطلها في المتصفّح');
+
+        // الطلبُ التالي لا يرث الاستثناء
+        $next = $this->pass(Request::create('http://localhost/dashboard', 'GET'));
+        $this->assertStringContainsString("script-src-attr 'none'", (string) $next->headers->get('Content-Security-Policy'));
     }
 
     public function test_off_emits_no_script_policy_at_all(): void
@@ -108,6 +144,38 @@ class CspScriptPolicyTest extends TestCase
 
         // سكربتُ السِّمة في رأس القشرة يحمل nonce الطلب نفسَه
         $this->assertStringContainsString('<script nonce="' . $m[1] . '">', (string) $res->getContent());
+    }
+
+    /**
+     * الصفحاتُ الحقيقيّة (لا القوالبُ وحدها) مفروضةً: كلُّ `<script>` تنفيذيٍّ مضمَّنٍ يحمل
+     * nonce الترويسة، ولا سمةَ `on…=` ولا `javascript:` في الناتج — ما يراه المتصفّح فعلاً.
+     */
+    public function test_rendered_pages_are_clean_under_enforce(): void
+    {
+        $this->seedCore();
+        $this->mode('enforce');
+
+        $pages = ['/', '/m/clients', '/m/clients/create', '/settings', '/notifications', '/system-map', '/kpis', '/esign'];
+        $seen = 0;
+        foreach ($pages as $uri) {
+            $res = $this->actingAs($this->owner)->get($uri);
+            if ($res->getStatusCode() !== 200) continue;
+            $seen++;
+            $csp = (string) $res->headers->get('Content-Security-Policy');
+            $this->assertMatchesRegularExpression("/'nonce-([A-Za-z0-9+\/=]{24})'/", $csp, $uri);
+            preg_match("/'nonce-([A-Za-z0-9+\/=]{24})'/", $csp, $m);
+            $html = (string) $res->getContent();
+
+            preg_match_all('/<script\b([^>]*)>/i', $html, $tags);
+            foreach ($tags[1] as $attrs) {
+                if (preg_match('/\bsrc=|application\/(ld\+)?json/i', $attrs)) continue;
+                $this->assertStringContainsString('nonce="' . $m[1] . '"', $attrs, "$uri: سكربتٌ مضمَّنٌ بلا nonce الطلب");
+            }
+            $body = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $html);
+            $this->assertDoesNotMatchRegularExpression('/\son[a-z]{3,}\s*=\s*["\']/i', $body, "$uri: معالجُ حدثٍ في سمة");
+            $this->assertStringNotContainsStringIgnoringCase('javascript:', $body, "$uri: رابطُ javascript:");
+        }
+        $this->assertGreaterThanOrEqual(4, $seen, 'الصفحاتُ المفحوصة لم تُعرض — الاختبارُ لا يقيس شيئاً');
     }
 
     public function test_report_endpoint_is_public_csrf_exempt_and_logs_same_origin_reports(): void

@@ -45,7 +45,7 @@
                         {{-- عكسٌ (step-up) لحركةٍ مُرحَّلةٍ ليست عكساً ولم تُعكَس بعد --}}
                         @if ($canReverse && $m->posted_at && ! $m->reverses_id && ! $reversed)
                             <form method="POST" action="{{ route('custody.wallet.reverse', $m->id) }}"
-                                  onsubmit="return confirm('عكسُ الحركة يُنشئ قيداً معاكساً ويتطلّب تأكيدَ الهوية — متابعة؟')">
+                                  data-confirm-native="عكسُ الحركة يُنشئ قيداً معاكساً ويتطلّب تأكيدَ الهوية — متابعة؟">
                                 @csrf
                                 <input type="hidden" name="reason" value="تصحيحُ حركةٍ خاطئة">
                                 <button class="btn ghost xs danger" type="submit">↩️ عكس</button>

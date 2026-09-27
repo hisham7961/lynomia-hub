@@ -395,17 +395,17 @@ return [
                 'where'  => 'AlertEngine::autoBlock عبر ip_allowed — ويقرؤها فرضُ IpDefense (WP-I.3) استثناءً',
                 'risk'   => 'شبكةٌ واسعة هنا تفتح ثغرةً: كلُّ من فيها معفيٌّ من الدفاع التكيّفي. اذكر عناوينَ الإدارة الفعلية فقط.',
             ],
-            // ── بند الدَّين #12 (FE-03): سياسةُ السكربتات في CSP — تقريرٌ أولاً ثم فرض ──
+            // ── بند الدَّين #12 (FE-03): سياسةُ السكربتات في CSP — مفروضةٌ افتراضياً منذ v2.617 ──
             'security.csp_script' => [
                 'label'  => 'سياسة السكربتات (CSP script-src): off · report · enforce',
                 'type'   => 'text',
-                'def'    => 'report',
-                'default'     => 'report',
+                'def'    => 'enforce',
+                'default'     => 'enforce',
                 'validation'  => ['re' => '/^(off|report|enforce)$/', 'msg' => 'إحدى ثلاث قيم: off أو report أو enforce'],
-                'effect' => 'report (الافتراضي): تُرسَل السياسةُ في ترويسة Content-Security-Policy-Report-Only — لا يُحجب شيء، ويُبلغ المتصفّحُ عن كل سكربتٍ كانت ستحجبه فيظهر في مركز الأخطاء بنوع «خطأ متصفح» مبدوءاً بـ«CSP». enforce: تُضمّ إلى Content-Security-Policy المفروضة فيُحجب كلُّ سكربتٍ من أصلٍ أجنبيّ وكلُّ نصٍّ مضمَّنٍ لا يحمل nonce الطلب. off: لا سياسةَ سكربتات. السياسة: script-src \'self\' + nonce لكل طلب، ومعالجاتُ الأحداث في السمات (onclick…) مسموحةٌ في هذه المرحلة.',
+                'effect' => 'enforce (الافتراضي): تُضمّ السياسةُ إلى Content-Security-Policy المفروضة فيُحجب كلُّ سكربتٍ من أصلٍ أجنبيّ، وكلُّ نصٍّ مضمَّنٍ لا يحمل nonce الطلب، وكلُّ معالجِ حدثٍ في السمات (onclick…) أو رابطِ javascript: — وهي صورُ الحقن الأشيع. report: تُرسَل في ترويسة Content-Security-Policy-Report-Only — لا يُحجب شيء، ويُبلغ المتصفّحُ عمّا كانت ستحجبه فيظهر في مركز الأخطاء بنوع «خطأ متصفح» مبدوءاً بـ«CSP». off: لا سياسةَ سكربتات. السياسة: script-src \'self\' + nonce لكل طلب، وscript-src-attr \'none\'.',
                 'where'  => 'SecurityHeaders::handle · ContentSecurity::mode · CspReportController (POST /csp-report)',
-                'doc'    => 'افتح أي صفحة وانظر ترويسات الاستجابة في أدوات المطوّر: Content-Security-Policy-Report-Only في report، أو script-src داخل Content-Security-Policy في enforce. والتقاريرُ في مركز الأخطاء (سقفٌ ٥٠٠ في اليوم).',
-                'risk'   => 'enforce قبل أن يصمت سجلُّ التقارير يكسر صفحاتٍ فيها نصوصٌ مضمَّنة لم تُوسَم بـnonce بعد (أزرارٌ لا تعمل ونماذجُ لا تتفاعل). ابقَ على report حتى تخلو التقارير أسبوعاً على الأقل، ثم جرّب enforce.',
+                'doc'    => 'افتح أي صفحة وانظر ترويسات الاستجابة في أدوات المطوّر: script-src داخل Content-Security-Policy في enforce، أو Content-Security-Policy-Report-Only في report. والتقاريرُ في مركز الأخطاء (سقفٌ ٥٠٠ في اليوم). وأفعالُ الواجهة سماتُ data-* ومستمِعاتُها في public/js/actions.js.',
+                'risk'   => 'إن ظهر زرٌّ لا يستجيب بعد تحديثٍ ما، فحوّلها إلى report مؤقتاً: تعود الواجهةُ كما كانت، وتصل تقاريرُ ما كان سيُحجب إلى مركز الأخطاء فيُصلَح موضعُه، ثمّ ارجع إلى enforce. off يُطفئ الحمايةَ كلَّها — لا تُبقِها.',
             ],
             // ── بند الدَّين #13 (FE-02): مصدرُ بلاطات الخريطة — إعدادٌ واحدٌ للمواضع الثلاثة ──
             'maps.tiles' => [

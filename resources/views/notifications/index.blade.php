@@ -8,7 +8,7 @@
     <div class="spacer"></div>
     <form method="POST" action="{{ route('notifications.readall') }}"
           hx-post="{{ route('notifications.readall') }}" hx-target="#bellbox" hx-swap="innerHTML"
-          hx-on::after-request="location.reload()">
+          data-reload-after-request>
         @csrf<button class="btn ghost sm" type="submit">✓ تحديد الكل كمقروء</button>
     </form>
 </div>

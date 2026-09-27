@@ -4,6 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ملصق عهدة {{ $a->code }}</title>
 <meta name="robots" content="noindex, nofollow">
+<script src="{{ asset('js/actions.js') }}?v={{ config('hub.version') }}" defer></script>
 <link href="{{ asset('css/fonts.css') }}?v={{ config('hub.version') }}" rel="stylesheet">
 {{-- ملصقُ العهدة ٤٠×٣٠ مم — **مقاسٌ حقيقيٌّ بالمليمتر لا تقريبٌ بالبكسل**:
      الطابعةُ الحرارية تقتطع بالمقاس المعلن في @page، فورقةٌ مقاسها A4 وفيها
@@ -55,7 +56,7 @@ body{font-family:Tajawal,sans-serif;background:#eceff0;color:#000;padding:16px}
     @foreach ([1, 2, 4, 10] as $c)
         <a class="btn ghost" href="{{ route('custody.label', [$a->id, 'copies' => $c]) }}">{{ $c }} نسخة</a>
     @endforeach
-    <button class="btn" onclick="window.print()">🖨 طباعة الملصق</button>
+    <button class="btn" data-print>🖨 طباعة الملصق</button>
 </div>
 
 <div class="hint">

@@ -34,7 +34,7 @@
             <div class="cx-ctxh">🔔 التنبيهات</div>
             <form method="POST" action="{{ route('conversations.notify', $conv->id) }}">
                 @csrf
-                <select class="inp" name="pref" onchange="this.form.submit()" aria-label="تفضيلُ تنبيهاتِ المجموعة">
+                <select class="inp" name="pref" data-submit-on-change aria-label="تفضيلُ تنبيهاتِ المجموعة">
                     <option value="all" @selected($myPref === 'all')>كلُّ الرسائل</option>
                     <option value="mentions" @selected($myPref === 'mentions')>الإشاراتُ إليّ فقط</option>
                     <option value="muted" @selected($myPref === 'muted')>كتمُ المجموعة</option>

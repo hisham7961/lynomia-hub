@@ -22,7 +22,7 @@
         <label class="vh" for="lq">بحث</label>
         <input class="inp" id="lq" name="q" value="{{ $q }}" placeholder="🔎 ابحث في نص القيد" style="max-width:220px">
         <label class="vh" for="llvl">المستوى</label>
-        <select class="inp" id="llvl" name="level" onchange="this.form.submit()">
+        <select class="inp" id="llvl" name="level" data-submit-on-change>
             <option value="">كل المستويات</option>
             @foreach ($levels as $lv)<option @selected($level === $lv)>{{ $lv }}</option>@endforeach
         </select>

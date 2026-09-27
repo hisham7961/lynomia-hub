@@ -19,7 +19,7 @@
          ولا يحدث شيء. الجافاسكربت الآن تسريعٌ لا شرطُ عمل. --}}
     <form method="GET" action="{{ route('dm.inbox') }}" class="filters">
         <label class="vh" for="dm-to">ابدأ محادثة مع</label>
-        <select class="inp" id="dm-to" name="to" onchange="if(this.value)this.form.submit()">
+        <select class="inp" id="dm-to" name="to" data-submit-on-change="filled">
             <option value="">✉️ محادثة جديدة مع…</option>
             @foreach ($all as $uid => $name)<option value="{{ $uid }}">{{ $name }}</option>@endforeach
         </select>
@@ -176,7 +176,7 @@
     .dmwrap.fresh .dmthread { order:0 }
 }
 </style>
-<script>
+<script @cspNonce>
 (function () {
     var box = document.getElementById('dmbox');
     if (box) box.scrollTop = box.scrollHeight;

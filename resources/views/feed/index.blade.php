@@ -82,7 +82,7 @@
 .fdcomp { display:flex; gap:11px; align-items:flex-start }
 .fdpin { border-inline-start:3px solid var(--wn) }
 </style>
-<script>
+<script @cspNonce>
 (function () {
     var ta = document.getElementById('fd-body');
     if (! ta) return;

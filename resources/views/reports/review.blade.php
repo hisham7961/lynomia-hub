@@ -52,7 +52,7 @@
                             @csrf
                             <button class="btn xs" name="action" value="accept">✅ قبول</button>
                             <button class="btn ghost xs" name="action" value="needs_revision"
-                                    onclick="var f=prompt('ما المطلوب تحسينُه؟ (يصل الموظفَ نصاً)');if(!f)return false;this.form.feedback.value=f;">✏️ تنقيح</button>
+                                    data-prompt-field="feedback" data-prompt="ما المطلوب تحسينُه؟ (يصل الموظفَ نصاً)">✏️ تنقيح</button>
                             <input type="hidden" name="feedback" value="">
                         </form>
                     @endif

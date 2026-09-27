@@ -38,9 +38,9 @@ class SecurityHeaders
             // المرفقات تقفل `default-src 'none'`) كي لا تُضعَّف بالأوسع.
             //
             // **وسياسةُ السكربتات بوضعٍ يختاره المالك** (بند الدَّين #12 · FE-03 ·
-            // `security.csp_script`): `report` (الافتراضي) يُعلنها في ترويسة
-            // Report-Only فيُبلغ المتصفّحُ ولا يحجب؛ `enforce` يضمّها إلى السياسة
-            // المفروضة؛ `off` يُسقطها. على صفحات HTML وحدها — ولا تمسّ سياسةً أخصّ.
+            // `security.csp_script`): `enforce` (الافتراضي منذ v2.617) يضمّها إلى السياسة
+            // المفروضة؛ `report` يُعلنها في ترويسة Report-Only فيُبلغ المتصفّحُ ولا يحجب؛
+            // `off` يُسقطها. على صفحات HTML وحدها — ولا تمسّ سياسةً أخصّ.
             if (! $response->headers->has('Content-Security-Policy')) {
                 $csp = "base-uri 'self'; object-src 'none'; frame-ancestors 'self'";
                 $mode = self::isHtml($response) ? ContentSecurity::mode() : 'off';

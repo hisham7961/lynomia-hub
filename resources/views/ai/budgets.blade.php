@@ -98,7 +98,7 @@
                         <form method="POST" action="{{ route('ai.budgets.toggle', $b) }}">@csrf
                             <button class="btn sm">{{ $b->enabled ? '⏸️ تعطيل' : '▶️ تفعيل' }}</button></form>
                         <form method="POST" action="{{ route('ai.budgets.destroy', $b) }}"
-                              onsubmit="return confirm('إزالةُ الميزانيّة «{{ $b->label }}»؟')">
+                              data-confirm-native="إزالةُ الميزانيّة «{{ $b->label }}»؟">
                             @csrf @method('DELETE')
                             <button class="btn sm danger">🗑️ إزالة</button></form>
                     </div>

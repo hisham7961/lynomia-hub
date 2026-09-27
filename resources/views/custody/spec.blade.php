@@ -4,6 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>بطاقة عهدة {{ $a->code }} — {{ setting('app.name', config('app.name')) }}</title>
 <meta name="robots" content="noindex, nofollow">
+<script src="{{ asset('js/actions.js') }}?v={{ config('hub.version') }}" defer></script>
 <link href="{{ asset('css/fonts.css') }}?v={{ config('hub.version') }}" rel="stylesheet">
 {{-- ورقةُ العهدة A5: المواصفاتُ الداخلية + نموذجُ تسليمٍ بتوقيع. تُطبَع وتُرفَق
      بالجهاز أو بملف الموظف. الأبعادُ بالمليمتر لا بالبكسل — والطباعةُ على A4
@@ -56,7 +57,7 @@ th{text-align:right;color:#5d706c;font-weight:700;width:38%;background:#f5f9f8}
 <div class="bar">
     <a class="btn ghost" href="{{ route('m.show', ['assets', $a->id]) }}">→ رجوع للعهدة</a>
     <a class="btn ghost" href="{{ route('custody.label', $a->id) }}">🏷️ ملصق ٤٠×٣٠</a>
-    <button class="btn" onclick="window.print()">🖨 طباعة / حفظ PDF</button>
+    <button class="btn" data-print>🖨 طباعة / حفظ PDF</button>
 </div>
 
 <div class="page">

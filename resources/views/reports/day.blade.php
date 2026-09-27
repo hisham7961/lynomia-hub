@@ -117,7 +117,7 @@
                     <div class="sub" style="margin-top:4px" data-auditor-draft>
                         ✍️ مسودةٌ مقترحة: «<span data-draft-text>{{ $draftNote }}</span>»
                         <button type="button" class="btn ghost xs"
-                            onclick="var f=this.closest('.card').querySelector('input[name=feedback]');f.value=this.parentNode.querySelector('[data-draft-text]').textContent;f.focus()">استعمل المسودة</button>
+                            data-fill-into="input[name=feedback]" data-fill-from="[data-draft-text]">استعمل المسودة</button>
                     </div>
                 @endif
                 <form method="post" action="{{ route('reports.review.act', $w->id) }}" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center">

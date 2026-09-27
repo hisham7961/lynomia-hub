@@ -41,7 +41,7 @@
     <p class="sub">يُرسِل إشعاراً تجريبيّاً عامّاً إلى <b>أجهزتِك أنت</b> وحدَها عبر المزوّدِ القائم — دون تجاوزِ ضبط،
         ونتيجةٌ صادقة، ومُدقَّق. لك حاليّاً <b>{{ number_format($myTokens) }}</b> جهازٌ مُسجَّل.</p>
     <form method="POST" action="{{ route('mobileplatform.push.test') }}"
-          onsubmit="return confirm('إرسالُ إشعارٍ تجريبيٍّ إلى أجهزتِك؟')" style="margin-top:6px">@csrf
+          data-confirm-native="إرسالُ إشعارٍ تجريبيٍّ إلى أجهزتِك؟" style="margin-top:6px">@csrf
         <button type="submit" class="btn p sm" @disabled($myTokens === 0)>📨 أرسِل اختباراً لجهازي</button>
         @if ($myTokens === 0)<span class="sub"> — لا جهازَ مُسجَّلٌ باسمك بعد</span>@endif
     </form>

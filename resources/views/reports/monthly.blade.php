@@ -18,7 +18,7 @@
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <a class="btn ghost sm" href="{{ route('reports.monthly', ['month'=>$prev]) }}">‹ {{ $prev }}</a>
-        <form method="get" style="display:inline"><input type="month" name="month" value="{{ $month }}" onchange="this.form.submit()"></form>
+        <form method="get" style="display:inline"><input type="month" name="month" value="{{ $month }}" data-submit-on-change></form>
         <a class="btn ghost sm" href="{{ route('reports.monthly', ['month'=>$next]) }}">{{ $next }} ›</a>
         @if ($canExport)
             <a class="btn ghost sm" @if ($xNight) title="{{ 'نقل الملفات ممنوع خارج وقت العمل — يعود متاحاً مع بداية الدوام' }}" @endif href="{{ route('reports.monthly.export', ['month'=>$month]) }}"

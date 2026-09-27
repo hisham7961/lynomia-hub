@@ -111,7 +111,7 @@
 <div class="card" style="max-width:760px" id="builder">
     <h3>＋ مسار جديد</h3>
     <form method="GET" class="crow" style="margin-bottom:12px">
-        <select class="inp" name="m" onchange="this.form.submit()" style="max-width:280px">
+        <select class="inp" name="m" data-submit-on-change style="max-width:280px">
             <option value="">— اختر الوحدة أولاً —</option>
             @foreach (hub_modules() as $mk => $md)<option value="{{ $mk }}" @selected($module === $mk)>{{ $md['label'] }}</option>@endforeach
         </select>

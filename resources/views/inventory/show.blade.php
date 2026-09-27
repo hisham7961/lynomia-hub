@@ -32,7 +32,7 @@
             @csrf<button class="btn ghost" type="submit">⚖️ مصالحةٌ الآن</button>
         </form>
         <form method="POST" action="{{ route('inventory.close', $session->id) }}" style="display:inline"
-              onsubmit="return confirm('إغلاقُ الجلسة يمنع أيَّ مسحٍ بعده — متابعة؟')">
+              data-confirm-native="إغلاقُ الجلسة يمنع أيَّ مسحٍ بعده — متابعة؟">
             @csrf<button class="btn" type="submit">🔒 إغلاقُ الجلسة</button>
         </form>
     </div>

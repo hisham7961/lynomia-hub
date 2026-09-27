@@ -57,6 +57,12 @@ class AppServiceProvider extends ServiceProvider
         // خريطةُ الأعمدة المخبوءة تُفرَّغ مع كلِّ DDL ومع نهاية الهجرات (PERF-05) — لا تكذب بعد migrate
         \App\Support\Platform\SchemaCache::register();
 
+        // `@cspNonce` ⇐ `nonce="…"` بـnonce هذا الطلب (بند الدَّين #12 · FE-03): كلُّ
+        // `<script>` مضمَّنٍ في قالبٍ يحمله، وإلا حجبته السياسةُ المفروضة. والمصدرُ
+        // واحد (`ContentSecurity::nonce()`) فما يطبعه القالب هو ما تكتبه الترويسة.
+        \Illuminate\Support\Facades\Blade::directive('cspNonce',
+            fn () => '<?php echo \'nonce="\' . e(\App\Support\Security\ContentSecurity::nonce()) . \'"\'; ?>');
+
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
         }

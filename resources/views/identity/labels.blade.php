@@ -4,6 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ملصقات دفعية — {{ $assets->count() }}</title>
 <meta name="robots" content="noindex, nofollow">
+<script src="{{ asset('js/actions.js') }}?v={{ config('hub.version') }}" defer></script>
 <link href="{{ asset('css/fonts.css') }}?v={{ config('hub.version') }}" rel="stylesheet">
 {{-- طباعةٌ دفعية على ورق A4 لاصق: شبكةُ خلايا ٤٠×٣٠ مم بخطوط قصٍّ خفيفة —
      تُطبع بعد تسجيل دفعةٍ (٥٠ لابتوباً) فتُلصق قطعةً قطعةً. ولطابعة الملصقات
@@ -42,7 +43,7 @@ body{font-family:Tajawal,sans-serif;background:#eceff0;color:#000;padding:16px}
 <body>
 <div class="bar">
     <a class="btn ghost" href="{{ route('custody.catalog') }}">→ كتالوج العهد</a>
-    <button class="btn" onclick="window.print()">🖨 طباعة {{ $assets->count() }} ملصقاً</button>
+    <button class="btn" data-print>🖨 طباعة {{ $assets->count() }} ملصقاً</button>
 </div>
 
 <div class="grid">

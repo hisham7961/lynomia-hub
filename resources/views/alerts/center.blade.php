@@ -24,14 +24,14 @@
         <h3 style="margin:0">🧾 التنبيهات</h3>
         <form method="GET" class="crow" style="gap:6px;flex-wrap:wrap">
             <label class="vh" for="st">تصفية بالحالة</label>
-            <select class="inp" id="st" name="st" onchange="this.form.submit()">
+            <select class="inp" id="st" name="st" data-submit-on-change>
                 <option value="">كل الحالات</option>
                 @foreach ($acStatuses as $acK => $acL)
                     <option value="{{ $acK }}" @selected($st === $acK)>{{ $acL }}</option>
                 @endforeach
             </select>
             <label class="vh" for="sev">تصفية بالشدّة</label>
-            <select class="inp" id="sev" name="sev" onchange="this.form.submit()">
+            <select class="inp" id="sev" name="sev" data-submit-on-change>
                 <option value="">كل الشدّات</option>
                 @foreach (\App\Support\Platform\Severity::LEVELS as $acLv)
                     <option value="{{ $acLv }}" @selected($sev === $acLv)>{{ \App\Support\Platform\Severity::LABELS[$acLv] }}</option>
