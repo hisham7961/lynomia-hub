@@ -133,6 +133,11 @@
             </div>
         @endif
 
+        {{-- ملخّصُ التقارير بالذكاء (ProjectReportDigest) — داخليٌّ بـupdates:v كتبويب «النشاط» --}}
+        @if ($pcSeeActivity)
+            @include('reports._digest_card', ['projectId' => (string) $row->id])
+        @endif
+
         {{-- بطاقةُ البيانات: الحقولُ المعرَّفة — يحرسُها field-mode للداخليّ، ويُحجب عن
              العميلِ الاقتصادُ والبنية (لأن field-mode لا يحجب عن عديمِ الدور). --}}
         <div class="card" style="--mh:{{ hub_mod_look($module)['color'] }}">
