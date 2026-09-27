@@ -1280,6 +1280,32 @@
     },
     {
         "methods": "POST",
+        "uri": "api/mobile/v1/saved",
+        "name": "mobile.saved.store",
+        "action": "App\\Http\\Controllers\\Api\\MobileCollabController@saveStore",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "DELETE",
+        "uri": "api/mobile/v1/saved/{id}",
+        "name": "mobile.saved.destroy",
+        "action": "App\\Http\\Controllers\\Api\\MobileCollabController@saveDestroy",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
         "uri": "api/mobile/v1/files/upload-session",
         "name": "mobile.files.upload_session",
         "action": "App\\Http\\Controllers\\Api\\MobileFileController@uploadSession",

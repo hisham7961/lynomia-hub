@@ -215,3 +215,24 @@ PUT /api/mobile/v1/tasks/{id}    If-Match: "3"      (والسجلُّ version=5)
 
 **التحقّق:** جدولُ المسارات مطابقٌ لـ`route:list --path=api/mobile` (٥٨). الغلافُ
 والأكوادُ من `app/Support/Platform/Api.php`. لا مسارٌ هنا غيرُ مُسجَّلٍ في `routes/api.php`.
+
+## 8. إضافاتٌ لطلباتِ تطبيقِ الجوال (#4–#8 · إضافيّةٌ لا كاسرة)
+
+سدُّ ما سجّله التطبيقُ في `docs/backend-change-requests.md` — حقولٌ ونقاطٌ **جديدة** فقط؛ لا حقلَ قائمٌ غُيّر ولا حُذف.
+الإثبات: `tests/Feature/Mobile/MobileBackendGapsTest.php`.
+
+| # | المسار | الإضافة |
+|---|---|---|
+| 4 | `GET dm/threads/{user}/messages` | `data.cursor` (string): مؤشّرُ آخرِ رسالةٍ مُعادة بترميزِ `dm/threads/{user}/since` نفسِه؛ `''` لخيطٍ فارغ. |
+| 4 | `GET comments` | `data.cursor`: للقناة (`module=channel`) مؤشّرُ أحدثِ صفٍّ مُعاد (جذراً أو ردّاً) بترميزِ `conversations/{id}/since`؛ `''` لخيطٍ فارغ؛ و`null` لغيرِ القناة (لا «منذ» لها). |
+| 5 | `GET work/today` · `work/daily-report` | النجاح: المفاتيحُ العلويّةُ `compliance/entries/submit_hint` باقية + `data` (نسخةٌ منها) + `request_id`. خطأُ «لا ملفَ موظّف» (422): `error:"no_employee_profile"` و`message` باقيان + `code:"BUSINESS_RULE_VIOLATION"` و`details.reason:"no_employee_profile"` و`request_id` وترويستا `X-Error-Code`/`X-Request-Id`. |
+| 6 | `DmMessage` (messages/send) · أحداثُ `dm/threads/{user}/since` و`conversations/{id}/since` | `reactions: [{emoji, count, mine}]` — مرتّبٌ بقائمةِ الرموزِ الثابتة، فارغٌ للمحذوفة؛ استعلامٌ واحدٌ للصفحة (لا N+1). |
+| 7 | `POST saved` (جديد) | `{target_type: comment\|dm, target_id, note?≤500}` بحرسِ رؤيةِ الويب (+`guardFeedComment`). 201 `{saved, created:true}` · إعادةٌ 200 `{saved, created:false}` (حفظٌ لا تبديل) · غيرُ المرئيّ/الغائب 404 · حمولةٌ فاسدة 422 `VALIDATION_FAILED`. العميلُ 404. |
+| 7 | `DELETE saved/{id}` (جديد) | لصاحبها وحده ⇒ `{id, deleted:true}`؛ غيرُها 404 (لا IDOR). |
+| 7 | بطاقةُ `saved` | `target` حين `available=true` وحدَه (وإلّا `null`): تعليق `{kind:"comment", module, record_id, comment_id, parent_id}` (القناة: `module=channel` و`record_id`=المحادثة؛ العامّة `feed` و`record_id=null`)، DM `{kind:"dm", user_id:<الطرفُ الآخر>, message_id}`. ومنشورُ `feed` لشركةٍ خارجَ نطاق القارئ صار `available=false` (كان يكشف مقتطفَه). |
+| 8 | `bootstrap` · `navigation` | `feature_flags.collab_typing` (= `hub_capability('collab.typing')`) و`feature_flags.collab_presence` (= القدرة ∧ ليس عميلاً). |
+
+**مؤشّرُ `since` v2 (بلا تغييرِ العقد):** المؤشّرُ ما زال نصّاً معتِماً، لكنّه صار يحمل ثانيتَه **ومجموعةَ ما سُلِّم فيها**
+(`Collaboration::encodeSince/applySince/nextSince/tipSince`) بدل حدِّ المعرّف — فرسالةٌ تصل لاحقاً في الثانيةِ نفسِها
+بمعرّفِ UUID أصغر لم تعد تُسقَط. مؤشّرُ الجيلِ الأوّل (`t|id`) يُفكّ بمعناه القديم ويُرقّى في أوّلِ ردّ. يسري على
+`since` في الويب والجوال (DM/قناة)، وعلى `cursor` الذيل (#4) ورأسِ الويب `sinceCursor`. (`CollabSinceTieBreakTest`)

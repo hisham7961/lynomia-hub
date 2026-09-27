@@ -296,6 +296,9 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     Route::post('comments/{id}/react', [\App\Http\Controllers\Api\MobileCollabController::class, 'commentReact'])->name('mobile.comments.react');
     Route::get('presence', [\App\Http\Controllers\Api\MobileCollabController::class, 'presence'])->name('mobile.presence');
     Route::get('saved', [\App\Http\Controllers\Api\MobileCollabController::class, 'saved'])->name('mobile.saved.index');
+    // طلب الجوال #7 (إضافيّ): حفظٌ/إزالةٌ بحرسِ الرؤيةِ نفسِه — حرفيّان قبل الـcatch-all (F9)
+    Route::post('saved', [\App\Http\Controllers\Api\MobileCollabController::class, 'saveStore'])->name('mobile.saved.store');
+    Route::delete('saved/{id}', [\App\Http\Controllers\Api\MobileCollabController::class, 'saveDestroy'])->name('mobile.saved.destroy');
 
     /*
      * ── ملفّاتٌ + ماسحٌ + موقع (Mobile Readiness · الطور F · §109) ──

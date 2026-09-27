@@ -211,6 +211,12 @@ class MobileContextController extends Controller
             'is_client'          => hub_is_client($u),
             // «اسأل Hub» متاحٌ الآن لهذا المستخدم (الصلاحيّةُ والبوّابةُ معاً) — علمُ عرض، والحرسُ في المسار
             'can_ask'            => ! hub_is_client($u) && \App\Support\Ai\Ask\AskPolicy::ready($u),
+            // (إضافيّ · طلب الجوال #8) توافرُ القدرتين العابرتين من سجلِّ القدرات (`hub_capability`)
+            // — علمُ عرضٍ كي لا يكتشف التطبيقُ الإطفاءَ من ٤٠٤؛ النقاطُ تعيد الفحص. الحضورُ
+            // داخليٌّ (`GET presence` يطوي العميلَ ٤٠٤) فعلمُه للعميل false؛ والكتابةُ تتبع
+            // القدرةَ وحدَها (نبضةُ DM متاحةٌ لمن يبلغ المحادثة).
+            'collab_typing'      => hub_capability('collab.typing'),
+            'collab_presence'    => ! hub_is_client($u) && hub_capability('collab.presence'),
         ];
     }
 
