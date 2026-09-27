@@ -29,6 +29,13 @@ use Illuminate\Support\Facades\Route;
     Route::get('reports/monthly', [\App\Http\Controllers\Web\ReportsController::class, 'monthly'])->name('reports.monthly');
     Route::get('reports/monthly/employee', [\App\Http\Controllers\Web\ReportsController::class, 'monthlyEmployee'])->name('reports.monthly.employee');
     Route::get('reports/monthly/export', [\App\Http\Controllers\Web\ReportsController::class, 'monthlyExport'])->name('reports.monthly.export');
+    // «تقارير حسب المشروع» — ملخّصُ الذكاء لكلِّ مشروع (ProjectReportDigest)؛ الحرّاس في المتحكّم
+    // (نطاقُ المشروع + updates:v، والعميلُ ٤٠٤). «تحديث الآن» مخنوقٌ للمستخدم وللمشروع معاً.
+    Route::get('reports/projects', [\App\Http\Controllers\Web\ProjectDigestController::class, 'index'])->name('reports.projects');
+    Route::get('reports/projects/{id}', [\App\Http\Controllers\Web\ProjectDigestController::class, 'show'])
+        ->whereUuid('id')->name('reports.projects.show');
+    Route::post('reports/projects/{id}/refresh', [\App\Http\Controllers\Web\ProjectDigestController::class, 'refresh'])
+        ->whereUuid('id')->middleware('throttle:6,10')->name('reports.projects.refresh');
     Route::middleware('throttle:60,1')->group(function () {
         Route::post('reports/review/{id}', [\App\Http\Controllers\Web\ReportsController::class, 'reviewAct'])->name('reports.review.act');
         // «حوّله إلى بلاغ» — المعوّقُ المبلَّغُ يصير التزاماً بمالكٍ وموعد (v2.558)

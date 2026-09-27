@@ -62,6 +62,9 @@ final class AiPurposes
     /** مفتاحُ مساعد التطوير (فرزُ الخطأ · `App\Support\Ai\Dev\ErrorTriage`) */
     public const DEV = 'dev';
 
+    /** مفتاحُ ملخّص تقارير المشروع (`App\Support\Ai\Reports\ProjectReportDigest`) — `feature` في سجلّ الاستهلاك */
+    public const DIGEST = 'report_digest';
+
     /**
      * **ما تحتاجه كلُّ ميزةٍ من قدرات** — صلبٌ لا يُضبَط من شاشة.
      *
@@ -87,6 +90,8 @@ final class AiPurposes
         self::BRAIN => ['embeddings'],
         // **ومساعدُ التطوير يحتاج التوليدَ وحدَه** — الخادمُ جمع الخطأَ ومقتطفَه، والنموذجُ يشرح ويقترح
         self::DEV => ['chat'],
+        // **وملخّصُ التقارير يحتاج التوليدَ وحدَه** — الخادمُ جمع التقاريرَ الجديدة والملخّصَ السابق، والنموذجُ يدمجهما
+        self::DIGEST => ['chat'],
     ];
 
     /** حالاتُ الملاءمة — ثلاثٌ لا اثنتان */
