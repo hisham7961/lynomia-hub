@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
  * **أحداثُ النقاط الطرفية** — Work OS · الطور J · WP-J.2 · §43.
  *
  * صفٌّ لكل حدثٍ يبلّغه وكيلُ جهازٍ عبر المسار الموقَّع `endpoint.event` (عقدُ
- * التوقيع في docblock ‏`App\Support\Es256`، والفرضُ في `EndpointSignature`).
+ * التوقيع في docblock ‏`App\Support\Security\Es256`، والفرضُ في `EndpointSignature`).
  *
  * **دلالاتُ الأعمدة الحاكمة:**
  *  • `kind` (usb|posture|network_self|policy|agent) **قائمةُ سماحٍ في النموذج

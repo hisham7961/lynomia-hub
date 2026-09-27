@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\SessionLog;
 use App\Models\User;
-use App\Support\Totp;
+use App\Support\Security\Totp;
 use Illuminate\Cookie\CookieValuePrefix;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;

@@ -7,7 +7,7 @@ use App\Models\FinDocument;
 use App\Models\Project;
 use App\Models\Quote;
 use App\Models\QuoteMilestone;
-use App\Support\Delivery;
+use App\Support\Apps\Delivery;
 use Illuminate\Support\Facades\DB;
 
 /**

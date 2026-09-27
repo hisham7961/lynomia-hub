@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>أمر شراء {{ $p->doc_no }} — {{ setting('app.name', config('app.name')) }}</title>
+<script src="{{ asset('js/actions.js') }}?v={{ config('hub.version') }}" defer></script>
 <link href="{{ asset('css/fonts.css') }}?v={{ config('hub.version') }}" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -35,7 +36,7 @@ td{padding:9px 12px;border-bottom:1px solid #e3ecea}
 <body>
 <div class="bar">
     <a class="btn ghost" href="{{ route('m.show', ['purchases', $p->id]) }}">→ رجوع</a>
-    <button class="btn" onclick="window.print()">🖨 طباعة / حفظ PDF</button>
+    <button class="btn" data-print>🖨 طباعة / حفظ PDF</button>
 </div>
 <div class="page">
     <div class="head">

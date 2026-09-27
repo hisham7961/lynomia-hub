@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\Uptime;
+use App\Support\Ops\Uptime;
 
 /** فحصٌ حيّ عند الطلب — «افحص الآن» بدل انتظار الدورة المجدولة */
 class MonitorController extends Controller

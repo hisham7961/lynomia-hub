@@ -5,7 +5,7 @@ namespace Tests\Feature\UltimateReview;
 use App\Models\Approval;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\ApprovalService;
+use App\Support\Platform\ApprovalService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;

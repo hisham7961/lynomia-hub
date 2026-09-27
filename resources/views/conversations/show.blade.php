@@ -33,7 +33,7 @@
         <form method="POST" action="{{ route('conversations.notify', $conv->id) }}" class="inline">
             @csrf
             <label class="vh" for="conv-notify">إشعارات القناة</label>
-            <select class="inp sm" id="conv-notify" name="pref" onchange="this.form.submit()" title="إشعارات القناة">
+            <select class="inp sm" id="conv-notify" name="pref" data-submit-on-change title="إشعارات القناة">
                 <option value="all" @selected($myPref === 'all')>🔔 كل الإشعارات</option>
                 <option value="mentions" @selected($myPref === 'mentions')>@ الإشارات فقط</option>
                 <option value="muted" @selected($myPref === 'muted')>🔕 مكتومة</option>
@@ -93,7 +93,7 @@
                     {{-- تعديلُ الدور: بابُ conversations.member.role — الخادمُ يفرض الحدود --}}
                     <form method="POST" action="{{ route('conversations.member.role', $conv->id) }}" class="inline">
                         @csrf<input type="hidden" name="user_id" value="{{ $m->user_id }}">
-                        <select class="inp sm" name="role" onchange="this.form.submit()" title="تعديلُ الدور">
+                        <select class="inp sm" name="role" data-submit-on-change title="تعديلُ الدور">
                             <option value="member" @selected($m->role === 'member')>عضو</option>
                             <option value="guest" @selected($m->role === 'guest')>ضيف</option>
                             @if ($role === 'owner')

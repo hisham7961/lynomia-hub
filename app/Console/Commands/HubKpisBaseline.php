@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\KpiDef;
-use App\Support\KpiCentre;
+use App\Support\Insights\KpiCentre;
 use Illuminate\Console\Command;
 
 /**

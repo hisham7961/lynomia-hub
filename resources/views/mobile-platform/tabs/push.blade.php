@@ -2,8 +2,8 @@
      الرموزِ الحيّة، تفصيلُ التسليم (لماذا فشل)، سجلٌّ مُرشَّحٌ مُصفَّح، واختبارُ دفعٍ
      آمنٌ إلى جهازِ المُختبِرِ وحدَه عبر المزوّدِ القائم (لا تجاوزَ ضبط). قيمٌ حقيقيّةٌ فقط. --}}
 @php
-    $tone = fn ($s) => \App\Support\MobilePlatform::TONE[$s] ?? 'g';
-    $lbl  = fn ($s) => \App\Support\MobilePlatform::LABEL[$s] ?? $s;
+    $tone = fn ($s) => \App\Support\Mobile\MobilePlatform::TONE[$s] ?? 'g';
+    $lbl  = fn ($s) => \App\Support\Mobile\MobilePlatform::LABEL[$s] ?? $s;
     $base = fn (array $q = []) => route('mobileplatform.index', array_merge(['tab' => 'push'], $q));
     $dt = fn ($v) => $v ? \Illuminate\Support\Carbon::parse($v)->format('m-d H:i') : '—';
 @endphp
@@ -27,13 +27,16 @@
         <tr><td>المزوّدُ الفعّال</td><td>{{ $push['driver'] }} @unless ($push['configured'])<span class="sub">(الصفريّ — لا نجاحٌ مزيّف)</span>@endunless</td></tr>
         <tr><td>المزوّدُ المطلوب (إعداد)</td><td>{{ $push['requested'] ?: '—' }}</td></tr>
         <tr><td>معرّفُ مشروع FCM</td><td>@if ($push['has_project_id'])<span class="bdg ok">مضبوط</span>@else<span class="bdg g">غير مضبوط</span>@endif <span class="sub">حضورٌ لا قيمة</span></td></tr>
-        <tr><td>رمزُ وصولِ FCM</td><td>@if ($push['has_access_token'])<span class="bdg ok">مضبوط</span>@else<span class="bdg g">غير مضبوط</span>@endif <span class="sub">لا يُعرَض المفتاحُ قط</span></td></tr>
+        <tr><td>حسابُ خدمة Firebase</td><td>@if (! empty($push['has_service_account']))<span class="bdg ok">مضبوط</span>@else<span class="bdg g">غير مضبوط</span>@endif <span class="sub">يُسكّ منه رمزُ OAuth ويُجدَّد تلقائيّاً</span></td></tr>
+        <tr><td>رمزُ وصولِ FCM (احتياطيّ)</td><td>@if ($push['has_access_token'])<span class="bdg ok">مضبوط</span>@else<span class="bdg g">غير مضبوط</span>@endif <span class="sub">لا يُعرَض المفتاحُ قط</span></td></tr>
     </table>
     @unless ($push['configured'])
         <p class="sub" style="margin-top:8px">المزوّدُ غير مُهيّأ — التسليمُ يُسجَّل <span class="mono">not_configured</span> صدقاً.
-            <a class="btn ghost xs" href="{{ route('settings.edit') }}#mobile.push_driver">هيّئ المزوّد ←</a></p>
+            <a class="btn ghost xs" href="{{ \App\Support\Mobile\MobileSettings::editUrl('mobile.push_driver') }}">هيّئ المزوّد ←</a></p>
     @endunless
 </div>
+
+@include('mobile-platform.tabs._settings_form', ['section' => 'push'])
 
 {{-- اختبارُ دفعٍ آمن — إلى جهازِ المُختبِرِ وحدَه، عبر المزوّدِ القائم (لا تجاوز) --}}
 <div class="card kid">
@@ -41,7 +44,7 @@
     <p class="sub">يُرسِل إشعاراً تجريبيّاً عامّاً إلى <b>أجهزتِك أنت</b> وحدَها عبر المزوّدِ القائم — دون تجاوزِ ضبط،
         ونتيجةٌ صادقة، ومُدقَّق. لك حاليّاً <b>{{ number_format($myTokens) }}</b> جهازٌ مُسجَّل.</p>
     <form method="POST" action="{{ route('mobileplatform.push.test') }}"
-          onsubmit="return confirm('إرسالُ إشعارٍ تجريبيٍّ إلى أجهزتِك؟')" style="margin-top:6px">@csrf
+          data-confirm-native="إرسالُ إشعارٍ تجريبيٍّ إلى أجهزتِك؟" style="margin-top:6px">@csrf
         <button type="submit" class="btn p sm" @disabled($myTokens === 0)>📨 أرسِل اختباراً لجهازي</button>
         @if ($myTokens === 0)<span class="sub"> — لا جهازَ مُسجَّلٌ باسمك بعد</span>@endif
     </form>

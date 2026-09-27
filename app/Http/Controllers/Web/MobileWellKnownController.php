@@ -22,7 +22,7 @@ use Illuminate\Http\JsonResponse;
  * الحقيقيّةُ تلقائيّاً — بلا نشرِ كودٍ جديد.
  *
  * الوجهةُ التي يلتقطها التطبيق `/m/*` هي ترميزُ الرابطِ العميق القانونيّ
- * `{module,id,action}` (‏`App\Support\NotificationLink` · x-deep-link في مواصفة الجوال).
+ * `{module,id,action}` (‏`App\Support\Collaboration\NotificationLink` · x-deep-link في مواصفة الجوال).
  */
 class MobileWellKnownController extends Controller
 {

@@ -6,7 +6,7 @@ use App\Models\Client;
 use App\Models\Role;
 use App\Models\User;
 use App\Models\VaultSecret;
-use App\Support\DigitalAssets;
+use App\Support\Assets\DigitalAssets;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

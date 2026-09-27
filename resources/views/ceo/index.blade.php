@@ -8,7 +8,7 @@
     </div>
     <div style="display:flex;gap:8px">
         <a class="btn ghost sm" href="{{ route('ceo', ['fresh' => 1]) }}">↻ تحديث</a>
-        <button class="btn ghost sm" onclick="window.print()">🖨 طباعة</button>
+        <button class="btn ghost sm" data-print>🖨 طباعة</button>
     </div>
 </div>
 

@@ -4,7 +4,7 @@ namespace Tests\Feature\MobilePlatform;
 
 use App\Models\Role;
 use App\Models\User;
-use App\Support\InformationArchitecture;
+use App\Support\Platform\InformationArchitecture;
 use Tests\TestCase;
 
 /**

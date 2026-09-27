@@ -3,7 +3,7 @@
 /**
  * **كتالوجُ القدرات — الحقيقةُ البنيويّة** (سجلّ القدرات · §6/§7).
  *
- * مصدرُ الحقيقةِ الكوديُّ الواحد لِما تدعمه Lynomia. يقرؤه `App\Support\FeatureRegistry`
+ * مصدرُ الحقيقةِ الكوديُّ الواحد لِما تدعمه Lynomia. يقرؤه `App\Support\Platform\FeatureRegistry`
  * فيشتقُّ الحالةَ السارية من هنا + الإعدادات + الفاحصات. **بلا closures** (يُخبَّأ config:cache).
  *
  * قواعدُ الصدق: لا حالةَ متفائلة — الخارجيُّ/غيرُ المُهيَّأ يُشتقُّ من فاحصٍ (`derive`) لا
@@ -59,35 +59,35 @@ return [
         'collab.channels' => ['domain' => 'collaboration', 'category' => 'messaging',
             'title_ar' => 'قنوات الفريق', 'title_en' => 'Team Channels', 'status' => 'ENABLED',
             'desc_ar' => 'قنواتٌ داخليّةٌ فوق حاوية المحادثة (comments).', 'desc_en' => 'Internal channels over the conversation container.',
-            'web_routes' => ['conversations.index', 'conversations.show'], 'introduced' => 'v2.456.0', 'docs' => 'docs/collaboration/03-channel-management.md'],
+            'web_routes' => ['conversations.index', 'conversations.show'], 'api_routes' => ['mobile.conversations.store', 'mobile.conversations.members.index', 'mobile.conversations.members.add', 'mobile.conversations.members.role', 'mobile.conversations.members.remove'], 'mobile_backend' => 'ready', 'introduced' => 'v2.456.0', 'docs' => 'docs/collaboration/03-channel-management.md'],
         'collab.private_channels' => ['domain' => 'collaboration', 'category' => 'messaging',
             'title_ar' => 'قنوات خاصّة', 'title_en' => 'Private Channels', 'status' => 'ENABLED',
             'desc_ar' => 'قنواتٌ بالدعوة فقط — غيرُ قابلةٍ للاكتشاف.', 'desc_en' => 'Invite-only, non-discoverable.', 'introduced' => 'v2.456.0'],
         'collab.dm' => ['domain' => 'collaboration', 'category' => 'messaging',
             'title_ar' => 'الرسائل المباشرة', 'title_en' => 'Direct Messages', 'status' => 'ENABLED',
             'desc_ar' => 'خيوطٌ ثنائيّةٌ بمفتاحٍ من auth (خصوصيّة الطرفين).', 'desc_en' => 'Two-party threads, server-keyed.',
-            'web_routes' => ['dm.inbox', 'dm.thread'], 'api_routes' => ['mobile.dm.threads'], 'mobile_backend' => 'ready', 'native_mobile' => 'deferred', 'openapi' => 'documented'],
+            'web_routes' => ['dm.inbox', 'dm.thread'], 'api_routes' => ['mobile.dm.threads', 'mobile.dm.edit', 'mobile.dm.destroy'], 'mobile_backend' => 'ready', 'native_mobile' => 'deferred', 'openapi' => 'documented'],
         'collab.group_dm' => ['domain' => 'collaboration', 'category' => 'messaging',
             'title_ar' => 'مجموعات الرسائل', 'title_en' => 'Group DMs', 'status' => 'ENABLED',
             'desc_ar' => 'محادثاتٌ جماعيّةٌ خاصّةٌ — إضافةُ عضوٍ تُنشئ مجموعةً جديدة (أمنُ الجمهور التاريخيّ).',
             'desc_en' => 'Private group conversations; adding a member forks a new group.',
-            'web_routes' => ['groups.index'], 'introduced' => 'v2.465.0', 'docs' => 'docs/collaboration/05-group-dms.md'],
+            'web_routes' => ['groups.index'], 'api_routes' => ['mobile.groups.store', 'mobile.groups.fork', 'mobile.groups.leave'], 'mobile_backend' => 'ready', 'introduced' => 'v2.465.0', 'docs' => 'docs/collaboration/05-group-dms.md'],
         'collab.threads' => ['domain' => 'collaboration', 'category' => 'messaging', 'title_ar' => 'الخيوط', 'title_en' => 'Threads', 'status' => 'ENABLED', 'introduced' => 'v2.456.0'],
         'collab.reactions' => ['domain' => 'collaboration', 'category' => 'messaging', 'title_ar' => 'التفاعلات', 'title_en' => 'Reactions', 'status' => 'ENABLED',
             'api_routes' => ['mobile.comments.react', 'mobile.dm.react'], 'mobile_backend' => 'ready', 'introduced' => 'v2.456.0'],
         'collab.mentions' => ['domain' => 'collaboration', 'category' => 'messaging', 'title_ar' => 'الإشارات (Mentions)', 'title_en' => 'Mentions', 'status' => 'ENABLED',
             'desc_ar' => 'إشاراتٌ مُنطَّقةٌ بالمصرَّح لهم — لا تمنح وصولاً.', 'introduced' => 'v2.456.0'],
         'collab.saved' => ['domain' => 'collaboration', 'category' => 'messaging', 'title_ar' => 'المحفوظات', 'title_en' => 'Saved for Later', 'status' => 'ENABLED',
-            'desc_ar' => 'محفوظاتٌ تُعادُ تخويلاً عند كلِّ فتح.', 'web_routes' => ['saved.index'], 'api_routes' => ['mobile.saved.index'], 'mobile_backend' => 'ready', 'introduced' => 'v2.456.0'],
-        'collab.pins' => ['domain' => 'collaboration', 'category' => 'messaging', 'title_ar' => 'التثبيت (Pins)', 'title_en' => 'Pins', 'status' => 'ENABLED', 'introduced' => 'v2.456.0'],
+            'desc_ar' => 'محفوظاتٌ تُعادُ تخويلاً عند كلِّ فتح.', 'web_routes' => ['saved.index'], 'api_routes' => ['mobile.saved.index', 'mobile.saved.store', 'mobile.saved.destroy'], 'mobile_backend' => 'ready', 'introduced' => 'v2.456.0'],
+        'collab.pins' => ['domain' => 'collaboration', 'category' => 'messaging', 'title_ar' => 'التثبيت (Pins)', 'title_en' => 'Pins', 'status' => 'ENABLED', 'api_routes' => ['mobile.comment_actions.pin', 'mobile.comment_actions.resolve'], 'mobile_backend' => 'ready', 'introduced' => 'v2.456.0'],
         'collab.search' => ['domain' => 'collaboration', 'category' => 'messaging', 'title_ar' => 'بحث الرسائل', 'title_en' => 'Message Search', 'status' => 'ENABLED',
-            'desc_ar' => 'بحثٌ منطَّقٌ بالعضويّة — لا يُرجِع قناةً لست فيها.', 'web_routes' => ['search.messages'], 'introduced' => 'v2.456.0'],
+            'desc_ar' => 'بحثٌ منطَّقٌ بالعضويّة — لا يُرجِع قناةً لست فيها.', 'web_routes' => ['search.messages'], 'api_routes' => ['mobile.search.messages'], 'mobile_backend' => 'ready', 'introduced' => 'v2.456.0'],
         'collab.unread' => ['domain' => 'collaboration', 'category' => 'messaging', 'title_ar' => 'حالة غير المقروء', 'title_en' => 'Unread State', 'status' => 'ENABLED', 'introduced' => 'v2.456.0'],
         'collab.directory' => ['domain' => 'collaboration', 'category' => 'management', 'title_ar' => 'دليل القنوات', 'title_en' => 'Channel Directory', 'status' => 'ENABLED',
-            'web_routes' => ['conversations.directory'], 'introduced' => 'v2.456.0'],
-        'collab.favorites' => ['domain' => 'collaboration', 'category' => 'management', 'title_ar' => 'المفضّلة', 'title_en' => 'Channel Favorites', 'status' => 'ENABLED', 'introduced' => 'v2.456.0'],
-        'collab.archive' => ['domain' => 'collaboration', 'category' => 'management', 'title_ar' => 'أرشفة القنوات', 'title_en' => 'Channel Archive', 'status' => 'ENABLED', 'introduced' => 'v2.456.0'],
-        'collab.notify_prefs' => ['domain' => 'collaboration', 'category' => 'management', 'title_ar' => 'تفضيلات الإشعار', 'title_en' => 'Notification Preferences', 'status' => 'ENABLED', 'introduced' => 'v2.456.0'],
+            'web_routes' => ['conversations.directory'], 'api_routes' => ['mobile.conversations.directory', 'mobile.conversations.join'], 'mobile_backend' => 'ready', 'introduced' => 'v2.456.0'],
+        'collab.favorites' => ['domain' => 'collaboration', 'category' => 'management', 'title_ar' => 'المفضّلة', 'title_en' => 'Channel Favorites', 'status' => 'ENABLED', 'api_routes' => ['mobile.conversations.favorite'], 'mobile_backend' => 'ready', 'introduced' => 'v2.456.0'],
+        'collab.archive' => ['domain' => 'collaboration', 'category' => 'management', 'title_ar' => 'أرشفة القنوات', 'title_en' => 'Channel Archive', 'status' => 'ENABLED', 'api_routes' => ['mobile.conversations.archive'], 'mobile_backend' => 'ready', 'introduced' => 'v2.456.0'],
+        'collab.notify_prefs' => ['domain' => 'collaboration', 'category' => 'management', 'title_ar' => 'تفضيلات الإشعار', 'title_en' => 'Notification Preferences', 'status' => 'ENABLED', 'api_routes' => ['mobile.conversations.notify'], 'mobile_backend' => 'ready', 'introduced' => 'v2.456.0'],
         'collab.internal_rooms' => ['domain' => 'collaboration', 'category' => 'rooms', 'title_ar' => 'غرف المشاريع الداخليّة', 'title_en' => 'Project Internal Rooms', 'status' => 'ENABLED',
             'desc_ar' => 'غرفةٌ داخليّةٌ لكلِّ مشروع — معزولةٌ فيزيائيّاً عن العميل.', 'introduced' => 'v2.456.0', 'docs' => 'docs/collaboration/08-rooms-disclosure.md'],
         'collab.client_rooms' => ['domain' => 'collaboration', 'category' => 'rooms', 'title_ar' => 'غرف مشاريع العملاء', 'title_en' => 'Client Project Rooms', 'status' => 'ENABLED',
@@ -117,7 +117,7 @@ return [
 
         /* ───────── 7B · العملاء / PSA (Work OS · الطور B/D) ───────── */
         'client.portal' => ['domain' => 'client', 'category' => 'portal', 'title_ar' => 'بوّابة العميل', 'title_en' => 'Client Portal', 'status' => 'ENABLED',
-            'account_types' => ['client'], 'desc_ar' => 'سطحُ العميل — فشلٌ مغلقٌ وأعمدةٌ عميليّةٌ حصراً (PortalGuard).', 'web_routes' => ['portal.home'], 'api_routes' => ['mobile.portal.home'], 'mobile_backend' => 'ready'],
+            'account_types' => ['client'], 'desc_ar' => 'سطحُ العميل — فشلٌ مغلقٌ وأعمدةٌ عميليّةٌ حصراً (PortalGuard).', 'web_routes' => ['portal.home'], 'api_routes' => ['mobile.portal.home', 'mobile.portal.tickets.index', 'mobile.portal.tickets.store', 'mobile.portal.tickets.show', 'mobile.portal.tickets.reply'], 'mobile_backend' => 'ready'],
         'client.activation' => ['domain' => 'client', 'category' => 'portal', 'title_ar' => 'تفعيل حساب العميل', 'title_en' => 'Client Account Activation', 'status' => 'ENABLED', 'account_types' => ['client']],
         'client.membership' => ['domain' => 'client', 'category' => 'portal', 'title_ar' => 'عضويّة العميل', 'title_en' => 'Client Membership', 'status' => 'ENABLED', 'permissions' => ['clients']],
         'client.project_access' => ['domain' => 'client', 'category' => 'delivery', 'title_ar' => 'وصول العميل للمشاريع', 'title_en' => 'Client Project Access', 'status' => 'ENABLED', 'account_types' => ['client']],
@@ -148,7 +148,7 @@ return [
         // ومراجعتُها — قراءةٌ/مراجعةٌ فوق WorkUpdate القائم (لا محرّكَ تقاريرَ ثانٍ)، تفصل
         // الحضورَ الفيزيائيَّ عن الامتثالِ التقريريّ عن الأثرِ الفعّال (§6). لا مفتاحَ لكلِّ تبويب.
         'workos.daily_reports' => ['domain' => 'work_os', 'category' => 'delivery', 'title_ar' => 'التقارير اليومية والمراجعة', 'title_en' => 'Daily Reports & Review', 'status' => 'ENABLED',
-            'permissions' => ['hr'], 'web_routes' => ['reports.index', 'reports.review', 'reports.mine'],
+            'permissions' => ['hr'], 'web_routes' => ['reports.index', 'reports.review', 'reports.mine'], 'api_routes' => ['mobile.reports.daily', 'mobile.reports.review'], 'mobile_backend' => 'ready',
             'desc_ar' => 'مركزُ التقارير اليوميّة ومراجعتُها فوق تحديثات العمل — من حضر، من كتب تقريراً، من حضر ولم يكتب، وماذا عمل كلٌّ على أيّ مشروع؛ مع فصلِ الحضور الفيزيائيّ عن الامتثال عن الأثر المحتسَب.',
             'desc_en' => 'Daily reports center and review over WorkUpdate — who attended, who reported, who attended without reporting, and what each did on which project; physical attendance, reporting compliance and effective outcome kept separate.',
             'introduced' => 'v2.476.0', 'docs' => 'docs/attendance-reporting/00-overview.md'],
@@ -269,7 +269,14 @@ return [
         'mobile.auth_apis' => ['domain' => 'mobile', 'category' => 'api', 'title_ar' => 'واجهات مصادقة الجوال', 'title_en' => 'Mobile Authentication APIs', 'status' => 'ENABLED', 'mobile_backend' => 'ready', 'openapi' => 'documented', 'native_mobile' => 'deferred'],
         'mobile.collab_apis' => ['domain' => 'mobile', 'category' => 'api', 'title_ar' => 'واجهات تعاون الجوال', 'title_en' => 'Mobile Collaboration APIs', 'status' => 'ENABLED',
             'desc_ar' => 'الواجهاتُ حيّةٌ ومُختبَرة؛ الواجهةُ الأصيلةُ مؤجَّلة.', 'mobile_backend' => 'ready', 'openapi' => 'documented', 'native_mobile' => 'deferred', 'introduced' => 'v2.469.0'],
-        'mobile.workos_apis' => ['domain' => 'mobile', 'category' => 'api', 'title_ar' => 'واجهات نظام العمل للجوال', 'title_en' => 'Mobile Work OS APIs', 'status' => 'ENABLED', 'mobile_backend' => 'ready', 'openapi' => 'documented', 'native_mobile' => 'deferred'],
+        'mobile.workos_apis' => ['domain' => 'mobile', 'category' => 'api', 'title_ar' => 'واجهات نظام العمل للجوال', 'title_en' => 'Mobile Work OS APIs', 'status' => 'ENABLED', 'mobile_backend' => 'ready', 'openapi' => 'documented', 'native_mobile' => 'deferred',
+            // أفعالُ الميدان والموظّف (خطّةُ التطبيق · المرحلة ٣): حضور/إجازة/عهدة/جرد/مرفقات/نسخ
+            'api_routes' => ['mobile.attendance.today', 'mobile.attendance.check_in', 'mobile.attendance.check_out',
+                'mobile.leaves.decide', 'mobile.leaves.decision', 'mobile.me.custody', 'mobile.custody.handover', 'mobile.custody.recover',
+                'mobile.custody.abilities',
+                'mobile.inventory.index', 'mobile.inventory.show', 'mobile.inventory.freeze', 'mobile.inventory.scan',
+                'mobile.inventory.reconcile', 'mobile.inventory.close', 'mobile.files.index', 'mobile.files.destroy',
+                'mobile.comments.attachment', 'mobile.dm.attachment', 'mobile.versions.index']],
         'mobile.openapi' => ['domain' => 'mobile', 'category' => 'api', 'title_ar' => 'مواصفة OpenAPI للجوال', 'title_en' => 'Mobile OpenAPI', 'status' => 'ENABLED', 'openapi' => 'documented', 'mobile_backend' => 'ready'],
         'mobile.native_app' => ['domain' => 'mobile', 'category' => 'deferred', 'title_ar' => 'التطبيق الأصيل', 'title_en' => 'Native Mobile App', 'status' => 'DEFERRED',
             'desc_ar' => 'قرارٌ استراتيجيّ: مؤجَّل. الخلفيّةُ جاهزةٌ متى بدأ.', 'depends' => ['mobile.backend'], 'native_mobile' => 'deferred',
@@ -306,7 +313,7 @@ return [
                 . 'والمركزِ القانونيِّ والتقريرِ الماليِّ والإيرادِ المتكرّر.',
             'admin_surface' => 'currency.rates',
             'web_routes' => ['currency.rates', 'currency.rates.store', 'currency.rates.destroy'],
-            'introduced' => 'v2.528.0', 'docs' => 'docs/ultimate-platform-review/03-design-currency-wiring.md',
+            'introduced' => 'v2.528.0', 'docs' => 'docs/archive/ultimate-platform-review/03-design-currency-wiring.md',
             'limitations' => 'لا يُشتقُّ سعرٌ عبر عملةٍ ثالثة، ومستندٌ أقدمُ من أوّلِ سعرٍ مسجَّلٍ لا يُحوَّل.'],
     ],
 ];

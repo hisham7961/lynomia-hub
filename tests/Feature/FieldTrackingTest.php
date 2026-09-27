@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\TrackPoint;
 use App\Models\TrackSession;
-use App\Support\Tracking;
+use App\Support\Workforce\Tracking;
 use Tests\TestCase;
 
 /**

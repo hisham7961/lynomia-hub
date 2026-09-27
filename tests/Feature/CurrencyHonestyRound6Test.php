@@ -171,7 +171,7 @@ class CurrencyHonestyRound6Test extends TestCase
             'state' => 'مرسلة', 'date' => now()->toDateString(), 'currency' => 'دولار', 'client_id' => $b->id]);
 
         $this->actingAs($this->owner);
-        $conc = \App\Support\CeoBoard::concentration();
+        $conc = \App\Support\Insights\CeoBoard::concentration();
 
         $this->assertNotEmpty($conc, 'التركّزُ لم يُحسب أصلاً — الاختبارُ يمرّ فراغاً');
         $this->assertTrue($conc['mixed'] ?? false,
@@ -191,7 +191,7 @@ class CurrencyHonestyRound6Test extends TestCase
             'price_from' => 500, 'price_to' => 900, 'currency' => 'دولار']);
 
         $this->actingAs($this->owner);
-        $titles = collect(\App\Support\Pricing::insights())->pluck('title')->all();
+        $titles = collect(\App\Support\Finance\Pricing::insights())->pluck('title')->all();
 
         $this->assertNotContains('أرخص من السوق كلّه', $titles,
             'قُورنت باقةٌ بالدينار بمنافسٍ بالدولار وأُفتيَ بـ«مالٌ متروك على الطاولة» — '
@@ -210,7 +210,7 @@ class CurrencyHonestyRound6Test extends TestCase
             'price_from' => 500, 'price_to' => 900, 'currency' => 'د.ك']);
 
         $this->actingAs($this->owner);
-        $titles = collect(\App\Support\Pricing::insights())->pluck('title')->all();
+        $titles = collect(\App\Support\Finance\Pricing::insights())->pluck('title')->all();
 
         $this->assertContains('أرخص من السوق كلّه', $titles,
             'الحارسُ أطفأ المقارنةَ المشروعة داخل العملة الواحدة');

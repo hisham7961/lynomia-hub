@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Support\Es256;
+use App\Support\Security\Es256;
 use App\Traits\Auditable;
 use App\Traits\HasUuid;
 use App\Traits\HasVersions;
@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * **جهازُ نقطةٍ طرفية** (Work OS · الطور J · WP-J.1 · §43) — جهازُ شركةٍ سجّل
- * نفسَه بالتسجيل اللاتماثليّ (عقدُ التوقيع في docblock ‏`App\Support\Es256`).
+ * نفسَه بالتسجيل اللاتماثليّ (عقدُ التوقيع في docblock ‏`App\Support\Security\Es256`).
  *
  * **الخادمُ يخزّن العامَّ فقط** — `saving` أدناه يرفض أيَّ مادةِ مفتاحٍ خاصّ
  * ويشتقّ البصمةَ من المفتاح المخزَّن نفسِه، فلا تفترق بصمةٌ عن مفتاحها أبداً.
@@ -50,9 +50,9 @@ class EndpointDevice extends Model
     /**
      * **قائمةُ تخزينِ عمود `os`** — تشمل المدعومَ + القديمَ (linux) كي تبقى صفوفُ
      * التسجيلِ التاريخيّة مقروءةً غيرَ محذوفة (§17). **المدعومُ رسميّاً للتسجيل**
-     * `App\Support\Endpoint::SUPPORTED` (Windows/macOS) — لا يُسجَّل جديدٌ بغيره.
+     * `App\Support\Endpoint\Endpoint::SUPPORTED` (Windows/macOS) — لا يُسجَّل جديدٌ بغيره.
      */
-    public const OSES = \App\Support\Endpoint::STORED;
+    public const OSES = \App\Support\Endpoint\Endpoint::STORED;
 
     protected static function booted(): void
     {

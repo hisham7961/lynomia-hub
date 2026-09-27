@@ -12,7 +12,7 @@ use App\Models\JournalLine;
 use App\Models\LedgerAccount;
 use App\Models\PayrollRun;
 use App\Models\Setting;
-use App\Support\CustodyPostingService;
+use App\Support\Assets\CustodyPostingService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;

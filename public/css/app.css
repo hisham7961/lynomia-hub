@@ -1219,3 +1219,5 @@ input[type=file]::file-selector-button:hover{background:var(--pd)}
   .filters select.inp{min-width:120px}
 }
 
+/* خريطةُ نقطةٍ واحدة (partials/map_point) — مصدرُ البلاطات إعدادٌ (maps.tiles) */
+.lyn-map-point{height:220px;width:100%;border-radius:var(--r);overflow:hidden;margin-top:6px}

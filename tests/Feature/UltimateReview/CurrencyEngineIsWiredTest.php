@@ -6,9 +6,9 @@ use App\Models\Client;
 use App\Models\FinDocument;
 use App\Models\Project;
 use App\Models\Quote;
-use App\Support\CeoBoard;
-use App\Support\Currency;
-use App\Support\SalesBoard;
+use App\Support\Insights\CeoBoard;
+use App\Support\Finance\Currency;
+use App\Support\Finance\SalesBoard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -16,7 +16,7 @@ use Tests\TestCase;
 /**
  * **محرّكُ الصرفِ موصولٌ بالشاشاتِ التي تجمع المال** (المراجعةُ الشاملة · F-15).
  *
- * كان في النظامِ محرّكُ صرفٍ كاملٌ — `App\Support\Currency` بسعرٍ مؤرَّخٍ ومقلوبٍ
+ * كان في النظامِ محرّكُ صرفٍ كاملٌ — `App\Support\Finance\Currency` بسعرٍ مؤرَّخٍ ومقلوبٍ
  * ومجموعٍ محافظٍ — **وشاشةُ إدارةٍ تُدخِل الأسعار**، ثمّ لا شيء: `Currency::sum`
  * لم تُنادَ من سطرٍ واحدٍ في `app/`، ونداؤها الوحيدُ كان من هذه الحزمة. فستُّ
  * شاشاتٍ تجمع المالَ كانت تنادي `hub_cur_label` فترفع علمَ «مخلوط»، والمالكُ

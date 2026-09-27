@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\Health;
+use App\Support\Ops\Health;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

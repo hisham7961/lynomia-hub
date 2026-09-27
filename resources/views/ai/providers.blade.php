@@ -34,8 +34,8 @@
 
     @forelse ($providers as $p)
         @php($def = $catalog[$p->catalog_key] ?? null)
-        @php($logo = \App\Support\AiProviderRegistry::logoSvg($p->catalog_key))
-        @php($mk = \App\Support\AiProviderRegistry::mark((string) ($def['litellm_key'] ?? $p->catalog_key)))
+        @php($logo = \App\Support\Ai\Catalog\AiProviderRegistry::logoSvg($p->catalog_key))
+        @php($mk = \App\Support\Ai\Catalog\AiProviderRegistry::mark((string) ($def['litellm_key'] ?? $p->catalog_key)))
         <div class="row" style="align-items:flex-start;gap:12px;flex-wrap:wrap;border-top:1px solid var(--line);padding:12px 0">
             @if ($logo !== null)
                 <span class="pvlogo pvsvg" aria-hidden="true">{!! $logo !!}</span>
@@ -88,12 +88,12 @@
                 </form>
                 @if ($p->credential_state !== 'missing')
                     <form method="POST" action="{{ route('ai.providers.revoke', $p) }}"
-                          onsubmit="return confirm('يُحذَف الاعتمادُ عند البوّابةِ نهائيّاً ويُطفأ المزوّد. أتتابع؟')">@csrf
+                          data-confirm-native="يُحذَف الاعتمادُ عند البوّابةِ نهائيّاً ويُطفأ المزوّد. أتتابع؟">@csrf
                         <button class="btn sm danger">🚫 إبطالُ الاعتماد</button>
                     </form>
                 @endif
                 <form method="POST" action="{{ route('ai.providers.destroy', $p) }}"
-                      onsubmit="return confirm('يُبطَل الاعتمادُ ثمّ يُحذَف المزوّد. أتتابع؟')">@csrf @method('DELETE')
+                      data-confirm-native="يُبطَل الاعتمادُ ثمّ يُحذَف المزوّد. أتتابع؟">@csrf @method('DELETE')
                     <button class="btn sm danger">🗑️ حذف</button>
                 </form>
                 @endif
@@ -303,8 +303,8 @@
 {{-- ── نموذجُ المزوّدِ المختارِ وحدَه ── --}}
 @if ($selected)
     @php($def = $catalog[$selected])
-    @php($selLogo = \App\Support\AiProviderRegistry::logoSvg($selected))
-    @php($selMark = \App\Support\AiProviderRegistry::mark((string) $def['litellm_key']))
+    @php($selLogo = \App\Support\Ai\Catalog\AiProviderRegistry::logoSvg($selected))
+    @php($selMark = \App\Support\Ai\Catalog\AiProviderRegistry::mark((string) $def['litellm_key']))
     <div class="card" id="add">
         <div class="row" style="gap:10px;align-items:center">
             @if ($selLogo !== null)

@@ -8,7 +8,7 @@ use App\Models\Company;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\ChunkedUpload;
+use App\Support\Collaboration\ChunkedUpload;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;

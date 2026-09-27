@@ -2,8 +2,8 @@
 
 namespace App\Http\Middleware;
 
-use App\Support\ErrorLog;
-use App\Support\Series;
+use App\Support\Ops\ErrorLog;
+use App\Support\Ops\Series;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -45,7 +45,7 @@ class Observability
             \Illuminate\Support\Facades\Log::withContext(array_filter([
                 'request_id' => $rid,
                 'method' => $request->method(),
-                'path' => '/' . ltrim($request->path(), '/'),
+                'path' => '/' . ltrim(\App\Support\Ops\ErrorLog::routePattern($request), '/'),   // بلا رموزِ المسار
                 'user_id' => auth()->id(),
                 'ip' => $request->ip(),
                 'release' => (string) config('hub.version'),

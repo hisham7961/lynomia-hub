@@ -6,9 +6,9 @@ use App\Models\AiModel;
 use App\Models\AiProfile;
 use App\Models\AiProfileModel;
 use App\Models\AiProvider;
-use App\Support\AiProfiles;
-use App\Support\AiRouteRun;
-use App\Support\AiRouting;
+use App\Support\Ai\Routing\AiProfiles;
+use App\Support\Ai\Routing\AiRouteRun;
+use App\Support\Ai\Routing\AiRouting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

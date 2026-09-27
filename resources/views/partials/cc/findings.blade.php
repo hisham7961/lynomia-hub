@@ -13,7 +13,7 @@
         @forelse ($rows ?? [] as $ccF)
             <tr>
                 <td>
-                    <span class="bdg {{ \App\Support\Severity::tone($ccF['sev'] ?? null) }}">{{ \App\Support\Severity::label($ccF['sev'] ?? null) }}</span>
+                    <span class="bdg {{ \App\Support\Platform\Severity::tone($ccF['sev'] ?? null) }}">{{ \App\Support\Platform\Severity::label($ccF['sev'] ?? null) }}</span>
                     @if (($ccF['n'] ?? 0) > 1)<span class="bdg g" title="عدد مرات الرصد">×{{ $ccF['n'] }}</span>@endif
                 </td>
                 <td>

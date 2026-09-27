@@ -62,10 +62,10 @@ class ConversationMember extends Model
             // §16 تفضيلُ الإشعار: allowlist (C10)؛ و«muted» يبقى **متزامناً** مع
             // `muted_at` القائم — كتمٌ واحدٌ يقود `scopeUnmuted`، لا اثنان.
             if (hub_has_col('conversation_members', 'notify_pref') && $m->isDirty('notify_pref') && $m->notify_pref !== null) {
-                if (! in_array($m->notify_pref, \App\Support\Collaboration::NOTIFY_PREFS, true)) {
+                if (! in_array($m->notify_pref, \App\Support\Collaboration\Collaboration::NOTIFY_PREFS, true)) {
                     throw new \InvalidArgumentException("تفضيلُ إشعارِ محادثةٍ غيرُ صالح: {$m->notify_pref}");
                 }
-                if ($m->notify_pref === \App\Support\Collaboration::NOTIFY_MUTED) {
+                if ($m->notify_pref === \App\Support\Collaboration\Collaboration::NOTIFY_MUTED) {
                     if ($m->muted_at === null) $m->muted_at = now();
                 } else {
                     $m->muted_at = null;
@@ -99,9 +99,9 @@ class ConversationMember extends Model
     /** §16 التفضيلُ الفعّال — `muted_at` يقود «muted»، وإلّا notify_pref أو `all` */
     public function effectiveNotifyPref(): string
     {
-        if ($this->muted_at !== null) return \App\Support\Collaboration::NOTIFY_MUTED;
+        if ($this->muted_at !== null) return \App\Support\Collaboration\Collaboration::NOTIFY_MUTED;
 
-        return \App\Support\Collaboration::normalizeNotifyPref($this->notify_pref);
+        return \App\Support\Collaboration\Collaboration::normalizeNotifyPref($this->notify_pref);
     }
 
     /** §15 هل نجّم العضوُ هذه المحادثة؟ */

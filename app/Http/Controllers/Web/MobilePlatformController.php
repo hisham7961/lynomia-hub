@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\MobileSession;
 use App\Models\PushToken;
-use App\Support\MobilePlatform;
-use App\Support\MobileSessionService;
-use App\Support\PushService;
+use App\Support\Mobile\MobilePlatform;
+use App\Support\Mobile\MobileSessionService;
+use App\Support\Mobile\PushService;
 use Illuminate\Http\Request;
 
 /**
@@ -15,7 +15,7 @@ use Illuminate\Http\Request;
  * فوق كلِّ قدرات الجوال القائمة: يفهم المسؤولُ ويضبط ويشغّل ويشخّص ويراقب من مكانٍ
  * واحد، دون أن يعرف أنّ الوظيفةَ مبعثرةٌ بين مسارٍ وإعدادٍ وجدولٍ وسجلّ.
  *
- * **لا خلفيّةَ جديدة:** كلُّ قراءةٍ تمرّ عبر `App\Support\MobilePlatform` التي تستدعي
+ * **لا خلفيّةَ جديدة:** كلُّ قراءةٍ تمرّ عبر `App\Support\Mobile\MobilePlatform` التي تستدعي
  * الأنظمةَ القائمة (PushService/MobileOpenApi/النماذج/الإعدادات/Health). **الحرسُ في
  * المتحكّم** (لا في إخفاء التنقّل): مالكٌ أو حاملُ رايةِ «الجوال» (`mobile`) فقط —
  * الموظّفُ العاديُّ يُصَدّ ٤٠٣ ولو بلغ المسارَ مباشرةً.
@@ -117,6 +117,7 @@ class MobilePlatformController extends Controller
         ];
 
         return [
+            'settings'  => \App\Support\Mobile\MobileSettings::values(),
             'push'      => MobilePlatform::push(),
             'stats'     => MobilePlatform::pushDeliveryStats(),
             'breakdown' => MobilePlatform::deliveryBreakdown(),
@@ -141,6 +142,7 @@ class MobilePlatformController extends Controller
         $cvAnd    = (string) $r->query('cv_android', '');
 
         return [
+            'settings'  => \App\Support\Mobile\MobileSettings::values(),
             'versions'  => MobilePlatform::versions(),
             'preview'   => [
                 'ios'     => MobilePlatform::appConfigPreview('ios', $cvIos),
@@ -270,6 +272,36 @@ class MobilePlatformController extends Controller
         $summary = collect($counts)->map(fn ($c, $s) => "{$s}×{$c}")->implode(' · ');
 
         return back()->with('ok', "📨 نُفِّذ الاختبارُ على {$tokens->count()} جهاز — {$summary}");
+    }
+
+    /**
+     * **حفظُ إعدادات الجوال** (خطّةُ التطبيق · 2.1) — `POST admin/mobile-platform/settings/{section}`
+     * (`release`|`deeplinks`|`push`). الحرسُ حرسُ المركز (مالكٌ أو رايةُ mobile)، والتحقّقُ والكتابةُ
+     * والتدقيقُ (قيدٌ لكلِّ تغيير) في `MobileSettings`. **السرُّ لا يُعاد إلى النموذج** — ولا حتى
+     * عند خطأِ التحقّق (يُستثنى من `withInput`).
+     */
+    public function saveSettings(Request $r, string $section)
+    {
+        $this->gate();
+        abort_unless(array_key_exists($section, \App\Support\Mobile\MobileSettings::SECTIONS), 404);
+        // هويةٌ طازجة: الأقسامُ الثلاثة تستبدل مفتاحَ حساب الخدمة، أو توجّه الروابطَ العميقة لتطبيقٍ آخر،
+        // أو تفرض تحديثاً حاجباً على كلِّ المستخدمين — كما تطلبه شاشاتُ الأسرار المماثلة
+        if ($resp = hub_require_stepup()) return $resp;
+
+        $res = \App\Support\Mobile\MobileSettings::save($section, $r->except(['_token']));
+        $tab = $section === 'push' ? 'push' : 'config';
+        $to = redirect()->to(route('mobileplatform.index', ['tab' => $tab]) . '#mps-' . $section);
+
+        if ($res['errors']) {
+            return $to->withErrors($res['errors'], 'mobileSettings')
+                ->withInput($r->except(array_merge(['_token'], array_map(
+                    fn ($k) => \App\Support\Mobile\MobileSettings::field($k), array_keys(\App\Support\Mobile\MobileSettings::SECRETS)))))
+                ->with('warn', 'لم يُحفظ شيء — راجع الحقولَ المعلَّمة');
+        }
+
+        $n = count($res['changed']);
+
+        return $to->with('ok', $n ? "💾 حُفظ {$n} إعداداً — يصل التطبيقَ في app-config التالي" : 'لا تغييرَ لحفظه');
     }
 
     /**

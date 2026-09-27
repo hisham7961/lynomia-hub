@@ -17,7 +17,7 @@
 
 ## AR-2) المُحلِّلُ المركزيّ — الحالاتُ والمهلةُ والإعدادات
 
-- **`app/Support/DailyWorkCompliance.php`** — الحقيقةُ الواحدةُ لحالةِ اليوم (§10/§101). ثمانِ
+- **`app/Support/Workforce/DailyWorkCompliance.php`** — الحقيقةُ الواحدةُ لحالةِ اليوم (§10/§101). ثمانِ
   حالاتٍ قانونيّة (`:32-40`)، والمسنَدُ الوحيد `hasSubmittedReport()` (`:68`) فوق تعريفِ
   التقريرِ الصالح `isValidReportRow()` (`:55`)، و`resolve()`/`resolveMany()` (N+1=0،
   `:88`/`:107`)، وآلةُ الحالاتِ `deriveState()` (`:240`) والأثرُ `deriveEffective()`
@@ -25,7 +25,7 @@
 - **`Workday::evaluate()`** أُعيد إلى **حضورٍ محضٍ** لا يُرجع `NO_REPORT` أبداً (`Workday.php:167-175`)؛
   و`checkOut()` يختم المهلةَ (`attendance.report_deadline_at`، `:130-134`) ويصوغ رسالتَه من
   المُحلِّلِ لا من عمودٍ مطموس (`:145-155`).
-- **التاريخُ التجاريّ** `app/Support/BusinessDate.php` (§48/§49/§50، tz=Asia/Kuwait) — مصدرٌ واحدٌ
+- **التاريخُ التجاريّ** `app/Support/Platform/BusinessDate.php` (§48/§49/§50، tz=Asia/Kuwait) — مصدرٌ واحدٌ
   للتاريخِ بدل `now()->toDateString()` المتناثر؛ عليه تُبنى المهلةُ الحيّةُ `computeDeadline()`
   (`DailyWorkCompliance.php:293`).
 - **الإعدادات** `config/hub_settings.php:634-695` — `report_required`، `report_grace_minutes`
@@ -49,7 +49,7 @@
   لا مفهومَ مسودّة) وحقولُ المراجعةِ الخفيفة `review_status/reviewed_by/reviewed_at/review_feedback`
   محروسةٌ من التعبئةِ الجماعيّة (`$guarded`, `:32-33`)، وخطّافُ `restored()` يستردّ `act_h`
   الناقص (§72، `:109-113`).
-- **`app/Support/ReportReview.php`** — مراجعةٌ خفيفةٌ فوق الحقولِ القائمة لا محرّكَ موافقاتٍ ثانٍ:
+- **`app/Support/Workforce/ReportReview.php`** — مراجعةٌ خفيفةٌ فوق الحقولِ القائمة لا محرّكَ موافقاتٍ ثانٍ:
   `accept/needsRevision/reopen` (`:77-102`)، وصلاحيّةٌ بالتنطيقِ لا اسمِ الدور (`canReview`/
   `canReviewAny`، `:35-60`)، وقفلُ التحريرِ بعد القبول (`isLockedForEditor`, `:68`). والقبولُ لا
   يمسّ الساعاتِ (§73). وقفلُ الامتثالِ اليدويّ المُدقَّق `finalizeCompliance()`/`clearComplianceLock()`

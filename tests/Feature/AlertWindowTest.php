@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\AlertRule;
 use App\Models\AuditEntry;
 use App\Models\HubNotification;
-use App\Support\AlertEngine;
+use App\Support\Ops\AlertEngine;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

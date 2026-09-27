@@ -41,7 +41,7 @@ Schedule::command('hub:audit-verify')->weeklyOn(0, '04:30')->withoutOverlapping(
     // نبضةُ الفاحص من المجدول نفسِه: نجاحٌ أو فشلٌ يُقرأ في نموذج الصحّة (v2.399)،
     // وبمدّتها الحقيقية (WP-2.3) — فاتّجاهُ مدّة الفحص يُرسم في جدول المجدولات
     ->onSuccess(function () use (&$auditT0) {
-        \App\Support\Health::beat('audit', $auditT0 !== null ? (int) round((microtime(true) - $auditT0) * 1000) : null);
+        \App\Support\Ops\Health::beat('audit', $auditT0 !== null ? (int) round((microtime(true) - $auditT0) * 1000) : null);
     })
     ->onFailure(fn () => hub_schedule_failed('hub:audit-verify', 'SECURITY', 'HIGH'));   // نبضة fail + خطأ + حادثة أمنية
 

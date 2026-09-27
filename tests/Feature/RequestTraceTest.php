@@ -6,7 +6,7 @@ use App\Models\Client;
 use App\Models\InboundHook;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\Api;
+use App\Support\Platform\Api;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;

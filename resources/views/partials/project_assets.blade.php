@@ -3,7 +3,7 @@
      داخليٌّ حصراً (يُدرَج داخل @unless($isCli)) — لا يرى العميلُ أصولاً ولا عدَّها (§12/§70).
      لغةٌ صريحة: «مخصّص للمشروع» لا «عهدة»/«حائز» (§23). --}}
 @php
-    use App\Support\AssetProjectService;
+    use App\Support\Assets\AssetProjectService;
     $paSvc = new AssetProjectService();
     $paU = auth()->user();
     // 16.3 — القارئُ المحصورُ بشركاتٍ يرى تخصيصاتِ أصولِ شركاتِه (أو العالميّةَ بلا شركة) فقط

@@ -18,7 +18,7 @@ class OutboxMessage extends Model
     protected static function booted(): void
     {
         static::creating(function (self $m) {
-            if ($m->request_id === null && hub_has_col('outbox', 'request_id')) $m->request_id = \App\Support\Api::requestId();
+            if ($m->request_id === null && hub_has_col('outbox', 'request_id')) $m->request_id = \App\Support\Platform\Api::requestId();
         });
     }
 }

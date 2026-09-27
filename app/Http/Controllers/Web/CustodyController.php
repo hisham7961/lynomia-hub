@@ -5,8 +5,9 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetCustody;
-use App\Support\Custody;
-use App\Support\Qr;
+use App\Support\Assets\Custody;
+use App\Support\Assets\CustodyHandover;
+use App\Support\Documents\Qr;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -43,12 +44,7 @@ class CustodyController extends Controller
      */
     protected function asset(string $id, string $op = 'v', ?string $fine = null): Asset
     {
-        $u = auth()->user();
-        $ok = hub_can($u, 'assets', $op) || ($fine !== null && hub_can($u, 'assets', $fine));
-        abort_unless($ok, 403,
-            $op === 'v' ? 'لا تملك عرض الأصول والعهد' : 'تعديلُ العهدة يتطلب صلاحية تعديل الأصول');
-
-        return Custody::scoped()->findOrFail($id);
+        return CustodyHandover::asset($id, $op, $fine);   // البوّابةُ الواحدة (الويب والجوال)
     }
 
     /* ────────── الكتالوج: أصناف ← عناصر ← تفاصيل ────────── */
@@ -106,7 +102,7 @@ class CustodyController extends Controller
             'rows'    => $rows,
             'holders' => $holders,
             'cur'     => setting('app.currency', 'د.ك'),
-            'q'       => $term ?? '', 'status' => $st, 'holder' => $h,
+            'q'       => $term, 'status' => $st, 'holder' => $h,
             'statuses' => collect(hub_mod('assets')['fields'])->firstWhere('key', 'status')['options'] ?? [],
         ]);
     }
@@ -184,24 +180,9 @@ class CustodyController extends Controller
     {
         $a = $this->asset($id, 'e', 'custodyAssign');
 
-        $d = $r->validate([
-            'userId' => ['required', 'string', Rule::exists('users', 'id')->whereNull('deleted_at')],
-            'at'     => 'required|date',
-            'note'   => 'nullable|string|max:500',
-            'projectId' => ['nullable', 'string', Rule::exists('projects', 'id')->whereNull('deleted_at')],
-        ], [], ['userId' => 'المستلم', 'at' => 'تاريخ التسليم', 'note' => 'ملاحظة', 'projectId' => 'المشروع']);
-        hub_guard_scope_input($d, ['projectId' => 'projects']);   // مشروعٌ خارج نطاق المسلِّم لا يُقبل (v2.399)
-
-        $entry = Custody::move($a, 'تسليم', $d['userId'], substr($d['at'], 0, 10), $d['note'] ?? null,
-            ['project_id' => $d['projectId'] ?? null]);
-
-        hub_audit('تسليم عهدة', 'assets', $a->id, (string) $a->name,
-            ['after' => ['المستلم' => $d['userId'], 'التاريخ' => $entry->at?->toDateString()]]);
-
-        // المستلمُ يُخبَر: عهدةٌ باسمه لا يعلم بها لا يُسأل عنها بعدل
-        hub_notify($d['userId'], 'custody',
-            '🧰 سُجّلت باسمك عهدة: ' . \Illuminate\Support\Str::limit((string) $a->name, 60)
-            . ' (' . $a->code . ')', 'assets', $a->id);
+        // القاعدةُ والأثرُ في السكّة الواحدة (`CustodyHandover`) — يسلكها الجوالُ حرفاً
+        $d = $r->validate(CustodyHandover::handoverRules(), [], CustodyHandover::HANDOVER_LABELS);
+        CustodyHandover::handover($a, $d);
 
         return back()->with('ok', '🤲 سُجّل التسليم — أضِف إقرار الاستلام من بطاقة الإقرار ليصير إثباتاً موقّعاً');
     }
@@ -209,18 +190,10 @@ class CustodyController extends Controller
     public function recover(Request $r, string $id)
     {
         $a = $this->asset($id, 'e', 'custodyAssign');
-        abort_if(! $a->holder_id, 422, 'هذه العهدة ليست بيد أحد أصلاً');
+        CustodyHandover::assertHeld($a);
 
-        $d = $r->validate([
-            'at'   => 'required|date',
-            'note' => 'nullable|string|max:500',
-        ], [], ['at' => 'تاريخ الاسترداد', 'note' => 'ملاحظة']);
-
-        $was = $a->holder_id;
-        Custody::move($a, 'استرداد', null, substr($d['at'], 0, 10), $d['note'] ?? null);
-
-        hub_audit('استرداد عهدة', 'assets', $a->id, (string) $a->name,
-            ['before' => ['الحائز' => $was], 'after' => ['الحائز' => '—']]);
+        $d = $r->validate(CustodyHandover::recoverRules(), [], CustodyHandover::RECOVER_LABELS);
+        CustodyHandover::recover($a, $d);
 
         return back()->with('ok', '📦 سُجّل الاسترداد — عاد الأصل «متاحاً» بلا حائز');
     }
@@ -238,14 +211,14 @@ class CustodyController extends Controller
         $a = $this->asset($id, 'e', 'assetStatus');
 
         $d = $r->validate([
-            'status' => ['required', 'string', Rule::in(\App\Support\Custody::STATUSES)],
+            'status' => ['required', 'string', Rule::in(\App\Support\Assets\Custody::STATUSES)],
             'at'     => 'required|date',
             'note'   => 'nullable|string|max:500',
         ], [], ['status' => 'الحالة', 'at' => 'التاريخ', 'note' => 'ملاحظة']);
 
         $from = (string) $a->status;
         try {
-            \App\Support\Custody::transition($a, $d['status'], substr($d['at'], 0, 10), $d['note'] ?? null);
+            \App\Support\Assets\Custody::transition($a, $d['status'], substr($d['at'], 0, 10), $d['note'] ?? null);
         } catch (\InvalidArgumentException $e) {
             abort(422, $e->getMessage());
         }
@@ -287,7 +260,7 @@ class CustodyController extends Controller
         }
 
         $was = $a->station_id;
-        \App\Support\Custody::assignStation($a, $stationId, substr($d['at'], 0, 10), $d['note'] ?? null);
+        \App\Support\Assets\Custody::assignStation($a, $stationId, substr($d['at'], 0, 10), $d['note'] ?? null);
 
         hub_audit($stationId ? 'إسناد أصل لمحطة' : 'إخلاء أصل من محطة', 'assets', $a->id, (string) $a->name,
             ['before' => ['المحطة' => $was ?: '—'], 'after' => ['المحطة' => $stationId ?: '—']]);

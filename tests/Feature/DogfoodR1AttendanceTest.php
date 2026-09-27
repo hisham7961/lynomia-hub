@@ -7,8 +7,8 @@ use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\DailyWorkCompliance;
-use App\Support\MonthlyAttendance;
+use App\Support\Workforce\DailyWorkCompliance;
+use App\Support\Workforce\MonthlyAttendance;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -56,7 +56,7 @@ class DogfoodR1AttendanceTest extends TestCase
     {
         return Attendance::create(array_merge([
             'emp_id' => $e->id, 'date' => $date, 'time_in' => $in, 'time_out' => $out,
-            'status' => \App\Support\Workday::PRESENT,
+            'status' => \App\Support\Workforce\Workday::PRESENT,
             'hours' => ($in && $out) ? 8 : null,
         ], $extra));
     }
@@ -168,7 +168,7 @@ class DogfoodR1AttendanceTest extends TestCase
         $this->attendance($present, '2026-09-08', '08:00', null);
         // صفٌّ مختومٌ «غائب» (كنسُ نهاية اليوم) — ليس «حاضراً» في العدّ
         [$u3, $stamped] = $this->linkedEmployee('مختومٌ غائباً');
-        Attendance::create(['emp_id' => $stamped->id, 'date' => '2026-09-08', 'status' => \App\Support\Workday::ABSENT]);
+        Attendance::create(['emp_id' => $stamped->id, 'date' => '2026-09-08', 'status' => \App\Support\Workforce\Workday::ABSENT]);
 
         $res = $this->actingAs($this->owner)->get('/ceo')->assertOk();
         $roll = $res->viewData('teamRoll');

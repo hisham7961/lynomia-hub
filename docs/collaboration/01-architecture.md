@@ -29,7 +29,7 @@ reactions (comment) · saved_messages (شخصيّ) · HubNotification (إشعا�
 | `pinned_at` · `pinned_by` | `comments` | §28 بيانُ التثبيت فوق `pinned` |
 | `saved_messages` (جدول) | جديد | §27 محفوظاتٌ شخصيّة (مرجعٌ لا نسخُ محتوى، تخويلٌ عند الفتح) |
 
-## عقدُ الزمن الحقيقيّ (`App\Support\Collaboration`)
+## عقدُ الزمن الحقيقيّ (`App\Support\Collaboration\Collaboration`)
 
 قرارُ §38/§39 (لا بنيةَ بثٍّ + استضافةٌ عاديّة بلا عمليّةٍ دائمة): **استطلاعٌ
 تدريجيٌّ بمؤشّر `since`** مع **عقدِ أحداثٍ مستقرّ** يستهلكه العميلُ سواءٌ وصله

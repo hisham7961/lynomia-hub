@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\ExecutionStats;
+use App\Support\Workforce\ExecutionStats;
 use Illuminate\Http\Request;
 
 /**

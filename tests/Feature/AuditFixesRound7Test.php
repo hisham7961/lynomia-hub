@@ -238,7 +238,7 @@ class AuditFixesRound7Test extends TestCase
                 ['Location' => 'http://169.254.169.254/latest/meta-data']),
         ]);
 
-        \App\Support\Uptime::check('servers', $s);
+        \App\Support\Ops\Uptime::check('servers', $s);
 
         \Illuminate\Support\Facades\Http::assertNotSent(
             fn ($req) => str_contains($req->url(), '169.254.169.254'));

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\Correlation;
+use App\Support\Ops\Correlation;
 
 /**
  * (WP-1.4) صفحةُ **أثر الطلب** `system/trace/{rid}` — «هذا المعرّفُ في يدي،

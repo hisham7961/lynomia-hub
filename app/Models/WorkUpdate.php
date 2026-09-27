@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * تحديثات العمل — بنودُ التقرير اليومي.
@@ -58,7 +57,7 @@ class WorkUpdate extends Model
             if (! $w->created_by && auth()->id()) $w->created_by = auth()->id();
             // زمنُ التقديم (§13): يُختم مرّةً عند أوّلِ حفظٍ — التقريرُ مُقدَّمٌ بإنشائه
             // (لا مفهومَ مسودّةٍ منفصل)، فيُقاس التأخّرُ عن المهلة منه لا من created_at
-            if ($w->submitted_at === null && Schema::hasColumn('work_updates', 'submitted_at')) {
+            if ($w->submitted_at === null && \App\Support\Platform\SchemaCache::hasColumn('work_updates', 'submitted_at')) {
                 $w->submitted_at = now();
             }
         });

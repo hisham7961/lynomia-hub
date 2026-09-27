@@ -17,7 +17,7 @@
         <h2>توقيع العقود الإلكتروني <span class="lx-count">{{ $requestsN }} وثيقة@if ($reqCapped) — من أحدثِ ٢٠٠ طلب@endif</span></h2>
     </div>
     <div class="spacer"></div>
-    <button class="btn p sm" type="button" onclick="document.getElementById('escreate').open=true;document.getElementById('escreate').scrollIntoView({behavior:'smooth'})">➕ طلب توقيع جديد</button>
+    <button class="btn p sm" type="button" data-open-target="#escreate">➕ طلب توقيع جديد</button>
 </div>
 
 @if (session('sign_link'))
@@ -115,14 +115,14 @@
                                     <span class="sub">{{ $s->role }}</span>
                                     <span class="spacer"></span>
                                     <button class="btn ghost xs" type="button"
-                                            onclick="navigator.clipboard.writeText(@js(route('sign.show', $s->token)));this.textContent='✓'">نسخ</button>
+                                            data-copy="{{ route('sign.show', $s->token) }}" data-copied="✓">نسخ</button>
                                 </div>
                             @endforeach
                         </div>
                     </details>
                 @else
                     <button class="btn ghost xs" type="button"
-                            onclick="navigator.clipboard.writeText(@js(route('sign.show', $q->token)));this.textContent='✓ نُسخ'">🔗 نسخ الرابط</button>
+                            data-copy="{{ route('sign.show', $q->token) }}" data-copied="✓ نُسخ">🔗 نسخ الرابط</button>
                 @endif
                 <span class="spacer"></span>
                 @if ($q->status === 'بانتظار التوقيع' && ! $q->cancelled_at)
@@ -148,7 +148,7 @@
                         <button class="btn ghost xs dn" data-confirm="إلغاء الطلب وإبطال كل روابطه؟" title="إلغاء الطلب">🚫</button></form>
                 @endif
                 @if ($q->status === 'بانتظار الموافقة' && ($ap = ($apSteps[$q->id] ?? null))
-                     && \App\Support\ContractApprovals::canDecide(auth()->user(), $ap))
+                     && \App\Support\Documents\ContractApprovals::canDecide(auth()->user(), $ap))
                     <details class="inline"><summary class="btn ghost xs">🔏 قرار المرحلة</summary>
                         <form method="POST" action="{{ route('esign.approve', $q->id) }}"
                               style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">@csrf
@@ -299,12 +299,12 @@
 
 <div class="modal" id="pvmodal" hidden>
     <div class="modalbox" style="max-width:760px">
-        <button class="mclose" type="button" onclick="document.getElementById('pvmodal').hidden=true" aria-label="إغلاق">✕</button>
+        <button class="mclose" type="button" data-hide-target="#pvmodal" aria-label="إغلاق">✕</button>
         <div id="pvbody"></div>
     </div>
 </div>
 
-<script>
+<script @cspNonce>
 // تفكيك اختيار الجهة «module:id» إلى حقلين مخفيين
 var linksel = document.getElementById('linksel');
 function splitLink() {

@@ -6,7 +6,7 @@ use App\Models\Application;
 use App\Models\Attachment;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\AppStudio;
+use App\Support\Apps\AppStudio;
 use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 

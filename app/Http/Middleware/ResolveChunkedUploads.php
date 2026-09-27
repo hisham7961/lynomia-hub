@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Support\ChunkedUpload;
+use App\Support\Collaboration\ChunkedUpload;
 use Closure;
 use Illuminate\Http\Request;
 

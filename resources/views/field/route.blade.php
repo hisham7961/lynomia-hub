@@ -15,19 +15,23 @@
 </div>
 
 <div class="card">
-    @if (count($line) >= 2)
+    @if (count($line) >= 2 && ! \App\Support\Platform\Maps::enabled())
+        {{-- الخرائط معطّلة (maps.tiles) — لا رسمَ ولا طلبَ بلاطاتٍ لأيّ خدمة، والأرقامُ أعلاه قائمة --}}
+        <div class="empty" data-map-mode="off">{{ \App\Support\Platform\Maps::offReason() }}</div>
+    @elseif (count($line) >= 2)
         <div id="map" style="height:460px;border-radius:var(--r);overflow:hidden"></div>
         <div class="sub" style="margin-top:8px">مسارٌ مبسَّط (Ramer–Douglas–Peucker) — يُبقي شكلَ الطريق ويُسقط التراصّ. النقاطُ الخام تُقلَّم بسياسة الاحتفاظ.</div>
         {{-- Leaflet مُضمَّنٌ محلياً (v2.399): كان يُحمَّل من CDN بلا SRI ولا script-src — سكربتُ طرفٍ ثالث بأصل النظام --}}
         <link rel="stylesheet" href="{{ asset('vendor/leaflet/1.9.4/leaflet.min.css') }}">
         <script src="{{ asset('vendor/leaflet/1.9.4/leaflet.min.js') }}"></script>
-        <script>
+        <script @cspNonce>
         (function () {
             var line = @json($line);
             if (!window.L || line.length < 2) return;
             var map = L.map('map');
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19, attribution: '© OpenStreetMap'
+            // مصدرُ البلاطات إعدادٌ واحد (maps.tiles · بند الدَّين #13): OSM أو خادمٌ خاصّ
+            L.tileLayer(@json(\App\Support\Platform\Maps::tilesUrl()), {
+                maxZoom: 19, attribution: @json(\App\Support\Platform\Maps::ATTRIBUTION)
             }).addTo(map);
             var poly = L.polyline(line, { color: '#3E8FB0', weight: 4 }).addTo(map);
             L.circleMarker(line[0], { radius: 6, color: '#0E7C66' }).addTo(map).bindTooltip('البداية');

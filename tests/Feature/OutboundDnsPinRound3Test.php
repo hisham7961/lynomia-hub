@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\Uptime;
+use App\Support\Ops\Uptime;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 

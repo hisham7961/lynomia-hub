@@ -101,7 +101,7 @@ trait Auditable
             'device'     => hub_fit(hub_str(Request::header('X-Device', Request::userAgent())), 200),
             'ip'         => Request::ip(),
             // ربطُ الأثر بطلبه (v2.399): به يُجمَع ما كتبه طلبٌ واحد عبر التدقيق والصندوق الصادر والويبهوك
-            'request_id' => \App\Support\Api::requestId(),
+            'request_id' => \App\Support\Platform\Api::requestId(),
             'created_at' => now(),
             // (WP-5.2) أعمدةُ التطبيع (فئة/شدّة/مصدر/مآل/فاعل/جلسة) — كلُّها خارج
             // البصمة (SEALED) فلا تمسّ الختم، وliveColumns تجرّدها على قاعدةٍ لم تُرحَّل

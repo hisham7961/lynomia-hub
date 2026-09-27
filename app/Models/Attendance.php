@@ -180,8 +180,7 @@ class Attendance extends Model
     {
         static $has = null;
         if ($has === null) {
-            $has = \Illuminate\Support\Facades\Schema::hasTable('attendance')
-                && \Illuminate\Support\Facades\Schema::hasColumn('attendance', 'report_deadline_at');
+            $has = \App\Support\Platform\SchemaCache::hasColumn('attendance', 'report_deadline_at');
         }
         if (! $has) return null;
         if (! $a->time_in || ! $a->time_out) return null;   // ورديّةٌ مفتوحة: لا مهلةَ بعد (§46)
@@ -193,7 +192,7 @@ class Attendance extends Model
         $crossed = (bool) $a->overnight
             && (string) $a->time_out < (string) $a->time_in;
 
-        return \App\Support\DailyWorkCompliance::computeDeadline($date, $a->time_out, true, $crossed);
+        return \App\Support\Workforce\DailyWorkCompliance::computeDeadline($date, $a->time_out, true, $crossed);
     }
 
     /**
@@ -216,8 +215,7 @@ class Attendance extends Model
     {
         static $memo = [];
         if (! array_key_exists($col, $memo)) {
-            $memo[$col] = \Illuminate\Support\Facades\Schema::hasTable('attendance')
-                && \Illuminate\Support\Facades\Schema::hasColumn('attendance', $col);
+            $memo[$col] = \App\Support\Platform\SchemaCache::hasColumn('attendance', $col);
         }
 
         return $memo[$col];

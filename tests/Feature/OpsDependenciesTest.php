@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Support\Integrations;
-use App\Support\TimeRange;
-use App\Support\Uptime;
+use App\Support\Ops\Integrations;
+use App\Support\Platform\TimeRange;
+use App\Support\Ops\Uptime;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -75,7 +75,7 @@ class OpsDependenciesTest extends TestCase
         Http::fake(['*' => Http::response(['jsonrpc' => '2.0',
             'result' => ['server_version' => '17.0']], 200)]);
 
-        \App\Support\Odoo::version();
+        \App\Support\Ops\Odoo::version();
 
         $ms = (string) setting('integration.odoo.last_ms', '');
         $this->assertNotSame('', $ms, 'مدّةُ نداء أودو لم تُكتب في integration.odoo.last_ms');

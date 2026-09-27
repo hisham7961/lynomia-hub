@@ -1,12 +1,12 @@
 {
-    "_generator": "App\\Support\\MobileOpenApi::capabilities() — مُشتقٌّ من المسارات الحيّة (php artisan tinker / اختبار الانحراف)",
+    "_generator": "App\\Support\\Mobile\\MobileOpenApi::capabilities() — مُشتقٌّ من المسارات الحيّة (php artisan tinker / اختبار الانحراف)",
     "_note": "بيانٌ آليّ — لا يُحرَّر يدويّاً؛ يُعاد توليدُه من المسارات فلا يصف قدرةً غيرَ مبنيّة",
     "namespace": "/api/mobile/v1",
     "mobile_api_version": "1",
     "schema_version": "8e9f8dd5bb93",
     "openapi": {
         "live": "/api/mobile/v1/openapi.json",
-        "generator": "App\\Support\\MobileOpenApi::spec()"
+        "generator": "App\\Support\\Mobile\\MobileOpenApi::spec()"
     },
     "auth": {
         "type": "first_party_session",
@@ -45,7 +45,7 @@
         "biometrics": "جانبُ التطبيق فقط — الخادمُ لا يستقبل قوالبَ حيويّة قط"
     },
     "error_codes": {
-        "contract": "App\\Support\\Api::CODES (موحَّدٌ مع /api/v1 — لا يُعاد تسميةُ كودٍ قائم)",
+        "contract": "App\\Support\\Platform\\Api::CODES (موحَّدٌ مع /api/v1 — لا يُعاد تسميةُ كودٍ قائم)",
         "reused": [
             "UNAUTHENTICATED",
             "ACCOUNT_RESTRICTED",
@@ -95,7 +95,11 @@
             "action run",
             "tracking points",
             "pin toggle",
-            "protected-write submit"
+            "protected-write submit",
+            "attendance check-in/out",
+            "leave decide",
+            "custody handover/recover",
+            "inventory freeze/scan/reconcile/close"
         ]
     },
     "context_headers": {
@@ -114,7 +118,7 @@
             "id": "string (UUID)",
             "action": "show"
         },
-        "source_of_truth": "App\\Support\\NotificationLink::target() — نفسُها التي تصدرها notifications/{id}/target والبحثُ واللوحة",
+        "source_of_truth": "App\\Support\\Collaboration\\NotificationLink::target() — نفسُها التي تصدرها notifications/{id}/target والبحثُ واللوحة",
         "null_semantics": "target=null ⇒ لا وجهةَ سجلٍّ (يعود التطبيقُ لقائمة الإشعارات) — نظيرُ الويب",
         "no_hardcoded_screens": true,
         "universal_link_encoding": {
@@ -250,8 +254,22 @@
             "configured_via": [
                 "setting: mobile.push_driver=fcm",
                 "setting: mobile.push_fcm_project_id",
-                "setting: mobile.push_fcm_access_token"
+                "setting: mobile.push_fcm_service_account (مفضَّل — رمزُ OAuth يُسكّ خادميّاً ويُجدَّد)",
+                "setting: mobile.push_fcm_access_token (احتياطٌ ينتهي خلال ساعة)"
             ],
+            "payload": {
+                "data": [
+                    "notification_id",
+                    "category",
+                    "unread",
+                    "module",
+                    "id",
+                    "action"
+                ],
+                "apns.payload.aps.badge": "عددُ غير المقروء",
+                "android.notification.channel_id": "lynomia_default",
+                "body": "عامٌّ ثابت (لا نصَّ الإشعار الخام)"
+            },
             "behavior_when_absent": "NullPushProvider — التسليمُ not_configured، لا نجاحٌ مُزيَّف، والإشعارُ الداخليُّ لا يُفقَد",
             "no_secret_exposed": true
         },
@@ -385,6 +403,70 @@
             ],
             "count": 4
         },
+        "ask": {
+            "endpoints": [
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/ask",
+                    "name": "mobile.ask.run",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/ask/stream",
+                    "name": "mobile.ask.stream",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "DELETE",
+                    "path": "/api/mobile/v1/ask/threads",
+                    "name": "mobile.ask.threads.destroy_all",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/ask/threads",
+                    "name": "mobile.ask.threads.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "DELETE",
+                    "path": "/api/mobile/v1/ask/threads/{id}",
+                    "name": "mobile.ask.threads.destroy",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/ask/threads/{id}",
+                    "name": "mobile.ask.threads.show",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 6
+        },
+        "attendance": {
+            "endpoints": [
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/attendance/check-in",
+                    "name": "mobile.attendance.check_in",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/attendance/check-out",
+                    "name": "mobile.attendance.check_out",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/attendance/today",
+                    "name": "mobile.attendance.today",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 3
+        },
         "auth": {
             "endpoints": [
                 {
@@ -444,6 +526,106 @@
             ],
             "count": 9
         },
+        "calendar": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/alerts",
+                    "name": "mobile.alerts",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/calendar",
+                    "name": "mobile.calendar",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 2
+        },
+        "channels": {
+            "endpoints": [
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/conversations",
+                    "name": "mobile.conversations.store",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/conversations/directory",
+                    "name": "mobile.conversations.directory",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/conversations/{id}/archive",
+                    "name": "mobile.conversations.archive",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/conversations/{id}/favorite",
+                    "name": "mobile.conversations.favorite",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/conversations/{id}/join",
+                    "name": "mobile.conversations.join",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/conversations/{id}/members",
+                    "name": "mobile.conversations.members.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/conversations/{id}/members",
+                    "name": "mobile.conversations.members.add",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "DELETE",
+                    "path": "/api/mobile/v1/conversations/{id}/members/{user}",
+                    "name": "mobile.conversations.members.remove",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "PUT",
+                    "path": "/api/mobile/v1/conversations/{id}/members/{user}",
+                    "name": "mobile.conversations.members.role",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "PUT",
+                    "path": "/api/mobile/v1/conversations/{id}/notify",
+                    "name": "mobile.conversations.notify",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/groups",
+                    "name": "mobile.groups.store",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/groups/{id}/leave",
+                    "name": "mobile.groups.leave",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/groups/{id}/participants",
+                    "name": "mobile.groups.fork",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 13
+        },
         "clients": {
             "endpoints": [
                 {
@@ -488,13 +670,49 @@
                     "auth": "mobile.session"
                 },
                 {
+                    "method": "DELETE",
+                    "path": "/api/mobile/v1/comments/{id}",
+                    "name": "mobile.comment_actions.destroy",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "PATCH",
+                    "path": "/api/mobile/v1/comments/{id}",
+                    "name": "mobile.comment_actions.edit",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/comments/{id}/attachment",
+                    "name": "mobile.comments.attachment",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/comments/{id}/pin",
+                    "name": "mobile.comment_actions.pin",
+                    "auth": "mobile.session"
+                },
+                {
                     "method": "POST",
                     "path": "/api/mobile/v1/comments/{id}/react",
                     "name": "mobile.comments.react",
                     "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/comments/{id}/resolve",
+                    "name": "mobile.comment_actions.resolve",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/comments/{id}/to-task",
+                    "name": "mobile.comment_actions.to_task",
+                    "auth": "mobile.session"
                 }
             ],
-            "count": 3
+            "count": 9
         },
         "context": {
             "endpoints": [
@@ -579,12 +797,65 @@
                     "path": "/api/mobile/v1/{module}/{id}",
                     "name": "mobile.resource.update",
                     "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/{module}/{id}/versions",
+                    "name": "mobile.versions.index",
+                    "auth": "mobile.session"
                 }
             ],
-            "count": 6
+            "count": 7
+        },
+        "custody": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/custody/{id}/abilities",
+                    "name": "mobile.custody.abilities",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/custody/{id}/handover",
+                    "name": "mobile.custody.handover",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/custody/{id}/recover",
+                    "name": "mobile.custody.recover",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/me/custody",
+                    "name": "mobile.me.custody",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 4
         },
         "dm": {
             "endpoints": [
+                {
+                    "method": "DELETE",
+                    "path": "/api/mobile/v1/dm/messages/{id}",
+                    "name": "mobile.dm.destroy",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "PATCH",
+                    "path": "/api/mobile/v1/dm/messages/{id}",
+                    "name": "mobile.dm.edit",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/dm/messages/{id}/attachment",
+                    "name": "mobile.dm.attachment",
+                    "auth": "mobile.session"
+                },
                 {
                     "method": "POST",
                     "path": "/api/mobile/v1/dm/messages/{id}/react",
@@ -628,10 +899,22 @@
                     "auth": "mobile.session"
                 }
             ],
-            "count": 7
+            "count": 10
         },
         "files": {
             "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/attachments",
+                    "name": "mobile.files.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "DELETE",
+                    "path": "/api/mobile/v1/attachments/{id}",
+                    "name": "mobile.files.destroy",
+                    "auth": "mobile.session"
+                },
                 {
                     "method": "POST",
                     "path": "/api/mobile/v1/files/attach",
@@ -669,7 +952,42 @@
                     "auth": "mobile.session"
                 }
             ],
-            "count": 6
+            "count": 8
+        },
+        "finance_actions": {
+            "endpoints": [
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/fin/{id}/pay",
+                    "name": "mobile.fin.pay",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/fin/{id}/pay-options",
+                    "name": "mobile.fin.pay_options",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/purchases/{id}/receive",
+                    "name": "mobile.purchases.receive",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/quotes/{id}/accept",
+                    "name": "mobile.quotes.accept",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/quotes/{id}/send",
+                    "name": "mobile.quotes.send",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 5
         },
         "health": {
             "endpoints": [
@@ -692,6 +1010,64 @@
                 }
             ],
             "count": 1
+        },
+        "inventory": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/inventory/sessions",
+                    "name": "mobile.inventory.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/inventory/sessions",
+                    "name": "mobile.inventory.freeze",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/inventory/sessions/{id}",
+                    "name": "mobile.inventory.show",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/inventory/sessions/{id}/close",
+                    "name": "mobile.inventory.close",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/inventory/sessions/{id}/reconcile",
+                    "name": "mobile.inventory.reconcile",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/inventory/sessions/{id}/scan",
+                    "name": "mobile.inventory.scan",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 6
+        },
+        "leaves": {
+            "endpoints": [
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/leaves/{id}/decide",
+                    "name": "mobile.leaves.decide",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/leaves/{id}/decision",
+                    "name": "mobile.leaves.decision",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 2
         },
         "me": {
             "endpoints": [
@@ -821,6 +1197,35 @@
             ],
             "count": 10
         },
+        "portal_tickets": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/portal/tickets",
+                    "name": "mobile.portal.tickets.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/portal/tickets",
+                    "name": "mobile.portal.tickets.store",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/portal/tickets/{id}",
+                    "name": "mobile.portal.tickets.show",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/portal/tickets/{id}/reply",
+                    "name": "mobile.portal.tickets.reply",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 4
+        },
         "prefs": {
             "endpoints": [
                 {
@@ -884,6 +1289,23 @@
             ],
             "count": 4
         },
+        "reports": {
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/reports/daily",
+                    "name": "mobile.reports.daily",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/reports/daily/{id}/review",
+                    "name": "mobile.reports.review",
+                    "auth": "mobile.session"
+                }
+            ],
+            "count": 2
+        },
         "saved": {
             "endpoints": [
                 {
@@ -891,9 +1313,21 @@
                     "path": "/api/mobile/v1/saved",
                     "name": "mobile.saved.index",
                     "auth": "mobile.session"
+                },
+                {
+                    "method": "POST",
+                    "path": "/api/mobile/v1/saved",
+                    "name": "mobile.saved.store",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "DELETE",
+                    "path": "/api/mobile/v1/saved/{id}",
+                    "name": "mobile.saved.destroy",
+                    "auth": "mobile.session"
                 }
             ],
-            "count": 1
+            "count": 3
         },
         "scanner": {
             "endpoints": [
@@ -930,9 +1364,15 @@
                     "path": "/api/mobile/v1/search",
                     "name": "mobile.search",
                     "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/search/messages",
+                    "name": "mobile.search.messages",
+                    "auth": "mobile.session"
                 }
             ],
-            "count": 1
+            "count": 2
         },
         "sync": {
             "endpoints": [

@@ -1,6 +1,6 @@
 # 08 — مُفسِّرُ الصلاحيّة الفعّالة (§12/§59/§60/§93)
 
-`App\Support\PermissionInspector` — طبقةُ قراءةٍ **تفوّض ولا تكرّر**: كلُّ قرارٍ من `hub_can`/
+`App\Support\Security\PermissionInspector` — طبقةُ قراءةٍ **تفوّض ولا تكرّر**: كلُّ قرارٍ من `hub_can`/
 `hub_flag`/`PortalGuard`/`hub_scope`/`hub_field_mode`. لا قرارَ سماحٍ محلّيّ.
 
 ## الواجهة

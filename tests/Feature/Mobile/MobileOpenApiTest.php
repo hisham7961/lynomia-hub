@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\Mobile;
 
-use App\Support\MobileOpenApi;
-use App\Support\OpenApi;
+use App\Support\Mobile\MobileOpenApi;
+use App\Support\Platform\OpenApi;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 

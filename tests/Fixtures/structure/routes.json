@@ -628,6 +628,72 @@
         ]
     },
     {
+        "methods": "POST",
+        "uri": "api/mobile/v1/ask",
+        "name": "mobile.ask.run",
+        "action": "App\\Http\\Controllers\\Api\\MobileAskController@ask",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:20,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/ask/threads",
+        "name": "mobile.ask.threads.index",
+        "action": "App\\Http\\Controllers\\Api\\MobileAskController@threads",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "DELETE",
+        "uri": "api/mobile/v1/ask/threads",
+        "name": "mobile.ask.threads.destroy_all",
+        "action": "App\\Http\\Controllers\\Api\\MobileAskController@destroyAll",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/ask/threads/{id}",
+        "name": "mobile.ask.threads.show",
+        "action": "App\\Http\\Controllers\\Api\\MobileAskController@show",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "DELETE",
+        "uri": "api/mobile/v1/ask/threads/{id}",
+        "name": "mobile.ask.threads.destroy",
+        "action": "App\\Http\\Controllers\\Api\\MobileAskController@destroy",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
         "methods": "GET|HEAD",
         "uri": "api/mobile/v1/work/today",
         "name": "mobile.work.today",
@@ -1214,6 +1280,32 @@
     },
     {
         "methods": "POST",
+        "uri": "api/mobile/v1/saved",
+        "name": "mobile.saved.store",
+        "action": "App\\Http\\Controllers\\Api\\MobileCollabController@saveStore",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "DELETE",
+        "uri": "api/mobile/v1/saved/{id}",
+        "name": "mobile.saved.destroy",
+        "action": "App\\Http\\Controllers\\Api\\MobileCollabController@saveDestroy",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
         "uri": "api/mobile/v1/files/upload-session",
         "name": "mobile.files.upload_session",
         "action": "App\\Http\\Controllers\\Api\\MobileFileController@uploadSession",
@@ -1344,9 +1436,754 @@
     },
     {
         "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/portal/tickets",
+        "name": "mobile.portal.tickets.index",
+        "action": "App\\Http\\Controllers\\Api\\MobilePortalTicketsController@tickets",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/portal/tickets",
+        "name": "mobile.portal.tickets.store",
+        "action": "App\\Http\\Controllers\\Api\\MobilePortalTicketsController@ticketStore",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:20,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/portal/tickets/{id}",
+        "name": "mobile.portal.tickets.show",
+        "action": "App\\Http\\Controllers\\Api\\MobilePortalTicketsController@ticket",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/portal/tickets/{id}/reply",
+        "name": "mobile.portal.tickets.reply",
+        "action": "App\\Http\\Controllers\\Api\\MobilePortalTicketsController@ticketReply",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:20,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/conversations/directory",
+        "name": "mobile.conversations.directory",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@directory",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/conversations",
+        "name": "mobile.conversations.store",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@channelStore",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/conversations/{id}/join",
+        "name": "mobile.conversations.join",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@join",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/conversations/{id}/members",
+        "name": "mobile.conversations.members.index",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@members",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/conversations/{id}/members",
+        "name": "mobile.conversations.members.add",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@addMember",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "PUT",
+        "uri": "api/mobile/v1/conversations/{id}/members/{user}",
+        "name": "mobile.conversations.members.role",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@setRole",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "DELETE",
+        "uri": "api/mobile/v1/conversations/{id}/members/{user}",
+        "name": "mobile.conversations.members.remove",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@removeMember",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/conversations/{id}/favorite",
+        "name": "mobile.conversations.favorite",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@favorite",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/conversations/{id}/archive",
+        "name": "mobile.conversations.archive",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@archive",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "PUT",
+        "uri": "api/mobile/v1/conversations/{id}/notify",
+        "name": "mobile.conversations.notify",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@notifyPref",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/groups",
+        "name": "mobile.groups.store",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@groupStore",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/groups/{id}/participants",
+        "name": "mobile.groups.fork",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@groupFork",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/groups/{id}/leave",
+        "name": "mobile.groups.leave",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@groupLeave",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "PATCH",
+        "uri": "api/mobile/v1/dm/messages/{id}",
+        "name": "mobile.dm.edit",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@dmEdit",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "DELETE",
+        "uri": "api/mobile/v1/dm/messages/{id}",
+        "name": "mobile.dm.destroy",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@dmDestroy",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/search/messages",
+        "name": "mobile.search.messages",
+        "action": "App\\Http\\Controllers\\Api\\MobileChannelsController@searchMessages",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "PATCH",
+        "uri": "api/mobile/v1/comments/{id}",
+        "name": "mobile.comment_actions.edit",
+        "action": "App\\Http\\Controllers\\Api\\MobileCommentActionsController@commentEdit",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "DELETE",
+        "uri": "api/mobile/v1/comments/{id}",
+        "name": "mobile.comment_actions.destroy",
+        "action": "App\\Http\\Controllers\\Api\\MobileCommentActionsController@commentDestroy",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/comments/{id}/pin",
+        "name": "mobile.comment_actions.pin",
+        "action": "App\\Http\\Controllers\\Api\\MobileCommentActionsController@commentPin",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/comments/{id}/resolve",
+        "name": "mobile.comment_actions.resolve",
+        "action": "App\\Http\\Controllers\\Api\\MobileCommentActionsController@commentResolve",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/comments/{id}/to-task",
+        "name": "mobile.comment_actions.to_task",
+        "action": "App\\Http\\Controllers\\Api\\MobileCommentActionsController@commentToTask",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/reports/daily",
+        "name": "mobile.reports.daily",
+        "action": "App\\Http\\Controllers\\Api\\MobileTeamReportsController@daily",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/reports/daily/{id}/review",
+        "name": "mobile.reports.review",
+        "action": "App\\Http\\Controllers\\Api\\MobileTeamReportsController@review",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/calendar",
+        "name": "mobile.calendar",
+        "action": "App\\Http\\Controllers\\Api\\MobileCalendarController@calendar",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/alerts",
+        "name": "mobile.alerts",
+        "action": "App\\Http\\Controllers\\Api\\MobileCalendarController@alerts",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/fin/{id}/pay-options",
+        "name": "mobile.fin.pay_options",
+        "action": "App\\Http\\Controllers\\Api\\MobileFinanceActionsController@payOptions",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/fin/{id}/pay",
+        "name": "mobile.fin.pay",
+        "action": "App\\Http\\Controllers\\Api\\MobileFinanceActionsController@pay",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/quotes/{id}/send",
+        "name": "mobile.quotes.send",
+        "action": "App\\Http\\Controllers\\Api\\MobileFinanceActionsController@quoteSend",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/quotes/{id}/accept",
+        "name": "mobile.quotes.accept",
+        "action": "App\\Http\\Controllers\\Api\\MobileFinanceActionsController@quoteAccept",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/purchases/{id}/receive",
+        "name": "mobile.purchases.receive",
+        "action": "App\\Http\\Controllers\\Api\\MobileFinanceActionsController@purchaseReceive",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/ask/stream",
+        "name": "mobile.ask.stream",
+        "action": "App\\Http\\Controllers\\Api\\MobileAskController@stream",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:20,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
         "uri": "api/mobile/v1/sync/{module}",
         "name": "mobile.sync",
         "action": "App\\Http\\Controllers\\Api\\MobileSyncController@sync",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/attendance/today",
+        "name": "mobile.attendance.today",
+        "action": "App\\Http\\Controllers\\Api\\MobileAttendanceController@today",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/attendance/check-in",
+        "name": "mobile.attendance.check_in",
+        "action": "App\\Http\\Controllers\\Api\\MobileAttendanceController@checkIn",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/attendance/check-out",
+        "name": "mobile.attendance.check_out",
+        "action": "App\\Http\\Controllers\\Api\\MobileAttendanceController@checkOut",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/leaves/{id}/decide",
+        "name": "mobile.leaves.decide",
+        "action": "App\\Http\\Controllers\\Api\\MobileLeavesController@decide",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/leaves/{id}/decision",
+        "name": "mobile.leaves.decision",
+        "action": "App\\Http\\Controllers\\Api\\MobileLeavesController@decision",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/me/custody",
+        "name": "mobile.me.custody",
+        "action": "App\\Http\\Controllers\\Api\\MobileCustodyController@mine",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/custody/{id}/handover",
+        "name": "mobile.custody.handover",
+        "action": "App\\Http\\Controllers\\Api\\MobileCustodyController@handover",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/custody/{id}/recover",
+        "name": "mobile.custody.recover",
+        "action": "App\\Http\\Controllers\\Api\\MobileCustodyController@recover",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/custody/{id}/abilities",
+        "name": "mobile.custody.abilities",
+        "action": "App\\Http\\Controllers\\Api\\MobileCustodyController@abilities",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/inventory/sessions",
+        "name": "mobile.inventory.index",
+        "action": "App\\Http\\Controllers\\Api\\MobileInventoryController@sessions",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/inventory/sessions/{id}",
+        "name": "mobile.inventory.show",
+        "action": "App\\Http\\Controllers\\Api\\MobileInventoryController@session",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/inventory/sessions",
+        "name": "mobile.inventory.freeze",
+        "action": "App\\Http\\Controllers\\Api\\MobileInventoryController@freeze",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:120,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/inventory/sessions/{id}/scan",
+        "name": "mobile.inventory.scan",
+        "action": "App\\Http\\Controllers\\Api\\MobileInventoryController@scan",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:120,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/inventory/sessions/{id}/reconcile",
+        "name": "mobile.inventory.reconcile",
+        "action": "App\\Http\\Controllers\\Api\\MobileInventoryController@reconcile",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:120,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/inventory/sessions/{id}/close",
+        "name": "mobile.inventory.close",
+        "action": "App\\Http\\Controllers\\Api\\MobileInventoryController@close",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:120,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/attachments",
+        "name": "mobile.files.index",
+        "action": "App\\Http\\Controllers\\Api\\MobileFileController@recordFiles",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "DELETE",
+        "uri": "api/mobile/v1/attachments/{id}",
+        "name": "mobile.files.destroy",
+        "action": "App\\Http\\Controllers\\Api\\MobileFileController@deleteFile",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/comments/{id}/attachment",
+        "name": "mobile.comments.attachment",
+        "action": "App\\Http\\Controllers\\Api\\MobileRecordExtrasController@commentAttachment",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/dm/messages/{id}/attachment",
+        "name": "mobile.dm.attachment",
+        "action": "App\\Http\\Controllers\\Api\\MobileRecordExtrasController@dmAttachment",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/{module}/{id}/versions",
+        "name": "mobile.versions.index",
+        "action": "App\\Http\\Controllers\\Api\\MobileRecordExtrasController@versions",
         "middleware": [
             "api",
             "throttle:api",
@@ -1515,6 +2352,16 @@
         ]
     },
     {
+        "methods": "POST",
+        "uri": "csp-report",
+        "name": "csp.report",
+        "action": "App\\Http\\Controllers\\Web\\CspReportController@store",
+        "middleware": [
+            "web",
+            "throttle:30,1"
+        ]
+    },
+    {
         "methods": "GET|HEAD",
         "uri": "manifest.webmanifest",
         "name": "pwa.manifest",
@@ -1601,6 +2448,50 @@
             "web",
             "guest",
             "throttle:6,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "password/forgot",
+        "name": "password.request",
+        "action": "App\\Http\\Controllers\\Web\\PasswordResetController@request",
+        "middleware": [
+            "web",
+            "guest",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "password/forgot",
+        "name": "password.email",
+        "action": "App\\Http\\Controllers\\Web\\PasswordResetController@email",
+        "middleware": [
+            "web",
+            "guest",
+            "throttle:password-reset"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "password/reset/{token}",
+        "name": "password.reset",
+        "action": "App\\Http\\Controllers\\Web\\PasswordResetController@show",
+        "middleware": [
+            "web",
+            "guest",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "password/reset",
+        "name": "password.update",
+        "action": "App\\Http\\Controllers\\Web\\PasswordResetController@update",
+        "middleware": [
+            "web",
+            "guest",
+            "throttle:10,1"
         ]
     },
     {
@@ -2548,6 +3439,39 @@
             "web",
             "auth",
             "throttle:20,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "ask/stream",
+        "name": "ask.stream",
+        "action": "App\\Http\\Controllers\\Web\\AskController@stream",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:20,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "assist/draft",
+        "name": "assist.draft",
+        "action": "App\\Http\\Controllers\\Web\\AssistController@draft",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:20,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "ask/forget",
+        "name": "ask.forget",
+        "action": "App\\Http\\Controllers\\Web\\AskController@forget",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:30,1"
         ]
     },
     {
@@ -5582,6 +6506,17 @@
     },
     {
         "methods": "POST",
+        "uri": "admin/errors/{id}/explain",
+        "name": "errors.explain",
+        "action": "App\\Http\\Controllers\\Web\\DevAssistController@explain",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:20,1"
+        ]
+    },
+    {
+        "methods": "POST",
         "uri": "jslog",
         "name": "jslog",
         "action": "App\\Http\\Controllers\\Web\\ErrorCenterController@jslog",
@@ -5883,6 +6818,27 @@
         ]
     },
     {
+        "methods": "GET|HEAD",
+        "uri": "admin/ai/auditor",
+        "name": "ai.auditor",
+        "action": "App\\Http\\Controllers\\Web\\AiAuditorController@index",
+        "middleware": [
+            "web",
+            "auth"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "admin/ai/auditor/{key}/toggle",
+        "name": "ai.auditor.toggle",
+        "action": "App\\Http\\Controllers\\Web\\AiAuditorController@toggle",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:30,1"
+        ]
+    },
+    {
         "methods": "POST",
         "uri": "admin/ai/reconcile",
         "name": "ai.reconcile",
@@ -5891,6 +6847,16 @@
             "web",
             "auth",
             "throttle:10,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "admin/ai/quick-setup",
+        "name": "ai.quick_setup",
+        "action": "App\\Http\\Controllers\\Web\\AiCenterController@quickSetup",
+        "middleware": [
+            "web",
+            "auth"
         ]
     },
     {
@@ -7209,6 +8175,17 @@
             "web",
             "auth",
             "throttle:6,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "admin/mobile-platform/settings/{section}",
+        "name": "mobileplatform.settings.save",
+        "action": "App\\Http\\Controllers\\Web\\MobilePlatformController@saveSettings",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:20,1"
         ]
     }
 ]

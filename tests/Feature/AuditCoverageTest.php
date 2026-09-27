@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\Web\AuditController;
-use App\Support\SecurityEvents;
+use App\Support\Security\SecurityEvents;
 use Tests\TestCase;
 
 /**

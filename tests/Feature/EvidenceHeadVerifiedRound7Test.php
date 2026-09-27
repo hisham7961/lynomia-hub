@@ -6,7 +6,7 @@ use App\Models\Contract;
 use App\Models\ContractEvent;
 use App\Models\ContractSigner;
 use App\Models\SignRequest;
-use App\Support\Evidence;
+use App\Support\Documents\Evidence;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

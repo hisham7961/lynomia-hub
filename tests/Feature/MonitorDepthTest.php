@@ -43,7 +43,7 @@ class MonitorDepthTest extends TestCase
         $this->assertStringContainsString('ذاكرة النظام', $html,
             'ذاكرة النظام لا ذروة طلب PHP الواحد');
 
-        $m = \App\Support\SysMonitor::memory();
+        $m = \App\Support\Ops\SysMonitor::memory();
         if ($m['ok']) {
             $this->assertGreaterThan($m['php_peak'], $m['total'], 'ذاكرة النظام أكبر من ذروة الطلب');
             $this->assertSame($m['total'] - $m['avail'], $m['used']);

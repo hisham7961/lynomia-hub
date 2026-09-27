@@ -6,12 +6,12 @@ use App\Models\AiModel;
 use App\Models\AiProfile;
 use App\Models\AiProvider;
 use App\Models\AuditEntry;
-use App\Support\AiProfiles;
-use App\Support\AiProviders;
-use App\Support\AiReconcile;
-use App\Support\AiRouteRun;
-use App\Support\Redactor;
-use App\Support\Settings;
+use App\Support\Ai\Routing\AiProfiles;
+use App\Support\Ai\Catalog\AiProviders;
+use App\Support\Ai\Center\AiReconcile;
+use App\Support\Ai\Routing\AiRouteRun;
+use App\Support\Platform\Redactor;
+use App\Support\Platform\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -143,7 +143,14 @@ class AiSecuritySweepTest extends TestCase
             return $at === false ? $t : substr($t, $at + 1);
         };
 
+        // **ومخطّطُنا وحدَه** — MySQL/MariaDB تُعيد جداولَ **كلِّ** القواعد التي يراها
+        // الاتصال، فيتسرّب جدولُ قاعدةٍ مجاورةٍ على الخادم نفسِه (قاعدةُ worktree آخر)
+        // ثمّ يُقرأ هنا فلا يوجد. النمطُ نفسُه في EnterpriseHardeningRound1Test.
+        $schema = \Illuminate\Support\Facades\DB::connection()->getDatabaseName();
         $names = collect(\Illuminate\Support\Facades\Schema::getTableListing())
+            ->map(fn ($t) => (string) $t)
+            ->filter(fn (string $t) => ! str_contains($t, '.')
+                || in_array(substr($t, 0, strrpos($t, '.')), ['main', $schema], true))
             ->map(fn ($t) => $bare((string) $t))
             ->filter(fn (string $t) => str_starts_with($t, 'ai_'))
             ->unique()->sort()->values()->all();
@@ -171,7 +178,7 @@ class AiSecuritySweepTest extends TestCase
          * يُضاف غداً يدخل هذا المسحَ في اللحظةِ نفسِها، بلا أن يتذكّره أحد.
          */
         $pages = array_map(fn ($sec) => route($sec['route']),
-            array_filter(\App\Support\AiAccess::sections($this->owner), fn ($sec) => $sec['ok']));
+            array_filter(\App\Support\Ai\Center\AiAccess::sections($this->owner), fn ($sec) => $sec['ok']));
 
         // **والمسارُ ذو المُعامل خارجَ الشريط** — فيُضاف صراحةً
         $pages[] = route('ai.models.index', $p);

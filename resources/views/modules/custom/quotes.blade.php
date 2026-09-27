@@ -35,7 +35,7 @@
 
 {{-- الفعلُ الأفضلُ التالي (محرّك NextAction) — الخطوةُ المنطقيةُ حسب حالة العرض --}}
 @php
-    $qNext = \App\Support\NextAction::for('quotes', $row);
+    $qNext = \App\Support\Insights\NextAction::for('quotes', $row);
     /*
      * (الجولة 2 · G18ب) **الخطوةُ تفعل أو لا تُعرض**: كان chip «حوّله لمشروعٍ
      * وارتباط» رابطاً إلى الصفحة التي أنت فيها — وعدٌ يعيد التحميلَ ولا يفعل شيئاً،

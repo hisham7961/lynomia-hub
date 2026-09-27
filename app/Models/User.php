@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\Auditable;
 use App\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -11,7 +12,7 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    use Notifiable, HasUuid, SoftDeletes, Auditable;
+    use HasFactory, Notifiable, HasUuid, SoftDeletes, Auditable;
     public $incrementing = false;
     protected $keyType = 'string';
 
@@ -56,7 +57,7 @@ class User extends Authenticatable
     /** حسابٌ جديد يجد ملفَّه الوظيفي الذي ينتظره — البريد هو الهوية */
     protected static function booted(): void
     {
-        static::created(fn (self $u) => \App\Support\Staff::linkWaitingFile($u));
+        static::created(fn (self $u) => \App\Support\Workforce\Staff::linkWaitingFile($u));
 
         // حارسُ الثوابت — يرفض حالةً خارج allowlist قبل أي كتابة (نمطُ
         // ClientMembership نفسه). يُفحص **المتغيّرُ فقط**: صفٌّ قديمٌ بقيمةٍ
@@ -66,6 +67,14 @@ class User extends Authenticatable
             if ($u->isDirty('status') && $u->status !== null
                 && ! in_array((string) $u->status, self::STATUSES, true)) {
                 throw new \InvalidArgumentException('حالةُ مستخدمٍ غيرُ صالحة: ' . $u->status);
+            }
+        });
+
+        // سجلُّ كلمات المرور (بندُ الدَّين #15 · AUTH-08): كلُّ كتابةٍ على `password`
+        // — من أيِّ مسار — تُدوَّن تجزيئاً هنا لا في كلِّ متحكّمٍ على حدة، فلا مسارَ ينساه.
+        static::saved(function (self $u): void {
+            if ($u->wasRecentlyCreated ? filled($u->getAttributes()['password'] ?? null) : $u->wasChanged('password')) {
+                \App\Support\Security\PasswordHistory::record($u);
             }
         });
     }
@@ -106,6 +115,15 @@ class User extends Authenticatable
     public function isSuspended(): bool
     {
         return ! $this->isActive();
+    }
+
+    /**
+     * رابطُ الاستعادة يسلك صندوقَ الصادر (قناةُ البريد) لا إشعارَ الإطار — المسارُ
+     * الصادرُ الوحيد (بندُ الدَّين #15 · AUTH-09 · PasswordResetController::deliver).
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        \App\Http\Controllers\Web\PasswordResetController::deliver($this, (string) $token);
     }
 
     public function role(): BelongsTo

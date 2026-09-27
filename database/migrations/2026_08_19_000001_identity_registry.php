@@ -119,7 +119,7 @@ return new class extends Migration
         $put = function (string $module, string $recordId, string $kind, ?string $value) use (&$seen, $now) {
             $value = trim((string) $value);
             if ($value === '') return;
-            $norm = \App\Support\Identity::norm($kind, $value);
+            $norm = \App\Support\Security\Identity::norm($kind, $value);
             if ($norm === '') return;
             $key = $module . '|' . $kind . '|' . $norm;
             if (isset($seen[$key])) return;                  // سيريالٌ مكرر في البيانات القديمة: الأول يحجز

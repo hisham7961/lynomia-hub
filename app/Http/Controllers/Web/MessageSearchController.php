@@ -3,11 +3,8 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Comment;
-use App\Models\ConversationMember;
-use App\Models\DmMessage;
-use App\Models\User;
-use App\Support\MessageLink;
+use App\Support\Collaboration\MessageLink;
+use App\Support\Collaboration\MessageSearch;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -28,82 +25,29 @@ class MessageSearchController extends Controller
     {
         $me = (string) auth()->id();
         $q = trim(hub_str($r->query('q')));
-        $results = [];
 
-        if (mb_strlen($q) >= 2) {
-            // هروبُ أحرف البدل — نصٌّ يبحثه المستخدم لا نمطُ LIKE
-            $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $q) . '%';
+        // القاعدةُ والعزلُ والعدُّ في `MessageSearch::run` (يشترك فيها الجوال) — هنا العرضُ وحده
+        $found = MessageSearch::run(auth()->user(), $q);
 
-            $rows = collect();
-
-            // ١) الخلاصة — منطَّقةٌ بشركة القارئ
-            $feed = $this->feedScope(
-                Comment::whereNull('deleted_at')->where('module', 'feed')->where('body', 'LIKE', $like)
-            )->with('user')->orderByDesc('created_at')->limit(30)->get();
-
-            // ٢) القنوات — التي هو عضوٌ فيها حصراً
-            $memberConvIds = ConversationMember::where('user_id', $me)->pluck('conversation_id');
-            $chan = Comment::whereNull('deleted_at')->where('module', 'channel')
-                ->whereIn('conversation_id', $memberConvIds)->where('body', 'LIKE', $like)
-                ->with('user')->orderByDesc('created_at')->limit(30)->get();
-
-            foreach ($feed->merge($chan) as $c) {
-                $rows->push([
-                    'kind'    => $c->module === 'feed' ? 'خلاصة' : 'قناة',
-                    'icon'    => $c->module === 'feed' ? '📣' : '#️⃣',
-                    'when'    => $c->created_at,
-                    'author'  => optional($c->user)->name,
-                    'excerpt' => Str::limit(trim((string) $c->body), 120),
-                    'link'    => MessageLink::comment($c),
-                ]);
-            }
-
-            // ٣) المحادثاتُ المباشرة — خيوطُ القارئ ضمن نطاق الشركة
-            $dms = DmMessage::alive()->inCompanyScope()
-                ->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
-                ->where('body', 'LIKE', $like)->orderByDesc('created_at')->limit(30)->get();
-            $names = User::whereIn('id', $dms->pluck('from_id')->unique())->pluck('name', 'id');
-            foreach ($dms as $m) {
-                $rows->push([
-                    'kind'    => 'محادثة',
-                    'icon'    => '💬',
-                    'when'    => $m->created_at,
-                    'author'  => $names[$m->from_id] ?? null,
-                    'excerpt' => Str::limit(trim((string) $m->body), 120),
-                    'link'    => MessageLink::dm($m, $me),
-                ]);
-            }
-
-            $results = $rows->sortByDesc(fn ($x) => (string) $x['when'])->take(50)->values()->all();
-
-            /*
-             * **«N نتيجة» تعني ما طابق لا ما عُرض** (W-5 · الطور ١٦٧). كانت
-             * الجملةُ تقرأ `count($results)` بعد `take(50)` وفوقَها ثلاثةُ
-             * مصادرَ كلٌّ مقصوصٌ بثلاثين — فبحثٌ يطابق أربعمئةَ رسالةٍ يُقرأ
-             * «٥٠ نتيجة»، والباحثُ يظنّ أنّه رأى كلَّ ما يطابق فيتوقّف.
-             * والعدُّ ثلاثةُ استعلاماتِ `COUNT` على المصادرِ الثلاثةِ نفسِها
-             * بشروطِ تنطيقِها نفسِها — لا تقديرَ ولا استقراء.
-             */
-            $resultsN = $this->feedScope(
-                    Comment::whereNull('deleted_at')->where('module', 'feed')->where('body', 'LIKE', $like)
-                )->count()
-                + Comment::whereNull('deleted_at')->where('module', 'channel')
-                    ->whereIn('conversation_id', $memberConvIds)->where('body', 'LIKE', $like)->count()
-                + DmMessage::alive()->inCompanyScope()
-                    ->where(fn ($w) => $w->where('from_id', $me)->orWhere('to_id', $me))
-                    ->where('body', 'LIKE', $like)->count();
-        }
+        $results = $found['rows']->map(fn (array $x) => $x['type'] === 'dm'
+            ? [
+                'kind'    => 'محادثة',
+                'icon'    => '💬',
+                'when'    => $x['at'],
+                'author'  => $x['author'],
+                'excerpt' => Str::limit(trim((string) $x['model']->body), 120),
+                'link'    => MessageLink::dm($x['model'], $me),
+            ]
+            : [
+                'kind'    => $x['type'] === 'feed' ? 'خلاصة' : 'قناة',
+                'icon'    => $x['type'] === 'feed' ? '📣' : '#️⃣',
+                'when'    => $x['at'],
+                'author'  => $x['author'],
+                'excerpt' => Str::limit(trim((string) $x['model']->body), 120),
+                'link'    => MessageLink::comment($x['model']),
+            ])->all();
 
         return view('search.messages', ['q' => $q, 'results' => $results,
-            'resultsN' => $resultsN ?? 0]);
-    }
-
-    /** نطاقُ الشركة على الخلاصة — نظيرُ `CommentController::feedCompanyFilter` حرفاً */
-    private function feedScope($query)
-    {
-        if (! hub_has_col('comments', 'company_id')) return $query;
-        if (($cids = hub_company_ids()) === null) return $query;
-
-        return $query->where(fn ($w) => $w->whereIn('company_id', $cids)->orWhereNull('company_id'));
+            'resultsN' => $found['total']]);
     }
 }

@@ -127,7 +127,7 @@ class EsignMultiSignerTest extends TestCase
     {
         $this->seedCore();
         $captured = [];
-        \App\Support\HubEvents::listen(function ($event) use (&$captured) { $captured[] = $event; });
+        \App\Support\Platform\HubEvents::listen(function ($event) use (&$captured) { $captured[] = $event; });
         $c = Contract::create(['title' => 'عقد الثنائي', 'type' => 'عقد عميل', 'status' => 'مسودة']);
         $req = $this->makeMulti('متوازٍ', $c->id);
         [$s1, $s2] = ContractSigner::where('request_id', $req->id)->orderBy('order')->get();

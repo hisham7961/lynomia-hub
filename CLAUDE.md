@@ -51,7 +51,16 @@ git config core.hooksPath .githooks
 - **التنطيق والصلاحية أولاً:** كل قارئ/استعلام جديد يمرّ بـ`hub_scope` + `hub_can` + `hub_field_mode`. يُختبَر بمستخدم معزول قبل الدفع.
 - **العربية أولاً (RTL):** الواجهة والتعليقات والرسائل بالعربية؛ المصطلحات التقنية في الكود بالإنجليزية كما هي.
 
+## 🗺️ أين الأشياء
+
+- **خريطةُ المعمارية:** `docs/ARCHITECTURE.md` (§٠ المجلّدات والنطاقات، §٨ أين تضيف ماذا)؛ وفهرسُ الوثائق
+  `docs/README.md` — الحيُّ في `docs/` والتاريخيُّ في `docs/archive/`.
+- **لقطاتُ البنية** (`tests/Fixtures/structure/`): المساراتُ والسجلّ والأصناف والدوالّ. تغييرٌ مقصود ⇒
+  `php artisan hub:structure-snapshot --write` ويُراجَع فرقُ اللقطة في الدفعة نفسها.
+- **النقلُ بلا تغيير سلوك** بأدوات `tools/` (`move-classes` · `extract-helpers` · `extract-methods`) — لا بيد.
+
 ## 🌿 الفرع والطلب
 
-- التطوير على `claude/marhaba-fmuoui`، والفرع الأساس `main` (أُنشئ عند نقطة ما قبل التوحيد).
-- الدفع: `git push -u origin claude/marhaba-fmuoui`، ولا يُفتح طلب دمج إلا بطلبٍ صريح.
+- التطويرُ على **فرعِ الجلسة المسمّى في تعليماتها** (آخرُه `claude/project-review-code-organization-uj0mco`)،
+  والفرعُ الأساس `main`. (الفرعُ المذكور هنا سابقاً `claude/marhaba-fmuoui` انتهى.)
+- الدفع: `git push -u origin <فرع الجلسة>`، ولا يُفتح طلب دمج إلا بطلبٍ صريح.

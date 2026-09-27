@@ -6,9 +6,9 @@ use App\Models\Conversation;
 use App\Models\ConversationMember;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\CommentService;
-use App\Support\DmService;
-use App\Support\Typing;
+use App\Support\Collaboration\CommentService;
+use App\Support\Collaboration\DmService;
+use App\Support\Collaboration\Typing;
 use Tests\TestCase;
 
 /**

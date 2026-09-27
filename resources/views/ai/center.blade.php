@@ -31,6 +31,36 @@
 
 @include('ai._sections')
 
+{{-- ═══ الإعدادُ السريع (§٩) — يظهر ما دام في الأغراض فراغٌ يُملأ أو لا ميزانيّة ═══ --}}
+@if (! empty($quick) && (collect($quick['profiles'])->contains('state', 'fill') || $quick['budget']))
+    <div class="card" data-ai-quick>
+        <h3 class="cardtitle">⚡ الإعدادُ السريع</h3>
+        <div class="sub">يملأ الأغراضَ <b>الفارغةَ وحدَها</b> من نماذج البوّابة — وما ضبطتَه لا يُمسّ. مفاتيحُ المزوّدين تبقى من «المزوّدون».</div>
+        <ul class="sub">
+            @foreach ($quick['profiles'] as $p)
+                <li>
+                    @if ($p['state'] === 'fill') ＋ <b>{{ $p['label'] }}</b>: {{ implode(' ← ', $p['models']) }}
+                    @elseif ($p['state'] === 'configured') ✔ {{ $p['label'] }}: مضبوط
+                    @else ✖ {{ $p['label'] }}: {{ $p['why'] }}
+                    @endif
+                </li>
+            @endforeach
+        </ul>
+        <form method="POST" action="{{ route('ai.quick_setup') }}" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">@csrf
+            @if ($quick['budget'])
+                <label>سقفٌ شهريٌّ عامّ (USD) <input class="inp" type="number" name="usd" min="0" value="{{ $quick['budget']['usd'] }}" style="width:110px"></label>
+                <span class="sub">ولكلِّ غرضٍ {{ \App\Support\Ai\Center\AiQuickSetup::PURPOSE_MONTHLY_PCT }}٪ منه شهريّاً و{{ \App\Support\Ai\Center\AiQuickSetup::PURPOSE_DAILY_PCT }}٪ يوميّاً</span>
+            @else
+                <input type="hidden" name="usd" value="0">
+            @endif
+            @if ($quick['brain'])
+                <label><input type="checkbox" name="brain" value="1"> فعّل البحثَ بالمعنى (نصوصُ السجلّات تُرسَل إلى مزوّد التضمين)</label>
+            @endif
+            <button class="btn sm">⚡ طبّق</button>
+        </form>
+    </div>
+@endif
+
 {{-- ═══ سلّمُ الجاهزيّة — من سجلِّ القدراتِ لا سلّمٌ ثانٍ ═══ --}}
 <div class="cards">
     <div class="stat"><span class="ico bdg {{ $tone }}">{{ $tone === 'ok' ? '✅' : '◻️' }}</span>

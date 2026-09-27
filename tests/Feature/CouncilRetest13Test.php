@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\DailyWorkCompliance;
+use App\Support\Workforce\DailyWorkCompliance;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

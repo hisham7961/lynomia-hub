@@ -50,7 +50,7 @@ class MessagingController extends Controller
             'tgChat'     => (string) setting('notify.tg_chat', ''),
             'mailer'     => $mailer,
             'mailReal'   => ! in_array($mailer, ['log', 'array'], true),
-            'mailFromScreen' => \App\Support\MailSettings::fromScreen(),
+            'mailFromScreen' => \App\Support\Platform\MailSettings::fromScreen(),
             'inappCount' => (int) DB::table('notifications_hub')->count(),
             'inappWeek'  => (int) DB::table('notifications_hub')->where('created_at', '>=', now()->subDays(7))->count(),
             'prefsUsers' => (int) DB::table('users')->whereNull('deleted_at')
@@ -111,20 +111,20 @@ class MessagingController extends Controller
         // فمن اختار «بلا تشفير» (خادم داخلي على 25) كان يُفرض عليه TLS فيفشل
         // (WP-9.2) دفعةٌ واحدةٌ على الكاتب الواحد: التشفيرُ للحسّاس، وإبطالُ
         // الخبيئة، وقيدُ التدقيق، وصفُّ تاريخٍ لكل مفتاح — من موضعٍ واحد.
-        \App\Support\Settings::batch('messaging', function () use ($d) {
+        \App\Support\Platform\Settings::batch('messaging', function () use ($d) {
             foreach (['host' => $d['host'], 'port' => (string) $d['port'],
                       'encryption' => $d['encryption'],
                       'username' => $d['username'], 'from_address' => $d['from_address'],
                       'from_name' => (string) ($d['from_name'] ?? '')] as $k => $v) {
-                \App\Support\Settings::put('mail.' . $k, $v, 'messaging');
+                \App\Support\Platform\Settings::put('mail.' . $k, $v, 'messaging');
             }
             // كلمةٌ فارغة تُبقي المخزون — والمكتوبة تُشفَّر عند الكاتب (وسمُ `sensitive`)
             if (filled($d['password'] ?? null)) {
-                \App\Support\Settings::put('mail.password', $d['password'], 'messaging');
+                \App\Support\Platform\Settings::put('mail.password', $d['password'], 'messaging');
             }
         }, ['name' => 'mail.* — من مركز المراسلة']);
 
-        \App\Support\MailSettings::apply();   // يسري في هذا الطلب نفسه — للتجربة الفورية
+        \App\Support\Platform\MailSettings::apply();   // يسري في هذا الطلب نفسه — للتجربة الفورية
 
         return back()->with('ok', 'حُفظ ضبط البريد — جرّبه الآن بزر «أرسل تجريبية»');
     }
@@ -142,12 +142,12 @@ class MessagingController extends Controller
             'tg_chat'  => ['nullable', 'string', 'max:120'],
         ], [], ['tg_token' => 'توكن البوت', 'tg_chat' => 'القناة الافتراضية']);
 
-        \App\Support\Settings::batch('messaging', function () use ($d) {
+        \App\Support\Platform\Settings::batch('messaging', function () use ($d) {
             // القناة الافتراضية نصّاً (‎@channel أو معرّفٌ رقميّ) — فارغةٌ تُلغي الوجهة الاحتياطية
-            \App\Support\Settings::put('notify.tg_chat', (string) ($d['tg_chat'] ?? ''), 'messaging');
+            \App\Support\Platform\Settings::put('notify.tg_chat', (string) ($d['tg_chat'] ?? ''), 'messaging');
             // التوكن: فارغٌ يُبقي المخزون؛ والمكتوب يُشفَّر عند الكاتب — يفكّه setting() للـBot API
             if (filled($d['tg_token'] ?? null)) {
-                \App\Support\Settings::put('notify.tg_token', $d['tg_token'], 'messaging');
+                \App\Support\Platform\Settings::put('notify.tg_token', $d['tg_token'], 'messaging');
             }
         }, ['name' => 'notify.tg_* — من مركز التكامل']);
 

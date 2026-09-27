@@ -96,7 +96,7 @@ class CostController extends Controller
         return view('costs.index', [
             'rows' => $rows->sortByDesc(fn ($x) => $x['pl']['revenue']['invoiced'])->values(),
             'tot' => $tot,
-            'currency' => $converted ? \App\Support\Currency::base() : $label['cur'],
+            'currency' => $converted ? \App\Support\Finance\Currency::base() : $label['cur'],
             'mixed' => $mixed,
             'converted' => $converted,
             'rates' => hub_hourly_rates(),

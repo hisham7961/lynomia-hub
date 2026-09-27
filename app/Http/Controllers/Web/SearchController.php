@@ -26,8 +26,10 @@ class SearchController extends Controller
         }
         if (mb_strlen($q) < 2) return response('');
 
+        $flat = array_slice($this->results($q, 3, 9, static::$miniBudgetMs), 0, 9);
+
         return view('partials.searchmini', [
-            'flat' => array_slice($this->results($q, 3, 9), 0, 9), 'q' => $q,
+            'flat' => $flat, 'q' => $q, 'partial' => $this->lastPartial,
             'dests' => array_slice($this->destinations($q), 0, 4),
             'acts' => $this->quickActions($q, 3),
         ]);
@@ -46,13 +48,19 @@ class SearchController extends Controller
      *
      * @return array<int,array{module:string,id:mixed,name:string,label:string}>
      */
-    public function results(string $q, int $perModule = 3, int $cap = 9): array
+    public function results(string $q, int $perModule = 3, int $cap = 9, ?int $budgetMs = null): array
     {
+        $this->lastPartial = false;
         $q = trim($q);
         if (mb_strlen($q) < 2) return [];
 
         $flat = [];
+        $t0 = hrtime(true);
         foreach ($this->searchableModules() as $key => $def) {
+            // **ميزانيّةُ وقتٍ للبحث السريع وحدَه** (بند الدَّين #26): «يحوي» على نصٍّ عربيٍّ لا فهرسَ له بلا تغيير
+            // دلالة المطابقة، فكلمةٌ نادرةٌ تمسح كلَّ الجداول (قيس: ~٤ ث عند ٤٨ ألف سجلّ). فالقائمةُ المنسدلة تقف
+            // عند الميزانيّة **وتقول ذلك** وتدلّ على البحث الكامل — لا «لا نتائج» كاذبة؛ والبحثُ الكاملُ كما كان.
+            if ($budgetMs !== null && (hrtime(true) - $t0) / 1e6 > $budgetMs) { $this->lastPartial = true; break; }
             // ترتيبٌ صريح: limit بلا orderBy يجعل «أي عددٍ يظهر» قرعةً بين المحرّكين
             $rows = $this->query($key, $def, $q)
                 ->orderByDesc('created_at')->orderByDesc('id')->limit($perModule)->get();
@@ -120,6 +128,15 @@ class SearchController extends Controller
     }
 
     /** صفحة النتائج الكاملة مجمّعة بالوحدات */
+    /** سقفُ البحث السريع (القائمة المنسدلة أثناء الكتابة) بالميلي ثانية */
+    public const MINI_BUDGET_MS = 800;
+
+    /** السقفُ الساري — ثابتُه الافتراض، ويضبطه الاختبارُ ليمتحن حدَّه */
+    public static int $miniBudgetMs = self::MINI_BUDGET_MS;
+
+    /** توقّف آخرُ `results()` عند الميزانيّة قبل أن يمرّ على كلِّ الوحدات؟ */
+    public bool $lastPartial = false;
+
     public function index(Request $r)
     {
         $q = trim(hub_str($r->input('q')));
@@ -129,15 +146,17 @@ class SearchController extends Controller
         if (mb_strlen($q) >= 2) {
             foreach ($this->searchableModules() as $key => $def) {
                 $base  = $this->query($key, $def, $q);
-                $count = (clone $base)->count();
-                if (! $count) continue;
+                // **مسحٌ واحدٌ لا اثنان** حين تكفي الصفوف: أقلُّ من ثمانيةٍ ⇒ عددُها هو العدد (نتيجةٌ مطابقةٌ حرفاً)
+                // فاصل id: created_at بدقة الثانية يتساوى في الإدخال الدفعي فيقترع المحرّكان
+                $rows  = (clone $base)->orderByDesc('created_at')->orderByDesc('id')->limit(8)->get();
+                if ($rows->isEmpty()) continue;
+                $count = $rows->count() < 8 ? $rows->count() : (clone $base)->count();
                 $groups[] = [
                     // العمود الفيزيائيّ لا المفتاح: وحدةٌ مفتاحُ حالتها ≠ عمودها
                     // (الوثائق: docStatus/doc_status) كانت شارةُ حالتها تختفي بصمت
                     'module' => $key, 'label' => $def['label'], 'count' => $count,
                     'display' => hub_display_col($key), 'status' => hub_status_col($key),
-                    // فاصل id: created_at بدقة الثانية يتساوى في الإدخال الدفعي فيقترع المحرّكان
-                    'rows' => $base->orderByDesc('created_at')->orderByDesc('id')->limit(8)->get(),
+                    'rows' => $rows,
                 ];
             }
             usort($groups, fn ($a, $b) => $b['count'] <=> $a['count']);
@@ -172,10 +191,10 @@ class SearchController extends Controller
                 $out[] = ['t' => $t, 'u' => $url];
             };
             $push('🏠 لوحة التحكم', 'dashboard');
-            foreach (\App\Support\Workspaces::for($u) as $key => $ws) {
+            foreach (\App\Support\Platform\Workspaces::for($u) as $key => $ws) {
                 $push($ws['icon'] . ' مساحة ' . $ws['label'], 'workspace', [$key]);
             }
-            foreach (\App\Support\InformationArchitecture::make()->catalogDestinations($u) as $d) {
+            foreach (\App\Support\Platform\InformationArchitecture::make()->catalogDestinations($u) as $d) {
                 if (! empty($d['route'])) $push($d['label'], $d['route'], $d['args'] ?? []);
             }
 
@@ -187,7 +206,7 @@ class SearchController extends Controller
         // `find` الإداريّةُ القديمةُ محفوظةٌ داخلَ الخدمة). **حارسُ كلِّ وجهةٍ حارسُها هي**.
         // لا تمسُّ operational()/workOs()/ترتيبَ الدمجِ/الإزالةَ بالرابط (C3).
         $iaHits = [];
-        foreach (\App\Support\InformationArchitecture::make()->searchDestinations($u, $q) as $d) {
+        foreach (\App\Support\Platform\InformationArchitecture::make()->searchDestinations($u, $q) as $d) {
             if (empty($d['route'])) continue;   // وجهةٌ سياقيّةٌ بلا رابطٍ عامّ — لا تُقترح هنا
             try {
                 $url = route($d['route'], $d['args'] ?? []);
@@ -200,7 +219,7 @@ class SearchController extends Controller
         // صفحاتُ المساحات المركزيّة (/w/{key}) — ليست وجهةَ IA (المساحةُ مجالٌ)، تبقى
         // قابلةً للإيجاد بالاسم كما كانت (صفر فقدان)
         $wsHits = [];
-        foreach (\App\Support\Workspaces::for($u) as $key => $ws) {
+        foreach (\App\Support\Platform\Workspaces::for($u) as $key => $ws) {
             if (mb_stripos('مساحة ' . $ws['label'], $q) !== false) {
                 $wsHits[] = ['t' => $ws['icon'] . ' مساحة ' . $ws['label'], 'u' => route('workspace', $key)];
             }
@@ -272,7 +291,7 @@ class SearchController extends Controller
         // ٤) مفتاحُ إعداد — من كتالوج الإعدادات نفسِه (`Settings::entry`)، فلا
         //    يُوعَد بمفتاحٍ لا تعرفه الشاشة. والقراءةُ من config بلا استعلام.
         if ($owner && str_contains($q, '.') && preg_match('/^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/i', $q)
-            && ($entry = \App\Support\Settings::entry($q)) !== null) {
+            && ($entry = \App\Support\Platform\Settings::entry($q)) !== null) {
             $out[] = ['t' => '⚙️ الإعداد ' . ($entry['label'] ?? $q) . ' — ' . $ltr($q),
                       'u' => route('settings.edit') . '#' . $q];
         }

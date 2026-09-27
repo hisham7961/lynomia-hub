@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\StepUp;
+use App\Support\Security\StepUp;
 use Tests\TestCase;
 
 /**

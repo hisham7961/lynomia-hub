@@ -9,8 +9,8 @@ use App\Models\Company;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\AssetProjectService;
-use App\Support\RelationshipProjection;
+use App\Support\Assets\AssetProjectService;
+use App\Support\Insights\RelationshipProjection;
 use Tests\TestCase;
 
 /**

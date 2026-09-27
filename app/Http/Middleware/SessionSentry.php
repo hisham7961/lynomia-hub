@@ -84,7 +84,7 @@ class SessionSentry
     protected function kick(Request $r, string $why)
     {
         // الطردُ حدثٌ أمنيّ يُرى في الرادار (v2.399) — كان يخرج صامتاً بلا أثر
-        try { \App\Support\SecurityRadar::record($r, 'وصول مرفوض', 'طرد جلسة: ' . $why); } catch (\Throwable $e) {}
+        try { \App\Support\Security\SecurityRadar::record($r, 'وصول مرفوض', 'طرد جلسة: ' . $why); } catch (\Throwable $e) {}
         Auth::logout();
         $r->session()->invalidate();
         $r->session()->regenerateToken();

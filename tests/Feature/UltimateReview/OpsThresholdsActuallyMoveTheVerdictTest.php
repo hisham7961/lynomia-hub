@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\UltimateReview;
 
-use App\Support\Health;
-use App\Support\SysMonitor;
+use App\Support\Ops\Health;
+use App\Support\Ops\SysMonitor;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

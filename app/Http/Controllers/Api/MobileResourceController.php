@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Middleware\MobileContext;
-use App\Support\Api;
-use App\Support\ApprovalService;
-use App\Support\MobileSessionService;
-use App\Support\StepUp;
+use App\Support\Platform\Api;
+use App\Support\Platform\ApprovalService;
+use App\Support\Mobile\MobileSessionService;
+use App\Support\Security\StepUp;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,7 +19,7 @@ use Illuminate\Http\Request;
  * البيضاء — لا mass-assignment)، و`findScoped` (`hub_scope`)، و`assertVersion`
  * (If-Match ⇒ VERSION_CONFLICT)، و`one`/`shape` (ETag)، و**آلةَ الـIdempotency**
  * (`idempotentBegin/Finish/Release`) المفتوحةَ على **مالكِ الجوال** لا NULL:
- * `ikeyOf` الموروثة تقرأ `App\Support\Idempotency::owner` فتعيد `mobile_session->id`
+ * `ikeyOf` الموروثة تقرأ `App\Support\Platform\Idempotency::owner` فتعيد `mobile_session->id`
  * لطلب الجوال (Critic F1) — فإعادةُ المحاولة تُحجَز لمرّة، ولا يُعاد ردُّ مستخدمٍ لآخر.
  *
  * **العقودُ الملتزَمة:**
@@ -301,7 +301,11 @@ class MobileResourceController extends V1Controller
             }
         }
 
-        if (isset(hub_ack_modules()[$module]) && hub_can($u, $module, 'v')) {
+        // «إقرار» لمن يُقرّ فعلاً — القاعدةُ من الباب الواحد (`Acknowledgement::denial`) لا عرضٌ لا يُنفَّذ
+        // (المرحلة ٣ · 3.3) الإقرارُ بمخزنَيه: سياسات/معرفة (`policy_acks`) **وإقرارُ استلامِ السجلّ**
+        // (`record_acks` — العهدة/الاجتماع/القرار) — الويبُ يُقرّ كليهما بالباب الواحد، فلا يُحرَم الجوال
+        if (\App\Support\Collaboration\Acknowledgement::def($module) !== null && hub_can($u, $module, 'v')
+            && \App\Support\Collaboration\Acknowledgement::denial($module, $m, (string) $u->id) === null) {
             $actions[] = ['action' => 'ack', 'label' => 'إقرار'];
         }
 
@@ -435,15 +439,30 @@ class MobileResourceController extends V1Controller
         }
     }
 
-    /** إقرارٌ موثَّق (سياسات/معرفة) — السكّةُ المشتركة `hub_ack_do` (تُدقّق + تُنطّق + تختم النسخة) */
+    /** إقرارٌ موثَّق (سياسات/معرفة) — السكّةُ المشتركة `hub_ack_do` ⟵ `Acknowledgement` (تُدقّق + تُنطّق + تختم النسخة) */
     private function doAck(string $module, Model $m, Request $r): \Symfony\Component\HttpFoundation\Response
     {
         if ($resp = $this->requireStepUp($module, 'ack', $r)) return $resp;
+        // مَن يُقرّ — القاعدةُ من الباب الواحد نفسِه (الويبُ يردّها 403 كذلك)
+        if ($why = \App\Support\Collaboration\Acknowledgement::denial($module, $m, (string) $r->user()->id)) {
+            return Api::error(Api::FORBIDDEN, 403, $why);
+        }
 
         $gate = $this->idempotentBegin($r);
         if ($gate instanceof \Symfony\Component\HttpFoundation\Response) return $gate;
 
         try {
+            // إقرارُ استلامِ السجلّ (مخزنُ `record_acks`): البابُ الواحد نفسُه الذي يسلكه `AckController`
+            // (السجلُّ هنا مُنطَّقٌ سلفاً بـfindScoped، والمنعُ فُحص أعلاه) — لا صفَّ policy له
+            if (\App\Support\Collaboration\Acknowledgement::store($module) !== \App\Support\Collaboration\Acknowledgement::STORE_POLICY) {
+                \App\Support\Collaboration\Acknowledgement::acknowledge($module, $m, (string) $r->user()->id);
+                $resp = $this->ok(['module' => $module, 'id' => (string) $m->id, 'action' => 'ack',
+                    'version' => (string) \App\Support\Collaboration\Acks::version($m)]);
+                $this->idempotentFinish($r, $resp);
+
+                return $resp;
+            }
+
             $ack = hub_ack_do($module, (string) $m->id);   // يُدقّق بـ source=mobile عبر request_source
             if (! $ack) {
                 if ($gate === true) $this->idempotentRelease($r);
@@ -500,7 +519,7 @@ class MobileResourceController extends V1Controller
 
         try {
             $row = \Illuminate\Support\Facades\DB::table('idempotency_keys')
-                ->where('token_id', $tokenId)->where('ikey', $ikey)->first();
+                ->where('token_id', $tokenId)->where('ikey', $ikey)->orderBy('id')->first();
         } catch (\Throwable $e) {
             return null;   // خطأُ قراءةٍ عابر: يمرّ للمسار العاديّ (idempotentBegin يحسمه)
         }

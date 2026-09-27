@@ -5,7 +5,7 @@ namespace Tests\Feature\Mobile;
 use App\Models\PushDelivery;
 use App\Models\PushToken;
 use App\Support\Push\PushProvider;
-use App\Support\PushService;
+use App\Support\Mobile\PushService;
 use Illuminate\Support\Str;
 use Tests\Support\FakePushProvider;
 use Tests\TestCase;

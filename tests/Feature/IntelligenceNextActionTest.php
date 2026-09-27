@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Contract;
-use App\Support\NextAction;
+use App\Support\Insights\NextAction;
 use Tests\TestCase;
 
 /**

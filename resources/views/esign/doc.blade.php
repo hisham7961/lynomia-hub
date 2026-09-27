@@ -13,11 +13,11 @@
     <div class="noprint" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         @if ($public ?? false)
             {{-- فُتحت عبر QR بلا حساب: طباعةٌ وتفاصيلُ تحقّقٍ فقط، لا أزرارٌ داخلية --}}
-            <button class="btn sm" onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+            <button class="btn sm" data-print>🖨️ طباعة / حفظ PDF</button>
             <a class="btn ghost sm" href="{{ route('sign.verify') }}?code={{ $req->verify_code }}">🔎 تفاصيل التحقّق</a>
         @else
             @unless ($client ?? false)<a class="btn ghost sm" href="{{ route('esign.index') }}">→ رجوع</a>@endunless
-            <button class="btn sm" onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+            <button class="btn sm" data-print>🖨️ طباعة / حفظ PDF</button>
             @if (($client ?? false) && ($token ?? null))
                 <a class="btn ghost sm" href="{{ route('sign.pdf', $token) }}">⬇️ تنزيل PDF</a>
                 @if ($req->status === 'وُقّع')<a class="btn ghost sm" href="{{ route('sign.cert', $token) }}">📜 شهادة الإتمام</a>@endif
@@ -35,7 +35,7 @@
     @endif
     <div class="card">
         @php $vdoc = ($req->status === 'وُقّع' && $req->verify_code)
-            ? \App\Support\Qr::svg(route('sign.verify.doc', $req->verify_code), 96) : null; @endphp
+            ? \App\Support\Documents\Qr::svg(route('sign.verify.doc', $req->verify_code), 96) : null; @endphp
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;border-bottom:2px solid var(--ln);padding-bottom:10px;margin-bottom:14px">
             <h2>{{ $req->title }}</h2>
             <div style="text-align:left">

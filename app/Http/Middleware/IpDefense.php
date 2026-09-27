@@ -3,8 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Models\IpRule;
-use App\Support\Api;
-use App\Support\SecurityRadar;
+use App\Support\Platform\Api;
+use App\Support\Security\SecurityRadar;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;

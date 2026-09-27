@@ -27,7 +27,7 @@
   لأنّه لا يحمل تخويلاً (الاستعلامُ منطَّقٌ بـ`user_id` أصلاً): مؤشّرٌ مُختلَقٌ يزيح النافذةَ داخلَ
   إشعاراتي وحدَها لا غير.
 - كلُّ عنصرٍ يحمل وجهتَه القانونيّة `{module,id,action}` من `NotificationLink::target($n)`
-  (`app/Support/NotificationLink.php:28`) — لا رابطَ ويبٍ صلبٌ ولا اسمَ شاشة (راجع
+  (`app/Support/Collaboration/NotificationLink.php:28`) — لا رابطَ ويبٍ صلبٌ ولا اسمَ شاشة (راجع
   `08-versioning-deep-links.md`).
 - الحذفُ الصلبُ للنموذج يعني لا شواهدَ حذف؛ يُزامَن العميلُ بالمؤشّر ويُسقِط من خبيئته ما لم يعد يرد.
 
@@ -39,7 +39,7 @@
 
 ```php
 static::created(function (self $n) {
-    \App\Support\PushService::scheduleFanout($n);
+    \App\Support\Mobile\PushService::scheduleFanout($n);
 });
 ```
 
@@ -47,7 +47,7 @@ static::created(function (self $n) {
   الستّة (`AlertEngine`/`FlowRunner`/`LoginSentry`/`EsignController`/`HubDigest`/`HubAutomation`)
   التي تتجاوز `hub_notify` — بلا لمسِ أيٍّ منها.
 - **بعد الالتزام لا سطريّاً:** `scheduleFanout` يجدوله عبر `DB::afterCommit`
-  (`app/Support/PushService.php:126-135`)، فاستثناءُ مزوّدٍ لا يقع **داخلَ** المعاملة المحيطة
+  (`app/Support/Mobile/PushService.php:126-135`)، فاستثناءُ مزوّدٍ لا يقع **داخلَ** المعاملة المحيطة
   (اعتماد/استيعابُ مقاييس/مسار) فيُرجِعَ الإشعارَ الملتزَم (spec §Push: «failed push must not
   lose internal notification»). واستثناءُ التفريعِ نفسِه ملتقَطٌ (`report($e)`) — الإشعارُ الداخليُّ نجا.
 - **الأنواعُ المكتومة لا تُدفَع بلا حارسٍ زائد:** hook الكتمِ يُلغي `creating` بـ`return false`
@@ -60,7 +60,7 @@ static::created(function (self $n) {
 
 ## 3) خدمةُ الدفع والمزوّدون
 
-`App\Support\PushService` (`app/Support/PushService.php`) هي التجريد؛ خلفَها واجهةٌ ومنفّذان:
+`App\Support\Mobile\PushService` (`app/Support/Mobile/PushService.php`) هي التجريد؛ خلفَها واجهةٌ ومنفّذان:
 
 | المكوّن | الملف | الدور |
 |---|---|---|
@@ -107,7 +107,7 @@ static::created(function (self $n) {
 
 ## 5) خصوصيّةُ الدفع — الحمولةُ آمنةٌ بالبناء
 
-`PushService::payloadFor($n)` (`app/Support/PushService.php:202`) يبني:
+`PushService::payloadFor($n)` (`app/Support/Mobile/PushService.php:202`) يبني:
 
 ```json
 {
@@ -129,7 +129,21 @@ static::created(function (self $n) {
 - **الجسمُ ثابتٌ عامّ** (`GENERIC_BODY` · `:41`) — «افتح التطبيق للاطّلاع على التفاصيل».
 - **الوجهةُ القانونيّة** `{module,id,action}` من `NotificationLink::target` — لا رابطَ ويبٍ ولا اسمَ شاشة.
 - **عددُ غير المقروء** لصاحب الإشعار وحدَه (`unreadFor` · `:303`).
-- على FCM تُرسَل `notification.{title,body}` + `data` (نصوصٌ) فقط (`FcmPushProvider.php:53-63`) — لا سرَّ في الحمولة.
+- على FCM تُرسَل `notification.{title,body}` + `data` (نصوصٌ) فقط — لا سرَّ في الحمولة.
+- **(إضافيّ · خطّةُ التطبيق 2.3)** يُضاف إلى رسالة FCM: `apns.payload.aps.badge` = عددُ غير المقروء
+  (شارةُ iOS دون فتح التطبيق)، و`android.notification.channel_id` = `lynomia_default`
+  (`PushService::ANDROID_CHANNEL` — ينشئ التطبيقُ القناةَ بالمعرّف نفسِه). قاعدةُ الجسمِ العامّ باقية.
+
+### اعتمادُ FCM — حسابُ خدمةٍ يسكّ رمزَ OAuth خادميّاً
+
+رمزُ الوصول الثابت (`mobile.push_fcm_access_token`) يعيش ساعةً ثم يسقط الدفعُ صامتاً. المفضَّلُ الآن
+**ملفُّ حساب الخدمة** (`mobile.push_fcm_service_account` — سرٌّ مشفَّرٌ للكتابة فقط يُضبط من مركز منصّة
+الجوال ← الدفع؛ يُتحقَّق من `client_email`/`private_key`/`project_id`). منه يسكّ
+`App\Support\Push\FcmServiceAccount` رمزاً: JWT موقَّعٌ RS256 (`openssl_sign`) بنطاق
+`https://www.googleapis.com/auth/firebase.messaging`، يُبادَل في `https://oauth2.googleapis.com/token`
+(منحةُ jwt-bearer، عبر حارس الصادر `hub_outbound_ok` — والنقطةُ ثابتةٌ لا تُقرأ من الملفّ)، ويُخبَّأ
+مشفَّراً حتى ما قبل انتهائه بخمس دقائق. الرمزُ الثابتُ يبقى احتياطاً للتوافق. تعذّرُ السكّ بلا احتياط ⇒
+تسليمٌ `failed` بصنف `auth_failed` (صادقٌ لا نجاحٌ مُزيَّف)، ولا يُسجَّل ملفٌّ ولا رمزٌ ولا ردُّ مزوّد.
 
 ---
 

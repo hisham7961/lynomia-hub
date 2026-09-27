@@ -51,7 +51,7 @@
 | `ai.timeout_read` | number | لا | مهلةُ القراءةِ بالثواني |
 
 السرّيّةُ تُعلَن بـ`'sensitive' => true` في `config/hub_settings.php`، فيتكفّل
-`Settings::put` بالتشفير (`app/Support/Settings.php:626`)، ويستثنيه التصديرُ
+`Settings::put` بالتشفير (`app/Support/Platform/Settings.php:626`)، ويستثنيه التصديرُ
 والسجلّاتُ تلقائيّاً. **لا قائمةَ أسرارٍ ثانية** — وهو نصُّ عقدِ الإعدادات نفسِه.
 
 > **قرارٌ مؤجَّلٌ للمرحلة ٢:** أين تُحفَظ اعتماداتُ **المزوّدين** (لا البوّابة)؟
@@ -81,7 +81,7 @@
 ## ٥) عقدُ الفحص
 
 `ConnectionProbe::litellm()` — يُضاف إلى **الفاحصِ الواحد** لا فاحصٌ ثانٍ،
-بشكلِه نفسِه (`app/Support/ConnectionProbe.php:33`):
+بشكلِه نفسِه (`app/Support/Ops/ConnectionProbe.php:33`):
 
 ```
 ['up' => true|false|null, 'code' => ?int, 'ms' => ?int,

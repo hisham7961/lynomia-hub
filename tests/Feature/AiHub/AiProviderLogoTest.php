@@ -3,7 +3,7 @@
 namespace Tests\Feature\AiHub;
 
 use App\Console\Commands\HubAiLogos;
-use App\Support\AiProviderRegistry;
+use App\Support\Ai\Catalog\AiProviderRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

@@ -1,0 +1,161 @@
+<?php
+
+/** سجلُّ الوحدات — «recur» (docs/REORG_PLAN.md §R4) — يُحمَّل بترتيبه من قائمة config/hub.php */
+
+return [
+    'key' => 'recur',
+    'table' => 'recurring_docs',
+    'model' => 'RecurringDoc',
+    'label' => 'المصروفات المتكررة',
+    'display' => 'name',
+    'status' => 'status',
+    'columns' => [
+        'name',
+        'amount',
+        'cycle',
+        'next',
+        'status',
+        
+    ],
+    'fields' => [
+        [
+            'key' => 'name',
+            'col' => 'name',
+            'label' => 'اسم المصروف',
+            'type' => 'text',
+            'required' => true,
+        ],
+        [
+            'key' => 'partner',
+            'col' => 'partner',
+            'label' => 'المورد',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'kind',
+            'col' => 'kind',
+            'label' => 'النوع',
+            'type' => 'sel',
+            'options' => [
+                'مصروف',
+                'فاتورة مشتريات',
+                'فاتورة مبيعات',
+            ],
+        ],
+        [
+            'key' => 'amount',
+            'col' => 'amount',
+            'label' => 'المبلغ',
+            'type' => 'num',
+            'money' => true,
+            'required' => true,
+        ],
+        [
+            'key' => 'currency',
+            'col' => 'currency',
+            'label' => 'العملة',
+            'type' => 'sel',
+            'options' => ['د.ك', 'دولار', 'ريال', 'درهم', 'يورو'],
+        ],
+        [
+            'key' => 'cycle',
+            'col' => 'cycle',
+            'label' => 'الدورة',
+            'type' => 'sel',
+            'required' => true,
+            'options' => [
+                'شهري',
+                'ربع سنوي',
+                'نصف سنوي',
+                'سنوي',
+            ],
+        ],
+        [
+            'key' => 'next',
+            'col' => 'next',
+            'label' => 'التوليد القادم',
+            'type' => 'date',
+            'required' => true,
+            // موعد آلة لا موعد إنسان: المحرك اليومي يولّده بنفسه — وجوده في الرادار ضجيج
+            'expiry' => false,
+        ],
+        [
+            'key' => 'projectId',
+            'col' => 'project_id',
+            'label' => 'المشروع',
+            'type' => 'ref',
+            'ref' => 'projects',
+        ],
+        [
+            'key' => 'companyId',
+            'col' => 'company_id',
+            'label' => 'الشركة',
+            'type' => 'ref',
+            'ref' => 'companies',
+        ],
+        [
+            'key' => 'ccId',
+            'col' => 'cc_id',
+            'label' => 'مركز التكلفة',
+            'type' => 'ref',
+            'ref' => 'costc',
+        ],
+        [
+            'key' => 'cat',
+            'col' => 'cat',
+            'label' => 'التصنيف',
+            'type' => 'sel',
+            'options' => [
+                'تطوير',
+                'تصميم',
+                'تسويق وإعلانات',
+                'استضافة وسيرفرات',
+                'اشتراكات وأدوات',
+                'رواتب وأتعاب',
+                'رسوم حكومية',
+                'شحن وتوصيل',
+                'أخرى',
+            ],
+        ],
+        [
+            'key' => 'method',
+            'col' => 'method',
+            'label' => 'طريقة الدفع',
+            'type' => 'sel',
+            'options' => [
+                'تحويل بنكي',
+                'بطاقة',
+                'نقدي',
+                'KNET',
+                'أخرى',
+            ],
+        ],
+        [
+            'key' => 'autoPost',
+            'col' => 'auto_post',
+            'label' => 'ترحيل تلقائي',
+            'type' => 'bool',
+        ],
+        [
+            'key' => 'status',
+            'col' => 'status',
+            'label' => 'الحالة',
+            'type' => 'sel',
+            'options' => [
+                'مفعّل',
+                'متوقف',
+                'منتهي',
+            ],
+        ],
+        [
+            'key' => 'notes',
+            'col' => 'notes',
+            'label' => 'ملاحظات',
+            'type' => 'ta',
+        ],
+    ],
+    'search' => [
+        'name',
+        'partner',
+    ],
+];

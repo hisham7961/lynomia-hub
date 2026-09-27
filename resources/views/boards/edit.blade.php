@@ -27,7 +27,7 @@
                     <li class="witem" draggable="true" data-id="{{ $w->id }}">
                         <input type="hidden" name="order[]" value="{{ $w->id }}">
                         <span class="grip" aria-hidden="true">⠿</span>
-                        <span class="wname">{{ \App\Support\WidgetRegistry::labels()[$w->widget_key] ?? $w->widget_key }}</span>
+                        <span class="wname">{{ \App\Support\Platform\WidgetRegistry::labels()[$w->widget_key] ?? $w->widget_key }}</span>
                         <label class="sub">العرض
                             <select class="inp xs" name="w[{{ $w->id }}]">
                                 @foreach ([3 => 'ربع', 4 => 'ثلث', 6 => 'نصف', 8 => 'ثلثان', 12 => 'كامل'] as $v => $t)

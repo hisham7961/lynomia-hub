@@ -2,7 +2,7 @@
 @section('title', $f['title_ar'])
 @section('content')
 @php
-    use App\Support\FeatureStatus;
+    use App\Support\Platform\FeatureStatus;
     $mob = ['ready' => 'الخلفيّةُ جاهزة', 'development' => 'قيدَ التطوير', 'not_applicable' => 'لا ينطبق'];
     $nat = ['deferred' => 'مؤجَّلة', 'available' => 'متاحة', 'not_applicable' => 'لا ينطبق'];
     $oa  = ['documented' => 'موثَّقة', 'not_applicable' => 'لا ينطبق'];
@@ -66,7 +66,7 @@
                 @endif
                 @if ($f['depends'])
                     <div class="sub" style="margin-top:6px"><b>يتوقّف على:</b>
-                        @foreach ($f['depends'] as $dep)<a href="{{ route('features.show', $dep) }}" class="bdg g" style="text-decoration:none">{{ \App\Support\FeatureRegistry::title($dep) }}</a>@endforeach
+                        @foreach ($f['depends'] as $dep)<a href="{{ route('features.show', $dep) }}" class="bdg g" style="text-decoration:none">{{ \App\Support\Platform\FeatureRegistry::title($dep) }}</a>@endforeach
                     </div>
                 @endif
                 @if ($f['external_depends'])

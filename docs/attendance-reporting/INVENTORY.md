@@ -51,7 +51,7 @@
 |---|---|---|---|
 | `config/hub_settings.php` (`:634-695`) | معدَّل | ستّةُ مفاتيحِ إعدادٍ للاشتراطِ والمهلةِ والسياسةِ والتذكيرِ والمراجعة (الجدولُ أدناه) | §9/§117 |
 | `config/hub_features.php` (`:131-135`) | معدَّل | قدرةٌ واحدةٌ `workos.daily_reports` (domain `work_os`، permissions `hr`، web_routes `reports.index/review/mine`) | §120 |
-| `config/hub_ia.php` (`:179-188`) + `app/Support/InformationArchitecture.php` (`:109-113`) | معدَّل | ثلاثُ وجهاتٍ في العمل → «المهام والتنفيذ» بحرّاسِ `reports_mine`/`reports_center`/`reports_review` | §121 |
+| `config/hub_ia.php` (`:179-188`) + `app/Support/Platform/InformationArchitecture.php` (`:109-113`) | معدَّل | ثلاثُ وجهاتٍ في العمل → «المهام والتنفيذ» بحرّاسِ `reports_mine`/`reports_center`/`reports_review` | §121 |
 | `routes/web.php` (`:251-258`) | معدَّل | مساراتُ الويب الستّة (الجدولُ أدناه) | §17 |
 | `routes/api.php` (`:23-25`, `:198-199`) | معدَّل | مساراتُ REST v1 والجوّال (الجدولُ أدناه) | §93 |
 

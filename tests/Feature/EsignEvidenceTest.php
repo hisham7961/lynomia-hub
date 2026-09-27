@@ -42,12 +42,12 @@ class EsignEvidenceTest extends TestCase
         $req = $this->signedLegacy();
 
         $this->assertNotNull($req->evidence_hash, 'رأس السلسلة يُجمَّد لحظة الاكتمال');
-        [, $head] = \App\Support\Evidence::chain($req);
+        [, $head] = \App\Support\Documents\Evidence::chain($req);
         $this->assertSame($head, $req->evidence_hash, 'إعادة الحساب تطابق المجمّد — السجل سليم');
 
         // السلسلة تكسر عند العبث: تغيير doc_hash يغيّر كل الحلقات
         $req->forceFill(['doc_hash' => hash('sha256', 'نص مزوّر')])->saveQuietly();
-        [, $tampered] = \App\Support\Evidence::chain($req->fresh());
+        [, $tampered] = \App\Support\Documents\Evidence::chain($req->fresh());
         $this->assertNotSame($req->evidence_hash, $tampered, 'العبث بالبصمة يكسر السلسلة');
     }
 

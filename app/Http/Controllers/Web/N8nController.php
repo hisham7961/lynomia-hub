@@ -38,11 +38,11 @@ class N8nController extends Controller
     public function test()
     {
         $this->gate();
-        $res = \App\Support\ConnectionProbe::n8n();
+        $res = \App\Support\Ops\ConnectionProbe::n8n();
 
         return $res['up'] === true
-            ? back()->with('ok', \App\Support\ConnectionProbe::line($res))
-            : back()->withErrors(['url' => \App\Support\ConnectionProbe::line($res)]);
+            ? back()->with('ok', \App\Support\Ops\ConnectionProbe::line($res))
+            : back()->withErrors(['url' => \App\Support\Ops\ConnectionProbe::line($res)]);
     }
 
     public function save(Request $r)
@@ -63,10 +63,10 @@ class N8nController extends Controller
         }
 
         // (WP-9.2) على الكاتب الواحد: التشفيرُ والإبطالُ والتدقيقُ وصفُّ التاريخ عنده
-        \App\Support\Settings::batch('n8n', function () use ($d) {
-            \App\Support\Settings::put('n8n.url', (string) ($d['url'] ?? ''), 'n8n');
+        \App\Support\Platform\Settings::batch('n8n', function () use ($d) {
+            \App\Support\Platform\Settings::put('n8n.url', (string) ($d['url'] ?? ''), 'n8n');
             // المفتاح: فارغٌ يُبقي المخزون؛ والمكتوب يُشفَّر (enc:) عند الكاتب
-            if (filled($d['key'] ?? null)) \App\Support\Settings::put('n8n.key', $d['key'], 'n8n');
+            if (filled($d['key'] ?? null)) \App\Support\Platform\Settings::put('n8n.key', $d['key'], 'n8n');
         }, ['name' => 'n8n.* — من مركز التكامل']);
 
         return back()->with('ok', 'حُفظ ربط n8n — افتح لوحته من الزر أعلاه');

@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Contract;
-use App\Support\Evidence;
+use App\Support\Documents\Evidence;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;

@@ -8,10 +8,10 @@ use App\Models\AiModel;
 use App\Models\AiPolicyRule;
 use App\Models\AiProvider;
 use App\Models\AiUsageEvent;
-use App\Support\AiAccess;
-use App\Support\AiBudgets;
-use App\Support\AiCost;
-use App\Support\AiPolicy;
+use App\Support\Ai\Center\AiAccess;
+use App\Support\Ai\Governance\AiBudgets;
+use App\Support\Ai\Governance\AiCost;
+use App\Support\Ai\Governance\AiPolicy;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 

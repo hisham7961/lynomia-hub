@@ -9,15 +9,15 @@ use App\Models\Company;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\AskContext;
-use App\Support\AskFailures;
-use App\Support\AskPipeline;
-use App\Support\AskPolicy;
-use App\Support\AiGateway;
-use App\Support\AiProfiles;
-use App\Support\AskTools;
-use App\Support\NullAskGenerator;
-use App\Support\Settings;
+use App\Support\Ai\Ask\AskContext;
+use App\Support\Ai\Ask\AskFailures;
+use App\Support\Ai\Ask\AskPipeline;
+use App\Support\Ai\Ask\AskPolicy;
+use App\Support\Ai\Gateway\AiGateway;
+use App\Support\Ai\Routing\AiProfiles;
+use App\Support\Ai\Ask\AskTools;
+use App\Support\Ai\Ask\NullAskGenerator;
+use App\Support\Platform\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -94,7 +94,7 @@ class AskPipelineTest extends TestCase
         // الصوابُ في الإنتاج (طلبٌ واحدٌ لا يُعيد اشتقاقَ مئةِ قدرة)، لكنّه
         // **يعبر بين أصنافِ الاختبارِ في العمليّةِ الواحدة**: صنفٌ سابقٌ حسم
         // «ai.assistant» وبوّابتُه غيرُ مهيّأة، فتبقى مُطفأةً هنا مهما ضبطنا.
-        \App\Support\FeatureRegistry::flush();
+        \App\Support\Platform\FeatureRegistry::flush();
 
         AiProfiles::seed();
 

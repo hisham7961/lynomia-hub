@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Task;
-use App\Support\ExecutionStats;
+use App\Support\Workforce\ExecutionStats;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

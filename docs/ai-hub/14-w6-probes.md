@@ -6,8 +6,8 @@
 
 | الملف | ماذا |
 |---|---|
-| `app/Support/AiProbes.php` | الخمسةُ — يرث `ConnectionProbe` |
-| `app/Support/AiModels.php` | `recordVerified()` — يكتبه المستوى E وحدَه |
+| `app/Support/Ai/Catalog/AiProbes.php` | الخمسةُ — يرث `ConnectionProbe` |
+| `app/Support/Ai/Catalog/AiModels.php` | `recordVerified()` — يكتبه المستوى E وحدَه |
 | `AiProviderController::probe` | المستوى B |
 | `AiModelController::probe` | المستويات C · D · E |
 | `tests/…/AiProbesTest.php` | ٢٢ اختباراً |

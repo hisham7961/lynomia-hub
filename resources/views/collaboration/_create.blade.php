@@ -121,7 +121,7 @@
 .cc-go { flex:none; color:var(--sb) }
 .cc-empty { padding:12px 2px; color:var(--sb); font-size:13px }
 </style>
-<script>
+<script @cspNonce>
 /* بحثُ منتقي المحادثة — يُرشّح الصفوفَ على الاسم/المسمّى (تحسينٌ تدريجيّ) */
 (function () {
     var q = document.querySelector('[data-cc-q]');

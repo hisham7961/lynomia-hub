@@ -18,7 +18,7 @@
         </tr></thead>
         <tbody>
         @forelse ($rows as $tok)
-            @php [$tokLabel, $tokTone] = \App\Support\ApiTokens::STATUSES[$tok->status] ?? [$tok->status, 'g']; @endphp
+            @php [$tokLabel, $tokTone] = \App\Support\Security\ApiTokens::STATUSES[$tok->status] ?? [$tok->status, 'g']; @endphp
             <tr>
                 <td><b>{{ $tok->name }}</b>
                     @if ($tok->allowed_ips)<div class="sub" title="محصورٌ بعناوين شبكةٍ محددة">🌐 مقيَّد العناوين</div>@endif</td>

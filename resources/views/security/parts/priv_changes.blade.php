@@ -12,7 +12,7 @@
         </tr></thead>
         <tbody>
         @forelse ($rows as $pc)
-            @php $pcMask = fn ($s) => $emailMode === '' ? (string) $s : \App\Support\SecurityFindings::maskPII((string) $s); @endphp
+            @php $pcMask = fn ($s) => $emailMode === '' ? (string) $s : \App\Support\Security\SecurityFindings::maskPII((string) $s); @endphp
             <tr>
                 <td><b>{{ $pcMask($pc->action) }}</b></td>
                 <td>{{ $pc->module === 'roles' ? 'الأدوار' : 'المستخدمون' }}</td>

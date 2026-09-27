@@ -25,7 +25,7 @@ class QuotePdfAndAcceptTest extends TestCase
         $q->recalc();
 
         // العرضُ الاحترافيّ يُبنى (HTML صريح من Proposal — مستقلٌّ عن توفّر mPDF)
-        $html = \App\Support\Proposal::html($q->fresh());
+        $html = \App\Support\Documents\Proposal::html($q->fresh());
         $this->assertStringContainsString('عرضُ مشروعٍ', $html);
         $this->assertStringContainsString('الملخّص التنفيذي', $html);
         $this->assertStringContainsString('العرض التجاريّ', $html);

@@ -7,8 +7,8 @@ use App\Models\Comment;
 use App\Models\DmMessage;
 use App\Models\SavedMessage;
 use App\Models\User;
-use App\Support\Collaboration;
-use App\Support\CommentService;
+use App\Support\Collaboration\Collaboration;
+use App\Support\Collaboration\CommentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -35,7 +35,7 @@ class SavedController extends Controller
 
         $existing = SavedMessage::where('user_id', $me->id)
             ->where('target_type', $data['target_type'])
-            ->where('target_id', $data['target_id'])->first();
+            ->where('target_id', $data['target_id'])->orderBy('id')->first();
 
         if ($existing) {
             $existing->delete();
@@ -82,6 +82,8 @@ class SavedController extends Controller
             $c = Comment::find($id);
             abort_unless($c, 422, 'لا رسالةَ بهذا المعرّف');
             CommentService::guardTarget($me, (string) $c->module, $c->record_id);   // يُجهض إن خفي
+            // منشورُ القناةِ العامّة الموسومُ بشركةٍ خارجَ نطاقي = ٤٠٤ (guardTarget يعيد feed بلا تنطيق)
+            CommentService::guardFeedComment($me, $c);
 
             return;
         }
@@ -103,6 +105,7 @@ class SavedController extends Controller
                 $c = Comment::find($s->target_id);
                 if (! $c) return $base;
                 CommentService::guardTarget($me, (string) $c->module, $c->record_id);   // يُجهض إن خفي
+                CommentService::guardFeedComment($me, $c);   // منشورُ شركةٍ خارجَ نطاقي = غيرُ متاح
 
                 return array_merge($base, [
                     'available' => true,
@@ -119,7 +122,7 @@ class SavedController extends Controller
                 'available' => $m->deleted_at === null,
                 'title'     => $m->deleted_at === null ? Str::limit(trim((string) $m->body), 90) : 'حُذفت رسالة',
                 'author'    => optional(User::find($m->from_id))->name,
-                'link'      => \App\Support\MessageLink::dm($m, (string) $me->id),
+                'link'      => \App\Support\Collaboration\MessageLink::dm($m, (string) $me->id),
             ]);
         } catch (\Throwable $e) {
             return $base;   // لم يعد يُرى — يبقى صفُّ المحفوظةِ كي يُزيلها صاحبُها

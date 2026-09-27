@@ -58,7 +58,7 @@ class Permissions360LeakClosureTest extends TestCase
         Attendance::create(['emp_id' => $emp->id, 'date' => now()->toDateString(),
             'time_in' => '08:00', 'time_out' => '16:00', 'status' => 'حاضر', 'hours' => 8]);
 
-        $e360 = new \App\Support\Employee360();
+        $e360 = new \App\Support\Workforce\Employee360();
 
         // يرى التقاريرَ (updates:v) لكن بلا حضور (attend:v) ⇒ وقتُ الحضورِ محجوب
         $noAttend = $this->userWith('noatt@test.local', ['updates' => ['v' => 1]]);

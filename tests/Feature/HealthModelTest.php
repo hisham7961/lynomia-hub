@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Models\OutboxMessage;
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
-use App\Support\Health;
-use App\Support\Integrations;
+use App\Support\Ops\Health;
+use App\Support\Ops\Integrations;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

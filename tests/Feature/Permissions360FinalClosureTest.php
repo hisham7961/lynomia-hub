@@ -10,7 +10,7 @@ use App\Models\Quote;
 use App\Models\QuoteLine;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\ClientPortalData;
+use App\Support\Collaboration\ClientPortalData;
 use Tests\TestCase;
 
 /**

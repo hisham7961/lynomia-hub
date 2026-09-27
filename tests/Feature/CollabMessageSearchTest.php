@@ -6,9 +6,9 @@ use App\Models\Comment;
 use App\Models\Conversation;
 use App\Models\ConversationMember;
 use App\Models\DmMessage;
-use App\Support\CommentService;
-use App\Support\DmService;
-use App\Support\MessageLink;
+use App\Support\Collaboration\CommentService;
+use App\Support\Collaboration\DmService;
+use App\Support\Collaboration\MessageLink;
 use Tests\TestCase;
 
 /**

@@ -241,7 +241,7 @@ class ApiContractTest extends TestCase
         $this->assertArrayHasKey('patch', $spec['paths']['/api/v1/clients/{id}']);
         $this->assertArrayHasKey('Clients', $spec['components']['schemas']);
         $this->assertArrayHasKey('Error', $spec['components']['schemas']);
-        $this->assertSame(array_keys(\App\Support\Api::CODES), array_keys($spec['x-error-codes']));
+        $this->assertSame(array_keys(\App\Support\Platform\Api::CODES), array_keys($spec['x-error-codes']));
         // المفتاحُ المقيَّد لا يُوثَّق له ما لا يستطيع
         $scoped = $this->withHeaders($this->h($this->owner, 'tasks:v'))->getJson('/api/v1/openapi.json')->assertOk()->json();
         $this->assertArrayNotHasKey('/api/v1/clients', $scoped['paths']);

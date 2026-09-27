@@ -22,7 +22,7 @@
 - بروتوكول الوكيل: `Api\EndpointProtocolController` خلف `EndpointSignature` middleware (ES256 على `Es256::canonical`، نافذةُ ±٣٠٠ث، nonce فريدٌ لكلِّ جهاز، إبطالُ إعادةٍ ذرّيّ).
 - التسجيل: `Api\EndpointEnrollController` (سكُّ رمزٍ مالك/مراقب + Step-Up؛ التسجيلُ عامٌّ برمزٍ لمرّةٍ واحدة).
 - الواجهة: `Web\EndpointCentreController` + `Web\EndpointReleaseController` (عميلٌ ٤٠٤، مالك/مراقب).
-- التوقيع: `App\Support\Es256` (P-256/ES256 حصراً). الخصوصيّة: `App\Support\EndpointPrivacy`.
+- التوقيع: `App\Support\Security\Es256` (P-256/ES256 حصراً). الخصوصيّة: `App\Support\Endpoint\EndpointPrivacy`.
 
 **الوكيل (Go · `agent/`):** هويّة P-256 (المفتاحُ الخاصّ لا يغادر الجهاز)، نقلٌ موقَّع، جردٌ، وضعيّة، USB (metadata فقط)، محرّكُ تحديثٍ يتحقّق من sha256 قبل التبديل، أوامرُ **قائمةُ سماحٍ مغلقة** (لا تنفيذَ عامّ)، وحُرّاسُ مصدرٍ (`guardrails_test.go`) يمنعون shell/keylog/screenshot/clipboard/packet-capture.
 

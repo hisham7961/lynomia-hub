@@ -147,6 +147,10 @@
             @include('partials.esign_linked')
         @endif
         @include('partials.attachments', ['aModule' => $module, 'aRecordId' => $row->id])
+        {{-- المساعدُ التنفيذيّ (خارطةُ الذكاء · المرحلة ٣): مسودةٌ ثمّ تأكيد — يظهر لمن يملك المساعدَ والهدف --}}
+        @if (! $row->trashed())
+            @include('partials.assist_card', ['aModule' => $module, 'aRecordId' => $row->id])
+        @endif
         @if ($versions->count() > 1)
             <div class="card">
                 <h3 class="cardtitle">🕐 سجل الإصدارات</h3>

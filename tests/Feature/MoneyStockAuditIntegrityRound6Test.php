@@ -164,7 +164,7 @@ class MoneyStockAuditIntegrityRound6Test extends TestCase
         // ولا يكشفه إلا فحصُ الوصل
         DB::table('audits')->where('id', $ids[2])->delete();
 
-        $v = \App\Support\Audit::verifyTail();
+        $v = \App\Support\Platform\Audit::verifyTail();
         $this->assertFalse($v['ok'],
             'حُذف قيدٌ من منتصف السلسلة والفحصُ يقول «سليمة» — يفحص بصمةَ كل قيدٍ '
             . 'ولا يفحص الوصلَ بينها، وهذا بالضبط ما تُصان السلسلةُ من أجله');

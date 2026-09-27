@@ -3,7 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\ApiToken;
-use App\Support\Api;
+use App\Support\Platform\Api;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,20 +18,20 @@ class ApiAuth
 
         $plain = (string) $request->bearerToken();
         if ($plain === '') {
-            \App\Support\SecurityRadar::record($request, 'وصول مرفوض', 'API بلا مفتاح');   // v2.399: تغطية ACCESS_DENIED
+            \App\Support\Security\SecurityRadar::record($request, 'وصول مرفوض', 'API بلا مفتاح');   // v2.399: تغطية ACCESS_DENIED
             return Api::error(Api::UNAUTHENTICATED, 401, 'أرسل المفتاح في ترويسة Authorization: Bearer <token>');
         }
 
         $token = ApiToken::where('token_hash', hash('sha256', $plain))->first();
         if (! $token || ($token->expires_at && now()->gt($token->expires_at))) {
-            \App\Support\SecurityRadar::record($request, 'وصول مرفوض', $token ? 'مفتاح API منتهٍ' : 'مفتاح API غير صالح');
+            \App\Support\Security\SecurityRadar::record($request, 'وصول مرفوض', $token ? 'مفتاح API منتهٍ' : 'مفتاح API غير صالح');
             return Api::error(Api::UNAUTHENTICATED, 401, 'مفتاح غير صالح أو منتهٍ');
         }
 
         // (WP-4.5) المُبطَل إدارياً ميتٌ فوراً — الإبطالُ الناعم (revoked_at) يُبقي
         // الصفَّ شاهداً للمراجعة، وهذا الرفضُ هو ما يجعله إبطالاً لا وسماً للعرض
         if ($token->revoked_at) {
-            \App\Support\SecurityRadar::record($request, 'وصول مرفوض', 'مفتاح API مُبطَل');
+            \App\Support\Security\SecurityRadar::record($request, 'وصول مرفوض', 'مفتاح API مُبطَل');
             return Api::error(Api::UNAUTHENTICATED, 401, 'هذا المفتاح أُبطل — أنشئ مفتاحاً جديداً من ملفك الشخصي');
         }
 
@@ -40,7 +40,7 @@ class ApiAuth
                 'هذا المفتاح مقيد بعناوين IP محددة وعنوانك ليس منها', ['reason' => 'token_ip_allowlist']);
         }
 
-        $user = $token->user()->whereNull('deleted_at')->first();
+        $user = $token->user()->whereNull('deleted_at')->orderBy('id')->first();
         if (! $user || $user->isSuspended() || ($user->locked_until && now()->lt($user->locked_until))) {   // AUTH-3
             return Api::error(Api::ACCOUNT_RESTRICTED, 403, 'الحساب موقوف أو مقفل', ['reason' => 'account_suspended_or_locked']);
         }

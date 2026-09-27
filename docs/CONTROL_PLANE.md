@@ -53,12 +53,12 @@
 
 | العمود | الواجهة | الملف |
 |---|---|---|
-| المدى الزمنيّ | `TimeRange::fromRequest` · `->prev()` · `->apply($q,$col)` + `hub_range()` | `app/Support/TimeRange.php` |
-| سلّمُ الشدّة | `Severity::normalize` · `label` · `tone` · `rank` · `atLeast` | `app/Support/Severity.php` |
-| المُطهِّرُ الواحد | `Redactor::text` · `arr` · `fingerprint` · `sql` · `json` | `app/Support/Redactor.php` |
-| الترابط | `Api::requestId` + وسيط `Observability` + `Correlation::forRequestId` | `app/Support/Correlation.php` |
+| المدى الزمنيّ | `TimeRange::fromRequest` · `->prev()` · `->apply($q,$col)` + `hub_range()` | `app/Support/Platform/TimeRange.php` |
+| سلّمُ الشدّة | `Severity::normalize` · `label` · `tone` · `rank` · `atLeast` | `app/Support/Platform/Severity.php` |
+| المُطهِّرُ الواحد | `Redactor::text` · `arr` · `fingerprint` · `sql` · `json` | `app/Support/Platform/Redactor.php` |
+| الترابط | `Api::requestId` + وسيط `Observability` + `Correlation::forRequestId` | `app/Support/Ops/Correlation.php` |
 | عُدّةُ الواجهة | `partials/cc/{kpis,trend,findings,freshness,tabs,th}` + `hub_admin_links()` | `resources/views/partials/cc/` |
-| أوّليّاتُ القياس | `hub_metric_bucket()` · `hub_window_pair()` · `hub_compare()` · `Series::percentiles` | `app/Support/Series.php` |
+| أوّليّاتُ القياس | `hub_metric_bucket()` · `hub_window_pair()` · `hub_compare()` · `Series::percentiles` | `app/Support/Ops/Series.php` |
 
 وثلاثُ قواعدَ تسري على كلّ مركز:
 
@@ -196,7 +196,7 @@
 ## ٤) معاني الشدّة — خمسُ درجاتٍ فوق ستّ مفردات
 
 المستودعُ يتكلّم الشدّةَ بستّ لهجات، ولم يكن يمكن **عدُّ** «كم مشكلةً حرجة عندنا»
-لأن الحرجَ يُكتب بستّ صيغ. `App\Support\Severity` **طبقةُ خرائطَ للقراءة** فوقها —
+لأن الحرجَ يُكتب بستّ صيغ. `App\Support\Platform\Severity` **طبقةُ خرائطَ للقراءة** فوقها —
 لا مفرداتٌ سابعة، ولا تحويلٌ مدمِّرٌ لقيمةٍ مخزَّنة.
 
 ### الدرجاتُ الخمس
@@ -353,7 +353,7 @@
 ## ٧) تنقيةُ البيانات الحسّاسة — المُطهِّرُ الواحد
 
 كان الطمسُ مبعثراً في سبعة مواضعَ بقواعدَ متفاوتة، **وما لم يعرفه موضعٌ تسرّب منه**.
-`App\Support\Redactor` يجمع القواعدَ كلَّها، والسبعةُ **تفوَّض إليه ولا تُستبدل**
+`App\Support\Platform\Redactor` يجمع القواعدَ كلَّها، والسبعةُ **تفوَّض إليه ولا تُستبدل**
 واجهاتُها.
 
 ### أ) الواجهات الخمس

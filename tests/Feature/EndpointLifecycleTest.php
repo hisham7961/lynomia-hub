@@ -6,7 +6,7 @@ use App\Models\Company;
 use App\Models\EndpointCommand;
 use App\Models\EndpointDevice;
 use App\Models\EndpointEvent;
-use App\Support\Custody;
+use App\Support\Assets\Custody;
 use Illuminate\Support\Str;
 use Tests\Concerns\EnrollsEndpoints;
 use Tests\TestCase;

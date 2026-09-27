@@ -1,5 +1,5 @@
 [
-    "app\\support\\in_array_route_show",
+    "app\\support\\platform\\in_array_route_show",
     "hub_ack_announce",
     "hub_ack_board",
     "hub_ack_do",

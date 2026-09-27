@@ -17,7 +17,7 @@
                 <td>
                     <b>{{ $pv['name'] }}</b>
                     @if ($emailMode !== 'hide')
-                        <div class="sub">{{ $emailMode === 'mask' ? \App\Support\SecurityFindings::maskPII($pv['email']) : $pv['email'] }}</div>
+                        <div class="sub">{{ $emailMode === 'mask' ? \App\Support\Security\SecurityFindings::maskPII($pv['email']) : $pv['email'] }}</div>
                     @endif
                 </td>
                 <td>
@@ -35,7 +35,7 @@
                     @endif
                     @if ($pvFind = $findings[$pv['id']] ?? null)
                         <span class="bdg {{ ['open' => 'bad', 'acknowledged' => 'wn', 'resolved' => 'ok', 'ignored' => 'g'][$pvFind->status] ?? 'g' }}"
-                              title="نتيجةٌ أمنية على سكّة الإقرار الواحدة">{{ \App\Support\SecurityFindings::STATUSES[$pvFind->status] ?? $pvFind->status }}</span>
+                              title="نتيجةٌ أمنية على سكّة الإقرار الواحدة">{{ \App\Support\Security\SecurityFindings::STATUSES[$pvFind->status] ?? $pvFind->status }}</span>
                     @endif
                 </td>
                 <td class="sub">

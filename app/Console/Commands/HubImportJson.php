@@ -146,10 +146,10 @@ class HubImportJson extends Command
             // يقلب سياسةَ أمنٍ في الاستعادة و**لا يعرف أحدٌ أن شيئاً تغيّر**.
             // الآن على الكاتب الواحد: تحقّقٌ، وتشفيرٌ للحسّاس، وإبطالُ خبيئة،
             // وقيدُ تدقيقٍ واحد، وصفُّ تاريخٍ لكل مفتاح.
-            \App\Support\Settings::batch('import', function () use ($db, &$rejected) {
+            \App\Support\Platform\Settings::batch('import', function () use ($db, &$rejected) {
                 foreach ((array) ($db['settings'] ?? []) as $k => $v) {
                     try {
-                        \App\Support\Settings::put((string) $k, $v, 'import', 'استعادة نسخة (hub:import)');
+                        \App\Support\Platform\Settings::put((string) $k, $v, 'import', 'استعادة نسخة (hub:import)');
                     } catch (\InvalidArgumentException $e) {
                         // قيمةٌ لا تسري لا تُخزَّن بصمت: تُذكر في المخرَج ويُكمَل
                         $rejected[] = $k . ' — ' . $e->getMessage();

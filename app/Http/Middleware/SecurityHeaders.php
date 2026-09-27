@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Security\ContentSecurity;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -35,9 +36,19 @@ class SecurityHeaders
             // خالصٌ بلا كسر: تمنع اختطافَ `<base>`، وحقنَ الإضافات (`object`)، وتأطيرَ
             // الموقع من غيره. لا تُكتب إن كان متحكّمٌ قد ضبط سياسةً أخصّ (خدمةُ
             // المرفقات تقفل `default-src 'none'`) كي لا تُضعَّف بالأوسع.
+            //
+            // **وسياسةُ السكربتات بوضعٍ يختاره المالك** (بند الدَّين #12 · FE-03 ·
+            // `security.csp_script`): `enforce` (الافتراضي منذ v2.617) يضمّها إلى السياسة
+            // المفروضة؛ `report` يُعلنها في ترويسة Report-Only فيُبلغ المتصفّحُ ولا يحجب؛
+            // `off` يُسقطها. على صفحات HTML وحدها — ولا تمسّ سياسةً أخصّ.
             if (! $response->headers->has('Content-Security-Policy')) {
-                $response->header('Content-Security-Policy',
-                    "base-uri 'self'; object-src 'none'; frame-ancestors 'self'");
+                $csp = "base-uri 'self'; object-src 'none'; frame-ancestors 'self'";
+                $mode = self::isHtml($response) ? ContentSecurity::mode() : 'off';
+                if ($mode === 'enforce') $csp .= '; ' . ContentSecurity::scriptPolicyWithReport();
+                $response->header('Content-Security-Policy', $csp);
+                if ($mode === 'report' && ! $response->headers->has('Content-Security-Policy-Report-Only')) {
+                    $response->header('Content-Security-Policy-Report-Only', ContentSecurity::scriptPolicyWithReport());
+                }
             }
 
             // **لا يظهر في جوجل**: نظامٌ خاصٌّ خلف تسجيل دخول لا مكان له في فهرس
@@ -58,5 +69,13 @@ class SecurityHeaders
         }
 
         return $response;
+    }
+
+    /** صفحةُ HTML (أو بلا نوعٍ معلَن بعد — استجابةُ القالب لا تكتبه قبل الإرسال) */
+    protected static function isHtml($response): bool
+    {
+        $type = (string) $response->headers->get('Content-Type', '');
+
+        return $type === '' || str_contains(strtolower($type), 'text/html');
     }
 }

@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Conversation;
 use App\Models\ConversationMember;
-use App\Support\DmService;
-use App\Support\Presence;
-use App\Support\Typing;
+use App\Support\Collaboration\DmService;
+use App\Support\Collaboration\Presence;
+use App\Support\Collaboration\Typing;
 use Tests\TestCase;
 
 /**

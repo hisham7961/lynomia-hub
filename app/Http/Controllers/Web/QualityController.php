@@ -6,12 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\KpiDef;
 use App\Models\Ticket;
-use App\Support\CeoBoard;
-use App\Support\DataQuality;
-use App\Support\ExecutionStats;
-use App\Support\KpiCentre;
-use App\Support\OkrCentre;
-use App\Support\TimeRange;
+use App\Support\Insights\CeoBoard;
+use App\Support\Insights\DataQuality;
+use App\Support\Workforce\ExecutionStats;
+use App\Support\Insights\KpiCentre;
+use App\Support\Insights\OkrCentre;
+use App\Support\Platform\TimeRange;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 

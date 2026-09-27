@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Contract;
 use App\Models\RecurringDoc;
-use App\Support\DayRange;
+use App\Support\Platform\DayRange;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
 

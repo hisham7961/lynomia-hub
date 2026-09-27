@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\AiGateway;
-use App\Support\ConnectionProbe;
-use App\Support\Settings;
+use App\Support\Ai\Gateway\AiGateway;
+use App\Support\Ops\ConnectionProbe;
+use App\Support\Platform\Settings;
 use Illuminate\Http\Request;
 
 /**
@@ -26,7 +26,7 @@ class AiCenterController extends Controller
      */
     protected function gate(): void
     {
-        \App\Support\AiAccess::gateManage();
+        \App\Support\Ai\Center\AiAccess::gateManage();
     }
 
     /**
@@ -39,16 +39,29 @@ class AiCenterController extends Controller
      */
     public function index()
     {
-        \App\Support\AiAccess::gateView();
+        \App\Support\Ai\Center\AiAccess::gateView();
 
         return view('ai.center', [
-            'snap'     => \App\Support\AiOverview::snapshot(),
+            'snap'     => \App\Support\Ai\Center\AiOverview::snapshot(),
             // **مسارُ القبولِ كاملاً** — ثماني درجاتٍ تُقرأ حالتُها من النظامِ لا تُؤشَّر
-            'path'     => \App\Support\AiOverview::acceptancePath(),
-            'sections' => \App\Support\AiAccess::sections(),
+            'path'     => \App\Support\Ai\Center\AiOverview::acceptancePath(),
+            'sections' => \App\Support\Ai\Center\AiAccess::sections(),
             'section'  => 'overview',
-            'manage'   => \App\Support\AiAccess::canManage(),
+            'manage'   => \App\Support\Ai\Center\AiAccess::canManage(),
+            'quick'    => \App\Support\Ai\Center\AiAccess::canManage() ? \App\Support\Ai\Center\AiQuickSetup::plan() : null,
         ]);
+    }
+
+    /** **الإعدادُ السريع** — الفارغُ وحدَه، وكلُّ ضمٍّ عبر `AiProfiles::attach` بحرّاسه وأثره */
+    public function quickSetup(Request $r)
+    {
+        $this->gate();
+        $data = $r->validate(['usd' => ['required', 'integer', 'min:0', 'max:1000000'], 'brain' => ['nullable', 'boolean']]);
+        $res = \App\Support\Ai\Center\AiQuickSetup::apply((int) $data['usd'], (bool) ($data['brain'] ?? false));
+
+        return redirect()->route('ai.index')->with('ok', '✅ الإعدادُ السريع: ' . $res['attached'] . ' ضمّاً'
+            . ($res['budget'] ? ' · ميزانيّةٌ شهريّةٌ أُنشئت' : '')
+            . ($res['brain'] ? ' · البحثُ بالمعنى مفعَّل (الفهرسةُ في جولة الأتمتة التالية)' : ''));
     }
 
     /**
@@ -81,7 +94,7 @@ class AiCenterController extends Controller
             // الفحصُ **لا يُطلَق مع فتحِ الصفحة**: صفحةٌ تتّصل بالشبكة عند كلِّ
             // عرضٍ تصير بطيئةً ومزعجةً لخدمةٍ متوقّفة. الفحصُ بزرٍّ صريح.
             'probe'      => session('ai.probe'),
-            'sections'   => \App\Support\AiAccess::sections(),
+            'sections'   => \App\Support\Ai\Center\AiAccess::sections(),
             'section'    => 'settings',
         ]);
     }
@@ -101,21 +114,21 @@ class AiCenterController extends Controller
      */
     public function usage(Request $r)
     {
-        \App\Support\AiAccess::gateCost();
+        \App\Support\Ai\Center\AiAccess::gateCost();
 
         $pull   = $r->boolean('pull');
-        $spend  = $pull ? \App\Support\LiteLlmAdmin::spendByModel()   : null;
-        $active = $pull ? \App\Support\LiteLlmAdmin::activityByModel() : null;
+        $spend  = $pull ? \App\Support\Ai\Gateway\LiteLlmAdmin::spendByModel()   : null;
+        $active = $pull ? \App\Support\Ai\Gateway\LiteLlmAdmin::activityByModel() : null;
 
         return view('ai.usage', [
-            'sections'   => \App\Support\AiAccess::sections(),
+            'sections'   => \App\Support\Ai\Center\AiAccess::sections(),
             'section'    => 'usage',
             'configured' => AiGateway::configured(),
             'whyNot'     => AiGateway::whyNotReady(),
             'pulled'     => $pull,
             'spend'      => $spend,
             'activity'   => $active,
-            'attribution' => \App\Support\AiUsage::ATTRIBUTION,
+            'attribution' => \App\Support\Ai\Gateway\AiUsage::ATTRIBUTION,
             /*
              * **وسجلُّ Hub يُقرأ مع فتحِ الصفحةِ بلا زرّ** (المرحلة ٤) — ولا
              * تناقضَ مع قاعدةِ «القراءةُ بزرّ»: تلك قاعدةُ **نداءِ الشبكة**،
@@ -140,14 +153,14 @@ class AiCenterController extends Controller
      */
     public function diagnostics()
     {
-        \App\Support\AiAccess::gateView();
+        \App\Support\Ai\Center\AiAccess::gateView();
 
         return view('ai.diagnostics', [
-            'sections' => \App\Support\AiAccess::sections(),
+            'sections' => \App\Support\Ai\Center\AiAccess::sections(),
             'section'  => 'diagnostics',
-            'chain'    => \App\Support\AiDiagnostics::chain(),
-            'probes'   => \App\Support\AiDiagnostics::recentProbes(),
-            'manage'   => \App\Support\AiAccess::canManage(),
+            'chain'    => \App\Support\Ai\Center\AiDiagnostics::chain(),
+            'probes'   => \App\Support\Ai\Center\AiDiagnostics::recentProbes(),
+            'manage'   => \App\Support\Ai\Center\AiAccess::canManage(),
             'recon'    => session('ai.recon'),
         ]);
     }
@@ -164,10 +177,10 @@ class AiCenterController extends Controller
     {
         $apply = $r->boolean('apply');
 
-        $apply ? $this->gate() : \App\Support\AiAccess::gateView();
+        $apply ? $this->gate() : \App\Support\Ai\Center\AiAccess::gateView();
         if ($apply && ($resp = hub_require_stepup())) return $resp;
 
-        $res = \App\Support\AiReconcile::run($apply);
+        $res = \App\Support\Ai\Center\AiReconcile::run($apply);
 
         if (! $res['ok']) {
             return back()->withErrors(['recon' => (string) $res['error']]);
@@ -316,7 +329,7 @@ class AiCenterController extends Controller
         $port = parse_url($url, PHP_URL_PORT);
         if (is_string($host) && in_array($host, ['127.0.0.1', '::1', '[::1]'], true)
             && in_array($scheme, ['http', 'https'], true)
-            && ! in_array((int) $port, \App\Support\AiGateway::SENSITIVE_LOOPBACK_PORTS, true)) {
+            && ! in_array((int) $port, \App\Support\Ai\Gateway\AiGateway::SENSITIVE_LOOPBACK_PORTS, true)) {
             return ['ok' => true, 'why' => '', 'ip' => null];
         }
 

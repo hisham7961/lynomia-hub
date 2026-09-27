@@ -2,14 +2,14 @@
 
 namespace Tests\Feature\AiHub;
 
-use App\Support\AiAuthSchemas;
-use App\Support\AiCatalog;
-use App\Support\AiProviderCoverage;
-use App\Support\AiProviderRegistry;
-use App\Support\AiProviders;
+use App\Support\Ai\Catalog\AiAuthSchemas;
+use App\Support\Ai\Catalog\AiCatalog;
+use App\Support\Ai\Catalog\AiProviderCoverage;
+use App\Support\Ai\Catalog\AiProviderRegistry;
+use App\Support\Ai\Catalog\AiProviders;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Http;

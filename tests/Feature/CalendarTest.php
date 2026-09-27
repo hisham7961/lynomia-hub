@@ -36,4 +36,25 @@ class CalendarTest extends TestCase
         $this->actingAs($this->employee)->get('/calendar')
             ->assertOk()->assertSee('متابعة ألف')->assertDontSee('متابعة باء');
     }
+
+    /**
+     * **حقلُ تاريخٍ محجوبٌ عن الدور لا يُعرَض في التقويم** (خطّة التطبيق 4.5 · اختبارٌ
+     * يفشل أولاً): كان التقويمُ يمسح كلَّ حقول التاريخ بـ`hub_can`+`hub_scope` وحدهما —
+     * فدورٌ حُجب عنه «الموعد النهائي» يقرؤه في شبكة التقويم بعنوان سجلّه وتاريخه، وهو
+     * محجوبٌ عنه في النموذج والعرض والتصدير وAPI. `hub_field_mode` يسري هنا كذلك.
+     */
+    public function test_calendar_hides_a_date_field_hidden_from_the_role(): void
+    {
+        $this->seedCore();
+        Task::create(['title' => 'موعدٌ-محجوبٌ-عن-الدور', 'due' => now()->startOfMonth()->addDays(6)]);
+        Task::create(['title' => 'بدايةٌ-ظاهرةٌ-للدور', 'start_date' => now()->startOfMonth()->addDays(7)]);
+        $this->employee->role->forceFill(['field_rules' => ['tasks' => ['due' => 'hide']]])->save();
+
+        $this->actingAs($this->employee->fresh())->get('/calendar?fresh=1')->assertOk()
+            ->assertSee('بدايةٌ-ظاهرةٌ-للدور')
+            ->assertDontSee('موعدٌ-محجوبٌ-عن-الدور');
+
+        // والمالكُ (لا قواعدَ حقول) يراه — الحجبُ للدور لا للبيانات
+        $this->actingAs($this->owner)->get('/calendar?fresh=1')->assertOk()->assertSee('موعدٌ-محجوبٌ-عن-الدور');
+    }
 }

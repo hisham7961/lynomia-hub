@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Models\Document;
 use App\Models\FinDocument;
 use App\Models\Project;
-use App\Support\Sheet;
-use App\Support\WebhookDispatcher;
+use App\Support\Platform\Sheet;
+use App\Support\Ops\WebhookDispatcher;
 use Tests\Concerns\FakesOdoo;
 use Tests\TestCase;
 

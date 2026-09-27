@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\AiHub;
 
-use App\Support\AiRouting;
+use App\Support\Ai\Routing\AiRouting;
 use Tests\TestCase;
 
 /**

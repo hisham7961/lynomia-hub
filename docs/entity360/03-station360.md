@@ -1,6 +1,6 @@
 # ٠٣ — المحطة 360 (§19–27)
 
-قشرةُ تبويباتٍ (نمطُ المشروع 360) على `modules/custom/stations.blade.php`، يغذّيها `App\Support\Station360`.
+قشرةُ تبويباتٍ (نمطُ المشروع 360) على `modules/custom/stations.blade.php`، يغذّيها `App\Support\Assets\Station360`.
 `stations` مُضافةٌ إلى `@unless` في `show.blade.php` فتملك القشرةُ الجسدَ (لا تكرار).
 
 ## التبويبات

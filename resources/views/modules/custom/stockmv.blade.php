@@ -5,7 +5,7 @@
         ? hub_scope(\App\Models\StockItem::query(), 'stock')->find($row->item_id)
         : null;
     $mvPack = ($mvItem && (int) ($mvItem->carton_qty ?? 0) > 0)
-        ? \App\Support\Items::pack((float) $row->qty, (int) $mvItem->carton_qty)
+        ? \App\Support\Assets\Items::pack((float) $row->qty, (int) $mvItem->carton_qty)
         : null;
 @endphp
 @if ($mvPack)

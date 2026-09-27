@@ -6,7 +6,7 @@ use App\Models\Client;
 use App\Models\Project;
 use App\Models\Quote;
 use App\Models\QuoteLine;
-use App\Support\HubEvents;
+use App\Support\Platform\HubEvents;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

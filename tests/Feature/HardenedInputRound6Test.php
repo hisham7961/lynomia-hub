@@ -120,7 +120,7 @@ class HardenedInputRound6Test extends TestCase
         $this->seedCore();
 
         $e = ErrorEvent::create(['kind' => 'خطأ', 'message' => 'اختبار',
-            'file' => app_path('Support/Qr.php'), 'line' => 3, 'url' => '/x', 'count' => 1,
+            'file' => \Tests\Support\Source::path(\App\Support\Documents\Qr::class), 'line' => 3, 'url' => '/x', 'count' => 1,
             'hash' => hash('sha256', 'y' . \Illuminate\Support\Str::random(8)),
             'first_seen' => now(), 'last_seen' => now(), 'created_at' => now()]);
 

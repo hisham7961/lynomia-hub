@@ -54,7 +54,7 @@ class ChangeOrderController extends Controller
             ])->saveQuietly();
 
             $co->forceFill(['status' => 'مطبَّق', 'applied_at' => now()])->save();
-            \App\Support\FlowRunner::fire('status', 'changeorders', $co, 'مطبَّق');
+            \App\Support\Platform\FlowRunner::fire('status', 'changeorders', $co, 'مطبَّق');
             hub_audit('تطبيق أمر تغيير', 'changeorders', $co->id, $co->doc_no . ' → ' . $project->name);
 
             return redirect()->route('m.show', ['projects', $project->id])
@@ -69,8 +69,8 @@ class ChangeOrderController extends Controller
         // حزامُ المستندِ الثنائيّ (N-14) — نظيرُ ما يلبسه بابُ عرضِ الأسعار
         $belt = hub_doc_belt('changeorders');
         $co = hub_scope(ChangeOrder::query(), 'changeorders')->findOrFail($id);
-        $html = \App\Support\ChangeOrderDoc::html($co);
-        $bin = \App\Support\DocRenderer::pdf($html, 'أمر تغيير ' . $co->doc_no);
+        $html = \App\Support\Documents\ChangeOrderDoc::html($co);
+        $bin = \App\Support\Documents\DocRenderer::pdf($html, 'أمر تغيير ' . $co->doc_no);
         if ($bin === null) {
             // نسخةُ الطباعةِ تُسجَّل كما تُسجَّل الثنائيّة (N-14)
             hub_audit('توليد مستند أمر تغيير (HTML للطباعة)', 'changeorders', $co->id, $co->doc_no, $belt);

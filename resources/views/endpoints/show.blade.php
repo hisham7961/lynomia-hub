@@ -27,9 +27,9 @@
 <div class="hero">
     <div>
         <h2>💻 {{ $device->hostname }} <span class="bdg {{ $stTone }}">{{ $stLabel }}</span>
-            @unless (\App\Support\Endpoint::isSupported($device->os))<span class="bdg wn">نظامٌ قديمٌ — غيرُ مدعوم</span>@endunless</h2>
+            @unless (\App\Support\Endpoint\Endpoint::isSupported($device->os))<span class="bdg wn">نظامٌ قديمٌ — غيرُ مدعوم</span>@endunless</h2>
         <div class="sub">
-            {{ \App\Support\Endpoint::label($device->os) }}{{ $device->agent_version ? ' · وكيل ' . $device->agent_version : '' }}
+            {{ \App\Support\Endpoint\Endpoint::label($device->os) }}{{ $device->agent_version ? ' · وكيل ' . $device->agent_version : '' }}
             · آخر نبضة: {{ $device->last_heartbeat_at?->format('Y-m-d H:i') ?? 'لم ينبض بعد' }}
         </div>
     </div>
@@ -74,9 +74,9 @@
     <div class="card kid">
         <h3>🔌 سياسة USB</h3>
         @php
-            $effMode = $usbEffectiveMode ?? \App\Support\MdmService::MODE_OBSERVE_ONLY;
-            $effLabel = \App\Support\MdmService::MODE_LABELS[$effMode] ?? $effMode;
-            $effTone = $effMode === \App\Support\MdmService::MODE_ENFORCE ? 'g' : 'wn';
+            $effMode = $usbEffectiveMode ?? \App\Support\Endpoint\MdmService::MODE_OBSERVE_ONLY;
+            $effLabel = \App\Support\Endpoint\MdmService::MODE_LABELS[$effMode] ?? $effMode;
+            $effTone = $effMode === \App\Support\Endpoint\MdmService::MODE_ENFORCE ? 'g' : 'wn';
         @endphp
         @if ($policy)
             <table class="mini">
@@ -85,7 +85,7 @@
                 {{-- §8 — الوضعُ **الفعليّ** الصادق: تكاملُ MDM يقرّره لا رايةُ السياسة وحدَها --}}
                 <tr><td class="sub">الفرض الفعليّ</td>
                     <td><span class="bdg {{ $effTone }}">{{ $effLabel }}</span></td></tr>
-                @if ($policy->enforce && $effMode !== \App\Support\MdmService::MODE_ENFORCE)
+                @if ($policy->enforce && $effMode !== \App\Support\Endpoint\MdmService::MODE_ENFORCE)
                     <tr><td class="sub"></td><td class="sub">السياسةُ تطلب الفرضَ، لكنّ لا مزوّدَ MDM قادرٌ فعلاً — يبقى رصداً فقط.</td></tr>
                 @endif
             </table>
@@ -102,7 +102,7 @@
             </div>
         @endif
         {{-- نصُّ الصدق الإلزاميّ (C15) — يُعرَض دائماً ما لم يكن فرضٌ فعليٌّ حقيقيّ --}}
-        @if ($effMode !== \App\Support\MdmService::MODE_ENFORCE)
+        @if ($effMode !== \App\Support\Endpoint\MdmService::MODE_ENFORCE)
             <div class="flash wn" style="margin-top:8px">
                 ⚠️ يتطلب MDM / رصدٌ فقط — {{ \App\Models\EndpointPolicy::ENFORCE_NOTICE }}
             </div>
@@ -149,7 +149,7 @@
         <table class="mini">
             @forelse ($events as $e)
                 <tr>
-                    <td><span class="bdg {{ \App\Support\SecurityEvents::SEVERITY_TONE[$e->severity] ?? 'wn' }}">{{ $e->kind }}</span></td>
+                    <td><span class="bdg {{ \App\Support\Security\SecurityEvents::SEVERITY_TONE[$e->severity] ?? 'wn' }}">{{ $e->kind }}</span></td>
                     <td>{{ \Illuminate\Support\Str::limit((string) $e->summary, 90) }}</td>
                     <td class="sub">{{ $e->created_at?->format('m-d H:i') }}</td>
                 </tr>

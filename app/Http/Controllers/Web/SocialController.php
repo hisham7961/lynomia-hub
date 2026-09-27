@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\Metrics;
+use App\Support\Ops\Metrics;
 
 /**
  * مركز السوشال ميديا — مراقبةٌ وتحليل لا دفتر جرد.

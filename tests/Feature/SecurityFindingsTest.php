@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Role;
 use App\Models\User;
-use App\Support\SecurityFindings;
+use App\Support\Security\SecurityFindings;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -142,7 +142,7 @@ class SecurityFindingsTest extends TestCase
         // والخريطةُ تغطّي رموزَ الفحوص كلَّها — لا رمزَ يسقط إلى الاستنتاج بالنبرة.
         // (WP-9.4 أضاف التجميدَين، فالتغطيةُ تُشتقّ من الوضعية نفسِها بدل رقمٍ
         //  مكتوبٍ بيدٍ يُنسى تحديثُه مع كل فحصٍ جديد.)
-        $postureKeys = array_column(\App\Support\SecurityPosture::checks(), 'key');
+        $postureKeys = array_column(\App\Support\Security\SecurityPosture::checks(), 'key');
         $this->assertSame([], array_values(array_diff($postureKeys,
             array_keys(SecurityFindings::SEVERITY_BY_CODE))),
             'فحصٌ في وضعية الأمان بلا شدّةٍ صريحة في SEVERITY_BY_CODE');
@@ -153,7 +153,7 @@ class SecurityFindingsTest extends TestCase
             array_keys(SecurityFindings::SEVERITY_BY_CODE), $postureKeys)),
             'شدّةٌ في SEVERITY_BY_CODE لرمزٍ لا تنتجه وضعيةُ الأمان');
         foreach (SecurityFindings::SEVERITY_BY_CODE as $code => $sev) {
-            $this->assertContains($sev, \App\Support\Severity::LEVELS, "شدّةُ {$code} خارج سلّم Severity");
+            $this->assertContains($sev, \App\Support\Platform\Severity::LEVELS, "شدّةُ {$code} خارج سلّم Severity");
         }
     }
 
@@ -199,7 +199,7 @@ class SecurityFindingsTest extends TestCase
         SecurityFindings::reconcile();
 
         $row = DB::table('security_findings')->where('code', 'ssrf')->first();
-        $check = collect(\App\Support\SecurityPosture::checks())->firstWhere('key', 'ssrf');
+        $check = collect(\App\Support\Security\SecurityPosture::checks())->firstWhere('key', 'ssrf');
         $this->assertSame($check['fix'], $row->remediation, 'التوصيةُ ليست حقلَ fix القائم');
         $this->assertSame($check['label'], $row->title);
         $this->assertSame($check['why'], $row->description);

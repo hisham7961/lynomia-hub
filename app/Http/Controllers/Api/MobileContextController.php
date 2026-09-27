@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\MobileContext;
 use App\Models\HubNotification;
-use App\Support\Api;
+use App\Support\Platform\Api;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -116,7 +116,7 @@ class MobileContextController extends Controller
             'nav'                  => hub_is_client($u) ? [] : hub_nav($u),
             'ia'                   => hub_is_client($u)
                 ? self::clientIa()
-                : \App\Support\InformationArchitecture::make()->navigationPayload($u),
+                : \App\Support\Platform\InformationArchitecture::make()->navigationPayload($u),
             'schema_version'       => $sv,
         ];
 
@@ -181,7 +181,7 @@ class MobileContextController extends Controller
             // العميلُ يتلقّى شجرةَ بوّابته — لا شجرةَ الإدارة الداخلية (نظيرُ الويب)
             'ia'             => hub_is_client($u)
                 ? self::clientIa()
-                : \App\Support\InformationArchitecture::make()->navigationPayload($u),
+                : \App\Support\Platform\InformationArchitecture::make()->navigationPayload($u),
         ]);
     }
 
@@ -209,6 +209,14 @@ class MobileContextController extends Controller
             'restricted_client'  => hub_client_ids($u) !== null,
             // نمطُ الحساب — علمُ عرضٍ (الغلافُ العميليّ)؛ الحرسُ في mobile.portal خادميّاً
             'is_client'          => hub_is_client($u),
+            // «اسأل Hub» متاحٌ الآن لهذا المستخدم (الصلاحيّةُ والبوّابةُ معاً) — علمُ عرض، والحرسُ في المسار
+            'can_ask'            => ! hub_is_client($u) && \App\Support\Ai\Ask\AskPolicy::ready($u),
+            // (إضافيّ · طلب الجوال #8) توافرُ القدرتين العابرتين من سجلِّ القدرات (`hub_capability`)
+            // — علمُ عرضٍ كي لا يكتشف التطبيقُ الإطفاءَ من ٤٠٤؛ النقاطُ تعيد الفحص. الحضورُ
+            // داخليٌّ (`GET presence` يطوي العميلَ ٤٠٤) فعلمُه للعميل false؛ والكتابةُ تتبع
+            // القدرةَ وحدَها (نبضةُ DM متاحةٌ لمن يبلغ المحادثة).
+            'collab_typing'      => hub_capability('collab.typing'),
+            'collab_presence'    => ! hub_is_client($u) && hub_capability('collab.presence'),
         ];
     }
 

@@ -104,7 +104,7 @@ class ContractActionsController extends Controller
             if ($c->status === 'ساري' || $c->status === 'منتهي') {
                 $c->status = 'قيد التجديد';
                 $c->save();
-                \App\Support\FlowRunner::fire('renewed', 'contracts', $c);
+                \App\Support\Platform\FlowRunner::fire('renewed', 'contracts', $c);
             }
 
             return $new;

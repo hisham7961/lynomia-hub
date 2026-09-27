@@ -55,7 +55,7 @@
                                title="{{ $f->original_name }}">⬇ {{ $f->doc_no ?: \Illuminate\Support\Str::limit($f->original_name, 16) }}</a>
                         @endforeach
                     @endif
-                    <a class="btn ghost xs" href="#attachments" onclick="document.getElementById('att-kind')&&(document.getElementById('att-kind').value='{{ $d['key'] }}')">
+                    <a class="btn ghost xs" href="#attachments" data-set-value="#att-kind" data-value="{{ $d['key'] }}">
                         {{ $d['n'] ? '＋ نسخة' : '＋ ارفع' }}</a>
                 </td>
             </tr>

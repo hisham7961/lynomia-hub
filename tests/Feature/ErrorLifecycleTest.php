@@ -6,9 +6,9 @@ use App\Models\AuditEntry;
 use App\Models\ErrorEvent;
 use App\Models\HubNotification;
 use App\Models\Task;
-use App\Support\ErrorLog;
-use App\Support\IssueState;
-use App\Support\SecurityEvents;
+use App\Support\Ops\ErrorLog;
+use App\Support\Platform\IssueState;
+use App\Support\Security\SecurityEvents;
 use Tests\TestCase;
 
 /**

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Tests\TestCase;
 
 /**
@@ -157,7 +157,7 @@ class SettingsExportTest extends TestCase
 
         $this->assertDatabaseHas('audits', ['action' => 'تصدير', 'module' => 'settings']);
         $this->assertSame('DATA_EXPORT',
-            \App\Support\SecurityEvents::codeFor('تصدير', 'settings'),
+            \App\Support\Security\SecurityEvents::codeFor('تصدير', 'settings'),
             'فعلُ التصدير لا يُصنَّف DATA_EXPORT');
     }
 

@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Setting;
-use App\Support\SecurityPosture;
+use App\Support\Security\SecurityPosture;
 use Tests\TestCase;
 
 /**

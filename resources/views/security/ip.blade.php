@@ -43,7 +43,7 @@
                         <td>
                             <b>{{ $ipk->uname ?? '—' }}</b>
                             @if ($emailMode !== 'hide' && $ipk->uemail)
-                                <div class="sub">{{ $emailMode === 'mask' ? \App\Support\SecurityFindings::maskPII($ipk->uemail) : $ipk->uemail }}</div>
+                                <div class="sub">{{ $emailMode === 'mask' ? \App\Support\Security\SecurityFindings::maskPII($ipk->uemail) : $ipk->uemail }}</div>
                             @endif
                         </td>
                         <td>{{ (int) $ipk->hits }}</td>

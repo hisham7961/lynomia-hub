@@ -6,7 +6,7 @@ use App\Models\AlertRule;
 use App\Models\AuditEntry;
 use App\Models\HubNotification;
 use App\Models\SignalState;
-use App\Support\AlertEngine;
+use App\Support\Ops\AlertEngine;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -71,20 +71,20 @@ class AlertLifecycleTest extends TestCase
 
         $this->actingAs($this->owner);
         // الإشارةُ تظهر في مركز الفعل بمفتاح dedup_key — بلا تصرّفٍ محليّ
-        $signals = \App\Support\ActionCenter::signals(true);
+        $signals = \App\Support\Insights\ActionCenter::signals(true);
         $keys = array_column($signals['visible'], 'key');
         $this->assertContains($i->dedup_key, $keys, 'التنبيهُ المفتوح غائبٌ عن مركز الفعل (ق٣)');
         $sig = collect($signals['visible'])->firstWhere('key', $i->dedup_key);
         $this->assertFalse($sig['can_act'], 'إشارةُ التنبيه قابلةٌ للتصرّف محلياً — سكّةُ إقرارٍ ثانية');
 
         // ومحاولةُ التصرّف عبر signal_states تُرفَض (المفتاحُ ليس في صفّ hub_recommendations)
-        $this->assertFalse(\App\Support\ActionCenter::disposition($i->dedup_key, 'ack'));
+        $this->assertFalse(\App\Support\Insights\ActionCenter::disposition($i->dedup_key, 'ack'));
         $this->assertSame(0, SignalState::where('skey', $i->dedup_key)->count(),
             'كُتب صفُّ signal_states لتنبيهٍ — الإقرارُ الدائم في alert_instances وحدَه');
 
         // والموظّفُ (لا مالكَ ولا monitor) لا يرى إشارةَ التنبيه ولا المركز
         $this->actingAs($this->employee);
-        $keysEmp = array_column(\App\Support\ActionCenter::signals(true)['visible'], 'key');
+        $keysEmp = array_column(\App\Support\Insights\ActionCenter::signals(true)['visible'], 'key');
         $this->assertNotContains($i->dedup_key, $keysEmp, 'إشارةُ التنبيه تسرّبت لغير المالك/المراقب');
         $this->actingAs($this->employee)->get('/admin/alerts')->assertForbidden();
         $this->actingAs($this->employee)->post("/admin/alerts/{$i->id}/ack")->assertForbidden();

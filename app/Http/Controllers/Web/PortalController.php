@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Attachment;
 use App\Models\Employee;
-use App\Support\AttachmentService;
-use App\Support\DocumentPolicy;
+use App\Support\Collaboration\AttachmentService;
+use App\Support\Documents\DocumentPolicy;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -23,10 +23,10 @@ class PortalController extends Controller
         // كان first() بلا orderBy يعرض بيانات زميلٍ بالقرعة بين المحرّكين
         $emp = Employee::where('user_id', auth()->id())->whereNull('deleted_at')
             ->orderBy('id')->first();
-        $inbox = \App\Support\Inbox::items(auth()->user());
+        $inbox = \App\Support\Collaboration\Inbox::items(auth()->user());
 
         return view('portal.me', ['emp' => $emp, 'self' => true,
-            'inbox' => $inbox, 'buckets' => \App\Support\Inbox::summary($inbox),
+            'inbox' => $inbox, 'buckets' => \App\Support\Collaboration\Inbox::summary($inbox),
             // **وثائقي** (N-5): الرادارُ يسوق صاحبَ الشأنِ إلى هنا بوثيقتِه — فلتكن هنا
             'myDocs' => $this->myDocs(),
         ] + $this->bundle($emp, auth()->id()));
@@ -41,13 +41,13 @@ class PortalController extends Controller
      */
     protected function myDocs(): array
     {
-        return \App\Support\EmployeeDocuments::forUser(auth()->user());
+        return \App\Support\Workforce\EmployeeDocuments::forUser(auth()->user());
     }
 
     /** الوثيقةُ التي أثبتُّ أنّها لي — أو ٤٠٤ (لا نُثبت وجودَ ما لا يخصّه) */
     protected function myDoc(string $id): Attachment
     {
-        $a = \App\Support\EmployeeDocuments::find(auth()->user(), $id);
+        $a = \App\Support\Workforce\EmployeeDocuments::find(auth()->user(), $id);
         abort_unless($a, 404);
 
         return $a;
@@ -139,7 +139,7 @@ class PortalController extends Controller
 
         // (الكيان 360 · §6/§17) نموذجُ الموظف 360: شريطُ نظرةٍ يُجمّع العلاقاتِ المصرَّحة،
         // وتاريخُ محطةٍ/عهدةٍ ونشاطٌ منطَّق — تكميلٌ للملفّ القائم لا محرّكٌ ثانٍ.
-        $e360 = new \App\Support\Employee360;
+        $e360 = new \App\Support\Workforce\Employee360;
 
         $data = ['emp' => $emp, 'self' => false, 'tab360' => $tab, 'tabs360' => $tabs,
                  'ov360' => $e360->overview($emp, $u)]
@@ -306,16 +306,16 @@ class PortalController extends Controller
         // حسابٌ غير مربوطٍ بالملفّ: لا أرقامَ عملٍ له — حالةٌ فارغةٌ صادقة لا أصفار
         if ($uid === null) return $out;
 
-        $out['work'] = \App\Support\ExecutionStats::person($uid, $range, $u);
+        $out['work'] = \App\Support\Workforce\ExecutionStats::person($uid, $range, $u);
 
         if (hub_monitor($u)) {
-            $out['act'] = \App\Support\ExecutionStats::personActivity($uid, $range, $u);
-            $out['wTl'] = \App\Support\ExecutionStats::personTimeline($uid, $range, $u);
+            $out['act'] = \App\Support\Workforce\ExecutionStats::personActivity($uid, $range, $u);
+            $out['wTl'] = \App\Support\Workforce\ExecutionStats::personTimeline($uid, $range, $u);
         }
 
         // الأمنُ للمالك وحدَه وفي بطاقةٍ لا تلامس بطاقاتِ العمل
         if (hub_is_owner($u) && ($su = \App\Models\User::find($uid))) {
-            $out['sec'] = \App\Support\Risk::activity($su, $range);
+            $out['sec'] = \App\Support\Security\Risk::activity($su, $range);
         }
 
         return $out;

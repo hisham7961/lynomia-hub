@@ -68,8 +68,8 @@ class FileController extends Controller
          * بعينها — وسقط بفارقِ مُنشئِ استعلامٍ على بُعدِ ستّةِ أسطر.)
          */
         if ($att = \App\Models\Attachment::withTrashed()
-            ->where(fn ($w) => $w->where('path', $path)->orWhere('thumb_path', $path))->first()) {
-            \App\Support\DocumentPolicy::authorize(auth()->user(), $att,
+            ->where(fn ($w) => $w->where('path', $path)->orWhere('thumb_path', $path))->orderBy('created_at')->orderBy('id')->first()) {
+            \App\Support\Documents\DocumentPolicy::authorize(auth()->user(), $att,
                 $r->boolean('dl') ? 'download' : 'preview');
         }
 
@@ -257,7 +257,7 @@ class FileController extends Controller
 
             $row = DB::table($table)->where(function ($w) use ($cols, $path) {
                 foreach (array_keys($cols) as $c) $w->orWhere($c, $path);
-            })->first();
+            })->orderBy('id')->first();
             if (! $row) continue;
 
             // أيُّ عمودٍ منها يحمل هذا الملف؟ (السجل قد يحمل ملفين)
@@ -318,7 +318,7 @@ class FileController extends Controller
                 // حقلِ ملفٍّ لوحدةٍ مسجَّلة، فكان يسقط من كلِّ الفحص أدناه ويُرفَض ٤٠٣
                 // لغيرِ المالك — أي رسالةٌ بمرفقٍ لا يفتحها متلقّيها. يُحرَس بطرفَيه:
                 // المُرسِلُ أو المُستقبِل فقط، ولا ثالثَ لهما.
-                if (Schema::hasTable('dm_messages') && Schema::hasColumn('dm_messages', 'att')
+                if (\App\Support\Platform\SchemaCache::hasColumn('dm_messages', 'att')
                     && DB::table('dm_messages')->where('att', $path)
                         ->where(fn ($w) => $w->where('from_id', $u->id)->orWhere('to_id', $u->id))
                         ->exists()) {
@@ -347,7 +347,7 @@ class FileController extends Controller
                     if (! $visibleCols) continue;
 
                     $q = DB::table($table)
-                        ->when(Schema::hasColumn($table, 'deleted_at'), fn ($x) => $x->whereNull('deleted_at'))
+                        ->when(\App\Support\Platform\SchemaCache::hasColumn($table, 'deleted_at'), fn ($x) => $x->whereNull('deleted_at'))
                         ->where(function ($w) use ($visibleCols, $path) {
                             foreach ($visibleCols as $c) $w->orWhere($c, $path);
                         });
@@ -361,7 +361,7 @@ class FileController extends Controller
                         && ! hub_can($u, $mk, 'docsec')) {
                         $q->where(function ($w) use ($table, $u) {
                             $w->whereNull('secrecy')->orWhere('secrecy', '!=', 'سري');
-                            if (Schema::hasColumn($table, 'created_by')) $w->orWhere('created_by', $u->id);
+                            if (\App\Support\Platform\SchemaCache::hasColumn($table, 'created_by')) $w->orWhere('created_by', $u->id);
                         });
                     }
 

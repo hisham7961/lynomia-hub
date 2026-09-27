@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Role;
 use App\Models\User;
-use App\Support\Severity;
+use App\Support\Platform\Severity;
 use Illuminate\Http\Request;
 use Tests\TestCase;
 

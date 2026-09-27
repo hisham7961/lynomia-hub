@@ -66,7 +66,7 @@
 @if (! empty($probe))
     <div class="card">
         <h3 class="cardtitle">نتيجةُ آخرِ فحص</h3>
-        <div class="sub">{{ \App\Support\ConnectionProbe::line($probe) }}</div>
+        <div class="sub">{{ \App\Support\Ops\ConnectionProbe::line($probe) }}</div>
         @if (($probe['detail']['models'] ?? null) !== null)
             <div class="sub" style="margin-top:4px">نماذجُ مُعلَنةٌ في البوّابة:
                 <b>{{ $probe['detail']['models'] }}</b>
@@ -128,7 +128,7 @@
 
     @if ($hasKey)
         <form method="POST" action="{{ route('ai.forget') }}" style="margin-top:8px;border-top:1px solid var(--line,#eee);padding-top:8px"
-              onsubmit="return confirm('سيُمسح مفتاحُ الإدارة ويُطفأ التكامل. متابعة؟')">
+              data-confirm-native="سيُمسح مفتاحُ الإدارة ويُطفأ التكامل. متابعة؟">
             @csrf
             <button class="btn ghost sm">🗑️ مسحُ المفتاح وإطفاءُ التكامل</button>
         </form>

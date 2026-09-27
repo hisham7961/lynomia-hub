@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Dashboard;
 use App\Models\DashboardWidget;
-use App\Support\WidgetRegistry;
+use App\Support\Platform\WidgetRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 

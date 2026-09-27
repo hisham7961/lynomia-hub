@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Support\AiReconcile;
+use App\Support\Ai\Center\AiReconcile;
 use Illuminate\Console\Command;
 
 /**

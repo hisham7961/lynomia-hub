@@ -2,7 +2,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\AssetLife;
+use App\Support\Assets\AssetLife;
 
 /** العهدة ودورة حياة الأصول — الحقول الأغلى ثمناً كانت تُملأ ولا تُقرأ */
 class AssetLifeController extends Controller

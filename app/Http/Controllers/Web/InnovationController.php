@@ -48,9 +48,9 @@ class InnovationController extends Controller
         return view('innovation', [
             'ideas' => $ideas,
             'byUsers' => $byUsers,
-            'contributors' => \App\Support\Innovation::contributors(),
-            'pulse' => \App\Support\Innovation::pulse(),
-            'atts' => \App\Support\Innovation::attachmentCounts($ideas->pluck('id')->all()),
+            'contributors' => \App\Support\Insights\Innovation::contributors(),
+            'pulse' => \App\Support\Insights\Innovation::pulse(),
+            'atts' => \App\Support\Insights\Innovation::attachmentCounts($ideas->pluck('id')->all()),
             'scored' => $scoredN,
             'ideasN' => $ideasN,
             'lens' => $lens,

@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\EndpointDevice;
 use App\Models\EnrollmentToken;
-use App\Support\Api;
-use App\Support\Es256;
-use App\Support\SecurityRadar;
+use App\Support\Platform\Api;
+use App\Support\Security\Es256;
+use App\Support\Security\SecurityRadar;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\DB;
  *    مُسنَداً لشركةٍ (وموظفٍ اختياراً) — النصُّ الصريح يُعرَض مرةً واحدةً ولا
  *    يبلغ القاعدةَ ولا التدقيقَ إلا sha256 (انضباطُ `ApiToken.token_hash`).
  *  • `enroll` (API عامّ بالرمز): الجهازُ يرسل هويّتَه ومفتاحَه **العامَّ** PEM
- *    (عقدُ التوقيع في docblock ‏`App\Support\Es256`) — الخاصُّ يُولَّد على الجهاز
+ *    (عقدُ التوقيع في docblock ‏`App\Support\Security\Es256`) — الخاصُّ يُولَّد على الجهاز
  *    ولا يُرسَل قط؛ حمولةٌ تحمل أيَّ مادةِ مفتاحٍ خاصّ تُرَدّ 422 قبل كل شيء.
  *
  * الإسنادُ من الرمز وحدَه: الجهازُ لا يختار شركتَه — `company_id`/`employee_id`
@@ -101,7 +101,7 @@ class EndpointEnrollController extends Controller
             'token' => ['required', 'string', 'max:120'],
             'device_uuid' => ['required', 'string', 'max:64', 'regex:/^[A-Za-z0-9._:-]{8,64}$/'],
             'hostname' => ['required', 'string', 'max:120'],
-            'os' => ['required', 'string', 'in:' . implode(',', \App\Support\Endpoint::SUPPORTED)],
+            'os' => ['required', 'string', 'in:' . implode(',', \App\Support\Endpoint\Endpoint::SUPPORTED)],
             'agent_version' => ['nullable', 'string', 'max:30'],
             'hw' => ['nullable', 'array'],
             'public_key' => ['required', 'string', 'max:4000'],
@@ -171,7 +171,7 @@ class EndpointEnrollController extends Controller
 
             hub_audit('تسجيلُ جهازٍ طرفيّ', 'endpoints', $device->id,
                 mb_substr((string) $device->hostname, 0, 120));
-            \App\Support\FlowRunner::fire('enrolled', 'endpoints', $device);
+            \App\Support\Platform\FlowRunner::fire('enrolled', 'endpoints', $device);
 
             return $device;
         });

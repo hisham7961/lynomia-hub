@@ -7,7 +7,7 @@
  * من `hub_admin_links`. لا جدولَ ولا نموذجَ ولا حقلَ ولا صلاحيةَ تُنسخ هنا.
  *
  * ⚠️ لا يمنحُ IA صلاحيةً قطّ (Critic C1). كلُّ وجهةٍ **تُصرّح كيف تُحرَس**، وخدمة
- * `App\Support\InformationArchitecture` تفوّض الرؤيةَ لنفس المُسنِد القائم:
+ * `App\Support\Platform\InformationArchitecture` تفوّض الرؤيةَ لنفس المُسنِد القائم:
  *   · type=module            → hub_can($u, module, 'v')
  *   · type=center (كتالوج)   → مفتاحُ `center` فقط؛ الرابط/التسمية/الحارس من
  *                              hub_top_links[$key] (C6 — لا نُعيد ذكر route/label)
@@ -573,7 +573,8 @@ return [
                 'portal.document', 'portal.engagements', 'portal.invoices', 'portal.invoice',
                 'portal.projects', 'portal.project']],
         'public' => ['label' => 'مداخل عامّة', 'prefixes' => ['sign', 'share'],
-            'routes' => ['login', 'login.otp', 'activate.show', 'sign.verify', 'sign.verify.doc',
+            'routes' => ['login', 'login.otp', 'activate.show', 'password.request', 'password.reset',
+                'sign.verify', 'sign.verify.doc',
                 'custody.code', 'stations.code', 'products.code']],
         'utility' => ['label' => 'مولّدات ووثائق', 'prefixes' => ['att', 'quotes'],
             'routes' => ['file.show', 'changeorders.pdf', 'purchases.doc']],

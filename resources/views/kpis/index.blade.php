@@ -26,7 +26,7 @@
      «على الهدف» — فالنظامُ يهنّئ نفسَه على قياسٍ لم يقع. --}}
 @php
     $healthTone = ['on' => 'ok', 'warn' => 'wn', 'off' => 'bad', 'dead' => 'wn', 'nodata' => 'g', 'notarget' => 'g'];
-    $H = \App\Support\KpiCentre::HEALTH;
+    $H = \App\Support\Insights\KpiCentre::HEALTH;
     $rowsById = collect($rows)->keyBy('id');
     $canRemediate = hub_monitor() && hub_can(auth()->user(), 'tasks', 'a');
 @endphp
@@ -336,7 +336,7 @@
         @include('kpis._metric', ['p' => 'a', 'catalog' => $catalog, 'sel' => $selA])
 
         <h4 style="margin:12px 0 6px">العملية</h4>
-        <select class="inp" name="combine" id="k-combine" onchange="document.getElementById('bwrap').style.display=this.value==='none'?'none':''" style="max-width:320px">
+        <select class="inp" name="combine" id="k-combine" data-toggle-display="#bwrap" data-hide-value="none" style="max-width:320px">
             @foreach (['none' => 'لا شيء — المقياس الأول وحده',
                        'ratio_pct' => 'نسبة مئوية: الأول ÷ الثاني × ١٠٠',
                        'ratio' => 'نسبة: الأول ÷ الثاني',

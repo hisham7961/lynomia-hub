@@ -54,7 +54,7 @@
         </form>
         @if (setting('work.geo', '0') === '1')
             <span class="sub fhint">يُلتقط موقعُك لحظةَ الحضور فقط إن سمحتَ به — لا تتبّعَ بعدها.</span>
-            <script>
+            <script @cspNonce>
             if (navigator.geolocation) navigator.geolocation.getCurrentPosition(function (p) {
                 var g = document.getElementById('wd-geo');
                 if (g) g.value = p.coords.latitude.toFixed(5) + ',' + p.coords.longitude.toFixed(5)
@@ -96,7 +96,7 @@
                 وساعاتُه تدخل مهمتَه تلقائياً.</div>
         @endif
         @unless (is_null($wElapsed))
-            <script>
+            <script @cspNonce>
             (function () {
                 var el = document.getElementById('wd-live-timer');
                 if (! el || el.dataset.ticking) return;   // لا نُكرّر المؤقّتَ على العنصر نفسِه

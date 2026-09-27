@@ -84,7 +84,7 @@
                 @php $fdef = hub_mod($f->module); @endphp
                 <tr style="{{ $f->enabled ? '' : 'opacity:.55' }}">
                     <td><b>{{ $f->name }}</b><div class="sub">{{ $fdef['label'] ?? $f->module }}</div></td>
-                    <td class="sub">{{ \App\Support\HubEvents::label($f->event) }}{{ $f->status_to ? ' إلى «' . $f->status_to . '»' : '' }}
+                    <td class="sub">{{ \App\Support\Platform\HubEvents::label($f->event) }}{{ $f->status_to ? ' إلى «' . $f->status_to . '»' : '' }}
                         @if ($f->cond_field)<div>+ شرط: {{ collect($fdef['fields'] ?? [])->firstWhere('key', $f->cond_field)['label'] ?? $f->cond_field }} {{ ['eq' => '=', 'has' => 'يحتوي', 'gt' => '>', 'lt' => '<'][$f->cond_op] ?? '=' }} {{ $f->cond_value }}</div>@endif</td>
                     <td>@foreach ((array) $f->actions as $a)<span class="bdg g">{{ ['notify' => '🔔 إشعار', 'tg' => '📨 تلجرام', 'mail' => '✉️ بريد', 'task' => '✅ مهمة', 'set' => '✏️ تعيين حقل'][$a['type']] ?? $a['type'] }}</span> @endforeach</td>
                     <td><b>{{ $f->runs }}</b>@if ($f->last_run_at)<div class="sub">{{ $f->last_run_at->diffForHumans() }}</div>@endif</td>
@@ -111,7 +111,7 @@
 <div class="card" style="max-width:760px" id="builder">
     <h3>＋ مسار جديد</h3>
     <form method="GET" class="crow" style="margin-bottom:12px">
-        <select class="inp" name="m" onchange="this.form.submit()" style="max-width:280px">
+        <select class="inp" name="m" data-submit-on-change style="max-width:280px">
             <option value="">— اختر الوحدة أولاً —</option>
             @foreach (hub_modules() as $mk => $md)<option value="{{ $mk }}" @selected($module === $mk)>{{ $md['label'] }}</option>@endforeach
         </select>

@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Support\AiProviderRegistry;
+use App\Support\Ai\Catalog\AiProviderRegistry;
 use Illuminate\Console\Command;
 
 /**

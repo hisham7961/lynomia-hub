@@ -23,8 +23,8 @@
     @endif
     @if ($viCoords)
         <div class="crow" style="margin-top:8px">
-            <a class="chip" target="_blank" rel="noopener"
-               href="https://www.openstreetmap.org/?mlat={{ $viCoords[0] }}&mlon={{ $viCoords[1] }}#map=17/{{ $viCoords[0] }}/{{ $viCoords[1] }}">🗺️ موقع التنفيذ</a>
+            {{-- مصدرُ الخريطة إعدادٌ واحد (maps.tiles) — رابطٌ خارجيّ أو خريطةٌ خاصّة أو لا خرائط --}}
+            @include('partials.map_point', ['lat' => $viCoords[0], 'lng' => $viCoords[1], 'label' => '🗺️ موقع التنفيذ'])
             <span class="sub">التُقط بموافقتك لحظةَ التنفيذ فقط — لا تتبّعَ بعدها.</span>
         </div>
     @endif

@@ -19,7 +19,7 @@ class PrefController extends Controller
      */
     protected function dashCards(): array
     {
-        return \App\Support\WidgetRegistry::labels();
+        return \App\Support\Platform\WidgetRegistry::labels();
     }
 
     public function edit()
@@ -88,7 +88,7 @@ class PrefController extends Controller
         ]);
         // كتم أنواع الإشعارات — ضمن القائمة القابلة للكتم فقط (سكّةٌ واحدة يتقاسمها
         // الجوالُ D.7 · Critic F2: العقدُ الذي يقرؤه HubNotification في مصدرٍ واحد)
-        $prefs['mute'] = \App\Support\PrefService::filterMute($data['mute'] ?? []);
+        $prefs['mute'] = \App\Support\Platform\PrefService::filterMute($data['mute'] ?? []);
         $u->prefs = array_filter($prefs, fn ($v) => $v !== null && $v !== [] && $v !== '') ?: null;
         $u->save();
 
@@ -113,7 +113,7 @@ class PrefController extends Controller
         // الجوهرُ الدلاليّ (تحقّقُ الوجهة + سقفُ ١٢ + شكلُ الحفظ) انتقل إلى
         // `PrefService::togglePin` سكّةً واحدةً يتقاسمها الجوالُ D.7 (Critic F2) —
         // والويبُ يترجم النتيجةَ إعادةَ توجيهٍ كما كان حرفاً (لا تغيّرَ في السلوك).
-        $res = \App\Support\PrefService::togglePin(auth()->user(), trim((string) $r->input('token')));
+        $res = \App\Support\Platform\PrefService::togglePin(auth()->user(), trim((string) $r->input('token')));
 
         return back()->with($res['ok'] ? 'ok' : 'err', $res['message']);
     }

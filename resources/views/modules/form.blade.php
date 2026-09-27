@@ -10,6 +10,23 @@
         <h2>{{ $updating ? '✏️ تعديل سجل' : (! empty($dup) ? '⎘ نسخ سجل' : '＋ سجل جديد') }}</h2>
     </div>
 </div>
+@if (! empty($editLock) && $updating)
+    {{-- قفلُ التحريرِ اللّيّن (DI-09): تنبيهٌ لا منع — `_version` يصون التعديلَ عند الحفظ --}}
+    <div class="card" data-edit-lock role="status" style="border-inline-start:4px solid var(--wn, #d98a00)">
+        <b>✋ {{ $editLock }}</b>
+    </div>
+@endif
+@if (! empty($suggest) && $updating)
+    @php $sfields = collect($def['fields'] ?? [])->keyBy('key'); @endphp
+    <div class="card" data-edit-suggest style="border-inline-start:4px solid var(--acc, #2a7ae2)">
+        <b>✨ قيمٌ مقترحة عُبّئت في النموذج — راجعها قبل الحفظ، ولم يُحفَظ شيءٌ بعد:</b>
+        <ul class="sub">
+            @foreach ($suggest as $k => $v)
+                <li>{{ $sfields[$k]['label'] ?? $k }}: {{ (string) ($row->{$sfields[$k]['col'] ?? $k} ?? '') !== '' ? $row->{$sfields[$k]['col'] ?? $k} : '—' }} ← <b>{{ $v }}</b></li>
+            @endforeach
+        </ul>
+    </div>
+@endif
 <div class="card lx-form" style="--mh:{{ $look['color'] }}">
     @include('modules._form', ['hx' => false])
 </div>

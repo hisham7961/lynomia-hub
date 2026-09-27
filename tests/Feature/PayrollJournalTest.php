@@ -89,15 +89,17 @@ class PayrollJournalTest extends TestCase
      * المشترَكة، انتقلت المعاملةُ التي تلفّ القيدَ وسطريه إلى `postBalanced`؛
      * فالحارسُ يتأكّد أنّها هناك، وأنّ المتحكّمَين يفوّضان إليها لا ينسخانها (لا
      * نسخةَ محرّكٍ ثالثة). الحرفُ نفسُه: قيدٌ لا يبقى بسطرٍ واحدٍ إن تعثّر ما بعده.
+     * (TECH_DEBT #29) والكتلةُ صارت في المحرّك الواحد `JournalPosting` — الخدمةُ بابُ توافقٍ إليه.
      */
     public function test_autojournal_is_transaction_wrapped(): void
     {
-        $svc = \Tests\Support\Source::read(\App\Support\JournalPostingService::class);
+        $svc = \Tests\Support\Source::read(\App\Support\Finance\JournalPosting::class);
         $this->assertMatchesRegularExpression('/postBalanced.*?DB::transaction/su', $svc,
             'خدمةُ الترحيل تبني القيدَ وسطريه بلا معاملة — فشلُ السطر الثاني يترك قيداً أعرج');
 
-        foreach (['FinController', 'PayrollController'] as $c) {
-            $src = \Tests\Support\Source::read("App\\Http\\Controllers\\Web\\{$c}");
+        // (خطّة التطبيق 4.6) قيدُ الدفعة انتقل مع محرّكها إلى `FinPayment` (يشترك فيه الجوال)
+        foreach (['App\\Support\\Finance\\FinPayment', 'App\\Http\\Controllers\\Web\\PayrollController'] as $c) {
+            $src = \Tests\Support\Source::read($c);
             $this->assertMatchesRegularExpression('/autoJournal.*?postBalanced/su', $src,
                 "{$c}::autoJournal لم يعد يفوّض إلى خدمة الترحيل المشترَكة — نسخةٌ ثالثةٌ محتملة");
         }

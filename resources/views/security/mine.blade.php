@@ -123,7 +123,7 @@
     </table></div>
 </div>
 @include('partials.passkey_js')
-<script>
+<script @cspNonce>
 (function () {
     var btn = document.getElementById('pk-add'); if (!btn) return;
     if (!window.LynPasskey || !LynPasskey.supported) { btn.disabled = true; btn.textContent = 'المتصفّح لا يدعم مفاتيح المرور'; return; }

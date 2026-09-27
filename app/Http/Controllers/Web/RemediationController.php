@@ -6,10 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\KpiDef;
 use App\Models\Objective;
 use App\Models\Ticket;
-use App\Support\DataQuality;
-use App\Support\KpiCentre;
-use App\Support\OkrCentre;
-use App\Support\Remediation;
+use App\Support\Insights\DataQuality;
+use App\Support\Insights\KpiCentre;
+use App\Support\Insights\OkrCentre;
+use App\Support\Ops\Remediation;
 use Illuminate\Http\Request;
 
 /**
@@ -159,7 +159,7 @@ class RemediationController extends Controller
             . 'الوحدة: ' . $def['label'] . "\n"
             . 'النقص: ' . $finding['label'] . "\n"
             . 'العدد: ' . $finding['count'] . ' من ' . $finding['total'] . " سجلاً\n"
-            . 'الشدّة: ' . \App\Support\Severity::label((string) ($finding['sev'] ?? '')) . "\n\n"
+            . 'الشدّة: ' . \App\Support\Platform\Severity::label((string) ($finding['sev'] ?? '')) . "\n\n"
             . 'لماذا يهمّ: ' . ($finding['why'] ?? '') . "\n"
             . 'الإصلاح: ' . ($finding['fix'] ?? '');
 

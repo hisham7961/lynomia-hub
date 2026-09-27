@@ -5,7 +5,7 @@ namespace Tests\Feature\Ia;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\InformationArchitecture;
+use App\Support\Platform\InformationArchitecture;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 

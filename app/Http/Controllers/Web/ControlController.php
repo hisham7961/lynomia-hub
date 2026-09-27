@@ -3,16 +3,16 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\ActionCenter;
-use App\Support\AttentionQueue;
-use App\Support\Audit;
-use App\Support\DataQuality;
-use App\Support\ErrorStats;
-use App\Support\ExecutionStats;
-use App\Support\Health;
-use App\Support\SecurityFindings;
-use App\Support\SecurityPosture;
-use App\Support\TimeRange;
+use App\Support\Insights\ActionCenter;
+use App\Support\Insights\AttentionQueue;
+use App\Support\Platform\Audit;
+use App\Support\Insights\DataQuality;
+use App\Support\Ops\ErrorStats;
+use App\Support\Workforce\ExecutionStats;
+use App\Support\Ops\Health;
+use App\Support\Security\SecurityFindings;
+use App\Support\Security\SecurityPosture;
+use App\Support\Platform\TimeRange;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 

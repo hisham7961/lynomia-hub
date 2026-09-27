@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Middleware\ResolveChunkedUploads;
 use App\Models\Attachment;
-use App\Support\Api;
-use App\Support\AttachmentService;
-use App\Support\ChunkedUpload;
+use App\Support\Platform\Api;
+use App\Support\Collaboration\AttachmentService;
+use App\Support\Collaboration\ChunkedUpload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -28,11 +28,11 @@ use Symfony\Component\HttpFoundation\Response;
  *    الجوال (`Idempotency::owner` ⇒ `mobile_session->id` · Critic F1) — لدفعةِ النقاط
  *    (F.4) وإتمامِ الرفع (F.1) كي لا تُضاعف إعادةُ المحاولة نقاطاً أو مرفقاً.
  *
- * **جوهرُ الملفّات (F.1/F.2):** يُعاد استعمالُ `App\Support\AttachmentService` — لا
+ * **جوهرُ الملفّات (F.1/F.2):** يُعاد استعمالُ `App\Support\Collaboration\AttachmentService` — لا
  * نسخةَ منطقٍ ثانية (Critic F2): `validateUpload` + `guardRecord(...,'v')` +
  * `filesFromRequest` + `attach` (قائمةُ الكتابة البيضاء + البصمةُ sha256 + القرصُ
  * الخاصّ `local` — لا base64 ولا رابطٌ عامّ) + `download`/`stream` (حاجزُ الإصابة +
- * سجلُّ الوصول + التدقيق). **الرفعُ المقطَّعُ يُعاد استعمالُ `App\Support\ChunkedUpload`**
+ * سجلُّ الوصول + التدقيق). **الرفعُ المقطَّعُ يُعاد استعمالُ `App\Support\Collaboration\ChunkedUpload`**
  * (لا جدولَ جديد — القرارُ موثَّق): `append` للقطعة و`claim` للتجميع، وعلامةُ
  * `ResolveChunkedUploads::FLAG` تُرفع في «الإتمام» كي يرفع `hub_upload_cap` سقفَ
  * الطلب الواحد عن الملفّ المجمَّع.
@@ -76,8 +76,7 @@ class MobileFileController extends V1Controller
         AttachmentService::guardAttach($data['module'], $data['record_id']);
 
         // حاجزُ الامتداد على الاسم المُعلَن — قبل أن يرفع العميلُ غيغابايتاً يُرفَض
-        $ext = mb_strtolower((string) pathinfo($data['filename'], PATHINFO_EXTENSION));
-        if (in_array($ext, AttachmentService::BLOCKED, true)) {
+        if (\App\Support\Security\UploadPolicy::blocked($data['filename'])) {
             return Api::error(Api::VALIDATION_FAILED, 422,
                 'هذا النوع من الملفات غير مسموح: ' . Str::limit($data['filename'], 40));
         }
@@ -282,6 +281,80 @@ class MobileFileController extends V1Controller
         $this->guardClientModule((string) $att->module);   // سطحُ العميل فقط
 
         return AttachmentService::stream($att);
+    }
+
+    // ═══════════════ 3.5 · قائمةُ مرفقات السجل وحذفُ مرفق (طلب الجوال #1) ═══════════════
+
+    /**
+     * `GET attachments?module=&record_id=` — مرفقاتُ سجلٍّ **بقواعد شاشة السجلّ الويبية نفسِها**:
+     *  • `guardRecord(...,'v')` — رؤيةُ الوحدة (٤٠٣) + نطاقُ السجلّ (خارجَه ٤٠٤ · لا IDOR).
+     *  • `DocumentPolicy::filterListable` — الوثيقةُ الممنوعةُ صراحةً عن القارئ لا تُعرَض أصلاً
+     *    (لا اسمَ ولا عدّ) — الترشيحُ نفسُه في `partials/attachments`.
+     *  • حسابُ العميل لا يبلغها (الويبُ يُخفي مرفقاتِ الشاشة الداخلية عنه — بوّابةُ `mobile.portal`).
+     * لكلِّ مرفقٍ ما يجوز للقارئ الآن (`can`) — عرضٌ يعيد الخادمُ فحصَه عند الفعل.
+     */
+    public function recordFiles(Request $r): Response
+    {
+        $this->tagMobile($r);
+        $d = $r->validate([
+            'module'    => ['required', 'string', 'max:60'],
+            'record_id' => ['required', 'string', 'max:36'],
+        ]);
+
+        AttachmentService::guardRecord($d['module'], $d['record_id'], 'v');
+
+        $u = auth()->user();
+        $items = Attachment::where('module', $d['module'])->where('record_id', $d['record_id'])
+            ->orderByDesc('created_at')->orderByDesc('id')->get();
+        $items = \App\Support\Documents\DocumentPolicy::filterListable($u, $items);
+        $users = \App\Models\User::whereIn('id', $items->pluck('uploaded_by')->filter()->unique()->values())
+            ->pluck('name', 'id');
+
+        return $this->ok([
+            'module'    => $d['module'],
+            'record_id' => $d['record_id'],
+            'count'     => $items->count(),
+            'files'     => $items->map(function (Attachment $a) use ($u, $users) {
+                $clean = $a->av_status !== 'infected';
+
+                return [
+                    'id'            => (string) $a->id,
+                    'original_name' => $a->original_name,
+                    'mime'          => $a->mime,
+                    'size'          => (int) $a->size,
+                    'kind'          => $a->kind,
+                    'kind_label'    => $a->kind ? hub_doc_label($a->module, $a->kind) : null,
+                    'av_status'     => $a->av_status,
+                    'expires_at'    => $a->expires_at?->toDateString(),
+                    'uploaded_by'   => $a->uploaded_by
+                        ? ['id' => (string) $a->uploaded_by, 'name' => (string) ($users[$a->uploaded_by] ?? '')] : null,
+                    'created_at'    => optional($a->created_at)->toIso8601String(),
+                    'can'           => [
+                        'download' => $clean && \App\Support\Documents\DocumentPolicy::allows($u, $a, 'download'),
+                        'preview'  => $clean && in_array($a->mime, AttachmentService::INLINE_MIMES, true)
+                            && \App\Support\Documents\DocumentPolicy::allows($u, $a, 'preview'),
+                        'delete'   => AttachmentService::mayDelete($a, $u),
+                    ],
+                    'download'      => route('mobile.files.download', ['id' => $a->id], false),
+                    'stream'        => route('mobile.files.stream', ['id' => $a->id], false),
+                ];
+            })->values()->all(),
+        ]);
+    }
+
+    /**
+     * `DELETE attachments/{id}` — حذفٌ ناعمٌ **بحارس الويب نفسِه** (`AttachmentService::authorizeDelete`):
+     * رافعُه أو المالكُ أو محرّرُ وحدته (٤٠٣ لغيرهم) + رؤيةُ السجلّ ونطاقُه (٤٠٤) — ثم الأثرُ
+     * المشترك (تدقيقٌ + إبطالُ رادار الانتهاء). الملفُّ يبقى على القرص للاستعادة.
+     */
+    public function deleteFile(Request $r, string $id): Response
+    {
+        $this->tagMobile($r);
+        $a = Attachment::findOrFail($id);
+        AttachmentService::authorizeDelete($a);
+        AttachmentService::delete($a);
+
+        return $this->ok(['id' => (string) $a->id, 'module' => $a->module, 'record_id' => $a->record_id, 'deleted' => true]);
     }
 
     /**

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\InformationArchitecture;
+use App\Support\Platform\InformationArchitecture;
 use Illuminate\Http\Request;
 
 /**

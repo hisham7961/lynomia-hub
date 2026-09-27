@@ -1,0 +1,132 @@
+<?php
+
+/** سجلُّ الوحدات — «stockmv» (docs/REORG_PLAN.md §R4) — يُحمَّل بترتيبه من قائمة config/hub.php */
+
+return [
+    'key' => 'stockmv',
+    'table' => 'stock_moves',
+    'model' => 'StockMove',
+    'label' => 'حركات المخزون',
+    'display' => 'no',
+    'status' => 'status',
+    'columns' => [
+        'no',
+        'kind',
+        'itemId',
+        'qty',
+        'date',
+        'status',
+    ],
+    'fields' => [
+        ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
+        [
+            'key' => 'no',
+            'col' => 'doc_no',
+            'label' => 'رقم الحركة',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'kind',
+            'col' => 'kind',
+            'label' => 'نوع الحركة',
+            'type' => 'sel',
+            'required' => true,
+            'options' => [
+                'استلام',
+                'صرف',
+                'تحويل بين المستودعات',
+                'جرد',
+                'تالف',
+                'مرتجع وارد',
+                'مرتجع صادر',
+            ],
+        ],
+        [
+            'key' => 'itemId',
+            'col' => 'item_id',
+            'label' => 'الصنف',
+            'type' => 'ref',
+            'required' => true,
+            'ref' => 'stock',
+        ],
+        [
+            'key' => 'qty',
+            'col' => 'qty',
+            'label' => 'الكمية',
+            'type' => 'num',
+            'required' => true,
+        ],
+        [
+            'key' => 'fromWh',
+            'col' => 'from_wh',
+            'label' => 'من مستودع',
+            'type' => 'sel',
+            'options' => [
+                'الرئيسي',
+                'الفرع',
+                'مستودع خارجي',
+                'بضاعة بالطريق',
+            ],
+        ],
+        [
+            'key' => 'toWh',
+            'col' => 'to_wh',
+            'label' => 'إلى مستودع',
+            'type' => 'sel',
+            'options' => [
+                'الرئيسي',
+                'الفرع',
+                'مستودع خارجي',
+                'بضاعة بالطريق',
+            ],
+        ],
+        [
+            'key' => 'date',
+            'col' => 'date',
+            'label' => 'التاريخ',
+            'type' => 'date',
+            'required' => true,
+        ],
+        [
+            'key' => 'byId',
+            'col' => 'by_id',
+            'label' => 'المنفّذ',
+            'type' => 'ref',
+            'ref' => 'users',
+        ],
+        [
+            'key' => 'ref',
+            'col' => 'reference',
+            'label' => 'المرجع (أمر/فاتورة)',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'partner',
+            'col' => 'partner',
+            'label' => 'العميل / المورد',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'status',
+            'col' => 'status',
+            'label' => 'الحالة',
+            'type' => 'sel',
+            'options' => [
+                'مسودة',
+                'مؤكدة',
+                'ملغاة',
+            ],
+        ],
+        [
+            'key' => 'notes',
+            'col' => 'notes',
+            'label' => 'البيان',
+            'type' => 'ta',
+        ],
+    ],
+    'search' => [
+        'doc_no',
+        'reference',
+        'partner',
+    ],
+];

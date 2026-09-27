@@ -19,7 +19,7 @@
                 <td>
                     <b>{{ $ir['name'] }}</b>
                     @if ($emailMode !== 'hide')
-                        <div class="sub">{{ $emailMode === 'mask' ? \App\Support\SecurityFindings::maskPII($ir['email']) : $ir['email'] }}</div>
+                        <div class="sub">{{ $emailMode === 'mask' ? \App\Support\Security\SecurityFindings::maskPII($ir['email']) : $ir['email'] }}</div>
                     @endif
                     <div class="sub">{{ $ir['role'] }}</div>
                 </td>

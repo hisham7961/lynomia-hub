@@ -3,8 +3,8 @@
 namespace Tests\Feature\AiHub;
 
 use App\Models\AiProvider;
-use App\Support\AiProviders;
-use App\Support\Settings;
+use App\Support\Ai\Catalog\AiProviders;
+use App\Support\Platform\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;

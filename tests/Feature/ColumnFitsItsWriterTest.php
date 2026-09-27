@@ -66,7 +66,7 @@ class ColumnFitsItsWriterTest extends TestCase
         $rule = \App\Models\AlertRule::create(['name' => 'قاعدة قصّ', 'mod' => '', 'field' => 'x', 'op' => 'يساوي',
             'status' => 'مفعّلة', 'source' => 'security.lockdown', 'window_min' => 5]);
 
-        $engine = new \App\Support\AlertEngine();
+        $engine = new \App\Support\Ops\AlertEngine();
         $m = new \ReflectionMethod($engine, 'upsert');
         $out = ['fired' => 0, 'resolved' => 0, 'incidents' => 0, 'notifs' => 0];
         $long = str_repeat('عنوانٌ طويلٌ جداً ', 40);   // > ٣٠٠ حرفاً بأحرفٍ عربية
@@ -211,7 +211,7 @@ class ColumnFitsItsWriterTest extends TestCase
 
         $statusMax = hub_col_max('assets', 'status');
         if ($statusMax !== null) {
-            foreach (\App\Support\Custody::STATUSES as $val) {
+            foreach (\App\Support\Assets\Custody::STATUSES as $val) {
                 if (mb_strlen($val) > $statusMax) {
                     $tight[] = "assets.status عرضُه {$statusMax} والحالة «{$val}» أطول";
                 }
@@ -242,13 +242,13 @@ class ColumnFitsItsWriterTest extends TestCase
     {
         $field = collect(config('hub.modules.assets.fields'))->firstWhere('key', 'status');
         $this->assertNotNull($field, 'حقلُ الحالة اختفى من سجل وحدة الأصول');
-        $this->assertSame(\App\Support\Custody::STATUSES, (array) ($field['options'] ?? []),
+        $this->assertSame(\App\Support\Assets\Custody::STATUSES, (array) ($field['options'] ?? []),
             'خياراتُ حالة الأصل في config انحرفت عن Custody::STATUSES — مصدرٌ واحدٌ لا مصدران');
         $this->assertTrue((bool) ($field['locked'] ?? false),
             'حقلُ الحالة يجب أن يكون locked — يُكتَب عبر Custody لا من النموذج العامّ');
-        $this->assertCount(11, \App\Support\Custody::STATUSES, 'الحالاتُ يجب أن تكون إحدى عشرة');
-        foreach (\App\Support\Custody::LEGACY_STATUSES as $legacy) {
-            $this->assertContains($legacy, \App\Support\Custody::STATUSES,
+        $this->assertCount(11, \App\Support\Assets\Custody::STATUSES, 'الحالاتُ يجب أن تكون إحدى عشرة');
+        foreach (\App\Support\Assets\Custody::LEGACY_STATUSES as $legacy) {
+            $this->assertContains($legacy, \App\Support\Assets\Custody::STATUSES,
                 "الحالةُ القديمة «{$legacy}» أُسقِطت — كسرُ توافقٍ رجعيّ (§86)");
         }
     }

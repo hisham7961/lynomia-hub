@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Support\SchemaGuard;
+use App\Support\Ops\SchemaGuard;
 use Illuminate\Console\Command;
 
 /**

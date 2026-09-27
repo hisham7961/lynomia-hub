@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Setting;
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

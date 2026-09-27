@@ -32,7 +32,7 @@ class HubAutomation extends Command
     {
         if ($this->dry || ! \Illuminate\Support\Facades\Schema::hasTable('attendance')) return 0;
         try {
-            return \App\Support\Workday::close();
+            return \App\Support\Workforce\Workday::close();
         } catch (\Throwable $e) {
             report($e);
             return 0;
@@ -65,6 +65,15 @@ class HubAutomation extends Command
         $this->dry = (bool) $this->option('dry');
         if ($this->dry) $this->warn('وضع المعاينة — لن يُكتب شيء');
 
+        // استدراكُ ختمِ تدقيقٍ ضاع بعد الالتزام (AUD-07) — أوّلاً، معزولاً كسائر الخطوات
+        if (! $this->dry) {
+            try {
+                \App\Models\AuditEntry::sealPending();
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+
         $g = $this->recurring();
         // عزلُ الفشل كسائر الخطوات (v2.399): قاعدةٌ واحدة ترمي كانت تُسقط التذكيرات والعقود والنبضة
         try {
@@ -83,10 +92,12 @@ class HubAutomation extends Command
         $rr = $this->reconcileReports();
         $s = $this->signalsPrune();
         $m = $this->marginSnapshot();
+        $au = $this->auditorRun();
+        $br = $this->brainIndex();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · تقارير: {$rr} تنبيهُ نقص · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · تقارير: {$rr} تنبيهُ نقص · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة · المدقّق: {$au['opened']} نتيجةٌ جديدة، {$au['resolved']} زال شرطُها · العقلُ الثاني: {$br} مقطعاً مُضمَّناً");
 
-        if (! $this->dry) \App\Support\Health::beat('automation', (int) round((microtime(true) - $t0) * 1000));
+        if (! $this->dry) \App\Support\Ops\Health::beat('automation', (int) round((microtime(true) - $t0) * 1000));
         return self::SUCCESS;
     }
 
@@ -128,6 +139,44 @@ class HubAutomation extends Command
     }
 
     /**
+     * **المدقّق** (docs/ai-hub/46-ai-roadmap.md §٣) — خطوةٌ في الدورة اليوميّة لا أمرُ
+     * جدولةٍ منفصل («لا أمرَ جدولةٍ لكلِّ مسح» — INTELLIGENCE_MAP). ومعزولُ الفشل كسائر
+     * الخطوات: كاشفٌ يرمي لا يُسقط ما بعده، ولا يحلّ نتائجَه القائمة.
+     *
+     * @return array{opened: int, resolved: int}
+     */
+    /** العقلُ الثاني (المرحلة ٤): جولةُ فهرسةٍ إن كان مفعَّلاً — ومعزولُ الفشل كسائر الخطوات */
+    protected function brainIndex(): int
+    {
+        try {
+            // الجاهزيّةُ داخلَ الحارس: قاعدةُ العقل المستقلّة المتوقّفة لا تُسقط الجولةَ قبل نبضها
+            if (! \App\Support\Ai\Brain\Brain::ready()) return 0;
+
+            return (int) \App\Support\Ai\Brain\Brain::index($this->dry)['embedded'];
+        } catch (\Throwable $e) {
+            report($e);
+
+            return 0;
+        }
+    }
+
+    protected function auditorRun(): array
+    {
+        try {
+            $stats = \App\Support\Ai\Auditor\Auditor::run($this->dry);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return ['opened' => 0, 'resolved' => 0];
+        }
+
+        return [
+            'opened' => array_sum(array_column($stats, 'opened')),
+            'resolved' => $this->dry ? 0 : array_sum(array_column($stats, 'resolved')),
+        ];
+    }
+
+    /**
      * تشذيبُ تصرّفاتِ الإشارات اليتيمة: إشارةٌ حُلَّت وزالت (لم تُرَ منذ مدّة) فلا
      * معنى لحالة تصرّفها. لا محرّكَ إشاراتٍ ثانٍ — الإشاراتُ تبقى محسوبةً حيّاً في
      * `hub_recommendations`/مركز الفعل، وتصلُ الملخّصَ اليوميّ عبر `hub:digest` أصلاً.
@@ -136,7 +185,7 @@ class HubAutomation extends Command
     {
         if ($this->dry) return 0;
         try {
-            return \App\Support\ActionCenter::prune();
+            return \App\Support\Insights\ActionCenter::prune();
         } catch (\Throwable $e) {
             report($e);
 
@@ -237,12 +286,12 @@ class HubAutomation extends Command
                 // مدىً لا دالّة: `DATE(date_end)` تُلغي `contracts_date_end_index`
                 // (قِيس بـEXPLAIN: `type: ALL · key: NULL` ⟵ `type: range`)
                 $due = \App\Models\Contract::where('status', 'ساري')->whereNotNull('date_end');
-                $due = \App\Support\DayRange::before($due, 'date_end', today())->limit(200)->get();
+                $due = \App\Support\Platform\DayRange::before($due, 'date_end', today())->limit(200)->get();
                 foreach ($due as $c) {
                     if (! $this->dry) {
                         $c->status = 'منتهي';
                         $c->save();
-                        \App\Support\FlowRunner::fire('status', 'contracts', $c, 'منتهي');
+                        \App\Support\Platform\FlowRunner::fire('status', 'contracts', $c, 'منتهي');
                         $this->notifyMonitors('contract-exp',
                             'انتهى العقد «' . \Illuminate\Support\Str::limit($c->title, 60) . '» تلقائياً بتجاوز نهايته',
                             'contracts', $c->id);
@@ -260,7 +309,7 @@ class HubAutomation extends Command
                 ->max('notice');
             $renewable = \App\Models\Contract::where('status', 'ساري')->where('renewal', 'تلقائي')
                 ->whereNotNull('notice')->where('notice', '>', 0)->whereNotNull('date_end')
-                ->tap(fn ($q) => \App\Support\DayRange::upto($q, 'date_end', today()->addDays(max(1, $maxNotice))))
+                ->tap(fn ($q) => \App\Support\Platform\DayRange::upto($q, 'date_end', today()->addDays(max(1, $maxNotice))))
                 ->orderBy('date_end')->orderBy('id')->limit(200)->get()
                 ->filter(fn ($c) => \Illuminate\Support\Carbon::parse($c->date_end)
                     ->lte(today()->addDays((int) $c->notice)));
@@ -335,7 +384,7 @@ class HubAutomation extends Command
         $due = RecurringDoc::whereNull('deleted_at')
             ->where('status', 'مفعّل')
             ->whereNotNull('next')
-            ->tap(fn ($q) => \App\Support\DayRange::upto($q, 'next', today()))
+            ->tap(fn ($q) => \App\Support\Platform\DayRange::upto($q, 'next', today()))
             ->get();
 
         foreach ($due as $rec) {
@@ -427,13 +476,13 @@ class HubAutomation extends Command
     }
 
     /* ───── 2) قواعد التنبيه ───── */
-    // ── Control Plane: Phase 6 (WP-6.3) ── الجوهرُ استُخرج إلى App\Support\AlertEngine
+    // ── Control Plane: Phase 6 (WP-6.3) ── الجوهرُ استُخرج إلى App\Support\Ops\AlertEngine
     // **بلا تغيير سلوك** (الصلاحيةُ قبل النطاق، التنطيقُ لكل مستلمٍ قبل الحدّ،
     // ترقيمٌ بمؤشّر المعرّف، التصعيد) — يستدعيه هذا الأمرُ اليوميّ هنا، ويستدعي
     // `hub:alerts-evaluate` سكّتَه النافذية كلَّ ٥ دقائق.
     protected function alertRules(): array
     {
-        return (new \App\Support\AlertEngine($this->dry, fn ($m) => $this->line($m)))->daily();
+        return (new \App\Support\Ops\AlertEngine($this->dry, fn ($m) => $this->line($m)))->daily();
     }
 
 
@@ -510,7 +559,7 @@ class HubAutomation extends Command
             foreach ($due as $ob) {
                 $ob->forceFill(['status' => 'متأخر'])->save();
                 // عبر النموذج لا update جماعي: مسارات «متأخر» وقواعده المبذورة تُطلَق
-                \App\Support\FlowRunner::fire('status', 'obligations', $ob, 'متأخر');
+                \App\Support\Platform\FlowRunner::fire('status', 'obligations', $ob, 'متأخر');
                 $n++;
             }
 
@@ -574,7 +623,7 @@ class HubAutomation extends Command
             // (فرصةُ ١٪) — حذفٌ على عمودٍ بلا فهرسٍ في أثناء تحميل صفحة. نُقل هنا
             // بجوار إخوته، على دفعاتٍ محدودة كي لا يقفل الجدولَ طويلاً.
             // عدّاداتُ استخدام API: ٩٠ يوماً تكفي للتحليل (v2.399)
-            $per['api_usage'] = \App\Support\Api::pruneUsage((int) setting('api.usage_keep_days', 90));
+            $per['api_usage'] = \App\Support\Platform\Api::pruneUsage((int) setting('api.usage_keep_days', 90));
 
             // **سياسةُ احتفاظٍ لسجلات التشغيل** (v2.399) — كانت بلا سقفٍ إطلاقاً:
             // الصندوقُ الصادر المُسلَّم، وتسليماتُ الويبهوك الفاشلة، والأخطاءُ المحلولة أو البائتة.
@@ -629,7 +678,7 @@ class HubAutomation extends Command
              * — فسجلُّ «ماتَ هنا» أنفعُ للتشخيصِ من صمت.
              */
             if (\Illuminate\Support\Facades\Schema::hasTable('ai_usage_events')) {
-                $per['ai_reservations_expired'] = \App\Support\AiLedger::expireStale();
+                $per['ai_reservations_expired'] = \App\Support\Ai\Governance\AiLedger::expireStale();
 
                 /*
                  * **ومقصُّ عمرِ السجلّ** — بأرضيّةٍ صلبةٍ ثلاثين يوماً.
@@ -648,6 +697,10 @@ class HubAutomation extends Command
                 } while ($gone >= 5000);
             }
 
+            // **ذاكرةُ «اسأل Hub»** (المرحلة ٢): خيوطٌ بلا نشاطٍ منذ ask.memory_days تُمحى بأدوارها
+            $per['ask_threads'] = \App\Support\Ai\Ask\AskMemory::prune();
+            $n += $per['ask_threads'];
+
             if (\Illuminate\Support\Facades\Schema::hasTable('page_visits')) {
                 // ── Control Plane: Phase 7 (WP-7.4) ── الزياراتُ وحدَها كانت بثابتِ
                 // ٩٠ في الشيفرة بينما إخوتُها بمفاتيحَ معلَنة — retention.visits_days
@@ -664,12 +717,12 @@ class HubAutomation extends Command
 
             // **ورادارُ الكشف** (v2.356): كل ٤٠٣ أو تخمينِ رابطٍ يكتب صفّاً — سطحٌ
             // قد يفيض تحت طرقٍ متعمَّد. حدٌّ زمنيٌّ وسقفٌ صلبٌ معاً كإخوته أعلاه.
-            $n += $per['access_denials'] = \App\Support\SecurityRadar::prune();
+            $n += $per['access_denials'] = \App\Support\Security\SecurityRadar::prune();
 
             // **وقطعُ الرفعات المهجورة**: اتصالٌ انقطع في منتصف رفعةٍ مقطَّعة يترك
             // نصفَ ملفٍ على القرص. تُكنَس عند كل إنهاء رفعةٍ أيضاً، وهذه شبكةُ
             // أمانٍ ليوم لا يُنهي فيه أحدٌ رفعةً أصلاً.
-            $n += $per['chunk_files'] = \App\Support\ChunkedUpload::prune();
+            $n += $per['chunk_files'] = \App\Support\Collaboration\ChunkedUpload::prune();
 
             // **وكاشُ الاستكشاف البائت**: باركود سُئل عنه المزوّدون قبل أشهرٍ
             // طويلة لا يستحق صفاً — إعادةُ مسحِه تسألهم من جديد فتتجدد إجابتُه.
@@ -694,7 +747,7 @@ class HubAutomation extends Command
 
             // **ونقاطُ المسار الخام** (v2.371): سياسةُ خصوصيةٍ صريحة — الإحداثيات
             // الدقيقة لا تبقى للأبد؛ المسارُ المبسَّط على الجلسة يكفي للتاريخ.
-            $n += $per['track_points'] = \App\Support\Tracking::prune();
+            $n += $per['track_points'] = \App\Support\Workforce\Tracking::prune();
 
             // ── Control Plane: Phase 2 (WP-2.2) ──
             // **ودلاءُ قياس HTTP**: صفٌّ لكل (حاوية ٥ دقائق × سطح × فعل × مسار)

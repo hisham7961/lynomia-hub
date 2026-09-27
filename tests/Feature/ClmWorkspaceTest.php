@@ -51,7 +51,7 @@ class ClmWorkspaceTest extends TestCase
     {
         $this->seedCore();
         $captured = [];
-        \App\Support\HubEvents::listen(function ($event) use (&$captured) { $captured[] = $event; });
+        \App\Support\Platform\HubEvents::listen(function ($event) use (&$captured) { $captured[] = $event; });
         $c = Contract::create(['title' => 'عقد أصلي', 'type' => 'عقد عميل', 'status' => 'ساري',
             'value' => 1200, 'party' => 'شركة الطرف']);
 

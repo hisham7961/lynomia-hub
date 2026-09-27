@@ -22,10 +22,10 @@ use App\Models\User;
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
 use App\Support\Discovery\Engine;
-use App\Support\ErrorLog;
-use App\Support\SecurityEvents;
-use App\Support\Totp;
-use App\Support\WebhookDispatcher;
+use App\Support\Ops\ErrorLog;
+use App\Support\Security\SecurityEvents;
+use App\Support\Security\Totp;
+use App\Support\Ops\WebhookDispatcher;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -169,12 +169,14 @@ class EnterpriseHardeningRound1Test extends TestCase
         $this->assertStringNotContainsString('QQ-FOREIGN-CO', $html, 'مركزُ الهوية يسرّب شركاتٍ أجنبية');
 
         $up = $this->userWith([], 'proj');
-        $p1 = Project::create(['name' => 'مشروعي PPA', 'manager_id' => $up->id]);
-        Project::create(['name' => 'مشروع سري PPB', 'manager_id' => $this->owner->id]);
+        // والوسمُ بشرطةٍ للسبب نفسِه أعلاه: «PPB» وقع فعلاً داخلَ اسمِ مستخدمٍ عشوائيّ («uPPBw»)
+        // في القائمة المنسدلة فسقطت الحزمة (v2.603.8) — والشرطةُ لا ترد في الأسماءِ العشوائيّة
+        $p1 = Project::create(['name' => 'مشروعي PP-OWN-PROJ', 'manager_id' => $up->id]);
+        Project::create(['name' => 'مشروع سري PP-FOREIGN-PROJ', 'manager_id' => $this->owner->id]);
         $asset = Asset::create(['name' => 'لابتوب', 'project_id' => $p1->id]);
         $html = $this->actingAs($up)->get('/m/assets/' . $asset->id)->assertOk()->getContent();
-        $this->assertStringContainsString('PPA', $html);
-        $this->assertStringNotContainsString('PPB', $html, 'بطاقةُ العهدة تسرّب مشاريعَ خارج النطاق');
+        $this->assertStringContainsString('PP-OWN-PROJ', $html);
+        $this->assertStringNotContainsString('PP-FOREIGN-PROJ', $html, 'بطاقةُ العهدة تسرّب مشاريعَ خارج النطاق');
 
         Client::create(['name' => 'عميل ألف', 'company_id' => $ca->id]);
         Client::create(['name' => 'عميل باء CFB', 'company_id' => $cb->id]);
@@ -193,7 +195,7 @@ class EnterpriseHardeningRound1Test extends TestCase
 
         $this->actingAs($this->owner)->get('/admin/users')->assertRedirect('/profile');
         $this->actingAs($this->owner)->getJson('/admin/users')->assertStatus(428)
-            ->assertJsonPath('code', \App\Support\Api::STEP_UP_REQUIRED)->assertJsonPath('stepup', true)
+            ->assertJsonPath('code', \App\Support\Platform\Api::STEP_UP_REQUIRED)->assertJsonPath('stepup', true)
             ->assertJsonPath('details.policy', 'auth.2fa_required_priv');
 
         $role = Role::where('is_owner', false)->first();
@@ -215,7 +217,7 @@ class EnterpriseHardeningRound1Test extends TestCase
         $emp = $this->employee;
 
         $this->actingAs($emp)->postJson('/passkey/register/options')->assertStatus(428)
-            ->assertJsonPath('code', \App\Support\Api::STEP_UP_REQUIRED)->assertJsonPath('stepup', true);
+            ->assertJsonPath('code', \App\Support\Platform\Api::STEP_UP_REQUIRED)->assertJsonPath('stepup', true);
 
         $r = $this->actingAs($emp)->post('/profile/token', ['tname' => 'x']);
         $r->assertRedirect();
@@ -305,7 +307,7 @@ class EnterpriseHardeningRound1Test extends TestCase
             'actions' => [['type' => 'set', 'field' => 'priority', 'value' => 'عالية']]]);
         $this->actingAs($this->owner);
         $t = Task::create(['title' => 'مهمة', 'status' => 'جديدة', 'priority' => 'عادية']);
-        \App\Support\FlowRunner::run('created', 'tasks', $t);
+        \App\Support\Platform\FlowRunner::run('created', 'tasks', $t);
         $this->assertSame('عالية', $t->fresh()->priority);
 
         $row = AuditEntry::where('module', 'tasks')->where('record_id', $t->id)->where('action', 'تعديل')
@@ -401,7 +403,7 @@ class EnterpriseHardeningRound1Test extends TestCase
         $r = $this->get('/healthz');
         $r->assertOk();
         $this->assertStringContainsString('application/json', (string) $r->headers->get('content-type'));
-        $this->assertSame(\App\Support\Health::MAINTENANCE, $r->json('components.config'));
+        $this->assertSame(\App\Support\Ops\Health::MAINTENANCE, $r->json('components.config'));
         $this->assertSame('ok', $r->json('checks.db'));
         $this->hubSetting('maintenance.on', '0');
 
@@ -409,7 +411,7 @@ class EnterpriseHardeningRound1Test extends TestCase
         $r = $this->get('/healthz');
         $r->assertOk();
         $this->assertStringContainsString('application/json', (string) $r->headers->get('content-type'));
-        $this->assertSame(\App\Support\Health::MAINTENANCE, $r->json('components.config'));
+        $this->assertSame(\App\Support\Ops\Health::MAINTENANCE, $r->json('components.config'));
         $this->hubSetting('security.lockdown', '0');
 
         // والمسبارُ لا يمرّ بوسطاء الجلسة: لا تعقّبَ زياراتٍ ولا قفلَ ساعات عمل

@@ -18,7 +18,7 @@
 <div class="card">
     <form method="GET" action="{{ route('flows.sandbox', $flow->id) }}" class="filters">
         <label class="lbl" for="rid">اختر سجلاً من «{{ $def['label'] }}» (أحدث ٢٠)</label>
-        <select class="inp" id="rid" name="rid" onchange="this.form.submit()" style="min-width:280px">
+        <select class="inp" id="rid" name="rid" data-submit-on-change style="min-width:280px">
             <option value="">— اختر سجلاً للتجربة —</option>
             @foreach ($recent as $row)
                 <option value="{{ $row->id }}" @selected($record && $record->id === $row->id)>

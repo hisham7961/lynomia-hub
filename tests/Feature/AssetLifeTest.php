@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Asset;
 use App\Models\User;
-use App\Support\AssetLife;
+use App\Support\Assets\AssetLife;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;

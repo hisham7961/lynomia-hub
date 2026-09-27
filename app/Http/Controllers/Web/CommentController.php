@@ -4,12 +4,11 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Comment;
-use App\Models\Conversation;
 use App\Models\HubNotification;
-use App\Models\Task;
 use App\Models\User;
-use App\Support\ChatCommands;
-use App\Support\CommentService;
+use App\Support\Collaboration\ChatCommands;
+use App\Support\Collaboration\CommentActions;
+use App\Support\Collaboration\CommentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -88,7 +87,7 @@ class CommentController extends Controller
             // السقفُ الفعليّ لا رقمٌ مكتوبٌ بيدٍ هنا: كان ٥٠٠ م.ب ثابتةً في هذا
 // المسار وحده، فتغييرُ الإعداد لا يمسّه — ومرفقُ التعليق يمرّ من
 // البوابة نفسها التي تمرّ منها بقيّة المرفقات.
-            'att'       => ['nullable', 'file', 'max:' . hub_upload_cap()['kb']],
+            'att'       => ['nullable', 'file', 'max:' . hub_upload_cap()['kb'], \App\Support\Security\UploadPolicy::rule()],   // FS-04
             'mention'   => ['nullable', 'array'],
             'internal'  => ['nullable', 'boolean'],
         ]);
@@ -149,12 +148,11 @@ class CommentController extends Controller
     public function edit(Request $r, string $id)
     {
         $c = Comment::findOrFail($id);
-        abort_unless($c->user_id === auth()->id(), 403, 'التحريرُ لصاحب الرسالة وحده');
-        $this->guardTarget($c->module, $c->record_id);
-        abort_if($c->task_id, 422, 'حُوّل هذا التعليق لمهمة — لا يُحرَّر');
+        // الحرّاسُ قبل التحقّق كما كانت — والقاعدةُ في `CommentActions` (يشترك فيها الجوال)
+        CommentActions::guardEdit(auth()->user(), $c);
 
         $data = $r->validate(['body' => ['required', 'string', 'max:4000']], [], ['body' => 'النص']);
-        CommentService::edit(auth()->user(), $c, trim($data['body']));
+        CommentActions::edit(auth()->user(), $c, $data['body']);
 
         return back()->with('ok', 'عُدّلت الرسالة')->withFragment('c-' . $c->id);
     }
@@ -162,27 +160,8 @@ class CommentController extends Controller
     /** تثبيت/فك تثبيت — لمن يملك تعديل الوحدة (وللقناة: المالك أو صاحب علم monitor) */
     public function pin(string $id)
     {
-        $c = Comment::findOrFail($id);
-        // تنطيقُ السجل الأمّ أولاً كما في toTask: تثبيتٌ على سجلٍ خارج النطاق
-        // كان يمرّ بمجرد امتلاك «تعديل» الوحدة دون فحص أن السجل نفسه مرئيّ
-        $this->guardTarget($c->module, $c->record_id);
-        $can = match ($c->module) {
-            'feed'    => hub_monitor(),
-            // تثبيتُ رسالةِ قناةٍ لأصحابها ومشرفيها — الدورُ عضويّةٌ لا مصفوفة
-            'channel' => Conversation::roleCanManage(Conversation::roleOf($c->record_id, (string) auth()->id())),
-            default   => hub_can(auth()->user(), $c->module, 'e'),
-        };
-        abort_unless($can, 403);
-
-        // §28 بيانُ التثبيت فوق العلَم `pinned`: مَن ثبّت ومتى — عمودٌ حديثٌ يُكتب
-        // حين وُجد (قبل الهجرة يبقى العلَمُ وحدَه كما كان).
-        $now = ! $c->pinned;   // الحالةُ الجديدة
-        $attrs = ['pinned' => $now, 'updated_at' => now()];
-        if (hub_has_col('comments', 'pinned_at')) {
-            $attrs['pinned_at'] = $now ? now() : null;
-            $attrs['pinned_by'] = $now ? auth()->id() : null;
-        }
-        $c->update($attrs);
+        // تنطيقُ السجل الأمّ أولاً ثمّ صلاحيةُ الإدارة (الخلاصة/القناة/الوحدة) — `CommentActions`
+        $c = CommentActions::togglePin(auth()->user(), Comment::findOrFail($id));
 
         return back()->with('ok', $c->pinned ? 'ثُبّت' : 'أُلغي التثبيت');
     }
@@ -193,29 +172,15 @@ class CommentController extends Controller
      */
     public function resolve(string $id)
     {
-        $c = Comment::findOrFail($id);
-        // السجلُّ الأمّ ضمن النطاق أولاً — ثم صاحبُ التعليق أو من يملك تعديله
-        $this->guardTarget($c->module, $c->record_id);
-        $can = $c->user_id === auth()->id() || match ($c->module) {
-            'feed'    => hub_monitor(),
-            'channel' => Conversation::roleCanManage(Conversation::roleOf($c->record_id, (string) auth()->id())),
-            default   => hub_can(auth()->user(), $c->module, 'e'),
-        };
-        abort_unless($can, 403);
+        $c = CommentActions::toggleResolve(auth()->user(), Comment::findOrFail($id));
 
-        $done = $c->resolved_at === null;
-        $c->update(['resolved_at' => $done ? now() : null,
-            'resolved_by' => $done ? auth()->id() : null, 'updated_at' => now()]);
-
-        return back()->with('ok', $done ? 'عُلّم التعليق محلولاً' : 'أُعيد التعليق مفتوحاً');
+        return back()->with('ok', $c->resolved_at !== null ? 'عُلّم التعليق محلولاً' : 'أُعيد التعليق مفتوحاً');
     }
 
     /** حذف — صاحب التعليق أو المالك */
     public function destroy(string $id)
     {
-        $c = Comment::findOrFail($id);
-        abort_unless($c->user_id === auth()->id() || hub_is_owner(), 403);
-        $c->delete();
+        CommentActions::destroy(auth()->user(), Comment::findOrFail($id));
 
         return back()->with('ok', 'حُذف التعليق');
     }
@@ -223,50 +188,13 @@ class CommentController extends Controller
     /** تحويل تعليق إلى مهمة — يرث مشروع السجل الأصلي إن وُجد */
     public function toTask(string $id)
     {
-        abort_unless(hub_can(auth()->user(), 'tasks', 'a'), 403, 'تحويل التعليقات لمهام يتطلب صلاحية إضافة مهام');
-        $c = Comment::findOrFail($id);
         /*
          * **هدفُ التعليق يُفحص كما في كل فعلٍ عليه**: كان يكفي امتلاكُ «إضافة
          * مهام» لتحويل **أي** تعليق — ونصُّ التعليق يُنسخ حرفياً في وصف المهمة.
-         * فمن لا يملك الموارد البشرية يقرأ تعليقاً على ملفٍّ وظيفيّ بتحويله.
-         * من يرى السجل يحوّل تعليقه، ولا أحد سواه.
+         * من يرى السجل يحوّل تعليقه، ولا أحد سواه. (القاعدةُ في `CommentActions::toTask`.)
          */
-        $this->guardTarget($c->module, $c->record_id);
-        abort_if($c->task_id, 422, 'حُوّل هذا التعليق لمهمة من قبل');
-
-        // مشروع المهمة: من عمود مشروع السجل الأصلي إن وُجد
-        $projectId = null;
-        if ($c->record_id && $c->module !== 'feed' && ($md = hub_mod($c->module)) && ($col = hub_project_col($c->module))) {
-            $projectId = \Illuminate\Support\Facades\DB::table($md['table'])->where('id', $c->record_id)->value($col);
-        }
-
-        // وراثةُ الشركة والعميل من السجل الأصل أو من نطاق المحوِّل (v2.399): المعزولُ كان
-        // يُنشئ مهمةً بلا شركةٍ فلا يراها هو نفسُه بعد ثانية.
-        $inherit = [];
-        if ($c->record_id && $c->module !== 'feed' && ($md0 = hub_mod($c->module))) {
-            foreach (['company_id' => hub_company_col($c->module), 'client_id' => hub_client_col($c->module)] as $k => $col) {
-                if ($col && hub_has_col('tasks', $k)) {
-                    $inherit[$k] = \Illuminate\Support\Facades\DB::table($md0['table'])->where('id', $c->record_id)->value($col);
-                }
-            }
-        }
-        if (empty($inherit['company_id']) && hub_has_col('tasks', 'company_id') && ($cids = hub_company_ids()) !== null && $cids) $inherit['company_id'] = $cids[0];
-        if (empty($inherit['client_id']) && hub_has_col('tasks', 'client_id') && ($kids = hub_client_ids()) !== null && $kids) $inherit['client_id'] = $kids[0];
-
-        $task = Task::create(array_filter($inherit) + [
-            'title'       => Str::limit(trim(preg_replace('/\s+/u', ' ', $c->body)), 70),
-            'project_id'  => $projectId,
-            'assignee_id' => $c->mentions[0] ?? $c->user_id,
-            'status'      => 'جديدة',
-            'description' => $c->body . "\n\n— حُوّلت من تعليق بواسطة " . auth()->user()->name,
-        ]);
-        $c->update(['task_id' => $task->id, 'updated_at' => now()]);
-
-        if ($task->assignee_id && $task->assignee_id !== auth()->id()) {
-            $this->notify($task->assignee_id, 'assign',
-                'أُسندت إليك مهمة من تعليق: ' . Str::limit($task->title, 60) . ' — بواسطة ' . auth()->user()->name,
-                'tasks', $task->id);
-        }
+        abort_unless(hub_can(auth()->user(), 'tasks', 'a'), 403, 'تحويل التعليقات لمهام يتطلب صلاحية إضافة مهام');
+        CommentActions::toTask(auth()->user(), Comment::findOrFail($id));
 
         return back()->with('ok', 'أُنشئت مهمة من التعليق');
     }
@@ -277,7 +205,7 @@ class CommentController extends Controller
         $c = Comment::findOrFail($id);
         $this->guardTarget($c->module, $c->record_id);          // يرى السجل = يتفاعل
         // 08.2 — منشورُ قناةٍ موسومٌ بشركةٍ خارجَ نطاقِ القارئ = ٤٠٤ (الخلاصةُ معزولةٌ عرضاً، وهذا يسدّ المعرّفَ المباشر)
-        \App\Support\CommentService::guardFeedComment(auth()->user(), $c);
+        \App\Support\Collaboration\CommentService::guardFeedComment(auth()->user(), $c);
 
         $emoji = hub_str($r->input('emoji'));
         abort_unless(in_array($emoji, self::REACTIONS, true), 422, 'تفاعل غير معروف');

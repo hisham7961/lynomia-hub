@@ -6,7 +6,7 @@ use App\Models\Company;
 use App\Models\Employee;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\Inbox;
+use App\Support\Collaboration\Inbox;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;

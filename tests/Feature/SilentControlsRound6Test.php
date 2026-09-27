@@ -90,7 +90,7 @@ class SilentControlsRound6Test extends TestCase
         $token = \Illuminate\Support\Str::random(48);
         $req = \Illuminate\Http\Request::create('/hook/' . $token, 'POST');
 
-        \App\Support\ErrorLog::capture(new \RuntimeException('عطلٌ في /hook/' . $token), $req);
+        \App\Support\Ops\ErrorLog::capture(new \RuntimeException('عطلٌ في /hook/' . $token), $req);
 
         $rows = \App\Models\HubNotification::pluck('text')->implode(' | ')
               . ' | ' . \App\Models\ErrorEvent::pluck('url')->implode(' | ')

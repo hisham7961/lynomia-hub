@@ -100,14 +100,14 @@ class UntestedControlsRound6Test extends TestCase
     {
         $this->seedCore();
 
-        $secret = \App\Support\Totp::secret();
+        $secret = \App\Support\Security\Totp::secret();
         $this->owner->forceFill(['totp_secret_cipher' => $secret, 'totp_enabled' => true])->saveQuietly();
 
         $this->actingAs($this->owner)->post('/profile/2fa/disable', ['code' => '000000']);
         $this->assertTrue((bool) $this->owner->fresh()->totp_enabled,
             'عُطّلت المصادقةُ الثنائية برمزٍ خاطئ — حارسُ الحساب يُنزَع بلا إثبات');
 
-        $this->actingAs($this->owner)->post('/profile/2fa/disable', ['code' => \App\Support\Totp::code($secret)]);
+        $this->actingAs($this->owner)->post('/profile/2fa/disable', ['code' => \App\Support\Security\Totp::code($secret)]);
         $this->assertFalse((bool) $this->owner->fresh()->totp_enabled, 'الرمزُ الصحيح لم يُعطّلها');
         $this->assertNull($this->owner->fresh()->totp_secret_cipher, 'بقي السرُّ مخزَّناً بعد التعطيل');
     }
@@ -120,7 +120,7 @@ class UntestedControlsRound6Test extends TestCase
         $this->owner->forceFill(['totp_secret_cipher' => '', 'totp_enabled' => true])->saveQuietly();
 
         $this->actingAs($this->owner)->post('/profile/2fa/disable',
-            ['code' => \App\Support\Totp::code('')]);
+            ['code' => \App\Support\Security\Totp::code('')]);
 
         $this->assertTrue((bool) $this->owner->fresh()->totp_enabled,
             'حسابٌ بسرٍّ ضائع عُطّلت حمايتُه برمزٍ يحسبه أيُّ أحد');

@@ -6,7 +6,7 @@ use App\Models\ErrorEvent;
 use App\Models\HubNotification;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\ErrorLog;
+use App\Support\Ops\ErrorLog;
 use Tests\TestCase;
 
 /**

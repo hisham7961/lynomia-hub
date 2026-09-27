@@ -22,11 +22,11 @@
 
 <form method="get" class="card" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
     <label>اليوم<br><a class="btn ghost xs" href="{{ route('reports.index', ['date' => $d->copy()->subDay()->toDateString(), 'compliance' => $filter]) }}">‹ أمس</a>
-        <input type="date" name="date" value="{{ $date }}" onchange="this.form.submit()">
+        <input type="date" name="date" value="{{ $date }}" data-submit-on-change>
         <a class="btn ghost xs" href="{{ route('reports.index', ['date' => $d->copy()->addDay()->toDateString(), 'compliance' => $filter]) }}">غد ›</a></label>
     <label>الموظف<br><input type="text" name="q" value="{{ $q }}" placeholder="اسم" class="in"></label>
     <label>الحالة<br>
-        <select name="compliance" class="in" onchange="this.form.submit()">
+        <select name="compliance" class="in" data-submit-on-change>
             <option value="">الكل</option>
             <option value="reported" @selected($filter==='reported')>قدّم تقريراً</option>
             <option value="missing" @selected($filter==='missing')>حاضرٌ بلا تقرير (بعد المهلة)</option>
@@ -66,7 +66,7 @@
                     @else<span class="bdg wn">لم يسجّل</span>@endif</td>
                 <td class="mono sub">{{ $c['time_in'] ?: '—' }}@if($c['time_out']) – {{ $c['time_out'] }}@endif
                     {{-- F11: دخولٌ بلا انصرافٍ في يومٍ ماضٍ — لا سقوطَ صامتاً، ورابطُ تصحيحِ HR --}}
-                    @if ($c['checked_in'] && ! $c['checked_out'] && $date < \App\Support\BusinessDate::today())
+                    @if ($c['checked_in'] && ! $c['checked_out'] && $date < \App\Support\Platform\BusinessDate::today())
                         @if ($c['attendance'] && hub_can(auth()->user(), 'attend', 'e'))
                             <a class="bdg wn" href="{{ route('m.edit', ['attend', $c['attendance']->id]) }}" title="صحّح صفَّ الحضور — الساعاتُ لا تُختلق">انصراف مفقود ✎</a>
                         @else

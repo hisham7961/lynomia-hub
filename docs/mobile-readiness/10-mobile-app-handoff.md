@@ -66,29 +66,164 @@ POST auth/refresh { refresh_token }
 
 ---
 
-## 4) خريطةُ النقاط الكاملة (٧٥ مساراً · كلُّها في `routes/api.php`)
+<!-- routes:begin (مولَّد: php artisan hub:mobile-handoff --write — لا يُحرَّر باليد) -->
+## 4) خريطةُ النقاط الكاملة (١٥٠ مساراً · كلُّها في `routes/api.php`)
 
-**عامّةٌ (بلا رمز وصول):**
+مولَّدةٌ من المسارات الحيّة — العامّةُ بلا رمز وصول (`public`)، والباقي خلف `mobile.session` + `mobile.portal` + `mobile.context`.
 
-| المسار | الاسم |
-|---|---|
-| `POST auth/login` · `POST auth/mfa/verify` · `POST auth/refresh` | `mobile.auth.login/mfa_verify/refresh` |
-| `GET app-config` · `GET health` | `mobile.app_config` · `mobile.health` |
-| `GET openapi.json` | `mobile.openapi` (مواصفةٌ حيّةٌ 3.1 منفصلةٌ عن v1) |
-| `GET activation/{token}` · `POST activation/{token}/complete` | `mobile.activation.show/complete` (تفعيلُ حساب عميل — §10 أدناه) |
-
-**مُصادَقة** (خلف `mobile.session` + `mobile.portal` + `mobile.context`):
-
-| المجال | المسارات |
-|---|---|
-| الجلسة | `POST auth/logout` · `POST auth/logout-all` · `GET auth/sessions` · `DELETE auth/sessions/{id}` · `POST auth/step-up` |
-| السياق/المخطّط | `GET context` · `GET bootstrap` (ETag) · `GET schema/modules` · `GET schema` (ETag) |
-| الأعمال | `GET approvals` · `GET approvals/{id}` · `POST approvals/{id}/approve` · `POST approvals/{id}/reject` · `GET home` · `GET search` · `GET prefs` · `PUT prefs` · `POST prefs/pin` |
-| الاتصال | `GET notifications` · `GET notifications/unread-count` · `POST notifications/read-all` · `GET notifications/{id}/target` · `POST notifications/{id}/read` · `GET comments` · `POST comments` · `GET dm/threads` · `GET dm/threads/{user}/messages` · `POST dm/threads/{user}/send` · `POST dm/threads/{user}/read` · `POST push/register` · `POST push/unregister` · `GET push/admin/status` · `POST push/admin/test` |
-| الملفّات/الماسح/الموقع | `POST files/upload-session` · `PUT files/upload-session/{id}/chunk` · `POST files/upload-session/{id}/complete` · `POST files/attach` · `GET files/{id}/download` · `GET files/{id}/stream` · `GET identity/resolve/{q}` · `POST tracking/start` · `POST tracking/{session}/points` · `POST tracking/{session}/end` |
-| المزامنة + CRUD | `GET sync/{module}` · `GET {module}` · `POST {module}` · `GET {module}/{id}` · `PUT {module}/{id}` · `PATCH {module}/{id}` · `DELETE {module}/{id}` · `GET {module}/{id}/actions` · `POST {module}/{id}/actions/{action}` |
-| بوّابةُ العميل (§10) | `GET portal/home` · `GET portal/engagements` · `GET portal/projects[/{id}]` · `GET portal/documents[/{id}]` · `GET portal/invoices[/{id}]` · `GET portal/conversations[/{id}]` |
-| إدارةُ أعضاء العميل (§10) | `GET clients/{client}/members` · `POST clients/{client}/members` · `PUT clients/{client}/members/{id}` · `DELETE clients/{client}/members/{id}` |
+| المجال | الطريقة والمسار (بعد `/api/mobile/v1/`) | الاسم | المصادقة |
+|---|---|---|---|
+| actions | `GET {module}/{id}/actions` | `mobile.resource.actions` | مُصادَقة |
+| actions | `POST {module}/{id}/actions/{action}` | `mobile.resource.run_action` | مُصادَقة |
+| activation | `GET activation/{token}` | `mobile.activation.show` | عامّة |
+| activation | `POST activation/{token}/complete` | `mobile.activation.complete` | عامّة |
+| approvals | `GET approvals` | `mobile.approvals.index` | مُصادَقة |
+| approvals | `GET approvals/{id}` | `mobile.approvals.show` | مُصادَقة |
+| approvals | `POST approvals/{id}/approve` | `mobile.approvals.approve` | مُصادَقة |
+| approvals | `POST approvals/{id}/reject` | `mobile.approvals.reject` | مُصادَقة |
+| ask | `POST ask` | `mobile.ask.run` | مُصادَقة |
+| ask | `POST ask/stream` | `mobile.ask.stream` | مُصادَقة |
+| ask | `DELETE ask/threads` | `mobile.ask.threads.destroy_all` | مُصادَقة |
+| ask | `GET ask/threads` | `mobile.ask.threads.index` | مُصادَقة |
+| ask | `DELETE ask/threads/{id}` | `mobile.ask.threads.destroy` | مُصادَقة |
+| ask | `GET ask/threads/{id}` | `mobile.ask.threads.show` | مُصادَقة |
+| attendance | `POST attendance/check-in` | `mobile.attendance.check_in` | مُصادَقة |
+| attendance | `POST attendance/check-out` | `mobile.attendance.check_out` | مُصادَقة |
+| attendance | `GET attendance/today` | `mobile.attendance.today` | مُصادَقة |
+| auth | `GET app-config` | `mobile.app_config` | عامّة |
+| auth | `POST auth/login` | `mobile.auth.login` | عامّة |
+| auth | `POST auth/logout` | `mobile.auth.logout` | مُصادَقة |
+| auth | `POST auth/logout-all` | `mobile.auth.logout_all` | مُصادَقة |
+| auth | `POST auth/mfa/verify` | `mobile.auth.mfa_verify` | عامّة |
+| auth | `POST auth/refresh` | `mobile.auth.refresh` | عامّة |
+| auth | `GET auth/sessions` | `mobile.auth.sessions.index` | مُصادَقة |
+| auth | `DELETE auth/sessions/{id}` | `mobile.auth.sessions.destroy` | مُصادَقة |
+| auth | `POST auth/step-up` | `mobile.auth.step_up` | مُصادَقة |
+| calendar | `GET alerts` | `mobile.alerts` | مُصادَقة |
+| calendar | `GET calendar` | `mobile.calendar` | مُصادَقة |
+| channels | `POST conversations` | `mobile.conversations.store` | مُصادَقة |
+| channels | `GET conversations/directory` | `mobile.conversations.directory` | مُصادَقة |
+| channels | `POST conversations/{id}/archive` | `mobile.conversations.archive` | مُصادَقة |
+| channels | `POST conversations/{id}/favorite` | `mobile.conversations.favorite` | مُصادَقة |
+| channels | `POST conversations/{id}/join` | `mobile.conversations.join` | مُصادَقة |
+| channels | `GET conversations/{id}/members` | `mobile.conversations.members.index` | مُصادَقة |
+| channels | `POST conversations/{id}/members` | `mobile.conversations.members.add` | مُصادَقة |
+| channels | `DELETE conversations/{id}/members/{user}` | `mobile.conversations.members.remove` | مُصادَقة |
+| channels | `PUT conversations/{id}/members/{user}` | `mobile.conversations.members.role` | مُصادَقة |
+| channels | `PUT conversations/{id}/notify` | `mobile.conversations.notify` | مُصادَقة |
+| channels | `POST groups` | `mobile.groups.store` | مُصادَقة |
+| channels | `POST groups/{id}/leave` | `mobile.groups.leave` | مُصادَقة |
+| channels | `POST groups/{id}/participants` | `mobile.groups.fork` | مُصادَقة |
+| clients | `GET clients/{client}/members` | `mobile.clients.members.index` | مُصادَقة |
+| clients | `POST clients/{client}/members` | `mobile.clients.members.invite` | مُصادَقة |
+| clients | `DELETE clients/{client}/members/{membership}` | `mobile.clients.members.revoke` | مُصادَقة |
+| clients | `PUT clients/{client}/members/{membership}` | `mobile.clients.members.role` | مُصادَقة |
+| comments | `GET comments` | `mobile.comments.index` | مُصادَقة |
+| comments | `POST comments` | `mobile.comments.store` | مُصادَقة |
+| comments | `DELETE comments/{id}` | `mobile.comment_actions.destroy` | مُصادَقة |
+| comments | `PATCH comments/{id}` | `mobile.comment_actions.edit` | مُصادَقة |
+| comments | `GET comments/{id}/attachment` | `mobile.comments.attachment` | مُصادَقة |
+| comments | `POST comments/{id}/pin` | `mobile.comment_actions.pin` | مُصادَقة |
+| comments | `POST comments/{id}/react` | `mobile.comments.react` | مُصادَقة |
+| comments | `POST comments/{id}/resolve` | `mobile.comment_actions.resolve` | مُصادَقة |
+| comments | `POST comments/{id}/to-task` | `mobile.comment_actions.to_task` | مُصادَقة |
+| context | `GET bootstrap` | `mobile.bootstrap` | مُصادَقة |
+| context | `GET context` | `mobile.context` | مُصادَقة |
+| context | `GET navigation` | `mobile.navigation` | مُصادَقة |
+| conversations | `GET conversations` | `mobile.conversations.index` | مُصادَقة |
+| conversations | `GET conversations/{id}/since` | `mobile.conversations.since` | مُصادَقة |
+| conversations | `POST conversations/{id}/typing` | `mobile.conversations.typing` | مُصادَقة |
+| crud | `GET {module}` | `mobile.resource.index` | مُصادَقة |
+| crud | `POST {module}` | `mobile.resource.store` | مُصادَقة |
+| crud | `DELETE {module}/{id}` | `mobile.resource.destroy` | مُصادَقة |
+| crud | `GET {module}/{id}` | `mobile.resource.show` | مُصادَقة |
+| crud | `PATCH {module}/{id}` | `mobile.resource.patch` | مُصادَقة |
+| crud | `PUT {module}/{id}` | `mobile.resource.update` | مُصادَقة |
+| crud | `GET {module}/{id}/versions` | `mobile.versions.index` | مُصادَقة |
+| custody | `GET custody/{id}/abilities` | `mobile.custody.abilities` | مُصادَقة |
+| custody | `POST custody/{id}/handover` | `mobile.custody.handover` | مُصادَقة |
+| custody | `POST custody/{id}/recover` | `mobile.custody.recover` | مُصادَقة |
+| custody | `GET me/custody` | `mobile.me.custody` | مُصادَقة |
+| dm | `DELETE dm/messages/{id}` | `mobile.dm.destroy` | مُصادَقة |
+| dm | `PATCH dm/messages/{id}` | `mobile.dm.edit` | مُصادَقة |
+| dm | `GET dm/messages/{id}/attachment` | `mobile.dm.attachment` | مُصادَقة |
+| dm | `POST dm/messages/{id}/react` | `mobile.dm.react` | مُصادَقة |
+| dm | `GET dm/threads` | `mobile.dm.threads` | مُصادَقة |
+| dm | `GET dm/threads/{user}/messages` | `mobile.dm.messages` | مُصادَقة |
+| dm | `POST dm/threads/{user}/read` | `mobile.dm.read` | مُصادَقة |
+| dm | `POST dm/threads/{user}/send` | `mobile.dm.send` | مُصادَقة |
+| dm | `GET dm/threads/{user}/since` | `mobile.dm.since` | مُصادَقة |
+| dm | `POST dm/threads/{user}/typing` | `mobile.dm.typing` | مُصادَقة |
+| files | `GET attachments` | `mobile.files.index` | مُصادَقة |
+| files | `DELETE attachments/{id}` | `mobile.files.destroy` | مُصادَقة |
+| files | `POST files/attach` | `mobile.files.attach` | مُصادَقة |
+| files | `POST files/upload-session` | `mobile.files.upload_session` | مُصادَقة |
+| files | `PUT files/upload-session/{id}/chunk` | `mobile.files.upload_chunk` | مُصادَقة |
+| files | `POST files/upload-session/{id}/complete` | `mobile.files.upload_complete` | مُصادَقة |
+| files | `GET files/{id}/download` | `mobile.files.download` | مُصادَقة |
+| files | `GET files/{id}/stream` | `mobile.files.stream` | مُصادَقة |
+| finance_actions | `POST fin/{id}/pay` | `mobile.fin.pay` | مُصادَقة |
+| finance_actions | `GET fin/{id}/pay-options` | `mobile.fin.pay_options` | مُصادَقة |
+| finance_actions | `POST purchases/{id}/receive` | `mobile.purchases.receive` | مُصادَقة |
+| finance_actions | `POST quotes/{id}/accept` | `mobile.quotes.accept` | مُصادَقة |
+| finance_actions | `POST quotes/{id}/send` | `mobile.quotes.send` | مُصادَقة |
+| health | `GET health` | `mobile.health` | عامّة |
+| home | `GET home` | `mobile.home` | مُصادَقة |
+| inventory | `GET inventory/sessions` | `mobile.inventory.index` | مُصادَقة |
+| inventory | `POST inventory/sessions` | `mobile.inventory.freeze` | مُصادَقة |
+| inventory | `GET inventory/sessions/{id}` | `mobile.inventory.show` | مُصادَقة |
+| inventory | `POST inventory/sessions/{id}/close` | `mobile.inventory.close` | مُصادَقة |
+| inventory | `POST inventory/sessions/{id}/reconcile` | `mobile.inventory.reconcile` | مُصادَقة |
+| inventory | `POST inventory/sessions/{id}/scan` | `mobile.inventory.scan` | مُصادَقة |
+| leaves | `POST leaves/{id}/decide` | `mobile.leaves.decide` | مُصادَقة |
+| leaves | `GET leaves/{id}/decision` | `mobile.leaves.decision` | مُصادَقة |
+| me | `GET me/documents` | `mobile.me.documents.index` | مُصادَقة |
+| me | `GET me/documents/{id}/file` | `mobile.me.documents.file` | مُصادَقة |
+| meta | `GET openapi.json` | `mobile.openapi` | عامّة |
+| notifications | `GET notifications` | `mobile.notifications.index` | مُصادَقة |
+| notifications | `POST notifications/read-all` | `mobile.notifications.read_all` | مُصادَقة |
+| notifications | `GET notifications/unread-count` | `mobile.notifications.unread` | مُصادَقة |
+| notifications | `POST notifications/{id}/read` | `mobile.notifications.read` | مُصادَقة |
+| notifications | `GET notifications/{id}/target` | `mobile.notifications.target` | مُصادَقة |
+| portal | `GET portal/conversations` | `mobile.portal.conversations.index` | مُصادَقة |
+| portal | `GET portal/conversations/{id}` | `mobile.portal.conversations.show` | مُصادَقة |
+| portal | `GET portal/documents` | `mobile.portal.documents.index` | مُصادَقة |
+| portal | `GET portal/documents/{id}` | `mobile.portal.documents.show` | مُصادَقة |
+| portal | `GET portal/engagements` | `mobile.portal.engagements` | مُصادَقة |
+| portal | `GET portal/home` | `mobile.portal.home` | مُصادَقة |
+| portal | `GET portal/invoices` | `mobile.portal.invoices.index` | مُصادَقة |
+| portal | `GET portal/invoices/{id}` | `mobile.portal.invoices.show` | مُصادَقة |
+| portal | `GET portal/projects` | `mobile.portal.projects.index` | مُصادَقة |
+| portal | `GET portal/projects/{id}` | `mobile.portal.projects.show` | مُصادَقة |
+| portal_tickets | `GET portal/tickets` | `mobile.portal.tickets.index` | مُصادَقة |
+| portal_tickets | `POST portal/tickets` | `mobile.portal.tickets.store` | مُصادَقة |
+| portal_tickets | `GET portal/tickets/{id}` | `mobile.portal.tickets.show` | مُصادَقة |
+| portal_tickets | `POST portal/tickets/{id}/reply` | `mobile.portal.tickets.reply` | مُصادَقة |
+| prefs | `GET prefs` | `mobile.prefs.index` | مُصادَقة |
+| prefs | `PUT prefs` | `mobile.prefs.update` | مُصادَقة |
+| prefs | `POST prefs/pin` | `mobile.prefs.pin` | مُصادَقة |
+| presence | `GET presence` | `mobile.presence` | مُصادَقة |
+| push | `GET push/admin/status` | `mobile.push.admin.status` | مُصادَقة |
+| push | `POST push/admin/test` | `mobile.push.admin.test` | مُصادَقة |
+| push | `POST push/register` | `mobile.push.register` | مُصادَقة |
+| push | `POST push/unregister` | `mobile.push.unregister` | مُصادَقة |
+| reports | `GET reports/daily` | `mobile.reports.daily` | مُصادَقة |
+| reports | `POST reports/daily/{id}/review` | `mobile.reports.review` | مُصادَقة |
+| saved | `GET saved` | `mobile.saved.index` | مُصادَقة |
+| saved | `POST saved` | `mobile.saved.store` | مُصادَقة |
+| saved | `DELETE saved/{id}` | `mobile.saved.destroy` | مُصادَقة |
+| scanner | `GET identity/resolve/{q}` | `mobile.identity.resolve` | مُصادَقة |
+| schema | `GET schema` | `mobile.schema` | مُصادَقة |
+| schema | `GET schema/modules` | `mobile.schema.modules` | مُصادَقة |
+| search | `GET search` | `mobile.search` | مُصادَقة |
+| search | `GET search/messages` | `mobile.search.messages` | مُصادَقة |
+| sync | `GET sync/{module}` | `mobile.sync` | مُصادَقة |
+| tracking | `POST tracking/start` | `mobile.tracking.start` | مُصادَقة |
+| tracking | `POST tracking/{session}/end` | `mobile.tracking.end` | مُصادَقة |
+| tracking | `POST tracking/{session}/points` | `mobile.tracking.points` | مُصادَقة |
+| work | `GET work/daily-report` | `mobile.work.daily_report` | مُصادَقة |
+| work | `GET work/today` | `mobile.work.today` | مُصادَقة |
+<!-- routes:end -->
 
 كلُّ الحرفيّاتِ مُسجَّلةٌ **قبل** الـcatch-all `{module}` كي لا يبتلعها (عقدٌ أمنيٌّ · F9)، ومواصفةُ
 `GET /api/mobile/v1/openapi.json` مولّدةٌ من المسارات الحيّة — **هي المرجعُ الآليُّ لتوليد عميلٍ**.

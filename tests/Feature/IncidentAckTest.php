@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Incident;
-use App\Support\Acks;
+use App\Support\Collaboration\Acks;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

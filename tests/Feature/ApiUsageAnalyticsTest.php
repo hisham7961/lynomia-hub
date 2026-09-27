@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\Api;
+use App\Support\Platform\Api;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

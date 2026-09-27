@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\Barcode;
+use App\Support\Documents\Barcode;
 use Tests\TestCase;
 
 /**

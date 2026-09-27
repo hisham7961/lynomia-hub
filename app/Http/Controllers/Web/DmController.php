@@ -8,7 +8,7 @@ use App\Models\ConversationMember;
 use App\Models\DmMessage;
 use App\Models\HubNotification;
 use App\Models\User;
-use App\Support\DmService;
+use App\Support\Collaboration\DmService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -42,7 +42,7 @@ class DmController extends Controller
             $c = \Illuminate\Support\Carbon::parse($at);
             // الحالةُ الخشنة (§presence) فوق «متصل» الثنائيّ — للتواصل لا للمراقبة
             $out[$uid] = ['online' => $c->gt(now()->subMinutes(5)), 'at' => $c,
-                'state' => \App\Support\Presence::state($c)];
+                'state' => \App\Support\Collaboration\Presence::state($c)];
         }
 
         return $out;
@@ -268,8 +268,8 @@ class DmController extends Controller
         $ids = $threads->pluck('other')->push($other->id)->unique()->all();
 
         // §39 مؤشّرُ البدءِ للاستطلاعِ التدريجيّ — رأسُ الخيط (أحدثُ رسالة، محذوفةً كانت أو لا)
-        $tip = DmMessage::where('thread_key', DmMessage::threadKey((string) $me, (string) $other->id))
-            ->orderByDesc('created_at')->orderByDesc('id')->first(['id', 'created_at']);
+        // v2 — رأسُ الخيط مع كلِّ معرّفاتِ ثانيتِه (لا قرعةَ تعادلٍ بـUUID)
+        $sinceTip = \App\Support\Collaboration\Collaboration::tipSince(DmMessage::where('thread_key', DmMessage::threadKey((string) $me, (string) $other->id)));
 
         return view('dm.inbox', [
             'other' => $other, 'msgs' => $msgs, 'open' => $other->id,
@@ -278,7 +278,7 @@ class DmController extends Controller
             'all' => $this->startableUsers((string) $me),
             'presence' => self::presence($ids),
             'dmReactions' => self::dmReactionsFor($msgs->pluck('id')->all()),
-            'sinceCursor' => $tip ? \App\Support\Collaboration::encodeCursor((string) $tip->created_at, (string) $tip->id) : '',
+            'sinceCursor' => $sinceTip,
         ]);
     }
 
@@ -321,7 +321,7 @@ class DmController extends Controller
         $r->merge(['body' => trim(hub_str($r->input('body')))]);
         $data = $r->validate([
             'body' => ['required', 'string', 'max:4000'],
-            'att'  => ['nullable', 'file', 'max:' . hub_upload_cap()['kb']],
+            'att'  => ['nullable', 'file', 'max:' . hub_upload_cap()['kb'], \App\Support\Security\UploadPolicy::rule()],   // FS-04
         ], [], ['body' => 'نص الرسالة', 'att' => 'المرفق']);
 
         // **جوهرُ الإرسال عبر `DmService::send`** (سكّةٌ تعيد الرسالة · Critic F2/F8):
@@ -341,13 +341,12 @@ class DmController extends Controller
     public function edit(Request $r, string $id)
     {
         $m = DmMessage::findOrFail($id);
-        abort_unless(in_array(auth()->id(), [$m->from_id, $m->to_id], true), 403, 'لا شأن لك بهذه المحادثة');
-        abort_unless($m->from_id === auth()->id(), 403, 'التحريرُ لصاحب الرسالة وحده — لا يُعدّل أحدٌ كلام غيره');
-        abort_if($m->deleted_at !== null, 422, 'لا تُحرَّر رسالةٌ محذوفة');
+        // حرّاسُ الملكيّة في `DmService::guardOwn` (يشترك فيها الجوال) — قبل التحقّق كما كان
+        DmService::guardOwn(auth()->user(), $m, 'edit');
 
         $r->merge(['body' => trim(hub_str($r->input('body')))]);
         $data = $r->validate(['body' => ['required', 'string', 'max:4000']], [], ['body' => 'نص الرسالة']);
-        DmService::edit(auth()->user(), $m, $data['body']);
+        DmService::editOwn(auth()->user(), $m, $data['body']);
 
         return back()->with('ok', 'عُدّلت الرسالة');
     }
@@ -362,30 +361,17 @@ class DmController extends Controller
     public function destroy(string $id)
     {
         $m = DmMessage::findOrFail($id);
-        abort_unless(in_array(auth()->id(), [$m->from_id, $m->to_id], true), 403,
-            'لا شأن لك بهذه المحادثة');
-        abort_unless($m->from_id === auth()->id(), 403,
-            'الحذف لصاحب الرسالة وحده — لا يمحو أحدٌ كلام غيره');
         /*
          * **رسالةٌ في مكانه لا طردٌ من الصفحة**: كان `abort(503)` — و٥٠٣ رمزُ وضع
-         * الصيانة لا رمزُ «ميزةٌ غير مهيّأة»، ولا صفحةَ له في المشروع فتُرجَم
-         * صفحةً إنجليزيةً عارية ضاعت فيها الرسالة التي تسمّي العلاج. من ضغط زرّاً
-         * في محادثةٍ يستحقّ سطراً يقرؤه وهو في مكانه.
+         * الصيانة لا رمزُ «ميزةٌ غير مهيّأة». من ضغط زرّاً في محادثةٍ يستحقّ سطراً
+         * يقرؤه وهو في مكانه. (القاعدةُ كلُّها في `DmService::retract` — يشترك فيها الجوال.)
          */
-        if (! hub_has_col('dm_messages', 'deleted_at')) {
+        if (! DmService::retract(auth()->user(), $m)) {
             return back()->with('err',
                 'سحبُ الرسائل ميزةٌ جديدة تحتاج تحديث قاعدة البيانات — شغّل الترحيلات '
                 . '(php artisan migrate أو من مركز التشغيل ⚙️) ثم أعد المحاولة. '
                 . 'وبقيةُ النظام تعمل كالمعتاد.');
         }
-        abort_if($m->deleted_at !== null, 422, 'حُذفت هذه الرسالة من قبل');
-
-        $m->forceFill(['deleted_at' => now()])->save();
-        hub_data_bump('dm_messages');
-
-        // غايةُ السحب استرجاعُ ما أُرسل خطأً — وكان نصُّ الرسالة كاملاً (حتى ٥٩٠
-        // حرفاً) يبقى في جرس المستلم بعد السحب. الإشعار يُسحب مع رسالته.
-        \App\Models\HubNotification::where('kind', 'dm')->where('record_id', $m->id)->delete();
 
         return back()->with('ok', 'سُحبت الرسالة — يبقى مكانُها يقول إنها حُذفت');
     }
@@ -404,14 +390,9 @@ class DmController extends Controller
 
         $me = (string) auth()->id();
         $key = DmMessage::threadKey($me, (string) $other->id);
-        $cursor = \App\Support\Collaboration::decodeCursor($r->query('cursor'));
-
-        $q = DmMessage::where('thread_key', $key)->inCompanyScope();
-        if ($cursor !== null) {
-            [$t, $cid] = $cursor;
-            $q->where(fn ($w) => $w->where('created_at', '>', $t)
-                ->orWhere(fn ($x) => $x->where('created_at', $t)->where('id', '>', $cid)));
-        }
+        // v2 — مجموعةُ ما سُلِّم في ثانيةِ المؤشّر لا حدُّ UUID (الجيلُ الأوّلُ يُفكّ كما كان)
+        $q = \App\Support\Collaboration\Collaboration::applySince(
+            DmMessage::where('thread_key', $key)->inCompanyScope(), (string) $r->query('cursor', ''));
 
         $rows = $q->orderBy('created_at')->orderBy('id')->limit(50)->get();
 
@@ -422,7 +403,7 @@ class DmController extends Controller
         }
 
         $events = $rows->map(fn (DmMessage $m) => [
-            'type'       => $m->deleted_at !== null ? \App\Support\Collaboration::EV_MESSAGE_DELETED : \App\Support\Collaboration::EV_MESSAGE_CREATED,
+            'type'       => $m->deleted_at !== null ? \App\Support\Collaboration\Collaboration::EV_MESSAGE_DELETED : \App\Support\Collaboration\Collaboration::EV_MESSAGE_CREATED,
             'id'         => (string) $m->id,
             'mine'       => $m->from_id === $me,
             'body'       => $m->deleted_at !== null ? null : (string) $m->body,
@@ -431,14 +412,11 @@ class DmController extends Controller
             'deleted'    => $m->deleted_at !== null,
         ])->all();
 
-        $last = $rows->last();
-        $next = $last
-            ? \App\Support\Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
-            : (string) $r->query('cursor', '');
+        $next = \App\Support\Collaboration\Collaboration::nextSince($rows, (string) $r->query('cursor', ''));
 
         // §typing الطرفُ الآخرُ يكتب الآن؟ (عابرٌ لا يُدقَّق) — الاسمُ إن كان في النافذة.
         // بوّابةُ القدرة: إن أُطفئ «مؤشّر الكتابة» لا إشارةَ (فشلٌ آمن).
-        $typing = (hub_capability('collab.typing') && in_array((string) $other->id, \App\Support\Typing::current($key, $me), true))
+        $typing = (hub_capability('collab.typing') && in_array((string) $other->id, \App\Support\Collaboration\Typing::current($key, $me), true))
             ? [$other->name] : [];
 
         return response()->json(['events' => $events, 'cursor' => $next, 'typing' => $typing]);
@@ -453,7 +431,7 @@ class DmController extends Controller
         abort_if($other->id === auth()->id(), 404);
         abort_unless(self::dmReachable($other), 404);
 
-        \App\Support\Typing::ping(DmMessage::threadKey((string) auth()->id(), (string) $other->id), (string) auth()->id());
+        \App\Support\Collaboration\Typing::ping(DmMessage::threadKey((string) auth()->id(), (string) $other->id), (string) auth()->id());
 
         return response()->noContent();
     }

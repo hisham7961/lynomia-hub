@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Application;
 use App\Models\Project;
-use App\Support\AppsProjects;
+use App\Support\Apps\AppsProjects;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;

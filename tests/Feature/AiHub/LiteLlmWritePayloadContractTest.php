@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\AiHub;
 
-use App\Support\LiteLlmAdmin;
-use App\Support\Settings;
+use App\Support\Ai\Gateway\LiteLlmAdmin;
+use App\Support\Platform\Settings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;

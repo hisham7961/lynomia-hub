@@ -8,7 +8,7 @@ use App\Models\Product;
 use App\Models\RecordIdentifier;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\Identity;
+use App\Support\Security\Identity;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 

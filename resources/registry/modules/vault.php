@@ -1,0 +1,111 @@
+<?php
+
+/** سجلُّ الوحدات — «vault» (docs/REORG_PLAN.md §R4) — يُحمَّل بترتيبه من قائمة config/hub.php */
+
+return [
+    'key' => 'vault',
+    'table' => 'vault_secrets',
+    'model' => 'VaultSecret',
+    'label' => 'الخزنة الآمنة',
+    'display' => 'title',
+    'status' => null,
+    'columns' => [
+        'title',
+        'type',
+        'projectId',
+        'username',
+    ],
+    'fields' => [
+        [
+            'key' => 'title',
+            'col' => 'title',
+            'label' => 'العنوان',
+            'type' => 'text',
+            'required' => true,
+        ],
+        [
+            'key' => 'type',
+            'col' => 'type',
+            'label' => 'النوع',
+            'type' => 'sel',
+            'options' => [
+                'كلمة مرور',
+                'مفتاح API',
+                'Token',
+                'مفتاح SSH',
+                'بيانات قاعدة بيانات',
+                'أكواد استرداد',
+                'مفتاح توقيع',
+                'FTP / SFTP',
+                'Secret Key',
+                'شهادة تطبيق',
+                'أخرى',
+            ],
+        ],
+        [
+            'key' => 'companyId',
+            'col' => 'company_id',
+            'label' => 'الشركة',
+            'type' => 'ref',
+            'ref' => 'companies',
+        ],
+        [
+            'key' => 'projectId',
+            'col' => 'project_id',
+            'label' => 'المشروع',
+            'type' => 'ref',
+            'ref' => 'projects',
+        ],
+        [
+            'key' => 'appId',
+            'col' => 'app_id',
+            'label' => 'التطبيق المرتبط',
+            'type' => 'ref',
+            'ref' => 'apps',
+        ],
+        [
+            'key' => 'serverId',
+            'col' => 'server_id',
+            'label' => 'السيرفر المرتبط',
+            'type' => 'ref',
+            'ref' => 'servers',
+        ],
+        [
+            'key' => 'username',
+            'col' => 'username',
+            'label' => 'اسم المستخدم / البريد',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'secret',
+            'col' => 'secret_cipher',
+            'label' => 'المعلومة السرية',
+            'type' => 'sec',
+            'required' => true,
+        ],
+        [
+            'key' => 'allowedIds',
+            'col' => 'allowed_ids',
+            'label' => 'المستخدمون المخولون (فارغ = حسب الدور)',
+            'type' => 'ref',
+            'ref' => 'users',
+            'multi' => true,
+        ],
+        [
+            'key' => 'url',
+            'col' => 'url',
+            'label' => 'الرابط',
+            'type' => 'url',
+        ],
+        [
+            'key' => 'notes',
+            'col' => 'notes',
+            'label' => 'ملاحظات',
+            'type' => 'ta',
+        ],
+    ],
+    'search' => [
+        'title',
+        'username',
+    ],
+];

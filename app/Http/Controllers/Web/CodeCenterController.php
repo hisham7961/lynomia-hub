@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\CodeHub;
+use App\Support\Apps\CodeHub;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 

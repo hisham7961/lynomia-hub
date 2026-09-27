@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Support\Uptime;
+use App\Support\Ops\Uptime;
 use Illuminate\Console\Command;
 
 /**
@@ -35,7 +35,7 @@ class HubUptimeCheck extends Command
             }
         }
 
-        \App\Support\Health::beat('uptime', (int) round((microtime(true) - $t0) * 1000), 'ok', $down ? "{$down} من {$n} معطّل" : null);
+        \App\Support\Ops\Health::beat('uptime', (int) round((microtime(true) - $t0) * 1000), 'ok', $down ? "{$down} من {$n} معطّل" : null);
         $this->info("فُحص {$n} هدفاً، منها {$down} معطّل.");
 
         return self::SUCCESS;

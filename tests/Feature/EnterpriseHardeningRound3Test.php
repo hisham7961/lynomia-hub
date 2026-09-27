@@ -10,11 +10,11 @@ use App\Models\User;
 use App\Models\Webhook;
 use App\Models\WebhookDelivery;
 use App\Models\WebauthnCredential;
-use App\Support\ErrorLog;
-use App\Support\Health;
-use App\Support\SecurityPosture;
-use App\Support\StepUp;
-use App\Support\Webauthn;
+use App\Support\Ops\ErrorLog;
+use App\Support\Ops\Health;
+use App\Support\Security\SecurityPosture;
+use App\Support\Security\StepUp;
+use App\Support\Security\Webauthn;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -182,7 +182,7 @@ class EnterpriseHardeningRound3Test extends TestCase
         Http::fake();
         $h = Webhook::create(['name' => 'n8n', 'url' => 'https://example.com/hook', 'secret' => 'whs_x', 'events' => '*', 'active' => true]);
         $d = WebhookDelivery::create(['webhook_id' => $h->id, 'event' => 'x', 'event_id' => (string) Str::uuid(), 'payload' => '{}', 'state' => 'queued', 'created_at' => now()]);
-        \App\Support\WebhookDispatcher::send($d);
+        \App\Support\Ops\WebhookDispatcher::send($d);
         Http::assertNothingSent();
     }
 
@@ -271,7 +271,7 @@ class EnterpriseHardeningRound3Test extends TestCase
         app()->instance('hub.dns', fn (string $x) => ['93.184.216.34']);
         Http::fake(['example.com/*' => Http::response('ok', 200)]);
         $d = WebhookDelivery::create(['webhook_id' => $h->id, 'event' => 'x', 'event_id' => (string) Str::uuid(), 'payload' => '{"a":1}', 'state' => 'queued', 'created_at' => now()]);
-        \App\Support\WebhookDispatcher::send($d);
+        \App\Support\Ops\WebhookDispatcher::send($d);
         Http::assertSent(fn ($req) => $req->header('X-Hub-Signature')[0] === 'sha256=' . hash_hmac('sha256', '{"a":1}', 'whs_legacy'));
     }
 

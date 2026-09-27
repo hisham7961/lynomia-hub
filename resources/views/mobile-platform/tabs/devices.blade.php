@@ -2,7 +2,7 @@
      تفتيشٌ وإبطالٌ عبر السكّة القائمة، وجهاز 360. مُصفَّحٌ ومُرشَّحٌ محترِمٌ للصلاحية. --}}
 @php
     use Illuminate\Support\Str;
-    $ssBadge = fn ($s) => \App\Support\MobilePlatform::sessionStatus($s);
+    $ssBadge = fn ($s) => \App\Support\Mobile\MobilePlatform::sessionStatus($s);
     $base = fn (array $q = []) => route('mobileplatform.index', array_merge(['tab' => 'devices'], $q));
     $dt = fn ($v) => $v ? \Illuminate\Support\Carbon::parse($v)->format('m-d H:i') : '—';
 @endphp
@@ -72,7 +72,7 @@
             </table>
             @unless ($session->revoked_at)
                 <form method="POST" action="{{ route('mobileplatform.session.revoke', $session->id) }}"
-                      onsubmit="return confirm('إبطالُ هذه الجلسة؟ يخرج جهازُها عند أول طلب.')" style="margin-top:10px">@csrf
+                      data-confirm-native="إبطالُ هذه الجلسة؟ يخرج جهازُها عند أول طلب." style="margin-top:10px">@csrf
                     <button type="submit" class="btn p sm">🔌 إبطالُ الجلسة</button>
                 </form>
             @endunless

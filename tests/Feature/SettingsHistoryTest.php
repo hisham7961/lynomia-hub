@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -217,9 +217,9 @@ class SettingsHistoryTest extends TestCase
      */
     public function test_heartbeats_and_integration_pulses_write_no_history(): void
     {
-        \App\Support\Health::beat('backup', 120);
-        \App\Support\Integrations::pulse('odoo', true, null, 35);
-        \App\Support\Integrations::pulse('n8n', false, 'تعذّر الاتصال', 900);
+        \App\Support\Ops\Health::beat('backup', 120);
+        \App\Support\Ops\Integrations::pulse('odoo', true, null, 35);
+        \App\Support\Ops\Integrations::pulse('n8n', false, 'تعذّر الاتصال', 900);
 
         $this->assertSame(0, DB::table('setting_changes')->count(),
             'نبضةٌ تشغيلية كُتبت في تاريخ الإعدادات');

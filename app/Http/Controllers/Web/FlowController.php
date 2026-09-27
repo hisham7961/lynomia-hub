@@ -128,7 +128,7 @@ class FlowController extends Controller
             'name'       => ['required', 'string', 'max:190'],
             'm'          => ['required', 'string'],
             'event'      => ['required', \Illuminate\Validation\Rule::in(
-                array_merge(['created', 'updated', 'status'], \App\Support\HubEvents::semanticNames()))],
+                array_merge(['created', 'updated', 'status'], \App\Support\Platform\HubEvents::semanticNames()))],
             'status_to'  => ['nullable', 'string', 'max:120'],
             'cond_field' => ['nullable', 'string', 'max:80'],
             'cond_op'    => ['nullable', 'in:eq,has,gt,lt'],
@@ -301,7 +301,7 @@ class FlowController extends Controller
             if ($record) {
                 // للحدث «status» نحاكي التحول إلى الحالة المطلوبة في المسار
                 $statusTo = $flow->event === 'status' ? (string) $flow->status_to : null;
-                $result = \App\Support\FlowRunner::simulate($flow, $flow->module, $record, $statusTo);
+                $result = \App\Support\Platform\FlowRunner::simulate($flow, $flow->module, $record, $statusTo);
             }
         }
 

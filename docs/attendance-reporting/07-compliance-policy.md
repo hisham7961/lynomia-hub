@@ -10,7 +10,7 @@
 ## المهلة — `computeDeadline` (§8/§9/§50)
 
 المهلةُ هي اللحظةُ التي بعدها فقط يُوسَم «حضورٌ بلا تقرير» مخالفةً. تُحسَب في
-`DailyWorkCompliance::computeDeadline()` (`app/Support/DailyWorkCompliance.php:293-307`)
+`DailyWorkCompliance::computeDeadline()` (`app/Support/Workforce/DailyWorkCompliance.php:293-307`)
 **أبعدَ نقطتين** — فالألطفُ للموظّف:
 
 | المُرشَّح | المصدر | الشرط |
@@ -21,7 +21,7 @@
 المهلةُ = **الأبعدُ** بين المُرشَّحين (`collect($candidates)->sort()->last()`,
 `:306`). فمن انصرف باكراً يُمهَل إلى الحدِّ اليوميِّ إن وُجد، ومن انصرف متأخّراً
 يُمهَل إلى انصرافِه + السماحية — أيُّهما أبعد. الوقتُ يُبنى بتوقيتِ المنشأة عبر
-`BusinessDate::at()` (`app/Support/BusinessDate.php:63-73`، `Asia/Kuwait`)، فعبورُ
+`BusinessDate::at()` (`app/Support/Platform/BusinessDate.php:63-73`، `Asia/Kuwait`)، فعبورُ
 منتصفِ الليلِ يبقى منسوباً ليومِ العملِ الأصليّ (§50).
 
 **حالتان بلا مهلة (`null`):**
@@ -31,7 +31,7 @@
   `HH:MM`، فيُعامَل فارغاً بأمان بلا رسالةِ خطأ (`hub_settings.php:662`).
 
 تُختَم المهلةُ في العمود `report_deadline_at` عند الانصراف (`Workday::checkOut`,
-`app/Support/Workday.php:130-134`) — **للعرضِ ولمرشّحِ أمرِ المصالحة الكفء** فقط؛ أمّا
+`app/Support/Workforce/Workday.php:130-134`) — **للعرضِ ولمرشّحِ أمرِ المصالحة الكفء** فقط؛ أمّا
 التقييمُ فيُعيد اشتقاقَها حيّاً في كلِّ قراءة (`DailyWorkCompliance.php:171`)، فلا
 يتبيّت بها رقمٌ قديم.
 
@@ -73,7 +73,7 @@
 `compliance_outcome` مختومَين، فـ`effective = lockedOutcome` — لا يُعاد كتابتُه صامتاً
 بتقريرٍ لاحقٍ ولا بتغيّرِ السياسة.
 
-الختمُ عبر `ReportReview::finalizeCompliance()` (`app/Support/ReportReview.php:122-136`):
+الختمُ عبر `ReportReview::finalizeCompliance()` (`app/Support/Workforce/ReportReview.php:122-136`):
 - القيمُ المسموحة: `absent_due_to_missing_report` / `excused` (معذور) / `present`
   (حاضر بعد قبولِ تقريرٍ متأخّر) / `non_compliant` — وأيُّ قيمةٍ سواها تسقط إلى `present`.
 - يُختم بـ**من ومتى ولماذا** (`compliance_finalized_by/at/note`) وبأثرٍ مدقَّق

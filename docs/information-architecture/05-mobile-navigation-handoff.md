@@ -2,7 +2,7 @@
 
 > **المبدأ:** سطحُ الجوال يقرأ **نفسَ** معماريةِ IA التي تقرؤها الويب — لا سجلَّ تنقّلٍ
 > ثانٍ (`mobile_nav.php`) ولا تكرار. مصدرُ الحقيقة الواحد `config/hub_ia.php` عبر خدمة
-> `App\Support\InformationArchitecture`، مُنطَّقاً بصلاحية المستخدم قبل التسلسل.
+> `App\Support\Platform\InformationArchitecture`، مُنطَّقاً بصلاحية المستخدم قبل التسلسل.
 
 ## النقاط
 

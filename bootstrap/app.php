@@ -55,7 +55,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // على مسارات API (نطاقٌ ممنوع، سجلٌّ خارج الملكية) لا يُرصد إطلاقاً.
         $middleware->appendToGroup('api', \App\Http\Middleware\AccessRadar::class);
         // وسيطُ توقيع النقاط الطرفية (Work OS · الطور J · WP-J.1): يفرض عقدَ
-        // ES256 (docblock ‏App\Support\Es256) — طابعٌ ±300ث + nonce فريد + تحقّقٌ
+        // ES256 (docblock ‏App\Support\Security\Es256) — طابعٌ ±300ث + nonce فريد + تحقّقٌ
         // بالمفتاح العامّ المخزَّن — على مجموعة مسارات الأجهزة التي يصلها WP-J.2
         // (heartbeat/أحداث/أوامر). اسمٌ مستعارٌ تلتقطه المجموعة لا إلحاقٌ عامّ.
         // بوّابةُ جلسة الجوال (Mobile Readiness · الطور B · SF-2): تُطابِق ترتيبَ
@@ -77,12 +77,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         // الويبهوك الوارد سطحٌ آليّ لا نموذج له: يُصادَق بالرمز في الرابط + توقيع
         // HMAC، فلا CSRF عليه (المُرسِل خدمةٌ خارجية لا متصفّح يحمل الرمز).
-        $middleware->validateCsrfTokens(except: ['hook/*']);
+        // وتقاريرُ CSP يرسلها المتصفّحُ آلياً بلا رمز (بند الدَّين #12) — متحكّمُها لا يكتب إلا بلاغاً محدوداً.
+        $middleware->validateCsrfTokens(except: ['hook/*', 'csp-report']);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // كل استثناء يُجمَّع في مركز الأخطاء (بلا كسر المعالجة الأصلية)
-        $exceptions->report(fn (\Throwable $e) => \App\Support\ErrorLog::exception($e));
+        $exceptions->report(fn (\Throwable $e) => \App\Support\Ops\ErrorLog::exception($e));
         // عقدُ API الواحد: كل استثناءٍ على /api/* يُصيَّر بالغلاف الموحَّد (كود آليّ +
         // request_id + لا تسريبَ أسماء أصنافٍ داخلية) — وغيرُ API يمضي كما كان.
-        $exceptions->render(fn (\Throwable $e, \Illuminate\Http\Request $r) => \App\Support\Api::render($e, $r));
+        $exceptions->render(fn (\Throwable $e, \Illuminate\Http\Request $r) => \App\Support\Platform\Api::render($e, $r));
     })->create();

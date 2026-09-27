@@ -32,7 +32,7 @@ class EndpointRelease extends Model
     protected $guarded = ['id'];
 
     /** الأنظمةُ المنشورُ لها — من المصدرِ الواحد `Endpoint::SUPPORTED` (§1، لا linux) */
-    public const OSES = \App\Support\Endpoint::SUPPORTED;
+    public const OSES = \App\Support\Endpoint\Endpoint::SUPPORTED;
 
     /** المعماريّتان — allowlist مفروضٌ في `saving` (C10) */
     public const ARCHES = ['amd64', 'arm64'];

@@ -152,7 +152,7 @@
 ## 7) التزامُن على الكتابة — If-Match ⇒ `VERSION_CONFLICT`
 
 المزامنةُ قراءةٌ؛ أمّا الكتابةُ فتحفظ القفلَ التفاؤليَّ نفسَه الذي في `/api/v1`. كلُّ كتابةٍ
-على مورد (`PUT`/`PATCH`) تمرّ بـ`Api::assertVersion` (`app/Support/Api.php:398`) الذي يقرأ
+على مورد (`PUT`/`PATCH`) تمرّ بـ`Api::assertVersion` (`app/Support/Platform/Api.php:398`) الذي يقرأ
 `If-Match: "n"` (أو `_version` في الجسم) ويقارنه بـ`$m->version`؛ عدمُ التطابق ⇒ `VERSION_CONFLICT`
 409 مع `{current_version, your_version}`. غيابُ الترويسة = مسموحٌ (عميلٌ قديم). العميلُ يأخذ
 `version` من سجلِّ المزامنة (المحمولِ حين `conflict_token: true`) ويبعثه في `If-Match` عند الكتابة.
@@ -164,7 +164,7 @@
 
 كلُّ جانبٍ قابلٍ لإعادة المحاولة على سطح الجوال (إنشاءٌ/إجراءٌ/تعليقٌ/رسالةٌ/إتمامُ رفعٍ/دفعةُ تتبّع)
 يقبل `Idempotency-Key`. المفتاحُ الحاسمُ أنّ **مالكَ الـIdempotency على الجوال هو الجلسة** —
-`Idempotency::owner($r)` يعيد `mobile_session->id` (`app/Support/Idempotency.php:40-47`) الذي يقرؤه
+`Idempotency::owner($r)` يعيد `mobile_session->id` (`app/Support/Platform/Idempotency.php:40-47`) الذي يقرؤه
 `V1Controller::ikeyOf` (`app/Http/Controllers/Api/V1Controller.php:466-473`). فلا يعود ردُّ مستخدمٍ
 لآخر (Critic F1: طلبُ الجوال يحمل `mobile_session` لا `api_token`، ولولا هذا المالكُ لكان
 `ikeyOf` يعيد `[null,null]` فيتعطّل الـIdempotency ويتسرّب ردُّ مستخدمٍ لغيره تحت قيدِ `(token_id, ikey)`).

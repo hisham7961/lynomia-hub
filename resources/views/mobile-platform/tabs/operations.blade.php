@@ -1,8 +1,8 @@
 {{-- التشغيل والصحّة (spec §37): فحوصٌ حقيقيّة — جوهريّةٌ تحسم الإجماليّ، وخارجيّةٌ
      تقول NOT_CONFIGURED صدقاً (لا تُحوَّل شرطُ إطلاقٍ إلى عُطلِ نظام). --}}
 @php
-    $tone = fn ($s) => \App\Support\MobilePlatform::TONE[$s] ?? 'g';
-    $lbl  = fn ($s) => \App\Support\MobilePlatform::LABEL[$s] ?? $s;
+    $tone = fn ($s) => \App\Support\Mobile\MobilePlatform::TONE[$s] ?? 'g';
+    $lbl  = fn ($s) => \App\Support\Mobile\MobilePlatform::LABEL[$s] ?? $s;
 @endphp
 
 <div class="cards">

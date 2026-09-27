@@ -31,17 +31,17 @@
 
 | الحاجة | ما في Hub اليوم | المسار |
 |---|---|---|
-| **حفظُ الأسرارِ مشفّرة** | `Settings::put` يشفّر تلقائيّاً كلَّ مفتاحٍ موسومٍ `'sensitive' => true`، ويخزّنه ببادئة `enc:` | `app/Support/Settings.php:626` · التحديد `Settings::secrets()` ‏`:180` |
+| **حفظُ الأسرارِ مشفّرة** | `Settings::put` يشفّر تلقائيّاً كلَّ مفتاحٍ موسومٍ `'sensitive' => true`، ويخزّنه ببادئة `enc:` | `app/Support/Platform/Settings.php:626` · التحديد `Settings::secrets()` ‏`:180` |
 | **مصدرُ أسرارٍ واحد** | «`Settings::secrets()` الوحيد — لا قائمةَ أسرارٍ ثانية» (نصُّ التوثيقِ نفسُه) | `config/hub_settings.php:24` |
 | **خزنةٌ لصفوفِ الأسرار** | `VaultSecret` بكاست `EncryptedOrPlain` + `AUDIT_SECRET` (بصمةٌ لا قيمة) + ختمُ تدوير | `app/Models/VaultSecret.php:26` |
-| **فاحصُ اتصالٍ واحد** | `ConnectionProbe` بشكلٍ ثابت `up · code · ms · error · info · detail`، و`up` **ثلاثيّة** (`null` = لم يُجرَّب) | `app/Support/ConnectionProbe.php:33` |
+| **فاحصُ اتصالٍ واحد** | `ConnectionProbe` بشكلٍ ثابت `up · code · ms · error · info · detail`، و`up` **ثلاثيّة** (`null` = لم يُجرَّب) | `app/Support/Ops/ConnectionProbe.php:33` |
 | **حارسُ الطلباتِ الصادرة (SSRF)** | `hub_outbound_ok()` + تثبيتُ العنوان `hub_resolve_pin()` بلا اتّباعِ تحويل | `app/Support/helpers.php:7078` و`:7128` |
-| **تطهيرُ الرسائل** | `Redactor::text()` / `Redactor::sql()` — لا سرَّ يخرج في خطأ | `app/Support/Redactor.php` |
+| **تطهيرُ الرسائل** | `Redactor::text()` / `Redactor::sql()` — لا سرَّ يخرج في خطأ | `app/Support/Platform/Redactor.php` |
 | **صلاحيّاتُ الأدوار** | `RoleController::FLAGS` (١٣ راية) تُعرَض في صفحةِ الأدوار، و`RISKY_FLAGS` توسم الواسعةَ منها | `app/Http/Controllers/Web/RoleController.php:13` و`:39` |
 | **صلاحيّاتٌ دقيقةٌ على الوحدات** | `config/hub_permissions.php` (١٩ مفتاحاً) — **مربوطةٌ بوحدات**، فلا تصلح لمركزٍ بلا وحدة | `config/hub_permissions.php` |
 | **حرّاسُ المراكزِ الإداريّة** | `hub_admin_links($user)` — كلُّ مركزٍ بمفتاحٍ وحارسٍ صريحٍ `ok` | `app/Support/helpers.php:7752` |
 | **العمارةُ المعلوماتيّة** | `config/hub_ia.php` → `administration.sections.settings` يضمّ «الإعدادات والتكاملات» | `config/hub_ia.php:510` |
-| **سجلُّ القدرات** | `FeatureRegistry` + `FeatureStatus` بحالاتٍ منها `NOT_CONFIGURED`/`READY`/`EXTERNAL` | `app/Support/FeatureRegistry.php` |
+| **سجلُّ القدرات** | `FeatureRegistry` + `FeatureStatus` بحالاتٍ منها `NOT_CONFIGURED`/`READY`/`EXTERNAL` | `app/Support/Platform/FeatureRegistry.php` |
 | **أثرُ التدقيق** | `hub_audit()` لما لا يمرّ بالموديل، و`Auditable` لما يمرّ | `app/Support/helpers.php:4630` · `app/Traits/Auditable.php` |
 | **التنطيقُ والحقول** | `hub_scope` · `hub_can` · `hub_field_mode` · `hub_visible_fields` | `app/Support/helpers.php` |
 | **نمطُ الخدمةِ الجانبيّة** | `deploy/n8n/` — compose + README **داخل Hub**، والخدمةُ على 127.0.0.1 خلف reverse proxy | `deploy/n8n/docker-compose.yml` |

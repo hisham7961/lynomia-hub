@@ -6,7 +6,7 @@ use App\Models\AiModel;
 use App\Models\AiProfile;
 use App\Models\AiProfileModel;
 use App\Models\AiProvider;
-use App\Support\AiProfiles;
+use App\Support\Ai\Routing\AiProfiles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -210,12 +210,12 @@ class AiProfileScreenTest extends TestCase
      */
     public function test_شاشةُ_التوجيهِ_تُسمّي_القدرةَ_الناقصةَ_للمساعد(): void
     {
-        $ask = $this->profile(\App\Support\AskPolicy::profileKey());
+        $ask = $this->profile(\App\Support\Ai\Ask\AskPolicy::profileKey());
         AiProfiles::attach($ask, $this->model($this->provider(), 'chat-only', ['chat' => true]));
 
         $this->actingAs($this->owner)->get(route('ai.profiles.index'))->assertOk()
             ->assertSee('يلزمه: chat + tools', false)
-            ->assertSee(\App\Support\AiPurposes::TAG[\App\Support\AiPurposes::UNFIT], false)
+            ->assertSee(\App\Support\Ai\Routing\AiPurposes::TAG[\App\Support\Ai\Routing\AiPurposes::UNFIT], false)
             ->assertSee('لا يُلائم «اسأل Hub»', false)
             ->assertSee('ينقص النموذجَ لهذا الغرض', false);
     }
@@ -223,12 +223,12 @@ class AiProfileScreenTest extends TestCase
     /** **ونموذجٌ مُلائمٌ يُوسَم مُلائماً** — فالوسمُ خبرٌ لا إنذارٌ دائم */
     public function test_النموذجُ_المُلائمُ_يُوسَم_ولا_يُنذَر_عنه(): void
     {
-        $ask = $this->profile(\App\Support\AskPolicy::profileKey());
+        $ask = $this->profile(\App\Support\Ai\Ask\AskPolicy::profileKey());
         AiProfiles::attach($ask, $this->model($this->provider(), 'chat-and-tools',
             ['chat' => true, 'tools' => true]));
 
         $this->actingAs($this->owner)->get(route('ai.profiles.index'))->assertOk()
-            ->assertSee(\App\Support\AiPurposes::TAG[\App\Support\AiPurposes::FIT], false)
+            ->assertSee(\App\Support\Ai\Routing\AiPurposes::TAG[\App\Support\Ai\Routing\AiPurposes::FIT], false)
             ->assertDontSee('لا يُلائم «اسأل Hub»', false);
     }
 

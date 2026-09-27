@@ -10,19 +10,19 @@
     <a class="btn ghost sm" href="{{ route('security.identity') }}">🪪 خطر الهويّة</a>
 </div>
 
-@include('partials.cc.kpis', ['items' => collect(\App\Support\IdentityRisk::CATEGORIES)->map(fn ($c, $k) => [
+@include('partials.cc.kpis', ['items' => collect(\App\Support\Security\IdentityRisk::CATEGORIES)->map(fn ($c, $k) => [
     'label' => $c[0] . ' ' . $c[1],
     'value' => count($cats[$k] ?? []),
     'tone'  => count($cats[$k] ?? []) ? (in_array($k, ['no_mfa'], true) ? 'bad' : '') : 'ok',
     'url'   => route('security.privileged', ['cat' => $k]),
 ])->values()->all()])
 
-@include('partials.cc.tabs', ['active' => $cat, 'tabs' => collect(\App\Support\IdentityRisk::CATEGORIES)
+@include('partials.cc.tabs', ['active' => $cat, 'tabs' => collect(\App\Support\Security\IdentityRisk::CATEGORIES)
     ->map(fn ($c, $k) => ['key' => $k, 'label' => $c[1], 'url' => route('security.privileged', ['cat' => $k])])
     ->values()->all()])
 
 <div class="card">
-    <h3>{{ \App\Support\IdentityRisk::CATEGORIES[$cat][0] }} {{ \App\Support\IdentityRisk::CATEGORIES[$cat][1] }}
+    <h3>{{ \App\Support\Security\IdentityRisk::CATEGORIES[$cat][0] }} {{ \App\Support\Security\IdentityRisk::CATEGORIES[$cat][1] }}
         <span class="sub">
             @switch($cat)
                 @case('owners') وصولٌ كامل يتخطى المصفوفةَ والأعلام — أقلُّهم أسلم @break

@@ -1,0 +1,95 @@
+<?php
+
+/** سجلُّ الوحدات — «accounts2» (docs/REORG_PLAN.md §R4) — يُحمَّل بترتيبه من قائمة config/hub.php */
+
+return [
+    'key' => 'accounts2',
+    'table' => 'ledger_accounts',
+    'model' => 'LedgerAccount',
+    'label' => 'دليل الحسابات',
+    'display' => 'name',
+    'status' => null,
+    'columns' => [
+        'code',
+        'name',
+        'type',
+        'sub',
+        'projectId',
+    ],
+    'fields' => [
+        [
+            'key' => 'code',
+            'col' => 'code',
+            'label' => 'الرمز',
+            'type' => 'text',
+            'required' => true,
+        ],
+        [
+            'key' => 'name',
+            'col' => 'name',
+            'label' => 'اسم الحساب',
+            'type' => 'text',
+            'required' => true,
+        ],
+        [
+            'key' => 'type',
+            'col' => 'type',
+            'label' => 'التصنيف',
+            'type' => 'sel',
+            'required' => true,
+            'options' => [
+                'أصول',
+                'خصوم',
+                'حقوق ملكية',
+                'إيرادات',
+                'مصروفات',
+            ],
+        ],
+        [
+            'key' => 'sub',
+            'col' => 'sub',
+            'label' => 'التصنيف الفرعي',
+            'type' => 'sel',
+            'options' => [
+                'نقد وبنوك',
+                'ذمم مدينة',
+                'أصول ثابتة',
+                'مخزون',
+                'ذمم دائنة',
+                'ضرائب',
+                'قروض',
+                'رأس المال',
+                'أرباح مبقاة',
+                'مبيعات',
+                'إيرادات أخرى',
+                'تكلفة المبيعات',
+                'مصروف تشغيلي',
+                'مصروف إداري',
+                'مصروف تسويقي',
+            ],
+        ],
+        [
+            'key' => 'projectId',
+            'col' => 'project_id',
+            'label' => 'المشروع (فارغ = مشترك)',
+            'type' => 'ref',
+            'ref' => 'projects',
+        ],
+        [
+            'key' => 'odooId',
+            'col' => 'odoo_id',
+            'label' => 'معرّف أودو',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'notes',
+            'col' => 'notes',
+            'label' => 'ملاحظات',
+            'type' => 'ta',
+        ],
+    ],
+    'search' => [
+        'code',
+        'name',
+    ],
+];

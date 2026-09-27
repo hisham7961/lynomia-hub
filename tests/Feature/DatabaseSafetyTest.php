@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\SchemaGuard;
+use App\Support\Ops\SchemaGuard;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;

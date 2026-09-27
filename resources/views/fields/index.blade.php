@@ -10,7 +10,7 @@
 
 <div class="card" style="max-width:760px">
     <form method="GET" class="crow">
-        <select class="inp" name="m" onchange="this.form.submit()" style="max-width:280px">
+        <select class="inp" name="m" data-submit-on-change style="max-width:280px">
             <option value="">— اختر الوحدة —</option>
             @foreach (hub_modules() as $mk => $md)
                 <option value="{{ $mk }}" @selected($module === $mk)>{{ $md['label'] }}</option>

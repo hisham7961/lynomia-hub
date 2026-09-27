@@ -1,7 +1,8 @@
 @php
     $k = $f['key']; $c = $f['col']; $t = $f['type'];
-    // التعبئة المسبقة تعمل في الإضافة فقط — التعديل يعرض قيم السجل حصراً
-    $raw = $row ? $row->{$c} : (($prefill ?? [])[$k] ?? null);
+    // التعبئة المسبقة في الإضافة؛ والتعديلُ يعرض قيمَ السجلّ — إلّا اقتراحاً مُسمّى (`$suggest`: اختيارٌ من خياراته
+    // لحقلٍ قابلٍ للكتابة، يُعلنه شريطُ النموذج ولا يُحفظ إلّا بالحفظ)
+    $raw = $row ? (array_key_exists($k, $suggest ?? []) ? $suggest[$k] : $row->{$c}) : (($prefill ?? [])[$k] ?? null);
     $wide = in_array($t, ['ta', 'tags']) || ! empty($f['multi']);
     // v2.128: ربطٌ برمجي — id للحقل وfor على العنوان، فالقارئ الشاشي يسمي كل حقل،
     // ونقر العنوان يركّز حقله. required الفعلية تعكس إلزامية السجل لا النجمة وحدها.
@@ -91,7 +92,7 @@
     @elseif ($t === 'file' || $t === 'img')
         <label class="filefield">
             <input type="file" name="{{ $k }}" data-empty="لم يُحدَّد ملف"
-                onchange="var n=this.parentNode.querySelector('.filename');n.textContent=this.files&&this.files.length?this.files[0].name:this.dataset.empty">
+                data-file-name>
             <span class="filebtn">📎 اختر ملفاً</span>
             <span class="filename">لم يُحدَّد ملف</span>
         </label>

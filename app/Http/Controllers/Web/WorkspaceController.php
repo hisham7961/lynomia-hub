@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\InformationArchitecture;
-use App\Support\Workspaces;
+use App\Support\Platform\InformationArchitecture;
+use App\Support\Platform\Workspaces;
 use Illuminate\Support\Facades\Cache;
 
 /**

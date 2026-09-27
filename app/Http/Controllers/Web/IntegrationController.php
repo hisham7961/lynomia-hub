@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\Integrations;
+use App\Support\Ops\Integrations;
 
 /**
  * مركز التكاملات: شاشةٌ واحدة تجمع كل ما يربط الهَب بالخارج — كانت المعرفة
@@ -25,7 +25,7 @@ class IntegrationController extends Controller
             'installed' => Integrations::installed(),
             'catalog'   => Integrations::catalog(),
             'odooMods'  => Integrations::odooModules(),
-        ], ['apiUsage' => \App\Support\Api::usage(7)]));
+        ], ['apiUsage' => \App\Support\Platform\Api::usage(7)]));
     }
 
     /** دليل الربط: الأحداث الصادرة، شكل الحمولة، التوقيع، وأين تنزل البيانات الواردة */

@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Conversation;
 use App\Models\ConversationMember;
 use App\Models\SavedMessage;
-use App\Support\Collaboration;
+use App\Support\Collaboration\Collaboration;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 

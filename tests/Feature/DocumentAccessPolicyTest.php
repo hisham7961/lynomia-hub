@@ -71,7 +71,7 @@ class DocumentAccessPolicyTest extends TestCase
             'principal_type' => $ptype, 'principal_id' => $pid,
             'effect' => $effect, 'action' => $action, 'created_at' => now(),
         ]);
-        \App\Support\DocumentPolicy::forget((string) $a->id);
+        \App\Support\Documents\DocumentPolicy::forget((string) $a->id);
     }
 
     /* ═══════════ الوراثة الافتراضية (لا كسر) ═══════════ */
@@ -148,7 +148,7 @@ class DocumentAccessPolicyTest extends TestCase
 
         // إعادةُ التسميةِ لا تُغيّر القرارَ (القاعدةُ على المعرِّفِ لا الاسم)
         $a->forceFill(['original_name' => 'اسمٌ مختلفٌ تماماً.pdf'])->save();
-        \App\Support\DocumentPolicy::forget((string) $a->id);
+        \App\Support\Documents\DocumentPolicy::forget((string) $a->id);
         $this->actingAs($u)->get(route('att.dl', $a->id))->assertForbidden();
     }
 
@@ -238,11 +238,11 @@ class DocumentAccessPolicyTest extends TestCase
         $all = Attachment::whereIn('id', [$ok->id, $denied->id])->orderBy('created_at')->get();
 
         // choke-point: الدالةُ نفسُها التي يستدعيها الجزءُ (partial) قبلَ السرد
-        $visible = \App\Support\DocumentPolicy::filterListable($u, $all);
+        $visible = \App\Support\Documents\DocumentPolicy::filterListable($u, $all);
         $this->assertSame([$ok->id], $visible->pluck('id')->all());
 
         // المالكُ يرى الاثنتين (يتجاوز)
-        $ownerVisible = \App\Support\DocumentPolicy::filterListable(
+        $ownerVisible = \App\Support\Documents\DocumentPolicy::filterListable(
             $this->owner, Attachment::whereIn('id', [$ok->id, $denied->id])->get());
         $this->assertCount(2, $ownerVisible);
 
@@ -378,7 +378,7 @@ class DocumentAccessPolicyTest extends TestCase
         // الفاحص: نوعٌ حسّاسٌ يظهرُ في سلسلةِ التفسير دون منع
         $p = Project::create(['name' => 'مشروع', 'status' => 'نشط']);
         $a = $this->attach($p, 'ملف.pdf', 'report');        // غيرُ حسّاس
-        $exp = \App\Support\PermissionInspector::explainDocument($this->owner, $a, 'download');
+        $exp = \App\Support\Security\PermissionInspector::explainDocument($this->owner, $a, 'download');
         $this->assertTrue($exp['allowed']);
         $this->assertFalse($exp['sensitive']);
 
@@ -389,7 +389,7 @@ class DocumentAccessPolicyTest extends TestCase
             'original_name' => 'جواز.pdf', 'mime' => 'application/pdf', 'size' => 9,
             'av_status' => 'clean', 'uploaded_by' => $this->owner->id,
         ]);
-        $expH = \App\Support\PermissionInspector::explainDocument($this->owner, $h, 'download');
+        $expH = \App\Support\Security\PermissionInspector::explainDocument($this->owner, $h, 'download');
         $this->assertTrue($expH['sensitive'], 'نوعُ passport حسّاسٌ ويُعلَّم في الفاحص');
         $this->assertTrue(collect($expH['chain'])->contains(fn ($s) => $s['step'] === 'التصنيف'));
     }
@@ -407,21 +407,21 @@ class DocumentAccessPolicyTest extends TestCase
 
         // يرى hr لكن بلا docsec ⇒ محجوبة (محتوًى + قائمة)
         $noClear = $this->internal('noclear@test.local', ['hr' => ['v' => 1]]);
-        $this->assertFalse(\App\Support\DocumentPolicy::allows($noClear, $a, 'download'));
+        $this->assertFalse(\App\Support\Documents\DocumentPolicy::allows($noClear, $a, 'download'));
         $this->assertSame('DENIED_SENSITIVE',
-            \App\Support\DocumentPolicy::decide($noClear, $a, 'download')['state']);
-        $this->assertFalse(\App\Support\DocumentPolicy::listable($noClear, $a));
+            \App\Support\Documents\DocumentPolicy::decide($noClear, $a, 'download')['state']);
+        $this->assertFalse(\App\Support\Documents\DocumentPolicy::listable($noClear, $a));
 
         // بتصريحِ docsec ⇒ مسموح
         $cleared = $this->internal('clear@test.local', ['hr' => ['v' => 1, 'docsec' => 1]]);
-        $this->assertTrue(\App\Support\DocumentPolicy::allows($cleared, $a, 'download'));
-        $this->assertTrue(\App\Support\DocumentPolicy::listable($cleared, $a));
+        $this->assertTrue(\App\Support\Documents\DocumentPolicy::allows($cleared, $a, 'download'));
+        $this->assertTrue(\App\Support\Documents\DocumentPolicy::listable($cleared, $a));
 
         // المالكُ يتجاوز
-        $this->assertTrue(\App\Support\DocumentPolicy::allows($this->owner, $a, 'download'));
+        $this->assertTrue(\App\Support\Documents\DocumentPolicy::allows($this->owner, $a, 'download'));
 
         // الفاحصُ يُفسّرُ الحجب
-        $exp = \App\Support\PermissionInspector::explainDocument($noClear, $a, 'download');
+        $exp = \App\Support\Security\PermissionInspector::explainDocument($noClear, $a, 'download');
         $this->assertFalse($exp['allowed']);
         $this->assertSame('DENIED_SENSITIVE', $exp['state']);
     }
@@ -433,9 +433,9 @@ class DocumentAccessPolicyTest extends TestCase
         $a = $this->hrDoc('bank', 'حسابٌ بنكيّ.pdf');
         $u = $this->internal('exalw@test.local', ['hr' => ['v' => 1]]);   // بلا docsec
 
-        $this->assertFalse(\App\Support\DocumentPolicy::allows($u, $a, 'download'), 'بلا قاعدةٍ ⇒ محجوب');
+        $this->assertFalse(\App\Support\Documents\DocumentPolicy::allows($u, $a, 'download'), 'بلا قاعدةٍ ⇒ محجوب');
         $this->rule($a, 'user', $u->id, 'allow');                          // منحٌ صريحٌ لهذه الوثيقة
-        $this->assertTrue(\App\Support\DocumentPolicy::allows($u, $a, 'download'), 'السماحُ الصريحُ يعلو البوّابة');
+        $this->assertTrue(\App\Support\Documents\DocumentPolicy::allows($u, $a, 'download'), 'السماحُ الصريحُ يعلو البوّابة');
     }
 
     /** نوعٌ غيرُ حسّاسٍ لا تمسّه البوّابة (لا حاجةَ إلى docsec) */
@@ -445,7 +445,7 @@ class DocumentAccessPolicyTest extends TestCase
         $p = Project::create(['name' => 'مشروع', 'status' => 'نشط']);
         $a = $this->attach($p, 'تقرير.pdf', 'report');
         $u = $this->internal('plain@test.local', ['projects' => ['v' => 1]]);
-        $this->assertTrue(\App\Support\DocumentPolicy::allows($u, $a, 'download'));
+        $this->assertTrue(\App\Support\Documents\DocumentPolicy::allows($u, $a, 'download'));
     }
 
     /* ═══════════ الهجرةُ الآمنة: لا فقدانَ وصولٍ مشروع ═══════════ */

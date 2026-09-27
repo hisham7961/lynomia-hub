@@ -7,7 +7,7 @@ use App\Models\EndpointDevice;
 use App\Models\EndpointRelease;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\Es256;
+use App\Support\Security\Es256;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;

@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Support\OpenApi;
+use App\Support\Platform\OpenApi;
 use Illuminate\Console\Command;
 
 /**

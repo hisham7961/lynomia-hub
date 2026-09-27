@@ -64,7 +64,7 @@
                     <div style="margin-top:2px"><span class="bdg {{ ['proven' => 'ok', 'derived' => '', 'review' => 'wn'][$e['status']] }}">{{ ['proven' => 'مغطّى', 'derived' => 'مشتق', 'review' => 'يحتاج مراجعة'][$e['status']] }}</span></div>
                 </td>
                 <td>{{ $e['label'] }}</td>
-                <td><span class="bdg {{ \App\Support\SecurityEvents::SEVERITY_TONE[$e['severity']] ?? '' }}">{{ $e['severity'] }}</span></td>
+                <td><span class="bdg {{ \App\Support\Security\SecurityEvents::SEVERITY_TONE[$e['severity']] ?? '' }}">{{ $e['severity'] }}</span></td>
                 <td>
                     <div style="display:flex;flex-direction:column;gap:3px">
                         @foreach ($e['actions'] as $a)

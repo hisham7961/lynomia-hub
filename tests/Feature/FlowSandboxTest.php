@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Flow;
 use App\Models\HubNotification;
 use App\Models\Task;
-use App\Support\FlowRunner;
+use App\Support\Platform\FlowRunner;
 use Tests\TestCase;
 
 class FlowSandboxTest extends TestCase

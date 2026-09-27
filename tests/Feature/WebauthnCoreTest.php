@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\Webauthn;
+use App\Support\Security\Webauthn;
 use Tests\TestCase;
 
 /**

@@ -21,7 +21,7 @@
 
 @include('ai._sections')
 
-@php($fmt = fn ($micro) => $micro === null ? '—' : number_format($micro / \App\Support\AiCost::SCALE, 4))
+@php($fmt = fn ($micro) => $micro === null ? '—' : number_format($micro / \App\Support\Ai\Governance\AiCost::SCALE, 4))
 
 {{-- ═══ سجلُّ Hub — ما يعرفه عندنا، لا ما تعرفه البوّابة ═══
 
@@ -49,7 +49,7 @@
             <span>محاولةٌ مُسجَّلة — منها {{ $ledger['ok'] }} ناجحةٌ و{{ $ledger['failed'] }} فاشلة</span></div>
         <div class="stat"><span class="ico bdg">💵</span>
             <b class="mono ltr">{{ $fmt($ledger['cost_micro']) }}</b>
-            <span>{{ \App\Support\AiCost::CURRENCY }} —
+            <span>{{ \App\Support\Ai\Governance\AiCost::CURRENCY }} —
             @if ($ledger['cost_micro'] === null)
                 <b>لا قياسَ بعد</b>: لم تمرّ محاولةٌ واحدة. <b>وهذا ليس «صفرَ إنفاق»</b>.
             @else
@@ -74,14 +74,14 @@
     <table class="tbl">
         <thead><tr><th>الدرجة</th><th>ما تعنيه</th><th>المحاولات</th><th>الكلفة</th></tr></thead>
         <tbody>
-        @foreach (\App\Support\AiCost::SOURCES as $src)
+        @foreach (\App\Support\Ai\Governance\AiCost::SOURCES as $src)
             @php($row = $ledger['by_source'][$src] ?? ['n' => 0, 'cost' => 0])
             <tr>
-                <td><span class="bdg {{ $src === \App\Support\AiCost::REPORTED ? 'ok' : ($src === \App\Support\AiCost::UNKNOWN ? 'wn' : '') }}">{{ $src }}</span></td>
-                <td>{{ \App\Support\AiCost::label($src) }}</td>
+                <td><span class="bdg {{ $src === \App\Support\Ai\Governance\AiCost::REPORTED ? 'ok' : ($src === \App\Support\Ai\Governance\AiCost::UNKNOWN ? 'wn' : '') }}">{{ $src }}</span></td>
+                <td>{{ \App\Support\Ai\Governance\AiCost::label($src) }}</td>
                 <td>{{ $row['n'] }}</td>
                 <td>
-                    @if ($src === \App\Support\AiCost::UNKNOWN)
+                    @if ($src === \App\Support\Ai\Governance\AiCost::UNKNOWN)
                         <span class="mut">—</span>
                     @else
                         <span class="mono ltr">{{ $fmt($row['cost']) }}</span>
@@ -126,7 +126,7 @@
         @foreach ($ledger['by_failure'] as $row)
             <tr>
                 <td><span class="mono ltr">{{ $row['failure'] }}</span></td>
-                <td class="mut">{{ \App\Support\AskFailures::message($row['failure']) }}</td>
+                <td class="mut">{{ \App\Support\Ai\Ask\AskFailures::message($row['failure']) }}</td>
                 <td>{{ $row['n'] }}</td>
             </tr>
         @endforeach

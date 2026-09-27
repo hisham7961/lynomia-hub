@@ -38,7 +38,7 @@ $this->app->bind(AskGenerator::class, NullAskGenerator::class);
 
 ## ٢) `AiChat` — طبقةُ نقلِ التوليدِ الواحدة
 
-`app/Support/AiChat.php` · `POST /v1/chat/completions`.
+`app/Support/Ai/Gateway/AiChat.php` · `POST /v1/chat/completions`.
 
 **ولا اسمَ مزوّدٍ في الملفِّ ولا في الطلبِ الذي يبنيه.** اسمُ النموذجِ سلسلةٌ
 سجّلها المالكُ في البوّابة، والبوّابةُ وحدَها تعرف من وراءَه — **فمزوّدٌ
@@ -149,7 +149,7 @@ rate_limited` بلا استثناء)، **كُتب اختباراً يفشل أو
 
 ## ٥) `LiteLlmAskGenerator` — المولِّدُ الإنتاجيّ
 
-`app/Support/LiteLlmAskGenerator.php` — يُنفّذ `AskGenerator` نفسَه الذي
+`app/Support/Ai/Ask/LiteLlmAskGenerator.php` — يُنفّذ `AskGenerator` نفسَه الذي
 يُنفّذه المزروع، **فالمنسّقُ لا يعرف أيَّهما خلفَه**.
 
 ### رحلةٌ واحدةٌ للطلبِ كلِّه

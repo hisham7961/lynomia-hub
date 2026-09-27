@@ -10,7 +10,7 @@ use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\WorkUpdate;
-use App\Support\Workday;
+use App\Support\Workforce\Workday;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -107,9 +107,9 @@ class WorkforceTest extends TestCase
         $this->actingAs($u)->post('/workday/check-out');
         $this->assertSame('حاضر', Workday::today($e->id)->status, 'الحضورُ الفيزيائيُّ لا يُطمَس');
 
-        $c = \App\Support\DailyWorkCompliance::resolve($e);
+        $c = \App\Support\Workforce\DailyWorkCompliance::resolve($e);
         $this->assertFalse($c['report_submitted']);
-        $this->assertSame(\App\Support\DailyWorkCompliance::REPORT_PENDING, $c['state'],
+        $this->assertSame(\App\Support\Workforce\DailyWorkCompliance::REPORT_PENDING, $c['state'],
             'قبلَ المهلة: بانتظار التقرير لا «حضور بدون تقرير»');
         $this->assertSame('present', $c['effective'], 'قبلَ المهلة لا يُحتسب غياباً — لا عقوبةَ مبكّرة');
 
@@ -120,8 +120,8 @@ class WorkforceTest extends TestCase
         WorkUpdate::create(['project_id' => $p->id, 'done' => 'أنجزتُ الإعداد', 'hours' => 2]);
         $this->actingAs($u2)->post('/workday/check-out');
         $this->assertSame('حاضر', Workday::today($e2->id)->status);
-        $this->assertSame(\App\Support\DailyWorkCompliance::PRESENT_REPORTED,
-            \App\Support\DailyWorkCompliance::resolve($e2)['state']);
+        $this->assertSame(\App\Support\Workforce\DailyWorkCompliance::PRESENT_REPORTED,
+            \App\Support\Workforce\DailyWorkCompliance::resolve($e2)['state']);
 
         // وبإطفاء اشتراط التقرير لا التزامَ أصلاً
         $this->hubSetting('work.report_required', '0');
@@ -129,8 +129,8 @@ class WorkforceTest extends TestCase
         $this->actingAs($u3)->post('/workday/check-in', []);
         $this->actingAs($u3)->post('/workday/check-out');
         $this->assertSame('حاضر', Workday::today($e3->id)->status);
-        $this->assertSame(\App\Support\DailyWorkCompliance::NOT_REQUIRED,
-            \App\Support\DailyWorkCompliance::resolve($e3)['state']);
+        $this->assertSame(\App\Support\Workforce\DailyWorkCompliance::NOT_REQUIRED,
+            \App\Support\Workforce\DailyWorkCompliance::resolve($e3)['state']);
     }
 
     public function test_an_approved_leave_wins_the_final_state(): void

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * صفٌّ لكلّ جهازِ شركةٍ (Windows/macOS) سجّل نفسَه بالتسجيل اللاتماثليّ: الخادمُ
  * يخزّن **المفتاحَ العامَّ PEM فقط** — الخاصُّ يُولَّد على الجهاز ولا يصل هنا أبداً
- * (عقدُ التوقيع في docblock ‏`App\Support\Es256`، والفرضُ في `EndpointSignature`).
+ * (عقدُ التوقيع في docblock ‏`App\Support\Security\Es256`، والفرضُ في `EndpointSignature`).
  *
  * **دلالاتُ الأعمدة الحاكمة:**
  *  • `device_uuid` هويّةُ الجهاز كما يعلنها وكيلُه (فريدة) — و`id` (uuid) هو

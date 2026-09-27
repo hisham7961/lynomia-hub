@@ -15,7 +15,7 @@
 
 @include('partials.cc.kpis', ['items' => [
     ['label' => 'نشطة الآن', 'value' => $kpi['live'], 'tone' => 'ok',
-     'hint' => 'آخر ظهورٍ خلال ' . \App\Support\Sessions::LIVE_MIN . ' دقيقة'],
+     'hint' => 'آخر ظهورٍ خلال ' . \App\Support\Security\Sessions::LIVE_MIN . ' دقيقة'],
     ['label' => 'مُنهاة في المدى', 'value' => $kpi['revoked'], 'tone' => $kpi['revoked'] ? 'wn' : 'ok'],
     ['label' => 'مستخدمون', 'value' => $kpi['users']],
     ['label' => 'عناوين شبكة', 'value' => $kpi['ips']],

@@ -7,7 +7,7 @@ use App\Models\CodeRelease;
 use App\Models\Project;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\CodeHub;
+use App\Support\Apps\CodeHub;
 use Tests\TestCase;
 
 /**

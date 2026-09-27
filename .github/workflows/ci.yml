@@ -86,6 +86,8 @@ jobs:
           php artisan hub:ai-coverage --check
           # وخريطةُ الشعارات: تشير إلى ملفٍّ زال، أو ملفٌّ يُنشَر ولا يُعرَض
           php artisan hub:ai-logos --check
+          # وخريطةُ نقاطِ الجوال في وثيقة التسليم (مولَّدةٌ من المسارات الحيّة · 2.5)
+          php artisan hub:mobile-handoff --check
 
       # ═══ محرّكُ القاعدة يُشغَّل مشروطاً لا عبر `services` ═══
       #
@@ -132,6 +134,46 @@ jobs:
 
       - name: الحزمة
         run: ./vendor/bin/phpunit -c ${{ matrix.config }}
+
+  # ═══ التحليلُ الساكن — phpstan (البند #36 و#31 · QE-05) ═══
+  #
+  # وظيفةٌ مستقلّةٌ لا صفٌّ في المصفوفة: التحليلُ لا يحتاج قاعدةً ولا يختلف
+  # بالمحرّك، فيكفيه صفٌّ واحدٌ على نسخةِ الإنتاج (PHP 8.4). ويسقط الدفعةَ عند
+  # **أوّلِ خطأٍ جديد** — وما قبل اليوم في `phpstan-baseline.neon` يُخفَض ولا
+  # يُرفَع (`StaticAnalysisGateTest` يسقط إن كبر). والنسخةُ مثبّتةٌ ببصمتِها في
+  # `tools/phpstan.sh`: لا `composer require` (أرشيفاتُ codeload `403`).
+  static:
+    name: التحليل الساكن (phpstan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: تهيئة PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_sqlite, pdo_mysql, intl, bcmath, gd, zip
+          coverage: none
+
+      - name: خبيئة الاعتماديات
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: ${{ runner.os }}-php8.4-${{ hashFiles('composer.lock') }}
+
+      - name: خبيئة phpstan.phar
+        # المفتاحُ بصمةُ السكربت: ترقيةُ النسخةِ تغيّره فيُنزَّل الجديدُ ويُتحقَّق منه
+        uses: actions/cache@v4
+        with:
+          path: tools/.phpstan
+          key: phpstan-${{ hashFiles('tools/phpstan.sh') }}
+
+      - name: تنصيب الاعتماديات
+        # التحليلُ يحمّل الأصنافَ من vendor (Laravel وحزمه) — فالاعتمادياتُ كاملةً
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: phpstan — لا خطأَ جديد فوق خطِّ الأساس
+        run: tools/phpstan.sh --error-format=github
 
   # النسخةُ تُرفع مع كل تحديث — قاعدةُ CLAUDE.md مفروضةٌ في الخطّاف وهنا معاً،
   # فالخطّافُ يُتجاوَز بـ--no-verify وهذا لا يُتجاوَز.

@@ -7,7 +7,7 @@ use App\Models\AssetCustody;
 use App\Models\Conversation;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\FeatureRegistry;
+use App\Support\Platform\FeatureRegistry;
 use Tests\TestCase;
 
 /**

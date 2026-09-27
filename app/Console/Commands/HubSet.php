@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Support\Settings;
+use App\Support\Platform\Settings;
 use Illuminate\Console\Command;
 
 /** ضبط إعداد خادم من سطر الأوامر أو من حزم التحديث:  php artisan hub:set auth.session_min 0 */

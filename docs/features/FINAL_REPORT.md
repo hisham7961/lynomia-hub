@@ -16,8 +16,8 @@
 ## ٢) المعماريّة (لا محرّكات مزدوجة)
 
 - **الكتالوجُ الكوديّ:** `config/hub_features.php` (بلا closures · config:cache-safe).
-- **نموذجُ الحالة:** `App\Support\FeatureStatus` — تسعُ حالاتٍ + تسمياتٌ AR/EN + قواعدُ انتقال.
-- **المحرّك:** `App\Support\FeatureRegistry` — يقرأ الكتالوج، **يشتقُّ** الحالة، يحلّ الاعتماديّاتِ
+- **نموذجُ الحالة:** `App\Support\Platform\FeatureStatus` — تسعُ حالاتٍ + تسمياتٌ AR/EN + قواعدُ انتقال.
+- **المحرّك:** `App\Support\Platform\FeatureRegistry` — يقرأ الكتالوج، **يشتقُّ** الحالة، يحلّ الاعتماديّاتِ
   (بكشفِ دورات)، يبدّل عبر `Settings`، يتحقّق من النزاهة.
 - **بوّابةُ التوافر:** `hub_capability($key)` — مستقلّةٌ عن `hub_can` (التوافرُ ≠ الصلاحية).
 - **الرايات:** `feature.collab_presence` · `feature.collab_typing` في `config/hub_settings.php`.

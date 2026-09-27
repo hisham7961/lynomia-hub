@@ -56,7 +56,7 @@ class NotificationController extends Controller
 
         // الخريطةُ مُستخرَجةٌ إلى محلِّلٍ واحدٍ يشترك فيه الويبُ والجوال (E.2) — سلوكُ
         // الويبِ **غيرُ متغيّر**: `webUrl` تُنتج الرابطَ نفسَه الذي كان هنا حرفيّاً.
-        return redirect(\App\Support\NotificationLink::webUrl($n));
+        return redirect(\App\Support\Collaboration\NotificationLink::webUrl($n));
     }
 
     public function readAll()

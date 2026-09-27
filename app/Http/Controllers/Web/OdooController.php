@@ -23,7 +23,7 @@ class OdooController extends Controller
         $meta['odoo_partner_name'] = (string) ($d['pname'] ?? '');
         $m->meta = $meta;
         $m->save();
-        \App\Support\Odoo::forRow($m)->forgetStats((int) $d['pid']);
+        \App\Support\Ops\Odoo::forRow($m)->forgetStats((int) $d['pid']);
 
         return back()->with('ok', '🔗 رُبط السجل بأودو — الأرقام ستظهر في البطاقة')->withFragment('odoo');
     }
@@ -43,7 +43,7 @@ class OdooController extends Controller
     {
         $m = $this->target($module, $id);
         if ($pid = (int) (((array) $m->meta)['odoo_partner_id'] ?? 0)) {
-            \App\Support\Odoo::forRow($m)->forgetStats($pid);
+            \App\Support\Ops\Odoo::forRow($m)->forgetStats($pid);
         }
 
         return back()->with('ok', '🔄 حُدّثت أرقام أودو')->withFragment('odoo');
@@ -67,11 +67,11 @@ class OdooController extends Controller
     public function project(Request $r, string $id)
     {
         $row = $this->target('projects', $id);
-        $cli = \App\Support\Odoo::forRow($row);
+        $cli = \App\Support\Ops\Odoo::forRow($row);
 
         // hub_str لا (string): `?mode[]=x` مصفوفةٌ يرمي كاستُها ErrorException → ٥٠٠
         $mode = hub_str($r->query('mode')) ?: 'team';
-        if (! in_array($mode, \App\Support\Odoo::CHANNEL_MODES, true)) $mode = 'team';
+        if (! in_array($mode, \App\Support\Ops\Odoo::CHANNEL_MODES, true)) $mode = 'team';
 
         // الخيارات تُجلب مزامنةً في try/catch — الشاشة لا تسقط بخادمٍ غائب
         $options = []; $err = null;
@@ -85,7 +85,7 @@ class OdooController extends Controller
         return view('odoo.project', [
             'row' => $row, 'cli' => $cli, 'mode' => $mode,
             'options' => $options, 'err' => $err,
-            'conns' => \App\Support\Odoo::connections(),
+            'conns' => \App\Support\Ops\Odoo::connections(),
             'channels' => (array) (((array) $row->meta)['odoo']['channels'] ?? []),
         ]);
     }
@@ -96,7 +96,7 @@ class OdooController extends Controller
         abort_unless(hub_is_owner(), 403, 'اختيار خادم أودو للمشروع قرارُ مالك');
         $row = $this->target('projects', $id);
 
-        $valid = array_column(\App\Support\Odoo::connections(), 'id');
+        $valid = array_column(\App\Support\Ops\Odoo::connections(), 'id');
         $conn = hub_str($r->input('conn'));
         abort_unless(in_array($conn, $valid, true), 422, 'اتصال غير معروف أو معطّل');
 
@@ -157,7 +157,7 @@ class OdooController extends Controller
             fn ($c) => ($c['key'] ?? '') !== $key));
         $row->meta = $meta;
         $row->save();
-        \App\Support\Odoo::forRow($row)->forgetChannel($row->id, $key);
+        \App\Support\Ops\Odoo::forRow($row)->forgetChannel($row->id, $key);
 
         return back()->with('ok', 'حُذفت القناة');
     }
@@ -173,7 +173,7 @@ class OdooController extends Controller
 
     protected function forgetProjectChannels($row): void
     {
-        $cli = \App\Support\Odoo::forRow($row);
+        $cli = \App\Support\Ops\Odoo::forRow($row);
         foreach ((array) (((array) $row->meta)['odoo']['channels'] ?? []) as $c) {
             $cli->forgetChannel($row->id, (string) ($c['key'] ?? ''));
         }

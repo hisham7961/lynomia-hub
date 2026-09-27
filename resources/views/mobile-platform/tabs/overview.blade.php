@@ -1,10 +1,10 @@
 {{-- نظرةٌ عامّة (spec §7/§56): مؤشّراتٌ حقيقيّة + حالةُ التهيئة الصادقة (تكشف ما يحتاج
      ضبطاً) + بطاقةُ الجاهزية. قيمٌ حقيقيّةٌ فقط — لا بيانات وهميّة. --}}
 @php
-    $tone = fn ($s) => \App\Support\MobilePlatform::TONE[$s] ?? 'g';
-    $lbl  = fn ($s) => \App\Support\MobilePlatform::LABEL[$s] ?? $s;
-    $R = \App\Support\MobilePlatform::READY;
-    $NC = \App\Support\MobilePlatform::NOT_CONFIGURED;
+    $tone = fn ($s) => \App\Support\Mobile\MobilePlatform::TONE[$s] ?? 'g';
+    $lbl  = fn ($s) => \App\Support\Mobile\MobilePlatform::LABEL[$s] ?? $s;
+    $R = \App\Support\Mobile\MobilePlatform::READY;
+    $NC = \App\Support\Mobile\MobilePlatform::NOT_CONFIGURED;
 @endphp
 
 @include('partials.cc.kpis', ['items' => [
@@ -33,24 +33,24 @@
             <td><span class="bdg {{ $tone($ov['push']['state']) }}">{{ $lbl($ov['push']['state']) }}</span>
                 @if ($ov['push']['configured'])<span class="sub"> · {{ $ov['push']['driver'] }}</span>@endif</td>
             <td class="acts">
-                @unless ($ov['push']['configured'])<a class="btn ghost xs" href="{{ route('settings.edit') }}#mobile.push_driver">هيّئ ←</a>@endunless
+                @unless ($ov['push']['configured'])<a class="btn ghost xs" href="{{ \App\Support\Mobile\MobileSettings::editUrl('mobile.push_driver') }}">هيّئ ←</a>@endunless
             </td>
         </tr>
         <tr>
             <td>روابطُ iOS العميقة (Universal Links)</td>
             <td><span class="bdg {{ $tone($ov['dl']['apple']['state']) }}">{{ $lbl($ov['dl']['apple']['state']) }}</span></td>
-            <td class="acts">@unless ($ov['dl']['apple']['configured'])<a class="btn ghost xs" href="{{ route('settings.edit') }}#mobile.dl_apple_team_id">هيّئ ←</a>@endunless</td>
+            <td class="acts">@unless ($ov['dl']['apple']['configured'])<a class="btn ghost xs" href="{{ \App\Support\Mobile\MobileSettings::editUrl('mobile.dl_apple_team_id') }}">هيّئ ←</a>@endunless</td>
         </tr>
         <tr>
             <td>روابطُ Android العميقة (App Links)</td>
             <td><span class="bdg {{ $tone($ov['dl']['android']['state']) }}">{{ $lbl($ov['dl']['android']['state']) }}</span></td>
-            <td class="acts">@unless ($ov['dl']['android']['configured'])<a class="btn ghost xs" href="{{ route('settings.edit') }}#mobile.dl_android_fingerprints">هيّئ ←</a>@endunless</td>
+            <td class="acts">@unless ($ov['dl']['android']['configured'])<a class="btn ghost xs" href="{{ \App\Support\Mobile\MobileSettings::editUrl('mobile.dl_android_fingerprints') }}">هيّئ ←</a>@endunless</td>
         </tr>
         <tr>
             <td>بوّابةُ الإصدار</td>
             <td><span class="bdg {{ $ov['ver']['gate_active'] ? $tone($R) : $tone($NC) }}">{{ $ov['ver']['gate_active'] ? $lbl($R) : $lbl($NC) }}</span>
                 @if ($ov['ver']['ios']['invalid'] || $ov['ver']['android']['invalid'])<span class="bdg bad">ضبطٌ باطل</span>@endif</td>
-            <td class="acts">@unless ($ov['ver']['gate_active'])<a class="btn ghost xs" href="{{ route('settings.edit') }}#mobile.min_version_ios">هيّئ ←</a>@endunless</td>
+            <td class="acts">@unless ($ov['ver']['gate_active'])<a class="btn ghost xs" href="{{ \App\Support\Mobile\MobileSettings::editUrl('mobile.min_version_ios') }}">هيّئ ←</a>@endunless</td>
         </tr>
         <tr>
             <td>الجلساتُ النشطة</td>

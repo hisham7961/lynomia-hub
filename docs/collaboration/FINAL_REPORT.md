@@ -47,7 +47,7 @@
 - **الحرّاس (نقاطُ الحسمِ الوحيدة):** `guardConversation($op)` للقنوات · `DmService::reachable` +
   مفتاحٌ من `auth()` (F8) للمحادثات · `CommentService::guardTarget` للتعليقات · `PortalGuard` فوق
   العميل · دفاعُ نطاقِ الشركة/العميل فوق العضويّة.
-- **السند:** `App\Support\Collaboration` (أحداث + مؤشّر keyset) · `CollaborationRail` (سكّةُ المركز) ·
+- **السند:** `App\Support\Collaboration\Collaboration` (أحداث + مؤشّر keyset) · `CollaborationRail` (سكّةُ المركز) ·
   `Presence` · `Typing` · `MessageLink` (روابطُ دائمة) · `CommentService`/`DmService`.
 
 ## ٥) المسارات

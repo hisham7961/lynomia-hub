@@ -3,10 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Client;
-use App\Support\CeoBoard;
-use App\Support\Health;
-use App\Support\Series;
-use App\Support\WidgetRegistry;
+use App\Support\Insights\CeoBoard;
+use App\Support\Ops\Health;
+use App\Support\Ops\Series;
+use App\Support\Platform\WidgetRegistry;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;

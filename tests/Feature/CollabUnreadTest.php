@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\Web\ConversationController;
 use App\Models\Conversation;
 use App\Models\ConversationMember;
-use App\Support\CommentService;
+use App\Support\Collaboration\CommentService;
 use Tests\TestCase;
 
 /**

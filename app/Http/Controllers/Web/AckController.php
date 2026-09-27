@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\Acks;
+use App\Support\Collaboration\Acks;
 use Illuminate\Http\Request;
 
 /**
@@ -21,27 +21,16 @@ class AckController extends Controller
     {
         [$def, $row] = $this->target($module, $id);
 
-        // لا يُقرّ عن غيره أحد: الإقرار شهادةٌ شخصية، وتوقيعُ الغير تزوير
-        abort_unless(in_array((string) auth()->id(), Acks::targets($module, $row), true), 403,
-            'الإقرار لمن طُلب منه وحده — ولا يُقرّ أحدٌ نيابةً عن غيره');
+        // لا يُقرّ عن غيره أحد: الإقرار شهادةٌ شخصية، وتوقيعُ الغير تزوير — القاعدةُ من الباب الواحد
+        if ($why = \App\Support\Collaboration\Acknowledgement::denial($module, $row, (string) auth()->id())) abort(403, $why);
 
         $note = trim(hub_str($r->input('note')));
         abort_if(mb_strlen($note) > 1000, 422, 'التحفّظ أطول من المسموح');
 
-        Acks::record($module, $row, (string) auth()->id(), $note ?: null);
-
-        hub_audit($def['label'], $module, $row->id,
-            (string) ($row->{hub_mod($module)['display'] ?? 'title'} ?? ''),
-            ['after' => ['نسخة السجل' => Acks::version($row), 'تحفّظ' => $note ?: '—']]);
-
-        // صاحب السجل يعرف أن إقراراً وقع — الاعتماد خبرٌ لا صمت
-        foreach (array_filter([$row->created_by ?? null, $row->owner_id ?? null]) as $uid) {
-            if ($uid !== auth()->id()) {
-                hub_notify($uid, 'ack', '✅ ' . auth()->user()->name . ' — ' . $def['label']
-                    . ': ' . \Illuminate\Support\Str::limit((string) ($row->title ?? $row->name ?? ''), 50),
-                    $module, $row->id);
-            }
-        }
+        // البابُ الواحد (TECH_DEBT #29 · `Acknowledgement`): لا يُقرّ عن غيره أحد (403)،
+        // والإقرارُ الأوّل لا يُمحى، وقيدُ التدقيق وإشعارُ صاحب السجل مرّةً واحدة لا بكلّ ضغطة.
+        \App\Support\Collaboration\Acknowledgement::acknowledge($module, $row, (string) auth()->id(),
+            ['note' => $note ?: null]);
 
         return back()->with('ok', '✅ سُجّل إقرارك بدليله — الوقت والعنوان والجهاز');
     }

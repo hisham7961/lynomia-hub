@@ -34,12 +34,12 @@
 
 ## ما بُني
 
-- **المُحلِّلُ المركزيّ** `app/Support/DailyWorkCompliance.php` — الحقيقةُ الواحدةُ لحالةِ
+- **المُحلِّلُ المركزيّ** `app/Support/Workforce/DailyWorkCompliance.php` — الحقيقةُ الواحدةُ لحالةِ
   اليوم (§10/§101). ثمانِ حالاتٍ قانونيّة (`:33-40`)، `resolve()`/`resolveMany()` (N+1=0،
   `:88`/`:107`)، المسنَدُ الوحيد `hasSubmittedReport()` (`:68`)، تعريفُ التقريرِ الصالح
   `isValidReportRow()` (`:55`)، والمهلةُ الحيّةُ `computeDeadline()` (`:293`). كلُّ شاشةٍ
   وواجهةٍ تستهلكه.
-- **التاريخُ التجاريّ** `app/Support/BusinessDate.php` — مُحلِّلٌ مركزيٌّ واحدٌ للتاريخ
+- **التاريخُ التجاريّ** `app/Support/Platform/BusinessDate.php` — مُحلِّلٌ مركزيٌّ واحدٌ للتاريخ
   (tz=Asia/Kuwait، `:22-63`) بدل `now()->toDateString()` المتناثر.
 - **الإعدادات** `config/hub_settings.php:634-695` — `report_required`، `report_grace_minutes`
   (120)، `report_cutoff_time`، `missing_report_policy` (`warning_only`/`non_compliant`/
@@ -48,7 +48,7 @@
   `attendance:reconcile-reports` يجد الأيامَ المرشَّحةَ فقط (فات موعدُها ولم تُقفَل، `:43-49`)،
   ويُشعِر بالتقريرِ الناقصِ إشعاراً **واحداً** لكلِّ (موظّف/يوم) عبر مسنَدِ الوجود (`:70-72`).
   موصولٌ بأتمتة `hub:automation` اليوميّة؛ والاشتقاقُ اللحظيُّ تلقائيٌّ أصلاً.
-- **المراجعةُ وقفلُ الامتثال** `app/Support/ReportReview.php` — مراجعةٌ خفيفةٌ فوق حقولِ
+- **المراجعةُ وقفلُ الامتثال** `app/Support/Workforce/ReportReview.php` — مراجعةٌ خفيفةٌ فوق حقولِ
   `WorkUpdate` (`pending_review → accepted/needs_revision`، `:35-113`)، وقفلٌ يدويٌّ مدقَّقٌ
   للأثرِ الفعّال (`finalizeCompliance()`، `:122`) لا يُعاد كتابتُه صامتاً بتقريرٍ لاحق.
 - **الهجرةُ الإضافيّة** `database/migrations/2026_09_26_000001_attendance_report_compliance.php`

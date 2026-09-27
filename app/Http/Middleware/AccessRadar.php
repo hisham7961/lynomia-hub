@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware;
 
-use App\Support\SecurityRadar;
+use App\Support\Security\SecurityRadar;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;

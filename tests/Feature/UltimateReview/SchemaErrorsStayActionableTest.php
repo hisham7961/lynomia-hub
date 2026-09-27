@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\UltimateReview;
 
-use App\Support\Redactor;
+use App\Support\Platform\Redactor;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 

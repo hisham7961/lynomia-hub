@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\TeamDirectory;
+use App\Support\Workforce\TeamDirectory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;

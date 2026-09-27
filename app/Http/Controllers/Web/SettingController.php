@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\ConnectionProbe;
-use App\Support\Settings;
+use App\Support\Ops\ConnectionProbe;
+use App\Support\Platform\Settings;
 use Illuminate\Http\Request;
 
 /**
@@ -18,7 +18,7 @@ use Illuminate\Http\Request;
  * (WP-9.1) وقواعدُ التحقّق وقائمةُ الأسرار **انتقلتا إلى الكتالوج**: كانتا
  * ثابتَين منسوخَين هنا بجانبه، فقاعدةٌ تُضاف لا يعرفها إلا الحفظ، ومفتاحُ سرٍّ
  * يُنسى فيُكتب نصّاً صريحاً من الطرفية بينما شاشتُه تشفّره (`n8n.key`).
- * فالقارئُ الواحد الآن `App\Support\Settings`.
+ * فالقارئُ الواحد الآن `App\Support\Platform\Settings`.
  */
 class SettingController extends Controller
 {

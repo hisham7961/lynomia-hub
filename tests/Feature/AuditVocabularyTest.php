@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Support\SecurityEvents;
-use App\Support\StepUp;
+use App\Support\Security\SecurityEvents;
+use App\Support\Security\StepUp;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use Tests\TestCase;

@@ -48,7 +48,7 @@ class TokenCenterTest extends TestCase
     public function test_classify_yields_one_status_per_token_with_threshold_from_settings(): void
     {
         $this->seedCore();
-        $c = fn (array $a) => \App\Support\ApiTokens::classify((object) ($a + [
+        $c = fn (array $a) => \App\Support\Security\ApiTokens::classify((object) ($a + [
             'revoked_at' => null, 'expires_at' => now()->addDays(30), 'last_used_at' => now(),
             'created_at' => now()->subDays(5), 'scopes' => 'tasks:v', 'privileged' => false,
         ]));
@@ -82,14 +82,14 @@ class TokenCenterTest extends TestCase
         DB::table('api_tokens')->where('id', $revoked->id)
             ->update(['revoked_at' => now(), 'revoked_by' => $this->owner->id]);
 
-        $ids = array_map('strval', \App\Support\SecurityPosture::apiStaleIds());
+        $ids = array_map('strval', \App\Support\Security\SecurityPosture::apiStaleIds());
         $this->assertContains((string) $idle->id, $ids, 'الخاملُ خطرٌ حيّ');
         $this->assertContains((string) $noexp->id, $ids, 'بلا انتهاءٍ خطرٌ حيّ');
         $this->assertNotContains((string) $expired->id, $ids, 'المنتهي ميتٌ لا خامل');
         $this->assertNotContains((string) $fresh->id, $ids);
         $this->assertNotContains((string) $revoked->id, $ids, 'المُبطَل ميتٌ — عدُّه خطراً ضجيج');
 
-        $check = collect(\App\Support\SecurityPosture::checks())->firstWhere('key', 'api_stale');
+        $check = collect(\App\Support\Security\SecurityPosture::checks())->firstWhere('key', 'api_stale');
         $this->assertSame(2, $check['n'], 'عدُّ الفحص لا يطابق التصنيفَ الواحد (خامل + بلا انتهاء)');
     }
 

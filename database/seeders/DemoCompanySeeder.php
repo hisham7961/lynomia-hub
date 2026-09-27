@@ -479,7 +479,7 @@ class DemoCompanySeeder extends Seeder
             'description' => 'تأسيس فريق دبي وتجهيز المكتب وبدء العمليّات.']);
 
         // أصولٌ مخصَّصةٌ لمشاريع (علاقة تشغيليّة)
-        $svc = new \App\Support\AssetProjectService();
+        $svc = new \App\Support\Assets\AssetProjectService();
         $owner = $this->u['owner'];
         foreach ([['LYN-SRV-001', 'gulf', 'خادم بيئة العميل'], ['LYN-SRV-003', 'ofoq', 'بيئة اختبار المرحلة الأولى'],
                   ['LYN-LT-901', 'salam', 'جهاز اختبار ميدانيّ في المستشفى']] as [$code, $pk, $purpose]) {

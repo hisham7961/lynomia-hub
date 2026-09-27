@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\Idea;
-use App\Support\Innovation;
+use App\Support\Insights\Innovation;
 use Tests\TestCase;
 
 /**

@@ -17,7 +17,7 @@ ai.models.index · discover · import · register · browse · adopt · refresh
 **ولا `destroy`.** والدالّةُ موجودةٌ منذ W3:
 
 ```php
-// app/Support/LiteLlmAdmin.php
+// app/Support/Ai/Gateway/LiteLlmAdmin.php
 public static function deleteModel(string $modelId): array
 ```
 

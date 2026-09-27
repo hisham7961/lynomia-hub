@@ -12,6 +12,7 @@
     @else<div class="loginmark">🏢</div>@endif
     <h1>{{ setting('app.name', 'Lynomia Business Hub') }}</h1>
     <p class="sub">نظام إدارة الأعمال الموحّد</p>
+    @if (session('ok'))<div class="flash ok">{{ session('ok') }}</div>@endif
     @if ($errors->any())<div class="flash bad">{{ $errors->first() }}</div>@endif
     <form method="POST" action="{{ route('login.attempt') }}">
         @csrf
@@ -21,6 +22,9 @@
         <input class="inp" type="password" name="password" required>
         <button class="btn p full" type="submit">دخول</button>
     </form>
+    @if (\App\Http\Controllers\Web\PasswordResetController::enabled())
+        <p class="sub" style="margin-top:10px"><a href="{{ route('password.request') }}">نسيت كلمة المرور؟</a></p>
+    @endif
     @if ((string) setting('auth.passkeys_on', '1') === '1')
         <div class="sub" style="margin:12px 0 6px">أو</div>
         <button class="btn full" type="button" id="pk-login">🔑 الدخول بمفتاح المرور</button>
@@ -29,7 +33,7 @@
 </div>
 @if ((string) setting('auth.passkeys_on', '1') === '1')
 @include('partials.passkey_js')
-<script>
+<script @cspNonce>
 (function () {
     var btn = document.getElementById('pk-login'); if (!btn) return;
     if (!window.LynPasskey || !LynPasskey.supported) { btn.style.display = 'none'; return; }

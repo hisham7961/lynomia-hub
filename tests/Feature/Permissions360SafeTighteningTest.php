@@ -133,7 +133,7 @@ class Permissions360SafeTighteningTest extends TestCase
         // (٢) فوق العتبة يتطلّب تأكيدَ الهويّة — صفُّ حضورٍ واحدٌ وعتبةٌ = ١
         $u = $this->user('mx@test.local', ['updates' => ['v' => 1]]);
         Employee::create(['name' => 'موظفُ التصدير', 'status' => 'نشط', 'user_id' => $u->id]);
-        \App\Support\Workday::checkIn($u, ['mode' => 'مكتب']);
+        \App\Support\Workforce\Workday::checkIn($u, ['mode' => 'مكتب']);
 
         $this->hubSetting('security.export_stepup_rows', '1');
         $res = $this->actingAs($this->owner)->get(route('reports.monthly.export'));
@@ -155,7 +155,7 @@ class Permissions360SafeTighteningTest extends TestCase
         $this->seedCore();
         $emp = $this->user('fm-emp@test.local', ['updates' => ['v' => 1]]);
         Employee::create(['name' => 'موظفُ الحقول', 'dept' => 'قسمٌ محجوب', 'status' => 'نشط', 'user_id' => $emp->id]);
-        \App\Support\Workday::checkIn($emp, ['mode' => 'مكتب']);
+        \App\Support\Workforce\Workday::checkIn($emp, ['mode' => 'مكتب']);
 
         // محاسبٌ دورُه يحجب حقلَ القسمِ في الموارد — لا يستلمه في CSV أيضاً
         $acc = $this->user('fm-acc@test.local', ['attend' => ['v' => 1], 'hr' => ['v' => 1]],

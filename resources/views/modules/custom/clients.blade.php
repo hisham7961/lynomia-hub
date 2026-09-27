@@ -17,7 +17,7 @@
             ->whereNotIn('state', ['مدفوعة', 'ملغاة', 'مسودة'])->count(),
         'assets' => \App\Models\Asset::whereNull('deleted_at')->where('client_id', $row->id)->count(),
     ];
-    $cHealth = \App\Support\Engagements::health($row);
+    $cHealth = \App\Support\Finance\Engagements::health($row);
 @endphp
 <div class="card">
     <h3 class="cardtitle">🧭 العميل ٣٦٠°
@@ -86,7 +86,7 @@
                             @if ($cmCanManage)
                                 <form method="POST" action="{{ route('clients.members.role', [$row->id, $mb->id]) }}" class="inline">
                                     @csrf
-                                    <select name="role" class="inp xs" onchange="this.form.submit()" aria-label="دورُ العضو">
+                                    <select name="role" class="inp xs" data-submit-on-change aria-label="دورُ العضو">
                                         @foreach ($cmRoles as $rk => $rl)
                                             <option value="{{ $rk }}" @selected($mb->role === $rk)>{{ $rl }}</option>
                                         @endforeach
@@ -109,7 +109,7 @@
                             <td>
                                 @if ($mb->status !== 'suspended')
                                     <form method="POST" action="{{ route('clients.members.revoke', [$row->id, $mb->id]) }}" class="inline"
-                                          onsubmit="return confirm('سحبُ وصولِ هذا العضو؟ يسقط عن مساحة العميل فوراً.')">
+                                          data-confirm-native="سحبُ وصولِ هذا العضو؟ يسقط عن مساحة العميل فوراً.">
                                         @csrf
                                         <button class="btn bad xs" title="يتطلّب تأكيدَ الهوية">سحبُ الوصول</button>
                                     </form>

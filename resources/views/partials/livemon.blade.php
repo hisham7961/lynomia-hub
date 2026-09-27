@@ -1,7 +1,7 @@
 {{-- المراقبة الحيّة لسيرفر أو موقع — يتوقع: $module $row --}}
 @php
     $mOn = (bool) ($row->monitor_on ?? false);
-    $mUrl = \App\Support\Uptime::urlOf($module, $row);
+    $mUrl = \App\Support\Ops\Uptime::urlOf($module, $row);
     $up = hub_uptime($module, $row->id, 30);
     $mGate = $mUrl ? hub_outbound_ok($mUrl) : ['ok' => false, 'why' => 'لا رابط فحص'];
 @endphp

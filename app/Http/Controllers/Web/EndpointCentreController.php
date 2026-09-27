@@ -95,8 +95,8 @@ class EndpointCentreController extends Controller
 
         // §8 — الوضعُ الفعليُّ الصادقُ لفرض USB: تكاملُ MDM (إن وُجد) يقرّره، لا رايةُ
         // السياسة وحدَها. بلا مزوّدٍ قادرٍ فعلاً يبقى «رصدٌ فقط» مهما طلبت السياسةُ الفرض.
-        $mdmConn = \App\Support\MdmService::connectionFor($device->company_id ? (string) $device->company_id : null);
-        $usbEffectiveMode = \App\Support\MdmService::effectiveUsbMode($policy, $mdmConn);
+        $mdmConn = \App\Support\Endpoint\MdmService::connectionFor($device->company_id ? (string) $device->company_id : null);
+        $usbEffectiveMode = \App\Support\Endpoint\MdmService::effectiveUsbMode($policy, $mdmConn);
 
         return view('endpoints.show', [
             'device' => $device,
@@ -105,7 +105,7 @@ class EndpointCentreController extends Controller
             'policy' => $policy,
             'holder' => $device->employee_id ? User::find($device->employee_id) : null,
             'usbEffectiveMode' => $usbEffectiveMode,
-            'mdmStatus' => \App\Support\MdmService::status($mdmConn),
+            'mdmStatus' => \App\Support\Endpoint\MdmService::status($mdmConn),
         ]);
     }
 }

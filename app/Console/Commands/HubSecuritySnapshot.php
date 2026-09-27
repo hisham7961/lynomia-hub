@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Support\Health;
-use App\Support\SecurityFindings;
-use App\Support\SecurityPosture;
+use App\Support\Ops\Health;
+use App\Support\Security\SecurityFindings;
+use App\Support\Security\SecurityPosture;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;

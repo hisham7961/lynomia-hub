@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\PermissionInspector;
+use App\Support\Security\PermissionInspector;
 use Tests\TestCase;
 
 /**

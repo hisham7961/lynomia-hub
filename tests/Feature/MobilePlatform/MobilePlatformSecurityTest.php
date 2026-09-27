@@ -6,7 +6,7 @@ use App\Models\AuditEntry;
 use App\Models\MobileInstallation;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\MobilePlatform;
+use App\Support\Mobile\MobilePlatform;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 

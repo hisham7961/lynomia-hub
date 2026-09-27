@@ -9,8 +9,8 @@ use App\Models\Project;
 use App\Models\Role;
 use App\Models\Station;
 use App\Models\User;
-use App\Support\Custody;
-use App\Support\Employee360;
+use App\Support\Assets\Custody;
+use App\Support\Workforce\Employee360;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 

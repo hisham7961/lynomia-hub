@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ErrorEvent;
 use App\Models\Task;
-use App\Support\ErrorLog;
+use App\Support\Ops\ErrorLog;
 use Tests\TestCase;
 
 /**

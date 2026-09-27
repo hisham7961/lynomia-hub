@@ -160,7 +160,7 @@ class ScopeLeakAuditTest extends TestCase
         }
 
         $u = $this->withRole(['policies' => ['v' => 1]], [], [$a->id]);
-        $titles = collect(\App\Support\Inbox::items($u->fresh()))->pluck('title')->all();
+        $titles = collect(\App\Support\Collaboration\Inbox::items($u->fresh()))->pluck('title')->all();
 
         $this->assertContains('سياسة شركتي', $titles);
         $this->assertNotContains('سياسة الشركة الأخرى', $titles,

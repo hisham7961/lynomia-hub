@@ -3,8 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\Deployment;
-use App\Support\Health;
-use App\Support\SysMonitor;
+use App\Support\Ops\Health;
+use App\Support\Ops\SysMonitor;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\ChunkedUpload;
+use App\Support\Collaboration\ChunkedUpload;
 use Illuminate\Http\Request;
 
 /**

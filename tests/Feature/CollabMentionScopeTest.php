@@ -9,7 +9,7 @@ use App\Models\HubNotification;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
-use App\Support\CommentService;
+use App\Support\Collaboration\CommentService;
 use Tests\TestCase;
 
 /**

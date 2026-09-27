@@ -51,9 +51,9 @@
                     @foreach ($ob['failed'] as $f)
                         <tr>
                             <td>{{ ['tg' => '✈️', 'mail' => '📧'][$f->channel] ?? $f->channel }}
-                                <span class="sub">{{ $f->kind }} · إلى <bdi class="mono ltr">{{ \App\Support\Integrations::maskDestination($f->target) }}</bdi>
+                                <span class="sub">{{ $f->kind }} · إلى <bdi class="mono ltr">{{ \App\Support\Ops\Integrations::maskDestination($f->target) }}</bdi>
                                     · {{ $f->created_at?->diffForHumans() }}</span>
-                                <div class="sub">{{ \App\Support\Integrations::outboxPreview($f->kind, $f->text) }}</div>
+                                <div class="sub">{{ \App\Support\Ops\Integrations::outboxPreview($f->kind, $f->text) }}</div>
                                 @if ($f->error)<div class="ferr">{{ $f->error }}</div>@endif</td>
                             <td class="acts">
                                 <form method="POST" action="{{ route('ops.outbox.retry', $f->id) }}">@csrf

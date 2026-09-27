@@ -2,8 +2,8 @@
 
 namespace Tests\Feature\AskHub;
 
-use App\Support\AskContext;
-use App\Support\AskPolicy;
+use App\Support\Ai\Ask\AskContext;
+use App\Support\Ai\Ask\AskPolicy;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 

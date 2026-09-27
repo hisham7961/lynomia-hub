@@ -8,10 +8,11 @@ use App\Http\Controllers\Web\DmController;
 use App\Models\Comment;
 use App\Models\HubNotification;
 use App\Models\User;
-use App\Support\Api;
-use App\Support\CommentService;
-use App\Support\DmService;
-use App\Support\NotificationLink;
+use App\Support\Platform\Api;
+use App\Support\Collaboration\Collaboration;
+use App\Support\Collaboration\CommentService;
+use App\Support\Collaboration\DmService;
+use App\Support\Collaboration\NotificationLink;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -190,8 +191,8 @@ class MobileCommController extends V1Controller
         // داخليّةٌ هو عضوٌ فيها خطأً تبقى 404 · نظيرُ بوّابة الويب حرفاً)
         if ($isClient && $module === 'channel') {
             $clientRoom = \App\Models\Conversation::whereKey($recordId)
-                ->whereIn('kind', \App\Support\ClientPortalData::CLIENT_CONV_KINDS)
-                ->whereIn('audience', \App\Support\ClientPortalData::CLIENT_AUDIENCES)
+                ->whereIn('kind', \App\Support\Collaboration\ClientPortalData::CLIENT_CONV_KINDS)
+                ->whereIn('audience', \App\Support\Collaboration\ClientPortalData::CLIENT_AUDIENCES)
                 ->whereNull('deleted_at')->exists();
             if (! $clientRoom) {
                 return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'غير موجود');
@@ -226,6 +227,9 @@ class MobileCommController extends V1Controller
             'module'   => $module,
             'record'   => $recordId !== null ? (string) $recordId : null,
             'comments' => $items->map(fn ($c) => $this->commentShape($c, $reactions, $u))->values()->all(),
+            // (إضافيّ · طلب الجوال #4) مؤشّرُ الذيل لـ`conversations/{id}/since` — للقناةِ وحدَها
+            // (لا «منذ» لغيرها ⇒ null)؛ '' لخيطٍ فارغ (= من البداية)
+            'cursor'   => $module === 'channel' ? $this->tailCursor($items) : null,
         ]);
     }
 
@@ -250,7 +254,7 @@ class MobileCommController extends V1Controller
             'record_id' => ['nullable', 'string'],
             'parent_id' => ['nullable', 'exists:comments,id'],
             'body'      => ['required', 'string', 'max:4000'],
-            'att'       => ['nullable', 'file', 'max:' . hub_upload_cap()['kb']],
+            'att'       => ['nullable', 'file', 'max:' . hub_upload_cap()['kb'], \App\Support\Security\UploadPolicy::rule()],   // FS-04
             'mention'   => ['nullable', 'array'],
             'internal'  => ['nullable', 'boolean'],
         ], [], ['body' => 'نص التعليق', 'att' => 'المرفق']);
@@ -266,8 +270,8 @@ class MobileCommController extends V1Controller
             [$conv] = ConversationController::guardConversation($convId, 'post');   // الضيفُ لا يكتب (403)
             // عميلٌ يكتب في غرفةٍ عميليّةِ الجمهور حصراً — الداخليّةُ 404 ولو كان عضواً
             if ($isClient && (
-                ! in_array((string) $conv->kind, \App\Support\ClientPortalData::CLIENT_CONV_KINDS, true)
-                || ! in_array((string) $conv->audience, \App\Support\ClientPortalData::CLIENT_AUDIENCES, true))) {
+                ! in_array((string) $conv->kind, \App\Support\Collaboration\ClientPortalData::CLIENT_CONV_KINDS, true)
+                || ! in_array((string) $conv->audience, \App\Support\Collaboration\ClientPortalData::CLIENT_AUDIENCES, true))) {
                 return Api::error(Api::RESOURCE_NOT_FOUND, 404, 'غير موجود');
             }
             [$module, $recordId] = ['channel', (string) $conv->id];
@@ -363,10 +367,14 @@ class MobileCommController extends V1Controller
 
         // F8 — المفتاحُ من auth+الطرف خادميّاً (DmService)، لا thread_key من العميل قط
         $msgs = DmService::thread((string) $me->id, (string) $other->id);
+        // (إضافيّ · طلب الجوال #6) تفاعلاتُ الصفحةِ كلِّها باستعلامٍ واحد — لا N+1
+        $reactions = DmController::dmReactionsFor($msgs->pluck('id')->map('strval')->all());
 
         return $this->ok([
             'user'     => ['id' => (string) $other->id, 'name' => (string) $other->name],
-            'messages' => $msgs->map(fn ($m) => $this->dmMessageShape($m, (string) $me->id))->all(),
+            'messages' => $msgs->map(fn ($m) => $this->dmMessageShape($m, (string) $me->id, $reactions))->all(),
+            // (إضافيّ · طلب الجوال #4) مؤشّرُ آخرِ صفٍّ بترميزِ `dm/threads/{user}/since` نفسِه؛ '' لخيطٍ فارغ
+            'cursor'   => $this->tailCursor($msgs),
         ]);
     }
 
@@ -400,7 +408,7 @@ class MobileCommController extends V1Controller
         $r->merge(['body' => trim(hub_str($r->input('body')))]);   // مسافاتٌ بيضٌ ليست رسالة
         $data = $r->validate([
             'body' => ['required', 'string', 'max:4000'],
-            'att'  => ['nullable', 'file', 'max:' . hub_upload_cap()['kb']],
+            'att'  => ['nullable', 'file', 'max:' . hub_upload_cap()['kb'], \App\Support\Security\UploadPolicy::rule()],   // FS-04
         ], [], ['body' => 'نص الرسالة', 'att' => 'المرفق']);
 
         $gate = $this->idempotentBegin($r);
@@ -502,6 +510,9 @@ class MobileCommController extends V1Controller
             'pinned'      => (bool) $c->pinned,
             'resolved'    => $c->resolved_at !== null,
             'has_attachment' => ! empty($c->att),
+            // (إضافيّ · طلب الجوال #2) مقبضُ تنزيلِ المرفق {id,name,size,mime,download} — للداخليّ
+            'attachment'  => ! empty($c->att) && ! hub_is_client($me)
+                ? \App\Support\Mobile\MessageAttachment::shape($c->att, (string) $c->id, 'mobile.comments.attachment') : null,
             'reactions'   => $this->reactionSummary($reactions[$c->id] ?? [], $me),
             'created_at'  => optional($c->created_at)->toIso8601String(),
         ];
@@ -534,7 +545,7 @@ class MobileCommController extends V1Controller
      * بطاقةُ رسالةِ DM لطرفٍ فيها: الجسمُ يُعرَض للطرفِ (محادثتُه هو — لا تسريب)، والمحذوفةُ
      * تُخفي جسمَها وتُعلَّم `deleted` (نظيرُ «حُذفت رسالة» في الويب). المرفقُ حضوراً لا مساراً.
      */
-    private function dmMessageShape($m, string $me): array
+    private function dmMessageShape($m, string $me, array $reactions = []): array
     {
         $deleted = isset($m->deleted_at) && $m->deleted_at !== null;
 
@@ -546,9 +557,57 @@ class MobileCommController extends V1Controller
             'body'           => $deleted ? null : (string) $m->body,
             'deleted'        => $deleted,
             'has_attachment' => ! $deleted && ! empty($m->att),
+            // (إضافيّ · طلب الجوال #2) مقبضُ تنزيلِ المرفق {id,name,size,mime,download}
+            'attachment'     => ! $deleted && ! empty($m->att)
+                ? \App\Support\Mobile\MessageAttachment::shape($m->att, (string) $m->id, 'mobile.dm.attachment') : null,
             'read'           => $m->read_at !== null,
             'created_at'     => optional($m->created_at)->toIso8601String(),
+            // (إضافيّ · طلب الجوال #6) ملخّصُ التفاعلات نظيرُ commentShape؛ المحذوفةُ بلا تفاعلات
+            'reactions'      => $deleted ? [] : self::reactionList($reactions[(string) $m->id] ?? [], $me),
         ];
+    }
+
+    /**
+     * ملخّصُ تفاعلاتِ رسالةٍ `[{emoji, count, mine}]` من مخرَجِ `reactionsFor`/`dmReactionsFor`
+     * (`[emoji => [{id,name}]]`) — ترتيبُ الرموزِ ترتيبُ `CommentController::REACTIONS` الثابت
+     * (لا قرعةَ ترتيبِ صفوف). عامٌّ كي يشاركه `MobileCollabController` (أحداثُ since).
+     */
+    public static function reactionList(array $byEmoji, ?string $me): array
+    {
+        $order = array_flip(CommentController::REACTIONS);
+        uksort($byEmoji, fn ($a, $b) => [$order[$a] ?? PHP_INT_MAX, (string) $a] <=> [$order[$b] ?? PHP_INT_MAX, (string) $b]);
+        $out = [];
+        foreach ($byEmoji as $emoji => $people) {
+            $ids = array_map(fn ($p) => (string) ($p['id'] ?? ''), (array) $people);
+            $out[] = [
+                'emoji' => (string) $emoji,
+                'count' => count($ids),
+                'mine'  => $me !== null && in_array($me, $ids, true),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * مؤشّرُ ذيلِ خيطِ قناة: أحدثُ `(created_at, id)` بين ما حُمِّل فعلاً (جذوراً وردوداً) —
+     * بالترتيبِ نفسِه الذي يطبّقه `conversations/{id}/since` (`created_at` ثم `id`)، ومن
+     * الصفوفِ المُعادةِ لا من استعلامٍ ثانٍ (فلا تسقط رسالةٌ وصلت بين الاستعلامين).
+     */
+    private function tailCursor($items): string
+    {
+        // v2: أحدثُ ثانيةٍ + **كلُّ** معرّفاتِ صفوفِها المُحمَّلة — لا حدَّ UUID يُسقط متأخّراً أصغر
+        $t = null;
+        $ids = [];
+        foreach ($items as $c) {
+            foreach ([$c, ...($c->relationLoaded('replies') ? $c->replies->all() : [])] as $row) {
+                $rt = (string) $row->created_at;
+                if ($t === null || $rt > $t) { $t = $rt; $ids = []; }
+                if ($rt === $t) $ids[] = (string) $row->id;
+            }
+        }
+
+        return $t !== null ? Collaboration::encodeSince($t, $ids) : '';
     }
 
     /**

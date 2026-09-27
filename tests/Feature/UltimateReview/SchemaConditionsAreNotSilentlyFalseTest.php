@@ -56,10 +56,10 @@ class SchemaConditionsAreNotSilentlyFalseTest extends TestCase
             if (! $f->isFile() || $f->getExtension() !== 'php') continue;
             $rel = 'app/' . str_replace($root . '/', '', $f->getPathname());
             foreach (explode("\n", (string) @file_get_contents($f->getPathname())) as $i => $ln) {
-                if (preg_match_all("/(?:Schema::hasColumn|hub_has_col)\s*\(\s*'([a-z0-9_]+)'\s*,\s*'([a-z0-9_]+)'/", $ln, $m, PREG_SET_ORDER)) {
+                if (preg_match_all("/(?:Schema(?:Cache)?::hasColumn|hub_has_col)\s*\(\s*'([a-z0-9_]+)'\s*,\s*'([a-z0-9_]+)'/", $ln, $m, PREG_SET_ORDER)) {
                     foreach ($m as $x) $cols["{$x[1]}.{$x[2]}"][] = $rel . ':' . ($i + 1);
                 }
-                if (preg_match_all("/(?:Schema::hasTable|hub_has_table)\s*\(\s*'([a-z0-9_]+)'/", $ln, $m, PREG_SET_ORDER)) {
+                if (preg_match_all("/(?:Schema(?:Cache)?::hasTable|hub_has_table)\s*\(\s*'([a-z0-9_]+)'/", $ln, $m, PREG_SET_ORDER)) {
                     foreach ($m as $x) $tables[$x[1]][] = $rel . ':' . ($i + 1);
                 }
             }

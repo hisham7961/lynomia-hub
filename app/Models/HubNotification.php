@@ -42,7 +42,7 @@ class HubNotification extends Model
         });
 
         static::creating(function (self $n) {
-            if ($n->request_id === null && hub_has_col('notifications_hub', 'request_id')) $n->request_id = \App\Support\Api::requestId();
+            if ($n->request_id === null && hub_has_col('notifications_hub', 'request_id')) $n->request_id = \App\Support\Platform\Api::requestId();
         });
 
         static::creating(function (self $n) {
@@ -75,7 +75,7 @@ class HubNotification extends Model
          * بـ`return false`، فلا يقع «created» لها — فلا تُدفَع (Critic F6، بلا حارسٍ زائد).
          */
         static::created(function (self $n) {
-            \App\Support\PushService::scheduleFanout($n);
+            \App\Support\Mobile\PushService::scheduleFanout($n);
         });
     }
 }

@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\DmMessage;
 use App\Models\HubNotification;
-use App\Support\DmService;
+use App\Support\Collaboration\DmService;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -71,7 +71,7 @@ class CollabDmReactionTest extends TestCase
         // القيدان الفريدان مستقلّان: صفُّ DM (comment_id فارغ) لا يصطدم بصفِّ تعليق
         $this->seedCore();
         $m = DmService::send($this->owner, $this->employee, 'رسالة');
-        $c = \App\Support\CommentService::create($this->owner, 'feed', null, 'منشور');
+        $c = \App\Support\Collaboration\CommentService::create($this->owner, 'feed', null, 'منشور');
 
         // تفاعلٌ على DM وتفاعلٌ على تعليقٍ بالرمز نفسِه لنفس المستخدم — كلاهما يُقبل
         $this->actingAs($this->employee)->post('/dm/msg/' . $m->id . '/react', ['emoji' => '❤️']);

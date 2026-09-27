@@ -34,12 +34,12 @@
              التسمية/الأيقونة من المساحة نفسها (اتّساقٌ مع ترويسة الصفحة)؛ الإدارةُ (نظام)
              تبقى في ترس البار العلوي لا هنا. --}}
         @php
-            $ia = \App\Support\InformationArchitecture::make();
+            $ia = \App\Support\Platform\InformationArchitecture::make();
             $iaUser = auth()->user();
-            $spaces = \App\Support\Workspaces::for($iaUser);   // المساحاتُ ذاتُ صفحةٍ (ترى ≥١ وحدة)
+            $spaces = \App\Support\Platform\Workspaces::for($iaUser);   // المساحاتُ ذاتُ صفحةٍ (ترى ≥١ وحدة)
             // شارة انتباه المساحة: مجموع ما يستحق/تأخّر في وحداتها — أهمُّ إشارةٍ
             // ملاحيّة بعد العدّ نفسه، منطَّقةٌ بصلاحية المستخدم فلا تسرّب رقماً
-            $wsAtt = \App\Support\Workspaces::attentionByWorkspace($iaUser);
+            $wsAtt = \App\Support\Platform\Workspaces::attentionByWorkspace($iaUser);
             // ترتيبُ المجالاتِ من IA (سطحُ العمل فقط — لا الإدارة)، ثمّ ما له صفحةُ مساحة
             $iaWorkDomains = array_keys(array_filter($ia->visibleDomains($iaUser),
                 fn ($d) => ($d['plane'] ?? '') === 'work'));
@@ -68,7 +68,7 @@
         @php
             // «بوابتي» تحمل عدّاد المتأخر والمستحق اليوم — صندوقٌ لا يُعلن نفسه لا يُفتح
             $navBadges = ['alerts' => hub_expiry_count(), 'dm' => \App\Http\Controllers\Web\DmController::unreadCount(),
-                          'me' => \App\Support\Inbox::count()];
+                          'me' => \App\Support\Collaboration\Inbox::count()];
             // **وكلُّ شارةٍ تقول ماذا تعدّ** (W-3 · الطور ١٦٧). شارةُ الرادارِ تعدّ
             // المتأخّرَ وما ينتهي خلال ٧ أيام، والبابُ الذي تفتحه يسرد النافذةَ
             // كلَّها — فرقمان مختلفان تحت كلمتَين متطابقتَين ما لم تُقَل النافذة.

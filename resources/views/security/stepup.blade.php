@@ -35,7 +35,7 @@
 </div>
 @if (! empty($hasPasskeys))
 @include('partials.passkey_js')
-<script>
+<script @cspNonce>
 (function () {
     var btn = document.getElementById('pk-stepup'); if (!btn) return;
     if (!window.LynPasskey || !LynPasskey.supported) { btn.style.display = 'none'; return; }

@@ -2,12 +2,12 @@
 
 namespace Tests\Unit;
 
-use App\Support\Qr;
-use App\Support\QrEncoder;
+use App\Support\Documents\Qr;
+use App\Support\Documents\QrEncoder;
 use PHPUnit\Framework\TestCase;
 
 /**
- * الرمزُ يُبنى من مُرمِّزنا **الصرف** (App\Support\QrEncoder) — لا BaconQrCode:
+ * الرمزُ يُبنى من مُرمِّزنا **الصرف** (App\Support\Documents\QrEncoder) — لا BaconQrCode:
  * تلك تُثبَّت بـcomposer وvendor مستبعدٌ من المستودع، فعلى استضافةٍ تُرفَع بنسخ
  * الملفات كانت تغيب فيختفي الرمز («qr غير موجود»). مُرمِّزنا يُشحَن مع الكود دائماً.
  *
@@ -103,8 +103,8 @@ class QrTest extends TestCase
     {
         // بلا التعليقات: ذكرُ المكتبة في التوثيق تاريخٌ لا اعتماد — الحارس على الكود الحيّ
         $strip = fn (string $s) => preg_replace(['/\/\*.*?\*\//s', '~//[^\n]*~'], ' ', $s);
-        $src = $strip(\Tests\Support\Source::read(\App\Support\Qr::class))
-            . $strip(\Tests\Support\Source::read(\App\Support\QrEncoder::class));
+        $src = $strip(\Tests\Support\Source::read(\App\Support\Documents\Qr::class))
+            . $strip(\Tests\Support\Source::read(\App\Support\Documents\QrEncoder::class));
         $this->assertStringNotContainsString('BaconQrCode', $src,
             'مسار الرمز يعتمد مكتبة composer — يختفي على استضافةٍ بلا vendor حديث');
     }

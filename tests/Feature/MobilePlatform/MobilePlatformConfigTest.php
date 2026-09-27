@@ -5,8 +5,8 @@ namespace Tests\Feature\MobilePlatform;
 use App\Models\HubNotification;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\MobilePlatform;
-use App\Support\NotificationLink;
+use App\Support\Mobile\MobilePlatform;
+use App\Support\Collaboration\NotificationLink;
 use Tests\TestCase;
 
 /**

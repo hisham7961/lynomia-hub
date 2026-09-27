@@ -131,7 +131,7 @@ class MobileMyDocumentsTest extends TestCase
             'principal_type' => 'user', 'principal_id' => $u->id,
             'effect' => 'deny', 'action' => '*', 'created_at' => now(),
         ]);
-        \App\Support\DocumentPolicy::forget((string) $a->id);
+        \App\Support\Documents\DocumentPolicy::forget((string) $a->id);
 
         $tok = $this->mobileLogin($u)['access_token'];
         $this->withHeaders($this->bearer($tok))
@@ -168,7 +168,7 @@ class MobileMyDocumentsTest extends TestCase
             ->getJson('/api/mobile/v1/me/documents')->assertOk()->json('data.items'))
             ->pluck('id')->all();
 
-        $web = collect(\App\Support\EmployeeDocuments::forUser($u))->pluck('id')->all();
+        $web = collect(\App\Support\Workforce\EmployeeDocuments::forUser($u))->pluck('id')->all();
 
         $this->assertSame($web, $mobile,
             'السطحان يجيبان «ما وثائقي؟» بجوابَين — وهو عينُ ما يلاحقه المجلس');

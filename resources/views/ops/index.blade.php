@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'مركز التشغيل')
 @section('content')
-@php $fmt = fn ($b) => \App\Support\SysMonitor::bytes($b === null ? null : (int) $b); @endphp
+@php $fmt = fn ($b) => \App\Support\Ops\SysMonitor::bytes($b === null ? null : (int) $b); @endphp
 @php /* (WP-2.1) قُسّمت الشاشةُ أقساماً — كلُّ قسمٍ ملفُّه في ops/parts فتحرّر كلُّ حزمةِ عملٍ لاحقةٍ قسمَها وحده بلا تزاحم. البطاقاتُ داخل .kids تُضمَّن بمسافةٍ بادئةٍ تعوّض اقتطاعَ محرّكِ العرض (ltrim) لبادئة أول سطر. */ @endphp
 @include('ops.parts.header')
 

@@ -6,7 +6,7 @@ use App\Models\Project;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\User;
-use App\Support\WidgetRegistry;
+use App\Support\Platform\WidgetRegistry;
 use Tests\TestCase;
 
 /**

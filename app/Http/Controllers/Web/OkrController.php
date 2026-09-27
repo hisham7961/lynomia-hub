@@ -18,7 +18,7 @@ class OkrController extends Controller
 
         // (WP-8.5) اللوحةُ نفسُها مُغنّاةً بأعلامها وعدّاداتها ومالكيها — والرقمُ
         // فيها من `hub_okr_progress` كما كان، فالمصدرُ واحدٌ للشاشتين
-        return view('okrs.index', ['b' => \App\Support\OkrCentre::board()]);
+        return view('okrs.index', ['b' => \App\Support\Insights\OkrCentre::board()]);
     }
 
     /** تحديث كل القيم الآلية الآن — بدل انتظار الدورة اليومية */

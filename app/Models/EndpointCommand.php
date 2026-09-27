@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Support\EndpointPrivacy;
+use App\Support\Endpoint\EndpointPrivacy;
 use App\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

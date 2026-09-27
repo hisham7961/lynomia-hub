@@ -260,7 +260,7 @@
     <div class="formfoot"><button class="btn p">حفظ الدور</button><a class="btn ghost" href="{{ route('roles.index') }}">إلغاء</a></div>
 </form>
 
-<script>
+<script @cspNonce>
 (function () {
     var form = document.getElementById('roleform');
     if (! form) return;

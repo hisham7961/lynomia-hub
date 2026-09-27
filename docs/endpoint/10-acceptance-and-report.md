@@ -10,7 +10,7 @@
 | 1 | `/api/mobile/v1/*` بلا مساسٍ ولا انحدار (§0) | الحزمتان خضراوان؛ لا تعديلَ في `routes/api.php` mobile ولا `Mobile*` |
 | 2 | أربعُ هويّاتٍ مستقلّة (ويب/جوال/API/جهاز) (§0) | `EndpointSignature` منفصلٌ عن `MobileAuth`؛ `docs/endpoint/00` |
 | 3 | لا تحويلَ جهازٍ↔جلسةِ جوال (§0) | التسجيلُ يولّد `EndpointDevice` لا `MobileSession` |
-| 4 | الأنظمةُ المدعومة Windows/macOS من مصدرٍ واحد (§1) | `App\Support\Endpoint::SUPPORTED`؛ `EndpointOsSupportTest` |
+| 4 | الأنظمةُ المدعومة Windows/macOS من مصدرٍ واحد (§1) | `App\Support\Endpoint\Endpoint::SUPPORTED`؛ `EndpointOsSupportTest` |
 | 5 | صفوفُ linux القديمة تبقى، والتسجيلُ الجديدُ يُحجَب (§1) | `STORED` تبقي linux؛ enroll يرفضه ٤٢٢؛ `EndpointOsSupportTest` |
 | 6 | التسجيلُ مربوطٌ بأصلٍ مؤهّلٍ مملوكٍ للشركة (§2) | `EnrollmentToken::mint(Asset)`؛ `EndpointAssetEnrollmentTest` |
 | 7 | الشركة/الموظف/المحطّة/الأصل خادميّةٌ لا من الحمولة (§2) | `enroll` يسند من الرمز؛ `EndpointAssetEnrollmentTest` |

@@ -94,7 +94,7 @@ class IncidentHeaderTest extends TestCase
         $this->incident(['title' => 'حادثة قديمة قبل الترحيل',
             'kind' => null, 'meta' => ['kind' => 'security']]);
 
-        $sec = (new \ReflectionMethod(\App\Support\Health::class, 'security'))->invoke(null);
+        $sec = (new \ReflectionMethod(\App\Support\Ops\Health::class, 'security'))->invoke(null);
         $this->assertSame(2, (int) ($sec['data']['open_security_incidents'] ?? -1),
             'القراءةُ الكسولة (العمود ثم meta) أسقطت صفوفاً — شاشةُ الصحة تكذب عن الحوادث المفتوحة');
     }

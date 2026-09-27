@@ -10,8 +10,8 @@
         <nav class="crumbs" aria-label="مسار التنقل"><span>النظام</span><span aria-hidden="true">‹</span>@include('security.parts.root_crumb')<span aria-hidden="true">‹</span><a href="{{ route('security.findings') }}">النتائج</a><span aria-hidden="true">‹</span><b><bdi class="mono ltr">{{ $f->code }}</bdi></b></nav>
         <h2>🔎 {{ $f->title }}</h2>
         <div class="sub">
-            <span class="bdg {{ \App\Support\Severity::tone($f->severity) }}">{{ \App\Support\Severity::label($f->severity) }}</span>
-            <span class="bdg {{ $sfStatusTone }}">{{ \App\Support\SecurityFindings::STATUSES[$f->status] ?? $f->status }}</span>
+            <span class="bdg {{ \App\Support\Platform\Severity::tone($f->severity) }}">{{ \App\Support\Platform\Severity::label($f->severity) }}</span>
+            <span class="bdg {{ $sfStatusTone }}">{{ \App\Support\Security\SecurityFindings::STATUSES[$f->status] ?? $f->status }}</span>
             @if ($f->entity_type !== 'org')<span class="bdg g" title="نتيجةُ كيانٍ لا منظّمة">{{ $f->entity_type }}</span>@endif
         </div>
     </div>

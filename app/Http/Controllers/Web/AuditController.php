@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\Audit;
-use App\Support\SecurityEvents;
-use App\Support\TimeRange;
+use App\Support\Platform\Audit;
+use App\Support\Security\SecurityEvents;
+use App\Support\Platform\TimeRange;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -78,15 +78,15 @@ class AuditController extends Controller
             'actions' => \Illuminate\Support\Facades\Cache::remember('audit:actions', 300, fn () => DB::table('audits')->distinct()->orderBy('action')->limit(40)->pluck('action')),
             'roles'   => DB::table('roles')->orderBy('name')->orderBy('id')->pluck('name', 'id'),
             'companies' => DB::table('companies')
-                ->when(Schema::hasColumn('companies', 'deleted_at'), fn ($w) => $w->whereNull('deleted_at'))
+                ->when(\App\Support\Platform\SchemaCache::hasColumn('companies', 'deleted_at'), fn ($w) => $w->whereNull('deleted_at'))
                 ->when($cids !== null, fn ($w) => $w->whereIn('id', $cids))
                 ->orderBy('name_ar')->orderBy('id')->pluck('name_ar', 'id'),
             'projects' => DB::table('projects')
-                ->when(Schema::hasColumn('projects', 'deleted_at'), fn ($w) => $w->whereNull('deleted_at'))
+                ->when(\App\Support\Platform\SchemaCache::hasColumn('projects', 'deleted_at'), fn ($w) => $w->whereNull('deleted_at'))
                 ->when(hub_scoped($u), fn ($w) => $w->whereIn('id', $u->visibleProjectIds()))
                 ->orderBy('name')->orderBy('id')->pluck('name', 'id'),
             'clients' => DB::table('clients')
-                ->when(Schema::hasColumn('clients', 'deleted_at'), fn ($w) => $w->whereNull('deleted_at'))
+                ->when(\App\Support\Platform\SchemaCache::hasColumn('clients', 'deleted_at'), fn ($w) => $w->whereNull('deleted_at'))
                 ->when($kids !== null, fn ($w) => $w->whereIn('id', $kids))
                 ->orderBy('name')->orderBy('id')->pluck('name', 'id'),
             'categories' => $this->categories(),
@@ -145,8 +145,8 @@ class AuditController extends Controller
         $rawB = $a->getAttributes()['before'] ?? null;
         $rawA = $a->getAttributes()['after'] ?? null;
         $diff = array_map(fn ($d) => [
-            'from' => \App\Support\Redactor::text($d['from']),
-            'to'   => \App\Support\Redactor::text($d['to']),
+            'from' => \App\Support\Platform\Redactor::text($d['from']),
+            'to'   => \App\Support\Platform\Redactor::text($d['to']),
         ] + $d, Audit::diff($a->module, $rawB, $rawA));
 
         // التصنيف: المخزّنُ للجديد (WP-5.2)، ومُترجِمُ القراءة للصفوف الأقدم
@@ -189,7 +189,7 @@ class AuditController extends Controller
                     ->map(function ($e) use (&$taskIds) {
                         $meta = json_decode((string) ($e->meta ?? ''), true) ?: [];
                         if (! empty($meta['task_id'])) $taskIds[] = (string) $meta['task_id'];
-                        $e->message = \App\Support\Redactor::text((string) $e->message);
+                        $e->message = \App\Support\Platform\Redactor::text((string) $e->message);
 
                         return $e;
                     });

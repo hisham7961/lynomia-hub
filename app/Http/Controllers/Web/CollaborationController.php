@@ -7,9 +7,9 @@ use App\Models\Comment;
 use App\Models\Conversation;
 use App\Models\ConversationMember;
 use App\Models\User;
-use App\Support\Collaboration;
-use App\Support\CollaborationRail;
-use App\Support\DmService;
+use App\Support\Collaboration\Collaboration;
+use App\Support\Collaboration\CollaborationRail;
+use App\Support\Collaboration\DmService;
 use Illuminate\Http\Request;
 
 /**
@@ -146,8 +146,8 @@ class CollaborationController extends Controller
             ];
         }
 
-        $tip = Comment::where('conversation_id', $conv->id)->whereNull('deleted_at')
-            ->orderByDesc('created_at')->orderByDesc('id')->first(['id', 'created_at']);
+        // v2 — رأسُ الخيط مع كلِّ معرّفاتِ ثانيتِه (لا قرعةَ تعادلٍ بـUUID)
+        $sinceTip = \App\Support\Collaboration\Collaboration::tipSince(Comment::where('conversation_id', $conv->id)->whereNull('deleted_at'));
 
         // §15/§16 مرشّحو «إضافةِ أشخاصٍ» للمجموعة (فرعٌ آمن) — زملاءُ الفريقِ غيرُ الأعضاء،
         // منطَّقون كسائرِ المنتقيات (داخليّون ضمن النطاق). للقناة لا يلزم (إضافةٌ مباشرة).
@@ -170,7 +170,7 @@ class CollaborationController extends Controller
             'files'         => $files,
             'record'        => $record,
             'addCandidates' => $addCandidates,
-            'sinceCursor'   => $tip ? Collaboration::encodeCursor((string) $tip->created_at, (string) $tip->id) : '',
+            'sinceCursor'   => $sinceTip,
         ];
     }
 
@@ -184,15 +184,15 @@ class CollaborationController extends Controller
         DmService::markThreadRead((string) $me->id, (string) $other->id);
         $msgs = DmService::thread((string) $me->id, (string) $other->id);
 
-        $tip = \App\Models\DmMessage::where('thread_key', \App\Models\DmMessage::threadKey((string) $me->id, (string) $other->id))
-            ->orderByDesc('created_at')->orderByDesc('id')->first(['id', 'created_at']);
+        // v2 — رأسُ الخيط مع كلِّ معرّفاتِ ثانيتِه (لا قرعةَ تعادلٍ بـUUID)
+        $sinceTip = \App\Support\Collaboration\Collaboration::tipSince(\App\Models\DmMessage::where('thread_key', \App\Models\DmMessage::threadKey((string) $me->id, (string) $other->id)));
 
         return [
             'other'       => $other,
             'msgs'        => $msgs,
             'dmReactions' => DmController::dmReactionsFor($msgs->pluck('id')->all()),
             'dmPresence'  => DmController::presence([(string) $other->id])[(string) $other->id] ?? null,
-            'sinceCursor' => $tip ? Collaboration::encodeCursor((string) $tip->created_at, (string) $tip->id) : '',
+            'sinceCursor' => $sinceTip,
         ];
     }
 }

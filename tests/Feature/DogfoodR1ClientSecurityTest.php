@@ -130,7 +130,7 @@ class DogfoodR1ClientSecurityTest extends TestCase
         $this->actingAs($sales)->get('/files/' . $a->path)->assertForbidden();
 
         // ويختفي من القوائم (رؤية): listable = لا معاينةَ ولا تنزيل
-        $this->assertFalse(\App\Support\DocumentPolicy::listable($sales->fresh(), $a->fresh()),
+        $this->assertFalse(\App\Support\Documents\DocumentPolicy::listable($sales->fresh(), $a->fresh()),
             'وثيقةُ سجلٍّ «سري» تُخفى من قوائم من لا يحمل docsec');
     }
 
@@ -148,7 +148,7 @@ class DogfoodR1ClientSecurityTest extends TestCase
         // حاملةُ docsec على وحدة الوثيقة (HR) ترى وتنزّل
         $hr = $this->internal('hr-docsec@test.local', ['files' => ['v' => 1, 'docsec' => 1]]);
         $this->actingAs($hr)->get(route('att.dl', $a->id))->assertOk();
-        $this->assertTrue(\App\Support\DocumentPolicy::listable($hr->fresh(), $a->fresh()));
+        $this->assertTrue(\App\Support\Documents\DocumentPolicy::listable($hr->fresh(), $a->fresh()));
 
         // المالكُ يتجاوز
         $this->actingAs($this->owner)->get(route('att.dl', $a->id))->assertOk();

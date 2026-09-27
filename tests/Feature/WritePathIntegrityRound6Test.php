@@ -142,7 +142,7 @@ class WritePathIntegrityRound6Test extends TestCase
 
         try {
             $before = memory_get_usage(true);
-            $rows = \App\Support\Sheet::read($xlsx, 'xlsx');
+            $rows = \App\Support\Platform\Sheet::read($xlsx, 'xlsx');
             $this->assertLessThan(64 * 1024 * 1024, memory_get_usage(true) - $before,
                 'مرجعُ خليةٍ ملفَّق فجّر حلقةَ الملء — استنزافُ ذاكرة');
             $this->assertIsArray($rows);

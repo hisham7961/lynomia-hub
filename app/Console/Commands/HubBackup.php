@@ -44,6 +44,10 @@ class HubBackup extends Command
         // (الطور ٤ · WP-4.1) نتائجُ الأمن: حالةُ حَوكمةٍ لا تليمتري — أعمارُ المشكلات
         // (first_seen/resolved) وإقراراتُها لا تُعاد تعبئتُها من الفحوص، فتُنسخ خاماً.
         'security_findings',
+        // نتائجُ المدقّق: حالةُ حوكمةٍ كنتائجِ الأمن — أعمارُها (رُصدت/زالت) لا تُعاد من
+        // جولةٍ لاحقة، وبصماتُها تمثّل نداءاتٍ مدفوعةً («لا يُدفع مرّتين»)، وusage_event_id
+        // يصلها بـai_usage_events المنسوخ. فتُنسخ خاماً.
+        'ai_findings',
         // أسعارُ الصرف (v2.528.0): جدولٌ صريحٌ لا وحدةَ سجلٍّ له، وقيمتُه **تاريخيّة** —
         // السعرُ المؤرَّخُ هو ما حُوِّل به مبلغُ الأمس، ولا يُعاد اشتقاقُه من شيءٍ ولا
         // يُجلَب من مزوّد. وبفقدِه تُستعاد المنشأةُ فتقرأ كلَّ مبلغٍ بعملةٍ أجنبيةٍ
@@ -221,6 +225,15 @@ class HubBackup extends Command
         // (الطور ٣ · WP-3.2) عيّناتُ وقوع الأخطاء — عابرةٌ كأخيها error_events:
         // سقفٌ لكل حدثٍ ومقصُّ عمرٍ في hub:automation، ولا تُستعاد من نسخة.
         'error_occurrences',
+        // (المرحلة ٢ · AskMemory) ذاكرةُ «اسأل Hub»: نصوصٌ مشفَّرةٌ لأصحابها بمقصِّ عمر (ask.memory_days)
+        // — نسخُها يُبقي أسئلةً حسّاسةً بعد أن يمحوها أصحابُها أو المقصّ، فلا تُنسخ عمداً.
+        'ask_threads', 'ask_turns',
+        // (المرحلة ٤ · Brain) متّجهاتُ العقل الثاني: مشتقّةٌ من السجلّات تُعاد بـhub:brain — لا تُستعاد من نسخة
+        'ai_embeddings',
+        // (بندُ الدَّين #15 · AUTH-08) تجزيءاتُ كلماتِ المرور **السابقة**: نسخُها يُطيل عمرَ
+        // تجزيءاتٍ قديمةٍ خارج القاعدة بلا فائدةٍ تشغيليّة — الاستعادةُ تبدأ سجلّاً فارغاً
+        // والحاليّةُ نفسُها محميّةٌ من عمود users.password.
+        'password_histories',
     ];
 
     /** الجداولُ التي تنسخها النسخة: وحداتُ السجل + الخام + (users/roles/settings بصيغتها) */
@@ -243,123 +256,12 @@ class HubBackup extends Command
         }
     }
 
+    /** أعلامُ الترميز — واحدةٌ لكلِّ جزء، فالناتجُ ما كان يُنتجه ترميزُ المصفوفة كلِّها */
+    private const JSON_FLAGS = JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE;
+
     public function handle(): int
     {
         $t0 = microtime(true);   // (WP-2.3) مدّةُ النسخة الحقيقية تُنبَض — لا نبضةَ بلا مدّة
-        $out = ['_meta' => ['app' => (string) setting('app.name', config('app.name')),
-                            'version' => config('hub.version'), 'at' => now()->toIso8601String()]];
-
-        // الأدوار — بصيغة الاستيراد: all/scope/m + الأعلام في المستوى الأعلى
-        $out['roles'] = DB::table('roles')->get()->map(function ($r) {
-            $flags = json_decode($r->flags ?? '[]', true) ?: [];
-            return array_merge([
-                'id' => $r->id, 'name' => $r->name, 'all' => (bool) $r->is_owner,
-                'scope' => $r->scope ?? 'proj', 'm' => json_decode($r->matrix ?? '[]', true) ?: [],
-                // **قيود مستوى الحقل تُنسَخ**: كانت تسقط من النسخة، فالاستعادة
-                // تُعيد النظام **بلا قيدٍ واحد** — وهي أخطر من غياب النسخة
-                // أصلاً لأنها تُظنّ استعادةً كاملة فلا يراجعها أحد.
-                'fieldRules' => json_decode($r->field_rules ?? '[]', true) ?: [],
-            ], $flags);
-        })->all();
-
-        // المستخدمون — بلا كلمات مرور (كما يتوقع الاستيراد)
-        /*
-         * **النسخةُ التي لا تُعيد حساباً ليست نسخة** (المراجعةُ الشاملة · F-14).
-         *
-         * كانت هذه المصفوفةُ قائمةَ سماحٍ بأحدَ عشرَ مفتاحاً بلا `password` — فاستعادةٌ
-         * حقيقيّةٌ تُنتج نظاماً كاملَ البياناتِ **لا يدخله أحد**. ومعها كان يسقط
-         * `account_type` فتنقلب حساباتُ العملاءِ داخليّةً، و`clients` فيسقط عزلُ
-         * العملاء، و`company_id` فيسقط عزلُ الشركات — أي أنّ **الكارثةَ تُصلَح
-         * بفتحِ النظام**، وهو أسوأُ ما يمكن أن يفعله تعافٍ.
-         *
-         * والتعليقُ الذي كان واقفاً هنا يشهد على الدرس: «عزل الشركات وحارسا الحساب
-         * — كلها تسقط عند الاستعادة إن لم تُنسخ». طُبِّق على ثلاثةِ حقولٍ ولم يُسأل
-         * عن الرابعِ وهو أهمُّها. فالقاعدةُ الآن: **ما يلزم الحسابَ ليعمل يُنسَخ،
-         * وما لا يُنسَخ يُذكَر سببُه** — لا صمتَ بعد اليوم.
-         *
-         * **وحساسيّةُ الملفّ ترتفع بذلك**: صار يحمل تجزيءَ كلماتِ المرور وسرَّ TOTP
-         * المُعمّى. وهو ما يحمله أيُّ تفريغِ قاعدةٍ أصلاً — لكنّه يوجب أن تبقى
-         * `storage/app/backups` خارجَ الجذرِ العامّ وأن تُنقَل النسخُ مُعمّاة.
-         *
-         * **وما لا يُنسَخ عمداً**: `remember_token` — أثرُ جلسةٍ لا هويّةُ حساب،
-         * وإحياؤه بعد كارثةٍ يُعيد جلساتٍ كان يجب أن تموت. و`failed_attempts`
-         * و`last_login_*` تاريخُ تشغيلٍ لا يمنع التعافي.
-         */
-        $out['users'] = DB::table('users')->whereNull('deleted_at')->get()->map(fn ($u) => [
-            'id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'phone' => $u->phone,
-            'title' => $u->job_title, 'roleId' => $u->role_id, 'status' => $u->status,
-            'nprefs' => json_decode($u->notify_prefs ?? '[]', true) ?: [],
-            // الاعتماد: بلا هذا لا يدخل أحدٌ بعد الاستعادة
-            'pwd'        => $u->password,
-            'pwdAt'      => $u->password_changed_at,
-            'mustChange' => (int) ($u->must_change_password ?? 0),
-            // التحقّقُ الثنائيّ: حسابٌ محميٌّ يجب أن يعود محميّاً
-            'totpOn'     => (int) ($u->totp_enabled ?? 0),
-            'totpCipher' => $u->totp_secret_cipher,
-            'recovery'   => $u->recovery_codes,
-            'lockedUntil' => $u->locked_until,
-            // عزل الشركات والعملاء وحارسا الحساب — كلها تسقط عند الاستعادة إن لم تُنسخ،
-            // فيعود الحساب المعزول يرى المنشأة كلها والمنتهي يعمل بلا انتهاء
-            'companies'  => json_decode($u->companies ?? '[]', true) ?: [],
-            'companyId'  => $u->company_id,
-            'clients'    => json_decode($u->clients ?? '[]', true) ?: [],
-            'accountType' => $u->account_type,
-            'allowedIps' => $u->allowed_ips,
-            'expiresAt'  => $u->expires_at,
-        ])->all();
-
-        // كل وحدات السجل — الأعمدة تعود مفاتيحَ (عكس خريطة الاستيراد)
-        $total = 0;
-        foreach (hub_modules() as $key => $def) {
-            if ($key === 'users') continue;
-            $map = collect($def['fields'])->pluck('key', 'col')->all();   // col → key
-
-            $rows = [];
-            // chunkById لا chunk على created_at: ترقيم OFFSET فوق ترتيبٍ تتساوى
-            // قيمُه يُسقط صفوفاً أو يكررها عند حدود الصفحات — قرعةُ المحرّكين نفسها
-            DB::table($def['table'])->whereNull('deleted_at')
-                ->chunkById(500, function ($part) use (&$rows, $map) {
-                    foreach ($part as $row) {
-                        $rec = ['id' => $row->id, '_v' => $row->version ?? 1];
-                        if (! empty($row->archived)) $rec['_arch'] = true;
-                        // التواريخ والنسبة تُنسَخ: كانت الاستعادة تدوس تاريخ إنشاء
-                        // كل سجل بـnow() وتفقد منشئه — فينكسر كل فرزٍ زمني بعدها
-                        if (! empty($row->created_at)) $rec['_ca'] = (string) $row->created_at;
-                        if (! empty($row->updated_at)) $rec['_ua'] = (string) $row->updated_at;
-                        if (! empty($row->created_by)) $rec['_cb'] = $row->created_by;
-                        foreach ($map as $col => $fk) {
-                            $v = $row->{$col} ?? null;
-                            if ($v === null || $v === '') continue;
-                            // المصفوفات المخزنة JSON تعود مصفوفات (الاستيراد يعيد ترميزها)
-                            if (is_string($v) && strlen($v) > 1 && ($v[0] === '[' || $v[0] === '{')) {
-                                $d = json_decode($v, true);
-                                if (is_array($d)) $v = $d;
-                            }
-                            $rec[$fk] = $v;
-                        }
-                        if (! empty($row->custom)) {
-                            foreach ((array) (json_decode($row->custom, true) ?: []) as $ck => $cv) $rec[$ck] = $cv;
-                        }
-                        $rows[] = $rec;
-                    }
-                });
-
-            if ($rows) { $out[$key] = $rows; $total += count($rows); }
-        }
-
-        // الجداول التشغيلية الخام — أعمدتها كما هي، بمحذوفاتها الناعمة (أمانة النسخة)
-        foreach (self::RAW_TABLES as $t) {
-            if (! Schema::hasTable($t)) continue;
-            $rows = [];
-            DB::table($t)->chunkById(500, function ($part) use (&$rows) {
-                foreach ($part as $row) $rows[] = (array) $row;
-            });
-            if ($rows) { $out['_tables'][$t] = $rows; $total += count($rows); }
-        }
-
-        // الإعدادات
-        $out['settings'] = DB::table('settings')->pluck('value', 'key')
-            ->map(fn ($v) => json_decode($v, true) ?? $v)->all();
 
         // الكتابة + التدوير — بصلاحياتٍ خاصة: الملف قاعدةُ الأعمال كلها
         // (هواتف، قيود IP، شفرات الخزنة) فلا يقرؤه حسابٌ محليّ آخر على الخادم
@@ -373,24 +275,44 @@ class HubBackup extends Command
         // **الترميز أولاً، والتدوير آخراً** (v2.312): بايتةٌ واحدة فاسدة في أي صفّ
         // تجعل json_encode تعيد `false`، فكانت تُكتب نسخةٌ بصفر بايت ثم يحذف
         // التدويرُ آخرَ النسخ السليمة ثم يُبلَّغ نجاحاً — فتُعطَّل قدرةُ التعافي
-        // كلها بصمت، والمشغّل يقرأ «✓» ويطمئن. الآن: يُرمَّز ويُفحَص العائد،
-        // ثم يُكتب إلى ملفٍ مؤقّت ويُتحقّق من طول ما كُتب، ثم يُنقل، ثم يُدوَّر.
-        $json = json_encode($out, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
-        if ($json === false || $json === '') {
-            $this->recordFailure('تعذّر ترميز النسخة');
-            $this->error('✗ تعذّر ترميز النسخة: ' . json_last_error_msg()
-                       . ' — لم تُكتب نسخةٌ ولم يُحذف شيء. راجع صفوفاً بترميزٍ فاسد.');
+        // كلها بصمت، والمشغّل يقرأ «✓» ويطمئن. الآن: يُرمَّز كلُّ جزءٍ ويُفحَص عائدُه،
+        // ويُكتب إلى ملفٍ مؤقّت يُفحص طولُ كلِّ كتابةٍ فيه، ثم يُنقل، ثم يُدوَّر.
+        //
+        // **وتدفّقاً لا دفعةً** (F-13): الجداولُ تُكتب جدولاً جدولاً والصفوفُ قطعاً
+        // (`chunkById` بترتيب المعرّف) — فذروةُ الذاكرة بحجم القطعة لا بحجم المنشأة،
+        // والملفُّ هو هو بايتاً ببايت (المفاتيحُ بترتيبها، والفارغُ يُسقط كما كان).
+        $tmp = $file . '.tmp';
+        $stream = \App\Support\Ops\BackupStream::open($tmp, $encrypt);
+        if ($stream === null) {
+            $this->error('✗ كتابةٌ ناقصة (تعذّر فتح الملف المؤقّت) — لم تُبدَّل النسخة ولم يُحذف شيء.');
 
             return self::FAILURE;
         }
 
-        $payload = $encrypt ? \Illuminate\Support\Facades\Crypt::encryptString($json) : $json;
-        $tmp = $file . '.tmp';
-        $written = @file_put_contents($tmp, $payload);
-        if ($written !== strlen($payload)) {
+        try {
+            $total = $this->dump($stream);
+        } catch (\UnexpectedValueException $e) {
+            $stream->abort();
+            $this->recordFailure('تعذّر ترميز النسخة');
+            $this->error('✗ تعذّر ترميز النسخة: ' . $e->getMessage()
+                       . ' — لم تُكتب نسخةٌ ولم يُحذف شيء. راجع صفوفاً بترميزٍ فاسد.');
+
+            return self::FAILURE;
+        } catch (\Throwable $e) {
+            // لا نصفَ نسخةٍ يبقى على القرص أيّاً كان السبب؛ والكتابةُ الناقصة (قرصٌ امتلأ)
+            // فشلٌ مُعلَن، وما سواها (استعلامٌ سقط) يُرمى كما كان يُرمى قبل التدفّق
+            $written = $stream->bytes();
+            $stream->abort();
+            if ($e->getCode() !== \App\Support\Ops\BackupStream::WRITE_FAILED) throw $e;
+            $this->error('✗ كتابةٌ ناقصة (' . $written . ' بايت قبل التعثّر) — لم تُبدَّل النسخة ولم يُحذف شيء.');
+
+            return self::FAILURE;
+        }
+
+        if (! $stream->close()) {
+            $written = $stream->bytes();
             @unlink($tmp);
-            $this->error('✗ كتابةٌ ناقصة (' . (int) $written . ' من ' . strlen($payload)
-                       . ' بايت) — لم تُبدَّل النسخة ولم يُحذف شيء.');
+            $this->error('✗ كتابةٌ ناقصة (' . $written . ' بايت) — لم تُبدَّل النسخة ولم يُحذف شيء.');
 
             return self::FAILURE;
         }
@@ -426,7 +348,168 @@ class HubBackup extends Command
         $this->info('✓ ' . basename($file) . ' — ' . number_format($total) . ' سجل، ' .
                     number_format(filesize($file) / 1024, 1) . ' KB (محفوظ آخر ' . $keep . ' نسخة)');
 
-        \App\Support\Health::beat('backup', (int) round((microtime(true) - $t0) * 1000), 'ok', basename($file) . ' · ' . number_format($total) . ' سجل');
+        \App\Support\Ops\Health::beat('backup', (int) round((microtime(true) - $t0) * 1000), 'ok', basename($file) . ' · ' . number_format($total) . ' سجل');
         return self::SUCCESS;
+    }
+
+    /**
+     * كتابةُ النسخة إلى المجرى — بترتيب المفاتيح الذي كان: `_meta` ثم `roles` ثم `users`
+     * ثم الوحداتُ بترتيب السجلّ ثم `_tables` ثم `settings`. يعيد عددَ السجلّات المكتوبة.
+     *
+     * @throws \UnexpectedValueException جزءٌ لا يُرمَّز
+     * @throws \RuntimeException كتابةٌ ناقصة
+     */
+    protected function dump(\App\Support\Ops\BackupStream $s): int
+    {
+        $put = static function (string $part) use ($s): void {
+            if (! $s->write($part)) throw new \RuntimeException('تعذّرت الكتابة', \App\Support\Ops\BackupStream::WRITE_FAILED);
+        };
+        $enc = static function ($v): string {
+            $j = json_encode($v, self::JSON_FLAGS);
+            if ($j === false) throw new \UnexpectedValueException(json_last_error_msg());
+
+            return $j;
+        };
+
+        $put('{"_meta":' . $enc(['app' => (string) setting('app.name', config('app.name')),
+                                 'version' => config('hub.version'), 'at' => now()->toIso8601String()]));
+
+        // الأدوار — بصيغة الاستيراد: all/scope/m + الأعلام في المستوى الأعلى
+        $roles = DB::table('roles')->orderBy('id')->get()->map(function ($r) {
+            $flags = json_decode($r->flags ?? '[]', true) ?: [];
+            return array_merge([
+                'id' => $r->id, 'name' => $r->name, 'all' => (bool) $r->is_owner,
+                'scope' => $r->scope ?? 'proj', 'm' => json_decode($r->matrix ?? '[]', true) ?: [],
+                // **قيود مستوى الحقل تُنسَخ**: كانت تسقط من النسخة، فالاستعادة
+                // تُعيد النظام **بلا قيدٍ واحد** — وهي أخطر من غياب النسخة
+                // أصلاً لأنها تُظنّ استعادةً كاملة فلا يراجعها أحد.
+                'fieldRules' => json_decode($r->field_rules ?? '[]', true) ?: [],
+            ], $flags);
+        })->all();
+
+        $put(',"roles":' . $enc($roles));
+        unset($roles);
+
+        // المستخدمون — بلا كلمات مرور (كما يتوقع الاستيراد)
+        /*
+         * **النسخةُ التي لا تُعيد حساباً ليست نسخة** (المراجعةُ الشاملة · F-14).
+         *
+         * كانت هذه المصفوفةُ قائمةَ سماحٍ بأحدَ عشرَ مفتاحاً بلا `password` — فاستعادةٌ
+         * حقيقيّةٌ تُنتج نظاماً كاملَ البياناتِ **لا يدخله أحد**. ومعها كان يسقط
+         * `account_type` فتنقلب حساباتُ العملاءِ داخليّةً، و`clients` فيسقط عزلُ
+         * العملاء، و`company_id` فيسقط عزلُ الشركات — أي أنّ **الكارثةَ تُصلَح
+         * بفتحِ النظام**، وهو أسوأُ ما يمكن أن يفعله تعافٍ.
+         *
+         * والتعليقُ الذي كان واقفاً هنا يشهد على الدرس: «عزل الشركات وحارسا الحساب
+         * — كلها تسقط عند الاستعادة إن لم تُنسخ». طُبِّق على ثلاثةِ حقولٍ ولم يُسأل
+         * عن الرابعِ وهو أهمُّها. فالقاعدةُ الآن: **ما يلزم الحسابَ ليعمل يُنسَخ،
+         * وما لا يُنسَخ يُذكَر سببُه** — لا صمتَ بعد اليوم.
+         *
+         * **وحساسيّةُ الملفّ ترتفع بذلك**: صار يحمل تجزيءَ كلماتِ المرور وسرَّ TOTP
+         * المُعمّى. وهو ما يحمله أيُّ تفريغِ قاعدةٍ أصلاً — لكنّه يوجب أن تبقى
+         * `storage/app/backups` خارجَ الجذرِ العامّ وأن تُنقَل النسخُ مُعمّاة.
+         *
+         * **وما لا يُنسَخ عمداً**: `remember_token` — أثرُ جلسةٍ لا هويّةُ حساب،
+         * وإحياؤه بعد كارثةٍ يُعيد جلساتٍ كان يجب أن تموت. و`failed_attempts`
+         * و`last_login_*` تاريخُ تشغيلٍ لا يمنع التعافي.
+         */
+        $users = DB::table('users')->whereNull('deleted_at')->orderBy('id')->get()->map(fn ($u) => [
+            'id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'phone' => $u->phone,
+            'title' => $u->job_title, 'roleId' => $u->role_id, 'status' => $u->status,
+            'nprefs' => json_decode($u->notify_prefs ?? '[]', true) ?: [],
+            // الاعتماد: بلا هذا لا يدخل أحدٌ بعد الاستعادة
+            'pwd'        => $u->password,
+            'pwdAt'      => $u->password_changed_at,
+            'mustChange' => (int) ($u->must_change_password ?? 0),
+            // التحقّقُ الثنائيّ: حسابٌ محميٌّ يجب أن يعود محميّاً
+            'totpOn'     => (int) ($u->totp_enabled ?? 0),
+            'totpCipher' => $u->totp_secret_cipher,
+            'recovery'   => $u->recovery_codes,
+            'lockedUntil' => $u->locked_until,
+            // عزل الشركات والعملاء وحارسا الحساب — كلها تسقط عند الاستعادة إن لم تُنسخ،
+            // فيعود الحساب المعزول يرى المنشأة كلها والمنتهي يعمل بلا انتهاء
+            'companies'  => json_decode($u->companies ?? '[]', true) ?: [],
+            'companyId'  => $u->company_id,
+            'clients'    => json_decode($u->clients ?? '[]', true) ?: [],
+            'accountType' => $u->account_type,
+            'allowedIps' => $u->allowed_ips,
+            'expiresAt'  => $u->expires_at,
+        ])->all();
+
+        $put(',"users":' . $enc($users));
+        unset($users);
+
+        // كل وحدات السجل — الأعمدة تعود مفاتيحَ (عكس خريطة الاستيراد)
+        $total = 0;
+        foreach (hub_modules() as $key => $def) {
+            if ($key === 'users') continue;
+            $map = collect($def['fields'])->pluck('key', 'col')->all();   // col → key
+
+            $n = 0;
+            // chunkById لا chunk على created_at: ترقيم OFFSET فوق ترتيبٍ تتساوى
+            // قيمُه يُسقط صفوفاً أو يكررها عند حدود الصفحات — قرعةُ المحرّكين نفسها.
+            // وكلُّ قطعةٍ تُرمَّز وتُكتب ثم تُنسى: لا يتراكم الجدولُ في الذاكرة.
+            DB::table($def['table'])->whereNull('deleted_at')
+                ->chunkById(500, function ($part) use (&$n, $map, $key, $put, $enc) {
+                    $parts = [];
+                    foreach ($part as $row) {
+                        $rec = ['id' => $row->id, '_v' => $row->version ?? 1];
+                        if (! empty($row->archived)) $rec['_arch'] = true;
+                        // التواريخ والنسبة تُنسَخ: كانت الاستعادة تدوس تاريخ إنشاء
+                        // كل سجل بـnow() وتفقد منشئه — فينكسر كل فرزٍ زمني بعدها
+                        if (! empty($row->created_at)) $rec['_ca'] = (string) $row->created_at;
+                        if (! empty($row->updated_at)) $rec['_ua'] = (string) $row->updated_at;
+                        if (! empty($row->created_by)) $rec['_cb'] = $row->created_by;
+                        foreach ($map as $col => $fk) {
+                            $v = $row->{$col} ?? null;
+                            if ($v === null || $v === '') continue;
+                            // المصفوفات المخزنة JSON تعود مصفوفات (الاستيراد يعيد ترميزها)
+                            if (is_string($v) && strlen($v) > 1 && ($v[0] === '[' || $v[0] === '{')) {
+                                $d = json_decode($v, true);
+                                if (is_array($d)) $v = $d;
+                            }
+                            $rec[$fk] = $v;
+                        }
+                        if (! empty($row->custom)) {
+                            foreach ((array) (json_decode($row->custom, true) ?: []) as $ck => $cv) $rec[$ck] = $cv;
+                        }
+                        $parts[] = $enc($rec);
+                    }
+                    if (! $parts) return;
+                    // الوحدةُ الفارغة لا مفتاحَ لها (كما كانت) — فالمفتاحُ يُفتح مع أوّل صفّ
+                    $put(($n === 0 ? ',' . $enc((string) $key) . ':[' : ',') . implode(',', $parts));
+                    $n += count($parts);
+                });
+
+            if ($n) { $put(']'); $total += $n; }
+        }
+
+        // الجداول التشغيلية الخام — أعمدتها كما هي، بمحذوفاتها الناعمة (أمانة النسخة)
+        $opened = false;   // `_tables` لا يُفتح إلا مع أوّل صفٍّ خام (كما كان غيابُه حين لا صفّ)
+        foreach (self::RAW_TABLES as $t) {
+            if (! Schema::hasTable($t)) continue;
+            $n = 0;
+            DB::table($t)->chunkById(500, function ($part) use (&$n, &$opened, $t, $put, $enc) {
+                $parts = [];
+                foreach ($part as $row) $parts[] = $enc((array) $row);
+                if (! $parts) return;
+                if ($n === 0) {
+                    $head = ($opened ? ',' : ',"_tables":{') . $enc($t) . ':[';
+                    $opened = true;
+                } else {
+                    $head = ',';
+                }
+                $put($head . implode(',', $parts));
+                $n += count($parts);
+            });
+            if ($n) { $put(']'); $total += $n; }
+        }
+        if ($opened) $put('}');
+
+        // الإعدادات
+        $put(',"settings":' . $enc(DB::table('settings')->pluck('value', 'key')
+            ->map(fn ($v) => json_decode($v, true) ?? $v)->all()) . '}');
+
+        return $total;
     }
 }

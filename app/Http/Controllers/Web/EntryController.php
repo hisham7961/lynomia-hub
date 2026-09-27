@@ -101,20 +101,11 @@ class EntryController extends Controller
         // فيسلسل نفسه مع إضافة السطر (addLineTo). سطرٌ يُضاف بينما نمسك القفل
         // ينتظر حتى ننتهي فيرى الحالة «مرحّل» ويُرفض؛ وإن سبقنا هو دخل مجموعَ
         // التوازن. والفحص المُعاد يمنع ترحيلاً مزدوجاً من نسختين قديمتين.
+        // والترحيلُ نفسُه من المحرّك الواحد (TECH_DEBT #29): توازنٌ بالملّيمات، وختمُ
+        // posted_at/posted_by، وقيدُ التدقيق «ترحيل قيد» — كما في كلّ بابٍ آخر.
         \Illuminate\Support\Facades\DB::transaction(function () use ($e) {
             $fresh = JournalEntry::whereKey($e->id)->lockForUpdate()->firstOrFail();
-            abort_if($fresh->state === 'مرحّل', 422, 'القيد مُرحَّل أصلاً');
-
-            $debit = (float) JournalLine::where('entry_id', $fresh->id)->sum('debit');
-            $credit = (float) JournalLine::where('entry_id', $fresh->id)->sum('credit');
-            abort_if($debit <= 0, 422, 'لا يُرحَّل قيدٌ بلا سطور');
-            abort_if(round($debit, 3) !== round($credit, 3), 422,
-                'القيد لا يوازن: مدين ' . number_format($debit, 3) . ' ≠ دائن ' . number_format($credit, 3));
-
-            $fresh->state = 'مرحّل';
-            $fresh->meta = (array) $fresh->meta + ['posted_at' => now()->toIso8601String(), 'posted_by' => auth()->id()];
-            $fresh->save();
-            hub_audit('ترحيل قيد', 'entries', $fresh->id, (string) $fresh->doc_no);
+            \App\Support\Finance\JournalPosting::postDraft($fresh);
         });
 
         return back()->with('ok', '🔏 رُحّل القيد وقُفل — يُعكس بقيدٍ جديد لا بالتعديل');

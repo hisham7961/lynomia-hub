@@ -7,10 +7,10 @@ use App\Models\EndpointCommand;
 use App\Models\EndpointDevice;
 use App\Models\EndpointEvent;
 use App\Models\EndpointRelease;
-use App\Support\Api;
-use App\Support\EndpointPrivacy;
-use App\Support\Es256;
-use App\Support\FlowRunner;
+use App\Support\Platform\Api;
+use App\Support\Endpoint\EndpointPrivacy;
+use App\Support\Security\Es256;
+use App\Support\Platform\FlowRunner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -21,7 +21,7 @@ use Illuminate\Validation\Rule;
  * **بروتوكولُ النقاط الطرفية الموقَّع** — Work OS · الطور J · WP-J.2 · §43.
  *
  * أربعةُ مسارات جهازٍ خلف وسيط `endpoint.signature` (عقدُ التوقيع مكتوبٌ مرةً
- * واحدةً في docblock ‏`App\Support\Es256` — replay/طابع/nonce تُفرَض هناك قبل
+ * واحدةً في docblock ‏`App\Support\Security\Es256` — replay/طابع/nonce تُفرَض هناك قبل
  * الوصول هنا)، وسطحُ إصدارٍ داخليّ واحد:
  *
  *  • `heartbeat` — نبضةٌ تحدّث `last_heartbeat_at` والعتادَ والوضعيّةَ **الصادقة**
@@ -83,7 +83,7 @@ class EndpointProtocolController extends Controller
             'keys' => array_slice($bad, 0, 10),
             'request_id' => Api::requestId(),
         ]);
-        \App\Support\SecurityRadar::record($r, 'وصول مرفوض',
+        \App\Support\Security\SecurityRadar::record($r, 'وصول مرفوض',
             'حمولةُ مراقبةٍ من جهازٍ طرفيّ (' . $surface . '): ' . implode('، ', array_slice($bad, 0, 5)));
 
         return Api::error(Api::VALIDATION_FAILED, 422,
@@ -120,7 +120,7 @@ class EndpointProtocolController extends Controller
             foreach ($d['posture'] as $check => $reading) {
                 if (! is_string($check) || trim($check) === '') continue;
                 $posture[mb_substr(trim($check), 0, 60)] =
-                    \App\Support\PostureContract::normalize(is_string($reading) ? $reading : '');
+                    \App\Support\Security\PostureContract::normalize(is_string($reading) ? $reading : '');
                 if (count($posture) >= 30) break;
             }
         }
@@ -132,14 +132,14 @@ class EndpointProtocolController extends Controller
             $policy = $device->policy_id ? \App\Models\EndpointPolicy::find($device->policy_id) : null;
             $approved = $policy ? $policy->approvedSsids() : [];
             $observedSsid = isset($d['wifi']['ssid']) ? mb_substr(trim((string) $d['wifi']['ssid']), 0, 64) : null;
-            $wifiState = \App\Support\PostureContract::evaluateWifi(
+            $wifiState = \App\Support\Security\PostureContract::evaluateWifi(
                 $observedSsid, $d['wifi']['status'] ?? null, $approved);
 
             $posture = $posture ?? [];
             $posture['wifi'] = $wifiState;
             // احترازُ خصوصيّة (§13): يُخزَّن اسمُ الشبكة **فقط حين تكون معتمدة** —
             // لا نُبقي اسمَ شبكةٍ شخصيّة (على غيرِ المعتمدة تبقى الحالةُ بلا اسم).
-            $wifiSsidToStore = $wifiState === \App\Support\PostureContract::ACTIVE ? $observedSsid : null;
+            $wifiSsidToStore = $wifiState === \App\Support\Security\PostureContract::ACTIVE ? $observedSsid : null;
         }
 
         // saveQuietly: نبضةٌ كل دقائق لا تُغرق التدقيقَ ولا ترفع نسخةَ القفل
@@ -220,7 +220,7 @@ class EndpointProtocolController extends Controller
         // بلوغ العتبة داخل النافذة — لا ضجيجَ لكل حدث. القرارُ (العتبةُ والتفرّدُ
         // للنافذة) في `SecurityEvents::endpointAlerts`، والصيغتان **حرفيّتان هنا**
         // (موضعُ الكتابة الذي تثبته خريطةُ التغطية) والكتالوجُ يطابقهما بالكود.
-        foreach (\App\Support\SecurityEvents::endpointAlerts($event) as $code => $al) {
+        foreach (\App\Support\Security\SecurityEvents::endpointAlerts($event) as $code => $al) {
             hub_audit(match ($code) {
                 'ENDPOINT_USB_SURGE' => 'تكرارُ أحداث USB على جهازٍ طرفيّ',
                 'ENDPOINT_POSTURE_ALERT' => 'تدهورُ وضعيّةِ جهازٍ طرفيّ',
@@ -314,7 +314,7 @@ class EndpointProtocolController extends Controller
                 report($e);
             }
             if (! $valid) {
-                \App\Support\SecurityRadar::record($r, 'وصول مرفوض', 'توقيعُ نتيجةِ أمرٍ طرفيّ لا يصحّ');
+                \App\Support\Security\SecurityRadar::record($r, 'وصول مرفوض', 'توقيعُ نتيجةِ أمرٍ طرفيّ لا يصحّ');
 
                 return Api::error(Api::VALIDATION_FAILED, 422, 'توقيعُ النتيجة لا يصحّ بعقده — لا انتقالَ حالة');
             }

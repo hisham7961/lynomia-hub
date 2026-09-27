@@ -621,7 +621,7 @@ timestamps
 
 ### W1 · الكتالوج ومخطَّطُ الإدخال
 **النطاق:** `config/ai_catalog.php` + مُصادِقُ المخطَّط.
-**ملفّات:** `config/ai_catalog.php` · `app/Support/AiCatalog.php`.
+**ملفّات:** `config/ai_catalog.php` · `app/Support/Ai/Catalog/AiCatalog.php`.
 **قاعدة:** لا شيء. **اختبارات:** كلُّ مدخلٍ يُصادَق · كلُّ حقلِ `secret` له
 `type=password` · لا قيمةَ في الكتالوج.
 **قبول:** الكتالوجُ يُقرأ ويُصادَق ولا يُعرَض بعد.
@@ -637,7 +637,7 @@ timestamps
 
 ### W3 · عميلُ إدارةِ البوّابة
 **النطاق:** `AiGateway` يُمدّ بعميلِ إدارة — والسرُّ **يمرّ ولا يُخزَّن**.
-**ملفّات:** `app/Support/LiteLlmAdmin.php` · `AiGateway.php` (`requestOptions`).
+**ملفّات:** `app/Support/Ai/Gateway/LiteLlmAdmin.php` · `AiGateway.php` (`requestOptions`).
 **اختبارات:** كلُّ نداءٍ يمرّ بـ`outboundGate` · لا تحويلَ متَّبع · لا سرَّ في
 سجلٍّ أو استثناء.
 **قبول:** قراءةُ `/model/info` و`/credentials` من اختبارٍ بخادمٍ وهميّ.

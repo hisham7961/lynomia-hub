@@ -57,7 +57,7 @@
     </div>
     @if ($found['truncated'])
         <div class="sub mut">
-            ✂️ <b>القائمةُ أطولُ ممّا عُرض</b> — عُرض أوّلُ {{ \App\Support\AiModelSources::MAX_CANDIDATES }} مرشَّحاً.
+            ✂️ <b>القائمةُ أطولُ ممّا عُرض</b> — عُرض أوّلُ {{ \App\Support\Ai\Catalog\AiModelSources::MAX_CANDIDATES }} مرشَّحاً.
             استعمل الترشيحَ للوصولِ إلى ما تريد.
         </div>
     @endif
@@ -92,7 +92,7 @@
 <div class="card">
     <form method="GET" action="{{ route('ai.models.browse', $provider) }}" class="grid">
         <label><span>الوضع</span>
-            <select name="mode" onchange="this.form.submit()">
+            <select name="mode" data-submit-on-change>
                 <option value="">كلُّ الأوضاع</option>
                 @foreach ($modes as $m)
                     <option value="{{ $m }}" @selected($mode === $m)>{{ $m }}</option>
@@ -121,9 +121,9 @@
         <div class="sub">
             {{-- تبديلٌ ضمنَ هذا النموذجِ وحدَه — بلا صنفٍ وسيطٍ ولا دالّةٍ عامّة --}}
             <button class="btn sm" type="button"
-                    onclick="this.closest('form').querySelectorAll('input[name=&quot;picks[]&quot;]').forEach(c=>c.checked=true)">☑️ اختر الكلّ</button>
+                    data-check-all="picks[]" data-check-state="1">☑️ اختر الكلّ</button>
             <button class="btn sm" type="button"
-                    onclick="this.closest('form').querySelectorAll('input[name=&quot;picks[]&quot;]').forEach(c=>c.checked=false)">☐ امسح الاختيار</button>
+                    data-check-all="picks[]" data-check-state="0">☐ امسح الاختيار</button>
         </div>
 
         <table class="tbl">
@@ -134,14 +134,14 @@
             <tbody>
             @foreach ($candidates as $c)
                 @php($caps = collect((array) $c['capabilities'])
-                        ->filter(fn ($f) => \App\Support\Tri::allowsExecution(is_array($f) ? ($f['v'] ?? null) : $f))
+                        ->filter(fn ($f) => \App\Support\Platform\Tri::allowsExecution(is_array($f) ? ($f['v'] ?? null) : $f))
                         ->keys()->all())
                 @php($ctx = ((array) $c['limits'])['max_input_tokens'] ?? null)
                 <tr>
                     <td>
                         @if ($c['already_imported'])
                             <span class="mut">—</span>
-                        @elseif (! \App\Support\AiModelSources::adoptableInOneClick($c['availability'] ?? ''))
+                        @elseif (! \App\Support\Ai\Catalog\AiModelSources::adoptableInOneClick($c['availability'] ?? ''))
                             <span class="mut" title="جذعُ عائلةٍ — يلزمه معرّفُك الكامل">✋</span>
                         @else
                             <input type="checkbox" name="picks[]"
@@ -162,9 +162,9 @@
                             : 'غيرُ معروف' }}</td>
                     <td>
                         @php($av = (string) ($c['availability'] ?? ''))
-                        @if ($av === \App\Support\AiModelSources::AVAIL_REGISTERED)
+                        @if ($av === \App\Support\Ai\Catalog\AiModelSources::AVAIL_REGISTERED)
                             <span class="bdg ok" title="منشورٌ عند البوّابةِ بمرجعِ اعتمادِك">مُسجَّل</span>
-                        @elseif ($av === \App\Support\AiModelSources::AVAIL_ACCOUNT)
+                        @elseif ($av === \App\Support\Ai\Catalog\AiModelSources::AVAIL_ACCOUNT)
                             <span class="bdg wn" title="جذعُ عائلةٍ — معرّفُك الحقيقيُّ يحمل لاحقةَ حسابِك">جذعُ عائلة</span>
                         @else
                             <span class="bdg" title="يعرفه الكتالوجُ — ولا يُثبِت أنّ حسابَك يبلغه">كتالوج</span>

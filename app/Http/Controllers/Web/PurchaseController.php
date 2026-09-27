@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FinDocument;
 use App\Models\Purchase;
 use App\Models\Supplier;
+use App\Support\Assets\PurchaseFlow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -32,8 +33,8 @@ class PurchaseController extends Controller
 
         // إثراء البنود بحساب الكراتين (تعبئة المنتجات) بعزل شركة المستند —
         // فيعرف المُستلِم كم كرتونة يتوقّع من كل صنف
-        $items = \App\Support\Items::cartons(
-            \App\Support\Items::parse((string) $p->items), $p->company_id);
+        $items = \App\Support\Assets\Items::cartons(
+            \App\Support\Assets\Items::parse((string) $p->items), $p->company_id);
 
         // قفل الحقل يسري على مستند الطباعة كما على صفحة العرض (modules/show:90):
         // دورٌ محجوبٌ عليه «الإجمالي» أو «البنود» لا يراهما عبر مسار الطباعة.
@@ -43,8 +44,8 @@ class PurchaseController extends Controller
             'p' => $p,
             'supplier' => $p->supplier_id ? Supplier::find($p->supplier_id) : null,
             'items' => $items,
-            'showCartons' => \App\Support\Items::anyCartons($items),
-            'totalCartons' => \App\Support\Items::totalCartons($items),
+            'showCartons' => \App\Support\Assets\Items::anyCartons($items),
+            'totalCartons' => \App\Support\Assets\Items::totalCartons($items),
             'logo' => setting('app.logo'),
             'hideAmount' => hub_field_mode($u, 'purchases', 'amount') === 'hide',
             'hideItems'  => hub_field_mode($u, 'purchases', 'items') === 'hide',
@@ -54,32 +55,19 @@ class PurchaseController extends Controller
     /**
      * آلة الحالة المفروضة على الخادم: كانت الأزرار تُخفى في القالب فقط بينما
      * act يقبل أي انتقالٍ من أي حالة — استلام مسودة يمرّ وبعث الملغى حياً يمرّ.
-     * [الإجراء => [الحالات المسموح منها، الحالة الهدف]]
+     * [الإجراء => [الحالات المسموح منها، الحالة الهدف]] — مصدرُها الواحد `PurchaseFlow::FLOW`.
      */
-    protected const FLOW = [
-        'submit'  => [['مسودة'], 'بانتظار الاعتماد'],
-        'approve' => [['بانتظار الاعتماد'], 'معتمد'],
-        'send'    => [['معتمد'], 'أُرسل للمورد'],
-        'receive' => [['أُرسل للمورد', 'معتمد'], 'مستلم'],
-        'return'  => [['مستلم'], 'مرتجع'],
-    ];
+    protected const FLOW = PurchaseFlow::FLOW;
 
     public function act(Request $r, string $id)
     {
         abort_unless(hub_can(auth()->user(), 'purchases', 'e'), 403, 'إجراءات الشراء تتطلب صلاحية تعديل');
         if ($why = hub_block_if_queued('purchases')) return back()->with('err', $why);
-        $p = hub_scope(Purchase::query(), 'purchases')->findOrFail($id);
+        $p = PurchaseFlow::authorize(auth()->user(), $id);
         $do = hub_str($r->input('do'));
 
-        // الملغى والمرتجع نهايتان — لا إجراء يبعثهما
-        abort_if(in_array((string) $p->status, ['ملغى', 'مرتجع'], true) && $do !== 'bill', 422,
-            'المستند ' . $p->status . ' — أنشئ أمر شراء جديداً بدل إحيائه');
-
-        if (isset(self::FLOW[$do])) {
-            [$from, $to] = self::FLOW[$do];
-            abort_unless(in_array((string) $p->status, $from, true), 422,
-                'لا يصح هذا الإجراء من حالة «' . $p->status . '» — المسموح منه: ' . implode('، ', $from));
-        }
+        // الملغى والمرتجع نهايتان، وكلُّ إجراءٍ من حالاتٍ مسموحة — `PurchaseFlow::guardTransition`
+        PurchaseFlow::guardTransition($p, $do);
 
         return match ($do) {
             'submit'  => $this->setStatus($p, 'بانتظار الاعتماد', '📨 أُرسل الطلب للاعتماد'),
@@ -120,72 +108,8 @@ class PurchaseController extends Controller
      */
     protected function receive(Purchase $p)
     {
-        // الاستلام داخل معاملة على صفٍّ مقفول: فحصُ «استُلم من قبل» يقرأ الحالة
-        // المُثبَتة لا نسخةً قديمة في الذاكرة — فنقرتان متزامنتان (نقر مزدوج/إعادة
-        // إرسال) تتسلسلان فلا تُضاعف حركات المخزون ولا يُزاد الرصيد مرتين.
-        [$made, $skipped] = DB::transaction(function () use ($p) {
-            $p = Purchase::whereKey($p->getKey())->lockForUpdate()->firstOrFail();
-            $meta = (array) $p->meta;
-            $made = 0; $skipped = 0;
-
-            // سبقتنا نقرةٌ متزامنة داخل القفل — لا تكرار للحركات (idempotent)
-            if ($p->status === 'مستلم' || ! empty($meta['stock_moves'])) {
-                return [$made, $skipped];
-            }
-
-            $lines = \App\Support\Items::parse((string) $p->items);
-            $supplierName = $p->supplier_id ? (Supplier::find($p->supplier_id)?->name ?? '') : '';
-            $moveIds = [];
-            foreach ($lines as $line) {
-                $qty = (float) ($line['qty'] ?? 0);
-                $name = trim((string) ($line['desc'] ?? ''));
-                if ($qty <= 0 || $name === '') { $skipped++; continue; }
-
-                // مطابقةٌ منطَّقةٌ بالشركة وحاسمةُ الترتيب: أمرٌ بشركةٍ يطابق أصنافها
-                // أو المشتركة (بلا شركة)، وأمرٌ **بلا** شركة يطابق المشتركة وحدها —
-                // فلا يحرّك مخزون شركةٍ أخرى. والمخصَّصُ للشركة قبل المشترك ثم id ثابت.
-                // قفلٌ صفّيّ على الصنف: استلامان متزامنان لنفس الصنف كانا يقرآن
-                // الرصيد نفسه (اقرأ-ثم-اكتب) فيضيع أحد الزيادتين — تحديثٌ ضائع.
-                // القفل يسلسلهما فيُبنى كلُّ رصيدٍ على سابقه. (كلٌّ يقفل أمرَه أولاً
-                // ثم الصنف، والبنودُ بترتيب ظهورها — فلا تشابكَ أقفال.)
-                $item = \App\Models\StockItem::whereNull('deleted_at')->where('name', $name)
-                    ->when($p->company_id,
-                        fn ($q) => $q->where(fn ($w) => $w->where('company_id', $p->company_id)->orWhereNull('company_id')),
-                        fn ($q) => $q->whereNull('company_id'))
-                    ->orderByRaw('company_id IS NULL')->orderBy('id')
-                    ->lockForUpdate()
-                    ->first();
-                if (! $item) { $skipped++; continue; }
-
-                \App\Models\StockMove::$posting = true;
-                try {
-                    $mv = \App\Models\StockMove::create([
-                        'doc_no' => 'IN-' . $p->doc_no . '-' . ($made + 1),
-                        'kind' => 'استلام', 'item_id' => $item->id, 'qty' => $qty,
-                        'to_wh' => $item->wh, 'date' => now()->toDateString(),
-                        'reference' => (string) $p->doc_no, 'partner' => $supplierName,
-                        'company_id' => $p->company_id, 'status' => 'مؤكدة',
-                        'meta' => ['posted_at' => now()->toIso8601String(),
-                                   'posted_by' => auth()->id(), 'delta' => $qty, 'purchase_id' => $p->id],
-                    ]);
-                } finally {
-                    \App\Models\StockMove::$posting = false;
-                }
-                $item->qty = (float) $item->qty + $qty;
-                $item->saveQuietly();
-                hub_stock_sync($item);
-                $moveIds[] = $mv->id;
-                $made++;
-            }
-            $meta['stock_moves'] = $moveIds;
-
-            $p->received_at = now()->toDateString();
-            $p->meta = $meta;
-            $p->status = 'مستلم';
-            $p->save();
-
-            return [$made, $skipped];
-        });
+        // المعاملةُ والقفلان (الأمر ثمّ الصنف) والحركاتُ في `PurchaseFlow::receive` (يشترك فيها الجوال)
+        [$made, $skipped] = PurchaseFlow::receive(auth()->user(), $p);
 
         return back()->with('ok', '📦 سُجّل الاستلام'
             . ($made ? " وتحرّك المخزون ({$made} حركة)" : '')

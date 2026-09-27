@@ -6,7 +6,7 @@
 ## عقدُ حالةِ الوضعيّة (§11)
 
 كان العقدُ ثلاثيّاً {active|inactive|not-configured} فيخلط ثلاثةَ معانٍ في
-not-configured. صار ستّيّاً صادقاً في `App\Support\PostureContract` (ومرآتُه في
+not-configured. صار ستّيّاً صادقاً في `App\Support\Security\PostureContract` (ومرآتُه في
 الوكيل `internal/security`):
 
 | الحالة | المعنى | امتثال؟ |

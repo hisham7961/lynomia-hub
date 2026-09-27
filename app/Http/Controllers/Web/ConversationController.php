@@ -8,9 +8,8 @@ use App\Models\Conversation;
 use App\Models\ConversationMember;
 use App\Models\Project;
 use App\Models\User;
-use App\Support\ChatCommands;
-use App\Support\Collaboration;
-use App\Support\FlowRunner;
+use App\Support\Collaboration\ChannelService;
+use App\Support\Collaboration\Collaboration;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -246,8 +245,8 @@ class ConversationController extends Controller
 
         // §39 مؤشّرُ البدءِ للاستطلاعِ التدريجيّ — رأسُ الخيطِ (أحدثُ رسالةٍ حيّةٍ في
         // الحاوية، جذراً كانت أو رداً). فارغٌ = قناةٌ خاليةٌ (يبدأ العميلُ من البداية).
-        $tip = Comment::where('conversation_id', $conv->id)->whereNull('deleted_at')
-            ->orderByDesc('created_at')->orderByDesc('id')->first(['id', 'created_at']);
+        // v2 — رأسُ الخيط مع كلِّ معرّفاتِ ثانيتِه (لا قرعةَ تعادلٍ بـUUID)
+        $sinceTip = \App\Support\Collaboration\Collaboration::tipSince(Comment::where('conversation_id', $conv->id)->whereNull('deleted_at'));
 
         return view('conversations.show', [
             'conv'        => $conv,
@@ -258,7 +257,7 @@ class ConversationController extends Controller
             'messages'    => $messages,
             'members'     => $members,
             'users'       => CommentController::userNames(),
-            'sinceCursor' => $tip ? Collaboration::encodeCursor((string) $tip->created_at, (string) $tip->id) : '',
+            'sinceCursor' => $sinceTip,
         ]);
     }
 
@@ -275,22 +274,8 @@ class ConversationController extends Controller
      */
     public function directory()
     {
-        $user = auth()->user();
-        abort_if(hub_is_client($user), 404);
-
-        $mineIds = ConversationMember::where('user_id', $user->getKey())->pluck('conversation_id');
-
-        $channels = Conversation::channels()->active()->whereNull('deleted_at')
-            ->where('audience', 'internal')
-            ->whereIn('visibility', self::DISCOVERABLE)
-            ->whereNotIn('id', $mineIds)
-            ->when(($cids = hub_company_ids($user)) !== null, fn ($q) => $q->where(
-                fn ($w) => $w->whereIn('company_id', $cids)->orWhereNull('company_id')))
-            ->when(($kids = hub_client_ids($user)) !== null, fn ($q) => $q->where(
-                fn ($w) => $w->whereIn('client_id', $kids)->orWhereNull('client_id')))
-            ->withCount('members')
-            ->orderBy('title')->orderBy('id')
-            ->get(['id', 'title', 'visibility', 'updated_at']);
+        // القاعدةُ في `ChannelService::directory` (يشترك فيها الجوال) — العميلُ ٤٠٤ هناك
+        $channels = ChannelService::directory(auth()->user());
 
         return view('conversations.directory', ['channels' => $channels]);
     }
@@ -302,31 +287,13 @@ class ConversationController extends Controller
      */
     public function join(string $id)
     {
-        $user = auth()->user();
-        abort_if(hub_is_client($user), 404);
-
-        $conv = Conversation::channels()->active()->whereNull('deleted_at')->find($id);
-        // لا نُثبت وجودَ ما لا يُكتشَف: غيرُ الموجودِ/الخاصُّ/«الأعضاء» = ٤٠٤ لا ٤٠٣
-        abort_if($conv === null || $conv->audience !== 'internal'
-            || ! in_array((string) $conv->visibility, self::DISCOVERABLE, true), 404);
-
-        // نطاقُ الشركة/العميل — دفاعٌ في العمق فوق الظهور (نظيرُ الحارس)
-        if (($cids = hub_company_ids($user)) !== null && $conv->company_id !== null
-            && ! in_array((string) $conv->company_id, $cids, true)) abort(404);
-        if (($kids = hub_client_ids($user)) !== null && $conv->client_id !== null
-            && ! in_array((string) $conv->client_id, $kids, true)) abort(404);
+        $res = ChannelService::join(auth()->user(), $id);
+        $conv = $res['conversation'];
 
         // عضوٌ أصلاً — لا تكرارَ (نظيرُ addMember)
-        if (ConversationMember::where('conversation_id', $conv->id)->where('user_id', $user->getKey())->exists()) {
+        if (! $res['joined']) {
             return redirect()->route('conversations.show', $conv->id)->with('ok', 'أنت عضوٌ فيها أصلاً');
         }
-
-        ConversationMember::create([
-            'conversation_id' => $conv->id, 'user_id' => $user->getKey(),
-            'role' => 'member', 'source' => 'explicit', 'last_read_at' => now(),
-        ]);
-
-        hub_audit('channel.joined', 'conversations', (string) $conv->id, $conv->title);
 
         return redirect()->route('conversations.show', $conv->id)->with('ok', 'انضممتَ إلى القناة');
     }
@@ -339,69 +306,18 @@ class ConversationController extends Controller
         $user = auth()->user();
         abort_unless($user, 403);
 
-        $data = $r->validate([
-            'title'      => ['required', 'string', 'max:200'],
-            'audience'   => ['nullable', 'string', Rule::in(Conversation::AUDIENCES)],
-            'visibility' => ['nullable', 'string', Rule::in(Conversation::VISIBILITIES)],
-            'client_id'  => ['nullable', 'string'],
-            'project_id' => ['nullable', 'string'],
-            // رسالةُ افتتاحٍ اختياريّة — نصٌّ أو أمرُ محادثة (WP-C.3)
-            'body'       => ['nullable', 'string', 'max:4000'],
-        ], [], ['title' => 'اسمُ القناة']);
+        $r->validate(ChannelService::createRules(), [], ['title' => 'اسمُ القناة']);
 
-        $audience = $data['audience'] ?? 'internal';
-
-        // نطاقُ الشركة: تُوسَم القناةُ بشركةِ مُنشئها المقيَّد فينعزل عنها الغريب
-        // (كتوسيمِ منشورِ القناةِ العامّة WP-A.5)؛ المُنشئُ غيرُ المقيَّد يتركها عامّة.
-        $companyId = (($cids = hub_company_ids($user)) !== null && $cids) ? $cids[0] : null;
-
-        // عميلُ القناة يُقيَّد بنطاق مُنشئه المقيَّد (لا يُوسَم بعميلٍ خارج نطاقه)
-        $clientId = null;
-        if (in_array($audience, ['client', 'both'], true)) {
-            $clientId = ($v = trim(hub_str($r->input('client_id')))) !== '' ? $v : null;
-            if ($clientId !== null && ($kids = hub_client_ids($user)) !== null
-                && ! in_array($clientId, $kids, true)) {
-                abort(403, 'عميلٌ خارجَ نطاقك');
-            }
-        }
-
-        $projectId = ($v = trim(hub_str($r->input('project_id')))) !== '' ? $v : null;
-
-        $conv = Conversation::create([
-            'kind'       => 'channel',
-            'title'      => mb_substr(trim($data['title']), 0, 200),
-            'audience'   => $audience,
-            'visibility' => $data['visibility'] ?? 'private',
-            'company_id' => $companyId,
-            'client_id'  => $clientId,
-            'project_id' => $projectId,
-            'created_by' => $user->getKey(),
+        // الجوهرُ في `ChannelService::create` (يشترك فيه الجوال): وسمُ الشركة، تقييدُ
+        // العميل بنطاق المُنشئ، عضويّةُ المالك، الحدثُ والتدقيق، ورسالةُ الافتتاح.
+        $conv = ChannelService::create($user, [
+            'title'      => $r->input('title'),
+            'audience'   => $r->input('audience'),
+            'visibility' => $r->input('visibility'),
+            'client_id'  => $r->input('client_id'),
+            'project_id' => $r->input('project_id'),
+            'body'       => $r->input('body'),
         ]);
-
-        // مُنشئُ القناةِ مالكُها — العضويّةُ المطبَّعة (لا read_by JSON)
-        ConversationMember::create([
-            'conversation_id' => $conv->id, 'user_id' => $user->getKey(),
-            'role' => 'owner', 'source' => 'explicit', 'last_read_at' => now(),
-        ]);
-
-        // الحدثُ الدلاليّ المُعلَنُ سلفاً في config('hub.events') (الطور A) — يُطلَق هنا
-        FlowRunner::fire('created', 'conversations', $conv);
-
-        // أثرُ التدقيق — سلسلةُ الوصول هي سلسلةُ التدقيق (لا سجلَّ ثانٍ)
-        hub_audit('channel.created', 'conversations', (string) $conv->id, $conv->title);
-
-        // (WP-C.3 · §8) رسالةُ افتتاحٍ اختياريّة عند الإنشاء — أمرُ محادثة يُنفَّذ خدمةً
-        // حقيقيّة، أو نصٌّ يُنشَر كأولِ رسالةٍ في القناة (المحرّكُ الوحيد: comments).
-        // المُنشئُ مالكٌ فله الكتابةُ والأمرُ معاً — والحرسُ نفسُه: hub_can على الوحدةِ الهدف.
-        $body = trim(hub_str($r->input('body')));
-        if ($body !== '') {
-            $ctx = ['module' => 'channel', 'record_id' => (string) $conv->id, 'conversation_id' => (string) $conv->id];
-            if (($parsed = ChatCommands::parse($body)) !== null) {
-                ChatCommands::dispatch($parsed, $user, $ctx);
-            } else {
-                ChatCommands::postMessage($user, $body, $ctx);
-            }
-        }
 
         // من داخلِ مركزِ التواصل: تُفتَح القناةُ الجديدةُ في المركزِ نفسِه (§17)
         if (hub_str($r->input('origin')) === 'collab') {
@@ -416,7 +332,7 @@ class ConversationController extends Controller
     /**
      * **رسائلُ القناةِ الجديدةُ منذ مؤشّر** (§39) — استطلاعٌ تدريجيٌّ بمؤشّر `since`
      * (keyset على `(created_at, id)`) لا إعادةُ جلبِ الخيطِ كلِّه في كلِّ نبضة. عقدُ
-     * الأحداثِ من `App\Support\Collaboration` — نفسُه سواءٌ وصله استطلاعاً أو بثّاً
+     * الأحداثِ من `App\Support\Collaboration\Collaboration` — نفسُه سواءٌ وصله استطلاعاً أو بثّاً
      * مستقبلاً (بلا كسرِ عقد العميل · §38). العزلُ خادميّ: `guardConversation` أولاً.
      *
      * مؤشّرٌ غائب/فاسد ⇒ من الذيل (أحدثُ ٥٠) — تمهيدٌ آمن. يُرجِع أحداثاً + مؤشّراً جديداً.
@@ -425,16 +341,9 @@ class ConversationController extends Controller
     {
         [$conv] = self::guardConversation($id, 'v');
 
-        $cursor = Collaboration::decodeCursor($r->query('cursor'));
-
-        $q = Comment::where('conversation_id', $conv->id)->whereNull('deleted_at')
-            ->with('user:id,name');
-
-        if ($cursor !== null) {
-            [$t, $cid] = $cursor;
-            $q->where(fn ($w) => $w->where('created_at', '>', $t)
-                ->orWhere(fn ($x) => $x->where('created_at', $t)->where('id', '>', $cid)));
-        }
+        // v2 — مجموعةُ ما سُلِّم في ثانيةِ المؤشّر لا حدُّ UUID (الجيلُ الأوّلُ يُفكّ كما كان)
+        $q = Collaboration::applySince(Comment::where('conversation_id', $conv->id)->whereNull('deleted_at')
+            ->with('user:id,name'), (string) $r->query('cursor', ''));
 
         $rows = $q->orderBy('created_at')->orderBy('id')->limit(50)->get();
 
@@ -449,15 +358,12 @@ class ConversationController extends Controller
             'edited'     => $c->edited_at !== null,
         ])->all();
 
-        $last = $rows->last();
-        $next = $last
-            ? Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
-            : (string) $r->query('cursor', '');
+        $next = Collaboration::nextSince($rows, (string) $r->query('cursor', ''));
 
         // §typing مؤشّرُ الكتابةِ العابر — أسماءُ الأعضاءِ الكاتبين الآن (عدا القارئ).
         // بوّابةُ القدرة: إن أُطفئ «مؤشّر الكتابة» لا تُبثّ إشارةٌ (فشلٌ آمنٌ لا تسريب).
         $typing = hub_capability('collab.typing')
-            ? User::whereIn('id', \App\Support\Typing::current((string) $conv->id, (string) auth()->id()))->pluck('name')->all()
+            ? User::whereIn('id', \App\Support\Collaboration\Typing::current((string) $conv->id, (string) auth()->id()))->pluck('name')->all()
             : [];
 
         return response()->json(['events' => $events, 'cursor' => $next, 'typing' => $typing]);
@@ -469,7 +375,7 @@ class ConversationController extends Controller
         // بوّابةُ القدرة: «مؤشّر الكتابة» اختياريّة — إن أُطفئت يفشل المسارُ بأمان (٤٠٤)
         abort_unless(hub_capability('collab.typing'), 404);
         [$conv] = self::guardConversation($id, 'v');
-        \App\Support\Typing::ping((string) $conv->id, (string) auth()->id());
+        \App\Support\Collaboration\Typing::ping((string) $conv->id, (string) auth()->id());
 
         return response()->noContent();
     }
@@ -484,20 +390,16 @@ class ConversationController extends Controller
      */
     public function setNotifyPref(Request $r, string $id)
     {
-        [$conv] = self::guardConversation($id, 'v');   // أيُّ عضوٍ يضبط تفضيلَه
+        self::guardConversation($id, 'v');   // أيُّ عضوٍ يضبط تفضيلَه (غيرُ العضو ٤٠٤ قبل التحقّق)
 
         $data = $r->validate([
-            'pref' => ['required', 'string', Rule::in(\App\Support\Collaboration::NOTIFY_PREFS)],
+            'pref' => ['required', 'string', Rule::in(\App\Support\Collaboration\Collaboration::NOTIFY_PREFS)],
         ], [], ['pref' => 'تفضيل الإشعار']);
 
-        if (! hub_has_col('conversation_members', 'notify_pref')) {
+        if (ChannelService::setNotifyPref($id, $data['pref']) === null) {
             return back()->with('err',
                 'ضبطُ تفضيلِ الإشعار ميزةٌ جديدة تحتاج تحديث قاعدة البيانات — شغّل الترحيلات ثم أعد المحاولة.');
         }
-
-        $m = ConversationMember::where('conversation_id', $conv->id)
-            ->where('user_id', auth()->id())->firstOrFail();
-        $m->forceFill(['notify_pref' => $data['pref']])->save();   // الخطّافُ يزامن muted_at
 
         return back()->with('ok', match ($data['pref']) {
             'muted'    => 'كُتمت القناة — لا إشعارات منها',
@@ -512,15 +414,10 @@ class ConversationController extends Controller
      */
     public function toggleFavorite(string $id)
     {
-        [$conv] = self::guardConversation($id, 'v');
-
-        if (! hub_has_col('conversation_members', 'favorite_at')) {
+        $m = ChannelService::toggleFavorite($id);
+        if ($m === null) {
             return back()->with('err', 'المفضّلةُ ميزةٌ جديدة تحتاج تحديث قاعدة البيانات — شغّل الترحيلات ثم أعد المحاولة.');
         }
-
-        $m = ConversationMember::where('conversation_id', $conv->id)
-            ->where('user_id', auth()->id())->firstOrFail();
-        $m->forceFill(['favorite_at' => $m->favorite_at ? null : now()])->save();
 
         return back()->with('ok', $m->favorite_at ? '⭐ أُضيفت للمفضّلة' : 'أُزيلت من المفضّلة');
     }
@@ -532,17 +429,10 @@ class ConversationController extends Controller
      */
     public function toggleArchive(string $id)
     {
-        // نبلغ المؤرشفةَ (لإعادتها) — ثم نشترط دورَ المالك (الأرشفةُ ليست إدارةَ أعضاء)
-        [$conv, $role] = self::guardConversation($id, 'v', true);
-        abort_unless($role === 'owner', 403, 'أرشفةُ القناةِ لمالكها وحده');
+        // نبلغ المؤرشفةَ (لإعادتها) ثم دورُ المالك — القاعدةُ في `ChannelService`
+        $conv = ChannelService::toggleArchive($id);
 
-        $now = $conv->archived_at === null;
-        $conv->forceFill(['archived_at' => $now ? now() : null])->save();
-
-        hub_audit($now ? 'channel.archived' : 'channel.unarchived', 'conversations',
-            (string) $conv->id, $conv->title);
-
-        return back()->with('ok', $now ? '🗄️ أُرشفت القناة' : '↩ أُعيدت القناة نشطة');
+        return back()->with('ok', $conv->archived_at !== null ? '🗄️ أُرشفت القناة' : '↩ أُعيدت القناة نشطة');
     }
 
     /* ────────── إدارةُ الأعضاء (owner/moderator) ────────── */
@@ -550,41 +440,14 @@ class ConversationController extends Controller
     /** إضافةُ عضوٍ — المشرفُ فأعلى؛ وتنصيبُ مالكٍ/مشرفٍ للمالك وحده */
     public function addMember(Request $r, string $id)
     {
-        [$conv, $actorRole] = self::guardConversation($id, 'manage');
+        [$conv] = self::guardConversation($id, 'manage');
 
         // §35 مجموعةُ الرسائل: إضافةُ عضوٍ مباشرةً تكشف تاريخَها للجديد — ممنوعة.
-        // الإضافةُ تُنشئ مجموعةً جديدةً (fork) حفظاً لجمهورِ التاريخ.
         abort_if($conv->kind === 'group', 422,
             'مجموعةُ الرسائل: أضِف المشاركَ عبر «مجموعةٌ جديدة» حفظاً لخصوصيّة ما مضى');
 
-        $data = $r->validate([
-            'user_id' => ['required', 'string'],
-            'role'    => ['nullable', 'string', Rule::in(ConversationMember::ROLES)],
-        ], [], ['user_id' => 'المستخدم', 'role' => 'الدور']);
-
-        $target = User::whereNull('deleted_at')->find($data['user_id']);
-        abort_unless($target, 422, 'لا مستخدمَ بهذا المعرّف');
-
-        $role = $data['role'] ?? 'member';
-
-        // تصعيدُ الهويّة — تنصيبُ مالكٍ أو مشرفٍ — للمالك وحده (لا المشرف)
-        if (Conversation::roleRank($role) >= Conversation::roleRank('moderator')) {
-            abort_unless($actorRole === 'owner', 403, 'تنصيبُ المشرفين والملّاك للمالك وحده');
-        }
-
-        // عضويّةٌ واحدةٌ لكلِّ ثنائيّ — إن كان عضواً فالتغييرُ عبر تعديل الدور لا الإضافة
-        abort_if(
-            ConversationMember::where('conversation_id', $conv->id)->where('user_id', $target->id)->exists(),
-            422, 'المستخدمُ عضوٌ أصلاً — عدّل دورَه'
-        );
-
-        ConversationMember::create([
-            'conversation_id' => $conv->id, 'user_id' => $target->id,
-            'role' => $role, 'source' => 'explicit',
-        ]);
-
-        hub_audit('channel.member_added', 'conversations', (string) $conv->id,
-            $target->name, ['after' => $role]);
+        $data = $r->validate(ChannelService::addMemberRules(), [], ['user_id' => 'المستخدم', 'role' => 'الدور']);
+        ChannelService::addMember($id, $data);
 
         return back()->with('ok', 'أُضيف العضو');
     }
@@ -592,38 +455,10 @@ class ConversationController extends Controller
     /** تعديلُ دورِ عضوٍ — المشرفُ فأعلى؛ ولا يمسّ مَن يفوقه، والتصعيدُ للمالك وحده */
     public function setRole(Request $r, string $id)
     {
-        [$conv, $actorRole] = self::guardConversation($id, 'manage');
+        self::guardConversation($id, 'manage');
 
-        $data = $r->validate([
-            'user_id' => ['required', 'string'],
-            'role'    => ['required', 'string', Rule::in(ConversationMember::ROLES)],
-        ], [], ['user_id' => 'المستخدم', 'role' => 'الدور']);
-
-        $m = ConversationMember::where('conversation_id', $conv->id)
-            ->where('user_id', $data['user_id'])->first();
-        abort_unless($m, 404, 'العضوُ غيرُ موجودٍ في القناة');
-
-        $newRole = $data['role'];
-        $actorRank = Conversation::roleRank($actorRole);
-
-        // المشرفُ لا يمسّ مَن يفوقه أو يساويه رتبةً (مالكٌ/مشرفٌ آخر)، ولا يصعّد إلى
-        // رتبةِ إدارة — التصعيدُ/المساسُ بالإدارة للمالك وحده.
-        if ($actorRole !== 'owner') {
-            abort_unless(Conversation::roleRank($m->role) < $actorRank, 403, 'لا تمسّ مَن يفوقك أو يساويك');
-            abort_unless(Conversation::roleRank($newRole) < Conversation::roleRank('moderator'), 403,
-                'التصعيدُ إلى إدارةٍ للمالك وحده');
-        }
-
-        // لا تُخلى القناةُ من مالكها الأخير بخفضِ دورِه
-        if ($m->role === 'owner' && $newRole !== 'owner' && $this->ownerCount($conv->id) <= 1) {
-            abort(422, 'لا تُخلى القناةُ من مالكها الوحيد — نصّب مالكاً آخرَ أولاً');
-        }
-
-        $before = $m->role;
-        $m->update(['role' => $newRole]);
-
-        hub_audit('channel.member_role', 'conversations', (string) $conv->id,
-            optional($m->user)->name, ['before' => $before, 'after' => $newRole]);
+        $data = $r->validate(ChannelService::setRoleRules(), [], ['user_id' => 'المستخدم', 'role' => 'الدور']);
+        ChannelService::setRole($id, $data);
 
         return back()->with('ok', 'عُدّل الدور');
     }
@@ -631,38 +466,11 @@ class ConversationController extends Controller
     /** إزالةُ عضوٍ — المشرفُ فأعلى؛ لا يزيل مَن يفوقه، ولا يُخلي القناةَ من مالك */
     public function removeMember(Request $r, string $id)
     {
-        [$conv, $actorRole] = self::guardConversation($id, 'manage');
+        self::guardConversation($id, 'manage');
 
         $data = $r->validate(['user_id' => ['required', 'string']], [], ['user_id' => 'المستخدم']);
-
-        $m = ConversationMember::where('conversation_id', $conv->id)
-            ->where('user_id', $data['user_id'])->first();
-        abort_unless($m, 404, 'العضوُ غيرُ موجودٍ في القناة');
-
-        // المشرفُ لا يزيل مالكاً/مشرفاً آخر — الإزالةُ لمن دونه رتبةً (المالكُ يزيل الكلّ)
-        if ($actorRole !== 'owner') {
-            abort_unless(Conversation::roleRank($m->role) < Conversation::roleRank($actorRole),
-                403, 'لا تزيل مَن يفوقك أو يساويك');
-        }
-
-        // لا تُخلى القناةُ من مالكها الأخير
-        if ($m->role === 'owner' && $this->ownerCount($conv->id) <= 1) {
-            abort(422, 'لا تُخلى القناةُ من مالكها الوحيد — نصّب مالكاً آخرَ أولاً');
-        }
-
-        $name = optional($m->user)->name;
-        $before = $m->role;
-        $m->delete();
-
-        hub_audit('channel.member_removed', 'conversations', (string) $conv->id, $name, ['before' => $before]);
+        ChannelService::removeMember($id, $data['user_id']);
 
         return back()->with('ok', 'أُزيل العضو');
-    }
-
-    /** عددُ مالكي الحاوية — حاجزُ «لا قناةَ بلا مالك» */
-    private function ownerCount(string $conversationId): int
-    {
-        return ConversationMember::where('conversation_id', $conversationId)
-            ->where('role', 'owner')->count();
     }
 }

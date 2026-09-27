@@ -7,11 +7,11 @@ use App\Models\Asset;
 use App\Models\IdentityLookup;
 use App\Models\Product;
 use App\Models\RecordIdentifier;
-use App\Support\Barcode;
-use App\Support\Custody;
+use App\Support\Documents\Barcode;
+use App\Support\Assets\Custody;
 use App\Support\Discovery\Engine;
-use App\Support\Identity;
-use App\Support\Qr;
+use App\Support\Security\Identity;
+use App\Support\Documents\Qr;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -190,7 +190,7 @@ class IdentityController extends Controller
 
                 $norm = Identity::norm('gtin', (string) ($d['barcode'] ?? ''));
                 $owner = $norm !== ''
-                    ? RecordIdentifier::where('module', 'products')->where('norm', $norm)->first() : null;
+                    ? RecordIdentifier::where('module', 'products')->where('norm', $norm)->orderBy('created_at')->orderBy('id')->first() : null;
                 // صاحبُ الباركود يُتبَع **داخل النطاق وحده**: منتجُ شركةٍ أخرى بالباركود نفسه
                 // كان يُتبنّى ويُطبع اسمُه في الرسالة، ويرث الأصلُ شركتَه الأجنبية.
                 $ownerProduct = $owner
@@ -204,7 +204,7 @@ class IdentityController extends Controller
                     $warnings[] = 'الباركود مسجَّلٌ لمنتجٍ قائم — استُعمل «' . $product->name . '» بدل إنشاء مكرر';
                 } else {
                     // مصدرُ الاستكشاف يُقرأ من كاش الخادم لا من المتصفح — لا ثقةَ تُدّعى
-                    $cache = $norm !== '' ? IdentityLookup::where('norm', $norm)->first() : null;
+                    $cache = $norm !== '' ? IdentityLookup::where('norm', $norm)->orderBy('id')->first() : null;
                     $product = new Product(array_filter([
                         'name' => $d['name'], 'brand' => $d['brand'] ?? null,
                         'manufacturer' => $d['manufacturer'] ?? null, 'model' => $d['model'] ?? null,

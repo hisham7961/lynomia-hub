@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\StepUp;
+use App\Support\Security\StepUp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 

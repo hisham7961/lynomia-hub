@@ -4,10 +4,11 @@
     @foreach ($items as $n)
         {{-- عبر notifications.go: فتحُ الإشعار يُقرّئه فتصدق الشارة بلا «تحديد الكل» --}}
         @php $url = ($n->module && $n->record_id && hub_mod($n->module)) ? route('notifications.go', $n->id) : null; @endphp
-        <a class="palitem" @if($url) href="{{ hub_safe_url($url) }}" @else href="javascript:void 0" @endif style="{{ $n->read ? 'opacity:.62' : '' }}">
+        {{-- بلا وجهة = ليس رابطاً (كما في مركز الإشعارات) — لا `javascript:void` تحجبه السياسةُ الصارمة --}}
+        <{{ $url ? 'a' : 'div' }} class="palitem" @if($url) href="{{ hub_safe_url($url) }}" @endif style="{{ $n->read ? 'opacity:.62' : '' }}">
             @unless ($n->read)<span style="width:7px;height:7px;border-radius:50%;background:var(--p);flex-shrink:0"></span>@endunless
             <span style="flex:1;font-size:12.5px;line-height:1.5">{{ hub_notification_text(auth()->user(), $n) }}<span class="sub" style="display:block;font-size:10.5px">{{ $n->created_at?->diffForHumans() }}</span></span>
-        </a>
+        </{{ $url ? 'a' : 'div' }}>
     @endforeach
     <button class="palitem sub" type="button" style="width:100%;border:0;background:none;cursor:pointer;border-top:1px dashed var(--ln);justify-content:center"
             {{-- **الرمزُ في الترويسة** (v2.338): الزرُّ خارج أيّ نموذج (يُحقن في

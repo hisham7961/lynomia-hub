@@ -7,8 +7,8 @@ use App\Models\EmployeeCustodyMove;
 use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use App\Models\LedgerAccount;
-use App\Support\CustodyPostingService;
-use App\Support\HubEvents;
+use App\Support\Assets\CustodyPostingService;
+use App\Support\Platform\HubEvents;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -202,17 +202,21 @@ class WorkOsCustodyPostingTest extends TestCase
 
     public function test_all_three_rails_post_through_the_one_shared_service(): void
     {
-        $fin = (string) \Tests\Support\Source::read(\App\Http\Controllers\Web\FinController::class);
+        // (خطّة التطبيق 4.6) رافدُ الدفعة صار `FinPayment` — يستدعيه الويبُ والجوالُ معاً
+        $fin = (string) \Tests\Support\Source::read(\App\Support\Finance\FinPayment::class);
+        $this->assertStringContainsString('FinPayment::pay',
+            (string) \Tests\Support\Source::read(\App\Http\Controllers\Web\FinController::class),
+            'FinController لم يعد يفوّض الدفعةَ إلى المحرّك المشترَك FinPayment — نسخةٌ محتملة');
         $pay = (string) \Tests\Support\Source::read(\App\Http\Controllers\Web\PayrollController::class);
-        $cust = (string) \Tests\Support\Source::read(\App\Support\CustodyPostingService::class);
+        $cust = (string) \Tests\Support\Source::read(\App\Support\Assets\CustodyPostingService::class);
 
-        foreach (['FinController' => $fin, 'PayrollController' => $pay, 'CustodyPostingService' => $cust] as $n => $src) {
+        foreach (['FinPayment' => $fin, 'PayrollController' => $pay, 'CustodyPostingService' => $cust] as $n => $src) {
             $this->assertStringContainsString('postBalanced', $src,
                 "{$n} لا يمرّ عبر خدمة الترحيل الواحدة (postBalanced) — نسخةٌ محتملةٌ من محرّك القيد");
         }
 
         // ولا نسخةَ ثالثة: المتحكّمان لا يُنشئان القيدَ ولا سطورَه مباشرةً بعد الاستخراج
-        foreach (['FinController' => $fin, 'PayrollController' => $pay] as $n => $src) {
+        foreach (['FinPayment' => $fin, 'PayrollController' => $pay] as $n => $src) {
             $this->assertStringNotContainsString('JournalEntry::create', $src,
                 "{$n} ما زال ينشئ القيدَ مباشرةً — لم يُستخرَج إلى الخدمة المشترَكة");
             $this->assertStringNotContainsString('JournalLine::create', $src,

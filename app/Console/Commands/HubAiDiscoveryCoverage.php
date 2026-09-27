@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Support\AiCatalog;
-use App\Support\LiteLlmAdmin;
+use App\Support\Ai\Catalog\AiCatalog;
+use App\Support\Ai\Gateway\LiteLlmAdmin;
 use Illuminate\Console\Command;
 
 /**

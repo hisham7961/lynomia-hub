@@ -6,7 +6,7 @@ use App\Models\Attachment;
 use App\Models\Employee;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\DocumentPolicy;
+use App\Support\Documents\DocumentPolicy;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;

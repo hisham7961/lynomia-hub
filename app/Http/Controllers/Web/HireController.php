@@ -51,7 +51,7 @@ class HireController extends Controller
          * لمراجعة الصلاحيات**. وحارس التصعيد نفسه يسري: الملكية لا يمنحها إلا مالك.
          */
         /*
-         * سكّةٌ واحدة للطرفين: App\Support\Staff. كان الشرط هنا نسخةً ثانية —
+         * سكّةٌ واحدة للطرفين: App\Support\Workforce\Staff. كان الشرط هنا نسخةً ثانية —
          * و`$roleId && hub_can(users,'v') || $roleId && hub_flag(users)` تُقرأ
          * **بالأسبقية** فتُجيز فتحَ حسابٍ لمن يملك **عرض** المستخدمين وحده.
          * العرضُ ليس المنح. الرايةُ وحدها تفتح الحسابات، ويفرضها الرافد نفسه.
@@ -61,8 +61,8 @@ class HireController extends Controller
         // والبوّابةُ واحدةٌ في Staff (الجولة 2 · G15): المالك، أو رايةُ إدارةِ المستخدمين
         // كما كان، أو مفتاحُ `hr:staffAccounts` — فمن يُعيّن يفتح الحسابَ في الحركة
         // نفسِها بدل أن ينتظر رابعاً. الرافدُ نفسُه يفرضها ثانيةً فلا نسخةَ تتفرّق.
-        if ($roleId !== '' && \App\Support\Staff::mayOpenAccounts()) {
-            $temp = \App\Support\Staff::makeAccount($emp, $roleId);
+        if ($roleId !== '' && \App\Support\Workforce\Staff::mayOpenAccounts()) {
+            $temp = \App\Support\Workforce\Staff::makeAccount($emp, $roleId);
         }
 
         $c->stage = 'تم التعيين';
@@ -72,7 +72,7 @@ class HireController extends Controller
             return [$emp, $temp];
         });
 
-        \App\Support\FlowRunner::fire('status', 'recruit', $c, 'تم التعيين');
+        \App\Support\Platform\FlowRunner::fire('status', 'recruit', $c, 'تم التعيين');
         hub_audit('تعيين مرشح', 'recruit', $c->id, $c->name);
 
         $msg = '🎉 عُيّن المرشح — أكمل ملفه الوظيفي (الراتب والإقامة والعهدة)';

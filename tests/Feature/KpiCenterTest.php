@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\KpiDef;
-use App\Support\KpiCentre;
+use App\Support\Insights\KpiCentre;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 

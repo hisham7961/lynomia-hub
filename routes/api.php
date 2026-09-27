@@ -193,6 +193,15 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     Route::get('home', [\App\Http\Controllers\Api\MobileWorkController::class, 'home'])->name('mobile.home');
     Route::get('search', [\App\Http\Controllers\Api\MobileWorkController::class, 'search'])->name('mobile.search');
 
+    // «اسأل Hub» (خارطةُ الذكاء · المرحلة ٢) — حرفيّةُ `ask*` قبل الـcatch-all؛ السؤالُ بخنقِ المساعد نفسِه،
+    // والخيوطُ لصاحبها وحدَه (AskMemory) — غيرُه ٤٠٤
+    Route::post('ask', [\App\Http\Controllers\Api\MobileAskController::class, 'ask'])
+        ->middleware('throttle:' . \App\Support\Ai\Ask\AskPolicy::THROTTLE)->name('mobile.ask.run');
+    Route::get('ask/threads', [\App\Http\Controllers\Api\MobileAskController::class, 'threads'])->name('mobile.ask.threads.index');
+    Route::delete('ask/threads', [\App\Http\Controllers\Api\MobileAskController::class, 'destroyAll'])->name('mobile.ask.threads.destroy_all');
+    Route::get('ask/threads/{id}', [\App\Http\Controllers\Api\MobileAskController::class, 'show'])->name('mobile.ask.threads.show');
+    Route::delete('ask/threads/{id}', [\App\Http\Controllers\Api\MobileAskController::class, 'destroy'])->name('mobile.ask.threads.destroy');
+
     // تقريرُ العملِ اليوميّ (§93): حالُ اليوم وبنودُه للموظّف نفسِه — حرفيّةُ `work/*`
     // قبل catch-all `{module}` كي لا يبتلعها. التقديمُ يُعادُ استعمالُ CRUD الوحدة updates.
     Route::get('work/today', [\App\Http\Controllers\Api\MobileReportsController::class, 'today'])->name('mobile.work.today');
@@ -287,6 +296,9 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     Route::post('comments/{id}/react', [\App\Http\Controllers\Api\MobileCollabController::class, 'commentReact'])->name('mobile.comments.react');
     Route::get('presence', [\App\Http\Controllers\Api\MobileCollabController::class, 'presence'])->name('mobile.presence');
     Route::get('saved', [\App\Http\Controllers\Api\MobileCollabController::class, 'saved'])->name('mobile.saved.index');
+    // طلب الجوال #7 (إضافيّ): حفظٌ/إزالةٌ بحرسِ الرؤيةِ نفسِه — حرفيّان قبل الـcatch-all (F9)
+    Route::post('saved', [\App\Http\Controllers\Api\MobileCollabController::class, 'saveStore'])->name('mobile.saved.store');
+    Route::delete('saved/{id}', [\App\Http\Controllers\Api\MobileCollabController::class, 'saveDestroy'])->name('mobile.saved.destroy');
 
     /*
      * ── ملفّاتٌ + ماسحٌ + موقع (Mobile Readiness · الطور F · §109) ──
@@ -327,6 +339,9 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     Route::post('tracking/{session}/points', [\App\Http\Controllers\Api\MobileFileController::class, 'trackingPoints'])->name('mobile.tracking.points');
     Route::post('tracking/{session}/end', [\App\Http\Controllers\Api\MobileFileController::class, 'trackingEnd'])->name('mobile.tracking.end');
 
+    // ── التعاونُ والعميلُ وسيرُ العمل (خطّة التطبيق · المرحلة ٤) — حرفيّاتٌ قبل الـcatch-all (F9)
+    require __DIR__ . '/api/mobile-workflow.php';
+
     /*
      * ── المزامنة/الصمود (Mobile Readiness · الطور G · §109) ──
      *
@@ -342,6 +357,50 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
      * (G.2/G.3/G.4) في المحرّكِ المُعادِ استعمالُه لا في مسارٍ ثانٍ.
      */
     Route::get('sync/{module}', [\App\Http\Controllers\Api\MobileSyncController::class, 'sync'])->name('mobile.sync');
+
+    /*
+     * ── أفعالُ الميدان والموظّف (خطّةُ التطبيق · المرحلة ٣ · إضافيّ) ──
+     *
+     * كلُّها فوق **السككِ الويبية نفسِها** لا محرّكٍ ثانٍ: `Workday` (الحضور)، `LeaveDecision`
+     * (قرارُ الإجازة)، `CustodyHandover` (العهدة)، `InventorySessions` (الجرد)، `AttachmentService`
+     * (المرفقات)، و`record_versions` (النسخ). **حرفيّةٌ كلُّها تُسجَّل قبل الـcatch-all (F9)** —
+     * وإلّا ابتلع `GET {module}` كلمةَ `files`، و`DELETE {module}/{id}` مسارَ `files/{id}`،
+     * و`GET {module}/{id}` مسارَ `me/custody`. وحسابُ العميل خارجَ قائمة `mobile.portal` لها
+     * كلِّها (الويبُ يردّه عن نظائرها) — عدا ما هو صريحٌ في `MobilePortalGuard::NAME_ALLOW`.
+     */
+    Route::get('attendance/today', [\App\Http\Controllers\Api\MobileAttendanceController::class, 'today'])->name('mobile.attendance.today');
+    Route::post('attendance/check-in', [\App\Http\Controllers\Api\MobileAttendanceController::class, 'checkIn'])
+        ->middleware('throttle:30,1')->name('mobile.attendance.check_in');
+    Route::post('attendance/check-out', [\App\Http\Controllers\Api\MobileAttendanceController::class, 'checkOut'])
+        ->middleware('throttle:30,1')->name('mobile.attendance.check_out');
+    Route::post('leaves/{id}/decide', [\App\Http\Controllers\Api\MobileLeavesController::class, 'decide'])
+        ->middleware('throttle:60,1')->name('mobile.leaves.decide');
+    // أهليّةُ الأزرار بلا أثر (قراءةٌ بقواعد الفعل نفسِه — لا تخمينَ في التطبيق) — ثلاثيّةٌ حرفيّةُ اللاحقة قبل الـcatch-all
+    Route::get('leaves/{id}/decision', [\App\Http\Controllers\Api\MobileLeavesController::class, 'decision'])->name('mobile.leaves.decision');
+    Route::get('me/custody', [\App\Http\Controllers\Api\MobileCustodyController::class, 'mine'])->name('mobile.me.custody');
+    Route::post('custody/{id}/handover', [\App\Http\Controllers\Api\MobileCustodyController::class, 'handover'])
+        ->middleware('throttle:60,1')->name('mobile.custody.handover');
+    Route::post('custody/{id}/recover', [\App\Http\Controllers\Api\MobileCustodyController::class, 'recover'])
+        ->middleware('throttle:60,1')->name('mobile.custody.recover');
+    Route::get('custody/{id}/abilities', [\App\Http\Controllers\Api\MobileCustodyController::class, 'abilities'])->name('mobile.custody.abilities');
+    Route::get('inventory/sessions', [\App\Http\Controllers\Api\MobileInventoryController::class, 'sessions'])->name('mobile.inventory.index');
+    Route::get('inventory/sessions/{id}', [\App\Http\Controllers\Api\MobileInventoryController::class, 'session'])->name('mobile.inventory.show');
+    Route::middleware('throttle:120,1')->group(function () {
+        Route::post('inventory/sessions', [\App\Http\Controllers\Api\MobileInventoryController::class, 'freeze'])->name('mobile.inventory.freeze');
+        Route::post('inventory/sessions/{id}/scan', [\App\Http\Controllers\Api\MobileInventoryController::class, 'scan'])->name('mobile.inventory.scan');
+        Route::post('inventory/sessions/{id}/reconcile', [\App\Http\Controllers\Api\MobileInventoryController::class, 'reconcile'])->name('mobile.inventory.reconcile');
+        Route::post('inventory/sessions/{id}/close', [\App\Http\Controllers\Api\MobileInventoryController::class, 'close'])->name('mobile.inventory.close');
+    });
+    // طلب الجوال #1: قائمةُ مرفقات السجلّ وحذفُ مرفق — بحارسَي الويب (`guardRecord` + `DocumentPolicy`)
+    // (مراجعة) تحت `attachments` لا `files`: `files` مفتاحُ وحدة الوثائق — والمسارُ الحرفيُّ كان يخطف قائمتها وحذفَها
+    Route::get('attachments', [\App\Http\Controllers\Api\MobileFileController::class, 'recordFiles'])->name('mobile.files.index');
+    Route::delete('attachments/{id}', [\App\Http\Controllers\Api\MobileFileController::class, 'deleteFile'])
+        ->middleware('throttle:60,1')->name('mobile.files.destroy');
+    // طلب الجوال #2: تنزيلُ مرفقِ تعليقٍ/رسالةٍ بمقبضِ صاحبها
+    Route::get('comments/{id}/attachment', [\App\Http\Controllers\Api\MobileRecordExtrasController::class, 'commentAttachment'])->name('mobile.comments.attachment');
+    Route::get('dm/messages/{id}/attachment', [\App\Http\Controllers\Api\MobileRecordExtrasController::class, 'dmAttachment'])->name('mobile.dm.attachment');
+    // نسخُ السجلّ (رقم/متى/من) — ثلاثيّةُ المقطع، قبل `{module}/{id}` انضباطاً (F9)
+    Route::get('{module}/{id}/versions', [\App\Http\Controllers\Api\MobileRecordExtrasController::class, 'versions'])->name('mobile.versions.index');
 
     // D.2/D.3 — إجراءاتُ المورد: لاحقةُ `/actions` **قبل** `{module}/{id}` (المقطعُ
     // الحرفيّ `actions` يميّزها، ومع ذلك تُسجَّل أوّلاً انضباطاً · F9)

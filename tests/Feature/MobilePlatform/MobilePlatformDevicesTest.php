@@ -6,7 +6,7 @@ use App\Models\MobileInstallation;
 use App\Models\MobileSession;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\MobileSessionService;
+use App\Support\Mobile\MobileSessionService;
 use Tests\TestCase;
 
 /**

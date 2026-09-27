@@ -42,7 +42,7 @@ class CeoController extends Controller
          * طبقة القرار تُحسب في محرّكاتٍ عامّةٍ خارج هذا المتحكّم — والتصريحُ
          * صدقٌ، أمّا الصمتُ فادّعاءُ تصفيةٍ لم تقع.
          */
-        $activeCo = \App\Support\ExecutionStats::activeCompany();
+        $activeCo = \App\Support\Workforce\ExecutionStats::activeCompany();
 
         // hub_fin_not_dead تُبقي «بلا حالة»: whereNotIn وحدها كانت تُسقط state=NULL صامتاً
         $fin = fn () => hub_fin_not_dead(
@@ -102,14 +102,14 @@ class CeoController extends Controller
         // أسفلَ الصفحةِ عينِها. القراءةُ الآن من `DailyWorkCompliance` — ومعها
         // `kind` يميّز إجازةَ الخصمِ من العذرِ المأذون، فلا يضيع أحدٌ ولا يُخلَط.
         // والتصفيةُ بشركةِ **الموظّف** صاحبِ الطلب — هي ما يقرؤه صاحبُ القرار.
-        $onLeave = \App\Support\DailyWorkCompliance::onLeaveToday($today, $activeCo['id'] ?? null);
+        $onLeave = \App\Support\Workforce\DailyWorkCompliance::onLeaveToday($today, $activeCo['id'] ?? null);
         $attToday = hub_company_scope(DB::table('attendance')->whereNull('deleted_at'), 'attend')
             ->where('date', $today)->count();
 
         // «نداءُ اليوم» (الجولة ١ · F9): المصدرُ نفسُه الذي تقرؤه شاشةُ «فريقي اليوم» —
         // الغائبُ بالفرق (النشطون − من ختم − من في إجازة)، فلا «0 حاضر» فوقها «مكتمل».
         // عدُّ الصفوفِ الخام كان يحسب صفَّ «غائب» المختومَ حاضراً — البطاقةُ تقرأ النداء.
-        $teamRoll = \App\Support\DailyWorkCompliance::rollCall(
+        $teamRoll = \App\Support\Workforce\DailyWorkCompliance::rollCall(
             hub_company_scope(\App\Models\Employee::whereNull('deleted_at')->where('status', 'نشط'), 'hr')
                 ->orderBy('name')->orderBy('id')->get(['id', 'name', 'dept', 'user_id'])
         );
@@ -132,12 +132,12 @@ class CeoController extends Controller
         $currency = setting('app.currency', 'د.ك');
 
         // طبقة القرار فوق طبقة الأرقام: ما ينتظرني · أين ينزف المال · أين الخطر
-        $awaiting = \App\Support\CeoBoard::awaiting(auth()->user());
-        $leaks = \App\Support\CeoBoard::leaks();
-        $conc = \App\Support\CeoBoard::concentration();
-        $risks = \App\Support\CeoBoard::risks();
-        $trend = \App\Support\CeoBoard::trend($months);
-        $gov = \App\Support\CeoBoard::governance();
+        $awaiting = \App\Support\Insights\CeoBoard::awaiting(auth()->user());
+        $leaks = \App\Support\Insights\CeoBoard::leaks();
+        $conc = \App\Support\Insights\CeoBoard::concentration();
+        $risks = \App\Support\Insights\CeoBoard::risks();
+        $trend = \App\Support\Insights\CeoBoard::trend($months);
+        $gov = \App\Support\Insights\CeoBoard::governance();
 
         return view('ceo.index', compact('kpi', 'health', 'months', 'max', 'projects',
             'onLeave', 'attToday', 'teamRoll', 'unpaidTop', 'taskSlices', 'pipe', 'mrr', 'currency',

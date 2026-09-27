@@ -56,7 +56,7 @@
 
 ## 2. زوجُ الرمزَين — التجزئةُ حصراً
 
-`app/Support/MobileSessionService.php`. القاعدةُ الواحدة: **الرمزان sha256 hex حصراً**
+`app/Support/Mobile/MobileSessionService.php`. القاعدةُ الواحدة: **الرمزان sha256 hex حصراً**
 (نمطُ `ApiToken.token_hash`)، والنصُّ الصريحُ يُعاد مرّةً ولا يُخزَّن ولا يُسجَّل ولا
 يُدقَّق. النصُّ: `lyma_…` للوصول (`:49`)، `lymr_…` للتحديث (`:55`).
 
@@ -104,7 +104,7 @@
 
 `POST auth/step-up` (`stepUp:427`). تصعيدُ الويب يختم نافذةً في `session()` — عديمُ
 الجدوى للجوال. الجوالُ يُعيد استعمالَ **فحصِ الاعتماد وحدَه** `StepUp::checkCredential`
-(`app/Support/StepUp.php:59` — TOTP لمن فعّله وإلا `Hash::check`، بلا `session()` ·
+(`app/Support/Security/StepUp.php:59` — TOTP لمن فعّله وإلا `Hash::check`، بلا `session()` ·
 Critic F11)، ثم يُثبِت المِنحةَ في `mobile_stepup_grants` مربوطةً بـ**(المستخدم + جلسة
 الجوال + الغرض + الانتهاء)**. الفشلُ ⇒ `STEP_UP_REQUIRED` 428. تستهلكها الأطوارُ
 اللاحقة عبر `MobileSessionService::mobileStepUpFresh($session, $purpose)`

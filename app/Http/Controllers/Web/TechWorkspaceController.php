@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\DigitalAssets;
-use App\Support\Workspaces;
+use App\Support\Assets\DigitalAssets;
+use App\Support\Platform\Workspaces;
 use Illuminate\Http\Request;
 
 /**

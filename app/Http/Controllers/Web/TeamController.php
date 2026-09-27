@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\TeamDirectory;
+use App\Support\Workforce\TeamDirectory;
 use Illuminate\Http\Request;
 
 /** دليل الفريق — وجوهٌ لا صفوف */

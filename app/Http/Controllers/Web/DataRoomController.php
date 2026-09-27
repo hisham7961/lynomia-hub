@@ -63,7 +63,7 @@ class DataRoomController extends Controller
             // حدُّ النظام نفسُه لا رقمٌ مكتوبٌ بيد: كان ٥٠ م.ب صامتاً بينما بقية
             // مسارات الرفع تتبع «files.max_kb» — فغرفةُ البيانات مخزنُ ملفاتٍ
             // كغيرها، ومن رفع هويةً بصريةً هنا يستحق السقفَ ذاته.
-            'file'     => ['required', 'file', 'max:' . hub_upload_cap()['kb']],
+            'file'     => ['required', 'file', 'max:' . hub_upload_cap()['kb'], \App\Support\Security\UploadPolicy::rule()],   // FS-04
             'password' => ['nullable', 'string', 'min:8', 'max:100'],   // سطحٌ عامّ: ٤ أحرف تُخمَّن (v2.399)
             'days'     => ['nullable', 'integer', 'min:1', 'max:365'],
             'no_download' => ['nullable'],
@@ -166,9 +166,9 @@ class DataRoomController extends Controller
             $stamp = setting('app.name', 'Lynomia') . ' · ' . $r->ip() . ' · ' . now()->format('Y-m-d H:i');
             try {
                 $bytes = (string) $link->mime === 'application/pdf'
-                    ? \App\Support\Watermark::pdf($abs, $stamp)
-                    : \App\Support\Watermark::image($abs, $stamp, (string) $link->mime);
-            } catch (\App\Support\UnsupportedPdfException $e) {
+                    ? \App\Support\Documents\Watermark::pdf($abs, $stamp)
+                    : \App\Support\Documents\Watermark::image($abs, $stamp, (string) $link->mime);
+            } catch (\App\Support\Documents\UnsupportedPdfException $e) {
                 // سببٌ مسمّى لا ٥٠٠ (v2.399): الملفُ بضغطٍ حديث لا يُوسم على هذا الخادم — يبقى مغلقاً
                 abort(415, 'هذا الملف بصيغة PDF مضغوطة (1.5+) لا تُوسم على هذا الخادم — اطلب من مُرسِل الرابط نسخةً قابلة للتنزيل أو ملفاً بصيغة PDF 1.4');
             } catch (\Throwable $e) {

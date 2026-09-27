@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Support\Metrics;
+use App\Support\Ops\Metrics;
 use Illuminate\Console\Command;
 
 /**
@@ -22,7 +22,7 @@ class HubMetricsSnapshot extends Command
 
         if (! $out) {
             $this->info('لا حقول مقيسة فيها قيم بعد — لا نقاط.');
-            \App\Support\Health::beat('metrics', (int) round((microtime(true) - $t0) * 1000), 'ok', 'لا نقاط');
+            \App\Support\Ops\Health::beat('metrics', (int) round((microtime(true) - $t0) * 1000), 'ok', 'لا نقاط');
 
             return self::SUCCESS;
         }
@@ -32,7 +32,7 @@ class HubMetricsSnapshot extends Command
         }
         $this->info('المجموع: ' . array_sum($out) . ' نقطة عند ' . now()->startOfDay()->toDateString());
 
-        \App\Support\Health::beat('metrics', (int) round((microtime(true) - $t0) * 1000));
+        \App\Support\Ops\Health::beat('metrics', (int) round((microtime(true) - $t0) * 1000));
         return self::SUCCESS;
     }
 }

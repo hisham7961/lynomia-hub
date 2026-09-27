@@ -17,7 +17,7 @@
                 <td>
                     <b>{{ $dev->uname ?? '—' }}</b>
                     @if ($emailMode !== 'hide' && $dev->uemail)
-                        <div class="sub">{{ $emailMode === 'mask' ? \App\Support\SecurityFindings::maskPII($dev->uemail) : $dev->uemail }}</div>
+                        <div class="sub">{{ $emailMode === 'mask' ? \App\Support\Security\SecurityFindings::maskPII($dev->uemail) : $dev->uemail }}</div>
                     @endif
                 </td>
                 <td>{{ $dev->label ?: '—' }}<div class="sub">{{ $dev->platform ?: '' }}</div></td>

@@ -3,7 +3,7 @@
 @section('content')
 @component('partials.pagehead', ['icon' => '💰', 'title' => 'التقارير المالية', 'crumb' => 'الأدوات',
     'sub' => 'مبنية مباشرة على وحدة المالية — الملغاة والمسودات مستثناة'])
-    <button class="btn ghost sm" onclick="window.print()">🖨 طباعة</button>
+    <button class="btn ghost sm" data-print>🖨 طباعة</button>
 @endcomponent
 @if ($converted ?? false)
     @include('partials._convertedcur', ['currency' => $currency, 'what' => 'مجاميعُ هذا التقرير'])

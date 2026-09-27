@@ -1,0 +1,122 @@
+<?php
+
+/** سجلُّ الوحدات — «hrlog» (docs/REORG_PLAN.md §R4) — يُحمَّل بترتيبه من قائمة config/hub.php */
+
+return [
+    'key' => 'hrlog',
+    'table' => 'employee_records',
+    'model' => 'EmployeeRecord',
+    'label' => 'سجلات الموظفين',
+    'display' => 'title',
+    'status' => 'status',
+    'columns' => [
+        'empId',
+        'title',
+        'kind',
+        'date',
+        'expiry',
+        'status',
+    ],
+    'fields' => [
+        ['key' => 'companyId', 'col' => 'company_id', 'label' => 'الشركة', 'type' => 'ref', 'ref' => 'companies'],
+        [
+            'key' => 'empId',
+            'col' => 'emp_id',
+            'label' => 'الموظف',
+            'type' => 'ref',
+            'required' => true,
+            'ref' => 'hr',
+        ],
+        [
+            'key' => 'title',
+            'col' => 'title',
+            'label' => 'العنوان',
+            'type' => 'text',
+            'required' => true,
+        ],
+        [
+            'key' => 'kind',
+            'col' => 'kind',
+            'label' => 'النوع',
+            'type' => 'sel',
+            'required' => true,
+            'options' => [
+                'تدريب',
+                'شهادة',
+                'إنذار',
+                'ملاحظة',
+                'تقييم أداء',
+                'مكافأة',
+            ],
+        ],
+        [
+            'key' => 'date',
+            'col' => 'date',
+            'label' => 'التاريخ',
+            'type' => 'date',
+            'required' => true,
+        ],
+        [
+            'key' => 'expiry',
+            'col' => 'expiry',
+            'label' => 'تاريخ الانتهاء',
+            'type' => 'date',
+            'expiry' => true,
+        ],
+        [
+            'key' => 'byId',
+            'col' => 'by_id',
+            'label' => 'الجهة / المسؤول',
+            'type' => 'ref',
+            'ref' => 'users',
+        ],
+        [
+            'key' => 'provider',
+            'col' => 'provider',
+            'label' => 'الجهة المانحة',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'score',
+            'col' => 'score',
+            'label' => 'النتيجة / الدرجة',
+            'type' => 'text',
+        ],
+        [
+            'key' => 'cost',
+            'col' => 'cost',
+            'label' => 'التكلفة',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'status',
+            'col' => 'status',
+            'label' => 'الحالة',
+            'type' => 'sel',
+            'options' => [
+                'ساري',
+                'منتهي',
+                'قيد التنفيذ',
+                'مغلق',
+            ],
+        ],
+        [
+            'key' => 'desc',
+            'col' => 'description',
+            'label' => 'التفاصيل',
+            'type' => 'ta',
+        ],
+        [
+            'key' => 'att',
+            'col' => 'att_id',
+            'label' => 'مرفق',
+            'type' => 'file',
+        ],
+    ],
+    'search' => [
+        'title',
+        'provider',
+        'score',
+        'description',
+    ],
+];

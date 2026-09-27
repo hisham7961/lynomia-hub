@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\HubNotification;
-use App\Support\Health;
+use App\Support\Ops\Health;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;

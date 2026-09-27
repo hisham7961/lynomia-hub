@@ -7,8 +7,8 @@ use App\Models\Employee;
 use App\Models\LeaveRequest;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\DailyWorkCompliance;
-use App\Support\MonthlyAttendance;
+use App\Support\Workforce\DailyWorkCompliance;
+use App\Support\Workforce\MonthlyAttendance;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -74,7 +74,7 @@ class DogfoodR2AttendanceTest extends TestCase
     {
         return Attendance::create(array_merge([
             'emp_id' => $e->id, 'date' => $date, 'time_in' => $in, 'time_out' => $out,
-            'status' => \App\Support\Workday::PRESENT,
+            'status' => \App\Support\Workforce\Workday::PRESENT,
         ], $extra));
     }
 
@@ -230,7 +230,7 @@ class DogfoodR2AttendanceTest extends TestCase
         // صفٌّ كُتب قبلَ الحارس (أو من خارجِ النموذج) — يُقرأ لا يُجمَّل
         DB::table('attendance')->insert([
             'id' => (string) Str::uuid(), 'emp_id' => $e->id, 'date' => '2026-09-09',
-            'time_in' => '16:00', 'time_out' => '09:00', 'status' => \App\Support\Workday::PRESENT,
+            'time_in' => '16:00', 'time_out' => '09:00', 'status' => \App\Support\Workforce\Workday::PRESENT,
             'version' => 1, 'archived' => false, 'created_at' => now(), 'updated_at' => now(),
         ]);
 

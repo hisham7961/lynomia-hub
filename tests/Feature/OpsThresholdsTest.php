@@ -3,9 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\OutboxMessage;
-use App\Support\Health;
-use App\Support\SecurityPosture;
-use App\Support\SysMonitor;
+use App\Support\Ops\Health;
+use App\Support\Security\SecurityPosture;
+use App\Support\Ops\SysMonitor;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;

@@ -18,8 +18,8 @@
 
 | المكوّن | المسار |
 |---|---|
-| طبقةُ الاتّصالِ والحالة | `app/Support/AiGateway.php` |
-| فاحصُ البوّابةِ في الفاحصِ الواحد | `app/Support/ConnectionProbe.php::litellm()` |
+| طبقةُ الاتّصالِ والحالة | `app/Support/Ai/Gateway/AiGateway.php` |
+| فاحصُ البوّابةِ في الفاحصِ الواحد | `app/Support/Ops/ConnectionProbe.php::litellm()` |
 | المتحكّمُ والحارسُ والحفظُ والفحصُ والمسح | `app/Http/Controllers/Web/AiCenterController.php` |
 | الواجهةُ العربيّةُ RTL | `resources/views/ai/index.blade.php` |
 | المسارات | `routes/web.php` (`ai.index` · `ai.save` · `ai.test` · `ai.forget`) |

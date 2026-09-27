@@ -112,7 +112,7 @@ class ReaderGuardsRound6Test extends TestCase
         $u = $this->userWith($this->roleWith(['vault' => ['v' => 1, 'a' => 0, 'e' => 0, 'd' => 0]]), [$a->id]);
         $this->actingAs($u);
 
-        $titles = json_encode(\App\Support\DigitalAssets::vaultHealth(), JSON_UNESCAPED_UNICODE);
+        $titles = json_encode(\App\Support\Assets\DigitalAssets::vaultHealth(), JSON_UNESCAPED_UNICODE);
         $this->assertStringNotContainsString('سرُّ باء المكشوف', $titles,
             'صحّةُ الخزنة تعرض عناوينَ أسرارِ شركةٍ أجنبية لقارئٍ معزول');
     }

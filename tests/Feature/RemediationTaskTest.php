@@ -152,7 +152,7 @@ class RemediationTaskTest extends TestCase
         $this->seedCore();
         // سجلٌّ بلا شركة = نتيجةُ جودةٍ حقيقية في وحدة المهامّ
         Task::create(['title' => 'مهمّةٌ بلا شركة', 'status' => 'جديدة']);
-        \App\Support\DataQuality::scan(true);
+        \App\Support\Insights\DataQuality::scan(true);
 
         $role = $this->employee->role;
         $role->update(['flags' => ['monitor' => 1]]);

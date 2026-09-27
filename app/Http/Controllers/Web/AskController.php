@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Support\AskFailures;
-use App\Support\AskPipeline;
-use App\Support\AskPolicy;
-use App\Support\AskTools;
+use App\Support\Ai\Ask\AskFailures;
+use App\Support\Ai\Ask\AskMemory;
+use App\Support\Ai\Ask\AskPipeline;
+use App\Support\Ai\Ask\AskPolicy;
+use App\Support\Ai\Ask\AskTools;
 use Illuminate\Http\Request;
 
 /**
@@ -18,16 +19,14 @@ use Illuminate\Http\Request;
  * الصفحة**، لا بإخفائها: لو أُخفيت عند انقطاعِ خدمةٍ لظنَّ صاحبُ الصلاحيّةِ
  * أنّه فقدها، وهو العيبُ نفسُه الذي يفصله `AskFailures`.
  *
- * ── **ولا محادثةً محفوظةً في هذه المرحلة — وهذا قرارٌ لا نقص** ──
+ * ── **والمحادثةُ المحفوظة: مرحلتُها جاءت بشروطها كاملة** (المرحلة ٢ · v2.605.0) ──
  *
- * حفظُ الأسئلةِ والأجوبةِ يُنشئ **مخزناً حسّاساً جديداً**: سؤالٌ مثل «كم راتبُ
- * فلان؟» يصير صفّاً يُقرأ لاحقاً بصلاحيّاتٍ غيرِ صلاحيّةِ سائله — وهو بعينِه
- * التسريبُ الذي أغلقه المسارُ كلُّه، ويعيده من البابِ الخلفيّ. فالمرحلةُ
- * **سؤالٌ وجوابٌ بلا أثرٍ مخزَّن**: ما يبقى هو أثرُ التدقيقِ وحدَه، وفيه
- * **من سأل ومتى وبأيِّ أدوات — لا ماذا سأل ولا ماذا أُجيب**.
- *
- * وإضافةُ محفوظاتٍ لاحقاً تحتاج مرحلتَها: مِلكيّةٌ ونطاقٌ وتحقّقٌ عند كلِّ
- * قراءةٍ وسياسةُ احتفاظٍ وحذف. ولا تُبنى بنصفِها.
+ * كانت المرحلةُ ٣ ترفض الحفظ: سؤالٌ مثل «كم راتبُ فلان؟» يصير صفّاً يُقرأ لاحقاً
+ * بصلاحيّاتٍ غيرِ صلاحيّةِ سائله. وقالت إنّ المحفوظاتِ تحتاج «مِلكيّةً ونطاقاً وتحقّقاً
+ * عند كلِّ قراءةٍ وسياسةَ احتفاظٍ وحذف — ولا تُبنى بنصفها». وهي الآن في `AskMemory`
+ * بالشروط تلك حرفاً: خيطٌ لصاحبه وحدَه، وجوابٌ لا يُعرَض ما لم تجتز مصادرُه الحارسَ
+ * **من جديد**، وأسئلةٌ سابقةٌ فقط (لا أجوبة) تصل النموذج، ونصوصٌ مشفَّرةٌ خارجَ التدقيق،
+ * ومقصُّ عمرٍ ومحوٌ لصاحبه. وأثرُ التدقيقِ ما زال يقول مَن سأل ومتى — لا ماذا.
  *
  * ── **وما لا يُعرَض أبداً** ──
  *
@@ -42,41 +41,122 @@ class AskController extends Controller
         AskPolicy::gate();
     }
 
-    public function index()
+    public function index(Request $r)
     {
         $this->gate();
 
-        return view('ask.index', $this->screen());
+        // خيطٌ محفوظٌ لصاحبه وحدَه — وخيطُ غيرِه ٤٠٤ كغيرِ الموجود (لا «ممنوع» تُفشي الوجود)
+        $thread = null;
+        if ($r->filled('thread')) {
+            $thread = AskMemory::open($r->user(), (string) $r->input('thread'));
+            abort_if($thread === null, 404);
+        }
+
+        return view('ask.index', $this->screen($thread));
     }
 
-    /** يسأل ويعرض — بلا حفظٍ ولا محادثةٍ مستمرّة */
+    /** يسأل ويعرض — ويحفظ في خيطِ صاحبه إن كانت الذاكرةُ مفعَّلة (`AskMemory`) */
     public function run(Request $r)
     {
         $this->gate();
 
+        return view('ask.index', $this->answer($r));
+    }
+
+    /**
+     * **السؤالُ نفسُه مع تقدّم القراءة** (المرحلة ٢ · «تدفّقُ الجواب» بصيغته الصادقة): أحداثُ SSE بكلِّ
+     * خطوةِ تفكيرٍ وكلِّ قراءةٍ مُنطَّقةٍ تمّت (وحدتُها وعددُ صفوفها) — **ولا حرفَ من الجواب قبل مصادقة
+     * مراجعه**: الحدثُ الأخيرُ (`done`) يحمل الصفحةَ نفسَها التي يعيدها `run`. والمسارُ ذاتُ الحرّاس
+     * (`answer()` واحدٌ للمسارين)، وبلا JavaScript يبقى النموذجُ العاديّ.
+     */
+    public function stream(Request $r)
+    {
+        $this->gate();
+        // خيطُ غيرِه ٤٠٤ **قبل** فتح البثّ — فلا يُرسَل رأسُ 200 لطلبٍ مرفوض
+        if ($r->filled('thread')) abort_if(AskMemory::open($r->user(), (string) $r->input('thread')) === null, 404);
+
+        return response()->stream(function () use ($r) {
+            // **يُكمل وإن أُغلق التبويب**: النداءُ دُفع ثمنُه، فالتدقيقُ ودورُ الخيط يُكتبان ولو غاب المتلقّي
+            ignore_user_abort(true);
+            $send = function (string $event, array $data): void {
+                if (connection_aborted()) return;
+                echo 'event: ' . $event . "\n" . 'data: ' . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
+                if (ob_get_level() > 0) @ob_flush();
+                flush();
+            };
+            // **والخطأُ بعد رأس 200 حدثٌ يُقال** — لا صفحةُ ٥٠٠ داخل بثٍّ بدأ فيقرؤها المتصفّحُ «انقطاعاً»
+            try {
+                $data = $this->answer($r, function (array $p) use ($send) {
+                    // الصياغةُ الواحدةُ للسطحَين (`AskPipeline::progressText`) — يبثّها الجوالُ حرفاً
+                    $send('progress', ['stage' => $p['stage'], 'text' => AskPipeline::progressText($p)]);
+                });
+                // والـnonce مع الصفحة: تُكتب فوق صفحةٍ قائمة فتبقى سياستُها — والعميلُ يستبدله بـnonce صفحته
+                $send('done', ['html' => view('ask.index', $data)->render(), 'nonce' => \App\Support\Security\ContentSecurity::nonce()]);
+            } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e) {
+                $send('error', ['text' => $e->getStatusCode() === 404 ? 'لم تعُد هذه المحادثةُ موجودة' : 'تعذّر إكمالُ الطلب']);
+            } catch (\Throwable $e) {
+                report($e);
+                $send('error', ['text' => 'تعذّر إكمالُ الجواب بسبب خطأٍ في الخادم — حاول مجدّداً']);
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream; charset=UTF-8',
+            'Cache-Control' => 'no-cache, no-store',
+            'X-Accel-Buffering' => 'no',   // nginx: لا يُخزَّن البثُّ مؤقّتاً
+        ]);
+    }
+
+    /** بابٌ واحدٌ للسؤال — للعرض العاديّ وللبثّ: الخيط (لصاحبه)، والمتابعة، والحفظ @return array<string,mixed> */
+    private function answer(Request $r, ?\Closure $progress = null): array
+    {
+        $thread = null;
+        if ($r->filled('thread')) {
+            $thread = AskMemory::open($r->user(), (string) $r->input('thread'));
+            abort_if($thread === null, 404);
+            if (AskMemory::full($thread)) $thread = null;   // بلغ سقفَه ⇒ خيطٌ جديد
+        }
+
         $question = (string) $r->input('q', '');
-        $result   = AskPipeline::ask($question, $r->user());
+        $result   = AskPipeline::ask($question, $r->user(), null, AskMemory::earlierQuestions($thread), $progress);
+        // يُحفظ دورٌ فقط إن كانت الذاكرةُ مفعَّلةً والسؤالُ غيرَ فارغ — وهو وحدَه ما يُسقَط من التاريخ المعروض
+        $saved    = AskMemory::enabled() && AskPolicy::sanitizeQuestion($question) !== null;
+        $thread   = AskMemory::record($r->user(), $thread, $question, $result) ?? $thread;
 
         // **`array_merge` لا `+`**: عاملُ الجمعِ يُبقي مفاتيحَ الطرفِ الأيسر،
         // و`screen()` يحمل `result => null` — فكان الجوابُ يُبنى ثمّ يُطمَس
         // بفراغٍ قبل العرض، والصفحةُ تعود كأن شيئاً لم يكن.
-        return view('ask.index', array_merge($this->screen(), [
+        return array_merge($this->screen($thread, $saved), [
             'result' => $result,
             // **السؤالُ يُعاد عرضُه للمستخدمِ نفسِه** — لا يُخزَّن ولا يُدقَّق
             'asked'  => AskPolicy::sanitizeQuestion($question),
-        ]));
+        ]);
+    }
+
+    /** محوُ خيطٍ واحدٍ أو كلِّ خيوط صاحب الجلسة — لا يمسّ خيطَ غيره أبداً */
+    public function forget(Request $r)
+    {
+        $this->gate();
+        $one = $r->filled('thread') ? (string) $r->input('thread') : null;
+        if ($one !== null) abort_if(AskMemory::open($r->user(), $one) === null, 404);
+        $n = AskMemory::forget($r->user(), $one);
+
+        return redirect()->route('ask.index')->with('ok', $one ? 'مُحيت المحادثة' : "مُحيت محادثاتُك ({$n})");
     }
 
     /**
      * حالةُ الشاشةِ المشتركة — **ولا سرَّ فيها ولا تفصيلَ بنيةٍ داخليّة**.
      *
+     * @param  bool  $justAsked  الدورُ الأخيرُ معروضٌ جواباً حيّاً فلا يُكرَّر في التاريخ
      * @return array<string,mixed>
      */
-    private function screen(): array
+    private function screen(?\App\Models\AskThread $thread = null, bool $justAsked = false): array
     {
+        $u = auth()->user();
+        $turns = $thread ? AskMemory::turns($u, $thread) : [];
+        if ($justAsked) array_pop($turns);
+
         $ready   = AskPolicy::ready();
         $profile = AskPolicy::profile();
-        $canFix  = \App\Support\AiAccess::canManage();
+        $canFix  = \App\Support\Ai\Center\AiAccess::canManage();
 
         return [
             'ready'    => $ready,
@@ -108,8 +188,14 @@ class AskController extends Controller
              * يخصّ السائل، **وعرضُه للجميعِ يوسّع سطحَ المعرفةِ بلا فائدةٍ له**.
              */
             'advisory' => ($canFix && $profile !== null)
-                ? \App\Support\AskModelAdvisory::read($profile) : null,
+                ? \App\Support\Ai\Ask\AskModelAdvisory::read($profile) : null,
             'failures' => AskFailures::MESSAGES,
+            // الذاكرة (المرحلة ٢): خيوطُه وحدَه، والأدوارُ بأجوبةٍ مُعادةِ التحقّق
+            'memory'   => AskMemory::enabled(),
+            'memoryDays' => AskMemory::days(),
+            'threads'  => AskMemory::threads($u),
+            'thread'   => $thread,
+            'turns'    => $turns,
         ];
     }
 }

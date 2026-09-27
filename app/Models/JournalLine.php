@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /** سطر قيد مزدوج: مدين أو دائن على حسابٍ من الدليل، بمركز تكلفة اختياري */
 class JournalLine extends Model
 {
-    use HasUuid;
+    use HasFactory, HasUuid;
 
     protected $table = 'journal_lines';
     protected $guarded = ['id'];

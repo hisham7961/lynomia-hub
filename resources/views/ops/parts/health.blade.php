@@ -1,4 +1,4 @@
-@php $H = \App\Support\Health::class; @endphp
+@php $H = \App\Support\Ops\Health::class; @endphp
 <div class="card" id="health" style="border-inline-start:4px solid var(--{{ $health['status'] === $H::HEALTHY ? 'ok' : ($health['status'] === $H::UNAVAILABLE ? 'bad' : 'wn') }}, #999)">
     <h3 class="cardtitle">🩺 صحّة المنصة
         <span class="bdg {{ $H::TONE[$health['status']] }}">{{ $H::LABELS[$health['status']] }}</span>

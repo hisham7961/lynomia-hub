@@ -5,11 +5,10 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\Employee;
-use App\Models\Project;
 use App\Models\User;
 use App\Models\WorkUpdate;
-use App\Support\DailyWorkCompliance;
-use App\Support\ReportReview;
+use App\Support\Workforce\DailyWorkCompliance;
+use App\Support\Workforce\ReportReview;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -63,7 +62,7 @@ class ReportsController extends Controller
     public function index(Request $r)
     {
         $this->guardTeam();
-        $date = $this->validDate($r->query('date')) ?: \App\Support\BusinessDate::today();
+        $date = $this->validDate($r->query('date')) ?: \App\Support\Platform\BusinessDate::today();
 
         $emps = hub_company_scope(hub_scope(Employee::query(), 'hr'), 'hr')
             ->whereNull('deleted_at')->where('status', 'نشط');
@@ -115,7 +114,7 @@ class ReportsController extends Controller
         abort_unless(hub_company_scope(hub_scope(Employee::query(), 'hr'), 'hr')
             ->whereKey($emp->id)->exists(), 404);
 
-        $date = $this->validDate($r->query('date')) ?: \App\Support\BusinessDate::today();
+        $date = $this->validDate($r->query('date')) ?: \App\Support\Platform\BusinessDate::today();
         $c = DailyWorkCompliance::resolve($emp, $date);
 
         // بنودُ اليوم — مع المشروع والمهمّة (§68 · بلا N+1)
@@ -125,7 +124,10 @@ class ReportsController extends Controller
                 ->whereDate('work_date', $date)->orderBy('submitted_at')->orderBy('id')->get()
             : collect();
 
-        return view('reports.day', compact('emp', 'date', 'c', 'entries'));
+        // ملاحظاتُ المدقّق على بنود اليوم — لمن يراجعها وحدَه، بالشروطِ الخمسةِ نفسِها (§٣.٤)
+        $auditNotes = \App\Support\Ai\Auditor\AuditorSignals::notesFor(auth()->user(), $entries);
+
+        return view('reports.day', compact('emp', 'date', 'c', 'entries', 'auditNotes'));
     }
 
     /* ═══════════ §31 مركزُ المراجعة — طابورُ التقارير ═══════════ */
@@ -145,10 +147,10 @@ class ReportsController extends Controller
          * الأوسع بنقرة (?scope=all).
          */
         $uu = auth()->user();
-        $isWide = ($uu->role?->is_owner ?? false) || hub_can($uu, 'hr', 'v');
+        $isWide = ReportReview::isWideReviewer($uu);
         $mineOnly = $r->query('scope') === 'mine' || (! $isWide && $r->query('scope') !== 'all');
 
-        $q = $this->reviewableUpdates($mineOnly);
+        $q = ReportReview::reviewableQuery($uu, $mineOnly);
         if ($status === 'pending') {
             $q->where(fn ($w) => $w->whereNull('review_status')->orWhere('review_status', ReportReview::PENDING));
         } else {
@@ -269,18 +271,10 @@ class ReportsController extends Controller
         abort_unless(ReportReview::canReview(auth()->user(), $w), 403);
 
         $action = (string) $r->input('action');
-        $feedback = trim((string) $r->input('feedback', ''));
+        // الفعلُ والمسودةُ والحكمُ في `ReportReview::act` (يشترك فيه الجوال)
+        $outcome = ReportReview::act($w, auth()->user(), $action, (string) $r->input('feedback', ''));
 
-        match ($action) {
-            'accept' => ReportReview::accept($w, auth()->user(), $feedback ?: null),
-            'needs_revision' => $feedback !== ''
-                ? ReportReview::needsRevision($w, auth()->user(), $feedback)
-                : null,
-            'reopen' => ReportReview::reopen($w, auth()->user()),
-            default => null,
-        };
-
-        if ($action === 'needs_revision' && $feedback === '') {
+        if ($outcome === 'feedback_required') {
             return back()->with('err', 'طلبُ التنقيح يحتاج ملاحظةً للموظف — اكتب ما المطلوب تحسينُه.');
         }
 
@@ -321,7 +315,7 @@ class ReportsController extends Controller
     {
         $this->guardInternal();
         $u = auth()->user();
-        $emp = \App\Support\Workday::emp($u);
+        $emp = \App\Support\Workforce\Workday::emp($u);
         // لا ملفَ موظّفٍ نشطٍ (كالمالك/الإدارة): لا نصفعُه بـ٤٠٣ — هذه الصفحةُ لتقريرِ
         // الموظّفِ الذاتيّ لا لحسابه. نوجّهه بلطفٍ إلى ما يخصُّه بحسب صلاحيّته (§66/§34).
         if (! $emp) {
@@ -333,7 +327,7 @@ class ReportsController extends Controller
             return redirect()->route('dashboard')->with('err', $msg);
         }
 
-        $date = $this->validDate($r->query('date')) ?: \App\Support\BusinessDate::today();
+        $date = $this->validDate($r->query('date')) ?: \App\Support\Platform\BusinessDate::today();
         $c = DailyWorkCompliance::resolve($emp, $date);
         $entries = WorkUpdate::with(['project:id,name', 'task:id,title'])
             ->whereNull('deleted_at')->where('created_by', auth()->id())
@@ -348,13 +342,13 @@ class ReportsController extends Controller
     public function monthly(Request $r)
     {
         $this->guardMonthly();
-        $month = \App\Support\MonthlyAttendance::normMonth($r->query('month'));
+        $month = \App\Support\Workforce\MonthlyAttendance::normMonth($r->query('month'));
         $emps = $this->monthlyEmployees()->orderBy('name')->limit(1000)->get(['id', 'name', 'dept', 'user_id', 'company_id']);
-        $summary = \App\Support\MonthlyAttendance::summary($emps, $month);
+        $summary = \App\Support\Workforce\MonthlyAttendance::summary($emps, $month);
 
         return view('reports.monthly', [
             'month' => $month, 'rows' => $summary['rows'],
-            'days' => count(\App\Support\MonthlyAttendance::daysOf($month)),
+            'days' => count(\App\Support\Workforce\MonthlyAttendance::daysOf($month)),
             'canExport' => true,
         ]);
     }
@@ -365,9 +359,9 @@ class ReportsController extends Controller
         $this->guardMonthly();
         $emp = Employee::whereNull('deleted_at')->whereKey($r->query('emp'))->firstOrFail();
         abort_unless($this->monthlyEmployees()->whereKey($emp->id)->exists(), 404);
-        $month = \App\Support\MonthlyAttendance::normMonth($r->query('month'));
+        $month = \App\Support\Workforce\MonthlyAttendance::normMonth($r->query('month'));
 
-        return view('reports.monthly-employee', \App\Support\MonthlyAttendance::sheet($emp, $month));
+        return view('reports.monthly-employee', \App\Support\Workforce\MonthlyAttendance::sheet($emp, $month));
     }
 
     /**
@@ -407,8 +401,8 @@ class ReportsController extends Controller
                 . ' أو يُمنح دورُك مفتاحَ «تصدير خارج الدوام» (exportNight) لإقفالٍ ليليٍّ مشروع');
         }
 
-        $month = \App\Support\MonthlyAttendance::normMonth($r->query('month'));
-        $dates = \App\Support\MonthlyAttendance::daysOf($month);
+        $month = \App\Support\Workforce\MonthlyAttendance::normMonth($r->query('month'));
+        $dates = \App\Support\Workforce\MonthlyAttendance::daysOf($month);
         $payroll = $r->query('mode') === 'payroll';
 
         // Permissions 360 · 17.3 — أعمدةُ الموظفِ تستشير نمطَ الحقل (نظيرَ CSV الوحدات):
@@ -430,7 +424,7 @@ class ReportsController extends Controller
         $emps = $empQ->orderBy('name')->orderBy('id')->limit(1000)->get($cols);
 
         // عدُّ الصفوفِ المُصدَّرةِ فعلاً (نفسُ شرطِ البثِّ أدناه) — لعتبةِ التصعيدِ وبصمةِ التدقيق
-        $range = $payroll ? [] : \App\Support\DailyWorkCompliance::resolveRange($emps, $dates);
+        $range = $payroll ? [] : \App\Support\Workforce\DailyWorkCompliance::resolveRange($emps, $dates);
         $rowCount = $emps->count();
         if (! $payroll) {
             $rowCount = 0;
@@ -500,7 +494,7 @@ class ReportsController extends Controller
      */
     protected function monthlyPayrollCsv($emps, string $month, bool $nameHidden, bool $deptHidden, bool $salaryHidden)
     {
-        $rows = \App\Support\MonthlyAttendance::summary($emps, $month)['rows'];
+        $rows = \App\Support\Workforce\MonthlyAttendance::summary($emps, $month)['rows'];
 
         $headers = ['الموظف', 'معرّف الموظف', 'القسم', 'أيام العمل', 'أيام الحضور',
             'غياب بلا عذر', 'غياب لعدم التقرير', 'أيام الإجازة', 'مجموع الساعات',
@@ -538,33 +532,6 @@ class ReportsController extends Controller
     }
 
     /* ────────── مساعدات ────────── */
-
-    /** بنودٌ قابلةٌ للمراجعة لهذا المستخدم — منطَّقةٌ شركةً ومشروعاً (§77/§80) */
-    protected function reviewableUpdates(bool $mineOnly = false)
-    {
-        $u = auth()->user();
-        $q = WorkUpdate::query()->whereNull('deleted_at');
-        if ($u->role?->is_owner && ! $mineOnly) return $q;
-
-        // «مشاريعي» = ما أُديرُه فعلاً — لا كلُّ ما يقع في نطاق رؤيتي (F7)
-        $projQ = hub_scope(Project::query(), 'projects');
-        if ($mineOnly) $projQ->where('manager_id', (string) $u->id);
-        $pids = $projQ->pluck('id')->all();
-        if ($mineOnly) {
-            return $q->where(fn ($w) => $pids
-                ? $w->whereIn('project_id', $pids) : $w->whereRaw('1 = 0'));
-        }
-        $userIds = [];
-        if (hub_can($u, 'hr', 'v')) {
-            $userIds = hub_company_scope(hub_scope(Employee::query(), 'hr'), 'hr')
-                ->whereNotNull('user_id')->pluck('user_id')->all();
-        }
-        return $q->where(function ($w) use ($pids, $userIds) {
-            $w->whereRaw('1 = 0');
-            if ($pids) $w->orWhereIn('project_id', $pids);
-            if ($userIds) $w->orWhereIn('created_by', $userIds);
-        });
-    }
 
     protected function validDate(?string $d): ?string
     {

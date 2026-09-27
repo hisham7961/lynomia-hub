@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Support\SecurityEvents;
+use App\Support\Security\SecurityEvents;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -81,7 +81,7 @@ class SecurityEventsTest extends TestCase
     public function test_mfa_challenge_is_audited(): void
     {
         $this->seedCore();
-        $this->owner->forceFill(['totp_enabled' => true, 'totp_secret_cipher' => \App\Support\Totp::secret()])->save();
+        $this->owner->forceFill(['totp_enabled' => true, 'totp_secret_cipher' => \App\Support\Security\Totp::secret()])->save();
         $this->post('/login', ['email' => 'owner@test.local', 'password' => 'Secret!2026x'])->assertRedirect(route('login.otp'));
         $this->assertSame(1, DB::table('audits')->where('action', 'تحدّي التحقق بخطوتين')->where('user_id', $this->owner->id)->count());
     }

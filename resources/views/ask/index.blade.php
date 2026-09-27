@@ -42,9 +42,67 @@
     </div>
 @endif
 
+{{-- ── ذاكرةُ المحادثة (المرحلة ٢ · AskMemory) — خيوطُك وحدَك، ولا يقرؤها غيرُك ولا المالك ── --}}
+@if ($memory)
+    <div class="card" data-ask-threads>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:space-between">
+            <h3 style="margin:0">محادثاتُك</h3>
+            <span style="display:flex;gap:6px;flex-wrap:wrap">
+                @if ($thread)<a class="btn sm" href="{{ route('ask.index') }}">➕ محادثةٌ جديدة</a>@endif
+                @if ($threads->isNotEmpty())
+                    <form method="POST" action="{{ route('ask.forget') }}" data-confirm-native="تُمحى كلُّ محادثاتك نهائيّاً — متابعة؟">@csrf
+                        <button class="btn sm">🗑️ امحُ كلَّ محادثاتي</button>
+                    </form>
+                @endif
+            </span>
+        </div>
+        <div class="sub">
+            تُحفظ مشفّرةً لك وحدَك وتُمحى بعد {{ $memoryDays }} يوماً بلا نشاط. والجوابُ المحفوظُ يُعرَض فقط
+            <b>ما دامت صلاحيّتُك تشمل ما بُني عليه</b> — وسؤالُ المتابعةِ يُرسل أسئلتَك السابقةَ لا أجوبتَها،
+            فيقرأ المساعدُ البياناتِ من جديد.
+        </div>
+        @forelse ($threads as $t)
+            <div>
+                <a href="{{ route('ask.index', ['thread' => $t->id]) }}" @if ($thread && $thread->id === $t->id) aria-current="page" @endif>
+                    {{ $thread && $thread->id === $t->id ? '▸ ' : '' }}{{ $t->title }}
+                </a>
+                <span class="mut">· {{ $t->last_at?->diffForHumans() }}</span>
+            </div>
+        @empty
+            <div class="mut">لا محادثاتٍ محفوظةٌ بعد — سؤالُك الأوّلُ يبدأ واحدة.</div>
+        @endforelse
+    </div>
+
+    @if ($thread)
+        <div class="card" data-ask-history>
+            <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+                <h3 style="margin:0">{{ $thread->title }}</h3>
+                <form method="POST" action="{{ route('ask.forget') }}" data-confirm-native="تُمحى هذه المحادثة نهائيّاً — متابعة؟">@csrf
+                    <input type="hidden" name="thread" value="{{ $thread->id }}">
+                    <button class="btn sm">🗑️ امحُ هذه المحادثة</button>
+                </form>
+            </div>
+            @foreach ($turns as $turn)
+                <div style="margin-top:10px">
+                    <div><b>سألتَ:</b> {{ $turn['question'] }}</div>
+                    @if ($turn['answer'] !== null)
+                        <div class="askanswer">{{ $turn['answer'] }}</div>
+                    @elseif ($turn['hidden'])
+                        <div class="sub" data-ask-hidden><span class="bdg wn">أُخفي الجواب</span>
+                            صلاحيّتُك لم تعد تشمل بعضَ ما بُني عليه — اسأل من جديد فيجيبك المساعدُ بما تراه الآن.</div>
+                    @else
+                        <div class="sub"><span class="bdg wn">لم يُجَب</span> {{ $failures[$turn['failure']] ?? 'تعذّر الجواب' }}</div>
+                    @endif
+                </div>
+            @endforeach
+        </div>
+    @endif
+@endif
+
 {{-- ── السؤال ── --}}
 <div class="card">
     <form method="POST" action="{{ route('ask.run') }}" class="grid" id="askform">@csrf
+        @if ($memory && $thread)<input type="hidden" name="thread" value="{{ $thread->id }}">@endif
         <label style="grid-column:1/-1">
             <span>سؤالُك</span>
             <textarea name="q" rows="3" maxlength="{{ $limits['question'] }}"
@@ -73,9 +131,9 @@
         @if ($advisory ?? null)
             <div style="grid-column:1/-1">
                 <small class="mut">
-                    <span class="bdg {{ \App\Support\AskModelAdvisory::warns($advisory) ? 'wn' : 'ok' }}"
-                          title="{{ $advisory['say'] }}">{{ \App\Support\AskModelAdvisory::TAG[$advisory['code']] }}</span>
-                    @if (\App\Support\AskModelAdvisory::warns($advisory))
+                    <span class="bdg {{ \App\Support\Ai\Ask\AskModelAdvisory::warns($advisory) ? 'wn' : 'ok' }}"
+                          title="{{ $advisory['say'] }}">{{ \App\Support\Ai\Ask\AskModelAdvisory::TAG[$advisory['code']] }}</span>
+                    @if (\App\Support\Ai\Ask\AskModelAdvisory::warns($advisory))
                         <a href="{{ route('ai.profiles.index') }}">راجِع سلسلةَ الغرض ←</a>
                     @endif
                 </small>
@@ -150,7 +208,7 @@
                 {{-- **وحيث تُقرَأ الرسالةُ يُقال السبب.** رسالةُ «بلغ الجوابُ
                      سقفَ طولِه» تُرسل قارئَها إلى رفعِ السقفِ — وقد يكون
                      السقفُ سليماً والمُتقاسِمُ هو العلّة. --}}
-                @if (($advisory ?? null) && \App\Support\AskModelAdvisory::warns($advisory)
+                @if (($advisory ?? null) && \App\Support\Ai\Ask\AskModelAdvisory::warns($advisory)
                      && in_array($result['failure'], ['OUTPUT_LIMIT', 'MODEL_REASONED_ONLY'], true))
                     <span class="mut">{{ $advisory['say'] }}</span>
                     <span><a class="btn sm" href="{{ route('ai.profiles.index') }}">راجِع سلسلةَ الغرض ←</a></span>
@@ -176,14 +234,69 @@
 @media (max-width:600px){#askform textarea{min-height:96px}}
 </style>
 
-<script>
-/* حالةُ الانتظار: الضغطةُ الواحدةُ تكفي — وزرٌّ يُضغَط مرّتين يُنفق خطوتين. */
-document.getElementById('askform')?.addEventListener('submit', function () {
-    var b = this.querySelector('[data-ask-submit]');
-    var w = this.querySelector('.askwait');
-    if (b) { b.disabled = true; }
-    if (w) { w.hidden = false; }
-});
+<script @cspNonce>
+/* حالةُ الانتظار: الضغطةُ الواحدةُ تكفي — وزرٌّ يُضغَط مرّتين يُنفق خطوتين.
+   **وتقدّمُ القراءة** (المرحلة ٢): يُرسَل السؤالُ إلى ask/stream فتصل أسطرُ «يفكّر… · قرأ «المشاريع» — ١٢ صفّاً»
+   أثناءَ العمل، والجوابُ **بعد مصادقة مراجعه** صفحةً كاملة. وأيُّ تعذّرٍ (متصفّحٌ قديم · انقطاع) يعود
+   إلى الإرسالِ العاديّ — فالميزةُ تحسينٌ لا شرط. */
+(function () {
+    var form = document.getElementById('askform');
+    if (!form) return;
+    var streamUrl = @json(route('ask.stream'));
+    // `inflight` محلّيٌّ عمداً: حارسُ الإرسال المزدوج العامّ يفكّ الزرَّ بعد ٢٠ ثانية، والبثُّ لا يغادر الصفحة
+    var plain = false, inflight = false, dead = false;
+    form.addEventListener('submit', function (e) {
+        // بثٌّ انقطع بعد أن بدأ: لا يُعاد السؤالُ صامتاً (قد يكون دُفع ثمنُه) — والزرُّ الحيُّ يُعيد تحميل الصفحة
+        if (inflight) { e.preventDefault(); if (dead) location.reload(); return; }
+        var b = form.querySelector('[data-ask-submit]');
+        var w = form.querySelector('.askwait');
+        if (b) { b.disabled = true; }
+        if (w) { w.hidden = false; }
+        if (plain || !window.fetch || !window.TextDecoder || !window.ReadableStream) return;
+        e.preventDefault();
+        inflight = true;
+        var started = false;
+        // لا يُعاد الإرسالُ إلّا إن لم يبدأ البثُّ أصلاً — فسؤالٌ بدأ العملُ عليه لا يُنفَق مرّتين
+        var fallback = function () {
+            if (!started) { plain = true; form.submit(); return; }
+            dead = true;
+            if (w) { w.textContent = '⚠️ انقطع الاتّصالُ قبل الجواب — افتح «محادثاتُك» أو أعِد تحميلَ الصفحة (الزرُّ يعيد التحميل)'; }
+        };
+        fetch(streamUrl, { method: 'POST', body: new FormData(form), credentials: 'same-origin',
+                           headers: { 'Accept': 'text/event-stream' } })
+            .then(function (res) {
+                // تحويلٌ (جلسةٌ منتهية · ساعاتُ العمل · تغييرُ كلمة المرور) ⇒ إلى حيث أراد الخادم، لا «انقطاع»
+                if (res.redirected) { location.assign(res.url); return; }
+                if (!res.ok || !res.body || !/text\/event-stream/.test(res.headers.get('Content-Type') || '')) { fallback(); return; }
+                var reader = res.body.getReader(), dec = new TextDecoder(), buf = '', done = false;
+                var pump = function () {
+                    return reader.read().then(function (chunk) {
+                        if (chunk.done) { if (!done) fallback(); return; }
+                        started = true;
+                        buf += dec.decode(chunk.value, { stream: true });
+                        var parts = buf.split('\n\n'); buf = parts.pop();
+                        parts.forEach(function (block) {
+                            var ev = (block.match(/^event: (.*)$/m) || [])[1], data = (block.match(/^data: (.*)$/m) || [])[1];
+                            if (!ev || !data) return;
+                            try { data = JSON.parse(data); } catch (x) { return; }
+                            if (ev === 'progress') { if (w) w.textContent = '⏳ ' + data.text; if (b) b.disabled = true; }
+                            if (ev === 'error') { done = true; inflight = false; if (b) b.disabled = false; if (w) w.textContent = '⚠️ ' + (data.text || ''); }
+                            if (ev === 'done' && data.html) {
+                                done = true;
+                                /* الصفحةُ تُكتب فوق هذه فتبقى سياسةُ CSP الأولى — فسكربتاتُها بـnonce هذه الصفحة */
+                                var own = document.querySelector('script[nonce]'), cur = own ? (own.nonce || own.getAttribute('nonce')) : '';
+                                var html = (data.nonce && cur && data.nonce !== cur) ? data.html.split('nonce="' + data.nonce + '"').join('nonce="' + cur + '"') : data.html;
+                                document.open(); document.write(html); document.close();
+                            }
+                        });
+                        return pump();
+                    });
+                };
+                return pump();
+            })
+            .catch(fallback);
+    });
+})();
 </script>
 
 @endsection

@@ -9,8 +9,8 @@ use App\Models\EndpointEvent;
 use App\Models\EndpointPolicy;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\Es256;
-use App\Support\HubEvents;
+use App\Support\Security\Es256;
+use App\Support\Platform\HubEvents;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -22,7 +22,7 @@ use Tests\TestCase;
  *
  * يمتدّ هذا الملفُّ سوابقَه المعلنة:
  *  • `WorkOsEndpointEnrollTest` — عتادُ التسجيل الحقيقيّ (mint + enroll بزوج
- *    P-256 يولَّد بـopenssl) وعقدُ التوقيع (docblock ‏`App\Support\Es256`).
+ *    P-256 يولَّد بـopenssl) وعقدُ التوقيع (docblock ‏`App\Support\Security\Es256`).
  *  • `InboundHookRound5Test` — انضباطُ replay الواحد: طابعٌ ±300ث + nonce فريد.
  *  • `HubOutbox` (آلةُ الحالة) — ادّعاءُ الأمر UPDATE مشروطاً فلا ازدواجَ إرسال.
  *  • `ColumnFitsItsWriterTest` — قيَمُ allowlist تسع أعمدتَها على المحرّكين.

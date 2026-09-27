@@ -1,0 +1,43 @@
+<?php
+
+/** سجلُّ الوحدات — «engagements» (docs/REORG_PLAN.md §R4) — يُحمَّل بترتيبه من قائمة config/hub.php */
+
+return [
+    'key' => 'engagements',
+    'table' => 'engagements',
+    'model' => 'Engagement',
+    'label' => 'ارتباطات العملاء',
+    'display' => 'name',
+    'status' => 'status',
+    'columns' => ['name', 'clientId', 'type', 'status', 'renewal', 'amId'],
+    'fields' => [
+        ['key' => 'name', 'col' => 'name', 'label' => 'اسم الارتباط', 'type' => 'text', 'required' => true,
+         'hint' => 'مثل «خدمات IT المُدارة» أو «تشغيل المتجر الإلكتروني» — علاقةٌ واحدةٌ محددة، لا اسم العميل.'],
+        ['key' => 'clientId', 'col' => 'client_id', 'label' => 'العميل', 'type' => 'ref', 'ref' => 'clients', 'required' => true],
+        ['key' => 'type', 'col' => 'type', 'label' => 'نوع الارتباط', 'type' => 'sel',
+         'options' => ['تنفيذ مشروع', 'عقد شهري (Retainer)', 'خدمة مُدارة', 'استشارة', 'دعم وصيانة', 'تسويق', 'تطوير', 'بنية تحتية', 'تشغيل', 'أخرى']],
+        ['key' => 'status', 'col' => 'status', 'label' => 'الحالة', 'type' => 'sel',
+         'options' => ['محتمل', 'نشط', 'متوقف مؤقتاً', 'قيد التجديد', 'منتهٍ', 'ملغى']],
+        ['key' => 'contractId', 'col' => 'contract_id', 'label' => 'العقد الأساس', 'type' => 'ref', 'ref' => 'contracts',
+         'hint' => 'العقود الإضافية (ملاحق وتجديدات) تُربط من حقل «الارتباط» على العقد نفسه.'],
+        ['key' => 'amId', 'col' => 'am_id', 'label' => 'مدير الحساب', 'type' => 'ref', 'ref' => 'users'],
+        ['key' => 'pmId', 'col' => 'pm_id', 'label' => 'مدير التنفيذ', 'type' => 'ref', 'ref' => 'users'],
+        ['key' => 'start', 'col' => 'date_start', 'label' => 'تاريخ البداية', 'type' => 'date'],
+        ['key' => 'end', 'col' => 'date_end', 'label' => 'تاريخ النهاية', 'type' => 'date'],
+        ['key' => 'renewal', 'col' => 'renewal', 'label' => 'موعد التجديد', 'type' => 'date',
+         'hint' => 'يدخل رادار «ينتهي قريباً» — فالتجديد يُطرق بابه قبل شهرٍ لا بعد فوات.'],
+        ['key' => 'billing', 'col' => 'billing', 'label' => 'نموذج الفوترة', 'type' => 'sel',
+         'options' => ['سعر ثابت', 'بالساعة', 'عقد شهري', 'اشتراك', 'دفعات مراحل', 'تكلفة + هامش', 'حسب الاستخدام', 'عقد دعم', 'أخرى']],
+        ['key' => 'revenue', 'col' => 'revenue', 'label' => 'القيمة التعاقدية', 'type' => 'num', 'money' => true,],
+        ['key' => 'budget', 'col' => 'budget', 'label' => 'الميزانية التقديرية للتكلفة', 'type' => 'num', 'money' => true,],
+        ['key' => 'currency', 'col' => 'currency', 'label' => 'العملة', 'type' => 'sel',
+         'options' => ['د.ك', 'دولار', 'ريال', 'درهم', 'يورو']],
+        ['key' => 'scope', 'col' => 'scope', 'label' => 'نطاق العمل (SOW)', 'type' => 'ta'],
+        ['key' => 'clientNote', 'col' => 'client_note', 'label' => 'ملاحظات تُشارك مع العميل', 'type' => 'ta',
+         'hint' => 'ما يصلح أن يقرأه العميل — الملاحظات الداخلية في حقلها أدناه ولا تختلط بهذه أبداً.'],
+        ['key' => 'notes', 'col' => 'notes', 'label' => 'ملاحظات داخلية', 'type' => 'ta'],
+        ['key' => 'companyId', 'col' => 'company_id', 'label' => 'شركتنا المنفّذة', 'type' => 'ref', 'ref' => 'companies'],
+        ['key' => 'tags', 'col' => 'tags', 'label' => 'وسوم', 'type' => 'tags'],
+    ],
+    'search' => ['name', 'scope', 'notes'],
+];

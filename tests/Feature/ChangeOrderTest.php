@@ -101,7 +101,7 @@ class ChangeOrderTest extends TestCase
         $co = ChangeOrder::create(['title' => 'توسعة', 'project_id' => $p->id,
             'value_delta' => 7000, 'cost_delta' => 2500, 'currency' => 'د.ك', 'status' => 'معتمد']);
 
-        $html = \App\Support\ChangeOrderDoc::html($co->fresh());
+        $html = \App\Support\Documents\ChangeOrderDoc::html($co->fresh());
         $this->assertStringContainsString('أمرُ تغيير', $html);
         $this->assertStringContainsString('7,000', $html);
         // **لا تكلفةَ داخلية في مستند العميل**

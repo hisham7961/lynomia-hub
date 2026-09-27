@@ -12,7 +12,7 @@ use App\Models\VaultSecret;
 use App\Support\Mdm\MdmActionResult;
 use App\Support\Mdm\MdmProvider;
 use App\Support\Mdm\NullMdmProvider;
-use App\Support\MdmService;
+use App\Support\Endpoint\MdmService;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 

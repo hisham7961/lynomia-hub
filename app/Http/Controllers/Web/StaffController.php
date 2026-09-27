@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\Role;
 use App\Models\User;
-use App\Support\Staff;
+use App\Support\Workforce\Staff;
 use Illuminate\Http\Request;
 
 /**

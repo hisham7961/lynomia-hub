@@ -3,7 +3,7 @@
 <table class="mini">
     <tr><th>المستخدم</th><th>المنصّة</th><th>الإصدار</th><th>آخر استعمال</th><th>IP</th><th>الحالة</th><th></th></tr>
     @forelse ($rows as $s)
-        @php $st = \App\Support\MobilePlatform::sessionStatus($s); @endphp
+        @php $st = \App\Support\Mobile\MobilePlatform::sessionStatus($s); @endphp
         <tr>
             <td>{{ $s->user?->name ?? '—' }}</td>
             <td>{{ $s->platform ?: '—' }}</td>
@@ -15,7 +15,7 @@
                 <a class="btn ghost xs" href="{{ route('mobileplatform.index', ['tab' => 'devices', 'session' => $s->id]) }}">تفتيش</a>
                 @unless ($s->revoked_at)
                     <form method="POST" action="{{ route('mobileplatform.session.revoke', $s->id) }}" style="display:inline"
-                          onsubmit="return confirm('إبطالُ الجلسة؟')">@csrf<button class="btn ghost xs" type="submit">إبطال</button></form>
+                          data-confirm-native="إبطالُ الجلسة؟">@csrf<button class="btn ghost xs" type="submit">إبطال</button></form>
                 @endunless
             </td>
         </tr>

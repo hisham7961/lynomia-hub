@@ -147,12 +147,12 @@ class CouncilRetest8Test extends TestCase
 
         // حضورٌ الساعةَ ٢٣:٠٠
         Carbon::setTestNow(Carbon::parse('2026-09-10 23:00:00'));
-        $in = \App\Support\Workday::checkIn($u, ['mode' => 'مكتب']);
+        $in = \App\Support\Workforce\Workday::checkIn($u, ['mode' => 'مكتب']);
         $this->assertTrue($in['ok'] ?? false, 'الحضورُ الليليُّ نفسُه يُسجَّل');
 
         // وانصرافٌ الساعةَ ٠٣:٤٨ من اليومِ التالي — **من اليومِ نفسِه في السجلّ**
         Carbon::setTestNow(Carbon::parse('2026-09-11 03:48:00'));
-        $out = \App\Support\Workday::checkOut($u);
+        $out = \App\Support\Workforce\Workday::checkOut($u);
 
         $this->assertTrue($out['ok'] ?? false,
             'انصرافُ الوردية الليلية مرفوض — الموظّفُ لا يملك تصحيحَ الوقتَين: ' . ($out['msg'] ?? ''));
@@ -175,11 +175,11 @@ class CouncilRetest8Test extends TestCase
 
         // حضورُ الأمسِ ٠٨:٠٠ ونسيَ الانصراف
         Carbon::setTestNow(Carbon::parse('2026-09-10 08:00:00'));
-        \App\Support\Workday::checkIn($u, ['mode' => 'مكتب']);
+        \App\Support\Workforce\Workday::checkIn($u, ['mode' => 'مكتب']);
 
         // واليومَ الخامسةَ مساءً يضغط «انصراف» — الساعةُ لم تلفّ، فلا يُتبنّى صفُّ الأمس
         Carbon::setTestNow(Carbon::parse('2026-09-11 17:00:00'));
-        $out = \App\Support\Workday::checkOut($u);
+        $out = \App\Support\Workforce\Workday::checkOut($u);
 
         $this->assertFalse($out['ok'] ?? true, 'يومُ الناسي أُغلق بساعاتٍ ملفَّقة');
         $this->assertStringContainsString('سجّل حضورَك أولاً', (string) ($out['msg'] ?? ''));
@@ -196,9 +196,9 @@ class CouncilRetest8Test extends TestCase
         Employee::create(['name' => 'موظّفُ النهار', 'status' => 'نشط', 'user_id' => $u->id]);
 
         Carbon::setTestNow(Carbon::parse('2026-09-10 08:00:00'));
-        \App\Support\Workday::checkIn($u, ['mode' => 'مكتب']);
+        \App\Support\Workforce\Workday::checkIn($u, ['mode' => 'مكتب']);
         Carbon::setTestNow(Carbon::parse('2026-09-10 17:00:00'));
-        $out = \App\Support\Workday::checkOut($u);
+        $out = \App\Support\Workforce\Workday::checkOut($u);
 
         $this->assertTrue($out['ok'] ?? false);
         $row = Attendance::query()->orderBy('id')->first();

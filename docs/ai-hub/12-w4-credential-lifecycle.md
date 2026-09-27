@@ -22,7 +22,7 @@ LiteLLM وفق عقدِ W0 ⟵ لا يحتفظ Hub بالسرِّ بل بالم�
 
 | الملف | ماذا |
 |---|---|
-| `app/Support/AiProviders.php` | الكاتبُ الواحدُ لدورةِ الحياة |
+| `app/Support/Ai/Catalog/AiProviders.php` | الكاتبُ الواحدُ لدورةِ الحياة |
 | `app/Http/Controllers/Web/AiProviderController.php` | الشاشةُ بحرّاسِها الثلاثة |
 | `resources/views/ai/providers.blade.php` | نموذجٌ **يُبنى من الكتالوج** |
 | `routes/web.php` | ستّةُ مساراتٍ تحت `admin/ai/providers` |

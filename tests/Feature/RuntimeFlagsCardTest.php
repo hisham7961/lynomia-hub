@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Support\SecurityPosture;
-use App\Support\Settings;
+use App\Support\Security\SecurityPosture;
+use App\Support\Platform\Settings;
 use Tests\TestCase;
 
 /**

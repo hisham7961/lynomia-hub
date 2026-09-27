@@ -4,8 +4,8 @@ namespace Tests\Feature\MobilePlatform;
 
 use App\Http\Controllers\Web\MobilePlatformController;
 use App\Models\User;
-use App\Support\InformationArchitecture;
-use App\Support\MobilePlatform;
+use App\Support\Platform\InformationArchitecture;
+use App\Support\Mobile\MobilePlatform;
 use Illuminate\Support\Facades\Route as RouteFacade;
 use Tests\TestCase;
 

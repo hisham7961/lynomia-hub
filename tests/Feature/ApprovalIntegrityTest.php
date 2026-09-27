@@ -123,7 +123,7 @@ class ApprovalIntegrityTest extends TestCase
     {
         // المنطقُ انتقل إلى السكّة المشتركة `ApprovalService` (Mobile Readiness · الطور D ·
         // Critic F2) كي يستدعيه الويبُ والجوالُ معاً بلا نسخٍ — والقفلُ والمعاملةُ معه.
-        $src = \Tests\Support\Source::read(\App\Support\ApprovalService::class);
+        $src = \Tests\Support\Source::read(\App\Support\Platform\ApprovalService::class);
         $this->assertStringContainsString('lockForUpdate', $src,
             'الحسم بلا قفل — معتمِدان متزامنان يجتازان فحص «معلّق» معاً');
         $this->assertStringContainsString('DB::transaction', $src,

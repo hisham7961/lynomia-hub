@@ -30,7 +30,7 @@ class HubDigest extends Command
             }
         }
         $owner = User::whereNull('deleted_at')->where('status', 'نشط')
-            ->whereHas('role', fn ($q) => $q->where('is_owner', true))->first();
+            ->whereHas('role', fn ($q) => $q->where('is_owner', true))->orderBy('created_at')->orderBy('id')->first();
         if (! $owner) {
             $this->warn('لا مالك نشط — لا تقرير');
             return self::SUCCESS;
@@ -51,6 +51,24 @@ class HubDigest extends Command
             }
         } else {
             $lines[] = 'لا توصيات حرجة الآن — أو أن البيانات غير مكتملة بعد.';
+        }
+
+        // المدقّق (A4): ما ينتظر المالكَ من إشاراته — بعينِ المالك (مُعادُ التنطيق)، والسطرُ يُحذف عند الصفر
+        try {
+            // الظاهرةُ وحدَها — ما رفضه المديرون أو أجّلوه لا يُعَدّ «مفتوحاً» هنا كما لا يُعَدّ في مركز الفعل
+            $aud = \App\Support\Ai\Auditor\AuditorSignals::openFor($owner);
+            if ($aud !== []) {
+                $by = [];
+                foreach ($aud as $s) {
+                    $label = (string) ($s['label'] ?? 'أخرى');
+                    $by[$label] = ($by[$label] ?? 0) + 1;
+                }
+                arsort($by);
+                $lines[] = '🔎 المدقّق: ' . count($aud) . (count($aud) >= \App\Support\Ai\Auditor\AuditorSignals::MAX ? '+' : '') . ' إشارةٌ مفتوحة — '
+                    . implode(' · ', array_map(fn ($k, $n) => "{$k} ×{$n}", array_keys($by), $by)) . '.';
+            }
+        } catch (\Throwable $e) {
+            report($e);   // إثراء — لا يُسقط التقرير
         }
 
         // v2.124: نبض العقود — أرقام حقيقية فقط، والسطر يُحذف كله عند الصفر
@@ -97,7 +115,7 @@ class HubDigest extends Command
                 'text' => hub_fit($text, hub_col_max('outbox', 'text') ?? 790), 'state' => 'queued', 'created_at' => now()]);
         }
 
-        \App\Support\Health::beat('digest', (int) round((microtime(true) - $t0) * 1000));
+        \App\Support\Ops\Health::beat('digest', (int) round((microtime(true) - $t0) * 1000));
 
         $this->info('أُرسل التقرير إلى ' . $owners->count() . ' مالك');
 

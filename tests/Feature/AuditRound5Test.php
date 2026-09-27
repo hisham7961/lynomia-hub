@@ -117,9 +117,9 @@ class AuditRound5Test extends TestCase
     /** تكرار الخطأ نفسه يجمع العدّ ولا يفقده — الزيادة ذرّية لا فحص-ثم-إدراج */
     public function test_error_log_accumulates_count(): void
     {
-        \App\Support\ErrorLog::capture('php', 'خطأ متكرر', 'x.php', 5);
-        \App\Support\ErrorLog::capture('php', 'خطأ متكرر', 'x.php', 5);
-        \App\Support\ErrorLog::capture('php', 'خطأ متكرر', 'x.php', 5);
+        \App\Support\Ops\ErrorLog::capture('php', 'خطأ متكرر', 'x.php', 5);
+        \App\Support\Ops\ErrorLog::capture('php', 'خطأ متكرر', 'x.php', 5);
+        \App\Support\Ops\ErrorLog::capture('php', 'خطأ متكرر', 'x.php', 5);
 
         $row = \App\Models\ErrorEvent::first();
         $this->assertSame(3, (int) $row->count);

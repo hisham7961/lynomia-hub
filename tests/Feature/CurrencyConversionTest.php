@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Client;
 use App\Models\FinDocument;
-use App\Support\Currency;
+use App\Support\Finance\Currency;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -145,7 +145,7 @@ class CurrencyConversionTest extends TestCase
 
         // بلا سعر: مخلوطٌ كما كان — لا انحدارَ في السلوك
         $this->actingAs($this->owner);
-        $before = \App\Support\CeoBoard::concentration();
+        $before = \App\Support\Insights\CeoBoard::concentration();
         $this->assertIsArray($before);
     }
 
@@ -221,7 +221,7 @@ class CurrencyConversionTest extends TestCase
         // الجوهرُ: لا وقوفَ في الإدارة، لا شريطاً ولا مجالاً في IA
         $this->assertFalse(hub_admin_bar_visible($fin), 'شريطُ الإدارة انفتح لقارئِ المالية');
         $this->assertArrayNotHasKey('administration',
-            app(\App\Support\InformationArchitecture::class)->visibleDomains($fin),
+            app(\App\Support\Platform\InformationArchitecture::class)->visibleDomains($fin),
             'مجالُ الإدارة ظهر لقارئِ المالية');
 
         // ومقامُه «الإعدادات» — كبسولاتُ §11 أربعٌ، لا خامسةَ تُخترَع لبندٍ واحد

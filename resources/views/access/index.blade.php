@@ -11,7 +11,7 @@
     <form method="GET" class="crow" style="gap:8px;flex-wrap:wrap;align-items:end">
         <div>
             <label class="sub" for="user">اختر مستخدماً</label><br>
-            <select class="inp" id="user" name="user" onchange="this.form.submit()" style="min-width:280px">
+            <select class="inp" id="user" name="user" data-submit-on-change style="min-width:280px">
                 <option value="">— اختر —</option>
                 @foreach ($users as $u)
                     <option value="{{ $u->id }}" @selected($selected && (string) $selected->id === (string) $u->id)>

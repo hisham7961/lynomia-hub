@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Company;
 use App\Models\EndpointMdmConnection;
 use App\Models\VaultSecret;
-use App\Support\MdmService;
+use App\Support\Endpoint\MdmService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 

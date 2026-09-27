@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\Web\ModuleController;
-use App\Support\ErrorLog;
+use App\Support\Ops\ErrorLog;
 use Illuminate\Database\QueryException;
 use Tests\TestCase;
 

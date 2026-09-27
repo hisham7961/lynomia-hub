@@ -69,7 +69,7 @@ class SamplingAndReachRound6Test extends TestCase
         foreach (array_chunk($rows, 50) as $chunk) DB::table('tickets')->insert($chunk);
 
         $this->actingAs($this->owner);
-        $scan = \App\Support\AppsProjects::scan($this->owner);
+        $scan = \App\Support\Apps\AppsProjects::scan($this->owner);
         $missing = collect($scan['noProject'])->where('module', 'tickets')->count();
 
         $this->assertSame(5, $missing,
@@ -110,7 +110,7 @@ class SamplingAndReachRound6Test extends TestCase
                 ['monitor' => 1])->id]);
 
         $this->actingAs($u);
-        $flags = collect(\App\Support\AssetLife::flags())->pluck('title')->implode(' | ');
+        $flags = collect(\App\Support\Assets\AssetLife::flags())->pluck('title')->implode(' | ');
 
         $this->assertStringContainsString('صيانتي الفائتة', $flags,
             'صيانةُ القارئ الفائتة حجبتها اثنتا عشرة صيانةً لشركةٍ لا يراها — الحدُّ وقع '
@@ -131,7 +131,7 @@ class SamplingAndReachRound6Test extends TestCase
         \App\Models\StockItem::create(['name' => 'عصير', 'qty' => 0, 'carton_qty' => 6, 'company_id' => $c->id]);
         \App\Models\StockItem::create(['name' => 'عصير', 'qty' => 0, 'carton_qty' => 30, 'company_id' => null]);
 
-        $rows = \App\Support\Items::cartons([
+        $rows = \App\Support\Assets\Items::cartons([
             ['desc' => 'ماء', 'qty' => 48, 'price' => 1, 'per' => null],
             ['desc' => 'عصير', 'qty' => 12, 'price' => 1, 'per' => null],
         ], $c->id);
@@ -220,9 +220,9 @@ class SamplingAndReachRound6Test extends TestCase
         }
 
         $this->actingAs($this->owner);
-        $a = \App\Support\Delivery::leadTime();
+        $a = \App\Support\Apps\Delivery::leadTime();
         \Illuminate\Support\Facades\Cache::flush();
-        $b = \App\Support\Delivery::leadTime();
+        $b = \App\Support\Apps\Delivery::leadTime();
 
         $this->assertSame($a['avg'], $b['avg'], 'العيّنةُ تتغيّر بين تشغيلين — المحرّك يختارها');
         $this->assertTrue($a['sampled'] ?? false,

@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Role;
 use App\Models\User;
-use App\Support\HubEvents;
-use App\Support\SecurityExposure;
+use App\Support\Platform\HubEvents;
+use App\Support\Security\SecurityExposure;
 use Tests\TestCase;
 
 /**

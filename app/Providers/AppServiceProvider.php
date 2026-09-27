@@ -32,8 +32,8 @@ class AppServiceProvider extends ServiceProvider
          */
         $this->app->bind(\App\Contracts\AskGenerator::class, static function ($app) {
             return $app->runningUnitTests()
-                ? new \App\Support\NullAskGenerator()
-                : \App\Support\AskGeneratorFactory::make();
+                ? new \App\Support\Ai\Ask\NullAskGenerator()
+                : \App\Support\Ai\Ask\AskGeneratorFactory::make();
         });
     }
 
@@ -46,7 +46,22 @@ class AppServiceProvider extends ServiceProvider
          */
         // تُستثنى الحزمةُ نفسها: أداةُ الاختبار تُعيد بناء قاعدةٍ مؤقتة بحقّ،
         // ولا بياناتٍ فيها تُفقد. والاختبارُ الذي يفحص الحاجز يستدعيه صراحةً.
-        if (! $this->app->runningUnitTests()) \App\Support\SchemaGuard::shield();
+        if (! $this->app->runningUnitTests()) \App\Support\Ops\SchemaGuard::shield();
+
+        // دلالةُ القراءة القافلة التي بُنيت عليها حرّاسُ التزامن — على MariaDB 11 أيضاً
+        // (قبل أوّل استعلام: `setting()` أدناه أوّلُ من يفتح الاتّصال)
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Database\Events\ConnectionEstablished::class,
+            fn ($e) => \App\Support\Ops\SnapshotIsolation::apply($e->connection));
+        foreach (\Illuminate\Support\Facades\DB::getConnections() as $c) \App\Support\Ops\SnapshotIsolation::apply($c);
+
+        // خريطةُ الأعمدة المخبوءة تُفرَّغ مع كلِّ DDL ومع نهاية الهجرات (PERF-05) — لا تكذب بعد migrate
+        \App\Support\Platform\SchemaCache::register();
+
+        // `@cspNonce` ⇐ `nonce="…"` بـnonce هذا الطلب (بند الدَّين #12 · FE-03): كلُّ
+        // `<script>` مضمَّنٍ في قالبٍ يحمله، وإلا حجبته السياسةُ المفروضة. والمصدرُ
+        // واحد (`ContentSecurity::nonce()`) فما يطبعه القالب هو ما تكتبه الترويسة.
+        \Illuminate\Support\Facades\Blade::directive('cspNonce',
+            fn () => '<?php echo \'nonce="\' . e(\App\Support\Security\ContentSecurity::nonce()) . \'"\'; ?>');
 
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
@@ -61,7 +76,7 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // بريد SMTP من حقول مركز المراسلة — تغلب .env إن مُلئت، محصّنة مثلها
-        \App\Support\MailSettings::apply();
+        \App\Support\Platform\MailSettings::apply();
 
         /*
          * حدُّ معدّل API: ١٢٠ بالدقيقة لكل مفتاح — **وسقفٌ للعنوان لا يُفلَت منه**.
@@ -96,6 +111,18 @@ class AppServiceProvider extends ServiceProvider
             return [
                 Limit::perMinute(10)->by('login:' . sha1($email) . '|' . $request->ip()),
                 Limit::perMinute(60)->by('login-ip:' . $request->ip()),
+            ];
+        });
+
+        // (بندُ الدَّين #15 · AUTH-09) الاستعادةُ الذاتيّة: سقفٌ على البريد نفسِه (وُجد أم لم
+        // يوجد — فالسقفُ لا يصير أوراكلَ تعداد) يمنع إغراقَ صندوقِ ضحيّةٍ بالروابط،
+        // وسقفٌ على العنوان يصدّ المسحَ على قوائم بريد. والوسيطُ يقع قبل المتحكّم.
+        RateLimiter::for('password-reset', function ($request) {
+            $email = mb_strtolower(trim((string) $request->input('email')));
+
+            return [
+                Limit::perHour(5)->by('pwreset:' . sha1($email)),
+                Limit::perMinute(5)->by('pwreset-ip:' . $request->ip()),
             ];
         });
 

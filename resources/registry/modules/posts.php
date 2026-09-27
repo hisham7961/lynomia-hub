@@ -1,0 +1,167 @@
+<?php
+
+/** سجلُّ الوحدات — «posts» (docs/REORG_PLAN.md §R4) — يُحمَّل بترتيبه من قائمة config/hub.php */
+
+return [
+    'key' => 'posts',
+    'table' => 'social_posts',
+    'model' => 'SocialPost',
+    'label' => 'منشورات ومشاهدات',
+    'display' => 'title',
+    'status' => 'status',
+    'columns' => [
+        'title',
+        'socialId',
+        'type',
+        'status',
+        'pubAt',
+        'views',
+        
+    ],
+    'fields' => [
+        [
+            'key' => 'title',
+            'col' => 'title',
+            'label' => 'عنوان/وصف المنشور',
+            'type' => 'text',
+            'required' => true,
+        ],
+        [
+            'key' => 'socialId',
+            'col' => 'social_id',
+            'label' => 'الحساب',
+            'type' => 'ref',
+            'required' => true,
+            'ref' => 'social',
+        ],
+        [
+            'key' => 'projectId',
+            'col' => 'project_id',
+            'label' => 'المشروع',
+            'type' => 'ref',
+            'ref' => 'projects',
+        ],
+        [
+            'key' => 'type',
+            'col' => 'type',
+            'label' => 'نوع المحتوى',
+            'type' => 'sel',
+            'options' => [
+                'صورة',
+                'فيديو / ريلز',
+                'ستوري',
+                'كاروسيل',
+                'نص',
+                'بث مباشر',
+                'إعلان ممول',
+            ],
+        ],
+        [
+            'key' => 'status',
+            'col' => 'status',
+            'label' => 'الحالة',
+            'type' => 'sel',
+            'options' => [
+                'مسودة',
+                'مجدول',
+                'منشور',
+                'متوقف',
+            ],
+        ],
+        [
+            'key' => 'pubAt',
+            'col' => 'pub_at',
+            'label' => 'تاريخ ووقت النشر',
+            'type' => 'dt',
+        ],
+        [
+            'key' => 'url',
+            'col' => 'url',
+            'label' => 'رابط المنشور',
+            'type' => 'url',
+        ],
+        [
+            'key' => 'authorId',
+            'col' => 'author_id',
+            'label' => 'المسؤول',
+            'type' => 'ref',
+            'ref' => 'users',
+        ],
+        [
+            'key' => 'designId',
+            'col' => 'design_id',
+            'label' => 'التصميم المرتبط',
+            'type' => 'ref',
+            'ref' => 'designs',
+        ],
+        [
+            'key' => 'views',
+            'col' => 'views',
+            'label' => 'المشاهدات',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'reach',
+            'col' => 'reach',
+            'label' => 'الوصول (Reach)',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'impr',
+            'col' => 'impr',
+            'label' => 'الظهور (Impressions)',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'likes',
+            'col' => 'likes',
+            'label' => 'إعجابات',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'comments2',
+            'col' => 'comments2',
+            'label' => 'تعليقات',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'shares',
+            'col' => 'shares',
+            'label' => 'مشاركات',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'saves',
+            'col' => 'saves',
+            'label' => 'حفظ',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'clicks',
+            'col' => 'clicks',
+            'label' => 'نقرات الرابط',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'spend',
+            'col' => 'spend',
+            'label' => 'الميزانية الإعلانية',
+            'type' => 'num',
+        ],
+        [
+            'key' => 'notes',
+            'col' => 'notes',
+            'label' => 'ملاحظات',
+            'type' => 'ta',
+        ],
+        [
+            'key' => 'tags',
+            'col' => 'tags',
+            'label' => 'وسوم',
+            'type' => 'tags',
+        ],
+    ],
+    'search' => [
+        'title',
+    ],
+];

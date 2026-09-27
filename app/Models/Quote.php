@@ -426,7 +426,7 @@ class Quote extends Model
         }
 
         if ($do === 'invoice'
-            && \Illuminate\Support\Facades\Schema::hasColumn('quote_milestones', 'invoice_id')
+            && \App\Support\Platform\SchemaCache::hasColumn('quote_milestones', 'invoice_id')
             && $this->hasLiveMilestoneInvoice($lock)) {
             return ['code' => 422, 'key' => 'milestone_invoices',
                 'why' => 'للعرض فواتيرُ دفعاتٍ حيّة — لا تُسكّ فاتورةٌ كاملةٌ فوقها'

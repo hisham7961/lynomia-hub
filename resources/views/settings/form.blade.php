@@ -68,14 +68,14 @@
      لا تخصّ مفتاحاً بعينه بل ما لا يصحّ **وحدَه** — خادمُ بريدٍ بلا مستخدم،
      ورابطُ أودو بلا قاعدة، وبدايةُ دوامٍ بعد الوضع الصارم. ومعها القارئُ الذي
      يجعلها قاعدةً لا رأياً. --}}
-@php $depErrors = collect(\App\Support\Settings::DEPENDS)->keys()->filter(fn ($g) => $errors->has($g)); @endphp
+@php $depErrors = collect(\App\Support\Platform\Settings::DEPENDS)->keys()->filter(fn ($g) => $errors->has($g)); @endphp
 @if ($depErrors->isNotEmpty())
     <div class="card" style="border-color:var(--bad);margin-bottom:12px">
         <h3>⛔ لم يُحفظ شيء — مجموعةٌ لا تصحّ نصفَ مضبوطة</h3>
         <ul style="margin:6px 0 0;padding-inline-start:18px;line-height:2">
             @foreach ($depErrors as $g)
                 <li>{{ $errors->first($g) }}
-                    <div class="sub mono ltr" style="font-size:11px">{{ \App\Support\Settings::DEPENDS[$g]['why'] }}</div></li>
+                    <div class="sub mono ltr" style="font-size:11px">{{ \App\Support\Platform\Settings::DEPENDS[$g]['why'] }}</div></li>
             @endforeach
         </ul>
     </div>
@@ -179,7 +179,7 @@
                         @if (empty($meta['readonly']) && ($fact['stored'] ?? null) !== null)
                             <button class="btn ghost xs" type="submit" form="rstk{{ $gi }}_{{ $input }}"
                                     style="margin-inline-start:auto"
-                                    data-confirm="استعادةُ «{{ $meta['label'] ?? $key }}» إلى افتراضيّه؟@if (\App\Support\Settings::isHighRisk($key)) مفتاحٌ عالي الخطورة — سيُطلَب تأكيدُ هويتك.@endif">↺ افتراضيّه</button>
+                                    data-confirm="استعادةُ «{{ $meta['label'] ?? $key }}» إلى افتراضيّه؟@if (\App\Support\Platform\Settings::isHighRisk($key)) مفتاحٌ عالي الخطورة — سيُطلَب تأكيدُ هويتك.@endif">↺ افتراضيّه</button>
                         @endif
                     </div>
 
@@ -347,7 +347,7 @@
                 <td class="sub">{{ $meta['why'] ?? '' }}</td>
                 <td>
                     @if (! empty($meta['owner_route']) && \Illuminate\Support\Facades\Route::has($meta['owner_route']))
-                        <a class="btn ghost sm" href="{{ route($meta['owner_route']) }}">↗ افتحها</a>
+                        <a class="btn ghost sm" href="{{ route($meta['owner_route'], $meta['owner_params'] ?? []) }}">↗ {{ ($meta['owner_label'] ?? '') !== '' ? $meta['owner_label'] : 'افتحها' }}</a>
                     @else
                         <span class="sub">أمرُ طرفيةٍ أو حالةٌ داخلية</span>
                     @endif
@@ -359,7 +359,7 @@
     <div class="sub" style="margin-top:10px">ولأي مفتاحٍ من الطرفية: <span class="mono ltr">php artisan hub:set key value</span></div>
 </div>
 
-<script>
+<script @cspNonce>
 (function () {
     var q = document.getElementById('setq'), only = document.getElementById('setrisk'),
         none = document.getElementById('setnone');

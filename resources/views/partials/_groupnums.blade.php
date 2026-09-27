@@ -11,7 +11,7 @@
         @include('partials._groupnums', ['what' => 'أرقامُ هذه اللوحة', 'parts' => 'بطاقةٌ وبطاقة'])
     ولا يظهر شيءٌ ما لم يكن في المبدّل كيانٌ مختار — فلا تحذيرَ دائمٌ يُقرأ ضجيجاً.
 --}}
-@php $gnCo = $gnCo ?? \App\Support\ExecutionStats::activeCompany(); @endphp
+@php $gnCo = $gnCo ?? \App\Support\Workforce\ExecutionStats::activeCompany(); @endphp
 @if ($gnCo)
     <div class="card" style="border-inline-start:3px solid var(--wn, #E0A82E);margin-bottom:12px">
         <div class="sub">🏢 <b>أرقام المجموعة —</b>
