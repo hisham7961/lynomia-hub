@@ -389,8 +389,9 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
         Route::post('inventory/sessions/{id}/close', [\App\Http\Controllers\Api\MobileInventoryController::class, 'close'])->name('mobile.inventory.close');
     });
     // طلب الجوال #1: قائمةُ مرفقات السجلّ وحذفُ مرفق — بحارسَي الويب (`guardRecord` + `DocumentPolicy`)
-    Route::get('files', [\App\Http\Controllers\Api\MobileFileController::class, 'recordFiles'])->name('mobile.files.index');
-    Route::delete('files/{id}', [\App\Http\Controllers\Api\MobileFileController::class, 'deleteFile'])
+    // (مراجعة) تحت `attachments` لا `files`: `files` مفتاحُ وحدة الوثائق — والمسارُ الحرفيُّ كان يخطف قائمتها وحذفَها
+    Route::get('attachments', [\App\Http\Controllers\Api\MobileFileController::class, 'recordFiles'])->name('mobile.files.index');
+    Route::delete('attachments/{id}', [\App\Http\Controllers\Api\MobileFileController::class, 'deleteFile'])
         ->middleware('throttle:60,1')->name('mobile.files.destroy');
     // طلب الجوال #2: تنزيلُ مرفقِ تعليقٍ/رسالةٍ بمقبضِ صاحبها
     Route::get('comments/{id}/attachment', [\App\Http\Controllers\Api\MobileRecordExtrasController::class, 'commentAttachment'])->name('mobile.comments.attachment');

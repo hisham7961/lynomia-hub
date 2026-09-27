@@ -230,7 +230,7 @@ class AttachmentController extends Controller
     /**
      * الحذف: من رفعه، أو من يملك تعديل الوحدة، أو المالك — ويُدوَّن في التدقيق.
      * الحارسُ والأثرُ في الجوهر المشترك (`AttachmentService::authorizeDelete/delete`) —
-     * يسلكه الجوالُ (`DELETE files/{id}`) حرفاً.
+     * يسلكه الجوالُ (`DELETE attachments/{id}`) حرفاً.
      */
     public function destroy(string $id)
     {

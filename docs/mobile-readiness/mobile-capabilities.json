@@ -899,8 +899,14 @@
             "endpoints": [
                 {
                     "method": "GET",
-                    "path": "/api/mobile/v1/files",
+                    "path": "/api/mobile/v1/attachments",
                     "name": "mobile.files.index",
+                    "auth": "mobile.session"
+                },
+                {
+                    "method": "DELETE",
+                    "path": "/api/mobile/v1/attachments/{id}",
+                    "name": "mobile.files.destroy",
                     "auth": "mobile.session"
                 },
                 {
@@ -925,12 +931,6 @@
                     "method": "POST",
                     "path": "/api/mobile/v1/files/upload-session/{id}/complete",
                     "name": "mobile.files.upload_complete",
-                    "auth": "mobile.session"
-                },
-                {
-                    "method": "DELETE",
-                    "path": "/api/mobile/v1/files/{id}",
-                    "name": "mobile.files.destroy",
                     "auth": "mobile.session"
                 },
                 {

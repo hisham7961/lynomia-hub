@@ -40,7 +40,7 @@ class MobilePlatformSettingsTest extends TestCase
         $this->seedCore();
         $admin = $this->mobileAdmin();
 
-        $this->actingAs($admin)->post('/admin/mobile-platform/settings/release', [
+        $this->actingAs($admin)->withSession(['stepup.ok_until' => now()->addMinutes(10)->timestamp])->post('/admin/mobile-platform/settings/release', [
             'min_version_ios' => '1.2.0', 'latest_version_ios' => '1.4.0',
             'store_url_ios' => 'https://apps.apple.com/app/id123', 'support_url' => 'mailto:help@example.com',
             'force_update' => '1',
@@ -58,7 +58,7 @@ class MobilePlatformSettingsTest extends TestCase
         $this->assertSame('https://apps.apple.com/app/id123', $cfg->json('data.store_urls.ios') ?? $cfg->json('store_urls.ios'));
 
         // حفظُ النموذجِ نفسِه بلا تغيير لا يكتب ولا يُدقّق
-        $this->actingAs($admin)->post('/admin/mobile-platform/settings/release', [
+        $this->actingAs($admin)->withSession(['stepup.ok_until' => now()->addMinutes(10)->timestamp])->post('/admin/mobile-platform/settings/release', [
             'min_version_ios' => '1.2.0', 'latest_version_ios' => '1.4.0',
             'store_url_ios' => 'https://apps.apple.com/app/id123', 'support_url' => 'mailto:help@example.com',
             'force_update' => '1',
@@ -69,7 +69,7 @@ class MobilePlatformSettingsTest extends TestCase
     public function test_invalid_input_saves_nothing(): void
     {
         $this->seedCore();
-        $this->actingAs($this->owner);
+        $this->actingAs($this->owner)->withSession(['stepup.ok_until' => now()->addMinutes(10)->timestamp]);
 
         foreach ([
             ['min_version_ios' => '2.0.0', 'latest_version_ios' => '1.9.9'],   // الأدنى > الأحدث
@@ -103,7 +103,7 @@ class MobilePlatformSettingsTest extends TestCase
         $fp = implode(':', array_fill(0, 32, 'ab'));
         $fp2 = implode(':', array_fill(0, 32, 'CD'));
 
-        $this->actingAs($this->owner)->post('/admin/mobile-platform/settings/deeplinks', [
+        $this->actingAs($this->owner)->withSession(['stepup.ok_until' => now()->addMinutes(10)->timestamp])->post('/admin/mobile-platform/settings/deeplinks', [
             'dl_apple_team_id' => 'ABCDE12345', 'dl_apple_bundle_id' => 'com.lynomia.hub',
             'dl_android_package' => 'com.lynomia.hub', 'dl_android_fingerprints' => $fp . "\n" . $fp2 . ', ' . $fp,
         ])->assertSessionHas('ok');
@@ -118,7 +118,7 @@ class MobilePlatformSettingsTest extends TestCase
     {
         $this->seedCore();
         $secret = 'ya29.SECRET-TOKEN-7f3c9e1d2b8a4c6e';
-        $this->actingAs($this->owner)->post('/admin/mobile-platform/settings/push', [
+        $this->actingAs($this->owner)->withSession(['stepup.ok_until' => now()->addMinutes(10)->timestamp])->post('/admin/mobile-platform/settings/push', [
             'push_driver' => 'fcm', 'push_fcm_project_id' => 'lynomia-hub', 'push_fcm_access_token' => $secret,
         ])->assertSessionHas('ok');
 
@@ -154,7 +154,7 @@ class MobilePlatformSettingsTest extends TestCase
             ->assertForbidden();
         $this->actingAs($this->viewer)->post('/admin/mobile-platform/settings/push', ['push_driver' => 'fcm'])
             ->assertForbidden();
-        $this->actingAs($this->owner)->post('/admin/mobile-platform/settings/unknown', [])->assertNotFound();
+        $this->actingAs($this->owner)->withSession(['stepup.ok_until' => now()->addMinutes(10)->timestamp])->post('/admin/mobile-platform/settings/unknown', [])->assertNotFound();
         $this->assertSame(0, Setting::where('key', 'like', 'mobile.%')->count());
     }
 
@@ -191,5 +191,23 @@ class MobilePlatformSettingsTest extends TestCase
         $this->assertSame(1, $listed);
         $this->assertSame($listed, $kpi, 'عدّادُ «نشطة» يخالف فلترَ «نشطة» — تعريفان لسؤالٍ واحد');
         $this->assertSame('active', MobilePlatform::sessionStatus($s->fresh())['key']);
+    }
+
+    /**
+     * (مراجعة) **الكتابةُ تتطلّب هويةً طازجة**: المحرّرُ يستبدل مفتاحَ حساب خدمة FCM، ويعيد توجيه
+     * الروابط العميقة إلى تطبيقٍ آخر، ويفرض تحديثاً حاجباً على كلِّ المستخدمين — وكانت جلسةُ ويبٍ
+     * عاديّةٌ تكفي حاملَ علم `mobile` لذلك. شاشاتُ الأسرار المماثلة (مزوّدو الذكاء) تطلب التحقّق.
+     */
+    public function test_writes_require_a_fresh_step_up(): void
+    {
+        $this->seedCore();
+        foreach (['release' => ['force_update' => '1', 'min_version_ios' => '99.0.0', 'latest_version_ios' => '99.0.0'],
+                  'deeplinks' => ['dl_android_package' => 'com.evil.app'],
+                  'push' => ['push_driver' => 'fcm']] as $section => $body) {
+            $this->actingAs($this->owner)->post('/admin/mobile-platform/settings/' . $section, $body)->assertRedirect();
+        }
+        $this->assertNull($this->raw('mobile.force_update'), 'حُفظ التحديثُ الإجباريُّ بلا تحقّقٍ إضافيّ');
+        $this->assertNull($this->raw('mobile.dl_android_package'), 'أُعيد توجيهُ الروابط العميقة بلا تحقّقٍ إضافيّ');
+        $this->assertNull($this->raw('mobile.push_driver'), 'غُيّر مزوّدُ الإشعارات بلا تحقّقٍ إضافيّ');
     }
 }

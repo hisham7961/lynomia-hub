@@ -2089,7 +2089,7 @@
     },
     {
         "methods": "GET|HEAD",
-        "uri": "api/mobile/v1/files",
+        "uri": "api/mobile/v1/attachments",
         "name": "mobile.files.index",
         "action": "App\\Http\\Controllers\\Api\\MobileFileController@recordFiles",
         "middleware": [
@@ -2102,7 +2102,7 @@
     },
     {
         "methods": "DELETE",
-        "uri": "api/mobile/v1/files/{id}",
+        "uri": "api/mobile/v1/attachments/{id}",
         "name": "mobile.files.destroy",
         "action": "App\\Http\\Controllers\\Api\\MobileFileController@deleteFile",
         "middleware": [

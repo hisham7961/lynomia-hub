@@ -92,9 +92,15 @@ class MobileInventoryController extends V1Controller
         $this->tagMobile($r);
         InventorySessions::authorize('e', 'assetInventory');
 
-        return $this->idempotently($r, function () use ($r) {
+        // ترويسةُ الشركة تمرّ للمالك بلا فحص — تُتحقَّق قبل أن تُكتب في عمود uuid (لا ٥٠٠ ولا جلسةَ يتيمة)
+        $hdr = MobileContext::company($r);
+        if ($hdr !== null && ! \App\Models\Company::whereKey($hdr)->exists()) {
+            return Api::error(Api::VALIDATION_FAILED, 422, 'الشركةُ المختارة غيرُ موجودة', ['reason' => 'unknown_company']);
+        }
+
+        return $this->idempotently($r, function () use ($hdr) {
             $cids = hub_company_ids();
-            $company = MobileContext::company($r)
+            $company = $hdr
                 ?? (($cids !== null && count($cids) === 1) ? $cids[0] : null);
             [$session, $n] = InventorySessions::freeze($company);
 

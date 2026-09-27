@@ -284,6 +284,9 @@ class MobilePlatformController extends Controller
     {
         $this->gate();
         abort_unless(array_key_exists($section, \App\Support\Mobile\MobileSettings::SECTIONS), 404);
+        // هويةٌ طازجة: الأقسامُ الثلاثة تستبدل مفتاحَ حساب الخدمة، أو توجّه الروابطَ العميقة لتطبيقٍ آخر،
+        // أو تفرض تحديثاً حاجباً على كلِّ المستخدمين — كما تطلبه شاشاتُ الأسرار المماثلة
+        if ($resp = hub_require_stepup()) return $resp;
 
         $res = \App\Support\Mobile\MobileSettings::save($section, $r->except(['_token']));
         $tab = $section === 'push' ? 'push' : 'config';

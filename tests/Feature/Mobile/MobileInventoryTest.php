@@ -139,4 +139,19 @@ class MobileInventoryTest extends TestCase
         $this->withHeaders($h)->postJson('/api/mobile/v1/inventory/sessions')->assertStatus(404);
         $this->assertSame(0, InventorySession::count());
     }
+
+    /**
+     * (مراجعة) ترويسةُ الشركة للمالك تمرّ بلا فحص إلى `inventory_sessions.company_id` (uuid): قيمةٌ عشوائيّةٌ
+     * تُسقط MySQL الصارم بـ٥٠٠، ومعرّفٌ غيرُ موجودٍ يُنشئ جلسةً يتيمة — فالشركةُ تُتحقَّق قبل التجميد.
+     */
+    public function test_freeze_rejects_an_unknown_company_header(): void
+    {
+        $this->seedCore();
+        foreach (['not-a-uuid-' . str_repeat('x', 50), (string) \Illuminate\Support\Str::uuid()] as $bad) {
+            $this->withHeaders($this->h($this->owner) + ['X-Lynomia-Company' => $bad])
+                ->postJson('/api/mobile/v1/inventory/sessions')->assertStatus(422)
+                ->assertJsonPath('code', 'VALIDATION_FAILED');
+        }
+        $this->assertSame(0, \Illuminate\Support\Facades\DB::table('inventory_sessions')->count(), 'جلسةٌ يتيمةٌ أُنشئت');
+    }
 }

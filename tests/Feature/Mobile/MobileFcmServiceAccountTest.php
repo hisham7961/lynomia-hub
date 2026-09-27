@@ -130,7 +130,7 @@ class MobileFcmServiceAccountTest extends TestCase
     public function test_editor_validates_and_never_echoes_the_service_account(): void
     {
         $this->seedCore();
-        $this->actingAs($this->owner);
+        $this->actingAs($this->owner)->withSession(['stepup.ok_until' => now()->addMinutes(10)->timestamp]);
 
         $this->post('/admin/mobile-platform/settings/push', ['push_fcm_service_account' => '{"client_email":"x@y.z"}'])
             ->assertSessionHasErrors(['push_fcm_service_account'], null, 'mobileSettings');
@@ -147,5 +147,35 @@ class MobileFcmServiceAccountTest extends TestCase
         $this->assertStringNotContainsString('PRIVATE KEY', $html);
         $this->assertStringNotContainsString('push@lynomia-hub', $html);
         $this->assertStringNotContainsString('PRIVATE KEY', (string) json_encode(DB::table('audits')->get()));
+    }
+
+    /**
+     * (مراجعة) **الفشلُ يُذكر**: التفريعُ متزامنٌ لكلِّ جهاز، فكان رمزُ OAuth الفاشلُ يُطلب من جديد لكلِّ جهاز
+     * (DNS + فحصٌ صادر + مهلةُ ٨ ثوانٍ) — مستخدمٌ بخمسة أجهزةٍ يؤخّر الطلبَ أربعين ثانية ويُمطر خادمَ Google.
+     */
+    public function test_a_failed_token_exchange_is_not_retried_per_device(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake(['oauth2.googleapis.com/*' => Http::response(['error' => 'invalid_grant'], 400)]);
+        $this->arm();
+        foreach (range(1, 3) as $i) {
+            PushToken::create(['installation_id' => (string) Str::uuid(), 'user_id' => $this->owner->id,
+                'platform' => 'android', 'provider' => 'fcm', 'token' => 'device-tok-' . $i, 'last_confirmed_at' => now()]);
+        }
+
+        $this->notify();
+
+        $this->assertSame(4, PushDelivery::where('status', 'failed')->count(), 'كلُّ جهازٍ يُسجَّل فشلُه بصدق');
+        Http::assertSentCount(1);
+    }
+
+    /** (مراجعة) معرّفُ المشروع من ملفّ حساب الخدمة يمرّ بنمط المحرّر نفسِه قبل أن يدخل مسارَ عنوان FCM */
+    public function test_project_id_from_service_account_is_validated(): void
+    {
+        $this->seedCore();
+        $sa = json_decode($this->serviceAccount(), true);
+        $sa['project_id'] = 'x/../../evil';
+        $this->assertNull(\App\Support\Push\FcmServiceAccount::parse((string) json_encode($sa)),
+            'حسابُ خدمةٍ بمعرّف مشروعٍ غير صالح قُبل');
     }
 }

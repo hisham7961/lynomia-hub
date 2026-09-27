@@ -153,12 +153,12 @@ POST auth/refresh { refresh_token }
 | dm | `POST dm/threads/{user}/send` | `mobile.dm.send` | مُصادَقة |
 | dm | `GET dm/threads/{user}/since` | `mobile.dm.since` | مُصادَقة |
 | dm | `POST dm/threads/{user}/typing` | `mobile.dm.typing` | مُصادَقة |
-| files | `GET files` | `mobile.files.index` | مُصادَقة |
+| files | `GET attachments` | `mobile.files.index` | مُصادَقة |
+| files | `DELETE attachments/{id}` | `mobile.files.destroy` | مُصادَقة |
 | files | `POST files/attach` | `mobile.files.attach` | مُصادَقة |
 | files | `POST files/upload-session` | `mobile.files.upload_session` | مُصادَقة |
 | files | `PUT files/upload-session/{id}/chunk` | `mobile.files.upload_chunk` | مُصادَقة |
 | files | `POST files/upload-session/{id}/complete` | `mobile.files.upload_complete` | مُصادَقة |
-| files | `DELETE files/{id}` | `mobile.files.destroy` | مُصادَقة |
 | files | `GET files/{id}/download` | `mobile.files.download` | مُصادَقة |
 | files | `GET files/{id}/stream` | `mobile.files.stream` | مُصادَقة |
 | finance_actions | `POST fin/{id}/pay` | `mobile.fin.pay` | مُصادَقة |

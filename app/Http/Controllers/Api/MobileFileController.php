@@ -286,7 +286,7 @@ class MobileFileController extends V1Controller
     // ═══════════════ 3.5 · قائمةُ مرفقات السجل وحذفُ مرفق (طلب الجوال #1) ═══════════════
 
     /**
-     * `GET files?module=&record_id=` — مرفقاتُ سجلٍّ **بقواعد شاشة السجلّ الويبية نفسِها**:
+     * `GET attachments?module=&record_id=` — مرفقاتُ سجلٍّ **بقواعد شاشة السجلّ الويبية نفسِها**:
      *  • `guardRecord(...,'v')` — رؤيةُ الوحدة (٤٠٣) + نطاقُ السجلّ (خارجَه ٤٠٤ · لا IDOR).
      *  • `DocumentPolicy::filterListable` — الوثيقةُ الممنوعةُ صراحةً عن القارئ لا تُعرَض أصلاً
      *    (لا اسمَ ولا عدّ) — الترشيحُ نفسُه في `partials/attachments`.
@@ -343,7 +343,7 @@ class MobileFileController extends V1Controller
     }
 
     /**
-     * `DELETE files/{id}` — حذفٌ ناعمٌ **بحارس الويب نفسِه** (`AttachmentService::authorizeDelete`):
+     * `DELETE attachments/{id}` — حذفٌ ناعمٌ **بحارس الويب نفسِه** (`AttachmentService::authorizeDelete`):
      * رافعُه أو المالكُ أو محرّرُ وحدته (٤٠٣ لغيرهم) + رؤيةُ السجلّ ونطاقُه (٤٠٤) — ثم الأثرُ
      * المشترك (تدقيقٌ + إبطالُ رادار الانتهاء). الملفُّ يبقى على القرص للاستعادة.
      */

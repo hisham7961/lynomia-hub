@@ -61,7 +61,7 @@ class MobileRecordFilesTest extends TestCase
             'created_by' => $this->owner->id, 'created_at' => now(), 'updated_at' => now()]);
 
         $res = $this->withHeaders($this->h($reader))
-            ->getJson('/api/mobile/v1/files?module=projects&record_id=' . $p->id)->assertOk();
+            ->getJson('/api/mobile/v1/attachments?module=projects&record_id=' . $p->id)->assertOk();
         $this->assertSame([$open->id], array_column($res->json('data.files'), 'id'),
             'الوثيقةُ الممنوعةُ صراحةً لا تُعرَض ولا تُعدّ — كشاشة الويب');
         $this->assertSame(1, $res->json('data.count'));
@@ -80,7 +80,7 @@ class MobileRecordFilesTest extends TestCase
         $coB = Company::create(['name_ar' => 'شركة باء', 'status' => 'نشطة']);
         $p = Project::create(['name' => 'مشروعُ ألف', 'company_id' => $coA->id]);
         $this->att($p, $this->owner, 'a.pdf');
-        $url = '/api/mobile/v1/files?module=projects&record_id=' . $p->id;
+        $url = '/api/mobile/v1/attachments?module=projects&record_id=' . $p->id;
 
         $blind = $this->person('بلا مشاريع', ['tasks' => ['v' => 1]]);
         $this->withHeaders($this->h($blind))->getJson($url)->assertStatus(403);
@@ -89,7 +89,7 @@ class MobileRecordFilesTest extends TestCase
         $isolated->forceFill(['companies' => [$coB->id]])->save();
         $this->withHeaders($this->h($isolated))->getJson($url)->assertStatus(404);
 
-        $this->withHeaders($this->h($this->viewer))->getJson('/api/mobile/v1/files?module=projects')
+        $this->withHeaders($this->h($this->viewer))->getJson('/api/mobile/v1/attachments?module=projects')
             ->assertStatus(422);
 
         // العميلُ: الويبُ يُخفي مرفقاتِ الشاشة الداخلية عنه — ٤٠٤ عند البوّابة
@@ -110,18 +110,18 @@ class MobileRecordFilesTest extends TestCase
         $a1 = $this->att($p, $this->owner, 'owner.pdf');
         $a2 = $this->att($p, $uploader, 'mine.pdf');
 
-        $this->withHeaders($this->h($reader))->deleteJson('/api/mobile/v1/files/' . $a1->id)->assertStatus(403);
+        $this->withHeaders($this->h($reader))->deleteJson('/api/mobile/v1/attachments/' . $a1->id)->assertStatus(403);
         $this->assertNotNull(Attachment::find($a1->id));
 
         // رافعُه يحذفه ولو لم يملك تعديلَ الوحدة، ومحرّرُ الوحدة يحذف ما رفعه غيرُه
-        $this->withHeaders($this->h($uploader))->deleteJson('/api/mobile/v1/files/' . $a2->id)->assertOk()
+        $this->withHeaders($this->h($uploader))->deleteJson('/api/mobile/v1/attachments/' . $a2->id)->assertOk()
             ->assertJsonPath('data.deleted', true);
-        $this->withHeaders($this->h($this->employee))->deleteJson('/api/mobile/v1/files/' . $a1->id)->assertOk();
+        $this->withHeaders($this->h($this->employee))->deleteJson('/api/mobile/v1/attachments/' . $a1->id)->assertOk();
         $this->assertNull(Attachment::find($a1->id));
         $this->assertNotNull(Attachment::withTrashed()->find($a1->id), 'حذفٌ ناعم — الملفُّ للاستعادة');
         $this->assertSame(2, DB::table('audits')->where('action', 'حذف مرفق')->count());
 
-        $this->withHeaders($this->h($this->employee))->deleteJson('/api/mobile/v1/files/' . $a1->id)->assertStatus(404);
+        $this->withHeaders($this->h($this->employee))->deleteJson('/api/mobile/v1/attachments/' . $a1->id)->assertStatus(404);
     }
 
     // ═══════════ 3.6 · نسخُ السجلّ ═══════════

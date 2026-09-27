@@ -30,6 +30,9 @@ final class FcmServiceAccount
     /** هامشُ الأمان قبل انتهاء الرمز (ثوانٍ) */
     public const EARLY = 300;
 
+    /** مدّةُ تذكّر الفشل (ث) — لا يُعاد طلبُ رمزٍ فاشلٍ لكلِّ جهازٍ في التفريع نفسِه */
+    public const FAIL_TTL = 60;
+
     /**
      * يُحلّل ملفَّ حساب الخدمة ويتحقّق من حقوله الثلاثة ومن صلاحية المفتاح الخاصّ —
      * يعيد `['client_email','private_key','project_id']` أو null.
@@ -43,6 +46,8 @@ final class FcmServiceAccount
         $key = (string) ($d['private_key'] ?? '');
         $project = trim((string) ($d['project_id'] ?? ''));
         if (! filter_var($email, FILTER_VALIDATE_EMAIL) || $project === '' || ! str_contains($key, 'PRIVATE KEY')) return null;
+        // المعرّفُ يدخل مسارَ عنوان FCM — بنمط المحرّر نفسِه (`MobileSettings`)، لا نصٌّ حرّ
+        if (! preg_match('/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/', $project)) return null;
         if (@openssl_pkey_get_private($key) === false) return null;
 
         return ['client_email' => $email, 'private_key' => $key, 'project_id' => $project,
@@ -92,9 +97,17 @@ final class FcmServiceAccount
             // خبيئةٌ فاسدة أو مفتاحُ تطبيقٍ تغيّر — يُسكّ رمزٌ جديد
         }
 
-        if (! (hub_outbound_ok(self::TOKEN_URL)['ok'] ?? false)) return null;
+        // فشلٌ حديثٌ يُذكر دقيقة: التفريعُ متزامنٌ لكلِّ جهاز، فلا يُعاد الطلبُ الفاشلُ (بمهلة ٨ ث) لكلِّ جهاز
+        if (Cache::has($key . ':fail')) return null;
+        $fail = function () use ($key) {
+            Cache::put($key . ':fail', 1, self::FAIL_TTL);
+
+            return null;
+        };
+
+        if (! (hub_outbound_ok(self::TOKEN_URL)['ok'] ?? false)) return $fail();
         $jwt = self::assertion($sa);
-        if ($jwt === null) return null;
+        if ($jwt === null) return $fail();
 
         try {
             $res = Http::asForm()->timeout(8)->post(self::TOKEN_URL, [
@@ -102,14 +115,14 @@ final class FcmServiceAccount
                 'assertion' => $jwt,
             ]);
             $token = (string) $res->json('access_token', '');
-            if (! $res->successful() || $token === '') return null;
+            if (! $res->successful() || $token === '') return $fail();
 
             $ttl = max(60, (int) $res->json('expires_in', 3600) - self::EARLY);
             Cache::put($key, Crypt::encryptString($token), $ttl);
 
             return $token;
         } catch (\Throwable $e) {
-            return null;   // شبكة/مهلة — لا نصَّ استثناءٍ قد يحمل الطلب
+            return $fail();   // شبكة/مهلة — لا نصَّ استثناءٍ قد يحمل الطلب
         }
     }
 }
