@@ -710,7 +710,7 @@ parameters:
 			path: app/Support/Ai/Ask/AskMemory.php
 
 		-
-			message: '#^Call to function in_array\(\) with arguments ''hub_count''\|''hub_findings''\|''hub_list''\|''hub_modules''\|''hub_record''\|''hub_search''\|''hub_semantic'', array\{\} and true will always evaluate to false\.$#'
+			message: '#^Call to function in_array\(\) with arguments ''hub_count''\|''hub_findings''\|.+, array\{\} and true will always evaluate to false\.$#'
 			identifier: function.impossibleType
 			count: 1
 			path: app/Support/Ai/Ask/AskPipeline.php

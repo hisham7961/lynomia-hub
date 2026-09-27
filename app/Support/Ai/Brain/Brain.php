@@ -40,6 +40,34 @@ final class Brain
         'tickets' => ['subject', 'body'],
     ];
 
+    /**
+     * **ما يُفهرَس فعلاً** — `SOURCES` افتراضاً (`brain.scope=core`)، أو **كامل النظام** (`all`، قرارُ المالك):
+     * حقولُ النصّ الطويل (`ta`) من كلِّ وحدةٍ قابلةٍ للتخزين (`CACHEABLE_*` في `hub.mobile_sync` — فلا الخزنة
+     * ولا الهواتف ولا الموارد البشرية ولا الرواتب ولا الحضور ولا المستخدمون)، **ومنها التقاريرُ اليوميّة**،
+     * بلا حقلٍ مصنّفٍ حسّاساً (`hub_field_sensitive`) ولا سرّ — ومع `SOURCES` كلِّها. والبحثُ يحكم بصلاحيّة
+     * القارئ كما كان، فالنطاقُ يوسّع ما يُفهرَس لا ما يُرى.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function sources(): array
+    {
+        if (strtolower(trim((string) setting('brain.scope', 'core'))) !== 'all') return self::SOURCES;
+
+        $out = self::SOURCES;
+        foreach (hub_modules() as $m => $def) {
+            if (! is_array($def) || $m === 'users') continue;
+            if (! str_starts_with(hub_sync_class($m), 'CACHEABLE')) continue;   // الحسّاسُ والآنيُّ خارجَ الفهرس
+            foreach ((array) ($def['fields'] ?? []) as $f) {
+                $k = (string) ($f['key'] ?? '');
+                if ($k === '' || ($f['type'] ?? '') !== 'ta' || hub_field_sensitive($m, $k)) continue;
+                if (! in_array($k, $out[$m] ?? [], true)) $out[$m][] = $k;
+            }
+        }
+        ksort($out);
+
+        return $out;
+    }
+
     public const CHUNK = 800;
 
     public const BATCH = 16;
@@ -145,7 +173,7 @@ final class Brain
         $chainNames = self::chainNames();
         $upgrade = [];
 
-        foreach (self::SOURCES as $module => $keys) {
+        foreach (self::sources() as $module => $keys) {
             $def = hub_mod($module);
             // السجلُّ يسمّي الموديلَ قصيراً (`Decision`) — كما يحلّه `AskTools`
             $class = is_array($def) && is_string($def['model'] ?? null) ? 'App\\Models\\' . $def['model'] : null;
@@ -257,7 +285,7 @@ final class Brain
         if (! self::ready()) return ['code' => 'BRAIN_OFF'] + $out;
 
         $catalog = AskTools::catalog($u);
-        $modules = array_values(array_filter(array_keys(self::SOURCES), fn ($m) => isset($catalog[$m])));
+        $modules = array_values(array_filter(array_keys(self::sources()), fn ($m) => isset($catalog[$m])));
         if ($modules === []) return ['ok' => true] + $out;
 
         $auth = GovernedCompletion::authorize($u, self::profile(), AiPurposes::BRAIN, 'brain-q:' . Str::uuid());

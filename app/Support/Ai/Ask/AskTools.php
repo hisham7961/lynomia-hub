@@ -39,7 +39,8 @@ final class AskTools
      * والسادسةُ (`hub_findings` · المرحلة ٢ في `docs/ai-hub/46-ai-roadmap.md`) تقرأ نتائجَ المدقّق
      * **عبر `AuditorSignals` نفسِه** — بشروطه الخمسة لكلِّ مشاهد، فلا قاعدةَ رؤيةٍ ثانية.
      */
-    public const TOOLS = ['hub_modules', 'hub_search', 'hub_list', 'hub_record', 'hub_count', 'hub_findings', 'hub_semantic'];
+    public const TOOLS = ['hub_modules', 'hub_search', 'hub_list', 'hub_record', 'hub_count', 'hub_findings', 'hub_semantic',
+        'hub_report_compliance'];
 
     /**
      * **الأدواتُ الكاتبة: فارغةٌ بقرارِ مالكٍ محسوم.**
@@ -188,10 +189,17 @@ final class AskTools
                 . 'ومع `module` تقتصر على ما موضوعُه تلك الوحدة. **رصدٌ آليٌّ يُتحقَّق منه لا حكم.**',
                 ['module' => $moduleArg]),
             // **العقلُ الثاني يُعلَن حين يعمل فقط** — أداةٌ تُعلَن ولا تعمل تُنفق خطوةَ نموذجٍ على لا شيء
-            ...(\App\Support\Ai\Brain\Brain::ready() ? [$fn('hub_semantic', 'بحثٌ **بالمعنى** في المعرفة والمحاضر والقرارات والمشاريع '
-                . 'والمهامّ والمشاكل والتذاكر — لسؤالٍ لا تعرف كلماتِه الحرفيّة («ما قرّرناه بشأن المورّدين؟»). '
+            ...(\App\Support\Ai\Brain\Brain::ready() ? [$fn('hub_semantic', 'بحثٌ **بالمعنى** في نصوص النظام المفهرسة (المعرفة والمحاضر والقرارات والمشاريع والمهامّ '
+                . 'والمشاكل والتذاكر — وكاملِ النظام ومنه التقاريرُ اليوميّة إن وُسّع النطاق) — لسؤالٍ لا تعرف كلماتِه الحرفيّة («ما قرّرناه بشأن المورّدين؟»). '
                 . 'يعيد سجلّاتٍ يراها صاحبُ الجلسة مرتّبةً بالقرب؛ اقرأ تفاصيلَها بـhub_record.',
                 ['q' => ['type' => 'string', 'minLength' => self::MIN_SEARCH_CHARS]], ['q'])] : []),
+            // **مَن سلّم تقريرَه ومَن لم يسلّم** — سؤالٌ عن غائبٍ لا صفَّ له، فلا يُجاب بالعدّ.
+            // يُعلَن لمن يرى الموارد البشرية وحدَه (`hr` في كتالوجه) — كما يُملأ امتثالُ الفريق على الجوال
+            ...(isset($catalog['hr']) ? [$fn('hub_report_compliance', 'امتثالُ التقارير اليوميّة ليومٍ واحد: '
+                . 'كم موظّفاً سلّم تقريرَه، ومَن **لم يسلّم** (بالاسم)، ومَن في إجازة أو لا يلزمه تقرير — من المُحلِّل '
+                . 'المركزيّ نفسِه الذي تبني عليه شاشةُ التقارير. **استعملها لكلِّ سؤالٍ عن تقريرٍ لم يُسلَّم أو التزامِ الفريق.** '
+                . '`date`: `today` أو `yesterday` أو تاريخٌ بصيغة YYYY-MM-DD.',
+                ['date' => ['type' => 'string', 'description' => 'today | yesterday | YYYY-MM-DD']])] : []),
         ];
     }
 
@@ -228,6 +236,7 @@ final class AskTools
             'hub_count'   => self::toolCount($u, $args),
             'hub_findings' => self::toolFindings($u, $args),
             'hub_semantic' => self::toolSemantic($u, $args),
+            'hub_report_compliance' => self::toolReportCompliance($u, $args),
         };
     }
 
@@ -407,6 +416,62 @@ final class AskTools
      * عميل) — ثمّ يُسقَط ما رفضه مديرٌ أو أجّله كما في الملخّص. فالموظّفُ لا يقرأ هنا حكمَ الآلة على
      * عمله (قرارُ المالك §٣.٦)، والمسودةُ ورابطُها لا يُسلَّمان (للمدير في شاشته).
      */
+    /**
+     * **امتثالُ التقارير ليومٍ** — من `DailyWorkCompliance::resolveMany` (المُحلِّلُ المركزيّ) بنطاق `hr`
+     * كما يبنيه تقريرُ الفريق (`MobileTeamReportsController::compliance`)، والاسمُ والقسمُ بحجب الحقول.
+     * الصفُّ الأوّل ملخّصٌ بلا معرّف، ثمّ صفٌّ لكلِّ مَن لم يسلّم أوّلاً (بمعرّف الموظّف مرجعاً).
+     */
+    private static function toolReportCompliance(mixed $u, array $args): array
+    {
+        if (! $u instanceof \App\Models\User || ! hub_can($u, 'hr', 'v')) {
+            return self::fail('hub_report_compliance', 'لا صلاحيّةَ لقراءة امتثالِ الموظّفين');
+        }
+        $today = \App\Support\Platform\BusinessDate::today();
+        $raw = strtolower(trim((string) ($args['date'] ?? 'today')));
+        try {
+            $date = match (true) {
+                $raw === '' || $raw === 'today' => $today,
+                $raw === 'yesterday' => \Illuminate\Support\Carbon::parse($today)->subDay()->toDateString(),
+                (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw) => \Illuminate\Support\Carbon::parse($raw)->toDateString(),
+                default => null,
+            };
+        } catch (\Throwable $e) {
+            $date = null;
+        }
+        if ($date === null) return self::fail('hub_report_compliance', 'تاريخٌ غيرُ مفهوم — today أو yesterday أو YYYY-MM-DD');
+
+        $emps = hub_company_scope(hub_scope(\App\Models\Employee::query(), 'hr'), 'hr')
+            ->whereNull('deleted_at')->where('status', 'نشط')
+            ->orderBy('name')->orderBy('id')->limit(500)->get(['id', 'name', 'dept', 'user_id']);
+        $comp = \App\Support\Workforce\DailyWorkCompliance::resolveMany($emps, $date);
+        $showName = hub_field_mode($u, 'hr', 'name') !== 'hide';
+        $showDept = hub_field_mode($u, 'hr', 'dept') !== 'hide';
+
+        $tally = ['submitted' => 0, 'missing' => 0, 'pending' => 0, 'on_leave' => 0, 'not_required' => 0];
+        $people = [];
+        foreach ($emps as $e) {
+            $c = (array) ($comp[$e->id] ?? []);
+            [$key, $label] = match (true) {
+                (bool) ($c['on_leave'] ?? false) => ['on_leave', 'إجازة'],
+                ! ($c['report_required'] ?? true) => ['not_required', 'لا يلزمه تقرير'],
+                (bool) ($c['report_submitted'] ?? false) => ['submitted', 'سلّم'],
+                (bool) ($c['verdict_pending'] ?? false) => ['pending', 'لم يحن الموعد'],
+                default => ['missing', 'لم يسلّم'],
+            };
+            $tally[$key]++;
+            $people[] = ['id' => (string) $e->id, 'name' => $showName ? $e->name : null,
+                'dept' => $showDept ? $e->dept : null, 'status' => $label, 'rank' => $key === 'missing' ? 0 : 1];
+        }
+        // مَن لم يسلّم أوّلاً — فسقفُ الصفوفِ لا يُسقط الجوابَ المطلوب
+        usort($people, fn ($a, $b) => [$a['rank'], (string) $a['name'], $a['id']] <=> [$b['rank'], (string) $b['name'], $b['id']]);
+        $people = array_map(function ($p) { unset($p['rank']); return $p; }, $people);
+
+        $summary = ['date' => $date, 'employees' => $emps->count()] + $tally;
+        $rows = array_merge([$summary], array_slice($people, 0, self::MAX_ROWS - 1));
+
+        return self::ok('hub_report_compliance', 'hr', $rows, count($people) > self::MAX_ROWS - 1);
+    }
+
     /** **العقلُ الثاني** — أقربُ السجلّات بالمعنى، محكومةً بنطاق السائل وحقوله (`Brain::search`) */
     private static function toolSemantic(mixed $u, array $args): array
     {
