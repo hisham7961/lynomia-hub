@@ -118,6 +118,80 @@ class ReportReview
             ['after' => ['review' => self::PENDING]]);
     }
 
+    /** أفعالُ المراجعة المسموحة — قائمةٌ مغلقة (ما سواها لا أثر) */
+    public const ACTIONS = ['accept', 'needs_revision', 'reopen'];
+
+    /**
+     * **فعلُ المراجعةِ الواحد** (مُستخرَجٌ من `ReportsController@reviewAct` — يشترك فيه
+     * الويبُ والجوال). لا يعيد الحرسَ (`canReview`) — المُنادي يحرس قبله. يعيد نتيجةً
+     * آليّة: `accepted` · `needs_revision` · `reopened` · `feedback_required` · `noop`.
+     *
+     * **مسودةُ المدقّق لا تركب القبول** (قرارُ المالك §٣.٦): «قبول» بنصِّ مسودةٍ مفتوحةٍ
+     * حرفيّاً لا يرسلها إلى الموظّف — المسودةُ تصله بـ«طلب تنقيح» وحده، عمداً.
+     */
+    public static function act(WorkUpdate $w, User $actor, string $action, string $feedback = ''): string
+    {
+        $feedback = trim($feedback);
+        if ($action === 'accept' && $feedback !== ''
+            && in_array($feedback, \App\Support\Ai\Auditor\AuditorSignals::draftNotes($w), true)) {
+            $feedback = '';
+        }
+
+        switch ($action) {
+            case 'accept':
+                self::accept($w, $actor, $feedback ?: null);
+
+                return 'accepted';
+            case 'needs_revision':
+                if ($feedback === '') return 'feedback_required';
+                self::needsRevision($w, $actor, $feedback);
+
+                return 'needs_revision';
+            case 'reopen':
+                self::reopen($w, $actor);
+
+                return 'reopened';
+            default:
+                return 'noop';
+        }
+    }
+
+    /** مراجعٌ «واسع» (مالكٌ أو HR) — لغيرِه الافتراضيُّ «مشاريعي» (الجولة 1 · F7) */
+    public static function isWideReviewer(User $u): bool
+    {
+        return (bool) ($u->role->is_owner ?? false) || hub_can($u, 'hr', 'v');
+    }
+
+    /**
+     * **بنودٌ قابلةٌ للمراجعة لهذا المستخدم** — منطَّقةٌ شركةً ومشروعاً (§77/§80).
+     * مُستخرَجةٌ حرفاً من `ReportsController::reviewableUpdates` (يشترك فيها الجوال).
+     * «مشاريعي» = ما أُديرُه فعلاً (`manager_id`) لا كلُّ ما يقع في نطاق رؤيتي (F7).
+     */
+    public static function reviewableQuery(User $u, bool $mineOnly = false)
+    {
+        $q = WorkUpdate::query()->whereNull('deleted_at');
+        if ($u->role?->is_owner && ! $mineOnly) return $q;
+
+        $projQ = hub_scope(\App\Models\Project::query(), 'projects', $u);
+        if ($mineOnly) $projQ->where('manager_id', (string) $u->id);
+        $pids = $projQ->pluck('id')->all();
+        if ($mineOnly) {
+            return $q->where(fn ($w) => $pids
+                ? $w->whereIn('project_id', $pids) : $w->whereRaw('1 = 0'));
+        }
+        $userIds = [];
+        if (hub_can($u, 'hr', 'v')) {
+            $userIds = hub_company_scope(hub_scope(Employee::query(), 'hr', $u), 'hr')
+                ->whereNotNull('user_id')->pluck('user_id')->all();
+        }
+
+        return $q->where(function ($w) use ($pids, $userIds) {
+            $w->whereRaw('1 = 0');
+            if ($pids) $w->orWhereIn('project_id', $pids);
+            if ($userIds) $w->orWhereIn('created_by', $userIds);
+        });
+    }
+
     protected static function stamp(WorkUpdate $w, string $status, User $actor, ?string $feedback): void
     {
         // عبر forceFill: الحقولُ محروسةٌ من التعبئة الجماعية عمداً — تُختم هنا فقط

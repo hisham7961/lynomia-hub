@@ -81,6 +81,50 @@ class DmService
     }
 
     /**
+     * **حرّاسُ الملكيّة على رسالةٍ مباشرة** (تحريرٌ/سحب) — القاعدةُ الواحدةُ للسطحَين:
+     * غريبٌ عن المحادثة ٤٠٣، وغيرُ صاحبها ٤٠٣ (لا يُعدّل أحدٌ كلامَ غيره ولا يمحوه)،
+     * والمحذوفةُ ٤٢٢. لا نافذةَ زمنيّةً في القاعدة — مرآةُ الويب حرفاً.
+     */
+    public static function guardOwn(User $actor, DmMessage $m, string $verb = 'edit'): void
+    {
+        $me = (string) $actor->getKey();
+        abort_unless(in_array($me, [(string) $m->from_id, (string) $m->to_id], true), 403, 'لا شأن لك بهذه المحادثة');
+        abort_unless((string) $m->from_id === $me, 403, $verb === 'edit'
+            ? 'التحريرُ لصاحب الرسالة وحده — لا يُعدّل أحدٌ كلام غيره'
+            : 'الحذف لصاحب الرسالة وحده — لا يمحو أحدٌ كلام غيره');
+        if ($verb === 'edit') {
+            abort_if($m->deleted_at !== null, 422, 'لا تُحرَّر رسالةٌ محذوفة');
+        }
+    }
+
+    /** **تحريرُ رسالتي** — الحرّاسُ ثمّ الجوهرُ `edit` (ختمُ `edited_at`) */
+    public static function editOwn(User $actor, DmMessage $m, string $body): DmMessage
+    {
+        self::guardOwn($actor, $m, 'edit');
+
+        return self::edit($actor, $m, $body);
+    }
+
+    /**
+     * **سحبُ رسالتي** — حذفٌ ناعمٌ يبقى مكانُه «حُذفت رسالة»، ويُسحب إشعارُ المستلم معه
+     * (نصُّ الرسالة لا يبقى في جرسه). يعيد `false` قبل الهجرة (العمودُ غائب) — والسطحُ
+     * يقول إنّ الميزةَ تحتاج ترحيلاً بدل خمسمئة.
+     */
+    public static function retract(User $actor, DmMessage $m): bool
+    {
+        self::guardOwn($actor, $m, 'delete');
+        if (! hub_has_col('dm_messages', 'deleted_at')) return false;
+        abort_if($m->deleted_at !== null, 422, 'حُذفت هذه الرسالة من قبل');
+
+        $m->forceFill(['deleted_at' => now()])->save();
+        hub_data_bump('dm_messages');
+
+        \App\Models\HubNotification::where('kind', 'dm')->where('record_id', $m->id)->delete();
+
+        return true;
+    }
+
+    /**
      * **بوّابةُ الوصول** — هل يبلغ `$me` الطرفَ `$other` ضمن نطاق الشركات؟ (F8).
      * غلافٌ لـ`DmController::dmReachable` (السكّةُ نفسُها، لا محرّكَ عزلٍ ثانٍ).
      */

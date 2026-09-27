@@ -87,11 +87,8 @@ class AskController extends Controller
             // **والخطأُ بعد رأس 200 حدثٌ يُقال** — لا صفحةُ ٥٠٠ داخل بثٍّ بدأ فيقرؤها المتصفّحُ «انقطاعاً»
             try {
                 $data = $this->answer($r, function (array $p) use ($send) {
-                    $send('progress', ['stage' => $p['stage'], 'text' => match ($p['stage']) {
-                        'think' => 'يفكّر… (الخطوة ' . (int) ($p['step'] ?? 1) . ')',
-                        'read' => 'قرأ ' . ($p['label'] ? '«' . $p['label'] . '»' : 'بياناتٍ مُنطَّقة') . ' — ' . (int) ($p['rows'] ?? 0) . ' صفّاً',
-                        default => 'يعمل…',
-                    }]);
+                    // الصياغةُ الواحدةُ للسطحَين (`AskPipeline::progressText`) — يبثّها الجوالُ حرفاً
+                    $send('progress', ['stage' => $p['stage'], 'text' => AskPipeline::progressText($p)]);
                 });
                 // والـnonce مع الصفحة: تُكتب فوق صفحةٍ قائمة فتبقى سياستُها — والعميلُ يستبدله بـnonce صفحته
                 $send('done', ['html' => view('ask.index', $data)->render(), 'nonce' => \App\Support\Security\ContentSecurity::nonce()]);

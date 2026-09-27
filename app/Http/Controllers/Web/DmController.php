@@ -341,13 +341,12 @@ class DmController extends Controller
     public function edit(Request $r, string $id)
     {
         $m = DmMessage::findOrFail($id);
-        abort_unless(in_array(auth()->id(), [$m->from_id, $m->to_id], true), 403, 'لا شأن لك بهذه المحادثة');
-        abort_unless($m->from_id === auth()->id(), 403, 'التحريرُ لصاحب الرسالة وحده — لا يُعدّل أحدٌ كلام غيره');
-        abort_if($m->deleted_at !== null, 422, 'لا تُحرَّر رسالةٌ محذوفة');
+        // حرّاسُ الملكيّة في `DmService::guardOwn` (يشترك فيها الجوال) — قبل التحقّق كما كان
+        DmService::guardOwn(auth()->user(), $m, 'edit');
 
         $r->merge(['body' => trim(hub_str($r->input('body')))]);
         $data = $r->validate(['body' => ['required', 'string', 'max:4000']], [], ['body' => 'نص الرسالة']);
-        DmService::edit(auth()->user(), $m, $data['body']);
+        DmService::editOwn(auth()->user(), $m, $data['body']);
 
         return back()->with('ok', 'عُدّلت الرسالة');
     }
@@ -362,30 +361,17 @@ class DmController extends Controller
     public function destroy(string $id)
     {
         $m = DmMessage::findOrFail($id);
-        abort_unless(in_array(auth()->id(), [$m->from_id, $m->to_id], true), 403,
-            'لا شأن لك بهذه المحادثة');
-        abort_unless($m->from_id === auth()->id(), 403,
-            'الحذف لصاحب الرسالة وحده — لا يمحو أحدٌ كلام غيره');
         /*
          * **رسالةٌ في مكانه لا طردٌ من الصفحة**: كان `abort(503)` — و٥٠٣ رمزُ وضع
-         * الصيانة لا رمزُ «ميزةٌ غير مهيّأة»، ولا صفحةَ له في المشروع فتُرجَم
-         * صفحةً إنجليزيةً عارية ضاعت فيها الرسالة التي تسمّي العلاج. من ضغط زرّاً
-         * في محادثةٍ يستحقّ سطراً يقرؤه وهو في مكانه.
+         * الصيانة لا رمزُ «ميزةٌ غير مهيّأة». من ضغط زرّاً في محادثةٍ يستحقّ سطراً
+         * يقرؤه وهو في مكانه. (القاعدةُ كلُّها في `DmService::retract` — يشترك فيها الجوال.)
          */
-        if (! hub_has_col('dm_messages', 'deleted_at')) {
+        if (! DmService::retract(auth()->user(), $m)) {
             return back()->with('err',
                 'سحبُ الرسائل ميزةٌ جديدة تحتاج تحديث قاعدة البيانات — شغّل الترحيلات '
                 . '(php artisan migrate أو من مركز التشغيل ⚙️) ثم أعد المحاولة. '
                 . 'وبقيةُ النظام تعمل كالمعتاد.');
         }
-        abort_if($m->deleted_at !== null, 422, 'حُذفت هذه الرسالة من قبل');
-
-        $m->forceFill(['deleted_at' => now()])->save();
-        hub_data_bump('dm_messages');
-
-        // غايةُ السحب استرجاعُ ما أُرسل خطأً — وكان نصُّ الرسالة كاملاً (حتى ٥٩٠
-        // حرفاً) يبقى في جرس المستلم بعد السحب. الإشعار يُسحب مع رسالته.
-        \App\Models\HubNotification::where('kind', 'dm')->where('record_id', $m->id)->delete();
 
         return back()->with('ok', 'سُحبت الرسالة — يبقى مكانُها يقول إنها حُذفت');
     }

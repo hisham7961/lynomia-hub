@@ -3,15 +3,14 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
-use App\Models\Ticket;
 use App\Support\Collaboration\AttachmentService;
 use App\Support\Collaboration\ClientPortalData;
+use App\Support\Collaboration\ClientTickets;
 use App\Support\Collaboration\CommentService;
 use App\Support\Documents\DocumentPolicy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 
 /**
  * **مساحةُ العميل** (Work OS · الطور B · WP-B.2 · §13/§82–86) — شلٌّ منفصلٌ أبسطُ
@@ -301,22 +300,7 @@ class ClientPortalController extends Controller
         $ids = ClientPortalData::clientIds();
         abort_if(! $ids, 404);   // عضويّةٌ فعّالةٌ شرطُ البلاغ (فشلٌ مغلق)
 
-        $data = $request->validate([
-            'subject'  => ['required', 'string', 'max:' . (hub_col_max('tickets', 'subject') ?: 300)],
-            'body'     => ['required', 'string', 'max:5000'],
-            'priority' => ['required', 'string', Rule::in(ClientPortalData::ticketFieldOptions('priority'))],
-            'project'  => ['nullable', 'string', 'max:64'],
-            'client'   => ['nullable', 'string', 'max:64'],
-            // تأكيدُ صاحبِ البلاغ أنّ المتشابهَ بلاغٌ مختلفٌ فعلاً (لا يُوسَّع به أيُّ سلطة)
-            'force'    => ['nullable', 'boolean'],
-        ], [], [
-            'subject' => 'الموضوع', 'body' => 'الوصف', 'priority' => 'الأولوية',
-            'project' => 'المشروع', 'client' => 'العميل',
-        ]);
-
-        // مشروعُه هو أو ٤٠٤ — والعميلُ يُشتقّ منه حين يُختار
-        $projectId = trim((string) ($data['project'] ?? ''));
-        $project = $projectId !== '' ? ClientPortalData::projectDetail($ids, $projectId) : null;
+        $data = $request->validate(ClientTickets::storeRules(), [], ClientTickets::storeAttributes());
 
         /*
          * **كشفُ البلاغِ المكرَّر** (الجولة 3 · V3) — العَرَضُ الذي رُصد: تذكرةٌ بلا
@@ -324,9 +308,10 @@ class ClientPortalController extends Controller
          * فصارت تذكرتين بلا تحذير. **يُوجَّه لا يُمنَع**: يُردّ إلى نموذجه بمدخلاته
          * محفوظةً وتحذيرٍ يحمل رابطَ تذكرتِه القائمة (حيث صار له بابُ ردّ)، ومعه
          * تأكيدٌ صريحٌ يمرّ به إن كان بلاغاً مختلفاً حقاً — فلا طريقَ مسدود.
+         * (القاعدةُ كلُّها في `ClientTickets::open` — يشترك فيها الجوال.)
          */
-        if (! $request->boolean('force')
-            && ($twin = ClientPortalData::duplicateTicket($ids, $data['subject'], $data['body'], $project?->id))) {
+        $res = ClientTickets::open($request->user(), $ids, $data, $request->boolean('force'));
+        if ($twin = $res['duplicate']) {
             return redirect()->route('portal.ticket.create')->withInput()
                 ->with('warn', 'لديك بلاغٌ مطابقٌ ما زال مفتوحاً — افتحه وأضِف ردَّك هناك بدل فتح تذكرةٍ ثانية.')
                 ->with('dup', [
@@ -337,43 +322,7 @@ class ClientPortalController extends Controller
                 ]);
         }
 
-        $clientId = $project?->client_id
-            ? (string) $project->client_id
-            : (in_array(trim((string) ($data['client'] ?? '')), $ids, true)
-                ? trim((string) $data['client'])
-                : (string) $ids[0]);
-
-        /*
-         * **الشركةُ تُعرَف عند الإنشاء لا بعده** (v2.544 · L2-05).
-         *
-         * كانت التذكرةُ تُولَد بلا `company_id`، و`hub_scope` يُسقط `NULL` —
-         * فبلاغُ العميلِ **لا يراه موظّفٌ معزولٌ بشركة** البتّة. تُشتقُّ من
-         * أوّلِ مصدرٍ يُجيب: مشروعُها، فعميلُها، فشركةُ فاتحِها. وما لم يُجب
-         * أحدٌ تبقى `NULL` — وقد أُعلنت «غيرَ مملوكةٍ فتُرى» في `hub_tenancy`،
-         * فلا تسقط في الفراغ بين الاثنين.
-         */
-        $u = $request->user();
-        $companyId = $project?->company_id
-            ?: (\App\Models\Client::whereKey($clientId)->value('company_id')
-                ?: ($u->company_id ?: null));
-
-        $t = new Ticket;
-        $t->company_id = $companyId ? (string) $companyId : null;
-        $t->subject    = trim($data['subject']);
-        $t->body       = trim($data['body']);
-        $t->priority   = $data['priority'];
-        $t->project_id = $project?->id;
-        $t->client_id  = $clientId;
-        $t->status     = ClientPortalData::TICKET_NEW_STATUS;
-        $t->channel    = ClientPortalData::TICKET_PORTAL_CHANNEL;
-        $t->customer   = (string) $u->name;
-        $t->email      = (string) $u->email;
-        $t->created_by = (string) $u->id;
-        $t->save();
-
-        \App\Support\Platform\FlowRunner::fire('created', 'tickets', $t);
-
-        return redirect()->route('portal.ticket', $t->id)
+        return redirect()->route('portal.ticket', $res['ticket']->id)
             ->with('ok', 'وصلَنا بلاغُك وفُتحت تذكرتُك — ستجد حالتَها وردودَ الفريق هنا.');
     }
 
@@ -417,31 +366,16 @@ class ClientPortalController extends Controller
         if ($r = $this->gate()) return $r;
         $ids = ClientPortalData::clientIds();
 
-        $ticket = ClientPortalData::ticketDetail($ids, $id);
+        // الفاحصُ الواحدُ قبل التحقّق — تذكرةُ غيره ٤٠٤ لا ٤٢٢ (لا كشفَ وجود)
+        ClientPortalData::ticketDetail($ids, $id);
+        $data = $request->validate(ClientTickets::replyRules(), [], ['body' => 'ردُّك']);
 
-        $data = $request->validate(['body' => ['required', 'string', 'max:4000']], [], ['body' => 'ردُّك']);
+        // الجوهرُ في `ClientTickets::reply` (يشترك فيه الجوال): ختمُ `internal`، الإشعار، الحدث
+        $res = ClientTickets::reply($request->user(), $ids, $id, $data['body']);
 
-        $u = $request->user();
-        $c = CommentService::create($u, 'tickets', (string) $ticket->id, trim($data['body']));
-
-        /*
-         * **الصفُّ كاملاً لِما بعد التخويل**: قارئُ البوّابة يختار أعمدةً عميليّةً
-         * حصراً (لا `assignee_id` ولا `channel` — وهذا صوابُه)، لكنّ الإشعارَ يحتاج
-         * المُسنَدَ إليه وجسمُ الويبهوك يحتاج حقولَ السجلّ. فالصفُّ يُعاد تحميلُه
-         * **بعد** أن خوّل `ticketDetail` (فلا يتوسّع وصولٌ)، وإلّا صار المُسنَدُ
-         * إليه `null` صامتاً فلا يبلغه ردُّ عميله — وهو عينُ العطلِ الذي نُصلح.
-         */
-        $full = Ticket::whereKey($ticket->id)->first() ?? $ticket;
-
-        // إشعارُ الفريقِ لا يكسر ردّاً وصل (نمطُ `announceTicketResolution`)
-        try { ClientPortalData::announceClientTicketReply($full, $u, (string) $c->body); }
-        catch (\Throwable $e) { report($e); }
-
-        \App\Support\Platform\FlowRunner::fire('client_reply', 'tickets', $full);
-
-        return redirect()->route('portal.ticket', $ticket->id)
+        return redirect()->route('portal.ticket', $res['ticket']->id)
             ->with('ok', 'وصلَ ردُّك — يراه الفريقُ الآن، وجوابُه يظهر هنا.')
-            ->withFragment('c-' . $c->id);
+            ->withFragment('c-' . $res['comment']->id);
     }
 
     /* ────────── حسابُه الذاتيّ: جلساتُه (الجولة 3 · V4) ────────── */

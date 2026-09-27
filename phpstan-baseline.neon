@@ -345,7 +345,7 @@ parameters:
 		-
 			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
-			count: 2
+			count: 1
 			path: app/Http/Controllers/Web/PurchaseController.php
 
 		-
@@ -384,11 +384,6 @@ parameters:
 			count: 1
 			path: app/Http/Controllers/Web/ReportsController.php
 
-		-
-			message: '#^Using nullsafe property access "\?\-\>is_owner" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Http/Controllers/Web/ReportsController.php
 
 		-
 			message: '#^Parameter \#1 \$array \(list\<\(int\|string\)\>\) of array_values is already a list, call has no effect\.$#'

@@ -209,7 +209,9 @@ class MobileAskTest extends TestCase
         $this->assertArrayHasKey('/api/mobile/v1/ask', $spec['paths']);
         $this->assertArrayHasKey('/api/mobile/v1/ask/threads/{id}', $spec['paths']);
         $caps = \App\Support\Mobile\MobileOpenApi::capabilities();
-        $this->assertSame(5, $caps['areas']['ask']['count']);
+        // (خطّة التطبيق 4.7) + `ask/stream` — البثُّ بجوار السؤال لا بديلاً عنه
+        $this->assertSame(6, $caps['areas']['ask']['count']);
+        $this->assertArrayHasKey('/api/mobile/v1/ask/stream', $spec['paths']);
     }
 
     public function test_علمُ_can_ask_في_الإقلاع_يتبع_الصلاحيّةَ_والبوّابة(): void
@@ -221,5 +223,85 @@ class MobileAskTest extends TestCase
         $this->assertTrue($this->getJson('/api/mobile/v1/bootstrap', $this->auth($u))->assertOk()->json('data.feature_flags.can_ask'));
         $noFlag = $this->asker(false);
         $this->assertFalse($this->getJson('/api/mobile/v1/bootstrap', $this->auth($noFlag))->assertOk()->json('data.feature_flags.can_ask'));
+    }
+
+    /* ══════════ 4.7 — «اسأل Hub» بالبثّ (SSE) ══════════ */
+
+    /**
+     * أحداثُ البثّ مقروءةً — `sendContent` داخل مخزنَين متداخلَين: البثُّ يدفع (`ob_flush`)
+     * مخزنَه الداخليَّ إلى الخارجيّ فلا يضيع منه شيءٌ في الالتقاط.
+     *
+     * @return list<array{event:string, data:array}>
+     */
+    private function sse(\Illuminate\Testing\TestResponse $res): array
+    {
+        ob_start();
+        ob_start();
+        $res->baseResponse->sendContent();
+        $inner = (string) ob_get_clean();
+        $raw = (string) ob_get_clean() . $inner;
+
+        $out = [];
+        foreach (preg_split("/\n\n/", trim($raw)) as $block) {
+            if (! preg_match('/^event: (\S+)\ndata: (.*)$/s', trim($block), $m)) continue;
+            $out[] = ['event' => $m[1], 'data' => json_decode($m[2], true)];
+        }
+
+        return $out;
+    }
+
+    public function test_البثُّ_يرسل_تقدّماً_ثمّ_حمولةَ_السؤال_نفسَها(): void
+    {
+        $u = $this->asker();
+        $this->ready();
+        $h = $this->auth($u);
+        $this->bindAnswer('لديك مشروعٌ واحد QWXZ-SSE');
+
+        $res = $this->postJson('/api/mobile/v1/ask/stream', ['q' => 'ما مشاريعي؟'], $h)->assertOk();
+        $this->assertStringStartsWith('text/event-stream', (string) $res->headers->get('Content-Type'));
+        $events = $this->sse($res);
+        $names = array_column($events, 'event');
+
+        $this->assertContains('progress', $names);
+        $this->assertSame('done', end($names), 'آخرُ حدثٍ done');
+        $this->assertNotContains('error', $names);
+        foreach ($events as $e) {
+            if ($e['event'] === 'progress') {
+                $this->assertContains($e['data']['stage'], ['think', 'read']);
+                $this->assertNotSame('', $e['data']['text']);
+            }
+        }
+        $read = collect($events)->firstWhere('data.stage', 'read');
+        $this->assertNotNull($read, 'حدثُ القراءة يُبثّ باسم الوحدة');
+
+        $done = end($events)['data'];
+        $this->assertTrue($done['data']['ok']);
+        $this->assertStringContainsString('QWXZ-SSE', $done['data']['answer']);
+        $this->assertSame('projects', $done['data']['sources'][0]['module']);
+        $this->assertNotNull($done['data']['thread'], 'الخيطُ يُحفظ كما في POST ask');
+        $this->assertArrayHasKey('request_id', $done);
+        $keys = $this->allKeysDeep($done);
+        foreach (['envelope', 'fence', 'refs', 'findings'] as $k) {
+            $this->assertNotContains($k, $keys, "مفتاحٌ داخليٌّ «{$k}» في حدث done");
+        }
+    }
+
+    public function test_البثُّ_يرفض_قبل_فتحه_بردٍّ_JSON_عاديّ(): void
+    {
+        $this->ready();
+        $alice = $this->asker();
+        $t = AskMemory::record($alice, null, 'سؤالُ أليس', ['ok' => true, 'answer' => 'سرّ', 'sources' => []]);
+        $bob = $this->asker();
+        $hb = $this->auth($bob);
+
+        // خيطُ غيري ⇒ ٤٠٤ JSON قبل أيّ رأس 200
+        $this->postJson('/api/mobile/v1/ask/stream', ['q' => 'تسلّل', 'thread' => $t->id], $hb)
+            ->assertNotFound()->assertJsonPath('code', 'RESOURCE_NOT_FOUND');
+        // تحقّقٌ فاشل ⇒ ٤٢٢
+        $this->postJson('/api/mobile/v1/ask/stream', [], $hb)->assertStatus(422);
+        // بلا راية ⇒ ٤٠٣، والعميلُ محجوبٌ بالسياج ⇒ ٤٠٤
+        $this->postJson('/api/mobile/v1/ask/stream', ['q' => 'سؤال'], $this->auth($this->asker(false)))->assertForbidden();
+        $this->postJson('/api/mobile/v1/ask/stream', ['q' => 'سؤال'],
+            $this->auth($this->asker(true, ['account_type' => 'client'])))->assertNotFound();
     }
 }

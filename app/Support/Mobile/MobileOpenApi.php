@@ -266,7 +266,8 @@ class MobileOpenApi
         $bool = ['type' => 'boolean'];
         $int = ['type' => 'integer'];
 
-        return [
+        // (خطّة التطبيق · المرحلة ٤) وصفاتُ التعاون/العميل/سير العمل — ملفٌّ منفصل يُضمّ هنا
+        return MobileWorkflowSpec::opMeta() + [
             // ── B · المصادقة (عامّة) ──
             'mobile.auth.login' => [
                 'tag' => 'auth', 'bodyRequired' => true,
@@ -590,7 +591,7 @@ class MobileOpenApi
         $i = ['type' => 'integer'];
         $dt = ['type' => 'string', 'format' => 'date-time', 'nullable' => true];
 
-        return [
+        return MobileWorkflowSpec::schemas() + [
             'Error' => ['type' => 'object', 'required' => ['error', 'code', 'message'], 'properties' => [
                 'error' => ['type' => 'string', 'description' => 'الرسالة (مفتاح التوافق القديم)'],
                 'code' => ['type' => 'string', 'enum' => array_keys(Api::CODES)],
@@ -867,7 +868,7 @@ class MobileOpenApi
             'tracking' => 'التتبّع الميدانيّ (بموافقة)',
             'sync' => 'المزامنة التزايُدية',
             'health' => 'الصحّة',
-        ];
+        ] + MobileWorkflowSpec::tags();
         $out = [];
         foreach ($t as $name => $desc) $out[] = ['name' => $name, 'description' => $desc];
 
@@ -1104,6 +1105,7 @@ class MobileOpenApi
             'mobile.resource.index' => 'crud', 'mobile.resource.store' => 'crud', 'mobile.resource.show' => 'crud',
             'mobile.resource.update' => 'crud', 'mobile.resource.patch' => 'crud', 'mobile.resource.destroy' => 'crud',
         ];
+        $map += MobileWorkflowSpec::areas();   // (المرحلة ٤) مجالاتُ مساراتها بالاسم
         if (isset($map[$name])) return $map[$name];
         // مسارٌ جديدٌ بلا تصنيفٍ صريح — يسقط لمجالٍ مُشتقٍّ من أوّلِ مقطعٍ بعد البادئة (صادقٌ لا مُختلَق)
         $rest = trim(substr($uri, strlen(self::PREFIX)), '/');

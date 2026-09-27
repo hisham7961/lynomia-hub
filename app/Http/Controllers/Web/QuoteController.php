@@ -12,6 +12,7 @@ use App\Models\Project;
 use App\Models\Quote;
 use App\Models\QuoteMilestone;
 use App\Models\User;
+use App\Support\Finance\QuoteActions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -82,7 +83,7 @@ class QuoteController extends Controller
     {
         abort_unless(hub_can(auth()->user(), 'quotes', 'e'), 403, 'إجراءات العرض تتطلب صلاحية تعديل');
         if ($why = hub_block_if_queued('quotes')) return back()->with('err', $why);
-        $q = hub_scope(Quote::query(), 'quotes')->findOrFail($id);
+        $q = QuoteActions::authorize(auth()->user(), $id);
         $action = hub_str($r->input('do'));
 
         return match ($action) {
@@ -578,52 +579,12 @@ class QuoteController extends Controller
      */
     protected function send(Quote $q)
     {
-        $amountAt = (float) setting('quotes.approve_amount', 0);
-        $discAt = (float) setting('quotes.approve_discount', 0);
-        $discPct = ((float) $q->total + (float) $q->discount) > 0
-            ? (float) $q->discount / ((float) $q->total + (float) $q->discount) * 100 : 0;
-        // **حاجزُ الهامش** (CPQ): هامشٌ دون الحدّ المضبوط يستوجب اعتماداً كالمبلغ
-        // والخصم — لا مجرّد تلوينٍ أحمر يُتجاوَز. (٠ = مطفأ.)
-        $floorAt = (float) setting('quotes.margin_floor', 0);
-        $margin = $q->margin();
-        $needs = ($amountAt > 0 && (float) $q->total >= $amountAt)
-            || ($discAt > 0 && $discPct >= $discAt)
-            || ($floorAt > 0 && $margin !== null && $margin < $floorAt);
-
-        if ($needs && ! hub_flag(auth()->user(), 'approve')
-            && ! hub_can(auth()->user(), 'quotes', 'approve') && ! hub_is_owner()) {
-            // يُبلَّغ المعتمدون بطلبِ إرسالٍ يستحق نظرَهم — دون قلبِ الحالة.
-            // **نطاقٌ لكلّ مستلم**: لا يُسرَّب عنوانُ العرض ومبلغُه لمعتمِدٍ معزولٍ
-            // عن شركة/عميل العرض (كنمط notifyMonitors في المسار الآليّ).
-            foreach (array_unique(hub_approvers_for('quotes', $q->id)) as $oid) {
-                if ($oid && $oid !== auth()->id()) {
-                    hub_notify($oid, 'approval', 'عرضٌ ينتظر اعتمادَ الإرسال: ' . ($q->title ?: $q->doc_no)
-                        . ' — ' . number_format((float) $q->total, 3) . ' ' . $q->currency, 'quotes', $q->id);
-                }
-            }
-            $q->status = 'مراجعة داخلية';
-            $q->save();
-
+        // العتبةُ والإحالةُ والأرشفةُ والقلبُ في `QuoteActions::send` (يشترك فيها الجوال)
+        if (QuoteActions::send(auth()->user(), $q) === QuoteActions::ESCALATED) {
             return back()->with('warn', 'العرضُ يتجاوز عتبةَ الاعتماد — أُحيل «للمراجعة الداخلية» وأُبلغ المعتمدون.');
         }
 
-        if (! $q->sent_at) $q->sent_at = now();
-
-        // **أرشفةُ العرض المُصدَر** (CPQ هـ): لقطةٌ ثابتةٌ من العرض لحظةَ الإرسال —
-        // فالتاريخيُّ لا يُعاد توليدُه من بياناتٍ متغيّرة لاحقاً (سلامةٌ تاريخية).
-        $this->archiveProposal($q, 'إرسال');
-
-        return $this->setStatus($q, 'مُرسل', '📨 حُدّد العرض كمُرسل للعميل');
-    }
-
-    /**
-     * أرشفةُ العرض الاحترافيّ كمرفقٍ ثابتٍ على السجل (نمط `archiveSignedCopy`):
-     * PDF إن توفّرت المكتبة وإلا HTML — فيبقى أثرٌ للمُصدَر دوماً. لا يُفشل الفعلَ.
-     */
-    protected function archiveProposal(Quote $q, string $tag): void
-    {
-        // المنطقُ في محرّك القبول (أرشيفٌ واحدٌ لبابَي الإرسال والقبول)
-        \App\Support\Finance\QuoteAcceptance::archive($q, $tag, auth()->id());
+        return back()->with('ok', '📨 حُدّد العرض كمُرسل للعميل');
     }
 
     /**
@@ -673,26 +634,15 @@ class QuoteController extends Controller
 
     protected function setStatus(Quote $q, string $status, string $msg)
     {
-        // قفلُ الحقل يسري على أزرار المسار كما على النموذج: دورٌ حقلُ حالته «قراءة
-        // فقط» لا يقلبها من الأزرار (hub_field_mode توثّق setStatus كأحد مستهلكيها).
-        abort_if(hub_field_mode(auth()->user(), 'quotes', 'status') !== '', 403,
-            'حقل الحالة مقفولٌ لدورك (قراءة فقط) — لا يُغيَّر من أزرار المسار');
-
-        // **القبولُ بمحرّكه الواحد** (TECH_DEBT #29): القفلُ + المعاملةُ + أرشفةُ النسخة المقبولة
-        // + سجلُّ «كيف قُبل» + إشعارُ المعتمدين + تدقيقٌ واحد — كالتوقيع الإلكترونيّ حرفاً،
-        // ومتكرّرٌ بلا أثر (ولا يُعاد عرضٌ «محوّل» إلى «مقبول»).
+        // قفلُ حقل الحالة يسري على أزرار المسار كما على النموذج — والقبولُ بمحرّكه الواحد
+        // (`QuoteAcceptance` عبر `QuoteActions::accept`)، متكرّرٌ بلا أثر؛ وغيرُه يُطلق حدثَه الدلاليّ.
         if ($status === 'مقبول') {
-            return \App\Support\Finance\QuoteAcceptance::byUser($q, auth()->user())
+            return QuoteActions::accept(auth()->user(), $q)
                 ? back()->with('ok', $msg)
                 : back()->with('ok', 'العرضُ مقبولٌ من قبل — لا أثرَ مكرّر');
         }
 
-        $q->status = $status;
-        $q->save();
-
-        // **إطلاقُ الأحداث الدلالية**: كان setStatus يتجاوز FlowRunner فلا تُطلَق
-        // quote.accepted/rejected المعلَنة — الآن تُطلق فتعمل حِزمُ الاستجابة والتنبيهات.
-        \App\Support\Platform\FlowRunner::fire('status', 'quotes', $q, $status);
+        QuoteActions::setStatus(auth()->user(), $q, $status);
 
         return back()->with('ok', $msg);
     }

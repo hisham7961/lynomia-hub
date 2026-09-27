@@ -33,9 +33,11 @@ class FinalAuditStockLeaveTest extends TestCase
     /** (#13) استلامُ الشراء يقفل صفَّ الصنف قبل قراءة‑وكتابة رصيده */
     public function test_purchase_receive_locks_the_stock_item_row(): void
     {
-        $src = \Tests\Support\Source::read(\App\Http\Controllers\Web\PurchaseController::class);
-        $recv = substr($src, strpos($src, 'protected function receive'),
-            strpos($src, 'protected function returnStock') - strpos($src, 'protected function receive'));
+        // (خطّة التطبيق 4.6) الاستلامُ انتقل إلى `PurchaseFlow::receive` — يستدعيه الويبُ والجوال
+        $src = \Tests\Support\Source::read(\App\Support\Assets\PurchaseFlow::class);
+        $recv = substr($src, strpos($src, 'public static function receive'));
+        $this->assertStringContainsString('PurchaseFlow::receive',
+            (string) \Tests\Support\Source::read(\App\Http\Controllers\Web\PurchaseController::class));
 
         // قفلان: على أمر الشراء (idempotency) وعلى الصنف (الرصيد) — العيبُ كان غياب الثاني
         $this->assertGreaterThanOrEqual(2, substr_count($recv, 'lockForUpdate'),

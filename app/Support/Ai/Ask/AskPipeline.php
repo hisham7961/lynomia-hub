@@ -66,6 +66,21 @@ final class AskPipeline
      *               message:?string, partial:bool, budget:array, meta:array}
      */
     /**
+     * **نصُّ حدثِ التقدّم** للمتلقّي (خطّة التطبيق 4.7) — الصياغةُ الواحدة التي يبثّها
+     * الويبُ والجوالُ في حدث `progress` (لا نصّان يفترقان بين سطحين).
+     *
+     * @param array{stage:string, step?:int, tool?:string, label?:?string, rows?:int} $p
+     */
+    public static function progressText(array $p): string
+    {
+        return match ($p['stage'] ?? '') {
+            'think' => 'يفكّر… (الخطوة ' . (int) ($p['step'] ?? 1) . ')',
+            'read' => 'قرأ ' . (! empty($p['label']) ? '«' . $p['label'] . '»' : 'بياناتٍ مُنطَّقة') . ' — ' . (int) ($p['rows'] ?? 0) . ' صفّاً',
+            default => 'يعمل…',
+        };
+    }
+
+    /**
      * @param  list<string>  $earlier  **أسئلةُ** الخيط السابقة لصاحبه (`AskMemory::earlierQuestions`) — لا أجوبتُها:
      *   فالبياناتُ تُقرأ من جديد بالأدوات المُنطَّقة ولا يعود إلى النموذج ما قُرئ بصلاحيّاتِ أمس.
      * @param  (\Closure(array{stage:string, step?:int, tool?:string, label?:?string, rows?:int}): void)|null  $progress

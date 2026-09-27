@@ -40,6 +40,9 @@ final class QuoteAcceptance
     public const VIA_WEB = 'web';
     public const VIA_ESIGN = 'esign';
 
+    /** قبولٌ من تطبيق الجوال باسم المستخدم (خطّة التطبيق 4.6) — البابُ نفسُه بوسمٍ صادق */
+    public const VIA_MOBILE = 'mobile';
+
     /**
      * سببُ منع الفاعل من القبول، أو null إن جاز. القاعدةُ عينُها لكلّ باب:
      * صلاحيةُ تعديل العروض + حقلُ الحالة غيرُ مقفولٍ لدوره (hub_field_mode).
@@ -56,9 +59,10 @@ final class QuoteAcceptance
     }
 
     /** قبولٌ من زرّ الويب باسم المستخدم الحاليّ */
-    public static function byUser(Quote $q, User $user): bool
+    public static function byUser(Quote $q, User $user, string $via = self::VIA_WEB): bool
     {
-        return self::accept($q, $user, ['via' => self::VIA_WEB, 'by' => $user->name]);
+        return self::accept($q, $user, ['via' => $via === self::VIA_MOBILE ? self::VIA_MOBILE : self::VIA_WEB,
+            'by' => $user->name]);
     }
 
     /**
@@ -102,7 +106,7 @@ final class QuoteAcceptance
             $record = array_filter([
                 'via' => $via,
                 'at' => now()->toIso8601String(),
-                'user_id' => $via === self::VIA_WEB ? $actor?->id : null,
+                'user_id' => $via !== self::VIA_ESIGN ? $actor?->id : null,
                 'envelope_id' => $how['envelope_id'] ?? null,
                 'verify_code' => $how['verify_code'] ?? null,
                 'signer' => $how['signer'] ?? null,
@@ -126,13 +130,14 @@ final class QuoteAcceptance
             }
 
             hub_audit(self::AUDIT_ACTION, 'quotes', $q->id, $q->doc_no . ' — '
-                . ($via === self::VIA_ESIGN ? 'بتوقيعٍ إلكترونيّ [' . ($how['verify_code'] ?? '') . '] — ' : 'من الويب — ')
+                . ($via === self::VIA_ESIGN ? 'بتوقيعٍ إلكترونيّ [' . ($how['verify_code'] ?? '') . '] — '
+                    : ($via === self::VIA_MOBILE ? 'من تطبيق الجوال — ' : 'من الويب — '))
                 . (string) $q->accepted_by);
 
             self::notify($q, $via === self::VIA_ESIGN
                 ? '🎉 قَبِل العميلُ العرضَ «' . ($q->title ?: $q->doc_no) . '» بتوقيعٍ إلكترونيّ [' . ($how['verify_code'] ?? '') . ']'
                 : '🎉 قُبل العرضُ «' . ($q->title ?: $q->doc_no) . '» — سجّله ' . (string) $q->accepted_by,
-                $via === self::VIA_WEB ? $actor?->id : null);
+                $via !== self::VIA_ESIGN ? $actor?->id : null);
 
             return true;
         });

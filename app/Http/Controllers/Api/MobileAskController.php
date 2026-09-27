@@ -65,7 +65,73 @@ class MobileAskController extends Controller
         $result = AskPipeline::ask((string) $data['q'], $r->user(), null, AskMemory::earlierQuestions($thread));
         $thread = AskMemory::record($r->user(), $thread, (string) $data['q'], $result) ?? $thread;
 
-        return $this->ok([
+        return $this->ok($this->payload($result, $thread));
+    }
+
+    /**
+     * `POST ask/stream` — السؤالُ نفسُه **بالبثّ** (SSE · خطّة التطبيق 4.7): أحداثُ الويب
+     * نفسُها — `progress` ثمّ `done` أو `error` — بحمولاتٍ JSON. البابُ والتحقّقُ والخيطُ
+     * (غيرُه ٤٠٤) **قبل** فتح البثّ، فلا يُرسَل رأسُ 200 لطلبٍ مرفوض؛ والخنقُ على المسار
+     * (`AskPolicy::THROTTLE`). `done` يحمل حمولةَ `POST ask` حرفاً (الجوابُ لا يُبثّ قبل
+     * مصادقة مراجعه — الأنبوبُ نفسُه)، و`error` رمزاً آليّاً + نصّاً عربيّاً.
+     */
+    public function stream(Request $r): Response
+    {
+        if ($deny = $this->gate($r)) return $deny;
+        $data = $r->validate([
+            'q' => ['required', 'string', 'max:' . AskPolicy::MAX_QUESTION_CHARS],
+            'thread' => ['nullable', 'string', 'max:64'],
+        ], [], ['q' => 'السؤال']);
+
+        $thread = $this->thread($r, $data['thread'] ?? null);
+        if ($thread instanceof Response) return $thread;
+        if ($thread !== null && AskMemory::full($thread)) $thread = null;   // بلغ سقفَه ⇒ خيطٌ جديد
+        $user = $r->user();
+        $requestId = Api::requestId();
+
+        return response()->stream(function () use ($data, $thread, $user, $requestId) {
+            // **يُكمل وإن انقطع الاتصال**: النداءُ دُفع ثمنُه، فالتدقيقُ ودورُ الخيط يُكتبان
+            ignore_user_abort(true);
+            $send = function (string $event, array $payload): void {
+                if (connection_aborted()) return;
+                echo 'event: ' . $event . "\n" . 'data: '
+                    . json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n\n";
+                if (ob_get_level() > 0) @ob_flush();
+                flush();
+            };
+            try {
+                $result = AskPipeline::ask((string) $data['q'], $user, null, AskMemory::earlierQuestions($thread),
+                    function (array $p) use ($send) {
+                        $send('progress', array_filter([
+                            'stage' => (string) $p['stage'],
+                            'step' => isset($p['step']) ? (int) $p['step'] : null,
+                            'label' => $p['label'] ?? null,
+                            'rows' => isset($p['rows']) ? (int) $p['rows'] : null,
+                            'text' => AskPipeline::progressText($p),
+                        ], fn ($v) => $v !== null));
+                    });
+                $saved = AskMemory::record($user, $thread, (string) $data['q'], $result) ?? $thread;
+                $send('done', ['data' => $this->payload($result, $saved), 'request_id' => $requestId]);
+            } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e) {
+                $send('error', $e->getStatusCode() === 404
+                    ? ['code' => Api::RESOURCE_NOT_FOUND, 'text' => 'لم تعُد هذه المحادثةُ موجودة', 'request_id' => $requestId]
+                    : ['code' => Api::codeFor($e->getStatusCode()), 'text' => 'تعذّر إكمالُ الطلب', 'request_id' => $requestId]);
+            } catch (\Throwable $e) {
+                report($e);
+                $send('error', ['code' => Api::INTERNAL_ERROR,
+                    'text' => 'تعذّر إكمالُ الجواب بسبب خطأٍ في الخادم — حاول مجدّداً', 'request_id' => $requestId]);
+            }
+        }, 200, [
+            'Content-Type' => 'text/event-stream; charset=UTF-8',
+            'Cache-Control' => 'no-cache, no-store',
+            'X-Accel-Buffering' => 'no',   // nginx: لا يُخزَّن البثُّ مؤقّتاً
+        ]);
+    }
+
+    /** حمولةُ الجواب الواحدة — لـ`POST ask` ولحدث `done` في البثّ (لا شكلان يفترقان) */
+    private function payload(array $result, ?AskThread $thread): array
+    {
+        return [
             'ok' => (bool) $result['ok'],
             'answer' => $result['ok'] ? (string) $result['answer'] : null,
             'partial' => (bool) ($result['partial'] ?? false),
@@ -81,7 +147,7 @@ class MobileAskController extends Controller
             ], (array) ($result['sources'] ?? [])),
             'thread' => $thread?->id,
             'request' => (string) ($result['meta']['correlation'] ?? ''),
-        ]);
+        ];
     }
 
     /** `GET ask/threads` — خيوطي (الأحدثُ أوّلاً) */

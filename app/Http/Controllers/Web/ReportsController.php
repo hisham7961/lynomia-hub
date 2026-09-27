@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\Employee;
-use App\Models\Project;
 use App\Models\User;
 use App\Models\WorkUpdate;
 use App\Support\Workforce\DailyWorkCompliance;
@@ -148,10 +147,10 @@ class ReportsController extends Controller
          * الأوسع بنقرة (?scope=all).
          */
         $uu = auth()->user();
-        $isWide = ($uu->role?->is_owner ?? false) || hub_can($uu, 'hr', 'v');
+        $isWide = ReportReview::isWideReviewer($uu);
         $mineOnly = $r->query('scope') === 'mine' || (! $isWide && $r->query('scope') !== 'all');
 
-        $q = $this->reviewableUpdates($mineOnly);
+        $q = ReportReview::reviewableQuery($uu, $mineOnly);
         if ($status === 'pending') {
             $q->where(fn ($w) => $w->whereNull('review_status')->orWhere('review_status', ReportReview::PENDING));
         } else {
@@ -272,25 +271,10 @@ class ReportsController extends Controller
         abort_unless(ReportReview::canReview(auth()->user(), $w), 403);
 
         $action = (string) $r->input('action');
-        $feedback = trim((string) $r->input('feedback', ''));
+        // الفعلُ والمسودةُ والحكمُ في `ReportReview::act` (يشترك فيه الجوال)
+        $outcome = ReportReview::act($w, auth()->user(), $action, (string) $r->input('feedback', ''));
 
-        // **مسودةُ المدقّق لا تركب القبول** (قرارُ المالك §٣.٦): «قبول» بنصِّ مسودةٍ مفتوحةٍ حرفيّاً
-        // لا يرسلها إلى الموظّف — المسودةُ تصله بـ«طلب تنقيح» وحده، بعد أن يختارها المراجعُ عمداً
-        if ($action === 'accept' && $feedback !== ''
-            && in_array($feedback, \App\Support\Ai\Auditor\AuditorSignals::draftNotes($w), true)) {
-            $feedback = '';
-        }
-
-        match ($action) {
-            'accept' => ReportReview::accept($w, auth()->user(), $feedback ?: null),
-            'needs_revision' => $feedback !== ''
-                ? ReportReview::needsRevision($w, auth()->user(), $feedback)
-                : null,
-            'reopen' => ReportReview::reopen($w, auth()->user()),
-            default => null,
-        };
-
-        if ($action === 'needs_revision' && $feedback === '') {
+        if ($outcome === 'feedback_required') {
             return back()->with('err', 'طلبُ التنقيح يحتاج ملاحظةً للموظف — اكتب ما المطلوب تحسينُه.');
         }
 
@@ -548,33 +532,6 @@ class ReportsController extends Controller
     }
 
     /* ────────── مساعدات ────────── */
-
-    /** بنودٌ قابلةٌ للمراجعة لهذا المستخدم — منطَّقةٌ شركةً ومشروعاً (§77/§80) */
-    protected function reviewableUpdates(bool $mineOnly = false)
-    {
-        $u = auth()->user();
-        $q = WorkUpdate::query()->whereNull('deleted_at');
-        if ($u->role?->is_owner && ! $mineOnly) return $q;
-
-        // «مشاريعي» = ما أُديرُه فعلاً — لا كلُّ ما يقع في نطاق رؤيتي (F7)
-        $projQ = hub_scope(Project::query(), 'projects');
-        if ($mineOnly) $projQ->where('manager_id', (string) $u->id);
-        $pids = $projQ->pluck('id')->all();
-        if ($mineOnly) {
-            return $q->where(fn ($w) => $pids
-                ? $w->whereIn('project_id', $pids) : $w->whereRaw('1 = 0'));
-        }
-        $userIds = [];
-        if (hub_can($u, 'hr', 'v')) {
-            $userIds = hub_company_scope(hub_scope(Employee::query(), 'hr'), 'hr')
-                ->whereNotNull('user_id')->pluck('user_id')->all();
-        }
-        return $q->where(function ($w) use ($pids, $userIds) {
-            $w->whereRaw('1 = 0');
-            if ($pids) $w->orWhereIn('project_id', $pids);
-            if ($userIds) $w->orWhereIn('created_by', $userIds);
-        });
-    }
 
     protected function validDate(?string $d): ?string
     {

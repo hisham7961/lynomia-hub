@@ -830,6 +830,9 @@ class MobilePlatform
         'me' => 'api',
         // «اسأل Hub» على الجوال (خارطةُ الذكاء · المرحلة ٢): المساعدُ القارئ وخيوطُه — سطحُ API
         'ask' => 'api',
+        // خطّةُ التطبيق · المرحلة ٤ (التعاون · العميل · سير العمل): كلُّها سطوحُ API
+        'portal_tickets' => 'api', 'channels' => 'api', 'reports' => 'api',
+        'calendar' => 'api', 'finance_actions' => 'api',
     ];
 
     /**

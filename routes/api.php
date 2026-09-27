@@ -339,6 +339,9 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
     Route::post('tracking/{session}/points', [\App\Http\Controllers\Api\MobileFileController::class, 'trackingPoints'])->name('mobile.tracking.points');
     Route::post('tracking/{session}/end', [\App\Http\Controllers\Api\MobileFileController::class, 'trackingEnd'])->name('mobile.tracking.end');
 
+    // ── التعاونُ والعميلُ وسيرُ العمل (خطّة التطبيق · المرحلة ٤) — حرفيّاتٌ قبل الـcatch-all (F9)
+    require __DIR__ . '/api/mobile-workflow.php';
+
     /*
      * ── المزامنة/الصمود (Mobile Readiness · الطور G · §109) ──
      *
