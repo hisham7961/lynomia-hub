@@ -457,6 +457,25 @@ class ProjectReportDigestTest extends TestCase
         $this->actingAs($client)->get(route('reports.projects.show', $this->pid))->assertNotFound();
     }
 
+    /**
+     * (طلب المالك) **المشروعُ يُختار لا يُكتب**: قائمةٌ منسدلةٌ بمشاريع نطاق القارئ وحدَها، واختيارُ
+     * مشروعٍ يفتح صفحةَ ملخّصه؛ ومشروعٌ خارجَ النطاق عبر المعامل ٤٠٤ — لا تسرّبُ اسمٍ ولا تحويل.
+     */
+    public function test_المشروعُ_يُختار_من_قائمةٍ_بنطاق_القارئ_والاختيارُ_يفتح_ملخّصه(): void
+    {
+        $foreign = $this->project('مشروعُ شركةٍ أخرى QWXZ-FOREIGN', $this->beta);
+        $u = $this->reader([$this->alpha->id]);
+
+        $page = $this->actingAs($u)->get(route('reports.projects'))->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/<select[^>]*name="project"/', $page, 'المشروعُ ما زال حقلاً يُكتب');
+        $this->assertStringContainsString('value="' . $this->pid . '"', $page);
+        $this->assertStringNotContainsString('QWXZ-FOREIGN', $page, 'مشروعٌ خارجَ النطاق في القائمة');
+
+        $this->actingAs($u)->get(route('reports.projects', ['project' => $this->pid]))
+            ->assertRedirect(route('reports.projects.show', $this->pid));
+        $this->actingAs($u)->get(route('reports.projects', ['project' => $foreign]))->assertNotFound();
+    }
+
     public function test_من_حُجب_عنه_حقلٌ_من_التقرير_لا_يرى_الملخّص(): void
     {
         $this->on();

@@ -18,8 +18,15 @@
 @endif
 
 <form method="get" class="card" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
-    <label>المشروع<br><input type="text" name="q" value="{{ $q }}" placeholder="اسم المشروع" class="in"></label>
-    <button class="btn sm">بحث</button>
+    <label>المشروع<br>
+        <select name="project" class="in" data-submit-on-change="filled">
+            <option value="">— اختر مشروعاً —</option>
+            @foreach ($options as $oid => $oname)
+                <option value="{{ $oid }}">{{ $oname }}</option>
+            @endforeach
+        </select>
+    </label>
+    <button class="btn sm">فتح الملخّص</button>
     @if ($waiting > 0)<span class="sub">{{ $waiting }} مشروعاً له تقاريرُ حديثةٌ ينتظر أوّلَ ملخّص</span>@endif
 </form>
 
