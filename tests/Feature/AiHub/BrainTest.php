@@ -165,8 +165,12 @@ class BrainTest extends TestCase
         foreach (Brain::SOURCES as $m => $keys) {
             foreach ($keys as $k) $this->assertContains($k, $all[$m] ?? [], "النطاقُ الكامل أسقط {$m}.{$k}");
         }
-        foreach (['vault', 'phones', 'carriers', 'hr', 'payroll', 'attend', 'hrlog', 'users'] as $m) {
-            $this->assertArrayNotHasKey($m, $all, "وحدةٌ حسّاسةٌ أو آنيّةٌ فُهرست: {$m}");
+        // «كلُّ شيء» (بلاغ المالك): العناوينُ والأسماءُ والنصوصُ القصيرة أيضاً، والموارد البشرية والحضور —
+        // ولا يُفهرَس أبداً ما هو سرٌّ بطبيعته: الخزنةُ والهواتفُ وشرائحُها والمستخدمون
+        $this->assertContains('title', $all['tasks'] ?? [], 'العناوينُ القصيرة في النطاق الكامل');
+        $this->assertArrayHasKey('hr', $all, 'الموارد البشرية في النطاق الكامل (والبحثُ بصلاحيّة القارئ)');
+        foreach (['vault', 'phones', 'carriers', 'users'] as $m) {
+            $this->assertArrayNotHasKey($m, $all, "وحدةٌ سرّيّةٌ بطبيعتها فُهرست: {$m}");
         }
         foreach ($all as $m => $keys) {
             foreach ($keys as $k) {

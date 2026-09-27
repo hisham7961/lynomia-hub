@@ -9,6 +9,7 @@
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
         <a class="btn ghost sm" href="{{ route('reports.index') }}">📊 مركز التقارير</a>
+        @if (\App\Support\Ai\Reports\DigestAccess::canUse(auth()->user()))<a class="btn ghost sm" href="{{ route('reports.projects') }}">📁 تقارير حسب المشروع</a>@endif
     </div>
 </div>
 

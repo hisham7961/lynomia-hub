@@ -3338,6 +3338,37 @@
         ]
     },
     {
+        "methods": "GET|HEAD",
+        "uri": "reports/projects",
+        "name": "reports.projects",
+        "action": "App\\Http\\Controllers\\Web\\ProjectDigestController@index",
+        "middleware": [
+            "web",
+            "auth"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "reports/projects/{id}",
+        "name": "reports.projects.show",
+        "action": "App\\Http\\Controllers\\Web\\ProjectDigestController@show",
+        "middleware": [
+            "web",
+            "auth"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "reports/projects/{id}/refresh",
+        "name": "reports.projects.refresh",
+        "action": "App\\Http\\Controllers\\Web\\ProjectDigestController@refresh",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:6,10"
+        ]
+    },
+    {
         "methods": "POST",
         "uri": "reports/review/{id}",
         "name": "reports.review.act",
@@ -3662,6 +3693,17 @@
         "middleware": [
             "web",
             "auth"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "custody/cat/{code}/insight",
+        "name": "custody.insight",
+        "action": "App\\Http\\Controllers\\Web\\CustodyController@refreshInsight",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:4,1"
         ]
     },
     {

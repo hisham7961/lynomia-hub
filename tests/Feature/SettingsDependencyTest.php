@@ -156,6 +156,22 @@ class SettingsDependencyTest extends TestCase
         $this->assertSame('75', (string) setting('risk.band_critical'));
     }
 
+    /**
+     * (بلاغ المالك) حفظُ **مفتاحٍ آخر** من النموذج يُرسل حقولَ النطاقات فارغةً (تعرض الافتراضيَّ
+     * نائباً لا قيمة) — فكانت تُقرأ صفراً: «الآن ٠ · ٠ · ٠» ويُرفض الحفظُ كلُّه. الفارغُ يسقط إلى
+     * الافتراضيّ كما يسقط القارئ (`setting()`)، فلا تُحكم مجموعةٌ على قيمٍ لم يكتبها أحد.
+     */
+    public function test_empty_band_fields_fall_back_to_defaults_and_do_not_block_other_saves(): void
+    {
+        $this->seedCore();
+
+        $this->actingAs($this->owner)->post(route('settings.update'), [
+            'brain_scope' => 'all',
+            'risk_band_medium' => '', 'risk_band_high' => '', 'risk_band_critical' => '',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('all', (string) setting('brain.scope'), 'حُجب حفظُ مفتاحٍ آخر بقيمٍ فارغةٍ لم يكتبها أحد');
+    }
+
     /* ═══════════════ ٤) لا قاعدةَ بلا قارئ ═══════════════ */
 
     public function test_notify_quiet_gets_no_rule_because_no_code_reads_it(): void

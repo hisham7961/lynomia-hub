@@ -41,10 +41,10 @@ final class Brain
     ];
 
     /**
-     * **ما يُفهرَس فعلاً** — `SOURCES` افتراضاً (`brain.scope=core`)، أو **كامل النظام** (`all`، قرارُ المالك):
-     * حقولُ النصّ الطويل (`ta`) من كلِّ وحدةٍ قابلةٍ للتخزين (`CACHEABLE_*` في `hub.mobile_sync` — فلا الخزنة
-     * ولا الهواتف ولا الموارد البشرية ولا الرواتب ولا الحضور ولا المستخدمون)، **ومنها التقاريرُ اليوميّة**،
-     * بلا حقلٍ مصنّفٍ حسّاساً (`hub_field_sensitive`) ولا سرّ — ومع `SOURCES` كلِّها. والبحثُ يحكم بصلاحيّة
+     * **ما يُفهرَس فعلاً** — `SOURCES` افتراضاً (`brain.scope=core`)، أو **كامل النظام** (`all`، قرارُ المالك:
+     * «كلُّ شيء»): كلُّ حقلٍ نصّيّ — طويلٍ وقصير، فالعناوينُ والأسماءُ منه — في كلِّ وحدة، **ومنها التقاريرُ
+     * اليوميّة والموارد البشرية والحضور**، إلّا ما هو سرٌّ بطبيعته (`NEVER`: الخزنة والهواتف والمستخدمون)
+     * والحقولَ المصنّفةَ حسّاسة (`hub_field_sensitive`) والأسرار (`sec` ليس نصّاً هنا) — ومع `SOURCES` كلِّها. والبحثُ يحكم بصلاحيّة
      * القارئ كما كان، فالنطاقُ يوسّع ما يُفهرَس لا ما يُرى.
      *
      * @return array<string, list<string>>
@@ -55,11 +55,10 @@ final class Brain
 
         $out = self::SOURCES;
         foreach (hub_modules() as $m => $def) {
-            if (! is_array($def) || $m === 'users') continue;
-            if (! str_starts_with(hub_sync_class($m), 'CACHEABLE')) continue;   // الحسّاسُ والآنيُّ خارجَ الفهرس
+            if (! is_array($def) || in_array($m, self::NEVER, true)) continue;   // سرٌّ بطبيعته لا يُفهرَس أبداً
             foreach ((array) ($def['fields'] ?? []) as $f) {
                 $k = (string) ($f['key'] ?? '');
-                if ($k === '' || ($f['type'] ?? '') !== 'ta' || hub_field_sensitive($m, $k)) continue;
+                if ($k === '' || ! in_array($f['type'] ?? '', self::TEXT_TYPES, true) || hub_field_sensitive($m, $k)) continue;
                 if (! in_array($k, $out[$m] ?? [], true)) $out[$m][] = $k;
             }
         }
@@ -67,6 +66,12 @@ final class Brain
 
         return $out;
     }
+
+    /** وحداتٌ سرّيّةٌ بطبيعتها — خارجَ الفهرس في كلِّ نطاق: الخزنة، والهواتف وشرائحها، والمستخدمون */
+    public const NEVER = ['vault', 'phones', 'carriers', 'users'];
+
+    /** أنواعُ الحقول النصّيّة المفهرَسة في النطاق الكامل: النصُّ الطويل والقصير (العناوين والأسماء) */
+    public const TEXT_TYPES = ['ta', 'text'];
 
     public const CHUNK = 800;
 

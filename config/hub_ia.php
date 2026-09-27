@@ -188,6 +188,10 @@ return [
                         'synonyms' => ['reports', 'التقارير', 'تقارير العمل', 'daily reports', 'compliance', 'الامتثال']],
                     ['type' => 'center', 'center' => 'reportsr', 'importance' => 'secondary',
                         'synonyms' => ['review', 'المراجعة', 'reports review', 'مراجعة التقارير']],
+                    // ملخّصُ الذكاء لكلِّ مشروع (ProjectReportDigest) — التفصيلُ تحت البادئة نفسِها
+                    ['type' => 'center', 'center' => 'reportsp', 'importance' => 'secondary',
+                        'route_prefix' => 'reports.projects', 'routes' => ['reports.projects', 'reports.projects.show'],
+                        'synonyms' => ['project reports', 'تقارير المشاريع', 'تقارير حسب المشروع', 'ملخص التقارير', 'report digest', 'ai summary']],
                     ['type' => 'center', 'center' => 'attmonth', 'importance' => 'secondary',
                         'route_prefix' => 'reports.monthly', 'routes' => ['reports.monthly', 'reports.monthly.employee'],
                         'synonyms' => ['monthly', 'الحضور الشهري', 'شهري', 'كشف الحضور', 'المحاسب', 'attendance sheet', 'payroll attendance']],

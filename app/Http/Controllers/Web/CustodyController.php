@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetCustody;
 use App\Support\Assets\Custody;
+use App\Support\Assets\CustodyFacts;
 use App\Support\Assets\CustodyHandover;
+use App\Support\Assets\CustodyInsights;
+use App\Support\Ai\Ask\AskFailures;
 use App\Support\Documents\Qr;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -70,19 +73,14 @@ class CustodyController extends Controller
     {
         abort_unless(hub_can(auth()->user(), 'assets', 'v'), 403, 'لا تملك عرض الأصول والعهد');
 
-        $known = array_keys(Custody::cats());
-        $types = array_values(array_filter($known, fn ($t) => Custody::catCode($t) === $code));
-        $isFallback = $code === (string) config('hub_assets.fallback', 'GN');
-        abort_if(! $types && ! $isFallback, 404, 'لا صنف بهذا الكود');
-
+        $types = CustodyFacts::typesOf($code);
         $q = Custody::scoped();
-        if ($isFallback) {
-            // «أخرى» تشمل المسجَّل باسمها، وما تُرك بلا صنف، وما كُتب صنفاً خارج السجل
-            $q->where(fn ($w) => $w->whereIn('type', $types)->orWhereNull('type')
-                ->orWhere('type', '')->orWhereNotIn('type', $known));
-        } else {
-            $q->whereIn('type', $types);
-        }
+        // «أخرى» تشمل المسجَّل باسمها، وما تُرك بلا صنف، وما كُتب صنفاً خارج السجل — القاعدةُ
+        // الواحدةُ في `CustodyFacts::filterType` يقرؤها التحليلُ أيضاً فلا يختلف العدّان
+        abort_unless(CustodyFacts::filterType($q, $code), 404, 'لا صنف بهذا الكود');
+
+        // الحقائقُ الحتميّةُ بنطاق القارئ وحقوله — قبل مرشّحات البحث (تصف الصنفَ لا نتيجةَ البحث)
+        $facts = CustodyFacts::compute(clone $q, auth()->user(), $code);
 
         if ($term = trim(hub_str($r->input('q')))) $q->search($term);
         if (($st = hub_str($r->input('status'))) !== '') $q->where('status', $st);
@@ -104,7 +102,31 @@ class CustodyController extends Controller
             'cur'     => setting('app.currency', 'د.ك'),
             'q'       => $term, 'status' => $st, 'holder' => $h,
             'statuses' => collect(hub_mod('assets')['fields'])->firstWhere('key', 'status')['options'] ?? [],
+            'facts'   => $facts,
+            'insight' => CustodyInsights::panel(auth()->user(), $code),
         ]);
+    }
+
+    /**
+     * **«تحديث التحليل»** — توليدٌ فوريٌّ لتحليل الذكاء لهذا الصنف ولو لم تتغيّر حقائقُه.
+     *
+     * لمن يرى التحليلَ (يرى الصنفَ كلَّه) **ويملك** تعديلَ الأصول أو إسنادَ العهدة أو المالك؛ ومحدودُ
+     * المعدّل على المسار، ومُدقَّق. والإخفاقُ يُقال بصدقٍ ويبقى التحليلُ السابق.
+     */
+    public function refreshInsight(string $code)
+    {
+        abort_unless(CustodyInsights::canRefresh(auth()->user()), 403, 'لا تملك تحديثَ تحليل هذا الصنف');
+        abort_unless(CustodyFacts::filterType(Custody::scoped(), $code), 404, 'لا صنف بهذا الكود');
+
+        $r = CustodyInsights::refresh($code, force: true);
+        hub_audit(CustodyInsights::AUDIT_REFRESH, 'assets', null, $code, ['after' => ['result' => $r['action']]]);
+
+        return match ($r['action']) {
+            'generated' => back()->with('ok', '✨ حُدِّث تحليلُ الذكاء لهذا الصنف'),
+            'empty'     => back()->with('err', 'لا عهدةَ في هذا الصنف ليُحلَّل'),
+            'off'       => back()->with('err', 'تعذّر التحديث: ' . $r['code']),
+            default     => back()->with('err', 'تعذّر التحديث — ' . AskFailures::message((string) $r['code']) . ' (بقي التحليلُ السابق)'),
+        };
     }
 
     /* ────────── الطباعة: ملصقٌ ٤٠×٣٠ مم وورقةُ مواصفاتٍ A5 ────────── */

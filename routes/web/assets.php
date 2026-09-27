@@ -16,6 +16,10 @@ use Illuminate\Support\Facades\Route;
     Route::prefix('custody')->name('custody.')->group(function () {
         Route::get('/', [\App\Http\Controllers\Web\CustodyController::class, 'catalog'])->name('catalog');
         Route::get('cat/{code}', [\App\Http\Controllers\Web\CustodyController::class, 'category'])->name('category');
+        // «تحديث التحليل» لصنفٍ (تحليلُ الذكاء — CustodyInsights): توليدٌ مدفوعٌ فحدُّ معدّلٍ ضيّق،
+        // والحرسُ في المتحكّم (يرى الصنفَ كلَّه + assets:e/custodyAssign أو المالك) ومُدقَّق
+        Route::post('cat/{code}/insight', [\App\Http\Controllers\Web\CustodyController::class, 'refreshInsight'])
+            ->middleware('throttle:4,1')->name('insight');
         Route::get('{id}/label', [\App\Http\Controllers\Web\CustodyController::class, 'label'])->name('label');
         Route::get('{id}/spec', [\App\Http\Controllers\Web\CustodyController::class, 'spec'])->name('spec');
         Route::post('{id}/specs', [\App\Http\Controllers\Web\CustodyController::class, 'saveSpecs'])->name('specs');
