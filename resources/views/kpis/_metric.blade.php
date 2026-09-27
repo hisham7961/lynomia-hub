@@ -21,7 +21,7 @@
     </div>
     <div class="fld">
         <label for="{{ $p }}-module">الوحدة</label>
-        <select class="inp" id="{{ $p }}-module" name="{{ $p }}_module" data-kpimod="{{ $p }}" onchange="kpiSync('{{ $p }}')">
+        <select class="inp" id="{{ $p }}-module" name="{{ $p }}_module" data-kpimod="{{ $p }}">
             <option value="">— اختر وحدة —</option>
             @foreach ($catalog as $mk => $c)
                 <option value="{{ $mk }}" @selected($selMod === $mk)>{{ $c['label'] }}</option>
@@ -48,7 +48,7 @@
     </div>
 </div>
 
-<script>
+<script @cspNonce>
 window.KPICAT = window.KPICAT || @json(collect($catalog)->map(fn ($c) => ['nums' => $c['nums'], 'states' => $c['states']]));
 function kpiSync(p) {
     var mod = document.getElementById(p + '-module').value;
@@ -60,4 +60,6 @@ function kpiSync(p) {
     (c.nums || []).forEach(function (n) { col.insertAdjacentHTML('beforeend', '<option value="' + n.key + '">' + n.label + '</option>'); });
     (c.states || []).forEach(function (s) { st.insertAdjacentHTML('beforeend', '<option value="' + s + '">' + s + '</option>'); });
 }
+// مستمِعٌ لا سمةُ onchange (السياسةُ الصارمة تحجب السمات) — لكلِّ مقياسٍ حقلُ وحدته
+document.getElementById(@json($p . '-module')).addEventListener('change', function () { kpiSync(@json($p)); });
 </script>

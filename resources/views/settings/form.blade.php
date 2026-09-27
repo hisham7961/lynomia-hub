@@ -359,7 +359,7 @@
     <div class="sub" style="margin-top:10px">ولأي مفتاحٍ من الطرفية: <span class="mono ltr">php artisan hub:set key value</span></div>
 </div>
 
-<script>
+<script @cspNonce>
 (function () {
     var q = document.getElementById('setq'), only = document.getElementById('setrisk'),
         none = document.getElementById('setnone');

@@ -98,6 +98,14 @@ class QuoteFlowController extends Controller
 
         hub_audit('فتح QuoteFlow', null, null, 'تطبيق جانبي');
 
+        // **الاستثناءُ المسمّى الوحيد من سياسة السكربتات الصارمة** (بند الدَّين #12): ملفُّ
+        // التطبيق مُضمَّنٌ كما هو ويبني أزرارَه بمعالجاتٍ في السمات — فتُخفَّف لهذه الاستجابة
+        // وحدها إلى 'self' 'unsafe-inline' (وأيُّ أصلٍ أجنبيٍّ غيرُ المسمّى أدناه يبقى محجوباً). للمالك خلف كلمة سرٍّ ثانية.
+        // ومكتبةُ تصدير PDF التي يحمّلها الملفُّ من cdnjs — بعنوانها الكامل لا بالنطاق كلِّه.
+        \App\Support\Security\ContentSecurity::allowLegacyInline([
+            'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.12.1/html2pdf.bundle.min.js',
+        ]);
+
         return response($html)->header('Content-Type', 'text/html; charset=utf-8')
             ->header('Cache-Control', 'no-store');   // الحالة مبذورة في الصفحة — لا تُخبأ
     }

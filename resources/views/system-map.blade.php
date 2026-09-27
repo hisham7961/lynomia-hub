@@ -11,7 +11,7 @@
 {{-- مُرشِّحٌ فوريّ (عميلٌ فقط): يُخفي الوجهاتِ التي لا تطابق الكلمة — بحثٌ بلا خادم --}}
 <div class="toolbar" style="margin-bottom:12px">
     <input class="inp" type="search" id="smq" placeholder="🔎 رشّح الوجهات…" autocomplete="off" style="max-width:320px"
-           oninput="(function(q){q=q.value.trim().toLowerCase();document.querySelectorAll('[data-smrow]').forEach(function(r){r.style.display=(!q||r.getAttribute('data-smrow').indexOf(q)>-1)?'':'none'});})(this)">
+           data-row-filter="data-smrow">
 </div>
 
 @php

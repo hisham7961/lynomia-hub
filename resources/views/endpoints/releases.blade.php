@@ -73,13 +73,13 @@
                         <a class="btn sm" href="{{ route('endpoints.releases.download', $rel->id) }}">⬇️ تنزيل</a>
                         @if ($rel->state === 'draft')
                             <form method="post" action="{{ route('endpoints.releases.publish', $rel->id) }}" style="display:inline"
-                                  onsubmit="return confirm('نشرُ المسوَّدة {{ $rel->version }}؟ سيبتلعها الأسطولُ ضمن رقعة طرحها.')">
+                                  data-confirm-native="نشرُ المسوَّدة {{ $rel->version }}؟ سيبتلعها الأسطولُ ضمن رقعة طرحها.">
                                 @csrf
                                 <button class="btn sm">نشر</button>
                             </form>
                         @endif
                         <form method="post" action="{{ route('endpoints.releases.delete', $rel->id) }}" style="display:inline"
-                              onsubmit="return confirm('سحبُ الإصدار {{ $rel->version }}؟ بيانُ التحديث لن يقدّمه بعد الآن.')">
+                              data-confirm-native="سحبُ الإصدار {{ $rel->version }}؟ بيانُ التحديث لن يقدّمه بعد الآن.">
                             @csrf
                             <button class="btn sm danger">سحب</button>
                         </form>

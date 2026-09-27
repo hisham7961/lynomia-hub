@@ -89,7 +89,7 @@
 .scconf{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 </style>
 
-<script>
+<script @cspNonce>
 /* شاشةُ المسح: الحسمُ عبر المحلّل الموحّد وحده — لا منطقَ بحثٍ في الواجهة */
 (function () {
     var $ = function (s) { return document.querySelector(s); };

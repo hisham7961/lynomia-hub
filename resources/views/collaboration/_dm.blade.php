@@ -47,7 +47,7 @@
     @error('body')<div class="err" style="margin:0 14px 10px">{{ $message }}</div>@enderror
 </div>
 
-<script>
+<script @cspNonce>
 (function () {
     var box = document.getElementById('cx-dmbox');
     if (box) box.scrollTop = box.scrollHeight;

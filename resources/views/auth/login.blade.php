@@ -33,7 +33,7 @@
 </div>
 @if ((string) setting('auth.passkeys_on', '1') === '1')
 @include('partials.passkey_js')
-<script>
+<script @cspNonce>
 (function () {
     var btn = document.getElementById('pk-login'); if (!btn) return;
     if (!window.LynPasskey || !LynPasskey.supported) { btn.style.display = 'none'; return; }

@@ -105,7 +105,7 @@
 @endforelse
 
 {{-- بحثٌ محليّ (F4: «لا يجد حتى مديرته بالبحث») — ترشيحُ بطاقاتٍ في المتصفح بلا استعلام --}}
-<script>
+<script @cspNonce>
 (function () {
     var q = document.getElementById('team-q');
     if (! q) return;

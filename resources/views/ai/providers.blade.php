@@ -88,12 +88,12 @@
                 </form>
                 @if ($p->credential_state !== 'missing')
                     <form method="POST" action="{{ route('ai.providers.revoke', $p) }}"
-                          onsubmit="return confirm('يُحذَف الاعتمادُ عند البوّابةِ نهائيّاً ويُطفأ المزوّد. أتتابع؟')">@csrf
+                          data-confirm-native="يُحذَف الاعتمادُ عند البوّابةِ نهائيّاً ويُطفأ المزوّد. أتتابع؟">@csrf
                         <button class="btn sm danger">🚫 إبطالُ الاعتماد</button>
                     </form>
                 @endif
                 <form method="POST" action="{{ route('ai.providers.destroy', $p) }}"
-                      onsubmit="return confirm('يُبطَل الاعتمادُ ثمّ يُحذَف المزوّد. أتتابع؟')">@csrf @method('DELETE')
+                      data-confirm-native="يُبطَل الاعتمادُ ثمّ يُحذَف المزوّد. أتتابع؟">@csrf @method('DELETE')
                     <button class="btn sm danger">🗑️ حذف</button>
                 </form>
                 @endif

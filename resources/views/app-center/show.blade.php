@@ -41,9 +41,7 @@
         <span class="bdg {{ $desc['tone'] }}">{{ number_format($desc['len']) }} / {{ number_format($desc['max']) }} حرف</span>
         @if ($desc['text'])
             <button class="btn ghost xs msauto" type="button" data-copydesc
-                    onclick="(function(b){var t=document.getElementById('descbody').innerText;
-                        (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject())
-                        .then(function(){b.textContent='✓ نُسخ'},function(){b.textContent='انسخه يدوياً'})})(this)">
+                    data-copy-from="#descbody" data-copied="✓ نُسخ" data-copy-failed="انسخه يدوياً">
                 ⧉ نسخ الوصف</button>
         @endif
     </h3>

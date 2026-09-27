@@ -279,7 +279,7 @@
     </section>
 </div>
 
-<script>
+<script @cspNonce>
     (function () {
         document.querySelectorAll('[data-cc-st]').forEach(function (box) {
             var tabs = box.querySelectorAll('[data-cstab]');

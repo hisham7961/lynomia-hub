@@ -26,7 +26,7 @@
         <h3>{{ ($result['kind'] ?? '') === 'notes' ? 'مسودةُ ملاحظاتِ الإصدار' : 'مسودةُ الردّ' }}</h3>
         <div class="askanswer" id="assist-reply">{{ $result['text'] }}</div>
         <button class="btn sm" type="button"
-                onclick="navigator.clipboard && navigator.clipboard.writeText(document.getElementById('assist-reply').innerText); this.textContent = '✓ نُسخ'">📋 انسخ</button>
+                data-copy-from="#assist-reply" data-copied="✓ نُسخ">📋 انسخ</button>
         @if (($result['commits']['source'] ?? null) === 'file')
             <div class="sub" data-assist-commits>📎 سجلُّ التغييرات قُرئ من الملفّ المرفق: {{ $result['commits']['name'] ?? '' }}</div>
         @elseif (($result['commits']['source'] ?? null) === 'github')

@@ -103,7 +103,7 @@
 .pp-row[aria-selected="true"] .pp-lab { background:var(--pss) }
 .pp-empty { padding:12px 10px; font-size:12.5px; color:var(--sb); text-align:center }
 </style>
-<script>
+<script @cspNonce>
 /* منتقي المشاركين — يعمل على أيِّ عددٍ من المنتقيات في الصفحة، بلا اعتماديّة.
    يُبقي aria-selected والعدَّ والرقائقَ متّسقةً مع المربّعات (مصدرُ الحقيقة). */
 (function () {

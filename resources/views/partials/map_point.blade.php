@@ -16,7 +16,7 @@
     <div id="{{ $mpId }}" class="lyn-map-point" data-map-mode="self"></div>
     <link rel="stylesheet" href="{{ asset('vendor/leaflet/1.9.4/leaflet.min.css') }}">
     <script src="{{ asset('vendor/leaflet/1.9.4/leaflet.min.js') }}"></script>
-    <script nonce="{{ \App\Support\Security\ContentSecurity::nonce() }}">
+    <script @cspNonce>
     (function () {
         if (!window.L) return;
         var p = [@json($mpLat), @json($mpLng)];

@@ -116,7 +116,7 @@
                 <div class="sub" style="padding:4px 0">لا تحقيقات محفوظة — رشّح واضبط المدى ثم احفظ السؤال باسم</div>
             @endforelse
             {{-- حقل الاستعلام يُملأ من العنوان لحظة الإرسال ليواكب آخرَ ما طُبِّق --}}
-            <form method="POST" action="{{ route('views.store') }}" onsubmit="this.query.value=location.search.replace(/^\?/,'')"
+            <form method="POST" action="{{ route('views.store') }}" data-save-query
                   style="display:flex;gap:6px;align-items:center;margin-top:8px;border-top:1px solid var(--brd);padding-top:8px;flex-wrap:wrap">
                 @csrf
                 <input type="hidden" name="module" value="audit">

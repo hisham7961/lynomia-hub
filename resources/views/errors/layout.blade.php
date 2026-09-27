@@ -18,7 +18,8 @@
     @endif
     <div style="display:flex;gap:8px;justify-content:center">
         <a class="btn p" href="{{ url('/') }}">→ لوحة التحكم</a>
-        <a class="btn ghost" href="javascript:history.back()">رجوع</a>
+        {{-- رجوعٌ بمستمِعٍ (`data-go-back`) لا برابط `javascript:` تحجبه السياسةُ الصارمة؛ والوجهةُ الاحتياطيّةُ الصفحةُ السابقة --}}
+        <a class="btn ghost" href="{{ rescue(fn () => url()->previous(), url('/'), false) }}" data-go-back>رجوع</a>
     </div>
 </div>
 </body>

@@ -5,7 +5,7 @@
    - التنقل بين الصفحات: الشبكة أولاً بمهلة، وإلا آخر نسخة محفوظة، وإلا صفحة «بلا اتصال»
    - لا يخبئ أبداً: API، الملفات الخاصة، الأسرار، مراكز الإدارة */
 var VER = 'hub-v2.337';   // رفعُ اسم الخبيئة يُسقط ما خُبِّئ بالمنطق المعطوب
-var STATIC = ['/offline', '/css/app.css', '/css/fonts.css', '/js/app.js', '/js/htmx.min.js',
+var STATIC = ['/offline', '/css/app.css', '/css/fonts.css', '/js/app.js', '/js/actions.js', '/js/htmx.min.js',
   // الجوهري من الخطوط يُخبأ مسبقاً (عربي + لاتيني)، وبقية الأطقم يخبئها مسار /fonts/ عند أول استعمال
   '/fonts/plexarabic-400-arabic.woff2', '/fonts/plexarabic-400-latin.woff2',
   '/fonts/plexarabic-500-arabic.woff2', '/fonts/plexarabic-500-latin.woff2',

@@ -41,14 +41,14 @@
         <form method="GET" class="crow" style="gap:6px;flex-wrap:wrap">
             <input type="hidden" name="d" value="{{ $days }}">
             <label class="vh" for="st">تصفية بالحالة</label>
-            <select class="inp" id="st" name="st" onchange="this.form.submit()">
+            <select class="inp" id="st" name="st" data-submit-on-change>
                 <option value="">كل الحالات</option>
                 @foreach (\App\Support\Security\SecurityFindings::STATUSES as $sfK => $sfL)
                     <option value="{{ $sfK }}" @selected($st === $sfK)>{{ $sfL }}</option>
                 @endforeach
             </select>
             <label class="vh" for="sev">تصفية بالشدّة</label>
-            <select class="inp" id="sev" name="sev" onchange="this.form.submit()">
+            <select class="inp" id="sev" name="sev" data-submit-on-change>
                 <option value="">كل الشدّات</option>
                 @foreach (\App\Support\Platform\Severity::LEVELS as $sfLv)
                     <option value="{{ $sfLv }}" @selected($sev === $sfLv)>{{ \App\Support\Platform\Severity::LABELS[$sfLv] }}</option>

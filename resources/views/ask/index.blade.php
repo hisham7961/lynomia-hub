@@ -50,7 +50,7 @@
             <span style="display:flex;gap:6px;flex-wrap:wrap">
                 @if ($thread)<a class="btn sm" href="{{ route('ask.index') }}">➕ محادثةٌ جديدة</a>@endif
                 @if ($threads->isNotEmpty())
-                    <form method="POST" action="{{ route('ask.forget') }}" onsubmit="return confirm('تُمحى كلُّ محادثاتك نهائيّاً — متابعة؟')">@csrf
+                    <form method="POST" action="{{ route('ask.forget') }}" data-confirm-native="تُمحى كلُّ محادثاتك نهائيّاً — متابعة؟">@csrf
                         <button class="btn sm">🗑️ امحُ كلَّ محادثاتي</button>
                     </form>
                 @endif
@@ -77,7 +77,7 @@
         <div class="card" data-ask-history>
             <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
                 <h3 style="margin:0">{{ $thread->title }}</h3>
-                <form method="POST" action="{{ route('ask.forget') }}" onsubmit="return confirm('تُمحى هذه المحادثة نهائيّاً — متابعة؟')">@csrf
+                <form method="POST" action="{{ route('ask.forget') }}" data-confirm-native="تُمحى هذه المحادثة نهائيّاً — متابعة؟">@csrf
                     <input type="hidden" name="thread" value="{{ $thread->id }}">
                     <button class="btn sm">🗑️ امحُ هذه المحادثة</button>
                 </form>
@@ -234,7 +234,7 @@
 @media (max-width:600px){#askform textarea{min-height:96px}}
 </style>
 
-<script>
+<script @cspNonce>
 /* حالةُ الانتظار: الضغطةُ الواحدةُ تكفي — وزرٌّ يُضغَط مرّتين يُنفق خطوتين.
    **وتقدّمُ القراءة** (المرحلة ٢): يُرسَل السؤالُ إلى ask/stream فتصل أسطرُ «يفكّر… · قرأ «المشاريع» — ١٢ صفّاً»
    أثناءَ العمل، والجوابُ **بعد مصادقة مراجعه** صفحةً كاملة. وأيُّ تعذّرٍ (متصفّحٌ قديم · انقطاع) يعود

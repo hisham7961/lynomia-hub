@@ -14,7 +14,7 @@
             @if (! is_array($qv))<input type="hidden" name="{{ $qk }}" value="{{ $qv }}">@endif
         @endforeach
         <label for="lens-p" style="font-weight:700">🔭 عدسة المشروع</label>
-        <select class="inp" id="lens-p" name="p" onchange="this.form.submit()" style="max-width:280px">
+        <select class="inp" id="lens-p" name="p" data-submit-on-change style="max-width:280px">
             <option value="">كل المنشأة</option>
             @foreach ($lensList as $lid => $lname)
                 <option value="{{ $lid }}" @selected(($lens['id'] ?? null) === $lid)>{{ $lname }}</option>

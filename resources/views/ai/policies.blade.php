@@ -88,7 +88,7 @@
                         <form method="POST" action="{{ route('ai.policies.toggle', $r) }}">@csrf
                             <button class="btn sm">{{ $r->enabled ? '⏸️ تعطيل' : '▶️ تفعيل' }}</button></form>
                         <form method="POST" action="{{ route('ai.policies.destroy', $r) }}"
-                              onsubmit="return confirm('إزالةُ السياسة «{{ $r->label }}»؟')">
+                              data-confirm-native="إزالةُ السياسة «{{ $r->label }}»؟">
                             @csrf @method('DELETE')
                             <button class="btn sm danger">🗑️ إزالة</button></form>
                     </div>

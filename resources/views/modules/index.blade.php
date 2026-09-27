@@ -105,7 +105,7 @@
                 <div class="sub" style="padding:4px 0">لا عروض محفوظة — رشّح وابحث وافرز ثم احفظ النتيجة باسم</div>
             @endforelse
             {{-- حقل الاستعلام يُملأ من العنوان لحظة الإرسال ليواكب البحث الحي المدفوع للعنوان --}}
-            <form method="POST" action="{{ route('views.store') }}" onsubmit="this.query.value=location.search.replace(/^\?/,'')"
+            <form method="POST" action="{{ route('views.store') }}" data-save-query
                   style="display:flex;gap:6px;align-items:center;margin-top:8px;border-top:1px solid var(--brd);padding-top:8px;flex-wrap:wrap">
                 @csrf
                 <input type="hidden" name="module" value="{{ $module }}">

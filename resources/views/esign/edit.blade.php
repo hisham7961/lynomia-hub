@@ -31,7 +31,7 @@
                 <span class="sub">{{ $s->role }}@if ($s->email) · <span class="mono ltr">{{ $s->email }}</span>@else · يدوي@endif</span>
                 <span class="spacer"></span>
                 <button class="btn ghost xs" type="button"
-                        onclick="navigator.clipboard.writeText(@js(route('sign.show', $s->token)));this.textContent='✓ نُسخ'">📋 نسخ رابطه</button>
+                        data-copy="{{ route('sign.show', $s->token) }}" data-copied="✓ نُسخ">📋 نسخ رابطه</button>
             </div>
             <div class="mono ltr sub" style="user-select:all;word-break:break-all;font-size:11px;padding:0 0 6px">{{ route('sign.show', $s->token) }}</div>
         @endforeach
@@ -57,7 +57,7 @@
                 <button class="btn p">💾 حفظ النص</button>
                 <a class="btn ghost" href="{{ route('esign.doc', $req->id) }}">👁 معاينة A4</a>
                 <button class="btn ghost" type="button"
-                        onclick="navigator.clipboard.writeText(@js(route('sign.show', $req->token)));this.textContent='✓ نُسخ الرابط'">📋 نسخ رابط العميل</button>
+                        data-copy="{{ route('sign.show', $req->token) }}" data-copied="✓ نُسخ الرابط">📋 نسخ رابط العميل</button>
             </div>
         </form>
     </div>

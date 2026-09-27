@@ -58,7 +58,7 @@
                         <form method="post" action="{{ route('endpoints.mdm.health', $c->id) }}" style="display:inline">@csrf<button class="btn sm ghost">فحص صحّة</button></form>
                         <form method="post" action="{{ route('endpoints.mdm.sync', $c->id) }}" style="display:inline">@csrf<button class="btn sm ghost">مزامنة</button></form>
                         <form method="post" action="{{ route('endpoints.mdm.delete', $c->id) }}" style="display:inline"
-                              onsubmit="return confirm('سحبُ وصلةِ {{ $c->provider }}؟')">@csrf<button class="btn sm danger">سحب</button></form>
+                              data-confirm-native="سحبُ وصلةِ {{ $c->provider }}؟">@csrf<button class="btn sm danger">سحب</button></form>
                     </td>
                 </tr>
             @endforeach

@@ -24,7 +24,7 @@
         {{-- Leaflet مُضمَّنٌ محلياً (v2.399): كان يُحمَّل من CDN بلا SRI ولا script-src — سكربتُ طرفٍ ثالث بأصل النظام --}}
         <link rel="stylesheet" href="{{ asset('vendor/leaflet/1.9.4/leaflet.min.css') }}">
         <script src="{{ asset('vendor/leaflet/1.9.4/leaflet.min.js') }}"></script>
-        <script nonce="{{ \App\Support\Security\ContentSecurity::nonce() }}">
+        <script @cspNonce>
         (function () {
             var line = @json($line);
             if (!window.L || line.length < 2) return;

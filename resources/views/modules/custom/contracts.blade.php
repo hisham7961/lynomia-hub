@@ -176,7 +176,7 @@
         @endif
     </div>
 </div>
-<script>
+<script @cspNonce>
 (function () {
     var tabs = [].slice.call(document.querySelectorAll('#cworkspace .cwtabs button'));
     function activate(b) {

@@ -9,7 +9,7 @@
      لا يصطدم بسقف الطلب الواحد، و`kb` سقفُ النظام النهائي. بالكيلوبايت. --}}
 @php $upc = hub_upload_cap(); @endphp
 <meta name="hub-upload" content="{{ $upc['kb'] }},{{ $upc['chunkAt'] }},{{ $upc['appKb'] }}">
-<script nonce="{{ \App\Support\Security\ContentSecurity::nonce() }}">(function(){var t=localStorage.getItem('lyn_theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.dataset.theme='dark'})()</script>
+<script @cspNonce>(function(){var t=localStorage.getItem('lyn_theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.dataset.theme='dark'})()</script>
 <title>@yield('title', 'لوحة التحكم') — {{ setting('app.name', config('app.name')) }}</title>
 <link href="{{ asset('css/fonts.css') }}?v={{ config('hub.version') }}" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ config('hub.version') }}">
@@ -35,10 +35,10 @@
 @endif
 <div class="shell">
     @include('partials.sidebar')
-    <div class="overlay" onclick="document.body.classList.remove('nav')"></div>
+    <div class="overlay" data-body-remove="nav"></div>
     <main class="main">
         <header class="topbar">
-            <button class="menubtn" type="button" onclick="document.body.classList.toggle('nav')" aria-label="القائمة">☰</button>
+            <button class="menubtn" type="button" data-body-toggle="nav" aria-label="القائمة">☰</button>
             <div class="crumb">@yield('title', 'لوحة التحكم')</div>
             {{-- البحث هو لوحة أوامر النظام: تركيزٌ يعرض الوجهات فوراً، وكتابةٌ تبحث في كل شيء --}}
             <div class="gsearch">
@@ -66,7 +66,7 @@
                     <form method="POST" action="{{ route('company.switch') }}" class="inline">
                         @csrf
                         <label class="vh" for="cosw">الشركة النشطة — تصفّي القوائم عليها</label>
-                        <select class="inp" id="cosw" name="company" onchange="this.form.submit()" style="max-width:150px;font-size:12.5px">
+                        <select class="inp" id="cosw" name="company" data-submit-on-change style="max-width:150px;font-size:12.5px">
                             <option value="">🏢 كل الشركات</option>
                             @foreach ($hubCos as $cid => $cn)<option value="{{ $cid }}" @selected(session('hub.company') === $cid)>{{ \Illuminate\Support\Str::limit($cn, 22) }}</option>@endforeach
                         </select>
@@ -109,7 +109,7 @@
                     <form method="POST" action="{{ route('client.switch') }}" class="inline">
                         @csrf
                         <label class="vh" for="klsw">مساحة العمل — داخلية أو لعميل</label>
-                        <select class="inp" id="klsw" name="client" onchange="this.form.submit()" style="max-width:150px;font-size:12.5px">
+                        <select class="inp" id="klsw" name="client" data-submit-on-change style="max-width:150px;font-size:12.5px">
                             <option value="">🏠 لينوميا الداخلية</option>
                             @foreach ($hubClients as $kid => $kn)<option value="{{ $kid }}" @selected(session('hub.client') === $kid)>👤 {{ \Illuminate\Support\Str::limit($kn, 20) }}</option>@endforeach
                         </select>
@@ -123,7 +123,7 @@
                         hx-get="{{ route('notifications.mini') }}" hx-target="#bellbox" hx-swap="innerHTML">🔔<span id="bellbadge">@php $nbc = \App\Models\HubNotification::where('user_id', auth()->id())->where('read', false)->count(); @endphp@if($nbc)<span class="nbdg">{{ $nbc }}</span>@endif</span></button>
                 <div id="bellbox" class="gsr"></div>
             </div>
-            <button class="btn ghost sm" type="button" onclick="Hub.theme()" title="الوضع الليلي" aria-label="تبديل الوضع الليلي">🌓</button>
+            <button class="btn ghost sm" type="button" data-theme-toggle title="الوضع الليلي" aria-label="تبديل الوضع الليلي">🌓</button>
             <div class="userbox">
                 <a href="{{ route('profile.edit') }}" title="ملفي الشخصي" style="display:flex;gap:10px;align-items:center;color:inherit">
                     <span class="ava">{{ mb_substr(auth()->user()->name, 0, 1) }}</span>
@@ -202,7 +202,7 @@
                     <div style="display:flex;gap:8px;justify-content:center;margin-top:14px">
                         <a class="btn" href="{{ route('profile.edit') }}">🔑 تغيير كلمة السر</a>
                         <button class="btn ghost" type="button"
-                                onclick="document.getElementById('secwarn').remove()">هذا أنا — متابعة</button>
+                                data-remove-target="#secwarn">هذا أنا — متابعة</button>
                     </div>
                 </div>
             </div>
@@ -212,11 +212,12 @@
 </div>
 <div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-label="نافذة حوارية">
     <div class="modalbox">
-        <button class="mclose" type="button" onclick="Hub.closeModal()" aria-label="إغلاق">✕</button>
+        <button class="mclose" type="button" data-close-modal aria-label="إغلاق">✕</button>
         <div id="modalbody"></div>
     </div>
 </div>
 {{-- لوحة ⌘K أُزيلت: البحث الشامل في الشريط العلوي صار الطريق الواحد لكل شيء --}}
+<script src="{{ asset('js/actions.js') }}?v={{ config('hub.version') }}"></script>
 <script src="{{ asset('js/htmx.min.js') }}?v={{ config('hub.version') }}"></script>
 <script src="{{ asset('js/app.js') }}?v={{ config('hub.version') }}"></script>
 </body>

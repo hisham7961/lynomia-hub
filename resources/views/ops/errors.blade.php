@@ -86,30 +86,30 @@
         <label class="vh" for="fq">بحث</label>
         <input class="inp" id="fq" name="q" value="{{ $q }}" placeholder="🔎 ابحث في الرسالة أو الملف أو الرابط" style="max-width:260px">
         <label class="vh" for="fst">تصفية بالحالة</label>
-        <select class="inp" id="fst" name="st" onchange="this.form.submit()">
+        <select class="inp" id="fst" name="st" data-submit-on-change>
             <option value="">كل الحالات</option>
             {{-- (WP-3.3) الحالاتُ الخمس من خريطة IssueState (الطور ١) — القيمةُ هي التسمية المخزَّنة فتُطابَق الصفوفُ الموروثة كما هي --}}
             @foreach (\App\Support\Platform\IssueState::MAP as $s)<option @selected($st === $s)>{{ $s }}</option>@endforeach
         </select>
         <label class="vh" for="fk">تصفية بالنوع</label>
-        <select class="inp" id="fk" name="k" onchange="this.form.submit()">
+        <select class="inp" id="fk" name="k" data-submit-on-change>
             <option value="">كل الأنواع</option>
             @foreach (['php' => 'PHP', 'api' => 'API', 'js' => 'متصفح', 'slow' => 'بطيء'] as $kk => $kl)<option value="{{ $kk }}" @selected($k === $kk)>{{ $kl }}</option>@endforeach
         </select>
         @if ($taxonomy)
             <label class="vh" for="fcat">تصفية بالصنف</label>
-            <select class="inp" id="fcat" name="cat" onchange="this.form.submit()">
+            <select class="inp" id="fcat" name="cat" data-submit-on-change>
                 <option value="">كل الأصناف</option>
                 @foreach (\App\Support\Ops\ErrorTaxonomy::CATEGORIES as $c)<option value="{{ $c }}" @selected($cat === $c)>{{ \App\Support\Ops\ErrorTaxonomy::LABELS[$c] ?? $c }}</option>@endforeach
             </select>
             <label class="vh" for="fsev">تصفية بالشدّة</label>
-            <select class="inp" id="fsev" name="sev" onchange="this.form.submit()">
+            <select class="inp" id="fsev" name="sev" data-submit-on-change>
                 <option value="">كل الشدّات</option>
                 @foreach (\App\Support\Ops\ErrorTaxonomy::SEVERITIES as $sv)<option value="{{ $sv }}" @selected($sev === $sv)>{{ \App\Support\Ops\ErrorTaxonomy::LABELS[$sv] ?? $sv }}@if (isset($bySeverity[$sv])) ({{ $bySeverity[$sv] }})@endif</option>@endforeach
             </select>
         @endif
         <label class="vh" for="fsort">الترتيب</label>
-        <select class="inp" id="fsort" name="sort" onchange="this.form.submit()">
+        <select class="inp" id="fsort" name="sort" data-submit-on-change>
             <option value="last_seen" @selected($sort === 'last_seen')>الأحدث ظهوراً</option>
             <option value="count" @selected($sort === 'count')>الأكثر تكراراً</option>
         </select>

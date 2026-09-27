@@ -92,7 +92,7 @@
     @elseif ($t === 'file' || $t === 'img')
         <label class="filefield">
             <input type="file" name="{{ $k }}" data-empty="لم يُحدَّد ملف"
-                onchange="var n=this.parentNode.querySelector('.filename');n.textContent=this.files&&this.files.length?this.files[0].name:this.dataset.empty">
+                data-file-name>
             <span class="filebtn">📎 اختر ملفاً</span>
             <span class="filename">لم يُحدَّد ملف</span>
         </label>

@@ -12,7 +12,7 @@
 <div style="max-width:820px;margin:0 auto">
     <div class="noprint" style="display:flex;gap:8px;margin-bottom:12px">
         @unless ($client ?? false)<a class="btn ghost sm" href="{{ route('esign.index') }}">→ رجوع</a>@endunless
-        <button class="btn sm" onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+        <button class="btn sm" data-print>🖨️ طباعة / حفظ PDF</button>
     </div>
     <div class="card">
         <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border-bottom:2px solid var(--ln);padding-bottom:12px;margin-bottom:14px">

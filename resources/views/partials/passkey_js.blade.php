@@ -1,5 +1,5 @@
 {{-- مساعدُ مفاتيح المرور (WebAuthn) — يُضمَّن حيث تلزم أزرارُه --}}
-<script>
+<script @cspNonce>
 window.LynPasskey = (function () {
     const CSRF = '{{ csrf_token() }}';
     function b64uToBuf(s) {

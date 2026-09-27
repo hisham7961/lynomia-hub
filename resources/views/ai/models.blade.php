@@ -178,7 +178,7 @@
                      فزرٌّ غائبٌ يُقرَأ «لا يمكن أبداً»، والحقيقةُ «ليس قبل أن تفكّ كذا». --}}
                 @if ($deps['removable'])
                     <form method="POST" action="{{ route('ai.models.destroy', $m) }}"
-                          onsubmit="return confirm('يُلغى نشرُ النموذجِ عند البوّابةِ ثمّ يُزال من Hub. أتتابع؟')">
+                          data-confirm-native="يُلغى نشرُ النموذجِ عند البوّابةِ ثمّ يُزال من Hub. أتتابع؟">
                         @csrf @method('DELETE')
                         <button class="btn sm danger">🗑️ إزالة</button>
                     </form>

@@ -16,7 +16,7 @@
     <div style="display:flex;gap:8px;flex-wrap:wrap">
         <form class="filters" method="GET">
             <label class="vh" for="fd">المدى</label>
-            <select class="inp" id="fd" name="d" onchange="this.form.submit()">
+            <select class="inp" id="fd" name="d" data-submit-on-change>
                 @foreach ([7 => 'أسبوع', 30 => 'شهر', 90 => '٣ أشهر', 365 => 'سنة'] as $dv => $dl)
                     <option value="{{ $dv }}" @selected($days === $dv)>{{ $dl }}</option>
                 @endforeach

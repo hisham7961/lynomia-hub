@@ -75,7 +75,7 @@
         <div class="crow" style="margin-top:10px">
             <form method="POST" action="{{ route('hooks.toggle', $h->id) }}">@csrf
                 <button class="btn ghost xs">{{ $h->enabled ? '⏸ إيقاف' : '▶ تفعيل' }}</button></form>
-            <form method="POST" action="{{ route('hooks.destroy', $h->id) }}" onsubmit="return confirm('حذفُ النقطة وسجلّها؟')">
+            <form method="POST" action="{{ route('hooks.destroy', $h->id) }}" data-confirm-native="حذفُ النقطة وسجلّها؟">
                 @csrf @method('DELETE')
                 <button class="btn ghost xs danger">🗑 حذف</button></form>
         </div>

@@ -57,7 +57,7 @@
             </ul>
         </nav>
         <div class="cportal-me">
-            <button class="btn ghost sm" type="button" onclick="Hub.theme()" title="الوضع الليلي" aria-label="تبديل الوضع الليلي">🌓</button>
+            <button class="btn ghost sm" type="button" data-theme-toggle title="الوضع الليلي" aria-label="تبديل الوضع الليلي">🌓</button>
             <a class="btn ghost sm" href="{{ route('profile.edit') }}" title="حسابي">⚙️ حسابي</a>
             <form method="POST" action="{{ route('logout') }}">@csrf<button class="btn ghost sm" type="submit">خروج</button></form>
         </div>
@@ -67,6 +67,7 @@
         @yield('content')
     </main>
 </div>
+<script src="{{ asset('js/actions.js') }}?v={{ config('hub.version') }}"></script>
 <script src="{{ asset('js/app.js') }}?v={{ config('hub.version') }}"></script>
 </body>
 </html>

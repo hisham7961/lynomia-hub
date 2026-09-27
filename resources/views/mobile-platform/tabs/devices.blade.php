@@ -72,7 +72,7 @@
             </table>
             @unless ($session->revoked_at)
                 <form method="POST" action="{{ route('mobileplatform.session.revoke', $session->id) }}"
-                      onsubmit="return confirm('إبطالُ هذه الجلسة؟ يخرج جهازُها عند أول طلب.')" style="margin-top:10px">@csrf
+                      data-confirm-native="إبطالُ هذه الجلسة؟ يخرج جهازُها عند أول طلب." style="margin-top:10px">@csrf
                     <button type="submit" class="btn p sm">🔌 إبطالُ الجلسة</button>
                 </form>
             @endunless

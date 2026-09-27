@@ -22,7 +22,7 @@
         @endif
         @if ($lvAb['reject'])
             <button class="btn danger" name="decision" value="reject"
-                    onclick="return this.form.note.value.trim() ? true : (this.form.note.focus(), alert('اكتب سبب الرفض — يقرؤه صاحب الطلب'), false)">❌ رفض</button>
+                    data-require-field="note" data-require-msg="اكتب سبب الرفض — يقرؤه صاحب الطلب">❌ رفض</button>
         @endif
     </form>
     @error('note')<div class="sub" style="color:var(--bad,#b91c1c)">{{ $message }}</div>@enderror

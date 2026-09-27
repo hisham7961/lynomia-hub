@@ -77,7 +77,7 @@
         </div>
     @endif
 </div>
-<script>
+<script @cspNonce>
 (function () {
     var c = document.getElementById('pad'); if (!c) return;
     var ctx = c.getContext('2d'), drawing = false, drew = false;

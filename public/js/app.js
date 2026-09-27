@@ -164,6 +164,20 @@
     document.close();
   }
 
+  /* **المستندُ المكتوب يرث سياسةَ الصفحة الحاليّة لا سياسةَ ردّه** (بند الدَّين #12):
+     `document.open()` يُبقي CSP المستندِ القائم، والمستندُ العائدُ يحمل nonce طلبِه هو —
+     فتُحجب سكربتاتُه المضمَّنة كلُّها. يُستبدل **nonce الردّ وحده** (المقروءُ من ترويسة
+     الردّ نفسه) بـnonce هذه الصفحة؛ وسكربتٌ محقونٌ بلا ذلك الـnonce يبقى محجوباً كما كان. */
+  function renonce(html, xhr) {
+    var hdr = (xhr.getResponseHeader('Content-Security-Policy') || '') + ' '
+      + (xhr.getResponseHeader('Content-Security-Policy-Report-Only') || '');
+    var m = /'nonce-([A-Za-z0-9+\/=]+)'/.exec(hdr);
+    var own = document.querySelector('script[nonce]');
+    var cur = own ? (own.nonce || own.getAttribute('nonce')) : '';
+    if (!m || !cur || m[1] === cur) return html;
+    return html.split('nonce="' + m[1] + '"').join('nonce="' + cur + '"');
+  }
+
   /* رفعُ ملفٍ واحدٍ **مقطَّعاً**: قطعٌ أصغرُ من سقف الطلب الواحد، بالترتيب.
      يُعيد وعداً برمزٍ يُستهلك في النموذج. onbit(bytes) للتقدّم التراكمي. */
   function chunkUpload(file, chunkBytes, onbit) {
@@ -302,7 +316,7 @@
         if (landed && absUrl(landed) === absUrl(sentTo)
             && ctype.indexOf('text/html') > -1 && xhr.responseText) {
           /* وإن تعذّرت الكتابةُ محلَّه لسببٍ ما فلا تُترك الصفحةُ جامدة */
-          try { writeDocument(xhr.responseText, landed); return; } catch (e) {}
+          try { writeDocument(renonce(xhr.responseText, xhr), landed); return; } catch (e) {}
         }
         window.location = landed || location.href;
         return;

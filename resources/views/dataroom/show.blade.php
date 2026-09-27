@@ -4,6 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>{{ $link->title }} — {{ setting('app.name', config('app.name')) }}</title>
+<script src="{{ asset('js/actions.js') }}?v={{ config('hub.version') }}" defer></script>
 <link href="{{ asset('css/fonts.css') }}?v={{ config('hub.version') }}" rel="stylesheet">
 <link rel="stylesheet" href="{{ asset('css/app.css') }}?v={{ config('hub.version') }}">
 <style>
@@ -16,7 +17,7 @@
 .wm span{transform:rotate(-28deg);font-size:15px;font-weight:800;white-space:nowrap;color:var(--tx);padding:34px 20px}
 </style>
 </head>
-<body class="loginbg" @if ($link->no_download) oncontextmenu="return false" @endif>
+<body class="loginbg" @if ($link->no_download) data-no-contextmenu @endif>
 <div class="dr">
     <div class="drhead">
         <h2 style="margin:0">📄 {{ $link->title }}</h2>

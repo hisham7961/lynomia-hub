@@ -81,8 +81,7 @@
                 {{-- البريدُ والدورُ شرطان: يُطلبان **عند وضع العلامة** لا بعد الحفظ.
                      وكان الطلب يُبتلع صامتاً فيُحفظ الموظف بلا حسابه ولا سبب --}}
                 <label class="chk">
-                    <input type="checkbox" name="_make_account" value="1" id="mkacct"
-                           onchange="hubAcct(this.checked)">
+                    <input type="checkbox" name="_make_account" value="1" id="mkacct">
                     🔑 <b>افتح له حساب نظام كذلك</b> — بكلمة مرورٍ مؤقتة تُعرض مرةً واحدة، يُلزَم بتبديلها عند أول دخول.
                 </label>
                 <div class="sub" style="margin-top:4px">
@@ -91,7 +90,7 @@
                 <div class="ferr" id="acctneed" style="display:none;margin-top:4px">
                     ⚠️ البريد الإلكتروني مطلوبٌ لفتح الحساب — البريد هو هوية الدخول.
                 </div>
-                <script>
+                <script @cspNonce>
                 function hubAcct(on) {
                     document.getElementById('acctrole').style.display = on ? '' : 'none';
                     var em = document.querySelector('[name="email"]');
@@ -103,6 +102,8 @@
                         (on && em && !em.value.trim()) ? '' : 'none';
                     if (on && em && !em.value.trim()) em.focus();
                 }
+                // مستمِعٌ لا سمةُ onchange — السياسةُ الصارمة (script-src-attr 'none') تحجب السمات
+                document.getElementById('mkacct').addEventListener('change', function () { hubAcct(this.checked); });
                 </script>
                 <div id="acctrole" style="display:none;margin-top:8px;max-width:320px">
                     <label for="acct-role">دور الحساب</label>
@@ -129,7 +130,7 @@
                 <button class="btn" type="submit" name="_stay" value="1">حفظ وإضافة آخر</button>
             @endunless
             @if ($hx)
-                <button class="btn ghost" type="button" onclick="Hub.closeModal()">إلغاء</button>
+                <button class="btn ghost" type="button" data-close-modal>إلغاء</button>
             @else
                 {{-- الإلغاءُ في التعديل يُحرِّر قفلَ تحريرك (DI-09) --}}
                 <a class="btn ghost" href="{{ $updating ? route('m.index', [$module, '_unlock' => $row->id]) : route('m.index', $module) }}">إلغاء</a>
