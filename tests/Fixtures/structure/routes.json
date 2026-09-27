@@ -3696,6 +3696,17 @@
         ]
     },
     {
+        "methods": "POST",
+        "uri": "custody/cat/{code}/insight",
+        "name": "custody.insight",
+        "action": "App\\Http\\Controllers\\Web\\CustodyController@refreshInsight",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:4,1"
+        ]
+    },
+    {
         "methods": "GET|HEAD",
         "uri": "custody/{id}/label",
         "name": "custody.label",
