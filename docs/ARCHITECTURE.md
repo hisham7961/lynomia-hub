@@ -132,6 +132,9 @@ Exception → bootstrap/app.php → Api::render (api/*) | صفحةُ خطأ عر
 | أمراً مجدولاً | `Schedule::command(...)->withoutOverlapping()->onFailure(fn () => hub_schedule_failed(...))` + `Health::beat('<job>')` + مدخلٌ في `Health::JOBS` |
 | إعداداً | `config/hub_settings.php` (مدخلٌ أو إعلانٌ داخليّ) — يحرسه `SettingsCenterTest` |
 | خطأً للعميل | `Api::abort(code, status, message)` أو `abort(<code>)` مع صفحةٍ عربية في `errors/` |
+| قيدَ يوميةٍ مرحَّلاً (آليّاً أو يدويّاً) | `JournalPosting::postBalanced($entry, $lines, ['module','id','key'])` — التوازنُ بالملّيمات، ورابطُ المصدر الفريد، والرقمُ، وقيدُ «ترحيل قيد»؛ لا `JournalEntry::create` مرحَّلاً مباشرةً (يحرسه `JournalPostingUnifiedTest`) |
+| إقراراً على سجلّ («قرأتُ/استلمتُ/اعتمدتُ») | مدخلٌ في `config/hub_acks.php` (`store` = `record_acks` أو `policy_acks`) والكتابةُ عبر `Acknowledgement::acknowledge()` — لا كتابةَ مباشرةً في الجدولين (يحرسه `AcknowledgementUnifiedTest`) |
+| قبولَ عرض سعر | `QuoteAcceptance::accept()` (الويبُ والتوقيعُ بابان له) |
 
 ## ٩) الثوابت (لا تُخالف)
 

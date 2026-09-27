@@ -31,9 +31,9 @@ class JournalEntry extends Model
     ];
 
     /**
-     * مولِّدٌ داخليّ موثوق يبني قيداً مرحَّلاً ثمّ سطورَه (قيدُ الدفعة الآليّ في
-     * `FinController::pay` وقيدُ الرواتب) — يرفع الرايةَ حول كتلته فقط، على نمط
-     * `StockMove::$posting`. لا يرفعها مسارُ مستخدمٍ أبداً.
+     * المحرّكُ الواحد `JournalPosting::postBalanced` يبني قيداً مرحَّلاً ثمّ سطورَه بعد
+     * فحصها بنفسه — يرفع الرايةَ حول كتلته فقط، على نمط `StockMove::$posting`. لا يرفعها
+     * مسارُ مستخدمٍ أبداً.
      */
     public static bool $posting = false;
 
@@ -60,19 +60,21 @@ class JournalEntry extends Model
         static::updating($guard);
         static::deleting($guard);
 
+        // حارسُ الدخول إلى «مرحّل» من المحرّك الواحد (TECH_DEBT #29 · `JournalPosting::guard`):
+        // توازنٌ بالملّيمات لا بالعائم، وختمُ الترحيل بوقته وفاعله — على كلّ بابٍ غيرِ آليّ.
         static::saving(function (self $m) {
-            if (static::$posting) return;                      // المولّد الداخلي يبني سطورَه بعدُ
-            if ($m->state !== 'مرحّل' || $m->getOriginal('state') === 'مرحّل') return;
+            if (static::$posting) return;                      // المحرّكُ الآليّ فحص سطورَه قبل كتابتها
+            if ($m->state !== \App\Support\Finance\JournalPosting::STATE
+                || $m->getOriginal('state') === \App\Support\Finance\JournalPosting::STATE) return;
 
-            $sum = \App\Models\JournalLine::where('entry_id', $m->getKey())
-                ->selectRaw('COALESCE(SUM(debit),0) d, COALESCE(SUM(credit),0) c')->first();
-            $debit = round((float) ($sum->d ?? 0), 3);
-            $credit = round((float) ($sum->c ?? 0), 3);
+            \App\Support\Finance\JournalPosting::guard($m);
+        });
 
-            if ($debit <= 0 || $debit !== $credit) {
-                throw \Illuminate\Validation\ValidationException::withMessages(['state' =>
-                    'لا يُرحَّل قيدٌ لا يوازن: مدين ' . number_format($debit, 3)
-                    . ' ≠ دائن ' . number_format($credit, 3) . ' — أضف سطورَه أولاً']);
+        // وقيدُ التدقيق الواحد «ترحيل قيد» بعد الحفظ — الزرُّ والنموذجُ العامّ والـAPI سواء
+        static::saved(function (self $m) {
+            if (static::$posting) return;
+            if ($m->state === \App\Support\Finance\JournalPosting::STATE && $m->wasChanged('state')) {
+                \App\Support\Finance\JournalPosting::audit($m);
             }
         });
     }

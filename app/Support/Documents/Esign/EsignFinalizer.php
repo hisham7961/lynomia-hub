@@ -123,34 +123,31 @@ final class EsignFinalizer
                     hub_audit('اعتماد موافقة بالتوقيع الإلكتروني', 'approvals', $ap->id, $ap->title);
                 }
             } elseif ($req->link_module === 'policies') {
+                // **إقرارُ السياسة بالتوقيع من البابِ الواحد** (TECH_DEBT #29 · `Acknowledgement`):
+                // الموظفُ المُقِرّ يُحلّ من بريد الموقّع (سجلُّ امتثالٍ بلا صاحبٍ لا يُدقَّق) — فيُتَمّ
+                // إقرارُه المعلّقُ نفسُه لا صفٌّ ثانٍ، ولا يُدهَس إقرارٌ سابق؛ والموقّعُ بلا حسابٍ
+                // يُقرّ بصفٍّ مربوطٍ بالمظروف. وقيدُ التدقيق بالشكل الواحد على السياسة.
                 $pol = \App\Models\Policy::find($req->link_id);
                 if ($pol) {
-                    // الموظف المُقِر يُحل من بريد الموقّع — سجل امتثال بلا صاحب لا يُدقَّق
                     $signerEmail = \App\Models\ContractSigner::where('request_id', $req->id)
-                        ->where('role', 'موقّع')->whereNotNull('email')->value('email');
-                    \App\Models\PolicyAck::create([
-                        'title' => $pol->title . ' — ' . $signer,
-                        'policy_id' => $pol->id, 'ver' => $pol->ver,
-                        'user_id' => $signerEmail
-                            ? \App\Models\User::whereNull('deleted_at')->where('email', $signerEmail)->value('id')
-                            : null,
-                        'ack_at' => now(), 'ip' => $r->ip(),
-                        'device' => substr((string) $r->userAgent(), 0, 190),
-                        'status' => 'مُقرّة',
-                        'notes' => 'إقرار موقّع إلكترونياً — رمز التحقق ' . $req->verify_code,
-                    ]);
-                    \App\Support\Documents\Esign\EsignFinalizer::notifyOwners('📜 وُثّق إقرار «' . $pol->title . '» بتوقيع ' . $signer);
-                    hub_audit('إقرار سياسة بالتوقيع الإلكتروني', 'policies', $pol->id, $pol->title . ' — ' . $signer);
+                        ->where('role', 'موقّع')->whereNotNull('email')->orderBy('id')->value('email');
+                    $uid = $signerEmail
+                        ? \App\Models\User::whereNull('deleted_at')->where('email', $signerEmail)->orderBy('id')->value('id')
+                        : null;
+                    $res = \App\Support\Collaboration\Acknowledgement::acknowledge('policies', $pol, $uid ? (string) $uid : null,
+                        \App\Support\Collaboration\Acknowledgement::esignEvidence($req, $signer)
+                        + ['title' => $pol->title . ' — ' . $signer, 'ip' => $r->ip(), 'device' => (string) $r->userAgent()]);
+                    if ($res['created']) {
+                        \App\Support\Documents\Esign\EsignFinalizer::notifyOwners('📜 وُثّق إقرار «' . $pol->title . '» بتوقيع ' . $signer);
+                    }
                 }
             } elseif ($req->link_module === 'policyacks') {
+                // صفُّ إقرارٍ معلّقٍ بعينه يُتَمّ بأدلّة التوقيع — من البابِ الواحد نفسِه
                 $ack = \App\Models\PolicyAck::find($req->link_id);
-                if ($ack && $ack->status !== 'مُقرّة') {
-                    $ack->forceFill(['status' => 'مُقرّة', 'ack_at' => now(), 'ip' => $r->ip(),
-                        'device' => substr((string) $r->userAgent(), 0, 190),
-                        'notes' => trim(($ack->notes ? $ack->notes . "\n" : '')
-                            . 'وُقّع إلكترونياً بواسطة ' . $signer . ' — رمز التحقق ' . $req->verify_code),
-                    ])->save();
-                    hub_audit('إتمام إقرار سياسة بالتوقيع الإلكتروني', 'policyacks', $ack->id, (string) $ack->title);
+                if ($ack) {
+                    \App\Support\Collaboration\Acknowledgement::completePending($ack,
+                        \App\Support\Collaboration\Acknowledgement::esignEvidence($req, $signer)
+                        + ['ip' => $r->ip(), 'device' => (string) $r->userAgent()]);
                 }
             } elseif ($req->link_module === 'decisions') {
                 hub_audit('توثيق قرار بتوقيع إلكتروني', 'decisions', $req->link_id, $req->title . ' — ' . $signer);

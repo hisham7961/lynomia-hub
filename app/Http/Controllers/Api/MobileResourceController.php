@@ -301,7 +301,9 @@ class MobileResourceController extends V1Controller
             }
         }
 
-        if (isset(hub_ack_modules()[$module]) && hub_can($u, $module, 'v')) {
+        // «إقرار» لمن يُقرّ فعلاً — القاعدةُ من الباب الواحد (`Acknowledgement::denial`) لا عرضٌ لا يُنفَّذ
+        if (isset(hub_ack_modules()[$module]) && hub_can($u, $module, 'v')
+            && \App\Support\Collaboration\Acknowledgement::denial($module, $m, (string) $u->id) === null) {
             $actions[] = ['action' => 'ack', 'label' => 'إقرار'];
         }
 
@@ -435,10 +437,14 @@ class MobileResourceController extends V1Controller
         }
     }
 
-    /** إقرارٌ موثَّق (سياسات/معرفة) — السكّةُ المشتركة `hub_ack_do` (تُدقّق + تُنطّق + تختم النسخة) */
+    /** إقرارٌ موثَّق (سياسات/معرفة) — السكّةُ المشتركة `hub_ack_do` ⟵ `Acknowledgement` (تُدقّق + تُنطّق + تختم النسخة) */
     private function doAck(string $module, Model $m, Request $r): \Symfony\Component\HttpFoundation\Response
     {
         if ($resp = $this->requireStepUp($module, 'ack', $r)) return $resp;
+        // مَن يُقرّ — القاعدةُ من الباب الواحد نفسِه (الويبُ يردّها 403 كذلك)
+        if ($why = \App\Support\Collaboration\Acknowledgement::denial($module, $m, (string) $r->user()->id)) {
+            return Api::error(Api::FORBIDDEN, 403, $why);
+        }
 
         $gate = $this->idempotentBegin($r);
         if ($gate instanceof \Symfony\Component\HttpFoundation\Response) return $gate;

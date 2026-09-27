@@ -7,15 +7,16 @@ use App\Models\JournalEntry;
 use App\Models\JournalLine;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use App\Support\Finance\JournalPostingService;
+use App\Support\Finance\JournalPosting;
 use App\Support\Platform\FlowRunner;
 
 /**
  * خدمةُ ترحيلِ العهدة المالية (Work OS · الطور E · WP-E.2 · §21a/b).
  *
  * **تُرحِّل في الدفتر الوحيد لا في دفترٍ ثانٍ:** لا نسخةً ثالثةً من منطق الترحيل —
- * القيدُ المحاسبيُّ المتوازن يُبنى عبر `JournalPostingService::postBalanced`
- * المشترَكة نفسِها التي يستهلكها الترحيلُ الماليّ والرواتب. هذه الخدمةُ تُضيف فوقها
+ * القيدُ المحاسبيُّ المتوازن يُبنى عبر المحرّك الواحد `JournalPosting::postBalanced`
+ * نفسِه الذي يستهلكه الترحيلُ الماليّ والرواتب (TECH_DEBT #29) — وبرابط المصدر
+ * `(custody, move_id, move|reversal)` فوق حاجزَي الحركة أدناه. هذه الخدمةُ تُضيف فوقها
  * خصوصيّةَ العهدة: سطرُ حسابِ العهدة (رمزُ `finance.accounts.custody`) مقابلَ
  * طرفٍ نقديٍّ/مصروفيّ، واتّجاهُ المدين/الدائن من إشارة الحركة.
  *
@@ -33,11 +34,6 @@ use App\Support\Platform\FlowRunner;
  */
 class CustodyPostingService
 {
-    public function __construct(private ?JournalPostingService $journal = null)
-    {
-        $this->journal = $journal ?: new JournalPostingService();
-    }
-
     /**
      * يُنشئ حركةَ عهدةٍ من مصدرٍ ويُرحّلها — idempotent ومُسلسَل. يعيد الحركةَ
      * (القائمةَ إن سبق ترحيلُ المصدر نفسِه) فلا حركتان ولا قيدان لمصدرٍ واحد.
@@ -136,7 +132,7 @@ class CustodyPostingService
      */
     private function reverseEntry(EmployeeCustodyMove $orig): ?JournalEntry
     {
-        if (! $this->journal->enabled() || $orig->entry_id === null) return null;
+        if (! JournalPosting::enabled() || $orig->entry_id === null) return null;
 
         // ترتيبٌ حتميٌّ بـid (C13) — لا قرعةَ في مطابقة سطرِ المرآة بسطرِ الأصل
         $lines = JournalLine::where('entry_id', $orig->entry_id)->orderBy('id')->get();
@@ -150,9 +146,8 @@ class CustodyPostingService
             'memo'   => 'عكسُ: ' . (string) $l->memo,
         ])->all();
 
-        return $this->journal->postBalanced([
-            'doc_no' => hub_fit('JE-CUST-REV-' . substr((string) $orig->id, 0, 8) . '-' . now()->format('His'),
-                hub_col_max('journal_entries', 'doc_no') ?? 300),
+        return JournalPosting::postBalanced([
+            'doc_no' => 'JE-CUST-REV-' . substr((string) $orig->id, 0, 8) . '-' . now()->format('His'),
             'date' => now()->toDateString(),
             'description' => 'عكسُ حركةِ عهدة: ' . $orig->kind,
             'reference' => 'CUST-REV-' . substr((string) $orig->id, 0, 8),
@@ -161,7 +156,7 @@ class CustodyPostingService
             'company_id' => $orig->company_id,
             'meta' => ['posted_at' => now()->toIso8601String(), 'auto' => 'custody',
                        'reverses_entry_id' => $orig->entry_id, 'reverses_move_id' => $orig->id],
-        ], $mirror);
+        ], $mirror, ['module' => EmployeeCustodyMove::MODULE, 'id' => $orig->id, 'key' => 'reversal']);
     }
 
     /**
@@ -176,19 +171,19 @@ class CustodyPostingService
      */
     private function postEntry(string $moveId, array $s): ?JournalEntry
     {
-        if (! $this->journal->enabled()) return null;
+        if (! JournalPosting::enabled()) return null;
 
-        $map = $this->journal->accountsMap();
+        $map = JournalPosting::accountsMap();
         $companyId = $s['company_id'] ?? null;
 
-        $custodyAcc = $this->journal->resolveAccount((string) ($map['custody'] ?? ''), $companyId);
+        $custodyAcc = JournalPosting::resolveAccount((string) ($map['custody'] ?? ''), $companyId);
 
         // الطرفُ المقابل: صراحةً إن مُرِّر، وإلا يُشتقّ من النوع (المصروفُ يقابله حسابُ
         // المصروف، وما عداه النقدُ — البنكُ ثمّ الصندوقُ احتياطاً كنمطِ الرواتب).
         $counterCode = $s['counterpart'] ?? (in_array($s['kind'], ['expense', 'deduction', 'settlement'], true)
             ? ($map['exp'] ?? null)
             : (($map['bank'] ?? null) ?: ($map['cash'] ?? null)));
-        $counterAcc = $this->journal->resolveAccount(
+        $counterAcc = JournalPosting::resolveAccount(
             $counterCode !== null ? (string) $counterCode : null, $companyId);
 
         if (! $custodyAcc || ! $counterAcc) return null;   // خريطةٌ ناقصة — لا قيد أعرج
@@ -197,10 +192,9 @@ class CustodyPostingService
         $custodyDebit = ((int) $s['sign']) > 0;   // +1 → مدين العهدة (أصلٌ يزيد) · -1 → دائنها
         $cc = $s['cc_id'] ?? null;
 
-        return $this->journal->postBalanced([
-            // مشتقٌّ من عمودٍ بعرضٍ محدود — يُقصّ لعرض العمود (درسُ notifications_hub / hub_fit)
-            'doc_no' => hub_fit('JE-CUST-' . substr($moveId, 0, 8) . '-' . now()->format('His'),
-                hub_col_max('journal_entries', 'doc_no') ?? 300),
+        return JournalPosting::postBalanced([
+            // يُقصّ لعرض العمود في المحرّك (درسُ notifications_hub / hub_fit)
+            'doc_no' => 'JE-CUST-' . substr($moveId, 0, 8) . '-' . now()->format('His'),
             'date' => now()->toDateString(),
             'description' => 'عهدةُ موظف: ' . $s['kind'],
             'reference' => 'CUST-' . substr($moveId, 0, 8),
@@ -216,6 +210,6 @@ class CustodyPostingService
             ['cc_id' => $cc, 'acc_id' => $counterAcc,
              'debit' => $custodyDebit ? 0 : $amount, 'credit' => $custodyDebit ? $amount : 0,
              'memo' => 'مقابلُ حركةِ العهدة'],
-        ]);
+        ], ['module' => EmployeeCustodyMove::MODULE, 'id' => $moveId, 'key' => 'move']);
     }
 }

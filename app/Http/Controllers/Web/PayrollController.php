@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use App\Models\PayrollLine;
 use App\Models\PayrollRun;
+use App\Support\Finance\JournalPosting;
 use Illuminate\Http\Request;
 
 /**
@@ -186,26 +187,24 @@ class PayrollController extends Controller
     /**
      * قيد رواتب موزون: مدين مصروفات، دائن صندوق/بنك — من خريطة finance.accounts.
      *
-     * (Work OS · الطور E · WP-E.2) البوابةُ والخريطةُ وحلُّ الرمز الحتميّ وكتلةُ
-     * الترحيل الموزونة استُخرِجت إلى `JournalPostingService` المشترَكة — لا نسخةَ
-     * ثانيةً من المحرّك هنا. السلوكُ محفوظٌ حرفيّاً: نفسُ القيد وسطريه.
+     * (TECH_DEBT #29) عبر المحرّك الواحد `JournalPosting::postBalanced` — ورابطُ المصدر
+     * `(payroll, id, approval)` يجعل المسيّرَ الواحدَ قيداً واحداً مهما أُعيد اعتمادُه (مسيّرٌ
+     * أُرجع إلى المسودة ثم اعتُمد كان يُرحّل مصروفَ رواتبٍ ثانياً في دفترٍ مقفول).
      */
     protected function autoJournal(PayrollRun $run): void
     {
-        $svc = new \App\Support\Finance\JournalPostingService();
-        if (! $svc->enabled()) return;
+        if (! JournalPosting::enabled()) return;
         try {
-            $map = $svc->accountsMap();
-            // حلٌّ مُحصَّرٌ بالشركة ثم بترتيب id (لا قرعة) — عبر الخدمة المشترَكة
-            $exp = $svc->resolveAccount($map['exp'] ?? null, $run->company_id);
-            $cash = $svc->resolveAccount($map['bank'] ?? null, $run->company_id)
-                ?: $svc->resolveAccount($map['cash'] ?? null, $run->company_id);
+            $map = JournalPosting::accountsMap();
+            // حلٌّ مُحصَّرٌ بالشركة ثم بترتيب id (لا قرعة)
+            $exp = JournalPosting::resolveAccount($map['exp'] ?? null, $run->company_id);
+            $cash = JournalPosting::resolveAccount($map['bank'] ?? null, $run->company_id)
+                ?: JournalPosting::resolveAccount($map['cash'] ?? null, $run->company_id);
             if (! $exp || ! $cash) return;
 
-            // معاملةٌ تلفّ القيد وسطريه ورايةُ التوازن — كلُّها في postBalanced
-            $svc->postBalanced([
-                'doc_no' => hub_fit('JE-PAYROLL-' . now()->format('ymHis'),
-                    hub_col_max('journal_entries', 'doc_no') ?? 300),
+            // المعاملةُ والتوازنُ والرقمُ والتدقيقُ ومنعُ الترحيل المزدوج — كلُّها في المحرّك
+            JournalPosting::postBalanced([
+                'doc_no' => 'JE-PAYROLL-' . now()->format('ymHis'),
                 'date' => now()->toDateString(),
                 'description' => 'قيد رواتب: ' . $run->name . ($run->month ? ' — ' . $run->month : ''),
                 'reference' => (string) $run->name, 'state' => 'مرحّل',
@@ -214,7 +213,7 @@ class PayrollController extends Controller
             ], [
                 ['acc_id' => $exp, 'debit' => (float) $run->total, 'credit' => 0, 'memo' => 'مصروف رواتب'],
                 ['acc_id' => $cash, 'debit' => 0, 'credit' => (float) $run->total, 'memo' => 'صرف الرواتب'],
-            ]);
+            ], ['module' => PayrollRun::MODULE, 'id' => $run->id, 'key' => 'approval']);
         } catch (\Throwable $e) {
             report($e);   // القيد الآلي لا يُفشل الاعتماد نفسه
         }

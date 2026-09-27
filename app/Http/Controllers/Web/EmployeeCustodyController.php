@@ -254,7 +254,7 @@ class EmployeeCustodyController extends Controller
 
         // الطرفُ المقابلُ لكلِّ ساقٍ حسابُ العهدة نفسُه (مالٌ لا يغادر المنشأة) —
         // فيصفو القيدُ داخل حساب العهدة بلا مساسِ نقدٍ أو مصروف.
-        $custody = (new \App\Support\Finance\JournalPostingService())->accountsMap()['custody'] ?? null;
+        $custody = \App\Support\Finance\JournalPosting::accountsMap()['custody'] ?? null;
 
         DB::transaction(function () use ($from, $to, $d, $tid, $r, $custody) {
             $this->svc()->record([

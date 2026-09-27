@@ -5315,13 +5315,15 @@ if (! function_exists('hub_okr_board')) {
  * إلكترونياً يظهر في اللوحة تحت «لم يُقِر».
  */
 if (! function_exists('hub_ack_modules')) {
-    /** الوحدات التي تُقَرّ: مفتاحها ⟵ [عمود الإلزام، عمود النسخة، المسار] */
+    /**
+     * الوحدات التي تُقَرّ بإعلانٍ ونسخة: مفتاحها ⟵ [عمود الإلزام، عمود النسخة، التسمية].
+     * **من السجلّ الواحد** `config/hub_acks.php` (مخزن policy_acks) — لا مصفوفةً مكتوبةً هنا
+     * (TECH_DEBT #29 · A01-06).
+     */
     function hub_ack_modules(): array
     {
-        return [
-            'policies' => ['col' => 'ack_required', 'ver' => 'ver', 'label' => 'سياسة'],
-            'kb'       => ['col' => 'must_read',    'ver' => 'ver', 'label' => 'مقال معرفة'],
-        ];
+        return array_map(fn ($d) => ['col' => $d['col'], 'ver' => $d['ver'] ?? 'ver', 'label' => $d['label']],
+            \App\Support\Collaboration\Acknowledgement::modules(\App\Support\Collaboration\Acknowledgement::STORE_POLICY));
     }
 }
 
@@ -5459,34 +5461,22 @@ if (! function_exists('hub_ack_state')) {
 }
 
 if (! function_exists('hub_ack_do')) {
-    /** تسجيل إقرار المستخدم الحالي بنسخة السجل — مع دليله: وقتٌ وعنوانٌ وجهاز */
+    /**
+     * إقرار المستخدم الحالي بنسخة السجل — **بابٌ إلى المحرّك الواحد** (`Acknowledgement`):
+     * بالنطاق، ولمن خوطب وحده (403)، والإقرارُ الأوّل لا يُمحى، وقيدُ تدقيقٍ واحد. يعيد
+     * صفَّ الإقرار (القائمَ إن سبق)، أو null إن غاب السجلّ عن النطاق.
+     */
     function hub_ack_do(string $module, string $recordId, ?string $signRequestId = null): ?\App\Models\PolicyAck
     {
-        $spec = hub_ack_modules()[$module] ?? null;
         $def = hub_mod($module);
-        if (! $spec || ! $def) return null;
+        if (! isset(hub_ack_modules()[$module]) || ! $def) return null;
 
         $class = '\\App\\Models\\' . $def['model'];
         $row = hub_scope($class::query(), $module)->find($recordId);   // بالنطاق لا خاماً
         if (! $row) return null;
 
-        $ver = (string) ($row->{$spec['ver']} ?? '') ?: '1.0';
-        $ack = \App\Models\PolicyAck::firstOrNew([
-            'src_module' => $module, 'record_id' => $recordId,
-            'user_id' => auth()->id(), 'ver' => $ver,
-        ]);
-        $ack->fill([
-            'title' => \Illuminate\Support\Str::limit((string) ($row->title ?? ''), 200),
-            'policy_id' => $module === 'policies' ? $recordId : ($ack->policy_id ?? null),
-            'status' => 'مُقرّة', 'ack_at' => now(),
-            'ip' => hub_fit((string) request()->ip(), 60),
-            'device' => hub_fit((string) request()->userAgent(), 200),
-            'sign_request_id' => $signRequestId ?: $ack->sign_request_id,
-        ])->save();
-
-        hub_audit('إقرار ' . $spec['label'], $module, $recordId, 'نسخة ' . $ver);
-
-        return $ack;
+        return \App\Support\Collaboration\Acknowledgement::acknowledge($module, $row, (string) auth()->id(),
+            array_filter(['sign_request_id' => $signRequestId]))['ack'];
     }
 }
 

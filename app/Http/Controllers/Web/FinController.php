@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\BankAccount;
 use App\Models\FinDocument;
+use App\Support\Finance\JournalPosting;
 use Illuminate\Http\Request;
 
 /**
@@ -231,33 +232,31 @@ class FinController extends Controller
      * قرار الترحيل الآلي للمنشأة لا لنا): قبضُ دخلٍ يدين البنك/الصندوق ويُدين
      * المبيعات، وصرفُ مصروفٍ يعكس. القيد يولد مُرحَّلاً مقفلاً بسطرين موزونين.
      *
-     * (Work OS · الطور E · WP-E.2) كان منطقُ الترحيل مكرَّراً حرفاً بحرفٍ هنا وفي
-     * `PayrollController::autoJournal`؛ استُخرِج إلى `JournalPostingService` المشترَكة
-     * — البوابةُ والخريطةُ وحلُّ الرمز الحتميّ وكتلةُ الترحيل الموزونة كلُّها هناك
-     * مرّةً واحدة، تستهلكها العهدةُ كذلك. السلوكُ محفوظٌ حرفيّاً: نفسُ القيد وسطريه.
+     * (TECH_DEBT #29) الترحيلُ عبر المحرّك الواحد `JournalPosting::postBalanced` — البوابةُ
+     * والخريطةُ والحلُّ الحتميّ هناك، ومعها ثوابتُ كلِّ قيد: توازنٌ عشريّ، ورقمٌ لا يتكرّر،
+     * وقيدُ تدقيق، ورابطُ المصدر `(fin, id, payment:ن|reversal:ن)` — ن ترتيبُ الحركة في
+     * `meta.payments` (المُسلسَل بقفل المستند)، فالحركةُ الواحدة لا تُرحَّل مرّتين.
      */
     protected function autoJournal(FinDocument $doc, float $amount, bool $reverse = false): void
     {
-        $svc = new \App\Support\Finance\JournalPostingService();
-        if (! $svc->enabled()) return;
+        if (! JournalPosting::enabled()) return;
 
         try {
-            $map = $svc->accountsMap();
+            $map = JournalPosting::accountsMap();
             $income = in_array((string) $doc->kind, config('hub.fin.income'), true);
             $moneyCode = (string) ($doc->bank_id ? ($map['bank'] ?? '') : ($map['cash'] ?? ''));
             $otherCode = (string) ($income ? ($map['sales'] ?? '') : ($map['exp'] ?? ''));
 
-            // حلٌّ مُحصَّرٌ بالشركة ثم بترتيب id (لا قرعة) — عبر الخدمة المشترَكة
-            $money = $svc->resolveAccount($moneyCode, $doc->company_id);
-            $other = $svc->resolveAccount($otherCode, $doc->company_id);
+            // حلٌّ مُحصَّرٌ بالشركة ثم بترتيب id (لا قرعة)
+            $money = JournalPosting::resolveAccount($moneyCode, $doc->company_id);
+            $other = JournalPosting::resolveAccount($otherCode, $doc->company_id);
             if (! $money || ! $other) return;   // خريطة غير مكتملة — لا قيد أعرج
 
-            // معاملةٌ تلفّ القيد وسطريه ورايةُ التوازن — كلُّها في postBalanced، فلا
-            // يبقى القيدُ بسطرٍ واحد إن تعثّر الثاني، ولا نسخةَ ثالثةً من المحرّك.
-            $svc->postBalanced([
-                // مشتقٌّ من عمودٍ بعرض ٣٠٠ — يُقصّ لعرض العمود (درسُ notifications_hub / hub_fit)
-                'doc_no' => hub_fit('JE-' . ($doc->doc_no ?: substr($doc->id, 0, 8)) . '-' . now()->format('His'),
-                    hub_col_max('journal_entries', 'doc_no') ?? 300),
+            $seq = count((array) (((array) $doc->meta)['payments'] ?? []));
+
+            // المعاملةُ والتوازنُ والرقمُ (مقصوصاً لعرض عموده) والتدقيقُ كلُّها في المحرّك
+            JournalPosting::postBalanced([
+                'doc_no' => 'JE-' . ($doc->doc_no ?: substr($doc->id, 0, 8)) . '-' . now()->format('His'),
                 'date' => now()->toDateString(),
                 'description' => ($reverse ? 'عكس ' : '') . ($income ? 'قبض' : 'صرف') . ' دفعة على ' . ($doc->doc_no ?: $doc->id),
                 'reference' => (string) $doc->doc_no,
@@ -280,7 +279,8 @@ class FinController extends Controller
                      'memo' => $income ? 'قبض الدفعة' : 'المصروف'],
                     ['cc_id' => $doc->cc_id, 'acc_id' => $income ? $other : $money, 'debit' => 0, 'credit' => $amount,
                      'memo' => $income ? 'الإيراد' : 'سداد الدفعة'],
-                ]);
+                ],
+                ['module' => FinDocument::MODULE, 'id' => $doc->id, 'key' => ($reverse ? 'reversal:' : 'payment:') . $seq]);
         } catch (\Throwable $e) {
             report($e);   // القيد الآلي لا يُفشل تسجيل الدفعة نفسها
         }
