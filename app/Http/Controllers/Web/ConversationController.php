@@ -246,8 +246,8 @@ class ConversationController extends Controller
 
         // §39 مؤشّرُ البدءِ للاستطلاعِ التدريجيّ — رأسُ الخيطِ (أحدثُ رسالةٍ حيّةٍ في
         // الحاوية، جذراً كانت أو رداً). فارغٌ = قناةٌ خاليةٌ (يبدأ العميلُ من البداية).
-        $tip = Comment::where('conversation_id', $conv->id)->whereNull('deleted_at')
-            ->orderByDesc('created_at')->orderByDesc('id')->first(['id', 'created_at']);
+        // v2 — رأسُ الخيط مع كلِّ معرّفاتِ ثانيتِه (لا قرعةَ تعادلٍ بـUUID)
+        $sinceTip = \App\Support\Collaboration\Collaboration::tipSince(Comment::where('conversation_id', $conv->id)->whereNull('deleted_at'));
 
         return view('conversations.show', [
             'conv'        => $conv,
@@ -258,7 +258,7 @@ class ConversationController extends Controller
             'messages'    => $messages,
             'members'     => $members,
             'users'       => CommentController::userNames(),
-            'sinceCursor' => $tip ? Collaboration::encodeCursor((string) $tip->created_at, (string) $tip->id) : '',
+            'sinceCursor' => $sinceTip,
         ]);
     }
 
@@ -425,16 +425,9 @@ class ConversationController extends Controller
     {
         [$conv] = self::guardConversation($id, 'v');
 
-        $cursor = Collaboration::decodeCursor($r->query('cursor'));
-
-        $q = Comment::where('conversation_id', $conv->id)->whereNull('deleted_at')
-            ->with('user:id,name');
-
-        if ($cursor !== null) {
-            [$t, $cid] = $cursor;
-            $q->where(fn ($w) => $w->where('created_at', '>', $t)
-                ->orWhere(fn ($x) => $x->where('created_at', $t)->where('id', '>', $cid)));
-        }
+        // v2 — مجموعةُ ما سُلِّم في ثانيةِ المؤشّر لا حدُّ UUID (الجيلُ الأوّلُ يُفكّ كما كان)
+        $q = Collaboration::applySince(Comment::where('conversation_id', $conv->id)->whereNull('deleted_at')
+            ->with('user:id,name'), (string) $r->query('cursor', ''));
 
         $rows = $q->orderBy('created_at')->orderBy('id')->limit(50)->get();
 
@@ -449,10 +442,7 @@ class ConversationController extends Controller
             'edited'     => $c->edited_at !== null,
         ])->all();
 
-        $last = $rows->last();
-        $next = $last
-            ? Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
-            : (string) $r->query('cursor', '');
+        $next = Collaboration::nextSince($rows, (string) $r->query('cursor', ''));
 
         // §typing مؤشّرُ الكتابةِ العابر — أسماءُ الأعضاءِ الكاتبين الآن (عدا القارئ).
         // بوّابةُ القدرة: إن أُطفئ «مؤشّر الكتابة» لا تُبثّ إشارةٌ (فشلٌ آمنٌ لا تسريب).

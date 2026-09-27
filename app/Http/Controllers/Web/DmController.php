@@ -268,8 +268,8 @@ class DmController extends Controller
         $ids = $threads->pluck('other')->push($other->id)->unique()->all();
 
         // §39 مؤشّرُ البدءِ للاستطلاعِ التدريجيّ — رأسُ الخيط (أحدثُ رسالة، محذوفةً كانت أو لا)
-        $tip = DmMessage::where('thread_key', DmMessage::threadKey((string) $me, (string) $other->id))
-            ->orderByDesc('created_at')->orderByDesc('id')->first(['id', 'created_at']);
+        // v2 — رأسُ الخيط مع كلِّ معرّفاتِ ثانيتِه (لا قرعةَ تعادلٍ بـUUID)
+        $sinceTip = \App\Support\Collaboration\Collaboration::tipSince(DmMessage::where('thread_key', DmMessage::threadKey((string) $me, (string) $other->id)));
 
         return view('dm.inbox', [
             'other' => $other, 'msgs' => $msgs, 'open' => $other->id,
@@ -278,7 +278,7 @@ class DmController extends Controller
             'all' => $this->startableUsers((string) $me),
             'presence' => self::presence($ids),
             'dmReactions' => self::dmReactionsFor($msgs->pluck('id')->all()),
-            'sinceCursor' => $tip ? \App\Support\Collaboration\Collaboration::encodeCursor((string) $tip->created_at, (string) $tip->id) : '',
+            'sinceCursor' => $sinceTip,
         ]);
     }
 
@@ -404,14 +404,9 @@ class DmController extends Controller
 
         $me = (string) auth()->id();
         $key = DmMessage::threadKey($me, (string) $other->id);
-        $cursor = \App\Support\Collaboration\Collaboration::decodeCursor($r->query('cursor'));
-
-        $q = DmMessage::where('thread_key', $key)->inCompanyScope();
-        if ($cursor !== null) {
-            [$t, $cid] = $cursor;
-            $q->where(fn ($w) => $w->where('created_at', '>', $t)
-                ->orWhere(fn ($x) => $x->where('created_at', $t)->where('id', '>', $cid)));
-        }
+        // v2 — مجموعةُ ما سُلِّم في ثانيةِ المؤشّر لا حدُّ UUID (الجيلُ الأوّلُ يُفكّ كما كان)
+        $q = \App\Support\Collaboration\Collaboration::applySince(
+            DmMessage::where('thread_key', $key)->inCompanyScope(), (string) $r->query('cursor', ''));
 
         $rows = $q->orderBy('created_at')->orderBy('id')->limit(50)->get();
 
@@ -431,10 +426,7 @@ class DmController extends Controller
             'deleted'    => $m->deleted_at !== null,
         ])->all();
 
-        $last = $rows->last();
-        $next = $last
-            ? \App\Support\Collaboration\Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
-            : (string) $r->query('cursor', '');
+        $next = \App\Support\Collaboration\Collaboration::nextSince($rows, (string) $r->query('cursor', ''));
 
         // §typing الطرفُ الآخرُ يكتب الآن؟ (عابرٌ لا يُدقَّق) — الاسمُ إن كان في النافذة.
         // بوّابةُ القدرة: إن أُطفئ «مؤشّر الكتابة» لا إشارةَ (فشلٌ آمن).

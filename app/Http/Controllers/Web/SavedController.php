@@ -82,6 +82,8 @@ class SavedController extends Controller
             $c = Comment::find($id);
             abort_unless($c, 422, 'لا رسالةَ بهذا المعرّف');
             CommentService::guardTarget($me, (string) $c->module, $c->record_id);   // يُجهض إن خفي
+            // منشورُ القناةِ العامّة الموسومُ بشركةٍ خارجَ نطاقي = ٤٠٤ (guardTarget يعيد feed بلا تنطيق)
+            CommentService::guardFeedComment($me, $c);
 
             return;
         }
@@ -103,6 +105,7 @@ class SavedController extends Controller
                 $c = Comment::find($s->target_id);
                 if (! $c) return $base;
                 CommentService::guardTarget($me, (string) $c->module, $c->record_id);   // يُجهض إن خفي
+                CommentService::guardFeedComment($me, $c);   // منشورُ شركةٍ خارجَ نطاقي = غيرُ متاح
 
                 return array_merge($base, [
                     'available' => true,

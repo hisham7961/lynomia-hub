@@ -92,13 +92,9 @@ class MobileCollabController extends V1Controller
 
         [$conv] = ConversationController::guardConversation($id, 'v');
 
-        $cursor = Collaboration::decodeCursor((string) $r->query('cursor', ''));
-        $q = Comment::where('conversation_id', $conv->id)->whereNull('deleted_at')->with('user:id,name');
-        if ($cursor !== null) {
-            [$t, $cid] = $cursor;
-            $q->where(fn ($w) => $w->where('created_at', '>', $t)
-                ->orWhere(fn ($x) => $x->where('created_at', $t)->where('id', '>', $cid)));
-        }
+        // v2 — مجموعةُ ما سُلِّم في ثانيةِ المؤشّر لا حدُّ UUID (الجيلُ الأوّلُ يُفكّ كما كان)
+        $q = Collaboration::applySince(Comment::where('conversation_id', $conv->id)->whereNull('deleted_at')->with('user:id,name'),
+            (string) $r->query('cursor', ''));
         $rows = $q->orderBy('created_at')->orderBy('id')->limit(50)->get();
         // (إضافيّ · طلب الجوال #6) تفاعلاتُ الدفعةِ باستعلامٍ واحد — لا N+1
         $reactions = CommentController::reactionsFor($rows);
@@ -116,9 +112,7 @@ class MobileCollabController extends V1Controller
             'reactions'  => MobileCommController::reactionList($reactions[$c->id] ?? [], $meId),
         ])->all();
 
-        $last = $rows->last();
-        $next = $last ? Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
-            : (string) $r->query('cursor', '');
+        $next = Collaboration::nextSince($rows, (string) $r->query('cursor', ''));
 
         $typing = hub_capability('collab.typing')
             ? User::whereIn('id', Typing::current((string) $conv->id, (string) auth()->id()))->pluck('name')->all()
@@ -155,13 +149,7 @@ class MobileCollabController extends V1Controller
         }
 
         $key = DmMessage::threadKey((string) $me->id, (string) $other->id);
-        $cursor = Collaboration::decodeCursor((string) $r->query('cursor', ''));
-        $q = DmMessage::where('thread_key', $key)->inCompanyScope();
-        if ($cursor !== null) {
-            [$t, $cid] = $cursor;
-            $q->where(fn ($w) => $w->where('created_at', '>', $t)
-                ->orWhere(fn ($x) => $x->where('created_at', $t)->where('id', '>', $cid)));
-        }
+        $q = Collaboration::applySince(DmMessage::where('thread_key', $key)->inCompanyScope(), (string) $r->query('cursor', ''));
         $rows = $q->orderBy('created_at')->orderBy('id')->limit(50)->get();
 
         // الواردُ الجديدُ إليّ يُختَم مقروءاً — المستخدمُ يقرأ الآن (نظيرُ dm.since في الويب)
@@ -185,9 +173,7 @@ class MobileCollabController extends V1Controller
                 : MobileCommController::reactionList($reactions[(string) $m->id] ?? [], (string) $me->id),
         ])->all();
 
-        $last = $rows->last();
-        $next = $last ? Collaboration::encodeCursor((string) $last->created_at, (string) $last->id)
-            : (string) $r->query('cursor', '');
+        $next = Collaboration::nextSince($rows, (string) $r->query('cursor', ''));
 
         // الطرفُ الآخرُ يكتب الآن؟ (عابرٌ) — الاسمُ إن كان في النافذة (وإن كانت القدرةُ مُفعَّلة)
         $typing = (hub_capability('collab.typing') && in_array((string) $other->id, Typing::current($key, (string) $me->id), true))

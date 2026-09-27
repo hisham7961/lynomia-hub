@@ -369,13 +369,12 @@ class MobileCommController extends V1Controller
         $msgs = DmService::thread((string) $me->id, (string) $other->id);
         // (إضافيّ · طلب الجوال #6) تفاعلاتُ الصفحةِ كلِّها باستعلامٍ واحد — لا N+1
         $reactions = DmController::dmReactionsFor($msgs->pluck('id')->map('strval')->all());
-        $last = $msgs->last();
 
         return $this->ok([
             'user'     => ['id' => (string) $other->id, 'name' => (string) $other->name],
             'messages' => $msgs->map(fn ($m) => $this->dmMessageShape($m, (string) $me->id, $reactions))->all(),
             // (إضافيّ · طلب الجوال #4) مؤشّرُ آخرِ صفٍّ بترميزِ `dm/threads/{user}/since` نفسِه؛ '' لخيطٍ فارغ
-            'cursor'   => $last ? Collaboration::encodeCursor((string) $last->created_at, (string) $last->id) : '',
+            'cursor'   => $this->tailCursor($msgs),
         ]);
     }
 
@@ -591,15 +590,18 @@ class MobileCommController extends V1Controller
      */
     private function tailCursor($items): string
     {
-        $last = null;
+        // v2: أحدثُ ثانيةٍ + **كلُّ** معرّفاتِ صفوفِها المُحمَّلة — لا حدَّ UUID يُسقط متأخّراً أصغر
+        $t = null;
+        $ids = [];
         foreach ($items as $c) {
             foreach ([$c, ...($c->relationLoaded('replies') ? $c->replies->all() : [])] as $row) {
-                $key = [(string) $row->created_at, (string) $row->id];
-                if ($last === null || $key > $last) $last = $key;
+                $rt = (string) $row->created_at;
+                if ($t === null || $rt > $t) { $t = $rt; $ids = []; }
+                if ($rt === $t) $ids[] = (string) $row->id;
             }
         }
 
-        return $last ? Collaboration::encodeCursor($last[0], $last[1]) : '';
+        return $t !== null ? Collaboration::encodeSince($t, $ids) : '';
     }
 
     /**

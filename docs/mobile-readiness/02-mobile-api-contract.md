@@ -231,3 +231,8 @@ PUT /api/mobile/v1/tasks/{id}    If-Match: "3"      (والسجلُّ version=5)
 | 7 | `DELETE saved/{id}` (جديد) | لصاحبها وحده ⇒ `{id, deleted:true}`؛ غيرُها 404 (لا IDOR). |
 | 7 | بطاقةُ `saved` | `target` حين `available=true` وحدَه (وإلّا `null`): تعليق `{kind:"comment", module, record_id, comment_id, parent_id}` (القناة: `module=channel` و`record_id`=المحادثة؛ العامّة `feed` و`record_id=null`)، DM `{kind:"dm", user_id:<الطرفُ الآخر>, message_id}`. ومنشورُ `feed` لشركةٍ خارجَ نطاق القارئ صار `available=false` (كان يكشف مقتطفَه). |
 | 8 | `bootstrap` · `navigation` | `feature_flags.collab_typing` (= `hub_capability('collab.typing')`) و`feature_flags.collab_presence` (= القدرة ∧ ليس عميلاً). |
+
+**مؤشّرُ `since` v2 (بلا تغييرِ العقد):** المؤشّرُ ما زال نصّاً معتِماً، لكنّه صار يحمل ثانيتَه **ومجموعةَ ما سُلِّم فيها**
+(`Collaboration::encodeSince/applySince/nextSince/tipSince`) بدل حدِّ المعرّف — فرسالةٌ تصل لاحقاً في الثانيةِ نفسِها
+بمعرّفِ UUID أصغر لم تعد تُسقَط. مؤشّرُ الجيلِ الأوّل (`t|id`) يُفكّ بمعناه القديم ويُرقّى في أوّلِ ردّ. يسري على
+`since` في الويب والجوال (DM/قناة)، وعلى `cursor` الذيل (#4) ورأسِ الويب `sinceCursor`. (`CollabSinceTieBreakTest`)
