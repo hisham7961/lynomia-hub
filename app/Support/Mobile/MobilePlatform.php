@@ -114,6 +114,17 @@ class MobilePlatform
 
     /* ════════════════════════ الجلسات والأجهزة ════════════════════════ */
 
+    /**
+     * **«نشطة» تعريفٌ واحد** (خطّةُ التطبيق · 2.4): غيرُ مُبطَلةٍ ورمزُ تحديثِها حيّ — أي جلسةٌ
+     * يستطيع جهازُها أن يجدّد وصولَه. كان العدّادُ يقرأ `access_expires_at` (١٥ دقيقة) والفلترُ
+     * والوسمُ يقرآن `refresh_expires_at`، فتقول البطاقةُ «٠ نشطة» والقائمةُ المرشَّحةُ تعرض عشراً.
+     * العدّادُ والفلترُ والوسمُ (`sessionStatus`) يسألون هذا وحدَه.
+     */
+    public static function whereActive($q)
+    {
+        return $q->whereNull('revoked_at')->where('refresh_expires_at', '>', now());
+    }
+
     /** إحصاءُ الجلسات — نشطة/مُبطَلة/مستعملة حديثاً (لا تجزئةَ رمزٍ قط) */
     public static function sessionStats(): array
     {
@@ -124,7 +135,7 @@ class MobilePlatform
 
         return [
             'total'   => (clone $q)->count(),
-            'active'  => (clone $q)->whereNull('revoked_at')->where('access_expires_at', '>', now())->count(),
+            'active'  => self::whereActive(clone $q)->count(),
             'revoked' => (clone $q)->whereNotNull('revoked_at')->count(),
             'recent'  => (clone $q)->where('last_used_at', '>=', now()->subDays(7))->count(),
         ];
@@ -163,7 +174,7 @@ class MobilePlatform
         $q = MobileSession::query()->select(self::SESSION_COLS)->with('user:id,name,email');
 
         if (($p = $f['platform'] ?? '') !== '' && in_array($p, ['ios', 'android'], true)) $q->where('platform', $p);
-        if (($s = $f['status'] ?? '') === 'active') $q->whereNull('revoked_at')->where('refresh_expires_at', '>', now());
+        if (($s = $f['status'] ?? '') === 'active') self::whereActive($q);
         elseif ($s === 'revoked') $q->whereNotNull('revoked_at');
         self::applyUserFilter($q, $f['q'] ?? '');
 
@@ -198,7 +209,8 @@ class MobilePlatform
     public static function sessionStatus(MobileSession $s): array
     {
         if ($s->revoked_at) return ['key' => 'revoked', 'label' => 'مُبطَلة', 'tone' => 'bad'];
-        if ($s->refresh_expires_at && now()->lte($s->refresh_expires_at)) return ['key' => 'active', 'label' => 'نشطة', 'tone' => 'ok'];
+        // المعيارُ نفسُه في `whereActive` (الحدُّ حصريّ: `>` لا `>=`)
+        if ($s->refresh_expires_at && now()->lt($s->refresh_expires_at)) return ['key' => 'active', 'label' => 'نشطة', 'tone' => 'ok'];
 
         return ['key' => 'expired', 'label' => 'منتهية', 'tone' => 'g'];
     }
@@ -833,6 +845,9 @@ class MobilePlatform
         // خطّةُ التطبيق · المرحلة ٤ (التعاون · العميل · سير العمل): كلُّها سطوحُ API
         'portal_tickets' => 'api', 'channels' => 'api', 'reports' => 'api',
         'calendar' => 'api', 'finance_actions' => 'api',
+        // أفعالُ الميدان والموظّف (خطّةُ التطبيق · المرحلة ٣): الحضورُ والجردُ والعهدةُ ميدانيّة،
+        // وقرارُ الإجازة سطحُ أعمال
+        'attendance' => 'field', 'inventory' => 'field', 'custody' => 'field', 'leaves' => 'api',
     ];
 
     /**

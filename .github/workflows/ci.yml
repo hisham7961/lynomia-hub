@@ -86,6 +86,8 @@ jobs:
           php artisan hub:ai-coverage --check
           # وخريطةُ الشعارات: تشير إلى ملفٍّ زال، أو ملفٌّ يُنشَر ولا يُعرَض
           php artisan hub:ai-logos --check
+          # وخريطةُ نقاطِ الجوال في وثيقة التسليم (مولَّدةٌ من المسارات الحيّة · 2.5)
+          php artisan hub:mobile-handoff --check
 
       # ═══ محرّكُ القاعدة يُشغَّل مشروطاً لا عبر `services` ═══
       #

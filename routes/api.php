@@ -358,6 +358,46 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
      */
     Route::get('sync/{module}', [\App\Http\Controllers\Api\MobileSyncController::class, 'sync'])->name('mobile.sync');
 
+    /*
+     * ── أفعالُ الميدان والموظّف (خطّةُ التطبيق · المرحلة ٣ · إضافيّ) ──
+     *
+     * كلُّها فوق **السككِ الويبية نفسِها** لا محرّكٍ ثانٍ: `Workday` (الحضور)، `LeaveDecision`
+     * (قرارُ الإجازة)، `CustodyHandover` (العهدة)، `InventorySessions` (الجرد)، `AttachmentService`
+     * (المرفقات)، و`record_versions` (النسخ). **حرفيّةٌ كلُّها تُسجَّل قبل الـcatch-all (F9)** —
+     * وإلّا ابتلع `GET {module}` كلمةَ `files`، و`DELETE {module}/{id}` مسارَ `files/{id}`،
+     * و`GET {module}/{id}` مسارَ `me/custody`. وحسابُ العميل خارجَ قائمة `mobile.portal` لها
+     * كلِّها (الويبُ يردّه عن نظائرها) — عدا ما هو صريحٌ في `MobilePortalGuard::NAME_ALLOW`.
+     */
+    Route::get('attendance/today', [\App\Http\Controllers\Api\MobileAttendanceController::class, 'today'])->name('mobile.attendance.today');
+    Route::post('attendance/check-in', [\App\Http\Controllers\Api\MobileAttendanceController::class, 'checkIn'])
+        ->middleware('throttle:30,1')->name('mobile.attendance.check_in');
+    Route::post('attendance/check-out', [\App\Http\Controllers\Api\MobileAttendanceController::class, 'checkOut'])
+        ->middleware('throttle:30,1')->name('mobile.attendance.check_out');
+    Route::post('leaves/{id}/decide', [\App\Http\Controllers\Api\MobileLeavesController::class, 'decide'])
+        ->middleware('throttle:60,1')->name('mobile.leaves.decide');
+    Route::get('me/custody', [\App\Http\Controllers\Api\MobileCustodyController::class, 'mine'])->name('mobile.me.custody');
+    Route::post('custody/{id}/handover', [\App\Http\Controllers\Api\MobileCustodyController::class, 'handover'])
+        ->middleware('throttle:60,1')->name('mobile.custody.handover');
+    Route::post('custody/{id}/recover', [\App\Http\Controllers\Api\MobileCustodyController::class, 'recover'])
+        ->middleware('throttle:60,1')->name('mobile.custody.recover');
+    Route::get('inventory/sessions', [\App\Http\Controllers\Api\MobileInventoryController::class, 'sessions'])->name('mobile.inventory.index');
+    Route::get('inventory/sessions/{id}', [\App\Http\Controllers\Api\MobileInventoryController::class, 'session'])->name('mobile.inventory.show');
+    Route::middleware('throttle:120,1')->group(function () {
+        Route::post('inventory/sessions', [\App\Http\Controllers\Api\MobileInventoryController::class, 'freeze'])->name('mobile.inventory.freeze');
+        Route::post('inventory/sessions/{id}/scan', [\App\Http\Controllers\Api\MobileInventoryController::class, 'scan'])->name('mobile.inventory.scan');
+        Route::post('inventory/sessions/{id}/reconcile', [\App\Http\Controllers\Api\MobileInventoryController::class, 'reconcile'])->name('mobile.inventory.reconcile');
+        Route::post('inventory/sessions/{id}/close', [\App\Http\Controllers\Api\MobileInventoryController::class, 'close'])->name('mobile.inventory.close');
+    });
+    // طلب الجوال #1: قائمةُ مرفقات السجلّ وحذفُ مرفق — بحارسَي الويب (`guardRecord` + `DocumentPolicy`)
+    Route::get('files', [\App\Http\Controllers\Api\MobileFileController::class, 'recordFiles'])->name('mobile.files.index');
+    Route::delete('files/{id}', [\App\Http\Controllers\Api\MobileFileController::class, 'deleteFile'])
+        ->middleware('throttle:60,1')->name('mobile.files.destroy');
+    // طلب الجوال #2: تنزيلُ مرفقِ تعليقٍ/رسالةٍ بمقبضِ صاحبها
+    Route::get('comments/{id}/attachment', [\App\Http\Controllers\Api\MobileRecordExtrasController::class, 'commentAttachment'])->name('mobile.comments.attachment');
+    Route::get('dm/messages/{id}/attachment', [\App\Http\Controllers\Api\MobileRecordExtrasController::class, 'dmAttachment'])->name('mobile.dm.attachment');
+    // نسخُ السجلّ (رقم/متى/من) — ثلاثيّةُ المقطع، قبل `{module}/{id}` انضباطاً (F9)
+    Route::get('{module}/{id}/versions', [\App\Http\Controllers\Api\MobileRecordExtrasController::class, 'versions'])->name('mobile.versions.index');
+
     // D.2/D.3 — إجراءاتُ المورد: لاحقةُ `/actions` **قبل** `{module}/{id}` (المقطعُ
     // الحرفيّ `actions` يميّزها، ومع ذلك تُسجَّل أوّلاً انضباطاً · F9)
     Route::get('{module}/{id}/actions', [\App\Http\Controllers\Api\MobileResourceController::class, 'listActions'])->name('mobile.resource.actions');

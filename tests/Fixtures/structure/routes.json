@@ -1911,6 +1911,250 @@
     },
     {
         "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/attendance/today",
+        "name": "mobile.attendance.today",
+        "action": "App\\Http\\Controllers\\Api\\MobileAttendanceController@today",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/attendance/check-in",
+        "name": "mobile.attendance.check_in",
+        "action": "App\\Http\\Controllers\\Api\\MobileAttendanceController@checkIn",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/attendance/check-out",
+        "name": "mobile.attendance.check_out",
+        "action": "App\\Http\\Controllers\\Api\\MobileAttendanceController@checkOut",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/leaves/{id}/decide",
+        "name": "mobile.leaves.decide",
+        "action": "App\\Http\\Controllers\\Api\\MobileLeavesController@decide",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/me/custody",
+        "name": "mobile.me.custody",
+        "action": "App\\Http\\Controllers\\Api\\MobileCustodyController@mine",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/custody/{id}/handover",
+        "name": "mobile.custody.handover",
+        "action": "App\\Http\\Controllers\\Api\\MobileCustodyController@handover",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/custody/{id}/recover",
+        "name": "mobile.custody.recover",
+        "action": "App\\Http\\Controllers\\Api\\MobileCustodyController@recover",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/inventory/sessions",
+        "name": "mobile.inventory.index",
+        "action": "App\\Http\\Controllers\\Api\\MobileInventoryController@sessions",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/inventory/sessions/{id}",
+        "name": "mobile.inventory.show",
+        "action": "App\\Http\\Controllers\\Api\\MobileInventoryController@session",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/inventory/sessions",
+        "name": "mobile.inventory.freeze",
+        "action": "App\\Http\\Controllers\\Api\\MobileInventoryController@freeze",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:120,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/inventory/sessions/{id}/scan",
+        "name": "mobile.inventory.scan",
+        "action": "App\\Http\\Controllers\\Api\\MobileInventoryController@scan",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:120,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/inventory/sessions/{id}/reconcile",
+        "name": "mobile.inventory.reconcile",
+        "action": "App\\Http\\Controllers\\Api\\MobileInventoryController@reconcile",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:120,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "api/mobile/v1/inventory/sessions/{id}/close",
+        "name": "mobile.inventory.close",
+        "action": "App\\Http\\Controllers\\Api\\MobileInventoryController@close",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:120,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/files",
+        "name": "mobile.files.index",
+        "action": "App\\Http\\Controllers\\Api\\MobileFileController@recordFiles",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "DELETE",
+        "uri": "api/mobile/v1/files/{id}",
+        "name": "mobile.files.destroy",
+        "action": "App\\Http\\Controllers\\Api\\MobileFileController@deleteFile",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/comments/{id}/attachment",
+        "name": "mobile.comments.attachment",
+        "action": "App\\Http\\Controllers\\Api\\MobileRecordExtrasController@commentAttachment",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/dm/messages/{id}/attachment",
+        "name": "mobile.dm.attachment",
+        "action": "App\\Http\\Controllers\\Api\\MobileRecordExtrasController@dmAttachment",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/{module}/{id}/versions",
+        "name": "mobile.versions.index",
+        "action": "App\\Http\\Controllers\\Api\\MobileRecordExtrasController@versions",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
         "uri": "api/mobile/v1/{module}/{id}/actions",
         "name": "mobile.resource.actions",
         "action": "App\\Http\\Controllers\\Api\\MobileResourceController@listActions",
@@ -7892,6 +8136,17 @@
             "web",
             "auth",
             "throttle:6,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "admin/mobile-platform/settings/{section}",
+        "name": "mobileplatform.settings.save",
+        "action": "App\\Http\\Controllers\\Web\\MobilePlatformController@saveSettings",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:20,1"
         ]
     }
 ]

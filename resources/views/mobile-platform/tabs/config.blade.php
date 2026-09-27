@@ -1,4 +1,4 @@
-{{-- التطبيق والإطلاق (§20–25، §38–39): إعداداتُ الإصدار (تُدار في الإعدادات)، معاينةُ
+{{-- التطبيق والإطلاق (§20–25، §38–39): إعداداتُ الإصدار (تُحرَّر هنا · 2.1)، معاينةُ
      app-config الحيّة + فعّاليّةُ بوّابةِ التحديث، الروابطُ العميقة ووثائقُها العالميّة،
      مُختبِرٌ دلاليّ، وقائمةُ فحصِ الإطلاق. قراءةٌ صرفة، قيمٌ حقيقيّة، وحالاتٌ صادقة. --}}
 @php
@@ -7,11 +7,12 @@
     $lbl  = fn ($s) => \App\Support\Mobile\MobilePlatform::LABEL[$s] ?? $s;
     $R = \App\Support\Mobile\MobilePlatform::READY;
     $NC = \App\Support\Mobile\MobilePlatform::NOT_CONFIGURED;
-    $set = fn ($anchor) => route('settings.edit') . '#' . $anchor;
+    // «اضبط ←» يفتح حقلَ المفتاح في محرّر هذا المركز (لا صفَّ قراءةٍ في شاشة الإعدادات)
+    $set = fn ($anchor) => \App\Support\Mobile\MobileSettings::editUrl($anchor);
     $yn = fn ($b) => $b ? '<span class="bdg ok">نعم</span>' : '<span class="bdg g">لا</span>';
 @endphp
 
-{{-- ═══ الإصدارات وبوّابة التحديث (§20/§23) — تُدار في الإعدادات، تُعرَض هنا حالتُها ═══ --}}
+{{-- ═══ الإصدارات وبوّابة التحديث (§20/§23) — حالتُها هنا، وتُحرَّر في النموذج أدناه ═══ --}}
 <div class="card kid wide">
     <h3>🏷️ إصداراتُ التطبيق وبوّابةُ التحديث</h3>
     <table class="mini">
@@ -31,9 +32,13 @@
     <p class="sub" style="margin-top:8px">
         الإلزامُ بالتحديث (force update): <span class="bdg {{ $versions['force_update'] ? 'wn' : 'g' }}">{{ $versions['force_update'] ? 'مُفعَّل' : 'مُعطَّل' }}</span> ·
         بوّابةُ الحجب: <span class="bdg {{ $versions['gate_active'] ? $tone($R) : $tone($NC) }}">{{ $versions['gate_active'] ? 'فعّالة' : 'غير مُهيّأة (لا حجب)' }}</span> ·
-        تُدار القيمُ في <a class="btn ghost xs" href="{{ $set('mobile.force_update') }}">الإعدادات ←</a>
+        تُحرَّر القيمُ <a class="btn ghost xs" href="{{ $set('mobile.force_update') }}">في المحرّر أدناه ←</a>
     </p>
 </div>
+
+{{-- ═══ محرّرُ الإعدادات (خطّةُ التطبيق · 2.1) — بدل hub:set ═══ --}}
+@include('mobile-platform.tabs._settings_form', ['section' => 'release'])
+@include('mobile-platform.tabs._settings_form', ['section' => 'deeplinks'])
 
 {{-- ═══ معاينةُ app-config الحيّة + فعّاليّةُ بوّابةِ التحديث (§21/§23) ═══ --}}
 <div class="card kid wide">

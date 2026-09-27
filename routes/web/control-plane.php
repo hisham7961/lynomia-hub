@@ -204,3 +204,8 @@ use Illuminate\Support\Facades\Route;
     // اختبارُ دفعٍ إداريٌّ آمن — إلى جهازِ المُختبِرِ وحدَه عبر المزوّدِ القائم (لا تجاوزَ ضبط). خنقٌ ضيّق.
     Route::post('admin/mobile-platform/push/test', [\App\Http\Controllers\Web\MobilePlatformController::class, 'pushTest'])
         ->name('mobileplatform.push.test')->middleware('throttle:6,1');
+    // محرّرُ إعدادات الجوال (خطّةُ التطبيق · 2.1) — بدل `hub:set`: الإصدارات/المتجر/الدعم/الروابطُ العميقة/FCM.
+    // الحرسُ حرسُ المركز في المتحكّم، والتحقّقُ والتدقيقُ في `MobileSettings`؛ خنقٌ ضيّق.
+    Route::post('admin/mobile-platform/settings/{section}', [\App\Http\Controllers\Web\MobilePlatformController::class, 'saveSettings'])
+        ->where('section', 'release|deeplinks|push')
+        ->name('mobileplatform.settings.save')->middleware('throttle:20,1');

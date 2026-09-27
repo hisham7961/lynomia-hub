@@ -347,7 +347,7 @@
                 <td class="sub">{{ $meta['why'] ?? '' }}</td>
                 <td>
                     @if (! empty($meta['owner_route']) && \Illuminate\Support\Facades\Route::has($meta['owner_route']))
-                        <a class="btn ghost sm" href="{{ route($meta['owner_route']) }}">↗ افتحها</a>
+                        <a class="btn ghost sm" href="{{ route($meta['owner_route'], $meta['owner_params'] ?? []) }}">↗ {{ ($meta['owner_label'] ?? '') !== '' ? $meta['owner_label'] : 'افتحها' }}</a>
                     @else
                         <span class="sub">أمرُ طرفيةٍ أو حالةٌ داخلية</span>
                     @endif

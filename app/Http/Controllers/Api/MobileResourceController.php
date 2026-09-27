@@ -302,7 +302,9 @@ class MobileResourceController extends V1Controller
         }
 
         // «إقرار» لمن يُقرّ فعلاً — القاعدةُ من الباب الواحد (`Acknowledgement::denial`) لا عرضٌ لا يُنفَّذ
-        if (isset(hub_ack_modules()[$module]) && hub_can($u, $module, 'v')
+        // (المرحلة ٣ · 3.3) الإقرارُ بمخزنَيه: سياسات/معرفة (`policy_acks`) **وإقرارُ استلامِ السجلّ**
+        // (`record_acks` — العهدة/الاجتماع/القرار) — الويبُ يُقرّ كليهما بالباب الواحد، فلا يُحرَم الجوال
+        if (\App\Support\Collaboration\Acknowledgement::def($module) !== null && hub_can($u, $module, 'v')
             && \App\Support\Collaboration\Acknowledgement::denial($module, $m, (string) $u->id) === null) {
             $actions[] = ['action' => 'ack', 'label' => 'إقرار'];
         }
@@ -450,6 +452,17 @@ class MobileResourceController extends V1Controller
         if ($gate instanceof \Symfony\Component\HttpFoundation\Response) return $gate;
 
         try {
+            // إقرارُ استلامِ السجلّ (مخزنُ `record_acks`): البابُ الواحد نفسُه الذي يسلكه `AckController`
+            // (السجلُّ هنا مُنطَّقٌ سلفاً بـfindScoped، والمنعُ فُحص أعلاه) — لا صفَّ policy له
+            if (\App\Support\Collaboration\Acknowledgement::store($module) !== \App\Support\Collaboration\Acknowledgement::STORE_POLICY) {
+                \App\Support\Collaboration\Acknowledgement::acknowledge($module, $m, (string) $r->user()->id);
+                $resp = $this->ok(['module' => $module, 'id' => (string) $m->id, 'action' => 'ack',
+                    'version' => (string) \App\Support\Collaboration\Acks::version($m)]);
+                $this->idempotentFinish($r, $resp);
+
+                return $resp;
+            }
+
             $ack = hub_ack_do($module, (string) $m->id);   // يُدقّق بـ source=mobile عبر request_source
             if (! $ack) {
                 if ($gate === true) $this->idempotentRelease($r);

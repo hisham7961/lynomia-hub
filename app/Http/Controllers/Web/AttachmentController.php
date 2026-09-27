@@ -227,23 +227,16 @@ class AttachmentController extends Controller
         return AttachmentService::stream(Attachment::findOrFail($id));
     }
 
-    /** الحذف: من رفعه، أو من يملك تعديل الوحدة، أو المالك — ويُدوَّن في التدقيق */
+    /**
+     * الحذف: من رفعه، أو من يملك تعديل الوحدة، أو المالك — ويُدوَّن في التدقيق.
+     * الحارسُ والأثرُ في الجوهر المشترك (`AttachmentService::authorizeDelete/delete`) —
+     * يسلكه الجوالُ (`DELETE files/{id}`) حرفاً.
+     */
     public function destroy(string $id)
     {
         $a = Attachment::findOrFail($id);
-        $u = auth()->user();
-        abort_unless(
-            $a->uploaded_by === $u->id || hub_is_owner($u) || hub_can($u, $a->module, 'e'),
-            403, 'حذف المرفق لمن رفعه أو من يملك تعديل الوحدة'
-        );
-        $this->guardRecord($a->module, $a->record_id, 'v');
-
-        $a->delete();   // حذف ناعم — الملف يبقى على القرص للاستعادة
-        // مرفقٌ مؤرَّخٌ حُذف: يخرج من رادار «ينتهي قريباً» وعدّاد شارة التنبيهات —
-        // كان الرفعُ يُبطل الخبيئة والحذفُ لا، فيبقى المحذوفُ في الرادار حتى انتهائها
-        if ($a->expires_at) hub_expiry_bust();
-
-        hub_audit('حذف مرفق', $a->module, $a->record_id, (string) $a->original_name);
+        AttachmentService::authorizeDelete($a);
+        AttachmentService::delete($a);   // حذف ناعم — الملف يبقى على القرص للاستعادة
 
         return back()->with('ok', 'حُذف المرفق');
     }

@@ -269,6 +269,41 @@ class AttachmentService
     }
 
     /**
+     * **حذفُ مرفق — الحارسُ الواحد للويب والجوال:** من رفعه، أو المالك، أو من يملك تعديلَ
+     * وحدته (٤٠٣ لغيرهم)، ثم رؤيةُ السجلّ ونطاقُه (`guardRecord(...,'v')` · خارجَ النطاق ٤٠٤).
+     * الترتيبُ ترتيبُ `AttachmentController::destroy` القائم حرفاً.
+     */
+    public static function authorizeDelete(Attachment $a): void
+    {
+        $u = auth()->user();
+        abort_unless(
+            $a->uploaded_by === $u->id || hub_is_owner($u) || hub_can($u, $a->module, 'e'),
+            403, 'حذف المرفق لمن رفعه أو من يملك تعديل الوحدة'
+        );
+        self::guardRecord($a->module, $a->record_id, 'v');
+    }
+
+    /** هل يملك المستخدمُ حذفَ هذا المرفق؟ (عرضٌ للقائمة — الحارسُ يعيد الفحص عند الفعل) */
+    public static function mayDelete(Attachment $a, $user = null): bool
+    {
+        $u = $user ?? auth()->user();
+
+        return $u !== null && ($a->uploaded_by === $u->id || hub_is_owner($u) || hub_can($u, $a->module, 'e'));
+    }
+
+    /**
+     * **الحذف** (بعد `authorizeDelete`): ناعمٌ — الملفُّ يبقى على القرص للاستعادة؛ ومرفقٌ مؤرَّخٌ
+     * يخرج من رادار «ينتهي قريباً» فوراً؛ وقيدُ تدقيق.
+     */
+    public static function delete(Attachment $a): void
+    {
+        $a->delete();
+        if ($a->expires_at) hub_expiry_bust();
+
+        hub_audit('حذف مرفق', $a->module, $a->record_id, (string) $a->original_name);
+    }
+
+    /**
      * يُدوّن وصولاً لبياناتٍ مصنَّفة إن كان السجلُّ الأمّ يحمل حقلَ سرّيةٍ مُقيَّداً.
      * يقرأ الحقلَ من تعريف الوحدة (أيُّ حقلٍ اسمُه `secrecy`)، فلا يُخصّ وحدةً بعينها.
      */
