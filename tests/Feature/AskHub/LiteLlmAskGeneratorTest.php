@@ -181,6 +181,46 @@ class LiteLlmAskGeneratorTest extends TestCase
         $this->assertTrue($r['meta']['live']);
     }
 
+    /**
+     * **نموذجٌ يُجيب من ذاكرتِه قبل أن يقرأ يُعاد بإلزامِ الأداة — مرّةً واحدة** (بلاغ المالك).
+     *
+     * «كم تقريراً لم يُسلَّم أمس؟» كان يُحجَب كلَّ مرّةٍ بـ«أجاب دون أن يقرأ سجلّاً»: الحارسُ صادق،
+     * لكنّ النموذجَ يملك الأدواتِ ولم يطلبها لأنّ `tool_choice=auto` يتركها له. فجوابٌ بلا قراءةٍ في
+     * **الخطوةِ الأولى** يُعاد بـ`tool_choice=required` مرّةً واحدة — والحارسُ باقٍ كما هو لما بعدها.
+     */
+    public function test_جوابٌ_بلا_قراءةٍ_في_الخطوةِ_الأولى_يُعاد_بإلزامِ_الأداة(): void
+    {
+        $this->script([
+            [LiteLlmFixtures::answer('لا أستطيع رؤية التقارير.'), 200],
+            [LiteLlmFixtures::toolCall([['id' => 'call_req1', 'name' => 'hub_list',
+                                        'args' => ['module' => 'projects']]]), 200],
+            [LiteLlmFixtures::answer('لديك مشروعٌ واحدٌ نشط [#1].', LiteLlmFixtures::usage()), 200],
+        ]);
+
+        $r = $this->ask();
+
+        $this->assertTrue($r['ok'], 'الجوابُ حُجب بدل أن يُلزَم النموذجُ بالقراءة: ' . (string) $r['failure']);
+        $this->assertCount(3, $this->sent);
+        $this->assertSame('auto', $this->sent[0]['tool_choice']);
+        $this->assertSame('required', $this->sent[1]['tool_choice'], 'الإعادةُ لم تُلزم الأداة');
+        $this->assertSame('auto', $this->sent[2]['tool_choice'], 'الإلزامُ تسرّب إلى ما بعد القراءة');
+    }
+
+    /** **والإلزامُ لا يتكرّر**: نموذجٌ يُصرّ على الجواب بلا قراءة يسقط عند الحارس كما كان — لا حلقة */
+    public function test_الإلزامُ_مرّةً_واحدةً_ثمّ_الحارسُ_كما_كان(): void
+    {
+        $this->script([
+            [LiteLlmFixtures::answer('لا أعرف.'), 200],
+            [LiteLlmFixtures::answer('لا أعرف حقّاً.'), 200],
+        ]);
+
+        $r = $this->ask();
+
+        $this->assertFalse($r['ok']);
+        $this->assertSame(\App\Support\Ai\Ask\AskFailures::NO_SERVER_READ, $r['failure']);
+        $this->assertCount(2, $this->sent, 'إعادةٌ واحدةٌ لا أكثر');
+    }
+
     /** **تسلسلُ `assistant`→`tool` بمعرّفِ النداءِ الذي ولّده النموذج** */
     public function test_تسلسلُ_الرسائلِ_يحمل_معرّفَ_النداءِ_كما_ورد(): void
     {

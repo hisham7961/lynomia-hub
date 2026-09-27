@@ -341,12 +341,13 @@ final class AiReleaseCheck
         }
 
         $extra = array_values(array_diff(AskTools::TOOLS,
-            ['hub_modules', 'hub_search', 'hub_list', 'hub_record', 'hub_count', 'hub_findings', 'hub_semantic']));
+            ['hub_modules', 'hub_search', 'hub_list', 'hub_record', 'hub_count', 'hub_findings', 'hub_semantic',
+             'hub_report_compliance']));
 
         return $extra === []
-            ? self::pass('أدواتُ الكتابةِ مغلقة', 'سبعُ أدواتٍ قارئةٍ مُراجَعة (آخرُها `hub_semantic`) ولا أداةَ تكتب')
+            ? self::pass('أدواتُ الكتابةِ مغلقة', 'ثماني أدواتٍ قارئةٍ مُراجَعة (آخرُها `hub_report_compliance`) ولا أداةَ تكتب')
             : self::warn('أدواتُ الكتابةِ مغلقة',
-                'أداةٌ خارجَ السبعِ المُراجَعة: ' . implode(' · ', $extra) . ' — تُراجَع',
+                'أداةٌ خارجَ الثماني المُراجَعة: ' . implode(' · ', $extra) . ' — تُراجَع',
                 null);
     }
 

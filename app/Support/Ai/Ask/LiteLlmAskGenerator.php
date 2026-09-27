@@ -91,6 +91,9 @@ final class LiteLlmAskGenerator implements AskGenerator
     /** طلبُ الأداةِ المعلَّقُ الذي لم تصل نتيجتُه بعد */
     private ?array $pending = null;
 
+    /** أُلزم النموذجُ بالأداةِ مرّةً في هذا الطلب — فلا إلزامَ ثانٍ */
+    private bool $forced = false;
+
     /** سياقُ الحوكمةِ لهذا الطلب — يُسلَّم من المنسّقِ قبل أوّلِ خطوة */
     private array $gov = [];
 
@@ -212,7 +215,31 @@ final class LiteLlmAskGenerator implements AskGenerator
             'temperature' => 0,
         ], $this->envelopeChars);
 
-        return $res['ok'] ? $this->read($res['data']) : $this->error($res['code']);
+        $out = $res['ok'] ? $this->read($res['data']) : $this->error($res['code']);
+
+        /*
+         * ── **جوابٌ قبل أيِّ قراءةٍ يُعاد بإلزامِ الأداة — مرّةً واحدة** (بلاغ المالك) ──
+         *
+         * `auto` يترك الأدواتِ للنموذج، وبعضُ النماذجِ يُجيب من ذاكرتِه («لا أستطيع رؤية التقارير»)
+         * فيحجبه حارسُ «لا جوابَ بلا قراءة» — صادقاً، لكنّ السؤالَ لم يُجَب وله أداةٌ تجيبه.
+         * فجوابٌ في **الخطوةِ الأولى** (لا زوجَ أداةٍ بعد) يُعاد بـ`required`. والإعادةُ مرّةٌ واحدة:
+         * إصرارٌ ثانٍ أو مزوّدٌ لا يعرف `required` يُعيد الجوابَ الأوّلَ إلى الحارسِ كما كان — لا حلقة.
+         */
+        if (($out['kind'] ?? null) === 'answer' && $this->pairs === [] && ! $this->forced && $toolDefs !== []) {
+            $this->forced = true;
+            $again = $this->gc->call([
+                'messages'    => $messages,
+                'tools'       => $toolDefs,
+                'tool_choice' => 'required',
+                'temperature' => 0,
+            ], $this->envelopeChars);
+            if ($again['ok']) {
+                $retry = $this->read($again['data']);
+                if (($retry['kind'] ?? null) === 'tool') return $retry;
+            }
+        }
+
+        return $out;
     }
 
     /**

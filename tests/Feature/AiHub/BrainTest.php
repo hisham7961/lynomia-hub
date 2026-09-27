@@ -148,6 +148,41 @@ class BrainTest extends TestCase
         $this->assertFalse(\Illuminate\Support\Facades\Schema::hasColumn('ai_embeddings', 'text'), 'المتّجهُ وحدَه — لا نصّ');
     }
 
+    /**
+     * **«العقلُ يصل لكامل النظام»** (بلاغ المالك): `brain.scope=all` يضمّ حقولَ النصّ الطويل (`ta`) من كلِّ
+     * وحدةٍ قابلةٍ للتخزين — ومنها التقاريرُ اليوميّة — **لا** الوحداتِ الحسّاسة ولا ما على الإنترنت وحده،
+     * ولا الحقولَ المصنّفةَ حسّاسة، ولا الأسرار. والافتراضيُّ `core` يبقى كما كان.
+     */
+    public function test_النطاقُ_الكامل_يضمّ_التقاريرَ_وكلَّ_نصٍّ_طويل_ويستثني_الحسّاس(): void
+    {
+        $core = Brain::sources();
+        $this->assertSame(array_keys(Brain::SOURCES), array_keys($core), 'الافتراضيُّ لم يتغيّر');
+
+        Settings::put('brain.scope', 'all', 'test');
+        $all = Brain::sources();
+        $this->assertContains('done', $all['updates'] ?? [], 'التقاريرُ اليوميّة في النطاق الكامل');
+        $this->assertContains('problems', $all['updates'] ?? []);
+        foreach (Brain::SOURCES as $m => $keys) {
+            foreach ($keys as $k) $this->assertContains($k, $all[$m] ?? [], "النطاقُ الكامل أسقط {$m}.{$k}");
+        }
+        foreach (['vault', 'phones', 'carriers', 'hr', 'payroll', 'attend', 'hrlog', 'users'] as $m) {
+            $this->assertArrayNotHasKey($m, $all, "وحدةٌ حسّاسةٌ أو آنيّةٌ فُهرست: {$m}");
+        }
+        foreach ($all as $m => $keys) {
+            foreach ($keys as $k) {
+                $this->assertFalse(hub_field_sensitive($m, $k), "حقلٌ حسّاسٌ فُهرس: {$m}.{$k}");
+                $f = collect((array) (hub_mod($m)['fields'] ?? []))->firstWhere('key', $k);
+                $this->assertNotSame('sec', $f['type'] ?? null, "سرٌّ فُهرس: {$m}.{$k}");
+            }
+        }
+
+        $u = $this->user();
+        DB::table('work_updates')->insert(['id' => (string) Str::uuid(), 'done' => 'أصلحنا بطءَ الشبكة في المستودع',
+            'work_date' => now()->toDateString(), 'created_by' => $u->id, 'created_at' => now(), 'updated_at' => now()]);
+        Brain::index();
+        $this->assertGreaterThan(0, DB::table('ai_embeddings')->where('module', 'updates')->count(), 'التقريرُ فُهرس فعلاً');
+    }
+
     public function test_المعاينةُ_لا_تنادي_ولا_تكتب(): void
     {
         $this->decision('اعتمادُ مورّدٍ ثانٍ');
