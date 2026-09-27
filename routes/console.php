@@ -19,6 +19,14 @@ Schedule::command('hub:automation')->dailyAt('06:00')->withoutOverlapping(240)
     ->onFailure(fn () => hub_schedule_failed('hub:automation', 'QUEUE', 'ERROR'));
 Schedule::command('hub:outbox')->everyFiveMinutes()->withoutOverlapping(20)
     ->onFailure(fn () => hub_schedule_failed('hub:outbox', 'QUEUE', 'ERROR'));
+/*
+| ملخّصُ تقارير المشروع **كلَّ ساعة** حين يختاره المالك (`reports.project_digest_frequency=hourly`) — وإلّا
+| فهو خطوةٌ في hub:automation اليوميّة. `when` يُقرأ عند كلِّ دقّةٍ لا عند الإقلاع: تغييرُ الإعداد يسري فوراً،
+| ومطفأٌ أو يوميٌّ ⇒ لا يجري. والجولةُ نفسُها تزايديّة: لا جديد ⇒ لا نداء.
+*/
+Schedule::command('hub:report-digest')->hourly()->withoutOverlapping(50)
+    ->when(fn () => \App\Support\Ai\Reports\ProjectReportDigest::hourly() && \App\Support\Ai\Reports\ProjectReportDigest::enabled())
+    ->onFailure(fn () => hub_schedule_failed('hub:report-digest', 'QUEUE', 'ERROR'));
 Schedule::command('hub:backup')->dailyAt('03:30')->withoutOverlapping(240)
     ->onFailure(fn () => hub_schedule_failed('hub:backup', 'QUEUE', 'HIGH'));
 Schedule::command('hub:digest')->weeklyOn(6, '07:00')->withoutOverlapping(240)   // تقرير تنفيذي أسبوعي (السبت ٧ صباحاً)

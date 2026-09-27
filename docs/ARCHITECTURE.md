@@ -211,7 +211,14 @@ Exception → bootstrap/app.php → Api::render (api/*) | صفحةُ خطأ عر
   (مؤشّرٌ مركّب `covered_until`+`last_report_id` في `project_report_digests`) — الجديدُ وحده مع الملخّص السابق، ولا نداءَ
   بلا جديد؛ هويّةُ خدمةٍ في الذاكرة (`DigestIdentity`) والكاتبُ رمزٌ `[P1]` لا اسم. الرؤيةُ في `DigestAccess` (نطاقُ
   المشروع + `updates:v`، لا العميل، ولا من حُجب عنه حقلٌ من التقرير). «التقارير ← تقارير حسب المشروع» (`reports.projects`)
-  وبطاقةٌ في صفحة المشروع؛ الجولةُ في `hub:automation` واليدويّةُ `hub:report-digest`. مطفأٌ افتراضاً (`reports.project_digest`).
+  وبطاقةٌ في صفحة المشروع؛ الجولةُ في `hub:automation` (أو كلَّ ساعةٍ بـ`reports.project_digest_frequency=hourly` من `routes/console.php`) واليدويّةُ `hub:report-digest`. مطفأٌ افتراضاً (`reports.project_digest`).
+- **تقريرُ أداء الموظّف** (`Ai\Reports\EmployeePerformance` · feature=`employee_performance`): لكلِّ (موظّف، فترة) صفٌّ في
+  `employee_performance_reports` (شهرٌ `2026-09` أو أسبوعٌ `2026-W39` — `PerformancePeriod`). الحقائقُ حتميّةٌ أوّلاً
+  (`PerformanceFacts` فوق `DailyWorkCompliance::resolveRange` والمهامّ والإجازات والعهدة والتذاكر) ثمّ سردٌ محكوم؛ بصمةُ ما يُرسَل
+  (`facts_hash`) تمنع النداءَ بلا جديد، والسابقةُ المكتملةُ تُولَّد مرّةً. هويّةُ خدمةٍ في الذاكرة (`PerformanceIdentity`، بلا `fieldsec`)،
+  والموظّفُ رمزٌ `[E]` والمشروعُ `[PR1]`. الرؤيةُ في `PerformanceAccess` (المالك · `hr:v` بنطاقه · المديرُ المباشر `employees.manager_id`
+  — لا الموظّفُ نفسُه ولا العميل، ولا من حُجب عنه `hr.perf` أو حقلٌ من التقرير). تبويبُ «تقرير الأداء» في الملفّ الشامل
+  و«التقارير ← تقارير الأداء» (`reports.performance`)؛ الجولةُ في `hub:automation` واليدويّةُ `hub:performance`. مطفأٌ افتراضاً (`hr.performance_ai`).
 - **المدقّق** (`Ai\Auditor`): هويّةُ خدمةٍ في الذاكرة لا تُحفظ، وكواشفُ قواعد (نسخُ التقرير · العائقُ المتكرّر ·
   ساعاتٌ بلا تقدّم · قرارٌ بلا مهمّة) وكواشفُ ذكاءٍ **مطفأةٌ افتراضاً** (`auditor.ai`). النتائجُ في `ai_findings` بمفتاحٍ
   ثابتٍ للشرط، و**يُعاد تنطيقُها لكلِّ مشاهد** قبل أن تظهر في مركز الفعل (`AuditorSignals`). لا يكتب سجلاتِ أعمال،

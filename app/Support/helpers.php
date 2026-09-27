@@ -597,6 +597,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'reportsc',  'label' => '📊 مركز التقارير اليومية', 'route' => 'reports.index',  'group' => 'centers',   'ok' => hub_can($user, 'hr', 'v')],
             ['key' => 'reportsr',  'label' => '📥 تقارير للمراجعة',    'route' => 'reports.review',  'group' => 'centers',   'ok' => \App\Support\Workforce\ReportReview::canReviewAny($user)],
             ['key' => 'reportsp',  'label' => '📁 تقارير حسب المشروع', 'route' => 'reports.projects', 'group' => 'centers',  'ok' => \App\Support\Ai\Reports\DigestAccess::canUse($user)],
+            ['key' => 'perfai',    'label' => '📈 تقارير الأداء',     'route' => 'reports.performance', 'group' => 'centers', 'ok' => \App\Support\Ai\Reports\PerformanceAccess::canUseAny($user)],
             // الحضورُ الشهريّ للمحاسبة والاعتماد — يكفيه `attend:v` (يمنحه المالكُ للمحاسب) أو `hr:v`
             ['key' => 'attmonth',  'label' => '🗓️ الحضور الشهري',     'route' => 'reports.monthly', 'group' => 'centers',   'ok' => hub_can($user, 'attend', 'v') || hub_can($user, 'hr', 'v')],
             ['key' => 'codehub',   'label' => '🌿 مركز الكود',        'route' => 'code.center',     'group' => 'centers',   'ok' => hub_can($user, 'code', 'v')],

@@ -91,6 +91,20 @@ final class ProjectReportDigest
         return (string) setting('reports.project_digest', '0') === '1';
     }
 
+    /**
+     * **تكرارُ الجولة:** `daily` (افتراضاً — خطوةٌ في `hub:automation`) أو `hourly` (مجدولٌ كلَّ ساعة في
+     * `routes/console.php`، ويُتخطّى في الدورة اليوميّة). أيُّ قيمةٍ سوى `hourly` تعني اليوميّ.
+     */
+    public static function frequency(): string
+    {
+        return (string) setting('reports.project_digest_frequency', 'daily') === 'hourly' ? 'hourly' : 'daily';
+    }
+
+    public static function hourly(): bool
+    {
+        return self::frequency() === 'hourly';
+    }
+
     public static function days(): int
     {
         return max(1, min(365, (int) setting('reports.project_digest_days', 30)));

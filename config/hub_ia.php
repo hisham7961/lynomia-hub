@@ -192,6 +192,10 @@ return [
                     ['type' => 'center', 'center' => 'reportsp', 'importance' => 'secondary',
                         'route_prefix' => 'reports.projects', 'routes' => ['reports.projects', 'reports.projects.show'],
                         'synonyms' => ['project reports', 'تقارير المشاريع', 'تقارير حسب المشروع', 'ملخص التقارير', 'report digest', 'ai summary']],
+                    // تقريرُ أداء الموظّف بالذكاء (EmployeePerformance) — التفصيلُ تحت البادئة نفسِها
+                    ['type' => 'center', 'center' => 'perfai', 'importance' => 'secondary',
+                        'route_prefix' => 'reports.performance', 'routes' => ['reports.performance', 'reports.performance.show'],
+                        'synonyms' => ['performance', 'تقارير الأداء', 'تقرير الأداء', 'تقييم الأداء', 'employee performance', 'ai performance']],
                     ['type' => 'center', 'center' => 'attmonth', 'importance' => 'secondary',
                         'route_prefix' => 'reports.monthly', 'routes' => ['reports.monthly', 'reports.monthly.employee'],
                         'synonyms' => ['monthly', 'الحضور الشهري', 'شهري', 'كشف الحضور', 'المحاسب', 'attendance sheet', 'payroll attendance']],
