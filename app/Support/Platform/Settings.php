@@ -966,7 +966,11 @@ class Settings
         // القيمةُ السارية بعد الحفظ — والمخزَّنُ الفارغ ليس قيمةً (‏`setting()`
         // تردّ الافتراضيَّ عند الفراغ) فيسقط إلى الافتراضيّ كما يسقط القارئ
         $val = function (string $k) use ($pending, $rows): string {
-            if (array_key_exists($k, $pending)) return (string) (self::flat($pending[$k]) ?? '');
+            // والمُرسَلُ الفارغُ كالمخزَّن الفارغ: يسقط إلى الافتراضيّ — النموذجُ يُرسل حقلاً لم يُمسّ
+            // فارغاً (الافتراضيُّ نائبٌ لا قيمة)، وقراءتُه صفراً كانت تُسقط حفظَ مفتاحٍ آخرَ كلَّه (بلاغ المالك)
+            $sent = array_key_exists($k, $pending) ? (string) (self::flat($pending[$k]) ?? '') : '';
+            if ($sent !== '') return $sent;
+            if (array_key_exists($k, $pending)) return (string) (self::flat(self::defaultOf($k)) ?? '');
             $stored = array_key_exists($k, $rows) ? (string) (self::flat($rows[$k]) ?? '') : '';
 
             return $stored !== '' ? $stored : (string) (self::flat(self::defaultOf($k)) ?? '');
