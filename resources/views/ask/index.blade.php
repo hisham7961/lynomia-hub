@@ -281,7 +281,13 @@
                             try { data = JSON.parse(data); } catch (x) { return; }
                             if (ev === 'progress') { if (w) w.textContent = '⏳ ' + data.text; if (b) b.disabled = true; }
                             if (ev === 'error') { done = true; inflight = false; if (b) b.disabled = false; if (w) w.textContent = '⚠️ ' + (data.text || ''); }
-                            if (ev === 'done' && data.html) { done = true; document.open(); document.write(data.html); document.close(); }
+                            if (ev === 'done' && data.html) {
+                                done = true;
+                                /* الصفحةُ تُكتب فوق هذه فتبقى سياسةُ CSP الأولى — فسكربتاتُها بـnonce هذه الصفحة */
+                                var own = document.querySelector('script[nonce]'), cur = own ? (own.nonce || own.getAttribute('nonce')) : '';
+                                var html = (data.nonce && cur && data.nonce !== cur) ? data.html.split('nonce="' + data.nonce + '"').join('nonce="' + cur + '"') : data.html;
+                                document.open(); document.write(html); document.close();
+                            }
                         });
                         return pump();
                     });

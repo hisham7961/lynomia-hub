@@ -93,7 +93,8 @@ class AskController extends Controller
                         default => 'يعمل…',
                     }]);
                 });
-                $send('done', ['html' => view('ask.index', $data)->render()]);
+                // والـnonce مع الصفحة: تُكتب فوق صفحةٍ قائمة فتبقى سياستُها — والعميلُ يستبدله بـnonce صفحته
+                $send('done', ['html' => view('ask.index', $data)->render(), 'nonce' => \App\Support\Security\ContentSecurity::nonce()]);
             } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e) {
                 $send('error', ['text' => $e->getStatusCode() === 404 ? 'لم تعُد هذه المحادثةُ موجودة' : 'تعذّر إكمالُ الطلب']);
             } catch (\Throwable $e) {

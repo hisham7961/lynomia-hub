@@ -17,6 +17,7 @@ use App\Support\Finance\JournalPosting;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -210,12 +211,85 @@ class JournalPostingUnifiedTest extends TestCase
             'اعتمادٌ ثانٍ للمسيّر نفسِه رحّل قيدَ رواتبٍ ثانياً — مصروفٌ مضاعف');
 
         $first = JournalEntry::where('reference', $run->name)->firstOrFail();
+        $amount = (string) \App\Models\JournalLine::where('entry_id', $first->id)->sum('debit');
         $again = JournalPosting::postBalanced(['doc_no' => 'X'], [
-            ['acc_id' => $this->acc('5200'), 'debit' => 1, 'credit' => 0],
-            ['acc_id' => $this->acc('1020'), 'debit' => 0, 'credit' => 1],
+            ['acc_id' => $this->acc('5200'), 'debit' => $amount, 'credit' => 0],
+            ['acc_id' => $this->acc('1020'), 'debit' => 0, 'credit' => $amount],
         ], ['module' => 'payroll', 'id' => $run->id, 'key' => 'approval']);
         $this->assertSame($first->id, $again->id, 'المحرّكُ رحّل المصدرَ نفسَه مرّتين');
         $this->assertSame(1, JournalEntry::count());
+    }
+
+    /**
+     * (مراجعة) **المصدرُ المرحَّلُ بمبلغٍ آخر لا يُعاد قيدُه القديمُ صامتاً** — مسيّرٌ عُدّل بعد
+     * ترحيله فأُعيد اعتمادُه كان يُعاد له القيدُ القديم فيختلف الدفترُ عن الرواتب بلا أثر.
+     */
+    public function test_same_source_with_a_different_amount_is_refused_not_silently_reused(): void
+    {
+        $this->seedCore();
+        $this->ledger();
+        $src = ['module' => 'payroll', 'id' => 'run-x', 'key' => 'approval'];
+        $lines = fn ($a) => [
+            ['acc_id' => $this->acc('5200'), 'debit' => $a, 'credit' => 0],
+            ['acc_id' => $this->acc('1020'), 'debit' => 0, 'credit' => $a],
+        ];
+        JournalPosting::postBalanced(['doc_no' => 'JE-A'], $lines('100.000'), $src);
+
+        try {
+            JournalPosting::postBalanced(['doc_no' => 'JE-B'], $lines('150.000'), $src);
+            $this->fail('مصدرٌ مرحَّلٌ بمبلغٍ آخر أُعيد قيدُه القديمُ صامتاً');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->assertStringContainsString('بمبلغٍ مختلف', implode(' ', \Illuminate\Support\Arr::flatten($e->errors())));
+        }
+        $this->assertSame(1, JournalEntry::count());
+    }
+
+    /**
+     * (مراجعة) **لا قفلَ فجوةٍ على مفتاح المصدر**: `SELECT … FOR UPDATE` على مفتاحٍ غائبٍ في فهرسٍ
+     * فريد يأخذ قفلَ فجوةٍ في InnoDB، فترحيلان لمصدرين مختلفين يتقاطعان في الفجوة نفسِها يتعاطلان —
+     * والتعاطلُ ليس خطأَ تفرّدٍ فيسقط القيدُ صامتاً خلف `report()`. الفهرسُ الفريدُ وحده الحاجز.
+     */
+    public function test_source_lookup_takes_no_gap_lock(): void
+    {
+        $this->seedCore();
+        $this->ledger();
+        $sql = [];
+        DB::listen(function ($q) use (&$sql) { $sql[] = strtolower($q->sql); });
+        JournalPosting::postBalanced(['doc_no' => 'JE-L'], [
+            ['acc_id' => $this->acc('5200'), 'debit' => 5, 'credit' => 0],
+            ['acc_id' => $this->acc('1020'), 'debit' => 0, 'credit' => 5],
+        ], ['module' => 'fin', 'id' => 'doc-1', 'key' => 'payment:1']);
+
+        $locked = array_filter($sql, fn ($q) => str_contains($q, 'journal_entries') && str_contains($q, 'for update'));
+        $this->assertSame([], array_values($locked), 'البحثُ عن قيد المصدر يقفل فجوةَ الفهرس');
+    }
+
+    /**
+     * (مراجعة) **رقمُ القيد فريدٌ في القاعدة لا بالفحص وحده**: `exists()` ثم الإدراجُ سباقٌ بين
+     * معاملتين؛ الفهرسُ الفريدُ يُسقط الثاني، والمحرّكُ يعيد التخصيصَ بلاحقة.
+     */
+    public function test_doc_no_race_is_caught_by_the_index_and_retried(): void
+    {
+        $this->seedCore();
+        $this->ledger();
+        $fired = false;
+        JournalEntry::creating(function ($e) use (&$fired) {
+            if ($fired || $e->doc_no !== 'JE-RACE') return;
+            $fired = true;   // معاملةٌ أخرى التزمت بالرقم نفسِه بين الفحص والإدراج
+            DB::table('journal_entries')->insert(['id' => (string) \Illuminate\Support\Str::uuid(), 'doc_no' => 'JE-RACE',
+                'date' => now()->toDateString(), 'state' => 'مسودة', 'created_at' => now(), 'updated_at' => now()]);
+        });
+
+        $e = JournalPosting::postBalanced(['doc_no' => 'JE-RACE'], [
+            ['acc_id' => $this->acc('5200'), 'debit' => 7, 'credit' => 0],
+            ['acc_id' => $this->acc('1020'), 'debit' => 0, 'credit' => 7],
+        ]);
+
+        // (المحاكاةُ داخل معاملتنا فيرتدّ صفُّها مع المحاولة الأولى — والمقصودُ: لا رقمَ مكرّرٌ يُكتب، والترحيلُ يتمّ)
+        $this->assertTrue($fired);
+        $this->assertTrue($e->exists && JournalEntry::whereKey($e->id)->exists(), 'الترحيلُ سقط بدل إعادة التخصيص');
+        $this->assertSame(1, JournalEntry::where('doc_no', $e->doc_no)->count(), 'رقمُ قيدٍ مكرّرٌ كُتب');
+        $this->assertSame(1, JournalEntry::where('doc_no', 'JE-RACE')->count());
     }
 
     /** (ج) دفعتان على المستند نفسِه في الثانية نفسِها ⇒ رقمان مختلفان لا رقمٌ مكرّر */

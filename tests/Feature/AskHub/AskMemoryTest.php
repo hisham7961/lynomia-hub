@@ -311,6 +311,33 @@ class AskMemoryTest extends TestCase
         $this->assertSame(1, AskTurn::query()->count(), 'البثُّ يحفظ كالعرض العاديّ');
     }
 
+    /**
+     * **صفحةُ الختام تُكتب فوق الصفحة (`document.write`) فتبقى سياسةُ CSP الأولى بـnonce طلبِها** —
+     * وسكربتاتُ صفحة الختام تحمل nonce طلبِ البثّ فتُحجب كلُّها مفروضةً (السمةُ، ومعالجُ البثّ التالي).
+     * فالحدثُ يحمل nonce طلبه، وسكربتُ الصفحة يستبدله بـnonce الصفحة القائمة قبل الكتابة.
+     */
+    public function test_حدثُ_الختام_يحمل_nonce_صفحته_والصفحةُ_تستبدله_قبل_الكتابة(): void
+    {
+        $u = $this->asker();
+        $this->ready();
+        $this->bindAnswer('جوابٌ للبصمة');
+
+        $body = $this->actingAs($u)->post(route('ask.stream'), ['q' => 'ما مشاريعي؟'])->assertOk()->streamedContent();
+        $done = substr($body, strpos($body, 'event: done'));
+        preg_match('/^data: (.*)$/m', $done, $m);
+        $data = json_decode($m[1] ?? '{}', true);
+
+        $this->assertIsString($data['nonce'] ?? null, 'حدثُ الختام بلا nonce');
+        preg_match_all('/<script\b[^>]*\bnonce="([^"]+)"/', (string) ($data['html'] ?? ''), $n);
+        $this->assertNotEmpty($n[1], 'صفحةُ الختام بلا سكربتٍ موسوم');
+        foreach (array_unique($n[1]) as $one) {
+            $this->assertSame($data['nonce'], $one, 'سكربتٌ في صفحة الختام بـnonce غير المُعلَن');
+        }
+
+        $page = $this->actingAs($u)->get(route('ask.index'))->assertOk()->getContent();
+        $this->assertStringContainsString("data.nonce", $page, 'سكربتُ البثّ لا يستبدل nonce الختام قبل الكتابة');
+    }
+
     public function test_خطأُ_الخادم_بعد_بدء_البثّ_حدثٌ_يُقال_لا_انقطاع(): void
     {
         $u = $this->asker();

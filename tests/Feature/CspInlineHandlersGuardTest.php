@@ -135,4 +135,15 @@ class CspInlineHandlersGuardTest extends TestCase
                 $f->getRelativePathname() . ' تستعمل سماتِ أفعالٍ ولا تحمّل actions.js');
         }
     }
+
+    /**
+     * **لا يُسجَّل المستمِعُ مرّتين**: البوّابةُ تحمّل الملفَّ في رأسها المشترك وفي ذيلها — فكان كلُّ فعلٍ
+     * يُنفَّذ مرّتين (زرُّ السمة يقلب ويعيد، والتأكيدُ يُسأل مرّتين، والكشفُ يُدقَّق مرّتين).
+     * فالملفُّ يحرس نفسَه من التحميل الثاني، وصفحةٌ حقيقيّةٌ للبوّابة تُفحص.
+     */
+    public function test_actions_script_guards_against_double_load(): void
+    {
+        $js = file_get_contents(public_path('js/actions.js'));
+        $this->assertMatchesRegularExpression('/if\s*\(window\.__hubActions\)\s*return;/', $js, 'actions.js بلا حارسِ تحميلٍ مزدوج');
+    }
 }

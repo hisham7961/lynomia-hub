@@ -175,33 +175,57 @@ final class JournalPosting
 
         JournalEntry::$posting = true;   // الحارسُ في النموذج يُخلي لهذه الكتلة — الفحصُ أعلاه بديلُه
         try {
-            return DB::transaction(function () use ($entryAttrs, $lines, $src, $d) {
-                if ($src && ($existing = self::existing($src, true))) return $existing;
+            // محاولاتٌ قليلة: سباقُ رقم القيد بين معاملتين يُسقطه الفهرسُ الفريد فيُعاد التخصيصُ بلاحقة
+            for ($attempt = 1; ; $attempt++) {
+                try {
+                    return DB::transaction(function () use ($entryAttrs, $lines, $src, $d) {
+                        // بلا `lockForUpdate`: قفلُ فجوةٍ على مفتاحٍ غائبٍ في فهرسٍ فريد يُعاطل ترحيلين
+                        // لمصدرين مختلفين في InnoDB — والفهرسُ الفريدُ على المصدر هو الحاجزُ الحقيقيّ
+                        if ($src && ($existing = self::existing($src))) return self::sameAmount($existing, $d);
 
-                $meta = (array) ($entryAttrs['meta'] ?? []);
-                $meta['posted_at'] ??= now()->toIso8601String();
+                        $meta = (array) ($entryAttrs['meta'] ?? []);
+                        $meta['posted_at'] ??= now()->toIso8601String();
 
-                $entry = JournalEntry::create(array_merge($entryAttrs, $src, [
-                    'doc_no' => self::allocateNumber($entryAttrs['doc_no'] ?? null),
-                    'date' => $entryAttrs['date'] ?? now()->toDateString(),
-                    'state' => self::STATE,
-                    'meta' => $meta,
-                ]));
-                foreach ($lines as $line) {
-                    JournalLine::create(array_merge(['entry_id' => $entry->id], (array) $line));
+                        $entry = JournalEntry::create(array_merge($entryAttrs, $src, [
+                            'doc_no' => self::allocateNumber($entryAttrs['doc_no'] ?? null),
+                            'date' => $entryAttrs['date'] ?? now()->toDateString(),
+                            'state' => self::STATE,
+                            'meta' => $meta,
+                        ]));
+                        foreach ($lines as $line) {
+                            JournalLine::create(array_merge(['entry_id' => $entry->id], (array) $line));
+                        }
+
+                        self::audit($entry, $d, $src);
+
+                        return $entry;
+                    });
+                } catch (UniqueConstraintViolationException $e) {
+                    // سباقٌ عبر المعاملات: سبقنا ترحيلُ المصدر نفسِه — قيدُه هو القيد (بالمبلغ نفسِه)
+                    if ($src && ($existing = self::existing($src))) return self::sameAmount($existing, $d);
+                    // وإلّا فرقمُ القيد: التزمت معاملةٌ أخرى بالرقم بين الفحص والإدراج — يُعاد التخصيص
+                    if ($attempt >= 3) throw $e;
                 }
-
-                self::audit($entry, $d, $src);
-
-                return $entry;
-            });
-        } catch (UniqueConstraintViolationException $e) {
-            // سباقٌ عبر المعاملات: سبقنا ترحيلُ المصدر نفسِه — قيدُه هو القيد
-            if ($src && ($existing = self::existing($src, false))) return $existing;
-            throw $e;
+            }
         } finally {
             JournalEntry::$posting = false;
         }
+    }
+
+    /**
+     * القيدُ القائمُ للمصدر يُعاد **إن كان بالمبلغ نفسِه** — وإلّا فالمصدرُ تغيّر بعد ترحيله
+     * (مسيّرٌ عُدّل ثم أُعيد اعتمادُه): إعادةُ القديم صامتاً تُفرّق الدفترَ عن مصدره بلا أثر.
+     */
+    private static function sameAmount(JournalEntry $existing, int $mills): JournalEntry
+    {
+        $had = self::entryTotals($existing->id)['debit'];
+        if ($had !== $mills) {
+            throw ValidationException::withMessages(['source' =>
+                'المصدرُ مُرحَّلٌ سلفاً بمبلغٍ مختلف (' . self::fmt($had) . ' ≠ ' . self::fmt($mills)
+                . ') — اعكس القيدَ القائم ' . $existing->doc_no . ' أوّلاً ثمّ رحّل من جديد']);
+        }
+
+        return $existing;
     }
 
     /**
@@ -291,12 +315,11 @@ final class JournalPosting
         ];
     }
 
-    private static function existing(array $src, bool $lock): ?JournalEntry
+    private static function existing(array $src): ?JournalEntry
     {
         $q = JournalEntry::query();
         $q->withTrashed();
         $q->where($src)->orderBy('id');
-        if ($lock) $q->lockForUpdate();
 
         return $q->first();
     }
