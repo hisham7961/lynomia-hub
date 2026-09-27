@@ -1,0 +1,1447 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Offset ''NOT_CONFIGURABLE…''\|''SUPPORTED''\|''SUPPORTED_WITH…'' on array\{SUPPORTED\: ''مدعومٌ كاملاً'', SUPPORTED_WITH_MANUAL_MODEL\: ''مدعومٌ بنماذجَ…'', SUPPORTED_WITH_SPECIAL_AUTH\: ''مدعومٌ بمصادقةٍ…'', NOT_CONFIGURABLE_FROM_HUB\: ''غيرُ قابلٍ للإعدادِ…''\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Console/Commands/HubAiCoverage.php
+
+		-
+			message: '#^Property App\\Console\\Commands\\HubAuditVerify\:\:\$startedAt \(Illuminate\\Support\\Carbon\|null\) does not accept Carbon\\CarbonInterface\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: app/Console/Commands/HubAuditVerify.php
+
+		-
+			message: '#^Parameter \#1 \$d of static method App\\Support\\Ops\\WebhookDispatcher\:\:send\(\) expects App\\Models\\WebhookDelivery, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Console/Commands/HubOutbox.php
+
+		-
+			message: '#^Call to an undefined method DateTimeInterface\:\:toIso8601String\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Api/MobileAskController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,App\\Models\\AskThread\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/MobileAskController.php
+
+		-
+			message: '#^Parameter \#1 \$u of static method App\\Support\\Security\\AccountLockout\:\:bump\(\) expects App\\Models\\User, Illuminate\\Contracts\\Auth\\Authenticatable given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/MobileAuthController.php
+
+		-
+			message: '#^Parameter \#1 \$user of method App\\Http\\Controllers\\Api\\MobileAuthController\:\:accountGate\(\) expects App\\Models\\User, Illuminate\\Contracts\\Auth\\Authenticatable given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/MobileAuthController.php
+
+		-
+			message: '#^Parameter \#1 \$user of method App\\Http\\Controllers\\Api\\MobileAuthController\:\:issueSession\(\) expects App\\Models\\User, Illuminate\\Contracts\\Auth\\Authenticatable given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/MobileAuthController.php
+
+		-
+			message: '#^Parameter \#1 \$user of method App\\Http\\Controllers\\Api\\MobileAuthController\:\:registerInstallation\(\) expects App\\Models\\User, Illuminate\\Contracts\\Auth\\Authenticatable given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/MobileAuthController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<\(int\|string\),mixed\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Api/MobileCommController.php
+
+		-
+			message: '#^Parameter \#2 \$default of method Illuminate\\Http\\Request\:\:query\(\) expects array\|string\|null, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/MobileCommController.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between mixed and null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/Api/MobileCommController.php
+
+		-
+			message: '#^Property Illuminate\\Http\\Request\:\:\$convertedFiles \(array\<int, array\<Illuminate\\Http\\UploadedFile\>\|Illuminate\\Http\\UploadedFile\>\) does not accept null\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: app/Http/Controllers/Api/MobileFileController.php
+
+		-
+			message: '#^Offset ''test'' on array\{assign\: ''إسنادٌ جديد'', approval\: ''طلبُ موافقة'', sign\: ''توقيعٌ إلكترونيّ'', sec\: ''تنبيهٌ أمنيّ'', dm\: ''رسالةٌ جديدة'', mention\: ''أشار إليك أحدُهم'', reply\: ''ردٌّ جديد'', react\: ''تفاعلٌ جديد'', \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Api/MobilePushController.php
+
+		-
+			message: '#^Parameter \#2 \$default of method Illuminate\\Http\\Request\:\:query\(\) expects array\|string\|null, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/MobileSyncController.php
+
+		-
+			message: '#^Parameter \#2 \$default of method Illuminate\\Http\\Request\:\:query\(\) expects array\|string\|null, int given\.$#'
+			identifier: argument.type
+			count: 3
+			path: app/Http/Controllers/Api/MobileWorkController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, App\\Models\\Employee\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1Controller.php
+
+		-
+			message: '#^Parameter \#2 \$default of method Illuminate\\Http\\Request\:\:query\(\) expects array\|string\|null, int given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Api/V1Controller.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Web/AccessController.php
+
+		-
+			message: '#^Parameter \#1 \$b of static method App\\Support\\Ai\\Governance\\AiBudgets\:\:status\(\) expects App\\Models\\AiBudget, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/AiGovernanceController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,stdClass\>\:\:filter\(\) expects \(callable\(stdClass, int\)\: bool\)\|null, Closure\(App\\Models\\AiModel\)\: bool given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/AiModelController.php
+
+		-
+			message: '#^Parameter \#2 \$model of static method App\\Support\\Ai\\Routing\\AiProfiles\:\:eligibility\(\) expects App\\Models\\AiModel, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/AiProfileController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, stdClass\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Web/AlertCenterController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,mixed\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Web/AttachmentController.php
+
+		-
+			message: '#^Parameter \#1 \$u of method App\\Http\\Controllers\\Web\\AuthController\:\:finishLogin\(\) expects App\\Models\\User, Illuminate\\Contracts\\Auth\\Authenticatable\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/AuthController.php
+
+		-
+			message: '#^Call to function in_array\(\) with arguments mixed, array\{\} and true will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Http/Controllers/Web/CapacityController.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/Web/CapacityController.php
+
+		-
+			message: '#^Offset mixed on array\{حرجة\: 4, عالية\: 3, متوسطة\: 2, منخفضة\: 1\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Web/CapacityController.php
+
+		-
+			message: '#^Result of \|\| is always true\.$#'
+			identifier: booleanOr.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/Web/CapacityController.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between null and null will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 1
+			path: app/Http/Controllers/Web/CapacityController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, stdClass\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/ClientPortalController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, stdClass\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/CurrencyRateController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, array\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Web/CustomFieldController.php
+
+		-
+			message: '#^Cannot call method visibleTo\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Web/DashboardController.php
+
+		-
+			message: '#^Parameter \#1 \$board of method App\\Http\\Controllers\\Web\\DashboardController\:\:layoutFor\(\) expects App\\Models\\Dashboard, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/DashboardController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, stdClass\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/DashboardController.php
+
+		-
+			message: '#^Call to protected method increment\(\) of class Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: method.protected
+			count: 1
+			path: app/Http/Controllers/Web/DataRoomController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, App\\Models\\ContractApprovalStep\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Web/EsignController.php
+
+		-
+			message: '#^Parameter \#2 \$a of static method App\\Support\\Documents\\DocumentPolicy\:\:authorize\(\) expects App\\Models\\Attachment, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/FileController.php
+
+		-
+			message: '#^Parameter \#2 \$att of method App\\Http\\Controllers\\Web\\FileController\:\:trail\(\) expects App\\Models\\Attachment\|null, stdClass\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/FileController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, array\|null given\.$#'
+			identifier: argument.type
+			count: 4
+			path: app/Http/Controllers/Web/FlowController.php
+
+		-
+			message: '#^Offset ''gtin'' on array\{type\: mixed, via\: mixed, viaLabel\: ''EAN''\|''GTIN''\|''ICCID''\|''MSISDN''\|''SKU''\|''UPC''\|''الرقم التسلسلي''\|''باركود''\|''رقم قطعة المصنع''\|''كود Lynomia''\|''كود سابق \(دمج\)''\|''وسم أصل''\|null, q\: string, gtin\: bool\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Web/IdentityController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, int\<0, max\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/ImportController.php
+
+		-
+			message: '#^Call to function is_array\(\) with non\-empty\-array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Http/Controllers/Web/InboundHookController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:restore\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Web/ModuleController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:restoreVersion\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Web/ModuleController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, string\|null given\.$#'
+			identifier: argument.type
+			count: 4
+			path: app/Http/Controllers/Web/ModuleController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>\(Expression\)" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Web/ModuleController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, stdClass\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/MySecurityController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,stdClass\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Web/OversightController.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,stdClass\>\:\:map\(\) expects callable\(stdClass, int\)\: array\{who\: mixed, body\: string, at\: mixed, deleted\: bool, pinned\: false, replies\: array\{\}\}, Closure\(App\\Models\\DmMessage\)\: array\{who\: mixed, body\: string, at\: mixed, deleted\: bool, pinned\: false, replies\: array\{\}\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/OversightController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/Web/OversightController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Contracts\\Auth\\PasswordBroker\:\:getUser\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Http/Controllers/Web/PasswordResetController.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Contracts\\Auth\\PasswordBroker\:\:tokenExists\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Web/PasswordResetController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, App\\Models\\PolicyAck\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/PolicyController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, App\\Models\\Attachment\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/PortalController.php
+
+		-
+			message: '#^Cannot call method saveQuietly\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Web/PurchaseController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/Web/PurchaseController.php
+
+		-
+			message: '#^Parameter \#2 \$default of method Illuminate\\Http\\Request\:\:query\(\) expects array\|string\|null, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/QuoteController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/Web/QuoteController.php
+
+		-
+			message: '#^Parameter \#2 \$default of method Illuminate\\Http\\Request\:\:query\(\) expects array\|string\|null, int given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Web/RelationshipExplorerController.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: string$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Http/Controllers/Web/RemediationController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, array\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/RemediationController.php
+
+		-
+			message: '#^Parameter \#2 \$reports of static method App\\Support\\Ai\\Auditor\\AuditorSignals\:\:notesFor\(\) expects iterable\<App\\Models\\WorkUpdate\>, Illuminate\\Support\\Collection\<int, stdClass\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/ReportsController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>is_owner" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Web/ReportsController.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<\(int\|string\)\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Http/Controllers/Web/RoleController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>field_rules" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Web/RoleController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>flags" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Web/RoleController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>matrix" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Web/RoleController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Web/SecurityController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, stdClass\|null given\.$#'
+			identifier: argument.type
+			count: 4
+			path: app/Http/Controllers/Web/SecurityController.php
+
+		-
+			message: '#^Parameter \#1 \$expires of method App\\Http\\Controllers\\Web\\SecurityController\:\:ruleTermLabel\(\) expects Illuminate\\Support\\Carbon\|null, Carbon\\CarbonInterface given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Web/SecurityController.php
+
+		-
+			message: '#^Parameter \#1 \$expires of method App\\Http\\Controllers\\Web\\SecurityController\:\:ruleTermLabel\(\) expects Illuminate\\Support\\Carbon\|null, Carbon\\CarbonInterface\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Web/SecurityController.php
+
+		-
+			message: '#^Parameter \#2 \$callback of function array_filter expects \(callable\(mixed\)\: bool\)\|null, Closure\(mixed\)\: array\<mixed, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/SecurityController.php
+
+		-
+			message: '#^Parameter \#2 \$default of method Illuminate\\Http\\Request\:\:query\(\) expects array\|string\|null, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/SecurityController.php
+
+		-
+			message: '#^Parameter \#2 \$syntax of method Carbon\\Carbon\:\:diffForHumans\(\) expects array\|int\|null, true given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/SecurityController.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between mixed and null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 2
+			path: app/Http/Controllers/Web/SecurityController.php
+
+		-
+			message: '#^Parameter \#2 \$default of method Illuminate\\Http\\Request\:\:query\(\) expects array\|string\|null, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/SocialController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Web/UserController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, array\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/WorkspaceController.php
+
+		-
+			message: '#^Parameter \#2 \$default of method Illuminate\\Http\\Request\:\:server\(\) expects array\|string\|null, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Middleware/Observability.php
+
+		-
+			message: '#^Property Illuminate\\Http\\Request\:\:\$convertedFiles \(array\<int, array\<Illuminate\\Http\\UploadedFile\>\|Illuminate\\Http\\UploadedFile\>\) does not accept null\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: app/Http/Middleware/ResolveChunkedUploads.php
+
+		-
+			message: '#^Cannot access property \$headers on class\-string\|object\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Http/Middleware/SecurityHeaders.php
+
+		-
+			message: '#^Ternary operator condition is always true\.$#'
+			identifier: ternary.alwaysTrue
+			count: 1
+			path: app/Http/Middleware/WorkHours.php
+
+		-
+			message: '#^Method App\\Models\\AccountActivation\:\:pendingByToken\(\) should return App\\Models\\AccountActivation\|null but returns stdClass\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/AccountActivation.php
+
+		-
+			message: '#^Method App\\Models\\AiBudget\:\:periods\(\) should return Illuminate\\Database\\Eloquent\\Relations\\HasMany but returns Illuminate\\Database\\Query\\Builder\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/AiBudget.php
+
+		-
+			message: '#^Method App\\Models\\AiProfile\:\:links\(\) should return Illuminate\\Database\\Eloquent\\Relations\\HasMany but returns Illuminate\\Database\\Query\\Builder\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/AiProfile.php
+
+		-
+			message: '#^Call to function method_exists\(\) with App\\Models\\Attendance and ''isForceDeleting'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Models/Attendance.php
+
+		-
+			message: '#^Cannot call method canonical\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Models/AuditEntry.php
+
+		-
+			message: '#^Cannot call method getKey\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Models/AuditEntry.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,stdClass\>\:\:each\(\) expects callable\(stdClass, int\)\: mixed, Closure\(App\\Models\\AuditEntry\)\: void given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/AuditEntry.php
+
+		-
+			message: '#^Method App\\Models\\Conversation\:\:messages\(\) should return Illuminate\\Database\\Eloquent\\Relations\\HasMany but returns Illuminate\\Database\\Query\\Builder\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Conversation.php
+
+		-
+			message: '#^Method App\\Models\\Dashboard\:\:widgets\(\) should return Illuminate\\Database\\Eloquent\\Relations\\HasMany but returns Illuminate\\Database\\Query\\Builder\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Dashboard.php
+
+		-
+			message: '#^Method App\\Models\\Employee\:\:custodyMoves\(\) should return Illuminate\\Database\\Eloquent\\Relations\\HasMany but returns Illuminate\\Database\\Query\\Builder\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Employee.php
+
+		-
+			message: '#^Unsafe usage of new static\(\)\.$#'
+			identifier: new.static
+			count: 1
+			path: app/Models/EmployeeCustodyMove.php
+
+		-
+			message: '#^Call to function method_exists\(\) with App\\Models\\FinDocument and ''isForceDeleting'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Models/FinDocument.php
+
+		-
+			message: '#^Cannot call method hasLiveFullInvoice\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Models/FinDocument.php
+
+		-
+			message: '#^Cannot call method hasLiveMilestoneInvoice\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Models/FinDocument.php
+
+		-
+			message: '#^Cannot call method liveInvoiceId\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Models/FinDocument.php
+
+		-
+			message: '#^Cannot call method liveMilestoneInvoicedTotal\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Models/FinDocument.php
+
+		-
+			message: '#^Method App\\Models\\IpRule\:\:scopeActive\(\) should return Illuminate\\Database\\Eloquent\\Builder but returns Illuminate\\Database\\Query\\Builder\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/IpRule.php
+
+		-
+			message: '#^Call to function method_exists\(\) with App\\Models\\PayrollRun and ''isForceDeleting'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Models/PayrollRun.php
+
+		-
+			message: '#^Method App\\Models\\Product\:\:identifiers\(\) should return Illuminate\\Database\\Eloquent\\Relations\\HasMany but returns Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\RecordIdentifier\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Product.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:computeTotal\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Models/Quote.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:countsToward\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Models/Quote.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:netBeforeTax\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: app/Models/Quote.php
+
+		-
+			message: '#^Method App\\Models\\Quote\:\:lines\(\) should return Illuminate\\Database\\Eloquent\\Relations\\HasMany but returns Illuminate\\Database\\Query\\Builder\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Quote.php
+
+		-
+			message: '#^Method App\\Models\\Quote\:\:milestones\(\) should return Illuminate\\Database\\Eloquent\\Relations\\HasMany but returns Illuminate\\Database\\Query\\Builder\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Quote.php
+
+		-
+			message: '#^Cannot call method forceFill\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Models/RecordLock.php
+
+		-
+			message: '#^Cannot call method getRawOriginal\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Models/RecordLock.php
+
+		-
+			message: '#^Method App\\Models\\RecordLock\:\:acquire\(\) should return App\\Models\\RecordLock\|null but returns stdClass\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/RecordLock.php
+
+		-
+			message: '#^Method App\\Models\\RecordLock\:\:activeOther\(\) should return App\\Models\\RecordLock\|null but returns stdClass\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/RecordLock.php
+
+		-
+			message: '#^Call to function method_exists\(\) with App\\Models\\StockMove and ''isForceDeleting'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Models/StockMove.php
+
+		-
+			message: '#^Method App\\Models\\Territory\:\:children\(\) should return Illuminate\\Database\\Eloquent\\Relations\\HasMany but returns Illuminate\\Database\\Query\\Builder\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/Territory.php
+
+		-
+			message: '#^Method App\\Models\\TrackSession\:\:points\(\) should return Illuminate\\Database\\Eloquent\\Relations\\HasMany but returns Illuminate\\Database\\Query\\Builder\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Models/TrackSession.php
+
+		-
+			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Support/Ai/Ask/AskContext.php
+
+		-
+			message: '#^Method App\\Support\\Ai\\Ask\\AskMemory\:\:threads\(\) should return Illuminate\\Support\\Collection\<int, App\\Models\\AskThread\> but returns Illuminate\\Support\\Collection\<int, stdClass\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Ai/Ask/AskMemory.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,stdClass\>\:\:map\(\) expects callable\(stdClass, int\)\: string, Closure\(App\\Models\\AskTurn\)\: string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Ai/Ask/AskMemory.php
+
+		-
+			message: '#^Parameter \#2 \$x of static method App\\Support\\Ai\\Ask\\AskMemory\:\:answerVisible\(\) expects App\\Models\\AskTurn, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Ai/Ask/AskMemory.php
+
+		-
+			message: '#^Call to function in_array\(\) with arguments ''hub_count''\|''hub_findings''\|''hub_list''\|''hub_modules''\|''hub_record''\|''hub_search''\|''hub_semantic'', array\{\} and true will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Support/Ai/Ask/AskPipeline.php
+
+		-
+			message: '#^Parameter \#1 \$shape of static method App\\Support\\Ai\\Ask\\AskAudit\:\:asked\(\) expects array\{tools\: list\<string\>, modules\: list\<string\>, rows\: int, profile\: string\|null, model\: string\|null, depth\: int, ms\: int\|null, chars\: int, \.\.\.\}, array\{correlation\: string, tools\: array, requested\: array, denied\: array, rows\: int, chars\: int, truncated\: bool, executed\: int, \.\.\.\} given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Ai/Ask/AskPipeline.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: string$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Support/Ai/Ask/AskTools.php
+
+		-
+			message: '#^Parameter \#1 \$array \(non\-empty\-list\<\(int\|string\)\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Support/Ai/Ask/AskTools.php
+
+		-
+			message: '#^Method App\\Support\\Ai\\Assist\\DraftAssistant\:\:profile\(\) never returns App\\Models\\AiProfile so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Support/Ai/Assist/DraftAssistant.php
+
+		-
+			message: '#^Method App\\Support\\Ai\\Assist\\DraftAssistant\:\:profile\(\) should return App\\Models\\AiProfile\|null but returns stdClass\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Ai/Assist/DraftAssistant.php
+
+		-
+			message: '#^Parameter \#1 \$profile of static method App\\Support\\Ai\\Routing\\AiProfiles\:\:chain\(\) expects App\\Models\\AiProfile, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Ai/Assist/DraftAssistant.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>file_id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Support/Ai/Assist/DraftAssistant.php
+
+		-
+			message: '#^Cannot call method fill\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/Ai/Auditor/Auditor.php
+
+		-
+			message: '#^Method App\\Support\\Ai\\Auditor\\AuditorAi\:\:profile\(\) never returns App\\Models\\AiProfile so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Support/Ai/Auditor/AuditorAi.php
+
+		-
+			message: '#^Method App\\Support\\Ai\\Auditor\\AuditorAi\:\:profile\(\) should return App\\Models\\AiProfile\|null but returns stdClass\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Ai/Auditor/AuditorAi.php
+
+		-
+			message: '#^Parameter \#1 \$profile of static method App\\Support\\Ai\\Routing\\AiProfiles\:\:chain\(\) expects App\\Models\\AiProfile, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Ai/Auditor/AuditorAi.php
+
+		-
+			message: '#^Cannot call method hidesNow\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/Ai/Auditor/AuditorSignals.php
+
+		-
+			message: '#^Method App\\Support\\Ai\\Auditor\\AuditorSignals\:\:reports\(\) should return array\<string, App\\Models\\WorkUpdate\> but returns array\<stdClass\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Ai/Auditor/AuditorSignals.php
+
+		-
+			message: '#^Cannot access property \$company_id on object\|false\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Support/Ai/Auditor/Detectors/SemanticBlocker.php
+
+		-
+			message: '#^Cannot access property \$id on object\|false\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Support/Ai/Auditor/Detectors/SemanticBlocker.php
+
+		-
+			message: '#^Cannot access property \$problems on object\|false\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Support/Ai/Auditor/Detectors/SemanticBlocker.php
+
+		-
+			message: '#^Parameter \#1 \$row of method App\\Support\\Ai\\Auditor\\Detectors\\SemanticBlocker\:\:reemit\(\) expects App\\Models\\AiFinding, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Ai/Auditor/Detectors/SemanticBlocker.php
+
+		-
+			message: '#^Method App\\Support\\Ai\\Brain\\Brain\:\:profile\(\) never returns App\\Models\\AiProfile so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Support/Ai/Brain/Brain.php
+
+		-
+			message: '#^Method App\\Support\\Ai\\Brain\\Brain\:\:profile\(\) should return App\\Models\\AiProfile\|null but returns stdClass\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Ai/Brain/Brain.php
+
+		-
+			message: '#^Parameter \#1 \$profile of static method App\\Support\\Ai\\Routing\\AiProfiles\:\:chain\(\) expects App\\Models\\AiProfile, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Ai/Brain/Brain.php
+
+		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
+			count: 4
+			path: app/Support/Ai/Brain/Brain.php
+
+		-
+			message: '#^Result of \|\| is always true\.$#'
+			identifier: booleanOr.alwaysTrue
+			count: 1
+			path: app/Support/Ai/Brain/Brain.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between null and null will always evaluate to false\.$#'
+			identifier: notIdentical.alwaysFalse
+			count: 4
+			path: app/Support/Ai/Brain/Brain.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between array\{\} and array\{\} will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 1
+			path: app/Support/Ai/Brain/Brain.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Support/Ai/Brain/Brain.php
+
+		-
+			message: '#^Parameter \#1 \$link of static method App\\Support\\Ai\\Routing\\AiProfiles\:\:detach\(\) expects App\\Models\\AiProfileModel, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Ai/Catalog/AiModelLifecycle.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>key" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Support/Ai/Catalog/AiModelLifecycle.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>label" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Support/Ai/Catalog/AiModelLifecycle.php
+
+		-
+			message: '#^Cannot call method forceFill\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Support/Ai/Catalog/AiModels.php
+
+		-
+			message: '#^Cannot call method fresh\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/Ai/Catalog/AiModels.php
+
+		-
+			message: '#^Cannot call method restore\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/Ai/Catalog/AiModels.php
+
+		-
+			message: '#^Cannot call method trashed\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/Ai/Catalog/AiModels.php
+
+		-
+			message: '#^Method App\\Support\\Ai\\Catalog\\AiModels\:\:refresh\(\) should return array\{ok\: bool, models\: list\<App\\Models\\AiModel\>, error\: string\|null\} but returns array\{ok\: true, models\: list\<stdClass\>, error\: null\}\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Ai/Catalog/AiModels.php
+
+		-
+			message: '#^Parameter \#1 \$held of static method App\\Support\\Ai\\Catalog\\AiModels\:\:reclaimable\(\) expects App\\Models\\AiModel\|null, stdClass given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Support/Ai/Catalog/AiModels.php
+
+		-
+			message: '#^Method App\\Support\\Ai\\Center\\AiOverview\:\:nextStep\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Support/Ai/Center/AiOverview.php
+
+		-
+			message: '#^Parameter \#1 \$profile of static method App\\Support\\Ai\\Routing\\AiProfiles\:\:chain\(\) expects App\\Models\\AiProfile, stdClass given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Support/Ai/Center/AiOverview.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,stdClass\>\:\:filter\(\) expects \(callable\(stdClass, int\)\: bool\)\|null, Closure\(App\\Models\\AiModel\)\: bool given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Support/Ai/Center/AiQuickSetup.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,stdClass\>\:\:reject\(\) expects bool\|\(callable\(stdClass, int\)\: bool\)\|stdClass, Closure\(App\\Models\\AiModel\)\: bool given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Ai/Center/AiQuickSetup.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,stdClass\>\:\:sort\(\) expects \(callable\(stdClass, stdClass\)\: int\)\|int\|null, Closure\(App\\Models\\AiModel, App\\Models\\AiModel\)\: int\<\-1, 1\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Ai/Center/AiQuickSetup.php
+
+		-
+			message: '#^Parameter \#1 \$p of static method App\\Support\\Ai\\Center\\AiQuickSetup\:\:candidates\(\) expects App\\Models\\AiProfile, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Ai/Center/AiQuickSetup.php
+
+		-
+			message: '#^Parameter \#1 \$profile of static method App\\Support\\Ai\\Routing\\AiProfiles\:\:attach\(\) expects App\\Models\\AiProfile, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Ai/Center/AiQuickSetup.php
+
+		-
+			message: '#^Parameter \#2 \$model of static method App\\Support\\Ai\\Routing\\AiProfiles\:\:attach\(\) expects App\\Models\\AiModel, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Ai/Center/AiQuickSetup.php
+
+		-
+			message: '#^Cannot call method forceFill\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Support/Ai/Center/AiReconcile.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between array\{\} and array\{\} will always evaluate to false\.$#'
+			identifier: notIdentical.alwaysFalse
+			count: 1
+			path: app/Support/Ai/Center/AiReleaseCheck.php
+
+		-
+			message: '#^Method App\\Support\\Ai\\Dev\\ErrorTriage\:\:profile\(\) never returns App\\Models\\AiProfile so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Support/Ai/Dev/ErrorTriage.php
+
+		-
+			message: '#^Method App\\Support\\Ai\\Dev\\ErrorTriage\:\:profile\(\) should return App\\Models\\AiProfile\|null but returns stdClass\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Ai/Dev/ErrorTriage.php
+
+		-
+			message: '#^Parameter \#1 \$profile of static method App\\Support\\Ai\\Routing\\AiProfiles\:\:chain\(\) expects App\\Models\\AiProfile, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Ai/Dev/ErrorTriage.php
+
+		-
+			message: '#^Method App\\Support\\Ai\\Governance\\AiBudgets\:\:governing\(\) should return list\<App\\Models\\AiBudget\> but returns list\<stdClass\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Ai/Governance/AiBudgets.php
+
+		-
+			message: '#^Method App\\Support\\Ai\\Governance\\AiBudgets\:\:periodRow\(\) should return App\\Models\\AiBudgetPeriod but returns stdClass\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Ai/Governance/AiBudgets.php
+
+		-
+			message: '#^Cannot call method forceFill\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/Ai/Governance/AiLedger.php
+
+		-
+			message: '#^Method App\\Support\\Ai\\Governance\\AiPolicy\:\:applicable\(\) should return list\<App\\Models\\AiPolicyRule\> but returns list\<stdClass\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Ai/Governance/AiPolicy.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>litellm_model_name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Support/Ai/Routing/AiProfiles.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>display_name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Support/Ai/Routing/AiRouteRun.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Support/Ai/Routing/AiRouteRun.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>label" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Support/Ai/Routing/AiRouteRun.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<array\{id\: mixed, name\: mixed, gone\: bool, n\: int\<1, max\>, value\: float, items\: list\}\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Support/Assets/AssetLife.php
+
+		-
+			message: '#^Offset ''تالف''\|''خارج مؤقتاً''\|''صيانة''\|''قيد الاستخدام''\|''قيد الطلب''\|''مباع''\|''متاح''\|''محجوز''\|''مستبعد''\|''مفقود''\|''مُعاد للمورد'' on array\{''قيد الطلب''\: array\{''متاح'', ''محجوز'', ''مُعاد للمورد'', ''مفقود''\}, متاح\: array\{''محجوز'', ''قيد الاستخدام'', ''صيانة'', ''خارج مؤقتاً'', ''تالف'', ''مفقود'', ''مستبعد'', ''مباع'', \.\.\.\}, محجوز\: array\{''متاح'', ''قيد الاستخدام''\}, ''قيد الاستخدام''\: array\{''متاح'', ''صيانة'', ''خارج مؤقتاً'', ''تالف'', ''مفقود'', ''مستبعد''\}, صيانة\: array\{''متاح'', ''قيد الاستخدام'', ''تالف'', ''مستبعد'', ''مُعاد للمورد''\}, ''خارج مؤقتاً''\: array\{''متاح'', ''قيد الاستخدام'', ''مفقود'', ''تالف'', ''مستبعد''\}, تالف\: array\{''صيانة'', ''مستبعد'', ''مباع'', ''مُعاد للمورد''\}, مفقود\: array\{''متاح'', ''قيد الاستخدام'', ''مستبعد''\}, \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Support/Assets/Custody.php
+
+		-
+			message: '#^Call to protected method increment\(\) of class Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: method.protected
+			count: 1
+			path: app/Support/Collaboration/AttachmentService.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: string$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Support/Collaboration/ChatCommands.php
+
+		-
+			message: '#^Cannot call method forceFill\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/Collaboration/ClientMembers.php
+
+		-
+			message: '#^Cannot call method restore\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/Collaboration/ClientMembers.php
+
+		-
+			message: '#^Cannot call method trashed\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/Collaboration/ClientMembers.php
+
+		-
+			message: '#^Method App\\Support\\Collaboration\\ClientMembers\:\:upsertMembership\(\) should return App\\Models\\ClientMembership but returns stdClass\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Collaboration/ClientMembers.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:countsToward\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Support/Documents/Proposal.php
+
+		-
+			message: '#^Match expression does not handle remaining values\: int\<min, \-1\>\|int\<8, max\>$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Support/Documents/QrEncoder.php
+
+		-
+			message: '#^Match arm comparison between ''jamf'' and ''jamf'' is always true\.$#'
+			identifier: match.alwaysTrue
+			count: 1
+			path: app/Support/Endpoint/MdmService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>usb_mode" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Support/Endpoint/MdmService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>cost" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Support/Finance/Pricing.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Support/Finance/QuoteAcceptance.php
+
+		-
+			message: '#^Parameter \#1 \$array \(list\<array\{module\: mixed, record_id\: mixed, top\: mixed, items\: non\-empty\-list\}\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Support/Insights/ActionCenter.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>state" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Support/Insights/ActionCenter.php
+
+		-
+			message: '#^Dead catch \- Throwable is never thrown in the try block\.$#'
+			identifier: catch.neverThrown
+			count: 1
+			path: app/Support/Insights/AttentionQueue.php
+
+		-
+			message: '#^Call to function is_array\(\) with array\{score\: int, measured\: bool, note\: non\-falsy\-string\} will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: app/Support/Insights/CompanyHealth.php
+
+		-
+			message: '#^Offset ''measured'' on array\{score\: int, measured\: bool, note\: non\-falsy\-string\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Support/Insights/CompanyHealth.php
+
+		-
+			message: '#^Offset ''ref'' does not exist on array\{kind\: ''ref'', col\: string\|null, label\: string, why\: string, fix\: string\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Support/Insights/DataQuality.php
+
+		-
+			message: '#^Offset ''whenVal'' does not exist on array\{kind\: ''blank_when'', col\: string\|null, label\: string, why\: string, fix\: string\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Support/Insights/DataQuality.php
+
+		-
+			message: '#^Ternary operator condition is always true\.$#'
+			identifier: ternary.alwaysTrue
+			count: 1
+			path: app/Support/Insights/DataQuality.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Support/Insights/Recommendations.php
+
+		-
+			message: '#^Parameter \#1 \$array of function array_values contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Support/Insights/RelationshipProjection.php
+
+		-
+			message: '#^Argument of an invalid type Illuminate\\Routing\\RouteCollectionInterface supplied for foreach, only iterables are supported\.$#'
+			identifier: foreach.nonIterable
+			count: 1
+			path: app/Support/Mobile/MobileOpenApi.php
+
+		-
+			message: '#^Offset ''APP_UPDATE_REQUIRED''\|''MFA_REQUIRED''\|''REFRESH_TOKEN…''\|''SESSION_REVOKED'' on array\{UNAUTHENTICATED\: ''مفتاحٌ مفقود أو غير…'', ACCOUNT_RESTRICTED\: ''الحساب موقوف/مقفل…'', FORBIDDEN\: ''لا صلاحية على…'', INSUFFICIENT_SCOPE\: ''نطاقُ المفتاح لا…'', RESOURCE_NOT_FOUND\: ''وحدةٌ أو سجلٌّ غير…'', METHOD_NOT_ALLOWED\: ''الطريقة غير مدعومة…'', VALIDATION_FAILED\: ''فشل التحقق —…'', CONFLICT\: ''تعارضٌ عام \(409\)'', \.\.\.\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Support/Mobile/MobileOpenApi.php
+
+		-
+			message: '#^Argument of an invalid type Illuminate\\Routing\\RouteCollectionInterface supplied for foreach, only iterables are supported\.$#'
+			identifier: foreach.nonIterable
+			count: 1
+			path: app/Support/Mobile/MobilePlatform.php
+
+		-
+			message: '#^Method App\\Support\\Mobile\\MobileSessionService\:\:accessTtlAt\(\) should return Illuminate\\Support\\Carbon but returns Carbon\\CarbonInterface\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Mobile/MobileSessionService.php
+
+		-
+			message: '#^Method App\\Support\\Mobile\\MobileSessionService\:\:refreshTtlAt\(\) should return Illuminate\\Support\\Carbon but returns Carbon\\CarbonInterface\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Mobile/MobileSessionService.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type mixed\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Support/Ops/AlertEngine.php
+
+		-
+			message: '#^Method App\\Support\\Platform\\InformationArchitecture\:\:visibleDomains\(\) has invalid return type App\\Support\\Platform\\icon\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Support/Platform/InformationArchitecture.php
+
+		-
+			message: '#^Method App\\Support\\Platform\\InformationArchitecture\:\:visibleDomains\(\) has invalid return type App\\Support\\Platform\\key\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Support/Platform/InformationArchitecture.php
+
+		-
+			message: '#^Method App\\Support\\Platform\\InformationArchitecture\:\:visibleDomains\(\) has invalid return type App\\Support\\Platform\\label\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Support/Platform/InformationArchitecture.php
+
+		-
+			message: '#^Method App\\Support\\Platform\\InformationArchitecture\:\:visibleDomains\(\) has invalid return type App\\Support\\Platform\\order\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Support/Platform/InformationArchitecture.php
+
+		-
+			message: '#^Method App\\Support\\Platform\\InformationArchitecture\:\:visibleDomains\(\) has invalid return type App\\Support\\Platform\\plane\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Support/Platform/InformationArchitecture.php
+
+		-
+			message: '#^Method App\\Support\\Platform\\InformationArchitecture\:\:visibleSections\(\) has invalid return type App\\Support\\Platform\\key\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Support/Platform/InformationArchitecture.php
+
+		-
+			message: '#^Method App\\Support\\Platform\\InformationArchitecture\:\:visibleSections\(\) has invalid return type App\\Support\\Platform\\label\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Support/Platform/InformationArchitecture.php
+
+		-
+			message: '#^Method App\\Support\\Platform\\InformationArchitecture\:\:visibleSections\(\) has invalid return type App\\Support\\Platform\\order\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Support/Platform/InformationArchitecture.php
+
+		-
+			message: '#^Offset ''icon'' does not exist on array\{App\\Support\\Platform\\key, App\\Support\\Platform\\label, App\\Support\\Platform\\icon, App\\Support\\Platform\\order, App\\Support\\Platform\\plane\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Support/Platform/InformationArchitecture.php
+
+		-
+			message: '#^Offset ''label'' does not exist on array\{App\\Support\\Platform\\key, App\\Support\\Platform\\label, App\\Support\\Platform\\icon, App\\Support\\Platform\\order, App\\Support\\Platform\\plane\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Support/Platform/InformationArchitecture.php
+
+		-
+			message: '#^Offset ''plane'' does not exist on array\{App\\Support\\Platform\\key, App\\Support\\Platform\\label, App\\Support\\Platform\\icon, App\\Support\\Platform\\order, App\\Support\\Platform\\plane\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Support/Platform/InformationArchitecture.php
+
+		-
+			message: '#^Ternary operator condition is always true\.$#'
+			identifier: ternary.alwaysTrue
+			count: 1
+			path: app/Support/Platform/Modules/ModuleCache.php
+
+		-
+			message: '#^Binary operation "\+" between string and 0 results in an error\.$#'
+			identifier: binaryOp.invalid
+			count: 4
+			path: app/Support/Platform/Modules/ModuleQuery.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: string$#'
+			identifier: match.unhandled
+			count: 1
+			path: app/Support/Platform/StructureSnapshot.php
+
+		-
+			message: '#^Cannot call method forceFill\(\) on stdClass\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Support/Security/Devices.php
+
+		-
+			message: '#^Method App\\Support\\Security\\Devices\:\:bindOnLogin\(\) should return App\\Models\\UserDevice\|null but returns stdClass\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Support/Security/Devices.php
+
+		-
+			message: '#^Offset ''why'' does not exist on null\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Support/Security/Identity.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<\(int\|string\),mixed\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Support/Security/Identity.php
+
+		-
+			message: '#^Parameter \#1 \$u of static method App\\Support\\Security\\IdentityRisk\:\:compose\(\) expects App\\Models\\User, stdClass given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Security/IdentityRisk.php
+
+		-
+			message: '#^Parameter \#2 \$callback of function array_filter expects \(callable\(mixed\)\: bool\)\|null, Closure\(mixed\)\: array\<mixed, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Security/IdentityRisk.php
+
+		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,stdClass\>\:\:filter\(\) expects \(callable\(stdClass, int\)\: bool\)\|null, Closure\(App\\Models\\User\)\: bool given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Security/PermissionInspector.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Support/Security/PermissionInspector.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Support/Security/PermissionInspector.php
+
+		-
+			message: '#^Offset ''kind'' on array\{kind\: ''posture'', severities\: array\{''warning'', ''high''\}, n\: 3, window_min\: 60\}\|array\{kind\: ''usb'', severities\: null, n\: 5, window_min\: 15\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Support/Security/SecurityEvents.php
+
+		-
+			message: '#^Dead catch \- Throwable is never thrown in the try block\.$#'
+			identifier: catch.neverThrown
+			count: 1
+			path: app/Support/Security/SecurityPosture.php
+
+		-
+			message: '#^Parameter \#1 \$key of method Illuminate\\Support\\Collection\<\*NEVER\*,\*NEVER\*\>\:\:has\(\) expects array, \(int\|string\) given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/Security/SecurityRadar.php
+
+		-
+			message: '#^Left side of \|\| is always false\.$#'
+			identifier: booleanOr.leftAlwaysFalse
+			count: 1
+			path: app/Support/Workforce/ExecutionStats.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Support/Workforce/TeamDirectory.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>role_id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Support/Workforce/TeamDirectory.php
+
+		-
+			message: '#^Parameter \#1 \$array \(array\{int\<min, \-1\>\|int\<1, max\>, int\<min, \-1\>\|int\<1, max\>\}\) to function array_filter does not contain falsy values, the array will always stay the same\.$#'
+			identifier: arrayFilter.same
+			count: 1
+			path: app/Support/helpers.php
+
+		-
+			message: '#^Parameter \#1 \$conn of function hub_ym_expr expects Illuminate\\Database\\Connection, Illuminate\\Database\\ConnectionInterface given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Support/helpers.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between mixed and null will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Support/helpers.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 3
+			path: app/Support/helpers.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>role_id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Support/helpers.php
+
+		-
+			message: '#^Match expression does not handle remaining value\: mixed$#'
+			identifier: match.unhandled
+			count: 1
+			path: database/migrations/2026_07_31_000023_generalize_policy_acks.php
+
+		-
+			message: '#^Parameter \#2 \.\.\.\$arg1 of function min expects non\-empty\-array, 0 given\.$#'
+			identifier: argument.type
+			count: 1
+			path: database/seeders/DemoCompanySeeder.php

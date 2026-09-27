@@ -1,0 +1,27 @@
+# ═══ التحليلُ الساكن — البند #36 و#31 (QE-05) ═══
+#
+# يُشغَّل بـ`tools/phpstan.sh` (يُنزّل نسخةً مثبّتةً ويتحقّق من بصمتِها — لا
+# `composer require`، فأرشيفاتُ codeload `403`). وCI يُسقط الدفعةَ عند أوّلِ
+# خطأٍ **جديد**؛ وما قبل اليوم في `phpstan-baseline.neon` — **يُخفَض ولا يُرفَع**:
+# خطأٌ أُصلح يُحذف سطرُه (`reportUnmatchedIgnoredErrors` يُلزم بذلك).
+#
+# **لماذا المستوى ٥؟** قِيست المستوياتُ كلُّها على v2.616.0: الخامسُ يفحص
+# أنواعَ الوسائطِ والإرجاعِ والمقارناتِ المستحيلة — وفيه وُجدت العيوبُ
+# الحقيقيّة. والسادسُ يضاعف العددَ (١٠٣٣٦) بـ«نوعٌ غيرُ مُعلَن» وحدَه: ضجيجٌ لا
+# عيب، وخطُّ أساسٍ لا يُقرأ.
+
+includes:
+    - tools/phpstan/laravel-magic.php
+    - phpstan-baseline.neon
+
+parameters:
+    level: 5
+    paths:
+        - app
+        - routes
+        - config
+        - database
+    tmpDir: storage/framework/cache/phpstan
+    # الجذرُ يُحمَّل من vendor/autoload.php تلقائيّاً (ومعه helpers.php عبر `files`)
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: true

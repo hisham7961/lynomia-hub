@@ -18,6 +18,8 @@
 | `app/Support/<النطاق>/` | المنطقُ بالنطاق — لا صنفَ مسطّحاً تحت `app/Support` (الجدول التالي) |
 | `app/Support/helpers.php` | قلبُ الأمن بدوالّه العامّة (`hub_can` · `hub_scope` · `hub_field_mode` · `hub_audit` …) وأغلفةٌ من سطرٍ لمحرّكاتٍ صارت أصنافاً |
 | `tools/` | أدواتُ النقل الآليّ التي بُنيت بها إعادةُ التنظيم (`move-classes` · `extract-helpers` · `extract-methods`) |
+| `tools/phpstan.sh` + `phpstan.neon` | **التحليلُ الساكن** (المستوى ٥): السكربتُ يُنزّل phpstan بنسخةٍ مثبّتةٍ ويتحقّق من بصمتِه (SHA-256) إلى `tools/.phpstan/` المُهمَل — لا `composer require`. وسحرُ Laravel (`Model::where` · أعمدةُ Eloquent · `auth()->user()`) يُستثنى **محسوباً بالانعكاس** في `tools/phpstan/laravel-magic.php`؛ وما قبل اليوم في `phpstan-baseline.neon` يُخفَض ولا يُرفَع (`StaticAnalysisGateTest`) |
+| `database/factories/` | مصانعُ النماذجِ الجوهريّة (٣٣) — `ModelFactoriesTest` يُشغّل **كلَّ** مصنعٍ في المجلّد على المحرّكَين |
 | `tests/Fixtures/structure/` | لقطاتُ البنية (المسارات · السجلّ · الأصناف · الدوالّ) — `php artisan hub:structure-snapshot --write` بعد تغييرٍ مقصود |
 
 | النطاق (`App\Support\…`) | ما يملكه |
@@ -135,6 +137,8 @@ Exception → bootstrap/app.php → Api::render (api/*) | صفحةُ خطأ عر
 | قيدَ يوميةٍ مرحَّلاً (آليّاً أو يدويّاً) | `JournalPosting::postBalanced($entry, $lines, ['module','id','key'])` — التوازنُ بالملّيمات، ورابطُ المصدر الفريد، والرقمُ، وقيدُ «ترحيل قيد»؛ لا `JournalEntry::create` مرحَّلاً مباشرةً (يحرسه `JournalPostingUnifiedTest`) |
 | إقراراً على سجلّ («قرأتُ/استلمتُ/اعتمدتُ») | مدخلٌ في `config/hub_acks.php` (`store` = `record_acks` أو `policy_acks`) والكتابةُ عبر `Acknowledgement::acknowledge()` — لا كتابةَ مباشرةً في الجدولين (يحرسه `AcknowledgementUnifiedTest`) |
 | قبولَ عرض سعر | `QuoteAcceptance::accept()` (الويبُ والتوقيعُ بابان له) |
+| بياناتِ اختبار | `Task::factory()->create([...])` إن كان للنموذج مصنع؛ ونموذجٌ جوهريٌّ يُبنى باليد في اختباراتٍ كثيرة ⇒ مصنعٌ في `database/factories/` بأعمدةٍ **صارمةٍ على MySQL** (العرضُ و`NOT NULL`) وحالةٍ تمرّ بحرّاسِ `booted()` (مسودةٌ لا مرحَّل، مقدَّمٌ لا معتمَد). و`HasFactory` بلا مصنعٍ على نموذجٍ يكتبه محرّكٌ وحدَه (سلسلةُ التدقيق، النسخ، الدفتر) **يُترك ولا يُحذف** — مصنعٌ له يبني صفوفاً لا يبنيها النظامُ أبداً |
+| كوداً يمرّ بالتحليل الساكن | `tools/phpstan.sh` محلّيّاً قبل الدفع (CI يُسقط أوّلَ خطأٍ جديد). خطأٌ حقيقيٌّ يُصلَح؛ و`--generate-baseline` بعد **إصلاحٍ** فقط (يُخفَض سقفُ `StaticAnalysisGateTest` معه) — لا لإسكاتِ جديد |
 
 ## ٩) الثوابت (لا تُخالف)
 
@@ -144,6 +148,7 @@ Exception → bootstrap/app.php → Api::render (api/*) | صفحةُ خطأ عر
 4. **الترتيبُ صريح** (`orderBy(...)->orderBy('id')`) — لا قرعةَ صفوف.
 5. **لا سرَّ في السجلّات**: `AUDIT_SECRET`، بصماتٌ للقيم المشفَّرة، لا تتبّعَ مكدّسٍ للمستخدم.
 6. **البنيةُ لا تتغيّر صامتةً**: لقطاتُ المسارات والسجلّ والأصناف والدوالّ (`StructureSnapshotTest`) تُسقط أيَّ فقدٍ أو إضافةٍ بلا لقطة.
+7. **لا خطأَ ساكنٍ جديد**: phpstan بالمستوى ٥ فوق خطِّ أساسٍ لا يكبر — و`StaticSoundnessTest` حارسٌ بلا شبكةٍ يبقى تحته.
 
 ## مستوى التحكّم المؤسسي (Control Plane) — الطور الأول (v2.401)
 

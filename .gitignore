@@ -37,3 +37,6 @@ deploy/litellm/*.env
 deploy/litellm/.env*
 .env.*test
 .env.uitest
+
+# phpstan.phar المُنزَّل بـtools/phpstan.sh (بصمةٌ مثبّتة) — ثنائيٌّ لا يدخل المستودع
+/tools/.phpstan/

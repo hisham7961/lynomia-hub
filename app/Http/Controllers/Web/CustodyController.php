@@ -106,7 +106,7 @@ class CustodyController extends Controller
             'rows'    => $rows,
             'holders' => $holders,
             'cur'     => setting('app.currency', 'د.ك'),
-            'q'       => $term ?? '', 'status' => $st, 'holder' => $h,
+            'q'       => $term, 'status' => $st, 'holder' => $h,
             'statuses' => collect(hub_mod('assets')['fields'])->firstWhere('key', 'status')['options'] ?? [],
         ]);
     }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\HasUuid;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Role extends Model
@@ -10,7 +11,7 @@ class Role extends Model
     /** افتراضيات آمنة بدل default على أعمدة JSON (غير مدعومة في MySQL) */
     protected $attributes = ['flags' => '{}', 'matrix' => '{}'];
 
-    use HasUuid;
+    use HasFactory, HasUuid;
 
     protected $guarded = ['id'];
     protected $casts = ['flags' => 'array', 'matrix' => 'array', 'is_owner' => 'boolean', 'field_rules' => 'array'];
