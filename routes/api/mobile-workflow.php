@@ -80,6 +80,8 @@ use Illuminate\Support\Facades\Route;
     Route::get('alerts', [MobileCalendarController::class, 'alerts'])->name('mobile.alerts');
 
     // ── 4.6 أفعالٌ ماليّةٌ عبر المحرّكات الموحّدة — **قبل** `{module}/{id}/actions` والـcatch-all
+    // خياراتُ نموذج الدفعة (قراءةٌ بلا أثرٍ ولا تصعيد) — ما يعرضه نموذجُ الويب لمن يملك الفعل
+    Route::get('fin/{id}/pay-options', [MobileFinanceActionsController::class, 'payOptions'])->name('mobile.fin.pay_options');
     Route::middleware('throttle:30,1')->group(function () {
         Route::post('fin/{id}/pay', [MobileFinanceActionsController::class, 'pay'])->name('mobile.fin.pay');
         Route::post('quotes/{id}/send', [MobileFinanceActionsController::class, 'quoteSend'])->name('mobile.quotes.send');

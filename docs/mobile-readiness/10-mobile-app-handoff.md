@@ -67,7 +67,7 @@ POST auth/refresh { refresh_token }
 ---
 
 <!-- routes:begin (مولَّد: php artisan hub:mobile-handoff --write — لا يُحرَّر باليد) -->
-## 4) خريطةُ النقاط الكاملة (١٤٧ مساراً · كلُّها في `routes/api.php`)
+## 4) خريطةُ النقاط الكاملة (١٥٠ مساراً · كلُّها في `routes/api.php`)
 
 مولَّدةٌ من المسارات الحيّة — العامّةُ بلا رمز وصول (`public`)، والباقي خلف `mobile.session` + `mobile.portal` + `mobile.context`.
 
@@ -140,6 +140,7 @@ POST auth/refresh { refresh_token }
 | crud | `PATCH {module}/{id}` | `mobile.resource.patch` | مُصادَقة |
 | crud | `PUT {module}/{id}` | `mobile.resource.update` | مُصادَقة |
 | crud | `GET {module}/{id}/versions` | `mobile.versions.index` | مُصادَقة |
+| custody | `GET custody/{id}/abilities` | `mobile.custody.abilities` | مُصادَقة |
 | custody | `POST custody/{id}/handover` | `mobile.custody.handover` | مُصادَقة |
 | custody | `POST custody/{id}/recover` | `mobile.custody.recover` | مُصادَقة |
 | custody | `GET me/custody` | `mobile.me.custody` | مُصادَقة |
@@ -162,6 +163,7 @@ POST auth/refresh { refresh_token }
 | files | `GET files/{id}/download` | `mobile.files.download` | مُصادَقة |
 | files | `GET files/{id}/stream` | `mobile.files.stream` | مُصادَقة |
 | finance_actions | `POST fin/{id}/pay` | `mobile.fin.pay` | مُصادَقة |
+| finance_actions | `GET fin/{id}/pay-options` | `mobile.fin.pay_options` | مُصادَقة |
 | finance_actions | `POST purchases/{id}/receive` | `mobile.purchases.receive` | مُصادَقة |
 | finance_actions | `POST quotes/{id}/accept` | `mobile.quotes.accept` | مُصادَقة |
 | finance_actions | `POST quotes/{id}/send` | `mobile.quotes.send` | مُصادَقة |
@@ -174,6 +176,7 @@ POST auth/refresh { refresh_token }
 | inventory | `POST inventory/sessions/{id}/reconcile` | `mobile.inventory.reconcile` | مُصادَقة |
 | inventory | `POST inventory/sessions/{id}/scan` | `mobile.inventory.scan` | مُصادَقة |
 | leaves | `POST leaves/{id}/decide` | `mobile.leaves.decide` | مُصادَقة |
+| leaves | `GET leaves/{id}/decision` | `mobile.leaves.decision` | مُصادَقة |
 | me | `GET me/documents` | `mobile.me.documents.index` | مُصادَقة |
 | me | `GET me/documents/{id}/file` | `mobile.me.documents.file` | مُصادَقة |
 | meta | `GET openapi.json` | `mobile.openapi` | عامّة |

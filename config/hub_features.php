@@ -272,7 +272,8 @@ return [
         'mobile.workos_apis' => ['domain' => 'mobile', 'category' => 'api', 'title_ar' => 'واجهات نظام العمل للجوال', 'title_en' => 'Mobile Work OS APIs', 'status' => 'ENABLED', 'mobile_backend' => 'ready', 'openapi' => 'documented', 'native_mobile' => 'deferred',
             // أفعالُ الميدان والموظّف (خطّةُ التطبيق · المرحلة ٣): حضور/إجازة/عهدة/جرد/مرفقات/نسخ
             'api_routes' => ['mobile.attendance.today', 'mobile.attendance.check_in', 'mobile.attendance.check_out',
-                'mobile.leaves.decide', 'mobile.me.custody', 'mobile.custody.handover', 'mobile.custody.recover',
+                'mobile.leaves.decide', 'mobile.leaves.decision', 'mobile.me.custody', 'mobile.custody.handover', 'mobile.custody.recover',
+                'mobile.custody.abilities',
                 'mobile.inventory.index', 'mobile.inventory.show', 'mobile.inventory.freeze', 'mobile.inventory.scan',
                 'mobile.inventory.reconcile', 'mobile.inventory.close', 'mobile.files.index', 'mobile.files.destroy',
                 'mobile.comments.attachment', 'mobile.dm.attachment', 'mobile.versions.index']],

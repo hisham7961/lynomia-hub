@@ -17,8 +17,9 @@ final class MobileOpenApiFieldOps
     public const AREAS = [
         'mobile.attendance.today' => 'attendance', 'mobile.attendance.check_in' => 'attendance',
         'mobile.attendance.check_out' => 'attendance',
-        'mobile.leaves.decide' => 'leaves',
+        'mobile.leaves.decide' => 'leaves', 'mobile.leaves.decision' => 'leaves',
         'mobile.me.custody' => 'custody', 'mobile.custody.handover' => 'custody', 'mobile.custody.recover' => 'custody',
+        'mobile.custody.abilities' => 'custody',
         'mobile.inventory.index' => 'inventory', 'mobile.inventory.show' => 'inventory', 'mobile.inventory.freeze' => 'inventory',
         'mobile.inventory.scan' => 'inventory', 'mobile.inventory.reconcile' => 'inventory', 'mobile.inventory.close' => 'inventory',
         'mobile.files.index' => 'files', 'mobile.files.destroy' => 'files',
@@ -86,6 +87,18 @@ final class MobileOpenApiFieldOps
                 'okDesc' => 'قُرِّر. الرفضُ بـdetails.reason: already_decided (422) | self_request (403) | not_decider (403) | reason_required (422 VALIDATION_FAILED)',
                 'errors' => ['403', '404', '409', '422']],
 
+            'mobile.leaves.decision' => ['tag' => 'leaves',
+                'summary' => 'أهليّةُ زرِّ القرار بلا أثر — LeaveDecision::abilities نفسُها التي يحسم بها decide (leaves:v ⇒ 403، خارجَ النطاق 404)',
+                'ok' => $env($obj(['id' => $str, 'status' => $str, 'can_decide' => $bool,
+                    'reason' => ['type' => 'string', 'nullable' => true, 'enum' => ['already_decided', 'self_request', 'not_decider', null],
+                        'description' => 'السببُ الآليُّ نفسُه الذي يردّ به decide — null حين can_decide'],
+                    'can_approve' => $bool, 'can_reject' => $bool,
+                    'approve_status' => ['type' => 'string', 'nullable' => true, 'enum' => ['معتمد', 'موافقة المدير', null],
+                        'description' => 'ما يصير إليه الطلبُ بالموافقة (HR يحسم، المديرُ يوصي)'],
+                    'reject_reason_required' => $bool],
+                    ['id', 'status', 'can_decide', 'reason', 'can_approve', 'can_reject', 'approve_status'])),
+                'errors' => ['403', '404']],
+
             // ── 3.3 العهدة ──
             'mobile.me.custody' => ['tag' => 'custody',
                 'summary' => 'عهدتي: ما بيدي + حركاتُها + إقراراتُ الاستلام المعلّقة (الإقرارُ عبر POST assets/{id}/actions/ack)',
@@ -101,6 +114,14 @@ final class MobileOpenApiFieldOps
                 'params' => ['Idempotency-Key'],
                 'body' => $obj(['at' => $date, 'note' => ['type' => 'string', 'maxLength' => 500]], ['at']),
                 'ok' => $env($ref('CustodyMove')), 'errors' => ['403', '404', '409', '422']],
+
+            'mobile.custody.abilities' => ['tag' => 'custody',
+                'summary' => 'أهليّةُ زرَّي التسليم/الاسترداد بلا أثر — بوّابةُ CustodyHandover (assets:e أو custodyAssign) + Custody::scoped (404) + الحيازة',
+                'ok' => $env($obj(['id' => $str, 'can_handover' => $bool, 'can_recover' => $bool,
+                    'holder_id' => ['type' => 'string', 'nullable' => true, 'description' => 'null إن لم تكن بيد أحد أو حُجب الحقلُ عن الدور'],
+                    'reason' => ['type' => 'string', 'nullable' => true, 'enum' => ['not_permitted', 'not_held', null]]],
+                    ['id', 'can_handover', 'can_recover', 'holder_id', 'reason'])),
+                'errors' => ['403', '404']],
 
             // ── 3.4 الجرد ──
             'mobile.inventory.index' => ['tag' => 'inventory', 'summary' => 'جلساتُ الجرد (assets:v · عزلُ الشركة) — الأحدثُ أوّلاً',

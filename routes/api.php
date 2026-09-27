@@ -375,11 +375,14 @@ Route::prefix('mobile/v1')->middleware(['throttle:api', 'mobile.session', 'mobil
         ->middleware('throttle:30,1')->name('mobile.attendance.check_out');
     Route::post('leaves/{id}/decide', [\App\Http\Controllers\Api\MobileLeavesController::class, 'decide'])
         ->middleware('throttle:60,1')->name('mobile.leaves.decide');
+    // أهليّةُ الأزرار بلا أثر (قراءةٌ بقواعد الفعل نفسِه — لا تخمينَ في التطبيق) — ثلاثيّةٌ حرفيّةُ اللاحقة قبل الـcatch-all
+    Route::get('leaves/{id}/decision', [\App\Http\Controllers\Api\MobileLeavesController::class, 'decision'])->name('mobile.leaves.decision');
     Route::get('me/custody', [\App\Http\Controllers\Api\MobileCustodyController::class, 'mine'])->name('mobile.me.custody');
     Route::post('custody/{id}/handover', [\App\Http\Controllers\Api\MobileCustodyController::class, 'handover'])
         ->middleware('throttle:60,1')->name('mobile.custody.handover');
     Route::post('custody/{id}/recover', [\App\Http\Controllers\Api\MobileCustodyController::class, 'recover'])
         ->middleware('throttle:60,1')->name('mobile.custody.recover');
+    Route::get('custody/{id}/abilities', [\App\Http\Controllers\Api\MobileCustodyController::class, 'abilities'])->name('mobile.custody.abilities');
     Route::get('inventory/sessions', [\App\Http\Controllers\Api\MobileInventoryController::class, 'sessions'])->name('mobile.inventory.index');
     Route::get('inventory/sessions/{id}', [\App\Http\Controllers\Api\MobileInventoryController::class, 'session'])->name('mobile.inventory.show');
     Route::middleware('throttle:120,1')->group(function () {

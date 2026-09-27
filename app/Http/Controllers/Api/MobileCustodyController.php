@@ -94,6 +94,30 @@ class MobileCustodyController extends V1Controller
         ]);
     }
 
+    /**
+     * `GET custody/{id}/abilities` — **أهليّةُ زرَّي التسليم والاسترداد بلا أثر**، من قواعد
+     * `CustodyHandover` نفسِها: الفعلُ لمن يملك `assets:e` أو المفتاحَ الدقيق `custodyAssign`،
+     * والاستردادُ لعهدةٍ بيد أحدٍ (`assertHeld`). الرؤيةُ `assets:v` أو صلاحيّةُ الفعل (وإلا ٤٠٣)،
+     * و`Custody::scoped` (خارجَ النطاق ٤٠٤) كالفعل. `reason`: not_permitted | not_held | null.
+     * الحائزُ المحجوبُ على الدور (`holderId = hide`) يُعاد null — والأهليّةُ لا تتغيّر به.
+     */
+    public function abilities(Request $r, string $id): Response
+    {
+        $this->tagMobile($r);
+        $u = $r->user();
+        $act = hub_can($u, 'assets', 'e') || hub_can($u, 'assets', 'custodyAssign');
+        $a = CustodyHandover::asset($id, $act ? 'e' : 'v', 'custodyAssign');
+        $held = (bool) $a->holder_id;
+
+        return $this->okData([
+            'id' => (string) $a->id,
+            'can_handover' => $act,
+            'can_recover' => $act && $held,
+            'holder_id' => $held && hub_field_mode($u, 'assets', 'holderId') !== 'hide' ? (string) $a->holder_id : null,
+            'reason' => ! $act ? 'not_permitted' : (! $held ? 'not_held' : null),
+        ]);
+    }
+
     /** `POST custody/{id}/handover` — `{user_id, at, note?, project_id?}` */
     public function handover(Request $r, string $id): Response
     {

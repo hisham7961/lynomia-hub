@@ -41,7 +41,7 @@ final class MobileWorkflowSpec
         $out['mobile.reports.review'] = 'reports';
         $out['mobile.calendar'] = 'calendar';
         $out['mobile.alerts'] = 'calendar';
-        foreach (['mobile.fin.pay', 'mobile.quotes.send', 'mobile.quotes.accept', 'mobile.purchases.receive'] as $n) {
+        foreach (['mobile.fin.pay', 'mobile.fin.pay_options', 'mobile.quotes.send', 'mobile.quotes.accept', 'mobile.purchases.receive'] as $n) {
             $out[$n] = 'finance_actions';
         }
         $out['mobile.ask.stream'] = 'ask';
@@ -293,6 +293,19 @@ final class MobileWorkflowSpec
                 'ok' => $env($obj(['amount' => ['type' => 'string'], 'document' => $ref('FinDocumentCard'),
                     'payment' => $obj(['amount' => $str, 'at' => $strN, 'ref' => $strN, 'bank_id' => $strN, 'seq' => $int])])),
                 'errors' => ['403', '404', '409', '422', '428']],
+            'mobile.fin.pay_options' => ['tag' => 'finance_actions',
+                'summary' => 'خياراتُ نموذج الدفعة بلا أثرٍ ولا تصعيد — بوّابةُ الدفعة نفسُها (fin:e ⇒ 403، النطاق ⇒ 404) + بنوكُ banks:v بنطاقها كنموذج الويب',
+                'ok' => $env($obj(['id' => $str, 'can_pay' => $bool,
+                    'reason' => ['type' => 'string', 'nullable' => true, 'enum' => ['dead_state', 'settled', null],
+                        'description' => 'dead_state: ملغى/مسودة · settled: لا متبقّي — null حين can_pay'],
+                    'remaining' => ['type' => 'string', 'nullable' => true, 'pattern' => '^\\d+\\.\\d{3}$',
+                        'description' => 'عشريٌّ نصّاً — null إن حُجب الإجماليُّ أو المدفوعُ عن الدور'],
+                    'currency' => $strN,
+                    'banks' => $arr($obj(['id' => $str, 'name' => $str, 'currency' => $strN], ['id', 'name'])),
+                    'default_bank_id' => ['type' => 'string', 'nullable' => true, 'description' => 'بنكُ المستند إن كان بين المعروض'],
+                    'step_up_purpose' => ['type' => 'string', 'description' => 'غرضُ التصعيد الذي يطلبه POST fin/{id}/pay']],
+                    ['id', 'can_pay', 'reason', 'remaining', 'currency', 'banks', 'default_bank_id'])),
+                'errors' => ['403', '404']],
             'mobile.quotes.send' => ['tag' => 'finance_actions',
                 'summary' => 'إرسالُ عرض السعر بعتبة اعتماد (sent | escalated للمراجعة الداخليّة) — quotes:e + النطاق + الطابور (409) + قفلُ حقل الحالة',
                 'params' => $idem, 'body' => $obj([]), 'bodyRequired' => false,

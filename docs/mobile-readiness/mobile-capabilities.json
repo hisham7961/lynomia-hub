@@ -810,6 +810,12 @@
         "custody": {
             "endpoints": [
                 {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/custody/{id}/abilities",
+                    "name": "mobile.custody.abilities",
+                    "auth": "mobile.session"
+                },
+                {
                     "method": "POST",
                     "path": "/api/mobile/v1/custody/{id}/handover",
                     "name": "mobile.custody.handover",
@@ -828,7 +834,7 @@
                     "auth": "mobile.session"
                 }
             ],
-            "count": 3
+            "count": 4
         },
         "dm": {
             "endpoints": [
@@ -957,6 +963,12 @@
                     "auth": "mobile.session"
                 },
                 {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/fin/{id}/pay-options",
+                    "name": "mobile.fin.pay_options",
+                    "auth": "mobile.session"
+                },
+                {
                     "method": "POST",
                     "path": "/api/mobile/v1/purchases/{id}/receive",
                     "name": "mobile.purchases.receive",
@@ -975,7 +987,7 @@
                     "auth": "mobile.session"
                 }
             ],
-            "count": 4
+            "count": 5
         },
         "health": {
             "endpoints": [
@@ -1047,9 +1059,15 @@
                     "path": "/api/mobile/v1/leaves/{id}/decide",
                     "name": "mobile.leaves.decide",
                     "auth": "mobile.session"
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/mobile/v1/leaves/{id}/decision",
+                    "name": "mobile.leaves.decision",
+                    "auth": "mobile.session"
                 }
             ],
-            "count": 1
+            "count": 2
         },
         "me": {
             "endpoints": [

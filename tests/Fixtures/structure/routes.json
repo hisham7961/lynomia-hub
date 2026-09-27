@@ -1827,6 +1827,19 @@
         ]
     },
     {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/fin/{id}/pay-options",
+        "name": "mobile.fin.pay_options",
+        "action": "App\\Http\\Controllers\\Api\\MobileFinanceActionsController@payOptions",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
         "methods": "POST",
         "uri": "api/mobile/v1/fin/{id}/pay",
         "name": "mobile.fin.pay",
@@ -1966,6 +1979,19 @@
     },
     {
         "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/leaves/{id}/decision",
+        "name": "mobile.leaves.decision",
+        "action": "App\\Http\\Controllers\\Api\\MobileLeavesController@decision",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
         "uri": "api/mobile/v1/me/custody",
         "name": "mobile.me.custody",
         "action": "App\\Http\\Controllers\\Api\\MobileCustodyController@mine",
@@ -2003,6 +2029,19 @@
             "mobile.portal",
             "mobile.context",
             "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "api/mobile/v1/custody/{id}/abilities",
+        "name": "mobile.custody.abilities",
+        "action": "App\\Http\\Controllers\\Api\\MobileCustodyController@abilities",
+        "middleware": [
+            "api",
+            "throttle:api",
+            "mobile.session",
+            "mobile.portal",
+            "mobile.context"
         ]
     },
     {

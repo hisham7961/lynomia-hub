@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\BankAccount;
 use App\Models\FinDocument;
 use App\Models\Purchase;
 use App\Models\Quote;
@@ -61,6 +62,52 @@ class MobileFinanceActionsController extends MobileWorkflowController
                 ],
             ]);
         });
+    }
+
+    /**
+     * `GET fin/{id}/pay-options` — **ما يعرضه نموذجُ «سجّل دفعة» الويبيّ** (`partials/fin_actions`)
+     * بلا أثرٍ ولا تصعيد: بوّابةُ الفعل نفسُها (`FinPayment::authorize`: `fin:e` ⇒ ٤٠٣، النطاق ⇒ ٤٠٤)،
+     * و`can_pay` بشرطَي النموذج (لا ملغى/مسودة `hub.fin.dead` ⇒ `dead_state`، والمتبقّي > 0 ⇒ `settled`)،
+     * والبنوكُ لمن يرى `banks:v` بنطاقه مرتّبةً بالاسم (سقفُ ٥٠ كالويب). حرّاسُ البنك الثلاثة تبقى
+     * عند الفعل. المتبقّي نصٌّ عشريّ، وnull إن حُجب الإجماليُّ أو المدفوعُ عن الدور.
+     */
+    public function payOptions(Request $r, string $id): Response
+    {
+        $this->tagMobile($r);
+        if ($deny = $this->denyClient()) return $deny;
+        $u = $r->user();
+        $doc = FinPayment::authorize($u, $id);
+
+        $total = (float) ($doc->total ?? 0);
+        $paid = (float) ($doc->paid ?? 0);
+        $remain = max(0, $total - $paid);
+        $dead = in_array((string) $doc->state, (array) config('hub.fin.dead'), true);
+        $masked = hub_field_mode($u, 'fin', 'total') === 'hide' || hub_field_mode($u, 'fin', 'paid') === 'hide';
+
+        $showBankCur = hub_field_mode($u, 'banks', 'currency') !== 'hide';
+        $banks = hub_can($u, 'banks', 'v')
+            ? hub_scope(BankAccount::query()->whereNull('deleted_at'), 'banks', $u)
+                ->orderBy('name')->orderBy('id')->limit(50)->get(['id', 'name', 'currency'])
+                ->map(fn ($b) => [
+                    'id' => (string) $b->id,
+                    'name' => (string) $b->name,
+                    'currency' => $showBankCur && filled($b->currency) ? (string) $b->currency : null,
+                ])->values()->all()
+            : [];
+        $bankIds = array_column($banks, 'id');
+        $default = $doc->bank_id && hub_field_mode($u, 'fin', 'bankId') !== 'hide'
+            && in_array((string) $doc->bank_id, $bankIds, true) ? (string) $doc->bank_id : null;
+
+        return $this->ok([
+            'id' => (string) $doc->id,
+            'can_pay' => ! $dead && $remain > 0,
+            'reason' => $dead ? 'dead_state' : ($remain <= 0 ? 'settled' : null),
+            'remaining' => $masked ? null : $this->money($remain),
+            'currency' => $this->field('fin', 'currency', $doc->currency ?: setting('app.currency', 'د.ك')),
+            'banks' => $banks,
+            'default_bank_id' => $default,
+            'step_up_purpose' => self::STEPUP_PAY,
+        ]);
     }
 
     /** `POST quotes/{id}/send` — إرسالٌ بعتبة اعتماد (`sent` أو `escalated` للمراجعة الداخليّة) */
