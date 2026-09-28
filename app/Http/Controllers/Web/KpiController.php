@@ -82,6 +82,10 @@ class KpiController extends Controller
                     (array) ($x['formula'] ?? []))])->all(),
             'summary' => \App\Support\Insights\KpiCentre::summary($rows),
             'off'     => \App\Support\Insights\KpiCentre::offTarget($rows),
+            // مؤشّراتٌ ذكيّة (المرحلة ٦): تفسيرٌ وإجراءاتٌ وهدفٌ مقترح لكلِّ مؤشّر، ومؤشّراتٌ ناقصة
+            'insights' => \App\Support\Ai\Kpi\KpiInsights::byKpi(),
+            'ideas'    => \App\Support\Ai\Kpi\KpiInsights::ideas(),
+            'aiKpi'    => \App\Support\Ai\Kpi\KpiInsights::ready(),
             'catalog' => $this->catalog(),
             'editing' => $editing,
             // Permissions 360 · 06.3 — دليلُ أسماءِ المستخدمين صلاحيةُ الموارد (hr:v) لا

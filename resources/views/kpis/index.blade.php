@@ -43,6 +43,29 @@
     ]])
 @endif
 
+@if ($aiKpi && ((string) setting('ai.kpi_insights', '0') === '1' || $insights || $ideas))
+    {{-- مؤشّراتٌ ذكيّة (docs/ai-hub/47 §العمود هـ): أهدافٌ مقترحةٌ لمؤشّراتٍ على هدفها، ومؤشّراتٌ ناقصة — الرقمُ الفعليّ لا يُمسّ --}}
+    @php $onIns = collect($rows)->filter(fn ($x) => ! in_array($x['health'], ['off', 'dead'], true) && isset($insights[$x['id']])
+        && ($insights[$x['id']]->target ?? null) && ! ($insights[$x['id']]->target_decision ?? null)); @endphp
+    <div class="card" data-kpi-ai>
+        <h3 class="cardtitle">🤖 تحليل الذكاء للمؤشّرات
+            <form method="POST" action="{{ route('kpis.aiRefresh') }}" style="display:inline">@csrf
+                <button class="btn ghost xs" title="يفسّر المؤشّراتِ خارج هدفها، ويقترح أهدافاً واقعيّةً ومؤشّراتٍ ناقصة">🔄 حلّل الآن</button>
+            </form>
+        </h3>
+        <div class="sub">القيمةُ الفعليّة محسوبةٌ من البيانات ولا تُعدَّل — الذكاءُ يفسّرها ويقترح الهدفَ والإجراء.</div>
+        @foreach ($onIns as $x)
+            <div style="margin-top:8px"><b>{{ $x['name'] }}</b>
+                @include('kpis._ai_insight', ['ins' => $insights[$x['id']], 'kpiId' => $x['id'], 'onlyTarget' => true])</div>
+        @endforeach
+        @if ($ideas)
+            <div style="margin-top:10px"><b>💡 مؤشّراتٌ ناقصةٌ مقترحة</b> <span class="sub">— ابنِ ما يناسبك منها في الباني أدناه</span>
+                <ul>@foreach ($ideas as $idea)<li><b>{{ $idea['name'] }}</b> <span class="sub">({{ hub_mod($idea['module'])['label'] ?? $idea['module'] }})</span> — {{ $idea['why'] }}</li>@endforeach</ul>
+            </div>
+        @endif
+    </div>
+@endif
+
 @if (count($off))
     <div class="card">
         <h3 class="cardtitle">🎯 خارج الهدف — وما لا يُقاس معه</h3>
@@ -64,6 +87,7 @@
                                 ⚠️ فلترٌ لا يطابق السجل: «{{ $d['status'] }}» في {{ $d['label'] }} — {{ $d['why'] }}
                             </div>
                         @endforeach
+                        @include('kpis._ai_insight', ['ins' => $insights[$k['id']] ?? null, 'kpiId' => $k['id']])
                     </td>
                     <td class="sub">{{ $k['owner'] ?: '—' }}</td>
                     <td class="sub">{{ $k['period'] ?: '—' }}</td>

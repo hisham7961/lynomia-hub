@@ -3400,6 +3400,123 @@
         ]
     },
     {
+        "methods": "GET|HEAD",
+        "uri": "ai/proposals",
+        "name": "ai.proposals",
+        "action": "App\\Http\\Controllers\\Web\\AiProposalController@index",
+        "middleware": [
+            "web",
+            "auth"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "ai/proposals/{id}/apply",
+        "name": "ai.proposals.apply",
+        "action": "App\\Http\\Controllers\\Web\\AiProposalController@apply",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "ai/proposals/{id}/reject",
+        "name": "ai.proposals.reject",
+        "action": "App\\Http\\Controllers\\Web\\AiProposalController@reject",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "reports/projects/{id}/understanding",
+        "name": "reports.projects.understand",
+        "action": "App\\Http\\Controllers\\Web\\UnderstandingController@refresh",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:6,10"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "reports/projects/{id}/suggestions/{sid}",
+        "name": "reports.projects.suggestion",
+        "action": "App\\Http\\Controllers\\Web\\UnderstandingController@suggestion",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "ai/brief",
+        "name": "ai.brief",
+        "action": "App\\Http\\Controllers\\Web\\ExecBriefController@index",
+        "middleware": [
+            "web",
+            "auth"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "ai/brief",
+        "name": "ai.brief.refresh",
+        "action": "App\\Http\\Controllers\\Web\\ExecBriefController@refresh",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:4,10"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "followups",
+        "name": "followups.mine",
+        "action": "App\\Http\\Controllers\\Web\\FollowUpController@mine",
+        "middleware": [
+            "web",
+            "auth"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "followups/team",
+        "name": "followups.team",
+        "action": "App\\Http\\Controllers\\Web\\FollowUpController@team",
+        "middleware": [
+            "web",
+            "auth"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "followups/{id}/answer",
+        "name": "followups.answer",
+        "action": "App\\Http\\Controllers\\Web\\FollowUpController@answer",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "followups/{id}/close",
+        "name": "followups.close",
+        "action": "App\\Http\\Controllers\\Web\\FollowUpController@close",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:60,1"
+        ]
+    },
+    {
         "methods": "POST",
         "uri": "reports/review/{id}",
         "name": "reports.review.act",
@@ -4395,6 +4512,28 @@
         "middleware": [
             "web",
             "auth"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "kpis/ai-refresh",
+        "name": "kpis.aiRefresh",
+        "action": "App\\Http\\Controllers\\Web\\KpiInsightController@refresh",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:4,10"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "kpis/{id}/ai-target",
+        "name": "kpis.aiTarget",
+        "action": "App\\Http\\Controllers\\Web\\KpiInsightController@target",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:30,1"
         ]
     },
     {

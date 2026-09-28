@@ -96,6 +96,11 @@ class ProjectDigestController extends Controller
             'project' => $project, 'digest' => $digest, 'reports' => $reports, 'see' => $see, 'authors' => $authors,
             'masked' => DigestAccess::masked($u), 'canRefresh' => DigestAccess::canRefresh($u) && ProjectReportDigest::ready(),
             'why' => ProjectReportDigest::whyNot(),
+            // ملفُّ فهم المشروع واقتراحاتُه (المرحلة ٥) — لمن يراه وحدَه
+            'understanding' => \App\Support\Ai\Understanding\ProjectUnderstanding::forViewer($u, (string) $project->id),
+            'canUnderstand' => DigestAccess::canRefresh($u) && \App\Support\Ai\Understanding\ProjectUnderstanding::ready(),
+            // مصادرُ الفهم (المرحلة ٤): أسماءُ الملفّات وحالتُها ولقطةُ الموقع — بلا نصٍّ في الصفحة
+            'sources' => \App\Support\Ai\Sources\ProjectSources::ready() ? \App\Support\Ai\Sources\ProjectSources::summary((string) $project->id) : null,
         ]);
     }
 

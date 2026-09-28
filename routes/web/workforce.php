@@ -43,6 +43,29 @@ use Illuminate\Support\Facades\Route;
         ->whereUuid('id')->name('reports.performance.show');
     Route::post('reports/performance/{id}/refresh', [\App\Http\Controllers\Web\PerformanceReportController::class, 'refresh'])
         ->whereUuid('id')->middleware('throttle:6,10')->name('reports.performance.refresh');
+    // صندوقُ اقتراحات الذكاء (docs/ai-hub/47 §العمود أ) — الحرّاسُ في ProposalService: تعديلُ الوحدة
+    // + نطاقُ السجلّ + حجبُ الحقل، والعميلُ ٤٠٤. والقرارُ يكتب في سجلٍّ أعماليّ فيُخنَق.
+    Route::get('ai/proposals', [\App\Http\Controllers\Web\AiProposalController::class, 'index'])->name('ai.proposals');
+    Route::post('ai/proposals/{id}/apply', [\App\Http\Controllers\Web\AiProposalController::class, 'apply'])
+        ->whereUuid('id')->middleware('throttle:60,1')->name('ai.proposals.apply');
+    Route::post('ai/proposals/{id}/reject', [\App\Http\Controllers\Web\AiProposalController::class, 'reject'])
+        ->whereUuid('id')->middleware('throttle:60,1')->name('ai.proposals.reject');
+    // ملفُّ فهم المشروع واقتراحاتُه (docs/ai-hub/47 §العمود ج) — الحرّاسُ في ProjectUnderstanding::forViewer
+    Route::post('reports/projects/{id}/understanding', [\App\Http\Controllers\Web\UnderstandingController::class, 'refresh'])
+        ->whereUuid('id')->middleware('throttle:6,10')->name('reports.projects.understand');
+    Route::post('reports/projects/{id}/suggestions/{sid}', [\App\Http\Controllers\Web\UnderstandingController::class, 'suggestion'])
+        ->whereUuid('id')->where('sid', '[a-f0-9]{12}')->middleware('throttle:60,1')->name('reports.projects.suggestion');
+    // موجزُ الأسبوع (docs/ai-hub/47 §العمود و) — للمالك وحدَه (الحارسُ في المتحكّم)
+    Route::get('ai/brief', [\App\Http\Controllers\Web\ExecBriefController::class, 'index'])->name('ai.brief');
+    Route::post('ai/brief', [\App\Http\Controllers\Web\ExecBriefController::class, 'refresh'])
+        ->middleware('throttle:4,10')->name('ai.brief.refresh');
+    // المتابِع (docs/ai-hub/47 §العمود ب): صاحبُ الالتزام يجيب بنقرة، والمديرُ المباشر يرى فريقَه وحدَه
+    Route::get('followups', [\App\Http\Controllers\Web\FollowUpController::class, 'mine'])->name('followups.mine');
+    Route::get('followups/team', [\App\Http\Controllers\Web\FollowUpController::class, 'team'])->name('followups.team');
+    Route::post('followups/{id}/answer', [\App\Http\Controllers\Web\FollowUpController::class, 'answer'])
+        ->whereUuid('id')->middleware('throttle:60,1')->name('followups.answer');
+    Route::post('followups/{id}/close', [\App\Http\Controllers\Web\FollowUpController::class, 'close'])
+        ->whereUuid('id')->middleware('throttle:60,1')->name('followups.close');
     Route::middleware('throttle:60,1')->group(function () {
         Route::post('reports/review/{id}', [\App\Http\Controllers\Web\ReportsController::class, 'reviewAct'])->name('reports.review.act');
         // «حوّله إلى بلاغ» — المعوّقُ المبلَّغُ يصير التزاماً بمالكٍ وموعد (v2.558)
