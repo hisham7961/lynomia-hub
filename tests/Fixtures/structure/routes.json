@@ -3432,6 +3432,48 @@
         ]
     },
     {
+        "methods": "GET|HEAD",
+        "uri": "followups",
+        "name": "followups.mine",
+        "action": "App\\Http\\Controllers\\Web\\FollowUpController@mine",
+        "middleware": [
+            "web",
+            "auth"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "followups/team",
+        "name": "followups.team",
+        "action": "App\\Http\\Controllers\\Web\\FollowUpController@team",
+        "middleware": [
+            "web",
+            "auth"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "followups/{id}/answer",
+        "name": "followups.answer",
+        "action": "App\\Http\\Controllers\\Web\\FollowUpController@answer",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:60,1"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "followups/{id}/close",
+        "name": "followups.close",
+        "action": "App\\Http\\Controllers\\Web\\FollowUpController@close",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:60,1"
+        ]
+    },
+    {
         "methods": "POST",
         "uri": "reports/review/{id}",
         "name": "reports.review.act",

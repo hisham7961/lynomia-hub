@@ -27,6 +27,16 @@ Schedule::command('hub:outbox')->everyFiveMinutes()->withoutOverlapping(20)
 Schedule::command('hub:report-digest')->hourly()->withoutOverlapping(50)
     ->when(fn () => \App\Support\Ai\Reports\ProjectReportDigest::hourly() && \App\Support\Ai\Reports\ProjectReportDigest::enabled())
     ->onFailure(fn () => hub_schedule_failed('hub:report-digest', 'QUEUE', 'ERROR'));
+/*
+| المتابِع (docs/ai-hub/47 §العمود ب) — مرّتين في ساعات العمل حين يُفعَّل: استخراجٌ وإغلاقٌ بالدليل وسؤال.
+| سؤالان في اليوم على الأكثر لكلِّ موظّف — والجدولةُ مرّتان فلا يتجاوزهما.
+*/
+Schedule::command('hub:followup')->dailyAt('10:05')->withoutOverlapping(60)
+    ->when(fn () => \App\Support\Ai\FollowUp\FollowUp::enabled())
+    ->onFailure(fn () => hub_schedule_failed('hub:followup', 'QUEUE', 'ERROR'));
+Schedule::command('hub:followup')->dailyAt('14:05')->withoutOverlapping(60)
+    ->when(fn () => \App\Support\Ai\FollowUp\FollowUp::enabled())
+    ->onFailure(fn () => hub_schedule_failed('hub:followup', 'QUEUE', 'ERROR'));
 Schedule::command('hub:backup')->dailyAt('03:30')->withoutOverlapping(240)
     ->onFailure(fn () => hub_schedule_failed('hub:backup', 'QUEUE', 'HIGH'));
 Schedule::command('hub:digest')->weeklyOn(6, '07:00')->withoutOverlapping(240)   // تقرير تنفيذي أسبوعي (السبت ٧ صباحاً)

@@ -76,6 +76,10 @@ return [
                 ]],
                 // مهامّي وموافقاتي: منظورٌ «لي» يرتبط بفهرس الوحدة القائم (C7) — بيتُها الأساسيّ «العمل»
                 'tasks' => ['label' => 'مهامّي وموافقاتي', 'order' => 2, 'destinations' => [
+                    // المتابِع (FollowUp) — التزاماتُ تقاريري التي يسأل عنها مساعد Hub
+                    ['type' => 'center', 'center' => 'followups', 'importance' => 'secondary',
+                        'route_prefix' => 'followups', 'routes' => ['followups.mine', 'followups.team'],
+                        'synonyms' => ['followups', 'متابعاتي', 'متابعة', 'التزاماتي', 'commitments', 'follow up']],
                     // صندوقُ اقتراحات الذكاء (ProposalService) — ما ينتظر قرارَك من تغييراتٍ مقترحة
                     ['type' => 'center', 'center' => 'aiprop', 'importance' => 'secondary',
                         'route_prefix' => 'ai.proposals', 'routes' => ['ai.proposals'],

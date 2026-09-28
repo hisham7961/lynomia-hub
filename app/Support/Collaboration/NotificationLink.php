@@ -55,6 +55,10 @@ class NotificationLink
             return route('portal.custody');
         }
 
+        // المتابِع: السؤالُ يفتح «متابعاتي» حيث يُجاب بنقرة، والتصعيدُ يفتح «متابعات فريقي»
+        if ((string) $n->kind === 'followup') return route('followups.mine');
+        if ((string) $n->kind === 'followup_team') return route('followups.team');
+
         return ($n->module && $n->record_id && hub_mod((string) $n->module))
             ? route('m.show', [$n->module, $n->record_id])
             : route('notifications.index');

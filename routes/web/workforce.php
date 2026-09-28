@@ -50,6 +50,13 @@ use Illuminate\Support\Facades\Route;
         ->whereUuid('id')->middleware('throttle:60,1')->name('ai.proposals.apply');
     Route::post('ai/proposals/{id}/reject', [\App\Http\Controllers\Web\AiProposalController::class, 'reject'])
         ->whereUuid('id')->middleware('throttle:60,1')->name('ai.proposals.reject');
+    // المتابِع (docs/ai-hub/47 §العمود ب): صاحبُ الالتزام يجيب بنقرة، والمديرُ المباشر يرى فريقَه وحدَه
+    Route::get('followups', [\App\Http\Controllers\Web\FollowUpController::class, 'mine'])->name('followups.mine');
+    Route::get('followups/team', [\App\Http\Controllers\Web\FollowUpController::class, 'team'])->name('followups.team');
+    Route::post('followups/{id}/answer', [\App\Http\Controllers\Web\FollowUpController::class, 'answer'])
+        ->whereUuid('id')->middleware('throttle:60,1')->name('followups.answer');
+    Route::post('followups/{id}/close', [\App\Http\Controllers\Web\FollowUpController::class, 'close'])
+        ->whereUuid('id')->middleware('throttle:60,1')->name('followups.close');
     Route::middleware('throttle:60,1')->group(function () {
         Route::post('reports/review/{id}', [\App\Http\Controllers\Web\ReportsController::class, 'reviewAct'])->name('reports.review.act');
         // «حوّله إلى بلاغ» — المعوّقُ المبلَّغُ يصير التزاماً بمالكٍ وموعد (v2.558)

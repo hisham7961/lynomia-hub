@@ -398,7 +398,7 @@ final class ProposalService
         $q = DB::table((string) $def['table'])->where('id', $id);
         if (\App\Support\Platform\SchemaCache::hasColumn((string) $def['table'], 'deleted_at')) $q->whereNull('deleted_at');
 
-        return $q->first();
+        return $q->orderBy('id')->first();
     }
 
     /** قيمةٌ مُتحقَّقٌ منها بنوع الحقل — والتقدّمُ بين ٠ و١٠٠ */
