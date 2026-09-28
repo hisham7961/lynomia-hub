@@ -100,30 +100,58 @@ final class ProgressFromReports
     {
         if (! self::enabled() || $rounds === []) return 0;
         $made = 0;
+        // سجلُّ «لماذا لم يُقترح؟» — ثلاثُ حالاتٍ مشروعةٍ تبدو من الخارج واحدة (بلا تقدير · ضمن العتبة · دليلٌ لم يثبت)
+        $why = ['project' => 'no_estimate', 'tasks' => 0, 'tasks_made' => 0];
 
         $last = $rounds[count($rounds) - 1];
         $project = $last['parsed']['project'] ?? null;
         if (is_array($project)) {
             $recorded = (float) (DB::table('projects')->where('id', $projectId)->value('progress') ?? 0);
-            if (abs((float) $project['estimate'] - $recorded) >= self::threshold()) {
-                $ev = self::evidence($project['quotes'], $last['refs']);
-                if ($ev !== [] && ProposalService::propose('project_progress', $projectId, (int) $project['estimate'],
-                        $project['why'], $ev, null, self::SOURCE)['ok']) $made++;
+            $why += ['estimate' => $project['estimate'], 'recorded' => $recorded];
+            if (abs((float) $project['estimate'] - $recorded) < self::threshold()) {
+                $why['project'] = 'within_threshold';
+            } else {
+                $ev = self::verified(self::evidence($project['quotes'], $last['refs']));
+                if ($ev === []) {
+                    $why['project'] = 'no_verified_quote';
+                } else {
+                    $r = ProposalService::propose('project_progress', $projectId, (int) $project['estimate'], $project['why'], $ev, null, self::SOURCE);
+                    $why['project'] = $r['ok'] ? 'proposed' : 'refused: ' . ($r['why'] ?? '');
+                    if ($r['ok']) $made++;
+                }
             }
         }
 
         foreach ($rounds as $r) {
             foreach ((array) ($r['parsed']['tasks'] ?? []) as $t) {
+                $why['tasks']++;
                 $ref = $r['refs'][$t['n']] ?? null;
                 if ($ref === null || $ref['task'] === '') continue;
                 $now = (float) (DB::table('tasks')->where('id', $ref['task'])->value('progress') ?? 0);
                 if (abs((float) $t['estimate'] - $now) < self::threshold()) continue;
                 $ev = [['module' => 'updates', 'record_id' => $ref['id'], 'quote' => $t['quote']]];
-                if (ProposalService::propose('task_progress', $ref['task'], (int) $t['estimate'], $t['why'], $ev, null, self::SOURCE)['ok']) $made++;
+                if (ProposalService::propose('task_progress', $ref['task'], (int) $t['estimate'], $t['why'], $ev, null, self::SOURCE)['ok']) {
+                    $made++;
+                    $why['tasks_made']++;
+                }
             }
         }
 
+        \Illuminate\Support\Facades\Log::info('ai.progress', ['project' => $projectId] + $why);
+
         return $made;
+    }
+
+    /**
+     * الاقتباساتُ الصادقةُ وحدَها — كلُّ اقتباسٍ يُتحقَّق منه منفرداً، فاقتباسٌ واحدٌ غيرُ حرفيٍّ بين عدّةٍ صادقة
+     * لا يُسقط التقديرَ كلَّه؛ وما لم يثبت يُحذف ولا يُعرض دليلاً. (بلا اقتباسٍ صادقٍ واحد ⇒ لا اقتراح.)
+     *
+     * @param  list<array{module:string, record_id:string, quote:string}>  $ev
+     * @return list<array{module:string, record_id:string, quote:string}>
+     */
+    private static function verified(array $ev): array
+    {
+        return array_values(array_filter($ev, fn ($e) => ProposalService::verifyEvidence([$e]) !== null));
     }
 
     /** @return list<array{module:string, record_id:string, quote:string}> */
