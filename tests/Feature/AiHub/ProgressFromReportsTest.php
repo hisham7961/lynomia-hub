@@ -122,6 +122,20 @@ class ProgressFromReportsTest extends TestCase
         $this->assertStringNotContainsString('منصّةُ الحجوزات', $sent);
     }
 
+    public function test_one_invented_quote_among_true_ones_is_dropped_not_the_whole_estimate(): void
+    {
+        $rid = $this->report('أنهينا لوحةَ الحجوزات وربطنا الإشعارات بالبريد');
+        $this->reply = $this->summary(['progress' => ['estimate' => 65, 'why' => 'لوحةٌ وإشعارات',
+            'quotes' => [['n' => 1, 'quote' => 'سلّمنا المشروعَ للعميل كاملاً اليوم'], ['n' => 1, 'quote' => 'أنهينا لوحةَ الحجوزات']]]]);
+
+        ProjectReportDigest::run();
+
+        $p = AiProposal::query()->where('kind', 'project_progress')->firstOrFail();
+        $this->assertCount(1, $p->evidence, 'الاقتباسُ المختلَقُ يُحذف ولا يُعرض دليلاً');
+        $this->assertSame('أنهينا لوحةَ الحجوزات', $p->evidence[0]['quote']);
+        $this->assertSame($rid, $p->evidence[0]['record_id']);
+    }
+
     public function test_an_invented_quote_or_a_close_estimate_proposes_nothing(): void
     {
         $this->report('راجعنا واجهةَ الحجوزات مع العميل واتفقنا على التعديلات');
