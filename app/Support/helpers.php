@@ -275,28 +275,8 @@ if (! function_exists('hub_scope')) {
          * API/مزامنة): «سري» يُرى لحامل docsec على الوحدة أو رافعِ الوثيقة —
          * والمالكُ لا يمرّ من هنا أصلاً (يعود قبل النطاق).
          */
-        /*
-         * **المهمّةُ الخاصّة تُرى لأهلها وحدَهم** (طلبُ المالك: «لمّا نرسل مهمّة لموظّف تظهر
-         * له هو لحاله»): المُسنَد إليه، والمشاركون، ومُنشئها، ومديرُ مشروعها — والمالكُ فوق
-         * الجميع. والحصرُ هنا في طبقة العزل فيسري على كلِّ بابِ قراءة (القائمة والسجلّ والبحث
-         * والتصدير والـAPI ومزامنة الجوال واسأل Hub) لا على شاشةٍ بعينها. والمهمّةُ العامّة
-         * (العلَمُ مطفأ — افتراضُ كلِّ ما سبق) لا يمسّها شيء.
-         */
-        if ($module === 'tasks' && $user && ! hub_is_owner($user)
-            && \App\Support\Platform\SchemaCache::hasColumn('tasks', 'private')) {
-            $uid = (string) $user->id;
-            $t = $q instanceof \Illuminate\Database\Eloquent\Builder ? $q->getModel()->getTable() : 'tasks';
-            $q->where(function ($w) use ($uid, $t) {
-                $w->where("$t.private", false)->orWhereNull("$t.private")
-                    ->orWhere("$t.assignee_id", $uid)
-                    ->orWhere("$t.created_by", $uid)
-                    // المشاركون مصفوفةُ UUID في JSON — والـUUID فريدٌ فلا يطابق جزءاً من غيره
-                    ->orWhere("$t.parts", 'like', '%' . $uid . '%')
-                    ->orWhereIn("$t.project_id", function ($sub) use ($uid) {
-                        $sub->select('id')->from('projects')->where('manager_id', $uid);
-                    });
-            });
-        }
+        // المهمّةُ الخاصّة تُرى لأهلها وحدَهم — المنطقُ في `PrivateTasks::scope`
+        if ($module === 'tasks' && $user) \App\Support\Workforce\PrivateTasks::scope($q, $user);
 
         if ($module === 'files' && ! hub_can($user, 'files', 'docsec')) {
             $q->where(fn ($w) => $w->where('secrecy', '!=', 'سري')
