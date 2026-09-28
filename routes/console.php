@@ -37,6 +37,10 @@ Schedule::command('hub:followup')->dailyAt('10:05')->withoutOverlapping(60)
 Schedule::command('hub:followup')->dailyAt('14:05')->withoutOverlapping(60)
     ->when(fn () => \App\Support\Ai\FollowUp\FollowUp::enabled())
     ->onFailure(fn () => hub_schedule_failed('hub:followup', 'QUEUE', 'ERROR'));
+// موجزُ الأسبوع للمالك (docs/ai-hub/47 §العمود و) — صباحَ الأحد، أوّلَ أسبوع العمل
+Schedule::command('hub:exec-brief')->weeklyOn(0, '07:40')->withoutOverlapping(60)
+    ->when(fn () => \App\Support\Ai\Brief\ExecBrief::enabled())
+    ->onFailure(fn () => hub_schedule_failed('hub:exec-brief', 'QUEUE', 'ERROR'));
 Schedule::command('hub:backup')->dailyAt('03:30')->withoutOverlapping(240)
     ->onFailure(fn () => hub_schedule_failed('hub:backup', 'QUEUE', 'HIGH'));
 Schedule::command('hub:digest')->weeklyOn(6, '07:00')->withoutOverlapping(240)   // تقرير تنفيذي أسبوعي (السبت ٧ صباحاً)

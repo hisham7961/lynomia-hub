@@ -3455,6 +3455,27 @@
     },
     {
         "methods": "GET|HEAD",
+        "uri": "ai/brief",
+        "name": "ai.brief",
+        "action": "App\\Http\\Controllers\\Web\\ExecBriefController@index",
+        "middleware": [
+            "web",
+            "auth"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "ai/brief",
+        "name": "ai.brief.refresh",
+        "action": "App\\Http\\Controllers\\Web\\ExecBriefController@refresh",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:4,10"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
         "uri": "followups",
         "name": "followups.mine",
         "action": "App\\Http\\Controllers\\Web\\FollowUpController@mine",

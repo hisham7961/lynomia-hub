@@ -602,6 +602,7 @@ if (! function_exists('hub_top_links')) {
             ['key' => 'reportsp',  'label' => '📁 تقارير حسب المشروع', 'route' => 'reports.projects', 'group' => 'centers',  'ok' => \App\Support\Ai\Reports\DigestAccess::canUse($user)],
             ['key' => 'aiprop',    'label' => '💡 اقتراحات الذكاء', 'route' => 'ai.proposals', 'group' => 'daily',  'ok' => ! hub_is_client($user) && (string) setting('ai.proposals', '1') === '1'],
             ['key' => 'followups', 'label' => '🔁 متابعاتي', 'route' => 'followups.mine', 'group' => 'daily', 'ok' => hub_is_owner($user) || (! hub_is_client($user) && (string) setting('followup.enabled', '0') === '1')],
+            ['key' => 'brief',     'label' => '🗓️ موجز الأسبوع', 'route' => 'ai.brief', 'group' => 'daily', 'ok' => hub_is_owner($user)],
             ['key' => 'perfai',    'label' => '📈 تقارير الأداء',     'route' => 'reports.performance', 'group' => 'centers', 'ok' => \App\Support\Ai\Reports\PerformanceAccess::canUseAny($user)],
             // الحضورُ الشهريّ للمحاسبة والاعتماد — يكفيه `attend:v` (يمنحه المالكُ للمحاسب) أو `hr:v`
             ['key' => 'attmonth',  'label' => '🗓️ الحضور الشهري',     'route' => 'reports.monthly', 'group' => 'centers',   'ok' => hub_can($user, 'attend', 'v') || hub_can($user, 'hr', 'v')],

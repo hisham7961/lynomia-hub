@@ -101,8 +101,9 @@ class HubAutomation extends Command
         $ps = $this->projectSources();
         $pu = $this->understanding();
         $ki = $this->kpiInsights();
+        $re = $this->requestEstimates();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · تقارير: {$rr} تنبيهُ نقص · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة · المدقّق: {$au['opened']} نتيجةٌ جديدة، {$au['resolved']} زال شرطُها · العقلُ الثاني: {$br} مقطعاً مُضمَّناً · ملخّصاتُ المشاريع: {$rd} محدَّثاً · تحليلُ العهد: {$ci} صنفاً · تقاريرُ الأداء: {$pf} مولَّداً · اقتراحاتٌ منتهية: {$px} · مصادرُ المشاريع: {$ps['files']} ملفّاً و{$ps['sites']} موقعاً · ملفّاتُ الفهم: {$pu} مبنيّاً · تحليلُ المؤشّرات: {$ki}");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · تقارير: {$rr} تنبيهُ نقص · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة · المدقّق: {$au['opened']} نتيجةٌ جديدة، {$au['resolved']} زال شرطُها · العقلُ الثاني: {$br} مقطعاً مُضمَّناً · ملخّصاتُ المشاريع: {$rd} محدَّثاً · تحليلُ العهد: {$ci} صنفاً · تقاريرُ الأداء: {$pf} مولَّداً · اقتراحاتٌ منتهية: {$px} · مصادرُ المشاريع: {$ps['files']} ملفّاً و{$ps['sites']} موقعاً · ملفّاتُ الفهم: {$pu} مبنيّاً · تحليلُ المؤشّرات: {$ki} · تقديراتُ الطلبات: {$re}");
 
         if (! $this->dry) \App\Support\Ops\Health::beat('automation', (int) round((microtime(true) - $t0) * 1000));
         return self::SUCCESS;
@@ -204,6 +205,20 @@ class HubAutomation extends Command
     }
 
     /** تحليلُ الذكاء لأصناف العهد (`custody.ai_insights`): ما تغيّرت حقائقُه فقط — ومعزولُ الفشل */
+    /** تقديرُ الطلبات الواردة ⇒ اقتراحات (docs/ai-hub/47 §العمود و) */
+    protected function requestEstimates(): int
+    {
+        try {
+            if (! \App\Support\Ai\Brief\RequestEstimator::enabled()) return 0;
+
+            return (int) \App\Support\Ai\Brief\RequestEstimator::run($this->dry)['proposals'];
+        } catch (\Throwable $e) {
+            report($e);
+
+            return 0;
+        }
+    }
+
     /** مؤشّراتٌ ذكيّة — تفسيرٌ وهدفٌ مقترح لما تغيّر أو مضى عليه أسبوع (docs/ai-hub/47 §العمود هـ) */
     protected function kpiInsights(): int
     {

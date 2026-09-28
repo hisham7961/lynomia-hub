@@ -58,6 +58,7 @@ class NotificationLink
         // المتابِع: السؤالُ يفتح «متابعاتي» حيث يُجاب بنقرة، والتصعيدُ يفتح «متابعات فريقي»
         if ((string) $n->kind === 'followup') return route('followups.mine');
         if ((string) $n->kind === 'followup_team') return route('followups.team');
+        if ((string) $n->kind === 'exec_brief') return route('ai.brief');
 
         return ($n->module && $n->record_id && hub_mod((string) $n->module))
             ? route('m.show', [$n->module, $n->record_id])
