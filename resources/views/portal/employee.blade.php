@@ -280,6 +280,15 @@
         </div>
     </div>
 
+@elseif ($tab360 === 'performance')
+    {{-- تقريرُ الأداء (ذكاء اصطناعي) — PerformanceAccess حرسه في المتحكّم؛ والتاريخُ و«تحديث» في صفحته --}}
+    <div class="card kid" data-performance-tab>
+        <h3>🤖 تقرير الأداء (ذكاء اصطناعي)
+            <a class="btn ghost xs" style="float:inline-end" href="{{ route('reports.performance.show', $emp->id) }}">التاريخ و«تحديث» ↗</a></h3>
+        @include('reports._performance_body', ['pf' => $perf, 'emp' => $emp,
+            'pfAction' => route('portal.employee', $emp->id), 'pfHidden' => ['tab' => 'performance']])
+    </div>
+
 @elseif ($tab360 === 'wallet')
     {{-- العهدة المالية (الطور E): رصيدُ ذمّته المشتقّ — يحرسه field-mode، والكشفُ الكاملُ
          محرّكُه الوحيد `EmployeeCustodyController` (لا محرّكَ ثانٍ). --}}

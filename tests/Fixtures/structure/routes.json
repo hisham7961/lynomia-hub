@@ -3369,6 +3369,37 @@
         ]
     },
     {
+        "methods": "GET|HEAD",
+        "uri": "reports/performance",
+        "name": "reports.performance",
+        "action": "App\\Http\\Controllers\\Web\\PerformanceReportController@index",
+        "middleware": [
+            "web",
+            "auth"
+        ]
+    },
+    {
+        "methods": "GET|HEAD",
+        "uri": "reports/performance/{id}",
+        "name": "reports.performance.show",
+        "action": "App\\Http\\Controllers\\Web\\PerformanceReportController@show",
+        "middleware": [
+            "web",
+            "auth"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "reports/performance/{id}/refresh",
+        "name": "reports.performance.refresh",
+        "action": "App\\Http\\Controllers\\Web\\PerformanceReportController@refresh",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:6,10"
+        ]
+    },
+    {
         "methods": "POST",
         "uri": "reports/review/{id}",
         "name": "reports.review.act",

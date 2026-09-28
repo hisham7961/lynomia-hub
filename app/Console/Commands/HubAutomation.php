@@ -96,8 +96,9 @@ class HubAutomation extends Command
         $br = $this->brainIndex();
         $rd = $this->reportDigest();
         $ci = $this->custodyInsights();
+        $pf = $this->employeePerformance();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · تقارير: {$rr} تنبيهُ نقص · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة · المدقّق: {$au['opened']} نتيجةٌ جديدة، {$au['resolved']} زال شرطُها · العقلُ الثاني: {$br} مقطعاً مُضمَّناً · ملخّصاتُ المشاريع: {$rd} محدَّثاً · تحليلُ العهد: {$ci} صنفاً");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · تقارير: {$rr} تنبيهُ نقص · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة · المدقّق: {$au['opened']} نتيجةٌ جديدة، {$au['resolved']} زال شرطُها · العقلُ الثاني: {$br} مقطعاً مُضمَّناً · ملخّصاتُ المشاريع: {$rd} محدَّثاً · تحليلُ العهد: {$ci} صنفاً · تقاريرُ الأداء: {$pf} مولَّداً");
 
         if (! $this->dry) \App\Support\Ops\Health::beat('automation', (int) round((microtime(true) - $t0) * 1000));
         return self::SUCCESS;
@@ -164,14 +165,33 @@ class HubAutomation extends Command
 
     /**
      * ملخّصُ تقارير المشروع (ProjectReportDigest): يحدّث ما فيه جديدٌ وحدَه — ومعزولُ الفشل كسائر الخطوات.
-     * مطفأٌ ⇒ صفرٌ بلا نداء.
+     * مطفأٌ ⇒ صفرٌ بلا نداء. **وبالتكرار الساعيّ** (`reports.project_digest_frequency=hourly`) يجدوله
+     * `routes/console.php` كلَّ ساعة — فيُتخطّى هنا كي لا تجري جولتان في اليوم نفسِه على المشاريع نفسِها.
      */
     protected function reportDigest(): int
     {
         try {
+            if (\App\Support\Ai\Reports\ProjectReportDigest::hourly()) return 0;
             if (! \App\Support\Ai\Reports\ProjectReportDigest::ready()) return 0;
 
             return (int) \App\Support\Ai\Reports\ProjectReportDigest::run($this->dry)['updated'];
+        } catch (\Throwable $e) {
+            report($e);
+
+            return 0;
+        }
+    }
+
+    /**
+     * تقريرُ أداء الموظّف (`EmployeePerformance`): الفترةُ المكتملةُ السابقةُ مرّةً، والجاريةُ مرّةً في اليوم
+     * إن تغيّرت بصمتُها — ومعزولُ الفشل كسائر الخطوات. مطفأٌ ⇒ صفرٌ بلا نداء.
+     */
+    protected function employeePerformance(): int
+    {
+        try {
+            if (! \App\Support\Ai\Reports\EmployeePerformance::ready()) return 0;
+
+            return (int) \App\Support\Ai\Reports\EmployeePerformance::run($this->dry)['updated'];
         } catch (\Throwable $e) {
             report($e);
 

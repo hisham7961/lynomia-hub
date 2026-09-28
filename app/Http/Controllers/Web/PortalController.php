@@ -130,6 +130,11 @@ class PortalController extends Controller
         // بوحدةٍ يحرسها hub_can — و`?tab=` مصنوعٌ باليد لوحدةٍ لا يملكها القارئُ يُردّ
         // ٤٠٣ (لا مجرَّدَ إخفاءٍ في الشريط). سككٌ قائمةٌ فقط تظهر (لا بطاقةٌ زائفة §82).
         $tabs = $this->emp360Tabs($u);
+        // تقريرُ الأداء (ذكاء اصطناعي) — بوحدة hr كالملفّ، **وبقاعدة PerformanceAccess للموظّف نفسِه**:
+        // الموظّفُ لا يرى السردَ عن نفسِه ولو ملك hr:v (سياسةُ المالك) — فلا تبويبَ له، وطلبُه ٤٠٣.
+        if (! \App\Support\Ai\Reports\PerformanceAccess::canView($u, $emp)) {
+            $tabs = array_values(array_filter($tabs, fn ($t) => $t['key'] !== 'performance'));
+        }
         $req  = request()->query('tab');
         $tab  = (is_string($req) && $req !== '') ? $req : $tabs[0]['key'];
         // تبويبٌ لا وجود له في السجلّ أصلاً (سكّةٌ لم تُبنَ) → ٤٠٤ لا لوحةٌ صامتة
@@ -163,6 +168,10 @@ class PortalController extends Controller
         if ($tab === 'systems') $data['servers'] = $this->serversFor($u, $emp->id);
         // (الطور J · WP-J.3) تبويبُ أمنِ النقاط — أجهزةُ الموظف بحسابه (employee_id مرجعُ users)
         if ($tab === 'endpoint') $data['endpointDevices'] = $this->endpointDevicesFor($u, $emp->user_id);
+        // تقريرُ الأداء (ذكاء اصطناعي): الفترةُ المختارة (?period=) أو الأحدث، وتاريخُ الفترات
+        if ($tab === 'performance') {
+            $data['perf'] = \App\Support\Ai\Reports\PerformanceAccess::panel($u, $emp, (string) request()->query('period', ''));
+        }
 
         return view('portal.employee', $data);
     }
@@ -194,6 +203,9 @@ class PortalController extends Controller
             // الآن لا بطاقةٌ زائفة، ويحرسه `endpoints:v` كسائر التبويبات.
             'endpoint' => ['mod' => 'endpoints', 'label' => '🛡️ أمن النقاط'],
             'wallet'  => ['mod' => 'custody',  'label' => '💰 العهدة المالية'],
+            // تقريرُ الأداء (EmployeePerformance) — يحرسه `hr:v` كالملفّ، **ثمّ** `PerformanceAccess::canView`
+            // للموظّف بعينه (لا يراه الموظّفُ عن نفسِه) في `employee()`.
+            'performance' => ['mod' => 'hr', 'label' => '🤖 تقرير الأداء (ذكاء اصطناعي)'],
         ];
     }
 

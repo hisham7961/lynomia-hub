@@ -65,6 +65,9 @@ final class AiPurposes
     /** مفتاحُ ملخّص تقارير المشروع (`App\Support\Ai\Reports\ProjectReportDigest`) — `feature` في سجلّ الاستهلاك */
     public const DIGEST = 'report_digest';
 
+    /** مفتاحُ تقرير أداء الموظّف (`App\Support\Ai\Reports\EmployeePerformance`) — `feature` في سجلّ الاستهلاك */
+    public const PERFORMANCE = 'employee_performance';
+
     /**
      * **ما تحتاجه كلُّ ميزةٍ من قدرات** — صلبٌ لا يُضبَط من شاشة.
      *
@@ -92,6 +95,8 @@ final class AiPurposes
         self::DEV => ['chat'],
         // **وملخّصُ التقارير يحتاج التوليدَ وحدَه** — الخادمُ جمع التقاريرَ الجديدة والملخّصَ السابق، والنموذجُ يدمجهما
         self::DIGEST => ['chat'],
+        // **وتقريرُ الأداء كذلك** — الخادمُ حسب الحقائقَ وجمع العيّنة، والنموذجُ يكتب السرد
+        self::PERFORMANCE => ['chat'],
     ];
 
     /** حالاتُ الملاءمة — ثلاثٌ لا اثنتان */

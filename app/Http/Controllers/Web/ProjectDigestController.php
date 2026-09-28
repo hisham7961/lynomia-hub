@@ -36,6 +36,15 @@ class ProjectDigestController extends Controller
         $u = $this->guard();
         $q = trim((string) $r->query('q', ''));
 
+        // المشروعُ يُختار لا يُكتب (طلب المالك): الاختيارُ يفتح صفحةَ ملخّصه — بنطاق القارئ، وما خارجَه ٤٠٤
+        $pick = trim((string) $r->query('project', ''));
+        if ($pick !== '') {
+            abort_unless(DigestAccess::project($u, $pick) !== null, 404);
+
+            return redirect()->route('reports.projects.show', $pick);
+        }
+        $options = DigestAccess::projects($u)->orderBy('name')->orderBy('id')->limit(1000)->pluck('name', 'id')->all();
+
         $visible = DigestAccess::projects($u);
         if ($q !== '') $visible->where('name', 'like', '%' . $q . '%');
         $digests = ReportDigest::query()
@@ -59,6 +68,7 @@ class ProjectDigestController extends Controller
 
         return view('reports.projects', [
             'digests' => $digests, 'names' => $names, 'latest' => $latest, 'waiting' => $waiting, 'q' => $q,
+            'options' => $options,
             'masked' => DigestAccess::masked($u), 'why' => ProjectReportDigest::whyNot(),
         ]);
     }

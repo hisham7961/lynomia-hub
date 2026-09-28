@@ -36,6 +36,13 @@ use Illuminate\Support\Facades\Route;
         ->whereUuid('id')->name('reports.projects.show');
     Route::post('reports/projects/{id}/refresh', [\App\Http\Controllers\Web\ProjectDigestController::class, 'refresh'])
         ->whereUuid('id')->middleware('throttle:6,10')->name('reports.projects.refresh');
+    // «تقارير الأداء (ذكاء اصطناعي)» — تقريرُ أداءٍ لكلِّ موظّفٍ لكلِّ فترة (EmployeePerformance)؛ الحرّاس في
+    // المتحكّم (نطاقُ hr أو المديرُ المباشر، والعميلُ ٤٠٤، والموظّفُ نفسُه ٤٠٤). «تحديث» مخنوقٌ للمستخدم وللموظّف.
+    Route::get('reports/performance', [\App\Http\Controllers\Web\PerformanceReportController::class, 'index'])->name('reports.performance');
+    Route::get('reports/performance/{id}', [\App\Http\Controllers\Web\PerformanceReportController::class, 'show'])
+        ->whereUuid('id')->name('reports.performance.show');
+    Route::post('reports/performance/{id}/refresh', [\App\Http\Controllers\Web\PerformanceReportController::class, 'refresh'])
+        ->whereUuid('id')->middleware('throttle:6,10')->name('reports.performance.refresh');
     Route::middleware('throttle:60,1')->group(function () {
         Route::post('reports/review/{id}', [\App\Http\Controllers\Web\ReportsController::class, 'reviewAct'])->name('reports.review.act');
         // «حوّله إلى بلاغ» — المعوّقُ المبلَّغُ يصير التزاماً بمالكٍ وموعد (v2.558)
