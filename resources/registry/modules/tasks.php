@@ -50,6 +50,12 @@ return [
             'multi' => true,
         ],
         [
+            'key' => 'private',
+            'col' => 'private',
+            'label' => 'مهمة خاصة — تظهر للمسؤول والمشاركين ومُنشئها ومدير المشروع فقط',
+            'type' => 'bool',
+        ],
+        [
             'key' => 'featId',
             'col' => 'feat_id',
             'label' => 'المتطلب المنفَّذ (خيط التتبع)',

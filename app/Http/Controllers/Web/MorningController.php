@@ -37,6 +37,32 @@ class MorningController extends Controller
                         'link' => $link, 'n' => max($n ?? $rows->count(), $rows->count())];
         };
 
+        // ── مهامي ──
+        // **ما أُسند إليك أوّلاً** (طلبُ المالك): كانت الصفحةُ تعرض «متأخّراتِ» الجميع ولا
+        // بطاقةَ لمهامّ القارئ نفسِه — فالمهمّةُ تُرسَل للموظّف ولا يجدها في مركزه اليوميّ.
+        // المفتوحةُ المُسنَدةُ إليه أو التي يشارك فيها، الأقربُ موعداً أوّلاً، والنطاقُ
+        // (`hub_scope`) يطبّق حصرَ المهامّ الخاصّة فلا يظهر هنا إلا ما له.
+        if (hub_can($u, 'tasks', 'v') && Schema::hasTable('tasks')) {
+            $uid = (string) $u->id;
+            $myQ = hub_scope(DB::table('tasks')->whereNull('deleted_at'), 'tasks')
+                ->where(fn ($w) => $w->where('assignee_id', $uid)->orWhere('parts', 'like', '%' . $uid . '%'))
+                ->whereNotIn('status', ['منجزة', 'مكتملة', 'ملغاة']);
+            $myN = (clone $myQ)->count();
+            $my = $myQ->orderByRaw('due IS NULL, due')->orderByDesc('created_at')->orderByDesc('id')->limit(10)
+                ->get(['id', 'title', 'due', 'status', 'priority', 'progress', 'private']);
+            $today = today()->toDateString();
+            $add('📌', 'مهامي', 'ما أُسند إليك أو تشارك فيه ولم يُغلق بعد',
+                $my->map(fn ($r) => [
+                    't' => ($r->private ? '🔒 ' : '') . $r->title,
+                    's' => trim(($r->status ?: '') . ($r->priority ? ' · ' . $r->priority : '')
+                        . ($r->progress !== null ? ' · ' . (int) $r->progress . '٪' : '')
+                        . ($r->due ? ' · الموعد ' . substr((string) $r->due, 0, 10) : '')),
+                    'u' => route('m.show', ['tasks', $r->id]),
+                    'tone' => $r->due && substr((string) $r->due, 0, 10) < $today ? 'bad' : ($r->status === 'جديدة' ? 'wn' : ''),
+                ]),
+                route('m.index', ['tasks', 'f' => ['assigneeId' => $uid]]), $myN);
+        }
+
         // ── قرارات تنتظرك ──
         // **«تنتظر حسمك» تعني حسمَك أنت.** كان الشرطُ `approvals:v` وحدَها، فكلُّ
         // من يرى الموافقاتِ يُقال له إنّ عمليّاتٍ موقوفةٌ على اعتماده — ولو كانت

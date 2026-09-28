@@ -22,6 +22,13 @@
             <input type="hidden" name="token" value="{{ $pinTok }}">
             <button class="btn ghost sm" title="{{ $isPin ? 'مثبّتة — انقر للإزالة' : 'ثبّت في الشريط الجانبي' }}">{{ $isPin ? '📌 مثبّتة' : '📌 تثبيت' }}</button>
         </form>
+        {{-- «المُسنَد إليّ» — نقرةٌ إلى ما يخصّك في كلِّ وحدةٍ لها مسؤول (المهام أوّلاً) --}}
+        @php $asgF = hub_has_assignee_col($module) ? collect($def['fields'] ?? [])->firstWhere('col', 'assignee_id') : null; @endphp
+        @if (! $trash && $asgF)
+            @php $asgOn = (string) (request('f')[$asgF['key']] ?? '') === (string) auth()->id(); @endphp
+            <a class="btn {{ $asgOn ? 'p' : 'ghost' }} sm"
+               href="{{ $asgOn ? route('m.index', $module) : route('m.index', ['module' => $module, 'f' => [$asgF['key'] => auth()->id()]]) }}">👤 المُسنَد إليّ</a>
+        @endif
         @if (! $trash && ($def['status'] ?? null))
             <a class="btn ghost sm" href="{{ route('m.board', $module) }}">🗂 كانبان</a>
         @endif
