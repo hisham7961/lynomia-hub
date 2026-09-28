@@ -41,6 +41,11 @@ use Illuminate\Support\Facades\Route;
     Route::put('kpis/{id}', [\App\Http\Controllers\Web\KpiController::class, 'update'])->name('kpis.update');
     // إسنادُ المالكِ المقترَح: نقرةٌ تعتمد ما عُرض بدليله — والجماعيُّ للمؤكَّدِ وحدَه
     Route::post('kpis/adopt-all', [\App\Http\Controllers\Web\KpiController::class, 'adoptAll'])->name('kpis.adoptAll');
+    // مؤشّراتٌ ذكيّة (docs/ai-hub/47 §العمود هـ): تحليلٌ الآن، وقرارُ الهدف المقترح — بابُ الباني نفسُه
+    Route::post('kpis/ai-refresh', [\App\Http\Controllers\Web\KpiInsightController::class, 'refresh'])
+        ->middleware('throttle:4,10')->name('kpis.aiRefresh');
+    Route::post('kpis/{id}/ai-target', [\App\Http\Controllers\Web\KpiInsightController::class, 'target'])
+        ->middleware('throttle:30,1')->name('kpis.aiTarget');
     Route::post('kpis/{id}/adopt', [\App\Http\Controllers\Web\KpiController::class, 'adopt'])->name('kpis.adopt');
     Route::post('kpis/{id}/toggle', [\App\Http\Controllers\Web\KpiController::class, 'toggle'])->name('kpis.toggle');
     Route::post('kpis/{id}/move', [\App\Http\Controllers\Web\KpiController::class, 'move'])->name('kpis.move');

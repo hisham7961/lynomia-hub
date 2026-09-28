@@ -4495,6 +4495,28 @@
     },
     {
         "methods": "POST",
+        "uri": "kpis/ai-refresh",
+        "name": "kpis.aiRefresh",
+        "action": "App\\Http\\Controllers\\Web\\KpiInsightController@refresh",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:4,10"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "kpis/{id}/ai-target",
+        "name": "kpis.aiTarget",
+        "action": "App\\Http\\Controllers\\Web\\KpiInsightController@target",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:30,1"
+        ]
+    },
+    {
+        "methods": "POST",
         "uri": "kpis/{id}/adopt",
         "name": "kpis.adopt",
         "action": "App\\Http\\Controllers\\Web\\KpiController@adopt",
