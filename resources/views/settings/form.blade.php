@@ -155,7 +155,7 @@
             @foreach ($items as $key => $meta)
                 @php
                     $input = str_replace('.', '_', $key);
-                    $type  = $meta['type'] ?? 'text';
+                    $type  = ! empty($meta['sensitive']) ? 'pass' : ($meta['type'] ?? 'text');   // السرُّ لا يُرسَم حقلاً ظاهراً
                     // القيمة قد تعود مركّبة (عمود value مصبوبٌ array والمنصِّب يبذر خرائط)
                     $val   = \App\Http\Controllers\Web\SettingController::displayValue(old($input, $values[$key] ?? ''));
                     $on    = in_array($val, ['1', 1, true], true);

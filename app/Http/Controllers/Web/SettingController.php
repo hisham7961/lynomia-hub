@@ -355,6 +355,10 @@ class SettingController extends Controller
 
                 $input = str_replace('.', '_', $key);
                 $type = (string) ($meta['type'] ?? 'text');
+                // **السرُّ يُعامَل سرّاً أيّاً كان نوعُه المُعلَن:** مفتاحُ البوّابة وُسم
+                // `text` فرُسم حقلاً ظاهراً قيمتُه القناعُ «••••» — فكان كلُّ حفظٍ للشاشة
+                // يكتب القناعَ نفسَه مفتاحاً ويُسقط البوّابةَ بـ401.
+                if (! empty($meta['sensitive'])) $type = 'pass';
 
                 if ($type === 'img') continue;                    // تُحفظ وحدَها — لا تُعاين
 
@@ -372,6 +376,12 @@ class SettingController extends Controller
                 if ($type === 'pass') {
                     $v = trim(hub_str($r->input($input, '')));
                     if ($v === '' || $v === '••••') continue;     // فارغ = إبقاء المخزَّن
+                    // مفتاحُ البوّابة: ملءُ المتصفّح التلقائيّ يضع كلمةَ سرِّ الدخول هنا
+                    // فيستبدل المفتاحَ الصحيح بصمت — ما لا يبدأ بـsk- يُردّ ويبقى المحفوظ.
+                    if ($key === 'ai.gateway_key' && ! \App\Support\Ai\Gateway\AiGateway::looksLikeKey($v)) {
+                        $errors[$input] = \App\Support\Ai\Gateway\AiGateway::KEY_SHAPE_ERROR;
+                        continue;
+                    }
                     // النصُّ الصريح يُمرَّر كما هو — **التشفيرُ عند الكاتب** لا هنا
                     $map[$key] = $v;
                     continue;
