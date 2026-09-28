@@ -33,6 +33,7 @@ class Task extends Model
         'custom' => 'array',
         'meta' => 'array',
         'archived' => 'boolean',
+        'private' => 'boolean',
     ];
 
     public function project(): BelongsTo

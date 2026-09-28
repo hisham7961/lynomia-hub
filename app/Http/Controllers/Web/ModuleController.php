@@ -137,6 +137,14 @@ class ModuleController extends Controller
             if (is_string($v) && $v !== '') $prefill[$f['key']] = $v;
         }
 
+        // **المهمّةُ الجديدة خاصّةٌ افتراضاً** (`tasks.private_default`): تُرسَل لموظّفٍ فتظهر
+        // له وحدَه مع أهلها — والمربّعُ يبقى في يد المُنشئ لكلِّ مهمّة. والرابطُ أولى.
+        if ($module === 'tasks' && ! array_key_exists('private', $prefill)
+            && collect($def['fields'] ?? [])->contains('key', 'private')
+            && (string) setting('tasks.private_default', '1') === '1') {
+            $prefill['private'] = '1';
+        }
+
         // **والاختيارُ من واحدٍ ليس اختياراً** (M-F6): حسابٌ معزولٌ على شركةٍ
         // واحدةٍ يفرض عليه الخادمُ ذكرَها، فتُنتقى له سلفاً بدل أن يُسأل عمّا
         // جوابُه محسومٌ — ولا يُكتَب شيءٌ لا يفرضه الحارسُ أصلاً. والرابطُ أولى:

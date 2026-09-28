@@ -30,7 +30,7 @@
 
 | المجلّد | النطاق |
 |---|---|
-| [`ai-hub/`](ai-hub/) | مركزُ الذكاء: البنية (`01`) · البوّابة وLiteLLM · الحوكمة والدفتر · اسأل المنصّة · **خارطةُ الطريق والمدقّق (`46-ai-roadmap.md`)** |
+| [`ai-hub/`](ai-hub/) | مركزُ الذكاء: البنية (`01`) · البوّابة وLiteLLM · الحوكمة والدفتر · اسأل المنصّة · **خارطةُ الطريق والمدقّق (`46-ai-roadmap.md`)** · **الذكاءُ في كلِّ النظام: الاقتراحات والمتابِع والفهمُ العميق (`47-ai-everywhere-plan.md`)** |
 | [`mobile-readiness/`](mobile-readiness/) · [`mobile-platform-center/`](mobile-platform-center/) | سطحُ الجوال `/api/mobile/v1` وعقدُه (`mobile-capabilities.json` مولَّد) · مركزُ منصّة الجوال — تُعرضان داخل المركز |
 | [`permissions-360/`](permissions-360/) · [`permissions-reconciliation/`](permissions-reconciliation/) | معمارُ الصلاحيّات والرؤية ومطابقتُه |
 | [`attendance-reporting/`](attendance-reporting/) | الحضور × التقارير اليومية × المراجعة والامتثال |

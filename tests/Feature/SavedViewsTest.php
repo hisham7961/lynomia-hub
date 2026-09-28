@@ -39,10 +39,10 @@ class SavedViewsTest extends TestCase
     {
         $this->seedCore();
         $v = SavedView::create(['user_id' => $this->employee->id, 'module' => 'tasks',
-            'name' => 'خاص', 'query' => null, 'is_default' => true]);
+            'name' => 'عرضُ الموظّفة المحفوظ 8841', 'query' => null, 'is_default' => true]);
 
         // مستخدم آخر: لا يراه في قائمته، ولا يحذفه، ولا يُحوَّل إليه
-        $this->actingAs($this->viewer)->get('/m/tasks')->assertOk()->assertDontSee('خاص');
+        $this->actingAs($this->viewer)->get('/m/tasks')->assertOk()->assertDontSee('عرضُ الموظّفة المحفوظ 8841');
         $this->actingAs($this->viewer)->delete('/views/' . $v->id)->assertNotFound();
         $this->assertSame(1, SavedView::count());
     }

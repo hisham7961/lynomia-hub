@@ -659,6 +659,7 @@
     "App\\Support\\Workforce\\LeaveDecision",
     "App\\Support\\Workforce\\MonthlyAttendance",
     "App\\Support\\Workforce\\PayrollMonth",
+    "App\\Support\\Workforce\\PrivateTasks",
     "App\\Support\\Workforce\\ReportReview",
     "App\\Support\\Workforce\\Staff",
     "App\\Support\\Workforce\\TeamDirectory",

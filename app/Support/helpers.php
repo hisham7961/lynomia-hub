@@ -275,6 +275,9 @@ if (! function_exists('hub_scope')) {
          * API/مزامنة): «سري» يُرى لحامل docsec على الوحدة أو رافعِ الوثيقة —
          * والمالكُ لا يمرّ من هنا أصلاً (يعود قبل النطاق).
          */
+        // المهمّةُ الخاصّة تُرى لأهلها وحدَهم — المنطقُ في `PrivateTasks::scope`
+        if ($module === 'tasks' && $user) \App\Support\Workforce\PrivateTasks::scope($q, $user);
+
         if ($module === 'files' && ! hub_can($user, 'files', 'docsec')) {
             $q->where(fn ($w) => $w->where('secrecy', '!=', 'سري')
                 ->orWhereNull('secrecy')
