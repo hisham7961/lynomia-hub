@@ -209,6 +209,17 @@ class AiCenterController extends Controller
          * مسروقةٌ أو جهازٌ تُرك مفتوحاً لا يكفي لاستبدالِ مفتاحٍ يحمل الإنفاقَ
          * كلَّه. والتحقّقُ **عند تغييرِ المفتاحِ وحدَه**، فضبطُ مهلةٍ لا يستحقّه.
          */
+        /*
+         * **شكلُ المفتاحِ قبل كلِّ شيء:** مفاتيحُ LiteLLM تبدأ بـ`sk-` دائماً. وحقلُ
+         * كلمةِ سرٍّ بعد حقلِ عنوانٍ يبدو للمتصفّح نموذجَ دخول، فيملؤه بكلمةِ سرِّ
+         * المستخدم — فكان كلُّ حفظٍ للإعدادات يستبدل المفتاحَ الصحيح ويُسقط البوّابةَ
+         * بـ401. فما لا يبدأ بـ`sk-` يُرفَض ويبقى المفتاحُ المحفوظُ كما هو.
+         */
+        if (filled($r->input('key')) && ! AiGateway::looksLikeKey((string) $r->input('key'))) {
+            return back()->withErrors(['key' => AiGateway::KEY_SHAPE_ERROR])
+                ->withInput($r->except(['key', '_token']));
+        }
+
         if (filled($r->input('key'))) {
             if ($redirect = hub_require_stepup()) return $redirect;
         }

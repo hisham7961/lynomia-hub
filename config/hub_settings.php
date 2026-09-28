@@ -1326,7 +1326,7 @@ return [
             ],
             'ai.gateway_key' => [
                 'label'  => 'مفتاح إدارة البوّابة',
-                'type'   => 'text',
+                'type'   => 'pass',
                 'sensitive'   => true,
                 'def'    => 'فارغ — البوّابة غير مهيّأة',
                 'default'     => '',
@@ -1458,7 +1458,7 @@ return [
             ],
             'dev.github_token' => [
                 'label'  => 'رمزُ GitHub للقراءة (اختياريّ)',
-                'type'   => 'text',
+                'type'   => 'pass',
                 'sensitive'   => true,
                 'def'    => 'فارغ — المستودعاتُ العامّةُ وحدَها',
                 'default'     => '',

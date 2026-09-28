@@ -332,6 +332,59 @@ class AiCenterFoundationTest extends TestCase
         $this->assertSame('sk-withstepup-222324', AiGateway::key());
     }
 
+    /**
+     * (بلاغ المالك: «كلّ مرّة أعدّل الإعدادات أغيّر sk») — حقلُ المفتاح كلمةُ سرٍّ بعد حقلِ عنوان، فيملؤه
+     * مديرُ كلمات المرور في المتصفّح بكلمة سرّ الدخول؛ والحفظُ كان يستبدل بها مفتاحَ البوّابة فيُرفض ٤٠١.
+     * مفتاحُ إدارة LiteLLM يبدأ بـ`sk-` دائماً — فما سواه يُرفض ويبقى المحفوظ، في الشاشتين.
+     */
+    /**
+     * **«كلَّ مرّةٍ أعدّل الإعدادات يجب أن أغيّر sk» — العيبُ كما وقع.** مفتاحُ البوّابة
+     * وُسم `text` فرسمته شاشةُ الإعدادات العامّة حقلاً ظاهراً قيمتُه القناعُ «••••»؛
+     * فأيُّ حفظٍ للشاشة — لتعديلِ مفتاحٍ آخرَ تماماً — كتب القناعَ مفتاحاً فسقطت البوّابة بـ401.
+     */
+    public function test_saving_the_settings_screen_with_the_mask_keeps_the_gateway_key(): void
+    {
+        $this->seedCore();
+        Settings::put('ai.gateway_key', 'sk-real-admin-778899', 'ai');
+
+        $html = $this->actingAs($this->owner)->get(route('settings.edit'))->assertOk()->getContent();
+        $this->assertDoesNotMatchRegularExpression('/name="ai_gateway_key"[^>]*value="/', $html,
+            'حقلُ السرّ لا يحمل قيمةً — ولا القناعَ — فلا يعود مع الحفظ');
+
+        $this->actingAs($this->owner)->withSession(['stepup.ok_until' => now()->addMinutes(10)->timestamp])
+            ->post(route('settings.update'), ['ai_gateway_key' => '••••', 'dev_github_token' => '••••']);
+        $this->assertSame('sk-real-admin-778899', AiGateway::key(), 'حفظُ الشاشة بالقناع يُبقي المفتاحَ المحفوظ');
+    }
+
+    /** كلُّ مفتاحٍ حسّاسٍ في الكتالوج نوعُه `pass` — فلا يُرسَم سرٌّ حقلاً ظاهراً ثانيةً */
+    public function test_every_sensitive_setting_is_declared_as_a_password_field(): void
+    {
+        foreach (Settings::catalog() as $items) {
+            foreach ($items as $key => $meta) {
+                if (! empty($meta['sensitive'])) {
+                    $this->assertSame('pass', $meta['type'] ?? 'text', "$key حسّاسٌ فنوعُه pass");
+                }
+            }
+        }
+    }
+
+    public function test_a_key_that_is_not_an_sk_key_is_refused_and_the_saved_key_kept(): void
+    {
+        $this->seedCore();
+        $u = $this->actor(['aiAdmin' => 1]);
+        $this->freshStepUp($u);
+        $this->actingAs($u)->post('/admin/ai', ['url' => 'http://127.0.0.1:4000', 'key' => 'sk-real-admin-445566']);
+        $this->assertSame('sk-real-admin-445566', AiGateway::key());
+
+        $this->actingAs($u)->post('/admin/ai', ['url' => 'http://127.0.0.1:4000', 'key' => 'MyLoginPassword!2026'])
+            ->assertSessionHasErrors('key');
+        $this->assertSame('sk-real-admin-445566', AiGateway::key(), 'كلمةُ سرٍّ ملأها المتصفّحُ استبدلت المفتاح');
+
+        $this->actingAs($this->owner)->withSession(['stepup.ok_until' => now()->addMinutes(10)->timestamp])
+            ->post(route('settings.update'), ['ai_gateway_key' => 'MyLoginPassword!2026'])->assertSessionHasErrors();
+        $this->assertSame('sk-real-admin-445566', AiGateway::key(), 'شاشةُ الإعدادات العامّة استبدلت المفتاحَ بكلمة سرّ');
+    }
+
     /** وضبطُ مهلةٍ بلا مفتاحٍ لا يستدعي تصعيداً — الحارسُ على السرِّ لا على كلِّ حقل */
     public function test_saving_non_secret_fields_does_not_demand_step_up(): void
     {
