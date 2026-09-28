@@ -464,6 +464,7 @@
     "App\\Support\\Ai\\Reports\\PerformanceFacts",
     "App\\Support\\Ai\\Reports\\PerformanceIdentity",
     "App\\Support\\Ai\\Reports\\PerformancePeriod",
+    "App\\Support\\Ai\\Reports\\ProgressFromReports",
     "App\\Support\\Ai\\Reports\\ProjectReportDigest",
     "App\\Support\\Ai\\Routing\\AiProfiles",
     "App\\Support\\Ai\\Routing\\AiPurposes",
