@@ -86,6 +86,11 @@
         @endif
         {{-- الإقرار الموثَّق — يظهر للوحدات المسجَّلة في config/hub_acks.php وحدها --}}
         @include('partials.acks')
+        {{-- اقتراحاتُ الذكاء المفتوحة على هذا السجلّ — لمن يملك قرارَها وحدَه (ProposalService::openFor) --}}
+        @php $aiProps = \App\Support\Ai\Proposals\ProposalService::openFor(auth()->user(), $module, (string) $row->id, 5); @endphp
+        @foreach ($aiProps as $p)
+            @include('ai.proposals._item', ['p' => $p, 'ev' => \App\Support\Ai\Proposals\ProposalService::evidenceFor(auth()->user(), $p)])
+        @endforeach
         {{-- v2.123: خطاف مساحة عمل مخصصة للوحدة — لا أثر على وحدة بلا ملف مخصص.
              (Work OS · الطور D · WP-D.2 · §11) المشاريعُ تملك قشرةَ تبويبات: مركزُ
              قيادةٍ يُجمّع البطاقاتِ ويُلبِس البياناتِ والملفَّ والخطَّ الزمنيَّ والغرفَ

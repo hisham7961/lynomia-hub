@@ -63,6 +63,18 @@ class MorningController extends Controller
                 route('m.index', ['tasks', 'f' => ['assigneeId' => $uid]]), $myN);
         }
 
+        // ── اقتراحاتُ الذكاء بانتظار قرارك ── (ما تملك تعديلَه وحدَه — ProposalService::openFor)
+        $props = \App\Support\Ai\Proposals\ProposalService::openFor($u, null, null, 200);
+        if ($props->isNotEmpty()) {
+            $pt = \App\Support\Ai\Proposals\ProposalService::titles($props->take(8));
+            $add('💡', 'اقتراحات الذكاء بانتظارك', 'تغييراتٌ مقترحةٌ بدليلها — لا يتغيّر شيءٌ حتى تعتمدها',
+                $props->take(8)->map(fn ($p) => [
+                    't' => \App\Support\Ai\Proposals\ProposalService::label($p->kind) . ' · ' . ($pt[$p->module . ':' . $p->record_id] ?? ''),
+                    's' => ($p->current_value !== '' && $p->current_value !== null ? $p->current_value : '—') . ' ← ' . $p->proposed_value,
+                    'u' => route('m.show', [$p->module, $p->record_id]), 'tone' => 'wn']),
+                route('ai.proposals'), $props->count());
+        }
+
         // ── قرارات تنتظرك ──
         // **«تنتظر حسمك» تعني حسمَك أنت.** كان الشرطُ `approvals:v` وحدَها، فكلُّ
         // من يرى الموافقاتِ يُقال له إنّ عمليّاتٍ موقوفةٌ على اعتماده — ولو كانت

@@ -76,6 +76,10 @@ return [
                 ]],
                 // مهامّي وموافقاتي: منظورٌ «لي» يرتبط بفهرس الوحدة القائم (C7) — بيتُها الأساسيّ «العمل»
                 'tasks' => ['label' => 'مهامّي وموافقاتي', 'order' => 2, 'destinations' => [
+                    // صندوقُ اقتراحات الذكاء (ProposalService) — ما ينتظر قرارَك من تغييراتٍ مقترحة
+                    ['type' => 'center', 'center' => 'aiprop', 'importance' => 'secondary',
+                        'route_prefix' => 'ai.proposals', 'routes' => ['ai.proposals'],
+                        'synonyms' => ['ai proposals', 'اقتراحات', 'اقتراحات الذكاء', 'suggestions', 'مقترحات']],
                     ['type' => 'module', 'module' => 'tasks', 'importance' => 'secondary', 'perspective' => 'mine'],
                     ['type' => 'module', 'module' => 'approvals', 'importance' => 'secondary', 'perspective' => 'mine'],
                     ['type' => 'module', 'module' => 'issues', 'importance' => 'secondary', 'perspective' => 'mine'],

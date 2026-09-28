@@ -43,6 +43,13 @@ use Illuminate\Support\Facades\Route;
         ->whereUuid('id')->name('reports.performance.show');
     Route::post('reports/performance/{id}/refresh', [\App\Http\Controllers\Web\PerformanceReportController::class, 'refresh'])
         ->whereUuid('id')->middleware('throttle:6,10')->name('reports.performance.refresh');
+    // صندوقُ اقتراحات الذكاء (docs/ai-hub/47 §العمود أ) — الحرّاسُ في ProposalService: تعديلُ الوحدة
+    // + نطاقُ السجلّ + حجبُ الحقل، والعميلُ ٤٠٤. والقرارُ يكتب في سجلٍّ أعماليّ فيُخنَق.
+    Route::get('ai/proposals', [\App\Http\Controllers\Web\AiProposalController::class, 'index'])->name('ai.proposals');
+    Route::post('ai/proposals/{id}/apply', [\App\Http\Controllers\Web\AiProposalController::class, 'apply'])
+        ->whereUuid('id')->middleware('throttle:60,1')->name('ai.proposals.apply');
+    Route::post('ai/proposals/{id}/reject', [\App\Http\Controllers\Web\AiProposalController::class, 'reject'])
+        ->whereUuid('id')->middleware('throttle:60,1')->name('ai.proposals.reject');
     Route::middleware('throttle:60,1')->group(function () {
         Route::post('reports/review/{id}', [\App\Http\Controllers\Web\ReportsController::class, 'reviewAct'])->name('reports.review.act');
         // «حوّله إلى بلاغ» — المعوّقُ المبلَّغُ يصير التزاماً بمالكٍ وموعد (v2.558)
