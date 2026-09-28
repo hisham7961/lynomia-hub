@@ -3432,6 +3432,28 @@
         ]
     },
     {
+        "methods": "POST",
+        "uri": "reports/projects/{id}/understanding",
+        "name": "reports.projects.understand",
+        "action": "App\\Http\\Controllers\\Web\\UnderstandingController@refresh",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:6,10"
+        ]
+    },
+    {
+        "methods": "POST",
+        "uri": "reports/projects/{id}/suggestions/{sid}",
+        "name": "reports.projects.suggestion",
+        "action": "App\\Http\\Controllers\\Web\\UnderstandingController@suggestion",
+        "middleware": [
+            "web",
+            "auth",
+            "throttle:60,1"
+        ]
+    },
+    {
         "methods": "GET|HEAD",
         "uri": "followups",
         "name": "followups.mine",

@@ -99,8 +99,9 @@ class HubAutomation extends Command
         $pf = $this->employeePerformance();
         $px = $this->proposalsExpire();
         $ps = $this->projectSources();
+        $pu = $this->understanding();
 
-        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · تقارير: {$rr} تنبيهُ نقص · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة · المدقّق: {$au['opened']} نتيجةٌ جديدة، {$au['resolved']} زال شرطُها · العقلُ الثاني: {$br} مقطعاً مُضمَّناً · ملخّصاتُ المشاريع: {$rd} محدَّثاً · تحليلُ العهد: {$ci} صنفاً · تقاريرُ الأداء: {$pf} مولَّداً · اقتراحاتٌ منتهية: {$px} · مصادرُ المشاريع: {$ps['files']} ملفّاً و{$ps['sites']} موقعاً");
+        $this->info("المتكررات: {$g['docs']} مستند مولّد، {$g['manual']} تذكير يدوي · القواعد: {$a['hits']} تنبيه ({$a['rules']} قاعدة)، {$a['esc']} مُتصاعد، {$a['outbox']} رسالة صادرة · توقيعات: {$e} تذكير · عقود: {$c['expired']} انتهاء، {$c['drafts']} مسودة تجديد · ميزانيات: {$b} تنبيه · التزامات: {$o} متأخر · إشعارات: {$p} مُقلَّم · أهداف: {$k} محدَّث · حضور: {$w} غياب مختوم · تقارير: {$rr} تنبيهُ نقص · إشارات: {$s} تصرّفٌ يتيمٌ مُشذَّب · هوامش: {$m} لقطة · المدقّق: {$au['opened']} نتيجةٌ جديدة، {$au['resolved']} زال شرطُها · العقلُ الثاني: {$br} مقطعاً مُضمَّناً · ملخّصاتُ المشاريع: {$rd} محدَّثاً · تحليلُ العهد: {$ci} صنفاً · تقاريرُ الأداء: {$pf} مولَّداً · اقتراحاتٌ منتهية: {$px} · مصادرُ المشاريع: {$ps['files']} ملفّاً و{$ps['sites']} موقعاً · ملفّاتُ الفهم: {$pu} مبنيّاً");
 
         if (! $this->dry) \App\Support\Ops\Health::beat('automation', (int) round((microtime(true) - $t0) * 1000));
         return self::SUCCESS;
@@ -202,6 +203,20 @@ class HubAutomation extends Command
     }
 
     /** تحليلُ الذكاء لأصناف العهد (`custody.ai_insights`): ما تغيّرت حقائقُه فقط — ومعزولُ الفشل */
+    /** ملفُّ فهم المشروع واقتراحاتُه — لما تغيّرت مصادرُه أو مضى أسبوع (docs/ai-hub/47 §العمود ج) */
+    protected function understanding(): int
+    {
+        try {
+            if (! \App\Support\Ai\Understanding\ProjectUnderstanding::enabled()) return 0;
+
+            return (int) \App\Support\Ai\Understanding\ProjectUnderstanding::run($this->dry)['built'];
+        } catch (\Throwable $e) {
+            report($e);
+
+            return 0;
+        }
+    }
+
     /** مصادرُ فهم المشروع: نصُّ الملفّات الجديدة ولقطاتُ المواقع التي فات أوانُها (docs/ai-hub/47 §العمود ج) */
     protected function projectSources(): array
     {
